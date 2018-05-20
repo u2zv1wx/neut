@@ -1,0 +1,37 @@
+name:                lisp
+version:             0.1.0.0
+license:             GPL-3
+license-file:        LICENSE
+author:              "u2zv1wx"
+maintainer:          "u2zv1wx@protonmail.ch "
+
+extra-source-files:
+  - readme.org
+
+dependencies:
+- base >= 4.7 && < 5
+
+library:
+  source-dirs: src
+
+executables:
+  lisp:
+    main:                Main.hs
+    source-dirs:         main
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - lisp
+
+tests:
+  lisp-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - lisp
