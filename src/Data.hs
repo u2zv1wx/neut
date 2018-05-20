@@ -1,7 +1,8 @@
 module Data where
 
-newtype Symbol =
-  S String
+data Symbol
+  = S String
+  | Hole
   deriving (Show)
 
 -- positive symbol
@@ -31,43 +32,57 @@ data NegSym
 data Type
   = PosType PosType
   | NegType NegType
-  | Univ Int
   deriving (Show)
 
 -- positive type
 -- P ::= p
---     | [lift N]
---     | [forall x- N P]
+--     | {defined value}
+--     | {inverted form of defined computation}
+--     | [forall ((x1- N1) ... (xn- Nn)) P]
 --     | [switch x- N (r1 P1) ... (rn Pn)]
+--     | [branch N P]
 --     | (closure N)
+--     | positive
 data PosType
   = PosTypeSym PosSym
-  | CoLift NegType
-  | CoForAll NegSym
+  | ValueApp ValueType
+             [Type]
+  | InvCompApp CompType
+               [Type]
+  | CoForAll [NegSym]
              NegType
              PosType
   | CoForAllPat NegSym
                 NegType
                 [(Refutation, PosType)]
   | Closure NegType
+  | PosUniv Int
   deriving (Show)
 
 -- negative type
 -- N ::= n
---     | (lift P)
---     | (forall x+ P N)
+--     | {defined computation type}
+--     | {inverted form of defined value}
+--     | (forall ((x1+ P1) ... (xn+ Pn)) N)
 --     | (switch x+ P (a1 N1) ... (an Nn))
+--     | (branch P N)
 --     | [closure P]
+--     | [N T1 ... Tn]
+--     | negative
 data NegType
   = NegTypeSym
-  | Lift PosType
-  | ForAll PosSym
+  | CompApp CompType
+            [Type]
+  | InvValueApp ValueType
+                [Type]
+  | ForAll [PosSym]
            PosType
            NegType
-  | ForAllPat PosSym
-              PosType
-              [(Assertion, NegType)]
+  | Switch PosSym
+           PosType
+           [(Assertion, NegType)]
   | CoClosure PosType
+  | NegUniv Int
   deriving (Show)
 
 -- program
@@ -79,14 +94,15 @@ newtype Program =
 -- term
 -- t ::= v | e
 data Term
-  = Value V
-  | Expr E
+  = PosTerm V
+  | NegTerm E
   deriving (Show)
 
 -- positive term
 -- v ::= x
---     | {copattern}
---     | [lambda x v]
+--     | {pattern}
+--     | {pattern application}
+--     | [lambda [x1 ... xn] v]
 --     | [v e1 ... en]
 --     | [zeta x (r1 v1) ... (rn vn)]
 --     | [elim e v]
@@ -98,8 +114,9 @@ data Term
 --     | [ascribe v P]
 data V
   = VPosSym PosSym
-  | VPat (Cons Term)
-  | CoLam NegSym
+  | VConsApp Constructor
+             [Term]
+  | CoLam [NegSym]
           V
   | CoApp V
           [E]
@@ -116,7 +133,7 @@ data V
 -- negative term
 -- e ::= x
 --     | {pattern}
---     | (lambda x e)
+--     | (lambda (x1 ... xn) e)
 --     | (e v1 ... vn)
 --     | (zeta x (a1 e1) ... (an en))
 --     | (elim v e)
@@ -128,8 +145,9 @@ data V
 --     | [ascribe e N]
 data E
   = ENegSym NegSym
-  | EPat (Cons Term)
-  | Lam PosSym
+  | EConsApp Constructor
+             [Term]
+  | Lam [PosSym]
         E
   | App E
         [V]
@@ -151,8 +169,8 @@ data Cons a =
 
 -- pattern ::= a | r
 data Pat
-  = Assertion Assertion
-  | Refutation Refutation
+  = PosPat Assertion
+  | NegPat Refutation
   deriving (Show)
 
 -- assertion pattern
@@ -161,7 +179,8 @@ data Pat
 --     | {etc.}
 data Assertion
   = PosAtom PosSym
-  | PosCons (Cons Pat)
+  | PosConsApp Constructor
+               [Pat]
   deriving (Show)
 
 -- refutation pattern
@@ -170,17 +189,50 @@ data Assertion
 --     | {etc.}
 data Refutation
   = NegAtom NegSym
-  | NegCons (Cons Pat)
+  | NegConsApp Constructor
+               [Pat]
   deriving (Show)
 
 inclusionA :: Assertion -> V
 inclusionA (PosAtom s) = VPosSym s
-inclusionA (PosCons (Make name args)) = VPat (Make name (map inclusionPat args))
+inclusionA (PosConsApp c args) = VConsApp c (map inclusionPat args)
 
 inclusionR :: Refutation -> E
 inclusionR (NegAtom s) = ENegSym s
-inclusionR (NegCons (Make name args)) = EPat (Make name (map inclusionPat args))
+inclusionR (NegConsApp c args) = EConsApp c (map inclusionPat args)
 
 inclusionPat :: Pat -> Term
-inclusionPat (Assertion a) = Value (inclusionA a)
-inclusionPat (Refutation r) = Expr (inclusionR r)
+inclusionPat (PosPat a) = PosTerm (inclusionA a)
+inclusionPat (NegPat r) = NegTerm (inclusionR r)
+
+data TypeSpec = TypeSpec
+  { specName :: Symbol
+  , specArg :: [(Symbol, Type)]
+  } deriving (Show)
+
+-- value-type definition
+-- valuedef ::= (value s (x1 t1) ... (xn tn))
+newtype ValueType =
+  ValueType TypeSpec
+  deriving (Show)
+
+-- computation-type definition
+-- compdef ::= (computation s (x1 t1) ... (xn tn))
+newtype CompType =
+  CompType TypeSpec
+  deriving (Show)
+
+-- constructor definition
+-- consdef ::= (constructor s (x1 t1) ... (xn tn) t)
+data Constructor = Constructor
+  { name :: Symbol
+  , arg :: [(Symbol, Type)]
+  , cod :: Type
+  } deriving (Show)
+
+data Env = Env
+  { i :: Int
+  , valueTypeEnv :: [ValueType]
+  , compTypeEnv :: [CompType]
+  , consEnv :: [Constructor]
+  } deriving (Show)
