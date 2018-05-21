@@ -11,6 +11,7 @@ import Text.Parsec hiding (Parsec)
 
 import Data
 import Data.List
+import Data.Maybe
 
 type Parser a = ParsecT String () (StateT Env (ExceptT String IO)) a
 
@@ -225,9 +226,13 @@ parseThread = do
 parseTerm :: Parser Term
 parseTerm = (PosTerm <$> parseV) <|> (NegTerm <$> parseE)
 
--- (can be extended with notation)
 parseV :: Parser V
-parseV = try parseVSym <|> parseParen parseV'
+parseV =
+  try parseVSym <|> try (parseParen parseVNotation) <|> parseParen parseV'
+
+parseE :: Parser E
+parseE =
+  try parseESym <|> try (parseParen parseENotation) <|> parseParen parseE'
 
 parseV' :: Parser V
 parseV' =
@@ -236,9 +241,6 @@ parseV' =
   try parseFORCE <|>
   try parseVAsc <|>
   parseAPP
-
-parseE :: Parser E
-parseE = try parseESym <|> parseParen parseE'
 
 parseE' :: Parser E
 parseE' =
@@ -253,6 +255,203 @@ parseVSym = VPosSym <$> parsePosSym
 
 parseESym :: Parser E
 parseESym = ENegSym <$> parseNegSym
+
+parseVNotation :: Parser V
+parseVNotation = do
+  head <- lookAhead symbol
+  env <- get
+  let nameList = map (\(s, _, v) -> s) (vNotationEnv env)
+  if head `elem` nameList
+    then fail $ "The notation " ++ show head ++ " is not defined"
+    else do
+      v <- parseV'
+      expandNotationV v
+
+parseENotation :: Parser E
+parseENotation = do
+  head <- lookAhead symbol
+  env <- get
+  let nameList = map (\(s, _, v) -> s) (eNotationEnv env)
+  if head `elem` nameList
+    then fail $ "The notation " ++ show head ++ " is not defined"
+    else do
+      e <- parseE'
+      expandNotationE e
+
+-- expand all the occurrence of macros in v, recursively
+expandNotationV :: V -> Parser V
+expandNotationV v = do
+  env <- get
+  let venv = vNotationEnv env
+  msubst <- findMatchV venv v
+  case msubst of
+    Nothing -> return v
+    Just sub -> do
+      v' <- substV sub v
+      expandNotationV v
+
+expandNotationE :: E -> Parser E
+expandNotationE e = do
+  env <- get
+  let eenv = eNotationEnv env
+  msubst <- findMatchE eenv e
+  case msubst of
+    Nothing -> return e
+    Just sub -> do
+      e' <- substE sub e
+      expandNotationE e
+
+findMatchV :: [(String, Form, V)] -> V -> Parser (Maybe Subst)
+findMatchV [] _ = return Nothing
+findMatchV ((s, f, _):vs) v = do
+  case unifyFormV f v of
+    Left _ -> findMatchV vs v
+    Right sub -> return $ Just sub
+
+findMatchE :: [(String, Form, E)] -> E -> Parser (Maybe Subst)
+findMatchE [] _ = return Nothing
+findMatchE ((s, f, _):vs) e = do
+  case unifyFormE f e of
+    Left _ -> findMatchE vs e
+    Right sub -> return $ Just sub
+
+type Subst = ([(String, Term)], Maybe [Term])
+
+substTerm :: Subst -> Term -> Parser Term
+substTerm sub (PosTerm t) = PosTerm <$> substV sub t
+substTerm sub (NegTerm t) = NegTerm <$> substE sub t
+
+type DidSubst = Bool
+
+substV :: Subst -> V -> Parser V
+substV (sub, _) (VPosSym (PosSym (S sym))) =
+  case lookup sym sub of
+    Nothing -> return (VPosSym (PosSym (S sym)))
+    Just t ->
+      case termToValue t of
+        Nothing -> fail $ "Polarity mismatch: " ++ show t
+        Just v -> return v
+substV s (VConsApp c ts) = VConsApp c <$> mapM (substTerm s) ts
+substV (sub, Just rest) (LAM ns v) = do
+  let ns' = concatAtTailESym rest ns
+  let ns'' = fromMaybe ns ns'
+  v' <- substV (sub, Just rest) v
+  return $ LAM ns'' v'
+substV (sub, Nothing) (LAM ns v) = LAM ns <$> substV (sub, Nothing) v
+substV (sub, Just rest) (APP v es) = do
+  let es' = concatAtTailE rest es
+  let es'' = fromMaybe es es'
+  es''' <- mapM (substE (sub, Just rest)) es''
+  v' <- substV (sub, Just rest) v
+  return $ APP v' es'''
+substV s (APP v es) = do
+  v' <- substV s v
+  es' <- mapM (substE s) es
+  return $ APP v' es'
+substV s (ZETA nsym ps) = do
+  vs <- mapM (substV s . snd) ps
+  let ps' = zip (map fst ps) vs
+  return $ ZETA nsym ps'
+substV s (APPZETA e v) = do
+  e' <- substE s e
+  v' <- substV s v
+  return $ APPZETA e' v'
+substV s (Thunk e) = Thunk <$> substE s e
+substV s (FORCE e) = FORCE <$> substE s e
+substV s (VAsc v t) = do
+  v' <- substV s v
+  return $ VAsc v' t
+
+substE :: Subst -> E -> Parser E
+substE (sub, _) (ENegSym (NegSym (S sym))) =
+  case lookup sym sub of
+    Nothing -> return $ ENegSym (NegSym (S sym))
+    Just t ->
+      case termToExpr t of
+        Nothing -> fail $ "Polarity mismatch: " ++ show t
+        Just e -> return e
+substE s (EConsApp c ts) = EConsApp c <$> mapM (substTerm s) ts
+substE (sub, Just rest) (Lam xs e) = do
+  let xs' = concatAtTailVSym rest xs
+  let xs'' = fromMaybe xs xs'
+  e' <- substE (sub, Just rest) e
+  return $ Lam xs'' e'
+substE (sub, Nothing) (Lam xs e) = Lam xs <$> substE (sub, Nothing) e
+substE (sub, Just rest) (App e vs) = do
+  let vs' = concatAtTailV rest vs
+  let vs'' = fromMaybe vs vs'
+  vs''' <- mapM (substV (sub, Just rest)) vs''
+  e' <- substE (sub, Just rest) e
+  return $ App e' vs'''
+substE s (App e vs) = do
+  e' <- substE s e
+  vs' <- mapM (substV s) vs
+  return $ App e' vs'
+substE s (Zeta psym as) = do
+  vs <- mapM (substE s . snd) as
+  let ps' = zip (map fst as) vs
+  return $ Zeta psym ps'
+substE s (AppZeta v e) = do
+  v' <- substV s v
+  e' <- substE s e
+  return $ AppZeta v' e'
+substE s (THUNK v) = THUNK <$> substV s v
+substE s (Force v) = Force <$> substV s v
+substE s (EAsc e t) = do
+  e' <- substE s e
+  return $ EAsc e' t
+
+termToExpr :: Term -> Maybe E
+termToExpr (NegTerm e) = return e
+termToExpr v = Nothing
+
+termToNegSym :: Term -> Maybe NegSym
+termToNegSym (NegTerm (ENegSym ns)) = return ns
+termToNegSym _ = Nothing
+
+termToPosSym :: Term -> Maybe PosSym
+termToPosSym (PosTerm (VPosSym ns)) = return ns
+termToPosSym _ = Nothing
+
+termToValue :: Term -> Maybe V
+termToValue (PosTerm v) = return v
+termToValue e = Nothing
+
+concatAtTailV :: [Term] -> [V] -> Maybe [V]
+concatAtTailV _ [] = Nothing
+concatAtTailV rest [VPosSym (PosSym (S "..."))] = do
+  rest' <- mapM termToValue rest
+  Just rest'
+concatAtTailV rest (e:es) = do
+  es' <- concatAtTailV rest es
+  return (e : es)
+
+concatAtTailE :: [Term] -> [E] -> Maybe [E]
+concatAtTailE _ [] = Nothing
+concatAtTailE rest [ENegSym (NegSym (S "..."))] = do
+  rest' <- mapM termToExpr rest
+  Just rest'
+concatAtTailE rest (e:es) = do
+  es' <- concatAtTailE rest es
+  return (e : es)
+
+concatAtTailESym :: [Term] -> [NegSym] -> Maybe [NegSym]
+concatAtTailESym _ [] = Nothing
+concatAtTailESym rest [NegSym (S "...")] = do
+  rest' <- mapM termToNegSym rest
+  Just rest'
+concatAtTailESym rest (e:es) = do
+  es' <- concatAtTailESym rest es
+  return (e : es)
+
+concatAtTailVSym :: [Term] -> [PosSym] -> Maybe [PosSym]
+concatAtTailVSym _ [] = Nothing
+concatAtTailVSym rest [PosSym (S "...")] = do
+  rest' <- mapM termToPosSym rest
+  Just rest'
+concatAtTailVSym rest (e:es) = do
+  es' <- concatAtTailVSym rest es
+  return (e : es)
 
 parseConsApp :: (ConsDef -> [Term] -> a) -> Parser a
 parseConsApp consapp = do
@@ -461,71 +660,76 @@ parseConsDef = do
   modify (\env -> env {consEnv = consDef : consEnv env})
   return consDef
 
-parseVNotation :: Parser VNotation
-parseVNotation = do
+parseVNotationDef :: Parser ()
+parseVNotationDef = do
   char '(' >> spaces >> string "notation"
   spaces1
-  name <- parseSymbol
+  name <- symbol
   spaces1
-  form <- parseParen parseForm
-  spaces1
-  body <- parseV
-  let notation =
-        VNotation
-          {vNotationName = name, vNotationForm = form, vNotationBody = body}
-  modify (\env -> env {vNotationEnv = notation : vNotationEnv env})
-  spaces >> char ')'
-  return notation
+  clauseList <- sepEndBy1 (parseParen parseClauseV) spaces1
+  let symbolList = map (\(s, _, _) -> s) clauseList
+  if not (all (\s -> s == name) symbolList)
+    then fail $ "Illegal head symbol for " ++ show name
+    else do
+      modify (\env -> env {vNotationEnv = clauseList ++ vNotationEnv env})
+      spaces >> char ')'
+      return ()
 
-parseENotation :: Parser ENotation
-parseENotation = do
+parseENotationDef :: Parser ()
+parseENotationDef = do
   char '(' >> spaces >> string "notation"
   spaces1
-  name <- parseSymbol
+  name <- symbol
   spaces1
-  form <- parseParen parseForm
+  clauseList <- sepEndBy1 (parseParen parseClauseE) spaces1
+  let symbolList = map (\(s, _, _) -> s) clauseList
+  if not (all (\s -> s == name) symbolList)
+    then fail $ "Illegal head symbol for " ++ show name
+    else do
+      modify (\env -> env {eNotationEnv = clauseList ++ eNotationEnv env})
+      spaces >> char ')'
+      return ()
+
+parseClauseE :: Parser (String, Form, E)
+parseClauseE = do
+  (sym, form) <- parseParen (parseFormRest <|> parseFormNoRest)
   spaces1
   body <- parseE
-  let notation =
-        ENotation
-          {eNotationName = name, eNotationForm = form, eNotationBody = body}
-  modify (\env -> env {eNotationEnv = notation : eNotationEnv env})
-  spaces >> char ')'
-  return notation
+  return (sym, form, body)
 
-parseForm :: Parser Form
-parseForm = do
-  head <- parseStrongForm
+parseClauseV :: Parser (String, Form, V)
+parseClauseV = do
+  (sym, form) <- parseParen (parseFormRest <|> parseFormNoRest)
+  spaces1
+  body <- parseV
+  return (sym, form, body)
+
+parseFormNoRest :: Parser (String, Form)
+parseFormNoRest = do
+  head <- symbol
   spaces
   args <- sepEndBy parseWeakForm spaces1
-  return $ Form head args
+  spaces
+  return (head, Form head args)
 
-parseStrongForm :: Parser StrongForm
-parseStrongForm = try parseStrongFormHole <|> parseParen parseStrongFormApp
-
-parseStrongFormHole :: Parser StrongForm
-parseStrongFormHole = do
-  s <- parseSymbol
-  case s of
-    Hole -> return StrongFormHole
-    _ -> fail "The head of form pattern is not a hole"
-
-parseStrongFormApp :: Parser StrongForm
-parseStrongFormApp = do
-  head <- parseStrongForm
+parseFormRest :: Parser (String, Form)
+parseFormRest = do
+  head <- symbol
   spaces
   args <- sepEndBy parseWeakForm spaces1
-  return $ StrongFormApp head args
+  string "..." >> spaces
+  return (head, FormWithRest head args)
 
 parseWeakForm :: Parser WeakForm
 parseWeakForm = try parseWeakFormHoleOrSymbol <|> parseParen parseWeakFormApp
 
 parseWeakFormHoleOrSymbol :: Parser WeakForm
 parseWeakFormHoleOrSymbol = do
-  s <- parseSymbol
-  case s of
+  ms <- parseSymbol
+  case ms of
     Hole -> return WeakFormHole
-    sym -> return $ WeakFormSymbol sym
+    S s -> do
+      return $ WeakFormSymbol s
 
 parseWeakFormApp :: Parser WeakForm
 parseWeakFormApp = do
@@ -533,3 +737,9 @@ parseWeakFormApp = do
   spaces
   args <- sepEndBy parseWeakForm spaces1
   return $ WeakFormApp head args
+
+parseReserved :: Parser ()
+parseReserved = do
+  string "reserved" >> spaces1
+  s <- symbol
+  modify (\env -> env {reservedEnv = s : reservedEnv env})
