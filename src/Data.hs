@@ -215,18 +215,39 @@ data ConsDef = ConsDef
   , consCod :: Type
   } deriving (Show)
 
--- (_ e1 ... en) ((_ x e1 e2) e3)
-data Form
-  = FormHole
-  | FormApp Form
-            [Symbol]
+-- strong-form ::= _ | (strong-form weak-form1 ... weak-formn)
+data StrongForm
+  = StrongFormHole
+  | StrongFormApp StrongForm
+                  [WeakForm]
   deriving (Show)
 
--- (notation name (pattern body))
-data Notation = Notation
-  { notationName :: Symbol
-  , notationPattern :: Form
-  , notationBody :: Term
+-- weak-form ::= _ | x | (weak-form weak-form1 .... weak-formn)
+data WeakForm
+  = WeakFormHole
+  | WeakFormSymbol Symbol
+  | WeakFormApp WeakForm
+                [WeakForm]
+  deriving (Show)
+
+-- form ::= strong-form | (strong-form weak-form1 ... weak-formn)
+data Form =
+  Form StrongForm
+       [WeakForm]
+  deriving (Show)
+
+-- v-notation ::= (notation name form body+)
+data VNotation = VNotation
+  { vNotationName :: Symbol
+  , vNotationForm :: Form
+  , vNotationBody :: V
+  } deriving (Show)
+
+-- e-notation ::= (notation name form body-)
+data ENotation = ENotation
+  { eNotationName :: Symbol
+  , eNotationForm :: Form
+  , eNotationBody :: E
   } deriving (Show)
 
 data Env = Env
@@ -234,13 +255,20 @@ data Env = Env
   , valueTypeEnv :: [ValueDef]
   , compTypeEnv :: [CompDef]
   , consEnv :: [ConsDef]
-  , notationEnv :: [Notation]
+  , vNotationEnv :: [VNotation]
+  , eNotationEnv :: [ENotation]
   } deriving (Show)
 
 initialEnv :: Env
 initialEnv =
   Env
-    {i = 0, valueTypeEnv = [], compTypeEnv = [], consEnv = [], notationEnv = []}
+    { i = 0
+    , valueTypeEnv = []
+    , compTypeEnv = []
+    , consEnv = []
+    , vNotationEnv = []
+    , eNotationEnv = []
+    }
 
 type WithEnv a = StateT Env (ExceptT String IO) a
 
