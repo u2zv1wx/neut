@@ -1,14 +1,20 @@
 module Data where
 
+import Control.Monad.Except
+import Control.Monad.Identity
+import Control.Monad.State
+import Control.Monad.Trans.Except
+
+import qualified Text.Show.Pretty as Pr
+
 data Symbol
   = S String
   | Hole
-  deriving (Show)
+  deriving (Show, Eq)
 
 -- positive symbol
 -- x+ ::= symbol+
 --      | (ascribe x+ P)
---      | [ascribe x+ P]
 data PosSym
   = PosSym Symbol
   | PosSymAsc PosSym
@@ -18,7 +24,6 @@ data PosSym
 -- negative symbol
 -- x- ::= symbol-
 --      | (ascribe x- N)
---      | [ascribe x- N]
 data NegSym
   = NegSym Symbol
   | NegSymAsc NegSym
@@ -28,7 +33,6 @@ data NegSym
 -- type
 -- T ::= P
 --     | N
---     | (universe i)
 data Type
   = PosType PosType
   | NegType NegType
@@ -38,25 +42,23 @@ data Type
 -- P ::= p
 --     | {defined value}
 --     | {inverted form of defined computation}
---     | [forall ((x1- N1) ... (xn- Nn)) P]
---     | [switch x- N (r1 P1) ... (rn Pn)]
---     | [branch N P]
+--     | (FORALL ((x1- N1) ... (xn- Nn)) P)
+--     | (SWITCH x- N (r1 P1) ... (rn Pn))
 --     | (closure N)
 --     | positive
 data PosType
   = PosTypeSym PosSym
-  | ValueApp ValueType
+  | ValueApp ValueDef
              [Type]
-  | InvCompApp CompType
-               [Type]
-  | CoForAll [NegSym]
-             NegType
-             PosType
-  | CoForAllPat NegSym
-                NegType
-                [(Refutation, PosType)]
+  | CoCompApp CompDef
+              [Type]
+  | FORALL [(NegSym, NegType)]
+           PosType
+  | SWITCH NegSym
+           NegType
+           [(Refutation, PosType)]
   | Closure NegType
-  | PosUniv Int
+  | PosUniv
   deriving (Show)
 
 -- negative type
@@ -65,24 +67,21 @@ data PosType
 --     | {inverted form of defined value}
 --     | (forall ((x1+ P1) ... (xn+ Pn)) N)
 --     | (switch x+ P (a1 N1) ... (an Nn))
---     | (branch P N)
---     | [closure P]
---     | [N T1 ... Tn]
+--     | (CLOSURE P)
 --     | negative
 data NegType
-  = NegTypeSym
-  | CompApp CompType
+  = NegTypeSym NegSym
+  | CompApp CompDef
             [Type]
-  | InvValueApp ValueType
-                [Type]
-  | ForAll [PosSym]
-           PosType
+  | CoValueApp ValueDef
+               [Type]
+  | ForAll [(PosSym, PosType)]
            NegType
   | Switch PosSym
            PosType
            [(Assertion, NegType)]
-  | CoClosure PosType
-  | NegUniv Int
+  | CLOSURE PosType
+  | NegUniv
   deriving (Show)
 
 -- program
@@ -102,32 +101,30 @@ data Term
 -- v ::= x
 --     | {pattern}
 --     | {pattern application}
---     | [lambda [x1 ... xn] v]
---     | [v e1 ... en]
---     | [zeta x (r1 v1) ... (rn vn)]
---     | [elim e v]
+--     | (LAMBDA (x1 ... xn) v)
+--     | (v e1 ... en)
+--     | (ZETA x (r1 v1) ... (rn vn))
+--     | (ELIM e v)
 --     | (thunk e)
---     | [force e]
+--     | (FORCE e)
 --     | (quote e)
---     | [unquote e]
 --     | (ascribe v P)
---     | [ascribe v P]
 data V
   = VPosSym PosSym
-  | VConsApp Constructor
+  | VConsApp ConsDef
              [Term]
-  | CoLam [NegSym]
-          V
-  | CoApp V
-          [E]
-  | CoZeta NegSym
-           [(Refutation, V)]
-  | CoAppZeta E
-              V
+  | LAM [NegSym]
+        V
+  | APP V
+        [E]
+  | ZETA NegSym
+         [(Refutation, V)]
+  | APPZETA E
+            V
   | Thunk E
-  | CoForce E
-  | CoAsc V
-          PosType
+  | FORCE E
+  | VAsc V
+         PosType
   deriving (Show)
 
 -- negative term
@@ -137,15 +134,13 @@ data V
 --     | (e v1 ... vn)
 --     | (zeta x (a1 e1) ... (an en))
 --     | (elim v e)
---     | [thunk v]
+--     | (THUNK v)
 --     | (force v)
---     | [quote v]
 --     | (unquote v)
 --     | (ascribe e N)
---     | [ascribe e N]
 data E
   = ENegSym NegSym
-  | EConsApp Constructor
+  | EConsApp ConsDef
              [Term]
   | Lam [PosSym]
         E
@@ -155,16 +150,10 @@ data E
          [(Assertion, E)]
   | AppZeta V
             E
-  | CoThunk V
+  | THUNK V
   | Force V
-  | Asc E
-        NegType
-  deriving (Show)
-
--- constructor
-data Cons a =
-  Make Symbol
-       [a]
+  | EAsc E
+         NegType
   deriving (Show)
 
 -- pattern ::= a | r
@@ -179,7 +168,7 @@ data Pat
 --     | {etc.}
 data Assertion
   = PosAtom PosSym
-  | PosConsApp Constructor
+  | PosConsApp ConsDef
                [Pat]
   deriving (Show)
 
@@ -189,7 +178,7 @@ data Assertion
 --     | {etc.}
 data Refutation
   = NegAtom NegSym
-  | NegConsApp Constructor
+  | NegConsApp ConsDef
                [Pat]
   deriving (Show)
 
@@ -205,34 +194,64 @@ inclusionPat :: Pat -> Term
 inclusionPat (PosPat a) = PosTerm (inclusionA a)
 inclusionPat (NegPat r) = NegTerm (inclusionR r)
 
-data TypeSpec = TypeSpec
+data TypeDef = TypeDef
   { specName :: Symbol
   , specArg :: [(Symbol, Type)]
   } deriving (Show)
 
 -- value-type definition
 -- valuedef ::= (value s (x1 t1) ... (xn tn))
-newtype ValueType =
-  ValueType TypeSpec
-  deriving (Show)
+type ValueDef = TypeDef
 
 -- computation-type definition
 -- compdef ::= (computation s (x1 t1) ... (xn tn))
-newtype CompType =
-  CompType TypeSpec
-  deriving (Show)
+type CompDef = TypeDef
 
 -- constructor definition
--- consdef ::= (constructor s (x1 t1) ... (xn tn) t)
-data Constructor = Constructor
-  { name :: Symbol
-  , arg :: [(Symbol, Type)]
-  , cod :: Type
+-- consdef ::= (constructor s ((x1 t1) ... (xn tn)) t)
+data ConsDef = ConsDef
+  { consName :: Symbol
+  , consArg :: [(Symbol, Type)]
+  , consCod :: Type
+  } deriving (Show)
+
+-- (_ e1 ... en) ((_ x e1 e2) e3)
+data Form
+  = FormHole
+  | FormApp Form
+            [Symbol]
+  deriving (Show)
+
+-- (notation name (pattern body))
+data Notation = Notation
+  { notationName :: Symbol
+  , notationPattern :: Form
+  , notationBody :: Term
   } deriving (Show)
 
 data Env = Env
   { i :: Int
-  , valueTypeEnv :: [ValueType]
-  , compTypeEnv :: [CompType]
-  , consEnv :: [Constructor]
+  , valueTypeEnv :: [ValueDef]
+  , compTypeEnv :: [CompDef]
+  , consEnv :: [ConsDef]
+  , notationEnv :: [Notation]
   } deriving (Show)
+
+initialEnv :: Env
+initialEnv =
+  Env
+    {i = 0, valueTypeEnv = [], compTypeEnv = [], consEnv = [], notationEnv = []}
+
+type WithEnv a = StateT Env (ExceptT String IO) a
+
+runWithEnv :: WithEnv a -> Env -> IO (Either String (a, Env))
+runWithEnv c env = runExceptT (runStateT c env)
+
+evalWithEnv :: (Show a) => WithEnv a -> Env -> IO ()
+evalWithEnv c env = do
+  x <- runWithEnv c env
+  case x of
+    Left err -> putStrLn err
+    Right (y, env) -> do
+      putStrLn $ Pr.ppShow y
+      putStrLn $ Pr.ppShow env

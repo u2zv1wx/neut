@@ -10,6 +10,10 @@ extra-source-files:
 
 dependencies:
 - base >= 4.7 && < 5
+- pretty-show
+- parsec
+- mtl
+- transformers
 
 library:
   source-dirs: src
