@@ -295,6 +295,7 @@ data Env = Env
   , vNotationEnv :: [(String, Form, V)]
   , eNotationEnv :: [(String, Form, E)]
   , reservedEnv :: [String]
+  , termEnv :: [Term]
   } deriving (Show)
 
 initialEnv :: Env
@@ -307,6 +308,7 @@ initialEnv =
     , vNotationEnv = []
     , eNotationEnv = []
     , reservedEnv = []
+    , termEnv = []
     }
 
 type WithEnv a = StateT Env (ExceptT String IO) a

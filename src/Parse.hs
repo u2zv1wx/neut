@@ -2,6 +2,7 @@ module Parse
   ( readExpr
   ) where
 
+import Control.Monad (void)
 import Control.Monad.Except
 import Control.Monad.Identity
 import Control.Monad.State
@@ -15,7 +16,7 @@ import Data.Maybe
 
 type Parser a = ParsecT String () (StateT Env (ExceptT String IO)) a
 
-readExpr :: String -> String -> WithEnv Program
+readExpr :: String -> String -> WithEnv ()
 readExpr top input = do
   env <- get
   t <- runParserT parseProgram () top input
@@ -31,7 +32,7 @@ readExpr' par top input = do
     Right p -> return p
 
 symbol :: Parser String
-symbol = many1 (noneOf "()[] ")
+symbol = many1 (noneOf "()[] \n")
 
 spaces1 :: Parser ()
 spaces1 = skipMany1 space
@@ -74,7 +75,7 @@ parseNegAscSym =
   parseParen $ parseAscSym (NegSym <$> parseSymbol) parseNegType NegSymAsc
 
 parseType :: Parser Type
-parseType = (PosType <$> parsePosType) <|> (NegType <$> parseNegType)
+parseType = try (PosType <$> parsePosType) <|> (NegType <$> parseNegType)
 
 parsePosType :: Parser PosType
 parsePosType =
@@ -88,46 +89,41 @@ parseNegType =
 
 parsePosType' :: Parser PosType
 parsePosType' =
-  parseValueApp <|> parseCoCompApp <|> parseFORALL <|> parseSWITCH <|>
-  parseClosure
+  try parseValueApp <|> try parseFORALL <|> try parseSWITCH <|> parseClosure
 
 parseNegType' :: Parser NegType
 parseNegType' =
-  (NegTypeSym <$> parseNegSym) <|> parseCoValueApp <|> parseCompApp <|>
-  parseForAll <|>
-  parseSwitch <|>
-  parseCLOSURE
+  try parseCompApp <|> try parseForAll <|> try parseSwitch <|> parseCLOSURE
 
 parseTConsApp :: (Env -> [TypeDef]) -> Parser (TypeDef, [Type])
 parseTConsApp f = do
   s <- parseSymbol
   env <- get
   case find (\def -> specName def == s) (f env) of
-    Nothing -> fail $ "The value type " ++ show s ++ " is not defined"
+    Nothing -> fail $ "The type " ++ show s ++ " is not defined"
     Just s -> do
+      spaces
       args <- sepEndBy parseType spaces1
       return (s, args)
 
 parseValueApp :: Parser PosType
 parseValueApp = do
-  (v, args) <- parseParen (parseTConsApp valueTypeEnv)
+  (v, args) <- parseTConsApp valueTypeEnv
   return $ ValueApp v args
 
-parseCoValueApp :: Parser NegType
-parseCoValueApp = do
-  (v, args) <- parseParen (parseTConsApp valueTypeEnv)
-  return $ CoValueApp v args
-
+-- parseCoValueApp :: Parser NegType
+-- parseCoValueApp = do
+--   (v, args) <- parseTConsApp valueTypeEnv
+--   return $ CoValueApp v args
 parseCompApp :: Parser NegType
 parseCompApp = do
   (e, args) <- parseTConsApp compTypeEnv
   return $ CompApp e args
 
-parseCoCompApp :: Parser PosType
-parseCoCompApp = do
-  (e, args) <- parseTConsApp compTypeEnv
-  return $ CoCompApp e args
-
+-- parseCoCompApp :: Parser PosType
+-- parseCoCompApp = do
+--   (e, args) <- parseTConsApp compTypeEnv
+--   return $ CoCompApp e args
 parseForAll :: Parser NegType
 parseForAll = do
   string "forall"
@@ -215,13 +211,21 @@ parsePosUniv = string "positive" >> return PosUniv
 parseNegUniv :: Parser NegType
 parseNegUniv = string "negative" >> return NegUniv
 
-parseProgram :: Parser Program
-parseProgram = Thread <$> sepEndBy1 (parseParen parseThread) spaces1
+parseProgram :: Parser ()
+parseProgram = void $ sepEndBy1 (parseParen parseProgram') spaces1
 
-parseThread :: Parser Term
+parseProgram' :: Parser ()
+parseProgram' =
+  try parseThread <|> try parseValueDef <|> try parseCompDef <|>
+  try parseConsDef <|>
+  try parseNotationDef <|>
+  parseReserve
+
+parseThread :: Parser ()
 parseThread = do
   string "thread" >> spaces1
-  parseTerm
+  t <- parseTerm
+  modify (\env -> env {termEnv = t : termEnv env})
 
 parseTerm :: Parser Term
 parseTerm = (PosTerm <$> parseV) <|> (NegTerm <$> parseE)
@@ -303,14 +307,14 @@ expandNotationE e = do
 
 findMatchV :: [(String, Form, V)] -> V -> Parser (Maybe Subst)
 findMatchV [] _ = return Nothing
-findMatchV ((s, f, _):vs) v = do
+findMatchV ((s, f, _):vs) v =
   case unifyFormV f v of
     Left _ -> findMatchV vs v
     Right sub -> return $ Just sub
 
 findMatchE :: [(String, Form, E)] -> E -> Parser (Maybe Subst)
 findMatchE [] _ = return Nothing
-findMatchE ((s, f, _):vs) e = do
+findMatchE ((s, f, _):vs) e =
   case unifyFormE f e of
     Left _ -> findMatchE vs e
     Right sub -> return $ Just sub
@@ -622,84 +626,80 @@ parseNegConsApp = do
 parseDefArg :: Parser (Symbol, Type)
 parseDefArg = parsePair parseSymbol parseType
 
-parseValueDef :: Parser ValueDef
+parseValueDef :: Parser ()
 parseValueDef =
   parseDef
     "value"
     (\def -> modify (\env -> env {valueTypeEnv = def : valueTypeEnv env}))
 
-parseCompDef :: Parser CompDef
+parseCompDef :: Parser ()
 parseCompDef =
   parseDef
     "computation"
     (\def -> modify (\env -> env {compTypeEnv = def : compTypeEnv env}))
 
-parseDef :: String -> (TypeDef -> Parser ()) -> Parser TypeDef
+parseDef :: String -> (TypeDef -> Parser ()) -> Parser ()
 parseDef name updater = do
-  char '(' >> spaces >> string name
+  string name
   spaces1
   s <- parseSymbol
   spaces
   args <- sepEndBy (parseParen parseDefArg) spaces1
-  spaces >> char ')'
-  let def = TypeDef {specName = s, specArg = args}
-  updater def
-  return def
+  updater $ TypeDef {specName = s, specArg = args}
 
-parseConsDef :: Parser ConsDef
+parseConsDef :: Parser ()
 parseConsDef = do
-  char '(' >> spaces >> string "constructor"
+  string "constructor"
   spaces1
   name <- parseSymbol
   spaces1
   args <- parseParen $ sepEndBy (parseParen parseDefArg) spaces1
   spaces
   cod <- parseType
-  spaces >> char ')'
   let consDef = ConsDef {consName = name, consArg = args, consCod = cod}
   modify (\env -> env {consEnv = consDef : consEnv env})
-  return consDef
+
+parseNotationDef :: Parser ()
+parseNotationDef = try parseVNotationDef <|> parseENotationDef
 
 parseVNotationDef :: Parser ()
 parseVNotationDef = do
-  char '(' >> spaces >> string "notation"
+  string "notation"
   spaces1
   name <- symbol
   spaces1
   clauseList <- sepEndBy1 (parseParen parseClauseV) spaces1
   let symbolList = map (\(s, _, _) -> s) clauseList
-  if not (all (\s -> s == name) symbolList)
+  if not (all (== name) symbolList)
     then fail $ "Illegal head symbol for " ++ show name
     else do
       modify (\env -> env {vNotationEnv = clauseList ++ vNotationEnv env})
-      spaces >> char ')'
       return ()
 
 parseENotationDef :: Parser ()
 parseENotationDef = do
-  char '(' >> spaces >> string "notation"
+  string "notation"
   spaces1
   name <- symbol
   spaces1
   clauseList <- sepEndBy1 (parseParen parseClauseE) spaces1
   let symbolList = map (\(s, _, _) -> s) clauseList
-  if not (all (\s -> s == name) symbolList)
+  if not (all (== name) symbolList)
     then fail $ "Illegal head symbol for " ++ show name
     else do
       modify (\env -> env {eNotationEnv = clauseList ++ eNotationEnv env})
-      spaces >> char ')'
       return ()
 
 parseClauseE :: Parser (String, Form, E)
 parseClauseE = do
-  (sym, form) <- parseParen (parseFormRest <|> parseFormNoRest)
+  (sym, form) <- parseParen (try parseFormRest <|> parseFormNoRest)
   spaces1
   body <- parseE
   return (sym, form, body)
 
 parseClauseV :: Parser (String, Form, V)
 parseClauseV = do
-  (sym, form) <- parseParen (parseFormRest <|> parseFormNoRest)
+  (sym, form) <- parseParen (try parseFormRest <|> parseFormNoRest)
   spaces1
   body <- parseV
   return (sym, form, body)
@@ -728,8 +728,7 @@ parseWeakFormHoleOrSymbol = do
   ms <- parseSymbol
   case ms of
     Hole -> return WeakFormHole
-    S s -> do
-      return $ WeakFormSymbol s
+    S s -> return $ WeakFormSymbol s
 
 parseWeakFormApp :: Parser WeakForm
 parseWeakFormApp = do
@@ -738,8 +737,8 @@ parseWeakFormApp = do
   args <- sepEndBy parseWeakForm spaces1
   return $ WeakFormApp head args
 
-parseReserved :: Parser ()
-parseReserved = do
-  string "reserved" >> spaces1
+parseReserve :: Parser ()
+parseReserve = do
+  string "reserve" >> spaces1
   s <- symbol
   modify (\env -> env {reservedEnv = s : reservedEnv env})
