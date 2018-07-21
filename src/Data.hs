@@ -9,7 +9,7 @@ import           Data.Maybe                 (fromMaybe)
 
 import qualified Text.Show.Pretty           as Pr
 
-type Symbol = String
+type Sym = String
 
 type Level = Int
 
@@ -19,14 +19,14 @@ type Level = Int
 --     | {defined constant} <- such as nat, succ, etc.
 --     | (v v)
 --     | (ascribe v P)
-data Value
-  = Var Symbol
-  | Quote Comp
-  | Atomic ConsDef
-  | AtomicApp Value
-              Value
-  | Ascribe Value
-            P
+data V
+  = Var Sym
+  | Quote E
+  | VAtom ValueDef
+  | VApp V
+         V
+  | VAsc V
+         P
   deriving (Show, Eq)
 
 -- negative term
@@ -40,29 +40,31 @@ data Value
 --     | (dispatch e1 ... en)
 --     | (select i e)
 --     | (mu x e)
---     | (case e (a1 e1) ... (an en))
+--     | (case e (v1 e1) ... (vn en))
 --     | (ascribe e N)
-data Comp
-  = Lam Symbol
-        Comp
-  | App Comp
-        Value
-  | Ret Value
-  | Bind Symbol
-         Comp
-         Comp
-  | Unquote Value
-  | Send Symbol
-         Comp
-  | Receive Symbol
-            Comp
-  | Dispatch [Comp]
+data E
+  = Lam Sym
+        E
+  | App E
+        V
+  | Ret V
+  | Bind Sym
+         E
+         E
+  | Unquote V
+  | Send Sym
+         E
+  | Receive Sym
+            E
+  | Dispatch [E]
   | Select Int
-           Comp
-  | Mu Symbol
-       Comp
-  | Case Comp
-         [(Value, Comp)]
+           E
+  | Mu Sym
+       E
+  | Case E
+         [(V, E)]
+  | NAsc E
+         N
   deriving (Show, Eq)
 
 -- positive type
@@ -72,12 +74,12 @@ data Comp
 --     | (constructor (x P) P)
 --     | (universe i)
 data P
-  = PVar Symbol
+  = PVar Sym
   | Down N
-  | ConsAtom Symbol
-  | ConsImp Symbol
-            P
-            P
+  | PAtom ValueDef
+  | PImp Sym
+         P
+         P
   | Universe Level
   deriving (Show, Eq)
 
@@ -87,24 +89,24 @@ data P
 --     | (par N1 ... Nn)
 --     | (up P)
 data N
-  = NVar Symbol
-  | Forall Symbol
+  = NVar Sym
+  | Up P
+  | Forall Sym
            P
            N
   | Par [N]
-  | Up P
   deriving (Show, Eq)
 
 -- constructor definition
--- C ::= (constructor x P)
-data ConsDef = ConsDef
-  { consName :: Symbol
+-- C ::= (value x P)
+data ValueDef = ValueDef
+  { consName :: Sym
   , consType :: P
   } deriving (Show, Eq)
 
 -- data WeakForm
 --   = WeakFormHole
---   | WeakFormSymbol String
+--   | WeakFormSym String
 --   | WeakFormApp WeakForm
 --                 [WeakForm]
 --   deriving (Show)
@@ -151,7 +153,7 @@ data ConsDef = ConsDef
 -- unifyFormE f v = Left $ "Cannot match " ++ show f ++ " with " ++ show v
 -- unifyVWeakForm :: WeakForm -> V -> Either String [(String, Term)]
 -- unifyVWeakForm WeakFormHole _ = return []
--- unifyVWeakForm (WeakFormSymbol s) v = return [(s, PosTerm v)]
+-- unifyVWeakForm (WeakFormSym s) v = return [(s, PosTerm v)]
 -- unifyVWeakForm (WeakFormApp s args) (APP v es) = do
 --   subst1 <- unifyVWeakForm s v
 --   subst2 <- zipWithM unifyEWeakForm args es
@@ -159,7 +161,7 @@ data ConsDef = ConsDef
 -- unifyVWeakForm f v = Left $ "Cannot match " ++ show f ++ " against " ++ show v
 -- unifyEWeakForm :: WeakForm -> E -> Either String [(String, Term)]
 -- unifyEWeakForm WeakFormHole _ = return []
--- unifyEWeakForm (WeakFormSymbol s) e = return [(s, NegTerm e)]
+-- unifyEWeakForm (WeakFormSym s) e = return [(s, NegTerm e)]
 -- unifyEWeakForm (WeakFormApp s args) (App e vs) = do
 --   subst1 <- unifyEWeakForm s e
 --   subst2 <- zipWithM unifyVWeakForm args vs
@@ -167,19 +169,18 @@ data ConsDef = ConsDef
 -- unifyEWeakForm f v = Left $ "Cannot match " ++ show f ++ " against " ++ show v
 data Env = Env
   { i           :: Int
-  -- , valueTypeEnv :: [ValueDef]
-  , consEnv     :: [ConsDef]
+  , valueEnv    :: [ValueDef]
   -- , vNotationEnv :: [(String, Form, V)]
   -- , eNotationEnv :: [(String, Form, E)]
   , reservedEnv :: [String]
-  , compEnv     :: [Comp]
+  , compEnv     :: [E]
   } deriving (Show)
 
 initialEnv :: Env
 initialEnv =
   Env
     { i = 0
-    , consEnv = []
+    , valueEnv = []
     -- , vNotationEnv = []
     -- , eNotationEnv = []
     , reservedEnv = []
