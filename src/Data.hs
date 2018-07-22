@@ -138,6 +138,7 @@ data Env = Env
   , valueEnv      :: [Sym]
   , notationEnv   :: [(Tree, Tree)]
   , reservedEnv   :: [String]
+  , nameEnv       :: [(String, String)]
   , exprEnv       :: [Expr]
   , typeEnv       :: [(String, Type)]
   , constraintEnv :: [(Type, Type)]
@@ -171,6 +172,7 @@ initialEnv =
         , "par"
         , "up"
         ]
+    , nameEnv = []
     , exprEnv = []
     , typeEnv = []
     , constraintEnv = []
@@ -199,6 +201,11 @@ newName = do
   let i = count env
   modify (\e -> e {count = i + 1})
   return $ "#" ++ show i
+
+newNameWith :: String -> WithEnv String
+newNameWith s = do
+  s' <- newName
+  return $ s ++ s'
 
 lookupTEnv :: String -> WithEnv (Maybe Type)
 lookupTEnv s = gets (lookup s . typeEnv)
