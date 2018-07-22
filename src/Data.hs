@@ -11,6 +11,29 @@ import qualified Text.Show.Pretty           as Pr
 
 type Sym = String
 
+data Tree
+  = Atom Sym
+  | Node [Tree]
+  deriving (Show, Eq)
+
+car :: Tree -> Maybe Tree
+car (Node (t:_)) = Just t
+car _            = Nothing
+
+cdr :: Tree -> Maybe [Tree]
+cdr (Node (_:ts)) = Just ts
+cdr _             = Nothing
+
+ith :: Int -> Tree -> Maybe Tree
+ith 1 (Atom s) = Just (Atom s)
+ith i (Node ts)
+  | 0 < i && i <= length ts = Just $ ts !! (i - 1)
+ith _ _ = Nothing
+
+treeLength :: Tree -> Int
+treeLength (Atom _)  = 1
+treeLength (Node ts) = length ts
+
 type Level = Int
 
 -- positive term
@@ -97,82 +120,18 @@ data N
   | Par [N]
   deriving (Show, Eq)
 
--- constructor definition
--- C ::= (value x P)
+-- value definition
+-- V ::= (value x P)
 data ValueDef = ValueDef
   { consName :: Sym
   , consType :: P
   } deriving (Show, Eq)
 
--- data WeakForm
---   = WeakFormHole
---   | WeakFormSym String
---   | WeakFormApp WeakForm
---                 [WeakForm]
---   deriving (Show)
--- -- form ::= strong-form | (strong-form weak-form1 ... weak-formn)
--- data Form
---   = Form String
---          [WeakForm]
---   | FormWithRest String
---                  [WeakForm]
---   deriving (Show)
--- unifyFormV :: Form -> V -> Either String ([(String, Term)], Maybe [Term])
--- unifyFormV (Form s ws) (APP (VPosSym (PosSym (S s'))) xs)
---   | s /= s' = Left $ "Cannot match " ++ show s ++ " with " ++ show s'
---   | length ws /= length xs =
---     Left $ "Cannot match " ++ show ws ++ " with " ++ show xs
---   | otherwise = do
---     ys <- zipWithM unifyEWeakForm ws xs
---     return (concat ys, Nothing)
--- unifyFormV (FormWithRest s ws) (APP (VPosSym (PosSym (S s'))) xs)
---   | s /= s' = Left $ "Cannot match " ++ show s ++ " with " ++ show s'
---   | length ws > length xs =
---     Left $ "Cannot match " ++ show ws ++ " with " ++ show xs
---   | otherwise = do
---     ys <- zipWithM unifyEWeakForm ws xs
---     let rest = drop (length ws) xs
---     return (concat ys, Just (map NegTerm rest))
--- unifyFormV f v = Left $ "Cannot match " ++ show f ++ " with " ++ show v
--- unifyFormE :: Form -> E -> Either String ([(String, Term)], Maybe [Term])
--- unifyFormE (Form s ws) (App (ENegSym (NegSym (S s'))) xs)
---   | s /= s' = Left $ "Cannot match " ++ show s ++ " with " ++ show s'
---   | length ws /= length xs =
---     Left $ "Cannot match " ++ show ws ++ " with " ++ show xs
---   | otherwise = do
---     ys <- zipWithM unifyVWeakForm ws xs
---     return (concat ys, Nothing)
--- unifyFormE (FormWithRest s ws) (App (ENegSym (NegSym (S s'))) xs)
---   | s /= s' = Left $ "Cannot match " ++ show s ++ " with " ++ show s'
---   | length ws > length xs =
---     Left $ "Cannot match " ++ show ws ++ " with " ++ show xs
---   | otherwise = do
---     ys <- zipWithM unifyVWeakForm ws xs
---     let rest = drop (length ws) xs
---     return (concat ys, Just (map PosTerm rest))
--- unifyFormE f v = Left $ "Cannot match " ++ show f ++ " with " ++ show v
--- unifyVWeakForm :: WeakForm -> V -> Either String [(String, Term)]
--- unifyVWeakForm WeakFormHole _ = return []
--- unifyVWeakForm (WeakFormSym s) v = return [(s, PosTerm v)]
--- unifyVWeakForm (WeakFormApp s args) (APP v es) = do
---   subst1 <- unifyVWeakForm s v
---   subst2 <- zipWithM unifyEWeakForm args es
---   return $ subst1 ++ concat subst2
--- unifyVWeakForm f v = Left $ "Cannot match " ++ show f ++ " against " ++ show v
--- unifyEWeakForm :: WeakForm -> E -> Either String [(String, Term)]
--- unifyEWeakForm WeakFormHole _ = return []
--- unifyEWeakForm (WeakFormSym s) e = return [(s, NegTerm e)]
--- unifyEWeakForm (WeakFormApp s args) (App e vs) = do
---   subst1 <- unifyEWeakForm s e
---   subst2 <- zipWithM unifyVWeakForm args vs
---   return $ subst1 ++ concat subst2
--- unifyEWeakForm f v = Left $ "Cannot match " ++ show f ++ " against " ++ show v
 data Env = Env
   { i           :: Int
   , valueEnv    :: [ValueDef]
-  -- , vNotationEnv :: [(String, Form, V)]
-  -- , eNotationEnv :: [(String, Form, E)]
-  , reservedEnv :: [String]
+  , notationEnv :: [(Tree, Tree)]
+  , reservedEnv :: [Sym]
   , compEnv     :: [E]
   } deriving (Show)
 
@@ -181,9 +140,26 @@ initialEnv =
   Env
     { i = 0
     , valueEnv = []
-    -- , vNotationEnv = []
-    -- , eNotationEnv = []
-    , reservedEnv = []
+    , notationEnv = []
+    , reservedEnv =
+        [ "quote"
+        , "lambda"
+        , "return"
+        , "bind"
+        , "unquote"
+        , "send"
+        , "receive"
+        , "dispatch"
+        , "select"
+        , "mu"
+        , "case"
+        , "ascribe"
+        , "down"
+        , "universe"
+        , "forall"
+        , "par"
+        , "up"
+        ]
     , compEnv = []
     }
 
