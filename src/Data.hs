@@ -44,7 +44,10 @@ data Sym =
     Type
   deriving (Show, Eq)
 
-type Level = Int
+data Level
+  = Fixed Int
+  | LHole String
+  deriving (Show, Eq)
 
 -- positive term
 -- v ::= x
@@ -138,6 +141,7 @@ data Env = Env
   , exprEnv       :: [Expr]
   , typeEnv       :: [(String, Type)]
   , constraintEnv :: [(Type, Type)]
+  , levelEnv      :: [(Level, Level)]
   , posEnv        :: [Type]
   , negEnv        :: [Type]
   } deriving (Show)
@@ -170,6 +174,7 @@ initialEnv =
     , exprEnv = []
     , typeEnv = []
     , constraintEnv = []
+    , levelEnv = []
     , posEnv = []
     , negEnv = []
     }
@@ -209,3 +214,6 @@ insPosEnv t = modify (\e -> e {posEnv = t : posEnv e})
 
 insNegEnv :: Type -> WithEnv ()
 insNegEnv t = modify (\e -> e {negEnv = t : negEnv e})
+
+insLEnv :: Level -> Level -> WithEnv ()
+insLEnv l1 l2 = modify (\e -> e {levelEnv = (l1, l2) : levelEnv e})

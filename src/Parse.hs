@@ -106,6 +106,7 @@ parseClause t = lift $ throwE $ "parseClause: syntax error:\n" ++ Pr.ppShow t
 
 parseType :: Tree -> WithEnv Type
 parseType (Atom "_") = THole <$> newName
+parseType (Atom "universe") = TUniv . LHole <$> newName
 parseType (Atom s) = do
   msym <- definedConst s
   case msym of
@@ -124,7 +125,7 @@ parseType (Node [Atom "constructor", Node [Atom s, tp1], tp2]) = do
 parseType (Node [Atom "universe", Atom si]) =
   case readMaybe si of
     Nothing -> lift $ throwE $ "not a number: " ++ si
-    Just i  -> return $ TUniv i
+    Just i  -> return $ TUniv (Fixed i)
 parseType (Node [Atom "forall", Node [Atom s, tp], tn]) = do
   s' <- strToName s
   p <- parseType tp
