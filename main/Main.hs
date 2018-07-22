@@ -25,8 +25,6 @@ printFile path = do
   case item of
     Left err -> putStrLn err
     Right (astList, env) -> do
-      putStrLn $ "==============================="
-      putStrLn $ "===RESULT============================"
       putStrLn $ Pr.ppShow (astList, env)
   -- evalWithEnv (readExpr "lisp" content) initialEnv
   -- p <- liftIO $ runWithEnv (readExpr "lisp" content) initialEnv
@@ -34,8 +32,10 @@ printFile path = do
   --   Left err -> putStrLn err
   --   Right (result, _) -> putStrLn $ Pr.ppShow result
 
-foo :: String -> WithEnv [Tree]
+foo :: String -> WithEnv [Term]
 foo input = do
   astList <- strToTree input
   ts <- loadMacroDef astList
-  mapM macroExpand ts
+  ts' <- mapM macroExpand ts
+  liftIO $ putStrLn $ Pr.ppShow ts'
+  mapM parse ts'

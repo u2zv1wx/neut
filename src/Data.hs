@@ -9,10 +9,9 @@ import           Data.Maybe                 (fromMaybe)
 
 import qualified Text.Show.Pretty           as Pr
 
-type Sym = String
-
+-- S-expression
 data Tree
-  = Atom Sym
+  = Atom String
   | Node [Tree]
   deriving (Show, Eq)
 
@@ -40,47 +39,45 @@ recurM f (Node ts) = do
   ts' <- mapM (recurM f) ts
   f (Node ts')
 
+data Sym =
+  S String
+    T
+  deriving (Show, Eq)
+
 type Level = Int
 
 -- positive term
 -- v ::= x
---     | (quote e)
 --     | {defined constant} <- such as nat, succ, etc.
 --     | (v v)
+--     | (thunk e)
 --     | (ascribe v P)
-data V
-  = Var Sym
-  | Quote E
-  | VAtom ValueDef
-  | VApp V
-         V
-  | VAsc V
-         P
-  deriving (Show, Eq)
-
 -- negative term
--- e ::= (lambda x e)
+-- e ::= (lambda (x P) e)
 --     | (e v)
 --     | (return v)
---     | (bind x e1 e2)
---     | (unquote v)
---     | (send x e)
---     | (receive x e)
+--     | (bind (x P) e1 e2)
+--     | (unthunk v)
+--     | (send (x P) e)
+--     | (receive (x P) e)
 --     | (dispatch e1 ... en)
 --     | (select i e)
---     | (mu x e)
+--     | (mu (x P) e)
 --     | (case e (v1 e1) ... (vn en))
 --     | (ascribe e N)
 data E
-  = Lam Sym
+  = Var String
+  | VAtom VDef
+  | Thunk E
+  | Lam Sym
         E
   | App E
-        V
-  | Ret V
+        E
+  | Ret E
   | Bind Sym
          E
          E
-  | Unquote V
+  | Unthunk E
   | Send Sym
          E
   | Receive Sym
@@ -91,9 +88,9 @@ data E
   | Mu Sym
        E
   | Case E
-         [(V, E)]
-  | NAsc E
-         N
+         [(E, E)]
+  | Asc E
+        T
   deriving (Show, Eq)
 
 -- positive type
@@ -102,49 +99,49 @@ data E
 --     | {defined constant type}
 --     | (constructor (x P) P)
 --     | (universe i)
-data P
-  = PVar Sym
-  | Down N
-  | PAtom ValueDef
-  | PImp Sym
-         P
-         P
-  | Universe Level
-  deriving (Show, Eq)
-
 -- negative type
--- N ::= n
---     | (forall (x P) N)
+-- N ::= (forall (x P) N)
 --     | (par N1 ... Nn)
 --     | (up P)
-data N
-  = NVar Sym
-  | Up P
+data T
+  = PVar String
+  | THole String
+  | PAtom VDef
+  | PImp Sym
+         T
+  | Down T
+  | Universe Level
   | Forall Sym
-           P
-           N
-  | Par [N]
+           T
+  | Up T
+  | Par [T]
   deriving (Show, Eq)
 
 -- value definition
 -- V ::= (value x P)
-data ValueDef = ValueDef
+newtype VDef = VDef
   { consName :: Sym
-  , consType :: P
   } deriving (Show, Eq)
 
+data Term
+  = Expr E
+  | ValueDefinition VDef
+  deriving (Show, Eq)
+
+type Program = [Term]
+
 data Env = Env
-  { i           :: Int
-  , valueEnv    :: [ValueDef]
+  { count       :: Int
+  , valueEnv    :: [VDef]
   , notationEnv :: [(Tree, Tree)]
-  , reservedEnv :: [Sym]
+  , reservedEnv :: [String]
   , compEnv     :: [E]
   } deriving (Show)
 
 initialEnv :: Env
 initialEnv =
   Env
-    { i = 0
+    { count = 0
     , valueEnv = []
     , notationEnv = []
     , reservedEnv =
@@ -182,3 +179,24 @@ evalWithEnv c env = do
     Right (y, env) -> do
       putStrLn $ Pr.ppShow y
       putStrLn $ Pr.ppShow env
+
+newName :: WithEnv String
+newName = do
+  env <- get
+  let i = count env
+  modify (\e -> e {count = i + 1})
+  return $ "#" ++ show i
+
+tryOptions' :: [a -> WithEnv b] -> a -> String -> WithEnv b
+tryOptions' [] t err = lift $ throwE err
+tryOptions' (k:ks) t err = do
+  env <- get
+  t' <- liftIO $ runWithEnv (k t) env
+  case t' of
+    Right (result, env') -> do
+      put env'
+      return result
+    Left err' -> tryOptions' ks t err'
+
+tryOptions :: [a -> WithEnv b] -> a -> WithEnv b
+tryOptions k t = tryOptions' k t "There's nothing to try"
