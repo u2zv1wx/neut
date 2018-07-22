@@ -61,13 +61,13 @@ type Level = Int
 --     | (send (x P) e)
 --     | (receive (x P) e)
 --     | (dispatch e1 ... en)
---     | (select i e)
+--     | (coleft e)
+--     | (coright e)
 --     | (mu (x P) e)
 --     | (case e (v1 e1) ... (vn en))
 --     | (ascribe e N)
 data Expr
   = Var String
-  | Hole String
   | Const Sym
   | Thunk Expr
   | Lam Sym
@@ -81,11 +81,12 @@ data Expr
   | Unthunk Expr
   | Send Sym
          Expr
-  | Receive Sym
-            Expr
-  | Dispatch [Expr]
-  | Select Int
-           Expr
+  | Recv Sym
+         Expr
+  | Dispatch Expr
+             Expr
+  | Coleft Expr
+  | Coright Expr
   | Mu Sym
        Expr
   | Case Expr
@@ -102,7 +103,7 @@ data Expr
 --     | (universe i)
 -- negative type
 -- N ::= (forall (x P) N)
---     | (par N1 ... Nn)
+--     | (cotensor N1 ... Nn)
 --     | (up P)
 data Type
   = TVar String
@@ -115,7 +116,8 @@ data Type
   | TUniv Level
   | TForall Sym
             Type
-  | TPar [Type]
+  | TCotensor Type
+              Type
   deriving (Show, Eq)
 
 -- value definition
@@ -129,11 +131,15 @@ data Type
 --   deriving (Show, Eq)
 -- type Program = [Term]
 data Env = Env
-  { count       :: Int
-  , valueEnv    :: [Sym]
-  , notationEnv :: [(Tree, Tree)]
-  , reservedEnv :: [String]
-  , compEnv     :: [Expr]
+  { count         :: Int
+  , valueEnv      :: [Sym]
+  , notationEnv   :: [(Tree, Tree)]
+  , reservedEnv   :: [String]
+  , exprEnv       :: [Expr]
+  , typeEnv       :: [(String, Type)]
+  , constraintEnv :: [(Type, Type)]
+  , posEnv        :: [Type]
+  , negEnv        :: [Type]
   } deriving (Show)
 
 initialEnv :: Env
@@ -161,7 +167,11 @@ initialEnv =
         , "par"
         , "up"
         ]
-    , compEnv = []
+    , exprEnv = []
+    , typeEnv = []
+    , constraintEnv = []
+    , posEnv = []
+    , negEnv = []
     }
 
 type WithEnv a = StateT Env (ExceptT String IO) a
@@ -185,16 +195,17 @@ newName = do
   modify (\e -> e {count = i + 1})
   return $ "#" ++ show i
 
-tryOptions' :: [a -> WithEnv b] -> a -> String -> WithEnv b
-tryOptions' [] t err = lift $ throwE err
-tryOptions' (k:ks) t err = do
-  env <- get
-  t' <- liftIO $ runWithEnv (k t) env
-  case t' of
-    Right (result, env') -> do
-      put env'
-      return result
-    Left err' -> tryOptions' ks t err'
+lookupTEnv :: String -> WithEnv (Maybe Type)
+lookupTEnv s = gets (lookup s . typeEnv)
 
-tryOptions :: [a -> WithEnv b] -> a -> WithEnv b
-tryOptions k t = tryOptions' k t "There's nothing to try"
+insTEnv :: String -> Type -> WithEnv ()
+insTEnv s t = modify (\e -> e {typeEnv = (s, t) : typeEnv e})
+
+insCEnv :: Type -> Type -> WithEnv ()
+insCEnv t1 t2 = modify (\e -> e {constraintEnv = (t1, t2) : constraintEnv e})
+
+insPosEnv :: Type -> WithEnv ()
+insPosEnv t = modify (\e -> e {posEnv = t : posEnv e})
+
+insNegEnv :: Type -> WithEnv ()
+insNegEnv t = modify (\e -> e {negEnv = t : negEnv e})

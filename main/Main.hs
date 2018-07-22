@@ -32,10 +32,10 @@ printFile path = do
   --   Left err -> putStrLn err
   --   Right (result, _) -> putStrLn $ Pr.ppShow result
 
-foo :: String -> WithEnv [Term]
+foo :: String -> WithEnv [Expr]
 foo input = do
   astList <- strToTree input
   ts <- loadMacroDef astList
   ts' <- mapM macroExpand ts
   liftIO $ putStrLn $ Pr.ppShow ts'
-  mapM parse ts'
+  parse ts'

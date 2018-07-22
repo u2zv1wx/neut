@@ -18,8 +18,13 @@ import qualified Text.Show.Pretty           as Pr
 -- parse = tryOptions [fmap ValueDefinition . parseVDef, fmap Expr . parseExpr]
 parse :: [Tree] -> WithEnv [Expr]
 parse [] = return []
+parse (t@(Node [Atom "value", Atom x, tp]):ts) = do
+  parseVDef t
+  parse ts
 parse (t:ts) = do
-  undefined
+  e <- parseExpr t
+  es <- parse ts
+  return $ e : es
 
 parseExpr :: Tree -> WithEnv Expr
 parseExpr (Atom "_") = Var <$> newName
@@ -59,17 +64,18 @@ parseExpr (Node [Atom "receive", Node [Atom s, tp], te]) = do
   s' <- strToName s
   p <- parseType tp
   e <- parseExpr te
-  return $ Receive (S s' p) e
-parseExpr (Node (Atom "dispatch":tes))
-  | length tes >= 2 = do
+  return $ Recv (S s' p) e
+parseExpr (Node (Atom "dispatch":te:tes))
+  | not (null tes) = do
+    e <- parseExpr te
     es <- mapM parseExpr tes
-    return $ Dispatch es
-parseExpr (Node [Atom "select", Atom si, te]) =
-  case readMaybe si of
-    Nothing -> lift $ throwE $ "not a number: " ++ si
-    Just i -> do
-      e <- parseExpr te
-      return $ Select i e
+    return $ foldl Dispatch e es
+parseExpr (Node [Atom "coleft", te]) = do
+  e <- parseExpr te
+  return $ Coleft e
+parseExpr (Node [Atom "coright", te]) = do
+  e <- parseExpr te
+  return $ Coright e
 parseExpr (Node [Atom "mu", Node [Atom s, tp], te]) = do
   s' <- strToName s
   p <- parseType tp
@@ -124,10 +130,11 @@ parseType (Node [Atom "forall", Node [Atom s, tp], tn]) = do
   p <- parseType tp
   n <- parseType tn
   return $ TForall (S s' p) n
-parseType (Node (Atom "par":tns))
-  | length tns >= 2 = do
+parseType (Node (Atom "par":tn:tns))
+  | not (null tns) = do
+    n <- parseType tn
     ns <- mapM parseType tns
-    return $ TPar ns
+    return $ foldl TCotensor n ns
 parseType (Node [Atom "up", tp]) = do
   p <- parseType tp
   return $ TUp p
