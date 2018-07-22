@@ -41,7 +41,7 @@ recurM f (Node ts) = do
 
 data Sym =
   S String
-    T
+    Type
   deriving (Show, Eq)
 
 type Level = Int
@@ -65,32 +65,33 @@ type Level = Int
 --     | (mu (x P) e)
 --     | (case e (v1 e1) ... (vn en))
 --     | (ascribe e N)
-data E
+data Expr
   = Var String
-  | VAtom VDef
-  | Thunk E
+  | Hole String
+  | Const Sym
+  | Thunk Expr
   | Lam Sym
-        E
-  | App E
-        E
-  | Ret E
+        Expr
+  | App Expr
+        Expr
+  | Ret Expr
   | Bind Sym
-         E
-         E
-  | Unthunk E
+         Expr
+         Expr
+  | Unthunk Expr
   | Send Sym
-         E
+         Expr
   | Receive Sym
-            E
-  | Dispatch [E]
+            Expr
+  | Dispatch [Expr]
   | Select Int
-           E
+           Expr
   | Mu Sym
-       E
-  | Case E
-         [(E, E)]
-  | Asc E
-        T
+       Expr
+  | Case Expr
+         [(Expr, Expr)]
+  | Asc Expr
+        Type
   deriving (Show, Eq)
 
 -- positive type
@@ -103,39 +104,36 @@ data E
 -- N ::= (forall (x P) N)
 --     | (par N1 ... Nn)
 --     | (up P)
-data T
-  = PVar String
+data Type
+  = TVar String
   | THole String
-  | PAtom VDef
-  | PImp Sym
-         T
-  | Down T
-  | Universe Level
-  | Forall Sym
-           T
-  | Up T
-  | Par [T]
+  | TConst Sym
+  | TImp Sym
+         Type
+  | TUp Type
+  | TDown Type
+  | TUniv Level
+  | TForall Sym
+            Type
+  | TPar [Type]
   deriving (Show, Eq)
 
 -- value definition
 -- V ::= (value x P)
-newtype VDef = VDef
-  { consName :: Sym
-  } deriving (Show, Eq)
-
-data Term
-  = Expr E
-  | ValueDefinition VDef
-  deriving (Show, Eq)
-
-type Program = [Term]
-
+-- newtype VDef = VDef
+--   { consName :: Sym
+--   } deriving (Show, Eq)
+-- data Term =
+--   Expr E
+--   -- | ValueDefinition VDef
+--   deriving (Show, Eq)
+-- type Program = [Term]
 data Env = Env
   { count       :: Int
-  , valueEnv    :: [VDef]
+  , valueEnv    :: [Sym]
   , notationEnv :: [(Tree, Tree)]
   , reservedEnv :: [String]
-  , compEnv     :: [E]
+  , compEnv     :: [Expr]
   } deriving (Show)
 
 initialEnv :: Env
