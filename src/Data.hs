@@ -34,6 +34,12 @@ treeLength :: Tree -> Int
 treeLength (Atom _)  = 1
 treeLength (Node ts) = length ts
 
+recurM :: (Monad m) => (Tree -> m Tree) -> Tree -> m Tree
+recurM f (Atom s) = f (Atom s)
+recurM f (Node ts) = do
+  ts' <- mapM (recurM f) ts
+  f (Node ts')
+
 type Level = Int
 
 -- positive term

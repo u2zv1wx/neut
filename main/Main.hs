@@ -7,6 +7,7 @@ import           Debug.Trace
 import qualified Text.Show.Pretty    as Pr
 
 import           Data
+import           Macro
 import           Parse
 import           Read
 
@@ -20,9 +21,21 @@ main = do
 printFile :: String -> IO ()
 printFile path = do
   content <- readFile path
-  evalWithEnv (strToTree content) initialEnv
+  item <- runWithEnv (foo content) initialEnv
+  case item of
+    Left err -> putStrLn err
+    Right (astList, env) -> do
+      putStrLn $ "==============================="
+      putStrLn $ "===RESULT============================"
+      putStrLn $ Pr.ppShow (astList, env)
   -- evalWithEnv (readExpr "lisp" content) initialEnv
   -- p <- liftIO $ runWithEnv (readExpr "lisp" content) initialEnv
   -- case p of
   --   Left err -> putStrLn err
   --   Right (result, _) -> putStrLn $ Pr.ppShow result
+
+foo :: String -> WithEnv [Tree]
+foo input = do
+  astList <- strToTree input
+  ts <- loadMacroDef astList
+  mapM macroExpand ts
