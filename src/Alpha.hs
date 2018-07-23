@@ -7,9 +7,8 @@ import           Data
 
 alpha :: Expr -> WithEnv Expr
 alpha (Var s) = Var <$> alphaString s
-alpha (Const (S s t)) = do
-  t' <- alphaType t
-  return $ Const (S s t')
+alpha (Const s) = do
+  return $ Const s
 alpha (Lam (S s t) e) = do
   t' <- alphaType t
   local $ do
@@ -49,7 +48,7 @@ alpha (Recv (S s t) e) = do
   local $ do
     s' <- newNameWith s
     e' <- alpha e
-    return $ Recv (S s t) e
+    return $ Recv (S s' t') e'
 alpha (Dispatch e1 e2) = do
   e1' <- alpha e1
   e2' <- alpha e2
@@ -89,9 +88,8 @@ alpha (Asc e t) = do
 alphaType :: Type -> WithEnv Type
 alphaType (TVar s) = TVar <$> alphaString s
 alphaType (THole i) = return $ THole i
-alphaType (TConst (S s t)) = do
-  t' <- alphaType t
-  return $ TConst (S s t')
+alphaType (TConst s) = do
+  return $ TConst s
 alphaType (TNode (S s tdom) tcod) = do
   tdom' <- alphaType tdom
   local $ do
@@ -121,9 +119,7 @@ alphaString s = do
 
 alphaPat :: Expr -> WithEnv Expr
 alphaPat (Var s) = Var <$> alphaPatString s
-alphaPat (Const (S s t)) = do
-  t' <- alphaType t
-  return $ Const (S s t')
+alphaPat (Const s) = return $ Const s
 alphaPat (Lam (S s t) e) = do
   t' <- alphaType t
   local $ do

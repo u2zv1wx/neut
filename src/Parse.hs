@@ -24,7 +24,7 @@ parseExpr (Atom s) = do
     Nothing -> do
       s' <- strToName s
       return $ Var s'
-    Just sym -> return $ Const sym
+    Just (s, _) -> return $ Const s
 parseExpr (Node [Atom "thunk", te]) = do
   e <- parseExpr te
   return $ Thunk e
@@ -105,7 +105,7 @@ parseType (Atom s) = do
     Nothing -> do
       s' <- strToName s
       return $ TVar s'
-    Just sym -> return $ TConst sym
+    Just (s, _) -> return $ TConst s
 parseType (Node [Atom "down", tn]) = do
   n <- parseType tn
   return $ TDown n
@@ -136,14 +136,14 @@ parseType t = lift $ throwE $ "parseType: syntax error:\n" ++ Pr.ppShow t
 parseVDef :: Tree -> WithEnv ()
 parseVDef (Node [Atom "value", Atom x, tp]) = do
   p <- parseType tp
-  modify (\e -> e {valueEnv = S x p : valueEnv e})
+  modify (\e -> e {valueEnv = (x, p) : valueEnv e})
 parseVDef t = lift $ throwE $ "parseVDef: syntax error:\n" ++ Pr.ppShow t
 
-definedConst :: String -> WithEnv (Maybe Sym)
+definedConst :: String -> WithEnv (Maybe (String, Type))
 definedConst s = do
   env <- get
   let vEnv = valueEnv env
-  return $ find (\(S x _) -> x == s) vEnv
+  return $ find (\(x, _) -> x == s) vEnv
 
 strToName :: String -> WithEnv String
 strToName "_" = newName

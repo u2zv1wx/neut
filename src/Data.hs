@@ -49,6 +49,10 @@ data Level
   | LHole String
   deriving (Show, Eq)
 
+type ClosureName = String
+
+type FreeVar = String
+
 -- positive term
 -- v ::= x
 --     | {defined constant} <- such as nat, succ, etc.
@@ -71,7 +75,7 @@ data Level
 --     | (ascribe e N)
 data Expr
   = Var String
-  | Const Sym
+  | Const String
   | Thunk Expr
   | Lam Sym
         Expr
@@ -98,6 +102,9 @@ data Expr
          [(Expr, Expr)]
   | Asc Expr
         Type
+  | Cls ClosureName
+        [FreeVar]
+        Expr
   deriving (Show, Eq)
 
 -- positive type
@@ -113,7 +120,7 @@ data Expr
 data Type
   = TVar String
   | THole String
-  | TConst Sym
+  | TConst String
   | TNode Sym
           Type
   | TUp Type
@@ -127,7 +134,7 @@ data Type
 
 data Env = Env
   { count         :: Int
-  , valueEnv      :: [Sym]
+  , valueEnv      :: [(String, Type)]
   , notationEnv   :: [(Tree, Tree)]
   , reservedEnv   :: [String]
   , nameEnv       :: [(String, String)]
@@ -135,6 +142,7 @@ data Env = Env
   , typeEnv       :: [(String, Type)]
   , constraintEnv :: [(Type, Type)]
   , levelEnv      :: [(Level, Level)]
+  , clsEnv        :: [(ClosureName, [FreeVar], Expr)]
   } deriving (Show)
 
 initialEnv :: Env
@@ -167,6 +175,7 @@ initialEnv =
     , typeEnv = []
     , constraintEnv = []
     , levelEnv = []
+    , clsEnv = []
     }
 
 type WithEnv a = StateT Env (ExceptT String IO) a
@@ -199,6 +208,9 @@ newNameWith s = do
 
 lookupTEnv :: String -> WithEnv (Maybe Type)
 lookupTEnv s = gets (lookup s . typeEnv)
+
+lookupVEnv :: String -> WithEnv (Maybe Type)
+lookupVEnv s = gets (lookup s . valueEnv)
 
 insTEnv :: String -> Type -> WithEnv ()
 insTEnv s t = modify (\e -> e {typeEnv = (s, t) : typeEnv e})

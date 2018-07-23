@@ -28,9 +28,11 @@ infer (Var s) = do
       new <- THole <$> newName
       insTEnv s new
       return new
-infer (Const (S s t)) = do
-  insTEnv s t
-  return t
+infer (Const s) = do
+  mt <- lookupVEnv s
+  case mt of
+    Just t  -> return t
+    Nothing -> lift $ throwE $ "const " ++ s ++ " is not defined"
 infer (Lam (S s t) e) = do
   insTEnv s t
   te <- infer e
@@ -150,7 +152,7 @@ unify ((t1, t2):cs) =
 occur :: String -> Type -> Bool
 occur _ (TVar s)                  = False
 occur x (THole s)                 = x == s
-occur _ (TConst (S _ _))          = False
+occur _ (TConst _)                = False
 occur x (TNode (S _ tdom) tcod)   = occur x tdom || occur x tcod
 occur x (TUp t)                   = occur x t
 occur x (TDown t)                 = occur x t
@@ -172,9 +174,7 @@ sType sub (THole s) =
   case lookup s sub of
     Nothing -> THole s
     Just t  -> t
-sType sub (TConst (S s t)) = do
-  let t' = sType sub t
-  TConst (S s t')
+sType sub (TConst s) = TConst s
 sType sub (TNode (S s tdom) tcod) = do
   let tdom' = sType sub tdom
   let tcod' = sType sub tcod

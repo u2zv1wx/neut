@@ -5,6 +5,7 @@ module Load
 import           Control.Monad.State
 
 import           Alpha
+import           Closure
 import           Data
 import           Macro
 import           Parse
@@ -28,7 +29,7 @@ load' (Node [Atom "reserve", Atom s]:as) = do
   load' as
 load' (Node [Atom "value", Atom s, tp]:as) = do
   p <- parseType tp
-  modify (\e -> e {valueEnv = S s p : valueEnv e})
+  modify (\e -> e {valueEnv = (s, p) : valueEnv e})
   load' as
 load' (a:as) = do
   a' <- macroExpand a
@@ -36,5 +37,6 @@ load' (a:as) = do
   e <- parseExpr a'
   e' <- alpha e
   check e'
-  liftIO $ putStrLn $ Pr.ppShow e'
+  e'' <- cls e'
+  liftIO $ putStrLn $ Pr.ppShow e''
   load' as
