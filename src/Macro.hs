@@ -1,6 +1,5 @@
 module Macro
   ( macroExpand
-  , loadMacroDef
   ) where
 
 import           Control.Monad
@@ -15,24 +14,6 @@ type Subst = ([(String, Tree)], [(String, [Tree])])
 
 type Pattern = Tree
 
--- ASTのリストを受け取って、前から読んでいく。予約語の定義が見つかったら、その情報で環境を
--- 更新し、その定義をリストから除去して残りを読む。マクロの定義が見つかったら、やはりその情報で
--- 環境を更新し、定義をリストから除去して残りを読む。最終的に、ASTのリストから、予約後の定義と
--- マクロの定義を除いたものを返す。
-loadMacroDef :: [Tree] -> WithEnv [Tree]
-loadMacroDef [] = return []
-loadMacroDef (Node (Atom "reserve":[Atom s]):as) = do
-  modify (\e -> e {reservedEnv = s : reservedEnv e})
-  loadMacroDef as
-loadMacroDef (Node (Atom "notation":[from, to]):as) = do
-  modify (\e -> e {notationEnv = (from, to) : notationEnv e})
-  loadMacroDef as
-loadMacroDef (a:as) = do
-  as' <- loadMacroDef as
-  return $ a : as'
-
--- - fromの中に出てくる変数でtoの中に出現する変数が尽くされることを確認する。
--- - rest変数が、すべてリストの末尾に出現していることを確認する。
 sanityCheck :: (Pattern, Pattern) -> Either String ()
 sanityCheck = undefined
 

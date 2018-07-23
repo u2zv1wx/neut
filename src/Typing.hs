@@ -17,9 +17,7 @@ check e = do
   sub <- unify $ constraintEnv env
   liftIO $ putStrLn $ Pr.ppShow sub
   let tenv' = map (\(s, t) -> (s, sType sub t)) $ typeEnv env
-  let posEnv' = map (sType sub) $ posEnv env
-  let negEnv' = map (sType sub) $ negEnv env
-  modify (\e -> e {typeEnv = tenv', posEnv = posEnv', negEnv = negEnv'})
+  modify (\e -> e {typeEnv = tenv'})
 
 infer :: Expr -> WithEnv Type
 infer (Var s) = do
@@ -29,108 +27,86 @@ infer (Var s) = do
     Nothing -> do
       new <- THole <$> newName
       insTEnv s new
-      insPosEnv new
       return new
 infer (Const (S s t)) = do
   insTEnv s t
-  insPosEnv t
   return t
 infer (Lam (S s t) e) = do
   insTEnv s t
-  insPosEnv t
   te <- infer e
-  insNegEnv te
   return $ TForall (S s t) te
 infer (App e v) = do
   te <- infer e
-  insNegEnv te
   tv <- infer v
-  insPosEnv tv
   i <- newName
   insTEnv i (THole i)
   j <- newName
   insTEnv j tv
   insCEnv te (TForall (S j tv) (THole i))
   return $ THole i
+infer (VApp v1 v2) = do
+  t1 <- infer v1
+  t2 <- infer v2
+  i <- newName
+  insTEnv i (THole i)
+  j <- newName
+  insTEnv j t2
+  insCEnv t1 (TImp (S j t2) (THole i))
+  return $ THole i
 infer (Ret v) = do
   tv <- infer v
-  insPosEnv tv
   return $ TUp tv
 infer (Bind (S s t) e1 e2) = do
   insTEnv s t
   t1 <- infer e1
   t2 <- infer e2
-  insPosEnv t
-  insNegEnv t1
-  insNegEnv t2
   insCEnv (TUp t) t1
   return t2
 infer (Thunk e) = do
   t <- infer e
-  insNegEnv t
   return $ TDown t
 infer (Unthunk v) = do
   t <- infer v
-  insPosEnv t
   i <- newName
   insCEnv t (TDown (THole i))
   return $ THole i
 infer (Send (S s t) e) = do
   insTEnv s t
-  insPosEnv t
   t <- infer e
-  insNegEnv t
   return t
 infer (Recv (S s t) e) = do
   insTEnv s t
-  insPosEnv t
   t <- infer e
-  insNegEnv t
   return t
 infer (Dispatch e1 e2) = do
   t1 <- infer e1
   t2 <- infer e2
-  insNegEnv t1
-  insNegEnv t2
   return $ TCotensor t1 t2
 infer (Coleft e) = do
   t <- infer e
   t1 <- THole <$> newName
   t2 <- THole <$> newName
   insCEnv t (TCotensor t1 t2)
-  insNegEnv t1
-  insNegEnv t2
-  insNegEnv t
   return t1
 infer (Coright e) = do
   t <- infer e
   t1 <- THole <$> newName
   t2 <- THole <$> newName
   insCEnv t (TCotensor t1 t2)
-  insNegEnv t1
-  insNegEnv t2
-  insNegEnv t
   return t2
 infer (Mu (S s t) e) = do
   insTEnv s t
-  insPosEnv t
   te <- infer e
   insCEnv (TDown te) t
-  insNegEnv te
   return te
 infer (Case e ves) = do
   t <- infer e
-  insPosEnv t
   let (vs, es) = unzip ves
   tvs <- mapM infer vs
-  forM_ tvs $ \tv -> do
-    insPosEnv tv
-    insCEnv t tv
+  forM_ tvs $ \tv -> insCEnv t tv
   ans <- THole <$> newName
   tes <- mapM infer es
-  forM_ tes $ \te -> do
-    insNegEnv te
-    insCEnv ans te
+  forM_ tes $ \te -> insCEnv ans te
   return ans
 infer (Asc e t) = do
   te <- infer e
@@ -218,26 +194,6 @@ sType sub (TCotensor t1 t2) = do
   let t1' = sType sub t1
   let t2' = sType sub t2
   TCotensor t1' t2'
-
--- data Type
---   = TVar String
---   | THole String
---   | TConst Sym
---   | TImp Sym
---          Type
---   | TUp Type
---   | TDown Type
---   | TUniv Level
---   | TForall Sym
---             Type
---   | TCotensor Type
---               Type
---   deriving (Show, Eq)
-isPos :: Type -> Bool
-isPos (TVar _) = True
-
-isNeg :: Type -> Bool
-isNeg = undefined
 
 sConstraint :: Subst -> Constraint -> Constraint
 sConstraint s = map (\(t1, t2) -> (sType s t1, sType s t2))

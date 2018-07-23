@@ -20,6 +20,10 @@ alpha (App e v) = do
   e' <- alpha e
   v' <- alpha v
   return $ App e' v'
+alpha (VApp v1 v2) = do
+  v1' <- alpha v1
+  v2' <- alpha v2
+  return $ VApp v1' v2'
 alpha (Ret v) = do
   v' <- alpha v
   return $ Ret v'
@@ -113,10 +117,7 @@ alphaString s = do
   env <- get
   case lookup s (nameEnv env) of
     Just s' -> return s'
-    Nothing -> do
-      s' <- newNameWith s
-      modify (\e -> e {nameEnv = (s, s') : nameEnv e})
-      return s'
+    Nothing -> lift $ throwE $ "undefined variable: " ++ show s
 
 local :: WithEnv a -> WithEnv a
 local p = do

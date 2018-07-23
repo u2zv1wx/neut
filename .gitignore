@@ -1,3 +1,4 @@
 .stack-work/
 lisp.cabal
 *~
+.DS_Store

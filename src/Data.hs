@@ -77,6 +77,8 @@ data Expr
         Expr
   | App Expr
         Expr
+  | VApp Expr
+         Expr
   | Ret Expr
   | Bind Sym
          Expr
@@ -143,8 +145,6 @@ data Env = Env
   , typeEnv       :: [(String, Type)]
   , constraintEnv :: [(Type, Type)]
   , levelEnv      :: [(Level, Level)]
-  , posEnv        :: [Type]
-  , negEnv        :: [Type]
   } deriving (Show)
 
 initialEnv :: Env
@@ -177,8 +177,6 @@ initialEnv =
     , typeEnv = []
     , constraintEnv = []
     , levelEnv = []
-    , posEnv = []
-    , negEnv = []
     }
 
 type WithEnv a = StateT Env (ExceptT String IO) a
@@ -215,12 +213,6 @@ insTEnv s t = modify (\e -> e {typeEnv = (s, t) : typeEnv e})
 
 insCEnv :: Type -> Type -> WithEnv ()
 insCEnv t1 t2 = modify (\e -> e {constraintEnv = (t1, t2) : constraintEnv e})
-
-insPosEnv :: Type -> WithEnv ()
-insPosEnv t = modify (\e -> e {posEnv = t : posEnv e})
-
-insNegEnv :: Type -> WithEnv ()
-insNegEnv t = modify (\e -> e {negEnv = t : negEnv e})
 
 insLEnv :: Level -> Level -> WithEnv ()
 insLEnv l1 l2 = modify (\e -> e {levelEnv = (l1, l2) : levelEnv e})

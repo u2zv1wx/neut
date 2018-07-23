@@ -6,10 +6,13 @@ import           Debug.Trace
 
 import qualified Text.Show.Pretty    as Pr
 
+import           Alpha
 import           Data
+import           Load
 import           Macro
 import           Parse
 import           Read
+import           Typing
 
 import           System.Environment
 
@@ -21,7 +24,7 @@ main = do
 printFile :: String -> IO ()
 printFile path = do
   content <- readFile path
-  item <- runWithEnv (foo content) initialEnv
+  item <- runWithEnv (load content) initialEnv
   case item of
     Left err -> putStrLn err
     Right (astList, env) -> do
@@ -31,11 +34,12 @@ printFile path = do
   -- case p of
   --   Left err -> putStrLn err
   --   Right (result, _) -> putStrLn $ Pr.ppShow result
-
-foo :: String -> WithEnv [Expr]
-foo input = do
-  astList <- strToTree input
-  ts <- loadMacroDef astList
-  ts' <- mapM macroExpand ts
-  liftIO $ putStrLn $ Pr.ppShow ts'
-  parse ts'
+-- foo :: String -> WithEnv ()
+-- foo input = do
+--   astList <- strToTree input
+--   ts <- loadMacroDef astList
+--   ts' <- mapM macroExpand ts
+--   liftIO $ putStrLn $ Pr.ppShow ts'
+--   ts'' <- parse ts'
+--   ts''' <- mapM alpha ts''
+--   mapM_ check ts'''

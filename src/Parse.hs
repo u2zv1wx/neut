@@ -1,5 +1,6 @@
 module Parse
-  ( parse
+  ( parseType
+  , parseExpr
   ) where
 
 import           Control.Monad              (void)
@@ -14,17 +15,6 @@ import           Data.Maybe
 import           Text.Read                  (readMaybe)
 
 import qualified Text.Show.Pretty           as Pr
-
--- parse = tryOptions [fmap ValueDefinition . parseVDef, fmap Expr . parseExpr]
-parse :: [Tree] -> WithEnv [Expr]
-parse [] = return []
-parse (t@(Node [Atom "value", Atom x, tp]):ts) = do
-  parseVDef t
-  parse ts
-parse (t:ts) = do
-  e <- parseExpr t
-  es <- parse ts
-  return $ e : es
 
 parseExpr :: Tree -> WithEnv Expr
 parseExpr (Atom "_") = Var <$> newName
@@ -94,7 +84,9 @@ parseExpr (Node (te:tvs))
   | not (null tvs) = do
     e <- parseExpr te
     vs <- mapM parseExpr tvs
-    return $ foldl App e vs
+    case e of
+      Const sym -> return $ foldl VApp e vs
+      _         -> return $ foldl App e vs
 parseExpr t = lift $ throwE $ "parseExpr: syntax error:\n" ++ Pr.ppShow t
 
 parseClause :: Tree -> WithEnv (Expr, Expr)
