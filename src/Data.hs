@@ -104,7 +104,7 @@ data Expr
 -- P ::= p
 --     | (down N)
 --     | {defined constant type}
---     | (constructor (x P) P)
+--     | (node (x P) P)
 --     | (universe i)
 -- negative type
 -- N ::= (forall (x P) N)
@@ -114,8 +114,8 @@ data Type
   = TVar String
   | THole String
   | TConst Sym
-  | TImp Sym
-         Type
+  | TNode Sym
+          Type
   | TUp Type
   | TDown Type
   | TUniv Level
@@ -125,16 +125,6 @@ data Type
               Type
   deriving (Show, Eq)
 
--- value definition
--- V ::= (value x P)
--- newtype VDef = VDef
---   { consName :: Sym
---   } deriving (Show, Eq)
--- data Term =
---   Expr E
---   -- | ValueDefinition VDef
---   deriving (Show, Eq)
--- type Program = [Term]
 data Env = Env
   { count         :: Int
   , valueEnv      :: [Sym]

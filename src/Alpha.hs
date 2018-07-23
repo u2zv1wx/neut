@@ -92,12 +92,12 @@ alphaType (THole i) = return $ THole i
 alphaType (TConst (S s t)) = do
   t' <- alphaType t
   return $ TConst (S s t')
-alphaType (TImp (S s tdom) tcod) = do
+alphaType (TNode (S s tdom) tcod) = do
   tdom' <- alphaType tdom
   local $ do
     s' <- newNameWith s
     tcod' <- alphaType tcod
-    return $ TImp (S s' tdom') tcod'
+    return $ TNode (S s' tdom') tcod'
 alphaType (TUp t) = TUp <$> alphaType t
 alphaType (TDown t) = TDown <$> alphaType t
 alphaType (TUniv level) = return $ TUniv level

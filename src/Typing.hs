@@ -51,7 +51,7 @@ infer (VApp v1 v2) = do
   insTEnv i (THole i)
   j <- newName
   insTEnv j t2
-  insCEnv t1 (TImp (S j t2) (THole i))
+  insCEnv t1 (TNode (S j t2) (THole i))
   return $ THole i
 infer (Ret v) = do
   tv <- infer v
@@ -131,7 +131,7 @@ unify ((TVar s1, TVar s2):cs)
   | s1 == s2 = unify cs
 unify ((TConst s1, TConst s2):cs)
   | s1 == s2 = unify cs
-unify ((TImp (S _ tdom1) tcod1, TImp (S _ tdom2) tcod2):cs) =
+unify ((TNode (S _ tdom1) tcod1, TNode (S _ tdom2) tcod2):cs) =
   unify $ (tdom1, tdom2) : (tcod1, tcod2) : cs
 unify ((TForall (S _ tdom1) tcod1, TForall (S _ tdom2) tcod2):cs) =
   unify $ (tdom1, tdom2) : (tcod1, tcod2) : cs
@@ -151,7 +151,7 @@ occur :: String -> Type -> Bool
 occur _ (TVar s)                  = False
 occur x (THole s)                 = x == s
 occur _ (TConst (S _ _))          = False
-occur x (TImp (S _ tdom) tcod)    = occur x tdom || occur x tcod
+occur x (TNode (S _ tdom) tcod)   = occur x tdom || occur x tcod
 occur x (TUp t)                   = occur x t
 occur x (TDown t)                 = occur x t
 occur _ (TUniv i)                 = False
@@ -175,10 +175,10 @@ sType sub (THole s) =
 sType sub (TConst (S s t)) = do
   let t' = sType sub t
   TConst (S s t')
-sType sub (TImp (S s tdom) tcod) = do
+sType sub (TNode (S s tdom) tcod) = do
   let tdom' = sType sub tdom
   let tcod' = sType sub tcod
-  TImp (S s tdom') tcod'
+  TNode (S s tdom') tcod'
 sType sub (TUp t) = do
   let t' = sType sub t
   TUp t'
