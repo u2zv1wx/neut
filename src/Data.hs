@@ -192,8 +192,10 @@ newName = do
 
 newNameWith :: String -> WithEnv String
 newNameWith s = do
-  s' <- newName
-  return $ s ++ s'
+  i <- newName
+  let s' = s ++ i
+  modify (\e -> e {nameEnv = (s, s') : nameEnv e})
+  return s'
 
 lookupTEnv :: String -> WithEnv (Maybe Type)
 lookupTEnv s = gets (lookup s . typeEnv)

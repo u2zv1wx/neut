@@ -15,7 +15,7 @@ alpha (Lam (S s t) e) = do
   local $ do
     s' <- newNameWith s
     e' <- alpha e
-    return $ Lam (S s t') e'
+    return $ Lam (S s' t') e'
 alpha (App e v) = do
   e' <- alpha e
   v' <- alpha v
@@ -72,7 +72,7 @@ alpha (Case e ves) = do
     forM ves $ \(pat, body) ->
       local $ do
         env <- get
-        patEnvOrErr <- liftIO $ runWithEnv (alpha pat) (env {nameEnv = []})
+        patEnvOrErr <- liftIO $ runWithEnv (alphaPat pat) (env {nameEnv = []})
         case patEnvOrErr of
           Left err -> lift $ throwE err
           Right (pat', env') -> do
@@ -118,6 +118,94 @@ alphaString s = do
   case lookup s (nameEnv env) of
     Just s' -> return s'
     Nothing -> lift $ throwE $ "undefined variable: " ++ show s
+
+alphaPat :: Expr -> WithEnv Expr
+alphaPat (Var s) = Var <$> alphaPatString s
+alphaPat (Const (S s t)) = do
+  t' <- alphaType t
+  return $ Const (S s t')
+alphaPat (Lam (S s t) e) = do
+  t' <- alphaType t
+  local $ do
+    s' <- newNameWith s
+    e' <- alphaPat e
+    return $ Lam (S s' t') e'
+alphaPat (App e v) = do
+  e' <- alphaPat e
+  v' <- alphaPat v
+  return $ App e' v'
+alphaPat (VApp v1 v2) = do
+  v1' <- alphaPat v1
+  v2' <- alphaPat v2
+  return $ VApp v1' v2'
+alphaPat (Ret v) = do
+  v' <- alphaPat v
+  return $ Ret v'
+alphaPat (Bind (S s t) e1 e2) = do
+  e1' <- alphaPat e1
+  s' <- newNameWith s
+  t' <- alphaType t
+  e2' <- alphaPat e2
+  return $ Bind (S s' t') e1' e2'
+alphaPat (Thunk e) = do
+  e' <- alphaPat e
+  return $ Thunk e'
+alphaPat (Unthunk v) = do
+  v' <- alphaPat v
+  return $ Unthunk v'
+alphaPat (Send (S s t) e) = do
+  s' <- alphaPatString s
+  t' <- alphaType t
+  e' <- alphaPat e
+  return $ Send (S s' t') e'
+alphaPat (Recv (S s t) e) = do
+  t' <- alphaType t
+  local $ do
+    s' <- newNameWith s
+    e' <- alphaPat e
+    return $ Recv (S s t) e
+alphaPat (Dispatch e1 e2) = do
+  e1' <- alphaPat e1
+  e2' <- alphaPat e2
+  return $ Dispatch e1' e2'
+alphaPat (Coleft e) = do
+  e' <- alphaPat e
+  return $ Coleft e'
+alphaPat (Coright e) = do
+  e' <- alphaPat e
+  return $ Coright e'
+alphaPat (Mu (S s t) e) = do
+  t' <- alphaType t
+  local $ do
+    s' <- newNameWith s
+    e' <- alphaPat e
+    return $ Mu (S s' t') e'
+alphaPat (Case e ves) = do
+  e' <- alphaPat e
+  ves' <-
+    forM ves $ \(pat, body) ->
+      local $ do
+        env <- get
+        patEnvOrErr <- liftIO $ runWithEnv (alphaPat pat) (env {nameEnv = []})
+        case patEnvOrErr of
+          Left err -> lift $ throwE err
+          Right (pat', env') -> do
+            put
+              (env {nameEnv = nameEnv env' ++ nameEnv env, count = count env'})
+            body' <- alphaPat body
+            return (pat', body')
+  return $ Case e' ves'
+alphaPat (Asc e t) = do
+  e' <- alphaPat e
+  t' <- alphaType t
+  return $ Asc e' t'
+
+alphaPatString :: String -> WithEnv String
+alphaPatString s = do
+  env <- get
+  case lookup s (nameEnv env) of
+    Just s' -> return s'
+    Nothing -> newNameWith s
 
 local :: WithEnv a -> WithEnv a
 local p = do
