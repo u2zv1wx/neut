@@ -34,7 +34,7 @@ load' (Node [Atom "value", Atom s, tp]:as) = do
 load' (a:as) = do
   a' <- macroExpand a
   liftIO $ putStrLn $ Pr.ppShow a'
-  e <- parseExpr a'
+  e <- parseTerm a'
   e' <- alpha e
   check e'
   e'' <- cls e'

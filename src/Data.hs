@@ -53,13 +53,23 @@ type ClosureName = String
 
 type FreeVar = String
 
--- positive term
+-- positive term / value
 -- v ::= x
 --     | {defined constant} <- such as nat, succ, etc.
 --     | (v v)
 --     | (thunk e)
 --     | (ascribe v P)
--- negative term
+data V
+  = VVar String
+  | VConst String
+  | VThunk C
+  | VConsApp V
+             V
+  | VAsc V
+         Type
+  deriving (Show, Eq)
+
+-- negative term / computation
 -- e ::= (lambda (x P) e)
 --     | (e v)
 --     | (return v)
@@ -73,38 +83,66 @@ type FreeVar = String
 --     | (mu (x P) e)
 --     | (case e (v1 e1) ... (vn en))
 --     | (ascribe e N)
-data Expr
+data C
+  = CLam Sym
+         C
+  | CApp C
+         V
+  | CRet V
+  | CBind Sym
+          C
+          C
+  | CUnthunk V
+  | CSend Sym
+          C
+  | CRecv Sym
+          C
+  | CDispatch C
+              C
+  | CColeft C
+  | CCoright C
+  | CMu Sym
+        C
+  | CCase C
+          [(V, C)]
+  | CAsc C
+         Type
+  deriving (Show, Eq)
+
+data PolTerm
+  = Value V
+  | Comp C
+  deriving (Show, Eq)
+
+data Term
   = Var String
   | Const String
-  | Thunk Expr
+  | Thunk Term
   | Lam Sym
-        Expr
-  | App Expr
-        Expr
-  | VApp Expr
-         Expr
-  | Ret Expr
+        Term
+  | App Term
+        Term
+  | ConsApp Term
+            Term
+  | Ret Term
   | Bind Sym
-         Expr
-         Expr
-  | Unthunk Expr
+         Term
+         Term
+  | Unthunk Term
   | Send Sym
-         Expr
+         Term
   | Recv Sym
-         Expr
-  | Dispatch Expr
-             Expr
-  | Coleft Expr
-  | Coright Expr
+         Term
+  | Dispatch Term
+             Term
+  | Coleft Term
+  | Coright Term
   | Mu Sym
-       Expr
-  | Case Expr
-         [(Expr, Expr)]
-  | Asc Expr
+       Term
+  | Case Term
+         [(Term, Term)]
+  | Asc Term
         Type
-  | Cls ClosureName
-        [FreeVar]
-        Expr
   deriving (Show, Eq)
 
 -- positive type
@@ -138,11 +176,12 @@ data Env = Env
   , notationEnv   :: [(Tree, Tree)]
   , reservedEnv   :: [String]
   , nameEnv       :: [(String, String)]
-  , exprEnv       :: [Expr]
+  , exprEnv       :: [Term]
   , typeEnv       :: [(String, Type)]
   , constraintEnv :: [(Type, Type)]
   , levelEnv      :: [(Level, Level)]
-  , clsEnv        :: [(ClosureName, [FreeVar], Expr)]
+  , clsEnv        :: [(ClosureName, [FreeVar], Term)]
+  , defEnv        :: [(String, [Asm])]
   } deriving (Show)
 
 initialEnv :: Env
@@ -176,6 +215,7 @@ initialEnv =
     , constraintEnv = []
     , levelEnv = []
     , clsEnv = []
+    , defEnv = []
     }
 
 type WithEnv a = StateT Env (ExceptT String IO) a
@@ -220,3 +260,37 @@ insCEnv t1 t2 = modify (\e -> e {constraintEnv = (t1, t2) : constraintEnv e})
 
 insLEnv :: Level -> Level -> WithEnv ()
 insLEnv l1 l2 = modify (\e -> e {levelEnv = (l1, l2) : levelEnv e})
+
+insDEnv :: String -> [Asm] -> WithEnv ()
+insDEnv s d = modify (\e -> e {defEnv = (s, d) : defEnv e})
+
+type Addr = String
+
+data Asm
+  = ALoad Addr
+  | AJump Addr
+  | ACons Addr
+          Addr
+  | ASetArgs [Addr]
+  | AStore Addr
+           Addr
+  | ARet Addr
+  | AAlloc Addr
+           [Asm]
+           [String]
+  | ADeref Addr
+  deriving (Show, Eq)
+
+data Operand
+  = Register String -- var
+  | Alloc Operation -- thunk code <list of free var>
+          [Addr]
+  deriving (Show, Eq)
+
+data Operation
+  = Ans Operand -- return
+  | Let String -- bind (we also use this to represent abstraction/application)
+        Operand
+        Operation
+  | Jump Addr -- unthunk
+  deriving (Show, Eq)

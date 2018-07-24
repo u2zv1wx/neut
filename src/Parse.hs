@@ -1,6 +1,6 @@
 module Parse
   ( parseType
-  , parseExpr
+  , parseTerm
   ) where
 
 import           Control.Monad              (void)
@@ -16,83 +16,83 @@ import           Text.Read                  (readMaybe)
 
 import qualified Text.Show.Pretty           as Pr
 
-parseExpr :: Tree -> WithEnv Expr
-parseExpr (Atom "_") = Var <$> newName
-parseExpr (Atom s) = do
+parseTerm :: Tree -> WithEnv Term
+parseTerm (Atom "_") = Var <$> newName
+parseTerm (Atom s) = do
   msym <- definedConst s
   case msym of
     Nothing -> do
       s' <- strToName s
       return $ Var s'
     Just (s, _) -> return $ Const s
-parseExpr (Node [Atom "thunk", te]) = do
-  e <- parseExpr te
+parseTerm (Node [Atom "thunk", te]) = do
+  e <- parseTerm te
   return $ Thunk e
-parseExpr (Node [Atom "lambda", Node [Atom s, tp], te]) = do
+parseTerm (Node [Atom "lambda", Node [Atom s, tp], te]) = do
   s' <- strToName s
   p <- parseType tp
-  e <- parseExpr te
+  e <- parseTerm te
   return $ Lam (S s' p) e
-parseExpr (Node [Atom "return", tv]) = do
-  v <- parseExpr tv
+parseTerm (Node [Atom "return", tv]) = do
+  v <- parseTerm tv
   return $ Ret v
-parseExpr (Node [Atom "bind", Node [Atom s, tp], te1, te2]) = do
+parseTerm (Node [Atom "bind", Node [Atom s, tp], te1, te2]) = do
   s' <- strToName s
   p <- parseType tp
-  e1 <- parseExpr te1
-  e2 <- parseExpr te2
+  e1 <- parseTerm te1
+  e2 <- parseTerm te2
   return $ Bind (S s' p) e1 e2
-parseExpr (Node [Atom "unthunk", tv]) = do
-  v <- parseExpr tv
+parseTerm (Node [Atom "unthunk", tv]) = do
+  v <- parseTerm tv
   return $ Unthunk v
-parseExpr (Node [Atom "send", Node [Atom s, tp], te]) = do
+parseTerm (Node [Atom "send", Node [Atom s, tp], te]) = do
   s' <- strToName s
   p <- parseType tp
-  e <- parseExpr te
+  e <- parseTerm te
   return $ Send (S s' p) e
-parseExpr (Node [Atom "receive", Node [Atom s, tp], te]) = do
+parseTerm (Node [Atom "receive", Node [Atom s, tp], te]) = do
   s' <- strToName s
   p <- parseType tp
-  e <- parseExpr te
+  e <- parseTerm te
   return $ Recv (S s' p) e
-parseExpr (Node (Atom "dispatch":te:tes))
+parseTerm (Node (Atom "dispatch":te:tes))
   | not (null tes) = do
-    e <- parseExpr te
-    es <- mapM parseExpr tes
+    e <- parseTerm te
+    es <- mapM parseTerm tes
     return $ foldl Dispatch e es
-parseExpr (Node [Atom "coleft", te]) = do
-  e <- parseExpr te
+parseTerm (Node [Atom "coleft", te]) = do
+  e <- parseTerm te
   return $ Coleft e
-parseExpr (Node [Atom "coright", te]) = do
-  e <- parseExpr te
+parseTerm (Node [Atom "coright", te]) = do
+  e <- parseTerm te
   return $ Coright e
-parseExpr (Node [Atom "mu", Node [Atom s, tp], te]) = do
+parseTerm (Node [Atom "mu", Node [Atom s, tp], te]) = do
   s' <- strToName s
   p <- parseType tp
-  e <- parseExpr te
+  e <- parseTerm te
   return $ Mu (S s' p) e
-parseExpr (Node (Atom "case":te:tves))
+parseTerm (Node (Atom "case":te:tves))
   | not (null tves) = do
-    e <- parseExpr te
+    e <- parseTerm te
     ves <- mapM parseClause tves
     return $ Case e ves
-parseExpr (Node [Atom "ascribe", te, tn]) = do
-  e <- parseExpr te
+parseTerm (Node [Atom "ascribe", te, tn]) = do
+  e <- parseTerm te
   n <- parseType tn
   return $ Asc e n
-parseExpr (Node (te:tvs))
+parseTerm (Node (te:tvs))
   | not (null tvs) = do
-    e <- parseExpr te
-    vs <- mapM parseExpr tvs
+    e <- parseTerm te
+    vs <- mapM parseTerm tvs
     case e of
-      Const sym -> return $ foldl VApp e vs
+      Const sym -> return $ foldl ConsApp e vs
       _         -> return $ foldl App e vs
-parseExpr t = lift $ throwE $ "parseExpr: syntax error:\n" ++ Pr.ppShow t
+parseTerm t = lift $ throwE $ "parseTerm: syntax error:\n" ++ Pr.ppShow t
 
-parseClause :: Tree -> WithEnv (Expr, Expr)
+parseClause :: Tree -> WithEnv (Term, Term)
 parseClause (Node [tv, te]) = do
-  v <- parseExpr tv
-  e <- parseExpr te
+  v <- parseTerm tv
+  e <- parseTerm te
   return (v, e)
 parseClause t = lift $ throwE $ "parseClause: syntax error:\n" ++ Pr.ppShow t
 

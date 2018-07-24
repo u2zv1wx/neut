@@ -4,7 +4,7 @@ import           Control.Monad
 import           Control.Monad.State
 import           Data
 
-cls :: Expr -> WithEnv Expr
+cls :: Term -> WithEnv Term
 cls (Var s) = return $ Var s
 cls (Const s) = return $ Const s
 cls (Lam (S s t) e) = do
@@ -14,10 +14,10 @@ cls (App e v) = do
   e' <- cls e
   v' <- cls v
   return $ App e' v'
-cls (VApp v1 v2) = do
+cls (ConsApp v1 v2) = do
   v1' <- cls v1
   v2' <- cls v2
-  return $ VApp v1' v2'
+  return $ ConsApp v1' v2'
 cls (Ret v) = do
   v' <- cls v
   return $ Ret v'
@@ -66,12 +66,12 @@ cls (Asc e t) = do
   e' <- cls e
   return $ Asc e' t
 
-freeVar :: Expr -> [String]
+freeVar :: Term -> [String]
 freeVar (Var s) = [s]
 freeVar (Const _) = []
 freeVar (Lam (S s t) e) = filter (/= s) (freeVar e)
 freeVar (App e v) = freeVar e ++ freeVar v
-freeVar (VApp v1 v2) = freeVar v1 ++ freeVar v2
+freeVar (ConsApp v1 v2) = freeVar v1 ++ freeVar v2
 freeVar (Ret v) = freeVar v
 freeVar (Bind (S s t) e1 e2) = freeVar e1 ++ filter (/= s) (freeVar e2)
 freeVar (Thunk e) = freeVar e

@@ -10,7 +10,7 @@ import qualified Text.Show.Pretty           as Pr
 
 import           Data
 
-check :: Expr -> WithEnv ()
+check :: Term -> WithEnv ()
 check e = do
   t <- infer e
   env <- get
@@ -19,7 +19,7 @@ check e = do
   let tenv' = map (\(s, t) -> (s, sType sub t)) $ typeEnv env
   modify (\e -> e {typeEnv = tenv'})
 
-infer :: Expr -> WithEnv Type
+infer :: Term -> WithEnv Type
 infer (Var s) = do
   mt <- lookupTEnv s
   case mt of
@@ -46,7 +46,7 @@ infer (App e v) = do
   insTEnv j tv
   insCEnv te (TForall (S j tv) (THole i))
   return $ THole i
-infer (VApp v1 v2) = do
+infer (ConsApp v1 v2) = do
   t1 <- infer v1
   t2 <- infer v2
   i <- newName

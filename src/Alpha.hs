@@ -5,7 +5,7 @@ import           Control.Monad.Trans.Except
 
 import           Data
 
-alpha :: Expr -> WithEnv Expr
+alpha :: Term -> WithEnv Term
 alpha (Var s) = Var <$> alphaString s
 alpha (Const s) = do
   return $ Const s
@@ -19,10 +19,10 @@ alpha (App e v) = do
   e' <- alpha e
   v' <- alpha v
   return $ App e' v'
-alpha (VApp v1 v2) = do
+alpha (ConsApp v1 v2) = do
   v1' <- alpha v1
   v2' <- alpha v2
-  return $ VApp v1' v2'
+  return $ ConsApp v1' v2'
 alpha (Ret v) = do
   v' <- alpha v
   return $ Ret v'
@@ -117,7 +117,7 @@ alphaString s = do
     Just s' -> return s'
     Nothing -> lift $ throwE $ "undefined variable: " ++ show s
 
-alphaPat :: Expr -> WithEnv Expr
+alphaPat :: Term -> WithEnv Term
 alphaPat (Var s) = Var <$> alphaPatString s
 alphaPat (Const s) = return $ Const s
 alphaPat (Lam (S s t) e) = do
@@ -130,10 +130,10 @@ alphaPat (App e v) = do
   e' <- alphaPat e
   v' <- alphaPat v
   return $ App e' v'
-alphaPat (VApp v1 v2) = do
+alphaPat (ConsApp v1 v2) = do
   v1' <- alphaPat v1
   v2' <- alphaPat v2
-  return $ VApp v1' v2'
+  return $ ConsApp v1' v2'
 alphaPat (Ret v) = do
   v' <- alphaPat v
   return $ Ret v'
