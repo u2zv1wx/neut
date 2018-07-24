@@ -28,6 +28,6 @@
   (bind (x type) (begin e+) (begin rest+)))
 
 (begin
-  (let yay (return (succ (succ zero))))
-  (let yay (return (thunk (lambda (x nat) (return x)))))
-  ((unthunk yay) zero))
+  (let yay (return (thunk (lambda (x nat) (return (succ x))))))
+  ((unthunk yay) zero)
+  (return true))

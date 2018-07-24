@@ -307,5 +307,8 @@ data Operation
   | Let RegName -- bind (we also use this to represent abstraction/application)
         Operand
         Operation
-  | Jump RegName -- unthunk (jump to the address in the register)
+  | LetCall RegName
+            MemAddr
+            Operation
+  | Jump RegName -- unthunk (jump to the address in the register, run, and back to the original point)
   deriving (Show, Eq)
