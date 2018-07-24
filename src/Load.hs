@@ -2,32 +2,36 @@ module Load
   ( load
   ) where
 
+import           Control.Monad.Except
+import           Control.Monad.Identity
 import           Control.Monad.State
+import           Control.Monad.Trans.Except
 
 import           Alpha
-import           Closure
 import           Data
 import           Macro
 import           Parse
+import           Polarize
 import           Read
 import           Typing
+import           Virtual
 
-import qualified Text.Show.Pretty    as Pr
+import qualified Text.Show.Pretty           as Pr
 
 load :: String -> WithEnv ()
 load s = do
   astList <- strToTree s
   load' astList
 
-load' :: [Tree] -> WithEnv ()
+load' :: [MTree] -> WithEnv ()
 load' [] = return ()
-load' (Node [Atom "notation", from, to]:as) = do
+load' ((Node [(Atom "notation", _), from, to], _):as) = do
   modify (\e -> e {notationEnv = (from, to) : notationEnv e})
   load' as
-load' (Node [Atom "reserve", Atom s]:as) = do
+load' ((Node [(Atom "reserve", _), (Atom s, _)], _):as) = do
   modify (\e -> e {reservedEnv = s : reservedEnv e})
   load' as
-load' (Node [Atom "value", Atom s, tp]:as) = do
+load' ((Node [(Atom "value", _), (Atom s, _), tp], _):as) = do
   p <- parseType tp
   modify (\e -> e {valueEnv = (s, p) : valueEnv e})
   load' as
@@ -37,6 +41,16 @@ load' (a:as) = do
   e <- parseTerm a'
   e' <- alpha e
   check e'
-  e'' <- cls e'
-  liftIO $ putStrLn $ Pr.ppShow e''
-  load' as
+  case polarize e' of
+    Left err -> lift $ throwE err
+    Right e''
+      -- liftIO $ putStrLn $ Pr.ppShow e''
+     -> do
+      case e'' of
+        Value v -> do
+          v' <- virtualV v
+          liftIO $ putStrLn $ Pr.ppShow v'
+        Comp c -> do
+          c' <- virtualC c
+          liftIO $ putStrLn $ Pr.ppShow c'
+      load' as

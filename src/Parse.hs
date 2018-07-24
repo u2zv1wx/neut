@@ -16,130 +16,157 @@ import           Text.Read                  (readMaybe)
 
 import qualified Text.Show.Pretty           as Pr
 
-parseTerm :: Tree -> WithEnv Term
-parseTerm (Atom "_") = Var <$> newName
-parseTerm (Atom s) = do
+parseTerm :: MTree -> WithEnv MTerm
+parseTerm (Atom "_", i) = do
+  name <- newName
+  return (Var name, i)
+parseTerm (Atom s, i) = do
   msym <- definedConst s
   case msym of
     Nothing -> do
       s' <- strToName s
-      return $ Var s'
-    Just (s, _) -> return $ Const s
-parseTerm (Node [Atom "thunk", te]) = do
+      return (Var s', i)
+    Just (s, _) -> return (Const s, i)
+parseTerm (Node [(Atom "thunk", _), te], i) = do
   e <- parseTerm te
-  return $ Thunk e
-parseTerm (Node [Atom "lambda", Node [Atom s, tp], te]) = do
+  return (Thunk e, i)
+parseTerm (Node [(Atom "lambda", _), (Node [(Atom s, _), tp], _), te], i) = do
   s' <- strToName s
   p <- parseType tp
   e <- parseTerm te
-  return $ Lam (S s' p) e
-parseTerm (Node [Atom "return", tv]) = do
+  return (Lam (S s' p) e, i)
+parseTerm (Node [(Atom "return", _), tv], i) = do
   v <- parseTerm tv
-  return $ Ret v
-parseTerm (Node [Atom "bind", Node [Atom s, tp], te1, te2]) = do
+  return (Ret v, i)
+parseTerm (Node [(Atom "bind", _), (Node [(Atom s, _), tp], _), te1, te2], i) = do
   s' <- strToName s
   p <- parseType tp
   e1 <- parseTerm te1
   e2 <- parseTerm te2
-  return $ Bind (S s' p) e1 e2
-parseTerm (Node [Atom "unthunk", tv]) = do
+  return (Bind (S s' p) e1 e2, i)
+parseTerm (Node [(Atom "unthunk", _), tv], i) = do
   v <- parseTerm tv
-  return $ Unthunk v
-parseTerm (Node [Atom "send", Node [Atom s, tp], te]) = do
+  return (Unthunk v, i)
+parseTerm (Node [(Atom "send", _), (Node [(Atom s, _), tp], _), te], i) = do
   s' <- strToName s
   p <- parseType tp
   e <- parseTerm te
-  return $ Send (S s' p) e
-parseTerm (Node [Atom "receive", Node [Atom s, tp], te]) = do
+  return (Send (S s' p) e, i)
+parseTerm (Node [(Atom "receive", _), (Node [(Atom s, _), tp], _), te], i) = do
   s' <- strToName s
   p <- parseType tp
   e <- parseTerm te
-  return $ Recv (S s' p) e
-parseTerm (Node (Atom "dispatch":te:tes))
+  return (Recv (S s' p) e, i)
+-- parseTerm (Node [(Atom "dispatch", _), t1, t2], i) = do
+--   e1 <- parseTerm t1
+--   e2 <- parseTerm t2
+--   return (Dispatch e1 e2, i)
+parseTerm (Node ((Atom "dispatch", k):t:tes), i)
   | not (null tes) = do
-    e <- parseTerm te
+    e <- parseTerm t
     es <- mapM parseTerm tes
-    return $ foldl Dispatch e es
-parseTerm (Node [Atom "coleft", te]) = do
+    tmp <- foldMTerm Dispatch e es
+    return (fst tmp, i)
+parseTerm (Node [(Atom "coleft", _), te], i) = do
   e <- parseTerm te
-  return $ Coleft e
-parseTerm (Node [Atom "coright", te]) = do
+  return (Coleft e, i)
+parseTerm (Node [(Atom "coright", _), te], i) = do
   e <- parseTerm te
-  return $ Coright e
-parseTerm (Node [Atom "mu", Node [Atom s, tp], te]) = do
+  return (Coright e, i)
+parseTerm (Node [(Atom "mu", _), (Node [(Atom s, _), tp], _), te], i) = do
   s' <- strToName s
   p <- parseType tp
   e <- parseTerm te
-  return $ Mu (S s' p) e
-parseTerm (Node (Atom "case":te:tves))
+  return (Mu (S s' p) e, i)
+parseTerm (Node ((Atom "case", _):te:tves), i)
   | not (null tves) = do
     e <- parseTerm te
     ves <- mapM parseClause tves
-    return $ Case e ves
-parseTerm (Node [Atom "ascribe", te, tn]) = do
+    return (Case e ves, i)
+parseTerm (Node [(Atom "ascribe", _), te, tn], i) = do
   e <- parseTerm te
   n <- parseType tn
-  return $ Asc e n
-parseTerm (Node (te:tvs))
+  return (Asc e n, i)
+parseTerm (Node (te:tvs), i)
   | not (null tvs) = do
     e <- parseTerm te
     vs <- mapM parseTerm tvs
     case e of
-      Const sym -> return $ foldl ConsApp e vs
-      _         -> return $ foldl App e vs
+      (Const sym, _) -> do
+        tmp <- foldMTerm ConsApp e vs
+        return (fst tmp, i)
+      _ -> do
+        tmp <- foldMTerm App e vs
+        return (fst tmp, i)
 parseTerm t = lift $ throwE $ "parseTerm: syntax error:\n" ++ Pr.ppShow t
 
-parseClause :: Tree -> WithEnv (Term, Term)
-parseClause (Node [tv, te]) = do
+foldMTerm ::
+     ((a, String) -> (a, String) -> a)
+  -> (a, String)
+  -> [(a, String)]
+  -> WithEnv (a, String)
+foldMTerm f e [] = return e
+foldMTerm f e (t:ts) = do
+  let tmp = f e t
+  i <- newName
+  foldMTerm f (tmp, i) ts
+
+parseClause :: MTree -> WithEnv (MTerm, MTerm)
+parseClause (Node [tv, te], i) = do
   v <- parseTerm tv
   e <- parseTerm te
   return (v, e)
 parseClause t = lift $ throwE $ "parseClause: syntax error:\n" ++ Pr.ppShow t
 
-parseType :: Tree -> WithEnv Type
-parseType (Atom "_") = THole <$> newName
-parseType (Atom "universe") = TUniv . LHole <$> newName
-parseType (Atom s) = do
+parseType :: MTree -> WithEnv MType
+parseType (Atom "_", i) = do
+  name <- newName
+  return (THole name, i)
+parseType (Atom "universe", i) = do
+  t <- TUniv . LHole <$> newName
+  return (t, i)
+parseType (Atom s, i) = do
   msym <- definedConst s
   case msym of
     Nothing -> do
       s' <- strToName s
-      return $ TVar s'
-    Just (s, _) -> return $ TConst s
-parseType (Node [Atom "down", tn]) = do
+      return (TVar s', i)
+    Just (s, _) -> return (TConst s, i)
+parseType (Node [(Atom "down", _), tn], i) = do
   n <- parseType tn
-  return $ TDown n
-parseType (Node [Atom "node", Node [Atom s, tp1], tp2]) = do
+  return (TDown n, i)
+parseType (Node [(Atom "node", _), (Node [(Atom s, _), tp1], _), tp2], i) = do
   s' <- strToName s
   p1 <- parseType tp1
   p2 <- parseType tp2
-  return $ TNode (S s' p1) p2
-parseType (Node [Atom "universe", Atom si]) =
+  return (TNode (S s' p1) p2, i)
+parseType (Node [(Atom "universe", _), (Atom si, _)], i) =
   case readMaybe si of
     Nothing -> lift $ throwE $ "not a number: " ++ si
-    Just i  -> return $ TUniv (Fixed i)
-parseType (Node [Atom "forall", Node [Atom s, tp], tn]) = do
+    Just j  -> return (TUniv (Fixed j), i)
+parseType (Node [(Atom "forall", _), (Node [(Atom s, _), tp], _), tn], i) = do
   s' <- strToName s
   p <- parseType tp
   n <- parseType tn
-  return $ TForall (S s' p) n
-parseType (Node (Atom "par":tn:tns))
+  return (TForall (S s' p) n, i)
+parseType (Node ((Atom "par", _):tn:tns), i)
   | not (null tns) = do
     n <- parseType tn
     ns <- mapM parseType tns
-    return $ foldl TCotensor n ns
-parseType (Node [Atom "up", tp]) = do
+    tmp <- foldMTerm TCotensor n ns
+    return (fst tmp, i)
+parseType (Node [(Atom "up", _), tp], i) = do
   p <- parseType tp
-  return $ TUp p
+  return (TUp p, i)
 parseType t = lift $ throwE $ "parseType: syntax error:\n" ++ Pr.ppShow t
 
-parseVDef :: Tree -> WithEnv ()
-parseVDef (Node [Atom "value", Atom x, tp]) = do
+parseVDef :: MTree -> WithEnv ()
+parseVDef (Node [(Atom "value", _), (Atom x, _), tp], i) = do
   p <- parseType tp
   modify (\e -> e {valueEnv = (x, p) : valueEnv e})
 parseVDef t = lift $ throwE $ "parseVDef: syntax error:\n" ++ Pr.ppShow t
 
-definedConst :: String -> WithEnv (Maybe (String, Type))
+definedConst :: String -> WithEnv (Maybe (String, MType))
 definedConst s = do
   env <- get
   let vEnv = valueEnv env

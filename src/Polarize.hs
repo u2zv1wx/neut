@@ -4,83 +4,84 @@ import           Control.Monad
 
 import           Data
 
-polarize :: Term -> Either String PolTerm
-polarize (Var s) = return $ Value $ VVar s
-polarize (Const s) = return $ Value $ VConst s
-polarize (Lam s e) = do
+polarize :: MTerm -> Either String PolTerm
+polarize (Var s, i) = return $ Value (VVar s, i)
+polarize (Const s, i) = return $ Value (VConst s, i)
+polarize (Lam s e, i) = do
   mc <- polarize e
   case mc of
-    Comp c -> return $ Comp $ CLam s c
+    Comp c -> return $ Comp (CLam s c, i)
     _      -> Left $ "the polarity of " ++ show e ++ " is wrong"
-polarize (App e1 e2) = do
+polarize (App e1 e2, i) = do
   mc <- polarize e1
   mv <- polarize e2
   case (mc, mv) of
-    (Comp c, Value v) -> return $ Comp $ CApp c v
+    (Comp c, Value v) -> return $ Comp (CApp c v, i)
     _ ->
       Left $ "the polarity of " ++ show e1 ++ " or " ++ show e2 ++ " is wrong"
-polarize (ConsApp e1 e2) = do
+polarize (ConsApp e1 e2, i) = do
   mv1 <- polarize e1
   mv2 <- polarize e2
   case (mv1, mv2) of
-    (Value v1, Value v2) -> return $ Value $ VConsApp v1 v2
+    (Value v1, Value v2) -> return $ Value (VConsApp v1 v2, i)
     _ ->
       Left $ "the polarity of " ++ show e1 ++ " or " ++ show e2 ++ " is wrong"
-polarize (Ret e) = do
+polarize (Ret e, i) = do
   mv <- polarize e
   case mv of
-    Value v -> return $ Comp $ CRet v
+    Value v -> return $ Comp (CRet v, i)
     _       -> Left $ "the polarity of " ++ show e ++ " is wrong"
-polarize (Bind s e1 e2) = do
+polarize (Bind s e1 e2, i) = do
   mc1 <- polarize e1
   mc2 <- polarize e2
   case (mc1, mc2) of
-    (Comp c1, Comp c2) -> return $ Comp $ CBind s c1 c2
+    (Comp c1, Comp c2) -> return $ Comp (CBind s c1 c2, i)
     _ ->
-      Left $ "the polarity of " ++ show e1 ++ " or " ++ show e2 ++ " is wrong"
-polarize (Thunk e) = do
+      Left $
+      "foo the polarity of " ++ show e1 ++ " or " ++ show e2 ++ " is wrong"
+polarize (Thunk e, i) = do
   mc <- polarize e
   case mc of
-    Comp c -> return $ Value $ VThunk c
+    Comp c -> return $ Value (VThunk c, i)
     _      -> Left $ "the polarity of " ++ show e ++ " is wrong"
-polarize (Unthunk e) = do
+polarize (Unthunk e, i) = do
   mv <- polarize e
   case mv of
-    Value v -> return $ Comp $ CUnthunk v
+    Value v -> return $ Comp (CUnthunk v, i)
     _       -> Left $ "the polarity of " ++ show e ++ " is wrong"
-polarize (Send s e) = do
+polarize (Send s e, i) = do
   mc <- polarize e
   case mc of
-    Comp c -> return $ Comp $ CSend s c
+    Comp c -> return $ Comp (CSend s c, i)
     _      -> Left $ "the polarity of " ++ show e ++ " is wrong"
-polarize (Recv s e) = do
+polarize (Recv s e, i) = do
   mc <- polarize e
   case mc of
-    Comp c -> return $ Comp $ CRecv s c
+    Comp c -> return $ Comp (CRecv s c, i)
     _      -> Left $ "the polarity of " ++ show e ++ " is wrong"
-polarize (Dispatch e1 e2) = do
+polarize (Dispatch e1 e2, i) = do
   mc1 <- polarize e1
   mc2 <- polarize e2
   case (mc1, mc2) of
-    (Comp c1, Comp c2) -> return $ Comp $ CDispatch c1 c2
+    (Comp c1, Comp c2) -> return $ Comp (CDispatch c1 c2, i)
     _ ->
       Left $ "the polarity of " ++ show e1 ++ " or " ++ show e2 ++ " is wrong"
-polarize (Coleft e) = do
+polarize (Coleft e, i) = do
   mc <- polarize e
   case mc of
-    Comp c -> return $ Comp $ CColeft c
+    Comp c -> return $ Comp (CColeft c, i)
     _      -> Left $ "the polarity of " ++ show e ++ " is wrong"
-polarize (Coright e) = do
+polarize (Coright e, i) = do
   mc <- polarize e
   case mc of
-    Comp c -> return $ Comp $ CCoright c
+    Comp c -> return $ Comp (CCoright c, i)
     _      -> Left $ "the polarity of " ++ show e ++ " is wrong"
-polarize (Mu s e) = do
+polarize (Mu s e, i) = do
   mc <- polarize e
   case mc of
-    Comp c -> return $ Comp $ CMu s c
+    Comp c -> return $ Comp (CMu s c, i)
     _      -> Left $ "the polarity of " ++ show e ++ " is wrong"
-polarize (Case e ves) = do
+polarize (Case e ves, i) = do
   ves' <-
     forM ves $ \(v, e) -> do
       v' <- polarize v
@@ -91,6 +92,5 @@ polarize (Case e ves) = do
           Left $ "the polarity of " ++ show v ++ " or " ++ show e ++ " is wrong"
   e' <- polarize e
   case e' of
-    Comp c -> return $ Comp $ CCase c ves'
-polarize (Asc e t) = do
-  polarize e
+    Comp c -> return $ Comp (CCase c ves', i)
+polarize (Asc e t, _) = polarize e

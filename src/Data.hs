@@ -12,19 +12,19 @@ import qualified Text.Show.Pretty           as Pr
 -- S-expression
 data Tree
   = Atom String
-  | Node [Tree]
+  | Node [MTree]
   deriving (Show, Eq)
 
-car :: Tree -> Maybe Tree
+car :: Tree -> Maybe MTree
 car (Node (t:_)) = Just t
 car _            = Nothing
 
-cdr :: Tree -> Maybe [Tree]
+cdr :: Tree -> Maybe [MTree]
 cdr (Node (_:ts)) = Just ts
 cdr _             = Nothing
 
-ith :: Int -> Tree -> Maybe Tree
-ith 1 (Atom s) = Just (Atom s)
+ith :: Int -> Tree -> Maybe MTree
+-- ith 1 (Atom s) = Just (Atom s)
 ith i (Node ts)
   | 0 < i && i <= length ts = Just $ ts !! (i - 1)
 ith _ _ = Nothing
@@ -33,15 +33,17 @@ treeLength :: Tree -> Int
 treeLength (Atom _)  = 1
 treeLength (Node ts) = length ts
 
-recurM :: (Monad m) => (Tree -> m Tree) -> Tree -> m Tree
-recurM f (Atom s) = f (Atom s)
-recurM f (Node ts) = do
-  ts' <- mapM (recurM f) ts
-  f (Node ts')
+recurM :: (Monad m) => (MTree -> m MTree) -> MTree -> m MTree
+recurM f (Atom s, i) = f (Atom s, i)
+recurM f (Node tis, i) = do
+  tis' <- mapM (recurM f) tis
+  f (Node tis', i)
+
+type MTree = (Tree, Identifier)
 
 data Sym =
   S String
-    Type
+    MType
   deriving (Show, Eq)
 
 data Level
@@ -53,6 +55,8 @@ type ClosureName = String
 
 type FreeVar = String
 
+type Identifier = String
+
 -- positive term / value
 -- v ::= x
 --     | {defined constant} <- such as nat, succ, etc.
@@ -62,12 +66,15 @@ type FreeVar = String
 data V
   = VVar String
   | VConst String
-  | VThunk C
-  | VConsApp V
-             V
-  | VAsc V
-         Type
+  | VThunk MC
+  | VConsApp MV
+             MV
+  | VAsc MV
+         MType
   deriving (Show, Eq)
+
+-- value with metadata
+type MV = (V, Identifier)
 
 -- negative term / computation
 -- e ::= (lambda (x P) e)
@@ -85,65 +92,70 @@ data V
 --     | (ascribe e N)
 data C
   = CLam Sym
-         C
-  | CApp C
-         V
-  | CRet V
+         MC
+  | CApp MC
+         MV
+  | CRet MV
   | CBind Sym
-          C
-          C
-  | CUnthunk V
+          MC
+          MC
+  | CUnthunk MV
   | CSend Sym
-          C
+          MC
   | CRecv Sym
-          C
-  | CDispatch C
-              C
-  | CColeft C
-  | CCoright C
+          MC
+  | CDispatch MC
+              MC
+  | CColeft MC
+  | CCoright MC
   | CMu Sym
-        C
-  | CCase C
-          [(V, C)]
-  | CAsc C
-         Type
+        MC
+  | CCase MC
+          [(MV, MC)]
+  | CAsc MC
+         MType
   deriving (Show, Eq)
 
+-- computation with identifier
+type MC = (C, Identifier)
+
 data PolTerm
-  = Value V
-  | Comp C
+  = Value MV
+  | Comp MC
   deriving (Show, Eq)
 
 data Term
   = Var String
   | Const String
-  | Thunk Term
+  | Thunk MTerm
   | Lam Sym
-        Term
-  | App Term
-        Term
-  | ConsApp Term
-            Term
-  | Ret Term
+        MTerm
+  | App MTerm
+        MTerm
+  | ConsApp MTerm
+            MTerm
+  | Ret MTerm
   | Bind Sym
-         Term
-         Term
-  | Unthunk Term
+         MTerm
+         MTerm
+  | Unthunk MTerm
   | Send Sym
-         Term
+         MTerm
   | Recv Sym
-         Term
-  | Dispatch Term
-             Term
-  | Coleft Term
-  | Coright Term
+         MTerm
+  | Dispatch MTerm
+             MTerm
+  | Coleft MTerm
+  | Coright MTerm
   | Mu Sym
-       Term
-  | Case Term
-         [(Term, Term)]
-  | Asc Term
-        Type
+       MTerm
+  | Case MTerm
+         [(MTerm, MTerm)]
+  | Asc MTerm
+        MType
   deriving (Show, Eq)
+
+type MTerm = (Term, Identifier)
 
 -- positive type
 -- P ::= p
@@ -160,20 +172,22 @@ data Type
   | THole String
   | TConst String
   | TNode Sym
-          Type
-  | TUp Type
-  | TDown Type
+          MType
+  | TUp MType
+  | TDown MType
   | TUniv Level
   | TForall Sym
-            Type
-  | TCotensor Type
-              Type
+            MType
+  | TCotensor MType
+              MType
   deriving (Show, Eq)
+
+type MType = (Type, Identifier)
 
 data Env = Env
   { count         :: Int
-  , valueEnv      :: [(String, Type)]
-  , notationEnv   :: [(Tree, Tree)]
+  , valueEnv      :: [(String, MType)]
+  , notationEnv   :: [(MTree, MTree)]
   , reservedEnv   :: [String]
   , nameEnv       :: [(String, String)]
   , exprEnv       :: [Term]
@@ -181,7 +195,6 @@ data Env = Env
   , constraintEnv :: [(Type, Type)]
   , levelEnv      :: [(Level, Level)]
   , clsEnv        :: [(ClosureName, [FreeVar], Term)]
-  , defEnv        :: [(String, [Asm])]
   } deriving (Show)
 
 initialEnv :: Env
@@ -215,7 +228,6 @@ initialEnv =
     , constraintEnv = []
     , levelEnv = []
     , clsEnv = []
-    , defEnv = []
     }
 
 type WithEnv a = StateT Env (ExceptT String IO) a
@@ -249,7 +261,7 @@ newNameWith s = do
 lookupTEnv :: String -> WithEnv (Maybe Type)
 lookupTEnv s = gets (lookup s . typeEnv)
 
-lookupVEnv :: String -> WithEnv (Maybe Type)
+lookupVEnv :: String -> WithEnv (Maybe MType)
 lookupVEnv s = gets (lookup s . valueEnv)
 
 insTEnv :: String -> Type -> WithEnv ()
@@ -261,36 +273,31 @@ insCEnv t1 t2 = modify (\e -> e {constraintEnv = (t1, t2) : constraintEnv e})
 insLEnv :: Level -> Level -> WithEnv ()
 insLEnv l1 l2 = modify (\e -> e {levelEnv = (l1, l2) : levelEnv e})
 
-insDEnv :: String -> [Asm] -> WithEnv ()
-insDEnv s d = modify (\e -> e {defEnv = (s, d) : defEnv e})
-
 type Addr = String
 
-data Asm
-  = ALoad Addr
-  | AJump Addr
-  | ACons Addr
-          Addr
-  | ASetArgs [Addr]
-  | AStore Addr
-           Addr
-  | ARet Addr
-  | AAlloc Addr
-           [Asm]
-           [String]
-  | ADeref Addr
+type RegName = String
+
+type MemAddr = String
+
+data Cell
+  = CellAtom String
+  | CellReg RegName
+  | CellCons Cell
+             Cell
   deriving (Show, Eq)
 
 data Operand
-  = Register String -- var
+  = Register RegName -- var
+  | LoadConst MemAddr -- the address of constants (such as `nat`, `succ`, etc.)
+  | ConstCell Cell -- create a new cons cell and return the newly allocated memory address
   | Alloc Operation -- thunk code <list of free var>
-          [Addr]
+          [RegName]
   deriving (Show, Eq)
 
 data Operation
   = Ans Operand -- return
-  | Let String -- bind (we also use this to represent abstraction/application)
+  | Let RegName -- bind (we also use this to represent abstraction/application)
         Operand
         Operation
-  | Jump Addr -- unthunk
+  | Jump RegName -- unthunk (jump to the address in the register)
   deriving (Show, Eq)

@@ -10,7 +10,7 @@ import           Data.Maybe          (fromMaybe)
 
 import qualified Text.Show.Pretty    as Pr
 
-type Subst = ([(String, Tree)], [(String, [Tree])])
+type Subst = ([(String, MTree)], [(String, [MTree])])
 
 type Pattern = Tree
 
@@ -24,21 +24,21 @@ isRest s = last s == '+'
 
 -- 予約語のリストと入力の木とパターンを受け取り、予約語の情報を使いながら木とパターンを
 -- マッチさせていく。マッチに成功した時には、substitution, つまりシンボルと木への対応関係が返る。
-macroMatch :: [String] -> Tree -> Pattern -> Maybe Subst
-macroMatch rs (Atom s1) (Atom s2) =
+macroMatch :: [String] -> MTree -> MTree -> Maybe Subst
+macroMatch rs (Atom s1, i) (Atom s2, _) =
   case (s1 `elem` rs, s2 `elem` rs) of
     (True, True)
       | s1 == s2 -> return ([], [])
-    (False, False) -> return ([(s2, Atom s1)], [])
+    (False, False) -> return ([(s2, (Atom s1, i))], [])
     _ -> Nothing
-macroMatch rs t (Atom s) =
+macroMatch rs t (Atom s, _) =
   if s `elem` rs
     then Nothing
     else return ([(s, t)], [])
-macroMatch rs (Atom s) t = Nothing
-macroMatch rs (Node ts1) (Node ts2) =
+macroMatch rs (Atom s, i) (t, _) = Nothing
+macroMatch rs (Node ts1, i) (Node ts2, _) =
   case last ts2 of
-    Atom sym
+    (Atom sym, _)
       | isRest sym && length ts1 >= length ts2 -> do
         let (xs, rest) = splitAt (length ts2 - 1) ts1
         let ys = take (length ts2 - 1) ts2
@@ -51,19 +51,22 @@ macroMatch rs (Node ts1) (Node ts2) =
     _ -> Nothing
 
 -- substitutionをtreeに対して作用させる。
-applySubst :: Subst -> Tree -> Tree
-applySubst (s1, _) (Atom s) = fromMaybe (Atom s) (lookup s s1)
-applySubst sub@(_, s2) (Node ts) =
+applySubst :: Subst -> MTree -> MTree
+applySubst (s1, _) (Atom s, i) = do
+  case lookup s s1 of
+    Nothing -> (Atom s, i)
+    Just t  -> t
+applySubst sub@(_, s2) (Node ts, i) =
   case last ts of
-    Atom s
+    (Atom s, j)
       | isRest s && s `elem` map fst s2 -> do
         let tsButLast' = map (applySubst sub) (take (length ts - 1) ts)
         case lookup s s2 of
           Nothing   -> undefined
-          Just rest -> Node $ tsButLast' ++ rest
-    _ -> do
+          Just rest -> (Node $ tsButLast' ++ rest, j)
+    (_, j) -> do
       let ts' = map (applySubst sub) ts
-      Node ts'
+      (Node ts', j)
 
 -- 関数fをリストの第1要素に対して作用させ、最初にJustが得られたときの要素と第2要素のペアを返す。
 -- Justが得られなかったときにはNothingを返す。
@@ -74,18 +77,18 @@ try f ((p, q):as) =
     Nothing -> try f as
     Just x  -> Just (x, q)
 
-macroExpand1 :: Tree -> WithEnv Tree
-macroExpand1 t = do
+macroExpand1 :: MTree -> WithEnv MTree
+macroExpand1 t@(_, i) = do
   env <- get
   let nenv = notationEnv env
   let renv = reservedEnv env
   case try (macroMatch renv t) nenv of
     Just (subst, template) -> do
-      let t' = applySubst subst template
+      let t' = applySubst subst (fst template, i)
       macroExpand t'
     Nothing -> return t
 
 -- これをtermについてinductiveにやる必要がある。
 -- macroの展開が起こったか否かをフラグで管理するべき？
-macroExpand :: Tree -> WithEnv Tree
+macroExpand :: MTree -> WithEnv MTree
 macroExpand = recurM macroExpand1

@@ -5,67 +5,69 @@ import           Control.Monad.Trans.Except
 
 import           Data
 
-alpha :: Term -> WithEnv Term
-alpha (Var s) = Var <$> alphaString s
-alpha (Const s) = do
-  return $ Const s
-alpha (Lam (S s t) e) = do
+alpha :: MTerm -> WithEnv MTerm
+alpha (Var s, i) = do
+  t <- Var <$> alphaString s
+  return (t, i)
+alpha (Const s, i) = do
+  return (Const s, i)
+alpha (Lam (S s t) e, i) = do
   t' <- alphaType t
   local $ do
     s' <- newNameWith s
     e' <- alpha e
-    return $ Lam (S s' t') e'
-alpha (App e v) = do
+    return (Lam (S s' t') e', i)
+alpha (App e v, i) = do
   e' <- alpha e
   v' <- alpha v
-  return $ App e' v'
-alpha (ConsApp v1 v2) = do
+  return (App e' v', i)
+alpha (ConsApp v1 v2, i) = do
   v1' <- alpha v1
   v2' <- alpha v2
-  return $ ConsApp v1' v2'
-alpha (Ret v) = do
+  return (ConsApp v1' v2', i)
+alpha (Ret v, i) = do
   v' <- alpha v
-  return $ Ret v'
-alpha (Bind (S s t) e1 e2) = do
+  return (Ret v', i)
+alpha (Bind (S s t) e1 e2, i) = do
   e1' <- alpha e1
   s' <- newNameWith s
   t' <- alphaType t
   e2' <- alpha e2
-  return $ Bind (S s' t') e1' e2'
-alpha (Thunk e) = do
+  return (Bind (S s' t') e1' e2', i)
+alpha (Thunk e, i) = do
   e' <- alpha e
-  return $ Thunk e'
-alpha (Unthunk v) = do
+  return (Thunk e', i)
+alpha (Unthunk v, i) = do
   v' <- alpha v
-  return $ Unthunk v'
-alpha (Send (S s t) e) = do
+  return (Unthunk v', i)
+alpha (Send (S s t) e, i) = do
   s' <- alphaString s
   t' <- alphaType t
   e' <- alpha e
-  return $ Send (S s' t') e'
-alpha (Recv (S s t) e) = do
+  return (Send (S s' t') e', i)
+alpha (Recv (S s t) e, i) = do
   t' <- alphaType t
   local $ do
     s' <- newNameWith s
     e' <- alpha e
-    return $ Recv (S s' t') e'
-alpha (Dispatch e1 e2) = do
+    return (Recv (S s' t') e', i)
+alpha (Dispatch e1 e2, i) = do
   e1' <- alpha e1
   e2' <- alpha e2
-  return $ Dispatch e1' e2'
-alpha (Coleft e) = do
+  return (Dispatch e1' e2', i)
+alpha (Coleft e, i) = do
   e' <- alpha e
-  return $ Coleft e'
-alpha (Coright e) = do
+  return (Coleft e', i)
+alpha (Coright e, i) = do
   e' <- alpha e
-  return $ Coright e'
-alpha (Mu (S s t) e) = do
+  return (Coright e', i)
+alpha (Mu (S s t) e, i) = do
   t' <- alphaType t
   local $ do
     s' <- newNameWith s
     e' <- alpha e
-    return $ Mu (S s' t') e'
-alpha (Case e ves) = do
+    return (Mu (S s' t') e', i)
+alpha (Case e ves, i) = do
   e' <- alpha e
   ves' <-
     forM ves $ \(pat, body) ->
@@ -79,36 +81,42 @@ alpha (Case e ves) = do
               (env {nameEnv = nameEnv env' ++ nameEnv env, count = count env'})
             body' <- alpha body
             return (pat', body')
-  return $ Case e' ves'
-alpha (Asc e t) = do
+  return (Case e' ves', i)
+alpha (Asc e t, i) = do
   e' <- alpha e
   t' <- alphaType t
-  return $ Asc e' t'
+  return (Asc e' t', i)
 
-alphaType :: Type -> WithEnv Type
-alphaType (TVar s) = TVar <$> alphaString s
-alphaType (THole i) = return $ THole i
-alphaType (TConst s) = do
-  return $ TConst s
-alphaType (TNode (S s tdom) tcod) = do
+alphaType :: MType -> WithEnv MType
+alphaType (TVar s, i) = do
+  t <- TVar <$> alphaString s
+  return (t, i)
+alphaType (THole i, j) = return (THole i, j)
+alphaType (TConst s, i) = do
+  return (TConst s, i)
+alphaType (TNode (S s tdom) tcod, i) = do
   tdom' <- alphaType tdom
   local $ do
     s' <- newNameWith s
     tcod' <- alphaType tcod
-    return $ TNode (S s' tdom') tcod'
-alphaType (TUp t) = TUp <$> alphaType t
-alphaType (TDown t) = TDown <$> alphaType t
-alphaType (TUniv level) = return $ TUniv level
-alphaType (TForall (S s tdom) tcod) = do
+    return (TNode (S s' tdom') tcod', i)
+alphaType (TUp t, i) = do
+  t' <- TUp <$> alphaType t
+  return (t', i)
+alphaType (TDown t, i) = do
+  t' <- TDown <$> alphaType t
+  return (t', i)
+alphaType (TUniv level, i) = return (TUniv level, i)
+alphaType (TForall (S s tdom) tcod, i) = do
   tdom' <- alphaType tdom
   local $ do
     s' <- newNameWith s
     tcod' <- alphaType tcod
-    return $ TForall (S s' tdom') tcod'
-alphaType (TCotensor t1 t2) = do
+    return (TForall (S s' tdom') tcod', i)
+alphaType (TCotensor t1 t2, i) = do
   t1' <- alphaType t1
   t2' <- alphaType t2
-  return $ TCotensor t1' t2'
+  return (TCotensor t1' t2', i)
 
 alphaString :: String -> WithEnv String
 alphaString s = do
@@ -117,66 +125,68 @@ alphaString s = do
     Just s' -> return s'
     Nothing -> lift $ throwE $ "undefined variable: " ++ show s
 
-alphaPat :: Term -> WithEnv Term
-alphaPat (Var s) = Var <$> alphaPatString s
-alphaPat (Const s) = return $ Const s
-alphaPat (Lam (S s t) e) = do
+alphaPat :: MTerm -> WithEnv MTerm
+alphaPat (Var s, i) = do
+  t <- Var <$> alphaPatString s
+  return (t, i)
+alphaPat (Const s, i) = return (Const s, i)
+alphaPat (Lam (S s t) e, i) = do
   t' <- alphaType t
   local $ do
     s' <- newNameWith s
     e' <- alphaPat e
-    return $ Lam (S s' t') e'
-alphaPat (App e v) = do
+    return (Lam (S s' t') e', i)
+alphaPat (App e v, i) = do
   e' <- alphaPat e
   v' <- alphaPat v
-  return $ App e' v'
-alphaPat (ConsApp v1 v2) = do
+  return (App e' v', i)
+alphaPat (ConsApp v1 v2, i) = do
   v1' <- alphaPat v1
   v2' <- alphaPat v2
-  return $ ConsApp v1' v2'
-alphaPat (Ret v) = do
+  return (ConsApp v1' v2', i)
+alphaPat (Ret v, i) = do
   v' <- alphaPat v
-  return $ Ret v'
-alphaPat (Bind (S s t) e1 e2) = do
+  return (Ret v', i)
+alphaPat (Bind (S s t) e1 e2, i) = do
   e1' <- alphaPat e1
   s' <- newNameWith s
   t' <- alphaType t
   e2' <- alphaPat e2
-  return $ Bind (S s' t') e1' e2'
-alphaPat (Thunk e) = do
+  return (Bind (S s' t') e1' e2', i)
+alphaPat (Thunk e, i) = do
   e' <- alphaPat e
-  return $ Thunk e'
-alphaPat (Unthunk v) = do
+  return (Thunk e', i)
+alphaPat (Unthunk v, i) = do
   v' <- alphaPat v
-  return $ Unthunk v'
-alphaPat (Send (S s t) e) = do
+  return (Unthunk v', i)
+alphaPat (Send (S s t) e, i) = do
   s' <- alphaPatString s
   t' <- alphaType t
   e' <- alphaPat e
-  return $ Send (S s' t') e'
-alphaPat (Recv (S s t) e) = do
+  return (Send (S s' t') e', i)
+alphaPat (Recv (S s t) e, i) = do
   t' <- alphaType t
   local $ do
     s' <- newNameWith s
     e' <- alphaPat e
-    return $ Recv (S s t) e
-alphaPat (Dispatch e1 e2) = do
+    return (Recv (S s t) e, i)
+alphaPat (Dispatch e1 e2, i) = do
   e1' <- alphaPat e1
   e2' <- alphaPat e2
-  return $ Dispatch e1' e2'
-alphaPat (Coleft e) = do
+  return (Dispatch e1' e2', i)
+alphaPat (Coleft e, i) = do
   e' <- alphaPat e
-  return $ Coleft e'
-alphaPat (Coright e) = do
+  return (Coleft e', i)
+alphaPat (Coright e, i) = do
   e' <- alphaPat e
-  return $ Coright e'
-alphaPat (Mu (S s t) e) = do
+  return (Coright e', i)
+alphaPat (Mu (S s t) e, i) = do
   t' <- alphaType t
   local $ do
     s' <- newNameWith s
     e' <- alphaPat e
-    return $ Mu (S s' t') e'
-alphaPat (Case e ves) = do
+    return (Mu (S s' t') e', i)
+alphaPat (Case e ves, i) = do
   e' <- alphaPat e
   ves' <-
     forM ves $ \(pat, body) ->
@@ -190,11 +200,11 @@ alphaPat (Case e ves) = do
               (env {nameEnv = nameEnv env' ++ nameEnv env, count = count env'})
             body' <- alphaPat body
             return (pat', body')
-  return $ Case e' ves'
-alphaPat (Asc e t) = do
+  return (Case e' ves', i)
+alphaPat (Asc e t, i) = do
   e' <- alphaPat e
   t' <- alphaType t
-  return $ Asc e' t'
+  return (Asc e' t', i)
 
 alphaPatString :: String -> WithEnv String
 alphaPatString s = do
