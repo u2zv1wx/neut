@@ -16,7 +16,10 @@ check e = do
   env <- get
   sub <- unify $ constraintEnv env
   liftIO $ putStrLn $ Pr.ppShow sub
-  let tenv' = map (\(s, t) -> (s, sType sub t)) $ typeEnv env
+  env' <- get
+  let unifiedNames = unifyName (nameConstraintEnv env')
+  let tenv' =
+        map (\(s, t) -> (s, sTypeName unifiedNames $ sType sub t)) $ typeEnv env
   modify (\e -> e {typeEnv = tenv'})
 
 infer :: MTerm -> WithEnv Type
@@ -50,7 +53,7 @@ infer (App e v, l) = do
   insTEnv j tv
   k <- newName
   m <- newName
-  insCEnv te (TForall (S j (tv, m)) (THole i, k))
+  insCEnv te (TForall (SHole j (tv, m)) (THole i, k))
   let result = THole i
   insTEnv l result
   return result
@@ -63,7 +66,7 @@ infer (ConsApp v1 v2, l) = do
   insTEnv j t2
   k <- newName
   m <- newName
-  insCEnv t1 (TNode (S j (t2, m)) (THole i, k))
+  insCEnv t1 (TNode (SHole j (t2, m)) (THole i, k))
   let result = THole i
   insTEnv l result
   return result
@@ -171,10 +174,32 @@ unify ((TVar s1, TVar s2):cs)
   | s1 == s2 = unify cs
 unify ((TConst s1, TConst s2):cs)
   | s1 == s2 = unify cs
-unify ((TNode (S _ (tdom1, _)) (tcod1, _), TNode (S _ (tdom2, _)) (tcod2, _)):cs) =
-  unify $ (tdom1, tdom2) : (tcod1, tcod2) : cs
-unify ((TForall (S _ (tdom1, _)) (tcod1, _), TForall (S _ (tdom2, _)) (tcod2, _)):cs) =
-  unify $ (tdom1, tdom2) : (tcod1, tcod2) : cs
+-- unify ((TNode (S _ (tdom1, _)) (tcod1, _), TNode (S _ (tdom2, _)) (tcod2, _)):cs) =
+--   unify $ (tdom1, tdom2) : (tcod1, tcod2) : cs
+unify ((TNode (S i (tdom1, _)) (tcod1, _), TNode (S j (tdom2, _)) (tcod2, _)):cs)
+  | i == j = do
+    unify $ (THole i, THole j) : (tdom1, tdom2) : (tcod1, tcod2) : cs
+unify ((TNode (S i (tdom1, p)) (tcod1, _), TNode (SHole j (tdom2, q)) (tcod2, _)):cs) = do
+  insNCEnv (S i (tdom1, p)) (SHole j (tdom2, q))
+  unify $ (THole i, THole j) : (tdom1, tdom2) : (tcod1, tcod2) : cs
+unify ((TNode (SHole i (tdom1, p)) (tcod1, _), TNode (S j (tdom2, q)) (tcod2, _)):cs) = do
+  insNCEnv (SHole i (tdom1, p)) (S j (tdom2, q))
+  unify $ (THole i, THole j) : (tdom1, tdom2) : (tcod1, tcod2) : cs
+unify ((TNode (SHole i (tdom1, p)) (tcod1, _), TNode (SHole j (tdom2, q)) (tcod2, _)):cs) = do
+  insNCEnv (SHole i (tdom1, p)) (SHole j (tdom2, q))
+  unify $ (THole i, THole j) : (tdom1, tdom2) : (tcod1, tcod2) : cs
+unify ((TForall (S i (tdom1, _)) (tcod1, _), TForall (S j (tdom2, _)) (tcod2, _)):cs)
+  | i == j = do
+    unify $ (THole i, THole j) : (tdom1, tdom2) : (tcod1, tcod2) : cs
+unify ((TForall (S i (tdom1, p)) (tcod1, _), TForall (SHole j (tdom2, q)) (tcod2, _)):cs) = do
+  insNCEnv (S i (tdom1, p)) (SHole j (tdom2, q))
+  unify $ (THole i, THole j) : (tdom1, tdom2) : (tcod1, tcod2) : cs
+unify ((TForall (SHole i (tdom1, p)) (tcod1, _), TForall (S j (tdom2, q)) (tcod2, _)):cs) = do
+  insNCEnv (SHole i (tdom1, p)) (S j (tdom2, q))
+  unify $ (THole i, THole j) : (tdom1, tdom2) : (tcod1, tcod2) : cs
+unify ((TForall (SHole i (tdom1, p)) (tcod1, _), TForall (SHole j (tdom2, q)) (tcod2, _)):cs) = do
+  insNCEnv (SHole i (tdom1, p)) (SHole j (tdom2, q))
+  unify $ (THole i, THole j) : (tdom1, tdom2) : (tcod1, tcod2) : cs
 unify ((TCotensor (t11, _) (t12, _), TCotensor (t21, _) (t22, _)):cs) =
   unify $ (t11, t21) : (t12, t22) : cs
 unify ((TUp (t1, _), TUp (t2, _)):cs) = unify $ (t1, t2) : cs
@@ -187,16 +212,41 @@ unify ((t1, t2):cs) =
   throwE $
   "unification failed for:\n" ++ Pr.ppShow t1 ++ "\nand:\n" ++ Pr.ppShow t2
 
+unifyName :: [(Sym, Sym)] -> [(String, String)]
+unifyName [] = []
+unifyName ((S i _, S j _):cs)
+  | i == j = unifyName cs
+unifyName ((SHole i _, S j _):cs) = (i, j) : unifyName cs
+unifyName ((S i _, SHole j _):cs) = (j, i) : unifyName cs
+unifyName ((SHole i _, SHole j _):cs) = do
+  let (xs, ys) = unzip cs
+  let replacer target =
+        case target of
+          S x t ->
+            if x == i
+              then S j t
+              else S x t
+          SHole x t ->
+            if x == i
+              then SHole j t
+              else SHole x t
+  let xs' = map replacer xs
+  let ys' = map replacer ys
+  let cs' = zip xs' ys'
+  unifyName cs
+
 occur :: String -> Type -> Bool
-occur _ (TVar s)                            = False
-occur x (THole s)                           = x == s
-occur _ (TConst _)                          = False
-occur x (TNode (S _ (tdom, _)) (tcod, _))   = occur x tdom || occur x tcod
-occur x (TUp (t, _))                        = occur x t
-occur x (TDown (t, _))                      = occur x t
-occur _ (TUniv i)                           = False
-occur x (TForall (S _ (tdom, _)) (tcod, _)) = occur x tdom || occur x tcod
-occur x (TCotensor (t1, _) (t2, _))         = occur x t1 || occur x t2
+occur _ (TVar s)                                = False
+occur x (THole s)                               = x == s
+occur _ (TConst _)                              = False
+occur x (TNode (S _ (tdom, _)) (tcod, _))       = occur x tdom || occur x tcod
+occur x (TNode (SHole _ (tdom, _)) (tcod, _))   = occur x tdom || occur x tcod
+occur x (TUp (t, _))                            = occur x t
+occur x (TDown (t, _))                          = occur x t
+occur _ (TUniv i)                               = False
+occur x (TForall (S _ (tdom, _)) (tcod, _))     = occur x tdom || occur x tcod
+occur x (TForall (SHole _ (tdom, _)) (tcod, _)) = occur x tdom || occur x tcod
+occur x (TCotensor (t1, _) (t2, _))             = occur x t1 || occur x t2
 
 compose :: Subst -> Subst -> Subst
 compose s1 s2 = do
@@ -217,6 +267,10 @@ sType sub (TNode (S s (tdom, i)) (tcod, j)) = do
   let tdom' = sType sub tdom
   let tcod' = sType sub tcod
   TNode (S s (tdom', i)) (tcod', j)
+sType sub (TNode (SHole s (tdom, i)) (tcod, j)) = do
+  let tdom' = sType sub tdom
+  let tcod' = sType sub tcod
+  TNode (SHole s (tdom', i)) (tcod', j)
 sType sub (TUp (t, i)) = do
   let t' = sType sub t
   TUp (t', i)
@@ -228,9 +282,52 @@ sType sub (TForall (S s (tdom, i)) (tcod, j)) = do
   let tdom' = sType sub tdom
   let tcod' = sType sub tcod
   TForall (S s (tdom', i)) (tcod', j)
+sType sub (TForall (SHole s (tdom, i)) (tcod, j)) = do
+  let tdom' = sType sub tdom
+  let tcod' = sType sub tcod
+  TForall (SHole s (tdom', i)) (tcod', j)
 sType sub (TCotensor (t1, i) (t2, j)) = do
   let t1' = sType sub t1
   let t2' = sType sub t2
+  TCotensor (t1', i) (t2', j)
+
+sTypeName :: [(String, String)] -> Type -> Type
+sTypeName _ (TVar s) = TVar s
+sTypeName _ (THole s) = THole s
+sTypeName sub (TConst s) = TConst s
+sTypeName sub (TNode (S s (tdom, i)) (tcod, j)) = do
+  let tdom' = sTypeName sub tdom
+  let tcod' = sTypeName sub tcod
+  TNode (S s (tdom', i)) (tcod', j)
+sTypeName sub (TNode (SHole s (tdom, i)) (tcod, j)) = do
+  let tdom' = sTypeName sub tdom
+  let tcod' = sTypeName sub tcod
+  case lookup s sub of
+    Just s' -> TNode (S s' (tdom', i)) (tcod', j)
+    Nothing -> TNode (SHole s (tdom', i)) (tcod', j)
+sTypeName sub (TUp (t, i)) = do
+  let t' = sTypeName sub t
+  TUp (t', i)
+sTypeName sub (TDown (t, i)) = do
+  let t' = sTypeName sub t
+  TDown (t', i)
+sTypeName _ (TUniv i) = TUniv i
+sTypeName sub (TForall (S s (tdom, i)) (tcod, j)) = do
+  let tdom' = sTypeName sub tdom
+  let tcod' = sTypeName sub tcod
+  TForall (S s (tdom', i)) (tcod', j)
+sTypeName sub (TForall (SHole s (tdom, i)) (tcod, j)) = do
+  let tdom' = sTypeName sub tdom
+  let tcod' = sTypeName sub tcod
+  case lookup s sub of
+    Just s' -> TForall (S s' (tdom', i)) (tcod', j)
+    Nothing -> TForall (SHole s (tdom', i)) (tcod', j)
+  -- let tdom' = sTypeName sub tdom
+  -- let tcod' = sTypeName sub tcod
+  -- TForall (SHole s (tdom', i)) (tcod', j)
+sTypeName sub (TCotensor (t1, i) (t2, j)) = do
+  let t1' = sTypeName sub t1
+  let t2' = sTypeName sub t2
   TCotensor (t1', i) (t2', j)
 
 sConstraint :: Subst -> Constraint -> Constraint

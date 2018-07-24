@@ -41,9 +41,11 @@ recurM f (Node tis, i) = do
 
 type MTree = (Tree, Identifier)
 
-data Sym =
-  S String
-    MType
+data Sym
+  = S String
+      MType
+  | SHole String
+          MType
   deriving (Show, Eq)
 
 data Level
@@ -185,16 +187,17 @@ data Type
 type MType = (Type, Identifier)
 
 data Env = Env
-  { count         :: Int
-  , valueEnv      :: [(String, MType)]
-  , notationEnv   :: [(MTree, MTree)]
-  , reservedEnv   :: [String]
-  , nameEnv       :: [(String, String)]
-  , exprEnv       :: [Term]
-  , typeEnv       :: [(String, Type)]
-  , constraintEnv :: [(Type, Type)]
-  , levelEnv      :: [(Level, Level)]
-  , clsEnv        :: [(ClosureName, [FreeVar], Term)]
+  { count             :: Int
+  , valueEnv          :: [(String, MType)]
+  , notationEnv       :: [(MTree, MTree)]
+  , reservedEnv       :: [String]
+  , nameEnv           :: [(String, String)]
+  , exprEnv           :: [Term]
+  , typeEnv           :: [(String, Type)]
+  , constraintEnv     :: [(Type, Type)]
+  , nameConstraintEnv :: [(Sym, Sym)]
+  , levelEnv          :: [(Level, Level)]
+  , clsEnv            :: [(ClosureName, [FreeVar], Term)]
   } deriving (Show)
 
 initialEnv :: Env
@@ -226,6 +229,7 @@ initialEnv =
     , exprEnv = []
     , typeEnv = []
     , constraintEnv = []
+    , nameConstraintEnv = []
     , levelEnv = []
     , clsEnv = []
     }
@@ -269,6 +273,10 @@ insTEnv s t = modify (\e -> e {typeEnv = (s, t) : typeEnv e})
 
 insCEnv :: Type -> Type -> WithEnv ()
 insCEnv t1 t2 = modify (\e -> e {constraintEnv = (t1, t2) : constraintEnv e})
+
+insNCEnv :: Sym -> Sym -> WithEnv ()
+insNCEnv s1 s2 =
+  modify (\e -> e {nameConstraintEnv = (s1, s2) : nameConstraintEnv e})
 
 insLEnv :: Level -> Level -> WithEnv ()
 insLEnv l1 l2 = modify (\e -> e {levelEnv = (l1, l2) : levelEnv e})

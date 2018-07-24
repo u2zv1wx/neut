@@ -7,6 +7,8 @@ import           Control.Monad.State
 import           Control.Monad.Trans.Except
 import           Data
 
+import qualified Text.Show.Pretty           as Pr
+
 virtualV :: MV -> WithEnv Operand
 virtualV (VVar s, _) = return $ Register s
 virtualV (VConst s, _) = return $ ConstCell (CellAtom s)
@@ -27,14 +29,16 @@ virtualV (VAsc v _, _) = virtualV v
 
 virtualC :: MC -> WithEnv Operation
 virtualC (CLam _ e, _) = virtualC e
-virtualC (CApp e v, i) = do
-  let (fun, args) = funAndArgs (CApp e v, i)
-  let formalArgs = getArgs fun
-  argOperands <- mapM virtualV args
-  funOperation <- virtualC fun
-  return $
-    foldr (\(i, argOp) rest -> Let i argOp rest) funOperation $
-    zip formalArgs argOperands
+virtualC (CApp e@(_, i) v, _) = do
+  liftIO $ putStrLn $ "we want the information of:" ++ show i
+  mt <- lookupTEnv i
+  liftIO $ putStrLn $ "the type of " ++ show i ++ " is:\n" ++ Pr.ppShow mt
+  case mt of
+    Nothing -> lift $ throwE "ERROR<virtualC>"
+    Just (TForall (S symbol _) _) -> do
+      argAsm <- virtualV v
+      cont <- virtualC e
+      return $ Let symbol argAsm cont
 virtualC (CRet v, _) = do
   asm <- virtualV v
   return $ Ans asm

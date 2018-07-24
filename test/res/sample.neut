@@ -29,5 +29,5 @@
 
 (begin
   (let yay (return (succ (succ zero))))
-  (let yay (return (thunk (lambda (x nat) (return yay)))))
+  (let yay (return (thunk (lambda (x nat) (return x)))))
   ((unthunk yay) zero))
