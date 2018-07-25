@@ -43,9 +43,9 @@ type MTree = (Tree, Identifier)
 
 data Sym
   = S String
-      MType
+      Type
   | SHole String
-          MType
+          Type
   deriving (Show, Eq)
 
 data Level
@@ -72,7 +72,7 @@ data V
   | VConsApp MV
              MV
   | VAsc MV
-         MType
+         Type
   deriving (Show, Eq)
 
 -- value with metadata
@@ -115,7 +115,7 @@ data C
   | CCase MC
           [(MV, MC)]
   | CAsc MC
-         MType
+         Type
   deriving (Show, Eq)
 
 -- computation with identifier
@@ -154,7 +154,7 @@ data Term
   | Case MTerm
          [(MTerm, MTerm)]
   | Asc MTerm
-        MType
+        Type
   deriving (Show, Eq)
 
 type MTerm = (Term, Identifier)
@@ -169,35 +169,37 @@ type MTerm = (Term, Identifier)
 -- N ::= (forall (x P) N)
 --     | (cotensor N1 ... Nn)
 --     | (up P)
+-- (region inference)
+-- R ::= (P, region)
 data Type
   = TVar String
   | THole String
   | TConst String
   | TNode Sym
-          MType
-  | TUp MType
-  | TDown MType
+          Type
+  | TUp Type
+  | TDown Type
   | TUniv Level
   | TForall Sym
-            MType
-  | TCotensor MType
-              MType
+            Type
+  | TCotensor Type
+              Type
+  | RType Type -- this "Type" is supposed to be a positive one
+          String
   deriving (Show, Eq)
 
-type MType = (Type, Identifier)
-
 data Env = Env
-  { count             :: Int
-  , valueEnv          :: [(String, MType)]
-  , notationEnv       :: [(MTree, MTree)]
-  , reservedEnv       :: [String]
-  , nameEnv           :: [(String, String)]
-  , exprEnv           :: [Term]
-  , typeEnv           :: [(String, Type)]
-  , constraintEnv     :: [(Type, Type)]
-  , nameConstraintEnv :: [(Sym, Sym)]
-  , levelEnv          :: [(Level, Level)]
-  , clsEnv            :: [(ClosureName, [FreeVar], Term)]
+  { count               :: Int
+  , valueEnv            :: [(String, Type)]
+  , notationEnv         :: [(MTree, MTree)]
+  , reservedEnv         :: [String]
+  , nameEnv             :: [(String, String)]
+  , exprEnv             :: [Term]
+  , typeEnv             :: [(String, Type)]
+  , constraintEnv       :: [(Type, Type)]
+  , nameConstraintEnv   :: [(Sym, Sym)]
+  , levelEnv            :: [(Level, Level)]
+  , regionConstraintEnv :: [(String, String)]
   } deriving (Show)
 
 initialEnv :: Env
@@ -230,8 +232,8 @@ initialEnv =
     , typeEnv = []
     , constraintEnv = []
     , nameConstraintEnv = []
+    , regionConstraintEnv = []
     , levelEnv = []
-    , clsEnv = []
     }
 
 type WithEnv a = StateT Env (ExceptT String IO) a
@@ -265,7 +267,7 @@ newNameWith s = do
 lookupTEnv :: String -> WithEnv (Maybe Type)
 lookupTEnv s = gets (lookup s . typeEnv)
 
-lookupVEnv :: String -> WithEnv (Maybe MType)
+lookupVEnv :: String -> WithEnv (Maybe Type)
 lookupVEnv s = gets (lookup s . valueEnv)
 
 insTEnv :: String -> Type -> WithEnv ()
@@ -277,6 +279,10 @@ insCEnv t1 t2 = modify (\e -> e {constraintEnv = (t1, t2) : constraintEnv e})
 insNCEnv :: Sym -> Sym -> WithEnv ()
 insNCEnv s1 s2 =
   modify (\e -> e {nameConstraintEnv = (s1, s2) : nameConstraintEnv e})
+
+insRCEnv :: String -> String -> WithEnv ()
+insRCEnv s1 s2 =
+  modify (\e -> e {regionConstraintEnv = (s1, s2) : regionConstraintEnv e})
 
 insLEnv :: Level -> Level -> WithEnv ()
 insLEnv l1 l2 = modify (\e -> e {levelEnv = (l1, l2) : levelEnv e})
@@ -296,7 +302,6 @@ data Cell
 
 data Operand
   = Register RegName -- var
-  | LoadConst MemAddr -- the address of constants (such as `nat`, `succ`, etc.)
   | ConstCell Cell -- create a new cons cell and return the newly allocated memory address
   | Alloc Operation -- thunk code <list of free var>
           [RegName]
@@ -307,8 +312,8 @@ data Operation
   | Let RegName -- bind (we also use this to represent abstraction/application)
         Operand
         Operation
-  | LetCall RegName
+  | LetCall RegName -- binding the result of unthunk
             MemAddr
             Operation
-  | Jump RegName -- unthunk (jump to the address in the register, run, and back to the original point)
+  | Jump RegName -- unthunk
   deriving (Show, Eq)

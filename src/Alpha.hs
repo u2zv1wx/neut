@@ -87,36 +87,36 @@ alpha (Asc e t, i) = do
   t' <- alphaType t
   return (Asc e' t', i)
 
-alphaType :: MType -> WithEnv MType
-alphaType (TVar s, i) = do
+alphaType :: Type -> WithEnv Type
+alphaType (TVar s) = do
   t <- TVar <$> alphaString s
-  return (t, i)
-alphaType (THole i, j) = return (THole i, j)
-alphaType (TConst s, i) = do
-  return (TConst s, i)
-alphaType (TNode (S s tdom) tcod, i) = do
+  return t
+alphaType (THole i) = return (THole i)
+alphaType (TConst s) = do
+  return (TConst s)
+alphaType (TNode (S s tdom) tcod) = do
   tdom' <- alphaType tdom
   local $ do
     s' <- newNameWith s
     tcod' <- alphaType tcod
-    return (TNode (S s' tdom') tcod', i)
-alphaType (TUp t, i) = do
+    return (TNode (S s' tdom') tcod')
+alphaType (TUp t) = do
   t' <- TUp <$> alphaType t
-  return (t', i)
-alphaType (TDown t, i) = do
+  return t'
+alphaType (TDown t) = do
   t' <- TDown <$> alphaType t
-  return (t', i)
-alphaType (TUniv level, i) = return (TUniv level, i)
-alphaType (TForall (S s tdom) tcod, i) = do
+  return t'
+alphaType (TUniv level) = return (TUniv level)
+alphaType (TForall (S s tdom) tcod) = do
   tdom' <- alphaType tdom
   local $ do
     s' <- newNameWith s
     tcod' <- alphaType tcod
-    return (TForall (S s' tdom') tcod', i)
-alphaType (TCotensor t1 t2, i) = do
+    return (TForall (S s' tdom') tcod')
+alphaType (TCotensor t1 t2) = do
   t1' <- alphaType t1
   t2' <- alphaType t2
-  return (TCotensor t1' t2', i)
+  return (TCotensor t1' t2')
 
 alphaString :: String -> WithEnv String
 alphaString s = do

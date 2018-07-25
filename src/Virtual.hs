@@ -30,11 +30,10 @@ virtualV (VAsc v _, _) = virtualV v
 virtualC :: MC -> WithEnv Operation
 virtualC (CLam _ e, _) = virtualC e
 virtualC (CApp e@(_, i) v, _) = do
-  liftIO $ putStrLn $ "we want the information of:" ++ show i
   mt <- lookupTEnv i
-  liftIO $ putStrLn $ "the type of " ++ show i ++ " is:\n" ++ Pr.ppShow mt
   case mt of
     Nothing -> lift $ throwE "ERROR<virtualC>"
+    Just (TForall (SHole symbol _) _) -> undefined
     Just (TForall (S symbol _) _) -> do
       argAsm <- virtualV v
       cont <- virtualC e
@@ -84,7 +83,7 @@ varP (VThunk e, _)       = varN e
 varP (VAsc e t, _)       = varP e
 
 varN :: MC -> [String]
-varN (CLam (S s t) e, _) = varN e -- do not filter s out
+varN (CLam (S s t) e, _) = filter (/= s) $ varN e
 varN (CApp e v, _) = varN e ++ varP v
 varN (CRet v, _) = varP v
 varN (CBind (S s t) e1 e2, _) = varN e1 ++ filter (/= s) (varN e2)

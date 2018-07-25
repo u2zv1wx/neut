@@ -18,7 +18,7 @@ import qualified Text.Show.Pretty           as Pr
 
 parseTerm :: MTree -> WithEnv MTerm
 parseTerm (Atom "_", i) = do
-  name <- newName
+  name <- newNameWith "hole"
   return (Var name, i)
 parseTerm (Atom s, i) = do
   msym <- definedConst s
@@ -118,46 +118,46 @@ parseClause (Node [tv, te], i) = do
   return (v, e)
 parseClause t = lift $ throwE $ "parseClause: syntax error:\n" ++ Pr.ppShow t
 
-parseType :: MTree -> WithEnv MType
+parseType :: MTree -> WithEnv Type
 parseType (Atom "_", i) = do
-  name <- newName
-  return (THole name, i)
+  name <- newNameWith "hole"
+  return (THole name)
 parseType (Atom "universe", i) = do
   t <- TUniv . LHole <$> newName
-  return (t, i)
+  return t
 parseType (Atom s, i) = do
   msym <- definedConst s
   case msym of
     Nothing -> do
       s' <- strToName s
-      return (TVar s', i)
-    Just (s, _) -> return (TConst s, i)
+      return $ TVar s'
+    Just (s, _) -> return $ TConst s
 parseType (Node [(Atom "down", _), tn], i) = do
   n <- parseType tn
-  return (TDown n, i)
+  return $ TDown n
 parseType (Node [(Atom "node", _), (Node [(Atom s, _), tp1], _), tp2], i) = do
   s' <- strToName s
   p1 <- parseType tp1
   p2 <- parseType tp2
-  return (TNode (S s' p1) p2, i)
+  return $ TNode (S s' p1) p2
 parseType (Node [(Atom "universe", _), (Atom si, _)], i) =
   case readMaybe si of
     Nothing -> lift $ throwE $ "not a number: " ++ si
-    Just j  -> return (TUniv (Fixed j), i)
+    Just j  -> return $ TUniv (Fixed j)
 parseType (Node [(Atom "forall", _), (Node [(Atom s, _), tp], _), tn], i) = do
   s' <- strToName s
   p <- parseType tp
   n <- parseType tn
-  return (TForall (S s' p) n, i)
+  return $ TForall (S s' p) n
 parseType (Node ((Atom "par", _):tn:tns), i)
   | not (null tns) = do
     n <- parseType tn
     ns <- mapM parseType tns
-    tmp <- foldMTerm TCotensor n ns
-    return (fst tmp, i)
+    let tmp = foldl TCotensor n ns
+    return tmp
 parseType (Node [(Atom "up", _), tp], i) = do
   p <- parseType tp
-  return (TUp p, i)
+  return $ TUp p
 parseType t = lift $ throwE $ "parseType: syntax error:\n" ++ Pr.ppShow t
 
 parseVDef :: MTree -> WithEnv ()
@@ -166,12 +166,12 @@ parseVDef (Node [(Atom "value", _), (Atom x, _), tp], i) = do
   modify (\e -> e {valueEnv = (x, p) : valueEnv e})
 parseVDef t = lift $ throwE $ "parseVDef: syntax error:\n" ++ Pr.ppShow t
 
-definedConst :: String -> WithEnv (Maybe (String, MType))
+definedConst :: String -> WithEnv (Maybe (String, Type))
 definedConst s = do
   env <- get
   let vEnv = valueEnv env
   return $ find (\(x, _) -> x == s) vEnv
 
 strToName :: String -> WithEnv String
-strToName "_" = newName
+strToName "_" = newNameWith "hole"
 strToName s   = return s
