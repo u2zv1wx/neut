@@ -201,7 +201,7 @@ data Env = Env
   , nameEnv             :: [(String, String)]
   , exprEnv             :: [Term]
   , typeEnv             :: [(String, Type)]
-  , rTypeEnv            :: [(String, (Type, String))]
+  , rTypeEnv            :: [(String, Type)]
   , constraintEnv       :: [(Type, Type)]
   , nameConstraintEnv   :: [(Sym, Sym)]
   , levelEnv            :: [(Level, Level)]
@@ -276,7 +276,7 @@ newNameWith s = do
 lookupTEnv :: String -> WithEnv (Maybe Type)
 lookupTEnv s = gets (lookup s . typeEnv)
 
-lookupRTEnv :: String -> WithEnv (Maybe (Type, String))
+lookupRTEnv :: String -> WithEnv (Maybe Type)
 lookupRTEnv s = gets (lookup s . rTypeEnv)
 
 lookupRNEnv :: String -> WithEnv (Maybe String)
@@ -288,7 +288,7 @@ lookupVEnv s = gets (lookup s . valueEnv)
 insTEnv :: String -> Type -> WithEnv ()
 insTEnv s t = modify (\e -> e {typeEnv = (s, t) : typeEnv e})
 
-insRTEnv :: String -> (Type, String) -> WithEnv ()
+insRTEnv :: String -> Type -> WithEnv ()
 insRTEnv s t = modify (\e -> e {rTypeEnv = (s, t) : rTypeEnv e})
 
 insCEnv :: Type -> Type -> WithEnv ()

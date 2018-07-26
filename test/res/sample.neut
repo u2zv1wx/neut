@@ -30,4 +30,5 @@
 (begin
   (let yay (return (thunk (lambda (x nat) (return (succ x))))))
   ((unthunk yay) zero)
+  ((unthunk yay) (succ zero))
   (return true))

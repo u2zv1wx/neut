@@ -33,37 +33,39 @@ check e = do
   liftIO $ putStrLn $ "MARK===="
   liftIO $ putStrLn $ Pr.ppShow nameTree
   liftIO $ putStrLn $ "MARK===="
+  let tenv' = map (\(s, t) -> (s, sType nameTree t)) $ rTypeEnv env
+  modify (\e -> e {rTypeEnv = tenv'})
   return ()
 
 type Region = String
 
 infer :: MTerm -> WithEnv Type
-infer (Var s, _) = lookupTEnv' s
-infer (Const s, _) = lookupTEnv' s >>= annotate
-infer (Lam (S s _) e, _) = do
+infer (Var s, i) = lookupTEnv' s >>= regAndRet i
+infer (Const s, i) = lookupTEnv' s >>= annotate >>= regAndRet i
+infer (Lam (S s _) e, i) = do
   tdom <- lookupTEnv' s >>= annotate
   insTEnv s tdom
   tcod <- infer e
-  return $ TForall (S s tdom) tcod
-infer (App e v, _) = do
+  regAndRet i $ TForall (S s tdom) tcod
+infer (App e v, i) = do
   te <- infer e
   tv <- infer v
   case (te, tv) of
     (TForall (S _ tdom) tcod, targ) -> do
       insCEnv tdom targ
-      return tcod
+      regAndRet i tcod
     _ -> lift $ throwE $ "Region.infer.App. Note:\n" ++ Pr.ppShow (e, te, tv)
-infer (ConsApp v1 v2, _) = do
+infer (ConsApp v1 v2, i) = do
   t1 <- infer v1
   t2 <- infer v2
   case (t1, t2) of
     (RType (TNode (S _ tdom) tcod) _, targ) -> do
       insCEnv tdom targ
-      return tcod
+      regAndRet i tcod
     _ -> lift $ throwE $ "Region.infer.ConsApp. Note:\n" ++ Pr.ppShow (t1, t2)
 infer (Ret v, i) = do
   tv <- infer v
-  return $ TUp tv
+  regAndRet i $ TUp tv
 infer (Bind (S s _) e1 e2, i) = do
   t1 <- infer e1
   ts <- lookupTEnv' s >>= annotate
@@ -72,17 +74,16 @@ infer (Bind (S s _) e1 e2, i) = do
   case t1 of
     TUp p -> do
       insCEnv p ts
-      return t2
+      regAndRet i t2
     _ -> lift $ throwE "Region.infer.Bind"
-infer (Thunk e, _) = do
+infer (Thunk e, i) = do
   t <- infer e
-  RType (TDown t) <$> newRegion
-infer (Unthunk v, _) = do
+  RType (TDown t) <$> newRegion >>= regAndRet i
+infer (Unthunk v, i) = do
   tv <- infer v
   case tv of
-    RType (TDown n) _ -> instantiate n
+    RType (TDown n) _ -> instantiate n >>= regAndRet i
     _ -> lift $ throwE $ "Region.infer.Unthunk. Note:\n" ++ Pr.ppShow (v, tv)
-
 -- infer (Send (S s t) e, _) = undefined
 -- infer (Recv (S s t) e, _) = undefined
 -- infer (Dispatch e1 e2, _) = do
@@ -99,45 +100,42 @@ infer (Unthunk v, _) = do
 --   case t of
 --     TCotensor _ t2 -> return t2
 --     _              -> lift $ throwE "Region.infer.Coright"
--- infer (Mu (S s t) e, _) = do
---   r <- newRegion
---   insRNEnv s r
---   infer e
--- infer (Case v ves, _) = do
---   tv <- infer v
---   case tv of
---     RType t r -> do
---       let (vs, es) = unzip ves
---       mapM_ (inferPat r) vs
---       es' <- mapM infer es
---       case es' of
---         (tbody:_) -> return tbody
---         _         -> lift $ throwE "Region.infer.Case"
---     _ -> lift $ throwE "Region.infer.Case"
--- infer (Asc e t, i) = infer e
--- type Region = String
--- inferPat :: Region -> MTerm -> WithEnv Type
--- inferPat r (Var s, i) = do
---   t <- lookupTEnv' i
---   insRNEnv s r
---   return $ RType t r
--- inferPat _ (Const s, i) = do
---   t <- lookupTEnv' i
---   mr <- lookupRNEnv s
---   case mr of
---     Nothing -> lift $ throwE "Region.inferPat.Const"
---     Just r  -> return $ RType t r
--- inferPat r (ConsApp v1 v2, _) = do
---   t1 <- inferPat r v1
---   t2 <- inferPat r v2
---   case (t1, t2) of
---     (TNode (S s (RType tdom r1)) tcod, RType tv r2) -> do
---       insRCEnv r1 r2
---       return tcod
---     _ -> lift $ throwE "Region.inferPat.ConsApp"
--- inferPat _ _ = lift $ throwE "Region.inferPat"
+infer (Mu (S s t) e, i) = do
+  ts <- lookupTEnv' s >>= annotate
+  insTEnv s ts
+  t <- infer e
+  insCEnv (TDown t) ts
+  regAndRet i t
+infer (Case v ves, i) = do
+  tv <- infer v
+  let (vs, es) = unzip ves
+  tvs <- mapM inferPat vs
+  tes <- mapM infer es
+  x <- THole <$> newName
+  forM_ (map (\s -> (s, x)) (tv : tvs)) $ uncurry insCEnv
+  y <- THole <$> newName
+  forM_ (map (\s -> (s, y)) tes) $ uncurry insCEnv
+  regAndRet i (head tes)
+infer (Asc e t, i) = infer e
+
+inferPat :: MTerm -> WithEnv Type
+inferPat (Var s, i) = lookupTEnv' s >>= annotate >>= regAndRet i
+inferPat (Const s, i) = lookupTEnv' s >>= annotate >>= regAndRet i
+inferPat (ConsApp v1 v2, i) = do
+  t1 <- infer v1
+  t2 <- infer v2
+  case (t1, t2) of
+    (RType (TNode (S _ tdom) tcod) _, targ) -> do
+      insCEnv tdom targ
+      regAndRet i tcod
+    _ -> lift $ throwE $ "Region.infer.ConsApp. Note:\n" ++ Pr.ppShow (t1, t2)
+inferPat _ = lift $ throwE "Region.inferPat"
+
 newRegion :: WithEnv String
 newRegion = newNameWith "region"
+
+regAndRet :: String -> Type -> WithEnv Type
+regAndRet i t = insRTEnv i t >> return t
 
 lookupTEnv' :: String -> WithEnv Type
 lookupTEnv' s = do
@@ -190,8 +188,47 @@ constructMap ((a, b):es) = do
     then (b, a) : xs
     else (a, b) : xs
 
-traceMap :: String -> [(Child, Parent)] -> String
-traceMap child xs =
+type Root = String
+
+type Subst = [(Child, Parent)]
+
+traceMap :: [(Child, Parent)] -> Child -> Root
+traceMap xs child =
   case lookup child xs of
     Nothing     -> child
-    Just parent -> traceMap parent xs
+    Just parent -> traceMap xs parent
+
+sType :: Subst -> Type -> Type
+sType _ (TVar s) = TVar s
+sType _ (THole s) = THole s
+sType _ (TConst s) = TConst s
+sType sub (TNode (S s tdom) tcod) = do
+  let tdom' = sType sub tdom
+  let tcod' = sType sub tcod
+  TNode (S s tdom') tcod'
+sType sub (TNode (SHole s tdom) tcod) = do
+  let tdom' = sType sub tdom
+  let tcod' = sType sub tcod
+  TNode (SHole s tdom') tcod'
+sType sub (TUp t) = do
+  let t' = sType sub t
+  TUp t'
+sType sub (TDown t) = do
+  let t' = sType sub t
+  TDown t'
+sType _ (TUniv i) = TUniv i
+sType sub (TForall (S s tdom) tcod) = do
+  let tdom' = sType sub tdom
+  let tcod' = sType sub tcod
+  TForall (S s tdom') tcod'
+sType sub (TForall (SHole s tdom) tcod) = do
+  let tdom' = sType sub tdom
+  let tcod' = sType sub tcod
+  TForall (SHole s tdom') tcod'
+sType sub (TCotensor t1 t2) = do
+  let t1' = sType sub t1
+  let t2' = sType sub t2
+  TCotensor t1' t2'
+sType sub (RType t r) = do
+  let t' = sType sub t
+  RType t' $ traceMap sub r
