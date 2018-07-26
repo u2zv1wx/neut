@@ -1,5 +1,6 @@
 module Typing
   ( check
+  , unify
   ) where
 
 import           Control.Monad
@@ -12,7 +13,7 @@ import           Data
 
 check :: MTerm -> WithEnv ()
 check e = do
-  t <- infer e
+  _ <- infer e
   env <- get
   sub <- unify $ constraintEnv env
   liftIO $ putStrLn $ Pr.ppShow sub
@@ -151,23 +152,20 @@ type Constraint = [(Type, Type)]
 
 unify :: Constraint -> WithEnv Subst
 unify [] = return []
-unify ((THole s, t2):cs)
-  | not (occur s t2) = do
-    sub <- unify (sConstraint [(s, t2)] cs)
-    return $ compose sub [(s, t2)]
-unify ((t1, THole s):cs)
-  | not (occur s t1) = do
-    sub <- unify (sConstraint [(s, t1)] cs)
-    return $ compose sub [(s, t1)]
+unify ((THole s, t2):cs) = do
+  sub <- unify (sConstraint [(s, t2)] cs)
+  return $ compose sub [(s, t2)]
+--  | not (occur s t2)
+unify ((t1, THole s):cs) = do
+  sub <- unify (sConstraint [(s, t1)] cs)
+  return $ compose sub [(s, t1)]
+--  | not (occur s t1)
 unify ((TVar s1, TVar s2):cs)
   | s1 == s2 = unify cs
 unify ((TConst s1, TConst s2):cs)
   | s1 == s2 = unify cs
--- unify ((TNode (S _ (tdom1, _)) (tcod1, _), TNode (S _ (tdom2, _)) (tcod2, _)):cs) =
---   unify $ (tdom1, tdom2) : (tcod1, tcod2) : cs
 unify ((TNode (S i tdom1) tcod1, TNode (S j tdom2) tcod2):cs)
-  | i == j = do
-    unify $ (THole i, THole j) : (tdom1, tdom2) : (tcod1, tcod2) : cs
+  | i == j = unify $ (THole i, THole j) : (tdom1, tdom2) : (tcod1, tcod2) : cs
 unify ((TNode (S i tdom1) tcod1, TNode (SHole j tdom2) tcod2):cs) = do
   insNCEnv (S i tdom1) (SHole j tdom2)
   unify $ (THole i, THole j) : (tdom1, tdom2) : (tcod1, tcod2) : cs
@@ -178,8 +176,7 @@ unify ((TNode (SHole i tdom1) tcod1, TNode (SHole j tdom2) tcod2):cs) = do
   insNCEnv (SHole i tdom1) (SHole j tdom2)
   unify $ (THole i, THole j) : (tdom1, tdom2) : (tcod1, tcod2) : cs
 unify ((TForall (S i tdom1) tcod1, TForall (S j tdom2) tcod2):cs)
-  | i == j = do
-    unify $ (THole i, THole j) : (tdom1, tdom2) : (tcod1, tcod2) : cs
+  | i == j = unify $ (THole i, THole j) : (tdom1, tdom2) : (tcod1, tcod2) : cs
 unify ((TForall (S i tdom1) tcod1, TForall (SHole j tdom2) tcod2):cs) = do
   insNCEnv (S i tdom1) (SHole j tdom2)
   unify $ (THole i, THole j) : (tdom1, tdom2) : (tcod1, tcod2) : cs
@@ -196,6 +193,9 @@ unify ((TDown t1, TDown t2):cs) = unify $ (t1, t2) : cs
 unify ((TUniv i, TUniv j):cs) = do
   insLEnv i j
   unify cs
+unify ((RType t1 r1, RType t2 r2):cs) = do
+  insRCEnv r1 r2
+  unify $ (t1, t2) : cs
 unify ((t1, t2):cs) =
   lift $
   throwE $
@@ -279,6 +279,9 @@ sType sub (TCotensor t1 t2) = do
   let t1' = sType sub t1
   let t2' = sType sub t2
   TCotensor t1' t2'
+sType sub (RType t r) = do
+  let t' = sType sub t
+  RType t' r
 
 sTypeName :: [(String, String)] -> Type -> Type
 sTypeName _ (TVar s) = TVar s
@@ -315,6 +318,9 @@ sTypeName sub (TCotensor t1 t2) = do
   let t1' = sTypeName sub t1
   let t2' = sTypeName sub t2
   TCotensor t1' t2'
+sTypeName sub (RType t r) = do
+  let t' = sTypeName sub t
+  RType t' r
 
 sConstraint :: Subst -> Constraint -> Constraint
 sConstraint s = map (\(t1, t2) -> (sType s t1, sType s t2))

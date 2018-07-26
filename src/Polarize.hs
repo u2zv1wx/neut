@@ -92,5 +92,5 @@ polarize (Case e ves, i) = do
           Left $ "the polarity of " ++ show v ++ " or " ++ show e ++ " is wrong"
   e' <- polarize e
   case e' of
-    Comp c -> return $ Comp (CCase c ves', i)
+    Value v -> return $ Comp (CCase v ves', i)
 polarize (Asc e t, _) = polarize e

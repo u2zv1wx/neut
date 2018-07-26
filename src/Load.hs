@@ -13,6 +13,7 @@ import           Macro
 import           Parse
 import           Polarize
 import           Read
+import qualified Region
 import           Typing
 import           Virtual
 
@@ -34,6 +35,9 @@ load' ((Node [(Atom "reserve", _), (Atom s, _)], _):as) = do
 load' ((Node [(Atom "value", _), (Atom s, _), tp], _):as) = do
   p <- parseType tp
   modify (\e -> e {valueEnv = (s, p) : valueEnv e})
+  -- r <- Region.newRegion
+  -- insRNEnv s r
+  insTEnv s p
   load' as
 load' (a:as) = do
   a' <- macroExpand a
@@ -41,6 +45,7 @@ load' (a:as) = do
   e <- parseTerm a'
   e' <- alpha e
   check e'
+  Region.check e'
   case polarize e' of
     Left err -> lift $ throwE err
     Right e''

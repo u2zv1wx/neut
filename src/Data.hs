@@ -112,7 +112,7 @@ data C
   | CCoright MC
   | CMu Sym
         MC
-  | CCase MC
+  | CCase MV
           [(MV, MC)]
   | CAsc MC
          Type
@@ -188,6 +188,11 @@ data Type
           String
   deriving (Show, Eq)
 
+data RegionSeq
+  = RSHole String
+  | RSSeq [String]
+  deriving (Show, Eq)
+
 data Env = Env
   { count               :: Int
   , valueEnv            :: [(String, Type)]
@@ -196,9 +201,11 @@ data Env = Env
   , nameEnv             :: [(String, String)]
   , exprEnv             :: [Term]
   , typeEnv             :: [(String, Type)]
+  , rTypeEnv            :: [(String, (Type, String))]
   , constraintEnv       :: [(Type, Type)]
   , nameConstraintEnv   :: [(Sym, Sym)]
   , levelEnv            :: [(Level, Level)]
+  , rNameEnv            :: [(String, String)]
   , regionConstraintEnv :: [(String, String)]
   } deriving (Show)
 
@@ -230,9 +237,11 @@ initialEnv =
     , nameEnv = []
     , exprEnv = []
     , typeEnv = []
+    , rTypeEnv = []
     , constraintEnv = []
     , nameConstraintEnv = []
     , regionConstraintEnv = []
+    , rNameEnv = []
     , levelEnv = []
     }
 
@@ -267,11 +276,20 @@ newNameWith s = do
 lookupTEnv :: String -> WithEnv (Maybe Type)
 lookupTEnv s = gets (lookup s . typeEnv)
 
+lookupRTEnv :: String -> WithEnv (Maybe (Type, String))
+lookupRTEnv s = gets (lookup s . rTypeEnv)
+
+lookupRNEnv :: String -> WithEnv (Maybe String)
+lookupRNEnv s = gets (lookup s . rNameEnv)
+
 lookupVEnv :: String -> WithEnv (Maybe Type)
 lookupVEnv s = gets (lookup s . valueEnv)
 
 insTEnv :: String -> Type -> WithEnv ()
 insTEnv s t = modify (\e -> e {typeEnv = (s, t) : typeEnv e})
+
+insRTEnv :: String -> (Type, String) -> WithEnv ()
+insRTEnv s t = modify (\e -> e {rTypeEnv = (s, t) : rTypeEnv e})
 
 insCEnv :: Type -> Type -> WithEnv ()
 insCEnv t1 t2 = modify (\e -> e {constraintEnv = (t1, t2) : constraintEnv e})
@@ -284,8 +302,24 @@ insRCEnv :: String -> String -> WithEnv ()
 insRCEnv s1 s2 =
   modify (\e -> e {regionConstraintEnv = (s1, s2) : regionConstraintEnv e})
 
+insRNEnv :: String -> String -> WithEnv ()
+insRNEnv s1 s2 = modify (\e -> e {rNameEnv = (s1, s2) : rNameEnv e})
+
 insLEnv :: Level -> Level -> WithEnv ()
 insLEnv l1 l2 = modify (\e -> e {levelEnv = (l1, l2) : levelEnv e})
+
+local :: WithEnv a -> WithEnv a
+local p = do
+  env <- get
+  x <- p
+  modify
+    (\e ->
+       env
+         { count = count e
+         , rNameEnv = rNameEnv e
+         , regionConstraintEnv = regionConstraintEnv e
+         })
+  return x
 
 type Addr = String
 

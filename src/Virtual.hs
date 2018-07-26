@@ -95,7 +95,7 @@ varN (CColeft e, _) = varN e
 varN (CCoright e, _) = varN e
 varN (CMu (S s t) e, _) = filter (/= s) (varN e)
 varN (CCase e ves, _) = do
-  let efs = varN e
+  let efs = varP e
   vefss <-
     forM ves $ \(pat, body) -> do
       bound <- varP pat

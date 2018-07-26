@@ -130,81 +130,11 @@ alphaPat (Var s, i) = do
   t <- Var <$> alphaPatString s
   return (t, i)
 alphaPat (Const s, i) = return (Const s, i)
-alphaPat (Lam (S s t) e, i) = do
-  t' <- alphaType t
-  local $ do
-    s' <- newNameWith s
-    e' <- alphaPat e
-    return (Lam (S s' t') e', i)
-alphaPat (App e v, i) = do
-  e' <- alphaPat e
-  v' <- alphaPat v
-  return (App e' v', i)
 alphaPat (ConsApp v1 v2, i) = do
   v1' <- alphaPat v1
   v2' <- alphaPat v2
   return (ConsApp v1' v2', i)
-alphaPat (Ret v, i) = do
-  v' <- alphaPat v
-  return (Ret v', i)
-alphaPat (Bind (S s t) e1 e2, i) = do
-  e1' <- alphaPat e1
-  s' <- newNameWith s
-  t' <- alphaType t
-  e2' <- alphaPat e2
-  return (Bind (S s' t') e1' e2', i)
-alphaPat (Thunk e, i) = do
-  e' <- alphaPat e
-  return (Thunk e', i)
-alphaPat (Unthunk v, i) = do
-  v' <- alphaPat v
-  return (Unthunk v', i)
-alphaPat (Send (S s t) e, i) = do
-  s' <- alphaPatString s
-  t' <- alphaType t
-  e' <- alphaPat e
-  return (Send (S s' t') e', i)
-alphaPat (Recv (S s t) e, i) = do
-  t' <- alphaType t
-  local $ do
-    s' <- newNameWith s
-    e' <- alphaPat e
-    return (Recv (S s t) e, i)
-alphaPat (Dispatch e1 e2, i) = do
-  e1' <- alphaPat e1
-  e2' <- alphaPat e2
-  return (Dispatch e1' e2', i)
-alphaPat (Coleft e, i) = do
-  e' <- alphaPat e
-  return (Coleft e', i)
-alphaPat (Coright e, i) = do
-  e' <- alphaPat e
-  return (Coright e', i)
-alphaPat (Mu (S s t) e, i) = do
-  t' <- alphaType t
-  local $ do
-    s' <- newNameWith s
-    e' <- alphaPat e
-    return (Mu (S s' t') e', i)
-alphaPat (Case e ves, i) = do
-  e' <- alphaPat e
-  ves' <-
-    forM ves $ \(pat, body) ->
-      local $ do
-        env <- get
-        patEnvOrErr <- liftIO $ runWithEnv (alphaPat pat) (env {nameEnv = []})
-        case patEnvOrErr of
-          Left err -> lift $ throwE err
-          Right (pat', env') -> do
-            put
-              (env {nameEnv = nameEnv env' ++ nameEnv env, count = count env'})
-            body' <- alphaPat body
-            return (pat', body')
-  return (Case e' ves', i)
-alphaPat (Asc e t, i) = do
-  e' <- alphaPat e
-  t' <- alphaType t
-  return (Asc e' t', i)
+alphaPat _ = lift $ throwE "Alpha.alphaPat"
 
 alphaPatString :: String -> WithEnv String
 alphaPatString s = do
@@ -212,10 +142,3 @@ alphaPatString s = do
   case lookup s (nameEnv env) of
     Just s' -> return s'
     Nothing -> newNameWith s
-
-local :: WithEnv a -> WithEnv a
-local p = do
-  env <- get
-  x <- p
-  modify (\e -> env {count = count e})
-  return x
