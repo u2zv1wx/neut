@@ -39,6 +39,68 @@ check e = do
 
 type Region = String
 
+prepare :: MTerm -> WithEnv MTerm
+prepare (Var s, meta) = do
+  r <- newRegion
+  return (Var s, meta {regionSet = [r]})
+prepare (Const s, meta) = do
+  r <- newRegion
+  return (Const s, meta {regionSet = [r]})
+prepare (Lam s e, meta) = do
+  e' <- prepare e
+  return (Lam s e', meta)
+prepare (App e v, meta) = do
+  e' <- prepare e
+  v' <- prepare v
+  return (App e' v', meta)
+prepare (ConsApp v1 v2, meta) = do
+  v1' <- prepare v1
+  v2' <- prepare v2
+  r <- newRegion
+  return (ConsApp v1' v2', meta {regionSet = [r]})
+prepare (Ret v, meta) = do
+  v' <- prepare v
+  return (Ret v', meta)
+prepare (Bind s e1 e2, meta) = do
+  e1' <- prepare e1
+  e2' <- prepare e2
+  return (Bind s e1' e2', meta)
+prepare (Thunk e, meta) = do
+  e' <- prepare e
+  r <- newRegion
+  return (Thunk e', meta {regionSet = [r]})
+prepare (Unthunk v, meta) = do
+  v' <- prepare v
+  return (Unthunk v', meta)
+prepare (Send s e, meta) = do
+  e' <- prepare e
+  return (Send s e', meta)
+prepare (Recv s e, meta) = do
+  e' <- prepare e
+  return (Recv s e, meta)
+prepare (Dispatch e1 e2, meta) = do
+  e1' <- prepare e1
+  e2' <- prepare e2
+  return (Dispatch e1' e2', meta)
+prepare (Coleft e, meta) = do
+  e' <- prepare e
+  return (Coleft e', meta)
+prepare (Coright e, meta) = do
+  e' <- prepare e
+  return (Coright e', meta)
+prepare (Mu s e, meta) = do
+  e' <- prepare e
+  return (Mu s e', meta)
+prepare (Case v ves, meta) = do
+  v' <- prepare v
+  let (vs, es) = unzip ves
+  vs' <- mapM prepare vs
+  es' <- mapM prepare es
+  return (Case v' (zip vs' es'), meta)
+prepare (Asc e t, meta) = do
+  e' <- prepare e
+  return (Asc e' t, meta)
+
 infer :: MTerm -> WithEnv Type
 infer (Var s, Meta {ident = i}) = lookupTEnv' s >>= regAndRet i
 infer (Const s, Meta {ident = i}) = lookupTEnv' s >>= annotate >>= regAndRet i
