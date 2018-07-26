@@ -84,22 +84,25 @@ infer (Unthunk v, i) = do
   case tv of
     RType (TDown n) _ -> instantiate n >>= regAndRet i
     _ -> lift $ throwE $ "Region.infer.Unthunk. Note:\n" ++ Pr.ppShow (v, tv)
--- infer (Send (S s t) e, _) = undefined
--- infer (Recv (S s t) e, _) = undefined
--- infer (Dispatch e1 e2, _) = do
---   t1 <- infer e1
---   t2 <- infer e2
---   return $ TCotensor t1 t2
--- infer (Coleft e, _) = do
---   t <- infer e
---   case t of
---     TCotensor t1 _ -> return t1
---     _              -> lift $ throwE "Region.infer.Coleft"
--- infer (Coright e, _) = do
---   t <- infer e
---   case t of
---     TCotensor _ t2 -> return t2
---     _              -> lift $ throwE "Region.infer.Coright"
+infer (Send (S s t) e, i) = infer e >>= regAndRet i
+infer (Recv (S s t) e, i) = do
+  ts <- lookupTEnv' s >>= annotate
+  insTEnv s ts
+  infer e >>= regAndRet i
+infer (Dispatch e1 e2, i) = do
+  t1 <- infer e1
+  t2 <- infer e2
+  regAndRet i $ TCotensor t1 t2
+infer (Coleft e, i) = do
+  t <- infer e
+  case t of
+    TCotensor t1 _ -> regAndRet i t1
+    _              -> lift $ throwE "Region.infer.Coleft"
+infer (Coright e, i) = do
+  t <- infer e
+  case t of
+    TCotensor _ t2 -> regAndRet i t2
+    _              -> lift $ throwE "Region.infer.Coright"
 infer (Mu (S s t) e, i) = do
   ts <- lookupTEnv' s >>= annotate
   insTEnv s ts
