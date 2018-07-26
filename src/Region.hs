@@ -78,7 +78,14 @@ infer (Bind (S s _) e1 e2, i) = do
     _ -> lift $ throwE "Region.infer.Bind"
 infer (Thunk e, i) = do
   t <- infer e
-  RType (TDown t) <$> newRegion >>= regAndRet i
+  r <- newRegion
+  forM_ (freeVar e) $ \v -> do
+    rt <- lookupTEnv v
+    case rt of
+      Just (RType _ r') -> insRNEnv r r'
+      _ ->
+        lift $ throwE $ "Region.infer.Region. Note:\n" ++ Pr.ppShow (v, rt, e)
+  regAndRet i $ RType (TDown t) r
 infer (Unthunk v, i) = do
   tv <- infer v
   case tv of
@@ -235,3 +242,29 @@ sType sub (TCotensor t1 t2) = do
 sType sub (RType t r) = do
   let t' = sType sub t
   RType t' $ traceMap sub r
+
+freeVar :: MTerm -> [String]
+freeVar (Var s, _) = [s]
+freeVar (Const _, _) = []
+freeVar (ConsApp v1 v2, _) = freeVar v1 ++ freeVar v2
+freeVar (Thunk e, _) = freeVar e
+freeVar (Lam (S s t) e, _) = filter (/= s) $ freeVar e
+freeVar (App e v, _) = freeVar e ++ freeVar v
+freeVar (Ret v, _) = freeVar v
+freeVar (Bind (S s t) e1 e2, _) = freeVar e1 ++ filter (/= s) (freeVar e2)
+freeVar (Unthunk v, _) = freeVar v
+freeVar (Send (S s t) e, _) = s : freeVar e
+freeVar (Recv (S s t) e, _) = filter (/= s) (freeVar e)
+freeVar (Dispatch e1 e2, _) = freeVar e1 ++ freeVar e2
+freeVar (Coleft e, _) = freeVar e
+freeVar (Coright e, _) = freeVar e
+freeVar (Mu (S s t) e, _) = filter (/= s) (freeVar e)
+freeVar (Case e ves, _) = do
+  let efs = freeVar e
+  vefss <-
+    forM ves $ \(pat, body) -> do
+      bound <- freeVar pat
+      fs <- freeVar body
+      return $ filter (`notElem` bound) fs
+  efs ++ vefss
+freeVar (Asc e t, _) = freeVar e
