@@ -39,7 +39,7 @@ recurM f (Node tis, i) = do
   tis' <- mapM (recurM f) tis
   f (Node tis', i)
 
-type MTree = (Tree, Identifier)
+type MTree = (Tree, Meta)
 
 data Sym
   = S String
@@ -76,7 +76,7 @@ data V
   deriving (Show, Eq)
 
 -- value with metadata
-type MV = (V, Identifier)
+type MV = (V, Meta)
 
 -- negative term / computation
 -- e ::= (lambda (x P) e)
@@ -119,7 +119,7 @@ data C
   deriving (Show, Eq)
 
 -- computation with identifier
-type MC = (C, Identifier)
+type MC = (C, Meta)
 
 data PolTerm
   = Value MV
@@ -157,7 +157,7 @@ data Term
         Type
   deriving (Show, Eq)
 
-type MTerm = (Term, Identifier)
+type MTerm = (Term, Meta)
 
 -- positive type
 -- P ::= p
@@ -187,6 +187,13 @@ data Type
   | RType Type -- this "Type" is supposed to be a positive one
           String
   deriving (Show, Eq)
+
+type Region = String
+
+data Meta = Meta
+  { ident     :: String
+  , regionSet :: [Region]
+  } deriving (Show, Eq)
 
 data RegionSeq
   = RSHole String

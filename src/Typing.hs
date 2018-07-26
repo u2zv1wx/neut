@@ -24,7 +24,7 @@ check e = do
   modify (\e -> e {typeEnv = tenv', constraintEnv = []})
 
 infer :: MTerm -> WithEnv Type
-infer (Var s, i) = do
+infer (Var s, Meta {ident = i}) = do
   mt <- lookupTEnv s
   case mt of
     Just t -> do
@@ -35,20 +35,20 @@ infer (Var s, i) = do
       insTEnv s new
       insTEnv i new
       return new
-infer (Const s, i) = do
+infer (Const s, Meta {ident = i}) = do
   mt <- lookupVEnv s
   case mt of
     Just t -> do
       insTEnv i t
       return t
     Nothing -> lift $ throwE $ "const " ++ s ++ " is not defined"
-infer (Lam (S s t) e, i) = do
+infer (Lam (S s t) e, Meta {ident = i}) = do
   insTEnv s t
   te <- infer e
   let result = TForall (S s t) te
   insTEnv i result
   return result
-infer (App e v, l) = do
+infer (App e v, Meta {ident = l}) = do
   te <- infer e
   tv <- infer v
   i <- newName
@@ -59,7 +59,7 @@ infer (App e v, l) = do
   let result = THole i
   insTEnv l result
   return result
-infer (ConsApp v1 v2, l) = do
+infer (ConsApp v1 v2, Meta {ident = l}) = do
   t1 <- infer v1
   t2 <- infer v2
   i <- newName
@@ -70,67 +70,67 @@ infer (ConsApp v1 v2, l) = do
   let result = THole i
   insTEnv l result
   return result
-infer (Ret v, i) = do
+infer (Ret v, Meta {ident = i}) = do
   tv <- infer v
   let result = TUp tv
   insTEnv i result
   return result
-infer (Bind (S s t) e1 e2, i) = do
+infer (Bind (S s t) e1 e2, Meta {ident = i}) = do
   insTEnv s t
   t1 <- infer e1
   t2 <- infer e2
   insCEnv (TUp t) t1
   insTEnv i t2
   return t2
-infer (Thunk e, i) = do
+infer (Thunk e, Meta {ident = i}) = do
   t <- infer e
   let result = TDown t
   insTEnv i result
   return result
-infer (Unthunk v, l) = do
+infer (Unthunk v, Meta {ident = l}) = do
   t <- infer v
   i <- newName
   insCEnv t (TDown (THole i))
   let result = THole i
   insTEnv l result
   return result
-infer (Send (S s t) e, i) = do
+infer (Send (S s t) e, Meta {ident = i}) = do
   insTEnv s t
   t <- infer e
   insTEnv i t
   return t
-infer (Recv (S s t) e, i) = do
+infer (Recv (S s t) e, Meta {ident = i}) = do
   insTEnv s t
   t <- infer e
   insTEnv i t
   return t
-infer (Dispatch e1 e2, i) = do
+infer (Dispatch e1 e2, Meta {ident = i}) = do
   t1 <- infer e1
   t2 <- infer e2
   let result = TCotensor t1 t2
   insTEnv i result
   return result
-infer (Coleft e, i) = do
+infer (Coleft e, Meta {ident = i}) = do
   t <- infer e
   t1 <- THole <$> newName
   t2 <- THole <$> newName
   insCEnv t (TCotensor t1 t2)
   insTEnv i t1
   return t1
-infer (Coright e, i) = do
+infer (Coright e, Meta {ident = i}) = do
   t <- infer e
   t1 <- THole <$> newName
   t2 <- THole <$> newName
   insCEnv t (TCotensor t1 t2)
   insTEnv i t2
   return t2
-infer (Mu (S s t) e, i) = do
+infer (Mu (S s t) e, Meta {ident = i}) = do
   insTEnv s t
   te <- infer e
   insCEnv (TDown te) t
   insTEnv i te
   return te
-infer (Case e ves, i) = do
+infer (Case e ves, Meta {ident = i}) = do
   t <- infer e
   let (vs, es) = unzip ves
   tvs <- mapM infer vs
@@ -140,7 +140,7 @@ infer (Case e ves, i) = do
   forM_ tes $ \te -> insCEnv ans te
   insTEnv i ans
   return ans
-infer (Asc e t, i) = do
+infer (Asc e t, Meta {ident = i}) = do
   te <- infer e
   insCEnv t te
   insTEnv i te

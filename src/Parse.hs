@@ -101,15 +101,15 @@ parseTerm (Node (te:tvs), i)
 parseTerm t = lift $ throwE $ "parseTerm: syntax error:\n" ++ Pr.ppShow t
 
 foldMTerm ::
-     ((a, String) -> (a, String) -> a)
-  -> (a, String)
-  -> [(a, String)]
-  -> WithEnv (a, String)
+     ((a, Meta) -> (a, Meta) -> a)
+  -> (a, Meta)
+  -> [(a, Meta)]
+  -> WithEnv (a, Meta)
 foldMTerm f e [] = return e
 foldMTerm f e (t:ts) = do
   let tmp = f e t
   i <- newName
-  foldMTerm f (tmp, i) ts
+  foldMTerm f (tmp, Meta {ident = i, regionSet = []}) ts
 
 parseClause :: MTree -> WithEnv (MTerm, MTerm)
 parseClause (Node [tv, te], i) = do

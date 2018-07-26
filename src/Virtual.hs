@@ -29,7 +29,7 @@ virtualV (VAsc v _, _) = virtualV v
 
 virtualC :: MC -> WithEnv Operation
 virtualC (CLam _ e, _) = virtualC e
-virtualC (CApp e@(_, i) v, _) = do
+virtualC (CApp e@(_, Meta {ident = i}) v, _) = do
   mt <- lookupTEnv i
   case mt of
     Nothing -> lift $ throwE "ERROR<virtualC>"

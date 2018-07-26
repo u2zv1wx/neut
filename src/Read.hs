@@ -34,7 +34,7 @@ parseAtom = do
   s <- symbol
   _ <- spaces
   i <- newNameParser
-  return (Atom s, i)
+  return (Atom s, Meta {ident = i, regionSet = []})
 
 parseNode :: Parser MTree
 parseNode = do
@@ -42,7 +42,7 @@ parseNode = do
   itemList <- many parseStr
   _ <- spaces >> char ')' >> spaces
   i <- newNameParser
-  return (Node itemList, i)
+  return (Node itemList, Meta {ident = i, regionSet = []})
 
 newNameParser :: Parser String
 newNameParser = do

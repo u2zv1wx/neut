@@ -40,14 +40,14 @@ check e = do
 type Region = String
 
 infer :: MTerm -> WithEnv Type
-infer (Var s, i) = lookupTEnv' s >>= regAndRet i
-infer (Const s, i) = lookupTEnv' s >>= annotate >>= regAndRet i
-infer (Lam (S s _) e, i) = do
+infer (Var s, Meta {ident = i}) = lookupTEnv' s >>= regAndRet i
+infer (Const s, Meta {ident = i}) = lookupTEnv' s >>= annotate >>= regAndRet i
+infer (Lam (S s _) e, Meta {ident = i}) = do
   tdom <- lookupTEnv' s >>= annotate
   insTEnv s tdom
   tcod <- infer e
   regAndRet i $ TForall (S s tdom) tcod
-infer (App e v, i) = do
+infer (App e v, Meta {ident = i}) = do
   te <- infer e
   tv <- infer v
   case (te, tv) of
@@ -55,7 +55,7 @@ infer (App e v, i) = do
       insCEnv tdom targ
       regAndRet i tcod
     _ -> lift $ throwE $ "Region.infer.App. Note:\n" ++ Pr.ppShow (e, te, tv)
-infer (ConsApp v1 v2, i) = do
+infer (ConsApp v1 v2, Meta {ident = i}) = do
   t1 <- infer v1
   t2 <- infer v2
   case (t1, t2) of
@@ -63,10 +63,10 @@ infer (ConsApp v1 v2, i) = do
       insCEnv tdom targ
       regAndRet i tcod
     _ -> lift $ throwE $ "Region.infer.ConsApp. Note:\n" ++ Pr.ppShow (t1, t2)
-infer (Ret v, i) = do
+infer (Ret v, Meta {ident = i}) = do
   tv <- infer v
   regAndRet i $ TUp tv
-infer (Bind (S s _) e1 e2, i) = do
+infer (Bind (S s _) e1 e2, Meta {ident = i}) = do
   t1 <- infer e1
   ts <- lookupTEnv' s >>= annotate
   insTEnv s ts
@@ -76,7 +76,7 @@ infer (Bind (S s _) e1 e2, i) = do
       insCEnv p ts
       regAndRet i t2
     _ -> lift $ throwE "Region.infer.Bind"
-infer (Thunk e, i) = do
+infer (Thunk e, Meta {ident = i}) = do
   t <- infer e
   r <- newRegion
   forM_ (freeVar e) $ \v -> do
@@ -86,52 +86,52 @@ infer (Thunk e, i) = do
       _ ->
         lift $ throwE $ "Region.infer.Region. Note:\n" ++ Pr.ppShow (v, rt, e)
   regAndRet i $ RType (TDown t) r
-infer (Unthunk v, i) = do
+infer (Unthunk v, Meta {ident = i}) = do
   tv <- infer v
   case tv of
     RType (TDown n) _ -> instantiate n >>= regAndRet i
     _ -> lift $ throwE $ "Region.infer.Unthunk. Note:\n" ++ Pr.ppShow (v, tv)
-infer (Send (S s t) e, i) = infer e >>= regAndRet i
-infer (Recv (S s t) e, i) = do
+infer (Send (S s t) e, Meta {ident = i}) = infer e >>= regAndRet i
+infer (Recv (S s t) e, Meta {ident = i}) = do
   ts <- lookupTEnv' s >>= annotate
   insTEnv s ts
   infer e >>= regAndRet i
-infer (Dispatch e1 e2, i) = do
+infer (Dispatch e1 e2, Meta {ident = i}) = do
   t1 <- infer e1
   t2 <- infer e2
   regAndRet i $ TCotensor t1 t2
-infer (Coleft e, i) = do
+infer (Coleft e, Meta {ident = i}) = do
   t <- infer e
   case t of
     TCotensor t1 _ -> regAndRet i t1
     _              -> lift $ throwE "Region.infer.Coleft"
-infer (Coright e, i) = do
+infer (Coright e, Meta {ident = i}) = do
   t <- infer e
   case t of
     TCotensor _ t2 -> regAndRet i t2
     _              -> lift $ throwE "Region.infer.Coright"
-infer (Mu (S s t) e, i) = do
+infer (Mu (S s t) e, Meta {ident = i}) = do
   ts <- lookupTEnv' s >>= annotate
   insTEnv s ts
   t <- infer e
   insCEnv (TDown t) ts
   regAndRet i t
-infer (Case v ves, i) = do
+infer (Case v ves, Meta {ident = i}) = do
   tv <- infer v
   let (vs, es) = unzip ves
   tvs <- mapM inferPat vs
   tes <- mapM infer es
-  x <- THole <$> newName
-  forM_ (map (\s -> (s, x)) (tv : tvs)) $ uncurry insCEnv
+  forM_ (map (\s -> (tv, s)) tvs) $ uncurry insCEnv
   y <- THole <$> newName
   forM_ (map (\s -> (s, y)) tes) $ uncurry insCEnv
   regAndRet i (head tes)
-infer (Asc e t, i) = infer e
+infer (Asc e t, Meta {ident = i}) = infer e
 
 inferPat :: MTerm -> WithEnv Type
-inferPat (Var s, i) = lookupTEnv' s >>= annotate >>= regAndRet i
-inferPat (Const s, i) = lookupTEnv' s >>= annotate >>= regAndRet i
-inferPat (ConsApp v1 v2, i) = do
+inferPat (Var s, Meta {ident = i}) = lookupTEnv' s >>= annotate >>= regAndRet i
+inferPat (Const s, Meta {ident = i}) =
+  lookupTEnv' s >>= annotate >>= regAndRet i
+inferPat (ConsApp v1 v2, Meta {ident = i}) = do
   t1 <- infer v1
   t2 <- infer v2
   case (t1, t2) of
@@ -145,7 +145,8 @@ newRegion :: WithEnv String
 newRegion = newNameWith "region"
 
 regAndRet :: String -> Type -> WithEnv Type
-regAndRet i t = insRTEnv i t >> return t
+regAndRet i (RType t r) = insRTEnv i (RType t r) >> return t
+regAndRet i t           = insRTEnv i t >> return t
 
 lookupTEnv' :: String -> WithEnv Type
 lookupTEnv' s = do
