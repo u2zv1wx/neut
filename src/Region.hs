@@ -17,7 +17,8 @@ import qualified Typing
 check :: MTerm -> WithEnv ()
 check e = do
   modify (\e -> e {constraintEnv = []})
-  _ <- infer e
+  e' <- prepare e
+  _ <- infer e'
   env <- get
   let cs = constraintEnv env
   liftIO $ putStrLn $ "CONSTRAINTS===="
@@ -41,14 +42,16 @@ type Region = String
 
 prepare :: MTerm -> WithEnv MTerm
 prepare (Var s, meta) = do
-  r <- newRegion
+  r <- lookupRNEnv' s
   return (Var s, meta {regionSet = [r]})
 prepare (Const s, meta) = do
-  r <- newRegion
+  r <- lookupRNEnv' s
   return (Const s, meta {regionSet = [r]})
-prepare (Lam s e, meta) = do
+prepare (Lam (S s p) e, meta) = do
+  r <- newRegion
+  insRNEnv s r
   e' <- prepare e
-  return (Lam s e', meta)
+  return (Lam (S s p) e', meta)
 prepare (App e v, meta) = do
   e' <- prepare e
   v' <- prepare v
@@ -61,10 +64,12 @@ prepare (ConsApp v1 v2, meta) = do
 prepare (Ret v, meta) = do
   v' <- prepare v
   return (Ret v', meta)
-prepare (Bind s e1 e2, meta) = do
+prepare (Bind (S s p) e1 e2, meta) = do
   e1' <- prepare e1
+  r <- newRegion
+  insRNEnv s r
   e2' <- prepare e2
-  return (Bind s e1' e2', meta)
+  return (Bind (S s p) e1' e2', meta)
 prepare (Thunk e, meta) = do
   e' <- prepare e
   r <- newRegion
@@ -75,9 +80,11 @@ prepare (Unthunk v, meta) = do
 prepare (Send s e, meta) = do
   e' <- prepare e
   return (Send s e', meta)
-prepare (Recv s e, meta) = do
+prepare (Recv (S s p) e, meta) = do
+  r <- newRegion
+  insRNEnv s r
   e' <- prepare e
-  return (Recv s e, meta)
+  return (Recv (S s p) e, meta)
 prepare (Dispatch e1 e2, meta) = do
   e1' <- prepare e1
   e2' <- prepare e2
@@ -94,18 +101,35 @@ prepare (Mu s e, meta) = do
 prepare (Case v ves, meta) = do
   v' <- prepare v
   let (vs, es) = unzip ves
-  vs' <- mapM prepare vs
+  vs' <- mapM preparePat vs
   es' <- mapM prepare es
   return (Case v' (zip vs' es'), meta)
 prepare (Asc e t, meta) = do
   e' <- prepare e
   return (Asc e' t, meta)
 
+preparePat :: MTerm -> WithEnv MTerm
+preparePat (Var s, meta) = do
+  r <- newRegion
+  insRNEnv s r
+  return (Var s, meta {regionSet = [r]})
+preparePat (Const s, meta) = do
+  r <- lookupRNEnv' s
+  return (Const s, meta {regionSet = [r]})
+preparePat (ConsApp v1 v2, meta) = do
+  v1' <- prepare v1
+  v2' <- prepare v2
+  r <- newRegion
+  return (ConsApp v1' v2', meta {regionSet = [r]})
+preparePat _ = lift $ throwE "Region.preparePat"
+
 infer :: MTerm -> WithEnv Type
 infer (Var s, Meta {ident = i}) = lookupTEnv' s >>= regAndRet i
-infer (Const s, Meta {ident = i}) = lookupTEnv' s >>= annotate >>= regAndRet i
+infer (Const s, Meta {ident = i, regionSet = [r]}) =
+  lookupTEnv' s >>= annotate r >>= regAndRet i
 infer (Lam (S s _) e, Meta {ident = i}) = do
-  tdom <- lookupTEnv' s >>= annotate
+  r <- lookupRNEnv' s
+  tdom <- lookupTEnv' s >>= annotate r
   insTEnv s tdom
   tcod <- infer e
   regAndRet i $ TForall (S s tdom) tcod
@@ -120,6 +144,7 @@ infer (App e v, Meta {ident = i}) = do
 infer (ConsApp v1 v2, Meta {ident = i}) = do
   t1 <- infer v1
   t2 <- infer v2
+  liftIO $ putStrLn $ Pr.ppShow t2
   case (t1, t2) of
     (RType (TNode (S _ tdom) tcod) _, targ) -> do
       insCEnv tdom targ
@@ -130,7 +155,8 @@ infer (Ret v, Meta {ident = i}) = do
   regAndRet i $ TUp tv
 infer (Bind (S s _) e1 e2, Meta {ident = i}) = do
   t1 <- infer e1
-  ts <- lookupTEnv' s >>= annotate
+  r <- lookupRNEnv' s
+  ts <- lookupTEnv' s >>= annotate r
   insTEnv s ts
   t2 <- infer e2
   case t1 of
@@ -138,9 +164,8 @@ infer (Bind (S s _) e1 e2, Meta {ident = i}) = do
       insCEnv p ts
       regAndRet i t2
     _ -> lift $ throwE "Region.infer.Bind"
-infer (Thunk e, Meta {ident = i}) = do
+infer (Thunk e, Meta {ident = i, regionSet = [r]}) = do
   t <- infer e
-  r <- newRegion
   forM_ (freeVar e) $ \v -> do
     rt <- lookupTEnv v
     case rt of
@@ -155,7 +180,8 @@ infer (Unthunk v, Meta {ident = i}) = do
     _ -> lift $ throwE $ "Region.infer.Unthunk. Note:\n" ++ Pr.ppShow (v, tv)
 infer (Send (S s t) e, Meta {ident = i}) = infer e >>= regAndRet i
 infer (Recv (S s t) e, Meta {ident = i}) = do
-  ts <- lookupTEnv' s >>= annotate
+  r <- lookupRNEnv' s
+  ts <- lookupTEnv' s >>= annotate r
   insTEnv s ts
   infer e >>= regAndRet i
 infer (Dispatch e1 e2, Meta {ident = i}) = do
@@ -173,7 +199,8 @@ infer (Coright e, Meta {ident = i}) = do
     TCotensor _ t2 -> regAndRet i t2
     _              -> lift $ throwE "Region.infer.Coright"
 infer (Mu (S s t) e, Meta {ident = i}) = do
-  ts <- lookupTEnv' s >>= annotate
+  r <- lookupRNEnv' s
+  ts <- lookupTEnv' s >>= annotate r
   insTEnv s ts
   t <- infer e
   insCEnv (TDown t) ts
@@ -190,9 +217,10 @@ infer (Case v ves, Meta {ident = i}) = do
 infer (Asc e t, Meta {ident = i}) = infer e
 
 inferPat :: MTerm -> WithEnv Type
-inferPat (Var s, Meta {ident = i}) = lookupTEnv' s >>= annotate >>= regAndRet i
-inferPat (Const s, Meta {ident = i}) =
-  lookupTEnv' s >>= annotate >>= regAndRet i
+inferPat (Var s, Meta {ident = i, regionSet = [r]}) =
+  lookupTEnv' s >>= annotate r >>= regAndRet i
+inferPat (Const s, Meta {ident = i, regionSet = [r]}) =
+  lookupTEnv' s >>= annotate r >>= regAndRet i
 inferPat (ConsApp v1 v2, Meta {ident = i}) = do
   t1 <- infer v1
   t2 <- infer v2
@@ -200,15 +228,16 @@ inferPat (ConsApp v1 v2, Meta {ident = i}) = do
     (RType (TNode (S _ tdom) tcod) _, targ) -> do
       insCEnv tdom targ
       regAndRet i tcod
-    _ -> lift $ throwE $ "Region.infer.ConsApp. Note:\n" ++ Pr.ppShow (t1, t2)
+    _ ->
+      lift $ throwE $ "Region.inferPat.ConsApp. Note:\n" ++ Pr.ppShow (t1, t2)
 inferPat _ = lift $ throwE "Region.inferPat"
 
 newRegion :: WithEnv String
 newRegion = newNameWith "region"
 
 regAndRet :: String -> Type -> WithEnv Type
-regAndRet i (RType t r) = insRTEnv i (RType t r) >> return t
-regAndRet i t           = insRTEnv i t >> return t
+-- regAndRet i (RType t r) = insRTEnv i (RType t r) >> return t
+regAndRet i t = insRTEnv i t >> return t
 
 lookupTEnv' :: String -> WithEnv Type
 lookupTEnv' s = do
@@ -217,6 +246,13 @@ lookupTEnv' s = do
     Just t  -> return t
     Nothing -> lift $ throwE $ "Region.lookupTEnv' : not found : " ++ show s
 
+lookupRNEnv' :: String -> WithEnv String
+lookupRNEnv' s = do
+  t <- lookupRNEnv s
+  case t of
+    Just t  -> return t
+    Nothing -> lift $ throwE $ "Region.lookupRNEnv' : not found : " ++ show s
+
 instantiate :: Type -> WithEnv Type
 instantiate (TForall (S s (RType dom r)) cod) = do
   r' <- newRegion
@@ -224,28 +260,35 @@ instantiate (TForall (S s (RType dom r)) cod) = do
   return $ TForall (S s (RType dom r')) cod'
 instantiate t = return t
 
-annotate :: Type -> WithEnv Type
-annotate (TVar s) = RType (TConst s) <$> newRegion
-annotate (THole s) = lift $ throwE "Region.annotate.THole"
-annotate (TConst s) = RType (TConst s) <$> newRegion
-annotate (TNode (S s p1) p2) = do
-  p1' <- annotate p1
-  p2' <- annotate p2
+annotate :: String -> Type -> WithEnv Type
+annotate r t = do
+  t' <- annotate' t
+  case t' of
+    (RType t'' _) -> return (RType t'' r)
+    _ -> lift $ throwE $ "Region.annotate. Note:\n" ++ Pr.ppShow t'
+
+annotate' :: Type -> WithEnv Type
+annotate' (TVar s) = RType (TConst s) <$> newRegion
+annotate' (THole s) = lift $ throwE "Region.annotate'.THole"
+annotate' (TConst s) = RType (TConst s) <$> newRegion
+annotate' (TNode (S s p1) p2) = do
+  p1' <- annotate' p1
+  p2' <- annotate' p2
   RType (TNode (S s p1') p2') <$> newRegion
-annotate (TUp p) = TUp <$> annotate p
-annotate (TDown n) = do
-  n' <- annotate n
+annotate' (TUp p) = TUp <$> annotate' p
+annotate' (TDown n) = do
+  n' <- annotate' n
   RType (TDown n') <$> newRegion
-annotate (TUniv l) = RType (TUniv l) <$> newRegion
-annotate (TForall (S s p) n) = do
-  p' <- annotate p
-  n' <- annotate n
+annotate' (TUniv l) = RType (TUniv l) <$> newRegion
+annotate' (TForall (S s p) n) = do
+  p' <- annotate' p
+  n' <- annotate' n
   return $ TForall (S s p') n'
-annotate (TCotensor n1 n2) = do
-  n1' <- annotate n1
-  n2' <- annotate n2
+annotate' (TCotensor n1 n2) = do
+  n1' <- annotate' n1
+  n2' <- annotate' n2
   return $ TCotensor n1' n2'
-annotate (RType p r) = lift $ throwE "Region.annotate.RType"
+annotate' (RType p r) = lift $ throwE "Region.annotate'.RType"
 
 type Child = String
 

@@ -35,8 +35,8 @@ load' ((Node [(Atom "reserve", _), (Atom s, _)], _):as) = do
 load' ((Node [(Atom "value", _), (Atom s, _), tp], _):as) = do
   p <- parseType tp
   modify (\e -> e {valueEnv = (s, p) : valueEnv e})
-  -- r <- Region.newRegion
-  -- insRNEnv s r
+  r <- Region.newRegion
+  insRNEnv s r
   insTEnv s p
   load' as
 load' (a:as) = do
