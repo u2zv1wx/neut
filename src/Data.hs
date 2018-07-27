@@ -213,7 +213,7 @@ data Env = Env
   , nameConstraintEnv   :: [(Sym, Sym)]
   , levelEnv            :: [(Level, Level)]
   , rNameEnv            :: [(String, String)]
-  , regionConstraintEnv :: [(String, String)]
+  , regionConstraintEnv :: [(String, String)] -- (a, b) means region(a) \subseteq region(b)
   } deriving (Show)
 
 initialEnv :: Env

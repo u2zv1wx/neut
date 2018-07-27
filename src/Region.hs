@@ -26,16 +26,19 @@ check e = do
   liftIO $ putStrLn $ "CONSTRAINTS===="
   sub <- Typing.unify cs
   env <- get
-  let nameEquations = regionConstraintEnv env
+  let regionInequalities = regionConstraintEnv env
   -- liftIO $ putStrLn $ "SUB===="
   -- liftIO $ putStrLn $ Pr.ppShow cs
   -- liftIO $ putStrLn $ "SUB===="
-  let nameTree = constructMap nameEquations
-  liftIO $ putStrLn $ "MARK===="
-  liftIO $ putStrLn $ Pr.ppShow nameTree
-  liftIO $ putStrLn $ "MARK===="
-  let tenv' = map (\(s, t) -> (s, sType nameTree t)) $ rTypeEnv env
-  modify (\e -> e {rTypeEnv = tenv'})
+  liftIO $ putStrLn $ "INEQUALITIES===="
+  liftIO $ putStrLn $ Pr.ppShow regionInequalities
+  liftIO $ putStrLn $ "INEQUALITIES===="
+  -- let nameTree = constructMap nameEquations
+  -- liftIO $ putStrLn $ "MARK===="
+  -- liftIO $ putStrLn $ Pr.ppShow nameTree
+  -- liftIO $ putStrLn $ "MARK===="
+  -- let tenv' = map (\(s, t) -> (s, sType nameTree t)) $ rTypeEnv env
+  -- modify (\e -> e {rTypeEnv = tenv'})
   return ()
 
 type Region = String
@@ -138,7 +141,7 @@ infer (App e v, Meta {ident = i}) = do
   tv <- infer v
   case (te, tv) of
     (TForall (S _ tdom) tcod, targ) -> do
-      insCEnv tdom targ
+      insCEnv tdom targ -- the actual arguments ("v") must live longer than formal ones ("x").
       regAndRet i tcod
     _ -> lift $ throwE $ "Region.infer.App. Note:\n" ++ Pr.ppShow (e, te, tv)
 infer (ConsApp v1 v2, Meta {ident = i}) = do
@@ -147,7 +150,7 @@ infer (ConsApp v1 v2, Meta {ident = i}) = do
   liftIO $ putStrLn $ Pr.ppShow t2
   case (t1, t2) of
     (RType (TNode (S _ tdom) tcod) _, targ) -> do
-      insCEnv tdom targ
+      insCEnv tdom targ -- the actual arguments ("v") must live longer than formal ones ("x").
       regAndRet i tcod
     _ -> lift $ throwE $ "Region.infer.ConsApp. Note:\n" ++ Pr.ppShow (t1, t2)
 infer (Ret v, Meta {ident = i}) = do
@@ -160,7 +163,11 @@ infer (Bind (S s _) e1 e2, Meta {ident = i}) = do
   insTEnv s ts
   t2 <- infer e2
   case t1 of
-    TUp p -> do
+    TUp p
+      -- the actual arguments ("e : ↑P") must live longer than formal ones ("x : P").
+      -- for example, consider an expression `let x := zero in foo`. the `x` in the expression
+      -- is expected to live shorter that `zero`.
+     -> do
       insCEnv p ts
       regAndRet i t2
     _ -> lift $ throwE "Region.infer.Bind"
@@ -169,7 +176,7 @@ infer (Thunk e, Meta {ident = i, regionSet = [r]}) = do
   forM_ (freeVar e) $ \v -> do
     rt <- lookupTEnv v
     case rt of
-      Just (RType _ r') -> insRNEnv r r'
+      Just (RType _ r') -> insRCEnv r r' -- the freevars in a thunk must live longer than the thunk
       _ ->
         lift $ throwE $ "Region.infer.Region. Note:\n" ++ Pr.ppShow (v, rt, e)
   regAndRet i $ RType (TDown t) r
@@ -198,21 +205,25 @@ infer (Coright e, Meta {ident = i}) = do
   case t of
     TCotensor _ t2 -> regAndRet i t2
     _              -> lift $ throwE "Region.infer.Coright"
-infer (Mu (S s t) e, Meta {ident = i}) = do
+infer (Mu (S s _) e, Meta {ident = i}) = do
   r <- lookupRNEnv' s
-  ts <- lookupTEnv' s >>= annotate r
-  insTEnv s ts
-  t <- infer e
-  insCEnv (TDown t) ts
-  regAndRet i t
+  targ <- lookupTEnv' s >>= annotate r
+  insTEnv s targ
+  tbody <- infer e
+  -- a == b iff a <= b && b <= a
+  insCEnv (TDown tbody) targ
+  insCEnv targ (TDown tbody)
+  regAndRet i tbody
 infer (Case v ves, Meta {ident = i}) = do
   tv <- infer v
   let (vs, es) = unzip ves
   tvs <- mapM inferPat vs
   tes <- mapM infer es
-  forM_ (map (\s -> (tv, s)) tvs) $ uncurry insCEnv
+  forM_ (map (\s -> (s, tv)) tvs) $ uncurry insCEnv -- lifetime(vars in pattern) <= lifetime(v)
   y <- THole <$> newName
+  -- all the lifetimes of the bodies are equal
   forM_ (map (\s -> (s, y)) tes) $ uncurry insCEnv
+  forM_ (map (\s -> (y, s)) tes) $ uncurry insCEnv
   regAndRet i (head tes)
 infer (Asc e t, Meta {ident = i}) = infer e
 
