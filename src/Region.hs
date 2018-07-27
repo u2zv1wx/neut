@@ -358,65 +358,151 @@ sType sub (RType t r) = do
   let t' = sType sub t
   RType t' $ traceMap sub r
 
+getTracer a i =
+  if [a] == regionSet i
+    then sTerm'
+    else sTerm
+
+-- replace all the occurences of `b` under `a`  (sub == (a, b))
 sTerm :: (Region, Region) -> MTerm -> MTerm
-sTerm sub (Var s, i) = (Var s, sMeta sub i)
-sTerm sub (Const s, i) = (Const s, sMeta sub i)
-sTerm sub (ConsApp v1 v2, i) = do
-  let v1' = sTerm sub v1
-  let v2' = sTerm sub v2
-  (ConsApp v1' v2', sMeta sub i)
-sTerm sub (Thunk e, i) = do
-  let e' = sTerm sub e
-  (Thunk e', sMeta sub i)
-sTerm sub (Lam (S s t) e, i) = do
-  let e' = sTerm sub e
-  (Lam (S s t) e', sMeta sub i)
-sTerm sub (App e v, i) = do
-  let e' = sTerm sub e
-  let v' = sTerm sub v
-  (App e' v', sMeta sub i)
-sTerm sub (Ret v, i) = do
-  let v' = sTerm sub v
-  (Ret v', sMeta sub i)
-sTerm sub (Bind (S s t) e1 e2, i) = do
-  let e1' = sTerm sub e1
-  let e2' = sTerm sub e2
-  (Bind (S s t) e1' e2', sMeta sub i)
-sTerm sub (Unthunk v, i) = do
-  let v' = sTerm sub v
-  (Unthunk v', sMeta sub i)
-sTerm sub (Send (S s t) e, i) = do
-  let e' = sTerm sub e
-  (Send (S s t) e', sMeta sub i)
-sTerm sub (Recv (S s t) e, i) = do
-  let e' = sTerm sub e
-  (Recv (S s t) e', sMeta sub i)
-sTerm sub (Dispatch e1 e2, i) = do
-  let e1' = sTerm sub e1
-  let e2' = sTerm sub e2
-  (Dispatch e1' e2', sMeta sub i)
-sTerm sub (Coleft e, i) = do
-  let e' = sTerm sub e
-  (Coleft e', sMeta sub i)
-sTerm sub (Coright e, i) = do
-  let e' = sTerm sub e
-  (Coright e', sMeta sub i)
-sTerm sub (Mu (S s t) e, i) = do
-  let e' = sTerm sub e
-  (Mu (S s t) e', sMeta sub i)
-sTerm sub (Case e ves, i) = do
-  let e' = sTerm sub e
+sTerm sub (Var s, i) = (Var s, i)
+sTerm sub (Const s, i) = (Const s, i)
+sTerm sub@(a, b) (ConsApp v1 v2, i) = do
+  let tracer = getTracer a i
+  let v1' = tracer sub v1
+  let v2' = tracer sub v2
+  (ConsApp v1' v2', i)
+sTerm sub@(a, _) (Thunk e, i) = do
+  let tracer = getTracer a i
+  let e' = tracer sub e
+  (Thunk e', i)
+sTerm sub@(a, _) (Lam (S s t) e, i) = do
+  let tracer = getTracer a i
+  let e' = tracer sub e
+  (Lam (S s t) e', i)
+sTerm sub@(a, _) (App e v, i) = do
+  let tracer = getTracer a i
+  let e' = tracer sub e
+  let v' = tracer sub v
+  (App e' v', i)
+sTerm sub@(a, _) (Ret v, i) = do
+  let tracer = getTracer a i
+  let v' = tracer sub v
+  (Ret v', i)
+sTerm sub@(a, _) (Bind (S s t) e1 e2, i) = do
+  let tracer = getTracer a i
+  let e1' = tracer sub e1
+  let e2' = tracer sub e2
+  (Bind (S s t) e1' e2', i)
+sTerm sub@(a, _) (Unthunk v, i) = do
+  let tracer = getTracer a i
+  let v' = tracer sub v
+  (Unthunk v', i)
+sTerm sub@(a, _) (Send (S s t) e, i) = do
+  let tracer = getTracer a i
+  let e' = tracer sub e
+  (Send (S s t) e', i)
+sTerm sub@(a, _) (Recv (S s t) e, i) = do
+  let tracer = getTracer a i
+  let e' = tracer sub e
+  (Recv (S s t) e', i)
+sTerm sub@(a, _) (Dispatch e1 e2, i) = do
+  let tracer = getTracer a i
+  let e1' = tracer sub e1
+  let e2' = tracer sub e2
+  (Dispatch e1' e2', i)
+sTerm sub@(a, _) (Coleft e, i) = do
+  let tracer = getTracer a i
+  let e' = tracer sub e
+  (Coleft e', i)
+sTerm sub@(a, _) (Coright e, i) = do
+  let tracer = getTracer a i
+  let e' = tracer sub e
+  (Coright e', i)
+sTerm sub@(a, _) (Mu (S s t) e, i) = do
+  let tracer = getTracer a i
+  let e' = tracer sub e
+  (Mu (S s t) e', i)
+sTerm sub@(a, _) (Case e ves, i) = do
+  let tracer = getTracer a i
+  let e' = tracer sub e
   let (vs, es) = unzip ves
-  let vs' = map (sTerm sub) vs
-  let es' = map (sTerm sub) es
+  let vs' = map (tracer sub) vs
+  let es' = map (tracer sub) es
+  (Case e' (zip vs' es'), i)
+sTerm sub@(a, _) (Asc e t, _) = sTerm sub e
+
+sTerm' :: (Region, Region) -> MTerm -> MTerm
+sTerm' sub (Var s, i) = (Var s, sMeta sub i)
+sTerm' sub (Const s, i) = (Const s, sMeta sub i)
+sTerm' sub (ConsApp v1 v2, i) = do
+  let v1' = sTerm' sub v1
+  let v2' = sTerm' sub v2
+  (ConsApp v1' v2', sMeta sub i)
+sTerm' sub (Thunk e, i) = do
+  let e' = sTerm' sub e
+  (Thunk e', sMeta sub i)
+sTerm' sub (Lam (S s t) e, i) = do
+  let e' = sTerm' sub e
+  (Lam (S s t) e', sMeta sub i)
+sTerm' sub (App e v, i) = do
+  let e' = sTerm' sub e
+  let v' = sTerm' sub v
+  (App e' v', sMeta sub i)
+sTerm' sub (Ret v, i) = do
+  let v' = sTerm' sub v
+  (Ret v', sMeta sub i)
+sTerm' sub (Bind (S s t) e1 e2, i) = do
+  let e1' = sTerm' sub e1
+  let e2' = sTerm' sub e2
+  (Bind (S s t) e1' e2', sMeta sub i)
+sTerm' sub (Unthunk v, i) = do
+  let v' = sTerm' sub v
+  (Unthunk v', sMeta sub i)
+sTerm' sub (Send (S s t) e, i) = do
+  let e' = sTerm' sub e
+  (Send (S s t) e', sMeta sub i)
+sTerm' sub (Recv (S s t) e, i) = do
+  let e' = sTerm' sub e
+  (Recv (S s t) e', sMeta sub i)
+sTerm' sub (Dispatch e1 e2, i) = do
+  let e1' = sTerm' sub e1
+  let e2' = sTerm' sub e2
+  (Dispatch e1' e2', sMeta sub i)
+sTerm' sub (Coleft e, i) = do
+  let e' = sTerm' sub e
+  (Coleft e', sMeta sub i)
+sTerm' sub (Coright e, i) = do
+  let e' = sTerm' sub e
+  (Coright e', sMeta sub i)
+sTerm' sub (Mu (S s t) e, i) = do
+  let e' = sTerm' sub e
+  (Mu (S s t) e', sMeta sub i)
+sTerm' sub (Case e ves, i) = do
+  let e' = sTerm' sub e
+  let (vs, es) = unzip ves
+  let vs' = map (sTerm' sub) vs
+  let es' = map (sTerm' sub) es
   (Case e' (zip vs' es'), sMeta sub i)
-sTerm sub (Asc e t, _) = sTerm sub e
+sTerm' sub (Asc e t, _) = sTerm' sub e
 
 sMeta :: (Region, Region) -> Meta -> Meta
-sMeta (from, to) meta =
-  if regionSet meta == [from]
-    then meta {regionSet = [to]}
+sMeta (low, high) meta =
+  if regionSet meta == [high]
+    then meta {regionSet = [low]}
     else meta
+
+sRegionConstraint ::
+     (Region, Region) -> [(Region, Region)] -> [(Region, Region)]
+sRegionConstraint (low, high) xs = do
+  let (fromList, toList) = unzip xs
+  let replacer x =
+        if x == high
+          then low
+          else x
+  let fromList' = map replacer fromList
+  let toList' = map replacer toList
+  zip fromList' toList'
 
 freeVar :: MTerm -> [String]
 freeVar (Var s, _) = [s]
@@ -478,14 +564,8 @@ setify :: MTerm -> MTerm
 setify = undefined
 
 qux :: [(Region, Region)] -> MTerm -> MTerm
-qux = undefined
-
--- inequalityに沿ってregionSetをenrichする
-foo :: (Region, Region) -> MTerm -> MTerm
-foo = undefined
-
--- a <= bにそって書き換えたいとして、このaが先に見つかった状況を扱う。
--- childにbが現れたならばsubstを行う。
--- childでsubstが行われていたならば (つまりsubstがemptyでなければ) 自分もsubstする。
-bar :: Region -> MTerm -> (MTerm, Subst)
-bar = undefined
+qux [] t = t
+qux ((a, b):ss) t = do
+  let t' = sTerm (a, b) t
+  let ss' = sRegionConstraint (a, b) ss
+  qux ss' t'
