@@ -41,8 +41,6 @@ check e = do
   -- modify (\e -> e {rTypeEnv = tenv'})
   return ()
 
-type Region = String
-
 prepare :: MTerm -> WithEnv MTerm
 prepare (Var s, meta) = do
   r <- lookupRNEnv' s
@@ -360,6 +358,66 @@ sType sub (RType t r) = do
   let t' = sType sub t
   RType t' $ traceMap sub r
 
+sTerm :: (Region, Region) -> MTerm -> MTerm
+sTerm sub (Var s, i) = (Var s, sMeta sub i)
+sTerm sub (Const s, i) = (Const s, sMeta sub i)
+sTerm sub (ConsApp v1 v2, i) = do
+  let v1' = sTerm sub v1
+  let v2' = sTerm sub v2
+  (ConsApp v1' v2', sMeta sub i)
+sTerm sub (Thunk e, i) = do
+  let e' = sTerm sub e
+  (Thunk e', sMeta sub i)
+sTerm sub (Lam (S s t) e, i) = do
+  let e' = sTerm sub e
+  (Lam (S s t) e', sMeta sub i)
+sTerm sub (App e v, i) = do
+  let e' = sTerm sub e
+  let v' = sTerm sub v
+  (App e' v', sMeta sub i)
+sTerm sub (Ret v, i) = do
+  let v' = sTerm sub v
+  (Ret v', sMeta sub i)
+sTerm sub (Bind (S s t) e1 e2, i) = do
+  let e1' = sTerm sub e1
+  let e2' = sTerm sub e2
+  (Bind (S s t) e1' e2', sMeta sub i)
+sTerm sub (Unthunk v, i) = do
+  let v' = sTerm sub v
+  (Unthunk v', sMeta sub i)
+sTerm sub (Send (S s t) e, i) = do
+  let e' = sTerm sub e
+  (Send (S s t) e', sMeta sub i)
+sTerm sub (Recv (S s t) e, i) = do
+  let e' = sTerm sub e
+  (Recv (S s t) e', sMeta sub i)
+sTerm sub (Dispatch e1 e2, i) = do
+  let e1' = sTerm sub e1
+  let e2' = sTerm sub e2
+  (Dispatch e1' e2', sMeta sub i)
+sTerm sub (Coleft e, i) = do
+  let e' = sTerm sub e
+  (Coleft e', sMeta sub i)
+sTerm sub (Coright e, i) = do
+  let e' = sTerm sub e
+  (Coright e', sMeta sub i)
+sTerm sub (Mu (S s t) e, i) = do
+  let e' = sTerm sub e
+  (Mu (S s t) e', sMeta sub i)
+sTerm sub (Case e ves, i) = do
+  let e' = sTerm sub e
+  let (vs, es) = unzip ves
+  let vs' = map (sTerm sub) vs
+  let es' = map (sTerm sub) es
+  (Case e' (zip vs' es'), sMeta sub i)
+sTerm sub (Asc e t, _) = sTerm sub e
+
+sMeta :: (Region, Region) -> Meta -> Meta
+sMeta (from, to) meta =
+  if regionSet meta == [from]
+    then meta {regionSet = [to]}
+    else meta
+
 freeVar :: MTerm -> [String]
 freeVar (Var s, _) = [s]
 freeVar (Const _, _) = []
@@ -385,3 +443,49 @@ freeVar (Case e ves, _) = do
       return $ filter (`notElem` bound) fs
   efs ++ vefss
 freeVar (Asc e t, _) = freeVar e
+
+data RegTree
+  = RegAtom Meta
+  | RegNode Meta
+            [RegTree]
+  deriving (Show, Eq)
+
+toRegTree :: MTerm -> RegTree
+toRegTree (Var s, i) = RegAtom i
+toRegTree (Const _, i) = RegAtom i
+toRegTree (ConsApp v1 v2, i) = RegNode i [toRegTree v1, toRegTree v2]
+toRegTree (Thunk e, i) = RegNode i [toRegTree e]
+toRegTree (Lam (S s t) e, i) = RegNode i [toRegTree e]
+toRegTree (App e v, i) = RegNode i [toRegTree e, toRegTree v]
+toRegTree (Ret v, i) = RegNode i [toRegTree v]
+toRegTree (Bind (S s t) e1 e2, i) = RegNode i [toRegTree e1, toRegTree e2]
+toRegTree (Unthunk v, i) = RegNode i [toRegTree v]
+toRegTree (Send (S s t) e, i) = RegNode i [toRegTree e]
+toRegTree (Recv (S s t) e, i) = RegNode i [toRegTree e]
+toRegTree (Dispatch e1 e2, i) = RegNode i [toRegTree e1, toRegTree e2]
+toRegTree (Coleft e, i) = RegNode i [toRegTree e]
+toRegTree (Coright e, i) = RegNode i [toRegTree e]
+toRegTree (Mu (S s t) e, i) = RegNode i [toRegTree e]
+toRegTree (Case e ves, i) = do
+  let (vs, es) = unzip ves
+  let vs' = map toRegTree vs
+  let es' = map toRegTree es
+  RegNode i $ toRegTree e : vs' ++ es'
+toRegTree (Asc e t, _) = toRegTree e
+
+-- region集合をchildからinheritするように書き換える
+setify :: MTerm -> MTerm
+setify = undefined
+
+qux :: [(Region, Region)] -> MTerm -> MTerm
+qux = undefined
+
+-- inequalityに沿ってregionSetをenrichする
+foo :: (Region, Region) -> MTerm -> MTerm
+foo = undefined
+
+-- a <= bにそって書き換えたいとして、このaが先に見つかった状況を扱う。
+-- childにbが現れたならばsubstを行う。
+-- childでsubstが行われていたならば (つまりsubstがemptyでなければ) 自分もsubstする。
+bar :: Region -> MTerm -> (MTerm, Subst)
+bar = undefined
