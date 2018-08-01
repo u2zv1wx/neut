@@ -185,7 +185,6 @@ data Env = Env
   , constraintEnv     :: [(Type, Type)]
   , nameConstraintEnv :: [(Sym, Sym)]
   , levelEnv          :: [(Level, Level)]
-  , rNameEnv          :: [(String, String)]
   } deriving (Show)
 
 initialEnv :: Env
@@ -219,7 +218,6 @@ initialEnv =
     , rTypeEnv = []
     , constraintEnv = []
     , nameConstraintEnv = []
-    , rNameEnv = []
     , levelEnv = []
     }
 
@@ -257,9 +255,6 @@ lookupTEnv s = gets (lookup s . typeEnv)
 lookupRTEnv :: String -> WithEnv (Maybe Type)
 lookupRTEnv s = gets (lookup s . rTypeEnv)
 
-lookupRNEnv :: String -> WithEnv (Maybe String)
-lookupRNEnv s = gets (lookup s . rNameEnv)
-
 lookupVEnv :: String -> WithEnv (Maybe Type)
 lookupVEnv s = gets (lookup s . valueEnv)
 
@@ -276,9 +271,6 @@ insNCEnv :: Sym -> Sym -> WithEnv ()
 insNCEnv s1 s2 =
   modify (\e -> e {nameConstraintEnv = (s1, s2) : nameConstraintEnv e})
 
-insRNEnv :: String -> String -> WithEnv ()
-insRNEnv s1 s2 = modify (\e -> e {rNameEnv = (s1, s2) : rNameEnv e})
-
 insLEnv :: Level -> Level -> WithEnv ()
 insLEnv l1 l2 = modify (\e -> e {levelEnv = (l1, l2) : levelEnv e})
 
@@ -286,7 +278,7 @@ local :: WithEnv a -> WithEnv a
 local p = do
   env <- get
   x <- p
-  modify (\e -> env {count = count e, rNameEnv = rNameEnv e})
+  modify (\e -> env {count = count e})
   return x
 
 type Addr = String
