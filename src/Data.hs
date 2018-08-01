@@ -101,14 +101,6 @@ data C
           MC
           MC
   | CUnthunk MV
-  | CSend Sym
-          MC
-  | CRecv Sym
-          MC
-  | CDispatch MC
-              MC
-  | CColeft MC
-  | CCoright MC
   | CMu Sym
         MC
   | CCase MV
@@ -140,14 +132,6 @@ data Term
          MTerm
          MTerm
   | Unthunk MTerm
-  | Send Sym
-         MTerm
-  | Recv Sym
-         MTerm
-  | Dispatch MTerm
-             MTerm
-  | Coleft MTerm
-  | Coright MTerm
   | Mu Sym
        MTerm
   | Case MTerm
@@ -181,8 +165,6 @@ data Type
   | TUniv Level
   | TForall Sym
             Type
-  | TCotensor Type
-              Type
   deriving (Show, Eq)
 
 type Region = String

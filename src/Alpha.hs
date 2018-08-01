@@ -40,27 +40,6 @@ alpha (Thunk e, i) = do
 alpha (Unthunk v, i) = do
   v' <- alpha v
   return (Unthunk v', i)
-alpha (Send (S s t) e, i) = do
-  s' <- alphaString s
-  t' <- alphaType t
-  e' <- alpha e
-  return (Send (S s' t') e', i)
-alpha (Recv (S s t) e, i) = do
-  t' <- alphaType t
-  local $ do
-    s' <- newNameWith s
-    e' <- alpha e
-    return (Recv (S s' t') e', i)
-alpha (Dispatch e1 e2, i) = do
-  e1' <- alpha e1
-  e2' <- alpha e2
-  return (Dispatch e1' e2', i)
-alpha (Coleft e, i) = do
-  e' <- alpha e
-  return (Coleft e', i)
-alpha (Coright e, i) = do
-  e' <- alpha e
-  return (Coright e', i)
 alpha (Mu (S s t) e, i) = do
   t' <- alphaType t
   local $ do
@@ -113,10 +92,6 @@ alphaType (TForall (S s tdom) tcod) = do
     s' <- newNameWith s
     tcod' <- alphaType tcod
     return (TForall (S s' tdom') tcod')
-alphaType (TCotensor t1 t2) = do
-  t1' <- alphaType t1
-  t2' <- alphaType t2
-  return (TCotensor t1' t2')
 
 alphaString :: String -> WithEnv String
 alphaString s = do

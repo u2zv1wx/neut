@@ -47,32 +47,6 @@ parseTerm (Node [(Atom "bind", _), (Node [(Atom s, _), tp], _), te1, te2], i) = 
 parseTerm (Node [(Atom "unthunk", _), tv], i) = do
   v <- parseTerm tv
   return (Unthunk v, i)
-parseTerm (Node [(Atom "send", _), (Node [(Atom s, _), tp], _), te], i) = do
-  s' <- strToName s
-  p <- parseType tp
-  e <- parseTerm te
-  return (Send (S s' p) e, i)
-parseTerm (Node [(Atom "receive", _), (Node [(Atom s, _), tp], _), te], i) = do
-  s' <- strToName s
-  p <- parseType tp
-  e <- parseTerm te
-  return (Recv (S s' p) e, i)
--- parseTerm (Node [(Atom "dispatch", _), t1, t2], i) = do
---   e1 <- parseTerm t1
---   e2 <- parseTerm t2
---   return (Dispatch e1 e2, i)
-parseTerm (Node ((Atom "dispatch", k):t:tes), i)
-  | not (null tes) = do
-    e <- parseTerm t
-    es <- mapM parseTerm tes
-    tmp <- foldMTerm Dispatch e es
-    return (fst tmp, i)
-parseTerm (Node [(Atom "coleft", _), te], i) = do
-  e <- parseTerm te
-  return (Coleft e, i)
-parseTerm (Node [(Atom "coright", _), te], i) = do
-  e <- parseTerm te
-  return (Coright e, i)
 parseTerm (Node [(Atom "mu", _), (Node [(Atom s, _), tp], _), te], i) = do
   s' <- strToName s
   p <- parseType tp
@@ -122,9 +96,7 @@ parseType :: MTree -> WithEnv Type
 parseType (Atom "_", i) = do
   name <- newNameWith "hole"
   return (THole name)
-parseType (Atom "universe", i) = do
-  t <- TUniv . LHole <$> newName
-  return t
+parseType (Atom "universe", i) = TUniv . LHole <$> newName
 parseType (Atom s, i) = do
   msym <- definedConst s
   case msym of
@@ -149,12 +121,6 @@ parseType (Node [(Atom "forall", _), (Node [(Atom s, _), tp], _), tn], i) = do
   p <- parseType tp
   n <- parseType tn
   return $ TForall (S s' p) n
-parseType (Node ((Atom "par", _):tn:tns), i)
-  | not (null tns) = do
-    n <- parseType tn
-    ns <- mapM parseType tns
-    let tmp = foldl TCotensor n ns
-    return tmp
 parseType (Node [(Atom "up", _), tp], i) = do
   p <- parseType tp
   return $ TUp p

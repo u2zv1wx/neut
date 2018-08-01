@@ -49,33 +49,6 @@ polarize (Unthunk e, i) = do
   case mv of
     Value v -> return $ Comp (CUnthunk v, i)
     _       -> Left $ "the polarity of " ++ show e ++ " is wrong"
-polarize (Send s e, i) = do
-  mc <- polarize e
-  case mc of
-    Comp c -> return $ Comp (CSend s c, i)
-    _      -> Left $ "the polarity of " ++ show e ++ " is wrong"
-polarize (Recv s e, i) = do
-  mc <- polarize e
-  case mc of
-    Comp c -> return $ Comp (CRecv s c, i)
-    _      -> Left $ "the polarity of " ++ show e ++ " is wrong"
-polarize (Dispatch e1 e2, i) = do
-  mc1 <- polarize e1
-  mc2 <- polarize e2
-  case (mc1, mc2) of
-    (Comp c1, Comp c2) -> return $ Comp (CDispatch c1 c2, i)
-    _ ->
-      Left $ "the polarity of " ++ show e1 ++ " or " ++ show e2 ++ " is wrong"
-polarize (Coleft e, i) = do
-  mc <- polarize e
-  case mc of
-    Comp c -> return $ Comp (CColeft c, i)
-    _      -> Left $ "the polarity of " ++ show e ++ " is wrong"
-polarize (Coright e, i) = do
-  mc <- polarize e
-  case mc of
-    Comp c -> return $ Comp (CCoright c, i)
-    _      -> Left $ "the polarity of " ++ show e ++ " is wrong"
 polarize (Mu s e, i) = do
   mc <- polarize e
   case mc of

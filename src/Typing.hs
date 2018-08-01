@@ -94,36 +94,6 @@ infer (Unthunk v, Meta {ident = l}) = do
   let result = THole i
   insTEnv l result
   return result
-infer (Send (S s t) e, Meta {ident = i}) = do
-  insTEnv s t
-  t <- infer e
-  insTEnv i t
-  return t
-infer (Recv (S s t) e, Meta {ident = i}) = do
-  insTEnv s t
-  t <- infer e
-  insTEnv i t
-  return t
-infer (Dispatch e1 e2, Meta {ident = i}) = do
-  t1 <- infer e1
-  t2 <- infer e2
-  let result = TCotensor t1 t2
-  insTEnv i result
-  return result
-infer (Coleft e, Meta {ident = i}) = do
-  t <- infer e
-  t1 <- THole <$> newName
-  t2 <- THole <$> newName
-  insCEnv t (TCotensor t1 t2)
-  insTEnv i t1
-  return t1
-infer (Coright e, Meta {ident = i}) = do
-  t <- infer e
-  t1 <- THole <$> newName
-  t2 <- THole <$> newName
-  insCEnv t (TCotensor t1 t2)
-  insTEnv i t2
-  return t2
 infer (Mu (S s t) e, Meta {ident = i}) = do
   insTEnv s t
   te <- infer e
@@ -186,8 +156,6 @@ unify ((TForall (SHole i tdom1) tcod1, TForall (S j tdom2) tcod2):cs) = do
 unify ((TForall (SHole i tdom1) tcod1, TForall (SHole j tdom2) tcod2):cs) = do
   insNCEnv (SHole i tdom1) (SHole j tdom2)
   unify $ (THole i, THole j) : (tdom1, tdom2) : (tcod1, tcod2) : cs
-unify ((TCotensor t11 t12, TCotensor t21 t22):cs) =
-  unify $ (t11, t21) : (t12, t22) : cs
 unify ((TUp t1, TUp t2):cs) = unify $ (t1, t2) : cs
 unify ((TDown t1, TDown t2):cs) = unify $ (t1, t2) : cs
 unify ((TUniv i, TUniv j):cs) = do
@@ -232,7 +200,6 @@ occur x (TDown t)                     = occur x t
 occur _ (TUniv i)                     = False
 occur x (TForall (S _ tdom) tcod)     = occur x tdom || occur x tcod
 occur x (TForall (SHole _ tdom) tcod) = occur x tdom || occur x tcod
-occur x (TCotensor t1 t2)             = occur x t1 || occur x t2
 
 compose :: Subst -> Subst -> Subst
 compose s1 s2 = do
@@ -272,10 +239,6 @@ sType sub (TForall (SHole s tdom) tcod) = do
   let tdom' = sType sub tdom
   let tcod' = sType sub tcod
   TForall (SHole s tdom') tcod'
-sType sub (TCotensor t1 t2) = do
-  let t1' = sType sub t1
-  let t2' = sType sub t2
-  TCotensor t1' t2'
 
 sTypeName :: [(String, String)] -> Type -> Type
 sTypeName _ (TVar s) = TVar s
@@ -308,10 +271,6 @@ sTypeName sub (TForall (SHole s tdom) tcod) = do
   case lookup s sub of
     Just s' -> TForall (S s' tdom') tcod'
     Nothing -> TForall (SHole s tdom') tcod'
-sTypeName sub (TCotensor t1 t2) = do
-  let t1' = sTypeName sub t1
-  let t2' = sTypeName sub t2
-  TCotensor t1' t2'
 
 sConstraint :: Subst -> Constraint -> Constraint
 sConstraint s = map (\(t1, t2) -> (sType s t1, sType s t2))

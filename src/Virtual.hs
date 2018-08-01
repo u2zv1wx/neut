@@ -51,11 +51,6 @@ virtualC (CUnthunk v, _) = do
     Register s -> return $ Jump s
     Alloc op _ -> return op
     _          -> lift $ throwE "virtualC.CUnthunk"
-virtualC (CSend s c, _) = undefined
-virtualC (CRecv s c, _) = undefined
-virtualC (CDispatch c1 c2, _) = undefined
-virtualC (CColeft c, _) = undefined
-virtualC (CCoright c, _) = undefined
 virtualC (CMu s c, _) = undefined
 virtualC (CCase c vcs, _) = undefined
 virtualC (CAsc c _, _) = virtualC c
@@ -88,11 +83,6 @@ varN (CApp e v, _) = varN e ++ varP v
 varN (CRet v, _) = varP v
 varN (CBind (S s t) e1 e2, _) = varN e1 ++ filter (/= s) (varN e2)
 varN (CUnthunk v, _) = varP v
-varN (CSend (S s t) e, _) = s : varN e
-varN (CRecv (S s t) e, _) = filter (/= s) (varN e)
-varN (CDispatch e1 e2, _) = varN e1 ++ varN e2
-varN (CColeft e, _) = varN e
-varN (CCoright e, _) = varN e
 varN (CMu (S s t) e, _) = filter (/= s) (varN e)
 varN (CCase e ves, _) = do
   let efs = varP e
