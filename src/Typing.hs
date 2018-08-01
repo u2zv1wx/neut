@@ -112,11 +112,9 @@ unify [] = return []
 unify ((THole s, t2):cs) = do
   sub <- unify (sConstraint [(s, t2)] cs)
   return $ compose sub [(s, t2)]
---  | not (occur s t2)
 unify ((t1, THole s):cs) = do
   sub <- unify (sConstraint [(s, t1)] cs)
   return $ compose sub [(s, t1)]
---  | not (occur s t1)
 unify ((TVar s1, TVar s2):cs)
   | s1 == s2 = unify cs
 unify ((TConst s1, TConst s2):cs)
@@ -132,15 +130,6 @@ unify ((t1, t2):cs) =
   lift $
   throwE $
   "unification failed for:\n" ++ Pr.ppShow t1 ++ "\nand:\n" ++ Pr.ppShow t2
-
-occur :: String -> Type -> Bool
-occur _ (TVar s)                 = False
-occur x (THole s)                = x == s
-occur _ (TConst _)               = False
-occur x (TUp t)                  = occur x t
-occur x (TDown t)                = occur x t
-occur _ (TUniv i)                = False
-occur x (TForall (_, tdom) tcod) = occur x tdom || occur x tcod
 
 compose :: Subst -> Subst -> Subst
 compose s1 s2 = do
