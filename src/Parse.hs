@@ -78,7 +78,7 @@ foldMTerm f e [] = return e
 foldMTerm f e (t:ts) = do
   let tmp = f e t
   i <- newName
-  foldMTerm f (tmp, Meta {ident = i, regionSet = []}) ts
+  foldMTerm f (tmp, Meta {ident = i}) ts
 
 parseClause :: MTree -> WithEnv (MTerm, MTerm)
 parseClause (Node [tv, te], i) = do

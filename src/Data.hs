@@ -161,17 +161,9 @@ data Type
             Type
   deriving (Show, Eq)
 
-type Region = String
-
 data Meta = Meta
-  { ident     :: String
-  , regionSet :: [Region]
+  { ident :: String
   } deriving (Show, Eq)
-
-data RegionSeq
-  = RSHole String
-  | RSSeq [String]
-  deriving (Show, Eq)
 
 data Env = Env
   { count             :: Int
@@ -181,7 +173,6 @@ data Env = Env
   , nameEnv           :: [(String, String)]
   , exprEnv           :: [Term]
   , typeEnv           :: [(String, Type)]
-  , rTypeEnv          :: [(String, Type)]
   , constraintEnv     :: [(Type, Type)]
   , nameConstraintEnv :: [(Sym, Sym)]
   , levelEnv          :: [(Level, Level)]
@@ -215,7 +206,6 @@ initialEnv =
     , nameEnv = []
     , exprEnv = []
     , typeEnv = []
-    , rTypeEnv = []
     , constraintEnv = []
     , nameConstraintEnv = []
     , levelEnv = []
@@ -252,17 +242,11 @@ newNameWith s = do
 lookupTEnv :: String -> WithEnv (Maybe Type)
 lookupTEnv s = gets (lookup s . typeEnv)
 
-lookupRTEnv :: String -> WithEnv (Maybe Type)
-lookupRTEnv s = gets (lookup s . rTypeEnv)
-
 lookupVEnv :: String -> WithEnv (Maybe Type)
 lookupVEnv s = gets (lookup s . valueEnv)
 
 insTEnv :: String -> Type -> WithEnv ()
 insTEnv s t = modify (\e -> e {typeEnv = (s, t) : typeEnv e})
-
-insRTEnv :: String -> Type -> WithEnv ()
-insRTEnv s t = modify (\e -> e {rTypeEnv = (s, t) : rTypeEnv e})
 
 insCEnv :: Type -> Type -> WithEnv ()
 insCEnv t1 t2 = modify (\e -> e {constraintEnv = (t1, t2) : constraintEnv e})
