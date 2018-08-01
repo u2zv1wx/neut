@@ -33,6 +33,10 @@ check e = do
   liftIO $ putStrLn $ "INEQUALITIES===="
   liftIO $ putStrLn $ Pr.ppShow regionInequalities
   liftIO $ putStrLn $ "INEQUALITIES===="
+  let e'' = qux regionInequalities e'
+  liftIO $ putStrLn $ "====TERM===="
+  liftIO $ putStrLn $ Pr.ppShow e''
+  liftIO $ putStrLn $ "====TERM===="
   -- let nameTree = constructMap nameEquations
   -- liftIO $ putStrLn $ "MARK===="
   -- liftIO $ putStrLn $ Pr.ppShow nameTree
@@ -358,6 +362,7 @@ sType sub (RType t r) = do
   let t' = sType sub t
   RType t' $ traceMap sub r
 
+getTracer :: Region -> Meta -> ((Region, Region) -> MTerm -> MTerm)
 getTracer a i =
   if [a] == regionSet i
     then sTerm'
@@ -530,37 +535,8 @@ freeVar (Case e ves, _) = do
   efs ++ vefss
 freeVar (Asc e t, _) = freeVar e
 
-data RegTree
-  = RegAtom Meta
-  | RegNode Meta
-            [RegTree]
-  deriving (Show, Eq)
-
-toRegTree :: MTerm -> RegTree
-toRegTree (Var s, i) = RegAtom i
-toRegTree (Const _, i) = RegAtom i
-toRegTree (ConsApp v1 v2, i) = RegNode i [toRegTree v1, toRegTree v2]
-toRegTree (Thunk e, i) = RegNode i [toRegTree e]
-toRegTree (Lam (S s t) e, i) = RegNode i [toRegTree e]
-toRegTree (App e v, i) = RegNode i [toRegTree e, toRegTree v]
-toRegTree (Ret v, i) = RegNode i [toRegTree v]
-toRegTree (Bind (S s t) e1 e2, i) = RegNode i [toRegTree e1, toRegTree e2]
-toRegTree (Unthunk v, i) = RegNode i [toRegTree v]
-toRegTree (Send (S s t) e, i) = RegNode i [toRegTree e]
-toRegTree (Recv (S s t) e, i) = RegNode i [toRegTree e]
-toRegTree (Dispatch e1 e2, i) = RegNode i [toRegTree e1, toRegTree e2]
-toRegTree (Coleft e, i) = RegNode i [toRegTree e]
-toRegTree (Coright e, i) = RegNode i [toRegTree e]
-toRegTree (Mu (S s t) e, i) = RegNode i [toRegTree e]
-toRegTree (Case e ves, i) = do
-  let (vs, es) = unzip ves
-  let vs' = map toRegTree vs
-  let es' = map toRegTree es
-  RegNode i $ toRegTree e : vs' ++ es'
-toRegTree (Asc e t, _) = toRegTree e
-
 -- region集合をchildからinheritするように書き換える
-setify :: MTerm -> MTerm
+setify :: MTerm -> (MTerm, [Region])
 setify = undefined
 
 qux :: [(Region, Region)] -> MTerm -> MTerm
