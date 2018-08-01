@@ -174,19 +174,18 @@ data RegionSeq
   deriving (Show, Eq)
 
 data Env = Env
-  { count               :: Int
-  , valueEnv            :: [(String, Type)]
-  , notationEnv         :: [(MTree, MTree)]
-  , reservedEnv         :: [String]
-  , nameEnv             :: [(String, String)]
-  , exprEnv             :: [Term]
-  , typeEnv             :: [(String, Type)]
-  , rTypeEnv            :: [(String, Type)]
-  , constraintEnv       :: [(Type, Type)]
-  , nameConstraintEnv   :: [(Sym, Sym)]
-  , levelEnv            :: [(Level, Level)]
-  , rNameEnv            :: [(String, String)]
-  , regionConstraintEnv :: [(String, String)] -- (a, b) means region(a) \subseteq region(b)
+  { count             :: Int
+  , valueEnv          :: [(String, Type)]
+  , notationEnv       :: [(MTree, MTree)]
+  , reservedEnv       :: [String]
+  , nameEnv           :: [(String, String)]
+  , exprEnv           :: [Term]
+  , typeEnv           :: [(String, Type)]
+  , rTypeEnv          :: [(String, Type)]
+  , constraintEnv     :: [(Type, Type)]
+  , nameConstraintEnv :: [(Sym, Sym)]
+  , levelEnv          :: [(Level, Level)]
+  , rNameEnv          :: [(String, String)]
   } deriving (Show)
 
 initialEnv :: Env
@@ -220,7 +219,6 @@ initialEnv =
     , rTypeEnv = []
     , constraintEnv = []
     , nameConstraintEnv = []
-    , regionConstraintEnv = []
     , rNameEnv = []
     , levelEnv = []
     }
@@ -278,10 +276,6 @@ insNCEnv :: Sym -> Sym -> WithEnv ()
 insNCEnv s1 s2 =
   modify (\e -> e {nameConstraintEnv = (s1, s2) : nameConstraintEnv e})
 
-insRCEnv :: String -> String -> WithEnv ()
-insRCEnv s1 s2 =
-  modify (\e -> e {regionConstraintEnv = (s1, s2) : regionConstraintEnv e})
-
 insRNEnv :: String -> String -> WithEnv ()
 insRNEnv s1 s2 = modify (\e -> e {rNameEnv = (s1, s2) : rNameEnv e})
 
@@ -292,13 +286,7 @@ local :: WithEnv a -> WithEnv a
 local p = do
   env <- get
   x <- p
-  modify
-    (\e ->
-       env
-         { count = count e
-         , rNameEnv = rNameEnv e
-         , regionConstraintEnv = regionConstraintEnv e
-         })
+  modify (\e -> env {count = count e, rNameEnv = rNameEnv e})
   return x
 
 type Addr = String
