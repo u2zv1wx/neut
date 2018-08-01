@@ -1,46 +1,69 @@
-{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveAnyClass       #-}
+{-# LANGUAGE DeriveFoldable       #-}
+{-# LANGUAGE DeriveFunctor        #-}
+{-# LANGUAGE DeriveTraversable    #-}
+{-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE StandaloneDeriving   #-}
+{-# LANGUAGE TemplateHaskell      #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 
 module Data where
 
+import           Control.Comonad
+import           Control.Comonad.Cofree
 import           Control.Monad.Except
 import           Control.Monad.Identity
 import           Control.Monad.State
 import           Control.Monad.Trans.Except
+import           Data.Functor.Classes
+import           Text.Show.Deriving
 
 import           Data.Maybe                 (fromMaybe)
 
 import qualified Text.Show.Pretty           as Pr
 
 -- S-expression
-data Tree
+data Tree a
   = Atom String
-  | Node [MTree]
-  deriving (Show, Eq)
+  | Node [a]
+  deriving (Foldable)
 
-car :: Tree -> Maybe MTree
-car (Node (t:_)) = Just t
-car _            = Nothing
+deriving instance Show a => Show (Tree a)
 
-cdr :: Tree -> Maybe [MTree]
-cdr (Node (_:ts)) = Just ts
-cdr _             = Nothing
+newtype Meta = Meta
+  { ident :: String
+  } deriving (Show, Eq)
 
-ith :: Int -> Tree -> Maybe MTree
-ith i (Node ts)
-  | 0 < i && i <= length ts = Just $ ts !! (i - 1)
-ith _ _ = Nothing
+$(deriveShow1 ''Tree)
 
-treeLength :: Tree -> Int
-treeLength (Atom _)  = 1
-treeLength (Node ts) = length ts
+type MTree = Cofree Tree Meta
 
 recurM :: (Monad m) => (MTree -> m MTree) -> MTree -> m MTree
-recurM f (Atom s, i) = f (Atom s, i)
-recurM f (Node tis, i) = do
+recurM f (meta :< Atom s) = f (meta :< Atom s)
+recurM f (meta :< Node tis) = do
   tis' <- mapM (recurM f) tis
-  f (Node tis', i)
+  f (meta :< Node tis')
 
-type MTree = (Tree, Meta)
+-- positive type
+-- P ::= p
+--     | (down N)
+--     | {defined constant type}
+--     | (node (x P) P)
+--     | (universe i)
+-- negative type
+-- N ::= (forall (x P) N)
+--     | (cotensor N1 ... Nn)
+--     | (up P)
+data Type
+  = TVar String
+  | THole String
+  | TConst String
+  | TUp Type
+  | TDown Type
+  | TUniv Level
+  | TForall Sym
+            Type
+  deriving (Show, Eq)
 
 type Sym = (String, Type)
 
@@ -57,16 +80,13 @@ type Identifier = String
 --     | (v v)
 --     | (thunk e)
 --     | (ascribe v P)
-data V
+data V c v
   = VVar String
   | VConst String
-  | VThunk MC
-  | VAsc MV
+  | VThunk c
+  | VAsc v
          Type
-  deriving (Show, Eq)
-
--- value with metadata
-type MV = (V, Meta)
+  deriving (Eq)
 
 -- negative term / computation
 -- e ::= (lambda (x P) e)
@@ -82,81 +102,79 @@ type MV = (V, Meta)
 --     | (mu (x P) e)
 --     | (case e (v1 e1) ... (vn en))
 --     | (ascribe e N)
-data C
+data C v c
   = CLam Sym
-         MC
-  | CApp MC
-         MV
-  | CRet MV
+         c
+  | CApp c
+         v
+  | CRet v
   | CBind Sym
-          MC
-          MC
-  | CUnthunk MV
+          c
+          c
+  | CUnthunk v
   | CMu Sym
-        MC
-  | CCase MV
-          [(MV, MC)]
-  | CAsc MC
+        c
+  | CCase v
+          [(v, c)]
+  | CAsc c
          Type
-  deriving (Show, Eq)
+  deriving (Eq)
+
+$(deriveShow1 ''V)
+
+$(deriveShow1 ''C)
+
+newtype MV =
+  MV (Cofree (V MC) Meta)
+  deriving (Show)
+
+newtype MC =
+  MC (Cofree (C MV) Meta)
+  deriving (Show)
 
 -- computation with identifier
-type MC = (C, Meta)
-
+-- type MC = (C, Meta)
 data PolTerm
   = Value MV
   | Comp MC
+  deriving (Show)
+
+data PatF a
+  = PatVar String
+  | PatConst String
+  | PatApp a
+           a
   deriving (Show, Eq)
 
-data Term
+$(deriveShow1 ''PatF)
+
+type Pat = Cofree PatF Meta
+
+data Term a
   = Var String
   | Const String
-  | Thunk MTerm
+  | Thunk a
   | Lam Sym
-        MTerm
-  | App MTerm
-        MTerm
-  | Ret MTerm
+        a
+  | App a
+        a
+  | Ret a
   | Bind Sym
-         MTerm
-         MTerm
-  | Unthunk MTerm
+         a
+         a
+  | Unthunk a
   | Mu Sym
-       MTerm
-  | Case MTerm
-         [(MTerm, MTerm)]
-  | Asc MTerm
+       a
+  | Case a
+         [(Pat, a)]
+  | Asc a
         Type
-  deriving (Show, Eq)
 
-type MTerm = (Term, Meta)
+$(deriveShow1 ''Term)
 
--- positive type
--- P ::= p
---     | (down N)
---     | {defined constant type}
---     | (node (x P) P)
---     | (universe i)
--- negative type
--- N ::= (forall (x P) N)
---     | (cotensor N1 ... Nn)
---     | (up P)
--- (region inference)
--- R ::= (P, region)
-data Type
-  = TVar String
-  | THole String
-  | TConst String
-  | TUp Type
-  | TDown Type
-  | TUniv Level
-  | TForall Sym
-            Type
-  deriving (Show, Eq)
+deriving instance Show a => Show (Term a)
 
-newtype Meta = Meta
-  { ident :: String
-  } deriving (Show, Eq)
+type MTerm = Cofree Term Meta
 
 data Env = Env
   { count             :: Int
@@ -164,7 +182,6 @@ data Env = Env
   , notationEnv       :: [(MTree, MTree)]
   , reservedEnv       :: [String]
   , nameEnv           :: [(String, String)]
-  , exprEnv           :: [Term]
   , typeEnv           :: [(String, Type)]
   , constraintEnv     :: [(Type, Type)]
   , nameConstraintEnv :: [(Sym, Sym)]
@@ -197,7 +214,6 @@ initialEnv =
         , "up"
         ]
     , nameEnv = []
-    , exprEnv = []
     , typeEnv = []
     , constraintEnv = []
     , nameConstraintEnv = []
@@ -257,31 +273,6 @@ local p = do
   x <- p
   modify (\e -> env {count = count e})
   return x
-
-class Functor w =>
-      Comonad w
-  where
-  extract :: w a -> a
-  extend :: (w b -> a) -> w b -> w a
-  duplicate :: w a -> w (w a)
-  duplicate = extend id
-  extend f = fmap f . duplicate
-
-data Store s a =
-  Store (s -> a)
-        s
-  deriving (Functor)
-
--- store :: (s -> a) -> s -> Store s a
--- store f s = Store f s
-pos :: Store s a -> s
-pos (Store _ s) = s
-
-instance Comonad (Store s) where
-  extract (Store f s) = f s
-  duplicate (Store f s) = Store (Store f) s
-
-type WithMeta = Store Meta
 
 type Addr = String
 
