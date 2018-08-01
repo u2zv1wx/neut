@@ -11,12 +11,12 @@ alpha (Var s, i) = do
   return (t, i)
 alpha (Const s, i) = do
   return (Const s, i)
-alpha (Lam (S s t) e, i) = do
+alpha (Lam (s, t) e, i) = do
   t' <- alphaType t
   local $ do
     s' <- newNameWith s
     e' <- alpha e
-    return (Lam (S s' t') e', i)
+    return (Lam (s', t') e', i)
 alpha (App e v, i) = do
   e' <- alpha e
   v' <- alpha v
@@ -24,24 +24,24 @@ alpha (App e v, i) = do
 alpha (Ret v, i) = do
   v' <- alpha v
   return (Ret v', i)
-alpha (Bind (S s t) e1 e2, i) = do
+alpha (Bind (s, t) e1 e2, i) = do
   e1' <- alpha e1
   s' <- newNameWith s
   t' <- alphaType t
   e2' <- alpha e2
-  return (Bind (S s' t') e1' e2', i)
+  return (Bind (s', t') e1' e2', i)
 alpha (Thunk e, i) = do
   e' <- alpha e
   return (Thunk e', i)
 alpha (Unthunk v, i) = do
   v' <- alpha v
   return (Unthunk v', i)
-alpha (Mu (S s t) e, i) = do
+alpha (Mu (s, t) e, i) = do
   t' <- alphaType t
   local $ do
     s' <- newNameWith s
     e' <- alpha e
-    return (Mu (S s' t') e', i)
+    return (Mu (s', t') e', i)
 alpha (Case e ves, i) = do
   e' <- alpha e
   ves' <-
@@ -76,12 +76,12 @@ alphaType (TDown t) = do
   t' <- TDown <$> alphaType t
   return t'
 alphaType (TUniv level) = return (TUniv level)
-alphaType (TForall (S s tdom) tcod) = do
+alphaType (TForall (s, tdom) tcod) = do
   tdom' <- alphaType tdom
   local $ do
     s' <- newNameWith s
     tcod' <- alphaType tcod
-    return (TForall (S s' tdom') tcod')
+    return (TForall (s', tdom') tcod')
 
 alphaString :: String -> WithEnv String
 alphaString s = do

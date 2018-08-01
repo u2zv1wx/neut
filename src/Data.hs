@@ -40,12 +40,7 @@ recurM f (Node tis, i) = do
 
 type MTree = (Tree, Meta)
 
-data Sym
-  = S String
-      Type
-  | SHole String
-          Type
-  deriving (Show, Eq)
+type Sym = (String, Type)
 
 data Level
   = Fixed Int

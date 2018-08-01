@@ -19,20 +19,15 @@ virtualV (VThunk c, _) = do
 virtualV (VAsc v _, _) = virtualV v
 
 virtualC :: MC -> WithEnv Operation
-virtualC (CLam _ e, _) = virtualC e
+virtualC (CLam _ e, _) = undefined -- return "closure"-like object
 virtualC (CApp e@(_, Meta {ident = i}) v, _) = do
-  mt <- lookupTEnv i
-  case mt of
-    Nothing -> lift $ throwE "ERROR<virtualC>"
-    Just (TForall (SHole symbol _) _) -> undefined
-    Just (TForall (S symbol _) _) -> do
-      argAsm <- virtualV v
-      cont <- virtualC e
-      return $ Let symbol argAsm cont
+  e' <- virtualC e
+  -- deconstruct e' and get "closure" or constant
+  undefined
 virtualC (CRet v, _) = do
   asm <- virtualV v
   return $ Ans asm
-virtualC (CBind (S s _) c1 c2, _) = do
+virtualC (CBind (s, _) c1 c2, _) = do
   operation1 <- virtualC c1
   operation2 <- virtualC c2
   return $ traceLet s operation1 operation2
@@ -58,8 +53,8 @@ traceLet s (Jump addr) cont   = LetCall s addr cont
 traceLet s (Let k o1 o2) cont = Let k o1 (traceLet s o2 cont)
 
 getArgs :: MC -> [String]
-getArgs (CLam (S s _) e, _) = s : getArgs e
-getArgs _                   = []
+getArgs (CLam (s, _) e, _) = s : getArgs e
+getArgs _                  = []
 
 varP :: MV -> [String]
 varP (VVar s, _)   = [s]
@@ -68,12 +63,12 @@ varP (VThunk e, _) = varN e
 varP (VAsc e t, _) = varP e
 
 varN :: MC -> [String]
-varN (CLam (S s t) e, _) = filter (/= s) $ varN e
+varN (CLam (s, t) e, _) = filter (/= s) $ varN e
 varN (CApp e v, _) = varN e ++ varP v
 varN (CRet v, _) = varP v
-varN (CBind (S s t) e1 e2, _) = varN e1 ++ filter (/= s) (varN e2)
+varN (CBind (s, t) e1 e2, _) = varN e1 ++ filter (/= s) (varN e2)
 varN (CUnthunk v, _) = varP v
-varN (CMu (S s t) e, _) = filter (/= s) (varN e)
+varN (CMu (s, t) e, _) = filter (/= s) (varN e)
 varN (CCase e ves, _) = do
   let efs = varP e
   vefss <-

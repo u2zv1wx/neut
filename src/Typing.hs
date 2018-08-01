@@ -18,9 +18,7 @@ check e = do
   sub <- unify $ constraintEnv env
   liftIO $ putStrLn $ Pr.ppShow sub
   env' <- get
-  let unifiedNames = unifyName (nameConstraintEnv env')
-  let tenv' =
-        map (\(s, t) -> (s, sTypeName unifiedNames $ sType sub t)) $ typeEnv env
+  let tenv' = map (\(s, t) -> (s, sType sub t)) $ typeEnv env
   modify (\e -> e {typeEnv = tenv', constraintEnv = []})
 
 infer :: MTerm -> WithEnv Type
@@ -42,10 +40,10 @@ infer (Const s, Meta {ident = i}) = do
       insTEnv i t
       return t
     Nothing -> lift $ throwE $ "const " ++ s ++ " is not defined"
-infer (Lam (S s t) e, Meta {ident = i}) = do
+infer (Lam (s, t) e, Meta {ident = i}) = do
   insTEnv s t
   te <- infer e
-  let result = TForall (S s t) te
+  let result = TForall (s, t) te
   insTEnv i result
   return result
 infer (App e v, Meta {ident = l}) = do
@@ -55,7 +53,7 @@ infer (App e v, Meta {ident = l}) = do
   insTEnv i (THole i)
   j <- newName
   insTEnv j tv
-  insCEnv te (TForall (SHole j tv) (THole i))
+  insCEnv te (TForall (j, tv) (THole i))
   let result = THole i
   insTEnv l result
   return result
@@ -64,7 +62,7 @@ infer (Ret v, Meta {ident = i}) = do
   let result = TUp tv
   insTEnv i result
   return result
-infer (Bind (S s t) e1 e2, Meta {ident = i}) = do
+infer (Bind (s, t) e1 e2, Meta {ident = i}) = do
   insTEnv s t
   t1 <- infer e1
   t2 <- infer e2
@@ -83,7 +81,7 @@ infer (Unthunk v, Meta {ident = l}) = do
   let result = THole i
   insTEnv l result
   return result
-infer (Mu (S s t) e, Meta {ident = i}) = do
+infer (Mu (s, t) e, Meta {ident = i}) = do
   insTEnv s t
   te <- infer e
   insCEnv (TDown te) t
@@ -123,17 +121,8 @@ unify ((TVar s1, TVar s2):cs)
   | s1 == s2 = unify cs
 unify ((TConst s1, TConst s2):cs)
   | s1 == s2 = unify cs
-unify ((TForall (S i tdom1) tcod1, TForall (S j tdom2) tcod2):cs)
+unify ((TForall (i, tdom1) tcod1, TForall (j, tdom2) tcod2):cs)
   | i == j = unify $ (THole i, THole j) : (tdom1, tdom2) : (tcod1, tcod2) : cs
-unify ((TForall (S i tdom1) tcod1, TForall (SHole j tdom2) tcod2):cs) = do
-  insNCEnv (S i tdom1) (SHole j tdom2)
-  unify $ (THole i, THole j) : (tdom1, tdom2) : (tcod1, tcod2) : cs
-unify ((TForall (SHole i tdom1) tcod1, TForall (S j tdom2) tcod2):cs) = do
-  insNCEnv (SHole i tdom1) (S j tdom2)
-  unify $ (THole i, THole j) : (tdom1, tdom2) : (tcod1, tcod2) : cs
-unify ((TForall (SHole i tdom1) tcod1, TForall (SHole j tdom2) tcod2):cs) = do
-  insNCEnv (SHole i tdom1) (SHole j tdom2)
-  unify $ (THole i, THole j) : (tdom1, tdom2) : (tcod1, tcod2) : cs
 unify ((TUp t1, TUp t2):cs) = unify $ (t1, t2) : cs
 unify ((TDown t1, TDown t2):cs) = unify $ (t1, t2) : cs
 unify ((TUniv i, TUniv j):cs) = do
@@ -144,38 +133,14 @@ unify ((t1, t2):cs) =
   throwE $
   "unification failed for:\n" ++ Pr.ppShow t1 ++ "\nand:\n" ++ Pr.ppShow t2
 
-unifyName :: [(Sym, Sym)] -> [(String, String)]
-unifyName [] = []
-unifyName ((S i _, S j _):cs)
-  | i == j = unifyName cs
-unifyName ((SHole i _, S j _):cs) = (i, j) : unifyName cs
-unifyName ((S i _, SHole j _):cs) = (j, i) : unifyName cs
-unifyName ((SHole i _, SHole j _):cs) = do
-  let (xs, ys) = unzip cs
-  let replacer target =
-        case target of
-          S x t ->
-            if x == i
-              then S j t
-              else S x t
-          SHole x t ->
-            if x == i
-              then SHole j t
-              else SHole x t
-  let xs' = map replacer xs
-  let ys' = map replacer ys
-  let cs' = zip xs' ys'
-  unifyName cs
-
 occur :: String -> Type -> Bool
-occur _ (TVar s)                      = False
-occur x (THole s)                     = x == s
-occur _ (TConst _)                    = False
-occur x (TUp t)                       = occur x t
-occur x (TDown t)                     = occur x t
-occur _ (TUniv i)                     = False
-occur x (TForall (S _ tdom) tcod)     = occur x tdom || occur x tcod
-occur x (TForall (SHole _ tdom) tcod) = occur x tdom || occur x tcod
+occur _ (TVar s)                 = False
+occur x (THole s)                = x == s
+occur _ (TConst _)               = False
+occur x (TUp t)                  = occur x t
+occur x (TDown t)                = occur x t
+occur _ (TUniv i)                = False
+occur x (TForall (_, tdom) tcod) = occur x tdom || occur x tcod
 
 compose :: Subst -> Subst -> Subst
 compose s1 s2 = do
@@ -199,14 +164,10 @@ sType sub (TDown t) = do
   let t' = sType sub t
   TDown t'
 sType _ (TUniv i) = TUniv i
-sType sub (TForall (S s tdom) tcod) = do
+sType sub (TForall (s, tdom) tcod) = do
   let tdom' = sType sub tdom
   let tcod' = sType sub tcod
-  TForall (S s tdom') tcod'
-sType sub (TForall (SHole s tdom) tcod) = do
-  let tdom' = sType sub tdom
-  let tcod' = sType sub tcod
-  TForall (SHole s tdom') tcod'
+  TForall (s, tdom') tcod'
 
 sTypeName :: [(String, String)] -> Type -> Type
 sTypeName _ (TVar s) = TVar s
@@ -219,16 +180,10 @@ sTypeName sub (TDown t) = do
   let t' = sTypeName sub t
   TDown t'
 sTypeName _ (TUniv i) = TUniv i
-sTypeName sub (TForall (S s tdom) tcod) = do
+sTypeName sub (TForall (s, tdom) tcod) = do
   let tdom' = sTypeName sub tdom
   let tcod' = sTypeName sub tcod
-  TForall (S s tdom') tcod'
-sTypeName sub (TForall (SHole s tdom) tcod) = do
-  let tdom' = sTypeName sub tdom
-  let tcod' = sTypeName sub tcod
-  case lookup s sub of
-    Just s' -> TForall (S s' tdom') tcod'
-    Nothing -> TForall (SHole s tdom') tcod'
+  TForall (s, tdom') tcod'
 
 sConstraint :: Subst -> Constraint -> Constraint
 sConstraint s = map (\(t1, t2) -> (sType s t1, sType s t2))

@@ -34,7 +34,7 @@ parseTerm (Node [(Atom "lambda", _), (Node [(Atom s, _), tp], _), te], i) = do
   s' <- strToName s
   p <- parseType tp
   e <- parseTerm te
-  return (Lam (S s' p) e, i)
+  return (Lam (s', p) e, i)
 parseTerm (Node [(Atom "return", _), tv], i) = do
   v <- parseTerm tv
   return (Ret v, i)
@@ -43,7 +43,7 @@ parseTerm (Node [(Atom "bind", _), (Node [(Atom s, _), tp], _), te1, te2], i) = 
   p <- parseType tp
   e1 <- parseTerm te1
   e2 <- parseTerm te2
-  return (Bind (S s' p) e1 e2, i)
+  return (Bind (s', p) e1 e2, i)
 parseTerm (Node [(Atom "unthunk", _), tv], i) = do
   v <- parseTerm tv
   return (Unthunk v, i)
@@ -51,7 +51,7 @@ parseTerm (Node [(Atom "mu", _), (Node [(Atom s, _), tp], _), te], i) = do
   s' <- strToName s
   p <- parseType tp
   e <- parseTerm te
-  return (Mu (S s' p) e, i)
+  return (Mu (s', p) e, i)
 parseTerm (Node ((Atom "case", _):te:tves), i)
   | not (null tves) = do
     e <- parseTerm te
@@ -110,7 +110,7 @@ parseType (Node [(Atom "forall", _), (Node [(Atom s, _), tp], _), tn], i) = do
   s' <- strToName s
   p <- parseType tp
   n <- parseType tn
-  return $ TForall (S s' p) n
+  return $ TForall (s', p) n
 parseType (Node [(Atom "up", _), tp], i) = do
   p <- parseType tp
   return $ TUp p
