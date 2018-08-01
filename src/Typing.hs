@@ -193,9 +193,6 @@ unify ((TDown t1, TDown t2):cs) = unify $ (t1, t2) : cs
 unify ((TUniv i, TUniv j):cs) = do
   insLEnv i j
   unify cs
-unify ((RType t1 r1, RType t2 r2):cs) = do
-  insRCEnv r1 r2
-  unify $ (t1, t2) : cs
 unify ((t1, t2):cs) =
   lift $
   throwE $
@@ -279,9 +276,6 @@ sType sub (TCotensor t1 t2) = do
   let t1' = sType sub t1
   let t2' = sType sub t2
   TCotensor t1' t2'
-sType sub (RType t r) = do
-  let t' = sType sub t
-  RType t' r
 
 sTypeName :: [(String, String)] -> Type -> Type
 sTypeName _ (TVar s) = TVar s
@@ -318,9 +312,6 @@ sTypeName sub (TCotensor t1 t2) = do
   let t1' = sTypeName sub t1
   let t2' = sTypeName sub t2
   TCotensor t1' t2'
-sTypeName sub (RType t r) = do
-  let t' = sTypeName sub t
-  RType t' r
 
 sConstraint :: Subst -> Constraint -> Constraint
 sConstraint s = map (\(t1, t2) -> (sType s t1, sType s t2))

@@ -24,7 +24,6 @@ cdr (Node (_:ts)) = Just ts
 cdr _             = Nothing
 
 ith :: Int -> Tree -> Maybe MTree
--- ith 1 (Atom s) = Just (Atom s)
 ith i (Node ts)
   | 0 < i && i <= length ts = Just $ ts !! (i - 1)
 ith _ _ = Nothing
@@ -184,8 +183,6 @@ data Type
             Type
   | TCotensor Type
               Type
-  | RType Type -- this "Type" is supposed to be a positive one
-          String
   deriving (Show, Eq)
 
 type Region = String
