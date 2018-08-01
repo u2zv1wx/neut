@@ -47,10 +47,6 @@ data Level
   | LHole String
   deriving (Show, Eq)
 
-type ClosureName = String
-
-type FreeVar = String
-
 type Identifier = String
 
 -- positive term / value
@@ -156,7 +152,7 @@ data Type
             Type
   deriving (Show, Eq)
 
-data Meta = Meta
+newtype Meta = Meta
   { ident :: String
   } deriving (Show, Eq)
 

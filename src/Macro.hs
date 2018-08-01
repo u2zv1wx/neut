@@ -52,10 +52,7 @@ macroMatch rs (Node ts1, i) (Node ts2, _) =
 
 -- substitutionをtreeに対して作用させる。
 applySubst :: Subst -> MTree -> MTree
-applySubst (s1, _) (Atom s, i) = do
-  case lookup s s1 of
-    Nothing -> (Atom s, i)
-    Just t  -> t
+applySubst (s1, _) (Atom s, i) = fromMaybe (Atom s, i) (lookup s s1)
 applySubst sub@(_, s2) (Node ts, i) =
   case last ts of
     (Atom s, j)

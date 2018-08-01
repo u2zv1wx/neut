@@ -9,8 +9,7 @@ alpha :: MTerm -> WithEnv MTerm
 alpha (Var s, i) = do
   t <- Var <$> alphaString s
   return (t, i)
-alpha (Const s, i) = do
-  return (Const s, i)
+alpha (Const s, i) = return (Const s, i)
 alpha (Lam (s, t) e, i) = do
   t' <- alphaType t
   local $ do
@@ -63,18 +62,11 @@ alpha (Asc e t, i) = do
   return (Asc e' t', i)
 
 alphaType :: Type -> WithEnv Type
-alphaType (TVar s) = do
-  t <- TVar <$> alphaString s
-  return t
+alphaType (TVar s) = TVar <$> alphaString s
 alphaType (THole i) = return (THole i)
-alphaType (TConst s) = do
-  return (TConst s)
-alphaType (TUp t) = do
-  t' <- TUp <$> alphaType t
-  return t'
-alphaType (TDown t) = do
-  t' <- TDown <$> alphaType t
-  return t'
+alphaType (TConst s) = return (TConst s)
+alphaType (TUp t) = TUp <$> alphaType t
+alphaType (TDown t) = TDown <$> alphaType t
 alphaType (TUniv level) = return (TUniv level)
 alphaType (TForall (s, tdom) tcod) = do
   tdom' <- alphaType tdom
