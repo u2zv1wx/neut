@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveFunctor #-}
+
 module Data where
 
 import           Control.Monad.Except
@@ -255,6 +257,31 @@ local p = do
   x <- p
   modify (\e -> env {count = count e})
   return x
+
+class Functor w =>
+      Comonad w
+  where
+  extract :: w a -> a
+  extend :: (w b -> a) -> w b -> w a
+  duplicate :: w a -> w (w a)
+  duplicate = extend id
+  extend f = fmap f . duplicate
+
+data Store s a =
+  Store (s -> a)
+        s
+  deriving (Functor)
+
+-- store :: (s -> a) -> s -> Store s a
+-- store f s = Store f s
+pos :: Store s a -> s
+pos (Store _ s) = s
+
+instance Comonad (Store s) where
+  extract (Store f s) = f s
+  duplicate (Store f s) = Store (Store f) s
+
+type WithMeta = Store Meta
 
 type Addr = String
 

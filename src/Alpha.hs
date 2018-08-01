@@ -89,6 +89,29 @@ alphaPat (Var s, i) = do
 alphaPat (Const s, i) = return (Const s, i)
 alphaPat _ = lift $ throwE "Alpha.alphaPat"
 
+foo :: WithMeta Term -> WithEnv MTerm
+foo tmp = do
+  let tmp' = extract tmp
+  case tmp' of
+    Var s   -> undefined
+    Const s -> undefined
+    _       -> lift $ throwE "Alpha.alphaPat"
+
+bar :: WithMeta Term -> WithEnv (WithMeta Term)
+bar x =
+  case extract x of
+    Var s -> do
+      t <- Var <$> alphaString s
+      return $ Store t (pos x)
+    Const s -> return $ Const s
+    App e v -> do
+      e' <- alpha e
+      v' <- alpha v
+      return $ App e' v'
+  -- t <- Var <$> barString s
+  -- return (t, i)
+
+-- bar (Const s, i) = return (Const s, i)
 alphaPatString :: String -> WithEnv String
 alphaPatString s = do
   env <- get
