@@ -12,15 +12,6 @@ import qualified Text.Show.Pretty           as Pr
 virtualV :: MV -> WithEnv Operand
 virtualV (VVar s, _) = return $ Register s
 virtualV (VConst s, _) = return $ ConstCell (CellAtom s)
-virtualV (VConsApp v1 v2, _) = do
-  o1 <- virtualV v1
-  o2 <- virtualV v2
-  case (o1, o2) of
-    (ConstCell cell1, ConstCell cell2) ->
-      return $ ConstCell (CellCons cell1 cell2)
-    (ConstCell cell1, Register regName) ->
-      return $ ConstCell (CellCons cell1 (CellReg regName))
-    _ -> lift $ throwE $ "virtualV : " ++ show v1 ++ "\n" ++ show v2
 virtualV (VThunk c, _) = do
   let fvs = varN c
   asm <- virtualC c
@@ -71,11 +62,10 @@ getArgs (CLam (S s _) e, _) = s : getArgs e
 getArgs _                   = []
 
 varP :: MV -> [String]
-varP (VVar s, _)         = [s]
-varP (VConst _, _)       = []
-varP (VConsApp v1 v2, _) = varP v1 ++ varP v2
-varP (VThunk e, _)       = varN e
-varP (VAsc e t, _)       = varP e
+varP (VVar s, _)   = [s]
+varP (VConst _, _) = []
+varP (VThunk e, _) = varN e
+varP (VAsc e t, _) = varP e
 
 varN :: MC -> [String]
 varN (CLam (S s t) e, _) = filter (/= s) $ varN e

@@ -68,8 +68,6 @@ data V
   = VVar String
   | VConst String
   | VThunk MC
-  | VConsApp MV
-             MV
   | VAsc MV
          Type
   deriving (Show, Eq)
@@ -125,8 +123,6 @@ data Term
         MTerm
   | App MTerm
         MTerm
-  | ConsApp MTerm
-            MTerm
   | Ret MTerm
   | Bind Sym
          MTerm

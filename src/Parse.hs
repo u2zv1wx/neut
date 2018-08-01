@@ -65,13 +65,8 @@ parseTerm (Node (te:tvs), i)
   | not (null tvs) = do
     e <- parseTerm te
     vs <- mapM parseTerm tvs
-    case e of
-      (Const sym, _) -> do
-        tmp <- foldMTerm ConsApp e vs
-        return (fst tmp, i)
-      _ -> do
-        tmp <- foldMTerm App e vs
-        return (fst tmp, i)
+    tmp <- foldMTerm App e vs
+    return (fst tmp, i)
 parseTerm t = lift $ throwE $ "parseTerm: syntax error:\n" ++ Pr.ppShow t
 
 foldMTerm ::

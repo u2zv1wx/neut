@@ -21,10 +21,6 @@ alpha (App e v, i) = do
   e' <- alpha e
   v' <- alpha v
   return (App e' v', i)
-alpha (ConsApp v1 v2, i) = do
-  v1' <- alpha v1
-  v2' <- alpha v2
-  return (ConsApp v1' v2', i)
 alpha (Ret v, i) = do
   v' <- alpha v
   return (Ret v', i)
@@ -105,10 +101,6 @@ alphaPat (Var s, i) = do
   t <- Var <$> alphaPatString s
   return (t, i)
 alphaPat (Const s, i) = return (Const s, i)
-alphaPat (ConsApp v1 v2, i) = do
-  v1' <- alphaPat v1
-  v2' <- alphaPat v2
-  return (ConsApp v1' v2', i)
 alphaPat _ = lift $ throwE "Alpha.alphaPat"
 
 alphaPatString :: String -> WithEnv String

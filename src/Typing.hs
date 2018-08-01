@@ -59,17 +59,6 @@ infer (App e v, Meta {ident = l}) = do
   let result = THole i
   insTEnv l result
   return result
-infer (ConsApp v1 v2, Meta {ident = l}) = do
-  t1 <- infer v1
-  t2 <- infer v2
-  i <- newName
-  insTEnv i (THole i)
-  j <- newName
-  insTEnv j t2
-  insCEnv t1 (TNode (SHole j t2) (THole i))
-  let result = THole i
-  insTEnv l result
-  return result
 infer (Ret v, Meta {ident = i}) = do
   tv <- infer v
   let result = TUp tv

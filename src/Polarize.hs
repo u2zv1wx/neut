@@ -19,13 +19,6 @@ polarize (App e1 e2, i) = do
     (Comp c, Value v) -> return $ Comp (CApp c v, i)
     _ ->
       Left $ "the polarity of " ++ show e1 ++ " or " ++ show e2 ++ " is wrong"
-polarize (ConsApp e1 e2, i) = do
-  mv1 <- polarize e1
-  mv2 <- polarize e2
-  case (mv1, mv2) of
-    (Value v1, Value v2) -> return $ Value (VConsApp v1 v2, i)
-    _ ->
-      Left $ "the polarity of " ++ show e1 ++ " or " ++ show e2 ++ " is wrong"
 polarize (Ret e, i) = do
   mv <- polarize e
   case mv of
