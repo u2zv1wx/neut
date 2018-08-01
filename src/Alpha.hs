@@ -69,12 +69,6 @@ alphaType (TVar s) = do
 alphaType (THole i) = return (THole i)
 alphaType (TConst s) = do
   return (TConst s)
-alphaType (TNode (S s tdom) tcod) = do
-  tdom' <- alphaType tdom
-  local $ do
-    s' <- newNameWith s
-    tcod' <- alphaType tcod
-    return (TNode (S s' tdom') tcod')
 alphaType (TUp t) = do
   t' <- TUp <$> alphaType t
   return t'

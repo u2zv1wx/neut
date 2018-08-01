@@ -102,11 +102,6 @@ parseType (Atom s, i) = do
 parseType (Node [(Atom "down", _), tn], i) = do
   n <- parseType tn
   return $ TDown n
-parseType (Node [(Atom "node", _), (Node [(Atom s, _), tp1], _), tp2], i) = do
-  s' <- strToName s
-  p1 <- parseType tp1
-  p2 <- parseType tp2
-  return $ TNode (S s' p1) p2
 parseType (Node [(Atom "universe", _), (Atom si, _)], i) =
   case readMaybe si of
     Nothing -> lift $ throwE $ "not a number: " ++ si

@@ -123,17 +123,6 @@ unify ((TVar s1, TVar s2):cs)
   | s1 == s2 = unify cs
 unify ((TConst s1, TConst s2):cs)
   | s1 == s2 = unify cs
-unify ((TNode (S i tdom1) tcod1, TNode (S j tdom2) tcod2):cs)
-  | i == j = unify $ (THole i, THole j) : (tdom1, tdom2) : (tcod1, tcod2) : cs
-unify ((TNode (S i tdom1) tcod1, TNode (SHole j tdom2) tcod2):cs) = do
-  insNCEnv (S i tdom1) (SHole j tdom2)
-  unify $ (THole i, THole j) : (tdom1, tdom2) : (tcod1, tcod2) : cs
-unify ((TNode (SHole i tdom1) tcod1, TNode (S j tdom2) tcod2):cs) = do
-  insNCEnv (SHole i tdom1) (S j tdom2)
-  unify $ (THole i, THole j) : (tdom1, tdom2) : (tcod1, tcod2) : cs
-unify ((TNode (SHole i tdom1) tcod1, TNode (SHole j tdom2) tcod2):cs) = do
-  insNCEnv (SHole i tdom1) (SHole j tdom2)
-  unify $ (THole i, THole j) : (tdom1, tdom2) : (tcod1, tcod2) : cs
 unify ((TForall (S i tdom1) tcod1, TForall (S j tdom2) tcod2):cs)
   | i == j = unify $ (THole i, THole j) : (tdom1, tdom2) : (tcod1, tcod2) : cs
 unify ((TForall (S i tdom1) tcod1, TForall (SHole j tdom2) tcod2):cs) = do
@@ -182,8 +171,6 @@ occur :: String -> Type -> Bool
 occur _ (TVar s)                      = False
 occur x (THole s)                     = x == s
 occur _ (TConst _)                    = False
-occur x (TNode (S _ tdom) tcod)       = occur x tdom || occur x tcod
-occur x (TNode (SHole _ tdom) tcod)   = occur x tdom || occur x tcod
 occur x (TUp t)                       = occur x t
 occur x (TDown t)                     = occur x t
 occur _ (TUniv i)                     = False
@@ -205,14 +192,6 @@ sType sub (THole s) =
     Nothing -> THole s
     Just t  -> t
 sType sub (TConst s) = TConst s
-sType sub (TNode (S s tdom) tcod) = do
-  let tdom' = sType sub tdom
-  let tcod' = sType sub tcod
-  TNode (S s tdom') tcod'
-sType sub (TNode (SHole s tdom) tcod) = do
-  let tdom' = sType sub tdom
-  let tcod' = sType sub tcod
-  TNode (SHole s tdom') tcod'
 sType sub (TUp t) = do
   let t' = sType sub t
   TUp t'
@@ -233,16 +212,6 @@ sTypeName :: [(String, String)] -> Type -> Type
 sTypeName _ (TVar s) = TVar s
 sTypeName _ (THole s) = THole s
 sTypeName sub (TConst s) = TConst s
-sTypeName sub (TNode (S s tdom) tcod) = do
-  let tdom' = sTypeName sub tdom
-  let tcod' = sTypeName sub tcod
-  TNode (S s tdom') tcod'
-sTypeName sub (TNode (SHole s tdom) tcod) = do
-  let tdom' = sTypeName sub tdom
-  let tcod' = sTypeName sub tcod
-  case lookup s sub of
-    Just s' -> TNode (S s' tdom') tcod'
-    Nothing -> TNode (SHole s tdom') tcod'
 sTypeName sub (TUp t) = do
   let t' = sTypeName sub t
   TUp t'

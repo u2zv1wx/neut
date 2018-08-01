@@ -154,8 +154,6 @@ data Type
   = TVar String
   | THole String
   | TConst String
-  | TNode Sym
-          Type
   | TUp Type
   | TDown Type
   | TUniv Level
