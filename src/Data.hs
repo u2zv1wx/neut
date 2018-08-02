@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveFunctor      #-}
+{-# LANGUAGE FlexibleInstances  #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell    #-}
 
@@ -34,6 +36,8 @@ data TreeF a
 
 deriving instance Show a => Show (TreeF a)
 
+deriving instance Functor TreeF
+
 $(deriveShow1 ''TreeF)
 
 type Tree = Cofree TreeF Meta
@@ -50,6 +54,8 @@ data WeakType
   = WeakTypeVar Identifier
   | WeakTypeHole Identifier
   | WeakTypeConst Identifier
+  | WeakTypeNode (Identifier, WeakType)
+                 WeakType
   | WeakTypeUp WeakType
   | WeakTypeDown WeakType
   | WeakTypeUniv WeakLevel
@@ -62,10 +68,13 @@ data WeakType
 --     | (down N)
 --     | {defined constant type}
 --     | (node (x P) P)
+--     | (p p)
 --     | (universe i)
 data ValueType
   = ValueTypeVar Identifier
   | ValueTypeConst Identifier
+  | ValueTypeNode (Identifier, ValueType)
+                  ValueType
   | ValueTypeDown CompType
   | ValueTypeUniv Level
   deriving (Show, Eq)
@@ -76,8 +85,25 @@ data ValueType
 data CompType
   = CompTypeForall (Identifier, ValueType)
                    CompType
-  | CompTypeUp CompType
+  | CompTypeUp ValueType
   deriving (Show, Eq)
+
+weakenValueType :: ValueType -> WeakType
+weakenValueType (ValueTypeVar i) = WeakTypeVar i
+weakenValueType (ValueTypeConst i) = WeakTypeConst i
+weakenValueType (ValueTypeNode (i, t1) t2) = do
+  let t1' = weakenValueType t1
+  let t2' = weakenValueType t2
+  WeakTypeNode (i, t1') t2'
+weakenValueType (ValueTypeDown c) = WeakTypeDown (weakenCompType c)
+weakenValueType (ValueTypeUniv l) = WeakTypeUniv (WeakLevelFixed l)
+
+weakenCompType :: CompType -> WeakType
+weakenCompType (CompTypeForall (i, t1) t2) = do
+  let t1' = weakenValueType t1
+  let t2' = weakenCompType t2
+  WeakTypeForall (i, t1') t2'
+weakenCompType (CompTypeUp v) = WeakTypeUp (weakenValueType v)
 
 -- value / positive term
 -- v ::= x
@@ -132,6 +158,10 @@ newtype Comp =
   Comp (Cofree (CompF Value) Meta)
   deriving (Show)
 
+deriving instance Functor (ValueF Comp)
+
+deriving instance Functor (CompF Value)
+
 data Term
   = TermValue Value
   | TermComp Comp
@@ -145,6 +175,8 @@ data PatF a
   deriving (Show, Eq)
 
 $(deriveShow1 ''PatF)
+
+deriving instance Functor PatF
 
 type Pat = Cofree PatF Meta
 
@@ -171,6 +203,8 @@ data WeakTermF a
 $(deriveShow1 ''WeakTermF)
 
 deriving instance Show a => Show (WeakTermF a)
+
+deriving instance Functor WeakTermF
 
 type WeakTerm = Cofree WeakTermF Meta
 
@@ -296,3 +330,12 @@ data Operation
             Operation
   | Jump RegName -- unthunk
   deriving (Show, Eq)
+
+foo :: TreeF a -> WeakTermF a
+foo = undefined
+
+bar :: Cofree TreeF Meta -> Cofree WeakTermF Meta
+bar = hoistCofree foo
+-- bar (meta :< TreeNode tis) = do
+--   tis' <- mapM (recurM f) tis
+--   f (meta :< TreeNode tis')
