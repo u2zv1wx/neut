@@ -54,9 +54,11 @@ load' (a:as) = do
      -> do
       case e'' of
         TermValue v -> do
+          liftIO $ putStrLn $ Pr.ppShow v
           v' <- virtualV v
           liftIO $ putStrLn $ Pr.ppShow v'
         TermComp c -> do
+          liftIO $ putStrLn $ Pr.ppShow c
           c' <- virtualC c
           liftIO $ putStrLn $ Pr.ppShow c'
       load' as

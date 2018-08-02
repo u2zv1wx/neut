@@ -49,6 +49,17 @@ infer (Meta {ident = i} :< WeakTermLam (s, t) e) = do
   let result = WeakTypeForall (s, t) te
   insTEnv i result
   return result
+infer (Meta {ident = l} :< WeakTermNodeApp e v) = do
+  te <- infer e
+  tv <- infer v
+  i <- newName
+  insTEnv i (WeakTypeHole i)
+  j <- newName
+  insTEnv j tv
+  insCEnv te (WeakTypeNode (j, tv) (WeakTypeHole i))
+  let result = WeakTypeHole i
+  insTEnv l result
+  return result
 infer (Meta {ident = l} :< WeakTermApp e v) = do
   te <- infer e
   tv <- infer v
@@ -154,10 +165,10 @@ unify ((WeakTypeVar s1, WeakTypeVar s2):cs)
   | s1 == s2 = unify cs
 unify ((WeakTypeConst s1, WeakTypeConst s2):cs)
   | s1 == s2 = unify cs
-unify ((WeakTypeForall (i, tdom1) tcod1, WeakTypeForall (j, tdom2) tcod2):cs)
-  | i == j =
-    unify $
-    (WeakTypeHole i, WeakTypeHole j) : (tdom1, tdom2) : (tcod1, tcod2) : cs
+unify ((WeakTypeForall (i, tdom1) tcod1, WeakTypeForall (j, tdom2) tcod2):cs) =
+  unify $ (tdom1, tdom2) : (tcod1, tcod2) : cs
+unify ((WeakTypeNode (i, tdom1) tcod1, WeakTypeNode (j, tdom2) tcod2):cs) =
+  unify $ (tdom1, tdom2) : (tcod1, tcod2) : cs
 unify ((WeakTypeUp t1, WeakTypeUp t2):cs) = unify $ (t1, t2) : cs
 unify ((WeakTypeDown t1, WeakTypeDown t2):cs) = unify $ (t1, t2) : cs
 unify ((WeakTypeUniv i, WeakTypeUniv j):cs) = do
@@ -194,6 +205,10 @@ sType sub (WeakTypeForall (s, tdom) tcod) = do
   let tdom' = sType sub tdom
   let tcod' = sType sub tcod
   WeakTypeForall (s, tdom') tcod'
+sType sub (WeakTypeNode (s, tdom) tcod) = do
+  let tdom' = sType sub tdom
+  let tcod' = sType sub tcod
+  WeakTypeNode (s, tdom') tcod'
 
 sTypeName :: [(String, String)] -> WeakType -> WeakType
 sTypeName _ (WeakTypeVar s) = WeakTypeVar s

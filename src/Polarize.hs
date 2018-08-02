@@ -93,6 +93,8 @@ polarizeType (WeakTypeDown t) = do
     _               -> Left $ "the polarity of " ++ show t ++ " is wrong"
 polarizeType (WeakTypeUniv (WeakLevelFixed i)) =
   return $ TypeValueType (ValueTypeUniv i)
+polarizeType (WeakTypeUniv (WeakLevelHole _)) =
+  return $ TypeValueType (ValueTypeUniv 0) -- for now
 polarizeType (WeakTypeForall (s, t1) t2) = do
   mt1' <- polarizeType t1
   mt2' <- polarizeType t2
@@ -101,3 +103,4 @@ polarizeType (WeakTypeForall (s, t1) t2) = do
       return $ TypeCompType (CompTypeForall (s, t1') t2')
     _ ->
       Left $ "the polarity of " ++ show t1 ++ " or " ++ show t2 ++ " is wrong"
+polarizeType t = Left $ "the polarity of " ++ show t ++ " is wrong"

@@ -12,6 +12,10 @@ alpha (i :< WeakTermVar s) = do
   t <- WeakTermVar <$> alphaString s
   return (i :< t)
 alpha (i :< WeakTermConst s) = return (i :< WeakTermConst s)
+alpha (i :< WeakTermNodeApp v1 v2) = do
+  v1' <- alpha v1
+  v2' <- alpha v2
+  return (i :< WeakTermNodeApp v1' v2')
 alpha (i :< WeakTermLam (s, t) e) = do
   t' <- alphaType t
   local $ do
@@ -76,6 +80,12 @@ alphaType (WeakTypeForall (s, tdom) tcod) = do
     s' <- newNameWith s
     tcod' <- alphaType tcod
     return (WeakTypeForall (s', tdom') tcod')
+alphaType (WeakTypeNode (s, tdom) tcod) = do
+  tdom' <- alphaType tdom
+  local $ do
+    s' <- newNameWith s
+    tcod' <- alphaType tcod
+    return (WeakTypeNode (s', tdom') tcod')
 
 alphaString :: String -> WithEnv String
 alphaString s = do
