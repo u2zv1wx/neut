@@ -7,42 +7,44 @@ import           Control.Monad.Identity
 import           Control.Monad.State
 import           Control.Monad.Trans.Except
 
+import           Control.Comonad.Cofree
+
 import           Text.Parsec                hiding (Parsec, count)
 
 import           Data
 
 type Parser a = ParsecT String () (StateT Env (ExceptT String IO)) a
 
-strToTree :: String -> WithEnv [MTree]
+strToTree :: String -> WithEnv [Tree]
 strToTree input = do
   t <- runParserT (spaces >> parseSExpList) () "read" input
   case t of
     Left err -> lift $ throwE (show err)
     Right p  -> return p
 
-parseSExpList :: Parser [MTree]
+parseSExpList :: Parser [Tree]
 parseSExpList = sepEndBy parseStr spaces
 
 symbol :: Parser String
 symbol = many1 (noneOf "()[] \n")
 
-parseStr :: Parser MTree
+parseStr :: Parser Tree
 parseStr = parseNode <|> parseAtom
 
-parseAtom :: Parser MTree
+parseAtom :: Parser Tree
 parseAtom = do
   s <- symbol
   _ <- spaces
   i <- newNameParser
-  return (Atom s, Meta {ident = i})
+  return $ Meta {ident = i} :< TreeAtom s
 
-parseNode :: Parser MTree
+parseNode :: Parser Tree
 parseNode = do
   _ <- char '(' >> spaces
   itemList <- many parseStr
   _ <- spaces >> char ')' >> spaces
   i <- newNameParser
-  return (Node itemList, Meta {ident = i})
+  return $ Meta {ident = i} :< TreeNode itemList
 
 newNameParser :: Parser String
 newNameParser = do
