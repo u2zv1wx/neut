@@ -12,10 +12,9 @@ alpha (i :< WeakTermVar s) = do
   t <- WeakTermVar <$> alphaString s
   return (i :< t)
 alpha (i :< WeakTermConst s) = return (i :< WeakTermConst s)
-alpha (i :< WeakTermNodeApp v1 v2) = do
-  v1' <- alpha v1
-  v2' <- alpha v2
-  return (i :< WeakTermNodeApp v1' v2')
+alpha (i :< WeakTermNodeApp s vs) = do
+  vs' <- mapM alpha vs
+  return (i :< WeakTermNodeApp s vs')
 alpha (i :< WeakTermLam (s, t) e) = do
   t' <- alphaType t
   local $ do
@@ -80,12 +79,20 @@ alphaType (WeakTypeForall (s, tdom) tcod) = do
     s' <- newNameWith s
     tcod' <- alphaType tcod
     return (WeakTypeForall (s', tdom') tcod')
-alphaType (WeakTypeNode (s, tdom) tcod) = do
+alphaType (WeakTypeNode [(x, t)] tcod) = do
+  t' <- alphaType t
+  local $ do
+    x' <- newNameWith x
+    tcod' <- alphaType tcod
+    return (WeakTypeForall (x', t') tcod')
+alphaType (WeakTypeNode ((x, tdom):xts) tcod) = do
   tdom' <- alphaType tdom
   local $ do
-    s' <- newNameWith s
-    tcod' <- alphaType tcod
-    return (WeakTypeNode (s', tdom') tcod')
+    x' <- newNameWith x
+    t' <- alphaType (WeakTypeNode xts tcod)
+    case t' of
+      WeakTypeNode yts tcod' -> return $ WeakTypeNode ((x', tdom') : yts) tcod'
+      _ -> lift $ throwE $ "malformed type"
 
 alphaString :: String -> WithEnv String
 alphaString s = do
@@ -99,10 +106,10 @@ alphaPat (i :< PatVar s) = do
   t <- PatVar <$> alphaPatString s
   return (i :< t)
 alphaPat (i :< PatConst s) = return (i :< PatConst s)
-alphaPat (i :< PatApp e v) = do
-  e' <- alphaPat e
-  v' <- alphaPat v
-  return (i :< PatApp e' v')
+alphaPat (i :< PatApp s vs) = do
+  s' <- alphaPatString s
+  vs' <- mapM alphaPat vs
+  return (i :< PatApp s' vs')
 
 alphaPatString :: String -> WithEnv String
 alphaPatString s = do

@@ -56,7 +56,7 @@ data WeakType
   = WeakTypeVar Identifier
   | WeakTypeHole Identifier
   | WeakTypeConst Identifier
-  | WeakTypeNode (Identifier, WeakType)
+  | WeakTypeNode [(Identifier, WeakType)]
                  WeakType
   | WeakTypeUp WeakType
   | WeakTypeDown WeakType
@@ -75,7 +75,7 @@ data WeakType
 data ValueType
   = ValueTypeVar Identifier
   | ValueTypeConst Identifier
-  | ValueTypeNode (Identifier, ValueType)
+  | ValueTypeNode [(Identifier, ValueType)]
                   ValueType
   | ValueTypeDown CompType
   | ValueTypeUniv Level
@@ -98,10 +98,11 @@ data Type
 weakenValueType :: ValueType -> WeakType
 weakenValueType (ValueTypeVar i) = WeakTypeVar i
 weakenValueType (ValueTypeConst i) = WeakTypeConst i
-weakenValueType (ValueTypeNode (i, t1) t2) = do
-  let t1' = weakenValueType t1
+weakenValueType (ValueTypeNode xts t2) = do
+  let (xs, ts) = unzip xts
+  let ts' = map weakenValueType ts
   let t2' = weakenValueType t2
-  WeakTypeNode (i, t1') t2'
+  WeakTypeNode (zip xs ts') t2'
 weakenValueType (ValueTypeDown c) = WeakTypeDown (weakenCompType c)
 weakenValueType (ValueTypeUniv l) = WeakTypeUniv (WeakLevelFixed l)
 
@@ -115,8 +116,8 @@ weakenCompType (CompTypeUp v) = WeakTypeUp (weakenValueType v)
 data PatF a
   = PatVar Identifier
   | PatConst Identifier
-  | PatApp a
-           a
+  | PatApp Identifier
+           [a]
   deriving (Show, Eq)
 
 $(deriveShow1 ''PatF)
@@ -133,8 +134,8 @@ type Pat = Cofree PatF Meta
 data Value
   = ValueVar Identifier
   | ValueConst Identifier
-  | ValueNodeApp Value
-                 Value
+  | ValueNodeApp Identifier
+                 [Value]
   | ValueThunk Comp
   deriving (Show)
 
@@ -170,8 +171,8 @@ data Term
 data WeakTermF a
   = WeakTermVar Identifier
   | WeakTermConst Identifier
-  | WeakTermNodeApp a
-                    a
+  | WeakTermNodeApp Identifier
+                    [a]
   | WeakTermThunk a
   | WeakTermLam (Identifier, WeakType)
                 a
@@ -306,6 +307,8 @@ data Operand
 
 data Operation
   = Ans Operand -- return
+  | Fragment RegName -- lambda (operation with free variable)
+             Operation
   | Let RegName -- bind (we also use this to represent abstraction/application)
         Operand
         Operation

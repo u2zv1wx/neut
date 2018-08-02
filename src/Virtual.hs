@@ -14,17 +14,24 @@ import qualified Text.Show.Pretty           as Pr
 virtualV :: Value -> WithEnv Operand
 virtualV (ValueVar s) = return $ Register s
 virtualV (ValueConst s) = return $ ConstCell (CellAtom s)
+virtualV (ValueNodeApp s vs) = do
+  undefined
 virtualV (ValueThunk c) = do
   let fvs = varN c
   asm <- virtualC c
   return $ Alloc asm fvs
 
 virtualC :: Comp -> WithEnv Operation
-virtualC (CompLam _ e) = undefined -- return "closure"-like object
-virtualC (CompApp e v) = do
+virtualC (CompLam i e) = do
   e' <- virtualC e
-  -- deconstruct e' and get "closure" or constant
-  undefined
+  return $ Fragment i e'
+virtualC (CompApp e v) = do
+  me' <- virtualC e
+  case me' of
+    Fragment i e' -> do
+      v' <- virtualV v
+      return $ Let i v' e'
+    _ -> undefined
 virtualC (CompRet v) = do
   asm <- virtualV v
   return $ Ans asm
@@ -78,6 +85,6 @@ varN (CompCase e ves) = do
   efs ++ vefss
 
 varPat :: Pat -> [String]
-varPat (_ :< PatVar s)     = [s]
-varPat (_ :< PatConst _)   = []
-varPat (_ :< PatApp p1 p2) = varPat p1 ++ varPat p2
+varPat (_ :< PatVar s)    = [s]
+varPat (_ :< PatConst _)  = []
+varPat (_ :< PatApp s ps) = join $ map varPat ps

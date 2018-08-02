@@ -67,7 +67,7 @@ parseTerm (meta :< TreeNode (te@(_ :< TreeAtom s):ts)) = do
   msym <- definedConst s
   case msym of
     Nothing -> parseTermApp te ts
-    Just _  -> parseTermNodeApp te ts
+    Just _  -> parseTermNodeApp meta s ts
 parseTerm (_ :< TreeNode (te:tvs))
   | not (null tvs) = parseTermApp te tvs
 parseTerm t = lift $ throwE $ "parseTerm: syntax error:\n" ++ Pr.ppShow t
@@ -78,11 +78,11 @@ parseTermApp te tvs = do
   vs <- mapM parseTerm tvs
   foldMTerm WeakTermApp e vs
 
-parseTermNodeApp :: Tree -> [Tree] -> WithEnv WeakTerm
-parseTermNodeApp te tvs = do
-  e <- parseTerm te
+parseTermNodeApp :: Meta -> Identifier -> [Tree] -> WithEnv WeakTerm
+parseTermNodeApp meta s tvs = do
   vs <- mapM parseTerm tvs
-  foldMTerm WeakTermNodeApp e vs
+  return $ meta :< WeakTermNodeApp s vs
+  -- foldMTerm WeakTermNodeApp e vs
 
 foldMTerm ::
      (Cofree f Meta -> a -> f (Cofree f Meta))
@@ -103,10 +103,11 @@ parsePat (meta :< TreeAtom s) = do
       s' <- strToName s
       return (meta :< PatVar s')
     Just (s, _) -> return (meta :< PatConst s)
-parsePat (meta :< TreeNode (te@(_ :< TreeAtom s):ts)) = do
-  te' <- parsePat te
+parsePat (meta :< TreeNode ((_ :< TreeAtom s):ts)) = do
+  s' <- strToName s
+  -- te' <- parsePat te
   ts' <- mapM parsePat ts
-  foldMTerm PatApp te' ts'
+  return $ meta :< PatApp s' ts'
 parsePat t = lift $ throwE $ "parsePat: syntax error:\n" ++ Pr.ppShow t
 
 parseClause :: Tree -> WithEnv (Pat, WeakTerm)
@@ -136,20 +137,25 @@ parseType (meta :< TreeNode [_ :< TreeAtom "universe", _ :< TreeAtom si]) =
   case readMaybe si of
     Nothing -> lift $ throwE $ "not a number: " ++ si
     Just j  -> return $ WeakTypeUniv (WeakLevelFixed j)
-parseType (meta :< TreeNode [_ :< TreeAtom "forall", _ :< TreeNode [_ :< TreeAtom s, tp], tn]) = do
-  s' <- strToName s
-  p <- parseType tp
+parseType (meta :< TreeNode [_ :< TreeAtom "forall", _ :< TreeNode ts, tn]) = do
+  its <- mapM parseTypeArg ts
   n <- parseType tn
-  return $ WeakTypeForall (s', p) n
-parseType (meta :< TreeNode [_ :< TreeAtom "node", _ :< TreeNode [_ :< TreeAtom s, tp], tn]) = do
-  s' <- strToName s
-  p <- parseType tp
-  n <- parseType tn
-  return $ WeakTypeNode (s', p) n
+  return $ foldr WeakTypeForall n its
+parseType (meta :< TreeNode [_ :< TreeAtom "node", _ :< TreeNode ts, tn]) = do
+  its <- mapM parseTypeArg ts
+  tcod <- parseType tn
+  return $ WeakTypeNode its tcod
 parseType (meta :< TreeNode [_ :< TreeAtom "up", tp]) = do
   p <- parseType tp
   return $ WeakTypeUp p
 parseType t = lift $ throwE $ "parseType: syntax error:\n" ++ Pr.ppShow t
+
+parseTypeArg :: Tree -> WithEnv (Identifier, WeakType)
+parseTypeArg (_ :< TreeNode [_ :< TreeAtom s, tp]) = do
+  s' <- strToName s
+  t <- parseType tp
+  return (s', t)
+parseTypeArg t = lift $ throwE $ "parseTypeArg: syntax error:\n" ++ Pr.ppShow t
 
 definedConst :: String -> WithEnv (Maybe (String, ValueType))
 definedConst s = do

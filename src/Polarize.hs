@@ -9,11 +9,14 @@ import           Data
 polarize :: WeakTerm -> Either String Term
 polarize (i :< WeakTermVar s) = return $ TermValue $ ValueVar s
 polarize (i :< WeakTermConst s) = return $ TermValue $ ValueConst s
-polarize (i :< WeakTermNodeApp v1 v2) = do
-  mv1' <- polarize v1
-  mv2' <- polarize v2
-  case (mv1', mv2') of
-    (TermValue v1', TermValue v2') -> return $ TermValue $ ValueNodeApp v1' v2'
+polarize (i :< WeakTermNodeApp s vs) = do
+  let sanitizer v =
+        case v of
+          TermValue v -> return v
+          _           -> Left $ "the polarity of " ++ show v ++ " is wrong"
+  vs' <- mapM polarize vs
+  vs'' <- mapM sanitizer vs'
+  return $ TermValue $ ValueNodeApp s vs''
 polarize (i :< WeakTermLam (s, _) e) = do
   mc <- polarize e
   case mc of
@@ -70,14 +73,19 @@ polarize (i :< WeakTermAsc e t) = polarize e
 polarizeType :: WeakType -> Either String Type
 polarizeType (WeakTypeVar i) = return $ TypeValueType (ValueTypeVar i)
 polarizeType (WeakTypeConst c) = return $ TypeValueType (ValueTypeConst c)
-polarizeType (WeakTypeNode (s, t1) t2) = do
-  mt1' <- polarizeType t1
+polarizeType (WeakTypeNode xts t2) = do
+  let (xs, ts) = unzip xts
+  let sanitizer v =
+        case v of
+          TypeValueType v -> return v
+          _ -> Left $ "the polarity of " ++ show v ++ " is wrong"
+  ts' <- mapM polarizeType ts
+  ts'' <- mapM sanitizer ts'
   mt2' <- polarizeType t2
-  case (mt1', mt2') of
-    (TypeValueType t1', TypeValueType t2') ->
-      return $ TypeValueType (ValueTypeNode (s, t1') t2')
-    _ ->
-      Left $ "the polarity of " ++ show t1 ++ " or " ++ show t2 ++ " is wrong"
+  case mt2' of
+    TypeValueType t2' ->
+      return $ TypeValueType (ValueTypeNode (zip xs ts'') t2')
+    _ -> Left $ "the polarity of " ++ show t2 ++ " is wrong"
 polarizeType (WeakTypeUp t) = do
   mt' <- polarizeType t
   case mt' of
