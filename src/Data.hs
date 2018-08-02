@@ -1,11 +1,5 @@
-{-# LANGUAGE DeriveAnyClass       #-}
-{-# LANGUAGE DeriveFoldable       #-}
-{-# LANGUAGE DeriveFunctor        #-}
-{-# LANGUAGE DeriveTraversable    #-}
-{-# LANGUAGE FlexibleInstances    #-}
-{-# LANGUAGE StandaloneDeriving   #-}
-{-# LANGUAGE TemplateHaskell      #-}
-{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TemplateHaskell    #-}
 
 module Data where
 
@@ -15,177 +9,181 @@ import           Control.Monad.Except
 import           Control.Monad.Identity
 import           Control.Monad.State
 import           Control.Monad.Trans.Except
-import           Data.Functor.Classes
 import           Text.Show.Deriving
-
-import           Data.Maybe                 (fromMaybe)
 
 import qualified Text.Show.Pretty           as Pr
 
--- S-expression
-data Tree a
-  = Atom String
-  | Node [a]
-  deriving (Foldable)
-
-deriving instance Show a => Show (Tree a)
+type Identifier = String
 
 newtype Meta = Meta
-  { ident :: String
+  { ident :: Identifier
   } deriving (Show, Eq)
 
-$(deriveShow1 ''Tree)
+-- level of universe
+data WeakLevel
+  = Fixed Int
+  | LHole Identifier
+  deriving (Show, Eq)
 
-type MTree = Cofree Tree Meta
+type Level = Int
 
-recurM :: (Monad m) => (MTree -> m MTree) -> MTree -> m MTree
-recurM f (meta :< Atom s) = f (meta :< Atom s)
-recurM f (meta :< Node tis) = do
+-- S-expression
+data SExpF a
+  = SAtom Identifier
+  | SNode [a]
+
+deriving instance Show a => Show (SExpF a)
+
+$(deriveShow1 ''SExpF)
+
+type Tree = Cofree SExpF Meta
+
+recurM :: (Monad m) => (Tree -> m Tree) -> Tree -> m Tree
+recurM f (meta :< SAtom s) = f (meta :< SAtom s)
+recurM f (meta :< SNode tis) = do
   tis' <- mapM (recurM f) tis
-  f (meta :< Node tis')
+  f (meta :< SNode tis')
 
--- positive type
+-- weaktype
+-- WT ::= P | N
+data WeakType
+  = WTVar Identifier
+  | WTHole Identifier
+  | WTConst Identifier
+  | WTUp WeakType
+  | WTDown WeakType
+  | WTUniv WeakLevel
+  | WTForall (Identifier, WeakType)
+             WeakType
+  deriving (Show, Eq)
+
+-- value type
 -- P ::= p
 --     | (down N)
 --     | {defined constant type}
 --     | (node (x P) P)
 --     | (universe i)
--- negative type
+data ValueType
+  = VTVar Identifier
+  | VTConst Identifier
+  | VTDown CompType
+  | VTUniv Level
+  deriving (Show, Eq)
+
+-- computation type
 -- N ::= (forall (x P) N)
 --     | (cotensor N1 ... Nn)
 --     | (up P)
-data Type
-  = TVar String
-  | THole String
-  | TConst String
-  | TUp Type
-  | TDown Type
-  | TUniv Level
-  | TForall Sym
-            Type
+data CompType
+  = CTForall (Identifier, ValueType)
+             CompType
+  | CTUp CompType
   deriving (Show, Eq)
 
-type Sym = (String, Type)
-
-data Level
-  = Fixed Int
-  | LHole String
-  deriving (Show, Eq)
-
-type Identifier = String
-
--- positive term / value
+-- value / positive term
 -- v ::= x
 --     | {defined constant} <- such as nat, succ, etc.
 --     | (v v)
 --     | (thunk e)
 --     | (ascribe v P)
-data V c v
-  = VVar String
-  | VConst String
+data ValueF c v
+  = VVar Identifier
+  | VConst Identifier
   | VThunk c
   | VAsc v
-         Type
+         ValueType
   deriving (Eq)
 
--- negative term / computation
+-- computation / negative term
 -- e ::= (lambda (x P) e)
 --     | (e v)
 --     | (return v)
 --     | (bind (x P) e1 e2)
 --     | (unthunk v)
---     | (send (x P) e)
---     | (receive (x P) e)
---     | (dispatch e1 ... en)
---     | (coleft e)
---     | (coright e)
 --     | (mu (x P) e)
 --     | (case e (v1 e1) ... (vn en))
 --     | (ascribe e N)
-data C v c
-  = CLam Sym
+data CompF v c
+  = CLam (Identifier, ValueType)
          c
   | CApp c
          v
   | CRet v
-  | CBind Sym
+  | CBind (Identifier, ValueType)
           c
           c
   | CUnthunk v
-  | CMu Sym
+  | CMu (Identifier, ValueType)
         c
   | CCase v
           [(v, c)]
   | CAsc c
-         Type
+         CompType
   deriving (Eq)
 
-$(deriveShow1 ''V)
+$(deriveShow1 ''ValueF)
 
-$(deriveShow1 ''C)
+$(deriveShow1 ''CompF)
 
-newtype MV =
-  MV (Cofree (V MC) Meta)
+newtype Value =
+  Value (Cofree (ValueF Comp) Meta)
   deriving (Show)
 
-newtype MC =
-  MC (Cofree (C MV) Meta)
+newtype Comp =
+  Comp (Cofree (CompF Value) Meta)
   deriving (Show)
 
--- computation with identifier
--- type MC = (C, Meta)
-data PolTerm
-  = Value MV
-  | Comp MC
+data Term
+  = TValue Value
+  | TComp Comp
   deriving (Show)
 
 data PatF a
-  = PatVar String
-  | PatConst String
-  | PatApp a
-           a
+  = PVar Identifier
+  | PConst Identifier
+  | PApp a
+         a
   deriving (Show, Eq)
 
 $(deriveShow1 ''PatF)
 
 type Pat = Cofree PatF Meta
 
-data Term a
-  = Var String
-  | Const String
+data WeakTermF a
+  = Var Identifier
+  | Const Identifier
   | Thunk a
-  | Lam Sym
+  | Lam (Identifier, WeakType)
         a
   | App a
         a
   | Ret a
-  | Bind Sym
+  | Bind (Identifier, WeakType)
          a
          a
   | Unthunk a
-  | Mu Sym
+  | Mu (Identifier, WeakType)
        a
   | Case a
          [(Pat, a)]
   | Asc a
-        Type
+        WeakType
 
-$(deriveShow1 ''Term)
+$(deriveShow1 ''WeakTermF)
 
-deriving instance Show a => Show (Term a)
+deriving instance Show a => Show (WeakTermF a)
 
-type MTerm = Cofree Term Meta
+type WeakTerm = Cofree WeakTermF Meta
 
 data Env = Env
-  { count             :: Int
-  , valueEnv          :: [(String, Type)]
-  , notationEnv       :: [(MTree, MTree)]
-  , reservedEnv       :: [String]
-  , nameEnv           :: [(String, String)]
-  , typeEnv           :: [(String, Type)]
-  , constraintEnv     :: [(Type, Type)]
-  , nameConstraintEnv :: [(Sym, Sym)]
-  , levelEnv          :: [(Level, Level)]
+  { count         :: Int -- to generate fresh symbols
+  , valueEnv      :: [(Identifier, ValueType)] -- values and its types
+  , notationEnv   :: [(Tree, Tree)] -- macro transformers
+  , reservedEnv   :: [Identifier] -- list of reserved keywords
+  , nameEnv       :: [(Identifier, Identifier)] -- used in alpha conversion
+  , typeEnv       :: [(Identifier, WeakType)] -- used in type inference
+  , constraintEnv :: [(WeakType, WeakType)] -- used in type inference
+  , levelEnv      :: [(WeakLevel, WeakLevel)] -- constraint regarding the level of universes
   } deriving (Show)
 
 initialEnv :: Env
@@ -216,7 +214,6 @@ initialEnv =
     , nameEnv = []
     , typeEnv = []
     , constraintEnv = []
-    , nameConstraintEnv = []
     , levelEnv = []
     }
 
@@ -234,37 +231,33 @@ evalWithEnv c env = do
       putStrLn $ Pr.ppShow y
       putStrLn $ Pr.ppShow env
 
-newName :: WithEnv String
+newName :: WithEnv Identifier
 newName = do
   env <- get
   let i = count env
   modify (\e -> e {count = i + 1})
   return $ "#" ++ show i
 
-newNameWith :: String -> WithEnv String
+newNameWith :: Identifier -> WithEnv Identifier
 newNameWith s = do
   i <- newName
   let s' = s ++ i
   modify (\e -> e {nameEnv = (s, s') : nameEnv e})
   return s'
 
-lookupTEnv :: String -> WithEnv (Maybe Type)
+lookupTEnv :: String -> WithEnv (Maybe WeakType)
 lookupTEnv s = gets (lookup s . typeEnv)
 
-lookupVEnv :: String -> WithEnv (Maybe Type)
+lookupVEnv :: String -> WithEnv (Maybe ValueType)
 lookupVEnv s = gets (lookup s . valueEnv)
 
-insTEnv :: String -> Type -> WithEnv ()
+insTEnv :: String -> WeakType -> WithEnv ()
 insTEnv s t = modify (\e -> e {typeEnv = (s, t) : typeEnv e})
 
-insCEnv :: Type -> Type -> WithEnv ()
+insCEnv :: WeakType -> WeakType -> WithEnv ()
 insCEnv t1 t2 = modify (\e -> e {constraintEnv = (t1, t2) : constraintEnv e})
 
-insNCEnv :: Sym -> Sym -> WithEnv ()
-insNCEnv s1 s2 =
-  modify (\e -> e {nameConstraintEnv = (s1, s2) : nameConstraintEnv e})
-
-insLEnv :: Level -> Level -> WithEnv ()
+insLEnv :: WeakLevel -> WeakLevel -> WithEnv ()
 insLEnv l1 l2 = modify (\e -> e {levelEnv = (l1, l2) : levelEnv e})
 
 local :: WithEnv a -> WithEnv a
