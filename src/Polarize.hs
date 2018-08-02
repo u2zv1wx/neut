@@ -7,67 +7,64 @@ import           Control.Comonad.Cofree
 import           Data
 
 polarize :: WeakTerm -> Either String Term
-polarize (i :< WeakTermVar s) = return $ TermValue $ Value (i :< ValueVar s)
-polarize (i :< WeakTermConst s) = return $ TermValue $ Value (i :< ValueConst s)
+polarize (i :< WeakTermVar s) = return $ TermValue $ ValueVar s
+polarize (i :< WeakTermConst s) = return $ TermValue $ ValueConst s
 polarize (i :< WeakTermNodeApp v1 v2) = do
   mv1' <- polarize v1
   mv2' <- polarize v2
   case (mv1', mv2') of
-    (TermValue (Value v1'), TermValue (Value v2')) ->
-      return $ TermValue $ Value (i :< ValueNodeApp v1' v2')
+    (TermValue v1', TermValue v2') -> return $ TermValue $ ValueNodeApp v1' v2'
 polarize (i :< WeakTermLam (s, _) e) = do
   mc <- polarize e
   case mc of
-    TermComp (Comp c) -> return $ TermComp $ Comp (i :< CompLam s c)
-    _                 -> Left $ "the polarity of " ++ show e ++ " is wrong"
+    TermComp c -> return $ TermComp $ CompLam s c
+    _          -> Left $ "the polarity of " ++ show e ++ " is wrong"
 polarize (i :< WeakTermApp e1 e2) = do
   mc <- polarize e1
   mv <- polarize e2
   case (mc, mv) of
-    (TermComp (Comp c), TermValue v) ->
-      return $ TermComp $ Comp (i :< CompApp c v)
+    (TermComp c, TermValue v) -> return $ TermComp $ CompApp c v
     _ ->
       Left $ "the polarity of " ++ show e1 ++ " or " ++ show e2 ++ " is wrong"
 polarize (i :< WeakTermRet e) = do
   mv <- polarize e
   case mv of
-    TermValue v -> return $ TermComp $ Comp (i :< CompRet v)
+    TermValue v -> return $ TermComp $ CompRet v
     _           -> Left $ "the polarity of " ++ show e ++ " is wrong"
 polarize (i :< WeakTermBind (s, _) e1 e2) = do
   mc1 <- polarize e1
   mc2 <- polarize e2
   case (mc1, mc2) of
-    (TermComp (Comp c1), TermComp (Comp c2)) ->
-      return $ TermComp $ Comp (i :< CompBind s c1 c2)
+    (TermComp c1, TermComp c2) -> return $ TermComp $ CompBind s c1 c2
     _ ->
       Left $
       "foo the polarity of " ++ show e1 ++ " or " ++ show e2 ++ " is wrong"
 polarize (i :< WeakTermThunk e) = do
   mc <- polarize e
   case mc of
-    TermComp c -> return $ TermValue $ Value (i :< ValueThunk c)
+    TermComp c -> return $ TermValue $ ValueThunk c
     _          -> Left $ "the polarity of " ++ show e ++ " is wrong"
 polarize (i :< WeakTermUnthunk e) = do
   mv <- polarize e
   case mv of
-    TermValue v -> return $ TermComp $ Comp (i :< CompUnthunk v)
+    TermValue v -> return $ TermComp $ CompUnthunk v
     _           -> Left $ "the polarity of " ++ show e ++ " is wrong"
 polarize (i :< WeakTermMu (s, _) e) = do
   mc <- polarize e
   case mc of
-    TermComp (Comp c) -> return $ TermComp $ Comp (i :< CompMu s c)
-    _                 -> Left $ "the polarity of " ++ show e ++ " is wrong"
+    TermComp c -> return $ TermComp $ CompMu s c
+    _          -> Left $ "the polarity of " ++ show e ++ " is wrong"
 polarize (i :< WeakTermCase e ves) = do
   ves' <-
     forM ves $ \(v, e) -> do
       e' <- polarize e
       case e' of
-        TermComp (Comp c) -> return (v, c)
+        TermComp c -> return (v, c)
         _ ->
           Left $ "the polarity of " ++ show v ++ " or " ++ show e ++ " is wrong"
   e' <- polarize e
   case e' of
-    TermValue v -> return $ TermComp $ Comp (i :< CompCase v ves')
+    TermValue v -> return $ TermComp $ CompCase v ves'
 polarize (i :< WeakTermAsc e t) = polarize e
 
 polarizeType :: WeakType -> Either String Type
