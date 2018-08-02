@@ -7,6 +7,7 @@ module Data where
 
 import           Control.Comonad
 import           Control.Comonad.Cofree
+
 import           Control.Monad.Except
 import           Control.Monad.Identity
 import           Control.Monad.State
@@ -30,6 +31,7 @@ data WeakLevel
 type Level = Int
 
 -- S-expression
+-- the "F" stands for "Functor"
 data TreeF a
   = TreeAtom Identifier
   | TreeNode [a]
@@ -223,15 +225,11 @@ initialEnv =
     , valueEnv = []
     , notationEnv = []
     , reservedEnv =
-        [ "quote"
+        [ "thunk"
         , "lambda"
         , "return"
         , "bind"
-        , "unquote"
-        , "send"
-        , "receive"
-        , "dispatch"
-        , "select"
+        , "unthunk"
         , "mu"
         , "case"
         , "ascribe"
