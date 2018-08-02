@@ -63,3 +63,47 @@ polarize (i :< WeakTermCase e ves) = do
   case e' of
     TermValue v -> return $ TermComp $ Comp (i :< CompCase v ves')
 polarize (i :< WeakTermAsc e t) = polarize e
+
+polarizeType :: WeakType -> Either String Type
+polarizeType (WeakTypeVar i) = return $ TypeValueType (ValueTypeVar i)
+polarizeType (WeakTypeConst c) = return $ TypeValueType (ValueTypeConst c)
+polarizeType (WeakTypeNode (s, t1) t2) = do
+  mt1' <- polarizeType t1
+  mt2' <- polarizeType t2
+  case (mt1', mt2') of
+    (TypeValueType t1', TypeValueType t2') ->
+      return $ TypeValueType (ValueTypeNode (s, t1') t2')
+    _ ->
+      Left $ "the polarity of " ++ show t1 ++ " or " ++ show t2 ++ " is wrong"
+polarizeType (WeakTypeUp t) = do
+  mt' <- polarizeType t
+  case mt' of
+    TypeValueType t' -> return $ TypeCompType (CompTypeUp t')
+    _                -> Left $ "the polarity of " ++ show t ++ " is wrong"
+polarizeType (WeakTypeDown t) = do
+  mt' <- polarizeType t
+  case mt' of
+    TypeCompType t' -> return $ TypeValueType (ValueTypeDown t')
+    _               -> Left $ "the polarity of " ++ show t ++ " is wrong"
+polarizeType (WeakTypeUniv (WeakLevelFixed i)) =
+  return $ TypeValueType (ValueTypeUniv i)
+polarizeType (WeakTypeForall (s, t1) t2) = do
+  mt1' <- polarizeType t1
+  mt2' <- polarizeType t2
+  case (mt1', mt2') of
+    (TypeValueType t1', TypeCompType t2') ->
+      return $ TypeCompType (CompTypeForall (s, t1') t2')
+    _ ->
+      Left $ "the polarity of " ++ show t1 ++ " or " ++ show t2 ++ " is wrong"
+-- data WeakType
+--   = WeakTypeVar Identifier
+--   | WeakTypeHole Identifier
+--   | WeakTypeConst Identifier
+--   | WeakTypeNode (Identifier, WeakType)
+--                  WeakType
+--   | WeakTypeUp WeakType
+--   | WeakTypeDown WeakType
+--   | WeakTypeUniv WeakLevel
+--   | WeakTypeForall (Identifier, WeakType)
+--                    WeakType
+--   deriving (Show, Eq)

@@ -34,10 +34,13 @@ load' ((_ :< TreeNode [_ :< TreeAtom "reserve", _ :< TreeAtom s]):as) = do
   modify (\e -> e {reservedEnv = s : reservedEnv e})
   load' as
 load' ((_ :< TreeNode [_ :< TreeAtom "value", _ :< TreeAtom s, tp]):as) = do
-  p <- parseValueType tp
-  modify (\e -> e {valueEnv = (s, p) : valueEnv e})
-  insTEnv s (weakenValueType p)
-  load' as
+  mt <- parseType tp
+  case polarizeType mt of
+    Right (TypeValueType t) -> do
+      modify (\e -> e {valueEnv = (s, t) : valueEnv e})
+      insTEnv s (weakenValueType t)
+      load' as
+    Left err -> lift $ throwE err
 load' (a:as) = do
   a' <- macroExpand a
   liftIO $ putStrLn $ Pr.ppShow a'

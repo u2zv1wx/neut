@@ -88,6 +88,11 @@ data CompType
   | CompTypeUp ValueType
   deriving (Show, Eq)
 
+data Type
+  = TypeValueType ValueType
+  | TypeCompType CompType
+  deriving (Show)
+
 weakenValueType :: ValueType -> WeakType
 weakenValueType (ValueTypeVar i) = WeakTypeVar i
 weakenValueType (ValueTypeConst i) = WeakTypeConst i
