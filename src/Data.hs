@@ -327,12 +327,3 @@ data Operation
             Operation
   | Jump RegName -- unthunk
   deriving (Show, Eq)
-
-foo :: TreeF a -> WeakTermF a
-foo = undefined
-
-bar :: Cofree TreeF Meta -> Cofree WeakTermF Meta
-bar = hoistCofree foo
--- bar (meta :< TreeNode tis) = do
---   tis' <- mapM (recurM f) tis
---   f (meta :< TreeNode tis')
