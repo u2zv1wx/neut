@@ -133,6 +133,8 @@ type Pat = Cofree PatF Meta
 data ValueF c v
   = ValueVar Identifier
   | ValueConst Identifier
+  | ValueNodeApp v
+                 v
   | ValueThunk c
 
 -- computation / negative term
@@ -182,6 +184,8 @@ data Term
 data WeakTermF a
   = WeakTermVar Identifier
   | WeakTermConst Identifier
+  | WeakTermNodeApp a
+                    a
   | WeakTermThunk a
   | WeakTermLam (Identifier, WeakType)
                 a
@@ -236,7 +240,6 @@ initialEnv =
         , "down"
         , "universe"
         , "forall"
-        , "par"
         , "up"
         ]
     , nameEnv = []

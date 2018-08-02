@@ -63,12 +63,26 @@ parseTerm (meta :< TreeNode [_ :< TreeAtom "ascribe", te, tn]) = do
   e <- parseTerm te
   n <- parseType tn
   return (meta :< WeakTermAsc e n)
-parseTerm (meta :< TreeNode (te:tvs))
-  | not (null tvs) = do
-    e <- parseTerm te
-    vs <- mapM parseTerm tvs
-    foldMTerm WeakTermApp e vs
+parseTerm (meta :< TreeNode (te@(_ :< TreeAtom s):ts)) = do
+  msym <- definedConst s
+  case msym of
+    Nothing -> parseTermApp te ts
+    Just _  -> parseTermNodeApp te ts
+parseTerm (_ :< TreeNode (te:tvs))
+  | not (null tvs) = parseTermApp te tvs
 parseTerm t = lift $ throwE $ "parseTerm: syntax error:\n" ++ Pr.ppShow t
+
+parseTermApp :: Tree -> [Tree] -> WithEnv WeakTerm
+parseTermApp te tvs = do
+  e <- parseTerm te
+  vs <- mapM parseTerm tvs
+  foldMTerm WeakTermApp e vs
+
+parseTermNodeApp :: Tree -> [Tree] -> WithEnv WeakTerm
+parseTermNodeApp te tvs = do
+  e <- parseTerm te
+  vs <- mapM parseTerm tvs
+  foldMTerm WeakTermNodeApp e vs
 
 foldMTerm ::
      (Cofree f Meta -> a -> f (Cofree f Meta))
@@ -82,7 +96,18 @@ foldMTerm f e (t:ts) = do
   foldMTerm f (Meta {ident = i} :< tmp) ts
 
 parsePat :: Tree -> WithEnv Pat
-parsePat = undefined
+parsePat (meta :< TreeAtom s) = do
+  msym <- definedConst s
+  case msym of
+    Nothing -> do
+      s' <- strToName s
+      return (meta :< PatVar s')
+    Just (s, _) -> return (meta :< PatConst s)
+parsePat (meta :< TreeNode (te@(_ :< TreeAtom s):ts)) = do
+  te' <- parsePat te
+  ts' <- mapM parsePat ts
+  foldMTerm PatApp te' ts'
+parsePat t = lift $ throwE $ "parsePat: syntax error:\n" ++ Pr.ppShow t
 
 parseClause :: Tree -> WithEnv (Pat, WeakTerm)
 parseClause (meta :< TreeNode [tv, te]) = do

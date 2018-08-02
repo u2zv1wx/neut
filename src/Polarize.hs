@@ -9,6 +9,12 @@ import           Data
 polarize :: WeakTerm -> Either String Term
 polarize (i :< WeakTermVar s) = return $ TermValue $ Value (i :< ValueVar s)
 polarize (i :< WeakTermConst s) = return $ TermValue $ Value (i :< ValueConst s)
+polarize (i :< WeakTermNodeApp v1 v2) = do
+  mv1' <- polarize v1
+  mv2' <- polarize v2
+  case (mv1', mv2') of
+    (TermValue (Value v1'), TermValue (Value v2')) ->
+      return $ TermValue $ Value (i :< ValueNodeApp v1' v2')
 polarize (i :< WeakTermLam (s, _) e) = do
   mc <- polarize e
   case mc of
