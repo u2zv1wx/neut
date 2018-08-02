@@ -9,12 +9,12 @@ import           Control.Monad.Trans.Except
 
 import           Control.Comonad.Cofree
 
-import           Alpha
 import           Data
 import           Macro
 import           Parse
 import           Polarize
 import           Read
+import           Rename
 import           Typing
 import           Virtual
 
@@ -45,7 +45,7 @@ load' (a:as) = do
   a' <- macroExpand a
   liftIO $ putStrLn $ Pr.ppShow a'
   e <- parseTerm a'
-  e' <- alpha e
+  e' <- rename e
   check e'
   case polarize e' of
     Left err -> lift $ throwE err

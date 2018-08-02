@@ -1,4 +1,4 @@
-name:                lisp
+name:                neut
 version:             0.1.0.0
 license:             GPL-3
 license-file:        LICENSE
@@ -22,7 +22,7 @@ library:
   source-dirs: src
 
 executables:
-  lisp:
+  neut:
     main:                Main.hs
     source-dirs:         main
     ghc-options:
@@ -30,10 +30,10 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - lisp
+    - neut
 
 tests:
-  lisp-test:
+  neut-test:
     main:                Spec.hs
     source-dirs:         test
     ghc-options:
@@ -41,4 +41,4 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - lisp
+    - neut

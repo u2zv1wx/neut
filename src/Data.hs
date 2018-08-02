@@ -285,10 +285,6 @@ local p = do
   modify (\e -> env {count = count e})
   return x
 
-type RegName = String
-
-type MemAddr = String
-
 data Data
   = DataPointer Identifier -- var is something that points already-allocated data
   | DataCell Identifier -- value of defined data types
