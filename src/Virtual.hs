@@ -11,30 +11,34 @@ import           Control.Comonad.Cofree
 
 import qualified Text.Show.Pretty           as Pr
 
-virtualV :: Value -> WithEnv Operand
-virtualV (ValueVar s) = return $ Register s
-virtualV (ValueConst s) = return $ ConstCell (CellAtom s)
+virtualV :: Value -> WithEnv Data
+virtualV (ValueVar s) = return $ DataPointer s
+virtualV (ValueConst s) = return $ DataCell s []
 virtualV (ValueNodeApp s vs) = do
-  undefined
+  vs' <- mapM virtualV vs
+  return $ DataCell s vs'
 virtualV (ValueThunk c) = do
   let fvs = varN c
   asm <- virtualC c
-  return $ Thunk asm fvs
+  return $ DataThunk asm fvs
 
-virtualC :: Comp -> WithEnv Operation
+virtualC :: Comp -> WithEnv Code
 virtualC (CompLam i e) = do
   e' <- virtualC e
-  return $ Fragment i e'
+  return $ CodeFragment i e'
 virtualC (CompApp e v) = do
   me' <- virtualC e
   case me' of
-    Fragment i e' -> do
+    CodeFragment i e' -> do
       v' <- virtualV v
-      return $ Let i v' e'
-    _ -> undefined
+      return $ CodeLet i (CodeAllocate v') e'
+    CodeJump i args -> do
+      v' <- virtualV v
+      return $ CodeJump i (v' : args)
+    t -> lift $ throwE $ "virtualC.CompApp. Note:\n " ++ Pr.ppShow t
 virtualC (CompRet v) = do
   asm <- virtualV v
-  return $ Ans asm
+  return $ CodeAllocate asm
 virtualC (CompBind s c1 c2) = do
   operation1 <- virtualC c1
   operation2 <- virtualC c2
@@ -42,9 +46,9 @@ virtualC (CompBind s c1 c2) = do
 virtualC (CompUnthunk v) = do
   operand <- virtualV v
   case operand of
-    Register s -> return $ Jump s
-    Thunk op _ -> return op
-    _          -> lift $ throwE "virtualC.CUnthunk"
+    DataPointer s  -> return $ CodeJump s []
+    DataThunk op _ -> return op
+    _              -> lift $ throwE "virtualC.CUnthunk"
 virtualC (CompMu s c) = undefined
 virtualC (CompCase c vcs) = undefined
 
@@ -54,19 +58,24 @@ funAndArgs (CompApp e v) = do
   (fun, v : args)
 funAndArgs e = (e, [])
 
-traceLet :: String -> Operation -> Operation -> Operation
-traceLet s (Ans o) cont       = Let s o cont
-traceLet s (Jump addr) cont   = LetCall s addr cont
-traceLet s (Let k o1 o2) cont = Let k o1 (traceLet s o2 cont)
+traceLet :: String -> Code -> Code -> Code
+traceLet s (CodeAllocate o) cont = CodeLet s (CodeAllocate o) cont
+traceLet s (CodeJump addr args) cont = CodeLet s (CodeJump addr args) cont
+traceLet s (CodeLet k o1 o2) cont = CodeLet k o1 (traceLet s o2 cont)
+traceLet s c1 c2 =
+  error $
+  "traceLet. s:\n" ++
+  Pr.ppShow s ++ "\nc1:\n" ++ Pr.ppShow c1 ++ "\nc2:\n" ++ Pr.ppShow c2
 
 getArgs :: Comp -> [String]
 getArgs (CompLam s e) = s : getArgs e
 getArgs _             = []
 
 varP :: Value -> [String]
-varP (ValueVar s)   = [s]
-varP (ValueConst _) = []
-varP (ValueThunk e) = varN e
+varP (ValueVar s)        = [s]
+varP (ValueConst _)      = []
+varP (ValueNodeApp s vs) = join $ map varP vs
+varP (ValueThunk e)      = varN e
 
 varN :: Comp -> [String]
 varN (CompLam s e) = filter (/= s) $ varN e

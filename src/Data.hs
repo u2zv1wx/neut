@@ -285,35 +285,25 @@ local p = do
   modify (\e -> env {count = count e})
   return x
 
-type Addr = String
-
 type RegName = String
 
 type MemAddr = String
 
-data Cell
-  = CellAtom String
-  | CellReg RegName
-  | CellCons Cell
-             Cell
+data Data
+  = DataPointer Identifier -- var is something that points already-allocated data
+  | DataCell Identifier -- value of defined data types
+             [Data]
+  | DataThunk Code -- thunk code <list of free var>. "code as data", literally.
+              [Identifier]
   deriving (Show, Eq)
 
-data Operand
-  = Register RegName -- var
-  | ConstCell Cell -- create a new cons cell and return the newly allocated memory address
-  | Thunk Operation -- thunk code <list of free var>
-          [RegName]
-  deriving (Show, Eq)
-
-data Operation
-  = Ans Operand -- return
-  | Fragment RegName -- lambda (operation with free variable)
-             Operation
-  | Let RegName -- bind (we also use this to represent abstraction/application)
-        Operand
-        Operation
-  | LetCall RegName -- binding the result of unthunk
-            MemAddr
-            Operation
-  | Jump RegName -- unthunk
+data Code
+  = CodeAllocate Data -- return
+  | CodeFragment Identifier -- lambda (operation with free variable)
+                 Code
+  | CodeLet Identifier -- bind (we also use this to represent abstraction/application)
+            Code
+            Code
+  | CodeJump Identifier -- unthunk
+             [Data] -- arguments
   deriving (Show, Eq)
