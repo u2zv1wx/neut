@@ -19,7 +19,7 @@ virtualV (ValueNodeApp s vs) = do
 virtualV (ValueThunk c) = do
   let fvs = varN c
   asm <- virtualC c
-  return $ Alloc asm fvs
+  return $ Thunk asm fvs
 
 virtualC :: Comp -> WithEnv Operation
 virtualC (CompLam i e) = do
@@ -43,7 +43,7 @@ virtualC (CompUnthunk v) = do
   operand <- virtualV v
   case operand of
     Register s -> return $ Jump s
-    Alloc op _ -> return op
+    Thunk op _ -> return op
     _          -> lift $ throwE "virtualC.CUnthunk"
 virtualC (CompMu s c) = undefined
 virtualC (CompCase c vcs) = undefined
@@ -87,4 +87,4 @@ varN (CompCase e ves) = do
 varPat :: Pat -> [String]
 varPat (_ :< PatVar s)    = [s]
 varPat (_ :< PatConst _)  = []
-varPat (_ :< PatApp s ps) = join $ map varPat ps
+varPat (_ :< PatApp _ ps) = join $ map varPat ps

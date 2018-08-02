@@ -301,7 +301,7 @@ data Cell
 data Operand
   = Register RegName -- var
   | ConstCell Cell -- create a new cons cell and return the newly allocated memory address
-  | Alloc Operation -- thunk code <list of free var>
+  | Thunk Operation -- thunk code <list of free var>
           [RegName]
   deriving (Show, Eq)
 

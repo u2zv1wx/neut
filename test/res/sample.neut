@@ -7,7 +7,7 @@
 (value zero nat)
 
 (value succ
-  (node (_ nat) nat))
+  (node ((_ nat)) nat))
 
 (value bool universe)
 
