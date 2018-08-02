@@ -7,43 +7,43 @@ import           Control.Monad.State
 import           Control.Monad.Trans.Except
 import           Data
 
+import           Control.Comonad.Cofree
+
 import qualified Text.Show.Pretty           as Pr
 
-virtualV :: MV -> WithEnv Operand
-virtualV (VVar s, _) = return $ Register s
-virtualV (VConst s, _) = return $ ConstCell (CellAtom s)
-virtualV (VThunk c, _) = do
+virtualV :: Value -> WithEnv Operand
+virtualV (Value (_ :< ValueVar s)) = return $ Register s
+virtualV (Value (_ :< ValueConst s)) = return $ ConstCell (CellAtom s)
+virtualV (Value (_ :< ValueThunk c)) = do
   let fvs = varN c
   asm <- virtualC c
   return $ Alloc asm fvs
-virtualV (VAsc v _, _) = virtualV v
 
-virtualC :: MC -> WithEnv Operation
-virtualC (CLam _ e, _) = undefined -- return "closure"-like object
-virtualC (CApp e@(_, Meta {ident = i}) v, _) = do
-  e' <- virtualC e
+virtualC :: Comp -> WithEnv Operation
+virtualC (Comp (_ :< CompLam _ e)) = undefined -- return "closure"-like object
+virtualC (Comp (_ :< CompApp e@(Meta {ident = i} :< _) v)) = do
+  e' <- virtualC (Comp e)
   -- deconstruct e' and get "closure" or constant
   undefined
-virtualC (CRet v, _) = do
+virtualC (Comp (_ :< CompRet v)) = do
   asm <- virtualV v
   return $ Ans asm
-virtualC (CBind (s, _) c1 c2, _) = do
-  operation1 <- virtualC c1
-  operation2 <- virtualC c2
+virtualC (Comp (_ :< CompBind s c1 c2)) = do
+  operation1 <- virtualC (Comp c1)
+  operation2 <- virtualC (Comp c2)
   return $ traceLet s operation1 operation2
-virtualC (CUnthunk v, _) = do
+virtualC (Comp (_ :< CompUnthunk v)) = do
   operand <- virtualV v
   case operand of
     Register s -> return $ Jump s
     Alloc op _ -> return op
     _          -> lift $ throwE "virtualC.CUnthunk"
-virtualC (CMu s c, _) = undefined
-virtualC (CCase c vcs, _) = undefined
-virtualC (CAsc c _, _) = virtualC c
+virtualC (Comp (_ :< CompMu s c)) = undefined
+virtualC (Comp (_ :< CompCase c vcs)) = undefined
 
-funAndArgs :: MC -> (MC, [MV])
-funAndArgs (CApp e v, _) = do
-  let (fun, args) = funAndArgs e
+funAndArgs :: Comp -> (Comp, [Value])
+funAndArgs (Comp (_ :< CompApp e v)) = do
+  let (fun, args) = funAndArgs (Comp e)
   (fun, v : args)
 funAndArgs e = (e, [])
 
@@ -52,29 +52,33 @@ traceLet s (Ans o) cont       = Let s o cont
 traceLet s (Jump addr) cont   = LetCall s addr cont
 traceLet s (Let k o1 o2) cont = Let k o1 (traceLet s o2 cont)
 
-getArgs :: MC -> [String]
-getArgs (CLam (s, _) e, _) = s : getArgs e
-getArgs _                  = []
+getArgs :: Comp -> [String]
+getArgs (Comp (_ :< CompLam s e)) = s : getArgs (Comp e)
+getArgs _                         = []
 
-varP :: MV -> [String]
-varP (VVar s, _)   = [s]
-varP (VConst _, _) = []
-varP (VThunk e, _) = varN e
-varP (VAsc e t, _) = varP e
+varP :: Value -> [String]
+varP (Value (_ :< ValueVar s))   = [s]
+varP (Value (_ :< ValueConst _)) = []
+varP (Value (_ :< ValueThunk e)) = varN e
 
-varN :: MC -> [String]
-varN (CLam (s, t) e, _) = filter (/= s) $ varN e
-varN (CApp e v, _) = varN e ++ varP v
-varN (CRet v, _) = varP v
-varN (CBind (s, t) e1 e2, _) = varN e1 ++ filter (/= s) (varN e2)
-varN (CUnthunk v, _) = varP v
-varN (CMu (s, t) e, _) = filter (/= s) (varN e)
-varN (CCase e ves, _) = do
+varN :: Comp -> [String]
+varN (Comp (_ :< CompLam s e)) = filter (/= s) $ varN (Comp e)
+varN (Comp (_ :< CompApp e v)) = varN (Comp e) ++ varP v
+varN (Comp (_ :< CompRet v)) = varP v
+varN (Comp (_ :< CompBind s e1 e2)) =
+  varN (Comp e1) ++ filter (/= s) (varN (Comp e2))
+varN (Comp (_ :< CompUnthunk v)) = varP v
+varN (Comp (_ :< CompMu s e)) = filter (/= s) (varN (Comp e))
+varN (Comp (_ :< CompCase e ves)) = do
   let efs = varP e
   vefss <-
     forM ves $ \(pat, body) -> do
-      bound <- varP pat
-      fs <- varN body
+      bound <- varPat pat
+      fs <- varN (Comp body)
       return $ filter (`notElem` bound) fs
   efs ++ vefss
-varN (CAsc e t, _) = varN e
+
+varPat :: Pat -> [String]
+varPat (_ :< PatVar s)     = [s]
+varPat (_ :< PatConst _)   = []
+varPat (_ :< PatApp p1 p2) = varPat p1 ++ varPat p2
