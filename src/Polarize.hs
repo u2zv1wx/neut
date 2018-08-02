@@ -95,15 +95,3 @@ polarizeType (WeakTypeForall (s, t1) t2) = do
       return $ TypeCompType (CompTypeForall (s, t1') t2')
     _ ->
       Left $ "the polarity of " ++ show t1 ++ " or " ++ show t2 ++ " is wrong"
--- data WeakType
---   = WeakTypeVar Identifier
---   | WeakTypeHole Identifier
---   | WeakTypeConst Identifier
---   | WeakTypeNode (Identifier, WeakType)
---                  WeakType
---   | WeakTypeUp WeakType
---   | WeakTypeDown WeakType
---   | WeakTypeUniv WeakLevel
---   | WeakTypeForall (Identifier, WeakType)
---                    WeakType
---   deriving (Show, Eq)
