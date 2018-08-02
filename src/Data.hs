@@ -301,7 +301,7 @@ data Code
   = CodeAllocate Data -- return
   | CodeFragment Identifier -- lambda (operation with free variable)
                  Code
-  | CodeLet Identifier -- bind (we also use this to represent abstraction/application)
+  | CodeLet Identifier -- bind (we also use this to represent application)
             Code
             Code
   | CodeJump Identifier -- unthunk
