@@ -19,42 +19,42 @@ newtype Meta = Meta
   { ident :: Identifier
   } deriving (Show, Eq)
 
--- level of universe
+-- (undetermined) level of universe
 data WeakLevel
-  = Fixed Int
-  | LHole Identifier
+  = WeakLevelFixed Int
+  | WeakLevelHole Identifier
   deriving (Show, Eq)
 
 type Level = Int
 
 -- S-expression
-data SExpF a
-  = SAtom Identifier
-  | SNode [a]
+data TreeF a
+  = TreeAtom Identifier
+  | TreeNode [a]
 
-deriving instance Show a => Show (SExpF a)
+deriving instance Show a => Show (TreeF a)
 
-$(deriveShow1 ''SExpF)
+$(deriveShow1 ''TreeF)
 
-type Tree = Cofree SExpF Meta
+type Tree = Cofree TreeF Meta
 
 recurM :: (Monad m) => (Tree -> m Tree) -> Tree -> m Tree
-recurM f (meta :< SAtom s) = f (meta :< SAtom s)
-recurM f (meta :< SNode tis) = do
+recurM f (meta :< TreeAtom s) = f (meta :< TreeAtom s)
+recurM f (meta :< TreeNode tis) = do
   tis' <- mapM (recurM f) tis
-  f (meta :< SNode tis')
+  f (meta :< TreeNode tis')
 
 -- weaktype
 -- WT ::= P | N
 data WeakType
-  = WTVar Identifier
-  | WTHole Identifier
-  | WTConst Identifier
-  | WTUp WeakType
-  | WTDown WeakType
-  | WTUniv WeakLevel
-  | WTForall (Identifier, WeakType)
-             WeakType
+  = WeakTypeVar Identifier
+  | WeakTypeHole Identifier
+  | WeakTypeConst Identifier
+  | WeakTypeUp WeakType
+  | WeakTypeDown WeakType
+  | WeakTypeUniv WeakLevel
+  | WeakTypeForall (Identifier, WeakType)
+                   WeakType
   deriving (Show, Eq)
 
 -- value type
@@ -64,20 +64,19 @@ data WeakType
 --     | (node (x P) P)
 --     | (universe i)
 data ValueType
-  = VTVar Identifier
-  | VTConst Identifier
-  | VTDown CompType
-  | VTUniv Level
+  = ValueTypeVar Identifier
+  | ValueTypeConst Identifier
+  | ValueTypeDown CompType
+  | ValueTypeUniv Level
   deriving (Show, Eq)
 
 -- computation type
 -- N ::= (forall (x P) N)
---     | (cotensor N1 ... Nn)
 --     | (up P)
 data CompType
-  = CTForall (Identifier, ValueType)
-             CompType
-  | CTUp CompType
+  = CompTypeForall (Identifier, ValueType)
+                   CompType
+  | CompTypeUp CompType
   deriving (Show, Eq)
 
 -- value / positive term
@@ -87,11 +86,11 @@ data CompType
 --     | (thunk e)
 --     | (ascribe v P)
 data ValueF c v
-  = VVar Identifier
-  | VConst Identifier
-  | VThunk c
-  | VAsc v
-         ValueType
+  = ValueVar Identifier
+  | ValueConst Identifier
+  | ValueThunk c
+  | ValueAsc v
+             ValueType
   deriving (Eq)
 
 -- computation / negative term
@@ -104,21 +103,21 @@ data ValueF c v
 --     | (case e (v1 e1) ... (vn en))
 --     | (ascribe e N)
 data CompF v c
-  = CLam (Identifier, ValueType)
-         c
-  | CApp c
-         v
-  | CRet v
-  | CBind (Identifier, ValueType)
-          c
-          c
-  | CUnthunk v
-  | CMu (Identifier, ValueType)
-        c
-  | CCase v
-          [(v, c)]
-  | CAsc c
-         CompType
+  = CompLam (Identifier, ValueType)
+            c
+  | CompApp c
+            v
+  | CompRet v
+  | CompBind (Identifier, ValueType)
+             c
+             c
+  | CompUnthunk v
+  | CompMu (Identifier, ValueType)
+           c
+  | CompCase v
+             [(v, c)]
+  | CompAsc c
+            CompType
   deriving (Eq)
 
 $(deriveShow1 ''ValueF)
@@ -134,15 +133,15 @@ newtype Comp =
   deriving (Show)
 
 data Term
-  = TValue Value
-  | TComp Comp
+  = TermValue Value
+  | TermComp Comp
   deriving (Show)
 
 data PatF a
-  = PVar Identifier
-  | PConst Identifier
-  | PApp a
-         a
+  = PatVar Identifier
+  | PatConst Identifier
+  | PatApp a
+           a
   deriving (Show, Eq)
 
 $(deriveShow1 ''PatF)
@@ -150,24 +149,24 @@ $(deriveShow1 ''PatF)
 type Pat = Cofree PatF Meta
 
 data WeakTermF a
-  = Var Identifier
-  | Const Identifier
-  | Thunk a
-  | Lam (Identifier, WeakType)
-        a
-  | App a
-        a
-  | Ret a
-  | Bind (Identifier, WeakType)
-         a
-         a
-  | Unthunk a
-  | Mu (Identifier, WeakType)
-       a
-  | Case a
-         [(Pat, a)]
-  | Asc a
-        WeakType
+  = WeakTermVar Identifier
+  | WeakTermConst Identifier
+  | WeakTermThunk a
+  | WeakTermLam (Identifier, WeakType)
+                a
+  | WeakTermApp a
+                a
+  | WeakTermRet a
+  | WeakTermBind (Identifier, WeakType)
+                 a
+                 a
+  | WeakTermUnthunk a
+  | WeakTermMu (Identifier, WeakType)
+               a
+  | WeakTermCase a
+                 [(Pat, a)]
+  | WeakTermAsc a
+                WeakType
 
 $(deriveShow1 ''WeakTermF)
 
