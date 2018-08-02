@@ -65,7 +65,7 @@ applySubst sub@(_, s2) (i :< TreeNode ts) =
           Just rest -> j :< TreeNode (tsButLast' ++ rest)
     (j :< _) -> do
       let ts' = map (applySubst sub) ts
-      j :< TreeNode ts
+      j :< TreeNode ts'
 
 -- 関数fをリストの第1要素に対して作用させ、最初にJustが得られたときの要素と第2要素のペアを返す。
 -- Justが得られなかったときにはNothingを返す。
