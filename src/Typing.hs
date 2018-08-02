@@ -167,8 +167,9 @@ unify ((WeakTypeConst s1, WeakTypeConst s2):cs)
   | s1 == s2 = unify cs
 unify ((WeakTypeForall (i, tdom1) tcod1, WeakTypeForall (j, tdom2) tcod2):cs) =
   unify $ (tdom1, tdom2) : (tcod1, tcod2) : cs
-unify ((WeakTypeNode xts tcod1, WeakTypeNode yts tcod2):cs) =
-  unify $ (tcod1, tcod2) : (zip (map snd xts) (map snd yts)) ++ cs
+unify ((WeakTypeNode xts tcod1, WeakTypeNode yts tcod2):cs)
+  | length xts == length yts =
+    unify $ (tcod1, tcod2) : (zip (map snd xts) (map snd yts)) ++ cs
 unify ((WeakTypeUp t1, WeakTypeUp t2):cs) = unify $ (t1, t2) : cs
 unify ((WeakTypeDown t1, WeakTypeDown t2):cs) = unify $ (t1, t2) : cs
 unify ((WeakTypeUniv i, WeakTypeUniv j):cs) = do
