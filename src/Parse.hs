@@ -1,5 +1,6 @@
 module Parse
   ( parseType
+  , parseValueType
   , parseTerm
   ) where
 
@@ -120,6 +121,9 @@ parseType (meta :< TreeNode [_ :< TreeAtom "up", tp]) = do
   p <- parseType tp
   return $ WeakTypeUp p
 parseType t = lift $ throwE $ "parseType: syntax error:\n" ++ Pr.ppShow t
+
+parseValueType :: Tree -> WithEnv ValueType
+parseValueType = undefined
 
 definedConst :: String -> WithEnv (Maybe (String, ValueType))
 definedConst s = do

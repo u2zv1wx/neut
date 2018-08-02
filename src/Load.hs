@@ -7,6 +7,8 @@ import           Control.Monad.Identity
 import           Control.Monad.State
 import           Control.Monad.Trans.Except
 
+import           Control.Comonad.Cofree
+
 import           Alpha
 import           Data
 import           Macro
@@ -23,18 +25,18 @@ load s = do
   astList <- strToTree s
   load' astList
 
-load' :: [MTree] -> WithEnv ()
+load' :: [Tree] -> WithEnv ()
 load' [] = return ()
-load' ((Node [(Atom "notation", _), from, to], _):as) = do
+load' ((_ :< TreeNode [_ :< TreeAtom "notation", from, to]):as) = do
   modify (\e -> e {notationEnv = (from, to) : notationEnv e})
   load' as
-load' ((Node [(Atom "reserve", _), (Atom s, _)], _):as) = do
+load' ((_ :< TreeNode [_ :< TreeAtom "reserve", _ :< TreeAtom s]):as) = do
   modify (\e -> e {reservedEnv = s : reservedEnv e})
   load' as
-load' ((Node [(Atom "value", _), (Atom s, _), tp], _):as) = do
-  p <- parseType tp
+load' ((_ :< TreeNode [_ :< TreeAtom "value", _ :< TreeAtom s, tp]):as) = do
+  p <- parseValueType tp
   modify (\e -> e {valueEnv = (s, p) : valueEnv e})
-  insTEnv s p
+  insTEnv s (weakenValueType p)
   load' as
 load' (a:as) = do
   a' <- macroExpand a
@@ -48,10 +50,10 @@ load' (a:as) = do
       -- liftIO $ putStrLn $ Pr.ppShow e''
      -> do
       case e'' of
-        Value v -> do
+        TermValue v -> do
           v' <- virtualV v
           liftIO $ putStrLn $ Pr.ppShow v'
-        Comp c -> do
+        TermComp c -> do
           c' <- virtualC c
           liftIO $ putStrLn $ Pr.ppShow c'
       load' as

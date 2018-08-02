@@ -105,19 +105,28 @@ weakenCompType (CompTypeForall (i, t1) t2) = do
   WeakTypeForall (i, t1') t2'
 weakenCompType (CompTypeUp v) = WeakTypeUp (weakenValueType v)
 
+data PatF a
+  = PatVar Identifier
+  | PatConst Identifier
+  | PatApp a
+           a
+  deriving (Show, Eq)
+
+$(deriveShow1 ''PatF)
+
+deriving instance Functor PatF
+
+type Pat = Cofree PatF Meta
+
 -- value / positive term
 -- v ::= x
 --     | {defined constant} <- such as nat, succ, etc.
 --     | (v v)
 --     | (thunk e)
---     | (ascribe v P)
 data ValueF c v
   = ValueVar Identifier
   | ValueConst Identifier
   | ValueThunk c
-  | ValueAsc v
-             ValueType
-  deriving (Eq)
 
 -- computation / negative term
 -- e ::= (lambda (x P) e)
@@ -127,24 +136,20 @@ data ValueF c v
 --     | (unthunk v)
 --     | (mu (x P) e)
 --     | (case e (v1 e1) ... (vn en))
---     | (ascribe e N)
 data CompF v c
-  = CompLam (Identifier, ValueType)
+  = CompLam Identifier
             c
   | CompApp c
             v
   | CompRet v
-  | CompBind (Identifier, ValueType)
+  | CompBind Identifier
              c
              c
   | CompUnthunk v
-  | CompMu (Identifier, ValueType)
+  | CompMu Identifier
            c
   | CompCase v
-             [(v, c)]
-  | CompAsc c
-            CompType
-  deriving (Eq)
+             [(Pat, c)]
 
 $(deriveShow1 ''ValueF)
 
@@ -166,19 +171,6 @@ data Term
   = TermValue Value
   | TermComp Comp
   deriving (Show)
-
-data PatF a
-  = PatVar Identifier
-  | PatConst Identifier
-  | PatApp a
-           a
-  deriving (Show, Eq)
-
-$(deriveShow1 ''PatF)
-
-deriving instance Functor PatF
-
-type Pat = Cofree PatF Meta
 
 data WeakTermF a
   = WeakTermVar Identifier
