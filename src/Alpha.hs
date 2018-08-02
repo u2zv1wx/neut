@@ -3,45 +3,47 @@ module Alpha where
 import           Control.Monad.State
 import           Control.Monad.Trans.Except
 
+import           Control.Comonad.Cofree
+
 import           Data
 
-alpha :: MTerm -> WithEnv MTerm
-alpha (Var s, i) = do
-  t <- Var <$> alphaString s
-  return (t, i)
-alpha (Const s, i) = return (Const s, i)
-alpha (Lam (s, t) e, i) = do
+alpha :: WeakTerm -> WithEnv WeakTerm
+alpha (i :< WeakTermVar s) = do
+  t <- WeakTermVar <$> alphaString s
+  return (i :< t)
+alpha (i :< WeakTermConst s) = return (i :< WeakTermConst s)
+alpha (i :< WeakTermLam (s, t) e) = do
   t' <- alphaType t
   local $ do
     s' <- newNameWith s
     e' <- alpha e
-    return (Lam (s', t') e', i)
-alpha (App e v, i) = do
+    return (i :< WeakTermLam (s', t') e')
+alpha (i :< WeakTermApp e v) = do
   e' <- alpha e
   v' <- alpha v
-  return (App e' v', i)
-alpha (Ret v, i) = do
+  return (i :< WeakTermApp e' v')
+alpha (i :< WeakTermRet v) = do
   v' <- alpha v
-  return (Ret v', i)
-alpha (Bind (s, t) e1 e2, i) = do
+  return (i :< WeakTermRet v')
+alpha (i :< WeakTermBind (s, t) e1 e2) = do
   e1' <- alpha e1
   s' <- newNameWith s
   t' <- alphaType t
   e2' <- alpha e2
-  return (Bind (s', t') e1' e2', i)
-alpha (Thunk e, i) = do
+  return (i :< WeakTermBind (s', t') e1' e2')
+alpha (i :< WeakTermThunk e) = do
   e' <- alpha e
-  return (Thunk e', i)
-alpha (Unthunk v, i) = do
+  return (i :< WeakTermThunk e')
+alpha (i :< WeakTermUnthunk v) = do
   v' <- alpha v
-  return (Unthunk v', i)
-alpha (Mu (s, t) e, i) = do
+  return (i :< WeakTermUnthunk v')
+alpha (i :< WeakTermMu (s, t) e) = do
   t' <- alphaType t
   local $ do
     s' <- newNameWith s
     e' <- alpha e
-    return (Mu (s', t') e', i)
-alpha (Case e ves, i) = do
+    return (i :< WeakTermMu (s', t') e')
+alpha (i :< WeakTermCase e ves) = do
   e' <- alpha e
   ves' <-
     forM ves $ \(pat, body) ->
@@ -55,25 +57,25 @@ alpha (Case e ves, i) = do
               (env {nameEnv = nameEnv env' ++ nameEnv env, count = count env'})
             body' <- alpha body
             return (pat', body')
-  return (Case e' ves', i)
-alpha (Asc e t, i) = do
+  return (i :< WeakTermCase e' ves')
+alpha (i :< WeakTermAsc e t) = do
   e' <- alpha e
   t' <- alphaType t
-  return (Asc e' t', i)
+  return (i :< WeakTermAsc e' t')
 
-alphaType :: Type -> WithEnv Type
-alphaType (TVar s) = TVar <$> alphaString s
-alphaType (THole i) = return (THole i)
-alphaType (TConst s) = return (TConst s)
-alphaType (TUp t) = TUp <$> alphaType t
-alphaType (TDown t) = TDown <$> alphaType t
-alphaType (TUniv level) = return (TUniv level)
-alphaType (TForall (s, tdom) tcod) = do
+alphaType :: WeakType -> WithEnv WeakType
+alphaType (WeakTypeVar s) = WeakTypeVar <$> alphaString s
+alphaType (WeakTypeHole i) = return (WeakTypeHole i)
+alphaType (WeakTypeConst s) = return (WeakTypeConst s)
+alphaType (WeakTypeUp t) = WeakTypeUp <$> alphaType t
+alphaType (WeakTypeDown t) = WeakTypeDown <$> alphaType t
+alphaType (WeakTypeUniv level) = return (WeakTypeUniv level)
+alphaType (WeakTypeForall (s, tdom) tcod) = do
   tdom' <- alphaType tdom
   local $ do
     s' <- newNameWith s
     tcod' <- alphaType tcod
-    return (TForall (s', tdom') tcod')
+    return (WeakTypeForall (s', tdom') tcod')
 
 alphaString :: String -> WithEnv String
 alphaString s = do
@@ -82,36 +84,16 @@ alphaString s = do
     Just s' -> return s'
     Nothing -> lift $ throwE $ "undefined variable: " ++ show s
 
-alphaPat :: MTerm -> WithEnv MTerm
-alphaPat (Var s, i) = do
-  t <- Var <$> alphaPatString s
-  return (t, i)
-alphaPat (Const s, i) = return (Const s, i)
-alphaPat _ = lift $ throwE "Alpha.alphaPat"
+alphaPat :: Pat -> WithEnv Pat
+alphaPat (i :< PatVar s) = do
+  t <- PatVar <$> alphaPatString s
+  return (i :< t)
+alphaPat (i :< PatConst s) = return (i :< PatConst s)
+alphaPat (i :< PatApp e v) = do
+  e' <- alphaPat e
+  v' <- alphaPat v
+  return (i :< PatApp e' v')
 
-foo :: WithMeta Term -> WithEnv MTerm
-foo tmp = do
-  let tmp' = extract tmp
-  case tmp' of
-    Var s   -> undefined
-    Const s -> undefined
-    _       -> lift $ throwE "Alpha.alphaPat"
-
-bar :: WithMeta Term -> WithEnv (WithMeta Term)
-bar x =
-  case extract x of
-    Var s -> do
-      t <- Var <$> alphaString s
-      return $ Store t (pos x)
-    Const s -> return $ Const s
-    App e v -> do
-      e' <- alpha e
-      v' <- alpha v
-      return $ App e' v'
-  -- t <- Var <$> barString s
-  -- return (t, i)
-
--- bar (Const s, i) = return (Const s, i)
 alphaPatString :: String -> WithEnv String
 alphaPatString s = do
   env <- get
