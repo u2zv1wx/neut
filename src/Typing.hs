@@ -171,7 +171,8 @@ unify ((WeakTypeNode xts tcod1, WeakTypeNode yts tcod2):cs)
   | length xts == length yts =
     unify $ (tcod1, tcod2) : (zip (map snd xts) (map snd yts)) ++ cs
 unify ((WeakTypeUp t1, WeakTypeUp t2):cs) = unify $ (t1, t2) : cs
-unify ((WeakTypeDown t1 site1, WeakTypeDown t2 site2):cs) =
+unify ((WeakTypeDown t1 site1, WeakTypeDown t2 site2):cs) = do
+  addCallSiteInfo site1 site2
   unify $ (t1, t2) : cs
 unify ((WeakTypeUniv i, WeakTypeUniv j):cs) = do
   insLEnv i j
@@ -180,6 +181,11 @@ unify ((t1, t2):cs) =
   lift $
   throwE $
   "unification failed for:\n" ++ Pr.ppShow t1 ++ "\nand:\n" ++ Pr.ppShow t2
+
+addCallSiteInfo :: CallSite -> CallSite -> WithEnv ()
+addCallSiteInfo (Just s1) (Just s2) =
+  modify (\e -> e {siteEnv = (s1, s2) : siteEnv e})
+addCallSiteInfo _ _ = return ()
 
 compose :: Subst -> Subst -> Subst
 compose s1 s2 = do

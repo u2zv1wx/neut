@@ -210,6 +210,7 @@ data Env = Env
   , typeEnv       :: [(Identifier, WeakType)] -- used in type inference
   , constraintEnv :: [(WeakType, WeakType)] -- used in type inference
   , levelEnv      :: [(WeakLevel, WeakLevel)] -- constraint regarding the level of universes
+  , siteEnv       :: [(Identifier, Identifier)]
   } deriving (Show)
 
 initialEnv :: Env
@@ -236,6 +237,7 @@ initialEnv =
     , typeEnv = []
     , constraintEnv = []
     , levelEnv = []
+    , siteEnv = []
     }
 
 type WithEnv a = StateT Env (ExceptT String IO) a

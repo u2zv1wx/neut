@@ -45,6 +45,7 @@ load' (a:as) = do
   a' <- macroExpand a
   liftIO $ putStrLn $ Pr.ppShow a'
   e <- parseTerm a'
+  liftIO $ putStrLn $ Pr.ppShow e
   e' <- rename e
   check e'
   case polarize e' of
