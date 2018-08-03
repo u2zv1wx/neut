@@ -18,9 +18,8 @@ virtualV (ValueNodeApp s vs) = do
   vs' <- mapM virtualV vs
   return $ DataCell s vs'
 virtualV (ValueThunk c) = do
-  let fvs = varN c
   asm <- virtualC c
-  return $ DataThunk asm fvs
+  return $ DataThunk asm
 
 virtualC :: Comp -> WithEnv Code
 virtualC (CompLam i e) = do
@@ -46,9 +45,9 @@ virtualC (CompBind s c1 c2) = do
 virtualC (CompUnthunk v) = do
   operand <- virtualV v
   case operand of
-    DataPointer s  -> return $ CodeJump s []
-    DataThunk op _ -> return op
-    _              -> lift $ throwE "virtualC.CUnthunk"
+    DataPointer s -> return $ CodeJump s []
+    DataThunk op  -> return op
+    _             -> lift $ throwE "virtualC.CUnthunk"
 virtualC (CompMu s c) = undefined
 virtualC (CompCase c vcs) = undefined
 
@@ -70,30 +69,3 @@ traceLet s c1 c2 =
 getArgs :: Comp -> [String]
 getArgs (CompLam s e) = s : getArgs e
 getArgs _             = []
-
-varP :: Value -> [String]
-varP (ValueVar s)        = [s]
-varP (ValueConst _)      = []
-varP (ValueNodeApp s vs) = join $ map varP vs
-varP (ValueThunk e)      = varN e
-
-varN :: Comp -> [String]
-varN (CompLam s e) = filter (/= s) $ varN e
-varN (CompApp e v) = varN e ++ varP v
-varN (CompRet v) = varP v
-varN (CompBind s e1 e2) = varN e1 ++ filter (/= s) (varN e2)
-varN (CompUnthunk v) = varP v
-varN (CompMu s e) = filter (/= s) (varN e)
-varN (CompCase e ves) = do
-  let efs = varP e
-  vefss <-
-    forM ves $ \(pat, body) -> do
-      bound <- varPat pat
-      fs <- varN body
-      return $ filter (`notElem` bound) fs
-  efs ++ vefss
-
-varPat :: Pat -> [String]
-varPat (_ :< PatVar s)    = [s]
-varPat (_ :< PatConst _)  = []
-varPat (_ :< PatApp _ ps) = join $ map varPat ps

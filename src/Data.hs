@@ -291,8 +291,7 @@ data Data
   = DataPointer Identifier -- var is something that points already-allocated data
   | DataCell Identifier -- value of defined data types
              [Data]
-  | DataThunk Code -- thunk code <list of free var>. "code as data", literally.
-              [Identifier]
+  | DataThunk Code -- "code as data"
   deriving (Show, Eq)
 
 data Code
