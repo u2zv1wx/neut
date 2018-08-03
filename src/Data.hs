@@ -50,6 +50,8 @@ recurM f (meta :< TreeNode tis) = do
   tis' <- mapM (recurM f) tis
   f (meta :< TreeNode tis')
 
+type CallSite = Maybe Identifier
+
 -- weaktype
 -- WT ::= P | N
 data WeakType
@@ -60,6 +62,7 @@ data WeakType
                  WeakType
   | WeakTypeUp WeakType
   | WeakTypeDown WeakType
+                 CallSite
   | WeakTypeUniv WeakLevel
   | WeakTypeForall (Identifier, WeakType)
                    WeakType
@@ -103,7 +106,7 @@ weakenValueType (ValueTypeNode xts t2) = do
   let ts' = map weakenValueType ts
   let t2' = weakenValueType t2
   WeakTypeNode (zip xs ts') t2'
-weakenValueType (ValueTypeDown c) = WeakTypeDown (weakenCompType c)
+weakenValueType (ValueTypeDown c) = WeakTypeDown (weakenCompType c) Nothing
 weakenValueType (ValueTypeUniv l) = WeakTypeUniv (WeakLevelFixed l)
 
 weakenCompType :: CompType -> WeakType

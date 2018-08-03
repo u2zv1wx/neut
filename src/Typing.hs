@@ -85,20 +85,20 @@ infer (Meta {ident = i} :< WeakTermBind (s, t) e1 e2) = do
   return t2
 infer (Meta {ident = i} :< WeakTermThunk e) = do
   t <- infer e
-  let result = WeakTypeDown t
+  let result = WeakTypeDown t (Just i)
   insTEnv i result
   return result
 infer (Meta {ident = l} :< WeakTermUnthunk v) = do
   t <- infer v
   i <- newName
-  insCEnv t (WeakTypeDown (WeakTypeHole i))
+  insCEnv t (WeakTypeDown (WeakTypeHole i) (Just l))
   let result = WeakTypeHole i
   insTEnv l result
   return result
 infer (Meta {ident = i} :< WeakTermMu (s, t) e) = do
   insTEnv s t
   te <- infer e
-  insCEnv (WeakTypeDown te) t
+  insCEnv (WeakTypeDown te (Just i)) t
   insTEnv i te
   return te
 infer (Meta {ident = i} :< WeakTermCase e ves) = do
@@ -171,7 +171,8 @@ unify ((WeakTypeNode xts tcod1, WeakTypeNode yts tcod2):cs)
   | length xts == length yts =
     unify $ (tcod1, tcod2) : (zip (map snd xts) (map snd yts)) ++ cs
 unify ((WeakTypeUp t1, WeakTypeUp t2):cs) = unify $ (t1, t2) : cs
-unify ((WeakTypeDown t1, WeakTypeDown t2):cs) = unify $ (t1, t2) : cs
+unify ((WeakTypeDown t1 site1, WeakTypeDown t2 site2):cs) =
+  unify $ (t1, t2) : cs
 unify ((WeakTypeUniv i, WeakTypeUniv j):cs) = do
   insLEnv i j
   unify cs
@@ -198,9 +199,9 @@ sType sub (WeakTypeConst s) = WeakTypeConst s
 sType sub (WeakTypeUp t) = do
   let t' = sType sub t
   WeakTypeUp t'
-sType sub (WeakTypeDown t) = do
+sType sub (WeakTypeDown t s) = do
   let t' = sType sub t
-  WeakTypeDown t'
+  WeakTypeDown t' s
 sType _ (WeakTypeUniv i) = WeakTypeUniv i
 sType sub (WeakTypeForall (s, tdom) tcod) = do
   let tdom' = sType sub tdom
@@ -218,9 +219,9 @@ sTypeName sub (WeakTypeConst s) = WeakTypeConst s
 sTypeName sub (WeakTypeUp t) = do
   let t' = sTypeName sub t
   WeakTypeUp t'
-sTypeName sub (WeakTypeDown t) = do
+sTypeName sub (WeakTypeDown t s) = do
   let t' = sTypeName sub t
-  WeakTypeDown t'
+  WeakTypeDown t' s
 sTypeName _ (WeakTypeUniv i) = WeakTypeUniv i
 sTypeName sub (WeakTypeForall (s, tdom) tcod) = do
   let tdom' = sTypeName sub tdom
