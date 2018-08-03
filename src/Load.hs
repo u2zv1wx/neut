@@ -50,9 +50,7 @@ load' (a:as) = do
   check e'
   case polarize e' of
     Left err -> lift $ throwE err
-    Right e''
-      -- liftIO $ putStrLn $ Pr.ppShow e''
-     -> do
+    Right e'' -> do
       case e'' of
         TermValue v -> do
           liftIO $ putStrLn $ Pr.ppShow v
