@@ -128,7 +128,7 @@ type Pat = Cofree PatF Meta
 
 -- value / positive term
 -- v ::= x
---     | {defined constant} <- such as nat, succ, etc.
+--     | {defined constant} <- nat, succ, etc.
 --     | (v v)
 --     | (thunk e)
 data Value
