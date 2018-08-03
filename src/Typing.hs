@@ -85,20 +85,20 @@ infer (Meta {ident = i} :< WeakTermBind (s, t) e1 e2) = do
   return t2
 infer (Meta {ident = i} :< WeakTermThunk e) = do
   t <- infer e
-  let result = WeakTypeDown t (Just i)
+  let result = WeakTypeDown t
   insTEnv i result
   return result
 infer (Meta {ident = l} :< WeakTermUnthunk v) = do
   t <- infer v
   i <- newName
-  insCEnv t (WeakTypeDown (WeakTypeHole i) (Just l))
+  insCEnv t (WeakTypeDown (WeakTypeHole i))
   let result = WeakTypeHole i
   insTEnv l result
   return result
 infer (Meta {ident = i} :< WeakTermMu (s, t) e) = do
   insTEnv s t
   te <- infer e
-  insCEnv (WeakTypeDown te (Just i)) t
+  insCEnv (WeakTypeDown te) t
   insTEnv i te
   return te
 infer (Meta {ident = i} :< WeakTermCase e ves) = do
@@ -171,8 +171,7 @@ unify ((WeakTypeNode xts tcod1, WeakTypeNode yts tcod2):cs)
   | length xts == length yts =
     unify $ (tcod1, tcod2) : (zip (map snd xts) (map snd yts)) ++ cs
 unify ((WeakTypeUp t1, WeakTypeUp t2):cs) = unify $ (t1, t2) : cs
-unify ((WeakTypeDown t1 site1, WeakTypeDown t2 site2):cs) = do
-  addCallSiteInfo site1 site2
+unify ((WeakTypeDown t1, WeakTypeDown t2):cs) = do
   unify $ (t1, t2) : cs
 unify ((WeakTypeUniv i, WeakTypeUniv j):cs) = do
   insLEnv i j
@@ -181,11 +180,6 @@ unify ((t1, t2):cs) =
   lift $
   throwE $
   "unification failed for:\n" ++ Pr.ppShow t1 ++ "\nand:\n" ++ Pr.ppShow t2
-
-addCallSiteInfo :: CallSite -> CallSite -> WithEnv ()
-addCallSiteInfo (Just s1) (Just s2) =
-  modify (\e -> e {siteEnv = (s1, s2) : siteEnv e})
-addCallSiteInfo _ _ = return ()
 
 compose :: Subst -> Subst -> Subst
 compose s1 s2 = do
@@ -205,9 +199,9 @@ sType sub (WeakTypeConst s) = WeakTypeConst s
 sType sub (WeakTypeUp t) = do
   let t' = sType sub t
   WeakTypeUp t'
-sType sub (WeakTypeDown t s) = do
+sType sub (WeakTypeDown t) = do
   let t' = sType sub t
-  WeakTypeDown t' s
+  WeakTypeDown t'
 sType _ (WeakTypeUniv i) = WeakTypeUniv i
 sType sub (WeakTypeForall (s, tdom) tcod) = do
   let tdom' = sType sub tdom
@@ -225,9 +219,9 @@ sTypeName sub (WeakTypeConst s) = WeakTypeConst s
 sTypeName sub (WeakTypeUp t) = do
   let t' = sTypeName sub t
   WeakTypeUp t'
-sTypeName sub (WeakTypeDown t s) = do
+sTypeName sub (WeakTypeDown t) = do
   let t' = sTypeName sub t
-  WeakTypeDown t' s
+  WeakTypeDown t'
 sTypeName _ (WeakTypeUniv i) = WeakTypeUniv i
 sTypeName sub (WeakTypeForall (s, tdom) tcod) = do
   let tdom' = sTypeName sub tdom

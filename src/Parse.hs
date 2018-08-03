@@ -132,7 +132,7 @@ parseType (meta :< TreeAtom s) = do
     Just (s, _) -> return $ WeakTypeConst s
 parseType (meta :< TreeNode [_ :< TreeAtom "down", tn]) = do
   n <- parseType tn
-  return $ WeakTypeDown n Nothing
+  return $ WeakTypeDown n
 parseType (meta :< TreeNode [_ :< TreeAtom "universe", _ :< TreeAtom si]) =
   case readMaybe si of
     Nothing -> lift $ throwE $ "not a number: " ++ si
