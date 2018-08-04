@@ -14,6 +14,10 @@ import           Control.Monad.State
 import           Control.Monad.Trans.Except
 import           Text.Show.Deriving
 
+import           System.IO.Unsafe
+
+import           Data.IORef
+
 import qualified Text.Show.Pretty           as Pr
 
 type Identifier = String
@@ -217,6 +221,9 @@ deriving instance Functor WeakTermF
 
 type WeakTerm = Cofree WeakTermF Meta
 
+instance (Show a) => Show (IORef a) where
+  show a = show (unsafePerformIO (readIORef a))
+
 data Env = Env
   { count         :: Int -- to generate fresh symbols
   , valueEnv      :: [(Identifier, ValueType)] -- values and its types
@@ -229,7 +236,7 @@ data Env = Env
   , levelEnv      :: [(WeakLevel, WeakLevel)] -- constraint regarding the level of universes
   , argEnv        :: [(IdentOrHole, IdentOrHole)] -- equivalence of arguments of forall
   , thunkEnv      :: [(Identifier, Identifier)]
-  , codeEnv       :: [(Identifier, Code)] -- quoted codes
+  , codeEnv       :: [(Identifier, IORef Code)] -- quoted codes (should be ioref?)
   } deriving (Show)
 
 initialEnv :: Env
@@ -311,6 +318,9 @@ lookupThunkEnv s = do
           _ -> []
   return $ concatMap selector $ thunkEnv env
 
+lookupCodeEnv :: Identifier -> WithEnv (Maybe (IORef Code))
+lookupCodeEnv s = gets (lookup s . codeEnv)
+
 insWTEnv :: String -> WeakType -> WithEnv ()
 insWTEnv s t = modify (\e -> e {weakTypeEnv = (s, t) : weakTypeEnv e})
 
@@ -326,7 +336,7 @@ insAEnv x y = modify (\e -> e {argEnv = (x, y) : argEnv e})
 insThunkEnv :: Identifier -> Identifier -> WithEnv ()
 insThunkEnv i j = modify (\e -> e {thunkEnv = (i, j) : thunkEnv e})
 
-insCodeEnv :: Identifier -> Code -> WithEnv ()
+insCodeEnv :: Identifier -> IORef Code -> WithEnv ()
 insCodeEnv i code = modify (\e -> e {codeEnv = (i, code) : codeEnv e})
 
 local :: WithEnv a -> WithEnv a
@@ -348,9 +358,6 @@ data Code
   | CodeLet Identifier -- bind (we also use this to represent application)
             Data
             Code
-  | CodeCall Identifier
-             Identifier
-             Code
   | CodeJump Identifier -- unthunk
-  | CodeIndirectJump Identifier -- unthunk to a variable
+             Identifier -- this second argument is required to lookup the corresponding code
   deriving (Show, Eq)

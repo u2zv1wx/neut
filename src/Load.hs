@@ -9,6 +9,8 @@ import           Control.Monad.Trans.Except
 
 import           Control.Comonad.Cofree
 
+import           Data.IORef
+
 import           Data
 import           Infer
 import           Macro
@@ -69,5 +71,6 @@ load' (a:as) = do
           c' <- virtualC c
           liftIO $ putStrLn $ Pr.ppShow c'
           i <- newNameWith "main"
-          insCodeEnv i c'
+          cref <- liftIO $ newIORef c'
+          insCodeEnv i cref
       load' as
