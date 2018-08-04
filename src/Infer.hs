@@ -46,7 +46,7 @@ infer (Meta {ident = i} :< WeakTermConst s) = do
 infer (Meta {ident = i} :< WeakTermLam (s, t) e) = do
   insTEnv s t
   te <- infer e
-  let result = WeakTypeForall (s, t) te
+  let result = WeakTypeForall (Just s, t) te
   insTEnv i result
   return result
 infer (_ :< WeakTermNodeApp s vs) = do
@@ -65,9 +65,9 @@ infer (Meta {ident = l} :< WeakTermApp e v) = do
   tv <- infer v
   i <- newName
   insTEnv i (WeakTypeHole i)
-  j <- newName
-  insTEnv j tv
-  insCEnv te (WeakTypeForall (j, tv) (WeakTypeHole i))
+  -- j <- newName
+  -- insTEnv j tv
+  insCEnv te (WeakTypeForall (Nothing, tv) (WeakTypeHole i))
   let result = WeakTypeHole i
   insTEnv l result
   return result

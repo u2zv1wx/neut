@@ -61,7 +61,7 @@ data WeakType
   | WeakTypeUp WeakType
   | WeakTypeDown WeakType
   | WeakTypeUniv WeakLevel
-  | WeakTypeForall (Identifier, WeakType)
+  | WeakTypeForall (Maybe Identifier, WeakType)
                    WeakType
   deriving (Show, Eq)
 
@@ -110,7 +110,7 @@ weakenCompType :: CompType -> WeakType
 weakenCompType (CompTypeForall (i, t1) t2) = do
   let t1' = weakenValueType t1
   let t2' = weakenCompType t2
-  WeakTypeForall (i, t1') t2'
+  WeakTypeForall (Just i, t1') t2'
 weakenCompType (CompTypeUp v) = WeakTypeUp (weakenValueType v)
 
 data PatF a

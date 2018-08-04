@@ -25,15 +25,13 @@ parseTerm (meta :< TreeAtom "_") = do
 parseTerm (meta :< TreeAtom s) = do
   msym <- definedConst s
   case msym of
-    Nothing -> do
-      s' <- strToName s
-      return (meta :< WeakTermVar s')
+    Nothing     -> return (meta :< WeakTermVar s)
     Just (s, _) -> return (meta :< WeakTermConst s)
 parseTerm (meta :< TreeNode [_ :< TreeAtom "thunk", te]) = do
   e <- parseTerm te
   return (meta :< WeakTermThunk e)
 parseTerm (meta :< TreeNode [_ :< TreeAtom "lambda", _ :< TreeNode [_ :< TreeAtom s, tp], te]) = do
-  s' <- strToName s
+  s' <- strOrNewName s
   p <- parseType tp
   e <- parseTerm te
   return (meta :< WeakTermLam (s', p) e)
@@ -41,7 +39,7 @@ parseTerm (meta :< TreeNode [_ :< TreeAtom "return", tv]) = do
   v <- parseTerm tv
   return (meta :< WeakTermRet v)
 parseTerm (meta :< TreeNode [_ :< TreeAtom "bind", _ :< TreeNode [_ :< TreeAtom s, tp], te1, te2]) = do
-  s' <- strToName s
+  s' <- strOrNewName s
   p <- parseType tp
   e1 <- parseTerm te1
   e2 <- parseTerm te2
@@ -50,7 +48,7 @@ parseTerm (meta :< TreeNode [_ :< TreeAtom "unthunk", tv]) = do
   v <- parseTerm tv
   return (meta :< WeakTermUnthunk v)
 parseTerm (meta :< TreeNode [_ :< TreeAtom "mu", _ :< TreeNode [_ :< TreeAtom s, tp], te]) = do
-  s' <- strToName s
+  s' <- strOrNewName s
   p <- parseType tp
   e <- parseTerm te
   return (meta :< WeakTermMu (s', p) e)
@@ -100,14 +98,17 @@ parsePat (meta :< TreeAtom s) = do
   msym <- definedConst s
   case msym of
     Nothing -> do
-      s' <- strToName s
+      s' <- strOrNewName s
       return (meta :< PatVar s')
     Just (s, _) -> return (meta :< PatConst s)
 parsePat (meta :< TreeNode ((_ :< TreeAtom s):ts)) = do
-  s' <- strToName s
-  -- te' <- parsePat te
-  ts' <- mapM parsePat ts
-  return $ meta :< PatApp s' ts'
+  msym <- definedConst s
+  case msym of
+    Nothing ->
+      lift $ throwE $ "parsePat: the constant " ++ show s ++ " is not defined"
+    Just _ -> do
+      ts' <- mapM parsePat ts
+      return $ meta :< PatApp s ts'
 parsePat t = lift $ throwE $ "parsePat: syntax error:\n" ++ Pr.ppShow t
 
 parseClause :: Tree -> WithEnv (Pat, WeakTerm)
@@ -127,8 +128,7 @@ parseType (meta :< TreeAtom s) = do
   msym <- definedConst s
   case msym of
     Nothing -> do
-      s' <- strToName s
-      return $ WeakTypeVar s'
+      return $ WeakTypeVar s
     Just (s, _) -> return $ WeakTypeConst s
 parseType (meta :< TreeNode [_ :< TreeAtom "down", tn]) = do
   n <- parseType tn
@@ -142,7 +142,7 @@ parseType (meta :< TreeNode [_ :< TreeAtom "forall", _ :< TreeNode ts, tn]) = do
   n <- parseType tn
   return $ foldr WeakTypeForall n its
 parseType (meta :< TreeNode [_ :< TreeAtom "node", _ :< TreeNode ts, tn]) = do
-  its <- mapM parseTypeArg ts
+  its <- mapM parseNodeTypeArg ts
   tcod <- parseType tn
   return $ WeakTypeNode its tcod
 parseType (meta :< TreeNode [_ :< TreeAtom "up", tp]) = do
@@ -150,12 +150,19 @@ parseType (meta :< TreeNode [_ :< TreeAtom "up", tp]) = do
   return $ WeakTypeUp p
 parseType t = lift $ throwE $ "parseType: syntax error:\n" ++ Pr.ppShow t
 
-parseTypeArg :: Tree -> WithEnv (Identifier, WeakType)
+parseTypeArg :: Tree -> WithEnv (Maybe Identifier, WeakType)
 parseTypeArg (_ :< TreeNode [_ :< TreeAtom s, tp]) = do
-  s' <- strToName s
+  t <- parseType tp
+  return (strToName s, t)
+parseTypeArg t = lift $ throwE $ "parseTypeArg: syntax error:\n" ++ Pr.ppShow t
+
+parseNodeTypeArg :: Tree -> WithEnv (Identifier, WeakType)
+parseNodeTypeArg (_ :< TreeNode [_ :< TreeAtom s, tp]) = do
+  s' <- strOrNewName s
   t <- parseType tp
   return (s', t)
-parseTypeArg t = lift $ throwE $ "parseTypeArg: syntax error:\n" ++ Pr.ppShow t
+parseNodeTypeArg t =
+  lift $ throwE $ "parseTypeArg: syntax error:\n" ++ Pr.ppShow t
 
 definedConst :: String -> WithEnv (Maybe (String, ValueType))
 definedConst s = do
@@ -163,6 +170,10 @@ definedConst s = do
   let vEnv = valueEnv env
   return $ find (\(x, _) -> x == s) vEnv
 
-strToName :: String -> WithEnv String
-strToName "_" = newNameWith "hole"
+strToName :: String -> Maybe String
+strToName "_" = Nothing
 strToName s   = return s
+
+strOrNewName :: String -> WithEnv String
+strOrNewName "_" = newName
+strOrNewName s   = return s
