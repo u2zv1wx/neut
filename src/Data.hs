@@ -226,6 +226,7 @@ data Env = Env
   , constraintEnv :: [(WeakType, WeakType)] -- used in type inference
   , levelEnv      :: [(WeakLevel, WeakLevel)] -- constraint regarding the level of universes
   , argEnv        :: [(IdentOrHole, IdentOrHole)] -- equivalence of arguments of forall
+  , codeEnv       :: [(Identifier, Code)] -- quoted codes
   } deriving (Show)
 
 initialEnv :: Env
@@ -254,6 +255,7 @@ initialEnv =
     , constraintEnv = []
     , levelEnv = []
     , argEnv = []
+    , codeEnv = []
     }
 
 type WithEnv a = StateT Env (ExceptT String IO) a
@@ -305,6 +307,9 @@ insLEnv l1 l2 = modify (\e -> e {levelEnv = (l1, l2) : levelEnv e})
 insAEnv :: IdentOrHole -> IdentOrHole -> WithEnv ()
 insAEnv x y = modify (\e -> e {argEnv = (x, y) : argEnv e})
 
+insCodeEnv :: Identifier -> Code -> WithEnv ()
+insCodeEnv i code = modify (\e -> e {codeEnv = (i, code) : codeEnv e})
+
 local :: WithEnv a -> WithEnv a
 local p = do
   env <- get
@@ -316,13 +321,17 @@ data Data
   = DataPointer Identifier -- var is something that points already-allocated data
   | DataCell Identifier -- value of defined data types
              [Data]
-  | DataThunk Code -- "code as data"
+  | DataLabel Identifier -- the address of quoted code.
   deriving (Show, Eq)
 
 data Code
   = CodeAllocate Data -- return
   | CodeLet Identifier -- bind (we also use this to represent application)
+            Data
             Code
-            Code
+  | CodeCall Identifier
+             Identifier
+             Code
   | CodeJump Identifier -- unthunk
+  | CodeIndirectJump Identifier -- unthunk to a variable
   deriving (Show, Eq)

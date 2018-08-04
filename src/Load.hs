@@ -63,8 +63,11 @@ load' (a:as) = do
           liftIO $ putStrLn $ Pr.ppShow v
           v' <- virtualV v
           liftIO $ putStrLn $ Pr.ppShow v'
+          liftIO $ putStrLn "the type of main term must be negative"
         TermComp c -> do
           liftIO $ putStrLn $ Pr.ppShow c
           c' <- virtualC c
           liftIO $ putStrLn $ Pr.ppShow c'
+          i <- newNameWith "main"
+          insCodeEnv i c'
       load' as
