@@ -299,6 +299,18 @@ lookupTEnv s = gets (lookup s . typeEnv)
 lookupVEnv :: String -> WithEnv (Maybe ValueType)
 lookupVEnv s = gets (lookup s . valueEnv)
 
+lookupThunkEnv :: Identifier -> WithEnv [Identifier]
+lookupThunkEnv s = do
+  env <- get
+  let selector pair =
+        case pair of
+          (x, y)
+            | x == s -> [y]
+          (x, y)
+            | y == s -> [x]
+          _ -> []
+  return $ concatMap selector $ thunkEnv env
+
 insWTEnv :: String -> WeakType -> WithEnv ()
 insWTEnv s t = modify (\e -> e {weakTypeEnv = (s, t) : weakTypeEnv e})
 

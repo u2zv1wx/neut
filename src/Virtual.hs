@@ -17,8 +17,9 @@ virtualV (Value (i :< ValueConst s)) = return $ DataCell s []
 virtualV (Value (i :< ValueNodeApp s vs)) = do
   vs' <- mapM (virtualV . Value) vs
   return $ DataCell s vs'
-virtualV (Value (i :< ValueThunk c)) = do
+virtualV (Value (Meta {ident = i} :< ValueThunk c)) = do
   asm <- virtualC c
+  mt <- lookupThunkEnv i
   i <- newNameWith "code"
   insCodeEnv i asm
   return $ DataLabel i
