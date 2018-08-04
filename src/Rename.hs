@@ -71,9 +71,9 @@ renameType (WeakTypeVar s) = WeakTypeVar <$> renameString s
 renameType (WeakTypeHole i) = return (WeakTypeHole i)
 renameType (WeakTypeConst s) = return (WeakTypeConst s)
 renameType (WeakTypeUp t) = WeakTypeUp <$> renameType t
-renameType (WeakTypeDown t) = do
+renameType (WeakTypeDown t i) = do
   t' <- renameType t
-  return $ WeakTypeDown t'
+  return $ WeakTypeDown t' i
 renameType (WeakTypeUniv level) = return (WeakTypeUniv level)
 renameType (WeakTypeForall (Ident s, tdom) tcod) = do
   tdom' <- renameType tdom

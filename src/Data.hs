@@ -65,6 +65,7 @@ data WeakType
                  WeakType
   | WeakTypeUp WeakType
   | WeakTypeDown WeakType
+                 Identifier
   | WeakTypeUniv WeakLevel
   | WeakTypeForall (IdentOrHole, WeakType)
                    WeakType
@@ -83,6 +84,7 @@ data ValueType
   | ValueTypeNode [(Identifier, ValueType)]
                   ValueType
   | ValueTypeDown CompType
+                  Identifier
   | ValueTypeUniv Level
   deriving (Show, Eq)
 
@@ -108,7 +110,7 @@ weakenValueType (ValueTypeNode xts t2) = do
   let ts' = map weakenValueType ts
   let t2' = weakenValueType t2
   WeakTypeNode (zip xs ts') t2'
-weakenValueType (ValueTypeDown c) = WeakTypeDown (weakenCompType c)
+weakenValueType (ValueTypeDown c i) = WeakTypeDown (weakenCompType c) i
 weakenValueType (ValueTypeUniv l) = WeakTypeUniv (WeakLevelFixed l)
 
 weakenCompType :: CompType -> WeakType
@@ -226,6 +228,7 @@ data Env = Env
   , constraintEnv :: [(WeakType, WeakType)] -- used in type inference
   , levelEnv      :: [(WeakLevel, WeakLevel)] -- constraint regarding the level of universes
   , argEnv        :: [(IdentOrHole, IdentOrHole)] -- equivalence of arguments of forall
+  , thunkEnv      :: [(Identifier, Identifier)]
   , codeEnv       :: [(Identifier, Code)] -- quoted codes
   } deriving (Show)
 
@@ -254,6 +257,7 @@ initialEnv =
     , typeEnv = []
     , constraintEnv = []
     , levelEnv = []
+    , thunkEnv = []
     , argEnv = []
     , codeEnv = []
     }
@@ -306,6 +310,9 @@ insLEnv l1 l2 = modify (\e -> e {levelEnv = (l1, l2) : levelEnv e})
 
 insAEnv :: IdentOrHole -> IdentOrHole -> WithEnv ()
 insAEnv x y = modify (\e -> e {argEnv = (x, y) : argEnv e})
+
+insThunkEnv :: Identifier -> Identifier -> WithEnv ()
+insThunkEnv i j = modify (\e -> e {thunkEnv = (i, j) : thunkEnv e})
 
 insCodeEnv :: Identifier -> Code -> WithEnv ()
 insCodeEnv i code = modify (\e -> e {codeEnv = (i, code) : codeEnv e})

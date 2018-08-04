@@ -88,20 +88,20 @@ infer (Meta {ident = i} :< WeakTermBind (s, t) e1 e2) = do
   return t2
 infer (Meta {ident = i} :< WeakTermThunk e) = do
   t <- infer e
-  let result = WeakTypeDown t
+  let result = WeakTypeDown t i
   insWTEnv i result
   return result
 infer (Meta {ident = l} :< WeakTermUnthunk v) = do
   t <- infer v
   i <- newName
-  insCEnv t (WeakTypeDown (WeakTypeHole i))
+  insCEnv t (WeakTypeDown (WeakTypeHole i) l)
   let result = WeakTypeHole i
   insWTEnv l result
   return result
 infer (Meta {ident = i} :< WeakTermMu (s, t) e) = do
   insWTEnv s t
   te <- infer e
-  insCEnv (WeakTypeDown te) t
+  insCEnv (WeakTypeDown te i) t
   insWTEnv i te
   return te
 infer (Meta {ident = i} :< WeakTermCase e ves) = do
@@ -174,8 +174,10 @@ unify ((WeakTypeForall (i, tdom1) tcod1, WeakTypeForall (j, tdom2) tcod2):cs) = 
 unify ((WeakTypeNode xts tcod1, WeakTypeNode yts tcod2):cs)
   | length xts == length yts =
     unify $ (tcod1, tcod2) : (zip (map snd xts) (map snd yts)) ++ cs
-unify ((WeakTypeUp t1, WeakTypeUp t2):cs) = unify $ (t1, t2) : cs
-unify ((WeakTypeDown t1, WeakTypeDown t2):cs) = do
+unify ((WeakTypeUp t1, WeakTypeUp t2):cs) = do
+  unify $ (t1, t2) : cs
+unify ((WeakTypeDown t1 i, WeakTypeDown t2 j):cs) = do
+  insThunkEnv i j
   unify $ (t1, t2) : cs
 unify ((WeakTypeUniv i, WeakTypeUniv j):cs) = do
   insLEnv i j
@@ -203,9 +205,9 @@ sType sub (WeakTypeConst s) = WeakTypeConst s
 sType sub (WeakTypeUp t) = do
   let t' = sType sub t
   WeakTypeUp t'
-sType sub (WeakTypeDown t) = do
+sType sub (WeakTypeDown t i) = do
   let t' = sType sub t
-  WeakTypeDown t'
+  WeakTypeDown t' i
 sType _ (WeakTypeUniv i) = WeakTypeUniv i
 sType sub (WeakTypeForall (s, tdom) tcod) = do
   let tdom' = sType sub tdom
@@ -271,9 +273,9 @@ applyArgSubst sub (WeakTypeNode xts tcod) = do
 applyArgSubst sub (WeakTypeUp t) = do
   let t' = applyArgSubst sub t
   WeakTypeUp t'
-applyArgSubst sub (WeakTypeDown t) = do
+applyArgSubst sub (WeakTypeDown t i) = do
   let t' = applyArgSubst sub t
-  WeakTypeDown t'
+  WeakTypeDown t' i
 applyArgSubst _ (WeakTypeUniv i) = WeakTypeUniv i
 applyArgSubst sub (WeakTypeForall (s, tdom) tcod) = do
   let tdom' = applyArgSubst sub tdom

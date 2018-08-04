@@ -96,10 +96,10 @@ polarizeType (WeakTypeUp t) = do
   case mt' of
     TypeValueType t' -> return $ TypeCompType (CompTypeUp t')
     _ -> lift $ throwE $ "the polarity of " ++ show t ++ " is wrong"
-polarizeType (WeakTypeDown t) = do
+polarizeType (WeakTypeDown t i) = do
   mt' <- polarizeType t
   case mt' of
-    TypeCompType t' -> return $ TypeValueType (ValueTypeDown t')
+    TypeCompType t' -> return $ TypeValueType (ValueTypeDown t' i)
     _ -> lift $ throwE $ "the polarity of " ++ show t ++ " is wrong"
 polarizeType (WeakTypeUniv (WeakLevelFixed i)) =
   return $ TypeValueType (ValueTypeUniv i)
