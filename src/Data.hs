@@ -136,12 +136,12 @@ type Pat = Cofree PatF Meta
 --     | {defined constant} <- nat, succ, etc.
 --     | (v v)
 --     | (thunk e)
-data Value
+data ValueF c v
   = ValueVar Identifier
   | ValueConst Identifier
   | ValueNodeApp Identifier
-                 [Value]
-  | ValueThunk Comp
+                 [v]
+  | ValueThunk c
   deriving (Show)
 
 -- computation / negative term
@@ -152,20 +152,32 @@ data Value
 --     | (unthunk v)
 --     | (mu (x P) e)
 --     | (case e (v1 e1) ... (vn en))
-data Comp
+data CompF v c
   = CompLam Identifier
-            Comp
-  | CompApp Comp
-            Value
-  | CompRet Value
+            c
+  | CompApp c
+            v
+  | CompRet v
   | CompBind Identifier
-             Comp
-             Comp
-  | CompUnthunk Value
+             c
+             c
+  | CompUnthunk v
   | CompMu Identifier
-           Comp
-  | CompCase Value
-             [(Pat, Comp)]
+           c
+  | CompCase v
+             [(Pat, c)]
+  deriving (Show)
+
+$(deriveShow1 ''ValueF)
+
+$(deriveShow1 ''CompF)
+
+newtype Value =
+  Value (Cofree (ValueF Comp) Meta)
+  deriving (Show)
+
+newtype Comp =
+  Comp (Cofree (CompF Value) Meta)
   deriving (Show)
 
 data Term
