@@ -10,12 +10,12 @@ import           Control.Monad.Trans.Except
 import           Control.Comonad.Cofree
 
 import           Data
+import           Infer
 import           Macro
 import           Parse
 import           Polarize
 import           Read
 import           Rename
-import           Typing
 import           Virtual
 
 import qualified Text.Show.Pretty           as Pr

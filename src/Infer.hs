@@ -1,4 +1,4 @@
-module Typing
+module Infer
   ( check
   , unify
   ) where
