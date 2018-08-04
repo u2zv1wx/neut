@@ -100,7 +100,7 @@ polarizeType (WeakTypeUniv (WeakLevelFixed i)) =
   return $ TypeValueType (ValueTypeUniv i)
 polarizeType (WeakTypeUniv (WeakLevelHole _)) =
   return $ TypeValueType (ValueTypeUniv 0) -- for now
-polarizeType (WeakTypeForall (Just s, t1) t2) = do
+polarizeType (WeakTypeForall (Ident s, t1) t2) = do
   mt1' <- polarizeType t1
   mt2' <- polarizeType t2
   case (mt1', mt2') of
@@ -108,6 +108,12 @@ polarizeType (WeakTypeForall (Just s, t1) t2) = do
       return $ TypeCompType (CompTypeForall (s, t1') t2')
     _ ->
       Left $ "the polarity of " ++ show t1 ++ " or " ++ show t2 ++ " is wrong"
-polarizeType t@(WeakTypeForall (Nothing, t1) t2) =
-  Left $ "the hole of the type " ++ show t ++ " is not resolved"
+polarizeType t@(WeakTypeForall (Hole i, t1) t2) = do
+  mt1' <- polarizeType t1
+  mt2' <- polarizeType t2
+  case (mt1', mt2') of
+    (TypeValueType t1', TypeCompType t2') ->
+      return $ TypeCompType (CompTypeForall (i, t1') t2')
+    _ ->
+      Left $ "the polarity of " ++ show t1 ++ " or " ++ show t2 ++ " is wrong"
 polarizeType t = Left $ "the polarity of " ++ show t ++ " is wrong"

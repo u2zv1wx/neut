@@ -75,17 +75,18 @@ renameType (WeakTypeDown t) = do
   t' <- renameType t
   return $ WeakTypeDown t'
 renameType (WeakTypeUniv level) = return (WeakTypeUniv level)
-renameType (WeakTypeForall (Just s, tdom) tcod) = do
+renameType (WeakTypeForall (Ident s, tdom) tcod) = do
   tdom' <- renameType tdom
   local $ do
     s' <- newNameWith s
     tcod' <- renameType tcod
-    return (WeakTypeForall (Just s', tdom') tcod')
-renameType (WeakTypeForall (Nothing, tdom) tcod) = do
+    return (WeakTypeForall (Ident s', tdom') tcod')
+renameType (WeakTypeForall (Hole s, tdom) tcod) = do
   tdom' <- renameType tdom
   local $ do
+    s' <- newNameWith s
     tcod' <- renameType tcod
-    return (WeakTypeForall (Nothing, tdom') tcod')
+    return (WeakTypeForall (Hole s', tdom') tcod')
 renameType (WeakTypeNode [(x, t)] tcod) = do
   t' <- renameType t
   local $ do

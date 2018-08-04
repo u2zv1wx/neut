@@ -20,7 +20,10 @@ check e = do
   sub <- unify $ constraintEnv env
   liftIO $ putStrLn $ Pr.ppShow sub
   env' <- get
-  let tenv' = map (\(s, t) -> (s, sType sub t)) $ typeEnv env
+  let aenv = argEnv env'
+  argSubst <- unifyArg aenv
+  let tenv' =
+        map (\(s, t) -> (s, applyArgSubst argSubst $ sType sub t)) $ typeEnv env
   modify (\e -> e {typeEnv = tenv', constraintEnv = []})
 
 infer :: WeakTerm -> WithEnv WeakType
@@ -46,7 +49,7 @@ infer (Meta {ident = i} :< WeakTermConst s) = do
 infer (Meta {ident = i} :< WeakTermLam (s, t) e) = do
   insTEnv s t
   te <- infer e
-  let result = WeakTypeForall (Just s, t) te
+  let result = WeakTypeForall (Ident s, t) te
   insTEnv i result
   return result
 infer (_ :< WeakTermNodeApp s vs) = do
@@ -65,9 +68,8 @@ infer (Meta {ident = l} :< WeakTermApp e v) = do
   tv <- infer v
   i <- newName
   insTEnv i (WeakTypeHole i)
-  -- j <- newName
-  -- insTEnv j tv
-  insCEnv te (WeakTypeForall (Nothing, tv) (WeakTypeHole i))
+  j <- newName
+  insCEnv te (WeakTypeForall (Hole j, tv) (WeakTypeHole i))
   let result = WeakTypeHole i
   insTEnv l result
   return result
@@ -165,7 +167,8 @@ unify ((WeakTypeVar s1, WeakTypeVar s2):cs)
   | s1 == s2 = unify cs
 unify ((WeakTypeConst s1, WeakTypeConst s2):cs)
   | s1 == s2 = unify cs
-unify ((WeakTypeForall (i, tdom1) tcod1, WeakTypeForall (j, tdom2) tcod2):cs) =
+unify ((WeakTypeForall (i, tdom1) tcod1, WeakTypeForall (j, tdom2) tcod2):cs) = do
+  insAEnv i j
   unify $ (tdom1, tdom2) : (tcod1, tcod2) : cs
 unify ((WeakTypeNode xts tcod1, WeakTypeNode yts tcod2):cs)
   | length xts == length yts =
@@ -212,21 +215,66 @@ sType sub (WeakTypeNode xts tcod) = do
   let tcod' = sType sub tcod
   WeakTypeNode xts' tcod'
 
-sTypeName :: [(String, String)] -> WeakType -> WeakType
-sTypeName _ (WeakTypeVar s) = WeakTypeVar s
-sTypeName _ (WeakTypeHole s) = WeakTypeHole s
-sTypeName sub (WeakTypeConst s) = WeakTypeConst s
-sTypeName sub (WeakTypeUp t) = do
-  let t' = sTypeName sub t
-  WeakTypeUp t'
-sTypeName sub (WeakTypeDown t) = do
-  let t' = sTypeName sub t
-  WeakTypeDown t'
-sTypeName _ (WeakTypeUniv i) = WeakTypeUniv i
-sTypeName sub (WeakTypeForall (s, tdom) tcod) = do
-  let tdom' = sTypeName sub tdom
-  let tcod' = sTypeName sub tcod
-  WeakTypeForall (s, tdom') tcod'
-
 sConstraint :: Subst -> Constraint -> Constraint
 sConstraint s = map (\(t1, t2) -> (sType s t1, sType s t2))
+
+type ArgConstraint = [(IdentOrHole, IdentOrHole)]
+
+type ArgSubst = [(Identifier, IdentOrHole)]
+
+unifyArg :: ArgConstraint -> WithEnv ArgSubst
+unifyArg [] = return []
+unifyArg ((Hole s1, j):cs) = do
+  sub <- unifyArg (sArgConstraint [(s1, j)] cs)
+  return $ argCompose sub [(s1, j)]
+unifyArg ((i, Hole s2):cs) = do
+  sub <- unifyArg (sArgConstraint [(s2, i)] cs)
+  return $ argCompose sub [(s2, i)]
+unifyArg ((Ident s1, Ident s2):cs)
+  | s1 == s2 = unifyArg cs
+unifyArg ((x, y):_) =
+  lift $
+  throwE $
+  "arg-unification failed for:\n" ++ Pr.ppShow x ++ "\nand:\n" ++ Pr.ppShow y
+
+sArgConstraint :: ArgSubst -> ArgConstraint -> ArgConstraint
+sArgConstraint s = map (\(t1, t2) -> (sArg s t1, sArg s t2))
+
+sArg :: ArgSubst -> IdentOrHole -> IdentOrHole
+sArg cs (Ident s) =
+  case lookup s cs of
+    Nothing -> Ident s
+    Just s' -> s'
+sArg cs (Hole s) =
+  case lookup s cs of
+    Nothing -> Hole s
+    Just s' -> s'
+
+argCompose :: ArgSubst -> ArgSubst -> ArgSubst
+argCompose s1 s2 = do
+  let domS2 = map fst s2
+  let codS2 = map snd s2
+  let codS2' = map (sArg s1) codS2
+  let fromS1 = filter (\(ident, _) -> ident `notElem` domS2) s1
+  fromS1 ++ zip domS2 codS2'
+
+applyArgSubst :: ArgSubst -> WeakType -> WeakType
+applyArgSubst _ (WeakTypeVar s) = WeakTypeVar s
+applyArgSubst _ (WeakTypeHole s) = WeakTypeHole s
+applyArgSubst sub (WeakTypeConst s) = WeakTypeConst s
+applyArgSubst sub (WeakTypeNode xts tcod) = do
+  let (xs, ts) = unzip xts
+  let ts' = map (applyArgSubst sub) ts
+  let tcod' = applyArgSubst sub tcod
+  WeakTypeNode (zip xs ts') tcod'
+applyArgSubst sub (WeakTypeUp t) = do
+  let t' = applyArgSubst sub t
+  WeakTypeUp t'
+applyArgSubst sub (WeakTypeDown t) = do
+  let t' = applyArgSubst sub t
+  WeakTypeDown t'
+applyArgSubst _ (WeakTypeUniv i) = WeakTypeUniv i
+applyArgSubst sub (WeakTypeForall (s, tdom) tcod) = do
+  let tdom' = applyArgSubst sub tdom
+  let tcod' = applyArgSubst sub tcod
+  WeakTypeForall (sArg sub s, tdom') tcod'

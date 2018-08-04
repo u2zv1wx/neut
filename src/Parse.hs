@@ -150,10 +150,11 @@ parseType (meta :< TreeNode [_ :< TreeAtom "up", tp]) = do
   return $ WeakTypeUp p
 parseType t = lift $ throwE $ "parseType: syntax error:\n" ++ Pr.ppShow t
 
-parseTypeArg :: Tree -> WithEnv (Maybe Identifier, WeakType)
+parseTypeArg :: Tree -> WithEnv (IdentOrHole, WeakType)
 parseTypeArg (_ :< TreeNode [_ :< TreeAtom s, tp]) = do
+  s' <- strToName s
   t <- parseType tp
-  return (strToName s, t)
+  return (s', t)
 parseTypeArg t = lift $ throwE $ "parseTypeArg: syntax error:\n" ++ Pr.ppShow t
 
 parseNodeTypeArg :: Tree -> WithEnv (Identifier, WeakType)
@@ -170,9 +171,11 @@ definedConst s = do
   let vEnv = valueEnv env
   return $ find (\(x, _) -> x == s) vEnv
 
-strToName :: String -> Maybe String
-strToName "_" = Nothing
-strToName s   = return s
+strToName :: String -> WithEnv IdentOrHole
+strToName "_" = do
+  s <- newNameWith "hole"
+  return $ Hole s
+strToName s = return $ Ident s
 
 strOrNewName :: String -> WithEnv String
 strOrNewName "_" = newName

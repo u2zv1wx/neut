@@ -50,6 +50,11 @@ recurM f (meta :< TreeNode tis) = do
   tis' <- mapM (recurM f) tis
   f (meta :< TreeNode tis')
 
+data IdentOrHole
+  = Ident Identifier
+  | Hole Identifier
+  deriving (Show, Eq)
+
 -- weaktype
 -- WT ::= P | N
 data WeakType
@@ -61,7 +66,7 @@ data WeakType
   | WeakTypeUp WeakType
   | WeakTypeDown WeakType
   | WeakTypeUniv WeakLevel
-  | WeakTypeForall (Maybe Identifier, WeakType)
+  | WeakTypeForall (IdentOrHole, WeakType)
                    WeakType
   deriving (Show, Eq)
 
@@ -110,7 +115,7 @@ weakenCompType :: CompType -> WeakType
 weakenCompType (CompTypeForall (i, t1) t2) = do
   let t1' = weakenValueType t1
   let t2' = weakenCompType t2
-  WeakTypeForall (Just i, t1') t2'
+  WeakTypeForall (Ident i, t1') t2'
 weakenCompType (CompTypeUp v) = WeakTypeUp (weakenValueType v)
 
 data PatF a
@@ -207,6 +212,7 @@ data Env = Env
   , typeEnv       :: [(Identifier, WeakType)] -- used in type inference
   , constraintEnv :: [(WeakType, WeakType)] -- used in type inference
   , levelEnv      :: [(WeakLevel, WeakLevel)] -- constraint regarding the level of universes
+  , argEnv        :: [(IdentOrHole, IdentOrHole)] -- equivalence of arguments of forall
   } deriving (Show)
 
 initialEnv :: Env
@@ -233,6 +239,7 @@ initialEnv =
     , typeEnv = []
     , constraintEnv = []
     , levelEnv = []
+    , argEnv = []
     }
 
 type WithEnv a = StateT Env (ExceptT String IO) a
@@ -277,6 +284,9 @@ insCEnv t1 t2 = modify (\e -> e {constraintEnv = (t1, t2) : constraintEnv e})
 
 insLEnv :: WeakLevel -> WeakLevel -> WithEnv ()
 insLEnv l1 l2 = modify (\e -> e {levelEnv = (l1, l2) : levelEnv e})
+
+insAEnv :: IdentOrHole -> IdentOrHole -> WithEnv ()
+insAEnv x y = modify (\e -> e {argEnv = (x, y) : argEnv e})
 
 local :: WithEnv a -> WithEnv a
 local p = do
