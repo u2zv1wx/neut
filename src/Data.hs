@@ -221,7 +221,7 @@ data Env = Env
   , notationEnv   :: [(Tree, Tree)] -- macro transformers
   , reservedEnv   :: [Identifier] -- list of reserved keywords
   , nameEnv       :: [(Identifier, Identifier)] -- used in alpha conversion
-  , typeEnv       :: [(Identifier, WeakType)] -- used in type inference
+  , weakTypeEnv   :: [(Identifier, WeakType)] -- used in type inference
   , polTypeEnv    :: [(Identifier, Type)] -- polarized type environment
   , constraintEnv :: [(WeakType, WeakType)] -- used in type inference
   , levelEnv      :: [(WeakLevel, WeakLevel)] -- constraint regarding the level of universes
@@ -249,7 +249,7 @@ initialEnv =
         , "up"
         ]
     , nameEnv = []
-    , typeEnv = []
+    , weakTypeEnv = []
     , polTypeEnv = []
     , constraintEnv = []
     , levelEnv = []
@@ -284,8 +284,8 @@ newNameWith s = do
   modify (\e -> e {nameEnv = (s, s') : nameEnv e})
   return s'
 
-lookupTEnv :: String -> WithEnv (Maybe WeakType)
-lookupTEnv s = gets (lookup s . typeEnv)
+lookupWTEnv :: String -> WithEnv (Maybe WeakType)
+lookupWTEnv s = gets (lookup s . weakTypeEnv)
 
 lookupPTEnv :: String -> WithEnv (Maybe Type)
 lookupPTEnv s = gets (lookup s . polTypeEnv)
@@ -293,8 +293,8 @@ lookupPTEnv s = gets (lookup s . polTypeEnv)
 lookupVEnv :: String -> WithEnv (Maybe ValueType)
 lookupVEnv s = gets (lookup s . valueEnv)
 
-insTEnv :: String -> WeakType -> WithEnv ()
-insTEnv s t = modify (\e -> e {typeEnv = (s, t) : typeEnv e})
+insWTEnv :: String -> WeakType -> WithEnv ()
+insWTEnv s t = modify (\e -> e {weakTypeEnv = (s, t) : weakTypeEnv e})
 
 insCEnv :: WeakType -> WeakType -> WithEnv ()
 insCEnv t1 t2 = modify (\e -> e {constraintEnv = (t1, t2) : constraintEnv e})

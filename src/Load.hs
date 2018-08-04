@@ -39,7 +39,7 @@ load' ((_ :< TreeNode [_ :< TreeAtom "value", _ :< TreeAtom s, tp]):as) = do
   case t of
     TypeValueType t -> do
       modify (\e -> e {valueEnv = (s, t) : valueEnv e})
-      insTEnv s (weakenValueType t)
+      insWTEnv s (weakenValueType t)
       load' as
     _ ->
       lift $
@@ -52,7 +52,7 @@ load' (a:as) = do
   e' <- rename e
   check e'
   env <- get
-  let wtenv = typeEnv env
+  let wtenv = weakTypeEnv env
   wtenv' <- polarizeTypeEnv wtenv
   modify (\e -> e {polTypeEnv = wtenv'})
   case polarize e' of

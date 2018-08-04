@@ -23,34 +23,35 @@ check e = do
   let aenv = argEnv env'
   argSubst <- unifyArg aenv
   let tenv' =
-        map (\(s, t) -> (s, applyArgSubst argSubst $ sType sub t)) $ typeEnv env
-  modify (\e -> e {typeEnv = tenv', constraintEnv = []})
+        map (\(s, t) -> (s, applyArgSubst argSubst $ sType sub t)) $
+        weakTypeEnv env
+  modify (\e -> e {weakTypeEnv = tenv', constraintEnv = []})
 
 infer :: WeakTerm -> WithEnv WeakType
 infer (Meta {ident = i} :< WeakTermVar s) = do
-  mt <- lookupTEnv s
+  mt <- lookupWTEnv s
   case mt of
     Just t -> do
-      insTEnv i t
+      insWTEnv i t
       return t
     Nothing -> do
       new <- WeakTypeHole <$> newName
-      insTEnv s new
-      insTEnv i new
+      insWTEnv s new
+      insWTEnv i new
       return new
 infer (Meta {ident = i} :< WeakTermConst s) = do
   mt <- lookupVEnv s
   case mt of
     Just t -> do
       let t' = weakenValueType t
-      insTEnv i t'
+      insWTEnv i t'
       return t'
     Nothing -> lift $ throwE $ "const " ++ s ++ " is not defined"
 infer (Meta {ident = i} :< WeakTermLam (s, t) e) = do
-  insTEnv s t
+  insWTEnv s t
   te <- infer e
   let result = WeakTypeForall (Ident s, t) te
-  insTEnv i result
+  insWTEnv i result
   return result
 infer (_ :< WeakTermNodeApp s vs) = do
   mt <- lookupVEnv s
@@ -67,41 +68,41 @@ infer (Meta {ident = l} :< WeakTermApp e v) = do
   te <- infer e
   tv <- infer v
   i <- newName
-  insTEnv i (WeakTypeHole i)
+  insWTEnv i (WeakTypeHole i)
   j <- newName
   insCEnv te (WeakTypeForall (Hole j, tv) (WeakTypeHole i))
   let result = WeakTypeHole i
-  insTEnv l result
+  insWTEnv l result
   return result
 infer (Meta {ident = i} :< WeakTermRet v) = do
   tv <- infer v
   let result = WeakTypeUp tv
-  insTEnv i result
+  insWTEnv i result
   return result
 infer (Meta {ident = i} :< WeakTermBind (s, t) e1 e2) = do
-  insTEnv s t
+  insWTEnv s t
   t1 <- infer e1
   t2 <- infer e2
   insCEnv (WeakTypeUp t) t1
-  insTEnv i t2
+  insWTEnv i t2
   return t2
 infer (Meta {ident = i} :< WeakTermThunk e) = do
   t <- infer e
   let result = WeakTypeDown t
-  insTEnv i result
+  insWTEnv i result
   return result
 infer (Meta {ident = l} :< WeakTermUnthunk v) = do
   t <- infer v
   i <- newName
   insCEnv t (WeakTypeDown (WeakTypeHole i))
   let result = WeakTypeHole i
-  insTEnv l result
+  insWTEnv l result
   return result
 infer (Meta {ident = i} :< WeakTermMu (s, t) e) = do
-  insTEnv s t
+  insWTEnv s t
   te <- infer e
   insCEnv (WeakTypeDown te) t
-  insTEnv i te
+  insWTEnv i te
   return te
 infer (Meta {ident = i} :< WeakTermCase e ves) = do
   t <- infer e
@@ -111,32 +112,32 @@ infer (Meta {ident = i} :< WeakTermCase e ves) = do
   ans <- WeakTypeHole <$> newName
   tes <- mapM infer es
   forM_ tes $ \te -> insCEnv ans te
-  insTEnv i ans
+  insWTEnv i ans
   return ans
 infer (Meta {ident = i} :< WeakTermAsc e t) = do
   te <- infer e
   insCEnv t te
-  insTEnv i te
+  insWTEnv i te
   return te
 
 inferPat :: Pat -> WithEnv WeakType
 inferPat (Meta {ident = i} :< PatVar s) = do
-  mt <- lookupTEnv s
+  mt <- lookupWTEnv s
   case mt of
     Just t -> do
-      insTEnv i t
+      insWTEnv i t
       return t
     Nothing -> do
       new <- WeakTypeHole <$> newName
-      insTEnv s new
-      insTEnv i new
+      insWTEnv s new
+      insWTEnv i new
       return new
 inferPat (Meta {ident = i} :< PatConst s) = do
   mt <- lookupVEnv s
   case mt of
     Just t -> do
       let t' = weakenValueType t
-      insTEnv i t'
+      insWTEnv i t'
       return t'
     Nothing -> lift $ throwE $ "const " ++ s ++ " is not defined"
 inferPat (Meta {ident = l} :< PatApp s vs) = do
