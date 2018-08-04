@@ -35,12 +35,15 @@ load' ((_ :< TreeNode [_ :< TreeAtom "reserve", _ :< TreeAtom s]):as) = do
   load' as
 load' ((_ :< TreeNode [_ :< TreeAtom "value", _ :< TreeAtom s, tp]):as) = do
   mt <- parseType tp
-  case polarizeType mt of
-    Right (TypeValueType t) -> do
+  t <- polarizeType mt
+  case t of
+    TypeValueType t -> do
       modify (\e -> e {valueEnv = (s, t) : valueEnv e})
       insTEnv s (weakenValueType t)
       load' as
-    Left err -> lift $ throwE err
+    _ ->
+      lift $
+      throwE $ "the polarity of value type " ++ show s ++ " must be positive"
 load' (a:as) = do
   a' <- macroExpand a
   liftIO $ putStrLn $ Pr.ppShow a'
@@ -48,6 +51,10 @@ load' (a:as) = do
   liftIO $ putStrLn $ Pr.ppShow e
   e' <- rename e
   check e'
+  env <- get
+  let wtenv = typeEnv env
+  wtenv' <- polarizeTypeEnv wtenv
+  modify (\e -> e {polTypeEnv = wtenv'})
   case polarize e' of
     Left err -> lift $ throwE err
     Right e'' -> do

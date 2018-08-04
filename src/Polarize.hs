@@ -4,6 +4,9 @@ import           Control.Monad
 
 import           Control.Comonad.Cofree
 
+import           Control.Monad.State
+import           Control.Monad.Trans.Except
+
 import           Data
 
 polarize :: WeakTerm -> Either String Term
@@ -72,7 +75,7 @@ polarize (i :< WeakTermCase e ves) = do
     TermValue v -> return $ TermComp $ Comp $ i :< CompCase v ves'
 polarize (i :< WeakTermAsc e t) = polarize e
 
-polarizeType :: WeakType -> Either String Type
+polarizeType :: WeakType -> WithEnv Type
 polarizeType (WeakTypeVar i) = return $ TypeValueType (ValueTypeVar i)
 polarizeType (WeakTypeConst c) = return $ TypeValueType (ValueTypeConst c)
 polarizeType (WeakTypeNode xts t2) = do
@@ -80,24 +83,24 @@ polarizeType (WeakTypeNode xts t2) = do
   let sanitizer v =
         case v of
           TypeValueType v -> return v
-          _ -> Left $ "the polarity of " ++ show v ++ " is wrong"
+          _ -> lift $ throwE $ "the polarity of " ++ show v ++ " is wrong"
   ts' <- mapM polarizeType ts
   ts'' <- mapM sanitizer ts'
   mt2' <- polarizeType t2
   case mt2' of
     TypeValueType t2' ->
       return $ TypeValueType (ValueTypeNode (zip xs ts'') t2')
-    _ -> Left $ "the polarity of " ++ show t2 ++ " is wrong"
+    _ -> lift $ throwE $ "the polarity of " ++ show t2 ++ " is wrong"
 polarizeType (WeakTypeUp t) = do
   mt' <- polarizeType t
   case mt' of
     TypeValueType t' -> return $ TypeCompType (CompTypeUp t')
-    _                -> Left $ "the polarity of " ++ show t ++ " is wrong"
+    _ -> lift $ throwE $ "the polarity of " ++ show t ++ " is wrong"
 polarizeType (WeakTypeDown t) = do
   mt' <- polarizeType t
   case mt' of
     TypeCompType t' -> return $ TypeValueType (ValueTypeDown t')
-    _               -> Left $ "the polarity of " ++ show t ++ " is wrong"
+    _ -> lift $ throwE $ "the polarity of " ++ show t ++ " is wrong"
 polarizeType (WeakTypeUniv (WeakLevelFixed i)) =
   return $ TypeValueType (ValueTypeUniv i)
 polarizeType (WeakTypeUniv (WeakLevelHole _)) =
@@ -109,13 +112,24 @@ polarizeType (WeakTypeForall (Ident s, t1) t2) = do
     (TypeValueType t1', TypeCompType t2') ->
       return $ TypeCompType (CompTypeForall (s, t1') t2')
     _ ->
-      Left $ "the polarity of " ++ show t1 ++ " or " ++ show t2 ++ " is wrong"
-polarizeType t@(WeakTypeForall (Hole i, t1) t2) = do
+      lift $
+      throwE $ "the polarity of " ++ show t1 ++ " or " ++ show t2 ++ " is wrong"
+polarizeType t@(WeakTypeForall (Hole i, t1) t2)
+  -- call-by-any-argument
+ = do
   mt1' <- polarizeType t1
   mt2' <- polarizeType t2
   case (mt1', mt2') of
     (TypeValueType t1', TypeCompType t2') ->
       return $ TypeCompType (CompTypeForall (i, t1') t2')
     _ ->
-      Left $ "the polarity of " ++ show t1 ++ " or " ++ show t2 ++ " is wrong"
-polarizeType t = Left $ "the polarity of " ++ show t ++ " is wrong"
+      lift $
+      throwE $ "the polarity of " ++ show t1 ++ " or " ++ show t2 ++ " is wrong"
+polarizeType t = lift $ throwE $ "the polarity of " ++ show t ++ " is wrong"
+
+polarizeTypeEnv :: [(Identifier, WeakType)] -> WithEnv [(Identifier, Type)]
+polarizeTypeEnv [] = return []
+polarizeTypeEnv ((i, wt):ts) = do
+  wt' <- polarizeType wt
+  ts' <- polarizeTypeEnv ts
+  return $ (i, wt') : ts'

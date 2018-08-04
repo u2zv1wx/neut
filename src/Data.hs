@@ -222,6 +222,7 @@ data Env = Env
   , reservedEnv   :: [Identifier] -- list of reserved keywords
   , nameEnv       :: [(Identifier, Identifier)] -- used in alpha conversion
   , typeEnv       :: [(Identifier, WeakType)] -- used in type inference
+  , polTypeEnv    :: [(Identifier, Type)] -- polarized type environment
   , constraintEnv :: [(WeakType, WeakType)] -- used in type inference
   , levelEnv      :: [(WeakLevel, WeakLevel)] -- constraint regarding the level of universes
   , argEnv        :: [(IdentOrHole, IdentOrHole)] -- equivalence of arguments of forall
@@ -249,6 +250,7 @@ initialEnv =
         ]
     , nameEnv = []
     , typeEnv = []
+    , polTypeEnv = []
     , constraintEnv = []
     , levelEnv = []
     , argEnv = []
@@ -285,6 +287,9 @@ newNameWith s = do
 lookupTEnv :: String -> WithEnv (Maybe WeakType)
 lookupTEnv s = gets (lookup s . typeEnv)
 
+lookupPTEnv :: String -> WithEnv (Maybe Type)
+lookupPTEnv s = gets (lookup s . polTypeEnv)
+
 lookupVEnv :: String -> WithEnv (Maybe ValueType)
 lookupVEnv s = gets (lookup s . valueEnv)
 
@@ -316,11 +321,8 @@ data Data
 
 data Code
   = CodeAllocate Data -- return
-  | CodeFragment Identifier -- lambda (operation with free variable)
-                 Code
   | CodeLet Identifier -- bind (we also use this to represent application)
             Code
             Code
   | CodeJump Identifier -- unthunk
-             [Data] -- arguments
   deriving (Show, Eq)
