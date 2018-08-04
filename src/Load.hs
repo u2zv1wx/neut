@@ -53,8 +53,8 @@ load' (a:as) = do
   check e'
   env <- get
   let wtenv = weakTypeEnv env
-  wtenv' <- polarizeTypeEnv wtenv
-  modify (\e -> e {polTypeEnv = wtenv'})
+  tenv <- polarizeTypeEnv wtenv
+  modify (\e -> e {typeEnv = tenv})
   case polarize e' of
     Left err -> lift $ throwE err
     Right e'' -> do

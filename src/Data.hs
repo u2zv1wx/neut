@@ -222,7 +222,7 @@ data Env = Env
   , reservedEnv   :: [Identifier] -- list of reserved keywords
   , nameEnv       :: [(Identifier, Identifier)] -- used in alpha conversion
   , weakTypeEnv   :: [(Identifier, WeakType)] -- used in type inference
-  , polTypeEnv    :: [(Identifier, Type)] -- polarized type environment
+  , typeEnv       :: [(Identifier, Type)] -- polarized type environment
   , constraintEnv :: [(WeakType, WeakType)] -- used in type inference
   , levelEnv      :: [(WeakLevel, WeakLevel)] -- constraint regarding the level of universes
   , argEnv        :: [(IdentOrHole, IdentOrHole)] -- equivalence of arguments of forall
@@ -250,7 +250,7 @@ initialEnv =
         ]
     , nameEnv = []
     , weakTypeEnv = []
-    , polTypeEnv = []
+    , typeEnv = []
     , constraintEnv = []
     , levelEnv = []
     , argEnv = []
@@ -287,8 +287,8 @@ newNameWith s = do
 lookupWTEnv :: String -> WithEnv (Maybe WeakType)
 lookupWTEnv s = gets (lookup s . weakTypeEnv)
 
-lookupPTEnv :: String -> WithEnv (Maybe Type)
-lookupPTEnv s = gets (lookup s . polTypeEnv)
+lookupTEnv :: String -> WithEnv (Maybe Type)
+lookupTEnv s = gets (lookup s . typeEnv)
 
 lookupVEnv :: String -> WithEnv (Maybe ValueType)
 lookupVEnv s = gets (lookup s . valueEnv)

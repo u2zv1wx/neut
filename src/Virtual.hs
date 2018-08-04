@@ -24,7 +24,7 @@ virtualV (Value (i :< ValueThunk c)) = do
 virtualC :: Comp -> WithEnv Code
 virtualC (Comp (i :< CompLam _ e)) = virtualC (Comp e)
 virtualC (Comp (_ :< CompApp e@(Meta {ident = i} :< _) v)) = do
-  mt <- lookupPTEnv i
+  mt <- lookupTEnv i
   liftIO $ putStrLn "==========↓↓↓↓ CompApp ↓↓↓↓==========="
   liftIO $ putStrLn $ Pr.ppShow mt
   liftIO $ putStrLn "==========↑↑↑↑ CompApp ↑↑↑↑==========="
