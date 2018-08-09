@@ -62,6 +62,7 @@ load' (a:as) = do
   case e'' of
     TermValue v -> do
       liftIO $ putStrLn $ Pr.ppShow v
+      insEmptyFunEnv "main"
       setFunName "main"
       v' <- virtualV v
       liftIO $ putStrLn $ Pr.ppShow v'
@@ -70,6 +71,7 @@ load' (a:as) = do
       liftIO $ putStrLn $ Pr.ppShow c
       liftedC <- liftC c
       liftIO $ putStrLn $ Pr.ppShow liftedC
+      insEmptyFunEnv "main"
       setFunName "main"
       c' <- virtualC liftedC
       liftIO $ putStrLn $ Pr.ppShow c'

@@ -142,7 +142,7 @@ inferPat (Meta {ident = i} :< PatConst s) = do
       insWTEnv i t'
       return t'
     Nothing -> lift $ throwE $ "const " ++ s ++ " is not defined"
-inferPat (Meta {ident = l} :< PatApp s vs) = do
+inferPat (Meta {ident = _} :< PatApp s vs) = do
   mt <- lookupVEnv s
   case mt of
     Nothing -> undefined
@@ -184,7 +184,7 @@ unify ((WeakTypeDown t1 i, WeakTypeDown t2 j):cs) = do
 unify ((WeakTypeUniv i, WeakTypeUniv j):cs) = do
   insLEnv i j
   unify cs
-unify ((t1, t2):cs) =
+unify ((t1, t2):_) =
   lift $
   throwE $
   "unification failed for:\n" ++ Pr.ppShow t1 ++ "\nand:\n" ++ Pr.ppShow t2
@@ -203,7 +203,7 @@ sType sub (WeakTypeHole s) =
   case lookup s sub of
     Nothing -> WeakTypeHole s
     Just t  -> t
-sType sub (WeakTypeConst s) = WeakTypeConst s
+sType _ (WeakTypeConst s) = WeakTypeConst s
 sType sub (WeakTypeUp t) = do
   let t' = sType sub t
   WeakTypeUp t'
@@ -266,7 +266,7 @@ argCompose s1 s2 = do
 applyArgSubst :: ArgSubst -> WeakType -> WeakType
 applyArgSubst _ (WeakTypeVar s) = WeakTypeVar s
 applyArgSubst _ (WeakTypeHole s) = WeakTypeHole s
-applyArgSubst sub (WeakTypeConst s) = WeakTypeConst s
+applyArgSubst _ (WeakTypeConst s) = WeakTypeConst s
 applyArgSubst sub (WeakTypeNode xts tcod) = do
   let (xs, ts) = unzip xts
   let ts' = map (applyArgSubst sub) ts

@@ -19,14 +19,14 @@ type Pattern = Tree
 sanityCheck :: (Pattern, Pattern) -> Either String ()
 sanityCheck = undefined
 
--- "body+" のように、末尾が '+' で終わるようなシンボルを「1個以上の式の繰り返し」を
--- 表現するための記号として採用する。これはBNF記法からの類推である。
 isRest :: String -> Bool
 isRest s = last s == '+'
 
--- 予約語のリストと入力の木とパターンを受け取り、予約語の情報を使いながら木とパターンを
--- マッチさせていく。マッチに成功した時には、substitution, つまりシンボルと木への対応関係が返る。
-macroMatch :: [String] -> Tree -> Tree -> Maybe Subst
+macroMatch ::
+     [String] -- the list of reserved words
+  -> Tree -- input tree
+  -> Tree -- pattern
+  -> Maybe Subst -- {symbols in a pattern} -> {trees}
 macroMatch rs (i :< TreeAtom s1) (_ :< TreeAtom s2) =
   case (s1 `elem` rs, s2 `elem` rs) of
     (True, True)
@@ -37,8 +37,8 @@ macroMatch rs t (_ :< TreeAtom s) =
   if s `elem` rs
     then Nothing
     else return ([(s, t)], [])
-macroMatch rs (i :< TreeAtom s) (_ :< t) = Nothing
-macroMatch rs (i :< TreeNode ts1) (_ :< TreeNode ts2) =
+macroMatch _ (_ :< TreeAtom _) (_ :< _) = Nothing
+macroMatch rs (_ :< TreeNode ts1) (_ :< TreeNode ts2) =
   case last ts2 of
     (_ :< TreeAtom sym)
       | isRest sym && length ts1 >= length ts2 -> do
@@ -52,10 +52,9 @@ macroMatch rs (i :< TreeNode ts1) (_ :< TreeNode ts2) =
         return (join ss, join rests)
     _ -> Nothing
 
--- substitutionをtreeに対して作用させる。
 applySubst :: Subst -> Tree -> Tree
 applySubst (s1, _) (i :< TreeAtom s) = fromMaybe (i :< TreeAtom s) (lookup s s1)
-applySubst sub@(_, s2) (i :< TreeNode ts) =
+applySubst sub@(_, s2) (_ :< TreeNode ts) =
   case last ts of
     (j :< TreeAtom s)
       | isRest s && s `elem` map fst s2 -> do
@@ -67,10 +66,9 @@ applySubst sub@(_, s2) (i :< TreeNode ts) =
       let ts' = map (applySubst sub) ts
       j :< TreeNode ts'
 
--- 関数fをリストの第1要素に対して作用させ、最初にJustが得られたときの要素と第2要素のペアを返す。
--- Justが得られなかったときにはNothingを返す。
+-- returns the first "Just"
 try :: (a -> Maybe b) -> [(a, c)] -> Maybe (b, c)
-try f [] = Nothing
+try _ [] = Nothing
 try f ((p, q):as) =
   case f p of
     Nothing -> try f as
@@ -87,7 +85,5 @@ macroExpand1 t@(i :< _) = do
       macroExpand t'
     Nothing -> return t
 
--- これをtermについてinductiveにやる必要がある。
--- macroの展開が起こったか否かをフラグで管理するべき？
 macroExpand :: Tree -> WithEnv Tree
 macroExpand = recurM macroExpand1

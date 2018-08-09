@@ -95,7 +95,8 @@ polarize (Meta {ident = i} :< WeakTermCase e ves) = do
   case e' of
     TermValue v ->
       return $ TermComp $ Comp $ CMeta {ctype = t} :< CompCase v ves'
-polarize (i :< WeakTermAsc e t) = polarize e
+    TermComp _ -> lift $ throwE $ "the polarity of " ++ show e ++ " is wrong"
+polarize (_ :< WeakTermAsc e _) = polarize e
 
 polarizeType :: WeakType -> WithEnv Type
 polarizeType (WeakTypeVar i) = return $ TypeValueType (ValueTypeVar i)
@@ -118,7 +119,7 @@ polarizeType (WeakTypeUp t) = do
   case mt' of
     TypeValueType t' -> return $ TypeCompType (CompTypeUp t')
     _ -> lift $ throwE $ "the polarity of " ++ show t ++ " is wrong"
-polarizeType (WeakTypeDown t i) = do
+polarizeType (WeakTypeDown t _) = do
   mt' <- polarizeType t
   case mt' of
     TypeCompType t' -> return $ TypeValueType (ValueTypeDown t')
@@ -136,7 +137,7 @@ polarizeType (WeakTypeForall (Ident s, t1) t2) = do
     _ ->
       lift $
       throwE $ "the polarity of " ++ show t1 ++ " or " ++ show t2 ++ " is wrong"
-polarizeType t@(WeakTypeForall (Hole i, t1) t2) = do
+polarizeType (WeakTypeForall (Hole i, t1) t2) = do
   mt1' <- polarizeType t1
   mt2' <- polarizeType t2
   case (mt1', mt2') of

@@ -58,10 +58,11 @@ virtualC (Comp (_ :< CompUnthunk v@(Value (VMeta {vtype = vt} :< _)) j)) = do
 virtualC (Comp (CMeta {ctype = ct} :< CompMu s c)) = do
   current <- getFunName
   setFunName s
+  insEmptyFunEnv s
   asm <- virtualC $ Comp c
   asm' <- liftIO $ newIORef asm
-  setFunName current
   insCodeEnv s asm'
+  setFunName current
   return $ CodeJump s s (forallArgs ct)
 virtualC (Comp (_ :< CompCase _ _)) = undefined
 

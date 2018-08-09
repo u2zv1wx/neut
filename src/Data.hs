@@ -379,9 +379,6 @@ insCodeEnv i code = do
   codeEnv <- liftIO $ readIORef codeEnvRef
   liftIO $ writeIORef codeEnvRef $ (i, code) : codeEnv
 
-insFunEnv :: Identifier -> IORef [(Identifier, IORef Code)] -> WithEnv ()
-insFunEnv i blocks = modify (\e -> e {funEnv = (i, blocks) : funEnv e})
-
 insEmptyFunEnv :: Identifier -> WithEnv ()
 insEmptyFunEnv i = do
   x <- liftIO $ newIORef []
@@ -389,7 +386,6 @@ insEmptyFunEnv i = do
 
 setFunName :: Identifier -> WithEnv ()
 setFunName i = do
-  insEmptyFunEnv i
   modify (\e -> e {scope = i})
 
 getFunName :: WithEnv Identifier

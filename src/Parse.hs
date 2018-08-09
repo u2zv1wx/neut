@@ -101,19 +101,18 @@ parsePat (meta :< TreeNode ((_ :< TreeAtom s):ts)) = do
 parsePat t = lift $ throwE $ "parsePat: syntax error:\n" ++ Pr.ppShow t
 
 parseClause :: Tree -> WithEnv (Pat, WeakTerm)
-parseClause (meta :< TreeNode [tv, te]) = do
+parseClause (_ :< TreeNode [tv, te]) = do
   v <- parsePat tv
   e <- parseTerm te
   return (v, e)
 parseClause t = lift $ throwE $ "parseClause: syntax error:\n" ++ Pr.ppShow t
 
 parseType :: Tree -> WithEnv WeakType
-parseType (meta :< TreeAtom "_") = do
+parseType (_ :< TreeAtom "_") = do
   name <- newNameWith "hole"
   return (WeakTypeHole name)
-parseType (meta :< TreeAtom "universe") =
-  WeakTypeUniv . WeakLevelHole <$> newName
-parseType (meta :< TreeAtom s) = do
+parseType (_ :< TreeAtom "universe") = WeakTypeUniv . WeakLevelHole <$> newName
+parseType (_ :< TreeAtom s) = do
   msym <- definedConst s
   case msym of
     Nothing -> do
@@ -122,19 +121,19 @@ parseType (meta :< TreeAtom s) = do
 parseType (Meta {ident = i} :< TreeNode [_ :< TreeAtom "down", tn]) = do
   n <- parseType tn
   return $ WeakTypeDown n i
-parseType (meta :< TreeNode [_ :< TreeAtom "universe", _ :< TreeAtom si]) =
+parseType (_ :< TreeNode [_ :< TreeAtom "universe", _ :< TreeAtom si]) =
   case readMaybe si of
     Nothing -> lift $ throwE $ "not a number: " ++ si
     Just j  -> return $ WeakTypeUniv (WeakLevelFixed j)
-parseType (meta :< TreeNode [_ :< TreeAtom "forall", _ :< TreeNode ts, tn]) = do
+parseType (_ :< TreeNode [_ :< TreeAtom "forall", _ :< TreeNode ts, tn]) = do
   its <- mapM parseTypeArg ts
   n <- parseType tn
   return $ foldr WeakTypeForall n its
-parseType (meta :< TreeNode [_ :< TreeAtom "node", _ :< TreeNode ts, tn]) = do
+parseType (_ :< TreeNode [_ :< TreeAtom "node", _ :< TreeNode ts, tn]) = do
   its <- mapM parseNodeTypeArg ts
   tcod <- parseType tn
   return $ WeakTypeNode its tcod
-parseType (meta :< TreeNode [_ :< TreeAtom "up", tp]) = do
+parseType (_ :< TreeNode [_ :< TreeAtom "up", tp]) = do
   p <- parseType tp
   return $ WeakTypeUp p
 parseType t = lift $ throwE $ "parseType: syntax error:\n" ++ Pr.ppShow t
