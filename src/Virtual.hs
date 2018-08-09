@@ -45,16 +45,15 @@ virtualC (Comp (_ :< CompBind s c1 c2)) = do
   operation1 <- virtualC (Comp c1)
   operation2 <- virtualC (Comp c2)
   traceLet s operation1 operation2
-virtualC (Comp (_ :< CompUnthunk v@(Value (VMeta {vtype = vt} :< _)) j)) = do
-  case vt of
-    ValueTypeDown ct -> do
-      operand <- virtualV v
-      let args = forallArgs ct
-      case operand of
-        DataPointer s   -> return $ CodeJump s j args
-        DataLabel label -> return $ CodeJump label j args
-        _               -> lift $ throwE "virtualC.CompUnthunk"
-    _ -> lift $ throwE "virtualC.CompUnthunk"
+virtualC (Comp (_ :< CompUnthunk v@(Value (VMeta {vtype = ValueTypeDown ct} :< _)) j)) = do
+  operand <- virtualV v
+  let args = forallArgs ct
+  case operand of
+    DataPointer s   -> return $ CodeJump s j args -- indirect branch
+    DataLabel label -> return $ CodeJump label j args -- direct branch
+    _               -> lift $ throwE "virtualC.CompUnthunk"
+virtualC (Comp (_ :< CompUnthunk (Value (VMeta {vtype = _} :< _)) _)) = do
+  lift $ throwE "virtualC.CompUnthunk"
 virtualC (Comp (CMeta {ctype = ct} :< CompMu s c)) = do
   current <- getFunName
   setFunName s
