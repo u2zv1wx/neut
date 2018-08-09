@@ -18,18 +18,15 @@ virtualV (Value (_ :< ValueConst s)) = return $ DataCell s []
 virtualV (Value (_ :< ValueNodeApp s vs)) = do
   vs' <- mapM (virtualV . Value) vs
   return $ DataCell s vs'
-virtualV (Value (VMeta {vtype = vt} :< ValueThunk c)) = do
-  case vt of
-    ValueTypeDown _ i -> do
-      asm <- virtualC c
-      unthunkIdents <- lookupThunkEnv i
-      forM_ unthunkIdents $ \j -> do
-        let newName = "thunk" ++ i ++ "unthunk" ++ j
-        liftIO $ putStrLn $ "creating thunk with name: " ++ newName
-        asm' <- liftIO $ newIORef asm
-        insCodeEnv newName asm'
-      return $ DataLabel i
-    _ -> lift $ throwE $ "virtualV.ValueThunk"
+virtualV (Value (_ :< ValueThunk c i)) = do
+  asm <- virtualC c
+  unthunkIdents <- lookupThunkEnv i
+  forM_ unthunkIdents $ \j -> do
+    let newName = "thunk" ++ i ++ "unthunk" ++ j
+    liftIO $ putStrLn $ "creating thunk with name: " ++ newName
+    asm' <- liftIO $ newIORef asm
+    insCodeEnv newName asm'
+  return $ DataLabel i
 
 virtualC :: Comp -> WithEnv Code
 virtualC (Comp (_ :< CompLam _ e)) = virtualC (Comp e)
@@ -48,19 +45,22 @@ virtualC (Comp (_ :< CompBind s c1 c2)) = do
   operation1 <- virtualC (Comp c1)
   operation2 <- virtualC (Comp c2)
   traceLet s operation1 operation2
-virtualC (Comp (_ :< CompUnthunk v@(Value (VMeta {vtype = vt} :< _)))) = do
+virtualC (Comp (_ :< CompUnthunk v@(Value (VMeta {vtype = vt} :< _)) j)) = do
   case vt of
-    ValueTypeDown ct i -> do
+    ValueTypeDown ct -> do
       operand <- virtualV v
       let args = forallArgs ct
       case operand of
-        DataPointer s   -> return $ CodeJump s i args
-        DataLabel label -> return $ CodeJump label i args
+        DataPointer s   -> return $ CodeJump s j args
+        DataLabel label -> return $ CodeJump label j args
         _               -> lift $ throwE "virtualC.CompUnthunk"
     _ -> lift $ throwE "virtualC.CompUnthunk"
 virtualC (Comp (CMeta {ctype = ct} :< CompMu s c)) = do
+  current <- getFunName
+  setFunName s
   asm <- virtualC $ Comp c
   asm' <- liftIO $ newIORef asm
+  setFunName current
   insCodeEnv s asm'
   return $ CodeJump s s (forallArgs ct)
 virtualC (Comp (_ :< CompCase _ _)) = undefined
@@ -82,7 +82,11 @@ traceLet s (CodeJump addr j args) cont = do
           code' <- traceLet s code cont
           liftIO $ writeIORef coderef code'
           return $ CodeJump addr newName args
-    _ -> lift $ throwE "multiple or zero thunk found for an unthunk"
+    _ ->
+      lift $
+      throwE $
+      "multiple or zero thunk found for an unthunk: \n" ++
+      show corresondingThunk
 traceLet s (CodeLet k o1 o2) cont = do
   c <- traceLet s o2 cont
   return $ CodeLet k o1 c

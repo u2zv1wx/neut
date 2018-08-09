@@ -53,7 +53,7 @@ infer (Meta {ident = i} :< WeakTermLam (s, t) e) = do
   let result = WeakTypeForall (Ident s, t) te
   insWTEnv i result
   return result
-infer (_ :< WeakTermNodeApp s vs) = do
+infer (Meta {ident = j} :< WeakTermNodeApp s vs) = do
   mt <- lookupVEnv s
   case mt of
     Nothing -> undefined
@@ -63,7 +63,9 @@ infer (_ :< WeakTermNodeApp s vs) = do
       i <- newName
       let t' = WeakTypeNode (zip is ts) (WeakTypeHole i)
       insCEnv (weakenValueType t) t'
-      return $ WeakTypeHole i
+      let result = WeakTypeHole i
+      insWTEnv j result
+      return result
 infer (Meta {ident = l} :< WeakTermApp e v) = do
   te <- infer e
   tv <- infer v

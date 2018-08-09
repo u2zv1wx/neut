@@ -88,7 +88,6 @@ data ValueType
   | ValueTypeNode [(Identifier, ValueType)]
                   ValueType
   | ValueTypeDown CompType
-                  Identifier
   | ValueTypeUniv Level
   deriving (Show, Eq)
 
@@ -114,7 +113,7 @@ weakenValueType (ValueTypeNode xts t2) = do
   let ts' = map weakenValueType ts
   let t2' = weakenValueType t2
   WeakTypeNode (zip xs ts') t2'
-weakenValueType (ValueTypeDown c i) = WeakTypeDown (weakenCompType c) i
+weakenValueType (ValueTypeDown c) = WeakTypeDown (weakenCompType c) "ANY"
 weakenValueType (ValueTypeUniv l) = WeakTypeUniv (WeakLevelFixed l)
 
 weakenCompType :: CompType -> WeakType
@@ -148,6 +147,7 @@ data ValueF c v
   | ValueNodeApp Identifier
                  [v]
   | ValueThunk c
+               Identifier
   deriving (Show)
 
 -- computation / negative term
@@ -168,6 +168,7 @@ data CompF v c
              c
              c
   | CompUnthunk v
+                Identifier
   | CompMu Identifier
            c
   | CompCase v
@@ -244,8 +245,8 @@ data Env = Env
   , levelEnv      :: [(WeakLevel, WeakLevel)] -- constraint regarding the level of universes
   , argEnv        :: [(IdentOrHole, IdentOrHole)] -- equivalence of arguments of forall
   , thunkEnv      :: [(Identifier, Identifier)]
-  , codeEnv       :: [(Identifier, IORef Code)]
   , funEnv        :: [(Identifier, IORef [(Identifier, IORef Code)])]
+  , scope         :: Identifier -- used in Virtual to determine the name of current function
   } deriving (Show)
 
 initialEnv :: Env
@@ -275,8 +276,8 @@ initialEnv =
     , levelEnv = []
     , thunkEnv = []
     , argEnv = []
-    , codeEnv = []
     , funEnv = []
+    , scope = "main"
     }
 
 type WithEnv a = StateT Env (ExceptT String IO) a
@@ -318,13 +319,24 @@ lookupWTEnv' s = do
   mt <- lookupWTEnv s
   case mt of
     Just t -> return t
-    Nothing ->
+    Nothing -> do
+      env <- get
       lift $
-      throwE $
-      "the type of " ++ show s ++ " is not defined in the type environment"
+        throwE $
+        "the type of " ++
+        show s ++
+        " is not defined in the type environment. typeEnv:\n" ++
+        (Pr.ppShow $ weakTypeEnv env)
 
 lookupVEnv :: String -> WithEnv (Maybe ValueType)
 lookupVEnv s = gets (lookup s . valueEnv)
+
+lookupFunEnv :: Identifier -> WithEnv (IORef [(Identifier, IORef Code)])
+lookupFunEnv s = do
+  m <- gets (lookup s . funEnv)
+  case m of
+    Nothing -> lift $ throwE $ "no such function: " ++ show s
+    Just k  -> return k
 
 lookupThunkEnv :: Identifier -> WithEnv [Identifier]
 lookupThunkEnv s = do
@@ -339,7 +351,11 @@ lookupThunkEnv s = do
   return $ concatMap selector $ thunkEnv env
 
 lookupCodeEnv :: Identifier -> WithEnv (Maybe (IORef Code))
-lookupCodeEnv s = gets (lookup s . codeEnv)
+lookupCodeEnv s = do
+  current <- getFunName
+  codeEnvRef <- lookupFunEnv current
+  codeEnv <- liftIO $ readIORef codeEnvRef
+  return $ lookup s codeEnv
 
 insWTEnv :: String -> WeakType -> WithEnv ()
 insWTEnv s t = modify (\e -> e {weakTypeEnv = (s, t) : weakTypeEnv e})
@@ -357,10 +373,29 @@ insThunkEnv :: Identifier -> Identifier -> WithEnv ()
 insThunkEnv i j = modify (\e -> e {thunkEnv = (i, j) : thunkEnv e})
 
 insCodeEnv :: Identifier -> IORef Code -> WithEnv ()
-insCodeEnv i code = modify (\e -> e {codeEnv = (i, code) : codeEnv e})
+insCodeEnv i code = do
+  current <- getFunName
+  codeEnvRef <- lookupFunEnv current
+  codeEnv <- liftIO $ readIORef codeEnvRef
+  liftIO $ writeIORef codeEnvRef $ (i, code) : codeEnv
 
 insFunEnv :: Identifier -> IORef [(Identifier, IORef Code)] -> WithEnv ()
 insFunEnv i blocks = modify (\e -> e {funEnv = (i, blocks) : funEnv e})
+
+insEmptyFunEnv :: Identifier -> WithEnv ()
+insEmptyFunEnv i = do
+  x <- liftIO $ newIORef []
+  modify (\e -> e {funEnv = (i, x) : funEnv e})
+
+setFunName :: Identifier -> WithEnv ()
+setFunName i = do
+  insEmptyFunEnv i
+  modify (\e -> e {scope = i})
+
+getFunName :: WithEnv Identifier
+getFunName = do
+  env <- get
+  return $ scope env
 
 local :: WithEnv a -> WithEnv a
 local p = do

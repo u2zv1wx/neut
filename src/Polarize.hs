@@ -63,13 +63,15 @@ polarize (Meta {ident = i} :< WeakTermThunk e) = do
   t <- findTypeV i
   mc <- polarize e
   case mc of
-    TermComp c -> return $ TermValue $ Value $ VMeta {vtype = t} :< ValueThunk c
+    TermComp c ->
+      return $ TermValue $ Value $ VMeta {vtype = t} :< ValueThunk c i
     _ -> lift $ throwE $ "the polarity of " ++ show e ++ " is wrong"
 polarize (Meta {ident = i} :< WeakTermUnthunk e) = do
   t <- findTypeC i
   mv <- polarize e
   case mv of
-    TermValue v -> return $ TermComp $ Comp $ CMeta {ctype = t} :< CompUnthunk v
+    TermValue v ->
+      return $ TermComp $ Comp $ CMeta {ctype = t} :< CompUnthunk v i
     _ -> lift $ throwE $ "the polarity of " ++ show e ++ " is wrong"
 polarize (Meta {ident = i} :< WeakTermMu (s, _) e) = do
   t <- findTypeC i
@@ -119,7 +121,7 @@ polarizeType (WeakTypeUp t) = do
 polarizeType (WeakTypeDown t i) = do
   mt' <- polarizeType t
   case mt' of
-    TypeCompType t' -> return $ TypeValueType (ValueTypeDown t' i)
+    TypeCompType t' -> return $ TypeValueType (ValueTypeDown t')
     _ -> lift $ throwE $ "the polarity of " ++ show t ++ " is wrong"
 polarizeType (WeakTypeUniv (WeakLevelFixed i)) =
   return $ TypeValueType (ValueTypeUniv i)

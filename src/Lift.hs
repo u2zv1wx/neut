@@ -14,9 +14,9 @@ liftV (Value (i :< ValueNodeApp s vs)) = do
   vs' <- mapM (liftV . Value) vs
   vs'' <- forM vs' $ \(Value v) -> return v
   return $ Value $ i :< ValueNodeApp s vs''
-liftV (Value (i :< ValueThunk c)) = do
+liftV (Value (i :< ValueThunk c j)) = do
   c' <- liftC c
-  return $ Value $ i :< ValueThunk c'
+  return $ Value $ i :< ValueThunk c' j
 
 liftC :: Comp -> WithEnv Comp
 liftC (Comp (i :< CompLam x e)) = do
@@ -33,9 +33,9 @@ liftC (Comp (i :< CompBind s c1 c2)) = do
   Comp c1' <- liftC (Comp c1)
   Comp c2' <- liftC (Comp c2)
   return $ Comp $ i :< CompBind s c1' c2'
-liftC (Comp (i :< CompUnthunk v)) = do
+liftC (Comp (i :< CompUnthunk v j)) = do
   v' <- liftV v
-  return $ Comp $ i :< CompUnthunk v'
+  return $ Comp $ i :< CompUnthunk v' j
 liftC (Comp (CMeta {ctype = ct} :< CompMu s c)) = do
   c' <- liftC (Comp c)
   let freeVarsInBody = varN c'
@@ -62,10 +62,10 @@ liftC (Comp (i :< CompCase v vcs)) = do
 type VIdentifier = (VMeta, Identifier)
 
 supplyV :: Identifier -> [(Identifier, VIdentifier)] -> Value -> WithEnv Value
-supplyV self args (Value (VMeta {vtype = ValueTypeDown ct i} :< ValueVar s))
+supplyV self args (Value (VMeta {vtype = ValueTypeDown ct} :< ValueVar s))
   | s == self = do
     let ct' = forallSeq (map snd args) ct -- update the type of `x` in `mu x. M`
-    return $ Value $ VMeta {vtype = ValueTypeDown ct' i} :< ValueVar s
+    return $ Value $ VMeta {vtype = ValueTypeDown ct'} :< ValueVar s
 supplyV _ f2b v@(Value (_ :< ValueVar s)) = do
   case lookup s f2b of
     Nothing         -> return v
@@ -75,9 +75,9 @@ supplyV self args (Value (i :< ValueNodeApp s vs)) = do
   vs' <- mapM (supplyV self args . Value) vs
   let vs'' = map (\(Value v) -> v) vs'
   return $ Value $ i :< ValueNodeApp s vs''
-supplyV self args (Value (i :< ValueThunk c)) = do
+supplyV self args (Value (i :< ValueThunk c j)) = do
   c' <- supplyC self args c
-  return $ Value $ i :< ValueThunk c'
+  return $ Value $ i :< ValueThunk c' j
 
 supplyC :: Identifier -> [(Identifier, VIdentifier)] -> Comp -> WithEnv Comp
 supplyC self args (Comp (i :< CompLam x e)) = do
@@ -94,7 +94,7 @@ supplyC self args (Comp (i :< CompBind s c1 c2)) = do
   Comp c1' <- supplyC self args (Comp c1)
   Comp c2' <- supplyC self args (Comp c2)
   return $ Comp $ i :< CompBind s c1' c2'
-supplyC self args (Comp inner@(i :< CompUnthunk v)) = do
+supplyC self args (Comp inner@(i :< CompUnthunk v j)) = do
   v' <- supplyV self args v
   case v' of
     Value (_ :< ValueVar s)
@@ -102,7 +102,7 @@ supplyC self args (Comp inner@(i :< CompUnthunk v)) = do
         let args' = map snd args
         c' <- appFold (Comp inner) args'
         return c'
-    _ -> return $ Comp $ i :< CompUnthunk v'
+    _ -> return $ Comp $ i :< CompUnthunk v' j
 supplyC self args (Comp (i :< CompMu s c)) = do
   Comp c' <- supplyC self args $ Comp c
   return $ Comp $ i :< CompMu s c'
@@ -118,7 +118,7 @@ varP :: Value -> [(VMeta, Identifier)]
 varP (Value (meta :< ValueVar s))     = [(meta, s)]
 varP (Value (_ :< ValueConst _))      = []
 varP (Value (_ :< ValueNodeApp _ vs)) = join $ map (varP . Value) vs
-varP (Value (_ :< ValueThunk e))      = varN e
+varP (Value (_ :< ValueThunk e _))    = varN e
 
 varN :: Comp -> [(VMeta, Identifier)]
 varN (Comp (_ :< CompLam s e)) = filter (\(_, t) -> t /= s) $ varN (Comp e)
@@ -126,7 +126,7 @@ varN (Comp (_ :< CompApp e v)) = varN (Comp e) ++ varP v
 varN (Comp (_ :< CompRet v)) = varP v
 varN (Comp (_ :< CompBind s e1 e2)) =
   varN (Comp e1) ++ filter (\(_, t) -> t /= s) (varN (Comp e2))
-varN (Comp (_ :< CompUnthunk v)) = varP v
+varN (Comp (_ :< CompUnthunk v _)) = varP v
 varN (Comp (_ :< CompMu s e)) = filter (\(_, t) -> t /= s) (varN (Comp e))
 varN (Comp (_ :< CompCase e ves)) = do
   let efs = varP e

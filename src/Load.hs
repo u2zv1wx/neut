@@ -62,6 +62,7 @@ load' (a:as) = do
   case e'' of
     TermValue v -> do
       liftIO $ putStrLn $ Pr.ppShow v
+      setFunName "main"
       v' <- virtualV v
       liftIO $ putStrLn $ Pr.ppShow v'
       liftIO $ putStrLn "the type of main term must be negative"
@@ -69,6 +70,7 @@ load' (a:as) = do
       liftIO $ putStrLn $ Pr.ppShow c
       liftedC <- liftC c
       liftIO $ putStrLn $ Pr.ppShow liftedC
+      setFunName "main"
       c' <- virtualC liftedC
       liftIO $ putStrLn $ Pr.ppShow c'
       i <- newNameWith "main"
