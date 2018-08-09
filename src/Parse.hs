@@ -82,17 +82,6 @@ parseTermNodeApp meta s tvs = do
   return $ meta :< WeakTermNodeApp s vs
   -- foldMTerm WeakTermNodeApp e vs
 
-foldMTerm ::
-     (Cofree f Meta -> a -> f (Cofree f Meta))
-  -> Cofree f Meta
-  -> [a]
-  -> StateT Env (ExceptT String IO) (Cofree f Meta)
-foldMTerm f e [] = return e
-foldMTerm f e (t:ts) = do
-  let tmp = f e t
-  i <- newName
-  foldMTerm f (Meta {ident = i} :< tmp) ts
-
 parsePat :: Tree -> WithEnv Pat
 parsePat (meta :< TreeAtom s) = do
   msym <- definedConst s

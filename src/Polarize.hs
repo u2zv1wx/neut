@@ -9,70 +9,90 @@ import           Control.Monad.Trans.Except
 
 import           Data
 
-polarize :: WeakTerm -> Either String Term
-polarize (i :< WeakTermVar s) = return $ TermValue $ Value $ i :< ValueVar s
-polarize (i :< WeakTermConst s) = return $ TermValue $ Value $ i :< ValueConst s
-polarize (i :< WeakTermNodeApp s vs) = do
+polarize :: WeakTerm -> WithEnv Term
+polarize (Meta {ident = i} :< WeakTermVar s) = do
+  t <- findTypeV i
+  return $ TermValue $ Value $ VMeta {vtype = t} :< ValueVar s
+polarize (Meta {ident = i} :< WeakTermConst s) = do
+  t <- findTypeV i
+  return $ TermValue $ Value $ VMeta {vtype = t} :< ValueConst s
+polarize (Meta {ident = i} :< WeakTermNodeApp s vs) = do
+  t <- findTypeV i
   let sanitizer v =
         case v of
           TermValue (Value v) -> return v
-          _ -> Left $ "the polarity of " ++ show v ++ " is wrong"
+          _ -> lift $ throwE $ "the polarity of " ++ show v ++ " is wrong"
   vs' <- mapM polarize vs
   vs'' <- mapM sanitizer vs'
-  return $ TermValue $ Value $ i :< ValueNodeApp s vs''
-polarize (i :< WeakTermLam (s, _) e) = do
+  return $ TermValue $ Value $ VMeta {vtype = t} :< ValueNodeApp s vs''
+polarize (Meta {ident = i} :< WeakTermLam (s, _) e) = do
+  t <- findTypeC i
   mc <- polarize e
   case mc of
-    TermComp (Comp c) -> return $ TermComp $ Comp $ i :< CompLam s c
-    _                 -> Left $ "the polarity of " ++ show e ++ " is wrong"
-polarize (i :< WeakTermApp e1 e2) = do
+    TermComp (Comp c) ->
+      return $ TermComp $ Comp $ CMeta {ctype = t} :< CompLam s c
+    _ -> lift $ throwE $ "the polarity of " ++ show e ++ " is wrong"
+polarize (Meta {ident = i} :< WeakTermApp e1 e2) = do
+  t <- findTypeC i
   mc <- polarize e1
   mv <- polarize e2
   case (mc, mv) of
     (TermComp (Comp c), TermValue v) ->
-      return $ TermComp $ Comp $ i :< CompApp c v
+      return $ TermComp $ Comp $ CMeta {ctype = t} :< CompApp c v
     _ ->
-      Left $ "the polarity of " ++ show e1 ++ " or " ++ show e2 ++ " is wrong"
-polarize (i :< WeakTermRet e) = do
+      lift $
+      throwE $ "the polarity of " ++ show e1 ++ " or " ++ show e2 ++ " is wrong"
+polarize (Meta {ident = i} :< WeakTermRet e) = do
+  t <- findTypeC i
   mv <- polarize e
   case mv of
-    TermValue v -> return $ TermComp $ Comp $ i :< CompRet v
-    _           -> Left $ "the polarity of " ++ show e ++ " is wrong"
-polarize (i :< WeakTermBind (s, _) e1 e2) = do
+    TermValue v -> return $ TermComp $ Comp $ CMeta {ctype = t} :< CompRet v
+    _ -> lift $ throwE $ "the polarity of " ++ show e ++ " is wrong"
+polarize (Meta {ident = i} :< WeakTermBind (s, _) e1 e2) = do
+  t <- findTypeC i
   mc1 <- polarize e1
   mc2 <- polarize e2
   case (mc1, mc2) of
     (TermComp (Comp c1), TermComp (Comp c2)) ->
-      return $ TermComp $ Comp $ i :< CompBind s c1 c2
+      return $ TermComp $ Comp $ CMeta {ctype = t} :< CompBind s c1 c2
     _ ->
-      Left $
+      lift $
+      throwE $
       "foo the polarity of " ++ show e1 ++ " or " ++ show e2 ++ " is wrong"
-polarize (i :< WeakTermThunk e) = do
+polarize (Meta {ident = i} :< WeakTermThunk e) = do
+  t <- findTypeV i
   mc <- polarize e
   case mc of
-    TermComp c -> return $ TermValue $ Value $ i :< ValueThunk c
-    _          -> Left $ "the polarity of " ++ show e ++ " is wrong"
-polarize (i :< WeakTermUnthunk e) = do
+    TermComp c -> return $ TermValue $ Value $ VMeta {vtype = t} :< ValueThunk c
+    _ -> lift $ throwE $ "the polarity of " ++ show e ++ " is wrong"
+polarize (Meta {ident = i} :< WeakTermUnthunk e) = do
+  t <- findTypeC i
   mv <- polarize e
   case mv of
-    TermValue v -> return $ TermComp $ Comp $ i :< CompUnthunk v
-    _           -> Left $ "the polarity of " ++ show e ++ " is wrong"
-polarize (i :< WeakTermMu (s, _) e) = do
+    TermValue v -> return $ TermComp $ Comp $ CMeta {ctype = t} :< CompUnthunk v
+    _ -> lift $ throwE $ "the polarity of " ++ show e ++ " is wrong"
+polarize (Meta {ident = i} :< WeakTermMu (s, _) e) = do
+  t <- findTypeC i
   mc <- polarize e
   case mc of
-    TermComp (Comp c) -> return $ TermComp $ Comp $ i :< CompMu s c
-    _                 -> Left $ "the polarity of " ++ show e ++ " is wrong"
-polarize (i :< WeakTermCase e ves) = do
+    TermComp (Comp c) ->
+      return $ TermComp $ Comp $ CMeta {ctype = t} :< CompMu s c
+    _ -> lift $ throwE $ "the polarity of " ++ show e ++ " is wrong"
+polarize (Meta {ident = i} :< WeakTermCase e ves) = do
+  t <- findTypeC i
   ves' <-
     forM ves $ \(v, e) -> do
       e' <- polarize e
       case e' of
         TermComp (Comp c) -> return (v, c)
         _ ->
-          Left $ "the polarity of " ++ show v ++ " or " ++ show e ++ " is wrong"
+          lift $
+          throwE $
+          "the polarity of " ++ show v ++ " or " ++ show e ++ " is wrong"
   e' <- polarize e
   case e' of
-    TermValue v -> return $ TermComp $ Comp $ i :< CompCase v ves'
+    TermValue v ->
+      return $ TermComp $ Comp $ CMeta {ctype = t} :< CompCase v ves'
 polarize (i :< WeakTermAsc e t) = polarize e
 
 polarizeType :: WeakType -> WithEnv Type
@@ -114,9 +134,7 @@ polarizeType (WeakTypeForall (Ident s, t1) t2) = do
     _ ->
       lift $
       throwE $ "the polarity of " ++ show t1 ++ " or " ++ show t2 ++ " is wrong"
-polarizeType t@(WeakTypeForall (Hole i, t1) t2)
-  -- call-by-any-argument
- = do
+polarizeType t@(WeakTypeForall (Hole i, t1) t2) = do
   mt1' <- polarizeType t1
   mt2' <- polarizeType t2
   case (mt1', mt2') of
@@ -133,3 +151,21 @@ polarizeTypeEnv ((i, wt):ts) = do
   wt' <- polarizeType wt
   ts' <- polarizeTypeEnv ts
   return $ (i, wt') : ts'
+
+findTypeV :: Identifier -> WithEnv ValueType
+findTypeV s = do
+  t <- lookupWTEnv' s
+  t' <- polarizeType t
+  case t' of
+    TypeValueType vt -> return vt
+    TypeCompType _ ->
+      lift $ throwE $ "The polarity of " ++ show s ++ " is wrong"
+
+findTypeC :: Identifier -> WithEnv CompType
+findTypeC s = do
+  t <- lookupWTEnv' s
+  t' <- polarizeType t
+  case t' of
+    TypeCompType ct -> return ct
+    TypeValueType _ ->
+      lift $ throwE $ "The polarity of " ++ show s ++ " is wrong"

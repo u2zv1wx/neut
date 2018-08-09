@@ -178,12 +178,20 @@ $(deriveShow1 ''ValueF)
 
 $(deriveShow1 ''CompF)
 
+data VMeta = VMeta
+  { vtype :: ValueType
+  } deriving (Show)
+
+data CMeta = CMeta
+  { ctype :: CompType
+  } deriving (Show)
+
 newtype Value =
-  Value (Cofree (ValueF Comp) Meta)
+  Value (Cofree (ValueF Comp) VMeta)
   deriving (Show)
 
 newtype Comp =
-  Comp (Cofree (CompF Value) Meta)
+  Comp (Cofree (CompF Value) CMeta)
   deriving (Show)
 
 data Term
@@ -236,7 +244,8 @@ data Env = Env
   , levelEnv      :: [(WeakLevel, WeakLevel)] -- constraint regarding the level of universes
   , argEnv        :: [(IdentOrHole, IdentOrHole)] -- equivalence of arguments of forall
   , thunkEnv      :: [(Identifier, Identifier)]
-  , codeEnv       :: [(Identifier, IORef Code)] -- quoted codes (should be ioref?)
+  , codeEnv       :: [(Identifier, IORef Code)]
+  , funEnv        :: [(Identifier, IORef [(Identifier, IORef Code)])]
   } deriving (Show)
 
 initialEnv :: Env
@@ -267,6 +276,7 @@ initialEnv =
     , thunkEnv = []
     , argEnv = []
     , codeEnv = []
+    , funEnv = []
     }
 
 type WithEnv a = StateT Env (ExceptT String IO) a
@@ -302,6 +312,16 @@ lookupWTEnv s = gets (lookup s . weakTypeEnv)
 
 lookupTEnv :: String -> WithEnv (Maybe Type)
 lookupTEnv s = gets (lookup s . typeEnv)
+
+lookupWTEnv' :: String -> WithEnv WeakType
+lookupWTEnv' s = do
+  mt <- lookupWTEnv s
+  case mt of
+    Just t -> return t
+    Nothing ->
+      lift $
+      throwE $
+      "the type of " ++ show s ++ " is not defined in the type environment"
 
 lookupVEnv :: String -> WithEnv (Maybe ValueType)
 lookupVEnv s = gets (lookup s . valueEnv)
@@ -339,6 +359,9 @@ insThunkEnv i j = modify (\e -> e {thunkEnv = (i, j) : thunkEnv e})
 insCodeEnv :: Identifier -> IORef Code -> WithEnv ()
 insCodeEnv i code = modify (\e -> e {codeEnv = (i, code) : codeEnv e})
 
+insFunEnv :: Identifier -> IORef [(Identifier, IORef Code)] -> WithEnv ()
+insFunEnv i blocks = modify (\e -> e {funEnv = (i, blocks) : funEnv e})
+
 local :: WithEnv a -> WithEnv a
 local p = do
   env <- get
@@ -346,6 +369,32 @@ local p = do
   modify (\e -> env {count = count e})
   return x
 
+foldMTerm ::
+     (Cofree f Meta -> a -> f (Cofree f Meta))
+  -> Cofree f Meta
+  -> [a]
+  -> StateT Env (ExceptT String IO) (Cofree f Meta)
+foldMTerm _ e [] = return e
+foldMTerm f e (t:ts) = do
+  let tmp = f e t
+  i <- newName
+  foldMTerm f (Meta {ident = i} :< tmp) ts
+  -- let tmp = f e t
+  -- i <- newName
+  -- foldMTerm f (CMeta {ident = i} :< tmp) ts
+
+-- foldMTermR ::
+--      (Cofree f Meta -> a -> f (Cofree f Meta))
+--   -> Cofree f Meta
+--   -> [a]
+--   -> StateT Env (ExceptT String IO) (Cofree f Meta)
+-- foldMTermR _ e [] = return e
+-- foldMTermR f e (t:ts) = do
+--   foo <- foldMTermR f e ts
+--   return $ f foo t
+--   -- let tmp = f e t
+--   -- i <- newName
+--   -- foldMTermR f (Meta {ident = i} :< tmp) ts
 data Data
   = DataPointer Identifier -- var is something that points already-allocated data
   | DataCell Identifier -- value of defined data types
@@ -358,6 +407,9 @@ data Code
   | CodeLet Identifier -- bind (we also use this to represent application)
             Data
             Code
+  | CodeCall Identifier -- call for mu
+             Identifier
+             Code
   | CodeJump Identifier -- unthunk
              Identifier -- this second argument is required to lookup the corresponding code
   deriving (Show, Eq)

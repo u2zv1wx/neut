@@ -13,6 +13,7 @@ import           Data.IORef
 
 import           Data
 import           Infer
+import           Lift
 import           Macro
 import           Parse
 import           Polarize
@@ -57,20 +58,20 @@ load' (a:as) = do
   let wtenv = weakTypeEnv env
   tenv <- polarizeTypeEnv wtenv
   modify (\e -> e {typeEnv = tenv})
-  case polarize e' of
-    Left err -> lift $ throwE err
-    Right e'' -> do
-      case e'' of
-        TermValue v -> do
-          liftIO $ putStrLn $ Pr.ppShow v
-          v' <- virtualV v
-          liftIO $ putStrLn $ Pr.ppShow v'
-          liftIO $ putStrLn "the type of main term must be negative"
-        TermComp c -> do
-          liftIO $ putStrLn $ Pr.ppShow c
-          c' <- virtualC c
-          liftIO $ putStrLn $ Pr.ppShow c'
-          i <- newNameWith "main"
-          cref <- liftIO $ newIORef c'
-          insCodeEnv i cref
-      load' as
+  e'' <- polarize e'
+  case e'' of
+    TermValue v -> do
+      liftIO $ putStrLn $ Pr.ppShow v
+      v' <- virtualV v
+      liftIO $ putStrLn $ Pr.ppShow v'
+      liftIO $ putStrLn "the type of main term must be negative"
+    TermComp c -> do
+      liftIO $ putStrLn $ Pr.ppShow c
+      liftedC <- liftC c
+      liftIO $ putStrLn $ Pr.ppShow liftedC
+      c' <- virtualC liftedC
+      liftIO $ putStrLn $ Pr.ppShow c'
+      i <- newNameWith "main"
+      cref <- liftIO $ newIORef c'
+      insCodeEnv i cref
+  load' as
