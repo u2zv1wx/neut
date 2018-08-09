@@ -414,27 +414,12 @@ foldMTerm f e (t:ts) = do
   let tmp = f e t
   i <- newName
   foldMTerm f (Meta {ident = i} :< tmp) ts
-  -- let tmp = f e t
-  -- i <- newName
-  -- foldMTerm f (CMeta {ident = i} :< tmp) ts
 
--- foldMTermR ::
---      (Cofree f Meta -> a -> f (Cofree f Meta))
---   -> Cofree f Meta
---   -> [a]
---   -> StateT Env (ExceptT String IO) (Cofree f Meta)
--- foldMTermR _ e [] = return e
--- foldMTermR f e (t:ts) = do
---   foo <- foldMTermR f e ts
---   return $ f foo t
---   -- let tmp = f e t
---   -- i <- newName
---   -- foldMTermR f (Meta {ident = i} :< tmp) ts
 data Data
   = DataPointer Identifier -- var is something that points already-allocated data
   | DataCell Identifier -- value of defined data types
              [Data]
-  | DataLabel Identifier -- the address of quoted code.
+  | DataLabel Identifier -- the address of quoted code
   deriving (Show, Eq)
 
 data Code
