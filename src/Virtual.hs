@@ -22,8 +22,8 @@ virtualV (Value (VMeta {vtype = vt} :< ValueThunk c)) = do
   case vt of
     ValueTypeDown _ i -> do
       asm <- virtualC c
-      corresondingUnthunkIdents <- lookupThunkEnv i
-      forM_ corresondingUnthunkIdents $ \j -> do
+      unthunkIdents <- lookupThunkEnv i
+      forM_ unthunkIdents $ \j -> do
         let newName = "thunk" ++ i ++ "unthunk" ++ j
         liftIO $ putStrLn $ "creating thunk with name: " ++ newName
         asm' <- liftIO $ newIORef asm
@@ -50,23 +50,24 @@ virtualC (Comp (_ :< CompBind s c1 c2)) = do
   traceLet s operation1 operation2
 virtualC (Comp (_ :< CompUnthunk v@(Value (VMeta {vtype = vt} :< _)))) = do
   case vt of
-    ValueTypeDown _ i -> do
+    ValueTypeDown ct i -> do
       operand <- virtualV v
+      let args = forallArgs ct
       case operand of
-        DataPointer s   -> return $ CodeJump s i -- indirect branch?
-        DataLabel label -> return $ CodeJump label i -- this shouldn't occur (by optimization)
+        DataPointer s   -> return $ CodeJump s i args
+        DataLabel label -> return $ CodeJump label i args
         _               -> lift $ throwE "virtualC.CompUnthunk"
     _ -> lift $ throwE "virtualC.CompUnthunk"
-virtualC (Comp (_ :< CompMu s c)) = do
+virtualC (Comp (CMeta {ctype = ct} :< CompMu s c)) = do
   asm <- virtualC $ Comp c
   asm' <- liftIO $ newIORef asm
   insCodeEnv s asm'
-  return $ CodeJump s s
+  return $ CodeJump s s (forallArgs ct)
 virtualC (Comp (_ :< CompCase _ _)) = undefined
 
 traceLet :: String -> Code -> Code -> WithEnv Code
 traceLet s (CodeAllocate o) cont = return $ CodeLet s o cont
-traceLet s (CodeJump addr j) cont = do
+traceLet s (CodeJump addr j args) cont = do
   liftIO $ putStrLn $ "Found CodeJump with Let. The ident is " ++ show j ++ "."
   corresondingThunk <- lookupThunkEnv j
   case corresondingThunk of
@@ -74,17 +75,21 @@ traceLet s (CodeJump addr j) cont = do
       let newName = "thunk" ++ i ++ "unthunk" ++ j
       mcode <- lookupCodeEnv newName
       case mcode of
-        Nothing -> undefined -- non-tail call of a recursive function
+        Nothing -> return $ CodeCall s addr args cont -- non-tail call
         Just coderef -> do
           code <- liftIO $ readIORef coderef
           liftIO $ putStrLn $ "corresponding thunk is " ++ show i
           code' <- traceLet s code cont
           liftIO $ writeIORef coderef code'
-          return $ CodeJump addr newName
+          return $ CodeJump addr newName args
     _ -> lift $ throwE "multiple or zero thunk found for an unthunk"
 traceLet s (CodeLet k o1 o2) cont = do
   c <- traceLet s o2 cont
   return $ CodeLet k o1 c
-traceLet s (CodeCall k i o) cont = do
+traceLet s (CodeCall k i args o) cont = do
   c <- traceLet s o cont
-  return $ CodeCall k i c
+  return $ CodeCall k i args c
+
+forallArgs :: CompType -> [Identifier]
+forallArgs (CompTypeForall (i, _) t) = i : forallArgs t
+forallArgs _                         = []

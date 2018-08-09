@@ -407,9 +407,11 @@ data Code
   | CodeLet Identifier -- bind (we also use this to represent application)
             Data
             Code
-  | CodeCall Identifier -- call for mu
-             Identifier
-             Code
+  | CodeCall Identifier -- the result of call
+             Identifier -- the label of the funtion
+             [Identifier] -- arguments
+             Code -- continuation
   | CodeJump Identifier -- unthunk
              Identifier -- this second argument is required to lookup the corresponding code
+             [Identifier] -- list of arguments
   deriving (Show, Eq)
