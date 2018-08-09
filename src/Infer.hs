@@ -39,24 +39,24 @@ infer (Meta {ident = i} :< WeakTermVar s) = do
       insWTEnv s new
       insWTEnv i new
       return new
-infer (Meta {ident = i} :< WeakTermNodeApp s []) = do
-  mt <- lookupVEnv s
-  case mt of
-    Just t -> do
-      let t' = weakenValueType t
-      insWTEnv i t'
-      return t'
-    Nothing -> lift $ throwE $ "const " ++ s ++ " is not defined"
 infer (Meta {ident = i} :< WeakTermLam (s, t) e) = do
   insWTEnv s t
   te <- infer e
   let result = WeakTypeForall (Ident s, t) te
   insWTEnv i result
   return result
+infer (Meta {ident = i} :< WeakTermNodeApp s []) = do
+  mt <- lookupVEnv s
+  case mt of
+    Nothing -> lift $ throwE $ "const " ++ s ++ " is not defined"
+    Just t -> do
+      let t' = weakenValueType t
+      insWTEnv i t'
+      return t'
 infer (Meta {ident = j} :< WeakTermNodeApp s vs) = do
   mt <- lookupVEnv s
   case mt of
-    Nothing -> undefined
+    Nothing -> lift $ throwE $ "const " ++ s ++ " is not defined"
     Just t -> do
       is <- forM vs $ \_ -> newName
       ts <- mapM infer vs
