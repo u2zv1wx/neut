@@ -39,7 +39,7 @@ infer (Meta {ident = i} :< WeakTermVar s) = do
       insWTEnv s new
       insWTEnv i new
       return new
-infer (Meta {ident = i} :< WeakTermConst s) = do
+infer (Meta {ident = i} :< WeakTermNodeApp s []) = do
   mt <- lookupVEnv s
   case mt of
     Just t -> do
@@ -134,7 +134,7 @@ inferPat (Meta {ident = i} :< PatVar s) = do
       insWTEnv s new
       insWTEnv i new
       return new
-inferPat (Meta {ident = i} :< PatConst s) = do
+inferPat (Meta {ident = i} :< PatApp s []) = do
   mt <- lookupVEnv s
   case mt of
     Just t -> do

@@ -9,7 +9,7 @@ import           Data
 
 liftV :: Value -> WithEnv Value
 liftV v@(Value (_ :< ValueVar _)) = return v
-liftV v@(Value (_ :< ValueConst _)) = return v
+liftV v@(Value (_ :< ValueNodeApp s [])) = return v
 liftV (Value (i :< ValueNodeApp s vs)) = do
   vs' <- mapM (liftV . Value) vs
   vs'' <- forM vs' $ \(Value v) -> return v
@@ -70,7 +70,7 @@ supplyV _ f2b v@(Value (_ :< ValueVar s)) = do
   case lookup s f2b of
     Nothing         -> return v
     Just (vmeta, b) -> return $ Value $ vmeta :< ValueVar b -- replace free vars
-supplyV _ _ v@(Value (_ :< ValueConst _)) = return v
+supplyV _ _ v@(Value (_ :< ValueNodeApp s [])) = return v
 supplyV self args (Value (i :< ValueNodeApp s vs)) = do
   vs' <- mapM (supplyV self args . Value) vs
   let vs'' = map (\(Value v) -> v) vs'
@@ -116,7 +116,6 @@ supplyC self args (Comp (i :< CompCase v vcs)) = do
 
 varP :: Value -> [(VMeta, Identifier)]
 varP (Value (meta :< ValueVar s))     = [(meta, s)]
-varP (Value (_ :< ValueConst _))      = []
 varP (Value (_ :< ValueNodeApp _ vs)) = join $ map (varP . Value) vs
 varP (Value (_ :< ValueThunk e _))    = varN e
 
@@ -139,7 +138,6 @@ varN (Comp (_ :< CompCase e ves)) = do
 
 varPat :: Pat -> [Identifier]
 varPat (_ :< PatVar s)    = [s]
-varPat (_ :< PatConst _)  = []
 varPat (_ :< PatApp _ ps) = join $ map varPat ps
 
 compLamSeq :: [(VMeta, Identifier)] -> Comp -> Comp

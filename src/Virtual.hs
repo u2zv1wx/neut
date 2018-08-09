@@ -14,7 +14,7 @@ import qualified Text.Show.Pretty           as Pr
 
 virtualV :: Value -> WithEnv Data
 virtualV (Value (_ :< ValueVar s)) = return $ DataPointer s
-virtualV (Value (_ :< ValueConst s)) = return $ DataCell s []
+virtualV (Value (_ :< ValueNodeApp s [])) = return $ DataCell s []
 virtualV (Value (_ :< ValueNodeApp s vs)) = do
   vs' <- mapM (virtualV . Value) vs
   return $ DataCell s vs'

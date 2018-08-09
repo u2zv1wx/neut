@@ -26,7 +26,7 @@ parseTerm (meta :< TreeAtom s) = do
   msym <- definedConst s
   case msym of
     Nothing     -> return (meta :< WeakTermVar s)
-    Just (s, _) -> return (meta :< WeakTermConst s)
+    Just (s, _) -> return (meta :< WeakTermNodeApp s [])
 parseTerm (meta :< TreeNode [_ :< TreeAtom "thunk", te]) = do
   e <- parseTerm te
   return (meta :< WeakTermThunk e)
@@ -89,7 +89,7 @@ parsePat (meta :< TreeAtom s) = do
     Nothing -> do
       s' <- strOrNewName s
       return (meta :< PatVar s')
-    Just (s, _) -> return (meta :< PatConst s)
+    Just (s, _) -> return (meta :< PatApp s [])
 parsePat (meta :< TreeNode ((_ :< TreeAtom s):ts)) = do
   msym <- definedConst s
   case msym of

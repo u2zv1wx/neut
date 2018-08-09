@@ -13,9 +13,9 @@ polarize :: WeakTerm -> WithEnv Term
 polarize (Meta {ident = i} :< WeakTermVar s) = do
   t <- findTypeV i
   return $ TermValue $ Value $ VMeta {vtype = t} :< ValueVar s
-polarize (Meta {ident = i} :< WeakTermConst s) = do
+polarize (Meta {ident = i} :< WeakTermNodeApp s []) = do
   t <- findTypeV i
-  return $ TermValue $ Value $ VMeta {vtype = t} :< ValueConst s
+  return $ TermValue $ Value $ VMeta {vtype = t} :< ValueNodeApp s []
 polarize (Meta {ident = i} :< WeakTermNodeApp s vs) = do
   t <- findTypeV i
   let sanitizer v =

@@ -11,7 +11,7 @@ rename :: WeakTerm -> WithEnv WeakTerm
 rename (i :< WeakTermVar s) = do
   t <- WeakTermVar <$> renameString s
   return (i :< t)
-rename (i :< WeakTermConst s) = return (i :< WeakTermConst s)
+rename (i :< WeakTermNodeApp s []) = return (i :< WeakTermNodeApp s [])
 rename (i :< WeakTermNodeApp s vs) = do
   vs' <- mapM rename vs
   return (i :< WeakTermNodeApp s vs')
@@ -110,7 +110,7 @@ renamePat :: Pat -> WithEnv Pat
 renamePat (i :< PatVar s) = do
   t <- PatVar <$> renamePatString s
   return (i :< t)
-renamePat (i :< PatConst s) = return (i :< PatConst s)
+renamePat (i :< PatApp s []) = return (i :< PatApp s [])
 renamePat (i :< PatApp s vs) = do
   s' <- renamePatString s
   vs' <- mapM renamePat vs

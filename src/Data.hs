@@ -125,7 +125,6 @@ weakenCompType (CompTypeUp v) = WeakTypeUp (weakenValueType v)
 
 data PatF a
   = PatVar Identifier
-  | PatConst Identifier
   | PatApp Identifier
            [a]
   deriving (Show, Eq)
@@ -143,7 +142,6 @@ type Pat = Cofree PatF Meta
 --     | (thunk e)
 data ValueF c v
   = ValueVar Identifier
-  | ValueConst Identifier
   | ValueNodeApp Identifier
                  [v]
   | ValueThunk c
@@ -202,7 +200,6 @@ data Term
 
 data WeakTermF a
   = WeakTermVar Identifier
-  | WeakTermConst Identifier
   | WeakTermNodeApp Identifier
                     [a]
   | WeakTermThunk a
