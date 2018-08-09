@@ -416,7 +416,7 @@ data Data
   deriving (Show, Eq)
 
 data Code
-  = CodeAllocate Data -- return
+  = CodeReturn Data -- return
   | CodeLet Identifier -- bind (we also use this to represent application)
             Data
             Code

@@ -40,7 +40,7 @@ virtualC (Comp (_ :< CompApp e@(CMeta {ctype = ct} :< _) v)) = do
       lift $ throwE $ "virtualC.CompApp. Note:\n " ++ Pr.ppShow ct
 virtualC (Comp (_ :< CompRet v)) = do
   asm <- virtualV v
-  return $ CodeAllocate asm
+  return $ CodeReturn asm
 virtualC (Comp (_ :< CompBind s c1 c2)) = do
   operation1 <- virtualC (Comp c1)
   operation2 <- virtualC (Comp c2)
@@ -67,7 +67,7 @@ virtualC (Comp (CMeta {ctype = ct} :< CompMu s c)) = do
 virtualC (Comp (_ :< CompCase _ _)) = undefined
 
 traceLet :: String -> Code -> Code -> WithEnv Code
-traceLet s (CodeAllocate o) cont = return $ CodeLet s o cont
+traceLet s (CodeReturn o) cont = return $ CodeLet s o cont
 traceLet s (CodeJump addr j args) cont = do
   liftIO $ putStrLn $ "Found CodeJump with Let. The ident is " ++ show j ++ "."
   corresondingThunk <- lookupThunkEnv j
@@ -76,18 +76,18 @@ traceLet s (CodeJump addr j args) cont = do
       let newName = "thunk" ++ i ++ "unthunk" ++ j
       mcode <- lookupCodeEnv newName
       case mcode of
-        Nothing -> return $ CodeCall s addr args cont -- non-tail call
+        Nothing -> lift $ throwE $ "Virutal.traceLet"
         Just coderef -> do
           code <- liftIO $ readIORef coderef
           liftIO $ putStrLn $ "corresponding thunk is " ++ show i
           code' <- traceLet s code cont
           liftIO $ writeIORef coderef code'
           return $ CodeJump addr newName args
+    [] -> return $ CodeCall s addr args cont -- non-tail call
     _ ->
       lift $
       throwE $
-      "multiple or zero thunk found for an unthunk: \n" ++
-      show corresondingThunk
+      "multiple thunk found for an unthunk: \n" ++ show corresondingThunk
 traceLet s (CodeLet k o1 o2) cont = do
   c <- traceLet s o2 cont
   return $ CodeLet k o1 c

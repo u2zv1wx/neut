@@ -31,6 +31,7 @@
   (let yay (return (thunk (lambda (x nat) (return (succ x))))))
   (let foo (return zero))
   (let ya (return (thunk (lambda (x nat) (return (succ foo))))))
+  (let sya (return (thunk (mu (x _) (return foo)))))
   ((unthunk yay) (succ zero))
-  ((unthunk yay) (succ zero))
+  (unthunk sya)
   (return true))
