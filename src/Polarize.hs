@@ -100,12 +100,11 @@ polarize (Meta {ident = i} :< WeakTermCase vs ves) = do
           TermValue (Value v) -> return $ Value v
           _ -> lift $ throwE $ "the polarity of " ++ show v ++ " is wrong"
   vs'' <- mapM sanitizer vs'
-  let (Value (VMeta {vtype = vt} :< _)) = head vs''
   -- create a decision tree from the pattern
   let vesMod = patDist ves'
   liftIO $ putStrLn $ Pr.ppShow vesMod
-  let initialOccurences = map (const [0]) vs
-  decisionTree <- toDecision vt initialOccurences vesMod
+  let initialOccurences = map (const []) vs
+  decisionTree <- toDecision initialOccurences vesMod
   return $ TermComp $ Comp $ CMeta {ctype = t} :< CompCase vs'' decisionTree
 polarize (_ :< WeakTermAsc e _) = polarize e
 

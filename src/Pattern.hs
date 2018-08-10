@@ -8,56 +8,45 @@ import           Control.Comonad.Cofree
 
 import           Control.Monad
 import           Control.Monad.State
+import           Control.Monad.Trans.Except
 
 import           Data
-import           Data.List              (nub, transpose)
+import           Data.List                  (nub, transpose)
 
 import           Debug.Trace
 
-import qualified Text.Show.Pretty       as Pr
+import qualified Text.Show.Pretty           as Pr
 
 type ClauseMatrix a = ([[Pat]], [a])
 
 -- Muranget, "Compiling Pattern Matching to Good Decision Trees", 2008
-toDecision ::
-     (Show a)
-  => ValueType
-  -> [Occurrence]
-  -> ClauseMatrix a
-  -> WithEnv (Decision a)
-toDecision _ _ ([], _) = return $ DecisionFail
-toDecision _ _ (_, []) = return $ DecisionFail
-toDecision vt os (patMat, bodyList) = do
-  case findPatApp patMat of
-    Nothing -> return $ DecisionLeaf (head bodyList)
-    Just i -> do
-      if i /= 0
-        then do
-          let patMat' = swapColumn 0 i patMat
-          let os' = swapColumn 0 i os
-          DecisionSwap i <$> toDecision vt os' (patMat', bodyList)
-        else do
-          consList <- headConstructor patMat
-          let consList' = nub consList
-          let specializeByConstructor c a = do
-                let os' = (map (\j -> head os ++ [j]) [1 .. a]) ++ tail os
-                tmp <- toDecision vt os' (specialize c a (patMat, bodyList))
-                return (c, tmp)
-          newMatrixList <- mapM (uncurry specializeByConstructor) consList'
-          case vt of
-            ValueTypeNode s _ -> do
-              cenv <- lookupConstructorEnv s
-              liftIO $
-                putStrLn $ "cenv for " ++ show s ++ ":\n" ++ Pr.ppShow cenv
-              if length cenv <= length consList
-                then return $ DecisionSwitch (head os) $ newMatrixList
-                else do
-                  dmat <-
-                    toDecision vt (tail os) $ defaultMatrix (patMat, bodyList)
-                  return $
-                    DecisionSwitch (head os) $
-                    newMatrixList ++ [("default", dmat)]
-            _ -> undefined
+toDecision :: (Show a) => [Occurrence] -> ClauseMatrix a -> WithEnv (Decision a)
+toDecision _ ([], _) = return $ DecisionFail
+toDecision _ (_, []) = return $ DecisionFail
+toDecision os (patMat, bodyList)
+  | Nothing <- findPatApp patMat = return $ DecisionLeaf (head bodyList)
+  | Just i <- findPatApp patMat
+  , i /= 0 = do
+    let patMat' = swapColumn 0 i patMat
+    let os' = swapColumn 0 i os
+    DecisionSwap i <$> toDecision os' (patMat', bodyList)
+  | Just _ <- findPatApp patMat = do
+    consList <- headConstructor patMat
+    let consList' = nub consList
+    newMatrixList <-
+      forM consList' $ \(c, a) -> do
+        let os' = (map (\j -> head os ++ [j]) [1 .. a]) ++ tail os
+        tmp <- toDecision os' $ specialize c a (patMat, bodyList)
+        return (c, tmp)
+    cenv <- getCEnv patMat
+    if length cenv <= length consList
+      then return $ DecisionSwitch (head os) $ newMatrixList
+      else do
+        let dmat = defaultMatrix (patMat, bodyList)
+        dmat' <- toDecision (tail os) dmat
+        return $
+          DecisionSwitch (head os) $ newMatrixList ++ [("default", dmat')]
+  | otherwise = undefined
 
 patDist :: [([Pat], a)] -> ([[Pat]], [a])
 patDist [] = ([], [])
@@ -66,6 +55,15 @@ patDist ((ps, body):rest) = do
   (ps : pss, body : bodyList)
 
 type Arity = Int
+
+getCEnv :: [[Pat]] -> WithEnv [Identifier]
+getCEnv [] = lift $ throwE "empty pattern"
+getCEnv ([]:_) = lift $ throwE "empty pattern"
+getCEnv (((Meta {ident = i} :< _):_):_) = do
+  t <- lookupWTEnv i
+  case t of
+    Just (WeakTypeNode s _) -> lookupConstructorEnv s
+    _                       -> undefined
 
 headConstructor :: [[Pat]] -> WithEnv [(Identifier, Arity)]
 headConstructor ([]) = return []
