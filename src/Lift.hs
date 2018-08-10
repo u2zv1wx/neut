@@ -53,11 +53,23 @@ liftC (Comp (CMeta {ctype = ct} :< CompMu s c)) = do
   return $ appMuAbsC
 liftC (Comp (i :< CompCase vs vcs)) = do
   vs' <- mapM liftV vs
-  vcs' <-
-    forM vcs $ \(pat, c) -> do
-      Comp c' <- liftC (Comp c)
-      return (pat, c')
+  vcs' <- liftDecision vcs
   return $ Comp $ i :< CompCase vs' vcs'
+
+liftDecision ::
+     Decision (Cofree (CompF Value) CMeta)
+  -> WithEnv (Decision (Cofree (CompF Value) CMeta))
+liftDecision (DecisionLeaf c) = do
+  Comp c' <- liftC $ Comp c
+  return $ DecisionLeaf c'
+liftDecision DecisionFail = return $ DecisionFail
+liftDecision (DecisionSwitch o ids) = do
+  let (is, ds) = unzip ids
+  ds' <- mapM liftDecision ds
+  return $ DecisionSwitch o $ zip is ds'
+liftDecision (DecisionSwap i d) = do
+  d' <- liftDecision d
+  return $ DecisionSwap i d'
 
 type VIdentifier = (VMeta, Identifier)
 
@@ -108,11 +120,25 @@ supplyC self args (Comp (i :< CompMu s c)) = do
   return $ Comp $ i :< CompMu s c'
 supplyC self args (Comp (i :< CompCase vs vcs)) = do
   vs' <- mapM (supplyV self args) vs
-  vcs' <-
-    forM vcs $ \(v, c) -> do
-      Comp c' <- supplyC self args $ Comp c
-      return (v, c')
+  vcs' <- supplyDecision self args vcs
   return $ Comp $ i :< CompCase vs' vcs'
+
+supplyDecision ::
+     Identifier
+  -> [(Identifier, VIdentifier)]
+  -> Decision (Cofree (CompF Value) CMeta)
+  -> WithEnv (Decision (Cofree (CompF Value) CMeta))
+supplyDecision self args (DecisionLeaf c) = do
+  Comp c' <- supplyC self args $ Comp c
+  return $ DecisionLeaf c'
+supplyDecision _ _ DecisionFail = return $ DecisionFail
+supplyDecision self args (DecisionSwitch o ids) = do
+  let (is, ds) = unzip ids
+  ds' <- mapM (supplyDecision self args) ds
+  return $ DecisionSwitch o $ zip is ds'
+supplyDecision self args (DecisionSwap i d) = do
+  d' <- supplyDecision self args d
+  return $ DecisionSwap i d'
 
 varP :: Value -> [(VMeta, Identifier)]
 varP (Value (meta :< ValueVar s))     = [(meta, s)]
@@ -128,13 +154,14 @@ varN (Comp (_ :< CompBind s e1 e2)) =
 varN (Comp (_ :< CompUnthunk v _)) = varP v
 varN (Comp (_ :< CompMu s e)) = filter (\(_, t) -> t /= s) (varN (Comp e))
 varN (Comp (_ :< CompCase vs ves)) = do
-  let efs = join $ map varP vs
-  vefss <-
-    forM ves $ \(pat, body) -> do
-      let bound = join $ map varPat pat
-      let fs = varN $ Comp body
-      return $ filter (\(_, k) -> k `notElem` bound) fs
-  efs ++ join vefss
+  undefined
+  -- let efs = join $ map varP vs
+  -- vefss <-
+  --   forM ves $ \(pat, body) -> do
+  --     let bound = join $ map varPat pat
+  --     let fs = varN $ Comp body
+  --     return $ filter (\(_, k) -> k `notElem` bound) fs
+  -- efs ++ join vefss
 
 varPat :: Pat -> [Identifier]
 varPat (_ :< PatVar s)    = [s]

@@ -135,14 +135,20 @@ deriving instance Functor PatF
 
 type Pat = Cofree PatF Meta
 
+type Occurrence = [Int]
+
 data Decision a
   = DecisionLeaf a
   | DecisionFail
-  | DecisionSwitch [Int]
+  | DecisionSwitch Occurrence
                    [(Identifier, Decision a)]
   | DecisionSwap Int
                  (Decision a)
   deriving (Show)
+
+deriving instance Functor Decision
+
+$(deriveShow1 ''Decision)
 
 -- value / positive term
 -- v ::= x
@@ -179,7 +185,7 @@ data CompF v c
   | CompMu Identifier
            c
   | CompCase [v]
-             [([Pat], c)]
+             (Decision c)
   deriving (Show)
 
 $(deriveShow1 ''ValueF)

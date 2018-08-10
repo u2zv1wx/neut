@@ -8,6 +8,7 @@ import           Control.Monad.State
 import           Control.Monad.Trans.Except
 
 import           Data
+import           Pattern
 
 polarize :: WeakTerm -> WithEnv Term
 polarize (Meta {ident = i} :< WeakTermVar s) = do
@@ -97,7 +98,12 @@ polarize (Meta {ident = i} :< WeakTermCase vs ves) = do
           TermValue (Value v) -> return $ Value v
           _ -> lift $ throwE $ "the polarity of " ++ show v ++ " is wrong"
   vs'' <- mapM sanitizer vs'
-  return $ TermComp $ Comp $ CMeta {ctype = t} :< CompCase vs'' ves'
+  -- create a decision tree from the pattern
+  let vesMod = patDist ves'
+  let initialOccurences = map (const [0]) vs
+  let decisionTree = toDecision initialOccurences vesMod
+  return $ TermComp $ Comp $ CMeta {ctype = t} :< CompCase vs'' decisionTree
+  -- return $ TermComp $ Comp $ CMeta {ctype = t} :< CompCase vs'' ves'
 polarize (_ :< WeakTermAsc e _) = polarize e
 
 polarizeType :: WeakType -> WithEnv Type
