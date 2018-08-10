@@ -28,7 +28,7 @@ polarize (Meta {ident = i} :< WeakTermNodeApp s vs) = do
   vs' <- mapM polarize vs
   vs'' <- mapM sanitizer vs'
   return $ TermValue $ Value $ VMeta {vtype = t} :< ValueNodeApp s vs''
-polarize (Meta {ident = i} :< WeakTermLam (s, _) e) = do
+polarize (Meta {ident = i} :< WeakTermLam s e) = do
   t <- findTypeC i
   mc <- polarize e
   case mc of
@@ -110,6 +110,7 @@ polarize (_ :< WeakTermAsc e _) = polarize e
 
 polarizeType :: WeakType -> WithEnv Type
 polarizeType (WeakTypeVar i) = return $ TypeValueType (ValueTypeVar i)
+polarizeType (WeakTypePosHole i) = return $ TypeValueType (ValueTypeVar i)
 polarizeType (WeakTypeNode x ts) = do
   let sanitizer v =
         case v of

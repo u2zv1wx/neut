@@ -27,11 +27,11 @@ parseTerm (meta :< TreeAtom s) = return (meta :< WeakTermVar s)
 parseTerm (meta :< TreeNode [_ :< TreeAtom "thunk", te]) = do
   e <- parseTerm te
   return (meta :< WeakTermThunk e)
-parseTerm (meta :< TreeNode [_ :< TreeAtom "lambda", _ :< TreeNode [_ :< TreeAtom s, tp], te]) = do
-  s' <- strOrNewName s
-  p <- parseType tp
+parseTerm (meta :< TreeNode [_ :< TreeAtom "lambda", _ :< TreeNode ts, te]) = do
+  xs <- parseIdentSeq ts
   e <- parseTerm te
-  return (meta :< WeakTermLam (s', p) e)
+  _ :< term <- foldMTermR WeakTermLam e xs
+  return $ meta :< term
 parseTerm (meta :< TreeNode [_ :< TreeAtom "return", tv]) = do
   v <- parseTerm tv
   return (meta :< WeakTermRet v)
@@ -87,6 +87,14 @@ parseTermNodeApp meta s tvs = do
   return $ meta :< WeakTermNodeApp s vs
   -- foldMTerm WeakTermNodeApp e vs
 
+parseIdentSeq :: [Tree] -> WithEnv [Identifier]
+parseIdentSeq [] = return []
+parseIdentSeq ((_ :< TreeAtom s):ts) = do
+  xs <- parseIdentSeq ts
+  return $ s : xs
+parseIdentSeq t =
+  lift $ throwE $ "parseIdentSeq: syntax error:\n" ++ Pr.ppShow t
+
 parsePat :: Tree -> WithEnv Pat
 parsePat (meta :< TreeAtom s) = do
   msym <- lookupVEnv s
@@ -115,7 +123,7 @@ parseClause t = lift $ throwE $ "parseClause: syntax error:\n" ++ Pr.ppShow t
 parseType :: Tree -> WithEnv WeakType
 parseType (_ :< TreeAtom "_") = do
   name <- newNameWith "hole"
-  return (WeakTypeHole name)
+  return (WeakTypePosHole name)
 parseType (_ :< TreeAtom "universe") = WeakTypeUniv . WeakLevelHole <$> newName
 parseType (_ :< TreeAtom s) = return $ WeakTypeVar s
 parseType (Meta {ident = i} :< TreeNode [_ :< TreeAtom "down", tn]) = do

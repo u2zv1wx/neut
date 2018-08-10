@@ -64,7 +64,8 @@ data IdentOrHole
 -- WT ::= P | N
 data WeakType
   = WeakTypeVar Identifier
-  | WeakTypeHole Identifier
+  | WeakTypePosHole Identifier
+  | WeakTypeNegHole Identifier
   | WeakTypeNode Identifier
                  [WeakType]
   | WeakTypeUp WeakType
@@ -215,7 +216,7 @@ data WeakTermF a
   | WeakTermNodeApp Identifier
                     [a]
   | WeakTermThunk a
-  | WeakTermLam (Identifier, WeakType)
+  | WeakTermLam Identifier
                 a
   | WeakTermApp a
                 a
@@ -443,6 +444,18 @@ foldMTerm f e (t:ts) = do
   let tmp = f e t
   i <- newName
   foldMTerm f (Meta {ident = i} :< tmp) ts
+
+foldMTermR ::
+     (a -> Cofree f Meta -> f (Cofree f Meta))
+  -> Cofree f Meta
+  -> [a]
+  -> StateT Env (ExceptT String IO) (Cofree f Meta)
+foldMTermR _ e [] = return e
+foldMTermR f e (t:ts) = do
+  tmp <- foldMTermR f e ts
+  let x = f t tmp
+  i <- newName
+  return $ Meta {ident = i} :< x
 
 data Data
   = DataPointer Identifier -- var is something that points already-allocated data

@@ -35,11 +35,12 @@ infer (Meta {ident = i} :< WeakTermVar s) = do
       insWTEnv i t
       return t
     Nothing -> do
-      new <- WeakTypeHole <$> newName
+      new <- WeakTypePosHole <$> newName
       insWTEnv s new
       insWTEnv i new
       return new
-infer (Meta {ident = i} :< WeakTermLam (s, t) e) = do
+infer (Meta {ident = i} :< WeakTermLam s e) = do
+  t <- WeakTypePosHole <$> newName
   insWTEnv s t
   te <- infer e
   let result = WeakTypeForall (Ident s, t) te
@@ -59,10 +60,10 @@ infer (Meta {ident = l} :< WeakTermApp e v) = do
   te <- infer e
   tv <- infer v
   i <- newName
-  insWTEnv i (WeakTypeHole i)
+  insWTEnv i (WeakTypeNegHole i)
   j <- newName
-  insCEnv te (WeakTypeForall (Hole j, tv) (WeakTypeHole i))
-  let result = WeakTypeHole i
+  insCEnv te (WeakTypeForall (Hole j, tv) (WeakTypeNegHole i))
+  let result = WeakTypeNegHole i
   insWTEnv l result
   return result
 infer (Meta {ident = i} :< WeakTermRet v) = do
@@ -85,8 +86,8 @@ infer (Meta {ident = i} :< WeakTermThunk e) = do
 infer (Meta {ident = l} :< WeakTermUnthunk v) = do
   t <- infer v
   i <- newName
-  insCEnv t (WeakTypeDown (WeakTypeHole i) l)
-  let result = WeakTypeHole i
+  insCEnv t (WeakTypeDown (WeakTypeNegHole i) l)
+  let result = WeakTypeNegHole i
   insWTEnv l result
   return result
 infer (Meta {ident = i} :< WeakTermMu (s, t) e) = do
@@ -100,7 +101,7 @@ infer (Meta {ident = i} :< WeakTermCase vs vses) = do
   let (vss, es) = unzip vses
   tvss <- mapM (mapM inferPat) vss
   forM_ tvss $ \tvs -> do forM_ (zip ts tvs) $ \(t1, t2) -> do insCEnv t1 t2
-  ans <- WeakTypeHole <$> newName
+  ans <- WeakTypeNegHole <$> newName
   tes <- mapM infer es
   forM_ tes $ \te -> insCEnv ans te
   insWTEnv i ans
@@ -119,7 +120,7 @@ inferPat (Meta {ident = i} :< PatVar s) = do
       insWTEnv i t
       return t
     Nothing -> do
-      new <- WeakTypeHole <$> newName
+      new <- WeakTypePosHole <$> newName
       insWTEnv s new
       insWTEnv i new
       return new
@@ -140,10 +141,16 @@ type Constraint = [(WeakType, WeakType)]
 
 unify :: Constraint -> WithEnv Subst
 unify [] = return []
-unify ((WeakTypeHole s, t2):cs) = do
+unify ((WeakTypePosHole s, t2):cs) = do
   sub <- unify (sConstraint [(s, t2)] cs)
   return $ compose sub [(s, t2)]
-unify ((t1, WeakTypeHole s):cs) = do
+unify ((t1, WeakTypePosHole s):cs) = do
+  sub <- unify (sConstraint [(s, t1)] cs)
+  return $ compose sub [(s, t1)]
+unify ((WeakTypeNegHole s, t2):cs) = do
+  sub <- unify (sConstraint [(s, t2)] cs)
+  return $ compose sub [(s, t2)]
+unify ((t1, WeakTypeNegHole s):cs) = do
   sub <- unify (sConstraint [(s, t1)] cs)
   return $ compose sub [(s, t1)]
 unify ((WeakTypeVar s1, WeakTypeVar s2):cs)
@@ -176,9 +183,13 @@ compose s1 s2 = do
 
 sType :: Subst -> WeakType -> WeakType
 sType _ (WeakTypeVar s) = WeakTypeVar s
-sType sub (WeakTypeHole s) =
+sType sub (WeakTypePosHole s) =
   case lookup s sub of
-    Nothing -> WeakTypeHole s
+    Nothing -> WeakTypePosHole s
+    Just t  -> t
+sType sub (WeakTypeNegHole s) =
+  case lookup s sub of
+    Nothing -> WeakTypeNegHole s
     Just t  -> t
 sType sub (WeakTypeUp t) = do
   let t' = sType sub t
@@ -240,7 +251,8 @@ argCompose s1 s2 = do
 
 applyArgSubst :: ArgSubst -> WeakType -> WeakType
 applyArgSubst _ (WeakTypeVar s) = WeakTypeVar s
-applyArgSubst _ (WeakTypeHole s) = WeakTypeHole s
+applyArgSubst _ (WeakTypePosHole s) = WeakTypePosHole s
+applyArgSubst _ (WeakTypeNegHole s) = WeakTypeNegHole s
 applyArgSubst sub (WeakTypeNode x ts) = do
   let ts' = map (applyArgSubst sub) ts
   WeakTypeNode x ts'

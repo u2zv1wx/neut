@@ -15,12 +15,11 @@ rename (i :< WeakTermNodeApp s []) = return (i :< WeakTermNodeApp s [])
 rename (i :< WeakTermNodeApp s vs) = do
   vs' <- mapM rename vs
   return (i :< WeakTermNodeApp s vs')
-rename (i :< WeakTermLam (s, t) e) = do
-  t' <- renameType t
+rename (i :< WeakTermLam s e) = do
   local $ do
     s' <- newNameWith s
     e' <- rename e
-    return (i :< WeakTermLam (s', t') e')
+    return (i :< WeakTermLam s' e')
 rename (i :< WeakTermApp e v) = do
   e' <- rename e
   v' <- rename v
@@ -69,7 +68,8 @@ rename (i :< WeakTermAsc e t) = do
 
 renameType :: WeakType -> WithEnv WeakType
 renameType (WeakTypeVar s) = WeakTypeVar <$> renameString s
-renameType (WeakTypeHole i) = return (WeakTypeHole i)
+renameType (WeakTypePosHole i) = return (WeakTypePosHole i)
+renameType (WeakTypeNegHole i) = return (WeakTypeNegHole i)
 renameType (WeakTypeUp t) = WeakTypeUp <$> renameType t
 renameType (WeakTypeDown t i) = do
   t' <- renameType t
