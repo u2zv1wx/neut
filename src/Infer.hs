@@ -145,7 +145,7 @@ inferPat (Meta {ident = i} :< PatApp s []) = do
 inferPat (Meta {ident = _} :< PatApp s vs) = do
   mt <- lookupVEnv s
   case mt of
-    Nothing -> undefined
+    Nothing -> lift $ throwE $ "const " ++ s ++ " is not defined"
     Just t -> do
       is <- forM vs $ \_ -> newName
       ts <- mapM inferPat vs

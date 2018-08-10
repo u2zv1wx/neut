@@ -7,6 +7,8 @@ import           Control.Comonad.Cofree
 import           Control.Monad.State
 import           Control.Monad.Trans.Except
 
+import qualified Text.Show.Pretty           as Pr
+
 import           Data
 import           Pattern
 
@@ -100,6 +102,7 @@ polarize (Meta {ident = i} :< WeakTermCase vs ves) = do
   vs'' <- mapM sanitizer vs'
   -- create a decision tree from the pattern
   let vesMod = patDist ves'
+  liftIO $ putStrLn $ Pr.ppShow vesMod
   let initialOccurences = map (const [0]) vs
   let decisionTree = toDecision initialOccurences vesMod
   return $ TermComp $ Comp $ CMeta {ctype = t} :< CompCase vs'' decisionTree

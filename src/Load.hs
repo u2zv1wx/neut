@@ -53,6 +53,7 @@ load' (a:as) = do
   e <- parseTerm a'
   liftIO $ putStrLn $ Pr.ppShow e
   e' <- rename e
+  liftIO $ putStrLn $ Pr.ppShow e'
   check e'
   env <- get
   let wtenv = weakTypeEnv env
