@@ -134,12 +134,17 @@ type Pat = Cofree PatF Meta
 
 type Occurrence = [Int]
 
+data Case
+  = CaseSwitch Identifier -- the naem of constructor
+  | CaseDefault [Identifier] -- arguments
+  deriving (Show)
+
 data Decision a
   = DecisionLeaf [Identifier]
                  a
   | DecisionFail
   | DecisionSwitch Occurrence
-                   [((Identifier, [Identifier]), Decision a)]
+                   [(Case, Decision a)]
   | DecisionSwap Int
                  (Decision a)
   deriving (Show)

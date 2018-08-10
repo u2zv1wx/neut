@@ -41,7 +41,7 @@ toDecision os (patMat, bodyList)
         let os' = (map (\j -> head os ++ [j]) [1 .. a]) ++ tail os
         (tmp, _) <- specialize c a (patMat, bodyList)
         tmp' <- toDecision os' tmp
-        return ((c, []), tmp')
+        return (CaseSwitch c, tmp')
     cenv <- getCEnv patMat
     if length cenv <= length consList
       then return $ DecisionSwitch (head os) $ newMatrixList
@@ -50,7 +50,7 @@ toDecision os (patMat, bodyList)
         dmat <- toDecision (tail os) $ tmp
         return $
           DecisionSwitch (head os) $
-          newMatrixList ++ [(("default", bounds), dmat)]
+          newMatrixList ++ [(CaseDefault bounds, dmat)]
 
 patDist :: [([Pat], a)] -> ([[Pat]], [a])
 patDist [] = ([], [])
