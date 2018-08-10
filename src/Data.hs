@@ -371,6 +371,13 @@ lookupCodeEnv s = do
   codeEnv <- liftIO $ readIORef codeEnvRef
   return $ lookup s codeEnv
 
+lookupConstructorEnv :: Identifier -> WithEnv [Identifier]
+lookupConstructorEnv cons = do
+  env <- get
+  case lookup cons (constructorEnv env) of
+    Nothing -> lift $ throwE $ "no such constructor defined: " ++ show cons
+    Just cenvRef -> liftIO $ readIORef cenvRef
+
 insWTEnv :: String -> WeakType -> WithEnv ()
 insWTEnv s t = modify (\e -> e {weakTypeEnv = (s, t) : weakTypeEnv e})
 

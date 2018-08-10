@@ -7,6 +7,7 @@ module Pattern
 import           Control.Comonad.Cofree
 
 import           Control.Monad
+import           Control.Monad.State
 
 import           Data
 import           Data.List              (nub, transpose)
@@ -18,27 +19,45 @@ import qualified Text.Show.Pretty       as Pr
 type ClauseMatrix a = ([[Pat]], [a])
 
 -- Muranget, "Compiling Pattern Matching to Good Decision Trees", 2008
-toDecision :: (Show a) => [Occurrence] -> ClauseMatrix a -> Decision a
-toDecision _ ([], _) = DecisionFail
-toDecision _ (_, []) = DecisionFail
-toDecision os (patMat, bodyList) =
-  trace
-    ("patMat:\n" ++ Pr.ppShow patMat ++ "\nbodyList:\n" ++ Pr.ppShow bodyList) $ do
-    case findPatApp patMat of
-      Nothing -> DecisionLeaf (head bodyList)
-      Just i -> do
-        if i /= 0
-          then do
-            let patMat' = swapColumn 0 i patMat
-            let os' = swapColumn 0 i os
-            DecisionSwap i $ toDecision os' (patMat', bodyList)
-          else do
-            let consList = nub $ headConstructor patMat
-            let specializeByConstructor c a = do
-                  let os' = (map (\j -> head os ++ [j]) [1 .. a]) ++ tail os
-                  (c, toDecision os' (specialize c a (patMat, bodyList)))
-            let newMatrixList = map (uncurry specializeByConstructor) consList
-            DecisionSwitch (head os) $ newMatrixList
+toDecision ::
+     (Show a)
+  => ValueType
+  -> [Occurrence]
+  -> ClauseMatrix a
+  -> WithEnv (Decision a)
+toDecision _ _ ([], _) = return $ DecisionFail
+toDecision _ _ (_, []) = return $ DecisionFail
+toDecision vt os (patMat, bodyList) = do
+  case findPatApp patMat of
+    Nothing -> return $ DecisionLeaf (head bodyList)
+    Just i -> do
+      if i /= 0
+        then do
+          let patMat' = swapColumn 0 i patMat
+          let os' = swapColumn 0 i os
+          DecisionSwap i <$> toDecision vt os' (patMat', bodyList)
+        else do
+          consList <- headConstructor patMat
+          let consList' = nub consList
+          let specializeByConstructor c a = do
+                let os' = (map (\j -> head os ++ [j]) [1 .. a]) ++ tail os
+                tmp <- toDecision vt os' (specialize c a (patMat, bodyList))
+                return (c, tmp)
+          newMatrixList <- mapM (uncurry specializeByConstructor) consList'
+          case vt of
+            ValueTypeNode s _ -> do
+              cenv <- lookupConstructorEnv s
+              liftIO $
+                putStrLn $ "cenv for " ++ show s ++ ":\n" ++ Pr.ppShow cenv
+              if length cenv <= length consList
+                then return $ DecisionSwitch (head os) $ newMatrixList
+                else do
+                  dmat <-
+                    toDecision vt (tail os) $ defaultMatrix (patMat, bodyList)
+                  return $
+                    DecisionSwitch (head os) $
+                    newMatrixList ++ [("default", dmat)]
+            _ -> undefined
 
 patDist :: [([Pat], a)] -> ([[Pat]], [a])
 patDist [] = ([], [])
@@ -48,15 +67,23 @@ patDist ((ps, body):rest) = do
 
 type Arity = Int
 
-headConstructor :: [[Pat]] -> [(Identifier, Arity)]
-headConstructor ([]) = []
+headConstructor :: [[Pat]] -> WithEnv [(Identifier, Arity)]
+headConstructor ([]) = return []
 headConstructor (ps:pss) = do
-  join $ headConstructor' ps : map headConstructor' pss
+  ps' <- headConstructor' ps
+  pss' <- mapM headConstructor' pss
+  return $ join $ ps' : pss'
 
-headConstructor' :: [Pat] -> [(Identifier, Arity)]
-headConstructor' []                       = []
-headConstructor' ((_ :< PatVar _):_)      = []
-headConstructor' ((_ :< PatApp s args):_) = [(s, length args)]
+headConstructor' :: [Pat] -> WithEnv [(Identifier, Arity)]
+headConstructor' [] = return []
+headConstructor' ((Meta {ident = i} :< PatVar _):_) = do
+  wt <- lookupWTEnv i
+  liftIO $ putStrLn $ "type: " ++ Pr.ppShow wt
+  return []
+headConstructor' ((Meta {ident = i} :< PatApp s args):_) = do
+  wt <- lookupWTEnv i
+  liftIO $ putStrLn $ "type: " ++ Pr.ppShow wt
+  return [(s, length args)]
 
 findPatApp :: [[Pat]] -> Maybe Int
 findPatApp [] = Nothing
