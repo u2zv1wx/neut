@@ -35,12 +35,11 @@ parseTerm (meta :< TreeNode [_ :< TreeAtom "lambda", _ :< TreeNode ts, te]) = do
 parseTerm (meta :< TreeNode [_ :< TreeAtom "return", tv]) = do
   v <- parseTerm tv
   return (meta :< WeakTermRet v)
-parseTerm (meta :< TreeNode [_ :< TreeAtom "bind", _ :< TreeNode [_ :< TreeAtom s, tp], te1, te2]) = do
+parseTerm (meta :< TreeNode [_ :< TreeAtom "bind", _ :< TreeAtom s, te1, te2]) = do
   s' <- strOrNewName s
-  p <- parseType tp
   e1 <- parseTerm te1
   e2 <- parseTerm te2
-  return (meta :< WeakTermBind (s', p) e1 e2)
+  return (meta :< WeakTermBind s' e1 e2)
 parseTerm (meta :< TreeNode [_ :< TreeAtom "unthunk", tv]) = do
   v <- parseTerm tv
   return (meta :< WeakTermUnthunk v)

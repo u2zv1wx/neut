@@ -71,7 +71,8 @@ infer (Meta {ident = i} :< WeakTermRet v) = do
   let result = WeakTypeUp tv
   insWTEnv i result
   return result
-infer (Meta {ident = i} :< WeakTermBind (s, t) e1 e2) = do
+infer (Meta {ident = i} :< WeakTermBind s e1 e2) = do
+  t <- WeakTypePosHole <$> newName
   insWTEnv s t
   t1 <- infer e1
   t2 <- infer e2

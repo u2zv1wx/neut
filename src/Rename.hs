@@ -27,12 +27,11 @@ rename (i :< WeakTermApp e v) = do
 rename (i :< WeakTermRet v) = do
   v' <- rename v
   return (i :< WeakTermRet v')
-rename (i :< WeakTermBind (s, t) e1 e2) = do
+rename (i :< WeakTermBind s e1 e2) = do
   e1' <- rename e1
   s' <- newNameWith s
-  t' <- renameType t
   e2' <- rename e2
-  return (i :< WeakTermBind (s', t') e1' e2')
+  return (i :< WeakTermBind s' e1' e2')
 rename (i :< WeakTermThunk e) = do
   e' <- rename e
   return (i :< WeakTermThunk e')

@@ -221,7 +221,7 @@ data WeakTermF a
   | WeakTermApp a
                 a
   | WeakTermRet a
-  | WeakTermBind (Identifier, WeakType)
+  | WeakTermBind Identifier
                  a
                  a
   | WeakTermUnthunk a

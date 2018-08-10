@@ -51,7 +51,7 @@ polarize (Meta {ident = i} :< WeakTermRet e) = do
   case mv of
     TermValue v -> return $ TermComp $ Comp $ CMeta {ctype = t} :< CompRet v
     _ -> lift $ throwE $ "the polarity of " ++ show e ++ " is wrong"
-polarize (Meta {ident = i} :< WeakTermBind (s, _) e1 e2) = do
+polarize (Meta {ident = i} :< WeakTermBind s e1 e2) = do
   t <- findTypeC i
   mc1 <- polarize e1
   mc2 <- polarize e2
