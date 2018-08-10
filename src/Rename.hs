@@ -91,6 +91,20 @@ renameType (WeakTypeNode s ts) = do
   ts' <- mapM renameType ts
   return $ WeakTypeNode s ts'
 
+renameNodeType ::
+     [(Identifier, WeakType)]
+  -> WeakType
+  -> WithEnv ([(Identifier, WeakType)], WeakType)
+renameNodeType [] t = do
+  t' <- renameType t
+  return ([], t')
+renameNodeType ((i, wt):wts) t = do
+  wt' <- renameType wt
+  local $ do
+    i' <- newNameWith i
+    (wts', t') <- renameNodeType wts t
+    return ((i', wt') : wts', t')
+
 renameString :: String -> WithEnv String
 renameString s = do
   env <- get

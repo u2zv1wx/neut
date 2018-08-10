@@ -39,8 +39,9 @@ load' ((_ :< TreeNode [_ :< TreeAtom "reserve", _ :< TreeAtom s]):as) = do
 load' ((_ :< TreeNode [_ :< TreeAtom "value", _ :< TreeAtom s, _ :< TreeNode tps, tp]):as) = do
   mts <- mapM parseNodeTypeArg tps
   mt <- parseType tp
-  ts <- polarizeTypeArg mts -- todo : check free var occurrence
-  t <- polarizeType mt
+  (mts', mt') <- renameNodeType mts mt
+  ts <- polarizeTypeArg mts' -- todo : check free var occurrence
+  t <- polarizeType mt'
   case t of
     TypeValueType t@(ValueTypeNode k _) -> do
       modify (\e -> e {valueEnv = (s, ts, t) : valueEnv e})
