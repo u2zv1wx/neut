@@ -38,12 +38,11 @@ rename (i :< WeakTermThunk e) = do
 rename (i :< WeakTermUnthunk v) = do
   v' <- rename v
   return (i :< WeakTermUnthunk v')
-rename (i :< WeakTermMu (s, t) e) = do
-  t' <- renameType t
+rename (i :< WeakTermMu s e) = do
   local $ do
     s' <- newNameWith s
     e' <- rename e
-    return (i :< WeakTermMu (s', t') e')
+    return (i :< WeakTermMu s' e')
 rename (i :< WeakTermCase vs ves) = do
   vs' <- mapM rename vs
   ves' <-

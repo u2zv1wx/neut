@@ -225,7 +225,7 @@ data WeakTermF a
                  a
                  a
   | WeakTermUnthunk a
-  | WeakTermMu (Identifier, WeakType)
+  | WeakTermMu Identifier
                a
   | WeakTermCase [a]
                  [([Pat], a)]

@@ -91,7 +91,8 @@ infer (Meta {ident = l} :< WeakTermUnthunk v) = do
   let result = WeakTypeNegHole i
   insWTEnv l result
   return result
-infer (Meta {ident = i} :< WeakTermMu (s, t) e) = do
+infer (Meta {ident = i} :< WeakTermMu s e) = do
+  t <- WeakTypePosHole <$> newName
   insWTEnv s t
   te <- infer e
   insCEnv (WeakTypeDown te i) t

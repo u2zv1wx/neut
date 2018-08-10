@@ -76,7 +76,7 @@ polarize (Meta {ident = i} :< WeakTermUnthunk e) = do
     TermValue v ->
       return $ TermComp $ Comp $ CMeta {ctype = t} :< CompUnthunk v i
     _ -> lift $ throwE $ "the polarity of " ++ show e ++ " is wrong"
-polarize (Meta {ident = i} :< WeakTermMu (s, _) e) = do
+polarize (Meta {ident = i} :< WeakTermMu s e) = do
   t <- findTypeC i
   mc <- polarize e
   case mc of
