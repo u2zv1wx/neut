@@ -135,6 +135,15 @@ deriving instance Functor PatF
 
 type Pat = Cofree PatF Meta
 
+data Decision a
+  = DecisionLeaf a
+  | DecisionFail
+  | DecisionSwitch [Int]
+                   [(Identifier, Decision a)]
+  | DecisionSwap Int
+                 (Decision a)
+  deriving (Show)
+
 -- value / positive term
 -- v ::= x
 --     | {defined constant} <- nat, succ, etc.
@@ -169,8 +178,8 @@ data CompF v c
                 Identifier
   | CompMu Identifier
            c
-  | CompCase v
-             [(Pat, c)]
+  | CompCase [v]
+             [([Pat], c)]
   deriving (Show)
 
 $(deriveShow1 ''ValueF)
@@ -214,8 +223,8 @@ data WeakTermF a
   | WeakTermUnthunk a
   | WeakTermMu (Identifier, WeakType)
                a
-  | WeakTermCase a
-                 [(Pat, a)]
+  | WeakTermCase [a]
+                 [([Pat], a)]
   | WeakTermAsc a
                 WeakType
 

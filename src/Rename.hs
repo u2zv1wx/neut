@@ -46,13 +46,14 @@ rename (i :< WeakTermMu (s, t) e) = do
     s' <- newNameWith s
     e' <- rename e
     return (i :< WeakTermMu (s', t') e')
-rename (i :< WeakTermCase e ves) = do
-  e' <- rename e
+rename (i :< WeakTermCase vs ves) = do
+  vs' <- mapM rename vs
   ves' <-
     forM ves $ \(pat, body) ->
       local $ do
         env <- get
-        patEnvOrErr <- liftIO $ runWithEnv (renamePat pat) (env {nameEnv = []})
+        patEnvOrErr <-
+          liftIO $ runWithEnv (mapM renamePat pat) (env {nameEnv = []})
         case patEnvOrErr of
           Left err -> lift $ throwE err
           Right (pat', env') -> do
@@ -60,7 +61,7 @@ rename (i :< WeakTermCase e ves) = do
               (env {nameEnv = nameEnv env' ++ nameEnv env, count = count env'})
             body' <- rename body
             return (pat', body')
-  return (i :< WeakTermCase e' ves')
+  return (i :< WeakTermCase vs' ves')
 rename (i :< WeakTermAsc e t) = do
   e' <- rename e
   t' <- renameType t

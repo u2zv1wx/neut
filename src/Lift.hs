@@ -51,13 +51,13 @@ liftC (Comp (CMeta {ctype = ct} :< CompMu s c)) = do
   let muAbsC = CMeta {ctype = ct'} :< CompMu s absC
   appMuAbsC <- appFold (Comp muAbsC) freeVarsInBody
   return $ appMuAbsC
-liftC (Comp (i :< CompCase v vcs)) = do
-  v' <- liftV v
+liftC (Comp (i :< CompCase vs vcs)) = do
+  vs' <- mapM liftV vs
   vcs' <-
     forM vcs $ \(pat, c) -> do
       Comp c' <- liftC (Comp c)
       return (pat, c')
-  return $ Comp $ i :< CompCase v' vcs'
+  return $ Comp $ i :< CompCase vs' vcs'
 
 type VIdentifier = (VMeta, Identifier)
 
@@ -106,13 +106,13 @@ supplyC self args (Comp inner@(i :< CompUnthunk v j)) = do
 supplyC self args (Comp (i :< CompMu s c)) = do
   Comp c' <- supplyC self args $ Comp c
   return $ Comp $ i :< CompMu s c'
-supplyC self args (Comp (i :< CompCase v vcs)) = do
-  v' <- supplyV self args v
+supplyC self args (Comp (i :< CompCase vs vcs)) = do
+  vs' <- mapM (supplyV self args) vs
   vcs' <-
     forM vcs $ \(v, c) -> do
       Comp c' <- supplyC self args $ Comp c
       return (v, c')
-  return $ Comp $ i :< CompCase v' vcs'
+  return $ Comp $ i :< CompCase vs' vcs'
 
 varP :: Value -> [(VMeta, Identifier)]
 varP (Value (meta :< ValueVar s))     = [(meta, s)]
@@ -127,11 +127,11 @@ varN (Comp (_ :< CompBind s e1 e2)) =
   varN (Comp e1) ++ filter (\(_, t) -> t /= s) (varN (Comp e2))
 varN (Comp (_ :< CompUnthunk v _)) = varP v
 varN (Comp (_ :< CompMu s e)) = filter (\(_, t) -> t /= s) (varN (Comp e))
-varN (Comp (_ :< CompCase e ves)) = do
-  let efs = varP e
+varN (Comp (_ :< CompCase vs ves)) = do
+  let efs = join $ map varP vs
   vefss <-
     forM ves $ \(pat, body) -> do
-      let bound = varPat pat
+      let bound = join $ map varPat pat
       let fs = varN $ Comp body
       return $ filter (\(_, k) -> k `notElem` bound) fs
   efs ++ join vefss

@@ -106,11 +106,11 @@ infer (Meta {ident = i} :< WeakTermMu (s, t) e) = do
   insCEnv (WeakTypeDown te i) t
   insWTEnv i te
   return te
-infer (Meta {ident = i} :< WeakTermCase e ves) = do
-  t <- infer e
-  let (vs, es) = unzip ves
-  tvs <- mapM inferPat vs
-  forM_ tvs $ \tv -> insCEnv t tv
+infer (Meta {ident = i} :< WeakTermCase vs vses) = do
+  ts <- mapM infer vs
+  let (vss, es) = unzip vses
+  tvss <- mapM (mapM inferPat) vss
+  forM_ tvss $ \tvs -> do forM_ (zip ts tvs) $ \(t1, t2) -> do insCEnv t1 t2
   ans <- WeakTypeHole <$> newName
   tes <- mapM infer es
   forM_ tes $ \te -> insCEnv ans te

@@ -52,11 +52,11 @@ parseTerm (meta :< TreeNode [_ :< TreeAtom "mu", _ :< TreeNode [_ :< TreeAtom s,
   p <- parseType tp
   e <- parseTerm te
   return (meta :< WeakTermMu (s', p) e)
-parseTerm (meta :< TreeNode ((_ :< TreeAtom "case"):te:tves))
+parseTerm (meta :< TreeNode ((_ :< TreeAtom "match"):(_ :< TreeNode tvs):tves))
   | not (null tves) = do
-    e <- parseTerm te
+    vs <- mapM parseTerm tvs
     ves <- mapM parseClause tves
-    return (meta :< WeakTermCase e ves)
+    return (meta :< WeakTermCase vs ves)
 parseTerm (meta :< TreeNode [_ :< TreeAtom "ascribe", te, tn]) = do
   e <- parseTerm te
   n <- parseType tn
@@ -100,11 +100,11 @@ parsePat (meta :< TreeNode ((_ :< TreeAtom s):ts)) = do
       return $ meta :< PatApp s ts'
 parsePat t = lift $ throwE $ "parsePat: syntax error:\n" ++ Pr.ppShow t
 
-parseClause :: Tree -> WithEnv (Pat, WeakTerm)
-parseClause (_ :< TreeNode [tv, te]) = do
-  v <- parsePat tv
-  e <- parseTerm te
-  return (v, e)
+parseClause :: Tree -> WithEnv ([Pat], WeakTerm)
+parseClause (_ :< TreeNode [(_ :< TreeAtom "with"), (_ :< TreeNode tps), tbody]) = do
+  ps <- mapM parsePat tps
+  body <- parseTerm tbody
+  return (ps, body)
 parseClause t = lift $ throwE $ "parseClause: syntax error:\n" ++ Pr.ppShow t
 
 parseType :: Tree -> WithEnv WeakType

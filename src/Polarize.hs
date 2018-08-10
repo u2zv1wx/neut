@@ -80,7 +80,7 @@ polarize (Meta {ident = i} :< WeakTermMu (s, _) e) = do
     TermComp (Comp c) ->
       return $ TermComp $ Comp $ CMeta {ctype = t} :< CompMu s c
     _ -> lift $ throwE $ "the polarity of " ++ show e ++ " is wrong"
-polarize (Meta {ident = i} :< WeakTermCase e ves) = do
+polarize (Meta {ident = i} :< WeakTermCase vs ves) = do
   t <- findTypeC i
   ves' <-
     forM ves $ \(v, e) -> do
@@ -91,11 +91,13 @@ polarize (Meta {ident = i} :< WeakTermCase e ves) = do
           lift $
           throwE $
           "the polarity of " ++ show v ++ " or " ++ show e ++ " is wrong"
-  e' <- polarize e
-  case e' of
-    TermValue v ->
-      return $ TermComp $ Comp $ CMeta {ctype = t} :< CompCase v ves'
-    TermComp _ -> lift $ throwE $ "the polarity of " ++ show e ++ " is wrong"
+  vs' <- mapM polarize vs
+  let sanitizer v =
+        case v of
+          TermValue (Value v) -> return $ Value v
+          _ -> lift $ throwE $ "the polarity of " ++ show v ++ " is wrong"
+  vs'' <- mapM sanitizer vs'
+  return $ TermComp $ Comp $ CMeta {ctype = t} :< CompCase vs'' ves'
 polarize (_ :< WeakTermAsc e _) = polarize e
 
 polarizeType :: WeakType -> WithEnv Type

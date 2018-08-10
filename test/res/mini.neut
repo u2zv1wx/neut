@@ -28,3 +28,26 @@
   (bind (x type) (begin e+) (begin rest+)))
 
 (return true)
+
+;; これとか結構読みやすくていいんじゃない？
+(match (v1 ... vn)
+  (with ((succ x) (succ y))
+    (foo))
+  (with ((succ x))
+    foo)
+  (with (zero)
+    some-function))
+
+(match (v1 ... vn)
+  (((succ x) (succ y))
+   (foo))
+  (with ((succ x))
+    foo)
+  (with (zero)
+    some-function))
+
+(match (n)
+  (with ((zero)) ;; 意味的にはzeroよりも(zero)のほうが正しい
+    some-function)
+  (with ((succ x))
+    foo))
