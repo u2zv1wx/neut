@@ -59,9 +59,9 @@ liftC (Comp (i :< CompCase vs vcs)) = do
 liftDecision ::
      Decision (Cofree (CompF Value) CMeta)
   -> WithEnv (Decision (Cofree (CompF Value) CMeta))
-liftDecision (DecisionLeaf c) = do
+liftDecision (DecisionLeaf xs c) = do
   Comp c' <- liftC $ Comp c
-  return $ DecisionLeaf c'
+  return $ DecisionLeaf xs c'
 liftDecision DecisionFail = return $ DecisionFail
 liftDecision (DecisionSwitch o ids) = do
   let (is, ds) = unzip ids
@@ -128,9 +128,9 @@ supplyDecision ::
   -> [(Identifier, VIdentifier)]
   -> Decision (Cofree (CompF Value) CMeta)
   -> WithEnv (Decision (Cofree (CompF Value) CMeta))
-supplyDecision self args (DecisionLeaf c) = do
+supplyDecision self args (DecisionLeaf xs c) = do
   Comp c' <- supplyC self args $ Comp c
-  return $ DecisionLeaf c'
+  return $ DecisionLeaf xs c'
 supplyDecision _ _ DecisionFail = return $ DecisionFail
 supplyDecision self args (DecisionSwitch o ids) = do
   let (is, ds) = unzip ids

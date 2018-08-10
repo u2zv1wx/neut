@@ -134,10 +134,11 @@ type Pat = Cofree PatF Meta
 type Occurrence = [Int]
 
 data Decision a
-  = DecisionLeaf a
+  = DecisionLeaf [Identifier]
+                 a
   | DecisionFail
   | DecisionSwitch Occurrence
-                   [(Identifier, Decision a)]
+                   [((Identifier, [Identifier]), Decision a)]
   | DecisionSwap Int
                  (Decision a)
   deriving (Show)

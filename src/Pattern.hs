@@ -24,29 +24,33 @@ toDecision :: (Show a) => [Occurrence] -> ClauseMatrix a -> WithEnv (Decision a)
 toDecision _ ([], _) = return $ DecisionFail
 toDecision _ (_, []) = return $ DecisionFail
 toDecision os (patMat, bodyList)
-  | Nothing <- findPatApp patMat = return $ DecisionLeaf (head bodyList)
+  | Nothing <- findPatApp patMat = do
+    liftIO $ putStrLn $ "found Leaf. the patMat is:\n" ++ Pr.ppShow patMat
+    liftIO $ putStrLn $ "and the occurrence vector is:\n" ++ Pr.ppShow os
+    let vs = collectVar patMat
+    return $ DecisionLeaf vs (head bodyList)
   | Just i <- findPatApp patMat
   , i /= 0 = do
     let patMat' = swapColumn 0 i patMat
     let os' = swapColumn 0 i os
     DecisionSwap i <$> toDecision os' (patMat', bodyList)
-  | Just _ <- findPatApp patMat = do
-    consList <- headConstructor patMat
-    let consList' = nub consList
+  | otherwise = do
+    consList <- nub <$> headConstructor patMat
     newMatrixList <-
-      forM consList' $ \(c, a) -> do
+      forM consList $ \(c, a) -> do
         let os' = (map (\j -> head os ++ [j]) [1 .. a]) ++ tail os
-        tmp <- toDecision os' $ specialize c a (patMat, bodyList)
-        return (c, tmp)
+        (tmp, _) <- specialize c a (patMat, bodyList)
+        tmp' <- toDecision os' tmp
+        return ((c, []), tmp')
     cenv <- getCEnv patMat
     if length cenv <= length consList
       then return $ DecisionSwitch (head os) $ newMatrixList
       else do
-        let dmat = defaultMatrix (patMat, bodyList)
-        dmat' <- toDecision (tail os) dmat
+        (tmp, bounds) <- defaultMatrix (patMat, bodyList)
+        dmat <- toDecision (tail os) $ tmp
         return $
-          DecisionSwitch (head os) $ newMatrixList ++ [("default", dmat')]
-  | otherwise = undefined
+          DecisionSwitch (head os) $
+          newMatrixList ++ [(("default", bounds), dmat)]
 
 patDist :: [([Pat], a)] -> ([[Pat]], [a])
 patDist [] = ([], [])
@@ -73,15 +77,21 @@ headConstructor (ps:pss) = do
   return $ join $ ps' : pss'
 
 headConstructor' :: [Pat] -> WithEnv [(Identifier, Arity)]
-headConstructor' [] = return []
-headConstructor' ((Meta {ident = i} :< PatVar _):_) = do
-  wt <- lookupWTEnv i
-  liftIO $ putStrLn $ "type: " ++ Pr.ppShow wt
-  return []
-headConstructor' ((Meta {ident = i} :< PatApp s args):_) = do
-  wt <- lookupWTEnv i
-  liftIO $ putStrLn $ "type: " ++ Pr.ppShow wt
-  return [(s, length args)]
+headConstructor' []                       = return []
+headConstructor' ((_ :< PatVar _):_)      = return []
+headConstructor' ((_ :< PatApp s args):_) = return [(s, length args)]
+
+collectVar :: [[Pat]] -> [Identifier]
+collectVar [] = []
+collectVar (ps:pss) = do
+  let vs1 = collectVar' ps
+  let vs2 = collectVar pss
+  vs1 ++ vs2
+
+collectVar' :: [Pat] -> [Identifier]
+collectVar' []                   = []
+collectVar' ((_ :< PatVar s):ps) = s : collectVar' ps
+collectVar' (_:ps)               = collectVar' ps
 
 findPatApp :: [[Pat]] -> Maybe Int
 findPatApp [] = Nothing
@@ -95,30 +105,44 @@ findPatApp' []                       = Nothing
 findPatApp' ((_ :< PatVar _, _):ps)  = findPatApp' ps
 findPatApp' ((_ :< PatApp _ _, i):_) = Just i
 
-specialize :: Identifier -> Arity -> ClauseMatrix a -> ClauseMatrix a
+specialize ::
+     Identifier
+  -> Arity
+  -> ClauseMatrix a
+  -> WithEnv ((ClauseMatrix a), [Identifier])
 specialize c a (pss, bs) = do
-  let pss' = join $ map (\(ps, b) -> specializeRow c a ps b) $ zip pss bs
-  patDist pss'
+  pss' <- mapM (\(ps, b) -> specializeRow c a ps b) $ zip pss bs
+  let pss'' = map fst pss'
+  let bounds = join $ map snd pss'
+  return (patDist $ join pss'', bounds)
 
-specializeRow :: Identifier -> Arity -> [Pat] -> a -> [([Pat], a)]
-specializeRow _ _ [] _ = []
-specializeRow _ a ((i :< PatVar _):ps) body = do
-  let newNames = map (const (i :< PatVar "_")) [1 .. a]
-  [(newNames ++ ps, body)]
+specializeRow ::
+     Identifier -> Arity -> [Pat] -> a -> WithEnv ([([Pat], a)], [Identifier])
+specializeRow _ _ [] _ = return ([], [])
+specializeRow _ a ((i :< PatVar s):ps) body = do
+  liftIO $ putStrLn $ "BINDING: " ++ show s
+  newNames <-
+    forM [1 .. a] $ \_ -> do
+      k <- newName
+      return $ i :< PatVar k
+  return ([(newNames ++ ps, body)], [s])
 specializeRow c _ ((_ :< PatApp s args):ps) body = do
   if c /= s
-    then []
-    else [(args ++ ps, body)]
+    then return ([], [])
+    else return ([(args ++ ps, body)], [])
 
-defaultMatrix :: ClauseMatrix a -> ClauseMatrix a
+defaultMatrix :: ClauseMatrix a -> WithEnv ((ClauseMatrix a), [Identifier])
 defaultMatrix (pss, bs) = do
-  let pss' = join $ map (\(ps, b) -> defaultMatrixRow ps b) $ zip pss bs
-  patDist pss'
+  pss' <- mapM (\(ps, b) -> defaultMatrixRow ps b) $ zip pss bs
+  let pss'' = map fst pss'
+  let bounds = join $ map snd pss'
+  return (patDist $ join pss'', bounds)
 
-defaultMatrixRow :: [Pat] -> a -> [([Pat], a)]
-defaultMatrixRow [] _                      = []
-defaultMatrixRow ((_ :< PatVar _):ps) body = [(ps, body)]
-defaultMatrixRow ((_ :< PatApp _ _):_) _   = []
+defaultMatrixRow :: [Pat] -> a -> WithEnv ([([Pat], a)], [Identifier])
+defaultMatrixRow [] _ = return ([], [])
+defaultMatrixRow ((_ :< PatVar s):ps) body = do
+  return ([(ps, body)], [s])
+defaultMatrixRow ((_ :< PatApp _ _):_) _ = return ([], [])
 
 swapColumn :: Int -> Int -> [[a]] -> [[a]]
 swapColumn i j mat = transpose $ swap i j $ transpose mat
