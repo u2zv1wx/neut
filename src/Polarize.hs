@@ -111,20 +111,14 @@ polarize (_ :< WeakTermAsc e _) = polarize e
 
 polarizeType :: WeakType -> WithEnv Type
 polarizeType (WeakTypeVar i) = return $ TypeValueType (ValueTypeVar i)
-polarizeType (WeakTypeConst c) = return $ TypeValueType (ValueTypeConst c)
-polarizeType (WeakTypeNode xts t2) = do
-  let (xs, ts) = unzip xts
+polarizeType (WeakTypeNode x ts) = do
   let sanitizer v =
         case v of
           TypeValueType v -> return v
           _ -> lift $ throwE $ "the polarity of " ++ show v ++ " is wrong"
   ts' <- mapM polarizeType ts
   ts'' <- mapM sanitizer ts'
-  mt2' <- polarizeType t2
-  case mt2' of
-    TypeValueType t2' ->
-      return $ TypeValueType (ValueTypeNode (zip xs ts'') t2')
-    _ -> lift $ throwE $ "the polarity of " ++ show t2 ++ " is wrong"
+  return $ TypeValueType $ ValueTypeNode x ts''
 polarizeType (WeakTypeUp t) = do
   mt' <- polarizeType t
   case mt' of
@@ -158,6 +152,15 @@ polarizeType (WeakTypeForall (Hole i, t1) t2) = do
       lift $
       throwE $ "the polarity of " ++ show t1 ++ " or " ++ show t2 ++ " is wrong"
 polarizeType t = lift $ throwE $ "the polarity of " ++ show t ++ " is wrong"
+
+polarizeTypeArg :: [(Identifier, WeakType)] -> WithEnv [(Identifier, ValueType)]
+polarizeTypeArg [] = return []
+polarizeTypeArg ((i, wt):wts) = do
+  mwt' <- polarizeType wt
+  wts' <- polarizeTypeArg wts
+  case mwt' of
+    TypeValueType wt' -> return $ (i, wt') : wts'
+    _ -> lift $ throwE $ "the polarity of " ++ show wt ++ " is wrong"
 
 polarizeTypeEnv :: [(Identifier, WeakType)] -> WithEnv [(Identifier, Type)]
 polarizeTypeEnv [] = return []

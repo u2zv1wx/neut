@@ -1,6 +1,7 @@
 module Parse
   ( parseType
   , parseTerm
+  , parseNodeTypeArg
   ) where
 
 import           Control.Monad              (void)
@@ -22,11 +23,7 @@ parseTerm :: Tree -> WithEnv WeakTerm
 parseTerm (meta :< TreeAtom "_") = do
   name <- newNameWith "hole"
   return (meta :< WeakTermVar name)
-parseTerm (meta :< TreeAtom s) = do
-  msym <- definedConst s
-  case msym of
-    Nothing     -> return (meta :< WeakTermVar s)
-    Just (s, _) -> return (meta :< WeakTermNodeApp s [])
+parseTerm (meta :< TreeAtom s) = return (meta :< WeakTermVar s)
 parseTerm (meta :< TreeNode [_ :< TreeAtom "thunk", te]) = do
   e <- parseTerm te
   return (meta :< WeakTermThunk e)
@@ -62,10 +59,18 @@ parseTerm (meta :< TreeNode [_ :< TreeAtom "ascribe", te, tn]) = do
   n <- parseType tn
   return (meta :< WeakTermAsc e n)
 parseTerm (meta :< TreeNode (te@(_ :< TreeAtom s):ts)) = do
-  msym <- definedConst s
+  msym <- lookupVEnv s
   case msym of
     Nothing -> parseTermApp te ts
-    Just _  -> parseTermNodeApp meta s ts
+    Just (s, args, _) -- "zero" should be written as `(zero)`, for example.
+      | length args == length ts -> do
+        es <- mapM parseTerm ts
+        return $ meta :< WeakTermNodeApp s es
+    Just (s, args, _) -> do
+      lift $
+        throwE $
+        "the arity of " ++
+        show s ++ " is " ++ show (length args) ++ ", not " ++ show (length ts)
 parseTerm (_ :< TreeNode (te:tvs))
   | not (null tvs) = parseTermApp te tvs
 parseTerm t = lift $ throwE $ "parseTerm: syntax error:\n" ++ Pr.ppShow t
@@ -84,14 +89,14 @@ parseTermNodeApp meta s tvs = do
 
 parsePat :: Tree -> WithEnv Pat
 parsePat (meta :< TreeAtom s) = do
-  msym <- definedConst s
+  msym <- lookupVEnv s
   case msym of
     Nothing -> do
       s' <- strOrNewName s
       return (meta :< PatVar s')
-    Just (s, _) -> return (meta :< PatApp s [])
+    Just (s, _, _) -> return (meta :< PatApp s [])
 parsePat (meta :< TreeNode ((_ :< TreeAtom s):ts)) = do
-  msym <- definedConst s
+  msym <- lookupVEnv s
   case msym of
     Nothing ->
       lift $ throwE $ "parsePat: the constant " ++ show s ++ " is not defined"
@@ -112,12 +117,7 @@ parseType (_ :< TreeAtom "_") = do
   name <- newNameWith "hole"
   return (WeakTypeHole name)
 parseType (_ :< TreeAtom "universe") = WeakTypeUniv . WeakLevelHole <$> newName
-parseType (_ :< TreeAtom s) = do
-  msym <- definedConst s
-  case msym of
-    Nothing -> do
-      return $ WeakTypeVar s
-    Just (s, _) -> return $ WeakTypeConst s
+parseType (_ :< TreeAtom s) = return $ WeakTypeVar s
 parseType (Meta {ident = i} :< TreeNode [_ :< TreeAtom "down", tn]) = do
   n <- parseType tn
   return $ WeakTypeDown n i
@@ -129,13 +129,22 @@ parseType (_ :< TreeNode [_ :< TreeAtom "forall", _ :< TreeNode ts, tn]) = do
   its <- mapM parseTypeArg ts
   n <- parseType tn
   return $ foldr WeakTypeForall n its
-parseType (_ :< TreeNode [_ :< TreeAtom "node", _ :< TreeNode ts, tn]) = do
-  its <- mapM parseNodeTypeArg ts
-  tcod <- parseType tn
-  return $ WeakTypeNode its tcod
 parseType (_ :< TreeNode [_ :< TreeAtom "up", tp]) = do
   p <- parseType tp
   return $ WeakTypeUp p
+parseType (_ :< TreeNode ((_ :< TreeAtom s):ts)) = do
+  msym <- lookupVEnv s
+  case msym of
+    Nothing -> lift $ throwE $ "the constant " ++ show s ++ " is not defined"
+    Just (s, args, _) -- "nat" should be written as `(nat)`, for example.
+      | length args == length ts -> do
+        es <- mapM parseType ts
+        return $ WeakTypeNode s es
+    Just (s, args, _) -> do
+      lift $
+        throwE $
+        "the arity of " ++
+        show s ++ " is " ++ show (length args) ++ ", not " ++ show (length ts)
 parseType t = lift $ throwE $ "parseType: syntax error:\n" ++ Pr.ppShow t
 
 parseTypeArg :: Tree -> WithEnv (IdentOrHole, WeakType)
@@ -152,12 +161,6 @@ parseNodeTypeArg (_ :< TreeNode [_ :< TreeAtom s, tp]) = do
   return (s', t)
 parseNodeTypeArg t =
   lift $ throwE $ "parseTypeArg: syntax error:\n" ++ Pr.ppShow t
-
-definedConst :: String -> WithEnv (Maybe (String, ValueType))
-definedConst s = do
-  env <- get
-  let vEnv = valueEnv env
-  return $ find (\(x, _) -> x == s) vEnv
 
 strToName :: String -> WithEnv IdentOrHole
 strToName "_" = do

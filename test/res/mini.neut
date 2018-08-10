@@ -38,16 +38,33 @@
   (with (zero)
     some-function))
 
-(match (v1 ... vn)
-  (((succ x) (succ y))
-   (foo))
-  (with ((succ x))
-    foo)
-  (with (zero)
-    some-function))
-
 (match (n)
   (with ((zero)) ;; 意味的にはzeroよりも(zero)のほうが正しい
     some-function)
   (with ((succ x))
     foo))
+
+(value nil
+  (node ((a type))
+    (list a)))
+
+(value cons
+  (node ((a type) (_ (list a)))
+    (list a)))
+
+(value nil
+  ((a type))
+  (list a))
+
+(value cons
+  ((a type)
+   (_ (list a)))
+  (list a))
+
+(value zero
+  ()
+  (nat))
+
+(value succ
+  ((_ (nat)))
+  (nat))

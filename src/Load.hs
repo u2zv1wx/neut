@@ -36,17 +36,25 @@ load' ((_ :< TreeNode [_ :< TreeAtom "notation", from, to]):as) = do
 load' ((_ :< TreeNode [_ :< TreeAtom "reserve", _ :< TreeAtom s]):as) = do
   modify (\e -> e {reservedEnv = s : reservedEnv e})
   load' as
-load' ((_ :< TreeNode [_ :< TreeAtom "value", _ :< TreeAtom s, tp]):as) = do
+load' ((_ :< TreeNode [_ :< TreeAtom "value", _ :< TreeAtom s, _ :< TreeNode tps, tp]):as) = do
+  mts <- mapM parseNodeTypeArg tps
   mt <- parseType tp
+  ts <- polarizeTypeArg mts -- todo : check free var occurrence
   t <- polarizeType mt
   case t of
-    TypeValueType t -> do
-      modify (\e -> e {valueEnv = (s, t) : valueEnv e})
+    TypeValueType t@(ValueTypeNode k _) -> do
+      modify (\e -> e {valueEnv = (s, ts, t) : valueEnv e})
+      insWTEnv s (weakenValueType t)
+      insConstructorEnv k s
+      load' as
+    TypeValueType t@(ValueTypeUniv _) -> do
+      modify (\e -> e {valueEnv = (s, ts, t) : valueEnv e})
       insWTEnv s (weakenValueType t)
       load' as
     _ ->
       lift $
-      throwE $ "the polarity of value type " ++ show s ++ " must be positive"
+      throwE $
+      "the codomain of value type " ++ show s ++ " must be universe or node"
 load' (a:as) = do
   a' <- macroExpand a
   liftIO $ putStrLn $ Pr.ppShow a'

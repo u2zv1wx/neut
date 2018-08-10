@@ -45,27 +45,16 @@ infer (Meta {ident = i} :< WeakTermLam (s, t) e) = do
   let result = WeakTypeForall (Ident s, t) te
   insWTEnv i result
   return result
-infer (Meta {ident = i} :< WeakTermNodeApp s []) = do
-  mt <- lookupVEnv s
-  case mt of
-    Nothing -> lift $ throwE $ "const " ++ s ++ " is not defined"
-    Just t -> do
-      let t' = weakenValueType t
-      insWTEnv i t'
-      return t'
 infer (Meta {ident = j} :< WeakTermNodeApp s vs) = do
   mt <- lookupVEnv s
   case mt of
     Nothing -> lift $ throwE $ "const " ++ s ++ " is not defined"
-    Just t -> do
-      is <- forM vs $ \_ -> newName
-      ts <- mapM infer vs
-      i <- newName
-      let t' = WeakTypeNode (zip is ts) (WeakTypeHole i)
-      insCEnv (weakenValueType t) t'
-      let result = WeakTypeHole i
-      insWTEnv j result
-      return result
+    Just (_, xts, t) -> do
+      tvs <- mapM infer vs
+      -- losing polymorphism? (need to add explicit parametrization)
+      forM_ (zip xts tvs) $ \(xt, t2) -> insCEnv (weakenValueType $ snd xt) t2
+      insWTEnv j $ weakenValueType t
+      return $ weakenValueType t
 infer (Meta {ident = l} :< WeakTermApp e v) = do
   te <- infer e
   tv <- infer v
@@ -134,25 +123,16 @@ inferPat (Meta {ident = i} :< PatVar s) = do
       insWTEnv s new
       insWTEnv i new
       return new
-inferPat (Meta {ident = i} :< PatApp s []) = do
-  mt <- lookupVEnv s
-  case mt of
-    Just t -> do
-      let t' = weakenValueType t
-      insWTEnv i t'
-      return t'
-    Nothing -> lift $ throwE $ "const " ++ s ++ " is not defined"
-inferPat (Meta {ident = _} :< PatApp s vs) = do
+inferPat (Meta {ident = j} :< PatApp s vs) = do
   mt <- lookupVEnv s
   case mt of
     Nothing -> lift $ throwE $ "const " ++ s ++ " is not defined"
-    Just t -> do
-      is <- forM vs $ \_ -> newName
-      ts <- mapM inferPat vs
-      i <- newName
-      let t' = WeakTypeNode (zip is ts) (WeakTypeHole i)
-      insCEnv (weakenValueType t) t'
-      return $ WeakTypeHole i
+    Just (_, xts, t) -> do
+      tvs <- mapM inferPat vs
+      -- need to add explicit parametrization
+      forM_ (zip xts tvs) $ \(xt, t2) -> insCEnv (weakenValueType $ snd xt) t2
+      insWTEnv j $ weakenValueType t
+      return $ weakenValueType t
 
 type Subst = [(String, WeakType)]
 
@@ -168,14 +148,11 @@ unify ((t1, WeakTypeHole s):cs) = do
   return $ compose sub [(s, t1)]
 unify ((WeakTypeVar s1, WeakTypeVar s2):cs)
   | s1 == s2 = unify cs
-unify ((WeakTypeConst s1, WeakTypeConst s2):cs)
-  | s1 == s2 = unify cs
 unify ((WeakTypeForall (i, tdom1) tcod1, WeakTypeForall (j, tdom2) tcod2):cs) = do
   insAEnv i j
   unify $ (tdom1, tdom2) : (tcod1, tcod2) : cs
-unify ((WeakTypeNode xts tcod1, WeakTypeNode yts tcod2):cs)
-  | length xts == length yts =
-    unify $ (tcod1, tcod2) : (zip (map snd xts) (map snd yts)) ++ cs
+unify ((WeakTypeNode x ts1, WeakTypeNode y ts2):cs)
+  | x == y = unify $ (zip ts1 ts2) ++ cs
 unify ((WeakTypeUp t1, WeakTypeUp t2):cs) = do
   unify $ (t1, t2) : cs
 unify ((WeakTypeDown t1 i, WeakTypeDown t2 j):cs) = do
@@ -203,7 +180,6 @@ sType sub (WeakTypeHole s) =
   case lookup s sub of
     Nothing -> WeakTypeHole s
     Just t  -> t
-sType _ (WeakTypeConst s) = WeakTypeConst s
 sType sub (WeakTypeUp t) = do
   let t' = sType sub t
   WeakTypeUp t'
@@ -215,10 +191,9 @@ sType sub (WeakTypeForall (s, tdom) tcod) = do
   let tdom' = sType sub tdom
   let tcod' = sType sub tcod
   WeakTypeForall (s, tdom') tcod'
-sType sub (WeakTypeNode xts tcod) = do
-  let xts' = map (\(x, t) -> (x, sType sub t)) xts
-  let tcod' = sType sub tcod
-  WeakTypeNode xts' tcod'
+sType sub (WeakTypeNode s ts) = do
+  let ts' = map (sType sub) ts
+  WeakTypeNode s ts'
 
 sConstraint :: Subst -> Constraint -> Constraint
 sConstraint s = map (\(t1, t2) -> (sType s t1, sType s t2))
@@ -266,12 +241,9 @@ argCompose s1 s2 = do
 applyArgSubst :: ArgSubst -> WeakType -> WeakType
 applyArgSubst _ (WeakTypeVar s) = WeakTypeVar s
 applyArgSubst _ (WeakTypeHole s) = WeakTypeHole s
-applyArgSubst _ (WeakTypeConst s) = WeakTypeConst s
-applyArgSubst sub (WeakTypeNode xts tcod) = do
-  let (xs, ts) = unzip xts
+applyArgSubst sub (WeakTypeNode x ts) = do
   let ts' = map (applyArgSubst sub) ts
-  let tcod' = applyArgSubst sub tcod
-  WeakTypeNode (zip xs ts') tcod'
+  WeakTypeNode x ts'
 applyArgSubst sub (WeakTypeUp t) = do
   let t' = applyArgSubst sub t
   WeakTypeUp t'

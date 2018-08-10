@@ -70,7 +70,6 @@ rename (i :< WeakTermAsc e t) = do
 renameType :: WeakType -> WithEnv WeakType
 renameType (WeakTypeVar s) = WeakTypeVar <$> renameString s
 renameType (WeakTypeHole i) = return (WeakTypeHole i)
-renameType (WeakTypeConst s) = return (WeakTypeConst s)
 renameType (WeakTypeUp t) = WeakTypeUp <$> renameType t
 renameType (WeakTypeDown t i) = do
   t' <- renameType t
@@ -88,17 +87,9 @@ renameType (WeakTypeForall (Hole s, tdom) tcod) = do
     s' <- newNameWith s
     tcod' <- renameType tcod
     return (WeakTypeForall (Hole s', tdom') tcod')
-renameType (WeakTypeNode [] tcod) = do
-  tcod' <- renameType tcod
-  return $ WeakTypeNode [] tcod'
-renameType (WeakTypeNode ((x, tdom):xts) tcod) = do
-  tdom' <- renameType tdom
-  local $ do
-    x' <- newNameWith x
-    t' <- renameType (WeakTypeNode xts tcod)
-    case t' of
-      WeakTypeNode yts tcod' -> return $ WeakTypeNode ((x', tdom') : yts) tcod'
-      _ -> lift $ throwE $ "malformed type"
+renameType (WeakTypeNode s ts) = do
+  ts' <- mapM renameType ts
+  return $ WeakTypeNode s ts'
 
 renameString :: String -> WithEnv String
 renameString s = do

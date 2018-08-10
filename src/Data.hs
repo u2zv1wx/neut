@@ -17,6 +17,7 @@ import           Text.Show.Deriving
 import           System.IO.Unsafe
 
 import           Data.IORef
+import           Data.List
 
 import qualified Text.Show.Pretty           as Pr
 
@@ -64,9 +65,8 @@ data IdentOrHole
 data WeakType
   = WeakTypeVar Identifier
   | WeakTypeHole Identifier
-  | WeakTypeConst Identifier
-  | WeakTypeNode [(Identifier, WeakType)]
-                 WeakType
+  | WeakTypeNode Identifier
+                 [WeakType]
   | WeakTypeUp WeakType
   | WeakTypeDown WeakType
                  Identifier
@@ -84,9 +84,8 @@ data WeakType
 --     | (universe i)
 data ValueType
   = ValueTypeVar Identifier
-  | ValueTypeConst Identifier
-  | ValueTypeNode [(Identifier, ValueType)]
-                  ValueType
+  | ValueTypeNode Identifier
+                  [ValueType]
   | ValueTypeDown CompType
   | ValueTypeUniv Level
   deriving (Show, Eq)
@@ -107,12 +106,9 @@ data Type
 
 weakenValueType :: ValueType -> WeakType
 weakenValueType (ValueTypeVar i) = WeakTypeVar i
-weakenValueType (ValueTypeConst i) = WeakTypeConst i
-weakenValueType (ValueTypeNode xts t2) = do
-  let (xs, ts) = unzip xts
+weakenValueType (ValueTypeNode s ts) = do
   let ts' = map weakenValueType ts
-  let t2' = weakenValueType t2
-  WeakTypeNode (zip xs ts') t2'
+  WeakTypeNode s ts'
 weakenValueType (ValueTypeDown c) = WeakTypeDown (weakenCompType c) "ANY"
 weakenValueType (ValueTypeUniv l) = WeakTypeUniv (WeakLevelFixed l)
 
@@ -245,20 +241,23 @@ type WeakTerm = Cofree WeakTermF Meta
 instance (Show a) => Show (IORef a) where
   show a = show (unsafePerformIO (readIORef a))
 
+type ValueInfo = (Identifier, [(Identifier, ValueType)], ValueType)
+
 data Env = Env
-  { count         :: Int -- to generate fresh symbols
-  , valueEnv      :: [(Identifier, ValueType)] -- values and its types
-  , notationEnv   :: [(Tree, Tree)] -- macro transformers
-  , reservedEnv   :: [Identifier] -- list of reserved keywords
-  , nameEnv       :: [(Identifier, Identifier)] -- used in alpha conversion
-  , weakTypeEnv   :: [(Identifier, WeakType)] -- used in type inference
-  , typeEnv       :: [(Identifier, Type)] -- polarized type environment
-  , constraintEnv :: [(WeakType, WeakType)] -- used in type inference
-  , levelEnv      :: [(WeakLevel, WeakLevel)] -- constraint regarding the level of universes
-  , argEnv        :: [(IdentOrHole, IdentOrHole)] -- equivalence of arguments of forall
-  , thunkEnv      :: [(Identifier, Identifier)]
-  , funEnv        :: [(Identifier, IORef [(Identifier, IORef Code)])]
-  , scope         :: Identifier -- used in Virtual to determine the name of current function
+  { count          :: Int -- to generate fresh symbols
+  , valueEnv       :: [ValueInfo] -- defined values
+  , constructorEnv :: [(Identifier, IORef [Identifier])]
+  , notationEnv    :: [(Tree, Tree)] -- macro transformers
+  , reservedEnv    :: [Identifier] -- list of reserved keywords
+  , nameEnv        :: [(Identifier, Identifier)] -- used in alpha conversion
+  , weakTypeEnv    :: [(Identifier, WeakType)] -- used in type inference
+  , typeEnv        :: [(Identifier, Type)] -- polarized type environment
+  , constraintEnv  :: [(WeakType, WeakType)] -- used in type inference
+  , levelEnv       :: [(WeakLevel, WeakLevel)] -- constraint regarding the level of universes
+  , argEnv         :: [(IdentOrHole, IdentOrHole)] -- equivalence of arguments of forall
+  , thunkEnv       :: [(Identifier, Identifier)]
+  , funEnv         :: [(Identifier, IORef [(Identifier, IORef Code)])]
+  , scope          :: Identifier -- used in Virtual to determine the name of current function
   } deriving (Show)
 
 initialEnv :: Env
@@ -266,6 +265,7 @@ initialEnv =
   Env
     { count = 0
     , valueEnv = []
+    , constructorEnv = []
     , notationEnv = []
     , reservedEnv =
         [ "thunk"
@@ -340,8 +340,10 @@ lookupWTEnv' s = do
         " is not defined in the type environment. typeEnv:\n" ++
         (Pr.ppShow $ weakTypeEnv env)
 
-lookupVEnv :: String -> WithEnv (Maybe ValueType)
-lookupVEnv s = gets (lookup s . valueEnv)
+lookupVEnv :: String -> WithEnv (Maybe ValueInfo)
+lookupVEnv s = do
+  env <- get
+  return $ find (\(x, _, _) -> x == s) $ valueEnv env
 
 lookupFunEnv :: Identifier -> WithEnv (IORef [(Identifier, IORef Code)])
 lookupFunEnv s = do
@@ -380,6 +382,17 @@ insLEnv l1 l2 = modify (\e -> e {levelEnv = (l1, l2) : levelEnv e})
 
 insAEnv :: IdentOrHole -> IdentOrHole -> WithEnv ()
 insAEnv x y = modify (\e -> e {argEnv = (x, y) : argEnv e})
+
+insConstructorEnv :: Identifier -> Identifier -> WithEnv ()
+insConstructorEnv i cons = do
+  env <- get
+  case lookup i (constructorEnv env) of
+    Nothing -> do
+      cenvRef <- liftIO $ newIORef [cons]
+      modify (\e -> e {constructorEnv = (i, cenvRef) : constructorEnv env})
+    Just cenvRef -> do
+      cenv <- liftIO $ readIORef cenvRef
+      liftIO $ writeIORef cenvRef (cons : cenv)
 
 insThunkEnv :: Identifier -> Identifier -> WithEnv ()
 insThunkEnv i j = modify (\e -> e {thunkEnv = (i, j) : thunkEnv e})
