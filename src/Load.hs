@@ -40,7 +40,7 @@ load' ((_ :< TreeNode [_ :< TreeAtom "value", _ :< TreeAtom s, _ :< TreeNode tps
   mts <- mapM parseNodeTypeArg tps
   mt <- parseType tp
   (mts', mt') <- renameNodeType mts mt
-  ts <- polarizeTypeArg mts' -- todo : check free var occurrence
+  ts <- polarizeTypeArg mts'
   t <- polarizeType mt'
   case t of
     TypeValueType t@(ValueTypeNode k _) -> do
