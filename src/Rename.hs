@@ -113,9 +113,8 @@ renamePat (i :< PatVar s) = do
   return (i :< t)
 renamePat (i :< PatApp s []) = return (i :< PatApp s [])
 renamePat (i :< PatApp s vs) = do
-  s' <- renamePatString s
   vs' <- mapM renamePat vs
-  return (i :< PatApp s' vs')
+  return (i :< PatApp s vs')
 
 renamePatString :: String -> WithEnv String
 renamePatString s = do
