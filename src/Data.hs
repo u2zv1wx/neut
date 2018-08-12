@@ -468,6 +468,8 @@ data Data
   | DataCell Identifier -- value of defined data types
              [Data]
   | DataLabel Identifier -- the address of quoted code
+  | DataElemAtIndex Data
+                    Index
   deriving (Show, Eq)
 
 type Index = [Int]
@@ -481,8 +483,6 @@ data Code
   | CodeLet Identifier -- bind (we also use this to represent application)
             Data
             Code
-  | CodeGetPtr Data
-               Index
   | CodeSwitch Data
                DefaultBranch
                [Branch]
