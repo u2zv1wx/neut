@@ -258,6 +258,53 @@ instance (Show a) => Show (IORef a) where
 
 type ValueInfo = (Identifier, [(Identifier, ValueType)], ValueType)
 
+type Index = [Int]
+
+data DataF a
+  = DataPointer Identifier -- var is something that points already-allocated data
+  | DataCell Identifier -- value of defined data types
+             [a]
+  | DataLabel Identifier -- the address of quoted code
+  | DataElemAtIndex a -- subvalue of an inductive value
+                    Index
+  -- deriving (Show, Eq)
+
+deriving instance Show a => Show (DataF a)
+
+deriving instance Functor DataF
+
+$(deriveShow1 ''DataF)
+
+type Data = Cofree DataF ValueType
+
+type Branch = (Identifier, Identifier)
+
+type DefaultBranch = Identifier
+
+data CodeF a
+  = CodeReturn Data -- return
+  | CodeLet Identifier -- bind (we also use this to represent application)
+            Data
+            a
+  | CodeSwitch Data -- branching in pattern-matching (elimination of inductive type)
+               DefaultBranch
+               [Branch]
+  | CodeCall Identifier -- the result of call
+             Identifier -- the label of the funtion
+             [Identifier] -- arguments
+             a -- continuation
+  | CodeJump Identifier -- unthunk
+             Identifier -- this second argument is required to lookup the corresponding code
+             [Identifier] -- list of arguments
+
+deriving instance Show a => Show (CodeF a)
+
+deriving instance Functor CodeF
+
+$(deriveShow1 ''CodeF)
+
+type Code = Cofree CodeF CompType
+
 data Env = Env
   { count          :: Int -- to generate fresh symbols
   , valueEnv       :: [ValueInfo] -- defined values
@@ -469,35 +516,3 @@ foldMTermR f e (t:ts) = do
   let x = f t tmp
   i <- newName
   return $ Meta {ident = i} :< x
-
-data Data
-  = DataPointer Identifier -- var is something that points already-allocated data
-  | DataCell Identifier -- value of defined data types
-             [Data]
-  | DataLabel Identifier -- the address of quoted code
-  | DataElemAtIndex Data
-                    Index
-  deriving (Show, Eq)
-
-type Index = [Int]
-
-type Branch = (Identifier, Identifier)
-
-type DefaultBranch = Identifier
-
-data Code
-  = CodeReturn Data -- return
-  | CodeLet Identifier -- bind (we also use this to represent application)
-            Data
-            Code
-  | CodeSwitch Data
-               DefaultBranch
-               [Branch]
-  | CodeCall Identifier -- the result of call
-             Identifier -- the label of the funtion
-             [Identifier] -- arguments
-             Code -- continuation
-  | CodeJump Identifier -- unthunk
-             Identifier -- this second argument is required to lookup the corresponding code
-             [Identifier] -- list of arguments
-  deriving (Show, Eq)
