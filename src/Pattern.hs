@@ -21,8 +21,8 @@ type ClauseMatrix a = ([[Pat]], [a])
 
 -- Muranget, "Compiling Pattern Matching to Good Decision Trees", 2008
 toDecision :: (Show a) => [Occurrence] -> ClauseMatrix a -> WithEnv (Decision a)
-toDecision _ ([], _) = return $ DecisionFail
-toDecision _ (_, []) = return $ DecisionFail
+toDecision _ ([], _) = lift $ throwE $ "non-exclusive pattern"
+toDecision _ (_, []) = lift $ throwE $ "non-exclusive pattern"
 toDecision os (patMat, bodyList)
   | Nothing <- findPatApp patMat = do
     liftIO $ putStrLn $ "found Leaf. the patMat is:\n" ++ Pr.ppShow patMat

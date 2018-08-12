@@ -143,7 +143,6 @@ data Case
 data Decision a
   = DecisionLeaf [(Occurrence, Identifier)]
                  a
-  | DecisionFail
   | DecisionSwitch Occurrence
                    [(Case, Decision a)]
   | DecisionSwap Int
