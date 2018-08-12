@@ -85,11 +85,11 @@ virtualDecision asmList (DecisionLeaf ois preComp) = do
   let forEach = flip map
   let varList = map (fst . snd) ois
   asmList' <-
-    forM (zip asmList ois) $ \(x, ((index, _), (y, _))) -> do
+    forM (zip asmList ois) $ \(x, ((index, _), _)) -> do
       return $ Fix $ DataElemAtIndex (Fix $ DataPointer x) index
   body <- virtualC $ Comp preComp
   return $ letSeq asmList' varList body
-virtualDecision (x:vs) (DecisionSwitch (o, ot) cs mdefault)
+virtualDecision (x:vs) (DecisionSwitch (o, _) cs mdefault)
   -- let vt' = traceLowType o vt
  = do
   let selector = Fix $ DataElemAtIndex (Fix $ DataPointer x) o
