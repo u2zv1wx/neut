@@ -140,15 +140,8 @@ traceLet s (CodeJump addr j args) cont = do
   case corresondingThunk of
     [i] -> do
       let newName = "thunk" ++ i ++ "unthunk" ++ j
-      mcode <- lookupCodeEnv newName
-      case mcode of
-        Nothing -> lift $ throwE $ "Virutal.traceLet"
-        Just coderef -> do
-          code <- liftIO $ readIORef coderef
-          liftIO $ putStrLn $ "corresponding thunk is " ++ show i
-          code' <- traceLet s code cont
-          liftIO $ writeIORef coderef code'
-          return $ CodeJump addr newName args
+      appendCode s cont newName
+      return $ CodeJump addr newName args
     [] -> return $ CodeCall s addr args cont -- non-tail call
     _ ->
       lift $
@@ -160,6 +153,20 @@ traceLet s (CodeLet k o1 o2) cont = do
 traceLet s (CodeCall k i args o) cont = do
   c <- traceLet s o cont
   return $ CodeCall k i args c
+traceLet s code@(CodeSwitch _ defaultBranch branchList) cont = do
+  appendCode s cont defaultBranch
+  forM_ branchList $ \(_, label) -> appendCode s cont label
+  return code
+
+appendCode :: Identifier -> Code -> Identifier -> WithEnv ()
+appendCode s cont key = do
+  mcode <- lookupCodeEnv key
+  case mcode of
+    Nothing -> lift $ throwE $ "no such code: " ++ show key
+    Just coderef -> do
+      code <- liftIO $ readIORef coderef
+      code' <- traceLet s code cont
+      liftIO $ writeIORef coderef code'
 
 forallArgs :: CompType -> [Identifier]
 forallArgs (CompTypeForall (i, _) t) = i : forallArgs t
