@@ -179,10 +179,6 @@ varDecision (DecisionLeaf ovs e) = do
 varDecision (DecisionSwitch _ [] mdefault) = varDefault mdefault
 varDecision (DecisionSwitch s ((_, tree):treeList) mdefault) = do
   varDecision tree ++ varDecision (DecisionSwitch s treeList mdefault)
--- varDecision (DecisionSwitch s ((CaseDefault boundIdents, tree):treeList)) = do
---   let fs1 = varDecision tree
---   let fs2 = varDecision (DecisionSwitch s treeList)
---   (filter (\(_, i) -> i `notElem` boundIdents) fs1) ++ fs2
 varDecision (DecisionSwap _ t) = varDecision t
 
 varDefault :: Maybe (Maybe Identifier, Decision a) -> [(VMeta, Identifier)]
