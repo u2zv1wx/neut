@@ -63,7 +63,63 @@ virtualC (Comp (CMeta {ctype = ct} :< CompMu s c)) = do
   insCodeEnv s asm'
   setFunName current
   return $ CodeJump s s (forallArgs ct)
-virtualC (Comp (_ :< CompCase _ _)) = undefined
+virtualC (Comp (_ :< CompCase vs tree)) = do
+  virtualDecision vs tree
+
+virtualCase :: [Value] -> [(Identifier, Decision PreComp)] -> WithEnv JumpList
+virtualCase _ [] = return []
+virtualCase vs ((cons, tree):cs) = do
+  code <- virtualDecision vs tree
+  codeRef <- liftIO $ newIORef code
+  label <- newName
+  insCodeEnv label codeRef
+  jumpList <- virtualCase vs cs
+  return $ (cons, label) : jumpList
+
+virtualDefaultCase ::
+     [Value]
+  -> Maybe (Maybe Identifier, Decision PreComp)
+  -> WithEnv (Maybe (Maybe Identifier, Identifier))
+virtualDefaultCase _ Nothing = return Nothing
+virtualDefaultCase vs (Just (mx, tree)) = do
+  code <- virtualDecision vs tree
+  codeRef <- liftIO $ newIORef code
+  label <- newName
+  insCodeEnv label codeRef
+  return $ Just (mx, label)
+
+virtualDecision :: [Value] -> Decision PreComp -> WithEnv Code
+virtualDecision vs (DecisionLeaf ois preComp) = do
+  asmList <- mapM virtualV vs
+  let indexList = map fst ois
+  let forEach = flip map
+  let asmList' =
+        forEach (zip asmList indexList) $ \(asm, index) ->
+          DataElemAtIndex asm index
+  let varList = map snd ois
+  body <- virtualC $ Comp preComp
+  return $ letSeq asmList' varList body
+virtualDecision (v:vs) (DecisionSwitch o cs mdefault) = do
+  asm <- virtualV v
+  let selector = DataElemAtIndex asm o
+  jumpList <- virtualCase vs cs
+  defaultJump <- virtualDefaultCase vs mdefault
+  return $ makeBranch asm jumpList defaultJump
+virtualDecision vs (DecisionSwap _ _) = undefined
+
+type JumpList = [(Identifier, Identifier)]
+
+makeBranch :: Data -> JumpList -> Maybe (Maybe Identifier, Identifier) -> Code
+makeBranch _ [] Nothing = error "empty branch"
+makeBranch d js@((_, target):_) Nothing = do
+  CodeSwitch d target js
+makeBranch d js (Just (Just x, label)) = CodeLet x d (CodeSwitch d label js)
+makeBranch d js (Just (Nothing, label)) = CodeSwitch d label js
+
+letSeq :: [Data] -> [Identifier] -> Code -> Code
+letSeq [] [] code         = code
+letSeq (d:ds) (i:is) code = CodeLet i d (letSeq ds is code)
+letSeq _ _ _              = error "Virtual.letSeq: invalid arguments"
 
 traceLet :: String -> Code -> Code -> WithEnv Code
 traceLet s (CodeReturn o) cont = return $ CodeLet s o cont

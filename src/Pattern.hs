@@ -41,16 +41,14 @@ toDecision os (patMat, bodyList)
         let os' = (map (\j -> head os ++ [j]) [1 .. a]) ++ tail os
         tmp <- specialize c a (patMat, bodyList)
         tmp' <- toDecision os' tmp
-        return (CaseSwitch c, tmp')
+        return (c, tmp')
     cenv <- getCEnv patMat
     if length cenv <= length consList
-      then return $ DecisionSwitch (head os) $ newMatrixList
+      then return $ DecisionSwitch (head os) newMatrixList Nothing
       else do
         (tmp, bounds) <- defaultMatrix (patMat, bodyList)
         dmat <- toDecision (tail os) $ tmp
-        return $
-          DecisionSwitch (head os) $
-          newMatrixList ++ [(CaseDefault bounds, dmat)]
+        return $ DecisionSwitch (head os) newMatrixList (Just (bounds, dmat))
 
 patDist :: [([Pat], a)] -> ([[Pat]], [a])
 patDist [] = ([], [])
@@ -124,20 +122,25 @@ specializeRow c _ ((_ :< PatApp s args):ps) body = do
     then return []
     else return [(args ++ ps, body)]
 
-defaultMatrix :: ClauseMatrix a -> WithEnv ((ClauseMatrix a), [Identifier])
+defaultMatrix :: ClauseMatrix a -> WithEnv ((ClauseMatrix a), Maybe Identifier)
 defaultMatrix (pss, bs) = do
   pss' <- mapM (\(ps, b) -> defaultMatrixRow ps b) $ zip pss bs
   let pss'' = map fst pss'
-  let bounds = join $ map snd pss'
+  let bounds = takeHeadJust $ map snd pss'
   return (patDist $ join pss'', bounds)
 
-defaultMatrixRow :: [Pat] -> a -> WithEnv ([([Pat], a)], [Identifier])
-defaultMatrixRow [] _ = return ([], [])
+takeHeadJust :: [Maybe a] -> Maybe a
+takeHeadJust []             = Nothing
+takeHeadJust (Nothing:rest) = takeHeadJust rest
+takeHeadJust (Just x:_)     = Just x
+
+defaultMatrixRow :: [Pat] -> a -> WithEnv ([([Pat], a)], Maybe Identifier)
+defaultMatrixRow [] _ = return ([], Nothing)
 defaultMatrixRow ((_ :< PatHole):ps) body = do
-  return ([(ps, body)], [])
+  return ([(ps, body)], Nothing)
 defaultMatrixRow ((_ :< PatVar s):ps) body = do
-  return ([(ps, body)], [s])
-defaultMatrixRow ((_ :< PatApp _ _):_) _ = return ([], [])
+  return ([(ps, body)], Just s)
+defaultMatrixRow ((_ :< PatApp _ _):_) _ = return ([], Nothing)
 
 swapColumn :: Int -> Int -> [[a]] -> [[a]]
 swapColumn i j mat = transpose $ swap i j $ transpose mat

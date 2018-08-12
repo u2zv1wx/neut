@@ -30,5 +30,7 @@
     (return (zero)))
   (with ((succ (succ x)))
     (return (succ x)))
+  (with ((succ k))
+    (return (succ k)))
   (with ((succ y))
-    (return (succ y))))
+    (return (succ (zero)))))

@@ -135,16 +135,20 @@ type Pat = Cofree PatF Meta
 
 type Occurrence = [Int]
 
-data Case
-  = CaseSwitch Identifier -- the name of constructor
-  | CaseDefault [Identifier] -- arguments
-  deriving (Show)
-
+-- data Case a
+--   = CaseSwitch Identifier
+--                a -- the name of constructor
+--   | CaseDefault [Identifier]
+--                 a -- arguments
+--   deriving (Show)
+-- deriving instance Functor Case
+-- $(deriveShow1 ''Case)
 data Decision a
   = DecisionLeaf [(Occurrence, Identifier)]
                  a
   | DecisionSwitch Occurrence
-                   [(Case, Decision a)]
+                   [(Identifier, Decision a)]
+                   (Maybe (Maybe Identifier, Decision a))
   | DecisionSwap Int
                  (Decision a)
   deriving (Show)
@@ -477,7 +481,7 @@ data Data
 
 type Index = [Int]
 
-type Branch = (Int, Identifier)
+type Branch = (Identifier, Identifier)
 
 type DefaultBranch = Identifier
 
