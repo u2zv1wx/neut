@@ -67,7 +67,7 @@ getCEnv (((Meta {ident = i} :< _):_):_) = do
   t <- lookupWTEnv i
   case t of
     Just (WeakTypeNode s _) -> lookupConstructorEnv s
-    _                       -> undefined
+    _                       -> lift $ throwE "type error in pattern"
 
 headConstructor :: [[Pat]] -> WithEnv [(Identifier, Arity)]
 headConstructor ([]) = return []

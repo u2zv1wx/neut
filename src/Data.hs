@@ -204,12 +204,16 @@ data CMeta = CMeta
   { ctype :: CompType
   } deriving (Show)
 
+type PreValue = Cofree (ValueF Comp) VMeta
+
+type PreComp = Cofree (CompF Value) CMeta
+
 newtype Value =
-  Value (Cofree (ValueF Comp) VMeta)
+  Value PreValue
   deriving (Show)
 
 newtype Comp =
-  Comp (Cofree (CompF Value) CMeta)
+  Comp PreComp
   deriving (Show)
 
 data Term

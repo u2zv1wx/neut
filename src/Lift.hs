@@ -153,20 +153,30 @@ varN (Comp (_ :< CompBind s e1 e2)) =
   varN (Comp e1) ++ filter (\(_, t) -> t /= s) (varN (Comp e2))
 varN (Comp (_ :< CompUnthunk v _)) = varP v
 varN (Comp (_ :< CompMu s e)) = filter (\(_, t) -> t /= s) (varN (Comp e))
-varN (Comp (_ :< CompCase vs ves)) = do
-  undefined
-  -- let efs = join $ map varP vs
-  -- vefss <-
-  --   forM ves $ \(pat, body) -> do
-  --     let bound = join $ map varPat pat
-  --     let fs = varN $ Comp body
-  --     return $ filter (\(_, k) -> k `notElem` bound) fs
-  -- efs ++ join vefss
+varN (Comp (_ :< CompCase vs tree)) = do
+  let efs = join $ map varP vs
+  let vars = varDecision tree
+  efs ++ vars
 
 varPat :: Pat -> [Identifier]
 varPat (_ :< PatHole)     = []
 varPat (_ :< PatVar s)    = [s]
 varPat (_ :< PatApp _ ps) = join $ map varPat ps
+
+varDecision :: Decision PreComp -> [(VMeta, Identifier)]
+varDecision DecisionFail = []
+varDecision (DecisionLeaf ovs e) = do
+  let boundIdents = map snd ovs
+  let fs = varN (Comp e)
+  filter (\(_, i) -> i `notElem` boundIdents) fs
+varDecision (DecisionSwitch _ []) = []
+varDecision (DecisionSwitch s ((CaseSwitch _, tree):treeList)) = do
+  varDecision tree ++ varDecision (DecisionSwitch s treeList)
+varDecision (DecisionSwitch s ((CaseDefault boundIdents, tree):treeList)) = do
+  let fs1 = varDecision tree
+  let fs2 = varDecision (DecisionSwitch s treeList)
+  (filter (\(_, i) -> i `notElem` boundIdents) fs1) ++ fs2
+varDecision (DecisionSwap _ t) = varDecision t
 
 compLamSeq :: [(VMeta, Identifier)] -> Comp -> Comp
 compLamSeq [] terminal = terminal
