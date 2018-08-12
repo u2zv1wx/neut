@@ -12,6 +12,8 @@ import           Control.Comonad.Cofree
 
 import qualified Text.Show.Pretty           as Pr
 
+import           Debug.Trace
+
 virtualV :: Value -> WithEnv Data
 virtualV (Value (_ :< ValueVar s)) = return $ DataPointer s
 virtualV (Value (_ :< ValueNodeApp s [])) = return $ DataCell s []
@@ -64,10 +66,36 @@ virtualC (Comp (CMeta {ctype = ct} :< CompMu s c)) = do
   setFunName current
   return $ CodeJump s s (forallArgs ct)
 virtualC (Comp (_ :< CompCase vs tree)) = do
-  asmList <- mapM virtualV vs
-  virtualDecision asmList tree
+  fooList <-
+    forM vs $ \v -> do
+      asm <- virtualV v
+      i <- newName
+      return (i, asm)
+  let (is, asms) = unzip fooList
+  body <- virtualDecision is tree
+  return $ letSeq asms is body
 
-virtualCase :: [Data] -> [(Identifier, Decision PreComp)] -> WithEnv JumpList
+virtualDecision :: [Identifier] -> Decision PreComp -> WithEnv Code
+virtualDecision asmList (DecisionLeaf ois preComp) = do
+  let indexList = map fst ois
+  let forEach = flip map
+  let asmList' =
+        forEach (zip asmList indexList) $ \(asm, index) -> do
+          DataElemAtIndex (DataPointer asm) index
+  let varList = map snd ois
+  body <- virtualC $ Comp preComp
+  return $ letSeq asmList' varList body
+virtualDecision (x:vs) (DecisionSwitch o cs mdefault) = do
+  jumpList <- virtualCase (x : vs) cs
+  defaultJump <- virtualDefaultCase (x : vs) mdefault
+  let selector = DataElemAtIndex (DataPointer x) o
+  return $ makeBranch selector jumpList defaultJump
+virtualDecision _ (DecisionSwap _ _) = undefined
+virtualDecision [] t =
+  lift $ throwE $ "virtualDecision. Note: \n" ++ Pr.ppShow t
+
+virtualCase ::
+     [Identifier] -> [(Identifier, Decision PreComp)] -> WithEnv JumpList
 virtualCase _ [] = return []
 virtualCase vs ((cons, tree):cs) = do
   code <- virtualDecision vs tree
@@ -78,7 +106,7 @@ virtualCase vs ((cons, tree):cs) = do
   return $ (cons, label) : jumpList
 
 virtualDefaultCase ::
-     [Data]
+     [Identifier]
   -> Maybe (Maybe Identifier, Decision PreComp)
   -> WithEnv (Maybe (Maybe Identifier, Identifier))
 virtualDefaultCase _ Nothing = return Nothing
@@ -89,38 +117,14 @@ virtualDefaultCase vs (Just (mx, tree)) = do
   insCodeEnv label codeRef
   return $ Just (mx, label)
 
--- virtualDefaultCase vs (Just (Just x, tree)) = do
---   code <- virtualDecision vs tree
---   codeRef <- liftIO $ newIORef code
---   label <- newName
---   insCodeEnv label codeRef
---   return $ Just (Just x, label)
-virtualDecision :: [Data] -> Decision PreComp -> WithEnv Code
-virtualDecision asmList (DecisionLeaf ois preComp) = do
-  let indexList = map fst ois
-  let forEach = flip map
-  let asmList' =
-        forEach (zip asmList indexList) $ \(asm, index) ->
-          DataElemAtIndex asm index
-  let varList = map snd ois
-  body <- virtualC $ Comp preComp
-  return $ letSeq asmList' varList body
-virtualDecision (asm:vs) (DecisionSwitch o cs mdefault) = do
-  let selector = DataElemAtIndex asm o
-  jumpList <- virtualCase (selector : vs) cs
-  defaultJump <- virtualDefaultCase (selector : vs) mdefault
-  return $ makeBranch asm jumpList defaultJump
-virtualDecision vs (DecisionSwap _ _) = undefined
-virtualDecision [] t =
-  lift $ throwE $ "virtualDecision. Note: \n" ++ Pr.ppShow t
-
 type JumpList = [(Identifier, Identifier)]
 
 makeBranch :: Data -> JumpList -> Maybe (Maybe Identifier, Identifier) -> Code
 makeBranch _ [] Nothing = error "empty branch"
 makeBranch d js@((_, target):_) Nothing = do
   CodeSwitch d target js
-makeBranch d js (Just (Just x, label)) = CodeLet x d (CodeSwitch d label js)
+makeBranch d js (Just (Just x, label)) =
+  CodeLet x d (CodeSwitch (DataPointer x) label js)
 makeBranch d js (Just (Nothing, label)) = CodeSwitch d label js
 
 letSeq :: [Data] -> [Identifier] -> Code -> Code
