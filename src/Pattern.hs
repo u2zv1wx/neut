@@ -39,7 +39,7 @@ toDecision os (patMat, bodyList)
     newMatrixList <-
       forM consList $ \(c, a) -> do
         let os' = (map (\j -> head os ++ [j]) [1 .. a]) ++ tail os
-        (tmp, _) <- specialize c a (patMat, bodyList)
+        tmp <- specialize c a (patMat, bodyList)
         tmp' <- toDecision os' tmp
         return (CaseSwitch c, tmp')
     cenv <- getCEnv patMat
@@ -78,6 +78,7 @@ headConstructor (ps:pss) = do
 
 headConstructor' :: [Pat] -> WithEnv [(Identifier, Arity)]
 headConstructor' []                       = return []
+headConstructor' ((_ :< PatHole):_)       = return []
 headConstructor' ((_ :< PatVar _):_)      = return []
 headConstructor' ((_ :< PatApp s args):_) = return [(s, length args)]
 
@@ -102,34 +103,26 @@ findPatApp (ps:pss) =
 
 findPatApp' :: [(Pat, Int)] -> Maybe Int
 findPatApp' []                       = Nothing
+findPatApp' ((_ :< PatHole, _):ps)   = findPatApp' ps
 findPatApp' ((_ :< PatVar _, _):ps)  = findPatApp' ps
 findPatApp' ((_ :< PatApp _ _, i):_) = Just i
 
-specialize ::
-     Identifier
-  -> Arity
-  -> ClauseMatrix a
-  -> WithEnv ((ClauseMatrix a), [Identifier])
+specialize :: Identifier -> Arity -> ClauseMatrix a -> WithEnv (ClauseMatrix a)
 specialize c a (pss, bs) = do
   pss' <- mapM (\(ps, b) -> specializeRow c a ps b) $ zip pss bs
-  let pss'' = map fst pss'
-  let bounds = join $ map snd pss'
-  return (patDist $ join pss'', bounds)
+  return $ patDist $ join pss'
 
-specializeRow ::
-     Identifier -> Arity -> [Pat] -> a -> WithEnv ([([Pat], a)], [Identifier])
-specializeRow _ _ [] _ = return ([], [])
-specializeRow _ a ((i :< PatVar s):ps) body = do
-  liftIO $ putStrLn $ "BINDING: " ++ show s
-  newNames <-
-    forM [1 .. a] $ \_ -> do
-      k <- newName
-      return $ i :< PatVar k
-  return ([(newNames ++ ps, body)], [s])
+specializeRow :: Identifier -> Arity -> [Pat] -> a -> WithEnv [([Pat], a)]
+specializeRow _ _ [] _ = return []
+specializeRow _ a ((i :< PatHole):ps) body = do
+  newNames <- forM [1 .. a] $ const $ return $ i :< PatHole
+  return [(newNames ++ ps, body)]
+specializeRow c a ((i :< PatVar _):ps) body = do
+  specializeRow c a ((i :< PatHole) : ps) body
 specializeRow c _ ((_ :< PatApp s args):ps) body = do
   if c /= s
-    then return ([], [])
-    else return ([(args ++ ps, body)], [])
+    then return []
+    else return [(args ++ ps, body)]
 
 defaultMatrix :: ClauseMatrix a -> WithEnv ((ClauseMatrix a), [Identifier])
 defaultMatrix (pss, bs) = do
@@ -140,6 +133,8 @@ defaultMatrix (pss, bs) = do
 
 defaultMatrixRow :: [Pat] -> a -> WithEnv ([([Pat], a)], [Identifier])
 defaultMatrixRow [] _ = return ([], [])
+defaultMatrixRow ((_ :< PatHole):ps) body = do
+  return ([(ps, body)], [])
 defaultMatrixRow ((_ :< PatVar s):ps) body = do
   return ([(ps, body)], [s])
 defaultMatrixRow ((_ :< PatApp _ _):_) _ = return ([], [])

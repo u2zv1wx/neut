@@ -115,6 +115,10 @@ infer (Meta {ident = i} :< WeakTermAsc e t) = do
   return te
 
 inferPat :: Pat -> WithEnv WeakType
+inferPat (Meta {ident = i} :< PatHole) = do
+  t <- WeakTypePosHole <$> newName
+  insWTEnv i t
+  return t
 inferPat (Meta {ident = i} :< PatVar s) = do
   mt <- lookupWTEnv s
   case mt of

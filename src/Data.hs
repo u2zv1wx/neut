@@ -121,7 +121,8 @@ weakenCompType (CompTypeForall (i, t1) t2) = do
 weakenCompType (CompTypeUp v) = WeakTypeUp (weakenValueType v)
 
 data PatF a
-  = PatVar Identifier
+  = PatHole
+  | PatVar Identifier
   | PatApp Identifier
            [a]
   deriving (Show, Eq)
@@ -135,7 +136,7 @@ type Pat = Cofree PatF Meta
 type Occurrence = [Int]
 
 data Case
-  = CaseSwitch Identifier -- the naem of constructor
+  = CaseSwitch Identifier -- the name of constructor
   | CaseDefault [Identifier] -- arguments
   deriving (Show)
 
@@ -469,11 +470,22 @@ data Data
   | DataLabel Identifier -- the address of quoted code
   deriving (Show, Eq)
 
+type Index = [Int]
+
+type Branch = (Int, Identifier)
+
+type DefaultBranch = Identifier
+
 data Code
   = CodeReturn Data -- return
   | CodeLet Identifier -- bind (we also use this to represent application)
             Data
             Code
+  | CodeGetPtr Data
+               Index
+  | CodeSwitch Data
+               DefaultBranch
+               [Branch]
   | CodeCall Identifier -- the result of call
              Identifier -- the label of the funtion
              [Identifier] -- arguments

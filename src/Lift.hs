@@ -164,6 +164,7 @@ varN (Comp (_ :< CompCase vs ves)) = do
   -- efs ++ join vefss
 
 varPat :: Pat -> [Identifier]
+varPat (_ :< PatHole)     = []
 varPat (_ :< PatVar s)    = [s]
 varPat (_ :< PatApp _ ps) = join $ map varPat ps
 

@@ -111,6 +111,7 @@ renameString s = do
     Nothing -> lift $ throwE $ "undefined variable: " ++ show s
 
 renamePat :: Pat -> WithEnv Pat
+renamePat (i :< PatHole) = return $ i :< PatHole
 renamePat (i :< PatVar s) = do
   t <- PatVar <$> renamePatString s
   return (i :< t)

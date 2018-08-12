@@ -94,6 +94,8 @@ parseIdentSeq t =
   lift $ throwE $ "parseIdentSeq: syntax error:\n" ++ Pr.ppShow t
 
 parsePat :: Tree -> WithEnv Pat
+parsePat (meta :< TreeAtom "_") = do
+  return $ meta :< PatHole
 parsePat (meta :< TreeAtom s) = do
   msym <- lookupVEnv s
   case msym of
