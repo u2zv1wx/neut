@@ -27,18 +27,24 @@ toDecision os (patMat, bodyList)
   | Nothing <- findPatApp patMat = do
     liftIO $ putStrLn $ "found Leaf. the patMat is:\n" ++ Pr.ppShow patMat
     liftIO $ putStrLn $ "and the occurrence vector is:\n" ++ Pr.ppShow os
-    let vs = collectVar patMat
+    vs <- collectVar patMat
     return $ DecisionLeaf (zip os vs) (head bodyList)
   | Just i <- findPatApp patMat
   , i /= 0 = do
     let patMat' = swapColumn 0 i patMat
-    let os' = swapColumn 0 i os
+    let ts = map snd os
+    let occurrenceList = map fst os
+    let occurrenceList' = swapColumn 0 i occurrenceList
+    let os' = zip occurrenceList' ts
     DecisionSwap i <$> toDecision os' (patMat', bodyList)
   | otherwise = do
     consList <- nub <$> headConstructor patMat
     newMatrixList <-
-      forM consList $ \(c, a) -> do
-        let os' = (map (\j -> head os ++ [j]) [1 .. a]) ++ tail os
+      forM consList $ \(c, args) -> do
+        let a = length args
+        let os' =
+              (map (\j -> (fst (head os) ++ [j], args !! (j - 1))) [1 .. a]) ++
+              tail os
         tmp <- specialize c a (patMat, bodyList)
         tmp' <- toDecision os' tmp
         return (c, tmp')
@@ -67,30 +73,38 @@ getCEnv (((Meta {ident = i} :< _):_):_) = do
     Just (WeakTypeNode s _) -> lookupConstructorEnv s
     _                       -> lift $ throwE "type error in pattern"
 
-headConstructor :: [[Pat]] -> WithEnv [(Identifier, Arity)]
+headConstructor :: [[Pat]] -> WithEnv [(Identifier, [ValueType])]
 headConstructor ([]) = return []
 headConstructor (ps:pss) = do
   ps' <- headConstructor' ps
   pss' <- mapM headConstructor' pss
   return $ join $ ps' : pss'
 
-headConstructor' :: [Pat] -> WithEnv [(Identifier, Arity)]
-headConstructor' []                       = return []
-headConstructor' ((_ :< PatHole):_)       = return []
-headConstructor' ((_ :< PatVar _):_)      = return []
-headConstructor' ((_ :< PatApp s args):_) = return [(s, length args)]
+headConstructor' :: [Pat] -> WithEnv [(Identifier, [ValueType])]
+headConstructor' [] = return []
+headConstructor' ((_ :< PatHole):_) = return []
+headConstructor' ((_ :< PatVar _):_) = return []
+headConstructor' ((_ :< PatApp s _):_) = do
+  (_, args, cod) <- lookupVEnv' s
+  return [(s, map snd args)]
+  -- case vt of
+  --   ValueTypeNode _ vts -> return [(s, vts)]
+  -- return [(s, length args)]
 
-collectVar :: [[Pat]] -> [Identifier]
-collectVar [] = []
+collectVar :: [[Pat]] -> WithEnv [(Identifier, ValueType)]
+collectVar [] = return []
 collectVar (ps:pss) = do
-  let vs1 = collectVar' ps
-  let vs2 = collectVar pss
-  vs1 ++ vs2
+  vs1 <- collectVar' ps
+  vs2 <- collectVar pss
+  return $ vs1 ++ vs2
 
-collectVar' :: [Pat] -> [Identifier]
-collectVar' []                   = []
-collectVar' ((_ :< PatVar s):ps) = s : collectVar' ps
-collectVar' (_:ps)               = collectVar' ps
+collectVar' :: [Pat] -> WithEnv [(Identifier, ValueType)]
+collectVar' [] = return []
+collectVar' ((Meta {ident = i} :< PatVar s):ps) = do
+  vt <- lookupValueTypeEnv' i
+  tmp <- collectVar' ps
+  return $ (s, vt) : tmp
+collectVar' (_:ps) = collectVar' ps
 
 findPatApp :: [[Pat]] -> Maybe Int
 findPatApp [] = Nothing

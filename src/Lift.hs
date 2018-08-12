@@ -175,7 +175,7 @@ varDecision :: Decision PreComp -> [(VMeta, Identifier)]
 varDecision (DecisionLeaf ovs e) = do
   let boundIdents = map snd ovs
   let fs = varN (Comp e)
-  filter (\(_, i) -> i `notElem` boundIdents) fs
+  filter (\(_, i) -> i `notElem` map fst boundIdents) fs
 varDecision (DecisionSwitch _ [] mdefault) = varDefault mdefault
 varDecision (DecisionSwitch s ((_, tree):treeList) mdefault) = do
   varDecision tree ++ varDecision (DecisionSwitch s treeList mdefault)

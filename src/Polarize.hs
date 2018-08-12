@@ -100,10 +100,11 @@ polarize (Meta {ident = i} :< WeakTermCase vs ves) = do
           TermValue (Value v) -> return $ Value v
           _ -> lift $ throwE $ "the polarity of " ++ show v ++ " is wrong"
   vs'' <- mapM sanitizer vs'
+  let tvs = map (\(Value (VMeta {vtype = tv} :< _)) -> tv) vs''
   -- create a decision tree from the pattern
   let vesMod = patDist ves'
   liftIO $ putStrLn $ Pr.ppShow vesMod
-  let initialOccurences = map (const []) vs
+  let initialOccurences = map (\tv -> ([], tv)) tvs
   decisionTree <- toDecision initialOccurences vesMod
   return $ TermComp $ Comp $ CMeta {ctype = t} :< CompCase vs'' decisionTree
 polarize (_ :< WeakTermAsc e _) = polarize e
@@ -162,12 +163,14 @@ polarizeTypeArg ((i, wt):wts) = do
     TypeValueType wt' -> return $ (i, wt') : wts'
     _ -> lift $ throwE $ "the polarity of " ++ show wt ++ " is wrong"
 
-polarizeTypeEnv :: [(Identifier, WeakType)] -> WithEnv [(Identifier, Type)]
-polarizeTypeEnv [] = return []
+polarizeTypeEnv :: [(Identifier, WeakType)] -> WithEnv ()
+polarizeTypeEnv [] = return ()
 polarizeTypeEnv ((i, wt):ts) = do
   wt' <- polarizeType wt
-  ts' <- polarizeTypeEnv ts
-  return $ (i, wt') : ts'
+  case wt' of
+    TypeCompType ct  -> insCTEnv i ct
+    TypeValueType vt -> insVTEnv i vt
+  polarizeTypeEnv ts
 
 findTypeV :: Identifier -> WithEnv ValueType
 findTypeV s = do

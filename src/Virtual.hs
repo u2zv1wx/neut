@@ -86,15 +86,15 @@ virtualDecision ct asmList (DecisionLeaf ois preComp) = do
   let indexList = map fst ois
   let forEach = flip map
   let asmList' =
-        forEach (zip asmList indexList) $ \((x, vt), index) -> do
-          vt :< DataElemAtIndex (vt :< DataPointer x) index
-  let varList = map snd ois
+        forEach (zip asmList indexList) $ \((x, vt), (index, ot)) -> do
+          ot :< DataElemAtIndex (vt :< DataPointer x) index
+  let varList = map (fst . snd) ois
   body <- virtualC $ Comp preComp
   return $ letSeq asmList' varList body
-virtualDecision ct ((x, vt):vs) (DecisionSwitch o cs mdefault) = do
+virtualDecision ct ((x, vt):vs) (DecisionSwitch (o, ot) cs mdefault) = do
   jumpList <- virtualCase ct ((x, vt) : vs) cs
   defaultJump <- virtualDefaultCase ct ((x, vt) : vs) mdefault
-  let selector = vt :< DataElemAtIndex (vt :< DataPointer x) o
+  let selector = ot :< DataElemAtIndex (vt :< DataPointer x) o
   return $ makeBranch ct selector jumpList defaultJump
 virtualDecision ct _ (DecisionSwap _ _) = undefined
 virtualDecision _ [] t =

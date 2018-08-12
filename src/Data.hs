@@ -133,7 +133,7 @@ deriving instance Functor PatF
 
 type Pat = Cofree PatF Meta
 
-type Occurrence = [Int]
+type Occurrence = ([Int], ValueType)
 
 -- data Case a
 --   = CaseSwitch Identifier
@@ -144,7 +144,7 @@ type Occurrence = [Int]
 -- deriving instance Functor Case
 -- $(deriveShow1 ''Case)
 data Decision a
-  = DecisionLeaf [(Occurrence, Identifier)]
+  = DecisionLeaf [(Occurrence, (Identifier, ValueType))]
                  a
   | DecisionSwitch Occurrence
                    [(Identifier, Decision a)]
@@ -314,6 +314,8 @@ data Env = Env
   , nameEnv        :: [(Identifier, Identifier)] -- used in alpha conversion
   , weakTypeEnv    :: [(Identifier, WeakType)] -- used in type inference
   , typeEnv        :: [(Identifier, Type)] -- polarized type environment
+  , valueTypeEnv   :: [(Identifier, ValueType)]
+  , compTypeEnv    :: [(Identifier, CompType)]
   , constraintEnv  :: [(WeakType, WeakType)] -- used in type inference
   , levelEnv       :: [(WeakLevel, WeakLevel)] -- constraint regarding the level of universes
   , argEnv         :: [(IdentOrHole, IdentOrHole)] -- equivalence of arguments of forall
@@ -346,6 +348,8 @@ initialEnv =
     , nameEnv = []
     , weakTypeEnv = []
     , typeEnv = []
+    , valueTypeEnv = []
+    , compTypeEnv = []
     , constraintEnv = []
     , levelEnv = []
     , thunkEnv = []
@@ -407,6 +411,14 @@ lookupVEnv s = do
   env <- get
   return $ find (\(x, _, _) -> x == s) $ valueEnv env
 
+lookupVEnv' :: String -> WithEnv ValueInfo
+lookupVEnv' s = do
+  mt <- lookupVEnv s
+  case mt of
+    Just t -> return t
+    Nothing -> do
+      lift $ throwE $ "the value " ++ show s ++ " is not defined "
+
 lookupFunEnv :: Identifier -> WithEnv (IORef [(Identifier, IORef Code)])
 lookupFunEnv s = do
   m <- gets (lookup s . funEnv)
@@ -442,6 +454,26 @@ lookupConstructorEnv cons = do
 
 insWTEnv :: String -> WeakType -> WithEnv ()
 insWTEnv s t = modify (\e -> e {weakTypeEnv = (s, t) : weakTypeEnv e})
+
+insVTEnv :: String -> ValueType -> WithEnv ()
+insVTEnv s t = modify (\e -> e {valueTypeEnv = (s, t) : valueTypeEnv e})
+
+lookupValueTypeEnv :: String -> WithEnv (Maybe ValueType)
+lookupValueTypeEnv s = gets (lookup s . valueTypeEnv)
+
+lookupValueTypeEnv' :: String -> WithEnv ValueType
+lookupValueTypeEnv' s = do
+  mt <- lookupValueTypeEnv s
+  case mt of
+    Just t -> return t
+    Nothing -> do
+      lift $ throwE $ "the type of " ++ show s ++ " is not defined "
+
+insCTEnv :: String -> CompType -> WithEnv ()
+insCTEnv s t = modify (\e -> e {compTypeEnv = (s, t) : compTypeEnv e})
+
+lookupCompTypeEnv :: String -> WithEnv (Maybe CompType)
+lookupCompTypeEnv s = gets (lookup s . compTypeEnv)
 
 insCEnv :: WeakType -> WeakType -> WithEnv ()
 insCEnv t1 t2 = modify (\e -> e {constraintEnv = (t1, t2) : constraintEnv e})

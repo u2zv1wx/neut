@@ -66,8 +66,7 @@ load' (a:as) = do
   check e'
   env <- get
   let wtenv = weakTypeEnv env
-  tenv <- polarizeTypeEnv wtenv
-  modify (\e -> e {typeEnv = tenv})
+  polarizeTypeEnv wtenv
   e'' <- polarize e'
   case e'' of
     TermValue v -> do
