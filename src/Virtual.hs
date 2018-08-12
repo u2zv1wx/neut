@@ -168,7 +168,7 @@ traceLet ct s (_ :< CodeLet k o1 o2) cont = do
 traceLet ct s (_ :< CodeCall k i args o) cont = do
   c <- traceLet ct s o cont
   return $ ct :< CodeCall k i args c
-traceLet ct s code@(_ :< switcher@(CodeSwitch _ defaultBranch branchList)) cont = do
+traceLet ct s (_ :< switcher@(CodeSwitch _ defaultBranch branchList)) cont = do
   appendCode ct s cont defaultBranch
   forM_ branchList $ \(_, label) -> appendCode ct s cont label
   return $ ct :< switcher
