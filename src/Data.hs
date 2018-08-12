@@ -141,7 +141,7 @@ data Case
   deriving (Show)
 
 data Decision a
-  = DecisionLeaf [Identifier]
+  = DecisionLeaf [(Occurrence, Identifier)]
                  a
   | DecisionFail
   | DecisionSwitch Occurrence

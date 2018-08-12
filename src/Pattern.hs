@@ -28,7 +28,7 @@ toDecision os (patMat, bodyList)
     liftIO $ putStrLn $ "found Leaf. the patMat is:\n" ++ Pr.ppShow patMat
     liftIO $ putStrLn $ "and the occurrence vector is:\n" ++ Pr.ppShow os
     let vs = collectVar patMat
-    return $ DecisionLeaf vs (head bodyList)
+    return $ DecisionLeaf (zip os vs) (head bodyList)
   | Just i <- findPatApp patMat
   , i /= 0 = do
     let patMat' = swapColumn 0 i patMat
