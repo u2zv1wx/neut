@@ -14,15 +14,15 @@ import qualified Text.Show.Pretty           as Pr
 
 import           Debug.Trace
 
-virtualV :: Value -> WithEnv Data
-virtualV (Value (VMeta {vtype = vt} :< ValueVar s)) =
-  return $ vt :< DataPointer s
-virtualV (Value (VMeta {vtype = vt} :< ValueNodeApp s [])) =
-  return $ vt :< DataCell s []
-virtualV (Value (VMeta {vtype = vt} :< ValueNodeApp s vs)) = do
+import           Data.Functor.Foldable
+
+virtualV :: Value -> WithEnv UData
+virtualV (Value (_ :< ValueVar s)) = do
+  return $ Fix (DataPointer s)
+virtualV (Value (_ :< ValueNodeApp s vs)) = do
   vs' <- mapM (virtualV . Value) vs
-  return $ vt :< DataCell s vs'
-virtualV (Value (VMeta {vtype = vt} :< ValueThunk c i)) = do
+  return $ Fix $ DataCell s vs'
+virtualV (Value (_ :< ValueThunk c i)) = do
   asm <- virtualC c
   unthunkIdents <- lookupThunkEnv i
   forM_ unthunkIdents $ \j -> do
@@ -30,34 +30,33 @@ virtualV (Value (VMeta {vtype = vt} :< ValueThunk c i)) = do
     liftIO $ putStrLn $ "creating thunk with name: " ++ newName
     asm' <- liftIO $ newIORef asm
     insCodeEnv newName asm'
-  return $ vt :< DataLabel i
+  return $ Fix $ DataLabel i
 
-virtualC :: Comp -> WithEnv Code
-virtualC (Comp (CMeta {ctype = ct} :< CompLam _ e)) = do
-  _ :< code <- virtualC (Comp e)
-  return $ ct :< code
-virtualC (Comp (CMeta {ctype = ct} :< CompApp e@(CMeta {ctype = ect} :< _) v)) = do
+virtualC :: Comp -> WithEnv UCode
+virtualC (Comp (_ :< CompLam _ e)) = do
+  virtualC (Comp e)
+virtualC (Comp (_ :< CompApp e@(CMeta {ctype = ect} :< _) v)) = do
   case ect of
     CompTypeForall (i, _) _ -> do
-      e' <- virtualC (Comp e)
       v' <- virtualV v
-      return $ ct :< CodeLet i v' e'
+      e' <- virtualC (Comp e)
+      return $ Fix $ CodeLet i v' e'
     _ -> do
-      lift $ throwE $ "virtualC.CompApp. Note:\n " ++ Pr.ppShow ct
-virtualC (Comp (CMeta {ctype = ct} :< CompRet v)) = do
+      lift $ throwE $ "virtualC.CompApp. Note:\n " ++ Pr.ppShow ect
+virtualC (Comp (_ :< CompRet v)) = do
   asm <- virtualV v
-  return $ ct :< CodeReturn asm
-virtualC (Comp (CMeta {ctype = ct} :< CompBind s c1 c2)) = do
+  return $ Fix $ CodeReturn asm
+virtualC (Comp (_ :< CompBind s c1 c2)) = do
   operation1 <- virtualC (Comp c1)
   operation2 <- virtualC (Comp c2)
-  traceLet ct s operation1 operation2
-virtualC (Comp (CMeta {ctype = ct} :< CompUnthunk v@(Value (VMeta {vtype = ValueTypeDown tct} :< _)) j)) = do
+  traceLet s operation1 operation2
+virtualC (Comp (_ :< CompUnthunk v@(Value (VMeta {vtype = ValueTypeDown tct} :< _)) j)) = do
   operand <- virtualV v
   let args = forallArgs tct
   case operand of
-    _ :< DataPointer s   -> return $ ct :< CodeJump s j args -- indirect branch
-    _ :< DataLabel label -> return $ ct :< CodeJump label j args -- direct branch
-    _                    -> lift $ throwE "virtualC.CompUnthunk"
+    Fix (DataPointer s)   -> return $ Fix $ CodeJump s j args -- indirect branch
+    Fix (DataLabel label) -> return $ Fix $ CodeJump label j args -- direct branch
+    _                     -> lift $ throwE "virtualC.CompUnthunk"
 virtualC (Comp (_ :< CompUnthunk (Value (VMeta {vtype = _} :< _)) _)) = do
   lift $ throwE "virtualC.CompUnthunk"
 virtualC (Comp (CMeta {ctype = ct} :< CompMu s c)) = do
@@ -68,121 +67,132 @@ virtualC (Comp (CMeta {ctype = ct} :< CompMu s c)) = do
   asm' <- liftIO $ newIORef asm
   insCodeEnv s asm'
   setFunName current
-  return $ ct :< CodeJump s s (forallArgs ct)
-virtualC (Comp (CMeta {ctype = ct} :< CompCase vs tree)) = do
+  return $ Fix $ CodeJump s s (forallArgs ct)
+virtualC (Comp (_ :< CompCase vs tree)) = do
   fooList <-
     forM vs $ \v -> do
-      vt :< asm <- virtualV v
+      asm <- virtualV v
       i <- newName
-      return ((i, vt), vt :< asm)
+      return (i, asm)
   let (is, asms) = unzip fooList
-  body <- virtualDecision ct is tree
-  let _ :< code = letSeq asms (map fst is) body
-  return $ ct :< code
+  body <- virtualDecision is tree
+  let code = letSeq asms is body
+  return $ code
 
-virtualDecision ::
-     CompType -> [(Identifier, ValueType)] -> Decision PreComp -> WithEnv Code
-virtualDecision ct asmList (DecisionLeaf ois preComp) = do
+virtualDecision :: [Identifier] -> Decision PreComp -> WithEnv UCode
+virtualDecision asmList (DecisionLeaf ois preComp) = do
   let indexList = map fst ois
   let forEach = flip map
-  let asmList' =
-        forEach (zip asmList indexList) $ \((x, vt), (index, ot)) -> do
-          ot :< DataElemAtIndex (vt :< DataPointer x) index
   let varList = map (fst . snd) ois
+  asmList' <-
+    forM (zip asmList ois) $ \(x, ((index, _), (y, _))) -> do
+      return $ Fix $ DataElemAtIndex (Fix $ DataPointer x) index
   body <- virtualC $ Comp preComp
   return $ letSeq asmList' varList body
-virtualDecision ct ((x, vt):vs) (DecisionSwitch (o, ot) cs mdefault) = do
-  jumpList <- virtualCase ct ((x, vt) : vs) cs
-  defaultJump <- virtualDefaultCase ct ((x, vt) : vs) mdefault
-  let selector = ot :< DataElemAtIndex (vt :< DataPointer x) o
-  return $ makeBranch ct selector jumpList defaultJump
-virtualDecision ct _ (DecisionSwap _ _) = undefined
-virtualDecision _ [] t =
+virtualDecision (x:vs) (DecisionSwitch (o, ot) cs mdefault)
+  -- let vt' = traceLowType o vt
+ = do
+  let selector = Fix $ DataElemAtIndex (Fix $ DataPointer x) o
+  jumpList <- virtualCase (x : vs) cs
+  defaultJump <- virtualDefaultCase (x : vs) mdefault
+  return $ makeBranch selector jumpList defaultJump
+virtualDecision _ (DecisionSwap _ _) = undefined
+virtualDecision [] t =
   lift $ throwE $ "virtualDecision. Note: \n" ++ Pr.ppShow t
 
 virtualCase ::
-     CompType
-  -> [(Identifier, ValueType)]
+     [Identifier]
   -> [(Identifier, Decision PreComp)]
-  -> WithEnv JumpList
-virtualCase _ _ [] = return []
-virtualCase ct vs ((cons, tree):cs) = do
-  code <- virtualDecision ct vs tree
+  -> WithEnv [(Identifier, Identifier)]
+virtualCase _ [] = return []
+virtualCase vs ((cons, tree):cs) = do
+  code <- virtualDecision vs tree
   codeRef <- liftIO $ newIORef code
   label <- newName
   insCodeEnv label codeRef
-  jumpList <- virtualCase ct vs cs
+  jumpList <- virtualCase vs cs
   return $ (cons, label) : jumpList
 
 virtualDefaultCase ::
-     CompType
-  -> [(Identifier, ValueType)]
+     [Identifier]
   -> Maybe (Maybe Identifier, Decision PreComp)
   -> WithEnv (Maybe (Maybe Identifier, Identifier))
-virtualDefaultCase ct _ Nothing = return Nothing
-virtualDefaultCase ct vs (Just (mx, tree)) = do
-  code <- virtualDecision ct vs tree
+virtualDefaultCase _ Nothing = return Nothing
+virtualDefaultCase vs (Just (Nothing, tree)) = do
+  code <- virtualDecision vs tree
   codeRef <- liftIO $ newIORef code
   label <- newName
   insCodeEnv label codeRef
-  return $ Just (mx, label)
+  return $ Just (Nothing, label)
+virtualDefaultCase vs (Just (Just x, tree)) = do
+  code <- virtualDecision vs tree
+  codeRef <- liftIO $ newIORef code
+  label <- newName
+  insCodeEnv label codeRef
+  return $ Just (Just x, label)
 
 type JumpList = [(Identifier, Identifier)]
 
 makeBranch ::
-     CompType
-  -> Data
-  -> JumpList
+     UData
+  -> [(Identifier, Identifier)]
   -> Maybe (Maybe Identifier, Identifier)
-  -> Code
-makeBranch _ _ [] Nothing = error "empty branch"
-makeBranch ct d js@((_, target):_) Nothing = do
-  ct :< CodeSwitch d target js
-makeBranch ct d@(vt :< _) js (Just (Just x, label)) =
-  ct :< CodeLet x d (ct :< CodeSwitch (vt :< DataPointer x) label js)
-makeBranch ct d js (Just (Nothing, label)) = ct :< CodeSwitch d label js
+  -> UCode
+makeBranch _ [] Nothing = error "empty branch"
+makeBranch d js@((_, target):_) Nothing = do
+  Fix $ CodeSwitch d target js
+makeBranch d js (Just (Just x, label)) = do
+  Fix $ CodeLet x d (Fix $ CodeSwitch (Fix $ DataPointer x) label js)
+makeBranch d js (Just (Nothing, label)) = do
+  Fix $ CodeSwitch d label js
 
-letSeq :: [Data] -> [Identifier] -> Code -> Code
-letSeq [] [] code = code
-letSeq (d:ds) (i:is) code@(ct :< _) = ct :< CodeLet i d (letSeq ds is code)
-letSeq _ _ _ = error "Virtual.letSeq: invalid arguments"
+letSeq :: [UData] -> [Identifier] -> UCode -> UCode
+letSeq [] [] code         = code
+letSeq (d:ds) (i:is) code = Fix $ CodeLet i d (letSeq ds is code)
+letSeq _ _ _              = error "Virtual.letSeq: invalid arguments"
 
-traceLet :: CompType -> String -> Code -> Code -> WithEnv Code
-traceLet ct s (_ :< CodeReturn o) cont = return $ ct :< CodeLet s o cont
-traceLet ct s (_ :< CodeJump addr j args) cont = do
+traceLet :: String -> UCode -> UCode -> WithEnv UCode
+traceLet s (Fix (CodeReturn o)) cont = return $ Fix $ CodeLet s o cont
+traceLet s (Fix (CodeJump addr j args)) cont = do
   liftIO $ putStrLn $ "Found CodeJump with Let. The ident is " ++ show j ++ "."
   corresondingThunk <- lookupThunkEnv j
   case corresondingThunk of
     [i] -> do
       let newName = "thunk" ++ i ++ "unthunk" ++ j
-      appendCode ct s cont newName
-      return $ ct :< CodeJump addr newName args
-    [] -> return $ ct :< CodeCall s addr args cont -- non-tail call
+      appendCode s cont newName
+      return $ Fix $ CodeJump addr newName args
+    [] -> return $ Fix $ CodeCall s addr args cont -- non-tail call
     _ ->
       lift $
       throwE $
       "multiple thunk found for an unthunk: \n" ++ show corresondingThunk
-traceLet ct s (_ :< CodeLet k o1 o2) cont = do
-  c <- traceLet ct s o2 cont
-  return $ ct :< CodeLet k o1 c
-traceLet ct s (_ :< CodeCall k i args o) cont = do
-  c <- traceLet ct s o cont
-  return $ ct :< CodeCall k i args c
-traceLet ct s (_ :< switcher@(CodeSwitch _ defaultBranch branchList)) cont = do
-  appendCode ct s cont defaultBranch
-  forM_ branchList $ \(_, label) -> appendCode ct s cont label
-  return $ ct :< switcher
+traceLet s (Fix (CodeLet k o1 o2)) cont = do
+  c <- traceLet s o2 cont
+  return $ Fix $ CodeLet k o1 c
+traceLet s (Fix (CodeCall k i args o)) cont = do
+  c <- traceLet s o cont
+  return $ Fix $ CodeCall k i args c
+traceLet s (Fix (switcher@(CodeSwitch _ defaultBranch branchList))) cont = do
+  appendCode s cont defaultBranch
+  forM_ branchList $ \(_, label) -> appendCode s cont label
+  return $ Fix $ switcher
 
-appendCode :: CompType -> Identifier -> Code -> Identifier -> WithEnv ()
-appendCode ct s cont key = do
+appendCode :: Identifier -> UCode -> Identifier -> WithEnv ()
+appendCode s cont key = do
   mcode <- lookupCodeEnv key
   case mcode of
     Nothing -> lift $ throwE $ "no such code: " ++ show key
     Just coderef -> do
       code <- liftIO $ readIORef coderef
-      code' <- traceLet ct s code cont
+      code' <- traceLet s code cont
       liftIO $ writeIORef coderef code'
 
 forallArgs :: CompType -> [Identifier]
 forallArgs (CompTypeForall (i, _) t) = i : forallArgs t
 forallArgs _                         = []
+
+traceLowType :: [Int] -> LowType -> LowType
+traceLowType [] t = t
+traceLowType (i:is) (LowTypeVec _ args)
+  | 0 <= i - 1 && i - 1 < length args = traceLowType is (args !! (i - 1))
+traceLowType _ _ = LowTypeNull

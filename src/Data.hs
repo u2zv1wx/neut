@@ -19,6 +19,8 @@ import           System.IO.Unsafe
 import           Data.IORef
 import           Data.List
 
+import           Data.Functor.Foldable
+
 import qualified Text.Show.Pretty           as Pr
 
 type Identifier = String
@@ -260,6 +262,14 @@ type ValueInfo = (Identifier, [(Identifier, ValueType)], ValueType)
 
 type Index = [Int]
 
+data LowType
+  = LowTypeConst
+  | LowTypeNull
+  | LowTypeVec Identifier -- the type of cons cell
+               [LowType]
+  | LowTypeSwitch [LowType]
+  deriving (Show)
+
 data DataF a
   = DataPointer Identifier -- var is something that points already-allocated data
   | DataCell Identifier -- value of defined data types
@@ -275,18 +285,23 @@ deriving instance Functor DataF
 
 $(deriveShow1 ''DataF)
 
-type Data = Cofree DataF ValueType
+type Data = Cofree DataF LowType
 
+type UData = Fix DataF
+
+-- newtype Fix f =
+--   In (f (Fix f))
+-- $(deriveShow1 ''Fix)
 type Branch = (Identifier, Identifier)
 
 type DefaultBranch = Identifier
 
-data CodeF a
-  = CodeReturn Data -- return
+data CodeF d a
+  = CodeReturn d -- return
   | CodeLet Identifier -- bind (we also use this to represent application)
-            Data
+            d
             a
-  | CodeSwitch Data -- branching in pattern-matching (elimination of inductive type)
+  | CodeSwitch d -- branching in pattern-matching (elimination of inductive type)
                DefaultBranch
                [Branch]
   | CodeCall Identifier -- the result of call
@@ -297,13 +312,19 @@ data CodeF a
              Identifier -- this second argument is required to lookup the corresponding code
              [Identifier] -- list of arguments
 
-deriving instance Show a => Show (CodeF a)
+deriving instance Show a => Show (CodeF UData a)
 
-deriving instance Functor CodeF
+deriving instance Show a => Show (CodeF Data a)
+
+deriving instance Functor (CodeF UData)
+
+deriving instance Functor (CodeF Data)
 
 $(deriveShow1 ''CodeF)
 
-type Code = Cofree CodeF CompType
+type Code = Cofree (CodeF Data) LowType
+
+type UCode = Fix (CodeF UData)
 
 data Env = Env
   { count          :: Int -- to generate fresh symbols
@@ -320,7 +341,8 @@ data Env = Env
   , levelEnv       :: [(WeakLevel, WeakLevel)] -- constraint regarding the level of universes
   , argEnv         :: [(IdentOrHole, IdentOrHole)] -- equivalence of arguments of forall
   , thunkEnv       :: [(Identifier, Identifier)]
-  , funEnv         :: [(Identifier, IORef [(Identifier, IORef Code)])]
+  , funEnv         :: [(Identifier, IORef [(Identifier, IORef UCode)])]
+  , lowTypeEnv     :: [(Identifier, LowType)]
   , scope          :: Identifier -- used in Virtual to determine the name of current function
   } deriving (Show)
 
@@ -355,6 +377,7 @@ initialEnv =
     , thunkEnv = []
     , argEnv = []
     , funEnv = []
+    , lowTypeEnv = []
     , scope = "main"
     }
 
@@ -419,7 +442,7 @@ lookupVEnv' s = do
     Nothing -> do
       lift $ throwE $ "the value " ++ show s ++ " is not defined "
 
-lookupFunEnv :: Identifier -> WithEnv (IORef [(Identifier, IORef Code)])
+lookupFunEnv :: Identifier -> WithEnv (IORef [(Identifier, IORef UCode)])
 lookupFunEnv s = do
   m <- gets (lookup s . funEnv)
   case m of
@@ -438,7 +461,7 @@ lookupThunkEnv s = do
           _ -> []
   return $ concatMap selector $ thunkEnv env
 
-lookupCodeEnv :: Identifier -> WithEnv (Maybe (IORef Code))
+lookupCodeEnv :: Identifier -> WithEnv (Maybe (IORef UCode))
 lookupCodeEnv s = do
   current <- getFunName
   codeEnvRef <- lookupFunEnv current
@@ -457,6 +480,20 @@ insWTEnv s t = modify (\e -> e {weakTypeEnv = (s, t) : weakTypeEnv e})
 
 insVTEnv :: String -> ValueType -> WithEnv ()
 insVTEnv s t = modify (\e -> e {valueTypeEnv = (s, t) : valueTypeEnv e})
+
+insLowTypeEnv :: String -> LowType -> WithEnv ()
+insLowTypeEnv s t = modify (\e -> e {lowTypeEnv = (s, t) : lowTypeEnv e})
+
+lookupLowTypeEnv :: String -> WithEnv (Maybe LowType)
+lookupLowTypeEnv s = gets (lookup s . lowTypeEnv)
+
+lookupLowTypeEnv' :: String -> WithEnv LowType
+lookupLowTypeEnv' s = do
+  mt <- lookupLowTypeEnv s
+  case mt of
+    Just t -> return t
+    Nothing -> do
+      lift $ throwE $ "the type of " ++ show s ++ " is not defined "
 
 lookupValueTypeEnv :: String -> WithEnv (Maybe ValueType)
 lookupValueTypeEnv s = gets (lookup s . valueTypeEnv)
@@ -498,7 +535,7 @@ insConstructorEnv i cons = do
 insThunkEnv :: Identifier -> Identifier -> WithEnv ()
 insThunkEnv i j = modify (\e -> e {thunkEnv = (i, j) : thunkEnv e})
 
-insCodeEnv :: Identifier -> IORef Code -> WithEnv ()
+insCodeEnv :: Identifier -> IORef UCode -> WithEnv ()
 insCodeEnv i code = do
   current <- getFunName
   codeEnvRef <- lookupFunEnv current

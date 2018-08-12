@@ -17,6 +17,7 @@ dependencies:
 - free
 - comonad
 - deriving-compat
+- recursion-schemes
 
 library:
   source-dirs: src
