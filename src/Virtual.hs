@@ -64,9 +64,10 @@ virtualC (Comp (CMeta {ctype = ct} :< CompMu s c)) = do
   setFunName current
   return $ CodeJump s s (forallArgs ct)
 virtualC (Comp (_ :< CompCase vs tree)) = do
-  virtualDecision vs tree
+  asmList <- mapM virtualV vs
+  virtualDecision asmList tree
 
-virtualCase :: [Value] -> [(Identifier, Decision PreComp)] -> WithEnv JumpList
+virtualCase :: [Data] -> [(Identifier, Decision PreComp)] -> WithEnv JumpList
 virtualCase _ [] = return []
 virtualCase vs ((cons, tree):cs) = do
   code <- virtualDecision vs tree
@@ -77,7 +78,7 @@ virtualCase vs ((cons, tree):cs) = do
   return $ (cons, label) : jumpList
 
 virtualDefaultCase ::
-     [Value]
+     [Data]
   -> Maybe (Maybe Identifier, Decision PreComp)
   -> WithEnv (Maybe (Maybe Identifier, Identifier))
 virtualDefaultCase _ Nothing = return Nothing
@@ -88,9 +89,14 @@ virtualDefaultCase vs (Just (mx, tree)) = do
   insCodeEnv label codeRef
   return $ Just (mx, label)
 
-virtualDecision :: [Value] -> Decision PreComp -> WithEnv Code
-virtualDecision vs (DecisionLeaf ois preComp) = do
-  asmList <- mapM virtualV vs
+-- virtualDefaultCase vs (Just (Just x, tree)) = do
+--   code <- virtualDecision vs tree
+--   codeRef <- liftIO $ newIORef code
+--   label <- newName
+--   insCodeEnv label codeRef
+--   return $ Just (Just x, label)
+virtualDecision :: [Data] -> Decision PreComp -> WithEnv Code
+virtualDecision asmList (DecisionLeaf ois preComp) = do
   let indexList = map fst ois
   let forEach = flip map
   let asmList' =
@@ -99,13 +105,14 @@ virtualDecision vs (DecisionLeaf ois preComp) = do
   let varList = map snd ois
   body <- virtualC $ Comp preComp
   return $ letSeq asmList' varList body
-virtualDecision (v:vs) (DecisionSwitch o cs mdefault) = do
-  asm <- virtualV v
+virtualDecision (asm:vs) (DecisionSwitch o cs mdefault) = do
   let selector = DataElemAtIndex asm o
-  jumpList <- virtualCase vs cs
-  defaultJump <- virtualDefaultCase vs mdefault
+  jumpList <- virtualCase (selector : vs) cs
+  defaultJump <- virtualDefaultCase (selector : vs) mdefault
   return $ makeBranch asm jumpList defaultJump
 virtualDecision vs (DecisionSwap _ _) = undefined
+virtualDecision [] t =
+  lift $ throwE $ "virtualDecision. Note: \n" ++ Pr.ppShow t
 
 type JumpList = [(Identifier, Identifier)]
 

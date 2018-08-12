@@ -62,11 +62,15 @@ liftDecision ::
 liftDecision (DecisionLeaf xs c) = do
   Comp c' <- liftC $ Comp c
   return $ DecisionLeaf xs c'
-liftDecision DecisionFail = return $ DecisionFail
-liftDecision (DecisionSwitch o ids) = do
+liftDecision (DecisionSwitch o ids Nothing) = do
   let (is, ds) = unzip ids
   ds' <- mapM liftDecision ds
-  return $ DecisionSwitch o $ zip is ds'
+  return $ DecisionSwitch o (zip is ds') Nothing
+liftDecision (DecisionSwitch o ids (Just (i, tree))) = do
+  let (is, ds) = unzip ids
+  ds' <- mapM liftDecision ds
+  tree' <- liftDecision tree
+  return $ DecisionSwitch o (zip is ds') (Just (i, tree'))
 liftDecision (DecisionSwap i d) = do
   d' <- liftDecision d
   return $ DecisionSwap i d'
@@ -131,11 +135,15 @@ supplyDecision ::
 supplyDecision self args (DecisionLeaf xs c) = do
   Comp c' <- supplyC self args $ Comp c
   return $ DecisionLeaf xs c'
-supplyDecision _ _ DecisionFail = return $ DecisionFail
-supplyDecision self args (DecisionSwitch o ids) = do
+supplyDecision self args (DecisionSwitch o ids Nothing) = do
   let (is, ds) = unzip ids
   ds' <- mapM (supplyDecision self args) ds
-  return $ DecisionSwitch o $ zip is ds'
+  return $ DecisionSwitch o (zip is ds') Nothing
+supplyDecision self args (DecisionSwitch o ids (Just (i, tree))) = do
+  let (is, ds) = unzip ids
+  ds' <- mapM (supplyDecision self args) ds
+  tree' <- supplyDecision self args tree
+  return $ DecisionSwitch o (zip is ds') (Just (i, tree'))
 supplyDecision self args (DecisionSwap i d) = do
   d' <- supplyDecision self args d
   return $ DecisionSwap i d'
@@ -164,19 +172,21 @@ varPat (_ :< PatVar s)    = [s]
 varPat (_ :< PatApp _ ps) = join $ map varPat ps
 
 varDecision :: Decision PreComp -> [(VMeta, Identifier)]
-varDecision DecisionFail = []
 varDecision (DecisionLeaf ovs e) = do
   let boundIdents = map snd ovs
   let fs = varN (Comp e)
   filter (\(_, i) -> i `notElem` boundIdents) fs
-varDecision (DecisionSwitch _ []) = []
-varDecision (DecisionSwitch s ((CaseSwitch _, tree):treeList)) = do
-  varDecision tree ++ varDecision (DecisionSwitch s treeList)
-varDecision (DecisionSwitch s ((CaseDefault boundIdents, tree):treeList)) = do
-  let fs1 = varDecision tree
-  let fs2 = varDecision (DecisionSwitch s treeList)
-  (filter (\(_, i) -> i `notElem` boundIdents) fs1) ++ fs2
+varDecision (DecisionSwitch _ [] mdefault) = varDefault mdefault
+varDecision (DecisionSwitch s ((_, tree):treeList) mdefault) = do
+  varDecision tree ++ varDecision (DecisionSwitch s treeList mdefault)
+-- varDecision (DecisionSwitch s ((CaseDefault boundIdents, tree):treeList)) = do
+--   let fs1 = varDecision tree
+--   let fs2 = varDecision (DecisionSwitch s treeList)
+--   (filter (\(_, i) -> i `notElem` boundIdents) fs1) ++ fs2
 varDecision (DecisionSwap _ t) = varDecision t
+
+varDefault :: Maybe (Maybe Identifier, Decision a) -> [(VMeta, Identifier)]
+varDefault = undefined
 
 compLamSeq :: [(VMeta, Identifier)] -> Comp -> Comp
 compLamSeq [] terminal = terminal
