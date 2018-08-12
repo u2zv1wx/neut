@@ -14,8 +14,6 @@ import qualified Text.Show.Pretty           as Pr
 
 import           Debug.Trace
 
-import           Data.Functor.Foldable
-
 virtualV :: Value -> WithEnv UData
 virtualV (Value (_ :< ValueVar s)) = do
   return $ Fix (DataPointer s)
@@ -89,9 +87,7 @@ virtualDecision asmList (DecisionLeaf ois preComp) = do
       return $ Fix $ DataElemAtIndex (Fix $ DataPointer x) index
   body <- virtualC $ Comp preComp
   return $ letSeq asmList' varList body
-virtualDecision (x:vs) (DecisionSwitch (o, _) cs mdefault)
-  -- let vt' = traceLowType o vt
- = do
+virtualDecision (x:vs) (DecisionSwitch (o, _) cs mdefault) = do
   let selector = Fix $ DataElemAtIndex (Fix $ DataPointer x) o
   jumpList <- virtualCase (x : vs) cs
   defaultJump <- virtualDefaultCase (x : vs) mdefault
@@ -126,7 +122,7 @@ virtualDefaultCase vs (Just (Nothing, tree)) = do
   return $ Just (Nothing, label)
 virtualDefaultCase vs (Just (Just x, tree)) = do
   code <- virtualDecision vs tree
-  codeRef <- liftIO $ newIORef code
+  codeRef <- liftIO $ newIORef $ code
   label <- newName
   insCodeEnv label codeRef
   return $ Just (Just x, label)

@@ -14,13 +14,14 @@ import           Control.Monad.State
 import           Control.Monad.Trans.Except
 import           Text.Show.Deriving
 
+import           Data.Functor.Classes
+
 import           System.IO.Unsafe
 
 import           Data.IORef
 import           Data.List
 
-import           Data.Functor.Foldable
-
+-- import           Data.Functor.Foldable
 import qualified Text.Show.Pretty           as Pr
 
 type Identifier = String
@@ -285,14 +286,18 @@ deriving instance Functor DataF
 
 $(deriveShow1 ''DataF)
 
+data Fix f =
+  Fix (f (Fix f))
+
 type Data = Cofree DataF LowType
 
 type UData = Fix DataF
 
--- newtype Fix f =
---   In (f (Fix f))
--- $(deriveShow1 ''Fix)
 type Branch = (Identifier, Identifier)
+
+instance Show1 f => Show (Fix f) where
+  showsPrec d (Fix a) =
+    showParen (d >= 11) $ showString "Fix " . showsPrec1 11 a
 
 type DefaultBranch = Identifier
 
