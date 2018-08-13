@@ -293,6 +293,8 @@ instance Show1 f => Show (Fix f) where
 
 type DefaultBranch = Identifier
 
+type Address = Identifier
+
 data CodeF d a
   = CodeReturn d -- return
   | CodeLet Identifier -- bind (we also use this to represent application)
@@ -307,6 +309,12 @@ data CodeF d a
              a -- continuation
   | CodeJump Identifier -- unthunk (the target label of the jump address)
              [Identifier] -- list of arguments
+  | CodeStore Identifier -- required to implement register allocation
+              Address
+              a
+  | CodeLoad Identifier -- required to implement register allocation
+             Address
+             a
 
 deriving instance Show a => Show (CodeF UData a)
 

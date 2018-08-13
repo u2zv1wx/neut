@@ -48,15 +48,9 @@ virtualC (Comp (_ :< CompBind s c1 c2)) = do
   operation1 <- virtualC (Comp c1)
   operation2 <- virtualC (Comp c2)
   traceLet s operation1 operation2
-virtualC (Comp (_ :< CompUnthunk v@(Value (VMeta {vtype = ValueTypeDown tct} :< _)) j))
-  -- operand <- virtualV v
- = do
+virtualC (Comp (_ :< CompUnthunk v@(Value (VMeta {vtype = ValueTypeDown tct} :< _)) j)) = do
   let args = forallArgs tct
   addMeta $ CodeJump j args
-  -- case operand of
-  --   Fix (DataPointer s)   -> addMeta $ CodeJump s j args -- indirect branch
-  --   Fix (DataLabel label) -> addMeta $ CodeJump label j args -- direct branch
-  --   _                     -> lift $ throwE "virtualC.CompUnthunk"
 virtualC (Comp (_ :< CompUnthunk (Value (VMeta {vtype = _} :< _)) _)) = do
   lift $ throwE "virtualC.CompUnthunk"
 virtualC (Comp (CMeta {ctype = ct} :< CompMu s c)) = do
@@ -176,6 +170,7 @@ traceLet s (_ :< (switcher@(CodeSwitch _ defaultBranch branchList))) cont = do
   appendCode s cont defaultBranch
   forM_ branchList $ \(_, label) -> appendCode s cont label
   addMeta $ switcher
+traceLet _ _ _ = error "Virtual.traceLet" -- load/store
 
 appendCode :: Identifier -> Code -> Identifier -> WithEnv ()
 appendCode s cont key = do
