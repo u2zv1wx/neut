@@ -14,6 +14,7 @@ import           Data.IORef
 import           Data
 import           Infer
 import           Lift
+import           Liveness
 import           Macro
 import           Parse
 import           Polarize
@@ -71,8 +72,6 @@ load' (a:as) = do
   case e'' of
     TermValue v -> do
       liftIO $ putStrLn $ Pr.ppShow v
-      insEmptyFunEnv "main"
-      setFunName "main"
       v' <- virtualV v
       liftIO $ putStrLn $ Pr.ppShow v'
       liftIO $ putStrLn "the type of main term must be negative"
@@ -80,11 +79,18 @@ load' (a:as) = do
       liftIO $ putStrLn $ Pr.ppShow c
       liftedC <- liftC c
       liftIO $ putStrLn $ Pr.ppShow liftedC
-      insEmptyFunEnv "main"
-      setFunName "main"
       c' <- virtualC liftedC
       liftIO $ putStrLn $ Pr.ppShow c'
       i <- newNameWith "main"
-      cref <- liftIO $ newIORef c'
-      insCodeEnv i cref
+      insCodeEnv i c'
+      annotCodeEnv
+      env <- get
+      mainCode <- lookupFunEnv i >>= liftIO . readIORef
+      liftIO $ putStrLn "===========FUNENV======"
+      liftIO $ putStrLn $ Pr.ppShow $ funEnv env
+      liftIO $ putStrLn "starting liveness analysis"
+      liftIO $ putStrLn $ "mainCode : \n" ++ Pr.ppShow mainCode
+      mainCode' <- analyze mainCode
+      liftIO $ putStrLn $ "c'' : \n" ++ Pr.ppShow mainCode'
+      updateCodeEnv i mainCode'
   load' as

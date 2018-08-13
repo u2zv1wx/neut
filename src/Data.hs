@@ -313,8 +313,7 @@ data CodeF d a
              Identifier -- the label of the funtion
              [Identifier] -- arguments
              a -- continuation
-  | CodeJump Identifier -- unthunk
-             Identifier -- this second argument is required to lookup the corresponding code
+  | CodeJump Identifier -- unthunk (the target label of the jump address)
              [Identifier] -- list of arguments
 
 deriving instance Show a => Show (CodeF UData a)
@@ -327,9 +326,22 @@ deriving instance Functor (CodeF Data)
 
 $(deriveShow1 ''CodeF)
 
-type Code = Cofree (CodeF Data) LowType
+data CodeMeta = CodeMeta
+  { codeMetaLive :: [Identifier]
+  , codeMetaDef  :: [Identifier]
+  , codeMetaUse  :: [Identifier]
+  } deriving (Show)
 
+emptyCodeMeta :: WithEnv CodeMeta
+emptyCodeMeta =
+  return $ CodeMeta {codeMetaLive = [], codeMetaDef = [], codeMetaUse = []}
+
+-- type Code = Cofree (CodeF Data) LowType
 type UCode = Fix (CodeF UData)
+
+type Code = Cofree (CodeF UData) CodeMeta
+
+type PreCode = CodeF UData Code
 
 data Env = Env
   { count          :: Int -- to generate fresh symbols
@@ -346,9 +358,9 @@ data Env = Env
   , levelEnv       :: [(WeakLevel, WeakLevel)] -- constraint regarding the level of universes
   , argEnv         :: [(IdentOrHole, IdentOrHole)] -- equivalence of arguments of forall
   , thunkEnv       :: [(Identifier, Identifier)]
-  , funEnv         :: [(Identifier, IORef [(Identifier, IORef UCode)])]
+  , funEnv         :: [(Identifier, IORef Code)]
   , lowTypeEnv     :: [(Identifier, LowType)]
-  , scope          :: Identifier -- used in Virtual to determine the name of current function
+  , didUpdate      :: Bool -- used in live analysis to detect the end of the process
   } deriving (Show)
 
 initialEnv :: Env
@@ -383,7 +395,7 @@ initialEnv =
     , argEnv = []
     , funEnv = []
     , lowTypeEnv = []
-    , scope = "main"
+    , didUpdate = False
     }
 
 type WithEnv a = StateT Env (ExceptT String IO) a
@@ -447,7 +459,7 @@ lookupVEnv' s = do
     Nothing -> do
       lift $ throwE $ "the value " ++ show s ++ " is not defined "
 
-lookupFunEnv :: Identifier -> WithEnv (IORef [(Identifier, IORef UCode)])
+lookupFunEnv :: Identifier -> WithEnv (IORef Code)
 lookupFunEnv s = do
   m <- gets (lookup s . funEnv)
   case m of
@@ -466,13 +478,13 @@ lookupThunkEnv s = do
           _ -> []
   return $ concatMap selector $ thunkEnv env
 
-lookupCodeEnv :: Identifier -> WithEnv (Maybe (IORef UCode))
-lookupCodeEnv s = do
-  current <- getFunName
-  codeEnvRef <- lookupFunEnv current
-  codeEnv <- liftIO $ readIORef codeEnvRef
-  return $ lookup s codeEnv
-
+-- lookupCodeEnv :: Identifier -> WithEnv (IORef Code)
+-- lookupCodeEnv s = do
+--   -- current <- getFunName
+--   codeEnvRef <- lookupFunEnv s
+--   liftIO $ readIORef codeEnvRef
+--   -- codeEnv <- liftIO $ readIORef codeEnvRef
+--   -- return $ lookup s codeEnv
 lookupConstructorEnv :: Identifier -> WithEnv [Identifier]
 lookupConstructorEnv cons = do
   env <- get
@@ -540,27 +552,32 @@ insConstructorEnv i cons = do
 insThunkEnv :: Identifier -> Identifier -> WithEnv ()
 insThunkEnv i j = modify (\e -> e {thunkEnv = (i, j) : thunkEnv e})
 
-insCodeEnv :: Identifier -> IORef UCode -> WithEnv ()
-insCodeEnv i code = do
-  current <- getFunName
-  codeEnvRef <- lookupFunEnv current
-  codeEnv <- liftIO $ readIORef codeEnvRef
-  liftIO $ writeIORef codeEnvRef $ (i, code) : codeEnv
+insCodeEnv :: Identifier -> Code -> WithEnv ()
+insCodeEnv i code
+  -- current <- getFunName
+ = do
+  codeRef <- liftIO $ newIORef code
+  modify (\e -> e {funEnv = (i, codeRef) : funEnv e})
 
-insEmptyFunEnv :: Identifier -> WithEnv ()
-insEmptyFunEnv i = do
-  x <- liftIO $ newIORef []
-  modify (\e -> e {funEnv = (i, x) : funEnv e})
+updateCodeEnv :: Identifier -> Code -> WithEnv ()
+updateCodeEnv key code = do
+  codeRef <- lookupFunEnv key
+  -- case mcode of
+  --   Nothing -> lift $ throwE $ "no such code: " ++ show key
+  --   Just coderef -> do
+  liftIO $ writeIORef codeRef code
 
-setFunName :: Identifier -> WithEnv ()
-setFunName i = do
-  modify (\e -> e {scope = i})
-
-getFunName :: WithEnv Identifier
-getFunName = do
-  env <- get
-  return $ scope env
-
+-- insEmptyFunEnv :: Identifier -> WithEnv ()
+-- insEmptyFunEnv i = do
+--   x <- liftIO $ newIORef []
+--   modify (\e -> e {funEnv = (i, x) : funEnv e})
+-- setFunName :: Identifier -> WithEnv ()
+-- setFunName i = do
+--   modify (\e -> e {scope = i})
+-- getFunName :: WithEnv Identifier
+-- getFunName = do
+--   env <- get
+--   return $ scope env
 local :: WithEnv a -> WithEnv a
 local p = do
   env <- get
