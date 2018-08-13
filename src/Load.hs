@@ -90,7 +90,7 @@ load' (a:as) = do
       liftIO $ putStrLn $ Pr.ppShow $ funEnv env
       liftIO $ putStrLn "starting liveness analysis"
       liftIO $ putStrLn $ "mainCode : \n" ++ Pr.ppShow mainCode
-      mainCode' <- analyze mainCode
+      mainCode' <- computeLiveness mainCode
       liftIO $ putStrLn $ "c'' : \n" ++ Pr.ppShow mainCode'
       updateCodeEnv i mainCode'
   load' as

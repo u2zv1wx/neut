@@ -1,6 +1,6 @@
 module Liveness
   ( annotCodeEnv
-  , analyze
+  , computeLiveness
   ) where
 
 import           Data
@@ -56,45 +56,51 @@ varsInData (Fix (DataCell _ ds)) = do
 varsInData (Fix (DataLabel _)) = return []
 varsInData (Fix (DataElemAtIndex d _)) = varsInData d
 
-analyze :: Code -> WithEnv Code
-analyze (meta :< code@(CodeReturn _)) = do
+computeLiveness :: Code -> WithEnv Code
+computeLiveness (meta :< code@(CodeReturn _)) = do
   contElems <- computeSuccAll (meta :< code)
-  analyze' meta contElems code
-analyze (meta :< (CodeLet x d cont)) = do
-  cont' <- analyze cont
+  computeLiveness' meta contElems code
+computeLiveness (meta :< (CodeLet x d cont)) = do
+  cont' <- computeLiveness cont
   contElemList <- computeSuccAll (meta :< (CodeLet x d cont'))
-  analyze' meta contElemList (CodeLet x d cont')
-analyze (meta :< (CodeSwitch d defaultBranch branchList)) = do
+  computeLiveness' meta contElemList (CodeLet x d cont')
+computeLiveness (meta :< (CodeSwitch d defaultBranch branchList)) = do
   let labelList = defaultBranch : map snd branchList
   contElemListList <-
     forM labelList $ \label -> do
       contRef <- lookupFunEnv label
       cont <- liftIO $ readIORef contRef
-      cont' <- analyze cont
+      cont' <- computeLiveness cont
       liftIO $ writeIORef contRef cont'
       computeSuccAll cont'
-  analyze' meta (join contElemListList) (CodeSwitch d defaultBranch branchList)
-analyze (meta :< (CodeCall x label argList cont)) = do
+  computeLiveness'
+    meta
+    (join contElemListList)
+    (CodeSwitch d defaultBranch branchList)
+computeLiveness (meta :< (CodeCall x label argList cont)) = do
   funRef <- lookupFunEnv label
   fun <- liftIO $ readIORef funRef
-  fun' <- analyze fun
+  fun' <- computeLiveness fun
   liftIO $ writeIORef funRef fun'
   funElemList <- computeSuccAll fun'
-  cont' <- analyze cont
+  cont' <- computeLiveness cont
   contElemList <- computeSuccAll cont'
-  analyze' meta (funElemList ++ contElemList) (CodeCall x label argList cont')
-analyze (meta :< (CodeJump labelName argList)) = do
+  computeLiveness'
+    meta
+    (funElemList ++ contElemList)
+    (CodeCall x label argList cont')
+computeLiveness (meta :< (CodeJump labelName argList)) = do
   contRef <- lookupFunEnv labelName
   cont <- liftIO $ readIORef contRef
-  cont' <- analyze cont
+  cont' <- computeLiveness cont
   liftIO $ writeIORef contRef cont'
   contElemList <- computeSuccAll cont'
-  analyze' meta contElemList (CodeJump labelName argList)
+  computeLiveness' meta contElemList (CodeJump labelName argList)
 
-analyze' :: CodeMeta -> [Identifier] -> PreCode -> WithEnv Code
-analyze' meta elems code =
+computeLiveness' :: CodeMeta -> [Identifier] -> PreCode -> WithEnv Code
+computeLiveness' meta elems code =
   if codeMetaLive meta /= elems
-    then analyze (meta {codeMetaLive = elems} :< code)
+    then computeLiveness (meta {codeMetaLive = elems} :< code)
     else return (meta :< code)
 
 computeCurrent :: Code -> [Identifier]
