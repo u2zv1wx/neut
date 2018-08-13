@@ -138,14 +138,6 @@ type Pat = Cofree PatF Meta
 
 type Occurrence = ([Int], ValueType)
 
--- data Case a
---   = CaseSwitch Identifier
---                a -- the name of constructor
---   | CaseDefault [Identifier]
---                 a -- arguments
---   deriving (Show)
--- deriving instance Functor Case
--- $(deriveShow1 ''Case)
 data Decision a
   = DecisionLeaf [(Occurrence, (Identifier, ValueType))]
                  a
@@ -478,13 +470,6 @@ lookupThunkEnv s = do
           _ -> []
   return $ concatMap selector $ thunkEnv env
 
--- lookupCodeEnv :: Identifier -> WithEnv (IORef Code)
--- lookupCodeEnv s = do
---   -- current <- getFunName
---   codeEnvRef <- lookupFunEnv s
---   liftIO $ readIORef codeEnvRef
---   -- codeEnv <- liftIO $ readIORef codeEnvRef
---   -- return $ lookup s codeEnv
 lookupConstructorEnv :: Identifier -> WithEnv [Identifier]
 lookupConstructorEnv cons = do
   env <- get
@@ -553,31 +538,15 @@ insThunkEnv :: Identifier -> Identifier -> WithEnv ()
 insThunkEnv i j = modify (\e -> e {thunkEnv = (i, j) : thunkEnv e})
 
 insCodeEnv :: Identifier -> Code -> WithEnv ()
-insCodeEnv i code
-  -- current <- getFunName
- = do
+insCodeEnv i code = do
   codeRef <- liftIO $ newIORef code
   modify (\e -> e {funEnv = (i, codeRef) : funEnv e})
 
 updateCodeEnv :: Identifier -> Code -> WithEnv ()
 updateCodeEnv key code = do
   codeRef <- lookupFunEnv key
-  -- case mcode of
-  --   Nothing -> lift $ throwE $ "no such code: " ++ show key
-  --   Just coderef -> do
   liftIO $ writeIORef codeRef code
 
--- insEmptyFunEnv :: Identifier -> WithEnv ()
--- insEmptyFunEnv i = do
---   x <- liftIO $ newIORef []
---   modify (\e -> e {funEnv = (i, x) : funEnv e})
--- setFunName :: Identifier -> WithEnv ()
--- setFunName i = do
---   modify (\e -> e {scope = i})
--- getFunName :: WithEnv Identifier
--- getFunName = do
---   env <- get
---   return $ scope env
 local :: WithEnv a -> WithEnv a
 local p = do
   env <- get
