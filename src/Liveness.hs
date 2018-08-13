@@ -47,6 +47,14 @@ annotCode (meta :< (CodeCall x label argList cont)) = do
 annotCode (meta :< (CodeJump labelName argList)) = do
   uvs <- return argList
   return $ meta {codeMetaUse = uvs} :< CodeJump labelName argList
+annotCode (meta :< (CodeStore x addr cont)) = do
+  cont' <- annotCode cont
+  dvs <- return [x]
+  return $ meta {codeMetaDef = dvs} :< CodeStore x addr cont'
+annotCode (meta :< (CodeLoad x addr cont)) = do
+  cont' <- annotCode cont
+  dvs <- return [x]
+  return $ meta {codeMetaDef = dvs} :< CodeLoad x addr cont'
 
 varsInData :: UData -> WithEnv [Identifier]
 varsInData (Fix (DataPointer x)) = return [x]
@@ -96,6 +104,14 @@ computeLiveness (meta :< (CodeJump labelName argList)) = do
   liftIO $ writeIORef contRef cont'
   contElemList <- computeSuccAll cont'
   computeLiveness' meta contElemList (CodeJump labelName argList)
+computeLiveness (meta :< (CodeStore x d cont)) = do
+  cont' <- computeLiveness cont
+  contElemList <- computeSuccAll (meta :< (CodeStore x d cont'))
+  computeLiveness' meta contElemList (CodeStore x d cont')
+computeLiveness (meta :< (CodeLoad x d cont)) = do
+  cont' <- computeLiveness cont
+  contElemList <- computeSuccAll (meta :< (CodeLoad x d cont'))
+  computeLiveness' meta contElemList (CodeLoad x d cont')
 
 computeLiveness' :: CodeMeta -> [Identifier] -> PreCode -> WithEnv Code
 computeLiveness' meta elems code =
@@ -140,3 +156,9 @@ computeSuccAll (meta :< (CodeJump labelName _)) = do
   cont <- lookupFunEnv labelName >>= liftIO . readIORef
   contElems <- computeSuccAll cont
   return $ next meta contElems
+computeSuccAll (meta :< (CodeStore _ _ cont)) = do
+  contLvs <- computeSuccAll cont
+  return $ next meta contLvs
+computeSuccAll (meta :< (CodeLoad _ _ cont)) = do
+  contLvs <- computeSuccAll cont
+  return $ next meta contLvs

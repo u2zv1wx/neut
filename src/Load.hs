@@ -19,6 +19,7 @@ import           Macro
 import           Parse
 import           Polarize
 import           Read
+import           Register
 import           Rename
 import           Virtual
 
@@ -93,4 +94,5 @@ load' (a:as) = do
       mainCode' <- computeLiveness mainCode
       liftIO $ putStrLn $ "c'' : \n" ++ Pr.ppShow mainCode'
       updateCodeEnv i mainCode'
+      regAlloc 32 mainCode' -- register number
   load' as

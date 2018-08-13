@@ -361,6 +361,7 @@ data Env = Env
   , funEnv         :: [(Identifier, IORef Code)]
   , lowTypeEnv     :: [(Identifier, LowType)]
   , didUpdate      :: Bool -- used in live analysis to detect the end of the process
+  , regEnv         :: [(Identifier, Int)] -- variable to register
   } deriving (Show)
 
 initialEnv :: Env
@@ -396,6 +397,7 @@ initialEnv =
     , funEnv = []
     , lowTypeEnv = []
     , didUpdate = False
+    , regEnv = []
     }
 
 type WithEnv a = StateT Env (ExceptT String IO) a
@@ -530,6 +532,12 @@ insLEnv l1 l2 = modify (\e -> e {levelEnv = (l1, l2) : levelEnv e})
 
 insAEnv :: IdentOrHole -> IdentOrHole -> WithEnv ()
 insAEnv x y = modify (\e -> e {argEnv = (x, y) : argEnv e})
+
+insRegEnv :: Identifier -> Int -> WithEnv ()
+insRegEnv x i = modify (\e -> e {regEnv = (x, i) : regEnv e})
+
+lookupRegEnv :: Identifier -> WithEnv (Maybe Int)
+lookupRegEnv s = gets (lookup s . regEnv)
 
 insConstructorEnv :: Identifier -> Identifier -> WithEnv ()
 insConstructorEnv i cons = do
