@@ -16,32 +16,33 @@ import qualified Text.Show.Pretty           as Pr
 import           Debug.Trace
 
 virtualV :: Value -> WithEnv UData
-virtualV (Value (_ :< ValueVar s)) = do
-  return $ Fix (DataPointer s)
+virtualV (Value (_ :< ValueVar x)) = do
+  return $ Fix (DataPointer x)
 virtualV (Value (_ :< ValueNodeApp s vs)) = do
   vs' <- mapM (virtualV . Value) vs
   return $ Fix $ DataCell s vs'
-virtualV (Value (_ :< ValueThunk c _)) = do
-  asm <- virtualC c
+virtualV (Value (_ :< ValueThunk comp _)) = do
+  asm <- virtualC comp
   i <- newName
   insCodeEnv i asm
   return $ Fix $ DataLabel i
 
 virtualC :: Comp -> WithEnv Code
-virtualC (Comp (_ :< CompLam _ e)) = do
-  virtualC (Comp e)
+virtualC (Comp (_ :< CompLam _ comp)) = do
+  virtualC (Comp comp)
 virtualC app@(Comp (_ :< CompApp _ _)) = do
   let (cont, xs, vs) = toFunAndArgs app
   ds <- mapM virtualV vs
   cont' <- virtualC cont
-  addMeta $ CodeLetForArg xs ds cont'
+  letSeq xs ds cont'
 virtualC (Comp (_ :< CompRet v)) = do
   ans <- virtualV v
   linkReg <- getLinkRegister
-  addMeta $ CodeReturn linkReg ans
-virtualC (Comp (_ :< CompBind s c1 c2)) = do
-  operation1 <- virtualC (Comp c1)
-  operation2 <- virtualC (Comp c2)
+  retReg <- getReturnRegister
+  addMeta $ CodeReturn retReg linkReg ans
+virtualC (Comp (_ :< CompBind s comp1 comp2)) = do
+  operation1 <- virtualC (Comp comp1)
+  operation2 <- virtualC (Comp comp2)
   traceLet s operation1 operation2
 virtualC (Comp (_ :< CompUnthunk v _)) = do
   operand <- virtualV v
@@ -49,8 +50,8 @@ virtualC (Comp (_ :< CompUnthunk v _)) = do
     Fix (DataPointer x)   -> addMeta $ CodeIndirectJump x -- indirect branch
     Fix (DataLabel label) -> addMeta $ CodeJump label -- direct branch
     _                     -> lift $ throwE "virtualC.CompUnthunk"
-virtualC (Comp (_ :< CompMu s c)) = do
-  asm <- (virtualC $ Comp c)
+virtualC (Comp (_ :< CompMu s comp)) = do
+  asm <- (virtualC $ Comp comp)
   insCodeEnv s asm
   addMeta $ CodeJump s
 virtualC (Comp (_ :< CompCase vs tree)) = do
@@ -134,22 +135,18 @@ letSeq (i:is) (d:ds) code = do
 letSeq _ _ _ = error "Virtual.letSeq: invalid arguments"
 
 traceLet :: String -> Code -> Code -> WithEnv Code
-traceLet s (_ :< (CodeReturn _ ans)) cont = addMeta $ CodeLet s ans cont
+traceLet s (_ :< (CodeReturn _ _ ans)) cont = addMeta $ CodeLet s ans cont
 traceLet s (_ :< (CodeJump unthunkId)) cont = do
   traceLetJump s unthunkId cont
 traceLet s (_ :< (CodeIndirectJump addrInReg)) cont = do
-  undefined
-  -- regName <- newName
-  -- sをreturn valueのレジスタとして設定？
-  -- retLabelName <- newName -- create a new label to call back after jump
-  -- cont' <- withStackRestore cont
-  -- insCodeEnv retLabelName cont'
-  -- jump <- addMeta $ CodeJump retLabelName
-  -- linkReg <- getLinkRegister
-  -- let retLabel = Fix $ DataLabel retLabelName
-  -- addMeta $ CodeWithLinkReg linkReg retLabel jump -- set return address before jump-
-  -- cont' <- traceLetJump s unthunkId cont
-  -- addMeta $ CodeLoad regName addrInReg cont'
+  retReg <- getReturnRegister
+  cont' <- addMeta $ CodeLet s (Fix $ DataPointer retReg) cont
+  linkLabelName <- newName -- create a new label to call back after jump
+  insCodeEnv linkLabelName cont'
+  linkReg <- getLinkRegister
+  let linkLabel = Fix $ DataLabel linkLabelName
+  jumpToAddr <- addMeta $ CodeIndirectJump addrInReg
+  addMeta $ CodeLet linkReg linkLabel jumpToAddr
 traceLet s (_ :< (switcher@(CodeSwitch _ defaultBranch branchList))) cont = do
   appendCode s cont defaultBranch
   forM_ branchList $ \(_, label) -> appendCode s cont label
@@ -157,19 +154,8 @@ traceLet s (_ :< (switcher@(CodeSwitch _ defaultBranch branchList))) cont = do
 traceLet s (_ :< (CodeLet k o1 o2)) cont = do
   c <- traceLet s o2 cont
   addMeta $ CodeLet k o1 c
-traceLet s (_ :< (CodeLetForArg xs ds body)) cont = do
-  tmp <- traceLet s body cont
-  case tmp of
-    item@(_ :< CodeWithLinkReg _ _ _) -> do
-      item' <- letSeq xs ds item -- set arguments
-      withStackSave item' -- save stack before the preparation of arguments
-    item@(_ :< CodeLoad _ _ _) -> do
-      item' <- letSeq xs ds item -- set arguments
-      withStackSave item' -- save stack before the preparation of arguments
-    item -> letSeq xs ds item
 traceLet _ _ _ = error "Virtual.traceLet" -- load/store
 
--- let s := (Jump addr) in cont
 traceLetJump :: Identifier -> Identifier -> Code -> WithEnv Code
 traceLetJump s addr cont = do
   liftIO $ putStrLn $ "looking for thunk of name " ++ show addr
@@ -187,22 +173,11 @@ traceLetJump s addr cont = do
 nonTail :: Code -> WithEnv Code
 nonTail cont = do
   retLabelName <- newName -- create a new label to call back after jump
-  cont' <- withStackRestore cont
-  insCodeEnv retLabelName cont'
+  insCodeEnv retLabelName cont
   jump <- addMeta $ CodeJump retLabelName
   linkReg <- getLinkRegister
   let retLabel = Fix $ DataLabel retLabelName
   addMeta $ CodeWithLinkReg linkReg retLabel jump -- set return address before jump
-
-withStackSave :: Code -> WithEnv Code
-withStackSave code = do
-  stackReg <- getStackRegister
-  addMeta $ CodeLet stackReg (Fix $ DataStackSave) code
-
-withStackRestore :: Code -> WithEnv Code
-withStackRestore code = do
-  stackReg <- getStackRegister
-  addMeta $ CodeStackLoad stackReg code
 
 appendCode :: Identifier -> Code -> Identifier -> WithEnv ()
 appendCode s cont key = do

@@ -297,14 +297,12 @@ type DefaultBranch = Identifier
 type Address = Identifier
 
 data CodeF d a
-  = CodeReturn Identifier -- the name of link register
-               d -- return value
+  = CodeReturn Identifier -- return register
+               Identifier -- link register
+               d
   | CodeLet Identifier -- bind (we also use this to represent application)
             d
             a
-  | CodeLetForArg [Identifier]
-                  [d]
-                  a
   | CodeWithLinkReg Identifier
                     d
                     a
@@ -313,14 +311,6 @@ data CodeF d a
                [Branch]
   | CodeJump Identifier -- unthunk (the target label of the jump address)
   | CodeIndirectJump Identifier -- the name of register
-  | CodeStore Identifier -- required to implement register allocation
-              Address
-              a
-  | CodeLoad Identifier -- required to implement register allocation
-             Address
-             a
-  | CodeStackLoad Identifier
-                  a
 
 deriving instance Show a => Show (CodeF UData a)
 
@@ -332,15 +322,16 @@ deriving instance Functor (CodeF Data)
 
 $(deriveShow1 ''CodeF)
 
-data CodeMeta = CodeMeta
-  { codeMetaLive :: [Identifier]
-  , codeMetaDef  :: [Identifier]
-  , codeMetaUse  :: [Identifier]
-  } deriving (Show)
+type CodeMeta = Int
 
+-- data CodeMeta = CodeMeta
+--   { codeMetaLive :: [Identifier]
+--   , codeMetaDef  :: [Identifier]
+--   , codeMetaUse  :: [Identifier]
+--   } deriving (Show)
 emptyCodeMeta :: WithEnv CodeMeta
-emptyCodeMeta =
-  return $ CodeMeta {codeMetaLive = [], codeMetaDef = [], codeMetaUse = []}
+emptyCodeMeta = return 0
+  -- return $ CodeMeta {codeMetaLive = [], codeMetaDef = [], codeMetaUse = []}
 
 -- type Code = Cofree (CodeF Data) LowType
 type UCode = Fix (CodeF UData)
@@ -591,17 +582,17 @@ updateCodeEnv key code = do
 
 initializeLinkRegister :: WithEnv ()
 initializeLinkRegister = do
-  s <- newName
+  s <- newNameWith "LinkReg"
   modify (\e -> e {linkRegister = Just s})
 
 initializeStackRegister :: WithEnv ()
 initializeStackRegister = do
-  s <- newName
+  s <- newNameWith "StackReg"
   modify (\e -> e {stackRegister = Just s})
 
 initializeReturnRegister :: WithEnv ()
 initializeReturnRegister = do
-  s <- newName
+  s <- newNameWith "ReturnReg"
   modify (\e -> e {returnRegister = Just s})
 
 getLinkRegister :: WithEnv Identifier
