@@ -296,7 +296,7 @@ type Address = Identifier
 
 data CodeF d a
   = CodeReturn Identifier -- return register
-               Identifier -- link register
+               Identifier -- link label
                d
   | CodeLet Identifier -- bind (we also use this to represent application)
             d
@@ -309,6 +309,7 @@ data CodeF d a
                [Branch]
   | CodeJump Identifier -- unthunk (the target label of the jump address)
   | CodeIndirectJump Identifier -- the name of register
+                     Identifier -- the id of corresponding unthunk
                      [Identifier] -- possible jump
   | CodeRecursiveJump Identifier -- jump by (unthunk x) in (mu x (...))
   | CodeStackSave Identifier -- the pointer created by stacksave

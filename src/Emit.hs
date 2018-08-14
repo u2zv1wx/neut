@@ -19,14 +19,12 @@ emit :: WithEnv ()
 emit = do
   env <- get
   liftIO $ putStrLn "define void @main() {"
-  linkReg <- getLinkRegister
-  exitLabel <- newNameWith "exit"
-  emitOp $ "%" ++ linkReg ++ " = %" ++ exitLabel
+  -- exitLabel <- newNameWith "exit"
   forM_ (funEnv env) $ \(label, codeRef) -> do
     code <- liftIO $ readIORef codeRef
     emitLabelHeader label
     emitCode code
-  emitLabelHeader exitLabel
+  emitLabelHeader "exit"
   emitOp $ "ret void"
   liftIO $ putStrLn "}"
 
@@ -36,14 +34,20 @@ emitCode (CodeMeta {codeMetaArgs = xds@(_:_)} :< code) = do
   code' <- addMeta code
   tmp <- letSeq xs ds code'
   emitCode tmp
-emitCode (_ :< CodeReturn retReg linkReg d) = do
+emitCode (_ :< CodeReturn retReg label d) = do
   x <- emitData d
   emitOp $ "%" ++ retReg ++ " = " ++ x
-  emitOp $ "indirectbr label %" ++ linkReg
-emitCode (_ :< CodeLet i d cont@(CodeMeta {codeMetaLive = lvs} :< _)) = do
-  when (i `elem` lvs) $ do
-    x <- emitData d
-    emitOp $ "%" ++ i ++ " = " ++ x
+  emitOp $ "br label %" ++ label
+emitCode (_ :< CodeLet i (Fix (DataLabel label)) cont) = do
+  emitOp $ "%" ++ i ++ " = alloca label"
+  emitOp $ "store label %" ++ label ++ ", label* %" ++ i
+  emitCode cont
+emitCode (_ :< CodeLet i (Fix (DataPointer x)) cont) = do
+  emitOp $ "%" ++ i ++ " = load <type>, <type>* %" ++ x
+  emitCode cont
+emitCode (_ :< CodeLet i d cont) = do
+  x <- emitData d
+  emitOp $ "%" ++ i ++ " = " ++ x
   emitCode cont
 emitCode (_ :< CodeLetLink i d cont) = do
   x <- emitData d
@@ -56,7 +60,7 @@ emitCode (_ :< CodeSwitch x defaultBranch branchList) = do
     x ++
     ", label %" ++ defaultBranch ++ " [" ++ emitBranchList branchList ++ "]"
 emitCode (_ :< CodeJump label) = emitOp $ "br label %" ++ label
-emitCode (_ :< CodeIndirectJump x poss) =
+emitCode (_ :< CodeIndirectJump x unthunkId poss) =
   emitOp $ "indirectbr label %" ++ x ++ ", [" ++ show poss ++ "]"
 emitCode (_ :< CodeRecursiveJump x) =
   emitOp $ "indirectbr label %" ++ x ++ ", [" ++ show x ++ "]"

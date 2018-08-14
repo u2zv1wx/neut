@@ -27,10 +27,9 @@ annotCodeEnv = do
     liftIO $ writeIORef codeRef code'
 
 annotCode :: Code -> WithEnv Code
-annotCode (meta :< (CodeReturn retReg linkReg d)) = do
+annotCode (meta :< (CodeReturn retReg label d)) = do
   uvs <- varsInData d
-  return $
-    meta {codeMetaUse = retReg : linkReg : uvs} :< CodeReturn retReg linkReg d
+  return $ meta {codeMetaUse = retReg : uvs} :< CodeReturn retReg label d
 annotCode (meta :< (CodeLet x d cont)) = do
   cont' <- annotCode cont
   uvs <- varsInData d
@@ -47,8 +46,8 @@ annotCode (meta :< (CodeJump labelName)) = do
   return $ meta :< CodeJump labelName
 annotCode (meta :< (CodeRecursiveJump x)) = do
   return $ meta {codeMetaUse = [x]} :< CodeRecursiveJump x
-annotCode (meta :< (CodeIndirectJump x poss)) = do
-  return $ meta {codeMetaUse = [x]} :< CodeIndirectJump x poss
+annotCode (meta :< (CodeIndirectJump x unthunkId poss)) = do
+  return $ meta {codeMetaUse = [x]} :< CodeIndirectJump x unthunkId poss
 annotCode (meta :< (CodeStackSave stackReg cont)) = do
   cont' <- annotCode cont
   return $ meta {codeMetaUse = [stackReg]} :< CodeStackSave stackReg cont'
@@ -104,9 +103,16 @@ computeLiveness (meta :< (CodeJump labelName)) = do
   liftIO $ writeIORef contRef cont'
   contElemList <- computeSuccAll cont'
   computeLiveness' meta contElemList (CodeJump labelName)
-computeLiveness (meta :< code@(CodeIndirectJump _ _)) = do
-  contElems <- computeSuccAll (meta :< code)
-  computeLiveness' meta contElems code
+computeLiveness (meta :< code@(CodeIndirectJump _ unthunkId poss)) = do
+  contElemListList <-
+    forM poss $ \thunkId -> do
+      let label = "thunk" ++ thunkId ++ "unthunk" ++ unthunkId -- unthunkId
+      codeRef <- lookupFunEnv label
+      code <- liftIO $ readIORef codeRef
+      code' <- computeLiveness code
+      liftIO $ writeIORef codeRef code'
+      computeSuccAll code'
+  computeLiveness' meta (join contElemListList) code
 computeLiveness (meta :< code@(CodeRecursiveJump _)) = do
   contElems <- computeSuccAll (meta :< code)
   computeLiveness' meta contElems code
@@ -160,7 +166,7 @@ computeSuccAll (meta :< (CodeJump labelName)) = do
   cont <- lookupFunEnv labelName >>= liftIO . readIORef
   contElems <- computeSuccAll cont
   return $ next meta contElems
-computeSuccAll (meta :< (CodeIndirectJump _ _)) = do
+computeSuccAll (meta :< (CodeIndirectJump _ _ _)) = do
   return $ computeCurrent' meta
 computeSuccAll (meta :< (CodeRecursiveJump _)) = do
   return $ computeCurrent' meta

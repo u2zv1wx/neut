@@ -38,6 +38,8 @@
 (begin
   (let yay (return (thunk (lambda (x) (return (succ x))))))
   (let foo (return (zero)))
-  (let ya (return (thunk (lambda (x) (return (succ foo))))))
+  (let sya (return (thunk (mu x (return (succ foo))))))
+  (let k (unthunk sya))
+  (return (zero))
   (let p ((unthunk yay) (succ (zero))))
-  (return p))
+  (return (true)))
