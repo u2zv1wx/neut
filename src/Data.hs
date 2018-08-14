@@ -461,6 +461,13 @@ lookupVEnv' s = do
     Nothing -> do
       lift $ throwE $ "the value " ++ show s ++ " is not defined "
 
+lookupNameEnv :: String -> WithEnv String
+lookupNameEnv s = do
+  env <- get
+  case lookup s (nameEnv env) of
+    Just s' -> return s'
+    Nothing -> lift $ throwE $ "undefined variable: " ++ show s
+
 lookupFunEnv :: Identifier -> WithEnv (IORef Code)
 lookupFunEnv s = do
   m <- gets (lookup s . funEnv)

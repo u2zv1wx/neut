@@ -9,7 +9,7 @@ import           Data
 
 rename :: WeakTerm -> WithEnv WeakTerm
 rename (i :< WeakTermVar s) = do
-  t <- WeakTermVar <$> renameString s
+  t <- WeakTermVar <$> lookupNameEnv s
   return (i :< t)
 rename (i :< WeakTermNodeApp s []) = return (i :< WeakTermNodeApp s [])
 rename (i :< WeakTermNodeApp s vs) = do
@@ -65,7 +65,7 @@ rename (i :< WeakTermAsc e t) = do
   return (i :< WeakTermAsc e' t')
 
 renameType :: WeakType -> WithEnv WeakType
-renameType (WeakTypeVar s) = WeakTypeVar <$> renameString s
+renameType (WeakTypeVar s) = WeakTypeVar <$> lookupNameEnv s
 renameType (WeakTypePosHole i) = return (WeakTypePosHole i)
 renameType (WeakTypeNegHole i) = return (WeakTypeNegHole i)
 renameType (WeakTypeUp t) = WeakTypeUp <$> renameType t
@@ -102,13 +102,6 @@ renameNodeType ((i, wt):wts) t = do
     i' <- newNameWith i
     (wts', t') <- renameNodeType wts t
     return ((i', wt') : wts', t')
-
-renameString :: String -> WithEnv String
-renameString s = do
-  env <- get
-  case lookup s (nameEnv env) of
-    Just s' -> return s'
-    Nothing -> lift $ throwE $ "undefined variable: " ++ show s
 
 renamePat :: Pat -> WithEnv Pat
 renamePat (i :< PatHole) = return $ i :< PatHole
