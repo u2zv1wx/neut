@@ -42,8 +42,11 @@ virtualC (Comp (_ :< CompApp e@(CMeta {ctype = ect} :< _) v)) = do
     _ -> do
       lift $ throwE $ "virtualC.CompApp. Note:\n " ++ Pr.ppShow ect
 virtualC (Comp (_ :< CompRet v)) = do
-  asm <- virtualV v
-  addMeta $ CodeReturn asm
+  ans <- virtualV v
+  link <- getLinkRegister
+  retReg <- getReturnRegister
+  tmp <- addMeta $ CodeIndirectJump link []
+  addMeta $ CodeLet retReg ans tmp
 virtualC (Comp (_ :< CompBind s c1 c2)) = do
   operation1 <- virtualC (Comp c1)
   operation2 <- virtualC (Comp c2)
