@@ -82,6 +82,7 @@ load' (a:as) = do
       liftIO $ putStrLn $ Pr.ppShow liftedC
       initializeLinkRegister
       initializeStackRegister
+      initializeReturnRegister
       c' <- virtualC liftedC
       liftIO $ putStrLn $ Pr.ppShow c'
       i <- newNameWith "main"

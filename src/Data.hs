@@ -366,6 +366,7 @@ data Env = Env
   , regEnv         :: [(Identifier, Int)] -- variable to register
   , linkRegister   :: Maybe Identifier
   , stackRegister  :: Maybe Identifier
+  , returnRegister :: Maybe Identifier
   } deriving (Show)
 
 initialEnv :: Env
@@ -404,6 +405,7 @@ initialEnv =
     , regEnv = []
     , linkRegister = Nothing
     , stackRegister = Nothing
+    , returnRegister = Nothing
     }
 
 type WithEnv a = StateT Env (ExceptT String IO) a
@@ -593,6 +595,11 @@ initializeStackRegister = do
   s <- newName
   modify (\e -> e {stackRegister = Just s})
 
+initializeReturnRegister :: WithEnv ()
+initializeReturnRegister = do
+  s <- newName
+  modify (\e -> e {returnRegister = Just s})
+
 getLinkRegister :: WithEnv Identifier
 getLinkRegister = do
   e <- get
@@ -604,6 +611,13 @@ getStackRegister :: WithEnv Identifier
 getStackRegister = do
   e <- get
   case stackRegister e of
+    Just s  -> return s
+    Nothing -> lift $ throwE "the name of link register is not defined"
+
+getReturnRegister :: WithEnv Identifier
+getReturnRegister = do
+  e <- get
+  case returnRegister e of
     Just s  -> return s
     Nothing -> lift $ throwE "the name of link register is not defined"
 
