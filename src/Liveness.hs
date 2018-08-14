@@ -1,6 +1,7 @@
 module Liveness
   ( annotCodeEnv
   , computeLiveness
+  , livenessAnalysis
   ) where
 
 import           Data
@@ -69,6 +70,14 @@ varsInData (Fix (DataCell _ ds)) = do
   return $ join vss
 varsInData (Fix (DataLabel _)) = return []
 varsInData (Fix (DataElemAtIndex d _)) = varsInData d
+
+livenessAnalysis :: WithEnv ()
+livenessAnalysis = do
+  env <- get
+  forM_ (funEnv env) $ \(_, codeRef) -> do
+    code <- liftIO $ readIORef codeRef
+    code' <- computeLiveness code
+    liftIO $ writeIORef codeRef code'
 
 computeLiveness :: Code -> WithEnv Code
 computeLiveness (meta :< code@(CodeReturn _ _ _)) = do
@@ -163,11 +172,8 @@ computeSuccAll (meta :< (CodeJump labelName)) = do
   cont <- lookupFunEnv labelName >>= liftIO . readIORef
   contElems <- computeSuccAll cont
   return $ next meta contElems
-computeSuccAll (meta :< (CodeIndirectJump x)) = do
-  undefined
-  -- cont <- lookupFunEnv labelName >>= liftIO . readIORef
-  -- contElems <- computeSuccAll cont
-  -- return $ next meta contElems
+computeSuccAll (meta :< (CodeIndirectJump _)) = do
+  return $ computeCurrent' meta
 computeSuccAll (meta :< (CodeStore _ _ cont)) = do
   contLvs <- computeSuccAll cont
   return $ next meta contLvs

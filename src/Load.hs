@@ -15,10 +15,12 @@ import           Data
 import           Emit
 import           Infer
 import           Lift
+import           Liveness
 import           Macro
 import           Parse
 import           Polarize
 import           Read
+import           Register
 import           Rename
 import           Virtual
 
@@ -86,16 +88,17 @@ load' (a:as) = do
       liftIO $ putStrLn $ Pr.ppShow c'
       i <- newNameWith "main"
       insCodeEnv i c'
-      -- annotCodeEnv
-      -- env <- get
+      annotCodeEnv
+      env <- get
       mainCode <- lookupFunEnv i >>= liftIO . readIORef
-      -- liftIO $ putStrLn "===========FUNENV======"
-      -- liftIO $ putStrLn $ Pr.ppShow $ funEnv env
-      -- liftIO $ putStrLn "starting liveness analysis"
-      -- liftIO $ putStrLn $ "mainCode : \n" ++ Pr.ppShow mainCode
+      liftIO $ putStrLn "===========FUNENV======"
+      liftIO $ putStrLn $ Pr.ppShow $ funEnv env
+      liftIO $ putStrLn "starting liveness analysis"
+      liftIO $ putStrLn $ "mainCode : \n" ++ Pr.ppShow mainCode
       -- mainCode' <- computeLiveness mainCode
+      livenessAnalysis
       -- liftIO $ putStrLn $ "c'' : \n" ++ Pr.ppShow mainCode'
-      updateCodeEnv i mainCode
-      -- regAlloc 32 mainCode' -- register number
+      regAlloc 32
+      -- updateCodeEnv i mainCode'
       emit
   load' as
