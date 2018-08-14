@@ -21,11 +21,13 @@ virtualV (Value (_ :< ValueVar x)) = do
 virtualV (Value (_ :< ValueNodeApp s vs)) = do
   vs' <- mapM (virtualV . Value) vs
   return $ Fix $ DataCell s vs'
-virtualV (Value (_ :< ValueThunk comp ident)) = do
+virtualV (Value (_ :< ValueThunk comp thunkId)) = do
   asm <- virtualC comp
-  i <- newNameWith $ "thunk" ++ ident
-  insCodeEnv i asm
-  return $ Fix $ DataLabel i
+  unthunkIdList <- lookupThunkEnv thunkId
+  forM_ unthunkIdList $ \unthunkId -> do
+    let label = "thunk" ++ thunkId ++ "unthunk" ++ unthunkId
+    insCodeEnv label asm
+  return $ Fix $ DataLabel thunkId
 
 virtualC :: Comp -> WithEnv Code
 virtualC (Comp (_ :< CompLam _ comp)) = do
@@ -45,12 +47,24 @@ virtualC (Comp (_ :< CompBind s comp1 comp2)) = do
   operation1 <- virtualC (Comp comp1)
   operation2 <- virtualC (Comp comp2)
   traceLet s operation1 operation2
-virtualC (Comp (_ :< CompUnthunk v _)) = do
+virtualC (Comp (_ :< CompUnthunk v unthunkId)) = do
   operand <- virtualV v
   case operand of
-    Fix (DataPointer x)   -> addMeta $ CodeIndirectJump x -- indirect branch
-    Fix (DataLabel label) -> addMeta $ CodeJump label -- direct branch
-    _                     -> lift $ throwE "virtualC.CompUnthunk"
+    Fix (DataPointer x) -> do
+      liftIO $ putStrLn $ "looking for thunk by unthunkId: " ++ show unthunkId
+      thunkIdList <- lookupThunkEnv unthunkId
+      liftIO $ putStrLn $ "found: " ++ show thunkIdList
+      case thunkIdList of
+        [thunkId] -> do
+          let label = "thunk" ++ thunkId ++ "unthunk" ++ unthunkId
+          addMeta $ CodeJump label
+        _ -> do
+          let possibleJumps = map (\x -> "thunk" ++ x) thunkIdList
+          addMeta $ CodeIndirectJump x possibleJumps -- indirect branch
+    Fix (DataLabel thunkId) -> do
+      let label = "thunk" ++ thunkId ++ "unthunk" ++ unthunkId
+      addMeta $ CodeJump label -- direct branch
+    _ -> lift $ throwE "virtualC.CompUnthunk"
 virtualC (Comp (_ :< CompMu s comp)) = do
   asm <- (virtualC $ Comp comp)
   insCodeEnv s asm
@@ -158,9 +172,10 @@ traceLet s (CodeMeta {codeMetaArgs = xds@(_:_)} :< code) cont = do
       let (xs, ds) = unzip xds
       letSeq xs ds tmp
 traceLet s (_ :< (CodeReturn _ _ ans)) cont = addMeta $ CodeLet s ans cont
-traceLet s (_ :< (CodeJump unthunkId)) cont = do
-  traceLetJump s unthunkId cont
-traceLet s (_ :< (CodeIndirectJump addrInReg)) cont = do
+traceLet s (_ :< (CodeJump label)) cont = do
+  appendCode s cont label
+  addMeta $ CodeJump label
+traceLet s (_ :< (CodeIndirectJump addrInReg poss)) cont = do
   retReg <- getReturnRegister
   cont' <- withStackRestore cont
   cont'' <- addMeta $ CodeLet s (Fix $ DataPointer retReg) cont'
@@ -168,7 +183,7 @@ traceLet s (_ :< (CodeIndirectJump addrInReg)) cont = do
   insCodeEnv linkLabelName cont''
   linkReg <- getLinkRegister
   let linkLabel = Fix $ DataLabel linkLabelName
-  jumpToAddr <- addMeta $ CodeIndirectJump addrInReg
+  jumpToAddr <- addMeta $ CodeIndirectJump addrInReg poss
   addMeta $ CodeLetLink linkReg linkLabel jumpToAddr
 traceLet s (_ :< (switcher@(CodeSwitch _ defaultBranch branchList))) cont = do
   appendCode s cont defaultBranch
@@ -185,29 +200,28 @@ traceLet _ (_ :< (CodeStackSave _ _)) _ =
 traceLet _ (_ :< (CodeStackRestore _ _)) _ =
   error "stackrestore at the tail of a term"
 
-traceLetJump :: Identifier -> Identifier -> Code -> WithEnv Code
-traceLetJump s addr cont = do
-  liftIO $ putStrLn $ "looking for thunk of name " ++ show addr
-  thunkIdList <- lookupThunkEnv addr
-  case thunkIdList of
-    [i] -> do
-      let newName = "thunk" ++ i ++ "unthunk" ++ addr
-      appendCode s cont newName -- append (let s := <ans> in cont) to the code in codeEnv
-      addMeta $ CodeJump newName -- ... and jump to that rewritten code
-    [] -> do
-      retReg <- getReturnRegister
-      cont' <- withStackRestore cont
-      cont'' <- addMeta $ CodeLet s (Fix $ DataPointer retReg) cont'
-      linkLabelName <- newNameWith $ "cont-for-" ++ addr
-      insCodeEnv linkLabelName cont''
-      linkReg <- getLinkRegister
-      let linkLabel = Fix $ DataLabel linkLabelName
-      jumpToAddr <- addMeta $ CodeJump addr
-      addMeta $ CodeLetLink linkReg linkLabel jumpToAddr
-    _ ->
-      lift $
-      throwE $ "multiple thunk found for an unthunk: \n" ++ show thunkIdList
-
+-- traceLetJump :: Identifier -> Identifier -> Code -> WithEnv Code
+-- traceLetJump s addr cont = do
+--   liftIO $ putStrLn $ "looking for thunk of name " ++ show addr
+--   thunkIdList <- lookupThunkEnv addr
+--   case thunkIdList of
+--     [i] -> do
+--       let newName = "thunk" ++ i ++ "unthunk" ++ addr
+--       appendCode s cont newName -- append (let s := <ans> in cont) to the code in codeEnv
+--       addMeta $ CodeJump newName -- ... and jump to that rewritten code
+--     [] -> do
+--       retReg <- getReturnRegister
+--       cont' <- withStackRestore cont
+--       cont'' <- addMeta $ CodeLet s (Fix $ DataPointer retReg) cont'
+--       linkLabelName <- newNameWith $ "cont-for-" ++ addr
+--       insCodeEnv linkLabelName cont''
+--       linkReg <- getLinkRegister
+--       let linkLabel = Fix $ DataLabel linkLabelName
+--       jumpToAddr <- addMeta $ CodeJump addr
+--       addMeta $ CodeLetLink linkReg linkLabel jumpToAddr
+--     _ ->
+--       lift $
+--       throwE $ "multiple thunk found for an unthunk: \n" ++ show thunkIdList
 appendCode :: Identifier -> Code -> Identifier -> WithEnv ()
 appendCode s cont key = do
   codeRef <- lookupFunEnv key

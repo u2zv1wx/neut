@@ -309,6 +309,7 @@ data CodeF d a
                [Branch]
   | CodeJump Identifier -- unthunk (the target label of the jump address)
   | CodeIndirectJump Identifier -- the name of register
+                     [Identifier] -- possible jump
   | CodeStackSave Identifier -- the pointer created by stacksave
                   a -- continuation
   | CodeStackRestore Identifier -- pass the pointer created by stacksave
@@ -379,6 +380,7 @@ data Env = Env
   , linkRegister   :: Maybe Identifier
   , stackRegister  :: Maybe Identifier
   , returnRegister :: Maybe Identifier
+  , returnAddr     :: [Identifier]
   } deriving (Show)
 
 initialEnv :: Env
@@ -418,6 +420,7 @@ initialEnv =
     , linkRegister = Nothing
     , stackRegister = Nothing
     , returnRegister = Nothing
+    , returnAddr = ["exit"]
     }
 
 type WithEnv a = StateT Env (ExceptT String IO) a
@@ -497,10 +500,13 @@ lookupNameEnv' s = do
 
 lookupFunEnv :: Identifier -> WithEnv (IORef Code)
 lookupFunEnv s = do
+  env <- get
   m <- gets (lookup s . funEnv)
   case m of
-    Nothing -> lift $ throwE $ "no such function: " ++ show s
-    Just k  -> return k
+    Nothing ->
+      lift $
+      throwE $ "no such function: " ++ show s ++ "\nenv:\n" ++ Pr.ppShow env
+    Just k -> return k
 
 lookupThunkEnv :: Identifier -> WithEnv [Identifier]
 lookupThunkEnv s = do
@@ -632,6 +638,16 @@ getReturnRegister = do
   case returnRegister e of
     Just s  -> return s
     Nothing -> lift $ throwE "the name of link register is not defined"
+
+getReturnAddr :: WithEnv Identifier
+getReturnAddr = do
+  e <- get
+  modify (\e -> e {returnAddr = tail (returnAddr e)})
+  return $ head $ returnAddr e
+
+setReturnAddr :: Identifier -> WithEnv ()
+setReturnAddr addr = do
+  modify (\e -> e {returnAddr = addr : returnAddr e})
 
 local :: WithEnv a -> WithEnv a
 local p = do

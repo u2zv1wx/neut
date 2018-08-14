@@ -45,8 +45,8 @@ annotCode (meta :< (CodeSwitch x defaultBranch branchList)) = do
   return $ meta {codeMetaUse = [x]} :< CodeSwitch x defaultBranch branchList
 annotCode (meta :< (CodeJump labelName)) = do
   return $ meta :< CodeJump labelName
-annotCode (meta :< (CodeIndirectJump x)) = do
-  return $ meta {codeMetaUse = [x]} :< CodeIndirectJump x
+annotCode (meta :< (CodeIndirectJump x poss)) = do
+  return $ meta {codeMetaUse = [x]} :< CodeIndirectJump x poss
 annotCode (meta :< (CodeStackSave stackReg cont)) = do
   cont' <- annotCode cont
   return $ meta {codeMetaUse = [stackReg]} :< CodeStackSave stackReg cont'
@@ -102,7 +102,7 @@ computeLiveness (meta :< (CodeJump labelName)) = do
   liftIO $ writeIORef contRef cont'
   contElemList <- computeSuccAll cont'
   computeLiveness' meta contElemList (CodeJump labelName)
-computeLiveness (meta :< code@(CodeIndirectJump _)) = do
+computeLiveness (meta :< code@(CodeIndirectJump _ _)) = do
   contElems <- computeSuccAll (meta :< code)
   computeLiveness' meta contElems code
 computeLiveness (meta :< (CodeStackSave stackReg cont)) = do
@@ -155,7 +155,7 @@ computeSuccAll (meta :< (CodeJump labelName)) = do
   cont <- lookupFunEnv labelName >>= liftIO . readIORef
   contElems <- computeSuccAll cont
   return $ next meta contElems
-computeSuccAll (meta :< (CodeIndirectJump _)) = do
+computeSuccAll (meta :< (CodeIndirectJump _ _)) = do
   return $ computeCurrent' meta
 computeSuccAll (meta :< (CodeStackSave _ cont)) = do
   contLvs <- computeSuccAll cont

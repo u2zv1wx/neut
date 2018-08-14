@@ -18,11 +18,16 @@ import           Debug.Trace
 emit :: WithEnv ()
 emit = do
   env <- get
-  liftIO $ putStrLn "define <type> @main() {"
+  liftIO $ putStrLn "define void @main() {"
+  linkReg <- getLinkRegister
+  exitLabel <- newNameWith "exit"
+  emitOp $ "%" ++ linkReg ++ " = %" ++ exitLabel
   forM_ (funEnv env) $ \(label, codeRef) -> do
     code <- liftIO $ readIORef codeRef
     emitLabelHeader label
     emitCode code
+  emitLabelHeader exitLabel
+  emitOp $ "ret void"
   liftIO $ putStrLn "}"
 
 emitCode :: Code -> WithEnv ()
@@ -32,13 +37,17 @@ emitCode (CodeMeta {codeMetaArgs = xds@(_:_)} :< code) = do
   tmp <- letSeq xs ds code'
   emitCode tmp
 emitCode (_ :< CodeReturn retReg linkReg d) = do
-  emitOp $ "%" ++ retReg ++ " = " ++ emitData d
+  x <- emitData d
+  emitOp $ "%" ++ retReg ++ " = " ++ x
   emitOp $ "indirectbr label %" ++ linkReg
-emitCode (_ :< CodeLet i d cont) = do
-  emitOp $ "%" ++ i ++ " = " ++ emitData d
+emitCode (_ :< CodeLet i d cont@(CodeMeta {codeMetaLive = lvs} :< _)) = do
+  when (i `elem` lvs) $ do
+    x <- emitData d
+    emitOp $ "%" ++ i ++ " = " ++ x
   emitCode cont
 emitCode (_ :< CodeLetLink i d cont) = do
-  emitOp $ "%" ++ i ++ " = " ++ emitData d
+  x <- emitData d
+  emitOp $ "%" ++ i ++ " = " ++ x
   emitCode cont
 emitCode (_ :< CodeSwitch x defaultBranch branchList) = do
   emitOp $
@@ -47,7 +56,8 @@ emitCode (_ :< CodeSwitch x defaultBranch branchList) = do
     x ++
     ", label %" ++ defaultBranch ++ " [" ++ emitBranchList branchList ++ "]"
 emitCode (_ :< CodeJump label) = emitOp $ "br label %" ++ label
-emitCode (_ :< CodeIndirectJump x) = emitOp $ "indirectbr label %" ++ x
+emitCode (_ :< CodeIndirectJump x poss) =
+  emitOp $ "indirectbr label %" ++ x ++ ", [" ++ show poss ++ "]"
 emitCode (_ :< CodeStackSave stackReg cont) = do
   emitOp $ "%" ++ stackReg ++ " = call i8* @llvm.stacksave()"
   emitCode cont
@@ -55,13 +65,16 @@ emitCode (_ :< CodeStackRestore stackReg cont) = do
   emitOp $ "call void @llvm.stackrestore(i8* " ++ "%" ++ stackReg ++ ")"
   emitCode cont
 
-emitData :: UData -> String
-emitData (Fix (DataPointer x)) = "%" ++ x
-emitData (Fix (DataCell s ds)) = s ++ " [" ++ join (map emitData ds) ++ "]"
-emitData (Fix (DataLabel label)) = "%" ++ label
+emitData :: UData -> WithEnv String
+emitData (Fix (DataPointer x)) = return $ "%" ++ x
+emitData (Fix (DataCell s ds)) = do
+  ss <- mapM emitData ds
+  return $ s ++ " [" ++ join ss ++ "]"
+emitData (Fix (DataLabel label)) = return $ "%" ++ label
 emitData (Fix (DataElemAtIndex d [])) = emitData d
-emitData (Fix (DataElemAtIndex d idx)) =
-  "getelementptr <ty>, <ty>* " ++ emitData d ++ ", " ++ emitIndex idx ++ ""
+emitData (Fix (DataElemAtIndex d idx)) = do
+  tmp <- emitData d
+  return $ "getelementptr <ty>, <ty>* " ++ tmp ++ ", " ++ emitIndex idx ++ ""
 
 emitIndex :: [Int] -> String
 emitIndex []     = ""

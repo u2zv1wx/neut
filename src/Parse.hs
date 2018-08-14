@@ -177,5 +177,5 @@ strToName "_" = do
 strToName s = return $ Ident s
 
 strOrNewName :: String -> WithEnv String
-strOrNewName "_" = newName
+strOrNewName "_" = newNameWith "hole"
 strOrNewName s   = return s

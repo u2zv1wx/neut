@@ -39,5 +39,5 @@
   (let yay (return (thunk (lambda (x) (return (succ x))))))
   (let foo (return (zero)))
   (let ya (return (thunk (lambda (x) (return (succ foo))))))
-  ((unthunk yay) (succ (zero)))
-  (return (true)))
+  (let p ((unthunk yay) (succ (zero))))
+  (return p))

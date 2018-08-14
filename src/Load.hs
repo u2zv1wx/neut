@@ -60,31 +60,22 @@ load' ((_ :< TreeNode [_ :< TreeAtom "value", _ :< TreeAtom s, _ :< TreeNode tps
       "the codomain of value type " ++ show s ++ " must be universe or node"
 load' (a:as) = do
   a' <- macroExpand a
-  liftIO $ putStrLn $ Pr.ppShow a'
   e <- parseTerm a'
-  liftIO $ putStrLn $ Pr.ppShow e
   e' <- rename e
-  liftIO $ putStrLn $ Pr.ppShow e'
   check e'
   env <- get
   let wtenv = weakTypeEnv env
   polarizeTypeEnv wtenv
   e'' <- polarize e'
   case e'' of
-    TermValue v -> do
-      liftIO $ putStrLn $ Pr.ppShow v
-      v' <- virtualV v
-      liftIO $ putStrLn $ Pr.ppShow v'
+    TermValue _ -> do
       liftIO $ putStrLn "the type of main term must be negative"
     TermComp c -> do
-      liftIO $ putStrLn $ Pr.ppShow c
       liftedC <- liftC c
-      liftIO $ putStrLn $ Pr.ppShow liftedC
       initializeLinkRegister
       initializeStackRegister
       initializeReturnRegister
       c' <- virtualC liftedC
-      liftIO $ putStrLn $ Pr.ppShow c'
       i <- newNameWith "main"
       insCodeEnv i c'
       annotCodeEnv
