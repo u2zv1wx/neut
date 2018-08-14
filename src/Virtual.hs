@@ -33,20 +33,15 @@ virtualV (Value (_ :< ValueThunk c i)) = do
 virtualC :: Comp -> WithEnv Code
 virtualC (Comp (_ :< CompLam _ e)) = do
   virtualC (Comp e)
-virtualC (Comp (_ :< CompApp e@(CMeta {ctype = ect} :< _) v)) = do
-  case ect of
-    CompTypeForall (i, _) _ -> do
-      v' <- virtualV v
-      e' <- virtualC (Comp e)
-      addMeta $ CodeLet i v' e'
-    _ -> do
-      lift $ throwE $ "virtualC.CompApp. Note:\n " ++ Pr.ppShow ect
+virtualC app@(Comp (_ :< CompApp _ _)) = do
+  let (cont, xs, vs) = toFunAndArgs app
+  ds <- mapM virtualV vs
+  cont' <- virtualC cont
+  addMeta $ CodeWithArg xs ds cont'
 virtualC (Comp (_ :< CompRet v)) = do
   ans <- virtualV v
-  link <- getLinkRegister
-  retReg <- getReturnRegister
-  tmp <- addMeta $ CodeIndirectJump link []
-  addMeta $ CodeLet retReg ans tmp
+  linkReg <- getLinkRegister
+  addMeta $ CodeReturn linkReg ans
 virtualC (Comp (_ :< CompBind s c1 c2)) = do
   operation1 <- virtualC (Comp c1)
   operation2 <- virtualC (Comp c2)
@@ -55,15 +50,15 @@ virtualC (Comp (_ :< CompUnthunk v@(Value (VMeta {vtype = ValueTypeDown tct} :< 
   operand <- virtualV v
   let args = forallArgs tct
   case operand of
-    Fix (DataPointer _) -> addMeta $ CodeIndirectJump j args -- indirect branch
-    Fix (DataLabel _)   -> addMeta $ CodeJump j args -- direct branch
+    Fix (DataPointer x) -> addMeta $ CodeIndirectJump x -- indirect branch
+    Fix (DataLabel _)   -> addMeta $ CodeJump j -- direct branch
     _                   -> lift $ throwE "virtualC.CompUnthunk"
 virtualC (Comp (_ :< CompUnthunk (Value (VMeta {vtype = _} :< _)) _)) = do
   lift $ throwE "virtualC.CompUnthunk"
-virtualC (Comp (CMeta {ctype = ct} :< CompMu s c)) = do
+virtualC (Comp (_ :< CompMu s c)) = do
   asm <- (virtualC $ Comp c)
   insCodeEnv s asm
-  addMeta $ CodeJump s (forallArgs ct)
+  addMeta $ CodeJump s
 virtualC (Comp (_ :< CompCase vs tree)) = do
   fooList <-
     forM vs $ \v -> do
@@ -72,12 +67,24 @@ virtualC (Comp (_ :< CompCase vs tree)) = do
       return (i, asm)
   let (is, asms) = unzip fooList
   body <- virtualDecision is tree
-  letSeq asms is body
+  letSeq is asms body
+
+virtualApp :: Comp -> [Identifier] -> [Value] -> WithEnv Code
+virtualApp cont xs vs = do
+  ds <- mapM virtualV vs
+  cont' <- virtualC cont
+  letSeq xs ds cont'
 
 addMeta :: PreCode -> WithEnv Code
 addMeta pc = do
   meta <- emptyCodeMeta
   return $ meta :< pc
+
+toFunAndArgs :: Comp -> (Comp, [Identifier], [Value])
+toFunAndArgs (Comp (_ :< CompApp e@((CMeta {ctype = CompTypeForall (i, _) _} :< _)) v)) = do
+  let (fun, xs, args) = toFunAndArgs (Comp e)
+  (fun, xs ++ [i], args ++ [v])
+toFunAndArgs c = (c, [], [])
 
 virtualDecision :: [Identifier] -> Decision PreComp -> WithEnv Code
 virtualDecision asmList (DecisionLeaf ois preComp) = do
@@ -88,7 +95,7 @@ virtualDecision asmList (DecisionLeaf ois preComp) = do
     forM (zip asmList ois) $ \(x, ((index, _), _)) -> do
       return $ Fix $ DataElemAtIndex (Fix $ DataPointer x) index
   body <- virtualC $ Comp preComp
-  letSeq asmList' varList body
+  letSeq varList asmList' body
 virtualDecision (x:vs) (DecisionSwitch (o, _) cs mdefault) = do
   let selector = Fix $ DataElemAtIndex (Fix $ DataPointer x) o
   jumpList <- virtualCase (x : vs) cs
@@ -143,39 +150,63 @@ makeBranch d js (Just (Just x, label)) = do
 makeBranch d js (Just (Nothing, label)) = do
   addMeta $ CodeSwitch d label js
 
-letSeq :: [UData] -> [Identifier] -> Code -> WithEnv Code
+letSeq :: [Identifier] -> [UData] -> Code -> WithEnv Code
 letSeq [] [] code = return code
-letSeq (d:ds) (i:is) code = do
-  tmp <- letSeq ds is code
+letSeq (i:is) (d:ds) code = do
+  tmp <- letSeq is ds code
   addMeta $ CodeLet i d tmp
 letSeq _ _ _ = error "Virtual.letSeq: invalid arguments"
 
 traceLet :: String -> Code -> Code -> WithEnv Code
-traceLet s (_ :< (CodeReturn o)) cont = addMeta $ CodeLet s o cont
-traceLet s (_ :< (CodeJump j args)) cont = do
-  liftIO $ putStrLn $ "Found CodeJump with Let. The ident is " ++ show j ++ "."
-  corresondingThunk <- lookupThunkEnv j
-  case corresondingThunk of
-    [i] -> do
-      let newName = "thunk" ++ i ++ "unthunk" ++ j
-      appendCode s cont newName
-      addMeta $ CodeJump newName args
-    [] -> addMeta $ CodeCall s j args cont -- non-tail call
-    _ ->
-      lift $
-      throwE $
-      "multiple thunk found for an unthunk: \n" ++ show corresondingThunk
+traceLet s (_ :< (CodeReturn _ ans)) cont = addMeta $ CodeLet s ans cont
+traceLet s (_ :< (CodeJump addr)) cont = do
+  traceLetJump s addr cont
+traceLet s (_ :< (CodeIndirectJump addrInReg)) cont = do
+  regName <- newName
+  cont' <- traceLetJump s regName cont
+  addMeta $ CodeLoad regName addrInReg cont'
 traceLet s (_ :< (CodeLet k o1 o2)) cont = do
   c <- traceLet s o2 cont
   addMeta $ CodeLet k o1 c
-traceLet s (_ :< (CodeCall k i args o)) cont = do
-  c <- traceLet s o cont
-  addMeta $ CodeCall k i args c
 traceLet s (_ :< (switcher@(CodeSwitch _ defaultBranch branchList))) cont = do
   appendCode s cont defaultBranch
   forM_ branchList $ \(_, label) -> appendCode s cont label
   addMeta $ switcher
+traceLet s (_ :< (CodeWithArg xs ds body)) cont = do
+  tmp <- traceLet s body cont
+  case tmp of
+    item@(_ :< CodeWithLinkReg _ _ _) -> do
+      item' <- letSeq xs ds item -- set arguments
+      withStackSave item' -- save stack before the preparation of arguments
+    item -> letSeq xs ds item
 traceLet _ _ _ = error "Virtual.traceLet" -- load/store
+
+-- let s := (Jump addr) in cont
+traceLetJump :: Identifier -> Identifier -> Code -> WithEnv Code
+traceLetJump s addr cont = do
+  thunkIdList <- lookupThunkEnv addr
+  case thunkIdList of
+    [i] -> do
+      let newName = "thunk" ++ i ++ "unthunk" ++ addr
+      appendCode s cont newName -- append (let s := <ans> in cont) to the code in codeEnv
+      addMeta $ CodeJump newName -- ... and jump to that rewritten code
+    [] -> do
+      retLabelName <- newName -- create a new label to call back after jump
+      cont' <- withStackRestore cont
+      insCodeEnv retLabelName cont'
+      jump <- addMeta $ CodeJump retLabelName
+      linkReg <- getLinkRegister
+      let retLabel = Fix $ DataLabel retLabelName
+      addMeta $ CodeWithLinkReg linkReg retLabel jump -- set return address before jump
+    _ ->
+      lift $
+      throwE $ "multiple thunk found for an unthunk: \n" ++ show thunkIdList
+
+withStackSave :: Code -> WithEnv Code
+withStackSave code = undefined
+
+withStackRestore :: Code -> WithEnv Code
+withStackRestore code = undefined
 
 appendCode :: Identifier -> Code -> Identifier -> WithEnv ()
 appendCode s cont key = do
@@ -187,9 +218,3 @@ appendCode s cont key = do
 forallArgs :: CompType -> [Identifier]
 forallArgs (CompTypeForall (i, _) t) = i : forallArgs t
 forallArgs _                         = []
-
-traceLowType :: [Int] -> LowType -> LowType
-traceLowType [] t = t
-traceLowType (i:is) (LowTypeVec _ args)
-  | 0 <= i - 1 && i - 1 < length args = traceLowType is (args !! (i - 1))
-traceLowType _ _ = LowTypeNull

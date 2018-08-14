@@ -296,21 +296,22 @@ type DefaultBranch = Identifier
 type Address = Identifier
 
 data CodeF d a
-  = CodeReturn d -- return
+  = CodeReturn Identifier -- the name of link register
+               d -- return value
   | CodeLet Identifier -- bind (we also use this to represent application)
             d
             a
+  | CodeWithLinkReg Identifier
+                    d
+                    a
   | CodeSwitch d -- branching in pattern-matching (elimination of inductive type)
                DefaultBranch
                [Branch]
-  | CodeCall Identifier -- the result of call
-             Identifier -- the label of the funtion
-             [Identifier] -- arguments
-             a -- continuation
   | CodeJump Identifier -- unthunk (the target label of the jump address)
-             [Identifier] -- list of arguments
-  | CodeIndirectJump Identifier -- register name
-                     [Identifier] -- list of arguments
+  | CodeIndirectJump Identifier -- the name of register
+  | CodeWithArg [Identifier]
+                [d]
+                a
   | CodeStore Identifier -- required to implement register allocation
               Address
               a
