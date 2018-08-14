@@ -304,7 +304,7 @@ data CodeF d a
   | CodeLetLink Identifier -- link register
                 d -- address
                 a
-  | CodeSwitch d -- branching in pattern-matching (elimination of inductive type)
+  | CodeSwitch Identifier -- branching in pattern-matching (elimination of inductive type)
                DefaultBranch
                [Branch]
   | CodeJump Identifier -- unthunk (the target label of the jump address)
@@ -313,12 +313,6 @@ data CodeF d a
                   a -- continuation
   | CodeStackRestore Identifier -- pass the pointer created by stacksave
                      a
-  | CodeStore Identifier
-              Identifier
-              a
-  | CodeLoad Identifier
-             Identifier
-             a
 
 deriving instance Show a => Show (CodeF UData a)
 
@@ -445,7 +439,7 @@ newName = do
   env <- get
   let i = count env
   modify (\e -> e {count = i + 1})
-  return $ "#" ++ show i
+  return $ "." ++ show i
 
 newNameWith :: Identifier -> WithEnv Identifier
 newNameWith s = do
@@ -605,17 +599,17 @@ updateCodeEnv key code = do
 
 initializeLinkRegister :: WithEnv ()
 initializeLinkRegister = do
-  s <- newNameWith "LinkReg"
+  s <- newNameWith "link-register"
   modify (\e -> e {linkRegister = Just s})
 
 initializeStackRegister :: WithEnv ()
 initializeStackRegister = do
-  s <- newNameWith "StackReg"
+  s <- newNameWith "stack-register"
   modify (\e -> e {stackRegister = Just s})
 
 initializeReturnRegister :: WithEnv ()
 initializeReturnRegister = do
-  s <- newNameWith "ReturnReg"
+  s <- newNameWith "return-register"
   modify (\e -> e {returnRegister = Just s})
 
 getLinkRegister :: WithEnv Identifier

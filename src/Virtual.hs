@@ -59,7 +59,7 @@ virtualC (Comp (_ :< CompCase vs tree)) = do
   fooList <-
     forM vs $ \v -> do
       asm <- virtualV v
-      i <- newName
+      i <- newNameWith "seq"
       return (i, asm)
   let (is, asms) = unzip fooList
   body <- virtualDecision is tree
@@ -76,10 +76,10 @@ virtualDecision asmList (DecisionLeaf ois preComp) = do
   body <- virtualC $ Comp preComp
   letSeq varList asmList' body
 virtualDecision (x:vs) (DecisionSwitch (o, _) cs mdefault) = do
-  let selector = Fix $ DataElemAtIndex (Fix $ DataPointer x) o
   jumpList <- virtualCase (x : vs) cs
   defaultJump <- virtualDefaultCase (x : vs) mdefault
-  makeBranch selector jumpList defaultJump
+  makeBranch x o jumpList defaultJump
+--  let selector = Fix $ DataElemAtIndex (Fix $ DataPointer x) o
 virtualDecision _ (DecisionSwap _ _) = undefined
 virtualDecision [] t =
   lift $ throwE $ "virtualDecision. Note: \n" ++ Pr.ppShow t
@@ -115,18 +115,35 @@ virtualDefaultCase vs (Just (Just x, tree)) = do
 type JumpList = [(Identifier, Identifier)]
 
 makeBranch ::
-     UData
+     Identifier
+  -> Index
   -> [(Identifier, Identifier)]
   -> Maybe (Maybe Identifier, Identifier)
   -> WithEnv Code
-makeBranch _ [] Nothing = error "empty branch"
-makeBranch d js@((_, target):_) Nothing = do
-  addMeta $ CodeSwitch d target js
-makeBranch d js (Just (Just x, label)) = do
-  tmp <- addMeta $ CodeSwitch (Fix $ DataPointer x) label js
-  addMeta $ CodeLet x d tmp
-makeBranch d js (Just (Nothing, label)) = do
-  addMeta $ CodeSwitch d label js
+makeBranch _ _ [] Nothing = error "empty branch"
+makeBranch y o js@((_, target):_) Nothing = do
+  if null o
+    then addMeta $ (CodeSwitch y target js)
+    else do
+      let tmp = Fix $ DataElemAtIndex (Fix $ DataPointer y) o
+      name <- newName
+      tmp2 <- addMeta $ (CodeSwitch name target js)
+      addMeta $ CodeLet name tmp tmp2
+makeBranch y o js (Just (Just defaultName, label)) = do
+  if null o
+    then addMeta $ (CodeSwitch y label js)
+    else do
+      tmp <- addMeta $ CodeSwitch defaultName label js
+      addMeta $
+        CodeLet defaultName (Fix $ DataElemAtIndex (Fix $ DataPointer y) o) tmp
+makeBranch y o js (Just (Nothing, label)) = do
+  if null o
+    then addMeta $ (CodeSwitch y label js)
+    else do
+      let tmp = Fix $ DataElemAtIndex (Fix $ DataPointer y) o
+      name <- newName
+      tmp2 <- addMeta $ (CodeSwitch name label js)
+      addMeta $ CodeLet name tmp tmp2
 
 traceLet :: String -> Code -> Code -> WithEnv Code
 traceLet s (CodeMeta {codeMetaArgs = xds@(_:_)} :< code) cont = do

@@ -20,7 +20,6 @@ import           Macro
 import           Parse
 import           Polarize
 import           Read
-import           Register
 import           Rename
 import           Virtual
 
@@ -89,16 +88,15 @@ load' (a:as) = do
       i <- newNameWith "main"
       insCodeEnv i c'
       annotCodeEnv
-      env <- get
-      mainCode <- lookupFunEnv i >>= liftIO . readIORef
-      liftIO $ putStrLn "===========FUNENV======"
-      liftIO $ putStrLn $ Pr.ppShow $ funEnv env
-      liftIO $ putStrLn "starting liveness analysis"
-      liftIO $ putStrLn $ "mainCode : \n" ++ Pr.ppShow mainCode
-      -- mainCode' <- computeLiveness mainCode
+      -- env <- get
+      -- mainCode <- lookupFunEnv i >>= liftIO . readIORef
+      -- liftIO $ putStrLn "===========FUNENV======"
+      -- liftIO $ putStrLn $ Pr.ppShow $ funEnv env
+      -- liftIO $ putStrLn "starting liveness analysis"
+      -- liftIO $ putStrLn $ "mainCode : \n" ++ Pr.ppShow mainCode
       livenessAnalysis
       -- liftIO $ putStrLn $ "c'' : \n" ++ Pr.ppShow mainCode'
-      regAlloc 32
+      -- regAlloc 32
       -- updateCodeEnv i mainCode'
       emit
   load' as

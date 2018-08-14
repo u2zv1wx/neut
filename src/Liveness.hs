@@ -41,21 +41,12 @@ annotCode (meta :< (CodeLetLink x d cont)) = do
   uvs <- varsInData d
   dvs <- return [x]
   return $ meta {codeMetaUse = uvs, codeMetaDef = dvs} :< CodeLetLink x d cont'
-annotCode (meta :< (CodeSwitch d defaultBranch branchList)) = do
-  uvs <- varsInData d
-  return $ meta {codeMetaUse = uvs} :< CodeSwitch d defaultBranch branchList
+annotCode (meta :< (CodeSwitch x defaultBranch branchList)) = do
+  return $ meta {codeMetaUse = [x]} :< CodeSwitch x defaultBranch branchList
 annotCode (meta :< (CodeJump labelName)) = do
   return $ meta :< CodeJump labelName
 annotCode (meta :< (CodeIndirectJump x)) = do
   return $ meta {codeMetaUse = [x]} :< CodeIndirectJump x
-annotCode (meta :< (CodeStore x addr cont)) = do
-  cont' <- annotCode cont
-  dvs <- return [x]
-  return $ meta {codeMetaDef = dvs} :< CodeStore x addr cont'
-annotCode (meta :< (CodeLoad x addr cont)) = do
-  cont' <- annotCode cont
-  dvs <- return [x]
-  return $ meta {codeMetaDef = dvs} :< CodeLoad x addr cont'
 annotCode (meta :< (CodeStackSave stackReg cont)) = do
   cont' <- annotCode cont
   return $ meta {codeMetaUse = [stackReg]} :< CodeStackSave stackReg cont'
@@ -91,7 +82,7 @@ computeLiveness (meta :< (CodeLetLink x d cont)) = do
   cont' <- computeLiveness cont
   contElemList <- computeSuccAll (meta :< (CodeLetLink x d cont'))
   computeLiveness' meta contElemList (CodeLetLink x d cont')
-computeLiveness (meta :< (CodeSwitch d defaultBranch branchList)) = do
+computeLiveness (meta :< (CodeSwitch x defaultBranch branchList)) = do
   let labelList = defaultBranch : map snd branchList
   contElemListList <-
     forM labelList $ \label -> do
@@ -103,7 +94,7 @@ computeLiveness (meta :< (CodeSwitch d defaultBranch branchList)) = do
   computeLiveness'
     meta
     (join contElemListList)
-    (CodeSwitch d defaultBranch branchList)
+    (CodeSwitch x defaultBranch branchList)
 computeLiveness (meta :< (CodeJump labelName)) = do
   contRef <- lookupFunEnv labelName
   cont <- liftIO $ readIORef contRef
@@ -114,14 +105,6 @@ computeLiveness (meta :< (CodeJump labelName)) = do
 computeLiveness (meta :< code@(CodeIndirectJump _)) = do
   contElems <- computeSuccAll (meta :< code)
   computeLiveness' meta contElems code
-computeLiveness (meta :< (CodeStore x d cont)) = do
-  cont' <- computeLiveness cont
-  contElemList <- computeSuccAll (meta :< (CodeStore x d cont'))
-  computeLiveness' meta contElemList (CodeStore x d cont')
-computeLiveness (meta :< (CodeLoad x d cont)) = do
-  cont' <- computeLiveness cont
-  contElemList <- computeSuccAll (meta :< (CodeLoad x d cont'))
-  computeLiveness' meta contElemList (CodeLoad x d cont')
 computeLiveness (meta :< (CodeStackSave stackReg cont)) = do
   cont' <- computeLiveness cont
   contElemList <- computeSuccAll (meta :< (CodeStackSave stackReg cont'))
@@ -174,12 +157,6 @@ computeSuccAll (meta :< (CodeJump labelName)) = do
   return $ next meta contElems
 computeSuccAll (meta :< (CodeIndirectJump _)) = do
   return $ computeCurrent' meta
-computeSuccAll (meta :< (CodeStore _ _ cont)) = do
-  contLvs <- computeSuccAll cont
-  return $ next meta contLvs
-computeSuccAll (meta :< (CodeLoad _ _ cont)) = do
-  contLvs <- computeSuccAll cont
-  return $ next meta contLvs
 computeSuccAll (meta :< (CodeStackSave _ cont)) = do
   contLvs <- computeSuccAll cont
   return $ next meta contLvs
