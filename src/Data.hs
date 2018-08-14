@@ -303,9 +303,6 @@ data CodeF d a
   | CodeLet Identifier -- bind (we also use this to represent application)
             d
             a
-  | CodeWithLinkReg Identifier
-                    d
-                    a
   | CodeSwitch d -- branching in pattern-matching (elimination of inductive type)
                DefaultBranch
                [Branch]

@@ -165,19 +165,16 @@ traceLetJump s addr cont = do
       let newName = "thunk" ++ i ++ "unthunk" ++ addr
       appendCode s cont newName -- append (let s := <ans> in cont) to the code in codeEnv
       addMeta $ CodeJump newName -- ... and jump to that rewritten code
-    [] -> nonTail cont
+    [] -> do
+      retLabelName <- newName -- create a new label to call back after jump
+      insCodeEnv retLabelName cont
+      jump <- addMeta $ CodeJump retLabelName
+      linkReg <- getLinkRegister
+      let retLabel = Fix $ DataLabel retLabelName
+      addMeta $ CodeLet linkReg retLabel jump -- set return address before jump
     _ ->
       lift $
       throwE $ "multiple thunk found for an unthunk: \n" ++ show thunkIdList
-
-nonTail :: Code -> WithEnv Code
-nonTail cont = do
-  retLabelName <- newName -- create a new label to call back after jump
-  insCodeEnv retLabelName cont
-  jump <- addMeta $ CodeJump retLabelName
-  linkReg <- getLinkRegister
-  let retLabel = Fix $ DataLabel retLabelName
-  addMeta $ CodeWithLinkReg linkReg retLabel jump -- set return address before jump
 
 appendCode :: Identifier -> Code -> Identifier -> WithEnv ()
 appendCode s cont key = do
