@@ -106,16 +106,9 @@ renameNodeType ((i, wt):wts) t = do
 renamePat :: Pat -> WithEnv Pat
 renamePat (i :< PatHole) = return $ i :< PatHole
 renamePat (i :< PatVar s) = do
-  t <- PatVar <$> renamePatString s
+  t <- PatVar <$> lookupNameEnv' s
   return (i :< t)
 renamePat (i :< PatApp s []) = return (i :< PatApp s [])
 renamePat (i :< PatApp s vs) = do
   vs' <- mapM renamePat vs
   return (i :< PatApp s vs')
-
-renamePatString :: String -> WithEnv String
-renamePatString s = do
-  env <- get
-  case lookup s (nameEnv env) of
-    Just s' -> return s'
-    Nothing -> newNameWith s

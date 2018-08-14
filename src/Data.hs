@@ -362,6 +362,8 @@ data Env = Env
   , lowTypeEnv     :: [(Identifier, LowType)]
   , didUpdate      :: Bool -- used in live analysis to detect the end of the process
   , regEnv         :: [(Identifier, Int)] -- variable to register
+  , linkRegister   :: Maybe Identifier
+  , stackRegister  :: Maybe Identifier
   } deriving (Show)
 
 initialEnv :: Env
@@ -398,6 +400,8 @@ initialEnv =
     , lowTypeEnv = []
     , didUpdate = False
     , regEnv = []
+    , linkRegister = Nothing
+    , stackRegister = Nothing
     }
 
 type WithEnv a = StateT Env (ExceptT String IO) a
@@ -467,6 +471,13 @@ lookupNameEnv s = do
   case lookup s (nameEnv env) of
     Just s' -> return s'
     Nothing -> lift $ throwE $ "undefined variable: " ++ show s
+
+lookupNameEnv' :: String -> WithEnv String
+lookupNameEnv' s = do
+  env <- get
+  case lookup s (nameEnv env) of
+    Just s' -> return s'
+    Nothing -> newNameWith s
 
 lookupFunEnv :: Identifier -> WithEnv (IORef Code)
 lookupFunEnv s = do
@@ -569,6 +580,30 @@ updateCodeEnv :: Identifier -> Code -> WithEnv ()
 updateCodeEnv key code = do
   codeRef <- lookupFunEnv key
   liftIO $ writeIORef codeRef code
+
+initializeLinkRegister :: WithEnv ()
+initializeLinkRegister = do
+  s <- newName
+  modify (\e -> e {linkRegister = Just s})
+
+initializeStackRegister :: WithEnv ()
+initializeStackRegister = do
+  s <- newName
+  modify (\e -> e {stackRegister = Just s})
+
+getLinkRegister :: WithEnv Identifier
+getLinkRegister = do
+  e <- get
+  case linkRegister e of
+    Just s  -> return s
+    Nothing -> lift $ throwE "the name of link register is not defined"
+
+getStackRegister :: WithEnv Identifier
+getStackRegister = do
+  e <- get
+  case stackRegister e of
+    Just s  -> return s
+    Nothing -> lift $ throwE "the name of link register is not defined"
 
 local :: WithEnv a -> WithEnv a
 local p = do
