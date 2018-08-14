@@ -270,6 +270,7 @@ data DataF a
   | DataLabel Identifier -- the address of quoted code
   | DataElemAtIndex a -- subvalue of an inductive value
                     Index
+  | DataStackSave
   -- deriving (Show, Eq)
 
 deriving instance Show a => Show (DataF a)
@@ -301,6 +302,9 @@ data CodeF d a
   | CodeLet Identifier -- bind (we also use this to represent application)
             d
             a
+  | CodeLetForArg [Identifier]
+                  [d]
+                  a
   | CodeWithLinkReg Identifier
                     d
                     a
@@ -309,15 +313,15 @@ data CodeF d a
                [Branch]
   | CodeJump Identifier -- unthunk (the target label of the jump address)
   | CodeIndirectJump Identifier -- the name of register
-  | CodeWithArg [Identifier]
-                [d]
-                a
+                     Identifier
   | CodeStore Identifier -- required to implement register allocation
               Address
               a
   | CodeLoad Identifier -- required to implement register allocation
              Address
              a
+  | CodeStackLoad Identifier
+                  a
 
 deriving instance Show a => Show (CodeF UData a)
 

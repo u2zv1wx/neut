@@ -37,7 +37,7 @@ virtualC app@(Comp (_ :< CompApp _ _)) = do
   let (cont, xs, vs) = toFunAndArgs app
   ds <- mapM virtualV vs
   cont' <- virtualC cont
-  addMeta $ CodeWithArg xs ds cont'
+  addMeta $ CodeLetForArg xs ds cont'
 virtualC (Comp (_ :< CompRet v)) = do
   ans <- virtualV v
   linkReg <- getLinkRegister
@@ -46,15 +46,12 @@ virtualC (Comp (_ :< CompBind s c1 c2)) = do
   operation1 <- virtualC (Comp c1)
   operation2 <- virtualC (Comp c2)
   traceLet s operation1 operation2
-virtualC (Comp (_ :< CompUnthunk v@(Value (VMeta {vtype = ValueTypeDown tct} :< _)) j)) = do
+virtualC (Comp (_ :< CompUnthunk v j)) = do
   operand <- virtualV v
-  let args = forallArgs tct
   case operand of
-    Fix (DataPointer x) -> addMeta $ CodeIndirectJump x -- indirect branch
+    Fix (DataPointer x) -> addMeta $ CodeIndirectJump x j -- indirect branch
     Fix (DataLabel _)   -> addMeta $ CodeJump j -- direct branch
     _                   -> lift $ throwE "virtualC.CompUnthunk"
-virtualC (Comp (_ :< CompUnthunk (Value (VMeta {vtype = _} :< _)) _)) = do
-  lift $ throwE "virtualC.CompUnthunk"
 virtualC (Comp (_ :< CompMu s c)) = do
   asm <- (virtualC $ Comp c)
   insCodeEnv s asm
@@ -159,20 +156,20 @@ letSeq _ _ _ = error "Virtual.letSeq: invalid arguments"
 
 traceLet :: String -> Code -> Code -> WithEnv Code
 traceLet s (_ :< (CodeReturn _ ans)) cont = addMeta $ CodeLet s ans cont
-traceLet s (_ :< (CodeJump addr)) cont = do
-  traceLetJump s addr cont
-traceLet s (_ :< (CodeIndirectJump addrInReg)) cont = do
+traceLet s (_ :< (CodeJump unthunkId)) cont = do
+  traceLetJump s unthunkId cont
+traceLet s (_ :< (CodeIndirectJump addrInReg unthunkId)) cont = do
   regName <- newName
-  cont' <- traceLetJump s regName cont
+  cont' <- traceLetJump s unthunkId cont
   addMeta $ CodeLoad regName addrInReg cont'
-traceLet s (_ :< (CodeLet k o1 o2)) cont = do
-  c <- traceLet s o2 cont
-  addMeta $ CodeLet k o1 c
 traceLet s (_ :< (switcher@(CodeSwitch _ defaultBranch branchList))) cont = do
   appendCode s cont defaultBranch
   forM_ branchList $ \(_, label) -> appendCode s cont label
   addMeta $ switcher
-traceLet s (_ :< (CodeWithArg xs ds body)) cont = do
+traceLet s (_ :< (CodeLet k o1 o2)) cont = do
+  c <- traceLet s o2 cont
+  addMeta $ CodeLet k o1 c
+traceLet s (_ :< (CodeLetForArg xs ds body)) cont = do
   tmp <- traceLet s body cont
   case tmp of
     item@(_ :< CodeWithLinkReg _ _ _) -> do
@@ -184,6 +181,7 @@ traceLet _ _ _ = error "Virtual.traceLet" -- load/store
 -- let s := (Jump addr) in cont
 traceLetJump :: Identifier -> Identifier -> Code -> WithEnv Code
 traceLetJump s addr cont = do
+  liftIO $ putStrLn $ "looking for thunk of name " ++ show addr
   thunkIdList <- lookupThunkEnv addr
   case thunkIdList of
     [i] -> do
@@ -203,10 +201,14 @@ traceLetJump s addr cont = do
       throwE $ "multiple thunk found for an unthunk: \n" ++ show thunkIdList
 
 withStackSave :: Code -> WithEnv Code
-withStackSave code = undefined
+withStackSave code = do
+  stackReg <- getStackRegister
+  addMeta $ CodeLet stackReg (Fix $ DataStackSave) code
 
 withStackRestore :: Code -> WithEnv Code
-withStackRestore code = undefined
+withStackRestore code = do
+  stackReg <- getStackRegister
+  addMeta $ CodeStackLoad stackReg code
 
 appendCode :: Identifier -> Code -> Identifier -> WithEnv ()
 appendCode s cont key = do
