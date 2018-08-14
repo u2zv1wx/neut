@@ -12,6 +12,7 @@ import           Control.Comonad.Cofree
 import           Data.IORef
 
 import           Data
+import           Emit
 import           Infer
 import           Lift
 import           Macro
@@ -96,4 +97,5 @@ load' (a:as) = do
       -- liftIO $ putStrLn $ "c'' : \n" ++ Pr.ppShow mainCode'
       updateCodeEnv i mainCode
       -- regAlloc 32 mainCode' -- register number
+      emit
   load' as

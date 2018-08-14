@@ -270,8 +270,6 @@ data DataF a
   | DataLabel Identifier -- the address of quoted code
   | DataElemAtIndex a -- subvalue of an inductive value
                     Index
-  | DataStackSave
-  -- deriving (Show, Eq)
 
 deriving instance Show a => Show (DataF a)
 
@@ -303,11 +301,18 @@ data CodeF d a
   | CodeLet Identifier -- bind (we also use this to represent application)
             d
             a
+  | CodeLetLink Identifier -- link register
+                d -- address
+                a
   | CodeSwitch d -- branching in pattern-matching (elimination of inductive type)
                DefaultBranch
                [Branch]
   | CodeJump Identifier -- unthunk (the target label of the jump address)
   | CodeIndirectJump Identifier -- the name of register
+  | CodeStackSave Identifier -- the pointer created by stacksave
+                  a -- continuation
+  | CodeStackRestore Identifier -- pass the pointer created by stacksave
+                     a
 
 deriving instance Show a => Show (CodeF UData a)
 
@@ -319,7 +324,14 @@ deriving instance Functor (CodeF Data)
 
 $(deriveShow1 ''CodeF)
 
-type CodeMeta = Int
+letSeq :: [Identifier] -> [UData] -> Code -> WithEnv Code
+letSeq [] [] code = return code
+letSeq (i:is) (d:ds) code = do
+  tmp <- letSeq is ds code
+  addMeta $ CodeLet i d tmp
+letSeq _ _ _ = error "Virtual.letSeq: invalid arguments"
+
+type CodeMeta = [(Identifier, UData)] -- arguments
 
 -- data CodeMeta = CodeMeta
 --   { codeMetaLive :: [Identifier]
@@ -327,8 +339,13 @@ type CodeMeta = Int
 --   , codeMetaUse  :: [Identifier]
 --   } deriving (Show)
 emptyCodeMeta :: WithEnv CodeMeta
-emptyCodeMeta = return 0
+emptyCodeMeta = return []
   -- return $ CodeMeta {codeMetaLive = [], codeMetaDef = [], codeMetaUse = []}
+
+addMeta :: PreCode -> WithEnv Code
+addMeta pc = do
+  meta <- emptyCodeMeta
+  return $ meta :< pc
 
 -- type Code = Cofree (CodeF Data) LowType
 type UCode = Fix (CodeF UData)
