@@ -118,13 +118,11 @@ virtualDefaultCase ::
 virtualDefaultCase _ Nothing = return Nothing
 virtualDefaultCase vs (Just (Nothing, tree)) = do
   code <- virtualDecision vs tree
-  -- codeRef <- liftIO $ newIORef code
   label <- newName
   insCodeEnv label code
   return $ Just (Nothing, label)
 virtualDefaultCase vs (Just (Just x, tree)) = do
   code <- virtualDecision vs tree
-  -- codeRef <- liftIO $ newIORef $ code
   label <- newName
   insCodeEnv label code
   return $ Just (Just x, label)
