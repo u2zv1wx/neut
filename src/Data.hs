@@ -313,7 +313,6 @@ data CodeF d a
                [Branch]
   | CodeJump Identifier -- unthunk (the target label of the jump address)
   | CodeIndirectJump Identifier -- the name of register
-                     Identifier
   | CodeStore Identifier -- required to implement register allocation
               Address
               a

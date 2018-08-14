@@ -21,13 +21,10 @@ virtualV (Value (_ :< ValueVar s)) = do
 virtualV (Value (_ :< ValueNodeApp s vs)) = do
   vs' <- mapM (virtualV . Value) vs
   return $ Fix $ DataCell s vs'
-virtualV (Value (_ :< ValueThunk c i)) = do
+virtualV (Value (_ :< ValueThunk c _)) = do
   asm <- virtualC c
-  unthunkIdents <- lookupThunkEnv i
-  forM_ unthunkIdents $ \j -> do
-    let newName = "thunk" ++ i ++ "unthunk" ++ j
-    liftIO $ putStrLn $ "creating thunk with name: " ++ newName
-    insCodeEnv newName asm
+  i <- newName
+  insCodeEnv i asm
   return $ Fix $ DataLabel i
 
 virtualC :: Comp -> WithEnv Code
@@ -46,12 +43,12 @@ virtualC (Comp (_ :< CompBind s c1 c2)) = do
   operation1 <- virtualC (Comp c1)
   operation2 <- virtualC (Comp c2)
   traceLet s operation1 operation2
-virtualC (Comp (_ :< CompUnthunk v j)) = do
+virtualC (Comp (_ :< CompUnthunk v _)) = do
   operand <- virtualV v
   case operand of
-    Fix (DataPointer x) -> addMeta $ CodeIndirectJump x j -- indirect branch
-    Fix (DataLabel _)   -> addMeta $ CodeJump j -- direct branch
-    _                   -> lift $ throwE "virtualC.CompUnthunk"
+    Fix (DataPointer x)   -> addMeta $ CodeIndirectJump x -- indirect branch
+    Fix (DataLabel label) -> addMeta $ CodeJump label -- direct branch
+    _                     -> lift $ throwE "virtualC.CompUnthunk"
 virtualC (Comp (_ :< CompMu s c)) = do
   asm <- (virtualC $ Comp c)
   insCodeEnv s asm
@@ -140,10 +137,19 @@ traceLet :: String -> Code -> Code -> WithEnv Code
 traceLet s (_ :< (CodeReturn _ ans)) cont = addMeta $ CodeLet s ans cont
 traceLet s (_ :< (CodeJump unthunkId)) cont = do
   traceLetJump s unthunkId cont
-traceLet s (_ :< (CodeIndirectJump addrInReg unthunkId)) cont = do
-  regName <- newName
-  cont' <- traceLetJump s unthunkId cont
-  addMeta $ CodeLoad regName addrInReg cont'
+traceLet s (_ :< (CodeIndirectJump addrInReg)) cont = do
+  undefined
+  -- regName <- newName
+  -- sをreturn valueのレジスタとして設定？
+  -- retLabelName <- newName -- create a new label to call back after jump
+  -- cont' <- withStackRestore cont
+  -- insCodeEnv retLabelName cont'
+  -- jump <- addMeta $ CodeJump retLabelName
+  -- linkReg <- getLinkRegister
+  -- let retLabel = Fix $ DataLabel retLabelName
+  -- addMeta $ CodeWithLinkReg linkReg retLabel jump -- set return address before jump-
+  -- cont' <- traceLetJump s unthunkId cont
+  -- addMeta $ CodeLoad regName addrInReg cont'
 traceLet s (_ :< (switcher@(CodeSwitch _ defaultBranch branchList))) cont = do
   appendCode s cont defaultBranch
   forM_ branchList $ \(_, label) -> appendCode s cont label
@@ -155,6 +161,9 @@ traceLet s (_ :< (CodeLetForArg xs ds body)) cont = do
   tmp <- traceLet s body cont
   case tmp of
     item@(_ :< CodeWithLinkReg _ _ _) -> do
+      item' <- letSeq xs ds item -- set arguments
+      withStackSave item' -- save stack before the preparation of arguments
+    item@(_ :< CodeLoad _ _ _) -> do
       item' <- letSeq xs ds item -- set arguments
       withStackSave item' -- save stack before the preparation of arguments
     item -> letSeq xs ds item
@@ -170,17 +179,20 @@ traceLetJump s addr cont = do
       let newName = "thunk" ++ i ++ "unthunk" ++ addr
       appendCode s cont newName -- append (let s := <ans> in cont) to the code in codeEnv
       addMeta $ CodeJump newName -- ... and jump to that rewritten code
-    [] -> do
-      retLabelName <- newName -- create a new label to call back after jump
-      cont' <- withStackRestore cont
-      insCodeEnv retLabelName cont'
-      jump <- addMeta $ CodeJump retLabelName
-      linkReg <- getLinkRegister
-      let retLabel = Fix $ DataLabel retLabelName
-      addMeta $ CodeWithLinkReg linkReg retLabel jump -- set return address before jump
+    [] -> nonTail cont
     _ ->
       lift $
       throwE $ "multiple thunk found for an unthunk: \n" ++ show thunkIdList
+
+nonTail :: Code -> WithEnv Code
+nonTail cont = do
+  retLabelName <- newName -- create a new label to call back after jump
+  cont' <- withStackRestore cont
+  insCodeEnv retLabelName cont'
+  jump <- addMeta $ CodeJump retLabelName
+  linkReg <- getLinkRegister
+  let retLabel = Fix $ DataLabel retLabelName
+  addMeta $ CodeWithLinkReg linkReg retLabel jump -- set return address before jump
 
 withStackSave :: Code -> WithEnv Code
 withStackSave code = do
