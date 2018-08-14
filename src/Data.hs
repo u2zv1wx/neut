@@ -309,6 +309,8 @@ data CodeF d a
              a -- continuation
   | CodeJump Identifier -- unthunk (the target label of the jump address)
              [Identifier] -- list of arguments
+  | CodeIndirectJump Identifier -- register name
+                     [Identifier] -- list of arguments
   | CodeStore Identifier -- required to implement register allocation
               Address
               a

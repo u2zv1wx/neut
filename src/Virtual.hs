@@ -49,8 +49,12 @@ virtualC (Comp (_ :< CompBind s c1 c2)) = do
   operation2 <- virtualC (Comp c2)
   traceLet s operation1 operation2
 virtualC (Comp (_ :< CompUnthunk v@(Value (VMeta {vtype = ValueTypeDown tct} :< _)) j)) = do
+  operand <- virtualV v
   let args = forallArgs tct
-  addMeta $ CodeJump j args
+  case operand of
+    Fix (DataPointer _) -> addMeta $ CodeIndirectJump j args -- indirect branch
+    Fix (DataLabel _)   -> addMeta $ CodeJump j args -- direct branch
+    _                   -> lift $ throwE "virtualC.CompUnthunk"
 virtualC (Comp (_ :< CompUnthunk (Value (VMeta {vtype = _} :< _)) _)) = do
   lift $ throwE "virtualC.CompUnthunk"
 virtualC (Comp (CMeta {ctype = ct} :< CompMu s c)) = do
