@@ -34,7 +34,8 @@ virtualC app@(Comp (_ :< CompApp _ _)) = do
   let (cont, xs, vs) = toFunAndArgs app
   ds <- mapM virtualV vs
   _ :< cont' <- virtualC cont
-  return $ (zip xs ds) :< cont'
+  meta <- emptyCodeMeta
+  return $ meta {codeMetaArgs = zip xs ds} :< cont'
 virtualC (Comp (_ :< CompRet v)) = do
   ans <- virtualV v
   linkReg <- getLinkRegister
@@ -128,7 +129,7 @@ makeBranch d js (Just (Nothing, label)) = do
   addMeta $ CodeSwitch d label js
 
 traceLet :: String -> Code -> Code -> WithEnv Code
-traceLet s (xds@(_:_) :< code) cont = do
+traceLet s (CodeMeta {codeMetaArgs = xds@(_:_)} :< code) cont = do
   code' <- addMeta code
   tmp <- traceLet s code' cont
   case tmp of

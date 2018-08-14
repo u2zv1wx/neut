@@ -313,6 +313,12 @@ data CodeF d a
                   a -- continuation
   | CodeStackRestore Identifier -- pass the pointer created by stacksave
                      a
+  | CodeStore Identifier
+              Identifier
+              a
+  | CodeLoad Identifier
+             Identifier
+             a
 
 deriving instance Show a => Show (CodeF UData a)
 
@@ -331,16 +337,19 @@ letSeq (i:is) (d:ds) code = do
   addMeta $ CodeLet i d tmp
 letSeq _ _ _ = error "Virtual.letSeq: invalid arguments"
 
-type CodeMeta = [(Identifier, UData)] -- arguments
+-- type CodeMeta = [(Identifier, UData)] -- arguments
+data CodeMeta = CodeMeta
+  { codeMetaArgs :: [(Identifier, UData)]
+  , codeMetaLive :: [Identifier]
+  , codeMetaDef  :: [Identifier]
+  , codeMetaUse  :: [Identifier]
+  } deriving (Show)
 
--- data CodeMeta = CodeMeta
---   { codeMetaLive :: [Identifier]
---   , codeMetaDef  :: [Identifier]
---   , codeMetaUse  :: [Identifier]
---   } deriving (Show)
 emptyCodeMeta :: WithEnv CodeMeta
-emptyCodeMeta = return []
-  -- return $ CodeMeta {codeMetaLive = [], codeMetaDef = [], codeMetaUse = []}
+emptyCodeMeta =
+  return $
+  CodeMeta
+    {codeMetaArgs = [], codeMetaLive = [], codeMetaDef = [], codeMetaUse = []}
 
 addMeta :: PreCode -> WithEnv Code
 addMeta pc = do
