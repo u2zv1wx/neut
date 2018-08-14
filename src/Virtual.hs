@@ -66,23 +66,6 @@ virtualC (Comp (_ :< CompCase vs tree)) = do
   body <- virtualDecision is tree
   letSeq is asms body
 
-virtualApp :: Comp -> [Identifier] -> [Value] -> WithEnv Code
-virtualApp cont xs vs = do
-  ds <- mapM virtualV vs
-  cont' <- virtualC cont
-  letSeq xs ds cont'
-
-addMeta :: PreCode -> WithEnv Code
-addMeta pc = do
-  meta <- emptyCodeMeta
-  return $ meta :< pc
-
-toFunAndArgs :: Comp -> (Comp, [Identifier], [Value])
-toFunAndArgs (Comp (_ :< CompApp e@((CMeta {ctype = CompTypeForall (i, _) _} :< _)) v)) = do
-  let (fun, xs, args) = toFunAndArgs (Comp e)
-  (fun, xs ++ [i], args ++ [v])
-toFunAndArgs c = (c, [], [])
-
 virtualDecision :: [Identifier] -> Decision PreComp -> WithEnv Code
 virtualDecision asmList (DecisionLeaf ois preComp) = do
   let indexList = map fst ois
@@ -109,7 +92,6 @@ virtualCase ::
 virtualCase _ [] = return []
 virtualCase vs ((cons, tree):cs) = do
   code <- virtualDecision vs tree
-  -- codeRef <- liftIO $ newIORef code
   label <- newName
   insCodeEnv label code
   jumpList <- virtualCase vs cs
@@ -220,3 +202,14 @@ appendCode s cont key = do
 forallArgs :: CompType -> [Identifier]
 forallArgs (CompTypeForall (i, _) t) = i : forallArgs t
 forallArgs _                         = []
+
+addMeta :: PreCode -> WithEnv Code
+addMeta pc = do
+  meta <- emptyCodeMeta
+  return $ meta :< pc
+
+toFunAndArgs :: Comp -> (Comp, [Identifier], [Value])
+toFunAndArgs (Comp (_ :< CompApp e@((CMeta {ctype = CompTypeForall (i, _) _} :< _)) v)) = do
+  let (fun, xs, args) = toFunAndArgs (Comp e)
+  (fun, xs ++ [i], args ++ [v])
+toFunAndArgs c = (c, [], [])
