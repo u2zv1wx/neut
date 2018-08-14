@@ -58,6 +58,8 @@ emitCode (_ :< CodeSwitch x defaultBranch branchList) = do
 emitCode (_ :< CodeJump label) = emitOp $ "br label %" ++ label
 emitCode (_ :< CodeIndirectJump x poss) =
   emitOp $ "indirectbr label %" ++ x ++ ", [" ++ show poss ++ "]"
+emitCode (_ :< CodeRecursiveJump x) =
+  emitOp $ "indirectbr label %" ++ x ++ ", [" ++ show x ++ "]"
 emitCode (_ :< CodeStackSave stackReg cont) = do
   emitOp $ "%" ++ stackReg ++ " = call i8* @llvm.stacksave()"
   emitCode cont
@@ -84,7 +86,7 @@ emitIndex (i:is) = "i32 " ++ show i ++ emitIndex is
 emitBranchList :: [Branch] -> String
 emitBranchList []          = ""
 emitBranchList [(_, b)]    = "%" ++ b
-emitBranchList ((c, b):bs) = "%" ++ b ++ ", " ++ emitBranchList bs
+emitBranchList ((_, b):bs) = "%" ++ b ++ ", " ++ emitBranchList bs
 
 emitLabelHeader :: Identifier -> WithEnv ()
 emitLabelHeader label = liftIO $ putStrLn $ label ++ ":"

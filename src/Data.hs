@@ -310,6 +310,7 @@ data CodeF d a
   | CodeJump Identifier -- unthunk (the target label of the jump address)
   | CodeIndirectJump Identifier -- the name of register
                      [Identifier] -- possible jump
+  | CodeRecursiveJump Identifier -- jump by (unthunk x) in (mu x (...))
   | CodeStackSave Identifier -- the pointer created by stacksave
                   a -- continuation
   | CodeStackRestore Identifier -- pass the pointer created by stacksave

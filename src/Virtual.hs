@@ -55,6 +55,8 @@ virtualC (Comp (_ :< CompUnthunk v unthunkId)) = do
       thunkIdList <- lookupThunkEnv unthunkId
       liftIO $ putStrLn $ "found: " ++ show thunkIdList
       case thunkIdList of
+        [] -> do
+          addMeta $ CodeRecursiveJump x
         [thunkId] -> do
           let label = "thunk" ++ thunkId ++ "unthunk" ++ unthunkId
           addMeta $ CodeJump label
@@ -175,6 +177,8 @@ traceLet s (_ :< (CodeReturn _ _ ans)) cont = addMeta $ CodeLet s ans cont
 traceLet s (_ :< (CodeJump label)) cont = do
   appendCode s cont label
   addMeta $ CodeJump label
+traceLet _ (_ :< (CodeRecursiveJump _)) _ = do
+  undefined
 traceLet s (_ :< (CodeIndirectJump addrInReg poss)) cont = do
   retReg <- getReturnRegister
   cont' <- withStackRestore cont

@@ -45,6 +45,8 @@ annotCode (meta :< (CodeSwitch x defaultBranch branchList)) = do
   return $ meta {codeMetaUse = [x]} :< CodeSwitch x defaultBranch branchList
 annotCode (meta :< (CodeJump labelName)) = do
   return $ meta :< CodeJump labelName
+annotCode (meta :< (CodeRecursiveJump x)) = do
+  return $ meta {codeMetaUse = [x]} :< CodeRecursiveJump x
 annotCode (meta :< (CodeIndirectJump x poss)) = do
   return $ meta {codeMetaUse = [x]} :< CodeIndirectJump x poss
 annotCode (meta :< (CodeStackSave stackReg cont)) = do
@@ -105,6 +107,9 @@ computeLiveness (meta :< (CodeJump labelName)) = do
 computeLiveness (meta :< code@(CodeIndirectJump _ _)) = do
   contElems <- computeSuccAll (meta :< code)
   computeLiveness' meta contElems code
+computeLiveness (meta :< code@(CodeRecursiveJump _)) = do
+  contElems <- computeSuccAll (meta :< code)
+  computeLiveness' meta contElems code
 computeLiveness (meta :< (CodeStackSave stackReg cont)) = do
   cont' <- computeLiveness cont
   contElemList <- computeSuccAll (meta :< (CodeStackSave stackReg cont'))
@@ -156,6 +161,8 @@ computeSuccAll (meta :< (CodeJump labelName)) = do
   contElems <- computeSuccAll cont
   return $ next meta contElems
 computeSuccAll (meta :< (CodeIndirectJump _ _)) = do
+  return $ computeCurrent' meta
+computeSuccAll (meta :< (CodeRecursiveJump _)) = do
   return $ computeCurrent' meta
 computeSuccAll (meta :< (CodeStackSave _ cont)) = do
   contLvs <- computeSuccAll cont
