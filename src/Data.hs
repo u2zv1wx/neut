@@ -269,7 +269,7 @@ data DataF a
              Int -- nth constructor
              [a]
   | DataLabel Identifier -- the address of quoted code
-  | DataElemAtIndex a -- subvalue of an inductive value
+  | DataElemAtIndex Identifier -- subvalue of an inductive value
                     Index
 
 deriving instance Show a => Show (DataF a)

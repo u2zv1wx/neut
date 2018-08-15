@@ -92,7 +92,7 @@ virtualDecision asmList (DecisionLeaf ois preComp) = do
   let varList = map (fst . snd) ois
   asmList' <-
     forM (zip asmList ois) $ \(x, ((index, _), _)) -> do
-      return $ Fix $ DataElemAtIndex (Fix $ DataPointer x) index
+      return $ Fix $ DataElemAtIndex x index
   body <- virtualC $ Comp preComp
   letSeq varList asmList' body
 virtualDecision (x:vs) (DecisionSwitch (o, _) cs mdefault) = do
@@ -145,7 +145,7 @@ makeBranch y o js@((_, _, target):_) Nothing = do
   if null o
     then addMeta $ (CodeSwitch y target js)
     else do
-      let tmp = Fix $ DataElemAtIndex (Fix $ DataPointer y) o
+      let tmp = Fix $ DataElemAtIndex y o
       name <- newName
       tmp2 <- addMeta $ (CodeSwitch name target js)
       addMeta $ CodeLet name tmp tmp2
@@ -154,13 +154,12 @@ makeBranch y o js (Just (Just defaultName, label)) = do
     then addMeta $ (CodeSwitch y label js)
     else do
       tmp <- addMeta $ CodeSwitch defaultName label js
-      addMeta $
-        CodeLet defaultName (Fix $ DataElemAtIndex (Fix $ DataPointer y) o) tmp
+      addMeta $ CodeLet defaultName (Fix $ DataElemAtIndex y o) tmp
 makeBranch y o js (Just (Nothing, label)) = do
   if null o
     then addMeta $ (CodeSwitch y label js)
     else do
-      let tmp = Fix $ DataElemAtIndex (Fix $ DataPointer y) o
+      let tmp = Fix $ DataElemAtIndex y o
       name <- newName
       tmp2 <- addMeta $ (CodeSwitch name label js)
       addMeta $ CodeLet name tmp tmp2

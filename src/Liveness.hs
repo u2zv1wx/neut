@@ -61,7 +61,7 @@ varsInData (Fix (DataCell _ _ ds)) = do
   vss <- mapM varsInData ds
   return $ join vss
 varsInData (Fix (DataLabel _)) = return []
-varsInData (Fix (DataElemAtIndex d _)) = varsInData d
+varsInData (Fix (DataElemAtIndex d _)) = return [d]
 
 livenessAnalysis :: WithEnv ()
 livenessAnalysis = do

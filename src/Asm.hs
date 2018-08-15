@@ -86,12 +86,12 @@ traceAsm x (Fix (DataLabel s)) asmCont = do
   return $
     AsmLet x (AsmAlloc LowTypeLabel) $
     AsmStore LowTypeLabel (AsmDataRegister s) x asmCont
-traceAsm x (Fix (DataElemAtIndex baseData idx)) asmCont = do
+traceAsm x (Fix (DataElemAtIndex base idx)) asmCont = do
   tmpVar <- newNameWith "tmp"
-  baseType <- typeOfData baseData
-  insLowTypeEnv tmpVar baseType
-  traceAsm tmpVar baseData $
-    AsmLet x (AsmGetElemPointer baseType tmpVar idx) asmCont
+  baseType <- lookupLowTypeEnv' base
+  insLowTypeEnv tmpVar (traceType [0] baseType)
+  return $
+    AsmLet x (AsmGetElemPointer (traceType [0] baseType) base idx) asmCont
 
 typeOfData :: UData -> WithEnv LowType
 typeOfData (Fix (DataPointer x)) = do
@@ -101,8 +101,8 @@ typeOfData (Fix (DataCell _ _ ds)) = do
   ts <- mapM typeOfData ds
   return $ LowTypePointer $ LowTypeStruct $ LowTypeInt32 : ts
 typeOfData (Fix (DataLabel _)) = return $ LowTypeLabel
-typeOfData (Fix (DataElemAtIndex d idx)) = do
-  t <- typeOfData d
+typeOfData (Fix (DataElemAtIndex x idx)) = do
+  t <- lookupLowTypeEnv' x
   return $ traceType idx t
 
 traceType :: Index -> LowType -> LowType
@@ -110,4 +110,3 @@ traceType [] t                      = t
 traceType (i:is) (LowTypeStruct ts) = traceType is (ts !! i)
 traceType (0:is) (LowTypePointer t) = traceType is t
 traceType _ _                       = LowTypeNull
-  -- error $ "traceType: index " ++ show i ++ " is out of range for " ++ show t
