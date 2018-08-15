@@ -25,8 +25,6 @@ toDecision _ ([], _) = lift $ throwE $ "non-exclusive pattern"
 toDecision _ (_, []) = lift $ throwE $ "non-exclusive pattern"
 toDecision os (patMat, bodyList)
   | Nothing <- findPatApp patMat = do
-    liftIO $ putStrLn $ "found Leaf. the patMat is:\n" ++ Pr.ppShow patMat
-    liftIO $ putStrLn $ "and the occurrence vector is:\n" ++ Pr.ppShow os
     vs <- collectVar patMat
     return $ DecisionLeaf (zip os vs) (head bodyList)
   | Just i <- findPatApp patMat
@@ -40,14 +38,16 @@ toDecision os (patMat, bodyList)
   | otherwise = do
     consList <- nub <$> headConstructor patMat
     newMatrixList <-
-      forM consList $ \(c, args) -> do
+      forM consList $ \(c, num, args) -> do
         let a = length args
         let os' =
-              (map (\j -> (fst (head os) ++ [j], args !! (j - 1))) [1 .. a]) ++
+              (map
+                 (\j -> (fst (head os) ++ [j], args !! (j - 1)))
+                 [0 .. (a - 1)]) ++
               tail os
         tmp <- specialize c a (patMat, bodyList)
         tmp' <- toDecision os' tmp
-        return (c, tmp')
+        return ((c, num), tmp')
     cenv <- getCEnv patMat
     if length cenv <= length consList
       then return $ DecisionSwitch (head os) newMatrixList Nothing
@@ -73,20 +73,25 @@ getCEnv (((Meta {ident = i} :< _):_):_) = do
     Just (WeakTypeNode s _) -> lookupConstructorEnv s
     _                       -> lift $ throwE "type error in pattern"
 
-headConstructor :: [[Pat]] -> WithEnv [(Identifier, [ValueType])]
+headConstructor :: [[Pat]] -> WithEnv [(Identifier, Int, [ValueType])]
 headConstructor ([]) = return []
 headConstructor (ps:pss) = do
   ps' <- headConstructor' ps
   pss' <- mapM headConstructor' pss
   return $ join $ ps' : pss'
 
-headConstructor' :: [Pat] -> WithEnv [(Identifier, [ValueType])]
+headConstructor' :: [Pat] -> WithEnv [(Identifier, Int, [ValueType])]
 headConstructor' [] = return []
 headConstructor' ((_ :< PatHole):_) = return []
 headConstructor' ((_ :< PatVar _):_) = return []
-headConstructor' ((_ :< PatApp s _):_) = do
-  (_, args, cod) <- lookupVEnv' s
-  return [(s, map snd args)]
+headConstructor' ((Meta {ident = i} :< PatApp s _):_) = do
+  t <- lookupWTEnv i
+  case t of
+    Just (WeakTypeNode node _) -> do
+      (_, args, cod) <- lookupVEnv' s
+      i <- getConstructorNumber node s
+      return [(s, i, map snd args)]
+    _ -> lift $ throwE "type error"
   -- case vt of
   --   ValueTypeNode _ vts -> return [(s, vts)]
   -- return [(s, length args)]

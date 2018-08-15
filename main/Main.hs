@@ -22,4 +22,5 @@ printFile path = do
   item <- runWithEnv (load content) initialEnv
   case item of
     Left err             -> putStrLn err
-    Right (astList, env) -> putStrLn $ Pr.ppShow (astList, env)
+    Right (astList, env) -> return ()
+      --putStrLn $ Pr.ppShow (astList, env)

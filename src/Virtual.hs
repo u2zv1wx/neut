@@ -18,9 +18,12 @@ import           Debug.Trace
 virtualV :: Value -> WithEnv UData
 virtualV (Value (_ :< ValueVar x)) = do
   return $ Fix (DataPointer x)
-virtualV (Value (_ :< ValueNodeApp s vs)) = do
+virtualV (Value (VMeta {vtype = ValueTypeNode node _} :< ValueNodeApp s vs)) = do
   vs' <- mapM (virtualV . Value) vs
-  return $ Fix $ DataCell s vs'
+  i <- getConstructorNumber node s
+  return $ Fix $ DataCell s i vs'
+virtualV (Value (_ :< ValueNodeApp _ _)) = do
+  lift $ throwE $ "virtualV.ValueNodeApp"
 virtualV (Value (_ :< ValueThunk comp thunkId)) = do
   asm <- virtualC comp
   unthunkIdList <- lookupThunkEnv thunkId
@@ -103,15 +106,15 @@ virtualDecision [] t =
 
 virtualCase ::
      [Identifier]
-  -> [(Identifier, Decision PreComp)]
-  -> WithEnv [(Identifier, Identifier)]
+  -> [((Identifier, Int), Decision PreComp)]
+  -> WithEnv [(Identifier, Int, Identifier)]
 virtualCase _ [] = return []
-virtualCase vs ((cons, tree):cs) = do
+virtualCase vs (((cons, num), tree):cs) = do
   code <- virtualDecision vs tree
   label <- newNameWith cons
   insCodeEnv label code
   jumpList <- virtualCase vs cs
-  return $ (cons, label) : jumpList
+  return $ (cons, num, label) : jumpList
 
 virtualDefaultCase ::
      [Identifier]
@@ -134,11 +137,11 @@ type JumpList = [(Identifier, Identifier)]
 makeBranch ::
      Identifier
   -> Index
-  -> [(Identifier, Identifier)]
+  -> [(Identifier, Int, Identifier)]
   -> Maybe (Maybe Identifier, Identifier)
   -> WithEnv Code
 makeBranch _ _ [] Nothing = error "empty branch"
-makeBranch y o js@((_, target):_) Nothing = do
+makeBranch y o js@((_, _, target):_) Nothing = do
   if null o
     then addMeta $ (CodeSwitch y target js)
     else do
@@ -198,7 +201,7 @@ traceLet s (_ :< (CodeIndirectJump addrInReg unthunkId poss)) cont = do
   addMeta $ CodeLetLink linkReg linkLabel jumpToAddr
 traceLet s (_ :< (switcher@(CodeSwitch _ defaultBranch branchList))) cont = do
   appendCode s cont defaultBranch
-  forM_ branchList $ \(_, label) -> appendCode s cont label
+  forM_ branchList $ \(_, _, label) -> appendCode s cont label
   addMeta $ switcher
 traceLet s (_ :< (CodeLet k o1 o2)) cont = do
   c <- traceLet s o2 cont
@@ -229,7 +232,7 @@ updateReturnAddr label (_ :< (CodeLetLink x d cont)) = do
   addMeta $ CodeLetLink x d cont'
 updateReturnAddr label (_ :< (CodeSwitch x defaultBranch branchList)) = do
   updateReturnAddr' label defaultBranch
-  forM_ branchList $ \(_, br) -> updateReturnAddr' label br
+  forM_ branchList $ \(_, _, br) -> updateReturnAddr' label br
   addMeta $ (CodeSwitch x defaultBranch branchList)
 updateReturnAddr label (_ :< (CodeJump dest)) = do
   updateReturnAddr' label dest

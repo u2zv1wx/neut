@@ -18,7 +18,7 @@ check e = do
   _ <- infer e
   env <- get
   sub <- unify $ constraintEnv env
-  liftIO $ putStrLn $ Pr.ppShow sub
+  -- liftIO $ putStrLn $ Pr.ppShow sub
   env' <- get
   let aenv = argEnv env'
   argSubst <- unifyArg aenv

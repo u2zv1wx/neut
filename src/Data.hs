@@ -142,7 +142,7 @@ data Decision a
   = DecisionLeaf [(Occurrence, (Identifier, ValueType))]
                  a
   | DecisionSwitch Occurrence
-                   [(Identifier, Decision a)]
+                   [((Identifier, Int), Decision a)]
                    (Maybe (Maybe Identifier, Decision a))
   | DecisionSwap Int
                  (Decision a)
@@ -266,6 +266,7 @@ data LowType
 data DataF a
   = DataPointer Identifier -- var is something that points already-allocated data
   | DataCell Identifier -- value of defined data types
+             Int -- nth constructor
              [a]
   | DataLabel Identifier -- the address of quoted code
   | DataElemAtIndex a -- subvalue of an inductive value
@@ -284,7 +285,7 @@ type Data = Cofree DataF LowType
 
 type UData = Fix DataF
 
-type Branch = (Identifier, Identifier)
+type Branch = (Identifier, Int, Identifier)
 
 instance Show1 f => Show (Fix f) where
   showsPrec d (Fix a) =
@@ -360,12 +361,18 @@ type Code = Cofree (CodeF UData) CodeMeta
 
 type PreCode = CodeF UData Code
 
+data AsmData
+  = AsmDataRegister Identifier
+  | AsmDataLabel Identifier
+  | AsmDataInt Int
+  deriving (Show)
+
 data Asm
   = AsmLet Identifier
            AsmOperation
            Asm
   | AsmStore LowType
-             Identifier
+             AsmData
              Identifier
              Asm
   | AsmBranch Identifier
@@ -373,7 +380,7 @@ data Asm
                       [Identifier]
   | AsmSwitch Identifier
               DefaultBranch
-              [Branch]
+              [(Identifier, Int, Identifier)]
   deriving (Show)
 
 data AsmOperation
@@ -556,6 +563,17 @@ lookupConstructorEnv cons = do
     Nothing -> lift $ throwE $ "no such constructor defined: " ++ show cons
     Just cenvRef -> liftIO $ readIORef cenvRef
 
+getConstructorNumber :: Identifier -> Identifier -> WithEnv Int
+getConstructorNumber nodeName ident = do
+  env <- get
+  case lookup nodeName (constructorEnv env) of
+    Nothing -> lift $ throwE $ "no such type defined: " ++ show nodeName
+    Just cenvRef -> do
+      cenv <- liftIO $ readIORef cenvRef
+      case elemIndex ident cenv of
+        Nothing -> lift $ throwE $ "no such constructor defined: " ++ ident
+        Just i  -> return i
+
 insWTEnv :: String -> WeakType -> WithEnv ()
 insWTEnv s t = modify (\e -> e {weakTypeEnv = (s, t) : weakTypeEnv e})
 
@@ -637,17 +655,17 @@ updateCodeEnv key code = do
 
 initializeLinkRegister :: WithEnv ()
 initializeLinkRegister = do
-  s <- newNameWith "link-register"
+  s <- newNameWith "link"
   modify (\e -> e {linkRegister = Just s})
 
 initializeStackRegister :: WithEnv ()
 initializeStackRegister = do
-  s <- newNameWith "stack-register"
+  s <- newNameWith "stack"
   modify (\e -> e {stackRegister = Just s})
 
 initializeReturnRegister :: WithEnv ()
 initializeReturnRegister = do
-  s <- newNameWith "return-register"
+  s <- newNameWith "ret"
   modify (\e -> e {returnRegister = Just s})
 
 getLinkRegister :: WithEnv Identifier

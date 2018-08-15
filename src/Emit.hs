@@ -32,21 +32,35 @@ emit = do
 
 emitAsm :: Asm -> WithEnv ()
 emitAsm (AsmLet i op cont) = emitAsmLet i op cont
-emitAsm (AsmStore t item dest cont) = do
+emitAsm (AsmStore t (AsmDataRegister item) dest cont) = do
   emitOp $
-    "store " ++ showType t ++ " " ++ item ++ ", " ++ showType t ++ "* " ++ dest
+    "store " ++
+    showType t ++ " %" ++ item ++ ", " ++ showType t ++ "* %" ++ dest
+  emitAsm cont
+emitAsm (AsmStore t (AsmDataLabel item) dest cont) = do
+  emitOp $
+    "store " ++
+    showType t ++ " %" ++ item ++ ", " ++ showType t ++ "* %" ++ dest
+  emitAsm cont
+emitAsm (AsmStore t (AsmDataInt i) dest cont) = do
+  emitOp $
+    "store " ++
+    showType t ++ " " ++ show i ++ ", " ++ showType t ++ "* %" ++ dest
   emitAsm cont
 emitAsm (AsmBranch label) = do
   emitOp $ "br label %" ++ label
 emitAsm (AsmIndirectBranch label poss) = do
   emitOp $ "indirectbr label %" ++ label ++ ", [" ++ showPossDest poss ++ "]"
 emitAsm (AsmSwitch i defaultBranch branchList) = do
+  t <- lookupLowTypeEnv' i
   emitOp $
-    "switch i32 " ++
-    "%" ++
+    "switch " ++
+    showType t ++
+    " %" ++
     i ++
     ", label %" ++ defaultBranch ++ " [" ++ showBranchList branchList ++ "]"
 
+--    "switch i32 " ++
 emitAsmLet :: Identifier -> AsmOperation -> Asm -> WithEnv ()
 emitAsmLet i (AsmAlloc t) cont = do
   emitOp $ "%" ++ i ++ " = alloca " ++ showType t
@@ -102,9 +116,11 @@ showIndex [i]    = "i32 " ++ show i
 showIndex (i:is) = "i32 " ++ show i ++ ", " ++ showIndex is
 
 showBranchList :: [Branch] -> String
-showBranchList []          = ""
-showBranchList [(_, b)]    = "<num> %" ++ b
-showBranchList ((_, b):bs) = "<num> " ++ "%" ++ b ++ ", " ++ showBranchList bs
+showBranchList [] = ""
+showBranchList [(_, i, b)] = do
+  "i32 " ++ show i ++ ", label %" ++ b
+showBranchList ((_, i, b):bs) = do
+  "i32 " ++ show i ++ ", label %" ++ b ++ " " ++ showBranchList bs
 
 emitLabelHeader :: Identifier -> WithEnv ()
 emitLabelHeader label = liftIO $ putStrLn $ label ++ ":"

@@ -57,7 +57,7 @@ annotCode (meta :< (CodeStackRestore stackReg cont)) = do
 
 varsInData :: UData -> WithEnv [Identifier]
 varsInData (Fix (DataPointer x)) = return [x]
-varsInData (Fix (DataCell _ ds)) = do
+varsInData (Fix (DataCell _ _ ds)) = do
   vss <- mapM varsInData ds
   return $ join vss
 varsInData (Fix (DataLabel _)) = return []
@@ -84,7 +84,7 @@ computeLiveness (meta :< (CodeLetLink x d cont)) = do
   contElemList <- computeSuccAll (meta :< (CodeLetLink x d cont'))
   computeLiveness' meta contElemList (CodeLetLink x d cont')
 computeLiveness (meta :< (CodeSwitch x defaultBranch branchList)) = do
-  let labelList = defaultBranch : map snd branchList
+  let labelList = defaultBranch : map (\(_, _, z) -> z) branchList
   contElemListList <-
     forM labelList $ \label -> do
       contRef <- lookupFunEnv label
@@ -155,7 +155,7 @@ computeSuccAll (meta :< (CodeLetLink _ _ cont)) = do
   contLvs <- computeSuccAll cont
   return $ next meta contLvs
 computeSuccAll (meta :< (CodeSwitch _ defaultBranch branchList)) = do
-  let labelList = defaultBranch : map snd branchList
+  let labelList = defaultBranch : map (\(_, _, z) -> z) branchList
   contElemss <-
     forM labelList $ \label -> do
       contRef <- lookupFunEnv label
