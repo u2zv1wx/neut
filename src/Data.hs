@@ -256,11 +256,11 @@ type ValueInfo = (Identifier, [(Identifier, ValueType)], ValueType)
 type Index = [Int]
 
 data LowType
-  = LowTypeConst
-  | LowTypeNull
-  | LowTypeVec Identifier -- the type of cons cell
-               [LowType]
-  | LowTypeSwitch [LowType]
+  = LowTypeNull
+  | LowTypeInt32
+  | LowTypeStruct [LowType]
+  | LowTypePointer LowType
+  | LowTypeLabel
   deriving (Show)
 
 data DataF a
@@ -359,6 +359,33 @@ type UCode = Fix (CodeF UData)
 type Code = Cofree (CodeF UData) CodeMeta
 
 type PreCode = CodeF UData Code
+
+data Asm
+  = AsmLet Identifier
+           AsmOperation
+           Asm
+  | AsmStore LowType
+             Identifier
+             Identifier
+             Asm
+  | AsmBranch Identifier
+  | AsmIndirectBranch Identifier
+                      [Identifier]
+  | AsmSwitch Identifier
+              DefaultBranch
+              [Branch]
+  deriving (Show)
+
+data AsmOperation
+  = AsmAlloc LowType
+  | AsmLoad LowType
+            Identifier
+  | AsmGetElemPointer LowType
+                      Identifier
+                      Index
+  | AsmStackSave
+  | AsmStackRestore
+  deriving (Show)
 
 data Env = Env
   { count          :: Int -- to generate fresh symbols
@@ -543,11 +570,14 @@ lookupLowTypeEnv s = gets (lookup s . lowTypeEnv)
 
 lookupLowTypeEnv' :: String -> WithEnv LowType
 lookupLowTypeEnv' s = do
+  env <- get
   mt <- lookupLowTypeEnv s
   case mt of
     Just t -> return t
     Nothing -> do
-      lift $ throwE $ "the type of " ++ show s ++ " is not defined "
+      lift $
+        throwE $
+        "the type of " ++ show s ++ " is not defined. env: " ++ Pr.ppShow env
 
 lookupValueTypeEnv :: String -> WithEnv (Maybe ValueType)
 lookupValueTypeEnv s = gets (lookup s . valueTypeEnv)

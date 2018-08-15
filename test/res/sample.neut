@@ -42,4 +42,6 @@
   (let k (unthunk sya))
   (return (zero))
   (let p ((unthunk yay) (succ (zero))))
+  (return (succ (zero)))
+  (let q ((unthunk yay) (succ (zero))))
   (return (true)))

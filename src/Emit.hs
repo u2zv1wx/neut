@@ -7,6 +7,7 @@ import           Control.Monad.State
 import           Control.Monad.Trans.Except
 import           Data.IORef
 
+import           Asm
 import           Data
 
 import           Control.Comonad.Cofree
@@ -22,75 +23,88 @@ emit = do
   -- exitLabel <- newNameWith "exit"
   forM_ (funEnv env) $ \(label, codeRef) -> do
     code <- liftIO $ readIORef codeRef
+    asm <- asmCode code
     emitLabelHeader label
-    emitCode code
+    emitAsm asm
   emitLabelHeader "exit"
   emitOp $ "ret void"
   liftIO $ putStrLn "}"
 
-emitCode :: Code -> WithEnv ()
-emitCode (CodeMeta {codeMetaArgs = xds@(_:_)} :< code) = do
-  let (xs, ds) = unzip xds
-  code' <- addMeta code
-  tmp <- letSeq xs ds code'
-  emitCode tmp
-emitCode (_ :< CodeReturn retReg label d) = do
-  x <- emitData d
-  emitOp $ "%" ++ retReg ++ " = " ++ x
+emitAsm :: Asm -> WithEnv ()
+emitAsm (AsmLet i op cont) = emitAsmLet i op cont
+emitAsm (AsmStore t item dest cont) = do
+  emitOp $
+    "store " ++ showType t ++ " " ++ item ++ ", " ++ showType t ++ "* " ++ dest
+  emitAsm cont
+emitAsm (AsmBranch label) = do
   emitOp $ "br label %" ++ label
-emitCode (_ :< CodeLet i (Fix (DataLabel label)) cont) = do
-  emitOp $ "%" ++ i ++ " = alloca label"
-  emitOp $ "store label %" ++ label ++ ", label* %" ++ i
-  emitCode cont
-emitCode (_ :< CodeLet i (Fix (DataPointer x)) cont) = do
-  emitOp $ "%" ++ i ++ " = load <type>, <type>* %" ++ x
-  emitCode cont
-emitCode (_ :< CodeLet i d cont) = do
-  x <- emitData d
-  emitOp $ "%" ++ i ++ " = " ++ x
-  emitCode cont
-emitCode (_ :< CodeLetLink i d cont) = do
-  x <- emitData d
-  emitOp $ "%" ++ i ++ " = " ++ x
-  emitCode cont
-emitCode (_ :< CodeSwitch x defaultBranch branchList) = do
+emitAsm (AsmIndirectBranch label poss) = do
+  emitOp $ "indirectbr label %" ++ label ++ ", [" ++ showPossDest poss ++ "]"
+emitAsm (AsmSwitch i defaultBranch branchList) = do
   emitOp $
     "switch i32 " ++
     "%" ++
-    x ++
-    ", label %" ++ defaultBranch ++ " [" ++ emitBranchList branchList ++ "]"
-emitCode (_ :< CodeJump label) = emitOp $ "br label %" ++ label
-emitCode (_ :< CodeIndirectJump x unthunkId poss) =
-  emitOp $ "indirectbr label %" ++ x ++ ", [" ++ show poss ++ "]"
-emitCode (_ :< CodeRecursiveJump x) =
-  emitOp $ "indirectbr label %" ++ x ++ ", [" ++ show x ++ "]"
-emitCode (_ :< CodeStackSave stackReg cont) = do
-  emitOp $ "%" ++ stackReg ++ " = call i8* @llvm.stacksave()"
-  emitCode cont
-emitCode (_ :< CodeStackRestore stackReg cont) = do
-  emitOp $ "call void @llvm.stackrestore(i8* " ++ "%" ++ stackReg ++ ")"
-  emitCode cont
+    i ++
+    ", label %" ++ defaultBranch ++ " [" ++ showBranchList branchList ++ "]"
 
-emitData :: UData -> WithEnv String
-emitData (Fix (DataPointer x)) = return $ "%" ++ x
-emitData (Fix (DataCell s ds)) = do
-  ss <- mapM emitData ds
-  return $ s ++ " [" ++ join ss ++ "]"
-emitData (Fix (DataLabel label)) = return $ "%" ++ label
-emitData (Fix (DataElemAtIndex d [])) = emitData d
-emitData (Fix (DataElemAtIndex d idx)) = do
-  tmp <- emitData d
-  return $ "getelementptr <ty>, <ty>* " ++ tmp ++ ", " ++ emitIndex idx ++ ""
+emitAsmLet :: Identifier -> AsmOperation -> Asm -> WithEnv ()
+emitAsmLet i (AsmAlloc t) cont = do
+  emitOp $ "%" ++ i ++ " = alloca " ++ showType t
+  emitAsm cont
+emitAsmLet i (AsmLoad t source) cont = do
+  emitOp $
+    "%" ++
+    i ++ " = load " ++ showType t ++ ", " ++ showType t ++ "* %" ++ source
+  emitAsm cont
+emitAsmLet i (AsmGetElemPointer t base index) cont = do
+  emitOp $
+    "%" ++
+    i ++
+    " = getelementptr " ++
+    showType t ++
+    ", " ++ showType t ++ "* %" ++ base ++ ", i32 0, " ++ showIndex index
+  emitAsm cont
+emitAsmLet i AsmStackSave cont = do
+  emitOp $ "%" ++ i ++ " = call i8* @llvm.stacksave()"
+  emitAsm cont
+emitAsmLet i AsmStackRestore cont = do
+  emitOp $ "call void @llvm.stackrestore(i8* " ++ "%" ++ i ++ ")"
+  emitAsm cont
 
-emitIndex :: [Int] -> String
-emitIndex []     = ""
-emitIndex [i]    = "i32 " ++ show i
-emitIndex (i:is) = "i32 " ++ show i ++ emitIndex is
+showPossDest :: [Identifier] -> String
+showPossDest []     = ""
+showPossDest [d]    = "label " ++ show d
+showPossDest (d:ds) = "label " ++ show d ++ ", " ++ showPossDest ds
 
-emitBranchList :: [Branch] -> String
-emitBranchList []          = ""
-emitBranchList [(_, b)]    = "%" ++ b
-emitBranchList ((_, b):bs) = "%" ++ b ++ ", " ++ emitBranchList bs
+showType :: LowType -> String
+showType LowTypeInt32 = "i32"
+showType LowTypeNull = "null"
+showType (LowTypeStruct (ts)) = do
+  let tmp = showTypeList ts
+  "{" ++ tmp ++ "}"
+showType LowTypeLabel = "label"
+showType (LowTypePointer t) = do
+  let s = showType t
+  s ++ "*"
+
+showTypeList :: [LowType] -> String
+showTypeList [] = ""
+showTypeList [t] = do
+  showType t
+showTypeList (t:ts) = do
+  let s = showType t
+  let ss = showTypeList ts
+  s ++ ", " ++ ss
+
+showIndex :: [Int] -> String
+showIndex []     = ""
+showIndex [i]    = "i32 " ++ show i
+showIndex (i:is) = "i32 " ++ show i ++ ", " ++ showIndex is
+
+showBranchList :: [Branch] -> String
+showBranchList []          = ""
+showBranchList [(_, b)]    = "<num> %" ++ b
+showBranchList ((_, b):bs) = "<num> " ++ "%" ++ b ++ ", " ++ showBranchList bs
 
 emitLabelHeader :: Identifier -> WithEnv ()
 emitLabelHeader label = liftIO $ putStrLn $ label ++ ":"

@@ -11,6 +11,7 @@ import           Control.Comonad.Cofree
 
 import           Data.IORef
 
+import           Asm
 import           Data
 import           Emit
 import           Infer
@@ -89,5 +90,6 @@ load' (a:as) = do
       -- liftIO $ putStrLn $ "c'' : \n" ++ Pr.ppShow mainCode'
       -- regAlloc 32
       -- updateCodeEnv i mainCode'
+      -- asmEmit
       emit
   load' as
