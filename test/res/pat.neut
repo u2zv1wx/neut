@@ -25,7 +25,7 @@
 (notation (begin (let x e+) rest+)
   (bind x (begin e+) (begin rest+)))
 
-(match ((succ (zero)))
+(match ((succ (succ (zero))))
   (with ((zero))
     (return (zero)))
   (with ((succ (succ x)))

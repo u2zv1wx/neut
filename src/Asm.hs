@@ -28,16 +28,16 @@ asmCode (meta :< CodeLetLink i d cont) = do
   asmCode $ meta :< CodeLet i d cont
 asmCode (_ :< CodeSwitch basePointer defaultBranch branchList) = do
   baseType <- lookupLowTypeEnv' basePointer
-  cursorAt00 <- newNameWith $ basePointer ++ ".elem0"
-  let typeAt00 = traceType [0, 0] baseType
-  let pointerTo00 = LowTypePointer typeAt00
-  insLowTypeEnv cursorAt00 pointerTo00
-  loadHead <- newNameWith "tmp"
-  insLowTypeEnv loadHead typeAt00
+  cursorAt00 <- newNameWith $ basePointer ++ ".cursor0"
+  let dataType = traceType [0, 0] baseType
+  -- let typeAt00 = traceType [0, 0] baseType
+  headData <- newNameWith $ basePointer ++ ".kind"
+  insLowTypeEnv headData $ dataType
+  insLowTypeEnv cursorAt00 $ LowTypePointer dataType
   return $
     [ AsmLet cursorAt00 (AsmGetElemPointer baseType basePointer [0, 0])
-    , AsmLet loadHead (AsmLoad pointerTo00 cursorAt00)
-    , AsmSwitch loadHead defaultBranch branchList
+    , AsmLet headData (AsmLoad (LowTypePointer dataType) cursorAt00)
+    , AsmSwitch headData defaultBranch branchList
     ]
 asmCode (_ :< CodeJump label) = return [AsmBranch label]
 asmCode (_ :< CodeIndirectJump x unthunkId poss) = do
@@ -76,7 +76,8 @@ traceAsm x (Fix (DataLabel s)) = do
     ]
 traceAsm x (Fix (DataElemAtIndex basePointer idx)) = do
   baseType <- lookupLowTypeEnv' basePointer
-  return [AsmLet x (AsmGetElemPointer baseType basePointer (0 : idx))]
+  return
+    [AsmLet x (AsmGetElemPointer baseType basePointer (0 : modifyIndex idx))]
 traceAsm x d@(Fix (DataInt32 i)) = do
   baseType <- typeOfData d -- i32*
   return [AsmLet x (AsmAlloc baseType), AsmStore baseType (AsmDataInt i) x]
@@ -92,14 +93,15 @@ traceAsm' x (Fix (DataLabel s)) = do
   return [AsmStore LowTypeLabel (AsmDataRegister s) x]
 traceAsm' x (Fix (DataElemAtIndex basePointer idx)) = do
   baseType <- lookupLowTypeEnv' basePointer
-  return [AsmLet x (AsmGetElemPointer baseType basePointer (0 : idx))]
+  return
+    [AsmLet x (AsmGetElemPointer baseType basePointer (0 : modifyIndex idx))]
 traceAsm' x d@(Fix (DataInt32 i)) = do
   baseType <- typeOfData d -- i32*
   return [AsmStore baseType (AsmDataInt i) x]
 
 setIthData :: Identifier -> (Int, UData) -> WithEnv [Asm]
 setIthData x (index, ithArg) = do
-  ithCursor <- newNameWith $ x ++ ".elem" ++ show index
+  ithCursor <- newNameWith $ x ++ ".cursor" ++ show index
   td <- typeOfData ithArg
   xt <- lookupLowTypeEnv' x
   insLowTypeEnv ithCursor (LowTypePointer td)
@@ -114,7 +116,7 @@ typeOfData (Fix (DataCell _ _ ds)) = do
 typeOfData (Fix (DataLabel _)) = return LowTypeLabel
 typeOfData (Fix (DataElemAtIndex basePointer idx)) = do
   t <- lookupLowTypeEnv' basePointer
-  return $ traceType (0 : idx) t
+  return $ traceType (0 : modifyIndex idx) t
 typeOfData (Fix (DataInt32 _)) = return LowTypeInt32
 
 traceType :: Index -> LowType -> LowType
@@ -122,3 +124,7 @@ traceType [] t                      = t
 traceType (i:is) (LowTypeStruct ts) = traceType is (ts !! i)
 traceType (0:is) (LowTypePointer t) = traceType is t
 traceType _ _                       = LowTypeNull -- quit process and emit "ret void"
+
+-- the first element of an inductive value is kind (i32)
+modifyIndex :: Index -> Index
+modifyIndex index = map (\i -> i + 1) index

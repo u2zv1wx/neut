@@ -23,8 +23,8 @@ emit = do
   -- exitLabel <- newNameWith "exit"
   forM_ (funEnv env) $ \(label, codeRef) -> do
     code <- liftIO $ readIORef codeRef
+    -- liftIO $ putStrLn $ Pr.ppShow code
     asm <- asmCode code
-    -- liftIO $ putStrLn $ Pr.ppShow asm
     emitLabelHeader label
     mapM_ emitAsm asm
   emitLabelHeader "exit"
