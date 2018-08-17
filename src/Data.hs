@@ -264,104 +264,57 @@ data LowType
   | LowTypeLabel
   deriving (Show)
 
-data DataF a
+data Data
   = DataPointer Identifier -- var is something that points already-allocated data
   | DataCell Identifier -- value of defined data types
              Int -- nth constructor
-             [a]
+             [Data]
   | DataLabel Identifier -- the address of quoted code
   | DataElemAtIndex Identifier -- subvalue of an inductive value
                     Index
   | DataInt32 Int
-
-deriving instance Show a => Show (DataF a)
-
-deriving instance Functor DataF
-
-$(deriveShow1 ''DataF)
-
-data Fix f =
-  Fix (f (Fix f))
-
-type Data = Cofree DataF LowType
-
-type UData = Fix DataF
+  deriving (Show)
 
 type Branch = (Identifier, Int, Identifier)
 
-instance Show1 f => Show (Fix f) where
-  showsPrec d (Fix a) =
-    showParen (d >= 11) $ showString "Fix " . showsPrec1 11 a
-
-type DefaultBranch = Identifier
-
 type Address = Identifier
 
-data CodeF d a
+type Function = Identifier
+
+type Label = (Function, Identifier)
+
+type DefaultBranch = Label
+
+data Code
   = CodeReturn Identifier -- return register
-               Identifier -- link label
-               d
+               Label -- link label
+               Data
   | CodeLet Identifier -- bind (we also use this to represent application)
-            d
-            a
+            Data
+            Code
   | CodeLetLink Identifier -- link register
-                d -- address
-                a
+                Data -- address
+                Code
   | CodeSwitch Identifier -- branching in pattern-matching (elimination of inductive type)
                DefaultBranch
                [Branch]
-  | CodeJump Identifier -- unthunk (the target label of the jump address)
+  | CodeJump Label -- unthunk (the target label of the jump address)
   | CodeIndirectJump Identifier -- the name of register
                      Identifier -- the id of corresponding unthunk
                      [Identifier] -- possible jump
-  | CodeRecursiveJump Identifier -- jump by (unthunk x) in (mu x (...))
-  | CodeStackSave Identifier -- the pointer created by stacksave
-                  a -- continuation
-  | CodeStackRestore Identifier -- pass the pointer created by stacksave
-                     a
+  | CodeRecursiveJump Label -- jump by (unthunk x) in (mu x (...))
+  | CodeCall [(Identifier, Data)]
+             Code
+  | CodeWithArg [(Identifier, Data)]
+                Code
+  deriving (Show)
 
-deriving instance Show a => Show (CodeF UData a)
-
-deriving instance Show a => Show (CodeF Data a)
-
-deriving instance Functor (CodeF UData)
-
-deriving instance Functor (CodeF Data)
-
-$(deriveShow1 ''CodeF)
-
-letSeq :: [Identifier] -> [UData] -> Code -> WithEnv Code
+letSeq :: [Identifier] -> [Data] -> Code -> WithEnv Code
 letSeq [] [] code = return code
 letSeq (i:is) (d:ds) code = do
   tmp <- letSeq is ds code
-  addMeta $ CodeLet i d tmp
+  return $ CodeLet i d tmp
 letSeq _ _ _ = error "Virtual.letSeq: invalid arguments"
-
--- type CodeMeta = [(Identifier, UData)] -- arguments
-data CodeMeta = CodeMeta
-  { codeMetaArgs :: [(Identifier, UData)]
-  , codeMetaLive :: [Identifier]
-  , codeMetaDef  :: [Identifier]
-  , codeMetaUse  :: [Identifier]
-  } deriving (Show)
-
-emptyCodeMeta :: WithEnv CodeMeta
-emptyCodeMeta =
-  return $
-  CodeMeta
-    {codeMetaArgs = [], codeMetaLive = [], codeMetaDef = [], codeMetaUse = []}
-
-addMeta :: PreCode -> WithEnv Code
-addMeta pc = do
-  meta <- emptyCodeMeta
-  return $ meta :< pc
-
--- type Code = Cofree (CodeF Data) LowType
-type UCode = Fix (CodeF UData)
-
-type Code = Cofree (CodeF UData) CodeMeta
-
-type PreCode = CodeF UData Code
 
 data AsmData
   = AsmDataRegister Identifier
@@ -404,19 +357,18 @@ data Env = Env
   , weakTypeEnv    :: [(Identifier, WeakType)] -- used in type inference
   , typeEnv        :: [(Identifier, Type)] -- polarized type environment
   , valueTypeEnv   :: [(Identifier, ValueType)]
-  , compTypeEnv    :: [(Identifier, CompType)]
   , constraintEnv  :: [(WeakType, WeakType)] -- used in type inference
   , levelEnv       :: [(WeakLevel, WeakLevel)] -- constraint regarding the level of universes
   , argEnv         :: [(IdentOrHole, IdentOrHole)] -- equivalence of arguments of forall
   , thunkEnv       :: [(Identifier, Identifier)]
-  , funEnv         :: [(Identifier, IORef Code)]
+  , codeEnv        :: [(Identifier, IORef [(Identifier, IORef Code)])]
+  -- , codeEnv         :: [(Label, IORef Code)]
   , lowTypeEnv     :: [(Identifier, LowType)]
   , didUpdate      :: Bool -- used in live analysis to detect the end of the process
-  , regEnv         :: [(Identifier, Int)] -- variable to register
   , linkRegister   :: Maybe Identifier
-  , stackRegister  :: Maybe Identifier
   , returnRegister :: Maybe Identifier
   , returnAddr     :: [Identifier]
+  , scope          :: Identifier -- used in Virtual to determine the name of current function
   } deriving (Show)
 
 initialEnv :: Env
@@ -444,19 +396,17 @@ initialEnv =
     , weakTypeEnv = []
     , typeEnv = []
     , valueTypeEnv = []
-    , compTypeEnv = []
     , constraintEnv = []
     , levelEnv = []
     , thunkEnv = []
     , argEnv = []
-    , funEnv = []
+    , codeEnv = []
     , lowTypeEnv = []
     , didUpdate = False
-    , regEnv = []
     , linkRegister = Nothing
-    , stackRegister = Nothing
     , returnRegister = Nothing
     , returnAddr = ["exit"]
+    , scope = ""
     }
 
 type WithEnv a = StateT Env (ExceptT String IO) a
@@ -534,15 +484,53 @@ lookupNameEnv' s = do
     Just s' -> return s'
     Nothing -> newNameWith s
 
-lookupFunEnv :: Identifier -> WithEnv (IORef Code)
-lookupFunEnv s = do
-  env <- get
-  m <- gets (lookup s . funEnv)
+lookupCodeEnv :: Identifier -> WithEnv (IORef [(Identifier, IORef Code)])
+lookupCodeEnv label = do
+  m <- gets (lookup label . codeEnv)
   case m of
+    Nothing     -> lift $ throwE $ "no such label: " ++ show label
+    Just envRef -> return envRef
+
+lookupCodeEnv' :: Identifier -> Identifier -> WithEnv (IORef Code)
+lookupCodeEnv' scope ident = do
+  scopeEnvRef <- lookupCodeEnv scope
+  scopeEnv <- liftIO $ readIORef scopeEnvRef
+  case lookup ident scopeEnv of
+    Just codeRef -> return codeRef
     Nothing ->
       lift $
-      throwE $ "no such function: " ++ show s ++ "\nenv:\n" ++ Pr.ppShow env
-    Just k -> return k
+      throwE $ "no such label " ++ show ident ++ " defined in scope " ++ scope
+
+insCodeEnv :: Identifier -> Identifier -> IORef Code -> WithEnv ()
+insCodeEnv scope ident codeRef = do
+  scopeEnvRef <- lookupCodeEnv scope
+  scopeEnv <- liftIO $ readIORef scopeEnvRef
+  liftIO $ writeIORef scopeEnvRef ((ident, codeRef) : scopeEnv)
+
+insCodeEnv' :: Identifier -> IORef Code -> WithEnv ()
+insCodeEnv' ident codeRef = do
+  scope <- getScope
+  insCodeEnv scope ident codeRef
+
+updateCodeEnv :: Identifier -> Identifier -> Code -> WithEnv ()
+updateCodeEnv scope label code = do
+  codeRef <- lookupCodeEnv' scope label
+  liftIO $ writeIORef codeRef code
+
+updateCodeEnv' :: Identifier -> Code -> WithEnv ()
+updateCodeEnv' ident code = do
+  scope <- getScope
+  updateCodeEnv scope ident code
+
+insEmptyCodeEnv :: Identifier -> WithEnv ()
+insEmptyCodeEnv scope = do
+  nop <- liftIO $ newIORef []
+  modify (\e -> e {codeEnv = (scope, nop) : codeEnv e})
+
+toLabel :: Identifier -> WithEnv Label
+toLabel ident = do
+  current <- getScope
+  return (current, ident)
 
 lookupThunkEnv :: Identifier -> WithEnv [Identifier]
 lookupThunkEnv s = do
@@ -608,12 +596,6 @@ lookupValueTypeEnv' s = do
     Nothing -> do
       lift $ throwE $ "the type of " ++ show s ++ " is not defined "
 
-insCTEnv :: String -> CompType -> WithEnv ()
-insCTEnv s t = modify (\e -> e {compTypeEnv = (s, t) : compTypeEnv e})
-
-lookupCompTypeEnv :: String -> WithEnv (Maybe CompType)
-lookupCompTypeEnv s = gets (lookup s . compTypeEnv)
-
 insCEnv :: WeakType -> WeakType -> WithEnv ()
 insCEnv t1 t2 = modify (\e -> e {constraintEnv = (t1, t2) : constraintEnv e})
 
@@ -622,12 +604,6 @@ insLEnv l1 l2 = modify (\e -> e {levelEnv = (l1, l2) : levelEnv e})
 
 insAEnv :: IdentOrHole -> IdentOrHole -> WithEnv ()
 insAEnv x y = modify (\e -> e {argEnv = (x, y) : argEnv e})
-
-insRegEnv :: Identifier -> Int -> WithEnv ()
-insRegEnv x i = modify (\e -> e {regEnv = (x, i) : regEnv e})
-
-lookupRegEnv :: Identifier -> WithEnv (Maybe Int)
-lookupRegEnv s = gets (lookup s . regEnv)
 
 insConstructorEnv :: Identifier -> Identifier -> WithEnv ()
 insConstructorEnv i cons = do
@@ -643,25 +619,10 @@ insConstructorEnv i cons = do
 insThunkEnv :: Identifier -> Identifier -> WithEnv ()
 insThunkEnv i j = modify (\e -> e {thunkEnv = (i, j) : thunkEnv e})
 
-insCodeEnv :: Identifier -> Code -> WithEnv ()
-insCodeEnv i code = do
-  codeRef <- liftIO $ newIORef code
-  modify (\e -> e {funEnv = (i, codeRef) : funEnv e})
-
-updateCodeEnv :: Identifier -> Code -> WithEnv ()
-updateCodeEnv key code = do
-  codeRef <- lookupFunEnv key
-  liftIO $ writeIORef codeRef code
-
 initializeLinkRegister :: WithEnv ()
 initializeLinkRegister = do
   s <- newNameWith "link"
   modify (\e -> e {linkRegister = Just s})
-
-initializeStackRegister :: WithEnv ()
-initializeStackRegister = do
-  s <- newNameWith "stack"
-  modify (\e -> e {stackRegister = Just s})
 
 initializeReturnRegister :: WithEnv ()
 initializeReturnRegister = do
@@ -672,13 +633,6 @@ getLinkRegister :: WithEnv Identifier
 getLinkRegister = do
   e <- get
   case linkRegister e of
-    Just s  -> return s
-    Nothing -> lift $ throwE "the name of link register is not defined"
-
-getStackRegister :: WithEnv Identifier
-getStackRegister = do
-  e <- get
-  case stackRegister e of
     Just s  -> return s
     Nothing -> lift $ throwE "the name of link register is not defined"
 
@@ -698,6 +652,15 @@ getReturnAddr = do
 setReturnAddr :: Identifier -> WithEnv ()
 setReturnAddr addr = do
   modify (\e -> e {returnAddr = addr : returnAddr e})
+
+setScope :: Identifier -> WithEnv ()
+setScope i = do
+  modify (\e -> e {scope = i})
+
+getScope :: WithEnv Identifier
+getScope = do
+  env <- get
+  return $ scope env
 
 local :: WithEnv a -> WithEnv a
 local p = do

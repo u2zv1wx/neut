@@ -19,17 +19,18 @@ import           Debug.Trace
 emit :: WithEnv ()
 emit = do
   env <- get
-  liftIO $ putStrLn "define void @main() {"
-  -- exitLabel <- newNameWith "exit"
-  forM_ (funEnv env) $ \(label, codeRef) -> do
-    code <- liftIO $ readIORef codeRef
-    -- liftIO $ putStrLn $ Pr.ppShow code
-    asm <- asmCode code
-    emitLabelHeader label
-    mapM_ emitAsm asm
-  emitLabelHeader "exit"
-  emitOp $ "ret void"
-  liftIO $ putStrLn "}"
+  liftIO $ putStrLn $ Pr.ppShow env
+  forM_ (codeEnv env) $ \(label, codeListRef) -> do
+    liftIO $ putStrLn $ "define <type> @" ++ label ++ "() {"
+    codeList <- liftIO $ readIORef codeListRef
+    forM_ codeList $ \(label, codeRef) -> do
+      code <- liftIO $ readIORef codeRef
+      asm <- asmCode code
+      emitLabelHeader label
+      mapM_ emitAsm asm
+    emitLabelHeader "exit"
+    emitOp $ "ret void"
+    liftIO $ putStrLn "}"
 
 emitAsm :: Asm -> WithEnv ()
 emitAsm (AsmLet i op) = emitAsmLet i op
@@ -53,7 +54,7 @@ emitAsm (AsmBranch label) = do
   emitOp $ "br label %" ++ label
 emitAsm (AsmIndirectBranch label poss) = do
   emitOp $ "indirectbr label %" ++ label ++ ", [" ++ showPossDest poss ++ "]"
-emitAsm (AsmSwitch i defaultBranch branchList) = do
+emitAsm (AsmSwitch i (_, defaultBranch) branchList) = do
   t <- lookupLowTypeEnv' i
   emitOp $
     "switch " ++

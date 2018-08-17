@@ -15,13 +15,13 @@ import qualified Text.Show.Pretty           as Pr
 
 import           Debug.Trace
 
-virtualV :: Value -> WithEnv UData
+virtualV :: Value -> WithEnv Data
 virtualV (Value (_ :< ValueVar x)) = do
-  return $ Fix (DataPointer x)
+  return $ DataPointer x
 virtualV (Value (VMeta {vtype = ValueTypeNode node _} :< ValueNodeApp s vs)) = do
   vs' <- mapM (virtualV . Value) vs
   i <- getConstructorNumber node s
-  return $ Fix $ DataCell s i vs'
+  return $ DataCell s i vs'
 virtualV (Value (_ :< ValueNodeApp _ _)) = do
   lift $ throwE $ "virtualV.ValueNodeApp"
 virtualV (Value (_ :< ValueThunk comp thunkId)) = do
@@ -29,9 +29,12 @@ virtualV (Value (_ :< ValueThunk comp thunkId)) = do
   unthunkIdList <- lookupThunkEnv thunkId
   forM_ unthunkIdList $ \unthunkId -> do
     let label = "thunk" ++ thunkId ++ "unthunk" ++ unthunkId
-    insCodeEnv label asm
-  insCodeEnv ("thunk." ++ thunkId) asm -- just for completeness
-  return $ Fix $ DataLabel $ "thunk." ++ thunkId
+    asmRef <- liftIO $ newIORef asm
+    -- insCodeEnv label asmRef
+    insCodeEnv' label asmRef
+  asmRef <- liftIO $ newIORef asm
+  insCodeEnv' ("thunk." ++ thunkId) asmRef -- just for completeness
+  return $ DataLabel $ "thunk." ++ thunkId
 
 virtualC :: Comp -> WithEnv Code
 virtualC (Comp (_ :< CompLam _ comp)) = do
@@ -39,42 +42,47 @@ virtualC (Comp (_ :< CompLam _ comp)) = do
 virtualC app@(Comp (_ :< CompApp _ _)) = do
   let (cont, xs, vs) = toFunAndArgs app
   ds <- mapM virtualV vs
-  _ :< cont' <- virtualC cont
-  meta <- emptyCodeMeta
-  return $ meta {codeMetaArgs = zip xs ds} :< cont'
+  cont' <- virtualC cont
+  return $ CodeWithArg (zip xs ds) cont'
 virtualC (Comp (_ :< CompRet v)) = do
   ans <- virtualV v
-  -- linkReg <- getLinkRegister
   retReg <- getReturnRegister
-  addMeta $ CodeReturn retReg "exit" ans
+  current <- getScope
+  return $ CodeReturn retReg (current, "exit") ans
 virtualC (Comp (_ :< CompBind s comp1 comp2)) = do
   operation1 <- virtualC (Comp comp1)
   operation2 <- virtualC (Comp comp2)
   traceLet s operation1 operation2
 virtualC (Comp (_ :< CompUnthunk v unthunkId)) = do
   operand <- virtualV v
+  current <- getScope
   case operand of
-    Fix (DataPointer x) -> do
+    DataPointer x -> do
       liftIO $ putStrLn $ "looking for thunk by unthunkId: " ++ show unthunkId
       thunkIdList <- lookupThunkEnv unthunkId
       liftIO $ putStrLn $ "found: " ++ show thunkIdList
       case thunkIdList of
         [] -> do
-          addMeta $ CodeRecursiveJump x
+          return $ CodeRecursiveJump (x, x)
         [thunkId] -> do
           let label = "thunk" ++ thunkId ++ "unthunk" ++ unthunkId
-          addMeta $ CodeJump label
+          return $ CodeJump (current, label)
         _ -> do
           let possibleJumps = map (\x -> "thunk" ++ x) thunkIdList
-          addMeta $ CodeIndirectJump x unthunkId possibleJumps -- indirect branch
-    Fix (DataLabel thunkId) -> do
+          return $ CodeIndirectJump x unthunkId possibleJumps -- indirect branch
+    DataLabel thunkId -> do
       let label = "thunk" ++ thunkId ++ "unthunk" ++ unthunkId
-      addMeta $ CodeJump label -- direct branch
+      return $ CodeJump (current, label) -- direct branch
     _ -> lift $ throwE "virtualC.CompUnthunk"
 virtualC (Comp (_ :< CompMu s comp)) = do
+  current <- getScope
+  setScope s
+  insEmptyCodeEnv s
   asm <- (virtualC $ Comp comp)
-  insCodeEnv s asm
-  addMeta $ CodeJump s
+  asm' <- liftIO $ newIORef asm
+  insCodeEnv s s asm'
+  setScope current
+  return $ CodeJump (s, s)
 virtualC (Comp (_ :< CompCase vs tree)) = do
   fooList <-
     forM vs $ \v -> do
@@ -92,14 +100,13 @@ virtualDecision asmList (DecisionLeaf ois preComp) = do
   let varList = map (fst . snd) ois
   asmList' <-
     forM (zip asmList ois) $ \(x, ((index, _), _)) -> do
-      return $ Fix $ DataElemAtIndex x index
+      return $ DataElemAtIndex x index
   body <- virtualC $ Comp preComp
   letSeq varList asmList' body
 virtualDecision (x:vs) (DecisionSwitch (o, _) cs mdefault) = do
   jumpList <- virtualCase (x : vs) cs
   defaultJump <- virtualDefaultCase (x : vs) mdefault
   makeBranch x o jumpList defaultJump
---  let selector = Fix $ DataElemAtIndex (Fix $ DataPointer x) o
 virtualDecision _ (DecisionSwap _ _) = undefined
 virtualDecision [] t =
   lift $ throwE $ "virtualDecision. Note: \n" ++ Pr.ppShow t
@@ -112,7 +119,8 @@ virtualCase _ [] = return []
 virtualCase vs (((cons, num), tree):cs) = do
   code <- virtualDecision vs tree
   label <- newNameWith cons
-  insCodeEnv label code
+  codeRef <- liftIO $ newIORef code
+  insCodeEnv' label codeRef
   jumpList <- virtualCase vs cs
   return $ (cons, num, label) : jumpList
 
@@ -122,14 +130,14 @@ virtualDefaultCase ::
   -> WithEnv (Maybe (Maybe Identifier, Identifier))
 virtualDefaultCase _ Nothing = return Nothing
 virtualDefaultCase vs (Just (Nothing, tree)) = do
-  code <- virtualDecision vs tree
+  codeRef <- virtualDecision vs tree >>= liftIO . newIORef
   label <- newNameWith "default"
-  insCodeEnv label code
+  insCodeEnv' label codeRef
   return $ Just (Nothing, label)
 virtualDefaultCase vs (Just (Just x, tree)) = do
-  code <- virtualDecision vs tree
+  codeRef <- virtualDecision vs tree >>= liftIO . newIORef
   label <- newNameWith $ "default-" ++ x
-  insCodeEnv label code
+  insCodeEnv' label codeRef
   return $ Just (Just x, label)
 
 type JumpList = [(Identifier, Identifier)]
@@ -142,121 +150,118 @@ makeBranch ::
   -> WithEnv Code
 makeBranch _ _ [] Nothing = error "empty branch"
 makeBranch y o js@((_, _, target):_) Nothing = do
+  current <- getScope
   if null o
-    then addMeta $ (CodeSwitch y target js)
+    then return $ (CodeSwitch y (current, target) js)
     else do
-      let tmp = Fix $ DataElemAtIndex y o
+      let tmp = DataElemAtIndex y o
       name <- newName
-      tmp2 <- addMeta $ (CodeSwitch name target js)
-      addMeta $ CodeLet name tmp tmp2
+      let tmp2 = (CodeSwitch name (current, target) js)
+      return $ CodeLet name tmp tmp2
 makeBranch y o js (Just (Just defaultName, label)) = do
+  current <- getScope
   if null o
-    then addMeta $ (CodeSwitch y label js)
+    then return $ (CodeSwitch y (current, label) js)
     else do
-      tmp <- addMeta $ CodeSwitch defaultName label js
-      addMeta $ CodeLet defaultName (Fix $ DataElemAtIndex y o) tmp
+      let tmp = CodeSwitch defaultName (current, label) js
+      return $ CodeLet defaultName (DataElemAtIndex y o) tmp
 makeBranch y o js (Just (Nothing, label)) = do
+  current <- getScope
   if null o
-    then addMeta $ (CodeSwitch y label js)
+    then return $ (CodeSwitch y (current, label) js)
     else do
-      let tmp = Fix $ DataElemAtIndex y o
+      let tmp = DataElemAtIndex y o
       name <- newName
-      tmp2 <- addMeta $ (CodeSwitch name label js)
-      addMeta $ CodeLet name tmp tmp2
+      let tmp2 = CodeSwitch name (current, label) js
+      return $ CodeLet name tmp tmp2
 
 traceLet :: String -> Code -> Code -> WithEnv Code
-traceLet s (CodeMeta {codeMetaArgs = xds@(_:_)} :< code) cont = do
-  code' <- addMeta code
-  tmp <- traceLet s code' cont
+traceLet s (CodeReturn _ _ ans) cont = return $ CodeLet s ans cont
+traceLet s (CodeJump label) cont = do
+  appendCode s cont label
+  return $ CodeJump label
+traceLet _ (CodeRecursiveJump _) _ = do
+  undefined
+traceLet s (CodeIndirectJump addrInReg unthunkId poss) cont = do
+  retReg <- getReturnRegister
+  -- cont' <- withStackRestore cont
+  cont' <- return (CodeLet s (DataPointer retReg) cont) >>= liftIO . newIORef
+  linkLabelName <- newNameWith $ "cont-for-" ++ addrInReg
+  insCodeEnv' linkLabelName cont'
+  linkReg <- getLinkRegister
+  let linkLabel = DataLabel linkLabelName
+  current <- getScope
+  forM_ poss $ \thunkId -> do
+    let label = "thunk" ++ thunkId ++ "unthunk" ++ unthunkId -- unthunkId
+    codeRef <- lookupCodeEnv' current label
+    code <- liftIO $ readIORef codeRef
+    code' <- updateReturnAddr (current, linkLabelName) code
+    updateCodeEnv current label code'
+  let jumpToAddr = CodeIndirectJump addrInReg unthunkId poss
+  return $ CodeLetLink linkReg linkLabel jumpToAddr
+traceLet s (switcher@(CodeSwitch _ defaultBranch@(current, _) branchList)) cont = do
+  appendCode s cont defaultBranch
+  forM_ branchList $ \(_, _, label) -> appendCode s cont (current, label)
+  return $ switcher
+traceLet s (CodeLet k o1 o2) cont = do
+  c <- traceLet s o2 cont
+  return $ CodeLet k o1 c
+traceLet s (CodeLetLink linkReg linkLabel body) cont = do
+  c <- traceLet s body cont
+  return $ CodeLetLink linkReg linkLabel c
+traceLet s (CodeWithArg xds code) cont = do
+  tmp <- traceLet s code cont
   case tmp of
-    _ :< CodeLetLink _ _ _ -> do
+    CodeLetLink _ _ _ -> do
       let (xs, ds) = unzip xds
       tmp' <- letSeq xs ds tmp
-      withStackSave tmp'
+      -- withStackSave tmp'
+      return $ CodeCall xds tmp
     _ -> do
       let (xs, ds) = unzip xds
       letSeq xs ds tmp
-traceLet s (_ :< (CodeReturn _ _ ans)) cont = addMeta $ CodeLet s ans cont
-traceLet s (_ :< (CodeJump label)) cont = do
-  appendCode s cont label
-  addMeta $ CodeJump label
-traceLet _ (_ :< (CodeRecursiveJump _)) _ = do
-  undefined
-traceLet s (_ :< (CodeIndirectJump addrInReg unthunkId poss)) cont = do
-  retReg <- getReturnRegister
-  cont' <- withStackRestore cont
-  cont'' <- addMeta $ CodeLet s (Fix $ DataPointer retReg) cont'
-  linkLabelName <- newNameWith $ "cont-for-" ++ addrInReg
-  insCodeEnv linkLabelName cont''
-  linkReg <- getLinkRegister
-  let linkLabel = Fix $ DataLabel linkLabelName
-  forM_ poss $ \thunkId -> do
-    let label = "thunk" ++ thunkId ++ "unthunk" ++ unthunkId -- unthunkId
-    codeRef <- lookupFunEnv label
-    code <- liftIO $ readIORef codeRef
-    code' <- updateReturnAddr linkLabelName code
-    updateCodeEnv label code'
-  jumpToAddr <- addMeta $ CodeIndirectJump addrInReg unthunkId poss
-  addMeta $ CodeLetLink linkReg linkLabel jumpToAddr
-traceLet s (_ :< (switcher@(CodeSwitch _ defaultBranch branchList))) cont = do
-  appendCode s cont defaultBranch
-  forM_ branchList $ \(_, _, label) -> appendCode s cont label
-  addMeta $ switcher
-traceLet s (_ :< (CodeLet k o1 o2)) cont = do
-  c <- traceLet s o2 cont
-  addMeta $ CodeLet k o1 c
-traceLet s (_ :< (CodeLetLink linkReg linkLabel body)) cont = do
-  c <- traceLet s body cont
-  addMeta $ CodeLetLink linkReg linkLabel c
-traceLet _ (_ :< (CodeStackSave _ _)) _ =
-  error "stacksave at the tail of a term"
-traceLet _ (_ :< (CodeStackRestore _ _)) _ =
-  error "stackrestore at the tail of a term"
 
-appendCode :: Identifier -> Code -> Identifier -> WithEnv ()
-appendCode s cont key = do
-  codeRef <- lookupFunEnv key
+appendCode :: Identifier -> Code -> (Identifier, Identifier) -> WithEnv ()
+appendCode s cont (scope, key) = do
+  codeRef <- lookupCodeEnv' scope key -- key is the target of jump
   code <- liftIO $ readIORef codeRef
   code' <- traceLet s code cont
   liftIO $ writeIORef codeRef code'
 
-updateReturnAddr :: Identifier -> Code -> WithEnv Code
-updateReturnAddr label (_ :< (CodeReturn retReg _ ans)) =
-  addMeta $ CodeReturn retReg label ans
-updateReturnAddr label (_ :< (CodeLet x d cont)) = do
+updateReturnAddr :: Label -> Code -> WithEnv Code
+updateReturnAddr label (CodeReturn retReg _ ans) =
+  return $ CodeReturn retReg label ans
+updateReturnAddr label (CodeLet x d cont) = do
   cont' <- updateReturnAddr label cont
-  addMeta $ CodeLet x d cont'
-updateReturnAddr label (_ :< (CodeLetLink x d cont)) = do
+  return $ CodeLet x d cont'
+updateReturnAddr label (CodeLetLink x d cont) = do
   cont' <- updateReturnAddr label cont
-  addMeta $ CodeLetLink x d cont'
-updateReturnAddr label (_ :< (CodeSwitch x defaultBranch branchList)) = do
+  return $ CodeLetLink x d cont'
+updateReturnAddr label (CodeSwitch x defaultBranch@(scope, _) branchList) = do
   updateReturnAddr' label defaultBranch
-  forM_ branchList $ \(_, _, br) -> updateReturnAddr' label br
-  addMeta $ (CodeSwitch x defaultBranch branchList)
-updateReturnAddr label (_ :< (CodeJump dest)) = do
+  forM_ branchList $ \(_, _, br) -> updateReturnAddr' label (scope, br)
+  return $ (CodeSwitch x defaultBranch branchList)
+updateReturnAddr label (CodeJump dest) = do
   updateReturnAddr' label dest
-  addMeta $ CodeJump dest
-updateReturnAddr label (_ :< (CodeIndirectJump addrInReg unthunkId poss)) = do
+  return $ CodeJump dest
+updateReturnAddr label (CodeIndirectJump addrInReg unthunkId poss) = do
+  current <- getScope
   forM_ poss $ \thunkId -> do
     let codeLabel = "thunk" ++ thunkId ++ "unthunk" ++ unthunkId -- unthunkId
-    codeRef <- lookupFunEnv codeLabel
+    codeRef <- lookupCodeEnv' current codeLabel
     code <- liftIO $ readIORef codeRef
     code' <- updateReturnAddr label code
-    updateCodeEnv codeLabel code'
-  addMeta $ CodeIndirectJump addrInReg unthunkId poss
-updateReturnAddr label (_ :< (CodeRecursiveJump x)) = do
+    updateCodeEnv current codeLabel code'
+  return $ CodeIndirectJump addrInReg unthunkId poss
+updateReturnAddr label (CodeRecursiveJump x) = do
   updateReturnAddr' label x
-  addMeta $ CodeRecursiveJump x
-updateReturnAddr _ (_ :< (CodeStackSave _ _)) = do
-  error "stacksave at the tail of a term"
-updateReturnAddr _ (_ :< (CodeStackRestore _ _)) = do
-  error "stacksave at the tail of a term"
+  return $ CodeRecursiveJump x
 
-updateReturnAddr' :: Identifier -> Identifier -> WithEnv ()
-updateReturnAddr' label key = do
-  codeRef <- lookupFunEnv key
+updateReturnAddr' :: Label -> Label -> WithEnv ()
+updateReturnAddr' (scope, label) (scopek, key) = do
+  codeRef <- lookupCodeEnv' scopek key
   code <- liftIO $ readIORef codeRef
-  code' <- updateReturnAddr label code
+  code' <- updateReturnAddr (scope, label) code
   liftIO $ writeIORef codeRef code'
 
 forallArgs :: CompType -> [Identifier]
@@ -268,13 +273,3 @@ toFunAndArgs (Comp (_ :< CompApp e@((CMeta {ctype = CompTypeForall (i, _) _} :< 
   let (fun, xs, args) = toFunAndArgs (Comp e)
   (fun, xs ++ [i], args ++ [v])
 toFunAndArgs c = (c, [], [])
-
-withStackSave :: Code -> WithEnv Code
-withStackSave code = do
-  stackReg <- getStackRegister
-  addMeta $ CodeStackSave stackReg code
-
-withStackRestore :: Code -> WithEnv Code
-withStackRestore code = do
-  stackReg <- getStackRegister
-  addMeta $ CodeStackRestore stackReg code

@@ -168,7 +168,7 @@ polarizeTypeEnv [] = return ()
 polarizeTypeEnv ((i, wt):ts) = do
   wt' <- polarizeType wt
   case wt' of
-    TypeCompType ct  -> insCTEnv i ct
+    TypeCompType _   -> return ()
     TypeValueType vt -> insVTEnv i vt
   polarizeTypeEnv ts
 

@@ -16,7 +16,6 @@ import           Data
 import           Emit
 import           Infer
 import           Lift
-import           Liveness
 import           Macro
 import           Parse
 import           Polarize
@@ -74,22 +73,23 @@ load' (a:as) = do
     TermComp c -> do
       liftedC <- liftC c
       initializeLinkRegister
-      initializeStackRegister
       initializeReturnRegister
-      c' <- virtualC liftedC
       i <- newNameWith "main"
-      insCodeEnv i c'
-      annotCodeEnv
+      setScope i
+      insEmptyCodeEnv i
+      c' <- virtualC liftedC >>= liftIO . newIORef
+      insCodeEnv' i c'
       -- env <- get
       -- mainCode <- lookupFunEnv i >>= liftIO . readIORef
       -- liftIO $ putStrLn "===========FUNENV======"
       -- liftIO $ putStrLn $ Pr.ppShow $ funEnv env
       -- liftIO $ putStrLn "starting liveness analysis"
       -- liftIO $ putStrLn $ "mainCode : \n" ++ Pr.ppShow mainCode
-      livenessAnalysis
       -- liftIO $ putStrLn $ "c'' : \n" ++ Pr.ppShow mainCode'
       -- regAlloc 32
       -- updateCodeEnv i mainCode'
       -- asmEmit
-      emit
+      -- emit
+      env <- get
+      liftIO $ putStrLn $ Pr.ppShow (codeEnv env)
   load' as
