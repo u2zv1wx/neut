@@ -10,20 +10,16 @@
   ()
   (nat))
 
-(value succ
-  ((_ (nat)))
+(value succ ((_ (nat)))
   (nat))
 
-(value bool
-  ()
+(value bool ()
   universe)
 
-(value true
-  ()
+(value true ()
   (bool))
 
-(value false
-  ()
+(value false ()
   (bool))
 
 (notation (begin e)

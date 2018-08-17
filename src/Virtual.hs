@@ -67,8 +67,7 @@ virtualC (Comp (_ :< CompUnthunk v unthunkId)) = do
           let label = "thunk" ++ thunkId ++ "unthunk" ++ unthunkId
           return $ CodeJump (current, label)
         _ -> do
-          let possibleJumps = map (\x -> "thunk" ++ x) thunkIdList
-          return $ CodeIndirectJump x unthunkId possibleJumps -- indirect branch
+          return $ CodeIndirectJump (current, x) unthunkId thunkIdList -- indirect branch
     DataLabel thunkId -> do
       let label = "thunk" ++ thunkId ++ "unthunk" ++ unthunkId
       return $ CodeJump (current, label) -- direct branch
@@ -81,7 +80,7 @@ virtualC (Comp (_ :< CompMu s comp)) = do
   asm' <- liftIO $ newIORef asm
   insCodeEnv s s asm'
   setScope current
-  return $ CodeJump (s, s)
+  return $ CodeRecursiveJump (s, s)
 virtualC (Comp (_ :< CompCase vs tree)) = do
   fooList <-
     forM vs $ \v -> do
@@ -179,25 +178,14 @@ traceLet s (CodeReturn _ _ ans) cont = return $ CodeLet s ans cont
 traceLet s (CodeJump label) cont = do
   appendCode s cont label
   return $ CodeJump label
-traceLet _ (CodeRecursiveJump _) _ = do
-  undefined
+traceLet s c@(CodeRecursiveJump _) cont = do
+  traceLet s (CodeWithArg [] c) cont
 traceLet s (CodeIndirectJump addrInReg unthunkId poss) cont = do
-  retReg <- getReturnRegister
-  -- cont' <- withStackRestore cont
-  cont' <- return (CodeLet s (DataPointer retReg) cont) >>= liftIO . newIORef
-  linkLabelName <- newNameWith $ "cont-for-" ++ addrInReg
-  insCurrentCodeEnv linkLabelName cont'
-  linkReg <- getLinkRegister
-  let linkLabel = DataLabel linkLabelName
-  current <- getScope
   forM_ poss $ \thunkId -> do
     let label = "thunk" ++ thunkId ++ "unthunk" ++ unthunkId -- unthunkId
-    codeRef <- lookupCodeEnv2 current label
-    code <- liftIO $ readIORef codeRef
-    code' <- updateReturnAddr (current, linkLabelName) code
-    updateCodeEnv current label code'
-  let jumpToAddr = CodeIndirectJump addrInReg unthunkId poss
-  return $ CodeLetLink linkReg linkLabel jumpToAddr
+    current <- getScope
+    appendCode s cont (current, label)
+  return $ CodeIndirectJump addrInReg unthunkId poss
 traceLet s (switcher@(CodeSwitch _ defaultBranch@(current, _) branchList)) cont = do
   appendCode s cont defaultBranch
   forM_ branchList $ \(_, _, label) -> appendCode s cont (current, label)
@@ -208,59 +196,22 @@ traceLet s (CodeLet k o1 o2) cont = do
 traceLet s (CodeLetLink linkReg linkLabel body) cont = do
   c <- traceLet s body cont
   return $ CodeLetLink linkReg linkLabel c
-traceLet s (CodeWithArg xds code) cont = do
-  tmp <- traceLet s code cont
-  case tmp of
-    CodeLetLink _ _ _ -> do
-      let (xs, ds) = unzip xds
-      tmp' <- letSeq xs ds tmp
-      -- withStackSave tmp'
-      return $ CodeCall xds tmp
+traceLet s (CodeWithArg xds code) cont =
+  case code of
+    CodeRecursiveJump (_, name) -> return $ CodeCall s name xds cont
     _ -> do
+      tmp <- traceLet s code cont
       let (xs, ds) = unzip xds
       letSeq xs ds tmp
+traceLet s (CodeCall reg name xds cont1) cont2 = do
+  tmp <- traceLet s cont1 cont2
+  return $ CodeCall reg name xds tmp
 
 appendCode :: Identifier -> Code -> (Identifier, Identifier) -> WithEnv ()
 appendCode s cont (scope, key) = do
   codeRef <- lookupCodeEnv2 scope key -- key is the target of jump
   code <- liftIO $ readIORef codeRef
   code' <- traceLet s code cont
-  liftIO $ writeIORef codeRef code'
-
-updateReturnAddr :: Label -> Code -> WithEnv Code
-updateReturnAddr label (CodeReturn retReg _ ans) =
-  return $ CodeReturn retReg label ans
-updateReturnAddr label (CodeLet x d cont) = do
-  cont' <- updateReturnAddr label cont
-  return $ CodeLet x d cont'
-updateReturnAddr label (CodeLetLink x d cont) = do
-  cont' <- updateReturnAddr label cont
-  return $ CodeLetLink x d cont'
-updateReturnAddr label (CodeSwitch x defaultBranch@(scope, _) branchList) = do
-  updateReturnAddr' label defaultBranch
-  forM_ branchList $ \(_, _, br) -> updateReturnAddr' label (scope, br)
-  return $ (CodeSwitch x defaultBranch branchList)
-updateReturnAddr label (CodeJump dest) = do
-  updateReturnAddr' label dest
-  return $ CodeJump dest
-updateReturnAddr label (CodeIndirectJump addrInReg unthunkId poss) = do
-  current <- getScope
-  forM_ poss $ \thunkId -> do
-    let codeLabel = "thunk" ++ thunkId ++ "unthunk" ++ unthunkId -- unthunkId
-    codeRef <- lookupCodeEnv2 current codeLabel
-    code <- liftIO $ readIORef codeRef
-    code' <- updateReturnAddr label code
-    updateCodeEnv current codeLabel code'
-  return $ CodeIndirectJump addrInReg unthunkId poss
-updateReturnAddr label (CodeRecursiveJump x) = do
-  updateReturnAddr' label x
-  return $ CodeRecursiveJump x
-
-updateReturnAddr' :: Label -> Label -> WithEnv ()
-updateReturnAddr' (scope, label) (scopek, key) = do
-  codeRef <- lookupCodeEnv2 scopek key
-  code <- liftIO $ readIORef codeRef
-  code' <- updateReturnAddr (scope, label) code
   liftIO $ writeIORef codeRef code'
 
 forallArgs :: CompType -> [Identifier]

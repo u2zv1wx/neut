@@ -279,9 +279,9 @@ type Branch = (Identifier, Int, Identifier)
 
 type Address = Identifier
 
-type Function = Identifier
+type FunctionName = Identifier
 
-type Label = (Function, Identifier)
+type Label = (FunctionName, Identifier)
 
 type DefaultBranch = Label
 
@@ -299,11 +299,13 @@ data Code
                DefaultBranch
                [Branch]
   | CodeJump Label -- unthunk (the target label of the jump address)
-  | CodeIndirectJump Identifier -- the name of register
+  | CodeIndirectJump Label -- the name of register
                      Identifier -- the id of corresponding unthunk
                      [Identifier] -- possible jump
   | CodeRecursiveJump Label -- jump by (unthunk x) in (mu x (...))
-  | CodeCall [(Identifier, Data)]
+  | CodeCall Identifier -- the register that stores the result of a function call
+             Identifier -- the name of the function
+             [(Identifier, Data)] -- arguments
              Code
   | CodeWithArg [(Identifier, Data)]
                 Code

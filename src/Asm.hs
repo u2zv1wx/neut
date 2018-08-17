@@ -34,7 +34,7 @@ asmCode (CodeSwitch basePointer defaultBranch branchList) = do
     , AsmSwitch headData defaultBranch branchList
     ]
 asmCode (CodeJump (_, label)) = return [AsmBranch label]
-asmCode (CodeIndirectJump x unthunkId poss) = do
+asmCode (CodeIndirectJump (_, x) unthunkId poss) = do
   labelList <-
     forM poss $ \thunkId -> do
       return $ "thunk" ++ thunkId ++ "unthunk" ++ unthunkId
