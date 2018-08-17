@@ -30,8 +30,8 @@ virtualV (Value (_ :< ValueThunk comp thunkId)) = do
   forM_ unthunkIdList $ \unthunkId -> do
     let label = "thunk" ++ thunkId ++ "unthunk" ++ unthunkId
     insCodeEnv label asm
-  insCodeEnv ("thunk" ++ thunkId) asm -- just for completeness
-  return $ Fix $ DataLabel $ "thunk" ++ thunkId
+  insCodeEnv ("thunk." ++ thunkId) asm -- just for completeness
+  return $ Fix $ DataLabel $ "thunk." ++ thunkId
 
 virtualC :: Comp -> WithEnv Code
 virtualC (Comp (_ :< CompLam _ comp)) = do

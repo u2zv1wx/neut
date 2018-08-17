@@ -257,6 +257,7 @@ type Index = [Int]
 
 data LowType
   = LowTypeNull
+  | LowTypeInt8
   | LowTypeInt32
   | LowTypeStruct [LowType]
   | LowTypePointer LowType
@@ -271,6 +272,7 @@ data DataF a
   | DataLabel Identifier -- the address of quoted code
   | DataElemAtIndex Identifier -- subvalue of an inductive value
                     Index
+  | DataInt32 Int
 
 deriving instance Show a => Show (DataF a)
 
@@ -370,11 +372,9 @@ data AsmData
 data Asm
   = AsmLet Identifier
            AsmOperation
-           Asm
-  | AsmStore LowType
-             AsmData
-             Identifier
-             Asm
+  | AsmStore LowType -- the type of source
+             AsmData -- source data
+             Identifier -- destination register
   | AsmBranch Identifier
   | AsmIndirectBranch Identifier
                       [Identifier]
@@ -385,11 +385,11 @@ data Asm
 
 data AsmOperation
   = AsmAlloc LowType
-  | AsmLoad LowType
-            Identifier
-  | AsmGetElemPointer LowType
-                      Identifier
-                      Index
+  | AsmLoad LowType -- the type of source register
+            Identifier -- source register
+  | AsmGetElemPointer LowType -- the type of base register
+                      Identifier -- base register
+                      Index -- (semantically sane) index
   | AsmStackSave
   | AsmStackRestore
   deriving (Show)

@@ -24,29 +24,31 @@ emit = do
   forM_ (funEnv env) $ \(label, codeRef) -> do
     code <- liftIO $ readIORef codeRef
     asm <- asmCode code
+    -- liftIO $ putStrLn $ Pr.ppShow asm
     emitLabelHeader label
-    emitAsm asm
+    mapM_ emitAsm asm
   emitLabelHeader "exit"
   emitOp $ "ret void"
   liftIO $ putStrLn "}"
 
 emitAsm :: Asm -> WithEnv ()
-emitAsm (AsmLet i op cont) = emitAsmLet i op cont
-emitAsm (AsmStore t (AsmDataRegister item) dest cont) = do
+emitAsm (AsmLet i op) = emitAsmLet i op
+emitAsm (AsmStore t (AsmDataRegister item) dest) = do
   emitOp $
     "store " ++
     showType t ++ " %" ++ item ++ ", " ++ showType t ++ "* %" ++ dest
-  emitAsm cont
-emitAsm (AsmStore t (AsmDataLabel item) dest cont) = do
+emitAsm (AsmStore t (AsmDataLabel item) dest)
+  -- %sya.178 = alloca i8*
+  -- store i8* blockaddress(@main, %thunk.119), i8** %sya.178
+ = do
   emitOp $
     "store " ++
-    showType t ++ " %" ++ item ++ ", " ++ showType t ++ "* %" ++ dest
-  emitAsm cont
-emitAsm (AsmStore t (AsmDataInt i) dest cont) = do
+    showType t ++
+    " blockaddress(@main, %" ++ item ++ "), " ++ showType t ++ "* %" ++ dest
+emitAsm (AsmStore t (AsmDataInt i) dest) = do
   emitOp $
     "store " ++
     showType t ++ " " ++ show i ++ ", " ++ showType t ++ "* %" ++ dest
-  emitAsm cont
 emitAsm (AsmBranch label) = do
   emitOp $ "br label %" ++ label
 emitAsm (AsmIndirectBranch label poss) = do
@@ -61,29 +63,25 @@ emitAsm (AsmSwitch i defaultBranch branchList) = do
     ", label %" ++ defaultBranch ++ " [" ++ showBranchList branchList ++ "]"
 
 --    "switch i32 " ++
-emitAsmLet :: Identifier -> AsmOperation -> Asm -> WithEnv ()
-emitAsmLet i (AsmAlloc t) cont = do
+emitAsmLet :: Identifier -> AsmOperation -> WithEnv ()
+emitAsmLet i (AsmAlloc t) = do
   emitOp $ "%" ++ i ++ " = alloca " ++ showType t
-  emitAsm cont
-emitAsmLet i (AsmLoad t source) cont = do
+emitAsmLet i (AsmLoad t source) = do
+  let t' = traceType [0] t
   emitOp $
     "%" ++
-    i ++ " = load " ++ showType t ++ ", " ++ showType t ++ "* %" ++ source
-  emitAsm cont
-emitAsmLet i (AsmGetElemPointer t base index) cont = do
+    i ++ " = load " ++ showType t' ++ ", " ++ showType t ++ " %" ++ source
+emitAsmLet i (AsmGetElemPointer t base index) = do
+  let t' = traceType [0] t
   emitOp $
     "%" ++
     i ++
     " = getelementptr " ++
-    showType t ++
-    ", " ++ showType t ++ "* %" ++ base ++ ", i32 0, " ++ showIndex index
-  emitAsm cont
-emitAsmLet i AsmStackSave cont = do
+    showType t' ++ ", " ++ showType t ++ " %" ++ base ++ ", " ++ showIndex index
+emitAsmLet i AsmStackSave = do
   emitOp $ "%" ++ i ++ " = call i8* @llvm.stacksave()"
-  emitAsm cont
-emitAsmLet i AsmStackRestore cont = do
+emitAsmLet i AsmStackRestore = do
   emitOp $ "call void @llvm.stackrestore(i8* " ++ "%" ++ i ++ ")"
-  emitAsm cont
 
 showPossDest :: [Identifier] -> String
 showPossDest []     = ""
@@ -92,11 +90,12 @@ showPossDest (d:ds) = "label " ++ show d ++ ", " ++ showPossDest ds
 
 showType :: LowType -> String
 showType LowTypeInt32 = "i32"
+showType LowTypeInt8 = "i8"
 showType LowTypeNull = "null"
 showType (LowTypeStruct (ts)) = do
   let tmp = showTypeList ts
   "{" ++ tmp ++ "}"
-showType LowTypeLabel = "label"
+showType LowTypeLabel = "i8"
 showType (LowTypePointer t) = do
   let s = showType t
   s ++ "*"
