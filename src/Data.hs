@@ -362,12 +362,10 @@ data Env = Env
   , argEnv         :: [(IdentOrHole, IdentOrHole)] -- equivalence of arguments of forall
   , thunkEnv       :: [(Identifier, Identifier)]
   , codeEnv        :: [(Identifier, IORef [(Identifier, IORef Code)])]
-  -- , codeEnv         :: [(Label, IORef Code)]
   , lowTypeEnv     :: [(Identifier, LowType)]
   , didUpdate      :: Bool -- used in live analysis to detect the end of the process
   , linkRegister   :: Maybe Identifier
   , returnRegister :: Maybe Identifier
-  , returnAddr     :: [Identifier]
   , scope          :: Identifier -- used in Virtual to determine the name of current function
   } deriving (Show)
 
@@ -405,7 +403,6 @@ initialEnv =
     , didUpdate = False
     , linkRegister = Nothing
     , returnRegister = Nothing
-    , returnAddr = ["exit"]
     , scope = ""
     }
 
@@ -642,16 +639,6 @@ getReturnRegister = do
   case returnRegister e of
     Just s  -> return s
     Nothing -> lift $ throwE "the name of link register is not defined"
-
-getReturnAddr :: WithEnv Identifier
-getReturnAddr = do
-  e <- get
-  modify (\e -> e {returnAddr = tail (returnAddr e)})
-  return $ head $ returnAddr e
-
-setReturnAddr :: Identifier -> WithEnv ()
-setReturnAddr addr = do
-  modify (\e -> e {returnAddr = addr : returnAddr e})
 
 setScope :: Identifier -> WithEnv ()
 setScope i = do
