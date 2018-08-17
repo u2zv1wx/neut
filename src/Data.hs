@@ -482,14 +482,19 @@ lookupNameEnv' s = do
     Nothing -> newNameWith s
 
 lookupCodeEnv :: Identifier -> WithEnv (IORef [(Identifier, IORef Code)])
-lookupCodeEnv label = do
-  m <- gets (lookup label . codeEnv)
+lookupCodeEnv scope = do
+  m <- gets (lookup scope . codeEnv)
   case m of
-    Nothing     -> lift $ throwE $ "no such label: " ++ show label
+    Nothing     -> lift $ throwE $ "no such scope: " ++ show scope
     Just envRef -> return envRef
 
-lookupCodeEnv' :: Identifier -> Identifier -> WithEnv (IORef Code)
-lookupCodeEnv' scope ident = do
+lookupCurrentCodeEnv :: WithEnv (IORef [(Identifier, IORef Code)])
+lookupCurrentCodeEnv = do
+  scope <- getScope
+  lookupCodeEnv scope
+
+lookupCodeEnv2 :: Identifier -> Identifier -> WithEnv (IORef Code)
+lookupCodeEnv2 scope ident = do
   scopeEnvRef <- lookupCodeEnv scope
   scopeEnv <- liftIO $ readIORef scopeEnvRef
   case lookup ident scopeEnv of
@@ -504,18 +509,18 @@ insCodeEnv scope ident codeRef = do
   scopeEnv <- liftIO $ readIORef scopeEnvRef
   liftIO $ writeIORef scopeEnvRef ((ident, codeRef) : scopeEnv)
 
-insCodeEnv' :: Identifier -> IORef Code -> WithEnv ()
-insCodeEnv' ident codeRef = do
+insCurrentCodeEnv :: Identifier -> IORef Code -> WithEnv ()
+insCurrentCodeEnv ident codeRef = do
   scope <- getScope
   insCodeEnv scope ident codeRef
 
 updateCodeEnv :: Identifier -> Identifier -> Code -> WithEnv ()
 updateCodeEnv scope label code = do
-  codeRef <- lookupCodeEnv' scope label
+  codeRef <- lookupCodeEnv2 scope label
   liftIO $ writeIORef codeRef code
 
-updateCodeEnv' :: Identifier -> Code -> WithEnv ()
-updateCodeEnv' ident code = do
+updateCurrentCodeEnv :: Identifier -> Code -> WithEnv ()
+updateCurrentCodeEnv ident code = do
   scope <- getScope
   updateCodeEnv scope ident code
 

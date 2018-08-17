@@ -78,7 +78,7 @@ load' (a:as) = do
       setScope i
       insEmptyCodeEnv i
       c' <- virtualC liftedC >>= liftIO . newIORef
-      insCodeEnv' i c'
+      insCurrentCodeEnv i c'
       -- env <- get
       -- mainCode <- lookupFunEnv i >>= liftIO . readIORef
       -- liftIO $ putStrLn "===========FUNENV======"
