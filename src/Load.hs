@@ -89,7 +89,7 @@ load' (a:as) = do
       -- regAlloc 32
       -- updateCodeEnv i mainCode'
       -- asmEmit
-      -- emit
-      env <- get
-      liftIO $ putStrLn $ Pr.ppShow (codeEnv env)
+      emit
+      -- env <- get
+      -- liftIO $ putStrLn $ Pr.ppShow (codeEnv env)
   load' as

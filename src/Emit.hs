@@ -19,7 +19,6 @@ import           Debug.Trace
 emit :: WithEnv ()
 emit = do
   env <- get
-  liftIO $ putStrLn $ Pr.ppShow env
   forM_ (codeEnv env) $ \(label, codeListRef) -> do
     liftIO $ putStrLn $ "define <type> @" ++ label ++ "() {"
     codeList <- liftIO $ readIORef codeListRef
@@ -33,15 +32,13 @@ emit = do
     liftIO $ putStrLn "}"
 
 emitAsm :: Asm -> WithEnv ()
+emitAsm (AsmReturn (i, t)) = emitOp $ "ret " ++ showType t ++ " " ++ i
 emitAsm (AsmLet i op) = emitAsmLet i op
 emitAsm (AsmStore t (AsmDataRegister item) dest) = do
   emitOp $
     "store " ++
     showType t ++ " %" ++ item ++ ", " ++ showType t ++ "* %" ++ dest
-emitAsm (AsmStore t (AsmDataLabel item) dest)
-  -- %sya.178 = alloca i8*
-  -- store i8* blockaddress(@main, %thunk.119), i8** %sya.178
- = do
+emitAsm (AsmStore t (AsmDataLabel item) dest) = do
   emitOp $
     "store " ++
     showType t ++
@@ -54,7 +51,7 @@ emitAsm (AsmBranch label) = do
   emitOp $ "br label %" ++ label
 emitAsm (AsmIndirectBranch label poss) = do
   emitOp $ "indirectbr label %" ++ label ++ ", [" ++ showPossDest poss ++ "]"
-emitAsm (AsmSwitch i (_, defaultBranch) branchList) = do
+emitAsm (AsmSwitch i defaultBranch branchList) = do
   t <- lookupLowTypeEnv' i
   emitOp $
     "switch " ++
@@ -79,10 +76,11 @@ emitAsmLet i (AsmGetElemPointer t base index) = do
     i ++
     " = getelementptr " ++
     showType t' ++ ", " ++ showType t ++ " %" ++ base ++ ", " ++ showIndex index
-emitAsmLet i AsmStackSave = do
-  emitOp $ "%" ++ i ++ " = call i8* @llvm.stacksave()"
-emitAsmLet i AsmStackRestore = do
-  emitOp $ "call void @llvm.stackrestore(i8* " ++ "%" ++ i ++ ")"
+emitAsmLet i (AsmCall (name, codType) args) = undefined
+emitAsmLet i (AsmBitcast from ident to) = do
+  emitOp $
+    "%" ++
+    i ++ " = bitcast " ++ showType from ++ " " ++ ident ++ " to " ++ showType to
 
 showPossDest :: [Identifier] -> String
 showPossDest []     = ""

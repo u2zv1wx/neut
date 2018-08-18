@@ -16,15 +16,18 @@ import qualified Text.Show.Pretty           as Pr
 import           Debug.Trace
 
 asmCode :: Code -> WithEnv [Asm]
-asmCode (CodeReturn retReg label d) = do
-  asmCode $ CodeLet retReg d (CodeJump label)
+asmCode (CodeReturn d) = do
+  tmp <- newNameWith "tmp"
+  t <- typeOfData d
+  insLowTypeEnv tmp $ LowTypePointer t
+  tmpAsm <- traceAsm tmp d
+  return $ tmpAsm ++ [AsmReturn (tmp, LowTypePointer t)]
 asmCode (CodeLetLink i d cont) = do
   asmCode $ CodeLet i d cont
 asmCode (CodeSwitch basePointer defaultBranch branchList) = do
   baseType <- lookupLowTypeEnv' basePointer
   cursorAt00 <- newNameWith $ basePointer ++ ".cursor0"
   let dataType = traceType [0, 0] baseType
-  -- let typeAt00 = traceType [0, 0] baseType
   headData <- newNameWith $ basePointer ++ ".kind"
   insLowTypeEnv headData $ dataType
   insLowTypeEnv cursorAt00 $ LowTypePointer dataType
@@ -33,13 +36,13 @@ asmCode (CodeSwitch basePointer defaultBranch branchList) = do
     , AsmLet headData (AsmLoad (LowTypePointer dataType) cursorAt00)
     , AsmSwitch headData defaultBranch branchList
     ]
-asmCode (CodeJump (_, label)) = return [AsmBranch label]
-asmCode (CodeIndirectJump (_, x) unthunkId poss) = do
+asmCode (CodeJump label) = return [AsmBranch label]
+asmCode (CodeIndirectJump x unthunkId poss) = do
   labelList <-
     forM poss $ \thunkId -> do
       return $ "thunk" ++ thunkId ++ "unthunk" ++ unthunkId
   return [AsmIndirectBranch x labelList]
-asmCode (CodeRecursiveJump (_, x)) = return [AsmIndirectBranch x [x]]
+asmCode (CodeRecursiveJump x) = return [AsmIndirectBranch x [x]]
 asmCode (CodeLet i d cont) = do
   t <- typeOfData d
   insLowTypeEnv i $ LowTypePointer t
@@ -50,6 +53,10 @@ asmCode (CodeWithArg xds code) = do
   let (xs, ds) = unzip xds
   tmp <- letSeq xs ds code
   asmCode tmp
+asmCode (CodeCall x name args cont)
+  -- bind all arguments using traceasm and then call name
+ = do
+  undefined
 
 traceAsm :: Identifier -> Data -> WithEnv [Asm]
 traceAsm x (DataPointer y) = do

@@ -255,6 +255,7 @@ type ValueInfo = (Identifier, [(Identifier, ValueType)], ValueType)
 
 type Index = [Int]
 
+-- %cell = type { i32, [0 x %cell]* }
 data LowType
   = LowTypeNull
   | LowTypeInt8
@@ -283,12 +284,10 @@ type FunctionName = Identifier
 
 type Label = (FunctionName, Identifier)
 
-type DefaultBranch = Label
+type DefaultBranch = Identifier
 
 data Code
-  = CodeReturn Identifier -- return register
-               Label -- link label
-               Data
+  = CodeReturn Data
   | CodeLet Identifier -- bind (we also use this to represent application)
             Data
             Code
@@ -298,11 +297,11 @@ data Code
   | CodeSwitch Identifier -- branching in pattern-matching (elimination of inductive type)
                DefaultBranch
                [Branch]
-  | CodeJump Label -- unthunk (the target label of the jump address)
-  | CodeIndirectJump Label -- the name of register
+  | CodeJump Identifier -- unthunk (the target label of the jump address)
+  | CodeIndirectJump Identifier -- the name of register
                      Identifier -- the id of corresponding unthunk
                      [Identifier] -- possible jump
-  | CodeRecursiveJump Label -- jump by (unthunk x) in (mu x (...))
+  | CodeRecursiveJump Identifier -- jump by (unthunk x) in (mu x (...))
   | CodeCall Identifier -- the register that stores the result of a function call
              Identifier -- the name of the function
              [(Identifier, Data)] -- arguments
@@ -325,7 +324,8 @@ data AsmData
   deriving (Show)
 
 data Asm
-  = AsmLet Identifier
+  = AsmReturn (Identifier, LowType)
+  | AsmLet Identifier
            AsmOperation
   | AsmStore LowType -- the type of source
              AsmData -- source data
@@ -344,9 +344,12 @@ data AsmOperation
             Identifier -- source register
   | AsmGetElemPointer LowType -- the type of base register
                       Identifier -- base register
-                      Index -- (semantically sane) index
-  | AsmStackSave
-  | AsmStackRestore
+                      Index -- index
+  | AsmCall (Identifier, LowType)
+            [(Identifier, LowType)]
+  | AsmBitcast LowType
+               Identifier
+               LowType
   deriving (Show)
 
 data Env = Env

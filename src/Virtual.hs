@@ -45,16 +45,14 @@ virtualC app@(Comp (_ :< CompApp _ _)) = do
   return $ CodeWithArg (zip xs ds) cont'
 virtualC (Comp (_ :< CompRet v)) = do
   ans <- virtualV v
-  retReg <- getReturnRegister
-  current <- getScope
-  return $ CodeReturn retReg (current, "exit") ans
+  -- retReg <- getReturnRegister
+  return $ CodeReturn ans
 virtualC (Comp (_ :< CompBind s comp1 comp2)) = do
   operation1 <- virtualC (Comp comp1)
   operation2 <- virtualC (Comp comp2)
   traceLet s operation1 operation2
 virtualC (Comp (_ :< CompUnthunk v unthunkId)) = do
   operand <- virtualV v
-  current <- getScope
   case operand of
     DataPointer x -> do
       liftIO $ putStrLn $ "looking for thunk by unthunkId: " ++ show unthunkId
@@ -62,15 +60,15 @@ virtualC (Comp (_ :< CompUnthunk v unthunkId)) = do
       liftIO $ putStrLn $ "found: " ++ show thunkIdList
       case thunkIdList of
         [] -> do
-          return $ CodeRecursiveJump (x, x)
+          return $ CodeRecursiveJump x
         [thunkId] -> do
           let label = "thunk" ++ thunkId ++ "unthunk" ++ unthunkId
-          return $ CodeJump (current, label)
+          return $ CodeJump label
         _ -> do
-          return $ CodeIndirectJump (current, x) unthunkId thunkIdList -- indirect branch
+          return $ CodeIndirectJump x unthunkId thunkIdList -- indirect branch
     DataLabel thunkId -> do
       let label = "thunk" ++ thunkId ++ "unthunk" ++ unthunkId
-      return $ CodeJump (current, label) -- direct branch
+      return $ CodeJump label -- direct branch
     _ -> lift $ throwE "virtualC.CompUnthunk"
 virtualC (Comp (_ :< CompMu s comp)) = do
   current <- getScope
@@ -80,7 +78,7 @@ virtualC (Comp (_ :< CompMu s comp)) = do
   asm' <- liftIO $ newIORef asm
   insCodeEnv s s asm'
   setScope current
-  return $ CodeRecursiveJump (s, s)
+  return $ CodeRecursiveJump s
 virtualC (Comp (_ :< CompCase vs tree)) = do
   fooList <-
     forM vs $ \v -> do
@@ -148,33 +146,30 @@ makeBranch ::
   -> WithEnv Code
 makeBranch _ _ [] Nothing = error "empty branch"
 makeBranch y o js@((_, _, target):_) Nothing = do
-  current <- getScope
   if null o
-    then return $ (CodeSwitch y (current, target) js)
+    then return $ (CodeSwitch y target js)
     else do
       let tmp = DataElemAtIndex y o
       name <- newName
-      let tmp2 = (CodeSwitch name (current, target) js)
+      let tmp2 = (CodeSwitch name target js)
       return $ CodeLet name tmp tmp2
 makeBranch y o js (Just (Just defaultName, label)) = do
-  current <- getScope
   if null o
-    then return $ (CodeSwitch y (current, label) js)
+    then return $ (CodeSwitch y label js)
     else do
-      let tmp = CodeSwitch defaultName (current, label) js
+      let tmp = CodeSwitch defaultName label js
       return $ CodeLet defaultName (DataElemAtIndex y o) tmp
 makeBranch y o js (Just (Nothing, label)) = do
-  current <- getScope
   if null o
-    then return $ (CodeSwitch y (current, label) js)
+    then return $ (CodeSwitch y label js)
     else do
       let tmp = DataElemAtIndex y o
       name <- newName
-      let tmp2 = CodeSwitch name (current, label) js
+      let tmp2 = CodeSwitch name label js
       return $ CodeLet name tmp tmp2
 
 traceLet :: String -> Code -> Code -> WithEnv Code
-traceLet s (CodeReturn _ _ ans) cont = return $ CodeLet s ans cont
+traceLet s (CodeReturn ans) cont = return $ CodeLet s ans cont
 traceLet s (CodeJump label) cont = do
   appendCode s cont label
   return $ CodeJump label
@@ -183,12 +178,11 @@ traceLet s c@(CodeRecursiveJump _) cont = do
 traceLet s (CodeIndirectJump addrInReg unthunkId poss) cont = do
   forM_ poss $ \thunkId -> do
     let label = "thunk" ++ thunkId ++ "unthunk" ++ unthunkId -- unthunkId
-    current <- getScope
-    appendCode s cont (current, label)
+    appendCode s cont label
   return $ CodeIndirectJump addrInReg unthunkId poss
-traceLet s (switcher@(CodeSwitch _ defaultBranch@(current, _) branchList)) cont = do
+traceLet s (switcher@(CodeSwitch _ defaultBranch branchList)) cont = do
   appendCode s cont defaultBranch
-  forM_ branchList $ \(_, _, label) -> appendCode s cont (current, label)
+  forM_ branchList $ \(_, _, label) -> appendCode s cont label
   return $ switcher
 traceLet s (CodeLet k o1 o2) cont = do
   c <- traceLet s o2 cont
@@ -198,7 +192,7 @@ traceLet s (CodeLetLink linkReg linkLabel body) cont = do
   return $ CodeLetLink linkReg linkLabel c
 traceLet s (CodeWithArg xds code) cont =
   case code of
-    CodeRecursiveJump (_, name) -> return $ CodeCall s name xds cont
+    CodeRecursiveJump name -> return $ CodeCall s name xds cont
     _ -> do
       tmp <- traceLet s code cont
       let (xs, ds) = unzip xds
@@ -207,9 +201,10 @@ traceLet s (CodeCall reg name xds cont1) cont2 = do
   tmp <- traceLet s cont1 cont2
   return $ CodeCall reg name xds tmp
 
-appendCode :: Identifier -> Code -> (Identifier, Identifier) -> WithEnv ()
-appendCode s cont (scope, key) = do
-  codeRef <- lookupCodeEnv2 scope key -- key is the target of jump
+appendCode :: Identifier -> Code -> Identifier -> WithEnv ()
+appendCode s cont key = do
+  current <- getScope
+  codeRef <- lookupCodeEnv2 current key -- key is the target of jump
   code <- liftIO $ readIORef codeRef
   code' <- traceLet s code cont
   liftIO $ writeIORef codeRef code'
