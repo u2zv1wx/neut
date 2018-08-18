@@ -30,21 +30,17 @@ toDecision os (patMat, bodyList)
   | Just i <- findPatApp patMat
   , i /= 0 = do
     let patMat' = swapColumn 0 i patMat
-    let ts = map snd os
-    let occurrenceList = map fst os
-    let occurrenceList' = swapColumn 0 i occurrenceList
-    let os' = zip occurrenceList' ts
+    -- let occurrenceList = map fst os
+    let os' = swapColumn 0 i os
+    -- let os' = zip occurrenceList' ts
     DecisionSwap i <$> toDecision os' (patMat', bodyList)
   | otherwise = do
     consList <- nub <$> headConstructor patMat
     newMatrixList <-
-      forM consList $ \(c, num, args) -> do
-        let a = length args
-        let os' =
-              (map
-                 (\j -> (fst (head os) ++ [j], args !! (j - 1)))
-                 [0 .. (a - 1)]) ++
-              tail os
+      forM consList $ \(c, num, a)
+        -- let a = length args
+       -> do
+        let os' = (map (\j -> ((head os) ++ [j])) [0 .. (a - 1)]) ++ tail os
         tmp <- specialize c a (patMat, bodyList)
         tmp' <- toDecision os' tmp
         return ((c, num), tmp')
@@ -73,14 +69,14 @@ getCEnv (((Meta {ident = i} :< _):_):_) = do
     Just (WeakTypeNode s _) -> lookupConstructorEnv s
     _                       -> lift $ throwE "type error in pattern"
 
-headConstructor :: [[Pat]] -> WithEnv [(Identifier, Int, [ValueType])]
+headConstructor :: [[Pat]] -> WithEnv [(Identifier, Int, Int)]
 headConstructor ([]) = return []
 headConstructor (ps:pss) = do
   ps' <- headConstructor' ps
   pss' <- mapM headConstructor' pss
   return $ join $ ps' : pss'
 
-headConstructor' :: [Pat] -> WithEnv [(Identifier, Int, [ValueType])]
+headConstructor' :: [Pat] -> WithEnv [(Identifier, Int, Int)]
 headConstructor' [] = return []
 headConstructor' ((_ :< PatHole):_) = return []
 headConstructor' ((_ :< PatVar _):_) = return []
@@ -90,7 +86,7 @@ headConstructor' ((Meta {ident = i} :< PatApp s _):_) = do
     Just (WeakTypeNode node _) -> do
       (_, args, cod) <- lookupVEnv' s
       i <- getConstructorNumber node s
-      return [(s, i, map snd args)]
+      return [(s, i, length args)]
     _ -> lift $ throwE "type error"
   -- case vt of
   --   ValueTypeNode _ vts -> return [(s, vts)]
