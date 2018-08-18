@@ -136,7 +136,7 @@ deriving instance Functor PatF
 
 type Pat = Cofree PatF Meta
 
-type Occurrence = ([Int], ValueType)
+type Occurrence = [Int]
 
 data Decision a
   = DecisionLeaf [(Occurrence, (Identifier, ValueType))]
@@ -162,9 +162,9 @@ data ValueF c v
   | ValueNodeApp Identifier
                  [v]
   | ValueThunk c
-               Identifier
   deriving (Show)
 
+--               Identifier
 -- computation / negative term
 -- e ::= (lambda (x P) e)
 --     | (e v)
@@ -183,28 +183,28 @@ data CompF v c
              c
              c
   | CompUnthunk v
-                Identifier
   | CompMu Identifier
            c
   | CompCase [v]
              (Decision c)
   deriving (Show)
 
+--                Identifier
 $(deriveShow1 ''ValueF)
 
 $(deriveShow1 ''CompF)
 
-data VMeta = VMeta
-  { vtype :: ValueType
-  } deriving (Show)
+-- data VMeta = VMeta
+--   { vtype  :: ValueType
+--   , vident :: Identifier
+--   } deriving (Show)
+-- data CMeta = CMeta
+--   { ctype  :: CompType
+--   , cident :: Identifier
+--   } deriving (Show)
+type PreValue = Cofree (ValueF Comp) Meta
 
-data CMeta = CMeta
-  { ctype :: CompType
-  } deriving (Show)
-
-type PreValue = Cofree (ValueF Comp) VMeta
-
-type PreComp = Cofree (CompF Value) CMeta
+type PreComp = Cofree (CompF Value) Meta
 
 newtype Value =
   Value PreValue
@@ -262,8 +262,39 @@ data LowType
   | LowTypeInt32
   | LowTypeStruct [LowType]
   | LowTypePointer LowType
-  | LowTypeLabel
+  | LowTypeFunction [(Identifier, LowType)]
+                    LowType
+  | LowTypeLabel LowType
+  | LowTypeAny
   deriving (Show)
+
+forallArgs :: CompType -> (CompType, [(Identifier, ValueType)])
+forallArgs (CompTypeForall (i, vt) t) = do
+  let (body, xs) = forallArgs t
+  (body, (i, vt) : xs)
+forallArgs body = (body, [])
+
+valueTypeToLowType :: ValueType -> LowType
+valueTypeToLowType (ValueTypeVar _) = LowTypeAny
+valueTypeToLowType (ValueTypeNode _ ds) =
+  LowTypeStruct $ LowTypeInt32 : map valueTypeToLowType ds
+valueTypeToLowType (ValueTypeDown c) = LowTypeLabel (compTypeToLowType c)
+valueTypeToLowType (ValueTypeUniv _) = LowTypeAny
+
+compTypeToLowType :: CompType -> LowType
+compTypeToLowType ct@(CompTypeForall _ _) = do
+  let (body, args) = forallArgs ct
+  let args' = map (\(i, vt) -> (i, valueTypeToLowType vt)) args
+  LowTypeFunction args' (compTypeToLowType body)
+compTypeToLowType (CompTypeUp d) = LowTypePointer (valueTypeToLowType d)
+
+constructLowTypeEnv :: WithEnv ()
+constructLowTypeEnv = do
+  env <- get
+  forM_ (valueTypeEnv env) $ \(i, vt) -> do
+    insLowTypeEnv i (valueTypeToLowType vt)
+  forM_ (compTypeEnv env) $ \(i, ct) -> do
+    insLowTypeEnv i (compTypeToLowType ct)
 
 data Data
   = DataPointer Identifier -- var is something that points already-allocated data
@@ -359,6 +390,7 @@ data Env = Env
   , weakTypeEnv    :: [(Identifier, WeakType)] -- used in type inference
   , typeEnv        :: [(Identifier, Type)] -- polarized type environment
   , valueTypeEnv   :: [(Identifier, ValueType)]
+  , compTypeEnv    :: [(Identifier, CompType)]
   , constraintEnv  :: [(WeakType, WeakType)] -- used in type inference
   , levelEnv       :: [(WeakLevel, WeakLevel)] -- constraint regarding the level of universes
   , argEnv         :: [(IdentOrHole, IdentOrHole)] -- equivalence of arguments of forall
@@ -394,6 +426,7 @@ initialEnv =
     , weakTypeEnv = []
     , typeEnv = []
     , valueTypeEnv = []
+    , compTypeEnv = []
     , constraintEnv = []
     , levelEnv = []
     , thunkEnv = []
@@ -568,6 +601,9 @@ insWTEnv s t = modify (\e -> e {weakTypeEnv = (s, t) : weakTypeEnv e})
 insVTEnv :: String -> ValueType -> WithEnv ()
 insVTEnv s t = modify (\e -> e {valueTypeEnv = (s, t) : valueTypeEnv e})
 
+insCTEnv :: String -> CompType -> WithEnv ()
+insCTEnv s t = modify (\e -> e {compTypeEnv = (s, t) : compTypeEnv e})
+
 insLowTypeEnv :: String -> LowType -> WithEnv ()
 insLowTypeEnv s t = modify (\e -> e {lowTypeEnv = (s, t) : lowTypeEnv e})
 
@@ -591,6 +627,17 @@ lookupValueTypeEnv s = gets (lookup s . valueTypeEnv)
 lookupValueTypeEnv' :: String -> WithEnv ValueType
 lookupValueTypeEnv' s = do
   mt <- lookupValueTypeEnv s
+  case mt of
+    Just t -> return t
+    Nothing -> do
+      lift $ throwE $ "the type of " ++ show s ++ " is not defined "
+
+lookupCompTypeEnv :: String -> WithEnv (Maybe CompType)
+lookupCompTypeEnv s = gets (lookup s . compTypeEnv)
+
+lookupCompTypeEnv' :: String -> WithEnv CompType
+lookupCompTypeEnv' s = do
+  mt <- lookupCompTypeEnv s
   case mt of
     Just t -> return t
     Nothing -> do
