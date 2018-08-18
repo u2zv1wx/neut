@@ -13,12 +13,12 @@ import qualified Text.Show.Pretty           as Pr
 
 import           Data
 
-check :: WeakTerm -> WithEnv ()
-check e = do
-  _ <- infer e
+check :: Identifier -> QuasiComp -> WithEnv ()
+check main e = do
+  t <- inferC e
+  insWTEnv main t -- insert the type of main function
   env <- get
   sub <- unify $ constraintEnv env
-  -- liftIO $ putStrLn $ Pr.ppShow sub
   env' <- get
   let aenv = argEnv env'
   argSubst <- unifyArg aenv
@@ -27,8 +27,8 @@ check e = do
         weakTypeEnv env
   modify (\e -> e {weakTypeEnv = tenv', constraintEnv = []})
 
-infer :: WeakTerm -> WithEnv WeakType
-infer (Meta {ident = i} :< WeakTermVar s) = do
+inferV :: QuasiValue -> WithEnv WeakType
+inferV (QuasiValue (Meta {ident = i} :< ValueVar s)) = do
   mt <- lookupWTEnv s
   case mt of
     Just t -> do
@@ -39,26 +39,32 @@ infer (Meta {ident = i} :< WeakTermVar s) = do
       insWTEnv s new
       insWTEnv i new
       return new
-infer (Meta {ident = i} :< WeakTermLam s e) = do
-  t <- WeakTypePosHole <$> newName
-  insWTEnv s t
-  te <- infer e
-  let result = WeakTypeForall (Ident s, t) te
-  insWTEnv i result
-  return result
-infer (Meta {ident = j} :< WeakTermNodeApp s vs) = do
+inferV (QuasiValue (Meta {ident = j} :< ValueNodeApp s vs)) = do
   mt <- lookupVEnv s
   case mt of
     Nothing -> lift $ throwE $ "const " ++ s ++ " is not defined"
     Just (_, xts, t) -> do
-      tvs <- mapM infer vs
-      -- losing polymorphism? (need to add explicit parametrization)
+      tvs <- mapM (inferV . QuasiValue) vs
       forM_ (zip xts tvs) $ \(xt, t2) -> insCEnv (weakenValueType $ snd xt) t2
       insWTEnv j $ weakenValueType t
       return $ weakenValueType t
-infer (Meta {ident = l} :< WeakTermApp e v) = do
-  te <- infer e
-  tv <- infer v
+inferV (QuasiValue (Meta {ident = i} :< ValueThunk e)) = do
+  t <- inferC e
+  let result = WeakTypeDown t i
+  insWTEnv i result
+  return result
+
+inferC :: QuasiComp -> WithEnv WeakType
+inferC (QuasiComp (Meta {ident = i} :< QuasiCompLam s e)) = do
+  t <- WeakTypePosHole <$> newName
+  insWTEnv s t
+  te <- inferC (QuasiComp e)
+  let result = WeakTypeForall (Ident s, t) te
+  insWTEnv i result
+  return result
+inferC (QuasiComp (Meta {ident = l} :< QuasiCompApp e v)) = do
+  te <- inferC (QuasiComp e)
+  tv <- inferV v
   i <- newName
   insWTEnv i (WeakTypeNegHole i)
   j <- newName
@@ -66,53 +72,43 @@ infer (Meta {ident = l} :< WeakTermApp e v) = do
   let result = WeakTypeNegHole i
   insWTEnv l result
   return result
-infer (Meta {ident = i} :< WeakTermRet v) = do
-  tv <- infer v
+inferC (QuasiComp (Meta {ident = i} :< QuasiCompRet v)) = do
+  tv <- inferV v
   let result = WeakTypeUp tv
   insWTEnv i result
   return result
-infer (Meta {ident = i} :< WeakTermBind s e1 e2) = do
+inferC (QuasiComp (Meta {ident = i} :< QuasiCompBind s e1 e2)) = do
   t <- WeakTypePosHole <$> newName
   insWTEnv s t
-  t1 <- infer e1
-  t2 <- infer e2
+  t1 <- inferC (QuasiComp e1)
+  t2 <- inferC (QuasiComp e2)
   insCEnv (WeakTypeUp t) t1
   insWTEnv i t2
   return t2
-infer (Meta {ident = i} :< WeakTermThunk e) = do
-  t <- infer e
-  let result = WeakTypeDown t i
-  insWTEnv i result
-  return result
-infer (Meta {ident = l} :< WeakTermUnthunk v) = do
-  t <- infer v
+inferC (QuasiComp (Meta {ident = l} :< QuasiCompUnthunk v)) = do
+  t <- inferV v
   i <- newName
   insCEnv t (WeakTypeDown (WeakTypeNegHole i) l)
   let result = WeakTypeNegHole i
   insWTEnv l result
   return result
-infer (Meta {ident = i} :< WeakTermMu s e) = do
+inferC (QuasiComp (Meta {ident = i} :< QuasiCompMu s e)) = do
   t <- WeakTypePosHole <$> newName
   insWTEnv s t
-  te <- infer e
+  te <- inferC (QuasiComp e)
   insCEnv (WeakTypeDown te i) t
   insWTEnv i te
   return te
-infer (Meta {ident = i} :< WeakTermCase vs vses) = do
-  ts <- mapM infer vs
+inferC (QuasiComp (Meta {ident = i} :< QuasiCompCase vs vses)) = do
+  ts <- mapM inferV vs
   let (vss, es) = unzip vses
   tvss <- mapM (mapM inferPat) vss
   forM_ tvss $ \tvs -> do forM_ (zip ts tvs) $ \(t1, t2) -> do insCEnv t1 t2
   ans <- WeakTypeNegHole <$> newName
-  tes <- mapM infer es
+  tes <- mapM (inferC . QuasiComp) es
   forM_ tes $ \te -> insCEnv ans te
   insWTEnv i ans
   return ans
-infer (Meta {ident = i} :< WeakTermAsc e t) = do
-  te <- infer e
-  insCEnv t te
-  insWTEnv i te
-  return te
 
 inferPat :: Pat -> WithEnv WeakType
 inferPat (Meta {ident = i} :< PatHole) = do

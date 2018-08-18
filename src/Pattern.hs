@@ -2,6 +2,7 @@ module Pattern
   ( toDecision
   , patDist
   , swap
+  , dequasiC
   ) where
 
 import           Control.Comonad.Cofree
@@ -19,6 +20,47 @@ import qualified Text.Show.Pretty           as Pr
 
 type ClauseMatrix a = ([[Pat]], [a])
 
+dequasiV :: QuasiValue -> WithEnv Value
+dequasiV (QuasiValue (i :< ValueVar s)) = do
+  return $ Value (i :< ValueVar s)
+dequasiV (QuasiValue (i :< ValueNodeApp s vs)) = do
+  vs' <- mapM (dequasiV . QuasiValue) vs
+  let vs'' = map (\(Value v) -> v) vs'
+  return $ Value (i :< ValueNodeApp s vs'')
+dequasiV (QuasiValue (i :< ValueThunk e)) = do
+  e' <- dequasiC e
+  return $ Value (i :< ValueThunk e')
+
+dequasiC :: QuasiComp -> WithEnv Comp
+dequasiC (QuasiComp (meta :< QuasiCompLam s e)) = do
+  Comp e' <- dequasiC $ QuasiComp e
+  return $ Comp $ meta :< CompLam s e'
+dequasiC (QuasiComp (meta :< QuasiCompApp e v)) = do
+  Comp e' <- dequasiC $ QuasiComp e
+  v' <- dequasiV v
+  return $ Comp $ meta :< CompApp e' v'
+dequasiC (QuasiComp (meta :< QuasiCompRet v)) = do
+  v' <- dequasiV v
+  return $ Comp $ meta :< CompRet v'
+dequasiC (QuasiComp (meta :< QuasiCompBind s e1 e2)) = do
+  Comp e1' <- dequasiC $ QuasiComp e1
+  Comp e2' <- dequasiC $ QuasiComp e2
+  return $ Comp $ meta :< CompBind s e1' e2'
+dequasiC (QuasiComp (meta :< QuasiCompUnthunk v)) = do
+  v' <- dequasiV v
+  return $ Comp $ meta :< CompUnthunk v'
+dequasiC (QuasiComp (meta :< QuasiCompMu s e)) = do
+  Comp e' <- dequasiC $ QuasiComp e
+  return $ Comp $ meta :< CompMu s e'
+dequasiC (QuasiComp (meta :< QuasiCompCase vs vses)) = do
+  vs' <- mapM dequasiV vs
+  let (ps, bodyList) = unzip vses
+  bodyList' <- mapM (dequasiC . QuasiComp) bodyList
+  let patList = zip ps $ map (\(Comp c) -> c) bodyList'
+  let initialOccurences = map (const []) vs
+  decisionTree <- toDecision initialOccurences (patDist patList)
+  return $ Comp $ meta :< CompCase vs' decisionTree
+
 -- Muranget, "Compiling Pattern Matching to Good Decision Trees", 2008
 toDecision :: (Show a) => [Occurrence] -> ClauseMatrix a -> WithEnv (Decision a)
 toDecision _ ([], _) = lift $ throwE $ "non-exclusive pattern"
@@ -30,9 +72,7 @@ toDecision os (patMat, bodyList)
   | Just i <- findPatApp patMat
   , i /= 0 = do
     let patMat' = swapColumn 0 i patMat
-    -- let occurrenceList = map fst os
     let os' = swapColumn 0 i os
-    -- let os' = zip occurrenceList' ts
     DecisionSwap i <$> toDecision os' (patMat', bodyList)
   | otherwise = do
     consList <- nub <$> headConstructor patMat
@@ -84,7 +124,7 @@ headConstructor' ((Meta {ident = i} :< PatApp s _):_) = do
   t <- lookupWTEnv i
   case t of
     Just (WeakTypeNode node _) -> do
-      (_, args, cod) <- lookupVEnv' s
+      (_, args, _) <- lookupVEnv' s
       i <- getConstructorNumber node s
       return [(s, i, length args)]
     _ -> lift $ throwE "type error"
@@ -92,19 +132,18 @@ headConstructor' ((Meta {ident = i} :< PatApp s _):_) = do
   --   ValueTypeNode _ vts -> return [(s, vts)]
   -- return [(s, length args)]
 
-collectVar :: [[Pat]] -> WithEnv [(Identifier, ValueType)]
+collectVar :: [[Pat]] -> WithEnv [Identifier]
 collectVar [] = return []
 collectVar (ps:pss) = do
   vs1 <- collectVar' ps
   vs2 <- collectVar pss
   return $ vs1 ++ vs2
 
-collectVar' :: [Pat] -> WithEnv [(Identifier, ValueType)]
+collectVar' :: [Pat] -> WithEnv [Identifier]
 collectVar' [] = return []
-collectVar' ((Meta {ident = i} :< PatVar s):ps) = do
-  vt <- lookupValueTypeEnv' i
+collectVar' ((_ :< PatVar s):ps) = do
   tmp <- collectVar' ps
-  return $ (s, vt) : tmp
+  return $ s : tmp
 collectVar' (_:ps) = collectVar' ps
 
 findPatApp :: [[Pat]] -> Maybe Int
@@ -159,13 +198,3 @@ defaultMatrixRow ((_ :< PatApp _ _):_) _ = return ([], Nothing)
 
 swapColumn :: Int -> Int -> [[a]] -> [[a]]
 swapColumn i j mat = transpose $ swap i j $ transpose mat
-
-swap :: Int -> Int -> [a] -> [a]
-swap i j xs = do
-  replaceNth j (xs !! i) (replaceNth i (xs !! j) xs)
-
-replaceNth :: Int -> a -> [a] -> [a]
-replaceNth _ _ [] = []
-replaceNth n newVal (x:xs)
-  | n == 0 = newVal : xs
-  | otherwise = x : replaceNth (n - 1) newVal xs

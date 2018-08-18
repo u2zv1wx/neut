@@ -94,10 +94,11 @@ showType LowTypeNull = "null"
 showType (LowTypeStruct (ts)) = do
   let tmp = showTypeList ts
   "{" ++ tmp ++ "}"
-showType LowTypeLabel = "i8"
+showType (LowTypeLabel _) = "<label>"
 showType (LowTypePointer t) = do
   let s = showType t
   s ++ "*"
+showType LowTypeAny = "%any"
 
 showTypeList :: [LowType] -> String
 showTypeList [] = ""

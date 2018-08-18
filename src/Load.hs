@@ -18,6 +18,7 @@ import           Infer
 import           Lift
 import           Macro
 import           Parse
+import           Pattern
 import           Polarize
 import           Read
 import           Rename
@@ -59,35 +60,37 @@ load' ((_ :< TreeNode [_ :< TreeAtom "value", _ :< TreeAtom s, _ :< TreeNode tps
       throwE $
       "the codomain of value type " ++ show s ++ " must be universe or node"
 load' (a:as) = do
-  a' <- macroExpand a
-  e <- parseTerm a'
-  e' <- rename e
-  check e'
+  e <- macroExpand a >>= parseComp >>= renameC >>= liftC
+  liftIO $ putStrLn $ Pr.ppShow e
+  i <- newNameWith "main"
+  check i e
   env <- get
   let wtenv = weakTypeEnv env
   polarizeTypeEnv wtenv
-  e'' <- polarize e'
-  case e'' of
-    TermValue _ -> do
-      liftIO $ putStrLn "the type of main term must be negative"
-    TermComp c -> do
-      liftedC <- liftC c
-      i <- newNameWith "main"
-      setScope i
-      insEmptyCodeEnv i
-      c' <- virtualC liftedC >>= liftIO . newIORef
-      insCurrentCodeEnv i c'
-      -- env <- get
-      -- mainCode <- lookupFunEnv i >>= liftIO . readIORef
-      -- liftIO $ putStrLn "===========FUNENV======"
-      -- liftIO $ putStrLn $ Pr.ppShow $ funEnv env
-      -- liftIO $ putStrLn "starting liveness analysis"
-      -- liftIO $ putStrLn $ "mainCode : \n" ++ Pr.ppShow mainCode
-      -- liftIO $ putStrLn $ "c'' : \n" ++ Pr.ppShow mainCode'
-      -- regAlloc 32
-      -- updateCodeEnv i mainCode'
-      -- asmEmit
-      emit
-      -- env <- get
-      -- liftIO $ putStrLn $ Pr.ppShow (codeEnv env)
+  e' <- dequasiC e
+  -- env <- get
+  -- liftIO $ putStrLn $ Pr.ppShow env
+  setScope i
+  insEmptyCodeEnv i
+  c' <- virtualC e' >>= liftIO . newIORef
+  insCurrentCodeEnv i c'
+  -- asmEmit
+  -- emit
+  env <- get
+  liftIO $ putStrLn $ Pr.ppShow env
   load' as
+  -- e'' <- polarize e'
+  -- case e'' of
+  --   TermValue _ -> do
+  --     liftIO $ putStrLn "the type of main term must be negative"
+  --   TermComp c -> do
+  --     liftedC <- liftC c
+  --     setScope i
+  --     insEmptyCodeEnv i
+  --     c' <- virtualC liftedC >>= liftIO . newIORef
+  --     insCurrentCodeEnv i c'
+  --     -- asmEmit
+  --     -- emit
+  --     env <- get
+  --     liftIO $ putStrLn $ Pr.ppShow env
+  -- load' as

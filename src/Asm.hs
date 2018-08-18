@@ -87,7 +87,7 @@ traceAsm' x (DataCell _ i args) = do
   let args' = (DataInt32 i) : args
   join <$> (forM (zip [0 ..] args') $ setIthData x)
 traceAsm' x (DataLabel s) = do
-  return [AsmStore LowTypeLabel (AsmDataRegister s) x]
+  return [AsmStore LowTypeInt8 (AsmDataRegister s) x]
 traceAsm' x (DataElemAtIndex basePointer idx) = do
   baseType <- lookupLowTypeEnv' basePointer
   return
@@ -110,7 +110,7 @@ typeOfData (DataPointer x) = lookupLowTypeEnv' x
 typeOfData (DataCell _ _ ds) = do
   ts <- mapM typeOfData ds
   return $ LowTypeStruct $ LowTypeInt32 : ts
-typeOfData (DataLabel _) = return LowTypeLabel
+typeOfData (DataLabel _) = return LowTypeInt8
 typeOfData (DataElemAtIndex basePointer idx) = do
   t <- lookupLowTypeEnv' basePointer
   return $ traceType (0 : modifyIndex idx) t

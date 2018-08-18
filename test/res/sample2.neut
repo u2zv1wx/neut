@@ -30,13 +30,13 @@
   e)
 
 (notation (begin e rest+)
-  (bind (_ _) (begin e) (begin rest+)))
+  (bind _ (begin e) (begin rest+)))
 
 (notation (begin (let x e+) rest+)
-  (bind (x _) (begin e+) (begin rest+)))
-
-(notation (begin (let x type e+) rest+)
-  (bind (x type) (begin e+) (begin rest+)))
+  (bind x (begin e+) (begin rest+)))
 
 (begin
-  (return (succ (zero))))
+  (let foo (return (zero)))
+  (let sya (return (thunk (mu rec (return (succ foo))))))
+  (let k (unthunk sya))
+  (return (true)))

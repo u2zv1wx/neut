@@ -7,201 +7,195 @@ import           Control.Monad.Trans.Except
 
 import           Data
 
-liftV :: Value -> WithEnv Value
-liftV v@(Value (_ :< ValueVar _)) = return v
-liftV v@(Value (_ :< ValueNodeApp s [])) = return v
-liftV (Value (i :< ValueNodeApp s vs)) = do
-  vs' <- mapM (liftV . Value) vs
-  vs'' <- forM vs' $ \(Value v) -> return v
-  return $ Value $ i :< ValueNodeApp s vs''
-liftV (Value (i :< ValueThunk c j)) = do
+liftV :: QuasiValue -> WithEnv QuasiValue
+liftV v@(QuasiValue (_ :< ValueVar _)) = return v
+liftV v@(QuasiValue (_ :< ValueNodeApp _ [])) = return v
+liftV (QuasiValue (i :< ValueNodeApp s vs)) = do
+  vs' <- mapM (liftV . QuasiValue) vs
+  vs'' <- forM vs' $ \(QuasiValue v) -> return v
+  return $ QuasiValue $ i :< ValueNodeApp s vs''
+liftV (QuasiValue (i :< ValueThunk c)) = do
   c' <- liftC c
-  return $ Value $ i :< ValueThunk c' j
+  return $ QuasiValue $ i :< ValueThunk c'
 
-liftC :: Comp -> WithEnv Comp
-liftC (Comp (i :< CompLam x e)) = do
-  Comp e' <- liftC $ Comp e
-  return $ Comp $ i :< CompLam x e'
-liftC (Comp (i :< CompApp e v)) = do
-  Comp e' <- liftC $ Comp e
+liftC :: QuasiComp -> WithEnv QuasiComp
+liftC (QuasiComp (i :< QuasiCompLam x e)) = do
+  QuasiComp e' <- liftC $ QuasiComp e
+  return $ QuasiComp $ i :< QuasiCompLam x e'
+liftC (QuasiComp (i :< QuasiCompApp e v)) = do
+  QuasiComp e' <- liftC $ QuasiComp e
   v' <- liftV v
-  return $ Comp $ i :< CompApp e' v'
-liftC (Comp (i :< CompRet v)) = do
+  return $ QuasiComp $ i :< QuasiCompApp e' v'
+liftC (QuasiComp (i :< QuasiCompRet v)) = do
   v' <- liftV v
-  return $ Comp $ i :< CompRet v'
-liftC (Comp (i :< CompBind s c1 c2)) = do
-  Comp c1' <- liftC (Comp c1)
-  Comp c2' <- liftC (Comp c2)
-  return $ Comp $ i :< CompBind s c1' c2'
-liftC (Comp (i :< CompUnthunk v j)) = do
+  return $ QuasiComp $ i :< QuasiCompRet v'
+liftC (QuasiComp (i :< QuasiCompBind s c1 c2)) = do
+  QuasiComp c1' <- liftC (QuasiComp c1)
+  QuasiComp c2' <- liftC (QuasiComp c2)
+  return $ QuasiComp $ i :< QuasiCompBind s c1' c2'
+liftC (QuasiComp (i :< QuasiCompUnthunk v)) = do
   v' <- liftV v
-  return $ Comp $ i :< CompUnthunk v' j
-liftC (Comp (CMeta {ctype = ct} :< CompMu s c)) = do
-  c' <- liftC (Comp c)
+  return $ QuasiComp $ i :< QuasiCompUnthunk v'
+liftC (QuasiComp (meta :< QuasiCompMu s c)) = do
+  c' <- liftC (QuasiComp c)
   let freeVarsInBody = varN c'
   newArgs <-
-    forM freeVarsInBody $ \(vt, _) -> do
+    forM freeVarsInBody $ \(vmeta, _) -> do
       i <- newName
-      return (vt, i)
+      return (vmeta, i)
   let f2b = zip (map snd freeVarsInBody) newArgs
-  Comp c'' <- supplyC s f2b c'
+  QuasiComp c'' <- supplyC s f2b c'
   -- mu x. M ~> (mu x. Lam (y1 ... yn). M) @ k1 @ ... @ kn
-  let Comp absC = compLamSeq newArgs $ Comp c''
-  let ct' = forallSeq newArgs ct -- update the type of `mu x. M`
-  let muAbsC = CMeta {ctype = ct'} :< CompMu s absC
-  appMuAbsC <- appFold (Comp muAbsC) freeVarsInBody
+  let QuasiComp absC = compLamSeq (map snd newArgs) $ QuasiComp c''
+  -- let ct' = forallSeq newArgs ct -- update the type of `mu x. M`
+  let muAbsC = meta :< QuasiCompMu s absC
+  appMuAbsC <- appFold (QuasiComp muAbsC) freeVarsInBody
   return $ appMuAbsC
-liftC (Comp (i :< CompCase vs vcs)) = do
+  -- let QuasiComp absC = compLamSeq (map snd newArgs) $ QuasiComp c''
+  -- return $ QuasiComp $ meta :< QuasiCompMu s absC
+  -- let ct' = forallSeq newArgs ct -- update the type of `mu x. M`
+  -- let muAbsC = CMeta {ctype = ct'} :< QuasiCompMu s absC
+  -- insVTEnv s $ ValueTypeDown ct'
+  -- appMuAbsC <- appFold (QuasiComp muAbsC) freeVarsInBody
+  -- undefined
+  -- return $ appMuAbsC
+liftC (QuasiComp (i :< QuasiCompCase vs vcs)) = do
   vs' <- mapM liftV vs
-  vcs' <- liftDecision vcs
-  return $ Comp $ i :< CompCase vs' vcs'
+  let (patList, bodyList) = unzip vcs
+  bodyList' <- mapM (liftC . QuasiComp) bodyList
+  let bodyList'' = map (\(QuasiComp c) -> c) bodyList'
+  -- vcs' <- liftDecision vcs
+  return $ QuasiComp $ i :< QuasiCompCase vs' (zip patList bodyList'')
 
-liftDecision ::
-     Decision (Cofree (CompF Value) CMeta)
-  -> WithEnv (Decision (Cofree (CompF Value) CMeta))
-liftDecision (DecisionLeaf xs c) = do
-  Comp c' <- liftC $ Comp c
-  return $ DecisionLeaf xs c'
-liftDecision (DecisionSwitch o ids Nothing) = do
-  let (is, ds) = unzip ids
-  ds' <- mapM liftDecision ds
-  return $ DecisionSwitch o (zip is ds') Nothing
-liftDecision (DecisionSwitch o ids (Just (i, tree))) = do
-  let (is, ds) = unzip ids
-  ds' <- mapM liftDecision ds
-  tree' <- liftDecision tree
-  return $ DecisionSwitch o (zip is ds') (Just (i, tree'))
-liftDecision (DecisionSwap i d) = do
-  d' <- liftDecision d
-  return $ DecisionSwap i d'
+-- liftDecision ::
+--      Decision (Cofree (CompF Value) Meta)
+--   -> WithEnv (Decision (Cofree (CompF Value) Meta))
+-- liftDecision (DecisionLeaf xs c) = do
+--   Comp c' <- liftC $ Comp c
+--   return $ DecisionLeaf xs c'
+-- liftDecision (DecisionSwitch o ids Nothing) = do
+--   let (is, ds) = unzip ids
+--   ds' <- mapM liftDecision ds
+--   return $ DecisionSwitch o (zip is ds') Nothing
+-- liftDecision (DecisionSwitch o ids (Just (i, tree))) = do
+--   let (is, ds) = unzip ids
+--   ds' <- mapM liftDecision ds
+--   tree' <- liftDecision tree
+--   return $ DecisionSwitch o (zip is ds') (Just (i, tree'))
+-- liftDecision (DecisionSwap i d) = do
+--   d' <- liftDecision d
+--   return $ DecisionSwap i d'
+type VIdentifier = (Meta, Identifier)
 
-type VIdentifier = (VMeta, Identifier)
-
-supplyV :: Identifier -> [(Identifier, VIdentifier)] -> Value -> WithEnv Value
-supplyV self args (Value (VMeta {vtype = ValueTypeDown ct} :< ValueVar s))
-  | s == self = do
-    let ct' = forallSeq (map snd args) ct -- update the type of `x` in `mu x. M`
-    return $ Value $ VMeta {vtype = ValueTypeDown ct'} :< ValueVar s
-supplyV _ f2b v@(Value (_ :< ValueVar s)) = do
-  case lookup s f2b of
-    Nothing         -> return v
-    Just (vmeta, b) -> return $ Value $ vmeta :< ValueVar b -- replace free vars
-supplyV _ _ v@(Value (_ :< ValueNodeApp s [])) = return v
-supplyV self args (Value (i :< ValueNodeApp s vs)) = do
-  vs' <- mapM (supplyV self args . Value) vs
-  let vs'' = map (\(Value v) -> v) vs'
-  return $ Value $ i :< ValueNodeApp s vs''
-supplyV self args (Value (i :< ValueThunk c j)) = do
-  c' <- supplyC self args c
-  return $ Value $ i :< ValueThunk c' j
-
-supplyC :: Identifier -> [(Identifier, VIdentifier)] -> Comp -> WithEnv Comp
-supplyC self args (Comp (i :< CompLam x e)) = do
-  Comp e' <- supplyC self args (Comp e)
-  return $ Comp $ i :< CompLam x e'
-supplyC self args (Comp (i :< CompApp e v)) = do
-  Comp e' <- supplyC self args (Comp e)
-  v' <- supplyV self args v
-  return $ Comp $ i :< CompApp e' v'
-supplyC self args (Comp (i :< CompRet v)) = do
-  v' <- supplyV self args v
-  return $ Comp $ i :< CompRet v'
-supplyC self args (Comp (i :< CompBind s c1 c2)) = do
-  Comp c1' <- supplyC self args (Comp c1)
-  Comp c2' <- supplyC self args (Comp c2)
-  return $ Comp $ i :< CompBind s c1' c2'
-supplyC self args (Comp inner@(i :< CompUnthunk v j)) = do
-  v' <- supplyV self args v
-  case v' of
-    Value (_ :< ValueVar s)
-      | s == self -> do
-        let args' = map snd args
-        c' <- appFold (Comp inner) args'
-        return c'
-    _ -> return $ Comp $ i :< CompUnthunk v' j
-supplyC self args (Comp (i :< CompMu s c)) = do
-  Comp c' <- supplyC self args $ Comp c
-  return $ Comp $ i :< CompMu s c'
-supplyC self args (Comp (i :< CompCase vs vcs)) = do
-  vs' <- mapM (supplyV self args) vs
-  vcs' <- supplyDecision self args vcs
-  return $ Comp $ i :< CompCase vs' vcs'
-
-supplyDecision ::
+supplyV ::
      Identifier
   -> [(Identifier, VIdentifier)]
-  -> Decision (Cofree (CompF Value) CMeta)
-  -> WithEnv (Decision (Cofree (CompF Value) CMeta))
-supplyDecision self args (DecisionLeaf xs c) = do
-  Comp c' <- supplyC self args $ Comp c
-  return $ DecisionLeaf xs c'
-supplyDecision self args (DecisionSwitch o ids Nothing) = do
-  let (is, ds) = unzip ids
-  ds' <- mapM (supplyDecision self args) ds
-  return $ DecisionSwitch o (zip is ds') Nothing
-supplyDecision self args (DecisionSwitch o ids (Just (i, tree))) = do
-  let (is, ds) = unzip ids
-  ds' <- mapM (supplyDecision self args) ds
-  tree' <- supplyDecision self args tree
-  return $ DecisionSwitch o (zip is ds') (Just (i, tree'))
-supplyDecision self args (DecisionSwap i d) = do
-  d' <- supplyDecision self args d
-  return $ DecisionSwap i d'
+  -> QuasiValue
+  -> WithEnv QuasiValue
+-- supplyV self args (Value (meta :< ValueVar s))
+--   | s == self = do
+--     let ct' = forallSeq (map snd args) ct -- update the type of `x` in `mu x. M`
+--     return $ Value $ meta :< ValueVar s
+supplyV _ f2b v@(QuasiValue (_ :< ValueVar s)) = do
+  case lookup s f2b of
+    Nothing        -> return v
+    Just (meta, b) -> return $ QuasiValue $ meta :< ValueVar b -- replace free vars
+supplyV _ _ v@(QuasiValue (_ :< ValueNodeApp _ [])) = return v
+supplyV self args (QuasiValue (i :< ValueNodeApp s vs)) = do
+  vs' <- mapM (supplyV self args . QuasiValue) vs
+  let vs'' = map (\(QuasiValue v) -> v) vs'
+  return $ QuasiValue $ i :< ValueNodeApp s vs''
+supplyV self args (QuasiValue (i :< ValueThunk c)) = do
+  c' <- supplyC self args c
+  return $ QuasiValue $ i :< ValueThunk c'
 
-varP :: Value -> [(VMeta, Identifier)]
-varP (Value (meta :< ValueVar s))     = [(meta, s)]
-varP (Value (_ :< ValueNodeApp _ vs)) = join $ map (varP . Value) vs
-varP (Value (_ :< ValueThunk e _))    = varN e
+supplyC ::
+     Identifier -> [(Identifier, VIdentifier)] -> QuasiComp -> WithEnv QuasiComp
+supplyC self args (QuasiComp (i :< QuasiCompLam x e)) = do
+  QuasiComp e' <- supplyC self args (QuasiComp e)
+  return $ QuasiComp $ i :< QuasiCompLam x e'
+supplyC self args (QuasiComp (i :< QuasiCompApp e v)) = do
+  QuasiComp e' <- supplyC self args (QuasiComp e)
+  v' <- supplyV self args v
+  return $ QuasiComp $ i :< QuasiCompApp e' v'
+supplyC self args (QuasiComp (i :< QuasiCompRet v)) = do
+  v' <- supplyV self args v
+  return $ QuasiComp $ i :< QuasiCompRet v'
+supplyC self args (QuasiComp (i :< QuasiCompBind s c1 c2)) = do
+  QuasiComp c1' <- supplyC self args (QuasiComp c1)
+  QuasiComp c2' <- supplyC self args (QuasiComp c2)
+  return $ QuasiComp $ i :< QuasiCompBind s c1' c2'
+supplyC self args (QuasiComp inner@(i :< QuasiCompUnthunk v)) = do
+  v' <- supplyV self args v
+  liftIO $
+    putStrLn $ "found unthunk. self == " ++ show self ++ ", v == " ++ show v'
+  case v' of
+    QuasiValue (_ :< ValueVar s)
+      | s == self -> do
+        liftIO $ putStrLn "updating"
+        let args' = map snd args
+        c' <- appFold (QuasiComp inner) args'
+        return c'
+    _ -> return $ QuasiComp $ i :< QuasiCompUnthunk v'
+supplyC self args (QuasiComp (i :< QuasiCompMu s c)) = do
+  QuasiComp c' <- supplyC self args $ QuasiComp c
+  return $ QuasiComp $ i :< QuasiCompMu s c'
+supplyC self args (QuasiComp (i :< QuasiCompCase vs vcs)) = do
+  vs' <- mapM (supplyV self args) vs
+  let (patList, bodyList) = unzip vcs
+  bodyList' <- mapM (supplyC self args . QuasiComp) bodyList
+  let bodyList'' = map (\(QuasiComp c) -> c) bodyList'
+  -- vcs' <- supplyDecision self args vcs
+  return $ QuasiComp $ i :< QuasiCompCase vs' (zip patList bodyList'')
+  -- undefined
+  -- return $ QuasiComp $ i :< QuasiCompCase vs' vcs'
 
-varN :: Comp -> [(VMeta, Identifier)]
-varN (Comp (_ :< CompLam s e)) = filter (\(_, t) -> t /= s) $ varN (Comp e)
-varN (Comp (_ :< CompApp e v)) = varN (Comp e) ++ varP v
-varN (Comp (_ :< CompRet v)) = varP v
-varN (Comp (_ :< CompBind s e1 e2)) =
-  varN (Comp e1) ++ filter (\(_, t) -> t /= s) (varN (Comp e2))
-varN (Comp (_ :< CompUnthunk v _)) = varP v
-varN (Comp (_ :< CompMu s e)) = filter (\(_, t) -> t /= s) (varN (Comp e))
-varN (Comp (_ :< CompCase vs tree)) = do
+varP :: QuasiValue -> [(Meta, Identifier)]
+varP (QuasiValue (meta :< ValueVar s))     = [(meta, s)]
+varP (QuasiValue (_ :< ValueNodeApp _ vs)) = join $ map (varP . QuasiValue) vs
+varP (QuasiValue (_ :< ValueThunk e))      = varN e
+
+varN :: QuasiComp -> [(Meta, Identifier)]
+varN (QuasiComp (_ :< QuasiCompLam s e)) =
+  filter (\(_, t) -> t /= s) $ varN (QuasiComp e)
+varN (QuasiComp (_ :< QuasiCompApp e v)) = varN (QuasiComp e) ++ varP v
+varN (QuasiComp (_ :< QuasiCompRet v)) = varP v
+varN (QuasiComp (_ :< QuasiCompBind s e1 e2)) =
+  varN (QuasiComp e1) ++ filter (\(_, t) -> t /= s) (varN (QuasiComp e2))
+varN (QuasiComp (_ :< QuasiCompUnthunk v)) = varP v
+varN (QuasiComp (_ :< QuasiCompMu s e)) =
+  filter (\(_, t) -> t /= s) (varN (QuasiComp e))
+varN (QuasiComp (_ :< QuasiCompCase vs vses)) = do
   let efs = join $ map varP vs
-  let vars = varDecision tree
-  efs ++ vars
+  let (patList, bodyList) = unzip vses
+  let vs1 = join $ join $ map (map varPat) patList
+  let vs2 = join $ map (varN . QuasiComp) bodyList
+  -- let vars = varDecision tree
+  efs ++ vs1 ++ vs2
 
-varPat :: Pat -> [Identifier]
+varPat :: Pat -> [(Meta, Identifier)]
 varPat (_ :< PatHole)     = []
-varPat (_ :< PatVar s)    = [s]
+varPat (meta :< PatVar s) = [(meta, s)]
 varPat (_ :< PatApp _ ps) = join $ map varPat ps
 
-varDecision :: Decision PreComp -> [(VMeta, Identifier)]
-varDecision (DecisionLeaf ovs e) = do
-  let boundIdents = map snd ovs
-  let fs = varN (Comp e)
-  filter (\(_, i) -> i `notElem` map fst boundIdents) fs
-varDecision (DecisionSwitch _ [] mdefault) = varDefault mdefault
-varDecision (DecisionSwitch s ((_, tree):treeList) mdefault) = do
-  varDecision tree ++ varDecision (DecisionSwitch s treeList mdefault)
-varDecision (DecisionSwap _ t) = varDecision t
-
-varDefault :: Maybe (Maybe Identifier, Decision a) -> [(VMeta, Identifier)]
-varDefault = undefined
-
-compLamSeq :: [(VMeta, Identifier)] -> Comp -> Comp
+compLamSeq :: [Identifier] -> QuasiComp -> QuasiComp
 compLamSeq [] terminal = terminal
-compLamSeq ((VMeta {vtype = vt}, x):xs) c@(Comp (CMeta {ctype = ct} :< _)) = do
-  let Comp tmp = compLamSeq xs c
-  Comp $ CMeta {ctype = CompTypeForall (x, vt) ct} :< CompLam x tmp
+compLamSeq (x:xs) c@(QuasiComp (meta :< _)) = do
+  let QuasiComp tmp = compLamSeq xs c
+  QuasiComp $ meta :< QuasiCompLam x tmp
 
-forallSeq :: [(VMeta, Identifier)] -> CompType -> CompType
-forallSeq [] t = t
-forallSeq ((VMeta {vtype = vt}, i):ts) t = do
-  let tmp = forallSeq ts t
-  CompTypeForall (i, vt) tmp
-
-appFold :: Comp -> [(VMeta, Identifier)] -> WithEnv Comp
+appFold :: QuasiComp -> [VIdentifier] -> WithEnv QuasiComp
 appFold e [] = return e
-appFold (Comp e@(CMeta {ctype = ct} :< _)) ((VMeta {vtype = vt}, i):ts) = do
-  case ct of
-    CompTypeForall _ cod -> do
-      let tmp = CompApp e (Value $ VMeta {vtype = vt} :< ValueVar i)
-      appFold (Comp $ CMeta {ctype = cod} :< tmp) ts
-    _ -> do
-      lift $ throwE $ "Lift.appFold. Note: \n" ++ show ct
+appFold (QuasiComp e) ((meta, i):ts) = do
+  let arg = meta :< ValueVar i
+  -- let tmp = CompApp e (Value $ Meta {vtype = vt} :< ValueVar i)
+  k <- newName
+  let tmp = Meta {ident = k} :< QuasiCompApp e (QuasiValue arg)
+  appFold (QuasiComp tmp) ts
+  -- appFold (Comp $ Meta {ctype = cod} :< tmp) ts
+  -- case ct of
+  --   CompTypeForall _ cod -> do
+  --     let tmp = CompApp e (Value $ Meta {vtype = vt} :< ValueVar i)
+  --     appFold (Comp $ Meta {ctype = cod} :< tmp) ts
+  --   _ -> do
+  --     lift $ throwE $ "Lift.appFold. Note: \n" ++ show ct

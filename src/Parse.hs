@@ -20,14 +20,14 @@ import           Text.Read                  (readMaybe)
 
 import qualified Text.Show.Pretty           as Pr
 
-parseValue :: Tree -> WithEnv Value
+parseValue :: Tree -> WithEnv QuasiValue
 parseValue (meta :< TreeAtom "_") = do
   name <- newNameWith "hole"
-  return $ Value $ meta :< ValueVar name
-parseValue (meta :< TreeAtom s) = return $ Value (meta :< ValueVar s)
+  return $ QuasiValue $ meta :< ValueVar name
+parseValue (meta :< TreeAtom s) = return $ QuasiValue (meta :< ValueVar s)
 parseValue (meta :< TreeNode [_ :< TreeAtom "thunk", te]) = do
   e <- parseComp te
-  return $ Value (meta :< ValueThunk e)
+  return $ QuasiValue (meta :< ValueThunk e)
 parseValue (meta :< TreeNode ((_ :< TreeAtom s):ts)) = do
   msym <- lookupVEnv s
   case msym of
@@ -35,8 +35,8 @@ parseValue (meta :< TreeNode ((_ :< TreeAtom s):ts)) = do
     Just (s, args, _) -- "zero" should be written as `(zero)`, for example.
       | length args == length ts -> do
         vs <- mapM parseValue ts
-        let vs' = map (\(Value v) -> v) vs
-        return $ Value $ meta :< ValueNodeApp s vs'
+        let vs' = map (\(QuasiValue v) -> v) vs
+        return $ QuasiValue $ meta :< ValueNodeApp s vs'
     Just (s, args, _) -> do
       lift $
         throwE $
@@ -44,34 +44,34 @@ parseValue (meta :< TreeNode ((_ :< TreeAtom s):ts)) = do
         show s ++ " is " ++ show (length args) ++ ", not " ++ show (length ts)
 parseValue t = lift $ throwE $ "parseValue: syntax error:\n" ++ Pr.ppShow t
 
-parseComp :: Tree -> WithEnv Comp
+parseComp :: Tree -> WithEnv QuasiComp
 parseComp (meta :< TreeNode [_ :< TreeAtom "lambda", _ :< TreeNode ts, te]) = do
   xs <- parseIdentSeq ts
-  Comp e <- parseComp te
-  _ :< term <- foldMTermR CompLam e xs
-  return $ Comp $ meta :< term
+  QuasiComp e <- parseComp te
+  _ :< term <- foldMTermR QuasiCompLam e xs
+  return $ QuasiComp $ meta :< term
 parseComp (meta :< TreeNode [_ :< TreeAtom "return", tv]) = do
   v <- parseValue tv
-  return $ Comp $ meta :< CompRet v
+  return $ QuasiComp $ meta :< QuasiCompRet v
 parseComp (meta :< TreeNode [_ :< TreeAtom "bind", _ :< TreeAtom s, te1, te2]) = do
   s' <- strOrNewName s
-  Comp e1 <- parseComp te1
-  Comp e2 <- parseComp te2
-  return $ Comp $ meta :< CompBind s' e1 e2
+  QuasiComp e1 <- parseComp te1
+  QuasiComp e2 <- parseComp te2
+  return $ QuasiComp $ meta :< QuasiCompBind s' e1 e2
 parseComp (meta :< TreeNode [_ :< TreeAtom "unthunk", tv]) = do
   v <- parseValue tv
-  return $ Comp $ meta :< CompUnthunk v
+  return $ QuasiComp $ meta :< QuasiCompUnthunk v
 parseComp (meta :< TreeNode [_ :< TreeAtom "mu", _ :< TreeAtom s, te]) = do
   s' <- strOrNewName s
-  Comp e <- parseComp te
-  return $ Comp $ meta :< CompMu s' e
+  QuasiComp e <- parseComp te
+  return $ QuasiComp $ meta :< QuasiCompMu s' e
 parseComp (meta :< TreeNode ((_ :< TreeAtom "match"):(_ :< TreeNode tvs):tves))
   | not (null tves) = do
     vs <- mapM parseValue tvs
     ves <- mapM parseClause tves
-    let initialOccurences = map (const []) vs
-    decisionTree <- toDecision initialOccurences (patDist ves)
-    return $ Comp $ meta :< CompCase vs decisionTree
+    -- let initialOccurences = map (const []) vs
+    -- decisionTree <- toDecision initialOccurences (patDist ves)
+    return $ QuasiComp $ meta :< QuasiCompCase vs ves
 parseComp (_ :< TreeNode (te@(_ :< TreeAtom s):ts)) = do
   msym <- lookupVEnv s
   case msym of
@@ -82,11 +82,11 @@ parseComp (_ :< TreeNode (te:tvs))
   | not (null tvs) = parseCompApp te tvs
 parseComp t = lift $ throwE $ "parseComp: syntax error:\n" ++ Pr.ppShow t
 
-parseCompApp :: Tree -> [Tree] -> WithEnv Comp
+parseCompApp :: Tree -> [Tree] -> WithEnv QuasiComp
 parseCompApp te tvs = do
-  Comp e <- parseComp te
+  QuasiComp e <- parseComp te
   vs <- mapM parseValue tvs
-  Comp <$> foldMTerm CompApp e vs
+  QuasiComp <$> foldMTerm QuasiCompApp e vs
 
 parseIdentSeq :: [Tree] -> WithEnv [Identifier]
 parseIdentSeq [] = return []
@@ -116,10 +116,10 @@ parsePat (meta :< TreeNode ((_ :< TreeAtom s):ts)) = do
       return $ meta :< PatApp s ts'
 parsePat t = lift $ throwE $ "parsePat: syntax error:\n" ++ Pr.ppShow t
 
-parseClause :: Tree -> WithEnv ([Pat], PreComp)
+parseClause :: Tree -> WithEnv ([Pat], PreQuasiComp)
 parseClause (_ :< TreeNode [(_ :< TreeAtom "with"), (_ :< TreeNode tps), tbody]) = do
   ps <- mapM parsePat tps
-  Comp body <- parseComp tbody
+  QuasiComp body <- parseComp tbody
   return (ps, body)
 parseClause t = lift $ throwE $ "parseClause: syntax error:\n" ++ Pr.ppShow t
 

@@ -18,13 +18,17 @@ import           Debug.Trace
 virtualV :: Value -> WithEnv Data
 virtualV (Value (_ :< ValueVar x)) = do
   return $ DataPointer x
-virtualV (Value (VMeta {vtype = ValueTypeNode node _} :< ValueNodeApp s vs)) = do
-  vs' <- mapM (virtualV . Value) vs
-  i <- getConstructorNumber node s
-  return $ DataCell s i vs'
-virtualV (Value (_ :< ValueNodeApp _ _)) = do
-  lift $ throwE $ "virtualV.ValueNodeApp"
-virtualV (Value (_ :< ValueThunk comp thunkId)) = do
+virtualV (Value (Meta {ident = i} :< ValueNodeApp s vs)) = do
+  t <- lookupValueTypeEnv' i
+  case t of
+    ValueTypeNode node _ -> do
+      vs' <- mapM (virtualV . Value) vs
+      i <- getConstructorNumber node s
+      return $ DataCell s i vs'
+    _ -> lift $ throwE $ "virtualV.ValueNodeApp"
+-- virtualV (Value (VMeta {vtype = ValueTypeNode node _} :< ValueNodeApp s vs)) = do
+-- virtualV (Value (_ :< ValueNodeApp _ _)) = do
+virtualV (Value (Meta {ident = thunkId} :< ValueThunk comp)) = do
   asm <- virtualC comp
   unthunkIdList <- lookupThunkEnv thunkId
   forM_ unthunkIdList $ \unthunkId -> do
@@ -39,19 +43,18 @@ virtualC :: Comp -> WithEnv Code
 virtualC (Comp (_ :< CompLam _ comp)) = do
   virtualC (Comp comp)
 virtualC app@(Comp (_ :< CompApp _ _)) = do
-  let (cont, xs, vs) = toFunAndArgs app
+  (cont, xs, vs) <- toFunAndArgs app
   ds <- mapM virtualV vs
   cont' <- virtualC cont
   return $ CodeWithArg (zip xs ds) cont'
 virtualC (Comp (_ :< CompRet v)) = do
   ans <- virtualV v
-  -- retReg <- getReturnRegister
   return $ CodeReturn ans
 virtualC (Comp (_ :< CompBind s comp1 comp2)) = do
   operation1 <- virtualC (Comp comp1)
   operation2 <- virtualC (Comp comp2)
   traceLet s operation1 operation2
-virtualC (Comp (_ :< CompUnthunk v unthunkId)) = do
+virtualC (Comp (Meta {ident = unthunkId} :< CompUnthunk v)) = do
   operand <- virtualV v
   case operand of
     DataPointer x -> do
@@ -93,13 +96,13 @@ virtualDecision :: [Identifier] -> Decision PreComp -> WithEnv Code
 virtualDecision asmList (DecisionLeaf ois preComp) = do
   let indexList = map fst ois
   let forEach = flip map
-  let varList = map (fst . snd) ois
+  let varList = map snd ois
   asmList' <-
-    forM (zip asmList ois) $ \(x, ((index, _), _)) -> do
+    forM (zip asmList ois) $ \(x, (index, _)) -> do
       return $ DataElemAtIndex x index
   body <- virtualC $ Comp preComp
   letSeq varList asmList' body
-virtualDecision (x:vs) (DecisionSwitch (o, _) cs mdefault) = do
+virtualDecision (x:vs) (DecisionSwitch o cs mdefault) = do
   jumpList <- virtualCase (x : vs) cs
   defaultJump <- virtualDefaultCase (x : vs) mdefault
   makeBranch x o jumpList defaultJump
@@ -206,12 +209,17 @@ appendCode s cont key = do
   code' <- traceLet s code cont
   liftIO $ writeIORef codeRef code'
 
-forallArgs :: CompType -> [Identifier]
-forallArgs (CompTypeForall (i, _) t) = i : forallArgs t
-forallArgs _                         = []
+toFunAndArgs :: Comp -> WithEnv (Comp, [Identifier], [Value])
+-- toFunAndArgs (Comp (_ :< CompApp e@((CMeta {ctype = CompTypeForall (i, _) _} :< _)) v)) = do
+--   let (fun, xs, args) = toFunAndArgs (Comp e)
+--   (fun, xs ++ [i], args ++ [v])
+toFunAndArgs c@(Comp (_ :< CompApp e@((Meta {ident = i} :< _)) v)) = do
+  t <- lookupCompTypeEnv' i
+  case t of
+    CompTypeForall (i, _) _ -> do
+      (fun, xs, args) <- toFunAndArgs (Comp e)
+      return (fun, xs ++ [i], args ++ [v])
+    _ -> return $(c, [], [])
 
-toFunAndArgs :: Comp -> (Comp, [Identifier], [Value])
-toFunAndArgs (Comp (_ :< CompApp e@((CMeta {ctype = CompTypeForall (i, _) _} :< _)) v)) = do
-  let (fun, xs, args) = toFunAndArgs (Comp e)
-  (fun, xs ++ [i], args ++ [v])
-toFunAndArgs c = (c, [], [])
+    -- CompTypeForall (i, _) _ (c, [], [])
+toFunAndArgs c = return (c, [], [])

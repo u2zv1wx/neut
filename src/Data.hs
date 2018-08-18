@@ -139,10 +139,10 @@ type Pat = Cofree PatF Meta
 type Occurrence = [Int]
 
 data Decision a
-  = DecisionLeaf [(Occurrence, (Identifier, ValueType))]
+  = DecisionLeaf [(Occurrence, Identifier)]
                  a
   | DecisionSwitch Occurrence
-                   [((Identifier, Int), Decision a)]
+                   [((Identifier, Int), Decision a)] -- [((constructor, id), cont)]
                    (Maybe (Maybe Identifier, Decision a))
   | DecisionSwap Int
                  (Decision a)
@@ -164,7 +164,6 @@ data ValueF c v
   | ValueThunk c
   deriving (Show)
 
---               Identifier
 -- computation / negative term
 -- e ::= (lambda (x P) e)
 --     | (e v)
@@ -189,22 +188,36 @@ data CompF v c
              (Decision c)
   deriving (Show)
 
+data QuasiCompF v c
+  = QuasiCompLam Identifier
+                 c
+  | QuasiCompApp c
+                 v
+  | QuasiCompRet v
+  | QuasiCompBind Identifier
+                  c
+                  c
+  | QuasiCompUnthunk v
+  | QuasiCompMu Identifier
+                c
+  | QuasiCompCase [v]
+                  [([Pat], c)]
+  deriving (Show)
+
 --                Identifier
 $(deriveShow1 ''ValueF)
 
 $(deriveShow1 ''CompF)
 
--- data VMeta = VMeta
---   { vtype  :: ValueType
---   , vident :: Identifier
---   } deriving (Show)
--- data CMeta = CMeta
---   { ctype  :: CompType
---   , cident :: Identifier
---   } deriving (Show)
+$(deriveShow1 ''QuasiCompF)
+
 type PreValue = Cofree (ValueF Comp) Meta
 
 type PreComp = Cofree (CompF Value) Meta
+
+type PreQuasiValue = Cofree (ValueF QuasiComp) Meta
+
+type PreQuasiComp = Cofree (QuasiCompF QuasiValue) Meta
 
 newtype Value =
   Value PreValue
@@ -214,39 +227,13 @@ newtype Comp =
   Comp PreComp
   deriving (Show)
 
-data Term
-  = TermValue Value
-  | TermComp Comp
+newtype QuasiValue =
+  QuasiValue (Cofree (ValueF QuasiComp) Meta)
   deriving (Show)
 
-data WeakTermF a
-  = WeakTermVar Identifier
-  | WeakTermNodeApp Identifier
-                    [a]
-  | WeakTermThunk a
-  | WeakTermLam Identifier
-                a
-  | WeakTermApp a
-                a
-  | WeakTermRet a
-  | WeakTermBind Identifier
-                 a
-                 a
-  | WeakTermUnthunk a
-  | WeakTermMu Identifier
-               a
-  | WeakTermCase [a]
-                 [([Pat], a)]
-  | WeakTermAsc a
-                WeakType
-
-$(deriveShow1 ''WeakTermF)
-
-deriving instance Show a => Show (WeakTermF a)
-
-deriving instance Functor WeakTermF
-
-type WeakTerm = Cofree WeakTermF Meta
+newtype QuasiComp =
+  QuasiComp (Cofree (QuasiCompF QuasiValue) Meta)
+  deriving (Show)
 
 instance (Show a) => Show (IORef a) where
   show a = show (unsafePerformIO (readIORef a))
@@ -254,6 +241,9 @@ instance (Show a) => Show (IORef a) where
 type ValueInfo = (Identifier, [(Identifier, ValueType)], ValueType)
 
 type Index = [Int]
+
+unwrapValue :: Value -> PreValue
+unwrapValue (Value v) = v
 
 -- %cell = type { i32, [0 x %cell]* }
 data LowType
@@ -704,3 +694,13 @@ foldMTermR f e (t:ts) = do
   let x = f t tmp
   i <- newName
   return $ Meta {ident = i} :< x
+
+swap :: Int -> Int -> [a] -> [a]
+swap i j xs = do
+  replaceNth j (xs !! i) (replaceNth i (xs !! j) xs)
+
+replaceNth :: Int -> a -> [a] -> [a]
+replaceNth _ _ [] = []
+replaceNth n newVal (x:xs)
+  | n == 0 = newVal : xs
+  | otherwise = x : replaceNth (n - 1) newVal xs
