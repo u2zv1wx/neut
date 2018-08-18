@@ -187,9 +187,6 @@ traceLet s (switcher@(CodeSwitch _ defaultBranch branchList)) cont = do
 traceLet s (CodeLet k o1 o2) cont = do
   c <- traceLet s o2 cont
   return $ CodeLet k o1 c
-traceLet s (CodeLetLink linkReg linkLabel body) cont = do
-  c <- traceLet s body cont
-  return $ CodeLetLink linkReg linkLabel c
 traceLet s (CodeWithArg xds code) cont =
   case code of
     CodeRecursiveJump name -> return $ CodeCall s name xds cont

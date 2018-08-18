@@ -22,8 +22,6 @@ asmCode (CodeReturn d) = do
   insLowTypeEnv tmp $ LowTypePointer t
   tmpAsm <- traceAsm tmp d
   return $ tmpAsm ++ [AsmReturn (tmp, LowTypePointer t)]
-asmCode (CodeLetLink i d cont) = do
-  asmCode $ CodeLet i d cont
 asmCode (CodeSwitch basePointer defaultBranch branchList) = do
   baseType <- lookupLowTypeEnv' basePointer
   cursorAt00 <- newNameWith $ basePointer ++ ".cursor0"

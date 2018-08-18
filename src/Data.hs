@@ -291,9 +291,6 @@ data Code
   | CodeLet Identifier -- bind (we also use this to represent application)
             Data
             Code
-  | CodeLetLink Identifier -- link register
-                Data -- address
-                Code
   | CodeSwitch Identifier -- branching in pattern-matching (elimination of inductive type)
                DefaultBranch
                [Branch]
@@ -369,8 +366,6 @@ data Env = Env
   , codeEnv        :: [(Identifier, IORef [(Identifier, IORef Code)])]
   , lowTypeEnv     :: [(Identifier, LowType)]
   , didUpdate      :: Bool -- used in live analysis to detect the end of the process
-  , linkRegister   :: Maybe Identifier
-  , returnRegister :: Maybe Identifier
   , scope          :: Identifier -- used in Virtual to determine the name of current function
   } deriving (Show)
 
@@ -406,8 +401,6 @@ initialEnv =
     , codeEnv = []
     , lowTypeEnv = []
     , didUpdate = False
-    , linkRegister = Nothing
-    , returnRegister = Nothing
     , scope = ""
     }
 
@@ -625,30 +618,6 @@ insConstructorEnv i cons = do
 
 insThunkEnv :: Identifier -> Identifier -> WithEnv ()
 insThunkEnv i j = modify (\e -> e {thunkEnv = (i, j) : thunkEnv e})
-
-initializeLinkRegister :: WithEnv ()
-initializeLinkRegister = do
-  s <- newNameWith "link"
-  modify (\e -> e {linkRegister = Just s})
-
-initializeReturnRegister :: WithEnv ()
-initializeReturnRegister = do
-  s <- newNameWith "ret"
-  modify (\e -> e {returnRegister = Just s})
-
-getLinkRegister :: WithEnv Identifier
-getLinkRegister = do
-  e <- get
-  case linkRegister e of
-    Just s  -> return s
-    Nothing -> lift $ throwE "the name of link register is not defined"
-
-getReturnRegister :: WithEnv Identifier
-getReturnRegister = do
-  e <- get
-  case returnRegister e of
-    Just s  -> return s
-    Nothing -> lift $ throwE "the name of link register is not defined"
 
 setScope :: Identifier -> WithEnv ()
 setScope i = do

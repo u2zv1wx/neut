@@ -72,8 +72,6 @@ load' (a:as) = do
       liftIO $ putStrLn "the type of main term must be negative"
     TermComp c -> do
       liftedC <- liftC c
-      initializeLinkRegister
-      initializeReturnRegister
       i <- newNameWith "main"
       setScope i
       insEmptyCodeEnv i
