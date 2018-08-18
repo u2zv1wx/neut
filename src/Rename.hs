@@ -7,63 +7,84 @@ import           Control.Comonad.Cofree
 
 import           Data
 
-rename :: WeakTerm -> WithEnv WeakTerm
-rename (i :< WeakTermVar s) = do
-  t <- WeakTermVar <$> lookupNameEnv s
-  return (i :< t)
-rename (i :< WeakTermNodeApp s []) = return (i :< WeakTermNodeApp s [])
-rename (i :< WeakTermNodeApp s vs) = do
-  vs' <- mapM rename vs
-  return (i :< WeakTermNodeApp s vs')
-rename (i :< WeakTermLam s e) = do
-  local $ do
-    s' <- newNameWith s
-    e' <- rename e
-    return (i :< WeakTermLam s' e')
-rename (i :< WeakTermApp e v) = do
-  e' <- rename e
-  v' <- rename v
-  return (i :< WeakTermApp e' v')
-rename (i :< WeakTermRet v) = do
-  v' <- rename v
-  return (i :< WeakTermRet v')
-rename (i :< WeakTermBind s e1 e2) = do
-  e1' <- rename e1
-  s' <- newNameWith s
-  e2' <- rename e2
-  return (i :< WeakTermBind s' e1' e2')
-rename (i :< WeakTermThunk e) = do
-  e' <- rename e
-  return (i :< WeakTermThunk e')
-rename (i :< WeakTermUnthunk v) = do
-  v' <- rename v
-  return (i :< WeakTermUnthunk v')
-rename (i :< WeakTermMu s e) = do
-  local $ do
-    s' <- newNameWith s
-    e' <- rename e
-    return (i :< WeakTermMu s' e')
-rename (i :< WeakTermCase vs ves) = do
-  vs' <- mapM rename vs
-  ves' <-
-    forM ves $ \(pat, body) ->
-      local $ do
-        env <- get
-        patEnvOrErr <-
-          liftIO $ runWithEnv (mapM renamePat pat) (env {nameEnv = []})
-        case patEnvOrErr of
-          Left err -> lift $ throwE err
-          Right (pat', env') -> do
-            put
-              (env {nameEnv = nameEnv env' ++ nameEnv env, count = count env'})
-            body' <- rename body
-            return (pat', body')
-  return (i :< WeakTermCase vs' ves')
-rename (i :< WeakTermAsc e t) = do
-  e' <- rename e
-  t' <- renameType t
-  return (i :< WeakTermAsc e' t')
+renameV :: Value -> WithEnv Value
+renameV (Value (i :< ValueVar s)) = do
+  t <- ValueVar <$> lookupNameEnv s
+  return $ Value (i :< t)
+renameV (Value (i :< ValueNodeApp s [])) =
+  return $ Value (i :< ValueNodeApp s [])
+renameV (Value (i :< ValueNodeApp s vs)) = do
+  vs' <- mapM (renameV . Value) vs
+  let vs'' = map unwrapValue vs'
+  return $ Value (i :< ValueNodeApp s vs'')
+renameV (Value (i :< ValueThunk e)) = do
+  e' <- renameC e
+  return $ Value (i :< ValueThunk e')
 
+renameC :: Comp -> WithEnv Comp
+renameC (Comp (i :< CompLam s e)) = do
+  local $ do
+    s' <- newNameWith s
+    Comp e' <- renameC $ Comp e
+    return $ Comp (i :< CompLam s' e')
+renameC (Comp (i :< CompApp e v)) = do
+  Comp e' <- renameC $ Comp e
+  v' <- renameV v
+  return $ Comp (i :< CompApp e' v')
+renameC (Comp (i :< CompRet v)) = do
+  v' <- renameV v
+  return $ Comp (i :< CompRet v')
+renameC (Comp (i :< CompBind s e1 e2)) = do
+  Comp e1' <- renameC $ Comp e1
+  s' <- newNameWith s
+  Comp e2' <- renameC $ Comp e2
+  return $ Comp (i :< CompBind s' e1' e2')
+renameC (Comp (i :< CompUnthunk v)) = do
+  v' <- renameV v
+  return $ Comp (i :< CompUnthunk v')
+renameC (Comp (i :< CompMu s e)) = do
+  local $ do
+    s' <- newNameWith s
+    Comp e' <- renameC $ Comp e
+    return $ Comp (i :< CompMu s' e')
+renameC (Comp (i :< CompCase vs dtree)) = do
+  vs' <- mapM renameV vs
+  dtree' <- renameDecision dtree
+  return $ Comp (i :< CompCase vs' dtree')
+
+renameDecision :: Decision PreComp -> WithEnv (Decision PreComp)
+renameDecision (DecisionLeaf oxs comp) = do
+  local $ do
+    let (os, xs) = unzip oxs
+    xs' <- forM xs $ \x -> newNameWith x
+    Comp comp' <- renameC $ Comp comp
+    return $ DecisionLeaf (zip os xs') comp'
+renameDecision (DecisionSwitch o condDecisionList Nothing) = do
+  let (condList, decisionList) = unzip condDecisionList
+  decisionList' <- mapM (local . renameDecision) decisionList
+  return $ DecisionSwitch o (zip condList decisionList') Nothing
+renameDecision (DecisionSwitch o condDecisionList (Just (Nothing, dcase))) = do
+  let (condList, decisionList) = unzip condDecisionList
+  decisionList' <- mapM (local . renameDecision) decisionList
+  dcase' <- renameDecision dcase
+  return $
+    DecisionSwitch o (zip condList decisionList') (Just (Nothing, dcase'))
+renameDecision (DecisionSwitch o condDecisionList (Just (Just d, dcase))) = do
+  let (condList, decisionList) = unzip condDecisionList
+  decisionList' <- mapM (local . renameDecision) decisionList
+  local $ do
+    d' <- newNameWith d
+    dcase' <- renameDecision dcase
+    return $
+      DecisionSwitch o (zip condList decisionList') (Just (Just d', dcase'))
+renameDecision (DecisionSwap i d) = do
+  d' <- renameDecision d
+  return $ DecisionSwap i d'
+
+-- renameC (i :< CompAsc e t) = do
+--   e' <- renameC e
+--   t' <- renameCType t
+--   return (i :< CompAsc e' t')
 renameType :: WeakType -> WithEnv WeakType
 renameType (WeakTypeVar s) = WeakTypeVar <$> lookupNameEnv s
 renameType (WeakTypePosHole i) = return (WeakTypePosHole i)
