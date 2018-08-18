@@ -68,29 +68,12 @@ load' (a:as) = do
   let wtenv = weakTypeEnv env
   polarizeTypeEnv wtenv
   e' <- dequasiC e
-  -- env <- get
-  -- liftIO $ putStrLn $ Pr.ppShow env
   setScope i
   insEmptyCodeEnv i
   c' <- virtualC e' >>= liftIO . newIORef
   insCurrentCodeEnv i c'
-  -- asmEmit
-  -- emit
+  constructLowTypeEnv
   env <- get
   liftIO $ putStrLn $ Pr.ppShow env
+  emit
   load' as
-  -- e'' <- polarize e'
-  -- case e'' of
-  --   TermValue _ -> do
-  --     liftIO $ putStrLn "the type of main term must be negative"
-  --   TermComp c -> do
-  --     liftedC <- liftC c
-  --     setScope i
-  --     insEmptyCodeEnv i
-  --     c' <- virtualC liftedC >>= liftIO . newIORef
-  --     insCurrentCodeEnv i c'
-  --     -- asmEmit
-  --     -- emit
-  --     env <- get
-  --     liftIO $ putStrLn $ Pr.ppShow env
-  -- load' as

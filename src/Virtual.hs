@@ -26,8 +26,6 @@ virtualV (Value (Meta {ident = i} :< ValueNodeApp s vs)) = do
       i <- getConstructorNumber node s
       return $ DataCell s i vs'
     _ -> lift $ throwE $ "virtualV.ValueNodeApp"
--- virtualV (Value (VMeta {vtype = ValueTypeNode node _} :< ValueNodeApp s vs)) = do
--- virtualV (Value (_ :< ValueNodeApp _ _)) = do
 virtualV (Value (Meta {ident = thunkId} :< ValueThunk comp)) = do
   asm <- virtualC comp
   unthunkIdList <- lookupThunkEnv thunkId
@@ -210,9 +208,6 @@ appendCode s cont key = do
   liftIO $ writeIORef codeRef code'
 
 toFunAndArgs :: Comp -> WithEnv (Comp, [Identifier], [Value])
--- toFunAndArgs (Comp (_ :< CompApp e@((CMeta {ctype = CompTypeForall (i, _) _} :< _)) v)) = do
---   let (fun, xs, args) = toFunAndArgs (Comp e)
---   (fun, xs ++ [i], args ++ [v])
 toFunAndArgs c@(Comp (_ :< CompApp e@((Meta {ident = i} :< _)) v)) = do
   t <- lookupCompTypeEnv' i
   case t of
@@ -220,6 +215,4 @@ toFunAndArgs c@(Comp (_ :< CompApp e@((Meta {ident = i} :< _)) v)) = do
       (fun, xs, args) <- toFunAndArgs (Comp e)
       return (fun, xs ++ [i], args ++ [v])
     _ -> return $(c, [], [])
-
-    -- CompTypeForall (i, _) _ (c, [], [])
 toFunAndArgs c = return (c, [], [])

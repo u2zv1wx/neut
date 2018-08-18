@@ -69,8 +69,6 @@ parseComp (meta :< TreeNode ((_ :< TreeAtom "match"):(_ :< TreeNode tvs):tves))
   | not (null tves) = do
     vs <- mapM parseValue tvs
     ves <- mapM parseClause tves
-    -- let initialOccurences = map (const []) vs
-    -- decisionTree <- toDecision initialOccurences (patDist ves)
     return $ QuasiComp $ meta :< QuasiCompCase vs ves
 parseComp (_ :< TreeNode (te@(_ :< TreeAtom s):ts)) = do
   msym <- lookupVEnv s

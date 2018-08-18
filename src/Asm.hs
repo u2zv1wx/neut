@@ -51,11 +51,20 @@ asmCode (CodeWithArg xds code) = do
   let (xs, ds) = unzip xds
   tmp <- letSeq xs ds code
   asmCode tmp
-asmCode (CodeCall x name args cont)
-  -- bind all arguments using traceasm and then call name
- = do
-  undefined
+asmCode (CodeCall x name args cont) = do
+  asms <- forM args $ \(ident, d) -> do traceAsm ident d
+  cont' <- asmCode cont
+  t <- lookupLowTypeEnv' name
+  case t of
+    LowTypeLabel (LowTypeFunction xts codType) -> do
+      let domTypes = map snd xts
+      let vars = map fst args
+      return $
+        join asms ++
+        [AsmLet x (AsmCall (name, codType) (zip vars domTypes))] ++ cont'
+    _ -> undefined
 
+-- emitAsmLet i (AsmCall (name, codType) args) = undefined
 traceAsm :: Identifier -> Data -> WithEnv [Asm]
 traceAsm x (DataPointer y) = do
   ty <- lookupLowTypeEnv' y

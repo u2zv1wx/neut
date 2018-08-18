@@ -1,7 +1,6 @@
 module Pattern
   ( toDecision
   , patDist
-  , swap
   , dequasiC
   ) where
 
@@ -77,9 +76,7 @@ toDecision os (patMat, bodyList)
   | otherwise = do
     consList <- nub <$> headConstructor patMat
     newMatrixList <-
-      forM consList $ \(c, num, a)
-        -- let a = length args
-       -> do
+      forM consList $ \(c, num, a) -> do
         let os' = (map (\j -> ((head os) ++ [j])) [0 .. (a - 1)]) ++ tail os
         tmp <- specialize c a (patMat, bodyList)
         tmp' <- toDecision os' tmp
@@ -127,10 +124,7 @@ headConstructor' ((Meta {ident = i} :< PatApp s _):_) = do
       (_, args, _) <- lookupVEnv' s
       i <- getConstructorNumber node s
       return [(s, i, length args)]
-    _ -> lift $ throwE "type error"
-  -- case vt of
-  --   ValueTypeNode _ vts -> return [(s, vts)]
-  -- return [(s, length args)]
+    _ -> lift $ throwE $ s ++ " is not a constructor"
 
 collectVar :: [[Pat]] -> WithEnv [Identifier]
 collectVar [] = return []

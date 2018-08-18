@@ -20,16 +20,31 @@ emit :: WithEnv ()
 emit = do
   env <- get
   forM_ (codeEnv env) $ \(label, codeListRef) -> do
-    liftIO $ putStrLn $ "define <type> @" ++ label ++ "() {"
-    codeList <- liftIO $ readIORef codeListRef
-    forM_ codeList $ \(label, codeRef) -> do
-      code <- liftIO $ readIORef codeRef
-      asm <- asmCode code
-      emitLabelHeader label
-      mapM_ emitAsm asm
-    emitLabelHeader "exit"
-    emitOp $ "ret void"
-    liftIO $ putStrLn "}"
+    t <- lookupLowTypeEnv' label
+    case t of
+      LowTypeLabel (LowTypeFunction args cod) -> do
+        liftIO $
+          putStrLn $
+          "define " ++
+          showType cod ++ " @" ++ label ++ "(" ++ showArgs args ++ ") {"
+        codeList <- liftIO $ readIORef codeListRef
+        forM_ codeList $ \(label, codeRef) -> do
+          code <- liftIO $ readIORef codeRef
+          asm <- asmCode code
+          emitLabelHeader label
+          mapM_ emitAsm asm
+        liftIO $ putStrLn "}"
+      t -> do
+        liftIO $ putStrLn $ "define " ++ showType t ++ " @" ++ label ++ "() {"
+        codeList <- liftIO $ readIORef codeListRef
+        forM_ codeList $ \(label, codeRef) -> do
+          code <- liftIO $ readIORef codeRef
+          asm <- asmCode code
+          emitLabelHeader label
+          mapM_ emitAsm asm
+        emitLabelHeader "exit"
+        emitOp $ "ret void"
+        liftIO $ putStrLn "}"
 
 emitAsm :: Asm -> WithEnv ()
 emitAsm (AsmReturn (i, t)) = emitOp $ "ret " ++ showType t ++ " " ++ i
@@ -76,7 +91,12 @@ emitAsmLet i (AsmGetElemPointer t base index) = do
     i ++
     " = getelementptr " ++
     showType t' ++ ", " ++ showType t ++ " %" ++ base ++ ", " ++ showIndex index
-emitAsmLet i (AsmCall (name, codType) args) = undefined
+emitAsmLet i (AsmCall (name, codType) args) = do
+  emitOp $
+    "%" ++
+    i ++
+    " = call " ++
+    showType codType ++ " @" ++ name ++ "(" ++ showArgs args ++ ")"
 emitAsmLet i (AsmBitcast from ident to) = do
   emitOp $
     "%" ++
@@ -99,6 +119,11 @@ showType (LowTypePointer t) = do
   let s = showType t
   s ++ "*"
 showType LowTypeAny = "%any"
+
+showArgs :: [(Identifier, LowType)] -> String
+showArgs []          = ""
+showArgs [(i, t)]    = showType t ++ " %" ++ i
+showArgs ((i, t):xs) = showType t ++ " %" ++ i ++ ", " ++ showArgs xs
 
 showTypeList :: [LowType] -> String
 showTypeList [] = ""

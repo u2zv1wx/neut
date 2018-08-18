@@ -61,9 +61,6 @@ renameC (QuasiComp (i :< QuasiCompCase vs ves)) = do
             QuasiComp body' <- renameC $ QuasiComp body
             return (pat', body')
   return $ QuasiComp (i :< QuasiCompCase vs' ves')
-  -- vs' <- mapM renameV vs
-  -- dtree' <- renameDecision dtree
-  -- return $ Comp (i :< CompCase vs' dtree')
 
 renameType :: WeakType -> WithEnv WeakType
 renameType (WeakTypeVar s) = WeakTypeVar <$> lookupNameEnv s

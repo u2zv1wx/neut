@@ -47,44 +47,16 @@ liftC (QuasiComp (meta :< QuasiCompMu s c)) = do
   QuasiComp c'' <- supplyC s f2b c'
   -- mu x. M ~> (mu x. Lam (y1 ... yn). M) @ k1 @ ... @ kn
   let QuasiComp absC = compLamSeq (map snd newArgs) $ QuasiComp c''
-  -- let ct' = forallSeq newArgs ct -- update the type of `mu x. M`
   let muAbsC = meta :< QuasiCompMu s absC
   appMuAbsC <- appFold (QuasiComp muAbsC) freeVarsInBody
   return $ appMuAbsC
-  -- let QuasiComp absC = compLamSeq (map snd newArgs) $ QuasiComp c''
-  -- return $ QuasiComp $ meta :< QuasiCompMu s absC
-  -- let ct' = forallSeq newArgs ct -- update the type of `mu x. M`
-  -- let muAbsC = CMeta {ctype = ct'} :< QuasiCompMu s absC
-  -- insVTEnv s $ ValueTypeDown ct'
-  -- appMuAbsC <- appFold (QuasiComp muAbsC) freeVarsInBody
-  -- undefined
-  -- return $ appMuAbsC
 liftC (QuasiComp (i :< QuasiCompCase vs vcs)) = do
   vs' <- mapM liftV vs
   let (patList, bodyList) = unzip vcs
   bodyList' <- mapM (liftC . QuasiComp) bodyList
   let bodyList'' = map (\(QuasiComp c) -> c) bodyList'
-  -- vcs' <- liftDecision vcs
   return $ QuasiComp $ i :< QuasiCompCase vs' (zip patList bodyList'')
 
--- liftDecision ::
---      Decision (Cofree (CompF Value) Meta)
---   -> WithEnv (Decision (Cofree (CompF Value) Meta))
--- liftDecision (DecisionLeaf xs c) = do
---   Comp c' <- liftC $ Comp c
---   return $ DecisionLeaf xs c'
--- liftDecision (DecisionSwitch o ids Nothing) = do
---   let (is, ds) = unzip ids
---   ds' <- mapM liftDecision ds
---   return $ DecisionSwitch o (zip is ds') Nothing
--- liftDecision (DecisionSwitch o ids (Just (i, tree))) = do
---   let (is, ds) = unzip ids
---   ds' <- mapM liftDecision ds
---   tree' <- liftDecision tree
---   return $ DecisionSwitch o (zip is ds') (Just (i, tree'))
--- liftDecision (DecisionSwap i d) = do
---   d' <- liftDecision d
---   return $ DecisionSwap i d'
 type VIdentifier = (Meta, Identifier)
 
 supplyV ::
@@ -92,10 +64,6 @@ supplyV ::
   -> [(Identifier, VIdentifier)]
   -> QuasiValue
   -> WithEnv QuasiValue
--- supplyV self args (Value (meta :< ValueVar s))
---   | s == self = do
---     let ct' = forallSeq (map snd args) ct -- update the type of `x` in `mu x. M`
---     return $ Value $ meta :< ValueVar s
 supplyV _ f2b v@(QuasiValue (_ :< ValueVar s)) = do
   case lookup s f2b of
     Nothing        -> return v
@@ -145,10 +113,7 @@ supplyC self args (QuasiComp (i :< QuasiCompCase vs vcs)) = do
   let (patList, bodyList) = unzip vcs
   bodyList' <- mapM (supplyC self args . QuasiComp) bodyList
   let bodyList'' = map (\(QuasiComp c) -> c) bodyList'
-  -- vcs' <- supplyDecision self args vcs
   return $ QuasiComp $ i :< QuasiCompCase vs' (zip patList bodyList'')
-  -- undefined
-  -- return $ QuasiComp $ i :< QuasiCompCase vs' vcs'
 
 varP :: QuasiValue -> [(Meta, Identifier)]
 varP (QuasiValue (meta :< ValueVar s))     = [(meta, s)]
@@ -170,7 +135,6 @@ varN (QuasiComp (_ :< QuasiCompCase vs vses)) = do
   let (patList, bodyList) = unzip vses
   let vs1 = join $ join $ map (map varPat) patList
   let vs2 = join $ map (varN . QuasiComp) bodyList
-  -- let vars = varDecision tree
   efs ++ vs1 ++ vs2
 
 varPat :: Pat -> [(Meta, Identifier)]
@@ -188,14 +152,6 @@ appFold :: QuasiComp -> [VIdentifier] -> WithEnv QuasiComp
 appFold e [] = return e
 appFold (QuasiComp e) ((meta, i):ts) = do
   let arg = meta :< ValueVar i
-  -- let tmp = CompApp e (Value $ Meta {vtype = vt} :< ValueVar i)
   k <- newName
   let tmp = Meta {ident = k} :< QuasiCompApp e (QuasiValue arg)
   appFold (QuasiComp tmp) ts
-  -- appFold (Comp $ Meta {ctype = cod} :< tmp) ts
-  -- case ct of
-  --   CompTypeForall _ cod -> do
-  --     let tmp = CompApp e (Value $ Meta {vtype = vt} :< ValueVar i)
-  --     appFold (Comp $ Meta {ctype = cod} :< tmp) ts
-  --   _ -> do
-  --     lift $ throwE $ "Lift.appFold. Note: \n" ++ show ct

@@ -265,11 +265,11 @@ forallArgs (CompTypeForall (i, vt) t) = do
 forallArgs body = (body, [])
 
 valueTypeToLowType :: ValueType -> LowType
-valueTypeToLowType (ValueTypeVar _) = LowTypeAny
-valueTypeToLowType (ValueTypeNode _ ds) =
-  LowTypeStruct $ LowTypeInt32 : map valueTypeToLowType ds
-valueTypeToLowType (ValueTypeDown c) = LowTypeLabel (compTypeToLowType c)
-valueTypeToLowType (ValueTypeUniv _) = LowTypeAny
+valueTypeToLowType (ValueTypeVar _)     = LowTypeAny
+valueTypeToLowType (ValueTypeNode _ ds) = LowTypeAny
+  -- LowTypeStruct $ LowTypeInt32 : map valueTypeToLowType ds
+valueTypeToLowType (ValueTypeDown c)    = LowTypeLabel (compTypeToLowType c)
+valueTypeToLowType (ValueTypeUniv _)    = LowTypeAny
 
 compTypeToLowType :: CompType -> LowType
 compTypeToLowType ct@(CompTypeForall _ _) = do
@@ -549,11 +549,6 @@ insEmptyCodeEnv :: Identifier -> WithEnv ()
 insEmptyCodeEnv scope = do
   nop <- liftIO $ newIORef []
   modify (\e -> e {codeEnv = (scope, nop) : codeEnv e})
-
-toLabel :: Identifier -> WithEnv Label
-toLabel ident = do
-  current <- getScope
-  return (current, ident)
 
 lookupThunkEnv :: Identifier -> WithEnv [Identifier]
 lookupThunkEnv s = do
