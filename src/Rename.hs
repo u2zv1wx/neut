@@ -7,46 +7,38 @@ import           Control.Comonad.Cofree
 
 import           Data
 
-renameV :: QuasiValue -> WithEnv QuasiValue
-renameV (QuasiValue (i :< ValueVar s)) = do
-  t <- ValueVar <$> lookupNameEnv s
-  return $ QuasiValue (i :< t)
-renameV (QuasiValue (i :< ValueNodeApp s vs)) = do
-  vs' <- mapM (renameV . QuasiValue) vs
-  let vs'' = map (\(QuasiValue v) -> v) vs'
-  return $ QuasiValue (i :< ValueNodeApp s vs'')
-renameV (QuasiValue (i :< ValueThunk e)) = do
-  e' <- renameC e
-  return $ QuasiValue (i :< ValueThunk e')
-
-renameC :: QuasiComp -> WithEnv QuasiComp
-renameC (QuasiComp (i :< QuasiCompLam s e)) = do
+rename :: Term -> WithEnv Term
+rename (i :< TermVar s) = do
+  t <- TermVar <$> lookupNameEnv s
+  return $ i :< t
+rename (i :< TermThunk e) = do
+  e' <- rename e
+  return $ i :< TermThunk e'
+rename (i :< TermLam s e) = do
   local $ do
-    s' <- newNameWith s
-    QuasiComp e' <- renameC $ QuasiComp e
-    return $ QuasiComp (i :< QuasiCompLam s' e')
-renameC (QuasiComp (i :< QuasiCompApp e v)) = do
-  QuasiComp e' <- renameC $ QuasiComp e
-  v' <- renameV v
-  return $ QuasiComp (i :< QuasiCompApp e' v')
-renameC (QuasiComp (i :< QuasiCompRet v)) = do
-  v' <- renameV v
-  return $ QuasiComp (i :< QuasiCompRet v')
-renameC (QuasiComp (i :< QuasiCompBind s e1 e2)) = do
-  QuasiComp e1' <- renameC $ QuasiComp e1
-  s' <- newNameWith s
-  QuasiComp e2' <- renameC $ QuasiComp e2
-  return $ QuasiComp (i :< QuasiCompBind s' e1' e2')
-renameC (QuasiComp (i :< QuasiCompUnthunk v)) = do
-  v' <- renameV v
-  return $ QuasiComp (i :< QuasiCompUnthunk v')
-renameC (QuasiComp (i :< QuasiCompMu s e)) = do
+    s' <- renameArg s
+    e' <- rename e
+    return $ i :< TermLam s' e'
+rename (i :< TermApp e v) = do
+  e' <- rename e
+  v' <- rename v
+  return $ i :< TermApp e' v'
+rename (i :< TermLift v) = do
+  v' <- rename v
+  return $ i :< TermLift v'
+rename (i :< TermColift v) = do
+  v' <- rename v
+  return $ i :< TermColift v'
+rename (i :< TermUnthunk v) = do
+  v' <- rename v
+  return $ i :< TermUnthunk v'
+rename (i :< TermMu s e) = do
   local $ do
-    s' <- newNameWith s
-    QuasiComp e' <- renameC $ QuasiComp e
-    return $ QuasiComp (i :< QuasiCompMu s' e')
-renameC (QuasiComp (i :< QuasiCompCase vs ves)) = do
-  vs' <- mapM renameV vs
+    s' <- renameArg s
+    e' <- rename e
+    return $ i :< TermMu s' e'
+rename (i :< TermCase vs ves) = do
+  vs' <- mapM rename vs
   ves' <-
     forM ves $ \(pat, body) ->
       local $ do
@@ -58,39 +50,41 @@ renameC (QuasiComp (i :< QuasiCompCase vs ves)) = do
           Right (pat', env') -> do
             put
               (env {nameEnv = nameEnv env' ++ nameEnv env, count = count env'})
-            QuasiComp body' <- renameC $ QuasiComp body
+            body' <- rename body
             return (pat', body')
-  return $ QuasiComp (i :< QuasiCompCase vs' ves')
+  return $ i :< TermCase vs' ves'
+rename _ = error "Rename.rename: unreachable"
 
-renameType :: WeakType -> WithEnv WeakType
-renameType (WeakTypeVar s) = WeakTypeVar <$> lookupNameEnv s
-renameType (WeakTypePosHole i) = return (WeakTypePosHole i)
-renameType (WeakTypeNegHole i) = return (WeakTypeNegHole i)
-renameType (WeakTypeUp t) = WeakTypeUp <$> renameType t
-renameType (WeakTypeDown t i) = do
+renameArg :: Arg -> WithEnv Arg
+renameArg (ArgIdent s)    = ArgIdent <$> newNameWith s
+renameArg (ArgLift arg)   = ArgLift <$> renameArg arg
+renameArg (ArgColift arg) = ArgColift <$> renameArg arg
+
+renameType :: Type -> WithEnv Type
+renameType (meta :< TypeVar s) = do
+  t' <- TypeVar <$> lookupNameEnv s
+  return $ meta :< t'
+renameType (meta :< TypeHole i) = do
+  return $ meta :< TypeHole i
+renameType (meta :< TypeUp t) = do
+  t' <- TypeUp <$> renameType t
+  return $ meta :< t'
+renameType (meta :< TypeDown t) = do
   t' <- renameType t
-  return $ WeakTypeDown t' i
-renameType (WeakTypeUniv level) = return (WeakTypeUniv level)
-renameType (WeakTypeForall (Ident s, tdom) tcod) = do
+  return $ meta :< TypeDown t'
+renameType (meta :< TypeUniv level) = return $ meta :< TypeUniv level
+renameType (meta :< TypeForall (s, tdom) tcod) = do
   tdom' <- renameType tdom
   local $ do
     s' <- newNameWith s
     tcod' <- renameType tcod
-    return (WeakTypeForall (Ident s', tdom') tcod')
-renameType (WeakTypeForall (Hole s, tdom) tcod) = do
-  tdom' <- renameType tdom
-  local $ do
-    s' <- newNameWith s
-    tcod' <- renameType tcod
-    return (WeakTypeForall (Hole s', tdom') tcod')
-renameType (WeakTypeNode s ts) = do
+    return $ meta :< TypeForall (s', tdom') tcod'
+renameType (meta :< TypeNode s ts) = do
   ts' <- mapM renameType ts
-  return $ WeakTypeNode s ts'
+  return $ meta :< TypeNode s ts'
 
 renameNodeType ::
-     [(Identifier, WeakType)]
-  -> WeakType
-  -> WithEnv ([(Identifier, WeakType)], WeakType)
+     [(Identifier, Type)] -> Type -> WithEnv ([(Identifier, Type)], Type)
 renameNodeType [] t = do
   t' <- renameType t
   return ([], t')
