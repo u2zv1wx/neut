@@ -29,7 +29,7 @@ parse (meta :< TreeNode [_ :< TreeAtom "thunk", te]) = do
   e <- parse te
   return $ meta :< TermThunk e
 parse (meta :< TreeNode [_ :< TreeAtom "lambda", _ :< TreeNode ts, te]) = do
-  xs <- parseIdentSeq ts
+  xs <- parseArg ts
   e <- parse te
   _ :< term <- foldMTermR TermLam e xs
   return $ meta :< term
@@ -42,10 +42,10 @@ parse (meta :< TreeNode [_ :< TreeAtom "colift", tv]) = do
 parse (meta :< TreeNode [_ :< TreeAtom "unthunk", tv]) = do
   v <- parse tv
   return $ meta :< TermUnthunk v
-parse (meta :< TreeNode [_ :< TreeAtom "mu", _ :< TreeAtom s, te]) = do
-  s' <- strToName s
+parse (meta :< TreeNode [_ :< TreeAtom "mu", t, te]) = do
+  arg <- parseArg' t
   e <- parse te
-  return $ meta :< TermMu s' e
+  return $ meta :< TermMu arg e
 parse (meta :< TreeNode ((_ :< TreeAtom "match"):(_ :< TreeNode tvs):tves))
   | not (null tves) = do
     vs <- mapM parse tvs
@@ -59,13 +59,22 @@ parse (meta :< TreeNode (te:tvs))
     return $ meta :< tmp
 parse t = lift $ throwE $ "parse: syntax error:\n" ++ Pr.ppShow t
 
-parseIdentSeq :: [Tree] -> WithEnv [Identifier]
-parseIdentSeq [] = return []
-parseIdentSeq ((_ :< TreeAtom s):ts) = do
-  xs <- parseIdentSeq ts
-  return $ s : xs
-parseIdentSeq t =
-  lift $ throwE $ "parseIdentSeq: syntax error:\n" ++ Pr.ppShow t
+parseArg :: [Tree] -> WithEnv [Arg]
+parseArg [] = return []
+parseArg (t:ts) = do
+  xs <- parseArg ts
+  arg <- parseArg' t
+  return $ arg : xs
+
+parseArg' :: Tree -> WithEnv Arg
+parseArg' (_ :< TreeAtom s) = return $ ArgIdent s
+parseArg' (_ :< TreeNode [_ :< TreeAtom "lift", t]) = do
+  t' <- parseArg' t
+  return $ ArgLift t'
+parseArg' (_ :< TreeNode [_ :< TreeAtom "colift", t]) = do
+  t' <- parseArg' t
+  return $ ArgColift t'
+parseArg' t = lift $ throwE $ "parseArg': syntax error:\n" ++ Pr.ppShow t
 
 parsePat :: Tree -> WithEnv Pat
 parsePat (meta :< TreeAtom "_") = do

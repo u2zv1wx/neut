@@ -105,9 +105,15 @@ deriving instance Functor Decision
 
 $(deriveShow1 ''Decision)
 
+data Arg
+  = ArgIdent Identifier
+  | ArgLift Arg
+  | ArgColift Arg
+  deriving (Show)
+
 data TermF a
   = TermVar Identifier
-  | TermLam Identifier
+  | TermLam Arg
             a -- positive or negative
   | TermApp a
             a
@@ -115,7 +121,7 @@ data TermF a
   | TermColift a
   | TermThunk a
   | TermUnthunk a
-  | TermMu Identifier
+  | TermMu Arg
            a
   | TermCase [a]
              [([Pat], a)]
