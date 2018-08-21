@@ -21,7 +21,6 @@ import           System.IO.Unsafe
 import           Data.IORef
 import           Data.List
 
--- import           Data.Functor.Foldable
 import qualified Text.Show.Pretty           as Pr
 
 type Identifier = String
@@ -29,12 +28,6 @@ type Identifier = String
 newtype Meta = Meta
   { ident :: Identifier
   } deriving (Show, Eq)
-
--- (undetermined) level of universe
-data WeakLevel
-  = WeakLevelFixed Int
-  | WeakLevelHole Identifier
-  deriving (Show, Eq)
 
 type Level = Int
 
@@ -58,70 +51,30 @@ recurM f (meta :< TreeNode tis) = do
   tis' <- mapM (recurM f) tis
   f (meta :< TreeNode tis')
 
-data IdentOrHole
-  = Ident Identifier
-  | Hole Identifier
+-- (undetermined) level of universe
+data WeakLevel
+  = WeakLevelFixed Int
+  | WeakLevelHole Identifier
   deriving (Show, Eq)
 
--- weaktype
--- WT ::= P | N
-data WeakType
-  = WeakTypeVar Identifier
-  | WeakTypePosHole Identifier
-  | WeakTypeNegHole Identifier
-  | WeakTypeNode Identifier
-                 [WeakType]
-  | WeakTypeUp WeakType
-  | WeakTypeDown WeakType
-                 Identifier
-  | WeakTypeUniv WeakLevel
-  | WeakTypeForall (IdentOrHole, WeakType)
-                   WeakType
-  deriving (Show, Eq)
+data TypeF a
+  = TypeVar Identifier
+  | TypeForall (Identifier, a)
+               a
+  | TypeNode Identifier
+             [a]
+  | TypeUp a
+  | TypeDown a
+  | TypeUniv WeakLevel
+  | TypeHole Identifier
 
--- value type
--- P ::= p
---     | (down N)
---     | {defined constant type}
---     | (node (x P) P)
---     | (p p)
---     | (universe i)
-data ValueType
-  = ValueTypeVar Identifier
-  | ValueTypeNode Identifier
-                  [ValueType]
-  | ValueTypeDown CompType
-  | ValueTypeUniv Level
-  deriving (Show, Eq)
+deriving instance Show a => Show (TypeF a)
 
--- computation type
--- N ::= (forall (x P) N)
---     | (up P)
-data CompType
-  = CompTypeForall (Identifier, ValueType)
-                   CompType
-  | CompTypeUp ValueType
-  deriving (Show, Eq)
+deriving instance Functor TypeF
 
-data Type
-  = TypeValueType ValueType
-  | TypeCompType CompType
-  deriving (Show)
+$(deriveShow1 ''TypeF)
 
-weakenValueType :: ValueType -> WeakType
-weakenValueType (ValueTypeVar i) = WeakTypeVar i
-weakenValueType (ValueTypeNode s ts) = do
-  let ts' = map weakenValueType ts
-  WeakTypeNode s ts'
-weakenValueType (ValueTypeDown c) = WeakTypeDown (weakenCompType c) "ANY"
-weakenValueType (ValueTypeUniv l) = WeakTypeUniv (WeakLevelFixed l)
-
-weakenCompType :: CompType -> WeakType
-weakenCompType (CompTypeForall (i, t1) t2) = do
-  let t1' = weakenValueType t1
-  let t2' = weakenCompType t2
-  WeakTypeForall (Ident i, t1') t2'
-weakenCompType (CompTypeUp v) = WeakTypeUp (weakenValueType v)
+type Type = Cofree TypeF Meta
 
 data PatF a
   = PatHole
@@ -152,137 +105,39 @@ deriving instance Functor Decision
 
 $(deriveShow1 ''Decision)
 
--- value / positive term
--- v ::= x
---     | {defined constant} <- nat, succ, etc.
---     | (v v)
---     | (thunk e)
-data ValueF c v
-  = ValueVar Identifier
-  | ValueNodeApp Identifier
-                 [v]
-  | ValueThunk c
-  deriving (Show)
+data TermF a
+  = TermVar Identifier
+  | TermLam Identifier
+            a -- positive or negative
+  | TermApp a
+            a
+  | TermLift a
+  | TermColift a
+  | TermThunk a
+  | TermUnthunk a
+  | TermMu Identifier
+           a
+  | TermCase [a]
+             [([Pat], a)]
+  | TermDecision [a]
+                 (Decision a)
 
--- computation / negative term
--- e ::= (lambda (x P) e)
---     | (e v)
---     | (return v)
---     | (bind (x P) e1 e2)
---     | (unthunk v)
---     | (mu (x P) e)
---     | (case e (v1 e1) ... (vn en))
-data CompF v c
-  = CompLam Identifier
-            c
-  | CompApp c
-            v
-  | CompRet v
-  | CompBind Identifier
-             c
-             c
-  | CompUnthunk v
-  | CompMu Identifier
-           c
-  | CompCase [v]
-             (Decision c)
-  deriving (Show)
+$(deriveShow1 ''TermF)
 
-data QuasiCompF v c
-  = QuasiCompLam Identifier
-                 c
-  | QuasiCompApp c
-                 v
-  | QuasiCompRet v
-  | QuasiCompBind Identifier
-                  c
-                  c
-  | QuasiCompUnthunk v
-  | QuasiCompMu Identifier
-                c
-  | QuasiCompCase [v]
-                  [([Pat], c)]
-  deriving (Show)
-
-$(deriveShow1 ''ValueF)
-
-$(deriveShow1 ''CompF)
-
-$(deriveShow1 ''QuasiCompF)
-
-type PreValue = Cofree (ValueF Comp) Meta
-
-type PreComp = Cofree (CompF Value) Meta
-
-type PreQuasiValue = Cofree (ValueF QuasiComp) Meta
-
-type PreQuasiComp = Cofree (QuasiCompF QuasiValue) Meta
-
-newtype Value =
-  Value PreValue
-  deriving (Show)
-
-newtype Comp =
-  Comp PreComp
-  deriving (Show)
-
-newtype QuasiValue =
-  QuasiValue (Cofree (ValueF QuasiComp) Meta)
-  deriving (Show)
-
-newtype QuasiComp =
-  QuasiComp (Cofree (QuasiCompF QuasiValue) Meta)
-  deriving (Show)
+type Term = Cofree TermF Meta
 
 instance (Show a) => Show (IORef a) where
   show a = show (unsafePerformIO (readIORef a))
 
-type ValueInfo = (Identifier, [(Identifier, ValueType)], ValueType)
+type ValueInfo = (Identifier, [(Identifier, Type)], Type)
 
 type Index = [Int]
 
-unwrapValue :: Value -> PreValue
-unwrapValue (Value v) = v
-
--- %cell = type { i32, [0 x %cell]* }
-data LowType
-  = LowTypeNull
-  | LowTypeInt8
-  | LowTypeInt32
-  | LowTypeStruct [LowType]
-  | LowTypePointer LowType
-  | LowTypeFunction [(Identifier, LowType)]
-                    LowType
-  | LowTypeLabel LowType
-  | LowTypeAny
-  deriving (Show)
-
-forallArgs :: CompType -> (CompType, [(Identifier, ValueType)])
-forallArgs (CompTypeForall (i, vt) t) = do
+forallArgs :: Type -> (Type, [(Identifier, Type)])
+forallArgs (_ :< TypeForall (i, vt) t) = do
   let (body, xs) = forallArgs t
   (body, (i, vt) : xs)
 forallArgs body = (body, [])
-
-valueTypeToLowType :: ValueType -> LowType
-valueTypeToLowType (ValueTypeVar _)    = LowTypeAny
-valueTypeToLowType (ValueTypeNode _ _) = LowTypeAny
-valueTypeToLowType (ValueTypeDown c)   = LowTypeLabel (compTypeToLowType c)
-valueTypeToLowType (ValueTypeUniv _)   = LowTypeAny
-
-compTypeToLowType :: CompType -> LowType
-compTypeToLowType ct@(CompTypeForall _ _) = do
-  let (body, args) = forallArgs ct
-  let args' = map (\(i, vt) -> (i, valueTypeToLowType vt)) args
-  LowTypeFunction args' (compTypeToLowType body)
-compTypeToLowType (CompTypeUp d) = LowTypePointer (valueTypeToLowType d)
-
-constructLowTypeEnv :: WithEnv ()
-constructLowTypeEnv = do
-  env <- get
-  forM_ (valueTypeEnv env) $ \(i, vt) -> do
-    insLowTypeEnv i (valueTypeToLowType vt)
-  forM_ (compTypeEnv env) $ \(i, ct) -> do
-    insLowTypeEnv i (compTypeToLowType ct)
 
 data Data
   = DataPointer Identifier -- var is something that points already-allocated data
@@ -336,10 +191,10 @@ data AsmData
   deriving (Show)
 
 data Asm
-  = AsmReturn (Identifier, LowType)
+  = AsmReturn (Identifier, Type)
   | AsmLet Identifier
            AsmOperation
-  | AsmStore LowType -- the type of source
+  | AsmStore Type -- the type of source
              AsmData -- source data
              Identifier -- destination register
   | AsmBranch Identifier
@@ -351,17 +206,17 @@ data Asm
   deriving (Show)
 
 data AsmOperation
-  = AsmAlloc LowType
-  | AsmLoad LowType -- the type of source register
+  = AsmAlloc Type
+  | AsmLoad Type -- the type of source register
             Identifier -- source register
-  | AsmGetElemPointer LowType -- the type of base register
+  | AsmGetElemPointer Type -- the type of base register
                       Identifier -- base register
                       Index -- index
-  | AsmCall (Identifier, LowType)
-            [(Identifier, LowType)]
-  | AsmBitcast LowType
+  | AsmCall (Identifier, Type)
+            [(Identifier, Type)]
+  | AsmBitcast Type
                Identifier
-               LowType
+               Type
   deriving (Show)
 
 data Env = Env
@@ -371,16 +226,10 @@ data Env = Env
   , notationEnv    :: [(Tree, Tree)] -- macro transformers
   , reservedEnv    :: [Identifier] -- list of reserved keywords
   , nameEnv        :: [(Identifier, Identifier)] -- used in alpha conversion
-  , weakTypeEnv    :: [(Identifier, WeakType)] -- used in type inference
   , typeEnv        :: [(Identifier, Type)] -- polarized type environment
-  , valueTypeEnv   :: [(Identifier, ValueType)]
-  , compTypeEnv    :: [(Identifier, CompType)]
-  , constraintEnv  :: [(WeakType, WeakType)] -- used in type inference
+  , constraintEnv  :: [(Type, Type)] -- used in type inference
   , levelEnv       :: [(WeakLevel, WeakLevel)] -- constraint regarding the level of universes
-  , argEnv         :: [(IdentOrHole, IdentOrHole)] -- equivalence of arguments of forall
-  , thunkEnv       :: [(Identifier, Identifier)]
   , codeEnv        :: [(Identifier, IORef [(Identifier, IORef Code)])]
-  , lowTypeEnv     :: [(Identifier, LowType)]
   , didUpdate      :: Bool -- used in live analysis to detect the end of the process
   , scope          :: Identifier -- used in Virtual to determine the name of current function
   } deriving (Show)
@@ -407,16 +256,10 @@ initialEnv =
         , "up"
         ]
     , nameEnv = []
-    , weakTypeEnv = []
     , typeEnv = []
-    , valueTypeEnv = []
-    , compTypeEnv = []
     , constraintEnv = []
     , levelEnv = []
-    , thunkEnv = []
-    , argEnv = []
     , codeEnv = []
-    , lowTypeEnv = []
     , didUpdate = False
     , scope = ""
     }
@@ -449,25 +292,8 @@ newNameWith s = do
   modify (\e -> e {nameEnv = (s, s') : nameEnv e})
   return s'
 
-lookupWTEnv :: String -> WithEnv (Maybe WeakType)
-lookupWTEnv s = gets (lookup s . weakTypeEnv)
-
 lookupTEnv :: String -> WithEnv (Maybe Type)
 lookupTEnv s = gets (lookup s . typeEnv)
-
-lookupWTEnv' :: String -> WithEnv WeakType
-lookupWTEnv' s = do
-  mt <- lookupWTEnv s
-  case mt of
-    Just t -> return t
-    Nothing -> do
-      env <- get
-      lift $
-        throwE $
-        "the type of " ++
-        show s ++
-        " is not defined in the type environment. typeEnv:\n" ++
-        (Pr.ppShow $ weakTypeEnv env)
 
 lookupVEnv :: String -> WithEnv (Maybe ValueInfo)
 lookupVEnv s = do
@@ -544,18 +370,6 @@ insEmptyCodeEnv scope = do
   nop <- liftIO $ newIORef []
   modify (\e -> e {codeEnv = (scope, nop) : codeEnv e})
 
-lookupThunkEnv :: Identifier -> WithEnv [Identifier]
-lookupThunkEnv s = do
-  env <- get
-  let selector pair =
-        case pair of
-          (x, y)
-            | x == s -> [y]
-          (x, y)
-            | y == s -> [x]
-          _ -> []
-  return $ concatMap selector $ thunkEnv env
-
 lookupConstructorEnv :: Identifier -> WithEnv [Identifier]
 lookupConstructorEnv cons = do
   env <- get
@@ -574,62 +388,12 @@ getConstructorNumber nodeName ident = do
         Nothing -> lift $ throwE $ "no such constructor defined: " ++ ident
         Just i  -> return i
 
-insWTEnv :: String -> WeakType -> WithEnv ()
-insWTEnv s t = modify (\e -> e {weakTypeEnv = (s, t) : weakTypeEnv e})
-
-insVTEnv :: String -> ValueType -> WithEnv ()
-insVTEnv s t = modify (\e -> e {valueTypeEnv = (s, t) : valueTypeEnv e})
-
-insCTEnv :: String -> CompType -> WithEnv ()
-insCTEnv s t = modify (\e -> e {compTypeEnv = (s, t) : compTypeEnv e})
-
-insLowTypeEnv :: String -> LowType -> WithEnv ()
-insLowTypeEnv s t = modify (\e -> e {lowTypeEnv = (s, t) : lowTypeEnv e})
-
-lookupLowTypeEnv :: String -> WithEnv (Maybe LowType)
-lookupLowTypeEnv s = gets (lookup s . lowTypeEnv)
-
-lookupLowTypeEnv' :: String -> WithEnv LowType
-lookupLowTypeEnv' s = do
-  env <- get
-  mt <- lookupLowTypeEnv s
-  case mt of
-    Just t -> return t
-    Nothing -> do
-      lift $
-        throwE $
-        "the type of " ++ show s ++ " is not defined. env: " ++ Pr.ppShow env
-
-lookupValueTypeEnv :: String -> WithEnv (Maybe ValueType)
-lookupValueTypeEnv s = gets (lookup s . valueTypeEnv)
-
-lookupValueTypeEnv' :: String -> WithEnv ValueType
-lookupValueTypeEnv' s = do
-  mt <- lookupValueTypeEnv s
-  case mt of
-    Just t -> return t
-    Nothing -> do
-      lift $ throwE $ "the type of " ++ show s ++ " is not defined "
-
-lookupCompTypeEnv :: String -> WithEnv (Maybe CompType)
-lookupCompTypeEnv s = gets (lookup s . compTypeEnv)
-
-lookupCompTypeEnv' :: String -> WithEnv CompType
-lookupCompTypeEnv' s = do
-  mt <- lookupCompTypeEnv s
-  case mt of
-    Just t -> return t
-    Nothing -> do
-      lift $ throwE $ "the type of " ++ show s ++ " is not defined "
-
-insCEnv :: WeakType -> WeakType -> WithEnv ()
-insCEnv t1 t2 = modify (\e -> e {constraintEnv = (t1, t2) : constraintEnv e})
+insConstraintEnv :: Type -> Type -> WithEnv ()
+insConstraintEnv t1 t2 =
+  modify (\e -> e {constraintEnv = (t1, t2) : constraintEnv e})
 
 insLEnv :: WeakLevel -> WeakLevel -> WithEnv ()
 insLEnv l1 l2 = modify (\e -> e {levelEnv = (l1, l2) : levelEnv e})
-
-insAEnv :: IdentOrHole -> IdentOrHole -> WithEnv ()
-insAEnv x y = modify (\e -> e {argEnv = (x, y) : argEnv e})
 
 insConstructorEnv :: Identifier -> Identifier -> WithEnv ()
 insConstructorEnv i cons = do
@@ -641,9 +405,6 @@ insConstructorEnv i cons = do
     Just cenvRef -> do
       cenv <- liftIO $ readIORef cenvRef
       liftIO $ writeIORef cenvRef (cons : cenv)
-
-insThunkEnv :: Identifier -> Identifier -> WithEnv ()
-insThunkEnv i j = modify (\e -> e {thunkEnv = (i, j) : thunkEnv e})
 
 setScope :: Identifier -> WithEnv ()
 setScope i = do
@@ -661,16 +422,16 @@ local p = do
   modify (\e -> env {count = count e})
   return x
 
-foldMTerm ::
+foldMTermL ::
      (Cofree f Meta -> a -> f (Cofree f Meta))
   -> Cofree f Meta
   -> [a]
   -> StateT Env (ExceptT String IO) (Cofree f Meta)
-foldMTerm _ e [] = return e
-foldMTerm f e (t:ts) = do
+foldMTermL _ e [] = return e
+foldMTermL f e (t:ts) = do
   let tmp = f e t
   i <- newName
-  foldMTerm f (Meta {ident = i} :< tmp) ts
+  foldMTermL f (Meta {ident = i} :< tmp) ts
 
 foldMTermR ::
      (a -> Cofree f Meta -> f (Cofree f Meta))
