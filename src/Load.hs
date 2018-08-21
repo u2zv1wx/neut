@@ -73,7 +73,7 @@ load' (a:as) = do
   c' <- virtualC e' >>= liftIO . newIORef
   insCurrentCodeEnv i c'
   constructLowTypeEnv
-  env <- get
-  liftIO $ putStrLn $ Pr.ppShow env
+  -- env <- get
+  -- liftIO $ putStrLn $ Pr.ppShow env
   emit
   load' as

@@ -42,12 +42,10 @@ emit = do
           asm <- asmCode code
           emitLabelHeader label
           mapM_ emitAsm asm
-        emitLabelHeader "exit"
-        emitOp $ "ret void"
         liftIO $ putStrLn "}"
 
 emitAsm :: Asm -> WithEnv ()
-emitAsm (AsmReturn (i, t)) = emitOp $ "ret " ++ showType t ++ " " ++ i
+emitAsm (AsmReturn (i, t)) = emitOp $ "ret " ++ showType t ++ " %" ++ i
 emitAsm (AsmLet i op) = emitAsmLet i op
 emitAsm (AsmStore t (AsmDataRegister item) dest) = do
   emitOp $

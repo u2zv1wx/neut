@@ -204,7 +204,6 @@ data QuasiCompF v c
                   [([Pat], c)]
   deriving (Show)
 
---                Identifier
 $(deriveShow1 ''ValueF)
 
 $(deriveShow1 ''CompF)
@@ -265,11 +264,10 @@ forallArgs (CompTypeForall (i, vt) t) = do
 forallArgs body = (body, [])
 
 valueTypeToLowType :: ValueType -> LowType
-valueTypeToLowType (ValueTypeVar _)     = LowTypeAny
-valueTypeToLowType (ValueTypeNode _ ds) = LowTypeAny
-  -- LowTypeStruct $ LowTypeInt32 : map valueTypeToLowType ds
-valueTypeToLowType (ValueTypeDown c)    = LowTypeLabel (compTypeToLowType c)
-valueTypeToLowType (ValueTypeUniv _)    = LowTypeAny
+valueTypeToLowType (ValueTypeVar _)    = LowTypeAny
+valueTypeToLowType (ValueTypeNode _ _) = LowTypeAny
+valueTypeToLowType (ValueTypeDown c)   = LowTypeLabel (compTypeToLowType c)
+valueTypeToLowType (ValueTypeUniv _)   = LowTypeAny
 
 compTypeToLowType :: CompType -> LowType
 compTypeToLowType ct@(CompTypeForall _ _) = do
@@ -300,10 +298,6 @@ data Data
 type Branch = (Identifier, Int, Identifier)
 
 type Address = Identifier
-
-type FunctionName = Identifier
-
-type Label = (FunctionName, Identifier)
 
 type DefaultBranch = Identifier
 

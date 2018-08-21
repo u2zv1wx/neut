@@ -17,11 +17,11 @@ import           Debug.Trace
 
 asmCode :: Code -> WithEnv [Asm]
 asmCode (CodeReturn d) = do
-  tmp <- newNameWith "tmp"
+  tmp <- newNameWith "alloc"
+  asms <- asmData tmp d
   t <- typeOfData d
-  insLowTypeEnv tmp $ LowTypePointer t
-  tmpAsm <- traceAsm tmp d
-  return $ tmpAsm ++ [AsmReturn (tmp, LowTypePointer t)]
+  insLowTypeEnv tmp (LowTypePointer t)
+  return $ asms ++ [AsmReturn (tmp, LowTypePointer t)]
 asmCode (CodeSwitch basePointer defaultBranch branchList) = do
   baseType <- lookupLowTypeEnv' basePointer
   cursorAt00 <- newNameWith $ basePointer ++ ".cursor0"
@@ -43,16 +43,25 @@ asmCode (CodeIndirectJump x unthunkId poss) = do
 asmCode (CodeRecursiveJump x) = return [AsmIndirectBranch x [x]]
 asmCode (CodeLet i d cont) = do
   t <- typeOfData d
-  insLowTypeEnv i $ LowTypePointer t
+  j <- newNameWith "loader"
+  insLowTypeEnv j (LowTypePointer t)
+  insLowTypeEnv i t
+  asms <- asmData j d
   cont' <- asmCode cont
-  tmp <- traceAsm i d
-  return $ tmp ++ cont'
+  return $ asms ++ [AsmLet i (AsmLoad (LowTypePointer t) j)] ++ cont'
 asmCode (CodeWithArg xds code) = do
   let (xs, ds) = unzip xds
   tmp <- letSeq xs ds code
   asmCode tmp
 asmCode (CodeCall x name args cont) = do
-  asms <- forM args $ \(ident, d) -> do traceAsm ident d
+  asms <-
+    forM args $ \(ident, d) -> do
+      j <- newNameWith "loader"
+      td <- typeOfData d
+      insLowTypeEnv j (LowTypePointer td)
+      insLowTypeEnv ident td
+      asms <- asmData j d
+      return $ asms ++ [AsmLet ident (AsmLoad (LowTypePointer td) j)]
   cont' <- asmCode cont
   t <- lookupLowTypeEnv' name
   case t of
@@ -62,64 +71,78 @@ asmCode (CodeCall x name args cont) = do
       return $
         join asms ++
         [AsmLet x (AsmCall (name, codType) (zip vars domTypes))] ++ cont'
-    _ -> undefined
+    _ ->
+      lift $ throwE $ "the type of " ++ name ++ " is not a function: " ++ show t
 
--- emitAsmLet i (AsmCall (name, codType) args) = undefined
-traceAsm :: Identifier -> Data -> WithEnv [Asm]
-traceAsm x (DataPointer y) = do
-  ty <- lookupLowTypeEnv' y
-  return [AsmLet x (AsmAlloc ty), AsmStore ty (AsmDataRegister y) x]
-traceAsm x d@(DataCell _ i args) = do
+-- allocate data (if needed) and set tmp to be a pointer to the data
+asmData :: Identifier -> Data -> WithEnv [Asm]
+asmData tmp (DataPointer x) = do
+  t <- lookupLowTypeEnv' x
+  insLowTypeEnv tmp (LowTypePointer t)
+  return [AsmLet tmp (AsmAlloc t), AsmStore t (AsmDataRegister x) tmp]
+asmData x d@(DataCell _ i args) = do
   let args' = (DataInt32 i) : args
   t <- typeOfData d
+  insLowTypeEnv x (LowTypePointer t)
   tmp <- join <$> (forM (zip [0 ..] args') $ setIthData x)
   return $ AsmLet x (AsmAlloc t) : tmp
-traceAsm x (DataLabel s) = do
-  let labelPointerType = LowTypePointer (LowTypeInt8)
-  return $
-    [ AsmLet x (AsmAlloc labelPointerType)
-    , AsmStore labelPointerType (AsmDataLabel s) x
+asmData tmp (DataLabel x) = do
+  let labelPointerType = LowTypePointer LowTypeInt8
+  insLowTypeEnv tmp (labelPointerType)
+  return
+    [ AsmLet tmp (AsmAlloc labelPointerType)
+    , AsmStore labelPointerType (AsmDataLabel x) tmp
     ]
-traceAsm x (DataElemAtIndex basePointer idx) = do
+asmData tmp (DataElemAtIndex basePointer idx) = do
   baseType <- lookupLowTypeEnv' basePointer
+  insLowTypeEnv tmp (LowTypePointer (traceType (0 : modifyIndex idx) baseType))
   return
-    [AsmLet x (AsmGetElemPointer baseType basePointer (0 : modifyIndex idx))]
-traceAsm x d@(DataInt32 i) = do
+    [AsmLet tmp (AsmGetElemPointer baseType basePointer (0 : modifyIndex idx))]
+asmData tmp d@(DataInt32 i) = do
   baseType <- typeOfData d -- i32*
-  return [AsmLet x (AsmAlloc baseType), AsmStore baseType (AsmDataInt i) x]
+  insLowTypeEnv tmp (LowTypePointer baseType)
+  return [AsmLet tmp (AsmAlloc baseType), AsmStore baseType (AsmDataInt i) tmp]
 
-traceAsm' :: Identifier -> Data -> WithEnv [Asm]
-traceAsm' x (DataPointer y) = do
+asmData' :: Identifier -> Data -> WithEnv [Asm]
+asmData' x (DataPointer y) = do
   ty <- lookupLowTypeEnv' y
+  insLowTypeEnv x (LowTypePointer ty)
   return [AsmStore ty (AsmDataRegister y) x]
-traceAsm' x (DataCell _ i args) = do
+asmData' x d@(DataCell _ i args) = do
   let args' = (DataInt32 i) : args
+  t <- typeOfData d
+  insLowTypeEnv x (LowTypePointer t)
   join <$> (forM (zip [0 ..] args') $ setIthData x)
-traceAsm' x (DataLabel s) = do
+asmData' x (DataLabel s) = do
+  let labelPointerType = LowTypePointer LowTypeInt8
+  insLowTypeEnv x (labelPointerType)
   return [AsmStore LowTypeInt8 (AsmDataRegister s) x]
-traceAsm' x (DataElemAtIndex basePointer idx) = do
+asmData' x (DataElemAtIndex basePointer idx) = do
   baseType <- lookupLowTypeEnv' basePointer
+  insLowTypeEnv x (LowTypePointer (traceType (0 : modifyIndex idx) baseType))
   return
     [AsmLet x (AsmGetElemPointer baseType basePointer (0 : modifyIndex idx))]
-traceAsm' x d@(DataInt32 i) = do
+asmData' x d@(DataInt32 i) = do
   baseType <- typeOfData d -- i32*
+  insLowTypeEnv x (LowTypePointer baseType)
   return [AsmStore baseType (AsmDataInt i) x]
 
 setIthData :: Identifier -> (Int, Data) -> WithEnv [Asm]
 setIthData x (index, ithArg) = do
-  ithCursor <- newNameWith $ x ++ ".cursor" ++ show index
-  td <- typeOfData ithArg
   xt <- lookupLowTypeEnv' x
+  ithCursor <- newNameWith $ "cursor" ++ show index
+  td <- typeOfData ithArg
   insLowTypeEnv ithCursor (LowTypePointer td)
-  asm <- traceAsm' ithCursor ithArg
-  return $ AsmLet ithCursor (AsmGetElemPointer xt x [0, index]) : asm
+  asms <- asmData' ithCursor ithArg
+  return $ AsmLet ithCursor (AsmGetElemPointer xt x [0, index]) : asms
 
+--  asm <- traceAsm' ithCursor ithArg
 typeOfData :: Data -> WithEnv LowType
 typeOfData (DataPointer x) = lookupLowTypeEnv' x
 typeOfData (DataCell _ _ ds) = do
   ts <- mapM typeOfData ds
   return $ LowTypeStruct $ LowTypeInt32 : ts
-typeOfData (DataLabel _) = return LowTypeInt8
+typeOfData (DataLabel _) = return $ LowTypePointer LowTypeInt8
 typeOfData (DataElemAtIndex basePointer idx) = do
   t <- lookupLowTypeEnv' basePointer
   return $ traceType (0 : modifyIndex idx) t
