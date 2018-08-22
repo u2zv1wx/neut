@@ -56,32 +56,38 @@ rename (i :< TermCase vs ves) = do
 rename _ = error "Rename.rename: unreachable"
 
 renameArg :: Arg -> WithEnv Arg
-renameArg (ArgIdent s)    = ArgIdent <$> newNameWith s
-renameArg (ArgLift arg)   = ArgLift <$> renameArg arg
-renameArg (ArgColift arg) = ArgColift <$> renameArg arg
+renameArg (meta :< ArgIdent s) = do
+  s' <- newNameWith s
+  return $ meta :< ArgIdent s'
+renameArg (meta :< ArgLift arg) = do
+  arg' <- renameArg arg
+  return $ meta :< ArgLift arg'
+renameArg (meta :< ArgColift arg) = do
+  arg' <- renameArg arg
+  return $ meta :< ArgColift arg'
 
 renameType :: Type -> WithEnv Type
-renameType (meta :< TypeVar s) = do
+renameType (Fix (TypeVar s)) = do
   t' <- TypeVar <$> lookupNameEnv s
-  return $ meta :< t'
-renameType (meta :< TypeHole i) = do
-  return $ meta :< TypeHole i
-renameType (meta :< TypeUp t) = do
+  return $ Fix t'
+renameType (Fix (TypeHole i)) = do
+  return $ Fix $ TypeHole i
+renameType (Fix (TypeUp t)) = do
   t' <- TypeUp <$> renameType t
-  return $ meta :< t'
-renameType (meta :< TypeDown t) = do
+  return $ Fix t'
+renameType (Fix (TypeDown t)) = do
   t' <- renameType t
-  return $ meta :< TypeDown t'
-renameType (meta :< TypeUniv level) = return $ meta :< TypeUniv level
-renameType (meta :< TypeForall (s, tdom) tcod) = do
+  return $ Fix $ TypeDown t'
+renameType (Fix (TypeUniv level)) = return $ Fix $ TypeUniv level
+renameType (Fix (TypeForall (s, tdom) tcod)) = do
   tdom' <- renameType tdom
   local $ do
-    s' <- newNameWith s
+    s' <- renameArg s
     tcod' <- renameType tcod
-    return $ meta :< TypeForall (s', tdom') tcod'
-renameType (meta :< TypeNode s ts) = do
+    return $ Fix $ TypeForall (s', tdom') tcod'
+renameType (Fix (TypeNode s ts)) = do
   ts' <- mapM renameType ts
-  return $ meta :< TypeNode s ts'
+  return $ Fix $ TypeNode s ts'
 
 renameNodeType ::
      [(Identifier, Type)] -> Type -> WithEnv ([(Identifier, Type)], Type)

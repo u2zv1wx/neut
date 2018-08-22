@@ -43,7 +43,7 @@ deriving instance Functor TreeF
 
 $(deriveShow1 ''TreeF)
 
-type Tree = Cofree TreeF Meta
+type Tree = Cofree TreeF Identifier
 
 recurM :: (Monad m) => (Tree -> m Tree) -> Tree -> m Tree
 recurM f (meta :< TreeAtom s) = f (meta :< TreeAtom s)
@@ -57,9 +57,20 @@ data WeakLevel
   | WeakLevelHole Identifier
   deriving (Show, Eq)
 
+data ArgF a
+  = ArgIdent Identifier
+  | ArgLift a
+  | ArgColift a
+  | ArgHole Identifier
+  deriving (Show)
+
+$(deriveShow1 ''ArgF)
+
+type Arg = Cofree ArgF Identifier
+
 data TypeF a
   = TypeVar Identifier
-  | TypeForall (Identifier, a)
+  | TypeForall (Arg, a)
                a
   | TypeNode Identifier
              [a]
@@ -74,7 +85,19 @@ deriving instance Functor TypeF
 
 $(deriveShow1 ''TypeF)
 
-type Type = Cofree TypeF Meta
+data Fix f =
+  Fix (f (Fix f))
+
+instance Show1 f => Show (Fix f) where
+  showsPrec d (Fix a) =
+    showParen (d >= 11) $ showString "Fix " . showsPrec1 11 a
+
+-- type Type = Cofree TypeF Identifier
+type Type = Fix TypeF
+
+type Region = Identifier
+
+type RegionType = Cofree TypeF Region
 
 data PatF a
   = PatHole
@@ -87,7 +110,7 @@ $(deriveShow1 ''PatF)
 
 deriving instance Functor PatF
 
-type Pat = Cofree PatF Meta
+type Pat = Cofree PatF Identifier
 
 type Occurrence = [Int]
 
@@ -104,12 +127,6 @@ data Decision a
 deriving instance Functor Decision
 
 $(deriveShow1 ''Decision)
-
-data Arg
-  = ArgIdent Identifier
-  | ArgLift Arg
-  | ArgColift Arg
-  deriving (Show)
 
 data TermF a
   = TermVar Identifier
@@ -130,7 +147,13 @@ data TermF a
 
 $(deriveShow1 ''TermF)
 
-type Term = Cofree TermF Meta
+type Term = Cofree TermF Identifier
+
+data Polarity
+  = PolarityHole Identifier
+  | PolarityPositive
+  | PolarityNegative
+  deriving (Show)
 
 instance (Show a) => Show (IORef a) where
   show a = show (unsafePerformIO (readIORef a))
@@ -139,8 +162,8 @@ type ValueInfo = (Identifier, [(Identifier, Type)], Type)
 
 type Index = [Int]
 
-forallArgs :: Type -> (Type, [(Identifier, Type)])
-forallArgs (_ :< TypeForall (i, vt) t) = do
+forallArgs :: Type -> (Type, [(Arg, Type)])
+forallArgs (Fix (TypeForall (i, vt) t)) = do
   let (body, xs) = forallArgs t
   (body, (i, vt) : xs)
 forallArgs body = (body, [])
@@ -226,18 +249,21 @@ data AsmOperation
   deriving (Show)
 
 data Env = Env
-  { count          :: Int -- to generate fresh symbols
-  , valueEnv       :: [ValueInfo] -- defined values
-  , constructorEnv :: [(Identifier, IORef [Identifier])]
-  , notationEnv    :: [(Tree, Tree)] -- macro transformers
-  , reservedEnv    :: [Identifier] -- list of reserved keywords
-  , nameEnv        :: [(Identifier, Identifier)] -- used in alpha conversion
-  , typeEnv        :: [(Identifier, Type)] -- polarized type environment
-  , constraintEnv  :: [(Type, Type)] -- used in type inference
-  , levelEnv       :: [(WeakLevel, WeakLevel)] -- constraint regarding the level of universes
-  , codeEnv        :: [(Identifier, IORef [(Identifier, IORef Code)])]
-  , didUpdate      :: Bool -- used in live analysis to detect the end of the process
-  , scope          :: Identifier -- used in Virtual to determine the name of current function
+  { count            :: Int -- to generate fresh symbols
+  , valueEnv         :: [ValueInfo] -- defined values
+  , constructorEnv   :: [(Identifier, IORef [Identifier])]
+  , notationEnv      :: [(Tree, Tree)] -- macro transformers
+  , reservedEnv      :: [Identifier] -- list of reserved keywords
+  , nameEnv          :: [(Identifier, Identifier)] -- used in alpha conversion
+  , typeEnv          :: [(Identifier, Type)] -- polarized type environment
+  , polEnv           :: [(Identifier, Polarity)]
+  , constraintEnv    :: [(Type, Type)] -- used in type inference
+  , polConstraintEnv :: [(Polarity, Polarity)]
+  , argConstraintEnv :: [(Arg, Arg)]
+  , levelEnv         :: [(WeakLevel, WeakLevel)] -- constraint regarding the level of universes
+  , codeEnv          :: [(Identifier, IORef [(Identifier, IORef Code)])]
+  , didUpdate        :: Bool -- used in live analysis to detect the end of the process
+  , scope            :: Identifier -- used in Virtual to determine the name of current function
   } deriving (Show)
 
 initialEnv :: Env
@@ -263,7 +289,10 @@ initialEnv =
         ]
     , nameEnv = []
     , typeEnv = []
+    , polEnv = []
     , constraintEnv = []
+    , polConstraintEnv = []
+    , argConstraintEnv = []
     , levelEnv = []
     , codeEnv = []
     , didUpdate = False
@@ -298,8 +327,25 @@ newNameWith s = do
   modify (\e -> e {nameEnv = (s, s') : nameEnv e})
   return s'
 
-lookupTEnv :: String -> WithEnv (Maybe Type)
-lookupTEnv s = gets (lookup s . typeEnv)
+lookupTypeEnv :: String -> WithEnv (Maybe Type)
+lookupTypeEnv s = gets (lookup s . typeEnv)
+
+lookupTypeEnv' :: String -> WithEnv Type
+lookupTypeEnv' s = do
+  mt <- gets (lookup s . typeEnv)
+  case mt of
+    Nothing -> lift $ throwE $ s ++ " is not found in the type environment"
+    Just t  -> return t
+
+lookupPolEnv :: String -> WithEnv (Maybe Polarity)
+lookupPolEnv s = gets (lookup s . polEnv)
+
+lookupPolEnv' :: String -> WithEnv Polarity
+lookupPolEnv' s = do
+  mpol <- gets (lookup s . polEnv)
+  case mpol of
+    Nothing  -> lift $ throwE $ s ++ " is not found in the type environment"
+    Just pol -> return pol
 
 lookupVEnv :: String -> WithEnv (Maybe ValueInfo)
 lookupVEnv s = do
@@ -350,6 +396,12 @@ lookupCodeEnv2 scope ident = do
       lift $
       throwE $ "no such label " ++ show ident ++ " defined in scope " ++ scope
 
+insTypeEnv :: Identifier -> Type -> WithEnv ()
+insTypeEnv i t = modify (\e -> e {typeEnv = (i, t) : typeEnv e})
+
+insPolEnv :: Identifier -> Polarity -> WithEnv ()
+insPolEnv i pol = modify (\e -> e {polEnv = (i, pol) : polEnv e})
+
 insCodeEnv :: Identifier -> Identifier -> IORef Code -> WithEnv ()
 insCodeEnv scope ident codeRef = do
   scopeEnvRef <- lookupCodeEnv scope
@@ -398,6 +450,14 @@ insConstraintEnv :: Type -> Type -> WithEnv ()
 insConstraintEnv t1 t2 =
   modify (\e -> e {constraintEnv = (t1, t2) : constraintEnv e})
 
+insPolConstraintEnv :: Polarity -> Polarity -> WithEnv ()
+insPolConstraintEnv pol1 pol2 =
+  modify (\e -> e {polConstraintEnv = (pol1, pol2) : polConstraintEnv e})
+
+insArgConstraintEnv :: Arg -> Arg -> WithEnv ()
+insArgConstraintEnv arg1 arg2 =
+  modify (\e -> e {argConstraintEnv = (arg1, arg2) : argConstraintEnv e})
+
 insLEnv :: WeakLevel -> WeakLevel -> WithEnv ()
 insLEnv l1 l2 = modify (\e -> e {levelEnv = (l1, l2) : levelEnv e})
 
@@ -429,27 +489,38 @@ local p = do
   return x
 
 foldMTermL ::
-     (Cofree f Meta -> a -> f (Cofree f Meta))
-  -> Cofree f Meta
+     (Cofree f Identifier -> a -> f (Cofree f Identifier))
+  -> Cofree f Identifier
   -> [a]
-  -> StateT Env (ExceptT String IO) (Cofree f Meta)
+  -> StateT Env (ExceptT String IO) (Cofree f Identifier)
 foldMTermL _ e [] = return e
 foldMTermL f e (t:ts) = do
   let tmp = f e t
   i <- newName
-  foldMTermL f (Meta {ident = i} :< tmp) ts
+  foldMTermL f (i :< tmp) ts
 
 foldMTermR ::
-     (a -> Cofree f Meta -> f (Cofree f Meta))
-  -> Cofree f Meta
+     (a -> Cofree f Identifier -> f (Cofree f Identifier))
+  -> Cofree f Identifier
   -> [a]
-  -> StateT Env (ExceptT String IO) (Cofree f Meta)
+  -> StateT Env (ExceptT String IO) (Cofree f Identifier)
 foldMTermR _ e [] = return e
 foldMTermR f e (t:ts) = do
   tmp <- foldMTermR f e ts
   let x = f t tmp
   i <- newName
-  return $ Meta {ident = i} :< x
+  return $ i :< x
+
+foldMTermR' ::
+     (a -> Fix f -> f (Fix f))
+  -> Fix f
+  -> [a]
+  -> StateT Env (ExceptT String IO) (Fix f)
+foldMTermR' _ e [] = return e
+foldMTermR' f e (t:ts) = do
+  tmp <- foldMTermR' f e ts
+  let x = f t tmp
+  return $ Fix x
 
 swap :: Int -> Int -> [a] -> [a]
 swap i j xs = do

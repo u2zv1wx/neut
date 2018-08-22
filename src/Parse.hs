@@ -67,13 +67,13 @@ parseArg (t:ts) = do
   return $ arg : xs
 
 parseArg' :: Tree -> WithEnv Arg
-parseArg' (_ :< TreeAtom s) = return $ ArgIdent s
-parseArg' (_ :< TreeNode [_ :< TreeAtom "lift", t]) = do
+parseArg' (meta :< TreeAtom s) = return $ meta :< ArgIdent s
+parseArg' (meta :< TreeNode [_ :< TreeAtom "lift", t]) = do
   t' <- parseArg' t
-  return $ ArgLift t'
-parseArg' (_ :< TreeNode [_ :< TreeAtom "colift", t]) = do
+  return $ meta :< ArgLift t'
+parseArg' (meta :< TreeNode [_ :< TreeAtom "colift", t]) = do
   t' <- parseArg' t
-  return $ ArgColift t'
+  return $ meta :< ArgColift t'
 parseArg' t = lift $ throwE $ "parseArg': syntax error:\n" ++ Pr.ppShow t
 
 parsePat :: Tree -> WithEnv Pat
@@ -104,36 +104,36 @@ parseClause (_ :< TreeNode [(_ :< TreeAtom "with"), (_ :< TreeNode tps), tbody])
 parseClause t = lift $ throwE $ "parseClause: syntax error:\n" ++ Pr.ppShow t
 
 parseType :: Tree -> WithEnv Type
-parseType (meta :< TreeAtom "_") = do
+parseType (_ :< TreeAtom "_") = do
   name <- newNameWith "hole"
-  return (meta :< TypeHole name)
-parseType (meta :< TreeAtom "universe") = do
+  return (Fix $ TypeHole name)
+parseType (_ :< TreeAtom "universe") = do
   t <- TypeUniv . WeakLevelHole <$> newName
-  return $ meta :< t
-parseType (meta :< TreeAtom s) = return $ meta :< TypeVar s -- ?
-parseType (meta :< TreeNode [_ :< TreeAtom "down", tn]) = do
+  return $ Fix t
+parseType (_ :< TreeAtom s) = return $ Fix $ TypeVar s -- ?
+parseType (_ :< TreeNode [_ :< TreeAtom "down", tn]) = do
   n <- parseType tn
-  return $ meta :< TypeDown n
-parseType (meta :< TreeNode [_ :< TreeAtom "universe", _ :< TreeAtom si]) =
+  return $ Fix $ TypeDown n
+parseType (_ :< TreeNode [_ :< TreeAtom "universe", _ :< TreeAtom si]) =
   case readMaybe si of
     Nothing -> lift $ throwE $ "not a number: " ++ si
-    Just j  -> return $ meta :< TypeUniv (WeakLevelFixed j)
-parseType (meta :< TreeNode [_ :< TreeAtom "forall", _ :< TreeNode ts, tn]) = do
+    Just j  -> return $ Fix $ TypeUniv (WeakLevelFixed j)
+parseType (_ :< TreeNode [_ :< TreeAtom "forall", _ :< TreeNode ts, tn]) = do
   its <- mapM parseTypeArg ts
   n <- parseType tn
-  _ :< t <- foldMTermR TypeForall n its
-  return $ meta :< t
-parseType (meta :< TreeNode [_ :< TreeAtom "up", tp]) = do
+  foldMTermR' TypeForall n its
+  -- return $ _ :< t
+parseType (_ :< TreeNode [_ :< TreeAtom "up", tp]) = do
   p <- parseType tp
-  return $ meta :< TypeUp p
-parseType (meta :< TreeNode ((_ :< TreeAtom s):ts)) = do
+  return $ Fix $ TypeUp p
+parseType (_ :< TreeNode ((_ :< TreeAtom s):ts)) = do
   msym <- lookupVEnv s
   case msym of
     Nothing -> lift $ throwE $ "the constant " ++ show s ++ " is not defined"
     Just (s, args, _) -- "nat" should be written as `(nat)`, for example.
       | length args == length ts -> do
         es <- mapM parseType ts
-        return $ meta :< TypeNode s es
+        return $ Fix $ TypeNode s es
     Just (s, args, _) -> do
       lift $
         throwE $
@@ -141,11 +141,11 @@ parseType (meta :< TreeNode ((_ :< TreeAtom s):ts)) = do
         show s ++ " is " ++ show (length args) ++ ", not " ++ show (length ts)
 parseType t = lift $ throwE $ "parseType: syntax error:\n" ++ Pr.ppShow t
 
-parseTypeArg :: Tree -> WithEnv (Identifier, Type)
-parseTypeArg (_ :< TreeNode [_ :< TreeAtom s, tp]) = do
-  s' <- strToName s
+parseTypeArg :: Tree -> WithEnv (Arg, Type)
+parseTypeArg (_ :< TreeNode [targ, tp]) = do
+  arg <- parseArg' targ
   t <- parseType tp
-  return (s', t)
+  return (arg, t)
 parseTypeArg t = lift $ throwE $ "parseTypeArg: syntax error:\n" ++ Pr.ppShow t
 
 strToName :: String -> WithEnv Identifier

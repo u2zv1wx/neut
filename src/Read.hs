@@ -36,7 +36,7 @@ parseAtom = do
   s <- symbol
   _ <- spaces
   i <- newNameParser
-  return $ Meta {ident = i} :< TreeAtom s
+  return $ i :< TreeAtom s
 
 parseNode :: Parser Tree
 parseNode = do
@@ -44,7 +44,7 @@ parseNode = do
   itemList <- many parseStr
   _ <- spaces >> char ')' >> spaces
   i <- newNameParser
-  return $ Meta {ident = i} :< TreeNode itemList
+  return $ i :< TreeNode itemList
 
 newNameParser :: Parser String
 newNameParser = do
