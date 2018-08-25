@@ -57,20 +57,9 @@ data WeakLevel
   | WeakLevelHole Identifier
   deriving (Show, Eq)
 
-data ArgF a
-  = ArgIdent Identifier
-  | ArgLift a
-  | ArgColift a
-  | ArgHole Identifier
-  deriving (Show)
-
-$(deriveShow1 ''ArgF)
-
-type Arg = Cofree ArgF Identifier
-
 data TypeF a
   = TypeVar Identifier
-  | TypeForall (Arg, a)
+  | TypeForall (Identifier, a)
                a
   | TypeNode Identifier
              [a]
@@ -130,15 +119,17 @@ $(deriveShow1 ''Decision)
 
 data TermF a
   = TermVar Identifier
-  | TermLam Arg
+  | TermLam Identifier
             a -- positive or negative
   | TermApp a
             a
   | TermLift a
-  | TermColift a
+  | TermBind Identifier
+             a
+             a
   | TermThunk a
   | TermUnthunk a
-  | TermMu Arg
+  | TermMu Identifier
            a
   | TermCase [a]
              [([Pat], a)]
@@ -150,8 +141,7 @@ $(deriveShow1 ''TermF)
 type Term = Cofree TermF Identifier
 
 data Polarity
-  = PolarityHole Identifier
-  | PolarityPositive
+  = PolarityPositive
   | PolarityNegative
   deriving (Show)
 
@@ -162,11 +152,21 @@ type ValueInfo = (Identifier, [(Identifier, Type)], Type)
 
 type Index = [Int]
 
-forallArgs :: Type -> (Type, [(Arg, Type)])
+forallArgs :: Type -> (Type, [(Identifier, Type)])
 forallArgs (Fix (TypeForall (i, vt) t)) = do
   let (body, xs) = forallArgs t
   (body, (i, vt) : xs)
 forallArgs body = (body, [])
+
+funAndArgs :: Term -> WithEnv (Term, [(Identifier, Term)])
+funAndArgs (i :< TermApp e v) = do
+  (fun, xs) <- funAndArgs e
+  return (fun, (i, v) : xs)
+funAndArgs c = return (c, [])
+
+coFunAndArgs :: (Term, [(Identifier, Term)]) -> Term
+coFunAndArgs (term, [])        = term
+coFunAndArgs (term, (i, v):xs) = coFunAndArgs (i :< TermApp term v, xs)
 
 data Data
   = DataPointer Identifier -- var is something that points already-allocated data
@@ -259,7 +259,6 @@ data Env = Env
   , polEnv           :: [(Identifier, Polarity)]
   , constraintEnv    :: [(Type, Type)] -- used in type inference
   , polConstraintEnv :: [(Polarity, Polarity)]
-  , argConstraintEnv :: [(Arg, Arg)]
   , levelEnv         :: [(WeakLevel, WeakLevel)] -- constraint regarding the level of universes
   , codeEnv          :: [(Identifier, IORef [(Identifier, IORef Code)])]
   , didUpdate        :: Bool -- used in live analysis to detect the end of the process
@@ -292,7 +291,6 @@ initialEnv =
     , polEnv = []
     , constraintEnv = []
     , polConstraintEnv = []
-    , argConstraintEnv = []
     , levelEnv = []
     , codeEnv = []
     , didUpdate = False
@@ -454,10 +452,6 @@ insPolConstraintEnv :: Polarity -> Polarity -> WithEnv ()
 insPolConstraintEnv pol1 pol2 =
   modify (\e -> e {polConstraintEnv = (pol1, pol2) : polConstraintEnv e})
 
-insArgConstraintEnv :: Arg -> Arg -> WithEnv ()
-insArgConstraintEnv arg1 arg2 =
-  modify (\e -> e {argConstraintEnv = (arg1, arg2) : argConstraintEnv e})
-
 insLEnv :: WeakLevel -> WeakLevel -> WithEnv ()
 insLEnv l1 l2 = modify (\e -> e {levelEnv = (l1, l2) : levelEnv e})
 
@@ -473,8 +467,7 @@ insConstructorEnv i cons = do
       liftIO $ writeIORef cenvRef (cons : cenv)
 
 setScope :: Identifier -> WithEnv ()
-setScope i = do
-  modify (\e -> e {scope = i})
+setScope i = modify (\e -> e {scope = i})
 
 getScope :: WithEnv Identifier
 getScope = do
@@ -523,11 +516,53 @@ foldMTermR' f e (t:ts) = do
   return $ Fix x
 
 swap :: Int -> Int -> [a] -> [a]
-swap i j xs = do
-  replaceNth j (xs !! i) (replaceNth i (xs !! j) xs)
+swap i j xs = replaceNth j (xs !! i) (replaceNth i (xs !! j) xs)
 
 replaceNth :: Int -> a -> [a] -> [a]
 replaceNth _ _ [] = []
 replaceNth n newVal (x:xs)
   | n == 0 = newVal : xs
   | otherwise = x : replaceNth (n - 1) newVal xs
+
+appFold :: Term -> [Term] -> WithEnv Term
+appFold e [] = return e
+appFold e@(i :< _) (term:ts) = do
+  t <- lookupTypeEnv' i
+  pol <- lookupPolEnv' i
+  case t of
+    Fix (TypeForall _ tcod) -> do
+      meta <- newNameWith "meta"
+      insTypeEnv meta tcod
+      insPolEnv meta pol
+      appFold (meta :< TermApp e term) ts
+    _ -> error "Lift.appFold"
+
+constructFormalArgs :: [Identifier] -> WithEnv [Identifier]
+constructFormalArgs [] = return []
+constructFormalArgs (ident:is) = do
+  varType <- lookupTypeEnv' ident
+  formalArg <- newNameWith "arg"
+  insTypeEnv formalArg varType
+  args <- constructFormalArgs is
+  return $ formalArg : args
+
+wrapArg :: Identifier -> WithEnv Term
+wrapArg i = do
+  t <- lookupTypeEnv' i
+  pol <- lookupPolEnv' i
+  meta <- newNameWith "meta"
+  insTypeEnv meta t
+  insPolEnv meta pol
+  return $ meta :< TermVar i
+
+bindFormalArgs :: [Identifier] -> Term -> WithEnv Term
+bindFormalArgs [] terminal = return terminal
+bindFormalArgs (arg:xs) c@(metaLam :< _) = do
+  tLam <- lookupTypeEnv' metaLam
+  polLam <- lookupPolEnv' metaLam
+  tArg <- lookupTypeEnv' arg
+  tmp <- bindFormalArgs xs c
+  meta <- newNameWith "meta"
+  insTypeEnv meta (Fix (TypeForall (arg, tArg) tLam))
+  insPolEnv meta polLam
+  return $ meta :< TermLam arg tmp

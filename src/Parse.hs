@@ -36,16 +36,16 @@ parse (meta :< TreeNode [_ :< TreeAtom "lambda", _ :< TreeNode ts, te]) = do
 parse (meta :< TreeNode [_ :< TreeAtom "lift", tv]) = do
   v <- parse tv
   return $ meta :< TermLift v
-parse (meta :< TreeNode [_ :< TreeAtom "colift", tv]) = do
-  v <- parse tv
-  return $ meta :< TermColift v
+parse (meta :< TreeNode [_ :< TreeAtom "bind", _ :< TreeAtom x, t1, t2]) = do
+  e1 <- parse t1
+  e2 <- parse t2
+  return $ meta :< TermBind x e1 e2
 parse (meta :< TreeNode [_ :< TreeAtom "unthunk", tv]) = do
   v <- parse tv
   return $ meta :< TermUnthunk v
-parse (meta :< TreeNode [_ :< TreeAtom "mu", t, te]) = do
-  arg <- parseArg' t
+parse (meta :< TreeNode [_ :< TreeAtom "mu", _ :< TreeAtom x, te]) = do
   e <- parse te
-  return $ meta :< TermMu arg e
+  return $ meta :< TermMu x e
 parse (meta :< TreeNode ((_ :< TreeAtom "match"):(_ :< TreeNode tvs):tves))
   | not (null tves) = do
     vs <- mapM parse tvs
@@ -59,26 +59,19 @@ parse (meta :< TreeNode (te:tvs))
     return $ meta :< tmp
 parse t = lift $ throwE $ "parse: syntax error:\n" ++ Pr.ppShow t
 
-parseArg :: [Tree] -> WithEnv [Arg]
+parseArg :: [Tree] -> WithEnv [Identifier]
 parseArg [] = return []
 parseArg (t:ts) = do
   xs <- parseArg ts
   arg <- parseArg' t
   return $ arg : xs
 
-parseArg' :: Tree -> WithEnv Arg
-parseArg' (meta :< TreeAtom s) = return $ meta :< ArgIdent s
-parseArg' (meta :< TreeNode [_ :< TreeAtom "lift", t]) = do
-  t' <- parseArg' t
-  return $ meta :< ArgLift t'
-parseArg' (meta :< TreeNode [_ :< TreeAtom "colift", t]) = do
-  t' <- parseArg' t
-  return $ meta :< ArgColift t'
+parseArg' :: Tree -> WithEnv Identifier
+parseArg' (_ :< TreeAtom s) = return s
 parseArg' t = lift $ throwE $ "parseArg': syntax error:\n" ++ Pr.ppShow t
 
 parsePat :: Tree -> WithEnv Pat
-parsePat (meta :< TreeAtom "_") = do
-  return $ meta :< PatHole
+parsePat (meta :< TreeAtom "_") = return $ meta :< PatHole
 parsePat (meta :< TreeAtom s) = do
   msym <- lookupVEnv s
   case msym of
@@ -97,7 +90,7 @@ parsePat (meta :< TreeNode ((_ :< TreeAtom s):ts)) = do
 parsePat t = lift $ throwE $ "parsePat: syntax error:\n" ++ Pr.ppShow t
 
 parseClause :: Tree -> WithEnv ([Pat], Term)
-parseClause (_ :< TreeNode [(_ :< TreeAtom "with"), (_ :< TreeNode tps), tbody]) = do
+parseClause (_ :< TreeNode [_ :< TreeAtom "with", _ :< TreeNode tps, tbody]) = do
   ps <- mapM parsePat tps
   body <- parse tbody
   return (ps, body)
@@ -122,7 +115,6 @@ parseType (_ :< TreeNode [_ :< TreeAtom "forall", _ :< TreeNode ts, tn]) = do
   its <- mapM parseTypeArg ts
   n <- parseType tn
   foldMTermR' TypeForall n its
-  -- return $ _ :< t
 parseType (_ :< TreeNode [_ :< TreeAtom "up", tp]) = do
   p <- parseType tp
   return $ Fix $ TypeUp p
@@ -134,14 +126,14 @@ parseType (_ :< TreeNode ((_ :< TreeAtom s):ts)) = do
       | length args == length ts -> do
         es <- mapM parseType ts
         return $ Fix $ TypeNode s es
-    Just (s, args, _) -> do
+    Just (s, args, _) ->
       lift $
-        throwE $
-        "the arity of " ++
-        show s ++ " is " ++ show (length args) ++ ", not " ++ show (length ts)
+      throwE $
+      "the arity of " ++
+      show s ++ " is " ++ show (length args) ++ ", not " ++ show (length ts)
 parseType t = lift $ throwE $ "parseType: syntax error:\n" ++ Pr.ppShow t
 
-parseTypeArg :: Tree -> WithEnv (Arg, Type)
+parseTypeArg :: Tree -> WithEnv (Identifier, Type)
 parseTypeArg (_ :< TreeNode [targ, tp]) = do
   arg <- parseArg' targ
   t <- parseType tp
@@ -150,4 +142,4 @@ parseTypeArg t = lift $ throwE $ "parseTypeArg: syntax error:\n" ++ Pr.ppShow t
 
 strToName :: String -> WithEnv Identifier
 strToName "_" = newNameWith "hole"
-strToName s   = return $ s
+strToName s   = return s

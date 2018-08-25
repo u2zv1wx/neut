@@ -14,9 +14,9 @@ rename (i :< TermVar s) = do
 rename (i :< TermThunk e) = do
   e' <- rename e
   return $ i :< TermThunk e'
-rename (i :< TermLam s e) = do
+rename (i :< TermLam s e) =
   local $ do
-    s' <- renameArg s
+    s' <- newNameWith s
     e' <- rename e
     return $ i :< TermLam s' e'
 rename (i :< TermApp e v) = do
@@ -26,15 +26,18 @@ rename (i :< TermApp e v) = do
 rename (i :< TermLift v) = do
   v' <- rename v
   return $ i :< TermLift v'
-rename (i :< TermColift v) = do
-  v' <- rename v
-  return $ i :< TermColift v'
+rename (i :< TermBind x e1 e2) = do
+  e1' <- rename e1
+  local $ do
+    x' <- newNameWith x
+    e2' <- rename e2
+    return $ i :< TermBind x' e1' e2'
 rename (i :< TermUnthunk v) = do
   v' <- rename v
   return $ i :< TermUnthunk v'
-rename (i :< TermMu s e) = do
+rename (i :< TermMu s e) =
   local $ do
-    s' <- renameArg s
+    s' <- newNameWith s
     e' <- rename e
     return $ i :< TermMu s' e'
 rename (i :< TermCase vs ves) = do
@@ -55,23 +58,11 @@ rename (i :< TermCase vs ves) = do
   return $ i :< TermCase vs' ves'
 rename _ = error "Rename.rename: unreachable"
 
-renameArg :: Arg -> WithEnv Arg
-renameArg (meta :< ArgIdent s) = do
-  s' <- newNameWith s
-  return $ meta :< ArgIdent s'
-renameArg (meta :< ArgLift arg) = do
-  arg' <- renameArg arg
-  return $ meta :< ArgLift arg'
-renameArg (meta :< ArgColift arg) = do
-  arg' <- renameArg arg
-  return $ meta :< ArgColift arg'
-
 renameType :: Type -> WithEnv Type
 renameType (Fix (TypeVar s)) = do
   t' <- TypeVar <$> lookupNameEnv s
   return $ Fix t'
-renameType (Fix (TypeHole i)) = do
-  return $ Fix $ TypeHole i
+renameType (Fix (TypeHole i)) = return $ Fix $ TypeHole i
 renameType (Fix (TypeUp t)) = do
   t' <- TypeUp <$> renameType t
   return $ Fix t'
@@ -82,7 +73,7 @@ renameType (Fix (TypeUniv level)) = return $ Fix $ TypeUniv level
 renameType (Fix (TypeForall (s, tdom) tcod)) = do
   tdom' <- renameType tdom
   local $ do
-    s' <- renameArg s
+    s' <- newNameWith s
     tcod' <- renameType tcod
     return $ Fix $ TypeForall (s', tdom') tcod'
 renameType (Fix (TypeNode s ts)) = do

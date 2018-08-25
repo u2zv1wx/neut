@@ -15,82 +15,86 @@ import qualified Text.Show.Pretty           as Pr
 
 import           Debug.Trace
 
-virtualV :: Value -> WithEnv Data
-virtualV (Value (_ :< ValueVar x)) = do
+virtual :: Term -> WithEnv Data
+virtual (_ :< TermVar x) = do
   return $ DataPointer x
-virtualV (Value (Meta {ident = i} :< ValueNodeApp s vs)) = do
-  t <- lookupValueTypeEnv' i
-  case t of
-    ValueTypeNode node _ -> do
-      vs' <- mapM (virtualV . Value) vs
-      i <- getConstructorNumber node s
-      return $ DataCell s i vs'
-    _ -> lift $ throwE $ "virtualV.ValueNodeApp"
-virtualV (Value (Meta {ident = thunkId} :< ValueThunk comp)) = do
-  asm <- virtualC comp
-  unthunkIdList <- lookupThunkEnv thunkId
-  forM_ unthunkIdList $ \unthunkId -> do
-    let label = "thunk" ++ thunkId ++ "unthunk" ++ unthunkId
-    asmRef <- liftIO $ newIORef asm
-    insCurrentCodeEnv label asmRef
-  asmRef <- liftIO $ newIORef asm
-  insCurrentCodeEnv ("thunk." ++ thunkId) asmRef -- just for completeness
-  return $ DataLabel $ "thunk." ++ thunkId
-
-virtualC :: Comp -> WithEnv Code
-virtualC (Comp (_ :< CompLam _ comp)) = do
-  virtualC (Comp comp)
-virtualC app@(Comp (_ :< CompApp _ _)) = do
+-- virtual (i :< ValueNodeApp s vs) = do
+--   t <- lookupValueTypeEnv' i
+--   case t of
+--     ValueTypeNode node _ -> do
+--       vs' <- mapM (virtual . Value) vs
+--       i <- getConstructorNumber node s
+--       return $ DataCell s i vs'
+--     _ -> lift $ throwE $ "virtual.ValueNodeApp"
+virtual (thunkId :< TermThunk comp) = do
+  undefined -- asm <- virtual comp
+  -- unthunkIdList <- lookupThunkEnv thunkId
+  -- forM_ unthunkIdList $ \unthunkId -> do
+  --   let label = "thunk" ++ thunkId ++ "unthunk" ++ unthunkId
+  --   asmRef <- liftIO $ newIORef asm
+  --   insCurrentCodeEnv label asmRef
+  -- asmRef <- liftIO $ newIORef asm
+  -- insCurrentCodeEnv ("thunk." ++ thunkId) asmRef -- just for completeness
+  -- return $ DataLabel $ "thunk." ++ thunkId
+virtual (_ :< TermLam _ comp) = do
+  virtual comp
+virtual app@(_ :< TermApp _ _) = do
   (cont, xs, vs) <- toFunAndArgs app
-  ds <- mapM virtualV vs
-  cont' <- virtualC cont
-  return $ CodeWithArg (zip xs ds) cont'
-virtualC (Comp (_ :< CompRet v)) = do
-  ans <- virtualV v
-  return $ CodeReturn ans
-virtualC (Comp (_ :< CompBind s comp1 comp2)) = do
-  operation1 <- virtualC (Comp comp1)
-  operation2 <- virtualC (Comp comp2)
-  traceLet s operation1 operation2
-virtualC (Comp (Meta {ident = unthunkId} :< CompUnthunk v)) = do
-  operand <- virtualV v
-  case operand of
-    DataPointer x -> do
-      liftIO $ putStrLn $ "looking for thunk by unthunkId: " ++ show unthunkId
-      thunkIdList <- lookupThunkEnv unthunkId
-      liftIO $ putStrLn $ "found: " ++ show thunkIdList
-      case thunkIdList of
-        [] -> do
-          return $ CodeRecursiveJump x
-        [thunkId] -> do
-          let label = "thunk" ++ thunkId ++ "unthunk" ++ unthunkId
-          return $ CodeJump label
-        _ -> do
-          return $ CodeIndirectJump x unthunkId thunkIdList -- indirect branch
-    DataLabel thunkId -> do
-      let label = "thunk" ++ thunkId ++ "unthunk" ++ unthunkId
-      return $ CodeJump label -- direct branch
-    _ -> lift $ throwE "virtualC.CompUnthunk"
-virtualC (Comp (_ :< CompMu s comp)) = do
+  ds <- mapM virtual vs
+  cont' <- virtual cont
+  undefined
+  -- return $ CodeWithArg (zip xs ds) cont'
+virtual (_ :< TermLift v) = do
+  ans <- virtual v
+  undefined
+  -- return $ CodeReturn ans
+virtual (_ :< TermBind s comp1 comp2) = do
+  operation1 <- virtual comp1
+  operation2 <- virtual comp2
+  undefined
+  -- traceLet s operation1 operation2
+virtual (unthunkId :< TermUnthunk v) = do
+  operand <- virtual v
+  undefined
+  -- case operand of
+  --   DataPointer x -> do
+  --     liftIO $ putStrLn $ "looking for thunk by unthunkId: " ++ show unthunkId
+  --     thunkIdList <- lookupThunkEnv unthunkId
+  --     liftIO $ putStrLn $ "found: " ++ show thunkIdList
+  --     case thunkIdList of
+  --       [] -> do
+  --         return $ CodeRecursiveJump x
+  --       [thunkId] -> do
+  --         let label = "thunk" ++ thunkId ++ "unthunk" ++ unthunkId
+  --         return $ CodeJump label
+  --       _ -> do
+  --         return $ CodeIndirectJump x unthunkId thunkIdList -- indirect branch
+  --   DataLabel thunkId -> do
+  --     let label = "thunk" ++ thunkId ++ "unthunk" ++ unthunkId
+  --     return $ CodeJump label -- direct branch
+  --   _ -> lift $ throwE "virtual.CompUnthunk"
+virtual (_ :< TermMu s comp) = do
   current <- getScope
   setScope s
   insEmptyCodeEnv s
-  asm <- (virtualC $ Comp comp)
+  asm <- virtual comp
   asm' <- liftIO $ newIORef asm
-  insCodeEnv s s asm'
-  setScope current
-  return $ CodeRecursiveJump s
-virtualC (Comp (_ :< CompCase vs tree)) = do
+  undefined
+  -- insCodeEnv s s asm'
+  -- setScope current
+  -- return $ CodeRecursiveJump s
+virtual (_ :< TermDecision vs tree) = do
   fooList <-
     forM vs $ \v -> do
-      asm <- virtualV v
+      asm <- virtual v
       i <- newNameWith "seq"
       return (i, asm)
   let (is, asms) = unzip fooList
-  body <- virtualDecision is tree
-  letSeq is asms body
+  undefined
+  -- body <- virtualDecision is tree
+  -- letSeq is asms body
 
-virtualDecision :: [Identifier] -> Decision PreComp -> WithEnv Code
+virtualDecision :: [Identifier] -> Decision Term -> WithEnv Code
 virtualDecision asmList (DecisionLeaf ois preComp) = do
   let indexList = map fst ois
   let forEach = flip map
@@ -98,32 +102,32 @@ virtualDecision asmList (DecisionLeaf ois preComp) = do
   asmList' <-
     forM (zip asmList ois) $ \(x, (index, _)) -> do
       return $ DataElemAtIndex x index
-  body <- virtualC $ Comp preComp
+  body <- virtual preComp
   letSeq varList asmList' body
 virtualDecision (x:vs) (DecisionSwitch o cs mdefault) = do
-  jumpList <- virtualCase (x : vs) cs
+  jumpList <- virtualase (x : vs) cs
   defaultJump <- virtualDefaultCase (x : vs) mdefault
   makeBranch x o jumpList defaultJump
 virtualDecision _ (DecisionSwap _ _) = undefined
 virtualDecision [] t =
   lift $ throwE $ "virtualDecision. Note: \n" ++ Pr.ppShow t
 
-virtualCase ::
+virtualase ::
      [Identifier]
-  -> [((Identifier, Int), Decision PreComp)]
+  -> [((Identifier, Int), Decision Term)]
   -> WithEnv [(Identifier, Int, Identifier)]
-virtualCase _ [] = return []
-virtualCase vs (((cons, num), tree):cs) = do
+virtualase _ [] = return []
+virtualase vs (((cons, num), tree):cs) = do
   code <- virtualDecision vs tree
   label <- newNameWith cons
   codeRef <- liftIO $ newIORef code
   insCurrentCodeEnv label codeRef
-  jumpList <- virtualCase vs cs
+  jumpList <- virtualase vs cs
   return $ (cons, num, label) : jumpList
 
 virtualDefaultCase ::
      [Identifier]
-  -> Maybe (Maybe Identifier, Decision PreComp)
+  -> Maybe (Maybe Identifier, Decision Term)
   -> WithEnv (Maybe (Maybe Identifier, Identifier))
 virtualDefaultCase _ Nothing = return Nothing
 virtualDefaultCase vs (Just (Nothing, tree)) = do
@@ -207,12 +211,12 @@ appendCode s cont key = do
   code' <- traceLet s code cont
   liftIO $ writeIORef codeRef code'
 
-toFunAndArgs :: Comp -> WithEnv (Comp, [Identifier], [Value])
-toFunAndArgs c@(Comp (_ :< CompApp e@((Meta {ident = i} :< _)) v)) = do
-  t <- lookupCompTypeEnv' i
+toFunAndArgs :: Term -> WithEnv (Term, [Identifier], [Term])
+toFunAndArgs c@(_ :< TermApp e@((i :< _)) v) = do
+  t <- lookupTypeEnv' i
   case t of
-    CompTypeForall (i, _) _ -> do
-      (fun, xs, args) <- toFunAndArgs (Comp e)
+    Fix (TypeForall (i, _) _) -> do
+      (fun, xs, args) <- toFunAndArgs e
       return (fun, xs ++ [i], args ++ [v])
-    _ -> return $(c, [], [])
+    _ -> return (c, [], [])
 toFunAndArgs c = return (c, [], [])
