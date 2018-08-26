@@ -11,6 +11,7 @@ rename :: Term -> WithEnv Term
 rename (i :< TermVar s) = do
   t <- TermVar <$> lookupNameEnv s
   return $ i :< t
+rename (i :< TermConst s) = return $ i :< TermConst s
 rename (i :< TermThunk e) = do
   e' <- rename e
   return $ i :< TermThunk e'

@@ -30,6 +30,10 @@ infer (meta :< TermVar s) = do
       insTypeEnv meta t
       return t
     _ -> lift $ throwE $ "undefined variable: " ++ s
+infer (meta :< TermConst s) = do
+  t <- lookupValueEnv' s
+  insTypeEnv meta t
+  return t
 infer (meta :< TermThunk e) = do
   t <- infer e
   let result = Fix $ TypeDown t
@@ -168,6 +172,8 @@ compose s1 s2 = do
 
 sType :: Subst -> Type -> Type
 sType _ (Fix TypeUnit) = Fix TypeUnit
+sType _ (Fix TypeOpaque) = Fix TypeOpaque
+sType _ (Fix (TypeInt i)) = Fix $ TypeInt i
 sType _ (Fix (TypeVar s)) = Fix $ TypeVar s
 sType sub (Fix (TypeHole s)) =
   case lookup s sub of
@@ -187,6 +193,9 @@ sType sub (Fix (TypeForall (s, tdom) tcod)) = do
 sType sub (Fix (TypeNode s ts)) = do
   let ts' = map (sType sub) ts
   Fix $ TypeNode s ts'
+sType sub (Fix (TypeStruct ts)) = do
+  let ts' = map (sType sub) ts
+  Fix $ TypeStruct ts'
 
 sConstraint :: Subst -> Constraint -> Constraint
 sConstraint s = map (\(t1, t2) -> (sType s t1, sType s t2))

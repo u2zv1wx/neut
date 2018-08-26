@@ -11,6 +11,7 @@ import           Data
 
 lift :: Term -> WithEnv Term
 lift v@(_ :< TermVar _) = return v
+lift v@(_ :< TermConst _) = return v
 lift (i :< TermLam arg body) = do
   body' <- lift body
   let freeVars = var body'
@@ -58,6 +59,7 @@ replace f2b (i :< TermVar s) =
       t <- lookupTypeEnv' i
       insTypeEnv b t
       return $ i :< TermVar b
+replace _ v@(_ :< TermConst _) = return v
 replace args (i :< TermThunk c) = do
   c' <- replace args c
   return $ i :< TermThunk c'
@@ -89,6 +91,7 @@ replace args (i :< TermCase vs vcs) = do
 
 var :: Term -> [Identifier]
 var (_ :< TermVar s) = [s]
+var (_ :< TermConst _) = []
 var (_ :< TermLam s e) = filter (/= s) $ var e
 var (_ :< TermApp e v) = var e ++ var v
 var (_ :< TermLift v) = var v

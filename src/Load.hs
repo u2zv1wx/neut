@@ -2,9 +2,9 @@ module Load
   ( load
   ) where
 
-import           Control.Monad.Except
+import qualified Control.Monad.Except       as E
 import           Control.Monad.Identity
-import           Control.Monad.State
+import           Control.Monad.State        hiding (lift)
 import           Control.Monad.Trans.Except
 
 import           Control.Comonad.Cofree
@@ -13,7 +13,8 @@ import           Data.IORef
 
 import           Asm
 import           Data
-import           Emit
+
+-- import           Emit
 import           Infer
 import           Lift
 import           Macro
@@ -39,41 +40,35 @@ load' ((_ :< TreeNode [_ :< TreeAtom "notation", from, to]):as) = do
 load' ((_ :< TreeNode [_ :< TreeAtom "reserve", _ :< TreeAtom s]):as) = do
   modify (\e -> e {reservedEnv = s : reservedEnv e})
   load' as
-load' ((_ :< TreeNode [_ :< TreeAtom "value", _ :< TreeAtom s, _ :< TreeNode tps, tp]):as) = do
-  mts <- mapM parseNodeTypeArg tps
-  mt <- parseType tp
-  (mts', mt') <- renameNodeType mts mt
-  ts <- polarizeTypeArg mts'
-  t <- polarizeType mt'
-  case t of
-    TypeValueType t@(ValueTypeNode k _) -> do
-      modify (\e -> e {valueEnv = (s, ts, t) : valueEnv e})
-      insWTEnv s (weakenValueType t)
-      insConstructorEnv k s
-      load' as
-    TypeValueType t@(ValueTypeUniv _) -> do
-      modify (\e -> e {valueEnv = (s, ts, t) : valueEnv e})
-      insWTEnv s (weakenValueType t)
-      load' as
+load' ((_ :< TreeNode ((_ :< TreeAtom "type"):(_ :< TreeAtom s):ts)):as) = do
+  args <- mapM parseTypeArg ts
+  -- TODO: check polarity, variable binding
+  insDefinedTypeEnv s args
+  load' as
+load' ((_ :< TreeNode [_ :< TreeAtom "value", _ :< TreeAtom x, tp]):as) = do
+  t <- parseType tp
+  -- TODO: check polarity, variable binding
+  let (tailType, _) = forallArgs t
+  env <- get
+  case tailType of
+    Fix (TypeNode s _)
+      | isDefinedType s env -> do
+        insTypeEnv x t
+        insValueEnv x t
+        insConstructorEnv s x
+        load' as
     _ ->
-      lift $
+      E.lift $
       throwE $
-      "the codomain of value type " ++ show s ++ " must be universe or node"
+      "the codomain of value type " ++ show x ++ " must be a user-defined type"
 load' (a:as) = do
-  e <- macroExpand a >>= parseComp >>= renameC >>= liftC
+  e <- macroExpand a >>= parse >>= rename >>= lift
   liftIO $ putStrLn $ Pr.ppShow e
   i <- newNameWith "main"
   check i e
-  env <- get
-  let wtenv = weakTypeEnv env
-  polarizeTypeEnv wtenv
-  e' <- dequasiC e
-  setScope i
-  insEmptyCodeEnv i
-  c' <- virtualC e' >>= liftIO . newIORef
-  insCurrentCodeEnv i c'
-  constructLowTypeEnv
-  -- env <- get
-  -- liftIO $ putStrLn $ Pr.ppShow env
-  emit
+  -- polarizeTypeEnv wtenv
+  e' <- polarize e >>= toComp
+  c' <- virtualC e'
+  asm <- asmCode c'
+  -- emit
   load' as

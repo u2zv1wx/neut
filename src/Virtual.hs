@@ -20,6 +20,17 @@ import           Debug.Trace
 
 virtualV :: Value -> WithEnv Data
 virtualV (Value (i :< ValueVar x)) = return $ i :< DataPointer x
+virtualV (Value (i :< ValueConst x)) = do
+  t <- lookupTypeEnv' i
+  case t of
+    Fix (TypeDown _) -> do
+      envName <- newNameWith "fv"
+      let envType = Fix (TypeDown (Fix (TypeStruct [])))
+      insTypeEnv envName envType
+      let label = "thunk" ++ i
+      insTypeEnv label t
+      return $ i :< DataClosure label envName []
+    _ -> return $ i :< DataFunName x
 virtualV (Value (i :< ValueThunk comp@(Comp (compMeta :< _)))) = do
   let fvList = varN comp
   fvTypeList <- mapM lookupTypeEnv' fvList
@@ -37,7 +48,7 @@ virtualV (Value (i :< ValueThunk comp@(Comp (compMeta :< _)))) = do
   return $ i :< DataClosure label envName fvList
 
 virtualC :: Comp -> WithEnv Code
-virtualC lam@(Comp (i :< CompLam _ _)) = do
+virtualC lam@(Comp (_ :< CompLam _ _)) = do
   (body, args) <- toLamSeq lam
   bodyCode <- virtualC body
   name <- newNameWith "lam"
@@ -215,6 +226,7 @@ funAndArgsPol c = return (c, [])
 
 varP :: Value -> [Identifier]
 varP (Value (_ :< ValueVar s))   = [s]
+varP (Value (_ :< ValueConst _)) = []
 varP (Value (_ :< ValueThunk e)) = varN e
 
 varN :: Comp -> [Identifier]

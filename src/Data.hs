@@ -136,6 +136,7 @@ data TermF a
              a
   | TermThunk a
   | TermUnthunk a
+  | TermConst Identifier
   | TermMu Identifier
            a
   | TermCase [a]
@@ -147,10 +148,11 @@ type Term = Cofree TermF Identifier
 
 -- value / positive term
 -- v ::= x
---     | (v v)
+--     | <const>
 --     | (thunk e)
 data ValueF c v
   = ValueVar Identifier
+  | ValueConst Identifier
   | ValueThunk c
   deriving (Show)
 
@@ -206,8 +208,6 @@ data Polarity
 
 instance (Show a) => Show (IORef a) where
   show a = show (unsafePerformIO (readIORef a))
-
-type ValueInfo = (Identifier, [(Identifier, Type)], Type)
 
 type Index = [Int]
 
@@ -299,14 +299,16 @@ data AsmOperation
                Type
   deriving (Show)
 
+-- type ValueInfo = (Identifier, [(Identifier, Type)], Type)
 data Env = Env
   { count          :: Int -- to generate fresh symbols
-  , valueEnv       :: [ValueInfo] -- defined values
+  , valueEnv       :: [(Identifier, Type)] -- defined values
+  , definedTypeEnv :: [(Identifier, [(Identifier, Type)])] -- types defined by (type ...)
   , constructorEnv :: [(Identifier, IORef [Identifier])]
   , notationEnv    :: [(Tree, Tree)] -- macro transformers
   , reservedEnv    :: [Identifier] -- list of reserved keywords
   , nameEnv        :: [(Identifier, Identifier)] -- used in alpha conversion
-  , typeEnv        :: [(Identifier, Type)] -- polarized type environment
+  , typeEnv        :: [(Identifier, Type)] -- type environment
   , constraintEnv  :: [(Type, Type)] -- used in type inference
   , levelEnv       :: [(WeakLevel, WeakLevel)] -- constraint regarding the level of universes
   , codeEnv        :: [(Identifier, ([Identifier], Code))]
@@ -317,6 +319,7 @@ initialEnv =
   Env
     { count = 0
     , valueEnv = []
+    , definedTypeEnv = []
     , constructorEnv = []
     , notationEnv = []
     , reservedEnv =
@@ -368,6 +371,15 @@ newNameWith s = do
   modify (\e -> e {nameEnv = (s, s') : nameEnv e})
   return s'
 
+lookupDefinedTypeEnv :: String -> WithEnv (Maybe [(Identifier, Type)])
+lookupDefinedTypeEnv s = gets (lookup s . definedTypeEnv)
+
+isDefinedType :: Identifier -> Env -> Bool
+isDefinedType s env =
+  case lookup s (definedTypeEnv env) of
+    Just _ -> True
+    _      -> False
+
 lookupTypeEnv :: String -> WithEnv (Maybe Type)
 lookupTypeEnv s = gets (lookup s . typeEnv)
 
@@ -378,14 +390,14 @@ lookupTypeEnv' s = do
     Nothing -> lift $ throwE $ s ++ " is not found in the type environment"
     Just t  -> return t
 
-lookupVEnv :: String -> WithEnv (Maybe ValueInfo)
-lookupVEnv s = do
+lookupValueEnv :: String -> WithEnv (Maybe Type)
+lookupValueEnv s = do
   env <- get
-  return $ find (\(x, _, _) -> x == s) $ valueEnv env
+  return $ lookup s (valueEnv env)
 
-lookupVEnv' :: String -> WithEnv ValueInfo
-lookupVEnv' s = do
-  mt <- lookupVEnv s
+lookupValueEnv' :: String -> WithEnv Type
+lookupValueEnv' s = do
+  mt <- lookupValueEnv s
   case mt of
     Just t  -> return t
     Nothing -> lift $ throwE $ "the value " ++ show s ++ " is not defined "
@@ -411,8 +423,15 @@ lookupCodeEnv funName = do
     Just (args, body) -> return (args, body)
     Nothing           -> lift $ throwE $ "no such code: " ++ show funName
 
+insDefinedTypeEnv :: Identifier -> [(Identifier, Type)] -> WithEnv ()
+insDefinedTypeEnv i t =
+  modify (\e -> e {definedTypeEnv = (i, t) : definedTypeEnv e})
+
 insTypeEnv :: Identifier -> Type -> WithEnv ()
 insTypeEnv i t = modify (\e -> e {typeEnv = (i, t) : typeEnv e})
+
+insValueEnv :: Identifier -> Type -> WithEnv ()
+insValueEnv ident t = modify (\e -> e {valueEnv = (ident, t) : valueEnv e})
 
 insCodeEnv :: Identifier -> [Identifier] -> Code -> WithEnv ()
 insCodeEnv funName args body = do
@@ -546,6 +565,10 @@ forallArgs (Fix (TypeForall (i, vt) t)) = do
   let (body, xs) = forallArgs t
   (body, (i, vt) : xs)
 forallArgs body = (body, [])
+
+coForallArgs :: (Type, [(Identifier, Type)]) -> Type
+coForallArgs (t, []) = t
+coForallArgs (t, (i, tdom):ts) = coForallArgs (Fix (TypeForall (i, tdom) t), ts)
 
 funAndArgs :: Term -> WithEnv (Term, [(Identifier, Term)])
 funAndArgs (i :< TermApp e v) = do

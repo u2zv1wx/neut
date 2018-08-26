@@ -15,6 +15,8 @@ import           Pattern
 polarize :: Term -> WithEnv PolarizedTerm
 polarize (i :< TermVar s) =
   return $ PolarizedTermValue $ Value $ i :< ValueVar s
+polarize (i :< TermConst s) =
+  return $ PolarizedTermValue $ Value $ i :< ValueConst s
 polarize (i :< TermLam s e) = do
   Comp c <- polarize e >>= toComp
   return $ PolarizedTermComp $ Comp $ i :< CompLam s c
@@ -42,7 +44,10 @@ polarize (i :< TermCase vs ves) = do
   ves' <- polarizeClause ves
   vs' <- mapM polarize vs >>= mapM toValue
   let vesMod = patDist ves'
-  let initialOccurences = map (const []) vs
+  let indexList = map (const []) vs
+  let metaList = map (\(meta :< _) -> meta) vs
+  typeList <- mapM lookupTypeEnv' metaList
+  let initialOccurences = zip indexList typeList
   decisionTree <- toDecision initialOccurences vesMod
   return $ PolarizedTermComp $ Comp $ i :< CompDecision vs' decisionTree
 

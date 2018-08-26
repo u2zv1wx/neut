@@ -1,5 +1,6 @@
 module Asm
   ( asmCode
+  , asmConstructor
   ) where
 
 import           Control.Monad
@@ -85,7 +86,6 @@ asmData tmp (_ :< DataElemAtIndex basePointer idx) =
 asmData tmp (meta :< DataInt32 i) = do
   baseType <- lookupTypeEnv' meta -- i32*
   return $ asmCopy baseType (AsmDataInt i) tmp
-  return [AsmLet tmp (AsmAlloc baseType), AsmStore baseType (AsmDataInt i) tmp]
 asmData tmp (_ :< DataClosure name fvListPtr fvList) = do
   varAsmList <-
     forM fvList $ \fv -> do
@@ -107,3 +107,28 @@ asmData tmp (_ :< DataClosure name fvListPtr fvList) = do
 
 asmCopy :: Type -> AsmData -> Identifier -> [Asm]
 asmCopy t from to = [AsmLet to (AsmAlloc t), AsmStore t from to]
+
+asmConstructor :: Identifier -> Type -> WithEnv [Asm]
+asmConstructor name t = do
+  let (_, identArgTypes) = forallArgs t
+  let (identList, argTypes) = unzip identArgTypes
+  let regList = map AsmDataRegister identList
+  let num = 1 :: Int
+  let contentList = (AsmDataInt num, Fix (TypeInt 32)) : zip regList argTypes
+  let constructorCodType = Fix $ TypeStruct $ Fix (TypeInt 32) : argTypes
+  let t' = Fix $ TypeDown $ coForallArgs (constructorCodType, identArgTypes)
+  insTypeEnv name t'
+  result <- newNameWith "tmp"
+  insTypeEnv result constructorCodType
+  setContent <-
+    forM (zip contentList [0 ..]) $ \((asmData, t), index) -> do
+      cursor <- newNameWith $ "cursor" ++ show index
+      insTypeEnv cursor $ Fix $ TypeDown t
+      return
+        [ AsmLet cursor (AsmGetElemPointer result [0, index])
+        , AsmStore t asmData cursor
+        ]
+  return $
+    [AsmLet result (AsmAlloc constructorCodType)] ++
+    join setContent ++ [AsmReturn result]
+  -- , valueEnv       :: [(Identifier, Type)] -- defined values

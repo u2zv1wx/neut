@@ -24,7 +24,11 @@ parse :: Tree -> WithEnv Term
 parse (meta :< TreeAtom "_") = do
   name <- newNameWith "hole"
   return $ meta :< TermVar name
-parse (meta :< TreeAtom s) = return $ meta :< TermVar s
+parse (meta :< TreeAtom s) = do
+  msym <- lookupValueEnv s
+  case msym of
+    Nothing -> return (meta :< TermVar s)
+    Just _  -> return $ meta :< TermConst s
 parse (meta :< TreeNode [_ :< TreeAtom "thunk", te]) = do
   e <- parse te
   return $ meta :< TermThunk e
@@ -73,12 +77,12 @@ parseArg' t = lift $ throwE $ "parseArg': syntax error:\n" ++ Pr.ppShow t
 parsePat :: Tree -> WithEnv Pat
 parsePat (meta :< TreeAtom "_") = return $ meta :< PatHole
 parsePat (meta :< TreeAtom s) = do
-  msym <- lookupVEnv s
+  msym <- lookupValueEnv s
   case msym of
     Nothing -> do
       s' <- strToName s
       return (meta :< PatVar s')
-    Just (s, _, _) -> return $ meta :< PatConst s
+    Just _ -> return $ meta :< PatConst s
 parsePat (meta :< TreeNode [_ :< TreeAtom "thunk", te]) = do
   e <- parsePat te
   return $ meta :< PatThunk e
@@ -89,23 +93,16 @@ parsePat (meta :< TreeNode (t:ts)) = do
   t' <- parsePat' t
   ts' <- mapM parsePat ts
   return $ meta :< PatApp t' ts'
-  -- msym <- lookupVEnv s
-  -- case msym of
-  --   Nothing ->
-  --     lift $ throwE $ "parsePat: the constant " ++ show s ++ " is not defined"
-  --   Just _ -> do
-  --     ts' <- mapM parsePat ts
-  --     return $ meta :< PatApp s ts'
 parsePat t = lift $ throwE $ "parsePat: syntax error:\n" ++ Pr.ppShow t
 
 parsePat' :: Tree -> WithEnv Pat
 parsePat' (meta :< TreeAtom "_") = return $ meta :< PatHole
 parsePat' (meta :< TreeAtom s) = do
-  msym <- lookupVEnv s
+  msym <- lookupValueEnv s
   case msym of
     Nothing ->
       lift $ throwE $ "parsePat: the constant " ++ show s ++ " is not defined"
-    Just (s, _, _) -> return $ meta :< PatConst s
+    Just _ -> return $ meta :< PatConst s
 parsePat' (meta :< TreeNode [_ :< TreeAtom "thunk", te]) = do
   e <- parsePat' te
   return $ meta :< PatThunk e
@@ -155,14 +152,14 @@ parseType (_ :< TreeNode [_ :< TreeAtom "up", tp]) = do
   p <- parseType tp
   return $ Fix $ TypeUp p
 parseType (_ :< TreeNode ((_ :< TreeAtom s):ts)) = do
-  msym <- lookupVEnv s
+  msym <- lookupDefinedTypeEnv s
   case msym of
     Nothing -> lift $ throwE $ "the constant " ++ show s ++ " is not defined"
-    Just (s, args, _) -- "nat" should be written as `(nat)`, for example.
+    Just args -- "nat" should be written as `(nat)`, for example.
       | length args == length ts -> do
         es <- mapM parseType ts
         return $ Fix $ TypeNode s es
-    Just (s, args, _) ->
+    Just args ->
       lift $
       throwE $
       "the arity of " ++
