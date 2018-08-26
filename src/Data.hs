@@ -58,7 +58,8 @@ data WeakLevel
   deriving (Show, Eq)
 
 data TypeF a
-  = TypeVar Identifier
+  = TypeUnit
+  | TypeVar Identifier
   | TypeForall (Identifier, a)
                a
   | TypeNode Identifier
@@ -66,6 +67,7 @@ data TypeF a
   | TypeUp a
   | TypeDown a
   | TypeUniv WeakLevel
+  | TypeStruct [a] -- for closure
   | TypeHole Identifier
 
 deriving instance Show a => Show (TypeF a)
@@ -74,7 +76,34 @@ deriving instance Functor TypeF
 
 $(deriveShow1 ''TypeF)
 
-data Fix f =
+-- value type
+-- P ::= p
+--     | (down N)
+--     | (universe i)
+data ValueType
+  = ValueTypeVar Identifier
+  | ValueTypeDown CompType
+  | ValueTypeUniv Level
+  deriving (Show, Eq)
+
+-- computation type
+-- N ::= (forall (x P) N)
+--     | (up P)
+--     | {defined constant type}
+data CompType
+  = CompTypeForall (Identifier, ValueType)
+                   CompType
+  | CompTypeUp ValueType
+  | CompTypeNode Identifier
+                 [ValueType]
+  deriving (Show, Eq)
+
+data PolarizedType
+  = PolarizedTypeValueType ValueType
+  | PolarizedTypeCompType CompType
+  deriving (Show)
+
+newtype Fix f =
   Fix (f (Fix f))
 
 instance Show1 f => Show (Fix f) where
@@ -133,12 +162,64 @@ data TermF a
            a
   | TermCase [a]
              [([Pat], a)]
-  | TermDecision [a]
-                 (Decision a)
 
 $(deriveShow1 ''TermF)
 
 type Term = Cofree TermF Identifier
+
+-- value / positive term
+-- v ::= x
+--     | (v v)
+--     | (thunk e)
+data ValueF c v
+  = ValueVar Identifier
+  | ValueThunk c
+  deriving (Show)
+
+-- computation / negative term
+-- e ::= (lambda x e)
+--     | (e v)
+--     | (return v)
+--     | (bind x e1 e2)
+--     | (unthunk v)
+--     | (mu x e)
+--     | (case e (v1 e1) ... (vn en))
+data CompF v c
+  = CompLam Identifier
+            c
+  | CompApp c
+            v
+  | CompLift v
+  | CompBind Identifier
+             c
+             c
+  | CompUnthunk v
+  | CompMu Identifier
+           c
+  | CompDecision [v]
+                 (Decision c)
+  deriving (Show)
+
+$(deriveShow1 ''ValueF)
+
+$(deriveShow1 ''CompF)
+
+type PreValue = Cofree (ValueF Comp) Identifier
+
+type PreComp = Cofree (CompF Value) Identifier
+
+newtype Value =
+  Value PreValue
+  deriving (Show)
+
+newtype Comp =
+  Comp PreComp
+  deriving (Show)
+
+data PolarizedTerm
+  = PolarizedTermValue Value
+  | PolarizedTermComp Comp
+  deriving (Show)
 
 data Polarity
   = PolarityPositive
@@ -177,13 +258,22 @@ data Data
   | DataElemAtIndex Identifier -- subvalue of an inductive value
                     Index
   | DataInt32 Int
+  | DataClosure Identifier -- the name of the closure
+                Identifier -- pointer to the struct with free-var information
+                [Identifier] -- list of free variables
   deriving (Show)
 
-type Branch = (Identifier, Int, Identifier)
+type ConstructorName = Identifier
+
+type ConstructorId = Int
+
+type TargetLabel = Identifier
+
+type Branch = (ConstructorName, ConstructorId, TargetLabel, Code)
 
 type Address = Identifier
 
-type DefaultBranch = Identifier
+type DefaultBranch = (TargetLabel, Code)
 
 data Code
   = CodeReturn Data
@@ -193,17 +283,13 @@ data Code
   | CodeSwitch Identifier -- branching in pattern-matching (elimination of inductive type)
                DefaultBranch
                [Branch]
-  | CodeJump Identifier -- unthunk (the target label of the jump address)
-  | CodeIndirectJump Identifier -- the name of register
-                     Identifier -- the id of corresponding unthunk
-                     [Identifier] -- possible jump
-  | CodeRecursiveJump Identifier -- jump by (unthunk x) in (mu x (...))
   | CodeCall Identifier -- the register that stores the result of a function call
              Identifier -- the name of the function
-             [(Identifier, Data)] -- arguments
-             Code
-  | CodeWithArg [(Identifier, Data)]
-                Code
+             [Data] -- arguments
+             Code -- continuation
+  | CodeCallClosure Identifier -- store the result of call to here
+                    Data -- {function-label, environment}
+                    Code -- continuation
   deriving (Show)
 
 letSeq :: [Identifier] -> [Data] -> Code -> WithEnv Code
@@ -249,20 +335,16 @@ data AsmOperation
   deriving (Show)
 
 data Env = Env
-  { count            :: Int -- to generate fresh symbols
-  , valueEnv         :: [ValueInfo] -- defined values
-  , constructorEnv   :: [(Identifier, IORef [Identifier])]
-  , notationEnv      :: [(Tree, Tree)] -- macro transformers
-  , reservedEnv      :: [Identifier] -- list of reserved keywords
-  , nameEnv          :: [(Identifier, Identifier)] -- used in alpha conversion
-  , typeEnv          :: [(Identifier, Type)] -- polarized type environment
-  , polEnv           :: [(Identifier, Polarity)]
-  , constraintEnv    :: [(Type, Type)] -- used in type inference
-  , polConstraintEnv :: [(Polarity, Polarity)]
-  , levelEnv         :: [(WeakLevel, WeakLevel)] -- constraint regarding the level of universes
-  , codeEnv          :: [(Identifier, IORef [(Identifier, IORef Code)])]
-  , didUpdate        :: Bool -- used in live analysis to detect the end of the process
-  , scope            :: Identifier -- used in Virtual to determine the name of current function
+  { count          :: Int -- to generate fresh symbols
+  , valueEnv       :: [ValueInfo] -- defined values
+  , constructorEnv :: [(Identifier, IORef [Identifier])]
+  , notationEnv    :: [(Tree, Tree)] -- macro transformers
+  , reservedEnv    :: [Identifier] -- list of reserved keywords
+  , nameEnv        :: [(Identifier, Identifier)] -- used in alpha conversion
+  , typeEnv        :: [(Identifier, Type)] -- polarized type environment
+  , constraintEnv  :: [(Type, Type)] -- used in type inference
+  , levelEnv       :: [(WeakLevel, WeakLevel)] -- constraint regarding the level of universes
+  , codeEnv        :: [(Identifier, ([Identifier], Code))]
   } deriving (Show)
 
 initialEnv :: Env
@@ -288,13 +370,9 @@ initialEnv =
         ]
     , nameEnv = []
     , typeEnv = []
-    , polEnv = []
     , constraintEnv = []
-    , polConstraintEnv = []
     , levelEnv = []
     , codeEnv = []
-    , didUpdate = False
-    , scope = ""
     }
 
 type WithEnv a = StateT Env (ExceptT String IO) a
@@ -335,16 +413,6 @@ lookupTypeEnv' s = do
     Nothing -> lift $ throwE $ s ++ " is not found in the type environment"
     Just t  -> return t
 
-lookupPolEnv :: String -> WithEnv (Maybe Polarity)
-lookupPolEnv s = gets (lookup s . polEnv)
-
-lookupPolEnv' :: String -> WithEnv Polarity
-lookupPolEnv' s = do
-  mpol <- gets (lookup s . polEnv)
-  case mpol of
-    Nothing  -> lift $ throwE $ s ++ " is not found in the type environment"
-    Just pol -> return pol
-
 lookupVEnv :: String -> WithEnv (Maybe ValueInfo)
 lookupVEnv s = do
   env <- get
@@ -354,9 +422,8 @@ lookupVEnv' :: String -> WithEnv ValueInfo
 lookupVEnv' s = do
   mt <- lookupVEnv s
   case mt of
-    Just t -> return t
-    Nothing -> do
-      lift $ throwE $ "the value " ++ show s ++ " is not defined "
+    Just t  -> return t
+    Nothing -> lift $ throwE $ "the value " ++ show s ++ " is not defined "
 
 lookupNameEnv :: String -> WithEnv String
 lookupNameEnv s = do
@@ -372,59 +439,19 @@ lookupNameEnv' s = do
     Just s' -> return s'
     Nothing -> newNameWith s
 
-lookupCodeEnv :: Identifier -> WithEnv (IORef [(Identifier, IORef Code)])
-lookupCodeEnv scope = do
-  m <- gets (lookup scope . codeEnv)
-  case m of
-    Nothing     -> lift $ throwE $ "no such scope: " ++ show scope
-    Just envRef -> return envRef
-
-lookupCurrentCodeEnv :: WithEnv (IORef [(Identifier, IORef Code)])
-lookupCurrentCodeEnv = do
-  scope <- getScope
-  lookupCodeEnv scope
-
-lookupCodeEnv2 :: Identifier -> Identifier -> WithEnv (IORef Code)
-lookupCodeEnv2 scope ident = do
-  scopeEnvRef <- lookupCodeEnv scope
-  scopeEnv <- liftIO $ readIORef scopeEnvRef
-  case lookup ident scopeEnv of
-    Just codeRef -> return codeRef
-    Nothing ->
-      lift $
-      throwE $ "no such label " ++ show ident ++ " defined in scope " ++ scope
+lookupCodeEnv :: Identifier -> WithEnv ([Identifier], Code)
+lookupCodeEnv funName = do
+  env <- get
+  case lookup funName (codeEnv env) of
+    Just (args, body) -> return (args, body)
+    Nothing           -> lift $ throwE $ "no such code: " ++ show funName
 
 insTypeEnv :: Identifier -> Type -> WithEnv ()
 insTypeEnv i t = modify (\e -> e {typeEnv = (i, t) : typeEnv e})
 
-insPolEnv :: Identifier -> Polarity -> WithEnv ()
-insPolEnv i pol = modify (\e -> e {polEnv = (i, pol) : polEnv e})
-
-insCodeEnv :: Identifier -> Identifier -> IORef Code -> WithEnv ()
-insCodeEnv scope ident codeRef = do
-  scopeEnvRef <- lookupCodeEnv scope
-  scopeEnv <- liftIO $ readIORef scopeEnvRef
-  liftIO $ writeIORef scopeEnvRef ((ident, codeRef) : scopeEnv)
-
-insCurrentCodeEnv :: Identifier -> IORef Code -> WithEnv ()
-insCurrentCodeEnv ident codeRef = do
-  scope <- getScope
-  insCodeEnv scope ident codeRef
-
-updateCodeEnv :: Identifier -> Identifier -> Code -> WithEnv ()
-updateCodeEnv scope label code = do
-  codeRef <- lookupCodeEnv2 scope label
-  liftIO $ writeIORef codeRef code
-
-updateCurrentCodeEnv :: Identifier -> Code -> WithEnv ()
-updateCurrentCodeEnv ident code = do
-  scope <- getScope
-  updateCodeEnv scope ident code
-
-insEmptyCodeEnv :: Identifier -> WithEnv ()
-insEmptyCodeEnv scope = do
-  nop <- liftIO $ newIORef []
-  modify (\e -> e {codeEnv = (scope, nop) : codeEnv e})
+insCodeEnv :: Identifier -> [Identifier] -> Code -> WithEnv ()
+insCodeEnv funName args body = do
+  modify (\e -> e {codeEnv = (funName, (args, body)) : codeEnv e})
 
 lookupConstructorEnv :: Identifier -> WithEnv [Identifier]
 lookupConstructorEnv cons = do
@@ -448,10 +475,6 @@ insConstraintEnv :: Type -> Type -> WithEnv ()
 insConstraintEnv t1 t2 =
   modify (\e -> e {constraintEnv = (t1, t2) : constraintEnv e})
 
-insPolConstraintEnv :: Polarity -> Polarity -> WithEnv ()
-insPolConstraintEnv pol1 pol2 =
-  modify (\e -> e {polConstraintEnv = (pol1, pol2) : polConstraintEnv e})
-
 insLEnv :: WeakLevel -> WeakLevel -> WithEnv ()
 insLEnv l1 l2 = modify (\e -> e {levelEnv = (l1, l2) : levelEnv e})
 
@@ -465,14 +488,6 @@ insConstructorEnv i cons = do
     Just cenvRef -> do
       cenv <- liftIO $ readIORef cenvRef
       liftIO $ writeIORef cenvRef (cons : cenv)
-
-setScope :: Identifier -> WithEnv ()
-setScope i = modify (\e -> e {scope = i})
-
-getScope :: WithEnv Identifier
-getScope = do
-  env <- get
-  return $ scope env
 
 local :: WithEnv a -> WithEnv a
 local p = do
@@ -528,12 +543,10 @@ appFold :: Term -> [Term] -> WithEnv Term
 appFold e [] = return e
 appFold e@(i :< _) (term:ts) = do
   t <- lookupTypeEnv' i
-  pol <- lookupPolEnv' i
   case t of
     Fix (TypeForall _ tcod) -> do
       meta <- newNameWith "meta"
       insTypeEnv meta tcod
-      insPolEnv meta pol
       appFold (meta :< TermApp e term) ts
     _ -> error "Lift.appFold"
 
@@ -549,20 +562,16 @@ constructFormalArgs (ident:is) = do
 wrapArg :: Identifier -> WithEnv Term
 wrapArg i = do
   t <- lookupTypeEnv' i
-  pol <- lookupPolEnv' i
   meta <- newNameWith "meta"
   insTypeEnv meta t
-  insPolEnv meta pol
   return $ meta :< TermVar i
 
 bindFormalArgs :: [Identifier] -> Term -> WithEnv Term
 bindFormalArgs [] terminal = return terminal
 bindFormalArgs (arg:xs) c@(metaLam :< _) = do
   tLam <- lookupTypeEnv' metaLam
-  polLam <- lookupPolEnv' metaLam
   tArg <- lookupTypeEnv' arg
   tmp <- bindFormalArgs xs c
   meta <- newNameWith "meta"
   insTypeEnv meta (Fix (TypeForall (arg, tArg) tLam))
-  insPolEnv meta polLam
   return $ meta :< TermLam arg tmp

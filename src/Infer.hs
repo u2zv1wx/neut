@@ -90,7 +90,6 @@ infer (meta :< TermCase vs vses) = do
   forM_ tes $ \te -> insConstraintEnv (Fix ans) te
   insTypeEnv meta (Fix ans)
   return $ Fix ans
-infer t = error $ "Infer.infer: illegal argument: " ++ Pr.ppShow t
 
 inferPat :: Pat -> WithEnv Type
 inferPat (meta :< PatHole) = do
@@ -156,6 +155,7 @@ compose s1 s2 = do
   fromS1 ++ zip domS2 codS2'
 
 sType :: Subst -> Type -> Type
+sType _ (Fix TypeUnit) = Fix TypeUnit
 sType _ (Fix (TypeVar s)) = Fix $ TypeVar s
 sType sub (Fix (TypeHole s)) =
   case lookup s sub of

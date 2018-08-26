@@ -1,4 +1,6 @@
-module Lift where
+module Lift
+  ( lift
+  ) where
 
 import           Control.Comonad.Cofree
 import           Control.Monad
@@ -9,9 +11,6 @@ import           Data
 
 lift :: Term -> WithEnv Term
 lift v@(_ :< TermVar _) = return v
-lift (i :< TermThunk c) = do
-  c' <- lift c
-  return $ i :< TermThunk c'
 lift (i :< TermLam arg body) = do
   body' <- lift body
   let freeVars = var body'
@@ -25,27 +24,31 @@ lift (i :< TermApp e v) = do
   e' <- lift e
   v' <- lift v
   return $ i :< TermApp e' v'
+lift (i :< TermThunk c) = do
+  c' <- lift c
+  return $ i :< TermThunk c'
+lift (i :< TermUnthunk c) = do
+  c' <- lift c
+  return $ i :< TermUnthunk c'
 lift (i :< TermLift v) = do
   v' <- lift v
   return $ i :< TermLift v'
-lift (i :< TermBind x e1 e2) = do
-  e1' <- lift e1
-  e2' <- lift e2
-  return $ i :< TermBind x e1' e2'
-lift (i :< TermUnthunk v) = do
-  v' <- lift v
-  return $ i :< TermUnthunk v'
+lift (i :< TermBind s c1 c2) = do
+  c1' <- lift c1
+  c2' <- lift c2
+  return $ i :< TermBind s c1' c2'
 lift (meta :< TermMu s c) = do
   c' <- lift c
   return $ meta :< TermMu s c'
+-- lift (i :< TermDecision es tree) = do
+--   es' <- mapM lift es
+--   tree' <- liftDecisionM lift tree
+--   return $ i :< TermDecision es' tree'
 lift (i :< TermCase vs vcs) = do
   vs' <- mapM lift vs
   let (patList, bodyList) = unzip vcs
   bodyList' <- mapM lift bodyList
   return $ i :< TermCase vs' (zip patList bodyList')
-lift _ = error "Lift.lift: illegal argument"
-
-type VIdentifier = (Identifier, Identifier)
 
 replace :: [(Identifier, Identifier)] -> Term -> WithEnv Term
 replace f2b (i :< TermVar s) =
@@ -83,26 +86,34 @@ replace args (i :< TermCase vs vcs) = do
   let (patList, bodyList) = unzip vcs
   bodyList' <- mapM (replace args) bodyList
   return $ i :< TermCase vs' (zip patList bodyList')
-replace _ _ = error "Lift.replace: illegal argument"
 
 var :: Term -> [Identifier]
 var (_ :< TermVar s) = [s]
-var (_ :< TermThunk e) = var e
 var (_ :< TermLam s e) = filter (/= s) $ var e
 var (_ :< TermApp e v) = var e ++ var v
-var (_ :< TermLift v) = var v
-var (_ :< TermBind x e1 e2) = filter (/= x) $ var e1 ++ var e2
-var (_ :< TermUnthunk v) = var v
 var (_ :< TermMu s e) = filter (/= s) (var e)
-var (_ :< TermCase vs vses) = do
+var (_ :< TermCase vs vcs) = do
   let efs = join $ map var vs
-  let (patList, bodyList) = unzip vses
+  let (patList, bodyList) = unzip vcs
   let vs1 = join $ join $ map (map varPat) patList
   let vs2 = join $ map var bodyList
   efs ++ vs1 ++ vs2
-var _ = error "Lift.var: illegal argument"
 
+-- var _ = error "Lift.var: illegal argument"
 varPat :: Pat -> [Identifier]
 varPat (_ :< PatHole)     = []
 varPat (_ :< PatVar s)    = [s]
 varPat (_ :< PatApp _ ps) = join $ map varPat ps
+-- varDecision :: Decision Term -> [Identifier]
+-- varDecision (DecisionLeaf ois e) = do
+--   let bounds = map snd ois
+--   filter (`notElem` bounds) $ var e
+-- varDecision (DecisionSwitch _ cds mdefault) = do
+--   undefined
+--   let (_, ds) = unzip cds
+--   let vs = join $ map varDecision ds
+--   case mdefault of
+--     Nothing                -> vs
+--     Just (Nothing, tree)   -> vs ++ varDecision tree
+--     Just (Just name, tree) -> vs ++ filter (/= name) (varDecision tree)
+-- varDecision (DecisionSwap _ tree) = varDecision tree

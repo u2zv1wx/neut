@@ -10,9 +10,6 @@ import           Data
 -- eliminate partial applications by eta-expansion
 expand :: Term -> WithEnv Term
 expand (i :< TermVar x) = expand' 0 $ i :< TermVar x
-expand (i :< TermThunk c) = do
-  c' <- expand c
-  expand' 0 $ i :< TermThunk c'
 expand (i :< TermLam arg body) = do
   body' <- expand body
   expand' 0 $ i :< TermLam arg body'
@@ -23,14 +20,17 @@ expand (i :< TermApp e v) = do
   expand' (length argList') $ coFunAndArgs (fun, zip identList argList')
 expand (i :< TermLift v) = do
   v' <- expand v
-  expand' 0 $ i :< TermLift v'
+  return $ i :< TermLift v'
 expand (i :< TermBind x e1 e2) = do
   e1' <- expand e1
   e2' <- expand e2
-  expand' 0 $ i :< TermBind x e1' e2'
+  return $ i :< TermBind x e1' e2'
+expand (i :< TermThunk c) = do
+  c' <- expand c
+  return $ i :< TermThunk c'
 expand (i :< TermUnthunk v) = do
   v' <- expand v
-  expand' 0 $ i :< TermUnthunk v'
+  return $ i :< TermUnthunk v'
 expand (meta :< TermMu s c) = do
   c' <- expand c
   expand' 0 $ meta :< TermMu s c'
@@ -39,7 +39,6 @@ expand (i :< TermCase vs vcs) = do
   let (patList, bodyList) = unzip vcs
   bodyList' <- mapM expand bodyList
   expand' 0 $ i :< TermCase vs' (zip patList bodyList')
-expand _ = error "Expand.expand: illegal argument"
 
 expand' :: Int -> Term -> WithEnv Term
 expand' given term@(i :< _) = do
