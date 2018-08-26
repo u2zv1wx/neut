@@ -19,9 +19,8 @@ import qualified Text.Show.Pretty           as Pr
 import           Debug.Trace
 
 virtualV :: Value -> WithEnv Data
-virtualV (Value (_ :< ValueVar x)) = return $ DataPointer x
+virtualV (Value (i :< ValueVar x)) = return $ i :< DataPointer x
 virtualV (Value (i :< ValueThunk comp@(Comp (compMeta :< _)))) = do
-  asm <- virtualC comp
   let fvList = varN comp
   fvTypeList <- mapM lookupTypeEnv' fvList
   envName <- newNameWith "fv"
@@ -33,30 +32,40 @@ virtualV (Value (i :< ValueThunk comp@(Comp (compMeta :< _)))) = do
   -- thunk : &(&type-of-env -> type-of-comp)
   let labelType = Fix (TypeDown (Fix (TypeForall (envName, envType) compType)))
   insTypeEnv label labelType
+  asm <- virtualC comp
   insCodeEnv label [envName] asm
-  return $ DataClosure label envName fvList
+  return $ i :< DataClosure label envName fvList
 
 virtualC :: Comp -> WithEnv Code
 virtualC lam@(Comp (i :< CompLam _ _)) = do
   (body, args) <- toLamSeq lam
   bodyCode <- virtualC body
   name <- newNameWith "lam"
-  lamType <- lookupTypeEnv' i
-  insTypeEnv name lamType
+  let labelPointerType = Fix $ TypeDown $ Fix $ TypeInt 8
+  -- name : &(P -> N) (must be a pointer)
+  -- ~> name : &i8 (just a reference)
+  insTypeEnv name labelPointerType
   insCodeEnv name args bodyCode
-  return $ CodeReturn $ DataLabel name
+  meta <- newNameWith "meta"
+  insTypeEnv meta labelPointerType
+  return $ CodeReturn $ meta :< DataFunName name
 virtualC app@(Comp (i :< CompApp _ _)) = do
   (fun@(Comp (funMeta :< _)), ivs) <- funAndArgsPol app
   let (_, vs) = unzip ivs
   ds <- mapM virtualV vs
-  fun' <- virtualC fun
+  funCode <- virtualC fun
   funName <- newNameWith "fun"
   funType <- lookupTypeEnv' funMeta
-  insTypeEnv funName funType
+  -- fun : P -> N
+  -- funName : &(P -> N)
+  insTypeEnv funName $ Fix (TypeDown funType)
   s <- newNameWith "tmp"
   resultType <- lookupTypeEnv' i
-  insTypeEnv s resultType
-  traceLet funName fun' $ CodeCall s funName ds (CodeReturn (DataPointer s))
+  insTypeEnv s $ Fix (TypeDown resultType)
+  meta <- newNameWith "meta"
+  insTypeEnv meta $ Fix (TypeDown resultType)
+  traceLet funName funCode $
+    CodeCall s funName ds (CodeReturn (meta :< DataPointer s))
 virtualC (Comp (_ :< CompLift v)) = do
   ans <- virtualV v
   return $ CodeReturn ans
@@ -64,22 +73,26 @@ virtualC (Comp (_ :< CompBind s comp1 comp2)) = do
   operation1 <- virtualC (Comp comp1)
   operation2 <- virtualC (Comp comp2)
   traceLet s operation1 operation2
-virtualC (Comp (i :< CompUnthunk v)) = do
+virtualC (Comp (i :< CompUnthunk v@(Value (valueMeta :< _)))) = do
   asm <- virtualV v
   s <- newNameWith "tmp"
   resultType <- lookupTypeEnv' i
   insTypeEnv s resultType
-  return $ CodeCallClosure s asm (CodeReturn (DataPointer s))
+  return $ CodeCallClosure s asm (CodeReturn (valueMeta :< DataPointer s))
 virtualC (Comp (_ :< CompMu s comp)) = do
   asm <- virtualC $ Comp comp
-  undefined
-  -- undefined -- insCodeEnv s s asm'
-  -- -- return $ CodeRecursiveJump
+  insCodeEnv s [] asm
+  meta <- newNameWith "meta"
+  let labelPointerType = Fix $ TypeDown $ Fix $ TypeInt 8
+  insTypeEnv meta labelPointerType
+  return $ CodeReturn $ meta :< DataFunName s
 virtualC (Comp (_ :< CompDecision vs tree)) = do
   valueList <-
-    forM vs $ \v -> do
+    forM vs $ \v@(Value (valueMeta :< _)) -> do
       asm <- virtualV v
       i <- newNameWith "seq"
+      valueType <- lookupTypeEnv' valueMeta
+      insTypeEnv i valueType
       return (i, asm)
   let (is, asms) = unzip valueList
   body <- virtualDecision is tree
@@ -87,12 +100,15 @@ virtualC (Comp (_ :< CompDecision vs tree)) = do
 
 virtualDecision :: [Identifier] -> Decision PreComp -> WithEnv Code
 virtualDecision asmList (DecisionLeaf ois e) = do
-  let varList = map snd ois
-  asmList' <-
-    forM (zip asmList ois) $ \(x, (index, _)) ->
-      return $ DataElemAtIndex x index
+  varAsmList <-
+    forM (zip asmList ois) $ \(x, ((index, t), var)) -> do
+      insTypeEnv var t
+      meta <- newNameWith "meta"
+      insTypeEnv meta t
+      return (var, meta :< DataElemAtIndex x index)
   body <- virtualC $ Comp e
-  letSeq varList asmList' body
+  let (varList, asmList) = unzip varAsmList
+  letSeq varList asmList body
 virtualDecision (x:vs) (DecisionSwitch o cs mdefault) = do
   jumpList <- virtualCase (x : vs) cs
   defaultJump <- virtualDefaultCase (x : vs) mdefault
@@ -128,33 +144,43 @@ virtualDefaultCase vs (Just (Just x, tree)) = do
 
 makeBranch ::
      Identifier
-  -> Index
+  -> Occurrence
   -> [(Identifier, Int, Identifier, Code)]
   -> Maybe (Maybe Identifier, Identifier, Code)
   -> WithEnv Code
 makeBranch _ _ [] Nothing = error "empty branch"
-makeBranch y o js@((_, _, target, code):_) Nothing =
+makeBranch y (o, t) js@((_, _, target, code):_) Nothing =
   if null o
     then return (CodeSwitch y (target, code) js)
     else do
-      let tmp = DataElemAtIndex y o
       name <- newName
-      let tmp2 = CodeSwitch name (target, code) js
-      return $ CodeLet name tmp tmp2
-makeBranch y o js (Just (Just defaultName, label, code)) =
+      insTypeEnv name t
+      meta <- newNameWith "meta"
+      insTypeEnv meta t
+      return $
+        CodeLet name (meta :< DataElemAtIndex y o) $
+        CodeSwitch name (target, code) js
+makeBranch y (o, t) js (Just (Just defaultName, label, code)) =
   if null o
     then return (CodeSwitch y (label, code) js)
     else do
-      let tmp = CodeSwitch defaultName (label, code) js
-      return $ CodeLet defaultName (DataElemAtIndex y o) tmp
-makeBranch y o js (Just (Nothing, label, code)) =
+      insTypeEnv defaultName t
+      meta <- newNameWith "meta"
+      insTypeEnv meta t
+      return $
+        CodeLet defaultName (meta :< DataElemAtIndex y o) $
+        CodeSwitch defaultName (label, code) js
+makeBranch y (o, t) js (Just (Nothing, label, code)) =
   if null o
     then return (CodeSwitch y (label, code) js)
     else do
-      let tmp = DataElemAtIndex y o
       name <- newName
-      let tmp2 = CodeSwitch name (label, code) js
-      return $ CodeLet name tmp tmp2
+      insTypeEnv name t
+      meta <- newNameWith "meta"
+      insTypeEnv meta t
+      return $
+        CodeLet name (meta :< DataElemAtIndex y o) $
+        CodeSwitch name (label, code) js
 
 traceLet :: String -> Code -> Code -> WithEnv Code
 traceLet s (CodeReturn ans) cont = return $ CodeLet s ans cont

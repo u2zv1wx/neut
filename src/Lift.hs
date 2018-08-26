@@ -91,6 +91,10 @@ var :: Term -> [Identifier]
 var (_ :< TermVar s) = [s]
 var (_ :< TermLam s e) = filter (/= s) $ var e
 var (_ :< TermApp e v) = var e ++ var v
+var (_ :< TermLift v) = var v
+var (_ :< TermBind x e1 e2) = var e1 ++ filter (/= x) (var e2)
+var (_ :< TermThunk e) = var e
+var (_ :< TermUnthunk v) = var v
 var (_ :< TermMu s e) = filter (/= s) (var e)
 var (_ :< TermCase vs vcs) = do
   let efs = join $ map var vs
@@ -101,9 +105,12 @@ var (_ :< TermCase vs vcs) = do
 
 -- var _ = error "Lift.var: illegal argument"
 varPat :: Pat -> [Identifier]
-varPat (_ :< PatHole)     = []
-varPat (_ :< PatVar s)    = [s]
-varPat (_ :< PatApp _ ps) = join $ map varPat ps
+varPat (_ :< PatHole)      = []
+varPat (_ :< PatConst _)   = []
+varPat (_ :< PatVar s)     = [s]
+varPat (_ :< PatApp p ps)  = varPat p ++ join (map varPat ps)
+varPat (_ :< PatThunk v)   = varPat v
+varPat (_ :< PatUnthunk e) = varPat e
 -- varDecision :: Decision Term -> [Identifier]
 -- varDecision (DecisionLeaf ois e) = do
 --   let bounds = map snd ois

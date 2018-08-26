@@ -96,6 +96,10 @@ inferPat (meta :< PatHole) = do
   t <- TypeHole <$> newName
   insTypeEnv meta $ Fix t
   return $ Fix t
+inferPat (meta :< PatConst x) = do
+  t <- lookupTypeEnv' x
+  insTypeEnv meta t
+  return t
 inferPat (meta :< PatVar s) = do
   mt <- lookupTypeEnv s
   case mt of
@@ -107,16 +111,24 @@ inferPat (meta :< PatVar s) = do
       insTypeEnv s $ Fix $ TypeHole i
       insTypeEnv meta (Fix (TypeHole i))
       return $ Fix (TypeHole i)
-inferPat (meta :< PatApp s vs) = do
-  mt <- lookupVEnv s
-  case mt of
-    Nothing -> lift $ throwE $ "const " ++ s ++ " is not defined"
-    Just (_, xts, t) -> do
-      tvs <- mapM inferPat vs
-      -- need to add explicit parametrization
-      forM_ (zip xts tvs) $ \(xt, t2) -> insConstraintEnv (snd xt) t2
-      insTypeEnv meta t
-      return t
+inferPat (meta :< PatApp v vs) = do
+  t <- inferPat v
+  let (cod, args) = forallArgs t
+  ts <- mapM inferPat vs
+  forM_ (zip ts (map snd args)) $ uncurry insConstraintEnv
+  insTypeEnv meta cod
+  return cod
+inferPat (meta :< PatThunk v) = do
+  t <- inferPat v
+  insTypeEnv meta $ Fix $ TypeDown t
+  return $ Fix $ TypeDown t
+inferPat (meta :< PatUnthunk e) = do
+  t <- inferPat e
+  i <- newName
+  let result = Fix $ TypeHole i
+  insConstraintEnv t (Fix $ TypeDown result)
+  insTypeEnv meta result
+  return result
 
 type Subst = [(String, Type)]
 

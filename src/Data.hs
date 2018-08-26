@@ -67,6 +67,8 @@ data TypeF a
   | TypeUp a
   | TypeDown a
   | TypeUniv WeakLevel
+  | TypeInt Int
+  | TypeOpaque
   | TypeStruct [a] -- for closure
   | TypeHole Identifier
 
@@ -75,33 +77,6 @@ deriving instance Show a => Show (TypeF a)
 deriving instance Functor TypeF
 
 $(deriveShow1 ''TypeF)
-
--- value type
--- P ::= p
---     | (down N)
---     | (universe i)
-data ValueType
-  = ValueTypeVar Identifier
-  | ValueTypeDown CompType
-  | ValueTypeUniv Level
-  deriving (Show, Eq)
-
--- computation type
--- N ::= (forall (x P) N)
---     | (up P)
---     | {defined constant type}
-data CompType
-  = CompTypeForall (Identifier, ValueType)
-                   CompType
-  | CompTypeUp ValueType
-  | CompTypeNode Identifier
-                 [ValueType]
-  deriving (Show, Eq)
-
-data PolarizedType
-  = PolarizedTypeValueType ValueType
-  | PolarizedTypeCompType CompType
-  deriving (Show)
 
 newtype Fix f =
   Fix (f (Fix f))
@@ -120,8 +95,11 @@ type RegionType = Cofree TypeF Region
 data PatF a
   = PatHole
   | PatVar Identifier
-  | PatApp Identifier
+  | PatConst Identifier
+  | PatApp a
            [a]
+  | PatThunk a
+  | PatUnthunk a
   deriving (Show, Eq)
 
 $(deriveShow1 ''PatF)
@@ -130,7 +108,7 @@ deriving instance Functor PatF
 
 type Pat = Cofree PatF Identifier
 
-type Occurrence = [Int]
+type Occurrence = ([Int], Type)
 
 data Decision a
   = DecisionLeaf [(Occurrence, Identifier)]
@@ -233,35 +211,23 @@ type ValueInfo = (Identifier, [(Identifier, Type)], Type)
 
 type Index = [Int]
 
-forallArgs :: Type -> (Type, [(Identifier, Type)])
-forallArgs (Fix (TypeForall (i, vt) t)) = do
-  let (body, xs) = forallArgs t
-  (body, (i, vt) : xs)
-forallArgs body = (body, [])
-
-funAndArgs :: Term -> WithEnv (Term, [(Identifier, Term)])
-funAndArgs (i :< TermApp e v) = do
-  (fun, xs) <- funAndArgs e
-  return (fun, (i, v) : xs)
-funAndArgs c = return (c, [])
-
-coFunAndArgs :: (Term, [(Identifier, Term)]) -> Term
-coFunAndArgs (term, [])        = term
-coFunAndArgs (term, (i, v):xs) = coFunAndArgs (i :< TermApp term v, xs)
-
-data Data
+data DataF a
   = DataPointer Identifier -- var is something that points already-allocated data
-  | DataCell Identifier -- value of defined data types
-             Int -- nth constructor
-             [Data]
-  | DataLabel Identifier -- the address of quoted code
+  | DataFunName Identifier
   | DataElemAtIndex Identifier -- subvalue of an inductive value
                     Index
   | DataInt32 Int
   | DataClosure Identifier -- the name of the closure
                 Identifier -- pointer to the struct with free-var information
                 [Identifier] -- list of free variables
-  deriving (Show)
+
+deriving instance Show a => Show (DataF a)
+
+deriving instance Functor DataF
+
+$(deriveShow1 ''DataF)
+
+type Data = Cofree DataF Identifier
 
 type ConstructorName = Identifier
 
@@ -303,10 +269,11 @@ data AsmData
   = AsmDataRegister Identifier
   | AsmDataLabel Identifier
   | AsmDataInt Int
+  | AsmDataStruct [AsmData]
   deriving (Show)
 
 data Asm
-  = AsmReturn (Identifier, Type)
+  = AsmReturn Identifier
   | AsmLet Identifier
            AsmOperation
   | AsmStore Type -- the type of source
@@ -317,18 +284,16 @@ data Asm
                       [Identifier]
   | AsmSwitch Identifier
               DefaultBranch
-              [(Identifier, Int, Identifier)]
+              [(Identifier, Int, Identifier, [Asm])]
   deriving (Show)
 
 data AsmOperation
   = AsmAlloc Type
-  | AsmLoad Type -- the type of source register
-            Identifier -- source register
-  | AsmGetElemPointer Type -- the type of base register
-                      Identifier -- base register
+  | AsmLoad Identifier -- source register
+  | AsmGetElemPointer Identifier -- base register
                       Index -- index
-  | AsmCall (Identifier, Type)
-            [(Identifier, Type)]
+  | AsmCall Identifier
+            [Identifier]
   | AsmBitcast Type
                Identifier
                Type
@@ -575,3 +540,19 @@ bindFormalArgs (arg:xs) c@(metaLam :< _) = do
   meta <- newNameWith "meta"
   insTypeEnv meta (Fix (TypeForall (arg, tArg) tLam))
   return $ meta :< TermLam arg tmp
+
+forallArgs :: Type -> (Type, [(Identifier, Type)])
+forallArgs (Fix (TypeForall (i, vt) t)) = do
+  let (body, xs) = forallArgs t
+  (body, (i, vt) : xs)
+forallArgs body = (body, [])
+
+funAndArgs :: Term -> WithEnv (Term, [(Identifier, Term)])
+funAndArgs (i :< TermApp e v) = do
+  (fun, xs) <- funAndArgs e
+  return (fun, (i, v) : xs)
+funAndArgs c = return (c, [])
+
+coFunAndArgs :: (Term, [(Identifier, Term)]) -> Term
+coFunAndArgs (term, [])        = term
+coFunAndArgs (term, (i, v):xs) = coFunAndArgs (i :< TermApp term v, xs)

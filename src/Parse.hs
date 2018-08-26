@@ -78,16 +78,52 @@ parsePat (meta :< TreeAtom s) = do
     Nothing -> do
       s' <- strToName s
       return (meta :< PatVar s')
-    Just (s, _, _) -> return $ meta :< PatApp s []
-parsePat (meta :< TreeNode ((_ :< TreeAtom s):ts)) = do
+    Just (s, _, _) -> return $ meta :< PatConst s
+parsePat (meta :< TreeNode [_ :< TreeAtom "thunk", te]) = do
+  e <- parsePat te
+  return $ meta :< PatThunk e
+parsePat (meta :< TreeNode [_ :< TreeAtom "unthunk", te]) = do
+  e <- parsePat te
+  return $ meta :< PatUnthunk e
+parsePat (meta :< TreeNode (t:ts)) = do
+  t' <- parsePat' t
+  ts' <- mapM parsePat ts
+  return $ meta :< PatApp t' ts'
+  -- msym <- lookupVEnv s
+  -- case msym of
+  --   Nothing ->
+  --     lift $ throwE $ "parsePat: the constant " ++ show s ++ " is not defined"
+  --   Just _ -> do
+  --     ts' <- mapM parsePat ts
+  --     return $ meta :< PatApp s ts'
+parsePat t = lift $ throwE $ "parsePat: syntax error:\n" ++ Pr.ppShow t
+
+parsePat' :: Tree -> WithEnv Pat
+parsePat' (meta :< TreeAtom "_") = return $ meta :< PatHole
+parsePat' (meta :< TreeAtom s) = do
   msym <- lookupVEnv s
   case msym of
     Nothing ->
       lift $ throwE $ "parsePat: the constant " ++ show s ++ " is not defined"
-    Just _ -> do
-      ts' <- mapM parsePat ts
-      return $ meta :< PatApp s ts'
-parsePat t = lift $ throwE $ "parsePat: syntax error:\n" ++ Pr.ppShow t
+    Just (s, _, _) -> return $ meta :< PatConst s
+parsePat' (meta :< TreeNode [_ :< TreeAtom "thunk", te]) = do
+  e <- parsePat' te
+  return $ meta :< PatThunk e
+parsePat' (meta :< TreeNode [_ :< TreeAtom "unthunk", te]) = do
+  e <- parsePat' te
+  return $ meta :< PatUnthunk e
+parsePat' (meta :< TreeNode (t:ts)) = do
+  t' <- parsePat' t
+  ts' <- mapM parsePat ts
+  return $ meta :< PatApp t' ts'
+  -- msym <- lookupVEnv s
+  -- case msym of
+  --   Nothing ->
+  --     lift $ throwE $ "parsePat': the constant " ++ show s ++ " is not defined"
+  --   Just _ -> do
+  --     ts' <- mapM parsePat' ts
+  --     return $ meta :< PatApp s ts'
+parsePat' t = lift $ throwE $ "parsePat': syntax error:\n" ++ Pr.ppShow t
 
 parseClause :: Tree -> WithEnv ([Pat], Term)
 parseClause (_ :< TreeNode [_ :< TreeAtom "with", _ :< TreeNode tps, tbody]) = do

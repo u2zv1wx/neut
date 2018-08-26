@@ -29,13 +29,18 @@ toDecision os (patMat, bodyList)
   | Just i <- findPatApp patMat
   , i /= 0 = do
     let patMat' = swapColumn 0 i patMat
-    let os' = swapColumn 0 i os
+    let (is, typeList) = unzip os
+    let is' = swapColumn 0 i is
+    let os' = zip is' typeList
     DecisionSwap i <$> toDecision os' (patMat', bodyList)
   | otherwise = do
-    consList <- nub <$> headConstructor patMat
+    consList <- headConstructor patMat
     newMatrixList <-
-      forM consList $ \(c, num, a) -> do
-        let os' = map (\j -> head os ++ [j]) [0 .. (a - 1)] ++ tail os
+      forM consList $ \(c, num, args) -> do
+        let a = length args
+        let os' =
+              map (\j -> (fst (head os) ++ [j], args !! j)) [0 .. (a - 1)] ++
+              tail os
         tmp <- specialize c a (patMat, bodyList)
         tmp' <- toDecision os' tmp
         return ((c, num), tmp')
@@ -64,25 +69,26 @@ getCEnv (((i :< _):_):_) = do
     Just (Fix (TypeNode s _)) -> lookupConstructorEnv s
     _                         -> lift $ throwE "type error in pattern"
 
-headConstructor :: [[Pat]] -> WithEnv [(Identifier, Int, Int)]
+headConstructor :: [[Pat]] -> WithEnv [(Identifier, Int, [Type])]
 headConstructor [] = return []
 headConstructor (ps:pss) = do
   ps' <- headConstructor' ps
   pss' <- mapM headConstructor' pss
   return $ join $ ps' : pss'
 
-headConstructor' :: [Pat] -> WithEnv [(Identifier, Int, Int)]
-headConstructor' [] = return []
-headConstructor' ((_ :< PatHole):_) = return []
-headConstructor' ((_ :< PatVar _):_) = return []
-headConstructor' ((i :< PatApp s _):_) = do
-  t <- lookupTypeEnv i
-  case t of
-    Just (Fix (TypeNode node _)) -> do
-      (_, args, _) <- lookupVEnv' s
+headConstructor' :: [Pat] -> WithEnv [(Identifier, Int, [Type])]
+headConstructor' ((_ :< PatApp (i :< PatUnthunk (_ :< PatConst s)) _):_) = do
+  t <- lookupTypeEnv' i
+  let (codType, args) = forallArgs t
+  case codType of
+    Fix (TypeNode node _) -> do
       i <- getConstructorNumber node s
-      return [(s, i, length args)]
+      return [(s, i, map snd args)]
     _ -> lift $ throwE $ s ++ " is not a constructor"
+headConstructor' ((_ :< PatThunk (meta :< _)):_) = do
+  t <- lookupTypeEnv' meta
+  return [("thunk", 0, [t])]
+headConstructor' _ = return []
 
 collectVar :: [[Pat]] -> WithEnv [Identifier]
 collectVar [] = return []
@@ -106,10 +112,10 @@ findPatApp (ps:pss) =
     Just i  -> Just i
 
 findPatApp' :: [(Pat, Int)] -> Maybe Int
-findPatApp' []                       = Nothing
-findPatApp' ((_ :< PatHole, _):ps)   = findPatApp' ps
-findPatApp' ((_ :< PatVar _, _):ps)  = findPatApp' ps
-findPatApp' ((_ :< PatApp _ _, i):_) = Just i
+findPatApp' [] = Nothing
+findPatApp' ((_ :< PatThunk (_ :< PatApp (_ :< PatUnthunk (_ :< PatConst _)) _), i):_) =
+  Just i
+findPatApp' (_:ps) = findPatApp' ps
 
 specialize :: Identifier -> Arity -> ClauseMatrix a -> WithEnv (ClauseMatrix a)
 specialize c a (pss, bs) = do
@@ -123,10 +129,22 @@ specializeRow _ a ((i :< PatHole):ps) body = do
   return [(newNames ++ ps, body)]
 specializeRow c a ((i :< PatVar _):ps) body =
   specializeRow c a ((i :< PatHole) : ps) body
-specializeRow c _ ((_ :< PatApp s args):ps) body =
+specializeRow c _ ((_ :< PatConst x):ps) body =
+  if c /= x
+    then return []
+    else return [(ps, body)]
+specializeRow c _ ((_ :< PatApp (_ :< PatUnthunk (_ :< PatConst s)) args):ps) body =
   if c /= s
     then return []
     else return [(args ++ ps, body)]
+specializeRow _ _ ((_ :< PatApp _ _):_) _ =
+  lift $ throwE "Pattern.specializeRow"
+specializeRow c _ ((_ :< PatThunk p):ps) body =
+  if c /= "thunk"
+    then return []
+    else return [(p : ps, body)]
+specializeRow _ _ ((_ :< PatUnthunk _):_) _ =
+  lift $ throwE "Pattern.specializeRow"
 
 defaultMatrix :: ClauseMatrix a -> WithEnv (ClauseMatrix a, Maybe Identifier)
 defaultMatrix (pss, bs) = do
@@ -141,10 +159,14 @@ takeHeadJust (Nothing:rest) = takeHeadJust rest
 takeHeadJust (Just x:_)     = Just x
 
 defaultMatrixRow :: [Pat] -> a -> WithEnv ([([Pat], a)], Maybe Identifier)
-defaultMatrixRow [] _                      = return ([], Nothing)
-defaultMatrixRow ((_ :< PatHole):ps) body  = return ([(ps, body)], Nothing)
+defaultMatrixRow [] _ = return ([], Nothing)
+defaultMatrixRow ((_ :< PatHole):ps) body = return ([(ps, body)], Nothing)
 defaultMatrixRow ((_ :< PatVar s):ps) body = return ([(ps, body)], Just s)
-defaultMatrixRow ((_ :< PatApp _ _):_) _   = return ([], Nothing)
+defaultMatrixRow ((_ :< PatConst _):_) _ = return ([], Nothing)
+defaultMatrixRow ((_ :< PatApp _ _):_) _ = return ([], Nothing)
+defaultMatrixRow ((_ :< PatThunk _):_) _ = return ([], Nothing)
+defaultMatrixRow ((_ :< PatUnthunk _):_) _ =
+  lift $ throwE "Pattern.defaultMatrixRow"
 
 swapColumn :: Int -> Int -> [[a]] -> [[a]]
 swapColumn i j mat = transpose $ swap i j $ transpose mat

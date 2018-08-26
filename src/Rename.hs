@@ -79,6 +79,9 @@ renameType (Fix (TypeForall (s, tdom) tcod)) = do
 renameType (Fix (TypeNode s ts)) = do
   ts' <- mapM renameType ts
   return $ Fix $ TypeNode s ts'
+renameType (Fix (TypeStruct ts)) = do
+  ts' <- mapM renameType ts
+  return $ Fix $ TypeStruct ts'
 
 renameNodeType ::
      [(Identifier, Type)] -> Type -> WithEnv ([(Identifier, Type)], Type)
@@ -94,10 +97,17 @@ renameNodeType ((i, wt):wts) t = do
 
 renamePat :: Pat -> WithEnv Pat
 renamePat (i :< PatHole) = return $ i :< PatHole
+renamePat (i :< PatConst x) = return $ i :< PatConst x
 renamePat (i :< PatVar s) = do
   t <- PatVar <$> lookupNameEnv' s
   return (i :< t)
-renamePat (i :< PatApp s []) = return (i :< PatApp s [])
-renamePat (i :< PatApp s vs) = do
+renamePat (i :< PatApp v vs) = do
+  v' <- renamePat v
   vs' <- mapM renamePat vs
-  return (i :< PatApp s vs')
+  return (i :< PatApp v' vs')
+renamePat (i :< PatThunk v) = do
+  v' <- renamePat v
+  return $ i :< PatThunk v'
+renamePat (i :< PatUnthunk v) = do
+  v' <- renamePat v
+  return $ i :< PatUnthunk v'
