@@ -20,7 +20,8 @@ import           Debug.Trace
 
 virtualV :: Value -> WithEnv Data
 virtualV (Value (i :< ValueVar x)) = return $ i :< DataPointer x
-virtualV (Value (i :< ValueConst x)) = do
+virtualV (Value (i :< ValueConst x)) -- xの型を更新すべき
+ = do
   t <- lookupTypeEnv' i
   case t of
     Fix (TypeDown _) -> do
@@ -247,7 +248,6 @@ varDecision (DecisionLeaf ois e) = do
   let bounds = map snd ois
   filter (`notElem` bounds) $ varN $ Comp e
 varDecision (DecisionSwitch _ cds mdefault) = do
-  undefined
   let (_, ds) = unzip cds
   let vs = join $ map varDecision ds
   case mdefault of

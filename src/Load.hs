@@ -14,7 +14,7 @@ import           Data.IORef
 import           Asm
 import           Data
 
--- import           Emit
+import           Emit
 import           Infer
 import           Lift
 import           Macro
@@ -64,11 +64,12 @@ load' ((_ :< TreeNode [_ :< TreeAtom "value", _ :< TreeAtom x, tp]):as) = do
 load' (a:as) = do
   e <- macroExpand a >>= parse >>= rename >>= lift
   liftIO $ putStrLn $ Pr.ppShow e
-  i <- newNameWith "main"
-  check i e
+  let main = "main"
+  check main e
   -- polarizeTypeEnv wtenv
   e' <- polarize e >>= toComp
   c' <- virtualC e'
-  asm <- asmCode c'
-  -- emit
+  insCodeEnv main [] c'
+  -- asm <- asmCode c'
+  emit
   load' as

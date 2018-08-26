@@ -241,6 +241,10 @@ type Address = Identifier
 
 type DefaultBranch = (TargetLabel, Code)
 
+type DefaultAsmBranch = (TargetLabel, [Asm])
+
+type AsmBranch = (ConstructorName, ConstructorId, TargetLabel, [Asm])
+
 data Code
   = CodeReturn Data
   | CodeLet Identifier -- bind (we also use this to represent application)
@@ -267,24 +271,20 @@ letSeq _ _ _ = error "Virtual.letSeq: invalid arguments"
 
 data AsmData
   = AsmDataRegister Identifier
-  | AsmDataLabel Identifier
-  | AsmDataInt Int
-  | AsmDataStruct [AsmData]
+  | AsmDataFunName Identifier
+  | AsmDataInt32 Int
+  -- | AsmDataStruct [AsmData]
   deriving (Show)
 
 data Asm
   = AsmReturn Identifier
   | AsmLet Identifier
            AsmOperation
-  | AsmStore Type -- the type of source
-             AsmData -- source data
+  | AsmStore AsmData -- source data
              Identifier -- destination register
-  | AsmBranch Identifier
-  | AsmIndirectBranch Identifier
-                      [Identifier]
   | AsmSwitch Identifier
-              DefaultBranch
-              [(Identifier, Int, Identifier, [Asm])]
+              DefaultAsmBranch
+              [AsmBranch]
   deriving (Show)
 
 data AsmOperation

@@ -106,7 +106,6 @@ var (_ :< TermCase vs vcs) = do
   let vs2 = join $ map var bodyList
   efs ++ vs1 ++ vs2
 
--- var _ = error "Lift.var: illegal argument"
 varPat :: Pat -> [Identifier]
 varPat (_ :< PatHole)      = []
 varPat (_ :< PatConst _)   = []
@@ -114,16 +113,3 @@ varPat (_ :< PatVar s)     = [s]
 varPat (_ :< PatApp p ps)  = varPat p ++ join (map varPat ps)
 varPat (_ :< PatThunk v)   = varPat v
 varPat (_ :< PatUnthunk e) = varPat e
--- varDecision :: Decision Term -> [Identifier]
--- varDecision (DecisionLeaf ois e) = do
---   let bounds = map snd ois
---   filter (`notElem` bounds) $ var e
--- varDecision (DecisionSwitch _ cds mdefault) = do
---   undefined
---   let (_, ds) = unzip cds
---   let vs = join $ map varDecision ds
---   case mdefault of
---     Nothing                -> vs
---     Just (Nothing, tree)   -> vs ++ varDecision tree
---     Just (Just name, tree) -> vs ++ filter (/= name) (varDecision tree)
--- varDecision (DecisionSwap _ tree) = varDecision tree
