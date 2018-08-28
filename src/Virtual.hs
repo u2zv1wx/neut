@@ -20,23 +20,14 @@ import           Debug.Trace
 
 virtualV :: Value -> WithEnv Data
 virtualV (Value (i :< ValueVar x)) = return $ i :< DataPointer x
-virtualV (Value (i :< ValueConst x)) -- xの型を更新すべき
- = do
+virtualV (Value (i :< ValueConst x)) = do
   t <- lookupTypeEnv' i
   case t of
-    Fix (TypeDown _)
-      -- let (_, identArgTypes) = forallArgs t'
-      -- let argTypes = map snd identArgTypes
-      -- let resultType = Fix $ TypeStruct $ Fix (TypeInt 32) : argTypes
-      -- let newType = Fix $ TypeDown $ coForallArgs (resultType, identArgTypes)
-      -- insTypeEnv x newType
-     -> do
+    Fix (TypeDown _) -> do
       envName <- newNameWith "fv"
       let envType = Fix (TypeDown (Fix (TypeStruct [])))
       insTypeEnv envName envType
-      let label = "thunk" ++ i
-      insTypeEnv label t
-      return $ i :< DataClosure label envName []
+      return $ i :< DataClosure x envName []
     _ -> return $ i :< DataFunName x
 virtualV (Value (i :< ValueThunk comp@(Comp (compMeta :< _)))) = do
   let fvList = varN comp

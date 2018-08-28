@@ -54,14 +54,16 @@ emitAsm (AsmStore (AsmDataRegister item) dest) = do
       , showType destType
       , showRegister dest
       ]
-emitAsm (AsmStore (AsmDataFunName item) dest) = do
-  itemType <- lookupTypeEnv' item
+emitAsm (AsmStore (AsmDataFunName item) dest)
+  -- itemType <- lookupTypeEnv' item
+ = do
   destType <- lookupTypeEnv' dest
   emitOp $
     unwords
       [ "store"
-      , showType itemType
-      , showGlobal item
+      -- , showType itemType
+      , "i8*"
+      , showGlobal item ++ ","
       , showType destType
       , showRegister dest
       ]
@@ -109,7 +111,7 @@ emitAsmLet i (AsmLoad source) = do
       , showRegister source
       ]
 emitAsmLet i (AsmGetElemPointer base index) = do
-  baseType <- lookupTypeEnv' base
+  baseType <- lookupRealTypeEnv' base
   case baseType of
     Fix (TypeDown t) ->
       emitOp $

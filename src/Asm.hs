@@ -101,11 +101,16 @@ asmData tmp (_ :< DataClosure name fvListPtr fvList) = do
   let contentList = zip varList' typeList
   let structType = Fix (TypeStruct typeList)
   let labelType = Fix (TypeDown (Fix (TypeInt 8)))
-  let clsType = Fix (TypeStruct [labelType, Fix (TypeDown structType)])
+  let fvListPtrType = Fix $ TypeDown structType
+  let clsType = Fix (TypeStruct [labelType, fvListPtrType])
+  -- どっかにbitcastが必要
   setEnvContent <- setContent contentList fvListPtr
   let clsContentList =
-        [(AsmDataFunName name, labelType), (AsmDataRegister fvListPtr, clsType)]
+        [ (AsmDataFunName name, labelType)
+        , (AsmDataRegister fvListPtr, fvListPtrType)
+        ]
   setClsContent <- setContent clsContentList tmp
+  insRealTypeEnv tmp $ Fix $ TypeDown clsType
   return $
     join copyFreeVar ++
     [AsmLet fvListPtr (AsmAlloc structType)] ++
@@ -134,7 +139,6 @@ asmConstructor name t = do
     [AsmLet resultPtr (AsmAlloc resultType)] ++
     setStructContent ++
     [AsmLet result (AsmLoad resultPtr)] ++ [AsmReturn result]
-    --[AsmReturn resultPtr]
 
 setContent :: [(AsmData, Type)] -> Identifier -> WithEnv [Asm]
 setContent contentList basePointer = do

@@ -77,6 +77,7 @@ load' (a:as) = do
   check main e
   e' <- lift e >>= polarize >>= toComp
   c' <- virtualC e'
+  liftIO $ putStrLn $ Pr.ppShow c'
   insCodeEnv main [] c'
   emit
   load' as
