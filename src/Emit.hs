@@ -25,23 +25,39 @@ emit = do
   env <- get
   forM_ (codeEnv env) $ \(label, (args, body)) -> do
     funType <- lookupTypeEnv' label
-    let (codType, _) = forallArgs funType
+    funType' <- unwrapDown funType
+    let (codType, _) = forallArgs funType'
     argTypeList <- mapM lookupTypeEnv' args
     bodyAsm <- asmCode body
     emitDefine label codType (zip args argTypeList) bodyAsm
   forM_ (valueEnv env) $ \(label, _) -> do
     t <- lookupValueEnv' label
-    case t of
-      Fix (TypeDown t') -> do
-        asm <- asmConstructor label t'
-        let (codType, identTypeList) = forallArgs t'
-        emitDefine label codType identTypeList asm
-      _ -> lift $ throwE "emit.typeError"
+    t' <- unwrapDown t
+    asm <- asmConstructor label t'
+    let (codType, identTypeList) = forallArgs t'
+    emitDefine label codType identTypeList asm
 
 emitAsm :: Asm -> WithEnv ()
 emitAsm (AsmReturn i) = do
   t <- lookupTypeEnv' i
-  emitOp $ unwords ["ret", showType t, showRegister i]
+  t' <- lookupRealTypeEnv' i
+  -- liftIO $ putStrLn $ "the real type of " ++ i ++ " is " ++ show t'
+  if t == t'
+    then emitOp $ unwords ["ret", showType t, showRegister i]
+    else do
+      tmp <- newNameWith "cast"
+      emitOp $
+        unwords
+          [ showRegister tmp
+          , "="
+          , "bitcast"
+          , showType t'
+          , showRegister i
+          , "to"
+          , showType t
+          ]
+      -- emitOp $ unwords ["bitcast"]
+      emitOp $ unwords ["ret", showType t, showRegister tmp]
 emitAsm (AsmLet i op) = emitAsmLet i op
 emitAsm (AsmStore (AsmDataRegister item) dest) = do
   itemType <- lookupTypeEnv' item

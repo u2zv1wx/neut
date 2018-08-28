@@ -37,10 +37,12 @@ virtualV (Value (i :< ValueThunk comp@(Comp (compMeta :< _)))) = do
   let envType = Fix (TypeDown (Fix (TypeStruct fvTypeList)))
   insTypeEnv envName envType
   let label = "thunk" ++ i
+  liftIO $ putStrLn $ "creating thunk" ++ i
   compType <- lookupTypeEnv' compMeta
   -- thunk : &(&type-of-env -> type-of-comp)
   let labelType = Fix (TypeDown (Fix (TypeForall (envName, envType) compType)))
   insTypeEnv label labelType
+  liftIO $ putStrLn $ "the type of thunk" ++ i ++ " is " ++ show labelType
   asm <- virtualC comp
   insCodeEnv label [envName] asm
   return $ i :< DataClosure label envName fvList

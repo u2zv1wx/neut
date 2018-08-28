@@ -17,7 +17,7 @@ import           Data
 check :: Identifier -> Term -> WithEnv ()
 check main e = do
   t <- infer e
-  insTypeEnv main t -- insert the type of main function
+  insTypeEnv main $ Fix $ TypeDown t -- insert the type of main function
   env <- get
   sub <- unify $ constraintEnv env
   let tenv' = map (\(s, t) -> (s, sType sub t)) $ typeEnv env

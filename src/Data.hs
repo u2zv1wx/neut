@@ -74,6 +74,8 @@ data TypeF a
 
 deriving instance Show a => Show (TypeF a)
 
+deriving instance Eq a => Eq (TypeF a)
+
 deriving instance Functor TypeF
 
 $(deriveShow1 ''TypeF)
@@ -87,6 +89,8 @@ instance Show1 f => Show (Fix f) where
 
 -- type Type = Cofree TypeF Identifier
 type Type = Fix TypeF
+
+deriving instance Eq Type
 
 type Region = Identifier
 
@@ -608,3 +612,7 @@ funAndArgs c = return (c, [])
 coFunAndArgs :: (Term, [(Identifier, Term)]) -> Term
 coFunAndArgs (term, [])        = term
 coFunAndArgs (term, (i, v):xs) = coFunAndArgs (i :< TermApp term v, xs)
+
+unwrapDown :: Type -> WithEnv Type
+unwrapDown (Fix (TypeDown t')) = return t'
+unwrapDown t = lift $ throwE $ "the type " ++ show t ++ " is not a pointer"

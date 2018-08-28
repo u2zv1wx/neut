@@ -49,28 +49,24 @@ load' ((_ :< TreeNode [_ :< TreeAtom "value", _ :< TreeAtom x, tp]):as) = do
   t <- parseType tp >>= renameType
   checkType t
   -- TODO: check polarity, variable binding
-  case t of
-    Fix (TypeDown t') -> do
-      let (tailType, identArgTypes) = forallArgs t'
-      let argTypes = map snd identArgTypes
-      let resultType = Fix $ TypeStruct $ Fix (TypeInt 32) : argTypes
-      let newType = Fix $ TypeDown $ coForallArgs (resultType, identArgTypes)
-      insTypeEnv x t
-      insValueEnv x newType
-      env <- get
-      case tailType of
-        Fix (TypeNode s _)
-          | isDefinedType s env
-            -- insTypeEnv x t
-           -> do
-            insConstructorEnv s x
-            load' as
-        t ->
-          E.lift $
-          throwE $
-          "the codomain of value type " ++
-          show x ++ " must be a user-defined type. Note:\n" ++ Pr.ppShow t
-    _ -> E.lift $ throwE $ "the value" ++ show x ++ " isn't wrapped by thunk"
+  t' <- unwrapDown t
+  let (tailType, identArgTypes) = forallArgs t'
+  let argTypes = map snd identArgTypes
+  let resultType = Fix $ TypeStruct $ Fix (TypeInt 32) : argTypes
+  let newType = Fix $ TypeDown $ coForallArgs (resultType, identArgTypes)
+  insTypeEnv x t
+  insValueEnv x newType
+  env <- get
+  case tailType of
+    Fix (TypeNode s _)
+      | isDefinedType s env -> do
+        insConstructorEnv s x
+        load' as
+    t ->
+      E.lift $
+      throwE $
+      "the codomain of value type " ++
+      show x ++ " must be a user-defined type. Note:\n" ++ Pr.ppShow t
 load' (a:as) = do
   e <- macroExpand a >>= parse >>= rename
   let main = "main"
