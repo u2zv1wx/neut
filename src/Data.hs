@@ -261,9 +261,10 @@ data Code
              Identifier -- the name of the function
              [Data] -- arguments
              Code -- continuation
-  | CodeCallClosure Identifier -- store the result of call to here
-                    Data -- {function-label, environment}
-                    Code -- continuation
+  | CodeLoadClosure Data
+  -- | CodeLoadClosure Identifier -- store the result of load to here
+  --                   Data -- closure (i.e. {function-label, environment})
+  --                   Code -- continuation
   deriving (Show)
 
 letSeq :: [Identifier] -> [Data] -> Code -> WithEnv Code
@@ -616,3 +617,8 @@ coFunAndArgs (term, (i, v):xs) = coFunAndArgs (i :< TermApp term v, xs)
 unwrapDown :: Type -> WithEnv Type
 unwrapDown (Fix (TypeDown t')) = return t'
 unwrapDown t = lift $ throwE $ "the type " ++ show t ++ " is not a pointer"
+
+closureType :: Type -> Type
+closureType envType = do
+  let labelType = Fix (TypeDown (Fix (TypeInt 8)))
+  Fix $ TypeDown $ Fix $ TypeStruct [labelType, envType]

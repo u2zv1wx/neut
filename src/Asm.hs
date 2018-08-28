@@ -31,7 +31,8 @@ asmCode (CodeLet i d@(meta :< _) cont) = do
   insTypeEnv loader t
   bindLoader <- asmData loader d
   cont' <- asmCode cont
-  return $ bindLoader ++ asmCopy t (AsmDataRegister loader) i ++ cont'
+  copy <- asmCopy (AsmDataRegister loader) i
+  return $ bindLoader ++ copy ++ cont'
 asmCode (CodeSwitch basePointer (defaultLabel, defaultCode) branchList) = do
   tagPtr <- newNameWith $ basePointer ++ ".tagptr"
   insTypeEnv tagPtr $ Fix $ TypeDown $ Fix $ TypeInt 32
@@ -47,7 +48,7 @@ asmCode (CodeSwitch basePointer (defaultLabel, defaultCode) branchList) = do
     , AsmLet headData (AsmLoad tagPtr)
     , AsmSwitch headData (defaultLabel, defaultAsm) branchList'
     ]
-asmCode (CodeCall x name args cont) = do
+asmCode (CodeCall x fun args cont) = do
   varAsmList <-
     forM args $ \arg@(meta :< _) -> do
       tmp <- newNameWith "tmp"
@@ -57,54 +58,45 @@ asmCode (CodeCall x name args cont) = do
       return (tmp, asm)
   let (varList, asmList) = unzip varAsmList
   asmCont <- asmCode cont
-  return $ join asmList ++ [AsmLet x (AsmCall name varList)] ++ asmCont
-asmCode (CodeCallClosure x cls@(clsMeta :< _) cont) = do
-  clsType <- lookupTypeEnv' clsMeta
-  clsReg <- newNameWith "cls"
-  insTypeEnv clsReg $ Fix $ TypeDown $ Fix $ TypeStruct []
-  funPtr <- newNameWith $ "cls" ++ ".cursor00"
-  insTypeEnv funPtr clsType
-  envPtr <- newNameWith $ "cls" ++ ".cursor010"
-  insTypeEnv envPtr $ Fix $ TypeDown $ Fix TypeOpaque
-  bindClsReg <- asmData clsReg cls
-  asmCont <- asmCode cont
-  return $
-    bindClsReg ++
-    [ AsmLet funPtr (AsmGetElemPointer clsReg [0, 0])
-    , AsmLet envPtr (AsmGetElemPointer clsReg [0, 1, 0])
-    , AsmLet x (AsmCall funPtr [envPtr])
-    ] ++
-    asmCont
+  funType <- lookupTypeEnv' fun
+  case funType of
+    Fix (TypeForall _ _) ->
+      return $ join asmList ++ [AsmLet x (AsmCall fun varList)] ++ asmCont
+    _ ->
+      return $
+      join asmList ++ [AsmLet (x ++ "CLOSURE") (AsmCall fun varList)] ++ asmCont
+asmCode (CodeLoadClosure cls@(clsMeta :< _)) = do
+  clsPtrType <- lookupTypeEnv' clsMeta
+  clsPtrReg <- newNameWith "cls"
+  insTypeEnv clsPtrReg clsPtrType
+  asmData clsPtrReg cls
+  -- asmCont <- asmCode cont
+  -- ++ [AsmLet x (AsmLoad clsPtrReg)]
 
+-- asmCode (CodeLoadClosure x cls@(clsMeta :< _) cont) = do
+--   clsPtrType <- lookupTypeEnv' clsMeta
+--   clsPtrReg <- newNameWith "cls"
+--   insTypeEnv clsPtrReg clsPtrType
+--   bindClsReg <- asmData clsPtrReg cls
+--   asmCont <- asmCode cont
+--   return $ bindClsReg ++ [AsmLet x (AsmLoad clsPtrReg)] ++ asmCont
 asmData :: Identifier -> Data -> WithEnv [Asm]
 asmData tmp (_ :< DataPointer x) = do
-  t <- lookupTypeEnv' x
-  return $ asmCopy t (AsmDataRegister x) tmp
+  asmCopy (AsmDataRegister x) tmp
 asmData tmp (_ :< DataFunName name) = do
-  let labelPointerType = Fix $ TypeDown $ Fix $ TypeInt 8
-  return $ asmCopy labelPointerType (AsmDataFunName name) tmp
+  asmCopy (AsmDataFunName name) tmp
 asmData tmp (_ :< DataElemAtIndex basePointer idx) =
   return [AsmLet tmp (AsmGetElemPointer basePointer idx)]
-asmData tmp (meta :< DataInt32 i) = do
-  baseType <- lookupTypeEnv' meta -- i32*
-  return $ asmCopy baseType (AsmDataInt32 i) tmp
+asmData tmp (_ :< DataInt32 i) = do
+  asmCopy (AsmDataInt32 i) tmp
 asmData tmp (_ :< DataClosure name fvListPtr fvList) = do
-  varAsmList <-
-    forM fvList $ \fv -> do
-      var <- newNameWith "tmp"
-      t <- lookupTypeEnv' fv
-      insTypeEnv var t
-      return (var, asmCopy t (AsmDataRegister fv) var)
-  let (varList, copyFreeVar) = unzip varAsmList
-  typeList <- mapM lookupTypeEnv' varList
-  let varList' = map AsmDataRegister varList
-  let contentList = zip varList' typeList
+  typeList <- mapM lookupTypeEnv' fvList
+  let contentList = zip (map AsmDataRegister fvList) typeList
+  setFvListPtrContent <- setContent contentList fvListPtr
   let structType = Fix (TypeStruct typeList)
   let labelType = Fix (TypeDown (Fix (TypeInt 8)))
   let fvListPtrType = Fix $ TypeDown structType
   let clsType = Fix (TypeStruct [labelType, fvListPtrType])
-  -- どっかにbitcastが必要
-  setEnvContent <- setContent contentList fvListPtr
   let clsContentList =
         [ (AsmDataFunName name, labelType)
         , (AsmDataRegister fvListPtr, fvListPtrType)
@@ -112,12 +104,18 @@ asmData tmp (_ :< DataClosure name fvListPtr fvList) = do
   setClsContent <- setContent clsContentList tmp
   insRealTypeEnv tmp $ Fix $ TypeDown clsType
   return $
-    join copyFreeVar ++
     [AsmLet fvListPtr (AsmAlloc structType)] ++
-    setEnvContent ++ [AsmLet tmp (AsmAlloc clsType)] ++ setClsContent
+    setFvListPtrContent ++ [AsmLet tmp (AsmAlloc clsType)] ++ setClsContent
 
-asmCopy :: Type -> AsmData -> Identifier -> [Asm]
-asmCopy t from to = [AsmLet to (AsmAlloc t), AsmStore from to]
+-- temporary
+asmCopy :: AsmData -> Identifier -> WithEnv [Asm]
+asmCopy from to = do
+  t <- lookupTypeEnv' to
+  t' <- unwrapDown t
+  -- undefined
+  -- tmp <- newNameWith "copy"
+  -- insTypeEnv tmp t'
+  return $ [AsmLet to (AsmAlloc t'), AsmStore from to]
 
 asmConstructor :: Identifier -> Type -> WithEnv [Asm]
 asmConstructor name t = do

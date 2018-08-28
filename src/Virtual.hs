@@ -27,6 +27,7 @@ virtualV (Value (i :< ValueConst x)) = do
       envName <- newNameWith "fv"
       let envType = Fix (TypeDown (Fix (TypeStruct [])))
       insTypeEnv envName envType
+      insRealTypeEnv i (closureType envType)
       return $ i :< DataClosure x envName []
     _ -> return $ i :< DataFunName x
 virtualV (Value (i :< ValueThunk comp@(Comp (compMeta :< _)))) = do
@@ -37,14 +38,13 @@ virtualV (Value (i :< ValueThunk comp@(Comp (compMeta :< _)))) = do
   let envType = Fix (TypeDown (Fix (TypeStruct fvTypeList)))
   insTypeEnv envName envType
   let label = "thunk" ++ i
-  liftIO $ putStrLn $ "creating thunk" ++ i
   compType <- lookupTypeEnv' compMeta
   -- thunk : &(&type-of-env -> type-of-comp)
   let labelType = Fix (TypeDown (Fix (TypeForall (envName, envType) compType)))
   insTypeEnv label labelType
-  liftIO $ putStrLn $ "the type of thunk" ++ i ++ " is " ++ show labelType
   asm <- virtualC comp
   insCodeEnv label [envName] asm
+  insRealTypeEnv i (closureType envType)
   return $ i :< DataClosure label envName fvList
 
 virtualC :: Comp -> WithEnv Code
@@ -84,12 +84,18 @@ virtualC (Comp (_ :< CompBind s comp1 comp2)) = do
   operation1 <- virtualC (Comp comp1)
   operation2 <- virtualC (Comp comp2)
   traceLet s operation1 operation2
-virtualC (Comp (i :< CompUnthunk v@(Value (valueMeta :< _)))) = do
-  asm <- virtualV v
+virtualC (Comp (i :< CompUnthunk v@(Value (_ :< _)))) = do
+  asm@(clsPtrMeta :< _) <- virtualV v
+  clsPtrType <- lookupTypeEnv' clsPtrMeta
+  clsType <- unwrapDown clsPtrType
   s <- newNameWith "tmp"
   resultType <- lookupTypeEnv' i
   insTypeEnv s resultType
-  return $ CodeCallClosure s asm (CodeReturn (valueMeta :< DataPointer s))
+  insRealTypeEnv s clsType
+  valueMeta <- newNameWith "meta"
+  insTypeEnv valueMeta resultType
+  insRealTypeEnv valueMeta clsType
+  return $ CodeLoadClosure asm
 virtualC (Comp (_ :< CompMu s comp)) = do
   asm <- virtualC $ Comp comp
   insCodeEnv s [] asm
@@ -194,7 +200,8 @@ makeBranch y (o, t) js (Just (Nothing, label, code)) =
         CodeSwitch name (label, code) js
 
 traceLet :: String -> Code -> Code -> WithEnv Code
-traceLet s (CodeReturn ans) cont = return $ CodeLet s ans cont
+traceLet s (CodeReturn ans@(_ :< _)) cont = do
+  return $ CodeLet s ans cont
 traceLet s (CodeSwitch x (label, defaultBranch) branchList) cont = do
   defaultBranch' <- traceLet s defaultBranch cont
   branchList' <-
@@ -208,10 +215,14 @@ traceLet s (CodeLet k o1 o2) cont = do
 traceLet s (CodeCall reg name xds cont1) cont2 = do
   tmp <- traceLet s cont1 cont2
   return $ CodeCall reg name xds tmp
-traceLet s (CodeCallClosure reg env cont1) cont2 = do
-  tmp <- traceLet s cont1 cont2
-  return $ CodeCallClosure reg env tmp
+traceLet s (CodeLoadClosure asm) cont = do
+  return $ CodeLet s asm cont
+  -- tmp <- traceLet s cont1 cont2
+  -- return $ CodeLoadClosure reg env tmp
 
+-- traceLet s (CodeLoadClosure reg env cont1) cont2 = do
+--   tmp <- traceLet s cont1 cont2
+--   return $ CodeLoadClosure reg env tmp
 toLamSeq :: Comp -> WithEnv (Comp, [Identifier])
 toLamSeq (Comp (_ :< CompLam x body)) = do
   (body', args) <- toLamSeq $ Comp body

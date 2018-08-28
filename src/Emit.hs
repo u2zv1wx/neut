@@ -56,7 +56,6 @@ emitAsm (AsmReturn i) = do
           , "to"
           , showType t
           ]
-      -- emitOp $ unwords ["bitcast"]
       emitOp $ unwords ["ret", showType t, showRegister tmp]
 emitAsm (AsmLet i op) = emitAsmLet i op
 emitAsm (AsmStore (AsmDataRegister item) dest) = do
@@ -70,9 +69,7 @@ emitAsm (AsmStore (AsmDataRegister item) dest) = do
       , showType destType
       , showRegister dest
       ]
-emitAsm (AsmStore (AsmDataFunName item) dest)
-  -- itemType <- lookupTypeEnv' item
- = do
+emitAsm (AsmStore (AsmDataFunName item) dest) = do
   destType <- lookupTypeEnv' dest
   emitOp $
     unwords

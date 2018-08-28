@@ -76,4 +76,6 @@ load' (a:as) = do
   liftIO $ putStrLn $ Pr.ppShow c'
   insCodeEnv main [] c'
   emit
+  env <- get
+  liftIO $ putStrLn $ Pr.ppShow (codeEnv env)
   load' as
