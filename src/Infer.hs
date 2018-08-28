@@ -1,6 +1,7 @@
 module Infer
   ( check
   , unify
+  , checkType
   ) where
 
 import           Control.Monad
@@ -22,6 +23,14 @@ check main e = do
   let tenv' = map (\(s, t) -> (s, sType sub t)) $ typeEnv env
   modify (\e -> e {typeEnv = tenv', constraintEnv = []})
 
+checkType :: Type -> WithEnv ()
+checkType t = do
+  _ <- inferType t
+  env <- get
+  sub <- unify $ constraintEnv env
+  let tenv' = map (\(s, t) -> (s, sType sub t)) $ typeEnv env
+  modify (\e -> e {typeEnv = tenv', constraintEnv = []})
+
 infer :: Term -> WithEnv Type
 infer (meta :< TermVar s) = do
   mt <- lookupTypeEnv s
@@ -31,7 +40,7 @@ infer (meta :< TermVar s) = do
       return t
     _ -> lift $ throwE $ "undefined variable: " ++ s
 infer (meta :< TermConst s) = do
-  t <- lookupValueEnv' s
+  t <- lookupTypeEnv' s
   insTypeEnv meta t
   return t
 infer (meta :< TermThunk e) = do
@@ -94,6 +103,51 @@ infer (meta :< TermCase vs vses) = do
   forM_ tes $ \te -> insConstraintEnv (Fix ans) te
   insTypeEnv meta (Fix ans)
   return $ Fix ans
+
+inferType :: Type -> WithEnv Type
+inferType (Fix TypeUnit) = do
+  i <- newNameWith "level"
+  return $ Fix (TypeUniv (WeakLevelHole i))
+inferType (Fix (TypeInt _)) = do
+  i <- newNameWith "level"
+  return $ Fix (TypeUniv (WeakLevelHole i))
+inferType (Fix TypeOpaque) = do
+  i <- newNameWith "level"
+  return $ Fix (TypeUniv (WeakLevelHole i))
+inferType (Fix (TypeVar _)) = do
+  i <- newNameWith "level"
+  return $ Fix (TypeUniv (WeakLevelHole i))
+inferType (Fix (TypeHole _)) = do
+  i <- newNameWith "level"
+  return $ Fix (TypeUniv (WeakLevelHole i))
+inferType (Fix (TypeUp t)) = do
+  u <- inferType t
+  i <- newNameWith "level"
+  return $ Fix (TypeUniv (WeakLevelHole i))
+inferType (Fix (TypeDown t)) = do
+  u <- inferType t
+  i <- newNameWith "level"
+  return $ Fix (TypeUniv (WeakLevelHole i))
+inferType (Fix (TypeUniv _)) = do
+  i <- newNameWith "level"
+  -- TODO: add constraint: level < i
+  return $ Fix (TypeUniv (WeakLevelHole i))
+inferType (Fix (TypeForall (s, tdom) tcod)) = do
+  insTypeEnv s tdom
+  udom <- inferType tdom
+  ucod <- inferType tcod
+  i <- newNameWith "level"
+  -- TODO: constraint: udom == ucod
+  return $ Fix (TypeUniv (WeakLevelHole i))
+inferType (Fix (TypeNode s ts)) = do
+  us <- mapM inferType ts
+  -- todo: constraint regarding us
+  i <- newNameWith "level"
+  return $ Fix (TypeUniv (WeakLevelHole i))
+inferType (Fix (TypeStruct ts)) = do
+  us <- mapM inferType ts
+  i <- newNameWith "level"
+  return $ Fix (TypeUniv (WeakLevelHole i))
 
 inferPat :: Pat -> WithEnv Type
 inferPat (meta :< PatHole) = do

@@ -41,10 +41,6 @@ lift (i :< TermBind s c1 c2) = do
 lift (meta :< TermMu s c) = do
   c' <- lift c
   return $ meta :< TermMu s c'
--- lift (i :< TermDecision es tree) = do
---   es' <- mapM lift es
---   tree' <- liftDecisionM lift tree
---   return $ i :< TermDecision es' tree'
 lift (i :< TermCase vs vcs) = do
   vs' <- mapM lift vs
   let (patList, bodyList) = unzip vcs

@@ -46,30 +46,37 @@ load' ((_ :< TreeNode ((_ :< TreeAtom "type"):(_ :< TreeAtom s):ts)):as) = do
   insDefinedTypeEnv s args
   load' as
 load' ((_ :< TreeNode [_ :< TreeAtom "value", _ :< TreeAtom x, tp]):as) = do
-  t <- parseType tp
+  t <- parseType tp >>= renameType
+  checkType t
   -- TODO: check polarity, variable binding
-  let (tailType, _) = forallArgs t
-  env <- get
-  case tailType of
-    Fix (TypeNode s _)
-      | isDefinedType s env -> do
-        insTypeEnv x t
-        insValueEnv x t
-        insConstructorEnv s x
-        load' as
-    _ ->
-      E.lift $
-      throwE $
-      "the codomain of value type " ++ show x ++ " must be a user-defined type"
+  case t of
+    Fix (TypeDown t') -> do
+      let (tailType, identArgTypes) = forallArgs t'
+      let argTypes = map snd identArgTypes
+      let resultType = Fix $ TypeStruct $ Fix (TypeInt 32) : argTypes
+      let newType = Fix $ TypeDown $ coForallArgs (resultType, identArgTypes)
+      insTypeEnv x t
+      insValueEnv x newType
+      env <- get
+      case tailType of
+        Fix (TypeNode s _)
+          | isDefinedType s env
+            -- insTypeEnv x t
+           -> do
+            insConstructorEnv s x
+            load' as
+        t ->
+          E.lift $
+          throwE $
+          "the codomain of value type " ++
+          show x ++ " must be a user-defined type. Note:\n" ++ Pr.ppShow t
+    _ -> E.lift $ throwE $ "the value" ++ show x ++ " isn't wrapped by thunk"
 load' (a:as) = do
-  e <- macroExpand a >>= parse >>= rename >>= lift
-  liftIO $ putStrLn $ Pr.ppShow e
+  e <- macroExpand a >>= parse >>= rename
   let main = "main"
   check main e
-  -- polarizeTypeEnv wtenv
-  e' <- polarize e >>= toComp
+  e' <- lift e >>= polarize >>= toComp
   c' <- virtualC e'
   insCodeEnv main [] c'
-  -- asm <- asmCode c'
   emit
   load' as

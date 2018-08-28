@@ -136,7 +136,11 @@ parseType (_ :< TreeAtom "_") = do
 parseType (_ :< TreeAtom "universe") = do
   t <- TypeUniv . WeakLevelHole <$> newName
   return $ Fix t
-parseType (_ :< TreeAtom s) = return $ Fix $ TypeVar s -- ?
+parseType (_ :< TreeAtom s) = do
+  msym <- lookupDefinedTypeEnv s
+  case msym of
+    Nothing -> return (Fix $ TypeVar s)
+    Just _  -> return $ Fix $ TypeNode s []
 parseType (_ :< TreeNode [_ :< TreeAtom "down", tn]) = do
   n <- parseType tn
   return $ Fix $ TypeDown n

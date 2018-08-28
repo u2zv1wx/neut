@@ -29,6 +29,14 @@ emit = do
     argTypeList <- mapM lookupTypeEnv' args
     bodyAsm <- asmCode body
     emitDefine label codType (zip args argTypeList) bodyAsm
+  forM_ (valueEnv env) $ \(label, _) -> do
+    t <- lookupValueEnv' label
+    case t of
+      Fix (TypeDown t') -> do
+        asm <- asmConstructor label t'
+        let (codType, identTypeList) = forallArgs t'
+        emitDefine label codType identTypeList asm
+      _ -> lift $ throwE "emit.typeError"
 
 emitAsm :: Asm -> WithEnv ()
 emitAsm (AsmReturn i) = do
@@ -42,8 +50,7 @@ emitAsm (AsmStore (AsmDataRegister item) dest) = do
     unwords
       [ "store"
       , showType itemType
-      , showRegister item
-      , ","
+      , showRegister item ++ ","
       , showType destType
       , showRegister dest
       ]
@@ -65,8 +72,7 @@ emitAsm (AsmStore (AsmDataInt32 i) dest) = do
     unwords
       [ "store"
       , showType itemType
-      , show i
-      , ","
+      , show i ++ ","
       , showType destType
       , showRegister dest
       ]
@@ -76,8 +82,7 @@ emitAsm (AsmSwitch i (defaultBranch, defaultCode) branchList) = do
     unwords
       [ "switch"
       , showType t
-      , showRegister i
-      , ","
+      , showRegister i ++ ","
       , "label"
       , showRegister defaultBranch
       , "[" ++ showBranchList branchList ++ "]"
@@ -99,8 +104,7 @@ emitAsmLet i (AsmLoad source) = do
       [ showRegister i
       , "="
       , "load"
-      , showType ti
-      , ","
+      , showType ti ++ ","
       , showType sourceType
       , showRegister source
       ]
@@ -113,14 +117,12 @@ emitAsmLet i (AsmGetElemPointer base index) = do
         [ showRegister i
         , "="
         , "getelementptr"
-        , showType t
-        , ","
+        , showType t ++ ","
         , showType baseType
-        , showRegister base
-        , ","
+        , showRegister base ++ ","
         , showIndex index
         ]
-    _ -> lift $ throwE "Emit.emitAsmLet.getelementptr"
+    t -> lift $ throwE $ "Emit.emitAsmLet.getelementptr. t:\n" ++ Pr.ppShow t
 emitAsmLet i (AsmCall name args) = do
   funType <- lookupTypeEnv' name
   let (codType, _) = forallArgs funType
@@ -150,8 +152,8 @@ showType (Fix (TypeUniv _)) = undefined
 showType t@(Fix (TypeForall _ _)) = do
   let (codType, identTypeList) = forallArgs t
   let typeList = map snd identTypeList
-  unwords [showType codType, "(" ++ showTypeList typeList ++ ")"]
-showType (Fix (TypeNode s _)) = s
+  "(" ++ unwords [showType codType, "(" ++ showTypeList typeList ++ ")"] ++ ")"
+showType (Fix (TypeNode s _)) = showRegister s
 showType (Fix TypeOpaque) = showRegister "any"
 showType (Fix (TypeStruct ts)) = "{" ++ showTypeList ts ++ "}"
 

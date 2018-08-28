@@ -121,15 +121,20 @@ asmConstructor name t = do
   let regList = map AsmDataRegister identList
   let num = 1 :: Int
   let contentList = (AsmDataInt32 num, Fix (TypeInt 32)) : zip regList argTypes
-  let constructorCodType = Fix $ TypeStruct $ Fix (TypeInt 32) : argTypes
+  let resultType = Fix $ TypeStruct $ Fix (TypeInt 32) : argTypes
+  let constructorCodType = Fix $ TypeDown resultType
   let t' = Fix $ TypeDown $ coForallArgs (constructorCodType, identArgTypes)
   insTypeEnv name t'
-  result <- newNameWith "tmp"
-  insTypeEnv result constructorCodType
-  setStructContent <- setContent contentList result
+  resultPtr <- newNameWith "tmp"
+  insTypeEnv resultPtr constructorCodType
+  setStructContent <- setContent contentList resultPtr
+  result <- newNameWith "result"
+  insTypeEnv result resultType
   return $
-    [AsmLet result (AsmAlloc constructorCodType)] ++
-    setStructContent ++ [AsmReturn result]
+    [AsmLet resultPtr (AsmAlloc resultType)] ++
+    setStructContent ++
+    [AsmLet result (AsmLoad resultPtr)] ++ [AsmReturn result]
+    --[AsmReturn resultPtr]
 
 setContent :: [(AsmData, Type)] -> Identifier -> WithEnv [Asm]
 setContent contentList basePointer = do

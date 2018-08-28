@@ -386,9 +386,15 @@ lookupTypeEnv s = gets (lookup s . typeEnv)
 lookupTypeEnv' :: String -> WithEnv Type
 lookupTypeEnv' s = do
   mt <- gets (lookup s . typeEnv)
+  env <- get
   case mt of
-    Nothing -> lift $ throwE $ s ++ " is not found in the type environment"
-    Just t  -> return t
+    Nothing ->
+      lift $
+      throwE $
+      s ++
+      " is not found in the type environment. typeenv: " ++
+      Pr.ppShow (typeEnv env)
+    Just t -> return t
 
 lookupValueEnv :: String -> WithEnv (Maybe Type)
 lookupValueEnv s = do

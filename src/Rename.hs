@@ -60,6 +60,8 @@ rename (i :< TermCase vs ves) = do
 
 renameType :: Type -> WithEnv Type
 renameType (Fix TypeUnit) = return $ Fix TypeUnit
+renameType (Fix (TypeInt i)) = return $ Fix (TypeInt i)
+renameType (Fix TypeOpaque) = return $ Fix TypeOpaque
 renameType (Fix (TypeVar s)) = do
   t' <- TypeVar <$> lookupNameEnv s
   return $ Fix t'

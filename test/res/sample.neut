@@ -2,25 +2,17 @@
 
 (reserve begin)
 
-(value nat
-  ()
-  universe)
+(type nat)
 
-(value zero
-  ()
-  (nat))
+(value zero (down nat))
 
-(value succ ((_ (nat)))
-  (nat))
+(value succ (down (forall ((_ (down nat))) nat)))
 
-(value bool ()
-  universe)
+(type bool)
 
-(value true ()
-  (bool))
+(value true (down bool))
 
-(value false ()
-  (bool))
+(value false (down bool))
 
 (notation (begin e)
   e)
@@ -32,12 +24,12 @@
   (bind x (begin e+) (begin rest+)))
 
 (begin
-  (let yay (return (thunk (lambda (x) (return (succ x))))))
-  (let foo (return (zero)))
-  (let sya (return (thunk (mu rec (return (succ foo))))))
-  (let k (unthunk sya))
-  (return (zero))
-  (let p ((unthunk yay) (succ (zero))))
-  (return (succ (zero)))
-  (let q ((unthunk yay) (succ (zero))))
-  (return (true)))
+  (let yay (lift (thunk (lambda (y) ((unthunk succ) y)))))
+  (let foo (lift zero))
+  (let sya (lift (thunk (mu rec ((unthunk succ) foo)))))
+  (let k (lift (thunk (unthunk sya))))
+  (lift zero)
+  (let p (lift (thunk ((unthunk yay) (thunk ((unthunk succ) zero))))))
+  (lift (thunk ((unthunk succ) zero)))
+  (let q (lift (thunk ((unthunk yay) (thunk ((unthunk succ) zero))))))
+  (lift true))

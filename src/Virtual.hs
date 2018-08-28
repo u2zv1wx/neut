@@ -24,7 +24,13 @@ virtualV (Value (i :< ValueConst x)) -- xの型を更新すべき
  = do
   t <- lookupTypeEnv' i
   case t of
-    Fix (TypeDown _) -> do
+    Fix (TypeDown _)
+      -- let (_, identArgTypes) = forallArgs t'
+      -- let argTypes = map snd identArgTypes
+      -- let resultType = Fix $ TypeStruct $ Fix (TypeInt 32) : argTypes
+      -- let newType = Fix $ TypeDown $ coForallArgs (resultType, identArgTypes)
+      -- insTypeEnv x newType
+     -> do
       envName <- newNameWith "fv"
       let envType = Fix (TypeDown (Fix (TypeStruct [])))
       insTypeEnv envName envType
