@@ -314,15 +314,15 @@ data Env = Env
   , reservedEnv    :: [Identifier] -- list of reserved keywords
   , nameEnv        :: [(Identifier, Identifier)] -- used in alpha conversion
   , typeEnv        :: [(Identifier, Type)] -- type environment
-  , realTypeEnv    :: [(Identifier, Type)] -- (*1)
+  , lowTypeEnv     :: [(Identifier, Type)] -- (*1)
   , constraintEnv  :: [(Type, Type)] -- used in type inference
   , levelEnv       :: [(WeakLevel, WeakLevel)] -- constraint regarding the level of universes
   , codeEnv        :: [(Identifier, ([Identifier], Code))]
   } deriving (Show)
 
--- (*1) the difference of typeEnv and realTypeEnv:
+-- (*1) the difference of typeEnv and lowTypeEnv:
 --   %tmp.101 -> %bool* in typeEnv
---   %tmp.101 -> {i8*, {}*}* in realTypeEnv
+--   %tmp.101 -> {i8*, {}*}* in lowTypeEnv
 initialEnv :: Env
 initialEnv =
   Env
@@ -347,7 +347,7 @@ initialEnv =
         ]
     , nameEnv = []
     , typeEnv = []
-    , realTypeEnv = []
+    , lowTypeEnv = []
     , constraintEnv = []
     , levelEnv = []
     , codeEnv = []
@@ -406,19 +406,19 @@ lookupTypeEnv' s = do
       Pr.ppShow (typeEnv env)
     Just t -> return t
 
-lookupRealTypeEnv :: String -> WithEnv (Maybe Type)
-lookupRealTypeEnv s = gets (lookup s . realTypeEnv)
+lookupLowTypeEnv :: String -> WithEnv (Maybe Type)
+lookupLowTypeEnv s = gets (lookup s . lowTypeEnv)
 
-lookupRealTypeEnv' :: String -> WithEnv Type
-lookupRealTypeEnv' s = do
-  mt <- gets (lookup s . realTypeEnv)
+lookupLowTypeEnv' :: String -> WithEnv Type
+lookupLowTypeEnv' s = do
+  mt <- gets (lookup s . lowTypeEnv)
   case mt of
     Nothing -> lookupTypeEnv' s
       -- lift $
       -- throwE $
       -- s ++
       -- " is not found in the type environment. realtypeenv: " ++
-      -- Pr.ppShow (realTypeEnv env)
+      -- Pr.ppShow (lowTypeEnv env)
     Just t  -> return t
 
 lookupValueEnv :: String -> WithEnv (Maybe Type)
@@ -461,8 +461,8 @@ insDefinedTypeEnv i t =
 insTypeEnv :: Identifier -> Type -> WithEnv ()
 insTypeEnv i t = modify (\e -> e {typeEnv = (i, t) : typeEnv e})
 
-insRealTypeEnv :: Identifier -> Type -> WithEnv ()
-insRealTypeEnv i t = modify (\e -> e {realTypeEnv = (i, t) : realTypeEnv e})
+insLowTypeEnv :: Identifier -> Type -> WithEnv ()
+insLowTypeEnv i t = modify (\e -> e {lowTypeEnv = (i, t) : lowTypeEnv e})
 
 insValueEnv :: Identifier -> Type -> WithEnv ()
 insValueEnv ident t = modify (\e -> e {valueEnv = (ident, t) : valueEnv e})

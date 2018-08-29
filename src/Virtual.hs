@@ -27,7 +27,7 @@ virtualV (Value (i :< ValueConst x)) = do
       envName <- newNameWith "fv"
       let envType = Fix (TypeDown (Fix (TypeStruct [])))
       insTypeEnv envName envType
-      insRealTypeEnv i (closureType envType)
+      insLowTypeEnv i (closureType envType)
       return $ i :< DataClosure x envName []
     _ -> return $ i :< DataFunName x
 virtualV (Value (i :< ValueThunk comp@(Comp (compMeta :< _)))) = do
@@ -44,7 +44,7 @@ virtualV (Value (i :< ValueThunk comp@(Comp (compMeta :< _)))) = do
   insTypeEnv label labelType
   asm <- virtualC comp
   insCodeEnv label [envName] asm
-  insRealTypeEnv i (closureType envType)
+  insLowTypeEnv i (closureType envType)
   return $ i :< DataClosure label envName fvList
 
 virtualC :: Comp -> WithEnv Code
@@ -91,10 +91,10 @@ virtualC (Comp (i :< CompUnthunk v@(Value (_ :< _)))) = do
   s <- newNameWith "tmp"
   resultType <- lookupTypeEnv' i
   insTypeEnv s resultType
-  insRealTypeEnv s clsType
+  insLowTypeEnv s clsType
   valueMeta <- newNameWith "meta"
   insTypeEnv valueMeta resultType
-  insRealTypeEnv valueMeta clsType
+  insLowTypeEnv valueMeta clsType
   return $ CodeLoadClosure asm
 virtualC (Comp (_ :< CompMu s comp)) = do
   asm <- virtualC $ Comp comp

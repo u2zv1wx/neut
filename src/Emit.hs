@@ -40,7 +40,7 @@ emit = do
 emitAsm :: Asm -> WithEnv ()
 emitAsm (AsmReturn i) = do
   t <- lookupTypeEnv' i
-  t' <- lookupRealTypeEnv' i
+  t' <- lookupLowTypeEnv' i
   -- liftIO $ putStrLn $ "the real type of " ++ i ++ " is " ++ show t'
   if t == t'
     then emitOp $ unwords ["ret", showType t, showRegister i]
@@ -124,7 +124,7 @@ emitAsmLet i (AsmLoad source) = do
       , showRegister source
       ]
 emitAsmLet i (AsmGetElemPointer base index) = do
-  baseType <- lookupRealTypeEnv' base
+  baseType <- lookupLowTypeEnv' base
   case baseType of
     Fix (TypeDown t) ->
       emitOp $

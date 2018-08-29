@@ -102,7 +102,7 @@ asmData tmp (_ :< DataClosure name fvListPtr fvList) = do
         , (AsmDataRegister fvListPtr, fvListPtrType)
         ]
   setClsContent <- setContent clsContentList tmp
-  insRealTypeEnv tmp $ Fix $ TypeDown clsType
+  insLowTypeEnv tmp $ Fix $ TypeDown clsType
   return $
     [AsmLet fvListPtr (AsmAlloc structType)] ++
     setFvListPtrContent ++ [AsmLet tmp (AsmAlloc clsType)] ++ setClsContent
