@@ -19,52 +19,35 @@ import qualified Text.Show.Pretty           as Pr
 import           Debug.Trace
 
 virtualV :: Value -> WithEnv Data
-virtualV (Value (i :< ValueVar x)) = return $ i :< DataPointer x
-virtualV (Value (i :< ValueConst x)) = do
-  t <- lookupTypeEnv' i
-  case t of
-    Fix (TypeDown _) -> do
-      envName <- newNameWith "fv"
-      let envType = Fix (TypeDown (Fix (TypeStruct [])))
-      insTypeEnv envName envType
-      insLowTypeEnv i (closureType envType)
-      return $ i :< DataClosure x envName []
-    _ -> return $ i :< DataFunName x
-virtualV (Value (i :< ValueThunk comp@(Comp (compMeta :< _)))) = do
-  let fvList = varN comp
-  fvTypeList <- mapM lookupTypeEnv' fvList
-  envName <- newNameWith "fv"
-  -- envName : &{posType-1, ..., posType-n}
-  let envType = Fix (TypeDown (Fix (TypeStruct fvTypeList)))
-  insTypeEnv envName envType
+virtualV (Value (i :< ValueVar x)) = return $ i :< DataRegister x
+virtualV (Value (i :< ValueConst x)) = return $ i :< DataPointer x
+virtualV (Value (i :< ValueThunk comp)) = do
   let label = "thunk" ++ i
-  compType <- lookupTypeEnv' compMeta
-  -- thunk : &(&type-of-env -> type-of-comp)
-  let labelType = Fix (TypeDown (Fix (TypeForall (envName, envType) compType)))
-  insTypeEnv label labelType
-  asm <- virtualC comp
-  insCodeEnv label [envName] asm
-  insLowTypeEnv i (closureType envType)
-  return $ i :< DataClosure label envName fvList
+  thunkType <- lookupTypeEnv' i
+  insTypeEnv label thunkType
+  (body, args) <- toLamSeq comp
+  bodyCode <- virtualC body
+  insCodeEnv label args bodyCode
+  return $ i :< DataPointer label
 
 virtualC :: Comp -> WithEnv Code
-virtualC lam@(Comp (_ :< CompLam _ _)) = do
+virtualC lam@(Comp (lamMeta :< CompLam _ _))
+  -- interpret (lambda x e) as !&(lambda x e).
+ = do
   (body, args) <- toLamSeq lam
   bodyCode <- virtualC body
   name <- newNameWith "lam"
-  let labelPointerType = Fix $ TypeDown $ Fix $ TypeInt 8
-  -- name : &(P -> N) (must be a pointer)
-  -- ~> name : &i8 (just a reference)
-  insTypeEnv name labelPointerType
+  lamType <- lookupTypeEnv' lamMeta
+  insTypeEnv name $ Fix $ TypeDown lamType
   insCodeEnv name args bodyCode
   meta <- newNameWith "meta"
-  insTypeEnv meta labelPointerType
-  return $ CodeReturn $ meta :< DataFunName name
+  insTypeEnv meta $ Fix $ TypeDown lamType
+  return $ CodeLoad (meta :< DataPointer name)
 virtualC app@(Comp (i :< CompApp _ _)) = do
-  (fun@(Comp (funMeta :< _)), ivs) <- funAndArgsPol app
+  (Comp (funMeta :< fun), ivs) <- funAndArgsPol app
   let (_, vs) = unzip ivs
   ds <- mapM virtualV vs
-  funCode <- virtualC fun
+  funCode <- virtualC $ Comp (funMeta :< fun)
   funName <- newNameWith "fun"
   funType <- lookupTypeEnv' funMeta
   -- fun : P -> N
@@ -75,8 +58,22 @@ virtualC app@(Comp (i :< CompApp _ _)) = do
   insTypeEnv s $ Fix (TypeDown resultType)
   meta <- newNameWith "meta"
   insTypeEnv meta $ Fix (TypeDown resultType)
-  traceLet funName funCode $
-    CodeCall s funName ds (CodeReturn (meta :< DataPointer s))
+  case fun of
+    CompBind x e1 e2 -> do
+      let Comp e2' = coFunAndArgsPol (Comp e2, ivs)
+      virtualC $ Comp $ i :< CompBind x e1 e2'
+    CompDecision ds tree -> do
+      let tree' = liftDecision (\x -> coFunAndArgsPol (Comp x, ivs)) tree
+      let tree'' = liftDecision (\(Comp x) -> x) tree'
+      virtualC $ Comp $ i :< CompDecision ds tree''
+    CompMu x e -> do
+      let Comp e' = coFunAndArgsPol (Comp e, ivs)
+      virtualC $ Comp $ i :< CompMu x e'
+    CompLift _ -> error "type error"
+    CompApp _ _ -> error "unreachable"
+    _ ->
+      traceLet funName funCode $
+      CodeCall s funName ds (CodeReturn (meta :< DataPointer s))
 virtualC (Comp (_ :< CompLift v)) = do
   ans <- virtualV v
   return $ CodeReturn ans
@@ -84,25 +81,18 @@ virtualC (Comp (_ :< CompBind s comp1 comp2)) = do
   operation1 <- virtualC (Comp comp1)
   operation2 <- virtualC (Comp comp2)
   traceLet s operation1 operation2
-virtualC (Comp (i :< CompUnthunk v@(Value (_ :< _)))) = do
-  asm@(clsPtrMeta :< _) <- virtualV v
-  clsPtrType <- lookupTypeEnv' clsPtrMeta
-  clsType <- unwrapDown clsPtrType
-  s <- newNameWith "tmp"
-  resultType <- lookupTypeEnv' i
-  insTypeEnv s resultType
-  insLowTypeEnv s clsType
-  valueMeta <- newNameWith "meta"
-  insTypeEnv valueMeta resultType
-  insLowTypeEnv valueMeta clsType
-  return $ CodeLoadClosure asm
-virtualC (Comp (_ :< CompMu s comp)) = do
+virtualC (Comp (_ :< CompUnthunk v)) = do
+  asm <- virtualV v
+  return $ CodeLoad asm
+virtualC (Comp (_ :< CompMu s comp))
+  -- interpret (mu x e) as !&(mu x e)
+ = do
   asm <- virtualC $ Comp comp
   insCodeEnv s [] asm
   meta <- newNameWith "meta"
-  let labelPointerType = Fix $ TypeDown $ Fix $ TypeInt 8
-  insTypeEnv meta labelPointerType
-  return $ CodeReturn $ meta :< DataFunName s
+  recType <- lookupTypeEnv' s
+  insTypeEnv meta recType
+  return $ CodeLoad (meta :< DataPointer s)
 virtualC (Comp (_ :< CompDecision vs tree)) = do
   valueList <-
     forM vs $ \v@(Value (valueMeta :< _)) -> do
@@ -200,8 +190,7 @@ makeBranch y (o, t) js (Just (Nothing, label, code)) =
         CodeSwitch name (label, code) js
 
 traceLet :: String -> Code -> Code -> WithEnv Code
-traceLet s (CodeReturn ans@(_ :< _)) cont = do
-  return $ CodeLet s ans cont
+traceLet s (CodeReturn ans@(_ :< _)) cont = return $ CodeLet s ans cont
 traceLet s (CodeSwitch x (label, defaultBranch) branchList) cont = do
   defaultBranch' <- traceLet s defaultBranch cont
   branchList' <-
@@ -215,14 +204,8 @@ traceLet s (CodeLet k o1 o2) cont = do
 traceLet s (CodeCall reg name xds cont1) cont2 = do
   tmp <- traceLet s cont1 cont2
   return $ CodeCall reg name xds tmp
-traceLet s (CodeLoadClosure asm) cont = do
-  return $ CodeLet s asm cont
-  -- tmp <- traceLet s cont1 cont2
-  -- return $ CodeLoadClosure reg env tmp
+traceLet s (CodeLoad asm) cont = return $ CodeLet s asm cont
 
--- traceLet s (CodeLoadClosure reg env cont1) cont2 = do
---   tmp <- traceLet s cont1 cont2
---   return $ CodeLoadClosure reg env tmp
 toLamSeq :: Comp -> WithEnv (Comp, [Identifier])
 toLamSeq (Comp (_ :< CompLam x body)) = do
   (body', args) <- toLamSeq $ Comp body
@@ -235,33 +218,7 @@ funAndArgsPol (Comp (i :< CompApp e v)) = do
   return (fun, (i, v) : xs)
 funAndArgsPol c = return (c, [])
 
-varP :: Value -> [Identifier]
-varP (Value (_ :< ValueVar s))   = [s]
-varP (Value (_ :< ValueConst _)) = []
-varP (Value (_ :< ValueThunk e)) = varN e
-
-varN :: Comp -> [Identifier]
-varN (Comp (_ :< CompLam s e)) = filter (/= s) $ varN (Comp e)
-varN (Comp (_ :< CompApp e v)) = varN (Comp e) ++ varP v
-varN (Comp (_ :< CompLift v)) = varP v
-varN (Comp (_ :< CompBind s e1 e2)) =
-  varN (Comp e1) ++ filter (/= s) (varN (Comp e2))
-varN (Comp (_ :< CompUnthunk v)) = varP v
-varN (Comp (_ :< CompMu s e)) = filter (/= s) $ varN (Comp e)
-varN (Comp (_ :< CompDecision vs tree)) = do
-  let vs1 = join $ map varP vs
-  let vs2 = varDecision tree
-  vs1 ++ vs2
-
-varDecision :: Decision PreComp -> [Identifier]
-varDecision (DecisionLeaf ois e) = do
-  let bounds = map snd ois
-  filter (`notElem` bounds) $ varN $ Comp e
-varDecision (DecisionSwitch _ cds mdefault) = do
-  let (_, ds) = unzip cds
-  let vs = join $ map varDecision ds
-  case mdefault of
-    Nothing                -> vs
-    Just (Nothing, tree)   -> vs ++ varDecision tree
-    Just (Just name, tree) -> vs ++ filter (/= name) (varDecision tree)
-varDecision (DecisionSwap _ tree) = varDecision tree
+coFunAndArgsPol :: (Comp, [(Identifier, Value)]) -> Comp
+coFunAndArgsPol (term, []) = term
+coFunAndArgsPol (Comp term, (i, v):xs) =
+  coFunAndArgsPol (Comp $ i :< CompApp term v, xs)

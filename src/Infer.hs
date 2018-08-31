@@ -43,11 +43,6 @@ infer (meta :< TermConst s) = do
   t <- lookupTypeEnv' s
   insTypeEnv meta t
   return t
-infer (meta :< TermThunk e) = do
-  t <- infer e
-  let result = Fix $ TypeDown t
-  insTypeEnv meta result
-  return result
 infer (meta :< TermLam s e) = do
   j <- newName
   let tdom = Fix $ TypeHole j
@@ -78,6 +73,14 @@ infer (meta :< TermBind x e1 e2) = do
   result <- infer e2
   insTypeEnv meta result
   return result
+infer (meta :< TermThunk e)
+  | null (var e) = do
+    t <- infer e
+    let result = Fix $ TypeDown t
+    insTypeEnv meta result
+    return result
+infer (_ :< TermThunk e) =
+  lift $ throwE $ "the thunk " ++ Pr.ppShow e ++ "is not closed"
 infer (meta :< TermUnthunk v) = do
   t <- infer v
   i <- newName

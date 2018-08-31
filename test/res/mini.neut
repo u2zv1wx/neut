@@ -23,5 +23,4 @@
 (notation (begin (let x e+) rest+)
   (bind x (begin e+) (begin rest+)))
 
-(begin
-  (lift (thunk ((unthunk succ) zero))))
+(begin (lift zero))

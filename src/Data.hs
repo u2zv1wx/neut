@@ -128,6 +128,15 @@ deriving instance Functor Decision
 
 $(deriveShow1 ''Decision)
 
+liftDecision :: (a -> b) -> Decision a -> Decision b
+liftDecision f (DecisionLeaf xs e) = DecisionLeaf xs (f e)
+liftDecision f (DecisionSwitch o xs mtree) = do
+  let xs' = map (\(xi, tree) -> (xi, liftDecision f tree)) xs
+  case mtree of
+    Nothing         -> DecisionSwitch o xs' Nothing
+    Just (mi, tree) -> DecisionSwitch o xs' $ Just (mi, liftDecision f tree)
+liftDecision f (DecisionSwap i tree) = DecisionSwap i (liftDecision f tree)
+
 data TermF a
   = TermVar Identifier
   | TermLam Identifier
@@ -216,14 +225,15 @@ instance (Show a) => Show (IORef a) where
 type Index = [Int]
 
 data DataF a
-  = DataPointer Identifier -- var is something that points already-allocated data
-  | DataFunName Identifier
+  = DataPointer Identifier
+  | DataRegister Identifier
+  -- | DataFunName Identifier
   | DataElemAtIndex Identifier -- subvalue of an inductive value
                     Index
   | DataInt32 Int
-  | DataClosure Identifier -- the name of the closure
-                Identifier -- pointer to the struct with free-var information
-                [Identifier] -- list of free variables
+  -- | DataClosure Identifier -- the name of the closure
+  --               Identifier -- pointer to the struct with free-var information
+  --               [Identifier] -- list of free variables
 
 deriving instance Show a => Show (DataF a)
 
@@ -261,10 +271,7 @@ data Code
              Identifier -- the name of the function
              [Data] -- arguments
              Code -- continuation
-  | CodeLoadClosure Data
-  -- | CodeLoadClosure Identifier -- store the result of load to here
-  --                   Data -- closure (i.e. {function-label, environment})
-  --                   Code -- continuation
+  | CodeLoad Data
   deriving (Show)
 
 letSeq :: [Identifier] -> [Data] -> Code -> WithEnv Code
@@ -622,3 +629,28 @@ closureType :: Type -> Type
 closureType envType = do
   let labelType = Fix (TypeDown (Fix (TypeInt 8)))
   Fix $ TypeDown $ Fix $ TypeStruct [labelType, envType]
+
+var :: Term -> [Identifier]
+var (_ :< TermVar s) = [s]
+var (_ :< TermConst _) = []
+var (_ :< TermLam s e) = filter (/= s) $ var e
+var (_ :< TermApp e v) = var e ++ var v
+var (_ :< TermLift v) = var v
+var (_ :< TermBind x e1 e2) = var e1 ++ filter (/= x) (var e2)
+var (_ :< TermThunk e) = var e
+var (_ :< TermUnthunk v) = var v
+var (_ :< TermMu s e) = filter (/= s) (var e)
+var (_ :< TermCase vs vcs) = do
+  let efs = join $ map var vs
+  let (patList, bodyList) = unzip vcs
+  let vs1 = join $ join $ map (map varPat) patList
+  let vs2 = join $ map var bodyList
+  efs ++ vs1 ++ vs2
+
+varPat :: Pat -> [Identifier]
+varPat (_ :< PatHole)      = []
+varPat (_ :< PatConst _)   = []
+varPat (_ :< PatVar s)     = [s]
+varPat (_ :< PatApp p ps)  = varPat p ++ join (map varPat ps)
+varPat (_ :< PatThunk v)   = varPat v
+varPat (_ :< PatUnthunk e) = varPat e

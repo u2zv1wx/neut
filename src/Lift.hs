@@ -84,28 +84,3 @@ replace args (i :< TermCase vs vcs) = do
   let (patList, bodyList) = unzip vcs
   bodyList' <- mapM (replace args) bodyList
   return $ i :< TermCase vs' (zip patList bodyList')
-
-var :: Term -> [Identifier]
-var (_ :< TermVar s) = [s]
-var (_ :< TermConst _) = []
-var (_ :< TermLam s e) = filter (/= s) $ var e
-var (_ :< TermApp e v) = var e ++ var v
-var (_ :< TermLift v) = var v
-var (_ :< TermBind x e1 e2) = var e1 ++ filter (/= x) (var e2)
-var (_ :< TermThunk e) = var e
-var (_ :< TermUnthunk v) = var v
-var (_ :< TermMu s e) = filter (/= s) (var e)
-var (_ :< TermCase vs vcs) = do
-  let efs = join $ map var vs
-  let (patList, bodyList) = unzip vcs
-  let vs1 = join $ join $ map (map varPat) patList
-  let vs2 = join $ map var bodyList
-  efs ++ vs1 ++ vs2
-
-varPat :: Pat -> [Identifier]
-varPat (_ :< PatHole)      = []
-varPat (_ :< PatConst _)   = []
-varPat (_ :< PatVar s)     = [s]
-varPat (_ :< PatApp p ps)  = varPat p ++ join (map varPat ps)
-varPat (_ :< PatThunk v)   = varPat v
-varPat (_ :< PatUnthunk e) = varPat e

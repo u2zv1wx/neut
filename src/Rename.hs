@@ -7,14 +7,13 @@ import           Control.Comonad.Cofree
 
 import           Data
 
+import qualified Text.Show.Pretty           as Pr
+
 rename :: Term -> WithEnv Term
 rename (i :< TermVar s) = do
   t <- TermVar <$> lookupNameEnv s
   return $ i :< t
 rename (i :< TermConst s) = return $ i :< TermConst s
-rename (i :< TermThunk e) = do
-  e' <- rename e
-  return $ i :< TermThunk e'
 rename (i :< TermLam s e) =
   local $ do
     s' <- newNameWith s
@@ -33,6 +32,9 @@ rename (i :< TermBind x e1 e2) = do
     x' <- newNameWith x
     e2' <- rename e2
     return $ i :< TermBind x' e1' e2'
+rename (i :< TermThunk e) = do
+  e' <- rename e
+  return $ i :< TermThunk e'
 rename (i :< TermUnthunk v) = do
   v' <- rename v
   return $ i :< TermUnthunk v'
