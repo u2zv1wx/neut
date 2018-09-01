@@ -44,13 +44,14 @@ toDecision os (patMat, bodyList)
         tmp <- specialize c a (patMat, bodyList)
         tmp' <- toDecision os' tmp
         return ((c, num), tmp')
-    consCount <- getCEnv patMat
-    if consCount <= length consList
-      then return $ DecisionSwitch (head os) newMatrixList Nothing
-      else do
-        (tmp, bounds) <- defaultMatrix (patMat, bodyList)
-        dmat <- toDecision (tail os) tmp
-        return $ DecisionSwitch (head os) newMatrixList (Just (bounds, dmat))
+    return $ DecisionSwitch (head os) newMatrixList Nothing
+    -- consCount <- getCEnv patMat
+    -- if consCount <= length consList
+    --   then return $ DecisionSwitch (head os) newMatrixList Nothing
+    --   else do
+    --     (tmp, bounds) <- defaultMatrix (patMat, bodyList)
+    --     dmat <- toDecision (tail os) tmp
+    --     return $ DecisionSwitch (head os) newMatrixList (Just (bounds, dmat))
 
 patDist :: [([Pat], a)] -> ([[Pat]], [a])
 patDist [] = ([], [])
@@ -60,15 +61,14 @@ patDist ((ps, body):rest) = do
 
 type Arity = Int
 
-getCEnv :: [[Pat]] -> WithEnv Int
-getCEnv [] = lift $ throwE "empty pattern"
-getCEnv ([]:_) = lift $ throwE "empty pattern"
-getCEnv (((i :< _):_):_) = do
-  t <- lookupTypeEnv i
-  case t of
-    Just (Fix (TypeSum labelList)) -> return $ length labelList
-    _                              -> lift $ throwE "type error in pattern"
-
+-- getCEnv :: [[Pat]] -> WithEnv Int
+-- getCEnv [] = lift $ throwE "empty pattern"
+-- getCEnv ([]:_) = lift $ throwE "empty pattern"
+-- getCEnv (((i :< _):_):_) = do
+--   t <- lookupTypeEnv i
+--   case t of
+--     Just (Fix (TypeSum labelList)) -> return $ length labelList
+--     _                              -> lift $ throwE "type error in pattern"
 headConstructor :: [[Pat]] -> WithEnv [(Identifier, Int, [Type])]
 headConstructor [] = return []
 headConstructor (ps:pss) = do
@@ -77,10 +77,6 @@ headConstructor (ps:pss) = do
   return $ join $ ps' : pss'
 
 headConstructor' :: [Pat] -> WithEnv [(Identifier, Int, [Type])]
-headConstructor' ((_ :< PatInject s (meta :< _)):_) = do
-  i <- lookupLabelNumEnv' s
-  argType <- lookupTypeEnv' meta
-  return [(s, i, [argType])]
 headConstructor' (pair@(_ :< PatProduct _ _):_) = do
   patList <- pairSeq pair
   typeList <- mapM (\(i :< _) -> lookupTypeEnv' i) patList
@@ -109,9 +105,9 @@ findPatApp (ps:pss) =
     Just i  -> Just i
 
 findPatApp' :: [(Pat, Int)] -> Maybe Int
-findPatApp' []                          = Nothing
-findPatApp' ((_ :< PatInject _ _, i):_) = Just i
-findPatApp' (_:ps)                      = findPatApp' ps
+findPatApp' []                           = Nothing
+findPatApp' ((_ :< PatProduct _ _, i):_) = Just i
+findPatApp' (_:ps)                       = findPatApp' ps
 
 specialize :: Identifier -> Arity -> ClauseMatrix a -> WithEnv (ClauseMatrix a)
 specialize c a (pss, bs) = do
@@ -129,10 +125,6 @@ specializeRow c _ ((_ :< PatConst x):ps) body =
   if c /= x
     then return []
     else return [(ps, body)]
-specializeRow c _ ((_ :< PatInject x arg):ps) body =
-  if c /= x
-    then return []
-    else return [(arg : ps, body)]
 specializeRow c _ ((_ :< PatProduct p1 p2):ps) body =
   if c /= "pair"
     then return []
@@ -156,7 +148,6 @@ defaultMatrixRow ((_ :< PatHole):ps) body    = return ([(ps, body)], Nothing)
 defaultMatrixRow ((_ :< PatVar s):ps) body   = return ([(ps, body)], Just s)
 defaultMatrixRow ((_ :< PatConst _):_) _     = return ([], Nothing)
 defaultMatrixRow ((_ :< PatProduct _ _):_) _ = return ([], Nothing)
-defaultMatrixRow ((_ :< PatInject _ _):_) _  = return ([], Nothing)
 
 swapColumn :: Int -> Int -> [[a]] -> [[a]]
 swapColumn i j mat = transpose $ swap i j $ transpose mat

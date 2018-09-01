@@ -28,9 +28,6 @@ polarize (i :< TermProduct v1 v2) = do
   Value v1' <- polarize v1 >>= toValue
   Value v2' <- polarize v2 >>= toValue
   return $ PolarizedTermValue $ Value $ i :< ValueProduct v1' v2'
-polarize (i :< TermInject x v) = do
-  Value v' <- polarize v >>= toValue
-  return $ PolarizedTermValue $ Value $ i :< ValueInject x v'
 polarize (i :< TermLift e) = do
   v <- polarize e >>= toValue
   return $ PolarizedTermComp $ Comp $ i :< CompLift v

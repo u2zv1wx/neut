@@ -55,12 +55,6 @@ parse (meta :< TreeNode ((_ :< TreeAtom "match"):(_ :< TreeNode tvs):tves))
     vs <- mapM parse tvs
     ves <- mapM parseClause tves
     return $ meta :< TermCase vs ves
-parse (meta :< TreeNode [i :< TreeAtom x, t]) = do
-  flag <- isDefinedLabel x
-  e <- parse t
-  if flag
-    then return $ meta :< TermInject x e
-    else return $ meta :< TermApp (i :< TermVar x) e
 parse (meta :< TreeNode (te:tvs))
   | not (null tvs) = do
     e <- parse te
@@ -89,9 +83,6 @@ parsePat (meta :< TreeNode [_ :< TreeAtom "pair", t1, t2]) = do
   p1 <- parsePat t1
   p2 <- parsePat t2
   return $ meta :< PatProduct p1 p2
-parsePat (meta :< TreeNode [_ :< TreeAtom x, t]) = do
-  e <- parsePat t
-  return $ meta :< PatInject x e
 parsePat t = lift $ throwE $ "parsePat: syntax error:\n" ++ Pr.ppShow t
 
 parseClause :: Tree -> WithEnv ([Pat], Term)
@@ -128,11 +119,6 @@ parseType (_ :< TreeNode [_ :< TreeAtom "exists", _ :< TreeNode ts, tn]) = do
   its <- mapM parseTypeArg ts
   n <- parseType tn
   foldMTermR' TypeExists n its
-parseType (_ :< TreeNode ((_ :< TreeAtom "sum"):ts)) = do
-  labelTypeList <- mapM parseTypeArg ts
-  forM_ labelTypeList $ \(label, _) -> insLabelEnv label labelTypeList
-  forM_ (zip labelTypeList [0 ..]) $ \((label, _), i) -> insLabelNumEnv label i
-  return $ Fix $ TypeSum labelTypeList
 parseType (_ :< TreeNode [_ :< TreeAtom "up", tp]) = do
   p <- parseType tp
   return $ Fix $ TypeUp p

@@ -57,6 +57,7 @@ data WeakLevel
   | WeakLevelHole Identifier
   deriving (Show, Eq)
 
+-- labelled sum == Sigma (x : Label). F(x)
 data TypeF a
   = TypeUnit
   | TypeVar Identifier
@@ -64,7 +65,6 @@ data TypeF a
                a
   | TypeExists (Identifier, a)
                a
-  | TypeSum [(Identifier, a)]
   | TypeUp a
   | TypeDown a
   | TypeUniv WeakLevel
@@ -104,8 +104,6 @@ data PatF a
   | PatConst Identifier
   | PatProduct a
                a
-  | PatInject Identifier
-              a
   deriving (Show, Eq)
 
 $(deriveShow1 ''PatF)
@@ -147,8 +145,6 @@ data TermF a
             a
   | TermProduct a -- tensor
                 a
-  | TermInject Identifier -- sum
-               a
   | TermLift a
   | TermBind Identifier
              a
@@ -169,14 +165,13 @@ type Term = Cofree TermF Identifier
 -- v ::= x
 --     | <const>
 --     | (thunk e)
+--     | (product v1 v2)
 data ValueF c v
   = ValueVar Identifier
   | ValueConst Identifier
   | ValueThunk c
   | ValueProduct v
                  v
-  | ValueInject Identifier
-                v
   deriving (Show)
 
 -- computation / negative term
@@ -222,11 +217,6 @@ newtype Comp =
 data PolarizedTerm
   = PolarizedTermValue Value
   | PolarizedTermComp Comp
-  deriving (Show)
-
-data Polarity
-  = PolarityPositive
-  | PolarityNegative
   deriving (Show)
 
 instance (Show a) => Show (IORef a) where
@@ -629,7 +619,6 @@ var (_ :< TermConst _) = []
 var (_ :< TermLam s e) = filter (/= s) $ var e
 var (_ :< TermApp e v) = var e ++ var v
 var (_ :< TermProduct v1 v2) = var v1 ++ var v2
-var (_ :< TermInject _ v) = var v
 var (_ :< TermLift v) = var v
 var (_ :< TermBind x e1 e2) = var e1 ++ filter (/= x) (var e2)
 var (_ :< TermThunk e) = var e
@@ -647,4 +636,3 @@ varPat (_ :< PatHole)          = []
 varPat (_ :< PatConst _)       = []
 varPat (_ :< PatVar s)         = [s]
 varPat (_ :< PatProduct v1 v2) = varPat v1 ++ varPat v2
-varPat (_ :< PatInject _ v)    = varPat v

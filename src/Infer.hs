@@ -69,15 +69,6 @@ infer (meta :< TermProduct v1 v2) = do
   let result = Fix $ TypeExists (s, t1) t2
   insTypeEnv meta result
   return result
-infer (meta :< TermInject x v) = do
-  labelTypeList <- lookupLabelEnv' x
-  case lookup x labelTypeList of
-    Nothing -> error "Infer.infer.TermInject"
-    Just t -> do
-      tv <- infer v
-      insConstraintEnv tv t
-      insTypeEnv meta $ Fix $ TypeSum labelTypeList
-      return $ Fix $ TypeSum labelTypeList
 infer (meta :< TermLift v) = do
   tv <- infer v
   insTypeEnv meta $ Fix $ TypeUp tv
@@ -163,10 +154,6 @@ inferType (Fix (TypeExists (s, tdom) tcod)) = do
   i <- newNameWith "level"
   -- TODO: constraint: udom == ucod
   return $ Fix (TypeUniv (WeakLevelHole i))
-inferType (Fix (TypeSum labelTypeList)) = do
-  let (_, typeList) = unzip labelTypeList
-  ulist <- mapM inferType typeList
-  return $ Fix (TypeUniv (WeakLevelFixed 0)) -- for now
 inferType (Fix (TypeNode s ts)) = do
   us <- mapM inferType ts
   -- todo: constraint regarding us
@@ -204,15 +191,6 @@ inferPat (meta :< PatProduct v1 v2) = do
   t2 <- inferPat v2
   insTypeEnv meta $ Fix $ TypeExists (s, t1) t2
   return $ Fix $ TypeExists (s, t1) t2
-inferPat (meta :< PatInject x v) = do
-  labelTypeList <- lookupLabelEnv' x
-  case lookup x labelTypeList of
-    Nothing -> error "Infer.infer.TermInject"
-    Just t -> do
-      tv <- inferPat v
-      insConstraintEnv tv t
-      insTypeEnv meta $ Fix $ TypeSum labelTypeList
-      return $ Fix $ TypeSum labelTypeList
 
 type Subst = [(String, Type)]
 
@@ -232,11 +210,6 @@ unify ((Fix (TypeForall (_, tdom1) tcod1), Fix (TypeForall (_, tdom2) tcod2)):cs
   unify $ (tdom1, tdom2) : (tcod1, tcod2) : cs
 unify ((Fix (TypeExists (_, tdom1) tcod1), Fix (TypeExists (_, tdom2) tcod2)):cs) =
   unify $ (tdom1, tdom2) : (tcod1, tcod2) : cs
-unify ((Fix (TypeSum labelTypeList1), Fix (TypeSum labelTypeList2)):cs)
-  | length labelTypeList1 == length labelTypeList2 = do
-    let (_, ts1) = unzip labelTypeList1
-    let (_, ts2) = unzip labelTypeList2
-    unify $ zip ts1 ts2 ++ cs
 unify ((Fix (TypeNode x ts1), Fix (TypeNode y ts2)):cs)
   | x == y = unify $ zip ts1 ts2 ++ cs
 unify ((Fix (TypeUp t1), Fix (TypeUp t2)):cs) = unify $ (t1, t2) : cs
@@ -283,10 +256,6 @@ sType sub (Fix (TypeExists (s, tdom) tcod)) = do
 sType sub (Fix (TypeNode s ts)) = do
   let ts' = map (sType sub) ts
   Fix $ TypeNode s ts'
-sType sub (Fix (TypeSum labelTypeList)) = do
-  let (labelList, typeList) = unzip labelTypeList
-  let typeList' = map (sType sub) typeList
-  Fix $ TypeSum $ zip labelList typeList'
 sType sub (Fix (TypeStruct ts)) = do
   let ts' = map (sType sub) ts
   Fix $ TypeStruct ts'

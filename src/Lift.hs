@@ -29,9 +29,6 @@ lift (i :< TermProduct v1 v2) = do
   v1' <- lift v1
   v2' <- lift v2
   return $ i :< TermProduct v1' v2'
-lift (i :< TermInject x v) = do
-  v' <- lift v
-  return $ i :< TermInject x v'
 lift (i :< TermThunk c) = do
   c' <- lift c
   return $ i :< TermThunk c'
@@ -77,9 +74,6 @@ replace args (i :< TermProduct v1 v2) = do
   v1' <- replace args v1
   v2' <- replace args v2
   return $ i :< TermProduct v1' v2'
-replace args (i :< TermInject x v) = do
-  v' <- replace args v
-  return $ i :< TermInject x v'
 replace args (i :< TermLift v) = do
   v' <- replace args v
   return $ i :< TermLift v'
