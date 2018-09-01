@@ -62,14 +62,16 @@ data TypeF a
   | TypeVar Identifier
   | TypeForall (Identifier, a)
                a
-  | TypeNode Identifier
-             [a]
+  | TypeExists (Identifier, a)
+               a
+  | TypeSum [(Identifier, a)]
   | TypeUp a
   | TypeDown a
   | TypeUniv WeakLevel
-  | TypeInt Int
-  | TypeOpaque
+  | TypeInt Int -- i1 ~ i(2^23-1)
   | TypeStruct [a] -- for closure
+  | TypeNode Identifier
+             [a]
   | TypeHole Identifier
 
 deriving instance Show a => Show (TypeF a)
@@ -102,6 +104,10 @@ data PatF a
   | PatConst Identifier
   | PatApp a
            [a]
+  | PatPair a
+            a
+  | PatInject Identifier
+              a
   | PatThunk a
   | PatUnthunk a
   deriving (Show, Eq)
@@ -139,10 +145,14 @@ liftDecision f (DecisionSwap i tree) = DecisionSwap i (liftDecision f tree)
 
 data TermF a
   = TermVar Identifier
-  | TermLam Identifier
-            a -- positive or negative
-  | TermApp a
+  | TermLam Identifier -- hom-intro
             a
+  | TermApp a -- hom-elim
+            a
+  | TermPair a -- tensor
+             a
+  | TermInject Identifier -- sum
+               a
   | TermLift a
   | TermBind Identifier
              a
@@ -319,19 +329,16 @@ data Env = Env
   , valueEnv       :: [(Identifier, Type)] -- defined values
   , definedTypeEnv :: [(Identifier, [(Identifier, Type)])] -- types defined by (type ...)
   , constructorEnv :: [(Identifier, IORef [Identifier])]
+  , labelEnv       :: [Identifier] -- labels in labeled sum
   , notationEnv    :: [(Tree, Tree)] -- macro transformers
   , reservedEnv    :: [Identifier] -- list of reserved keywords
   , nameEnv        :: [(Identifier, Identifier)] -- used in alpha conversion
   , typeEnv        :: [(Identifier, Type)] -- type environment
-  , lowTypeEnv     :: [(Identifier, Type)] -- (*1)
   , constraintEnv  :: [(Type, Type)] -- used in type inference
   , levelEnv       :: [(WeakLevel, WeakLevel)] -- constraint regarding the level of universes
   , codeEnv        :: [(Identifier, ([Identifier], Code))]
   } deriving (Show)
 
--- (*1) the difference of typeEnv and lowTypeEnv:
---   %tmp.101 -> %bool* in typeEnv
---   %tmp.101 -> {i8*, {}*}* in lowTypeEnv
 initialEnv :: Env
 initialEnv =
   Env
@@ -339,6 +346,7 @@ initialEnv =
     , valueEnv = []
     , definedTypeEnv = []
     , constructorEnv = []
+    , labelEnv = []
     , notationEnv = []
     , reservedEnv =
         [ "thunk"
@@ -356,7 +364,6 @@ initialEnv =
         ]
     , nameEnv = []
     , typeEnv = []
-    , lowTypeEnv = []
     , constraintEnv = []
     , levelEnv = []
     , codeEnv = []
@@ -415,21 +422,6 @@ lookupTypeEnv' s = do
       Pr.ppShow (typeEnv env)
     Just t -> return t
 
-lookupLowTypeEnv :: String -> WithEnv (Maybe Type)
-lookupLowTypeEnv s = gets (lookup s . lowTypeEnv)
-
-lookupLowTypeEnv' :: String -> WithEnv Type
-lookupLowTypeEnv' s = do
-  mt <- gets (lookup s . lowTypeEnv)
-  case mt of
-    Nothing -> lookupTypeEnv' s
-      -- lift $
-      -- throwE $
-      -- s ++
-      -- " is not found in the type environment. realtypeenv: " ++
-      -- Pr.ppShow (lowTypeEnv env)
-    Just t  -> return t
-
 lookupValueEnv :: String -> WithEnv (Maybe Type)
 lookupValueEnv s = do
   env <- get
@@ -470,9 +462,6 @@ insDefinedTypeEnv i t =
 insTypeEnv :: Identifier -> Type -> WithEnv ()
 insTypeEnv i t = modify (\e -> e {typeEnv = (i, t) : typeEnv e})
 
-insLowTypeEnv :: Identifier -> Type -> WithEnv ()
-insLowTypeEnv i t = modify (\e -> e {lowTypeEnv = (i, t) : lowTypeEnv e})
-
 insValueEnv :: Identifier -> Type -> WithEnv ()
 insValueEnv ident t = modify (\e -> e {valueEnv = (ident, t) : valueEnv e})
 
@@ -504,6 +493,14 @@ insConstraintEnv t1 t2 =
 
 insLEnv :: WeakLevel -> WeakLevel -> WithEnv ()
 insLEnv l1 l2 = modify (\e -> e {levelEnv = (l1, l2) : levelEnv e})
+
+insLabelEnv :: Identifier -> WithEnv ()
+insLabelEnv label = modify (\e -> e {labelEnv = label : labelEnv e})
+
+isDefinedLabel :: Identifier -> WithEnv Bool
+isDefinedLabel label = do
+  env <- get
+  return $ label `elem` labelEnv env
 
 insConstructorEnv :: Identifier -> Identifier -> WithEnv ()
 insConstructorEnv i cons = do

@@ -29,14 +29,19 @@ parse (meta :< TreeAtom s) = do
   case msym of
     Nothing -> return (meta :< TermVar s)
     Just _  -> return $ meta :< TermConst s
-parse (meta :< TreeNode [_ :< TreeAtom "thunk", te]) = do
-  e <- parse te
-  return $ meta :< TermThunk e
 parse (meta :< TreeNode [_ :< TreeAtom "lambda", _ :< TreeNode ts, te]) = do
   xs <- parseArg ts
   e <- parse te
   _ :< term <- foldMTermR TermLam e xs
   return $ meta :< term
+parse (meta :< TreeNode [_ :< TreeAtom "pair", t1, t2]) = do
+  e1 <- parse t1
+  e2 <- parse t2
+  return $ meta :< TermPair e1 e2
+-- parse (meta :< TreeNode [_ :< TreeAtom "destruct", _ :< TreeAtom x, _ :< TreeAtom y, t1, t2]) = do
+--   e1 <- parse t1
+--   e2 <- parse t2
+--   return $ meta :< TermDestruct x y e1 e2
 parse (meta :< TreeNode [_ :< TreeAtom "lift", tv]) = do
   v <- parse tv
   return $ meta :< TermLift v
@@ -44,6 +49,9 @@ parse (meta :< TreeNode [_ :< TreeAtom "bind", _ :< TreeAtom x, t1, t2]) = do
   e1 <- parse t1
   e2 <- parse t2
   return $ meta :< TermBind x e1 e2
+parse (meta :< TreeNode [_ :< TreeAtom "thunk", te]) = do
+  e <- parse te
+  return $ meta :< TermThunk e
 parse (meta :< TreeNode [_ :< TreeAtom "unthunk", tv]) = do
   v <- parse tv
   return $ meta :< TermUnthunk v
@@ -55,6 +63,12 @@ parse (meta :< TreeNode ((_ :< TreeAtom "match"):(_ :< TreeNode tvs):tves))
     vs <- mapM parse tvs
     ves <- mapM parseClause tves
     return $ meta :< TermCase vs ves
+parse (meta :< TreeNode [i :< TreeAtom x, t]) = do
+  flag <- isDefinedLabel x
+  e <- parse t
+  if flag
+    then return $ meta :< TermInject x e
+    else return $ meta :< TermApp (i :< TermVar x) e
 parse (meta :< TreeNode (te:tvs))
   | not (null tvs) = do
     e <- parse te
@@ -89,6 +103,17 @@ parsePat (meta :< TreeNode [_ :< TreeAtom "thunk", te]) = do
 parsePat (meta :< TreeNode [_ :< TreeAtom "unthunk", te]) = do
   e <- parsePat te
   return $ meta :< PatUnthunk e
+parsePat (meta :< TreeNode [_ :< TreeAtom "pair", t1, t2]) = do
+  p1 <- parsePat t1
+  p2 <- parsePat t2
+  return $ meta :< PatPair p1 p2
+parsePat (meta :< TreeNode [i :< TreeAtom x, t]) = do
+  undefined
+  flag <- isDefinedLabel x
+  e <- parsePat t
+  if flag
+    then return $ meta :< PatInject x e
+    else return $ meta :< PatApp (i :< PatVar x) [e]
 parsePat (meta :< TreeNode (t:ts)) = do
   t' <- parsePat' t
   ts' <- mapM parsePat ts
@@ -152,6 +177,14 @@ parseType (_ :< TreeNode [_ :< TreeAtom "forall", _ :< TreeNode ts, tn]) = do
   its <- mapM parseTypeArg ts
   n <- parseType tn
   foldMTermR' TypeForall n its
+parseType (_ :< TreeNode [_ :< TreeAtom "exists", _ :< TreeNode ts, tn]) = do
+  its <- mapM parseTypeArg ts
+  n <- parseType tn
+  foldMTermR' TypeExists n its
+parseType (_ :< TreeNode ((_ :< TreeAtom "sum"):ts)) = do
+  labelTypeList <- mapM parseTypeArg ts
+  forM_ labelTypeList $ \(label, _) -> insLabelEnv label
+  return $ Fix $ TypeSum labelTypeList
 parseType (_ :< TreeNode [_ :< TreeAtom "up", tp]) = do
   p <- parseType tp
   return $ Fix $ TypeUp p

@@ -169,7 +169,6 @@ showType t@(Fix (TypeForall _ _)) = do
   let typeList = map snd identTypeList
   "(" ++ unwords [showType codType, "(" ++ showTypeList typeList ++ ")"] ++ ")"
 showType (Fix (TypeNode s _)) = showRegister s
-showType (Fix TypeOpaque) = showRegister "any"
 showType (Fix (TypeStruct ts)) = "{" ++ showTypeList ts ++ "}"
 
 showArgs :: [Identifier] -> WithEnv String

@@ -114,9 +114,6 @@ inferType (Fix TypeUnit) = do
 inferType (Fix (TypeInt _)) = do
   i <- newNameWith "level"
   return $ Fix (TypeUniv (WeakLevelHole i))
-inferType (Fix TypeOpaque) = do
-  i <- newNameWith "level"
-  return $ Fix (TypeUniv (WeakLevelHole i))
 inferType (Fix (TypeVar _)) = do
   i <- newNameWith "level"
   return $ Fix (TypeUniv (WeakLevelHole i))
@@ -229,7 +226,6 @@ compose s1 s2 = do
 
 sType :: Subst -> Type -> Type
 sType _ (Fix TypeUnit) = Fix TypeUnit
-sType _ (Fix TypeOpaque) = Fix TypeOpaque
 sType _ (Fix (TypeInt i)) = Fix $ TypeInt i
 sType _ (Fix (TypeVar s)) = Fix $ TypeVar s
 sType sub (Fix (TypeHole s)) =

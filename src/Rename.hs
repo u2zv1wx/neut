@@ -63,7 +63,6 @@ rename (i :< TermCase vs ves) = do
 renameType :: Type -> WithEnv Type
 renameType (Fix TypeUnit) = return $ Fix TypeUnit
 renameType (Fix (TypeInt i)) = return $ Fix (TypeInt i)
-renameType (Fix TypeOpaque) = return $ Fix TypeOpaque
 renameType (Fix (TypeVar s)) = do
   t' <- TypeVar <$> lookupNameEnv s
   return $ Fix t'
@@ -81,6 +80,16 @@ renameType (Fix (TypeForall (s, tdom) tcod)) = do
     s' <- newNameWith s
     tcod' <- renameType tcod
     return $ Fix $ TypeForall (s', tdom') tcod'
+renameType (Fix (TypeExists (s, tdom) tcod)) = do
+  tdom' <- renameType tdom
+  local $ do
+    s' <- newNameWith s
+    tcod' <- renameType tcod
+    return $ Fix $ TypeExists (s', tdom') tcod'
+renameType (Fix (TypeSum labelTypeList)) = do
+  let (labelList, typeList) = unzip labelTypeList
+  typeList' <- mapM renameType typeList
+  undefined
 renameType (Fix (TypeNode s ts)) = do
   ts' <- mapM renameType ts
   return $ Fix $ TypeNode s ts'
