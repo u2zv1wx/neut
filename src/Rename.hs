@@ -23,6 +23,13 @@ rename (i :< TermApp e v) = do
   e' <- rename e
   v' <- rename v
   return $ i :< TermApp e' v'
+rename (i :< TermPair v1 v2) = do
+  v1' <- rename v1
+  v2' <- rename v2
+  return $ i :< TermPair v1' v2'
+rename (i :< TermInject x v) = do
+  v' <- rename v
+  return $ i :< TermInject x v'
 rename (i :< TermLift v) = do
   v' <- rename v
   return $ i :< TermLift v'
@@ -89,7 +96,7 @@ renameType (Fix (TypeExists (s, tdom) tcod)) = do
 renameType (Fix (TypeSum labelTypeList)) = do
   let (labelList, typeList) = unzip labelTypeList
   typeList' <- mapM renameType typeList
-  undefined
+  return $ Fix $ TypeSum $ zip labelList typeList'
 renameType (Fix (TypeNode s ts)) = do
   ts' <- mapM renameType ts
   return $ Fix $ TypeNode s ts'
@@ -119,6 +126,13 @@ renamePat (i :< PatApp v vs) = do
   v' <- renamePat v
   vs' <- mapM renamePat vs
   return (i :< PatApp v' vs')
+renamePat (i :< PatPair v1 v2) = do
+  v1' <- renamePat v1
+  v2' <- renamePat v2
+  return $ i :< PatPair v1' v2'
+renamePat (i :< PatInject x v) = do
+  v' <- renamePat v
+  return $ i :< PatInject x v'
 renamePat (i :< PatThunk v) = do
   v' <- renamePat v
   return $ i :< PatThunk v'
