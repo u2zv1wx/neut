@@ -177,6 +177,10 @@ data ValueF c v
   = ValueVar Identifier
   | ValueConst Identifier
   | ValueThunk c
+  | ValuePair v
+              v
+  | ValueInject Identifier
+                v
   deriving (Show)
 
 -- computation / negative term
