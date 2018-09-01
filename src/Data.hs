@@ -329,7 +329,7 @@ data Env = Env
   , valueEnv       :: [(Identifier, Type)] -- defined values
   , definedTypeEnv :: [(Identifier, [(Identifier, Type)])] -- types defined by (type ...)
   , constructorEnv :: [(Identifier, IORef [Identifier])]
-  , labelEnv       :: [Identifier] -- labels in labeled sum
+  , labelEnv       :: [(Identifier, [(Identifier, Type)])] -- labels in labeled sum
   , notationEnv    :: [(Tree, Tree)] -- macro transformers
   , reservedEnv    :: [Identifier] -- list of reserved keywords
   , nameEnv        :: [(Identifier, Identifier)] -- used in alpha conversion
@@ -422,6 +422,22 @@ lookupTypeEnv' s = do
       Pr.ppShow (typeEnv env)
     Just t -> return t
 
+lookupLabelEnv :: String -> WithEnv (Maybe [(Identifier, Type)])
+lookupLabelEnv s = gets (lookup s . labelEnv)
+
+lookupLabelEnv' :: String -> WithEnv [(Identifier, Type)]
+lookupLabelEnv' s = do
+  mt <- gets (lookup s . labelEnv)
+  env <- get
+  case mt of
+    Nothing ->
+      lift $
+      throwE $
+      s ++
+      " is not found in the label environment. typeenv: " ++
+      Pr.ppShow (labelEnv env)
+    Just t -> return t
+
 lookupValueEnv :: String -> WithEnv (Maybe Type)
 lookupValueEnv s = do
   env <- get
@@ -494,13 +510,13 @@ insConstraintEnv t1 t2 =
 insLEnv :: WeakLevel -> WeakLevel -> WithEnv ()
 insLEnv l1 l2 = modify (\e -> e {levelEnv = (l1, l2) : levelEnv e})
 
-insLabelEnv :: Identifier -> WithEnv ()
-insLabelEnv label = modify (\e -> e {labelEnv = label : labelEnv e})
+insLabelEnv :: Identifier -> [(Identifier, Type)] -> WithEnv ()
+insLabelEnv label t = modify (\e -> e {labelEnv = (label, t) : labelEnv e})
 
 isDefinedLabel :: Identifier -> WithEnv Bool
 isDefinedLabel label = do
   env <- get
-  return $ label `elem` labelEnv env
+  return $ label `elem` map fst (labelEnv env)
 
 insConstructorEnv :: Identifier -> Identifier -> WithEnv ()
 insConstructorEnv i cons = do

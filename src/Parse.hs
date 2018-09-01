@@ -183,7 +183,7 @@ parseType (_ :< TreeNode [_ :< TreeAtom "exists", _ :< TreeNode ts, tn]) = do
   foldMTermR' TypeExists n its
 parseType (_ :< TreeNode ((_ :< TreeAtom "sum"):ts)) = do
   labelTypeList <- mapM parseTypeArg ts
-  forM_ labelTypeList $ \(label, _) -> insLabelEnv label
+  forM_ labelTypeList $ \(label, _) -> insLabelEnv label labelTypeList
   return $ Fix $ TypeSum labelTypeList
 parseType (_ :< TreeNode [_ :< TreeAtom "up", tp]) = do
   p <- parseType tp
