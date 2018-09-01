@@ -102,14 +102,10 @@ data PatF a
   = PatHole
   | PatVar Identifier
   | PatConst Identifier
-  | PatApp a
-           [a]
   | PatPair a
             a
   | PatInject Identifier
               a
-  | PatThunk a
-  | PatUnthunk a
   deriving (Show, Eq)
 
 $(deriveShow1 ''PatF)
@@ -332,8 +328,8 @@ data Env = Env
   { count          :: Int -- to generate fresh symbols
   , valueEnv       :: [(Identifier, Type)] -- defined values
   , definedTypeEnv :: [(Identifier, [(Identifier, Type)])] -- types defined by (type ...)
-  , constructorEnv :: [(Identifier, IORef [Identifier])]
   , labelEnv       :: [(Identifier, [(Identifier, Type)])] -- labels in labeled sum
+  , labelNumEnv    :: [(Identifier, Int)]
   , notationEnv    :: [(Tree, Tree)] -- macro transformers
   , reservedEnv    :: [Identifier] -- list of reserved keywords
   , nameEnv        :: [(Identifier, Identifier)] -- used in alpha conversion
@@ -349,7 +345,7 @@ initialEnv =
     { count = 0
     , valueEnv = []
     , definedTypeEnv = []
-    , constructorEnv = []
+    , labelNumEnv = []
     , labelEnv = []
     , notationEnv = []
     , reservedEnv =
@@ -489,23 +485,17 @@ insCodeEnv :: Identifier -> [Identifier] -> Code -> WithEnv ()
 insCodeEnv funName args body =
   modify (\e -> e {codeEnv = (funName, (args, body)) : codeEnv e})
 
-lookupConstructorEnv :: Identifier -> WithEnv [Identifier]
-lookupConstructorEnv cons = do
+lookupLabelNumEnv :: Identifier -> WithEnv (Maybe Int)
+lookupLabelNumEnv label = do
   env <- get
-  case lookup cons (constructorEnv env) of
-    Nothing -> lift $ throwE $ "no such constructor defined: " ++ show cons
-    Just cenvRef -> liftIO $ readIORef cenvRef
+  return $ lookup label (labelNumEnv env)
 
-getConstructorNumber :: Identifier -> Identifier -> WithEnv Int
-getConstructorNumber nodeName ident = do
-  env <- get
-  case lookup nodeName (constructorEnv env) of
-    Nothing -> lift $ throwE $ "no such type defined: " ++ show nodeName
-    Just cenvRef -> do
-      cenv <- liftIO $ readIORef cenvRef
-      case elemIndex ident cenv of
-        Nothing -> lift $ throwE $ "no such constructor defined: " ++ ident
-        Just i  -> return i
+lookupLabelNumEnv' :: Identifier -> WithEnv Int
+lookupLabelNumEnv' label = do
+  mi <- lookupLabelNumEnv label
+  case mi of
+    Just i  -> return i
+    Nothing -> lift $ throwE $ "the label " ++ label ++ " is not defined"
 
 insConstraintEnv :: Type -> Type -> WithEnv ()
 insConstraintEnv t1 t2 =
@@ -522,16 +512,9 @@ isDefinedLabel label = do
   env <- get
   return $ label `elem` map fst (labelEnv env)
 
-insConstructorEnv :: Identifier -> Identifier -> WithEnv ()
-insConstructorEnv i cons = do
-  env <- get
-  case lookup i (constructorEnv env) of
-    Nothing -> do
-      cenvRef <- liftIO $ newIORef [cons]
-      modify (\e -> e {constructorEnv = (i, cenvRef) : constructorEnv env})
-    Just cenvRef -> do
-      cenv <- liftIO $ readIORef cenvRef
-      liftIO $ writeIORef cenvRef (cons : cenv)
+insConstructorEnv :: Identifier -> Int -> WithEnv ()
+insConstructorEnv i num = do
+  modify (\e -> e {labelNumEnv = (i, num) : labelNumEnv e})
 
 local :: WithEnv a -> WithEnv a
 local p = do
@@ -640,6 +623,12 @@ coFunAndArgs :: (Term, [(Identifier, Term)]) -> Term
 coFunAndArgs (term, [])        = term
 coFunAndArgs (term, (i, v):xs) = coFunAndArgs (i :< TermApp term v, xs)
 
+pairSeq :: Pat -> WithEnv [Pat]
+pairSeq (i :< PatPair v1 v2) = do
+  xs <- pairSeq v2
+  return $ v1 : xs
+pairSeq c = return [c]
+
 unwrapDown :: Type -> WithEnv Type
 unwrapDown (Fix (TypeDown t')) = return t'
 unwrapDown t = lift $ throwE $ "the type " ++ show t ++ " is not a pointer"
@@ -654,6 +643,8 @@ var (_ :< TermVar s) = [s]
 var (_ :< TermConst _) = []
 var (_ :< TermLam s e) = filter (/= s) $ var e
 var (_ :< TermApp e v) = var e ++ var v
+var (_ :< TermPair v1 v2) = var v1 ++ var v2
+var (_ :< TermInject _ v) = var v
 var (_ :< TermLift v) = var v
 var (_ :< TermBind x e1 e2) = var e1 ++ filter (/= x) (var e2)
 var (_ :< TermThunk e) = var e
@@ -667,9 +658,8 @@ var (_ :< TermCase vs vcs) = do
   efs ++ vs1 ++ vs2
 
 varPat :: Pat -> [Identifier]
-varPat (_ :< PatHole)      = []
-varPat (_ :< PatConst _)   = []
-varPat (_ :< PatVar s)     = [s]
-varPat (_ :< PatApp p ps)  = varPat p ++ join (map varPat ps)
-varPat (_ :< PatThunk v)   = varPat v
-varPat (_ :< PatUnthunk e) = varPat e
+varPat (_ :< PatHole)       = []
+varPat (_ :< PatConst _)    = []
+varPat (_ :< PatVar s)      = [s]
+varPat (_ :< PatPair v1 v2) = varPat v1 ++ varPat v2
+varPat (_ :< PatInject _ v) = varPat v

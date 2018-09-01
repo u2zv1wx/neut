@@ -59,9 +59,9 @@ load' ((_ :< TreeNode [_ :< TreeAtom "value", _ :< TreeAtom x, tp]):as) = do
   env <- get
   case tailType of
     Fix (TypeNode s _)
-      | isDefinedType s env -> do
-        insConstructorEnv s x
-        load' as
+      | isDefinedType s env
+        -- insConstructorEnv s x
+       -> do load' as
     t ->
       E.lift $
       throwE $

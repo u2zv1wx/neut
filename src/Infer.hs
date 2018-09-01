@@ -197,13 +197,6 @@ inferPat (meta :< PatVar s) = do
       insTypeEnv s $ Fix $ TypeHole i
       insTypeEnv meta (Fix (TypeHole i))
       return $ Fix (TypeHole i)
-inferPat (meta :< PatApp v vs) = do
-  t <- inferPat v
-  let (cod, args) = forallArgs t
-  ts <- mapM inferPat vs
-  forM_ (zip ts (map snd args)) $ uncurry insConstraintEnv
-  insTypeEnv meta cod
-  return cod
 inferPat (meta :< PatPair v1 v2) = do
   t1 <- inferPat v1
   s <- newName
@@ -220,17 +213,6 @@ inferPat (meta :< PatInject x v) = do
       insConstraintEnv tv t
       insTypeEnv meta $ Fix $ TypeSum labelTypeList
       return $ Fix $ TypeSum labelTypeList
-inferPat (meta :< PatThunk v) = do
-  t <- inferPat v
-  insTypeEnv meta $ Fix $ TypeDown t
-  return $ Fix $ TypeDown t
-inferPat (meta :< PatUnthunk e) = do
-  t <- inferPat e
-  i <- newName
-  let result = Fix $ TypeHole i
-  insConstraintEnv t (Fix $ TypeDown result)
-  insTypeEnv meta result
-  return result
 
 type Subst = [(String, Type)]
 

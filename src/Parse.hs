@@ -97,55 +97,14 @@ parsePat (meta :< TreeAtom s) = do
       s' <- strToName s
       return (meta :< PatVar s')
     Just _ -> return $ meta :< PatConst s
-parsePat (meta :< TreeNode [_ :< TreeAtom "thunk", te]) = do
-  e <- parsePat te
-  return $ meta :< PatThunk e
-parsePat (meta :< TreeNode [_ :< TreeAtom "unthunk", te]) = do
-  e <- parsePat te
-  return $ meta :< PatUnthunk e
 parsePat (meta :< TreeNode [_ :< TreeAtom "pair", t1, t2]) = do
   p1 <- parsePat t1
   p2 <- parsePat t2
   return $ meta :< PatPair p1 p2
-parsePat (meta :< TreeNode [i :< TreeAtom x, t]) = do
-  undefined
-  flag <- isDefinedLabel x
+parsePat (meta :< TreeNode [_ :< TreeAtom x, t]) = do
   e <- parsePat t
-  if flag
-    then return $ meta :< PatInject x e
-    else return $ meta :< PatApp (i :< PatVar x) [e]
-parsePat (meta :< TreeNode (t:ts)) = do
-  t' <- parsePat' t
-  ts' <- mapM parsePat ts
-  return $ meta :< PatApp t' ts'
+  return $ meta :< PatInject x e
 parsePat t = lift $ throwE $ "parsePat: syntax error:\n" ++ Pr.ppShow t
-
-parsePat' :: Tree -> WithEnv Pat
-parsePat' (meta :< TreeAtom "_") = return $ meta :< PatHole
-parsePat' (meta :< TreeAtom s) = do
-  msym <- lookupValueEnv s
-  case msym of
-    Nothing ->
-      lift $ throwE $ "parsePat: the constant " ++ show s ++ " is not defined"
-    Just _ -> return $ meta :< PatConst s
-parsePat' (meta :< TreeNode [_ :< TreeAtom "thunk", te]) = do
-  e <- parsePat' te
-  return $ meta :< PatThunk e
-parsePat' (meta :< TreeNode [_ :< TreeAtom "unthunk", te]) = do
-  e <- parsePat' te
-  return $ meta :< PatUnthunk e
-parsePat' (meta :< TreeNode (t:ts)) = do
-  t' <- parsePat' t
-  ts' <- mapM parsePat ts
-  return $ meta :< PatApp t' ts'
-  -- msym <- lookupVEnv s
-  -- case msym of
-  --   Nothing ->
-  --     lift $ throwE $ "parsePat': the constant " ++ show s ++ " is not defined"
-  --   Just _ -> do
-  --     ts' <- mapM parsePat' ts
-  --     return $ meta :< PatApp s ts'
-parsePat' t = lift $ throwE $ "parsePat': syntax error:\n" ++ Pr.ppShow t
 
 parseClause :: Tree -> WithEnv ([Pat], Term)
 parseClause (_ :< TreeNode [_ :< TreeAtom "with", _ :< TreeNode tps, tbody]) = do
@@ -183,7 +142,8 @@ parseType (_ :< TreeNode [_ :< TreeAtom "exists", _ :< TreeNode ts, tn]) = do
   foldMTermR' TypeExists n its
 parseType (_ :< TreeNode ((_ :< TreeAtom "sum"):ts)) = do
   labelTypeList <- mapM parseTypeArg ts
-  forM_ labelTypeList $ \(label, _) -> insLabelEnv label labelTypeList
+  forM_ (zip labelTypeList [0 ..]) $ \((label, i), _) ->
+    insLabelEnv label labelTypeList
   return $ Fix $ TypeSum labelTypeList
 parseType (_ :< TreeNode [_ :< TreeAtom "up", tp]) = do
   p <- parseType tp

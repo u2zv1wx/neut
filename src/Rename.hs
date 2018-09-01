@@ -122,10 +122,6 @@ renamePat (i :< PatConst x) = return $ i :< PatConst x
 renamePat (i :< PatVar s) = do
   t <- PatVar <$> lookupNameEnv' s
   return (i :< t)
-renamePat (i :< PatApp v vs) = do
-  v' <- renamePat v
-  vs' <- mapM renamePat vs
-  return (i :< PatApp v' vs')
 renamePat (i :< PatPair v1 v2) = do
   v1' <- renamePat v1
   v2' <- renamePat v2
@@ -133,9 +129,3 @@ renamePat (i :< PatPair v1 v2) = do
 renamePat (i :< PatInject x v) = do
   v' <- renamePat v
   return $ i :< PatInject x v'
-renamePat (i :< PatThunk v) = do
-  v' <- renamePat v
-  return $ i :< PatThunk v'
-renamePat (i :< PatUnthunk v) = do
-  v' <- renamePat v
-  return $ i :< PatUnthunk v'
