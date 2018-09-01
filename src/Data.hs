@@ -326,7 +326,6 @@ data AsmOperation
 -- type ValueInfo = (Identifier, [(Identifier, Type)], Type)
 data Env = Env
   { count          :: Int -- to generate fresh symbols
-  , valueEnv       :: [(Identifier, Type)] -- defined values
   , definedTypeEnv :: [(Identifier, [(Identifier, Type)])] -- types defined by (type ...)
   , labelEnv       :: [(Identifier, [(Identifier, Type)])] -- labels in labeled sum
   , labelNumEnv    :: [(Identifier, Int)]
@@ -343,7 +342,6 @@ initialEnv :: Env
 initialEnv =
   Env
     { count = 0
-    , valueEnv = []
     , definedTypeEnv = []
     , labelNumEnv = []
     , labelEnv = []
@@ -438,16 +436,6 @@ lookupLabelEnv' s = do
       Pr.ppShow (labelEnv env)
     Just t -> return t
 
-lookupValueEnv :: String -> WithEnv (Maybe Type)
-lookupValueEnv s = gets (lookup s . valueEnv)
-
-lookupValueEnv' :: String -> WithEnv Type
-lookupValueEnv' s = do
-  mt <- lookupValueEnv s
-  case mt of
-    Just t  -> return t
-    Nothing -> lift $ throwE $ "the value " ++ show s ++ " is not defined "
-
 lookupNameEnv :: String -> WithEnv String
 lookupNameEnv s = do
   env <- get
@@ -475,9 +463,6 @@ insDefinedTypeEnv i t =
 
 insTypeEnv :: Identifier -> Type -> WithEnv ()
 insTypeEnv i t = modify (\e -> e {typeEnv = (i, t) : typeEnv e})
-
-insValueEnv :: Identifier -> Type -> WithEnv ()
-insValueEnv ident t = modify (\e -> e {valueEnv = (ident, t) : valueEnv e})
 
 insCodeEnv :: Identifier -> [Identifier] -> Code -> WithEnv ()
 insCodeEnv funName args body =

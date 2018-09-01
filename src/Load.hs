@@ -45,28 +45,6 @@ load' ((_ :< TreeNode ((_ :< TreeAtom "type"):(_ :< TreeAtom s):ts)):as) = do
   -- TODO: check polarity, variable binding
   insDefinedTypeEnv s args
   load' as
-load' ((_ :< TreeNode [_ :< TreeAtom "value", _ :< TreeAtom x, tp]):as) = do
-  t <- parseType tp >>= renameType
-  checkType t
-  -- TODO: check polarity, variable binding
-  t' <- unwrapDown t
-  let (tailType, identArgTypes) = forallArgs t'
-  let argTypes = map snd identArgTypes
-  let resultType = Fix $ TypeStruct $ Fix (TypeInt 32) : argTypes
-  let newType = Fix $ TypeDown $ coForallArgs (resultType, identArgTypes)
-  insTypeEnv x t
-  insValueEnv x newType
-  env <- get
-  case tailType of
-    Fix (TypeNode s _)
-      | isDefinedType s env
-        -- insConstructorEnv s x
-       -> do load' as
-    t ->
-      E.lift $
-      throwE $
-      "the codomain of value type " ++
-      show x ++ " must be a user-defined type. Note:\n" ++ Pr.ppShow t
 load' (a:as) = do
   e <- macroExpand a >>= parse >>= rename
   let main = "main"

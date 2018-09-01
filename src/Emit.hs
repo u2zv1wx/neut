@@ -30,33 +30,35 @@ emit = do
     argTypeList <- mapM lookupTypeEnv' args
     bodyAsm <- asmCode body
     emitDefine label codType (zip args argTypeList) bodyAsm
-  forM_ (valueEnv env) $ \(label, _) -> do
-    t <- lookupValueEnv' label
-    t' <- unwrapDown t
-    asm <- asmConstructor label t'
-    let (codType, identTypeList) = forallArgs t'
-    emitDefine label codType identTypeList asm
+  -- forM_ (valueEnv env) $ \(label, _)
+  --  -> do
+  --   t <- lookupTypeEnv' label
+  --   t' <- unwrapDown t
+  --   asm <- asmConstructor label t'
+  --   let (codType, identTypeList) = forallArgs t'
+  --   emitDefine label codType identTypeList asm
 
 emitAsm :: Asm -> WithEnv ()
 emitAsm (AsmReturn i) = do
-  t <- lookupTypeEnv' i
-  t' <- lookupLowTypeEnv' i
-  -- liftIO $ putStrLn $ "the real type of " ++ i ++ " is " ++ show t'
-  if t == t'
-    then emitOp $ unwords ["ret", showType t, showRegister i]
-    else do
-      tmp <- newNameWith "cast"
-      emitOp $
-        unwords
-          [ showRegister tmp
-          , "="
-          , "bitcast"
-          , showType t'
-          , showRegister i
-          , "to"
-          , showType t
-          ]
-      emitOp $ unwords ["ret", showType t, showRegister tmp]
+  undefined
+  -- t <- lookupTypeEnv' i
+  -- -- t' <- lookupTypeEnv' i
+  -- -- liftIO $ putStrLn $ "the real type of " ++ i ++ " is " ++ show t'
+  -- if t == t'
+  --   then emitOp $ unwords ["ret", showType t, showRegister i]
+  --   else do
+  --     tmp <- newNameWith "cast"
+  --     emitOp $
+  --       unwords
+  --         [ showRegister tmp
+  --         , "="
+  --         , "bitcast"
+  --         , showType t'
+  --         , showRegister i
+  --         , "to"
+  --         , showType t
+  --         ]
+  --     emitOp $ unwords ["ret", showType t, showRegister tmp]
 emitAsm (AsmLet i op) = emitAsmLet i op
 emitAsm (AsmStore (AsmDataLocal item) dest) = do
   itemType <- lookupTypeEnv' item
@@ -124,20 +126,21 @@ emitAsmLet i (AsmLoad source) = do
       , showRegister source
       ]
 emitAsmLet i (AsmGetElemPointer base index) = do
-  baseType <- lookupLowTypeEnv' base
-  case baseType of
-    Fix (TypeDown t) ->
-      emitOp $
-      unwords
-        [ showRegister i
-        , "="
-        , "getelementptr"
-        , showType t ++ ","
-        , showType baseType
-        , showRegister base ++ ","
-        , showIndex index
-        ]
-    t -> lift $ throwE $ "Emit.emitAsmLet.getelementptr. t:\n" ++ Pr.ppShow t
+  undefined
+  -- baseType <- lookupLowTypeEnv' base
+  -- case baseType of
+  --   Fix (TypeDown t) ->
+  --     emitOp $
+  --     unwords
+  --       [ showRegister i
+  --       , "="
+  --       , "getelementptr"
+  --       , showType t ++ ","
+  --       , showType baseType
+  --       , showRegister base ++ ","
+  --       , showIndex index
+  --       ]
+  --   t -> lift $ throwE $ "Emit.emitAsmLet.getelementptr. t:\n" ++ Pr.ppShow t
 emitAsmLet i (AsmCall name args) = do
   funType <- lookupTypeEnv' name
   let (codType, _) = forallArgs funType

@@ -24,11 +24,7 @@ parse :: Tree -> WithEnv Term
 parse (meta :< TreeAtom "_") = do
   name <- newNameWith "hole"
   return $ meta :< TermVar name
-parse (meta :< TreeAtom s) = do
-  msym <- lookupValueEnv s
-  case msym of
-    Nothing -> return (meta :< TermVar s)
-    Just _  -> return $ meta :< TermConst s
+parse (meta :< TreeAtom s) = return $ meta :< TermVar s
 parse (meta :< TreeNode [_ :< TreeAtom "lambda", _ :< TreeNode ts, te]) = do
   xs <- parseArg ts
   e <- parse te
@@ -38,10 +34,6 @@ parse (meta :< TreeNode [_ :< TreeAtom "pair", t1, t2]) = do
   e1 <- parse t1
   e2 <- parse t2
   return $ meta :< TermProduct e1 e2
--- parse (meta :< TreeNode [_ :< TreeAtom "destruct", _ :< TreeAtom x, _ :< TreeAtom y, t1, t2]) = do
---   e1 <- parse t1
---   e2 <- parse t2
---   return $ meta :< TermDestruct x y e1 e2
 parse (meta :< TreeNode [_ :< TreeAtom "lift", tv]) = do
   v <- parse tv
   return $ meta :< TermLift v
@@ -91,12 +83,8 @@ parseArg' t = lift $ throwE $ "parseArg': syntax error:\n" ++ Pr.ppShow t
 parsePat :: Tree -> WithEnv Pat
 parsePat (meta :< TreeAtom "_") = return $ meta :< PatHole
 parsePat (meta :< TreeAtom s) = do
-  msym <- lookupValueEnv s
-  case msym of
-    Nothing -> do
-      s' <- strToName s
-      return (meta :< PatVar s')
-    Just _ -> return $ meta :< PatConst s
+  s' <- strToName s
+  return (meta :< PatVar s')
 parsePat (meta :< TreeNode [_ :< TreeAtom "pair", t1, t2]) = do
   p1 <- parsePat t1
   p2 <- parsePat t2
