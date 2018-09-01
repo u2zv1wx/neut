@@ -439,9 +439,7 @@ lookupLabelEnv' s = do
     Just t -> return t
 
 lookupValueEnv :: String -> WithEnv (Maybe Type)
-lookupValueEnv s = do
-  env <- get
-  return $ lookup s (valueEnv env)
+lookupValueEnv s = gets (lookup s . valueEnv)
 
 lookupValueEnv' :: String -> WithEnv Type
 lookupValueEnv' s = do
@@ -486,9 +484,7 @@ insCodeEnv funName args body =
   modify (\e -> e {codeEnv = (funName, (args, body)) : codeEnv e})
 
 lookupLabelNumEnv :: Identifier -> WithEnv (Maybe Int)
-lookupLabelNumEnv label = do
-  env <- get
-  return $ lookup label (labelNumEnv env)
+lookupLabelNumEnv label = gets (lookup label . labelNumEnv)
 
 lookupLabelNumEnv' :: Identifier -> WithEnv Int
 lookupLabelNumEnv' label = do
@@ -513,7 +509,7 @@ isDefinedLabel label = do
   return $ label `elem` map fst (labelEnv env)
 
 insConstructorEnv :: Identifier -> Int -> WithEnv ()
-insConstructorEnv i num = do
+insConstructorEnv i num =
   modify (\e -> e {labelNumEnv = (i, num) : labelNumEnv e})
 
 local :: WithEnv a -> WithEnv a
@@ -624,7 +620,7 @@ coFunAndArgs (term, [])        = term
 coFunAndArgs (term, (i, v):xs) = coFunAndArgs (i :< TermApp term v, xs)
 
 pairSeq :: Pat -> WithEnv [Pat]
-pairSeq (i :< PatPair v1 v2) = do
+pairSeq (_ :< PatPair v1 v2) = do
   xs <- pairSeq v2
   return $ v1 : xs
 pairSeq c = return [c]

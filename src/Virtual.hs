@@ -29,6 +29,8 @@ virtualV (Value (i :< ValueThunk comp)) = do
   bodyCode <- virtualC body
   insCodeEnv label args bodyCode
   return $ i :< DataGlobal label
+virtualV (Value (i :< ValuePair v1 v2)) = undefined
+virtualV (Value (i :< ValueInject x v)) = undefined
 
 virtualC :: Comp -> WithEnv Code
 virtualC lam@(Comp (lamMeta :< CompLam _ _))
