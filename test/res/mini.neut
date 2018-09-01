@@ -8,12 +8,6 @@
 
 (value succ (down (forall ((_ (down nat))) nat)))
 
-(type bool)
-
-(value true (down bool))
-
-(value false (down bool))
-
 (notation (begin e)
   e)
 
@@ -23,4 +17,5 @@
 (notation (begin (let x e+) rest+)
   (bind x (begin e+) (begin rest+)))
 
-(begin (lift zero))
+(begin
+  (lift (thunk ((unthunk succ) zero))))

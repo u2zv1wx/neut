@@ -31,7 +31,7 @@ asmCode (CodeLet i d@(meta :< _) cont) = do
   insTypeEnv loader t
   bindLoader <- asmData loader d
   cont' <- asmCode cont
-  copy <- asmCopy (AsmDataRegister loader) i
+  copy <- asmCopy (AsmDataLocal loader) i
   return $ bindLoader ++ copy ++ cont'
 asmCode (CodeSwitch basePointer (defaultLabel, defaultCode) branchList) = do
   tagPtr <- newNameWith $ basePointer ++ ".tagptr"
@@ -52,37 +52,16 @@ asmCode (CodeCall x fun args cont) = do
   (varList, asmList) <- toVarAsmList args
   asmCont <- asmCode cont
   return $ join asmList ++ [AsmLet x (AsmCall fun varList)] ++ asmCont
--- asmCode (CodeCallCls x cls args cont) = do
---   (varList, asmList) <- toVarAsmList args
---   asmCont <- asmCode cont
---   funPtr <- newNameWith "cls.0"
---   insTypeEnv funPtr $ Fix $ TypeDown $ Fix $ TypeInt 32
---   envPtr <- newNameWith "env"
---   headData <- newNameWith $ "cls" ++ "0"
---   insTypeEnv headData $ Fix $ TypeInt 32
---   clsVar <- newNameWith "cls"
---   bindCls <- asmData clsVar cls
---     -- Fix $ TypeDown $ Fix $ TypeStruct [labelType, envType]
---   return $
---     join asmList ++
---     bindCls ++
---     [ AsmLet funPtr (AsmGetElemPointer clsVar [0, 0])
---     , AsmLet envPtr (AsmGetElemPointer clsVar [0, 1])
---     ] ++
---     [AsmLet x (AsmCall funPtr (envPtr : varList))] ++ asmCont
--- asmCode (CodeLoadClosure cls@(clsMeta :< _)) = do
---   clsPtrType <- lookupTypeEnv' clsMeta
---   clsPtrReg <- newNameWith "cls"
---   insTypeEnv clsPtrReg clsPtrType
---   asmData clsPtrReg cls
-asmCode (CodeLoad d@(meta :< _)) = do
+asmCode (CodeLoad d@(meta :< _))
+  -- call d
+ = do
   t <- lookupTypeEnv' meta
   x <- newNameWith "tmp"
   insTypeEnv x t
   tmp <- newNameWith "tmp"
   insTypeEnv tmp t
   bindDataToVar <- asmData tmp d
-  return $ bindDataToVar ++ [AsmLet x (AsmLoad tmp), AsmReturn x]
+  return $ bindDataToVar ++ [AsmLet x (AsmCall tmp []), AsmReturn x]
 
 toVarAsmList :: [Data] -> WithEnv ([Identifier], [[Asm]])
 toVarAsmList args = do
@@ -96,45 +75,24 @@ toVarAsmList args = do
   return $ unzip varAsmList
 
 asmData :: Identifier -> Data -> WithEnv [Asm]
-asmData tmp (_ :< DataRegister x) = asmCopy (AsmDataRegister x) tmp
-asmData tmp (_ :< DataPointer x) = asmCopy (AsmDataRegister x) tmp
--- asmData tmp (_ :< DataFunName name) = asmCopy (AsmDataFunName name) tmp
+asmData tmp (_ :< DataLocal x) = asmCopy (AsmDataLocal x) tmp
+asmData tmp (_ :< DataGlobal x) = asmCopy (AsmDataGlobal x) tmp
 asmData tmp (_ :< DataElemAtIndex basePointer idx) =
   return [AsmLet tmp (AsmGetElemPointer basePointer idx)]
 asmData tmp (_ :< DataInt32 i) = asmCopy (AsmDataInt32 i) tmp
 
--- asmData tmp (_ :< DataClosure name fvListPtr fvList) = do
---   typeList <- mapM lookupTypeEnv' fvList
---   let contentList = zip (map AsmDataRegister fvList) typeList
---   setFvListPtrContent <- setContent contentList fvListPtr
---   let structType = Fix (TypeStruct typeList)
---   let labelType = Fix (TypeDown (Fix (TypeInt 8)))
---   let fvListPtrType = Fix $ TypeDown structType
---   let clsType = Fix (TypeStruct [labelType, fvListPtrType])
---   let clsContentList =
---         [ (AsmDataFunName name, labelType)
---         , (AsmDataRegister fvListPtr, fvListPtrType)
---         ]
---   setClsContent <- setContent clsContentList tmp
---   insLowTypeEnv tmp $ Fix $ TypeDown clsType
---   return $
---     [AsmLet fvListPtr (AsmAlloc structType)] ++
---     setFvListPtrContent ++ [AsmLet tmp (AsmAlloc clsType)] ++ setClsContent
 -- temporary
 asmCopy :: AsmData -> Identifier -> WithEnv [Asm]
 asmCopy from to = do
   t <- lookupTypeEnv' to
   t' <- unwrapDown t
-  -- undefined
-  -- tmp <- newNameWith "copy"
-  -- insTypeEnv tmp t'
   return [AsmLet to (AsmAlloc t'), AsmStore from to]
 
 asmConstructor :: Identifier -> Type -> WithEnv [Asm]
 asmConstructor name t = do
   let (_, identArgTypes) = forallArgs t
   let (identList, argTypes) = unzip identArgTypes
-  let regList = map AsmDataRegister identList
+  let regList = map AsmDataLocal identList
   let num = 1 :: Int
   let contentList = (AsmDataInt32 num, Fix (TypeInt 32)) : zip regList argTypes
   let resultType = Fix $ TypeStruct $ Fix (TypeInt 32) : argTypes

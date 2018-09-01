@@ -225,15 +225,11 @@ instance (Show a) => Show (IORef a) where
 type Index = [Int]
 
 data DataF a
-  = DataPointer Identifier
-  | DataRegister Identifier
-  -- | DataFunName Identifier
+  = DataLocal Identifier
+  | DataGlobal Identifier
   | DataElemAtIndex Identifier -- subvalue of an inductive value
                     Index
   | DataInt32 Int
-  -- | DataClosure Identifier -- the name of the closure
-  --               Identifier -- pointer to the struct with free-var information
-  --               [Identifier] -- list of free variables
 
 deriving instance Show a => Show (DataF a)
 
@@ -282,10 +278,11 @@ letSeq (i:is) (d:ds) code = do
 letSeq _ _ _ = error "Virtual.letSeq: invalid arguments"
 
 data AsmData
-  = AsmDataRegister Identifier
-  | AsmDataFunName Identifier
+  = AsmDataLocal Identifier
+  | AsmDataGlobal Identifier
   | AsmDataInt32 Int
-  -- | AsmDataStruct [AsmData]
+  -- | AsmDataElemAtIndex Identifier -- base register
+  --                      Index -- index
   deriving (Show)
 
 data Asm
@@ -297,6 +294,11 @@ data Asm
   | AsmSwitch Identifier
               DefaultAsmBranch
               [AsmBranch]
+  -- | AsmCall Identifier
+  --           Identifier
+  --           [Identifier]
+  --           Asm
+  -- | AsmLoad AsmData
   deriving (Show)
 
 data AsmOperation

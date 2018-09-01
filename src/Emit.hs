@@ -58,7 +58,7 @@ emitAsm (AsmReturn i) = do
           ]
       emitOp $ unwords ["ret", showType t, showRegister tmp]
 emitAsm (AsmLet i op) = emitAsmLet i op
-emitAsm (AsmStore (AsmDataRegister item) dest) = do
+emitAsm (AsmStore (AsmDataLocal item) dest) = do
   itemType <- lookupTypeEnv' item
   destType <- lookupTypeEnv' dest
   emitOp $
@@ -69,13 +69,13 @@ emitAsm (AsmStore (AsmDataRegister item) dest) = do
       , showType destType
       , showRegister dest
       ]
-emitAsm (AsmStore (AsmDataFunName item) dest) = do
+emitAsm (AsmStore (AsmDataGlobal item) dest) = do
+  itemType <- lookupTypeEnv' item
   destType <- lookupTypeEnv' dest
   emitOp $
     unwords
       [ "store"
-      -- , showType itemType
-      , "i8*"
+      , showType itemType
       , showGlobal item ++ ","
       , showType destType
       , showRegister dest

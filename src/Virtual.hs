@@ -19,8 +19,8 @@ import qualified Text.Show.Pretty           as Pr
 import           Debug.Trace
 
 virtualV :: Value -> WithEnv Data
-virtualV (Value (i :< ValueVar x)) = return $ i :< DataRegister x
-virtualV (Value (i :< ValueConst x)) = return $ i :< DataPointer x
+virtualV (Value (i :< ValueVar x)) = return $ i :< DataLocal x
+virtualV (Value (i :< ValueConst x)) = return $ i :< DataGlobal x
 virtualV (Value (i :< ValueThunk comp)) = do
   let label = "thunk" ++ i
   thunkType <- lookupTypeEnv' i
@@ -28,7 +28,7 @@ virtualV (Value (i :< ValueThunk comp)) = do
   (body, args) <- toLamSeq comp
   bodyCode <- virtualC body
   insCodeEnv label args bodyCode
-  return $ i :< DataPointer label
+  return $ i :< DataGlobal label
 
 virtualC :: Comp -> WithEnv Code
 virtualC lam@(Comp (lamMeta :< CompLam _ _))
@@ -42,7 +42,7 @@ virtualC lam@(Comp (lamMeta :< CompLam _ _))
   insCodeEnv name args bodyCode
   meta <- newNameWith "meta"
   insTypeEnv meta $ Fix $ TypeDown lamType
-  return $ CodeLoad (meta :< DataPointer name)
+  return $ CodeLoad (meta :< DataGlobal name)
 virtualC app@(Comp (i :< CompApp _ _)) = do
   (Comp (funMeta :< fun), ivs) <- funAndArgsPol app
   let (_, vs) = unzip ivs
@@ -73,7 +73,7 @@ virtualC app@(Comp (i :< CompApp _ _)) = do
     CompApp _ _ -> error "unreachable"
     _ ->
       traceLet funName funCode $
-      CodeCall s funName ds (CodeReturn (meta :< DataPointer s))
+      CodeCall s funName ds (CodeReturn (meta :< DataGlobal s))
 virtualC (Comp (_ :< CompLift v)) = do
   ans <- virtualV v
   return $ CodeReturn ans
@@ -92,7 +92,7 @@ virtualC (Comp (_ :< CompMu s comp))
   meta <- newNameWith "meta"
   recType <- lookupTypeEnv' s
   insTypeEnv meta recType
-  return $ CodeLoad (meta :< DataPointer s)
+  return $ CodeLoad (meta :< DataGlobal s)
 virtualC (Comp (_ :< CompDecision vs tree)) = do
   valueList <-
     forM vs $ \v@(Value (valueMeta :< _)) -> do
