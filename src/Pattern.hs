@@ -81,7 +81,7 @@ headConstructor' ((_ :< PatInject s (meta :< _)):_) = do
   i <- lookupLabelNumEnv' s
   argType <- lookupTypeEnv' meta
   return [(s, i, [argType])]
-headConstructor' (pair@(_ :< PatPair _ _):_) = do
+headConstructor' (pair@(_ :< PatProduct _ _):_) = do
   patList <- pairSeq pair
   typeList <- mapM (\(i :< _) -> lookupTypeEnv' i) patList
   return [("pair", 0, typeList)]
@@ -133,7 +133,7 @@ specializeRow c _ ((_ :< PatInject x arg):ps) body =
   if c /= x
     then return []
     else return [(arg : ps, body)]
-specializeRow c _ ((_ :< PatPair p1 p2):ps) body =
+specializeRow c _ ((_ :< PatProduct p1 p2):ps) body =
   if c /= "pair"
     then return []
     else return [(p1 : p2 : ps, body)]
@@ -151,12 +151,12 @@ takeHeadJust (Nothing:rest) = takeHeadJust rest
 takeHeadJust (Just x:_)     = Just x
 
 defaultMatrixRow :: [Pat] -> a -> WithEnv ([([Pat], a)], Maybe Identifier)
-defaultMatrixRow [] _                       = return ([], Nothing)
-defaultMatrixRow ((_ :< PatHole):ps) body   = return ([(ps, body)], Nothing)
-defaultMatrixRow ((_ :< PatVar s):ps) body  = return ([(ps, body)], Just s)
-defaultMatrixRow ((_ :< PatConst _):_) _    = return ([], Nothing)
-defaultMatrixRow ((_ :< PatPair _ _):_) _   = return ([], Nothing)
-defaultMatrixRow ((_ :< PatInject _ _):_) _ = return ([], Nothing)
+defaultMatrixRow [] _                        = return ([], Nothing)
+defaultMatrixRow ((_ :< PatHole):ps) body    = return ([(ps, body)], Nothing)
+defaultMatrixRow ((_ :< PatVar s):ps) body   = return ([(ps, body)], Just s)
+defaultMatrixRow ((_ :< PatConst _):_) _     = return ([], Nothing)
+defaultMatrixRow ((_ :< PatProduct _ _):_) _ = return ([], Nothing)
+defaultMatrixRow ((_ :< PatInject _ _):_) _  = return ([], Nothing)
 
 swapColumn :: Int -> Int -> [[a]] -> [[a]]
 swapColumn i j mat = transpose $ swap i j $ transpose mat

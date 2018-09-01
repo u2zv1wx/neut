@@ -61,7 +61,7 @@ infer (meta :< TermApp e v) = do
   insConstraintEnv te (Fix $ TypeForall (j, tv) result)
   insTypeEnv meta result
   return result
-infer (meta :< TermPair v1 v2) = do
+infer (meta :< TermProduct v1 v2) = do
   s <- newName
   t1 <- infer v1
   insTypeEnv s t1
@@ -197,7 +197,7 @@ inferPat (meta :< PatVar s) = do
       insTypeEnv s $ Fix $ TypeHole i
       insTypeEnv meta (Fix (TypeHole i))
       return $ Fix (TypeHole i)
-inferPat (meta :< PatPair v1 v2) = do
+inferPat (meta :< PatProduct v1 v2) = do
   t1 <- inferPat v1
   s <- newName
   insTypeEnv s t1

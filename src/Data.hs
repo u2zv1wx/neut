@@ -102,8 +102,8 @@ data PatF a
   = PatHole
   | PatVar Identifier
   | PatConst Identifier
-  | PatPair a
-            a
+  | PatProduct a
+               a
   | PatInject Identifier
               a
   deriving (Show, Eq)
@@ -145,8 +145,8 @@ data TermF a
             a
   | TermApp a -- hom-elim
             a
-  | TermPair a -- tensor
-             a
+  | TermProduct a -- tensor
+                a
   | TermInject Identifier -- sum
                a
   | TermLift a
@@ -173,8 +173,8 @@ data ValueF c v
   = ValueVar Identifier
   | ValueConst Identifier
   | ValueThunk c
-  | ValuePair v
-              v
+  | ValueProduct v
+                 v
   | ValueInject Identifier
                 v
   deriving (Show)
@@ -503,6 +503,10 @@ insLEnv l1 l2 = modify (\e -> e {levelEnv = (l1, l2) : levelEnv e})
 insLabelEnv :: Identifier -> [(Identifier, Type)] -> WithEnv ()
 insLabelEnv label t = modify (\e -> e {labelEnv = (label, t) : labelEnv e})
 
+insLabelNumEnv :: Identifier -> Int -> WithEnv ()
+insLabelNumEnv label i =
+  modify (\e -> e {labelNumEnv = (label, i) : labelNumEnv e})
+
 isDefinedLabel :: Identifier -> WithEnv Bool
 isDefinedLabel label = do
   env <- get
@@ -620,7 +624,7 @@ coFunAndArgs (term, [])        = term
 coFunAndArgs (term, (i, v):xs) = coFunAndArgs (i :< TermApp term v, xs)
 
 pairSeq :: Pat -> WithEnv [Pat]
-pairSeq (_ :< PatPair v1 v2) = do
+pairSeq (_ :< PatProduct v1 v2) = do
   xs <- pairSeq v2
   return $ v1 : xs
 pairSeq c = return [c]
@@ -639,7 +643,7 @@ var (_ :< TermVar s) = [s]
 var (_ :< TermConst _) = []
 var (_ :< TermLam s e) = filter (/= s) $ var e
 var (_ :< TermApp e v) = var e ++ var v
-var (_ :< TermPair v1 v2) = var v1 ++ var v2
+var (_ :< TermProduct v1 v2) = var v1 ++ var v2
 var (_ :< TermInject _ v) = var v
 var (_ :< TermLift v) = var v
 var (_ :< TermBind x e1 e2) = var e1 ++ filter (/= x) (var e2)
@@ -654,8 +658,8 @@ var (_ :< TermCase vs vcs) = do
   efs ++ vs1 ++ vs2
 
 varPat :: Pat -> [Identifier]
-varPat (_ :< PatHole)       = []
-varPat (_ :< PatConst _)    = []
-varPat (_ :< PatVar s)      = [s]
-varPat (_ :< PatPair v1 v2) = varPat v1 ++ varPat v2
-varPat (_ :< PatInject _ v) = varPat v
+varPat (_ :< PatHole)          = []
+varPat (_ :< PatConst _)       = []
+varPat (_ :< PatVar s)         = [s]
+varPat (_ :< PatProduct v1 v2) = varPat v1 ++ varPat v2
+varPat (_ :< PatInject _ v)    = varPat v

@@ -23,10 +23,10 @@ rename (i :< TermApp e v) = do
   e' <- rename e
   v' <- rename v
   return $ i :< TermApp e' v'
-rename (i :< TermPair v1 v2) = do
+rename (i :< TermProduct v1 v2) = do
   v1' <- rename v1
   v2' <- rename v2
-  return $ i :< TermPair v1' v2'
+  return $ i :< TermProduct v1' v2'
 rename (i :< TermInject x v) = do
   v' <- rename v
   return $ i :< TermInject x v'
@@ -122,10 +122,10 @@ renamePat (i :< PatConst x) = return $ i :< PatConst x
 renamePat (i :< PatVar s) = do
   t <- PatVar <$> lookupNameEnv' s
   return (i :< t)
-renamePat (i :< PatPair v1 v2) = do
+renamePat (i :< PatProduct v1 v2) = do
   v1' <- renamePat v1
   v2' <- renamePat v2
-  return $ i :< PatPair v1' v2'
+  return $ i :< PatProduct v1' v2'
 renamePat (i :< PatInject x v) = do
   v' <- renamePat v
   return $ i :< PatInject x v'
