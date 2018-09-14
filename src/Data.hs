@@ -67,20 +67,22 @@ $(deriveShow1 ''NeutF)
 
 data PosF c v
   = PosVar Identifier
-  | PosPair v -- exists-intro
-            v
-  | PosUnit -- top-intro
-  | PosThunk c -- down-intro
   | PosTypeForall (Identifier, v) -- forall-form
                   v
   | PosTypeExists (Identifier, v) -- exists-form
                   v
+  | PosPair v -- exists-intro
+            v
   | PosTypeTop -- top-form
+  | PosUnit -- top-intro
   | PosTypeBottom -- bottom-form
+  | PosDown v -- down-form
+  | PosThunk c -- down-intro
+  | PosUp v -- up-form
   | PosTypeUniv
 
 data NegF v c
-  = NegLam (Identifier, v) -- forall-intro
+  = NegLam Identifier -- forall-intro
            c
   | NegApp c -- forall-elim
            [Identifier]
@@ -474,3 +476,56 @@ compose s1 s2 = do
   let codS2' = map (subst s1) codS2
   let fromS1 = filter (\(ident, _) -> ident `notElem` domS2) s1
   fromS1 ++ zip domS2 codS2'
+
+reduce :: Neut -> Neut
+reduce (i :< NeutApp e1 e2) = do
+  let e2' = reduce e2
+  let e1' = reduce e1
+  case e1' of
+    _ :< NeutLam (arg, _) body -> do
+      let sub = [(arg, reduce e2)]
+      let _ :< body' = subst sub body
+      reduce $ i :< body'
+    _ -> i :< NeutApp e1' e2'
+reduce (i :< NeutPair e1 e2) = do
+  let e1' = reduce e1
+  let e2' = reduce e2
+  i :< NeutPair e1' e2'
+reduce (i :< NeutCase e (x, y) body) = do
+  let e' = reduce e
+  case e of
+    _ :< NeutPair e1 e2 -> do
+      let sub = [(x, reduce e1), (y, reduce e2)]
+      let _ :< body' = subst sub body
+      reduce $ i :< body'
+    _ -> i :< NeutCase e' (x, y) body
+reduce (meta :< NeutMu s c) = do
+  let c' = reduce c
+  meta :< NeutMu s c'
+reduce t = t
+
+-- bindWithLet x e1 e2 ~> let x := e1 in e2
+bindWithLet :: Identifier -> Neut -> Neut -> WithEnv Neut
+bindWithLet x e1 e2 = do
+  i <- newName
+  j <- newName
+  tdom <- lookupTypeEnv' x
+  return $ j :< NeutApp (i :< NeutLam (x, tdom) e2) e1
+
+pendSubst :: Subst -> Neut -> WithEnv Neut
+pendSubst [] e = return e
+pendSubst ((x, e1):rest) e = do
+  e' <- pendSubst rest e
+  bindWithLet x e1 e'
+
+wrapUniv :: NeutF Neut -> WithEnv Neut
+wrapUniv a = do
+  meta <- newNameWith "meta"
+  return $ meta :< a
+
+wrapType :: NeutF Neut -> WithEnv Neut
+wrapType t = do
+  meta <- newNameWith "meta"
+  u <- wrapUniv NeutUniv
+  insTypeEnv meta u
+  return $ meta :< t
