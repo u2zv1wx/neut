@@ -1,7 +1,6 @@
 module Infer
   ( check
   , unify
-  , checkType
   ) where
 
 import           Control.Monad
@@ -13,252 +12,162 @@ import           Control.Comonad.Cofree
 import qualified Text.Show.Pretty           as Pr
 
 import           Data
+import           Data.Maybe
 
-check :: Identifier -> Term -> WithEnv ()
+check :: Identifier -> Neut -> WithEnv ()
 check main e = do
   t <- infer e
-  insTypeEnv main $ Fix $ TypeDown t -- insert the type of main function
+  insTypeEnv main t -- insert the type of main function
   env <- get
   sub <- unify $ constraintEnv env
-  let tenv' = map (\(s, t) -> (s, sType sub t)) $ typeEnv env
+  let tenv' = map (\(s, t) -> (s, subst sub t)) $ typeEnv env
   modify (\e -> e {typeEnv = tenv', constraintEnv = []})
 
-checkType :: Type -> WithEnv ()
-checkType t = do
-  _ <- inferType t
-  env <- get
-  sub <- unify $ constraintEnv env
-  let tenv' = map (\(s, t) -> (s, sType sub t)) $ typeEnv env
-  modify (\e -> e {typeEnv = tenv', constraintEnv = []})
-
-infer :: Term -> WithEnv Type
-infer (meta :< TermVar s) = do
+infer :: Neut -> WithEnv Neut
+infer (meta :< NeutVar s) = do
   mt <- lookupTypeEnv s
   case mt of
     Just t -> do
       insTypeEnv meta t
       return t
     _ -> lift $ throwE $ "undefined variable: " ++ s
-infer (meta :< TermConst s) = do
-  t <- lookupTypeEnv' s
-  insTypeEnv meta t
-  return t
-infer (meta :< TermLam s e) = do
-  j <- newName
-  let tdom = Fix $ TypeHole j
+infer (meta :< NeutForall (s, tdom) tcod) = do
+  udom <- infer tdom
+  wrapUniv NeutUniv >>= \u -> insConstraintEnv udom u
+  insTypeEnv s tdom
+  ucod <- infer tcod
+  wrapUniv NeutUniv >>= \u -> insConstraintEnv ucod u
+  return $ meta :< NeutUniv
+infer (meta :< NeutLam (s, tdom) e) = do
   insTypeEnv s tdom
   te <- infer e
-  let result = Fix $ TypeForall (s, tdom) te
+  typeMeta <- newNameWith "meta"
+  let result = typeMeta :< NeutForall (s, tdom) te
   insTypeEnv meta result
   return result
-infer (meta :< TermApp e v) = do
+infer (meta :< NeutApp e v) = do
   te <- infer e
-  tv <- infer v
+  tdom <- infer v
   i <- newName
-  let result = Fix $ TypeHole i
+  tcod <- wrapType $ NeutHole i
   j <- newName
-  insTypeEnv j tv
-  insConstraintEnv te (Fix $ TypeForall (j, tv) result)
+  insTypeEnv j tdom
+  typeMeta2 <- newNameWith "meta"
+  insConstraintEnv te (typeMeta2 :< NeutForall (j, tdom) tcod)
+  result <- bindWithLet j tdom v tcod -- let x := v in tcod
   insTypeEnv meta result
   return result
-infer (meta :< TermProduct v1 v2) = do
-  s <- newName
-  t1 <- infer v1
-  insTypeEnv s t1
-  t2 <- infer v2
-  let result = Fix $ TypeExists (s, t1) t2
-  insTypeEnv meta result
-  return result
-infer (meta :< TermLift v) = do
-  tv <- infer v
-  insTypeEnv meta $ Fix $ TypeUp tv
-  return $ Fix $ TypeUp tv
-infer (meta :< TermBind x e1 e2) = do
+infer (meta :< NeutExists (s, tdom) tcod) = do
+  udom <- infer tdom
+  wrapUniv NeutUniv >>= \u -> insConstraintEnv udom u
+  insTypeEnv s tdom
+  ucod <- infer tcod
+  wrapUniv NeutUniv >>= \u -> insConstraintEnv ucod u
+  return $ meta :< NeutUniv
+infer (meta :< NeutPair e1 e2) = do
+  x <- newName
   t1 <- infer e1
-  i <- newName
-  insConstraintEnv t1 (Fix $ TypeUp $ Fix $ TypeHole i)
-  insTypeEnv x (Fix $ TypeHole i)
-  result <- infer e2
+  insTypeEnv x t1
+  t2 <- infer e2
+  j <- NeutHole <$> newName >>= wrapType
+  hole <- bindWithLet x t1 e1 j -- typeof(e2) == B {x := e1} == let x := e1 in HOLE
+  insConstraintEnv t2 hole
+  result <- wrapType $ NeutExists (x, t1) hole
   insTypeEnv meta result
   return result
-infer (meta :< TermThunk e)
-  | null (var e) = do
-    t <- infer e
-    let result = Fix $ TypeDown t
-    insTypeEnv meta result
-    return result
-infer (_ :< TermThunk e) =
-  lift $ throwE $ "the thunk " ++ Pr.ppShow e ++ "is not closed"
-infer (meta :< TermUnthunk v) = do
-  t <- infer v
-  i <- newName
-  let result = Fix $ TypeHole i
-  insConstraintEnv t (Fix $ TypeDown result)
+infer (meta :< NeutCase e1 (x, y) e2) = do
+  t1 <- infer e1
+  xHole <- newNameWith x >>= \x -> wrapType (NeutHole x)
+  yHole <- newNameWith y >>= \y -> wrapType (NeutHole y)
+  z <- newName
+  eMeta <- newName
+  xMeta <- newName
+  yMeta <- newName
+  let pair = eMeta :< NeutPair (xMeta :< NeutVar x) (yMeta :< NeutVar y)
+  yHole' <- bindWithLet z t1 pair yHole
+  sigmaType <- wrapType $ NeutExists (x, xHole) yHole
+  insConstraintEnv t1 sigmaType
+  t2 <- infer e2
+  insConstraintEnv yHole' t2
+  result <- bindWithLet z t1 e1 yHole
   insTypeEnv meta result
   return result
-infer (meta :< TermMu s e) = do
+infer (meta :< NeutMu s e) = do
   j <- newName
-  let trec = Fix $ TypeHole j
+  trec <- wrapType $ NeutHole j
   insTypeEnv s trec
   te <- infer e
-  insConstraintEnv (Fix $ TypeDown te) trec
+  insConstraintEnv te trec
   insTypeEnv meta te
   return te
-infer (meta :< TermCase vs vses) = do
-  tps <- mapM infer vs
-  let (vss, es) = unzip vses
-  tvss <- mapM (mapM inferPat) vss
-  forM_ tvss $ \tvs -> forM_ (zip tps tvs) $ uncurry insConstraintEnv
-  ans <- TypeHole <$> newName
-  tes <- mapM infer es
-  forM_ tes $ \te -> insConstraintEnv (Fix ans) te
-  insTypeEnv meta (Fix ans)
-  return $ Fix ans
-
-inferType :: Type -> WithEnv Type
-inferType (Fix TypeUnit) = do
-  i <- newNameWith "level"
-  return $ Fix (TypeUniv (WeakLevelHole i))
-inferType (Fix (TypeInt _)) = do
-  i <- newNameWith "level"
-  return $ Fix (TypeUniv (WeakLevelHole i))
-inferType (Fix (TypeVar _)) = do
-  i <- newNameWith "level"
-  return $ Fix (TypeUniv (WeakLevelHole i))
-inferType (Fix (TypeHole _)) = do
-  i <- newNameWith "level"
-  return $ Fix (TypeUniv (WeakLevelHole i))
-inferType (Fix (TypeUp t)) = do
-  u <- inferType t
-  i <- newNameWith "level"
-  return $ Fix (TypeUniv (WeakLevelHole i))
-inferType (Fix (TypeDown t)) = do
-  u <- inferType t
-  i <- newNameWith "level"
-  return $ Fix (TypeUniv (WeakLevelHole i))
-inferType (Fix (TypeUniv _)) = do
-  i <- newNameWith "level"
-  -- TODO: add constraint: level < i
-  return $ Fix (TypeUniv (WeakLevelHole i))
-inferType (Fix (TypeForall (s, tdom) tcod)) = do
-  insTypeEnv s tdom
-  udom <- inferType tdom
-  ucod <- inferType tcod
-  i <- newNameWith "level"
-  -- TODO: constraint: udom == ucod
-  return $ Fix (TypeUniv (WeakLevelHole i))
-inferType (Fix (TypeExists (s, tdom) tcod)) = do
-  insTypeEnv s tdom
-  udom <- inferType tdom
-  ucod <- inferType tcod
-  i <- newNameWith "level"
-  -- TODO: constraint: udom == ucod
-  return $ Fix (TypeUniv (WeakLevelHole i))
-inferType (Fix (TypeNode s ts)) = do
-  us <- mapM inferType ts
-  -- todo: constraint regarding us
-  i <- newNameWith "level"
-  return $ Fix (TypeUniv (WeakLevelHole i))
-inferType (Fix (TypeStruct ts)) = do
-  us <- mapM inferType ts
-  i <- newNameWith "level"
-  return $ Fix (TypeUniv (WeakLevelHole i))
-
-inferPat :: Pat -> WithEnv Type
-inferPat (meta :< PatHole) = do
-  t <- TypeHole <$> newName
-  insTypeEnv meta $ Fix t
-  return $ Fix t
-inferPat (meta :< PatConst x) = do
-  t <- lookupTypeEnv' x
+infer (meta :< NeutTop) = do
+  u <- wrapUniv NeutUniv
+  insTypeEnv meta u
+  return u
+infer (meta :< NeutUnit) = do
+  t <- wrapType NeutTop
   insTypeEnv meta t
   return t
-inferPat (meta :< PatVar s) = do
-  mt <- lookupTypeEnv s
-  case mt of
-    Just t -> do
-      insTypeEnv meta t
-      return t
-    _ -> do
-      i <- newName
-      insTypeEnv s $ Fix $ TypeHole i
-      insTypeEnv meta (Fix (TypeHole i))
-      return $ Fix (TypeHole i)
-inferPat (meta :< PatProduct v1 v2) = do
-  t1 <- inferPat v1
-  s <- newName
-  insTypeEnv s t1
-  t2 <- inferPat v2
-  insTypeEnv meta $ Fix $ TypeExists (s, t1) t2
-  return $ Fix $ TypeExists (s, t1) t2
+infer (meta :< NeutBottom) = do
+  u <- wrapUniv NeutUniv
+  insTypeEnv meta u
+  return u
+infer (meta :< NeutAbort e) = do
+  t <- infer e
+  t' <- wrapType NeutBottom
+  insConstraintEnv t t'
+  i <- newName
+  result <- wrapType $ NeutHole i
+  insTypeEnv meta result
+  return result
+infer (_ :< NeutUniv) = error "the level of type universe hierarchy is upto 2"
+infer (meta :< NeutHole _) = do
+  result <- wrapUniv NeutUniv
+  insTypeEnv meta result
+  return result
 
-type Subst = [(String, Type)]
+wrapUniv :: NeutF Neut -> WithEnv Neut
+wrapUniv a = do
+  meta <- newNameWith "meta"
+  return $ meta :< a
 
-type Constraint = [(Type, Type)]
+wrapType :: NeutF Neut -> WithEnv Neut
+wrapType t = do
+  meta <- newNameWith "meta"
+  u <- wrapUniv NeutUniv
+  insTypeEnv meta u
+  return $ meta :< t
+
+-- bindWithLet x tdom e1 e2 ~> let x : tdom := e1 in e2
+bindWithLet :: Identifier -> Neut -> Neut -> Neut -> WithEnv Neut
+bindWithLet x tdom e1 e2 = do
+  i <- newName
+  j <- newName
+  return $ j :< NeutApp (i :< NeutLam (x, tdom) e2) e1
+
+type Constraint = [(Neut, Neut)]
 
 unify :: Constraint -> WithEnv Subst
 unify [] = return []
-unify ((Fix (TypeHole s), t2):cs) = do
+unify ((_ :< NeutHole s, t2):cs) = do
   sub <- unify (sConstraint [(s, t2)] cs)
   return $ compose sub [(s, t2)]
-unify ((t1, Fix (TypeHole s)):cs) = do
+unify ((t1, _ :< NeutHole s):cs) = do
   sub <- unify (sConstraint [(s, t1)] cs)
   return $ compose sub [(s, t1)]
-unify ((Fix (TypeVar s1), Fix (TypeVar s2)):cs)
+unify ((_ :< NeutVar s1, _ :< NeutVar s2):cs)
   | s1 == s2 = unify cs
-unify ((Fix (TypeForall (_, tdom1) tcod1), Fix (TypeForall (_, tdom2) tcod2)):cs) =
+unify ((_ :< NeutForall (_, tdom1) tcod1, _ :< NeutForall (_, tdom2) tcod2):cs) =
   unify $ (tdom1, tdom2) : (tcod1, tcod2) : cs
-unify ((Fix (TypeExists (_, tdom1) tcod1), Fix (TypeExists (_, tdom2) tcod2)):cs) =
+unify ((_ :< NeutExists (_, tdom1) tcod1, _ :< NeutExists (_, tdom2) tcod2):cs) =
   unify $ (tdom1, tdom2) : (tcod1, tcod2) : cs
-unify ((Fix (TypeNode x ts1), Fix (TypeNode y ts2)):cs)
-  | x == y = unify $ zip ts1 ts2 ++ cs
-unify ((Fix (TypeUp t1), Fix (TypeUp t2)):cs) = unify $ (t1, t2) : cs
-unify ((Fix (TypeDown t1), Fix (TypeDown t2)):cs) = unify $ (t1, t2) : cs
-unify ((Fix (TypeUniv i), Fix (TypeUniv j)):cs) = do
-  insLEnv i j
-  unify cs
+unify ((_ :< NeutTop, _ :< NeutTop):cs) = unify cs
+unify ((_ :< NeutBottom, _ :< NeutBottom):cs) = unify cs
+unify ((_ :< NeutUniv, _ :< NeutUniv):cs) = unify cs
 unify ((t1, t2):_) =
   lift $
   throwE $
   "unification failed for:\n" ++ Pr.ppShow t1 ++ "\nand:\n" ++ Pr.ppShow t2
 
-compose :: Subst -> Subst -> Subst
-compose s1 s2 = do
-  let domS2 = map fst s2
-  let codS2 = map snd s2
-  let codS2' = map (sType s1) codS2
-  let fromS1 = filter (\(ident, _) -> ident `notElem` domS2) s1
-  fromS1 ++ zip domS2 codS2'
-
-sType :: Subst -> Type -> Type
-sType _ (Fix TypeUnit) = Fix TypeUnit
-sType _ (Fix (TypeInt i)) = Fix $ TypeInt i
-sType _ (Fix (TypeVar s)) = Fix $ TypeVar s
-sType sub (Fix (TypeHole s)) =
-  case lookup s sub of
-    Nothing -> Fix $ TypeHole s
-    Just t  -> t
-sType sub (Fix (TypeUp t)) = do
-  let t' = sType sub t
-  Fix $ TypeUp t'
-sType sub (Fix (TypeDown t)) = do
-  let t' = sType sub t
-  Fix $ TypeDown t'
-sType _ (Fix (TypeUniv i)) = Fix $ TypeUniv i
-sType sub (Fix (TypeForall (s, tdom) tcod)) = do
-  let tdom' = sType sub tdom
-  let tcod' = sType sub tcod
-  Fix $ TypeForall (s, tdom') tcod'
-sType sub (Fix (TypeExists (s, tdom) tcod)) = do
-  let tdom' = sType sub tdom
-  let tcod' = sType sub tcod
-  Fix $ TypeExists (s, tdom') tcod'
-sType sub (Fix (TypeNode s ts)) = do
-  let ts' = map (sType sub) ts
-  Fix $ TypeNode s ts'
-sType sub (Fix (TypeStruct ts)) = do
-  let ts' = map (sType sub) ts
-  Fix $ TypeStruct ts'
-
 sConstraint :: Subst -> Constraint -> Constraint
-sConstraint s = map (\(t1, t2) -> (sType s t1, sType s t2))
+sConstraint s = map (\(t1, t2) -> (subst s t1, subst s t2))
