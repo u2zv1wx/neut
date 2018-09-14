@@ -19,6 +19,7 @@ import           Data.Functor.Classes
 import           System.IO.Unsafe
 
 import           Data.List
+import           Data.Maybe                 (fromMaybe)
 
 import qualified Text.Show.Pretty           as Pr
 
@@ -40,7 +41,7 @@ data NeutF a
   = NeutVar Identifier
   | NeutForall (Identifier, a) -- forall-form
                a
-  | NeutLam Identifier -- forall-intro
+  | NeutLam (Identifier, a) -- forall-intro
             a
   | NeutApp a -- forall-elim
             a
@@ -79,7 +80,7 @@ data PosF c v
   | PosTypeUniv
 
 data NegF v c
-  = NegLam Identifier -- forall-intro
+  = NegLam (Identifier, v) -- forall-intro
            c
   | NegApp c -- forall-elim
            [Identifier]
@@ -386,7 +387,7 @@ bindFormalArgs (arg:xs) c@(metaLam :< _) = do
   univMeta <- newNameWith "meta"
   insTypeEnv univMeta (univMeta :< NeutUniv)
   insTypeEnv meta (univMeta :< NeutForall (arg, tArg) tLam)
-  return $ meta :< NeutLam arg tmp
+  return $ meta :< NeutLam (arg, tArg) tmp
 
 forallArgs :: Neut -> (Neut, [(Identifier, Neut, Identifier)])
 forallArgs (meta :< NeutForall (i, vt) t) = do
@@ -412,7 +413,7 @@ coFunAndArgs (term, (i, v):xs) = coFunAndArgs (i :< NeutApp term v, xs)
 var :: Neut -> [Identifier]
 var (_ :< NeutVar s) = [s]
 var (_ :< NeutForall (i, tdom) tcod) = var tdom ++ filter (/= i) (var tcod)
-var (_ :< NeutLam s e) = filter (/= s) $ var e
+var (_ :< NeutLam (s, tdom) e) = var tdom ++ filter (/= s) (var e)
 var (_ :< NeutApp e v) = var e ++ var v
 var (_ :< NeutExists (i, tdom) tcod) = var tdom ++ filter (/= i) (var tcod)
 var (_ :< NeutPair v1 v2) = var v1 ++ var v2
@@ -425,3 +426,51 @@ var (_ :< NeutAbort e) = var e
 var (_ :< NeutUniv) = []
 var (_ :< NeutMu s e) = filter (/= s) (var e)
 var (_ :< NeutHole _) = []
+
+type Subst = [(Identifier, Neut)]
+
+subst :: Subst -> Neut -> Neut
+subst _ (j :< NeutVar s) = j :< NeutVar s
+subst sub (j :< NeutForall (s, tdom) tcod) = do
+  let tdom' = subst sub tdom
+  let tcod' = subst sub tcod -- note that we don't have to drop s from sub, thanks to rename.
+  j :< NeutForall (s, tdom') tcod'
+subst sub (j :< NeutLam (s, tdom) body) = do
+  let tdom' = subst sub tdom
+  let body' = subst sub body
+  j :< NeutLam (s, tdom') body'
+subst sub (j :< NeutApp e1 e2) = do
+  let e1' = subst sub e1
+  let e2' = subst sub e2
+  j :< NeutApp e1' e2'
+subst sub (j :< NeutExists (s, tdom) tcod) = do
+  let tdom' = subst sub tdom
+  let tcod' = subst sub tcod
+  j :< NeutExists (s, tdom') tcod'
+subst sub (j :< NeutPair e1 e2) = do
+  let e1' = subst sub e1
+  let e2' = subst sub e2
+  j :< NeutPair e1' e2'
+subst sub (j :< NeutCase e1 (x, y) e2) = do
+  let e1' = subst sub e1
+  let e2' = subst sub e2
+  j :< NeutCase e1' (x, y) e2'
+subst _ (j :< NeutTop) = j :< NeutTop
+subst _ (j :< NeutUnit) = j :< NeutUnit
+subst _ (j :< NeutBottom) = j :< NeutBottom
+subst sub (j :< NeutAbort e) = do
+  let e' = subst sub e
+  j :< NeutAbort e'
+subst _ (j :< NeutUniv) = j :< NeutUniv
+subst sub (j :< NeutMu x e) = do
+  let e' = subst sub e
+  j :< NeutMu x e'
+subst sub (j :< NeutHole s) = fromMaybe (j :< NeutHole s) (lookup s sub)
+
+compose :: Subst -> Subst -> Subst
+compose s1 s2 = do
+  let domS2 = map fst s2
+  let codS2 = map snd s2
+  let codS2' = map (subst s1) codS2
+  let fromS1 = filter (\(ident, _) -> ident `notElem` domS2) s1
+  fromS1 ++ zip domS2 codS2'
