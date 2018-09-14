@@ -48,8 +48,8 @@ data NeutF a
                a
   | NeutPair a -- exists-intro
              a
-  | NeutCase (Identifier, Identifier) -- exists-elim
-             a
+  | NeutCase a
+             (Identifier, Identifier) -- exists-elim
              a
   | NeutTop -- top-form
   | NeutUnit -- top-intro
@@ -83,8 +83,8 @@ data NegF v c
            c
   | NegApp c -- forall-elim
            [Identifier]
-  | NegCase (Identifier, Identifier) -- exists-elim
-            v
+  | NegCase v
+            (Identifier, Identifier) -- exists-elim
             c
   | NegAbort c -- bottom-elim
   | NegReturn v -- up-intro
@@ -416,12 +416,12 @@ var (_ :< NeutLam s e) = filter (/= s) $ var e
 var (_ :< NeutApp e v) = var e ++ var v
 var (_ :< NeutExists (i, tdom) tcod) = var tdom ++ filter (/= i) (var tcod)
 var (_ :< NeutPair v1 v2) = var v1 ++ var v2
+var (_ :< NeutCase e1 (x, y) e2) =
+  var e1 ++ filter (\s -> s /= x && s /= y) (var e2)
 var (_ :< NeutTop) = []
 var (_ :< NeutUnit) = []
 var (_ :< NeutBottom) = []
 var (_ :< NeutAbort e) = var e
 var (_ :< NeutUniv) = []
 var (_ :< NeutMu s e) = filter (/= s) (var e)
-var (_ :< NeutCase (x, y) e1 e2) =
-  var e1 ++ filter (\s -> s /= x && s /= y) (var e2)
 var (_ :< NeutHole _) = []
