@@ -9,86 +9,88 @@ import           Control.Monad.Trans.Except
 
 import           Data
 
-lift :: Term -> WithEnv Term
-lift v@(_ :< TermVar _) = return v
-lift v@(_ :< TermConst _) = return v
-lift (i :< TermLam arg body) = do
+lift :: Neut -> WithEnv Neut
+lift v@(_ :< NeutVar _) = return v
+lift (i :< NeutForall (x, tdom) tcod) = do
+  tdom' <- lift tdom
+  tcod' <- lift tcod
+  return $ i :< NeutForall (x, tdom') tcod'
+lift (i :< NeutLam arg body) = do
   body' <- lift body
   let freeVars = var body'
   newFormalArgs <- constructFormalArgs freeVars
   let freeToBound = zip freeVars newFormalArgs
   body'' <- replace freeToBound body'
-  lam' <- bindFormalArgs newFormalArgs $ i :< TermLam arg body''
+  lam' <- bindFormalArgs newFormalArgs $ i :< NeutLam arg body''
   args <- mapM wrapArg freeVars
   appFold lam' args
-lift (i :< TermApp e v) = do
+lift (i :< NeutApp e v) = do
   e' <- lift e
   v' <- lift v
-  return $ i :< TermApp e' v'
-lift (i :< TermProduct v1 v2) = do
+  return $ i :< NeutApp e' v'
+lift (i :< NeutExists (x, tdom) tcod) = do
+  tdom' <- lift tdom
+  tcod' <- lift tcod
+  return $ i :< NeutExists (x, tdom') tcod'
+lift (i :< NeutPair v1 v2) = do
   v1' <- lift v1
   v2' <- lift v2
-  return $ i :< TermProduct v1' v2'
-lift (i :< TermThunk c) = do
+  return $ i :< NeutPair v1' v2'
+lift (i :< NeutCase e1 (x, y) e2) = do
+  e1' <- lift e1
+  e2' <- lift e2
+  return $ i :< NeutCase e1' (x, y) e2'
+lift (i :< NeutTop) = return $ i :< NeutTop
+lift (i :< NeutUnit) = return $ i :< NeutUnit
+lift (i :< NeutBottom) = return $ i :< NeutBottom
+lift (i :< NeutAbort e) = do
+  e' <- lift e
+  return $ i :< NeutAbort e'
+lift (i :< NeutUniv) = return $ i :< NeutUniv
+lift (i :< NeutHole x) = return $ i :< NeutHole x
+lift (meta :< NeutMu s c) = do
   c' <- lift c
-  return $ i :< TermThunk c'
-lift (i :< TermUnthunk c) = do
-  c' <- lift c
-  return $ i :< TermUnthunk c'
-lift (i :< TermLift v) = do
-  v' <- lift v
-  return $ i :< TermLift v'
-lift (i :< TermBind s c1 c2) = do
-  c1' <- lift c1
-  c2' <- lift c2
-  return $ i :< TermBind s c1' c2'
-lift (meta :< TermMu s c) = do
-  c' <- lift c
-  return $ meta :< TermMu s c'
-lift (i :< TermCase vs vcs) = do
-  vs' <- mapM lift vs
-  let (patList, bodyList) = unzip vcs
-  bodyList' <- mapM lift bodyList
-  return $ i :< TermCase vs' (zip patList bodyList')
+  return $ meta :< NeutMu s c'
 
-replace :: [(Identifier, Identifier)] -> Term -> WithEnv Term
-replace f2b (i :< TermVar s) =
+replace :: [(Identifier, Identifier)] -> Neut -> WithEnv Neut
+replace f2b (i :< NeutVar s) =
   case lookup s f2b of
-    Nothing -> return $ i :< TermVar s
+    Nothing -> return $ i :< NeutVar s
     Just b -> do
       t <- lookupTypeEnv' i
       insTypeEnv b t
-      return $ i :< TermVar b
-replace _ v@(_ :< TermConst _) = return v
-replace args (i :< TermThunk c) = do
-  c' <- replace args c
-  return $ i :< TermThunk c'
-replace args (i :< TermLam x e) = do
+      return $ i :< NeutVar b
+replace args (i :< NeutForall (x, tdom) tcod) = do
+  tdom' <- replace args tdom
+  tcod' <- replace args tcod
+  return $ i :< NeutForall (x, tdom') tcod'
+replace args (i :< NeutLam x e) = do
   e' <- replace args e
-  return $ i :< TermLam x e'
-replace args (i :< TermApp e v) = do
+  return $ i :< NeutLam x e'
+replace args (i :< NeutApp e v) = do
   e' <- replace args e
   v' <- replace args v
-  return $ i :< TermApp e' v'
-replace args (i :< TermProduct v1 v2) = do
+  return $ i :< NeutApp e' v'
+replace args (i :< NeutExists (x, tdom) tcod) = do
+  tdom' <- replace args tdom
+  tcod' <- replace args tcod
+  return $ i :< NeutExists (x, tdom') tcod'
+replace args (i :< NeutPair v1 v2) = do
   v1' <- replace args v1
   v2' <- replace args v2
-  return $ i :< TermProduct v1' v2'
-replace args (i :< TermLift v) = do
-  v' <- replace args v
-  return $ i :< TermLift v'
-replace args (i :< TermBind x e1 e2) = do
+  return $ i :< NeutPair v1' v2'
+replace args (i :< NeutCase e1 (x, y) e2) = do
   e1' <- replace args e1
   e2' <- replace args e2
-  return $ i :< TermBind x e1' e2'
-replace args (i :< TermUnthunk v) = do
-  v' <- replace args v
-  return $ i :< TermUnthunk v'
-replace args (i :< TermMu s c) = do
+  return $ i :< NeutCase e1' (x, y) e2'
+replace args (i :< NeutMu s c) = do
   c' <- replace args c
-  return $ i :< TermMu s c'
-replace args (i :< TermCase vs vcs) = do
-  vs' <- mapM (replace args) vs
-  let (patList, bodyList) = unzip vcs
-  bodyList' <- mapM (replace args) bodyList
-  return $ i :< TermCase vs' (zip patList bodyList')
+  return $ i :< NeutMu s c'
+replace _ (i :< NeutTop) = return $ i :< NeutTop
+replace _ (i :< NeutUnit) = return $ i :< NeutUnit
+replace _ (i :< NeutBottom) = return $ i :< NeutBottom
+replace args (i :< NeutAbort e) = do
+  e' <- replace args e
+  return $ i :< NeutAbort e'
+replace _ (i :< NeutUniv) = return $ i :< NeutUniv
+replace _ (i :< NeutHole x) = return $ i :< NeutHole x
