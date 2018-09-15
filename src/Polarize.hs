@@ -1,4 +1,6 @@
-module Polarize where
+module Polarize
+  ( polarize
+  ) where
 
 import           Control.Monad
 
@@ -10,63 +12,124 @@ import           Control.Monad.Trans.Except
 import qualified Text.Show.Pretty           as Pr
 
 import           Data
-import           Pattern
 
-polarize :: Term -> WithEnv PolarizedTerm
-polarize (i :< TermVar s) =
-  return $ PolarizedTermValue $ Value $ i :< ValueVar s
-polarize (i :< TermConst s) =
-  return $ PolarizedTermValue $ Value $ i :< ValueConst s
-polarize (i :< TermLam s e) = do
-  Comp c <- polarize e >>= toComp
-  return $ PolarizedTermComp $ Comp $ i :< CompLam s c
-polarize (i :< TermApp e1 e2) = do
-  Comp c <- polarize e1 >>= toComp
-  v <- polarize e2 >>= toValue
-  return $ PolarizedTermComp $ Comp $ i :< CompApp c v
-polarize (i :< TermProduct v1 v2) = do
-  Value v1' <- polarize v1 >>= toValue
-  Value v2' <- polarize v2 >>= toValue
-  return $ PolarizedTermValue $ Value $ i :< ValueProduct v1' v2'
-polarize (i :< TermLift e) = do
-  v <- polarize e >>= toValue
-  return $ PolarizedTermComp $ Comp $ i :< CompLift v
-polarize (i :< TermBind s e1 e2) = do
-  Comp c1 <- polarize e1 >>= toComp
-  Comp c2 <- polarize e2 >>= toComp
-  return $ PolarizedTermComp $ Comp $ i :< CompBind s c1 c2
-polarize (i :< TermThunk e) = do
-  c <- polarize e >>= toComp
-  return $ PolarizedTermValue $ Value $ i :< ValueThunk c
-polarize (i :< TermUnthunk e) = do
-  v <- polarize e >>= toValue
-  return $ PolarizedTermComp $ Comp $ i :< CompUnthunk v
-polarize (i :< TermMu s e) = do
-  Comp c <- polarize e >>= toComp
-  return $ PolarizedTermComp $ Comp $ i :< CompMu s c
-polarize (i :< TermCase vs ves) = do
-  ves' <- polarizeClause ves
-  vs' <- mapM polarize vs >>= mapM toValue
-  let vesMod = patDist ves'
-  let indexList = map (const []) vs
-  let metaList = map (\(meta :< _) -> meta) vs
-  typeList <- mapM lookupTypeEnv' metaList
-  let initialOccurences = zip indexList typeList
-  decisionTree <- toDecision initialOccurences vesMod
-  return $ PolarizedTermComp $ Comp $ i :< CompDecision vs' decisionTree
-
-toValue :: PolarizedTerm -> WithEnv Value
-toValue (PolarizedTermValue (Value c)) = return $ Value c
-toValue e = lift $ throwE $ "the polarity of " ++ show e ++ " is wrong"
-
-toComp :: PolarizedTerm -> WithEnv Comp
-toComp (PolarizedTermComp (Comp c)) = return $ Comp c
-toComp e = lift $ throwE $ "the polarity of " ++ show e ++ " is wrong"
-
-polarizeClause :: [([Pat], Term)] -> WithEnv [([Pat], PreComp)]
-polarizeClause [] = return []
-polarizeClause ((patList, e):ves) = do
+polarize :: Neut -> WithEnv Term
+polarize (i :< NeutVar s) = do
+  t <- lookupTypeEnv' i >>= polarize >>= toPos
+  insPolTypeEnv i t
+  (j, _) <- newNameOfTypeUp t
+  return $ Comp $ Neg $ j :< (NegReturn $ Pos $ i :< PosVar s)
+polarize (i :< NeutForall (x, tdom) tcod) = do
+  Pos tdom' <- polarize tdom >>= toPos
+  Pos tcod' <- polarize tcod >>= toPos
+  return $
+    Value $ Pos $ i :< PosDown (i :< PosForall (x, tdom') (i :< PosUp tcod'))
+polarize (i :< NeutLam (s, _) e) = do
+  Neg c <- polarize e >>= toNeg
+  t <- lookupTypeEnv' i >>= polarize >>= toPos
+  insPolTypeEnv i t
+  (thunk, t') <- newNameOfTypeDown t
+  (ret, _) <- newNameOfTypeUp t'
+  return $
+    Comp $
+    Neg $ ret :< (NegReturn $ Pos $ thunk :< (PosThunk $ Neg $ i :< NegLam s c))
+polarize e@(i :< NeutApp _ _) = do
+  t <- lookupTypeEnv' i >>= polarize >>= toPos
+  (j, _) <- newNameOfTypeUp t
+  (fun@(funMeta :< _), identArgList) <- funAndArgsPol e
+  formalArgs <- mapM (const newName) identArgList
+  let (_, argList) = unzip identArgList
+  let metaList = map (\(i :< _) -> i) argList
+  let args = map (\(i, x) -> Pos $ i :< PosVar x) $ zip metaList formalArgs
+  funName <- newName
+  bindSeq
+    j
+    (zip formalArgs argList ++ [(funName, fun)])
+    (Neg $
+     j :< NegApp (funMeta :< NegForce (Pos $ funMeta :< PosVar funName)) args)
+polarize (i :< NeutExists (x, tdom) tcod) = do
+  Pos tdom' <- polarize tdom >>= toPos
+  Pos tcod' <- polarize tcod >>= toPos
+  return $ Value $ Pos $ i :< PosExists (x, tdom') tcod'
+polarize (i :< NeutPair v1@(meta1 :< _) v2@(meta2 :< _)) = do
+  t <- lookupTypeEnv' i >>= polarize >>= toPos
+  (j, _) <- newNameOfTypeUp t
+  x <- newName
+  y <- newName
+  bindSeq
+    j
+    [(x, v1), (y, v2)]
+    (Neg $
+     j :< NegReturn (Pos $ i :< PosPair (meta1 :< PosVar x) (meta2 :< PosVar y)))
+polarize (i :< NeutCase e1@(meta1 :< _) (x, y) e2) = do
+  t <- lookupTypeEnv' i >>= polarize >>= toPos
+  (j, _) <- newNameOfTypeUp t
+  Neg e2' <- polarize e2 >>= toNeg
+  z <- newName
+  bindSeq j [(z, e1)] (Neg $ j :< NegCase (Pos $ meta1 :< PosVar z) (x, y) e2')
+polarize (i :< NeutTop) = return $ Value $ Pos $ i :< PosTop
+polarize (i :< NeutUnit) = do
+  t <- lookupTypeEnv' i >>= polarize >>= toPos
+  insPolTypeEnv i t
+  return $ Value $ Pos $ i :< PosUnit
+polarize (i :< NeutBottom) = return $ Value $ Pos $ i :< PosBottom
+polarize (i :< NeutAbort e) = do
+  t <- lookupTypeEnv' i >>= polarize >>= toPos
+  insPolTypeEnv i t
+  (thunk, t') <- newNameOfTypeDown t
+  (ret, _) <- newNameOfTypeUp t'
+  Neg e' <- polarize e >>= toNeg
+  return $
+    Comp $
+    Neg $
+    ret :< (NegReturn $ Pos $ thunk :< (PosThunk $ Neg $ i :< NegAbort e'))
+polarize (i :< NeutUniv) = return $ Value $ Pos $ i :< PosUniv
+polarize (_ :< NeutHole x) = error $ "Polarize.polarize: remaining hole: " ++ x
+polarize (i :< NeutMu s e) = do
+  t <- lookupTypeEnv' i >>= polarize >>= toPos
+  (_, t') <- newNameOfTypeUp t
+  insPolTypeEnv i t'
   e' <- polarize e
-  Comp c <- toComp e'
-  ves' <- polarizeClause ves
-  return $ (patList, c) : ves'
+  insTermEnv s e'
+  return e'
+
+toPos :: Term -> WithEnv Pos
+toPos (Value (Pos c)) = return $ Pos c
+toPos e = lift $ throwE $ "the polarity of " ++ show e ++ " is wrong"
+
+toNeg :: Term -> WithEnv Neg
+toNeg (Comp (Neg c)) = return $ Neg c
+toNeg e = lift $ throwE $ "the polarity of " ++ show e ++ " is wrong"
+
+bindSeq :: Identifier -> [(Identifier, Neut)] -> Neg -> WithEnv Term
+bindSeq _ [] fun = return $ Comp fun
+bindSeq i ((formalArg, arg@(meta :< _)):rest) fun = do
+  t <- lookupTypeEnv' meta >>= polarize >>= toPos
+  insPolTypeEnv formalArg t
+  Neg arg' <- polarize arg >>= toNeg
+  Neg fun' <- bindSeq i rest fun >>= toNeg
+  return $ Comp $ Neg $ i :< NegBind formalArg arg' fun'
+
+funAndArgsPol :: Neut -> WithEnv (Neut, [(Identifier, Neut)])
+funAndArgsPol (i :< NeutApp e v) = do
+  (fun, xs) <- funAndArgsPol e
+  return (fun, (i, v) : xs)
+funAndArgsPol c = return (c, [])
+
+newNameOfTypeUp :: Pos -> WithEnv (Identifier, Pos)
+newNameOfTypeUp (Pos t) = do
+  meta <- newName
+  x <- newNameOfType (Pos $ meta :< PosUp t)
+  return (x, Pos $ meta :< PosUp t)
+
+newNameOfTypeDown :: Pos -> WithEnv (Identifier, Pos)
+newNameOfTypeDown (Pos t) = do
+  meta <- newName
+  x <- newNameOfType (Pos $ meta :< PosDown t)
+  return (x, Pos $ meta :< PosDown t)
+
+newNameOfType :: Pos -> WithEnv Identifier
+newNameOfType t = do
+  i <- newName
+  insPolTypeEnv i t
+  return i
