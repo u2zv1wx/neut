@@ -95,8 +95,6 @@ data NegF v c
             c
             c
   | NegForce v -- down-elim
-  | NegMu Identifier -- recursion
-          c
 
 $(deriveShow1 ''PosF)
 
@@ -195,6 +193,8 @@ data Env = Env
   , reservedEnv   :: [Identifier] -- list of reserved keywords
   , nameEnv       :: [(Identifier, Identifier)] -- used in alpha conversion
   , typeEnv       :: [(Identifier, Neut)] -- type environment
+  , polTypeEnv    :: [(Identifier, Pos)] -- polarized type environment
+  , termEnv       :: [(Identifier, Term)]
   , constraintEnv :: [(Neut, Neut)] -- used in type inference
   , codeEnv       :: [(Identifier, ([Identifier], Code))]
   } deriving (Show)
@@ -220,6 +220,8 @@ initialEnv =
         ]
     , nameEnv = []
     , typeEnv = []
+    , polTypeEnv = []
+    , termEnv = []
     , constraintEnv = []
     , codeEnv = []
     }
@@ -268,6 +270,38 @@ lookupTypeEnv' s = do
       Pr.ppShow (typeEnv env)
     Just t -> return t
 
+lookupPolTypeEnv :: String -> WithEnv (Maybe Pos)
+lookupPolTypeEnv s = gets (lookup s . polTypeEnv)
+
+lookupPolTypeEnv' :: String -> WithEnv Pos
+lookupPolTypeEnv' s = do
+  mt <- gets (lookup s . polTypeEnv)
+  env <- get
+  case mt of
+    Nothing ->
+      lift $
+      throwE $
+      s ++
+      " is not found in the type environment. typeenv: " ++
+      Pr.ppShow (typeEnv env)
+    Just t -> return t
+
+lookupTermEnv :: String -> WithEnv (Maybe Term)
+lookupTermEnv s = gets (lookup s . termEnv)
+
+lookupTermEnv' :: String -> WithEnv Term
+lookupTermEnv' s = do
+  mt <- gets (lookup s . termEnv)
+  env <- get
+  case mt of
+    Nothing ->
+      lift $
+      throwE $
+      s ++
+      " is not found in the term environment. termenv: " ++
+      Pr.ppShow (termEnv env)
+    Just t -> return t
+
 lookupNameEnv :: String -> WithEnv String
 lookupNameEnv s = do
   env <- get
@@ -291,6 +325,12 @@ lookupCodeEnv funName = do
 
 insTypeEnv :: Identifier -> Neut -> WithEnv ()
 insTypeEnv i t = modify (\e -> e {typeEnv = (i, t) : typeEnv e})
+
+insTermEnv :: Identifier -> Term -> WithEnv ()
+insTermEnv i t = modify (\e -> e {termEnv = (i, t) : termEnv e})
+
+insPolTypeEnv :: Identifier -> Pos -> WithEnv ()
+insPolTypeEnv i t = modify (\e -> e {polTypeEnv = (i, t) : polTypeEnv e})
 
 insCodeEnv :: Identifier -> [Identifier] -> Code -> WithEnv ()
 insCodeEnv funName args body =
@@ -472,7 +512,8 @@ subst sub (j :< NeutHole s) = fromMaybe (j :< NeutHole s) (lookup s sub)
 type SubstPos = [(Identifier, Pos)]
 
 substPos :: SubstPos -> Pos -> Pos
-substPos _ (Pos (j :< PosVar s)) = Pos $ j :< PosVar s
+substPos sub (Pos (j :< PosVar s)) =
+  fromMaybe (Pos $ j :< PosVar s) (lookup s sub)
 substPos sub (Pos (j :< PosForall (s, tdom) tcod)) = do
   let Pos tdom' = substPos sub $ Pos tdom
   let Pos tcod' = substPos sub $ Pos tcod
@@ -524,9 +565,6 @@ substNeg sub (Neg (j :< NegForce v)) = do
 substNeg sub (Neg (j :< NegAbort e)) = do
   let Neg e' = substNeg sub $ Neg e
   Neg $ j :< NegAbort e'
-substNeg sub (Neg (j :< NegMu x e)) = do
-  let Neg e' = substNeg sub $ Neg e
-  Neg $ j :< NegMu x e'
 
 compose :: Subst -> Subst -> Subst
 compose s1 s2 = do

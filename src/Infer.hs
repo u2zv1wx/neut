@@ -126,18 +126,6 @@ returnMeta meta t = do
   insTypeEnv meta t
   return t
 
-wrapUniv :: NeutF Neut -> WithEnv Neut
-wrapUniv a = do
-  meta <- newNameWith "meta"
-  return $ meta :< a
-
-wrapType :: NeutF Neut -> WithEnv Neut
-wrapType t = do
-  meta <- newNameWith "meta"
-  u <- wrapUniv NeutUniv
-  insTypeEnv meta u
-  return $ meta :< t
-
 type Constraint = [(Neut, Neut)]
 
 unifyLoop :: Constraint -> Int -> WithEnv Subst
