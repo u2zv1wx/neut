@@ -67,25 +67,25 @@ $(deriveShow1 ''NeutF)
 
 data PosF c v
   = PosVar Identifier
-  | PosTypeForall (Identifier, v) -- forall-form
-                  v
-  | PosTypeExists (Identifier, v) -- exists-form
-                  v
+  | PosForall (Identifier, v) -- forall-form
+              v
+  | PosExists (Identifier, v) -- exists-form
+              v
   | PosPair v -- exists-intro
             v
-  | PosTypeTop -- top-form
+  | PosTop -- top-form
   | PosUnit -- top-intro
-  | PosTypeBottom -- bottom-form
+  | PosBottom -- bottom-form
   | PosDown v -- down-form
   | PosThunk c -- down-intro
   | PosUp v -- up-form
-  | PosTypeUniv
+  | PosUniv
 
 data NegF v c
   = NegLam Identifier -- forall-intro
            c
   | NegApp c -- forall-elim
-           [Identifier]
+           [v]
   | NegCase v
             (Identifier, Identifier) -- exists-elim
             c
@@ -94,7 +94,7 @@ data NegF v c
   | NegBind Identifier -- up-elim
             c
             c
-  | NegForce Identifier -- down-elim
+  | NegForce v -- down-elim
   | NegMu Identifier -- recursion
           c
 
@@ -469,6 +469,65 @@ subst sub (j :< NeutMu x e) = do
   j :< NeutMu x e'
 subst sub (j :< NeutHole s) = fromMaybe (j :< NeutHole s) (lookup s sub)
 
+type SubstPos = [(Identifier, Pos)]
+
+substPos :: SubstPos -> Pos -> Pos
+substPos _ (Pos (j :< PosVar s)) = Pos $ j :< PosVar s
+substPos sub (Pos (j :< PosForall (s, tdom) tcod)) = do
+  let Pos tdom' = substPos sub $ Pos tdom
+  let Pos tcod' = substPos sub $ Pos tcod
+  Pos $ j :< PosForall (s, tdom') tcod'
+substPos sub (Pos (j :< PosExists (s, tdom) tcod)) = do
+  let Pos tdom' = substPos sub $ Pos tdom
+  let Pos tcod' = substPos sub $ Pos tcod
+  Pos $ j :< PosExists (s, tdom') tcod'
+substPos sub (Pos (j :< PosPair e1 e2)) = do
+  let Pos e1' = substPos sub $ Pos e1
+  let Pos e2' = substPos sub $ Pos e2
+  Pos $ j :< PosPair e1' e2'
+substPos sub (Pos (j :< PosDown t)) = do
+  let Pos t' = substPos sub $ Pos t
+  Pos $ j :< PosDown t'
+substPos sub (Pos (j :< PosThunk e)) = do
+  let e' = substNeg sub e
+  Pos $ j :< PosThunk e'
+substPos sub (Pos (j :< PosUp t)) = do
+  let Pos t' = substPos sub $ Pos t
+  Pos $ j :< PosUp t'
+substPos _ (Pos (j :< PosTop)) = Pos $ j :< PosTop
+substPos _ (Pos (j :< PosUnit)) = Pos $ j :< PosUnit
+substPos _ (Pos (j :< PosBottom)) = Pos $ j :< PosBottom
+substPos _ (Pos (j :< PosUniv)) = Pos $ j :< PosUniv
+
+substNeg :: SubstPos -> Neg -> Neg
+substNeg sub (Neg (j :< NegLam s body)) = do
+  let Neg body' = substNeg sub $ Neg body
+  Neg $ j :< NegLam s body'
+substNeg sub (Neg (j :< NegApp e1 vs)) = do
+  let Neg e1' = substNeg sub $ Neg e1
+  let vs' = map (substPos sub) vs
+  Neg $ j :< NegApp e1' vs'
+substNeg sub (Neg (j :< NegCase v (x, y) e)) = do
+  let v' = substPos sub v
+  let Neg e' = substNeg sub $ Neg e
+  Neg $ j :< NegCase v' (x, y) e'
+substNeg sub (Neg (j :< NegReturn v)) = do
+  let v' = substPos sub v
+  Neg $ j :< NegReturn v'
+substNeg sub (Neg (j :< NegBind x e1 e2)) = do
+  let Neg e1' = substNeg sub $ Neg e1
+  let Neg e2' = substNeg sub $ Neg e2
+  Neg $ j :< NegBind x e1' e2'
+substNeg sub (Neg (j :< NegForce v)) = do
+  let v' = substPos sub v
+  Neg $ j :< NegForce v'
+substNeg sub (Neg (j :< NegAbort e)) = do
+  let Neg e' = substNeg sub $ Neg e
+  Neg $ j :< NegAbort e'
+substNeg sub (Neg (j :< NegMu x e)) = do
+  let Neg e' = substNeg sub $ Neg e
+  Neg $ j :< NegMu x e'
+
 compose :: Subst -> Subst -> Subst
 compose s1 s2 = do
   let domS2 = map fst s2
@@ -518,14 +577,15 @@ pendSubst ((x, e1):rest) e = do
   e' <- pendSubst rest e
   bindWithLet x e1 e'
 
-wrapUniv :: NeutF Neut -> WithEnv Neut
-wrapUniv a = do
+-- wrap :: NeutF Neut -> WithEnv Neut
+wrap :: f (Cofree f Identifier) -> WithEnv (Cofree f Identifier)
+wrap a = do
   meta <- newNameWith "meta"
   return $ meta :< a
 
 wrapType :: NeutF Neut -> WithEnv Neut
 wrapType t = do
   meta <- newNameWith "meta"
-  u <- wrapUniv NeutUniv
+  u <- wrap NeutUniv
   insTypeEnv meta u
   return $ meta :< t
