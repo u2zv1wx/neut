@@ -24,65 +24,46 @@ polarize (i :< NeutForall (x, tdom) tcod) = do
   Pos tcod' <- polarize tcod >>= toPos
   return $
     Value $ Pos $ i :< PosDown (i :< PosForall (x, tdom') (i :< PosUp tcod'))
-polarize (i :< NeutLam (s, _) e) = do
-  Neg c <- polarize e >>= toNeg
+polarize lam@(i :< NeutLam _ _) = do
+  (body, args) <- toLamSeq lam
+  c <- polarize body >>= toNeg
   t <- lookupTypeEnv' i >>= polarize >>= toPos
   insPolTypeEnv i t
   (thunk, t') <- newNameOfTypeDown t
   (ret, _) <- newNameOfTypeUp t'
-  return $
-    Comp $
-    Neg $ ret :< (NegReturn $ Pos $ thunk :< (PosThunk $ Neg $ i :< NegLam s c))
+  return $ Comp $ Neg $ ret :< (NegReturn $ Pos $ thunk :< PosThunkLam args c)
 polarize e@(i :< NeutApp _ _) = do
   t <- lookupTypeEnv' i >>= polarize >>= toPos
   (j, _) <- newNameOfTypeUp t
-  (fun@(funMeta :< _), identArgList) <- funAndArgsPol e
+  (fun, identArgList) <- funAndArgsPol e
   formalArgs <- mapM (const newName) identArgList
   let (_, argList) = unzip identArgList
-  let metaList = map (\(i :< _) -> i) argList
-  let args = map (\(i, x) -> Pos $ i :< PosVar x) $ zip metaList formalArgs
-  funName <- newName
+  funName <- newNameWith "fun"
   bindSeq
     j
     (zip formalArgs argList ++ [(funName, fun)])
-    (Neg $
-     j :< NegApp (funMeta :< NegForce (Pos $ funMeta :< PosVar funName)) args)
+    (Neg $ j :< NegAppForce funName formalArgs)
 polarize (i :< NeutExists (x, tdom) tcod) = do
   Pos tdom' <- polarize tdom >>= toPos
   Pos tcod' <- polarize tcod >>= toPos
   return $ Value $ Pos $ i :< PosExists (x, tdom') tcod'
-polarize (i :< NeutPair v1@(meta1 :< _) v2@(meta2 :< _)) = do
+polarize (i :< NeutPair v1 v2) = do
   t <- lookupTypeEnv' i >>= polarize >>= toPos
   (j, _) <- newNameOfTypeUp t
   x <- newName
   y <- newName
-  bindSeq
-    j
-    [(x, v1), (y, v2)]
-    (Neg $
-     j :< NegReturn (Pos $ i :< PosPair (meta1 :< PosVar x) (meta2 :< PosVar y)))
-polarize (i :< NeutCase e1@(meta1 :< _) (x, y) e2) = do
+  bindSeq j [(x, v1), (y, v2)] (Neg $ j :< NegReturn (Pos $ i :< PosPair x y))
+polarize (i :< NeutCase e1 (x, y) e2) = do
   t <- lookupTypeEnv' i >>= polarize >>= toPos
   (j, _) <- newNameOfTypeUp t
   Neg e2' <- polarize e2 >>= toNeg
   z <- newName
-  bindSeq j [(z, e1)] (Neg $ j :< NegCase (Pos $ meta1 :< PosVar z) (x, y) e2')
+  bindSeq j [(z, e1)] (Neg $ j :< NegCase z (x, y) e2')
 polarize (i :< NeutTop) = return $ Value $ Pos $ i :< PosTop
 polarize (i :< NeutUnit) = do
   t <- lookupTypeEnv' i >>= polarize >>= toPos
   insPolTypeEnv i t
   return $ Value $ Pos $ i :< PosUnit
-polarize (i :< NeutBottom) = return $ Value $ Pos $ i :< PosBottom
-polarize (i :< NeutAbort e) = do
-  t <- lookupTypeEnv' i >>= polarize >>= toPos
-  insPolTypeEnv i t
-  (thunk, t') <- newNameOfTypeDown t
-  (ret, _) <- newNameOfTypeUp t'
-  Neg e' <- polarize e >>= toNeg
-  return $
-    Comp $
-    Neg $
-    ret :< (NegReturn $ Pos $ thunk :< (PosThunk $ Neg $ i :< NegAbort e'))
 polarize (i :< NeutUniv) = return $ Value $ Pos $ i :< PosUniv
 polarize (_ :< NeutHole x) = error $ "Polarize.polarize: remaining hole: " ++ x
 polarize (i :< NeutMu s e) = do
@@ -133,3 +114,9 @@ newNameOfType t = do
   i <- newName
   insPolTypeEnv i t
   return i
+
+toLamSeq :: Neut -> WithEnv (Neut, [Identifier])
+toLamSeq (_ :< NeutLam (x, _) body) = do
+  (body', args) <- toLamSeq body
+  return (body', x : args)
+toLamSeq t = return (t, [])

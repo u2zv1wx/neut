@@ -36,10 +36,6 @@ expand (i :< NeutCase e1 (x, y) e2) = do
   expand' 0 $ i :< NeutCase e1' (x, y) e2'
 expand (i :< NeutTop) = return $ i :< NeutTop
 expand (i :< NeutUnit) = return $ i :< NeutUnit
-expand (i :< NeutBottom) = return $ i :< NeutBottom
-expand (i :< NeutAbort e) = do
-  e' <- expand e
-  expand' 0 $ i :< NeutAbort e'
 expand (i :< NeutUniv) = return $ i :< NeutUniv
 expand (i :< NeutHole x) = return $ i :< NeutHole x
 expand (meta :< NeutMu s c) = do

@@ -54,8 +54,6 @@ data NeutF a
              a
   | NeutTop -- top-form
   | NeutUnit -- top-intro
-  | NeutBottom -- bottom-form
-  | NeutAbort a -- bottom-elim
   | NeutUniv
   | NeutMu Identifier -- recursion
            a
@@ -71,30 +69,26 @@ data PosF c v
               v
   | PosExists (Identifier, v) -- exists-form
               v
-  | PosPair v -- exists-intro
-            v
+  | PosPair Identifier -- exists-intro
+            Identifier
   | PosTop -- top-form
   | PosUnit -- top-intro
-  | PosBottom -- bottom-form
   | PosDown v -- down-form
-  | PosThunk c -- down-intro
+  | PosThunkLam [Identifier]
+                c
   | PosUp v -- up-form
   | PosUniv
 
 data NegF v c
-  = NegLam Identifier -- forall-intro
-           c
-  | NegApp c -- forall-elim
-           [v]
-  | NegCase v
+  = NegAppForce Identifier
+                [Identifier]
+  | NegCase Identifier
             (Identifier, Identifier) -- exists-elim
             c
-  | NegAbort c -- bottom-elim
   | NegReturn v -- up-intro
   | NegBind Identifier -- up-elim
             c
             c
-  | NegForce v -- down-elim
 
 $(deriveShow1 ''PosF)
 
@@ -125,6 +119,7 @@ data Data
   | DataElemAtIndex Identifier -- subvalue of an inductive value
                     Index
   | DataInt32 Int
+  | DataStruct [Identifier]
   deriving (Show)
 
 type ConstructorName = Identifier
@@ -148,14 +143,10 @@ data Code
   | CodeLet Identifier -- bind (we also use this to represent application)
             Data
             Code
-  | CodeSwitch Identifier -- branching in pattern-matching (elimination of inductive type)
-               DefaultBranch
-               [Branch]
   | CodeCall Identifier -- the register that stores the result of a function call
              Identifier -- the name of the function
-             [Data] -- arguments
+             [Identifier] -- arguments
              Code -- continuation
-  | CodeLoad Data
   deriving (Show)
 
 data AsmData
@@ -463,8 +454,6 @@ var (_ :< NeutCase e1 (x, y) e2) =
   var e1 ++ filter (\s -> s /= x && s /= y) (var e2)
 var (_ :< NeutTop) = []
 var (_ :< NeutUnit) = []
-var (_ :< NeutBottom) = []
-var (_ :< NeutAbort e) = var e
 var (_ :< NeutUniv) = []
 var (_ :< NeutMu s e) = filter (/= s) (var e)
 var (_ :< NeutHole _) = []
@@ -499,21 +488,19 @@ subst sub (j :< NeutCase e1 (x, y) e2) = do
   j :< NeutCase e1' (x, y) e2'
 subst _ (j :< NeutTop) = j :< NeutTop
 subst _ (j :< NeutUnit) = j :< NeutUnit
-subst _ (j :< NeutBottom) = j :< NeutBottom
-subst sub (j :< NeutAbort e) = do
-  let e' = subst sub e
-  j :< NeutAbort e'
 subst _ (j :< NeutUniv) = j :< NeutUniv
 subst sub (j :< NeutMu x e) = do
   let e' = subst sub e
   j :< NeutMu x e'
 subst sub (j :< NeutHole s) = fromMaybe (j :< NeutHole s) (lookup s sub)
 
-type SubstPos = [(Identifier, Pos)]
+type SubstIdent = [(Identifier, Identifier)]
 
-substPos :: SubstPos -> Pos -> Pos
-substPos sub (Pos (j :< PosVar s)) =
-  fromMaybe (Pos $ j :< PosVar s) (lookup s sub)
+substIdent :: SubstIdent -> Identifier -> Identifier
+substIdent sub x = fromMaybe x (lookup x sub)
+
+substPos :: SubstIdent -> Pos -> Pos
+substPos sub (Pos (j :< PosVar s)) = Pos $ j :< PosVar (substIdent sub s)
 substPos sub (Pos (j :< PosForall (s, tdom) tcod)) = do
   let Pos tdom' = substPos sub $ Pos tdom
   let Pos tcod' = substPos sub $ Pos tcod
@@ -522,34 +509,30 @@ substPos sub (Pos (j :< PosExists (s, tdom) tcod)) = do
   let Pos tdom' = substPos sub $ Pos tdom
   let Pos tcod' = substPos sub $ Pos tcod
   Pos $ j :< PosExists (s, tdom') tcod'
-substPos sub (Pos (j :< PosPair e1 e2)) = do
-  let Pos e1' = substPos sub $ Pos e1
-  let Pos e2' = substPos sub $ Pos e2
-  Pos $ j :< PosPair e1' e2'
+substPos sub (Pos (j :< PosPair x y)) = do
+  let x' = substIdent sub x
+  let y' = substIdent sub y
+  Pos $ j :< PosPair x' y'
 substPos sub (Pos (j :< PosDown t)) = do
   let Pos t' = substPos sub $ Pos t
   Pos $ j :< PosDown t'
-substPos sub (Pos (j :< PosThunk e)) = do
-  let e' = substNeg sub e
-  Pos $ j :< PosThunk e'
+substPos sub (Pos (j :< PosThunkLam s body)) = do
+  let body' = substNeg sub body
+  Pos $ j :< PosThunkLam s body'
 substPos sub (Pos (j :< PosUp t)) = do
   let Pos t' = substPos sub $ Pos t
   Pos $ j :< PosUp t'
 substPos _ (Pos (j :< PosTop)) = Pos $ j :< PosTop
 substPos _ (Pos (j :< PosUnit)) = Pos $ j :< PosUnit
-substPos _ (Pos (j :< PosBottom)) = Pos $ j :< PosBottom
 substPos _ (Pos (j :< PosUniv)) = Pos $ j :< PosUniv
 
-substNeg :: SubstPos -> Neg -> Neg
-substNeg sub (Neg (j :< NegLam s body)) = do
-  let Neg body' = substNeg sub $ Neg body
-  Neg $ j :< NegLam s body'
-substNeg sub (Neg (j :< NegApp e1 vs)) = do
-  let Neg e1' = substNeg sub $ Neg e1
-  let vs' = map (substPos sub) vs
-  Neg $ j :< NegApp e1' vs'
+substNeg :: SubstIdent -> Neg -> Neg
+substNeg sub (Neg (j :< NegAppForce e vs)) = do
+  let e' = substIdent sub e
+  let vs' = map (substIdent sub) vs
+  Neg $ j :< NegAppForce e' vs'
 substNeg sub (Neg (j :< NegCase v (x, y) e)) = do
-  let v' = substPos sub v
+  let v' = substIdent sub v
   let Neg e' = substNeg sub $ Neg e
   Neg $ j :< NegCase v' (x, y) e'
 substNeg sub (Neg (j :< NegReturn v)) = do
@@ -559,12 +542,6 @@ substNeg sub (Neg (j :< NegBind x e1 e2)) = do
   let Neg e1' = substNeg sub $ Neg e1
   let Neg e2' = substNeg sub $ Neg e2
   Neg $ j :< NegBind x e1' e2'
-substNeg sub (Neg (j :< NegForce v)) = do
-  let v' = substPos sub v
-  Neg $ j :< NegForce v'
-substNeg sub (Neg (j :< NegAbort e)) = do
-  let Neg e' = substNeg sub $ Neg e
-  Neg $ j :< NegAbort e'
 
 compose :: Subst -> Subst -> Subst
 compose s1 s2 = do

@@ -42,10 +42,6 @@ parse (meta :< TreeNode [_ :< TreeAtom "case", t, _ :< TreeNode [_ :< TreeAtom "
   return $ meta :< NeutCase e (x, y) body
 parse (meta :< TreeAtom "top") = return $ meta :< NeutTop
 parse (meta :< TreeAtom "unit") = return $ meta :< NeutUnit
-parse (meta :< TreeAtom "bottom") = return $ meta :< NeutBottom
-parse (meta :< TreeNode [_ :< TreeAtom "abort", t]) = do
-  e <- parse t
-  return $ meta :< NeutAbort e
 parse (meta :< TreeAtom "universe") = return $ meta :< NeutUniv
 parse (meta :< TreeNode [_ :< TreeAtom "mu", _ :< TreeAtom x, te]) = do
   e <- parse te

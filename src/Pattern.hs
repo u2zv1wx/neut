@@ -1,5 +1,6 @@
 module Pattern
   ( toDecision
+  , decision
   , patDist
   ) where
 
@@ -17,6 +18,42 @@ import           Debug.Trace
 import qualified Text.Show.Pretty           as Pr
 
 type ClauseMatrix a = ([[Pat]], [a])
+
+decision :: Term -> WithEnv Term
+decision (i :< TermVar s) = return $ i :< TermVar s
+decision (i :< TermConst s) = return $ i :< TermConst s
+decision (i :< TermLam s e) = do
+  c <- decision e
+  return $ i :< TermLam s c
+decision (i :< TermApp e1 e2) = do
+  c <- decision e1
+  v <- decision e2
+  return $ i :< TermApp c v
+decision (i :< TermPair v1 v2) = do
+  v1' <- decision v1
+  v2' <- decision v2
+  return $ i :< TermPair v1' v2'
+decision (i :< TermMu s e) = do
+  c <- decision e
+  return $ i :< TermMu s c
+decision (i :< TermCase vs ves) = do
+  ves' <- decisionClause ves
+  vs' <- mapM decision vs
+  let vesMod = patDist ves'
+  let indexList = map (const []) vs
+  let metaList = map (\(meta :< _) -> meta) vs
+  typeList <- mapM lookupTypeEnv' metaList
+  let initialOccurences = zip indexList typeList
+  decisionTree <- toDecision initialOccurences vesMod
+  return $ i :< TermDecision vs' decisionTree
+decision (_ :< TermDecision _ _) = error "Decision"
+
+decisionClause :: [([Pat], Term)] -> WithEnv [([Pat], Term)]
+decisionClause [] = return []
+decisionClause ((patList, e):ves) = do
+  e' <- decision e
+  ves' <- decisionClause ves
+  return $ (patList, e') : ves'
 
 -- Muranget, "Compiling Pattern Matching to Good Decision Trees", 2008
 toDecision :: (Show a) => [Occurrence] -> ClauseMatrix a -> WithEnv (Decision a)
@@ -77,7 +114,7 @@ headConstructor (ps:pss) = do
   return $ join $ ps' : pss'
 
 headConstructor' :: [Pat] -> WithEnv [(Identifier, Int, [Type])]
-headConstructor' (pair@(_ :< PatProduct _ _):_) = do
+headConstructor' (pair@(_ :< PatPair _ _):_) = do
   patList <- pairSeq pair
   typeList <- mapM (\(i :< _) -> lookupTypeEnv' i) patList
   return [("pair", 0, typeList)]
@@ -105,9 +142,9 @@ findPatApp (ps:pss) =
     Just i  -> Just i
 
 findPatApp' :: [(Pat, Int)] -> Maybe Int
-findPatApp' []                           = Nothing
-findPatApp' ((_ :< PatProduct _ _, i):_) = Just i
-findPatApp' (_:ps)                       = findPatApp' ps
+findPatApp' []                        = Nothing
+findPatApp' ((_ :< PatPair _ _, i):_) = Just i
+findPatApp' (_:ps)                    = findPatApp' ps
 
 specialize :: Identifier -> Arity -> ClauseMatrix a -> WithEnv (ClauseMatrix a)
 specialize c a (pss, bs) = do
@@ -125,7 +162,7 @@ specializeRow c _ ((_ :< PatConst x):ps) body =
   if c /= x
     then return []
     else return [(ps, body)]
-specializeRow c _ ((_ :< PatProduct p1 p2):ps) body =
+specializeRow c _ ((_ :< PatPair p1 p2):ps) body =
   if c /= "pair"
     then return []
     else return [(p1 : p2 : ps, body)]
@@ -143,11 +180,11 @@ takeHeadJust (Nothing:rest) = takeHeadJust rest
 takeHeadJust (Just x:_)     = Just x
 
 defaultMatrixRow :: [Pat] -> a -> WithEnv ([([Pat], a)], Maybe Identifier)
-defaultMatrixRow [] _                        = return ([], Nothing)
-defaultMatrixRow ((_ :< PatHole):ps) body    = return ([(ps, body)], Nothing)
-defaultMatrixRow ((_ :< PatVar s):ps) body   = return ([(ps, body)], Just s)
-defaultMatrixRow ((_ :< PatConst _):_) _     = return ([], Nothing)
-defaultMatrixRow ((_ :< PatProduct _ _):_) _ = return ([], Nothing)
+defaultMatrixRow [] _                      = return ([], Nothing)
+defaultMatrixRow ((_ :< PatHole):ps) body  = return ([(ps, body)], Nothing)
+defaultMatrixRow ((_ :< PatVar s):ps) body = return ([(ps, body)], Just s)
+defaultMatrixRow ((_ :< PatConst _):_) _   = return ([], Nothing)
+defaultMatrixRow ((_ :< PatPair _ _):_) _  = return ([], Nothing)
 
 swapColumn :: Int -> Int -> [[a]] -> [[a]]
 swapColumn i j mat = transpose $ swap i j $ transpose mat

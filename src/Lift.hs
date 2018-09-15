@@ -42,10 +42,6 @@ lift (i :< NeutCase e1 (x, y) e2) = do
   return $ i :< NeutCase e1' (x, y) e2'
 lift (i :< NeutTop) = return $ i :< NeutTop
 lift (i :< NeutUnit) = return $ i :< NeutUnit
-lift (i :< NeutBottom) = return $ i :< NeutBottom
-lift (i :< NeutAbort e) = do
-  e' <- lift e
-  return $ i :< NeutAbort e'
 lift (i :< NeutUniv) = return $ i :< NeutUniv
 lift (i :< NeutHole x) = return $ i :< NeutHole x
 lift (meta :< NeutMu s c) = do
@@ -88,9 +84,5 @@ replace args (i :< NeutMu s c) = do
   return $ i :< NeutMu s c'
 replace _ (i :< NeutTop) = return $ i :< NeutTop
 replace _ (i :< NeutUnit) = return $ i :< NeutUnit
-replace _ (i :< NeutBottom) = return $ i :< NeutBottom
-replace args (i :< NeutAbort e) = do
-  e' <- replace args e
-  return $ i :< NeutAbort e'
 replace _ (i :< NeutUniv) = return $ i :< NeutUniv
 replace _ (i :< NeutHole x) = return $ i :< NeutHole x

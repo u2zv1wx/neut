@@ -80,16 +80,10 @@ infer (meta :< NeutMu s e) = do
   te <- infer e
   insConstraintEnv te trec
   returnMeta meta te
-infer (meta :< NeutTop) = wrapUniv NeutUniv >>= returnMeta meta
+infer (meta :< NeutTop) = wrap NeutUniv >>= returnMeta meta
 infer (meta :< NeutUnit) = wrapType NeutTop >>= returnMeta meta
-infer (meta :< NeutBottom) = wrapUniv NeutUniv >>= returnMeta meta
-infer (meta :< NeutAbort e) = do
-  t <- infer e
-  t' <- wrapType NeutBottom
-  insConstraintEnv t t'
-  newHole >>= returnMeta meta
 infer (_ :< NeutUniv) = error "the level of type universe hierarchy is upto 2"
-infer (meta :< NeutHole _) = wrapUniv NeutUniv >>= returnMeta meta
+infer (meta :< NeutHole _) = wrap NeutUniv >>= returnMeta meta
 
 constructPair :: Identifier -> Identifier -> WithEnv Neut
 constructPair x y = do
@@ -109,7 +103,7 @@ newNameOfType t = do
 mustBeType :: Neut -> WithEnv ()
 mustBeType t = do
   t' <- infer t
-  wrapUniv NeutUniv >>= \u -> insConstraintEnv t' u
+  wrap NeutUniv >>= \u -> insConstraintEnv t' u
 
 bindWithLet' :: Identifier -> Neut -> Neut -> WithEnv Neut
 bindWithLet' x e1 e2 = do
@@ -175,7 +169,6 @@ unify ((_ :< NeutForall (_, tdom1) tcod1, _ :< NeutForall (_, tdom2) tcod2):cs) 
 unify ((_ :< NeutExists (_, tdom1) tcod1, _ :< NeutExists (_, tdom2) tcod2):cs) =
   unify $ (tdom1, tdom2) : (tcod1, tcod2) : cs
 unify ((_ :< NeutTop, _ :< NeutTop):cs) = unify cs
-unify ((_ :< NeutBottom, _ :< NeutBottom):cs) = unify cs
 unify ((_ :< NeutUniv, _ :< NeutUniv):cs) = unify cs
 unify cs = ([], cs)
 

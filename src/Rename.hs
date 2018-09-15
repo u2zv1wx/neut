@@ -53,9 +53,5 @@ rename (i :< NeutCase e1 (x, y) e2) = do
     return $ i :< NeutCase e1' (x', y') e2'
 rename (i :< NeutTop) = return $ i :< NeutTop
 rename (i :< NeutUnit) = return $ i :< NeutUnit
-rename (i :< NeutBottom) = return $ i :< NeutBottom
-rename (i :< NeutAbort e) = do
-  e' <- rename e
-  return $ i :< NeutAbort e'
 rename (i :< NeutUniv) = return $ i :< NeutUniv
 rename (i :< NeutHole x) = return $ i :< NeutHole x
