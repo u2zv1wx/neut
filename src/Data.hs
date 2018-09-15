@@ -123,24 +123,10 @@ data Data
   | DataStruct [Identifier]
   deriving (Show)
 
-type ConstructorName = Identifier
-
-type ConstructorId = Int
-
-type TargetLabel = Identifier
-
-type Branch = (ConstructorName, ConstructorId, TargetLabel, Code)
-
 type Address = Identifier
 
-type DefaultBranch = (TargetLabel, Code)
-
-type DefaultAsmBranch = (TargetLabel, [Asm])
-
-type AsmBranch = (ConstructorName, ConstructorId, TargetLabel, [Asm])
-
 data Code
-  = CodeReturn Data
+  = CodeReturn Identifier
   | CodeLet Identifier -- bind (we also use this to represent application)
             Data
             Code
@@ -154,6 +140,8 @@ data AsmData
   = AsmDataLocal Identifier
   | AsmDataGlobal Identifier
   | AsmDataInt32 Int
+  | AsmDataNullPtr
+  | AsmDataStruct [Identifier]
   deriving (Show)
 
 data Asm
@@ -162,14 +150,10 @@ data Asm
            AsmOperation
   | AsmStore AsmData -- source data
              Identifier -- destination register
-  | AsmSwitch Identifier
-              DefaultAsmBranch
-              [AsmBranch]
   deriving (Show)
 
 data AsmOperation
   = AsmAlloc Term
-  | AsmLoad Identifier -- source register
   | AsmGetElemPointer Identifier -- base register
                       Index -- index
   | AsmCall Identifier
