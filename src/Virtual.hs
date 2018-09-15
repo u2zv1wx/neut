@@ -17,14 +17,13 @@ import qualified Text.Show.Pretty           as Pr
 
 import           Debug.Trace
 
--- virtual :: Term -> WithEnv Code
 virtualPos :: Pos -> WithEnv Data
 virtualPos (Pos (_ :< PosVar x)) = return (DataLocal x)
 virtualPos (Pos (i :< PosForall (_, _) _)) = virtualPos $ Pos $ i :< PosUnit
 virtualPos (Pos (i :< PosExists (_, _) _)) = virtualPos $ Pos $ i :< PosUnit
 virtualPos (Pos (_ :< PosPair x y)) = return $ DataStruct [x, y]
 virtualPos (Pos (i :< PosTop)) = virtualPos $ Pos $ i :< PosUnit
-virtualPos (Pos (_ :< PosUnit)) = undefined
+virtualPos (Pos (_ :< PosUnit)) = return DataNullPtr
 virtualPos (Pos (i :< PosUp _)) = virtualPos $ Pos $ i :< PosUnit
 virtualPos (Pos (i :< PosDown _)) = virtualPos $ Pos $ i :< PosUnit
 virtualPos (Pos (i :< PosThunkLam args body)) = do

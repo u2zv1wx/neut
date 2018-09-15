@@ -119,6 +119,7 @@ data Data
   | DataElemAtIndex Identifier -- subvalue of an inductive value
                     Index
   | DataInt32 Int
+  | DataNullPtr
   | DataStruct [Identifier]
   deriving (Show)
 

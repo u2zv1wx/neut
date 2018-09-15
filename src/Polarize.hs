@@ -28,7 +28,6 @@ polarize lam@(i :< NeutLam _ _) = do
   (body, args) <- toLamSeq lam
   c <- polarize body >>= toNeg
   t <- lookupTypeEnv' i >>= polarize >>= toPos
-  insPolTypeEnv i t
   (thunk, t') <- newNameOfTypeDown t
   (ret, _) <- newNameOfTypeUp t'
   return $ Comp $ Neg $ ret :< (NegReturn $ Pos $ thunk :< PosThunkLam args c)
