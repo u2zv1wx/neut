@@ -54,7 +54,7 @@ asmData reg (DataLocal x) cont = do
   return $ AsmMov reg x' cont --asmCopy (AsmDataLocal x) reg
 asmData reg (DataLabel x) cont = do
   return $ AsmMov reg x cont
-asmData reg DataNullPtr cont = undefined
+asmData reg (DataInt32 i) cont = return $ AsmMov reg (show i) cont
 asmData reg (DataStruct xs) cont = do
   is <- mapM sizeOf xs
   let size = sum is

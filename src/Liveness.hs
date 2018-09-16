@@ -54,7 +54,7 @@ annotCode (meta :< CodeStackRestore x cont) = do
 varsInData :: Data -> [Identifier]
 varsInData (DataLocal x)   = [x]
 varsInData (DataLabel _)   = [] -- a label is not a variable
-varsInData DataNullPtr     = []
+varsInData (DataInt32 _)   = []
 varsInData (DataStruct ds) = ds
 
 livenessAnalysis :: WithEnv ()

@@ -117,7 +117,7 @@ type Index = [Int]
 data Data
   = DataLocal Identifier
   | DataLabel Identifier
-  | DataNullPtr
+  | DataInt32 Int
   | DataStruct [Identifier]
   deriving (Show)
 

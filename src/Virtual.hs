@@ -19,11 +19,11 @@ import           Debug.Trace
 
 virtualPos :: Pos -> WithEnv Data
 virtualPos (Pos (_ :< PosVar x)) = return (DataLocal x)
-virtualPos (Pos (i :< PosForall (_, _) _)) = virtualPos $ Pos $ i :< PosUnit
-virtualPos (Pos (i :< PosExists (_, _) _)) = virtualPos $ Pos $ i :< PosUnit
+virtualPos (Pos (i :< PosForall _ _)) = virtualPos $ Pos $ i :< PosUnit
+virtualPos (Pos (i :< PosExists _ _)) = virtualPos $ Pos $ i :< PosUnit
 virtualPos (Pos (_ :< PosPair x y)) = return $ DataStruct [x, y]
 virtualPos (Pos (i :< PosTop)) = virtualPos $ Pos $ i :< PosUnit
-virtualPos (Pos (_ :< PosUnit)) = return DataNullPtr
+virtualPos (Pos (_ :< PosUnit)) = return $ DataInt32 0
 virtualPos (Pos (i :< PosUp _)) = virtualPos $ Pos $ i :< PosUnit
 virtualPos (Pos (i :< PosDown _)) = virtualPos $ Pos $ i :< PosUnit
 virtualPos (Pos (i :< PosThunkLam args body)) = do
