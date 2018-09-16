@@ -40,23 +40,23 @@ type Tree = Cofree TreeF Identifier
 
 data NeutF a
   = NeutVar Identifier
-  | NeutPi (Identifier, a) -- forall-form
+  | NeutPi (Identifier, a)
            a
-  | NeutPiIntro (Identifier, a) -- forall-intro
+  | NeutPiIntro (Identifier, a)
                 a
-  | NeutPiElim a -- forall-elim
+  | NeutPiElim a
                a
-  | NeutSigma (Identifier, a) -- exists-form
+  | NeutSigma (Identifier, a)
               a
-  | NeutSigmaIntro a -- exists-intro
+  | NeutSigmaIntro a
                    a
   | NeutSigmaElim a
-                  (Identifier, Identifier) -- exists-elim
+                  (Identifier, Identifier)
                   a
-  | NeutTop -- top-form
-  | NeutTopIntro -- top-intro
+  | NeutTop
+  | NeutTopIntro
   | NeutUniv
-  | NeutMu Identifier -- recursion
+  | NeutMu Identifier
            a
   | NeutHole Identifier
 
@@ -66,17 +66,17 @@ $(deriveShow1 ''NeutF)
 
 data PosF c v
   = PosVar Identifier
-  | PosPi [(Identifier, v)] -- forall-form
+  | PosPi [(Identifier, v)]
           v
-  | PosSigma [(Identifier, v)] -- exists-form
+  | PosSigma [(Identifier, v)]
              v
   | PosSigmaIntro [Identifier]
-  | PosTop -- top-form
-  | PosTopIntro -- top-intro
-  | PosDown v -- down-form
+  | PosTop
+  | PosTopIntro
+  | PosDown v
   | PosDownIntroPiIntro [Identifier]
                         c
-  | PosUp v -- up-form
+  | PosUp v
   | PosUniv
 
 data NegF v c
@@ -85,8 +85,8 @@ data NegF v c
   | NegSigmaElim Identifier
                  (Identifier, Identifier) -- exists-elim
                  c
-  | NegUpIntro v -- up-intro
-  | NegUpElim Identifier -- up-elim
+  | NegUpIntro v
+  | NegUpElim Identifier
               c
               c
 
