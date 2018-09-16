@@ -21,7 +21,7 @@ virtualPos :: Pos -> WithEnv Data
 virtualPos (Pos (_ :< PosVar x)) = return (DataLocal x)
 virtualPos (Pos (i :< PosForall _ _)) = virtualPos $ Pos $ i :< PosUnit
 virtualPos (Pos (i :< PosExists _ _)) = virtualPos $ Pos $ i :< PosUnit
-virtualPos (Pos (_ :< PosPair x y)) = return $ DataStruct [x, y] -- ここでサイズを指定しないとダメ？
+virtualPos (Pos (_ :< PosPair xs)) = return $ DataStruct xs
 virtualPos (Pos (i :< PosTop)) = virtualPos $ Pos $ i :< PosUnit
 virtualPos (Pos (_ :< PosUnit)) = return $ DataInt32 0
 virtualPos (Pos (i :< PosUp _)) = virtualPos $ Pos $ i :< PosUnit
