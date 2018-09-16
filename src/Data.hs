@@ -117,8 +117,7 @@ data Data
   = DataLocal Identifier
   | DataLabel Identifier
   | DataInt32 Int
-  | DataStruct Identifier -- base pointer
-               [Identifier]
+  | DataStruct [Identifier]
   deriving (Show)
 
 type Address = Identifier
