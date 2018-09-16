@@ -38,19 +38,17 @@ $(deriveShow1 ''TreeF)
 type Tree = Cofree TreeF Identifier
 
 data WeakType
-  = WeakTypeArrow WeakType -- A -> A  (== forall (_ : A) { A })
+  = WeakTypeArrow WeakType -- (arrow A A)  (i.e. forall (_ : A) { A })
                   WeakType
-  | WeakTypeForall Identifier -- forall (x : type) { A }
+  | WeakTypeForall Identifier -- (forall x A)
                    WeakType
-  | WeakTypePi Identifier -- forall (x : label) { clause }
-               [(Identifier, WeakType)]
-  | WeakTypeProduct WeakType -- (A, A)  (== exists (_ : A) { A } )
+  | WeakTypePi [(Identifier, WeakType)] -- (pi ((x1 A1) ... (xn An)))
+  | WeakTypeProduct WeakType -- (product A A)
                     WeakType
-  | WeakTypeExists Identifier -- exists (x : type) { A }
+  | WeakTypeExists Identifier -- (exists x A)
                    WeakType
-  | WeakTypeSigma Identifier -- exists (x : label) { clause }
-                  [(Identifier, WeakType)]
-  | WeakTypeTop
+  | WeakTypeSigma [(Identifier, WeakType)] -- (sigma ((x1 A1) ... (xn An)))
+  | WeakTypeTop -- top
   | WeakTypeHole Identifier
   deriving (Show)
 
@@ -73,35 +71,34 @@ data Type
   deriving (Show)
 
 data NeutF a
-  = NeutVar Identifier
-  | NeutArrowIntro Identifier
+  = NeutVar Identifier -- x
+  | NeutArrowIntro Identifier -- (lambda x e)
                    a
-  | NeutArrowElim a
+  | NeutArrowElim a -- (e e)
                   a
-  | NeutForallIntro Identifier
+  | NeutForallIntro Identifier -- (forall x e)
                     a
-  | NeutForallElim a
-                   a
-  | NeutPiIntro Identifier
-                [(Identifier, a)]
-  | NeutPiElim a
+  | NeutForallElim a -- (instance e A)
+                   Type
+  | NeutPiIntro [(Identifier, a)] -- (struct ((x1 e1) ... (xn en)))
+  | NeutPiElim a -- (project e x)
                Identifier
-  | NeutProductIntro a
+  | NeutProductIntro a -- (pair e e)
                      a
-  | NeutProductElim a
+  | NeutProductElim a -- (case e ((pair x y) e))
                     (Identifier, Identifier)
                     a
-  | NeutExistsIntro Identifier
+  | NeutExistsIntro Identifier -- (exists x e)
                     a
-  | NeutExistsElim a
+  | NeutExistsElim a -- (case e ((exists x y) e))
                    (Identifier, Identifier)
                    a
-  | NeutSigmaIntro Identifier
-                   (Identifier, a)
-  | NeutSigmaElim a
+  | NeutSigmaIntro Identifier -- (inject x e)
+                   a
+  | NeutSigmaElim a -- (case e ((inject x1 e1) ... (inject xn en)))
                   [((Identifier, Identifier), a)]
-  | NeutTopIntro
-  | NeutMu Identifier
+  | NeutTopIntro -- unit
+  | NeutMu Identifier -- (mu x e)
            a
 
 type Neut = Cofree NeutF Identifier
@@ -121,8 +118,7 @@ data PosF c v
                            c
   | PosDownIntroForallIntro [Identifier]
                             c
-  | PosDownIntroPiIntro Identifier
-                        [(Identifier, c)]
+  | PosDownIntroPiIntro [(Identifier, c)]
 
 data NegF v c
   = NegArrowElimDownElim Identifier
