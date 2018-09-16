@@ -18,6 +18,7 @@ import           Data.Functor.Classes
 
 import           System.IO.Unsafe
 
+import           Data.IORef
 import           Data.List
 import           Data.Maybe                 (fromMaybe)
 
@@ -116,7 +117,6 @@ type Index = [Int]
 data Data
   = DataLocal Identifier
   | DataGlobal Identifier
-  | DataInt32 Int
   | DataNullPtr
   | DataStruct [Data]
   deriving (Show)
@@ -187,6 +187,9 @@ data AsmOperation
                Term
   deriving (Show)
 
+instance (Show a) => Show (IORef a) where
+  show a = show (unsafePerformIO (readIORef a))
+
 data Env = Env
   { count         :: Int -- to generate fresh symbols
   , notationEnv   :: [(Tree, Tree)] -- macro transformers
@@ -196,7 +199,7 @@ data Env = Env
   , polTypeEnv    :: [(Identifier, Pos)] -- polarized type environment
   , termEnv       :: [(Identifier, Term)]
   , constraintEnv :: [(Neut, Neut)] -- used in type inference
-  , codeEnv       :: [(Identifier, ([Identifier], Code))]
+  , codeEnv       :: [(Identifier, ([Identifier], IORef Code))]
   } deriving (Show)
 
 initialEnv :: Env
@@ -316,7 +319,7 @@ lookupNameEnv' s = do
     Just s' -> return s'
     Nothing -> newNameWith s
 
-lookupCodeEnv :: Identifier -> WithEnv ([Identifier], Code)
+lookupCodeEnv :: Identifier -> WithEnv ([Identifier], IORef Code)
 lookupCodeEnv funName = do
   env <- get
   case lookup funName (codeEnv env) of
@@ -333,8 +336,9 @@ insPolTypeEnv :: Identifier -> Pos -> WithEnv ()
 insPolTypeEnv i t = modify (\e -> e {polTypeEnv = (i, t) : polTypeEnv e})
 
 insCodeEnv :: Identifier -> [Identifier] -> Code -> WithEnv ()
-insCodeEnv funName args body =
-  modify (\e -> e {codeEnv = (funName, (args, body)) : codeEnv e})
+insCodeEnv funName args body = do
+  codeRef <- liftIO $ newIORef body
+  modify (\e -> e {codeEnv = (funName, (args, codeRef)) : codeEnv e})
 
 insConstraintEnv :: Neut -> Neut -> WithEnv ()
 insConstraintEnv t1 t2 =
