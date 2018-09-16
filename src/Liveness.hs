@@ -49,7 +49,7 @@ annotCode (meta :< CodeExtractValue x base idx cont) = do
     CodeExtractValue x base idx cont'
 annotCode (meta :< CodeStackSave x cont) = do
   cont' <- annotCode cont
-  return $ meta {codeMetaUse = [x]} :< CodeStackSave x cont'
+  return $ meta {codeMetaDef = [x]} :< CodeStackSave x cont'
 annotCode (meta :< CodeStackRestore x cont) = do
   cont' <- annotCode cont
   return $ meta {codeMetaUse = [x]} :< CodeStackRestore x cont'
