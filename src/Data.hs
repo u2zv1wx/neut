@@ -116,24 +116,26 @@ type Index = [Int]
 data Data
   = DataLocal Identifier
   | DataGlobal Identifier
-  | DataElemAtIndex Identifier -- subvalue of an inductive value
-                    Index
   | DataInt32 Int
   | DataNullPtr
-  | DataStruct [Identifier]
+  | DataStruct [Data]
   deriving (Show)
 
 type Address = Identifier
 
 data CodeF a
-  = CodeReturn Identifier
+  = CodeReturn Data
   | CodeLet Identifier -- bind (we also use this to represent application)
             Data
             a
   | CodeCall Identifier -- the register that stores the result of a function call
-             Identifier -- the name of the function
-             [Identifier] -- arguments
+             Data -- the name of the function
+             [Data] -- arguments
              a -- continuation
+  | CodeExtractValue Identifier
+                     Data
+                     Int
+                     a
   deriving (Show)
 
 $(deriveShow1 ''CodeF)
