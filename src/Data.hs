@@ -200,6 +200,7 @@ data Env = Env
   , termEnv       :: [(Identifier, Term)]
   , constraintEnv :: [(Neut, Neut)] -- used in type inference
   , codeEnv       :: [(Identifier, ([Identifier], IORef Code))]
+  , regEnv        :: [(Identifier, Int)] -- variable to register
   } deriving (Show)
 
 initialEnv :: Env
@@ -227,6 +228,7 @@ initialEnv =
     , termEnv = []
     , constraintEnv = []
     , codeEnv = []
+    , regEnv = []
     }
 
 type WithEnv a = StateT Env (ExceptT String IO) a
@@ -343,6 +345,12 @@ insCodeEnv funName args body = do
 insConstraintEnv :: Neut -> Neut -> WithEnv ()
 insConstraintEnv t1 t2 =
   modify (\e -> e {constraintEnv = (t1, t2) : constraintEnv e})
+
+lookupRegEnv :: Identifier -> WithEnv (Maybe Int)
+lookupRegEnv s = gets (lookup s . regEnv)
+
+insRegEnv :: Identifier -> Int -> WithEnv ()
+insRegEnv x i = modify (\e -> e {regEnv = (x, i) : regEnv e})
 
 local :: WithEnv a -> WithEnv a
 local p = do
