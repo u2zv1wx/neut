@@ -70,8 +70,7 @@ data PosF c v
               v
   | PosExists [(Identifier, v)] -- exists-form
               v
-  | PosPair Identifier -- exists-intro
-            Identifier
+  | PosPair [Identifier]
   | PosTop -- top-form
   | PosUnit -- top-intro
   | PosDown v -- down-form
@@ -118,7 +117,8 @@ data Data
   = DataLocal Identifier
   | DataLabel Identifier
   | DataInt32 Int
-  | DataStruct [Identifier]
+  | DataStruct Identifier -- base pointer
+               [Identifier]
   deriving (Show)
 
 type Address = Identifier
@@ -136,6 +136,9 @@ data CodeF a
                      Identifier
                      Int
                      a
+  | CodeMalloc Identifier -- let x := malloc <size> in cont
+               Int
+               a
   | CodeStackSave Identifier -- the pointer created by stacksave
                   a -- continuation
   | CodeStackRestore Identifier -- pass the pointer created by stacksave
@@ -163,14 +166,6 @@ addMeta :: CodeF Code -> WithEnv Code
 addMeta pc = do
   meta <- emptyCodeMeta
   return $ meta :< pc
-
-data AsmData
-  = AsmDataLocal Identifier
-  | AsmDataGlobal Identifier
-  | AsmDataInt Int
-  | AsmDataNullPtr
-  | AsmDataStruct [Identifier]
-  deriving (Show)
 
 data Asm
   = AsmReturn
@@ -533,10 +528,11 @@ substPos sub (Pos (j :< PosExists xts tcod)) = do
   -- let Pos tdom' = substPos sub $ Pos tdom
   -- let Pos tcod' = substPos sub $ Pos tcod
   -- Pos $ j :< PosExists (s, tdom') tcod'
-substPos sub (Pos (j :< PosPair x y)) = do
-  let x' = substIdent sub x
-  let y' = substIdent sub y
-  Pos $ j :< PosPair x' y'
+substPos sub (Pos (j :< PosPair xs)) = do
+  let xs' = map (substIdent sub) xs
+  -- let x' = substIdent sub x
+  -- let y' = substIdent sub y
+  Pos $ j :< PosPair xs'
 substPos sub (Pos (j :< PosDown t)) = do
   let Pos t' = substPos sub $ Pos t
   Pos $ j :< PosDown t'

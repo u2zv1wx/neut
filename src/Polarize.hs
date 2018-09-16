@@ -51,12 +51,15 @@ polarize exists@(i :< NeutExists _ _) = do
   ts' <- mapM (polarize >=> toPos') ts
   let xts' = zip xs ts'
   return $ Value $ Pos $ i :< PosExists xts' body'
-polarize (i :< NeutPair v1 v2) = do
+polarize pair@(i :< NeutPair _ _) = do
+  seq <- toPairSeq pair
+  nameList <- mapM (const newName) seq
   t <- lookupTypeEnv' i >>= polarize >>= toPos
   (j, _) <- newNameOfTypeUp t
-  x <- newName
-  y <- newName
-  bindSeq j [(x, v1), (y, v2)] (Neg $ j :< NegReturn (Pos $ i :< PosPair x y))
+  bindSeq
+    j
+    (zip nameList seq)
+    (Neg $ j :< NegReturn (Pos $ i :< PosPair nameList))
 polarize (i :< NeutCase e1 (x, y) e2) = do
   t <- lookupTypeEnv' i >>= polarize >>= toPos
   (j, _) <- newNameOfTypeUp t
@@ -128,6 +131,12 @@ toLamSeq (_ :< NeutLam (x, _) body) = do
   (body', args) <- toLamSeq body
   return (body', x : args)
 toLamSeq t = return (t, [])
+
+toPairSeq :: Neut -> WithEnv [Neut]
+toPairSeq (_ :< NeutPair e1 e2) = do
+  rest <- toPairSeq e2
+  return $ e1 : rest
+toPairSeq t = return [t]
 
 toForallSeq :: Neut -> WithEnv (Neut, [(Identifier, Neut)])
 toForallSeq (_ :< NeutForall (x, t) body) = do
