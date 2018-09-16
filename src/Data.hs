@@ -178,7 +178,7 @@ data Asm
            Identifier
            Asm
   | AsmLea Identifier
-           Identifier
+           String
            Asm
   | AsmCall Identifier
             Asm
