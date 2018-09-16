@@ -108,3 +108,9 @@ edgeInfo (meta :< CodeCall _ _ _ cont) = do
 edgeInfo (meta :< CodeExtractValue _ _ _ cont) = do
   info <- edgeInfo cont
   return $ codeMetaLive meta : info
+edgeInfo (meta :< CodeStackSave _ cont) = do
+  info <- edgeInfo cont
+  return $ codeMetaLive meta : info
+edgeInfo (meta :< CodeStackRestore _ cont) = do
+  info <- edgeInfo cont
+  return $ codeMetaLive meta : info

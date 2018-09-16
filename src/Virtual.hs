@@ -69,3 +69,9 @@ traceLet s (meta :< CodeCall reg name xds cont1) cont2 = do
 traceLet s (meta :< CodeExtractValue x d i cont1) cont2 = do
   tmp <- traceLet s cont1 cont2
   return $ meta :< CodeExtractValue x d i tmp
+traceLet s (meta :< CodeStackSave x cont1) cont2 = do
+  tmp <- traceLet s cont1 cont2
+  return $ meta :< CodeStackSave x tmp
+traceLet s (meta :< CodeStackRestore x cont1) cont2 = do
+  tmp <- traceLet s cont1 cont2
+  return $ meta :< CodeStackRestore x tmp

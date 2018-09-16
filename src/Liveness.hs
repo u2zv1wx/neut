@@ -47,6 +47,12 @@ annotCode (meta :< CodeExtractValue x base idx cont) = do
   return $
     meta {codeMetaUse = uvs, codeMetaDef = [x]} :<
     CodeExtractValue x base idx cont'
+annotCode (meta :< CodeStackSave x cont) = do
+  cont' <- annotCode cont
+  return $ meta {codeMetaUse = [x]} :< CodeStackSave x cont'
+annotCode (meta :< CodeStackRestore x cont) = do
+  cont' <- annotCode cont
+  return $ meta {codeMetaUse = [x]} :< CodeStackRestore x cont'
 
 varsInData :: Data -> [Identifier]
 varsInData (DataLocal x)   = [x]
@@ -78,6 +84,14 @@ computeLiveness (meta :< CodeExtractValue x base idx cont) = do
   cont' <- computeLiveness cont
   contElemList <- computeSuccAll (meta :< CodeExtractValue x base idx cont')
   computeLiveness' meta contElemList (CodeExtractValue x base idx cont')
+computeLiveness (meta :< CodeStackSave x cont) = do
+  cont' <- computeLiveness cont
+  contElemList <- computeSuccAll (meta :< CodeStackSave x cont')
+  computeLiveness' meta contElemList (CodeStackSave x cont')
+computeLiveness (meta :< CodeStackRestore x cont) = do
+  cont' <- computeLiveness cont
+  contElemList <- computeSuccAll (meta :< CodeStackRestore x cont')
+  computeLiveness' meta contElemList (CodeStackRestore x cont')
 
 computeLiveness' :: CodeMeta -> [Identifier] -> CodeF Code -> WithEnv Code
 computeLiveness' meta elems code =
@@ -105,5 +119,11 @@ computeSuccAll (meta :< CodeCall _ _ _ cont) = do
   contLvs <- computeSuccAll cont
   return $ next meta contLvs
 computeSuccAll (meta :< CodeExtractValue _ _ _ cont) = do
+  contLvs <- computeSuccAll cont
+  return $ next meta contLvs
+computeSuccAll (meta :< CodeStackSave _ cont) = do
+  contLvs <- computeSuccAll cont
+  return $ next meta contLvs
+computeSuccAll (meta :< CodeStackRestore _ cont) = do
   contLvs <- computeSuccAll cont
   return $ next meta contLvs

@@ -136,6 +136,10 @@ data CodeF a
                      Data
                      Int
                      a
+  | CodeStackSave Identifier -- the pointer created by stacksave
+                  a -- continuation
+  | CodeStackRestore Identifier -- pass the pointer created by stacksave
+                     a
   deriving (Show)
 
 $(deriveShow1 ''CodeF)
