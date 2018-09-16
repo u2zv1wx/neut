@@ -125,16 +125,38 @@ data Data
 
 type Address = Identifier
 
-data Code
+data CodeF a
   = CodeReturn Identifier
   | CodeLet Identifier -- bind (we also use this to represent application)
             Data
-            Code
+            a
   | CodeCall Identifier -- the register that stores the result of a function call
              Identifier -- the name of the function
              [Identifier] -- arguments
-             Code -- continuation
+             a -- continuation
   deriving (Show)
+
+$(deriveShow1 ''CodeF)
+
+data CodeMeta = CodeMeta
+  { codeMetaArgs :: [(Identifier, Data)]
+  , codeMetaLive :: [Identifier]
+  , codeMetaDef  :: [Identifier]
+  , codeMetaUse  :: [Identifier]
+  } deriving (Show)
+
+emptyCodeMeta :: WithEnv CodeMeta
+emptyCodeMeta =
+  return $
+  CodeMeta
+    {codeMetaArgs = [], codeMetaLive = [], codeMetaDef = [], codeMetaUse = []}
+
+type Code = Cofree CodeF CodeMeta
+
+addMeta :: CodeF Code -> WithEnv Code
+addMeta pc = do
+  meta <- emptyCodeMeta
+  return $ meta :< pc
 
 data AsmData
   = AsmDataLocal Identifier
@@ -351,13 +373,6 @@ foldMR f e (t:ts) = do
   let x = f t tmp
   i <- newName
   return $ i :< x
-
-letSeq :: [Identifier] -> [Data] -> Code -> WithEnv Code
-letSeq [] [] code = return code
-letSeq (i:is) (d:ds) code = do
-  tmp <- letSeq is ds code
-  return $ CodeLet i d tmp
-letSeq _ _ _ = error "Virtual.letSeq: invalid arguments"
 
 swap :: Int -> Int -> [a] -> [a]
 swap i j xs = replaceNth j (xs !! i) (replaceNth i (xs !! j) xs)
