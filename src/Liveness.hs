@@ -25,7 +25,7 @@ import qualified Text.Show.Pretty           as Pr
 --     asm' <- annotAsm asm
 --     liftIO $ writeIORef asmRef asm'
 annotAsm :: Asm -> WithEnv Asm
-annotAsm (meta :< AsmReturn) = return $ meta :< AsmReturn
+annotAsm (meta :< AsmReturn x) = return $ meta {asmMetaUse = [x]} :< AsmReturn x
 annotAsm (meta :< AsmMov x y cont) = do
   cont' <- annotAsm cont
   return $ meta {asmMetaUse = [y], asmMetaDef = [x]} :< AsmMov x y cont'
@@ -56,9 +56,9 @@ varsInAddr (AddrAdd a1 a2) = varsInAddr a1 ++ varsInAddr a2
 --     asm' <- computeLiveness asm
 --     liftIO $ writeIORef asmRef asm'
 computeLiveness :: Asm -> WithEnv Asm
-computeLiveness (meta :< AsmReturn) = do
-  contElems <- computeSuccAll (meta :< AsmReturn)
-  computeLiveness' meta contElems AsmReturn
+computeLiveness (meta :< AsmReturn x) = do
+  contElems <- computeSuccAll (meta :< AsmReturn x)
+  computeLiveness' meta contElems $ AsmReturn x
 computeLiveness (meta :< AsmMov x y cont) = do
   cont' <- computeLiveness cont
   contElemList <- computeSuccAll (meta :< AsmMov x y cont')
@@ -98,7 +98,7 @@ next meta lvs =
   nub $ computeCurrent' $ meta {asmMetaLive = asmMetaLive meta ++ lvs}
 
 computeSuccAll :: Asm -> WithEnv [Identifier]
-computeSuccAll (meta :< AsmReturn) = return $ computeCurrent' meta
+computeSuccAll (meta :< AsmReturn _) = return $ computeCurrent' meta
 computeSuccAll (meta :< AsmMov _ _ cont) = do
   contLvs <- computeSuccAll cont
   return $ next meta contLvs

@@ -94,7 +94,7 @@ selectColor' (i:is) xs =
     else selectColor' is xs
 
 edgeInfo :: Asm -> WithEnv [[Identifier]]
-edgeInfo (meta :< AsmReturn) = return [asmMetaLive meta]
+edgeInfo (meta :< AsmReturn _) = return [asmMetaLive meta]
 edgeInfo (meta :< AsmMov _ _ cont) = do
   info <- edgeInfo cont
   return $ asmMetaLive meta : info

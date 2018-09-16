@@ -152,7 +152,7 @@ data Addr
   deriving (Show)
 
 data AsmF a
-  = AsmReturn
+  = AsmReturn Identifier
   | AsmMov Identifier
            Identifier
            a

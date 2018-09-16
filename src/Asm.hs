@@ -19,8 +19,9 @@ import           Debug.Trace
 
 asmCode :: Code -> WithEnv Asm
 asmCode (CodeReturn d) = do
-  tmp <- addMeta AsmReturn
-  asmData "%rax" d tmp
+  x <- newName
+  tmp <- addMeta $ AsmReturn x
+  asmData x d tmp
 asmCode (CodeLet i d cont) = do
   cont' <- asmCode cont
   asmData i d cont'
@@ -39,10 +40,8 @@ asmCode (CodeExtractValue x base i cont) = do
     _ -> lift $ throwE "Asm.asmCode : typeError"
 
 asmData :: Identifier -> Data -> Asm -> WithEnv Asm
-asmData reg (DataLocal x) cont = do
-  addMeta $ AsmMov reg x cont --asmCopy (AsmDataLocal x) reg
-asmData reg (DataLabel x) cont = do
-  addMeta $ AsmMov reg x cont
+asmData reg (DataLocal x) cont = addMeta $ AsmMov reg x cont
+asmData reg (DataLabel x) cont = addMeta $ AsmMov reg x cont
 asmData reg (DataInt32 i) cont = addMeta $ AsmMov reg (show i) cont
 asmData reg (DataStruct xs) cont = do
   is <- mapM sizeOf xs
