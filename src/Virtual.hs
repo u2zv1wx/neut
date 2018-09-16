@@ -21,8 +21,7 @@ virtualPos :: Pos -> WithEnv Data
 virtualPos (Pos (_ :< PosVar x)) = return (DataLocal x)
 virtualPos (Pos (i :< PosForall (_, _) _)) = virtualPos $ Pos $ i :< PosUnit
 virtualPos (Pos (i :< PosExists (_, _) _)) = virtualPos $ Pos $ i :< PosUnit
-virtualPos (Pos (_ :< PosPair x y)) =
-  return $ DataStruct [DataLocal x, DataLocal y]
+virtualPos (Pos (_ :< PosPair x y)) = return $ DataStruct [x, y]
 virtualPos (Pos (i :< PosTop)) = virtualPos $ Pos $ i :< PosUnit
 virtualPos (Pos (_ :< PosUnit)) = return DataNullPtr
 virtualPos (Pos (i :< PosUp _)) = virtualPos $ Pos $ i :< PosUnit
@@ -41,13 +40,12 @@ virtualNeg (Neg (i :< NegAppForce funName args)) = do
   s <- newNameWith "tmp"
   resultType <- lookupPolTypeEnv' i
   insPolTypeEnv s resultType
-  let args' = map DataLocal args
   tmp <- addMeta $ CodeReturn $ DataLocal s
-  addMeta $ CodeCall s (DataLocal funName) args' tmp
+  addMeta $ CodeCall s funName args tmp
 virtualNeg (Neg (_ :< NegCase z (x, y) e)) = do
   e' <- virtualNeg $ Neg e
-  tmp <- addMeta $ CodeExtractValue y (DataLocal z) 1 e'
-  addMeta $ CodeExtractValue x (DataLocal z) 0 tmp
+  tmp <- addMeta $ CodeExtractValue y z 1 e'
+  addMeta $ CodeExtractValue x z 0 tmp
 virtualNeg (Neg (_ :< NegReturn v)) = do
   d <- virtualPos v
   x <- newName

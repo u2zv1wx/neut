@@ -17,45 +17,42 @@ import qualified Text.Show.Pretty           as Pr
 
 import           Debug.Trace
 
-asmCode :: Code -> WithEnv [Asm]
-asmCode (CodeReturn d)
-  -- t <- lookupTypeEnv' meta
- = do
-  tmp <- newNameWith "tmp"
-  -- insTypeEnv tmp t
-  asms <- asmData tmp d
-  return $ asms ++ [AsmReturn tmp]
-asmCode (CodeLet i d cont)
-  -- t <- lookupTypeEnv' meta
- = do
-  load <- asmData i d
+asmCode :: Code -> WithEnv Asm
+asmCode (_ :< CodeReturn d) = asmData "%rax" d AsmReturn
+asmCode (_ :< CodeLet i d cont) = do
   cont' <- asmCode cont
-  return $ load ++ cont'
-asmCode (CodeCall x fun args cont) = do
-  asmCont <- asmCode cont
-  return $ AsmLet x (AsmCall fun args) : asmCont
-
-asmData :: Identifier -> Data -> WithEnv [Asm]
-asmData tmp (DataLocal x) = asmCopy (AsmDataLocal x) tmp
-asmData tmp (DataGlobal x) = asmCopy (AsmDataGlobal x) tmp
-asmData tmp (DataElemAtIndex basePointer idx) =
-  return [AsmLet tmp (AsmGetElemPointer basePointer idx)]
-asmData tmp (DataInt32 i) = asmCopy (AsmDataInt32 i) tmp
-asmData tmp DataNullPtr = undefined
-asmData tmp (DataStruct xs) = undefined
-
-foo :: Data -> WithEnv AsmData
-foo (DataLocal x)                     = return $ AsmDataLocal x
-foo (DataGlobal x)                    = return $ AsmDataGlobal x
-foo (DataElemAtIndex basePointer idx) = undefined --return $ AsmGetElemPointer basePointer idx
-foo (DataInt32 i)                     = return $ AsmDataInt32 i
-foo DataNullPtr                       = return AsmDataNullPtr
-foo (DataStruct xs)                   = return $ AsmDataStruct xs
-
--- temporary
-asmCopy :: AsmData -> Identifier -> WithEnv [Asm]
-asmCopy from to = do
+  asmData i d cont'
+asmCode (meta :< CodeCall _ fun _ cont) = do
+  let lvs = codeMetaLive meta
+  cont' <- asmCode cont
+  return $ stackSave lvs $ AsmCall fun $ stackRestore lvs cont'
+asmCode (_ :< CodeExtractValue x base idx cont) = do
   undefined
-  -- t <- lookupTypeEnv' to
-  -- t' <- unwrapDown t
-  -- return [AsmLet to (AsmAlloc t'), AsmStore from to]
+asmCode (_ :< CodeStackSave x cont) = do
+  cont' <- asmCode cont
+  return $ AsmPush x cont'
+asmCode (_ :< CodeStackRestore x cont) = do
+  cont' <- asmCode cont
+  return $ AsmPop x cont'
+
+asmData :: Identifier -> Data -> Asm -> WithEnv Asm
+asmData tmp (DataLocal x) cont = do
+  tmp' <- lookupRegEnv' tmp
+  x' <- lookupRegEnv' x
+  return $ AsmMov tmp' x' cont --asmCopy (AsmDataLocal x) tmp
+asmData tmp (DataLabel x) cont = do
+  tmp' <- lookupRegEnv' tmp
+  return $ AsmMov tmp' x cont
+asmData tmp DataNullPtr cont = undefined
+asmData tmp (DataStruct xs) cont = do
+  is <- mapM sizeOf xs
+  undefined
+
+stackSave :: [Identifier] -> Asm -> Asm
+stackSave xs asm = foldr AsmPush asm xs
+
+stackRestore :: [Identifier] -> Asm -> Asm
+stackRestore xs asm = foldr AsmPop asm xs
+
+sizeOf :: Identifier -> WithEnv Int
+sizeOf = undefined

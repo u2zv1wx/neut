@@ -118,7 +118,7 @@ data Data
   = DataLocal Identifier
   | DataLabel Identifier
   | DataNullPtr
-  | DataStruct [Data]
+  | DataStruct [Identifier]
   deriving (Show)
 
 type Address = Identifier
@@ -129,11 +129,11 @@ data CodeF a
             Data
             a
   | CodeCall Identifier -- the register that stores the result of a function call
-             Data -- the name of the function
-             [Data] -- arguments
+             Identifier -- the name of the function
+             [Identifier] -- arguments
              a -- continuation
   | CodeExtractValue Identifier
-                     Data
+                     Identifier
                      Int
                      a
   | CodeStackSave Identifier -- the pointer created by stacksave
@@ -167,28 +167,25 @@ addMeta pc = do
 data AsmData
   = AsmDataLocal Identifier
   | AsmDataGlobal Identifier
-  | AsmDataInt32 Int
+  | AsmDataInt Int
   | AsmDataNullPtr
   | AsmDataStruct [Identifier]
   deriving (Show)
 
 data Asm
-  = AsmReturn Identifier
-  | AsmLet Identifier
-           AsmOperation
-  | AsmStore AsmData -- source data
-             Identifier -- destination register
-  deriving (Show)
-
-data AsmOperation
-  = AsmAlloc Term
-  | AsmGetElemPointer Identifier -- base register
-                      Index -- index
+  = AsmReturn
+  | AsmMov Identifier
+           Identifier
+           Asm
+  | AsmLea Identifier
+           Identifier
+           Asm
   | AsmCall Identifier
-            [Identifier]
-  | AsmBitcast Term
-               Identifier
-               Term
+            Asm
+  | AsmPush Identifier
+            Asm
+  | AsmPop Identifier
+           Asm
   deriving (Show)
 
 instance (Show a) => Show (IORef a) where
@@ -352,6 +349,13 @@ insConstraintEnv t1 t2 =
 
 lookupRegEnv :: Identifier -> WithEnv (Maybe Int)
 lookupRegEnv s = gets (lookup s . regEnv)
+
+lookupRegEnv' :: Identifier -> WithEnv Identifier
+lookupRegEnv' s = do
+  tmp <- gets (lookup s . regEnv)
+  case tmp of
+    Just i  -> return $ numToReg i
+    Nothing -> lift $ throwE $ "no such register: " ++ show s
 
 insRegEnv :: Identifier -> Int -> WithEnv ()
 insRegEnv x i = modify (\e -> e {regEnv = (x, i) : regEnv e})
@@ -622,3 +626,6 @@ wrapType t = do
   u <- wrap NeutUniv
   insTypeEnv meta u
   return $ meta :< t
+
+numToReg :: Int -> Identifier
+numToReg = undefined

@@ -36,16 +36,13 @@ annotCode (meta :< CodeLet x d cont) = do
   return $ meta {codeMetaUse = uvs, codeMetaDef = [x]} :< CodeLet x d cont'
 annotCode (meta :< CodeCall x fun args cont) = do
   cont' <- annotCode cont
-  let uvs1 = varsInData fun
-  let uvs2 = concatMap varsInData args
   return $
-    meta {codeMetaUse = uvs1 ++ uvs2, codeMetaDef = [x]} :<
+    meta {codeMetaUse = fun : args, codeMetaDef = [x]} :<
     CodeCall x fun args cont'
 annotCode (meta :< CodeExtractValue x base idx cont) = do
   cont' <- annotCode cont
-  let uvs = varsInData base
   return $
-    meta {codeMetaUse = uvs, codeMetaDef = [x]} :<
+    meta {codeMetaUse = [base], codeMetaDef = [x]} :<
     CodeExtractValue x base idx cont'
 annotCode (meta :< CodeStackSave x cont) = do
   cont' <- annotCode cont
@@ -58,7 +55,7 @@ varsInData :: Data -> [Identifier]
 varsInData (DataLocal x)   = [x]
 varsInData (DataLabel _)   = [] -- a label is not a variable
 varsInData DataNullPtr     = []
-varsInData (DataStruct ds) = concatMap varsInData ds
+varsInData (DataStruct ds) = ds
 
 livenessAnalysis :: WithEnv ()
 livenessAnalysis = do

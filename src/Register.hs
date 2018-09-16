@@ -115,6 +115,3 @@ edgeInfo (meta :< CodeStackSave _ cont) = do
 edgeInfo (meta :< CodeStackRestore _ cont) = do
   info <- edgeInfo cont
   return $ codeMetaLive meta : info
-
-numToReg :: Int -> Identifier
-numToReg = undefined
