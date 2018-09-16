@@ -66,9 +66,9 @@ $(deriveShow1 ''NeutF)
 
 data PosF c v
   = PosVar Identifier
-  | PosForall (Identifier, v) -- forall-form
+  | PosForall [(Identifier, v)] -- forall-form
               v
-  | PosExists (Identifier, v) -- exists-form
+  | PosExists [(Identifier, v)] -- exists-form
               v
   | PosPair Identifier -- exists-intro
             Identifier
@@ -523,14 +523,16 @@ substIdent sub x = fromMaybe x (lookup x sub)
 
 substPos :: SubstIdent -> Pos -> Pos
 substPos sub (Pos (j :< PosVar s)) = Pos $ j :< PosVar (substIdent sub s)
-substPos sub (Pos (j :< PosForall (s, tdom) tcod)) = do
-  let Pos tdom' = substPos sub $ Pos tdom
-  let Pos tcod' = substPos sub $ Pos tcod
-  Pos $ j :< PosForall (s, tdom') tcod'
-substPos sub (Pos (j :< PosExists (s, tdom) tcod)) = do
-  let Pos tdom' = substPos sub $ Pos tdom
-  let Pos tcod' = substPos sub $ Pos tcod
-  Pos $ j :< PosExists (s, tdom') tcod'
+substPos sub (Pos (j :< PosForall xts tcod)) = do
+  undefined
+  -- let Pos tdom' = substPos sub $ Pos tdom
+  -- let Pos tcod' = substPos sub $ Pos tcod
+  -- Pos $ j :< PosForall (s, tdom') tcod'
+substPos sub (Pos (j :< PosExists xts tcod)) = do
+  undefined
+  -- let Pos tdom' = substPos sub $ Pos tdom
+  -- let Pos tcod' = substPos sub $ Pos tcod
+  -- Pos $ j :< PosExists (s, tdom') tcod'
 substPos sub (Pos (j :< PosPair x y)) = do
   let x' = substIdent sub x
   let y' = substIdent sub y

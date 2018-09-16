@@ -19,11 +19,13 @@ polarize (i :< NeutVar s) = do
   insPolTypeEnv i t
   (j, _) <- newNameOfTypeUp t
   return $ Comp $ Neg $ j :< (NegReturn $ Pos $ i :< PosVar s)
-polarize (i :< NeutForall (x, tdom) tcod) = do
-  Pos tdom' <- polarize tdom >>= toPos
-  Pos tcod' <- polarize tcod >>= toPos
-  return $
-    Value $ Pos $ i :< PosDown (i :< PosForall (x, tdom') (i :< PosUp tcod'))
+polarize forall@(i :< NeutForall _ _) = do
+  (body, xts) <- toForallSeq forall
+  Pos body' <- polarize body >>= toPos
+  let (xs, ts) = unzip xts
+  ts' <- mapM (polarize >=> toPos') ts
+  let xts' = zip xs ts'
+  return $ Value $ Pos $ i :< PosDown (i :< PosForall xts' (i :< PosUp body'))
 polarize lam@(i :< NeutLam _ _) = do
   (body, args) <- toLamSeq lam
   c <- polarize body >>= toNeg
@@ -42,10 +44,13 @@ polarize e@(i :< NeutApp _ _) = do
     j
     (zip formalArgs argList ++ [(funName, fun)])
     (Neg $ j :< NegAppForce funName formalArgs)
-polarize (i :< NeutExists (x, tdom) tcod) = do
-  Pos tdom' <- polarize tdom >>= toPos
-  Pos tcod' <- polarize tcod >>= toPos
-  return $ Value $ Pos $ i :< PosExists (x, tdom') tcod'
+polarize exists@(i :< NeutExists _ _) = do
+  (body, xts) <- toExistsSeq exists
+  Pos body' <- polarize body >>= toPos
+  let (xs, ts) = unzip xts
+  ts' <- mapM (polarize >=> toPos') ts
+  let xts' = zip xs ts'
+  return $ Value $ Pos $ i :< PosExists xts' body'
 polarize (i :< NeutPair v1 v2) = do
   t <- lookupTypeEnv' i >>= polarize >>= toPos
   (j, _) <- newNameOfTypeUp t
@@ -76,6 +81,10 @@ polarize (i :< NeutMu s e) = do
 toPos :: Term -> WithEnv Pos
 toPos (Value (Pos c)) = return $ Pos c
 toPos e = lift $ throwE $ "the polarity of " ++ show e ++ " is wrong"
+
+toPos' :: Term -> WithEnv PrePos
+toPos' (Value (Pos c)) = return c
+toPos' e = lift $ throwE $ "the polarity of " ++ show e ++ " is wrong"
 
 toNeg :: Term -> WithEnv Neg
 toNeg (Comp (Neg c)) = return $ Neg c
@@ -119,3 +128,15 @@ toLamSeq (_ :< NeutLam (x, _) body) = do
   (body', args) <- toLamSeq body
   return (body', x : args)
 toLamSeq t = return (t, [])
+
+toForallSeq :: Neut -> WithEnv (Neut, [(Identifier, Neut)])
+toForallSeq (_ :< NeutForall (x, t) body) = do
+  (body', args) <- toForallSeq body
+  return (body', (x, t) : args)
+toForallSeq t = return (t, [])
+
+toExistsSeq :: Neut -> WithEnv (Neut, [(Identifier, Neut)])
+toExistsSeq (_ :< NeutExists (x, t) body) = do
+  (body', args) <- toExistsSeq body
+  return (body', (x, t) : args)
+toExistsSeq t = return (t, [])
