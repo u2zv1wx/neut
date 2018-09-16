@@ -27,44 +27,44 @@ infer :: Neut -> WithEnv Neut
 infer (meta :< NeutVar s) = do
   t <- lookupTypeEnv' s
   returnMeta meta t
-infer (meta :< NeutForall (s, tdom) tcod) = do
+infer (meta :< NeutPi (s, tdom) tcod) = do
   mustBeType tdom
   insTypeEnv s tdom
   mustBeType tcod
   return $ meta :< NeutUniv
-infer (meta :< NeutLam (s, tdom) e) = do
+infer (meta :< NeutPiIntro (s, tdom) e) = do
   mustBeType tdom
   insTypeEnv s tdom
   te <- infer e
-  wrapType (NeutForall (s, tdom) te) >>= returnMeta meta
-infer (meta :< NeutApp e1 e2) = do
+  wrapType (NeutPi (s, tdom) te) >>= returnMeta meta
+infer (meta :< NeutPiElim e1 e2) = do
   t1 <- infer e1 -- forall (x : tdom). tcod
   tdom <- infer e2
   tcod <- newHole
   x <- newNameOfType tdom
   typeMeta2 <- newNameWith "meta"
-  insConstraintEnv t1 (typeMeta2 :< NeutForall (x, tdom) tcod) -- t1 == forall (x : tdom). tcod
+  insConstraintEnv t1 (typeMeta2 :< NeutPi (x, tdom) tcod) -- t1 == forall (x : tdom). tcod
   bindWithLet' x e2 tcod >>= returnMeta meta -- tcod {x := e2}
-infer (meta :< NeutExists (s, tdom) tcod) = do
+infer (meta :< NeutSigma (s, tdom) tcod) = do
   mustBeType tdom
   insTypeEnv s tdom
   mustBeType tcod
   return $ meta :< NeutUniv
-infer (meta :< NeutPair e1 e2) = do
+infer (meta :< NeutSigmaIntro e1 e2) = do
   t1 <- infer e1 -- A
   x <- newNameOfType t1
   t2 <- infer e2 -- B {x := e1}
   t2nosub <- newHole -- B
   t2sub <- bindWithLet' x e1 t2nosub -- B {x := e1}
   insConstraintEnv t2 t2sub
-  wrapType (NeutExists (x, t1) t2nosub) >>= returnMeta meta -- Sigma (x : A). B
-infer (meta :< NeutCase e1 (x, y) e2) = do
+  wrapType (NeutSigma (x, t1) t2nosub) >>= returnMeta meta -- Sigma (x : A). B
+infer (meta :< NeutSigmaElim e1 (x, y) e2) = do
   t1 <- infer e1
   xHole <- newHole
   insTypeEnv x xHole
   yHole <- newHole
   insTypeEnv y yHole
-  sigmaType <- wrapType $ NeutExists (x, xHole) yHole
+  sigmaType <- wrapType $ NeutSigma (x, xHole) yHole
   insConstraintEnv t1 sigmaType -- t1 == Sigma (x : A). B
   z <- newNameOfType t1
   pair <- constructPair x y
@@ -81,7 +81,7 @@ infer (meta :< NeutMu s e) = do
   insConstraintEnv te trec
   returnMeta meta te
 infer (meta :< NeutTop) = wrap NeutUniv >>= returnMeta meta
-infer (meta :< NeutUnit) = wrapType NeutTop >>= returnMeta meta
+infer (meta :< NeutTopIntro) = wrapType NeutTop >>= returnMeta meta
 infer (_ :< NeutUniv) = error "the level of type universe hierarchy is upto 2"
 infer (meta :< NeutHole _) = wrap NeutUniv >>= returnMeta meta
 
@@ -90,7 +90,7 @@ constructPair x y = do
   eMeta <- newName
   xMeta <- newName
   yMeta <- newName
-  let pair = eMeta :< NeutPair (xMeta :< NeutVar x) (yMeta :< NeutVar y)
+  let pair = eMeta :< NeutSigmaIntro (xMeta :< NeutVar x) (yMeta :< NeutVar y)
   _ <- infer pair
   return pair
 
@@ -164,9 +164,9 @@ unify ((t1, _ :< NeutHole s):cs) = do
   (compose sub [(s, t1)], cs')
 unify ((_ :< NeutVar s1, _ :< NeutVar s2):cs)
   | s1 == s2 = unify cs
-unify ((_ :< NeutForall (_, tdom1) tcod1, _ :< NeutForall (_, tdom2) tcod2):cs) =
+unify ((_ :< NeutPi (_, tdom1) tcod1, _ :< NeutPi (_, tdom2) tcod2):cs) =
   unify $ (tdom1, tdom2) : (tcod1, tcod2) : cs
-unify ((_ :< NeutExists (_, tdom1) tcod1, _ :< NeutExists (_, tdom2) tcod2):cs) =
+unify ((_ :< NeutSigma (_, tdom1) tcod1, _ :< NeutSigma (_, tdom2) tcod2):cs) =
   unify $ (tdom1, tdom2) : (tcod1, tcod2) : cs
 unify ((_ :< NeutTop, _ :< NeutTop):cs) = unify cs
 unify ((_ :< NeutUniv, _ :< NeutUniv):cs) = unify cs

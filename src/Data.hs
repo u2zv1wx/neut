@@ -40,21 +40,21 @@ type Tree = Cofree TreeF Identifier
 
 data NeutF a
   = NeutVar Identifier
-  | NeutForall (Identifier, a) -- forall-form
+  | NeutPi (Identifier, a) -- forall-form
+           a
+  | NeutPiIntro (Identifier, a) -- forall-intro
+                a
+  | NeutPiElim a -- forall-elim
                a
-  | NeutLam (Identifier, a) -- forall-intro
-            a
-  | NeutApp a -- forall-elim
-            a
-  | NeutExists (Identifier, a) -- exists-form
-               a
-  | NeutPair a -- exists-intro
-             a
-  | NeutCase a
-             (Identifier, Identifier) -- exists-elim
-             a
+  | NeutSigma (Identifier, a) -- exists-form
+              a
+  | NeutSigmaIntro a -- exists-intro
+                   a
+  | NeutSigmaElim a
+                  (Identifier, Identifier) -- exists-elim
+                  a
   | NeutTop -- top-form
-  | NeutUnit -- top-intro
+  | NeutTopIntro -- top-intro
   | NeutUniv
   | NeutMu Identifier -- recursion
            a
@@ -66,29 +66,29 @@ $(deriveShow1 ''NeutF)
 
 data PosF c v
   = PosVar Identifier
-  | PosForall [(Identifier, v)] -- forall-form
-              v
-  | PosExists [(Identifier, v)] -- exists-form
-              v
-  | PosPair [Identifier]
+  | PosPi [(Identifier, v)] -- forall-form
+          v
+  | PosSigma [(Identifier, v)] -- exists-form
+             v
+  | PosSigmaIntro [Identifier]
   | PosTop -- top-form
-  | PosUnit -- top-intro
+  | PosTopIntro -- top-intro
   | PosDown v -- down-form
-  | PosThunkLam [Identifier]
-                c
+  | PosDownIntroPiIntro [Identifier]
+                        c
   | PosUp v -- up-form
   | PosUniv
 
 data NegF v c
-  = NegAppForce Identifier
-                [Identifier]
-  | NegCase Identifier
-            (Identifier, Identifier) -- exists-elim
-            c
-  | NegReturn v -- up-intro
-  | NegBind Identifier -- up-elim
-            c
-            c
+  = NegPiElimDownElim Identifier
+                      [Identifier]
+  | NegSigmaElim Identifier
+                 (Identifier, Identifier) -- exists-elim
+                 c
+  | NegUpIntro v -- up-intro
+  | NegUpElim Identifier -- up-elim
+              c
+              c
 
 $(deriveShow1 ''PosF)
 
@@ -404,10 +404,10 @@ appFold e [] = return e
 appFold e@(i :< _) (term:ts) = do
   t <- lookupTypeEnv' i
   case t of
-    _ :< NeutForall _ tcod -> do
+    _ :< NeutPi _ tcod -> do
       meta <- newNameWith "meta"
       insTypeEnv meta tcod
-      appFold (meta :< NeutApp e term) ts
+      appFold (meta :< NeutPiElim e term) ts
     _ -> error "Lift.appFold"
 
 constructFormalArgs :: [Identifier] -> WithEnv [Identifier]
@@ -435,11 +435,11 @@ bindFormalArgs (arg:xs) c@(metaLam :< _) = do
   meta <- newNameWith "meta"
   univMeta <- newNameWith "meta"
   insTypeEnv univMeta (univMeta :< NeutUniv)
-  insTypeEnv meta (univMeta :< NeutForall (arg, tArg) tLam)
-  return $ meta :< NeutLam (arg, tArg) tmp
+  insTypeEnv meta (univMeta :< NeutPi (arg, tArg) tLam)
+  return $ meta :< NeutPiIntro (arg, tArg) tmp
 
 forallArgs :: Neut -> (Neut, [(Identifier, Neut, Identifier)])
-forallArgs (meta :< NeutForall (i, vt) t) = do
+forallArgs (meta :< NeutPi (i, vt) t) = do
   let (body, xs) = forallArgs t
   (body, (i, vt, meta) : xs)
 forallArgs body = (body, [])
@@ -447,29 +447,29 @@ forallArgs body = (body, [])
 coForallArgs :: (Neut, [(Identifier, Neut, Identifier)]) -> Neut
 coForallArgs (t, []) = t
 coForallArgs (t, (i, tdom, meta):ts) =
-  coForallArgs (meta :< NeutForall (i, tdom) t, ts)
+  coForallArgs (meta :< NeutPi (i, tdom) t, ts)
 
 funAndArgs :: Neut -> WithEnv (Neut, [(Identifier, Neut)])
-funAndArgs (i :< NeutApp e v) = do
+funAndArgs (i :< NeutPiElim e v) = do
   (fun, xs) <- funAndArgs e
   return (fun, (i, v) : xs)
 funAndArgs c = return (c, [])
 
 coFunAndArgs :: (Neut, [(Identifier, Neut)]) -> Neut
 coFunAndArgs (term, [])        = term
-coFunAndArgs (term, (i, v):xs) = coFunAndArgs (i :< NeutApp term v, xs)
+coFunAndArgs (term, (i, v):xs) = coFunAndArgs (i :< NeutPiElim term v, xs)
 
 var :: Neut -> [Identifier]
 var (_ :< NeutVar s) = [s]
-var (_ :< NeutForall (i, tdom) tcod) = var tdom ++ filter (/= i) (var tcod)
-var (_ :< NeutLam (s, tdom) e) = var tdom ++ filter (/= s) (var e)
-var (_ :< NeutApp e v) = var e ++ var v
-var (_ :< NeutExists (i, tdom) tcod) = var tdom ++ filter (/= i) (var tcod)
-var (_ :< NeutPair v1 v2) = var v1 ++ var v2
-var (_ :< NeutCase e1 (x, y) e2) =
+var (_ :< NeutPi (i, tdom) tcod) = var tdom ++ filter (/= i) (var tcod)
+var (_ :< NeutPiIntro (s, tdom) e) = var tdom ++ filter (/= s) (var e)
+var (_ :< NeutPiElim e v) = var e ++ var v
+var (_ :< NeutSigma (i, tdom) tcod) = var tdom ++ filter (/= i) (var tcod)
+var (_ :< NeutSigmaIntro v1 v2) = var v1 ++ var v2
+var (_ :< NeutSigmaElim e1 (x, y) e2) =
   var e1 ++ filter (\s -> s /= x && s /= y) (var e2)
 var (_ :< NeutTop) = []
-var (_ :< NeutUnit) = []
+var (_ :< NeutTopIntro) = []
 var (_ :< NeutUniv) = []
 var (_ :< NeutMu s e) = filter (/= s) (var e)
 var (_ :< NeutHole _) = []
@@ -478,32 +478,32 @@ type Subst = [(Identifier, Neut)]
 
 subst :: Subst -> Neut -> Neut
 subst _ (j :< NeutVar s) = j :< NeutVar s
-subst sub (j :< NeutForall (s, tdom) tcod) = do
+subst sub (j :< NeutPi (s, tdom) tcod) = do
   let tdom' = subst sub tdom
   let tcod' = subst sub tcod -- note that we don't have to drop s from sub, thanks to rename.
-  j :< NeutForall (s, tdom') tcod'
-subst sub (j :< NeutLam (s, tdom) body) = do
+  j :< NeutPi (s, tdom') tcod'
+subst sub (j :< NeutPiIntro (s, tdom) body) = do
   let tdom' = subst sub tdom
   let body' = subst sub body
-  j :< NeutLam (s, tdom') body'
-subst sub (j :< NeutApp e1 e2) = do
+  j :< NeutPiIntro (s, tdom') body'
+subst sub (j :< NeutPiElim e1 e2) = do
   let e1' = subst sub e1
   let e2' = subst sub e2
-  j :< NeutApp e1' e2'
-subst sub (j :< NeutExists (s, tdom) tcod) = do
+  j :< NeutPiElim e1' e2'
+subst sub (j :< NeutSigma (s, tdom) tcod) = do
   let tdom' = subst sub tdom
   let tcod' = subst sub tcod
-  j :< NeutExists (s, tdom') tcod'
-subst sub (j :< NeutPair e1 e2) = do
+  j :< NeutSigma (s, tdom') tcod'
+subst sub (j :< NeutSigmaIntro e1 e2) = do
   let e1' = subst sub e1
   let e2' = subst sub e2
-  j :< NeutPair e1' e2'
-subst sub (j :< NeutCase e1 (x, y) e2) = do
+  j :< NeutSigmaIntro e1' e2'
+subst sub (j :< NeutSigmaElim e1 (x, y) e2) = do
   let e1' = subst sub e1
   let e2' = subst sub e2
-  j :< NeutCase e1' (x, y) e2'
+  j :< NeutSigmaElim e1' (x, y) e2'
 subst _ (j :< NeutTop) = j :< NeutTop
-subst _ (j :< NeutUnit) = j :< NeutUnit
+subst _ (j :< NeutTopIntro) = j :< NeutTopIntro
 subst _ (j :< NeutUniv) = j :< NeutUniv
 subst sub (j :< NeutMu x e) = do
   let e' = subst sub e
@@ -517,50 +517,50 @@ substIdent sub x = fromMaybe x (lookup x sub)
 
 substPos :: SubstIdent -> Pos -> Pos
 substPos sub (Pos (j :< PosVar s)) = Pos $ j :< PosVar (substIdent sub s)
-substPos sub (Pos (j :< PosForall xts tcod)) = do
+substPos sub (Pos (j :< PosPi xts tcod)) = do
   undefined
   -- let Pos tdom' = substPos sub $ Pos tdom
   -- let Pos tcod' = substPos sub $ Pos tcod
-  -- Pos $ j :< PosForall (s, tdom') tcod'
-substPos sub (Pos (j :< PosExists xts tcod)) = do
+  -- Pos $ j :< PosPi (s, tdom') tcod'
+substPos sub (Pos (j :< PosSigma xts tcod)) = do
   undefined
   -- let Pos tdom' = substPos sub $ Pos tdom
   -- let Pos tcod' = substPos sub $ Pos tcod
-  -- Pos $ j :< PosExists (s, tdom') tcod'
-substPos sub (Pos (j :< PosPair xs)) = do
+  -- Pos $ j :< PosSigma (s, tdom') tcod'
+substPos sub (Pos (j :< PosSigmaIntro xs)) = do
   let xs' = map (substIdent sub) xs
   -- let x' = substIdent sub x
   -- let y' = substIdent sub y
-  Pos $ j :< PosPair xs'
+  Pos $ j :< PosSigmaIntro xs'
 substPos sub (Pos (j :< PosDown t)) = do
   let Pos t' = substPos sub $ Pos t
   Pos $ j :< PosDown t'
-substPos sub (Pos (j :< PosThunkLam s body)) = do
+substPos sub (Pos (j :< PosDownIntroPiIntro s body)) = do
   let body' = substNeg sub body
-  Pos $ j :< PosThunkLam s body'
+  Pos $ j :< PosDownIntroPiIntro s body'
 substPos sub (Pos (j :< PosUp t)) = do
   let Pos t' = substPos sub $ Pos t
   Pos $ j :< PosUp t'
 substPos _ (Pos (j :< PosTop)) = Pos $ j :< PosTop
-substPos _ (Pos (j :< PosUnit)) = Pos $ j :< PosUnit
+substPos _ (Pos (j :< PosTopIntro)) = Pos $ j :< PosTopIntro
 substPos _ (Pos (j :< PosUniv)) = Pos $ j :< PosUniv
 
 substNeg :: SubstIdent -> Neg -> Neg
-substNeg sub (Neg (j :< NegAppForce e vs)) = do
+substNeg sub (Neg (j :< NegPiElimDownElim e vs)) = do
   let e' = substIdent sub e
   let vs' = map (substIdent sub) vs
-  Neg $ j :< NegAppForce e' vs'
-substNeg sub (Neg (j :< NegCase v (x, y) e)) = do
+  Neg $ j :< NegPiElimDownElim e' vs'
+substNeg sub (Neg (j :< NegSigmaElim v (x, y) e)) = do
   let v' = substIdent sub v
   let Neg e' = substNeg sub $ Neg e
-  Neg $ j :< NegCase v' (x, y) e'
-substNeg sub (Neg (j :< NegReturn v)) = do
+  Neg $ j :< NegSigmaElim v' (x, y) e'
+substNeg sub (Neg (j :< NegUpIntro v)) = do
   let v' = substPos sub v
-  Neg $ j :< NegReturn v'
-substNeg sub (Neg (j :< NegBind x e1 e2)) = do
+  Neg $ j :< NegUpIntro v'
+substNeg sub (Neg (j :< NegUpElim x e1 e2)) = do
   let Neg e1' = substNeg sub $ Neg e1
   let Neg e2' = substNeg sub $ Neg e2
-  Neg $ j :< NegBind x e1' e2'
+  Neg $ j :< NegUpElim x e1' e2'
 
 compose :: Subst -> Subst -> Subst
 compose s1 s2 = do
@@ -571,27 +571,27 @@ compose s1 s2 = do
   fromS1 ++ zip domS2 codS2'
 
 reduce :: Neut -> Neut
-reduce (i :< NeutApp e1 e2) = do
+reduce (i :< NeutPiElim e1 e2) = do
   let e2' = reduce e2
   let e1' = reduce e1
   case e1' of
-    _ :< NeutLam (arg, _) body -> do
+    _ :< NeutPiIntro (arg, _) body -> do
       let sub = [(arg, reduce e2)]
       let _ :< body' = subst sub body
       reduce $ i :< body'
-    _ -> i :< NeutApp e1' e2'
-reduce (i :< NeutPair e1 e2) = do
+    _ -> i :< NeutPiElim e1' e2'
+reduce (i :< NeutSigmaIntro e1 e2) = do
   let e1' = reduce e1
   let e2' = reduce e2
-  i :< NeutPair e1' e2'
-reduce (i :< NeutCase e (x, y) body) = do
+  i :< NeutSigmaIntro e1' e2'
+reduce (i :< NeutSigmaElim e (x, y) body) = do
   let e' = reduce e
   case e of
-    _ :< NeutPair e1 e2 -> do
+    _ :< NeutSigmaIntro e1 e2 -> do
       let sub = [(x, reduce e1), (y, reduce e2)]
       let _ :< body' = subst sub body
       reduce $ i :< body'
-    _ -> i :< NeutCase e' (x, y) body
+    _ -> i :< NeutSigmaElim e' (x, y) body
 reduce (meta :< NeutMu s c) = do
   let c' = reduce c
   meta :< NeutMu s c'
@@ -603,7 +603,7 @@ bindWithLet x e1 e2 = do
   i <- newName
   j <- newName
   tdom <- lookupTypeEnv' x
-  return $ j :< NeutApp (i :< NeutLam (x, tdom) e2) e1
+  return $ j :< NeutPiElim (i :< NeutPiIntro (x, tdom) e2) e1
 
 pendSubst :: Subst -> Neut -> WithEnv Neut
 pendSubst [] e = return e

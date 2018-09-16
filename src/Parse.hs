@@ -22,26 +22,26 @@ parse :: Tree -> WithEnv Neut
 parse (_ :< TreeNode [_ :< TreeAtom "forall", _ :< TreeNode ts, tn]) = do
   its <- mapM parseArg ts
   n <- parse tn
-  foldMR NeutForall n its
+  foldMR NeutPi n its
 parse (meta :< TreeNode [_ :< TreeAtom "lambda", _ :< TreeNode ts, te]) = do
   xs <- mapM parseArg ts
   e <- parse te
-  _ :< term <- foldMR NeutLam e xs
+  _ :< term <- foldMR NeutPiIntro e xs
   return $ meta :< term
 parse (_ :< TreeNode [_ :< TreeAtom "exists", _ :< TreeNode ts, tn]) = do
   its <- mapM parseArg ts
   n <- parse tn
-  foldMR NeutExists n its
+  foldMR NeutSigma n its
 parse (meta :< TreeNode [_ :< TreeAtom "pair", t1, t2]) = do
   e1 <- parse t1
   e2 <- parse t2
-  return $ meta :< NeutPair e1 e2
+  return $ meta :< NeutSigmaIntro e1 e2
 parse (meta :< TreeNode [_ :< TreeAtom "case", t, _ :< TreeNode [_ :< TreeAtom "pair", _ :< TreeAtom x, _ :< TreeAtom y], tbody]) = do
   e <- parse t
   body <- parse tbody
-  return $ meta :< NeutCase e (x, y) body
+  return $ meta :< NeutSigmaElim e (x, y) body
 parse (meta :< TreeAtom "top") = return $ meta :< NeutTop
-parse (meta :< TreeAtom "unit") = return $ meta :< NeutUnit
+parse (meta :< TreeAtom "unit") = return $ meta :< NeutTopIntro
 parse (meta :< TreeAtom "universe") = return $ meta :< NeutUniv
 parse (meta :< TreeNode [_ :< TreeAtom "mu", _ :< TreeAtom x, te]) = do
   e <- parse te
@@ -50,7 +50,7 @@ parse (meta :< TreeNode (te:tvs))
   | not (null tvs) = do
     e <- parse te
     vs <- mapM parse tvs
-    _ :< tmp <- foldML NeutApp e vs
+    _ :< tmp <- foldML NeutPiElim e vs
     return $ meta :< tmp
 parse (meta :< TreeAtom "_") = do
   name <- newNameWith "hole"
