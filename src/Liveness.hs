@@ -56,7 +56,7 @@ annotCode (meta :< CodeStackRestore x cont) = do
 
 varsInData :: Data -> [Identifier]
 varsInData (DataLocal x)   = [x]
-varsInData (DataGlobal x)  = [x]
+varsInData (DataLabel x)   = [x]
 varsInData DataNullPtr     = []
 varsInData (DataStruct ds) = concatMap varsInData ds
 

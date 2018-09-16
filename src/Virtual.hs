@@ -33,7 +33,7 @@ virtualPos (Pos (i :< PosThunkLam args body)) = do
   lamType <- lookupPolTypeEnv' i
   insPolTypeEnv name lamType
   insCodeEnv name args bodyCode
-  return $ DataGlobal name
+  return $ DataLabel name
 virtualPos (Pos (i :< PosUniv)) = virtualPos $ Pos $ i :< PosUnit
 
 virtualNeg :: Neg -> WithEnv Code
