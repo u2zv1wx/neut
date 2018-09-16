@@ -38,7 +38,8 @@ $(deriveShow1 ''TreeF)
 type Tree = Cofree TreeF Identifier
 
 data WeakType
-  = WeakTypeArrow WeakType -- (arrow A A)  (i.e. forall (_ : A) { A })
+  = WeakTypeVar Identifier
+  | WeakTypeArrow WeakType -- (arrow A A)  (i.e. forall (_ : A) { A })
                   WeakType
   | WeakTypeForall Identifier -- (forall x A)
                    WeakType
@@ -50,10 +51,17 @@ data WeakType
   | WeakTypeSigma [(Identifier, WeakType)] -- (sigma ((x1 A1) ... (xn An)))
   | WeakTypeTop -- top
   | WeakTypeHole Identifier
+  | WeakTypeApp WeakType
+                WeakType
+  | WeakTypeEnum Identifier
+  | WeakTypeSubst WeakType -- t1 { x := t2 }. explicit substitution for type inference.
+                  Identifier
+                  WeakType
   deriving (Show)
 
 data Type
-  = TypeArrow Type
+  = TypeVar Identifier
+  | TypeArrow Type
               Type
   | TypeForall Identifier
                Type
@@ -72,17 +80,17 @@ data Type
 
 data NeutF a
   = NeutVar Identifier -- x
-  | NeutArrowIntro Identifier -- (lambda x e)
+  | NeutArrowIntro (Identifier, WeakType) -- (lambda x e)
                    a
   | NeutArrowElim a -- (e e)
                   a
   | NeutForallIntro Identifier -- (forall x e)
                     a
   | NeutForallElim a -- (instance e A)
-                   Type
+                   WeakType
   | NeutPiIntro [(Identifier, a)] -- (struct ((x1 e1) ... (xn en)))
-  | NeutPiElim a -- (project e x)
-               Identifier
+  | NeutPiElim a -- (project e e)
+               a
   | NeutProductIntro a -- (pair e e)
                      a
   | NeutProductElim a -- (case e ((pair x y) e))
@@ -93,9 +101,9 @@ data NeutF a
   | NeutExistsElim a -- (case e ((exists x y) e))
                    (Identifier, Identifier)
                    a
-  | NeutSigmaIntro Identifier -- (inject x e)
+  | NeutSigmaIntro a -- (inject x e)
                    a
-  | NeutSigmaElim a -- (case e ((inject x1 e1) ... (inject xn en)))
+  | NeutSigmaElim a -- (case e (((inject x1 e1) body1) ... ((inject xn en) bodyn)))
                   [((Identifier, Identifier), a)]
   | NeutTopIntro -- unit
   | NeutMu Identifier -- (mu x e)
@@ -189,6 +197,7 @@ data Env = Env
   { count         :: Int -- to generate fresh symbols
   , notationEnv   :: [(Tree, Tree)] -- macro transformers
   , reservedEnv   :: [Identifier] -- list of reserved keywords
+  , enumEnv       :: [(Identifier, [Identifier])] -- (label-set-name, [list of labels])
   , nameEnv       :: [(Identifier, Identifier)] -- used in alpha conversion
   , typeEnv       :: [(Identifier, WeakType)] -- type environment
   , polTypeEnv    :: [(Identifier, Pos)] -- polarized type environment
@@ -216,6 +225,7 @@ initialEnv =
         , "forall"
         , "up"
         ]
+    , enumEnv = []
     , nameEnv = []
     , typeEnv = []
     , polTypeEnv = []
@@ -338,6 +348,30 @@ insConstraintEnv :: WeakType -> WeakType -> WithEnv ()
 insConstraintEnv t1 t2 =
   modify (\e -> e {constraintEnv = (t1, t2) : constraintEnv e})
 
+insEnumEnv :: Identifier -> [Identifier] -> WithEnv ()
+insEnumEnv name labels = modify (\e -> e {enumEnv = (name, labels) : enumEnv e})
+
+lookupEnumEnv' :: Identifier -> WithEnv [Identifier]
+lookupEnumEnv' name = do
+  mt <- gets (lookup name . enumEnv)
+  case mt of
+    Nothing -> lift $ throwE $ name ++ " is not found in the enum environment."
+    Just t -> return t
+
+lookupEnumKind' :: Identifier -> WithEnv Identifier
+lookupEnumKind' name = do
+  env <- get
+  case findEnumKind name (enumEnv env) of
+    Just x  -> return x
+    Nothing -> lift $ throwE $ "the label " ++ name ++ " is not a defined."
+
+findEnumKind :: Identifier -> [(Identifier, [Identifier])] -> Maybe Identifier
+findEnumKind _ [] = Nothing
+findEnumKind name ((cand, labelList):rest) =
+  if name `elem` labelList
+    then return cand
+    else findEnumKind name rest
+
 local :: WithEnv a -> WithEnv a
 local p = do
   env <- get
@@ -374,6 +408,17 @@ foldMR f e (t:ts) = do
   i <- newName
   return $ i :< x
 
+-- foldMR' ::
+--      (a -> Cofree f Identifier -> f (Cofree f Identifier))
+--   -> Cofree f Identifier
+--   -> [a]
+--   -> StateT Env (ExceptT String IO) (Cofree f Identifier)
+-- foldMR _ e [] = return e
+-- foldMR f e (t:ts) = do
+--   tmp <- foldMR f e ts
+--   let x = f t tmp
+--   i <- newName
+--   return $ i :< x
 letSeq :: [Identifier] -> [Data] -> Code -> WithEnv Code
 letSeq [] [] code = return code
 letSeq (i:is) (d:ds) code = do
@@ -471,9 +516,9 @@ var = undefined
 -- var (_ :< NeutUniv) = []
 -- var (_ :< NeutMu s e) = filter (/= s) (var e)
 -- var (_ :< NeutHole _) = []
-type Subst = [(Identifier, Neut)]
+type Subst = [(Identifier, WeakType)]
 
-subst :: Subst -> Neut -> Neut
+subst :: Subst -> WeakType -> WeakType
 subst = undefined
 
 -- subst _ (j :< NeutVar s) = j :< NeutVar s
@@ -603,12 +648,11 @@ bindWithLet x e1 e2 = do
   undefined
   -- return $ j :< NeutApp (i :< NeutLam (x, tdom) e2) e1
 
-pendSubst :: Subst -> Neut -> WithEnv Neut
-pendSubst [] e = return e
-pendSubst ((x, e1):rest) e = do
-  e' <- pendSubst rest e
-  bindWithLet x e1 e'
-
+-- pendSubst :: Subst -> Neut -> WithEnv Neut
+-- pendSubst [] e = return e
+-- pendSubst ((x, e1):rest) e = do
+--   e' <- pendSubst rest e
+--   bindWithLet x e1 e'
 -- wrap :: NeutF Neut -> WithEnv Neut
 wrap :: f (Cofree f Identifier) -> WithEnv (Cofree f Identifier)
 wrap a = do

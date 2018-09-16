@@ -19,158 +19,92 @@ check main e = do
   t <- infer e
   insTypeEnv main t -- insert the type of main function
   env <- get
-  sub <- unifyLoop (constraintEnv env) 0
+  sub <- unify (constraintEnv env)
   let tenv' = map (\(s, t) -> (s, subst sub t)) $ typeEnv env
   modify (\e -> e {typeEnv = tenv', constraintEnv = []})
 
-infer :: Neut -> WithEnv Neut
+infer :: Neut -> WithEnv WeakType
 infer (meta :< NeutVar s) = do
   t <- lookupTypeEnv' s
   returnMeta meta t
-infer (meta :< NeutForall (s, tdom) tcod) = do
-  mustBeType tdom
-  insTypeEnv s tdom
-  mustBeType tcod
-  return $ meta :< NeutUniv
-infer (meta :< NeutLam (s, tdom) e) = do
-  mustBeType tdom
+infer (meta :< NeutArrowIntro (s, tdom) e) = do
   insTypeEnv s tdom
   te <- infer e
-  wrapType (NeutForall (s, tdom) te) >>= returnMeta meta
-infer (meta :< NeutApp e1 e2) = do
+  returnMeta meta $ WeakTypeArrow tdom te
+infer (meta :< NeutArrowElim e1 e2) = do
   t1 <- infer e1 -- forall (x : tdom). tcod
   tdom <- infer e2
   tcod <- newHole
-  x <- newNameOfType tdom
-  typeMeta2 <- newNameWith "meta"
-  insConstraintEnv t1 (typeMeta2 :< NeutForall (x, tdom) tcod) -- t1 == forall (x : tdom). tcod
-  bindWithLet' x e2 tcod >>= returnMeta meta -- tcod {x := e2}
-infer (meta :< NeutExists (s, tdom) tcod) = do
-  mustBeType tdom
-  insTypeEnv s tdom
-  mustBeType tcod
-  return $ meta :< NeutUniv
-infer (meta :< NeutPair e1 e2) = do
-  t1 <- infer e1 -- A
-  x <- newNameOfType t1
-  t2 <- infer e2 -- B {x := e1}
-  t2nosub <- newHole -- B
-  t2sub <- bindWithLet' x e1 t2nosub -- B {x := e1}
-  insConstraintEnv t2 t2sub
-  wrapType (NeutExists (x, t1) t2nosub) >>= returnMeta meta -- Sigma (x : A). B
-infer (meta :< NeutCase e1 (x, y) e2) = do
+  insConstraintEnv t1 (WeakTypeArrow tdom tcod) -- t1 == forall (x : tdom). tcod
+  returnMeta meta tcod
+infer (meta :< NeutForallIntro x e) = do
+  te <- infer e
+  returnMeta meta $ WeakTypeForall x te
+infer (meta :< NeutForallElim e t) = do
+  te <- infer e -- forall (x : tdom). tcod
+  returnMeta meta $ WeakTypeApp te t
+infer (meta :< NeutPiIntro xs) = undefined
+infer (meta :< NeutPiElim e1 e2) = undefined
+infer (meta :< NeutProductIntro e1 e2) = do
+  t1 <- infer e1
+  t2 <- infer e2
+  returnMeta meta $ WeakTypeProduct t1 t2
+infer (meta :< NeutProductElim e1 (x, y) e2) = do
   t1 <- infer e1
   xHole <- newHole
   insTypeEnv x xHole
   yHole <- newHole
   insTypeEnv y yHole
-  sigmaType <- wrapType $ NeutExists (x, xHole) yHole
-  insConstraintEnv t1 sigmaType -- t1 == Sigma (x : A). B
-  z <- newNameOfType t1
-  pair <- constructPair x y
-  resultHole <- newHole
-  resultType <- bindWithLet' z pair resultHole -- C {z := (x, y)}
-  resultType' <- bindWithLet' z e1 resultHole -- C {z := e1}
+  insConstraintEnv t1 $ WeakTypeProduct xHole yHole
   t2 <- infer e2
-  insConstraintEnv resultType t2
-  returnMeta meta resultType'
+  returnMeta meta t2
+infer (meta :< NeutExistsIntro x e) = do
+  undefined
+infer (meta :< NeutExistsElim e1 (x, y) e2) = do
+  undefined
+infer (meta :< NeutSigmaIntro x e) = do
+  undefined
+infer (meta :< NeutSigmaElim e clauseList) = do
+  undefined
 infer (meta :< NeutMu s e) = do
   trec <- newHole
   insTypeEnv s trec
   te <- infer e
   insConstraintEnv te trec
   returnMeta meta te
-infer (meta :< NeutTop) = wrap NeutUniv >>= returnMeta meta
-infer (meta :< NeutUnit) = wrapType NeutTop >>= returnMeta meta
-infer (_ :< NeutUniv) = error "the level of type universe hierarchy is upto 2"
-infer (meta :< NeutHole _) = wrap NeutUniv >>= returnMeta meta
+infer (meta :< NeutTopIntro) = returnMeta meta WeakTypeTop
 
-constructPair :: Identifier -> Identifier -> WithEnv Neut
-constructPair x y = do
-  eMeta <- newName
-  xMeta <- newName
-  yMeta <- newName
-  let pair = eMeta :< NeutPair (xMeta :< NeutVar x) (yMeta :< NeutVar y)
-  _ <- infer pair
-  return pair
+newHole :: WithEnv WeakType
+newHole = WeakTypeHole <$> newName
 
-newNameOfType :: Neut -> WithEnv Identifier
-newNameOfType t = do
-  i <- newName
-  insTypeEnv i t
-  return i
-
-mustBeType :: Neut -> WithEnv ()
-mustBeType t = do
-  t' <- infer t
-  wrap NeutUniv >>= \u -> insConstraintEnv t' u
-
-bindWithLet' :: Identifier -> Neut -> Neut -> WithEnv Neut
-bindWithLet' x e1 e2 = do
-  e <- bindWithLet x e1 e2
-  infer e >> return e
-
-newHole :: WithEnv Neut
-newHole = do
-  i <- newName
-  wrapType $ NeutHole i
-
-returnMeta :: Identifier -> Neut -> WithEnv Neut
+returnMeta :: Identifier -> WeakType -> WithEnv WeakType
 returnMeta meta t = do
   insTypeEnv meta t
   return t
 
-type Constraint = [(Neut, Neut)]
+type Constraint = [(WeakType, WeakType)]
 
-unifyLoop :: Constraint -> Int -> WithEnv Subst
-unifyLoop [] _ = return []
-unifyLoop ((e1, e2):cs) loopCount =
-  case unify ((reduce e1, reduce e2) : cs) of
-    (s, []) -> return s
-    (s, (e1', e2'):cs') -> do
-      let loopCount' = nextLoopCount (length cs) (length cs') loopCount
-      if didFinishLoop (length cs') loopCount'
-        then unificationFailed (reduce e1) (reduce e2) cs'
-        else do
-          s' <- unifyLoop (cs' ++ [(e1', e2')]) loopCount'
-          return (s ++ s')
-
-unificationFailed :: Neut -> Neut -> Constraint -> WithEnv Subst
-unificationFailed e1 e2 cs =
+unify :: Constraint -> WithEnv Subst
+unify [] = return []
+unify ((WeakTypeHole s, t2):cs) = do
+  sub <- unify (sConstraint [(s, t2)] cs)
+  return $ compose sub [(s, t2)]
+unify ((t1, WeakTypeHole s):cs) = do
+  sub <- unify (sConstraint [(s, t1)] cs)
+  return $ compose sub [(s, t1)]
+unify ((WeakTypeVar s1, WeakTypeVar s2):cs)
+  | s1 == s2 = unify cs
+unify ((WeakTypeForall x tcod1, WeakTypeForall y tcod2):cs) = undefined
+  -- unify $ (tdom1, tdom2) : (tcod1, tcod2) : cs
+unify ((WeakTypeExists x tcod1, WeakTypeExists y tcod2):cs) = undefined
+  -- unify $ (tdom1, tdom2) : (tcod1, tcod2) : cs
+unify ((WeakTypeTop, WeakTypeTop):cs) = unify cs
+unify cs@((e1, e2):_) =
   lift $
   throwE $
   "unification failed for\n" ++
   Pr.ppShow e1 ++
   "\nand\n" ++ Pr.ppShow e2 ++ "\nwith constraints:\n" ++ Pr.ppShow cs
-
-nextLoopCount :: Int -> Int -> Int -> Int
-nextLoopCount i j loopCount = do
-  let lenOld = i + 1
-  let lenNew = j + 1
-  if lenOld <= lenNew
-    then loopCount + 1
-    else 0
-
-didFinishLoop :: Int -> Int -> Bool
-didFinishLoop j loopCount' = loopCount' >= j + 2
-
-unify :: Constraint -> (Subst, Constraint)
-unify [] = ([], [])
-unify ((_ :< NeutHole s, t2):cs) = do
-  let (sub, cs') = unify (sConstraint [(s, t2)] cs)
-  (compose sub [(s, t2)], cs')
-unify ((t1, _ :< NeutHole s):cs) = do
-  let (sub, cs') = unify (sConstraint [(s, t1)] cs)
-  (compose sub [(s, t1)], cs')
-unify ((_ :< NeutVar s1, _ :< NeutVar s2):cs)
-  | s1 == s2 = unify cs
-unify ((_ :< NeutForall (_, tdom1) tcod1, _ :< NeutForall (_, tdom2) tcod2):cs) =
-  unify $ (tdom1, tdom2) : (tcod1, tcod2) : cs
-unify ((_ :< NeutExists (_, tdom1) tcod1, _ :< NeutExists (_, tdom2) tcod2):cs) =
-  unify $ (tdom1, tdom2) : (tcod1, tcod2) : cs
-unify ((_ :< NeutTop, _ :< NeutTop):cs) = unify cs
-unify ((_ :< NeutUniv, _ :< NeutUniv):cs) = unify cs
-unify cs = ([], cs)
 
 sConstraint :: Subst -> Constraint -> Constraint
 sConstraint s = map (\(t1, t2) -> (subst s t1, subst s t2))

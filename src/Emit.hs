@@ -9,7 +9,6 @@ import           Control.Monad.State
 import           Control.Monad.Trans.Except
 import           Data.IORef
 
-import           Asm
 import           Data
 
 import           Control.Comonad.Cofree
@@ -24,180 +23,93 @@ emit :: WithEnv ()
 emit = do
   env <- get
   forM_ (codeEnv env) $ \(label, (args, body)) -> do
-    funType <- lookupTypeEnv' label
-    funType' <- unwrapDown funType
-    let (codType, _) = forallArgs funType'
-    argTypeList <- mapM lookupTypeEnv' args
-    bodyAsm <- asmCode body
-    emitDefine label codType (zip args argTypeList) bodyAsm
-  -- forM_ (valueEnv env) $ \(label, _)
-  --  -> do
-  --   t <- lookupTypeEnv' label
-  --   t' <- unwrapDown t
-  --   asm <- asmConstructor label t'
-  --   let (codType, identTypeList) = forallArgs t'
-  --   emitDefine label codType identTypeList asm
+    let (codType, _) = undefined
+    -- funType <- lookupPolTypeEnv' label
+    -- funType' <- unwrapDown funType
+    -- let (codType, _) = forallArgs funType'
+    argTypeList <- mapM lookupPolTypeEnv' args
+    -- bodyAsm <- asmCode body
+    emitDefine label codType (zip args argTypeList) body
 
-emitAsm :: Asm -> WithEnv ()
-emitAsm (AsmReturn i) = do
-  undefined
-  -- t <- lookupTypeEnv' i
-  -- -- t' <- lookupTypeEnv' i
-  -- -- liftIO $ putStrLn $ "the real type of " ++ i ++ " is " ++ show t'
-  -- if t == t'
-  --   then emitOp $ unwords ["ret", showType t, showRegister i]
-  --   else do
-  --     tmp <- newNameWith "cast"
-  --     emitOp $
-  --       unwords
-  --         [ showRegister tmp
-  --         , "="
-  --         , "bitcast"
-  --         , showType t'
-  --         , showRegister i
-  --         , "to"
-  --         , showType t
-  --         ]
-  --     emitOp $ unwords ["ret", showType t, showRegister tmp]
-emitAsm (AsmLet i op) = emitAsmLet i op
-emitAsm (AsmStore (AsmDataLocal item) dest) = do
-  itemType <- lookupTypeEnv' item
-  destType <- lookupTypeEnv' dest
-  emitOp $
-    unwords
-      [ "store"
-      , showType itemType
-      , showRegister item ++ ","
-      , showType destType
-      , showRegister dest
-      ]
-emitAsm (AsmStore (AsmDataGlobal item) dest) = do
-  itemType <- lookupTypeEnv' item
-  destType <- lookupTypeEnv' dest
-  emitOp $
-    unwords
-      [ "store"
-      , showType itemType
-      , showGlobal item ++ ","
-      , showType destType
-      , showRegister dest
-      ]
-emitAsm (AsmStore (AsmDataInt32 i) dest) = do
-  let itemType = Fix $ TypeInt 32
-  destType <- lookupTypeEnv' dest
-  emitOp $
-    unwords
-      [ "store"
-      , showType itemType
-      , show i ++ ","
-      , showType destType
-      , showRegister dest
-      ]
-emitAsm (AsmSwitch i (defaultBranch, defaultCode) branchList) = do
-  t <- lookupTypeEnv' i
-  emitOp $
-    unwords
-      [ "switch"
-      , showType t
-      , showRegister i ++ ","
-      , "label"
-      , showRegister defaultBranch
-      , "[" ++ showBranchList branchList ++ "]"
-      ]
-  let labelBranchList =
-        (defaultBranch, defaultCode) : map toLabelAndAsm branchList
-  forM_ labelBranchList $ \(label, asm) -> do
-    emitLabelHeader label
-    mapM emitAsm asm
-
-emitAsmLet :: Identifier -> AsmOperation -> WithEnv ()
-emitAsmLet i (AsmAlloc t) =
-  emitOp $ unwords [showRegister i, "=", "alloca", showType t]
-emitAsmLet i (AsmLoad source) = do
-  ti <- lookupTypeEnv' i
-  sourceType <- lookupTypeEnv' source
-  emitOp $
-    unwords
-      [ showRegister i
-      , "="
-      , "load"
-      , showType ti ++ ","
-      , showType sourceType
-      , showRegister source
-      ]
-emitAsmLet i (AsmGetElemPointer base index) = do
-  undefined
-  -- baseType <- lookupLowTypeEnv' base
-  -- case baseType of
-  --   Fix (TypeDown t) ->
-  --     emitOp $
-  --     unwords
-  --       [ showRegister i
-  --       , "="
-  --       , "getelementptr"
-  --       , showType t ++ ","
-  --       , showType baseType
-  --       , showRegister base ++ ","
-  --       , showIndex index
-  --       ]
-  --   t -> lift $ throwE $ "Emit.emitAsmLet.getelementptr. t:\n" ++ Pr.ppShow t
-emitAsmLet i (AsmCall name args) = do
-  funType <- lookupTypeEnv' name
-  let (codType, _) = forallArgs funType
+emitAsm :: Code -> WithEnv ()
+emitAsm (CodeReturn d) = do
+  t <- typeOfData d
+  emitOp $ unwords ["ret", showType t, showData d]
+emitAsm (CodeLet x d cont) = do
+  let cont' = substCode [(x, d)] cont
+  emitAsm cont'
+emitAsm (CodeCall x fun args cont) = do
+  codType <- lookupPolTypeEnv' x
   argStr <- showArgs args
   emitOp $
     unwords
-      [ showRegister i
+      [ showLocal x
       , "="
       , "call"
       , showType codType
-      , showGlobal name
+      , showData fun
       , "(" ++ argStr ++ ")"
       ]
-emitAsmLet i (AsmBitcast from ident to) =
+  emitAsm cont
+emitAsm (CodeExtractValue i base index cont) = do
+  baseType <- typeOfData base
   emitOp $
-  unwords
-    [showRegister i, "=", "bitcast", showType from, ident, "to", showType to]
+    unwords
+      [ showLocal i
+      , "="
+      , "extractvalue"
+      , showType baseType
+      , showData base ++ ","
+      , show index
+      ]
+  emitAsm cont
 
-showType :: Type -> String
-showType (Fix TypeUnit) = "unit"
-showType (Fix (TypeVar s)) = showRegister s
-showType (Fix (TypeHole _)) = error "Emit.showType"
-showType (Fix (TypeInt i)) = "i" ++ show i
-showType (Fix (TypeUp t)) = showType t
-showType (Fix (TypeDown t)) = showType t ++ "*"
-showType (Fix (TypeUniv _)) = "<univ>"
-showType t@(Fix (TypeForall _ _)) = do
-  let (codType, identTypeList) = forallArgs t
-  let typeList = map snd identTypeList
-  "(" ++ unwords [showType codType, "(" ++ showTypeList typeList ++ ")"] ++ ")"
-showType (Fix (TypeNode s _)) = showRegister s
-showType (Fix (TypeStruct ts)) = "{" ++ showTypeList ts ++ "}"
+typeOfData :: Data -> WithEnv Pos
+typeOfData d = undefined
 
-showArgs :: [Identifier] -> WithEnv String
+showData :: Data -> String
+showData = undefined
+
+showType :: Pos -> String
+showType = undefined
+
+-- showType (_ :< TypeUnit) = "unit"
+-- showType (_ :< (TypeVar s)) = showLocal s
+-- showType (_ :< (TypeHole _)) = error "Emit.showType"
+-- showType (_ :< (TypeInt i)) = "i" ++ show i
+-- showType (_ :< (TypeUp t)) = showType t
+-- showType (_ :< (TypeDown t)) = showType t ++ "*"
+-- showType (_ :< (TypeUniv _)) = "<univ>"
+-- showType t@(_ :< (TypeForall _ _)) = do
+--   let (codType, identTypeList) = forallArgs t
+--   let typeList = map snd identTypeList
+--   "(" ++ unwords [showType codType, "(" ++ showTypeList typeList ++ ")"] ++ ")"
+-- showType (_ :< (TypeNode s _)) = showLocal s
+-- showType (_ :< (TypeStruct ts)) = "{" ++ showTypeList ts ++ "}"
+showArgs :: [Data] -> WithEnv String
 showArgs [] = return ""
 showArgs [i] = do
-  t <- lookupTypeEnv' i
-  return $ unwords [showType t, showRegister i]
+  t <- typeOfData i
+  return $ unwords [showType t, showData i]
 showArgs (i:xs) = do
-  t <- lookupTypeEnv' i
+  t <- typeOfData i
   s <- showArgs xs
-  return $ unwords [showType t, showRegister i ++ ",", s]
+  return $ unwords [showType t, showData i ++ ",", s]
 
-showArgTypeList :: [(Identifier, Type)] -> String
+showArgTypeList :: [(Identifier, Pos)] -> String
 showArgTypeList [] = ""
-showArgTypeList [(i, t)] = unwords [showType t, showRegister i]
+showArgTypeList [(i, t)] = unwords [showType t, showLocal i]
 showArgTypeList ((i, t):xs) = do
   let s = showArgTypeList xs
-  unwords [showType t, showRegister i ++ ",", s]
+  unwords [showType t, showLocal i ++ ",", s]
 
-showRegister :: Identifier -> String
-showRegister i = "%" ++ i
+showLocal :: Identifier -> String
+showLocal i = "%" ++ i
 
 showGlobal :: Identifier -> String
 showGlobal i = "@" ++ i
 
-showTypeList :: [Type] -> String
+showTypeList :: [Pos] -> String
 showTypeList [] = ""
 showTypeList [t] = showType t
 showTypeList (t:ts) = do
@@ -210,22 +122,10 @@ showIndex []     = ""
 showIndex [i]    = "i32 " ++ show i
 showIndex (i:is) = "i32 " ++ show i ++ ", " ++ showIndex is
 
-showBranchList :: [AsmBranch] -> String
-showBranchList [] = ""
-showBranchList [(_, i, b, _)] = "i32 " ++ show i ++ ", label %" ++ b
-showBranchList ((_, i, b, _):bs) =
-  "i32 " ++ show i ++ ", label %" ++ b ++ " " ++ showBranchList bs
-
-toLabelAndAsm :: AsmBranch -> (TargetLabel, [Asm])
-toLabelAndAsm (_, _, label, asm) = (label, asm)
-
-emitLabelHeader :: Identifier -> WithEnv ()
-emitLabelHeader label = liftIO $ putStrLn $ label ++ ":"
-
 emitOp :: String -> WithEnv ()
 emitOp s = liftIO $ putStrLn $ "  " ++ s
 
-emitDefine :: Identifier -> Type -> [(Identifier, Type)] -> [Asm] -> WithEnv ()
+emitDefine :: Identifier -> Pos -> [(Identifier, Pos)] -> Code -> WithEnv ()
 emitDefine name codType argList content = do
   liftIO $
     putStrLn $
@@ -235,5 +135,5 @@ emitDefine name codType argList content = do
       , showGlobal name ++ "(" ++ showArgTypeList argList ++ ")"
       , "{"
       ]
-  mapM_ emitAsm content
+  emitAsm content
   liftIO $ putStrLn "}"

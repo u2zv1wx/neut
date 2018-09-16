@@ -21,7 +21,8 @@ virtualPos :: Pos -> WithEnv Data
 virtualPos (Pos (_ :< PosVar x)) = return (DataLocal x)
 virtualPos (Pos (i :< PosForall (_, _) _)) = virtualPos $ Pos $ i :< PosUnit
 virtualPos (Pos (i :< PosExists (_, _) _)) = virtualPos $ Pos $ i :< PosUnit
-virtualPos (Pos (_ :< PosPair x y)) = return $ DataStruct [x, y]
+virtualPos (Pos (_ :< PosPair x y)) =
+  return $ DataStruct [DataLocal x, DataLocal y]
 virtualPos (Pos (i :< PosTop)) = virtualPos $ Pos $ i :< PosUnit
 virtualPos (Pos (_ :< PosUnit)) = return DataNullPtr
 virtualPos (Pos (i :< PosUp _)) = virtualPos $ Pos $ i :< PosUnit
@@ -40,26 +41,29 @@ virtualNeg (Neg (i :< NegAppForce funName args)) = do
   s <- newNameWith "tmp"
   resultType <- lookupPolTypeEnv' i
   insPolTypeEnv s resultType
-  return $ CodeCall s funName args (CodeReturn s)
+  let args' = map DataLocal args
+  return $ CodeCall s (DataLocal funName) args' (CodeReturn $ DataLocal s)
 virtualNeg (Neg (_ :< NegCase z (x, y) e)) = do
   e' <- virtualNeg $ Neg e
   return $
-    CodeLet x (DataElemAtIndex z [0, 0]) $
-    CodeLet y (DataElemAtIndex z [0, 1]) e'
+    CodeExtractValue x (DataLocal z) 0 $ CodeExtractValue y (DataLocal z) 1 e'
 virtualNeg (Neg (_ :< NegReturn v)) = do
   d <- virtualPos v
   x <- newName
-  return $ CodeLet x d $ CodeReturn x
+  return $ CodeLet x d $ CodeReturn $ DataLocal x
 virtualNeg (Neg (_ :< NegBind x e1 e2)) = do
   e1' <- virtualNeg $ Neg e1
   e2' <- virtualNeg $ Neg e2
   traceLet x e1' e2'
 
 traceLet :: String -> Code -> Code -> WithEnv Code
-traceLet s (CodeReturn ans) cont = return $ CodeLet s (DataLocal ans) cont
+traceLet s (CodeReturn ans) cont = return $ CodeLet s ans cont
 traceLet s (CodeLet k o1 o2) cont = do
   c <- traceLet s o2 cont
   return $ CodeLet k o1 c
 traceLet s (CodeCall reg name xds cont1) cont2 = do
   tmp <- traceLet s cont1 cont2
   return $ CodeCall reg name xds tmp
+traceLet s (CodeExtractValue x d i cont1) cont2 = do
+  tmp <- traceLet s cont1 cont2
+  return $ CodeExtractValue x d i tmp
