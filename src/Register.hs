@@ -21,19 +21,14 @@ type Edge = (Identifier, Identifier)
 
 type Graph = [Edge]
 
-regAlloc :: Int -> WithEnv ()
-regAlloc i = do
-  env <- get
-  graphList <-
-    forM (codeEnv env) $ \(_, (_, codeRef)) -> do
-      code <- liftIO $ readIORef codeRef
-      build code
-  let graph = join graphList
+regAlloc :: Int -> Asm -> WithEnv ()
+regAlloc i asm = do
+  graph <- build asm
   let nodeList = nub $ map fst graph
   is <- simplify nodeList i graph
   select i is graph
 
-build :: Code -> WithEnv Graph
+build :: Asm -> WithEnv Graph
 build code = do
   info <- edgeInfo code
   edgeListList <- forM info $ \xs -> return [(p, q) | p <- xs, q <- xs]
@@ -98,20 +93,20 @@ selectColor' (i:is) xs =
     then Just i
     else selectColor' is xs
 
-edgeInfo :: Code -> WithEnv [[Identifier]]
-edgeInfo (meta :< CodeReturn _) = return [codeMetaLive meta]
-edgeInfo (meta :< CodeLet _ _ cont) = do
+edgeInfo :: Asm -> WithEnv [[Identifier]]
+edgeInfo (meta :< AsmReturn) = return [asmMetaLive meta]
+edgeInfo (meta :< AsmMov _ _ cont) = do
   info <- edgeInfo cont
-  return $ codeMetaLive meta : info
-edgeInfo (meta :< CodeCall _ _ _ cont) = do
+  return $ asmMetaLive meta : info
+edgeInfo (meta :< AsmCall _ _ _ cont) = do
   info <- edgeInfo cont
-  return $ codeMetaLive meta : info
-edgeInfo (meta :< CodeExtractValue _ _ _ cont) = do
+  return $ asmMetaLive meta : info
+edgeInfo (meta :< AsmLoadAddr _ _ cont) = do
   info <- edgeInfo cont
-  return $ codeMetaLive meta : info
-edgeInfo (meta :< CodeStackSave _ cont) = do
+  return $ asmMetaLive meta : info
+edgeInfo (meta :< AsmPush _ cont) = do
   info <- edgeInfo cont
-  return $ codeMetaLive meta : info
-edgeInfo (meta :< CodeStackRestore _ cont) = do
+  return $ asmMetaLive meta : info
+edgeInfo (meta :< AsmPop _ cont) = do
   info <- edgeInfo cont
-  return $ codeMetaLive meta : info
+  return $ asmMetaLive meta : info

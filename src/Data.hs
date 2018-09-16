@@ -122,65 +122,55 @@ data Data
 
 type Address = Identifier
 
-data CodeF a
+data Code
   = CodeReturn Data
   | CodeLet Identifier -- bind (we also use this to represent application)
             Data
-            a
+            Code
   | CodeCall Identifier -- the register that stores the result of a function call
              Identifier -- the name of the function
              [Identifier] -- arguments
-             a -- continuation
+             Code -- continuation
   | CodeExtractValue Identifier
                      Identifier
                      Int
-                     a
-  | CodeMalloc Identifier -- let x := malloc <size> in cont
-               Int
-               a
-  | CodeStackSave Identifier -- the pointer created by stacksave
-                  a -- continuation
-  | CodeStackRestore Identifier -- pass the pointer created by stacksave
-                     a
+                     Code
   deriving (Show)
 
-$(deriveShow1 ''CodeF)
-
-data CodeMeta = CodeMeta
-  { codeMetaArgs :: [(Identifier, Data)]
-  , codeMetaLive :: [Identifier]
-  , codeMetaDef  :: [Identifier]
-  , codeMetaUse  :: [Identifier]
+data AsmMeta = AsmMeta
+  { asmMetaArgs :: [(Identifier, Data)]
+  , asmMetaLive :: [Identifier]
+  , asmMetaDef  :: [Identifier]
+  , asmMetaUse  :: [Identifier]
   } deriving (Show)
 
-emptyCodeMeta :: WithEnv CodeMeta
-emptyCodeMeta =
-  return $
-  CodeMeta
-    {codeMetaArgs = [], codeMetaLive = [], codeMetaDef = [], codeMetaUse = []}
+data Addr
+  = AddrReg Identifier
+  | AddrInt Int
+  | AddrAdd Addr
+            Addr
+  deriving (Show)
 
-type Code = Cofree CodeF CodeMeta
-
-addMeta :: CodeF Code -> WithEnv Code
-addMeta pc = do
-  meta <- emptyCodeMeta
-  return $ meta :< pc
-
-data Asm
+data AsmF a
   = AsmReturn
   | AsmMov Identifier
            Identifier
-           Asm
-  | AsmLea Identifier
-           String
-           Asm
+           a
+  | AsmLoadAddr Identifier
+                Addr
+                a
   | AsmCall Identifier
-            Asm
+            Identifier
+            [Identifier]
+            a
   | AsmPush Identifier
-            Asm
+            a
   | AsmPop Identifier
-           Asm
-  deriving (Show)
+           a
+
+$(deriveShow1 ''AsmF)
+
+type Asm = Cofree AsmF AsmMeta
 
 instance (Show a) => Show (IORef a) where
   show a = show (unsafePerformIO (readIORef a))
@@ -626,3 +616,13 @@ wrapType t = do
 
 numToReg :: Int -> Identifier
 numToReg = undefined
+
+addMeta :: AsmF Asm -> WithEnv Asm
+addMeta pc = do
+  meta <- emptyAsmMeta
+  return $ meta :< pc
+
+emptyAsmMeta :: WithEnv AsmMeta
+emptyAsmMeta =
+  return $
+  AsmMeta {asmMetaArgs = [], asmMetaLive = [], asmMetaDef = [], asmMetaUse = []}

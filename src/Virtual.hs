@@ -40,36 +40,27 @@ virtualNeg (Neg (i :< NegPiElimDownElim funName args)) = do
   s <- newNameWith "tmp"
   resultType <- lookupPolTypeEnv' i
   insPolTypeEnv s resultType
-  tmp <- addMeta $ CodeReturn $ DataLocal s
-  addMeta $ CodeCall s funName args tmp
+  return $ CodeCall s funName args (CodeReturn $ DataLocal s)
 virtualNeg (Neg (_ :< NegSigmaElim z (x, y) e)) = do
   e' <- virtualNeg $ Neg e
-  tmp <- addMeta $ CodeExtractValue y z 1 e'
-  addMeta $ CodeExtractValue x z 0 tmp
+  return $ CodeExtractValue x z 0 (CodeExtractValue y z 1 e')
 virtualNeg (Neg (_ :< NegUpIntro v)) = do
   d <- virtualPos v
   x <- newName
-  tmp <- addMeta $ CodeReturn $ DataLocal x
-  addMeta $ CodeLet x d tmp
+  return $ CodeLet x d (CodeReturn $ DataLocal x)
 virtualNeg (Neg (_ :< NegUpElim x e1 e2)) = do
   e1' <- virtualNeg $ Neg e1
   e2' <- virtualNeg $ Neg e2
   traceLet x e1' e2'
 
 traceLet :: String -> Code -> Code -> WithEnv Code
-traceLet s (meta :< CodeReturn ans) cont = return $ meta :< CodeLet s ans cont
-traceLet s (meta :< CodeLet k o1 o2) cont = do
+traceLet s (CodeReturn ans) cont = return $ CodeLet s ans cont
+traceLet s (CodeLet k o1 o2) cont = do
   c <- traceLet s o2 cont
-  return $ meta :< CodeLet k o1 c
-traceLet s (meta :< CodeCall reg name xds cont1) cont2 = do
+  return $ CodeLet k o1 c
+traceLet s (CodeCall reg name xds cont1) cont2 = do
   tmp <- traceLet s cont1 cont2
-  return $ meta :< CodeCall reg name xds tmp
-traceLet s (meta :< CodeExtractValue x d i cont1) cont2 = do
+  return $ CodeCall reg name xds tmp
+traceLet s (CodeExtractValue x d i cont1) cont2 = do
   tmp <- traceLet s cont1 cont2
-  return $ meta :< CodeExtractValue x d i tmp
-traceLet s (meta :< CodeStackSave x cont1) cont2 = do
-  tmp <- traceLet s cont1 cont2
-  return $ meta :< CodeStackSave x tmp
-traceLet s (meta :< CodeStackRestore x cont1) cont2 = do
-  tmp <- traceLet s cont1 cont2
-  return $ meta :< CodeStackRestore x tmp
+  return $ CodeExtractValue x d i tmp

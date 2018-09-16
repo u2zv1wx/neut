@@ -1,7 +1,6 @@
 module Liveness
-  ( annotCodeEnv
-  , computeLiveness
-  , livenessAnalysis
+  ( computeLiveness
+  , annotAsm
   ) where
 
 import           Data
@@ -18,109 +17,100 @@ import           Debug.Trace
 
 import qualified Text.Show.Pretty           as Pr
 
-annotCodeEnv :: WithEnv ()
-annotCodeEnv = do
-  env <- get
-  forM_ (codeEnv env) $ \(_, (_, codeRef)) -> do
-    code <- liftIO $ readIORef codeRef
-    code' <- annotCode code
-    liftIO $ writeIORef codeRef code'
-
-annotCode :: Code -> WithEnv Code
-annotCode (meta :< CodeReturn d) = do
-  let uvs = varsInData d
-  return $ meta {codeMetaUse = uvs} :< CodeReturn d
-annotCode (meta :< CodeLet x d cont) = do
-  cont' <- annotCode cont
-  let uvs = varsInData d
-  return $ meta {codeMetaUse = uvs, codeMetaDef = [x]} :< CodeLet x d cont'
-annotCode (meta :< CodeCall x fun args cont) = do
-  cont' <- annotCode cont
+-- annotAsmEnv :: WithEnv ()
+-- annotAsmEnv = do
+--   env <- get
+--   forM_ (codeEnv env) $ \(_, (_, asmRef)) -> do
+--     asm <- liftIO $ readIORef asmRef
+--     asm' <- annotAsm asm
+--     liftIO $ writeIORef asmRef asm'
+annotAsm :: Asm -> WithEnv Asm
+annotAsm (meta :< AsmReturn) = return $ meta :< AsmReturn
+annotAsm (meta :< AsmMov x y cont) = do
+  cont' <- annotAsm cont
+  return $ meta {asmMetaUse = [y], asmMetaDef = [x]} :< AsmMov x y cont'
+annotAsm (meta :< AsmCall x fun args cont) = do
+  cont' <- annotAsm cont
   return $
-    meta {codeMetaUse = fun : args, codeMetaDef = [x]} :<
-    CodeCall x fun args cont'
-annotCode (meta :< CodeExtractValue x base idx cont) = do
-  cont' <- annotCode cont
-  return $
-    meta {codeMetaUse = [base], codeMetaDef = [x]} :<
-    CodeExtractValue x base idx cont'
-annotCode (meta :< CodeStackSave x cont) = do
-  cont' <- annotCode cont
-  return $ meta {codeMetaDef = [x]} :< CodeStackSave x cont'
-annotCode (meta :< CodeStackRestore x cont) = do
-  cont' <- annotCode cont
-  return $ meta {codeMetaUse = [x]} :< CodeStackRestore x cont'
+    meta {asmMetaUse = fun : args, asmMetaDef = [x]} :< AsmCall x fun args cont'
+annotAsm (meta :< AsmLoadAddr x addr cont) = do
+  let used = varsInAddr addr
+  return $ meta {asmMetaUse = used, asmMetaDef = [x]} :< AsmLoadAddr x addr cont
+annotAsm (meta :< AsmPush x cont) = do
+  cont' <- annotAsm cont
+  return $ meta {asmMetaDef = [x]} :< AsmPush x cont'
+annotAsm (meta :< AsmPop x cont) = do
+  cont' <- annotAsm cont
+  return $ meta {asmMetaUse = [x]} :< AsmPop x cont'
 
-varsInData :: Data -> [Identifier]
-varsInData (DataLocal x)   = [x]
-varsInData (DataLabel _)   = [] -- a label is not a variable
-varsInData (DataInt32 _)   = []
-varsInData (DataStruct ds) = ds
+varsInAddr :: Addr -> [Identifier]
+varsInAddr (AddrReg x)     = [x]
+varsInAddr (AddrInt _)     = []
+varsInAddr (AddrAdd a1 a2) = varsInAddr a1 ++ varsInAddr a2
 
-livenessAnalysis :: WithEnv ()
-livenessAnalysis = do
-  env <- get
-  forM_ (codeEnv env) $ \(_, (_, codeRef)) -> do
-    code <- liftIO $ readIORef codeRef
-    code' <- computeLiveness code
-    liftIO $ writeIORef codeRef code'
+-- livenessAnalysis :: WithEnv ()
+-- livenessAnalysis = do
+--   env <- get
+--   forM_ (asmEnv env) $ \(_, (_, asmRef)) -> do
+--     asm <- liftIO $ readIORef asmRef
+--     asm' <- computeLiveness asm
+--     liftIO $ writeIORef asmRef asm'
+computeLiveness :: Asm -> WithEnv Asm
+computeLiveness (meta :< AsmReturn) = do
+  contElems <- computeSuccAll (meta :< AsmReturn)
+  computeLiveness' meta contElems AsmReturn
+computeLiveness (meta :< AsmMov x y cont) = do
+  cont' <- computeLiveness cont
+  contElemList <- computeSuccAll (meta :< AsmMov x y cont')
+  computeLiveness' meta contElemList (AsmMov x y cont')
+computeLiveness (meta :< AsmCall x fun args cont) = do
+  cont' <- computeLiveness cont
+  contElemList <- computeSuccAll (meta :< AsmCall x fun args cont')
+  computeLiveness' meta contElemList (AsmCall x fun args cont')
+computeLiveness (meta :< AsmLoadAddr x addr cont) = do
+  cont' <- computeLiveness cont
+  contElemList <- computeSuccAll (meta :< AsmLoadAddr x addr cont')
+  computeLiveness' meta contElemList (AsmLoadAddr x addr cont')
+computeLiveness (meta :< AsmPush x cont) = do
+  cont' <- computeLiveness cont
+  contElemList <- computeSuccAll (meta :< AsmPush x cont')
+  computeLiveness' meta contElemList (AsmPush x cont')
+computeLiveness (meta :< AsmPop x cont) = do
+  cont' <- computeLiveness cont
+  contElemList <- computeSuccAll (meta :< AsmPop x cont')
+  computeLiveness' meta contElemList (AsmPop x cont')
 
-computeLiveness :: Code -> WithEnv Code
-computeLiveness (meta :< code@(CodeReturn _)) = do
-  contElems <- computeSuccAll (meta :< code)
-  computeLiveness' meta contElems code
-computeLiveness (meta :< CodeLet x d cont) = do
-  cont' <- computeLiveness cont
-  contElemList <- computeSuccAll (meta :< CodeLet x d cont')
-  computeLiveness' meta contElemList (CodeLet x d cont')
-computeLiveness (meta :< CodeCall x fun args cont) = do
-  cont' <- computeLiveness cont
-  contElemList <- computeSuccAll (meta :< CodeCall x fun args cont')
-  computeLiveness' meta contElemList (CodeCall x fun args cont')
-computeLiveness (meta :< CodeExtractValue x base idx cont) = do
-  cont' <- computeLiveness cont
-  contElemList <- computeSuccAll (meta :< CodeExtractValue x base idx cont')
-  computeLiveness' meta contElemList (CodeExtractValue x base idx cont')
-computeLiveness (meta :< CodeStackSave x cont) = do
-  cont' <- computeLiveness cont
-  contElemList <- computeSuccAll (meta :< CodeStackSave x cont')
-  computeLiveness' meta contElemList (CodeStackSave x cont')
-computeLiveness (meta :< CodeStackRestore x cont) = do
-  cont' <- computeLiveness cont
-  contElemList <- computeSuccAll (meta :< CodeStackRestore x cont')
-  computeLiveness' meta contElemList (CodeStackRestore x cont')
+computeLiveness' :: AsmMeta -> [Identifier] -> AsmF Asm -> WithEnv Asm
+computeLiveness' meta elems asm =
+  if asmMetaLive meta /= elems
+    then computeLiveness (meta {asmMetaLive = elems} :< asm)
+    else return (meta :< asm)
 
-computeLiveness' :: CodeMeta -> [Identifier] -> CodeF Code -> WithEnv Code
-computeLiveness' meta elems code =
-  if codeMetaLive meta /= elems
-    then computeLiveness (meta {codeMetaLive = elems} :< code)
-    else return (meta :< code)
-
-computeCurrent' :: CodeMeta -> [Identifier]
+computeCurrent' :: AsmMeta -> [Identifier]
 computeCurrent' meta = do
-  let lvs = codeMetaLive meta
-  let dvs = codeMetaDef meta
-  let uvs = codeMetaUse meta
+  let lvs = asmMetaLive meta
+  let dvs = asmMetaDef meta
+  let uvs = asmMetaUse meta
   nub $ (lvs \\ dvs) ++ uvs
 
-next :: CodeMeta -> [Identifier] -> [Identifier]
+next :: AsmMeta -> [Identifier] -> [Identifier]
 next meta lvs =
-  nub $ computeCurrent' $ meta {codeMetaLive = codeMetaLive meta ++ lvs}
+  nub $ computeCurrent' $ meta {asmMetaLive = asmMetaLive meta ++ lvs}
 
-computeSuccAll :: Code -> WithEnv [Identifier]
-computeSuccAll (meta :< CodeReturn _) = return $ computeCurrent' meta
-computeSuccAll (meta :< CodeLet _ _ cont) = do
+computeSuccAll :: Asm -> WithEnv [Identifier]
+computeSuccAll (meta :< AsmReturn) = return $ computeCurrent' meta
+computeSuccAll (meta :< AsmMov _ _ cont) = do
   contLvs <- computeSuccAll cont
   return $ next meta contLvs
-computeSuccAll (meta :< CodeCall _ _ _ cont) = do
+computeSuccAll (meta :< AsmCall _ _ _ cont) = do
   contLvs <- computeSuccAll cont
   return $ next meta contLvs
-computeSuccAll (meta :< CodeExtractValue _ _ _ cont) = do
+computeSuccAll (meta :< AsmLoadAddr _ _ cont) = do
   contLvs <- computeSuccAll cont
   return $ next meta contLvs
-computeSuccAll (meta :< CodeStackSave _ cont) = do
+computeSuccAll (meta :< AsmPush _ cont) = do
   contLvs <- computeSuccAll cont
   return $ next meta contLvs
-computeSuccAll (meta :< CodeStackRestore _ cont) = do
+computeSuccAll (meta :< AsmPop _ cont) = do
   contLvs <- computeSuccAll cont
   return $ next meta contLvs
