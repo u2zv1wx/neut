@@ -1,5 +1,6 @@
 module Polarize
   ( polarize
+  , toNeg
   ) where
 
 import           Control.Monad
