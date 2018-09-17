@@ -185,6 +185,7 @@ data Env = Env
   , constraintEnv :: [(Neut, Neut)] -- used in type inference
   , codeEnv       :: [(Identifier, ([Identifier], IORef Code))]
   , regEnv        :: [(Identifier, Int)] -- variable to register
+  , regVarList    :: [Identifier]
   } deriving (Show)
 
 initialEnv :: Env
@@ -625,6 +626,11 @@ emptyAsmMeta :: WithEnv AsmMeta
 emptyAsmMeta =
   return $ AsmMeta {asmMetaLive = [], asmMetaDef = [], asmMetaUse = []}
 
+data Register
+  = General Identifier
+  | Specified Identifier
+  deriving (Show)
+
 regList :: [Identifier]
 regList =
   [ "r15"
@@ -649,8 +655,71 @@ regNthArg i =
     then regList !! (length regList - (1 + i))
     else error "regNthArg"
 
+getNthArgRegVar :: Int -> WithEnv Identifier
+getNthArgRegVar i = do
+  env <- get
+  if 0 <= i && i < 6
+    then return $ regVarList env !! (length (regVarList env) - (2 + i))
+    else error "regNthArg"
+
 regRetReg :: Identifier
 regRetReg = regList !! (length regList - 1)
+
+regArgReg :: [Identifier]
+regArgReg = ["rdi", "rsi", "rdx", "rcx", "r8", "r9", "r10", "r11"]
+
+initRegVar :: WithEnv ()
+initRegVar = do
+  xs <- mapM (const newName) regList
+  modify (\e -> e {regVarList = xs})
+  forM_ (zip [0 ..] xs) $ \(i, regVar) -> insRegEnv regVar i -- precolored
+
+getIthReg :: Int -> WithEnv Identifier
+getIthReg i = do
+  env <- get
+  return $ regVarList env !! i
+
+getR15 :: WithEnv Identifier
+getR15 = getIthReg 0
+
+getR14 :: WithEnv Identifier
+getR14 = getIthReg 1
+
+getR13 :: WithEnv Identifier
+getR13 = getIthReg 2
+
+getR12 :: WithEnv Identifier
+getR12 = getIthReg 3
+
+getR11 :: WithEnv Identifier
+getR11 = getIthReg 4
+
+getR10 :: WithEnv Identifier
+getR10 = getIthReg 5
+
+getRBX :: WithEnv Identifier
+getRBX = getIthReg 6
+
+getR9 :: WithEnv Identifier
+getR9 = getIthReg 7
+
+getR8 :: WithEnv Identifier
+getR8 = getIthReg 8
+
+getRCX :: WithEnv Identifier
+getRCX = getIthReg 9
+
+getRDX :: WithEnv Identifier
+getRDX = getIthReg 10
+
+getRSI :: WithEnv Identifier
+getRSI = getIthReg 11
+
+getRDI :: WithEnv Identifier
+getRDI = getIthReg 12
+
+getRAX :: WithEnv Identifier
+getRAX = getIthReg 13
 
 -- stack pointer
 regSp :: Identifier
