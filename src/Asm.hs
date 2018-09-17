@@ -54,7 +54,7 @@ asmCode (CodeExtractValue x base i cont) = do
       is <- mapM sizeOfType ts
       let offset = sum $ take i is
       cont' <- asmCode cont
-      addMeta $ AsmLoadAddr x (AddrAdd (AddrReg base) (AddrInt offset)) cont'
+      addMeta $ AsmLoadWithOffset x base offset cont'
     _ -> lift $ throwE "Asm.asmCode : typeError"
 
 bindArgs :: [(Identifier, Identifier)] -> Asm -> WithEnv Asm

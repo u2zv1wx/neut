@@ -143,13 +143,6 @@ data AsmMeta = AsmMeta
   , asmMetaUse  :: [Identifier]
   } deriving (Show)
 
-data Addr
-  = AddrReg Identifier
-  | AddrInt Int
-  | AddrAdd Addr
-            Addr
-  deriving (Show)
-
 data AsmArg
   = AsmArgReg Identifier
   | AsmArgImmediate Int
@@ -160,17 +153,22 @@ data AsmF a
   | AsmMov Identifier
            AsmArg
            a
-  | AsmLoadAddr Identifier
-                Addr
-                a
+  | AsmLoadWithOffset Identifier
+                      Identifier
+                      Int
+                      a
+  | AsmStoreWithOffset Identifier
+                       AsmArg
+                       Int
+                       a
   | AsmCall Identifier
             Identifier
             [Identifier]
             a
-  | AsmPush Identifier
-            a
-  | AsmPop Identifier
-           a
+  -- | AsmPush Identifier
+  --           a
+  -- | AsmPop Identifier
+  --          a
 
 $(deriveShow1 ''AsmF)
 
