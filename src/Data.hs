@@ -683,6 +683,18 @@ initRegVar = do
   modify (\e -> e {regVarList = xs})
   forM_ (zip [0 ..] xs) $ \(i, regVar) -> insRegEnv regVar i -- precolored
 
+isRegVar :: Identifier -> WithEnv Bool
+isRegVar x = do
+  env <- get
+  return $ x `elem` regVarList env
+
+getRegVarIndex :: Identifier -> WithEnv Int
+getRegVarIndex x = do
+  env <- get
+  case elemIndex x (regVarList env) of
+    Just i  -> return i
+    Nothing -> lift $ throwE $ x ++ " is not a register variable"
+
 getIthReg :: Int -> WithEnv Identifier
 getIthReg i = do
   env <- get
