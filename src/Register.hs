@@ -21,8 +21,8 @@ type Edge = (Identifier, Identifier)
 
 type Graph = [Edge]
 
-regAlloc :: Int -> Asm -> WithEnv ()
-regAlloc i asm = do
+regAlloc :: Int -> (Identifier, ([Identifier], Asm)) -> WithEnv ()
+regAlloc i (_, (args, asm)) = do
   graph <- build asm
   let nodeList = nub $ map fst graph
   is <- simplify nodeList i graph
@@ -39,7 +39,7 @@ simplify :: [Identifier] -> Int -> Graph -> WithEnv [Identifier]
 simplify _ _ [] = return []
 simplify nodeList i edges =
   case selectNode i nodeList edges of
-    Nothing -> undefined -- spill
+    Nothing -> undefined -- spillの候補をnodeListから一つ選ぶ
     Just x -> do
       let edges' = removeNodeFromEdgeList x edges
       let nodeList' = filter (/= x) nodeList
@@ -68,7 +68,7 @@ select i (x:xs) g = do
   let adj = map snd $ filter (\(p, _) -> p == x) g
   colorList <- getColorList adj
   case selectColor i colorList of
-    Nothing -> undefined -- spill
+    Nothing -> undefined -- spillが実際に起こるケース
     Just c -> do
       insRegEnv x c
       select i xs g

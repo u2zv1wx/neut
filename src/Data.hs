@@ -138,8 +138,7 @@ data Code
   deriving (Show)
 
 data AsmMeta = AsmMeta
-  { asmMetaArgs :: [(Identifier, Data)]
-  , asmMetaLive :: [Identifier]
+  { asmMetaLive :: [Identifier]
   , asmMetaDef  :: [Identifier]
   , asmMetaUse  :: [Identifier]
   } deriving (Show)
@@ -624,5 +623,39 @@ addMeta pc = do
 
 emptyAsmMeta :: WithEnv AsmMeta
 emptyAsmMeta =
-  return $
-  AsmMeta {asmMetaArgs = [], asmMetaLive = [], asmMetaDef = [], asmMetaUse = []}
+  return $ AsmMeta {asmMetaLive = [], asmMetaDef = [], asmMetaUse = []}
+
+regList :: [Identifier]
+regList =
+  [ "r15"
+  , "r14"
+  , "r13"
+  , "r12"
+  , "r11"
+  , "r10"
+  , "rbx"
+  , "r9"
+  , "r8"
+  , "rcx"
+  , "rdx"
+  , "rsi"
+  , "rdi"
+  , "rax"
+  ]
+
+regNthArg :: Int -> Identifier
+regNthArg i =
+  if 0 <= i && i < 6
+    then regList !! (length regList - (1 + i))
+    else error "regNthArg"
+
+regRetReg :: Identifier
+regRetReg = regList !! (length regList - 1)
+
+-- stack pointer
+regSp :: Identifier
+regSp = "rsp"
+
+-- base pointer
+regBp :: Identifier
+regBp = "rbp"
