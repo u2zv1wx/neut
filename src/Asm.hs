@@ -30,9 +30,9 @@ asm = do
 
 asmCode :: Code -> WithEnv Asm
 asmCode (CodeReturn d) = do
-  x <- newName
-  tmp <- addMeta $ AsmReturn x
-  asmData x d tmp
+  rax <- getRAX
+  tmp <- addMeta $ AsmReturn rax
+  asmData rax d tmp
 asmCode (CodeLet i d cont) = do
   cont' <- asmCode cont
   asmData i d cont'
