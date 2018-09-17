@@ -1,3 +1,5 @@
+{-# LANGUAGE TupleSections #-}
+
 module Register
   ( regAlloc
   , numToReg
@@ -21,6 +23,7 @@ type Edge = (Identifier, Identifier)
 
 type Graph = [Edge]
 
+-- regsiter allocation based on chordal graph coloring
 regAlloc :: Int -> (Identifier, ([Identifier], Asm)) -> WithEnv ()
 regAlloc i (_, (args, asm)) = do
   graph <- build asm
@@ -34,6 +37,44 @@ build code = do
   edgeListList <- forM info $ \xs -> return [(p, q) | p <- xs, q <- xs]
   let edgeList = filter (uncurry (/=)) $ nub $ join edgeListList
   return edgeList
+
+-- maximum cardinality search
+maxCardSearch :: Graph -> WithEnv [Identifier]
+maxCardSearch graph = do
+  let nodeList = nub $ map fst graph
+  let weightList = map (, 0) nodeList
+  maxCardSearch' graph weightList
+
+type WeightList = [(Identifier, Int)]
+
+maxCardSearch' :: Graph -> WeightList -> WithEnv [Identifier]
+maxCardSearch' [] _ = return []
+maxCardSearch' graph weightList = do
+  let v = fst $ maximumBy (\(_, i) (_, j) -> compare i j) weightList
+  let adj = map snd $ filter (\(p, _) -> p == v) graph
+  let weightList' = updateWeightList adj weightList
+  let graph' = removeNodeFromEdgeList v graph
+  vs <- maxCardSearch' graph' weightList'
+  return $ v : vs
+
+updateWeightList :: [Identifier] -> WeightList -> WeightList
+updateWeightList adj weightList =
+  (flip map) weightList $ \(ident, i) ->
+    if ident `elem` adj
+      then (ident, i + 1)
+      else (ident, i)
+
+coloring :: Int -> Graph -> [Identifier] -> WithEnv ()
+coloring _ _ [] = return ()
+coloring i graph (x:xs) = do
+  coloring i graph xs
+  let adj = map snd $ filter (\(p, _) -> p == x) graph
+  env <- get
+  let colorList = map snd $ filter (\(y, _) -> y `elem` adj) $ regEnv env
+  let min = minimum colorList
+  if min <= i
+    then insRegEnv x min
+    else undefined -- spill
 
 simplify :: [Identifier] -> Int -> Graph -> WithEnv [Identifier]
 simplify _ _ [] = return []

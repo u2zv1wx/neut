@@ -184,6 +184,7 @@ data Env = Env
   , termEnv       :: [(Identifier, Term)]
   , constraintEnv :: [(Neut, Neut)] -- used in type inference
   , codeEnv       :: [(Identifier, ([Identifier], IORef Code))]
+  , asmEnv        :: [(Identifier, Asm)]
   , regEnv        :: [(Identifier, Int)] -- variable to register
   , regVarList    :: [Identifier]
   } deriving (Show)
@@ -213,7 +214,9 @@ initialEnv =
     , termEnv = []
     , constraintEnv = []
     , codeEnv = []
+    , asmEnv = []
     , regEnv = []
+    , regVarList = []
     }
 
 type WithEnv a = StateT Env (ExceptT String IO) a
@@ -326,6 +329,9 @@ insCodeEnv :: Identifier -> [Identifier] -> Code -> WithEnv ()
 insCodeEnv funName args body = do
   codeRef <- liftIO $ newIORef body
   modify (\e -> e {codeEnv = (funName, (args, codeRef)) : codeEnv e})
+
+insAsmEnv :: Identifier -> Asm -> WithEnv ()
+insAsmEnv funName asm = modify (\e -> e {asmEnv = (funName, asm) : asmEnv e})
 
 insConstraintEnv :: Neut -> Neut -> WithEnv ()
 insConstraintEnv t1 t2 =

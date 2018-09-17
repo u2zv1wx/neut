@@ -1,5 +1,6 @@
 module Asm
-  ( asmCode
+  ( asm
+  , asmCode
   ) where
 
 import           Control.Monad
@@ -16,6 +17,16 @@ import           Control.Comonad.Cofree
 import qualified Text.Show.Pretty           as Pr
 
 import           Debug.Trace
+
+asm :: WithEnv ()
+asm = do
+  env <- get
+  forM_ (codeEnv env) $ \(name, (args, codeRef)) -> do
+    code <- liftIO $ readIORef codeRef
+    argRegList <- getArgRegList
+    asm <- asmCode code
+    asm' <- bindArgs (zip args argRegList) asm
+    insAsmEnv name asm'
 
 asmCode :: Code -> WithEnv Asm
 asmCode (CodeReturn d) = do
@@ -34,7 +45,7 @@ asmCode (CodeCall x fun args cont) = do
       rax <- getRAX
       cont'' <- addMeta $ AsmMov x rax cont'
       call <- addMeta $ AsmCall rax fun args cont''
-      bindArgs (zip args argRegList) call
+      bindArgs (zip argRegList args) call
 asmCode (CodeExtractValue x base i cont) = do
   t <- lookupPolTypeEnv' base
   case t of
@@ -48,9 +59,9 @@ asmCode (CodeExtractValue x base i cont) = do
 
 bindArgs :: [(Identifier, Identifier)] -> Asm -> WithEnv Asm
 bindArgs [] asm = return asm
-bindArgs ((arg, argReg):rest) asm = do
+bindArgs ((to, from):rest) asm = do
   asm' <- bindArgs rest asm
-  addMeta $ AsmMov argReg arg asm'
+  addMeta $ AsmMov to from asm'
 
 asmData :: Identifier -> Data -> Asm -> WithEnv Asm
 asmData reg (DataLocal x) cont = addMeta $ AsmMov reg x cont
