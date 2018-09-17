@@ -43,7 +43,7 @@ asmCode (CodeCall x fun args cont) = do
     else do
       argRegList <- getArgRegList
       rax <- getRAX
-      cont'' <- addMeta $ AsmMov x rax cont'
+      cont'' <- addMeta $ AsmMov x (AsmArgReg rax) cont'
       call <- addMeta $ AsmCall rax fun args cont''
       bindArgs (zip argRegList args) call
 asmCode (CodeExtractValue x base i cont) = do
@@ -61,16 +61,22 @@ bindArgs :: [(Identifier, Identifier)] -> Asm -> WithEnv Asm
 bindArgs [] asm = return asm
 bindArgs ((to, from):rest) asm = do
   asm' <- bindArgs rest asm
-  addMeta $ AsmMov to from asm'
+  addMeta $ AsmMov to (AsmArgReg from) asm'
 
 asmData :: Identifier -> Data -> Asm -> WithEnv Asm
-asmData reg (DataLocal x) cont = addMeta $ AsmMov reg x cont
-asmData reg (DataLabel x) cont = addMeta $ AsmMov reg x cont
-asmData reg (DataInt32 i) cont = addMeta $ AsmMov reg (show i) cont
+asmData reg (DataLocal x) cont = addMeta $ AsmMov reg (AsmArgReg x) cont
+asmData reg (DataLabel x) cont = addMeta $ AsmMov reg (AsmArgReg x) cont
+asmData reg (DataInt32 i) cont = addMeta $ AsmMov reg (AsmArgImmediate i) cont
 asmData reg (DataStruct xs) cont = do
   is <- mapM sizeOf xs
   let size = sum is
-  -- mallocしてregにpointerをとって、んで要素をsetしてからcont'を続ける、とかで。
+  tmp <- setContent reg is cont
+  rdi <- getRDI
+  call <- addMeta $ AsmCall reg "_malloc" [rdi] tmp
+  addMeta $ AsmMov rdi (AsmArgImmediate size) call
+
+setContent :: Identifier -> [Int] -> Asm -> WithEnv Asm
+setContent basePointer sizeList cont = do
   undefined
 
 sizeOf :: Identifier -> WithEnv Int

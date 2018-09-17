@@ -28,7 +28,8 @@ annotAsm :: Asm -> WithEnv Asm
 annotAsm (meta :< AsmReturn x) = return $ meta {asmMetaUse = [x]} :< AsmReturn x
 annotAsm (meta :< AsmMov x y cont) = do
   cont' <- annotAsm cont
-  return $ meta {asmMetaUse = [y], asmMetaDef = [x]} :< AsmMov x y cont'
+  return $
+    meta {asmMetaUse = varsInAsmArg y, asmMetaDef = [x]} :< AsmMov x y cont'
 annotAsm (meta :< AsmCall x fun args cont) = do
   cont' <- annotAsm cont
   return $
@@ -47,6 +48,10 @@ varsInAddr :: Addr -> [Identifier]
 varsInAddr (AddrReg x)     = [x]
 varsInAddr (AddrInt _)     = []
 varsInAddr (AddrAdd a1 a2) = varsInAddr a1 ++ varsInAddr a2
+
+varsInAsmArg :: AsmArg -> [Identifier]
+varsInAsmArg (AsmArgReg x)       = [x]
+varsInAsmArg (AsmArgImmediate _) = []
 
 -- livenessAnalysis :: WithEnv ()
 -- livenessAnalysis = do

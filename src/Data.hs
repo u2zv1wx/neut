@@ -150,10 +150,15 @@ data Addr
             Addr
   deriving (Show)
 
+data AsmArg
+  = AsmArgReg Identifier
+  | AsmArgImmediate Int
+  deriving (Show)
+
 data AsmF a
   = AsmReturn Identifier
   | AsmMov Identifier
-           Identifier
+           AsmArg
            a
   | AsmLoadAddr Identifier
                 Addr
@@ -669,7 +674,9 @@ getNthArgRegVar i = do
     else error "regNthArg"
 
 getArgRegList :: WithEnv [Identifier]
-getArgRegList = gets (take 6 . drop 7 . regVarList)
+getArgRegList = do
+  tmp <- gets (take 6 . drop 7 . regVarList)
+  return $ reverse tmp
 
 regRetReg :: Identifier
 regRetReg = regList !! (length regList - 1)
