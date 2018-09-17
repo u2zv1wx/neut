@@ -27,7 +27,14 @@ asmCode (CodeLet i d cont) = do
   asmData i d cont'
 asmCode (CodeCall x fun args cont) = do
   cont' <- asmCode cont
-  addMeta $ AsmCall x fun args cont'
+  if length args > 6
+    then lift $ throwE "Asm.asmCode: the number of arguments exceeds 6"
+    else do
+      argRegList <- getArgRegList
+      rax <- getRAX
+      cont'' <- addMeta $ AsmMov x rax cont'
+      call <- addMeta $ AsmCall rax fun args cont''
+      bindArgs (zip args argRegList) call
 asmCode (CodeExtractValue x base i cont) = do
   t <- lookupPolTypeEnv' base
   case t of
@@ -38,6 +45,12 @@ asmCode (CodeExtractValue x base i cont) = do
       cont' <- asmCode cont
       addMeta $ AsmLoadAddr x (AddrAdd (AddrReg base) (AddrInt offset)) cont'
     _ -> lift $ throwE "Asm.asmCode : typeError"
+
+bindArgs :: [(Identifier, Identifier)] -> Asm -> WithEnv Asm
+bindArgs [] asm = return asm
+bindArgs ((arg, argReg):rest) asm = do
+  asm' <- bindArgs rest asm
+  addMeta $ AsmMov argReg arg asm'
 
 asmData :: Identifier -> Data -> Asm -> WithEnv Asm
 asmData reg (DataLocal x) cont = addMeta $ AsmMov reg x cont

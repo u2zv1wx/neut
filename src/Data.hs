@@ -662,6 +662,9 @@ getNthArgRegVar i = do
     then return $ regVarList env !! (length (regVarList env) - (2 + i))
     else error "regNthArg"
 
+getArgRegList :: WithEnv [Identifier]
+getArgRegList = gets (take 6 . drop 7 . regVarList)
+
 regRetReg :: Identifier
 regRetReg = regList !! (length regList - 1)
 
