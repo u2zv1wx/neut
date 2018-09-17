@@ -37,11 +37,12 @@ emitAsm (_ :< AsmReturn _) = do
 emitAsm (_ :< AsmMov x y cont) = do
   emitOp $ unwords ["movq", showAsmArg y ++ ",", x]
   emitAsm cont
-emitAsm (_ :< AsmStoreWithOffset x y i cont) = do
-  emitOp $ unwords ["movq", show y ++ ",", showRegWithOffset i x]
+emitAsm (_ :< AsmLoadWithOffset offset base dest cont) = do
+  emitOp $ unwords ["movq", showRegWithOffset offset base ++ ",", dest]
   emitAsm cont
-emitAsm (_ :< AsmLoadWithOffset x y i cont) = do
-  emitOp $ unwords ["movq", showRegWithOffset i y ++ ",", x]
+emitAsm (_ :< AsmStoreWithOffset val offset base cont) = do
+  emitOp $
+    unwords ["movq", showAsmArg val ++ ",", showRegWithOffset offset base]
   emitAsm cont
 emitAsm (_ :< AsmCall _ _ _ cont) = do
   emitOp "call"
@@ -49,11 +50,11 @@ emitAsm (_ :< AsmCall _ _ _ cont) = do
 emitAsm (meta :< AsmPush x cont) = do
   offset <- undefined x
   rsp <- undefined
-  emitAsm $ meta :< AsmStoreWithOffset rsp (AsmArgReg x) offset cont
+  emitAsm $ meta :< AsmStoreWithOffset (AsmArgReg x) offset rsp cont
 emitAsm (meta :< AsmPop x cont) = do
   offset <- undefined x
   rsp <- undefined
-  emitAsm $ meta :< AsmLoadWithOffset rsp x offset cont
+  emitAsm $ meta :< AsmLoadWithOffset offset rsp x cont
 
 extendStack :: Int -> WithEnv ()
 extendStack = undefined

@@ -148,18 +148,20 @@ data AsmArg
   | AsmArgImmediate Int
   deriving (Show)
 
+-- AsmLoadWithOffset offset base dest == movq offset(base), dest
+-- AsmStoreWithOffset val offset base == movq val, offset(base).
 data AsmF a
   = AsmReturn Identifier
   | AsmMov Identifier
            AsmArg
            a
-  | AsmLoadWithOffset Identifier
+  | AsmLoadWithOffset Int
                       Identifier
-                      Int
+                      Identifier
                       a
-  | AsmStoreWithOffset Identifier
-                       AsmArg
+  | AsmStoreWithOffset AsmArg
                        Int
+                       Identifier
                        a
   | AsmCall Identifier
             Identifier

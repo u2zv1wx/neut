@@ -23,15 +23,16 @@ annotAsm (meta :< AsmMov x y cont) = do
   cont' <- annotAsm cont
   return $
     meta {asmMetaUse = varsInAsmArg y, asmMetaDef = [x]} :< AsmMov x y cont'
-annotAsm (meta :< AsmLoadWithOffset x y i cont) = do
+annotAsm (meta :< AsmLoadWithOffset offset base dest cont) = do
   cont' <- annotAsm cont
   return $
-    meta {asmMetaUse = [y], asmMetaDef = [x]} :< AsmLoadWithOffset x y i cont'
-annotAsm (meta :< AsmStoreWithOffset x arg i cont) = do
+    meta {asmMetaUse = [base], asmMetaDef = [dest]} :<
+    AsmLoadWithOffset offset base dest cont'
+annotAsm (meta :< AsmStoreWithOffset val offset base cont) = do
   cont' <- annotAsm cont
   return $
-    meta {asmMetaUse = varsInAsmArg arg, asmMetaDef = [x]} :<
-    AsmStoreWithOffset x arg i cont'
+    meta {asmMetaUse = base : varsInAsmArg val, asmMetaDef = []} :<
+    AsmStoreWithOffset val offset base cont'
 annotAsm (meta :< AsmCall x fun args cont) = do
   cont' <- annotAsm cont
   return $
