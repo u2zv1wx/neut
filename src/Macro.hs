@@ -12,7 +12,7 @@ import           Data.Maybe             (fromMaybe)
 
 import qualified Text.Show.Pretty       as Pr
 
-type Subst = ([(String, Tree)], [(String, [Tree])])
+type MacroSubst = ([(String, Tree)], [(String, [Tree])])
 
 type Pattern = Tree
 
@@ -26,7 +26,7 @@ macroMatch ::
      [String] -- the list of reserved words
   -> Tree -- input tree
   -> Tree -- pattern
-  -> Maybe Subst -- {symbols in a pattern} -> {trees}
+  -> Maybe MacroSubst -- {symbols in a pattern} -> {trees}
 macroMatch rs (i :< TreeAtom s1) (_ :< TreeAtom s2) =
   case (s1 `elem` rs, s2 `elem` rs) of
     (True, True)
@@ -52,18 +52,19 @@ macroMatch rs (_ :< TreeNode ts1) (_ :< TreeNode ts2) =
         return (join ss, join rests)
     _ -> Nothing
 
-applySubst :: Subst -> Tree -> Tree
-applySubst (s1, _) (i :< TreeAtom s) = fromMaybe (i :< TreeAtom s) (lookup s s1)
-applySubst sub@(_, s2) (_ :< TreeNode ts) =
+applyMacroSubst :: MacroSubst -> Tree -> Tree
+applyMacroSubst (s1, _) (i :< TreeAtom s) =
+  fromMaybe (i :< TreeAtom s) (lookup s s1)
+applyMacroSubst sub@(_, s2) (_ :< TreeNode ts) =
   case last ts of
     (j :< TreeAtom s)
       | isRest s && s `elem` map fst s2 -> do
-        let tsButLast' = map (applySubst sub) (take (length ts - 1) ts)
+        let tsButLast' = map (applyMacroSubst sub) (take (length ts - 1) ts)
         case lookup s s2 of
           Nothing   -> undefined
           Just rest -> j :< TreeNode (tsButLast' ++ rest)
     (j :< _) -> do
-      let ts' = map (applySubst sub) ts
+      let ts' = map (applyMacroSubst sub) ts
       j :< TreeNode ts'
 
 -- returns the first "Just"
@@ -81,7 +82,7 @@ macroExpand1 t@(i :< _) = do
   let renv = reservedEnv env
   case try (macroMatch renv t) nenv of
     Just (subst, _ :< template) -> do
-      let t' = applySubst subst (i :< template)
+      let t' = applyMacroSubst subst (i :< template)
       macroExpand t'
     Nothing -> return t
 
