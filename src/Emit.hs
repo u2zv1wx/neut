@@ -27,16 +27,18 @@ emit = do
     emitLabel name
     stackSize <- undefined
     extendStack stackSize
-    emitAsm asm
-    shrinkStack stackSize
+    insSaveRestore asm >>= emitAsm
 
 emitAsm :: Asm -> WithEnv ()
-emitAsm (_ :< AsmReturn _) = emitOp $ unwords ["ret"]
+emitAsm (_ :< AsmReturn _) = do
+  stackSize <- undefined
+  shrinkStack stackSize
+  emitOp $ unwords ["ret"]
 emitAsm (_ :< AsmMov x y cont) = do
   emitOp $ unwords ["movq", showAsmArg y ++ ",", x]
   emitAsm cont
 emitAsm (_ :< AsmStoreWithOffset x y i cont) = do
-  emitOp $ unwords ["movq", showAsmArg y ++ ",", showRegWithOffset i x]
+  emitOp $ unwords ["movq", show y ++ ",", showRegWithOffset i x]
   emitAsm cont
 emitAsm (_ :< AsmLoadWithOffset x y i cont) = do
   emitOp $ unwords ["movq", showRegWithOffset i y ++ ",", x]
@@ -44,6 +46,14 @@ emitAsm (_ :< AsmLoadWithOffset x y i cont) = do
 emitAsm (_ :< AsmCall _ _ _ cont) = do
   emitOp "call"
   emitAsm cont
+emitAsm (meta :< AsmPush x cont) = do
+  offset <- undefined x
+  rsp <- undefined
+  emitAsm $ meta :< AsmStoreWithOffset rsp (AsmArgReg x) offset cont
+emitAsm (meta :< AsmPop x cont) = do
+  offset <- undefined x
+  rsp <- undefined
+  emitAsm $ meta :< AsmLoadWithOffset rsp x offset cont
 
 extendStack :: Int -> WithEnv ()
 extendStack = undefined
@@ -67,3 +77,38 @@ emitLabel s = liftIO $ putStrLn $ s ++ ":"
 
 emitGlobalLabel :: Identifier -> WithEnv ()
 emitGlobalLabel label = liftIO $ putStrLn $ "  " ++ ".globl " ++ label
+
+insSaveRestore :: Asm -> WithEnv Asm
+insSaveRestore (meta :< AsmReturn x) = return $ meta :< AsmReturn x
+insSaveRestore (meta :< AsmMov x y cont) = do
+  cont' <- insSaveRestore cont
+  return $ meta :< AsmMov x y cont'
+insSaveRestore (meta :< AsmStoreWithOffset x y i cont) = do
+  cont' <- insSaveRestore cont
+  return $ meta :< AsmStoreWithOffset x y i cont'
+insSaveRestore (meta :< AsmLoadWithOffset x y i cont) = do
+  cont' <- insSaveRestore cont
+  return $ meta :< AsmLoadWithOffset x y i cont'
+insSaveRestore (meta :< AsmCall x fun args cont) = do
+  let lvs = asmMetaLive meta
+  cont' <- insSaveRestore cont
+  tmp <- insRestore lvs cont'
+  insSave lvs $ meta :< AsmCall x fun args tmp
+insSaveRestore (meta :< AsmPush x cont) = do
+  cont' <- insSaveRestore cont
+  return $ meta :< AsmPush x cont'
+insSaveRestore (meta :< AsmPop x cont) = do
+  cont' <- insSaveRestore cont
+  return $ meta :< AsmPop x cont'
+
+insSave :: [Identifier] -> Asm -> WithEnv Asm
+insSave [] asm = return asm
+insSave (x:xs) asm = do
+  tmp <- insSave xs asm
+  addMeta $ AsmPush x tmp
+
+insRestore :: [Identifier] -> Asm -> WithEnv Asm
+insRestore [] asm = return asm
+insRestore (x:xs) asm = do
+  tmp <- insRestore xs asm
+  addMeta $ AsmPop x tmp
