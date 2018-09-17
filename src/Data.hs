@@ -165,10 +165,10 @@ data AsmF a
             Identifier
             [Identifier]
             a
-  -- | AsmPush Identifier
-  --           a
-  -- | AsmPop Identifier
-  --          a
+  | AsmPush Identifier
+            a
+  | AsmPop Identifier
+           a
 
 $(deriveShow1 ''AsmF)
 
@@ -190,6 +190,7 @@ data Env = Env
   , asmEnv        :: [(Identifier, Asm)]
   , regEnv        :: [(Identifier, Int)] -- variable to register
   , regVarList    :: [Identifier]
+  , spill         :: Maybe Identifier
   } deriving (Show)
 
 initialEnv :: Env
@@ -220,6 +221,7 @@ initialEnv =
     , asmEnv = []
     , regEnv = []
     , regVarList = []
+    , spill = Nothing
     }
 
 type WithEnv a = StateT Env (ExceptT String IO) a
@@ -352,6 +354,12 @@ lookupRegEnv' s = do
 
 insRegEnv :: Identifier -> Int -> WithEnv ()
 insRegEnv x i = modify (\e -> e {regEnv = (x, i) : regEnv e})
+
+insSpill :: Identifier -> WithEnv ()
+insSpill x = modify (\e -> e {spill = Just x})
+
+lookupSpill :: WithEnv (Maybe Identifier)
+lookupSpill = gets spill
 
 local :: WithEnv a -> WithEnv a
 local p = do

@@ -2,8 +2,6 @@ module Register
   ( regAlloc
   ) where
 
-import           Data
-
 import           Control.Monad.State
 import           Control.Monad.Trans.Except
 import           Data.IORef
@@ -11,6 +9,9 @@ import           Data.IORef
 import           Control.Comonad.Cofree
 
 import           Data.List
+
+import           Data
+import           Liveness
 
 import           Debug.Trace
 
@@ -23,9 +24,18 @@ type Graph = [Edge]
 -- regsiter allocation based on chordal graph coloring
 regAlloc :: Int -> Asm -> WithEnv ()
 regAlloc i asm = do
-  graph <- build asm
+  asm' <- annotAsm asm >>= computeLiveness
+  graph <- build asm'
   xs <- maxCardSearch graph
+  env <- get
   color i graph xs
+  env' <- get
+  case spill env' of
+    Nothing -> return ()
+    Just x -> do
+      asm'' <- insertSpill asm x >>= annotAsm >>= computeLiveness
+      put env
+      regAlloc i asm''
 
 build :: Asm -> WithEnv Graph
 build code = do
@@ -81,7 +91,7 @@ color i graph (x:xs) = do
       let min = minimum colorList
       if min <= i
         then insRegEnv x min
-        else undefined -- spill
+        else insSpill x
 
 removeNodeFromEdgeList :: Identifier -> [Edge] -> [Edge]
 removeNodeFromEdgeList _ [] = []
@@ -94,10 +104,13 @@ edgeInfo (meta :< AsmReturn _) = return [asmMetaLive meta]
 edgeInfo (meta :< AsmMov _ _ cont) = do
   info <- edgeInfo cont
   return $ asmMetaLive meta : info
-edgeInfo (meta :< AsmCall _ _ _ cont) = do
+edgeInfo (meta :< AsmLoadWithOffset _ _ _ cont) = do
   info <- edgeInfo cont
   return $ asmMetaLive meta : info
-edgeInfo (meta :< AsmLoadAddr _ _ cont) = do
+edgeInfo (meta :< AsmStoreWithOffset _ _ _ cont) = do
+  info <- edgeInfo cont
+  return $ asmMetaLive meta : info
+edgeInfo (meta :< AsmCall _ _ _ cont) = do
   info <- edgeInfo cont
   return $ asmMetaLive meta : info
 edgeInfo (meta :< AsmPush _ cont) = do
@@ -106,3 +119,6 @@ edgeInfo (meta :< AsmPush _ cont) = do
 edgeInfo (meta :< AsmPop _ cont) = do
   info <- edgeInfo cont
   return $ asmMetaLive meta : info
+
+insertSpill :: Asm -> Identifier -> WithEnv Asm
+insertSpill asm x = undefined
