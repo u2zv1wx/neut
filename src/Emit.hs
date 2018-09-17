@@ -1,5 +1,6 @@
 module Emit
   ( emit
+  , emitGlobalLabel
   ) where
 
 import           Control.Monad
@@ -63,3 +64,6 @@ emitOp s = liftIO $ putStrLn $ "  " ++ s
 
 emitLabel :: String -> WithEnv ()
 emitLabel s = liftIO $ putStrLn $ s ++ ":"
+
+emitGlobalLabel :: Identifier -> WithEnv ()
+emitGlobalLabel label = liftIO $ putStrLn $ "  " ++ ".globl " ++ label
