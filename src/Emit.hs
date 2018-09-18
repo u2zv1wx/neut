@@ -189,4 +189,7 @@ shrinkStack asm = do
 
 -- find the least y such that y >= x && y mod 16 == 8
 alignedSize :: Int -> Int
-alignedSize x = undefined
+alignedSize x =
+  if x `mod` 16 == 8
+    then x
+    else alignedSize (x + 1)
