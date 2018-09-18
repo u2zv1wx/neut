@@ -27,13 +27,12 @@ emit = do
     emitLabel name
     modify (\e -> e {sizeEnv = []})
     computeSizeList asm
-    asm' <- extendStack asm
-    insSaveRestore asm' >>= emitAsm
+    asm' <- insExtendShrink asm
+    asm'' <- insSaveRestore asm'
+    emitAsm asm''
 
 emitAsm :: Asm -> WithEnv ()
-emitAsm (_ :< AsmReturn _) = do
-  shrinkStack
-  emitOp $ unwords ["ret"]
+emitAsm (_ :< AsmReturn _) = emitOp $ unwords ["ret"]
 emitAsm (_ :< AsmMov x y cont) = do
   emitOp $ unwords ["movq", showAsmArg y ++ ",", x]
   emitAsm cont
@@ -55,23 +54,12 @@ emitAsm (meta :< AsmPop x cont) = do
   rsp <- undefined
   offset <- computeOffset x
   emitAsm $ meta :< AsmLoadWithOffset offset rsp x cont
-emitAsm (meta :< AsmAddInt64 arg dest cont) = do
-  undefined
-emitAsm (meta :< AsmSubInt64 arg dest cont) = do
-  undefined
-
-extendStack :: Asm -> WithEnv Asm
-extendStack asm = do
-  env <- get
-  let size = alignedSize $ sum $ map snd $ sizeEnv env
-  undefined
-
-shrinkStack :: WithEnv ()
-shrinkStack = undefined
-
--- find the least y such that y >= x && y mod 16 == 8
-alignedSize :: Int -> Int
-alignedSize x = undefined
+emitAsm (_ :< AsmAddInt64 arg dest cont) = do
+  emitOp $ unwords ["addq", showAsmArg arg, dest]
+  emitAsm cont
+emitAsm (_ :< AsmSubInt64 arg dest cont) = do
+  emitOp $ unwords ["subq", showAsmArg arg, dest]
+  emitAsm cont
 
 showAsmArg :: AsmArg -> String
 showAsmArg (AsmArgReg x)       = "%" ++ x
@@ -90,6 +78,7 @@ emitLabel s = liftIO $ putStrLn $ s ++ ":"
 emitGlobalLabel :: Identifier -> WithEnv ()
 emitGlobalLabel label = liftIO $ putStrLn $ "  " ++ ".globl " ++ label
 
+-- save/restore all the live variables before function call
 insSaveRestore :: Asm -> WithEnv Asm
 insSaveRestore (meta :< AsmReturn x) = return $ meta :< AsmReturn x
 insSaveRestore (meta :< AsmMov x y cont) = do
@@ -150,3 +139,54 @@ computeOffset x = do
   env <- get
   let prefixList = takeWhile (\(y, _) -> x /= y) $ sizeEnv env
   return $ sum $ map snd prefixList
+
+-- extend/shrink the stack pointer before/after executing function body
+insExtendShrink :: Asm -> WithEnv Asm
+insExtendShrink asm = do
+  asm' <- extendStack asm
+  insShrink asm'
+
+insShrink :: Asm -> WithEnv Asm
+insShrink (meta :< AsmReturn x) = shrinkStack $ meta :< AsmReturn x
+insShrink (meta :< AsmMov x y cont) = do
+  cont' <- insShrink cont
+  return $ meta :< AsmMov x y cont'
+insShrink (meta :< AsmStoreWithOffset val offset base cont) = do
+  cont' <- insShrink cont
+  return $ meta :< AsmStoreWithOffset val offset base cont'
+insShrink (meta :< AsmLoadWithOffset offset base dest cont) = do
+  cont' <- insShrink cont
+  return $ meta :< AsmLoadWithOffset offset base dest cont'
+insShrink (meta :< AsmCall x fun args cont) = do
+  cont' <- insShrink cont
+  return $ meta :< AsmCall x fun args cont'
+insShrink (meta :< AsmPush x cont) = do
+  cont' <- insShrink cont
+  return $ meta :< AsmPush x cont'
+insShrink (meta :< AsmPop x cont) = do
+  cont' <- insShrink cont
+  return $ meta :< AsmPop x cont'
+insShrink (meta :< AsmAddInt64 arg dest cont) = do
+  cont' <- insShrink cont
+  return $ meta :< AsmAddInt64 arg dest cont'
+insShrink (meta :< AsmSubInt64 arg dest cont) = do
+  cont' <- insShrink cont
+  return $ meta :< AsmSubInt64 arg dest cont'
+
+extendStack :: Asm -> WithEnv Asm
+extendStack asm = do
+  env <- get
+  let size = alignedSize $ sum $ map snd $ sizeEnv env
+  rsp <- undefined
+  addMeta $ AsmSubInt64 (AsmArgImmediate size) rsp asm
+
+shrinkStack :: Asm -> WithEnv Asm
+shrinkStack asm = do
+  env <- get
+  let size = alignedSize $ sum $ map snd $ sizeEnv env
+  rsp <- undefined
+  addMeta $ AsmAddInt64 (AsmArgImmediate size) rsp asm
+
+-- find the least y such that y >= x && y mod 16 == 8
+alignedSize :: Int -> Int
+alignedSize x = undefined
