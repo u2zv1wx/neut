@@ -27,8 +27,8 @@ emit = do
     emitLabel name
     modify (\e -> e {sizeEnv = []})
     computeSizeList asm
-    extendStack
-    insSaveRestore asm >>= emitAsm
+    asm' <- extendStack asm
+    insSaveRestore asm' >>= emitAsm
 
 emitAsm :: Asm -> WithEnv ()
 emitAsm (_ :< AsmReturn _) = do
@@ -48,19 +48,30 @@ emitAsm (_ :< AsmCall _ _ _ cont) = do
   emitOp "call"
   emitAsm cont
 emitAsm (meta :< AsmPush x cont) = do
-  offset <- undefined x
   rsp <- undefined
+  offset <- computeOffset x
   emitAsm $ meta :< AsmStoreWithOffset (AsmArgReg x) offset rsp cont
 emitAsm (meta :< AsmPop x cont) = do
-  offset <- undefined x
   rsp <- undefined
+  offset <- computeOffset x
   emitAsm $ meta :< AsmLoadWithOffset offset rsp x cont
+emitAsm (meta :< AsmAddInt64 arg dest cont) = do
+  undefined
+emitAsm (meta :< AsmSubInt64 arg dest cont) = do
+  undefined
 
-extendStack :: WithEnv ()
-extendStack = undefined
+extendStack :: Asm -> WithEnv Asm
+extendStack asm = do
+  env <- get
+  let size = alignedSize $ sum $ map snd $ sizeEnv env
+  undefined
 
 shrinkStack :: WithEnv ()
 shrinkStack = undefined
+
+-- find the least y such that y >= x && y mod 16 == 8
+alignedSize :: Int -> Int
+alignedSize x = undefined
 
 showAsmArg :: AsmArg -> String
 showAsmArg (AsmArgReg x)       = "%" ++ x
@@ -84,23 +95,29 @@ insSaveRestore (meta :< AsmReturn x) = return $ meta :< AsmReturn x
 insSaveRestore (meta :< AsmMov x y cont) = do
   cont' <- insSaveRestore cont
   return $ meta :< AsmMov x y cont'
-insSaveRestore (meta :< AsmStoreWithOffset x y i cont) = do
+insSaveRestore (meta :< AsmStoreWithOffset val offset base cont) = do
   cont' <- insSaveRestore cont
-  return $ meta :< AsmStoreWithOffset x y i cont'
-insSaveRestore (meta :< AsmLoadWithOffset x y i cont) = do
+  return $ meta :< AsmStoreWithOffset val offset base cont'
+insSaveRestore (meta :< AsmLoadWithOffset offset base dest cont) = do
   cont' <- insSaveRestore cont
-  return $ meta :< AsmLoadWithOffset x y i cont'
+  return $ meta :< AsmLoadWithOffset offset base dest cont'
 insSaveRestore (meta :< AsmCall x fun args cont) = do
   let lvs = asmMetaLive meta
   cont' <- insSaveRestore cont
-  tmp <- insRestore lvs cont'
-  insSave lvs $ meta :< AsmCall x fun args tmp
+  cont'' <- insRestore lvs cont'
+  insSave lvs $ meta :< AsmCall x fun args cont''
 insSaveRestore (meta :< AsmPush x cont) = do
   cont' <- insSaveRestore cont
   return $ meta :< AsmPush x cont'
 insSaveRestore (meta :< AsmPop x cont) = do
   cont' <- insSaveRestore cont
   return $ meta :< AsmPop x cont'
+insSaveRestore (meta :< AsmAddInt64 arg dest cont) = do
+  cont' <- insSaveRestore cont
+  return $ meta :< AsmAddInt64 arg dest cont'
+insSaveRestore (meta :< AsmSubInt64 arg dest cont) = do
+  cont' <- insSaveRestore cont
+  return $ meta :< AsmSubInt64 arg dest cont'
 
 insSave :: [Identifier] -> Asm -> WithEnv Asm
 insSave [] asm = return asm
@@ -125,6 +142,8 @@ computeSizeList (_ :< AsmPush x cont) = do
   insSizeEnv x size
   computeSizeList cont
 computeSizeList (_ :< AsmPop _ cont) = computeSizeList cont
+computeSizeList (_ :< AsmAddInt64 _ _ cont) = computeSizeList cont
+computeSizeList (_ :< AsmSubInt64 _ _ cont) = computeSizeList cont
 
 computeOffset :: Identifier -> WithEnv Int
 computeOffset x = do

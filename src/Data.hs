@@ -155,11 +155,11 @@ data AsmF a
   | AsmMov Identifier
            AsmArg
            a
-  | AsmLoadWithOffset Int
+  | AsmLoadWithOffset Int -- movq {Int}({Identifier}), {Identifier}; cont
                       Identifier
                       Identifier
                       a
-  | AsmStoreWithOffset AsmArg
+  | AsmStoreWithOffset AsmArg -- movq {AsmArg}, {Int}({Identifier}); cont
                        Int
                        Identifier
                        a
@@ -171,6 +171,12 @@ data AsmF a
             a
   | AsmPop Identifier
            a
+  | AsmAddInt64 AsmArg -- subq {AsmArg}, {Identifier}
+                Identifier
+                a
+  | AsmSubInt64 AsmArg -- subq {AsmArg}, {Identifier}
+                Identifier
+                a
 
 $(deriveShow1 ''AsmF)
 

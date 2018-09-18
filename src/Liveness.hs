@@ -43,6 +43,16 @@ annotAsm (meta :< AsmPush x cont) = do
 annotAsm (meta :< AsmPop x cont) = do
   cont' <- annotAsm cont
   return $ meta {asmMetaUse = [x]} :< AsmPop x cont'
+annotAsm (meta :< AsmAddInt64 arg dest cont) = do
+  cont' <- annotAsm cont
+  return $
+    meta {asmMetaUse = varsInAsmArg arg, asmMetaDef = [dest]} :<
+    AsmAddInt64 arg dest cont'
+annotAsm (meta :< AsmSubInt64 arg dest cont) = do
+  cont' <- annotAsm cont
+  return $
+    meta {asmMetaUse = varsInAsmArg arg, asmMetaDef = [dest]} :<
+    AsmSubInt64 arg dest cont'
 
 varsInAsmArg :: AsmArg -> [Identifier]
 varsInAsmArg (AsmArgReg x)       = [x]
@@ -76,6 +86,14 @@ computeLiveness (meta :< AsmPop x cont) = do
   cont' <- computeLiveness cont
   contElemList <- computeSuccAll (meta :< AsmPop x cont')
   computeLiveness' meta contElemList (AsmPop x cont')
+computeLiveness (meta :< AsmAddInt64 arg dest cont) = do
+  cont' <- computeLiveness cont
+  contElemList <- computeSuccAll (meta :< AsmAddInt64 arg dest cont')
+  computeLiveness' meta contElemList (AsmAddInt64 arg dest cont')
+computeLiveness (meta :< AsmSubInt64 arg dest cont) = do
+  cont' <- computeLiveness cont
+  contElemList <- computeSuccAll (meta :< AsmSubInt64 arg dest cont')
+  computeLiveness' meta contElemList (AsmSubInt64 arg dest cont')
 
 computeLiveness' :: AsmMeta -> [Identifier] -> AsmF Asm -> WithEnv Asm
 computeLiveness' meta elems asm =
@@ -112,5 +130,11 @@ computeSuccAll (meta :< AsmPush _ cont) = do
   contLvs <- computeSuccAll cont
   return $ next meta contLvs
 computeSuccAll (meta :< AsmPop _ cont) = do
+  contLvs <- computeSuccAll cont
+  return $ next meta contLvs
+computeSuccAll (meta :< AsmAddInt64 _ _ cont) = do
+  contLvs <- computeSuccAll cont
+  return $ next meta contLvs
+computeSuccAll (meta :< AsmSubInt64 _ _ cont) = do
   contLvs <- computeSuccAll cont
   return $ next meta contLvs

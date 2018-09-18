@@ -119,6 +119,12 @@ edgeInfo (meta :< AsmPush _ cont) = do
 edgeInfo (meta :< AsmPop _ cont) = do
   info <- edgeInfo cont
   return $ asmMetaLive meta : info
+edgeInfo (meta :< AsmAddInt64 _ _ cont) = do
+  info <- edgeInfo cont
+  return $ asmMetaLive meta : info
+edgeInfo (meta :< AsmSubInt64 _ _ cont) = do
+  info <- edgeInfo cont
+  return $ asmMetaLive meta : info
 
 insertSpill :: Asm -> Identifier -> WithEnv Asm
 insertSpill asm x = undefined
