@@ -25,14 +25,14 @@ emit = do
   env <- get
   forM_ (asmEnv env) $ \(name, asm) -> do
     emitLabel name
-    stackSize <- undefined
-    extendStack stackSize
+    modify (\e -> e {sizeEnv = []})
+    computeSizeList asm
+    extendStack
     insSaveRestore asm >>= emitAsm
 
 emitAsm :: Asm -> WithEnv ()
 emitAsm (_ :< AsmReturn _) = do
-  stackSize <- undefined
-  shrinkStack stackSize
+  shrinkStack
   emitOp $ unwords ["ret"]
 emitAsm (_ :< AsmMov x y cont) = do
   emitOp $ unwords ["movq", showAsmArg y ++ ",", x]
@@ -56,10 +56,10 @@ emitAsm (meta :< AsmPop x cont) = do
   rsp <- undefined
   emitAsm $ meta :< AsmLoadWithOffset offset rsp x cont
 
-extendStack :: Int -> WithEnv ()
+extendStack :: WithEnv ()
 extendStack = undefined
 
-shrinkStack :: Int -> WithEnv ()
+shrinkStack :: WithEnv ()
 shrinkStack = undefined
 
 showAsmArg :: AsmArg -> String
@@ -113,3 +113,21 @@ insRestore [] asm = return asm
 insRestore (x:xs) asm = do
   tmp <- insRestore xs asm
   addMeta $ AsmPop x tmp
+
+computeSizeList :: Asm -> WithEnv ()
+computeSizeList (_ :< AsmReturn _) = return ()
+computeSizeList (_ :< AsmMov _ _ cont) = computeSizeList cont
+computeSizeList (_ :< AsmStoreWithOffset _ _ _ cont) = computeSizeList cont
+computeSizeList (_ :< AsmLoadWithOffset _ _ _ cont) = computeSizeList cont
+computeSizeList (_ :< AsmCall _ _ _ cont) = computeSizeList cont
+computeSizeList (_ :< AsmPush x cont) = do
+  size <- sizeOf x
+  insSizeEnv x size
+  computeSizeList cont
+computeSizeList (_ :< AsmPop _ cont) = computeSizeList cont
+
+computeOffset :: Identifier -> WithEnv Int
+computeOffset x = do
+  env <- get
+  let prefixList = takeWhile (\(y, _) -> x /= y) $ sizeEnv env
+  return $ sum $ map snd prefixList

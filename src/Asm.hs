@@ -83,24 +83,3 @@ setContent _ [] cont = return cont
 setContent basePointer ((s, d):sizeDataList) cont = do
   cont' <- setContent basePointer sizeDataList cont
   addMeta $ AsmStoreWithOffset (AsmArgReg d) s basePointer cont'
-
-sizeOf :: Identifier -> WithEnv Int
-sizeOf x = do
-  Pos t <- lookupPolTypeEnv' x
-  sizeOfType t
-
--- byte size of type
-sizeOfType :: PrePos -> WithEnv Int
-sizeOfType (_ :< PosVar _) =
-  lift $ throwE "Asm.sizeOfType: the type of a type variable is not defined"
-sizeOfType (_ :< PosPi _ _) =
-  lift $ throwE "Asm.sizeOfType: the type of function itself is not defined"
-sizeOfType (_ :< PosSigma xts t) = do
-  is <- mapM (sizeOfType . snd) xts
-  i <- sizeOfType t
-  return $ i + sum is
-sizeOfType (_ :< PosTop) = return 4
-sizeOfType (_ :< PosDown _) = return 4
-sizeOfType (_ :< PosUp t) = sizeOfType t
-sizeOfType (_ :< PosUniv) = return 4
-sizeOfType v = lift $ throwE $ "Asm.sizeOfType: " ++ show v ++ " is not a type"

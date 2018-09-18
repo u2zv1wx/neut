@@ -193,6 +193,7 @@ data Env = Env
   , regEnv        :: [(Identifier, Int)] -- variable to register
   , regVarList    :: [Identifier]
   , spill         :: Maybe Identifier
+  , sizeEnv       :: [(Identifier, Int)] -- offset from stackpointer
   } deriving (Show)
 
 initialEnv :: Env
@@ -224,6 +225,7 @@ initialEnv =
     , regEnv = []
     , regVarList = []
     , spill = Nothing
+    , sizeEnv = []
     }
 
 type WithEnv a = StateT Env (ExceptT String IO) a
@@ -339,6 +341,19 @@ insCodeEnv funName args body = do
 
 insAsmEnv :: Identifier -> Asm -> WithEnv ()
 insAsmEnv funName asm = modify (\e -> e {asmEnv = (funName, asm) : asmEnv e})
+
+insSizeEnv :: Identifier -> Int -> WithEnv ()
+insSizeEnv name size = modify (\e -> e {sizeEnv = (name, size) : sizeEnv e})
+
+lookupSizeEnv :: Identifier -> WithEnv (Maybe Int)
+lookupSizeEnv s = gets (lookup s . sizeEnv)
+
+lookupSizeEnv' :: Identifier -> WithEnv Int
+lookupSizeEnv' s = do
+  tmp <- gets (lookup s . sizeEnv)
+  case tmp of
+    Just i  -> return i
+    Nothing -> lift $ throwE $ "the size of " ++ show s ++ " is not defined"
 
 insConstraintEnv :: Neut -> Neut -> WithEnv ()
 insConstraintEnv t1 t2 =
@@ -644,6 +659,27 @@ addMeta pc = do
 emptyAsmMeta :: WithEnv AsmMeta
 emptyAsmMeta =
   return $ AsmMeta {asmMetaLive = [], asmMetaDef = [], asmMetaUse = []}
+
+-- byte size of type
+sizeOfType :: PrePos -> WithEnv Int
+sizeOfType (_ :< PosVar _) =
+  lift $ throwE "Asm.sizeOfType: the type of a type variable is not defined"
+sizeOfType (_ :< PosPi _ _) =
+  lift $ throwE "Asm.sizeOfType: the type of function itself is not defined"
+sizeOfType (_ :< PosSigma xts t) = do
+  is <- mapM (sizeOfType . snd) xts
+  i <- sizeOfType t
+  return $ i + sum is
+sizeOfType (_ :< PosTop) = return 4
+sizeOfType (_ :< PosDown _) = return 4
+sizeOfType (_ :< PosUp t) = sizeOfType t
+sizeOfType (_ :< PosUniv) = return 4
+sizeOfType v = lift $ throwE $ "Asm.sizeOfType: " ++ show v ++ " is not a type"
+
+sizeOf :: Identifier -> WithEnv Int
+sizeOf x = do
+  Pos t <- lookupPolTypeEnv' x
+  sizeOfType t
 
 data Register
   = General Identifier
