@@ -40,12 +40,7 @@ asmCode (CodeCall x fun args cont) = do
   cont' <- asmCode cont
   if length args > 6
     then lift $ throwE "Asm.asmCode: the number of arguments exceeds 6"
-    else do
-      argRegList <- getArgRegList
-      rax <- getRAX
-      cont'' <- addMeta $ AsmMov x (AsmArgReg rax) cont'
-      call <- addMeta $ AsmCall rax fun args cont''
-      bindArgs (zip argRegList args) call
+    else asmCodeCall x fun args cont'
 asmCode (CodeExtractValue x base i cont) = do
   t <- lookupPolTypeEnv' base
   case t of
@@ -54,8 +49,16 @@ asmCode (CodeExtractValue x base i cont) = do
       is <- mapM sizeOfType ts
       let offset = sum $ take i is
       cont' <- asmCode cont
-      addMeta $ AsmLoadWithOffset x base offset cont'
+      addMeta $ AsmLoadWithOffset offset base x cont'
     _ -> lift $ throwE "Asm.asmCode : typeError"
+
+asmCodeCall :: Identifier -> Identifier -> [Identifier] -> Asm -> WithEnv Asm
+asmCodeCall x fun args cont = do
+  argRegList <- getArgRegList
+  rax <- getRAX
+  cont' <- addMeta $ AsmMov x (AsmArgReg rax) cont
+  call <- addMeta $ AsmCall rax fun args cont'
+  bindArgs (zip argRegList args) call
 
 bindArgs :: [(Identifier, Identifier)] -> Asm -> WithEnv Asm
 bindArgs [] asm = return asm
@@ -68,16 +71,18 @@ asmData reg (DataLocal x) cont = addMeta $ AsmMov reg (AsmArgReg x) cont
 asmData reg (DataLabel x) cont = addMeta $ AsmMov reg (AsmArgReg x) cont
 asmData reg (DataInt32 i) cont = addMeta $ AsmMov reg (AsmArgImmediate i) cont
 asmData reg (DataStruct xs) cont = do
-  is <- mapM sizeOf xs
-  let size = sum is
-  tmp <- setContent reg is cont
+  sizeList <- mapM sizeOf xs
+  let structSize = sum sizeList
+  cont' <- setContent reg (zip sizeList xs) cont
   rdi <- getRDI
-  call <- addMeta $ AsmCall reg "_malloc" [rdi] tmp
-  addMeta $ AsmMov rdi (AsmArgImmediate size) call
+  callThenCont <- asmCodeCall reg "_malloc" [rdi] cont'
+  addMeta $ AsmMov rdi (AsmArgImmediate structSize) callThenCont
 
-setContent :: Identifier -> [Int] -> Asm -> WithEnv Asm
-setContent basePointer sizeList cont = do
-  undefined
+setContent :: Identifier -> [(Int, Identifier)] -> Asm -> WithEnv Asm
+setContent _ [] cont = return cont
+setContent basePointer ((s, d):sizeDataList) cont = do
+  cont' <- setContent basePointer sizeDataList cont
+  addMeta $ AsmStoreWithOffset (AsmArgReg d) s basePointer cont'
 
 sizeOf :: Identifier -> WithEnv Int
 sizeOf x = do
