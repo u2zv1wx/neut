@@ -11,6 +11,7 @@ import           Control.Monad.Trans.Except
 import           Data.IORef
 
 import           Data
+import           Register
 
 import           Control.Comonad.Cofree
 
@@ -27,6 +28,7 @@ asmCodeEnv = do
     asm <- asmCode code
     asm' <- bindArgs (zip args argRegList) asm
     insAsmEnv name asm'
+    regAlloc 15 asm' -- rsp is not used
 
 asmCode :: Code -> WithEnv Asm
 asmCode (CodeReturn d) = do

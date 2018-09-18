@@ -33,41 +33,52 @@ emit = do
 
 emitAsm :: Asm -> WithEnv ()
 emitAsm (_ :< AsmReturn _) = emitOp $ unwords ["ret"]
-emitAsm (_ :< AsmMov x y cont) = do
-  emitOp $ unwords ["movq", showAsmArg y ++ ",", x]
+emitAsm (_ :< AsmMov x arg cont) = do
+  x' <- toRegName x
+  arg' <- showAsmArg arg
+  emitOp $ unwords ["movq", arg' ++ ",", x']
   emitAsm cont
 emitAsm (_ :< AsmLoadWithOffset offset base dest cont) = do
-  emitOp $ unwords ["movq", showRegWithOffset offset base ++ ",", dest]
+  base' <- toRegName base
+  dest' <- toRegName dest
+  emitOp $ unwords ["movq", showRegWithOffset offset base' ++ ",", dest']
   emitAsm cont
 emitAsm (_ :< AsmStoreWithOffset val offset base cont) = do
-  emitOp $
-    unwords ["movq", showAsmArg val ++ ",", showRegWithOffset offset base]
+  val' <- showAsmArg val
+  base' <- toRegName base
+  emitOp $ unwords ["movq", val' ++ ",", showRegWithOffset offset base']
   emitAsm cont
-emitAsm (_ :< AsmCall _ _ _ cont) = do
-  emitOp "call"
+emitAsm (_ :< AsmCall _ label _ cont) = do
+  label' <- toRegName label
+  emitOp $ unwords ["call", label']
   emitAsm cont
 emitAsm (meta :< AsmPush x cont) = do
-  rsp <- undefined
+  rsp <- getRSP
   offset <- computeOffset x
   emitAsm $ meta :< AsmStoreWithOffset (AsmArgReg x) offset rsp cont
 emitAsm (meta :< AsmPop x cont) = do
-  rsp <- undefined
+  rsp <- getRSP
   offset <- computeOffset x
   emitAsm $ meta :< AsmLoadWithOffset offset rsp x cont
 emitAsm (_ :< AsmAddInt64 arg dest cont) = do
-  emitOp $ unwords ["addq", showAsmArg arg, dest]
+  arg' <- showAsmArg arg
+  dest' <- toRegName dest
+  emitOp $ unwords ["addq", arg', dest']
   emitAsm cont
 emitAsm (_ :< AsmSubInt64 arg dest cont) = do
-  emitOp $ unwords ["subq", showAsmArg arg, dest]
+  arg' <- showAsmArg arg
+  dest' <- toRegName dest
+  emitOp $ unwords ["subq", arg', dest']
   emitAsm cont
 
-showAsmArg :: AsmArg -> String
-showAsmArg (AsmArgReg x)       = "%" ++ x
-showAsmArg (AsmArgImmediate i) = "$" ++ show i
+showAsmArg :: AsmArg -> WithEnv String
+showAsmArg (AsmArgReg x) = do
+  x' <- toRegName x
+  return $ "%" ++ x'
+showAsmArg (AsmArgImmediate i) = return $ "$" ++ show i
 
 showRegWithOffset :: Int -> Identifier -> Identifier
-showRegWithOffset offset x =
-  show offset ++ "(" ++ showAsmArg (AsmArgReg x) ++ ")"
+showRegWithOffset offset x = show offset ++ "(" ++ x ++ ")"
 
 emitOp :: String -> WithEnv ()
 emitOp s = liftIO $ putStrLn $ "  " ++ s
@@ -177,14 +188,14 @@ extendStack :: Asm -> WithEnv Asm
 extendStack asm = do
   env <- get
   let size = alignedSize $ sum $ map snd $ sizeEnv env
-  rsp <- undefined
+  rsp <- getRSP
   addMeta $ AsmSubInt64 (AsmArgImmediate size) rsp asm
 
 shrinkStack :: Asm -> WithEnv Asm
 shrinkStack asm = do
   env <- get
   let size = alignedSize $ sum $ map snd $ sizeEnv env
-  rsp <- undefined
+  rsp <- getRSP
   addMeta $ AsmAddInt64 (AsmArgImmediate size) rsp asm
 
 -- find the least y such that y >= x && y mod 16 == 8

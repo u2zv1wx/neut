@@ -368,11 +368,11 @@ insConstraintEnv t1 t2 =
 lookupRegEnv :: Identifier -> WithEnv (Maybe Int)
 lookupRegEnv s = gets (lookup s . regEnv)
 
-lookupRegEnv' :: Identifier -> WithEnv Identifier
+lookupRegEnv' :: Identifier -> WithEnv Int
 lookupRegEnv' s = do
   tmp <- gets (lookup s . regEnv)
   case tmp of
-    Just i  -> return $ numToReg i
+    Just i  -> return i
     Nothing -> lift $ throwE $ "no such register: " ++ show s
 
 insRegEnv :: Identifier -> Int -> WithEnv ()
@@ -654,9 +654,6 @@ wrapType t = do
   insTypeEnv meta u
   return $ meta :< t
 
-numToReg :: Int -> Identifier
-numToReg = undefined
-
 addMeta :: AsmF Asm -> WithEnv Asm
 addMeta pc = do
   meta <- emptyAsmMeta
@@ -687,10 +684,15 @@ sizeOf x = do
   Pos t <- lookupPolTypeEnv' x
   sizeOfType t
 
-data Register
-  = General Identifier
-  | Specified Identifier
-  deriving (Show)
+getArgRegList :: WithEnv [Identifier]
+getArgRegList = do
+  rdi <- getRDI
+  rsi <- getRSI
+  rdx <- getRDX
+  rcx <- getRCX
+  r8 <- getR8
+  r9 <- getR9
+  return [rdi, rsi, rdx, rcx, r8, r9]
 
 regList :: [Identifier]
 regList =
@@ -700,6 +702,7 @@ regList =
   , "r12"
   , "r11"
   , "r10"
+  , "rbp"
   , "rbx"
   , "r9"
   , "r8"
@@ -708,35 +711,15 @@ regList =
   , "rsi"
   , "rdi"
   , "rax"
+  , "rsp" -- rsp is not used in register allocation
   ]
 
-regNthArg :: Int -> Identifier
-regNthArg i =
-  if 0 <= i && i < 6
-    then regList !! (length regList - (1 + i))
-    else error "regNthArg"
-
-getNthArgRegVar :: Int -> WithEnv Identifier
-getNthArgRegVar i = do
-  env <- get
-  if 0 <= i && i < 6
-    then return $ regVarList env !! (length (regVarList env) - (2 + i))
-    else error "regNthArg"
-
-getArgRegList :: WithEnv [Identifier]
-getArgRegList = do
-  tmp <- gets (take 6 . drop 7 . regVarList)
-  return $ reverse tmp
-
-regRetReg :: Identifier
-regRetReg = regList !! (length regList - 1)
-
-regArgReg :: [Identifier]
-regArgReg = ["rdi", "rsi", "rdx", "rcx", "r8", "r9", "r10", "r11"]
-
+-- rsp is colored by -1, and not used in register allocation
 initRegVar :: WithEnv ()
 initRegVar = do
   xs <- mapM (const newName) regList
+  forM_ (zip regList xs) $ \(regVar, newVar) ->
+    modify (\e -> e {nameEnv = (regVar, newVar) : nameEnv e})
   modify (\e -> e {regVarList = xs})
   forM_ (zip [0 ..] xs) $ \(i, regVar) -> insRegEnv regVar i -- precolored
 
@@ -747,62 +730,61 @@ isRegVar x = do
 
 getRegVarIndex :: Identifier -> WithEnv Int
 getRegVarIndex x = do
+  x' <- lookupNameEnv' x
   env <- get
-  case elemIndex x (regVarList env) of
+  case elemIndex x' (regVarList env) of
     Just i  -> return i
-    Nothing -> lift $ throwE $ x ++ " is not a register variable"
+    Nothing -> lift $ throwE $ x' ++ " is not a register variable"
 
-getIthReg :: Int -> WithEnv Identifier
-getIthReg i = do
-  env <- get
-  return $ regVarList env !! i
+toRegName :: Identifier -> WithEnv Identifier
+toRegName x = do
+  i <- lookupRegEnv' x
+  return $ regList !! i
 
 getR15 :: WithEnv Identifier
-getR15 = getIthReg 0
+getR15 = lookupNameEnv' "r15"
 
 getR14 :: WithEnv Identifier
-getR14 = getIthReg 1
+getR14 = lookupNameEnv' "r14"
 
 getR13 :: WithEnv Identifier
-getR13 = getIthReg 2
+getR13 = lookupNameEnv' "r13"
 
 getR12 :: WithEnv Identifier
-getR12 = getIthReg 3
+getR12 = lookupNameEnv' "r12"
 
 getR11 :: WithEnv Identifier
-getR11 = getIthReg 4
+getR11 = lookupNameEnv' "r11"
 
 getR10 :: WithEnv Identifier
-getR10 = getIthReg 5
+getR10 = lookupNameEnv' "r10"
 
 getRBX :: WithEnv Identifier
-getRBX = getIthReg 6
+getRBX = lookupNameEnv' "rbx"
 
 getR9 :: WithEnv Identifier
-getR9 = getIthReg 7
+getR9 = lookupNameEnv' "r9"
 
 getR8 :: WithEnv Identifier
-getR8 = getIthReg 8
+getR8 = lookupNameEnv' "r8"
 
 getRCX :: WithEnv Identifier
-getRCX = getIthReg 9
+getRCX = lookupNameEnv' "rcx"
 
 getRDX :: WithEnv Identifier
-getRDX = getIthReg 10
+getRDX = lookupNameEnv' "rdx"
 
 getRSI :: WithEnv Identifier
-getRSI = getIthReg 11
+getRSI = lookupNameEnv' "rsi"
 
 getRDI :: WithEnv Identifier
-getRDI = getIthReg 12
+getRDI = lookupNameEnv' "rdi"
 
 getRAX :: WithEnv Identifier
-getRAX = getIthReg 13
+getRAX = lookupNameEnv' "rax"
 
--- stack pointer
-regSp :: Identifier
-regSp = "rsp"
+getRBP :: WithEnv Identifier
+getRBP = lookupNameEnv' "rbp"
 
--- base pointer
-regBp :: Identifier
-regBp = "rbp"
+getRSP :: WithEnv Identifier
+getRSP = lookupNameEnv' "rsp"
