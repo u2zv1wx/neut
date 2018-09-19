@@ -545,53 +545,6 @@ type SubstIdent = [(Identifier, Identifier)]
 substIdent :: SubstIdent -> Identifier -> Identifier
 substIdent sub x = fromMaybe x (lookup x sub)
 
-substPos :: SubstIdent -> Pos -> Pos
-substPos sub (Pos (j :< PosVar s)) = Pos $ j :< PosVar (substIdent sub s)
-substPos sub (Pos (j :< PosPi xts tcod)) = do
-  undefined
-  -- let Pos tdom' = substPos sub $ Pos tdom
-  -- let Pos tcod' = substPos sub $ Pos tcod
-  -- Pos $ j :< PosPi (s, tdom') tcod'
-substPos sub (Pos (j :< PosSigma xts tcod)) = do
-  undefined
-  -- let Pos tdom' = substPos sub $ Pos tdom
-  -- let Pos tcod' = substPos sub $ Pos tcod
-  -- Pos $ j :< PosSigma (s, tdom') tcod'
-substPos sub (Pos (j :< PosSigmaIntro xs)) = do
-  let xs' = map (substIdent sub) xs
-  -- let x' = substIdent sub x
-  -- let y' = substIdent sub y
-  Pos $ j :< PosSigmaIntro xs'
-substPos sub (Pos (j :< PosDown t)) = do
-  let Pos t' = substPos sub $ Pos t
-  Pos $ j :< PosDown t'
-substPos sub (Pos (j :< PosDownIntroPiIntro s body)) = do
-  let body' = substNeg sub body
-  Pos $ j :< PosDownIntroPiIntro s body'
-substPos sub (Pos (j :< PosUp t)) = do
-  let Pos t' = substPos sub $ Pos t
-  Pos $ j :< PosUp t'
-substPos _ (Pos (j :< PosTop)) = Pos $ j :< PosTop
-substPos _ (Pos (j :< PosTopIntro)) = Pos $ j :< PosTopIntro
-substPos _ (Pos (j :< PosUniv)) = Pos $ j :< PosUniv
-
-substNeg :: SubstIdent -> Neg -> Neg
-substNeg sub (Neg (j :< NegPiElimDownElim e vs)) = do
-  let e' = substIdent sub e
-  let vs' = map (substIdent sub) vs
-  Neg $ j :< NegPiElimDownElim e' vs'
-substNeg sub (Neg (j :< NegSigmaElim v (x, y) e)) = do
-  let v' = substIdent sub v
-  let Neg e' = substNeg sub $ Neg e
-  Neg $ j :< NegSigmaElim v' (x, y) e'
-substNeg sub (Neg (j :< NegUpIntro v)) = do
-  let v' = substPos sub v
-  Neg $ j :< NegUpIntro v'
-substNeg sub (Neg (j :< NegUpElim x e1 e2)) = do
-  let Neg e1' = substNeg sub $ Neg e1
-  let Neg e2' = substNeg sub $ Neg e2
-  Neg $ j :< NegUpElim x e1' e2'
-
 compose :: Subst -> Subst -> Subst
 compose s1 s2 = do
   let domS2 = map fst s2
