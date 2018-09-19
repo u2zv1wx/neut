@@ -99,16 +99,6 @@ data Neg
               Neg
   deriving (Show)
 
--- $(deriveShow1 ''PosF)
--- $(deriveShow1 ''NegF)
--- type PrePos = Cofree (PosF Neg) Identifier
--- type PreNeg = Cofree (NegF Pos) Identifier
--- newtype Pos =
---   Pos PrePos
---   deriving (Show)
--- newtype Neg =
---   Neg PreNeg
---   deriving (Show)
 data Term
   = Value Pos
   | Comp Neg
