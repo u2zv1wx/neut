@@ -26,6 +26,7 @@ asmCodeEnv = do
     code <- liftIO $ readIORef codeRef
     argRegList <- getArgRegList
     asm <- asmCode code
+    liftIO $ putStrLn $ Pr.ppShow asm
     asm' <- bindArgs (zip args argRegList) asm
     insAsmEnv name asm'
     regAlloc 15 asm' -- rsp is not used

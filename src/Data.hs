@@ -175,6 +175,11 @@ $(deriveShow1 ''AsmF)
 
 type Asm = Cofree AsmF AsmMeta
 
+data LowType
+  = LowTypeInt Int
+  | LowTypePointer LowType
+  deriving (Show)
+
 instance (Show a) => Show (IORef a) where
   show a = show (unsafePerformIO (readIORef a))
 
@@ -605,6 +610,15 @@ sizeOfType (_ :< NeutSigma (_, t1) t2) = do
 sizeOfType (_ :< NeutTop) = return 4
 sizeOfType (_ :< NeutUniv _) = return 4
 sizeOfType v = lift $ throwE $ "Asm.sizeOfType: " ++ show v ++ " is not a type"
+
+toLowType :: Neut -> WithEnv LowType
+toLowType (_ :< NeutVar _) =
+  lift $ throwE "Asm.toLowType: the type of a type variable is not defined"
+toLowType (_ :< NeutPi _ _) = return $ LowTypePointer $ LowTypeInt 8
+toLowType (_ :< NeutSigma _ _) = return $ LowTypePointer $ LowTypeInt 8
+toLowType (_ :< NeutTop) = return $ LowTypeInt 32
+toLowType (_ :< NeutUniv _) = return $ LowTypeInt 32
+toLowType v = lift $ throwE $ "Asm.toLowType: " ++ show v ++ " is not a type"
 
 sizeOf :: Identifier -> WithEnv Int
 sizeOf x = do
