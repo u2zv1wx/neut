@@ -6,8 +6,8 @@
 module Data where
 
 import           Control.Comonad
-import           Control.Comonad.Cofree
 
+import           Control.Comonad.Cofree
 import           Control.Monad.Except
 import           Control.Monad.Identity
 import           Control.Monad.State
@@ -38,6 +38,11 @@ $(deriveShow1 ''TreeF)
 
 type Tree = Cofree TreeF Identifier
 
+data UnivLevel
+  = UnivLevelFixed Int
+  | UnivLevelHole Identifier
+  deriving (Show)
+
 data NeutF a
   = NeutVar Identifier
   | NeutPi (Identifier, a)
@@ -55,10 +60,12 @@ data NeutF a
                   a
   | NeutTop
   | NeutTopIntro
-  | NeutUniv Int
+  | NeutUniv UnivLevel
   | NeutMu Identifier
            a
   | NeutHole Identifier
+  | NeutSubst a -- explicit substitution for types
+              [(Identifier, a)]
 
 type Neut = Cofree NeutF Identifier
 
@@ -77,7 +84,7 @@ data PosF c v
   | PosDownIntroPiIntro [Identifier]
                         c
   | PosUp v
-  | PosUniv Int
+  | PosUniv
 
 data NegF v c
   = NegPiElimDownElim Identifier
@@ -186,20 +193,21 @@ instance (Show a) => Show (IORef a) where
   show a = show (unsafePerformIO (readIORef a))
 
 data Env = Env
-  { count         :: Int -- to generate fresh symbols
-  , notationEnv   :: [(Tree, Tree)] -- macro transformers
-  , reservedEnv   :: [Identifier] -- list of reserved keywords
-  , nameEnv       :: [(Identifier, Identifier)] -- used in alpha conversion
-  , typeEnv       :: [(Identifier, Neut)] -- type environment
-  , polTypeEnv    :: [(Identifier, Pos)] -- polarized type environment
-  , termEnv       :: [(Identifier, Term)]
-  , constraintEnv :: [(Neut, Neut)] -- used in type inference
-  , codeEnv       :: [(Identifier, ([Identifier], IORef Code))]
-  , asmEnv        :: [(Identifier, Asm)]
-  , regEnv        :: [(Identifier, Int)] -- variable to register
-  , regVarList    :: [Identifier]
-  , spill         :: Maybe Identifier
-  , sizeEnv       :: [(Identifier, Int)] -- offset from stackpointer
+  { count             :: Int -- to generate fresh symbols
+  , notationEnv       :: [(Tree, Tree)] -- macro transformers
+  , reservedEnv       :: [Identifier] -- list of reserved keywords
+  , nameEnv           :: [(Identifier, Identifier)] -- used in alpha conversion
+  , typeEnv           :: [(Identifier, Neut)] -- type environment
+  , polTypeEnv        :: [(Identifier, Pos)] -- polarized type environment
+  , termEnv           :: [(Identifier, Term)]
+  , constraintEnv     :: [(Neut, Neut)] -- used in type inference
+  , univConstraintEnv :: [(UnivLevel, UnivLevel)]
+  , codeEnv           :: [(Identifier, ([Identifier], IORef Code))]
+  , asmEnv            :: [(Identifier, Asm)]
+  , regEnv            :: [(Identifier, Int)] -- variable to register
+  , regVarList        :: [Identifier]
+  , spill             :: Maybe Identifier
+  , sizeEnv           :: [(Identifier, Int)] -- offset from stackpointer
   } deriving (Show)
 
 initialEnv :: Env
@@ -226,6 +234,7 @@ initialEnv =
     , polTypeEnv = []
     , termEnv = []
     , constraintEnv = []
+    , univConstraintEnv = []
     , codeEnv = []
     , asmEnv = []
     , regEnv = []
@@ -365,6 +374,10 @@ insConstraintEnv :: Neut -> Neut -> WithEnv ()
 insConstraintEnv t1 t2 =
   modify (\e -> e {constraintEnv = (t1, t2) : constraintEnv e})
 
+insUnivConstraintEnv :: UnivLevel -> UnivLevel -> WithEnv ()
+insUnivConstraintEnv t1 t2 =
+  modify (\e -> e {univConstraintEnv = (t1, t2) : univConstraintEnv e})
+
 lookupRegEnv :: Identifier -> WithEnv (Maybe Int)
 lookupRegEnv s = gets (lookup s . regEnv)
 
@@ -460,11 +473,12 @@ bindFormalArgs :: [Identifier] -> Neut -> WithEnv Neut
 bindFormalArgs [] terminal = return terminal
 bindFormalArgs (arg:xs) c@(metaLam :< _) = do
   tLam <- lookupTypeEnv' metaLam
-  tArg <- lookupTypeEnv' arg
+  tArg@(argMeta :< _) <- lookupTypeEnv' arg
   tmp <- bindFormalArgs xs c
   meta <- newNameWith "meta"
   univMeta <- newNameWith "meta"
-  insTypeEnv univMeta (univMeta :< NeutUniv 0)
+  univ <- lookupTypeEnv' argMeta
+  insTypeEnv univMeta univ
   insTypeEnv meta (univMeta :< NeutPi (arg, tArg) tLam)
   return $ meta :< NeutPiIntro (arg, tArg) tmp
 
@@ -503,42 +517,13 @@ var (_ :< NeutTopIntro) = []
 var (_ :< NeutUniv _) = []
 var (_ :< NeutMu s e) = filter (/= s) (var e)
 var (_ :< NeutHole _) = []
+var e@(_ :< NeutSubst _ _) = var $ reduce e
 
 type Subst = [(Identifier, Neut)]
 
+-- proceed explicit substitution
 subst :: Subst -> Neut -> Neut
-subst _ (j :< NeutVar s) = j :< NeutVar s
-subst sub (j :< NeutPi (s, tdom) tcod) = do
-  let tdom' = subst sub tdom
-  let tcod' = subst sub tcod -- note that we don't have to drop s from sub, thanks to rename.
-  j :< NeutPi (s, tdom') tcod'
-subst sub (j :< NeutPiIntro (s, tdom) body) = do
-  let tdom' = subst sub tdom
-  let body' = subst sub body
-  j :< NeutPiIntro (s, tdom') body'
-subst sub (j :< NeutPiElim e1 e2) = do
-  let e1' = subst sub e1
-  let e2' = subst sub e2
-  j :< NeutPiElim e1' e2'
-subst sub (j :< NeutSigma (s, tdom) tcod) = do
-  let tdom' = subst sub tdom
-  let tcod' = subst sub tcod
-  j :< NeutSigma (s, tdom') tcod'
-subst sub (j :< NeutSigmaIntro e1 e2) = do
-  let e1' = subst sub e1
-  let e2' = subst sub e2
-  j :< NeutSigmaIntro e1' e2'
-subst sub (j :< NeutSigmaElim e1 (x, y) e2) = do
-  let e1' = subst sub e1
-  let e2' = subst sub e2
-  j :< NeutSigmaElim e1' (x, y) e2'
-subst _ (j :< NeutTop) = j :< NeutTop
-subst _ (j :< NeutTopIntro) = j :< NeutTopIntro
-subst _ (j :< NeutUniv i) = j :< NeutUniv i
-subst sub (j :< NeutMu x e) = do
-  let e' = subst sub e
-  j :< NeutMu x e'
-subst sub (j :< NeutHole s) = fromMaybe (j :< NeutHole s) (lookup s sub)
+subst sub e = reduce ("" :< NeutSubst e sub)
 
 type SubstIdent = [(Identifier, Identifier)]
 
@@ -578,23 +563,44 @@ reduce (i :< NeutSigmaElim e (x, y) body) = do
 reduce (meta :< NeutMu s c) = do
   let c' = reduce c
   meta :< NeutMu s c'
-reduce t = t
+reduce (_ :< NeutSubst (k :< NeutVar s) sub) =
+  fromMaybe (k :< NeutVar s) (lookup s sub)
+reduce (j :< NeutSubst (i :< NeutPi (s, tdom) tcod) sub) = do
+  let tdom' = reduce (j :< NeutSubst tdom sub)
+  let tcod' = reduce (j :< NeutSubst tcod sub)
+  i :< NeutPi (s, tdom') tcod'
+reduce (j :< NeutSubst (i :< NeutPiIntro (s, tdom) body) sub) = do
+  let tdom' = reduce (j :< NeutSubst tdom sub)
+  let body' = reduce (j :< NeutSubst body sub)
+  i :< NeutPiIntro (s, tdom') body'
+reduce (j :< NeutSubst (i :< NeutPiElim e1 e2) sub) = do
+  let e1' = reduce (j :< NeutSubst e1 sub)
+  let e2' = reduce (j :< NeutSubst e2 sub)
+  i :< NeutPiElim e1' e2'
+reduce (j :< NeutSubst (i :< NeutSigma (s, tdom) tcod) sub) = do
+  let tdom' = reduce (j :< NeutSubst tdom sub)
+  let tcod' = reduce (j :< NeutSubst tcod sub)
+  i :< NeutSigma (s, tdom') tcod'
+reduce (j :< NeutSubst (i :< NeutSigmaIntro e1 e2) sub) = do
+  let e1' = reduce (j :< NeutSubst e1 sub)
+  let e2' = reduce (j :< NeutSubst e2 sub)
+  i :< NeutSigmaIntro e1' e2'
+reduce (j :< NeutSubst (i :< NeutSigmaElim e1 (x, y) e2) sub) = do
+  let e1' = reduce (j :< NeutSubst e1 sub)
+  let e2' = reduce (j :< NeutSubst e2 sub)
+  i :< NeutSigmaElim e1' (x, y) e2'
+reduce (_ :< NeutSubst (i :< NeutTop) _) = i :< NeutTop
+reduce (_ :< NeutSubst (i :< NeutTopIntro) _) = i :< NeutTopIntro
+reduce (_ :< NeutSubst (i :< NeutUniv l) _) = i :< NeutUniv l
+reduce (j :< NeutSubst (i :< NeutMu x e) sub) = do
+  let e' = reduce (j :< NeutSubst e sub)
+  i :< NeutMu x e'
+reduce self@(_ :< NeutSubst (_ :< NeutHole x) sub) =
+  fromMaybe self (lookup x sub)
+reduce (_ :< NeutSubst (i :< NeutSubst e sub1) sub2) =
+  reduce $ i :< NeutSubst e (sub1 ++ sub2)
+reduce e = e
 
--- bindWithLet x e1 e2 ~> let x := e1 in e2
-bindWithLet :: Identifier -> Neut -> Neut -> WithEnv Neut
-bindWithLet x e1 e2 = do
-  i <- newName
-  j <- newName
-  tdom <- lookupTypeEnv' x
-  return $ j :< NeutPiElim (i :< NeutPiIntro (x, tdom) e2) e1
-
-pendSubst :: Subst -> Neut -> WithEnv Neut
-pendSubst [] e = return e
-pendSubst ((x, e1):rest) e = do
-  e' <- pendSubst rest e
-  bindWithLet x e1 e'
-
--- wrap :: NeutF Neut -> WithEnv Neut
 wrap :: f (Cofree f Identifier) -> WithEnv (Cofree f Identifier)
 wrap a = do
   meta <- newNameWith "meta"
@@ -603,8 +609,15 @@ wrap a = do
 wrapType :: NeutF Neut -> WithEnv Neut
 wrapType t = do
   meta <- newNameWith "meta"
-  u <- wrap $ NeutUniv 0
+  hole <- newName
+  u <- wrap $ NeutUniv (UnivLevelHole hole)
   insTypeEnv meta u
+  return $ meta :< t
+
+wrapTypeWithUniv :: Neut -> NeutF Neut -> WithEnv Neut
+wrapTypeWithUniv univ t = do
+  meta <- newNameWith "meta"
+  insTypeEnv meta univ
   return $ meta :< t
 
 addMeta :: AsmF Asm -> WithEnv Asm
@@ -628,7 +641,7 @@ sizeOfType (_ :< PosSigma xts t) = do
 sizeOfType (_ :< PosTop) = return 4
 sizeOfType (_ :< PosDown _) = return 4
 sizeOfType (_ :< PosUp t) = sizeOfType t
-sizeOfType (_ :< PosUniv _) = return 4
+sizeOfType (_ :< PosUniv) = return 4
 sizeOfType v = lift $ throwE $ "Asm.sizeOfType: " ++ show v ++ " is not a type"
 
 sizeOf :: Identifier -> WithEnv Int
