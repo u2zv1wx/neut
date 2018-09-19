@@ -39,8 +39,8 @@ $(deriveShow1 ''TreeF)
 type Tree = Cofree TreeF Identifier
 
 data UnivLevel
-  = UnivLevelFixed Int
-  | UnivLevelHole Identifier
+  = UnivLevelHole Identifier
+  | UnivLevelNext UnivLevel
   deriving (Show)
 
 data NeutF a

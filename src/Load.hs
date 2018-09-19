@@ -44,6 +44,8 @@ load' (a:as) = do
   e <- macroExpand a >>= parse >>= rename
   liftIO $ putStrLn $ Pr.ppShow e
   check mainLabel e
+  env <- get
+  liftIO $ putStrLn $ Pr.ppShow (univConstraintEnv env)
   c' <- lift e >>= expand >>= polarize >>= toNeg >>= virtualNeg
   liftIO $ putStrLn $ Pr.ppShow c'
   insCodeEnv mainLabel [] c'

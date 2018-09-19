@@ -50,28 +50,36 @@ infer (meta :< NeutPiElim e1 e2) = do
 infer (meta :< NeutSigma (s, tdom) tcod) = inferBinder meta s tdom tcod
 infer (meta :< NeutSigmaIntro e1 e2) = do
   t1 <- infer e1 -- A
-  x <- newNameOfType t1
   t2 <- infer e2 -- B {x := e1}
+  u1 <- infer t1
+  u2 <- infer t2
+  insConstraintEnv u1 u2
   t2nosub <- newHole -- B
+  x <- newNameOfType t1
   let t2sub = explicitSubst t2nosub [(x, e1)]
   insConstraintEnv t2 t2sub
-  wrapType (NeutSigma (x, t1) t2nosub) >>= returnMeta meta -- Sigma (x : A). B
+  wrapTypeWithUniv u1 (NeutSigma (x, t1) t2nosub) >>= returnMeta meta -- Sigma (x : A). B
 infer (meta :< NeutSigmaElim e1 (x, y) e2) = do
   t1 <- infer e1
-  xHole <- newHole
-  insTypeEnv x xHole
-  yHole <- newHole
-  insTypeEnv y yHole
-  sigmaType <- wrapType $ NeutSigma (x, xHole) yHole
-  insConstraintEnv t1 sigmaType -- t1 == Sigma (x : A). B
+  u1 <- infer t1
+  tx <- newHole
+  ux <- infer tx
+  ty <- newHole
+  uy <- infer ty
+  t2 <- infer e2
+  u2 <- infer t2
+  insTypeEnv x tx
+  insTypeEnv y ty
+  insConstraintEnv u1 u2
+  insConstraintEnv u1 ux
+  insConstraintEnv ux uy
+  sigmaType <- wrapType $ NeutSigma (x, tx) ty
+  insConstraintEnv t1 sigmaType
   z <- newNameOfType t1
   pair <- constructPair x y
   resultHole <- newHole
-  let resultType = explicitSubst resultHole [(z, pair)]
-  let resultType' = explicitSubst resultHole [(z, e1)]
-  t2 <- infer e2
-  insConstraintEnv resultType t2
-  returnMeta meta resultType'
+  insConstraintEnv t2 $ explicitSubst resultHole [(z, pair)]
+  returnMeta meta $ explicitSubst resultHole [(z, e1)]
 infer (meta :< NeutMu s e) = do
   trec <- newHole
   insTypeEnv s trec
@@ -82,14 +90,12 @@ infer (meta :< NeutTop) = do
   hole <- newName
   wrap (NeutUniv (UnivLevelHole hole)) >>= returnMeta meta
 infer (meta :< NeutTopIntro) = wrapType NeutTop >>= returnMeta meta
-infer (meta :< NeutUniv (UnivLevelFixed i)) =
-  wrap (NeutUniv (UnivLevelFixed $ i + 1)) >>= returnMeta meta
-infer (meta :< NeutUniv (UnivLevelHole _)) = do
-  hole <- newName
-  wrap (NeutUniv (UnivLevelHole hole)) >>= returnMeta meta
+infer (meta :< NeutUniv l) =
+  wrap (NeutUniv (UnivLevelNext l)) >>= returnMeta meta
 infer (meta :< NeutHole _) = do
   hole <- newName
   wrap (NeutUniv (UnivLevelHole hole)) >>= returnMeta meta
+infer (_ :< NeutSubst e _) = infer e
 
 inferBinder :: Identifier -> Identifier -> Neut -> Neut -> WithEnv Neut
 inferBinder meta s tdom tcod = do

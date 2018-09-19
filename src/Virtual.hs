@@ -33,7 +33,7 @@ virtualPos (Pos (i :< PosDownIntroPiIntro args body)) = do
   insPolTypeEnv name lamType
   insCodeEnv name args bodyCode
   return $ DataLabel name
-virtualPos (Pos (i :< PosUniv _)) = virtualPos $ Pos $ i :< PosTopIntro
+virtualPos (Pos (i :< PosUniv)) = virtualPos $ Pos $ i :< PosTopIntro
 
 virtualNeg :: Neg -> WithEnv Code
 virtualNeg (Neg (i :< NegPiElimDownElim funName args)) = do
