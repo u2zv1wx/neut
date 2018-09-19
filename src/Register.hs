@@ -127,4 +127,47 @@ edgeInfo (meta :< AsmSubInt64 _ _ cont) = do
   return $ asmMetaLive meta : info
 
 insertSpill :: Asm -> Identifier -> WithEnv Asm
-insertSpill asm x = undefined
+insertSpill (meta :< AsmReturn ans) x =
+  insertPop x [ans] $ meta :< AsmReturn ans
+insertSpill (meta :< AsmMov dest src cont) x = do
+  cont' <- insertSpill cont x
+  cont'' <- insertPush x [dest] cont'
+  insertPop x (varsInAsmArg src) $ meta :< AsmMov dest src cont''
+insertSpill (meta :< AsmLoadWithOffset offset base dest cont) x = do
+  cont' <- insertSpill cont x
+  cont'' <- insertPush x [dest] cont'
+  insertPop x [base] $ meta :< AsmLoadWithOffset offset base dest cont''
+insertSpill (meta :< AsmStoreWithOffset val offset base cont) x = do
+  cont' <- insertSpill cont x
+  insertPop x [base] $ meta :< AsmStoreWithOffset val offset base cont'
+insertSpill (meta :< AsmCall dest fun args cont) x = do
+  cont' <- insertSpill cont x
+  cont'' <- insertPush x [dest] cont'
+  insertPop x (fun : args) $ meta :< AsmCall dest fun args cont''
+insertSpill (meta :< AsmPush y cont) x = do
+  cont' <- insertSpill cont x
+  cont'' <- insertPush x [y] cont'
+  return $ meta :< AsmPush y cont''
+insertSpill (meta :< AsmPop y cont) x = do
+  cont' <- insertSpill cont x
+  insertPop x [y] $ meta :< AsmPop y cont'
+insertSpill (meta :< AsmAddInt64 arg dest cont) x = do
+  cont' <- insertSpill cont x
+  cont'' <- insertPush x [dest] cont'
+  insertPop x (varsInAsmArg arg) $ meta :< AsmAddInt64 arg dest cont''
+insertSpill (meta :< AsmSubInt64 arg dest cont) x = do
+  cont' <- insertSpill cont x
+  cont'' <- insertPush x [dest] cont'
+  insertPop x (varsInAsmArg arg) $ meta :< AsmSubInt64 arg dest cont''
+
+insertPush :: Identifier -> [Identifier] -> Asm -> WithEnv Asm
+insertPush x ds asm =
+  if x `elem` ds
+    then addMeta $ AsmPush x asm
+    else return asm
+
+insertPop :: Identifier -> [Identifier] -> Asm -> WithEnv Asm
+insertPop x us asm =
+  if x `elem` us
+    then addMeta $ AsmPop x asm
+    else return asm

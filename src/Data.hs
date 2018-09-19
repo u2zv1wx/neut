@@ -656,12 +656,11 @@ wrapType t = do
 
 addMeta :: AsmF Asm -> WithEnv Asm
 addMeta pc = do
-  meta <- emptyAsmMeta
+  let meta = emptyAsmMeta
   return $ meta :< pc
 
-emptyAsmMeta :: WithEnv AsmMeta
-emptyAsmMeta =
-  return $ AsmMeta {asmMetaLive = [], asmMetaDef = [], asmMetaUse = []}
+emptyAsmMeta :: AsmMeta
+emptyAsmMeta = AsmMeta {asmMetaLive = [], asmMetaDef = [], asmMetaUse = []}
 
 -- byte size of type
 sizeOfType :: PrePos -> WithEnv Int
@@ -788,3 +787,7 @@ getRBP = lookupNameEnv' "rbp"
 
 getRSP :: WithEnv Identifier
 getRSP = lookupNameEnv' "rsp"
+
+varsInAsmArg :: AsmArg -> [Identifier]
+varsInAsmArg (AsmArgReg x)       = [x]
+varsInAsmArg (AsmArgImmediate _) = []

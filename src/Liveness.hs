@@ -18,45 +18,44 @@ import           Debug.Trace
 import qualified Text.Show.Pretty           as Pr
 
 annotAsm :: Asm -> WithEnv Asm
-annotAsm (meta :< AsmReturn x) = return $ meta {asmMetaUse = [x]} :< AsmReturn x
-annotAsm (meta :< AsmMov x y cont) = do
+annotAsm (_ :< AsmReturn x) =
+  return $ emptyAsmMeta {asmMetaUse = [x]} :< AsmReturn x
+annotAsm (_ :< AsmMov x y cont) = do
   cont' <- annotAsm cont
   return $
-    meta {asmMetaUse = varsInAsmArg y, asmMetaDef = [x]} :< AsmMov x y cont'
-annotAsm (meta :< AsmLoadWithOffset offset base dest cont) = do
+    emptyAsmMeta {asmMetaUse = varsInAsmArg y, asmMetaDef = [x]} :<
+    AsmMov x y cont'
+annotAsm (_ :< AsmLoadWithOffset offset base dest cont) = do
   cont' <- annotAsm cont
   return $
-    meta {asmMetaUse = [base], asmMetaDef = [dest]} :<
+    emptyAsmMeta {asmMetaUse = [base], asmMetaDef = [dest]} :<
     AsmLoadWithOffset offset base dest cont'
-annotAsm (meta :< AsmStoreWithOffset val offset base cont) = do
+annotAsm (_ :< AsmStoreWithOffset val offset base cont) = do
   cont' <- annotAsm cont
   return $
-    meta {asmMetaUse = base : varsInAsmArg val, asmMetaDef = []} :<
+    emptyAsmMeta {asmMetaUse = base : varsInAsmArg val} :<
     AsmStoreWithOffset val offset base cont'
-annotAsm (meta :< AsmCall x fun args cont) = do
+annotAsm (_ :< AsmCall x fun args cont) = do
   cont' <- annotAsm cont
   return $
-    meta {asmMetaUse = fun : args, asmMetaDef = [x]} :< AsmCall x fun args cont'
-annotAsm (meta :< AsmPush x cont) = do
+    emptyAsmMeta {asmMetaUse = fun : args, asmMetaDef = [x]} :<
+    AsmCall x fun args cont'
+annotAsm (_ :< AsmPush x cont) = do
   cont' <- annotAsm cont
-  return $ meta {asmMetaDef = [x]} :< AsmPush x cont'
-annotAsm (meta :< AsmPop x cont) = do
+  return $ emptyAsmMeta {asmMetaDef = [x]} :< AsmPush x cont'
+annotAsm (_ :< AsmPop x cont) = do
   cont' <- annotAsm cont
-  return $ meta {asmMetaUse = [x]} :< AsmPop x cont'
-annotAsm (meta :< AsmAddInt64 arg dest cont) = do
+  return $ emptyAsmMeta {asmMetaUse = [x]} :< AsmPop x cont'
+annotAsm (_ :< AsmAddInt64 arg dest cont) = do
   cont' <- annotAsm cont
   return $
-    meta {asmMetaUse = varsInAsmArg arg, asmMetaDef = [dest]} :<
+    emptyAsmMeta {asmMetaUse = varsInAsmArg arg, asmMetaDef = [dest]} :<
     AsmAddInt64 arg dest cont'
-annotAsm (meta :< AsmSubInt64 arg dest cont) = do
+annotAsm (_ :< AsmSubInt64 arg dest cont) = do
   cont' <- annotAsm cont
   return $
-    meta {asmMetaUse = varsInAsmArg arg, asmMetaDef = [dest]} :<
+    emptyAsmMeta {asmMetaUse = varsInAsmArg arg, asmMetaDef = [dest]} :<
     AsmSubInt64 arg dest cont'
-
-varsInAsmArg :: AsmArg -> [Identifier]
-varsInAsmArg (AsmArgReg x)       = [x]
-varsInAsmArg (AsmArgImmediate _) = []
 
 computeLiveness :: Asm -> WithEnv Asm
 computeLiveness (meta :< AsmReturn x) = do
