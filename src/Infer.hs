@@ -46,14 +46,14 @@ infer (meta :< NeutPiElim e1 e2) = do
   typeMeta2 <- newNameWith "meta"
   insTypeEnv typeMeta2 udom
   insConstraintEnv tPi (typeMeta2 :< NeutPi (x, tdom) tcod) -- t1 == forall (x : tdom). tcod
-  bindWithLet' x e2 tcod >>= returnMeta meta -- tcod {x := e2}
+  returnMeta meta $ explicitSubst tcod [(x, e2)]
 infer (meta :< NeutSigma (s, tdom) tcod) = inferBinder meta s tdom tcod
 infer (meta :< NeutSigmaIntro e1 e2) = do
   t1 <- infer e1 -- A
   x <- newNameOfType t1
   t2 <- infer e2 -- B {x := e1}
   t2nosub <- newHole -- B
-  t2sub <- bindWithLet' x e1 t2nosub -- B {x := e1}
+  let t2sub = explicitSubst t2nosub [(x, e1)]
   insConstraintEnv t2 t2sub
   wrapType (NeutSigma (x, t1) t2nosub) >>= returnMeta meta -- Sigma (x : A). B
 infer (meta :< NeutSigmaElim e1 (x, y) e2) = do
@@ -67,8 +67,8 @@ infer (meta :< NeutSigmaElim e1 (x, y) e2) = do
   z <- newNameOfType t1
   pair <- constructPair x y
   resultHole <- newHole
-  resultType <- bindWithLet' z pair resultHole -- C {z := (x, y)}
-  resultType' <- bindWithLet' z e1 resultHole -- C {z := e1}
+  let resultType = explicitSubst resultHole [(z, pair)]
+  let resultType' = explicitSubst resultHole [(z, e1)]
   t2 <- infer e2
   insConstraintEnv resultType t2
   returnMeta meta resultType'
@@ -114,18 +114,8 @@ newNameOfType t = do
   insTypeEnv i t
   return i
 
--- bindWithLet x e1 e2 ~> let x := e1 in e2
-bindWithLet :: Identifier -> Neut -> Neut -> WithEnv Neut
-bindWithLet x e1 e2 = do
-  i <- newName
-  j <- newName
-  tdom <- lookupTypeEnv' x
-  return $ j :< NeutPiElim (i :< NeutPiIntro (x, tdom) e2) e1
-
-bindWithLet' :: Identifier -> Neut -> Neut -> WithEnv Neut
-bindWithLet' x e1 e2 = do
-  e <- bindWithLet x e1 e2
-  infer e >> return e
+explicitSubst :: Neut -> [(Identifier, Neut)] -> Neut
+explicitSubst e1 sub = "" :< NeutSubst e1 sub
 
 newHole :: WithEnv Neut
 newHole = do
