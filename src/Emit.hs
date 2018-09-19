@@ -1,6 +1,5 @@
 module Emit
   ( emit
-  , emitGlobalLabel
   ) where
 
 import           Control.Monad

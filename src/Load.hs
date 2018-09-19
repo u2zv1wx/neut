@@ -55,7 +55,6 @@ load' (a:as) = do
   liftIO $ putStrLn $ Pr.ppShow c'
   insCodeEnv mainLabel [] c'
   asmCodeEnv
-  emitGlobalLabel mainLabel
   emit
   env <- get
   liftIO $ putStrLn $ Pr.ppShow (codeEnv env)
