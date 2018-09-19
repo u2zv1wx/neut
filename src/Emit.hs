@@ -40,8 +40,23 @@ emitAsm :: Asm -> WithEnv ()
 emitAsm (AsmReturn x) = do
   t <- lookupTypeEnv' x >>= toLowType
   emitOp $ unwords ["ret", showLowType t, x]
-emitAsm (AsmLet x arg cont) = do
-  undefined
+emitAsm (AsmLet x (AsmArgReg y) cont) = do
+  tmp <- newNameWith "tmp"
+  ty <- lookupTypeEnv' y >>= toLowType
+  let typ = LowTypePointer ty
+  emitOp $ unwords [tmp, "= alloca", showLowType ty]
+  emitOp $ unwords ["store", showLowType ty, y ++ ",", showLowType typ, tmp]
+  emitOp $ unwords [x, "= load", showLowType ty ++ ",", showLowType typ, tmp]
+  emitAsm cont
+emitAsm (AsmLet x (AsmArgImmediate i) cont) = do
+  tmp <- newNameWith "tmp"
+  let ty = LowTypeInt 32
+  let typ = LowTypePointer ty
+  emitOp $ unwords [tmp, "= alloca", showLowType ty]
+  emitOp $
+    unwords ["store", showLowType ty, show i ++ ",", showLowType typ, tmp]
+  emitOp $ unwords [x, "= load", showLowType ty ++ ",", showLowType typ, tmp]
+  emitAsm cont
 emitAsm (AsmExtractValue x (base, t) i cont) = do
   tmp <- newName
   let tp = LowTypePointer t
