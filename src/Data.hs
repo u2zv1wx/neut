@@ -71,6 +71,12 @@ type Neut = Cofree NeutF Identifier
 
 $(deriveShow1 ''NeutF)
 
+data LowType
+  = LowTypeInt Int
+  | LowTypeStruct [LowType]
+  | LowTypePointer LowType
+  deriving (Show)
+
 data Pos
   = PosVar Identifier
   | PosPi [(Identifier, Pos)]
@@ -81,8 +87,9 @@ data Pos
   | PosTop
   | PosTopIntro
   | PosDown Pos
-  | PosDownIntroPiIntro [Identifier]
-                        Neg
+  | PosDownIntroPiIntro Identifier -- the name of this lambda abstraction
+                        [Identifier] -- arguments
+                        Neg -- body
   | PosUp Pos
   | PosUniv
   deriving (Show)
@@ -116,7 +123,7 @@ data Data
 type Address = Identifier
 
 data Code
-  = CodeReturn Data
+  = CodeReturn Identifier
   | CodeLet Identifier -- bind (we also use this to represent application)
             Data
             Code
@@ -143,41 +150,26 @@ data AsmArg
 
 -- AsmLoadWithOffset offset base dest == movq offset(base), dest
 -- AsmStoreWithOffset val offset base == movq val, offset(base).
-data AsmF a
+data Asm
   = AsmReturn Identifier
-  | AsmMov Identifier
+  | AsmLet Identifier
            AsmArg
-           a
-  | AsmLoadWithOffset Int -- movq {Int}({Identifier}), {Identifier}; cont
-                      Identifier
-                      Identifier
-                      a
-  | AsmStoreWithOffset AsmArg -- movq {AsmArg}, {Int}({Identifier}); cont
-                       Int
-                       Identifier
-                       a
+           Asm
+  | AsmExtractValue Identifier -- destination
+                    (Identifier, LowType) -- base pointer
+                    Int -- index
+                    Asm
+  | AsmInsertValue AsmArg -- source
+                   (Identifier, LowType) -- base pointer
+                   Int -- index
+                   Asm
   | AsmCall Identifier
             Identifier
-            [Identifier]
-            a
-  | AsmPush Identifier
-            a
-  | AsmPop Identifier
-           a
-  | AsmAddInt64 AsmArg -- subq {AsmArg}, {Identifier}
-                Identifier
-                a
-  | AsmSubInt64 AsmArg -- subq {AsmArg}, {Identifier}
-                Identifier
-                a
-
-$(deriveShow1 ''AsmF)
-
-type Asm = Cofree AsmF AsmMeta
-
-data LowType
-  = LowTypeInt Int
-  | LowTypePointer LowType
+            [AsmArg]
+            Asm
+  | AsmMalloc Identifier
+              LowType
+              Asm
   deriving (Show)
 
 instance (Show a) => Show (IORef a) where
@@ -193,7 +185,7 @@ data Env = Env
   , constraintEnv     :: [(Neut, Neut)] -- used in type inference
   , univConstraintEnv :: [(UnivLevel, UnivLevel)]
   , codeEnv           :: [(Identifier, ([Identifier], IORef Code))]
-  , asmEnv            :: [(Identifier, Asm)]
+  , asmEnv            :: [(Identifier, ([Identifier], Asm))]
   , regEnv            :: [(Identifier, Int)] -- variable to register
   , regVarList        :: [Identifier]
   , spill             :: Maybe Identifier
@@ -324,8 +316,9 @@ insCodeEnv funName args body = do
   codeRef <- liftIO $ newIORef body
   modify (\e -> e {codeEnv = (funName, (args, codeRef)) : codeEnv e})
 
-insAsmEnv :: Identifier -> Asm -> WithEnv ()
-insAsmEnv funName asm = modify (\e -> e {asmEnv = (funName, asm) : asmEnv e})
+insAsmEnv :: Identifier -> [Identifier] -> Asm -> WithEnv ()
+insAsmEnv funName args asm =
+  modify (\e -> e {asmEnv = (funName, (args, asm)) : asmEnv e})
 
 insSizeEnv :: Identifier -> Int -> WithEnv ()
 insSizeEnv name size = modify (\e -> e {sizeEnv = (name, size) : sizeEnv e})
@@ -590,11 +583,10 @@ wrapTypeWithUniv univ t = do
   insTypeEnv meta univ
   return $ meta :< t
 
-addMeta :: AsmF Asm -> WithEnv Asm
-addMeta pc = do
-  let meta = emptyAsmMeta
-  return $ meta :< pc
-
+-- addMeta :: AsmF Asm -> WithEnv Asm
+-- addMeta pc = do
+--   let meta = emptyAsmMeta
+--   return $ meta :< pc
 emptyAsmMeta :: AsmMeta
 emptyAsmMeta = AsmMeta {asmMetaLive = [], asmMetaDef = [], asmMetaUse = []}
 
@@ -610,6 +602,11 @@ sizeOfType (_ :< NeutSigma (_, t1) t2) = do
 sizeOfType (_ :< NeutTop) = return 4
 sizeOfType (_ :< NeutUniv _) = return 4
 sizeOfType v = lift $ throwE $ "Asm.sizeOfType: " ++ show v ++ " is not a type"
+
+sizeOfLowType :: LowType -> Int
+sizeOfLowType (LowTypeInt _)     = 8
+sizeOfLowType (LowTypePointer _) = 8
+sizeOfLowType (LowTypeStruct ts) = sum $ map sizeOfLowType ts
 
 toLowType :: Neut -> WithEnv LowType
 toLowType (_ :< NeutVar _) =

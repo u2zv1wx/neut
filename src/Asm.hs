@@ -24,66 +24,41 @@ asmCodeEnv = do
   env <- get
   forM_ (codeEnv env) $ \(name, (args, codeRef)) -> do
     code <- liftIO $ readIORef codeRef
-    argRegList <- getArgRegList
     asm <- asmCode code
     liftIO $ putStrLn $ Pr.ppShow asm
-    asm' <- bindArgs (zip args argRegList) asm
-    insAsmEnv name asm'
-    regAlloc 15 asm' -- rsp is not used
+    insAsmEnv name args asm
 
 asmCode :: Code -> WithEnv Asm
-asmCode (CodeReturn d) = do
-  rax <- getRAX
-  tmp <- addMeta $ AsmReturn rax
-  asmData rax d tmp
+asmCode (CodeReturn x) = return $ AsmReturn x
 asmCode (CodeLet i d cont) = do
   cont' <- asmCode cont
   asmData i d cont'
 asmCode (CodeCall x fun args cont) = do
   cont' <- asmCode cont
-  if length args > 6
-    then lift $ throwE "Asm.asmCode: the number of arguments exceeds 6"
-    else asmCodeCall x fun args cont'
+  return $ AsmCall x fun (map AsmArgReg args) cont'
 asmCode (CodeExtractValue x base i cont) = do
   t <- lookupTypeEnv' base
   case t of
     _ :< NeutSigma _ _ -> do
       (_, args) <- toSigmaSeq t
-      let ts = map snd args
-      is <- mapM sizeOfType ts
-      let offset = sum $ take i is
+      ts <- mapM (toLowType . snd) args
       cont' <- asmCode cont
-      addMeta $ AsmLoadWithOffset offset base x cont'
+      return $ AsmExtractValue x (base, LowTypeStruct ts) i cont'
     _ -> lift $ throwE "Asm.asmCode : typeError"
 
-asmCodeCall :: Identifier -> Identifier -> [Identifier] -> Asm -> WithEnv Asm
-asmCodeCall x fun args cont = do
-  argRegList <- getArgRegList
-  rax <- getRAX
-  cont' <- addMeta $ AsmMov x (AsmArgReg rax) cont
-  call <- addMeta $ AsmCall rax fun args cont'
-  bindArgs (zip argRegList args) call
-
-bindArgs :: [(Identifier, Identifier)] -> Asm -> WithEnv Asm
-bindArgs [] asm = return asm
-bindArgs ((to, from):rest) asm = do
-  asm' <- bindArgs rest asm
-  addMeta $ AsmMov to (AsmArgReg from) asm'
-
 asmData :: Identifier -> Data -> Asm -> WithEnv Asm
-asmData reg (DataLocal x) cont = addMeta $ AsmMov reg (AsmArgReg x) cont
-asmData reg (DataLabel x) cont = addMeta $ AsmMov reg (AsmArgReg x) cont
-asmData reg (DataInt32 i) cont = addMeta $ AsmMov reg (AsmArgImmediate i) cont
+asmData reg (DataLocal x) cont = return $ AsmLet reg (AsmArgReg x) cont
+asmData reg (DataLabel x) cont = return $ AsmLet reg (AsmArgReg x) cont
+asmData reg (DataInt32 i) cont = return $ AsmLet reg (AsmArgImmediate i) cont
 asmData reg (DataStruct xs) cont = do
-  sizeList <- mapM sizeOf xs
-  let structSize = sum sizeList
-  cont' <- setContent reg (zip sizeList xs) cont
-  rdi <- getRDI
-  callThenCont <- asmCodeCall reg "_malloc" [rdi] cont'
-  addMeta $ AsmMov rdi (AsmArgImmediate structSize) callThenCont
+  ts <- mapM (lookupTypeEnv' >=> toLowType) xs
+  cont' <- setContent ts reg (zip [0 ..] xs) cont
+  return $ AsmMalloc reg (LowTypeStruct ts) cont'
 
-setContent :: Identifier -> [(Int, Identifier)] -> Asm -> WithEnv Asm
-setContent _ [] cont = return cont
-setContent basePointer ((s, d):sizeDataList) cont = do
-  cont' <- setContent basePointer sizeDataList cont
-  addMeta $ AsmStoreWithOffset (AsmArgReg d) s basePointer cont'
+setContent ::
+     [LowType] -> Identifier -> [(Int, Identifier)] -> Asm -> WithEnv Asm
+setContent _ _ [] cont = return cont
+setContent ts basePointer ((index, d):sizeDataList) cont = do
+  cont' <- setContent ts basePointer sizeDataList cont
+  return $
+    AsmInsertValue (AsmArgReg d) (basePointer, LowTypeStruct ts) index cont'

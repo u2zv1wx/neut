@@ -23,10 +23,13 @@ polarize forall@(_ :< NeutPi _ _) = do
   ts' <- mapM (polarize >=> toPos) ts
   let xts' = zip xs ts'
   return $ Value $ PosDown (PosPi xts' (PosUp body'))
-polarize lam@(_ :< NeutPiIntro _ _) = do
+polarize lam@(i :< NeutPiIntro _ _) = do
   (body, args) <- toPiIntroSeq lam
   c <- polarize body >>= toNeg
-  return $ Comp $ NegUpIntro $ PosDownIntroPiIntro args c
+  name <- newNameWith "lam"
+  lamType <- lookupTypeEnv' i
+  insTypeEnv name lamType
+  return $ Comp $ NegUpIntro $ PosDownIntroPiIntro name args c
 polarize e@(_ :< NeutPiElim _ _) = do
   (fun, identArgList) <- funAndArgsPol e
   formalArgs <- mapM (const newName) identArgList
