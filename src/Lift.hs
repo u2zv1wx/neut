@@ -7,6 +7,8 @@ import           Control.Monad
 import           Control.Monad.State        hiding (lift)
 import           Control.Monad.Trans.Except
 
+import qualified Text.Show.Pretty           as Pr
+
 import           Data
 
 lift :: Neut -> WithEnv Neut
@@ -17,7 +19,7 @@ lift (i :< NeutPi (x, tdom) tcod) = do
   return $ i :< NeutPi (x, tdom') tcod'
 lift (i :< NeutPiIntro arg body) = do
   body' <- lift body
-  let freeVars = var body'
+  let freeVars = var $ i :< NeutPiIntro arg body'
   newFormalArgs <- constructFormalArgs freeVars
   let freeToBound = zip freeVars newFormalArgs
   body'' <- replace freeToBound body'

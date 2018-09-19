@@ -506,7 +506,7 @@ coFunAndArgs (term, (i, v):xs) = coFunAndArgs (i :< NeutPiElim term v, xs)
 var :: Neut -> [Identifier]
 var (_ :< NeutVar s) = [s]
 var (_ :< NeutPi (i, tdom) tcod) = var tdom ++ filter (/= i) (var tcod)
-var (_ :< NeutPiIntro (s, tdom) e) = var tdom ++ filter (/= s) (var e)
+var (_ :< NeutPiIntro (s, _) e) = filter (/= s) (var e)
 var (_ :< NeutPiElim e v) = var e ++ var v
 var (_ :< NeutSigma (i, tdom) tcod) = var tdom ++ filter (/= i) (var tcod)
 var (_ :< NeutSigmaIntro v1 v2) = var v1 ++ var v2

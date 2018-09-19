@@ -9,14 +9,14 @@ import           Data
 
 -- eliminate partial applications by eta-expansion
 expand :: Neut -> WithEnv Neut
-expand (i :< NeutVar x) = expand' 0 $ i :< NeutVar x
+expand (i :< NeutVar x) = return $ i :< NeutVar x
 expand (i :< NeutPi (x, tdom) tcod) = do
   tdom' <- expand tdom
   tcod' <- expand tcod
   return $ i :< NeutPi (x, tdom') tcod'
 expand (i :< NeutPiIntro arg body) = do
   body' <- expand body
-  expand' 0 $ i :< NeutPiIntro arg body'
+  return $ i :< NeutPiIntro arg body'
 expand (i :< NeutPiElim e v) = do
   (fun, identArgList) <- funAndArgs (i :< NeutPiElim e v)
   let (identList, argList) = unzip identArgList
@@ -33,14 +33,14 @@ expand (i :< NeutSigmaIntro v1 v2) = do
 expand (i :< NeutSigmaElim e1 (x, y) e2) = do
   e1' <- expand e1
   e2' <- expand e2
-  expand' 0 $ i :< NeutSigmaElim e1' (x, y) e2'
+  return $ i :< NeutSigmaElim e1' (x, y) e2'
 expand (i :< NeutTop) = return $ i :< NeutTop
 expand (i :< NeutTopIntro) = return $ i :< NeutTopIntro
 expand (i :< NeutUniv j) = return $ i :< NeutUniv j
 expand (i :< NeutHole x) = return $ i :< NeutHole x
 expand (meta :< NeutMu s c) = do
   c' <- expand c
-  expand' 0 $ meta :< NeutMu s c'
+  return $ meta :< NeutMu s c'
 
 expand' :: Int -> Neut -> WithEnv Neut
 expand' given term@(i :< _) = do
