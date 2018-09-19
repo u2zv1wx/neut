@@ -71,48 +71,44 @@ type Neut = Cofree NeutF Identifier
 
 $(deriveShow1 ''NeutF)
 
-data PosF c v
+data Pos
   = PosVar Identifier
-  | PosPi [(Identifier, v)]
-          v
-  | PosSigma [(Identifier, v)]
-             v
+  | PosPi [(Identifier, Pos)]
+          Pos
+  | PosSigma [(Identifier, Pos)]
+             Pos
   | PosSigmaIntro [Identifier]
   | PosTop
   | PosTopIntro
-  | PosDown v
+  | PosDown Pos
   | PosDownIntroPiIntro [Identifier]
-                        c
-  | PosUp v
+                        Neg
+  | PosUp Pos
   | PosUniv
+  deriving (Show)
 
-data NegF v c
+data Neg
   = NegPiElimDownElim Identifier
                       [Identifier]
   | NegSigmaElim Identifier
                  (Identifier, Identifier) -- exists-elim
-                 c
-  | NegUpIntro v
+                 Neg
+  | NegUpIntro Pos
   | NegUpElim Identifier
-              c
-              c
-
-$(deriveShow1 ''PosF)
-
-$(deriveShow1 ''NegF)
-
-type PrePos = Cofree (PosF Neg) Identifier
-
-type PreNeg = Cofree (NegF Pos) Identifier
-
-newtype Pos =
-  Pos PrePos
+              Neg
+              Neg
   deriving (Show)
 
-newtype Neg =
-  Neg PreNeg
-  deriving (Show)
-
+-- $(deriveShow1 ''PosF)
+-- $(deriveShow1 ''NegF)
+-- type PrePos = Cofree (PosF Neg) Identifier
+-- type PreNeg = Cofree (NegF Pos) Identifier
+-- newtype Pos =
+--   Pos PrePos
+--   deriving (Show)
+-- newtype Neg =
+--   Neg PreNeg
+--   deriving (Show)
 data Term
   = Value Pos
   | Comp Neg
@@ -198,7 +194,6 @@ data Env = Env
   , reservedEnv       :: [Identifier] -- list of reserved keywords
   , nameEnv           :: [(Identifier, Identifier)] -- used in alpha conversion
   , typeEnv           :: [(Identifier, Neut)] -- type environment
-  , polTypeEnv        :: [(Identifier, Pos)] -- polarized type environment
   , termEnv           :: [(Identifier, Term)]
   , constraintEnv     :: [(Neut, Neut)] -- used in type inference
   , univConstraintEnv :: [(UnivLevel, UnivLevel)]
@@ -231,7 +226,6 @@ initialEnv =
         ]
     , nameEnv = []
     , typeEnv = []
-    , polTypeEnv = []
     , termEnv = []
     , constraintEnv = []
     , univConstraintEnv = []
@@ -287,22 +281,6 @@ lookupTypeEnv' s = do
       Pr.ppShow (typeEnv env)
     Just t -> return t
 
-lookupPolTypeEnv :: String -> WithEnv (Maybe Pos)
-lookupPolTypeEnv s = gets (lookup s . polTypeEnv)
-
-lookupPolTypeEnv' :: String -> WithEnv Pos
-lookupPolTypeEnv' s = do
-  mt <- gets (lookup s . polTypeEnv)
-  env <- get
-  case mt of
-    Nothing ->
-      lift $
-      throwE $
-      s ++
-      " is not found in the type environment. typeenv: " ++
-      Pr.ppShow (typeEnv env)
-    Just t -> return t
-
 lookupTermEnv :: String -> WithEnv (Maybe Term)
 lookupTermEnv s = gets (lookup s . termEnv)
 
@@ -345,9 +323,6 @@ insTypeEnv i t = modify (\e -> e {typeEnv = (i, t) : typeEnv e})
 
 insTermEnv :: Identifier -> Term -> WithEnv ()
 insTermEnv i t = modify (\e -> e {termEnv = (i, t) : termEnv e})
-
-insPolTypeEnv :: Identifier -> Pos -> WithEnv ()
-insPolTypeEnv i t = modify (\e -> e {polTypeEnv = (i, t) : polTypeEnv e})
 
 insCodeEnv :: Identifier -> [Identifier] -> Code -> WithEnv ()
 insCodeEnv funName args body = do
@@ -629,24 +604,21 @@ emptyAsmMeta :: AsmMeta
 emptyAsmMeta = AsmMeta {asmMetaLive = [], asmMetaDef = [], asmMetaUse = []}
 
 -- byte size of type
-sizeOfType :: PrePos -> WithEnv Int
-sizeOfType (_ :< PosVar _) =
+sizeOfType :: Neut -> WithEnv Int
+sizeOfType (_ :< NeutVar _) =
   lift $ throwE "Asm.sizeOfType: the type of a type variable is not defined"
-sizeOfType (_ :< PosPi _ _) =
-  lift $ throwE "Asm.sizeOfType: the type of function itself is not defined"
-sizeOfType (_ :< PosSigma xts t) = do
-  is <- mapM (sizeOfType . snd) xts
-  i <- sizeOfType t
-  return $ i + sum is
-sizeOfType (_ :< PosTop) = return 4
-sizeOfType (_ :< PosDown _) = return 4
-sizeOfType (_ :< PosUp t) = sizeOfType t
-sizeOfType (_ :< PosUniv) = return 4
+sizeOfType (_ :< NeutPi _ _) = return 4
+sizeOfType (_ :< NeutSigma (_, t1) t2) = do
+  i1 <- sizeOfType t1
+  i2 <- sizeOfType t2
+  return $ i1 + i2
+sizeOfType (_ :< NeutTop) = return 4
+sizeOfType (_ :< NeutUniv _) = return 4
 sizeOfType v = lift $ throwE $ "Asm.sizeOfType: " ++ show v ++ " is not a type"
 
 sizeOf :: Identifier -> WithEnv Int
 sizeOf x = do
-  Pos t <- lookupPolTypeEnv' x
+  t <- lookupTypeEnv' x
   sizeOfType t
 
 getArgRegList :: WithEnv [Identifier]
@@ -757,3 +729,27 @@ getRSP = lookupNameEnv' "rsp"
 varsInAsmArg :: AsmArg -> [Identifier]
 varsInAsmArg (AsmArgReg x)       = [x]
 varsInAsmArg (AsmArgImmediate _) = []
+
+toPiIntroSeq :: Neut -> WithEnv (Neut, [Identifier])
+toPiIntroSeq (_ :< NeutPiIntro (x, _) body) = do
+  (body', args) <- toPiIntroSeq body
+  return (body', x : args)
+toPiIntroSeq t = return (t, [])
+
+toSigmaIntroSeq :: Neut -> WithEnv [Neut]
+toSigmaIntroSeq (_ :< NeutSigmaIntro e1 e2) = do
+  rest <- toSigmaIntroSeq e2
+  return $ e1 : rest
+toSigmaIntroSeq t = return [t]
+
+toPiSeq :: Neut -> WithEnv (Neut, [(Identifier, Neut)])
+toPiSeq (_ :< NeutPi (x, t) body) = do
+  (body', args) <- toPiSeq body
+  return (body', (x, t) : args)
+toPiSeq t = return (t, [])
+
+toSigmaSeq :: Neut -> WithEnv (Neut, [(Identifier, Neut)])
+toSigmaSeq (_ :< NeutSigma (x, t) body) = do
+  (body', args) <- toSigmaSeq body
+  return (body', (x, t) : args)
+toSigmaSeq t = return (t, [])

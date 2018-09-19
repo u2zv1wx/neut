@@ -18,39 +18,35 @@ import qualified Text.Show.Pretty           as Pr
 import           Debug.Trace
 
 virtualPos :: Pos -> WithEnv Data
-virtualPos (Pos (_ :< PosVar x)) = return (DataLocal x)
-virtualPos (Pos (i :< PosPi _ _)) = virtualPos $ Pos $ i :< PosTopIntro
-virtualPos (Pos (i :< PosSigma _ _)) = virtualPos $ Pos $ i :< PosTopIntro
-virtualPos (Pos (_ :< PosSigmaIntro xs)) = return $ DataStruct xs
-virtualPos (Pos (i :< PosTop)) = virtualPos $ Pos $ i :< PosTopIntro
-virtualPos (Pos (_ :< PosTopIntro)) = return $ DataInt32 0
-virtualPos (Pos (i :< PosUp _)) = virtualPos $ Pos $ i :< PosTopIntro
-virtualPos (Pos (i :< PosDown _)) = virtualPos $ Pos $ i :< PosTopIntro
-virtualPos (Pos (i :< PosDownIntroPiIntro args body)) = do
+virtualPos (PosVar x) = return (DataLocal x)
+virtualPos (PosPi _ _) = virtualPos PosTopIntro
+virtualPos (PosSigma _ _) = virtualPos PosTopIntro
+virtualPos (PosSigmaIntro xs) = return $ DataStruct xs
+virtualPos PosTop = virtualPos PosTopIntro
+virtualPos PosTopIntro = return $ DataInt32 0
+virtualPos (PosUp _) = virtualPos PosTopIntro
+virtualPos (PosDown _) = virtualPos PosTopIntro
+virtualPos (PosDownIntroPiIntro args body) = do
   bodyCode <- virtualNeg body
   name <- newNameWith "lam"
-  lamType <- lookupPolTypeEnv' i
-  insPolTypeEnv name lamType
   insCodeEnv name args bodyCode
   return $ DataLabel name
-virtualPos (Pos (i :< PosUniv)) = virtualPos $ Pos $ i :< PosTopIntro
+virtualPos PosUniv = virtualPos PosTopIntro
 
 virtualNeg :: Neg -> WithEnv Code
-virtualNeg (Neg (i :< NegPiElimDownElim funName args)) = do
+virtualNeg (NegPiElimDownElim funName args) = do
   s <- newNameWith "tmp"
-  resultType <- lookupPolTypeEnv' i
-  insPolTypeEnv s resultType
   return $ CodeCall s funName args (CodeReturn $ DataLocal s)
-virtualNeg (Neg (_ :< NegSigmaElim z (x, y) e)) = do
-  e' <- virtualNeg $ Neg e
+virtualNeg (NegSigmaElim z (x, y) e) = do
+  e' <- virtualNeg e
   return $ CodeExtractValue x z 0 (CodeExtractValue y z 1 e')
-virtualNeg (Neg (_ :< NegUpIntro v)) = do
+virtualNeg (NegUpIntro v) = do
   d <- virtualPos v
   x <- newName
   return $ CodeLet x d (CodeReturn $ DataLocal x)
-virtualNeg (Neg (_ :< NegUpElim x e1 e2)) = do
-  e1' <- virtualNeg $ Neg e1
-  e2' <- virtualNeg $ Neg e2
+virtualNeg (NegUpElim x e1 e2) = do
+  e1' <- virtualNeg e1
+  e2' <- virtualNeg e2
   traceLet x e1' e2'
 
 traceLet :: String -> Code -> Code -> WithEnv Code

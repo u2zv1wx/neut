@@ -44,9 +44,10 @@ asmCode (CodeCall x fun args cont) = do
     then lift $ throwE "Asm.asmCode: the number of arguments exceeds 6"
     else asmCodeCall x fun args cont'
 asmCode (CodeExtractValue x base i cont) = do
-  t <- lookupPolTypeEnv' base
+  t <- lookupTypeEnv' base
   case t of
-    Pos (_ :< PosSigma args _) -> do
+    _ :< NeutSigma _ _ -> do
+      (_, args) <- toSigmaSeq t
       let ts = map snd args
       is <- mapM sizeOfType ts
       let offset = sum $ take i is
