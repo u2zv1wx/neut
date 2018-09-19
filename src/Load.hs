@@ -15,6 +15,7 @@ import           Asm
 import           Data
 
 import           Emit
+import           Expand
 import           Infer
 import           Lift
 import           Macro
@@ -43,7 +44,7 @@ load' (a:as) = do
   e <- macroExpand a >>= parse >>= rename
   liftIO $ putStrLn $ Pr.ppShow e
   check mainLabel e
-  c' <- lift e >>= polarize >>= toNeg >>= virtualNeg
+  c' <- lift e >>= expand >>= polarize >>= toNeg >>= virtualNeg
   liftIO $ putStrLn $ Pr.ppShow c'
   insCodeEnv mainLabel [] c'
   asmCodeEnv
