@@ -31,7 +31,7 @@ infer (meta :< NeutPi (s, tdom) tcod) = do
   mustBeType tdom
   insTypeEnv s tdom
   mustBeType tcod
-  return $ meta :< NeutUniv
+  return $ meta :< NeutUniv 0
 infer (meta :< NeutPiIntro (s, tdom) e) = do
   mustBeType tdom
   insTypeEnv s tdom
@@ -49,7 +49,7 @@ infer (meta :< NeutSigma (s, tdom) tcod) = do
   mustBeType tdom
   insTypeEnv s tdom
   mustBeType tcod
-  return $ meta :< NeutUniv
+  return $ meta :< NeutUniv 0
 infer (meta :< NeutSigmaIntro e1 e2) = do
   t1 <- infer e1 -- A
   x <- newNameOfType t1
@@ -80,10 +80,10 @@ infer (meta :< NeutMu s e) = do
   te <- infer e
   insConstraintEnv te trec
   returnMeta meta te
-infer (meta :< NeutTop) = wrap NeutUniv >>= returnMeta meta
+infer (meta :< NeutTop) = wrap (NeutUniv 0) >>= returnMeta meta
 infer (meta :< NeutTopIntro) = wrapType NeutTop >>= returnMeta meta
-infer (_ :< NeutUniv) = error "the level of type universe hierarchy is upto 2"
-infer (meta :< NeutHole _) = wrap NeutUniv >>= returnMeta meta
+infer (meta :< NeutUniv i) = wrap (NeutUniv (i + 1)) >>= returnMeta meta
+infer (meta :< NeutHole _) = wrap (NeutUniv 0) >>= returnMeta meta
 
 constructPair :: Identifier -> Identifier -> WithEnv Neut
 constructPair x y = do
@@ -103,7 +103,7 @@ newNameOfType t = do
 mustBeType :: Neut -> WithEnv ()
 mustBeType t = do
   t' <- infer t
-  wrap NeutUniv >>= \u -> insConstraintEnv t' u
+  wrap (NeutUniv 0) >>= \u -> insConstraintEnv t' u
 
 bindWithLet' :: Identifier -> Neut -> Neut -> WithEnv Neut
 bindWithLet' x e1 e2 = do
@@ -169,7 +169,8 @@ unify ((_ :< NeutPi (_, tdom1) tcod1, _ :< NeutPi (_, tdom2) tcod2):cs) =
 unify ((_ :< NeutSigma (_, tdom1) tcod1, _ :< NeutSigma (_, tdom2) tcod2):cs) =
   unify $ (tdom1, tdom2) : (tcod1, tcod2) : cs
 unify ((_ :< NeutTop, _ :< NeutTop):cs) = unify cs
-unify ((_ :< NeutUniv, _ :< NeutUniv):cs) = unify cs
+unify ((_ :< NeutUniv i, _ :< NeutUniv j):cs)
+  | i == j = unify cs
 unify cs = ([], cs)
 
 sConstraint :: Subst -> Constraint -> Constraint

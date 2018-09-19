@@ -73,7 +73,7 @@ polarize (i :< NeutTopIntro) = do
   t <- lookupTypeEnv' i >>= polarize >>= toPos
   insPolTypeEnv i t
   return $ Value $ Pos $ i :< PosTopIntro
-polarize (i :< NeutUniv) = return $ Value $ Pos $ i :< PosUniv
+polarize (i :< NeutUniv j) = return $ Value $ Pos $ i :< PosUniv j
 polarize (_ :< NeutHole x) = error $ "Polarize.polarize: remaining hole: " ++ x
 polarize (i :< NeutMu s e) = do
   t <- lookupTypeEnv' i >>= polarize >>= toPos

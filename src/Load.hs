@@ -41,6 +41,7 @@ load' ((_ :< TreeNode [_ :< TreeAtom "reserve", _ :< TreeAtom s]):as) = do
   load' as
 load' (a:as) = do
   e <- macroExpand a >>= parse >>= rename
+  liftIO $ putStrLn $ Pr.ppShow e
   check mainLabel e
   c' <- lift e >>= polarize >>= toNeg >>= virtualNeg
   liftIO $ putStrLn $ Pr.ppShow c'

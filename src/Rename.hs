@@ -53,5 +53,5 @@ rename (i :< NeutMu s e) =
     return $ i :< NeutMu s' e'
 rename (i :< NeutTop) = return $ i :< NeutTop
 rename (i :< NeutTopIntro) = return $ i :< NeutTopIntro
-rename (i :< NeutUniv) = return $ i :< NeutUniv
+rename (i :< NeutUniv j) = return $ i :< NeutUniv j
 rename (i :< NeutHole x) = return $ i :< NeutHole x

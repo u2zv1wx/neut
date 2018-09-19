@@ -2,12 +2,6 @@
 
 (reserve begin)
 
-(type nat)
-
-(value zero (down nat))
-
-(value succ (down (forall ((_ (down nat))) nat)))
-
 (notation (begin e)
   e)
 
@@ -17,5 +11,4 @@
 (notation (begin (let x e+) rest+)
   (bind x (begin e+) (begin rest+)))
 
-(begin
-  (lift (thunk ((unthunk succ) zero))))
+(begin (lambda ((x universe) (a x)) a))

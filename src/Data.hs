@@ -55,7 +55,7 @@ data NeutF a
                   a
   | NeutTop
   | NeutTopIntro
-  | NeutUniv
+  | NeutUniv Int
   | NeutMu Identifier
            a
   | NeutHole Identifier
@@ -77,7 +77,7 @@ data PosF c v
   | PosDownIntroPiIntro [Identifier]
                         c
   | PosUp v
-  | PosUniv
+  | PosUniv Int
 
 data NegF v c
   = NegPiElimDownElim Identifier
@@ -464,7 +464,7 @@ bindFormalArgs (arg:xs) c@(metaLam :< _) = do
   tmp <- bindFormalArgs xs c
   meta <- newNameWith "meta"
   univMeta <- newNameWith "meta"
-  insTypeEnv univMeta (univMeta :< NeutUniv)
+  insTypeEnv univMeta (univMeta :< NeutUniv 0)
   insTypeEnv meta (univMeta :< NeutPi (arg, tArg) tLam)
   return $ meta :< NeutPiIntro (arg, tArg) tmp
 
@@ -500,7 +500,7 @@ var (_ :< NeutSigmaElim e1 (x, y) e2) =
   var e1 ++ filter (\s -> s /= x && s /= y) (var e2)
 var (_ :< NeutTop) = []
 var (_ :< NeutTopIntro) = []
-var (_ :< NeutUniv) = []
+var (_ :< NeutUniv _) = []
 var (_ :< NeutMu s e) = filter (/= s) (var e)
 var (_ :< NeutHole _) = []
 
@@ -534,7 +534,7 @@ subst sub (j :< NeutSigmaElim e1 (x, y) e2) = do
   j :< NeutSigmaElim e1' (x, y) e2'
 subst _ (j :< NeutTop) = j :< NeutTop
 subst _ (j :< NeutTopIntro) = j :< NeutTopIntro
-subst _ (j :< NeutUniv) = j :< NeutUniv
+subst _ (j :< NeutUniv i) = j :< NeutUniv i
 subst sub (j :< NeutMu x e) = do
   let e' = subst sub e
   j :< NeutMu x e'
@@ -603,7 +603,7 @@ wrap a = do
 wrapType :: NeutF Neut -> WithEnv Neut
 wrapType t = do
   meta <- newNameWith "meta"
-  u <- wrap NeutUniv
+  u <- wrap $ NeutUniv 0
   insTypeEnv meta u
   return $ meta :< t
 
@@ -628,7 +628,7 @@ sizeOfType (_ :< PosSigma xts t) = do
 sizeOfType (_ :< PosTop) = return 4
 sizeOfType (_ :< PosDown _) = return 4
 sizeOfType (_ :< PosUp t) = sizeOfType t
-sizeOfType (_ :< PosUniv) = return 4
+sizeOfType (_ :< PosUniv _) = return 4
 sizeOfType v = lift $ throwE $ "Asm.sizeOfType: " ++ show v ++ " is not a type"
 
 sizeOf :: Identifier -> WithEnv Int

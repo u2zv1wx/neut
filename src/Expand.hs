@@ -36,7 +36,7 @@ expand (i :< NeutSigmaElim e1 (x, y) e2) = do
   expand' 0 $ i :< NeutSigmaElim e1' (x, y) e2'
 expand (i :< NeutTop) = return $ i :< NeutTop
 expand (i :< NeutTopIntro) = return $ i :< NeutTopIntro
-expand (i :< NeutUniv) = return $ i :< NeutUniv
+expand (i :< NeutUniv j) = return $ i :< NeutUniv j
 expand (i :< NeutHole x) = return $ i :< NeutHole x
 expand (meta :< NeutMu s c) = do
   c' <- expand c

@@ -2,18 +2,6 @@
 
 (reserve begin)
 
-(type nat)
-
-(value zero (down nat))
-
-(value succ (down (forall ((_ (down nat))) nat)))
-
-(type bool)
-
-(value true (down bool))
-
-(value false (down bool))
-
 (notation (begin e)
   e)
 
