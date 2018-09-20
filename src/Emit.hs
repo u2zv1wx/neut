@@ -57,7 +57,7 @@ emitAsm (_ :< AsmInsertValue val base offset cont) = do
   emitOp $ unwords ["movq", val' ++ ",", showRegWithOffset offset base']
   emitAsm cont
 emitAsm (_ :< AsmCall _ (AsmArgReg x) _ cont) = do
-  x' <- toRegName x
+  x' <- showReg x
   emitOp $ unwords ["call", "*" ++ x']
   emitAsm cont
 emitAsm (_ :< AsmCall _ (AsmArgLabel label) _ cont) = do
