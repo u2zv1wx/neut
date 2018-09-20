@@ -33,10 +33,18 @@ emit = do
 
 emitAsm :: Asm -> WithEnv ()
 emitAsm (_ :< AsmReturn _) = emitOp $ unwords ["ret"]
-emitAsm (_ :< AsmLet x arg cont) = do
+emitAsm (_ :< AsmLet x (AsmArgReg y) cont) = do
   x' <- showReg x
-  arg' <- showAsmArg arg
-  emitOp $ unwords ["movq", arg' ++ ",", x']
+  y' <- showReg y
+  emitOp $ unwords ["movq", y' ++ ",", x']
+  emitAsm cont
+emitAsm (_ :< AsmLet x (AsmArgLabel label) cont) = do
+  x' <- showReg x
+  emitOp $ unwords ["leaq", label ++ "(%rip),", x']
+  emitAsm cont
+emitAsm (_ :< AsmLet x (AsmArgImmediate i) cont) = do
+  x' <- showReg x
+  emitOp $ unwords ["movq", show i, x']
   emitAsm cont
 emitAsm (_ :< AsmExtractValue dest base offset cont) = do
   base' <- showReg base
@@ -48,10 +56,15 @@ emitAsm (_ :< AsmInsertValue val base offset cont) = do
   base' <- showReg base
   emitOp $ unwords ["movq", val' ++ ",", showRegWithOffset offset base']
   emitAsm cont
-emitAsm (_ :< AsmCall _ label _ cont) = do
-  label' <- toRegName label
-  emitOp $ unwords ["call", label']
+emitAsm (_ :< AsmCall _ (AsmArgReg x) _ cont) = do
+  x' <- toRegName x
+  emitOp $ unwords ["call", "*" ++ x']
   emitAsm cont
+emitAsm (_ :< AsmCall _ (AsmArgLabel label) _ cont) = do
+  emitOp $ unwords ["call", label]
+  emitAsm cont
+emitAsm (_ :< AsmCall _ (AsmArgImmediate _) _ _) =
+  liftIO $ putStrLn "emitAsm.AsmCall: immediate?"
 emitAsm (meta :< AsmPush x cont) = do
   rsp <- getRSP
   offset <- computeOffset x

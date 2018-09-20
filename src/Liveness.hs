@@ -38,7 +38,7 @@ annotAsm (_ :< AsmInsertValue val base i cont) = do
 annotAsm (_ :< AsmCall x fun args cont) = do
   cont' <- annotAsm cont
   return $
-    emptyAsmMeta {asmMetaUse = fun : args, asmMetaDef = [x]} :<
+    emptyAsmMeta {asmMetaUse = varsInAsmArg fun ++ args, asmMetaDef = [x]} :<
     AsmCall x fun args cont'
 annotAsm (_ :< AsmPush x cont) = do
   cont' <- annotAsm cont

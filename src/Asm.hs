@@ -84,7 +84,7 @@ asmCodeCall x fun args cont = do
   argRegList <- getArgRegList
   rax <- getRAX
   cont' <- addMeta $ AsmLet x (AsmArgReg rax) cont
-  call <- addMeta $ AsmCall rax fun args cont'
+  call <- addMeta $ AsmCall rax (AsmArgReg fun) args cont'
   bindArgs (zip argRegList args) call
 
 bindArgs :: [(Identifier, Identifier)] -> Asm -> WithEnv Asm

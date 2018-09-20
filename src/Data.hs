@@ -165,7 +165,7 @@ data AsmF a
                    Int -- offset
                    a
   | AsmCall Identifier
-            Identifier
+            AsmArg
             [Identifier]
             a
   | AsmPush Identifier
@@ -360,7 +360,7 @@ lookupRegEnv' s = do
   tmp <- gets (lookup s . regEnv)
   case tmp of
     Just i  -> return i
-    Nothing -> return 100
+    Nothing -> return 0
     -- Nothing -> lift $ throwE $ "no such register: " ++ show s
 
 insRegEnv :: Identifier -> Int -> WithEnv ()

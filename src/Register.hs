@@ -156,7 +156,7 @@ insertSpill (meta :< AsmInsertValue val base i cont) x = do
 insertSpill (meta :< AsmCall dest fun args cont) x = do
   cont' <- insertSpill cont x
   cont'' <- insertPush x [dest] cont'
-  insertPop x (fun : args) $ meta :< AsmCall dest fun args cont''
+  insertPop x (varsInAsmArg fun ++ args) $ meta :< AsmCall dest fun args cont''
 insertSpill (meta :< AsmPush y cont) x = do
   cont' <- insertSpill cont x
   cont'' <- insertPush x [y] cont'
