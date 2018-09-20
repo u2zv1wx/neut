@@ -53,6 +53,7 @@ load' (a:as) = do
   emitGlobalLabel mainLabel
   emit
   env <- get
+  liftIO $ putStrLn $ Pr.ppShow $ typeEnv env
   load' as
 
 mainLabel :: Identifier

@@ -71,6 +71,15 @@ type Neut = Cofree NeutF Identifier
 
 $(deriveShow1 ''NeutF)
 
+data Equation
+  = EquationPiElim Neut
+                   Neut
+                   Identifier
+  | EquationSigmaElim Neut
+                      (Neut, (Identifier, Identifier))
+                      Identifier
+  deriving (Show)
+
 data LowType
   = LowTypeInt Int
   | LowTypeStruct [LowType]
@@ -194,6 +203,7 @@ data Env = Env
   , nameEnv           :: [(Identifier, Identifier)] -- used in alpha conversion
   , typeEnv           :: [(Identifier, Neut)] -- type environment
   , termEnv           :: [(Identifier, Term)]
+  , eqEnv             :: [Equation]
   , constraintEnv     :: [(Neut, Neut)] -- used in type inference
   , univConstraintEnv :: [(UnivLevel, UnivLevel)]
   , codeEnv           :: [(Identifier, ([Identifier], IORef Code))]
@@ -226,6 +236,7 @@ initialEnv =
     , nameEnv = []
     , typeEnv = []
     , termEnv = []
+    , eqEnv = []
     , constraintEnv = []
     , univConstraintEnv = []
     , codeEnv = []
@@ -319,6 +330,9 @@ lookupCodeEnv funName = do
 
 insTypeEnv :: Identifier -> Neut -> WithEnv ()
 insTypeEnv i t = modify (\e -> e {typeEnv = (i, t) : typeEnv e})
+
+insEqEnv :: Equation -> WithEnv ()
+insEqEnv eq = modify (\e -> e {eqEnv = eq : eqEnv e})
 
 insTermEnv :: Identifier -> Term -> WithEnv ()
 insTermEnv i t = modify (\e -> e {termEnv = (i, t) : termEnv e})
