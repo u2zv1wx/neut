@@ -157,12 +157,12 @@ data AsmF a
            AsmArg
            a
   | AsmExtractValue Identifier -- destination
-                    (Identifier, [LowType]) -- base pointer
-                    Int -- index
+                    Identifier -- base pointer
+                    Int -- offset
                     a
   | AsmInsertValue AsmArg -- source
-                   (Identifier, [LowType]) -- base pointer
-                   Int -- index
+                   Identifier -- base pointer
+                   Int -- offset
                    a
   | AsmCall Identifier
             Identifier
@@ -201,7 +201,7 @@ data Env = Env
   , regEnv            :: [(Identifier, Int)] -- variable to register
   , regVarList        :: [Identifier]
   , spill             :: Maybe Identifier
-  , sizeEnv           :: [(Identifier, LowType)] -- offset from stackpointer
+  , sizeEnv           :: [(Identifier, Int)] -- offset from stackpointer
   } deriving (Show)
 
 initialEnv :: Env
@@ -331,13 +331,13 @@ insCodeEnv funName args body = do
 insAsmEnv :: Identifier -> Asm -> WithEnv ()
 insAsmEnv funName asm = modify (\e -> e {asmEnv = (funName, asm) : asmEnv e})
 
-insSizeEnv :: Identifier -> LowType -> WithEnv ()
-insSizeEnv name t = modify (\e -> e {sizeEnv = (name, t) : sizeEnv e})
+insSizeEnv :: Identifier -> Int -> WithEnv ()
+insSizeEnv name size = modify (\e -> e {sizeEnv = (name, size) : sizeEnv e})
 
-lookupSizeEnv :: Identifier -> WithEnv (Maybe LowType)
+lookupSizeEnv :: Identifier -> WithEnv (Maybe Int)
 lookupSizeEnv s = gets (lookup s . sizeEnv)
 
-lookupSizeEnv' :: Identifier -> WithEnv LowType
+lookupSizeEnv' :: Identifier -> WithEnv Int
 lookupSizeEnv' s = do
   tmp <- gets (lookup s . sizeEnv)
   case tmp of
@@ -360,7 +360,8 @@ lookupRegEnv' s = do
   tmp <- gets (lookup s . regEnv)
   case tmp of
     Just i  -> return i
-    Nothing -> lift $ throwE $ "no such register: " ++ show s
+    Nothing -> return 100
+    -- Nothing -> lift $ throwE $ "no such register: " ++ show s
 
 insRegEnv :: Identifier -> Int -> WithEnv ()
 insRegEnv x i = modify (\e -> e {regEnv = (x, i) : regEnv e})
@@ -669,10 +670,10 @@ regList =
 -- rsp is colored by -1, and not used in register allocation
 initRegVar :: WithEnv ()
 initRegVar = do
-  xs <- mapM (const newName) regList
+  xs <- mapM newNameWith regList
   forM_ (zip regList xs) $ \(regVar, newVar) ->
     modify (\e -> e {nameEnv = (regVar, newVar) : nameEnv e})
-  modify (\e -> e {regVarList = xs})
+  modify (\e -> e {regVarList = xs ++ regVarList e})
   forM_ (zip [0 ..] xs) $ \(i, regVar) -> insRegEnv regVar i -- precolored
 
 isRegVar :: Identifier -> WithEnv Bool
@@ -692,6 +693,15 @@ toRegName :: Identifier -> WithEnv Identifier
 toRegName x = do
   i <- lookupRegEnv' x
   return $ regList !! i
+
+toRegNumList :: [Identifier] -> WithEnv [Int]
+toRegNumList [] = return []
+toRegNumList (x:xs) = do
+  is <- toRegNumList xs
+  mi <- lookupRegEnv x
+  case mi of
+    Just i  -> return $ i : is
+    Nothing -> return is
 
 getR15 :: WithEnv Identifier
 getR15 = lookupNameEnv' "r15"

@@ -30,25 +30,22 @@ emit = do
     asm' <- insExtendShrink asm
     asm'' <- insSaveRestore asm'
     emitAsm asm''
-  -- forM_ (asmEnv env) $ \(name, (args, asm)) -> emitDefine name args asm
 
 emitAsm :: Asm -> WithEnv ()
 emitAsm (_ :< AsmReturn _) = emitOp $ unwords ["ret"]
 emitAsm (_ :< AsmLet x arg cont) = do
-  x' <- toRegName x
+  x' <- showReg x
   arg' <- showAsmArg arg
   emitOp $ unwords ["movq", arg' ++ ",", x']
   emitAsm cont
-emitAsm (_ :< AsmExtractValue dest (base, ts) i cont) = do
-  base' <- toRegName base
-  dest' <- toRegName dest
-  let offset = sum $ map sizeOfLowType $ take i ts
+emitAsm (_ :< AsmExtractValue dest base offset cont) = do
+  base' <- showReg base
+  dest' <- showReg dest
   emitOp $ unwords ["movq", showRegWithOffset offset base' ++ ",", dest']
   emitAsm cont
-emitAsm (_ :< AsmInsertValue val (base, ts) i cont) = do
+emitAsm (_ :< AsmInsertValue val base offset cont) = do
   val' <- showAsmArg val
-  base' <- toRegName base
-  let offset = sum $ map sizeOfLowType $ take i ts
+  base' <- showReg base
   emitOp $ unwords ["movq", val' ++ ",", showRegWithOffset offset base']
   emitAsm cont
 emitAsm (_ :< AsmCall _ label _ cont) = do
@@ -58,47 +55,37 @@ emitAsm (_ :< AsmCall _ label _ cont) = do
 emitAsm (meta :< AsmPush x cont) = do
   rsp <- getRSP
   offset <- computeOffset x
-  emitAsm $
-    meta :< AsmInsertValue (AsmArgReg x) (rsp, offset) (length offset - 1) cont
+  emitAsm $ meta :< AsmInsertValue (AsmArgReg x) rsp offset cont
 emitAsm (meta :< AsmPop dest cont) = do
   rsp <- getRSP
   offset <- computeOffset dest
-  emitAsm $ meta :< AsmExtractValue dest (rsp, offset) (length offset - 1) cont
+  emitAsm $ meta :< AsmExtractValue dest rsp offset cont
 emitAsm (_ :< AsmAddInt64 arg dest cont) = do
   arg' <- showAsmArg arg
-  dest' <- toRegName dest
-  emitOp $ unwords ["addq", arg', dest']
+  dest' <- showReg dest
+  emitOp $ unwords ["addq", arg' ++ ",", dest']
   emitAsm cont
 emitAsm (_ :< AsmSubInt64 arg dest cont) = do
   arg' <- showAsmArg arg
-  dest' <- toRegName dest
-  emitOp $ unwords ["subq", arg', dest']
+  dest' <- showReg dest
+  emitOp $ unwords ["subq", arg' ++ ",", dest']
   emitAsm cont
 
 showAsmArg :: AsmArg -> WithEnv String
-showAsmArg (AsmArgReg x) = do
-  t <- lookupTypeEnv' x >>= toLowType
-  return $ unwords [showLowType t, "%" ++ x]
+showAsmArg (AsmArgReg x)       = showReg x
+showAsmArg (AsmArgLabel x)     = return x
 showAsmArg (AsmArgImmediate i) = return $ "$" ++ show i
+
+showReg :: Identifier -> WithEnv String
+showReg x = do
+  x' <- toRegName x
+  return $ "%" ++ x'
 
 emitOp :: String -> WithEnv ()
 emitOp s = liftIO $ putStrLn $ "  " ++ s
 
 emitGlobalLabel :: Identifier -> WithEnv ()
 emitGlobalLabel label = liftIO $ putStrLn $ "  " ++ ".globl " ++ label
-
-showLowType :: LowType -> String
-showLowType (LowTypeInt i)     = "i" ++ show i
-showLowType (LowTypePointer t) = showLowType t ++ "*"
-showLowType (LowTypeStruct ts) = "{" ++ showLowTypeList ts ++ "}"
-
-showLowTypeList :: [LowType] -> String
-showLowTypeList [] = ""
-showLowTypeList [t] = showLowType t
-showLowTypeList (t1:t2:ts) = do
-  let s1 = showLowType t1
-  let s2 = showLowTypeList $ t2 : ts
-  s1 ++ ", " ++ s2
 
 showRegWithOffset :: Int -> Identifier -> Identifier
 showRegWithOffset offset x = show offset ++ "(" ++ x ++ ")"
@@ -155,18 +142,17 @@ computeSizeList (_ :< AsmExtractValue _ _ _ cont) = computeSizeList cont
 computeSizeList (_ :< AsmCall _ _ _ cont) = computeSizeList cont
 computeSizeList (_ :< AsmPush x cont) = do
   computeSizeList cont
-  -- size <- sizeOf x
-  t <- lookupTypeEnv' x >>= toLowType
-  insSizeEnv x t
+  size <- sizeOf x
+  insSizeEnv x size
 computeSizeList (_ :< AsmPop _ cont) = computeSizeList cont
 computeSizeList (_ :< AsmAddInt64 _ _ cont) = computeSizeList cont
 computeSizeList (_ :< AsmSubInt64 _ _ cont) = computeSizeList cont
 
-computeOffset :: Identifier -> WithEnv [LowType]
+computeOffset :: Identifier -> WithEnv Int
 computeOffset x = do
   env <- get
   let prefixList = takeWhile (\(y, _) -> x /= y) $ sizeEnv env
-  return $ map snd prefixList
+  return $ sum $ map snd prefixList
 
 -- extend/shrink the stack pointer before/after executing function body
 insExtendShrink :: Asm -> WithEnv Asm
@@ -204,14 +190,14 @@ insShrink (meta :< AsmSubInt64 arg dest cont) = do
 extendStack :: Asm -> WithEnv Asm
 extendStack asm = do
   env <- get
-  let size = alignedSize $ sum $ map (sizeOfLowType . snd) $ sizeEnv env
+  let size = alignedSize $ sum $ map snd $ sizeEnv env
   rsp <- getRSP
   addMeta $ AsmSubInt64 (AsmArgImmediate size) rsp asm
 
 shrinkStack :: Asm -> WithEnv Asm
 shrinkStack asm = do
   env <- get
-  let size = alignedSize $ sum $ map (sizeOfLowType . snd) $ sizeEnv env
+  let size = alignedSize $ sum $ map snd $ sizeEnv env
   rsp <- getRSP
   addMeta $ AsmAddInt64 (AsmArgImmediate size) rsp asm
 

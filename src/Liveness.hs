@@ -25,16 +25,16 @@ annotAsm (_ :< AsmLet x y cont) = do
   return $
     emptyAsmMeta {asmMetaUse = varsInAsmArg y, asmMetaDef = [x]} :<
     AsmLet x y cont'
-annotAsm (_ :< AsmExtractValue dest (base, t) i cont) = do
+annotAsm (_ :< AsmExtractValue dest base i cont) = do
   cont' <- annotAsm cont
   return $
     emptyAsmMeta {asmMetaUse = [base], asmMetaDef = [dest]} :<
-    AsmExtractValue dest (base, t) i cont'
-annotAsm (_ :< AsmInsertValue val (base, t) i cont) = do
+    AsmExtractValue dest base i cont'
+annotAsm (_ :< AsmInsertValue val base i cont) = do
   cont' <- annotAsm cont
   return $
     emptyAsmMeta {asmMetaUse = base : varsInAsmArg val} :<
-    AsmInsertValue val (base, t) i cont'
+    AsmInsertValue val base i cont'
 annotAsm (_ :< AsmCall x fun args cont) = do
   cont' <- annotAsm cont
   return $

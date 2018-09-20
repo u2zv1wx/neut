@@ -146,13 +146,13 @@ insertSpill (meta :< AsmLet dest src cont) x = do
   cont' <- insertSpill cont x
   cont'' <- insertPush x [dest] cont'
   insertPop x (varsInAsmArg src) $ meta :< AsmLet dest src cont''
-insertSpill (meta :< AsmExtractValue dest (base, t) i cont) x = do
+insertSpill (meta :< AsmExtractValue dest base i cont) x = do
   cont' <- insertSpill cont x
   cont'' <- insertPush x [dest] cont'
-  insertPop x [base] $ meta :< AsmExtractValue dest (base, t) i cont''
-insertSpill (meta :< AsmInsertValue val (base, t) i cont) x = do
+  insertPop x [base] $ meta :< AsmExtractValue dest base i cont''
+insertSpill (meta :< AsmInsertValue val base i cont) x = do
   cont' <- insertSpill cont x
-  insertPop x [base] $ meta :< AsmInsertValue val (base, t) i cont'
+  insertPop x [base] $ meta :< AsmInsertValue val base i cont'
 insertSpill (meta :< AsmCall dest fun args cont) x = do
   cont' <- insertSpill cont x
   cont'' <- insertPush x [dest] cont'
