@@ -123,7 +123,7 @@ data Data
 type Address = Identifier
 
 data Code
-  = CodeReturn Identifier
+  = CodeReturn Data
   | CodeLet Identifier -- bind (we also use this to represent application)
             Data
             Code
@@ -145,32 +145,44 @@ data AsmMeta = AsmMeta
 
 data AsmArg
   = AsmArgReg Identifier
+  | AsmArgLabel Identifier
   | AsmArgImmediate Int
   deriving (Show)
 
 -- AsmLoadWithOffset offset base dest == movq offset(base), dest
 -- AsmStoreWithOffset val offset base == movq val, offset(base).
-data Asm
+data AsmF a
   = AsmReturn Identifier
   | AsmLet Identifier
            AsmArg
-           Asm
+           a
   | AsmExtractValue Identifier -- destination
-                    (Identifier, LowType) -- base pointer
+                    (Identifier, [LowType]) -- base pointer
                     Int -- index
-                    Asm
+                    a
   | AsmInsertValue AsmArg -- source
-                   (Identifier, LowType) -- base pointer
+                   (Identifier, [LowType]) -- base pointer
                    Int -- index
-                   Asm
+                   a
   | AsmCall Identifier
             Identifier
-            [AsmArg]
-            Asm
-  | AsmMalloc Identifier
-              LowType
-              Asm
+            [Identifier]
+            a
+  | AsmPush Identifier
+            a
+  | AsmPop Identifier
+           a
+  | AsmAddInt64 AsmArg -- subq {AsmArg}, {Identifier}
+                Identifier
+                a
+  | AsmSubInt64 AsmArg -- subq {AsmArg}, {Identifier}
+                Identifier
+                a
   deriving (Show)
+
+$(deriveShow1 ''AsmF)
+
+type Asm = Cofree AsmF AsmMeta
 
 instance (Show a) => Show (IORef a) where
   show a = show (unsafePerformIO (readIORef a))
@@ -185,11 +197,11 @@ data Env = Env
   , constraintEnv     :: [(Neut, Neut)] -- used in type inference
   , univConstraintEnv :: [(UnivLevel, UnivLevel)]
   , codeEnv           :: [(Identifier, ([Identifier], IORef Code))]
-  , asmEnv            :: [(Identifier, ([Identifier], Asm))]
+  , asmEnv            :: [(Identifier, Asm)]
   , regEnv            :: [(Identifier, Int)] -- variable to register
   , regVarList        :: [Identifier]
   , spill             :: Maybe Identifier
-  , sizeEnv           :: [(Identifier, Int)] -- offset from stackpointer
+  , sizeEnv           :: [(Identifier, LowType)] -- offset from stackpointer
   } deriving (Show)
 
 initialEnv :: Env
@@ -316,17 +328,16 @@ insCodeEnv funName args body = do
   codeRef <- liftIO $ newIORef body
   modify (\e -> e {codeEnv = (funName, (args, codeRef)) : codeEnv e})
 
-insAsmEnv :: Identifier -> [Identifier] -> Asm -> WithEnv ()
-insAsmEnv funName args asm =
-  modify (\e -> e {asmEnv = (funName, (args, asm)) : asmEnv e})
+insAsmEnv :: Identifier -> Asm -> WithEnv ()
+insAsmEnv funName asm = modify (\e -> e {asmEnv = (funName, asm) : asmEnv e})
 
-insSizeEnv :: Identifier -> Int -> WithEnv ()
-insSizeEnv name size = modify (\e -> e {sizeEnv = (name, size) : sizeEnv e})
+insSizeEnv :: Identifier -> LowType -> WithEnv ()
+insSizeEnv name t = modify (\e -> e {sizeEnv = (name, t) : sizeEnv e})
 
-lookupSizeEnv :: Identifier -> WithEnv (Maybe Int)
+lookupSizeEnv :: Identifier -> WithEnv (Maybe LowType)
 lookupSizeEnv s = gets (lookup s . sizeEnv)
 
-lookupSizeEnv' :: Identifier -> WithEnv Int
+lookupSizeEnv' :: Identifier -> WithEnv LowType
 lookupSizeEnv' s = do
   tmp <- gets (lookup s . sizeEnv)
   case tmp of
@@ -583,10 +594,11 @@ wrapTypeWithUniv univ t = do
   insTypeEnv meta univ
   return $ meta :< t
 
--- addMeta :: AsmF Asm -> WithEnv Asm
--- addMeta pc = do
---   let meta = emptyAsmMeta
---   return $ meta :< pc
+addMeta :: AsmF Asm -> WithEnv Asm
+addMeta pc = do
+  let meta = emptyAsmMeta
+  return $ meta :< pc
+
 emptyAsmMeta :: AsmMeta
 emptyAsmMeta = AsmMeta {asmMetaLive = [], asmMetaDef = [], asmMetaUse = []}
 
@@ -609,8 +621,10 @@ sizeOfLowType (LowTypePointer _) = 8
 sizeOfLowType (LowTypeStruct ts) = sum $ map sizeOfLowType ts
 
 toLowType :: Neut -> WithEnv LowType
-toLowType (_ :< NeutVar _) =
-  lift $ throwE "Asm.toLowType: the type of a type variable is not defined"
+toLowType (_ :< NeutVar _) = return $ LowTypeInt 32
+  -- lift $
+  -- throwE $
+  -- "Asm.toLowType: the type of a type variable " ++ x ++ " is not defined"
 toLowType (_ :< NeutPi _ _) = return $ LowTypePointer $ LowTypeInt 8
 toLowType (_ :< NeutSigma _ _) = return $ LowTypePointer $ LowTypeInt 8
 toLowType (_ :< NeutTop) = return $ LowTypeInt 32
@@ -729,6 +743,7 @@ getRSP = lookupNameEnv' "rsp"
 
 varsInAsmArg :: AsmArg -> [Identifier]
 varsInAsmArg (AsmArgReg x)       = [x]
+varsInAsmArg (AsmArgLabel _)     = []
 varsInAsmArg (AsmArgImmediate _) = []
 
 toPiIntroSeq :: Neut -> WithEnv (Neut, [Identifier])

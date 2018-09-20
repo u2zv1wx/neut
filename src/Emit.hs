@@ -1,5 +1,6 @@
 module Emit
   ( emit
+  , emitGlobalLabel
   ) where
 
 import           Control.Monad
@@ -22,113 +23,63 @@ import           Debug.Trace
 emit :: WithEnv ()
 emit = do
   env <- get
-  forM_ (asmEnv env) $ \(name, (args, asm)) -> emitDefine name args asm
-
-emitDefine :: Identifier -> [Identifier] -> Asm -> WithEnv ()
-emitDefine name args asm = do
-  lamCodLowType <- getCodLowType name
-  argStr <- showLamArgs args
-  liftIO $
-    putStrLn $
-    "define " ++
-    showLowType lamCodLowType ++ " @" ++ name ++ "(" ++ argStr ++ ") {"
-  emitAsm asm
-  liftIO $ putStrLn "}"
+  forM_ (asmEnv env) $ \(name, asm) -> do
+    emitLabel name
+    modify (\e -> e {sizeEnv = []})
+    computeSizeList asm
+    asm' <- insExtendShrink asm
+    asm'' <- insSaveRestore asm'
+    emitAsm asm''
+  -- forM_ (asmEnv env) $ \(name, (args, asm)) -> emitDefine name args asm
 
 emitAsm :: Asm -> WithEnv ()
-emitAsm (AsmReturn x) = do
-  t <- lookupTypeEnv' x >>= toLowType
-  emitOp $ unwords ["ret", showLowType t, x]
-emitAsm (AsmLet x (AsmArgReg y) cont) = do
-  tmp <- newNameWith "tmp"
-  ty <- lookupTypeEnv' y >>= toLowType
-  let typ = LowTypePointer ty
-  emitOp $ unwords [tmp, "= alloca", showLowType ty]
-  emitOp $ unwords ["store", showLowType ty, y ++ ",", showLowType typ, tmp]
-  emitOp $ unwords [x, "= load", showLowType ty ++ ",", showLowType typ, tmp]
+emitAsm (_ :< AsmReturn _) = emitOp $ unwords ["ret"]
+emitAsm (_ :< AsmLet x arg cont) = do
+  x' <- toRegName x
+  arg' <- showAsmArg arg
+  emitOp $ unwords ["movq", arg' ++ ",", x']
   emitAsm cont
-emitAsm (AsmLet x (AsmArgImmediate i) cont) = do
-  tmp <- newNameWith "tmp"
-  let ty = LowTypeInt 32
-  let typ = LowTypePointer ty
-  emitOp $ unwords [tmp, "= alloca", showLowType ty]
-  emitOp $
-    unwords ["store", showLowType ty, show i ++ ",", showLowType typ, tmp]
-  emitOp $ unwords [x, "= load", showLowType ty ++ ",", showLowType typ, tmp]
+emitAsm (_ :< AsmExtractValue dest (base, ts) i cont) = do
+  base' <- toRegName base
+  dest' <- toRegName dest
+  let offset = sum $ map sizeOfLowType $ take i ts
+  emitOp $ unwords ["movq", showRegWithOffset offset base' ++ ",", dest']
   emitAsm cont
-emitAsm (AsmExtractValue x (base, t) i cont) = do
-  tmp <- newName
-  let tp = LowTypePointer t
-  emitOp $
-    unwords
-      [ tmp ++ " = getelementptr"
-      , showLowType t ++ ","
-      , showLowType tp
-      , base
-      , ", "
-      , showIndexList [0, i]
-      ]
-  tx <- lookupTypeEnv' x >>= toLowType
-  let txp = LowTypePointer tx
-  emitOp $ unwords [x ++ " = load", showLowType tx ++ ",", showLowType txp, tmp]
+emitAsm (_ :< AsmInsertValue val (base, ts) i cont) = do
+  val' <- showAsmArg val
+  base' <- toRegName base
+  let offset = sum $ map sizeOfLowType $ take i ts
+  emitOp $ unwords ["movq", val' ++ ",", showRegWithOffset offset base']
   emitAsm cont
-emitAsm (AsmInsertValue val (base, t) i cont) = do
-  tmp <- newName
-  let tp = LowTypePointer t
-  emitOp $
-    unwords
-      [ tmp ++ " = getelementptr"
-      , showLowType t ++ ","
-      , showLowType tp
-      , base
-      , ", "
-      , showIndexList [0, i]
-      ]
-  valType <- asmArgType val
-  -- let valType' = LowTypePointer valType
-  valStr <- showAsmArg val
-  emitOp $ unwords ["store", valStr ++ ",", showLowType valType, tmp]
-  emitAsm cont
-emitAsm (AsmCall x label args cont) = do
-  codLowTypeStr <- showLowType <$> getCodLowType label
+emitAsm (_ :< AsmCall _ label _ cont) = do
   label' <- toRegName label
-  argStr <- showAsmArgs args
-  emitOp $ unwords [x, "= call", codLowTypeStr, label', "(" ++ argStr ++ ")"]
+  emitOp $ unwords ["call", label']
   emitAsm cont
-emitAsm (AsmMalloc x t cont) = do
-  let size = sizeOfLowType t
-  emitOp $ unwords [x, "= call i8* @malloc(i32 " ++ show size ++ ")"]
+emitAsm (meta :< AsmPush x cont) = do
+  rsp <- getRSP
+  offset <- computeOffset x
+  emitAsm $
+    meta :< AsmInsertValue (AsmArgReg x) (rsp, offset) (length offset - 1) cont
+emitAsm (meta :< AsmPop dest cont) = do
+  rsp <- getRSP
+  offset <- computeOffset dest
+  emitAsm $ meta :< AsmExtractValue dest (rsp, offset) (length offset - 1) cont
+emitAsm (_ :< AsmAddInt64 arg dest cont) = do
+  arg' <- showAsmArg arg
+  dest' <- toRegName dest
+  emitOp $ unwords ["addq", arg', dest']
   emitAsm cont
-
-getCodLowType :: Identifier -> WithEnv LowType
-getCodLowType name = do
-  lamType <- lookupTypeEnv' name
-  (lamCodType, _) <- toPiSeq lamType
-  toLowType lamCodType
+emitAsm (_ :< AsmSubInt64 arg dest cont) = do
+  arg' <- showAsmArg arg
+  dest' <- toRegName dest
+  emitOp $ unwords ["subq", arg', dest']
+  emitAsm cont
 
 showAsmArg :: AsmArg -> WithEnv String
 showAsmArg (AsmArgReg x) = do
   t <- lookupTypeEnv' x >>= toLowType
   return $ unwords [showLowType t, "%" ++ x]
 showAsmArg (AsmArgImmediate i) = return $ "$" ++ show i
-
-showLamArgs :: [Identifier] -> WithEnv String
-showLamArgs [] = return ""
-showLamArgs [x] = do
-  t <- lookupTypeEnv' x >>= toLowType
-  return $ showLowType t
-showLamArgs (x:y:rest) = do
-  s <- showLamArgs $ y : rest
-  t <- lookupTypeEnv' x >>= toLowType
-  return $ showLowType t ++ ", " ++ s
-
-showAsmArgs :: [AsmArg] -> WithEnv String
-showAsmArgs [] = return ""
-showAsmArgs [x] = showAsmArg x
-showAsmArgs (x:y:rest) = do
-  s1 <- showAsmArg x
-  s2 <- showAsmArgs $ y : rest
-  return $ s1 ++ ", " ++ s2
 
 emitOp :: String -> WithEnv ()
 emitOp s = liftIO $ putStrLn $ "  " ++ s
@@ -149,14 +100,124 @@ showLowTypeList (t1:t2:ts) = do
   let s2 = showLowTypeList $ t2 : ts
   s1 ++ ", " ++ s2
 
-showIndexList :: [Int] -> String
-showIndexList [] = ""
-showIndexList [i] = "i32 " ++ show i
-showIndexList (i:j:is) = do
-  let s1 = "i32" ++ show i
-  let s2 = showIndexList $ j : is
-  s1 ++ ", " ++ s2
+showRegWithOffset :: Int -> Identifier -> Identifier
+showRegWithOffset offset x = show offset ++ "(" ++ x ++ ")"
 
-asmArgType :: AsmArg -> WithEnv LowType
-asmArgType (AsmArgReg x)       = lookupTypeEnv' x >>= toLowType
-asmArgType (AsmArgImmediate _) = return $ LowTypeInt 32
+emitLabel :: String -> WithEnv ()
+emitLabel s = liftIO $ putStrLn $ s ++ ":"
+
+insSaveRestore :: Asm -> WithEnv Asm
+insSaveRestore (meta :< AsmReturn x) = return $ meta :< AsmReturn x
+insSaveRestore (meta :< AsmLet x y cont) = do
+  cont' <- insSaveRestore cont
+  return $ meta :< AsmLet x y cont'
+insSaveRestore (meta :< AsmInsertValue val offset base cont) = do
+  cont' <- insSaveRestore cont
+  return $ meta :< AsmInsertValue val offset base cont'
+insSaveRestore (meta :< AsmExtractValue offset base dest cont) = do
+  cont' <- insSaveRestore cont
+  return $ meta :< AsmExtractValue offset base dest cont'
+insSaveRestore (meta :< AsmCall x fun args cont) = do
+  let lvs = asmMetaLive meta
+  cont' <- insSaveRestore cont
+  cont'' <- insRestore lvs cont'
+  insSave lvs $ meta :< AsmCall x fun args cont''
+insSaveRestore (meta :< AsmPush x cont) = do
+  cont' <- insSaveRestore cont
+  return $ meta :< AsmPush x cont'
+insSaveRestore (meta :< AsmPop x cont) = do
+  cont' <- insSaveRestore cont
+  return $ meta :< AsmPop x cont'
+insSaveRestore (meta :< AsmAddInt64 arg dest cont) = do
+  cont' <- insSaveRestore cont
+  return $ meta :< AsmAddInt64 arg dest cont'
+insSaveRestore (meta :< AsmSubInt64 arg dest cont) = do
+  cont' <- insSaveRestore cont
+  return $ meta :< AsmSubInt64 arg dest cont'
+
+insSave :: [Identifier] -> Asm -> WithEnv Asm
+insSave [] asm = return asm
+insSave (x:xs) asm = do
+  tmp <- insSave xs asm
+  addMeta $ AsmPush x tmp
+
+insRestore :: [Identifier] -> Asm -> WithEnv Asm
+insRestore [] asm = return asm
+insRestore (x:xs) asm = do
+  tmp <- insRestore xs asm
+  addMeta $ AsmPop x tmp
+
+computeSizeList :: Asm -> WithEnv ()
+computeSizeList (_ :< AsmReturn _) = return ()
+computeSizeList (_ :< AsmLet _ _ cont) = computeSizeList cont
+computeSizeList (_ :< AsmInsertValue _ _ _ cont) = computeSizeList cont
+computeSizeList (_ :< AsmExtractValue _ _ _ cont) = computeSizeList cont
+computeSizeList (_ :< AsmCall _ _ _ cont) = computeSizeList cont
+computeSizeList (_ :< AsmPush x cont) = do
+  computeSizeList cont
+  -- size <- sizeOf x
+  t <- lookupTypeEnv' x >>= toLowType
+  insSizeEnv x t
+computeSizeList (_ :< AsmPop _ cont) = computeSizeList cont
+computeSizeList (_ :< AsmAddInt64 _ _ cont) = computeSizeList cont
+computeSizeList (_ :< AsmSubInt64 _ _ cont) = computeSizeList cont
+
+computeOffset :: Identifier -> WithEnv [LowType]
+computeOffset x = do
+  env <- get
+  let prefixList = takeWhile (\(y, _) -> x /= y) $ sizeEnv env
+  return $ map snd prefixList
+
+-- extend/shrink the stack pointer before/after executing function body
+insExtendShrink :: Asm -> WithEnv Asm
+insExtendShrink asm = do
+  asm' <- extendStack asm
+  insShrink asm'
+
+insShrink :: Asm -> WithEnv Asm
+insShrink (meta :< AsmReturn x) = shrinkStack $ meta :< AsmReturn x
+insShrink (meta :< AsmLet x y cont) = do
+  cont' <- insShrink cont
+  return $ meta :< AsmLet x y cont'
+insShrink (meta :< AsmInsertValue val offset base cont) = do
+  cont' <- insShrink cont
+  return $ meta :< AsmInsertValue val offset base cont'
+insShrink (meta :< AsmExtractValue offset base dest cont) = do
+  cont' <- insShrink cont
+  return $ meta :< AsmExtractValue offset base dest cont'
+insShrink (meta :< AsmCall x fun args cont) = do
+  cont' <- insShrink cont
+  return $ meta :< AsmCall x fun args cont'
+insShrink (meta :< AsmPush x cont) = do
+  cont' <- insShrink cont
+  return $ meta :< AsmPush x cont'
+insShrink (meta :< AsmPop x cont) = do
+  cont' <- insShrink cont
+  return $ meta :< AsmPop x cont'
+insShrink (meta :< AsmAddInt64 arg dest cont) = do
+  cont' <- insShrink cont
+  return $ meta :< AsmAddInt64 arg dest cont'
+insShrink (meta :< AsmSubInt64 arg dest cont) = do
+  cont' <- insShrink cont
+  return $ meta :< AsmSubInt64 arg dest cont'
+
+extendStack :: Asm -> WithEnv Asm
+extendStack asm = do
+  env <- get
+  let size = alignedSize $ sum $ map (sizeOfLowType . snd) $ sizeEnv env
+  rsp <- getRSP
+  addMeta $ AsmSubInt64 (AsmArgImmediate size) rsp asm
+
+shrinkStack :: Asm -> WithEnv Asm
+shrinkStack asm = do
+  env <- get
+  let size = alignedSize $ sum $ map (sizeOfLowType . snd) $ sizeEnv env
+  rsp <- getRSP
+  addMeta $ AsmAddInt64 (AsmArgImmediate size) rsp asm
+
+-- find the least y such that y >= x && y mod 16 == 8
+alignedSize :: Int -> Int
+alignedSize x =
+  if x `mod` 16 == 8
+    then x
+    else alignedSize (x + 1)

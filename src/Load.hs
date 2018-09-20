@@ -46,18 +46,12 @@ load' (a:as) = do
   check mainLabel e
   env <- get
   liftIO $ putStrLn $ Pr.ppShow (univConstraintEnv env)
-  liftIO $ putStrLn $ Pr.ppShow (typeEnv env)
-  tmp <- lift e
-  liftIO $ putStrLn $ Pr.ppShow tmp
-  tmp <- lift e >>= expand
-  liftIO $ putStrLn $ Pr.ppShow tmp
   c' <- lift e >>= expand >>= polarize >>= toNeg >>= virtualNeg
   liftIO $ putStrLn $ Pr.ppShow c'
   insCodeEnv mainLabel [] c'
   asmCodeEnv
   emit
   env <- get
-  liftIO $ putStrLn $ Pr.ppShow (codeEnv env)
   load' as
 
 mainLabel :: Identifier
