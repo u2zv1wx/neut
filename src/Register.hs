@@ -19,13 +19,14 @@ import qualified Text.Show.Pretty           as Pr
 
 type Edge = (Identifier, Identifier)
 
-type Graph = [Edge]
+type Node = Identifier
+
+type Graph = ([Node], [Edge])
 
 -- regsiter allocation based on chordal graph coloring
 regAlloc :: Int -> Asm -> WithEnv ()
 regAlloc i asm = do
   asm' <- annotAsm asm >>= computeLiveness
-  liftIO $ putStrLn $ Pr.ppShow asm'
   graph <- build asm'
   xs <- maxCardSearch graph
   env <- get
@@ -43,61 +44,72 @@ build code = do
   info <- edgeInfo code
   edgeListList <- forM info $ \xs -> return [(p, q) | p <- xs, q <- xs]
   let edgeList = filter (uncurry (/=)) $ nub $ join edgeListList
-  return edgeList
+  let nodeList = nub $ join info
+  return (nodeList, edgeList)
 
 -- maximum cardinality search
 maxCardSearch :: Graph -> WithEnv [Identifier]
-maxCardSearch graph = do
-  let nodeList = nub $ map fst graph
-  weightList <- mapM (initialWeight graph) nodeList
+maxCardSearch graph@(nodeList, edgeList) = do
+  weightList <- mapM (initialWeight edgeList) nodeList
   maxCardSearch' graph (zip nodeList weightList)
 
 type WeightList = [(Identifier, Int)]
 
 -- initial weight for a node is the number of neighbors that are precolored
-initialWeight :: Graph -> Identifier -> WithEnv Int
-initialWeight graph v = do
+initialWeight :: [Edge] -> Identifier -> WithEnv Int
+initialWeight edgeList v = do
   env <- get
   let isAdjRegVar (p, q) = p == v && q `elem` regVarList env
-  return $ length $ filter isAdjRegVar graph
+  return $ length $ filter isAdjRegVar edgeList
 
 maxCardSearch' :: Graph -> WeightList -> WithEnv [Identifier]
-maxCardSearch' [] _ = return []
-maxCardSearch' graph weightList = do
+maxCardSearch' ([], _) _ = return []
+maxCardSearch' (nodeList, edgeList) weightList = do
   let v = fst $ maximumBy (\(_, i) (_, j) -> compare i j) weightList
-  let adj = map snd $ filter (\(p, _) -> p == v) graph
-  let weightList' = updateWeightList adj weightList
-  let graph' = removeNodeFromEdgeList v graph
-  vs <- maxCardSearch' graph' weightList'
+  let adj = map snd $ filter (\(p, _) -> p == v) edgeList
+  let weightList' = updateWeightList adj v weightList
+  let nodeList' = filter (/= v) nodeList
+  let edgeList' = removeNodeFromEdgeList v edgeList
+  vs <- maxCardSearch' (nodeList', edgeList') weightList'
   return $ v : vs
 
-updateWeightList :: [Identifier] -> WeightList -> WeightList
-updateWeightList adj weightList =
-  flip map weightList $ \(ident, i) ->
-    if ident `elem` adj
-      then (ident, i + 1)
-      else (ident, i)
+updateWeightList :: [Identifier] -> Identifier -> WeightList -> WeightList
+updateWeightList _ _ [] = []
+updateWeightList adj v ((w, i):xs) = do
+  let i' =
+        if w `elem` adj
+          then i + 1
+          else i
+  let xs' = updateWeightList adj v xs
+  if v == w
+    then xs'
+    else (w, i') : xs'
 
 color :: Int -> Graph -> [Identifier] -> WithEnv ()
 color _ _ [] = return ()
-color i graph (x:xs) = do
+color i graph@(_, edgeList) (x:xs) = do
   color i graph xs
   mj <- lookupRegEnv x
   case mj of
     Just _ -> return () -- precolored variable
     Nothing -> do
-      let adj = map snd $ filter (\(p, _) -> p == x) graph
-      env <- get
-      let colorList = map snd $ filter (\(y, _) -> y `elem` adj) $ regEnv env
-      let min = minimum colorList
+      let adj = map snd $ filter (\(p, _) -> p == x) edgeList
+      colorList <- toRegNumList adj
+      let min = minimumRegNum colorList
       if min <= i
         then insRegEnv x min
         else insSpill x
+
+minimumRegNum :: [Int] -> Int
+minimumRegNum [] = 0
+minimumRegNum xs = minimum xs
 
 removeNodeFromEdgeList :: Identifier -> [Edge] -> [Edge]
 removeNodeFromEdgeList _ [] = []
 removeNodeFromEdgeList x ((p, _):rest)
   | p == x = removeNodeFromEdgeList x rest
+removeNodeFromEdgeList x ((_, q):rest)
+  | q == x = removeNodeFromEdgeList x rest
 removeNodeFromEdgeList x ((p, q):rest) = (p, q) : removeNodeFromEdgeList x rest
 
 edgeInfo :: Asm -> WithEnv [[Identifier]]
