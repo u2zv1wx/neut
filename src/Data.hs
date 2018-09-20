@@ -374,8 +374,8 @@ lookupRegEnv' s = do
   tmp <- gets (lookup s . regEnv)
   case tmp of
     Just i  -> return i
-    Nothing -> return 0
-    -- Nothing -> lift $ throwE $ "no such register: " ++ show s
+    -- Nothing -> return 0
+    Nothing -> lift $ throwE $ "no such register: " ++ show s
 
 insRegEnv :: Identifier -> Int -> WithEnv ()
 insRegEnv x i = modify (\e -> e {regEnv = (x, i) : regEnv e})

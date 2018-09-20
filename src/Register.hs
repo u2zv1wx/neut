@@ -41,10 +41,12 @@ regAlloc i asm = do
 
 build :: Asm -> WithEnv Graph
 build code = do
-  info <- edgeInfo code
-  edgeListList <- forM info $ \xs -> return [(p, q) | p <- xs, q <- xs]
+  lvs <- liveInfo code
+  uvs <- defInfo code
+  edgeListList <- forM lvs $ \xs -> return [(p, q) | p <- xs, q <- xs]
   let edgeList = filter (uncurry (/=)) $ nub $ join edgeListList
-  let nodeList = nub $ join info
+  let nodeList = nub $ join lvs ++ join uvs
+  liftIO $ putStrLn $ "nodeList = " ++ Pr.ppShow nodeList
   return (nodeList, edgeList)
 
 -- maximum cardinality search
@@ -112,32 +114,59 @@ removeNodeFromEdgeList x ((_, q):rest)
   | q == x = removeNodeFromEdgeList x rest
 removeNodeFromEdgeList x ((p, q):rest) = (p, q) : removeNodeFromEdgeList x rest
 
-edgeInfo :: Asm -> WithEnv [[Identifier]]
-edgeInfo (meta :< AsmReturn _) = return [asmMetaLive meta]
-edgeInfo (meta :< AsmLet _ _ cont) = do
-  info <- edgeInfo cont
+liveInfo :: Asm -> WithEnv [[Identifier]]
+liveInfo (meta :< AsmReturn _) = return [asmMetaLive meta]
+liveInfo (meta :< AsmLet _ _ cont) = do
+  info <- liveInfo cont
   return $ asmMetaLive meta : info
-edgeInfo (meta :< AsmExtractValue _ _ _ cont) = do
-  info <- edgeInfo cont
+liveInfo (meta :< AsmExtractValue _ _ _ cont) = do
+  info <- liveInfo cont
   return $ asmMetaLive meta : info
-edgeInfo (meta :< AsmInsertValue _ _ _ cont) = do
-  info <- edgeInfo cont
+liveInfo (meta :< AsmInsertValue _ _ _ cont) = do
+  info <- liveInfo cont
   return $ asmMetaLive meta : info
-edgeInfo (meta :< AsmCall _ _ _ cont) = do
-  info <- edgeInfo cont
+liveInfo (meta :< AsmCall _ _ _ cont) = do
+  info <- liveInfo cont
   return $ asmMetaLive meta : info
-edgeInfo (meta :< AsmPush _ cont) = do
-  info <- edgeInfo cont
+liveInfo (meta :< AsmPush _ cont) = do
+  info <- liveInfo cont
   return $ asmMetaLive meta : info
-edgeInfo (meta :< AsmPop _ cont) = do
-  info <- edgeInfo cont
+liveInfo (meta :< AsmPop _ cont) = do
+  info <- liveInfo cont
   return $ asmMetaLive meta : info
-edgeInfo (meta :< AsmAddInt64 _ _ cont) = do
-  info <- edgeInfo cont
+liveInfo (meta :< AsmAddInt64 _ _ cont) = do
+  info <- liveInfo cont
   return $ asmMetaLive meta : info
-edgeInfo (meta :< AsmSubInt64 _ _ cont) = do
-  info <- edgeInfo cont
+liveInfo (meta :< AsmSubInt64 _ _ cont) = do
+  info <- liveInfo cont
   return $ asmMetaLive meta : info
+
+defInfo :: Asm -> WithEnv [[Identifier]]
+defInfo (meta :< AsmReturn _) = return [asmMetaDef meta]
+defInfo (meta :< AsmLet _ _ cont) = do
+  info <- defInfo cont
+  return $ asmMetaDef meta : info
+defInfo (meta :< AsmExtractValue _ _ _ cont) = do
+  info <- defInfo cont
+  return $ asmMetaDef meta : info
+defInfo (meta :< AsmInsertValue _ _ _ cont) = do
+  info <- defInfo cont
+  return $ asmMetaDef meta : info
+defInfo (meta :< AsmCall _ _ _ cont) = do
+  info <- defInfo cont
+  return $ asmMetaDef meta : info
+defInfo (meta :< AsmPush _ cont) = do
+  info <- defInfo cont
+  return $ asmMetaDef meta : info
+defInfo (meta :< AsmPop _ cont) = do
+  info <- defInfo cont
+  return $ asmMetaDef meta : info
+defInfo (meta :< AsmAddInt64 _ _ cont) = do
+  info <- defInfo cont
+  return $ asmMetaDef meta : info
+defInfo (meta :< AsmSubInt64 _ _ cont) = do
+  info <- defInfo cont
+  return $ asmMetaDef meta : info
 
 insertSpill :: Asm -> Identifier -> WithEnv Asm
 insertSpill (meta :< AsmReturn ans) x =

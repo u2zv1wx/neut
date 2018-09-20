@@ -52,8 +52,8 @@ load' (a:as) = do
   asmCodeEnv
   emitGlobalLabel mainLabel
   emit
-  env <- get
-  liftIO $ putStrLn $ Pr.ppShow $ typeEnv env
+  -- env <- get
+  -- liftIO $ putStrLn $ Pr.ppShow $ regEnv env
   load' as
 
 mainLabel :: Identifier

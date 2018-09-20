@@ -6,9 +6,11 @@
   e)
 
 (notation (begin e rest+)
-  (bind _ (begin e) (begin rest+)))
+  ((lambda ((_ _)) (begin rest+)) (begin e)))
 
 (notation (begin (let x e+) rest+)
-  (bind x (begin e+) (begin rest+)))
+  ((lambda ((x _)) (begin rest+)) (begin e+)))
 
-(begin (lambda ((x universe) (a x)) a))
+(begin
+  (let f (lambda ((x universe) (a x)) a))
+  f)
