@@ -197,7 +197,7 @@ data AsmF a
             a
   | AsmPop Identifier
            a
-  | AsmAddInt64 AsmArg -- subq {AsmArg}, {Identifier}
+  | AsmAddInt64 AsmArg -- addq {AsmArg}, {Identifier}
                 Identifier
                 a
   | AsmSubInt64 AsmArg -- subq {AsmArg}, {Identifier}

@@ -33,14 +33,16 @@ polarize lam@(i :< NeutPiIntro _ _) = do
   return $ Comp $ NegUpIntro $ PosDownIntroPiIntro name args c
 polarize e@(_ :< NeutPiElim _ _) = do
   (fun, identArgList) <- funAndArgsPol e
-  -- liftIO $ putStrLn $ "fun = " ++ Pr.ppShow fun
-  -- liftIO $ putStrLn $ "argList = " ++ Pr.ppShow identArgList
   formalArgs <- mapM (const newName) identArgList
   let (_, argList) = unzip identArgList
-  funName <- newNameWith "fun"
-  bindSeq
-    (zip formalArgs argList ++ [(funName, fun)])
-    (NegPiElimDownElim funName formalArgs)
+  case fun of
+    _ :< NeutVar funName ->
+      bindSeq (zip formalArgs argList) (NegPiElimDownElim funName formalArgs)
+    _ -> do
+      funName <- newNameWith "fun"
+      bindSeq
+        (zip formalArgs argList ++ [(funName, fun)])
+        (NegPiElimDownElim funName formalArgs)
 polarize exists@(_ :< NeutSigma _ _) = do
   (body, xts) <- toSigmaSeq exists
   body' <- polarize body >>= toPos

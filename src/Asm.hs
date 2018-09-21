@@ -40,6 +40,10 @@ asmCode (CodeReturn d) = do
 asmCode (CodeLet i d cont) = do
   cont' <- asmCode cont
   asmData i d cont'
+asmCode (CodeCall dest "core.add" [x, y] cont) = do
+  cont' <- asmCode cont
+  cont'' <- addMeta $ AsmAddInt64 (AsmArgReg y) dest cont'
+  addMeta $ AsmLet dest (AsmArgReg x) cont''
 asmCode (CodeCall x fun args cont) = do
   cont' <- asmCode cont
   if length args > 6
