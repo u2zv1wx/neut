@@ -558,7 +558,11 @@ coFunAndArgs (term, [])        = term
 coFunAndArgs (term, (i, v):xs) = coFunAndArgs (i :< NeutPiElim term v, xs)
 
 var :: Neut -> WithEnv [Identifier]
-var (_ :< NeutVar s) = return [s]
+var (_ :< NeutVar s) = do
+  b <- isExternalConst s
+  if b
+    then return []
+    else return [s]
 var (_ :< NeutPi (i, tdom) tcod) = do
   vs1 <- var tdom
   vs2 <- var tcod
