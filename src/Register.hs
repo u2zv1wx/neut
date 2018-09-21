@@ -27,6 +27,7 @@ type Graph = ([Node], [Edge])
 regAlloc :: Int -> Asm -> WithEnv ()
 regAlloc i asm = do
   asm' <- annotAsm asm >>= computeLiveness
+  liftIO $ putStrLn $ Pr.ppShow asm'
   graph <- build asm'
   xs <- maxCardSearch graph
   env <- get
@@ -47,6 +48,7 @@ build code = do
   let edgeList = filter (uncurry (/=)) $ nub $ join edgeListList
   let nodeList = nub $ join lvs ++ join uvs
   liftIO $ putStrLn $ "nodeList = " ++ Pr.ppShow nodeList
+  liftIO $ putStrLn $ "edgeList = " ++ Pr.ppShow edgeList
   return (nodeList, edgeList)
 
 -- maximum cardinality search
@@ -97,15 +99,23 @@ color i graph@(_, edgeList) (x:xs) = do
     Nothing -> do
       let adj = map snd $ filter (\(p, _) -> p == x) edgeList
       colorList <- toRegNumList adj
-      let min = minimumRegNum colorList
+      let min = unusedMinimumRegNum colorList
       if min <= i
-        then insRegEnv x min
+        then do
+          liftIO $ putStrLn $ "allocating " ++ x ++ " to " ++ show min
+          insRegEnv x min
         else insSpill x
 
-minimumRegNum :: [Int] -> Int
-minimumRegNum [] = 0
-minimumRegNum xs = minimum xs
+unusedMinimumRegNum :: [Int] -> Int
+unusedMinimumRegNum = unusedMinimumRegNum' 0
 
+unusedMinimumRegNum' :: Int -> [Int] -> Int
+unusedMinimumRegNum' i xs =
+  if i `notElem` xs
+    then i
+    else unusedMinimumRegNum' (i + 1) xs
+
+-- minimumRegNum :: Int -> [Int] -> Int
 removeNodeFromEdgeList :: Identifier -> [Edge] -> [Edge]
 removeNodeFromEdgeList _ [] = []
 removeNodeFromEdgeList x ((p, _):rest)
