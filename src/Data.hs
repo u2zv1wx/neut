@@ -71,7 +71,7 @@ data NeutF a
   | NeutMu Identifier
            a
   | NeutHole Identifier
-  | NeutSubst a -- explicit substitution for types
+  | NeutSubst a -- explicit substitution
               [(Identifier, a)]
 
 type Neut = Cofree NeutF Identifier
