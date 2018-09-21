@@ -31,16 +31,12 @@ asmCodeEnv = do
     insAsmEnv name asm'
     liftIO $ putStrLn $ Pr.ppShow asm'
     regAlloc 15 asm' -- rsp is not used
-    -- insAsmEnv name args asm
 
 asmCode :: Code -> WithEnv Asm
 asmCode (CodeReturn d) = do
   rax <- getRAX
   tmp <- addMeta $ AsmReturn rax
   asmData rax d tmp
-  -- tmp <- newNameWith "tmp"
-  -- ret <- addMeta $ AsmReturn tmp
-  -- asmData tmp d ret
 asmCode (CodeLet i d cont) = do
   cont' <- asmCode cont
   asmData i d cont'
@@ -49,7 +45,6 @@ asmCode (CodeCall x fun args cont) = do
   if length args > 6
     then lift $ throwE "Asm.asmCode: the number of arguments exceeds 6"
     else asmCodeCall x fun args cont'
-  -- addMeta $ AsmCall x fun args cont'
 asmCode (CodeSwitch x branchList) = asmSwitch x branchList
 asmCode (CodeExtractValue x base i cont) = do
   t <- lookupTypeEnv' base
