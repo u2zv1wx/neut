@@ -69,7 +69,7 @@ polarize (_ :< NeutBoxElim e) = do
   x <- newName
   bindSeq [(x, e)] (NegPiElimDownElim x [])
 polarize (_ :< NeutIndex l) = return $ Value $ PosIndex l
-polarize (_ :< NeutIndexIntro x) = return $ Value $ PosIndexIntro x
+polarize (_ :< NeutIndexIntro x) = return $ Comp $ NegUpIntro $ PosIndexIntro x
 polarize (_ :< NeutIndexElim e branchList) = do
   let (labelList, es) = unzip branchList
   cs <- mapM (polarize >=> toNeg) es
