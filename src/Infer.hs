@@ -15,7 +15,7 @@ import           Data
 import           Data.List                  (nub)
 import           Data.Maybe
 
-check :: Identifier -> Neut -> WithEnv ()
+check :: Identifier -> Neut -> WithEnv Neut
 check main e = do
   t <- infer e
   insTypeEnv main t -- insert the type of main function
@@ -25,6 +25,7 @@ check main e = do
   ts' <- mapM (subst sub) ts
   let tenv' = zip is ts'
   modify (\e -> e {typeEnv = tenv', constraintEnv = []})
+  subst sub e
 
 infer :: Neut -> WithEnv Neut
 infer (meta :< NeutVar s) = do

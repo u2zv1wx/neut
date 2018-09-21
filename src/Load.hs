@@ -15,6 +15,7 @@ import           Asm
 import           Data
 
 import           Emit
+import           Exhaust
 import           Expand
 import           Infer
 import           Lift
@@ -47,10 +48,10 @@ load' ((_ :< TreeNode ((_ :< TreeAtom "index"):(_ :< TreeAtom name):ts)):as) = d
 load' (a:as) = do
   e <- macroExpand a >>= parse >>= rename
   liftIO $ putStrLn $ Pr.ppShow e
-  check mainLabel e
+  e' <- check mainLabel e
   env <- get
   liftIO $ putStrLn $ Pr.ppShow (univConstraintEnv env)
-  c' <- lift e >>= expand >>= polarize >>= toNeg >>= virtualNeg
+  c' <- exhaust e' >>= lift >>= expand >>= polarize >>= toNeg >>= virtualNeg
   liftIO $ putStrLn $ Pr.ppShow c'
   insCodeEnv mainLabel [] c'
   asmCodeEnv
