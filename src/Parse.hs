@@ -41,6 +41,10 @@ parse (meta :< TreeNode [_ :< TreeAtom "case", t, _ :< TreeNode [_ :< TreeAtom "
   e <- parse t
   body <- parse tbody
   return $ meta :< NeutSigmaElim e (x, y) body
+parse (meta :< TreeNode [_ :< TreeAtom "case", t, _ :< TreeNode ts]) = do
+  e <- parse t
+  branchList <- mapM parseClause ts
+  return $ meta :< NeutIndexElim e branchList
 parse (meta :< TreeAtom "universe") = do
   hole <- newName
   return $ meta :< NeutUniv (UnivLevelHole hole)
@@ -62,6 +66,12 @@ parse (meta :< TreeAtom s) = do
     then return $ meta :< NeutIndexIntro s
     else return $ meta :< NeutVar s
 parse t = lift $ throwE $ "parse: syntax error:\n" ++ Pr.ppShow t
+
+parseClause :: Tree -> WithEnv (Identifier, Neut)
+parseClause (_ :< TreeNode [_ :< TreeAtom x, t]) = do
+  e <- parse t
+  return (x, e)
+parseClause e = lift $ throwE $ "parseClause: syntax error:\n " ++ Pr.ppShow e
 
 parseArg :: Tree -> WithEnv (Identifier, Neut)
 parseArg (meta :< TreeAtom s) = do
