@@ -33,6 +33,8 @@ polarize lam@(i :< NeutPiIntro _ _) = do
   return $ Comp $ NegUpIntro $ PosDownIntroPiIntro name args c
 polarize e@(_ :< NeutPiElim _ _) = do
   (fun, identArgList) <- funAndArgsPol e
+  -- liftIO $ putStrLn $ "fun = " ++ Pr.ppShow fun
+  -- liftIO $ putStrLn $ "argList = " ++ Pr.ppShow identArgList
   formalArgs <- mapM (const newName) identArgList
   let (_, argList) = unzip identArgList
   funName <- newNameWith "fun"

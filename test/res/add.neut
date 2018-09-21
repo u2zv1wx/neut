@@ -1,0 +1,15 @@
+(reserve let)
+
+(reserve begin)
+
+(notation (begin e)
+  e)
+
+(notation (begin e rest+)
+  ((lambda ((_ _)) (begin rest+)) (begin e)))
+
+(notation (begin (let x e+) rest+)
+  ((lambda ((x _)) (begin rest+)) (begin e+)))
+
+(begin
+  (lambda ((x int)) (core.add x x)))

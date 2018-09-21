@@ -24,8 +24,8 @@ asmCodeEnv = do
   env <- get
   forM_ (codeEnv env) $ \(name, (args, codeRef)) -> do
     code <- liftIO $ readIORef codeRef
-    argRegList <- getArgRegList
     initRegVar
+    argRegList <- getArgRegList
     asm <- asmCode code
     asm' <- bindArgs (zip args argRegList) asm
     insAsmEnv name asm'

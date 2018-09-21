@@ -197,8 +197,6 @@ unifyLoop ((e1, e2):cs) loopCount = do
           eqEnv' <- mapM (substEq s) $ eqEnv env
           (eqEnv'', additionalSubst) <- unifyEq eqEnv'
           eqEnv''' <- mapM (substEq additionalSubst) eqEnv''
-          liftIO $
-            putStrLn $ "found additional subst: " ++ Pr.ppShow additionalSubst
           modify (\e -> e {eqEnv = eqEnv'''})
           newConstraints <- sConstraint additionalSubst (cs' ++ [(e1'', e2'')])
           s' <- unifyLoop newConstraints loopCount'

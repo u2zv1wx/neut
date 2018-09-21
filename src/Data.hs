@@ -212,6 +212,45 @@ type Asm = Cofree AsmF AsmMeta
 instance (Show a) => Show (IORef a) where
   show a = show (unsafePerformIO (readIORef a))
 
+intType :: WithEnv Neut
+intType = wrapType $ NeutIndex "int"
+
+arrowType :: Neut -> Neut -> WithEnv Neut
+arrowType t1 t2 = do
+  x <- newName
+  insTypeEnv x t1
+  wrapType $ NeutPi (x, t1) t2
+
+constCoreAdd :: WithEnv (Identifier, Neut)
+constCoreAdd = do
+  i <- intType
+  i2i <- arrowType i i
+  i2i2i <- arrowType i i2i
+  return ("core.add", i2i2i)
+
+constList :: WithEnv [(Identifier, Neut)]
+constList = do
+  coreAdd <- constCoreAdd
+  return [coreAdd]
+
+initConstList :: WithEnv ()
+initConstList = do
+  xs <- constList
+  forM_ xs $ \(name, t) -> do
+    insNameEnv name name
+    insTypeEnv name t
+  modify (\e -> e {constEnv = map fst xs})
+
+initialIndexEnv :: [(Identifier, [Identifier])]
+initialIndexEnv = [("int", [])]
+
+isExternalConst :: Identifier -> WithEnv Bool
+isExternalConst name = do
+  env <- get
+  return $ name `elem` constEnv env
+
+-- initTypeConst :: WithEnv ()
+-- initTypeConst = do
 data Env = Env
   { count             :: Int -- to generate fresh symbols
   , notationEnv       :: [(Tree, Tree)] -- macro transformers
@@ -220,6 +259,7 @@ data Env = Env
   , nameEnv           :: [(Identifier, Identifier)] -- used in alpha conversion
   , typeEnv           :: [(Identifier, Neut)] -- type environment
   , termEnv           :: [(Identifier, Term)]
+  , constEnv          :: [Identifier]
   , eqEnv             :: [Equation]
   , constraintEnv     :: [(Neut, Neut)] -- used in type inference
   , univConstraintEnv :: [(UnivLevel, UnivLevel)]
@@ -250,10 +290,11 @@ initialEnv =
         , "forall"
         , "up"
         ]
-    , indexEnv = []
+    , indexEnv = initialIndexEnv
     , nameEnv = []
     , typeEnv = []
     , termEnv = []
+    , constEnv = []
     , eqEnv = []
     , constraintEnv = []
     , univConstraintEnv = []
@@ -324,6 +365,9 @@ lookupTermEnv' s = do
       " is not found in the term environment. termenv: " ++
       Pr.ppShow (termEnv env)
     Just t -> return t
+
+insNameEnv :: Identifier -> Identifier -> WithEnv ()
+insNameEnv from to = modify (\e -> e {nameEnv = (from, to) : nameEnv e})
 
 lookupNameEnv :: String -> WithEnv String
 lookupNameEnv s = do
@@ -409,6 +453,12 @@ isDefinedIndex name = do
   env <- get
   let labelList = join $ map snd $ indexEnv env
   return $ name `elem` labelList
+
+isDefinedIndexName :: Identifier -> WithEnv Bool
+isDefinedIndexName name = do
+  env <- get
+  let indexNameList = map fst $ indexEnv env
+  return $ name `elem` indexNameList
 
 insSizeEnv :: Identifier -> Int -> WithEnv ()
 insSizeEnv name size = modify (\e -> e {sizeEnv = (name, size) : sizeEnv e})
