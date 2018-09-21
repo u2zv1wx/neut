@@ -1,5 +1,6 @@
 module Parse
   ( parse
+  , parseAtom
   ) where
 
 import           Control.Monad              (void)
@@ -57,7 +58,11 @@ parse (meta :< TreeNode (te:tvs))
 parse (meta :< TreeAtom "_") = do
   name <- newNameWith "hole"
   return $ meta :< NeutHole name
-parse (meta :< TreeAtom s) = return $ meta :< NeutVar s
+parse (meta :< TreeAtom s) = do
+  flag <- isDefinedIndex s
+  if flag
+    then return $ meta :< NeutIndexIntro s
+    else return $ meta :< NeutVar s
 parse t = lift $ throwE $ "parse: syntax error:\n" ++ Pr.ppShow t
 
 parseArg :: Tree -> WithEnv (Identifier, Neut)
@@ -69,3 +74,7 @@ parseArg (_ :< TreeNode [targ, tp]) = do
   t <- parse tp
   return (arg, t)
 parseArg t = lift $ throwE $ "parseArg: syntax error:\n" ++ Pr.ppShow t
+
+parseAtom :: Tree -> WithEnv Identifier
+parseAtom (_ :< TreeAtom s) = return s
+parseAtom t = lift $ throwE $ "parseAtom: syntax error:\n" ++ Pr.ppShow t

@@ -12,6 +12,7 @@ import           Control.Comonad.Cofree
 import qualified Text.Show.Pretty           as Pr
 
 import           Data
+import           Data.List                  (nub)
 import           Data.Maybe
 
 check :: Identifier -> Neut -> WithEnv ()
@@ -94,12 +95,44 @@ infer (meta :< NeutTop) = do
   hole <- newName
   wrap (NeutUniv (UnivLevelHole hole)) >>= returnMeta meta
 infer (meta :< NeutTopIntro) = wrapType NeutTop >>= returnMeta meta
+infer (meta :< NeutIndex _) = do
+  hole <- newName
+  wrap (NeutUniv (UnivLevelHole hole)) >>= returnMeta meta
+infer (meta :< NeutIndexIntro l) = do
+  k <- lookupKind l
+  t <- wrapType $ NeutIndex k
+  returnMeta meta t
+infer (_ :< NeutIndexElim _ []) = lift $ throwE "empty branch"
+infer (meta :< NeutIndexElim e branchList) = do
+  t <- infer e
+  let (labelList, es) = unzip branchList
+  tls <- mapM inferLabel labelList
+  constrainList tls
+  insConstraintEnv t $ head tls
+  tes <- mapM infer es
+  constrainList tes
+  kindSet <- lookupIndexSet $ head labelList
+  if length kindSet <= length (nub labelList)
+    then returnMeta meta $ head tes
+    else lift $ throwE "incomplete pattern"
 infer (meta :< NeutUniv l) =
   wrap (NeutUniv (UnivLevelNext l)) >>= returnMeta meta
 infer (meta :< NeutHole _) = do
   hole <- newName
   wrap (NeutUniv (UnivLevelHole hole)) >>= returnMeta meta
 infer (_ :< NeutSubst e _) = infer e
+
+inferLabel :: Identifier -> WithEnv Neut
+inferLabel name = do
+  k <- lookupKind name
+  wrapType $ NeutIndex k
+
+constrainList :: [Neut] -> WithEnv ()
+constrainList [] = return ()
+constrainList [_] = return ()
+constrainList (t1:t2:ts) = do
+  insConstraintEnv t1 t2
+  constrainList $ t2 : ts
 
 inferBinder :: Identifier -> Identifier -> Neut -> Neut -> WithEnv Neut
 inferBinder meta s tdom tcod = do
@@ -198,6 +231,8 @@ unify ((_ :< NeutPi (_, tdom1) tcod1, _ :< NeutPi (_, tdom2) tcod2):cs) =
 unify ((_ :< NeutSigma (_, tdom1) tcod1, _ :< NeutSigma (_, tdom2) tcod2):cs) =
   unify $ (tdom1, tdom2) : (tcod1, tcod2) : cs
 unify ((_ :< NeutTop, _ :< NeutTop):cs) = unify cs
+unify ((_ :< NeutIndex l1, _ :< NeutIndex l2):cs)
+  | l1 == l2 = unify cs
 unify ((_ :< NeutUniv i, _ :< NeutUniv j):cs) = do
   insUnivConstraintEnv i j
   unify cs
@@ -218,6 +253,11 @@ isStrong (_ :< NeutSigmaElim e1 (_, _) e2) = isStrong e1 && isStrong e2
 isStrong (_ :< NeutMu _ e) = isStrong e
 isStrong (_ :< NeutTop) = True
 isStrong (_ :< NeutTopIntro) = True
+isStrong (_ :< NeutIndex _) = True
+isStrong (_ :< NeutIndexIntro _) = True
+isStrong (_ :< NeutIndexElim e1 branchList) = do
+  let (_, es) = unzip branchList
+  isStrong e1 && all isStrong es
 isStrong (_ :< NeutUniv _) = True
 isStrong (_ :< NeutHole _) = False
 isStrong (_ :< NeutSubst (_ :< NeutHole x) sub) =
@@ -292,6 +332,13 @@ substPair (x, y) dest (meta :< NeutMu z e) = do
   meta :< NeutMu z e'
 substPair _ _ e@(_ :< NeutTop) = e
 substPair _ _ e@(_ :< NeutTopIntro) = e
+substPair _ _ e@(_ :< NeutIndex _) = e
+substPair _ _ e@(_ :< NeutIndexIntro _) = e
+substPair (x, y) dest (meta :< NeutIndexElim e branchList) = do
+  let e' = substPair (x, y) dest e
+  let (labelList, es) = unzip branchList
+  let es' = map (substPair (x, y) dest) es
+  meta :< NeutIndexElim e' (zip labelList es')
 substPair _ _ e@(_ :< NeutUniv _) = e
 substPair _ _ e@(_ :< NeutHole _) = e -- shouldn't occur
 substPair (x, y) dest (_ :< NeutSubst (meta :< NeutHole z) sub) =

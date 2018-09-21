@@ -60,6 +60,10 @@ data NeutF a
                   a
   | NeutTop
   | NeutTopIntro
+  | NeutIndex Identifier
+  | NeutIndexIntro Identifier
+  | NeutIndexElim a
+                  [(Identifier, a)]
   | NeutUniv UnivLevel
   | NeutMu Identifier
            a
@@ -95,6 +99,8 @@ data Pos
   | PosSigmaIntro [Identifier]
   | PosTop
   | PosTopIntro
+  | PosIndex Identifier
+  | PosIndexIntro Identifier
   | PosDown Pos
   | PosDownIntroPiIntro Identifier -- the name of this lambda abstraction
                         [Identifier] -- arguments
@@ -109,6 +115,8 @@ data Neg
   | NegSigmaElim Identifier
                  (Identifier, Identifier) -- exists-elim
                  Neg
+  | NegIndexElim Identifier
+                 [(Identifier, Neg)]
   | NegUpIntro Pos
   | NegUpElim Identifier
               Neg
@@ -140,6 +148,8 @@ data Code
              Identifier -- the name of the function
              [Identifier] -- arguments
              Code -- continuation
+  | CodeSwitch Identifier
+               [(Identifier, Code)]
   | CodeExtractValue Identifier
                      Identifier
                      Int
@@ -177,6 +187,12 @@ data AsmF a
             AsmArg
             [Identifier]
             a
+  | AsmCompare Identifier
+               Identifier
+               a
+  | AsmJumpIfZero Identifier
+                  a
+  | AsmJump Identifier
   | AsmPush Identifier
             a
   | AsmPop Identifier
@@ -200,6 +216,7 @@ data Env = Env
   { count             :: Int -- to generate fresh symbols
   , notationEnv       :: [(Tree, Tree)] -- macro transformers
   , reservedEnv       :: [Identifier] -- list of reserved keywords
+  , indexEnv          :: [(Identifier, [Identifier])]
   , nameEnv           :: [(Identifier, Identifier)] -- used in alpha conversion
   , typeEnv           :: [(Identifier, Neut)] -- type environment
   , termEnv           :: [(Identifier, Term)]
@@ -233,6 +250,7 @@ initialEnv =
         , "forall"
         , "up"
         ]
+    , indexEnv = []
     , nameEnv = []
     , typeEnv = []
     , termEnv = []
@@ -344,6 +362,48 @@ insCodeEnv funName args body = do
 
 insAsmEnv :: Identifier -> Asm -> WithEnv ()
 insAsmEnv funName asm = modify (\e -> e {asmEnv = (funName, asm) : asmEnv e})
+
+insIndexEnv :: Identifier -> [Identifier] -> WithEnv ()
+insIndexEnv name indexList =
+  modify (\e -> e {indexEnv = (name, indexList) : indexEnv e})
+
+lookupKind :: Identifier -> WithEnv Identifier
+lookupKind name = do
+  env <- get
+  lookupKind' name $ indexEnv env
+
+lookupKind' :: Identifier -> [(Identifier, [Identifier])] -> WithEnv Identifier
+lookupKind' i [] = lift $ throwE $ "no such index defined: " ++ show i
+lookupKind' i ((j, ls):xs) =
+  if i `elem` ls
+    then return j
+    else lookupKind' i xs
+
+lookupIndexSet :: Identifier -> WithEnv [Identifier]
+lookupIndexSet name = do
+  env <- get
+  lookupIndexSet' name $ indexEnv env
+
+lookupIndexSet' ::
+     Identifier -> [(Identifier, [Identifier])] -> WithEnv [Identifier]
+lookupIndexSet' name [] = lift $ throwE $ "no such index defined: " ++ show name
+lookupIndexSet' name ((_, ls):xs) =
+  if name `elem` ls
+    then return ls
+    else lookupIndexSet' name xs
+
+indexToInt :: Identifier -> WithEnv Int
+indexToInt name = do
+  set <- lookupIndexSet name
+  case elemIndex name set of
+    Just i  -> return i
+    Nothing -> lift $ throwE $ "no such index defined: " ++ show name
+
+isDefinedIndex :: Identifier -> WithEnv Bool
+isDefinedIndex name = do
+  env <- get
+  let labelList = join $ map snd $ indexEnv env
+  return $ name `elem` labelList
 
 insSizeEnv :: Identifier -> Int -> WithEnv ()
 insSizeEnv name size = modify (\e -> e {sizeEnv = (name, size) : sizeEnv e})
@@ -503,6 +563,9 @@ var (_ :< NeutSigmaElim e1 (x, y) e2) =
   var e1 ++ filter (\s -> s /= x && s /= y) (var e2)
 var (_ :< NeutTop) = []
 var (_ :< NeutTopIntro) = []
+var (_ :< NeutIndex _) = []
+var (_ :< NeutIndexIntro _) = []
+var (_ :< NeutIndexElim _ _) = []
 var (_ :< NeutUniv _) = []
 var (_ :< NeutMu s e) = filter (/= s) (var e)
 var (_ :< NeutHole _) = []

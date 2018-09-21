@@ -40,6 +40,10 @@ load' ((_ :< TreeNode [_ :< TreeAtom "notation", from, to]):as) = do
 load' ((_ :< TreeNode [_ :< TreeAtom "reserve", _ :< TreeAtom s]):as) = do
   modify (\e -> e {reservedEnv = s : reservedEnv e})
   load' as
+load' ((_ :< TreeNode ((_ :< TreeAtom "index"):(_ :< TreeAtom name):ts)):as) = do
+  indexList <- mapM parseAtom ts
+  insIndexEnv name indexList
+  load' as
 load' (a:as) = do
   e <- macroExpand a >>= parse >>= rename
   liftIO $ putStrLn $ Pr.ppShow e

@@ -50,6 +50,7 @@ asmCode (CodeCall x fun args cont) = do
     then lift $ throwE "Asm.asmCode: the number of arguments exceeds 6"
     else asmCodeCall x fun args cont'
   -- addMeta $ AsmCall x fun args cont'
+asmCode (CodeSwitch x branchList) = asmSwitch x branchList
 asmCode (CodeExtractValue x base i cont) = do
   t <- lookupTypeEnv' base
   case t of
@@ -72,6 +73,19 @@ asmData reg (DataStruct xs) cont = do
   rdi <- getRDI
   callThenCont <- asmCodeCall reg "_malloc" [rdi] cont'
   addMeta $ AsmLet rdi (AsmArgImmediate structSize) callThenCont
+
+asmSwitch :: Identifier -> [(Identifier, Code)] -> WithEnv Asm
+asmSwitch _ [] = lift $ throwE "empty branch"
+asmSwitch _ [(label, code)] = do
+  asm <- asmCode code
+  insAsmEnv label asm
+  addMeta $ AsmJump label
+asmSwitch name ((label, code):rest) = do
+  cont <- asmSwitch name rest
+  asm <- asmCode code
+  insAsmEnv label asm
+  cont' <- addMeta $ AsmJumpIfZero label cont
+  addMeta $ AsmCompare name label cont'
 
 setContent :: Identifier -> [Int] -> [(Int, Identifier)] -> Asm -> WithEnv Asm
 setContent _ _ [] cont = return cont

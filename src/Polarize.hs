@@ -55,6 +55,13 @@ polarize (_ :< NeutSigmaElim e1 (x, y) e2) = do
   bindSeq [(z, e1)] (NegSigmaElim z (x, y) e2')
 polarize (_ :< NeutTop) = return $ Value PosTop
 polarize (_ :< NeutTopIntro) = return $ Value PosTopIntro
+polarize (_ :< NeutIndex l) = return $ Value $ PosIndex l
+polarize (_ :< NeutIndexIntro x) = return $ Value $ PosIndexIntro x
+polarize (_ :< NeutIndexElim e branchList) = do
+  let (labelList, es) = unzip branchList
+  cs <- mapM (polarize >=> toNeg) es
+  x <- newName
+  bindSeq [(x, e)] $ NegIndexElim x (zip labelList cs)
 polarize (_ :< NeutUniv _) = return $ Value PosUniv
 polarize (_ :< NeutHole x) = error $ "Polarize.polarize: remaining hole: " ++ x
 polarize (_ :< NeutMu s e) = do
