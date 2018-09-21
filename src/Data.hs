@@ -64,6 +64,9 @@ data NeutF a
   | NeutSigmaElim a
                   (Identifier, Identifier)
                   a
+  | NeutBox a
+  | NeutBoxIntro a
+  | NeutBoxElim a
   | NeutIndex Identifier
   | NeutIndexIntro Index
   | NeutIndexElim a
