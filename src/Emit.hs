@@ -70,12 +70,7 @@ emitAsm (_ :< AsmCompare x y cont) = do
   y' <- showReg y
   emitOp $ unwords ["cmp", x' ++ ",", y']
   emitAsm cont
-emitAsm (_ :< AsmJumpIfZero label cont)
-  -- env <- get
-  -- let size = alignedSize $ sum $ map snd $ sizeEnv env
-  -- rsp <- getRSP
-  -- addMeta $ AsmSubInt64 (AsmArgImmediate size) rsp asm
- = do
+emitAsm (_ :< AsmJumpIfZero label cont) = do
   emitOp $ unwords ["jz", label]
   emitAsm cont
 emitAsm (_ :< AsmJump label) = emitOp $ unwords ["jmp", label]
