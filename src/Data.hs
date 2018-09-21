@@ -104,14 +104,12 @@ data Pos
   | PosSigma [(Identifier, Pos)]
              Pos
   | PosSigmaIntro [Identifier]
-  | PosBox Pos
   | PosIndex Identifier
   | PosIndexIntro Index
   | PosDown Pos
   | PosDownIntroPiIntro Identifier -- the name of this lambda abstraction
                         [Identifier] -- arguments
                         Neg -- body
-  | PosDownIntroBoxIntro Neg
   | PosUp Pos
   | PosUniv
   deriving (Show)
@@ -122,7 +120,6 @@ data Neg
   | NegSigmaElim Identifier
                  (Identifier, Identifier) -- exists-elim
                  Neg
-  | NegBoxElimDownElim Identifier
   | NegIndexElim Identifier
                  [(Index, Neg)]
   | NegUpIntro Pos
