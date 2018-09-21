@@ -43,6 +43,11 @@ data UnivLevel
   | UnivLevelNext UnivLevel
   deriving (Show)
 
+data Index
+  = IndexLabel Identifier
+  | IndexInteger Int
+  deriving (Show, Eq)
+
 data NeutF a
   = NeutVar Identifier
   | NeutPi (Identifier, a)
@@ -59,9 +64,9 @@ data NeutF a
                   (Identifier, Identifier)
                   a
   | NeutIndex Identifier
-  | NeutIndexIntro Identifier
+  | NeutIndexIntro Index
   | NeutIndexElim a
-                  [(Identifier, a)]
+                  [(Index, a)]
   | NeutUniv UnivLevel
   | NeutMu Identifier
            a
@@ -96,7 +101,7 @@ data Pos
              Pos
   | PosSigmaIntro [Identifier]
   | PosIndex Identifier
-  | PosIndexIntro Identifier
+  | PosIndexIntro Index
   | PosDown Pos
   | PosDownIntroPiIntro Identifier -- the name of this lambda abstraction
                         [Identifier] -- arguments
@@ -112,7 +117,7 @@ data Neg
                  (Identifier, Identifier) -- exists-elim
                  Neg
   | NegIndexElim Identifier
-                 [(Identifier, Neg)]
+                 [(Index, Neg)]
   | NegUpIntro Pos
   | NegUpElim Identifier
               Neg
@@ -123,8 +128,6 @@ data Term
   = Value Pos
   | Comp Neg
   deriving (Show)
-
-type Index = [Int]
 
 data Data
   = DataLocal Identifier
@@ -145,7 +148,7 @@ data Code
              [Identifier] -- arguments
              Code -- continuation
   | CodeSwitch Identifier
-               [(Identifier, Code)]
+               [(Int, Code)]
   | CodeExtractValue Identifier
                      Identifier
                      Int
@@ -363,8 +366,9 @@ insIndexEnv :: Identifier -> [Identifier] -> WithEnv ()
 insIndexEnv name indexList =
   modify (\e -> e {indexEnv = (name, indexList) : indexEnv e})
 
-lookupKind :: Identifier -> WithEnv Identifier
-lookupKind name = do
+lookupKind :: Index -> WithEnv Identifier
+lookupKind (IndexInteger _) = return "int"
+lookupKind (IndexLabel name) = do
   env <- get
   lookupKind' name $ indexEnv env
 
@@ -388,8 +392,9 @@ lookupIndexSet' name ((_, ls):xs) =
     then return ls
     else lookupIndexSet' name xs
 
-indexToInt :: Identifier -> WithEnv Int
-indexToInt name = do
+indexToInt :: Index -> WithEnv Int
+indexToInt (IndexInteger i) = return i
+indexToInt (IndexLabel name) = do
   set <- lookupIndexSet name
   case elemIndex name set of
     Just i  -> return i

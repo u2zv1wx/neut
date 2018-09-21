@@ -63,14 +63,14 @@ parse (meta :< TreeAtom "_") = do
 parse (meta :< TreeAtom s) = do
   flag <- isDefinedIndex s
   if flag
-    then return $ meta :< NeutIndexIntro s
+    then return $ meta :< NeutIndexIntro (IndexLabel s)
     else return $ meta :< NeutVar s
 parse t = lift $ throwE $ "parse: syntax error:\n" ++ Pr.ppShow t
 
-parseClause :: Tree -> WithEnv (Identifier, Neut)
+parseClause :: Tree -> WithEnv (Index, Neut)
 parseClause (_ :< TreeNode [_ :< TreeAtom x, t]) = do
   e <- parse t
-  return (x, e)
+  return (IndexLabel x, e)
 parseClause e = lift $ throwE $ "parseClause: syntax error:\n " ++ Pr.ppShow e
 
 parseArg :: Tree -> WithEnv (Identifier, Neut)

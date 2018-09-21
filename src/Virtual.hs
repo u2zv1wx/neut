@@ -44,7 +44,8 @@ virtualNeg (NegSigmaElim z (x, y) e) = do
 virtualNeg (NegIndexElim x branchList) = do
   let (labelList, es) = unzip branchList
   es' <- mapM virtualNeg es
-  return $ CodeSwitch x $ zip labelList es'
+  is <- mapM indexToInt labelList
+  return $ CodeSwitch x $ zip is es'
 virtualNeg (NegUpIntro v) = do
   d <- virtualPos v
   return $ CodeReturn d

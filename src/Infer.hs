@@ -104,15 +104,12 @@ infer (_ :< NeutIndexElim _ []) = lift $ throwE "empty branch"
 infer (meta :< NeutIndexElim e branchList) = do
   t <- infer e
   let (labelList, es) = unzip branchList
-  tls <- mapM inferLabel labelList
+  tls <- mapM inferIndex labelList
   constrainList tls
   insConstraintEnv t $ head tls
   tes <- mapM infer es
   constrainList tes
-  kindSet <- lookupIndexSet $ head labelList
-  if length kindSet <= length (nub labelList)
-    then returnMeta meta $ head tes
-    else lift $ throwE "incomplete pattern"
+  returnMeta meta $ head tes
 infer (meta :< NeutUniv l) =
   wrap (NeutUniv (UnivLevelNext l)) >>= returnMeta meta
 infer (meta :< NeutHole _) = do
@@ -120,8 +117,8 @@ infer (meta :< NeutHole _) = do
   wrap (NeutUniv (UnivLevelHole hole)) >>= returnMeta meta
 infer (_ :< NeutSubst e _) = infer e
 
-inferLabel :: Identifier -> WithEnv Neut
-inferLabel name = do
+inferIndex :: Index -> WithEnv Neut
+inferIndex name = do
   k <- lookupKind name
   wrapType $ NeutIndex k
 

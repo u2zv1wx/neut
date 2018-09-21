@@ -74,15 +74,19 @@ asmData reg (DataStruct xs) cont = do
   callThenCont <- asmCodeCall reg "_malloc" [rdi] cont'
   addMeta $ AsmLet rdi (AsmArgImmediate structSize) callThenCont
 
-asmSwitch :: Identifier -> [(Identifier, Code)] -> WithEnv Asm
+asmSwitch :: Identifier -> [(Int, Code)] -> WithEnv Asm
 asmSwitch _ [] = lift $ throwE "empty branch"
-asmSwitch _ [(label, code)] = do
+asmSwitch _ [(index, code)] = do
   asm <- asmCode code
+  x <- newNameWith "case"
+  let label = x ++ "." ++ show index
   insAsmEnv label asm
   addMeta $ AsmJump label
-asmSwitch name ((label, code):rest) = do
+asmSwitch name ((index, code):rest) = do
   cont <- asmSwitch name rest
   asm <- asmCode code
+  x <- newNameWith "case"
+  let label = x ++ "." ++ show index
   insAsmEnv label asm
   cont' <- addMeta $ AsmJumpIfZero label cont
   addMeta $ AsmCompare name label cont'
