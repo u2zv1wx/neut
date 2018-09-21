@@ -43,8 +43,8 @@ parse (meta :< TreeNode [_ :< TreeAtom "case", t, _ :< TreeNode [_ :< TreeAtom "
   return $ meta :< NeutSigmaElim e (x, y) body
 parse (meta :< TreeNode [_ :< TreeAtom "case", t, _ :< TreeNode ts]) = do
   e <- parse t
-  branchList <- mapM parseClause ts
-  return $ meta :< NeutIndexElim e branchList
+  (branchList, defaultBranch) <- parseClauseList ts
+  return $ meta :< NeutIndexElim e branchList defaultBranch
 parse (meta :< TreeAtom "universe") = do
   hole <- newName
   return $ meta :< NeutUniv (UnivLevelHole hole)
@@ -61,8 +61,7 @@ parse (meta :< TreeAtom "_") = do
   name <- newNameWith "hole"
   return $ meta :< NeutHole name
 parse (meta :< TreeAtom s)
-  | Just i <- readMaybe s :: Maybe Int =
-    return $ meta :< NeutIndexIntro (IndexInteger i)
+  | Just i <- readMaybe s = return $ meta :< NeutIndexIntro (IndexInteger i)
 parse (meta :< TreeAtom s) = do
   flag <- isDefinedIndex s
   if flag
@@ -70,10 +69,27 @@ parse (meta :< TreeAtom s) = do
     else return $ meta :< NeutVar s
 parse t = lift $ throwE $ "parse: syntax error:\n" ++ Pr.ppShow t
 
-parseClause :: Tree -> WithEnv (Index, Neut)
-parseClause (_ :< TreeNode [_ :< TreeAtom x, t]) = do
+parseClauseList :: [Tree] -> WithEnv ([(Index, Neut)], Maybe Neut)
+parseClauseList [] = return ([], Nothing)
+parseClauseList [_ :< TreeNode [_ :< TreeAtom "default", t]] = do
   e <- parse t
-  return (IndexLabel x, e)
+  return ([], Just e)
+parseClauseList [t] = do
+  clause <- parseClause t
+  return ([clause], Nothing)
+parseClauseList (t:ts) = do
+  (clauseList, defaultBranch) <- parseClauseList ts
+  e <- parseClause t
+  return (e : clauseList, defaultBranch)
+
+parseClause :: Tree -> WithEnv (Index, Neut)
+parseClause (_ :< TreeNode [_ :< TreeAtom s, t])
+  | Just i <- readMaybe s = do
+    e <- parse t
+    return (IndexInteger i, e)
+parseClause (_ :< TreeNode [_ :< TreeAtom s, t]) = do
+  e <- parse t
+  return (IndexLabel s, e)
 parseClause e = lift $ throwE $ "parseClause: syntax error:\n " ++ Pr.ppShow e
 
 parseArg :: Tree -> WithEnv (Identifier, Neut)
