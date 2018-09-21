@@ -104,12 +104,14 @@ data Pos
   | PosSigma [(Identifier, Pos)]
              Pos
   | PosSigmaIntro [Identifier]
+  | PosBox Pos
   | PosIndex Identifier
   | PosIndexIntro Index
   | PosDown Pos
   | PosDownIntroPiIntro Identifier -- the name of this lambda abstraction
                         [Identifier] -- arguments
                         Neg -- body
+  | PosDownIntroBoxIntro Neg
   | PosUp Pos
   | PosUniv
   deriving (Show)
@@ -120,6 +122,7 @@ data Neg
   | NegSigmaElim Identifier
                  (Identifier, Identifier) -- exists-elim
                  Neg
+  | NegBoxElimDownElim Identifier
   | NegIndexElim Identifier
                  [(Index, Neg)]
   | NegUpIntro Pos
@@ -639,6 +642,9 @@ var (_ :< NeutSigmaElim e1 (x, y) e2) = do
   vs1 <- var e1
   vs2 <- var e2
   return $ vs1 ++ filter (\s -> s /= x && s /= y) vs2
+var (_ :< NeutBox e) = var e
+var (_ :< NeutBoxIntro e) = var e
+var (_ :< NeutBoxElim e) = var e
 var (_ :< NeutIndex _) = return []
 var (_ :< NeutIndexIntro _) = return []
 var (_ :< NeutIndexElim e branchList) = do
@@ -654,6 +660,50 @@ var (_ :< NeutHole _) = return []
 var e@(_ :< NeutSubst _ _) = do
   e' <- reduce e
   var e'
+
+var' :: Neut -> WithEnv [Identifier]
+var' (_ :< NeutVar s) = do
+  b <- isExternalConst s
+  if b
+    then return []
+    else return [s]
+var' (_ :< NeutPi (_, tdom) tcod) = do
+  vs1 <- var' tdom
+  vs2 <- var' tcod
+  return $ vs1 ++ vs2
+var' (_ :< NeutPiIntro (_, _) e) = var' e
+var' (_ :< NeutPiElim e1 e2) = do
+  vs1 <- var' e1
+  vs2 <- var' e2
+  return $ vs1 ++ vs2
+var' (_ :< NeutSigma (_, t1) t2) = do
+  vs1 <- var' t1
+  vs2 <- var' t2
+  return $ vs1 ++ vs2
+var' (_ :< NeutSigmaIntro e1 e2) = do
+  vs1 <- var' e1
+  vs2 <- var' e2
+  return $ vs1 ++ vs2
+var' (_ :< NeutSigmaElim e1 _ e2) = do
+  vs1 <- var' e1
+  vs2 <- var' e2
+  return $ vs1 ++ vs2
+var' (_ :< NeutBox e) = var' e
+var' (_ :< NeutBoxIntro e) = var' e
+var' (_ :< NeutBoxElim e) = var' e
+var' (_ :< NeutIndex _) = return []
+var' (_ :< NeutIndexIntro _) = return []
+var' (_ :< NeutIndexElim e branchList) = do
+  vs <- var' e
+  let (_, es) = unzip branchList
+  vss <- mapM var' es
+  return $ vs ++ join vss
+var' (_ :< NeutUniv _) = return []
+var' (_ :< NeutMu _ e) = var' e
+var' (_ :< NeutHole _) = return []
+var' e@(_ :< NeutSubst _ _) = do
+  e' <- reduce e
+  var' e'
 
 type Subst = [(Identifier, Neut)]
 
