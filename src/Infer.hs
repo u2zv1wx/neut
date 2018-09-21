@@ -196,7 +196,10 @@ unifyLoop ((e1, e2):cs) loopCount = do
           env <- get
           eqEnv' <- mapM (substEq s) $ eqEnv env
           (eqEnv'', additionalSubst) <- unifyEq eqEnv'
-          modify (\e -> e {eqEnv = eqEnv''})
+          eqEnv''' <- mapM (substEq additionalSubst) eqEnv''
+          liftIO $
+            putStrLn $ "found additional subst: " ++ Pr.ppShow additionalSubst
+          modify (\e -> e {eqEnv = eqEnv'''})
           newConstraints <- sConstraint additionalSubst (cs' ++ [(e1'', e2'')])
           s' <- unifyLoop newConstraints loopCount'
           return (s ++ s')
@@ -211,7 +214,9 @@ unificationFailed e1 e2 cs = do
     "\nand\n" ++
     Pr.ppShow e2 ++
     "\nwith constraints:\n" ++
-    Pr.ppShow cs ++ "\ntypeEnv:\n" ++ Pr.ppShow (typeEnv env)
+    Pr.ppShow cs ++
+    "\ntypeEnv:\n" ++
+    Pr.ppShow (typeEnv env) ++ "\neqEnv:\n" ++ Pr.ppShow (eqEnv env)
 
 nextLoopCount :: Int -> Int -> Int -> Int
 nextLoopCount i j loopCount = do
