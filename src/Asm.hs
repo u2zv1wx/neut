@@ -76,10 +76,9 @@ asmData reg (DataStruct xs) cont = do
 
 asmSwitch :: Identifier -> [(Int, Code)] -> WithEnv Asm
 asmSwitch _ [] = lift $ throwE "empty branch"
-asmSwitch _ [(index, code)] = do
+asmSwitch _ [(_, code)] = do
   asm <- asmCode code
-  x <- newNameWith "case"
-  let label = x ++ "." ++ show index
+  label <- newNameWith "default"
   insAsmEnv label asm
   addMeta $ AsmJump label
 asmSwitch name ((index, code):rest) = do

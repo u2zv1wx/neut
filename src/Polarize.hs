@@ -13,6 +13,7 @@ import           Control.Monad.Trans.Except
 import qualified Text.Show.Pretty           as Pr
 
 import           Data
+import           Data.Maybe                 (maybeToList)
 
 polarize :: Neut -> WithEnv Term
 polarize (_ :< NeutVar s) = return $ Comp $ NegUpIntro $ PosVar s
@@ -55,9 +56,9 @@ polarize (_ :< NeutSigmaElim e1 (x, y) e2) = do
   bindSeq [(z, e1)] (NegSigmaElim z (x, y) e2')
 polarize (_ :< NeutIndex l) = return $ Value $ PosIndex l
 polarize (_ :< NeutIndexIntro x) = return $ Value $ PosIndexIntro x
-polarize (_ :< NeutIndexElim e branchList) = do
+polarize (_ :< NeutIndexElim e branchList defaultBranch) = do
   let (labelList, es) = unzip branchList
-  cs <- mapM (polarize >=> toNeg) es
+  cs <- mapM (polarize >=> toNeg) $ es ++ maybeToList defaultBranch
   x <- newName
   bindSeq [(x, e)] $ NegIndexElim x (zip labelList cs)
 polarize (_ :< NeutUniv _) = return $ Value PosUniv
