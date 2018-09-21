@@ -36,11 +36,12 @@ expand (i :< NeutSigmaElim e1 (x, y) e2) = do
   return $ i :< NeutSigmaElim e1' (x, y) e2'
 expand (i :< NeutIndex l) = return $ i :< NeutIndex l
 expand (i :< NeutIndexIntro x) = return $ i :< NeutIndexIntro x
-expand (i :< NeutIndexElim e branchList) = do
+expand (i :< NeutIndexElim e branchList defaultBranch) = do
   e' <- expand e
   let (indexList, es) = unzip branchList
   es' <- mapM expand es
-  return $ i :< NeutIndexElim e' (zip indexList es')
+  defaultBranch' <- mapM expand defaultBranch
+  return $ i :< NeutIndexElim e' (zip indexList es') defaultBranch'
 expand (i :< NeutUniv j) = return $ i :< NeutUniv j
 expand (i :< NeutHole x) = return $ i :< NeutHole x
 expand (meta :< NeutMu s c) = do
