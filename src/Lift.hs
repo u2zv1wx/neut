@@ -19,7 +19,7 @@ lift (i :< NeutPi (x, tdom) tcod) = do
   return $ i :< NeutPi (x, tdom') tcod'
 lift (i :< NeutPiIntro arg body) = do
   body' <- lift body
-  let freeVars = var $ i :< NeutPiIntro arg body'
+  freeVars <- var $ i :< NeutPiIntro arg body'
   newFormalArgs <- constructFormalArgs freeVars
   let freeToBound = zip freeVars newFormalArgs
   body'' <- replace freeToBound body'

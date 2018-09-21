@@ -21,7 +21,9 @@ check main e = do
   insTypeEnv main t -- insert the type of main function
   env <- get
   sub <- unifyLoop (constraintEnv env) 0
-  let tenv' = map (\(s, t) -> (s, subst sub t)) $ typeEnv env
+  let (is, ts) = unzip $ typeEnv env
+  ts' <- mapM (subst sub) ts
+  let tenv' = zip is ts'
   modify (\e -> e {typeEnv = tenv', constraintEnv = []})
 
 infer :: Neut -> WithEnv Neut
@@ -175,21 +177,23 @@ type Constraint = [(Neut, Neut)]
 unifyLoop :: Constraint -> Int -> WithEnv Subst
 unifyLoop [] _ = return []
 unifyLoop ((e1, e2):cs) loopCount = do
-  (tmpSubst, tmpConstraint) <- unify ((reduce e1, reduce e2) : cs)
+  e1' <- reduce e1
+  e2' <- reduce e2
+  (tmpSubst, tmpConstraint) <- unify ((e1', e2') : cs)
   case (tmpSubst, tmpConstraint) of
     (s, []) -> return s
-    (s, (e1', e2'):cs') -> do
+    (s, (e1'', e2''):cs') -> do
       let loopCount' = nextLoopCount (length cs) (length cs') loopCount
       if didFinishLoop (length cs') loopCount'
         then do
           liftIO $ putStrLn $ "failing unification. subst:\n" ++ Pr.ppShow s
-          unificationFailed (reduce e1) (reduce e2) cs'
+          unificationFailed e1'' e2'' cs'
         else do
           env <- get
-          let eqEnv' = map (substEq s) $ eqEnv env
+          eqEnv' <- mapM (substEq s) $ eqEnv env
           (eqEnv'', additionalSubst) <- unifyEq eqEnv'
           modify (\e -> e {eqEnv = eqEnv''})
-          let newConstraints = sConstraint additionalSubst (cs' ++ [(e1', e2')])
+          newConstraints <- sConstraint additionalSubst (cs' ++ [(e1'', e2'')])
           s' <- unifyLoop newConstraints loopCount'
           return (s ++ s')
 
@@ -219,11 +223,15 @@ didFinishLoop j loopCount' = loopCount' >= j + 2
 unify :: Constraint -> WithEnv (Subst, Constraint)
 unify [] = return ([], [])
 unify ((_ :< NeutHole s, t2):cs) = do
-  (sub, cs') <- unify (sConstraint [(s, t2)] cs)
-  return (compose sub [(s, t2)], cs')
+  cs' <- sConstraint [(s, t2)] cs
+  (sub, cs'') <- unify cs'
+  sub' <- compose sub [(s, t2)]
+  return (sub', cs'')
 unify ((t1, _ :< NeutHole s):cs) = do
-  (sub, cs') <- unify (sConstraint [(s, t1)] cs)
-  return (compose sub [(s, t1)], cs')
+  cs' <- sConstraint [(s, t1)] cs
+  (sub, cs'') <- unify cs'
+  sub' <- compose sub [(s, t1)]
+  return (sub', cs'')
 unify ((_ :< NeutVar s1, _ :< NeutVar s2):cs)
   | s1 == s2 = unify cs
 unify ((_ :< NeutPi (_, tdom1) tcod1, _ :< NeutPi (_, tdom2) tcod2):cs) =
@@ -238,111 +246,145 @@ unify ((_ :< NeutUniv i, _ :< NeutUniv j):cs) = do
   unify cs
 unify cs = return ([], cs)
 
-sConstraint :: Subst -> Constraint -> Constraint
-sConstraint s = map (\(t1, t2) -> (subst s t1, subst s t2))
+sConstraint :: Subst -> Constraint -> WithEnv Constraint
+sConstraint s cs = do
+  let (ts1, ts2) = unzip cs
+  ts1' <- mapM (subst s) ts1
+  ts2' <- mapM (subst s) ts2
+  return $ zip ts1' ts2'
 
 -- e is strong <=> e does not contain any holes
-isStrong :: Neut -> Bool
-isStrong (_ :< NeutVar _) = True
-isStrong (_ :< NeutPi (_, tdom) tcod) = isStrong tdom && isStrong tcod
-isStrong (_ :< NeutPiIntro (_, tdom) e) = isStrong tdom && isStrong e
-isStrong (_ :< NeutPiElim e1 e2) = isStrong e1 && isStrong e2
-isStrong (_ :< NeutSigma (_, tdom) tcod) = isStrong tdom && isStrong tcod
-isStrong (_ :< NeutSigmaIntro e1 e2) = isStrong e1 && isStrong e2
-isStrong (_ :< NeutSigmaElim e1 (_, _) e2) = isStrong e1 && isStrong e2
+isStrong :: Neut -> WithEnv Bool
+isStrong (_ :< NeutVar _) = return True
+isStrong (_ :< NeutPi (_, tdom) tcod) = do
+  b1 <- isStrong tdom
+  b2 <- isStrong tcod
+  return $ b1 && b2
+isStrong (_ :< NeutPiIntro (_, tdom) e) = do
+  b1 <- isStrong tdom
+  b2 <- isStrong e
+  return $ b1 && b2
+isStrong (_ :< NeutPiElim e1 e2) = do
+  b1 <- isStrong e1
+  b2 <- isStrong e2
+  return $ b1 && b2
+isStrong (_ :< NeutSigma (_, t1) t2) = do
+  b1 <- isStrong t1
+  b2 <- isStrong t2
+  return $ b1 && b2
+isStrong (_ :< NeutSigmaIntro e1 e2) = do
+  b1 <- isStrong e1
+  b2 <- isStrong e2
+  return $ b1 && b2
+isStrong (_ :< NeutSigmaElim e1 (_, _) e2) = do
+  b1 <- isStrong e1
+  b2 <- isStrong e2
+  return $ b1 && b2
 isStrong (_ :< NeutMu _ e) = isStrong e
-isStrong (_ :< NeutTop) = True
-isStrong (_ :< NeutTopIntro) = True
-isStrong (_ :< NeutIndex _) = True
-isStrong (_ :< NeutIndexIntro _) = True
+isStrong (_ :< NeutTop) = return True
+isStrong (_ :< NeutTopIntro) = return True
+isStrong (_ :< NeutIndex _) = return True
+isStrong (_ :< NeutIndexIntro _) = return True
 isStrong (_ :< NeutIndexElim e1 branchList) = do
   let (_, es) = unzip branchList
-  isStrong e1 && all isStrong es
-isStrong (_ :< NeutUniv _) = True
-isStrong (_ :< NeutHole _) = False
+  b1 <- isStrong e1
+  bs <- mapM isStrong es
+  return $ b1 && and bs
+isStrong (_ :< NeutUniv _) = return True
+isStrong (_ :< NeutHole _) = return False
 isStrong (_ :< NeutSubst (_ :< NeutHole x) sub) =
   case lookup x sub of
-    Nothing -> False
+    Nothing -> return False
     Just e  -> isStrong e
-isStrong e@(_ :< NeutSubst _ _) = isStrong $ reduce e
+isStrong e@(_ :< NeutSubst _ _) = do
+  e' <- reduce e
+  isStrong e'
 
-substEq :: Subst -> Equation -> Equation
+substEq :: Subst -> Equation -> WithEnv Equation
 substEq sub (EquationPiElim t1 e2 hole) = do
-  let t1' = subst sub t1
-  let e2' = subst sub e2
-  EquationPiElim t1' e2' hole
+  t1' <- subst sub t1
+  e2' <- subst sub e2
+  return $ EquationPiElim t1' e2' hole
 substEq sub (EquationSigmaElim e1 (t2, (x, y)) hole) = do
-  let e1' = subst sub e1
-  let t2' = subst sub t2
-  EquationSigmaElim e1' (t2', (x, y)) hole
+  e1' <- subst sub e1
+  t2' <- subst sub t2
+  return $ EquationSigmaElim e1' (t2', (x, y)) hole
 
 unifyEq :: [Equation] -> WithEnv ([Equation], Subst)
 unifyEq [] = return ([], [])
-unifyEq (eq@(EquationPiElim t1 _ _):rest)
-  | not (isStrong t1) = do
-    (eqs, s) <- unifyEq rest
-    return (eq : eqs, s)
-unifyEq (EquationPiElim (_ :< NeutPi (x, _) tcod) e2 hole:rest) = do
-  let t2' = subst [(x, e2)] tcod
-  (eqs, s) <- unifyEq rest
-  return (eqs, (hole, t2') : s)
-unifyEq (EquationPiElim t _ _:_) =
-  lift $
-  throwE $
-  "the type " ++ Pr.ppShow t ++ " is expected to be a pi-type, but not."
-unifyEq (eq@(EquationSigmaElim _ (t2, _) _):rest)
-  | not (isStrong t2) = do
-    (eqs, s) <- unifyEq rest
-    return (eq : eqs, s)
-unifyEq (EquationSigmaElim e1 (t2, (x, y)) hole:rest) = do
-  let t2' = substPair (x, y) e1 t2
-  (eqs, s) <- unifyEq rest
-  return (eqs, (hole, t2') : s)
+unifyEq (eq@(EquationPiElim t1 e2 hole):rest) = do
+  b <- isStrong t1
+  if not b
+    then do
+      (eqs, s) <- unifyEq rest
+      return (eq : eqs, s)
+    else case t1 of
+           _ :< NeutPi (x, _) tcod -> do
+             t2' <- subst [(x, e2)] tcod
+             (eqs, s) <- unifyEq rest
+             return (eqs, (hole, t2') : s)
+           _ ->
+             lift $
+             throwE $
+             "the type " ++
+             Pr.ppShow t1 ++ " is expected to be a pi-type, but not."
+unifyEq (eq@(EquationSigmaElim e1 (t2, (x, y)) hole):rest) = do
+  b <- isStrong t2
+  if not b
+    then do
+      (eqs, s) <- unifyEq rest
+      return (eq : eqs, s)
+    else do
+      t2' <- substPair (x, y) e1 t2
+      (eqs, s) <- unifyEq rest
+      return (eqs, (hole, t2') : s)
 
-substPair :: (Identifier, Identifier) -> Neut -> Neut -> Neut
-substPair _ _ e@(_ :< NeutVar _) = e
+substPair :: (Identifier, Identifier) -> Neut -> Neut -> WithEnv Neut
+substPair _ _ e@(_ :< NeutVar _) = return e
 substPair (x, y) dest (meta :< NeutPi (z, tdom) tcod) = do
-  let tdom' = substPair (x, y) dest tdom
-  let tcod' = substPair (x, y) dest tcod
-  meta :< NeutPi (z, tdom') tcod'
+  tdom' <- substPair (x, y) dest tdom
+  tcod' <- substPair (x, y) dest tcod
+  return $ meta :< NeutPi (z, tdom') tcod'
 substPair (x, y) dest (meta :< NeutPiIntro (z, tdom) body) = do
-  let tdom' = substPair (x, y) dest tdom
-  let body' = substPair (x, y) dest body
-  meta :< NeutPiIntro (z, tdom') body'
+  tdom' <- substPair (x, y) dest tdom
+  body' <- substPair (x, y) dest body
+  return $ meta :< NeutPiIntro (z, tdom') body'
 substPair (x, y) dest (meta :< NeutPiElim e1 e2) = do
-  let e1' = substPair (x, y) dest e1
-  let e2' = substPair (x, y) dest e2
-  meta :< NeutPiElim e1' e2'
+  e1' <- substPair (x, y) dest e1
+  e2' <- substPair (x, y) dest e2
+  return $ meta :< NeutPiElim e1' e2'
 substPair (x, y) dest (meta :< NeutSigma (z, tl) tr) = do
-  let tl' = substPair (x, y) dest tl
-  let tr' = substPair (x, y) dest tr
-  meta :< NeutSigma (z, tl') tr'
+  tl' <- substPair (x, y) dest tl
+  tr' <- substPair (x, y) dest tr
+  return $ meta :< NeutSigma (z, tl') tr'
 substPair (x, y) dest (_ :< NeutSigmaIntro (_ :< NeutVar p) (_ :< NeutVar q))
-  | p == x && q == y = dest
+  | p == x && q == y = return dest
 substPair (x, y) dest (meta :< NeutSigmaIntro e1 e2) = do
-  let e1' = substPair (x, y) dest e1
-  let e2' = substPair (x, y) dest e2
-  meta :< NeutSigmaIntro e1' e2'
+  e1' <- substPair (x, y) dest e1
+  e2' <- substPair (x, y) dest e2
+  return $ meta :< NeutSigmaIntro e1' e2'
 substPair (x, y) dest (meta :< NeutSigmaElim e1 (p, q) e2) = do
-  let e1' = substPair (x, y) dest e1
-  let e2' = substPair (x, y) dest e2
-  meta :< NeutSigmaElim e1' (p, q) e2'
+  e1' <- substPair (x, y) dest e1
+  e2' <- substPair (x, y) dest e2
+  return $ meta :< NeutSigmaElim e1' (p, q) e2'
 substPair (x, y) dest (meta :< NeutMu z e) = do
-  let e' = substPair (x, y) dest e
-  meta :< NeutMu z e'
-substPair _ _ e@(_ :< NeutTop) = e
-substPair _ _ e@(_ :< NeutTopIntro) = e
-substPair _ _ e@(_ :< NeutIndex _) = e
-substPair _ _ e@(_ :< NeutIndexIntro _) = e
+  e' <- substPair (x, y) dest e
+  return $ meta :< NeutMu z e'
+substPair _ _ e@(_ :< NeutTop) = return e
+substPair _ _ e@(_ :< NeutTopIntro) = return e
+substPair _ _ e@(_ :< NeutIndex _) = return e
+substPair _ _ e@(_ :< NeutIndexIntro _) = return e
 substPair (x, y) dest (meta :< NeutIndexElim e branchList) = do
-  let e' = substPair (x, y) dest e
+  e' <- substPair (x, y) dest e
   let (labelList, es) = unzip branchList
-  let es' = map (substPair (x, y) dest) es
-  meta :< NeutIndexElim e' (zip labelList es')
-substPair _ _ e@(_ :< NeutUniv _) = e
-substPair _ _ e@(_ :< NeutHole _) = e -- shouldn't occur
+  es' <- mapM (substPair (x, y) dest) es
+  return $ meta :< NeutIndexElim e' (zip labelList es')
+substPair _ _ e@(_ :< NeutUniv _) = return e
+substPair _ _ e@(_ :< NeutHole _) = return e -- shouldn't occur
 substPair (x, y) dest (_ :< NeutSubst (meta :< NeutHole z) sub) =
   case lookup z sub of
-    Nothing -> meta :< NeutHole x
+    Nothing -> return $ meta :< NeutHole x
     Just e  -> substPair (x, y) dest e
-substPair (x, y) dest e@(_ :< NeutSubst _ _) = substPair (x, y) dest $ reduce e
+substPair (x, y) dest e@(_ :< NeutSubst _ _) = do
+  e' <- reduce e
+  substPair (x, y) dest e'
