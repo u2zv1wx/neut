@@ -12,13 +12,14 @@ import           Control.Comonad.Cofree
 import qualified Text.Show.Pretty           as Pr
 
 import           Data
-import           Data.List                  (nub)
+import           Data.List
 import           Data.Maybe
 
 check :: Identifier -> Neut -> WithEnv Neut
 check main e = do
   t <- infer e
   insTypeEnv main t -- insert the type of main function
+  affineConstraint e
   env <- get
   sub <- unifyLoop (constraintEnv env) 0
   let (is, ts) = unzip $ typeEnv env
@@ -88,6 +89,20 @@ infer (meta :< NeutSigmaElim e1 (x, y) e2) = do
   insConstraintEnv t2 $ explicitSubst resultHole [(z, pair)]
   insEqEnv $ EquationSigmaElim e1 (t2, (x, y)) holeName
   returnMeta meta $ explicitSubst resultHole [(z, e1)]
+infer (meta :< NeutBox t) = do
+  u <- infer t
+  returnMeta meta u
+infer (meta :< NeutBoxIntro e) = do
+  t <- infer e
+  u <- infer t
+  wrapTypeWithUniv u (NeutBox t) >>= returnMeta meta
+infer (meta :< NeutBoxElim e) = do
+  t <- infer e
+  holeName <- newName
+  resultHole <- wrapType $ NeutHole holeName
+  boxType <- wrapType $ NeutBox resultHole
+  insConstraintEnv t boxType
+  returnMeta meta resultHole
 infer (meta :< NeutMu s e) = do
   trec <- newHole
   insTypeEnv s trec
@@ -245,6 +260,7 @@ unify ((_ :< NeutPi (_, tdom1) tcod1, _ :< NeutPi (_, tdom2) tcod2):cs) =
   unify $ (tdom1, tdom2) : (tcod1, tcod2) : cs
 unify ((_ :< NeutSigma (_, tdom1) tcod1, _ :< NeutSigma (_, tdom2) tcod2):cs) =
   unify $ (tdom1, tdom2) : (tcod1, tcod2) : cs
+unify ((_ :< NeutBox t1, _ :< NeutBox t2):cs) = unify $ (t1, t2) : cs
 unify ((_ :< NeutIndex l1, _ :< NeutIndex l2):cs)
   | l1 == l2 = unify cs
 unify ((_ :< NeutUniv i, _ :< NeutUniv j):cs) = do
@@ -286,6 +302,9 @@ isStrong (_ :< NeutSigmaElim e1 (_, _) e2) = do
   b1 <- isStrong e1
   b2 <- isStrong e2
   return $ b1 && b2
+isStrong (_ :< NeutBox e) = isStrong e
+isStrong (_ :< NeutBoxIntro e) = isStrong e
+isStrong (_ :< NeutBoxElim e) = isStrong e
 isStrong (_ :< NeutMu _ e) = isStrong e
 isStrong (_ :< NeutIndex _) = return True
 isStrong (_ :< NeutIndexIntro _) = return True
@@ -371,6 +390,15 @@ substPair (x, y) dest (meta :< NeutSigmaElim e1 (p, q) e2) = do
   e1' <- substPair (x, y) dest e1
   e2' <- substPair (x, y) dest e2
   return $ meta :< NeutSigmaElim e1' (p, q) e2'
+substPair (x, y) dest (meta :< NeutBox e) = do
+  e' <- substPair (x, y) dest e
+  return $ meta :< NeutBox e'
+substPair (x, y) dest (meta :< NeutBoxIntro e) = do
+  e' <- substPair (x, y) dest e
+  return $ meta :< NeutBoxIntro e'
+substPair (x, y) dest (meta :< NeutBoxElim e) = do
+  e' <- substPair (x, y) dest e
+  return $ meta :< NeutBoxElim e'
 substPair (x, y) dest (meta :< NeutMu z e) = do
   e' <- substPair (x, y) dest e
   return $ meta :< NeutMu z e'
@@ -390,3 +418,21 @@ substPair (x, y) dest (_ :< NeutSubst (meta :< NeutHole z) sub) =
 substPair (x, y) dest e@(_ :< NeutSubst _ _) = do
   e' <- reduce e
   substPair (x, y) dest e'
+
+occursMoreThanTwice :: Eq a => [a] -> [a]
+occursMoreThanTwice xs = do
+  let ys = nub xs
+  nub $ occursMoreThanTwice' ys xs
+
+occursMoreThanTwice' :: Eq a => [a] -> [a] -> [a]
+occursMoreThanTwice' ys xs = foldl (flip delete) xs ys
+
+affineConstraint :: Neut -> WithEnv ()
+affineConstraint e = do
+  varList <- var' e
+  let xs = occursMoreThanTwice varList
+  forM_ xs $ \x -> do
+    t <- lookupTypeEnv' x
+    h <- newHole
+    boxType <- wrapType $ NeutBox h
+    insConstraintEnv t boxType
