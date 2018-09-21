@@ -46,6 +46,7 @@ data UnivLevel
 data Index
   = IndexLabel Identifier
   | IndexInteger Int
+  | IndexDefault
   deriving (Show, Eq)
 
 data NeutF a
@@ -67,7 +68,6 @@ data NeutF a
   | NeutIndexIntro Index
   | NeutIndexElim a
                   [(Index, a)]
-                  (Maybe a)
   | NeutUniv UnivLevel
   | NeutMu Identifier
            a
@@ -149,7 +149,7 @@ data Code
              [Identifier] -- arguments
              Code -- continuation
   | CodeSwitch Identifier
-               [(Int, Code)]
+               [(Index, Code)]
   | CodeExtractValue Identifier
                      Identifier
                      Int
@@ -367,11 +367,13 @@ insIndexEnv :: Identifier -> [Identifier] -> WithEnv ()
 insIndexEnv name indexList =
   modify (\e -> e {indexEnv = (name, indexList) : indexEnv e})
 
-lookupKind :: Index -> WithEnv Identifier
-lookupKind (IndexInteger _) = return "int"
+lookupKind :: Index -> WithEnv (Maybe Identifier)
+lookupKind IndexDefault = return Nothing
+lookupKind (IndexInteger _) = return $ Just "int"
 lookupKind (IndexLabel name) = do
   env <- get
-  lookupKind' name $ indexEnv env
+  tmp <- lookupKind' name $ indexEnv env
+  return $ Just tmp
 
 lookupKind' :: Identifier -> [(Identifier, [Identifier])] -> WithEnv Identifier
 lookupKind' i [] = lift $ throwE $ "no such index defined: " ++ show i
@@ -394,6 +396,7 @@ lookupIndexSet' name ((_, ls):xs) =
     else lookupIndexSet' name xs
 
 indexToInt :: Index -> WithEnv Int
+indexToInt IndexDefault = return 0
 indexToInt (IndexInteger i) = return i
 indexToInt (IndexLabel name) = do
   set <- lookupIndexSet name
@@ -581,15 +584,11 @@ var (_ :< NeutSigmaElim e1 (x, y) e2) = do
   return $ vs1 ++ filter (\s -> s /= x && s /= y) vs2
 var (_ :< NeutIndex _) = return []
 var (_ :< NeutIndexIntro _) = return []
-var (_ :< NeutIndexElim e branchList defaultBranch) = do
+var (_ :< NeutIndexElim e branchList) = do
   vs <- var e
   let (_, es) = unzip branchList
   vss <- mapM var es
-  case defaultBranch of
-    Nothing -> return $ vs ++ join vss
-    Just e' -> do
-      vs' <- var e'
-      return $ vs ++ join vss ++ vs'
+  return $ vs ++ join vss
 var (_ :< NeutUniv _) = return []
 var (_ :< NeutMu s e) = do
   vs <- var e
@@ -642,17 +641,16 @@ reduce (i :< NeutSigmaElim e (x, y) body) = do
       _ :< body' <- subst sub body
       reduce $ i :< body'
     _ -> return $ i :< NeutSigmaElim e' (x, y) body
-reduce (i :< NeutIndexElim e branchList defaultBranch) = do
+reduce (i :< NeutIndexElim e branchList) = do
   e' <- reduce e
   case e' of
     _ :< NeutIndexIntro x ->
-      case (lookup x branchList, defaultBranch) of
-        (Nothing, Nothing) ->
+      case lookup x branchList of
+        Nothing ->
           lift $
           throwE $ "the index " ++ show x ++ " is not included in branchList"
-        (Nothing, Just e'') -> reduce e''
-        (Just body, _) -> reduce body
-    _ -> return $ i :< NeutIndexElim e' branchList defaultBranch
+        Just body -> reduce body
+    _ -> return $ i :< NeutIndexElim e' branchList
 reduce (meta :< NeutMu s e) = do
   e' <- reduce e
   return $ meta :< NeutMu s e'
@@ -685,12 +683,11 @@ reduce (j :< NeutSubst (i :< NeutSigmaElim e1 (x, y) e2) sub) = do
 reduce (_ :< NeutSubst (i :< NeutIndex l) _) = return $ i :< NeutIndex l
 reduce (_ :< NeutSubst (i :< NeutIndexIntro x) _) =
   return $ i :< NeutIndexIntro x
-reduce (j :< NeutSubst (i :< NeutIndexElim e branchList defaultBranch) sub) = do
+reduce (j :< NeutSubst (i :< NeutIndexElim e branchList) sub) = do
   e' <- reduce (j :< NeutSubst e sub)
   let (labelList, es) = unzip branchList
   es' <- mapM (\e -> reduce (j :< NeutSubst e sub)) es
-  defaultBranch' <- mapM reduce defaultBranch
-  return $ i :< NeutIndexElim e' (zip labelList es') defaultBranch'
+  return $ i :< NeutIndexElim e' (zip labelList es')
 reduce (_ :< NeutSubst (i :< NeutUniv l) _) = return $ i :< NeutUniv l
 reduce (j :< NeutSubst (i :< NeutMu x e) sub) = do
   e' <- reduce (j :< NeutSubst e sub)
@@ -903,6 +900,11 @@ toSigmaSeq (_ :< NeutSigma (x, t) body) = do
   (body', args) <- toSigmaSeq body
   return (body', (x, t) : args)
 toSigmaSeq t = return (t, [])
+
 -- maybeToList :: Maybe a -> [a]
 -- maybeToList (Just x) = [x]
 -- maybeToList Nothing  = []
+showIndex :: Index -> String
+showIndex (IndexInteger i) = show i
+showIndex (IndexLabel s)   = s
+showIndex IndexDefault     = "default"

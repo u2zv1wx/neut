@@ -97,17 +97,21 @@ infer (meta :< NeutIndex _) = do
   hole <- newName
   wrap (NeutUniv (UnivLevelHole hole)) >>= returnMeta meta
 infer (meta :< NeutIndexIntro l) = do
-  k <- lookupKind l
-  t <- wrapType $ NeutIndex k
-  returnMeta meta t
-infer (_ :< NeutIndexElim _ [] Nothing) = lift $ throwE "empty branch"
-infer (meta :< NeutIndexElim e branchList defaultBranch) = do
+  mk <- lookupKind l
+  case mk of
+    Just k -> do
+      t <- wrapType $ NeutIndex k
+      returnMeta meta t
+    Nothing -> undefined -- shouldn't occur
+infer (_ :< NeutIndexElim _ []) = lift $ throwE "empty branch"
+infer (meta :< NeutIndexElim e branchList) = do
   t <- infer e
   let (labelList, es) = unzip branchList
   tls <- mapM inferIndex labelList
-  constrainList tls
-  insConstraintEnv t $ head tls
-  tes <- mapM infer $ es ++ maybeToList defaultBranch
+  let tls' = join $ map maybeToList tls
+  constrainList tls'
+  headConstraint t tls'
+  tes <- mapM infer es
   constrainList tes
   returnMeta meta $ head tes
 infer (meta :< NeutUniv l) =
@@ -117,10 +121,12 @@ infer (meta :< NeutHole _) = do
   wrap (NeutUniv (UnivLevelHole hole)) >>= returnMeta meta
 infer (_ :< NeutSubst e _) = infer e
 
-inferIndex :: Index -> WithEnv Neut
+inferIndex :: Index -> WithEnv (Maybe Neut)
 inferIndex name = do
-  k <- lookupKind name
-  wrapType $ NeutIndex k
+  mk <- lookupKind name
+  case mk of
+    Just k  -> Just <$> wrapType (NeutIndex k)
+    Nothing -> return Nothing
 
 constrainList :: [Neut] -> WithEnv ()
 constrainList [] = return ()
@@ -128,6 +134,10 @@ constrainList [_] = return ()
 constrainList (t1:t2:ts) = do
   insConstraintEnv t1 t2
   constrainList $ t2 : ts
+
+headConstraint :: Neut -> [Neut] -> WithEnv ()
+headConstraint _ []      = return ()
+headConstraint t1 (t2:_) = insConstraintEnv t1 t2
 
 inferBinder :: Identifier -> Identifier -> Neut -> Neut -> WithEnv Neut
 inferBinder meta s tdom tcod = do
@@ -275,10 +285,10 @@ isStrong (_ :< NeutSigmaElim e1 (_, _) e2) = do
 isStrong (_ :< NeutMu _ e) = isStrong e
 isStrong (_ :< NeutIndex _) = return True
 isStrong (_ :< NeutIndexIntro _) = return True
-isStrong (_ :< NeutIndexElim e1 branchList defaultBranch) = do
+isStrong (_ :< NeutIndexElim e1 branchList) = do
   let (_, es) = unzip branchList
   b1 <- isStrong e1
-  bs <- mapM isStrong $ es ++ maybeToList defaultBranch
+  bs <- mapM isStrong es
   return $ b1 && and bs
 isStrong (_ :< NeutUniv _) = return True
 isStrong (_ :< NeutHole _) = return False
@@ -362,12 +372,11 @@ substPair (x, y) dest (meta :< NeutMu z e) = do
   return $ meta :< NeutMu z e'
 substPair _ _ e@(_ :< NeutIndex _) = return e
 substPair _ _ e@(_ :< NeutIndexIntro _) = return e
-substPair (x, y) dest (meta :< NeutIndexElim e branchList defaultBranch) = do
+substPair (x, y) dest (meta :< NeutIndexElim e branchList) = do
   e' <- substPair (x, y) dest e
   let (labelList, es) = unzip branchList
   es' <- mapM (substPair (x, y) dest) es
-  defaultBranch' <- mapM (substPair (x, y) dest) defaultBranch
-  return $ meta :< NeutIndexElim e' (zip labelList es') defaultBranch'
+  return $ meta :< NeutIndexElim e' (zip labelList es')
 substPair _ _ e@(_ :< NeutUniv _) = return e
 substPair _ _ e@(_ :< NeutHole _) = return e -- shouldn't occur
 substPair (x, y) dest (_ :< NeutSubst (meta :< NeutHole z) sub) =

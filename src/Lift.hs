@@ -44,12 +44,11 @@ lift (i :< NeutSigmaElim e1 (x, y) e2) = do
   return $ i :< NeutSigmaElim e1' (x, y) e2'
 lift (i :< NeutIndex l) = return $ i :< NeutIndex l
 lift (i :< NeutIndexIntro x) = return $ i :< NeutIndexIntro x
-lift (i :< NeutIndexElim e branchList defaultBranch) = do
+lift (i :< NeutIndexElim e branchList) = do
   e' <- lift e
   let (indexList, es) = unzip branchList
   es' <- mapM lift es
-  defaultBranch' <- mapM lift defaultBranch
-  return $ i :< NeutIndexElim e' (zip indexList es') defaultBranch'
+  return $ i :< NeutIndexElim e' (zip indexList es')
 lift (i :< NeutUniv j) = return $ i :< NeutUniv j
 lift (i :< NeutHole x) = return $ i :< NeutHole x
 lift (meta :< NeutMu s c) = do
@@ -92,11 +91,10 @@ replace args (i :< NeutMu s c) = do
   return $ i :< NeutMu s c'
 replace _ (i :< NeutIndex l) = return $ i :< NeutIndex l
 replace _ (i :< NeutIndexIntro x) = return $ i :< NeutIndexIntro x
-replace args (i :< NeutIndexElim e branchList defaultBranch) = do
+replace args (i :< NeutIndexElim e branchList) = do
   e' <- replace args e
   let (indexList, es) = unzip branchList
   es' <- mapM (replace args) es
-  defaultBranch' <- mapM (replace args) defaultBranch
-  return $ i :< NeutIndexElim e' (zip indexList es') defaultBranch'
+  return $ i :< NeutIndexElim e' (zip indexList es')
 replace _ (i :< NeutUniv j) = return $ i :< NeutUniv j
 replace _ (i :< NeutHole x) = return $ i :< NeutHole x

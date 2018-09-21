@@ -56,9 +56,9 @@ polarize (_ :< NeutSigmaElim e1 (x, y) e2) = do
   bindSeq [(z, e1)] (NegSigmaElim z (x, y) e2')
 polarize (_ :< NeutIndex l) = return $ Value $ PosIndex l
 polarize (_ :< NeutIndexIntro x) = return $ Value $ PosIndexIntro x
-polarize (_ :< NeutIndexElim e branchList defaultBranch) = do
+polarize (_ :< NeutIndexElim e branchList) = do
   let (labelList, es) = unzip branchList
-  cs <- mapM (polarize >=> toNeg) $ es ++ maybeToList defaultBranch
+  cs <- mapM (polarize >=> toNeg) es
   x <- newName
   bindSeq [(x, e)] $ NegIndexElim x (zip labelList cs)
 polarize (_ :< NeutUniv _) = return $ Value PosUniv

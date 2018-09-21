@@ -53,11 +53,10 @@ rename (i :< NeutMu s e) =
     return $ i :< NeutMu s' e'
 rename (i :< NeutIndex s) = return $ i :< NeutIndex s
 rename (i :< NeutIndexIntro x) = return $ i :< NeutIndexIntro x
-rename (i :< NeutIndexElim e branchList defaultBranch) = do
+rename (i :< NeutIndexElim e branchList) = do
   e' <- rename e
   let (indexList, es) = unzip branchList
   es' <- mapM rename es
-  defaultBranch' <- mapM rename defaultBranch
-  return $ i :< NeutIndexElim e' (zip indexList es') defaultBranch'
+  return $ i :< NeutIndexElim e' (zip indexList es')
 rename (i :< NeutUniv j) = return $ i :< NeutUniv j
 rename (i :< NeutHole x) = return $ i :< NeutHole x
