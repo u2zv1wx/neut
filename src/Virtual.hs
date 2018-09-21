@@ -19,22 +19,20 @@ import           Debug.Trace
 
 virtualPos :: Pos -> WithEnv Data
 virtualPos (PosVar x) = return (DataLocal x)
-virtualPos (PosPi _ _) = virtualPos PosTopIntro
-virtualPos (PosSigma _ _) = virtualPos PosTopIntro
+virtualPos (PosPi _ _) = return $ DataInt32 0
+virtualPos (PosSigma _ _) = return $ DataInt32 0
 virtualPos (PosSigmaIntro xs) = return $ DataStruct xs
-virtualPos PosTop = virtualPos PosTopIntro
-virtualPos PosTopIntro = return $ DataInt32 0
 virtualPos (PosIndex _) = return $ DataInt32 0
 virtualPos (PosIndexIntro x) = do
   i <- indexToInt x
   return $ DataInt32 i
-virtualPos (PosUp _) = virtualPos PosTopIntro
-virtualPos (PosDown _) = virtualPos PosTopIntro
+virtualPos (PosUp _) = return $ DataInt32 0
+virtualPos (PosDown _) = return $ DataInt32 0
 virtualPos (PosDownIntroPiIntro name args body) = do
   bodyCode <- virtualNeg body
   insCodeEnv name args bodyCode
   return $ DataLabel name
-virtualPos PosUniv = virtualPos PosTopIntro
+virtualPos PosUniv = return $ DataInt32 0
 
 virtualNeg :: Neg -> WithEnv Code
 virtualNeg (NegPiElimDownElim funName args) = do

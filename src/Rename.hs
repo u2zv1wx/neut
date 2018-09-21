@@ -51,8 +51,6 @@ rename (i :< NeutMu s e) =
     s' <- newNameWith s
     e' <- rename e
     return $ i :< NeutMu s' e'
-rename (i :< NeutTop) = return $ i :< NeutTop
-rename (i :< NeutTopIntro) = return $ i :< NeutTopIntro
 rename (i :< NeutIndex s) = return $ i :< NeutIndex s
 rename (i :< NeutIndexIntro x) = return $ i :< NeutIndexIntro x
 rename (i :< NeutIndexElim e branchList) = do

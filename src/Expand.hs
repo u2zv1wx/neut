@@ -34,8 +34,6 @@ expand (i :< NeutSigmaElim e1 (x, y) e2) = do
   e1' <- expand e1
   e2' <- expand e2
   return $ i :< NeutSigmaElim e1' (x, y) e2'
-expand (i :< NeutTop) = return $ i :< NeutTop
-expand (i :< NeutTopIntro) = return $ i :< NeutTopIntro
 expand (i :< NeutIndex l) = return $ i :< NeutIndex l
 expand (i :< NeutIndexIntro x) = return $ i :< NeutIndexIntro x
 expand (i :< NeutIndexElim e branchList) = do

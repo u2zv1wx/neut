@@ -58,8 +58,6 @@ data NeutF a
   | NeutSigmaElim a
                   (Identifier, Identifier)
                   a
-  | NeutTop
-  | NeutTopIntro
   | NeutIndex Identifier
   | NeutIndexIntro Identifier
   | NeutIndexElim a
@@ -97,8 +95,6 @@ data Pos
   | PosSigma [(Identifier, Pos)]
              Pos
   | PosSigmaIntro [Identifier]
-  | PosTop
-  | PosTopIntro
   | PosIndex Identifier
   | PosIndexIntro Identifier
   | PosDown Pos
@@ -577,8 +573,6 @@ var (_ :< NeutSigmaElim e1 (x, y) e2) = do
   vs1 <- var e1
   vs2 <- var e2
   return $ vs1 ++ filter (\s -> s /= x && s /= y) vs2
-var (_ :< NeutTop) = return []
-var (_ :< NeutTopIntro) = return []
 var (_ :< NeutIndex _) = return []
 var (_ :< NeutIndexIntro _) = return []
 var (_ :< NeutIndexElim _ _) = return []
@@ -673,8 +667,6 @@ reduce (j :< NeutSubst (i :< NeutSigmaElim e1 (x, y) e2) sub) = do
   e1' <- reduce (j :< NeutSubst e1 sub)
   e2' <- reduce (j :< NeutSubst e2 sub)
   return $ i :< NeutSigmaElim e1' (x, y) e2'
-reduce (_ :< NeutSubst (i :< NeutTop) _) = return $ i :< NeutTop
-reduce (_ :< NeutSubst (i :< NeutTopIntro) _) = return $ i :< NeutTopIntro
 reduce (_ :< NeutSubst (i :< NeutIndex l) _) = return $ i :< NeutIndex l
 reduce (_ :< NeutSubst (i :< NeutIndexIntro x) _) =
   return $ i :< NeutIndexIntro x
@@ -729,8 +721,7 @@ sizeOfType (_ :< NeutSigma (_, t1) t2) = do
   i1 <- sizeOfType t1
   i2 <- sizeOfType t2
   return $ i1 + i2
-sizeOfType (_ :< NeutTop) = return 4
-sizeOfType (_ :< NeutUniv _) = return 4
+sizeOfType (_ :< NeutIndex _) = return 4
 sizeOfType v = lift $ throwE $ "Asm.sizeOfType: " ++ show v ++ " is not a type"
 
 sizeOfLowType :: LowType -> Int
@@ -745,7 +736,7 @@ toLowType (_ :< NeutVar _) = return $ LowTypeInt 32
   -- "Asm.toLowType: the type of a type variable " ++ x ++ " is not defined"
 toLowType (_ :< NeutPi _ _) = return $ LowTypePointer $ LowTypeInt 8
 toLowType (_ :< NeutSigma _ _) = return $ LowTypePointer $ LowTypeInt 8
-toLowType (_ :< NeutTop) = return $ LowTypeInt 32
+toLowType (_ :< NeutIndex _) = return $ LowTypeInt 32
 toLowType (_ :< NeutUniv _) = return $ LowTypeInt 32
 toLowType v = lift $ throwE $ "Asm.toLowType: " ++ show v ++ " is not a type"
 

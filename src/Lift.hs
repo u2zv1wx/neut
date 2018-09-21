@@ -42,8 +42,6 @@ lift (i :< NeutSigmaElim e1 (x, y) e2) = do
   e1' <- lift e1
   e2' <- lift e2
   return $ i :< NeutSigmaElim e1' (x, y) e2'
-lift (i :< NeutTop) = return $ i :< NeutTop
-lift (i :< NeutTopIntro) = return $ i :< NeutTopIntro
 lift (i :< NeutIndex l) = return $ i :< NeutIndex l
 lift (i :< NeutIndexIntro x) = return $ i :< NeutIndexIntro x
 lift (i :< NeutIndexElim e branchList) = do
@@ -91,8 +89,6 @@ replace args (i :< NeutSigmaElim e1 (x, y) e2) = do
 replace args (i :< NeutMu s c) = do
   c' <- replace args c
   return $ i :< NeutMu s c'
-replace _ (i :< NeutTop) = return $ i :< NeutTop
-replace _ (i :< NeutTopIntro) = return $ i :< NeutTopIntro
 replace _ (i :< NeutIndex l) = return $ i :< NeutIndex l
 replace _ (i :< NeutIndexIntro x) = return $ i :< NeutIndexIntro x
 replace args (i :< NeutIndexElim e branchList) = do

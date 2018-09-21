@@ -53,8 +53,6 @@ polarize (_ :< NeutSigmaElim e1 (x, y) e2) = do
   e2' <- polarize e2 >>= toNeg
   z <- newName
   bindSeq [(z, e1)] (NegSigmaElim z (x, y) e2')
-polarize (_ :< NeutTop) = return $ Value PosTop
-polarize (_ :< NeutTopIntro) = return $ Value PosTopIntro
 polarize (_ :< NeutIndex l) = return $ Value $ PosIndex l
 polarize (_ :< NeutIndexIntro x) = return $ Value $ PosIndexIntro x
 polarize (_ :< NeutIndexElim e branchList) = do

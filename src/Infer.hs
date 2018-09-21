@@ -93,10 +93,6 @@ infer (meta :< NeutMu s e) = do
   te <- infer e
   insConstraintEnv te trec
   returnMeta meta te
-infer (meta :< NeutTop) = do
-  hole <- newName
-  wrap (NeutUniv (UnivLevelHole hole)) >>= returnMeta meta
-infer (meta :< NeutTopIntro) = wrapType NeutTop >>= returnMeta meta
 infer (meta :< NeutIndex _) = do
   hole <- newName
   wrap (NeutUniv (UnivLevelHole hole)) >>= returnMeta meta
@@ -238,7 +234,6 @@ unify ((_ :< NeutPi (_, tdom1) tcod1, _ :< NeutPi (_, tdom2) tcod2):cs) =
   unify $ (tdom1, tdom2) : (tcod1, tcod2) : cs
 unify ((_ :< NeutSigma (_, tdom1) tcod1, _ :< NeutSigma (_, tdom2) tcod2):cs) =
   unify $ (tdom1, tdom2) : (tcod1, tcod2) : cs
-unify ((_ :< NeutTop, _ :< NeutTop):cs) = unify cs
 unify ((_ :< NeutIndex l1, _ :< NeutIndex l2):cs)
   | l1 == l2 = unify cs
 unify ((_ :< NeutUniv i, _ :< NeutUniv j):cs) = do
@@ -281,8 +276,6 @@ isStrong (_ :< NeutSigmaElim e1 (_, _) e2) = do
   b2 <- isStrong e2
   return $ b1 && b2
 isStrong (_ :< NeutMu _ e) = isStrong e
-isStrong (_ :< NeutTop) = return True
-isStrong (_ :< NeutTopIntro) = return True
 isStrong (_ :< NeutIndex _) = return True
 isStrong (_ :< NeutIndexIntro _) = return True
 isStrong (_ :< NeutIndexElim e1 branchList) = do
@@ -370,8 +363,6 @@ substPair (x, y) dest (meta :< NeutSigmaElim e1 (p, q) e2) = do
 substPair (x, y) dest (meta :< NeutMu z e) = do
   e' <- substPair (x, y) dest e
   return $ meta :< NeutMu z e'
-substPair _ _ e@(_ :< NeutTop) = return e
-substPair _ _ e@(_ :< NeutTopIntro) = return e
 substPair _ _ e@(_ :< NeutIndex _) = return e
 substPair _ _ e@(_ :< NeutIndexIntro _) = return e
 substPair (x, y) dest (meta :< NeutIndexElim e branchList) = do
