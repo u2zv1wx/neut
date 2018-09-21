@@ -60,6 +60,9 @@ parse (meta :< TreeNode (te:tvs))
 parse (meta :< TreeAtom "_") = do
   name <- newNameWith "hole"
   return $ meta :< NeutHole name
+parse (meta :< TreeAtom s)
+  | Just i <- readMaybe s :: Maybe Int =
+    return $ meta :< NeutIndexIntro (IndexInteger i)
 parse (meta :< TreeAtom s) = do
   flag <- isDefinedIndex s
   if flag
