@@ -19,7 +19,7 @@ check :: Identifier -> Neut -> WithEnv Neut
 check main e = do
   t <- infer e
   insTypeEnv main t -- insert the type of main function
-  affineConstraint e
+  affineConstraint' e
   env <- get
   sub <- unifyLoop (constraintEnv env) 0
   let (is, ts) = unzip $ typeEnv env
@@ -94,6 +94,7 @@ infer (meta :< NeutBox t) = do
   returnMeta meta u
 infer (meta :< NeutBoxIntro e) = do
   t <- infer e
+  affineConstraint e
   u <- infer t
   wrapTypeWithUniv u (NeutBox t) >>= returnMeta meta
 infer (meta :< NeutBoxElim e) = do
@@ -429,8 +430,17 @@ occursMoreThanTwice' ys xs = foldl (flip delete) xs ys
 
 affineConstraint :: Neut -> WithEnv ()
 affineConstraint e = do
+  varList <- var e
+  affineConstraint0 $ nub varList
+
+affineConstraint' :: Neut -> WithEnv ()
+affineConstraint' e = do
   varList <- var' e
   let xs = occursMoreThanTwice varList
+  affineConstraint0 xs
+
+affineConstraint0 :: [Identifier] -> WithEnv ()
+affineConstraint0 xs =
   forM_ xs $ \x -> do
     t <- lookupTypeEnv' x
     h <- newHole
