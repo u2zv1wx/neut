@@ -100,14 +100,14 @@ infer (meta :< NeutIndexIntro l) = do
   k <- lookupKind l
   t <- wrapType $ NeutIndex k
   returnMeta meta t
-infer (_ :< NeutIndexElim _ []) = lift $ throwE "empty branch"
-infer (meta :< NeutIndexElim e branchList) = do
+infer (_ :< NeutIndexElim _ [] Nothing) = lift $ throwE "empty branch"
+infer (meta :< NeutIndexElim e branchList defaultBranch) = do
   t <- infer e
   let (labelList, es) = unzip branchList
   tls <- mapM inferIndex labelList
   constrainList tls
   insConstraintEnv t $ head tls
-  tes <- mapM infer es
+  tes <- mapM infer $ es ++ maybeToList defaultBranch
   constrainList tes
   returnMeta meta $ head tes
 infer (meta :< NeutUniv l) =
@@ -275,10 +275,10 @@ isStrong (_ :< NeutSigmaElim e1 (_, _) e2) = do
 isStrong (_ :< NeutMu _ e) = isStrong e
 isStrong (_ :< NeutIndex _) = return True
 isStrong (_ :< NeutIndexIntro _) = return True
-isStrong (_ :< NeutIndexElim e1 branchList) = do
+isStrong (_ :< NeutIndexElim e1 branchList defaultBranch) = do
   let (_, es) = unzip branchList
   b1 <- isStrong e1
-  bs <- mapM isStrong es
+  bs <- mapM isStrong $ es ++ maybeToList defaultBranch
   return $ b1 && and bs
 isStrong (_ :< NeutUniv _) = return True
 isStrong (_ :< NeutHole _) = return False
@@ -362,11 +362,12 @@ substPair (x, y) dest (meta :< NeutMu z e) = do
   return $ meta :< NeutMu z e'
 substPair _ _ e@(_ :< NeutIndex _) = return e
 substPair _ _ e@(_ :< NeutIndexIntro _) = return e
-substPair (x, y) dest (meta :< NeutIndexElim e branchList) = do
+substPair (x, y) dest (meta :< NeutIndexElim e branchList defaultBranch) = do
   e' <- substPair (x, y) dest e
   let (labelList, es) = unzip branchList
   es' <- mapM (substPair (x, y) dest) es
-  return $ meta :< NeutIndexElim e' (zip labelList es')
+  defaultBranch' <- mapM (substPair (x, y) dest) defaultBranch
+  return $ meta :< NeutIndexElim e' (zip labelList es') defaultBranch'
 substPair _ _ e@(_ :< NeutUniv _) = return e
 substPair _ _ e@(_ :< NeutHole _) = return e -- shouldn't occur
 substPair (x, y) dest (_ :< NeutSubst (meta :< NeutHole z) sub) =

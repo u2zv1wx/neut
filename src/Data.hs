@@ -903,3 +903,6 @@ toSigmaSeq (_ :< NeutSigma (x, t) body) = do
   (body', args) <- toSigmaSeq body
   return (body', (x, t) : args)
 toSigmaSeq t = return (t, [])
+-- maybeToList :: Maybe a -> [a]
+-- maybeToList (Just x) = [x]
+-- maybeToList Nothing  = []
