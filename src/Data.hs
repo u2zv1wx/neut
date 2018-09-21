@@ -67,6 +67,7 @@ data NeutF a
   | NeutIndexIntro Index
   | NeutIndexElim a
                   [(Index, a)]
+                  (Maybe a)
   | NeutUniv UnivLevel
   | NeutMu Identifier
            a
@@ -580,7 +581,15 @@ var (_ :< NeutSigmaElim e1 (x, y) e2) = do
   return $ vs1 ++ filter (\s -> s /= x && s /= y) vs2
 var (_ :< NeutIndex _) = return []
 var (_ :< NeutIndexIntro _) = return []
-var (_ :< NeutIndexElim _ _) = return []
+var (_ :< NeutIndexElim e branchList defaultBranch) = do
+  vs <- var e
+  let (_, es) = unzip branchList
+  vss <- mapM var es
+  case defaultBranch of
+    Nothing -> return $ vs ++ join vss
+    Just e' -> do
+      vs' <- var e'
+      return $ vs ++ join vss ++ vs'
 var (_ :< NeutUniv _) = return []
 var (_ :< NeutMu s e) = do
   vs <- var e
@@ -633,16 +642,17 @@ reduce (i :< NeutSigmaElim e (x, y) body) = do
       _ :< body' <- subst sub body
       reduce $ i :< body'
     _ -> return $ i :< NeutSigmaElim e' (x, y) body
-reduce (i :< NeutIndexElim e branchList) = do
+reduce (i :< NeutIndexElim e branchList defaultBranch) = do
   e' <- reduce e
   case e' of
     _ :< NeutIndexIntro x ->
-      case lookup x branchList of
-        Nothing ->
+      case (lookup x branchList, defaultBranch) of
+        (Nothing, Nothing) ->
           lift $
           throwE $ "the index " ++ show x ++ " is not included in branchList"
-        Just body -> reduce body
-    _ -> return $ i :< NeutIndexElim e' branchList
+        (Nothing, Just e'') -> reduce e''
+        (Just body, _) -> reduce body
+    _ -> return $ i :< NeutIndexElim e' branchList defaultBranch
 reduce (meta :< NeutMu s e) = do
   e' <- reduce e
   return $ meta :< NeutMu s e'
@@ -675,11 +685,12 @@ reduce (j :< NeutSubst (i :< NeutSigmaElim e1 (x, y) e2) sub) = do
 reduce (_ :< NeutSubst (i :< NeutIndex l) _) = return $ i :< NeutIndex l
 reduce (_ :< NeutSubst (i :< NeutIndexIntro x) _) =
   return $ i :< NeutIndexIntro x
-reduce (j :< NeutSubst (i :< NeutIndexElim e branchList) sub) = do
+reduce (j :< NeutSubst (i :< NeutIndexElim e branchList defaultBranch) sub) = do
   e' <- reduce (j :< NeutSubst e sub)
   let (labelList, es) = unzip branchList
   es' <- mapM (\e -> reduce (j :< NeutSubst e sub)) es
-  return $ i :< NeutIndexElim e' (zip labelList es')
+  defaultBranch' <- mapM reduce defaultBranch
+  return $ i :< NeutIndexElim e' (zip labelList es') defaultBranch'
 reduce (_ :< NeutSubst (i :< NeutUniv l) _) = return $ i :< NeutUniv l
 reduce (j :< NeutSubst (i :< NeutMu x e) sub) = do
   e' <- reduce (j :< NeutSubst e sub)
