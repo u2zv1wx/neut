@@ -241,6 +241,10 @@ isExternalConst name = do
   env <- get
   return $ name `elem` constEnv env
 
+type Context = [Identifier]
+
+type Constraint = [(Context, (Neut, Neut))]
+
 -- initTypeConst :: WithEnv ()
 -- initTypeConst = do
 data Env = Env
@@ -252,7 +256,7 @@ data Env = Env
   , typeEnv           :: [(Identifier, Neut)] -- type environment
   , termEnv           :: [(Identifier, Term)]
   , constEnv          :: [Identifier]
-  , constraintEnv     :: [(Neut, Neut)] -- used in type inference
+  , constraintEnv     :: Constraint
   , univConstraintEnv :: [(UnivLevel, UnivLevel)]
   , codeEnv           :: [(Identifier, ([Identifier], IORef Code))]
   , asmEnv            :: [(Identifier, Asm)]
@@ -460,9 +464,9 @@ lookupSizeEnv' s = do
     Just i  -> return i
     Nothing -> lift $ throwE $ "the size of " ++ show s ++ " is not defined"
 
-insConstraintEnv :: Neut -> Neut -> WithEnv ()
-insConstraintEnv t1 t2 =
-  modify (\e -> e {constraintEnv = (t1, t2) : constraintEnv e})
+insConstraintEnv :: Context -> Neut -> Neut -> WithEnv ()
+insConstraintEnv ctx t1 t2 =
+  modify (\e -> e {constraintEnv = (ctx, (t1, t2)) : constraintEnv e})
 
 insUnivConstraintEnv :: UnivLevel -> UnivLevel -> WithEnv ()
 insUnivConstraintEnv t1 t2 =
