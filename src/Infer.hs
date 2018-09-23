@@ -38,14 +38,12 @@ infer ctx (meta :< NeutPiIntro (s, tdom) e) = do
   let ctx' = ctx ++ [s]
   insTypeEnv s tdom
   udom <- infer ctx' tdom
-  tcod <- infer ctx' e
-  ucod <- infer ctx' tcod
+  (tcod, ucod) <- infer2 ctx' e
   insConstraintEnv udom ucod
   wrapTypeWithUniv udom (NeutPi (s, tdom) tcod) >>= returnMeta meta
 infer ctx (meta :< NeutPiElim e1 e2) = do
   tPi <- infer ctx e1 -- forall (x : tdom). tcod
-  tdom <- infer ctx e2
-  udom <- infer ctx tdom
+  (tdom, udom) <- infer2 ctx e2
   codName <- newName
   x <- newNameOfType tdom
   typeMeta2 <- newNameWith "meta"
@@ -57,24 +55,20 @@ infer ctx (meta :< NeutPiElim e1 e2) = do
   returnMeta meta $ subst [(x, e2)] tcod
 infer ctx (meta :< NeutSigma (s, tdom) tcod) = inferBinder ctx meta s tdom tcod
 infer ctx (meta :< NeutSigmaIntro e1 e2) = do
-  t1 <- infer ctx e1 -- A
-  t2 <- infer ctx e2 -- B {x := e1}
-  u1 <- infer ctx t1
-  u2 <- infer ctx t2
+  (t1, u1) <- infer2 ctx e1
+  (t2, u2) <- infer2 ctx e2
   insConstraintEnv u1 u2
   x <- newNameOfType t1
   typeB <- newHole >>= appCtx (ctx ++ [x]) -- B
   insConstraintEnv t2 $ subst [(x, e1)] typeB
   wrapTypeWithUniv u1 (NeutSigma (x, t1) typeB) >>= returnMeta meta -- Sigma (x : A). B
 infer ctx (meta :< NeutSigmaElim e1 (x, y) e2) = do
-  t1 <- infer ctx e1
-  u1 <- infer ctx t1
+  (t1, u1) <- infer2 ctx e1
   tx <- newHole >>= appCtx ctx
   ux <- infer ctx tx
   ty <- newHole >>= appCtx (ctx ++ [x])
   uy <- infer ctx ty
-  t2 <- infer (ctx ++ [x, y]) e2
-  u2 <- infer (ctx ++ [x, y]) t2
+  (t2, u2) <- infer2 (ctx ++ [x, y]) e2
   insTypeEnv x tx
   insTypeEnv y ty
   insConstraintEnv u1 u2
@@ -133,6 +127,12 @@ infer _ (meta :< NeutUniv l) =
 infer _ (meta :< NeutHole _) = do
   hole <- newName
   wrap (NeutUniv (UnivLevelHole hole)) >>= returnMeta meta
+
+infer2 :: [Identifier] -> Neut -> WithEnv (Neut, Neut)
+infer2 ctx e = do
+  t <- infer ctx e
+  u <- infer ctx t
+  return (t, u)
 
 inferIndex :: Index -> WithEnv (Maybe Neut)
 inferIndex name = do
