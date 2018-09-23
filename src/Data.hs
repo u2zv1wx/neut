@@ -243,7 +243,8 @@ isExternalConst name = do
 
 type Context = [Identifier]
 
-type Constraint = [(Context, (Neut, Neut))]
+-- (Gamma, e1, e2, t)  ==  Gamma |- e1 = e2 : t
+type Constraint = [(Context, Neut, Neut, Neut)]
 
 -- initTypeConst :: WithEnv ()
 -- initTypeConst = do
@@ -464,9 +465,9 @@ lookupSizeEnv' s = do
     Just i  -> return i
     Nothing -> lift $ throwE $ "the size of " ++ show s ++ " is not defined"
 
-insConstraintEnv :: Context -> Neut -> Neut -> WithEnv ()
-insConstraintEnv ctx t1 t2 =
-  modify (\e -> e {constraintEnv = (ctx, (t1, t2)) : constraintEnv e})
+insConstraintEnv :: Context -> Neut -> Neut -> Neut -> WithEnv ()
+insConstraintEnv ctx t1 t2 t =
+  modify (\e -> e {constraintEnv = (ctx, t1, t2, t) : constraintEnv e})
 
 insUnivConstraintEnv :: UnivLevel -> UnivLevel -> WithEnv ()
 insUnivConstraintEnv t1 t2 =
