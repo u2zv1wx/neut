@@ -685,6 +685,61 @@ var' (_ :< NeutUniv _) = return []
 var' (_ :< NeutMu _ e) = var' e
 var' (_ :< NeutHole _) = return []
 
+(+-+) ::
+     ([Identifier], [Identifier])
+  -> ([Identifier], [Identifier])
+  -> ([Identifier], [Identifier])
+(xs1, xs2) +-+ (ys1, ys2) = (xs1 ++ ys1, xs2 ++ ys2)
+
+-- list all the variables and the metavariables in given term, assuming that
+-- the term is renamed by `rename`
+varAndHole :: Neut -> WithEnv ([Identifier], [Identifier])
+varAndHole (_ :< NeutVar s) = do
+  b <- isExternalConst s
+  if b
+    then return ([], [])
+    else return ([s], [])
+varAndHole (_ :< NeutPi (_, tdom) tcod) = do
+  vs1 <- varAndHole tdom
+  vs2 <- varAndHole tcod
+  return $ vs1 +-+ vs2
+varAndHole (_ :< NeutPiIntro _ e) = varAndHole e
+varAndHole (_ :< NeutPiElim e1 e2) = do
+  vs1 <- varAndHole e1
+  vs2 <- varAndHole e2
+  return $ vs1 +-+ vs2
+varAndHole (_ :< NeutSigma (_, t1) t2) = do
+  vs1 <- varAndHole t1
+  vs2 <- varAndHole t2
+  return $ vs1 +-+ vs2
+varAndHole (_ :< NeutSigmaIntro e1 e2) = do
+  vs1 <- varAndHole e1
+  vs2 <- varAndHole e2
+  return $ vs1 +-+ vs2
+varAndHole (_ :< NeutSigmaElim e1 _ e2) = do
+  vs1 <- varAndHole e1
+  vs2 <- varAndHole e2
+  return $ vs1 +-+ vs2
+varAndHole (_ :< NeutBox e) = varAndHole e
+varAndHole (_ :< NeutBoxIntro e) = varAndHole e
+varAndHole (_ :< NeutBoxElim e) = varAndHole e
+varAndHole (_ :< NeutIndex _) = return ([], [])
+varAndHole (_ :< NeutIndexIntro _) = return ([], [])
+varAndHole (_ :< NeutIndexElim e branchList) = do
+  vs <- varAndHole e
+  let (_, es) = unzip branchList
+  vss <- mapM varAndHole es
+  return $ vs +-+ pairwiseConcat vss
+varAndHole (_ :< NeutUniv _) = return ([], [])
+varAndHole (_ :< NeutMu _ e) = varAndHole e
+varAndHole (_ :< NeutHole x) = return ([], [x])
+
+pairwiseConcat :: [([a], [b])] -> ([a], [b])
+pairwiseConcat [] = ([], [])
+pairwiseConcat ((xs, ys):rest) = do
+  let (xs', ys') = pairwiseConcat rest
+  (xs ++ xs', ys ++ ys')
+
 type Subst = [(Identifier, Neut)]
 
 subst :: Subst -> Neut -> Neut

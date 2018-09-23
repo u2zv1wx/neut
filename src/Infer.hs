@@ -33,8 +33,7 @@ infer :: Context -> Neut -> WithEnv Neut
 infer _ (meta :< NeutVar s) = do
   t <- lookupTypeEnv' s
   returnMeta meta t
-infer ctx (meta :< NeutPi (s, tdom) tcod) = do
-  inferBinder ctx meta s tdom tcod
+infer ctx (meta :< NeutPi (s, tdom) tcod) = inferBinder ctx meta s tdom tcod
 infer ctx (meta :< NeutPiIntro (s, tdom) e) = do
   let ctx' = ctx ++ [s]
   insTypeEnv s tdom
@@ -49,7 +48,8 @@ infer ctx (meta :< NeutPiElim e1 e2) = do
   x <- newNameOfType tdom
   typeMeta2 <- newNameWith "meta"
   insTypeEnv typeMeta2 udom
-  tcod@(codMeta :< _) <- newHole >>= appCtx (ctx ++ [x])
+  -- tcod@(codMeta :< _) <- newHole >>= appCtx (ctx ++ [x])
+  tcod@(codMeta :< _) <- appCtx (ctx ++ [x])
   ucod <- lookupTypeEnv' codMeta
   u <- lookupTypeEnv' udomMeta
   insConstraintEnv ctx udom ucod u
@@ -62,16 +62,15 @@ infer ctx (meta :< NeutSigmaIntro e1 e2) = do
   u <- infer ctx u1
   insConstraintEnv ctx u1 u2 u
   x <- newNameOfType t1
-  typeB <- newHole >>= appCtx (ctx ++ [x]) -- B
+  typeB <- appCtx (ctx ++ [x]) -- B
   insConstraintEnv ctx t2 (subst [(x, e1)] typeB) u1
   wrapTypeWithUniv u1 (NeutSigma (x, t1) typeB) >>= returnMeta meta -- Sigma (x : A). B
 infer ctx (meta :< NeutSigmaElim e1 (x, y) e2) = do
   (t1, u1) <- infer2 ctx e1
-  tx@(txMeta :< _) <- newHole >>= appCtx ctx
+  tx@(txMeta :< _) <- appCtx ctx
   ux <- lookupTypeEnv' txMeta
   insTypeEnv x tx
-  ty@(tyMeta :< _) <- newHole >>= appCtx (ctx ++ [x])
-  -- uy <- infer ctx ty
+  ty@(tyMeta :< _) <- appCtx (ctx ++ [x])
   uy <- lookupTypeEnv' tyMeta
   insTypeEnv y ty
   (t2, u2) <- infer2 (ctx ++ [x, y]) e2
@@ -83,7 +82,7 @@ infer ctx (meta :< NeutSigmaElim e1 (x, y) e2) = do
   insConstraintEnv ctx t1 sigmaType u1
   z <- newNameOfType t1
   pair <- constructPair (ctx ++ [x, y]) x y
-  typeC <- newHole >>= appCtx (ctx ++ [x, y, z])
+  typeC <- appCtx (ctx ++ [x, y, z])
   insConstraintEnv ctx t2 (subst [(z, pair)] typeC) u2
   returnMeta meta $ subst [(z, e1)] typeC
 infer ctx (meta :< NeutBox t) = do
@@ -96,13 +95,13 @@ infer ctx (meta :< NeutBoxIntro e) = do
   wrapTypeWithUniv u (NeutBox t) >>= returnMeta meta
 infer ctx (meta :< NeutBoxElim e) = do
   t <- infer ctx e
-  resultHole <- newHole >>= appCtx ctx
+  resultHole <- appCtx ctx
   boxType <- wrapType $ NeutBox resultHole
   u <- infer ctx t
   insConstraintEnv ctx t boxType u
   returnMeta meta resultHole
 infer ctx (meta :< NeutMu s e) = do
-  trec <- newHole >>= appCtx ctx
+  trec <- appCtx ctx
   insTypeEnv s trec
   te <- infer (ctx ++ [s]) e
   u <- infer (ctx ++ [s]) te
@@ -132,7 +131,7 @@ infer ctx (meta :< NeutIndexElim e branchList) = do
 infer _ (meta :< NeutUniv l) =
   wrapType (NeutUniv (UnivLevelNext l)) >>= returnMeta meta
 infer ctx (meta :< NeutHole _) = do
-  hole <- newHole >>= appCtx ctx
+  hole <- appCtx ctx
   returnMeta meta hole
 
 infer2 :: Context -> Neut -> WithEnv (Neut, Neut)
@@ -188,28 +187,32 @@ newNameOfType t = do
   return i
 
 -- apply all the context variables to e
-appCtx :: Context -> Neut -> WithEnv Neut
-appCtx [] e = return e
-appCtx ctx@(x:xs) e@(meta :< _) = do
-  txs <- mapM lookupTypeEnv' xs
-  let metaList = map (\(m :< _) -> m) txs
-  uxs <- mapM lookupTypeEnv' metaList
-  univ@(univMeta :< _) <-
-    newName >>= \x -> wrapType (NeutUniv (UnivLevelHole x))
-  arrowType <- foldMR NeutPi univ $ zip xs txs
-  te <- lookupTypeEnv' meta
-  u <- lookupTypeEnv' univMeta
-  insConstraintEnv ctx te arrowType u
-  constrainList ctx $ univ : uxs
-  varMeta <- newName
-  tx <- lookupTypeEnv' x
-  insTypeEnv varMeta tx
-  let var = varMeta :< NeutVar x
-  appMeta <- newName
-  arrowType' <- foldMR NeutPi univ $ drop 1 $ zip xs txs
-  insTypeEnv appMeta arrowType'
-  let app = appMeta :< NeutPiElim e var
-  appCtx xs app
+appCtx :: Context -> WithEnv Neut
+appCtx ctx = do
+  tctxs <- mapM lookupTypeEnv' ctx
+  univ <- newName >>= \x -> wrapType (NeutUniv (UnivLevelHole x))
+  higherArrowType <- foldMR NeutPi univ $ zip ctx tctxs
+  higherHoleName <- newNameWith "ctx"
+  higherMeta <- newNameWith "meta"
+  insTypeEnv higherHoleName higherArrowType
+  insTypeEnv higherMeta higherArrowType
+  let higherHole = higherMeta :< NeutHole higherHoleName
+  varSeq <- mapM toVar ctx
+  cod <- appFold higherHole varSeq
+  arrowType <- foldMR NeutPi cod $ zip ctx tctxs
+  holeName <- newNameWith "hole"
+  meta <- newNameWith "meta"
+  insTypeEnv holeName arrowType
+  insTypeEnv meta arrowType
+  let hole = meta :< NeutHole holeName
+  appFold hole varSeq
+
+toVar :: Identifier -> WithEnv Neut
+toVar x = do
+  t <- lookupTypeEnv' x
+  meta <- newNameWith "meta"
+  insTypeEnv meta t
+  return $ meta :< NeutVar x
 
 newHole :: WithEnv Neut
 newHole = do
@@ -319,7 +322,38 @@ unify ((_, _ :< NeutIndex l1, _ :< NeutIndex l2, _):cs)
 unify ((_, _ :< NeutUniv i, _ :< NeutUniv j, _):cs) = do
   insUnivConstraintEnv i j
   unify cs
+unify ((_, e1, e2, _):cs)
+  | Just (x, args) <- headMeta [] e1 = do
+    (fvs, fmvs) <- varAndHole e2
+    if affineCheck args fvs && x `notElem` fmvs
+      then do
+        ans <- bindFormalArgs args e2
+        cs' <- sConstraint [(x, ans)] cs
+        (sub, cs'') <- unify cs'
+        let sub' = compose sub [(x, ans)]
+        return (sub', cs'')
+      else return ([], cs)
+unify ((ctx, e1, e2, t):cs)
+  | Just _ <- headMeta [] e2 = unify $ (ctx, e2, e1, t) : cs
 unify cs = return ([], cs)
+
+headMeta :: [Identifier] -> Neut -> Maybe (Identifier, [Identifier])
+headMeta args (_ :< NeutPiElim e1 (_ :< NeutVar x)) = headMeta (x : args) e1
+headMeta args (_ :< NeutHole x)                     = Just (x, args)
+headMeta _ _                                        = Nothing
+
+affineCheck :: [Identifier] -> [Identifier] -> Bool
+affineCheck xs = affineCheck' xs xs
+
+affineCheck' :: [Identifier] -> [Identifier] -> [Identifier] -> Bool
+affineCheck' _ [] _ = True
+affineCheck' xs (y:ys) fvs =
+  if y `notElem` fvs
+    then affineCheck' xs ys fvs
+    else isLinear y xs && affineCheck' xs ys fvs
+
+isLinear :: Eq a => a -> [a] -> Bool
+isLinear y xs = length (filter (== y) xs) == 1
 
 -- left projection for sigma
 pr1 :: Neut -> ((Identifier, Neut), Neut) -> WithEnv Neut
