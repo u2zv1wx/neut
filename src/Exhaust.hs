@@ -65,10 +65,3 @@ exhaust' (meta :< NeutIndexElim e1 branchList@((l, _):_)) = do
                _ -> return False
 exhaust' (_ :< NeutUniv _) = return True
 exhaust' (_ :< NeutHole _) = return False
-exhaust' (_ :< NeutSubst (_ :< NeutHole x) sub) =
-  case lookup x sub of
-    Nothing -> return False
-    Just e  -> exhaust' e
-exhaust' e@(_ :< NeutSubst _ _) = do
-  e' <- reduce e
-  exhaust' e'

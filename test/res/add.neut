@@ -12,4 +12,4 @@
   ((lambda ((x _)) (begin rest+)) (begin e+)))
 
 (begin
-  (lambda ((x int)) (core.add x x)))
+  (lambda (x) (core.add x 1)))

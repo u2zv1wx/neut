@@ -21,12 +21,13 @@ check main e = do
   insTypeEnv main t -- insert the type of main function
   affineConstraint' e
   env <- get
+  liftIO $ putStrLn $ "constraint = " ++ Pr.ppShow (constraintEnv env)
   sub <- unifyLoop (constraintEnv env) 0
   let (is, ts) = unzip $ typeEnv env
-  ts' <- mapM (subst sub) ts
+  let ts' = map (subst sub) ts
   let tenv' = zip is ts'
   modify (\e -> e {typeEnv = tenv', constraintEnv = []})
-  subst sub e
+  return $ subst sub e
 
 infer :: Neut -> WithEnv Neut
 infer (meta :< NeutVar s) = do
@@ -53,7 +54,8 @@ infer (meta :< NeutPiElim e1 e2) = do
   insTypeEnv typeMeta2 udom
   insConstraintEnv tPi (typeMeta2 :< NeutPi (x, tdom) tcod) -- t1 == forall (x : tdom). tcod
   insEqEnv $ EquationPiElim tPi e2 codName
-  returnMeta meta $ explicitSubst tcod [(x, e2)]
+  undefined
+  -- returnMeta meta $ explicitSubst tcod [(x, e2)]
 infer (meta :< NeutSigma (s, tdom) tcod) = inferBinder meta s tdom tcod
 infer (meta :< NeutSigmaIntro e1 e2) = do
   t1 <- infer e1 -- A
@@ -63,7 +65,8 @@ infer (meta :< NeutSigmaIntro e1 e2) = do
   insConstraintEnv u1 u2
   t2nosub <- newHole -- B
   x <- newNameOfType t1
-  let t2sub = explicitSubst t2nosub [(x, e1)]
+  -- let t2sub = explicitSubst t2nosub [(x, e1)]
+  let t2sub = undefined
   insConstraintEnv t2 t2sub
   wrapTypeWithUniv u1 (NeutSigma (x, t1) t2nosub) >>= returnMeta meta -- Sigma (x : A). B
 infer (meta :< NeutSigmaElim e1 (x, y) e2) = do
@@ -86,9 +89,10 @@ infer (meta :< NeutSigmaElim e1 (x, y) e2) = do
   pair <- constructPair x y
   holeName <- newName
   resultHole <- wrapType $ NeutHole holeName
-  insConstraintEnv t2 $ explicitSubst resultHole [(z, pair)]
+  -- insConstraintEnv t2 $ explicitSubst resultHole [(z, pair)]
   insEqEnv $ EquationSigmaElim e1 (t2, (x, y)) holeName
-  returnMeta meta $ explicitSubst resultHole [(z, e1)]
+  returnMeta meta $ undefined
+  -- returnMeta meta $ explicitSubst resultHole [(z, e1)]
 infer (meta :< NeutBox t) = do
   u <- infer t
   returnMeta meta u
@@ -136,7 +140,6 @@ infer (meta :< NeutUniv l) =
 infer (meta :< NeutHole _) = do
   hole <- newName
   wrap (NeutUniv (UnivLevelHole hole)) >>= returnMeta meta
-infer (_ :< NeutSubst e _) = infer e
 
 inferIndex :: Index -> WithEnv (Maybe Neut)
 inferIndex name = do
@@ -179,9 +182,8 @@ newNameOfType t = do
   insTypeEnv i t
   return i
 
-explicitSubst :: Neut -> [(Identifier, Neut)] -> Neut
-explicitSubst e1 sub = "" :< NeutSubst e1 sub
-
+-- explicitSubst :: Neut -> [(Identifier, Neut)] -> Neut
+-- explicitSubst e1 sub = "" :< NeutSubst e1 sub
 newHole :: WithEnv Neut
 newHole = do
   i <- newName
@@ -199,23 +201,30 @@ unifyLoop [] _ = return []
 unifyLoop ((e1, e2):cs) loopCount = do
   e1' <- reduce e1
   e2' <- reduce e2
-  (tmpSubst, tmpConstraint) <- unify ((e1', e2') : cs)
-  case (tmpSubst, tmpConstraint) of
-    (s, []) -> return s
-    (s, (e1'', e2''):cs') -> do
+  (s, tmpConstraint) <- unify ((e1', e2') : cs)
+  liftIO $ putStrLn $ "subst:\n " ++ Pr.ppShow s
+  case tmpConstraint of
+    [] -> return s
+    (e1'', e2''):cs' -> do
       let loopCount' = nextLoopCount (length cs) (length cs') loopCount
       if didFinishLoop (length cs') loopCount'
         then do
-          liftIO $ putStrLn $ "failing unification. subst:\n" ++ Pr.ppShow s
-          unificationFailed e1'' e2'' cs'
-        else do
           env <- get
           eqEnv' <- mapM (substEq s) $ eqEnv env
-          (eqEnv'', additionalSubst) <- unifyEq eqEnv'
-          eqEnv''' <- mapM (substEq additionalSubst) eqEnv''
-          modify (\e -> e {eqEnv = eqEnv'''})
-          newConstraints <- sConstraint additionalSubst (cs' ++ [(e1'', e2'')])
-          s' <- unifyLoop newConstraints loopCount'
+          (eqEnv'', sEq) <- unifyEq eqEnv'
+          case sEq of
+            [] -> do
+              liftIO $ putStrLn $ "failing unification. subst:\n" ++ Pr.ppShow s
+              unificationFailed e1'' e2'' cs'
+            _ -> do
+              liftIO $ putStrLn $ "additionalSubst:\n " ++ Pr.ppShow sEq
+              eqEnv''' <- mapM (substEq sEq) eqEnv''
+              modify (\e -> e {eqEnv = eqEnv'''})
+              newConstraints <- sConstraint sEq (cs' ++ [(e1'', e2'')])
+              s' <- unifyLoop newConstraints 0
+              return (s ++ s')
+        else do
+          s' <- unifyLoop (cs' ++ [(e1'', e2'')]) loopCount'
           return (s ++ s')
 
 unificationFailed :: Neut -> Neut -> Constraint -> WithEnv Subst
@@ -246,14 +255,16 @@ didFinishLoop j loopCount' = loopCount' >= j + 2
 unify :: Constraint -> WithEnv (Subst, Constraint)
 unify [] = return ([], [])
 unify ((_ :< NeutHole s, t2):cs) = do
+  liftIO $ putStrLn $ "found a substition:\n" ++ Pr.ppShow (s, t2)
   cs' <- sConstraint [(s, t2)] cs
   (sub, cs'') <- unify cs'
-  sub' <- compose sub [(s, t2)]
+  let sub' = compose sub [(s, t2)]
   return (sub', cs'')
 unify ((t1, _ :< NeutHole s):cs) = do
+  liftIO $ putStrLn $ "found a substition:\n" ++ Pr.ppShow (s, t1)
   cs' <- sConstraint [(s, t1)] cs
   (sub, cs'') <- unify cs'
-  sub' <- compose sub [(s, t1)]
+  let sub' = compose sub [(s, t1)]
   return (sub', cs'')
 unify ((_ :< NeutVar s1, _ :< NeutVar s2):cs)
   | s1 == s2 = unify cs
@@ -272,8 +283,8 @@ unify cs = return ([], cs)
 sConstraint :: Subst -> Constraint -> WithEnv Constraint
 sConstraint s cs = do
   let (ts1, ts2) = unzip cs
-  ts1' <- mapM (subst s) ts1
-  ts2' <- mapM (subst s) ts2
+  let ts1' = map (subst s) ts1
+  let ts2' = map (subst s) ts2
   return $ zip ts1' ts2'
 
 -- e is strong <=> e does not contain any holes
@@ -316,22 +327,15 @@ isStrong (_ :< NeutIndexElim e1 branchList) = do
   return $ b1 && and bs
 isStrong (_ :< NeutUniv _) = return True
 isStrong (_ :< NeutHole _) = return False
-isStrong (_ :< NeutSubst (_ :< NeutHole x) sub) =
-  case lookup x sub of
-    Nothing -> return False
-    Just e  -> isStrong e
-isStrong e@(_ :< NeutSubst _ _) = do
-  e' <- reduce e
-  isStrong e'
 
 substEq :: Subst -> Equation -> WithEnv Equation
 substEq sub (EquationPiElim t1 e2 hole) = do
-  t1' <- subst sub t1
-  e2' <- subst sub e2
+  let t1' = subst sub t1
+  let e2' = subst sub e2
   return $ EquationPiElim t1' e2' hole
 substEq sub (EquationSigmaElim e1 (t2, (x, y)) hole) = do
-  e1' <- subst sub e1
-  t2' <- subst sub t2
+  let e1' = subst sub e1
+  let t2' = subst sub t2
   return $ EquationSigmaElim e1' (t2', (x, y)) hole
 
 unifyEq :: [Equation] -> WithEnv ([Equation], Subst)
@@ -344,7 +348,7 @@ unifyEq (eq@(EquationPiElim t1 e2 hole):rest) = do
       return (eq : eqs, s)
     else case t1 of
            _ :< NeutPi (x, _) tcod -> do
-             t2' <- subst [(x, e2)] tcod
+             let t2' = subst [(x, e2)] tcod
              (eqs, s) <- unifyEq rest
              return (eqs, (hole, t2') : s)
            _ ->
@@ -412,13 +416,6 @@ substPair (x, y) dest (meta :< NeutIndexElim e branchList) = do
   return $ meta :< NeutIndexElim e' (zip labelList es')
 substPair _ _ e@(_ :< NeutUniv _) = return e
 substPair _ _ e@(_ :< NeutHole _) = return e -- shouldn't occur
-substPair (x, y) dest (_ :< NeutSubst (meta :< NeutHole z) sub) =
-  case lookup z sub of
-    Nothing -> return $ meta :< NeutHole x
-    Just e  -> substPair (x, y) dest e
-substPair (x, y) dest e@(_ :< NeutSubst _ _) = do
-  e' <- reduce e
-  substPair (x, y) dest e'
 
 occursMoreThanTwice :: Eq a => [a] -> [a]
 occursMoreThanTwice xs = do

@@ -81,9 +81,6 @@ polarize (_ :< NeutMu s e) = do
   e' <- polarize e
   insTermEnv s e'
   return e'
-polarize e@(_ :< NeutSubst _ _) = do
-  e' <- reduce e
-  polarize e'
 
 toPos :: Term -> WithEnv Pos
 toPos (Value c) = return c

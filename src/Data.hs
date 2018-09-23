@@ -75,8 +75,6 @@ data NeutF a
   | NeutMu Identifier
            a
   | NeutHole Identifier
-  | NeutSubst a -- explicit substitution
-              [(Identifier, a)]
 
 type Neut = Cofree NeutF Identifier
 
@@ -654,9 +652,6 @@ var (_ :< NeutMu s e) = do
   vs <- var e
   return $ filter (/= s) vs
 var (_ :< NeutHole _) = return []
-var e@(_ :< NeutSubst _ _) = do
-  e' <- reduce e
-  var e'
 
 var' :: Neut -> WithEnv [Identifier]
 var' (_ :< NeutVar s) = do
@@ -698,28 +693,68 @@ var' (_ :< NeutIndexElim e branchList) = do
 var' (_ :< NeutUniv _) = return []
 var' (_ :< NeutMu _ e) = var' e
 var' (_ :< NeutHole _) = return []
-var' e@(_ :< NeutSubst _ _) = do
-  e' <- reduce e
-  var' e'
 
 type Subst = [(Identifier, Neut)]
 
--- proceed explicit substitution
-subst :: Subst -> Neut -> WithEnv Neut
-subst sub e = reduce ("" :< NeutSubst e sub)
+subst :: Subst -> Neut -> Neut
+subst _ (j :< NeutVar s) = j :< NeutVar s
+subst sub (j :< NeutPi (s, tdom) tcod) = do
+  let tdom' = subst sub tdom
+  let tcod' = subst sub tcod -- note that we don't have to drop s from sub, thanks to rename.
+  j :< NeutPi (s, tdom') tcod'
+subst sub (j :< NeutPiIntro (s, tdom) body) = do
+  let tdom' = subst sub tdom
+  let body' = subst sub body
+  j :< NeutPiIntro (s, tdom') body'
+subst sub (j :< NeutPiElim e1 e2) = do
+  let e1' = subst sub e1
+  let e2' = subst sub e2
+  j :< NeutPiElim e1' e2'
+subst sub (j :< NeutSigma (s, tdom) tcod) = do
+  let tdom' = subst sub tdom
+  let tcod' = subst sub tcod
+  j :< NeutSigma (s, tdom') tcod'
+subst sub (j :< NeutSigmaIntro e1 e2) = do
+  let e1' = subst sub e1
+  let e2' = subst sub e2
+  j :< NeutSigmaIntro e1' e2'
+subst sub (j :< NeutSigmaElim e1 (x, y) e2) = do
+  let e1' = subst sub e1
+  let e2' = subst sub e2
+  j :< NeutSigmaElim e1' (x, y) e2'
+subst sub (j :< NeutBox e) = do
+  let e' = subst sub e
+  j :< NeutBox e'
+subst sub (j :< NeutBoxIntro e) = do
+  let e' = subst sub e
+  j :< NeutBoxIntro e'
+subst sub (j :< NeutBoxElim e) = do
+  let e' = subst sub e
+  j :< NeutBoxElim e'
+subst _ (j :< NeutIndex x) = j :< NeutIndex x
+subst _ (j :< NeutIndexIntro l) = j :< NeutIndexIntro l
+subst sub (j :< NeutIndexElim e branchList) = do
+  let e' = subst sub e
+  let branchList' = map (\(l, e) -> (l, subst sub e)) branchList
+  j :< NeutIndexElim e' branchList'
+subst _ (j :< NeutUniv i) = j :< NeutUniv i
+subst sub (j :< NeutMu x e) = do
+  let e' = subst sub e
+  j :< NeutMu x e'
+subst sub (j :< NeutHole s) = fromMaybe (j :< NeutHole s) (lookup s sub)
 
 type SubstIdent = [(Identifier, Identifier)]
 
 substIdent :: SubstIdent -> Identifier -> Identifier
 substIdent sub x = fromMaybe x (lookup x sub)
 
-compose :: Subst -> Subst -> WithEnv Subst
+compose :: Subst -> Subst -> Subst
 compose s1 s2 = do
   let domS2 = map fst s2
   let codS2 = map snd s2
-  codS2' <- mapM (subst s1) codS2
+  let codS2' = map (subst s1) codS2
   let fromS1 = filter (\(ident, _) -> ident `notElem` domS2) s1
-  return $ fromS1 ++ zip domS2 codS2'
+  fromS1 ++ zip domS2 codS2'
 
 reduce :: Neut -> WithEnv Neut
 reduce (i :< NeutPiElim e1 e2) = do
@@ -728,7 +763,7 @@ reduce (i :< NeutPiElim e1 e2) = do
   case e1' of
     _ :< NeutPiIntro (arg, _) body -> do
       let sub = [(arg, e2')]
-      _ :< body' <- subst sub body
+      let _ :< body' = subst sub body
       reduce $ i :< body'
     _ -> return $ i :< NeutPiElim e1' e2'
 reduce (i :< NeutSigmaIntro e1 e2) = do
@@ -742,7 +777,7 @@ reduce (i :< NeutSigmaElim e (x, y) body) = do
       e1' <- reduce e1
       e2' <- reduce e2
       let sub = [(x, e1'), (y, e2')]
-      _ :< body' <- subst sub body
+      let _ :< body' = subst sub body
       reduce $ i :< body'
     _ -> return $ i :< NeutSigmaElim e' (x, y) body
 reduce (i :< NeutIndexElim e branchList) = do
@@ -755,52 +790,15 @@ reduce (i :< NeutIndexElim e branchList) = do
           throwE $ "the index " ++ show x ++ " is not included in branchList"
         Just body -> reduce body
     _ -> return $ i :< NeutIndexElim e' branchList
+reduce (i :< NeutBoxElim e) = do
+  e' <- reduce e
+  case e' of
+    _ :< NeutBoxIntro e'' -> reduce e''
+    _                     -> return $ i :< NeutBoxElim e'
 reduce (meta :< NeutMu s e) = do
   e' <- reduce e
   return $ meta :< NeutMu s e'
-reduce (_ :< NeutSubst (k :< NeutVar s) sub) =
-  return $ fromMaybe (k :< NeutVar s) (lookup s sub)
-reduce (j :< NeutSubst (i :< NeutPi (s, tdom) tcod) sub) = do
-  tdom' <- reduce (j :< NeutSubst tdom sub)
-  tcod' <- reduce (j :< NeutSubst tcod sub)
-  return $ i :< NeutPi (s, tdom') tcod'
-reduce (j :< NeutSubst (i :< NeutPiIntro (s, tdom) body) sub) = do
-  tdom' <- reduce (j :< NeutSubst tdom sub)
-  body' <- reduce (j :< NeutSubst body sub)
-  return $ i :< NeutPiIntro (s, tdom') body'
-reduce (j :< NeutSubst (i :< NeutPiElim e1 e2) sub) = do
-  e1' <- reduce (j :< NeutSubst e1 sub)
-  e2' <- reduce (j :< NeutSubst e2 sub)
-  return $ i :< NeutPiElim e1' e2'
-reduce (j :< NeutSubst (i :< NeutSigma (s, tdom) tcod) sub) = do
-  tdom' <- reduce (j :< NeutSubst tdom sub)
-  tcod' <- reduce (j :< NeutSubst tcod sub)
-  return $ i :< NeutSigma (s, tdom') tcod'
-reduce (j :< NeutSubst (i :< NeutSigmaIntro e1 e2) sub) = do
-  e1' <- reduce (j :< NeutSubst e1 sub)
-  e2' <- reduce (j :< NeutSubst e2 sub)
-  return $ i :< NeutSigmaIntro e1' e2'
-reduce (j :< NeutSubst (i :< NeutSigmaElim e1 (x, y) e2) sub) = do
-  e1' <- reduce (j :< NeutSubst e1 sub)
-  e2' <- reduce (j :< NeutSubst e2 sub)
-  return $ i :< NeutSigmaElim e1' (x, y) e2'
-reduce (_ :< NeutSubst (i :< NeutIndex l) _) = return $ i :< NeutIndex l
-reduce (_ :< NeutSubst (i :< NeutIndexIntro x) _) =
-  return $ i :< NeutIndexIntro x
-reduce (j :< NeutSubst (i :< NeutIndexElim e branchList) sub) = do
-  e' <- reduce (j :< NeutSubst e sub)
-  let (labelList, es) = unzip branchList
-  es' <- mapM (\e -> reduce (j :< NeutSubst e sub)) es
-  return $ i :< NeutIndexElim e' (zip labelList es')
-reduce (_ :< NeutSubst (i :< NeutUniv l) _) = return $ i :< NeutUniv l
-reduce (j :< NeutSubst (i :< NeutMu x e) sub) = do
-  e' <- reduce (j :< NeutSubst e sub)
-  return $ i :< NeutMu x e'
-reduce self@(_ :< NeutSubst (_ :< NeutHole x) sub) =
-  return $ fromMaybe self (lookup x sub)
-reduce (_ :< NeutSubst (i :< NeutSubst e sub1) sub2) =
-  reduce $ i :< NeutSubst e (sub1 ++ sub2)
-reduce e = return e
+reduce t = return t
 
 wrap :: f (Cofree f Identifier) -> WithEnv (Cofree f Identifier)
 wrap a = do
