@@ -53,7 +53,6 @@ infer (meta :< NeutPiElim e1 e2) = do
   typeMeta2 <- newNameWith "meta"
   insTypeEnv typeMeta2 udom
   insConstraintEnv tPi (typeMeta2 :< NeutPi (x, tdom) tcod) -- t1 == forall (x : tdom). tcod
-  insEqEnv $ EquationPiElim tPi e2 codName
   undefined
   -- returnMeta meta $ explicitSubst tcod [(x, e2)]
 infer (meta :< NeutSigma (s, tdom) tcod) = inferBinder meta s tdom tcod
@@ -90,7 +89,6 @@ infer (meta :< NeutSigmaElim e1 (x, y) e2) = do
   holeName <- newName
   resultHole <- wrapType $ NeutHole holeName
   -- insConstraintEnv t2 $ explicitSubst resultHole [(z, pair)]
-  insEqEnv $ EquationSigmaElim e1 (t2, (x, y)) holeName
   returnMeta meta $ undefined
   -- returnMeta meta $ explicitSubst resultHole [(z, e1)]
 infer (meta :< NeutBox t) = do
@@ -209,20 +207,8 @@ unifyLoop ((e1, e2):cs) loopCount = do
       let loopCount' = nextLoopCount (length cs) (length cs') loopCount
       if didFinishLoop (length cs') loopCount'
         then do
-          env <- get
-          eqEnv' <- mapM (substEq s) $ eqEnv env
-          (eqEnv'', sEq) <- unifyEq eqEnv'
-          case sEq of
-            [] -> do
-              liftIO $ putStrLn $ "failing unification. subst:\n" ++ Pr.ppShow s
-              unificationFailed e1'' e2'' cs'
-            _ -> do
-              liftIO $ putStrLn $ "additionalSubst:\n " ++ Pr.ppShow sEq
-              eqEnv''' <- mapM (substEq sEq) eqEnv''
-              modify (\e -> e {eqEnv = eqEnv'''})
-              newConstraints <- sConstraint sEq (cs' ++ [(e1'', e2'')])
-              s' <- unifyLoop newConstraints 0
-              return (s ++ s')
+          liftIO $ putStrLn $ "failing unification. subst:\n" ++ Pr.ppShow s
+          unificationFailed e1'' e2'' cs'
         else do
           s' <- unifyLoop (cs' ++ [(e1'', e2'')]) loopCount'
           return (s ++ s')
@@ -237,9 +223,7 @@ unificationFailed e1 e2 cs = do
     "\nand\n" ++
     Pr.ppShow e2 ++
     "\nwith constraints:\n" ++
-    Pr.ppShow cs ++
-    "\ntypeEnv:\n" ++
-    Pr.ppShow (typeEnv env) ++ "\neqEnv:\n" ++ Pr.ppShow (eqEnv env)
+    Pr.ppShow cs ++ "\ntypeEnv:\n" ++ Pr.ppShow (typeEnv env)
 
 nextLoopCount :: Int -> Int -> Int -> Int
 nextLoopCount i j loopCount = do
@@ -327,45 +311,6 @@ isStrong (_ :< NeutIndexElim e1 branchList) = do
   return $ b1 && and bs
 isStrong (_ :< NeutUniv _) = return True
 isStrong (_ :< NeutHole _) = return False
-
-substEq :: Subst -> Equation -> WithEnv Equation
-substEq sub (EquationPiElim t1 e2 hole) = do
-  let t1' = subst sub t1
-  let e2' = subst sub e2
-  return $ EquationPiElim t1' e2' hole
-substEq sub (EquationSigmaElim e1 (t2, (x, y)) hole) = do
-  let e1' = subst sub e1
-  let t2' = subst sub t2
-  return $ EquationSigmaElim e1' (t2', (x, y)) hole
-
-unifyEq :: [Equation] -> WithEnv ([Equation], Subst)
-unifyEq [] = return ([], [])
-unifyEq (eq@(EquationPiElim t1 e2 hole):rest) = do
-  b <- isStrong t1
-  if not b
-    then do
-      (eqs, s) <- unifyEq rest
-      return (eq : eqs, s)
-    else case t1 of
-           _ :< NeutPi (x, _) tcod -> do
-             let t2' = subst [(x, e2)] tcod
-             (eqs, s) <- unifyEq rest
-             return (eqs, (hole, t2') : s)
-           _ ->
-             lift $
-             throwE $
-             "the type " ++
-             Pr.ppShow t1 ++ " is expected to be a pi-type, but not."
-unifyEq (eq@(EquationSigmaElim e1 (t2, (x, y)) hole):rest) = do
-  b <- isStrong t2
-  if not b
-    then do
-      (eqs, s) <- unifyEq rest
-      return (eq : eqs, s)
-    else do
-      t2' <- substPair (x, y) e1 t2
-      (eqs, s) <- unifyEq rest
-      return (eqs, (hole, t2') : s)
 
 substPair :: (Identifier, Identifier) -> Neut -> Neut -> WithEnv Neut
 substPair _ _ e@(_ :< NeutVar _) = return e
