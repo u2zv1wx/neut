@@ -45,9 +45,7 @@ expand (i :< NeutUniv j) = return $ i :< NeutUniv j
 expand (i :< NeutMu s c) = do
   c' <- expand c
   return $ i :< NeutMu s c'
-expand (i :< NeutCopy tmp x e) = do
-  e' <- expand e
-  return $ i :< NeutCopy tmp x e'
+expand (i :< NeutCopy x) = return $ i :< NeutCopy x
 expand (i :< NeutFree x e) = do
   e' <- expand e
   return $ i :< NeutFree x e'
