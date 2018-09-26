@@ -71,6 +71,11 @@ data NeutF a
   | NeutUniv UnivLevel
   | NeutMu Identifier
            a
+  | NeutCopy Identifier -- copy tmp <- x in e
+             Identifier
+             a
+  | NeutFree Identifier -- free x; e
+             a
   | NeutHole Identifier
 
 type Neut = Cofree NeutF Identifier
@@ -636,6 +641,12 @@ var (_ :< NeutUniv _) = return []
 var (_ :< NeutMu s e) = do
   vs <- var e
   return $ filter (/= s) vs
+var (_ :< NeutCopy tmp x e) = do
+  vs <- var e
+  return $ tmp : filter (/= x) vs
+var (_ :< NeutFree x e) = do
+  vs <- var e
+  return $ x : vs
 var (_ :< NeutHole _) = return []
 
 var' :: Neut -> WithEnv [Identifier]
@@ -674,6 +685,8 @@ var' (_ :< NeutIndexElim e branchList) = do
   return $ vs ++ join vss
 var' (_ :< NeutUniv _) = return []
 var' (_ :< NeutMu _ e) = var' e
+var' (_ :< NeutCopy _ _ e) = undefined
+var' (_ :< NeutFree _ e) = undefined
 var' (_ :< NeutHole _) = return []
 
 (+-+) ::
@@ -999,12 +1012,26 @@ varsInAsmArg (AsmArgReg x)       = [x]
 varsInAsmArg (AsmArgLabel _)     = []
 varsInAsmArg (AsmArgImmediate _) = []
 
-toPiIntroSeq :: Neut -> WithEnv (Neut, [Identifier])
-toPiIntroSeq (_ :< NeutPiIntro (x, _) body) = do
+toPiIntroSeq :: Neut -> WithEnv (Neut, [(Identifier, Neut, Identifier)])
+toPiIntroSeq (meta :< NeutPiIntro (x, t) body) = do
   (body', args) <- toPiIntroSeq body
-  return (body', x : args)
+  return (body', (x, t, meta) : args)
 toPiIntroSeq t = return (t, [])
 
+fromPiIntroSeq :: (Neut, [(Identifier, Neut, Identifier)]) -> Neut
+fromPiIntroSeq (e, []) = e
+fromPiIntroSeq (e, (x, t, meta):rest) =
+  fromPiIntroSeq (meta :< NeutPiIntro (x, t) e, rest)
+
+-- forallArgs :: Neut -> (Neut, [(Identifier, Neut, Identifier)])
+-- forallArgs (meta :< NeutPi (i, vt) t) = do
+--   let (body, xs) = forallArgs t
+--   (body, (i, vt, meta) : xs)
+-- forallArgs body = (body, [])
+-- coForallArgs :: (Neut, [(Identifier, Neut, Identifier)]) -> Neut
+-- coForallArgs (t, []) = t
+-- coForallArgs (t, (i, tdom, meta):ts) =
+--   coForallArgs (meta :< NeutPi (i, tdom) t, ts)
 toSigmaIntroSeq :: Neut -> WithEnv [Neut]
 toSigmaIntroSeq (_ :< NeutSigmaIntro e1 e2) = do
   rest <- toSigmaIntroSeq e2

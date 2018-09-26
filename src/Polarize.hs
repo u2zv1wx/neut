@@ -25,7 +25,8 @@ polarize forall@(_ :< NeutPi _ _) = do
   let xts' = zip xs ts'
   return $ Value $ PosDown (PosPi xts' (PosUp body'))
 polarize lam@(i :< NeutPiIntro _ _) = do
-  (body, args) <- toPiIntroSeq lam
+  (body, argTypeMetaList) <- toPiIntroSeq lam
+  let args = map (\(x, _, _) -> x) argTypeMetaList
   c <- polarize body >>= toNeg
   name <- newNameWith "lam"
   lamType <- lookupTypeEnv' i
