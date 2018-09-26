@@ -149,6 +149,11 @@ data Code
                      Identifier
                      Int
                      Code
+  | CodeCopy Identifier
+             Identifier
+             Code
+  | CodeFree Identifier
+             Code
   deriving (Show)
 
 data AsmMeta = AsmMeta
