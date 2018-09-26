@@ -19,7 +19,6 @@ check :: Identifier -> Neut -> WithEnv Neut
 check main e = do
   t <- infer [] e
   insTypeEnv main t -- insert the type of main function
-  affineConstraint' [] e
   env <- get
   liftIO $ putStrLn $ "constraint = " ++ Pr.ppShow (constraintEnv env)
   sub <- unifyLoop (constraintEnv env) 0
@@ -85,21 +84,6 @@ infer ctx (meta :< NeutSigmaElim e1 (x, y) e2) = do
   typeC <- appCtx (ctx ++ [x, y, z])
   insConstraintEnv ctx t2 (subst [(z, pair)] typeC) u2
   returnMeta meta $ subst [(z, e1)] typeC
-infer ctx (meta :< NeutBox t) = do
-  u <- infer ctx t
-  returnMeta meta u
-infer ctx (meta :< NeutBoxIntro e) = do
-  t <- infer ctx e
-  affineConstraint ctx e
-  u <- infer ctx t
-  wrapTypeWithUniv u (NeutBox t) >>= returnMeta meta
-infer ctx (meta :< NeutBoxElim e) = do
-  t <- infer ctx e
-  resultHole <- appCtx ctx
-  boxType <- wrapType $ NeutBox resultHole
-  u <- infer ctx t
-  insConstraintEnv ctx t boxType u
-  returnMeta meta resultHole
 infer ctx (meta :< NeutMu s e) = do
   trec <- appCtx ctx
   insTypeEnv s trec
@@ -248,12 +232,7 @@ unificationFailed e1 e2 cs = do
   env <- get
   lift $
     throwE $
-    "unification failed for\n" ++
-    Pr.ppShow e1 ++
-    "\nand\n" ++
-    Pr.ppShow e2 ++
-    "\nwith constraints:\n" ++
-    Pr.ppShow cs ++ "\ntypeEnv:\n" ++ Pr.ppShow (typeEnv env)
+    "unification failed for\n" ++ Pr.ppShow e1 ++ "\nand\n" ++ Pr.ppShow e2
 
 nextLoopCount :: Int -> Int -> Int -> Int
 nextLoopCount i j loopCount = do
@@ -313,10 +292,6 @@ unify ((ctx, e1, _ :< NeutSigmaIntro e21 e22, _ :< NeutSigma (x, typeA) typeB):c
   e12 <- pr2 e1 ((x, typeA), typeB)
   let typeB' = subst [(x, e11)] typeB
   unify $ (ctx, e11, e21, typeA) : (ctx, e12, e22, typeB') : cs
-unify ((ctx, _ :< NeutBox t1, _ :< NeutBox t2, univ):cs) =
-  unify $ (ctx, t1, t2, univ) : cs
-unify ((ctx, _ :< NeutBoxIntro e1, _ :< NeutBoxIntro e2, _ :< NeutBox t):cs) =
-  unify $ (ctx, e1, e2, t) : cs
 unify ((_, _ :< NeutIndex l1, _ :< NeutIndex l2, _):cs)
   | l1 == l2 = unify cs
 unify ((_, _ :< NeutUniv i, _ :< NeutUniv j, _):cs) = do
@@ -415,31 +390,3 @@ unsplit [] [] [] = []
 unsplit (ctx:ctxList) ((e1, e2):cs) (t:typeList) =
   (ctx, e1, e2, t) : unsplit ctxList cs typeList
 unsplit _ _ _ = error "Infer.unsplit: invalid arguments"
-
-occursMoreThanTwice :: Eq a => [a] -> [a]
-occursMoreThanTwice xs = do
-  let ys = nub xs
-  nub $ occursMoreThanTwice' ys xs
-
-occursMoreThanTwice' :: Eq a => [a] -> [a] -> [a]
-occursMoreThanTwice' ys xs = foldl (flip delete) xs ys
-
-affineConstraint :: Context -> Neut -> WithEnv ()
-affineConstraint ctx e = do
-  varList <- var e
-  affineConstraint0 ctx $ nub varList
-
-affineConstraint' :: Context -> Neut -> WithEnv ()
-affineConstraint' ctx e = do
-  varList <- var' e
-  let xs = occursMoreThanTwice varList
-  affineConstraint0 ctx xs
-
-affineConstraint0 :: Context -> [Identifier] -> WithEnv ()
-affineConstraint0 ctx xs =
-  forM_ xs $ \x -> do
-    t <- lookupTypeEnv' x
-    h <- newHole
-    boxType@(meta :< _) <- wrapType $ NeutBox h
-    u <- lookupTypeEnv' meta
-    insConstraintEnv ctx t boxType u

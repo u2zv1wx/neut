@@ -11,5 +11,7 @@
 (notation (begin (let x e+) rest+)
   ((lambda ((x _)) (begin rest+)) (begin e+)))
 
+(index top unit)
+
 (begin
-  (lambda (x) (core.add x 1)))
+  (lambda (x) (core.add unit 1)))

@@ -46,15 +46,6 @@ rename (i :< NeutSigmaElim e1 (x, y) e2) = do
     y' <- newNameWith y
     e2' <- rename e2
     return $ i :< NeutSigmaElim e1' (x', y') e2'
-rename (i :< NeutBox t) = do
-  t' <- rename t
-  return $ i :< NeutBox t'
-rename (i :< NeutBoxIntro t) = do
-  t' <- rename t
-  return $ i :< NeutBoxIntro t'
-rename (i :< NeutBoxElim t) = do
-  t' <- rename t
-  return $ i :< NeutBoxElim t'
 rename (i :< NeutMu s e) =
   local $ do
     s' <- newNameWith s
