@@ -16,15 +16,10 @@ insCopyFree :: Neut -> WithEnv Neut
 insCopyFree e = insCopy [] e >>= \(e', _) -> insFree e'
 
 insCopy :: [Identifier] -> Neut -> WithEnv (Neut, [Identifier])
-insCopy found v@(i :< NeutVar x) =
+insCopy found (i :< NeutVar x) =
   if x `notElem` found
-    then return (v, [x]) -- the final occurrence of x
-    else do
-      tmp <- newNameWith "copy"
-      meta <- newNameWith "meta"
-      -- Copy the content of a variable if it's not the final occurrence.
-      let e = meta :< NeutCopy tmp x (i :< NeutVar tmp)
-      return (e, [])
+    then return (i :< NeutVar x, [x]) -- the final occurrence of x
+    else return (i :< NeutCopy x, [x])
 insCopy found (i :< NeutPi (x, tdom) tcod) = do
   (tdom', vs1) <- insCopy found tdom
   (tcod', vs2) <- insCopy found tcod
@@ -61,9 +56,7 @@ insCopy found (i :< NeutIndexElim e branchList) = do
   (e', vs') <- insCopy (vs ++ found) e
   return (i :< NeutIndexElim e' (zip indexList es'), found ++ vs ++ vs')
 insCopy _ (i :< NeutUniv j) = return (i :< NeutUniv j, [])
-insCopy found (i :< NeutCopy tmp x e) = do
-  (e', vs) <- insCopy found e
-  return (i :< NeutCopy tmp x e', found ++ vs)
+insCopy found (i :< NeutCopy x) = return (i :< NeutCopy x, found ++ [x])
 insCopy found (i :< NeutFree x e) = do
   (e', vs) <- insCopy found e
   return (i :< NeutFree x e', found ++ vs)
@@ -116,12 +109,7 @@ insFree (i :< NeutUniv j) = return $ i :< NeutUniv j
 insFree (meta :< NeutMu s c) = do
   c' <- insFree c
   return $ meta :< NeutMu s c'
-insFree (i :< NeutCopy tmp x e) = do
-  e' <- insFree e
-  vs <- var e
-  let unusedVarList = filter (`notElem` vs) [tmp]
-  e'' <- insFree' unusedVarList e'
-  return $ i :< NeutCopy tmp x e''
+insFree (i :< NeutCopy x) = return $ i :< NeutCopy x
 insFree (i :< NeutFree x e) = do
   e' <- insFree e
   return $ i :< NeutFree x e'

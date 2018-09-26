@@ -50,10 +50,14 @@ lift (i :< NeutIndexElim e branchList) = do
   es' <- mapM lift es
   return $ i :< NeutIndexElim e' (zip indexList es')
 lift (i :< NeutUniv j) = return $ i :< NeutUniv j
-lift (i :< NeutHole x) = return $ i :< NeutHole x
-lift (meta :< NeutMu s c) = do
+lift (i :< NeutMu s c) = do
   c' <- lift c
-  return $ meta :< NeutMu s c'
+  return $ i :< NeutMu s c'
+lift (i :< NeutCopy x) = return $ i :< NeutCopy x
+lift (i :< NeutFree x e) = do
+  e' <- lift e
+  return $ i :< NeutFree x e'
+lift (i :< NeutHole x) = return $ i :< NeutHole x
 
 replace :: [(Identifier, Identifier)] -> Neut -> WithEnv Neut
 replace f2b (i :< NeutVar s) =
@@ -97,4 +101,14 @@ replace args (i :< NeutIndexElim e branchList) = do
   es' <- mapM (replace args) es
   return $ i :< NeutIndexElim e' (zip indexList es')
 replace _ (i :< NeutUniv j) = return $ i :< NeutUniv j
+replace f2b (i :< NeutCopy x) =
+  case lookup x f2b of
+    Nothing -> return $ i :< NeutCopy x
+    Just b -> do
+      t <- lookupTypeEnv' i
+      insTypeEnv b t
+      return $ i :< NeutCopy b
+replace args (i :< NeutFree x e) = do
+  e' <- replace args e
+  return $ i :< NeutFree x e'
 replace _ (i :< NeutHole x) = return $ i :< NeutHole x

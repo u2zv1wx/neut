@@ -59,12 +59,9 @@ rename (i :< NeutIndexElim e branchList) = do
   es' <- mapM rename es
   return $ i :< NeutIndexElim e' (zip indexList es')
 rename (i :< NeutUniv j) = return $ i :< NeutUniv j
-rename (i :< NeutCopy tmp x e) = do
+rename (i :< NeutCopy x) = do
   x' <- lookupNameEnv' x
-  local $ do
-    tmp' <- newNameWith tmp
-    e' <- rename e
-    return $ i :< NeutCopy tmp' x' e'
+  return $ i :< NeutCopy x'
 rename (i :< NeutFree x e) = do
   x' <- lookupNameEnv' x
   e' <- rename e

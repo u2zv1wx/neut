@@ -71,9 +71,7 @@ data NeutF a
   | NeutUniv UnivLevel
   | NeutMu Identifier
            a
-  | NeutCopy Identifier -- copy tmp <- x in e
-             Identifier
-             a
+  | NeutCopy Identifier
   | NeutFree Identifier -- free x; e
              a
   | NeutHole Identifier
@@ -641,9 +639,7 @@ var (_ :< NeutUniv _) = return []
 var (_ :< NeutMu s e) = do
   vs <- var e
   return $ filter (/= s) vs
-var (_ :< NeutCopy tmp x e) = do
-  vs <- var e
-  return $ tmp : filter (/= x) vs
+var (_ :< NeutCopy x) = return [x]
 var (_ :< NeutFree x e) = do
   vs <- var e
   return $ x : vs
@@ -685,7 +681,7 @@ var' (_ :< NeutIndexElim e branchList) = do
   return $ vs ++ join vss
 var' (_ :< NeutUniv _) = return []
 var' (_ :< NeutMu _ e) = var' e
-var' (_ :< NeutCopy _ _ e) = undefined
+var' (_ :< NeutCopy x) = return [x]
 var' (_ :< NeutFree _ e) = undefined
 var' (_ :< NeutHole _) = return []
 

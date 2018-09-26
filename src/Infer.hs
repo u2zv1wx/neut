@@ -114,6 +114,12 @@ infer ctx (meta :< NeutIndexElim e branchList) = do
   returnMeta meta $ head tes
 infer _ (meta :< NeutUniv l) =
   wrapType (NeutUniv (UnivLevelNext l)) >>= returnMeta meta
+infer _ (meta :< NeutCopy x) = do
+  t <- lookupTypeEnv' x
+  returnMeta meta t
+infer ctx (meta :< NeutFree _ e) = do
+  t <- infer ctx e
+  returnMeta meta t
 infer ctx (meta :< NeutHole _) = do
   hole <- appCtx ctx
   returnMeta meta hole
@@ -197,11 +203,6 @@ toVar x = do
   meta <- newNameWith "meta"
   insTypeEnv meta t
   return $ meta :< NeutVar x
-
-newHole :: WithEnv Neut
-newHole = do
-  i <- newName
-  wrapType $ NeutHole i
 
 returnMeta :: Identifier -> Neut -> WithEnv Neut
 returnMeta meta t = do

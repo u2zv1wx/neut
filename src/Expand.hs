@@ -42,10 +42,16 @@ expand (i :< NeutIndexElim e branchList) = do
   es' <- mapM expand es
   return $ i :< NeutIndexElim e' (zip indexList es')
 expand (i :< NeutUniv j) = return $ i :< NeutUniv j
-expand (i :< NeutHole x) = return $ i :< NeutHole x
-expand (meta :< NeutMu s c) = do
+expand (i :< NeutMu s c) = do
   c' <- expand c
-  return $ meta :< NeutMu s c'
+  return $ i :< NeutMu s c'
+expand (i :< NeutCopy tmp x e) = do
+  e' <- expand e
+  return $ i :< NeutCopy tmp x e'
+expand (i :< NeutFree x e) = do
+  e' <- expand e
+  return $ i :< NeutFree x e'
+expand (i :< NeutHole x) = return $ i :< NeutHole x
 
 expand' :: Int -> Neut -> WithEnv Neut
 expand' given term@(i :< _) = do
