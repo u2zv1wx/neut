@@ -56,6 +56,8 @@ virtualNeg (NegUpElim x e1 e2) = do
   e1' <- virtualNeg e1
   e2' <- virtualNeg e2
   traceLet x e1' e2'
+virtualNeg (NegCopy x) = undefined
+virtualNeg (NegFree x e) = undefined
 
 traceLet :: String -> Code -> Code -> WithEnv Code
 traceLet s (CodeReturn ans) cont = return $ CodeLet s ans cont

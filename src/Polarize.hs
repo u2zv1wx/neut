@@ -71,7 +71,7 @@ polarize (_ :< NeutMu s e) = do
   insTermEnv s e'
   return e'
 polarize (_ :< NeutUniv _) = return $ Value PosUniv
-polarize (_ :< NeutCopy x) = return $ Comp $ NegUpIntro $ PosCopy x
+polarize (_ :< NeutCopy x) = return $ Comp $ NegCopy x
 polarize (_ :< NeutFree x e) = do
   e' <- polarize e >>= toNeg
   return $ Comp $ NegFree x e'
