@@ -101,6 +101,7 @@ data Pos
                         Neg -- body
   | PosUp Pos
   | PosUniv
+  | PosCopy Identifier
   deriving (Show)
 
 data Neg
@@ -115,6 +116,8 @@ data Neg
   | NegUpElim Identifier
               Neg
               Neg
+  | NegFree Identifier
+            Neg
   deriving (Show)
 
 data Term

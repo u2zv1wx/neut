@@ -66,12 +66,16 @@ polarize (_ :< NeutIndexElim e branchList) = do
   cs <- mapM (polarize >=> toNeg) es
   x <- newName
   bindSeq [(x, e)] $ NegIndexElim x (zip labelList cs)
-polarize (_ :< NeutUniv _) = return $ Value PosUniv
-polarize (_ :< NeutHole x) = error $ "Polarize.polarize: remaining hole: " ++ x
 polarize (_ :< NeutMu s e) = do
   e' <- polarize e
   insTermEnv s e'
   return e'
+polarize (_ :< NeutUniv _) = return $ Value PosUniv
+polarize (_ :< NeutCopy x) = return $ Comp $ NegUpIntro $ PosCopy x
+polarize (_ :< NeutFree x e) = do
+  e' <- polarize e >>= toNeg
+  return $ Comp $ NegFree x e'
+polarize (_ :< NeutHole x) = error $ "Polarize.polarize: remaining hole: " ++ x
 
 toPos :: Term -> WithEnv Pos
 toPos (Value c) = return c
