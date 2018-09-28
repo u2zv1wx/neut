@@ -13,19 +13,21 @@ import           Control.Monad.Trans.Except
 import qualified Text.Show.Pretty           as Pr
 
 import           Data
+import           Util
+
 import           Data.Maybe                 (maybeToList)
 
 polarize :: Neut -> WithEnv Term
 polarize (_ :< NeutVar s) = return $ Comp $ NegUpIntro $ PosVar s
 polarize forall@(_ :< NeutPi _ _) = do
-  (body, xts) <- toPiSeq forall
+  let (body, xts) = toPiSeq forall
   body' <- polarize body >>= toPos
   let (xs, ts) = unzip xts
   ts' <- mapM (polarize >=> toPos) ts
   let xts' = zip xs ts'
   return $ Value $ PosDown (PosPi xts' (PosUp body'))
 polarize lam@(i :< NeutPiIntro _ _) = do
-  (body, argTypeMetaList) <- toPiIntroSeq lam
+  let (body, argTypeMetaList) = toPiIntroSeq lam
   let args = map (\(x, _, _) -> x) argTypeMetaList
   c <- polarize body >>= toNeg
   name <- newNameWith "lam"
@@ -33,7 +35,7 @@ polarize lam@(i :< NeutPiIntro _ _) = do
   insTypeEnv name lamType
   return $ Comp $ NegUpIntro $ PosDownIntroPiIntro name args c
 polarize e@(_ :< NeutPiElim _ _) = do
-  (fun, identArgList) <- funAndArgsPol e
+  let (fun, identArgList) = toPiElimSeq e
   formalArgs <- mapM (const newName) identArgList
   let (_, argList) = unzip identArgList
   case fun of
@@ -97,9 +99,3 @@ bindSeq ((formalArg, arg@(argMeta :< _)):rest) fun = do
   argType <- lookupTypeEnv' argMeta
   insTypeEnv formalArg argType
   return $ Comp $ NegUpElim formalArg arg' fun'
-
-funAndArgsPol :: Neut -> WithEnv (Neut, [(Identifier, Neut)])
-funAndArgsPol (i :< NeutPiElim e v) = do
-  (fun, xs) <- funAndArgsPol e
-  return (fun, (i, v) : xs)
-funAndArgsPol c = return (c, [])

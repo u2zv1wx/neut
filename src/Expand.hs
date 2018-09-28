@@ -6,6 +6,7 @@ import           Control.Monad.State        hiding (expand)
 import           Control.Monad.Trans.Except
 
 import           Data
+import           Util
 
 -- eliminate partial applications by eta-expansion
 expand :: Neut -> WithEnv Neut
@@ -18,10 +19,10 @@ expand (i :< NeutPiIntro arg body) = do
   body' <- expand body
   return $ i :< NeutPiIntro arg body'
 expand (i :< NeutPiElim e v) = do
-  (fun, identArgList) <- funAndArgs (i :< NeutPiElim e v)
+  let (fun, identArgList) = toPiElimSeq (i :< NeutPiElim e v)
   let (identList, argList) = unzip identArgList
   argList' <- mapM expand argList
-  expand' (length argList') $ coFunAndArgs (fun, zip identList argList')
+  expand' (length argList') $ fromPiElimSeq (fun, zip identList argList')
 expand (i :< NeutSigma xts tcod) = do
   let (xs, ts) = unzip xts
   ts' <- mapM expand ts
@@ -61,8 +62,8 @@ expand' given term@(i :< _) = do
   t <- lookupTypeEnv' i
   case t of
     _ :< NeutPi _ _ -> do
-      let (_, argTypeList) = forallArgs t
-      let argList = map (\(x, _, _) -> x) argTypeList
+      let (_, argTypeList) = toPiSeq t
+      let argList = map fst argTypeList
       newArgList <- constructFormalArgs $ drop given argList
       termVarList <- mapM wrapArg newArgList
       term' <- appFold term termVarList

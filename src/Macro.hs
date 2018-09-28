@@ -88,3 +88,9 @@ macroExpand1 t@(i :< _) = do
 
 macroExpand :: Tree -> WithEnv Tree
 macroExpand = recurM macroExpand1
+
+recurM :: (Monad m) => (Tree -> m Tree) -> Tree -> m Tree
+recurM f (meta :< TreeAtom s) = f (meta :< TreeAtom s)
+recurM f (meta :< TreeNode tis) = do
+  tis' <- mapM (recurM f) tis
+  f (meta :< TreeNode tis')

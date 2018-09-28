@@ -12,6 +12,8 @@ import           Control.Monad.Trans.Except
 import           Control.Comonad.Cofree
 
 import           Data
+import           Util
+
 import           Data.List
 import           Data.Maybe
 

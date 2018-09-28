@@ -9,6 +9,8 @@ import           Control.Monad.Trans.Except
 
 import qualified Text.Show.Pretty           as Pr
 
+import           Util
+
 import           Data
 
 lift :: Neut -> WithEnv Neut

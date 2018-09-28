@@ -117,3 +117,8 @@ bindArgs [] asm = return asm
 bindArgs ((to, from):rest) asm = do
   asm' <- bindArgs rest asm
   addMeta $ AsmLet to (AsmArgReg from) asm'
+
+showIndex :: Index -> String
+showIndex (IndexInteger i) = show i
+showIndex (IndexLabel s)   = s
+showIndex IndexDefault     = "default"

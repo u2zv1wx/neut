@@ -13,8 +13,10 @@ import qualified Text.Show.Pretty           as Pr
 
 import           Data
 import           Reduce
+import           Util
 
 import           Data.List
+
 import           Data.Maybe
 
 check :: Identifier -> Neut -> WithEnv Neut

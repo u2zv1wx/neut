@@ -14,4 +14,4 @@
 (index top unit)
 
 (begin
-  (lambda (x) (core.add unit 1)))
+  (lambda (x) (core.add x x)))

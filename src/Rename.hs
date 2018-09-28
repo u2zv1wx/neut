@@ -70,3 +70,10 @@ rename (i :< NeutMu s e) =
     e' <- rename e
     return $ i :< NeutMu s' e'
 rename (i :< NeutHole x) = return $ i :< NeutHole x
+
+local :: WithEnv a -> WithEnv a
+local p = do
+  env <- get
+  x <- p
+  modify (\e -> env {count = count e})
+  return x
