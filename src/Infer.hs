@@ -23,9 +23,7 @@ check main e = do
   env <- get
   liftIO $ putStrLn $ "constraint = " ++ Pr.ppShow (constraintEnv env)
   sub <- unifyLoop (constraintEnv env) 0
-  let (is, ts) = unzip $ typeEnv env
-  let ts' = map (subst sub) ts
-  let tenv' = zip is ts'
+  let tenv' = map (\(i, t) -> (i, subst sub t)) $ typeEnv env
   modify (\e -> e {typeEnv = tenv', constraintEnv = []})
   return $ subst sub e
 

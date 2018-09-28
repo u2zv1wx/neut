@@ -128,8 +128,6 @@ data Data
   | DataStruct [Identifier]
   deriving (Show)
 
-type Address = Identifier
-
 data Code
   = CodeReturn Data
   | CodeLet Identifier -- bind (we also use this to represent application)
@@ -528,15 +526,6 @@ foldMR f e (t:ts) = do
   i <- newName
   return $ i :< x
 
-swap :: Int -> Int -> [a] -> [a]
-swap i j xs = replaceNth j (xs !! i) (replaceNth i (xs !! j) xs)
-
-replaceNth :: Int -> a -> [a] -> [a]
-replaceNth _ _ [] = []
-replaceNth n newVal (x:xs)
-  | n == 0 = newVal : xs
-  | otherwise = x : replaceNth (n - 1) newVal xs
-
 appFold :: Neut -> [Neut] -> WithEnv Neut
 appFold e [] = return e
 appFold e@(i :< _) (term:ts) = do
@@ -582,11 +571,6 @@ forallArgs (meta :< NeutPi (i, vt) t) = do
   let (body, xs) = forallArgs t
   (body, (i, vt, meta) : xs)
 forallArgs body = (body, [])
-
-coForallArgs :: (Neut, [(Identifier, Neut, Identifier)]) -> Neut
-coForallArgs (t, []) = t
-coForallArgs (t, (i, tdom, meta):ts) =
-  coForallArgs (meta :< NeutPi (i, tdom) t, ts)
 
 funAndArgs :: Neut -> WithEnv (Neut, [(Identifier, Neut)])
 funAndArgs (i :< NeutPiElim e v) = do
@@ -754,10 +738,7 @@ subst sub (j :< NeutSigma xts tcod) = do
   let ts' = map (subst sub) ts
   let tcod' = subst sub tcod
   j :< NeutSigma (zip xs ts') tcod'
-subst sub (j :< NeutSigmaIntro es)
-  -- let e1' = subst sub e1
-  -- let e2' = subst sub e2
- = do
+subst sub (j :< NeutSigmaIntro es) = do
   j :< NeutSigmaIntro (map (subst sub) es) -- e1' e2'
 subst sub (j :< NeutSigmaElim e1 xs e2) = do
   let e1' = subst sub e1
@@ -809,16 +790,12 @@ reduce (i :< NeutPiElim e1 e2) = do
     _ -> return $ i :< NeutPiElim e1' e2'
 reduce (i :< NeutSigmaIntro es) = do
   es' <- mapM reduce es
-  -- e1' <- reduce e1
-  -- e2' <- reduce e2
   return $ i :< NeutSigmaIntro es'
 reduce (i :< NeutSigmaElim e xs body) = do
   e' <- reduce e
   case e of
     _ :< NeutSigmaIntro es -> do
       es' <- mapM reduce es
-      -- e1' <- reduce e1
-      -- e2' <- reduce e2
       let sub = zip xs es'
       let _ :< body' = subst sub body
       reduce $ i :< body'
@@ -890,12 +867,12 @@ sizeOfLowType (LowTypePointer _) = 8
 sizeOfLowType (LowTypeStruct ts) = sum $ map sizeOfLowType ts
 
 toLowType :: Neut -> WithEnv LowType
-toLowType (_ :< NeutVar _) = return $ LowTypeInt 32
-  -- lift $
-  -- throwE $
-  -- "Asm.toLowType: the type of a type variable " ++ x ++ " is not defined"
+toLowType (_ :< NeutVar _) = return $ LowTypeInt 32 -- (*1)
 toLowType (_ :< NeutPi _ _) = return $ LowTypePointer $ LowTypeInt 8
-toLowType (_ :< NeutSigma _ _) = return $ LowTypePointer $ LowTypeInt 8
+toLowType (_ :< NeutSigma xts t) = do
+  ts' <- mapM toLowType (map snd xts ++ [t])
+  let ts'' = map LowTypePointer ts'
+  return $ LowTypeStruct ts''
 toLowType (_ :< NeutIndex _) = return $ LowTypeInt 32
 toLowType (_ :< NeutUniv _) = return $ LowTypeInt 32
 toLowType v = lift $ throwE $ "Asm.toLowType: " ++ show v ++ " is not a type"
@@ -935,7 +912,6 @@ regList =
   , "rsp" -- rsp is not used in register allocation
   ]
 
--- rsp is colored by -1, and not used in register allocation
 initRegVar :: WithEnv ()
 initRegVar = do
   xs <- mapM newNameWith regList
@@ -1035,30 +1011,12 @@ fromPiIntroSeq (e, []) = e
 fromPiIntroSeq (e, (x, t, meta):rest) =
   fromPiIntroSeq (meta :< NeutPiIntro (x, t) e, rest)
 
--- toSigmaIntroSeq :: Neut -> WithEnv [Neut]
--- toSigmaIntroSeq (_ :< NeutSigmaIntro es) = do
---   rest <- toSigmaIntroSeq e2
---   return $ e1 : rest
--- toSigmaIntroSeq t = return [t]
 toPiSeq :: Neut -> WithEnv (Neut, [(Identifier, Neut)])
 toPiSeq (_ :< NeutPi (x, t) body) = do
   (body', args) <- toPiSeq body
   return (body', (x, t) : args)
 toPiSeq t = return (t, [])
 
--- toSigmaSeq :: Neut -> WithEnv (Neut, [(Identifier, Neut)])
--- toSigmaSeq (_ :< NeutSigma (x, t) body) = do
---   (body', args) <- toSigmaSeq body
---   return (body', (x, t) : args)
--- toSigmaSeq t = return (t, [])
--- toSigmaElimSeq :: Neut -> WithEnv (Neut, [(Identifier, Neut)])
--- toSigmaElimSeq (_ :< NeutSigmaElim e1@(meta :< _) (x, y) e2) = undefined
--- toSigmaElimSeq e                                             = return (e, [])
--- funAndArgs :: Neut -> WithEnv (Neut, [(Identifier, Neut)])
--- funAndArgs (i :< NeutPiElim e v) = do
---   (fun, xs) <- funAndArgs e
---   return (fun, (i, v) : xs)
--- funAndArgs c = return (c, [)]
 showIndex :: Index -> String
 showIndex (IndexInteger i) = show i
 showIndex (IndexLabel s)   = s
