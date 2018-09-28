@@ -67,6 +67,7 @@ type Subst = [(Identifier, Neut)]
 
 subst :: Subst -> Neut -> Neut
 subst _ (j :< NeutVar s) = j :< NeutVar s
+subst _ (j :< NeutConst s) = j :< NeutConst s
 subst sub (j :< NeutPi (s, tdom) tcod) = do
   let tdom' = subst sub tdom
   let tcod' = subst sub tcod -- note that we don't have to drop s from sub, thanks to rename.

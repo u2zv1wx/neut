@@ -40,7 +40,7 @@ polarize e@(_ :< NeutPiElim _ _) = do
   formalArgs <- mapM (const newName) identArgList
   let (_, argList) = unzip identArgList
   case fun of
-    _ :< NeutVar funName ->
+    _ :< NeutConst funName ->
       bindSeq (zip formalArgs argList) (NegPiElimDownElim funName formalArgs)
     _ -> do
       funName <- newNameWith "fun"

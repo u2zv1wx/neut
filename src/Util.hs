@@ -10,6 +10,10 @@ import           Control.Monad.State
 
 import           Data
 
+import qualified Text.Show.Pretty       as Pr
+
+import           Debug.Trace
+
 toPiIntroSeq :: Neut -> (Neut, [(Identifier, Neut, Identifier)])
 toPiIntroSeq (meta :< NeutPiIntro (x, t) body) = do
   let (body', args) = toPiIntroSeq body
@@ -37,134 +41,88 @@ toPiSeq (_ :< NeutPi (x, t) body) = do
   (body', (x, t) : args)
 toPiSeq t = (t, [])
 
-var :: Neut -> WithEnv [Identifier]
-var (_ :< NeutVar s) = do
-  b <- isExternalConst s
-  if b
-    then return []
-    else return [s]
-var (_ :< NeutPi (i, tdom) tcod) = do
-  vs1 <- var tdom
-  vs2 <- var tcod
-  return $ vs1 ++ filter (/= i) vs2
-var (_ :< NeutPiIntro (s, _) e) = do
-  vs <- var e
-  return $ filter (/= s) vs
-var (_ :< NeutPiElim e1 e2) = do
-  vs1 <- var e1
-  vs2 <- var e2
-  return $ vs1 ++ vs2
-var (_ :< NeutSigma [] t2) = var t2
-var (i :< NeutSigma ((x, t):xts) t2) = do
-  vs1 <- var (i :< NeutSigma xts t2)
-  vs2 <- var t
-  return $ vs2 ++ filter (/= x) vs1
-var (_ :< NeutSigmaIntro es) = join <$> mapM var es
-var (_ :< NeutSigmaElim e1 xs e2) = do
-  vs1 <- var e1
-  vs2 <- var e2
-  return $ vs1 ++ filter (`notElem` xs) vs2
-var (_ :< NeutBox e) = var e
-var (_ :< NeutBoxIntro e) = var e
-var (_ :< NeutBoxElim e) = var e
-var (_ :< NeutIndex _) = return []
-var (_ :< NeutIndexIntro _) = return []
-var (_ :< NeutIndexElim e branchList) = do
-  vs <- var e
+var :: Neut -> [Identifier]
+var e = fst $ varAndHole e
+
+nonLinear :: Neut -> [Identifier]
+nonLinear (_ :< NeutVar _) = []
+nonLinear (_ :< NeutConst _) = []
+nonLinear (_ :< NeutPi (_, tdom) tcod) = do
+  let ns1 = nonLinear tdom
+  let ns2 = nonLinear tcod
+  ns1 ++ ns2
+nonLinear (_ :< NeutPiIntro (x, _) e) = isLinear x (var e) ++ nonLinear e
+nonLinear (_ :< NeutPiElim e1 e2) = do
+  let ns1 = nonLinear e1
+  let ns2 = nonLinear e2
+  ns1 ++ ns2
+nonLinear (_ :< NeutSigma [] t2) = nonLinear t2
+nonLinear (i :< NeutSigma ((x, t):xts) t2) = do
+  let ns1 = nonLinear (i :< NeutSigma xts t2)
+  let ns2 = nonLinear t
+  let vs = join $ map var (map snd xts ++ [t2])
+  isLinear x vs ++ ns1 ++ ns2
+nonLinear (_ :< NeutSigmaIntro es) = join $ map nonLinear es
+nonLinear (_ :< NeutSigmaElim e1 xs e2) = do
+  let ns1 = nonLinear e1
+  let ns2 = nonLinear e2
+  let vs = var e2
+  let tmp = concatMap (`isLinear` vs) xs
+  tmp ++ ns1 ++ ns2
+nonLinear (_ :< NeutBox e) = nonLinear e
+nonLinear (_ :< NeutBoxIntro e) = nonLinear e
+nonLinear (_ :< NeutBoxElim e) = nonLinear e
+nonLinear (_ :< NeutIndex _) = []
+nonLinear (_ :< NeutIndexIntro _) = []
+nonLinear (_ :< NeutIndexElim e branchList) = do
+  let vs = nonLinear e
   let (_, es) = unzip branchList
-  vss <- mapM var es
-  return $ vs ++ join vss
-var (_ :< NeutUniv _) = return []
-var (_ :< NeutMu s e) = do
-  vs <- var e
-  return $ filter (/= s) vs
-var (_ :< NeutHole _) = return []
+  let vss = map nonLinear es
+  vs ++ join vss
+nonLinear (_ :< NeutUniv _) = []
+nonLinear (_ :< NeutMu s e) = isLinear s (var e) ++ nonLinear e
+nonLinear (_ :< NeutHole _) = []
 
-var' :: Neut -> WithEnv [Identifier]
-var' (_ :< NeutVar s) = do
-  b <- isExternalConst s
-  if b
-    then return []
-    else return [s]
-var' (_ :< NeutPi (_, tdom) tcod) = do
-  vs1 <- var' tdom
-  vs2 <- var' tcod
-  return $ vs1 ++ vs2
-var' (_ :< NeutPiIntro (_, _) e) = var' e
-var' (_ :< NeutPiElim e1 e2) = do
-  vs1 <- var' e1
-  vs2 <- var' e2
-  return $ vs1 ++ vs2
-var' (_ :< NeutSigma [] t2) = var' t2
-var' (i :< NeutSigma ((x, t):xts) t2) = do
-  vs1 <- var' (i :< NeutSigma xts t2)
-  vs2 <- var' t
-  return $ vs2 ++ filter (/= x) vs1
-var' (_ :< NeutSigmaIntro es) = join <$> mapM var' es
-var' (_ :< NeutSigmaElim e1 _ e2) = do
-  vs1 <- var' e1
-  vs2 <- var' e2
-  return $ vs1 ++ vs2
-var' (_ :< NeutBox e) = var' e
-var' (_ :< NeutBoxIntro e) = var' e
-var' (_ :< NeutBoxElim e) = var' e
-var' (_ :< NeutIndex _) = return []
-var' (_ :< NeutIndexIntro _) = return []
-var' (_ :< NeutIndexElim e branchList) = do
-  vs <- var' e
-  let (_, es) = unzip branchList
-  vss <- mapM var' es
-  return $ vs ++ join vss
-var' (_ :< NeutUniv _) = return []
-var' (_ :< NeutMu _ e) = var' e
-var' (_ :< NeutHole _) = return []
-
-(+-+) ::
-     ([Identifier], [Identifier])
-  -> ([Identifier], [Identifier])
-  -> ([Identifier], [Identifier])
-(xs1, xs2) +-+ (ys1, ys2) = (xs1 ++ ys1, xs2 ++ ys2)
-
--- list all the variables and the metavariables in given term, assuming that
--- the term is renamed by `rename`
-varAndHole :: Neut -> WithEnv ([Identifier], [Identifier])
-varAndHole (_ :< NeutVar s) = do
-  b <- isExternalConst s
-  if b
-    then return ([], [])
-    else return ([s], [])
-varAndHole (_ :< NeutPi (_, tdom) tcod) = do
-  vs1 <- varAndHole tdom
-  vs2 <- varAndHole tcod
-  return $ vs1 +-+ vs2
-varAndHole (_ :< NeutPiIntro _ e) = varAndHole e
-varAndHole (_ :< NeutPiElim e1 e2) = do
-  vs1 <- varAndHole e1
-  vs2 <- varAndHole e2
-  return $ vs1 +-+ vs2
-varAndHole (_ :< NeutSigma [] t2) = varAndHole t2
-varAndHole (i :< NeutSigma ((_, t):xts) t2) = do
-  vs1 <- varAndHole (i :< NeutSigma xts t2)
-  vs2 <- varAndHole t
-  return $ vs1 +-+ vs2
-varAndHole (_ :< NeutSigmaIntro es) = pairwiseConcat <$> mapM varAndHole es
-varAndHole (_ :< NeutSigmaElim e1 _ e2) = do
-  vs1 <- varAndHole e1
-  vs2 <- varAndHole e2
-  return $ vs1 +-+ vs2
+varAndHole :: Neut -> ([Identifier], [Identifier])
+varAndHole (_ :< NeutVar s) = ([s], [])
+varAndHole (_ :< NeutConst _) = ([], [])
+varAndHole (_ :< NeutPi (x, tdom) tcod) = do
+  let vs1 = varAndHole tdom
+  let (vs21, vs22) = varAndHole tcod
+  let vs2 = (filter (/= x) vs21, vs22)
+  pairwiseConcat [vs1, vs2]
+varAndHole (_ :< NeutPiIntro (x, _) e) = do
+  let (vs1, vs2) = varAndHole e
+  (filter (/= x) vs1, vs2)
+varAndHole (_ :< NeutPiElim e1 e2) =
+  pairwiseConcat [varAndHole e1, varAndHole e2]
+varAndHole (_ :< NeutSigma xts t2) = do
+  let (xs, ts) = unzip xts
+  let (vs1, vs2) = pairwiseConcat $ map varAndHole (t2 : ts)
+  (filter (`notElem` xs) vs1, vs2)
+varAndHole (_ :< NeutSigmaIntro es) = pairwiseConcat $ map varAndHole es
+varAndHole (_ :< NeutSigmaElim e1 xs e2) = do
+  let vs1 = varAndHole e1
+  let (vs21, vs22) = varAndHole e2
+  let vs2 = (filter (`notElem` xs) vs21, vs22)
+  pairwiseConcat [vs1, vs2]
 varAndHole (_ :< NeutBox e) = varAndHole e
 varAndHole (_ :< NeutBoxIntro e) = varAndHole e
 varAndHole (_ :< NeutBoxElim e) = varAndHole e
-varAndHole (_ :< NeutIndex _) = return ([], [])
-varAndHole (_ :< NeutIndexIntro _) = return ([], [])
+varAndHole (_ :< NeutIndex _) = ([], [])
+varAndHole (_ :< NeutIndexIntro _) = ([], [])
 varAndHole (_ :< NeutIndexElim e branchList) = do
-  vs <- varAndHole e
   let (_, es) = unzip branchList
-  vss <- mapM varAndHole es
-  return $ vs +-+ pairwiseConcat vss
-varAndHole (_ :< NeutUniv _) = return ([], [])
+  pairwiseConcat $ map varAndHole (e : es)
+varAndHole (_ :< NeutUniv _) = ([], [])
 varAndHole (_ :< NeutMu _ e) = varAndHole e
-varAndHole (_ :< NeutHole x) = return ([], [x])
+varAndHole (_ :< NeutHole x) = ([], [x])
+
+isLinear :: Identifier -> [Identifier] -> [Identifier]
+isLinear x xs =
+  if length (filter (== x) xs) == 1
+    then []
+    else [x]
 
 foldML ::
      (Cofree f Identifier -> a -> f (Cofree f Identifier))

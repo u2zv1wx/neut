@@ -23,7 +23,8 @@ check :: Identifier -> Neut -> WithEnv Neut
 check main e = do
   t <- infer [] e
   insTypeEnv main t -- insert the type of main function
-  affineConstraint' [] e
+  liftIO $ putStrLn $ "nonLinear = " ++ Pr.ppShow (nonLinear e)
+  boxConstraint [] $ nonLinear e
   env <- get
   liftIO $ putStrLn $ "constraint = " ++ Pr.ppShow (constraintEnv env)
   sub <- unifyLoop (constraintEnv env) 0
@@ -101,7 +102,7 @@ infer ctx (meta :< NeutBox t) = do
   returnMeta meta u
 infer ctx (meta :< NeutBoxIntro e) = do
   t <- infer ctx e
-  affineConstraint ctx e
+  boxConstraint ctx $ var e
   u <- infer ctx t
   wrapTypeWithUniv u (NeutBox t) >>= returnMeta meta
 infer ctx (meta :< NeutBoxElim e) = do
@@ -334,7 +335,7 @@ unify ((_, _ :< NeutUniv i, _ :< NeutUniv j, _):cs) = do
   unify cs
 unify ((_, e1, e2, _):cs)
   | Just (x, args) <- headMeta [] e1 = do
-    (fvs, fmvs) <- varAndHole e2
+    let (fvs, fmvs) = varAndHole e2
     if affineCheck args fvs && x `notElem` fmvs
       then do
         ans <- bindFormalArgs args e2
@@ -368,10 +369,7 @@ affineCheck' _ [] _ = True
 affineCheck' xs (y:ys) fvs =
   if y `notElem` fvs
     then affineCheck' xs ys fvs
-    else isLinear y xs && affineCheck' xs ys fvs
-
-isLinear :: Eq a => a -> [a] -> Bool
-isLinear y xs = length (filter (== y) xs) == 1
+    else length (isLinear y xs) == 0 && affineCheck' xs ys fvs
 
 projectionList :: Neut -> ([(Identifier, Neut)], Neut) -> WithEnv [Neut]
 projectionList e (xts, t) = do
@@ -425,27 +423,8 @@ unsplit (ctx:ctxList) ((e1, e2):cs) (t:typeList) =
   (ctx, e1, e2, t) : unsplit ctxList cs typeList
 unsplit _ _ _ = error "Infer.unsplit: invalid arguments"
 
-occursMoreThanTwice :: Eq a => [a] -> [a]
-occursMoreThanTwice xs = do
-  let ys = nub xs
-  nub $ occursMoreThanTwice' ys xs
-
-occursMoreThanTwice' :: Eq a => [a] -> [a] -> [a]
-occursMoreThanTwice' ys xs = foldl (flip delete) xs ys
-
-affineConstraint :: Context -> Neut -> WithEnv ()
-affineConstraint ctx e = do
-  varList <- var e
-  affineConstraint0 ctx $ nub varList
-
-affineConstraint' :: Context -> Neut -> WithEnv ()
-affineConstraint' ctx e = do
-  varList <- var' e
-  let xs = occursMoreThanTwice varList
-  affineConstraint0 ctx xs
-
-affineConstraint0 :: Context -> [Identifier] -> WithEnv ()
-affineConstraint0 ctx xs =
+boxConstraint :: Context -> [Identifier] -> WithEnv ()
+boxConstraint ctx xs =
   forM_ xs $ \x -> do
     t <- lookupTypeEnv' x
     h <- appCtx ctx
