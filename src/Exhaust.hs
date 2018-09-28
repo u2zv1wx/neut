@@ -12,6 +12,7 @@ import qualified Text.Show.Pretty           as Pr
 
 exhaust :: Neut -> WithEnv Neut
 exhaust e = do
+  liftIO $ putStrLn $ "exhaust, for:\n" ++ Pr.ppShow e
   b <- exhaust' e
   if b
     then return e
@@ -24,10 +25,7 @@ exhaust' (_ :< NeutPi (_, tdom) tcod) = do
   b1 <- exhaust' tdom
   b2 <- exhaust' tcod
   return $ b1 && b2
-exhaust' (_ :< NeutPiIntro (_, tdom) e) = do
-  b1 <- exhaust' tdom
-  b2 <- exhaust' e
-  return $ b1 && b2
+exhaust' (_ :< NeutPiIntro _ e) = exhaust' e
 exhaust' (_ :< NeutPiElim e1 e2) = do
   b1 <- exhaust' e1
   b2 <- exhaust' e2
