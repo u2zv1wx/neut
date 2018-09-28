@@ -55,7 +55,9 @@ polarize pair@(_ :< NeutSigmaIntro _ _) = do
   seq <- toSigmaIntroSeq pair
   nameList <- mapM (const newName) seq
   bindSeq (zip nameList seq) (NegUpIntro (PosSigmaIntro nameList))
-polarize (_ :< NeutSigmaElim e1 (x, y) e2) = do
+polarize (_ :< NeutSigmaElim e1@(meta :< _) (x, y) e2) = do
+  t <- lookupTypeEnv' meta
+  (body, xts) <- toSigmaSeq t
   e2' <- polarize e2 >>= toNeg
   z <- newName
   bindSeq [(z, e1)] (NegSigmaElim z (x, y) e2')

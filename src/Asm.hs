@@ -60,6 +60,10 @@ asmCode (CodeExtractValue x base i cont) = do
       cont' <- asmCode cont
       addMeta $ AsmExtractValue x base offset cont'
     _ -> lift $ throwE "Asm.asmCode : typeError"
+asmCode (CodeFree x cont) = do
+  tmp <- newName
+  cont' <- asmCode cont
+  asmCodeCall tmp "_free" [x] cont'
 
 asmData :: Identifier -> Data -> Asm -> WithEnv Asm
 asmData reg (DataLocal x) cont = addMeta $ AsmLet reg (AsmArgReg x) cont

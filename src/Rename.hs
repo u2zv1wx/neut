@@ -29,23 +29,24 @@ rename (i :< NeutPiElim e v) = do
   e' <- rename e
   v' <- rename v
   return $ i :< NeutPiElim e' v'
-rename (i :< NeutSigma (s, tdom) tcod) = do
-  tdom' <- rename tdom
-  local $ do
-    s' <- newNameWith s
-    tcod' <- rename tcod
-    return $ i :< NeutSigma (s', tdom') tcod'
-rename (i :< NeutSigmaIntro v1 v2) = do
-  v1' <- rename v1
-  v2' <- rename v2
-  return $ i :< NeutSigmaIntro v1' v2'
-rename (i :< NeutSigmaElim e1 (x, y) e2) = do
-  e1' <- rename e1
+rename (i :< NeutSigma [] tcod) = do
+  tcod' <- rename tcod
+  return $ i :< NeutSigma [] tcod'
+rename (i :< NeutSigma ((x, t):xts) tcod) = do
+  t' <- rename t
   local $ do
     x' <- newNameWith x
-    y' <- newNameWith y
+    _ :< NeutSigma xts' tcod' <- rename $ i :< NeutSigma xts tcod
+    return $ i :< NeutSigma ((x', t') : xts') tcod'
+rename (i :< NeutSigmaIntro es) = do
+  es' <- mapM rename es
+  return $ i :< NeutSigmaIntro es'
+rename (i :< NeutSigmaElim e1 xs e2) = do
+  e1' <- rename e1
+  local $ do
+    xs' <- mapM newNameWith xs
     e2' <- rename e2
-    return $ i :< NeutSigmaElim e1' (x', y') e2'
+    return $ i :< NeutSigmaElim e1' xs' e2'
 rename (i :< NeutBox t) = do
   t' <- rename t
   return $ i :< NeutBox t'

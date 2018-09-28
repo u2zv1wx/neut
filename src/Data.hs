@@ -57,12 +57,11 @@ data NeutF a
                 a
   | NeutPiElim a
                a
-  | NeutSigma (Identifier, a)
+  | NeutSigma [(Identifier, a)]
               a
-  | NeutSigmaIntro a
-                   a
+  | NeutSigmaIntro [a]
   | NeutSigmaElim a
-                  (Identifier, Identifier)
+                  [Identifier]
                   a
   | NeutBox a
   | NeutBoxIntro a
@@ -107,7 +106,7 @@ data Neg
   = NegPiElimDownElim Identifier
                       [Identifier]
   | NegSigmaElim Identifier
-                 (Identifier, Identifier) -- exists-elim
+                 [Identifier]
                  Neg
   | NegIndexElim Identifier
                  [(Index, Neg)]
@@ -146,6 +145,8 @@ data Code
                      Identifier
                      Int
                      Code
+  | CodeFree Identifier
+             Code
   deriving (Show)
 
 data AsmMeta = AsmMeta
@@ -614,18 +615,16 @@ var (_ :< NeutPiElim e1 e2) = do
   vs1 <- var e1
   vs2 <- var e2
   return $ vs1 ++ vs2
-var (_ :< NeutSigma (i, t1) t2) = do
-  vs1 <- var t1
-  vs2 <- var t2
-  return $ vs1 ++ filter (/= i) vs2
-var (_ :< NeutSigmaIntro e1 e2) = do
+var (_ :< NeutSigma [] t2) = var t2
+var (i :< NeutSigma ((x, t):xts) t2) = do
+  vs1 <- var (i :< NeutSigma xts t2)
+  vs2 <- var t
+  return $ vs2 ++ filter (/= x) vs1
+var (_ :< NeutSigmaIntro es) = join <$> mapM var es
+var (_ :< NeutSigmaElim e1 xs e2) = do
   vs1 <- var e1
   vs2 <- var e2
-  return $ vs1 ++ vs2
-var (_ :< NeutSigmaElim e1 (x, y) e2) = do
-  vs1 <- var e1
-  vs2 <- var e2
-  return $ vs1 ++ filter (\s -> s /= x && s /= y) vs2
+  return $ vs1 ++ filter (`notElem` xs) vs2
 var (_ :< NeutBox e) = var e
 var (_ :< NeutBoxIntro e) = var e
 var (_ :< NeutBoxElim e) = var e
@@ -657,14 +656,12 @@ var' (_ :< NeutPiElim e1 e2) = do
   vs1 <- var' e1
   vs2 <- var' e2
   return $ vs1 ++ vs2
-var' (_ :< NeutSigma (_, t1) t2) = do
-  vs1 <- var' t1
-  vs2 <- var' t2
-  return $ vs1 ++ vs2
-var' (_ :< NeutSigmaIntro e1 e2) = do
-  vs1 <- var' e1
-  vs2 <- var' e2
-  return $ vs1 ++ vs2
+var' (_ :< NeutSigma [] t2) = var' t2
+var' (i :< NeutSigma ((x, t):xts) t2) = do
+  vs1 <- var' (i :< NeutSigma xts t2)
+  vs2 <- var' t
+  return $ vs2 ++ filter (/= x) vs1
+var' (_ :< NeutSigmaIntro es) = join <$> mapM var' es
 var' (_ :< NeutSigmaElim e1 _ e2) = do
   vs1 <- var' e1
   vs2 <- var' e2
@@ -706,14 +703,12 @@ varAndHole (_ :< NeutPiElim e1 e2) = do
   vs1 <- varAndHole e1
   vs2 <- varAndHole e2
   return $ vs1 +-+ vs2
-varAndHole (_ :< NeutSigma (_, t1) t2) = do
-  vs1 <- varAndHole t1
-  vs2 <- varAndHole t2
+varAndHole (_ :< NeutSigma [] t2) = varAndHole t2
+varAndHole (i :< NeutSigma ((_, t):xts) t2) = do
+  vs1 <- varAndHole (i :< NeutSigma xts t2)
+  vs2 <- varAndHole t
   return $ vs1 +-+ vs2
-varAndHole (_ :< NeutSigmaIntro e1 e2) = do
-  vs1 <- varAndHole e1
-  vs2 <- varAndHole e2
-  return $ vs1 +-+ vs2
+varAndHole (_ :< NeutSigmaIntro es) = pairwiseConcat <$> mapM varAndHole es
 varAndHole (_ :< NeutSigmaElim e1 _ e2) = do
   vs1 <- varAndHole e1
   vs2 <- varAndHole e2
@@ -754,18 +749,20 @@ subst sub (j :< NeutPiElim e1 e2) = do
   let e1' = subst sub e1
   let e2' = subst sub e2
   j :< NeutPiElim e1' e2'
-subst sub (j :< NeutSigma (s, tdom) tcod) = do
-  let tdom' = subst sub tdom
+subst sub (j :< NeutSigma xts tcod) = do
+  let (xs, ts) = unzip xts
+  let ts' = map (subst sub) ts
   let tcod' = subst sub tcod
-  j :< NeutSigma (s, tdom') tcod'
-subst sub (j :< NeutSigmaIntro e1 e2) = do
+  j :< NeutSigma (zip xs ts') tcod'
+subst sub (j :< NeutSigmaIntro es)
+  -- let e1' = subst sub e1
+  -- let e2' = subst sub e2
+ = do
+  j :< NeutSigmaIntro (map (subst sub) es) -- e1' e2'
+subst sub (j :< NeutSigmaElim e1 xs e2) = do
   let e1' = subst sub e1
   let e2' = subst sub e2
-  j :< NeutSigmaIntro e1' e2'
-subst sub (j :< NeutSigmaElim e1 (x, y) e2) = do
-  let e1' = subst sub e1
-  let e2' = subst sub e2
-  j :< NeutSigmaElim e1' (x, y) e2'
+  j :< NeutSigmaElim e1' xs e2'
 subst sub (j :< NeutBox e) = do
   let e' = subst sub e
   j :< NeutBox e'
@@ -810,20 +807,22 @@ reduce (i :< NeutPiElim e1 e2) = do
       let _ :< body' = subst sub body
       reduce $ i :< body'
     _ -> return $ i :< NeutPiElim e1' e2'
-reduce (i :< NeutSigmaIntro e1 e2) = do
-  e1' <- reduce e1
-  e2' <- reduce e2
-  return $ i :< NeutSigmaIntro e1' e2'
-reduce (i :< NeutSigmaElim e (x, y) body) = do
+reduce (i :< NeutSigmaIntro es) = do
+  es' <- mapM reduce es
+  -- e1' <- reduce e1
+  -- e2' <- reduce e2
+  return $ i :< NeutSigmaIntro es'
+reduce (i :< NeutSigmaElim e xs body) = do
   e' <- reduce e
   case e of
-    _ :< NeutSigmaIntro e1 e2 -> do
-      e1' <- reduce e1
-      e2' <- reduce e2
-      let sub = [(x, e1'), (y, e2')]
+    _ :< NeutSigmaIntro es -> do
+      es' <- mapM reduce es
+      -- e1' <- reduce e1
+      -- e2' <- reduce e2
+      let sub = zip xs es'
       let _ :< body' = subst sub body
       reduce $ i :< body'
-    _ -> return $ i :< NeutSigmaElim e' (x, y) body
+    _ -> return $ i :< NeutSigmaElim e' xs body
 reduce (i :< NeutBoxElim e) = do
   e' <- reduce e
   case e' of
@@ -876,10 +875,12 @@ sizeOfType :: Neut -> WithEnv Int
 sizeOfType (_ :< NeutVar _) =
   lift $ throwE "Asm.sizeOfType: the type of a type variable is not defined"
 sizeOfType (_ :< NeutPi _ _) = return 4
-sizeOfType (_ :< NeutSigma (_, t1) t2) = do
-  i1 <- sizeOfType t1
+sizeOfType (_ :< NeutSigma xts t2) = do
+  let (_, ts) = unzip xts
+  is <- mapM sizeOfType ts
+  -- i1 <- sizeOfType t1
   i2 <- sizeOfType t2
-  return $ i1 + i2
+  return $ sum is + i2
 sizeOfType (_ :< NeutIndex _) = return 4
 sizeOfType v = lift $ throwE $ "Asm.sizeOfType: " ++ show v ++ " is not a type"
 
@@ -1034,24 +1035,30 @@ fromPiIntroSeq (e, []) = e
 fromPiIntroSeq (e, (x, t, meta):rest) =
   fromPiIntroSeq (meta :< NeutPiIntro (x, t) e, rest)
 
-toSigmaIntroSeq :: Neut -> WithEnv [Neut]
-toSigmaIntroSeq (_ :< NeutSigmaIntro e1 e2) = do
-  rest <- toSigmaIntroSeq e2
-  return $ e1 : rest
-toSigmaIntroSeq t = return [t]
-
+-- toSigmaIntroSeq :: Neut -> WithEnv [Neut]
+-- toSigmaIntroSeq (_ :< NeutSigmaIntro es) = do
+--   rest <- toSigmaIntroSeq e2
+--   return $ e1 : rest
+-- toSigmaIntroSeq t = return [t]
 toPiSeq :: Neut -> WithEnv (Neut, [(Identifier, Neut)])
 toPiSeq (_ :< NeutPi (x, t) body) = do
   (body', args) <- toPiSeq body
   return (body', (x, t) : args)
 toPiSeq t = return (t, [])
 
-toSigmaSeq :: Neut -> WithEnv (Neut, [(Identifier, Neut)])
-toSigmaSeq (_ :< NeutSigma (x, t) body) = do
-  (body', args) <- toSigmaSeq body
-  return (body', (x, t) : args)
-toSigmaSeq t = return (t, [])
-
+-- toSigmaSeq :: Neut -> WithEnv (Neut, [(Identifier, Neut)])
+-- toSigmaSeq (_ :< NeutSigma (x, t) body) = do
+--   (body', args) <- toSigmaSeq body
+--   return (body', (x, t) : args)
+-- toSigmaSeq t = return (t, [])
+-- toSigmaElimSeq :: Neut -> WithEnv (Neut, [(Identifier, Neut)])
+-- toSigmaElimSeq (_ :< NeutSigmaElim e1@(meta :< _) (x, y) e2) = undefined
+-- toSigmaElimSeq e                                             = return (e, [])
+-- funAndArgs :: Neut -> WithEnv (Neut, [(Identifier, Neut)])
+-- funAndArgs (i :< NeutPiElim e v) = do
+--   (fun, xs) <- funAndArgs e
+--   return (fun, (i, v) : xs)
+-- funAndArgs c = return (c, [)]
 showIndex :: Index -> String
 showIndex (IndexInteger i) = show i
 showIndex (IndexLabel s)   = s

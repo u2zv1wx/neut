@@ -29,18 +29,19 @@ parse (meta :< TreeNode [_ :< TreeAtom "lambda", _ :< TreeNode ts, te]) = do
   e <- parse te
   _ :< term <- foldMR NeutPiIntro e xs
   return $ meta :< term
-parse (_ :< TreeNode [_ :< TreeAtom "exists", _ :< TreeNode ts, tn]) = do
+parse (meta :< TreeNode [_ :< TreeAtom "exists", _ :< TreeNode ts, tn]) = do
   its <- mapM parseArg ts
   n <- parse tn
-  foldMR NeutSigma n its
-parse (meta :< TreeNode [_ :< TreeAtom "pair", t1, t2]) = do
-  e1 <- parse t1
-  e2 <- parse t2
-  return $ meta :< NeutSigmaIntro e1 e2
-parse (meta :< TreeNode [_ :< TreeAtom "case", t, _ :< TreeNode [_ :< TreeAtom "pair", _ :< TreeAtom x, _ :< TreeAtom y], tbody]) = do
+  return $ meta :< NeutSigma its n
+parse (meta :< TreeNode ((_ :< TreeAtom "pair"):ts)) = do
+  es <- mapM parse ts
+  return $ meta :< NeutSigmaIntro es
+parse (meta :< TreeNode [_ :< TreeAtom "case", t, _ :< TreeNode ((_ :< TreeAtom "pair"):ts), tbody]) = do
   e <- parse t
+  tmp <- mapM parseArg ts
+  let args = map fst tmp
   body <- parse tbody
-  return $ meta :< NeutSigmaElim e (x, y) body
+  return $ meta :< NeutSigmaElim e args body
 parse (meta :< TreeNode [_ :< TreeAtom "box", t]) = do
   e <- parse t
   return $ meta :< NeutBox e

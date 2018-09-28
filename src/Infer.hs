@@ -55,34 +55,40 @@ infer ctx (meta :< NeutPiElim e1 e2) = do
   insConstraintEnv ctx udom ucod u
   insConstraintEnv ctx tPi (typeMeta2 :< NeutPi (x, tdom) tcod) udom
   returnMeta meta $ subst [(x, e2)] tcod
-infer ctx (meta :< NeutSigma (s, tdom) tcod) = inferBinder ctx meta s tdom tcod
-infer ctx (meta :< NeutSigmaIntro e1 e2) = do
+infer ctx (_ :< NeutSigma [] tcod) = infer ctx tcod
+infer ctx (meta :< NeutSigma ((s, tdom):xts) tcod) = do
+  udom@(domMeta :< _) <- infer ctx tdom
+  u <- lookupTypeEnv' domMeta
+  insTypeEnv s tdom
+  ucod <- infer (ctx ++ [s]) (meta :< NeutSigma xts tcod)
+  insConstraintEnv ctx udom ucod u
+  returnMeta meta udom
+infer _ (_ :< NeutSigmaIntro []) = undefined
+infer _ (_ :< NeutSigmaIntro [_]) = undefined
+infer ctx (meta :< NeutSigmaIntro es) = do
+  tus <- mapM (infer2 ctx) es
+  let (ts, us) = unzip tus
+  constrainList ctx us
+  xs <- forM ts newNameOfType
+  holeList <- sigmaHole ctx xs
+  let xes = zip xs es
+  let holeList' = map (subst xes) holeList
+  forM_ (zip holeList' ts) $ \(h, t) -> insConstraintEnv ctx h t (head us)
+  let binder = zip xs (take (length holeList - 1) holeList)
+  wrapTypeWithUniv (head us) (NeutSigma binder (last holeList)) >>=
+    returnMeta meta
+infer ctx (meta :< NeutSigmaElim e1 xs e2) = do
   (t1, u1) <- infer2 ctx e1
-  (t2, u2) <- infer2 ctx e2
-  u <- infer ctx u1
-  insConstraintEnv ctx u1 u2 u
-  x <- newNameOfType t1
-  typeB <- appCtx (ctx ++ [x]) -- B
-  insConstraintEnv ctx t2 (subst [(x, e1)] typeB) u1
-  wrapTypeWithUniv u1 (NeutSigma (x, t1) typeB) >>= returnMeta meta -- Sigma (x : A). B
-infer ctx (meta :< NeutSigmaElim e1 (x, y) e2) = do
-  (t1, u1) <- infer2 ctx e1
-  tx@(txMeta :< _) <- appCtx ctx
-  ux <- lookupTypeEnv' txMeta
-  insTypeEnv x tx
-  ty@(tyMeta :< _) <- appCtx (ctx ++ [x])
-  uy <- lookupTypeEnv' tyMeta
-  insTypeEnv y ty
-  (t2, u2) <- infer2 (ctx ++ [x, y]) e2
-  u <- infer ctx u1
-  insConstraintEnv ctx u1 u2 u
-  insConstraintEnv ctx u1 ux u
-  insConstraintEnv ctx ux uy u
-  sigmaType <- wrapType $ NeutSigma (x, tx) ty
+  holeList <- sigmaHole ctx xs
+  forM_ (zip xs holeList) $ uncurry insTypeEnv
+  (t2, u2) <- infer2 (ctx ++ xs) e2
+  let binder = zip xs (take (length holeList - 1) holeList)
+  let cod = last holeList
+  sigmaType <- wrapType $ NeutSigma binder cod
   insConstraintEnv ctx t1 sigmaType u1
   z <- newNameOfType t1
-  pair <- constructPair (ctx ++ [x, y]) x y
-  typeC <- appCtx (ctx ++ [x, y, z])
+  pair <- constructPair (ctx ++ xs) xs
+  typeC <- appCtx (ctx ++ xs ++ [z])
   insConstraintEnv ctx t2 (subst [(z, pair)] typeC) u2
   returnMeta meta $ subst [(z, e1)] typeC
 infer ctx (meta :< NeutBox t) = do
@@ -140,6 +146,12 @@ infer2 ctx e = do
   u <- infer ctx t
   return (t, u)
 
+sigmaHole :: Context -> [Identifier] -> WithEnv [Neut]
+sigmaHole ctx xs = forM (zip xs [0 ..]) $ \(_, i) -> sigmaHole' ctx xs i
+
+sigmaHole' :: Context -> [Identifier] -> Int -> WithEnv Neut
+sigmaHole' ctx xs i = appCtx (ctx ++ take i xs)
+
 inferIndex :: Index -> WithEnv (Maybe Neut)
 inferIndex name = do
   mk <- lookupKind name
@@ -171,12 +183,12 @@ inferBinder ctx meta s tdom tcod = do
   insConstraintEnv ctx udom ucod u
   returnMeta meta udom
 
-constructPair :: Context -> Identifier -> Identifier -> WithEnv Neut
-constructPair ctx x y = do
+constructPair :: Context -> [Identifier] -> WithEnv Neut
+constructPair ctx xs = do
   eMeta <- newName
-  xMeta <- newName
-  yMeta <- newName
-  let pair = eMeta :< NeutSigmaIntro (xMeta :< NeutVar x) (yMeta :< NeutVar y)
+  metaList <- mapM (const newName) xs
+  let varList = map (\(m, x) -> m :< NeutVar x) $ zip metaList xs
+  let pair = eMeta :< NeutSigmaIntro varList
   _ <- infer ctx pair
   return pair
 
@@ -288,21 +300,24 @@ unify ((ctx, _ :< NeutPiIntro (x, tdom1) body1, e2, _):cs) = do
 unify ((ctx, e1, _ :< NeutPiIntro (y, tdom2) body2, _):cs) = do
   c <- constraintPiElim ctx ((y, tdom2), body2) e1
   unify $ c : cs
-unify ((ctx, _ :< NeutSigma (x, tdom1) tcod1, _ :< NeutSigma (y, tdom2) tcod2, univ):cs) =
+unify ((ctx, _ :< NeutSigma [(x, tdom1)] tcod1, _ :< NeutSigma [(y, tdom2)] tcod2, univ):cs) =
   unifyBinder ctx ((x, tdom1), tcod1) ((y, tdom2), tcod2) univ cs
-unify ((ctx, _ :< NeutSigmaIntro e11 e12, _ :< NeutSigmaIntro e21 e22, _ :< NeutSigma (x, typeA) typeB):cs) = do
-  let typeB' = subst [(x, e11)] typeB
-  unify $ (ctx, e11, e21, typeA) : (ctx, e12, e22, typeB') : cs
-unify ((ctx, _ :< NeutSigmaIntro e11 e12, e2, _ :< NeutSigma (x, typeA) typeB):cs) = do
-  e21 <- pr1 e2 ((x, typeA), typeB)
-  e22 <- pr2 e2 ((x, typeA), typeB)
-  let typeB' = subst [(x, e11)] typeB
-  unify $ (ctx, e11, e21, typeA) : (ctx, e12, e22, typeB') : cs
-unify ((ctx, e1, _ :< NeutSigmaIntro e21 e22, _ :< NeutSigma (x, typeA) typeB):cs) = do
-  e11 <- pr1 e1 ((x, typeA), typeB)
-  e12 <- pr2 e1 ((x, typeA), typeB)
-  let typeB' = subst [(x, e11)] typeB
-  unify $ (ctx, e11, e21, typeA) : (ctx, e12, e22, typeB') : cs
+unify ((ctx, i :< NeutSigma ((x, tdom1):xts) tcod1, j :< NeutSigma ((y, tdom2):yts) tcod2, univ):cs) = do
+  let sig1 = i :< NeutSigma [(x, tdom1)] (i :< NeutSigma xts tcod1)
+  let sig2 = j :< NeutSigma [(y, tdom2)] (j :< NeutSigma yts tcod2)
+  unify ((ctx, sig1, sig2, univ) : cs)
+unify ((ctx, _ :< NeutSigmaIntro es1, _ :< NeutSigmaIntro es2, _ :< NeutSigma xts t):cs)
+  | length es1 == length es2 = do
+    let ts = map snd xts ++ [t]
+    let sub = zip (map fst xts) es1
+    let ts' = map (subst sub) ts
+    newCs <-
+      forM (zip (zip es1 es2) ts') $ \((e1, e2), t') -> return (ctx, e1, e2, t')
+    unify $ newCs ++ cs
+unify ((ctx, _ :< NeutSigmaIntro es, e2, _ :< NeutSigma xts t):cs)
+  | length xts + 1 == length es = unifySigma ctx e2 es xts t cs
+unify ((ctx, e1, _ :< NeutSigmaIntro es, _ :< NeutSigma xts t):cs)
+  | length xts + 1 == length es = unifySigma ctx e1 es xts t cs
 unify ((ctx, _ :< NeutBox t1, _ :< NeutBox t2, univ):cs) =
   unify $ (ctx, t1, t2, univ) : cs
 unify ((ctx, _ :< NeutBoxIntro e1, _ :< NeutBoxIntro e2, _ :< NeutBox t):cs) =
@@ -327,6 +342,14 @@ unify ((ctx, e1, e2, t):cs)
   | Just _ <- headMeta [] e2 = unify $ (ctx, e2, e1, t) : cs
 unify cs = return ([], cs)
 
+unifySigma ctx e es xts t cs = do
+  prList <- projectionList e (xts, t)
+  let sub = zip (map fst xts) es
+  let ts = map (subst sub) $ map snd xts ++ [t]
+  newCs <-
+    forM (zip3 es prList ts) $ \(e, ithProj, t) -> return (ctx, e, ithProj, t)
+  unify $ newCs ++ cs
+
 headMeta :: [Identifier] -> Neut -> Maybe (Identifier, [Identifier])
 headMeta args (_ :< NeutPiElim e1 (_ :< NeutVar x)) = headMeta (x : args) e1
 headMeta args (_ :< NeutHole x)                     = Just (x, args)
@@ -345,23 +368,14 @@ affineCheck' xs (y:ys) fvs =
 isLinear :: Eq a => a -> [a] -> Bool
 isLinear y xs = length (filter (== y) xs) == 1
 
--- left projection for sigma
-pr1 :: Neut -> ((Identifier, Neut), Neut) -> WithEnv Neut
-pr1 e ((x, typeA), typeB) = do
-  y <- newNameOfType typeB
-  meta <- newNameOfType typeA
-  xMeta <- newNameOfType typeA
-  return $ meta :< NeutSigmaElim e (x, y) (xMeta :< NeutVar x)
-
--- right projection for sigma
-pr2 :: Neut -> ((Identifier, Neut), Neut) -> WithEnv Neut
-pr2 e ((x, typeA), typeB) = do
-  eLeft <- pr1 e ((x, typeA), typeB)
-  let typeB' = subst [(x, eLeft)] typeB
-  y <- newNameOfType typeB'
-  yMeta <- newNameOfType typeB'
-  meta <- newNameOfType typeB'
-  return $ meta :< NeutSigmaElim e (x, y) (yMeta :< NeutVar y)
+projectionList :: Neut -> ([(Identifier, Neut)], Neut) -> WithEnv [Neut]
+projectionList e (xts, t) = do
+  xiList <- forM (map snd xts ++ [t]) $ \t -> newNameOfType t
+  metaList <- mapM (const newName) xiList
+  let varList = map (\(m, x) -> m :< NeutVar x) $ zip metaList xiList
+  forM varList $ \v -> do
+    meta <- newName
+    return $ meta :< NeutSigmaElim e xiList v
 
 unifyBinder ctx ((x, tdom1), tcod1) ((y, tdom2), tcod2) univ cs = do
   z <- newName
