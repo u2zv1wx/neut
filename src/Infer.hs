@@ -35,6 +35,9 @@ infer :: Context -> Neut -> WithEnv Neut
 infer _ (meta :< NeutVar s) = do
   t <- lookupTypeEnv' s
   returnMeta meta t
+infer _ (meta :< NeutConst s) = do
+  t <- lookupTypeEnv' s
+  returnMeta meta t
 infer ctx (meta :< NeutPi (s, tdom) tcod) = inferBinder ctx meta s tdom tcod
 infer ctx (meta :< NeutPiIntro (s, tdom) e) = do
   let ctx' = ctx ++ [s]

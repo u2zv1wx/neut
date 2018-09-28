@@ -19,6 +19,7 @@ import           Data.Maybe                 (maybeToList)
 
 polarize :: Neut -> WithEnv Term
 polarize (_ :< NeutVar s) = return $ Comp $ NegUpIntro $ PosVar s
+polarize (_ :< NeutConst s) = return $ Comp $ NegUpIntro $ PosConst s
 polarize forall@(_ :< NeutPi _ _) = do
   let (body, xts) = toPiSeq forall
   body' <- polarize body >>= toPos

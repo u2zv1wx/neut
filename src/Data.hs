@@ -51,6 +51,7 @@ data Index
 
 data NeutF a
   = NeutVar Identifier
+  | NeutConst Identifier
   | NeutPi (Identifier, a)
            a
   | NeutPiIntro (Identifier, a)
@@ -87,6 +88,7 @@ data LowType
 
 data Pos
   = PosVar Identifier
+  | PosConst Identifier
   | PosPi [(Identifier, Pos)]
           Pos
   | PosSigma [(Identifier, Pos)]

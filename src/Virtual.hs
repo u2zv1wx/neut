@@ -18,11 +18,8 @@ import qualified Text.Show.Pretty           as Pr
 import           Debug.Trace
 
 virtualPos :: Pos -> WithEnv Data
-virtualPos (PosVar x) = do
-  b <- isExternalConst x
-  if b
-    then return $ DataLabel x
-    else return (DataLocal x)
+virtualPos (PosVar x) = return (DataLocal x)
+virtualPos (PosConst x) = return $ DataLabel x
 virtualPos (PosPi _ _) = return $ DataInt32 0
 virtualPos (PosSigma _ _) = return $ DataInt32 0
 virtualPos (PosSigmaIntro xs) = return $ DataStruct xs

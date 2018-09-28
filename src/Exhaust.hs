@@ -19,6 +19,7 @@ exhaust e = do
 
 exhaust' :: Neut -> WithEnv Bool
 exhaust' (_ :< NeutVar _) = return True
+exhaust' (_ :< NeutConst _) = return True
 exhaust' (_ :< NeutPi (_, tdom) tcod) = do
   b1 <- exhaust' tdom
   b2 <- exhaust' tcod

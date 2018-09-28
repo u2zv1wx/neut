@@ -15,6 +15,7 @@ import           Data
 
 lift :: Neut -> WithEnv Neut
 lift v@(_ :< NeutVar _) = return v
+lift v@(_ :< NeutConst _) = return v
 lift (i :< NeutPi (x, tdom) tcod) = do
   tdom' <- lift tdom
   tcod' <- lift tcod
@@ -74,6 +75,7 @@ replace f2b (i :< NeutVar s) =
       t <- lookupTypeEnv' i
       insTypeEnv b t
       return $ i :< NeutVar b
+replace _ (i :< NeutConst x) = return $ i :< NeutConst x
 replace args (i :< NeutPi (x, tdom) tcod) = do
   tdom' <- replace args tdom
   tcod' <- replace args tcod
