@@ -12,6 +12,8 @@ import           Control.Comonad.Cofree
 import qualified Text.Show.Pretty           as Pr
 
 import           Data
+import           Reduce
+
 import           Data.List
 import           Data.Maybe
 
