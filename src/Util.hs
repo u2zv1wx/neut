@@ -51,7 +51,7 @@ nonLinear (_ :< NeutPi (_, tdom) tcod) = do
   let ns1 = nonLinear tdom
   let ns2 = nonLinear tcod
   ns1 ++ ns2
-nonLinear (_ :< NeutPiIntro (x, _) e) = isLinear x (var e) ++ nonLinear e
+nonLinear (_ :< NeutPiIntro (x, _) e) = isAffine x (var e) ++ nonLinear e
 nonLinear (_ :< NeutPiElim e1 e2) = do
   let ns1 = nonLinear e1
   let ns2 = nonLinear e2
@@ -61,7 +61,7 @@ nonLinear (i :< NeutSigma ((x, t):xts) t2) = do
   let ns1 = nonLinear (i :< NeutSigma xts t2)
   let ns2 = nonLinear t
   let vs = join $ map var (map snd xts ++ [t2])
-  isLinear x vs ++ ns1 ++ ns2
+  isAffine x vs ++ ns1 ++ ns2
 nonLinear (_ :< NeutSigmaIntro es) = join $ map nonLinear es
 nonLinear (_ :< NeutSigmaElim e1 xs e2) = do
   let ns1 = nonLinear e1
@@ -121,6 +121,12 @@ varAndHole (_ :< NeutHole x) = ([], [x])
 isLinear :: Identifier -> [Identifier] -> [Identifier]
 isLinear x xs =
   if length (filter (== x) xs) == 1
+    then []
+    else [x]
+
+isAffine :: Identifier -> [Identifier] -> [Identifier]
+isAffine x xs =
+  if length (filter (== x) xs) <= 1
     then []
     else [x]
 
