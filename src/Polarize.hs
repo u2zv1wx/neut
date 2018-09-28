@@ -59,6 +59,16 @@ polarize (_ :< NeutSigmaElim e1 (x, y) e2) = do
   e2' <- polarize e2 >>= toNeg
   z <- newName
   bindSeq [(z, e1)] (NegSigmaElim z (x, y) e2')
+polarize (_ :< NeutBox e) = do
+  e' <- polarize e >>= toPos
+  return $ Value $ PosDown (PosPi [] (PosUp e'))
+polarize (_ :< NeutBoxIntro e) = do
+  e' <- polarize e >>= toNeg
+  label <- newNameWith "box"
+  return $ Comp $ NegUpIntro $ PosDownIntroPiIntro label [] e'
+polarize (_ :< NeutBoxElim e) = do
+  x <- newName
+  bindSeq [(x, e)] (NegPiElimDownElim x [])
 polarize (_ :< NeutIndex l) = return $ Value $ PosIndex l
 polarize (_ :< NeutIndexIntro x) = return $ Comp $ NegUpIntro $ PosIndexIntro x
 polarize (_ :< NeutIndexElim e branchList) = do
@@ -68,13 +78,10 @@ polarize (_ :< NeutIndexElim e branchList) = do
   bindSeq [(x, e)] $ NegIndexElim x (zip labelList cs)
 polarize (_ :< NeutMu s e) = do
   e' <- polarize e
-  insTermEnv s e'
+  undefined
+  -- insTermEnv s e'
   return e'
 polarize (_ :< NeutUniv _) = return $ Value PosUniv
-polarize (_ :< NeutCopy x) = return $ Comp $ NegCopy x
-polarize (_ :< NeutFree x e) = do
-  e' <- polarize e >>= toNeg
-  return $ Comp $ NegFree x e'
 polarize (_ :< NeutHole x) = error $ "Polarize.polarize: remaining hole: " ++ x
 
 toPos :: Term -> WithEnv Pos

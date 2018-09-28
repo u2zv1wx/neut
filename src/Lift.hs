@@ -42,6 +42,15 @@ lift (i :< NeutSigmaElim e1 (x, y) e2) = do
   e1' <- lift e1
   e2' <- lift e2
   return $ i :< NeutSigmaElim e1' (x, y) e2'
+lift (i :< NeutBox e) = do
+  e' <- lift e
+  return $ i :< NeutBox e'
+lift (i :< NeutBoxIntro e) = do
+  e' <- lift e
+  return $ i :< NeutBoxIntro e'
+lift (i :< NeutBoxElim e) = do
+  e' <- lift e
+  return $ i :< NeutBoxElim e'
 lift (i :< NeutIndex l) = return $ i :< NeutIndex l
 lift (i :< NeutIndexIntro x) = return $ i :< NeutIndexIntro x
 lift (i :< NeutIndexElim e branchList) = do
@@ -53,10 +62,6 @@ lift (i :< NeutUniv j) = return $ i :< NeutUniv j
 lift (i :< NeutMu s c) = do
   c' <- lift c
   return $ i :< NeutMu s c'
-lift (i :< NeutCopy x) = return $ i :< NeutCopy x
-lift (i :< NeutFree x e) = do
-  e' <- lift e
-  return $ i :< NeutFree x e'
 lift (i :< NeutHole x) = return $ i :< NeutHole x
 
 replace :: [(Identifier, Identifier)] -> Neut -> WithEnv Neut
@@ -90,9 +95,15 @@ replace args (i :< NeutSigmaElim e1 (x, y) e2) = do
   e1' <- replace args e1
   e2' <- replace args e2
   return $ i :< NeutSigmaElim e1' (x, y) e2'
-replace args (i :< NeutMu s c) = do
-  c' <- replace args c
-  return $ i :< NeutMu s c'
+replace args (i :< NeutBox e) = do
+  e' <- replace args e
+  return $ i :< NeutBox e'
+replace args (i :< NeutBoxIntro e) = do
+  e' <- replace args e
+  return $ i :< NeutBoxIntro e'
+replace args (i :< NeutBoxElim e) = do
+  e' <- replace args e
+  return $ i :< NeutBoxElim e'
 replace _ (i :< NeutIndex l) = return $ i :< NeutIndex l
 replace _ (i :< NeutIndexIntro x) = return $ i :< NeutIndexIntro x
 replace args (i :< NeutIndexElim e branchList) = do
@@ -101,14 +112,7 @@ replace args (i :< NeutIndexElim e branchList) = do
   es' <- mapM (replace args) es
   return $ i :< NeutIndexElim e' (zip indexList es')
 replace _ (i :< NeutUniv j) = return $ i :< NeutUniv j
-replace f2b (i :< NeutCopy x) =
-  case lookup x f2b of
-    Nothing -> return $ i :< NeutCopy x
-    Just b -> do
-      t <- lookupTypeEnv' i
-      insTypeEnv b t
-      return $ i :< NeutCopy b
-replace args (i :< NeutFree x e) = do
-  e' <- replace args e
-  return $ i :< NeutFree x e'
+replace args (i :< NeutMu s c) = do
+  c' <- replace args c
+  return $ i :< NeutMu s c'
 replace _ (i :< NeutHole x) = return $ i :< NeutHole x

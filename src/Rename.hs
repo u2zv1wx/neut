@@ -46,11 +46,15 @@ rename (i :< NeutSigmaElim e1 (x, y) e2) = do
     y' <- newNameWith y
     e2' <- rename e2
     return $ i :< NeutSigmaElim e1' (x', y') e2'
-rename (i :< NeutMu s e) =
-  local $ do
-    s' <- newNameWith s
-    e' <- rename e
-    return $ i :< NeutMu s' e'
+rename (i :< NeutBox t) = do
+  t' <- rename t
+  return $ i :< NeutBox t'
+rename (i :< NeutBoxIntro t) = do
+  t' <- rename t
+  return $ i :< NeutBoxIntro t'
+rename (i :< NeutBoxElim t) = do
+  t' <- rename t
+  return $ i :< NeutBoxElim t'
 rename (i :< NeutIndex s) = return $ i :< NeutIndex s
 rename (i :< NeutIndexIntro x) = return $ i :< NeutIndexIntro x
 rename (i :< NeutIndexElim e branchList) = do
@@ -59,11 +63,9 @@ rename (i :< NeutIndexElim e branchList) = do
   es' <- mapM rename es
   return $ i :< NeutIndexElim e' (zip indexList es')
 rename (i :< NeutUniv j) = return $ i :< NeutUniv j
-rename (i :< NeutCopy x) = do
-  x' <- lookupNameEnv' x
-  return $ i :< NeutCopy x'
-rename (i :< NeutFree x e) = do
-  x' <- lookupNameEnv' x
-  e' <- rename e
-  return $ i :< NeutFree x' e'
+rename (i :< NeutMu s e) =
+  local $ do
+    s' <- newNameWith s
+    e' <- rename e
+    return $ i :< NeutMu s' e'
 rename (i :< NeutHole x) = return $ i :< NeutHole x

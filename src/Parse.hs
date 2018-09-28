@@ -41,6 +41,15 @@ parse (meta :< TreeNode [_ :< TreeAtom "case", t, _ :< TreeNode [_ :< TreeAtom "
   e <- parse t
   body <- parse tbody
   return $ meta :< NeutSigmaElim e (x, y) body
+parse (meta :< TreeNode [_ :< TreeAtom "box", t]) = do
+  e <- parse t
+  return $ meta :< NeutBox e
+parse (meta :< TreeNode [_ :< TreeAtom "data", t]) = do
+  e <- parse t
+  return $ meta :< NeutBoxIntro e
+parse (meta :< TreeNode [_ :< TreeAtom "code", t]) = do
+  e <- parse t
+  return $ meta :< NeutBoxElim e
 parse (meta :< TreeNode [_ :< TreeAtom "case", t, _ :< TreeNode ts]) = do
   e <- parse t
   branchList <- mapM parseClause ts

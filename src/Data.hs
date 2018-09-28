@@ -64,6 +64,9 @@ data NeutF a
   | NeutSigmaElim a
                   (Identifier, Identifier)
                   a
+  | NeutBox a
+  | NeutBoxIntro a
+  | NeutBoxElim a
   | NeutIndex Identifier
   | NeutIndexIntro Index
   | NeutIndexElim a
@@ -71,9 +74,6 @@ data NeutF a
   | NeutUniv UnivLevel
   | NeutMu Identifier
            a
-  | NeutCopy Identifier
-  | NeutFree Identifier -- free x; e
-             a
   | NeutHole Identifier
 
 type Neut = Cofree NeutF Identifier
@@ -254,8 +254,6 @@ type Context = [Identifier]
 -- (Gamma, e1, e2, t)  ==  Gamma |- e1 = e2 : t
 type Constraint = [(Context, Neut, Neut, Neut)]
 
--- initTypeConst :: WithEnv ()
--- initTypeConst = do
 data Env = Env
   { count             :: Int -- to generate fresh symbols
   , notationEnv       :: [(Tree, Tree)] -- macro transformers
@@ -636,6 +634,9 @@ var (_ :< NeutSigmaElim e1 (x, y) e2) = do
   vs1 <- var e1
   vs2 <- var e2
   return $ vs1 ++ filter (\s -> s /= x && s /= y) vs2
+var (_ :< NeutBox e) = var e
+var (_ :< NeutBoxIntro e) = var e
+var (_ :< NeutBoxElim e) = var e
 var (_ :< NeutIndex _) = return []
 var (_ :< NeutIndexIntro _) = return []
 var (_ :< NeutIndexElim e branchList) = do
@@ -647,10 +648,6 @@ var (_ :< NeutUniv _) = return []
 var (_ :< NeutMu s e) = do
   vs <- var e
   return $ filter (/= s) vs
-var (_ :< NeutCopy x) = return [x]
-var (_ :< NeutFree x e) = do
-  vs <- var e
-  return $ x : vs
 var (_ :< NeutHole _) = return []
 
 var' :: Neut -> WithEnv [Identifier]
@@ -680,6 +677,9 @@ var' (_ :< NeutSigmaElim e1 _ e2) = do
   vs1 <- var' e1
   vs2 <- var' e2
   return $ vs1 ++ vs2
+var' (_ :< NeutBox e) = var' e
+var' (_ :< NeutBoxIntro e) = var' e
+var' (_ :< NeutBoxElim e) = var' e
 var' (_ :< NeutIndex _) = return []
 var' (_ :< NeutIndexIntro _) = return []
 var' (_ :< NeutIndexElim e branchList) = do
@@ -689,8 +689,6 @@ var' (_ :< NeutIndexElim e branchList) = do
   return $ vs ++ join vss
 var' (_ :< NeutUniv _) = return []
 var' (_ :< NeutMu _ e) = var' e
-var' (_ :< NeutCopy x) = return [x]
-var' (_ :< NeutFree _ e) = undefined
 var' (_ :< NeutHole _) = return []
 
 (+-+) ::
@@ -728,6 +726,9 @@ varAndHole (_ :< NeutSigmaElim e1 _ e2) = do
   vs1 <- varAndHole e1
   vs2 <- varAndHole e2
   return $ vs1 +-+ vs2
+varAndHole (_ :< NeutBox e) = varAndHole e
+varAndHole (_ :< NeutBoxIntro e) = varAndHole e
+varAndHole (_ :< NeutBoxElim e) = varAndHole e
 varAndHole (_ :< NeutIndex _) = return ([], [])
 varAndHole (_ :< NeutIndexIntro _) = return ([], [])
 varAndHole (_ :< NeutIndexElim e branchList) = do
@@ -773,6 +774,15 @@ subst sub (j :< NeutSigmaElim e1 (x, y) e2) = do
   let e1' = subst sub e1
   let e2' = subst sub e2
   j :< NeutSigmaElim e1' (x, y) e2'
+subst sub (j :< NeutBox e) = do
+  let e' = subst sub e
+  j :< NeutBox e'
+subst sub (j :< NeutBoxIntro e) = do
+  let e' = subst sub e
+  j :< NeutBoxIntro e'
+subst sub (j :< NeutBoxElim e) = do
+  let e' = subst sub e
+  j :< NeutBoxElim e'
 subst _ (j :< NeutIndex x) = j :< NeutIndex x
 subst _ (j :< NeutIndexIntro l) = j :< NeutIndexIntro l
 subst sub (j :< NeutIndexElim e branchList) = do
@@ -822,6 +832,11 @@ reduce (i :< NeutSigmaElim e (x, y) body) = do
       let _ :< body' = subst sub body
       reduce $ i :< body'
     _ -> return $ i :< NeutSigmaElim e' (x, y) body
+reduce (i :< NeutBoxElim e) = do
+  e' <- reduce e
+  case e' of
+    _ :< NeutBoxIntro e'' -> reduce e''
+    _                     -> return $ i :< NeutBoxElim e'
 reduce (i :< NeutIndexElim e branchList) = do
   e' <- reduce e
   case e' of
@@ -1027,15 +1042,6 @@ fromPiIntroSeq (e, []) = e
 fromPiIntroSeq (e, (x, t, meta):rest) =
   fromPiIntroSeq (meta :< NeutPiIntro (x, t) e, rest)
 
--- forallArgs :: Neut -> (Neut, [(Identifier, Neut, Identifier)])
--- forallArgs (meta :< NeutPi (i, vt) t) = do
---   let (body, xs) = forallArgs t
---   (body, (i, vt, meta) : xs)
--- forallArgs body = (body, [])
--- coForallArgs :: (Neut, [(Identifier, Neut, Identifier)]) -> Neut
--- coForallArgs (t, []) = t
--- coForallArgs (t, (i, tdom, meta):ts) =
---   coForallArgs (meta :< NeutPi (i, tdom) t, ts)
 toSigmaIntroSeq :: Neut -> WithEnv [Neut]
 toSigmaIntroSeq (_ :< NeutSigmaIntro e1 e2) = do
   rest <- toSigmaIntroSeq e2
@@ -1054,9 +1060,6 @@ toSigmaSeq (_ :< NeutSigma (x, t) body) = do
   return (body', (x, t) : args)
 toSigmaSeq t = return (t, [])
 
--- maybeToList :: Maybe a -> [a]
--- maybeToList (Just x) = [x]
--- maybeToList Nothing  = []
 showIndex :: Index -> String
 showIndex (IndexInteger i) = show i
 showIndex (IndexLabel s)   = s
