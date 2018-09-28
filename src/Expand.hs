@@ -22,18 +22,18 @@ expand (i :< NeutPiElim e v) = do
   let (identList, argList) = unzip identArgList
   argList' <- mapM expand argList
   expand' (length argList') $ coFunAndArgs (fun, zip identList argList')
-expand (i :< NeutSigma (x, tdom) tcod) = do
-  tdom' <- expand tdom
+expand (i :< NeutSigma xts tcod) = do
+  let (xs, ts) = unzip xts
+  ts' <- mapM expand ts
   tcod' <- expand tcod
-  return $ i :< NeutSigma (x, tdom') tcod'
-expand (i :< NeutSigmaIntro v1 v2) = do
-  v1' <- expand v1
-  v2' <- expand v2
-  return $ i :< NeutSigmaIntro v1' v2'
-expand (i :< NeutSigmaElim e1 (x, y) e2) = do
+  return $ i :< NeutSigma (zip xs ts') tcod'
+expand (i :< NeutSigmaIntro es) = do
+  es' <- mapM expand es
+  return $ i :< NeutSigmaIntro es'
+expand (i :< NeutSigmaElim e1 xs e2) = do
   e1' <- expand e1
   e2' <- expand e2
-  return $ i :< NeutSigmaElim e1' (x, y) e2'
+  return $ i :< NeutSigmaElim e1' xs e2'
 expand (i :< NeutBox e) = do
   e' <- expand e
   return $ i :< NeutBox e'

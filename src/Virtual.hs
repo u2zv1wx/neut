@@ -42,9 +42,9 @@ virtualNeg :: Neg -> WithEnv Code
 virtualNeg (NegPiElimDownElim funName args) = do
   s <- newNameWith "tmp"
   return $ CodeCall s funName args (CodeReturn (DataLocal s))
-virtualNeg (NegSigmaElim z (x, y) e) = do
+virtualNeg (NegSigmaElim z xs e) = do
   e' <- virtualNeg e
-  return $ CodeExtractValue x z 0 (CodeExtractValue y z 1 (CodeFree z e'))
+  return $ extract z (zip xs [0 ..]) e'
 virtualNeg (NegIndexElim x branchList) = do
   let (labelList, es) = unzip branchList
   es' <- mapM virtualNeg es
@@ -56,6 +56,12 @@ virtualNeg (NegUpElim x e1 e2) = do
   e1' <- virtualNeg e1
   e2' <- virtualNeg e2
   traceLet x e1' e2'
+
+extract :: Identifier -> [(Identifier, Int)] -> Code -> Code
+extract z [] cont = CodeFree z cont
+extract z ((x, i):xis) cont = do
+  let cont' = extract z xis cont
+  CodeExtractValue z x i cont'
 
 traceLet :: String -> Code -> Code -> WithEnv Code
 traceLet s (CodeReturn ans) cont = return $ CodeLet s ans cont

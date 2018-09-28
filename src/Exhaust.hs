@@ -31,18 +31,21 @@ exhaust' (_ :< NeutPiElim e1 e2) = do
   b1 <- exhaust' e1
   b2 <- exhaust' e2
   return $ b1 && b2
-exhaust' (_ :< NeutSigma (_, t1) t2) = do
-  b1 <- exhaust' t1
+exhaust' (_ :< NeutSigma xts t2) = do
+  let (_, ts) = unzip xts
+  bs <- mapM exhaust' ts
   b2 <- exhaust' t2
-  return $ b1 && b2
-exhaust' (_ :< NeutSigmaIntro e1 e2) = do
+  return $ and bs && b2
+exhaust' (_ :< NeutSigmaIntro es) = do
+  bs <- mapM exhaust' es
+  return $ and bs
+exhaust' (_ :< NeutSigmaElim e1 _ e2) = do
   b1 <- exhaust' e1
   b2 <- exhaust' e2
   return $ b1 && b2
-exhaust' (_ :< NeutSigmaElim e1 (_, _) e2) = do
-  b1 <- exhaust' e1
-  b2 <- exhaust' e2
-  return $ b1 && b2
+exhaust' (_ :< NeutBox e) = exhaust' e
+exhaust' (_ :< NeutBoxIntro e) = exhaust' e
+exhaust' (_ :< NeutBoxElim e) = exhaust' e
 exhaust' (_ :< NeutMu _ e) = exhaust' e
 exhaust' (_ :< NeutIndex _) = return True
 exhaust' (_ :< NeutIndexIntro _) = return True

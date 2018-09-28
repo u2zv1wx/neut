@@ -44,23 +44,19 @@ polarize e@(_ :< NeutPiElim _ _) = do
       bindSeq
         (zip formalArgs argList ++ [(funName, fun)])
         (NegPiElimDownElim funName formalArgs)
-polarize exists@(_ :< NeutSigma _ _) = do
-  (body, xts) <- toSigmaSeq exists
+polarize (_ :< NeutSigma xts body) = do
   body' <- polarize body >>= toPos
   let (xs, ts) = unzip xts
   ts' <- mapM (polarize >=> toPos) ts
   let xts' = zip xs ts'
   return $ Value $ PosSigma xts' body'
-polarize pair@(_ :< NeutSigmaIntro _ _) = do
-  seq <- toSigmaIntroSeq pair
-  nameList <- mapM (const newName) seq
-  bindSeq (zip nameList seq) (NegUpIntro (PosSigmaIntro nameList))
-polarize (_ :< NeutSigmaElim e1@(meta :< _) (x, y) e2) = do
-  t <- lookupTypeEnv' meta
-  (body, xts) <- toSigmaSeq t
+polarize (_ :< NeutSigmaIntro es) = do
+  nameList <- mapM (const newName) es
+  bindSeq (zip nameList es) (NegUpIntro (PosSigmaIntro nameList))
+polarize (_ :< NeutSigmaElim e1 xs e2) = do
   e2' <- polarize e2 >>= toNeg
   z <- newName
-  bindSeq [(z, e1)] (NegSigmaElim z (x, y) e2')
+  bindSeq [(z, e1)] (NegSigmaElim z xs e2')
 polarize (_ :< NeutBox e) = do
   e' <- polarize e >>= toPos
   return $ Value $ PosDown (PosPi [] (PosUp e'))

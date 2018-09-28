@@ -53,9 +53,9 @@ asmCode (CodeSwitch x branchList) = asmSwitch x branchList
 asmCode (CodeExtractValue x base i cont) = do
   t <- lookupTypeEnv' base
   case t of
-    _ :< NeutSigma _ _ -> do
-      (_, args) <- toSigmaSeq t
-      ts <- mapM (toLowType . snd) args
+    _ :< NeutSigma xts t -> do
+      let args = map snd xts ++ [t]
+      ts <- mapM toLowType args
       let offset = sum $ map sizeOfLowType $ take i ts
       cont' <- asmCode cont
       addMeta $ AsmExtractValue x base offset cont'

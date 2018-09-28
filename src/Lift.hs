@@ -30,18 +30,18 @@ lift (i :< NeutPiElim e v) = do
   e' <- lift e
   v' <- lift v
   return $ i :< NeutPiElim e' v'
-lift (i :< NeutSigma (x, tdom) tcod) = do
-  tdom' <- lift tdom
+lift (i :< NeutSigma xts tcod) = do
+  let (xs, ts) = unzip xts
+  ts' <- mapM lift ts
   tcod' <- lift tcod
-  return $ i :< NeutSigma (x, tdom') tcod'
-lift (i :< NeutSigmaIntro v1 v2) = do
-  v1' <- lift v1
-  v2' <- lift v2
-  return $ i :< NeutSigmaIntro v1' v2'
-lift (i :< NeutSigmaElim e1 (x, y) e2) = do
+  return $ i :< NeutSigma (zip xs ts') tcod'
+lift (i :< NeutSigmaIntro es) = do
+  es' <- mapM lift es
+  return $ i :< NeutSigmaIntro es'
+lift (i :< NeutSigmaElim e1 xs e2) = do
   e1' <- lift e1
   e2' <- lift e2
-  return $ i :< NeutSigmaElim e1' (x, y) e2'
+  return $ i :< NeutSigmaElim e1' xs e2'
 lift (i :< NeutBox e) = do
   e' <- lift e
   return $ i :< NeutBox e'
@@ -83,18 +83,19 @@ replace args (i :< NeutPiElim e v) = do
   e' <- replace args e
   v' <- replace args v
   return $ i :< NeutPiElim e' v'
-replace args (i :< NeutSigma (x, tdom) tcod) = do
-  tdom' <- replace args tdom
+replace args (i :< NeutSigma xts tcod) = do
+  let (xs, ts) = unzip xts
+  ts' <- mapM (replace args) ts
+  -- tdom' <- replace args tdom
   tcod' <- replace args tcod
-  return $ i :< NeutSigma (x, tdom') tcod'
-replace args (i :< NeutSigmaIntro v1 v2) = do
-  v1' <- replace args v1
-  v2' <- replace args v2
-  return $ i :< NeutSigmaIntro v1' v2'
-replace args (i :< NeutSigmaElim e1 (x, y) e2) = do
+  return $ i :< NeutSigma (zip xs ts') tcod'
+replace args (i :< NeutSigmaIntro es) = do
+  es' <- mapM (replace args) es
+  return $ i :< NeutSigmaIntro es'
+replace args (i :< NeutSigmaElim e1 xs e2) = do
   e1' <- replace args e1
   e2' <- replace args e2
-  return $ i :< NeutSigmaElim e1' (x, y) e2'
+  return $ i :< NeutSigmaElim e1' xs e2'
 replace args (i :< NeutBox e) = do
   e' <- replace args e
   return $ i :< NeutBox e'
