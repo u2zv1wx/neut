@@ -56,12 +56,6 @@ virtualNeg (NegUpElim x e1 e2) = do
   e1' <- virtualNeg e1
   e2' <- virtualNeg e2
   traceLet x e1' e2'
-virtualNeg (NegCopy x) = do
-  tmp <- newNameWith "copy"
-  return $ CodeCopy tmp x (CodeReturn (DataLocal tmp))
-virtualNeg (NegFree x e) = do
-  e' <- virtualNeg e
-  return $ CodeFree x e'
 
 traceLet :: String -> Code -> Code -> WithEnv Code
 traceLet s (CodeReturn ans) cont = return $ CodeLet s ans cont
@@ -78,9 +72,3 @@ traceLet x (CodeSwitch y branchList) cont = do
 traceLet s (CodeExtractValue x d i cont1) cont2 = do
   tmp <- traceLet s cont1 cont2
   return $ CodeExtractValue x d i tmp
-traceLet s (CodeCopy y x cont1) cont2 = do
-  tmp <- traceLet s cont1 cont2
-  return $ CodeCopy y x tmp
-traceLet s (CodeFree x cont1) cont2 = do
-  tmp <- traceLet s cont1 cont2
-  return $ CodeFree x tmp

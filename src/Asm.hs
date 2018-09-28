@@ -60,15 +60,6 @@ asmCode (CodeExtractValue x base i cont) = do
       cont' <- asmCode cont
       addMeta $ AsmExtractValue x base offset cont'
     _ -> lift $ throwE "Asm.asmCode : typeError"
-asmCode (CodeCopy tmp x cont) = do
-  t <- lookupTypeEnv' x
-  undefined
-asmCode (CodeFree x cont) = do
-  t <- lookupTypeEnv' x
-  undefined
-
-asmCopy :: Neut -> Identifier -> Code -> WithEnv Asm
-asmCopy = undefined
 
 asmData :: Identifier -> Data -> Asm -> WithEnv Asm
 asmData reg (DataLocal x) cont = addMeta $ AsmLet reg (AsmArgReg x) cont

@@ -78,8 +78,7 @@ polarize (_ :< NeutIndexElim e branchList) = do
   bindSeq [(x, e)] $ NegIndexElim x (zip labelList cs)
 polarize (_ :< NeutMu s e) = do
   e' <- polarize e
-  undefined
-  -- insTermEnv s e'
+  insTermEnv s e'
   return e'
 polarize (_ :< NeutUniv _) = return $ Value PosUniv
 polarize (_ :< NeutHole x) = error $ "Polarize.polarize: remaining hole: " ++ x
