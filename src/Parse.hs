@@ -41,6 +41,12 @@ parse (meta :< TreeNode [_ :< TreeAtom "exists", _ :< TreeNode ts, tn]) = do
   its <- mapM parseArg ts
   n <- parse tn
   return $ meta :< NeutSigma its n
+parse (meta :< TreeNode ((_ :< TreeAtom "tensor"):ts)) = do
+  typeList <- mapM parse ts
+  let argList = take (length typeList - 1) typeList
+  let rightMost = last typeList
+  identList <- mapM (const $ newNameWith "hole") argList
+  return $ meta :< NeutSigma (zip identList argList) rightMost
 parse (meta :< TreeNode ((_ :< TreeAtom "pair"):ts)) = do
   es <- mapM parse ts
   return $ meta :< NeutSigmaIntro es
