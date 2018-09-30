@@ -12,7 +12,6 @@ import qualified Text.Show.Pretty           as Pr
 
 exhaust :: Neut -> WithEnv Neut
 exhaust e = do
-  liftIO $ putStrLn $ "exhaust, for:\n" ++ Pr.ppShow e
   b <- exhaust' e
   if b
     then return e

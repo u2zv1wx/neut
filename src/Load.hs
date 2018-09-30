@@ -60,16 +60,16 @@ load' (a:as) = do
   e <- macroExpand a >>= parse >>= rename
   liftIO $ putStrLn $ Pr.ppShow e
   e' <- check mainLabel e
-  liftIO $ putStrLn $ Pr.ppShow e'
-  lifted <- exhaust e' >>= lift
-  liftIO $ putStrLn $ Pr.ppShow lifted
+  -- liftIO $ putStrLn $ Pr.ppShow e'
+  -- lifted <- exhaust e' >>= lift
+  -- liftIO $ putStrLn $ Pr.ppShow lifted
   tmp <- exhaust e' >>= lift >>= expand >>= polarize >>= toNeg
-  liftIO $ putStrLn $ Pr.ppShow tmp
+  -- liftIO $ putStrLn $ Pr.ppShow tmp
   c' <- exhaust e' >>= lift >>= expand >>= polarize >>= toNeg >>= virtualNeg
   -- liftIO $ putStrLn $ Pr.ppShow c'
   insCodeEnv mainLabel [] c'
   env <- get
-  liftIO $ putStrLn $ Pr.ppShow (codeEnv env)
+  -- liftIO $ putStrLn $ Pr.ppShow (codeEnv env)
   asmCodeEnv
   emitGlobalLabel mainLabel
   emit

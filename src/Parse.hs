@@ -26,6 +26,12 @@ parse (_ :< TreeNode [_ :< TreeAtom "forall", _ :< TreeNode ts, tn]) = do
   its <- mapM parseArg ts
   n <- parse tn
   foldMR NeutPi n its
+parse (_ :< TreeNode ((_ :< TreeAtom "arrow"):ts)) = do
+  typeList <- mapM parse ts
+  let argList = take (length typeList - 1) typeList
+  let cod = last typeList
+  identList <- mapM (const $ newNameWith "hole") argList
+  foldMR NeutPi cod $ zip identList argList
 parse (meta :< TreeNode [_ :< TreeAtom "lambda", _ :< TreeNode ts, te]) = do
   xs <- mapM parseArg ts
   e <- parse te
