@@ -229,6 +229,7 @@ data Env = Env
   , constEnv          :: [(Identifier, Neut)] -- (name, type)
   , constraintEnv     :: Constraint
   , univConstraintEnv :: [(UnivLevel, UnivLevel)]
+  , numConstraintEnv  :: [Identifier]
   , codeEnv           :: [(Identifier, ([Identifier], IORef Code))]
   , asmEnv            :: [(Identifier, Asm)]
   , regEnv            :: [(Identifier, Int)] -- variable to register
@@ -263,6 +264,7 @@ initialEnv =
     , constEnv = []
     , constraintEnv = []
     , univConstraintEnv = []
+    , numConstraintEnv = []
     , codeEnv = []
     , asmEnv = []
     , regEnv = []
@@ -371,6 +373,10 @@ insTypeEnv i t = modify (\e -> e {typeEnv = (i, t) : typeEnv e})
 
 insConstEnv :: Identifier -> Neut -> WithEnv ()
 insConstEnv i t = modify (\e -> e {constEnv = (i, t) : constEnv e})
+
+insNumConstraintEnv :: Identifier -> WithEnv ()
+insNumConstraintEnv x =
+  modify (\e -> e {numConstraintEnv = x : numConstraintEnv e})
 
 insTermEnv :: Identifier -> Term -> WithEnv ()
 insTermEnv i t = modify (\e -> e {termEnv = (i, t) : termEnv e})

@@ -23,24 +23,19 @@ check :: Identifier -> Neut -> WithEnv Neut
 check main e = do
   t <- infer [] e
   insTypeEnv main t -- insert the type of main function
-    -- liftIO $ putStrLn $ "nonLinear = " ++ Pr.ppShow (nonLinear e)
   boxConstraint [] $ nonLinear e
   env <- get
-  liftIO $ putStrLn $ "starting unification"
-  -- liftIO $ putStrLn $ "constraint = " ++ Pr.ppShow (constraintEnv env)
   sub <- unifyLoop (constraintEnv env) 0
-  -- liftIO $ putStrLn $ "sub = " ++ Pr.ppShow sub
   let tenv' = map (\(i, t) -> (i, subst sub t)) $ typeEnv env
   modify (\e -> e {typeEnv = tenv', constraintEnv = []})
+  checkNumConstraint
   return $ subst sub e
 
 infer :: Context -> Neut -> WithEnv Neut
 infer _ (meta :< NeutVar s) = do
-  liftIO $ putStrLn $ "looking up NeutVar: " ++ show s
   t <- lookupTypeEnv' s
   returnMeta meta t
 infer _ (meta :< NeutConst s) = do
-  liftIO $ putStrLn $ "looking up NeutConst: " ++ show s
   t <- lookupConstEnv' s
   returnMeta meta t
 infer ctx (_ :< NeutPi (s, tdom) tcod) = inferBinder ctx s tdom tcod
@@ -132,6 +127,10 @@ infer ctx (meta :< NeutIndexIntro l) = do
       returnMeta meta t
     Nothing -> do
       hole <- appCtx ctx
+      liftIO $
+        putStrLn $
+        "add num constraint for: " ++ Pr.ppShow (meta :< NeutIndexIntro l)
+      insNumConstraintEnv meta
       returnMeta meta hole
 infer _ (_ :< NeutIndexElim _ []) = lift $ throwE "empty branch"
 infer ctx (meta :< NeutIndexElim e branchList) = do
@@ -229,7 +228,6 @@ newNameOfType t = do
 -- apply all the context variables to e
 appCtx :: Context -> WithEnv Neut
 appCtx ctx = do
-  liftIO $ putStrLn $ "looking up appCtx: " ++ Pr.ppShow ctx
   tctxs <- mapM lookupTypeEnv' ctx
   univ <- newName >>= \x -> wrapType (NeutUniv (UnivLevelHole x))
   higherArrowType <- foldMR NeutPi univ $ zip ctx tctxs
@@ -250,7 +248,6 @@ appCtx ctx = do
 
 toVar :: Identifier -> WithEnv Neut
 toVar x = do
-  liftIO $ putStrLn $ "looking up toVar: " ++ Pr.ppShow x
   t <- lookupTypeEnv' x
   meta <- newNameWith "meta"
   insTypeEnv meta t
@@ -460,6 +457,30 @@ boxConstraint ctx xs =
     t <- lookupTypeEnv' x
     h <- appCtx ctx
     boxType@(meta :< _) <- wrapType $ NeutBox h
-    liftIO $ putStrLn $ "looking up meta: " ++ show meta
     u <- lookupTypeEnv' meta
     insConstraintEnv ctx t boxType u
+
+checkNumConstraint :: WithEnv ()
+checkNumConstraint = do
+  env <- get
+  forM_ (numConstraintEnv env) $ \x -> do
+    t <- lookupTypeEnv' x
+    t' <- reduce t
+    case t' of
+      _ :< NeutIndex "i8" -> return ()
+      _ :< NeutIndex "i16" -> return ()
+      _ :< NeutIndex "i32" -> return ()
+      _ :< NeutIndex "i64" -> return ()
+      _ :< NeutIndex "u8" -> return ()
+      _ :< NeutIndex "u16" -> return ()
+      _ :< NeutIndex "u32" -> return ()
+      _ :< NeutIndex "u64" -> return ()
+      _ :< NeutIndex "f8" -> return ()
+      _ :< NeutIndex "f16" -> return ()
+      _ :< NeutIndex "f32" -> return ()
+      _ :< NeutIndex "f64" -> return ()
+      t ->
+        lift $
+        throwE $
+        "the type of " ++
+        x ++ " is supposed to be a number, but is " ++ Pr.ppShow t

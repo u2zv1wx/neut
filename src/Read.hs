@@ -51,4 +51,4 @@ newNameParser = do
   env <- get
   let i = count env
   modify (\e -> e {count = i + 1})
-  return $ show i
+  return $ "meta." ++ show i
