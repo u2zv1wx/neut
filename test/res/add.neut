@@ -13,5 +13,10 @@
 
 (index top unit)
 
+(index i32)
+
+(primitive core.add
+  (forall ((x i32) (y i32)) i32))
+
 (begin
   (lambda (x) (core.add 1 1)))

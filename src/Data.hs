@@ -205,42 +205,13 @@ type Asm = Cofree AsmF AsmMeta
 instance (Show a) => Show (IORef a) where
   show a = show (unsafePerformIO (readIORef a))
 
-intType :: WithEnv Neut
-intType = wrapType $ NeutIndex "int"
-
-arrowType :: Neut -> Neut -> WithEnv Neut
-arrowType t1 t2 = do
-  x <- newName
-  insTypeEnv x t1
-  wrapType $ NeutPi (x, t1) t2
-
-constCoreAdd :: WithEnv (Identifier, Neut)
-constCoreAdd = do
-  i <- intType
-  i2i <- arrowType i i
-  i2i2i <- arrowType i i2i
-  return ("core.add", i2i2i)
-
-constList :: WithEnv [(Identifier, Neut)]
-constList = do
-  coreAdd <- constCoreAdd
-  return [coreAdd]
-
-initConstList :: WithEnv ()
-initConstList = do
-  xs <- constList
-  forM_ xs $ \(name, t) -> do
-    insNameEnv name name
-    insTypeEnv name t
-  modify (\e -> e {constEnv = map fst xs})
-
 initialIndexEnv :: [(Identifier, [Identifier])]
 initialIndexEnv = [("int", [])]
 
 isExternalConst :: Identifier -> WithEnv Bool
 isExternalConst name = do
   env <- get
-  return $ name `elem` constEnv env
+  return $ name `elem` map fst (constEnv env)
 
 type Context = [Identifier]
 
@@ -255,7 +226,7 @@ data Env = Env
   , nameEnv           :: [(Identifier, Identifier)] -- used in alpha conversion
   , typeEnv           :: [(Identifier, Neut)] -- type environment
   , termEnv           :: [(Identifier, Term)]
-  , constEnv          :: [Identifier]
+  , constEnv          :: [(Identifier, Neut)] -- (name, type)
   , constraintEnv     :: Constraint
   , univConstraintEnv :: [(UnivLevel, UnivLevel)]
   , codeEnv           :: [(Identifier, ([Identifier], IORef Code))]
@@ -336,12 +307,23 @@ lookupTypeEnv' s = do
   mt <- gets (lookup s . typeEnv)
   env <- get
   case mt of
+    Nothing -> lift $ throwE $ s ++ " is not found in the type environment."
+    Just t  -> return t
+
+lookupConstEnv :: String -> WithEnv (Maybe Neut)
+lookupConstEnv s = gets (lookup s . constEnv)
+
+lookupConstEnv' :: String -> WithEnv Neut
+lookupConstEnv' s = do
+  mt <- gets (lookup s . constEnv)
+  env <- get
+  case mt of
     Nothing ->
       lift $
       throwE $
       s ++
-      " is not found in the type environment. typeenv: " ++
-      Pr.ppShow (typeEnv env)
+      " is not found in the const environment. constenv: " ++
+      Pr.ppShow (constEnv env)
     Just t -> return t
 
 lookupTermEnv :: String -> WithEnv (Maybe Term)
@@ -387,6 +369,9 @@ lookupCodeEnv funName = do
 insTypeEnv :: Identifier -> Neut -> WithEnv ()
 insTypeEnv i t = modify (\e -> e {typeEnv = (i, t) : typeEnv e})
 
+insConstEnv :: Identifier -> Neut -> WithEnv ()
+insConstEnv i t = modify (\e -> e {constEnv = (i, t) : constEnv e})
+
 insTermEnv :: Identifier -> Term -> WithEnv ()
 insTermEnv i t = modify (\e -> e {termEnv = (i, t) : termEnv e})
 
@@ -404,7 +389,7 @@ insIndexEnv name indexList =
 
 lookupKind :: Index -> WithEnv (Maybe Identifier)
 lookupKind IndexDefault = return Nothing
-lookupKind (IndexInteger _) = return $ Just "int"
+lookupKind (IndexInteger _) = return $ Nothing
 lookupKind (IndexLabel name) = do
   env <- get
   tmp <- lookupKind' name $ indexEnv env
