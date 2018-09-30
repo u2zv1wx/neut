@@ -23,22 +23,25 @@ check :: Identifier -> Neut -> WithEnv Neut
 check main e = do
   t <- infer [] e
   insTypeEnv main t -- insert the type of main function
-  liftIO $ putStrLn $ "nonLinear = " ++ Pr.ppShow (nonLinear e)
+    -- liftIO $ putStrLn $ "nonLinear = " ++ Pr.ppShow (nonLinear e)
   boxConstraint [] $ nonLinear e
   env <- get
-  liftIO $ putStrLn $ "constraint = " ++ Pr.ppShow (constraintEnv env)
+  liftIO $ putStrLn $ "starting unification"
+  -- liftIO $ putStrLn $ "constraint = " ++ Pr.ppShow (constraintEnv env)
   sub <- unifyLoop (constraintEnv env) 0
-  liftIO $ putStrLn $ "sub = " ++ Pr.ppShow sub
+  -- liftIO $ putStrLn $ "sub = " ++ Pr.ppShow sub
   let tenv' = map (\(i, t) -> (i, subst sub t)) $ typeEnv env
   modify (\e -> e {typeEnv = tenv', constraintEnv = []})
   return $ subst sub e
 
 infer :: Context -> Neut -> WithEnv Neut
 infer _ (meta :< NeutVar s) = do
+  liftIO $ putStrLn $ "looking up NeutVar: " ++ show s
   t <- lookupTypeEnv' s
   returnMeta meta t
 infer _ (meta :< NeutConst s) = do
-  t <- lookupTypeEnv' s
+  liftIO $ putStrLn $ "looking up NeutConst: " ++ show s
+  t <- lookupConstEnv' s
   returnMeta meta t
 infer ctx (_ :< NeutPi (s, tdom) tcod) = inferBinder ctx s tdom tcod
 infer ctx (meta :< NeutPiIntro (s, tdom) e) = do
@@ -121,13 +124,15 @@ infer ctx (meta :< NeutBoxElim e) = do
   insConstraintEnv ctx t boxType u
   returnMeta meta resultHole
 infer _ (_ :< NeutIndex _) = boxUniv
-infer _ (meta :< NeutIndexIntro l) = do
+infer ctx (meta :< NeutIndexIntro l) = do
   mk <- lookupKind l
   case mk of
     Just k -> do
       t <- wrapType $ NeutIndex k
       returnMeta meta t
-    Nothing -> undefined -- shouldn't occur
+    Nothing -> do
+      hole <- appCtx ctx
+      returnMeta meta hole
 infer _ (_ :< NeutIndexElim _ []) = lift $ throwE "empty branch"
 infer ctx (meta :< NeutIndexElim e branchList) = do
   t <- infer ctx e
@@ -224,6 +229,7 @@ newNameOfType t = do
 -- apply all the context variables to e
 appCtx :: Context -> WithEnv Neut
 appCtx ctx = do
+  liftIO $ putStrLn $ "looking up appCtx: " ++ Pr.ppShow ctx
   tctxs <- mapM lookupTypeEnv' ctx
   univ <- newName >>= \x -> wrapType (NeutUniv (UnivLevelHole x))
   higherArrowType <- foldMR NeutPi univ $ zip ctx tctxs
@@ -244,6 +250,7 @@ appCtx ctx = do
 
 toVar :: Identifier -> WithEnv Neut
 toVar x = do
+  liftIO $ putStrLn $ "looking up toVar: " ++ Pr.ppShow x
   t <- lookupTypeEnv' x
   meta <- newNameWith "meta"
   insTypeEnv meta t
@@ -260,7 +267,7 @@ unifyLoop ((ctx, e1, e2, t):cs) loopCount = do
   e1' <- reduce e1
   e2' <- reduce e2
   (s, tmpConstraint) <- unify ((ctx, e1', e2', t) : cs)
-  liftIO $ putStrLn $ "subst:\n " ++ Pr.ppShow s
+  -- liftIO $ putStrLn $ "subst:\n " ++ Pr.ppShow s
   case tmpConstraint of
     [] -> return s
     (ctx', e1'', e2'', t'):cs' -> do
@@ -308,19 +315,21 @@ unify ((_, _ :< NeutVar s1, _ :< NeutVar s2, _):cs)
   | s1 == s2 = unify cs
 unify ((ctx, _ :< NeutPi (x, tdom1) tcod1, _ :< NeutPi (y, tdom2) tcod2, univ):cs) =
   unifyBinder ctx ((x, tdom1), tcod1) ((y, tdom2), tcod2) univ cs
-unify ((ctx, _ :< NeutPiIntro (x, tdom1@(meta1 :< _)) body1, _ :< NeutPiIntro (y, tdom2) body2, _ :< NeutPi (z, tdom) tcod):cs) = do
+unify ((ctx, _ :< NeutPiIntro (x, tdom1@(meta1 :< _)) body1, _ :< NeutPiIntro (y, tdom2@(meta2 :< _)) body2, _ :< NeutPi (z, tdom) tcod):cs) = do
   meta <- newName
   insTypeEnv meta tdom
   let var = meta :< NeutVar z
-  u <- lookupTypeEnv' meta1
+  u <- boxUniv
+  insTypeEnv meta1 u
+  insTypeEnv meta2 u
   unify $
     (ctx, tdom1, tdom2, u) :
     (ctx ++ [z], subst [(x, var)] body1, subst [(y, var)] body2, tcod) : cs
-unify ((ctx, _ :< NeutPiIntro (x, tdom1) body1, e2, _):cs) = do
-  c <- constraintPiElim ctx ((x, tdom1), body1) e2
+unify ((ctx, _ :< NeutPiIntro (x, tdom1) body1, e2, _ :< NeutPi (z, _) tcod):cs) = do
+  c <- constraintPiElim ctx ((x, tdom1), body1) e2 z tcod
   unify $ c : cs
-unify ((ctx, e1, _ :< NeutPiIntro (y, tdom2) body2, _):cs) = do
-  c <- constraintPiElim ctx ((y, tdom2), body2) e1
+unify ((ctx, e1, _ :< NeutPiIntro (y, tdom2) body2, _ :< NeutPi (z, _) tcod):cs) = do
+  c <- constraintPiElim ctx ((y, tdom2), body2) e1 z tcod
   unify $ c : cs
 unify ((ctx, _ :< NeutSigma [(x, tdom1)] tcod1, _ :< NeutSigma [(y, tdom2)] tcod2, univ):cs) =
   unifyBinder ctx ((x, tdom1), tcod1) ((y, tdom2), tcod2) univ cs
@@ -396,9 +405,14 @@ projectionList e (xts, t) = do
     meta <- newName
     return $ meta :< NeutSigmaElim e xiList v
 
-unifyBinder ctx ((x, tdom1), tcod1) ((y, tdom2), tcod2) univ cs = do
+unifyBinder ctx ((x, tdom1@(tdomMeta1 :< _)), tcod1@(tcodMeta1 :< _)) ((y, tdom2@(tdomMeta2 :< _)), tcod2@(tcodMeta2 :< _)) univ cs = do
   z <- newName
   insTypeEnv z tdom1
+  u <- boxUniv
+  insTypeEnv tdomMeta1 u
+  insTypeEnv tcodMeta1 u
+  insTypeEnv tdomMeta2 u
+  insTypeEnv tcodMeta2 u
   meta <- newName
   insTypeEnv meta tdom1
   let var = meta :< NeutVar z
@@ -406,17 +420,18 @@ unifyBinder ctx ((x, tdom1), tcod1) ((y, tdom2), tcod2) univ cs = do
     (ctx, tdom1, tdom2, univ) :
     (ctx ++ [z], subst [(x, var)] tcod1, subst [(y, var)] tcod2, univ) : cs
 
-constraintPiElim ctx ((x, tdom), body@(meta :< _)) e2 = do
-  tbody <- lookupTypeEnv' meta
+constraintPiElim ctx ((x, tdom), body) e2 z tcod = do
   meta <- newName
-  insTypeEnv meta tbody
+  varX <- toVar x
+  let tcod' = subst [(z, varX)] tcod
+  insTypeEnv meta tcod'
   varMeta <- newName
   insTypeEnv varMeta tdom
   let var = varMeta :< NeutVar x
   appMeta <- newName
-  insTypeEnv appMeta tbody
+  insTypeEnv appMeta tcod'
   let app = appMeta :< NeutPiElim e2 var
-  return (ctx ++ [x], body, app, undefined)
+  return (ctx ++ [x], body, app, tcod')
 
 sConstraint :: Subst -> Constraint -> WithEnv Constraint
 sConstraint s ctcs = do
@@ -445,5 +460,6 @@ boxConstraint ctx xs =
     t <- lookupTypeEnv' x
     h <- appCtx ctx
     boxType@(meta :< _) <- wrapType $ NeutBox h
+    liftIO $ putStrLn $ "looking up meta: " ++ show meta
     u <- lookupTypeEnv' meta
     insConstraintEnv ctx t boxType u

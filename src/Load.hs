@@ -31,7 +31,6 @@ import qualified Text.Show.Pretty           as Pr
 load :: String -> WithEnv ()
 load s = do
   astList <- strToTree s
-  initConstList
   load' astList
 
 load' :: [Tree] -> WithEnv ()
@@ -46,8 +45,20 @@ load' ((_ :< TreeNode ((_ :< TreeAtom "index"):(_ :< TreeAtom name):ts)):as) = d
   indexList <- mapM parseAtom ts
   insIndexEnv name indexList
   load' as
+load' ((_ :< TreeNode [_ :< TreeAtom "primitive", _ :< TreeAtom name, t]):as) = do
+  e <- macroExpand t >>= parse >>= rename
+  e' <- check name e
+  t <- lookupTypeEnv' name
+  case t of
+    _ :< NeutBox (_ :< NeutUniv _) -> do
+      insConstEnv name e'
+      env <- get
+      liftIO $ putStrLn $ Pr.ppShow (constEnv env)
+      load' as
+    _ -> error $ "the type of " ++ name ++ " is not univ"
 load' (a:as) = do
   e <- macroExpand a >>= parse >>= rename
+  liftIO $ putStrLn $ Pr.ppShow e
   e' <- check mainLabel e
   liftIO $ putStrLn $ Pr.ppShow e'
   lifted <- exhaust e' >>= lift
