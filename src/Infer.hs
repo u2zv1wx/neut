@@ -24,10 +24,11 @@ check main e = do
   t <- infer [] e
   insTypeEnv main t -- insert the type of main function
   boxConstraint [] $ nonLinear e
+  liftIO $ putStrLn $ "unification start"
   env <- get
   sub <- unifyLoop (constraintEnv env) 0
   let tenv' = map (\(i, t) -> (i, subst sub t)) $ typeEnv env
-  modify (\e -> e {typeEnv = tenv', constraintEnv = []})
+  modify (\e -> e {typeEnv = tenv'})
   checkNumConstraint
   return $ subst sub e
 
@@ -38,32 +39,42 @@ infer _ (meta :< NeutVar s) = do
 infer _ (meta :< NeutConst s) = do
   t <- lookupConstEnv' s
   returnMeta meta t
-infer ctx (_ :< NeutPi (s, tdom) tcod) = inferBinder ctx s tdom tcod
+infer ctx (meta :< NeutPi (s, tdom) tcod) =
+  inferBinder ctx s tdom tcod >>= returnMeta meta
 infer ctx (meta :< NeutPiIntro (s, tdom) e) = do
-  let ctx' = ctx ++ [s]
   insTypeEnv s tdom
-  udom <- infer ctx' tdom
-  (tcod, ucod) <- infer2 ctx' e
-  u <- infer ctx' udom
-  insConstraintEnv ctx udom ucod u
-  wrapTypeWithUniv udom (NeutPi (s, tdom) tcod) >>= returnMeta meta
+  higherUniv <- boxUniv
+  udom <- infer ctx tdom >>= annot higherUniv
+  let ctx' = ctx ++ [s]
+  tcod <- infer ctx' e
+  ucod <- infer ctx' tcod >>= annot higherUniv
+  insConstraintEnv ctx' udom ucod higherUniv
+  typeMeta <- newNameWith "meta"
+  insTypeEnv typeMeta udom
+  returnMeta meta $ typeMeta :< NeutPi (s, tdom) tcod
 infer ctx (meta :< NeutPiElim e1 e2) = do
   tPi <- infer ctx e1 -- forall (x : tdom). tcod
-  (tdom, udom@(udomMeta :< _)) <- infer2 ctx e2
+  -- declare the universe of tdom, tcod
+  higherUniv <- boxUniv
+  -- infer the type of e2, and obtain (tdom, udom)
+  tdom <- infer ctx e2
+  udom <- infer ctx tdom >>= annot higherUniv
+  -- represent (tcod, ucod) using hole
   x <- newNameOfType tdom
-  typeMeta2 <- newNameWith "meta"
-  insTypeEnv typeMeta2 udom
-  tcod@(codMeta :< _) <- appCtx (ctx ++ [x])
-  ucod@(ucodMeta :< _) <- boxUniv
-  insTypeEnv codMeta ucod
-  u <- boxUniv
-  insTypeEnv udomMeta u
-  insTypeEnv ucodMeta u
-  insConstraintEnv ctx udom ucod u
-  insConstraintEnv ctx tPi (typeMeta2 :< NeutPi (x, tdom) tcod) udom
+  ucod <- boxUniv >>= annot higherUniv
+  tcod <- appCtx (ctx ++ [x]) >>= annot ucod
+  -- add a constraint regarding the level of universes
+  insConstraintEnv ctx udom ucod higherUniv
+  -- add a constraint regarding the Pi-type
+  typeMeta <- newNameWith "meta"
+  insTypeEnv typeMeta udom
+  insConstraintEnv ctx tPi (typeMeta :< NeutPi (x, tdom) tcod) udom
+  -- return the type of this elimination
   returnMeta meta $ subst [(x, e2)] tcod
 infer _ (_ :< NeutSigma [] _) =
   lift $ throwE "Infer.Sigma: Sigma without arguments"
+infer ctx (meta :< NeutSigma [(s, tdom)] tcod) =
+  inferBinder ctx s tdom tcod >>= returnMeta meta
 infer ctx (_ :< NeutSigma ((s, tdom):xts) tcod) = do
   udom <- infer ctx tdom
   insTypeEnv s tdom
@@ -100,12 +111,12 @@ infer ctx (meta :< NeutSigmaElim e1 xs e2) = do
   typeC <- appCtx (ctx ++ xs ++ [z])
   insConstraintEnv ctx t2 (subst [(z, pair)] typeC) u2
   returnMeta meta $ subst [(z, e1)] typeC
-infer ctx (_ :< NeutBox t) = do
-  u <- infer ctx t
-  bu <- boxUniv
-  bu' <- boxUniv
-  insConstraintEnv ctx u bu bu'
-  return u
+infer ctx (meta :< NeutBox t) = do
+  higherUniv <- boxUniv
+  u <- infer ctx t >>= annot higherUniv
+  bu <- boxUniv >>= annot higherUniv
+  insConstraintEnv ctx u bu higherUniv
+  returnMeta meta u
 infer ctx (meta :< NeutBoxIntro e) = do
   t <- infer ctx e
   boxConstraint ctx $ var e
@@ -118,7 +129,7 @@ infer ctx (meta :< NeutBoxElim e) = do
   u <- infer ctx t
   insConstraintEnv ctx t boxType u
   returnMeta meta resultHole
-infer _ (_ :< NeutIndex _) = boxUniv
+infer _ (meta :< NeutIndex _) = boxUniv >>= returnMeta meta
 infer ctx (meta :< NeutIndexIntro l) = do
   mk <- lookupKind l
   case mk of
@@ -150,10 +161,8 @@ infer ctx (meta :< NeutMu s e) = do
   u <- infer (ctx ++ [s]) te
   insConstraintEnv ctx te trec u
   returnMeta meta te
-infer _ (_ :< NeutUniv _) = boxUniv
-infer ctx (meta :< NeutHole _) = do
-  hole <- appCtx ctx
-  returnMeta meta hole
+infer _ (meta :< NeutUniv _) = boxUniv >>= returnMeta meta
+infer ctx (meta :< NeutHole _) = appCtx ctx >>= returnMeta meta
 
 infer2 :: Context -> Neut -> WithEnv (Neut, Neut)
 infer2 ctx e = do
@@ -167,13 +176,6 @@ sigmaHole ctx xs = forM (zip xs [0 ..]) $ \(_, i) -> sigmaHole' ctx xs i
 sigmaHole' :: Context -> [Identifier] -> Int -> WithEnv Neut
 sigmaHole' ctx xs i = appCtx (ctx ++ take i xs)
 
-boxUniv :: WithEnv Neut
-boxUniv = do
-  univMeta <- newNameWith "meta"
-  boxMeta <- newNameWith "meta"
-  l <- newName
-  return $ boxMeta :< NeutBox (univMeta :< NeutUniv (UnivLevelHole l))
-
 inferIndex :: Index -> WithEnv (Maybe Neut)
 inferIndex name = do
   mk <- lookupKind name
@@ -186,7 +188,6 @@ constrainList _ [] = return ()
 constrainList _ [_] = return ()
 constrainList ctx (t1@(meta1 :< _):t2@(meta2 :< _):ts) = do
   u <- boxUniv
-  -- u <- lookupTypeEnv' meta
   insTypeEnv meta1 u
   insTypeEnv meta2 u
   insConstraintEnv ctx t1 t2 u
@@ -196,19 +197,23 @@ headConstraint :: Context -> Neut -> [Neut] -> WithEnv ()
 headConstraint _ _ [] = return ()
 headConstraint ctx t1@(meta1 :< _) (t2@(meta2 :< _):_) = do
   u <- boxUniv
-  -- u <- lookupTypeEnv' meta
   insTypeEnv meta1 u
   insTypeEnv meta2 u
   insConstraintEnv ctx t1 t2 u
 
 inferBinder :: Context -> Identifier -> Neut -> Neut -> WithEnv Neut
 inferBinder ctx s tdom tcod = do
-  udom <- infer ctx tdom
   insTypeEnv s tdom
-  ucod <- infer (ctx ++ [s]) tcod
-  u <- boxUniv
-  insConstraintEnv ctx udom ucod u
+  higherUniv <- boxUniv
+  udom <- infer ctx tdom >>= annot higherUniv
+  ucod <- infer (ctx ++ [s]) tcod >>= annot higherUniv
+  ub <- boxUniv >>= annot higherUniv
+  insConstraintEnv (ctx ++ [s]) udom ub higherUniv
+  insConstraintEnv (ctx ++ [s]) udom ucod higherUniv
   return udom
+
+annot :: Neut -> Neut -> WithEnv Neut
+annot t e@(meta :< _) = insTypeEnv meta t >> return e
 
 constructPair :: Context -> [Identifier] -> WithEnv Neut
 constructPair ctx xs = do
@@ -225,26 +230,28 @@ newNameOfType t = do
   insTypeEnv i t
   return i
 
+newName' :: Identifier -> Neut -> WithEnv Identifier
+newName' name t = do
+  i <- newNameWith name
+  insTypeEnv i t
+  return i
+
 -- apply all the context variables to e
 appCtx :: Context -> WithEnv Neut
 appCtx ctx = do
   tctxs <- mapM lookupTypeEnv' ctx
-  univ <- newName >>= \x -> wrapType (NeutUniv (UnivLevelHole x))
+  univ <- boxUniv
   higherArrowType <- foldMR NeutPi univ $ zip ctx tctxs
-  higherHoleName <- newNameWith "ctx"
-  higherMeta <- newNameWith "meta"
-  insTypeEnv higherHoleName higherArrowType
+  higherHoleName <- newName' "ctx" higherArrowType
+  higherMeta <- newName' "ctx" higherArrowType
   insTypeEnv higherMeta higherArrowType
   let higherHole = higherMeta :< NeutHole higherHoleName
   varSeq <- mapM toVar ctx
   cod <- appFold higherHole varSeq
   arrowType <- foldMR NeutPi cod $ zip ctx tctxs
-  holeName <- newNameWith "hole"
-  meta <- newNameWith "meta"
-  insTypeEnv holeName arrowType
-  insTypeEnv meta arrowType
-  let hole = meta :< NeutHole holeName
-  appFold hole varSeq
+  holeName <- newName' "hole" arrowType
+  meta <- newName' "meta" arrowType
+  appFold (meta :< NeutHole holeName) varSeq
 
 toVar :: Identifier -> WithEnv Neut
 toVar x = do
@@ -264,7 +271,7 @@ unifyLoop ((ctx, e1, e2, t):cs) loopCount = do
   e1' <- reduce e1
   e2' <- reduce e2
   (s, tmpConstraint) <- unify ((ctx, e1', e2', t) : cs)
-  -- liftIO $ putStrLn $ "subst:\n " ++ Pr.ppShow s
+  -- liftIO $ putStrLn $ "subst:\n" ++ Pr.ppShow s
   case tmpConstraint of
     [] -> return s
     (ctx', e1'', e2'', t'):cs' -> do
@@ -272,6 +279,7 @@ unifyLoop ((ctx, e1, e2, t):cs) loopCount = do
       if didFinishLoop (length cs') loopCount'
         then do
           liftIO $ putStrLn $ "failing unification. subst:\n" ++ Pr.ppShow s
+          liftIO $ putStrLn $ "ctx:\n" ++ Pr.ppShow ctx'
           unificationFailed e1'' e2'' cs'
         else do
           s' <- unifyLoop (cs' ++ [(ctx', e1'', e2'', t')]) loopCount'
@@ -279,6 +287,7 @@ unifyLoop ((ctx, e1, e2, t):cs) loopCount = do
 
 unificationFailed :: Neut -> Neut -> Constraint -> WithEnv Subst
 unificationFailed e1 e2 cs = do
+  liftIO $ putStrLn $ "constraints:\n" ++ Pr.ppShow cs
   lift $
     throwE $
     "unification failed for\n" ++ Pr.ppShow e1 ++ "\nand\n" ++ Pr.ppShow e2
@@ -296,18 +305,6 @@ didFinishLoop j loopCount' = loopCount' >= j + 2
 
 unify :: Constraint -> WithEnv (Subst, Constraint)
 unify [] = return ([], [])
-unify ((_, _ :< NeutHole s, t2, _):cs) = do
-  liftIO $ putStrLn $ "found a substition:\n" ++ Pr.ppShow (s, t2)
-  cs' <- sConstraint [(s, t2)] cs
-  (sub, cs'') <- unify cs'
-  let sub' = compose sub [(s, t2)]
-  return (sub', cs'')
-unify ((_, t1, _ :< NeutHole s, _):cs) = do
-  liftIO $ putStrLn $ "found a substition:\n" ++ Pr.ppShow (s, t1)
-  cs' <- sConstraint [(s, t1)] cs
-  (sub, cs'') <- unify cs'
-  let sub' = compose sub [(s, t1)]
-  return (sub', cs'')
 unify ((_, _ :< NeutVar s1, _ :< NeutVar s2, _):cs)
   | s1 == s2 = unify cs
 unify ((ctx, _ :< NeutPi (x, tdom1) tcod1, _ :< NeutPi (y, tdom2) tcod2, univ):cs) =
@@ -319,6 +316,11 @@ unify ((ctx, _ :< NeutPiIntro (x, tdom1@(meta1 :< _)) body1, _ :< NeutPiIntro (y
   u <- boxUniv
   insTypeEnv meta1 u
   insTypeEnv meta2 u
+  let foo =
+        [ (ctx, tdom1, tdom2, u)
+        , (ctx ++ [z], subst [(x, var)] body1, subst [(y, var)] body2, tcod)
+        ]
+  liftIO $ putStrLn $ "new constraints:\n" ++ Pr.ppShow foo
   unify $
     (ctx, tdom1, tdom2, u) :
     (ctx ++ [z], subst [(x, var)] body1, subst [(y, var)] body2, tcod) : cs
@@ -355,17 +357,22 @@ unify ((_, _ :< NeutIndex l1, _ :< NeutIndex l2, _):cs)
 unify ((_, _ :< NeutUniv i, _ :< NeutUniv j, _):cs) = do
   insUnivConstraintEnv i j
   unify cs
-unify ((_, e1, e2, _):cs)
+unify (c@(_, e1, e2, _):cs)
   | Just (x, args) <- headMeta [] e1 = do
+    liftIO $ putStrLn $ "trying:\n" ++ Pr.ppShow c
     let (fvs, fmvs) = varAndHole e2
     if affineCheck args fvs && x `notElem` fmvs
       then do
+        liftIO $ putStrLn $ "resolving:\n" ++ Pr.ppShow c
         ans <- bindFormalArgs args e2
+        -- liftIO $ putStrLn $ "sub:\n" ++ Pr.ppShow (x, ans)
         cs' <- sConstraint [(x, ans)] cs
         (sub, cs'') <- unify cs'
         let sub' = compose sub [(x, ans)]
         return (sub', cs'')
-      else return ([], cs)
+      else do
+        liftIO $ putStrLn "affineCheck failed"
+        return ([], c : cs)
 unify ((ctx, e1, e2, t):cs)
   | Just _ <- headMeta [] e2 = unify $ (ctx, e2, e1, t) : cs
 unify cs = return ([], cs)
@@ -391,7 +398,7 @@ affineCheck' _ [] _ = True
 affineCheck' xs (y:ys) fvs =
   if y `notElem` fvs
     then affineCheck' xs ys fvs
-    else length (isLinear y xs) == 0 && affineCheck' xs ys fvs
+    else null (isLinear y xs) && affineCheck' xs ys fvs
 
 projectionList :: Neut -> ([(Identifier, Neut)], Neut) -> WithEnv [Neut]
 projectionList e (xts, t) = do
@@ -413,11 +420,19 @@ unifyBinder ctx ((x, tdom1@(tdomMeta1 :< _)), tcod1@(tcodMeta1 :< _)) ((y, tdom2
   meta <- newName
   insTypeEnv meta tdom1
   let var = meta :< NeutVar z
+  liftIO $
+    putStrLn $
+    "UnifyBinder. x == " ++ show x ++ ", y == " ++ show y ++ ", z == " ++ show z
+  -- ctx' <- sConstraint [(x, var), (y, var)] ctx
+  let ctx' = map (\w -> fromMaybe w (lookup w [(x, z), (y, z)])) ctx
+  let univ' = subst [(x, var), (y, var)] univ
+  cs' <- sConstraint [(x, var), (y, var)] cs
   unify $
-    (ctx, tdom1, tdom2, univ) :
-    (ctx ++ [z], subst [(x, var)] tcod1, subst [(y, var)] tcod2, univ) : cs
+    (ctx', tdom1, tdom2, univ') :
+    (ctx' ++ [z], subst [(x, var)] tcod1, subst [(y, var)] tcod2, univ') : cs'
 
 constraintPiElim ctx ((x, tdom), body) e2 z tcod = do
+  liftIO $ putStrLn $ "piElim. x = " ++ x
   meta <- newName
   varX <- toVar x
   let tcod' = subst [(z, varX)] tcod
@@ -428,6 +443,8 @@ constraintPiElim ctx ((x, tdom), body) e2 z tcod = do
   appMeta <- newName
   insTypeEnv appMeta tcod'
   let app = appMeta :< NeutPiElim e2 var
+  let foo = (ctx ++ [x], body, app, tcod')
+  liftIO $ putStrLn $ "new constraints:\n" ++ Pr.ppShow foo
   return (ctx ++ [x], body, app, tcod')
 
 sConstraint :: Subst -> Constraint -> WithEnv Constraint
