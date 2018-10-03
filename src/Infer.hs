@@ -22,10 +22,17 @@ import           Data.Maybe
 check :: Identifier -> Neut -> WithEnv Neut
 check main e = do
   t <- infer [] e
-  insTypeEnv main t -- insert the type of main function
-  boxConstraint [] $ nonLinear e
-  liftIO $ putStrLn $ "unification start"
   env <- get
+  liftIO $
+    putStrLn $
+    "unification start. constraint:\n" ++ Pr.ppShow (constraintEnv env)
+  insTypeEnv main t -- insert the type of main function
+  -- boxConstraint [] $ nonLinear e
+  liftIO $ putStrLn $ "nonLinear: " ++ Pr.ppShow (nonLinear e)
+  env <- get
+  -- liftIO $
+  --   putStrLn $
+  --   "unification start. constraint:\n" ++ Pr.ppShow (constraintEnv env)
   sub <- unifyLoop (constraintEnv env) 0
   let tenv' = map (\(i, t) -> (i, subst sub t)) $ typeEnv env
   modify (\e -> e {typeEnv = tenv'})
@@ -53,24 +60,30 @@ infer ctx (meta :< NeutPiIntro (s, tdom) e) = do
   insTypeEnv typeMeta udom
   returnMeta meta $ typeMeta :< NeutPi (s, tdom) tcod
 infer ctx (meta :< NeutPiElim e1 e2) = do
-  tPi <- infer ctx e1 -- forall (x : tdom). tcod
-  -- declare the universe of tdom, tcod
   higherUniv <- boxUniv
+  -- obtain the type of e1
+  tPi <- infer ctx e1 -- forall (x : tdom). tcod
+  tPi' <- reduce tPi
   -- infer the type of e2, and obtain (tdom, udom)
   tdom <- infer ctx e2
   udom <- infer ctx tdom >>= annot higherUniv
-  -- represent (tcod, ucod) using hole
-  x <- newNameOfType tdom
-  ucod <- boxUniv >>= annot higherUniv
-  tcod <- appCtx (ctx ++ [x]) >>= annot ucod
-  -- add a constraint regarding the level of universes
-  insConstraintEnv ctx udom ucod higherUniv
-  -- add a constraint regarding the Pi-type
-  typeMeta <- newNameWith "meta"
-  insTypeEnv typeMeta udom
-  insConstraintEnv ctx tPi (typeMeta :< NeutPi (x, tdom) tcod) udom
-  -- return the type of this elimination
-  returnMeta meta $ subst [(x, e2)] tcod
+  case tPi' of
+    _ :< NeutPi (x, tdom') tcod' -> do
+      insConstraintEnv ctx tdom tdom' udom
+      returnMeta meta $ subst [(x, e2)] tcod'
+    _ -> do
+      x <- newNameOfType tdom
+      -- represent (tcod, ucod) using hole
+      ucod <- boxUniv >>= annot higherUniv
+      tcod <- appCtx (ctx ++ [x]) >>= annot ucod
+      -- add a constraint regarding the level of universes
+      insConstraintEnv ctx udom ucod higherUniv
+      -- add a constraint regarding the Pi-type
+      typeMeta <- newNameWith "meta"
+      insTypeEnv typeMeta udom
+      insConstraintEnv ctx tPi (typeMeta :< NeutPi (x, tdom) tcod) udom
+      -- return the type of this elimination
+      returnMeta meta $ subst [(x, e2)] tcod
 infer _ (_ :< NeutSigma [] _) =
   lift $ throwE "Infer.Sigma: Sigma without arguments"
 infer ctx (meta :< NeutSigma [(s, tdom)] tcod) =
@@ -134,8 +147,10 @@ infer ctx (meta :< NeutIndexIntro l) = do
   mk <- lookupKind l
   case mk of
     Just k -> do
-      t <- wrapType $ NeutIndex k
-      returnMeta meta t
+      indexMeta <- newNameWith "meta"
+      u <- boxUniv
+      insTypeEnv indexMeta u
+      returnMeta meta $ indexMeta :< NeutIndex k
     Nothing -> do
       hole <- appCtx ctx
       liftIO $
@@ -208,7 +223,7 @@ inferBinder ctx s tdom tcod = do
   udom <- infer ctx tdom >>= annot higherUniv
   ucod <- infer (ctx ++ [s]) tcod >>= annot higherUniv
   ub <- boxUniv >>= annot higherUniv
-  insConstraintEnv (ctx ++ [s]) udom ub higherUniv
+  insConstraintEnv ctx udom ub higherUniv
   insConstraintEnv (ctx ++ [s]) udom ucod higherUniv
   return udom
 
@@ -270,7 +285,7 @@ unifyLoop [] _ = return []
 unifyLoop ((ctx, e1, e2, t):cs) loopCount = do
   e1' <- reduce e1
   e2' <- reduce e2
-  (s, tmpConstraint) <- unify ((ctx, e1', e2', t) : cs)
+  (s, tmpConstraint) <- unify ((ctx, e1, e2, t) : cs)
   -- liftIO $ putStrLn $ "subst:\n" ++ Pr.ppShow s
   case tmpConstraint of
     [] -> return s
@@ -303,69 +318,55 @@ nextLoopCount i j loopCount = do
 didFinishLoop :: Int -> Int -> Bool
 didFinishLoop j loopCount' = loopCount' >= j + 2
 
-unify :: Constraint -> WithEnv (Subst, Constraint)
-unify [] = return ([], [])
-unify ((_, _ :< NeutVar s1, _ :< NeutVar s2, _):cs)
-  | s1 == s2 = unify cs
-unify ((ctx, _ :< NeutPi (x, tdom1) tcod1, _ :< NeutPi (y, tdom2) tcod2, univ):cs) =
-  unifyBinder ctx ((x, tdom1), tcod1) ((y, tdom2), tcod2) univ cs
-unify ((ctx, _ :< NeutPiIntro (x, tdom1@(meta1 :< _)) body1, _ :< NeutPiIntro (y, tdom2@(meta2 :< _)) body2, _ :< NeutPi (z, tdom) tcod):cs) = do
-  meta <- newName
-  insTypeEnv meta tdom
-  let var = meta :< NeutVar z
-  u <- boxUniv
-  insTypeEnv meta1 u
-  insTypeEnv meta2 u
-  let foo =
-        [ (ctx, tdom1, tdom2, u)
-        , (ctx ++ [z], subst [(x, var)] body1, subst [(y, var)] body2, tcod)
-        ]
-  liftIO $ putStrLn $ "new constraints:\n" ++ Pr.ppShow foo
-  unify $
-    (ctx, tdom1, tdom2, u) :
-    (ctx ++ [z], subst [(x, var)] body1, subst [(y, var)] body2, tcod) : cs
-unify ((ctx, _ :< NeutPiIntro (x, tdom1) body1, e2, _ :< NeutPi (z, _) tcod):cs) = do
+simp :: Constraint -> WithEnv Constraint
+simp ((ctx, _ :< NeutPi (x, tdom1) tcod1, _ :< NeutPi (y, tdom2) tcod2, univ):cs) =
+  simpBinder ctx ((x, tdom1), tcod1) ((y, tdom2), tcod2) univ cs
+simp ((ctx, _ :< NeutPiIntro (x, _) body1, _ :< NeutPiIntro (y, _) body2, _ :< NeutPi (z, _) tcod):cs) = do
+  var <- toVar z
+  simp $ (ctx ++ [z], subst [(x, var)] body1, subst [(y, var)] body2, tcod) : cs
+simp ((ctx, _ :< NeutPiIntro (x, tdom1) body1, e2, _ :< NeutPi (z, _) tcod):cs) = do
   c <- constraintPiElim ctx ((x, tdom1), body1) e2 z tcod
-  unify $ c : cs
-unify ((ctx, e1, _ :< NeutPiIntro (y, tdom2) body2, _ :< NeutPi (z, _) tcod):cs) = do
+  simp $ c : cs
+simp ((ctx, e1, _ :< NeutPiIntro (y, tdom2) body2, _ :< NeutPi (z, _) tcod):cs) = do
   c <- constraintPiElim ctx ((y, tdom2), body2) e1 z tcod
-  unify $ c : cs
-unify ((ctx, _ :< NeutSigma [(x, tdom1)] tcod1, _ :< NeutSigma [(y, tdom2)] tcod2, univ):cs) =
-  unifyBinder ctx ((x, tdom1), tcod1) ((y, tdom2), tcod2) univ cs
-unify ((ctx, i :< NeutSigma ((x, tdom1):xts) tcod1, j :< NeutSigma ((y, tdom2):yts) tcod2, univ):cs) = do
+  simp $ c : cs
+simp ((ctx, _ :< NeutSigma [(x, tdom1)] tcod1, _ :< NeutSigma [(y, tdom2)] tcod2, univ):cs) =
+  simpBinder ctx ((x, tdom1), tcod1) ((y, tdom2), tcod2) univ cs
+simp ((ctx, i :< NeutSigma ((x, tdom1):xts) tcod1, j :< NeutSigma ((y, tdom2):yts) tcod2, univ):cs) = do
   let sig1 = i :< NeutSigma [(x, tdom1)] (i :< NeutSigma xts tcod1)
   let sig2 = j :< NeutSigma [(y, tdom2)] (j :< NeutSigma yts tcod2)
-  unify ((ctx, sig1, sig2, univ) : cs)
-unify ((ctx, _ :< NeutSigmaIntro es1, _ :< NeutSigmaIntro es2, _ :< NeutSigma xts t):cs)
+  simp ((ctx, sig1, sig2, univ) : cs)
+simp ((ctx, _ :< NeutSigmaIntro es1, _ :< NeutSigmaIntro es2, _ :< NeutSigma xts t):cs)
   | length es1 == length es2 = do
     let ts = map snd xts ++ [t]
     let sub = zip (map fst xts) es1
     let ts' = map (subst sub) ts
     newCs <-
       forM (zip (zip es1 es2) ts') $ \((e1, e2), t') -> return (ctx, e1, e2, t')
-    unify $ newCs ++ cs
-unify ((ctx, _ :< NeutSigmaIntro es, e2, _ :< NeutSigma xts t):cs)
-  | length xts + 1 == length es = unifySigma ctx e2 es xts t cs
-unify ((ctx, e1, _ :< NeutSigmaIntro es, _ :< NeutSigma xts t):cs)
-  | length xts + 1 == length es = unifySigma ctx e1 es xts t cs
-unify ((ctx, _ :< NeutBox t1, _ :< NeutBox t2, univ):cs) =
-  unify $ (ctx, t1, t2, univ) : cs
-unify ((ctx, _ :< NeutBoxIntro e1, _ :< NeutBoxIntro e2, _ :< NeutBox t):cs) =
-  unify $ (ctx, e1, e2, t) : cs
-unify ((_, _ :< NeutIndex l1, _ :< NeutIndex l2, _):cs)
-  | l1 == l2 = unify cs
-unify ((_, _ :< NeutUniv i, _ :< NeutUniv j, _):cs) = do
+    simp $ newCs ++ cs
+simp ((ctx, _ :< NeutSigmaIntro es, e2, _ :< NeutSigma xts t):cs)
+  | length xts + 1 == length es = simpSigma ctx e2 es xts t cs
+simp ((ctx, e1, _ :< NeutSigmaIntro es, _ :< NeutSigma xts t):cs)
+  | length xts + 1 == length es = simpSigma ctx e1 es xts t cs
+simp ((ctx, _ :< NeutBox t1, _ :< NeutBox t2, univ):cs) =
+  simp $ (ctx, t1, t2, univ) : cs
+simp ((ctx, _ :< NeutBoxIntro e1, _ :< NeutBoxIntro e2, _ :< NeutBox t):cs) =
+  simp $ (ctx, e1, e2, t) : cs
+simp ((_, _ :< NeutIndex l1, _ :< NeutIndex l2, _):cs)
+  | l1 == l2 = simp cs
+simp ((_, _ :< NeutUniv i, _ :< NeutUniv j, _):cs) = do
   insUnivConstraintEnv i j
-  unify cs
+  simp cs
+simp cs = return cs
+
+unify :: Constraint -> WithEnv (Subst, Constraint)
+unify [] = return ([], [])
 unify (c@(_, e1, e2, _):cs)
   | Just (x, args) <- headMeta [] e1 = do
-    liftIO $ putStrLn $ "trying:\n" ++ Pr.ppShow c
     let (fvs, fmvs) = varAndHole e2
     if affineCheck args fvs && x `notElem` fmvs
       then do
-        liftIO $ putStrLn $ "resolving:\n" ++ Pr.ppShow c
         ans <- bindFormalArgs args e2
-        -- liftIO $ putStrLn $ "sub:\n" ++ Pr.ppShow (x, ans)
         cs' <- sConstraint [(x, ans)] cs
         (sub, cs'') <- unify cs'
         let sub' = compose sub [(x, ans)]
@@ -375,15 +376,29 @@ unify (c@(_, e1, e2, _):cs)
         return ([], c : cs)
 unify ((ctx, e1, e2, t):cs)
   | Just _ <- headMeta [] e2 = unify $ (ctx, e2, e1, t) : cs
+unify ((_, _ :< NeutVar s1, _ :< NeutVar s2, _):cs)
+  | s1 == s2 = unify cs
+unify ((_, _ :< NeutVar s, t2, _):cs) = do
+  liftIO $ putStrLn $ "found a var-substition:\n" ++ Pr.ppShow (s, t2)
+  cs' <- sConstraint [(s, t2)] $ removeIdentFromCtx s cs
+  (sub, cs'') <- unify cs'
+  let sub' = compose sub [(s, t2)]
+  return (sub', cs'')
+unify ((_, t1, _ :< NeutVar s, _):cs) = do
+  liftIO $ putStrLn $ "found a var-substition:\n" ++ Pr.ppShow (s, t1)
+  cs' <- sConstraint [(s, t1)] $ removeIdentFromCtx s cs
+  (sub, cs'') <- unify cs'
+  let sub' = compose sub [(s, t1)]
+  return (sub', cs'')
 unify cs = return ([], cs)
 
-unifySigma ctx e es xts t cs = do
+simpSigma ctx e es xts t cs = do
   prList <- projectionList e (xts, t)
   let sub = zip (map fst xts) es
   let ts = map (subst sub) $ map snd xts ++ [t]
   newCs <-
     forM (zip3 es prList ts) $ \(e, ithProj, t) -> return (ctx, e, ithProj, t)
-  unify $ newCs ++ cs
+  simp $ newCs ++ cs
 
 headMeta :: [Identifier] -> Neut -> Maybe (Identifier, [Identifier])
 headMeta args (_ :< NeutPiElim e1 (_ :< NeutVar x)) = headMeta (x : args) e1
@@ -409,27 +424,12 @@ projectionList e (xts, t) = do
     meta <- newName
     return $ meta :< NeutSigmaElim e xiList v
 
-unifyBinder ctx ((x, tdom1@(tdomMeta1 :< _)), tcod1@(tcodMeta1 :< _)) ((y, tdom2@(tdomMeta2 :< _)), tcod2@(tcodMeta2 :< _)) univ cs = do
-  z <- newName
-  insTypeEnv z tdom1
-  u <- boxUniv
-  insTypeEnv tdomMeta1 u
-  insTypeEnv tcodMeta1 u
-  insTypeEnv tdomMeta2 u
-  insTypeEnv tcodMeta2 u
-  meta <- newName
-  insTypeEnv meta tdom1
-  let var = meta :< NeutVar z
-  liftIO $
-    putStrLn $
-    "UnifyBinder. x == " ++ show x ++ ", y == " ++ show y ++ ", z == " ++ show z
-  -- ctx' <- sConstraint [(x, var), (y, var)] ctx
-  let ctx' = map (\w -> fromMaybe w (lookup w [(x, z), (y, z)])) ctx
-  let univ' = subst [(x, var), (y, var)] univ
-  cs' <- sConstraint [(x, var), (y, var)] cs
-  unify $
-    (ctx', tdom1, tdom2, univ') :
-    (ctx' ++ [z], subst [(x, var)] tcod1, subst [(y, var)] tcod2, univ') : cs'
+simpBinder ctx ((x, tdom1), tcod1) ((y, tdom2), tcod2) univ cs = do
+  var <- toVar x
+  cs' <- sConstraint [(y, var)] cs
+  return $
+    (ctx, tdom1, tdom2, univ) :
+    (ctx ++ [x], tcod1, subst [(y, var)] tcod2, univ) : cs'
 
 constraintPiElim ctx ((x, tdom), body) e2 z tcod = do
   liftIO $ putStrLn $ "piElim. x = " ++ x
@@ -455,6 +455,13 @@ sConstraint s ctcs = do
   let ts2' = map (subst s) ts2
   let typeList' = map (subst s) typeList
   return $ unsplit ctxList (zip ts1' ts2') typeList'
+
+removeIdentFromCtx :: Identifier -> Constraint -> Constraint
+removeIdentFromCtx _ [] = []
+removeIdentFromCtx x ((ctx, e1, e2, t):cs) = do
+  let ctx' = filter (/= x) ctx
+  let cs' = removeIdentFromCtx x cs
+  (ctx', e1, e2, t) : cs'
 
 split :: Constraint -> ([[Identifier]], [(Neut, Neut)], [Neut])
 split [] = ([], [], [])
