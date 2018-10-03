@@ -59,6 +59,8 @@ load' ((_ :< TreeNode [_ :< TreeAtom "primitive", _ :< TreeAtom name, t]):as) = 
       load' as
     _ -> error $ "the type of " ++ name ++ " is not univ"
 load' ((meta :< TreeNode [_ :< TreeAtom "definition", _ :< TreeAtom name, tbody]):as) = do
+  tmp <- macroExpand tbody >>= parse
+  liftIO $ putStrLn $ Pr.ppShow tmp
   e <- macroExpand tbody >>= parse >>= rename
   name' <- newNameWith name
   defList <- load' as

@@ -47,9 +47,9 @@ var e = fst $ varAndHole e
 nonLinear :: Neut -> [Identifier]
 nonLinear (_ :< NeutVar _) = []
 nonLinear (_ :< NeutConst _) = []
-nonLinear (_ :< NeutPi (_, tdom) tcod) = do
+nonLinear (_ :< NeutPi (x, tdom) tcod) = do
   let ns1 = nonLinear tdom
-  let ns2 = nonLinear tcod
+  let ns2 = isAffine x $ nonLinear tcod
   ns1 ++ ns2
 nonLinear (_ :< NeutPiIntro (x, _) e) = isAffine x (var e) ++ nonLinear e
 nonLinear (_ :< NeutPiElim e1 e2) = do
@@ -176,12 +176,14 @@ constructFormalArgs (ident:is) = do
 bindFormalArgs :: [Identifier] -> Neut -> WithEnv Neut
 bindFormalArgs [] terminal = return terminal
 bindFormalArgs (arg:xs) c@(metaLam :< _) = do
-  tLam <- lookupTypeEnv' metaLam
-  tArg@(argMeta :< _) <- lookupTypeEnv' arg
+  tLam@(tLamMeta :< _) <- lookupTypeEnv'' metaLam
+  tArg@(tArgMeta :< _) <- lookupTypeEnv' arg
   tmp <- bindFormalArgs xs c
   meta <- newNameWith "meta"
   univMeta <- newNameWith "meta"
-  univ <- lookupTypeEnv' argMeta
+  univ <- boxUniv
+  insTypeEnv tArgMeta univ
+  insTypeEnv tLamMeta univ
   insTypeEnv univMeta univ
   insTypeEnv meta (univMeta :< NeutPi (arg, tArg) tLam)
   return $ meta :< NeutPiIntro (arg, tArg) tmp
@@ -191,3 +193,17 @@ pairwiseConcat [] = ([], [])
 pairwiseConcat ((xs, ys):rest) = do
   let (xs', ys') = pairwiseConcat rest
   (xs ++ xs', ys ++ ys')
+
+boxUniv :: WithEnv Neut
+boxUniv = do
+  univMeta <- newNameWith "meta"
+  boxMeta <- newNameWith "meta"
+  l <- newName
+  return $ boxMeta :< NeutBox (univMeta :< NeutUniv (UnivLevelHole l))
+
+lookupTypeEnv'' :: String -> WithEnv Neut
+lookupTypeEnv'' s = do
+  mt <- gets (lookup s . typeEnv)
+  case mt of
+    Just t  -> return t
+    Nothing -> boxUniv

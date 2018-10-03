@@ -1,6 +1,5 @@
 module Infer
   ( check
-  , unify
   ) where
 
 import           Control.Monad
@@ -22,18 +21,11 @@ import           Data.Maybe
 check :: Identifier -> Neut -> WithEnv Neut
 check main e = do
   t <- infer [] e
-  env <- get
-  liftIO $
-    putStrLn $
-    "unification start. constraint:\n" ++ Pr.ppShow (constraintEnv env)
   insTypeEnv main t -- insert the type of main function
-  -- boxConstraint [] $ nonLinear e
+  boxConstraint [] $ nonLinear e
   liftIO $ putStrLn $ "nonLinear: " ++ Pr.ppShow (nonLinear e)
   env <- get
-  -- liftIO $
-  --   putStrLn $
-  --   "unification start. constraint:\n" ++ Pr.ppShow (constraintEnv env)
-  sub <- unifyLoop (constraintEnv env) 0
+  sub <- solve $ constraintEnv env
   let tenv' = map (\(i, t) -> (i, subst sub t)) $ typeEnv env
   modify (\e -> e {typeEnv = tenv'})
   checkNumConstraint
@@ -280,58 +272,33 @@ returnMeta meta t = do
   insTypeEnv meta t
   return t
 
-unifyLoop :: Constraint -> Int -> WithEnv Subst
-unifyLoop [] _ = return []
-unifyLoop ((ctx, e1, e2, t):cs) loopCount = do
-  e1' <- reduce e1
-  e2' <- reduce e2
-  (s, tmpConstraint) <- unify ((ctx, e1, e2, t) : cs)
-  -- liftIO $ putStrLn $ "subst:\n" ++ Pr.ppShow s
-  case tmpConstraint of
-    [] -> return s
-    (ctx', e1'', e2'', t'):cs' -> do
-      let loopCount' = nextLoopCount (length cs) (length cs') loopCount
-      if didFinishLoop (length cs') loopCount'
-        then do
-          liftIO $ putStrLn $ "failing unification. subst:\n" ++ Pr.ppShow s
-          liftIO $ putStrLn $ "ctx:\n" ++ Pr.ppShow ctx'
-          unificationFailed e1'' e2'' cs'
-        else do
-          s' <- unifyLoop (cs' ++ [(ctx', e1'', e2'', t')]) loopCount'
-          return (s ++ s')
-
-unificationFailed :: Neut -> Neut -> Constraint -> WithEnv Subst
-unificationFailed e1 e2 cs = do
-  liftIO $ putStrLn $ "constraints:\n" ++ Pr.ppShow cs
-  lift $
-    throwE $
-    "unification failed for\n" ++ Pr.ppShow e1 ++ "\nand\n" ++ Pr.ppShow e2
-
-nextLoopCount :: Int -> Int -> Int -> Int
-nextLoopCount i j loopCount = do
-  let lenOld = i + 1
-  let lenNew = j + 1
-  if lenOld <= lenNew
-    then loopCount + 1
-    else 0
-
-didFinishLoop :: Int -> Int -> Bool
-didFinishLoop j loopCount' = loopCount' >= j + 2
-
 simp :: Constraint -> WithEnv Constraint
-simp ((ctx, _ :< NeutPi (x, tdom1) tcod1, _ :< NeutPi (y, tdom2) tcod2, univ):cs) =
-  simpBinder ctx ((x, tdom1), tcod1) ((y, tdom2), tcod2) univ cs
+simp [] = return []
+simp ((_, _ :< NeutVar s1, _ :< NeutVar s2, _):cs)
+  | s1 == s2 = simp cs
+simp ((ctx, _ :< NeutPi (x, tdom1) tcod1, _ :< NeutPi (y, tdom2) tcod2, univ):cs) = do
+  var <- toVar x
+  cs' <- sConstraint [(y, var)] cs >>= simp
+  return $
+    (ctx, tdom1, tdom2, univ) :
+    (ctx ++ [x], tcod1, subst [(y, var)] tcod2, univ) : cs'
 simp ((ctx, _ :< NeutPiIntro (x, _) body1, _ :< NeutPiIntro (y, _) body2, _ :< NeutPi (z, _) tcod):cs) = do
   var <- toVar z
   simp $ (ctx ++ [z], subst [(x, var)] body1, subst [(y, var)] body2, tcod) : cs
-simp ((ctx, _ :< NeutPiIntro (x, tdom1) body1, e2, _ :< NeutPi (z, _) tcod):cs) = do
-  c <- constraintPiElim ctx ((x, tdom1), body1) e2 z tcod
-  simp $ c : cs
-simp ((ctx, e1, _ :< NeutPiIntro (y, tdom2) body2, _ :< NeutPi (z, _) tcod):cs) = do
-  c <- constraintPiElim ctx ((y, tdom2), body2) e1 z tcod
-  simp $ c : cs
-simp ((ctx, _ :< NeutSigma [(x, tdom1)] tcod1, _ :< NeutSigma [(y, tdom2)] tcod2, univ):cs) =
-  simpBinder ctx ((x, tdom1), tcod1) ((y, tdom2), tcod2) univ cs
+simp ((ctx, _ :< NeutPiIntro (x, _) body1, e2, _ :< NeutPi (z, _) tcod):cs) = do
+  var <- toVar x
+  let tcod' = subst [(z, var)] tcod
+  appMeta <- newNameOfType tcod'
+  let app = appMeta :< NeutPiElim e2 var
+  simp $ (ctx ++ [x], body1, app, tcod') : cs
+simp ((ctx, e1, e2@(_ :< NeutPiIntro _ _), t@(_ :< NeutPi _ _)):cs) =
+  simp $ (ctx, e2, e1, t) : cs
+simp ((ctx, _ :< NeutSigma [(x, tdom1)] tcod1, _ :< NeutSigma [(y, tdom2)] tcod2, univ):cs) = do
+  var <- toVar x
+  cs' <- sConstraint [(y, var)] cs >>= simp
+  return $
+    (ctx, tdom1, tdom2, univ) :
+    (ctx ++ [x], tcod1, subst [(y, var)] tcod2, univ) : cs'
 simp ((ctx, i :< NeutSigma ((x, tdom1):xts) tcod1, j :< NeutSigma ((y, tdom2):yts) tcod2, univ):cs) = do
   let sig1 = i :< NeutSigma [(x, tdom1)] (i :< NeutSigma xts tcod1)
   let sig2 = j :< NeutSigma [(y, tdom2)] (j :< NeutSigma yts tcod2)
@@ -345,9 +312,15 @@ simp ((ctx, _ :< NeutSigmaIntro es1, _ :< NeutSigmaIntro es2, _ :< NeutSigma xts
       forM (zip (zip es1 es2) ts') $ \((e1, e2), t') -> return (ctx, e1, e2, t')
     simp $ newCs ++ cs
 simp ((ctx, _ :< NeutSigmaIntro es, e2, _ :< NeutSigma xts t):cs)
-  | length xts + 1 == length es = simpSigma ctx e2 es xts t cs
-simp ((ctx, e1, _ :< NeutSigmaIntro es, _ :< NeutSigma xts t):cs)
-  | length xts + 1 == length es = simpSigma ctx e1 es xts t cs
+  | length xts + 1 == length es = do
+    prList <- projectionList e2 (xts, t)
+    let sub = zip (map fst xts) es
+    let ts = map (subst sub) $ map snd xts ++ [t]
+    newCs <-
+      forM (zip3 es prList ts) $ \(e, ithProj, t) -> return (ctx, e, ithProj, t)
+    simp $ newCs ++ cs
+simp ((ctx, e1, e2@(_ :< NeutSigmaIntro es), t@(_ :< NeutSigma xts _)):cs)
+  | length xts + 1 == length es = simp $ (ctx, e2, e1, t) : cs
 simp ((ctx, _ :< NeutBox t1, _ :< NeutBox t2, univ):cs) =
   simp $ (ctx, t1, t2, univ) : cs
 simp ((ctx, _ :< NeutBoxIntro e1, _ :< NeutBoxIntro e2, _ :< NeutBox t):cs) =
@@ -357,48 +330,61 @@ simp ((_, _ :< NeutIndex l1, _ :< NeutIndex l2, _):cs)
 simp ((_, _ :< NeutUniv i, _ :< NeutUniv j, _):cs) = do
   insUnivConstraintEnv i j
   simp cs
-simp cs = return cs
+simp (c:cs) = do
+  cs' <- simp cs
+  return $ c : cs'
 
-unify :: Constraint -> WithEnv (Subst, Constraint)
-unify [] = return ([], [])
-unify (c@(_, e1, e2, _):cs)
+solve :: Constraint -> WithEnv Subst
+solve cs = do
+  cs' <- simp cs
+  (s1, cs1) <- solvePat cs'
+  case cs1 of
+    [] -> return s1
+    _ -> do
+      mcs2 <- solveDelta cs1
+      case mcs2 of
+        Just cs2 -> do
+          s2 <- solve cs2
+          return $ compose s1 s2
+        Nothing -> lift $ throwE $ "couldn't solve: " ++ Pr.ppShow cs1
+
+solvePat :: Constraint -> WithEnv (Subst, Constraint)
+solvePat [] = return ([], [])
+solvePat (c@(_, e1, e2, _):cs)
   | Just (x, args) <- headMeta [] e1 = do
     let (fvs, fmvs) = varAndHole e2
     if affineCheck args fvs && x `notElem` fmvs
       then do
         ans <- bindFormalArgs args e2
         cs' <- sConstraint [(x, ans)] cs
-        (sub, cs'') <- unify cs'
+        (sub, cs'') <- solvePat cs'
         let sub' = compose sub [(x, ans)]
         return (sub', cs'')
       else do
         liftIO $ putStrLn "affineCheck failed"
         return ([], c : cs)
-unify ((ctx, e1, e2, t):cs)
-  | Just _ <- headMeta [] e2 = unify $ (ctx, e2, e1, t) : cs
-unify ((_, _ :< NeutVar s1, _ :< NeutVar s2, _):cs)
-  | s1 == s2 = unify cs
-unify ((_, _ :< NeutVar s, t2, _):cs) = do
+solvePat ((ctx, e1, e2, t):cs)
+  | Just _ <- headMeta [] e2 = solvePat $ (ctx, e2, e1, t) : cs
+solvePat (c:cs) = do
+  (sub, cs') <- solvePat cs
+  return (sub, c : cs')
+
+-- solvePat cs = return ([], cs)
+solveDelta :: Constraint -> WithEnv (Maybe Constraint)
+solveDelta [] = return Nothing
+solveDelta ((_, _ :< NeutVar s, t2, _):cs) = do
   liftIO $ putStrLn $ "found a var-substition:\n" ++ Pr.ppShow (s, t2)
   cs' <- sConstraint [(s, t2)] $ removeIdentFromCtx s cs
-  (sub, cs'') <- unify cs'
-  let sub' = compose sub [(s, t2)]
-  return (sub', cs'')
-unify ((_, t1, _ :< NeutVar s, _):cs) = do
+  return (Just cs')
+solveDelta ((_, t1, _ :< NeutVar s, _):cs) = do
   liftIO $ putStrLn $ "found a var-substition:\n" ++ Pr.ppShow (s, t1)
   cs' <- sConstraint [(s, t1)] $ removeIdentFromCtx s cs
-  (sub, cs'') <- unify cs'
-  let sub' = compose sub [(s, t1)]
-  return (sub', cs'')
-unify cs = return ([], cs)
-
-simpSigma ctx e es xts t cs = do
-  prList <- projectionList e (xts, t)
-  let sub = zip (map fst xts) es
-  let ts = map (subst sub) $ map snd xts ++ [t]
-  newCs <-
-    forM (zip3 es prList ts) $ \(e, ithProj, t) -> return (ctx, e, ithProj, t)
-  simp $ newCs ++ cs
+  return $ Just cs'
+solveDelta (c:cs) = do
+  mcs' <- solveDelta cs
+  case mcs' of
+    Nothing  -> return Nothing
+    Just cs' -> return $ Just $ c : cs'
 
 headMeta :: [Identifier] -> Neut -> Maybe (Identifier, [Identifier])
 headMeta args (_ :< NeutPiElim e1 (_ :< NeutVar x)) = headMeta (x : args) e1
@@ -423,29 +409,6 @@ projectionList e (xts, t) = do
   forM varList $ \v -> do
     meta <- newName
     return $ meta :< NeutSigmaElim e xiList v
-
-simpBinder ctx ((x, tdom1), tcod1) ((y, tdom2), tcod2) univ cs = do
-  var <- toVar x
-  cs' <- sConstraint [(y, var)] cs
-  return $
-    (ctx, tdom1, tdom2, univ) :
-    (ctx ++ [x], tcod1, subst [(y, var)] tcod2, univ) : cs'
-
-constraintPiElim ctx ((x, tdom), body) e2 z tcod = do
-  liftIO $ putStrLn $ "piElim. x = " ++ x
-  meta <- newName
-  varX <- toVar x
-  let tcod' = subst [(z, varX)] tcod
-  insTypeEnv meta tcod'
-  varMeta <- newName
-  insTypeEnv varMeta tdom
-  let var = varMeta :< NeutVar x
-  appMeta <- newName
-  insTypeEnv appMeta tcod'
-  let app = appMeta :< NeutPiElim e2 var
-  let foo = (ctx ++ [x], body, app, tcod')
-  liftIO $ putStrLn $ "new constraints:\n" ++ Pr.ppShow foo
-  return (ctx ++ [x], body, app, tcod')
 
 sConstraint :: Subst -> Constraint -> WithEnv Constraint
 sConstraint s ctcs = do
