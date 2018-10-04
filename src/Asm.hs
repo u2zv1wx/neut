@@ -69,13 +69,21 @@ asmData :: Identifier -> Data -> Asm -> WithEnv Asm
 asmData reg (DataLocal x) cont = addMeta $ AsmLet reg (AsmArgReg x) cont
 asmData reg (DataLabel x) cont = addMeta $ AsmLet reg (AsmArgLabel x) cont
 asmData reg (DataInt32 i) cont = addMeta $ AsmLet reg (AsmArgImmediate i) cont
-asmData reg (DataStruct xs) cont = do
-  sizeList <- mapM sizeOf xs
+asmData reg (DataStruct ds) cont = do
+  xs <- mapM (const newName) ds
+  let sizeList = map sizeOfData ds
   let structSize = sum sizeList
   cont' <- setContent reg sizeList (zip [0 ..] xs) cont
   rdi <- getRDI
   callThenCont <- asmCodeCall reg "_malloc" [rdi] cont'
-  addMeta $ AsmLet rdi (AsmArgImmediate structSize) callThenCont
+  tmp <- addMeta $ AsmLet rdi (AsmArgImmediate structSize) callThenCont
+  asmStruct (zip xs ds) tmp
+
+asmStruct :: [(Identifier, Data)] -> Asm -> WithEnv Asm
+asmStruct [] cont = return cont
+asmStruct ((x, d):xds) cont = do
+  cont' <- asmStruct xds cont
+  asmData x d cont'
 
 asmSwitch :: Identifier -> [(Index, Code)] -> WithEnv Asm
 asmSwitch _ [] = lift $ throwE "empty branch"
@@ -122,3 +130,9 @@ showIndex :: Index -> String
 showIndex (IndexInteger i) = show i
 showIndex (IndexLabel s)   = s
 showIndex IndexDefault     = "default"
+
+sizeOfData :: Data -> Int
+sizeOfData (DataLocal _)   = 8
+sizeOfData (DataLabel x)   = 8
+sizeOfData (DataInt32 i)   = 8
+sizeOfData (DataStruct ds) = sum $ map sizeOfData ds

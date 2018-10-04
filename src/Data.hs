@@ -93,7 +93,7 @@ data Pos
           Pos
   | PosSigma [(Identifier, Pos)]
              Pos
-  | PosSigmaIntro [Identifier]
+  | PosSigmaIntro [Pos]
   | PosIndex Identifier
   | PosIndexIntro Index
   | PosDown Pos
@@ -127,7 +127,7 @@ data Data
   = DataLocal Identifier
   | DataLabel Identifier
   | DataInt32 Int
-  | DataStruct [Identifier]
+  | DataStruct [Data]
   deriving (Show)
 
 data Code
@@ -307,7 +307,6 @@ lookupTypeEnv s = gets (lookup s . typeEnv)
 lookupTypeEnv' :: String -> WithEnv Neut
 lookupTypeEnv' s = do
   mt <- gets (lookup s . typeEnv)
-  env <- get
   case mt of
     Nothing -> lift $ throwE $ s ++ " is not found in the type environment."
     Just t  -> return t

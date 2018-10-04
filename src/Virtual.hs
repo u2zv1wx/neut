@@ -22,7 +22,9 @@ virtualPos (PosVar x) = return (DataLocal x)
 virtualPos (PosConst x) = return $ DataLabel x
 virtualPos (PosPi _ _) = return $ DataInt32 0
 virtualPos (PosSigma _ _) = return $ DataInt32 0
-virtualPos (PosSigmaIntro xs) = return $ DataStruct xs
+virtualPos (PosSigmaIntro es) = do
+  ds <- mapM virtualPos es
+  return $ DataStruct ds
 virtualPos (PosIndex _) = return $ DataInt32 0
 virtualPos (PosIndexIntro x) = do
   i <- indexToInt x

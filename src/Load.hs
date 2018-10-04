@@ -104,7 +104,7 @@ process :: Neut -> WithEnv ()
 process e = do
   liftIO $ putStrLn $ Pr.ppShow e
   e' <- check mainLabel e
-  c' <- exhaust e' >>= lift >>= expand >>= polarize >>= toNeg >>= virtualNeg
+  c' <- exhaust e' >>= lift >>= expand >>= polarizeNeg >>= virtualNeg
   -- liftIO $ putStrLn $ Pr.ppShow c'
   insCodeEnv mainLabel [] c'
   asmCodeEnv
