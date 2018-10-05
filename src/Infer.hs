@@ -61,6 +61,7 @@ infer ctx (meta :< NeutPiElim e1 e2) = do
   udom <- infer ctx tdom >>= annot higherUniv
   case tPi' of
     _ :< NeutPi (x, tdom') tcod' -> do
+      liftIO $ putStrLn "shortcut!"
       insConstraintEnv ctx tdom tdom' udom
       returnMeta meta $ subst [(x, e2)] tcod'
     _ -> do
@@ -338,14 +339,17 @@ solve :: Constraint -> WithEnv Subst
 solve cs = do
   cs' <- simp cs
   (s1, cs1) <- solvePat cs'
-  case cs1 of
+  (s1', cs1') <- simp cs1 >>= solvePat
+  case cs1' of
     [] -> return s1
     _ -> do
-      mcs2 <- solveDelta cs1
+      cs1'' <- simp cs1'
+      liftIO $ putStrLn $ "after pat:\n" ++ Pr.ppShow cs1'
+      mcs2 <- solveDelta cs1''
       case mcs2 of
         Just cs2 -> do
           s2 <- solve cs2
-          return $ compose s1 s2
+          return $ compose s1' s2
         Nothing -> lift $ throwE $ "couldn't solve: " ++ Pr.ppShow cs1
 
 solvePat :: Constraint -> WithEnv (Subst, Constraint)
@@ -361,13 +365,17 @@ solvePat (c@(_, e1, e2, _):cs)
         let sub' = compose sub [(x, ans)]
         return (sub', cs'')
       else do
-        liftIO $ putStrLn "affineCheck failed"
-        return ([], c : cs)
+        liftIO $ putStrLn $ "affineCheck failed for:\n" ++ Pr.ppShow e1
+        (s, cs') <- solvePat cs
+        c' <- sConstraint s [c]
+        return (s, c' ++ cs')
+        -- return ([], c : cs)
 solvePat ((ctx, e1, e2, t):cs)
   | Just _ <- headMeta [] e2 = solvePat $ (ctx, e2, e1, t) : cs
 solvePat (c:cs) = do
   (sub, cs') <- solvePat cs
-  return (sub, c : cs')
+  c' <- sConstraint sub [c]
+  return (sub, c' ++ cs')
 
 -- solvePat cs = return ([], cs)
 solveDelta :: Constraint -> WithEnv (Maybe Constraint)
