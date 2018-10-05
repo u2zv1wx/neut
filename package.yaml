@@ -18,6 +18,7 @@ dependencies:
 - comonad
 - deriving-compat
 - recursion-schemes
+- pqueue
 
 library:
   source-dirs: src

@@ -22,6 +22,8 @@ import           Data.IORef
 import           Data.List
 import           Data.Maybe                 (fromMaybe)
 
+import qualified Data.PQueue.Min            as Q
+
 import qualified Text.Show.Pretty           as Pr
 
 type Identifier = String
@@ -216,7 +218,45 @@ isExternalConst name = do
 type Context = [Identifier]
 
 -- (Gamma, e1, e2, t)  ==  Gamma |- e1 = e2 : t
-type Constraint = [(Context, Neut, Neut, Neut)]
+type PreConstraint = (Context, Neut, Neut, Neut)
+
+data Constraint
+  = ConstraintPattern PreConstraint
+  | ConstraintDelta PreConstraint
+  | ConstraintQuasiPattern PreConstraint
+  | ConstraintFlexRigid PreConstraint
+  | ConstraintFlexFlex PreConstraint
+  deriving (Show)
+
+constraintToInt :: Constraint -> Int
+constraintToInt (ConstraintPattern _)      = 0
+constraintToInt (ConstraintDelta _)        = 1
+constraintToInt (ConstraintQuasiPattern _) = 2
+constraintToInt (ConstraintFlexRigid _)    = 3
+constraintToInt (ConstraintFlexFlex _)     = 4
+
+instance Eq Constraint where
+  c1 == c2 = constraintToInt c1 == constraintToInt c2
+
+instance Ord Constraint where
+  compare c1 c2 = compare (constraintToInt c1) (constraintToInt c2)
+
+type Subst = [(Identifier, Neut)]
+
+data Justification
+  = Asserted Identifier
+  | Assumption Identifier
+  | Join [Justification]
+  deriving (Show)
+
+data Case = Case
+  { constraintQueueSnapshot :: Q.MinQueue Constraint
+  , metaMapSnapshot         :: [(Identifier, [Constraint])]
+  , substitutionSnapshot    :: Subst
+  , caseJustification       :: Justification
+  , savedJustification      :: Justification
+  , alternatives            :: [[Constraint]]
+  } deriving (Show)
 
 data Env = Env
   { count             :: Int -- to generate fresh symbols
@@ -227,7 +267,11 @@ data Env = Env
   , typeEnv           :: [(Identifier, Neut)] -- type environment
   , termEnv           :: [(Identifier, Term)]
   , constEnv          :: [(Identifier, Neut)] -- (name, type)
-  , constraintEnv     :: Constraint
+  , constraintEnv     :: [PreConstraint]
+  , constraintQueue   :: Q.MinQueue Constraint
+  , metaMap           :: [(Identifier, [Constraint])]
+  , substitution      :: Subst
+  , caseStack         :: [Case]
   , univConstraintEnv :: [(UnivLevel, UnivLevel)]
   , numConstraintEnv  :: [Identifier]
   , codeEnv           :: [(Identifier, ([Identifier], IORef Code))]
@@ -263,6 +307,10 @@ initialEnv =
     , termEnv = []
     , constEnv = []
     , constraintEnv = []
+    , constraintQueue = Q.empty
+    , metaMap = []
+    , substitution = []
+    , caseStack = []
     , univConstraintEnv = []
     , numConstraintEnv = []
     , codeEnv = []
