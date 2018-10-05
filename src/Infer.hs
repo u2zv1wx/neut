@@ -25,7 +25,7 @@ check main e = do
   boxConstraint [] $ nonLinear e
   liftIO $ putStrLn $ "nonLinear: " ++ Pr.ppShow (nonLinear e)
   env <- get
-  sub <- solve $ constraintEnv env
+  sub <- resolve $ constraintEnv env
   let tenv' = map (\(i, t) -> (i, subst sub t)) $ typeEnv env
   modify (\e -> e {typeEnv = tenv'})
   checkNumConstraint
@@ -335,61 +335,61 @@ simp (c:cs) = do
   cs' <- simp cs
   return $ c : cs'
 
-solve :: Constraint -> WithEnv Subst
-solve cs = do
+resolve :: Constraint -> WithEnv Subst
+resolve cs = do
   cs' <- simp cs
-  (s1, cs1) <- solvePat cs'
-  (s1', cs1') <- simp cs1 >>= solvePat
+  (s1, cs1) <- resolvePat cs'
+  (s1', cs1') <- simp cs1 >>= resolvePat
   case cs1' of
     [] -> return s1
     _ -> do
       cs1'' <- simp cs1'
       liftIO $ putStrLn $ "after pat:\n" ++ Pr.ppShow cs1'
-      mcs2 <- solveDelta cs1''
+      mcs2 <- resolveDelta cs1''
       case mcs2 of
         Just cs2 -> do
-          s2 <- solve cs2
+          s2 <- resolve cs2
           return $ compose s1' s2
-        Nothing -> lift $ throwE $ "couldn't solve: " ++ Pr.ppShow cs1
+        Nothing -> lift $ throwE $ "couldn't resolve: " ++ Pr.ppShow cs1
 
-solvePat :: Constraint -> WithEnv (Subst, Constraint)
-solvePat [] = return ([], [])
-solvePat (c@(_, e1, e2, _):cs)
+resolvePat :: Constraint -> WithEnv (Subst, Constraint)
+resolvePat [] = return ([], [])
+resolvePat (c@(_, e1, e2, _):cs)
   | Just (x, args) <- headMeta [] e1 = do
     let (fvs, fmvs) = varAndHole e2
     if affineCheck args fvs && x `notElem` fmvs
       then do
         ans <- bindFormalArgs args e2
         cs' <- sConstraint [(x, ans)] cs
-        (sub, cs'') <- solvePat cs'
+        (sub, cs'') <- resolvePat cs'
         let sub' = compose sub [(x, ans)]
         return (sub', cs'')
       else do
         liftIO $ putStrLn $ "affineCheck failed for:\n" ++ Pr.ppShow e1
-        (s, cs') <- solvePat cs
+        (s, cs') <- resolvePat cs
         c' <- sConstraint s [c]
         return (s, c' ++ cs')
         -- return ([], c : cs)
-solvePat ((ctx, e1, e2, t):cs)
-  | Just _ <- headMeta [] e2 = solvePat $ (ctx, e2, e1, t) : cs
-solvePat (c:cs) = do
-  (sub, cs') <- solvePat cs
+resolvePat ((ctx, e1, e2, t):cs)
+  | Just _ <- headMeta [] e2 = resolvePat $ (ctx, e2, e1, t) : cs
+resolvePat (c:cs) = do
+  (sub, cs') <- resolvePat cs
   c' <- sConstraint sub [c]
   return (sub, c' ++ cs')
 
--- solvePat cs = return ([], cs)
-solveDelta :: Constraint -> WithEnv (Maybe Constraint)
-solveDelta [] = return Nothing
-solveDelta ((_, _ :< NeutVar s, t2, _):cs) = do
+-- resolvePat cs = return ([], cs)
+resolveDelta :: Constraint -> WithEnv (Maybe Constraint)
+resolveDelta [] = return Nothing
+resolveDelta ((_, _ :< NeutVar s, t2, _):cs) = do
   liftIO $ putStrLn $ "found a var-substition:\n" ++ Pr.ppShow (s, t2)
   cs' <- sConstraint [(s, t2)] $ removeIdentFromCtx s cs
   return (Just cs')
-solveDelta ((_, t1, _ :< NeutVar s, _):cs) = do
+resolveDelta ((_, t1, _ :< NeutVar s, _):cs) = do
   liftIO $ putStrLn $ "found a var-substition:\n" ++ Pr.ppShow (s, t1)
   cs' <- sConstraint [(s, t1)] $ removeIdentFromCtx s cs
   return $ Just cs'
-solveDelta (c:cs) = do
-  mcs' <- solveDelta cs
+resolveDelta (c:cs) = do
+  mcs' <- resolveDelta cs
   case mcs' of
     Nothing  -> return Nothing
     Just cs' -> return $ Just $ c : cs'
