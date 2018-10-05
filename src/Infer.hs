@@ -18,6 +18,8 @@ import           Data.List
 
 import           Data.Maybe
 
+import qualified Data.PQueue.Min            as Q
+
 check :: Identifier -> Neut -> WithEnv Neut
 check main e = do
   t <- infer [] e
@@ -273,7 +275,7 @@ returnMeta meta t = do
   insTypeEnv meta t
   return t
 
-simp :: Constraint -> WithEnv Constraint
+simp :: [PreConstraint] -> WithEnv [PreConstraint]
 simp [] = return []
 simp ((_, _ :< NeutVar s1, _ :< NeutVar s2, _):cs)
   | s1 == s2 = simp cs
@@ -335,24 +337,58 @@ simp (c:cs) = do
   cs' <- simp cs
   return $ c : cs'
 
-resolve :: Constraint -> WithEnv Subst
-resolve cs = do
-  cs' <- simp cs
-  (s1, cs1) <- resolvePat cs'
-  (s1', cs1') <- simp cs1 >>= resolvePat
-  case cs1' of
-    [] -> return s1
-    _ -> do
-      cs1'' <- simp cs1'
-      liftIO $ putStrLn $ "after pat:\n" ++ Pr.ppShow cs1'
-      mcs2 <- resolveDelta cs1''
-      case mcs2 of
-        Just cs2 -> do
-          s2 <- resolve cs2
-          return $ compose s1' s2
-        Nothing -> lift $ throwE $ "couldn't resolve: " ++ Pr.ppShow cs1
+categorize :: PreConstraint -> Constraint
+categorize = undefined
 
-resolvePat :: Constraint -> WithEnv (Subst, Constraint)
+visit :: PreConstraint -> WithEnv ()
+visit = undefined
+
+visitEq :: PreConstraint -> Justification -> WithEnv ()
+visitEq c@(ctx, e1, e2, t) j = do
+  sub <- gets substitution
+  case (headMeta [] e1, headMeta [] e2) of
+    (Just (x, _), _)
+      | Just e <- lookup x sub -> do
+        let e1' = subst [(x, e)] e1
+        let e2' = subst [(x, e)] e2
+        cs <- simp [(ctx, e1', e2', t)]
+        mapM_ visit cs
+    (_, Just (y, _))
+      | Just _ <- lookup y sub -> visitEq (ctx, e2, e1, t) j
+    (Just (x, args), _)
+      | let (fvs, fmvs) = varAndHole e2
+      , affineCheck args fvs && x `notElem` fmvs -> do
+        ans <- bindFormalArgs args e2
+        modify (\e -> e {substitution = (x, ans) : substitution e})
+        mmap <- gets metaMap
+        let cs = concatMap snd $ filter (\(y, _) -> y == x) mmap
+        mapM_ visit cs
+    (_, Just (y, args))
+      | let (fvs, fmvs) = varAndHole e2
+      , affineCheck args fvs && y `notElem` fmvs -> visitEq (ctx, e2, e1, t) j
+    _ -> do
+      let c' = categorize c
+      modify (\e -> e {constraintQueue = Q.insert c' (constraintQueue e)})
+
+resolve :: [PreConstraint] -> WithEnv Subst
+resolve cs = do
+  undefined
+  -- cs' <- simp cs
+  -- (s1, cs1) <- resolvePat cs'
+  -- (s1', cs1') <- simp cs1 >>= resolvePat
+  -- case cs1' of
+  --   [] -> return s1
+  --   _ -> do
+  --     cs1'' <- simp cs1'
+  --     liftIO $ putStrLn $ "after pat:\n" ++ Pr.ppShow cs1'
+  --     mcs2 <- resolveDelta cs1''
+  --     case mcs2 of
+  --       Just cs2 -> do
+  --         s2 <- resolve cs2
+  --         return $ compose s1' s2
+  --       Nothing -> lift $ throwE $ "couldn't resolve: " ++ Pr.ppShow cs1
+
+resolvePat :: [PreConstraint] -> WithEnv (Subst, [PreConstraint])
 resolvePat [] = return ([], [])
 resolvePat (c@(_, e1, e2, _):cs)
   | Just (x, args) <- headMeta [] e1 = do
@@ -378,7 +414,7 @@ resolvePat (c:cs) = do
   return (sub, c' ++ cs')
 
 -- resolvePat cs = return ([], cs)
-resolveDelta :: Constraint -> WithEnv (Maybe Constraint)
+resolveDelta :: [PreConstraint] -> WithEnv (Maybe [PreConstraint])
 resolveDelta [] = return Nothing
 resolveDelta ((_, _ :< NeutVar s, t2, _):cs) = do
   liftIO $ putStrLn $ "found a var-substition:\n" ++ Pr.ppShow (s, t2)
@@ -418,7 +454,7 @@ projectionList e (xts, t) = do
     meta <- newName
     return $ meta :< NeutSigmaElim e xiList v
 
-sConstraint :: Subst -> Constraint -> WithEnv Constraint
+sConstraint :: Subst -> [PreConstraint] -> WithEnv [PreConstraint]
 sConstraint s ctcs = do
   let (ctxList, cs, typeList) = split ctcs
   let (ts1, ts2) = unzip cs
@@ -427,20 +463,20 @@ sConstraint s ctcs = do
   let typeList' = map (subst s) typeList
   return $ unsplit ctxList (zip ts1' ts2') typeList'
 
-removeIdentFromCtx :: Identifier -> Constraint -> Constraint
+removeIdentFromCtx :: Identifier -> [PreConstraint] -> [PreConstraint]
 removeIdentFromCtx _ [] = []
 removeIdentFromCtx x ((ctx, e1, e2, t):cs) = do
   let ctx' = filter (/= x) ctx
   let cs' = removeIdentFromCtx x cs
   (ctx', e1, e2, t) : cs'
 
-split :: Constraint -> ([[Identifier]], [(Neut, Neut)], [Neut])
+split :: [PreConstraint] -> ([[Identifier]], [(Neut, Neut)], [Neut])
 split [] = ([], [], [])
 split ((ctx, e1, e2, t):rest) = do
   let (ctxList, cs, typeList) = split rest
   (ctx : ctxList, (e1, e2) : cs, t : typeList)
 
-unsplit :: [[Identifier]] -> [(Neut, Neut)] -> [Neut] -> Constraint
+unsplit :: [[Identifier]] -> [(Neut, Neut)] -> [Neut] -> [PreConstraint]
 unsplit [] [] [] = []
 unsplit (ctx:ctxList) ((e1, e2):cs) (t:typeList) =
   (ctx, e1, e2, t) : unsplit ctxList cs typeList

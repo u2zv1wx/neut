@@ -64,8 +64,6 @@ reduce (meta :< NeutMu s e) = do
   return $ meta :< NeutMu s e'
 reduce t = return t
 
-type Subst = [(Identifier, Neut)]
-
 subst :: Subst -> Neut -> Neut
 subst sub (j :< NeutVar s) = fromMaybe (j :< NeutVar s) (lookup s sub)
 subst _ (j :< NeutConst s) = j :< NeutConst s

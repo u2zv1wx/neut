@@ -269,7 +269,7 @@ data Env = Env
   , constEnv          :: [(Identifier, Neut)] -- (name, type)
   , constraintEnv     :: [PreConstraint]
   , constraintQueue   :: Q.MinQueue Constraint
-  , metaMap           :: [(Identifier, [Constraint])]
+  , metaMap           :: [(Identifier, [PreConstraint])]
   , substitution      :: Subst
   , caseStack         :: [Case]
   , univConstraintEnv :: [(UnivLevel, UnivLevel)]
