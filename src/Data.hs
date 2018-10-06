@@ -43,7 +43,7 @@ type Tree = Cofree TreeF Identifier
 data UnivLevel
   = UnivLevelHole Identifier
   | UnivLevelNext UnivLevel
-  deriving (Show)
+  deriving (Show, Eq)
 
 data Index
   = IndexLabel Identifier
@@ -81,6 +81,8 @@ data NeutF a
 type Neut = Cofree NeutF Identifier
 
 $(deriveShow1 ''NeutF)
+
+deriving instance Eq a => Eq (NeutF a)
 
 data LowType
   = LowTypeInt Int
@@ -220,26 +222,52 @@ type Context = [Identifier]
 -- (Gamma, e1, e2, t)  ==  Gamma |- e1 = e2 : t
 type PreConstraint = (Context, Neut, Neut, Neut)
 
-data Constraint
-  = ConstraintPattern PreConstraint
-  | ConstraintDelta PreConstraint
-  | ConstraintQuasiPattern PreConstraint
-  | ConstraintFlexRigid PreConstraint
-  | ConstraintFlexFlex PreConstraint
+data WeakConstraint
+  = ConstraintPattern Identifier
+                      [Identifier]
+                      Neut
+  | ConstraintBeta Identifier
+                   Neut
+  | ConstraintDelta Identifier
+                    [Neut]
+                    [Neut]
+  | ConstraintQuasiPattern Identifier
+                           [Identifier]
+                           Neut
+  | ConstraintFlexRigid Identifier
+                        [Neut]
+                        Neut
+  | ConstraintFlexFlex Identifier
+                       [Neut]
+                       Identifier
+                       [Neut]
   deriving (Show)
 
-constraintToInt :: Constraint -> Int
-constraintToInt (ConstraintPattern _)      = 0
-constraintToInt (ConstraintDelta _)        = 1
-constraintToInt (ConstraintQuasiPattern _) = 2
-constraintToInt (ConstraintFlexRigid _)    = 3
-constraintToInt (ConstraintFlexFlex _)     = 4
+data Constraint =
+  Constraint Context
+             WeakConstraint
+             Neut
+  deriving (Show)
 
-instance Eq Constraint where
+constraintToInt :: WeakConstraint -> Int
+constraintToInt ConstraintPattern {}      = 0
+constraintToInt ConstraintDelta {}        = 1
+constraintToInt ConstraintBeta {}         = 2
+constraintToInt ConstraintQuasiPattern {} = 3
+constraintToInt ConstraintFlexRigid {}    = 4
+constraintToInt ConstraintFlexFlex {}     = 5
+
+instance Eq WeakConstraint where
   c1 == c2 = constraintToInt c1 == constraintToInt c2
 
-instance Ord Constraint where
+instance Ord WeakConstraint where
   compare c1 c2 = compare (constraintToInt c1) (constraintToInt c2)
+
+instance Eq Constraint where
+  (Constraint _ c1 _) == (Constraint _ c2 _) = c1 == c2
+
+instance Ord Constraint where
+  compare (Constraint _ c1 _) (Constraint _ c2 _) = compare c1 c2
 
 type Subst = [(Identifier, Neut)]
 
@@ -251,11 +279,11 @@ data Justification
 
 data Case = Case
   { constraintQueueSnapshot :: Q.MinQueue Constraint
-  , metaMapSnapshot         :: [(Identifier, [Constraint])]
+  , metaMapSnapshot         :: [(Identifier, PreConstraint)]
   , substitutionSnapshot    :: Subst
   , caseJustification       :: Justification
   , savedJustification      :: Justification
-  , alternatives            :: [[Constraint]]
+  , alternatives            :: [PreConstraint]
   } deriving (Show)
 
 data Env = Env
@@ -269,7 +297,7 @@ data Env = Env
   , constEnv          :: [(Identifier, Neut)] -- (name, type)
   , constraintEnv     :: [PreConstraint]
   , constraintQueue   :: Q.MinQueue Constraint
-  , metaMap           :: [(Identifier, [PreConstraint])]
+  , metaMap           :: [(Identifier, PreConstraint)]
   , substitution      :: Subst
   , caseStack         :: [Case]
   , univConstraintEnv :: [(UnivLevel, UnivLevel)]

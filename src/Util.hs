@@ -207,3 +207,14 @@ lookupTypeEnv'' s = do
   case mt of
     Just t  -> return t
     Nothing -> boxUniv
+
+depends :: Justification -> Justification -> Bool
+depends j1 j2 = do
+  let vs1 = varInJusitifcation j1
+  let vs2 = varInJusitifcation j2
+  foldr (\x -> (||) (x `elem` vs2)) False vs1
+
+varInJusitifcation :: Justification -> [Identifier]
+varInJusitifcation (Asserted i)   = [i]
+varInJusitifcation (Assumption i) = [i]
+varInJusitifcation (Join js)      = concatMap varInJusitifcation js

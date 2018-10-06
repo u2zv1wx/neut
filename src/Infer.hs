@@ -26,8 +26,12 @@ check main e = do
   insTypeEnv main t -- insert the type of main function
   boxConstraint [] $ nonLinear e
   liftIO $ putStrLn $ "nonLinear: " ++ Pr.ppShow (nonLinear e)
+  cs <- gets constraintEnv
+  liftIO $ putStrLn $ "constraints:\n" ++ Pr.ppShow cs
+  gets constraintEnv >>= mapM_ visit
+  gets constraintQueue >>= synth
+  sub <- gets substitution
   env <- get
-  sub <- resolve $ constraintEnv env
   let tenv' = map (\(i, t) -> (i, subst sub t)) $ typeEnv env
   modify (\e -> e {typeEnv = tenv'})
   checkNumConstraint
@@ -63,7 +67,7 @@ infer ctx (meta :< NeutPiElim e1 e2) = do
   udom <- infer ctx tdom >>= annot higherUniv
   case tPi' of
     _ :< NeutPi (x, tdom') tcod' -> do
-      liftIO $ putStrLn "shortcut!"
+      liftIO $ putStrLn $ "shortcut!\n" ++ Pr.ppShow tPi'
       insConstraintEnv ctx tdom tdom' udom
       returnMeta meta $ subst [(x, e2)] tcod'
     _ -> do
@@ -338,102 +342,234 @@ simp (c:cs) = do
   return $ c : cs'
 
 categorize :: PreConstraint -> Constraint
-categorize = undefined
+categorize (ctx, _ :< NeutVar x, e2, t) = do
+  let c = ConstraintBeta x e2
+  Constraint ctx c t
+categorize (ctx, e1, e2@(_ :< NeutVar _), t) = categorize (ctx, e2, e1, t)
+categorize (ctx, e1, e2, t)
+  | (_ :< NeutVar x, metaArgs1) <- toPiElimSeq e1
+  , (_ :< NeutVar y, metaArgs2) <- toPiElimSeq e2
+  , x == y
+  , length metaArgs1 == length metaArgs2 = do
+    let c = ConstraintDelta x (map snd metaArgs1) (map snd metaArgs2)
+    Constraint ctx c t
+categorize (ctx, e1, e2, t)
+  | Just (x, args) <- headMeta [] e1
+  , let (fvs, fmvs) = varAndHole e2
+  , affineCheck args fvs && x `notElem` fmvs = do
+    let c = ConstraintPattern x args e2
+    Constraint ctx c t
+categorize (ctx, e1, e2, t)
+  | Just (x, args) <- headMeta [] e1
+  , let (fvs, fmvs) = varAndHole e2
+  , affineCheck args fvs && x `notElem` fmvs = categorize (ctx, e2, e1, t)
+categorize (ctx, e1, e2, t)
+  | Just (x, args) <- headMeta [] e1 = do
+    let c = ConstraintQuasiPattern x args e2
+    Constraint ctx c t
+categorize (ctx, e1, e2, t)
+  | Just _ <- headMeta [] e2 = categorize (ctx, e2, e1, t)
+categorize (ctx, e1, e2, t)
+  | Just (x, args1) <- headMeta' [] e1
+  , Just (y, args2) <- headMeta' [] e2 = do
+    let c = ConstraintFlexFlex x args1 y args2
+    Constraint ctx c t
+categorize (ctx, e1, e2, t)
+  | Just (x, args) <- headMeta' [] e1 = do
+    let c = ConstraintFlexRigid x args e2
+    Constraint ctx c t
+categorize (ctx, e1, e2, t)
+  | Just _ <- headMeta' [] e2 = categorize (ctx, e2, e1, t)
+categorize c = error $ "categorize: invalid argument:\n" ++ Pr.ppShow c
 
 visit :: PreConstraint -> WithEnv ()
-visit = undefined
+visit c = simp [c] >>= mapM_ visit'
 
-visitEq :: PreConstraint -> Justification -> WithEnv ()
-visitEq c@(ctx, e1, e2, t) j = do
+visit' :: PreConstraint -> WithEnv ()
+visit' c@(ctx, e1, e2, t) = do
   sub <- gets substitution
-  case (headMeta [] e1, headMeta [] e2) of
-    (Just (x, _), _)
-      | Just e <- lookup x sub -> do
-        let e1' = subst [(x, e)] e1
-        let e2' = subst [(x, e)] e2
-        cs <- simp [(ctx, e1', e2', t)]
+  case categorize c of
+    Constraint _ (ConstraintPattern hole _ _) _
+      | Just e <- lookup hole sub -> do
+        cs <- simp [(ctx, subst [(hole, e)] e1, subst [(hole, e)] e2, t)]
         mapM_ visit cs
-    (_, Just (y, _))
-      | Just _ <- lookup y sub -> visitEq (ctx, e2, e1, t) j
-    (Just (x, args), _)
-      | let (fvs, fmvs) = varAndHole e2
-      , affineCheck args fvs && x `notElem` fmvs -> do
-        ans <- bindFormalArgs args e2
-        modify (\e -> e {substitution = (x, ans) : substitution e})
-        mmap <- gets metaMap
-        let cs = concatMap snd $ filter (\(y, _) -> y == x) mmap
+    Constraint _ (ConstraintQuasiPattern hole _ _) _
+      | Just e <- lookup hole sub -> do
+        cs <- simp [(ctx, subst [(hole, e)] e1, subst [(hole, e)] e2, t)]
         mapM_ visit cs
-    (_, Just (y, args))
-      | let (fvs, fmvs) = varAndHole e2
-      , affineCheck args fvs && y `notElem` fmvs -> visitEq (ctx, e2, e1, t) j
+    Constraint _ (ConstraintFlexRigid hole _ _) _
+      | Just e <- lookup hole sub -> do
+        cs <- simp [(ctx, subst [(hole, e)] e1, subst [(hole, e)] e2, t)]
+        mapM_ visit cs
+    Constraint _ (ConstraintFlexFlex hole1 _ _ _) _
+      | Just e <- lookup hole1 sub -> do
+        cs <- simp [(ctx, subst [(hole1, e)] e1, subst [(hole1, e)] e2, t)]
+        mapM_ visit cs
+    Constraint _ (ConstraintFlexFlex _ _ hole2 _) _
+      | Just e <- lookup hole2 sub -> do
+        cs <- simp [(ctx, subst [(hole2, e)] e1, subst [(hole2, e)] e2, t)]
+        mapM_ visit cs
+    Constraint _ (ConstraintPattern hole args e) _ -> do
+      liftIO $ putStrLn $ "resolving: " ++ show hole
+      ans <- bindFormalArgs args e
+      modify (\e -> e {substitution = (hole, ans) : substitution e})
+      mmap <- gets metaMap
+      liftIO $ putStrLn $ "lem mmap = " ++ show (length mmap)
+      mapM_ (visit . snd) $ filter (\(y, _) -> y == hole) mmap
     _ -> do
       let c' = categorize c
-      modify (\e -> e {constraintQueue = Q.insert c' (constraintQueue e)})
+      liftIO $ putStrLn $ "inserting:\n" ++ Pr.ppShow c
+      modify (\e -> e {constraintQueue = Q.insert c' $ constraintQueue e})
+      case c' of
+        (Constraint _ (ConstraintQuasiPattern hole _ _) _) ->
+          modify (\e -> e {metaMap = (hole, c) : metaMap e})
+        (Constraint _ (ConstraintFlexRigid hole _ _) _) ->
+          modify (\e -> e {metaMap = (hole, c) : metaMap e})
+        (Constraint _ (ConstraintFlexFlex hole1 _ hole2 _) _) -> do
+          modify (\e -> e {metaMap = (hole1, c) : metaMap e})
+          modify (\e -> e {metaMap = (hole2, c) : metaMap e})
+        _ -> return ()
 
-resolve :: [PreConstraint] -> WithEnv Subst
-resolve cs = do
+resolve :: Justification -> WithEnv ()
+resolve j = do
+  stack <- gets caseStack
+  resolve' j stack
+
+resolve' :: Justification -> [Case] -> WithEnv ()
+resolve' _ [] = lift $ throwE "failed to resolvelve the case-split"
+resolve' j (c:cs)
+  | j `depends` caseJustification c = do
+    restoreState c
+    case alternatives c of
+      []    -> resolve' j cs
+      (a:_) -> visit a
+resolve' j (_:cs) = resolve' j cs
+
+restoreState :: Case -> WithEnv ()
+restoreState c =
+  modify
+    (\e ->
+       e
+         { constraintQueue = constraintQueueSnapshot c
+         , metaMap = metaMapSnapshot c
+         , substitution = substitutionSnapshot c
+         })
+
+process :: [PreConstraint] -> Justification -> WithEnv ()
+process [] j = resolve j
+process z@(a:_) j = do
+  ja <- Assumption <$> newNameWith "j"
+  c <- newCaseSplit ja z
+  modify (\e -> e {caseStack = c : caseStack e})
+  visit a
+
+newCaseSplit :: Justification -> [PreConstraint] -> WithEnv Case
+newCaseSplit ja z = do
+  q <- gets constraintQueue
+  mmap <- gets metaMap
+  sub <- gets substitution
+  return $
+    Case
+      { constraintQueueSnapshot = q
+      , metaMapSnapshot = mmap
+      , substitutionSnapshot = sub
+      , caseJustification = ja
+      , savedJustification = ja
+      , alternatives = z
+      }
+
+synth :: Q.MinQueue Constraint -> WithEnv ()
+synth q = do
+  liftIO $ putStrLn $ Pr.ppShow q
+  case Q.getMin q of
+    Nothing -> return ()
+    Just c -> do
+      q' <- synth' c
+      synth $ Q.deleteMin q `Q.union` q'
+
+synth' :: Constraint -> WithEnv (Q.MinQueue Constraint)
+synth' (Constraint _ (ConstraintPattern x args e) _) = do
+  ans <- bindFormalArgs args e
+  modify (\e -> e {substitution = (x, ans) : substitution e})
+  mmap <- gets metaMap
+  modify (\e -> e {constraintQueue = Q.empty})
+  mapM_ (visit . snd) $ filter (\(y, _) -> y == x) mmap
+  gets constraintQueue
+synth' (Constraint ctx (ConstraintBeta x body) t) = do
+  sub <- gets substitution
+  modify (\e -> e {substitution = (x, body) : substitution e})
+  case lookup x sub of
+    Nothing -> return Q.empty
+    Just body' -> Q.fromList . map categorize <$> simp [(ctx, body, body', t)]
+synth' (Constraint ctx (ConstraintDelta x args1 args2) t) = do
+  sub <- gets substitution
+  liftIO $ putStrLn $ Pr.ppShow sub
+  a1 <- simp $ map (\(e1, e2) -> (ctx, e1, e2, t)) $ zip args1 args2
+  a2 <- undefined
+  j <- Assumption <$> newNameWith "j"
+  process (a1 ++ a2) j
+  return Q.empty
+synth' (Constraint ctx (ConstraintQuasiPattern {}) t) = do
   undefined
-  -- cs' <- simp cs
-  -- (s1, cs1) <- resolvePat cs'
-  -- (s1', cs1') <- simp cs1 >>= resolvePat
-  -- case cs1' of
-  --   [] -> return s1
-  --   _ -> do
-  --     cs1'' <- simp cs1'
-  --     liftIO $ putStrLn $ "after pat:\n" ++ Pr.ppShow cs1'
-  --     mcs2 <- resolveDelta cs1''
-  --     case mcs2 of
-  --       Just cs2 -> do
-  --         s2 <- resolve cs2
-  --         return $ compose s1' s2
-  --       Nothing -> lift $ throwE $ "couldn't resolve: " ++ Pr.ppShow cs1
+synth' (Constraint ctx (ConstraintFlexRigid {}) t) = undefined
+synth' (Constraint ctx (ConstraintFlexFlex {}) t) = undefined
 
-resolvePat :: [PreConstraint] -> WithEnv (Subst, [PreConstraint])
-resolvePat [] = return ([], [])
-resolvePat (c@(_, e1, e2, _):cs)
-  | Just (x, args) <- headMeta [] e1 = do
-    let (fvs, fmvs) = varAndHole e2
-    if affineCheck args fvs && x `notElem` fmvs
-      then do
-        ans <- bindFormalArgs args e2
-        cs' <- sConstraint [(x, ans)] cs
-        (sub, cs'') <- resolvePat cs'
-        let sub' = compose sub [(x, ans)]
-        return (sub', cs'')
-      else do
-        liftIO $ putStrLn $ "affineCheck failed for:\n" ++ Pr.ppShow e1
-        (s, cs') <- resolvePat cs
-        c' <- sConstraint s [c]
-        return (s, c' ++ cs')
-        -- return ([], c : cs)
-resolvePat ((ctx, e1, e2, t):cs)
-  | Just _ <- headMeta [] e2 = resolvePat $ (ctx, e2, e1, t) : cs
-resolvePat (c:cs) = do
-  (sub, cs') <- resolvePat cs
-  c' <- sConstraint sub [c]
-  return (sub, c' ++ cs')
-
+-- resolve :: [PreConstraint] -> WithEnv Subst
+-- resolve cs = do
+--   undefined
+-- resolvePat :: [PreConstraint] -> WithEnv (Subst, [PreConstraint])
+-- resolvePat [] = return ([], [])
+-- resolvePat (c@(_, e1, e2, _):cs)
+--   | Just (x, args) <- headMeta [] e1 = do
+--     let (fvs, fmvs) = varAndHole e2
+--     if affineCheck args fvs && x `notElem` fmvs
+--       then do
+--         ans <- bindFormalArgs args e2
+--         cs' <- sConstraint [(x, ans)] cs
+--         (sub, cs'') <- resolvePat cs'
+--         let sub' = compose sub [(x, ans)]
+--         return (sub', cs'')
+--       else do
+--         liftIO $ putStrLn $ "affineCheck failed for:\n" ++ Pr.ppShow e1
+--         (s, cs') <- resolvePat cs
+--         c' <- sConstraint s [c]
+--         return (s, c' ++ cs')
+--         -- return ([], c : cs)
+-- resolvePat ((ctx, e1, e2, t):cs)
+--   | Just _ <- headMeta [] e2 = resolvePat $ (ctx, e2, e1, t) : cs
+-- resolvePat (c:cs) = do
+--   (sub, cs') <- resolvePat cs
+--   c' <- sConstraint sub [c]
+--   return (sub, c' ++ cs')
 -- resolvePat cs = return ([], cs)
-resolveDelta :: [PreConstraint] -> WithEnv (Maybe [PreConstraint])
-resolveDelta [] = return Nothing
-resolveDelta ((_, _ :< NeutVar s, t2, _):cs) = do
-  liftIO $ putStrLn $ "found a var-substition:\n" ++ Pr.ppShow (s, t2)
-  cs' <- sConstraint [(s, t2)] $ removeIdentFromCtx s cs
-  return (Just cs')
-resolveDelta ((_, t1, _ :< NeutVar s, _):cs) = do
-  liftIO $ putStrLn $ "found a var-substition:\n" ++ Pr.ppShow (s, t1)
-  cs' <- sConstraint [(s, t1)] $ removeIdentFromCtx s cs
-  return $ Just cs'
-resolveDelta (c:cs) = do
-  mcs' <- resolveDelta cs
-  case mcs' of
-    Nothing  -> return Nothing
-    Just cs' -> return $ Just $ c : cs'
-
+-- resolveDelta :: [PreConstraint] -> WithEnv (Maybe [PreConstraint])
+-- resolveDelta [] = return Nothing
+-- resolveDelta ((_, _ :< NeutVar s, t2, _):cs) = do
+--   liftIO $ putStrLn $ "found a var-substition:\n" ++ Pr.ppShow (s, t2)
+--   cs' <- sConstraint [(s, t2)] $ removeIdentFromCtx s cs
+--   return (Just cs')
+-- resolveDelta ((_, t1, _ :< NeutVar s, _):cs) = do
+--   liftIO $ putStrLn $ "found a var-substition:\n" ++ Pr.ppShow (s, t1)
+--   cs' <- sConstraint [(s, t1)] $ removeIdentFromCtx s cs
+--   return $ Just cs'
+-- resolveDelta (c:cs) = do
+--   mcs' <- resolveDelta cs
+--   case mcs' of
+--     Nothing  -> return Nothing
+--     Just cs' -> return $ Just $ c : cs'
 headMeta :: [Identifier] -> Neut -> Maybe (Identifier, [Identifier])
 headMeta args (_ :< NeutPiElim e1 (_ :< NeutVar x)) = headMeta (x : args) e1
 headMeta args (_ :< NeutHole x)                     = Just (x, args)
 headMeta _ _                                        = Nothing
+
+headMeta' :: [Neut] -> Neut -> Maybe (Identifier, [Neut])
+headMeta' args (_ :< NeutPiElim e1 e2) = headMeta' (e2 : args) e1
+headMeta' args (_ :< NeutHole x)       = Just (x, args)
+headMeta' _ _                          = Nothing
+
+getHead :: Neut -> Neut
+getHead (_ :< NeutPiElim e1 _) = getHead e1
+getHead e                      = e
 
 affineCheck :: [Identifier] -> [Identifier] -> Bool
 affineCheck xs = affineCheck' xs xs
@@ -463,13 +599,12 @@ sConstraint s ctcs = do
   let typeList' = map (subst s) typeList
   return $ unsplit ctxList (zip ts1' ts2') typeList'
 
-removeIdentFromCtx :: Identifier -> [PreConstraint] -> [PreConstraint]
-removeIdentFromCtx _ [] = []
-removeIdentFromCtx x ((ctx, e1, e2, t):cs) = do
-  let ctx' = filter (/= x) ctx
-  let cs' = removeIdentFromCtx x cs
-  (ctx', e1, e2, t) : cs'
-
+-- removeIdentFromCtx :: Identifier -> [PreConstraint] -> [PreConstraint]
+-- removeIdentFromCtx _ [] = []
+-- removeIdentFromCtx x ((ctx, e1, e2, t):cs) = do
+--   let ctx' = filter (/= x) ctx
+--   let cs' = removeIdentFromCtx x cs
+--   (ctx', e1, e2, t) : cs'
 split :: [PreConstraint] -> ([[Identifier]], [(Neut, Neut)], [Neut])
 split [] = ([], [], [])
 split ((ctx, e1, e2, t):rest) = do
