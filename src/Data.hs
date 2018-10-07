@@ -283,7 +283,7 @@ data Case = Case
   , substitutionSnapshot    :: Subst
   , caseJustification       :: Justification
   , savedJustification      :: Justification
-  , alternatives            :: [PreConstraint]
+  , alternatives            :: [[PreConstraint]]
   } deriving (Show)
 
 data Env = Env

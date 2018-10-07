@@ -421,7 +421,7 @@ resolve' j (c:cs)
     restoreState c
     case alternatives c of
       []    -> resolve' j cs
-      (a:_) -> analyze [a]
+      (a:_) -> analyze a
 resolve' j (_:cs) = resolve' j cs
 
 restoreState :: Case -> WithEnv ()
@@ -434,15 +434,15 @@ restoreState c =
          , substitution = substitutionSnapshot c
          })
 
-process :: [PreConstraint] -> Justification -> WithEnv ()
+process :: [[PreConstraint]] -> Justification -> WithEnv ()
 process [] j = resolve j
 process z@(a:_) j = do
   ja <- Assumption <$> newNameWith "j"
   c <- newCaseSplit ja z
   modify (\e -> e {caseStack = c : caseStack e})
-  analyze [a]
+  analyze a
 
-newCaseSplit :: Justification -> [PreConstraint] -> WithEnv Case
+newCaseSplit :: Justification -> [[PreConstraint]] -> WithEnv Case
 newCaseSplit ja z = do
   q <- gets constraintQueue
   mmap <- gets metaMap
@@ -471,9 +471,7 @@ synthesize' (Constraint _ (ConstraintPattern x args e) _) = do
   ans <- bindFormalArgs args e
   modify (\e -> e {substitution = (x, ans) : substitution e})
   mmap <- gets metaMap
-  modify (\e -> e {constraintQueue = Q.empty})
-  analyze $ map snd $ filter (\(y, _) -> y == x) mmap
-  gets constraintQueue
+  getQueue $ analyze $ map snd $ filter (\(y, _) -> y == x) mmap
 synthesize' (Constraint ctx (ConstraintBeta x body) t) = do
   me <- insDef x body
   case me of
@@ -483,15 +481,41 @@ synthesize' (Constraint ctx (ConstraintDelta x args1 args2) t) = do
   sub <- gets substitution
   liftIO $ putStrLn $ Pr.ppShow sub
   a1 <- simp $ map (\(e1, e2) -> (ctx, e1, e2, t)) $ zip args1 args2
-  a2 <- undefined
   j <- Assumption <$> newNameWith "j"
-  process (a1 ++ a2) j
-  return Q.empty
-synthesize' (Constraint ctx (ConstraintQuasiPattern {}) t) = do
-  undefined
-synthesize' (Constraint ctx (ConstraintFlexRigid {}) t) = undefined
+  case lookup x sub of
+    Nothing -> getQueue $ process [a1] j
+    Just e -> do
+      e1' <- appFold' e args1 >>= reduce
+      e2' <- appFold' e args2 >>= reduce
+      a2 <- simp [(ctx, e1', e2', t)]
+      getQueue $ process [a1, a2] j
+synthesize' (Constraint ctx (ConstraintQuasiPattern hole preArgs e) t) = do
+  args <- mapM toVar preArgs
+  synthesize' (Constraint ctx (ConstraintFlexRigid hole args e) t)
+synthesize' (Constraint ctx (ConstraintFlexRigid hole args e) t)
+  | (x@(_ :< NeutVar _), eArgs) <- toPiElimSeq e = do
+    let candList = x : args
+    newHoleList <- mapM (const (newNameWith "hole") >=> toVar) args
+    newArgList <- mapM (const $ newNameWith "arg") eArgs
+    newVarList <- mapM toVar newArgList
+    argList <- forM newHoleList $ \h -> appFold' h newVarList
+    bodyList <- forM candList $ \v -> appFold' v argList
+    lamList <- forM bodyList $ \body -> bindFormalArgs newArgList body
+    as <-
+      forM lamList $ \lam -> do
+        left <- appFold' lam args
+        meta <- newNameWith "meta"
+        simp [(ctx, left, e, t), (ctx, meta :< NeutHole hole, lam, t)]
+    j <- Assumption <$> newNameWith "j"
+    getQueue $ process as j
 synthesize' (Constraint _ c _) =
   lift $ throwE $ "cannot synthesize:\n" ++ Pr.ppShow c
+
+getQueue :: WithEnv a -> WithEnv (Q.MinQueue Constraint)
+getQueue command = do
+  modify (\e -> e {constraintQueue = Q.empty})
+  command
+  gets constraintQueue
 
 insDef :: Identifier -> Neut -> WithEnv (Maybe Neut)
 insDef x body = do

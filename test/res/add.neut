@@ -22,4 +22,4 @@
 (definition foo
   (lambda ((S type)) (hom S S)))
 
-(core.add 1 1)
+(core.add 1 2)

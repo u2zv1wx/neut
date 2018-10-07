@@ -164,6 +164,12 @@ appFold e@(i :< _) (term:ts) = do
       appFold (meta :< NeutPiElim e term) ts
     _ -> error "Lift.appFold"
 
+appFold' :: Neut -> [Neut] -> WithEnv Neut
+appFold' e [] = return e
+appFold' e (term:ts) = do
+  meta <- newNameWith "meta"
+  appFold (meta :< NeutPiElim e term) ts
+
 constructFormalArgs :: [Identifier] -> WithEnv [Identifier]
 constructFormalArgs [] = return []
 constructFormalArgs (ident:is) = do
