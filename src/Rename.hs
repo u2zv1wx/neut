@@ -13,7 +13,9 @@ rename :: Neut -> WithEnv Neut
 rename (i :< NeutVar s) = do
   t <- NeutVar <$> lookupNameEnv s
   return $ i :< t
-rename (i :< NeutConst s) = return $ i :< NeutConst s
+rename (i :< NeutConst s t) = do
+  t' <- rename t
+  return $ i :< NeutConst s t'
 rename (i :< NeutPi (s, tdom) tcod) = do
   tdom' <- rename tdom
   local $ do

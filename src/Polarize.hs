@@ -18,7 +18,7 @@ import           Data.Maybe                 (maybeToList)
 
 polarizeNeg :: Neut -> WithEnv Neg
 polarizeNeg (_ :< NeutVar s) = return $ NegUpIntro $ PosVar s
-polarizeNeg (_ :< NeutConst s) = return $ NegUpIntro $ PosConst s
+polarizeNeg (_ :< NeutConst s _) = return $ NegUpIntro $ PosConst s
 polarizeNeg forall@(_ :< NeutPi _ _) = NegUpIntro <$> polarizePos forall
 polarizeNeg lam@(_ :< NeutPiIntro _ _) = NegUpIntro <$> polarizePos lam
 polarizeNeg e@(_ :< NeutPiElim _ _) = do
@@ -26,7 +26,7 @@ polarizeNeg e@(_ :< NeutPiElim _ _) = do
   formalArgs <- mapM (const newName) identArgList
   let (_, argList) = unzip identArgList
   case fun of
-    _ :< NeutConst funName ->
+    _ :< NeutConst funName _ ->
       bindSeq (zip formalArgs argList) (NegPiElimDownElim funName formalArgs)
     _ -> do
       funName <- newNameWith "fun"
@@ -64,7 +64,7 @@ polarizeNeg (_ :< NeutHole x) =
 
 polarizePos :: Neut -> WithEnv Pos
 polarizePos (_ :< NeutVar s) = return $ PosVar s
-polarizePos (_ :< NeutConst s) = return $ PosConst s
+polarizePos (_ :< NeutConst s _) = return $ PosConst s
 polarizePos forall@(_ :< NeutPi _ _) = do
   let (body, xts) = toPiSeq forall
   body' <- polarizePos body

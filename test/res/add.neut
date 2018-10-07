@@ -19,7 +19,18 @@
 
 (definition type (box universe))
 
+(definition state
+  (lambda ((S type) (A type))
+    (hom S (tensor S A))))
+
+(index world)
+
+(definition io
+  (state world))
+
+(primitive print (hom i32 (io top)))
+
 (definition foo
   (lambda ((S type)) (hom S S)))
 
-(core.add 1 2)
+(core.add 100 2)

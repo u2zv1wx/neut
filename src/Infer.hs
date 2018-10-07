@@ -39,18 +39,22 @@ infer :: Context -> Neut -> WithEnv Neut
 infer _ (meta :< NeutVar s) = do
   t <- lookupTypeEnv' s
   returnMeta meta t
-infer _ (meta :< NeutConst s) = do
-  t <- lookupConstEnv' s
+infer ctx (meta :< NeutConst s t) = do
+  insTypeEnv s t
+  higherUniv <- boxUniv
+  univ <- boxUniv >>= annot higherUniv
+  u <- infer ctx t >>= annot higherUniv
+  insConstraintEnv ctx univ u higherUniv
   returnMeta meta t
 infer ctx (meta :< NeutPi (s, tdom) tcod) = do
   insTypeEnv s tdom
   higherUniv <- boxUniv
+  univ <- boxUniv >>= annot higherUniv
   udom <- infer ctx tdom >>= annot higherUniv
   ucod <- infer (ctx ++ [s]) tcod >>= annot higherUniv
-  ub <- boxUniv >>= annot higherUniv
-  insConstraintEnv ctx udom ub higherUniv
   insConstraintEnv (ctx ++ [s]) udom ucod higherUniv
-  returnMeta meta higherUniv
+  insConstraintEnv ctx udom univ higherUniv
+  returnMeta meta univ
 infer ctx (meta :< NeutPiIntro (s, tdom) e) = do
   univ <- boxUniv
   tdom' <- annot univ tdom
@@ -59,7 +63,7 @@ infer ctx (meta :< NeutPiIntro (s, tdom) e) = do
   tcod <- infer ctx' e >>= annot univ
   typeMeta <- newName' "meta" univ
   returnMeta meta $ typeMeta :< NeutPi (s, tdom') tcod
-infer ctx (meta :< NeutPiElim e1 e2) = do
+infer ctx e@(meta :< NeutPiElim e1 e2) = do
   univ <- boxUniv
   -- obtain the type of e1
   tPi <- infer ctx e1 >>= reduce -- forall (x : tdom). tcod
@@ -83,7 +87,7 @@ infer ctx (_ :< NeutSigma xts t) = do
   forM_ xts $ uncurry insTypeEnv
   higherUniv <- boxUniv
   univ <- boxUniv >>= annot higherUniv
-  forM_ (map snd xts ++ [t]) $ \t -> do
+  forM_ (map snd xts ++ [t]) $ \t@(meta :< _) -> do
     u <- infer ctx t
     insConstraintEnv ctx u univ higherUniv
   return univ
@@ -244,6 +248,16 @@ toVar x = do
   insTypeEnv meta t
   return $ meta :< NeutVar x
 
+toVar' :: Identifier -> WithEnv Neut
+toVar' x = do
+  meta <- newNameWith "meta"
+  return $ meta :< NeutVar x
+
+toHole' :: Identifier -> WithEnv Neut
+toHole' x = do
+  meta <- newNameWith "meta"
+  return $ meta :< NeutHole x
+
 returnMeta :: Identifier -> Neut -> WithEnv Neut
 returnMeta meta t = do
   insTypeEnv meta t
@@ -251,6 +265,12 @@ returnMeta meta t = do
 
 simp :: [PreConstraint] -> WithEnv [PreConstraint]
 simp [] = return []
+simp ((ctx, e1, e2, t):cs)
+  | isNonRecReducible e1 = do
+    e1' <- nonRecReduce e1
+    simp $ (ctx, e1', e2, t) : cs
+simp ((ctx, e1, e2, t):cs)
+  | isNonRecReducible e2 = simp $ (ctx, e2, e1, t) : cs
 simp ((_, _ :< NeutVar s1, _ :< NeutVar s2, _):cs)
   | s1 == s2 = simp cs
 simp ((ctx, _ :< NeutVar s1, e2, t):cs) = do
@@ -260,16 +280,16 @@ simp ((ctx, _ :< NeutVar s1, e2, t):cs) = do
     Just e  -> simp $ (ctx, e, e2, t) : cs
 simp ((ctx, e1, v@(_ :< NeutVar _), t):cs) = simp $ (ctx, v, e1, t) : cs
 simp ((ctx, _ :< NeutPi (x, tdom1) tcod1, _ :< NeutPi (y, tdom2) tcod2, univ):cs) = do
-  var <- toVar x
+  var <- toVar' x
   cs' <- sConstraint [(y, var)] cs >>= simp
   return $
     (ctx, tdom1, tdom2, univ) :
     (ctx ++ [x], tcod1, subst [(y, var)] tcod2, univ) : cs'
 simp ((ctx, _ :< NeutPiIntro (x, _) body1, _ :< NeutPiIntro (y, _) body2, _ :< NeutPi (z, _) tcod):cs) = do
-  var <- toVar z
+  var <- toVar' z
   simp $ (ctx ++ [z], subst [(x, var)] body1, subst [(y, var)] body2, tcod) : cs
 simp ((ctx, _ :< NeutPiIntro (x, _) body1, e2, _ :< NeutPi (z, _) tcod):cs) = do
-  var <- toVar x
+  var <- toVar' x
   let tcod' = subst [(z, var)] tcod
   appMeta <- newNameOfType tcod'
   let app = appMeta :< NeutPiElim e2 var
@@ -277,7 +297,7 @@ simp ((ctx, _ :< NeutPiIntro (x, _) body1, e2, _ :< NeutPi (z, _) tcod):cs) = do
 simp ((ctx, e1, e2@(_ :< NeutPiIntro _ _), t@(_ :< NeutPi _ _)):cs) =
   simp $ (ctx, e2, e1, t) : cs
 simp ((ctx, _ :< NeutSigma [(x, tdom1)] tcod1, _ :< NeutSigma [(y, tdom2)] tcod2, univ):cs) = do
-  var <- toVar x
+  var <- toVar' x
   cs' <- sConstraint [(y, var)] cs >>= simp
   return $
     (ctx, tdom1, tdom2, univ) :
@@ -392,8 +412,12 @@ analyze' c@(ctx, e1, e2, t) = do
         cs <- simp [(ctx, subst [(hole2, e)] e1, subst [(hole2, e)] e2, t)]
         analyze cs
     Constraint _ (ConstraintPattern hole args e) _ -> do
-      ans <- bindFormalArgs args e
-      modify (\e -> e {substitution = (hole, ans) : substitution e})
+      ans <- bindFormalArgs' args e
+      modify (\e -> e {substitution = compose [(hole, ans)] (substitution e)})
+      sub <- gets substitution
+      q <- gets constraintQueue
+      modify (\e -> e {constraintQueue = Q.empty})
+      mapM_ (substConstraint sub) $ Q.toList q
       mmap <- gets metaMap
       analyze $ map snd $ filter (\(y, _) -> y == hole) mmap
     _ -> do
@@ -408,6 +432,41 @@ analyze' c@(ctx, e1, e2, t) = do
           modify (\e -> e {metaMap = (hole1, c) : metaMap e})
           modify (\e -> e {metaMap = (hole2, c) : metaMap e})
         _ -> return ()
+
+derelict :: Constraint -> WithEnv PreConstraint
+derelict (Constraint ctx (ConstraintPattern hole xs e2) t) = do
+  v <- toHole' hole
+  args <- mapM toVar' xs
+  e1 <- appFold' v args
+  return (ctx, e1, e2, t)
+derelict (Constraint ctx (ConstraintBeta x e) t) = do
+  v <- toVar' x
+  return (ctx, v, e, t)
+derelict (Constraint ctx (ConstraintDelta x es1 es2) t) = do
+  v <- toVar' x
+  e1 <- appFold' v es1
+  e2 <- appFold' v es2
+  return (ctx, e1, e2, t)
+derelict (Constraint ctx (ConstraintQuasiPattern hole xs e2) t) = do
+  v <- toHole' hole
+  args <- mapM toVar' xs
+  e1 <- appFold' v args
+  return (ctx, e1, e2, t)
+derelict (Constraint ctx (ConstraintFlexRigid hole args e2) t) = do
+  v <- toHole' hole
+  e1 <- appFold' v args
+  return (ctx, e1, e2, t)
+derelict (Constraint ctx (ConstraintFlexFlex hole1 es1 hole2 es2) t) = do
+  v1 <- toHole' hole1
+  v2 <- toHole' hole2
+  e1 <- appFold' v1 es1
+  e2 <- appFold' v2 es2
+  return (ctx, e1, e2, t)
+
+substConstraint :: Subst -> Constraint -> WithEnv ()
+substConstraint sub c = do
+  (ctx, e1, e2, t) <- derelict c
+  analyze [(ctx, subst sub e1, subst sub e2, t)]
 
 resolve :: Justification -> WithEnv ()
 resolve j = do
@@ -468,8 +527,9 @@ synthesize q = do
 
 synthesize' :: Constraint -> WithEnv (Q.MinQueue Constraint)
 synthesize' (Constraint _ (ConstraintPattern x args e) _) = do
-  ans <- bindFormalArgs args e
-  modify (\e -> e {substitution = (x, ans) : substitution e})
+  ans <- bindFormalArgs' args e
+  liftIO $ putStrLn $ "solved: " ++ x
+  modify (\e -> e {substitution = compose [(x, ans)] (substitution e)})
   mmap <- gets metaMap
   getQueue $ analyze $ map snd $ filter (\(y, _) -> y == x) mmap
 synthesize' (Constraint ctx (ConstraintBeta x body) t) = do
@@ -490,17 +550,17 @@ synthesize' (Constraint ctx (ConstraintDelta x args1 args2) t) = do
       a2 <- simp [(ctx, e1', e2', t)]
       getQueue $ process [a1, a2] j
 synthesize' (Constraint ctx (ConstraintQuasiPattern hole preArgs e) t) = do
-  args <- mapM toVar preArgs
+  args <- mapM toVar' preArgs
   synthesize' (Constraint ctx (ConstraintFlexRigid hole args e) t)
 synthesize' (Constraint ctx (ConstraintFlexRigid hole args e) t)
   | (x@(_ :< NeutVar _), eArgs) <- toPiElimSeq e = do
     let candList = x : args
-    newHoleList <- mapM (const (newNameWith "hole") >=> toVar) args
+    newHoleList <- mapM (const (newNameWith "hole") >=> toVar') args
     newArgList <- mapM (const $ newNameWith "arg") eArgs
-    newVarList <- mapM toVar newArgList
+    newVarList <- mapM toVar' newArgList
     argList <- forM newHoleList $ \h -> appFold' h newVarList
     bodyList <- forM candList $ \v -> appFold' v argList
-    lamList <- forM bodyList $ \body -> bindFormalArgs newArgList body
+    lamList <- forM bodyList $ \body -> bindFormalArgs' newArgList body
     as <-
       forM lamList $ \lam -> do
         left <- appFold' lam args
@@ -508,7 +568,9 @@ synthesize' (Constraint ctx (ConstraintFlexRigid hole args e) t)
         simp [(ctx, left, e, t), (ctx, meta :< NeutHole hole, lam, t)]
     j <- Assumption <$> newNameWith "j"
     getQueue $ process as j
-synthesize' (Constraint _ c _) =
+synthesize' (Constraint _ c _) = do
+  sub <- gets substitution
+  liftIO $ putStrLn $ Pr.ppShow sub
   lift $ throwE $ "cannot synthesize:\n" ++ Pr.ppShow c
 
 getQueue :: WithEnv a -> WithEnv (Q.MinQueue Constraint)

@@ -33,6 +33,7 @@ load s = do
   astList <- strToTree s
   defList <- load' astList
   e <- concatDefList defList
+  liftIO $ putStrLn $ Pr.ppShow e
   process e
 
 load' :: [Tree] -> WithEnv [(Identifier, Identifier, Neut)]
@@ -47,17 +48,20 @@ load' ((_ :< TreeNode ((_ :< TreeAtom "index"):(_ :< TreeAtom name):ts)):as) = d
   indexList <- mapM parseAtom ts
   insIndexEnv name indexList
   load' as
-load' ((_ :< TreeNode [_ :< TreeAtom "primitive", _ :< TreeAtom name, t]):as) = do
-  e <- macroExpand t >>= parse >>= rename
-  e' <- check name e
-  t <- lookupTypeEnv' name
-  case t of
-    _ :< NeutBox (_ :< NeutUniv _) -> do
-      insConstEnv name e'
-      env <- get
-      liftIO $ putStrLn $ Pr.ppShow (constEnv env)
-      load' as
-    _ -> error $ "the type of " ++ name ++ " is not univ"
+load' ((meta :< TreeNode [primMeta :< TreeAtom "primitive", _ :< TreeAtom name, t]):as) = do
+  t' <- macroExpand t >>= parse >>= rename
+  constNameWith name
+  defList <- load' as
+  return $ (meta, name, primMeta :< NeutConst name t') : defList
+  -- e' <- check name e
+  -- t <- lookupTypeEnv' name
+  -- case t of
+  --   _ :< NeutBox (_ :< NeutUniv _) -> do
+  --     insConstEnv name e'
+  --     env <- get
+  --     liftIO $ putStrLn $ Pr.ppShow (constEnv env)
+  --     load' as
+  --   _ -> error $ "the type of " ++ name ++ " is not univ"
 load' ((meta :< TreeNode [_ :< TreeAtom "definition", _ :< TreeAtom name, tbody]):as) = do
   tmp <- macroExpand tbody >>= parse
   liftIO $ putStrLn $ Pr.ppShow tmp

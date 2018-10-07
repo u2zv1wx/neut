@@ -46,7 +46,7 @@ var e = fst $ varAndHole e
 
 nonLinear :: Neut -> [Identifier]
 nonLinear (_ :< NeutVar _) = []
-nonLinear (_ :< NeutConst _) = []
+nonLinear (_ :< NeutConst _ _) = []
 nonLinear (_ :< NeutPi (x, tdom) tcod) = do
   let ns1 = nonLinear tdom
   let ns2 = isAffine x $ nonLinear tcod
@@ -85,7 +85,7 @@ nonLinear (_ :< NeutHole _) = []
 
 varAndHole :: Neut -> ([Identifier], [Identifier])
 varAndHole (_ :< NeutVar s) = ([s], [])
-varAndHole (_ :< NeutConst _) = ([], [])
+varAndHole (_ :< NeutConst _ _) = ([], [])
 varAndHole (_ :< NeutPi (x, tdom) tcod) = do
   let vs1 = varAndHole tdom
   let (vs21, vs22) = varAndHole tcod
@@ -168,7 +168,7 @@ appFold' :: Neut -> [Neut] -> WithEnv Neut
 appFold' e [] = return e
 appFold' e (term:ts) = do
   meta <- newNameWith "meta"
-  appFold (meta :< NeutPiElim e term) ts
+  appFold' (meta :< NeutPiElim e term) ts
 
 constructFormalArgs :: [Identifier] -> WithEnv [Identifier]
 constructFormalArgs [] = return []
@@ -192,6 +192,15 @@ bindFormalArgs (arg:xs) c@(metaLam :< _) = do
   insTypeEnv tLamMeta univ
   insTypeEnv univMeta univ
   insTypeEnv meta (univMeta :< NeutPi (arg, tArg) tLam)
+  return $ meta :< NeutPiIntro (arg, tArg) tmp
+
+bindFormalArgs' :: [Identifier] -> Neut -> WithEnv Neut
+bindFormalArgs' [] terminal = return terminal
+bindFormalArgs' (arg:xs) c = do
+  tmp <- bindFormalArgs' xs c
+  meta <- newNameWith "meta"
+  liftIO $ putStrLn $ "arg: " ++ arg
+  tArg <- lookupTypeEnv' arg
   return $ meta :< NeutPiIntro (arg, tArg) tmp
 
 pairwiseConcat :: [([a], [b])] -> ([a], [b])

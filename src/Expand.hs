@@ -11,7 +11,7 @@ import           Util
 -- eliminate partial applications by eta-expansion
 expand :: Neut -> WithEnv Neut
 expand (i :< NeutVar x) = return $ i :< NeutVar x
-expand (i :< NeutConst x) = return $ i :< NeutConst x
+expand (i :< NeutConst x t) = return $ i :< NeutConst x t
 expand (i :< NeutPi (x, tdom) tcod) = do
   tdom' <- expand tdom
   tcod' <- expand tcod

@@ -54,6 +54,7 @@ data Index
 data NeutF a
   = NeutVar Identifier
   | NeutConst Identifier
+              a
   | NeutPi (Identifier, a)
            a
   | NeutPiIntro (Identifier, a)
@@ -212,11 +213,10 @@ instance (Show a) => Show (IORef a) where
 initialIndexEnv :: [(Identifier, [Identifier])]
 initialIndexEnv = [("int", [])]
 
-isExternalConst :: Identifier -> WithEnv Bool
-isExternalConst name = do
-  env <- get
-  return $ name `elem` map fst (constEnv env)
-
+-- isExternalConst :: Identifier -> WithEnv Bool
+-- isExternalConst name = do
+--   env <- get
+--   return $ name `elem` map fst (constEnv env)
 type Context = [Identifier]
 
 -- (Gamma, e1, e2, t)  ==  Gamma |- e1 = e2 : t
@@ -376,6 +376,9 @@ newNameWith s = do
   let s' = s ++ i
   modify (\e -> e {nameEnv = (s, s') : nameEnv e})
   return s'
+
+constNameWith :: Identifier -> WithEnv ()
+constNameWith s = modify (\e -> e {nameEnv = (s, s) : nameEnv e})
 
 lookupTypeEnv :: String -> WithEnv (Maybe Neut)
 lookupTypeEnv s = gets (lookup s . typeEnv)
