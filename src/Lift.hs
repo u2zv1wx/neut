@@ -9,9 +9,9 @@ import           Control.Monad.Trans.Except
 
 import qualified Text.Show.Pretty           as Pr
 
-import           Util
-
 import           Data
+import           Reduce
+import           Util
 
 lift :: Neut -> WithEnv Neut
 lift v@(_ :< NeutVar _) = return v
@@ -20,14 +20,18 @@ lift (i :< NeutPi (x, tdom) tcod) = do
   tdom' <- lift tdom
   tcod' <- lift tcod
   return $ i :< NeutPi (x, tdom') tcod'
-lift (i :< NeutPiIntro arg body) = do
+lift lam@(i :< NeutPiIntro _ _) = do
+  let (body, xtms) = toPiIntroSeq lam
   body' <- lift body
-  let freeVars = var $ i :< NeutPiIntro arg body'
+  let xs = map (\(x, _, _) -> x) xtms
+  let freeVars = filter (`notElem` xs) $ var body'
   newFormalArgs <- constructFormalArgs freeVars
   let freeToBound = zip freeVars newFormalArgs
   body'' <- replace freeToBound body'
-  lam' <- bindFormalArgs newFormalArgs $ i :< NeutPiIntro arg body''
-  args <- mapM wrapArg freeVars
+  lamType <- lookupTypeEnv' i
+  ytms <- enrich lamType newFormalArgs
+  let lam' = fromPiIntroSeq (body'', ytms ++ xtms)
+  args <- mapM toVar freeVars
   appFold lam' args
 lift (i :< NeutPiElim e v) = do
   e' <- lift e
@@ -121,3 +125,12 @@ replace args (i :< NeutMu s c) = do
   c' <- replace args c
   return $ i :< NeutMu s c'
 replace _ (i :< NeutHole x) = return $ i :< NeutHole x
+
+enrich :: Neut -> [Identifier] -> WithEnv [(Identifier, Neut, Identifier)]
+enrich _ [] = return []
+enrich cod (x:xs) = do
+  pi <- abstractPi (x : xs) cod
+  meta <- newNameWith "meta"
+  insTypeEnv meta pi
+  xtms <- enrich cod xs
+  return $ (x, pi, meta) : xtms
