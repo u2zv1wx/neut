@@ -199,9 +199,10 @@ bindFormalArgs' [] terminal = return terminal
 bindFormalArgs' (arg:xs) c = do
   tmp <- bindFormalArgs' xs c
   meta <- newNameWith "meta"
-  liftIO $ putStrLn $ "arg: " ++ arg
-  tArg <- lookupTypeEnv' arg
-  return $ meta :< NeutPiIntro (arg, tArg) tmp
+  -- tArg <- lookupTypeEnv' arg
+  h <- newNameWith "hole"
+  holeMeta <- newNameWith "meta"
+  return $ meta :< NeutPiIntro (arg, holeMeta :< NeutHole h) tmp
 
 pairwiseConcat :: [([a], [b])] -> ([a], [b])
 pairwiseConcat [] = ([], [])

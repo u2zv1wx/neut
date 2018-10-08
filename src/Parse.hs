@@ -50,7 +50,7 @@ parse (meta :< TreeNode ((_ :< TreeAtom "tensor"):ts)) = do
 parse (meta :< TreeNode ((_ :< TreeAtom "pair"):ts)) = do
   es <- mapM parse ts
   return $ meta :< NeutSigmaIntro es
-parse (meta :< TreeNode [_ :< TreeAtom "case", t, _ :< TreeNode ((_ :< TreeAtom "pair"):ts), tbody]) = do
+parse (meta :< TreeNode [_ :< TreeAtom "case", t, _ :< TreeNode [_ :< TreeNode ((_ :< TreeAtom "pair"):ts), tbody]]) = do
   e <- parse t
   tmp <- mapM parseArg ts
   let args = map fst tmp

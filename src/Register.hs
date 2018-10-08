@@ -27,7 +27,6 @@ type Graph = ([Node], [Edge])
 regAlloc :: Int -> Asm -> WithEnv ()
 regAlloc i asm = do
   asm' <- annotAsm asm >>= computeLiveness
-  liftIO $ putStrLn $ Pr.ppShow asm'
   graph <- build asm'
   xs <- maxCardSearch graph
   env <- get
@@ -47,8 +46,6 @@ build code = do
   edgeListList <- forM lvs $ \xs -> return [(p, q) | p <- xs, q <- xs]
   let edgeList = filter (uncurry (/=)) $ nub $ join edgeListList
   let nodeList = nub $ join lvs ++ join uvs
-  liftIO $ putStrLn $ "nodeList = " ++ Pr.ppShow nodeList
-  liftIO $ putStrLn $ "edgeList = " ++ Pr.ppShow edgeList
   return (nodeList, edgeList)
 
 -- maximum cardinality search
@@ -101,9 +98,7 @@ color i graph@(_, edgeList) (x:xs) = do
       colorList <- toRegNumList adj
       let min = unusedMinimumRegNum colorList
       if min <= i
-        then do
-          liftIO $ putStrLn $ "allocating " ++ x ++ " to " ++ show min
-          insRegEnv x min
+        then insRegEnv x min
         else insSpill x
 
 unusedMinimumRegNum :: [Int] -> Int

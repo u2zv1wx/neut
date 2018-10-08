@@ -3,6 +3,7 @@ module Infer
   ) where
 
 import           Control.Monad
+import           Control.Monad.Except
 import           Control.Monad.State
 import           Control.Monad.Trans.Except
 
@@ -31,8 +32,12 @@ check main e = do
   sub <- gets substitution
   env <- get
   let tenv' = map (\(i, t) -> (i, subst sub t)) $ typeEnv env
+  -- ts' <- mapM nonRecReduce ts
+  -- let tenv'' = zip xs ts'
+  -- liftIO $ putStrLn $ Pr.ppShow tenv''
   modify (\e -> e {typeEnv = tenv'})
   checkNumConstraint
+  liftIO $ putStrLn $ "type-checked."
   return $ subst sub e
 
 infer :: Context -> Neut -> WithEnv Neut
@@ -152,7 +157,7 @@ infer _ (_ :< NeutIndexElim _ []) = lift $ throwE "empty branch"
 infer ctx (meta :< NeutIndexElim e branchList) = do
   t <- infer ctx e
   let (labelList, es) = unzip branchList
-  tls <- mapM inferIndex labelList
+  tls <- mapM (inferIndex ctx) labelList
   let tls' = join $ map maybeToList tls
   constrainList ctx tls'
   headConstraint ctx t tls'
@@ -173,14 +178,22 @@ sigmaHole :: Context -> [Identifier] -> WithEnv [Neut]
 sigmaHole ctx xs = forM (zip xs [0 ..]) $ \(_, i) -> sigmaHole' ctx xs i
 
 sigmaHole' :: Context -> [Identifier] -> Int -> WithEnv Neut
-sigmaHole' ctx xs i = appCtx (ctx ++ take i xs)
+sigmaHole' ctx xs i = do
+  t <- appCtx (ctx ++ take i xs)
+  insTypeEnv (xs !! i) t
+  return t
 
-inferIndex :: Index -> WithEnv (Maybe Neut)
-inferIndex name = do
-  mk <- lookupKind name
+inferIndex :: Context -> Index -> WithEnv (Maybe Neut)
+inferIndex ctx (IndexLabel name) = do
+  ienv <- gets indexEnv
+  mk <- lookupKind' name ienv
   case mk of
-    Just k  -> Just <$> wrapType (NeutIndex k)
-    Nothing -> return Nothing
+    Just k -> Just <$> wrapType (NeutIndex k)
+    Nothing -> do
+      t <- appCtx ctx
+      insTypeEnv name t
+      return $ Just t
+inferIndex _ _ = return Nothing
 
 constrainList :: Context -> [Neut] -> WithEnv ()
 constrainList _ [] = return ()
@@ -285,17 +298,16 @@ simp ((ctx, _ :< NeutPi (x, tdom1) tcod1, _ :< NeutPi (y, tdom2) tcod2, univ):cs
   return $
     (ctx, tdom1, tdom2, univ) :
     (ctx ++ [x], tcod1, subst [(y, var)] tcod2, univ) : cs'
-simp ((ctx, _ :< NeutPiIntro (x, _) body1, _ :< NeutPiIntro (y, _) body2, _ :< NeutPi (z, _) tcod):cs) = do
-  var <- toVar' z
-  simp $ (ctx ++ [z], subst [(x, var)] body1, subst [(y, var)] body2, tcod) : cs
-simp ((ctx, _ :< NeutPiIntro (x, _) body1, e2, _ :< NeutPi (z, _) tcod):cs) = do
+simp ((ctx, _ :< NeutPiIntro (x, _) body1, _ :< NeutPiIntro (y, _) body2, t):cs) = do
   var <- toVar' x
-  let tcod' = subst [(z, var)] tcod
-  appMeta <- newNameOfType tcod'
+  simp $ (ctx, body1, subst [(y, var)] body2, t) : cs
+simp ((ctx, _ :< NeutPiIntro (x, _) body1, e2, t):cs) = do
+  var <- toVar' x
+  -- let tcod' = subst [(z, var)] tcod
+  appMeta <- newNameWith "meta"
   let app = appMeta :< NeutPiElim e2 var
-  simp $ (ctx ++ [x], body1, app, tcod') : cs
-simp ((ctx, e1, e2@(_ :< NeutPiIntro _ _), t@(_ :< NeutPi _ _)):cs) =
-  simp $ (ctx, e2, e1, t) : cs
+  simp $ (ctx, body1, app, t) : cs
+simp ((ctx, e1, e2@(_ :< NeutPiIntro _ _), t):cs) = simp $ (ctx, e2, e1, t) : cs
 simp ((ctx, _ :< NeutSigma [(x, tdom1)] tcod1, _ :< NeutSigma [(y, tdom2)] tcod2, univ):cs) = do
   var <- toVar' x
   cs' <- sConstraint [(y, var)] cs >>= simp
@@ -341,8 +353,87 @@ simp (c@(_, _, e2, _):cs)
   | Just _ <- headMeta' [] e2 = do
     cs' <- simp cs
     return $ c : cs'
-simp (c:_) = lift $ throwE $ "cannot simplify:\n" ++ Pr.ppShow c
+simp (c:_) = throwError $ "cannot simplify:\n" ++ Pr.ppShow c
 
+-- simp :: [PreConstraint] -> WithEnv [PreConstraint]
+-- simp [] = return []
+-- simp ((ctx, e1, e2, t):cs)
+--   | isNonRecReducible e1 = do
+--     e1' <- nonRecReduce e1
+--     simp $ (ctx, e1', e2, t) : cs
+-- simp ((ctx, e1, e2, t):cs)
+--   | isNonRecReducible e2 = simp $ (ctx, e2, e1, t) : cs
+-- simp ((_, _ :< NeutVar s1, _ :< NeutVar s2, _):cs)
+--   | s1 == s2 = simp cs
+-- simp ((ctx, _ :< NeutVar s1, e2, t):cs) = do
+--   me <- insDef s1 e2
+--   case me of
+--     Nothing -> simp cs
+--     Just e  -> simp $ (ctx, e, e2, t) : cs
+-- simp ((ctx, e1, v@(_ :< NeutVar _), t):cs) = simp $ (ctx, v, e1, t) : cs
+-- simp ((ctx, _ :< NeutPi (x, tdom1) tcod1, _ :< NeutPi (y, tdom2) tcod2, univ):cs) = do
+--   var <- toVar' x
+--   cs' <- sConstraint [(y, var)] cs >>= simp
+--   return $
+--     (ctx, tdom1, tdom2, univ) :
+--     (ctx ++ [x], tcod1, subst [(y, var)] tcod2, univ) : cs'
+-- simp ((ctx, _ :< NeutPiIntro (x, _) body1, _ :< NeutPiIntro (y, _) body2, _ :< NeutPi (z, _) tcod):cs) = do
+--   var <- toVar' z
+--   simp $ (ctx ++ [z], subst [(x, var)] body1, subst [(y, var)] body2, tcod) : cs
+-- simp ((ctx, _ :< NeutPiIntro (x, _) body1, e2, _ :< NeutPi (z, _) tcod):cs) = do
+--   var <- toVar' x
+--   let tcod' = subst [(z, var)] tcod
+--   appMeta <- newNameOfType tcod'
+--   let app = appMeta :< NeutPiElim e2 var
+--   simp $ (ctx ++ [x], body1, app, tcod') : cs
+-- simp ((ctx, e1, e2@(_ :< NeutPiIntro _ _), t@(_ :< NeutPi _ _)):cs) =
+--   simp $ (ctx, e2, e1, t) : cs
+-- simp ((ctx, _ :< NeutSigma [(x, tdom1)] tcod1, _ :< NeutSigma [(y, tdom2)] tcod2, univ):cs) = do
+--   var <- toVar' x
+--   cs' <- sConstraint [(y, var)] cs >>= simp
+--   return $
+--     (ctx, tdom1, tdom2, univ) :
+--     (ctx ++ [x], tcod1, subst [(y, var)] tcod2, univ) : cs'
+-- simp ((ctx, i :< NeutSigma ((x, tdom1):xts) tcod1, j :< NeutSigma ((y, tdom2):yts) tcod2, univ):cs) = do
+--   let sig1 = i :< NeutSigma [(x, tdom1)] (i :< NeutSigma xts tcod1)
+--   let sig2 = j :< NeutSigma [(y, tdom2)] (j :< NeutSigma yts tcod2)
+--   simp ((ctx, sig1, sig2, univ) : cs)
+-- simp ((ctx, _ :< NeutSigmaIntro es1, _ :< NeutSigmaIntro es2, _ :< NeutSigma xts t):cs)
+--   | length es1 == length es2 = do
+--     let ts = map snd xts ++ [t]
+--     let sub = zip (map fst xts) es1
+--     let ts' = map (subst sub) ts
+--     newCs <-
+--       forM (zip (zip es1 es2) ts') $ \((e1, e2), t') -> return (ctx, e1, e2, t')
+--     simp $ newCs ++ cs
+-- simp ((ctx, _ :< NeutSigmaIntro es, e2, _ :< NeutSigma xts t):cs)
+--   | length xts + 1 == length es = do
+--     prList <- projectionList e2 (xts, t)
+--     let sub = zip (map fst xts) es
+--     let ts = map (subst sub) $ map snd xts ++ [t]
+--     newCs <-
+--       forM (zip3 es prList ts) $ \(e, ithProj, t) -> return (ctx, e, ithProj, t)
+--     simp $ newCs ++ cs
+-- simp ((ctx, e1, e2@(_ :< NeutSigmaIntro es), t@(_ :< NeutSigma xts _)):cs)
+--   | length xts + 1 == length es = simp $ (ctx, e2, e1, t) : cs
+-- simp ((ctx, _ :< NeutBox t1, _ :< NeutBox t2, univ):cs) =
+--   simp $ (ctx, t1, t2, univ) : cs
+-- simp ((ctx, _ :< NeutBoxIntro e1, _ :< NeutBoxIntro e2, _ :< NeutBox t):cs) =
+--   simp $ (ctx, e1, e2, t) : cs
+-- simp ((_, _ :< NeutIndex l1, _ :< NeutIndex l2, _):cs)
+--   | l1 == l2 = simp cs
+-- simp ((_, _ :< NeutUniv i, _ :< NeutUniv j, _):cs) = do
+--   insUnivConstraintEnv i j
+--   simp cs
+-- simp (c@(_, e1, _, _):cs)
+--   | Just _ <- headMeta' [] e1 = do
+--     cs' <- simp cs
+--     return $ c : cs'
+-- simp (c@(_, _, e2, _):cs)
+--   | Just _ <- headMeta' [] e2 = do
+--     cs' <- simp cs
+--     return $ c : cs'
+-- simp (c:_) = throwError $ "cannot simplify:\n" ++ Pr.ppShow c
 categorize :: PreConstraint -> Constraint
 categorize (ctx, _ :< NeutVar x, e2, t) = do
   let c = ConstraintBeta x e2
@@ -412,7 +503,9 @@ analyze' c@(ctx, e1, e2, t) = do
         cs <- simp [(ctx, subst [(hole2, e)] e1, subst [(hole2, e)] e2, t)]
         analyze cs
     Constraint _ (ConstraintPattern hole args e) _ -> do
-      ans <- bindFormalArgs' args e
+      liftIO $ putStrLn $ "solved: " ++ hole
+      e' <- nonRecReduce e
+      ans <- bindFormalArgs' args e'
       modify (\e -> e {substitution = compose [(hole, ans)] (substitution e)})
       sub <- gets substitution
       q <- gets constraintQueue
@@ -474,7 +567,7 @@ resolve j = do
   resolve' j stack
 
 resolve' :: Justification -> [Case] -> WithEnv ()
-resolve' _ [] = lift $ throwE "failed to resolvelve the case-split"
+resolve' _ [] = throwError "failed to resolvelve the case-split"
 resolve' j (c:cs)
   | j `depends` caseJustification c = do
     restoreState c
@@ -517,61 +610,89 @@ newCaseSplit ja z = do
       }
 
 synthesize :: Q.MinQueue Constraint -> WithEnv ()
-synthesize q = do
-  liftIO $ putStrLn $ Pr.ppShow q
+synthesize q =
   case Q.getMin q of
     Nothing -> return ()
-    Just c -> do
-      q' <- synthesize' c
-      synthesize $ Q.deleteMin q `Q.union` q'
-
-synthesize' :: Constraint -> WithEnv (Q.MinQueue Constraint)
-synthesize' (Constraint _ (ConstraintPattern x args e) _) = do
-  ans <- bindFormalArgs' args e
-  liftIO $ putStrLn $ "solved: " ++ x
-  modify (\e -> e {substitution = compose [(x, ans)] (substitution e)})
-  mmap <- gets metaMap
-  getQueue $ analyze $ map snd $ filter (\(y, _) -> y == x) mmap
-synthesize' (Constraint ctx (ConstraintBeta x body) t) = do
-  me <- insDef x body
-  case me of
-    Nothing -> return Q.empty
-    Just body' -> Q.fromList . map categorize <$> simp [(ctx, body, body', t)]
-synthesize' (Constraint ctx (ConstraintDelta x args1 args2) t) = do
-  sub <- gets substitution
-  liftIO $ putStrLn $ Pr.ppShow sub
-  a1 <- simp $ map (\(e1, e2) -> (ctx, e1, e2, t)) $ zip args1 args2
-  j <- Assumption <$> newNameWith "j"
-  case lookup x sub of
-    Nothing -> getQueue $ process [a1] j
-    Just e -> do
-      e1' <- appFold' e args1 >>= reduce
-      e2' <- appFold' e args2 >>= reduce
-      a2 <- simp [(ctx, e1', e2', t)]
-      getQueue $ process [a1, a2] j
-synthesize' (Constraint ctx (ConstraintQuasiPattern hole preArgs e) t) = do
-  args <- mapM toVar' preArgs
-  synthesize' (Constraint ctx (ConstraintFlexRigid hole args e) t)
-synthesize' (Constraint ctx (ConstraintFlexRigid hole args e) t)
-  | (x@(_ :< NeutVar _), eArgs) <- toPiElimSeq e = do
-    let candList = x : args
-    newHoleList <- mapM (const (newNameWith "hole") >=> toVar') args
-    newArgList <- mapM (const $ newNameWith "arg") eArgs
-    newVarList <- mapM toVar' newArgList
-    argList <- forM newHoleList $ \h -> appFold' h newVarList
-    bodyList <- forM candList $ \v -> appFold' v argList
-    lamList <- forM bodyList $ \body -> bindFormalArgs' newArgList body
-    as <-
-      forM lamList $ \lam -> do
-        left <- appFold' lam args
+    Just (Constraint _ (ConstraintPattern x args e) _) -> do
+      e' <- nonRecReduce e
+      ans <- bindFormalArgs' args e'
+      liftIO $ putStrLn $ "solved here: " ++ x
+      modify (\e -> e {substitution = compose [(x, ans)] (substitution e)})
+      sub <- gets substitution
+      q' <- getQueue $ mapM_ (substConstraint sub) $ Q.toList $ Q.deleteMin q
+      liftIO $ putStrLn $ "length q - 1 == " ++ show (Q.size q - 1)
+      liftIO $ putStrLn $ "length q' == " ++ show (Q.size q')
+      synthesize q'
+    Just (Constraint ctx (ConstraintBeta x body) t) -> do
+      me <- insDef x body
+      case me of
+        Nothing -> synthesize $ Q.deleteMin q
+        Just body' -> do
+          q' <- Q.fromList . map categorize <$> simp [(ctx, body, body', t)]
+          synthesize $ Q.deleteMin q `Q.union` q'
+    Just (Constraint ctx (ConstraintDelta x args1 args2) t) -> do
+      sub <- gets substitution
+      liftIO $ putStrLn $ Pr.ppShow sub
+      a1 <- simp $ map (\(e1, e2) -> (ctx, e1, e2, t)) $ zip args1 args2
+      j <- Assumption <$> newNameWith "j"
+      case lookup x sub of
+        Nothing -> do
+          q' <- getQueue $ process [a1] j
+          synthesize $ Q.deleteMin q `Q.union` q'
+        Just e -> do
+          e1' <- appFold' e args1 >>= reduce
+          e2' <- appFold' e args2 >>= reduce
+          a2 <- simp [(ctx, e1', e2', t)]
+          q' <- getQueue $ process [a1, a2] j
+          synthesize $ Q.deleteMin q `Q.union` q'
+    Just (Constraint ctx (ConstraintQuasiPattern hole preArgs e) t) -> do
+      args <- mapM toVar' preArgs
+      let c = Constraint ctx (ConstraintFlexRigid hole args e) t
+      synthesize $ Q.insert c $ Q.deleteMin q
+    Just (Constraint ctx (ConstraintFlexRigid hole args e) t)
+      | (x@(_ :< NeutVar _), eArgs) <- toPiElimSeq e -> do
+        let candList = x : args
+        newHoleList <- mapM (const (newNameWith "hole") >=> toVar') args
+        newArgList <- mapM (const $ newNameWith "arg") eArgs
+        newVarList <- mapM toVar' newArgList
+        argList <- forM newHoleList $ \h -> appFold' h newVarList
+        bodyList <- forM candList $ \v -> appFold' v argList
+        lamList <- forM bodyList $ \body -> bindFormalArgs' newArgList body
+        as <-
+          forM lamList $ \lam -> do
+            left <- appFold' lam args
+            meta <- newNameWith "meta"
+            simp [(ctx, left, e, t), (ctx, meta :< NeutHole hole, lam, t)]
+        j <- Assumption <$> newNameWith "j"
+        q' <- getQueue $ process as j
+        synthesize $ Q.deleteMin q `Q.union` q'
+    Just (Constraint ctx (ConstraintFlexRigid hole args e) t)
+      | (x@(_ :< NeutIndex _), eArgs) <- toPiElimSeq e -> do
+        liftIO $ putStrLn "backtracking!"
+        newHoleList <- mapM (const (newNameWith "hole")) args -- ?M_i
+        newHoleVarList <- mapM toVar' newHoleList
+        newArgList <- mapM (const $ newNameWith "arg") eArgs -- x_i
+        newVarList <- mapM toVar' newArgList
+        argList <- forM newHoleVarList $ \h -> appFold' h newVarList -- ?M_i @ x_1 @ ... @ x_n
+        bodyList <- forM (x : args) $ \v -> appFold' v argList
+        lamList <- forM bodyList $ \body -> bindFormalArgs' newArgList body
+        let compList =
+              flip map lamList $ \lam -> do
+                left <- appFold' lam args
+                meta <- newNameWith "meta"
+                getQueue $
+                  analyze
+                    [(ctx, left, e, t), (ctx, meta :< NeutHole hole, lam, t)]
         meta <- newNameWith "meta"
-        simp [(ctx, left, e, t), (ctx, meta :< NeutHole hole, lam, t)]
-    j <- Assumption <$> newNameWith "j"
-    getQueue $ process as j
-synthesize' (Constraint _ c _) = do
-  sub <- gets substitution
-  liftIO $ putStrLn $ Pr.ppShow sub
-  lift $ throwE $ "cannot synthesize:\n" ++ Pr.ppShow c
+        lam <- bindFormalArgs' newHoleList e
+        let independent =
+              getQueue $ analyze [(ctx, meta :< NeutHole hole, lam, t)]
+        q' <- chain q $ compList ++ [independent]
+        sub <- gets substitution
+        let q'' = Q.deleteMin q `Q.union` q'
+        q''' <- getQueue $ mapM_ (substConstraint sub) $ Q.toList q''
+        synthesize q'''
+    Just c -> throwError $ "cannot synthesize:\n" ++ Pr.ppShow c
 
 getQueue :: WithEnv a -> WithEnv (Q.MinQueue Constraint)
 getQueue command = do
@@ -579,10 +700,15 @@ getQueue command = do
   command
   gets constraintQueue
 
+chain :: Q.MinQueue Constraint -> [WithEnv a] -> WithEnv a
+chain c []     = throwError $ "cannot synthesize++:\n" ++ Pr.ppShow c
+chain c (e:es) = e `catchError` (\i -> do chain c es)
+
 insDef :: Identifier -> Neut -> WithEnv (Maybe Neut)
 insDef x body = do
+  body' <- nonRecReduce body
   sub <- gets substitution
-  modify (\e -> e {substitution = (x, body) : substitution e})
+  modify (\e -> e {substitution = (x, body') : substitution e})
   return $ lookup x sub
 
 headMeta :: [Identifier] -> Neut -> Maybe (Identifier, [Identifier])

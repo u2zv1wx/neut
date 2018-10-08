@@ -63,9 +63,13 @@ rename (i :< NeutIndex s) = return $ i :< NeutIndex s
 rename (i :< NeutIndexIntro x) = return $ i :< NeutIndexIntro x
 rename (i :< NeutIndexElim e branchList) = do
   e' <- rename e
-  let (indexList, es) = unzip branchList
-  es' <- mapM rename es
-  return $ i :< NeutIndexElim e' (zip indexList es')
+  branchList' <-
+    forM branchList $ \(l, body) -> do
+      local $ do
+        l' <- newNameIndex l
+        body' <- rename body
+        return (l', body')
+  return $ i :< NeutIndexElim e' branchList'
 rename (i :< NeutUniv j) = return $ i :< NeutUniv j
 rename (i :< NeutMu s e) =
   local $ do
@@ -74,6 +78,17 @@ rename (i :< NeutMu s e) =
     return $ i :< NeutMu s' e'
 rename (i :< NeutHole x) = return $ i :< NeutHole x
 
+newNameIndex :: Index -> WithEnv Index
+newNameIndex (IndexLabel x) = do
+  x' <- newNameWith x
+  return $ IndexLabel x'
+newNameIndex l = return l
+
+-- data Index
+--   = IndexLabel Identifier
+--   | IndexInteger Int
+--   | IndexDefault
+--   deriving (Show, Eq)
 local :: WithEnv a -> WithEnv a
 local p = do
   env <- get

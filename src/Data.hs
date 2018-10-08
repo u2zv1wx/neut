@@ -473,17 +473,20 @@ insIndexEnv name indexList =
 
 lookupKind :: Index -> WithEnv (Maybe Identifier)
 lookupKind IndexDefault = return Nothing
-lookupKind (IndexInteger _) = return $ Nothing
+lookupKind (IndexInteger _) = return Nothing
 lookupKind (IndexLabel name) = do
   env <- get
-  tmp <- lookupKind' name $ indexEnv env
-  return $ Just tmp
+  lookupKind' name $ indexEnv env
+  -- tmp <- lookupKind' name $ indexEnv env
+  -- return $ Just tmp
 
-lookupKind' :: Identifier -> [(Identifier, [Identifier])] -> WithEnv Identifier
-lookupKind' i [] = lift $ throwE $ "no such index defined: " ++ show i
+lookupKind' ::
+     Identifier -> [(Identifier, [Identifier])] -> WithEnv (Maybe Identifier)
+lookupKind' _ [] = return Nothing
+-- lookupKind' i [] = lift $ throwE $ "no such index defined: " ++ show i
 lookupKind' i ((j, ls):xs) =
   if i `elem` ls
-    then return j
+    then return $ Just j
     else lookupKind' i xs
 
 lookupIndexSet :: Identifier -> WithEnv [Identifier]
