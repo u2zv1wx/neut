@@ -2,6 +2,7 @@ module Util where
 
 import           Control.Monad.Except
 import           Control.Monad.Identity
+import           Control.Monad.Trans.Except
 
 import           Control.Comonad
 import           Control.Comonad.Cofree
@@ -9,8 +10,9 @@ import           Control.Comonad.Cofree
 import           Control.Monad.State
 
 import           Data
+import           Reduce
 
-import qualified Text.Show.Pretty       as Pr
+import qualified Text.Show.Pretty           as Pr
 
 import           Debug.Trace
 
@@ -22,8 +24,10 @@ toPiIntroSeq t = (t, [])
 
 fromPiIntroSeq :: (Neut, [(Identifier, Neut, Identifier)]) -> Neut
 fromPiIntroSeq (e, []) = e
-fromPiIntroSeq (e, (x, t, meta):rest) =
-  fromPiIntroSeq (meta :< NeutPiIntro (x, t) e, rest)
+fromPiIntroSeq (e, (x, t, meta):rest) = do
+  let e' = fromPiIntroSeq (e, rest)
+  meta :< NeutPiIntro (x, t) e'
+  -- fromPiIntroSeq (meta :< NeutPiIntro (x, t) e, rest)
 
 toPiElimSeq :: Neut -> (Neut, [(Identifier, Neut)])
 toPiElimSeq (i :< NeutPiElim e1 e2) = do
@@ -156,13 +160,16 @@ foldMR f e (t:ts) = do
 appFold :: Neut -> [Neut] -> WithEnv Neut
 appFold e [] = return e
 appFold e@(i :< _) (term:ts) = do
-  t <- lookupTypeEnv' i
+  t <- lookupTypeEnv' i >>= reduce
   case t of
     _ :< NeutPi _ tcod -> do
       meta <- newNameWith "meta"
       insTypeEnv meta tcod
       appFold (meta :< NeutPiElim e term) ts
-    _ -> error "Lift.appFold"
+    _ -> do
+      e' <- nonRecReduce e
+      lift $ throwE $ "appfold. t:\n" ++ Pr.ppShow t ++ "\ne:\n" ++ Pr.ppShow e'
+      -- error "Lift.appFold"
 
 appFold' :: Neut -> [Neut] -> WithEnv Neut
 appFold' e [] = return e
@@ -199,10 +206,17 @@ bindFormalArgs' [] terminal = return terminal
 bindFormalArgs' (arg:xs) c = do
   tmp <- bindFormalArgs' xs c
   meta <- newNameWith "meta"
-  -- tArg <- lookupTypeEnv' arg
   h <- newNameWith "hole"
   holeMeta <- newNameWith "meta"
   return $ meta :< NeutPiIntro (arg, holeMeta :< NeutHole h) tmp
+
+abstractPi :: [Identifier] -> Neut -> WithEnv Neut
+abstractPi [] terminal = return terminal
+abstractPi (x:xs) c = do
+  tmp <- abstractPi xs c
+  meta <- newNameWith "meta"
+  t <- lookupTypeEnv' x
+  return $ meta :< NeutPi (x, t) tmp
 
 pairwiseConcat :: [([a], [b])] -> ([a], [b])
 pairwiseConcat [] = ([], [])
@@ -234,3 +248,15 @@ varInJusitifcation :: Justification -> [Identifier]
 varInJusitifcation (Asserted i)   = [i]
 varInJusitifcation (Assumption i) = [i]
 varInJusitifcation (Join js)      = concatMap varInJusitifcation js
+
+toVar :: Identifier -> WithEnv Neut
+toVar x = do
+  t <- lookupTypeEnv' x
+  meta <- newNameWith "meta"
+  insTypeEnv meta t
+  return $ meta :< NeutVar x
+
+toVar' :: Identifier -> WithEnv Neut
+toVar' x = do
+  meta <- newNameWith "meta"
+  return $ meta :< NeutVar x

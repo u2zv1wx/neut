@@ -254,18 +254,6 @@ appCtx ctx = do
   meta <- newName' "meta" arrowType
   appFold (meta :< NeutHole holeName) varSeq
 
-toVar :: Identifier -> WithEnv Neut
-toVar x = do
-  t <- lookupTypeEnv' x
-  meta <- newNameWith "meta"
-  insTypeEnv meta t
-  return $ meta :< NeutVar x
-
-toVar' :: Identifier -> WithEnv Neut
-toVar' x = do
-  meta <- newNameWith "meta"
-  return $ meta :< NeutVar x
-
 toHole' :: Identifier -> WithEnv Neut
 toHole' x = do
   meta <- newNameWith "meta"
@@ -503,7 +491,6 @@ analyze' c@(ctx, e1, e2, t) = do
         cs <- simp [(ctx, subst [(hole2, e)] e1, subst [(hole2, e)] e2, t)]
         analyze cs
     Constraint _ (ConstraintPattern hole args e) _ -> do
-      liftIO $ putStrLn $ "solved: " ++ hole
       e' <- nonRecReduce e
       ans <- bindFormalArgs' args e'
       modify (\e -> e {substitution = compose [(hole, ans)] (substitution e)})
@@ -616,12 +603,9 @@ synthesize q =
     Just (Constraint _ (ConstraintPattern x args e) _) -> do
       e' <- nonRecReduce e
       ans <- bindFormalArgs' args e'
-      liftIO $ putStrLn $ "solved here: " ++ x
       modify (\e -> e {substitution = compose [(x, ans)] (substitution e)})
       sub <- gets substitution
       q' <- getQueue $ mapM_ (substConstraint sub) $ Q.toList $ Q.deleteMin q
-      liftIO $ putStrLn $ "length q - 1 == " ++ show (Q.size q - 1)
-      liftIO $ putStrLn $ "length q' == " ++ show (Q.size q')
       synthesize q'
     Just (Constraint ctx (ConstraintBeta x body) t) -> do
       me <- insDef x body

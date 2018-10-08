@@ -7,6 +7,7 @@ import           Control.Comonad.Cofree
 
 import           Data
 import           Data.List
+import           Reduce
 
 import qualified Text.Show.Pretty           as Pr
 
@@ -50,10 +51,11 @@ exhaust' (_ :< NeutIndexIntro _) = return True
 exhaust' (_ :< NeutIndexElim _ []) = return False -- empty clause?
 exhaust' (meta :< NeutIndexElim e1 branchList@((l, _):_)) = do
   b1 <- exhaust' e1
-  t <- lookupTypeEnv' meta
+  t <- lookupTypeEnv' meta >>= reduce
   let labelList = map fst branchList
   case t of
-    _ :< NeutIndex "int" -> return $ b1 && (IndexDefault `elem` labelList)
+    _ :< NeutIndex "i32" ->
+      return $ b1 && (IndexDefault `elem` labelList || hasVar labelList)
     _ ->
       if IndexDefault `elem` labelList
         then return b1
@@ -66,3 +68,8 @@ exhaust' (meta :< NeutIndexElim e1 branchList@((l, _):_)) = do
                _ -> return False
 exhaust' (_ :< NeutUniv _) = return True
 exhaust' (_ :< NeutHole _) = return False
+
+hasVar :: [Index] -> Bool
+hasVar []               = False
+hasVar (IndexLabel _:_) = True
+hasVar (_:is)           = hasVar is

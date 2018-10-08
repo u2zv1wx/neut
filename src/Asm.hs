@@ -11,6 +11,7 @@ import           Control.Monad.Trans.Except
 import           Data.IORef
 
 import           Data
+import           Reduce
 import           Register
 
 import           Control.Comonad.Cofree
@@ -51,7 +52,7 @@ asmCode (CodeCall x fun args cont) = do
     else asmCodeCall x fun args cont'
 asmCode (CodeSwitch x branchList) = asmSwitch x branchList
 asmCode (CodeExtractValue x base i cont) = do
-  t <- lookupTypeEnv' base
+  t <- lookupTypeEnv' x >>= reduce
   case t of
     _ :< NeutSigma xts t -> do
       let args = map snd xts ++ [t]
@@ -59,7 +60,7 @@ asmCode (CodeExtractValue x base i cont) = do
       let offset = sum $ map sizeOfLowType $ take i ts
       cont' <- asmCode cont
       addMeta $ AsmExtractValue x base offset cont'
-    _ -> lift $ throwE "Asm.asmCode : typeError"
+    _ -> lift $ throwE $ "Asm.asmCode : typeError. t:\n" ++ Pr.ppShow t
 asmCode (CodeFree x cont) = do
   tmp <- newName
   cont' <- asmCode cont

@@ -53,18 +53,9 @@ load' ((meta :< TreeNode [primMeta :< TreeAtom "primitive", _ :< TreeAtom name, 
   constNameWith name
   defList <- load' as
   return $ (meta, name, primMeta :< NeutConst name t') : defList
-  -- e' <- check name e
-  -- t <- lookupTypeEnv' name
-  -- case t of
-  --   _ :< NeutBox (_ :< NeutUniv _) -> do
-  --     insConstEnv name e'
-  --     env <- get
-  --     liftIO $ putStrLn $ Pr.ppShow (constEnv env)
-  --     load' as
-  --   _ -> error $ "the type of " ++ name ++ " is not univ"
 load' ((meta :< TreeNode [_ :< TreeAtom "definition", _ :< TreeAtom name, tbody]):as) = do
   tmp <- macroExpand tbody >>= parse
-  liftIO $ putStrLn $ Pr.ppShow tmp
+  -- liftIO $ putStrLn $ Pr.ppShow tmp
   e <- macroExpand tbody >>= parse >>= rename
   name' <- newNameWith name
   defList <- load' as
@@ -88,8 +79,12 @@ concatDefList ((meta, name, e):es) = do
 process :: Neut -> WithEnv ()
 process e = do
   e' <- check mainLabel e
+  p <- exhaust e' >>= lift >>= expand >>= polarizeNeg
+  -- liftIO $ putStrLn $ Pr.ppShow p
   c' <- exhaust e' >>= lift >>= expand >>= polarizeNeg >>= virtualNeg
   insCodeEnv mainLabel [] c'
+  ce <- gets codeEnv
+  liftIO $ putStrLn $ Pr.ppShow ce
   asmCodeEnv
   emitGlobalLabel mainLabel
   emit
