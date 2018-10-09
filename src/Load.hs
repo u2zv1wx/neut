@@ -26,6 +26,8 @@ import           Read
 import           Rename
 import           Virtual
 
+import           Reduce
+
 import qualified Text.Show.Pretty           as Pr
 
 load :: String -> WithEnv ()
@@ -33,7 +35,7 @@ load s = do
   astList <- strToTree s
   defList <- load' astList
   e <- concatDefList defList
-  liftIO $ putStrLn $ Pr.ppShow e
+  -- liftIO $ putStrLn $ Pr.ppShow e
   process e
 
 load' :: [Tree] -> WithEnv [(Identifier, Identifier, Neut)]
@@ -79,12 +81,12 @@ concatDefList ((meta, name, e):es) = do
 process :: Neut -> WithEnv ()
 process e = do
   e' <- check mainLabel e
-  p <- exhaust e' >>= lift >>= expand >>= polarizeNeg
+  -- p <- exhaust e' >>= lift
   -- liftIO $ putStrLn $ Pr.ppShow p
-  c' <- exhaust e' >>= lift >>= expand >>= polarizeNeg >>= virtualNeg
+  c' <- exhaust e' >>= expand >>= lift >>= polarizeNeg >>= virtualNeg
   insCodeEnv mainLabel [] c'
   ce <- gets codeEnv
-  liftIO $ putStrLn $ Pr.ppShow ce
+  -- liftIO $ putStrLn $ Pr.ppShow ce
   asmCodeEnv
   emitGlobalLabel mainLabel
   emit

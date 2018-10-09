@@ -11,30 +11,39 @@
 (notation (begin (let x e+) rest+)
   ((lambda ((x _)) (begin rest+)) (begin e+)))
 
+(reserve arrow)
+
+(notation (arrow rest+)
+  (box (hom rest+)))
+
 (index top unit)
 
 (index i32)
 
-(primitive core.add (hom i32 i32 i32))
+(primitive core.add (arrow i32 i32 i32))
 
-(primitive core.sub (hom i32 i32 i32))
+(primitive core.sub (arrow i32 i32 i32))
 
-(primitive core.mul (hom i32 i32 i32))
+(primitive core.mul (arrow i32 i32 i32))
 
-(primitive i32.copy (hom i32 (tensor i32 i32)))
+(primitive i32.copy (arrow i32 (tensor i32 i32)))
 
 (definition type (box universe))
 
 (definition state
-  (lambda ((S type) (A type))
-    (hom S (tensor S A))))
+  (data
+    (lambda ((S type) (A type))
+      (hom S (tensor S A)))))
 
 (index world)
 
 (definition io
-  (state world))
+  ((code state) world))
 
-(primitive print (hom i32 (io top)))
+(definition io2
+  ((code state) world))
+
+(primitive print (arrow i32 (io top)))
 
 (definition fact
   (mu self
@@ -42,8 +51,9 @@
       (case x
         ((1 1)
          (n (begin
-              (let p (i32.copy n))
+              (let p ((code i32.copy) n))
               (case p
-                ((pair n1 n2) (core.mul n1 (self (core.sub n2 1))))))))))))
+                ((pair n1 n2)
+                 ((code core.mul) n1 (self ((code core.sub) n2 1))))))))))))
 
-(print (fact 10))
+((code print) (fact 10))

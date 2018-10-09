@@ -616,7 +616,7 @@ synthesize q =
           synthesize $ Q.deleteMin q `Q.union` q'
     Just (Constraint ctx (ConstraintDelta x args1 args2) t) -> do
       sub <- gets substitution
-      liftIO $ putStrLn $ Pr.ppShow sub
+      -- liftIO $ putStrLn $ Pr.ppShow sub
       a1 <- simp $ map (\(e1, e2) -> (ctx, e1, e2, t)) $ zip args1 args2
       j <- Assumption <$> newNameWith "j"
       case lookup x sub of
