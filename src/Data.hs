@@ -293,6 +293,7 @@ data Env = Env
   , indexEnv          :: [(Identifier, [Identifier])]
   , nameEnv           :: [(Identifier, Identifier)] -- used in alpha conversion
   , typeEnv           :: [(Identifier, Neut)] -- type environment
+  , weakTermEnv       :: [(Identifier, Neut)]
   , termEnv           :: [(Identifier, Term)]
   , constEnv          :: [(Identifier, Neut)] -- (name, type)
   , constraintEnv     :: [PreConstraint]
@@ -332,6 +333,7 @@ initialEnv =
     , indexEnv = initialIndexEnv
     , nameEnv = []
     , typeEnv = []
+    , weakTermEnv = []
     , termEnv = []
     , constEnv = []
     , constraintEnv = []
@@ -458,6 +460,16 @@ insNumConstraintEnv x =
 
 insTermEnv :: Identifier -> Term -> WithEnv ()
 insTermEnv i t = modify (\e -> e {termEnv = (i, t) : termEnv e})
+
+insWeakTermEnv :: Identifier -> Neut -> WithEnv ()
+insWeakTermEnv i t = modify (\e -> e {weakTermEnv = (i, t) : weakTermEnv e})
+
+lookupWeakTermEnv :: Identifier -> WithEnv Neut
+lookupWeakTermEnv funName = do
+  env <- get
+  case lookup funName (weakTermEnv env) of
+    Just body -> return body
+    Nothing   -> lift $ throwE $ "no such weakterm: " ++ show funName
 
 insCodeEnv :: Identifier -> [Identifier] -> Code -> WithEnv ()
 insCodeEnv funName args body = do

@@ -24,15 +24,28 @@ lift lam@(i :< NeutPiIntro _ _) = do
   let (body, xtms) = toPiIntroSeq lam
   body' <- lift body
   let xs = map (\(x, _, _) -> x) xtms
-  let freeVars = filter (`notElem` xs) $ var body'
+  freeVars <- takeNonBox $ filter (`notElem` xs) $ var body'
   newFormalArgs <- constructFormalArgs freeVars
   let freeToBound = zip freeVars newFormalArgs
   body'' <- replace freeToBound body'
   lamType <- lookupTypeEnv' i
   ytms <- enrich lamType newFormalArgs
-  let lam' = fromPiIntroSeq (body'', ytms ++ xtms)
+  let lam'@(lamMeta :< _) = fromPiIntroSeq (body'', ytms ++ xtms)
+  name <- newNameWith "lam"
+  lamType' <- lookupTypeEnv' lamMeta
+  boxMeta <- newNameWith "meta"
+  boxUnivMeta <- newNameWith "meta"
+  let boxLamType = boxUnivMeta :< NeutBox lamType'
+  let boxLam = boxMeta :< NeutBoxIntro lam'
+  insTypeEnv boxMeta boxLamType
+  insWeakTermEnv name boxLam
+  insTypeEnv name boxLamType
+  var <- toVar name
   args <- mapM toVar freeVars
-  appFold lam' args
+  meta <- newNameWith "meta"
+  let unboxVar = meta :< NeutBoxElim var
+  insTypeEnv meta lamType'
+  appFold unboxVar args
 lift (i :< NeutPiElim e v) = do
   e' <- lift e
   v' <- lift v
@@ -134,3 +147,13 @@ enrich cod (x:xs) = do
   insTypeEnv meta pi
   xtms <- enrich cod xs
   return $ (x, pi, meta) : xtms
+
+takeNonBox :: [Identifier] -> WithEnv [Identifier]
+takeNonBox [] = return []
+takeNonBox (x:xs) = do
+  t <- lookupTypeEnv' x >>= reduce
+  case t of
+    _ :< NeutBox _ -> takeNonBox xs
+    _ -> do
+      xs' <- takeNonBox xs
+      return $ x : xs'
