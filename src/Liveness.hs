@@ -43,10 +43,13 @@ annotAsm (_ :< AsmCall x fun args cont) = do
 annotAsm (_ :< AsmCompare x y cont) = do
   cont' <- annotAsm cont
   return $ emptyAsmMeta {asmMetaUse = [x, y]} :< AsmCompare x y cont'
-annotAsm (_ :< AsmJumpIfZero label cont) = do
+annotAsm (_ :< AsmJumpIfZero (label, body) cont) = do
   cont' <- annotAsm cont
-  return $ emptyAsmMeta :< AsmJumpIfZero label cont'
-annotAsm (_ :< AsmJump label) = return $ emptyAsmMeta :< AsmJump label
+  body' <- annotAsm body
+  return $ emptyAsmMeta :< AsmJumpIfZero (label, body') cont'
+annotAsm (_ :< AsmJump (label, body)) = do
+  body' <- annotAsm body
+  return $ emptyAsmMeta :< AsmJump (label, body')
 annotAsm (_ :< AsmPush x cont) = do
   cont' <- annotAsm cont
   return $ emptyAsmMeta {asmMetaDef = [x]} :< AsmPush x cont'
@@ -88,13 +91,15 @@ computeLiveness (meta :< AsmCompare x y cont) = do
   cont' <- computeLiveness cont
   contElemList <- computeSuccAll (meta :< AsmCompare x y cont')
   computeLiveness' meta contElemList (AsmCompare x y cont')
-computeLiveness (meta :< AsmJumpIfZero label cont) = do
+computeLiveness (meta :< AsmJumpIfZero (label, body) cont) = do
   cont' <- computeLiveness cont
-  contElemList <- computeSuccAll (meta :< AsmJumpIfZero label cont')
-  computeLiveness' meta contElemList (AsmJumpIfZero label cont')
-computeLiveness (meta :< AsmJump label) = do
-  contElems <- computeSuccAll (meta :< AsmJump label)
-  computeLiveness' meta contElems $ AsmJump label
+  body' <- computeLiveness body
+  contElemList <- computeSuccAll (meta :< AsmJumpIfZero (label, body') cont')
+  computeLiveness' meta contElemList (AsmJumpIfZero (label, body') cont')
+computeLiveness (meta :< AsmJump (label, body)) = do
+  body' <- computeLiveness body
+  contElems <- computeSuccAll (meta :< AsmJump (label, body'))
+  computeLiveness' meta contElems $ AsmJump (label, body')
 computeLiveness (meta :< AsmPush x cont) = do
   cont' <- computeLiveness cont
   contElemList <- computeSuccAll (meta :< AsmPush x cont')
@@ -146,10 +151,14 @@ computeSuccAll (meta :< AsmCall _ _ _ cont) = do
 computeSuccAll (meta :< AsmCompare _ _ cont) = do
   contLvs <- computeSuccAll cont
   return $ next meta contLvs
-computeSuccAll (meta :< AsmJumpIfZero _ cont) = do
+computeSuccAll (meta :< AsmJumpIfZero (_, body) cont) = do
   contLvs <- computeSuccAll cont
-  return $ next meta contLvs
-computeSuccAll (meta :< AsmJump _) = return $ computeCurrent' meta
+  bodyLvs <- computeSuccAll body
+  return $ next meta $ contLvs ++ bodyLvs
+computeSuccAll (meta :< AsmJump (_, body)) = do
+  bodyLvs <- computeSuccAll body
+  return $ next meta bodyLvs
+  -- return $ computeCurrent' meta
 computeSuccAll (meta :< AsmPush _ cont) = do
   contLvs <- computeSuccAll cont
   return $ next meta contLvs

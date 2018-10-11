@@ -122,7 +122,7 @@ nonRecReduce (i :< NeutSigmaIntro es) = do
   return $ i :< NeutSigmaIntro es'
 nonRecReduce (i :< NeutSigmaElim e xs body) = do
   e' <- nonRecReduce e
-  case e of
+  case e' of
     _ :< NeutSigmaIntro es -> do
       es' <- mapM nonRecReduce es
       let sub = zip xs es'
@@ -159,6 +159,65 @@ nonRecReduce e@(_ :< NeutHole x) = do
   case lookup x sub of
     Just e' -> return e'
     Nothing -> return e
+
+reducePos :: Pos -> WithEnv Pos
+reducePos (PosDownIntro e) = do
+  e' <- reduceNeg e
+  return $ PosDownIntro e'
+reducePos e = return e
+
+reduceNeg :: Neg -> WithEnv Neg
+reduceNeg (NegPiIntro x e) = do
+  e' <- reduceNeg e
+  return $ NegPiIntro x e'
+reduceNeg (NegPiElim e1 e2) = do
+  e1' <- reduceNeg e1
+  case e1' of
+    NegPiIntro x body -> do
+      let sub = [(x, e2)]
+      let body' = substNeg sub body
+      reduceNeg body'
+    _ -> return $ NegPiElim e1' e2
+reduceNeg (NegSigmaElim e xs body) =
+  case e of
+    PosSigmaIntro es -> do
+      let sub = zip xs es
+      let body' = substNeg sub body
+      reduceNeg body'
+    _ -> do
+      body' <- reduceNeg body
+      return $ NegSigmaElim e xs body'
+reduceNeg (NegBoxIntro e) = do
+  e' <- reduceNeg e
+  return $ NegBoxIntro e'
+reduceNeg (NegBoxElim e) = do
+  e' <- reduceNeg e
+  case e' of
+    NegBoxIntro e'' -> reduceNeg e''
+    _               -> return $ NegBoxElim e'
+reduceNeg (NegIndexElim e branchList) =
+  case e of
+    PosIndexIntro x ->
+      case lookup x branchList of
+        Nothing ->
+          lift $
+          throwE $ "the index " ++ show x ++ " is not included in branchList"
+        Just body -> reduceNeg body
+    _ -> return $ NegIndexElim e branchList
+reduceNeg (NegUpIntro e) = do
+  e' <- reducePos e
+  return $ NegUpIntro e'
+reduceNeg (NegUpElim x e1 e2) = do
+  e1' <- reduceNeg e1
+  e2' <- reduceNeg e2
+  case e1' of
+    NegUpIntro e1'' -> reduceNeg $ substNeg [(x, e1'')] e2'
+    _               -> return $ NegUpElim x e1' e2'
+reduceNeg (NegDownElim e) = do
+  e' <- reducePos e
+  case e' of
+    PosDownIntro e'' -> reduceNeg e''
+    _                -> return $ NegDownElim e'
 
 subst :: Subst -> Neut -> Neut
 subst sub (j :< NeutVar s) = fromMaybe (j :< NeutVar s) (lookup s sub)
@@ -205,6 +264,58 @@ subst sub (j :< NeutMu x e) = do
   let e' = subst sub e
   j :< NeutMu x e'
 subst sub (j :< NeutHole s) = fromMaybe (j :< NeutHole s) (lookup s sub)
+
+type SubstPos = [(Identifier, Pos)]
+
+substPos :: SubstPos -> Pos -> Pos
+substPos sub (PosVar s) = fromMaybe (PosVar s) (lookup s sub)
+substPos _ (PosConst s) = PosConst s
+substPos sub (PosPi (s, tdom) tcod) = do
+  let tdom' = substPos sub tdom
+  let tcod' = substPos sub tcod -- note that we don't have to drop s from sub, thanks to rename.
+  PosPi (s, tdom') tcod'
+substPos sub (PosSigma xts tcod) = do
+  let (xs, ts) = unzip xts
+  let ts' = map (substPos sub) ts
+  let tcod' = substPos sub tcod
+  PosSigma (zip xs ts') tcod'
+substPos sub (PosSigmaIntro es) = PosSigmaIntro (map (substPos sub) es)
+substPos sub (PosBox e) = do
+  let e' = substPos sub e
+  PosBox e'
+substPos _ (PosIndex x) = PosIndex x
+substPos _ (PosIndexIntro l) = PosIndexIntro l
+substPos _ PosUniv = PosUniv
+substPos sub (PosUp e) = PosUp (substPos sub e)
+substPos sub (PosDown e) = PosDown (substPos sub e)
+substPos sub (PosDownIntro e) = PosDownIntro (substNeg sub e)
+
+substNeg :: SubstPos -> Neg -> Neg
+substNeg sub (NegPiIntro s body) = do
+  let body' = substNeg sub body
+  NegPiIntro s body'
+substNeg sub (NegPiElim e1 e2) = do
+  let e1' = substNeg sub e1
+  let e2' = substPos sub e2
+  NegPiElim e1' e2'
+substNeg sub (NegSigmaElim e1 xs e2) = do
+  let e1' = substPos sub e1
+  let e2' = substNeg sub e2
+  NegSigmaElim e1' xs e2'
+substNeg sub (NegBoxIntro e) = do
+  let e' = substNeg sub e
+  NegBoxIntro e'
+substNeg sub (NegBoxElim e) = do
+  let e' = substNeg sub e
+  NegBoxElim e'
+substNeg sub (NegIndexElim e branchList) = do
+  let e' = substPos sub e
+  let branchList' = map (\(l, e) -> (l, substNeg sub e)) branchList
+  NegIndexElim e' branchList'
+substNeg sub (NegUpIntro e) = NegUpIntro (substPos sub e)
+substNeg sub (NegUpElim x e1 e2) =
+  NegUpElim x (substNeg sub e1) (substNeg sub e2)
+substNeg sub (NegDownElim e) = NegDownElim (substPos sub e)
 
 findInvVar :: Subst -> Identifier -> Maybe Identifier
 findInvVar [] _ = Nothing

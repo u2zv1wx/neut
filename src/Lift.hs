@@ -81,7 +81,7 @@ lift (i :< NeutIndexElim e branchList) = do
 lift (i :< NeutUniv j) = return $ i :< NeutUniv j
 lift (i :< NeutMu s c) = do
   c' <- lift c
-  freeVars <- takeNonBox $ var c'
+  freeVars <- takeNonBox $ filter (/= s) $ var c'
   newFormalArgs <- constructFormalArgs freeVars
   let freeToBound = zip freeVars newFormalArgs
   c'' <- replace freeToBound c'

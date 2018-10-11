@@ -26,7 +26,6 @@ check main e = do
   t <- infer [] e
   insTypeEnv main t -- insert the type of main function
   boxConstraint [] $ nonLinear e
-  liftIO $ putStrLn $ "nonLinear: " ++ Pr.ppShow (nonLinear e)
   gets constraintEnv >>= analyze
   gets constraintQueue >>= synthesize
   sub <- gets substitution
@@ -37,7 +36,6 @@ check main e = do
   -- liftIO $ putStrLn $ Pr.ppShow tenv''
   modify (\e -> e {typeEnv = tenv'})
   checkNumConstraint
-  liftIO $ putStrLn $ "type-checked."
   return $ subst sub e
 
 infer :: Context -> Neut -> WithEnv Neut
@@ -148,9 +146,6 @@ infer ctx (meta :< NeutIndexIntro l) = do
       returnMeta meta $ indexMeta :< NeutIndex k
     Nothing -> do
       hole <- appCtx ctx
-      liftIO $
-        putStrLn $
-        "add num constraint for: " ++ Pr.ppShow (meta :< NeutIndexIntro l)
       insNumConstraintEnv meta
       returnMeta meta hole
 infer _ (_ :< NeutIndexElim _ []) = lift $ throwE "empty branch"
@@ -567,7 +562,6 @@ synthesize q =
         synthesize $ Q.deleteMin q `Q.union` q'
     Just (Constraint ctx (ConstraintFlexRigid hole args e) t)
       | (x@(_ :< NeutIndex _), eArgs) <- toPiElimSeq e -> do
-        liftIO $ putStrLn "backtracking!"
         newHoleList <- mapM (const (newNameWith "hole")) args -- ?M_i
         newHoleVarList <- mapM toVar' newHoleList
         newArgList <- mapM (const $ newNameWith "arg") eArgs -- x_i

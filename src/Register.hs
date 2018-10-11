@@ -25,8 +25,9 @@ type Graph = ([Node], [Edge])
 
 -- regsiter allocation based on chordal graph coloring
 regAlloc :: Int -> Asm -> WithEnv ()
-regAlloc i asm = do
-  liftIO $ putStrLn $ "regalloc"
+regAlloc i asm
+  -- liftIO $ putStrLn $ "regalloc"
+ = do
   asm' <- annotAsm asm >>= computeLiveness
   graph <- build asm'
   xs <- maxCardSearch graph
@@ -35,7 +36,11 @@ regAlloc i asm = do
   env' <- get
   case spill env' of
     Nothing -> return ()
-    Just x -> do
+    Just x
+      -- liftIO $ putStrLn $ "spill: " ++ x
+      -- u <- insertSpill asm x
+      -- liftIO $ putStrLn $ "inserted spill:\n" ++ Pr.ppShow u
+     -> do
       asm'' <- insertSpill asm x >>= annotAsm >>= computeLiveness
       put env
       regAlloc i asm''
@@ -137,10 +142,13 @@ liveInfo (meta :< AsmCall _ _ _ cont) = do
 liveInfo (meta :< AsmCompare _ _ cont) = do
   info <- liveInfo cont
   return $ asmMetaDef meta : info
-liveInfo (meta :< AsmJumpIfZero _ cont) = do
-  info <- liveInfo cont
+liveInfo (meta :< AsmJumpIfZero (_, body) cont) = do
+  info1 <- liveInfo cont
+  info2 <- liveInfo body
+  return $ asmMetaDef meta : info1 ++ info2
+liveInfo (meta :< AsmJump (_, body)) = do
+  info <- liveInfo body
   return $ asmMetaDef meta : info
-liveInfo (meta :< AsmJump _) = return [asmMetaDef meta]
 liveInfo (meta :< AsmPush _ cont) = do
   info <- liveInfo cont
   return $ asmMetaLive meta : info
@@ -171,10 +179,13 @@ defInfo (meta :< AsmCall _ _ _ cont) = do
 defInfo (meta :< AsmCompare _ _ cont) = do
   info <- defInfo cont
   return $ asmMetaDef meta : info
-defInfo (meta :< AsmJumpIfZero _ cont) = do
-  info <- defInfo cont
+defInfo (meta :< AsmJumpIfZero (_, body) cont) = do
+  info1 <- defInfo cont
+  info2 <- defInfo body
+  return $ asmMetaDef meta : info1 ++ info2
+defInfo (meta :< AsmJump (_, body)) = do
+  info <- defInfo body
   return $ asmMetaDef meta : info
-defInfo (meta :< AsmJump _) = return [asmMetaDef meta]
 defInfo (meta :< AsmPush _ cont) = do
   info <- defInfo cont
   return $ asmMetaDef meta : info
@@ -209,10 +220,13 @@ insertSpill (meta :< AsmCall dest fun args cont) x = do
 insertSpill (meta :< AsmCompare p q cont) x = do
   cont' <- insertSpill cont x
   insertPop x [p, q] $ meta :< AsmCompare p q cont'
-insertSpill (meta :< AsmJumpIfZero label cont) x = do
+insertSpill (meta :< AsmJumpIfZero (label, body) cont) x = do
   cont' <- insertSpill cont x
-  return $ meta :< AsmJumpIfZero label cont'
-insertSpill (meta :< AsmJump label) _ = return $ meta :< AsmJump label
+  body' <- insertSpill body x
+  return $ meta :< AsmJumpIfZero (label, body') cont'
+insertSpill (meta :< AsmJump (label, body)) x = do
+  body' <- insertSpill body x
+  return $ meta :< AsmJump (label, body')
 insertSpill (meta :< AsmPush y cont) x = do
   cont' <- insertSpill cont x
   cont'' <- insertPush x [y] cont'

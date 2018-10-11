@@ -83,10 +83,10 @@ virtualNeg (NegUpElim x e1 e2) = do
   return $ traceLet x e1' e2'
 virtualNeg (NegDownElim e) = do
   e' <- virtualPos e
-  fun <- newName
-  envName <- newName
+  fun <- newNameWith "fun"
+  envName <- newNameWith "env"
   cls <- newNameWith "cls"
-  s <- newName
+  s <- newNameWith "tmp"
   let ts = [LowTypePointer (LowTypeInt 32), LowTypePointer (LowTypeInt 32)]
   return $
     CodeLet cls e' $
@@ -108,7 +108,7 @@ extract :: Identifier -> [LowType] -> [(Identifier, Int)] -> Code -> Code
 extract z _ [] cont = CodeFree z cont
 extract z ts ((x, i):xis) cont = do
   let cont' = extract z ts xis cont
-  CodeExtractValue z x ts i cont'
+  CodeExtractValue x (z, ts) i cont'
 
 bindLet :: [(Identifier, Data)] -> Code -> Code
 bindLet [] e           = e
@@ -126,9 +126,21 @@ traceLet x (CodeSwitch y branchList) cont = do
   let (labelList, es) = unzip branchList
   let es' = map (\e -> traceLet x e cont) es
   CodeSwitch y $ zip labelList es'
-traceLet s (CodeExtractValue x d ts i cont1) cont2 = do
+traceLet s (CodeExtractValue x (basePointer, ts) i cont1) cont2 = do
   let tmp = traceLet s cont1 cont2
-  CodeExtractValue x d ts i tmp
+  CodeExtractValue x (basePointer, ts) i tmp
 traceLet s (CodeFree x cont1) cont2 = do
   let tmp = traceLet s cont1 cont2
   CodeFree x tmp
+-- freeAtTail :: String -> Code -> Code
+-- freeAtTail s (CodeReturn ans) = CodeFree s (CodeReturn ans)
+-- freeAtTail s (CodeLet k o1 o2) = CodeLet k o1 (freeAtTail s o2)
+-- freeAtTail s (CodeCall reg name xds cont) =
+--   CodeCall reg name xds (freeAtTail s cont)
+-- freeAtTail x (CodeSwitch y branchList) = do
+--   let (labelList, es) = unzip branchList
+--   let es' = map (freeAtTail x) es
+--   CodeSwitch y $ zip labelList es'
+-- freeAtTail s (CodeExtractValue x (basePointer, ts) i cont) =
+--   CodeExtractValue x (basePointer, ts) i (freeAtTail s cont)
+-- freeAtTail s (CodeFree x cont) = CodeFree x (freeAtTail s cont)

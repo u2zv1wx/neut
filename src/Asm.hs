@@ -48,16 +48,16 @@ asmCode (CodeCall x fun args cont) = do
   cont' <- asmCode cont
   if length args > 6
     then lift $ throwE "Asm.asmCode: the number of arguments exceeds 6 (FIXME)"
-    else asmCodeCall x fun args cont'
+    else asmCodeCall x (AsmDataReg fun) args cont'
 asmCode (CodeSwitch x branchList) = asmSwitch x branchList
-asmCode (CodeExtractValue x base ts i cont) = do
+asmCode (CodeExtractValue x (basePointer, ts) i cont) = do
   let offset = sum $ map sizeOfLowType $ take i ts
   cont' <- asmCode cont
-  addMeta $ AsmExtractValue x base offset cont'
+  addMeta $ AsmExtractValue x basePointer offset cont'
 asmCode (CodeFree x cont) = do
   tmp <- newName
   cont' <- asmCode cont
-  asmCodeCall tmp "_free" [x] cont'
+  asmCodeCall tmp (AsmDataLabel "_free") [x] cont'
 
 asmData :: Identifier -> Data -> Asm -> WithEnv Asm
 asmData reg (DataLocal x) cont = addMeta $ AsmLet reg (AsmDataReg x) cont
@@ -69,15 +69,15 @@ asmData reg (DataStruct ds) cont = do
   let structSize = sum sizeList
   cont' <- setContent reg sizeList (zip [0 ..] xs) cont
   rdi <- getRDI
-  callThenCont <- asmCodeCall reg "_malloc" [rdi] cont'
+  callThenCont <- asmCodeCall reg (AsmDataLabel "_malloc") [rdi] cont'
   tmp <- addMeta $ AsmLet rdi (AsmDataImmediate structSize) callThenCont
   asmStruct (zip xs ds) tmp
 asmData reg (DataClosure cls envName fv) cont = do
-  cont' <- asmData reg (DataStruct [DataLabel cls, DataLocal envName]) cont
   let sizeList = map (const 8) fv
-  cont'' <- setContent envName sizeList (zip [0 ..] fv) cont'
+  cont' <- setContent envName sizeList (zip [0 ..] fv) cont
+  cont'' <- asmData reg (DataStruct [DataLabel cls, DataLocal envName]) cont'
   rdi <- getRDI
-  asmCodeCall envName "_malloc" [rdi] cont''
+  asmCodeCall envName (AsmDataLabel "_malloc") [rdi] cont''
 
 asmStruct :: [(Identifier, Data)] -> Asm -> WithEnv Asm
 asmStruct [] cont = return cont
@@ -87,23 +87,21 @@ asmStruct ((x, d):xds) cont = do
 
 asmSwitch :: Identifier -> [(Index, Code)] -> WithEnv Asm
 asmSwitch _ [] = lift $ throwE "empty branch"
-asmSwitch _ [(_, code)] = asmSwitchLast code
+asmSwitch _ [(_, code)] = asmSwitchLast code -- FIXME (bind the argument)
 asmSwitch _ ((IndexDefault, code):_) = asmSwitchLast code
 asmSwitch name ((i, code):rest) = do
   cont <- asmSwitch name rest
   asm <- asmCode code
   x <- newNameWith "case"
   let label = x ++ "." ++ showIndex i
-  insAsmEnv label asm
-  cont' <- addMeta $ AsmJumpIfZero label cont
+  cont' <- addMeta $ AsmJumpIfZero (label, asm) cont
   addMeta $ AsmCompare name label cont'
 
 asmSwitchLast :: Code -> WithEnv Asm
 asmSwitchLast code = do
   asm <- asmCode code
   label <- newNameWith "default"
-  insAsmEnv label asm
-  addMeta $ AsmJump label
+  addMeta $ AsmJump (label, asm)
 
 setContent :: Identifier -> [Int] -> [(Int, Identifier)] -> Asm -> WithEnv Asm
 setContent _ _ [] cont = return cont
@@ -112,12 +110,12 @@ setContent basePointer sizeList ((i, dataAtIndex):sizeDataList) cont = do
   let offset = sum $ take i sizeList
   addMeta $ AsmInsertValue (AsmDataReg dataAtIndex) basePointer offset cont'
 
-asmCodeCall :: Identifier -> Identifier -> [Identifier] -> Asm -> WithEnv Asm
+asmCodeCall :: Identifier -> AsmData -> [Identifier] -> Asm -> WithEnv Asm
 asmCodeCall x fun args cont = do
   argRegList <- getArgRegList
   rax <- getRAX
   cont' <- addMeta $ AsmLet x (AsmDataReg rax) cont
-  call <- addMeta $ AsmCall rax (AsmDataReg fun) args cont'
+  call <- addMeta $ AsmCall rax fun args cont'
   bindArgs (zip argRegList args) call
 
 bindArgs :: [(Identifier, Identifier)] -> Asm -> WithEnv Asm

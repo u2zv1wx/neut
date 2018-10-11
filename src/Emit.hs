@@ -23,13 +23,15 @@ import           Debug.Trace
 emit :: WithEnv ()
 emit = do
   env <- get
-  forM_ (asmEnv env) $ \(name, asm) -> do
-    emitLabel name
-    modify (\e -> e {sizeEnv = []})
-    computeSizeList asm
-    asm' <- insExtendShrink name asm
-    asm'' <- insSaveRestore asm'
-    emitAsm asm''
+  forM_ (asmEnv env) $ uncurry emit'
+
+emit' name asm = do
+  emitLabel name
+  modify (\e -> e {sizeEnv = []})
+  computeSizeList asm
+  asm' <- insExtendShrink name asm
+  asm'' <- insSaveRestore asm'
+  emitAsm asm''
 
 emitAsm :: Asm -> WithEnv ()
 emitAsm (_ :< AsmReturn _) = emitOp $ unwords ["ret"]
@@ -44,7 +46,7 @@ emitAsm (_ :< AsmLet x (AsmDataLabel label) cont) = do
   emitAsm cont
 emitAsm (_ :< AsmLet x (AsmDataImmediate i) cont) = do
   x' <- showReg x
-  emitOp $ unwords ["movq", show i, x']
+  emitOp $ unwords ["movq", show i ++ ",", x']
   emitAsm cont
 emitAsm (_ :< AsmExtractValue dest base offset cont) = do
   base' <- showReg base
@@ -70,10 +72,13 @@ emitAsm (_ :< AsmCompare x y cont) = do
   y' <- showReg y
   emitOp $ unwords ["cmp", x' ++ ",", y']
   emitAsm cont
-emitAsm (_ :< AsmJumpIfZero label cont) = do
+emitAsm (_ :< AsmJumpIfZero (label, body) cont) = do
   emitOp $ unwords ["jz", label]
   emitAsm cont
-emitAsm (_ :< AsmJump label) = emitOp $ unwords ["jmp", label]
+  emit' label body
+emitAsm (_ :< AsmJump (label, body)) = do
+  emitOp $ unwords ["jmp", label]
+  emit' label body
 emitAsm (meta :< AsmPush x cont) = do
   rsp <- getRSP
   offset <- computeOffset x

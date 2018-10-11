@@ -78,7 +78,7 @@ polarizePos (_ :< NeutSigmaElim {}) =
   lift $ throwE "Polarize.polarizePos.NeutSigmaElim"
 polarizePos (_ :< NeutBox e) = do
   e' <- polarizePos e
-  return $ PosDown $ PosBox e'
+  return $ PosDown $ PosBox $ PosUp e'
 polarizePos (_ :< NeutBoxIntro e) = do
   e' <- polarizeNeg e
   return $ PosDownIntro $ NegBoxIntro e'

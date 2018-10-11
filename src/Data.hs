@@ -153,9 +153,8 @@ data Code
              Code -- continuation
   | CodeSwitch Identifier
                [(Index, Code)]
-  | CodeExtractValue Identifier -- base pointer
-                     Identifier -- store to this variable
-                     [LowType] -- the type of base pointer is LowTypeStruct [this]
+  | CodeExtractValue Identifier -- destination
+                     (Identifier, [LowType]) -- base pointer
                      Int -- index
                      Code -- continuation
   | CodeFree Identifier
@@ -196,9 +195,9 @@ data AsmF a
   | AsmCompare Identifier
                Identifier
                a
-  | AsmJumpIfZero Identifier
+  | AsmJumpIfZero (Identifier, a)
                   a
-  | AsmJump Identifier
+  | AsmJump (Identifier, a)
   | AsmPush Identifier
             a
   | AsmPop Identifier
@@ -475,8 +474,10 @@ insNumConstraintEnv x =
 insTermEnv :: Identifier -> Term -> WithEnv ()
 insTermEnv i t = modify (\e -> e {termEnv = (i, t) : termEnv e})
 
+-- insWeakTermEnv :: Identifier -> Neut -> WithEnv ()
+-- insWeakTermEnv i t = modify (\e -> e {weakTermEnv = (i, t) : weakTermEnv e})
 insWeakTermEnv :: Identifier -> Neut -> WithEnv ()
-insWeakTermEnv i t = modify (\e -> e {weakTermEnv = (i, t) : weakTermEnv e})
+insWeakTermEnv i t = modify (\e -> e {weakTermEnv = weakTermEnv e ++ [(i, t)]})
 
 lookupWeakTermEnv :: Identifier -> WithEnv Neut
 lookupWeakTermEnv funName = do

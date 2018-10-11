@@ -87,9 +87,13 @@ process e = do
   -- c'' <- exhaust e' >>= lift >>= polarizeNeg
   insWeakTermEnv mainLabel c''
   wtenv <- gets weakTermEnv
-  liftIO $ putStrLn "lifted."
+  -- liftIO $ putStrLn "lifted."
   forM_ wtenv $ \(name, e) ->
-    polarizeNeg e >>= virtualNeg >>= insCodeEnv name []
+    polarizeNeg e >>= reduceNeg >>= virtualNeg >>= insCodeEnv name []
+    -- e' <- polarizeNeg e
+    -- e'' <- reduceNeg e'
+    -- liftIO $ putStrLn $ "name: " ++ name
+    -- liftIO $ putStrLn $ Pr.ppShow e''
   -- liftIO $ putStrLn $ Pr.ppShow c''
   -- c' <- exhaust e' >>= lift >>= polarizeNeg >>= virtualNeg
   -- liftIO $ putStrLn $ Pr.ppShow c'
