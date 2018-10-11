@@ -42,33 +42,27 @@ asmCode (CodeLet i d cont) = do
   asmData i d cont'
 asmCode (CodeCall dest "core.add" [x, y] cont) = do
   cont' <- asmCode cont
-  cont'' <- addMeta $ AsmAddInt64 (AsmArgReg y) dest cont'
-  addMeta $ AsmLet dest (AsmArgReg x) cont''
+  cont'' <- addMeta $ AsmAddInt64 (AsmDataReg y) dest cont'
+  addMeta $ AsmLet dest (AsmDataReg x) cont''
 asmCode (CodeCall x fun args cont) = do
   cont' <- asmCode cont
   if length args > 6
-    then lift $ throwE "Asm.asmCode: the number of arguments exceeds 6"
+    then lift $ throwE "Asm.asmCode: the number of arguments exceeds 6 (FIXME)"
     else asmCodeCall x fun args cont'
 asmCode (CodeSwitch x branchList) = asmSwitch x branchList
-asmCode (CodeExtractValue x base i cont) = do
-  t <- lookupTypeEnv' x >>= reduce
-  case t of
-    _ :< NeutSigma xts t -> do
-      let args = map snd xts ++ [t]
-      ts <- mapM toLowType args
-      let offset = sum $ map sizeOfLowType $ take i ts
-      cont' <- asmCode cont
-      addMeta $ AsmExtractValue x base offset cont'
-    _ -> lift $ throwE $ "Asm.asmCode : typeError. t:\n" ++ Pr.ppShow t
+asmCode (CodeExtractValue x base ts i cont) = do
+  let offset = sum $ map sizeOfLowType $ take i ts
+  cont' <- asmCode cont
+  addMeta $ AsmExtractValue x base offset cont'
 asmCode (CodeFree x cont) = do
   tmp <- newName
   cont' <- asmCode cont
   asmCodeCall tmp "_free" [x] cont'
 
 asmData :: Identifier -> Data -> Asm -> WithEnv Asm
-asmData reg (DataLocal x) cont = addMeta $ AsmLet reg (AsmArgReg x) cont
-asmData reg (DataLabel x) cont = addMeta $ AsmLet reg (AsmArgLabel x) cont
-asmData reg (DataInt32 i) cont = addMeta $ AsmLet reg (AsmArgImmediate i) cont
+asmData reg (DataLocal x) cont = addMeta $ AsmLet reg (AsmDataReg x) cont
+asmData reg (DataLabel x) cont = addMeta $ AsmLet reg (AsmDataLabel x) cont
+asmData reg (DataInt32 i) cont = addMeta $ AsmLet reg (AsmDataImmediate i) cont
 asmData reg (DataStruct ds) cont = do
   xs <- mapM (const newName) ds
   let sizeList = map sizeOfData ds
@@ -76,8 +70,14 @@ asmData reg (DataStruct ds) cont = do
   cont' <- setContent reg sizeList (zip [0 ..] xs) cont
   rdi <- getRDI
   callThenCont <- asmCodeCall reg "_malloc" [rdi] cont'
-  tmp <- addMeta $ AsmLet rdi (AsmArgImmediate structSize) callThenCont
+  tmp <- addMeta $ AsmLet rdi (AsmDataImmediate structSize) callThenCont
   asmStruct (zip xs ds) tmp
+asmData reg (DataClosure cls envName fv) cont = do
+  cont' <- asmData reg (DataStruct [DataLabel cls, DataLocal envName]) cont
+  let sizeList = map (const 8) fv
+  cont'' <- setContent envName sizeList (zip [0 ..] fv) cont'
+  rdi <- getRDI
+  asmCodeCall envName "_malloc" [rdi] cont''
 
 asmStruct :: [(Identifier, Data)] -> Asm -> WithEnv Asm
 asmStruct [] cont = return cont
@@ -110,21 +110,21 @@ setContent _ _ [] cont = return cont
 setContent basePointer sizeList ((i, dataAtIndex):sizeDataList) cont = do
   cont' <- setContent basePointer sizeList sizeDataList cont
   let offset = sum $ take i sizeList
-  addMeta $ AsmInsertValue (AsmArgReg dataAtIndex) basePointer offset cont'
+  addMeta $ AsmInsertValue (AsmDataReg dataAtIndex) basePointer offset cont'
 
 asmCodeCall :: Identifier -> Identifier -> [Identifier] -> Asm -> WithEnv Asm
 asmCodeCall x fun args cont = do
   argRegList <- getArgRegList
   rax <- getRAX
-  cont' <- addMeta $ AsmLet x (AsmArgReg rax) cont
-  call <- addMeta $ AsmCall rax (AsmArgReg fun) args cont'
+  cont' <- addMeta $ AsmLet x (AsmDataReg rax) cont
+  call <- addMeta $ AsmCall rax (AsmDataReg fun) args cont'
   bindArgs (zip argRegList args) call
 
 bindArgs :: [(Identifier, Identifier)] -> Asm -> WithEnv Asm
 bindArgs [] asm = return asm
 bindArgs ((to, from):rest) asm = do
   asm' <- bindArgs rest asm
-  addMeta $ AsmLet to (AsmArgReg from) asm'
+  addMeta $ AsmLet to (AsmDataReg from) asm'
 
 showIndex :: Index -> String
 showIndex (IndexInteger i) = show i
@@ -133,6 +133,7 @@ showIndex IndexDefault     = "default"
 
 sizeOfData :: Data -> Int
 sizeOfData (DataLocal _)   = 8
-sizeOfData (DataLabel x)   = 8
-sizeOfData (DataInt32 i)   = 8
+sizeOfData (DataLabel _)   = 8
+sizeOfData (DataInt32 _)   = 8
 sizeOfData (DataStruct ds) = sum $ map sizeOfData ds
+sizeOfData DataClosure {}  = 16

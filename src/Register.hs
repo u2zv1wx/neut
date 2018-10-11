@@ -26,6 +26,7 @@ type Graph = ([Node], [Edge])
 -- regsiter allocation based on chordal graph coloring
 regAlloc :: Int -> Asm -> WithEnv ()
 regAlloc i asm = do
+  liftIO $ putStrLn $ "regalloc"
   asm' <- annotAsm asm >>= computeLiveness
   graph <- build asm'
   xs <- maxCardSearch graph
@@ -193,7 +194,7 @@ insertSpill (meta :< AsmReturn ans) x =
 insertSpill (meta :< AsmLet dest src cont) x = do
   cont' <- insertSpill cont x
   cont'' <- insertPush x [dest] cont'
-  insertPop x (varsInAsmArg src) $ meta :< AsmLet dest src cont''
+  insertPop x (varsInAsmData src) $ meta :< AsmLet dest src cont''
 insertSpill (meta :< AsmExtractValue dest base i cont) x = do
   cont' <- insertSpill cont x
   cont'' <- insertPush x [dest] cont'
@@ -204,7 +205,7 @@ insertSpill (meta :< AsmInsertValue val base i cont) x = do
 insertSpill (meta :< AsmCall dest fun args cont) x = do
   cont' <- insertSpill cont x
   cont'' <- insertPush x [dest] cont'
-  insertPop x (varsInAsmArg fun ++ args) $ meta :< AsmCall dest fun args cont''
+  insertPop x (varsInAsmData fun ++ args) $ meta :< AsmCall dest fun args cont''
 insertSpill (meta :< AsmCompare p q cont) x = do
   cont' <- insertSpill cont x
   insertPop x [p, q] $ meta :< AsmCompare p q cont'
@@ -222,11 +223,11 @@ insertSpill (meta :< AsmPop y cont) x = do
 insertSpill (meta :< AsmAddInt64 arg dest cont) x = do
   cont' <- insertSpill cont x
   cont'' <- insertPush x [dest] cont'
-  insertPop x (varsInAsmArg arg) $ meta :< AsmAddInt64 arg dest cont''
+  insertPop x (varsInAsmData arg) $ meta :< AsmAddInt64 arg dest cont''
 insertSpill (meta :< AsmSubInt64 arg dest cont) x = do
   cont' <- insertSpill cont x
   cont'' <- insertPush x [dest] cont'
-  insertPop x (varsInAsmArg arg) $ meta :< AsmSubInt64 arg dest cont''
+  insertPop x (varsInAsmData arg) $ meta :< AsmSubInt64 arg dest cont''
 
 -- insertPushPop :: Identifier -> [Identifier] -> Asm -> WithEnv Asm
 -- insertPushPop x us cont = do

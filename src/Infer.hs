@@ -225,12 +225,6 @@ constructPair ctx xs = do
   _ <- infer ctx pair
   return pair
 
-newNameOfType :: Neut -> WithEnv Identifier
-newNameOfType t = do
-  i <- newName
-  insTypeEnv i t
-  return i
-
 newName' :: Identifier -> Neut -> WithEnv Identifier
 newName' name t = do
   i <- newNameWith name

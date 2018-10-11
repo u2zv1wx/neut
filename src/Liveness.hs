@@ -23,7 +23,7 @@ annotAsm (_ :< AsmReturn x) =
 annotAsm (_ :< AsmLet x y cont) = do
   cont' <- annotAsm cont
   return $
-    emptyAsmMeta {asmMetaUse = varsInAsmArg y, asmMetaDef = [x]} :<
+    emptyAsmMeta {asmMetaUse = varsInAsmData y, asmMetaDef = [x]} :<
     AsmLet x y cont'
 annotAsm (_ :< AsmExtractValue dest base i cont) = do
   cont' <- annotAsm cont
@@ -33,12 +33,12 @@ annotAsm (_ :< AsmExtractValue dest base i cont) = do
 annotAsm (_ :< AsmInsertValue val base i cont) = do
   cont' <- annotAsm cont
   return $
-    emptyAsmMeta {asmMetaUse = base : varsInAsmArg val} :<
+    emptyAsmMeta {asmMetaUse = base : varsInAsmData val} :<
     AsmInsertValue val base i cont'
 annotAsm (_ :< AsmCall x fun args cont) = do
   cont' <- annotAsm cont
   return $
-    emptyAsmMeta {asmMetaUse = varsInAsmArg fun ++ args, asmMetaDef = [x]} :<
+    emptyAsmMeta {asmMetaUse = varsInAsmData fun ++ args, asmMetaDef = [x]} :<
     AsmCall x fun args cont'
 annotAsm (_ :< AsmCompare x y cont) = do
   cont' <- annotAsm cont
@@ -56,12 +56,12 @@ annotAsm (_ :< AsmPop x cont) = do
 annotAsm (_ :< AsmAddInt64 arg dest cont) = do
   cont' <- annotAsm cont
   return $
-    emptyAsmMeta {asmMetaUse = varsInAsmArg arg, asmMetaDef = [dest]} :<
+    emptyAsmMeta {asmMetaUse = varsInAsmData arg, asmMetaDef = [dest]} :<
     AsmAddInt64 arg dest cont'
 annotAsm (_ :< AsmSubInt64 arg dest cont) = do
   cont' <- annotAsm cont
   return $
-    emptyAsmMeta {asmMetaUse = varsInAsmArg arg, asmMetaDef = [dest]} :<
+    emptyAsmMeta {asmMetaUse = varsInAsmData arg, asmMetaDef = [dest]} :<
     AsmSubInt64 arg dest cont'
 
 computeLiveness :: Asm -> WithEnv Asm

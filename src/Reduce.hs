@@ -157,9 +157,7 @@ nonRecReduce e@(_ :< NeutMu _ _) = return e
 nonRecReduce e@(_ :< NeutHole x) = do
   sub <- gets substitution
   case lookup x sub of
-    Just e' -> do
-      liftIO $ putStrLn "FOUND!"
-      return e'
+    Just e' -> return e'
     Nothing -> return e
 
 subst :: Subst -> Neut -> Neut

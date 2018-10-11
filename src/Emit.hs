@@ -33,16 +33,16 @@ emit = do
 
 emitAsm :: Asm -> WithEnv ()
 emitAsm (_ :< AsmReturn _) = emitOp $ unwords ["ret"]
-emitAsm (_ :< AsmLet x (AsmArgReg y) cont) = do
+emitAsm (_ :< AsmLet x (AsmDataReg y) cont) = do
   x' <- showReg x
   y' <- showReg y
   emitOp $ unwords ["movq", y' ++ ",", x']
   emitAsm cont
-emitAsm (_ :< AsmLet x (AsmArgLabel label) cont) = do
+emitAsm (_ :< AsmLet x (AsmDataLabel label) cont) = do
   x' <- showReg x
   emitOp $ unwords ["leaq", label ++ "(%rip),", x']
   emitAsm cont
-emitAsm (_ :< AsmLet x (AsmArgImmediate i) cont) = do
+emitAsm (_ :< AsmLet x (AsmDataImmediate i) cont) = do
   x' <- showReg x
   emitOp $ unwords ["movq", show i, x']
   emitAsm cont
@@ -52,18 +52,18 @@ emitAsm (_ :< AsmExtractValue dest base offset cont) = do
   emitOp $ unwords ["movq", showRegWithOffset offset base' ++ ",", dest']
   emitAsm cont
 emitAsm (_ :< AsmInsertValue val base offset cont) = do
-  val' <- showAsmArg val
+  val' <- showAsmData val
   base' <- showReg base
   emitOp $ unwords ["movq", val' ++ ",", showRegWithOffset offset base']
   emitAsm cont
-emitAsm (_ :< AsmCall _ (AsmArgReg x) _ cont) = do
+emitAsm (_ :< AsmCall _ (AsmDataReg x) _ cont) = do
   x' <- showReg x
   emitOp $ unwords ["call", "*" ++ x']
   emitAsm cont
-emitAsm (_ :< AsmCall _ (AsmArgLabel label) _ cont) = do
+emitAsm (_ :< AsmCall _ (AsmDataLabel label) _ cont) = do
   emitOp $ unwords ["call", label]
   emitAsm cont
-emitAsm (_ :< AsmCall _ (AsmArgImmediate _) _ _) =
+emitAsm (_ :< AsmCall _ (AsmDataImmediate _) _ _) =
   liftIO $ putStrLn "emitAsm.AsmCall: immediate?"
 emitAsm (_ :< AsmCompare x y cont) = do
   x' <- showReg x
@@ -77,26 +77,26 @@ emitAsm (_ :< AsmJump label) = emitOp $ unwords ["jmp", label]
 emitAsm (meta :< AsmPush x cont) = do
   rsp <- getRSP
   offset <- computeOffset x
-  emitAsm $ meta :< AsmInsertValue (AsmArgReg x) rsp offset cont
+  emitAsm $ meta :< AsmInsertValue (AsmDataReg x) rsp offset cont
 emitAsm (meta :< AsmPop dest cont) = do
   rsp <- getRSP
   offset <- computeOffset dest
   emitAsm $ meta :< AsmExtractValue dest rsp offset cont
 emitAsm (_ :< AsmAddInt64 arg dest cont) = do
-  arg' <- showAsmArg arg
+  arg' <- showAsmData arg
   dest' <- showReg dest
   emitOp $ unwords ["addq", arg' ++ ",", dest']
   emitAsm cont
 emitAsm (_ :< AsmSubInt64 arg dest cont) = do
-  arg' <- showAsmArg arg
+  arg' <- showAsmData arg
   dest' <- showReg dest
   emitOp $ unwords ["subq", arg' ++ ",", dest']
   emitAsm cont
 
-showAsmArg :: AsmArg -> WithEnv String
-showAsmArg (AsmArgReg x)       = showReg x
-showAsmArg (AsmArgLabel x)     = return x
-showAsmArg (AsmArgImmediate i) = return $ "$" ++ show i
+showAsmData :: AsmData -> WithEnv String
+showAsmData (AsmDataReg x)       = showReg x
+showAsmData (AsmDataLabel x)     = return x
+showAsmData (AsmDataImmediate i) = return $ "$" ++ show i
 
 showReg :: Identifier -> WithEnv String
 showReg x = do
@@ -230,13 +230,13 @@ extendStack :: Identifier -> Asm -> WithEnv Asm
 extendStack name asm = do
   size <- alignedSize name
   rsp <- getRSP
-  addMeta $ AsmSubInt64 (AsmArgImmediate size) rsp asm
+  addMeta $ AsmSubInt64 (AsmDataImmediate size) rsp asm
 
 shrinkStack :: Identifier -> Asm -> WithEnv Asm
 shrinkStack name asm = do
   size <- alignedSize name
   rsp <- getRSP
-  addMeta $ AsmAddInt64 (AsmArgImmediate size) rsp asm
+  addMeta $ AsmAddInt64 (AsmDataImmediate size) rsp asm
 
 alignedSize :: Identifier -> WithEnv Int
 alignedSize name = do

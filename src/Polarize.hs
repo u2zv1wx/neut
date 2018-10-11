@@ -19,20 +19,12 @@ import           Data.Maybe                 (maybeToList)
 polarizeNeg :: Neut -> WithEnv Neg
 polarizeNeg (_ :< NeutVar s) = return $ NegUpIntro $ PosVar s
 polarizeNeg (_ :< NeutConst s _) = return $ NegUpIntro $ PosConst s
-polarizeNeg forall@(_ :< NeutPi _ _) = NegUpIntro <$> polarizePos forall
+polarizeNeg pi@(_ :< NeutPi _ _) = NegUpIntro <$> polarizePos pi
 polarizeNeg lam@(_ :< NeutPiIntro _ _) = NegUpIntro <$> polarizePos lam
-polarizeNeg e@(_ :< NeutPiElim _ _) = do
-  let (fun, identArgList) = toPiElimSeq e
-  formalArgs <- mapM (const newName) identArgList
-  let (_, argList) = unzip identArgList
-  case fun of
-    _ :< NeutConst funName _ ->
-      bindSeq (zip formalArgs argList) (NegPiElimDownElim funName formalArgs)
-    _ -> do
-      funName <- newNameWith "fun"
-      bindSeq
-        (zip formalArgs argList ++ [(funName, fun)])
-        (NegPiElimDownElim funName formalArgs)
+polarizeNeg (_ :< NeutPiElim e1 e2) = do
+  f <- newNameWith "pi"
+  v <- newNameWith "arg"
+  bindSeq [(v, e2), (f, e1)] (NegPiElim (NegDownElim (PosVar f)) (PosVar v))
 polarizeNeg exists@(_ :< NeutSigma _ _) = NegUpIntro <$> polarizePos exists
 polarizeNeg (_ :< NeutSigmaIntro es) = do
   nameList <- mapM (const newName) es
@@ -40,24 +32,23 @@ polarizeNeg (_ :< NeutSigmaIntro es) = do
   bindSeq (zip nameList es) (NegUpIntro (PosSigmaIntro nameList'))
 polarizeNeg (_ :< NeutSigmaElim e1 xs e2) = do
   e2' <- polarizeNeg e2
-  z <- newName
-  bindSeq [(z, e1)] (NegSigmaElim z xs e2')
+  z <- newNameWith "sigma"
+  bindSeq [(z, e1)] (NegSigmaElim (PosVar z) xs e2')
 polarizeNeg box@(_ :< NeutBox _) = NegUpIntro <$> polarizePos box
-polarizeNeg e@(_ :< NeutBoxIntro _) = NegUpIntro <$> polarizePos e
+polarizeNeg (_ :< NeutBoxIntro e) = do
+  e' <- polarizeNeg e
+  return $ NegUpIntro $ PosDownIntro $ NegBoxIntro e'
 polarizeNeg (_ :< NeutBoxElim e) = do
-  x <- newName
-  bindSeq [(x, e)] (NegPiElimDownElim x [])
+  z <- newNameWith "box"
+  bindSeq [(z, e)] (NegBoxElim $ NegDownElim (PosVar z))
 polarizeNeg t@(_ :< NeutIndex _) = NegUpIntro <$> polarizePos t
 polarizeNeg e@(_ :< NeutIndexIntro _) = NegUpIntro <$> polarizePos e
 polarizeNeg (_ :< NeutIndexElim e branchList) = do
   let (labelList, es) = unzip branchList
   cs <- mapM polarizeNeg es
   x <- newName
-  bindSeq [(x, e)] $ NegIndexElim x (zip labelList cs)
-polarizeNeg (_ :< NeutMu s e) = do
-  e' <- polarizeNeg e
-  insTermEnv s $ Comp e'
-  return e'
+  bindSeq [(x, e)] $ NegIndexElim (PosVar x) (zip labelList cs)
+polarizeNeg (_ :< NeutMu _ _) = error "polarizeNeg.polarizeNeg: unreachable: Mu"
 polarizeNeg t@(_ :< NeutUniv _) = NegUpIntro <$> polarizePos t
 polarizeNeg (_ :< NeutHole x) =
   error $ "PolarizeNeg.polarizeNeg: remaining hole: " ++ x
@@ -65,21 +56,13 @@ polarizeNeg (_ :< NeutHole x) =
 polarizePos :: Neut -> WithEnv Pos
 polarizePos (_ :< NeutVar s) = return $ PosVar s
 polarizePos (_ :< NeutConst s _) = return $ PosConst s
-polarizePos forall@(_ :< NeutPi _ _) = do
-  let (body, xts) = toPiSeq forall
-  body' <- polarizePos body
-  let (xs, ts) = unzip xts
-  ts' <- mapM polarizePos ts
-  let xts' = zip xs ts'
-  return $ PosDown (PosPi xts' (PosUp body'))
-polarizePos lam@(i :< NeutPiIntro _ _) = do
-  let (body, argTypeMetaList) = toPiIntroSeq lam
-  let args = map (\(x, _, _) -> x) argTypeMetaList
-  c <- polarizeNeg body
-  name <- newNameWith "lam"
-  lamType <- lookupTypeEnv' i
-  insTypeEnv name lamType
-  return $ PosDownIntroPiIntro name args c
+polarizePos (_ :< NeutPi (x, tdom) tcod) = do
+  tdom' <- polarizePos tdom
+  tcod' <- PosUp <$> polarizePos tcod
+  return $ PosDown $ PosPi (x, tdom') tcod'
+polarizePos (_ :< NeutPiIntro (x, _) e) = do
+  e' <- polarizeNeg e
+  return $ PosDownIntro (NegPiIntro x e')
 polarizePos (_ :< NeutPiElim _ _) =
   lift $ throwE "Polarize.polarizePos.NeutPiElim"
 polarizePos (_ :< NeutSigma xts body) = do
@@ -95,11 +78,10 @@ polarizePos (_ :< NeutSigmaElim {}) =
   lift $ throwE "Polarize.polarizePos.NeutSigmaElim"
 polarizePos (_ :< NeutBox e) = do
   e' <- polarizePos e
-  return $ PosDown (PosPi [] (PosUp e'))
+  return $ PosDown $ PosBox e'
 polarizePos (_ :< NeutBoxIntro e) = do
   e' <- polarizeNeg e
-  label <- newNameWith "box"
-  return $ PosDownIntroPiIntro label [] e'
+  return $ PosDownIntro $ NegBoxIntro e'
 polarizePos (_ :< NeutBoxElim _) =
   lift $ throwE "Polarize.polarizePos.NeutBoxElim"
 polarizePos (_ :< NeutIndex l) = return $ PosIndex l

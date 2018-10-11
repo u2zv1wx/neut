@@ -39,6 +39,18 @@ fromPiElimSeq :: (Neut, [(Identifier, Neut)]) -> Neut
 fromPiElimSeq (term, [])        = term
 fromPiElimSeq (term, (i, v):xs) = fromPiElimSeq (i :< NeutPiElim term v, xs)
 
+toNegPiIntroSeq :: Neg -> (Neg, [Identifier])
+toNegPiIntroSeq (NegPiIntro x body) = do
+  let (body', args) = toNegPiIntroSeq body
+  (body', x : args)
+toNegPiIntroSeq t = (t, [])
+
+toNegPiElimSeq :: Neg -> (Neg, [Pos])
+toNegPiElimSeq (NegPiElim e1 e2) = do
+  let (fun, xs) = toNegPiElimSeq e1
+  (fun, e2 : xs)
+toNegPiElimSeq c = (c, [])
+
 toPiSeq :: Neut -> (Neut, [(Identifier, Neut)])
 toPiSeq (_ :< NeutPi (x, t) body) = do
   let (body', args) = toPiSeq body
@@ -121,6 +133,53 @@ varAndHole (_ :< NeutIndexElim e branchList) = do
 varAndHole (_ :< NeutUniv _) = ([], [])
 varAndHole (_ :< NeutMu _ e) = varAndHole e
 varAndHole (_ :< NeutHole x) = ([], [x])
+
+varPos :: Pos -> [Identifier]
+varPos (PosVar s) = [s]
+varPos (PosConst _) = []
+varPos (PosPi (x, tdom) tcod) = do
+  let vs1 = varPos tdom
+  let vs2 = filter (/= x) $ varPos tcod
+  vs1 ++ vs2
+varPos (PosSigma xts t2) = do
+  let (xs, ts) = unzip xts
+  let vs = concatMap varPos (t2 : ts)
+  filter (`notElem` xs) vs
+varPos (PosSigmaIntro es) = concatMap varPos es
+varPos (PosBox e) = varPos e
+varPos (PosIndex _) = []
+varPos (PosIndexIntro _) = []
+varPos (PosUp e) = varPos e
+varPos (PosDown e) = varPos e
+varPos (PosDownIntro e) = varNeg e
+varPos PosUniv = []
+
+varNeg :: Neg -> [Identifier]
+varNeg (NegPiIntro x e) = do
+  let vs = varNeg e
+  filter (/= x) vs
+varNeg (NegPiElim e1 e2) = varNeg e1 ++ varPos e2
+varNeg (NegSigmaElim e1 xs e2) = do
+  let vs1 = varPos e1
+  let vs2 = filter (`notElem` xs) $ varNeg e2
+  vs1 ++ vs2
+varNeg (NegBoxIntro e) = varNeg e
+varNeg (NegBoxElim e) = varNeg e
+varNeg (NegIndexElim e branchList) = do
+  let vs1 = varPos e
+  let select (i, body) = filter (`notElem` varIndex i) (varNeg body)
+  let vs2 = concatMap select branchList
+  vs1 ++ vs2
+varNeg (NegUpIntro e) = varPos e
+varNeg (NegUpElim x e1 e2) = do
+  let vs1 = varNeg e1
+  let vs2 = filter (/= x) $ varNeg e2
+  vs1 ++ vs2
+varNeg (NegDownElim e) = varPos e
+
+varIndex :: Index -> [Identifier]
+varIndex (IndexLabel x) = [x]
+varIndex _              = []
 
 isLinear :: Identifier -> [Identifier] -> [Identifier]
 isLinear x xs =
@@ -260,3 +319,15 @@ toVar' :: Identifier -> WithEnv Neut
 toVar' x = do
   meta <- newNameWith "meta"
   return $ meta :< NeutVar x
+
+toLowType :: Neut -> WithEnv LowType
+toLowType (_ :< NeutVar _) = return $ LowTypeInt 32 -- (*1)
+toLowType (_ :< NeutPi _ _) = return $ LowTypePointer $ LowTypeInt 8
+toLowType (_ :< NeutSigma xts t) = do
+  ts' <- mapM (reduce >=> toLowType) (map snd xts ++ [t])
+  let ts'' = map LowTypePointer ts'
+  return $ LowTypeStruct ts''
+toLowType (_ :< NeutIndex _) = return $ LowTypeInt 32
+toLowType (_ :< NeutUniv _) = return $ LowTypeInt 32
+toLowType (_ :< NeutBox _) = return $ LowTypePointer $ LowTypeInt 32
+toLowType v = lift $ throwE $ "Asm.toLowType: " ++ show v ++ " is not a type"

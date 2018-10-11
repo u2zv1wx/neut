@@ -16,7 +16,6 @@ import           Data
 
 import           Emit
 import           Exhaust
-import           Expand
 import           Infer
 import           Lift
 import           Macro
@@ -83,11 +82,22 @@ process e = do
   e' <- check mainLabel e
   -- p <- exhaust e' >>= lift
   -- liftIO $ putStrLn $ Pr.ppShow p
-  c' <- exhaust e' >>= expand >>= lift >>= polarizeNeg >>= virtualNeg
-  insCodeEnv mainLabel [] c'
-  ce <- gets codeEnv
+  -- c' <- exhaust e' >>= expand >>= lift >>= polarizeNeg >>= virtualNeg
+  c'' <- exhaust e' >>= lift
+  -- c'' <- exhaust e' >>= lift >>= polarizeNeg
+  insWeakTermEnv mainLabel c''
+  wtenv <- gets weakTermEnv
+  liftIO $ putStrLn "lifted."
+  forM_ wtenv $ \(name, e) ->
+    polarizeNeg e >>= virtualNeg >>= insCodeEnv name []
+  -- liftIO $ putStrLn $ Pr.ppShow c''
+  -- c' <- exhaust e' >>= lift >>= polarizeNeg >>= virtualNeg
+  -- liftIO $ putStrLn $ Pr.ppShow c'
+  -- insCodeEnv mainLabel [] c'
+  -- ce <- gets codeEnv
   -- liftIO $ putStrLn $ Pr.ppShow ce
   asmCodeEnv
+  -- liftIO $ putStrLn $ "asmCodeEnv."
   emitGlobalLabel mainLabel
   emit
 

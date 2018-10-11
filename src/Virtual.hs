@@ -9,7 +9,11 @@ import           Control.Monad.Identity
 import           Control.Monad.State
 import           Control.Monad.Trans.Except
 
+import           Data.List
+
 import           Data
+import           Reduce
+import           Util
 
 import           Control.Comonad.Cofree
 
@@ -31,52 +35,100 @@ virtualPos (PosIndexIntro x) = do
   return $ DataInt32 i
 virtualPos (PosUp _) = return $ DataInt32 0
 virtualPos (PosDown _) = return $ DataInt32 0
-virtualPos (PosDownIntroPiIntro name args body) = do
-  bodyCode <- virtualNeg body
-  insCodeEnv name args bodyCode
-  return $ DataLabel name
+virtualPos (PosDownIntro e) = do
+  envName <- newNameWith "env"
+  let fvs = nub $ varNeg e
+  e' <- virtualNeg $ NegSigmaElim (PosVar envName) fvs e
+  cls <- newNameWith "closure"
+  insCodeEnv cls [envName] e'
+  return $ DataClosure cls envName fvs
 virtualPos PosUniv = return $ DataInt32 0
+virtualPos (PosBox _) = return $ DataInt32 0
 
 virtualNeg :: Neg -> WithEnv Code
-virtualNeg (NegPiElimDownElim funName args) = do
-  s <- newNameWith "tmp"
-  return $ CodeCall s funName args (CodeReturn (DataLocal s))
-virtualNeg (NegSigmaElim z xs e) = do
-  e' <- virtualNeg e
-  return $ extract z (zip xs [0 ..]) e'
-virtualNeg (NegIndexElim x branchList) = do
+virtualNeg lam@(NegPiIntro _ _) = do
+  let (body, args) = toNegPiIntroSeq lam
+  name <- newNameWith "lam"
+  body' <- virtualNeg body
+  insCodeEnv name args body'
+  return $ CodeReturn (DataLabel name)
+virtualNeg app@(NegPiElim _ _) = do
+  let (fun, args) = toNegPiElimSeq app
+  dataList <- mapM virtualPos args
+  funCode <- virtualNeg fun
+  funName <- newNameWith "fun"
+  s <- newName
+  xs <- mapM (const newName) dataList
+  return $
+    bindLet (zip xs dataList) $
+    traceLet funName funCode $ CodeCall s funName xs (CodeReturn (DataLocal s))
+virtualNeg (NegSigmaElim e1 xs e2) = do
+  e1' <- virtualPos e1
+  e2' <- virtualNeg e2
+  z <- newName
+  ts <- mapM (lookupTypeEnv' >=> reduce >=> toLowType) xs
+  return $ CodeLet z e1' $ extract z ts (zip xs [0 ..]) e2'
+virtualNeg (NegIndexElim e branchList) = do
   let (labelList, es) = unzip branchList
   es' <- mapM virtualNeg es
-  return $ CodeSwitch x $ zip labelList es'
+  e' <- virtualPos e
+  z <- newName
+  return $ CodeLet z e' $ CodeSwitch z $ zip labelList es'
 virtualNeg (NegUpIntro v) = do
   d <- virtualPos v
   return $ CodeReturn d
 virtualNeg (NegUpElim x e1 e2) = do
   e1' <- virtualNeg e1
   e2' <- virtualNeg e2
-  traceLet x e1' e2'
+  return $ traceLet x e1' e2'
+virtualNeg (NegDownElim e) = do
+  e' <- virtualPos e
+  fun <- newName
+  envName <- newName
+  cls <- newNameWith "cls"
+  s <- newName
+  let ts = [LowTypePointer (LowTypeInt 32), LowTypePointer (LowTypeInt 32)]
+  return $
+    CodeLet cls e' $
+    extract cls ts [(fun, 0), (envName, 1)] $
+    CodeCall s fun [envName] $ CodeFree envName $ CodeReturn (DataLocal s)
+virtualNeg (NegBoxIntro e) = do
+  e' <- virtualNeg e
+  name <- newNameWith "box"
+  insCodeEnv name [] e'
+  return $ CodeReturn (DataLabel name)
+virtualNeg (NegBoxElim e) = do
+  e' <- virtualNeg e
+  funName <- newNameWith "unbox"
+  s <- newName
+  return $
+    traceLet funName e' $ CodeCall s funName [] (CodeReturn (DataLocal s))
 
-extract :: Identifier -> [(Identifier, Int)] -> Code -> Code
-extract z [] cont = CodeFree z cont
-extract z ((x, i):xis) cont = do
-  let cont' = extract z xis cont
-  CodeExtractValue z x i cont'
+extract :: Identifier -> [LowType] -> [(Identifier, Int)] -> Code -> Code
+extract z _ [] cont = CodeFree z cont
+extract z ts ((x, i):xis) cont = do
+  let cont' = extract z ts xis cont
+  CodeExtractValue z x ts i cont'
 
-traceLet :: String -> Code -> Code -> WithEnv Code
-traceLet s (CodeReturn ans) cont = return $ CodeLet s ans cont
+bindLet :: [(Identifier, Data)] -> Code -> Code
+bindLet [] e           = e
+bindLet ((x, d):xds) e = CodeLet x d $ bindLet xds e
+
+traceLet :: String -> Code -> Code -> Code
+traceLet s (CodeReturn ans) cont = CodeLet s ans cont
 traceLet s (CodeLet k o1 o2) cont = do
-  c <- traceLet s o2 cont
-  return $ CodeLet k o1 c
+  let c = traceLet s o2 cont
+  CodeLet k o1 c
 traceLet s (CodeCall reg name xds cont1) cont2 = do
-  tmp <- traceLet s cont1 cont2
-  return $ CodeCall reg name xds tmp
+  let tmp = traceLet s cont1 cont2
+  CodeCall reg name xds tmp
 traceLet x (CodeSwitch y branchList) cont = do
   let (labelList, es) = unzip branchList
-  es' <- mapM (\e -> traceLet x e cont) es
-  return $ CodeSwitch y $ zip labelList es'
-traceLet s (CodeExtractValue x d i cont1) cont2 = do
-  tmp <- traceLet s cont1 cont2
-  return $ CodeExtractValue x d i tmp
+  let es' = map (\e -> traceLet x e cont) es
+  CodeSwitch y $ zip labelList es'
+traceLet s (CodeExtractValue x d ts i cont1) cont2 = do
+  let tmp = traceLet s cont1 cont2
+  CodeExtractValue x d ts i tmp
 traceLet s (CodeFree x cont1) cont2 = do
-  tmp <- traceLet s cont1 cont2
-  return $ CodeFree x tmp
+  let tmp = traceLet s cont1 cont2
+  CodeFree x tmp

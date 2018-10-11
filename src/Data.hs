@@ -94,7 +94,7 @@ data LowType
 data Pos
   = PosVar Identifier
   | PosConst Identifier
-  | PosPi [(Identifier, Pos)]
+  | PosPi (Identifier, Pos)
           Pos
   | PosSigma [(Identifier, Pos)]
              Pos
@@ -102,25 +102,29 @@ data Pos
   | PosIndex Identifier
   | PosIndexIntro Index
   | PosDown Pos
-  | PosDownIntroPiIntro Identifier -- the name of this lambda abstraction
-                        [Identifier] -- arguments
-                        Neg -- body
+  | PosDownIntro Neg
   | PosUp Pos
   | PosUniv
+  | PosBox Pos
   deriving (Show)
 
 data Neg
-  = NegPiElimDownElim Identifier
-                      [Identifier]
-  | NegSigmaElim Identifier
+  = NegPiIntro Identifier
+               Neg
+  | NegPiElim Neg
+              Pos
+  | NegSigmaElim Pos
                  [Identifier]
                  Neg
-  | NegIndexElim Identifier
+  | NegIndexElim Pos
                  [(Index, Neg)]
   | NegUpIntro Pos
   | NegUpElim Identifier
               Neg
               Neg
+  | NegDownElim Pos
+  | NegBoxIntro Neg
+  | NegBoxElim Neg
   deriving (Show)
 
 data Term
@@ -133,6 +137,9 @@ data Data
   | DataLabel Identifier
   | DataInt32 Int
   | DataStruct [Data]
+  | DataClosure Identifier -- name of closure
+                Identifier -- environment variable
+                [Identifier] -- list of free variables
   deriving (Show)
 
 data Code
@@ -146,10 +153,11 @@ data Code
              Code -- continuation
   | CodeSwitch Identifier
                [(Index, Code)]
-  | CodeExtractValue Identifier
-                     Identifier
-                     Int
-                     Code
+  | CodeExtractValue Identifier -- base pointer
+                     Identifier -- store to this variable
+                     [LowType] -- the type of base pointer is LowTypeStruct [this]
+                     Int -- index
+                     Code -- continuation
   | CodeFree Identifier
              Code
   deriving (Show)
@@ -160,10 +168,10 @@ data AsmMeta = AsmMeta
   , asmMetaUse  :: [Identifier]
   } deriving (Show)
 
-data AsmArg
-  = AsmArgReg Identifier
-  | AsmArgLabel Identifier
-  | AsmArgImmediate Int
+data AsmData
+  = AsmDataReg Identifier
+  | AsmDataLabel Identifier
+  | AsmDataImmediate Int
   deriving (Show)
 
 -- AsmLoadWithOffset offset base dest == movq offset(base), dest
@@ -171,18 +179,18 @@ data AsmArg
 data AsmF a
   = AsmReturn Identifier
   | AsmLet Identifier
-           AsmArg
+           AsmData
            a
   | AsmExtractValue Identifier -- destination
                     Identifier -- base pointer
                     Int -- offset
                     a
-  | AsmInsertValue AsmArg -- source
+  | AsmInsertValue AsmData -- source
                    Identifier -- base pointer
                    Int -- offset
                    a
   | AsmCall Identifier
-            AsmArg
+            AsmData
             [Identifier]
             a
   | AsmCompare Identifier
@@ -195,10 +203,10 @@ data AsmF a
             a
   | AsmPop Identifier
            a
-  | AsmAddInt64 AsmArg -- addq {AsmArg}, {Identifier}
+  | AsmAddInt64 AsmData -- addq {AsmData}, {Identifier}
                 Identifier
                 a
-  | AsmSubInt64 AsmArg -- subq {AsmArg}, {Identifier}
+  | AsmSubInt64 AsmData -- subq {AsmData}, {Identifier}
                 Identifier
                 a
   deriving (Show)
@@ -378,6 +386,12 @@ newNameWith s = do
   let s' = s ++ i
   modify (\e -> e {nameEnv = (s, s') : nameEnv e})
   return s'
+
+newNameOfType :: Neut -> WithEnv Identifier
+newNameOfType t = do
+  i <- newName
+  insTypeEnv i t
+  return i
 
 constNameWith :: Identifier -> WithEnv ()
 constNameWith s = modify (\e -> e {nameEnv = (s, s) : nameEnv e})
@@ -627,17 +641,6 @@ sizeOfLowType (LowTypeInt _)     = 8
 sizeOfLowType (LowTypePointer _) = 8
 sizeOfLowType (LowTypeStruct ts) = sum $ map sizeOfLowType ts
 
-toLowType :: Neut -> WithEnv LowType
-toLowType (_ :< NeutVar _) = return $ LowTypeInt 32 -- (*1)
-toLowType (_ :< NeutPi _ _) = return $ LowTypePointer $ LowTypeInt 8
-toLowType (_ :< NeutSigma xts t) = do
-  ts' <- mapM toLowType (map snd xts ++ [t])
-  let ts'' = map LowTypePointer ts'
-  return $ LowTypeStruct ts''
-toLowType (_ :< NeutIndex _) = return $ LowTypeInt 32
-toLowType (_ :< NeutUniv _) = return $ LowTypeInt 32
-toLowType v = lift $ throwE $ "Asm.toLowType: " ++ show v ++ " is not a type"
-
 sizeOf :: Identifier -> WithEnv Int
 sizeOf x = do
   t <- lookupTypeEnv' x
@@ -756,7 +759,7 @@ getRBP = lookupNameEnv' "rbp"
 getRSP :: WithEnv Identifier
 getRSP = lookupNameEnv' "rsp"
 
-varsInAsmArg :: AsmArg -> [Identifier]
-varsInAsmArg (AsmArgReg x)       = [x]
-varsInAsmArg (AsmArgLabel _)     = []
-varsInAsmArg (AsmArgImmediate _) = []
+varsInAsmData :: AsmData -> [Identifier]
+varsInAsmData (AsmDataReg x)       = [x]
+varsInAsmData (AsmDataLabel _)     = []
+varsInAsmData (AsmDataImmediate _) = []
