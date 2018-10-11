@@ -128,8 +128,13 @@ varAndHole (_ :< NeutBoxElim e) = varAndHole e
 varAndHole (_ :< NeutIndex _) = ([], [])
 varAndHole (_ :< NeutIndexIntro _) = ([], [])
 varAndHole (_ :< NeutIndexElim e branchList) = do
-  let (_, es) = unzip branchList
-  pairwiseConcat $ map varAndHole (e : es)
+  let vs1 = varAndHole e
+  let select i = filter (`notElem` varIndex i)
+  vss <-
+    forM branchList $ \(i, body) -> do
+      let (vs21, vs22) = varAndHole body
+      return (select i vs21, vs22)
+  pairwiseConcat (vs1 : vss)
 varAndHole (_ :< NeutUniv _) = ([], [])
 varAndHole (_ :< NeutMu _ e) = varAndHole e
 varAndHole (_ :< NeutHole x) = ([], [x])
