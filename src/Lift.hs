@@ -81,7 +81,27 @@ lift (i :< NeutIndexElim e branchList) = do
 lift (i :< NeutUniv j) = return $ i :< NeutUniv j
 lift (i :< NeutMu s c) = do
   c' <- lift c
-  return $ i :< NeutMu s c'
+  freeVars <- takeNonBox $ var c'
+  newFormalArgs <- constructFormalArgs freeVars
+  let freeToBound = zip freeVars newFormalArgs
+  c'' <- replace freeToBound c'
+  muType <- lookupTypeEnv' i
+  ytms <- enrich muType newFormalArgs
+  let mu'@(muMeta :< _) = fromPiIntroSeq (c'', ytms)
+  muType' <- lookupTypeEnv' muMeta
+  boxMeta <- newNameWith "meta"
+  boxUnivMeta <- newNameWith "meta"
+  let boxMuType = boxUnivMeta :< NeutBox muType'
+  let boxMu = boxMeta :< NeutBoxIntro mu'
+  insTypeEnv boxMeta boxMuType
+  insWeakTermEnv s boxMu
+  insTypeEnv s boxMuType -- update the type of s from t to (box t).
+  var <- toVar s
+  args <- mapM toVar freeVars
+  meta <- newNameWith "meta"
+  let unboxVar = meta :< NeutBoxElim var
+  insTypeEnv meta muType'
+  appFold unboxVar args
 lift (i :< NeutHole x) = return $ i :< NeutHole x
 
 replace :: [(Identifier, Identifier)] -> Neut -> WithEnv Neut
