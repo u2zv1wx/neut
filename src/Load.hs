@@ -2,39 +2,38 @@ module Load
   ( load
   ) where
 
-import qualified Control.Monad.Except       as E
-import           Control.Monad.Identity
-import           Control.Monad.State        hiding (lift)
-import           Control.Monad.Trans.Except
+import qualified Control.Monad.Except as E
+import Control.Monad.Identity
+import Control.Monad.State hiding (lift)
+import Control.Monad.Trans.Except
 
-import           Control.Comonad.Cofree
+import Control.Comonad.Cofree
 
-import           Data.IORef
+import Data.IORef
 
-import           Asm
-import           Data
+import Asm
+import Data
 
-import           Emit
-import           Exhaust
-import           Infer
-import           Lift
-import           Macro
-import           Parse
-import           Polarize
-import           Read
-import           Rename
-import           Virtual
+import Emit
+import Exhaust
+import Infer
+import Lift
+import Macro
+import Parse
+import Polarize
+import Read
+import Rename
+import Virtual
 
-import           Reduce
+import Reduce
 
-import qualified Text.Show.Pretty           as Pr
+import qualified Text.Show.Pretty as Pr
 
 load :: String -> WithEnv ()
 load s = do
   astList <- strToTree s
   defList <- load' astList
   e <- concatDefList defList
-  -- liftIO $ putStrLn $ Pr.ppShow e
   process e
 
 load' :: [Tree] -> WithEnv [(Identifier, Identifier, Neut)]
@@ -55,8 +54,6 @@ load' ((meta :< TreeNode [primMeta :< TreeAtom "primitive", _ :< TreeAtom name, 
   defList <- load' as
   return $ (meta, name, primMeta :< NeutConst name t') : defList
 load' ((meta :< TreeNode [_ :< TreeAtom "definition", _ :< TreeAtom name, tbody]):as) = do
-  tmp <- macroExpand tbody >>= parse
-  -- liftIO $ putStrLn $ Pr.ppShow tmp
   e <- macroExpand tbody >>= parse >>= rename
   name' <- newNameWith name
   defList <- load' as
@@ -71,6 +68,7 @@ concatDefList :: [(Identifier, Identifier, Neut)] -> WithEnv Neut
 concatDefList [] = do
   meta <- newNameWith "meta"
   return $ meta :< NeutIndexIntro (IndexLabel "unit")
+concatDefList [(meta, name, e)] = return e
 concatDefList ((meta, name, e):es) = do
   cont <- concatDefList es
   h <- newNameWith "any"
@@ -79,29 +77,18 @@ concatDefList ((meta, name, e):es) = do
 
 process :: Neut -> WithEnv ()
 process e = do
-  e' <- check mainLabel e
-  -- p <- exhaust e' >>= lift
-  -- liftIO $ putStrLn $ Pr.ppShow p
-  -- c' <- exhaust e' >>= expand >>= lift >>= polarizeNeg >>= virtualNeg
+  e' <- check mainLabel e >>= nonRecReduce
   c'' <- exhaust e' >>= lift
-  -- c'' <- exhaust e' >>= lift >>= polarizeNeg
   insWeakTermEnv mainLabel c''
   wtenv <- gets weakTermEnv
-  -- liftIO $ putStrLn "lifted."
-  forM_ wtenv $ \(name, e) ->
-    polarizeNeg e >>= reduceNeg >>= virtualNeg >>= insCodeEnv name []
-    -- e' <- polarizeNeg e
-    -- e'' <- reduceNeg e'
-    -- liftIO $ putStrLn $ "name: " ++ name
-    -- liftIO $ putStrLn $ Pr.ppShow e''
-  -- liftIO $ putStrLn $ Pr.ppShow c''
-  -- c' <- exhaust e' >>= lift >>= polarizeNeg >>= virtualNeg
-  -- liftIO $ putStrLn $ Pr.ppShow c'
-  -- insCodeEnv mainLabel [] c'
-  -- ce <- gets codeEnv
-  -- liftIO $ putStrLn $ Pr.ppShow ce
+  tmp <- polarize wtenv c''
+  -- liftIO $ putStrLn "main:\n"
+  -- liftIO $ putStrLn $ Pr.ppShow tmp
+  e'' <- polarize wtenv c'' >>= virtualNeg
+  insCodeEnv mainLabel [] e''
+  -- forM_ wtenv $ \(name, e) ->
+  --   polarizeNeg e >>= virtualNeg >>= insCodeEnv name []
   asmCodeEnv
-  -- liftIO $ putStrLn $ "asmCodeEnv."
   emitGlobalLabel mainLabel
   emit
 

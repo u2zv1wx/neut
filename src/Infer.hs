@@ -31,9 +31,6 @@ check main e = do
   sub <- gets substitution
   env <- get
   let tenv' = map (\(i, t) -> (i, subst sub t)) $ typeEnv env
-  -- ts' <- mapM nonRecReduce ts
-  -- let tenv'' = zip xs ts'
-  -- liftIO $ putStrLn $ Pr.ppShow tenv''
   modify (\e -> e {typeEnv = tenv'})
   checkNumConstraint
   return $ subst sub e

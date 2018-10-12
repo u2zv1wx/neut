@@ -1,30 +1,30 @@
-{-# LANGUAGE DeriveFunctor      #-}
-{-# LANGUAGE FlexibleInstances  #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE TemplateHaskell    #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Data where
 
-import           Control.Comonad
+import Control.Comonad
 
-import           Control.Comonad.Cofree
-import           Control.Monad.Except
-import           Control.Monad.Identity
-import           Control.Monad.State
-import           Control.Monad.Trans.Except
-import           Text.Show.Deriving
+import Control.Comonad.Cofree
+import Control.Monad.Except
+import Control.Monad.Identity
+import Control.Monad.State
+import Control.Monad.Trans.Except
+import Text.Show.Deriving
 
-import           Data.Functor.Classes
+import Data.Functor.Classes
 
-import           System.IO.Unsafe
+import System.IO.Unsafe
 
-import           Data.IORef
-import           Data.List
-import           Data.Maybe                 (fromMaybe)
+import Data.IORef
+import Data.List
+import Data.Maybe (fromMaybe)
 
-import qualified Data.PQueue.Min            as Q
+import qualified Data.PQueue.Min as Q
 
-import qualified Text.Show.Pretty           as Pr
+import qualified Text.Show.Pretty as Pr
 
 type Identifier = String
 
@@ -163,8 +163,8 @@ data Code
 
 data AsmMeta = AsmMeta
   { asmMetaLive :: [Identifier]
-  , asmMetaDef  :: [Identifier]
-  , asmMetaUse  :: [Identifier]
+  , asmMetaDef :: [Identifier]
+  , asmMetaUse :: [Identifier]
   } deriving (Show)
 
 data AsmData
@@ -257,12 +257,12 @@ data Constraint =
   deriving (Show)
 
 constraintToInt :: WeakConstraint -> Int
-constraintToInt ConstraintPattern {}      = 0
-constraintToInt ConstraintDelta {}        = 1
-constraintToInt ConstraintBeta {}         = 2
+constraintToInt ConstraintPattern {} = 0
+constraintToInt ConstraintDelta {} = 1
+constraintToInt ConstraintBeta {} = 2
 constraintToInt ConstraintQuasiPattern {} = 3
-constraintToInt ConstraintFlexRigid {}    = 4
-constraintToInt ConstraintFlexFlex {}     = 5
+constraintToInt ConstraintFlexRigid {} = 4
+constraintToInt ConstraintFlexFlex {} = 5
 
 instance Eq WeakConstraint where
   c1 == c2 = constraintToInt c1 == constraintToInt c2
@@ -286,36 +286,36 @@ data Justification
 
 data Case = Case
   { constraintQueueSnapshot :: Q.MinQueue Constraint
-  , metaMapSnapshot         :: [(Identifier, PreConstraint)]
-  , substitutionSnapshot    :: Subst
-  , caseJustification       :: Justification
-  , savedJustification      :: Justification
-  , alternatives            :: [[PreConstraint]]
+  , metaMapSnapshot :: [(Identifier, PreConstraint)]
+  , substitutionSnapshot :: Subst
+  , caseJustification :: Justification
+  , savedJustification :: Justification
+  , alternatives :: [[PreConstraint]]
   } deriving (Show)
 
 data Env = Env
-  { count             :: Int -- to generate fresh symbols
-  , notationEnv       :: [(Tree, Tree)] -- macro transformers
-  , reservedEnv       :: [Identifier] -- list of reserved keywords
-  , indexEnv          :: [(Identifier, [Identifier])]
-  , nameEnv           :: [(Identifier, Identifier)] -- used in alpha conversion
-  , typeEnv           :: [(Identifier, Neut)] -- type environment
-  , weakTermEnv       :: [(Identifier, Neut)]
-  , termEnv           :: [(Identifier, Term)]
-  , constEnv          :: [(Identifier, Neut)] -- (name, type)
-  , constraintEnv     :: [PreConstraint]
-  , constraintQueue   :: Q.MinQueue Constraint
-  , metaMap           :: [(Identifier, PreConstraint)]
-  , substitution      :: Subst
-  , caseStack         :: [Case]
+  { count :: Int -- to generate fresh symbols
+  , notationEnv :: [(Tree, Tree)] -- macro transformers
+  , reservedEnv :: [Identifier] -- list of reserved keywords
+  , indexEnv :: [(Identifier, [Identifier])]
+  , nameEnv :: [(Identifier, Identifier)] -- used in alpha conversion
+  , typeEnv :: [(Identifier, Neut)] -- type environment
+  , weakTermEnv :: [(Identifier, Neut)]
+  , termEnv :: [(Identifier, Term)]
+  , constEnv :: [(Identifier, Neut)] -- (name, type)
+  , constraintEnv :: [PreConstraint]
+  , constraintQueue :: Q.MinQueue Constraint
+  , metaMap :: [(Identifier, PreConstraint)]
+  , substitution :: Subst
+  , caseStack :: [Case]
   , univConstraintEnv :: [(UnivLevel, UnivLevel)]
-  , numConstraintEnv  :: [Identifier]
-  , codeEnv           :: [(Identifier, ([Identifier], IORef Code))]
-  , asmEnv            :: [(Identifier, Asm)]
-  , regEnv            :: [(Identifier, Int)] -- variable to register
-  , regVarList        :: [Identifier]
-  , spill             :: Maybe Identifier
-  , sizeEnv           :: [(Identifier, Int)] -- offset from stackpointer
+  , numConstraintEnv :: [Identifier]
+  , codeEnv :: [(Identifier, ([Identifier], IORef Code))]
+  , asmEnv :: [(Identifier, Asm)]
+  , regEnv :: [(Identifier, Int)] -- variable to register
+  , regVarList :: [Identifier]
+  , spill :: Maybe Identifier
+  , sizeEnv :: [(Identifier, Int)] -- offset from stackpointer
   } deriving (Show)
 
 initialEnv :: Env
@@ -403,7 +403,7 @@ lookupTypeEnv' s = do
   mt <- gets (lookup s . typeEnv)
   case mt of
     Nothing -> lift $ throwE $ s ++ " is not found in the type environment."
-    Just t  -> return t
+    Just t -> return t
 
 lookupConstEnv :: String -> WithEnv (Maybe Neut)
 lookupConstEnv s = gets (lookup s . constEnv)
@@ -459,7 +459,7 @@ lookupCodeEnv funName = do
   env <- get
   case lookup funName (codeEnv env) of
     Just (args, body) -> return (args, body)
-    Nothing           -> lift $ throwE $ "no such code: " ++ show funName
+    Nothing -> lift $ throwE $ "no such code: " ++ show funName
 
 insTypeEnv :: Identifier -> Neut -> WithEnv ()
 insTypeEnv i t = modify (\e -> e {typeEnv = (i, t) : typeEnv e})
@@ -474,8 +474,6 @@ insNumConstraintEnv x =
 insTermEnv :: Identifier -> Term -> WithEnv ()
 insTermEnv i t = modify (\e -> e {termEnv = (i, t) : termEnv e})
 
--- insWeakTermEnv :: Identifier -> Neut -> WithEnv ()
--- insWeakTermEnv i t = modify (\e -> e {weakTermEnv = (i, t) : weakTermEnv e})
 insWeakTermEnv :: Identifier -> Neut -> WithEnv ()
 insWeakTermEnv i t = modify (\e -> e {weakTermEnv = weakTermEnv e ++ [(i, t)]})
 
@@ -484,7 +482,7 @@ lookupWeakTermEnv funName = do
   env <- get
   case lookup funName (weakTermEnv env) of
     Just body -> return body
-    Nothing   -> lift $ throwE $ "no such weakterm: " ++ show funName
+    Nothing -> lift $ throwE $ "no such weakterm: " ++ show funName
 
 insCodeEnv :: Identifier -> [Identifier] -> Code -> WithEnv ()
 insCodeEnv funName args body = do
@@ -535,7 +533,7 @@ indexToInt (IndexInteger i) = return i
 indexToInt (IndexLabel name) = do
   set <- lookupIndexSet name
   case elemIndex name set of
-    Just i  -> return i
+    Just i -> return i
     Nothing -> lift $ throwE $ "no such index defined: " ++ show name
 
 isDefinedIndex :: Identifier -> WithEnv Bool
@@ -560,7 +558,7 @@ lookupSizeEnv' :: Identifier -> WithEnv Int
 lookupSizeEnv' s = do
   tmp <- gets (lookup s . sizeEnv)
   case tmp of
-    Just i  -> return i
+    Just i -> return i
     Nothing -> lift $ throwE $ "the size of " ++ show s ++ " is not defined"
 
 insConstraintEnv :: Context -> Neut -> Neut -> Neut -> WithEnv ()
@@ -578,7 +576,7 @@ lookupRegEnv' :: Identifier -> WithEnv Int
 lookupRegEnv' s = do
   tmp <- gets (lookup s . regEnv)
   case tmp of
-    Just i  -> return i
+    Just i -> return i
     Nothing -> lift $ throwE $ "no such register: " ++ show s
 
 insRegEnv :: Identifier -> Int -> WithEnv ()
@@ -638,7 +636,7 @@ sizeOfType (_ :< NeutIndex _) = return 4
 sizeOfType v = lift $ throwE $ "Asm.sizeOfType: " ++ show v ++ " is not a type"
 
 sizeOfLowType :: LowType -> Int
-sizeOfLowType (LowTypeInt _)     = 8
+sizeOfLowType (LowTypeInt _) = 8
 sizeOfLowType (LowTypePointer _) = 8
 sizeOfLowType (LowTypeStruct ts) = sum $ map sizeOfLowType ts
 
@@ -695,7 +693,7 @@ getRegVarIndex x = do
   x' <- lookupNameEnv' x
   env <- get
   case elemIndex x' (regVarList env) of
-    Just i  -> return i
+    Just i -> return i
     Nothing -> lift $ throwE $ x' ++ " is not a register variable"
 
 toRegName :: Identifier -> WithEnv Identifier
@@ -709,7 +707,7 @@ toRegNumList (x:xs) = do
   is <- toRegNumList xs
   mi <- lookupRegEnv x
   case mi of
-    Just i  -> return $ i : is
+    Just i -> return $ i : is
     Nothing -> return is
 
 getR15 :: WithEnv Identifier
@@ -761,6 +759,6 @@ getRSP :: WithEnv Identifier
 getRSP = lookupNameEnv' "rsp"
 
 varsInAsmData :: AsmData -> [Identifier]
-varsInAsmData (AsmDataReg x)       = [x]
-varsInAsmData (AsmDataLabel _)     = []
+varsInAsmData (AsmDataReg x) = [x]
+varsInAsmData (AsmDataLabel _) = []
 varsInAsmData (AsmDataImmediate _) = []

@@ -132,15 +132,3 @@ traceLet s (CodeExtractValue x (basePointer, ts) i cont1) cont2 = do
 traceLet s (CodeFree x cont1) cont2 = do
   let tmp = traceLet s cont1 cont2
   CodeFree x tmp
--- freeAtTail :: String -> Code -> Code
--- freeAtTail s (CodeReturn ans) = CodeFree s (CodeReturn ans)
--- freeAtTail s (CodeLet k o1 o2) = CodeLet k o1 (freeAtTail s o2)
--- freeAtTail s (CodeCall reg name xds cont) =
---   CodeCall reg name xds (freeAtTail s cont)
--- freeAtTail x (CodeSwitch y branchList) = do
---   let (labelList, es) = unzip branchList
---   let es' = map (freeAtTail x) es
---   CodeSwitch y $ zip labelList es'
--- freeAtTail s (CodeExtractValue x (basePointer, ts) i cont) =
---   CodeExtractValue x (basePointer, ts) i (freeAtTail s cont)
--- freeAtTail s (CodeFree x cont) = CodeFree x (freeAtTail s cont)

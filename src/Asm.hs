@@ -3,22 +3,22 @@ module Asm
   , asmCode
   ) where
 
-import           Control.Monad
-import           Control.Monad.Except
-import           Control.Monad.Identity
-import           Control.Monad.State
-import           Control.Monad.Trans.Except
-import           Data.IORef
+import Control.Monad
+import Control.Monad.Except
+import Control.Monad.Identity
+import Control.Monad.State
+import Control.Monad.Trans.Except
+import Data.IORef
 
-import           Data
-import           Reduce
-import           Register
+import Data
+import Reduce
+import Register
 
-import           Control.Comonad.Cofree
+import Control.Comonad.Cofree
 
-import qualified Text.Show.Pretty           as Pr
+import qualified Text.Show.Pretty as Pr
 
-import           Debug.Trace
+import Debug.Trace
 
 asmCodeEnv :: WithEnv ()
 asmCodeEnv = do
@@ -30,7 +30,7 @@ asmCodeEnv = do
     asm <- asmCode code
     asm' <- bindArgs (zip args argRegList) asm
     insAsmEnv name asm'
-    regAlloc 15 asm' -- rsp is not used
+    regAlloc 15 asm'
 
 asmCode :: Code -> WithEnv Asm
 asmCode (CodeReturn d) = do
@@ -40,10 +40,6 @@ asmCode (CodeReturn d) = do
 asmCode (CodeLet i d cont) = do
   cont' <- asmCode cont
   asmData i d cont'
-asmCode (CodeCall dest "core.add" [x, y] cont) = do
-  cont' <- asmCode cont
-  cont'' <- addMeta $ AsmAddInt64 (AsmDataReg y) dest cont'
-  addMeta $ AsmLet dest (AsmDataReg x) cont''
 asmCode (CodeCall x fun args cont) = do
   cont' <- asmCode cont
   if length args > 6
@@ -74,10 +70,11 @@ asmData reg (DataStruct ds) cont = do
   asmStruct (zip xs ds) tmp
 asmData reg (DataClosure cls envName fv) cont = do
   let sizeList = map (const 8) fv
-  cont' <- setContent envName sizeList (zip [0 ..] fv) cont
-  cont'' <- asmData reg (DataStruct [DataLabel cls, DataLocal envName]) cont'
+  cont' <- asmData reg (DataStruct [DataLabel cls, DataLocal envName]) cont
+  cont'' <- setContent envName sizeList (zip [0 ..] fv) cont'
   rdi <- getRDI
-  asmCodeCall envName (AsmDataLabel "_malloc") [rdi] cont''
+  tmp <- asmCodeCall envName (AsmDataLabel "_malloc.closure.fvEnv") [rdi] cont''
+  addMeta $ AsmLet rdi (AsmDataImmediate 16) tmp
 
 asmStruct :: [(Identifier, Data)] -> Asm -> WithEnv Asm
 asmStruct [] cont = return cont
@@ -126,12 +123,12 @@ bindArgs ((to, from):rest) asm = do
 
 showIndex :: Index -> String
 showIndex (IndexInteger i) = show i
-showIndex (IndexLabel s)   = s
-showIndex IndexDefault     = "default"
+showIndex (IndexLabel s) = s
+showIndex IndexDefault = "default"
 
 sizeOfData :: Data -> Int
-sizeOfData (DataLocal _)   = 8
-sizeOfData (DataLabel _)   = 8
-sizeOfData (DataInt32 _)   = 8
+sizeOfData (DataLocal _) = 8
+sizeOfData (DataLabel _) = 8
+sizeOfData (DataInt32 _) = 8
 sizeOfData (DataStruct ds) = sum $ map sizeOfData ds
-sizeOfData DataClosure {}  = 16
+sizeOfData DataClosure {} = 16

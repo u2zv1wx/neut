@@ -36,11 +36,7 @@ regAlloc i asm
   env' <- get
   case spill env' of
     Nothing -> return ()
-    Just x
-      -- liftIO $ putStrLn $ "spill: " ++ x
-      -- u <- insertSpill asm x
-      -- liftIO $ putStrLn $ "inserted spill:\n" ++ Pr.ppShow u
-     -> do
+    Just x -> do
       asm'' <- insertSpill asm x >>= annotAsm >>= computeLiveness
       put env
       regAlloc i asm''
@@ -243,10 +239,6 @@ insertSpill (meta :< AsmSubInt64 arg dest cont) x = do
   cont'' <- insertPush x [dest] cont'
   insertPop x (varsInAsmData arg) $ meta :< AsmSubInt64 arg dest cont''
 
--- insertPushPop :: Identifier -> [Identifier] -> Asm -> WithEnv Asm
--- insertPushPop x us cont = do
---   cont' <- insertPop meta x cont
---   insertPush meta x cont'
 insertPush :: Identifier -> [Identifier] -> Asm -> WithEnv Asm
 insertPush x ds asm =
   if x `elem` ds

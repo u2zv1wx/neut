@@ -2,16 +2,16 @@ module Lift
   ( lift
   ) where
 
-import           Control.Comonad.Cofree
-import           Control.Monad
-import           Control.Monad.State        hiding (lift)
-import           Control.Monad.Trans.Except
+import Control.Comonad.Cofree
+import Control.Monad
+import Control.Monad.State hiding (lift)
+import Control.Monad.Trans.Except
 
-import qualified Text.Show.Pretty           as Pr
+import qualified Text.Show.Pretty as Pr
 
-import           Data
-import           Reduce
-import           Util
+import Data
+import Reduce
+import Util
 
 lift :: Neut -> WithEnv Neut
 lift v@(_ :< NeutVar _) = return v

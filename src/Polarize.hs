@@ -1,20 +1,28 @@
 module Polarize
   ( polarizeNeg
+  , polarize
   ) where
 
-import           Control.Monad
+import Control.Monad
 
-import           Control.Comonad.Cofree
+import Control.Comonad.Cofree
 
-import           Control.Monad.State
-import           Control.Monad.Trans.Except
+import Control.Monad.State
+import Control.Monad.Trans.Except
 
-import qualified Text.Show.Pretty           as Pr
+import qualified Text.Show.Pretty as Pr
 
-import           Data
-import           Util
+import Data
+import Util
 
-import           Data.Maybe                 (maybeToList)
+import Data.Maybe (maybeToList)
+
+polarize :: [(Identifier, Neut)] -> Neut -> WithEnv Neg
+polarize [] final = polarizeNeg final
+polarize ((x, e):rest) final = do
+  cont <- polarize rest final
+  e' <- polarizeNeg e
+  return $ NegUpElim x e' cont
 
 polarizeNeg :: Neut -> WithEnv Neg
 polarizeNeg (_ :< NeutVar s) = return $ NegUpIntro $ PosVar s
