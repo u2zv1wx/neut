@@ -368,7 +368,6 @@ data Env = Env
   , polTypeEnv :: [(Identifier, PrePos)]
   , valueTypeEnv :: [(Identifier, Value)]
   , weakTermEnv :: [(Identifier, Neut)]
-  -- , termEnv :: [(Identifier, Term)]
   , modalEnv :: [(Identifier, ([Identifier], Comp))]
   , constEnv :: [(Identifier, Neut)] -- (name, type)
   , constraintEnv :: [PreConstraint]
@@ -412,7 +411,6 @@ initialEnv =
     , valueTypeEnv = []
     , weakTermEnv = []
     , modalEnv = []
-    -- , termEnv = []
     , constEnv = []
     , constraintEnv = []
     , constraintQueue = Q.empty
@@ -518,20 +516,6 @@ lookupConstEnv' s = do
       Pr.ppShow (constEnv env)
     Just t -> return t
 
--- lookupTermEnv :: String -> WithEnv (Maybe Term)
--- lookupTermEnv s = gets (lookup s . termEnv)
--- lookupTermEnv' :: String -> WithEnv Term
--- lookupTermEnv' s = do
---   mt <- gets (lookup s . termEnv)
---   env <- get
---   case mt of
---     Nothing ->
---       lift $
---       throwE $
---       s ++
---       " is not found in the term environment. termenv: " ++
---       Pr.ppShow (termEnv env)
---     Just t -> return t
 insNameEnv :: Identifier -> Identifier -> WithEnv ()
 insNameEnv from to = modify (\e -> e {nameEnv = (from, to) : nameEnv e})
 
@@ -572,8 +556,6 @@ insNumConstraintEnv :: Identifier -> WithEnv ()
 insNumConstraintEnv x =
   modify (\e -> e {numConstraintEnv = x : numConstraintEnv e})
 
--- insTermEnv :: Identifier -> Term -> WithEnv ()
--- insTermEnv i t = modify (\e -> e {termEnv = (i, t) : termEnv e})
 insWeakTermEnv :: Identifier -> Neut -> WithEnv ()
 insWeakTermEnv i t = modify (\e -> e {weakTermEnv = weakTermEnv e ++ [(i, t)]})
 
