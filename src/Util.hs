@@ -1,20 +1,20 @@
 module Util where
 
-import           Control.Monad.Except
-import           Control.Monad.Identity
-import           Control.Monad.Trans.Except
+import Control.Monad.Except
+import Control.Monad.Identity
+import Control.Monad.Trans.Except
 
-import           Control.Comonad
-import           Control.Comonad.Cofree
+import Control.Comonad
+import Control.Comonad.Cofree
 
-import           Control.Monad.State
+import Control.Monad.State
 
-import           Data
-import           Reduce
+import Data
+import Reduce
 
-import qualified Text.Show.Pretty           as Pr
+import qualified Text.Show.Pretty as Pr
 
-import           Debug.Trace
+import Debug.Trace
 
 toPiIntroSeq :: Neut -> (Neut, [(Identifier, Neut, Identifier)])
 toPiIntroSeq (meta :< NeutPiIntro (x, t) body) = do
@@ -36,20 +36,31 @@ toPiElimSeq (i :< NeutPiElim e1 e2) = do
 toPiElimSeq c = (c, [])
 
 fromPiElimSeq :: (Neut, [(Identifier, Neut)]) -> Neut
-fromPiElimSeq (term, [])        = term
+fromPiElimSeq (term, []) = term
 fromPiElimSeq (term, (i, v):xs) = fromPiElimSeq (i :< NeutPiElim term v, xs)
 
 toNegPiIntroSeq :: Neg -> (Neg, [Identifier])
-toNegPiIntroSeq (NegPiIntro x body) = do
-  let (body', args) = toNegPiIntroSeq body
+toNegPiIntroSeq (Neg (_ :< NegPiIntro x body)) = do
+  let (body', args) = toNegPiIntroSeq $ Neg body
   (body', x : args)
 toNegPiIntroSeq t = (t, [])
 
 toNegPiElimSeq :: Neg -> (Neg, [Pos])
-toNegPiElimSeq (NegPiElim e1 e2) = do
-  let (fun, xs) = toNegPiElimSeq e1
+toNegPiElimSeq (Neg (_ :< NegPiElim e1 e2)) = do
+  let (fun, xs) = toNegPiElimSeq $ Neg e1
   (fun, e2 : xs)
 toNegPiElimSeq c = (c, [])
+
+toNegLamSeq :: [Identifier] -> Neg -> WithEnv Neg
+toNegLamSeq [] e = return e
+toNegLamSeq (x:xs) e = do
+  Neg e'@(eMeta :< _) <- toNegLamSeq xs e
+  tx <- lookupPolTypeEnv' x
+  meta <- newNameWith "meta"
+  te <- lookupPolTypeEnv' eMeta
+  tmp <- newNameWith "meta"
+  insPolTypeEnv meta $ tmp :< PosPi (x, tx) te
+  return $ Neg $ meta :< NegPiIntro x e'
 
 toPiSeq :: Neut -> (Neut, [(Identifier, Neut)])
 toPiSeq (_ :< NeutPi (x, t) body) = do
@@ -140,51 +151,51 @@ varAndHole (_ :< NeutMu _ e) = varAndHole e
 varAndHole (_ :< NeutHole x) = ([], [x])
 
 varPos :: Pos -> [Identifier]
-varPos (PosVar s) = [s]
-varPos (PosConst _) = []
-varPos (PosPi (x, tdom) tcod) = do
-  let vs1 = varPos tdom
-  let vs2 = filter (/= x) $ varPos tcod
+varPos (Pos (_ :< PosVar s)) = [s]
+varPos (Pos (_ :< PosConst _)) = []
+varPos (Pos (_ :< PosPi (x, tdom) tcod)) = do
+  let vs1 = varPos $ Pos tdom
+  let vs2 = filter (/= x) $ varPos $ Pos tcod
   vs1 ++ vs2
-varPos (PosSigma xts t2) = do
+varPos (Pos (_ :< PosSigma xts t2)) = do
   let (xs, ts) = unzip xts
-  let vs = concatMap varPos (t2 : ts)
+  let vs = concatMap (varPos . Pos) (t2 : ts)
   filter (`notElem` xs) vs
-varPos (PosSigmaIntro es) = concatMap varPos es
-varPos (PosBox e) = varPos e
-varPos (PosIndex _) = []
-varPos (PosIndexIntro _) = []
-varPos (PosUp e) = varPos e
-varPos (PosDown e) = varPos e
-varPos (PosDownIntro e) = varNeg e
-varPos PosUniv = []
+varPos (Pos (_ :< PosSigmaIntro es)) = concatMap (varPos . Pos) es
+varPos (Pos (_ :< PosBox e)) = varPos $ Pos e
+varPos (Pos (_ :< PosBoxIntro e)) = varNeg e
+varPos (Pos (_ :< PosIndex _)) = []
+varPos (Pos (_ :< PosIndexIntro _)) = []
+varPos (Pos (_ :< PosUp e)) = varPos $ Pos e
+varPos (Pos (_ :< PosDown e)) = varPos $ Pos e
+varPos (Pos (_ :< PosDownIntro e)) = varNeg e
+varPos (Pos (_ :< PosUniv)) = []
 
 varNeg :: Neg -> [Identifier]
-varNeg (NegPiIntro x e) = do
-  let vs = varNeg e
+varNeg (Neg (_ :< NegPiIntro x e)) = do
+  let vs = varNeg $ Neg e
   filter (/= x) vs
-varNeg (NegPiElim e1 e2) = varNeg e1 ++ varPos e2
-varNeg (NegSigmaElim e1 xs e2) = do
+varNeg (Neg (_ :< NegPiElim e1 e2)) = varNeg (Neg e1) ++ varPos e2
+varNeg (Neg (_ :< NegSigmaElim e1 xs e2)) = do
   let vs1 = varPos e1
-  let vs2 = filter (`notElem` xs) $ varNeg e2
+  let vs2 = filter (`notElem` xs) $ varNeg $ Neg e2
   vs1 ++ vs2
-varNeg (NegBoxIntro e) = varNeg e
-varNeg (NegBoxElim e) = varNeg e
-varNeg (NegIndexElim e branchList) = do
+varNeg (Neg (_ :< NegBoxElim e)) = varPos e
+varNeg (Neg (_ :< NegIndexElim e branchList)) = do
   let vs1 = varPos e
-  let select (i, body) = filter (`notElem` varIndex i) (varNeg body)
+  let select (i, body) = filter (`notElem` varIndex i) (varNeg $ Neg body)
   let vs2 = concatMap select branchList
   vs1 ++ vs2
-varNeg (NegUpIntro e) = varPos e
-varNeg (NegUpElim x e1 e2) = do
-  let vs1 = varNeg e1
-  let vs2 = filter (/= x) $ varNeg e2
+varNeg (Neg (_ :< NegUpIntro e)) = varPos e
+varNeg (Neg (_ :< NegUpElim x e1 e2)) = do
+  let vs1 = varNeg $ Neg e1
+  let vs2 = filter (/= x) $ varNeg $ Neg e2
   vs1 ++ vs2
-varNeg (NegDownElim e) = varPos e
+varNeg (Neg (_ :< NegDownElim e)) = varPos e
 
 varIndex :: Index -> [Identifier]
 varIndex (IndexLabel x) = [x]
-varIndex _              = []
+varIndex _ = []
 
 isLinear :: Identifier -> [Identifier] -> [Identifier]
 isLinear x xs =
@@ -299,7 +310,7 @@ lookupTypeEnv'' :: String -> WithEnv Neut
 lookupTypeEnv'' s = do
   mt <- gets (lookup s . typeEnv)
   case mt of
-    Just t  -> return t
+    Just t -> return t
     Nothing -> boxUniv
 
 depends :: Justification -> Justification -> Bool
@@ -309,9 +320,9 @@ depends j1 j2 = do
   foldr (\x -> (||) (x `elem` vs2)) False vs1
 
 varInJusitifcation :: Justification -> [Identifier]
-varInJusitifcation (Asserted i)   = [i]
+varInJusitifcation (Asserted i) = [i]
 varInJusitifcation (Assumption i) = [i]
-varInJusitifcation (Join js)      = concatMap varInJusitifcation js
+varInJusitifcation (Join js) = concatMap varInJusitifcation js
 
 toVar :: Identifier -> WithEnv Neut
 toVar x = do
@@ -332,6 +343,13 @@ toVar' x = do
   meta <- newNameWith "meta"
   return $ meta :< NeutVar x
 
+toValueVar :: Identifier -> WithEnv Value
+toValueVar x = do
+  t <- lookupTypeEnv' x
+  meta <- newNameWith "meta"
+  insTypeEnv meta t
+  return $ Value $ meta :< ValueVar x
+
 toLowType :: Neut -> WithEnv LowType
 toLowType (_ :< NeutVar _) = return $ LowTypeInt 32 -- (*1)
 toLowType (_ :< NeutPi _ _) = return $ LowTypePointer $ LowTypeInt 8
@@ -343,3 +361,37 @@ toLowType (_ :< NeutIndex _) = return $ LowTypeInt 32
 toLowType (_ :< NeutUniv _) = return $ LowTypeInt 32
 toLowType (_ :< NeutBox _) = return $ LowTypePointer $ LowTypeInt 32
 toLowType v = lift $ throwE $ "Asm.toLowType: " ++ show v ++ " is not a type"
+
+tensorType :: [PrePos] -> WithEnv PrePos
+tensorType [] = do
+  meta <- newNameWith "meta"
+  return $ meta :< PosIndex "top"
+tensorType [t] = return t
+tensorType ts = do
+  let (ts', t) = sepLast ts
+  vs <- mapM (const newName) ts'
+  meta <- newNameWith "meta"
+  return $ meta :< PosSigma (zip vs ts') t
+
+sepLast :: [a] -> ([a], a)
+sepLast [] = error "sepLast: invalid argument"
+sepLast [x] = ([], x)
+sepLast (x:xs) = do
+  let (ys, y) = sepLast xs
+  (x : ys, y)
+
+piSeqType :: [Identifier] -> PrePos -> WithEnv PrePos
+piSeqType [] t = return t
+piSeqType (x:xs) t = do
+  t' <- piSeqType xs t
+  tmp <- newNameWith "meta"
+  tx <- lookupPolTypeEnv' x
+  return $ tmp :< PosPi (x, tx) t'
+
+piSeqValueType :: [Identifier] -> PreValue -> WithEnv PreValue
+piSeqValueType [] t = return t
+piSeqValueType (x:xs) t = do
+  t' <- piSeqValueType xs t
+  tmp <- newNameWith "meta"
+  Value tx <- lookupValueTypeEnv' x
+  return $ tmp :< ValuePi (x, tx) t'
