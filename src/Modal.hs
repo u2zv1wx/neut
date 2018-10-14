@@ -73,7 +73,6 @@ modalNeg lam@(Neg (meta :< NegPiIntro _ _)) = do
   let (body@(Neg (bodyMeta :< _)), args) = toNegPiIntroSeq lam
   -- lambda-lifting for non-box variables
   xs <- takeNonBox $ varNeg lam
-  forM_ xs updateType
   body' <- modalNeg body
   lamName <- newNameWith "lam"
   -- set the type of lamName

@@ -206,9 +206,6 @@ data Data
   | DataLabel Identifier
   | DataInt32 Int
   | DataStruct [Data]
-  | DataClosure Identifier -- name of closure
-                Identifier -- environment variable
-                [Identifier] -- list of free variables
   deriving (Show)
 
 data Code
