@@ -154,16 +154,11 @@ polarizePos (_ :< NeutSigmaElim {}) =
 polarizePos (meta :< NeutBox e) = do
   Pos e' <- polarizePos e
   e'' <- wrap $ PosUp e'
-  newMeta <- newNameWith "meta"
-  return $ Pos $ meta :< (PosDown $ newMeta :< PosBox e'')
+  return $ Pos $ meta :< PosBox e''
 polarizePos (meta :< NeutBoxIntro e) = do
-  Neg e'@(eMeta :< _) <- polarizeNeg e
-  eType <- lookupPolTypeEnv' eMeta
-  boxMeta <- newNameWith "meta"
-  tmp <- newNameWith "meta"
-  insPolTypeEnv boxMeta $ tmp :< PosBox eType
+  e' <- polarizeNeg e
   lookupTypeEnv' meta >>= polarizePos >>= \(Pos te) -> insPolTypeEnv meta te
-  return $ Pos $ meta :< (PosDownIntro $ Neg $ boxMeta :< NegBoxIntro e')
+  return $ Pos $ meta :< PosBoxIntro e'
 polarizePos (_ :< NeutBoxElim _) =
   lift $ throwE "Polarize.polarizePos.NeutBoxElim"
 polarizePos (meta :< NeutIndex l) = return $ Pos $ meta :< PosIndex l
