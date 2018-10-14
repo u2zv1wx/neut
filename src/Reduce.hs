@@ -1,26 +1,26 @@
 module Reduce where
 
-import           Data
+import Data
 
-import           Control.Comonad
+import Control.Comonad
 
-import           Control.Comonad.Cofree
-import           Control.Monad.Except
-import           Control.Monad.Identity
-import           Control.Monad.State
-import           Control.Monad.Trans.Except
-import           Text.Show.Deriving
+import Control.Comonad.Cofree
+import Control.Monad.Except
+import Control.Monad.Identity
+import Control.Monad.State
+import Control.Monad.Trans.Except
+import Text.Show.Deriving
 
-import           Data.Functor.Classes
+import Data.Functor.Classes
 
-import           System.IO.Unsafe
+import System.IO.Unsafe
 
-import           Data.IORef
-import           Data.List
-import           Data.Maybe                 (fromMaybe)
-import           Data.Tuple                 (swap)
+import Data.IORef
+import Data.List
+import Data.Maybe (fromMaybe)
+import Data.Tuple (swap)
 
-import qualified Text.Show.Pretty           as Pr
+import qualified Text.Show.Pretty as Pr
 
 reduce :: Neut -> WithEnv Neut
 reduce (i :< NeutPiElim e1 e2) = do
@@ -40,15 +40,14 @@ reduce (i :< NeutSigmaElim e xs body) = do
   case e of
     _ :< NeutSigmaIntro es -> do
       es' <- mapM reduce es
-      let sub = zip xs es'
-      let _ :< body' = subst sub body
+      let _ :< body' = subst (zip xs es') body
       reduce $ i :< body'
     _ -> return $ i :< NeutSigmaElim e' xs body
 reduce (i :< NeutBoxElim e) = do
   e' <- reduce e
   case e' of
     _ :< NeutBoxIntro e'' -> reduce e''
-    _                     -> return $ i :< NeutBoxElim e'
+    _ -> return $ i :< NeutBoxElim e'
 reduce (i :< NeutIndexElim e branchList) = do
   e' <- reduce e
   case e' of
@@ -139,7 +138,7 @@ nonRecReduce (i :< NeutBoxElim e) = do
   e' <- nonRecReduce e
   case e' of
     _ :< NeutBoxIntro e'' -> nonRecReduce e''
-    _                     -> return $ i :< NeutBoxElim e'
+    _ -> return $ i :< NeutBoxElim e'
 nonRecReduce e@(_ :< NeutIndex _) = return e
 nonRecReduce e@(_ :< NeutIndexIntro _) = return e
 nonRecReduce (i :< NeutIndexElim e branchList) = do
@@ -161,63 +160,60 @@ nonRecReduce e@(_ :< NeutHole x) = do
     Nothing -> return e
 
 reducePos :: Pos -> WithEnv Pos
-reducePos (PosDownIntro e) = do
+reducePos (Pos (meta :< PosDownIntro e)) = do
   e' <- reduceNeg e
-  return $ PosDownIntro e'
+  return $ Pos $ meta :< PosDownIntro e'
 reducePos e = return e
 
 reduceNeg :: Neg -> WithEnv Neg
-reduceNeg (NegPiIntro x e) = do
-  e' <- reduceNeg e
-  return $ NegPiIntro x e'
-reduceNeg (NegPiElim e1 e2) = do
-  e1' <- reduceNeg e1
+reduceNeg (Neg (meta :< NegPiIntro x e)) = do
+  Neg e' <- reduceNeg $ Neg e
+  return $ Neg $ meta :< NegPiIntro x e'
+reduceNeg (Neg (meta :< NegPiElim e1 e2)) = do
+  Neg e1' <- reduceNeg $ Neg e1
   case e1' of
-    NegPiIntro x body -> do
+    _ :< NegPiIntro x body -> do
       let sub = [(x, e2)]
-      let body' = substNeg sub body
+      let body' = substNeg sub $ Neg body
       reduceNeg body'
-    _ -> return $ NegPiElim e1' e2
-reduceNeg (NegSigmaElim e xs body) =
+    _ -> return $ Neg $ meta :< NegPiElim e1' e2
+reduceNeg (Neg (meta :< NegSigmaElim e xs body)) =
   case e of
-    PosSigmaIntro es -> do
-      let sub = zip xs es
-      let body' = substNeg sub body
+    Pos (_ :< PosSigmaIntro es) -> do
+      let sub = zip xs $ map Pos es
+      let body' = substNeg sub $ Neg body
       reduceNeg body'
     _ -> do
-      body' <- reduceNeg body
-      return $ NegSigmaElim e xs body'
-reduceNeg (NegBoxIntro e) = do
-  e' <- reduceNeg e
-  return $ NegBoxIntro e'
-reduceNeg (NegBoxElim e) = do
-  e' <- reduceNeg e
+      Neg body' <- reduceNeg $ Neg body
+      return $ Neg $ meta :< NegSigmaElim e xs body'
+reduceNeg (Neg (meta :< NegBoxElim e)) = do
+  e' <- reducePos e
   case e' of
-    NegBoxIntro e'' -> reduceNeg e''
-    _               -> return $ NegBoxElim e'
-reduceNeg (NegIndexElim e branchList) =
+    Pos (_ :< PosBoxIntro e'') -> reduceNeg e''
+    _ -> return $ Neg $ meta :< NegBoxElim e'
+reduceNeg (Neg (meta :< NegIndexElim e branchList)) =
   case e of
-    PosIndexIntro x ->
+    Pos (_ :< PosIndexIntro x) ->
       case lookup x branchList of
         Nothing ->
           lift $
           throwE $ "the index " ++ show x ++ " is not included in branchList"
-        Just body -> reduceNeg body
-    _ -> return $ NegIndexElim e branchList
-reduceNeg (NegUpIntro e) = do
+        Just body -> reduceNeg $ Neg body
+    _ -> return $ Neg $ meta :< NegIndexElim e branchList
+reduceNeg (Neg (meta :< NegUpIntro e)) = do
   e' <- reducePos e
-  return $ NegUpIntro e'
-reduceNeg (NegUpElim x e1 e2) = do
-  e1' <- reduceNeg e1
-  e2' <- reduceNeg e2
+  return $ Neg $ meta :< NegUpIntro e'
+reduceNeg (Neg (meta :< NegUpElim x e1 e2)) = do
+  Neg e1' <- reduceNeg $ Neg e1
+  Neg e2' <- reduceNeg $ Neg e2
   case e1' of
-    NegUpIntro e1'' -> reduceNeg $ substNeg [(x, e1'')] e2'
-    _               -> return $ NegUpElim x e1' e2'
-reduceNeg (NegDownElim e) = do
+    _ :< NegUpIntro e1'' -> reduceNeg $ substNeg [(x, e1'')] $ Neg e2'
+    _ -> return $ Neg $ meta :< NegUpElim x e1' e2'
+reduceNeg (Neg (meta :< NegDownElim e)) = do
   e' <- reducePos e
   case e' of
-    PosDownIntro e'' -> reduceNeg e''
-    _                -> return $ NegDownElim e'
+    Pos (_ :< PosDownIntro e'') -> reduceNeg e''
+    _ -> return $ Neg $ meta :< NegDownElim e'
 
 subst :: Subst -> Neut -> Neut
 subst sub (j :< NeutVar s) = fromMaybe (j :< NeutVar s) (lookup s sub)
@@ -268,54 +264,70 @@ subst sub (j :< NeutHole s) = fromMaybe (j :< NeutHole s) (lookup s sub)
 type SubstPos = [(Identifier, Pos)]
 
 substPos :: SubstPos -> Pos -> Pos
-substPos sub (PosVar s) = fromMaybe (PosVar s) (lookup s sub)
-substPos _ (PosConst s) = PosConst s
-substPos sub (PosPi (s, tdom) tcod) = do
-  let tdom' = substPos sub tdom
-  let tcod' = substPos sub tcod -- note that we don't have to drop s from sub, thanks to rename.
-  PosPi (s, tdom') tcod'
-substPos sub (PosSigma xts tcod) = do
+substPos sub (Pos (meta :< PosVar s)) =
+  fromMaybe (Pos $ meta :< PosVar s) (lookup s sub)
+substPos _ (Pos (meta :< PosConst s)) = Pos $ meta :< PosConst s
+substPos sub (Pos (meta :< PosPi (s, tdom) tcod)) = do
+  let Pos tdom' = substPos sub $ Pos tdom
+  let Pos tcod' = substPos sub $ Pos tcod
+  Pos $ meta :< PosPi (s, tdom') tcod'
+substPos sub (Pos (meta :< PosSigma xts tcod)) = do
   let (xs, ts) = unzip xts
-  let ts' = map (substPos sub) ts
-  let tcod' = substPos sub tcod
-  PosSigma (zip xs ts') tcod'
-substPos sub (PosSigmaIntro es) = PosSigmaIntro (map (substPos sub) es)
-substPos sub (PosBox e) = do
-  let e' = substPos sub e
-  PosBox e'
-substPos _ (PosIndex x) = PosIndex x
-substPos _ (PosIndexIntro l) = PosIndexIntro l
-substPos _ PosUniv = PosUniv
-substPos sub (PosUp e) = PosUp (substPos sub e)
-substPos sub (PosDown e) = PosDown (substPos sub e)
-substPos sub (PosDownIntro e) = PosDownIntro (substNeg sub e)
+  let ts' = map (substPos sub . Pos) ts
+  let ts'' = map (\(Pos x) -> x) ts'
+  let Pos tcod' = substPos sub $ Pos tcod
+  Pos $ meta :< PosSigma (zip xs ts'') tcod'
+substPos sub (Pos (meta :< PosSigmaIntro es)) = do
+  let es' = map (substPos sub . Pos) es
+  let es'' = map (\(Pos x) -> x) es'
+  Pos $ meta :< PosSigmaIntro es''
+substPos sub (Pos (meta :< PosBox e)) = do
+  let Pos e' = substPos sub $ Pos e
+  Pos $ meta :< PosBox e'
+substPos sub (Pos (meta :< PosBoxIntro e)) = do
+  let e' = substNeg sub e
+  Pos $ meta :< PosBoxIntro e'
+substPos _ (Pos (meta :< PosIndex x)) = Pos $ meta :< PosIndex x
+substPos _ (Pos (meta :< PosIndexIntro l)) = Pos $ meta :< PosIndexIntro l
+substPos _ (Pos (meta :< PosUniv)) = Pos $ meta :< PosUniv
+substPos sub (Pos (meta :< PosUp e)) = do
+  let Pos e' = substPos sub $ Pos e
+  Pos $ meta :< PosUp e'
+substPos sub (Pos (meta :< PosDown e)) = do
+  let Pos e' = substPos sub $ Pos e
+  Pos $ meta :< PosDown e'
+substPos sub (Pos (meta :< PosDownIntro e)) = do
+  let e' = substNeg sub e
+  Pos $ meta :< PosDownIntro e'
 
 substNeg :: SubstPos -> Neg -> Neg
-substNeg sub (NegPiIntro s body) = do
-  let body' = substNeg sub body
-  NegPiIntro s body'
-substNeg sub (NegPiElim e1 e2) = do
-  let e1' = substNeg sub e1
+substNeg sub (Neg (meta :< NegPiIntro s body)) = do
+  let Neg body' = substNeg sub $ Neg body
+  Neg $ meta :< NegPiIntro s body'
+substNeg sub (Neg (meta :< NegPiElim e1 e2)) = do
+  let Neg e1' = substNeg sub $ Neg e1
   let e2' = substPos sub e2
-  NegPiElim e1' e2'
-substNeg sub (NegSigmaElim e1 xs e2) = do
+  Neg $ meta :< NegPiElim e1' e2'
+substNeg sub (Neg (meta :< NegSigmaElim e1 xs e2)) = do
   let e1' = substPos sub e1
-  let e2' = substNeg sub e2
-  NegSigmaElim e1' xs e2'
-substNeg sub (NegBoxIntro e) = do
-  let e' = substNeg sub e
-  NegBoxIntro e'
-substNeg sub (NegBoxElim e) = do
-  let e' = substNeg sub e
-  NegBoxElim e'
-substNeg sub (NegIndexElim e branchList) = do
+  let Neg e2' = substNeg sub $ Neg e2
+  Neg $ meta :< NegSigmaElim e1' xs e2'
+substNeg sub (Neg (meta :< NegBoxElim e)) = do
   let e' = substPos sub e
-  let branchList' = map (\(l, e) -> (l, substNeg sub e)) branchList
-  NegIndexElim e' branchList'
-substNeg sub (NegUpIntro e) = NegUpIntro (substPos sub e)
-substNeg sub (NegUpElim x e1 e2) =
-  NegUpElim x (substNeg sub e1) (substNeg sub e2)
-substNeg sub (NegDownElim e) = NegDownElim (substPos sub e)
+  Neg $ meta :< NegBoxElim e'
+substNeg sub (Neg (meta :< NegIndexElim e branchList)) = do
+  let e' = substPos sub e
+  let branchList' = map (\(l, e) -> (l, substNeg sub $ Neg e)) branchList
+  let branchList'' = map (\(l, Neg e) -> (l, e)) branchList'
+  Neg $ meta :< NegIndexElim e' branchList''
+substNeg sub (Neg (meta :< NegUpIntro e)) =
+  Neg $ meta :< NegUpIntro (substPos sub e)
+substNeg sub (Neg (meta :< NegUpElim x e1 e2)) = do
+  let Neg e1' = substNeg sub $ Neg e1
+  let Neg e2' = substNeg sub $ Neg e2
+  Neg $ meta :< NegUpElim x e1' e2'
+substNeg sub (Neg (meta :< NegDownElim e)) =
+  Neg $ meta :< NegDownElim (substPos sub e)
 
 findInvVar :: Subst -> Identifier -> Maybe Identifier
 findInvVar [] _ = Nothing
