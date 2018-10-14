@@ -2,20 +2,20 @@ module Register
   ( regAlloc
   ) where
 
-import           Control.Monad.State
-import           Control.Monad.Trans.Except
-import           Data.IORef
+import Control.Monad.State
+import Control.Monad.Trans.Except
+import Data.IORef
 
-import           Control.Comonad.Cofree
+import Control.Comonad.Cofree
 
-import           Data.List
+import Data.List
 
-import           Data
-import           Liveness
+import Data
+import Liveness
 
-import           Debug.Trace
+import Debug.Trace
 
-import qualified Text.Show.Pretty           as Pr
+import qualified Text.Show.Pretty as Pr
 
 type Edge = (Identifier, Identifier)
 
@@ -25,9 +25,7 @@ type Graph = ([Node], [Edge])
 
 -- regsiter allocation based on chordal graph coloring
 regAlloc :: Int -> Asm -> WithEnv ()
-regAlloc i asm
-  -- liftIO $ putStrLn $ "regalloc"
- = do
+regAlloc i asm = do
   asm' <- annotAsm asm >>= computeLiveness
   graph <- build asm'
   xs <- maxCardSearch graph

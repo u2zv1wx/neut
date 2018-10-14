@@ -46,10 +46,11 @@ asmCode (CodeCall x fun args cont) = do
     then lift $ throwE "Asm.asmCode: the number of arguments exceeds 6 (FIXME)"
     else asmCodeCall x (AsmDataReg fun) args cont'
 asmCode (CodeSwitch x branchList) = asmSwitch x branchList
-asmCode (CodeExtractValue x (basePointer, ts) i cont) = do
-  let offset = sum $ map sizeOfLowType $ take i ts
-  cont' <- asmCode cont
-  addMeta $ AsmExtractValue x basePointer offset cont'
+asmCode (CodeExtractValue x basePointer i cont) = do
+  undefined
+  -- let offset = sum $ map sizeOfLowType $ take i ts
+  -- cont' <- asmCode cont
+  -- addMeta $ AsmExtractValue x basePointer offset cont'
 asmCode (CodeFree x cont) = do
   tmp <- newName
   cont' <- asmCode cont

@@ -2,24 +2,24 @@ module Infer
   ( check
   ) where
 
-import           Control.Monad
-import           Control.Monad.Except
-import           Control.Monad.State
-import           Control.Monad.Trans.Except
+import Control.Monad
+import Control.Monad.Except
+import Control.Monad.State
+import Control.Monad.Trans.Except
 
-import           Control.Comonad.Cofree
+import Control.Comonad.Cofree
 
-import qualified Text.Show.Pretty           as Pr
+import qualified Text.Show.Pretty as Pr
 
-import           Data
-import           Reduce
-import           Util
+import Data
+import Reduce
+import Util
 
-import           Data.List
+import Data.List
 
-import           Data.Maybe
+import Data.Maybe
 
-import qualified Data.PQueue.Min            as Q
+import qualified Data.PQueue.Min as Q
 
 check :: Identifier -> Neut -> WithEnv Neut
 check main e = do
@@ -30,7 +30,10 @@ check main e = do
   gets constraintQueue >>= synthesize
   sub <- gets substitution
   env <- get
-  let tenv' = map (\(i, t) -> (i, subst sub t)) $ typeEnv env
+  tenv' <-
+    forM (typeEnv env) $ \(i, t) -> do
+      t' <- reduce $ subst sub t
+      return (i, t')
   modify (\e -> e {typeEnv = tenv'})
   checkNumConstraint
   return $ subst sub e
@@ -264,7 +267,7 @@ simp ((ctx, _ :< NeutVar s1, e2, t):cs) = do
   me <- insDef s1 e2
   case me of
     Nothing -> simp cs
-    Just e  -> simp $ (ctx, e, e2, t) : cs
+    Just e -> simp $ (ctx, e, e2, t) : cs
 simp ((ctx, e1, v@(_ :< NeutVar _), t):cs) = simp $ (ctx, v, e1, t) : cs
 simp ((ctx, _ :< NeutPi (x, tdom1) tcod1, _ :< NeutPi (y, tdom2) tcod2, univ):cs) = do
   var <- toVar' x
@@ -466,7 +469,7 @@ resolve' j (c:cs)
   | j `depends` caseJustification c = do
     restoreState c
     case alternatives c of
-      []    -> resolve' j cs
+      [] -> resolve' j cs
       (a:_) -> analyze a
 resolve' j (_:cs) = resolve' j cs
 
@@ -591,7 +594,7 @@ getQueue command = do
   gets constraintQueue
 
 chain :: Q.MinQueue Constraint -> [WithEnv a] -> WithEnv a
-chain c []     = throwError $ "cannot synthesize++:\n" ++ Pr.ppShow c
+chain c [] = throwError $ "cannot synthesize++:\n" ++ Pr.ppShow c
 chain c (e:es) = e `catchError` (\i -> do chain c es)
 
 insDef :: Identifier -> Neut -> WithEnv (Maybe Neut)
@@ -603,13 +606,13 @@ insDef x body = do
 
 headMeta :: [Identifier] -> Neut -> Maybe (Identifier, [Identifier])
 headMeta args (_ :< NeutPiElim e1 (_ :< NeutVar x)) = headMeta (x : args) e1
-headMeta args (_ :< NeutHole x)                     = Just (x, args)
-headMeta _ _                                        = Nothing
+headMeta args (_ :< NeutHole x) = Just (x, args)
+headMeta _ _ = Nothing
 
 headMeta' :: [Neut] -> Neut -> Maybe (Identifier, [Neut])
 headMeta' args (_ :< NeutPiElim e1 e2) = headMeta' (e2 : args) e1
-headMeta' args (_ :< NeutHole x)       = Just (x, args)
-headMeta' _ _                          = Nothing
+headMeta' args (_ :< NeutHole x) = Just (x, args)
+headMeta' _ _ = Nothing
 
 affineCheck :: [Identifier] -> [Identifier] -> Bool
 affineCheck xs = affineCheck' xs xs

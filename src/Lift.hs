@@ -171,7 +171,7 @@ enrich cod (x:xs) = do
 takeNonBox :: [Identifier] -> WithEnv [Identifier]
 takeNonBox [] = return []
 takeNonBox (x:xs) = do
-  t <- lookupTypeEnv' x >>= reduce
+  t <- lookupTypeEnv' x
   case t of
     _ :< NeutBox _ -> takeNonBox xs
     _ -> do

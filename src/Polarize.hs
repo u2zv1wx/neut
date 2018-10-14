@@ -80,11 +80,7 @@ polarizeNeg (meta :< NeutBoxElim e@(boxMeta :< _)) = do
   (_, retMeta) <- lookupTypeEnv' meta >>= polarizePos >>= toRetType'
   Pos boxType <- lookupTypeEnv' boxMeta >>= polarizePos
   insPolTypeEnv boxMeta boxType
-  bindSeq
-    [(z, e)]
-    (Neg $
-     retMeta :<
-     (NegBoxElim $ retMeta :< NegDownElim (Pos $ boxMeta :< PosVar z)))
+  bindSeq [(z, e)] (Neg $ retMeta :< (NegBoxElim $ Pos $ boxMeta :< PosVar z))
 polarizeNeg t@(_ :< NeutIndex _) = posRet t
 polarizeNeg e@(_ :< NeutIndexIntro _) = posRet e
 polarizeNeg (meta :< NeutIndexElim e@(indexMeta :< _) branchList) = do

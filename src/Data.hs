@@ -91,45 +91,114 @@ data LowType
   | LowTypePointer LowType
   deriving (Show)
 
-data Pos
+data PosF n p
   = PosVar Identifier
   | PosConst Identifier
-  | PosPi (Identifier, Pos)
-          Pos
-  | PosSigma [(Identifier, Pos)]
-             Pos
-  | PosSigmaIntro [Pos]
+  | PosPi (Identifier, p)
+          p
+  | PosSigma [(Identifier, p)]
+             p
+  | PosSigmaIntro [p]
   | PosIndex Identifier
   | PosIndexIntro Index
-  | PosDown Pos
-  | PosDownIntro Neg
-  | PosUp Pos
+  | PosDown p
+  | PosDownIntro n
+  | PosUp p
   | PosUniv
-  | PosBox Pos
+  | PosBox p
+  | PosBoxIntro n
   deriving (Show)
 
-data Neg
+data NegF p n
   = NegPiIntro Identifier
-               Neg
-  | NegPiElim Neg
-              Pos
-  | NegSigmaElim Pos
+               n
+  | NegPiElim n
+              p
+  | NegSigmaElim p
                  [Identifier]
-                 Neg
-  | NegIndexElim Pos
-                 [(Index, Neg)]
-  | NegUpIntro Pos
+                 n
+  | NegIndexElim p
+                 [(Index, n)]
+  | NegUpIntro p
   | NegUpElim Identifier
-              Neg
-              Neg
-  | NegDownElim Pos
-  | NegBoxIntro Neg
-  | NegBoxElim Neg
+              n
+              n
+  | NegDownElim p
+  | NegBoxElim p
   deriving (Show)
 
-data Term
-  = Value Pos
-  | Comp Neg
+-- type Neut = Cofree NeutF Identifier
+$(deriveShow1 ''PosF)
+
+$(deriveShow1 ''NegF)
+
+type PrePos = Cofree (PosF Neg) Identifier
+
+type PreNeg = Cofree (NegF Pos) Identifier
+
+newtype Pos =
+  Pos (Cofree (PosF Neg) Identifier)
+  deriving (Show)
+
+newtype Neg =
+  Neg (Cofree (NegF Pos) Identifier)
+  deriving (Show)
+
+-- A polarize term is in *modal-normal form* if the following two conditions are true:
+-- (1) for every application `e @ v1 @ ... @ vn`,
+--   - e == (unbox x) for some variable x,
+--   - vi == xi for some variable x,
+-- (2) the term doesn't contain any thunk/force.
+-- (3) for every unboxing `(unbox v)`, v == x for some variable x.
+--
+-- Note that there exists a type isomorphism:
+--  Down N === Sigma (P : Type). Box (P -> N) * P.
+-- We emploty this type isomorphism in `Modal.hs` to eliminate all the thunk/forces.
+--
+-- positive modal normal form
+data ValueF n p
+  = ValueVar Identifier
+  | ValueConst Identifier
+  | ValuePi (Identifier, p)
+            p
+  | ValueSigma [(Identifier, p)]
+               p
+  | ValueSigmaIntro [p]
+  | ValueIndex Identifier
+  | ValueIndexIntro Index
+  | ValueUp p
+  | ValueUniv
+  deriving (Show)
+
+-- negative modal normal form
+data CompF p n
+  = CompPiElim Identifier -- (unbox f) @ x1 @ ... @ xn
+               [Identifier]
+  | CompSigmaElim p
+                  [Identifier]
+                  n
+  | CompIndexElim p
+                  [(Index, n)]
+  | CompUpIntro p
+  | CompUpElim Identifier
+               n
+               n
+  deriving (Show)
+
+$(deriveShow1 ''ValueF)
+
+$(deriveShow1 ''CompF)
+
+type PreValue = Cofree (ValueF Comp) Identifier
+
+type PreComp = Cofree (CompF Value) Identifier
+
+newtype Value =
+  Value (Cofree (ValueF Comp) Identifier)
+  deriving (Show)
+
+newtype Comp =
+  Comp (Cofree (CompF Value) Identifier)
   deriving (Show)
 
 data Data
@@ -147,14 +216,16 @@ data Code
   | CodeLet Identifier -- bind (we also use this to represent application)
             Data
             Code
-  | CodeCall Identifier -- the register that stores the result of a function call
-             Identifier -- the name of the function
-             [Identifier] -- arguments
+  | CodeCall Identifier -- the register that stores the result of a function call (type: P)
+             Identifier -- the name of the function (type: Box (P1 -> ... -> Pn -> ↑P))
+             [Identifier] -- arguments (type : [P1, ..., Pn])
              Code -- continuation
+  | CodeCallTail Identifier -- the name of the function (type: Box (P1 -> ... -> Pn -> ↑P))
+                 [Identifier] -- arguments (type : [P1, ..., Pn])
   | CodeSwitch Identifier
                [(Index, Code)]
   | CodeExtractValue Identifier -- destination
-                     (Identifier, [LowType]) -- base pointer
+                     Identifier -- base pointer
                      Int -- index
                      Code -- continuation
   | CodeFree Identifier
@@ -173,8 +244,6 @@ data AsmData
   | AsmDataImmediate Int
   deriving (Show)
 
--- AsmLoadWithOffset offset base dest == movq offset(base), dest
--- AsmStoreWithOffset val offset base == movq val, offset(base).
 data AsmF a
   = AsmReturn Identifier
   | AsmLet Identifier
@@ -220,10 +289,6 @@ instance (Show a) => Show (IORef a) where
 initialIndexEnv :: [(Identifier, [Identifier])]
 initialIndexEnv = [("int", [])]
 
--- isExternalConst :: Identifier -> WithEnv Bool
--- isExternalConst name = do
---   env <- get
---   return $ name `elem` map fst (constEnv env)
 type Context = [Identifier]
 
 -- (Gamma, e1, e2, t)  ==  Gamma |- e1 = e2 : t
@@ -300,8 +365,11 @@ data Env = Env
   , indexEnv :: [(Identifier, [Identifier])]
   , nameEnv :: [(Identifier, Identifier)] -- used in alpha conversion
   , typeEnv :: [(Identifier, Neut)] -- type environment
+  , polTypeEnv :: [(Identifier, PrePos)]
+  , valueTypeEnv :: [(Identifier, Value)]
   , weakTermEnv :: [(Identifier, Neut)]
-  , termEnv :: [(Identifier, Term)]
+  -- , termEnv :: [(Identifier, Term)]
+  , modalEnv :: [(Identifier, ([Identifier], Comp))]
   , constEnv :: [(Identifier, Neut)] -- (name, type)
   , constraintEnv :: [PreConstraint]
   , constraintQueue :: Q.MinQueue Constraint
@@ -340,8 +408,11 @@ initialEnv =
     , indexEnv = initialIndexEnv
     , nameEnv = []
     , typeEnv = []
+    , polTypeEnv = []
+    , valueTypeEnv = []
     , weakTermEnv = []
-    , termEnv = []
+    , modalEnv = []
+    -- , termEnv = []
     , constEnv = []
     , constraintEnv = []
     , constraintQueue = Q.empty
@@ -392,6 +463,12 @@ newNameOfType t = do
   insTypeEnv i t
   return i
 
+newNameOfPolType :: PrePos -> WithEnv Identifier
+newNameOfPolType t = do
+  i <- newName
+  insPolTypeEnv i t
+  return i
+
 constNameWith :: Identifier -> WithEnv ()
 constNameWith s = modify (\e -> e {nameEnv = (s, s) : nameEnv e})
 
@@ -403,6 +480,26 @@ lookupTypeEnv' s = do
   mt <- gets (lookup s . typeEnv)
   case mt of
     Nothing -> lift $ throwE $ s ++ " is not found in the type environment."
+    Just t -> return t
+
+lookupPolTypeEnv :: String -> WithEnv (Maybe PrePos)
+lookupPolTypeEnv s = gets (lookup s . polTypeEnv)
+
+lookupPolTypeEnv' :: String -> WithEnv PrePos
+lookupPolTypeEnv' s = do
+  mt <- gets (lookup s . polTypeEnv)
+  case mt of
+    Nothing -> lift $ throwE $ s ++ " is not found in the polType environment."
+    Just t -> return t
+
+lookupValueTypeEnv :: String -> WithEnv (Maybe Value)
+lookupValueTypeEnv s = gets (lookup s . valueTypeEnv)
+
+lookupValueTypeEnv' :: String -> WithEnv Value
+lookupValueTypeEnv' s = do
+  mt <- gets (lookup s . valueTypeEnv)
+  case mt of
+    Nothing -> lift $ throwE $ s ++ " is not found in the polType environment."
     Just t -> return t
 
 lookupConstEnv :: String -> WithEnv (Maybe Neut)
@@ -421,22 +518,20 @@ lookupConstEnv' s = do
       Pr.ppShow (constEnv env)
     Just t -> return t
 
-lookupTermEnv :: String -> WithEnv (Maybe Term)
-lookupTermEnv s = gets (lookup s . termEnv)
-
-lookupTermEnv' :: String -> WithEnv Term
-lookupTermEnv' s = do
-  mt <- gets (lookup s . termEnv)
-  env <- get
-  case mt of
-    Nothing ->
-      lift $
-      throwE $
-      s ++
-      " is not found in the term environment. termenv: " ++
-      Pr.ppShow (termEnv env)
-    Just t -> return t
-
+-- lookupTermEnv :: String -> WithEnv (Maybe Term)
+-- lookupTermEnv s = gets (lookup s . termEnv)
+-- lookupTermEnv' :: String -> WithEnv Term
+-- lookupTermEnv' s = do
+--   mt <- gets (lookup s . termEnv)
+--   env <- get
+--   case mt of
+--     Nothing ->
+--       lift $
+--       throwE $
+--       s ++
+--       " is not found in the term environment. termenv: " ++
+--       Pr.ppShow (termEnv env)
+--     Just t -> return t
 insNameEnv :: Identifier -> Identifier -> WithEnv ()
 insNameEnv from to = modify (\e -> e {nameEnv = (from, to) : nameEnv e})
 
@@ -464,6 +559,12 @@ lookupCodeEnv funName = do
 insTypeEnv :: Identifier -> Neut -> WithEnv ()
 insTypeEnv i t = modify (\e -> e {typeEnv = (i, t) : typeEnv e})
 
+insPolTypeEnv :: Identifier -> PrePos -> WithEnv ()
+insPolTypeEnv i t = modify (\e -> e {polTypeEnv = (i, t) : polTypeEnv e})
+
+insValueTypeEnv :: Identifier -> Value -> WithEnv ()
+insValueTypeEnv i t = modify (\e -> e {valueTypeEnv = (i, t) : valueTypeEnv e})
+
 insConstEnv :: Identifier -> Neut -> WithEnv ()
 insConstEnv i t = modify (\e -> e {constEnv = (i, t) : constEnv e})
 
@@ -471,9 +572,8 @@ insNumConstraintEnv :: Identifier -> WithEnv ()
 insNumConstraintEnv x =
   modify (\e -> e {numConstraintEnv = x : numConstraintEnv e})
 
-insTermEnv :: Identifier -> Term -> WithEnv ()
-insTermEnv i t = modify (\e -> e {termEnv = (i, t) : termEnv e})
-
+-- insTermEnv :: Identifier -> Term -> WithEnv ()
+-- insTermEnv i t = modify (\e -> e {termEnv = (i, t) : termEnv e})
 insWeakTermEnv :: Identifier -> Neut -> WithEnv ()
 insWeakTermEnv i t = modify (\e -> e {weakTermEnv = weakTermEnv e ++ [(i, t)]})
 
@@ -484,10 +584,17 @@ lookupWeakTermEnv funName = do
     Just body -> return body
     Nothing -> lift $ throwE $ "no such weakterm: " ++ show funName
 
+-- funName : Box (P1 -> ... -> Pn -> N)
+-- arg_i : Pi
+-- body : N
 insCodeEnv :: Identifier -> [Identifier] -> Code -> WithEnv ()
 insCodeEnv funName args body = do
   codeRef <- liftIO $ newIORef body
   modify (\e -> e {codeEnv = (funName, (args, codeRef)) : codeEnv e})
+
+insModalEnv :: Identifier -> [Identifier] -> Comp -> WithEnv ()
+insModalEnv funName args body =
+  modify (\e -> e {modalEnv = (funName, (args, body)) : modalEnv e})
 
 insAsmEnv :: Identifier -> Asm -> WithEnv ()
 insAsmEnv funName asm = modify (\e -> e {asmEnv = (funName, asm) : asmEnv e})

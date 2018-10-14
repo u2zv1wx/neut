@@ -19,6 +19,7 @@ import Exhaust
 import Infer
 import Lift
 import Macro
+import Modal
 import Parse
 import Polarize
 import Read
@@ -78,13 +79,13 @@ concatDefList ((meta, name, e):es) = do
 process :: Neut -> WithEnv ()
 process e = do
   e' <- check mainLabel e >>= nonRecReduce
-  c'' <- exhaust e' >>= lift
+  c'' <- exhaust e' -- >>= lift
   insWeakTermEnv mainLabel c''
   wtenv <- gets weakTermEnv
-  tmp <- polarize wtenv c''
+  -- tmp <- polarize wtenv c''
   -- liftIO $ putStrLn "main:\n"
   -- liftIO $ putStrLn $ Pr.ppShow tmp
-  e'' <- polarize wtenv c'' >>= virtualNeg
+  e'' <- polarize wtenv c'' >>= modalNeg >>= virtualComp
   insCodeEnv mainLabel [] e''
   -- forM_ wtenv $ \(name, e) ->
   --   polarizeNeg e >>= virtualNeg >>= insCodeEnv name []

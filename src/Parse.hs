@@ -3,23 +3,23 @@ module Parse
   , parseAtom
   ) where
 
-import           Control.Monad              (void)
-import           Control.Monad.Except
-import           Control.Monad.Identity
-import           Control.Monad.State
-import           Control.Monad.Trans.Except
+import Control.Monad (void)
+import Control.Monad.Except
+import Control.Monad.Identity
+import Control.Monad.State
+import Control.Monad.Trans.Except
 
-import           Control.Comonad.Cofree
+import Control.Comonad.Cofree
 
-import           Data
-import           Util
+import Data
+import Util
 
-import           Data.List
-import           Data.Maybe
+import Data.List
+import Data.Maybe
 
-import           Text.Read                  (readMaybe)
+import Text.Read (readMaybe)
 
-import qualified Text.Show.Pretty           as Pr
+import qualified Text.Show.Pretty as Pr
 
 parse :: Tree -> WithEnv Neut
 parse (_ :< TreeNode [_ :< TreeAtom "forall", _ :< TreeNode ts, tn]) = do
@@ -92,7 +92,7 @@ parse (meta :< TreeAtom s) = do
   case (flag1, flag2) of
     (True, False) -> return $ meta :< NeutIndexIntro (IndexLabel s)
     (False, True) -> return $ meta :< NeutIndex s
-    _             -> return $ meta :< NeutVar s
+    _ -> return $ meta :< NeutVar s
 parse t = lift $ throwE $ "parse: syntax error:\n" ++ Pr.ppShow t
 
 parseClause :: Tree -> WithEnv (Index, Neut)
