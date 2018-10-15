@@ -12,6 +12,8 @@ import Control.Monad.State
 import Data
 import Reduce
 
+import Data.Maybe (fromMaybe)
+
 import qualified Text.Show.Pretty as Pr
 
 import Debug.Trace
@@ -395,3 +397,31 @@ piSeqValueType (x:xs) t = do
   tmp <- newNameWith "meta"
   Value tx <- lookupValueTypeEnv' x
   return $ tmp :< ValuePi (x, tx) t'
+
+substCode :: [(String, Data)] -> Code -> Code
+substCode sub (CodeReturn ans) = CodeReturn $ substData sub ans
+substCode sub (CodeCall x name xds cont) = do
+  let name' = substData sub name
+  let xds' = map (substData sub) xds
+  CodeCall x name' xds' $ substCode sub cont
+substCode sub (CodeCallTail name xds) = do
+  let name' = substData sub name
+  let xds' = map (substData sub) xds
+  CodeCallTail name' xds'
+substCode sub (CodeSwitch y branchList) = do
+  let y' = substData sub y
+  let (labelList, es) = unzip branchList
+  let es' = map (substCode sub) es
+  CodeSwitch y' $ zip labelList es'
+substCode sub (CodeExtractValue x basePointer i cont) = do
+  let basePointer' = substData sub basePointer
+  CodeExtractValue x basePointer' i $ substCode sub cont
+substCode sub (CodeFree x cont) = do
+  let x' = substData sub x
+  CodeFree x' $ substCode sub cont
+
+substData :: [(String, Data)] -> DataPlus -> DataPlus
+substData sub (DataLocal x, t) = (fromMaybe (DataLocal x) (lookup x sub), t)
+substData _ (DataLabel x, t) = (DataLabel x, t)
+substData _ (DataInt32 i, t) = (DataInt32 i, t)
+substData sub (DataStruct ds, t) = (DataStruct $ map (substData sub) ds, t)

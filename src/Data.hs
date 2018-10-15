@@ -205,27 +205,26 @@ data Data
   = DataLocal Identifier
   | DataLabel Identifier
   | DataInt32 Int
-  | DataStruct [Data]
+  | DataStruct [DataPlus]
   deriving (Show)
 
+type DataPlus = (Data, Value)
+
 data Code
-  = CodeReturn Data
-  | CodeLet Identifier -- bind (we also use this to represent application)
-            Data
-            Code
+  = CodeReturn DataPlus
   | CodeCall Identifier -- the register that stores the result of a function call (type: P)
-             Identifier -- the name of the function (type: Box (P1 -> ... -> Pn -> ↑P))
-             [Identifier] -- arguments (type : [P1, ..., Pn])
+             DataPlus -- the name of the function (type: Box (P1 -> ... -> Pn -> ↑P))
+             [DataPlus] -- arguments (type : [P1, ..., Pn])
              Code -- continuation
-  | CodeCallTail Identifier -- the name of the function (type: Box (P1 -> ... -> Pn -> ↑P))
-                 [Identifier] -- arguments (type : [P1, ..., Pn])
-  | CodeSwitch Identifier
+  | CodeCallTail DataPlus -- the name of the function (type: Box (P1 -> ... -> Pn -> ↑P))
+                 [DataPlus] -- arguments (type : [P1, ..., Pn])
+  | CodeSwitch DataPlus
                [(Index, Code)]
   | CodeExtractValue Identifier -- destination
-                     Identifier -- base pointer
+                     DataPlus -- base pointer
                      Int -- index
                      Code -- continuation
-  | CodeFree Identifier
+  | CodeFree DataPlus
              Code
   deriving (Show)
 
@@ -242,38 +241,66 @@ data AsmData
   deriving (Show)
 
 data AsmF a
-  = AsmReturn Identifier
-  | AsmLet Identifier
-           AsmData
-           a
-  | AsmExtractValue Identifier -- destination
-                    Identifier -- base pointer
-                    Int -- offset
-                    a
-  | AsmInsertValue AsmData -- source
-                   Identifier -- base pointer
-                   Int -- offset
-                   a
+  = AsmReturn DataPlus
+  | AsmGetElementPtr Identifier
+                     DataPlus
+                     Int
+                     a
+  -- | AsmExtractValue Identifier -- destination
+  --                   Identifier -- base pointer
+  --                   Int -- offset
+  --                   a
+  -- | AsmInsertValue AsmData -- source
+  --                  Identifier -- base pointer
+  --                  Int -- offset
+  --                  a
   | AsmCall Identifier
-            AsmData
-            [Identifier]
+            DataPlus
+            [DataPlus]
             a
-  | AsmCompare Identifier
-               Identifier
+  | AsmCallTail DataPlus
+                [DataPlus]
+  | AsmBitcast Identifier -- store the result in this register
+               DataPlus
+               Value -- cast to this type
                a
-  | AsmJumpIfZero (Identifier, a)
+  | AsmZeroExtend Identifier
+                  DataPlus
+                  Value
                   a
-  | AsmJump (Identifier, a)
-  | AsmPush Identifier
+  | AsmTrunc Identifier
+             DataPlus
+             Value
+             a
+  | AsmIntToPointer Identifier
+                    DataPlus
+                    Value
+                    a
+  | AsmPointerToInt Identifier
+                    DataPlus
+                    Value
+                    a
+  | AsmSwitch DataPlus
+              a
+              [(Int, a)]
+  | AsmFree DataPlus
             a
-  | AsmPop Identifier
-           a
-  | AsmAddInt64 AsmData -- addq {AsmData}, {Identifier}
-                Identifier
-                a
-  | AsmSubInt64 AsmData -- subq {AsmData}, {Identifier}
-                Identifier
-                a
+  -- | AsmCompare Identifier
+  --              Identifier
+  --              a
+  -- | AsmJumpIfZero (Identifier, a)
+  --                 a
+  -- | AsmJump (Identifier, a)
+  -- | AsmPush Identifier
+  --           a
+  -- | AsmPop Identifier
+  --          a
+  -- | AsmAddInt64 AsmData -- addq {AsmData}, {Identifier}
+  --               Identifier
+  --               a
+  -- | AsmSubInt64 AsmData -- subq {AsmData}, {Identifier}
+  --               Identifier
+  --               a
   deriving (Show)
 
 $(deriveShow1 ''AsmF)
@@ -375,7 +402,7 @@ data Env = Env
   , univConstraintEnv :: [(UnivLevel, UnivLevel)]
   , numConstraintEnv :: [Identifier]
   , codeEnv :: [(Identifier, ([Identifier], IORef Code))]
-  , asmEnv :: [(Identifier, Asm)]
+  , asmEnv :: [(Identifier, ([Identifier], Asm))]
   , regEnv :: [(Identifier, Int)] -- variable to register
   , regVarList :: [Identifier]
   , spill :: Maybe Identifier
@@ -575,8 +602,9 @@ insModalEnv :: Identifier -> [Identifier] -> Comp -> WithEnv ()
 insModalEnv funName args body =
   modify (\e -> e {modalEnv = (funName, (args, body)) : modalEnv e})
 
-insAsmEnv :: Identifier -> Asm -> WithEnv ()
-insAsmEnv funName asm = modify (\e -> e {asmEnv = (funName, asm) : asmEnv e})
+insAsmEnv :: Identifier -> [Identifier] -> Asm -> WithEnv ()
+insAsmEnv funName args asm =
+  modify (\e -> e {asmEnv = (funName, (args, asm)) : asmEnv e})
 
 insIndexEnv :: Identifier -> [Identifier] -> WithEnv ()
 insIndexEnv name indexList =
@@ -848,3 +876,6 @@ varsInAsmData :: AsmData -> [Identifier]
 varsInAsmData (AsmDataReg x) = [x]
 varsInAsmData (AsmDataLabel _) = []
 varsInAsmData (AsmDataImmediate _) = []
+
+intTypeList :: [Identifier]
+intTypeList = ["i8", "i16", "i32", "i64"]

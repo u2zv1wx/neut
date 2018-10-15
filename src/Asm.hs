@@ -108,6 +108,7 @@ toInt64 (from, fromType@(_ :< ValueIndex "f32")) to cont = do
   int32 <- getInt32Type
   int64 <- getInt64Type
   tmp <- newNameWith "cast"
+  insValueTypeEnv tmp int32
   cont' <- addMeta $ AsmZeroExtend to (DataLocal tmp, int32) int64 cont
   addMeta $ AsmBitcast tmp (from, Value fromType) int32 cont'
 toInt64 (from, fromType@(_ :< ValueIndex "f64")) to cont = do
@@ -134,6 +135,7 @@ fromInt64 from (to, toType@(_ :< ValueIndex i)) cont
 fromInt64 from (to, toType@(_ :< ValueIndex "f32")) cont = do
   int32 <- getInt32Type
   tmp <- newNameWith "cast"
+  insValueTypeEnv tmp int32
   cont' <- addMeta $ AsmBitcast to (DataLocal tmp, int32) (Value toType) cont
   fromType <- lookupValueTypeEnv' from
   addMeta $ AsmTrunc tmp (DataLocal from, fromType) int32 cont'
@@ -153,6 +155,3 @@ getInt64Type :: WithEnv Value
 getInt64Type = do
   meta <- newNameWith "meta"
   return $ Value $ meta :< ValueIndex "i64"
-
-intTypeList :: [Identifier]
-intTypeList = ["i8", "i16", "i32", "i64"]
