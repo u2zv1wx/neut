@@ -344,12 +344,14 @@ toVar' x = do
   return $ meta :< NeutVar x
 
 toValueVar :: Identifier -> WithEnv Value
-toValueVar x
-  -- t <- lookupTypeEnv' x
- = do
+toValueVar x = do
   meta <- newNameWith "meta"
-  -- insTypeEnv meta t
   return $ Value $ meta :< ValueVar x
+
+toValueConst :: Identifier -> WithEnv Value
+toValueConst x = do
+  meta <- newNameWith "meta"
+  return $ Value $ meta :< ValueConst x
 
 toLowType :: Neut -> WithEnv LowType
 toLowType (_ :< NeutVar _) = return $ LowTypeInt 32 -- (*1)

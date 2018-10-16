@@ -1,6 +1,5 @@
 module Modal
-  ( modalPos
-  , modalNeg
+  ( modal
   ) where
 
 import Control.Monad
@@ -20,6 +19,14 @@ import Control.Comonad.Cofree
 import qualified Text.Show.Pretty as Pr
 
 import Debug.Trace
+
+modal :: WithEnv ()
+modal = do
+  penv <- gets polEnv
+  forM_ penv $ \(name, e) -> do
+    let (body, args) = toNegPiIntroSeq e
+    body' <- modalNeg body
+    insModalEnv name args body'
 
 modalPos :: Pos -> WithEnv Value
 modalPos (Pos (meta :< PosVar x)) = return $ Value $ meta :< ValueVar x
@@ -133,8 +140,9 @@ makeClosure meta abs = do
   body' <- makeClosureBody envName fvs body
   fun <- newNameWith "closure"
   insModalEnv fun (envName : args) body'
-  vs <- mapM toValueVar [fun, envName]
-  let elems = map (\(Value x) -> x) $ envType : vs
+  funConst <- toValueConst fun
+  envVar <- toValueVar envName -- fixme: use tensor
+  let elems = map (\(Value x) -> x) [envType, funConst, envVar]
   return $ Value $ meta :< ValueSigmaIntro elems
 
 -- Extract the values of free variables from the free-variable struct,

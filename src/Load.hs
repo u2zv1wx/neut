@@ -82,13 +82,7 @@ process e = do
   c'' <- exhaust e' >>= lift
   insWeakTermEnv "main" c''
   polarize
+  modal
   virtual
   asmCodeEnv
   emit
-
-polarize :: WithEnv ()
-polarize = do
-  wtenv <- gets weakTermEnv
-  forM_ wtenv $ \(name, e) -> do
-    e' <- polarizeNeg e >>= modalNeg
-    insModalEnv name [] e'

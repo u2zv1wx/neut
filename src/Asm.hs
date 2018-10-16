@@ -1,6 +1,5 @@
 module Asm
   ( asmCodeEnv
-  , asmCode
   ) where
 
 import Control.Monad

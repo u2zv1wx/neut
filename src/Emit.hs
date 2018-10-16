@@ -31,7 +31,7 @@ emitDefinition :: Identifier -> ([Identifier], Asm) -> WithEnv ()
 emitDefinition name (args, asm) = do
   let name' = DataLabel name
   let args' = map DataLocal args
-  liftIO $ putStrLn $ "define i8* " ++ showData name' ++ showArgs args' ++ "{"
+  liftIO $ putStrLn $ "define i8* " ++ showData name' ++ showArgs args' ++ " {"
   emitAsm asm
   liftIO $ putStrLn "}"
 
@@ -50,7 +50,7 @@ emitAsm (_ :< AsmGetElementPtr x base (i, n) cont) = do
       , showStructOfLength n ++ ","
       , showStructOfLength n ++ "*"
       , showData base ++ ","
-      , showIndex [0, i]
+      , showIndex [0, i, 0]
       ]
   emitAsm cont
 emitAsm (_ :< AsmCall x f args cont) = do
@@ -112,7 +112,7 @@ emitAsm (_ :< AsmSwitch d defaultBranch branchList) = do
       , "i32"
       , showData d ++ ","
       , "label"
-      , defaultLabel
+      , showData (DataLocal defaultLabel)
       , showBranchList $ zip (map fst branchList) labelList
       ]
   let asmList = map snd branchList

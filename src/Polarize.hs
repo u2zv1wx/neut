@@ -1,5 +1,5 @@
 module Polarize
-  ( polarizeNeg
+  ( polarize
   ) where
 
 import Control.Monad
@@ -16,6 +16,13 @@ import Reduce
 import Util
 
 import Data.Maybe (maybeToList)
+
+polarize :: WithEnv ()
+polarize = do
+  wtenv <- gets weakTermEnv
+  forM_ wtenv $ \(name, e) -> do
+    e' <- polarizeNeg e
+    insPolEnv name e'
 
 polarizeNeg :: Neut -> WithEnv Neg
 polarizeNeg (meta :< NeutVar x) = do

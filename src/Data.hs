@@ -358,6 +358,7 @@ data Env = Env
   , nameEnv :: [(Identifier, Identifier)] -- used in alpha conversion
   , typeEnv :: [(Identifier, Neut)] -- type environment
   , weakTermEnv :: [(Identifier, Neut)]
+  , polEnv :: [(Identifier, Neg)]
   , modalEnv :: [(Identifier, ([Identifier], Comp))]
   , constEnv :: [(Identifier, Neut)] -- (name, type)
   , constraintEnv :: [PreConstraint]
@@ -394,6 +395,7 @@ initialEnv =
     , nameEnv = []
     , typeEnv = []
     , weakTermEnv = []
+    , polEnv = []
     , modalEnv = []
     , constEnv = []
     , constraintEnv = []
@@ -526,6 +528,9 @@ insCodeEnv :: Identifier -> [Identifier] -> Code -> WithEnv ()
 insCodeEnv funName args body = do
   codeRef <- liftIO $ newIORef body
   modify (\e -> e {codeEnv = (funName, (args, codeRef)) : codeEnv e})
+
+insPolEnv :: Identifier -> Neg -> WithEnv ()
+insPolEnv name body = modify (\e -> e {polEnv = (name, body) : polEnv e})
 
 insModalEnv :: Identifier -> [Identifier] -> Comp -> WithEnv ()
 insModalEnv funName args body =
