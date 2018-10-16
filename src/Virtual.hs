@@ -1,5 +1,5 @@
 module Virtual
-  ( virtual
+  ( virtualize
   ) where
 
 import Control.Monad
@@ -22,8 +22,8 @@ import qualified Text.Show.Pretty as Pr
 
 import Debug.Trace
 
-virtual :: WithEnv ()
-virtual = do
+virtualize :: WithEnv ()
+virtualize = do
   menv <- gets modalEnv
   forM_ menv $ \(name, (args, code)) -> do
     code' <- virtualComp code

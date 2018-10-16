@@ -1,5 +1,5 @@
 module Asm
-  ( asmCodeEnv
+  ( assemblize
   ) where
 
 import Control.Monad
@@ -19,8 +19,8 @@ import qualified Text.Show.Pretty as Pr
 
 import Debug.Trace
 
-asmCodeEnv :: WithEnv ()
-asmCodeEnv = do
+assemblize :: WithEnv ()
+assemblize = do
   env <- get
   forM_ (codeEnv env) $ \(name, (args, codeRef)) -> do
     code <- liftIO $ readIORef codeRef

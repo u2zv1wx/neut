@@ -78,11 +78,9 @@ concatDefList ((meta, name, e):es) = do
 
 process :: Neut -> WithEnv ()
 process e = do
-  e' <- check "main" e >>= nonRecReduce
-  c'' <- exhaust e' >>= lift
-  insWeakTermEnv "main" c''
+  check "main" e >>= nonRecReduce >>= exhaust >>= lift >>= insWeakTermEnv "main"
   polarize
-  modal
-  virtual
-  asmCodeEnv
+  modalize
+  virtualize
+  assemblize
   emit

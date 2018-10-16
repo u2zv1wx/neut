@@ -1,5 +1,5 @@
 module Modal
-  ( modal
+  ( modalize
   ) where
 
 import Control.Monad
@@ -20,8 +20,8 @@ import qualified Text.Show.Pretty as Pr
 
 import Debug.Trace
 
-modal :: WithEnv ()
-modal = do
+modalize :: WithEnv ()
+modalize = do
   penv <- gets polEnv
   forM_ penv $ \(name, e) -> do
     let (body, args) = toNegPiIntroSeq e
