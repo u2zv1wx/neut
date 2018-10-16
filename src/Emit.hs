@@ -41,8 +41,8 @@ emitBlock name asm = do
   emitAsm asm
 
 emitAsm :: Asm -> WithEnv ()
-emitAsm (_ :< AsmReturn d) = emitOp $ unwords ["ret i8*", showData d]
-emitAsm (_ :< AsmGetElementPtr x base (i, n) cont) = do
+emitAsm (AsmReturn d) = emitOp $ unwords ["ret i8*", showData d]
+emitAsm (AsmGetElementPtr x base (i, n) cont) = do
   emitOp $
     unwords
       [ showData (DataLocal x)
@@ -53,12 +53,12 @@ emitAsm (_ :< AsmGetElementPtr x base (i, n) cont) = do
       , showIndex [0, i, 0]
       ]
   emitAsm cont
-emitAsm (_ :< AsmCall x f args cont) = do
+emitAsm (AsmCall x f args cont) = do
   emitOp $
     unwords
       [showData (DataLocal x), "=", "i8* call", showData f ++ showArgs args]
   emitAsm cont
-emitAsm (_ :< AsmCallTail f args) = do
+emitAsm (AsmCallTail f args) = do
   tmp <- newNameWith "tmp"
   emitOp $
     unwords
@@ -68,7 +68,7 @@ emitAsm (_ :< AsmCallTail f args) = do
       , showData f ++ showArgs args
       ]
   emitOp $ unwords ["ret i8*", showData (DataLocal tmp)]
-emitAsm (_ :< AsmBitcast x d fromType toType cont) = do
+emitAsm (AsmBitcast x d fromType toType cont) = do
   emitOp $
     unwords
       [ showData (DataLocal x)
@@ -80,7 +80,7 @@ emitAsm (_ :< AsmBitcast x d fromType toType cont) = do
       , showLowType toType
       ]
   emitAsm cont
-emitAsm (_ :< AsmIntToPointer x d fromType _ cont) = do
+emitAsm (AsmIntToPointer x d fromType _ cont) = do
   emitOp $
     unwords
       [ showData (DataLocal x)
@@ -91,7 +91,7 @@ emitAsm (_ :< AsmIntToPointer x d fromType _ cont) = do
       , "to i8*"
       ]
   emitAsm cont
-emitAsm (_ :< AsmPointerToInt x d _ toType cont) = do
+emitAsm (AsmPointerToInt x d _ toType cont) = do
   emitOp $
     unwords
       [ showData (DataLocal x)
@@ -103,7 +103,7 @@ emitAsm (_ :< AsmPointerToInt x d _ toType cont) = do
       , showLowType toType
       ]
   emitAsm cont
-emitAsm (_ :< AsmSwitch d defaultBranch branchList) = do
+emitAsm (AsmSwitch d defaultBranch branchList) = do
   defaultLabel <- newNameWith "default"
   labelList <- constructLabelList branchList
   emitOp $
@@ -118,7 +118,7 @@ emitAsm (_ :< AsmSwitch d defaultBranch branchList) = do
   let asmList = map snd branchList
   forM_ ((defaultLabel, defaultBranch) : zip labelList asmList) $
     uncurry emitBlock
-emitAsm (_ :< AsmFree d cont) = do
+emitAsm (AsmFree d cont) = do
   emitOp $ unwords ["call", "void", "@free(i8* " ++ showData d ++ ")"]
   emitAsm cont
 

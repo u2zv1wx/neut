@@ -91,56 +91,39 @@ data LowType
   | LowTypePointer LowType
   deriving (Show)
 
-data PosF n p
+data Pos
   = PosVar Identifier
   | PosConst Identifier
-  | PosSigma [(Identifier, p)]
-             p
-  | PosSigmaIntro [p]
+  | PosSigma [(Identifier, Pos)]
+             Pos
+  | PosSigmaIntro [Pos]
   | PosIndex Identifier
   | PosIndexIntro Index
-  | PosDown n
-  | PosDownIntro n
+  | PosDown Neg
+  | PosDownIntro Neg
   | PosUniv
-  | PosBox n
-  | PosBoxIntro n
+  | PosBox Neg
+  | PosBoxIntro Neg
   deriving (Show)
 
-data NegF p n
-  = NegPi (Identifier, p)
-          n
+data Neg
+  = NegPi (Identifier, Pos)
+          Neg
   | NegPiIntro Identifier
-               n
-  | NegPiElim n
-              p
-  | NegSigmaElim p
+               Neg
+  | NegPiElim Neg
+              Pos
+  | NegSigmaElim Pos
                  [Identifier]
-                 n
-  | NegIndexElim p
-                 [(Index, n)]
-  | NegUpIntro p
+                 Neg
+  | NegIndexElim Pos
+                 [(Index, Neg)]
+  | NegUpIntro Pos
   | NegUpElim Identifier
-              n
-              n
-  | NegDownElim p
-  | NegBoxElim p
-  deriving (Show)
-
--- type Neut = Cofree NeutF Identifier
-$(deriveShow1 ''PosF)
-
-$(deriveShow1 ''NegF)
-
-type PrePos = Cofree (PosF Neg) Identifier
-
-type PreNeg = Cofree (NegF Pos) Identifier
-
-newtype Pos =
-  Pos (Cofree (PosF Neg) Identifier)
-  deriving (Show)
-
-newtype Neg =
-  Neg (Cofree (NegF Pos) Identifier)
+              Neg
+              Neg
+  | NegDownElim Pos
+  | NegBoxElim Pos
   deriving (Show)
 
 -- A polarize term is in *modal-normal form* if the following two conditions are true:
@@ -155,49 +138,33 @@ newtype Neg =
 -- We emploty this type isomorphism in `Modal.hs` to eliminate all the thunk/forces.
 --
 -- positive modal normal form
-data ValueF n p
+data Value
   = ValueVar Identifier
   | ValueConst Identifier
-  | ValueSigma [(Identifier, p)]
-               p
-  | ValueSigmaIntro [p]
+  | ValueSigma [(Identifier, Value)]
+               Value
+  | ValueSigmaIntro [Value]
   | ValueIndex Identifier
   | ValueIndexIntro Index
   | ValueUniv
-  | ValueBox n
+  | ValueBox Comp
   deriving (Show)
 
 -- negative modal normal form
-data CompF p n
-  = CompPi (Identifier, p)
-           n
+data Comp
+  = CompPi (Identifier, Value)
+           Comp
   | CompPiElim Identifier -- (unbox f) @ x1 @ ... @ xn
                [Identifier]
-  | CompSigmaElim p
+  | CompSigmaElim Value
                   [Identifier]
-                  n
-  | CompIndexElim p
-                  [(Index, n)]
-  | CompUpIntro p
+                  Comp
+  | CompIndexElim Value
+                  [(Index, Comp)]
+  | CompUpIntro Value
   | CompUpElim Identifier
-               n
-               n
-  deriving (Show)
-
-$(deriveShow1 ''ValueF)
-
-$(deriveShow1 ''CompF)
-
-type PreValue = Cofree (ValueF Comp) Identifier
-
-type PreComp = Cofree (CompF Value) Identifier
-
-newtype Value =
-  Value (Cofree (ValueF Comp) Identifier)
-  deriving (Show)
-
-newtype Comp =
-  Comp (Cofree (CompF Value) Identifier)
+               Comp
+               Comp
   deriving (Show)
 
 data Data
@@ -225,61 +192,48 @@ data Code
              Code
   deriving (Show)
 
-data AsmMeta = AsmMeta
-  { asmMetaLive :: [Identifier]
-  , asmMetaDef :: [Identifier]
-  , asmMetaUse :: [Identifier]
-  } deriving (Show)
-
 data AsmData
   = AsmDataReg Identifier
   | AsmDataLabel Identifier
   | AsmDataImmediate Int
   deriving (Show)
 
-data AsmF a
+data Asm
   = AsmReturn Data
   | AsmGetElementPtr Identifier
                      Data
                      (Int, Int)
-                     a
+                     Asm
   | AsmCall Identifier
             Data
             [Data]
-            a
+            Asm
   | AsmCallTail Data
                 [Data]
   | AsmBitcast Identifier -- store the result in this register
                Data
                LowType
                LowType -- cast to this type
-               a
+               Asm
   | AsmIntToPointer Identifier
                     Data
                     LowType
                     LowType
-                    a
+                    Asm
   | AsmPointerToInt Identifier
                     Data
                     LowType
                     LowType
-                    a
+                    Asm
   | AsmSwitch Data
-              a
-              [(Int, a)]
+              Asm
+              [(Int, Asm)]
   | AsmFree Data
-            a
+            Asm
   deriving (Show)
-
-$(deriveShow1 ''AsmF)
-
-type Asm = Cofree AsmF AsmMeta
 
 instance (Show a) => Show (IORef a) where
   show a = show (unsafePerformIO (readIORef a))
-
-initialIndexEnv :: [(Identifier, [Identifier])]
-initialIndexEnv = [("int", [])]
 
 type Context = [Identifier]
 
@@ -360,7 +314,6 @@ data Env = Env
   , weakTermEnv :: [(Identifier, Neut)]
   , polEnv :: [(Identifier, Neg)]
   , modalEnv :: [(Identifier, ([Identifier], Comp))]
-  , constEnv :: [(Identifier, Neut)] -- (name, type)
   , constraintEnv :: [PreConstraint]
   , constraintQueue :: Q.MinQueue Constraint
   , metaMap :: [(Identifier, PreConstraint)]
@@ -391,13 +344,14 @@ initialEnv =
         , "forall"
         , "up"
         ]
-    , indexEnv = initialIndexEnv
+    , indexEnv = []
     , nameEnv = []
     , typeEnv = []
     , weakTermEnv = []
     , polEnv = []
     , modalEnv = []
-    , constEnv = []
+    , codeEnv = []
+    , asmEnv = []
     , constraintEnv = []
     , constraintQueue = Q.empty
     , metaMap = []
@@ -405,8 +359,6 @@ initialEnv =
     , caseStack = []
     , univConstraintEnv = []
     , numConstraintEnv = []
-    , codeEnv = []
-    , asmEnv = []
     }
 
 type WithEnv a = StateT Env (ExceptT String IO) a
@@ -443,11 +395,6 @@ newNameOfType t = do
   insTypeEnv i t
   return i
 
-newNameOfPolType :: PrePos -> WithEnv Identifier
-newNameOfPolType t = do
-  i <- newName
-  return i
-
 constNameWith :: Identifier -> WithEnv ()
 constNameWith s = modify (\e -> e {nameEnv = (s, s) : nameEnv e})
 
@@ -459,22 +406,6 @@ lookupTypeEnv' s = do
   mt <- gets (lookup s . typeEnv)
   case mt of
     Nothing -> lift $ throwE $ s ++ " is not found in the type environment."
-    Just t -> return t
-
-lookupConstEnv :: String -> WithEnv (Maybe Neut)
-lookupConstEnv s = gets (lookup s . constEnv)
-
-lookupConstEnv' :: String -> WithEnv Neut
-lookupConstEnv' s = do
-  mt <- gets (lookup s . constEnv)
-  env <- get
-  case mt of
-    Nothing ->
-      lift $
-      throwE $
-      s ++
-      " is not found in the const environment. constenv: " ++
-      Pr.ppShow (constEnv env)
     Just t -> return t
 
 insNameEnv :: Identifier -> Identifier -> WithEnv ()
@@ -503,9 +434,6 @@ lookupCodeEnv funName = do
 
 insTypeEnv :: Identifier -> Neut -> WithEnv ()
 insTypeEnv i t = modify (\e -> e {typeEnv = (i, t) : typeEnv e})
-
-insConstEnv :: Identifier -> Neut -> WithEnv ()
-insConstEnv i t = modify (\e -> e {constEnv = (i, t) : constEnv e})
 
 insNumConstraintEnv :: Identifier -> WithEnv ()
 insNumConstraintEnv x =
@@ -626,37 +554,6 @@ wrapTypeWithUniv univ t = do
   meta <- newNameWith "meta"
   insTypeEnv meta univ
   return $ meta :< t
-
-addMeta :: AsmF Asm -> WithEnv Asm
-addMeta pc = do
-  let meta = emptyAsmMeta
-  return $ meta :< pc
-
-emptyAsmMeta :: AsmMeta
-emptyAsmMeta = AsmMeta {asmMetaLive = [], asmMetaDef = [], asmMetaUse = []}
-
--- byte size of type
-sizeOfType :: Neut -> WithEnv Int
-sizeOfType (_ :< NeutVar _) =
-  lift $ throwE "Asm.sizeOfType: the type of a type variable is not defined"
-sizeOfType (_ :< NeutPi _ _) = return 4
-sizeOfType (_ :< NeutSigma xts t2) = do
-  let (_, ts) = unzip xts
-  is <- mapM sizeOfType ts
-  i2 <- sizeOfType t2
-  return $ sum is + i2
-sizeOfType (_ :< NeutIndex _) = return 4
-sizeOfType v = lift $ throwE $ "Asm.sizeOfType: " ++ show v ++ " is not a type"
-
-sizeOfLowType :: LowType -> Int
-sizeOfLowType (LowTypeInt _) = 8
-sizeOfLowType (LowTypePointer _) = 8
-sizeOfLowType (LowTypeStruct ts) = sum $ map sizeOfLowType ts
-
-sizeOf :: Identifier -> WithEnv Int
-sizeOf x = do
-  t <- lookupTypeEnv' x
-  sizeOfType t
 
 intTypeList :: [Identifier]
 intTypeList = ["i8", "i16", "i32", "i64"]

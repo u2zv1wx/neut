@@ -28,18 +28,18 @@ asmCodeEnv = do
     insAsmEnv name args asm
 
 asmCode :: Code -> WithEnv Asm
-asmCode (CodeReturn d) = addMeta $ AsmReturn d
+asmCode (CodeReturn d) = return $ AsmReturn d
 asmCode (CodeCall x fun args cont) = do
   cont' <- asmCode cont
-  addMeta $ AsmCall x fun args cont'
-asmCode (CodeCallTail fun args) = addMeta $ AsmCallTail fun args
+  return $ AsmCall x fun args cont'
+asmCode (CodeCallTail fun args) = return $ AsmCallTail fun args
 asmCode (CodeSwitch x branchList) = asmSwitch x branchList
 asmCode (CodeExtractValue x basePointer (i, n) cont) = do
   cont' <- asmCode cont
-  addMeta $ AsmGetElementPtr x basePointer (i, n) cont'
+  return $ AsmGetElementPtr x basePointer (i, n) cont'
 asmCode (CodeFree x cont) = do
   cont' <- asmCode cont
-  addMeta $ AsmFree x cont'
+  return $ AsmFree x cont'
 
 constructSwitch :: Data -> [(Index, Code)] -> WithEnv (Asm, [(Int, Asm)])
 constructSwitch _ [] = lift $ throwE "empty branch"
@@ -60,4 +60,4 @@ constructSwitch name ((IndexInteger i, code):rest) = do
 asmSwitch :: Data -> [(Index, Code)] -> WithEnv Asm
 asmSwitch name branchList = do
   (defaultCase, caseList) <- constructSwitch name branchList
-  addMeta $ AsmSwitch name defaultCase caseList
+  return $ AsmSwitch name defaultCase caseList

@@ -30,40 +30,40 @@ virtual = do
     insCodeEnv name args code'
 
 virtualValue :: Value -> WithEnv Data
-virtualValue (Value (_ :< ValueVar x)) = return $ DataLocal x
-virtualValue (Value (_ :< ValueConst x)) = return $ DataLabel x
-virtualValue (Value (_ :< ValueSigma _ _)) = return $ DataInt32 0
-virtualValue (Value (_ :< ValueSigmaIntro es)) = do
-  ds <- mapM (virtualValue . Value) es
+virtualValue (ValueVar x) = return $ DataLocal x
+virtualValue (ValueConst x) = return $ DataLabel x
+virtualValue (ValueSigma _ _) = return $ DataInt32 0
+virtualValue (ValueSigmaIntro es) = do
+  ds <- mapM virtualValue es
   return $ DataStruct ds
-virtualValue (Value (_ :< ValueIndex _)) = return $ DataInt32 0
-virtualValue (Value (_ :< ValueIndexIntro x)) = do
+virtualValue (ValueIndex _) = return $ DataInt32 0
+virtualValue (ValueIndexIntro x) = do
   i <- indexToInt x
   return $ DataInt32 i
-virtualValue (Value (_ :< ValueUniv)) = return $ DataInt32 0
-virtualValue (Value (_ :< ValueBox _)) = return $ DataInt32 0
+virtualValue ValueUniv = return $ DataInt32 0
+virtualValue (ValueBox _) = return $ DataInt32 0
 
 virtualComp :: Comp -> WithEnv Code
-virtualComp (Comp (_ :< CompPi _ _)) = return $ CodeReturn $ DataInt32 0
-virtualComp (Comp (_ :< CompPiElim f xs)) = do
+virtualComp (CompPi _ _) = return $ CodeReturn $ DataInt32 0
+virtualComp (CompPiElim f xs) = do
   let f' = DataLocal f
   let xs' = map DataLocal xs
   return $ CodeCallTail f' xs'
-virtualComp (Comp (_ :< CompSigmaElim e1 xs e2)) = do
+virtualComp (CompSigmaElim e1 xs e2) = do
   e1' <- virtualValue e1
-  e2' <- virtualComp $ Comp e2
+  e2' <- virtualComp e2
   return $ extract e1' (zip xs [0 ..]) (length xs) e2'
-virtualComp (Comp (_ :< CompIndexElim e branchList)) = do
+virtualComp (CompIndexElim e branchList) = do
   let (labelList, es) = unzip branchList
-  es' <- mapM (virtualComp . Comp) es
+  es' <- mapM virtualComp es
   e' <- virtualValue e
   return $ CodeSwitch e' $ zip labelList es'
-virtualComp (Comp (_ :< CompUpIntro v)) = do
+virtualComp (CompUpIntro v) = do
   d <- virtualValue v
   return $ CodeReturn d
-virtualComp (Comp (_ :< CompUpElim x e1 e2)) = do
-  e1' <- virtualComp $ Comp e1
-  e2' <- virtualComp $ Comp e2
+virtualComp (CompUpElim x e1 e2) = do
+  e1' <- virtualComp e1
+  e2' <- virtualComp e2
   return $ traceLet x e1' e2'
 
 extract :: Data -> [(Identifier, Int)] -> Int -> Code -> Code
