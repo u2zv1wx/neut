@@ -53,17 +53,16 @@ toNegPiElimSeq (Neg (_ :< NegPiElim e1 e2)) = do
   (fun, e2 : xs)
 toNegPiElimSeq c = (c, [])
 
-toNegLamSeq :: [Identifier] -> Neg -> WithEnv Neg
-toNegLamSeq [] e = return e
-toNegLamSeq (x:xs) e = do
-  Neg e'@(eMeta :< _) <- toNegLamSeq xs e
-  tx <- lookupPolTypeEnv' x
-  meta <- newNameWith "meta"
-  te <- lookupPolTypeEnv' eMeta
-  tmp <- newNameWith "meta"
-  insPolTypeEnv meta $ tmp :< PosPi (x, tx) te
-  return $ Neg $ meta :< NegPiIntro x e'
-
+-- toNegLamSeq :: [Identifier] -> Neg -> WithEnv Neg
+-- toNegLamSeq [] e = return e
+-- toNegLamSeq (x:xs) e = do
+--   Neg e'@(eMeta :< _) <- toNegLamSeq xs e
+--   tx <- lookupPolTypeEnv' x
+--   meta <- newNameWith "meta"
+--   te <- lookupPolTypeEnv' eMeta
+--   tmp <- newNameWith "meta"
+--   insPolTypeEnv meta $ tmp :< NegPi (x, Pos tx) te
+--   return $ Neg $ meta :< NegPiIntro x e'
 toPiSeq :: Neut -> (Neut, [(Identifier, Neut)])
 toPiSeq (_ :< NeutPi (x, t) body) = do
   let (body', args) = toPiSeq body
@@ -155,25 +154,24 @@ varAndHole (_ :< NeutHole x) = ([], [x])
 varPos :: Pos -> [Identifier]
 varPos (Pos (_ :< PosVar s)) = [s]
 varPos (Pos (_ :< PosConst _)) = []
-varPos (Pos (_ :< PosPi (x, tdom) tcod)) = do
-  let vs1 = varPos $ Pos tdom
-  let vs2 = filter (/= x) $ varPos $ Pos tcod
-  vs1 ++ vs2
 varPos (Pos (_ :< PosSigma xts t2)) = do
   let (xs, ts) = unzip xts
   let vs = concatMap (varPos . Pos) (t2 : ts)
   filter (`notElem` xs) vs
 varPos (Pos (_ :< PosSigmaIntro es)) = concatMap (varPos . Pos) es
-varPos (Pos (_ :< PosBox e)) = varPos $ Pos e
+varPos (Pos (_ :< PosBox e)) = varNeg e
 varPos (Pos (_ :< PosBoxIntro e)) = varNeg e
 varPos (Pos (_ :< PosIndex _)) = []
 varPos (Pos (_ :< PosIndexIntro _)) = []
-varPos (Pos (_ :< PosUp e)) = varPos $ Pos e
-varPos (Pos (_ :< PosDown e)) = varPos $ Pos e
+varPos (Pos (_ :< PosDown e)) = varNeg e
 varPos (Pos (_ :< PosDownIntro e)) = varNeg e
 varPos (Pos (_ :< PosUniv)) = []
 
 varNeg :: Neg -> [Identifier]
+varNeg (Neg (_ :< NegPi (x, tdom) tcod)) = do
+  let vs1 = varPos tdom
+  let vs2 = filter (/= x) $ varNeg $ Neg tcod
+  vs1 ++ vs2
 varNeg (Neg (_ :< NegPiIntro x e)) = do
   let vs = varNeg $ Neg e
   filter (/= x) vs
@@ -346,10 +344,11 @@ toVar' x = do
   return $ meta :< NeutVar x
 
 toValueVar :: Identifier -> WithEnv Value
-toValueVar x = do
-  t <- lookupTypeEnv' x
+toValueVar x
+  -- t <- lookupTypeEnv' x
+ = do
   meta <- newNameWith "meta"
-  insTypeEnv meta t
+  -- insTypeEnv meta t
   return $ Value $ meta :< ValueVar x
 
 toLowType :: Neut -> WithEnv LowType
@@ -382,22 +381,20 @@ sepLast (x:xs) = do
   let (ys, y) = sepLast xs
   (x : ys, y)
 
-piSeqType :: [Identifier] -> PrePos -> WithEnv PrePos
-piSeqType [] t = return t
-piSeqType (x:xs) t = do
-  t' <- piSeqType xs t
-  tmp <- newNameWith "meta"
-  tx <- lookupPolTypeEnv' x
-  return $ tmp :< PosPi (x, tx) t'
-
-piSeqValueType :: [Identifier] -> PreValue -> WithEnv PreValue
-piSeqValueType [] t = return t
-piSeqValueType (x:xs) t = do
-  t' <- piSeqValueType xs t
-  tmp <- newNameWith "meta"
-  Value tx <- lookupValueTypeEnv' x
-  return $ tmp :< ValuePi (x, tx) t'
-
+-- piSeqType :: [Identifier] -> PreNeg -> WithEnv PreNeg
+-- piSeqType [] t = return t
+-- piSeqType (x:xs) t = do
+--   t' <- piSeqType xs t
+--   tmp <- newNameWith "meta"
+--   tx <- lookupPolTypeEnv' x
+--   return $ tmp :< NegPi (x, Pos tx) t'
+-- piSeqValueType :: [Identifier] -> PreValue -> WithEnv PreValue
+-- piSeqValueType [] t = return t
+-- piSeqValueType (x:xs) t = do
+--   t' <- piSeqValueType xs t
+--   tmp <- newNameWith "meta"
+--   Value tx <- lookupValueTypeEnv' x
+--   return $ tmp :< ValuePi (x, tx) t'
 substCode :: [(String, Data)] -> Code -> Code
 substCode sub (CodeReturn ans) = CodeReturn $ substData sub ans
 substCode sub (CodeCall x name xds cont) = do
@@ -420,8 +417,8 @@ substCode sub (CodeFree x cont) = do
   let x' = substData sub x
   CodeFree x' $ substCode sub cont
 
-substData :: [(String, Data)] -> DataPlus -> DataPlus
-substData sub (DataLocal x, t) = (fromMaybe (DataLocal x) (lookup x sub), t)
-substData _ (DataLabel x, t) = (DataLabel x, t)
-substData _ (DataInt32 i, t) = (DataInt32 i, t)
-substData sub (DataStruct ds, t) = (DataStruct $ map (substData sub) ds, t)
+substData :: [(String, Data)] -> Data -> Data
+substData sub (DataLocal x) = fromMaybe (DataLocal x) (lookup x sub)
+substData _ (DataLabel x) = DataLabel x
+substData _ (DataInt32 i) = DataInt32 i
+substData sub (DataStruct ds) = DataStruct $ map (substData sub) ds

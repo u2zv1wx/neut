@@ -94,23 +94,22 @@ data LowType
 data PosF n p
   = PosVar Identifier
   | PosConst Identifier
-  | PosPi (Identifier, p)
-          p
   | PosSigma [(Identifier, p)]
              p
   | PosSigmaIntro [p]
   | PosIndex Identifier
   | PosIndexIntro Index
-  | PosDown p
+  | PosDown n
   | PosDownIntro n
-  | PosUp p
   | PosUniv
-  | PosBox p
+  | PosBox n
   | PosBoxIntro n
   deriving (Show)
 
 data NegF p n
-  = NegPiIntro Identifier
+  = NegPi (Identifier, p)
+          n
+  | NegPiIntro Identifier
                n
   | NegPiElim n
               p
@@ -159,20 +158,20 @@ newtype Neg =
 data ValueF n p
   = ValueVar Identifier
   | ValueConst Identifier
-  | ValuePi (Identifier, p)
-            p
   | ValueSigma [(Identifier, p)]
                p
   | ValueSigmaIntro [p]
   | ValueIndex Identifier
   | ValueIndexIntro Index
-  | ValueUp p
   | ValueUniv
+  | ValueBox n
   deriving (Show)
 
 -- negative modal normal form
 data CompF p n
-  = CompPiElim Identifier -- (unbox f) @ x1 @ ... @ xn
+  = CompPi (Identifier, p)
+           n
+  | CompPiElim Identifier -- (unbox f) @ x1 @ ... @ xn
                [Identifier]
   | CompSigmaElim p
                   [Identifier]
@@ -205,26 +204,24 @@ data Data
   = DataLocal Identifier
   | DataLabel Identifier
   | DataInt32 Int
-  | DataStruct [DataPlus]
+  | DataStruct [Data]
   deriving (Show)
 
-type DataPlus = (Data, Value)
-
 data Code
-  = CodeReturn DataPlus
+  = CodeReturn Data
   | CodeCall Identifier -- the register that stores the result of a function call (type: P)
-             DataPlus -- the name of the function (type: Box (P1 -> ... -> Pn -> ↑P))
-             [DataPlus] -- arguments (type : [P1, ..., Pn])
+             Data -- the name of the function (type: Box (P1 -> ... -> Pn -> ↑P))
+             [Data] -- arguments (type : [P1, ..., Pn])
              Code -- continuation
-  | CodeCallTail DataPlus -- the name of the function (type: Box (P1 -> ... -> Pn -> ↑P))
-                 [DataPlus] -- arguments (type : [P1, ..., Pn])
-  | CodeSwitch DataPlus
+  | CodeCallTail Data -- the name of the function (type: Box (P1 -> ... -> Pn -> ↑P))
+                 [Data] -- arguments (type : [P1, ..., Pn])
+  | CodeSwitch Data
                [(Index, Code)]
   | CodeExtractValue Identifier -- destination
-                     DataPlus -- base pointer
-                     Int -- index
+                     Data -- base pointer
+                     (Int, Int) -- (i, n) ... index i in [1 ... n]
                      Code -- continuation
-  | CodeFree DataPlus
+  | CodeFree Data
              Code
   deriving (Show)
 
@@ -241,66 +238,37 @@ data AsmData
   deriving (Show)
 
 data AsmF a
-  = AsmReturn DataPlus
+  = AsmReturn Data
   | AsmGetElementPtr Identifier
-                     DataPlus
-                     Int
+                     Data
+                     (Int, Int)
                      a
-  -- | AsmExtractValue Identifier -- destination
-  --                   Identifier -- base pointer
-  --                   Int -- offset
-  --                   a
-  -- | AsmInsertValue AsmData -- source
-  --                  Identifier -- base pointer
-  --                  Int -- offset
-  --                  a
   | AsmCall Identifier
-            DataPlus
-            [DataPlus]
+            Data
+            [Data]
             a
-  | AsmCallTail DataPlus
-                [DataPlus]
+  | AsmCallTail Data
+                [Data]
   | AsmBitcast Identifier -- store the result in this register
-               DataPlus
-               Value -- cast to this type
+               Data
+               LowType
+               LowType -- cast to this type
                a
-  | AsmZeroExtend Identifier
-                  DataPlus
-                  Value
-                  a
-  | AsmTrunc Identifier
-             DataPlus
-             Value
-             a
   | AsmIntToPointer Identifier
-                    DataPlus
-                    Value
+                    Data
+                    LowType
+                    LowType
                     a
   | AsmPointerToInt Identifier
-                    DataPlus
-                    Value
+                    Data
+                    LowType
+                    LowType
                     a
-  | AsmSwitch DataPlus
+  | AsmSwitch Data
               a
               [(Int, a)]
-  | AsmFree DataPlus
+  | AsmFree Data
             a
-  -- | AsmCompare Identifier
-  --              Identifier
-  --              a
-  -- | AsmJumpIfZero (Identifier, a)
-  --                 a
-  -- | AsmJump (Identifier, a)
-  -- | AsmPush Identifier
-  --           a
-  -- | AsmPop Identifier
-  --          a
-  -- | AsmAddInt64 AsmData -- addq {AsmData}, {Identifier}
-  --               Identifier
-  --               a
-  -- | AsmSubInt64 AsmData -- subq {AsmData}, {Identifier}
-  --               Identifier
-  --               a
   deriving (Show)
 
 $(deriveShow1 ''AsmF)
@@ -389,8 +357,6 @@ data Env = Env
   , indexEnv :: [(Identifier, [Identifier])]
   , nameEnv :: [(Identifier, Identifier)] -- used in alpha conversion
   , typeEnv :: [(Identifier, Neut)] -- type environment
-  , polTypeEnv :: [(Identifier, PrePos)]
-  , valueTypeEnv :: [(Identifier, Value)]
   , weakTermEnv :: [(Identifier, Neut)]
   , modalEnv :: [(Identifier, ([Identifier], Comp))]
   , constEnv :: [(Identifier, Neut)] -- (name, type)
@@ -403,10 +369,6 @@ data Env = Env
   , numConstraintEnv :: [Identifier]
   , codeEnv :: [(Identifier, ([Identifier], IORef Code))]
   , asmEnv :: [(Identifier, ([Identifier], Asm))]
-  , regEnv :: [(Identifier, Int)] -- variable to register
-  , regVarList :: [Identifier]
-  , spill :: Maybe Identifier
-  , sizeEnv :: [(Identifier, Int)] -- offset from stackpointer
   } deriving (Show)
 
 initialEnv :: Env
@@ -431,8 +393,6 @@ initialEnv =
     , indexEnv = initialIndexEnv
     , nameEnv = []
     , typeEnv = []
-    , polTypeEnv = []
-    , valueTypeEnv = []
     , weakTermEnv = []
     , modalEnv = []
     , constEnv = []
@@ -445,10 +405,6 @@ initialEnv =
     , numConstraintEnv = []
     , codeEnv = []
     , asmEnv = []
-    , regEnv = []
-    , regVarList = []
-    , spill = Nothing
-    , sizeEnv = []
     }
 
 type WithEnv a = StateT Env (ExceptT String IO) a
@@ -488,7 +444,6 @@ newNameOfType t = do
 newNameOfPolType :: PrePos -> WithEnv Identifier
 newNameOfPolType t = do
   i <- newName
-  insPolTypeEnv i t
   return i
 
 constNameWith :: Identifier -> WithEnv ()
@@ -502,26 +457,6 @@ lookupTypeEnv' s = do
   mt <- gets (lookup s . typeEnv)
   case mt of
     Nothing -> lift $ throwE $ s ++ " is not found in the type environment."
-    Just t -> return t
-
-lookupPolTypeEnv :: String -> WithEnv (Maybe PrePos)
-lookupPolTypeEnv s = gets (lookup s . polTypeEnv)
-
-lookupPolTypeEnv' :: String -> WithEnv PrePos
-lookupPolTypeEnv' s = do
-  mt <- gets (lookup s . polTypeEnv)
-  case mt of
-    Nothing -> lift $ throwE $ s ++ " is not found in the polType environment."
-    Just t -> return t
-
-lookupValueTypeEnv :: String -> WithEnv (Maybe Value)
-lookupValueTypeEnv s = gets (lookup s . valueTypeEnv)
-
-lookupValueTypeEnv' :: String -> WithEnv Value
-lookupValueTypeEnv' s = do
-  mt <- gets (lookup s . valueTypeEnv)
-  case mt of
-    Nothing -> lift $ throwE $ s ++ " is not found in the polType environment."
     Just t -> return t
 
 lookupConstEnv :: String -> WithEnv (Maybe Neut)
@@ -567,12 +502,6 @@ lookupCodeEnv funName = do
 insTypeEnv :: Identifier -> Neut -> WithEnv ()
 insTypeEnv i t = modify (\e -> e {typeEnv = (i, t) : typeEnv e})
 
-insPolTypeEnv :: Identifier -> PrePos -> WithEnv ()
-insPolTypeEnv i t = modify (\e -> e {polTypeEnv = (i, t) : polTypeEnv e})
-
-insValueTypeEnv :: Identifier -> Value -> WithEnv ()
-insValueTypeEnv i t = modify (\e -> e {valueTypeEnv = (i, t) : valueTypeEnv e})
-
 insConstEnv :: Identifier -> Neut -> WithEnv ()
 insConstEnv i t = modify (\e -> e {constEnv = (i, t) : constEnv e})
 
@@ -616,13 +545,10 @@ lookupKind (IndexInteger _) = return Nothing
 lookupKind (IndexLabel name) = do
   env <- get
   lookupKind' name $ indexEnv env
-  -- tmp <- lookupKind' name $ indexEnv env
-  -- return $ Just tmp
 
 lookupKind' ::
      Identifier -> [(Identifier, [Identifier])] -> WithEnv (Maybe Identifier)
 lookupKind' _ [] = return Nothing
--- lookupKind' i [] = lift $ throwE $ "no such index defined: " ++ show i
 lookupKind' i ((j, ls):xs) =
   if i `elem` ls
     then return $ Just j
@@ -662,19 +588,6 @@ isDefinedIndexName name = do
   let indexNameList = map fst $ indexEnv env
   return $ name `elem` indexNameList
 
-insSizeEnv :: Identifier -> Int -> WithEnv ()
-insSizeEnv name size = modify (\e -> e {sizeEnv = (name, size) : sizeEnv e})
-
-lookupSizeEnv :: Identifier -> WithEnv (Maybe Int)
-lookupSizeEnv s = gets (lookup s . sizeEnv)
-
-lookupSizeEnv' :: Identifier -> WithEnv Int
-lookupSizeEnv' s = do
-  tmp <- gets (lookup s . sizeEnv)
-  case tmp of
-    Just i -> return i
-    Nothing -> lift $ throwE $ "the size of " ++ show s ++ " is not defined"
-
 insConstraintEnv :: Context -> Neut -> Neut -> Neut -> WithEnv ()
 insConstraintEnv ctx t1 t2 t =
   modify (\e -> e {constraintEnv = (ctx, t1, t2, t) : constraintEnv e})
@@ -682,25 +595,6 @@ insConstraintEnv ctx t1 t2 t =
 insUnivConstraintEnv :: UnivLevel -> UnivLevel -> WithEnv ()
 insUnivConstraintEnv t1 t2 =
   modify (\e -> e {univConstraintEnv = (t1, t2) : univConstraintEnv e})
-
-lookupRegEnv :: Identifier -> WithEnv (Maybe Int)
-lookupRegEnv s = gets (lookup s . regEnv)
-
-lookupRegEnv' :: Identifier -> WithEnv Int
-lookupRegEnv' s = do
-  tmp <- gets (lookup s . regEnv)
-  case tmp of
-    Just i -> return i
-    Nothing -> lift $ throwE $ "no such register: " ++ show s
-
-insRegEnv :: Identifier -> Int -> WithEnv ()
-insRegEnv x i = modify (\e -> e {regEnv = (x, i) : regEnv e})
-
-insSpill :: Identifier -> WithEnv ()
-insSpill x = modify (\e -> e {spill = Just x})
-
-lookupSpill :: WithEnv (Maybe Identifier)
-lookupSpill = gets spill
 
 wrapArg :: Identifier -> WithEnv Neut
 wrapArg i = do
@@ -758,124 +652,6 @@ sizeOf :: Identifier -> WithEnv Int
 sizeOf x = do
   t <- lookupTypeEnv' x
   sizeOfType t
-
-getArgRegList :: WithEnv [Identifier]
-getArgRegList = do
-  rdi <- getRDI
-  rsi <- getRSI
-  rdx <- getRDX
-  rcx <- getRCX
-  r8 <- getR8
-  r9 <- getR9
-  return [rdi, rsi, rdx, rcx, r8, r9]
-
-regList :: [Identifier]
-regList =
-  [ "r15"
-  , "r14"
-  , "r13"
-  , "r12"
-  , "r11"
-  , "r10"
-  , "rbp"
-  , "rbx"
-  , "r9"
-  , "r8"
-  , "rcx"
-  , "rdx"
-  , "rsi"
-  , "rdi"
-  , "rax"
-  , "rsp" -- rsp is not used in register allocation
-  ]
-
-initRegVar :: WithEnv ()
-initRegVar = do
-  xs <- mapM newNameWith regList
-  forM_ (zip regList xs) $ \(regVar, newVar) ->
-    modify (\e -> e {nameEnv = (regVar, newVar) : nameEnv e})
-  modify (\e -> e {regVarList = xs ++ regVarList e})
-  forM_ (zip [0 ..] xs) $ \(i, regVar) -> insRegEnv regVar i -- precolored
-
-isRegVar :: Identifier -> WithEnv Bool
-isRegVar x = do
-  env <- get
-  return $ x `elem` regVarList env
-
-getRegVarIndex :: Identifier -> WithEnv Int
-getRegVarIndex x = do
-  x' <- lookupNameEnv' x
-  env <- get
-  case elemIndex x' (regVarList env) of
-    Just i -> return i
-    Nothing -> lift $ throwE $ x' ++ " is not a register variable"
-
-toRegName :: Identifier -> WithEnv Identifier
-toRegName x = do
-  i <- lookupRegEnv' x
-  return $ regList !! i
-
-toRegNumList :: [Identifier] -> WithEnv [Int]
-toRegNumList [] = return []
-toRegNumList (x:xs) = do
-  is <- toRegNumList xs
-  mi <- lookupRegEnv x
-  case mi of
-    Just i -> return $ i : is
-    Nothing -> return is
-
-getR15 :: WithEnv Identifier
-getR15 = lookupNameEnv' "r15"
-
-getR14 :: WithEnv Identifier
-getR14 = lookupNameEnv' "r14"
-
-getR13 :: WithEnv Identifier
-getR13 = lookupNameEnv' "r13"
-
-getR12 :: WithEnv Identifier
-getR12 = lookupNameEnv' "r12"
-
-getR11 :: WithEnv Identifier
-getR11 = lookupNameEnv' "r11"
-
-getR10 :: WithEnv Identifier
-getR10 = lookupNameEnv' "r10"
-
-getRBX :: WithEnv Identifier
-getRBX = lookupNameEnv' "rbx"
-
-getR9 :: WithEnv Identifier
-getR9 = lookupNameEnv' "r9"
-
-getR8 :: WithEnv Identifier
-getR8 = lookupNameEnv' "r8"
-
-getRCX :: WithEnv Identifier
-getRCX = lookupNameEnv' "rcx"
-
-getRDX :: WithEnv Identifier
-getRDX = lookupNameEnv' "rdx"
-
-getRSI :: WithEnv Identifier
-getRSI = lookupNameEnv' "rsi"
-
-getRDI :: WithEnv Identifier
-getRDI = lookupNameEnv' "rdi"
-
-getRAX :: WithEnv Identifier
-getRAX = lookupNameEnv' "rax"
-
-getRBP :: WithEnv Identifier
-getRBP = lookupNameEnv' "rbp"
-
-getRSP :: WithEnv Identifier
-getRSP = lookupNameEnv' "rsp"
-
-varsInAsmData :: AsmData -> [Identifier]
-varsInAsmData (AsmDataReg x) = [x]
-varsInAsmData (AsmDataLabel _) = []
-varsInAsmData (AsmDataImmediate _) = []
 
 intTypeList :: [Identifier]
 intTypeList = ["i8", "i16", "i32", "i64"]

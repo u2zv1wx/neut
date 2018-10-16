@@ -22,21 +22,10 @@ import qualified Text.Show.Pretty as Pr
 import Debug.Trace
 
 modalPos :: Pos -> WithEnv Value
-modalPos (Pos (meta :< PosVar x)) = do
-  updateType x
-  updateType meta
-  return $ Value $ meta :< ValueVar x
-modalPos (Pos (meta :< PosConst x)) = do
-  updateType x
-  updateType meta
-  return $ Value $ meta :< ValueConst x
-modalPos (Pos (meta :< PosPi (x, tdom) tcod)) = do
-  Value tdom' <- modalPos $ Pos tdom
-  Value tcod' <- modalPos $ Pos tcod
-  return $ Value $ meta :< ValuePi (x, tdom') tcod'
+modalPos (Pos (meta :< PosVar x)) = return $ Value $ meta :< ValueVar x
+modalPos (Pos (meta :< PosConst x)) = return $ Value $ meta :< ValueConst x
 modalPos (Pos (meta :< PosSigma xts t)) = do
   let (xs, ts) = unzip xts
-  forM_ xs updateType
   ts' <- mapM (modalPos . Pos) ts
   let ts'' = map (\(Value x) -> x) ts'
   Value t' <- modalPos $ Pos t
@@ -44,130 +33,108 @@ modalPos (Pos (meta :< PosSigma xts t)) = do
 modalPos (Pos (meta :< PosSigmaIntro es)) = do
   ds <- mapM (modalPos . Pos) es
   let ds' = map (\(Value x) -> x) ds
-  updateType meta
   return $ Value $ meta :< ValueSigmaIntro ds'
 modalPos (Pos (meta :< PosIndex l)) = return $ Value $ meta :< ValueIndex l
-modalPos (Pos (meta :< PosIndexIntro l)) = do
-  updateType meta
-  updateLabelType l
+modalPos (Pos (meta :< PosIndexIntro l)) =
   return $ Value $ meta :< ValueIndexIntro l
-modalPos (Pos (meta :< PosUp t)) = do
-  Value t' <- modalPos $ Pos t
-  return $ Value $ meta :< ValueUp t'
 modalPos (Pos (_ :< PosDown t)) = do
-  Value t' <- modalPos $ Pos t
+  t' <- modalNeg t
   closureType t'
 modalPos (Pos (meta :< PosDownIntro abs)) = makeClosure meta abs
 modalPos (Pos (meta :< PosUniv)) = return $ Value $ meta :< ValueUniv
-modalPos (Pos (_ :< PosBox t)) = modalPos $ Pos t
+modalPos (Pos (meta :< PosBox t)) = do
+  t' <- modalNeg t
+  return $ Value $ meta :< ValueBox t'
 modalPos (Pos (meta :< PosBoxIntro e)) = do
   let (fun, args) = toNegPiIntroSeq e
   fun' <- modalNeg fun
   name <- newNameWith "box"
   insModalEnv name args fun'
-  updateType meta
   return $ Value $ meta :< ValueConst name
 
 modalNeg :: Neg -> WithEnv Comp
+modalNeg (Neg (meta :< NegPi (x, tdom) tcod)) = do
+  tdom' <- modalPos tdom
+  Comp tcod' <- modalNeg $ Neg tcod
+  return $ Comp $ meta :< CompPi (x, tdom') tcod'
 modalNeg lam@(Neg (meta :< NegPiIntro _ _)) = do
-  let (body@(Neg (bodyMeta :< _)), args) = toNegPiIntroSeq lam
-  -- lambda-lifting for non-box variables
+  let (body, args) = toNegPiIntroSeq lam
   xs <- takeNonBox $ varNeg lam
   body' <- modalNeg body
   lamName <- newNameWith "lam"
-  -- set the type of lamName
-  Value bodyType <- lookupPolTypeEnv' bodyMeta >>= modalPos . Pos
-  lamType <- piSeqValueType (xs ++ args) bodyType
-  insValueTypeEnv lamName $ Value lamType
   insModalEnv lamName (xs ++ args) body'
-  -- return the lifted term
-  updateType meta
   return $ Comp $ meta :< CompPiElim lamName (xs ++ args)
 modalNeg app@(Neg (_ :< NegPiElim _ _)) = do
   let (fun, args) = toNegPiElimSeq app
   fun' <- modalNeg fun
   args' <- mapM modalPos args
   xs <- mapM (const (newNameWith "arg")) args
-  ts <- mapM (\(Pos (meta :< _)) -> lookupPolTypeEnv' meta) args
-  ts' <- mapM (modalPos . Pos) ts
-  forM_ (zip xs ts') $ uncurry insValueTypeEnv
   app' <- tracePiElim fun' xs
   bindLet (zip xs args') app'
 modalNeg (Neg (meta :< NegSigmaElim e1 xs e2)) = do
   e1' <- modalPos e1
   Comp e2' <- modalNeg $ Neg e2
-  forM_ xs updateType
-  updateType meta
   return $ Comp $ meta :< CompSigmaElim e1' xs e2'
 modalNeg (Neg (meta :< NegIndexElim e branchList)) = do
   let (labelList, es) = unzip branchList
   es' <- mapM (modalNeg . Neg) es
   let es'' = map (\(Comp x) -> x) es'
   e' <- modalPos e
-  updateType meta
-  forM_ labelList updateLabelType
   return $ Comp $ meta :< CompIndexElim e' (zip labelList es'')
 modalNeg (Neg (meta :< NegUpIntro v)) = do
   v' <- modalPos v
-  updateType meta
   return $ Comp $ meta :< CompUpIntro v'
 modalNeg (Neg (meta :< NegUpElim x e1 e2)) = do
   Comp e1' <- modalNeg $ Neg e1
   Comp e2' <- modalNeg $ Neg e2
-  updateType meta
   return $ Comp $ meta :< CompUpElim x e1' e2'
 modalNeg (Neg (meta :< NegDownElim e)) = callClosure meta e
 modalNeg (Neg (meta :< NegBoxElim e)) = do
   e' <- modalPos e
   f <- newName
-  updateType meta
   bindLet [(f, e')] (Comp $ meta :< CompPiElim f [])
 
 -- closureType t == Sigma (A : Ui). (Box (A -> t)) * A
-closureType :: PreValue -> WithEnv Value
+closureType :: Comp -> WithEnv Value
 closureType t = do
-  (sigmaMeta, envInfo, piInfo, envType) <- closureType' t
+  (sigmaMeta, envInfo, piInfo, Value envType) <- closureType' t
   return $ Value $ sigmaMeta :< ValueSigma [envInfo, piInfo] envType
 
 type IdentPlus = (Identifier, PreValue)
 
-type ClsInfo = (Identifier, IdentPlus, IdentPlus, PreValue)
+-- type IdentMinus = (Identifier, PreComp)
+type ClsInfo = (Identifier, IdentPlus, IdentPlus, Value)
 
-closureType' :: PreValue -> WithEnv ClsInfo
-closureType' t = do
+closureType' :: Comp -> WithEnv ClsInfo
+closureType' (Comp t) = do
   envTypeName <- newNameWith "env"
   univMeta <- newNameWith "meta"
-  insValueTypeEnv envTypeName $ Value $ univMeta :< ValueUniv
-  Value envType <- toValueVar envTypeName
+  -- insValueTypeEnv envTypeName $ Value $ univMeta :< ValueUniv
+  envType <- toValueVar envTypeName
   piMeta <- newNameWith "meta"
   piArg <- newNameWith "arg"
-  insValueTypeEnv piArg $ Value envType
-  let piType = piMeta :< ValuePi (piArg, envType) t
+  -- insValueTypeEnv piArg $ Value envType
+  let piType = piMeta :< CompPi (piArg, envType) t
+  boxMeta <- newNameWith "meta"
+  let boxPiType = boxMeta :< ValueBox (Comp piType)
   sigmaMeta <- newNameWith "meta"
   let univ = univMeta :< ValueUniv
   sigmaArg <- newNameWith "arg"
-  return (sigmaMeta, (envTypeName, univ), (sigmaArg, piType), envType)
+  return (sigmaMeta, (envTypeName, univ), (sigmaArg, boxPiType), envType)
 
 -- e ~> (env-type, name, env) : Sigma (A : Ui). (Box (Env -> N)) * Env
 makeClosure :: Identifier -> Neg -> WithEnv Value
-makeClosure meta abs@(Neg (absMeta :< _)) = do
+makeClosure meta abs = do
   let (Neg body, args) = toNegPiIntroSeq abs
-  -- construct the struct of free variables
   fvs <- takeNonBox $ nub $ varNeg abs
-  ts <- mapM lookupPolTypeEnv' fvs
-  envType <- tensorType ts >>= modalPos . Pos -- the type of the struct
+  placeHolder <- newNameWith "env"
+  let envType = Value $ placeHolder :< ValueVar placeHolder
   envName <- newNameWith "env"
-  insValueTypeEnv envName envType
-  -- construct the body of the closure-function
   body' <- makeClosureBody envName fvs body
   fun <- newNameWith "closure"
   insModalEnv fun (envName : args) body'
   vs <- mapM toValueVar [fun, envName]
   let elems = map (\(Value x) -> x) $ envType : vs
-  -- represent (Down N) using sigma-type
-  Value tAbs <- lookupPolTypeEnv' absMeta >>= modalPos . Pos
-  tCls <- closureType tAbs
-  insValueTypeEnv meta tCls
   return $ Value $ meta :< ValueSigmaIntro elems
 
 -- Extract the values of free variables from the free-variable struct,
@@ -175,11 +142,8 @@ makeClosure meta abs@(Neg (absMeta :< _)) = do
 makeClosureBody :: Identifier -> [Identifier] -> PreNeg -> WithEnv Comp
 makeClosureBody _ [] funBody = modalNeg $ Neg funBody
 makeClosureBody envName [x] funBody@(bodyMeta :< _) = do
-  Value envType <- lookupValueTypeEnv' envName
-  envMeta <- metaOfType $ Value envType
-  upTypeMeta <- newNameWith "meta"
-  let upType = upTypeMeta :< ValueUp envType
-  upMeta <- metaOfType $ Value upType
+  envMeta <- newNameWith "meta"
+  upMeta <- newNameWith "meta"
   modalNeg $
     Neg $
     bodyMeta :<
@@ -188,27 +152,16 @@ makeClosureBody envName [x] funBody@(bodyMeta :< _) = do
       (upMeta :< (NegUpIntro $ Pos $ envMeta :< PosVar envName))
       funBody
 makeClosureBody envName xs funBody@(funMeta :< _) = do
-  Value envType <- lookupValueTypeEnv' envName
-  envMeta <- metaOfType $ Value envType
+  envMeta <- newNameWith "meta"
   modalNeg $
     Neg $ funMeta :< NegSigmaElim (Pos $ envMeta :< PosVar envName) xs funBody
-
-metaOfType :: Value -> WithEnv Identifier
-metaOfType t = do
-  meta <- newNameWith "meta"
-  insValueTypeEnv meta t
-  return meta
 
 callClosure :: Identifier -> Pos -> WithEnv Comp
 callClosure meta e = do
   e' <- modalPos e
-  Value t <- lookupValueTypeEnv' meta
-  (_, (envTypeName, _), (_, piType), envType) <- closureType' t
   envName <- newNameWith "env"
   fun <- newNameWith "fun"
-  insValueTypeEnv fun $ Value piType
-  insValueTypeEnv envName $ Value envType
-  updateType meta
+  envTypeName <- newNameWith "type"
   return $
     Comp $
     meta :<
@@ -220,26 +173,24 @@ callClosure meta e = do
 takeNonBox :: [Identifier] -> WithEnv [Identifier]
 takeNonBox [] = return []
 takeNonBox (x:xs) = do
-  t <- lookupPolTypeEnv' x
-  case t of
-    _ :< PosBox _ -> takeNonBox xs
-    _ -> do
+  mt <- lookupTypeEnv x
+  case mt of
+    Nothing -> takeNonBox xs
+    Just (_ :< NeutBox _) -> takeNonBox xs
+    Just _ -> do
       xs' <- takeNonBox xs
       return $ x : xs'
 
 bindLet :: [(Identifier, Value)] -> Comp -> WithEnv Comp
 bindLet [] e = return e
-bindLet ((x, v@(Value (valueMeta :< _))):rest) e@(Comp (compMeta :< _)) = do
+bindLet ((x, v):rest) e@(Comp (compMeta :< _)) = do
   Comp e' <- bindLet rest e
-  Value valueType <- lookupValueTypeEnv' valueMeta
-  insValueTypeEnv x $ Value valueType
-  upTypeMeta <- newNameWith "meta"
-  let upType = upTypeMeta :< ValueUp valueType
   upMeta <- newNameWith "meta"
-  insValueTypeEnv upMeta $ Value upType
   return $ Comp $ compMeta :< CompUpElim x (upMeta :< CompUpIntro v) e'
 
 tracePiElim :: Comp -> [Identifier] -> WithEnv Comp
+tracePiElim (Comp (_ :< CompPi _ _)) _ =
+  lift $ throwE "Modal.tracePiElim: type error"
 tracePiElim (Comp (meta :< CompPiElim f xs)) args =
   return $ Comp $ meta :< CompPiElim f (xs ++ args)
 tracePiElim (Comp (meta :< CompSigmaElim v xs e)) args = do
@@ -255,10 +206,3 @@ tracePiElim (Comp (_ :< CompUpIntro _)) _ =
 tracePiElim (Comp (meta :< CompUpElim x e1 e2)) args = do
   Comp e2' <- tracePiElim (Comp e2) args
   return $ Comp $ meta :< CompUpElim x e1 e2'
-
-updateType :: Identifier -> WithEnv ()
-updateType x = lookupPolTypeEnv' x >>= modalPos . Pos >>= insValueTypeEnv x
-
-updateLabelType :: Index -> WithEnv ()
-updateLabelType (IndexLabel x) = updateType x
-updateLabelType _ = return ()

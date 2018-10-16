@@ -267,10 +267,6 @@ substPos :: SubstPos -> Pos -> Pos
 substPos sub (Pos (meta :< PosVar s)) =
   fromMaybe (Pos $ meta :< PosVar s) (lookup s sub)
 substPos _ (Pos (meta :< PosConst s)) = Pos $ meta :< PosConst s
-substPos sub (Pos (meta :< PosPi (s, tdom) tcod)) = do
-  let Pos tdom' = substPos sub $ Pos tdom
-  let Pos tcod' = substPos sub $ Pos tcod
-  Pos $ meta :< PosPi (s, tdom') tcod'
 substPos sub (Pos (meta :< PosSigma xts tcod)) = do
   let (xs, ts) = unzip xts
   let ts' = map (substPos sub . Pos) ts
@@ -282,7 +278,7 @@ substPos sub (Pos (meta :< PosSigmaIntro es)) = do
   let es'' = map (\(Pos x) -> x) es'
   Pos $ meta :< PosSigmaIntro es''
 substPos sub (Pos (meta :< PosBox e)) = do
-  let Pos e' = substPos sub $ Pos e
+  let e' = substNeg sub e
   Pos $ meta :< PosBox e'
 substPos sub (Pos (meta :< PosBoxIntro e)) = do
   let e' = substNeg sub e
@@ -290,17 +286,18 @@ substPos sub (Pos (meta :< PosBoxIntro e)) = do
 substPos _ (Pos (meta :< PosIndex x)) = Pos $ meta :< PosIndex x
 substPos _ (Pos (meta :< PosIndexIntro l)) = Pos $ meta :< PosIndexIntro l
 substPos _ (Pos (meta :< PosUniv)) = Pos $ meta :< PosUniv
-substPos sub (Pos (meta :< PosUp e)) = do
-  let Pos e' = substPos sub $ Pos e
-  Pos $ meta :< PosUp e'
 substPos sub (Pos (meta :< PosDown e)) = do
-  let Pos e' = substPos sub $ Pos e
+  let e' = substNeg sub e
   Pos $ meta :< PosDown e'
 substPos sub (Pos (meta :< PosDownIntro e)) = do
   let e' = substNeg sub e
   Pos $ meta :< PosDownIntro e'
 
 substNeg :: SubstPos -> Neg -> Neg
+substNeg sub (Neg (meta :< NegPi (s, tdom) tcod)) = do
+  let tdom' = substPos sub tdom
+  let Neg tcod' = substNeg sub $ Neg tcod
+  Neg $ meta :< NegPi (s, tdom') tcod'
 substNeg sub (Neg (meta :< NegPiIntro s body)) = do
   let Neg body' = substNeg sub $ Neg body
   Neg $ meta :< NegPiIntro s body'

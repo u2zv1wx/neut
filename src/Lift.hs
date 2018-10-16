@@ -20,32 +20,9 @@ lift (i :< NeutPi (x, tdom) tcod) = do
   tdom' <- lift tdom
   tcod' <- lift tcod
   return $ i :< NeutPi (x, tdom') tcod'
-lift lam@(i :< NeutPiIntro _ _) = do
-  let (body, xtms) = toPiIntroSeq lam
-  body' <- lift body
-  let xs = map (\(x, _, _) -> x) xtms
-  freeVars <- takeNonBox $ filter (`notElem` xs) $ var body'
-  newFormalArgs <- constructFormalArgs freeVars
-  let freeToBound = zip freeVars newFormalArgs
-  body'' <- replace freeToBound body'
-  lamType <- lookupTypeEnv' i
-  ytms <- enrich lamType newFormalArgs
-  let lam'@(lamMeta :< _) = fromPiIntroSeq (body'', ytms ++ xtms)
-  name <- newNameWith "lam"
-  lamType' <- lookupTypeEnv' lamMeta
-  boxMeta <- newNameWith "meta"
-  boxUnivMeta <- newNameWith "meta"
-  let boxLamType = boxUnivMeta :< NeutBox lamType'
-  let boxLam = boxMeta :< NeutBoxIntro lam'
-  insTypeEnv boxMeta boxLamType
-  insWeakTermEnv name boxLam
-  insTypeEnv name boxLamType
-  var <- toVar name
-  args <- mapM toVar freeVars
-  meta <- newNameWith "meta"
-  let unboxVar = meta :< NeutBoxElim var
-  insTypeEnv meta lamType'
-  appFold unboxVar args
+lift (i :< NeutPiIntro (x, t) e) = do
+  e' <- lift e
+  return $ i :< NeutPiIntro (x, t) e'
 lift (i :< NeutPiElim e v) = do
   e' <- lift e
   v' <- lift v
@@ -96,7 +73,7 @@ lift (i :< NeutMu s c) = do
   insTypeEnv boxMeta boxMuType
   insWeakTermEnv s boxMu
   insTypeEnv s boxMuType -- update the type of s from t to (box t).
-  var <- toVar s
+  var <- toConst s
   args <- mapM toVar freeVars
   meta <- newNameWith "meta"
   let unboxVar = meta :< NeutBoxElim var
@@ -127,7 +104,6 @@ replace args (i :< NeutPiElim e v) = do
 replace args (i :< NeutSigma xts tcod) = do
   let (xs, ts) = unzip xts
   ts' <- mapM (replace args) ts
-  -- tdom' <- replace args tdom
   tcod' <- replace args tcod
   return $ i :< NeutSigma (zip xs ts') tcod'
 replace args (i :< NeutSigmaIntro es) = do

@@ -69,7 +69,7 @@ concatDefList :: [(Identifier, Identifier, Neut)] -> WithEnv Neut
 concatDefList [] = do
   meta <- newNameWith "meta"
   return $ meta :< NeutIndexIntro (IndexLabel "unit")
-concatDefList [(meta, name, e)] = return e
+concatDefList [(_, _, e)] = return e
 concatDefList ((meta, name, e):es) = do
   cont <- concatDefList es
   h <- newNameWith "any"
@@ -78,20 +78,17 @@ concatDefList ((meta, name, e):es) = do
 
 process :: Neut -> WithEnv ()
 process e = do
-  e' <- check mainLabel e >>= nonRecReduce
-  c'' <- exhaust e' -- >>= lift
-  insWeakTermEnv mainLabel c''
-  wtenv <- gets weakTermEnv
-  -- tmp <- polarize wtenv c''
-  -- liftIO $ putStrLn "main:\n"
-  -- liftIO $ putStrLn $ Pr.ppShow tmp
-  e'' <- polarize wtenv c'' >>= modalNeg >>= virtualComp
-  insCodeEnv mainLabel [] e''
-  -- forM_ wtenv $ \(name, e) ->
-  --   polarizeNeg e >>= virtualNeg >>= insCodeEnv name []
+  e' <- check "main" e >>= nonRecReduce
+  c'' <- exhaust e' >>= lift
+  insWeakTermEnv "main" c''
+  polarize
+  virtual
   asmCodeEnv
-  emitGlobalLabel mainLabel
   emit
 
-mainLabel :: Identifier
-mainLabel = "_main"
+polarize :: WithEnv ()
+polarize = do
+  wtenv <- gets weakTermEnv
+  forM_ wtenv $ \(name, e) -> do
+    e' <- polarizeNeg e >>= modalNeg
+    insModalEnv name [] e'
