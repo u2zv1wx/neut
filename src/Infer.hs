@@ -162,7 +162,9 @@ infer ctx (meta :< NeutIndexElim e branchList) = do
 infer ctx (meta :< NeutMu s e) = do
   univ <- boxUniv
   trec <- appCtx ctx >>= annot univ
-  insTypeEnv s trec
+  boxType <- wrapType (NeutBox trec) >>= annot univ
+  insTypeEnv s boxType
+  boxConstraint ctx $ var e
   te <- infer (ctx ++ [s]) e >>= annot univ
   insConstraintEnv ctx te trec univ
   returnMeta meta te
