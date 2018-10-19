@@ -124,6 +124,8 @@ data Neg
               Neg
   | NegDownElim Pos
   | NegBoxElim Pos
+  | NegMu Identifier
+          Neg
   deriving (Show)
 
 -- A polarize term is in *modal-normal form* if the following two conditions are true:
@@ -169,13 +171,16 @@ data Comp
 
 data Data
   = DataLocal Identifier
-  | DataLabel Identifier
+  | DataGlobal Identifier
   | DataInt32 Int
   | DataStruct [Data]
   deriving (Show)
 
 data Code
   = CodeReturn Data
+  | CodeLet Identifier
+            Data
+            Code
   | CodeCall Identifier -- the register that stores the result of a function call (type: P)
              Data -- the name of the function (type: Box (P1 -> ... -> Pn -> ↑P))
              [Data] -- arguments (type : [P1, ..., Pn])
@@ -193,13 +198,13 @@ data Code
   deriving (Show)
 
 data AsmData
-  = AsmDataReg Identifier
-  | AsmDataLabel Identifier
-  | AsmDataImmediate Int
+  = AsmDataLocal Identifier
+  | AsmDataGlobal Identifier
+  | AsmDataInt32 Int
   deriving (Show)
 
 data Asm
-  = AsmReturn Data
+  = AsmReturn AsmData
   | AsmGetElementPtr Identifier
                      Data
                      (Int, Int)
@@ -228,6 +233,15 @@ data Asm
   | AsmSwitch Data
               Asm
               [(Int, Asm)]
+  | AsmLoad Identifier
+            AsmData
+            Asm
+  | AsmStore (AsmData, LowType)
+             (AsmData, LowType)
+             Asm
+  | AsmAlloc Identifier
+             [LowType]
+             Asm
   | AsmFree Data
             Asm
   deriving (Show)

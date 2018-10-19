@@ -29,7 +29,7 @@ emit = do
 
 emitDefinition :: Identifier -> ([Identifier], Asm) -> WithEnv ()
 emitDefinition name (args, asm) = do
-  let name' = DataLabel name
+  let name' = DataGlobal name
   let args' = map DataLocal args
   liftIO $ putStrLn $ "define i8* " ++ showData name' ++ showArgs args' ++ " {"
   emitAsm asm
@@ -41,7 +41,7 @@ emitBlock name asm = do
   emitAsm asm
 
 emitAsm :: Asm -> WithEnv ()
-emitAsm (AsmReturn d) = emitOp $ unwords ["ret i8*", showData d]
+emitAsm (AsmReturn d) = emitOp $ unwords ["ret i8*", showAsmData d]
 emitAsm (AsmGetElementPtr x base (i, n) cont) = do
   emitOp $
     unwords
@@ -116,8 +116,47 @@ emitAsm (AsmSwitch d defaultBranch branchList) = do
       , showBranchList $ zip (map fst branchList) labelList
       ]
   let asmList = map snd branchList
-  forM_ ((defaultLabel, defaultBranch) : zip labelList asmList) $
+  forM_ (zip labelList asmList ++ [(defaultLabel, defaultBranch)]) $
     uncurry emitBlock
+emitAsm (AsmLoad x d cont) = do
+  emitOp $ unwords [showData (DataLocal x), "=", "load", "i8*", showAsmData d]
+  emitAsm cont
+emitAsm (AsmStore (d1, t1) (d2, t2) cont) = do
+  emitOp $
+    unwords
+      [ "store"
+      , showLowType t1
+      , showAsmData d1 ++ ","
+      , showLowType t2
+      , showAsmData d2
+      ]
+  emitAsm cont
+emitAsm (AsmAlloc x ts cont) = do
+  size <- newNameWith "sizeptr"
+  emitOp $
+    unwords
+      [ showData (DataLocal size)
+      , "="
+      , "getelementptr i64, i64* null, i32 " ++ show (length ts)
+      ]
+  casted <- newNameWith "size"
+  emitOp $
+    unwords
+      [ showData (DataLocal casted)
+      , "="
+      , "ptrtoint i64*"
+      , showData (DataLocal size)
+      , "to i32"
+      ]
+  emitOp $
+    unwords
+      [ showData (DataLocal x)
+      , "="
+      , "call"
+      , "i8*"
+      , "@malloc(i32 " ++ showData (DataLocal casted) ++ ")"
+      ]
+  emitAsm cont
 emitAsm (AsmFree d cont) = do
   emitOp $ unwords ["call", "void", "@free(i8* " ++ showData d ++ ")"]
   emitAsm cont
@@ -133,8 +172,8 @@ emitLabel s = liftIO $ putStrLn $ s ++ ":"
 
 constructLabelList :: [(Int, Asm)] -> WithEnv [String]
 constructLabelList [] = return []
-constructLabelList ((i, _):rest) = do
-  label <- newNameWith $ "case." ++ show i
+constructLabelList ((_, _):rest) = do
+  label <- newNameWith "case"
   labelList <- constructLabelList rest
   return $ label : labelList
 
@@ -145,9 +184,14 @@ showBranch :: Int -> String -> String
 showBranch i label =
   "i32 " ++ show i ++ ", label " ++ showData (DataLocal label)
 
+showAsmData :: AsmData -> String
+showAsmData (AsmDataLocal x) = "%" ++ x
+showAsmData (AsmDataGlobal x) = "@" ++ x
+showAsmData (AsmDataInt32 i) = show i
+
 showData :: Data -> String
 showData (DataLocal x) = "%" ++ x
-showData (DataLabel x) = "@" ++ x
+showData (DataGlobal x) = "@" ++ x
 showData (DataInt32 i) = show i
 showData (DataStruct ds) = "{" ++ showList showData ds ++ "}*"
 
@@ -163,7 +207,9 @@ showArgs :: [Data] -> String
 showArgs ds = "(" ++ showList showArg ds ++ ")"
 
 showLowType :: LowType -> String
-showLowType = undefined
+showLowType (LowTypeInt i) = "i" ++ show i
+showLowType (LowTypePointer t) = showLowType t ++ "*"
+showLowType (LowTypeStruct ts) = "{" ++ showList showLowType ts ++ "}"
 
 showStructOfLength :: Int -> String
 showStructOfLength i = "{" ++ showList (const "i8*") [1 .. i] ++ "}"

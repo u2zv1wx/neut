@@ -96,6 +96,11 @@ modalNeg (NegBoxElim e) = do
   e' <- modalPos e
   f <- newName
   bindLet [(f, e')] (CompPiElim f [])
+modalNeg (NegMu self e) = do
+  let (fun, args) = toNegPiIntroSeq e
+  fun' <- modalNeg fun
+  insModalEnv self args fun'
+  return $ CompPiElim self []
 
 -- closureType t == Sigma (A : Ui). (Box (A -> t)) * A
 closureType :: Comp -> WithEnv Value
@@ -111,7 +116,6 @@ type ClsInfo = (IdentPlus, IdentPlus, Value)
 closureType' :: Comp -> WithEnv ClsInfo
 closureType' t = do
   envTypeName <- newNameWith "env"
-  -- insValueTypeEnv envTypeName $ Value $ univMeta :< ValueUniv
   piArg <- newNameWith "arg"
   let piType = CompPi (piArg, ValueVar envTypeName) t
   let boxPiType = ValueBox piType
@@ -124,13 +128,12 @@ makeClosure :: Neg -> WithEnv Value
 makeClosure abs = do
   let (body, args) = toNegPiIntroSeq abs
   fvs <- takeNonBox $ nub $ varNeg abs
-  placeHolder <- newNameWith "env"
-  let envType = ValueVar placeHolder
   envName <- newNameWith "env"
   body' <- makeClosureBody envName fvs body
   fun <- newNameWith "closure"
   insModalEnv fun (envName : args) body'
-  let elems = [envType, ValueConst fun, ValueVar envName]
+  let vs = map ValueVar fvs
+  let elems = [ValueConst fun, ValueSigmaIntro vs]
   return $ ValueSigmaIntro elems
 
 -- Extract the values of free variables from the free-variable struct,
@@ -147,9 +150,7 @@ callClosure e = do
   e' <- modalPos e
   envName <- newNameWith "env"
   fun <- newNameWith "fun"
-  envTypeName <- newNameWith "type"
-  return $
-    CompSigmaElim e' [envTypeName, fun, envName] (CompPiElim fun [envName])
+  return $ CompSigmaElim e' [fun, envName] (CompPiElim fun [envName])
 
 takeNonBox :: [Identifier] -> WithEnv [Identifier]
 takeNonBox [] = return []

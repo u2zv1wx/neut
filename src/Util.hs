@@ -369,6 +369,6 @@ substCode sub (CodeFree x cont) = do
 
 substData :: [(String, Data)] -> Data -> Data
 substData sub (DataLocal x) = fromMaybe (DataLocal x) (lookup x sub)
-substData _ (DataLabel x) = DataLabel x
+substData _ (DataGlobal x) = DataGlobal x
 substData _ (DataInt32 i) = DataInt32 i
 substData sub (DataStruct ds) = DataStruct $ map (substData sub) ds

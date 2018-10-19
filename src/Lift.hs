@@ -71,16 +71,15 @@ lift (i :< NeutMu s c) = do
   let boxMuType = boxUnivMeta :< NeutBox muType'
   let boxMu = boxMeta :< NeutBoxIntro mu'
   insTypeEnv boxMeta boxMuType
-  -- insWeakTermEnv s boxMu
-  insWeakTermEnv s mu'
+  insWeakTermEnv s boxMu
+  -- insWeakTermEnv s mu'
   insTypeEnv s boxMuType -- update the type of s from t to (box t).
   var <- toConst s
   args <- mapM toVar freeVars
   meta <- newNameWith "meta"
   let unboxVar = meta :< NeutBoxElim var
   insTypeEnv meta muType'
-  appFold var args
-  -- appFold unboxVar args
+  appFold unboxVar args
 lift (i :< NeutHole x) = return $ i :< NeutHole x
 
 replace :: [(Identifier, Identifier)] -> Neut -> WithEnv Neut

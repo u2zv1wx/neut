@@ -31,7 +31,7 @@ virtualize = do
 
 virtualValue :: Value -> WithEnv Data
 virtualValue (ValueVar x) = return $ DataLocal x
-virtualValue (ValueConst x) = return $ DataLabel x
+virtualValue (ValueConst x) = return $ DataGlobal x
 virtualValue (ValueSigma _ _) = return $ DataInt32 0
 virtualValue (ValueSigmaIntro es) = do
   ds <- mapM virtualValue es
@@ -73,7 +73,8 @@ extract z ((x, i):xis) n cont = do
   CodeExtractValue x z (i, n) cont'
 
 traceLet :: String -> Code -> Code -> Code
-traceLet s (CodeReturn ans) cont = substCode [(s, ans)] cont
+traceLet s (CodeReturn ans) cont = CodeLet s ans cont
+traceLet s (CodeLet x d cont1) cont2 = CodeLet x d (traceLet s cont1 cont2)
 traceLet s (CodeCall reg name xds cont1) cont2 =
   CodeCall reg name xds $ traceLet s cont1 cont2
 traceLet s (CodeCallTail name xds) cont = CodeCall s name xds cont
