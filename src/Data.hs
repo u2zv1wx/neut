@@ -89,6 +89,8 @@ data LowType
   = LowTypeInt Int
   | LowTypeStruct [LowType]
   | LowTypePointer LowType
+  | LowTypeFunction [LowType]
+                    LowType
   deriving (Show)
 
 data Pos
@@ -215,6 +217,9 @@ data Asm
             Asm
   | AsmCallTail AsmData
                 [AsmData]
+  | AsmSwitch AsmData
+              Asm
+              [(Int, Asm)]
   | AsmBitcast Identifier -- store the result in this register
                AsmData
                LowType
@@ -230,9 +235,6 @@ data Asm
                     LowType
                     LowType
                     Asm
-  | AsmSwitch AsmData
-              Asm
-              [(Int, Asm)]
   | AsmLoad Identifier
             AsmData
             Asm

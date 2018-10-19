@@ -51,7 +51,7 @@ emitAsm (AsmGetElementPtr x base (i, n) cont) = do
       , showStructOfLength n ++ ","
       , showStructOfLength n ++ "*"
       , showAsmData base ++ ","
-      , showIndex [0, i, 0]
+      , showIndex [0, i]
       ]
   emitAsm cont
 emitAsm (AsmCall x f args cont) = do
@@ -59,7 +59,7 @@ emitAsm (AsmCall x f args cont) = do
     unwords
       [ showAsmData (AsmDataLocal x)
       , "="
-      , "i8* call"
+      , "call i8*"
       , showAsmData f ++ showArgs args
       ]
   emitAsm cont
@@ -114,7 +114,7 @@ emitAsm (AsmSwitch d defaultBranch branchList) = do
   emitOp $
     unwords
       [ "switch"
-      , "i32"
+      , "i64"
       , showAsmData d ++ ","
       , "label"
       , showAsmData (AsmDataLocal defaultLabel)
@@ -125,7 +125,7 @@ emitAsm (AsmSwitch d defaultBranch branchList) = do
     uncurry emitBlock
 emitAsm (AsmLoad x d cont) = do
   emitOp $
-    unwords [showAsmData (AsmDataLocal x), "=", "load", "i8*", showAsmData d]
+    unwords [showAsmData (AsmDataLocal x), "=", "load i8*, i8**", showAsmData d]
   emitAsm cont
 emitAsm (AsmStore (d1, t1) (d2, t2) cont) = do
   emitOp $
@@ -188,7 +188,7 @@ showBranchList xs = "[" ++ showList (uncurry showBranch) xs ++ "]"
 
 showBranch :: Int -> String -> String
 showBranch i label =
-  "i32 " ++ show i ++ ", label " ++ showAsmData (AsmDataLocal label)
+  "i64 " ++ show i ++ ", label " ++ showAsmData (AsmDataLocal label)
 
 showAsmData :: AsmData -> String
 showAsmData (AsmDataLocal x) = "%" ++ x
@@ -210,6 +210,8 @@ showLowType :: LowType -> String
 showLowType (LowTypeInt i) = "i" ++ show i
 showLowType (LowTypePointer t) = showLowType t ++ "*"
 showLowType (LowTypeStruct ts) = "{" ++ showList showLowType ts ++ "}"
+showLowType (LowTypeFunction ts t) =
+  showLowType t ++ " (" ++ showList showLowType ts ++ ")"
 
 showStructOfLength :: Int -> String
 showStructOfLength i = "{" ++ showList (const "i8*") [1 .. i] ++ "}"
