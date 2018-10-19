@@ -210,27 +210,27 @@ data Asm
                      (Int, Int)
                      Asm
   | AsmCall Identifier
-            Data
-            [Data]
+            AsmData
+            [AsmData]
             Asm
-  | AsmCallTail Data
-                [Data]
+  | AsmCallTail AsmData
+                [AsmData]
   | AsmBitcast Identifier -- store the result in this register
-               Data
+               AsmData
                LowType
                LowType -- cast to this type
                Asm
   | AsmIntToPointer Identifier
-                    Data
+                    AsmData
                     LowType
                     LowType
                     Asm
   | AsmPointerToInt Identifier
-                    Data
+                    AsmData
                     LowType
                     LowType
                     Asm
-  | AsmSwitch Data
+  | AsmSwitch AsmData
               Asm
               [(Int, Asm)]
   | AsmLoad Identifier
@@ -242,7 +242,7 @@ data Asm
   | AsmAlloc Identifier
              [LowType]
              Asm
-  | AsmFree Data
+  | AsmFree AsmData
             Asm
   deriving (Show)
 

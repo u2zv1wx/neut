@@ -36,29 +36,43 @@ asmCode (CodeLet x d cont) = do
   asmData x d cont'
 asmCode (CodeCall x fun args cont) = do
   cont' <- asmCode cont
-  return $ AsmCall x fun args cont'
-asmCode (CodeCallTail fun args) = return $ AsmCallTail fun args
+  f <- newNameWith "fun"
+  xs <- mapM (const (newNameWith "arg")) args
+  asmData' ((f, fun) : zip xs args) $
+    AsmCall x (AsmDataLocal f) (map AsmDataLocal xs) cont'
+asmCode (CodeCallTail fun args) = do
+  f <- newNameWith "fun"
+  xs <- mapM (const (newNameWith "arg")) args
+  asmData' ((f, fun) : zip xs args) $
+    AsmCallTail (AsmDataLocal f) (map AsmDataLocal xs)
 asmCode (CodeSwitch x branchList) = asmSwitch x branchList
 asmCode (CodeExtractValue x baseData (i, n) cont) = do
   cont' <- asmCode cont
   tmp <- newNameWith "sigma"
   asmData tmp baseData $ AsmGetElementPtr x (AsmDataLocal tmp) (i, n) cont'
-asmCode (CodeFree x cont) = do
+asmCode (CodeFree d cont) = do
   cont' <- asmCode cont
-  return $ AsmFree x cont'
+  tmp <- newNameWith "free"
+  asmData' [(tmp, d)] $ AsmFree (AsmDataLocal tmp) cont'
 
 asmData :: Identifier -> Data -> Asm -> WithEnv Asm
 asmData x (DataLocal y) cont =
-  return $ AsmBitcast x (DataLocal y) voidPtr voidPtr cont
+  return $ AsmBitcast x (AsmDataLocal y) voidPtr voidPtr cont
 asmData x (DataGlobal y) cont =
-  return $ AsmBitcast x (DataGlobal y) voidPtr voidPtr cont
+  return $ AsmBitcast x (AsmDataGlobal y) voidPtr voidPtr cont
 asmData x (DataInt32 i) cont =
-  return $ AsmBitcast x (DataInt32 i) (LowTypeInt 32) (LowTypeInt 32) cont
+  return $ AsmBitcast x (AsmDataInt32 i) (LowTypeInt 32) (LowTypeInt 32) cont
 asmData reg (DataStruct ds) cont = do
   xs <- mapM (const $ newNameWith "cursor") ds
   let structType = map (const voidPtr) ds
   cont' <- setContent reg (length xs) (zip [0 ..] xs) cont
   asmStruct (zip xs ds) $ AsmAlloc reg structType cont'
+
+asmData' :: [(Identifier, Data)] -> Asm -> WithEnv Asm
+asmData' [] cont = return cont
+asmData' ((x, d):rest) cont = do
+  cont' <- asmData' rest cont
+  asmData x d cont'
 
 constructSwitch :: Data -> [(Index, Code)] -> WithEnv (Asm, [(Int, Asm)])
 constructSwitch _ [] = lift $ throwE "empty branch"
@@ -76,7 +90,8 @@ constructSwitch name ((IndexInteger i, code):rest) = do
 asmSwitch :: Data -> [(Index, Code)] -> WithEnv Asm
 asmSwitch name branchList = do
   (defaultCase, caseList) <- constructSwitch name branchList
-  return $ AsmSwitch name defaultCase caseList
+  tmp <- newNameWith "switch"
+  asmData' [(tmp, name)] $ AsmSwitch (AsmDataLocal tmp) defaultCase caseList
 
 setContent :: Identifier -> Int -> [(Int, Identifier)] -> Asm -> WithEnv Asm
 setContent _ _ [] cont = return cont

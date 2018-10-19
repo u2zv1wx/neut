@@ -74,7 +74,6 @@ extract z ((x, i):xis) n cont = do
 
 traceLet :: String -> Code -> Code -> Code
 traceLet s (CodeReturn ans) cont = CodeLet s ans cont
-  -- substCode [(s, ans)] cont --CodeLet s ans cont
 traceLet s (CodeLet x d cont1) cont2 = CodeLet x d (traceLet s cont1 cont2)
 traceLet s (CodeCall reg name xds cont1) cont2 =
   CodeCall reg name xds $ traceLet s cont1 cont2
