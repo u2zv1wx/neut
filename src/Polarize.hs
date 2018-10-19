@@ -22,8 +22,6 @@ polarize = do
   wtenv <- gets weakTermEnv
   forM_ wtenv $ \(name, e) -> do
     e' <- polarize' e
-    liftIO $ putStrLn $ Pr.ppShow e
-    liftIO $ putStrLn $ Pr.ppShow e'
     insPolEnv name e'
 
 polarize' :: Neut -> WithEnv Neg
@@ -72,7 +70,9 @@ polarize' (_ :< NeutIndexElim e branchList) = do
   cs <- mapM polarize' es
   x <- newNameWith "tmp"
   bindSeq [(x, e)] (NegIndexElim (PosVar x) (zip labelList cs))
-polarize' (_ :< NeutMu _ _) = error "polarize'.polarize': unreachable: Mu"
+polarize' (_ :< NeutMu x e) = do
+  e' <- polarize' e
+  return $ NegMu x e'
 polarize' (_ :< NeutUniv _) = return $ NegUpIntro PosUniv
 polarize' (_ :< NeutHole x) =
   error $ "PolarizeNeg.polarize': remaining hole: " ++ x
