@@ -218,6 +218,9 @@ reduceNeg (NegDownElim e) = do
   case e' of
     PosDownIntro e'' -> reduceNeg e''
     _ -> return $ NegDownElim e'
+reduceNeg (NegMu x e) = do
+  e' <- reduceNeg e
+  return $ NegMu x e'
 
 subst :: Subst -> Neut -> Neut
 subst sub (j :< NeutVar s) = fromMaybe (j :< NeutVar s) (lookup s sub)
@@ -308,7 +311,7 @@ substNeg sub (NegPiElim e1 e2) = do
   NegPiElim e1' e2'
 substNeg sub (NegSigmaElim e1 xs e2) = do
   let e1' = substPos sub e1
-  let e2' = substNeg sub $ e2
+  let e2' = substNeg sub e2
   NegSigmaElim e1' xs e2'
 substNeg sub (NegBoxElim e) = do
   let e' = substPos sub e
@@ -323,6 +326,7 @@ substNeg sub (NegUpElim x e1 e2) = do
   let e2' = substNeg sub e2
   NegUpElim x e1' e2'
 substNeg sub (NegDownElim e) = NegDownElim (substPos sub e)
+substNeg sub (NegMu x e) = NegMu x $ substNeg sub e
 
 findInvVar :: Subst -> Identifier -> Maybe Identifier
 findInvVar [] _ = Nothing

@@ -39,32 +39,21 @@ asmCode (CodeCall x fun args cont) = do
   return $ AsmCall x fun args cont'
 asmCode (CodeCallTail fun args) = return $ AsmCallTail fun args
 asmCode (CodeSwitch x branchList) = asmSwitch x branchList
-asmCode (CodeExtractValue x basePointer (i, n) cont) = do
+asmCode (CodeExtractValue x baseData (i, n) cont) = do
   cont' <- asmCode cont
-  return $ AsmGetElementPtr x basePointer (i, n) cont'
+  tmp <- newNameWith "sigma"
+  asmData tmp baseData $ AsmGetElementPtr x (AsmDataLocal tmp) (i, n) cont'
 asmCode (CodeFree x cont) = do
   cont' <- asmCode cont
   return $ AsmFree x cont'
 
 asmData :: Identifier -> Data -> Asm -> WithEnv Asm
-asmData x (DataLocal y) cont = do
-  tmp <- newNameWith "cast"
-  let t1 = LowTypeInt 64
-  let t2 = LowTypePointer t1
-  return $
-    AsmPointerToInt tmp (DataLocal y) voidPtr (LowTypeInt 64) $
-    AsmStore (AsmDataLocal tmp, t1) (AsmDataLocal x, t2) cont
-asmData x (DataGlobal y) cont = do
-  tmp <- newNameWith "cast"
-  let t1 = LowTypeInt 64
-  let t2 = LowTypePointer t1
-  return $
-    AsmPointerToInt tmp (DataGlobal y) voidPtr (LowTypeInt 64) $
-    AsmStore (AsmDataLocal tmp, t1) (AsmDataLocal x, t2) cont
-asmData x (DataInt32 i) cont = do
-  let t1 = LowTypeInt 32
-  let t2 = LowTypePointer t1
-  return $ AsmStore (AsmDataInt32 i, t1) (AsmDataLocal x, t2) cont
+asmData x (DataLocal y) cont =
+  return $ AsmBitcast x (DataLocal y) voidPtr voidPtr cont
+asmData x (DataGlobal y) cont =
+  return $ AsmBitcast x (DataGlobal y) voidPtr voidPtr cont
+asmData x (DataInt32 i) cont =
+  return $ AsmBitcast x (DataInt32 i) (LowTypeInt 32) (LowTypeInt 32) cont
 asmData reg (DataStruct ds) cont = do
   xs <- mapM (const $ newNameWith "cursor") ds
   let structType = map (const voidPtr) ds
@@ -98,7 +87,7 @@ setContent basePointer length ((index, dataAtIndex):sizeDataList) cont = do
   let tmp = LowTypeInt 100
   return $
     AsmLoad dataPtr (AsmDataLocal dataAtIndex) $
-    AsmGetElementPtr cursorPtr (DataLocal basePointer) (index, length) $
+    AsmGetElementPtr cursorPtr (AsmDataLocal basePointer) (index, length) $
     AsmStore (AsmDataLocal dataPtr, tmp) (AsmDataLocal cursorPtr, tmp) cont'
 
 asmStruct :: [(Identifier, Data)] -> Asm -> WithEnv Asm

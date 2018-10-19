@@ -94,7 +94,7 @@ modalNeg (NegUpElim x e1 e2) = do
 modalNeg (NegDownElim e) = callClosure e
 modalNeg (NegBoxElim e) = do
   e' <- modalPos e
-  f <- newName
+  f <- newNameWith "box"
   bindLet [(f, e')] (CompPiElim f [])
 modalNeg (NegMu self e) = do
   let (fun, args) = toNegPiIntroSeq e

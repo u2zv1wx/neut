@@ -49,7 +49,7 @@ emitAsm (AsmGetElementPtr x base (i, n) cont) = do
       , "= getelementptr"
       , showStructOfLength n ++ ","
       , showStructOfLength n ++ "*"
-      , showData base ++ ","
+      , showAsmData base ++ ","
       , showIndex [0, i, 0]
       ]
   emitAsm cont

@@ -347,6 +347,8 @@ toLowType v = lift $ throwE $ "Asm.toLowType: " ++ show v ++ " is not a type"
 
 substCode :: [(String, Data)] -> Code -> Code
 substCode sub (CodeReturn ans) = CodeReturn $ substData sub ans
+substCode sub (CodeLet x d cont) =
+  CodeLet x (substData sub d) $ substCode sub cont
 substCode sub (CodeCall x name xds cont) = do
   let name' = substData sub name
   let xds' = map (substData sub) xds

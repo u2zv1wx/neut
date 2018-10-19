@@ -206,7 +206,7 @@ data AsmData
 data Asm
   = AsmReturn AsmData
   | AsmGetElementPtr Identifier
-                     Data
+                     AsmData
                      (Int, Int)
                      Asm
   | AsmCall Identifier

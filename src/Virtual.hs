@@ -30,7 +30,7 @@ virtualize = do
     insCodeEnv name args code'
 
 virtualValue :: Value -> WithEnv Data
-virtualValue (ValueVar x) = return $ DataLocal x
+virtualValue (ValueVar x) = globalizeIfNecessary x
 virtualValue (ValueConst x) = return $ DataGlobal x
 virtualValue (ValueSigma _ _) = return $ DataInt32 0
 virtualValue (ValueSigmaIntro es) = do
@@ -46,7 +46,7 @@ virtualValue (ValueBox _) = return $ DataInt32 0
 virtualComp :: Comp -> WithEnv Code
 virtualComp (CompPi _ _) = return $ CodeReturn $ DataInt32 0
 virtualComp (CompPiElim f xs) = do
-  let f' = DataLocal f
+  f' <- globalizeIfNecessary f
   let xs' = map DataLocal xs
   return $ CodeCallTail f' xs'
 virtualComp (CompSigmaElim e1 xs e2) = do
@@ -74,6 +74,7 @@ extract z ((x, i):xis) n cont = do
 
 traceLet :: String -> Code -> Code -> Code
 traceLet s (CodeReturn ans) cont = CodeLet s ans cont
+  -- substCode [(s, ans)] cont --CodeLet s ans cont
 traceLet s (CodeLet x d cont1) cont2 = CodeLet x d (traceLet s cont1 cont2)
 traceLet s (CodeCall reg name xds cont1) cont2 =
   CodeCall reg name xds $ traceLet s cont1 cont2
@@ -85,3 +86,10 @@ traceLet x (CodeSwitch y branchList) cont = do
 traceLet s (CodeExtractValue x basePointer i cont1) cont2 =
   CodeExtractValue x basePointer i $ traceLet s cont1 cont2
 traceLet s (CodeFree x cont1) cont2 = CodeFree x $ traceLet s cont1 cont2
+
+globalizeIfNecessary :: Identifier -> WithEnv Data
+globalizeIfNecessary x = do
+  menv <- gets modalEnv
+  if x `elem` map fst menv
+    then return $ DataGlobal x
+    else return $ DataLocal x
