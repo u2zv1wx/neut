@@ -23,6 +23,7 @@ polarize = do
   forM_ wtenv $ \(name, e) -> do
     e' <- polarize' e
     insPolEnv name e'
+  insArith
 
 polarize' :: Neut -> WithEnv Neg
 polarize' (_ :< NeutVar x) = return $ NegUpIntro (PosVar x)
@@ -83,3 +84,22 @@ bindSeq ((formalArg, arg):rest) fun = do
   arg' <- polarize' arg
   fun' <- bindSeq rest fun
   return $ NegUpElim formalArg arg' fun'
+
+insArith :: WithEnv ()
+insArith =
+  forM_ intLowTypeList $ \intLowType -> do
+    x <- newNameWith "arg"
+    y <- newNameWith "arg"
+    meta <- newNameWith "meta"
+    insTypeEnv x $ meta :< NeutIndex (show intLowType)
+    insTypeEnv y $ meta :< NeutIndex (show intLowType)
+    let base e = rt $ NegPiIntro x $ rt $ NegPiIntro y $ NegUpIntro e
+    let add = base $ PosArith (ArithAdd, intLowType) (PosVar x) (PosVar y)
+    let sub = base $ PosArith (ArithSub, intLowType) (PosVar x) (PosVar y)
+    let mul = base $ PosArith (ArithMul, intLowType) (PosVar x) (PosVar y)
+    insPolEnv ("core." ++ show intLowType ++ ".add") add
+    insPolEnv ("core." ++ show intLowType ++ ".sub") sub
+    insPolEnv ("core." ++ show intLowType ++ ".mul") mul
+
+rt :: Neg -> Neg
+rt e = NegUpIntro $ PosDownIntro e

@@ -5,6 +5,8 @@
 
 module Data where
 
+import Prelude hiding (showList)
+
 import Control.Comonad
 
 import Control.Comonad.Cofree
@@ -91,7 +93,17 @@ data LowType
   | LowTypePointer LowType
   | LowTypeFunction [LowType]
                     LowType
-  deriving (Show)
+
+instance Show LowType where
+  show (LowTypeInt i) = "i" ++ show i
+  show (LowTypePointer t) = show t ++ "*"
+  show (LowTypeStruct ts) = "{" ++ showList ts ++ "}"
+  show (LowTypeFunction ts t) = show t ++ " (" ++ showList ts ++ ")"
+
+showList :: Show a => [a] -> String
+showList [] = ""
+showList [a] = show a
+showList (a:as) = show a ++ ", " ++ showList as
 
 data Pos
   = PosVar Identifier
@@ -106,6 +118,9 @@ data Pos
   | PosUniv
   | PosBox Neg
   | PosBoxIntro Neg
+  | PosArith (Arith, LowType)
+             Pos
+             Pos
   deriving (Show)
 
 data Neg
@@ -152,6 +167,9 @@ data Value
   | ValueIndexIntro Index
   | ValueUniv
   | ValueBox Comp
+  | ValueArith (Arith, LowType)
+               Value
+               Value
   deriving (Show)
 
 -- negative modal normal form
@@ -176,6 +194,9 @@ data Data
   | DataGlobal Identifier
   | DataInt32 Int
   | DataStruct [Data]
+  | DataArith (Arith, LowType)
+              Data
+              Data
   deriving (Show)
 
 data Code
@@ -203,6 +224,16 @@ data AsmData
   = AsmDataLocal Identifier
   | AsmDataGlobal Identifier
   | AsmDataInt32 Int
+
+instance Show AsmData where
+  show (AsmDataLocal x) = "%" ++ x
+  show (AsmDataGlobal x) = "@" ++ x
+  show (AsmDataInt32 i) = show i
+
+data Arith
+  = ArithAdd
+  | ArithSub
+  | ArithMul
   deriving (Show)
 
 data Asm
@@ -246,6 +277,11 @@ data Asm
              Asm
   | AsmFree AsmData
             Asm
+  | AsmArith Identifier
+             (Arith, LowType)
+             AsmData
+             AsmData
+             Asm
   deriving (Show)
 
 instance (Show a) => Show (IORef a) where
@@ -573,3 +609,6 @@ wrapTypeWithUniv univ t = do
 
 intTypeList :: [Identifier]
 intTypeList = ["i8", "i16", "i32", "i64"]
+
+intLowTypeList :: [LowType]
+intLowTypeList = [LowTypeInt 8, LowTypeInt 16, LowTypeInt 32, LowTypeInt 64]

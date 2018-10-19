@@ -55,6 +55,10 @@ modalPos (PosBoxIntro e) = do
   name <- newNameWith "box"
   insModalEnv name args fun'
   return $ ValueConst name
+modalPos (PosArith kind e1 e2) = do
+  e1' <- modalPos e1
+  e2' <- modalPos e2
+  return $ ValueArith kind e1' e2'
 
 modalNeg :: Neg -> WithEnv Comp
 modalNeg (NegPi (x, tdom) tcod) = do

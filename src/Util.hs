@@ -156,6 +156,7 @@ varPos (PosIndexIntro _) = []
 varPos (PosDown e) = varNeg e
 varPos (PosDownIntro e) = varNeg e
 varPos PosUniv = []
+varPos (PosArith _ e1 e2) = varPos e1 ++ varPos e2
 
 varNeg :: Neg -> [Identifier]
 varNeg (NegPi (x, tdom) tcod) = do
@@ -182,6 +183,7 @@ varNeg (NegUpElim x e1 e2) = do
   let vs2 = filter (/= x) $ varNeg e2
   vs1 ++ vs2
 varNeg (NegDownElim e) = varPos e
+varNeg (NegMu x e) = filter (/= x) $ varNeg e
 
 varIndex :: Index -> [Identifier]
 varIndex (IndexLabel x) = [x]

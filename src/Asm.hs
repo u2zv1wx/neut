@@ -90,6 +90,17 @@ asmData reg (DataStruct ds) cont = do
   asmStruct (zip xs ds) $
     AsmAlloc reg ts $ -- the result of malloc is i8*
     AsmBitcast cast (AsmDataLocal reg) voidPtr structPtrType cont''
+asmData reg (DataArith kind@(_, int) d1 d2) cont = do
+  x1 <- newNameWith "arg"
+  x2 <- newNameWith "arg"
+  cast1 <- newNameWith "cast"
+  cast2 <- newNameWith "cast"
+  tmp <- newNameWith "cast"
+  asmStruct [(x1, d1), (x2, d2)] $
+    AsmPointerToInt cast1 (AsmDataLocal x1) voidPtr int $
+    AsmPointerToInt cast2 (AsmDataLocal x2) voidPtr int $
+    AsmArith tmp kind (AsmDataLocal cast1) (AsmDataLocal cast2) $
+    AsmIntToPointer reg (AsmDataLocal tmp) int voidPtr cont
 
 asmData' :: [(Identifier, Data)] -> Asm -> WithEnv Asm
 asmData' [] cont = return cont

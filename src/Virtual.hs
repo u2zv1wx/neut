@@ -42,6 +42,10 @@ virtualValue (ValueIndexIntro x) = do
   return $ DataInt32 i
 virtualValue ValueUniv = return $ DataInt32 0
 virtualValue (ValueBox _) = return $ DataInt32 0
+virtualValue (ValueArith kind e1 e2) = do
+  d1 <- virtualValue e1
+  d2 <- virtualValue e2
+  return $ DataArith kind d1 d2
 
 virtualComp :: Comp -> WithEnv Code
 virtualComp (CompPi _ _) = return $ CodeReturn $ DataInt32 0
