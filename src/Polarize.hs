@@ -25,6 +25,7 @@ polarize = do
     insPolEnv name e'
   insArith
   insCopyInt
+  insPrintInt
 
 polarize' :: Neut -> WithEnv Neg
 polarize' (_ :< NeutVar x) = return $ NegUpIntro (PosVar x)
@@ -109,6 +110,13 @@ insCopyInt =
     let pair = PosSigmaIntro [PosVar x, PosVar x]
     let copy = rt $ NegPiIntro x $ NegUpIntro pair
     insPolEnv ("core." ++ show intLowType ++ ".copy") copy
+
+insPrintInt :: WithEnv ()
+insPrintInt =
+  forM_ intLowTypeList $ \intLowType -> do
+    x <- newNameWith "arg"
+    let print = rt $ NegPiIntro x $ NegPrint intLowType (PosVar x)
+    insPolEnv ("core." ++ show intLowType ++ ".print") print
 
 rt :: Neg -> Neg
 rt e = NegUpIntro $ PosDownIntro e

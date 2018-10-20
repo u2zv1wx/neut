@@ -71,7 +71,7 @@ modalNeg lam@(NegPiIntro _ _) = do
   body' <- modalNeg body
   lamName <- newNameWith "lam"
   insModalEnv lamName (xs ++ args) body'
-  return $ CompPiElim lamName (xs ++ args)
+  return $ CompPiElimBoxElim lamName (xs ++ args)
 modalNeg app@(NegPiElim _ _) = do
   let (fun, args) = toNegPiElimSeq app
   fun' <- modalNeg fun
@@ -99,12 +99,15 @@ modalNeg (NegDownElim e) = callClosure e
 modalNeg (NegBoxElim e) = do
   e' <- modalPos e
   f <- newNameWith "box"
-  bindLet [(f, e')] (CompPiElim f [])
+  bindLet [(f, e')] (CompPiElimBoxElim f [])
 modalNeg (NegMu self e) = do
   let (fun, args) = toNegPiIntroSeq e
   fun' <- modalNeg fun
   insModalEnv self args fun'
-  return $ CompPiElim self []
+  return $ CompPiElimBoxElim self []
+modalNeg (NegPrint t e) = do
+  e' <- modalPos e
+  return $ CompPrint t e'
 
 -- closureType t == Sigma (A : Ui). (Box (A -> t)) * A
 closureType :: Comp -> WithEnv Value
@@ -154,7 +157,7 @@ callClosure e = do
   e' <- modalPos e
   envName <- newNameWith "env"
   fun <- newNameWith "fun"
-  return $ CompSigmaElim e' [fun, envName] (CompPiElim fun [envName])
+  return $ CompSigmaElim e' [fun, envName] (CompPiElimBoxElim fun [envName])
 
 takeNonBox :: [Identifier] -> WithEnv [Identifier]
 takeNonBox [] = return []
@@ -175,7 +178,8 @@ bindLet ((x, v):rest) e = do
 
 tracePiElim :: Comp -> [Identifier] -> WithEnv Comp
 tracePiElim (CompPi _ _) _ = lift $ throwE "Modal.tracePiElim: type error"
-tracePiElim (CompPiElim f xs) args = return $ CompPiElim f (xs ++ args)
+tracePiElim (CompPiElimBoxElim f xs) args =
+  return $ CompPiElimBoxElim f (xs ++ args)
 tracePiElim (CompSigmaElim v xs e) args = do
   e' <- tracePiElim e args
   return $ CompSigmaElim v xs e'

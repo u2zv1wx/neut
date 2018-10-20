@@ -89,16 +89,20 @@ deriving instance Eq a => Eq (NeutF a)
 
 data LowType
   = LowTypeInt Int
-  | LowTypeStruct [LowType]
   | LowTypePointer LowType
   | LowTypeFunction [LowType]
                     LowType
+  | LowTypeArray Int
+                 LowType
+  | LowTypeStruct [LowType]
+  deriving (Eq)
 
 instance Show LowType where
   show (LowTypeInt i) = "i" ++ show i
   show (LowTypePointer t) = show t ++ "*"
-  show (LowTypeStruct ts) = "{" ++ showList ts ++ "}"
   show (LowTypeFunction ts t) = show t ++ " (" ++ showList ts ++ ")"
+  show (LowTypeArray i t) = "[" ++ show i ++ " x " ++ show t ++ "]"
+  show (LowTypeStruct ts) = "{" ++ showList ts ++ "}"
 
 showList :: Show a => [a] -> String
 showList [] = ""
@@ -143,6 +147,8 @@ data Neg
   | NegBoxElim Pos
   | NegMu Identifier
           Neg
+  | NegPrint LowType
+             Pos
   deriving (Show)
 
 -- A polarize term is in *modal-normal form* if the following two conditions are true:
@@ -176,8 +182,8 @@ data Value
 data Comp
   = CompPi (Identifier, Value)
            Comp
-  | CompPiElim Identifier -- (unbox f) @ x1 @ ... @ xn
-               [Identifier]
+  | CompPiElimBoxElim Identifier -- (unbox f) @ x1 @ ... @ xn
+                      [Identifier]
   | CompSigmaElim Value
                   [Identifier]
                   Comp
@@ -187,6 +193,8 @@ data Comp
   | CompUpElim Identifier
                Comp
                Comp
+  | CompPrint LowType
+              Value
   deriving (Show)
 
 data Data
@@ -218,6 +226,9 @@ data Code
                      Code -- continuation
   | CodeFree Data
              Code
+  | CodePrint LowType
+              Data
+              Code
   deriving (Show)
 
 data AsmData
@@ -280,6 +291,9 @@ data Asm
   | AsmArith Identifier
              (Arith, LowType)
              AsmData
+             AsmData
+             Asm
+  | AsmPrint LowType
              AsmData
              Asm
   deriving (Show)

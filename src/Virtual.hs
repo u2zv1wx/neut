@@ -49,7 +49,7 @@ virtualValue (ValueArith kind e1 e2) = do
 
 virtualComp :: Comp -> WithEnv Code
 virtualComp (CompPi _ _) = return $ CodeReturn $ DataInt32 0
-virtualComp (CompPiElim f xs) = do
+virtualComp (CompPiElimBoxElim f xs) = do
   f' <- globalizeIfNecessary f
   let xs' = map DataLocal xs
   return $ CodeCallTail f' xs'
@@ -69,6 +69,9 @@ virtualComp (CompUpElim x e1 e2) = do
   e1' <- virtualComp e1
   e2' <- virtualComp e2
   return $ traceLet x e1' e2'
+virtualComp (CompPrint t e) = do
+  e' <- virtualValue e
+  return $ CodePrint t e' $ CodeReturn (DataInt32 0)
 
 extract :: Data -> [(Identifier, Int)] -> Int -> Code -> Code
 extract z [] _ cont = CodeFree z cont
@@ -89,6 +92,8 @@ traceLet x (CodeSwitch y branchList) cont = do
 traceLet s (CodeExtractValue x basePointer i cont1) cont2 =
   CodeExtractValue x basePointer i $ traceLet s cont1 cont2
 traceLet s (CodeFree x cont1) cont2 = CodeFree x $ traceLet s cont1 cont2
+traceLet s (CodePrint t e' cont1) cont2 =
+  CodePrint t e' (traceLet s cont1 cont2)
 
 globalizeIfNecessary :: Identifier -> WithEnv Data
 globalizeIfNecessary x = do

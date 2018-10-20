@@ -66,6 +66,13 @@ asmCode (CodeFree d cont) = do
   cont' <- asmCode cont
   tmp <- newNameWith "free"
   asmData' [(tmp, d)] $ AsmFree (AsmDataLocal tmp) cont'
+asmCode (CodePrint t d cont) = do
+  cont' <- asmCode cont
+  tmp <- newNameWith "item"
+  cast <- newNameWith "cast"
+  asmData' [(tmp, d)] $
+    AsmPointerToInt cast (AsmDataLocal tmp) voidPtr t $
+    AsmPrint t (AsmDataLocal cast) cont'
 
 asmData :: Identifier -> Data -> Asm -> WithEnv Asm
 asmData x (DataLocal y) cont =
@@ -75,6 +82,7 @@ asmData x (DataGlobal y) cont = do
   case lookup y cenv of
     Nothing -> do
       liftIO $ putStrLn $ "no such global label defined: " ++ y -- FIXME
+      -- todo: decleare y
       return $ AsmBitcast x (AsmDataGlobal y) voidPtr voidPtr cont
     Just (args, _) -> do
       let funPtrType = toFunPtrType args
@@ -134,16 +142,20 @@ setContent :: Identifier -> Int -> [(Int, Identifier)] -> Asm -> WithEnv Asm
 setContent _ _ [] cont = return cont
 setContent basePointer length ((index, dataAtIndex):sizeDataList) cont = do
   cont' <- setContent basePointer length sizeDataList cont
-  addr <- newNameWith "addr"
-  cursorPtr <- newNameWith "cursor"
-  castPtr <- newNameWith "cast"
+  -- addr <- newNameWith "addr"
+  -- cursorPtr <- newNameWith "cursor"
+  -- castPtr <- newNameWith "cast"
   loader <- newNameWith "loader"
+  let voidPtrPtr = LowTypePointer voidPtr
   return $
     AsmGetElementPtr loader (AsmDataLocal basePointer) (index, length) $
-    AsmLoad cursorPtr (AsmDataLocal loader) $
-    AsmBitcast castPtr (AsmDataLocal cursorPtr) voidPtr int64ptr $
-    AsmPointerToInt addr (AsmDataLocal dataAtIndex) voidPtr int64 $
-    AsmStore (AsmDataLocal addr, int64) (AsmDataLocal castPtr, int64ptr) cont'
+    -- AsmLoad cursorPtr (AsmDataLocal loader) $
+    -- AsmBitcast castPtr (AsmDataLocal cursorPtr) voidPtr int64ptr $
+    -- AsmPointerToInt addr (AsmDataLocal dataAtIndex) voidPtr int64 $
+    AsmStore
+      (AsmDataLocal dataAtIndex, voidPtr)
+      (AsmDataLocal loader, voidPtrPtr)
+      cont'
 
 asmStruct :: [(Identifier, Data)] -> Asm -> WithEnv Asm
 asmStruct [] cont = return cont

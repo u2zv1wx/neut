@@ -184,6 +184,7 @@ varNeg (NegUpElim x e1 e2) = do
   vs1 ++ vs2
 varNeg (NegDownElim e) = varPos e
 varNeg (NegMu x e) = filter (/= x) $ varNeg e
+varNeg (NegPrint _ e) = varPos e
 
 varIndex :: Index -> [Identifier]
 varIndex (IndexLabel x) = [x]

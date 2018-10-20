@@ -25,6 +25,7 @@ import Debug.Trace
 emit :: WithEnv ()
 emit = do
   env <- get
+  emitGlobal
   forM_ (asmEnv env) $ uncurry emitDefinition
 
 emitDefinition :: Identifier -> ([Identifier], Asm) -> WithEnv ()
@@ -136,7 +137,7 @@ emitAsm (AsmAlloc x ts cont) = do
       , "="
       , "ptrtoint i64*"
       , show (AsmDataLocal size)
-      , "to i32"
+      , "to i64"
       ]
   emitOp $
     unwords
@@ -144,7 +145,7 @@ emitAsm (AsmAlloc x ts cont) = do
       , "="
       , "call"
       , "i8*"
-      , "@malloc(i32 " ++ show (AsmDataLocal casted) ++ ")"
+      , "@malloc(i64 " ++ show (AsmDataLocal casted) ++ ")"
       ]
   emitAsm cont
 emitAsm (AsmFree d cont) = do
@@ -183,6 +184,24 @@ emitAsm (AsmArith x (ArithMul, t) d1 d2 cont) = do
       , show d2
       ]
   emitAsm cont
+emitAsm (AsmPrint t d cont) = do
+  fmt <- newNameWith "fmt"
+  emitOp $
+    unwords
+      [ show (AsmDataLocal fmt)
+      , "="
+      , "getelementptr [3 x i8], [3 x i8]* @fmt.i32, i32 0, i32 0"
+      ]
+  -- emitOp $ unwords [show (AsmDataLocal fmt), "=", "getelementptr"]
+  emitOp $
+    unwords
+      [ "call"
+      , "i32 (i8*, ...)"
+      , "@printf(i8* " ++ show (AsmDataLocal fmt) ++ ","
+      , showLowType t
+      , show d ++ ")"
+      ]
+  emitAsm cont
 
 emitOp :: String -> WithEnv ()
 emitOp s = liftIO $ putStrLn $ "  " ++ s
@@ -206,10 +225,6 @@ showBranchList xs = "[" ++ showItems (uncurry showBranch) xs ++ "]"
 showBranch :: Int -> String -> String
 showBranch i label = "i64 " ++ show i ++ ", label " ++ show (AsmDataLocal label)
 
--- show :: AsmData -> String
--- show (AsmDataLocal x) = "%" ++ x
--- show (AsmDataGlobal x) = "@" ++ x
--- show (AsmDataInt32 i) = show i
 showIndex :: [Int] -> String
 showIndex [] = ""
 showIndex [i] = "i32 " ++ show i
@@ -234,3 +249,11 @@ showItems :: (a -> String) -> [a] -> String
 showItems _ [] = ""
 showItems f [a] = f a
 showItems f (a:as) = f a ++ ", " ++ showItems f as
+
+-- for now
+emitGlobal :: WithEnv ()
+emitGlobal = do
+  liftIO $ putStrLn "@fmt.i32 = constant [3 x i8] c\"%d\00\""
+  liftIO $ putStrLn "declare i32 @printf(i8* noalias nocapture, ...)"
+  liftIO $ putStrLn "declare i8* @malloc(i64)"
+  liftIO $ putStrLn "declare void @free(i8*)"

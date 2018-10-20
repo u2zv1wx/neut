@@ -43,7 +43,7 @@
 (definition io2
   ((code state) world))
 
-(primitive print (arrow i32 (io top)))
+(primitive core.i32.print (arrow i32 (io top)))
 
 (definition fact
   (mu self
@@ -56,4 +56,4 @@
                 ((pair n1 n2)
                  ((code core.i32.mul) n1 ((code self) ((code core.i32.sub) n2 1))))))))))))
 
-((code print) (fact 10))
+((code core.i32.print) (fact 10))
