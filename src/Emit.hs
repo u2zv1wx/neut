@@ -30,20 +30,23 @@ emit = do
 
 emitDefinition :: Identifier -> ([Identifier], Asm) -> WithEnv ()
 emitDefinition name (args, asm) = do
-  let name' = AsmDataGlobal name
-  let args' = map AsmDataLocal args
-  liftIO $ putStrLn $ "define i8* " ++ show name' ++ showArgs args' ++ " {"
-  emitAsm asm
+  liftIO $ putStrLn $ sig name args ++ " {"
+  emitAsm name asm
   liftIO $ putStrLn "}"
 
-emitBlock :: Identifier -> Asm -> WithEnv ()
-emitBlock name asm = do
-  emitLabel name
-  emitAsm asm
+sig :: Identifier -> [Identifier] -> String
+sig "main" args = "define i64 @main" ++ showArgs (map AsmDataLocal args)
+sig name args =
+  "define i8* " ++ show (AsmDataGlobal name) ++ showArgs (map AsmDataLocal args)
 
-emitAsm :: Asm -> WithEnv ()
-emitAsm (AsmReturn d) = emitOp $ unwords ["ret i8*", show d]
-emitAsm (AsmGetElementPtr x base (i, n) cont) = do
+emitBlock :: Identifier -> Identifier -> Asm -> WithEnv ()
+emitBlock funName name asm = do
+  emitLabel name
+  emitAsm funName asm
+
+emitAsm :: Identifier -> Asm -> WithEnv ()
+emitAsm funName (AsmReturn d) = emitRet funName d
+emitAsm funName (AsmGetElementPtr x base (i, n) cont) = do
   emitOp $
     unwords
       [ show (AsmDataLocal x)
@@ -53,18 +56,19 @@ emitAsm (AsmGetElementPtr x base (i, n) cont) = do
       , show base ++ ","
       , showIndex [0, i]
       ]
-  emitAsm cont
-emitAsm (AsmCall x f args cont) = do
+  emitAsm funName cont
+emitAsm funName (AsmCall x f args cont) = do
   emitOp $
     unwords [show (AsmDataLocal x), "=", "call i8*", show f ++ showArgs args]
-  emitAsm cont
-emitAsm (AsmCallTail f args) = do
+  emitAsm funName cont
+emitAsm funName (AsmCallTail f args) = do
   tmp <- newNameWith "tmp"
   emitOp $
     unwords
       [show (AsmDataLocal tmp), "=", "tail call i8*", show f ++ showArgs args]
-  emitOp $ unwords ["ret i8*", show (AsmDataLocal tmp)]
-emitAsm (AsmBitcast x d fromType toType cont) = do
+  emitRet funName (AsmDataLocal tmp)
+  -- emitOp $ unwords ["ret i8*", show (AsmDataLocal tmp)]
+emitAsm funName (AsmBitcast x d fromType toType cont) = do
   emitOp $
     unwords
       [ show (AsmDataLocal x)
@@ -75,8 +79,8 @@ emitAsm (AsmBitcast x d fromType toType cont) = do
       , "to"
       , showLowType toType
       ]
-  emitAsm cont
-emitAsm (AsmIntToPointer x d fromType toType cont) = do
+  emitAsm funName cont
+emitAsm funName (AsmIntToPointer x d fromType toType cont) = do
   emitOp $
     unwords
       [ show (AsmDataLocal x)
@@ -87,8 +91,8 @@ emitAsm (AsmIntToPointer x d fromType toType cont) = do
       , "to"
       , showLowType toType
       ]
-  emitAsm cont
-emitAsm (AsmPointerToInt x d fromType toType cont) = do
+  emitAsm funName cont
+emitAsm funName (AsmPointerToInt x d fromType toType cont) = do
   emitOp $
     unwords
       [ show (AsmDataLocal x)
@@ -99,8 +103,8 @@ emitAsm (AsmPointerToInt x d fromType toType cont) = do
       , "to"
       , showLowType toType
       ]
-  emitAsm cont
-emitAsm (AsmSwitch d defaultBranch branchList) = do
+  emitAsm funName cont
+emitAsm funName (AsmSwitch d defaultBranch branchList) = do
   defaultLabel <- newNameWith "default"
   labelList <- constructLabelList branchList
   emitOp $
@@ -114,15 +118,15 @@ emitAsm (AsmSwitch d defaultBranch branchList) = do
       ]
   let asmList = map snd branchList
   forM_ (zip labelList asmList ++ [(defaultLabel, defaultBranch)]) $
-    uncurry emitBlock
-emitAsm (AsmLoad x d cont) = do
+    uncurry (emitBlock funName)
+emitAsm funName (AsmLoad x d cont) = do
   emitOp $ unwords [show (AsmDataLocal x), "=", "load i8*, i8**", show d]
-  emitAsm cont
-emitAsm (AsmStore (d1, t1) (d2, t2) cont) = do
+  emitAsm funName cont
+emitAsm funName (AsmStore (d1, t1) (d2, t2) cont) = do
   emitOp $
     unwords ["store", showLowType t1, show d1 ++ ",", showLowType t2, show d2]
-  emitAsm cont
-emitAsm (AsmAlloc x ts cont) = do
+  emitAsm funName cont
+emitAsm funName (AsmAlloc x ts cont) = do
   size <- newNameWith "sizeptr"
   emitOp $
     unwords
@@ -147,11 +151,11 @@ emitAsm (AsmAlloc x ts cont) = do
       , "i8*"
       , "@malloc(i64 " ++ show (AsmDataLocal casted) ++ ")"
       ]
-  emitAsm cont
-emitAsm (AsmFree d cont) = do
+  emitAsm funName cont
+emitAsm funName (AsmFree d cont) = do
   emitOp $ unwords ["call", "void", "@free(i8* " ++ show d ++ ")"]
-  emitAsm cont
-emitAsm (AsmArith x (ArithAdd, t) d1 d2 cont) = do
+  emitAsm funName cont
+emitAsm funName (AsmArith x (ArithAdd, t) d1 d2 cont) = do
   emitOp $
     unwords
       [ show (AsmDataLocal x)
@@ -161,8 +165,8 @@ emitAsm (AsmArith x (ArithAdd, t) d1 d2 cont) = do
       , show d1 ++ ","
       , show d2
       ]
-  emitAsm cont
-emitAsm (AsmArith x (ArithSub, t) d1 d2 cont) = do
+  emitAsm funName cont
+emitAsm funName (AsmArith x (ArithSub, t) d1 d2 cont) = do
   emitOp $
     unwords
       [ show (AsmDataLocal x)
@@ -172,8 +176,8 @@ emitAsm (AsmArith x (ArithSub, t) d1 d2 cont) = do
       , show d1 ++ ","
       , show d2
       ]
-  emitAsm cont
-emitAsm (AsmArith x (ArithMul, t) d1 d2 cont) = do
+  emitAsm funName cont
+emitAsm funName (AsmArith x (ArithMul, t) d1 d2 cont) = do
   emitOp $
     unwords
       [ show (AsmDataLocal x)
@@ -183,8 +187,8 @@ emitAsm (AsmArith x (ArithMul, t) d1 d2 cont) = do
       , show d1 ++ ","
       , show d2
       ]
-  emitAsm cont
-emitAsm (AsmPrint t d cont) = do
+  emitAsm funName cont
+emitAsm funName (AsmPrint t d cont) = do
   fmt <- newNameWith "fmt"
   emitOp $
     unwords
@@ -201,13 +205,22 @@ emitAsm (AsmPrint t d cont) = do
       , showLowType t
       , show d ++ ")"
       ]
-  emitAsm cont
+  emitAsm funName cont
 
 emitOp :: String -> WithEnv ()
 emitOp s = liftIO $ putStrLn $ "  " ++ s
 
 emitGlobalLabel :: Identifier -> WithEnv ()
 emitGlobalLabel label = liftIO $ putStrLn $ "  " ++ ".globl " ++ label
+
+emitRet :: Identifier -> AsmData -> WithEnv ()
+emitRet "main" d = do
+  tmp <- newNameWith "cast"
+  emitOp $
+    unwords
+      [show (AsmDataLocal tmp), "=", "ptrtoint", "i8*", show d, "to", "i64"]
+  emitOp $ unwords ["ret i64", show (AsmDataLocal tmp)]
+emitRet _ d = emitOp $ unwords ["ret i8*", show d]
 
 emitLabel :: String -> WithEnv ()
 emitLabel s = liftIO $ putStrLn $ s ++ ":"
@@ -240,6 +253,7 @@ showLowType :: LowType -> String
 showLowType (LowTypeInt i) = "i" ++ show i
 showLowType (LowTypePointer t) = showLowType t ++ "*"
 showLowType (LowTypeStruct ts) = "{" ++ showList ts ++ "}"
+showLowType (LowTypeArray i t) = "[" ++ show i ++ " x " ++ showLowType t ++ "]"
 showLowType (LowTypeFunction ts t) = showLowType t ++ " (" ++ showList ts ++ ")"
 
 showStructOfLength :: Int -> String
