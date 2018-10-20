@@ -222,6 +222,41 @@ reduceNeg (NegMu x e) = do
   e' <- reduceNeg e
   return $ NegMu x e'
 
+reduceValue :: Value -> WithEnv Value
+reduceValue = return
+
+reduceComp :: Comp -> WithEnv Comp
+reduceComp (CompPi (x, tdom) tcod) = do
+  tdom' <- reduceValue tdom
+  tcod' <- reduceComp tcod
+  return $ CompPi (x, tdom') tcod'
+reduceComp (CompPiElimBoxElim x xs) = return $ CompPiElimBoxElim x xs
+reduceComp (CompSigmaElim e xs body) = do
+  body' <- reduceComp body
+  return $ CompSigmaElim e xs body'
+reduceComp (CompIndexElim e branchList) =
+  case e of
+    ValueIndexIntro x ->
+      case lookup x branchList of
+        Nothing ->
+          lift $
+          throwE $ "the index " ++ show x ++ " is not included in branchList"
+        Just body -> reduceComp body
+    _ -> return $ CompIndexElim e branchList
+reduceComp (CompUpIntro e) = do
+  e' <- reduceValue e
+  return $ CompUpIntro e'
+reduceComp (CompUpElim x e1 e2) = do
+  e1' <- reduceComp e1
+  e2' <- reduceComp e2
+  case e1' of
+    CompUpIntro (ValueVar y) -> reduceComp $ substComp [(x, y)] e2'
+    CompUpIntro (ValueConst y) -> reduceComp $ substComp [(x, y)] e2'
+    _ -> return $ CompUpElim x e1' e2'
+reduceComp (CompPrint t e) = do
+  e' <- reduceValue e
+  return $ CompPrint t e'
+
 subst :: Subst -> Neut -> Neut
 subst sub (j :< NeutVar s) = fromMaybe (j :< NeutVar s) (lookup s sub)
 subst sub (j :< NeutConst s t) = j :< NeutConst s (subst sub t)
@@ -328,21 +363,72 @@ substNeg sub (NegUpElim x e1 e2) = do
 substNeg sub (NegDownElim e) = NegDownElim (substPos sub e)
 substNeg sub (NegMu x e) = NegMu x $ substNeg sub e
 
-findInvVar :: Subst -> Identifier -> Maybe Identifier
-findInvVar [] _ = Nothing
-findInvVar ((y, _ :< NeutVar x):rest) x'
-  | x == x' =
-    if not (any (/= y) $ findInvVar' rest x')
-      then Just y
-      else Nothing
-findInvVar ((_, _):rest) i = findInvVar rest i
+type SubstValue = [(Identifier, Identifier)]
 
-findInvVar' :: Subst -> Identifier -> [Identifier]
-findInvVar' [] _ = []
-findInvVar' ((z, _ :< NeutVar x):rest) x'
-  | x /= x' = z : findInvVar' rest x'
-findInvVar' (_:rest) x' = findInvVar' rest x'
+substValue :: SubstValue -> Value -> Value
+substValue sub (ValueVar s) = do
+  let s' = fromMaybe s (lookup s sub)
+  ValueVar s'
+substValue _ (ValueConst s) = ValueConst s
+substValue sub (ValueSigma xts tcod) = do
+  let (xs, ts) = unzip xts
+  let ts' = map (substValue sub) ts
+  let tcod' = substValue sub tcod
+  ValueSigma (zip xs ts') tcod'
+substValue sub (ValueSigmaIntro es) = do
+  let es' = map (substValue sub) es
+  ValueSigmaIntro es'
+substValue sub (ValueBox e) = do
+  let e' = substComp sub e
+  ValueBox e'
+substValue _ (ValueIndex x) = ValueIndex x
+substValue _ (ValueIndexIntro l) = ValueIndexIntro l
+substValue _ ValueUniv = ValueUniv
+substValue sub (ValueArith kind e1 e2) = do
+  let e1' = substValue sub e1
+  let e2' = substValue sub e2
+  ValueArith kind e1' e2'
 
+substComp :: SubstValue -> Comp -> Comp
+substComp sub (CompPi (s, tdom) tcod) = do
+  let tdom' = substValue sub tdom
+  let tcod' = substComp sub tcod
+  CompPi (s, tdom') tcod'
+substComp sub (CompPiElimBoxElim x xs) = do
+  let x' = fromMaybe x (lookup x sub)
+  let xs' = map (\y -> fromMaybe y (lookup y sub)) xs
+  CompPiElimBoxElim x' xs'
+  -- let e1' = substComp sub e1
+  -- let e2' = substValue sub e2
+  -- CompPiElim e1' e2'
+substComp sub (CompSigmaElim e1 xs e2) = do
+  let e1' = substValue sub e1
+  let e2' = substComp sub e2
+  CompSigmaElim e1' xs e2'
+substComp sub (CompIndexElim e branchList) = do
+  let e' = substValue sub e
+  let branchList' = map (\(l, e) -> (l, substComp sub e)) branchList
+  CompIndexElim e' branchList'
+substComp sub (CompUpIntro e) = CompUpIntro (substValue sub e)
+substComp sub (CompUpElim x e1 e2) = do
+  let e1' = substComp sub e1
+  let e2' = substComp sub e2
+  CompUpElim x e1' e2'
+substComp sub (CompPrint t e) = CompPrint t $ substValue sub e
+
+-- findInvVar :: Subst -> Identifier -> Maybe Identifier
+-- findInvVar [] _ = Nothing
+-- findInvVar ((y, _ :< NeutVar x):rest) x'
+--   | x == x' =
+--     if not (any (/= y) $ findInvVar' rest x')
+--       then Just y
+--       else Nothing
+-- findInvVar ((_, _):rest) i = findInvVar rest i
+-- findInvVar' :: Subst -> Identifier -> [Identifier]
+-- findInvVar' [] _ = []
+-- findInvVar' ((z, _ :< NeutVar x):rest) x'
+--   | x /= x' = z : findInvVar' rest x'
+-- findInvVar' (_:rest) x' = findInvVar' rest x'
 type SubstIdent = [(Identifier, Identifier)]
 
 substIdent :: SubstIdent -> Identifier -> Identifier
