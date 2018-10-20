@@ -89,6 +89,7 @@ asmData x (DataGlobal y) cont = do
       return $ AsmBitcast x (AsmDataGlobal y) funPtrType voidPtr cont
 asmData x (DataInt32 i) cont =
   return $ AsmIntToPointer x (AsmDataInt32 i) (LowTypeInt 32) voidPtr cont
+asmData reg (DataStruct []) cont = asmData reg (DataInt32 0) cont
 asmData reg (DataStruct [d]) cont = asmData reg d cont
 asmData reg (DataStruct ds) cont = do
   xs <- mapM (const $ newNameWith "cursor") ds
