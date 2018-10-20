@@ -68,7 +68,7 @@ virtualComp (CompUpIntro v) = do
 virtualComp (CompUpElim x e1 e2) = do
   e1' <- virtualComp e1
   e2' <- virtualComp e2
-  return $ traceLet x e1' e2'
+  return $ commUpElim x e1' e2'
 virtualComp (CompPrint t e) = do
   e' <- virtualValue e
   return $ CodePrint t e' $ CodeReturn (DataInt32 0)
@@ -79,21 +79,22 @@ extract z ((x, i):xis) n cont = do
   let cont' = extract z xis n cont
   CodeExtractValue x z (i, n) cont'
 
-traceLet :: String -> Code -> Code -> Code
-traceLet s (CodeReturn ans) cont = CodeLet s ans cont
-traceLet s (CodeLet x d cont1) cont2 = CodeLet x d (traceLet s cont1 cont2)
-traceLet s (CodeCall reg name xds cont1) cont2 =
-  CodeCall reg name xds $ traceLet s cont1 cont2
-traceLet s (CodeCallTail name xds) cont = CodeCall s name xds cont
-traceLet x (CodeSwitch y branchList) cont = do
+-- commutative conversion for up-elimination
+commUpElim :: String -> Code -> Code -> Code
+commUpElim s (CodeReturn ans) cont = CodeLet s ans cont
+commUpElim s (CodeLet x d cont1) cont2 = CodeLet x d (commUpElim s cont1 cont2)
+commUpElim s (CodeCall reg name xds cont1) cont2 =
+  CodeCall reg name xds $ commUpElim s cont1 cont2
+commUpElim s (CodeCallTail name xds) cont = CodeCall s name xds cont
+commUpElim x (CodeSwitch y branchList) cont = do
   let (labelList, es) = unzip branchList
-  let es' = map (\e -> traceLet x e cont) es
+  let es' = map (\e -> commUpElim x e cont) es
   CodeSwitch y $ zip labelList es'
-traceLet s (CodeExtractValue x basePointer i cont1) cont2 =
-  CodeExtractValue x basePointer i $ traceLet s cont1 cont2
-traceLet s (CodeFree x cont1) cont2 = CodeFree x $ traceLet s cont1 cont2
-traceLet s (CodePrint t e' cont1) cont2 =
-  CodePrint t e' (traceLet s cont1 cont2)
+commUpElim s (CodeExtractValue x basePointer i cont1) cont2 =
+  CodeExtractValue x basePointer i $ commUpElim s cont1 cont2
+commUpElim s (CodeFree x cont1) cont2 = CodeFree x $ commUpElim s cont1 cont2
+commUpElim s (CodePrint t e' cont1) cont2 =
+  CodePrint t e' (commUpElim s cont1 cont2)
 
 globalizeIfNecessary :: Identifier -> WithEnv Data
 globalizeIfNecessary x = do
