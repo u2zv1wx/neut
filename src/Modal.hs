@@ -77,7 +77,7 @@ modalNeg app@(NegPiElim _ _) = do
   fun' <- modalNeg fun
   args' <- mapM modalPos args
   xs <- mapM (const (newNameWith "arg")) args
-  app' <- tracePiElim fun' xs
+  app' <- commPiElim fun' xs
   bindLet (zip xs args') app'
 modalNeg (NegSigmaElim e1 xs e2) = do
   e1' <- modalPos e1
@@ -176,18 +176,20 @@ bindLet ((x, v):rest) e = do
   e' <- bindLet rest e
   return $ CompUpElim x (CompUpIntro v) e'
 
-tracePiElim :: Comp -> [Identifier] -> WithEnv Comp
-tracePiElim (CompPi _ _) _ = lift $ throwE "Modal.tracePiElim: type error"
-tracePiElim (CompPiElimBoxElim f xs) args =
+-- commutative conversion for pi-elimination
+commPiElim :: Comp -> [Identifier] -> WithEnv Comp
+commPiElim (CompPi _ _) _ = lift $ throwE "Modal.commPiElim: type error"
+commPiElim (CompPiElimBoxElim f xs) args =
   return $ CompPiElimBoxElim f (xs ++ args)
-tracePiElim (CompSigmaElim v xs e) args = do
-  e' <- tracePiElim e args
+commPiElim (CompSigmaElim v xs e) args = do
+  e' <- commPiElim e args
   return $ CompSigmaElim v xs e'
-tracePiElim (CompIndexElim v branchList) args = do
+commPiElim (CompIndexElim v branchList) args = do
   let (labelList, es) = unzip branchList
-  es' <- mapM (`tracePiElim` args) es
+  es' <- mapM (`commPiElim` args) es
   return $ CompIndexElim v (zip labelList es')
-tracePiElim (CompUpIntro _) _ = lift $ throwE "Modal.tracePiElim: type error"
-tracePiElim (CompUpElim x e1 e2) args = do
-  e2' <- tracePiElim e2 args
+commPiElim (CompUpIntro _) _ = lift $ throwE "Modal.commPiElim: type error"
+commPiElim (CompUpElim x e1 e2) args = do
+  e2' <- commPiElim e2 args
   return $ CompUpElim x e1 e2'
+commPiElim CompPrint {} _ = lift $ throwE "Modal.commPiElim: type error"
