@@ -89,6 +89,7 @@ asmData x (DataGlobal y) cont = do
       return $ AsmBitcast x (AsmDataGlobal y) funPtrType voidPtr cont
 asmData x (DataInt32 i) cont =
   return $ AsmIntToPointer x (AsmDataInt32 i) (LowTypeInt 32) voidPtr cont
+asmData reg (DataStruct [d]) cont = asmData reg d cont
 asmData reg (DataStruct ds) cont = do
   xs <- mapM (const $ newNameWith "cursor") ds
   cast <- newNameWith "cast"
@@ -142,16 +143,10 @@ setContent :: Identifier -> Int -> [(Int, Identifier)] -> Asm -> WithEnv Asm
 setContent _ _ [] cont = return cont
 setContent basePointer length ((index, dataAtIndex):sizeDataList) cont = do
   cont' <- setContent basePointer length sizeDataList cont
-  -- addr <- newNameWith "addr"
-  -- cursorPtr <- newNameWith "cursor"
-  -- castPtr <- newNameWith "cast"
   loader <- newNameWith "loader"
   let voidPtrPtr = LowTypePointer voidPtr
   return $
     AsmGetElementPtr loader (AsmDataLocal basePointer) (index, length) $
-    -- AsmLoad cursorPtr (AsmDataLocal loader) $
-    -- AsmBitcast castPtr (AsmDataLocal cursorPtr) voidPtr int64ptr $
-    -- AsmPointerToInt addr (AsmDataLocal dataAtIndex) voidPtr int64 $
     AsmStore
       (AsmDataLocal dataAtIndex, voidPtr)
       (AsmDataLocal loader, voidPtrPtr)
@@ -165,12 +160,6 @@ asmStruct ((x, d):xds) cont = do
 
 voidPtr :: LowType
 voidPtr = LowTypePointer $ LowTypeInt 8
-
-int64 :: LowType
-int64 = LowTypeInt 64
-
-int64ptr :: LowType
-int64ptr = LowTypePointer $ LowTypeInt 64
 
 toFunPtrType :: [a] -> LowType
 toFunPtrType xs = do
