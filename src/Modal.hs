@@ -40,7 +40,7 @@ modalPos (PosSigmaIntro es) = do
   ds <- mapM modalPos es
   return $ ValueSigmaIntro ds
 modalPos (PosIndex l) = return $ ValueIndex l
-modalPos (PosIndexIntro l) = return $ ValueIndexIntro l
+modalPos (PosIndexIntro l meta) = return $ ValueIndexIntro l meta
 modalPos (PosDown t) = do
   t' <- modalNeg t
   closureType t'

@@ -197,7 +197,7 @@ reduceNeg (NegBoxElim e) = do
     _ -> return $ NegBoxElim e'
 reduceNeg (NegIndexElim e branchList) =
   case e of
-    PosIndexIntro x ->
+    PosIndexIntro x _ ->
       case lookup x branchList of
         Nothing ->
           lift $
@@ -236,7 +236,7 @@ reduceComp (CompSigmaElim e xs body) = do
   return $ CompSigmaElim e xs body'
 reduceComp (CompIndexElim e branchList) =
   case e of
-    ValueIndexIntro x ->
+    ValueIndexIntro x _ ->
       case lookup x branchList of
         Nothing ->
           lift $
@@ -323,7 +323,7 @@ substPos sub (PosBoxIntro e) = do
   let e' = substNeg sub e
   PosBoxIntro e'
 substPos _ (PosIndex x) = PosIndex x
-substPos _ (PosIndexIntro l) = PosIndexIntro l
+substPos _ (PosIndexIntro l meta) = PosIndexIntro l meta
 substPos _ PosUniv = PosUniv
 substPos sub (PosDown e) = do
   let e' = substNeg sub e
@@ -382,7 +382,7 @@ substValue sub (ValueBox e) = do
   let e' = substComp sub e
   ValueBox e'
 substValue _ (ValueIndex x) = ValueIndex x
-substValue _ (ValueIndexIntro l) = ValueIndexIntro l
+substValue _ (ValueIndexIntro l meta) = ValueIndexIntro l meta
 substValue _ ValueUniv = ValueUniv
 substValue sub (ValueArith kind e1 e2) = do
   let e1' = substValue sub e1

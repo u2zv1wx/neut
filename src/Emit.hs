@@ -156,36 +156,105 @@ emitAsm funName (AsmFree d cont) = do
   emitOp $ unwords ["call", "void", "@free(i8* " ++ show d ++ ")"]
   emitAsm funName cont
 emitAsm funName (AsmArith x (ArithAdd, t) d1 d2 cont)
+  | t `elem` intLowTypeList
   -- thanks to the two's complement representation of LLVM, these arithmetic
   -- instructions ('add', 'sub', 'mul') are valid for both signed and unsigned integers.
- = do
+   = do
+    emitOp $
+      unwords
+        [ show (AsmDataLocal x)
+        , "="
+        , "add"
+        , showLowType t
+        , show d1 ++ ","
+        , show d2
+        ]
+    emitAsm funName cont
+emitAsm funName (AsmArith x (ArithAdd, t) d1 d2 cont) = do
   emitOp $
     unwords
       [ show (AsmDataLocal x)
       , "="
-      , "add"
+      , "fadd"
       , showLowType t
       , show d1 ++ ","
       , show d2
       ]
   emitAsm funName cont
+emitAsm funName (AsmArith x (ArithSub, t) d1 d2 cont)
+  | t `elem` intLowTypeList = do
+    emitOp $
+      unwords
+        [ show (AsmDataLocal x)
+        , "="
+        , "sub"
+        , showLowType t
+        , show d1 ++ ","
+        , show d2
+        ]
+    emitAsm funName cont
 emitAsm funName (AsmArith x (ArithSub, t) d1 d2 cont) = do
   emitOp $
     unwords
       [ show (AsmDataLocal x)
       , "="
-      , "sub"
+      , "fsub"
       , showLowType t
       , show d1 ++ ","
       , show d2
       ]
   emitAsm funName cont
+emitAsm funName (AsmArith x (ArithMul, t) d1 d2 cont)
+  | t `elem` intLowTypeList = do
+    emitOp $
+      unwords
+        [ show (AsmDataLocal x)
+        , "="
+        , "mul"
+        , showLowType t
+        , show d1 ++ ","
+        , show d2
+        ]
+    emitAsm funName cont
 emitAsm funName (AsmArith x (ArithMul, t) d1 d2 cont) = do
   emitOp $
     unwords
       [ show (AsmDataLocal x)
       , "="
-      , "mul"
+      , "fmul"
+      , showLowType t
+      , show d1 ++ ","
+      , show d2
+      ]
+  emitAsm funName cont
+emitAsm funName (AsmArith x (ArithDiv, t@(LowTypeSignedInt _)) d1 d2 cont) = do
+  emitOp $
+    unwords
+      [ show (AsmDataLocal x)
+      , "="
+      , "sdiv"
+      , showLowType t
+      , show d1 ++ ","
+      , show d2
+      ]
+  emitAsm funName cont
+emitAsm funName (AsmArith x (ArithDiv, t@(LowTypeUnsignedInt _)) d1 d2 cont) = do
+  emitOp $
+    unwords
+      [ show (AsmDataLocal x)
+      , "="
+      , "udiv"
+      , showLowType t
+      , show d1 ++ ","
+      , show d2
+      ]
+  emitAsm funName cont
+emitAsm funName (AsmArith x (ArithDiv, t) d1 d2 cont) = do
+  emitOp $
+    unwords
+      [ show (AsmDataLocal x)
+      , "="
+      , "fdiv"
       , showLowType t
       , show d1 ++ ","
       , show d2
@@ -199,7 +268,6 @@ emitAsm funName (AsmPrint t d cont) = do
       , "="
       , "getelementptr [3 x i8], [3 x i8]* @fmt.i32, i32 0, i32 0"
       ]
-  -- emitOp $ unwords [show (AsmDataLocal fmt), "=", "getelementptr"]
   emitOp $
     unwords
       [ "call"
@@ -256,6 +324,10 @@ showLowType :: LowType -> String
 showLowType (LowTypeSignedInt i) = "i" ++ show i
 -- LLVM doesn't distinguish unsigned integers from signed ones
 showLowType (LowTypeUnsignedInt i) = "i" ++ show i
+showLowType (LowTypeFloat 16) = "half"
+showLowType (LowTypeFloat 32) = "float"
+showLowType (LowTypeFloat 64) = "double"
+showLowType (LowTypeFloat i) = "f" ++ show i -- shouldn't occur
 showLowType (LowTypePointer t) = showLowType t ++ "*"
 showLowType (LowTypeStruct ts) = "{" ++ showList ts ++ "}"
 showLowType (LowTypeArray i t) = "[" ++ show i ++ " x " ++ showLowType t ++ "]"

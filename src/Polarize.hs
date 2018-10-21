@@ -67,7 +67,8 @@ polarize' (_ :< NeutBoxElim e) = do
   z <- newNameWith "box"
   bindSeq [(z, e)] (NegBoxElim $ PosVar z)
 polarize' (_ :< NeutIndex l) = return $ NegUpIntro (PosIndex l)
-polarize' (_ :< NeutIndexIntro l) = return $ NegUpIntro (PosIndexIntro l)
+polarize' (meta :< NeutIndexIntro l) =
+  return $ NegUpIntro (PosIndexIntro l meta)
 polarize' (_ :< NeutIndexElim e branchList) = do
   let (labelList, es) = unzip branchList
   cs <- mapM polarize' es
@@ -88,20 +89,28 @@ bindSeq ((formalArg, arg):rest) fun = do
   return $ NegUpElim formalArg arg' fun'
 
 insArith :: WithEnv ()
-insArith =
-  forM_ intLowTypeList $ \intLowType -> do
-    x <- newNameWith "arg"
-    y <- newNameWith "arg"
-    meta <- newNameWith "meta"
-    insTypeEnv x $ meta :< NeutIndex (show intLowType)
-    insTypeEnv y $ meta :< NeutIndex (show intLowType)
+insArith = do
+  let numLowTypeList = intLowTypeList ++ floatLowTypeList
+  forM_ numLowTypeList $ \numLowType -> do
+    (x, y) <- prepareVariables numLowType
     let base e = rt $ NegPiIntro x $ rt $ NegPiIntro y $ NegUpIntro e
-    let add = base $ PosArith (ArithAdd, intLowType) (PosVar x) (PosVar y)
-    let sub = base $ PosArith (ArithSub, intLowType) (PosVar x) (PosVar y)
-    let mul = base $ PosArith (ArithMul, intLowType) (PosVar x) (PosVar y)
-    insPolEnv ("core." ++ show intLowType ++ ".add") add
-    insPolEnv ("core." ++ show intLowType ++ ".sub") sub
-    insPolEnv ("core." ++ show intLowType ++ ".mul") mul
+    let add = base $ PosArith (ArithAdd, numLowType) (PosVar x) (PosVar y)
+    let sub = base $ PosArith (ArithSub, numLowType) (PosVar x) (PosVar y)
+    let mul = base $ PosArith (ArithMul, numLowType) (PosVar x) (PosVar y)
+    let div = base $ PosArith (ArithDiv, numLowType) (PosVar x) (PosVar y)
+    insPolEnv ("core." ++ show numLowType ++ ".add") add
+    insPolEnv ("core." ++ show numLowType ++ ".sub") sub
+    insPolEnv ("core." ++ show numLowType ++ ".mul") mul
+    insPolEnv ("core." ++ show numLowType ++ ".div") div
+
+prepareVariables :: LowType -> WithEnv (Identifier, Identifier)
+prepareVariables lowType = do
+  x <- newNameWith "arg"
+  y <- newNameWith "arg"
+  meta <- newNameWith "meta"
+  insTypeEnv x $ meta :< NeutIndex (show lowType)
+  insTypeEnv y $ meta :< NeutIndex (show lowType)
+  return (x, y)
 
 insCopyInt :: WithEnv ()
 insCopyInt =

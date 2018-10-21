@@ -37,9 +37,27 @@ virtualValue (ValueSigmaIntro es) = do
   ds <- mapM virtualValue es
   return $ DataStruct ds
 virtualValue (ValueIndex _) = return $ DataInt 0
-virtualValue (ValueIndexIntro x) = do
-  i <- indexToInt x
-  return $ DataInt i
+virtualValue (ValueIndexIntro x meta) =
+  case x of
+    IndexDefault -> return $ DataInt 0
+    IndexInteger i -> return $ DataInt i
+    IndexFloat x -> do
+      t <- lookupTypeEnv' meta
+      case t of
+        _ :< NeutIndex "f16" -> return $ DataFloat16 x
+        _ :< NeutIndex "f32" -> return $ DataFloat32 x
+        _ :< NeutIndex "f64" -> return $ DataFloat64 x
+        _ ->
+          lift $
+          throwE $
+          show x ++
+          " is expected to be a valid floating point number, but its type is: " ++
+          show t
+    IndexLabel name -> do
+      set <- lookupIndexSet name
+      case elemIndex name set of
+        Just i -> return $ DataInt i
+        Nothing -> lift $ throwE $ "no such index defined: " ++ show name
 virtualValue ValueUniv = return $ DataInt 0
 virtualValue (ValueBox _) = return $ DataInt 0
 virtualValue (ValueArith kind e1 e2) = do

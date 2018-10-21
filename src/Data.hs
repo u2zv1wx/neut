@@ -50,6 +50,7 @@ data UnivLevel
 data Index
   = IndexLabel Identifier
   | IndexInteger Int
+  | IndexFloat Double
   | IndexDefault
   deriving (Show, Eq)
 
@@ -90,6 +91,7 @@ deriving instance Eq a => Eq (NeutF a)
 data LowType
   = LowTypeSignedInt Int
   | LowTypeUnsignedInt Int
+  | LowTypeFloat Int
   | LowTypePointer LowType
   | LowTypeFunction [LowType]
                     LowType
@@ -100,7 +102,8 @@ data LowType
 
 instance Show LowType where
   show (LowTypeSignedInt i) = "i" ++ show i
-  show (LowTypeUnsignedInt i) = "i" ++ show i
+  show (LowTypeUnsignedInt i) = "u" ++ show i
+  show (LowTypeFloat i) = "f" ++ show i
   show (LowTypePointer t) = show t ++ "*"
   show (LowTypeFunction ts t) = show t ++ " (" ++ showList ts ++ ")"
   show (LowTypeArray i t) = "[" ++ show i ++ " x " ++ show t ++ "]"
@@ -119,6 +122,7 @@ data Pos
   | PosSigmaIntro [Pos]
   | PosIndex Identifier
   | PosIndexIntro Index
+                  Identifier -- metadata to determine its type
   | PosDown Neg
   | PosDownIntro Neg
   | PosUniv
@@ -173,6 +177,7 @@ data Value
   | ValueSigmaIntro [Value]
   | ValueIndex Identifier
   | ValueIndexIntro Index
+                    Identifier
   | ValueUniv
   | ValueBox Comp
   | ValueArith (Arith, LowType)
@@ -203,6 +208,9 @@ data Data
   = DataLocal Identifier
   | DataGlobal Identifier
   | DataInt Int
+  | DataFloat16 Double
+  | DataFloat32 Double
+  | DataFloat64 Double
   | DataStruct [Data]
   | DataArith (Arith, LowType)
               Data
@@ -237,16 +245,19 @@ data AsmData
   = AsmDataLocal Identifier
   | AsmDataGlobal Identifier
   | AsmDataInt Int
+  | AsmDataFloat Double
 
 instance Show AsmData where
   show (AsmDataLocal x) = "%" ++ x
   show (AsmDataGlobal x) = "@" ++ x
   show (AsmDataInt i) = show i
+  show (AsmDataFloat x) = show x
 
 data Arith
   = ArithAdd
   | ArithSub
   | ArithMul
+  | ArithDiv
   deriving (Show)
 
 data Asm
@@ -543,6 +554,7 @@ insIndexEnv name indexList =
 lookupKind :: Index -> WithEnv (Maybe Identifier)
 lookupKind IndexDefault = return Nothing
 lookupKind (IndexInteger _) = return Nothing
+lookupKind (IndexFloat _) = return Nothing
 lookupKind (IndexLabel name) = do
   env <- get
   lookupKind' name $ indexEnv env
@@ -567,15 +579,6 @@ lookupIndexSet' name ((_, ls):xs) =
   if name `elem` ls
     then return ls
     else lookupIndexSet' name xs
-
-indexToInt :: Index -> WithEnv Int
-indexToInt IndexDefault = return 0
-indexToInt (IndexInteger i) = return i
-indexToInt (IndexLabel name) = do
-  set <- lookupIndexSet name
-  case elemIndex name set of
-    Just i -> return i
-    Nothing -> lift $ throwE $ "no such index defined: " ++ show name
 
 isDefinedIndex :: Identifier -> WithEnv Bool
 isDefinedIndex name = do
@@ -641,3 +644,6 @@ unsignedIntLowTypeList =
   , LowTypeUnsignedInt 32
   , LowTypeUnsignedInt 64
   ]
+
+floatLowTypeList :: [LowType]
+floatLowTypeList = [LowTypeFloat 16, LowTypeFloat 32, LowTypeFloat 64]

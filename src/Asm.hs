@@ -89,6 +89,21 @@ asmData x (DataGlobal y) cont = do
       return $ AsmBitcast x (AsmDataGlobal y) funPtrType voidPtr cont
 asmData x (DataInt i) cont =
   return $ AsmIntToPointer x (AsmDataInt i) (LowTypeSignedInt 64) voidPtr cont
+asmData x (DataFloat16 f) cont = do
+  cast <- newNameWith "cast"
+  return $
+    AsmBitcast cast (AsmDataFloat f) (LowTypeFloat 16) (LowTypeSignedInt 16) $
+    AsmIntToPointer x (AsmDataLocal cast) (LowTypeSignedInt 16) voidPtr cont
+asmData x (DataFloat32 f) cont = do
+  cast <- newNameWith "cast"
+  return $
+    AsmBitcast cast (AsmDataFloat f) (LowTypeFloat 32) (LowTypeSignedInt 32) $
+    AsmIntToPointer x (AsmDataLocal cast) (LowTypeSignedInt 32) voidPtr cont
+asmData x (DataFloat64 f) cont = do
+  cast <- newNameWith "cast"
+  return $
+    AsmBitcast cast (AsmDataFloat f) (LowTypeFloat 64) (LowTypeSignedInt 64) $
+    AsmIntToPointer x (AsmDataLocal cast) (LowTypeSignedInt 64) voidPtr cont
 asmData reg (DataStruct []) cont = asmData reg (DataInt 0) cont
 asmData reg (DataStruct [d]) cont = asmData reg d cont
 asmData reg (DataStruct ds) cont = do
@@ -100,17 +115,41 @@ asmData reg (DataStruct ds) cont = do
   asmStruct (zip xs ds) $
     AsmAlloc reg ts $ -- the result of malloc is i8*
     AsmBitcast cast (AsmDataLocal reg) voidPtr structPtrType cont''
-asmData reg (DataArith kind@(_, int) d1 d2) cont = do
+asmData reg (DataArith kind@(_, intType) d1 d2) cont
+  | intType `elem` intLowTypeList = do
+    x1 <- newNameWith "arg"
+    x2 <- newNameWith "arg"
+    cast1 <- newNameWith "cast"
+    cast2 <- newNameWith "cast"
+    tmp <- newNameWith "arith"
+    asmStruct [(x1, d1), (x2, d2)] $
+      AsmPointerToInt cast1 (AsmDataLocal x1) voidPtr intType $
+      AsmPointerToInt cast2 (AsmDataLocal x2) voidPtr intType $
+      AsmArith tmp kind (AsmDataLocal cast1) (AsmDataLocal cast2) $
+      AsmIntToPointer reg (AsmDataLocal tmp) intType voidPtr cont
+asmData reg (DataArith kind@(_, LowTypeFloat i) d1 d2) cont = do
   x1 <- newNameWith "arg"
   x2 <- newNameWith "arg"
-  cast1 <- newNameWith "cast"
-  cast2 <- newNameWith "cast"
-  tmp <- newNameWith "cast"
+  cast11 <- newNameWith "cast"
+  cast12 <- newNameWith "float"
+  cast21 <- newNameWith "cast"
+  cast22 <- newNameWith "float"
+  tmp <- newNameWith "arith"
+  uncast <- newNameWith "uncast"
+  let intType = LowTypeSignedInt i
   asmStruct [(x1, d1), (x2, d2)] $
-    AsmPointerToInt cast1 (AsmDataLocal x1) voidPtr int $
-    AsmPointerToInt cast2 (AsmDataLocal x2) voidPtr int $
-    AsmArith tmp kind (AsmDataLocal cast1) (AsmDataLocal cast2) $
-    AsmIntToPointer reg (AsmDataLocal tmp) int voidPtr cont
+    -- cast the first argument from i8* to float
+    AsmPointerToInt cast11 (AsmDataLocal x1) voidPtr intType $
+    AsmBitcast cast12 (AsmDataLocal cast11) intType (LowTypeFloat i) $
+    -- cast the second argument from i8* to float
+    AsmPointerToInt cast21 (AsmDataLocal x2) voidPtr intType $
+    AsmBitcast cast22 (AsmDataLocal cast21) intType (LowTypeFloat i) $
+    -- compute
+    AsmArith tmp kind (AsmDataLocal cast12) (AsmDataLocal cast22) $
+    -- cast the result from float to i8*
+    AsmBitcast uncast (AsmDataLocal tmp) (LowTypeFloat i) intType $
+    AsmIntToPointer reg (AsmDataLocal uncast) intType voidPtr cont
+asmData _ DataArith {} _ = lift $ throwE "Asm.asmData: type error"
 
 asmData' :: [(Identifier, Data)] -> Asm -> WithEnv Asm
 asmData' [] cont = return cont
@@ -130,6 +169,7 @@ constructSwitch name ((IndexInteger i, code):rest) = do
   code' <- asmCode code
   (defaultCase, caseList) <- constructSwitch name rest
   return (defaultCase, (i, code') : caseList)
+constructSwitch _ ((IndexFloat _, _):_) = undefined -- IEEE754 float equality!
 
 asmSwitch :: Data -> [(Index, Code)] -> WithEnv Asm
 asmSwitch name branchList = do

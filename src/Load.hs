@@ -81,8 +81,6 @@ process e = do
   check "main" e >>= nonRecReduce >>= exhaust >>= insWeakTermEnv "main"
   polarize
   modalize
-  -- menv <- gets modalEnv
-  -- liftIO $ putStrLn $ Pr.ppShow menv
   virtualize
   assemblize
   emit

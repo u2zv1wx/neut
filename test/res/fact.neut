@@ -20,6 +20,8 @@
 
 (index i32)
 
+(index u32)
+
 (primitive core.i32.add (arrow i32 i32 i32))
 
 (primitive core.i32.sub (arrow i32 i32 i32))

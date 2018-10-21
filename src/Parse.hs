@@ -85,6 +85,8 @@ parse (meta :< TreeAtom "_") = do
   name <- newNameWith "hole"
   return $ meta :< NeutHole name
 parse (meta :< TreeAtom s)
+  | '.' `elem` s
+  , Just f <- readMaybe s = return $ meta :< NeutIndexIntro (IndexFloat f)
   | Just i <- readMaybe s = return $ meta :< NeutIndexIntro (IndexInteger i)
 parse (meta :< TreeAtom s) = do
   flag1 <- isDefinedIndex s
@@ -96,6 +98,11 @@ parse (meta :< TreeAtom s) = do
 parse t = lift $ throwE $ "parse: syntax error:\n" ++ Pr.ppShow t
 
 parseClause :: Tree -> WithEnv (Index, Neut)
+parseClause (_ :< TreeNode [_ :< TreeAtom s, t])
+  | '.' `elem` s
+  , Just f <- readMaybe s = do
+    e <- parse t
+    return (IndexFloat f, e)
 parseClause (_ :< TreeNode [_ :< TreeAtom s, t])
   | Just i <- readMaybe s = do
     e <- parse t
