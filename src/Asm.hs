@@ -87,9 +87,9 @@ asmData x (DataGlobal y) cont = do
     Just (args, _) -> do
       let funPtrType = toFunPtrType args
       return $ AsmBitcast x (AsmDataGlobal y) funPtrType voidPtr cont
-asmData x (DataInt32 i) cont =
-  return $ AsmIntToPointer x (AsmDataInt32 i) (LowTypeInt 32) voidPtr cont
-asmData reg (DataStruct []) cont = asmData reg (DataInt32 0) cont
+asmData x (DataInt i) cont =
+  return $ AsmIntToPointer x (AsmDataInt i) (LowTypeSignedInt 64) voidPtr cont
+asmData reg (DataStruct []) cont = asmData reg (DataInt 0) cont
 asmData reg (DataStruct [d]) cont = asmData reg d cont
 asmData reg (DataStruct ds) cont = do
   xs <- mapM (const $ newNameWith "cursor") ds
@@ -137,7 +137,7 @@ asmSwitch name branchList = do
   tmp <- newNameWith "switch"
   cast <- newNameWith "cast"
   asmData' [(tmp, name)] $
-    AsmPointerToInt cast (AsmDataLocal tmp) voidPtr (LowTypeInt 64) $
+    AsmPointerToInt cast (AsmDataLocal tmp) voidPtr (LowTypeSignedInt 64) $
     AsmSwitch (AsmDataLocal cast) defaultCase caseList
 
 setContent :: Identifier -> Int -> [(Int, Identifier)] -> Asm -> WithEnv Asm
@@ -160,7 +160,7 @@ asmStruct ((x, d):xds) cont = do
   asmData x d cont'
 
 voidPtr :: LowType
-voidPtr = LowTypePointer $ LowTypeInt 8
+voidPtr = LowTypePointer $ LowTypeSignedInt 8
 
 toFunPtrType :: [a] -> LowType
 toFunPtrType xs = do

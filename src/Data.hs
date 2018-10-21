@@ -88,7 +88,8 @@ $(deriveShow1 ''NeutF)
 deriving instance Eq a => Eq (NeutF a)
 
 data LowType
-  = LowTypeInt Int
+  = LowTypeSignedInt Int
+  | LowTypeUnsignedInt Int
   | LowTypePointer LowType
   | LowTypeFunction [LowType]
                     LowType
@@ -98,7 +99,8 @@ data LowType
   deriving (Eq)
 
 instance Show LowType where
-  show (LowTypeInt i) = "i" ++ show i
+  show (LowTypeSignedInt i) = "i" ++ show i
+  show (LowTypeUnsignedInt i) = "i" ++ show i
   show (LowTypePointer t) = show t ++ "*"
   show (LowTypeFunction ts t) = show t ++ " (" ++ showList ts ++ ")"
   show (LowTypeArray i t) = "[" ++ show i ++ " x " ++ show t ++ "]"
@@ -200,7 +202,7 @@ data Comp
 data Data
   = DataLocal Identifier
   | DataGlobal Identifier
-  | DataInt32 Int
+  | DataInt Int
   | DataStruct [Data]
   | DataArith (Arith, LowType)
               Data
@@ -234,12 +236,12 @@ data Code
 data AsmData
   = AsmDataLocal Identifier
   | AsmDataGlobal Identifier
-  | AsmDataInt32 Int
+  | AsmDataInt Int
 
 instance Show AsmData where
   show (AsmDataLocal x) = "%" ++ x
   show (AsmDataGlobal x) = "@" ++ x
-  show (AsmDataInt32 i) = show i
+  show (AsmDataInt i) = show i
 
 data Arith
   = ArithAdd
@@ -621,8 +623,21 @@ wrapTypeWithUniv univ t = do
   insTypeEnv meta univ
   return $ meta :< t
 
-intTypeList :: [Identifier]
-intTypeList = ["i8", "i16", "i32", "i64"]
-
 intLowTypeList :: [LowType]
-intLowTypeList = [LowTypeInt 8, LowTypeInt 16, LowTypeInt 32, LowTypeInt 64]
+intLowTypeList = signedIntLowTypeList ++ unsignedIntLowTypeList
+
+signedIntLowTypeList :: [LowType]
+signedIntLowTypeList =
+  [ LowTypeSignedInt 8
+  , LowTypeSignedInt 16
+  , LowTypeSignedInt 32
+  , LowTypeSignedInt 64
+  ]
+
+unsignedIntLowTypeList :: [LowType]
+unsignedIntLowTypeList =
+  [ LowTypeUnsignedInt 8
+  , LowTypeUnsignedInt 16
+  , LowTypeUnsignedInt 32
+  , LowTypeUnsignedInt 64
+  ]

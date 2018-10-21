@@ -155,7 +155,10 @@ emitAsm funName (AsmAlloc x ts cont) = do
 emitAsm funName (AsmFree d cont) = do
   emitOp $ unwords ["call", "void", "@free(i8* " ++ show d ++ ")"]
   emitAsm funName cont
-emitAsm funName (AsmArith x (ArithAdd, t) d1 d2 cont) = do
+emitAsm funName (AsmArith x (ArithAdd, t) d1 d2 cont)
+  -- thanks to the two's complement representation of LLVM, these arithmetic
+  -- instructions ('add', 'sub', 'mul') are valid for both signed and unsigned integers.
+ = do
   emitOp $
     unwords
       [ show (AsmDataLocal x)
@@ -250,7 +253,9 @@ showArgs :: [AsmData] -> String
 showArgs ds = "(" ++ showItems showArg ds ++ ")"
 
 showLowType :: LowType -> String
-showLowType (LowTypeInt i) = "i" ++ show i
+showLowType (LowTypeSignedInt i) = "i" ++ show i
+-- LLVM doesn't distinguish unsigned integers from signed ones
+showLowType (LowTypeUnsignedInt i) = "i" ++ show i
 showLowType (LowTypePointer t) = showLowType t ++ "*"
 showLowType (LowTypeStruct ts) = "{" ++ showList ts ++ "}"
 showLowType (LowTypeArray i t) = "[" ++ show i ++ " x " ++ showLowType t ++ "]"

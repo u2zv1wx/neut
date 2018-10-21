@@ -336,18 +336,6 @@ toVar' x = do
   meta <- newNameWith "meta"
   return $ meta :< NeutVar x
 
-toLowType :: Neut -> WithEnv LowType
-toLowType (_ :< NeutVar _) = return $ LowTypeInt 32 -- (*1)
-toLowType (_ :< NeutPi _ _) = return $ LowTypePointer $ LowTypeInt 8
-toLowType (_ :< NeutSigma xts t) = do
-  ts' <- mapM (reduce >=> toLowType) (map snd xts ++ [t])
-  let ts'' = map LowTypePointer ts'
-  return $ LowTypeStruct ts''
-toLowType (_ :< NeutIndex _) = return $ LowTypeInt 32
-toLowType (_ :< NeutUniv _) = return $ LowTypeInt 32
-toLowType (_ :< NeutBox _) = return $ LowTypePointer $ LowTypeInt 32
-toLowType v = lift $ throwE $ "Asm.toLowType: " ++ show v ++ " is not a type"
-
 substCode :: [(String, Data)] -> Code -> Code
 substCode sub (CodeReturn ans) = CodeReturn $ substData sub ans
 substCode sub (CodeLet x d cont) =
@@ -375,5 +363,5 @@ substCode sub (CodeFree x cont) = do
 substData :: [(String, Data)] -> Data -> Data
 substData sub (DataLocal x) = fromMaybe (DataLocal x) (lookup x sub)
 substData _ (DataGlobal x) = DataGlobal x
-substData _ (DataInt32 i) = DataInt32 i
+substData _ (DataInt i) = DataInt i
 substData sub (DataStruct ds) = DataStruct $ map (substData sub) ds

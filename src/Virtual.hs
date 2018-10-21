@@ -32,23 +32,23 @@ virtualize = do
 virtualValue :: Value -> WithEnv Data
 virtualValue (ValueVar x) = globalizeIfNecessary x
 virtualValue (ValueConst x) = return $ DataGlobal x
-virtualValue (ValueSigma _ _) = return $ DataInt32 0
+virtualValue (ValueSigma _ _) = return $ DataInt 0
 virtualValue (ValueSigmaIntro es) = do
   ds <- mapM virtualValue es
   return $ DataStruct ds
-virtualValue (ValueIndex _) = return $ DataInt32 0
+virtualValue (ValueIndex _) = return $ DataInt 0
 virtualValue (ValueIndexIntro x) = do
   i <- indexToInt x
-  return $ DataInt32 i
-virtualValue ValueUniv = return $ DataInt32 0
-virtualValue (ValueBox _) = return $ DataInt32 0
+  return $ DataInt i
+virtualValue ValueUniv = return $ DataInt 0
+virtualValue (ValueBox _) = return $ DataInt 0
 virtualValue (ValueArith kind e1 e2) = do
   d1 <- virtualValue e1
   d2 <- virtualValue e2
   return $ DataArith kind d1 d2
 
 virtualComp :: Comp -> WithEnv Code
-virtualComp (CompPi _ _) = return $ CodeReturn $ DataInt32 0
+virtualComp (CompPi _ _) = return $ CodeReturn $ DataInt 0
 virtualComp (CompPiElimBoxElim f xs) = do
   f' <- globalizeIfNecessary f
   let xs' = map DataLocal xs
@@ -71,7 +71,7 @@ virtualComp (CompUpElim x e1 e2) = do
   return $ commUpElim x e1' e2'
 virtualComp (CompPrint t e) = do
   e' <- virtualValue e
-  return $ CodePrint t e' $ CodeReturn (DataInt32 0)
+  return $ CodePrint t e' $ CodeReturn (DataInt 0)
 
 extract :: Data -> [(Identifier, Int)] -> Int -> Code -> Code
 extract z [] _ cont = CodeFree z cont
