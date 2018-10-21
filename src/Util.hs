@@ -18,6 +18,9 @@ import qualified Text.Show.Pretty as Pr
 
 import Debug.Trace
 
+import System.Directory
+import System.FilePath
+
 toPiIntroSeq :: Neut -> (Neut, [(Identifier, Neut, Identifier)])
 toPiIntroSeq (meta :< NeutPiIntro (x, t) body) = do
   let (body', args) = toPiIntroSeq body
@@ -365,3 +368,9 @@ substData sub (DataLocal x) = fromMaybe (DataLocal x) (lookup x sub)
 substData _ (DataGlobal x) = DataGlobal x
 substData _ (DataInt i) = DataInt i
 substData sub (DataStruct ds) = DataStruct $ map (substData sub) ds
+
+expandDirPath :: FilePath -> IO FilePath
+expandDirPath path = do
+  current <- getCurrentDirectory
+  -- note that, if `path` is an absolute path, `path` itself is returned here.
+  return $ current </> path

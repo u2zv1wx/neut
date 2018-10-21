@@ -1,49 +1,6 @@
-(reserve let)
+;; fact.neut
 
-(reserve begin)
-
-(notation (begin e)
-  e)
-
-(notation (begin e rest+)
-  (apply (lambda ((_ _)) (begin rest+)) (begin e)))
-
-(notation (begin (let x e+) rest+)
-  (apply (lambda ((x _)) (begin rest+)) (begin e+)))
-
-(reserve arrow)
-
-(notation (arrow rest+)
-  (box (hom rest+)))
-
-(index top unit)
-
-(index i32)
-
-(index u32)
-
-(primitive core.i32.add (arrow i32 i32 i32))
-
-(primitive core.i32.sub (arrow i32 i32 i32))
-
-(primitive core.i32.mul (arrow i32 i32 i32))
-
-(primitive core.i32.copy (arrow i32 (tensor i32 i32)))
-
-(definition type (box universe))
-
-(definition state
-  (data
-    (lambda ((S type) (A type))
-      (hom S (tensor S A)))))
-
-(index world)
-
-(definition io
-  (data
-    (state world)))
-
-(primitive core.i32.print (arrow i32 (io top)))
+(include "./base.neut")
 
 (definition fact
   (data
@@ -58,3 +15,5 @@
                    (core.i32.mul n1 (self (core.i32.sub n2 1)))))))))))))
 
 (core.i32.print (fact 10))
+
+;; fact.neut ends here.

@@ -19,6 +19,8 @@ dependencies:
 - deriving-compat
 - recursion-schemes
 - pqueue
+- directory
+- filepath
 
 library:
   source-dirs: src

@@ -28,14 +28,15 @@ import Virtual
 
 import Reduce
 
+import System.Directory
+import System.FilePath
+
+import Text.Read (readMaybe)
+
 import qualified Text.Show.Pretty as Pr
 
 load :: String -> WithEnv ()
-load s = do
-  astList <- strToTree s
-  defList <- load' astList
-  e <- concatDefList defList
-  process e
+load s = toDefList s >>= concatDefList >>= process
 
 load' :: [Tree] -> WithEnv [(Identifier, Identifier, Neut)]
 load' [] = return []
@@ -49,6 +50,23 @@ load' ((_ :< TreeNode ((_ :< TreeAtom "index"):(_ :< TreeAtom name):ts)):as) = d
   indexList <- mapM parseAtom ts
   insIndexEnv name indexList
   load' as
+load' ((_ :< TreeNode [_ :< TreeAtom "include", _ :< TreeAtom s]):as) =
+  case readMaybe s :: Maybe String of
+    Nothing -> E.lift $ throwE "the argument of `include` must be a string"
+    Just path -> do
+      dirPath <- gets currentDir
+      let nextPath = dirPath </> path
+      b <- liftIO $ doesFileExist nextPath
+      if not b
+        then E.lift $ throwE $ "no such file: " ++ normalise nextPath
+        else do
+          content <- liftIO $ readFile nextPath
+          let nextDirPath = dirPath </> takeDirectory path
+          modify (\e -> e {currentDir = nextDirPath})
+          includedDefList <- toDefList content
+          modify (\e -> e {currentDir = dirPath})
+          defList <- load' as
+          return $ includedDefList ++ defList
 load' ((meta :< TreeNode [primMeta :< TreeAtom "primitive", _ :< TreeAtom name, t]):as) = do
   t' <- macroExpand t >>= parse >>= rename
   constNameWith name
@@ -64,6 +82,9 @@ load' (a:as) = do
   name <- newNameWith "hole"
   defList <- load' as
   return $ (meta, name, e) : defList
+
+toDefList :: String -> WithEnv [(Identifier, Identifier, Neut)]
+toDefList s = strToTree s >>= load'
 
 concatDefList :: [(Identifier, Identifier, Neut)] -> WithEnv Neut
 concatDefList [] = do

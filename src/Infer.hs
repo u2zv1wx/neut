@@ -274,7 +274,7 @@ simp ((ctx, e1, v@(_ :< NeutVar _), t):cs) = simp $ (ctx, v, e1, t) : cs
 simp ((ctx, _ :< NeutPi (x, tdom1) tcod1, _ :< NeutPi (y, tdom2) tcod2, univ):cs) = do
   var <- toVar' x
   cs' <- sConstraint [(y, var)] cs >>= simp
-  return $
+  simp $
     (ctx, tdom1, tdom2, univ) :
     (ctx ++ [x], tcod1, subst [(y, var)] tcod2, univ) : cs'
 simp ((ctx, _ :< NeutPiIntro (x, _) body1, _ :< NeutPiIntro (y, _) body2, t):cs) = do
@@ -290,7 +290,7 @@ simp ((ctx, e1, e2@(_ :< NeutPiIntro _ _), t):cs) = simp $ (ctx, e2, e1, t) : cs
 simp ((ctx, _ :< NeutSigma [(x, tdom1)] tcod1, _ :< NeutSigma [(y, tdom2)] tcod2, univ):cs) = do
   var <- toVar' x
   cs' <- sConstraint [(y, var)] cs >>= simp
-  return $
+  simp $
     (ctx, tdom1, tdom2, univ) :
     (ctx ++ [x], tcod1, subst [(y, var)] tcod2, univ) : cs'
 simp ((ctx, i :< NeutSigma ((x, tdom1):xts) tcod1, j :< NeutSigma ((y, tdom2):yts) tcod2, univ):cs) = do

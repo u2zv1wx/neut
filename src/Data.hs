@@ -402,10 +402,11 @@ data Env = Env
   , numConstraintEnv :: [Identifier]
   , codeEnv :: [(Identifier, ([Identifier], IORef Code))]
   , asmEnv :: [(Identifier, ([Identifier], Asm))]
+  , currentDir :: FilePath
   } deriving (Show)
 
-initialEnv :: Env
-initialEnv =
+initialEnv :: FilePath -> Env
+initialEnv path =
   Env
     { count = 0
     , notationEnv = []
@@ -438,6 +439,7 @@ initialEnv =
     , caseStack = []
     , univConstraintEnv = []
     , numConstraintEnv = []
+    , currentDir = path
     }
 
 type WithEnv a = StateT Env (ExceptT String IO) a
