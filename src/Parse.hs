@@ -37,6 +37,10 @@ parse (meta :< TreeNode [_ :< TreeAtom "lambda", _ :< TreeNode ts, te]) = do
   e <- parse te
   _ :< term <- foldMR NeutPiIntro e xs
   return $ meta :< term
+parse (meta :< TreeNode [_ :< TreeAtom "apply", t1, t2]) = do
+  e1 <- parse t1
+  e2 <- parse t2
+  return $ meta :< NeutPiElim e1 e2
 parse (meta :< TreeNode [_ :< TreeAtom "exists", _ :< TreeNode ts, tn]) = do
   its <- mapM parseArg ts
   n <- parse tn

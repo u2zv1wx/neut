@@ -58,4 +58,4 @@
                 ((pair n1 n2)
                  ((code core.i32.mul) n1 ((code self) ((code core.i32.sub) n2 1))))))))))))
 
-((code core.i32.print) (fact 10))
+(apply (code core.i32.print) (fact 10))
