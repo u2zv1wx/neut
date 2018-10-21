@@ -6,10 +6,10 @@
   e)
 
 (notation (begin e rest+)
-  ((lambda ((_ _)) (begin rest+)) (begin e)))
+  (apply (lambda ((_ _)) (begin rest+)) (begin e)))
 
 (notation (begin (let x e+) rest+)
-  ((lambda ((x _)) (begin rest+)) (begin e+)))
+  (apply (lambda ((x _)) (begin rest+)) (begin e+)))
 
 (reserve arrow)
 
@@ -40,22 +40,21 @@
 (index world)
 
 (definition io
-  ((code state) world))
-
-(definition io2
-  ((code state) world))
+  (data
+    (state world)))
 
 (primitive core.i32.print (arrow i32 (io top)))
 
 (definition fact
-  (mu self
-    (lambda (x)
-      (case x
-        ((1 1)
-         (n (begin
-              (let p ((code core.i32.copy) n))
-              (case p
-                ((pair n1 n2)
-                 ((code core.i32.mul) n1 ((code self) ((code core.i32.sub) n2 1))))))))))))
+  (data
+    (mu self
+      (lambda (x)
+        (case x
+          ((1 1)
+           (n (begin
+                (let p (core.i32.copy n))
+                (case p
+                  ((pair n1 n2)
+                   (core.i32.mul n1 (self (core.i32.sub n2 1)))))))))))))
 
-(apply (code core.i32.print) (fact 10))
+(core.i32.print (fact 10))

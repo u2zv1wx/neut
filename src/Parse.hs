@@ -82,8 +82,10 @@ parse (meta :< TreeNode [_ :< TreeAtom "mu", _ :< TreeAtom x, te]) = do
 parse (meta :< TreeNode (te:tvs))
   | not (null tvs) = do
     e <- parse te
+    funMeta <- newNameWith "meta"
+    let e' = funMeta :< NeutBoxElim e
     vs <- mapM parse tvs
-    _ :< tmp <- foldML NeutPiElim e vs
+    _ :< tmp <- foldML NeutPiElim e' vs
     return $ meta :< tmp
 parse (meta :< TreeAtom "_") = do
   name <- newNameWith "hole"
