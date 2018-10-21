@@ -2,31 +2,31 @@ module Read
   ( strToTree
   ) where
 
-import           Control.Monad.Except
-import           Control.Monad.Identity
-import           Control.Monad.State
-import           Control.Monad.Trans.Except
+import Control.Monad.Except
+import Control.Monad.Identity
+import Control.Monad.State
+import Control.Monad.Trans.Except
 
-import           Control.Comonad.Cofree
+import Control.Comonad.Cofree
 
-import           Text.Parsec                hiding (Parsec, count)
+import Text.Parsec hiding (Parsec, count)
 
-import           Data
+import Data
 
 type Parser a = ParsecT String () (StateT Env (ExceptT String IO)) a
 
 strToTree :: String -> WithEnv [Tree]
 strToTree input = do
-  t <- runParserT (spaces >> parseSExpList) () "read" input
+  t <- runParserT (skip >> parseSExpList) () "read" input
   case t of
     Left err -> lift $ throwE (show err)
-    Right p  -> return p
+    Right p -> return p
 
 parseSExpList :: Parser [Tree]
-parseSExpList = sepEndBy parseStr spaces
+parseSExpList = sepEndBy parseStr skip
 
 symbol :: Parser String
-symbol = many1 (noneOf "()[] \n")
+symbol = many1 (noneOf "()[] \n;")
 
 parseStr :: Parser Tree
 parseStr = parseNode <|> parseAtom
@@ -34,15 +34,15 @@ parseStr = parseNode <|> parseAtom
 parseAtom :: Parser Tree
 parseAtom = do
   s <- symbol
-  _ <- spaces
+  _ <- skip
   i <- newNameParser
   return $ i :< TreeAtom s
 
 parseNode :: Parser Tree
 parseNode = do
-  _ <- char '(' >> spaces
+  _ <- char '(' >> skip
   itemList <- many parseStr
-  _ <- spaces >> char ')' >> spaces
+  _ <- skip >> char ')' >> skip
   i <- newNameParser
   return $ i :< TreeNode itemList
 
@@ -52,3 +52,12 @@ newNameParser = do
   let i = count env
   modify (\e -> e {count = i + 1})
   return $ "meta." ++ show i
+
+skip :: Parser ()
+skip = spaces >> (comment <|> spaces)
+
+comment :: Parser ()
+comment = do
+  _ <- char ';'
+  skipMany (noneOf "\n")
+  skip
