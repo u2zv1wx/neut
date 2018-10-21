@@ -72,16 +72,31 @@ load' ((meta :< TreeNode [primMeta :< TreeAtom "primitive", _ :< TreeAtom name, 
   constNameWith name
   defList <- load' as
   return $ (meta, name, primMeta :< NeutConst name t') : defList
-load' ((meta :< TreeNode [_ :< TreeAtom "definition", _ :< TreeAtom name, tbody]):as) = do
+load' ((meta :< TreeNode [_ :< TreeAtom "let", _ :< TreeAtom name, tbody]):as) = do
   e <- macroExpand tbody >>= parse >>= rename
   name' <- newNameWith name
   defList <- load' as
   return $ (meta, name', e) : defList
 load' (a:as) = do
-  e@(meta :< _) <- macroExpand a >>= parse >>= rename
-  name <- newNameWith "hole"
-  defList <- load' as
-  return $ (meta, name, e) : defList
+  e <- macroExpand a
+  if isSpecialForm e
+    then load' $ e : as
+    else do
+      e'@(meta :< _) <- parse e >>= rename
+      name <- newNameWith "hole"
+      defList <- load' as
+      return $ (meta, name, e') : defList
+
+isSpecialForm :: Tree -> Bool
+isSpecialForm (_ :< TreeNode [_ :< TreeAtom "notation", _, _]) = True
+isSpecialForm (_ :< TreeNode [_ :< TreeAtom "reserve", _ :< TreeAtom _]) = True
+isSpecialForm (_ :< TreeNode ((_ :< TreeAtom "index"):(_ :< TreeAtom _):_)) =
+  True
+isSpecialForm (_ :< TreeNode [_ :< TreeAtom "include", _ :< TreeAtom _]) = True
+isSpecialForm (_ :< TreeNode [_ :< TreeAtom "primitive", _ :< TreeAtom _, _]) =
+  True
+isSpecialForm (_ :< TreeNode [_ :< TreeAtom "let", _ :< TreeAtom _, _]) = True
+isSpecialForm _ = False
 
 toDefList :: String -> WithEnv [(Identifier, Identifier, Neut)]
 toDefList s = strToTree s >>= load'

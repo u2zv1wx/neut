@@ -3,16 +3,14 @@
 (include "./base.neut")
 
 (definition fact
-  (data
-    (mu self
-      (lambda (x)
-        (case x
-          ((1 1)
-           (n (begin
-                (let p (core.i32.copy n))
-                (case p
-                  ((pair n1 n2)
-                   (core.i32.mul n1 (self (core.i32.sub n2 1)))))))))))))
+  (lambda (x)
+    (case x
+      ((1 1)
+       (n (begin
+            (let p (core.i32.copy n))
+            (case p
+              ((pair n1 n2)
+               (core.i32.mul n1 (fact (core.i32.sub n2 1)))))))))))
 
 (core.i32.print (fact 10))
 
