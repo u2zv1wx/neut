@@ -66,7 +66,7 @@ infer ctx (meta :< NeutPiIntro (s, tdom) e) = do
   tcod <- infer ctx' e >>= annot univ
   typeMeta <- newName' "meta" univ
   returnMeta meta $ typeMeta :< NeutPi (s, tdom') tcod
-infer ctx e@(meta :< NeutPiElim e1 e2) = do
+infer ctx (meta :< NeutPiElim e1 e2) = do
   univ <- boxUniv
   -- obtain the type of e1
   tPi <- infer ctx e1 >>= reduce -- forall (x : tdom). tcod

@@ -38,7 +38,7 @@ import qualified Text.Show.Pretty as Pr
 load :: String -> WithEnv ()
 load s = toDefList s >>= concatDefList >>= process
 
-load' :: [Tree] -> WithEnv [(Identifier, Identifier, Neut)]
+load' :: [Tree] -> WithEnv [Def]
 load' [] = return []
 load' ((_ :< TreeNode [_ :< TreeAtom "notation", from, to]):as) = do
   modify (\e -> e {notationEnv = (from, to) : notationEnv e})
@@ -67,16 +67,40 @@ load' ((_ :< TreeNode [_ :< TreeAtom "include", _ :< TreeAtom s]):as) =
           modify (\e -> e {currentDir = dirPath})
           defList <- load' as
           return $ includedDefList ++ defList
+load' ((meta :< TreeNode ((_ :< TreeAtom "module"):(_ :< TreeAtom moduleName):ts)):as) = do
+  moduleDefList <- load' ts
+  xes <- join <$> mapM defToDefList moduleDefList
+  moduleName' <- newNameWith moduleName
+  modify (\e -> e {moduleEnv = (moduleName', xes) : moduleEnv e})
+  let es = map snd xes
+  boxMeta <- newNameWith "meta"
+  let boxSigma = boxMeta :< NeutBoxIntro (meta :< NeutSigmaIntro es)
+  defList <- load' as
+  return $ DefLet meta (moduleName, moduleName') boxSigma : defList
+load' ((meta :< TreeNode [_ :< TreeAtom "use", _ :< TreeAtom moduleName]):as) = do
+  moduleName' <- lookupNameEnv moduleName
+  menv <- gets moduleEnv
+  case lookup moduleName' menv of
+    Nothing ->
+      E.lift $
+      throwE $
+      "the module " ++
+      moduleName ++ " is defined, but not registered in the module environment."
+    Just xes -> do
+      let (nameList, _) = unzip xes
+      ns <- mapM (newNameWith . (\s -> moduleName ++ ":" ++ s)) nameList
+      defList <- load' as
+      return $ DefMod meta (moduleName, moduleName') ns : defList
 load' ((meta :< TreeNode [primMeta :< TreeAtom "primitive", _ :< TreeAtom name, t]):as) = do
   t' <- macroExpand t >>= parse >>= rename
   constNameWith name
   defList <- load' as
-  return $ (meta, name, primMeta :< NeutConst name t') : defList
+  return $ DefLet meta (name, name) (primMeta :< NeutConst name t') : defList
 load' ((meta :< TreeNode [_ :< TreeAtom "let", _ :< TreeAtom name, tbody]):as) = do
   e <- macroExpand tbody >>= parse >>= rename
   name' <- newNameWith name
   defList <- load' as
-  return $ (meta, name', e) : defList
+  return $ DefLet meta (name, name') e : defList
 load' (a:as) = do
   e <- macroExpand a
   if isSpecialForm e
@@ -85,7 +109,15 @@ load' (a:as) = do
       e'@(meta :< _) <- parse e >>= rename
       name <- newNameWith "hole"
       defList <- load' as
-      return $ (meta, name, e') : defList
+      return $ DefLet meta (name, name) e' : defList
+
+defToDefList :: Def -> WithEnv [(Identifier, Neut)]
+defToDefList (DefLet _ (name, _) e) = return [(name, e)]
+defToDefList (DefMod _ (name, name') _) = do
+  menv <- gets moduleEnv
+  case lookup name' menv of
+    Nothing -> E.lift $ throwE $ "no such module: " ++ name
+    Just es -> return es
 
 isSpecialForm :: Tree -> Bool
 isSpecialForm (_ :< TreeNode [_ :< TreeAtom "notation", _, _]) = True
@@ -98,19 +130,25 @@ isSpecialForm (_ :< TreeNode [_ :< TreeAtom "primitive", _ :< TreeAtom _, _]) =
 isSpecialForm (_ :< TreeNode [_ :< TreeAtom "let", _ :< TreeAtom _, _]) = True
 isSpecialForm _ = False
 
-toDefList :: String -> WithEnv [(Identifier, Identifier, Neut)]
+toDefList :: String -> WithEnv [Def]
 toDefList s = strToTree s >>= load'
 
-concatDefList :: [(Identifier, Identifier, Neut)] -> WithEnv Neut
+concatDefList :: [Def] -> WithEnv Neut
 concatDefList [] = do
   meta <- newNameWith "meta"
   return $ meta :< NeutIndexIntro (IndexLabel "unit")
-concatDefList [(_, _, e)] = return e
-concatDefList ((meta, name, e):es) = do
+concatDefList [DefLet _ _ e] = return e
+concatDefList (DefLet meta (_, name') e:es) = do
   cont <- concatDefList es
   h <- newNameWith "any"
   let hole = meta :< NeutHole h
-  return $ meta :< NeutPiElim (meta :< NeutPiIntro (name, hole) cont) e
+  return $ meta :< NeutPiElim (meta :< NeutPiIntro (name', hole) cont) e
+concatDefList (DefMod sigMeta (_, name') xs:es) = do
+  cont <- concatDefList es
+  meta <- newNameWith "meta"
+  unboxMeta <- newNameWith "meta"
+  let v = unboxMeta :< NeutBoxElim (meta :< NeutVar name')
+  return $ sigMeta :< NeutSigmaElim v xs cont
 
 process :: Neut -> WithEnv ()
 process e = do
@@ -120,3 +158,12 @@ process e = do
   virtualize
   assemblize
   emit
+
+data Def
+  = DefLet Identifier
+           (Identifier, Identifier)
+           Neut
+  | DefMod Identifier
+           (Identifier, Identifier)
+           [Identifier]
+  deriving (Show)

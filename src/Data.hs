@@ -387,6 +387,7 @@ data Env = Env
   { count :: Int -- to generate fresh symbols
   , notationEnv :: [(Tree, Tree)] -- macro transformers
   , reservedEnv :: [Identifier] -- list of reserved keywords
+  , moduleEnv :: [(Identifier, [(Identifier, Neut)])]
   , indexEnv :: [(Identifier, [Identifier])]
   , nameEnv :: [(Identifier, Identifier)] -- used in alpha conversion
   , typeEnv :: [(Identifier, Neut)] -- type environment
@@ -424,6 +425,7 @@ initialEnv path =
         , "forall"
         , "up"
         ]
+    , moduleEnv = []
     , indexEnv = []
     , nameEnv = []
     , typeEnv = []
