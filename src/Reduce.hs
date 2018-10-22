@@ -65,7 +65,6 @@ reduce t = return t
 
 isNonRecReducible :: Neut -> Bool
 isNonRecReducible (_ :< NeutVar _) = False
-isNonRecReducible (_ :< NeutConst _ _) = False
 isNonRecReducible (_ :< NeutPi (_, tdom) tcod) =
   isNonRecReducible tdom || isNonRecReducible tcod
 isNonRecReducible (_ :< NeutPiIntro _ e) = isNonRecReducible e
@@ -89,12 +88,14 @@ isNonRecReducible (_ :< NeutIndexElim e branchList) = do
   let es = map snd branchList
   any isNonRecReducible $ e : es
 isNonRecReducible (_ :< NeutUniv _) = False
+isNonRecReducible (_ :< NeutConst _) = False
+isNonRecReducible (_ :< NeutConstIntro _) = False
+isNonRecReducible (_ :< NeutConstElim _) = False
 isNonRecReducible (_ :< NeutMu _ _) = False
 isNonRecReducible (_ :< NeutHole _) = False
 
 nonRecReduce :: Neut -> WithEnv Neut
 nonRecReduce e@(_ :< NeutVar _) = return e
-nonRecReduce e@(_ :< NeutConst _ _) = return e
 nonRecReduce (i :< NeutPi (x, tdom) tcod) = do
   tdom' <- nonRecReduce tdom
   tcod' <- nonRecReduce tcod
@@ -151,6 +152,9 @@ nonRecReduce (i :< NeutIndexElim e branchList) = do
           throwE $ "the index " ++ show x ++ " is not included in branchList"
         Just body -> nonRecReduce body
     _ -> return $ i :< NeutIndexElim e' branchList
+nonRecReduce e@(_ :< NeutConst _) = return e
+nonRecReduce e@(_ :< NeutConstIntro _) = return e
+nonRecReduce e@(_ :< NeutConstElim _) = return e
 nonRecReduce e@(_ :< NeutUniv _) = return e
 nonRecReduce e@(_ :< NeutMu _ _) = return e
 nonRecReduce e@(_ :< NeutHole x) = do
@@ -230,7 +234,7 @@ reduceComp (CompPi (x, tdom) tcod) = do
   tdom' <- reduceValue tdom
   tcod' <- reduceComp tcod
   return $ CompPi (x, tdom') tcod'
-reduceComp (CompPiElimBoxElim x xs) = return $ CompPiElimBoxElim x xs
+reduceComp (CompPiElimConstElim x xs) = return $ CompPiElimConstElim x xs
 reduceComp (CompSigmaElim e xs body) = do
   body' <- reduceComp body
   return $ CompSigmaElim e xs body'
@@ -251,7 +255,7 @@ reduceComp (CompUpElim x e1 e2) = do
   e2' <- reduceComp e2
   case e1' of
     CompUpIntro (ValueVar y) -> reduceComp $ substComp [(x, y)] e2'
-    CompUpIntro (ValueConst y) -> reduceComp $ substComp [(x, y)] e2'
+    CompUpIntro (ValueConstIntro y) -> reduceComp $ substComp [(x, y)] e2'
     _ -> return $ CompUpElim x e1' e2'
 reduceComp (CompPrint t e) = do
   e' <- reduceValue e
@@ -259,7 +263,6 @@ reduceComp (CompPrint t e) = do
 
 subst :: Subst -> Neut -> Neut
 subst sub (j :< NeutVar s) = fromMaybe (j :< NeutVar s) (lookup s sub)
-subst sub (j :< NeutConst s t) = j :< NeutConst s (subst sub t)
 subst sub (j :< NeutPi (s, tdom) tcod) = do
   let tdom' = subst sub tdom
   let tcod' = subst sub tcod -- note that we don't have to drop s from sub, thanks to rename.
@@ -297,6 +300,9 @@ subst sub (j :< NeutIndexElim e branchList) = do
   let e' = subst sub e
   let branchList' = map (\(l, e) -> (l, subst sub e)) branchList
   j :< NeutIndexElim e' branchList'
+subst sub (j :< NeutConst t) = j :< NeutConst (subst sub t)
+subst _ (j :< NeutConstIntro s) = j :< NeutConstIntro s
+subst sub (j :< NeutConstElim e) = j :< NeutConstElim (subst sub e)
 subst _ (j :< NeutUniv i) = j :< NeutUniv i
 subst sub (j :< NeutMu x e) = do
   let e' = subst sub e
@@ -394,13 +400,10 @@ substComp sub (CompPi (s, tdom) tcod) = do
   let tdom' = substValue sub tdom
   let tcod' = substComp sub tcod
   CompPi (s, tdom') tcod'
-substComp sub (CompPiElimBoxElim x xs) = do
+substComp sub (CompPiElimConstElim x xs) = do
   let x' = fromMaybe x (lookup x sub)
   let xs' = map (\y -> fromMaybe y (lookup y sub)) xs
-  CompPiElimBoxElim x' xs'
-  -- let e1' = substComp sub e1
-  -- let e2' = substValue sub e2
-  -- CompPiElim e1' e2'
+  CompPiElimConstElim x' xs'
 substComp sub (CompSigmaElim e1 xs e2) = do
   let e1' = substValue sub e1
   let e2' = substComp sub e2

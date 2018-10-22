@@ -56,8 +56,6 @@ data Index
 
 data NeutF a
   = NeutVar Identifier
-  | NeutConst Identifier
-              a
   | NeutPi (Identifier, a)
            a
   | NeutPiIntro (Identifier, a)
@@ -78,6 +76,9 @@ data NeutF a
   | NeutIndexElim a
                   [(Index, a)]
   | NeutUniv UnivLevel
+  | NeutConst a -- constant modality
+  | NeutConstIntro Identifier
+  | NeutConstElim a
   | NeutMu Identifier
            a
   | NeutHole Identifier
@@ -116,7 +117,6 @@ showList (a:as) = show a ++ ", " ++ showList as
 
 data Pos
   = PosVar Identifier
-  | PosConst Identifier
   | PosSigma [(Identifier, Pos)]
              Pos
   | PosSigmaIntro [Pos]
@@ -128,6 +128,8 @@ data Pos
   | PosUniv
   | PosBox Neg
   | PosBoxIntro Neg
+  | PosConst Pos
+  | PosConstIntro Identifier
   | PosArith (Arith, LowType)
              Pos
              Pos
@@ -151,6 +153,7 @@ data Neg
               Neg
   | NegDownElim Pos
   | NegBoxElim Pos
+  | NegConstElim Pos
   | NegMu Identifier
           Neg
   | NegPrint LowType
@@ -171,7 +174,6 @@ data Neg
 -- positive modal normal form
 data Value
   = ValueVar Identifier
-  | ValueConst Identifier
   | ValueSigma [(Identifier, Value)]
                Value
   | ValueSigmaIntro [Value]
@@ -180,6 +182,8 @@ data Value
                     Identifier
   | ValueUniv
   | ValueBox Comp
+  | ValueConst Value
+  | ValueConstIntro Identifier
   | ValueArith (Arith, LowType)
                Value
                Value
@@ -189,8 +193,8 @@ data Value
 data Comp
   = CompPi (Identifier, Value)
            Comp
-  | CompPiElimBoxElim Identifier -- (unbox f) @ x1 @ ... @ xn
-                      [Identifier]
+  | CompPiElimConstElim Identifier -- (unbox f) @ x1 @ ... @ xn
+                        [Identifier]
   | CompSigmaElim Value
                   [Identifier]
                   Comp
@@ -390,6 +394,7 @@ data Env = Env
   , weakTermEnv :: [(Identifier, Neut)]
   , polEnv :: [(Identifier, Neg)]
   , modalEnv :: [(Identifier, ([Identifier], Comp))]
+  -- , modalEnv :: [(Identifier, Value)]
   , constraintEnv :: [PreConstraint]
   , constraintQueue :: Q.MinQueue EnrichedConstraint
   , metaMap :: [(Identifier, PreConstraint)]
@@ -541,6 +546,9 @@ insModalEnv :: Identifier -> [Identifier] -> Comp -> WithEnv ()
 insModalEnv funName args body =
   modify (\e -> e {modalEnv = (funName, (args, body)) : modalEnv e})
 
+-- insModalEnv :: Identifier -> Value -> WithEnv ()
+-- insModalEnv funName body =
+--   modify (\e -> e {modalEnv = (funName, body) : modalEnv e})
 insAsmEnv :: Identifier -> [Identifier] -> Asm -> WithEnv ()
 insAsmEnv funName args asm =
   modify (\e -> e {asmEnv = (funName, (args, asm)) : asmEnv e})

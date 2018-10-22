@@ -1,21 +1,18 @@
 module Rename where
 
-import           Control.Monad.State
-import           Control.Monad.Trans.Except
+import Control.Monad.State
+import Control.Monad.Trans.Except
 
-import           Control.Comonad.Cofree
+import Control.Comonad.Cofree
 
-import           Data
+import Data
 
-import qualified Text.Show.Pretty           as Pr
+import qualified Text.Show.Pretty as Pr
 
 rename :: Neut -> WithEnv Neut
 rename (i :< NeutVar s) = do
   t <- NeutVar <$> lookupNameEnv s
   return $ i :< t
-rename (i :< NeutConst s t) = do
-  t' <- rename t
-  return $ i :< NeutConst s t'
 rename (i :< NeutPi (s, tdom) tcod) = do
   tdom' <- rename tdom
   local $ do
@@ -64,12 +61,19 @@ rename (i :< NeutIndexIntro x) = return $ i :< NeutIndexIntro x
 rename (i :< NeutIndexElim e branchList) = do
   e' <- rename e
   branchList' <-
-    forM branchList $ \(l, body) -> do
+    forM branchList $ \(l, body) ->
       local $ do
         l' <- newNameIndex l
         body' <- rename body
         return (l', body')
   return $ i :< NeutIndexElim e' branchList'
+rename (i :< NeutConst t) = do
+  t' <- rename t
+  return $ i :< NeutConst t'
+rename (i :< NeutConstIntro s) = return $ i :< NeutConstIntro s
+rename (i :< NeutConstElim e) = do
+  e' <- rename e
+  return $ i :< NeutConstElim e'
 rename (i :< NeutUniv j) = return $ i :< NeutUniv j
 rename (i :< NeutMu s e) =
   local $ do
@@ -84,11 +88,6 @@ newNameIndex (IndexLabel x) = do
   return $ IndexLabel x'
 newNameIndex l = return l
 
--- data Index
---   = IndexLabel Identifier
---   | IndexInteger Int
---   | IndexDefault
---   deriving (Show, Eq)
 local :: WithEnv a -> WithEnv a
 local p = do
   env <- get

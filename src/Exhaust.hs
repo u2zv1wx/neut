@@ -1,15 +1,15 @@
 module Exhaust where
 
-import           Control.Monad.State
-import           Control.Monad.Trans.Except
+import Control.Monad.State
+import Control.Monad.Trans.Except
 
-import           Control.Comonad.Cofree
+import Control.Comonad.Cofree
 
-import           Data
-import           Data.List
-import           Reduce
+import Data
+import Data.List
+import Reduce
 
-import qualified Text.Show.Pretty           as Pr
+import qualified Text.Show.Pretty as Pr
 
 exhaust :: Neut -> WithEnv Neut
 exhaust e = do
@@ -20,7 +20,6 @@ exhaust e = do
 
 exhaust' :: Neut -> WithEnv Bool
 exhaust' (_ :< NeutVar _) = return True
-exhaust' (_ :< NeutConst _ _) = return True
 exhaust' (_ :< NeutPi (_, tdom) tcod) = do
   b1 <- exhaust' tdom
   b2 <- exhaust' tcod
@@ -66,10 +65,13 @@ exhaust' (meta :< NeutIndexElim e1 branchList@((l, _):_)) = do
                    then return True
                    else return False
                _ -> return False
+exhaust' (_ :< NeutConst t) = exhaust' t
+exhaust' (_ :< NeutConstIntro _) = return True
+exhaust' (_ :< NeutConstElim e) = exhaust' e
 exhaust' (_ :< NeutUniv _) = return True
 exhaust' (_ :< NeutHole _) = return False
 
 hasVar :: [Index] -> Bool
-hasVar []               = False
+hasVar [] = False
 hasVar (IndexLabel _:_) = True
-hasVar (_:is)           = hasVar is
+hasVar (_:is) = hasVar is

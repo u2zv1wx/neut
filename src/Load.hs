@@ -17,7 +17,8 @@ import Data
 import Emit
 import Exhaust
 import Infer
-import Lift
+
+-- import Lift
 import Macro
 import Modal
 import Parse
@@ -92,10 +93,24 @@ load' ((meta :< TreeNode [_ :< TreeAtom "use", _ :< TreeAtom moduleName]):as) = 
       defList <- load' as
       return $ DefMod meta (moduleName, moduleName') ns : defList
 load' ((meta :< TreeNode [primMeta :< TreeAtom "primitive", _ :< TreeAtom name, t]):as) = do
+  let primName = "prim." ++ name
+  primName' <- newNameWith primName
+  name' <- newNameWith name
   t' <- macroExpand t >>= parse >>= rename
-  constNameWith name
+  constMeta <- newNameWith "meta"
+  insTypeEnv name' t'
+  insTypeEnv primName' $ constMeta :< NeutConst t'
+  insTypeEnv name $ constMeta :< NeutConst t'
   defList <- load' as
-  return $ DefLet meta (name, name) (primMeta :< NeutConst name t') : defList
+  constElimMeta <- newNameWith "meta"
+  primVarMeta <- newNameWith "meta"
+  let constElim =
+        constElimMeta :< NeutConstElim (primVarMeta :< NeutVar primName')
+  defMeta <- newNameWith "meta"
+  return $
+    DefLet defMeta (primName, primName') (primMeta :< NeutConstIntro name) :
+    DefLet meta (name, name') constElim : defList
+  -- return $ DefLet meta (name, name) (primMeta :< NeutConst name t') : defList
 load' ((meta :< TreeNode [_ :< TreeAtom "let", _ :< TreeAtom name, tbody]):as) = do
   e <- macroExpand tbody >>= parse >>= rename
   name' <- newNameWith name
@@ -156,8 +171,14 @@ process :: Neut -> WithEnv ()
 process e = do
   check "main" e >>= nonRecReduce >>= exhaust >>= insWeakTermEnv "main"
   polarize
+  -- penv <- gets polEnv
+  -- liftIO $ putStrLn $ Pr.ppShow penv
   modalize
+  -- menv <- gets modalEnv
+  -- liftIO $ putStrLn $ Pr.ppShow menv
   virtualize
+  -- cenv <- gets codeEnv
+  -- liftIO $ putStrLn $ Pr.ppShow cenv
   assemblize
   emit
 

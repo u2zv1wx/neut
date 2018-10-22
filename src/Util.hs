@@ -67,7 +67,6 @@ var e = fst $ varAndHole e
 
 nonLinear :: Neut -> [Identifier]
 nonLinear (_ :< NeutVar _) = []
-nonLinear (_ :< NeutConst _ _) = []
 nonLinear (_ :< NeutPi (x, tdom) tcod) = do
   let ns1 = nonLinear tdom
   let ns2 = isAffine x $ nonLinear tcod
@@ -100,13 +99,15 @@ nonLinear (_ :< NeutIndexElim e branchList) = do
   let (_, es) = unzip branchList
   let vss = map nonLinear es
   vs ++ join vss
+nonLinear (_ :< NeutConst t) = nonLinear t
+nonLinear (_ :< NeutConstIntro _) = []
+nonLinear (_ :< NeutConstElim e) = nonLinear e
 nonLinear (_ :< NeutUniv _) = []
 nonLinear (_ :< NeutMu s e) = isLinear s (var e) ++ nonLinear e
 nonLinear (_ :< NeutHole _) = []
 
 varAndHole :: Neut -> ([Identifier], [Identifier])
 varAndHole (_ :< NeutVar s) = ([s], [])
-varAndHole (_ :< NeutConst _ _) = ([], [])
 varAndHole (_ :< NeutPi (x, tdom) tcod) = do
   let vs1 = varAndHole tdom
   let (vs21, vs22) = varAndHole tcod
@@ -140,13 +141,15 @@ varAndHole (_ :< NeutIndexElim e branchList) = do
       let (vs21, vs22) = varAndHole body
       return (select i vs21, vs22)
   pairwiseConcat (vs1 : vss)
+varAndHole (_ :< NeutConst t) = varAndHole t
+varAndHole (_ :< NeutConstIntro _) = ([], [])
+varAndHole (_ :< NeutConstElim e) = varAndHole e
 varAndHole (_ :< NeutUniv _) = ([], [])
 varAndHole (_ :< NeutMu _ e) = varAndHole e
 varAndHole (_ :< NeutHole x) = ([], [x])
 
 varPos :: Pos -> [Identifier]
 varPos (PosVar s) = [s]
-varPos (PosConst _) = []
 varPos (PosSigma xts t2) = do
   let (xs, ts) = unzip xts
   let vs = concatMap varPos (t2 : ts)
@@ -159,6 +162,8 @@ varPos (PosIndexIntro _ _) = []
 varPos (PosDown e) = varNeg e
 varPos (PosDownIntro e) = varNeg e
 varPos PosUniv = []
+varPos (PosConst e) = varPos e
+varPos (PosConstIntro _) = []
 varPos (PosArith _ e1 e2) = varPos e1 ++ varPos e2
 
 varNeg :: Neg -> [Identifier]
@@ -186,6 +191,7 @@ varNeg (NegUpElim x e1 e2) = do
   let vs2 = filter (/= x) $ varNeg e2
   vs1 ++ vs2
 varNeg (NegDownElim e) = varPos e
+varNeg (NegConstElim e) = varPos e
 varNeg (NegMu x e) = filter (/= x) $ varNeg e
 varNeg (NegPrint _ e) = varPos e
 
@@ -309,17 +315,6 @@ lookupTypeEnv'' s = do
     Just t -> return t
     Nothing -> boxUniv
 
-depends :: Justification -> Justification -> Bool
-depends j1 j2 = do
-  let vs1 = varInJusitifcation j1
-  let vs2 = varInJusitifcation j2
-  foldr (\x -> (||) (x `elem` vs2)) False vs1
-
-varInJusitifcation :: Justification -> [Identifier]
-varInJusitifcation (Asserted i) = [i]
-varInJusitifcation (Assumption i) = [i]
-varInJusitifcation (Join js) = concatMap varInJusitifcation js
-
 toVar :: Identifier -> WithEnv Neut
 toVar x = do
   t <- lookupTypeEnv' x
@@ -332,7 +327,8 @@ toConst x = do
   t <- lookupTypeEnv' x
   meta <- newNameWith "meta"
   insTypeEnv meta t
-  return $ meta :< NeutConst x t
+  return $ meta :< NeutConstIntro x
+  -- return $ meta :< NeutConst x t
 
 toVar' :: Identifier -> WithEnv Neut
 toVar' x = do

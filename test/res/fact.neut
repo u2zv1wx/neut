@@ -33,6 +33,12 @@
 
 (use item)
 
-(core.i32.print (item:fact 10))
+(definition id
+  (lambda ((a type) (x a)) x))
+
+; (core.i32.print (id i32 1))
+
+(core.i32.print (id i32 (item:fact 10)))
+; (core.i32.print (item:fact 10))
 
 ;; fact.neut ends here.

@@ -31,7 +31,6 @@ virtualize = do
 
 virtualValue :: Value -> WithEnv Data
 virtualValue (ValueVar x) = globalizeIfNecessary x
-virtualValue (ValueConst x) = return $ DataGlobal x
 virtualValue (ValueSigma _ _) = return $ DataInt 0
 virtualValue (ValueSigmaIntro es) = do
   ds <- mapM virtualValue es
@@ -60,6 +59,8 @@ virtualValue (ValueIndexIntro x meta) =
         Nothing -> lift $ throwE $ "no such index defined: " ++ show name
 virtualValue ValueUniv = return $ DataInt 0
 virtualValue (ValueBox _) = return $ DataInt 0
+virtualValue (ValueConst _) = return $ DataInt 0
+virtualValue (ValueConstIntro x) = return $ DataGlobal x
 virtualValue (ValueArith kind e1 e2) = do
   d1 <- virtualValue e1
   d2 <- virtualValue e2
@@ -67,13 +68,17 @@ virtualValue (ValueArith kind e1 e2) = do
 
 virtualComp :: Comp -> WithEnv Code
 virtualComp (CompPi _ _) = return $ CodeReturn $ DataInt 0
-virtualComp (CompPiElimBoxElim f xs) = do
+virtualComp (CompPiElimConstElim f xs) = do
   f' <- globalizeIfNecessary f
   let xs' = map DataLocal xs
   return $ CodeCallTail f' xs'
 virtualComp (CompSigmaElim e1 xs e2) = do
   e1' <- virtualValue e1
   e2' <- virtualComp e2
+  case length xs of
+    0 -> liftIO $ putStrLn "sigmaelim for empty"
+    1 -> liftIO $ putStrLn "sigmaelim for singleton"
+    _ -> return ()
   return $ extract e1' (zip xs [0 ..]) (length xs) e2'
 virtualComp (CompIndexElim e branchList) = do
   let (labelList, es) = unzip branchList

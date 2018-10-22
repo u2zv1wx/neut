@@ -28,6 +28,7 @@ check main e = do
   boxConstraint [] $ nonLinear e
   -- Kantian type-inference ;)
   gets constraintEnv >>= analyze
+  q <- gets constraintQueue
   gets constraintQueue >>= synthesize
   -- update the type environment by resulting substitution
   sub <- gets substitution
@@ -43,13 +44,6 @@ check main e = do
 infer :: Context -> Neut -> WithEnv Neut
 infer _ (meta :< NeutVar s) = do
   t <- lookupTypeEnv' s
-  returnMeta meta t
-infer ctx (meta :< NeutConst s t) = do
-  insTypeEnv s t
-  higherUniv <- boxUniv
-  univ <- boxUniv >>= annot higherUniv
-  u <- infer ctx t >>= annot higherUniv
-  insConstraintEnv ctx univ u higherUniv
   returnMeta meta t
 infer ctx (meta :< NeutPi (s, tdom) tcod) = do
   insTypeEnv s tdom
@@ -170,6 +164,22 @@ infer ctx (meta :< NeutMu s e) = do
   te <- infer (ctx ++ [s]) e >>= annot univ
   insConstraintEnv ctx te trec univ
   returnMeta meta te
+infer ctx (meta :< NeutConst t) = infer ctx t >>= returnMeta meta
+infer ctx (meta :< NeutConstIntro s) = do
+  t <- lookupTypeEnv' s
+  insTypeEnv s t
+  higherUniv <- boxUniv
+  univ <- boxUniv >>= annot higherUniv
+  u <- infer ctx t >>= annot higherUniv
+  insConstraintEnv ctx univ u higherUniv
+  returnMeta meta t
+infer ctx (meta :< NeutConstElim e) = do
+  univ <- boxUniv
+  t <- infer ctx e >>= annot univ
+  resultHole <- appCtx ctx
+  constType <- wrapType $ NeutConst resultHole
+  insConstraintEnv ctx t constType univ
+  returnMeta meta resultHole
 infer _ (meta :< NeutUniv _) = boxUniv >>= returnMeta meta
 infer ctx (meta :< NeutHole _) = appCtx ctx >>= returnMeta meta
 
@@ -315,6 +325,8 @@ simp ((ctx, _ :< NeutBox t1, _ :< NeutBox t2, univ):cs) =
   simp $ (ctx, t1, t2, univ) : cs
 simp ((ctx, _ :< NeutBoxIntro e1, _ :< NeutBoxIntro e2, _ :< NeutBox t):cs) =
   simp $ (ctx, e1, e2, t) : cs
+simp ((ctx, _ :< NeutConst t1, _ :< NeutConst t2, univ):cs) =
+  simp $ (ctx, t1, t2, univ) : cs
 simp ((_, _ :< NeutIndex l1, _ :< NeutIndex l2, _):cs)
   | l1 == l2 = simp cs
 simp ((_, _ :< NeutUniv i, _ :< NeutUniv j, _):cs) = do

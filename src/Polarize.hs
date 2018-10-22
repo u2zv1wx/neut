@@ -29,7 +29,6 @@ polarize = do
 
 polarize' :: Neut -> WithEnv Neg
 polarize' (_ :< NeutVar x) = return $ NegUpIntro (PosVar x)
-polarize' (_ :< NeutConst x _) = return $ NegUpIntro (PosConst x)
 polarize' (_ :< NeutPi (x, tdom) tcod) = do
   dom <- newNameWith "dom"
   cod <- newNameWith "cod"
@@ -77,6 +76,13 @@ polarize' (_ :< NeutIndexElim e branchList) = do
 polarize' (_ :< NeutMu x e) = do
   e' <- polarize' e
   return $ NegMu x e'
+polarize' (_ :< NeutConst t) = do
+  x <- newNameWith "const"
+  bindSeq [(x, t)] $ NegUpIntro $ PosConst $ PosVar x
+polarize' (_ :< NeutConstIntro x) = return $ NegUpIntro (PosConstIntro x)
+polarize' (_ :< NeutConstElim e) = do
+  x <- newNameWith "const"
+  bindSeq [(x, e)] $ NegConstElim $ PosVar x
 polarize' (_ :< NeutUniv _) = return $ NegUpIntro PosUniv
 polarize' (_ :< NeutHole x) =
   error $ "PolarizeNeg.polarize': remaining hole: " ++ x
@@ -93,7 +99,7 @@ insArith = do
   let numLowTypeList = intLowTypeList ++ floatLowTypeList
   forM_ numLowTypeList $ \numLowType -> do
     (x, y) <- prepareVariables numLowType
-    let base e = rt $ NegPiIntro x $ rt $ NegPiIntro y $ NegUpIntro e
+    let base e = rb $ rt $ NegPiIntro x $ rt $ NegPiIntro y $ NegUpIntro e
     let add = base $ PosArith (ArithAdd, numLowType) (PosVar x) (PosVar y)
     let sub = base $ PosArith (ArithSub, numLowType) (PosVar x) (PosVar y)
     let mul = base $ PosArith (ArithMul, numLowType) (PosVar x) (PosVar y)
@@ -117,15 +123,20 @@ insCopyInt =
   forM_ intLowTypeList $ \intLowType -> do
     x <- newNameWith "arg"
     let pair = PosSigmaIntro [PosVar x, PosVar x]
-    let copy = rt $ NegPiIntro x $ NegUpIntro pair
+    let copy = rb $ rt $ NegPiIntro x $ NegUpIntro pair
     insPolEnv ("core." ++ show intLowType ++ ".copy") copy
 
 insPrintInt :: WithEnv ()
 insPrintInt =
-  forM_ intLowTypeList $ \intLowType -> do
+  forM_ [LowTypeSignedInt 32] $ \intLowType
+  -- forM_ intLowTypeList $ \intLowType -> do
+   -> do
     x <- newNameWith "arg"
-    let print = rt $ NegPiIntro x $ NegPrint intLowType (PosVar x)
+    let print = rb $ rt $ NegPiIntro x $ NegPrint intLowType (PosVar x)
     insPolEnv ("core." ++ show intLowType ++ ".print") print
 
 rt :: Neg -> Neg
 rt e = NegUpIntro $ PosDownIntro e
+
+rb :: Neg -> Neg
+rb e = NegUpIntro $ PosBoxIntro e
