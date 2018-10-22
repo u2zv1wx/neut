@@ -379,21 +379,6 @@ instance Ord EnrichedConstraint where
 
 type Subst = [(Identifier, Neut)]
 
-data Justification
-  = Asserted Identifier
-  | Assumption Identifier
-  | Join [Justification]
-  deriving (Show)
-
-data Case = Case
-  { constraintQueueSnapshot :: Q.MinQueue Constraint
-  , metaMapSnapshot :: [(Identifier, PreConstraint)]
-  , substitutionSnapshot :: Subst
-  , caseJustification :: Justification
-  , savedJustification :: Justification
-  , alternatives :: [[PreConstraint]]
-  } deriving (Show)
-
 data Env = Env
   { count :: Int -- to generate fresh symbols
   , notationEnv :: [(Tree, Tree)] -- macro transformers
@@ -409,7 +394,6 @@ data Env = Env
   , constraintQueue :: Q.MinQueue EnrichedConstraint
   , metaMap :: [(Identifier, PreConstraint)]
   , substitution :: Subst
-  , caseStack :: [Case]
   , univConstraintEnv :: [(UnivLevel, UnivLevel)]
   , numConstraintEnv :: [Identifier]
   , codeEnv :: [(Identifier, ([Identifier], IORef Code))]
@@ -449,7 +433,6 @@ initialEnv path =
     , constraintQueue = Q.empty
     , metaMap = []
     , substitution = []
-    , caseStack = []
     , univConstraintEnv = []
     , numConstraintEnv = []
     , currentDir = path
