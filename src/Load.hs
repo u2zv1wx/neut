@@ -141,8 +141,10 @@ concatDefList [DefLet _ _ e] = return e
 concatDefList (DefLet meta (_, name') e:es) = do
   cont <- concatDefList es
   h <- newNameWith "any"
-  let hole = meta :< NeutHole h
-  return $ meta :< NeutPiElim (meta :< NeutPiIntro (name', hole) cont) e
+  holeMeta <- newNameWith "meta"
+  let hole = holeMeta :< NeutHole h
+  lamMeta <- newNameWith "meta"
+  return $ meta :< NeutPiElim (lamMeta :< NeutPiIntro (name', hole) cont) e
 concatDefList (DefMod sigMeta (_, name') xs:es) = do
   cont <- concatDefList es
   meta <- newNameWith "meta"

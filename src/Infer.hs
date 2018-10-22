@@ -24,10 +24,12 @@ import qualified Data.PQueue.Min as Q
 check :: Identifier -> Neut -> WithEnv Neut
 check main e = do
   t <- infer [] e
-  insTypeEnv main t -- insert the type of main function
+  insTypeEnv main t
   boxConstraint [] $ nonLinear e
+  -- Kantian type-inference ;)
   gets constraintEnv >>= analyze
   gets constraintQueue >>= synthesize
+  -- update the type environment by resulting substitution
   sub <- gets substitution
   env <- get
   tenv' <-
@@ -245,11 +247,6 @@ appCtx ctx = do
   meta <- newName' "meta" arrowType
   appFold (meta :< NeutHole holeName) varSeq
 
-toHole' :: Identifier -> WithEnv Neut
-toHole' x = do
-  meta <- newNameWith "meta"
-  return $ meta :< NeutHole x
-
 returnMeta :: Identifier -> Neut -> WithEnv Neut
 returnMeta meta t = do
   insTypeEnv meta t
@@ -282,7 +279,6 @@ simp ((ctx, _ :< NeutPiIntro (x, _) body1, _ :< NeutPiIntro (y, _) body2, t):cs)
   simp $ (ctx, body1, subst [(y, var)] body2, t) : cs
 simp ((ctx, _ :< NeutPiIntro (x, _) body1, e2, t):cs) = do
   var <- toVar' x
-  -- let tcod' = subst [(z, var)] tcod
   appMeta <- newNameWith "meta"
   let app = appMeta :< NeutPiElim e2 var
   simp $ (ctx, body1, app, t) : cs
@@ -406,198 +402,121 @@ analyze' c@(ctx, e1, e2, t) = do
       e' <- nonRecReduce e
       ans <- bindFormalArgs' args e'
       modify (\e -> e {substitution = compose [(hole, ans)] (substitution e)})
-      sub <- gets substitution
       q <- gets constraintQueue
-      modify (\e -> e {constraintQueue = Q.empty})
-      mapM_ (substConstraint sub) $ Q.toList q
-      mmap <- gets metaMap
-      analyze $ map snd $ filter (\(y, _) -> y == hole) mmap
+      updateQueue q
     _ -> do
-      let c' = categorize c
-      modify (\e -> e {constraintQueue = Q.insert c' $ constraintQueue e})
-      case c' of
-        (Constraint _ (ConstraintQuasiPattern hole _ _) _) ->
-          modify (\e -> e {metaMap = (hole, c) : metaMap e})
-        (Constraint _ (ConstraintFlexRigid hole _ _) _) ->
-          modify (\e -> e {metaMap = (hole, c) : metaMap e})
-        (Constraint _ (ConstraintFlexFlex hole1 _ hole2 _) _) -> do
-          modify (\e -> e {metaMap = (hole1, c) : metaMap e})
-          modify (\e -> e {metaMap = (hole2, c) : metaMap e})
-        _ -> return ()
+      let ec = Enriched c $ categorize c
+      modify (\e -> e {constraintQueue = Q.insert ec $ constraintQueue e})
 
-derelict :: Constraint -> WithEnv PreConstraint
-derelict (Constraint ctx (ConstraintPattern hole xs e2) t) = do
-  v <- toHole' hole
-  args <- mapM toVar' xs
-  e1 <- appFold' v args
-  return (ctx, e1, e2, t)
-derelict (Constraint ctx (ConstraintBeta x e) t) = do
-  v <- toVar' x
-  return (ctx, v, e, t)
-derelict (Constraint ctx (ConstraintDelta x es1 es2) t) = do
-  v <- toVar' x
-  e1 <- appFold' v es1
-  e2 <- appFold' v es2
-  return (ctx, e1, e2, t)
-derelict (Constraint ctx (ConstraintQuasiPattern hole xs e2) t) = do
-  v <- toHole' hole
-  args <- mapM toVar' xs
-  e1 <- appFold' v args
-  return (ctx, e1, e2, t)
-derelict (Constraint ctx (ConstraintFlexRigid hole args e2) t) = do
-  v <- toHole' hole
-  e1 <- appFold' v args
-  return (ctx, e1, e2, t)
-derelict (Constraint ctx (ConstraintFlexFlex hole1 es1 hole2 es2) t) = do
-  v1 <- toHole' hole1
-  v2 <- toHole' hole2
-  e1 <- appFold' v1 es1
-  e2 <- appFold' v2 es2
-  return (ctx, e1, e2, t)
-
-substConstraint :: Subst -> Constraint -> WithEnv ()
-substConstraint sub c = do
-  (ctx, e1, e2, t) <- derelict c
-  analyze [(ctx, subst sub e1, subst sub e2, t)]
-
-resolve :: Justification -> WithEnv ()
-resolve j = do
-  stack <- gets caseStack
-  resolve' j stack
-
-resolve' :: Justification -> [Case] -> WithEnv ()
-resolve' _ [] = throwError "failed to resolvelve the case-split"
-resolve' j (c:cs)
-  | j `depends` caseJustification c = do
-    restoreState c
-    case alternatives c of
-      [] -> resolve' j cs
-      (a:_) -> analyze a
-resolve' j (_:cs) = resolve' j cs
-
-restoreState :: Case -> WithEnv ()
-restoreState c =
-  modify
-    (\e ->
-       e
-         { constraintQueue = constraintQueueSnapshot c
-         , metaMap = metaMapSnapshot c
-         , substitution = substitutionSnapshot c
-         })
-
-process :: [[PreConstraint]] -> Justification -> WithEnv ()
-process [] j = resolve j
-process z@(a:_) j = do
-  ja <- Assumption <$> newNameWith "j"
-  c <- newCaseSplit ja z
-  modify (\e -> e {caseStack = c : caseStack e})
-  analyze a
-
-newCaseSplit :: Justification -> [[PreConstraint]] -> WithEnv Case
-newCaseSplit ja z = do
-  q <- gets constraintQueue
-  mmap <- gets metaMap
+-- update the `constraintQueue` by `q`, updating its content using current substitution
+updateQueue :: Q.MinQueue EnrichedConstraint -> WithEnv ()
+updateQueue q = do
+  modify (\e -> e {constraintQueue = Q.empty})
   sub <- gets substitution
-  return $
-    Case
-      { constraintQueueSnapshot = q
-      , metaMapSnapshot = mmap
-      , substitutionSnapshot = sub
-      , caseJustification = ja
-      , savedJustification = ja
-      , alternatives = z
-      }
+  updateQueue' sub q
 
-synthesize :: Q.MinQueue Constraint -> WithEnv ()
+updateQueue' :: Subst -> Q.MinQueue EnrichedConstraint -> WithEnv ()
+updateQueue' sub q =
+  case Q.getMin q of
+    Nothing -> return ()
+    Just (Enriched (ctx, e1, e2, t) _) -> do
+      analyze [(ctx, subst sub e1, subst sub e2, t)]
+      updateQueue' sub $ Q.deleteMin q
+
+substQueue ::
+     Q.MinQueue EnrichedConstraint -> WithEnv (Q.MinQueue EnrichedConstraint)
+substQueue q = updateQueue q >> gets constraintQueue
+
+synthesize :: Q.MinQueue EnrichedConstraint -> WithEnv ()
 synthesize q =
   case Q.getMin q of
     Nothing -> return ()
-    Just (Constraint _ (ConstraintPattern x args e) _) -> do
+    Just (Enriched _ (Constraint _ (ConstraintPattern x args e) _)) -> do
       e' <- nonRecReduce e
       ans <- bindFormalArgs' args e'
       modify (\e -> e {substitution = compose [(x, ans)] (substitution e)})
-      sub <- gets substitution
-      q' <- getQueue $ mapM_ (substConstraint sub) $ Q.toList $ Q.deleteMin q
-      synthesize q'
-    Just (Constraint ctx (ConstraintBeta x body) t) -> do
+      substQueue (Q.deleteMin q) >>= synthesize
+    Just (Enriched _ (Constraint ctx (ConstraintBeta x body) t)) -> do
       me <- insDef x body
       case me of
         Nothing -> synthesize $ Q.deleteMin q
         Just body' -> do
-          q' <- Q.fromList . map categorize <$> simp [(ctx, body, body', t)]
+          cs <- simp [(ctx, body, body', t)]
+          let q' = Q.fromList $ map (\c -> Enriched c $ categorize c) cs
           synthesize $ Q.deleteMin q `Q.union` q'
-    Just (Constraint ctx (ConstraintDelta x args1 args2) t) -> do
+    Just (Enriched _ (Constraint ctx (ConstraintDelta x args1 args2) t))
+      -- try two alternatives:
+      -- (1) assume that x is opaque and attempt to resolve this by args1 === args2
+      -- (2) unfold the definition of x and resolve (unfold x) @ args1 == (unfold x) @ args2
+     -> do
+      let plan1 = do
+            cs <- simp $ map (\(e1, e2) -> (ctx, e1, e2, t)) $ zip args1 args2
+            getQueue $ analyze cs
       sub <- gets substitution
-      -- liftIO $ putStrLn $ Pr.ppShow sub
-      a1 <- simp $ map (\(e1, e2) -> (ctx, e1, e2, t)) $ zip args1 args2
-      j <- Assumption <$> newNameWith "j"
-      case lookup x sub of
-        Nothing -> do
-          q' <- getQueue $ process [a1] j
-          synthesize $ Q.deleteMin q `Q.union` q'
-        Just e -> do
-          e1' <- appFold' e args1 >>= reduce
-          e2' <- appFold' e args2 >>= reduce
-          a2 <- simp [(ctx, e1', e2', t)]
-          q' <- getQueue $ process [a1, a2] j
-          synthesize $ Q.deleteMin q `Q.union` q'
-    Just (Constraint ctx (ConstraintQuasiPattern hole preArgs e) t) -> do
+      planList <-
+        case lookup x sub of
+          Nothing -> return [plan1]
+          Just body -> do
+            e1' <- appFold' body args1 >>= reduce
+            e2' <- appFold' body args2 >>= reduce
+            cs <- simp [(ctx, e1', e2', t)]
+            let plan2 = getQueue $ analyze cs
+            return [plan1, plan2]
+      q <- gets constraintQueue
+      chain q planList >>= continue q
+    Just (Enriched _ (Constraint ctx (ConstraintQuasiPattern hole preArgs e) t)) -> do
       args <- mapM toVar' preArgs
-      let c = Constraint ctx (ConstraintFlexRigid hole args e) t
-      synthesize $ Q.insert c $ Q.deleteMin q
-    Just (Constraint ctx (ConstraintFlexRigid hole args e) t)
-      | (x@(_ :< NeutVar _), eArgs) <- toPiElimSeq e -> do
-        let candList = x : args
-        newHoleList <- mapM (const (newNameWith "hole") >=> toVar') args
-        newArgList <- mapM (const $ newNameWith "arg") eArgs
-        newVarList <- mapM toVar' newArgList
-        argList <- forM newHoleList $ \h -> appFold' h newVarList
-        bodyList <- forM candList $ \v -> appFold' v argList
-        lamList <- forM bodyList $ \body -> bindFormalArgs' newArgList body
-        as <-
-          forM lamList $ \lam -> do
-            left <- appFold' lam args
-            meta <- newNameWith "meta"
-            simp [(ctx, left, e, t), (ctx, meta :< NeutHole hole, lam, t)]
-        j <- Assumption <$> newNameWith "j"
-        q' <- getQueue $ process as j
-        synthesize $ Q.deleteMin q `Q.union` q'
-    Just (Constraint ctx (ConstraintFlexRigid hole args e) t)
-      | (x@(_ :< NeutIndex _), eArgs) <- toPiElimSeq e -> do
-        newHoleList <- mapM (const (newNameWith "hole")) args -- ?M_i
-        newHoleVarList <- mapM toVar' newHoleList
-        newArgList <- mapM (const $ newNameWith "arg") eArgs -- x_i
-        newVarList <- mapM toVar' newArgList
-        argList <- forM newHoleVarList $ \h -> appFold' h newVarList -- ?M_i @ x_1 @ ... @ x_n
-        bodyList <- forM (x : args) $ \v -> appFold' v argList
-        lamList <- forM bodyList $ \body -> bindFormalArgs' newArgList body
-        let compList =
-              flip map lamList $ \lam -> do
-                left <- appFold' lam args
-                meta <- newNameWith "meta"
-                getQueue $
-                  analyze
-                    [(ctx, left, e, t), (ctx, meta :< NeutHole hole, lam, t)]
-        meta <- newNameWith "meta"
-        lam <- bindFormalArgs' newHoleList e
-        let independent =
-              getQueue $ analyze [(ctx, meta :< NeutHole hole, lam, t)]
-        q' <- chain q $ compList ++ [independent]
-        sub <- gets substitution
-        let q'' = Q.deleteMin q `Q.union` q'
-        q''' <- getQueue $ mapM_ (substConstraint sub) $ Q.toList q''
-        synthesize q'''
+      synthesizeFlexRigid q ctx hole args e t
+    Just (Enriched _ (Constraint ctx (ConstraintFlexRigid hole args e) t)) ->
+      synthesizeFlexRigid q ctx hole args e t
     Just c -> throwError $ "cannot synthesize:\n" ++ Pr.ppShow c
 
-getQueue :: WithEnv a -> WithEnv (Q.MinQueue Constraint)
+synthesizeFlexRigid ::
+     Q.MinQueue EnrichedConstraint
+  -> Context
+  -> Identifier
+  -> [Neut]
+  -> Neut
+  -> Neut
+  -> WithEnv ()
+synthesizeFlexRigid q ctx hole args e t = do
+  let (x, eArgs) = toPiElimSeq e
+  newHoleList <- mapM (const (newNameWith "hole")) args -- ?M_i
+  newHoleVarList <- mapM toVar' newHoleList
+  newArgList <- mapM (const $ newNameWith "arg") eArgs -- x_i
+  newVarList <- mapM toVar' newArgList
+  argList <- forM newHoleVarList $ \h -> appFold' h newVarList -- ?M_i @ x_1 @ ... @ x_n
+  bodyList <- forM (x : args) $ \v -> appFold' v argList
+  lamList <- forM bodyList $ \body -> bindFormalArgs' newArgList body
+  let compList =
+        flip map lamList $ \lam -> do
+          left <- appFold' lam args
+          meta <- newNameWith "meta"
+          getQueue $
+            analyze [(ctx, left, e, t), (ctx, meta :< NeutHole hole, lam, t)]
+  meta <- newNameWith "meta"
+  lam <- bindFormalArgs' newHoleList e
+  let independent = getQueue $ analyze [(ctx, meta :< NeutHole hole, lam, t)]
+  q' <- chain q $ compList ++ [independent]
+  continue q q'
+
+getQueue :: WithEnv a -> WithEnv (Q.MinQueue EnrichedConstraint)
 getQueue command = do
   modify (\e -> e {constraintQueue = Q.empty})
   command
   gets constraintQueue
 
-chain :: Q.MinQueue Constraint -> [WithEnv a] -> WithEnv a
+continue ::
+     Q.MinQueue EnrichedConstraint
+  -> Q.MinQueue EnrichedConstraint
+  -> WithEnv ()
+continue currentQueue newQueue = do
+  let q = Q.deleteMin currentQueue `Q.union` newQueue
+  substQueue q >>= synthesize
+
+chain :: Q.MinQueue EnrichedConstraint -> [WithEnv a] -> WithEnv a
 chain c [] = throwError $ "cannot synthesize++:\n" ++ Pr.ppShow c
-chain c (e:es) = e `catchError` (\i -> do chain c es)
+chain c (e:es) = e `catchError` const (chain c es)
 
 insDef :: Identifier -> Neut -> WithEnv (Maybe Neut)
 insDef x body = do

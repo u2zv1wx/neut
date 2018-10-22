@@ -366,6 +366,17 @@ instance Eq Constraint where
 instance Ord Constraint where
   compare (Constraint _ c1 _) (Constraint _ c2 _) = compare c1 c2
 
+data EnrichedConstraint =
+  Enriched PreConstraint
+           Constraint
+  deriving (Show)
+
+instance Eq EnrichedConstraint where
+  (Enriched _ c1) == (Enriched _ c2) = c1 == c2
+
+instance Ord EnrichedConstraint where
+  compare (Enriched _ c1) (Enriched _ c2) = compare c1 c2
+
 type Subst = [(Identifier, Neut)]
 
 data Justification
@@ -395,7 +406,7 @@ data Env = Env
   , polEnv :: [(Identifier, Neg)]
   , modalEnv :: [(Identifier, ([Identifier], Comp))]
   , constraintEnv :: [PreConstraint]
-  , constraintQueue :: Q.MinQueue Constraint
+  , constraintQueue :: Q.MinQueue EnrichedConstraint
   , metaMap :: [(Identifier, PreConstraint)]
   , substitution :: Subst
   , caseStack :: [Case]

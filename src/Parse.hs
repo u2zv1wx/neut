@@ -74,7 +74,7 @@ parse (meta :< TreeNode [_ :< TreeAtom "case", t, _ :< TreeNode ts]) = do
   branchList <- mapM parseClause ts
   return $ meta :< NeutIndexElim e branchList
 parse (meta :< TreeAtom "universe") = do
-  hole <- newName
+  hole <- newNameWith "univ"
   return $ meta :< NeutUniv (UnivLevelHole hole)
 parse (meta :< TreeNode [_ :< TreeAtom "mu", _ :< TreeAtom x, te]) = do
   e <- parse te
