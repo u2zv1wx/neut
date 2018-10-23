@@ -92,6 +92,10 @@ load' ((meta :< TreeNode [_ :< TreeAtom "use", _ :< TreeAtom moduleName]):as) = 
       ns <- mapM (newNameWith . (\s -> moduleName ++ ":" ++ s)) nameList
       defList <- load' as
       return $ DefMod meta (moduleName, moduleName') ns : defList
+load' ((_ :< TreeNode ((_ :< TreeAtom "statement"):as1)):as2) = do
+  defList1 <- load' as1
+  defList2 <- load' as2
+  return $ defList1 ++ defList2
 load' ((meta :< TreeNode [primMeta :< TreeAtom "primitive", _ :< TreeAtom name, t]):as) = do
   let primName = "prim." ++ name
   primName' <- newNameWith primName
