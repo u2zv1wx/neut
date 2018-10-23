@@ -74,7 +74,6 @@ emitAsm funName (AsmCallTail f args) = do
       [show (AsmDataLocal tmp), "=", "tail call i8*", show f ++ showArgs args]
   a <- emitRet funName (AsmDataLocal tmp)
   return $ op ++ a
-  -- emitOp $ unwords ["ret i8*", show (AsmDataLocal tmp)]
 emitAsm funName (AsmBitcast x d fromType toType cont) = do
   op <-
     emitOp $
@@ -135,8 +134,6 @@ emitAsm funName (AsmSwitch d defaultBranch branchList) = do
     forM (zip labelList asmList ++ [(defaultLabel, defaultBranch)]) $
     uncurry (emitBlock funName)
   return $ op ++ concat xs
-  -- forM_ (zip labelList asmList ++ [(defaultLabel, defaultBranch)]) $
-  --   uncurry (emitBlock funName)
 emitAsm funName (AsmLoad x d cont) = do
   op <- emitOp $ unwords [show (AsmDataLocal x), "=", "load i8*, i8**", show d]
   a <- emitAsm funName cont

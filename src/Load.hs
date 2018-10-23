@@ -120,7 +120,6 @@ load' ((meta :< TreeNode [primMeta :< TreeAtom "primitive", _ :< TreeAtom name, 
   return $
     DefLet defMeta (primName, primName') (primMeta :< NeutConstIntro name) :
     DefLet meta (name, name') constElim : defList
-  -- return $ DefLet meta (name, name) (primMeta :< NeutConst name t') : defList
 load' ((meta :< TreeNode [_ :< TreeAtom "let", _ :< TreeAtom name, tbody]):as) = do
   e <- macroExpand tbody >>= parse >>= rename
   name' <- newNameWith name
@@ -181,15 +180,8 @@ process :: Neut -> WithEnv [String]
 process e = do
   check "main" e >>= nonRecReduce >>= exhaust >>= insWeakTermEnv "main"
   polarize
-  -- penv <- gets polEnv
-  -- liftIO $ putStrLn $ Pr.ppShow penv
-  -- liftIO $ putStrLn "-----------------------"
   modalize
-  -- menv <- gets modalEnv
-  -- liftIO $ putStrLn $ Pr.ppShow menv
   virtualize
-  -- cenv <- gets codeEnv
-  -- liftIO $ putStrLn $ Pr.ppShow cenv
   assemblize
   emit
 

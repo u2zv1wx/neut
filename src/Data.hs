@@ -392,7 +392,6 @@ data Env = Env
   , weakTermEnv :: [(Identifier, Neut)]
   , polEnv :: [(Identifier, Neg)]
   , modalEnv :: [(Identifier, ([Identifier], Comp))]
-  -- , modalEnv :: [(Identifier, Value)]
   , constraintEnv :: [PreConstraint]
   , constraintQueue :: Q.MinQueue EnrichedConstraint
   , metaMap :: [(Identifier, PreConstraint)]
@@ -439,8 +438,6 @@ evalWithEnv c env = do
   case resultOrErr of
     Left err -> return $ Left err
     Right (result, _) -> return $ Right result
-      -- putStrLn $ Pr.ppShow y
-      -- putStrLn $ Pr.ppShow env
 
 newName :: WithEnv Identifier
 newName = do
@@ -526,9 +523,6 @@ lookupWeakTermEnv funName = do
     Just body -> return body
     Nothing -> lift $ throwE $ "no such weakterm: " ++ show funName
 
--- funName : Box (P1 -> ... -> Pn -> N)
--- arg_i : Pi
--- body : N
 insCodeEnv :: Identifier -> [Identifier] -> Code -> WithEnv ()
 insCodeEnv funName args body = do
   codeRef <- liftIO $ newIORef body
@@ -541,9 +535,6 @@ insModalEnv :: Identifier -> [Identifier] -> Comp -> WithEnv ()
 insModalEnv funName args body =
   modify (\e -> e {modalEnv = (funName, (args, body)) : modalEnv e})
 
--- insModalEnv :: Identifier -> Value -> WithEnv ()
--- insModalEnv funName body =
---   modify (\e -> e {modalEnv = (funName, body) : modalEnv e})
 insAsmEnv :: Identifier -> [Identifier] -> Asm -> WithEnv ()
 insAsmEnv funName args asm =
   modify (\e -> e {asmEnv = (funName, (args, asm)) : asmEnv e})
