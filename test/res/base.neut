@@ -1,3 +1,17 @@
+(reserve forall)
+
+(reserve lambda)
+
+(reserve apply)
+
+(reserve exists)
+
+(reserve tensor)
+
+(reserve case)
+
+(reserve universe)
+
 
 (reserve let)
 
@@ -12,8 +26,11 @@
 (notation (begin (let x e+) rest+)
   (apply (lambda ((x _)) (begin rest+)) (begin e+)))
 
-(notation (begin (definition x e+) rest+)
-  (apply (lambda ((x _)) (begin rest+)) (data (mu x begin e+))))
+(notation (begin (definition x e) rest+)
+  (apply (lambda ((x _)) (begin rest+)) (data (mu x e))))
+
+(notation (begin (definition name (x+) e+) rest+)
+  (apply (lambda ((name _)) (begin rest+)) (data (mu name (lambda (x+) (begin e+))))))
 
 (reserve arrow)
 
@@ -25,8 +42,8 @@
 (notation (definition name e)
   (let name (data (mu name e))))
 
-(notation (definition name (x+) e)
-  (let name (data (mu name (lambda (x+) e)))))
+(notation (definition name (x+) e+)
+  (let name (data (mu name (lambda (x+) (begin e+))))))
 
 (index top unit)
 
