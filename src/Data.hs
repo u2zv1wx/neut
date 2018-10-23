@@ -409,20 +409,7 @@ initialEnv path =
   Env
     { count = 0
     , notationEnv = []
-    , reservedEnv =
-        [ "thunk"
-        , "lambda"
-        , "return"
-        , "bind"
-        , "unthunk"
-        , "mu"
-        , "case"
-        , "ascribe"
-        , "down"
-        , "universe"
-        , "forall"
-        , "up"
-        ]
+    , reservedEnv = []
     , moduleEnv = []
     , indexEnv = []
     , nameEnv = []
