@@ -28,7 +28,6 @@ check main e = do
   boxConstraint [] $ nonLinear e
   -- Kantian type-inference ;)
   gets constraintEnv >>= analyze
-  q <- gets constraintQueue
   gets constraintQueue >>= synthesize
   -- update the type environment by resulting substitution
   sub <- gets substitution
