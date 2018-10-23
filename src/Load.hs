@@ -36,7 +36,7 @@ import Text.Read (readMaybe)
 
 import qualified Text.Show.Pretty as Pr
 
-load :: String -> WithEnv ()
+load :: String -> WithEnv [String]
 load s = toDefList s >>= concatDefList >>= process
 
 load' :: [Tree] -> WithEnv [Def]
@@ -167,7 +167,7 @@ concatDefList (DefMod sigMeta (_, name') xs:es) = do
   let v = unboxMeta :< NeutBoxElim (meta :< NeutVar name')
   return $ sigMeta :< NeutSigmaElim v xs cont
 
-process :: Neut -> WithEnv ()
+process :: Neut -> WithEnv [String]
 process e = do
   check "main" e >>= nonRecReduce >>= exhaust >>= insWeakTermEnv "main"
   polarize

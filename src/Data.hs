@@ -448,14 +448,14 @@ type WithEnv a = StateT Env (ExceptT String IO) a
 runWithEnv :: WithEnv a -> Env -> IO (Either String (a, Env))
 runWithEnv c env = runExceptT (runStateT c env)
 
-evalWithEnv :: (Show a) => WithEnv a -> Env -> IO ()
+evalWithEnv :: (Show a) => WithEnv a -> Env -> IO (Either String a)
 evalWithEnv c env = do
-  x <- runWithEnv c env
-  case x of
-    Left err -> putStrLn err
-    Right (y, env) -> do
-      putStrLn $ Pr.ppShow y
-      putStrLn $ Pr.ppShow env
+  resultOrErr <- runWithEnv c env
+  case resultOrErr of
+    Left err -> return $ Left err
+    Right (result, _) -> return $ Right result
+      -- putStrLn $ Pr.ppShow y
+      -- putStrLn $ Pr.ppShow env
 
 newName :: WithEnv Identifier
 newName = do

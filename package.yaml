@@ -21,6 +21,8 @@ dependencies:
 - pqueue
 - directory
 - filepath
+- optparse-applicative
+- process
 
 library:
   source-dirs: src

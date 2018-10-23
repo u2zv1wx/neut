@@ -1,4 +1,3 @@
 
-(definition state
-  (lambda ((S type) (A type))
-    (hom S (tensor S A))))
+(definition state ((S type) (A type))
+  (hom S (tensor S A)))

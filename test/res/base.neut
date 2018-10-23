@@ -25,6 +25,9 @@
 (notation (definition name e)
   (let name (data (mu name e))))
 
+(notation (definition name (x+) e)
+  (let name (data (mu name (lambda (x+) e)))))
+
 (index top unit)
 
 (index i32)
