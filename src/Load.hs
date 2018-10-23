@@ -18,7 +18,6 @@ import Emit
 import Exhaust
 import Infer
 
--- import Lift
 import Macro
 import Modal
 import Parse
