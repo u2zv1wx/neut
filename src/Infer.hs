@@ -85,7 +85,7 @@ infer ctx (_ :< NeutSigma xts t) = do
   forM_ xts $ uncurry insTypeEnv
   higherUniv <- boxUniv
   univ <- boxUniv >>= annot higherUniv
-  forM_ (map snd xts ++ [t]) $ \t@(meta :< _) -> do
+  forM_ (map snd xts ++ [t]) $ \t -> do
     u <- infer ctx t
     insConstraintEnv ctx u univ higherUniv
   return univ

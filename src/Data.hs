@@ -87,8 +87,6 @@ type Neut = Cofree NeutF Identifier
 
 $(deriveShow1 ''NeutF)
 
-deriving instance Eq a => Eq (NeutF a)
-
 data LowType
   = LowTypeSignedInt Int
   | LowTypeUnsignedInt Int
