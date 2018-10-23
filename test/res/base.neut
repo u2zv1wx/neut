@@ -53,8 +53,5 @@
 
 (definition io
   (state world))
-; (definition io
-;   (data
-;     (state world)))
 
 (primitive core.i32.print (arrow i32 (io top)))

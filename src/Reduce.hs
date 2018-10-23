@@ -207,7 +207,10 @@ reduceNeg (NegIndexElim e branchList) =
           lift $
           throwE $ "the index " ++ show x ++ " is not included in branchList"
         Just body -> reduceNeg body
-    _ -> return $ NegIndexElim e branchList
+    _ -> do
+      let (labelList, es) = unzip branchList
+      es' <- mapM reduceNeg es
+      return $ NegIndexElim e $ zip labelList es'
 reduceNeg (NegUpIntro e) = do
   e' <- reducePos e
   return $ NegUpIntro e'
@@ -222,6 +225,14 @@ reduceNeg (NegDownElim e) = do
   case e' of
     PosDownIntro e'' -> reduceNeg e''
     _ -> return $ NegDownElim e'
+reduceNeg (NegConstElim e) = do
+  e' <- reducePos e
+  case e' of
+    PosConstIntro x -> return $ NegConstElim $ PosConstIntro x
+    _ -> return $ NegConstElim e'
+reduceNeg (NegPrint x e) = do
+  e' <- reducePos e
+  return $ NegPrint x e'
 reduceNeg (NegMu x e) = do
   e' <- reduceNeg e
   return $ NegMu x e'
@@ -246,7 +257,10 @@ reduceComp (CompIndexElim e branchList) =
           lift $
           throwE $ "the index " ++ show x ++ " is not included in branchList"
         Just body -> reduceComp body
-    _ -> return $ CompIndexElim e branchList
+    _ -> do
+      let (labelList, es) = unzip branchList
+      es' <- mapM reduceComp es
+      return $ CompIndexElim e $ zip labelList es'
 reduceComp (CompUpIntro e) = do
   e' <- reduceValue e
   return $ CompUpIntro e'
@@ -255,7 +269,7 @@ reduceComp (CompUpElim x e1 e2) = do
   e2' <- reduceComp e2
   case e1' of
     CompUpIntro (ValueVar y) -> reduceComp $ substComp [(x, y)] e2'
-    CompUpIntro (ValueConstIntro y) -> reduceComp $ substComp [(x, y)] e2'
+    -- CompUpIntro (ValueConstIntro y) -> reduceComp $ substComp [(x, y)] e2'
     _ -> return $ CompUpElim x e1' e2'
 reduceComp (CompPrint t e) = do
   e' <- reduceValue e
@@ -313,7 +327,6 @@ type SubstPos = [(Identifier, Pos)]
 
 substPos :: SubstPos -> Pos -> Pos
 substPos sub (PosVar s) = fromMaybe (PosVar s) (lookup s sub)
-substPos _ (PosConst s) = PosConst s
 substPos sub (PosSigma xts tcod) = do
   let (xs, ts) = unzip xts
   let ts' = map (substPos sub) ts
@@ -337,6 +350,12 @@ substPos sub (PosDown e) = do
 substPos sub (PosDownIntro e) = do
   let e' = substNeg sub e
   PosDownIntro e'
+substPos sub (PosConst s) = PosConst $ substPos sub s
+substPos _ (PosConstIntro x) = PosConstIntro x
+substPos sub (PosArith kind e1 e2) = do
+  let e1' = substPos sub e1
+  let e2' = substPos sub e2
+  PosArith kind e1' e2'
 
 substNeg :: SubstPos -> Neg -> Neg
 substNeg sub (NegPi (s, tdom) tcod) = do
@@ -367,6 +386,8 @@ substNeg sub (NegUpElim x e1 e2) = do
   let e2' = substNeg sub e2
   NegUpElim x e1' e2'
 substNeg sub (NegDownElim e) = NegDownElim (substPos sub e)
+substNeg sub (NegConstElim e) = NegConstElim $ substPos sub e
+substNeg sub (NegPrint x e) = NegPrint x (substPos sub e)
 substNeg sub (NegMu x e) = NegMu x $ substNeg sub e
 
 type SubstValue = [(Identifier, Identifier)]
@@ -390,6 +411,7 @@ substValue sub (ValueBox e) = do
 substValue _ (ValueIndex x) = ValueIndex x
 substValue _ (ValueIndexIntro l meta) = ValueIndexIntro l meta
 substValue _ ValueUniv = ValueUniv
+substValue _ (ValueConstIntro x) = ValueConstIntro x
 substValue sub (ValueArith kind e1 e2) = do
   let e1' = substValue sub e1
   let e2' = substValue sub e2

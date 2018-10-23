@@ -18,27 +18,52 @@
 
 (include "./base.neut")
 
-(module item
-  (definition placeholder unit)
+; (module item
+;   (definition placeholder unit)
 
-  (definition fact
-    (lambda (x)
-      (case x
-        ((1 1)
-         (n (begin
-              (let p (core.i32.copy n))
-              (case p
-                ((pair n1 n2)
-                 (core.i32.mul n1 (fact (core.i32.sub n2 1))))))))))))
+;   (definition fact
+;     (lambda (x)
+;       (case x
+;         ((1 1)
+;          (n (begin
+;               (let p (core.i32.copy n))
+;               (case p
+;                 ((pair n1 n2)
+;                  (core.i32.mul n1 (fact (core.i32.sub n2 1))))))))))))
 
-(use item)
+; (use item)
 
-(definition id
-  (lambda ((a type) (x a)) x))
+; (let fact
+;   (data
+;      (mu self
+;   (lambda (x)
+;     (case x
+;       ((1 1)
+;        (n (begin
+;             (let p (core.i32.copy n))
+;             (case p
+;               ((pair n1 n2)
+;                (core.i32.mul n1 (self (core.i32.sub n2 1)))))))))))))
+
+(definition fact
+  (lambda (x)
+    (case x
+      ((1 1)
+       (n (begin
+            (let p (core.i32.copy n))
+            (case p
+              ((pair n1 n2)
+               (core.i32.mul n1 (fact (core.i32.sub n2 1)))))))))))
+
+; (definition id
+;   (lambda ((a type) (x a)) x))
 
 ; (core.i32.print (id i32 1))
 
-(core.i32.print (id i32 (item:fact 10)))
+; (core.i32.print (id i32 (item:fact 10)))
 ; (core.i32.print (item:fact 10))
+(core.i32.print (fact 10))
+
+; (core.i32.print (id i32 (core.i32.add 1 1)))
 
 ;; fact.neut ends here.

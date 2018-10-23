@@ -1,0 +1,20 @@
+;; adder.neut
+
+(include "./base.neut")
+
+;; make-adder : box i32 -> box (i32 -> i32)
+; (definition make-adder
+;   (lambda (x)
+;     (begin
+;       (let adder (data (lambda (y) (core.i32.add (code x) y))))
+;       adder)))
+(definition make-adder
+  (lambda (x)
+    (begin
+      (definition adder
+        (lambda (y) (core.i32.add (code x) y)))
+      adder)))
+
+(core.i32.print ((make-adder (data 3)) 4))
+
+;; adder.neut ends here.

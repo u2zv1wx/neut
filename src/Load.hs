@@ -173,6 +173,7 @@ process e = do
   polarize
   -- penv <- gets polEnv
   -- liftIO $ putStrLn $ Pr.ppShow penv
+  -- liftIO $ putStrLn "-----------------------"
   modalize
   -- menv <- gets modalEnv
   -- liftIO $ putStrLn $ Pr.ppShow menv

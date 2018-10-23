@@ -68,7 +68,9 @@ modalNeg lam@(NegPiIntro _ _) = do
   body' <- modalNeg body
   lamName <- newNameWith "lam"
   insModalEnv lamName (xs ++ args) body'
-  return $ CompPiElimConstElim lamName (xs ++ args)
+  name <- newNameWith "fun"
+  bindLet [(name, ValueConstIntro lamName)] $
+    CompPiElimConstElim name $ xs ++ args
 modalNeg app@(NegPiElim _ _) = do
   let (fun, args) = toNegPiElimSeq app
   fun' <- modalNeg fun
@@ -101,9 +103,13 @@ modalNeg (NegConstElim e) = do
 modalNeg (NegMu self e) = do
   let (body, args) = toNegPiIntroSeq e
   let xs = varNeg $ NegMu self e
-  body' <- modalNeg body
-  insModalEnv self (xs ++ args) body'
-  return $ CompPiElimConstElim self (xs ++ args)
+  let vs = map PosVar xs
+  fixName <- newNameWith "fix"
+  let app = foldl NegPiElim (NegConstElim (PosConstIntro fixName)) vs
+  let inner = NegUpElim self (NegUpIntro $ PosBoxIntro app) body
+  inner' <- modalNeg inner
+  insModalEnv fixName (xs ++ args) inner'
+  return $ CompPiElimConstElim fixName $ xs ++ args
 modalNeg (NegPrint t e) = do
   e' <- modalPos e
   return $ CompPrint t e'
@@ -134,7 +140,7 @@ makeClosure abs = do
   let (body, args) = toNegPiIntroSeq abs
   let fvs = nub $ varNeg abs
   envName <- newNameWith "env"
-  body' <- makeClosureBody envName fvs body
+  body' <- makeClosureBody envName fvs body >>= reduceComp
   cls <- newNameWith "closure"
   insModalEnv cls (envName : args) body'
   let vs = map ValueVar fvs

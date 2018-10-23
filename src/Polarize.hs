@@ -21,7 +21,7 @@ polarize :: WithEnv ()
 polarize = do
   wtenv <- gets weakTermEnv
   forM_ wtenv $ \(name, e) -> do
-    e' <- polarize' e
+    e' <- polarize' e >>= reduceNeg
     insPolEnv name e'
   insArith
   insCopyInt
@@ -128,9 +128,7 @@ insCopyInt =
 
 insPrintInt :: WithEnv ()
 insPrintInt =
-  forM_ [LowTypeSignedInt 32] $ \intLowType
-  -- forM_ intLowTypeList $ \intLowType -> do
-   -> do
+  forM_ intLowTypeList $ \intLowType -> do
     x <- newNameWith "arg"
     let print = rb $ rt $ NegPiIntro x $ NegPrint intLowType (PosVar x)
     insPolEnv ("core." ++ show intLowType ++ ".print") print
