@@ -488,6 +488,16 @@ lookupTypeEnv' s = do
     Nothing -> lift $ throwE $ s ++ " is not found in the type environment."
     Just t -> return t
 
+lookupTypeEnv1 :: String -> [Identifier] -> Neut -> WithEnv Neut
+lookupTypeEnv1 s ctx univ = do
+  tenv <- gets typeEnv
+  let ts = map snd $ filter (\(x, _) -> s == x) tenv
+  case ts of
+    [] -> lift $ throwE $ s ++ " is not found in the type environment."
+    (t:ts') -> do
+      forM_ ts' $ \t' -> insConstraintEnv ctx t t' univ
+      return t
+
 insNameEnv :: Identifier -> Identifier -> WithEnv ()
 insNameEnv from to = modify (\e -> e {nameEnv = (from, to) : nameEnv e})
 

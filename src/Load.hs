@@ -166,17 +166,11 @@ concatDefList [] = do
 concatDefList [DefLet _ _ e] = return e
 concatDefList (DefLet meta (_, name') e:es) = do
   cont <- concatDefList es
-  mt <- lookupTypeEnv name'
-  holeOrType <-
-    case mt of
-      Just t -> return t
-      Nothing -> do
-        h <- newNameWith "any"
-        holeMeta <- newNameWith "meta"
-        return $ holeMeta :< NeutHole h
+  h <- newNameWith "any"
+  holeMeta <- newNameWith "meta"
+  let hole = holeMeta :< NeutHole h
   lamMeta <- newNameWith "meta"
-  return $
-    meta :< NeutPiElim (lamMeta :< NeutPiIntro (name', holeOrType) cont) e
+  return $ meta :< NeutPiElim (lamMeta :< NeutPiIntro (name', hole) cont) e
 concatDefList (DefMod sigMeta (_, name') xs:es) = do
   cont <- concatDefList es
   meta <- newNameWith "meta"

@@ -41,8 +41,9 @@ check main e = do
   return $ subst sub e
 
 infer :: Context -> Neut -> WithEnv Neut
-infer _ (meta :< NeutVar s) = do
-  t <- lookupTypeEnv' s
+infer ctx (meta :< NeutVar s) = do
+  univ <- boxUniv
+  t <- lookupTypeEnv1 s ctx univ >>= annot univ
   returnMeta meta t
 infer ctx (meta :< NeutPi (s, tdom) tcod) = do
   insTypeEnv s tdom
@@ -165,10 +166,11 @@ infer ctx (meta :< NeutMu s e) = do
   returnMeta meta te
 infer ctx (meta :< NeutConst t) = infer ctx t >>= returnMeta meta
 infer ctx (meta :< NeutConstIntro s) = do
-  t <- lookupTypeEnv' s
-  insTypeEnv s t
   higherUniv <- boxUniv
   univ <- boxUniv >>= annot higherUniv
+  -- t <- lookupTypeEnv' s
+  t <- lookupTypeEnv1 s ctx univ
+  insTypeEnv s t
   u <- infer ctx t >>= annot higherUniv
   insConstraintEnv ctx univ u higherUniv
   returnMeta meta t
