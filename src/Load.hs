@@ -89,13 +89,20 @@ load' ((meta :< TreeNode [_ :< TreeAtom "use", _ :< TreeAtom moduleName]):as) = 
       moduleName ++ " is defined, but not registered in the module environment."
     Just xes -> do
       let (nameList, _) = unzip xes
-      ns <- mapM (newNameWith . (\s -> moduleName ++ ":" ++ s)) nameList
+      let nameList' = map (\s -> moduleName ++ ":" ++ s) nameList
+      ns <- mapM newNameWith nameList'
+      forM_ (zip nameList' ns) $ uncurry insNameEnv
       defList <- load' as
       return $ DefMod meta (moduleName, moduleName') ns : defList
 load' ((_ :< TreeNode ((_ :< TreeAtom "statement"):as1)):as2) = do
   defList1 <- load' as1
   defList2 <- load' as2
   return $ defList1 ++ defList2
+load' ((_ :< TreeNode [_ :< TreeAtom "ascription", _ :< TreeAtom name, t]):as) = do
+  name' <- lookupNameEnv name
+  t' <- macroExpand t >>= parse >>= rename
+  insTypeEnv name' t'
+  load' as
 load' ((meta :< TreeNode [primMeta :< TreeAtom "primitive", _ :< TreeAtom name, t]):as) = do
   let primName = "prim." ++ name
   primName' <- newNameWith primName
@@ -159,11 +166,17 @@ concatDefList [] = do
 concatDefList [DefLet _ _ e] = return e
 concatDefList (DefLet meta (_, name') e:es) = do
   cont <- concatDefList es
-  h <- newNameWith "any"
-  holeMeta <- newNameWith "meta"
-  let hole = holeMeta :< NeutHole h
+  mt <- lookupTypeEnv name'
+  holeOrType <-
+    case mt of
+      Just t -> return t
+      Nothing -> do
+        h <- newNameWith "any"
+        holeMeta <- newNameWith "meta"
+        return $ holeMeta :< NeutHole h
   lamMeta <- newNameWith "meta"
-  return $ meta :< NeutPiElim (lamMeta :< NeutPiIntro (name', hole) cont) e
+  return $
+    meta :< NeutPiElim (lamMeta :< NeutPiIntro (name', holeOrType) cont) e
 concatDefList (DefMod sigMeta (_, name') xs:es) = do
   cont <- concatDefList es
   meta <- newNameWith "meta"
