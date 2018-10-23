@@ -324,6 +324,9 @@ simp ((ctx, _ :< NeutBox t1, _ :< NeutBox t2, univ):cs) =
   simp $ (ctx, t1, t2, univ) : cs
 simp ((ctx, _ :< NeutBoxIntro e1, _ :< NeutBoxIntro e2, _ :< NeutBox t):cs) =
   simp $ (ctx, e1, e2, t) : cs
+simp ((ctx, _ :< NeutBoxElim e1, _ :< NeutBoxElim e2, t):cs) = do
+  meta <- newNameWith "meta"
+  simp $ (ctx, e1, e2, meta :< NeutBox t) : cs
 simp ((ctx, _ :< NeutConst t1, _ :< NeutConst t2, univ):cs) =
   simp $ (ctx, t1, t2, univ) : cs
 simp ((_, _ :< NeutIndex l1, _ :< NeutIndex l2, _):cs)
@@ -339,8 +342,13 @@ simp (c@(_, _, e2, _):cs)
   | Just _ <- headMeta' [] e2 = do
     cs' <- simp cs
     return $ c : cs'
-simp (c:_) = throwError $ "cannot simplify:\n" ++ Pr.ppShow c
+simp (c@(_, e1, e2, _):cs) = do
+  b <- isEq e1 e2
+  if b
+    then simp cs
+    else throwError $ "cannot simplify:\n" ++ Pr.ppShow c
 
+-- simp (c:_) = throwError $ "cannot simplify:\n" ++ Pr.ppShow c
 categorize :: PreConstraint -> Constraint
 categorize (ctx, _ :< NeutVar x, e2, t) = do
   let c = ConstraintBeta x e2

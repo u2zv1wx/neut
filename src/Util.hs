@@ -370,3 +370,88 @@ expandDirPath path = do
   current <- getCurrentDirectory
   -- note that, if `path` is an absolute path, `path` itself is returned here.
   return $ current </> path
+
+isEq :: Neut -> Neut -> WithEnv Bool
+isEq (_ :< NeutVar x1) (_ :< NeutVar x2) = return $ x1 == x2
+isEq (_ :< NeutPi (x1, t11) t12) (_ :< NeutPi (x2, t21) t22) = do
+  vx <- toVar' x1
+  b1 <- isEq t11 t21
+  b2 <- isEq t12 $ subst [(x2, vx)] t22
+  return $ b1 && b2
+isEq (_ :< NeutPiIntro (x1, t1) e1) (_ :< NeutPiIntro (x2, t2) e2) = do
+  vx <- toVar' x1
+  b1 <- isEq t1 t2
+  b2 <- isEq e1 $ subst [(x2, vx)] e2
+  return $ b1 && b2
+isEq (_ :< NeutPiElim e11 e12) (_ :< NeutPiElim e21 e22) = do
+  b1 <- isEq e11 e21
+  b2 <- isEq e12 e22
+  return $ b1 && b2
+isEq (_ :< NeutSigma [(x1, t11)] t12) (_ :< NeutSigma [(x2, t21)] t22) = do
+  vx <- toVar' x1
+  b1 <- isEq t11 t21
+  b2 <- isEq t12 $ subst [(x2, vx)] t22
+  return $ b1 && b2
+isEq (i :< NeutSigma ((x1, t11):xts1) t12) (j :< NeutSigma ((x2, t21):xts2) t22) = do
+  vx <- toVar' x1
+  let (xs, ts) = unzip xts2
+  let ts' = map (subst [(x2, vx)]) ts
+  let xts2' = zip xs ts'
+  let t22' = subst [(x2, vx)] t22
+  b1 <- isEq (i :< NeutSigma xts1 t12) (j :< NeutSigma xts2' t22')
+  b2 <- isEq t11 t21
+  return $ b1 && b2
+isEq (_ :< NeutSigmaIntro es1) (_ :< NeutSigmaIntro es2)
+  | length es1 == length es2 = do
+    bs <- zipWithM isEq es1 es2
+    return $ and bs
+isEq (_ :< NeutSigmaElim e11 xs1 e12) (_ :< NeutSigmaElim e21 xs2 e22)
+  | length xs1 == length xs2 = do
+    metaList <- mapM (const $ newNameWith "meta") xs1
+    let vs = map (\(meta, x) -> meta :< NeutVar x) $ zip metaList xs1
+    let sub = zip xs2 vs
+    let e22' = subst sub e22
+    b1 <- isEq e11 e21
+    b2 <- isEq e12 e22'
+    return $ b1 && b2
+isEq (_ :< NeutBox t1) (_ :< NeutBox t2) = isEq t1 t2
+isEq (_ :< NeutBoxIntro e1) (_ :< NeutBoxIntro e2) = isEq e1 e2
+isEq (_ :< NeutBoxElim e1) (_ :< NeutBoxElim e2) = isEq e1 e2
+isEq (_ :< NeutIndex l1) (_ :< NeutIndex l2) = return $ l1 == l2
+isEq (_ :< NeutIndexIntro i1) (_ :< NeutIndexIntro i2) = return $ i1 == i2
+isEq (_ :< NeutIndexElim e1 bs1) (_ :< NeutIndexElim e2 bs2) = do
+  b1 <- isEq e1 e2
+  b2 <- isEqBranch bs1 bs2
+  return $ b1 && b2
+isEq (_ :< NeutUniv l1) (_ :< NeutUniv l2) = return $ l1 == l2
+isEq (_ :< NeutConst t1) (_ :< NeutConst t2) = isEq t1 t2
+isEq (_ :< NeutConstIntro x1) (_ :< NeutConstIntro x2) = return $ x1 == x2
+isEq (_ :< NeutConstElim e1) (_ :< NeutConstElim e2) = isEq e1 e2
+isEq (_ :< NeutMu x1 e1) (_ :< NeutMu x2 e2) = do
+  vx <- toVar' x1
+  isEq e1 $ subst [(x2, vx)] e2
+isEq (_ :< NeutHole x1) (_ :< NeutHole x2) = return $ x1 == x2
+isEq _ _ = return False
+
+isEqBranch :: [(Index, Neut)] -> [(Index, Neut)] -> WithEnv Bool
+isEqBranch [] [] = return True
+isEqBranch ((IndexLabel x1, e1):es1) ((IndexLabel x2, e2):es2) = do
+  vx <- toVar' x1
+  b1 <- isEq e1 $ subst [(x2, vx)] e2
+  b2 <- isEqBranch es1 es2
+  return $ b1 && b2
+isEqBranch ((IndexInteger i1, e1):es1) ((IndexInteger i2, e2):es2)
+  | i1 == i2 = do
+    b1 <- isEq e1 e2
+    b2 <- isEqBranch es1 es2
+    return $ b1 && b2
+isEqBranch ((IndexFloat i1, e1):es1) ((IndexFloat i2, e2):es2)
+  | i1 == i2 = do
+    b1 <- isEq e1 e2
+    b2 <- isEqBranch es1 es2
+    return $ b1 && b2
+isEqBranch ((IndexDefault, e1):es1) ((IndexDefault, e2):es2) = do
+  b1 <- isEq e1 e2
+  b2 <- isEqBranch es1 es2
+  return $ b1 && b2
+isEqBranch _ _ = return False
