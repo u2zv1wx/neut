@@ -68,7 +68,10 @@ load' ((_ :< TreeNode [_ :< TreeAtom "include", _ :< TreeAtom s]):as) =
           defList <- load' as
           return $ includedDefList ++ defList
 load' ((meta :< TreeNode ((_ :< TreeAtom "module"):(_ :< TreeAtom moduleName):ts)):as) = do
+  nenv <- gets notationEnv
+  renv <- gets reservedEnv
   moduleDefList <- load' ts
+  modify (\e -> e {notationEnv = nenv, reservedEnv = renv})
   xes <- join <$> mapM defToDefList moduleDefList
   moduleName' <- newNameWith moduleName
   modify (\e -> e {moduleEnv = (moduleName', xes) : moduleEnv e})
