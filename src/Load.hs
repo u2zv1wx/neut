@@ -36,7 +36,7 @@ import Text.Read (readMaybe)
 import qualified Text.Show.Pretty as Pr
 
 load :: String -> WithEnv [String]
-load s = toDefList s >>= concatDefList >>= process
+load s = strToTree s >>= load' >>= concatDefList >>= process
 
 load' :: [Tree] -> WithEnv [Def]
 load' [] = return []
@@ -63,7 +63,7 @@ load' ((_ :< TreeNode [_ :< TreeAtom "include", _ :< TreeAtom s]):as) =
           content <- liftIO $ readFile nextPath
           let nextDirPath = dirPath </> takeDirectory path
           modify (\e -> e {currentDir = nextDirPath})
-          includedDefList <- toDefList content
+          includedDefList <- strToTree content >>= load'
           modify (\e -> e {currentDir = dirPath})
           defList <- load' as
           return $ includedDefList ++ defList
@@ -152,13 +152,16 @@ isSpecialForm (_ :< TreeNode [_ :< TreeAtom "reserve", _ :< TreeAtom _]) = True
 isSpecialForm (_ :< TreeNode ((_ :< TreeAtom "index"):(_ :< TreeAtom _):_)) =
   True
 isSpecialForm (_ :< TreeNode [_ :< TreeAtom "include", _ :< TreeAtom _]) = True
+isSpecialForm (_ :< TreeNode [_ :< TreeAtom "module", _ :< TreeAtom _, _]) =
+  True
+isSpecialForm (_ :< TreeNode [_ :< TreeAtom "use", _ :< TreeAtom _]) = True
 isSpecialForm (_ :< TreeNode [_ :< TreeAtom "primitive", _ :< TreeAtom _, _]) =
   True
+isSpecialForm (_ :< TreeNode [_ :< TreeAtom "ascription", _ :< TreeAtom _, _]) =
+  True
+isSpecialForm (_ :< TreeNode [_ :< TreeAtom "statement", _]) = True
 isSpecialForm (_ :< TreeNode [_ :< TreeAtom "let", _ :< TreeAtom _, _]) = True
 isSpecialForm _ = False
-
-toDefList :: String -> WithEnv [Def]
-toDefList s = strToTree s >>= load'
 
 concatDefList :: [Def] -> WithEnv Neut
 concatDefList [] = do
