@@ -35,9 +35,27 @@ import Text.Read (readMaybe)
 
 import qualified Text.Show.Pretty as Pr
 
+-- Def is essentially just a correspondence from name to term.
+data Def
+  = DefLet Identifier -- meta
+           (Identifier, Identifier) -- (name, alpha-converted name)
+           Neut -- content  (the `e` in `let x = e in ...`)
+  -- a module is just a tensor of its contents.
+  -- DefMod can be understood as `let x = (f1, ..., fn) in ...`.
+  -- The `fi`s are the third argument of DefMod.
+  | DefMod Identifier -- metaa
+           (Identifier, Identifier) -- (name, alpha-converted name)
+           [Identifier] -- list of the names of the contents
+  deriving (Show)
+
+-- Given a content of a file, translate it into the list of corresponding S-expressions
+-- using `strToTree`. Then parse them into the list of definitions (updating the
+-- internal state of the compiler). After that, concatenate the list of definitions,
+-- obtaining a term. Finally, process the resulting term using `process`.
 load :: String -> WithEnv [String]
 load s = strToTree s >>= load' >>= concatDefList >>= process
 
+-- Parse the head element of the input list.
 load' :: [Tree] -> WithEnv [Def]
 load' [] = return []
 load' ((_ :< TreeNode [_ :< TreeAtom "notation", from, to]):as) = do
@@ -50,8 +68,8 @@ load' ((_ :< TreeNode ((_ :< TreeAtom "index"):(_ :< TreeAtom name):ts)):as) = d
   indexList <- mapM parseAtom ts
   insIndexEnv name indexList
   load' as
-load' ((_ :< TreeNode [_ :< TreeAtom "include", _ :< TreeAtom s]):as) =
-  case readMaybe s :: Maybe String of
+load' ((_ :< TreeNode [_ :< TreeAtom "include", _ :< TreeAtom pathString]):as) =
+  case readMaybe pathString :: Maybe String of
     Nothing -> E.lift $ throwE "the argument of `include` must be a string"
     Just path -> do
       dirPath <- gets currentDir
@@ -67,7 +85,14 @@ load' ((_ :< TreeNode [_ :< TreeAtom "include", _ :< TreeAtom s]):as) =
           modify (\e -> e {currentDir = dirPath})
           defList <- load' as
           return $ includedDefList ++ defList
-load' ((meta :< TreeNode ((_ :< TreeAtom "module"):(_ :< TreeAtom moduleName):ts)):as) = do
+load' ((meta :< TreeNode ((_ :< TreeAtom "module"):(_ :< TreeAtom moduleName):ts)):as)
+  -- (module name statement-1 ... statement-n) is processed as follows:
+  --   (1) process the list [statement-1, ..., statement-n], obtaining a defList.
+  --   (1.1) let us write defList == [(name-1, e1), ..., (name-m, em)]
+  --   (2) bind the tensor `(e1, ..., em)` to `name`.
+  --   (3) update the moduleEnv, so that we can lookup the names name-i from the
+  --   name of the tensor `name`.
+ = do
   nenv <- gets notationEnv
   renv <- gets reservedEnv
   moduleDefList <- load' ts
@@ -80,7 +105,12 @@ load' ((meta :< TreeNode ((_ :< TreeAtom "module"):(_ :< TreeAtom moduleName):ts
   let boxSigma = boxMeta :< NeutBoxIntro (meta :< NeutSigmaIntro es)
   defList <- load' as
   return $ DefLet meta (moduleName, moduleName') boxSigma : defList
-load' ((meta :< TreeNode [_ :< TreeAtom "use", _ :< TreeAtom moduleName]):as) = do
+load' ((meta :< TreeNode [_ :< TreeAtom "use", _ :< TreeAtom moduleName]):as)
+  -- (use name) is essentially just a elimination of Sigma.
+  -- Specifically, what (use name) does is:
+  --   (1) lookup the moduleEnv, obtaining the list of names [name-1, ..., name-m].
+  --   (2) create a sigma-decomposition `let (name:name-1, ..., name:name-m) = name`.
+ = do
   moduleName' <- lookupNameEnv moduleName
   menv <- gets moduleEnv
   case lookup moduleName' menv of
@@ -96,7 +126,12 @@ load' ((meta :< TreeNode [_ :< TreeAtom "use", _ :< TreeAtom moduleName]):as) = 
       forM_ (zip nameList' ns) $ uncurry insNameEnv
       defList <- load' as
       return $ DefMod meta (moduleName, moduleName') ns : defList
-load' ((_ :< TreeNode ((_ :< TreeAtom "statement"):as1)):as2) = do
+load' ((_ :< TreeNode ((_ :< TreeAtom "statement"):as1)):as2)
+  -- (statement stmt-1 ... stmt-n) is just a list of statements.
+  -- This statement is useful when defining new statements using `notation`.
+  -- For example, one may define `(import name path)` as:
+  --   (statement (module name (include path)) (use name)).
+ = do
   defList1 <- load' as1
   defList2 <- load' as2
   return $ defList1 ++ defList2
@@ -105,7 +140,9 @@ load' ((_ :< TreeNode [_ :< TreeAtom "ascription", _ :< TreeAtom name, t]):as) =
   t' <- macroExpand t >>= parse >>= rename
   insTypeEnv name' t'
   load' as
-load' ((meta :< TreeNode [primMeta :< TreeAtom "primitive", _ :< TreeAtom name, t]):as) = do
+load' ((meta :< TreeNode [primMeta :< TreeAtom "primitive", _ :< TreeAtom name, t]):as)
+  -- Declare external constants.
+ = do
   let primName = "prim." ++ name
   primName' <- newNameWith primName
   name' <- newNameWith name
@@ -123,12 +160,16 @@ load' ((meta :< TreeNode [primMeta :< TreeAtom "primitive", _ :< TreeAtom name, 
   return $
     DefLet defMeta (primName, primName') (primMeta :< NeutConstIntro name) :
     DefLet meta (name, name') constElim : defList
-load' ((meta :< TreeNode [_ :< TreeAtom "let", _ :< TreeAtom name, tbody]):as) = do
+load' ((meta :< TreeNode [_ :< TreeAtom "let", _ :< TreeAtom name, tbody]):as)
+  -- `(let name body)` binds `body` to `name`.
+ = do
   e <- macroExpand tbody >>= parse >>= rename
   name' <- newNameWith name
   defList <- load' as
   return $ DefLet meta (name, name') e : defList
-load' (a:as) = do
+load' (a:as)
+  -- If the head element is not a special form, we interpret it as an ordinary term.
+ = do
   e <- macroExpand a
   if isSpecialForm e
     then load' $ e : as
@@ -163,6 +204,8 @@ isSpecialForm (_ :< TreeNode [_ :< TreeAtom "statement", _]) = True
 isSpecialForm (_ :< TreeNode [_ :< TreeAtom "let", _ :< TreeAtom _, _]) = True
 isSpecialForm _ = False
 
+-- Represent the list of Defs in the target language, using `let`.
+-- (Note that `let x := e1 in e2` can be represented as `(lam x e2) e1`.)
 concatDefList :: [Def] -> WithEnv Neut
 concatDefList [] = do
   meta <- newNameWith "meta"
@@ -190,12 +233,3 @@ process e = do
   virtualize
   assemblize
   emit
-
-data Def
-  = DefLet Identifier
-           (Identifier, Identifier)
-           Neut
-  | DefMod Identifier
-           (Identifier, Identifier)
-           [Identifier]
-  deriving (Show)
