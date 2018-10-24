@@ -1,0 +1,119 @@
+
+% BNF-notation
+\newcommand{\production}{\vcentcolon\vcentcolon=}
+\newlength{\len}
+\settowidth{\len}{\( \production \)}
+\newcommand{\Mid}{\makebox[\len]{\( \vert \)}}
+
+\newlength{\lenS}
+\settowidth{\lenS}{\( = \)}
+\newcommand{\MidS}{\makebox[\lenS]{\( \vert \)}}
+
+% operator
+\newcommand{\abs}[2]{\lambda #1.\,#2}
+\newcommand{\Abs}[2]{\underbar{\lambda} #1.\,#2}
+
+\newcommand{\absP}[2]{\zeta #1.\,#2}
+\newcommand{\AbsP}[2]{\underbar{\zeta} #1.\,#2}
+
+\newcommand{\app}[2]{#1 \lhd #2}
+\newcommand{\App}[2]{#1 \mathbin{\underline{\lhd}} #2}
+
+\newcommand{\appE}[2]{#1 \mathbin{@} #2}
+\newcommand{\AppE}[2]{#1 \mathbin{\underline{@}} #2}
+
+\newcommand{\appT}[2]{#1 \LHD #2}
+\newcommand{\AppT}[2]{#1 \mathbin{\underline{\LHD}} #2}
+% \newcommand{\AppT}[2]{#1 \UNLHD #2}
+
+\newcommand{\appsT}[3]{#2 \diamond^{#1} #3}
+\newcommand{\appi}[2]{#1 @_{i} #2}
+\newcommand{\coabs}[2]{\mu #1.\,#2}
+\newcommand{\coapp}[2]{#1 \diamond #2}
+\newcommand{\pair}[2]{(#1, #2)}
+\newcommand{\simnot}{\mathord{\sim}}
+\newcommand{\LET}[3]{\mathsf{let}\ #1 = #2\ \mathsf{in}\ #3}
+\newcommand{\slet}[3]{\mathsf{let}\ #1 = #2\ \mathsf{in}\ #3}
+
+\newcommand{\xabs}[2]{\Lambda #1.\,#2}
+\newcommand{\xAbs}[2]{\underbar{\Lambda} #1.\,#2}
+
+\newcommand{\quit}[3]{\mathsf{quit}^{#1}(#2, #3)}
+
+% notation
+\newcommand{\subst}[2]{\{ #1 := #2 \}}
+
+\newcommand{\downT}[1]{\mathord{\downarrow}#1}
+\newcommand{\upT}[1]{\mathord{\uparrow}#1}
+
+\newcommand{\DownT}[1]{\mathord{\Downarrow}#1}
+\newcommand{\UpT}[1]{\mathord{\Uparrow}#1}
+
+\newcommand{\ir}[1]{\mathsf{#1}}
+
+% \newcommand{\shift}[2]{\mathcal{S}#1.\,#2}
+\newcommand{\shiftT}[2]{\mathcal{S}#1.\,#2}
+\newcommand{\delimit}[1]{\langle #1 \rangle}
+
+\newcommand{\dprod}[2]{\Pi (#1).\,#2}
+\newcommand{\dsum}[2]{\Sigma (#1).\,#2}
+
+\newcommand{\Dprod}[2]{\hat{\Pi} (#1).\,#2}
+\newcommand{\Dsum}[2]{\widehat{\Sigma} (#1).\,#2}
+
+\newcommand{\thunkS}[1]{\mathsf{thunk}\,#1}
+\newcommand{\unthunkS}[1]{\mathsf{unthunk}\,#1}
+\newcommand{\forceS}[1]{\mathsf{force}\,#1}
+
+\newcommand{\quoteS}[1]{\mathsf{quote}\,#1}
+\newcommand{\unquoteS}[1]{\mathsf{unquote}\,#1}
+
+\newcommand{\runS}[1]{\mathsf{run}\,#1}
+
+\newcommand{\bind}[3]{#1 \rhd_{#2} #3}
+\newcommand{\cobind}[3]{#1 \RHD_{#2} #3}
+
+\newcommand{\vcode}[1]{\mathsf{code}\,#1}
+\newcommand{\vdata}[1]{\mathsf{data}\,#1}
+\newcommand{\mybox}[1]{\mathsf{box}\,#1}
+\newcommand{\myunbox}[1]{\mathsf{unbox}\,#1}
+\newcommand{\vcocode}[1]{\mathsf{cocode}\,#1}
+\newcommand{\vcodata}[1]{\mathsf{codata}\,#1}
+
+\newcommand{\vret}[1]{\mathsf{return}\,#1}
+\newcommand{\vcoret}[1]{\mathsf{coreturn}\,#1}
+
+\newcommand{\flip}[1]{#1^{\circlearrowleft}}
+\newcommand{\flop}[1]{#1^{\CIRCLE}}
+
+% \newcommand{\pair}[2]{(#1, #2)}
+
+\newcommand{\toneg}[1]{#1^{-}}
+\newcommand{\topos}[1]{#1^{+}}
+
+\newcommand{\stringT}{\mathsf{string}}
+\newcommand{\print}[1]{\mathsf{print}\,#1}
+
+\newcommand{\rec}[2]{\mathsf{rec}\,#1.\,#2}
+\newcommand{\corec}[2]{\mathsf{corec}\,#1\,#2}
+
+\newcommand{\myzero}{\mathsf{zero}}
+\newcommand{\mysucc}[1]{\mathsf{succ}\,#1}
+\newcommand{\nat}{\mathbb{N}}
+
+\newcommand{\FA}[2]{\forall #1.\,#2}
+\newcommand{\EX}[2]{\exists #1.\,#2}
+
+\newcommand{\deref}[1]{\mathsf{deref}\,#1}
+\newcommand{\mydia}[1]{\mathsf{dia}\,#1}
+\newcommand{\coderef}[1]{\mathsf{coderef}\,#1}
+\newcommand{\cothunk}[1]{\mathsf{cothunk}\,#1}
+\newcommand{\coforce}[1]{\mathsf{coforce}\,#1}
+
+\newcommand{\sep}{\,;\ }
+
+\newcommand{\ctx}[1]{\Vdash #1}
+% \newcommand{\ctx}[1]{#1\,\mathsf{ctx}}
+
+\newcommand{\luniv}{\mathbb{L}}
+\newcommand{\univ}{\Box \luniv}

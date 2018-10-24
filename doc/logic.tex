@@ -1,0 +1,237 @@
+\documentclass[11pt,a4]{article}
+\usepackage{luacode}
+
+%
+% packages
+%
+
+\usepackage{fontspec}
+\usepackage{mathpazo}
+\setmainfont[Ligatures=TeX]{TeXGyrePagella}
+\linespread{1.05}
+
+\def\OPTpagesize{210mm,297mm}
+\def\OPTtopmargin{1in}
+\def\OPTbottommargin{1in}
+\def\OPTinnermargin{0.75in}
+\def\OPToutermargin{1.0in}
+\def\OPTbindingoffset{0.35in}
+\usepackage[papersize={\OPTpagesize},
+twoside,
+includehead,
+top=\OPTtopmargin,
+bottom=\OPTbottommargin,
+inner=\OPTinnermargin,
+outer=\OPToutermargin,
+bindingoffset=\OPTbindingoffset]{geometry}
+
+\usepackage{xcolor}
+\def\OPTlinkcolor{0,0.45,0} % RGB components for clickable links
+\definecolor{linkcolor}{rgb}{\OPTlinkcolor}
+\usepackage[backref=page,
+colorlinks,
+citecolor=linkcolor,
+linkcolor=linkcolor,
+urlcolor=linkcolor,
+unicode=true]{hyperref}
+
+\usepackage{amssymb,amsmath,amsthm}
+% \usepackage{mathabx}
+\usepackage{mathtools}
+\usepackage{bussproofs}
+\newenvironment{bprooftree}{\leavevmode\hbox\bgroup}{\DisplayProof\egroup}
+\usepackage{framed}
+
+\input{macro}
+\newcommand{\nuabs}[2]{\nu #1.\,#2}
+\newcommand{\conuabs}[2]{\overline{\nu} #1.\,#2}
+\newcommand{\tensor}[2]{\mathsf{tensor}(#1, #2)}
+\newcommand{\tpar}[2]{\mathsf{dispatch}(#1, #2)}
+\newcommand{\tleft}[1]{\mathsf{left}\,#1}
+\newcommand{\tright}[1]{\mathsf{right}\,#1}
+\newcommand{\tlet}[4]{\mathsf{let}\ \tensor{#1}{#2} = #3\ \mathsf{in}\ #4}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\J}{\mathcal{J}}
+
+\usepackage{cmll}
+
+
+
+\usepackage{tikz}
+\usetikzlibrary{cd}
+
+\usepackage{amssymb,amsmath,amsthm,stmaryrd,mathrsfs,wasysym}
+\usepackage{enumitem,mathtools,xspace}
+\usepackage{xstring}
+
+\title{}
+\date{}
+\author{}
+
+\begin{document}
+
+% \maketitle{}
+
+\begin{framed}
+  \begin{center}
+    \begin{bprooftree}
+      \AxiomC{\( \vphantom{\Gamma} \)}
+      \RightLabel{\( \ir{(empty)} \)}
+      \UnaryInfC{\( \ctx{\emptyset} \)}
+    \end{bprooftree}
+    \begin{bprooftree}
+      \AxiomC{\( \ctx{\Box \Gamma} \)}
+      \RightLabel{\( \ir{(univ)} \)}
+      \UnaryInfC{\( \Box \Gamma \vdash \univ_{i} : \univ_{i + 1} \)}
+    \end{bprooftree}
+    \begin{bprooftree}
+      \AxiomC{\( \Gamma \vdash A : \univ_{i} \)}
+      \RightLabel{\( \ir{(hier)} \)}
+      \UnaryInfC{\( \Gamma \vdash A : \univ_{i + 1} \)}
+    \end{bprooftree}
+    \\
+    \vspace{1.5em}
+    \begin{bprooftree}
+      \AxiomC{\( \Gamma \vdash A : \univ_{i} \)}
+      \RightLabel{\( \ir{(ext)} \)}
+      \UnaryInfC{\( \ctx{\Gamma, x : A} \)}
+    \end{bprooftree}
+    \begin{bprooftree}
+      \AxiomC{\( \ctx{\Box \Gamma, x : A} \)}
+      \RightLabel{\( \ir{(var)} \)}
+      \UnaryInfC{\( \Box \Gamma, x : A \vdash x : A \)}
+    \end{bprooftree}
+    \\
+    \vspace{1.5em}
+    \begin{bprooftree}
+      \AxiomC{\( \Gamma \vdash A : \univ_{i} \)}
+      \AxiomC{\( \Delta, x : A \vdash B : \univ_{i} \)}
+      \RightLabel{\( (\Pi) \)}
+      \BinaryInfC{\( \Gamma, \Delta \vdash \dprod{x : A}{B} : \univ_{i} \)}
+    \end{bprooftree}
+    \\
+    \vspace{1.5em}
+    \begin{bprooftree}
+      \AxiomC{\( \Gamma, x : A \vdash e : B \)}
+      \RightLabel{\( (\Pi_{\ir{i}}) \)}
+      \UnaryInfC{\( \Gamma \vdash \abs{x}{e} : \dprod{x : A}{B} \)}
+    \end{bprooftree}
+    \begin{bprooftree}
+      \AxiomC{\( \Gamma \vdash e_{1} : \dprod{x : A}{B}\)}
+      \AxiomC{\( \Delta \vdash e_{2} : A \)}
+      \RightLabel{\( (\Pi_{\ir{e}}) \)}
+      \BinaryInfC{\( \Gamma, \Delta \vdash \appE{e_{1}}{e_{2}} : B \subst{x}{e_{1}} \)}
+    \end{bprooftree}
+    \\
+    \vspace{1.5em}
+    \begin{bprooftree}
+      \AxiomC{\( \Gamma \vdash A : \univ_{i} \)}
+      \AxiomC{\( \Delta \vdash B : \univ_{i} \)}
+      \RightLabel{\( (\multimap) \)}
+      \BinaryInfC{\( \Gamma, \Delta \vdash A \multimap B : \univ_{i} \)}
+    \end{bprooftree}
+    \\
+    \vspace{1.5em}
+    \begin{bprooftree}
+      \AxiomC{\( \Gamma, x : A \vdash e : B \)}
+      \RightLabel{\( (\multimap_{\ir{i}}) \)}
+      \UnaryInfC{\( \Gamma \vdash \abs{x}{e} : A \multimap B \)}
+    \end{bprooftree}
+    \begin{bprooftree}
+      \AxiomC{\( \Gamma \vdash e_{1} : A \multimap B \)}
+      \AxiomC{\( \Delta \vdash e_{2} : A \)}
+      \RightLabel{\( (\multimap_{\ir{e}}) \)}
+      \BinaryInfC{\( \Gamma, \Delta \vdash \appE{e_{1}}{e_{2}} : B \)}
+    \end{bprooftree}
+    \\
+    \vspace{1.5em}
+    \begin{bprooftree}
+      \AxiomC{\( \Gamma \vdash A : \univ_{i} \)}
+      \AxiomC{\( \Delta, x : A \vdash B : \univ_{i} \)}
+      \RightLabel{\( (\Sigma) \)}
+      \BinaryInfC{\( \Gamma, \Delta \vdash \dsum{x : A}{B} : \univ_{i} \)}
+    \end{bprooftree}
+    \\
+    \vspace{1.5em}
+    \begin{bprooftree}
+      \AxiomC{\( \Gamma \vdash e_{1} : A \)}
+      \AxiomC{\( \Delta \vdash e_{2} : B \subst{x}{e_{1}} \)}
+      \RightLabel{\( (\Sigma_{\ir{i}}) \)}
+      \BinaryInfC{\( \Gamma, \Delta \vdash \pair{e_{1}}{e_{2}} : \dsum{x : A}{B} \)}
+    \end{bprooftree}
+    \\
+    \vspace{1.5em}
+    \begin{bprooftree}
+      \AxiomC{\( \Gamma \vdash e_{1} : \dsum{x : A}{B} \)}
+      \AxiomC{\( \Delta, x : A, y : B \vdash e_{2} : C \subst{z}{\pair{x}{y}} \)}
+      \RightLabel{\( (\Sigma_{\ir{e}}) \)}
+      \BinaryInfC{\( \Gamma, \Delta \vdash \LET{\pair{x}{y}}{e_{1}}{e_{2}} : C \subst{z}{e_{1}} \)}
+    \end{bprooftree}
+    \\
+    \vspace{1.5em}
+    \begin{bprooftree}
+      \AxiomC{\( \Gamma \vdash A : \univ_{i} \)}
+      \AxiomC{\( \Delta \vdash B : \univ_{i} \)}
+      \RightLabel{\( (\otimes) \)}
+      \BinaryInfC{\( \Gamma, \Delta \vdash A \otimes B : \univ_{i} \)}
+    \end{bprooftree}
+    \\
+    \vspace{1.5em}
+    \begin{bprooftree}
+      \AxiomC{\( \Gamma \vdash e_{1} : A \)}
+      \AxiomC{\( \Delta \vdash e_{2} : B \)}
+      \RightLabel{\( (\otimes_{\ir{i}}) \)}
+      \BinaryInfC{\( \Gamma, \Delta \vdash \pair{e_{1}}{e_{2}} : A \otimes B \)}
+    \end{bprooftree}
+    \begin{bprooftree}
+      \AxiomC{\( \Gamma \vdash e_{1} : A \otimes B \)}
+      \AxiomC{\( \Delta, x : A, y : B \vdash e_{2} : C \)}
+      \RightLabel{\( (\otimes_{\ir{e}}) \)}
+      \BinaryInfC{\( \Gamma, \Delta \vdash \LET{\pair{x}{y}}{e_{1}}{e_{2}} : C \)}
+    \end{bprooftree}
+    \\
+    \vspace{1.5em}
+    \begin{bprooftree}
+      \AxiomC{\( \Box \Gamma, x : \Box A \vdash e : A \)}
+      \RightLabel{\( \ir{(rec)} \)}
+      \UnaryInfC{\( \Box \Gamma \vdash \rec{x}{e} : A \)}
+    \end{bprooftree}
+    \\
+    \vspace{1.5em}
+    \begin{bprooftree}
+      \AxiomC{\( \Gamma \vdash A : \univ_{i} \)}
+      \RightLabel{\( (\Box) \)}
+      \UnaryInfC{\( \Gamma \vdash \Box A : \univ_{i} \)}
+    \end{bprooftree}
+    \begin{bprooftree}
+      \AxiomC{\( \Box \Gamma \vdash e : A \)}
+      \RightLabel{\( (\Box_{i}) \)}
+      \UnaryInfC{\( \Box \Gamma \vdash \mybox{e} : \Box A \)}
+    \end{bprooftree}
+    \begin{bprooftree}
+      \AxiomC{\( \Box \Gamma \vdash e : \Box A \)}
+      \RightLabel{\( (\Box_{e}) \)}
+      \UnaryInfC{\( \Box \Gamma \vdash \myunbox{e} : A \)}
+    \end{bprooftree}
+    \\
+    \vspace{1.5em}
+    \begin{bprooftree}
+      \AxiomC{\( \Gamma \vdash e : A \)}
+      \RightLabel{\( \ir{(wkg)} \)}
+      \UnaryInfC{\( \Gamma, x : \Box B \vdash e : A \)}
+    \end{bprooftree}
+    \begin{bprooftree}
+      \AxiomC{\( \Gamma, x : \Box B, y : \Box B \vdash e : A \)}
+      \RightLabel{\( \ir{(ctr)} \)}
+      \UnaryInfC{\( \Gamma, x : \Box B \vdash e \subst{y}{x} : A \)}
+    \end{bprooftree}
+  \end{center}
+\end{framed}
+
+
+
+
+\bibliographystyle{plain}
+\bibliography{library}
+
+\end{document}
