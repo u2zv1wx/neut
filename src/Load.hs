@@ -14,9 +14,9 @@ import Data.IORef
 import Asm
 import Data
 
+import Elaborate
 import Emit
 import Exhaust
-import Infer
 
 import Macro
 import Modal
@@ -232,7 +232,7 @@ concatDefList (DefMod sigMeta (_, name') xs:es) = do
 
 process :: Neut -> WithEnv [String]
 process e = do
-  check "main" e >>= nonRecReduce >>= exhaust >>= insWeakTermEnv "main"
+  elaborate "main" e >>= nonRecReduce >>= exhaust >>= insWeakTermEnv "main"
   polarize
   modalize
   virtualize

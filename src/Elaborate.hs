@@ -1,5 +1,5 @@
-module Infer
-  ( check
+module Elaborate
+  ( elaborate
   ) where
 
 import Control.Monad
@@ -21,8 +21,8 @@ import Data.Maybe
 
 import qualified Data.PQueue.Min as Q
 
-check :: Identifier -> Neut -> WithEnv Neut
-check main e = do
+elaborate :: Identifier -> Neut -> WithEnv Neut
+elaborate main e = do
   t <- infer [] e
   insTypeEnv main t
   boxConstraint [] $ nonLinear e
