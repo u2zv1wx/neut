@@ -117,11 +117,10 @@ macroMatch (_ :< TreeNode ts1) (_ :< TreeNode ts2)
         let (xs, rest) = splitAt (length ts2 - 1) ts1
         let ys = take (length ts2 - 1) ts2
         mzs <- sequence <$> zipWithM macroMatch xs ys
-        case mzs of
-          Nothing -> return Nothing
-          Just zs -> do
+        return $
+          mzs >>= \zs -> do
             let (ss, rests) = unzip zs
-            return $ Just (join ss, (sym, rest) : join rests)
+            Just (join ss, (sym, rest) : join rests)
     _
       | length ts1 == length ts2
       -- If the last element is not a '+'-suffixed name, the `ts1` and `ts2` must be
@@ -129,19 +128,12 @@ macroMatch (_ :< TreeNode ts1) (_ :< TreeNode ts2)
       -- the resulting substitutions.
        -> do
         mzs <- sequence <$> zipWithM macroMatch ts1 ts2
-        case mzs of
-          Nothing -> return Nothing
-          Just zs -> do
+        return $
+          mzs >>= \zs -> do
             let (ss, rests) = unzip zs
-            return $ Just (join ss, join rests)
+            Just (join ss, join rests)
     _ -> return Nothing
 
--- select :: [Maybe a] -> Maybe [a]
--- select [] = return []
--- select (Just a:xs) = do
---   xs' <- select xs
---   return $ a : xs'
--- select (Nothing:_) = Nothing
 -- Using the resulting substitution, replace the variables in a pattern.
 -- The first projection of MacroSubst is an "ordinary" substitution, namely just a
 -- mapping from a name to a tree. The second projection is a "multiple" substitution,
