@@ -58,9 +58,14 @@ load s = strToTree s >>= load' >>= concatDefList >>= process
 -- Parse the head element of the input list.
 load' :: [Tree] -> WithEnv [Def]
 load' [] = return []
-load' ((_ :< TreeNode [_ :< TreeAtom "notation", from, to]):as) = do
-  modify (\e -> e {notationEnv = (from, to) : notationEnv e})
-  load' as
+load' ((_ :< TreeNode [_ :< TreeAtom "notation", from, to]):as) =
+  if not $ isSaneNotation from
+    then E.lift $
+         throwE
+           "The '+'-suffixed name can be occurred only at the end of a list"
+    else do
+      modify (\e -> e {notationEnv = (from, to) : notationEnv e})
+      load' as
 load' ((_ :< TreeNode [_ :< TreeAtom "reserve", _ :< TreeAtom s]):as) = do
   modify (\e -> e {reservedEnv = s : reservedEnv e})
   load' as
