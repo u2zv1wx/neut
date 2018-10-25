@@ -1,3 +1,15 @@
+-- This module "polarizes" a neutral term to a negative term. Operationally,
+-- this corresponds to determination of the order of evaluation. In proof-theoretic
+-- term, we translate a ordinary dependent calculus to a dependent variant of
+-- Call-By-Push-Value calculus. The basics of Call-By-Push-Value can be found in
+-- P. Levy. "Call-by-Push-Value: A Subsuming Paradigm". Ph. D. thesis, Queen
+-- Mary College, 2001. In the thesis, Levy gives a translation from a call-by-value
+-- calculus to a call-by-push-value calculus. Our translation is a dependent
+-- extension of the translation. The crucial point in our translation would be that,
+-- in dependent setting, the distinction between the type constructor `↑(-)`
+-- and the term constructor `return (-)` seems to disappear. Indeed, in this
+-- translation, we only use `NegUpIntro` (the term-level construct), and
+-- not `NegUp` (the type-level construct).
 module Polarize
   ( polarize
   ) where
@@ -17,6 +29,8 @@ import Util
 
 import Data.Maybe (maybeToList)
 
+-- Apply polarization to all the terms in `weakTermEnv`, and insert the results
+-- to `polEnv`. This function also inserts the definitions of constants to `polEnv`.
 polarize :: WithEnv ()
 polarize = do
   wtenv <- gets weakTermEnv
@@ -27,6 +41,12 @@ polarize = do
   insCopyInt
   insPrintInt
 
+-- Given a term, polarize it to a negative term. This translation determines the
+-- order of evaluation. For example, an application `e1 @ e2` is tranlated into
+--   let v := return (polarize' e1) in
+--   let f := return (polarize' e2) in
+--   (force f) @ v
+-- Ignoring the `force`, one can see the order of evaluation is now made explicit.
 polarize' :: Neut -> WithEnv Neg
 polarize' (_ :< NeutVar x) = return $ NegUpIntro (PosVar x)
 polarize' (_ :< NeutPi (x, tdom) tcod) = do
@@ -87,6 +107,10 @@ polarize' (_ :< NeutUniv _) = return $ NegUpIntro PosUniv
 polarize' (_ :< NeutHole x) =
   error $ "PolarizeNeg.polarize': remaining hole: " ++ x
 
+-- Intuitively, `bindSeq [(x1, e1), (x2, e2)] e3` is:
+--   let x1 = (polarize' e1) in
+--   let x2 = (polarize' e2) in
+--   e3.
 bindSeq :: [(Identifier, Neut)] -> Neg -> WithEnv Neg
 bindSeq [] fun = return fun
 bindSeq ((formalArg, arg):rest) fun = do
