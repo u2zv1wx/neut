@@ -203,11 +203,3 @@ updateQueue' sub q =
     Just (Enriched (ctx, e1, e2, t) _) -> do
       analyze [(ctx, subst sub e1, subst sub e2, t)]
       updateQueue' sub $ Q.deleteMin q
--- projectionList :: Neut -> ([(Identifier, Neut)], Neut) -> WithEnv [Neut]
--- projectionList e (xts, t) = do
---   xiList <- forM (map snd xts ++ [t]) $ \t -> newNameOfType t
---   metaList <- mapM (const newName) xiList
---   let varList = map (\(m, x) -> m :< NeutVar x) $ zip metaList xiList
---   forM varList $ \v -> do
---     meta <- newName
---     return $ meta :< NeutSigmaElim e xiList v
