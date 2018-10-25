@@ -9,6 +9,7 @@ import Data
 
 import qualified Text.Show.Pretty as Pr
 
+-- Alpha-convert all the variables so that different variables have different names.
 rename :: Neut -> WithEnv Neut
 rename (i :< NeutVar s) = do
   t <- NeutVar <$> lookupNameEnv s
