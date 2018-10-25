@@ -1,3 +1,10 @@
+-- This module translates the content of file using `strToTree`, and
+-- update the state of the compiler according to the head element of the
+-- resulting list of S-expressions. After loading all the S-expressions
+-- in the list, this module concatenates all the definitions in the tree in some
+-- appropriate way, obtaining a term, and then process the term (`process`).
+-- After the procedure, we obtain a list of string that represents
+-- LLVM instructions. The `load` function returns this instructions.
 module Load
   ( load
   ) where
