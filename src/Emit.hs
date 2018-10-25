@@ -1,3 +1,5 @@
+-- Just emit the resulting LLVM code.
+-- The result is [String], where each element corresponds to a line.
 module Emit
   ( emit
   ) where
