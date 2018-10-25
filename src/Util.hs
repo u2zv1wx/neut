@@ -455,3 +455,60 @@ isEqBranch ((IndexDefault, e1):es1) ((IndexDefault, e2):es2) = do
   b2 <- isEqBranch es1 es2
   return $ b1 && b2
 isEqBranch _ _ = return False
+
+headMeta :: [Identifier] -> Neut -> Maybe (Identifier, [Identifier])
+headMeta args (_ :< NeutPiElim e1 (_ :< NeutVar x)) = headMeta (x : args) e1
+headMeta args (_ :< NeutHole x) = Just (x, args)
+headMeta _ _ = Nothing
+
+headMeta' :: [Neut] -> Neut -> Maybe (Identifier, [Neut])
+headMeta' args (_ :< NeutPiElim e1 e2) = headMeta' (e2 : args) e1
+headMeta' args (_ :< NeutHole x) = Just (x, args)
+headMeta' _ _ = Nothing
+
+affineCheck :: [Identifier] -> [Identifier] -> Bool
+affineCheck xs = affineCheck' xs xs
+
+affineCheck' :: [Identifier] -> [Identifier] -> [Identifier] -> Bool
+affineCheck' _ [] _ = True
+affineCheck' xs (y:ys) fvs =
+  if y `notElem` fvs
+    then affineCheck' xs ys fvs
+    else null (isLinear y xs) && affineCheck' xs ys fvs
+
+sConstraint :: Subst -> [PreConstraint] -> WithEnv [PreConstraint]
+sConstraint s ctcs = do
+  let (ctxList, cs, typeList) = split ctcs
+  let (ts1, ts2) = unzip cs
+  let ts1' = map (subst s) ts1
+  let ts2' = map (subst s) ts2
+  let typeList' = map (subst s) typeList
+  return $ unsplit ctxList (zip ts1' ts2') typeList'
+
+insDef :: Identifier -> Neut -> WithEnv (Maybe Neut)
+insDef x body = do
+  body' <- nonRecReduce body
+  sub <- gets substitution
+  modify (\e -> e {substitution = (x, body') : substitution e})
+  return $ lookup x sub
+
+split :: [PreConstraint] -> ([[Identifier]], [(Neut, Neut)], [Neut])
+split [] = ([], [], [])
+split ((ctx, e1, e2, t):rest) = do
+  let (ctxList, cs, typeList) = split rest
+  (ctx : ctxList, (e1, e2) : cs, t : typeList)
+
+unsplit :: [[Identifier]] -> [(Neut, Neut)] -> [Neut] -> [PreConstraint]
+unsplit [] [] [] = []
+unsplit (ctx:ctxList) ((e1, e2):cs) (t:typeList) =
+  (ctx, e1, e2, t) : unsplit ctxList cs typeList
+unsplit _ _ _ = error "Infer.unsplit: invalid arguments"
+
+projectionList :: Neut -> ([(Identifier, Neut)], Neut) -> WithEnv [Neut]
+projectionList e (xts, t) = do
+  xiList <- forM (map snd xts ++ [t]) $ \t -> newNameOfType t
+  metaList <- mapM (const newName) xiList
+  let varList = map (\(m, x) -> m :< NeutVar x) $ zip metaList xiList
+  forM varList $ \v -> do
+    meta <- newName
+    return $ meta :< NeutSigmaElim e xiList v
