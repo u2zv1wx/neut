@@ -1,3 +1,13 @@
+-- This module translates an ordinary S-expression to corresponding AST.
+-- The parsing here is more or less straightforward. One exception would be the
+-- parseing of a term`(e1 e2 ... en)`, where `e1` is not a keyword.
+-- We interpret this kind of terms as `(unbox e1) @ e2 @ ... @ en`. The heading
+-- `unbox` might seem a little alien. In our type system, ordinary functions
+-- have box types in normal circumstances. For example, a function that computes
+-- the factorial of an integer value would have the type `box (i32 -> i32)`,
+-- not `i32 -> i32`. Therefore, without the heading `unbox`, one might need to
+-- write something like `((unbox fact) 100)` in every applications. That would
+-- be cumbersome, and this is why we adopt this shorthand.
 module Parse
   ( parse
   , parseAtom
