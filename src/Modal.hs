@@ -1,3 +1,20 @@
+-- Before describing the behavior of this module, we firstly define *modal-normal form*.
+-- A polarized term is in *modal-normal form* if the following conditions are true:
+-- (A) for every application `e @ v1 @ ... @ vn`,
+--   - e == (constElim x) for some variable x,
+--   - vi == xi for some variable x,
+-- (B) the term doesn't contain any thunk/force, box/unbox.
+-- (C) for every unboxing `(constElim v)`, v == x for some variable x.
+--
+-- Now, this module (1) eliminates `down N` (the type of closures) and `box N` (the type of
+-- functions), (2) translates a term to modal-normal form.
+--
+-- For (1), we treat `box N` as `down N`, and employ the following type isomorphism:
+--   Down N === Sigma (P : Type). Const (P -> N) * P.
+-- One may understand that this is a proof-theoretic characterization of closure conversion.
+--
+-- For (2), we *crop* closed term in appropriate situation, insert it into the environment,
+-- and replace the original term as a variable.
 module Modal
   ( modalize
   ) where
@@ -67,7 +84,7 @@ modalNeg lam@(NegPiIntro _ _) = do
   let xs = varNeg lam
   body' <- modalNeg body
   lamName <- newNameWith "lam"
-  insModalEnv lamName (xs ++ args) body'
+  insModalEnv lamName (xs ++ args) body' -- lambda-lifting
   name <- newNameWith "fun"
   bindLet [(name, ValueConstIntro lamName)] $
     CompPiElimConstElim name $ xs ++ args
@@ -100,7 +117,15 @@ modalNeg (NegConstElim e) = do
   e' <- modalPos e
   x <- newNameWith "const"
   bindLet [(x, e')] $ CompPiElimConstElim x []
-modalNeg (NegMu self e) = do
+modalNeg (NegMu self e)
+  -- We firstly translate `mu x e` to
+  --   (mu c. lam vs. let x = box ((constElim c) @ vs) in
+  --                  e),
+  -- where the `vs` is all the free variables in `e`. After that, we translate the
+  -- closed term `lam vs. (let x = box ((constelim c) @ vs) in e)`, obtaining a
+  -- modal term `inner'`. Then, we insert this term with name `c`, and return
+  -- `(constElim c) @ vs`.
+ = do
   let (body, args) = toNegPiIntroSeq e
   let xs = varNeg $ NegMu self e
   let vs = map PosVar xs
@@ -168,7 +193,7 @@ bindLet ((x, v):rest) e = do
   e' <- bindLet rest e
   return $ CompUpElim x (CompUpIntro v) e'
 
--- commutative conversion for pi-elimination
+-- Commutative conversion for pi-elimination
 commPiElim :: Comp -> [Identifier] -> WithEnv Comp
 commPiElim (CompPi _ _) _ = lift $ throwE "Modal.commPiElim: type error"
 commPiElim (CompPiElimConstElim f xs) args =

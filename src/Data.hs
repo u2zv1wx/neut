@@ -76,6 +76,11 @@ data NeutF a
   | NeutIndexElim a
                   [(Index, a)]
   | NeutUniv UnivLevel
+  -- Constant type is a "strict" version of box type.
+  -- Suppose `e` has a ordinary box type, `(box a)`. In this case, we have a side-condition
+  -- that all the free variables in `e` must have type of the form `(box b)`. Now, for `e`
+  -- to a constant type, the side-condition is changed to: `e` does not have any
+  -- free variables.
   | NeutConst a -- constant modality
   | NeutConstIntro Identifier
   | NeutConstElim a
@@ -158,17 +163,6 @@ data Neg
              Pos
   deriving (Show)
 
--- A polarize term is in *modal-normal form* if the following two conditions are true:
--- (1) for every application `e @ v1 @ ... @ vn`,
---   - e == (unbox x) for some variable x,
---   - vi == xi for some variable x,
--- (2) the term doesn't contain any thunk/force.
--- (3) for every unboxing `(unbox v)`, v == x for some variable x.
---
--- Note that there exists a type isomorphism:
---  Down N === Sigma (P : Type). Box (P -> N) * P.
--- We emploty this type isomorphism in `Modal.hs` to eliminate all the thunk/forces.
---
 -- positive modal normal form
 data Value
   = ValueVar Identifier
