@@ -1,3 +1,9 @@
+-- This module generates a virtual code from a modal-normal term.
+-- The procedure here is more or less straightforward. It would be worth noting that,
+-- after the elimination of Sigma-terms in virtualComp, we insert CodeFree.
+-- This can be justified that our type system is linear. Incidently, memory allocation
+-- is trigerred before binding the content of `DataStruct ds` to a variable, which is
+-- invisible at this stage.
 module Virtual
   ( virtualize
   ) where
@@ -102,7 +108,7 @@ extract z ((x, i):xis) n cont = do
   let cont' = extract z xis n cont
   CodeExtractValue x z (i, n) cont'
 
--- commutative conversion for up-elimination
+-- Commutative conversion for up-elimination.
 commUpElim :: String -> Code -> Code -> Code
 commUpElim s (CodeReturn ans) cont = CodeLet s ans cont
 commUpElim s (CodeLet x d cont1) cont2 = CodeLet x d (commUpElim s cont1 cont2)

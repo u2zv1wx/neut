@@ -1,3 +1,14 @@
+-- This module creates a LLVM virtual code from the result of `virtualize`.
+-- Remember that our calculus is dependent, whereas LLVM isn't. Therefore, we cannot
+-- simply use the result of type inference of our dependent calculus here.
+-- To deal with this situation, we represent all the datas as i8*, and cast it
+-- when necessary. For example, if we'd like to add two variables x and y as i32,
+-- the correspoing LLVM code is essentially:
+--   tmp1 = cast-pointer-to-int i8* x to i32
+--   tmp2 = cast-pointer-to-int i8* y to i32
+--   tmp3 = add i32 tmp1, tmp2
+--   result = cast-int-to-pointer i32 tmp3 to i8*
+-- By this design decision, one can handle polymorphic functions in LLVM.
 module Asm
   ( assemblize
   ) where
@@ -74,6 +85,8 @@ asmCode (CodePrint t d cont) = do
     AsmPointerToInt cast (AsmDataLocal tmp) voidPtr t $
     AsmPrint t (AsmDataLocal cast) cont'
 
+-- `asmData x d cont` binds the data `d` to the variable `x`, and computes then
+-- continuation `cont`.
 asmData :: Identifier -> Data -> Asm -> WithEnv Asm
 asmData x (DataLocal y) cont =
   return $ AsmBitcast x (AsmDataLocal y) voidPtr voidPtr cont
@@ -82,7 +95,6 @@ asmData x (DataGlobal y) cont = do
   case lookup y cenv of
     Nothing -> do
       liftIO $ putStrLn $ "no such global label defined: " ++ y -- FIXME
-      -- todo: decleare y
       return $ AsmBitcast x (AsmDataGlobal y) voidPtr voidPtr cont
     Just (args, _) -> do
       let funPtrType = toFunPtrType args
