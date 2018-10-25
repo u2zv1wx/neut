@@ -350,7 +350,6 @@ simp (c@(_, e1, e2, _):cs) = do
     then simp cs
     else throwError $ "cannot simplify:\n" ++ Pr.ppShow c
 
--- simp (c:_) = throwError $ "cannot simplify:\n" ++ Pr.ppShow c
 categorize :: PreConstraint -> Constraint
 categorize (ctx, _ :< NeutVar x, e2, t) = do
   let c = ConstraintBeta x e2

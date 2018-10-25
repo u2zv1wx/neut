@@ -394,7 +394,6 @@ data Env = Env
   , modalEnv :: [(Identifier, ([Identifier], Comp))]
   , constraintEnv :: [PreConstraint]
   , constraintQueue :: Q.MinQueue EnrichedConstraint
-  , metaMap :: [(Identifier, PreConstraint)]
   , substitution :: Subst
   , univConstraintEnv :: [(UnivLevel, UnivLevel)]
   , numConstraintEnv :: [Identifier]
@@ -420,7 +419,6 @@ initialEnv path =
     , asmEnv = []
     , constraintEnv = []
     , constraintQueue = Q.empty
-    , metaMap = []
     , substitution = []
     , univConstraintEnv = []
     , numConstraintEnv = []
