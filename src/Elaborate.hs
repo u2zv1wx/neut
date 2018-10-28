@@ -125,7 +125,7 @@ elaborate' (_ :< NeutBoxElim t) = do
   t' <- elaborate' t
   return $ TermBoxElim t'
 elaborate' (_ :< NeutIndex s) = return $ TermIndex s
-elaborate' (_ :< NeutIndexIntro x) = return $ TermIndexIntro x
+elaborate' (meta :< NeutIndexIntro x) = return $ TermIndexIntro x meta
 elaborate' (_ :< NeutIndexElim e branchList) = do
   e' <- elaborate' e
   branchList' <-
