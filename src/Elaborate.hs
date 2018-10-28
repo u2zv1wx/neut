@@ -64,10 +64,16 @@ checkNumConstraint = do
   forM_ (numConstraintEnv env) $ \x -> do
     t <- lookupTypeEnv' x
     case t of
+      _ :< NeutIndex "i1" -> return ()
+      _ :< NeutIndex "i2" -> return ()
+      _ :< NeutIndex "i4" -> return ()
       _ :< NeutIndex "i8" -> return ()
       _ :< NeutIndex "i16" -> return ()
       _ :< NeutIndex "i32" -> return ()
       _ :< NeutIndex "i64" -> return ()
+      _ :< NeutIndex "u1" -> return ()
+      _ :< NeutIndex "u2" -> return ()
+      _ :< NeutIndex "u4" -> return ()
       _ :< NeutIndex "u8" -> return ()
       _ :< NeutIndex "u16" -> return ()
       _ :< NeutIndex "u32" -> return ()

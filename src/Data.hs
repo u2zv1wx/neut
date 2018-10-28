@@ -615,7 +615,10 @@ intLowTypeList = signedIntLowTypeList ++ unsignedIntLowTypeList
 
 signedIntLowTypeList :: [LowType]
 signedIntLowTypeList =
-  [ LowTypeSignedInt 8
+  [ LowTypeSignedInt 1
+  , LowTypeSignedInt 2
+  , LowTypeSignedInt 4
+  , LowTypeSignedInt 8
   , LowTypeSignedInt 16
   , LowTypeSignedInt 32
   , LowTypeSignedInt 64
@@ -623,7 +626,10 @@ signedIntLowTypeList =
 
 unsignedIntLowTypeList :: [LowType]
 unsignedIntLowTypeList =
-  [ LowTypeUnsignedInt 8
+  [ LowTypeUnsignedInt 1
+  , LowTypeUnsignedInt 2
+  , LowTypeUnsignedInt 4
+  , LowTypeUnsignedInt 8
   , LowTypeUnsignedInt 16
   , LowTypeUnsignedInt 32
   , LowTypeUnsignedInt 64
