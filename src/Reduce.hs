@@ -246,9 +246,9 @@ reduceComp (CompPi (x, tdom) tcod) = do
   tcod' <- reduceComp tcod
   return $ CompPi (x, tdom') tcod'
 reduceComp (CompPiElimConstElim x xs) = return $ CompPiElimConstElim x xs
-reduceComp (CompSigmaElim e xs body) = do
+reduceComp (CompSigmaElim size e xs body) = do
   body' <- reduceComp body
-  return $ CompSigmaElim e xs body'
+  return $ CompSigmaElim size e xs body'
 reduceComp (CompIndexElim e branchList) =
   case e of
     ValueIndexIntro x _ ->
@@ -402,9 +402,9 @@ substValue sub (ValueSigma xts tcod) = do
   let ts' = map (substValue sub) ts
   let tcod' = substValue sub tcod
   ValueSigma (zip xs ts') tcod'
-substValue sub (ValueSigmaIntro es) = do
+substValue sub (ValueSigmaIntro size es) = do
   let es' = map (substValue sub) es
-  ValueSigmaIntro es'
+  ValueSigmaIntro size es'
 substValue sub (ValueBox e) = do
   let e' = substComp sub e
   ValueBox e'
@@ -426,10 +426,10 @@ substComp sub (CompPiElimConstElim x xs) = do
   let x' = fromMaybe x (lookup x sub)
   let xs' = map (\y -> fromMaybe y (lookup y sub)) xs
   CompPiElimConstElim x' xs'
-substComp sub (CompSigmaElim e1 xs e2) = do
+substComp sub (CompSigmaElim size e1 xs e2) = do
   let e1' = substValue sub e1
   let e2' = substComp sub e2
-  CompSigmaElim e1' xs e2'
+  CompSigmaElim size e1' xs e2'
 substComp sub (CompIndexElim e branchList) = do
   let e' = substValue sub e
   let branchList' = map (\(l, e) -> (l, substComp sub e)) branchList
