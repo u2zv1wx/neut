@@ -195,10 +195,6 @@ varNeg (NegConstElim e) = varPos e
 varNeg (NegMu x e) = filter (/= x) $ varNeg e
 varNeg (NegPrint _ e) = varPos e
 
-varIndex :: Index -> [Identifier]
-varIndex (IndexLabel x) = [x]
-varIndex _ = []
-
 isLinear :: Identifier -> [Identifier] -> [Identifier]
 isLinear x xs =
   if length (filter (== x) xs) == 1
@@ -466,6 +462,12 @@ headMeta' args (_ :< NeutPiElim e1 e2) = headMeta' (e2 : args) e1
 headMeta' args (_ :< NeutHole x) = Just (x, args)
 headMeta' _ _ = Nothing
 
+headMeta'' :: Neut -> Maybe Identifier
+headMeta'' (_ :< NeutVar x) = Just x
+headMeta'' (_ :< NeutPiElim e1 _) = headMeta'' e1
+headMeta'' (_ :< NeutBoxElim e) = headMeta'' e
+headMeta'' _ = Nothing
+
 affineCheck :: [Identifier] -> [Identifier] -> Bool
 affineCheck xs = affineCheck' xs xs
 
@@ -491,6 +493,11 @@ insDef x body = do
   sub <- gets substitution
   modify (\e -> e {substitution = (x, body') : substitution e})
   return $ lookup x sub
+
+insDef' :: Identifier -> Neut -> WithEnv ()
+insDef' x body = do
+  body' <- nonRecReduce body
+  modify (\e -> e {substitution = (x, body') : substitution e})
 
 split :: [PreConstraint] -> ([[Identifier]], [(Neut, Neut)], [Neut])
 split [] = ([], [], [])

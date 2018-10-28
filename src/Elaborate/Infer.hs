@@ -61,7 +61,7 @@ infer ctx (meta :< NeutPi (s, tdom) tcod) = do
 infer ctx (meta :< NeutPiIntro (s, tdom) e) = do
   univ <- boxUniv
   tdom' <- annot univ tdom
-  insTypeEnv s tdom'
+  insTypeEnv1 ctx univ s tdom'
   let ctx' = ctx ++ [s]
   tcod <- infer ctx' e >>= annot univ
   typeMeta <- newName' "meta" univ
@@ -74,6 +74,7 @@ infer ctx (meta :< NeutPiElim e1 e2) = do
   tdom <- infer ctx e2 >>= annot univ
   case tPi of
     _ :< NeutPi (x, tdom') tcod' -> do
+      insDef' x e2
       insConstraintEnv ctx tdom tdom' univ
       returnMeta meta $ subst [(x, e2)] tcod'
     _ -> do
@@ -100,7 +101,7 @@ infer ctx (meta :< NeutSigmaIntro es) = do
   univ <- boxUniv
   ts <- mapM (infer ctx) es
   forM_ ts $ annot univ
-  xs <- forM ts newNameOfType
+  xs <- forM ts $ \t -> newName1 "sigma" t
   holeList <- sigmaHole ctx xs
   let holeList' = map (subst (zip xs es)) holeList
   forM_ (zip holeList' ts) $ \(h, t) -> insConstraintEnv ctx h t univ
@@ -160,6 +161,7 @@ infer ctx (meta :< NeutIndexElim e branchList) = do
   constrainList ctx tes
   returnMeta meta $ head tes
 infer ctx (meta :< NeutMu s e) = do
+  insDef' s e
   univ <- boxUniv
   trec <- appCtx ctx >>= annot univ
   boxType <- wrapType (NeutBox trec) >>= annot univ
