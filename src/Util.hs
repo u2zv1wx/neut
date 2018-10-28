@@ -363,7 +363,7 @@ substData :: [(String, Data)] -> Data -> Data
 substData sub (DataLocal x) = fromMaybe (DataLocal x) (lookup x sub)
 substData _ (DataGlobal x) = DataGlobal x
 substData _ (DataInt i) = DataInt i
-substData sub (DataStruct ds) = DataStruct $ map (substData sub) ds
+substData sub (DataStruct size ds) = DataStruct size $ map (substData sub) ds
 
 expandDirPath :: FilePath -> IO FilePath
 expandDirPath path = do

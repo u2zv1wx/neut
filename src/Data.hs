@@ -243,7 +243,8 @@ data Data
   | DataFloat16 Double
   | DataFloat32 Double
   | DataFloat64 Double
-  | DataStruct [Data]
+  | DataStruct Int
+               [Data]
   | DataArith (Arith, LowType)
               Data
               Data
@@ -264,7 +265,9 @@ data Code
                [(Index, Code)]
   | CodeExtractValue Identifier -- destination
                      Data -- base pointer
-                     (Int, Int) -- (i, n) ... index i in [1 ... n]
+                     -- (i, n, size) ... index i in [1 ... n], where the size of ith
+                     -- element is upto `size`.
+                     (Int, Int, Int)
                      Code -- continuation
   | CodeFree Data
              Code
@@ -296,7 +299,7 @@ data Asm
   = AsmReturn AsmData
   | AsmGetElementPtr Identifier
                      AsmData
-                     (Int, Int)
+                     (Int, Int, Int) -- (index, length, size)
                      Asm
   | AsmCall Identifier
             AsmData

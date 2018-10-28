@@ -63,16 +63,20 @@ asmCode (CodeCallTail fun args) = do
     AsmBitcast cast (AsmDataLocal f) voidPtr funPtrType $
     AsmCallTail (AsmDataLocal cast) (map AsmDataLocal xs)
 asmCode (CodeSwitch x branchList) = asmSwitch x branchList
-asmCode (CodeExtractValue x baseData (i, n) cont) = do
+asmCode (CodeExtractValue x baseData (i, n, size) cont) = do
   cont' <- asmCode cont
   tmp <- newNameWith "sigma"
   cast <- newNameWith "cast"
-  let structPtrType = toStructPtrType [1 .. n]
+  let structPtrType = toStructPtrType size [1 .. n]
   loader <- newNameWith "loader"
+  castedLoader <- newNameWith "loader"
+  let intPtr = LowTypePointer $ LowTypeSignedInt size
+  let voidPtrPtr = LowTypePointer voidPtr
   asmData tmp baseData $
     AsmBitcast cast (AsmDataLocal tmp) voidPtr structPtrType $
-    AsmGetElementPtr loader (AsmDataLocal cast) (i, n) $
-    AsmLoad x (AsmDataLocal loader) cont'
+    AsmGetElementPtr loader (AsmDataLocal cast) (i, n, size) $
+    AsmBitcast castedLoader (AsmDataLocal loader) intPtr voidPtrPtr $
+    AsmLoad x (AsmDataLocal castedLoader) cont'
 asmCode (CodeFree d cont) = do
   cont' <- asmCode cont
   tmp <- newNameWith "free"
@@ -116,14 +120,14 @@ asmData x (DataFloat64 f) cont = do
   return $
     AsmBitcast cast (AsmDataFloat f) (LowTypeFloat 64) (LowTypeSignedInt 64) $
     AsmIntToPointer x (AsmDataLocal cast) (LowTypeSignedInt 64) voidPtr cont
-asmData reg (DataStruct []) cont = asmData reg (DataInt 0) cont
-asmData reg (DataStruct [d]) cont = asmData reg d cont
-asmData reg (DataStruct ds) cont = do
+asmData reg (DataStruct _ []) cont = asmData reg (DataInt 0) cont
+asmData reg (DataStruct _ [d]) cont = asmData reg d cont
+asmData reg (DataStruct size ds) cont = do
   xs <- mapM (const $ newNameWith "cursor") ds
   cast <- newNameWith "cast"
   let ts = map (const voidPtr) ds
-  let structPtrType = LowTypePointer $ LowTypeStruct ts
-  cont'' <- setContent cast (length xs) (zip [0 ..] xs) cont
+  let structPtrType = toStructPtrType size ds
+  cont'' <- setContent cast size (length xs) (zip [0 ..] xs) cont
   asmStruct (zip xs ds) $
     AsmAlloc reg ts $ -- the result of malloc is i8*
     AsmBitcast cast (AsmDataLocal reg) voidPtr structPtrType cont''
@@ -192,17 +196,21 @@ asmSwitch name branchList = do
     AsmPointerToInt cast (AsmDataLocal tmp) voidPtr (LowTypeSignedInt 64) $
     AsmSwitch (AsmDataLocal cast) defaultCase caseList
 
-setContent :: Identifier -> Int -> [(Int, Identifier)] -> Asm -> WithEnv Asm
-setContent _ _ [] cont = return cont
-setContent basePointer length ((index, dataAtIndex):sizeDataList) cont = do
-  cont' <- setContent basePointer length sizeDataList cont
+setContent ::
+     Identifier -> Int -> Int -> [(Int, Identifier)] -> Asm -> WithEnv Asm
+setContent _ _ _ [] cont = return cont
+setContent basePointer size length ((index, dataAtIndex):sizeDataList) cont = do
+  cont' <- setContent basePointer size length sizeDataList cont
   loader <- newNameWith "loader"
+  castedLoader <- newNameWith "cast"
+  let intPtr = LowTypePointer $ LowTypeSignedInt size
   let voidPtrPtr = LowTypePointer voidPtr
   return $
-    AsmGetElementPtr loader (AsmDataLocal basePointer) (index, length) $
+    AsmGetElementPtr loader (AsmDataLocal basePointer) (index, length, size) $
+    AsmBitcast castedLoader (AsmDataLocal loader) intPtr voidPtrPtr $
     AsmStore
       (AsmDataLocal dataAtIndex, voidPtr)
-      (AsmDataLocal loader, voidPtrPtr)
+      (AsmDataLocal castedLoader, voidPtrPtr)
       cont'
 
 asmStruct :: [(Identifier, Data)] -> Asm -> WithEnv Asm
@@ -219,7 +227,8 @@ toFunPtrType xs = do
   let funType = LowTypeFunction (map (const voidPtr) xs) voidPtr
   LowTypePointer funType
 
-toStructPtrType :: [a] -> LowType
-toStructPtrType xs = do
-  let structType = LowTypeStruct $ map (const voidPtr) xs
+toStructPtrType :: Int -> [a] -> LowType
+toStructPtrType size xs = do
+  let t = LowTypeSignedInt size
+  let structType = LowTypeStruct $ map (const t) xs
   LowTypePointer structType
