@@ -185,15 +185,15 @@ reduceNeg (NegPiElim e1 e2) = do
       let body' = substNeg sub body
       reduceNeg body'
     _ -> return $ NegPiElim e1' e2
-reduceNeg (NegSigmaElim e xs body) =
+reduceNeg (NegSigmaElim size e xs body) =
   case e of
-    PosSigmaIntro es -> do
+    PosSigmaIntro _ es -> do
       let sub = zip xs es
       let body' = substNeg sub body
       reduceNeg body'
     _ -> do
       body' <- reduceNeg body
-      return $ NegSigmaElim e xs body'
+      return $ NegSigmaElim size e xs body'
 reduceNeg (NegBoxElim e) = do
   e' <- reducePos e
   case e' of
@@ -332,9 +332,9 @@ substPos sub (PosSigma xts tcod) = do
   let ts' = map (substPos sub) ts
   let tcod' = substPos sub tcod
   PosSigma (zip xs ts') tcod'
-substPos sub (PosSigmaIntro es) = do
+substPos sub (PosSigmaIntro size es) = do
   let es' = map (substPos sub) es
-  PosSigmaIntro es'
+  PosSigmaIntro size es'
 substPos sub (PosBox e) = do
   let e' = substNeg sub e
   PosBox e'
@@ -369,10 +369,10 @@ substNeg sub (NegPiElim e1 e2) = do
   let e1' = substNeg sub e1
   let e2' = substPos sub e2
   NegPiElim e1' e2'
-substNeg sub (NegSigmaElim e1 xs e2) = do
+substNeg sub (NegSigmaElim size e1 xs e2) = do
   let e1' = substPos sub e1
   let e2' = substNeg sub e2
-  NegSigmaElim e1' xs e2'
+  NegSigmaElim size e1' xs e2'
 substNeg sub (NegBoxElim e) = do
   let e' = substPos sub e
   NegBoxElim e'
