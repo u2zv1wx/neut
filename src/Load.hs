@@ -239,7 +239,7 @@ concatDefList (DefMod sigMeta (_, name') xs:es) = do
 
 process :: Neut -> WithEnv [String]
 process e = do
-  elaborate "main" e >>= nonRecReduce >>= exhaust >>= insWeakTermEnv "main"
+  elaborate "main" e
   polarize
   modalize
   virtualize

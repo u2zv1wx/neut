@@ -12,6 +12,7 @@ import Control.Comonad.Cofree
 import qualified Text.Show.Pretty as Pr
 
 import Data
+import Exhaust
 import Reduce
 import Util
 
@@ -35,7 +36,7 @@ import qualified Data.PQueue.Min as Q
 -- The inference algorithm in this module is based on L. de Moura, J. Avigad,
 -- S. Kong, and C. Roux. "Elaboration in Dependent Type Theory", arxiv,
 -- https://arxiv.org/abs/1505.04324, 2015.
-elaborate :: Identifier -> Neut -> WithEnv Neut
+elaborate :: Identifier -> Neut -> WithEnv ()
 elaborate main e = do
   t <- infer [] e
   insTypeEnv main t
@@ -53,7 +54,7 @@ elaborate main e = do
   modify (\e -> e {typeEnv = tenv'})
   checkNumConstraint
   -- use the resulting substitution to elaborate `e`.
-  return $ subst sub e
+  nonRecReduce (subst sub e) >>= exhaust >>= insWeakTermEnv main
 
 -- In short: numbers must have one of the number types. We firstly generate constraints
 -- assuming that `1`, `1.2321`, etc. have arbitrary types. After the inference finished,
@@ -86,3 +87,6 @@ checkNumConstraint = do
         throwE $
         "the type of " ++
         x ++ " is supposed to be a number, but is " ++ Pr.ppShow t
+
+elaborate' :: Neut -> WithEnv Neut
+elaborate' = undefined
