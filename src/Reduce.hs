@@ -23,6 +23,10 @@ import Data.Tuple (swap)
 import qualified Text.Show.Pretty as Pr
 
 reduce :: Neut -> WithEnv Neut
+reduce (i :< NeutPi (x, tdom) tcod) = do
+  tdom' <- reduce tdom
+  tcod' <- reduce tcod
+  return $ i :< NeutPi (x, tdom') tcod'
 reduce (i :< NeutPiElim e1 e2) = do
   e2' <- reduce e2
   e1' <- reduce e1
@@ -32,6 +36,11 @@ reduce (i :< NeutPiElim e1 e2) = do
       let _ :< body' = subst sub body
       reduce $ i :< body'
     _ -> return $ i :< NeutPiElim e1' e2'
+reduce (i :< NeutSigma xts t) = do
+  let (xs, ts) = unzip xts
+  ts' <- mapM reduce ts
+  t' <- reduce t
+  return $ i :< NeutSigma (zip xs ts') t'
 reduce (i :< NeutSigmaIntro es) = do
   es' <- mapM reduce es
   return $ i :< NeutSigmaIntro es'
@@ -39,10 +48,12 @@ reduce (i :< NeutSigmaElim e xs body) = do
   e' <- reduce e
   case e of
     _ :< NeutSigmaIntro es -> do
-      es' <- mapM reduce es
-      let _ :< body' = subst (zip xs es') body
+      let _ :< body' = subst (zip xs es) body
       reduce $ i :< body'
     _ -> return $ i :< NeutSigmaElim e' xs body
+reduce (i :< NeutBox t) = do
+  t' <- reduce t
+  return $ i :< NeutBox t'
 reduce (i :< NeutBoxElim e) = do
   e' <- reduce e
   case e' of
@@ -53,15 +64,48 @@ reduce (i :< NeutIndexElim e branchList) = do
   case e' of
     _ :< NeutIndexIntro x ->
       case lookup x branchList of
-        Nothing ->
-          lift $
-          throwE $ "the index " ++ show x ++ " is not included in branchList"
         Just body -> reduce body
+        Nothing ->
+          case findLabelIndex branchList of
+            Just (y, body) -> reduce $ subst [(y, e')] body
+            Nothing ->
+              case findDefault branchList of
+                Just body -> reduce body
+                Nothing ->
+                  lift $
+                  throwE $
+                  "the index " ++ show x ++ " is not included in branchList"
     _ -> return $ i :< NeutIndexElim e' branchList
 reduce (meta :< NeutMu s e) = do
+  boxMeta <- newNameWith "meta"
+  let box = boxMeta :< NeutBoxIntro (meta :< NeutMu s e)
+  reduce $ subst [(s, box)] e
+reduce (i :< NeutConst t) = do
+  t' <- reduce t
+  return $ i :< NeutConst t'
+reduce (i :< NeutConstElim e) = do
   e' <- reduce e
-  return $ meta :< NeutMu s e'
+  case e' of
+    _ :< NeutConstIntro x -> do
+      return $ i :< NeutConstElim e'
+    _ -> return $ i :< NeutConstElim e'
 reduce t = return t
+
+findLabelIndex :: [(Index, Neut)] -> Maybe (Identifier, Neut)
+findLabelIndex [] = Nothing
+findLabelIndex ((l, e):ls) =
+  case getLabelIndex l of
+    Just i -> Just (i, e)
+    Nothing -> findLabelIndex ls
+
+getLabelIndex :: Index -> Maybe Identifier
+getLabelIndex (IndexLabel x) = Just x
+getLabelIndex _ = Nothing
+
+findDefault :: [(Index, Neut)] -> Maybe Neut
+findDefault [] = Nothing
+findDefault ((IndexDefault, e):_) = Just e
+findDefault (_:rest) = findDefault rest
 
 isNonRecReducible :: Neut -> Bool
 isNonRecReducible (_ :< NeutVar _) = False
@@ -279,25 +323,26 @@ subst :: Subst -> Neut -> Neut
 subst sub (j :< NeutVar s) = fromMaybe (j :< NeutVar s) (lookup s sub)
 subst sub (j :< NeutPi (s, tdom) tcod) = do
   let tdom' = subst sub tdom
-  let tcod' = subst sub tcod -- note that we don't have to drop s from sub, thanks to rename.
+  let sub' = filter (\(x, _) -> x /= s) sub
+  let tcod' = subst sub' tcod
   j :< NeutPi (s, tdom') tcod'
 subst sub (j :< NeutPiIntro (s, tdom) body) = do
   let tdom' = subst sub tdom
-  let body' = subst sub body
+  let sub' = filter (\(x, _) -> x /= s) sub
+  let body' = subst sub' body
   j :< NeutPiIntro (s, tdom') body'
 subst sub (j :< NeutPiElim e1 e2) = do
   let e1' = subst sub e1
   let e2' = subst sub e2
   j :< NeutPiElim e1' e2'
-subst sub (j :< NeutSigma xts tcod) = do
-  let (xs, ts) = unzip xts
-  let ts' = map (subst sub) ts
-  let tcod' = subst sub tcod
-  j :< NeutSigma (zip xs ts') tcod'
+subst sub (j :< NeutSigma xts t) = do
+  let (xts', t') = substSigma sub xts t
+  j :< NeutSigma xts' t'
 subst sub (j :< NeutSigmaIntro es) = j :< NeutSigmaIntro (map (subst sub) es)
 subst sub (j :< NeutSigmaElim e1 xs e2) = do
   let e1' = subst sub e1
-  let e2' = subst sub e2
+  let sub' = filter (\(x, _) -> x `notElem` xs) sub
+  let e2' = subst sub' e2
   j :< NeutSigmaElim e1' xs e2'
 subst sub (j :< NeutBox e) = do
   let e' = subst sub e
@@ -312,16 +357,34 @@ subst _ (j :< NeutIndex x) = j :< NeutIndex x
 subst _ (j :< NeutIndexIntro l) = j :< NeutIndexIntro l
 subst sub (j :< NeutIndexElim e branchList) = do
   let e' = subst sub e
-  let branchList' = map (\(l, e) -> (l, subst sub e)) branchList
+  let branchList' =
+        flip map branchList $ \(l, e) -> do
+          let vs = varIndex l
+          let sub' = filter (\(x, _) -> x `notElem` vs) sub
+          (l, subst sub' e)
   j :< NeutIndexElim e' branchList'
 subst sub (j :< NeutConst t) = j :< NeutConst (subst sub t)
 subst _ (j :< NeutConstIntro s) = j :< NeutConstIntro s
 subst sub (j :< NeutConstElim e) = j :< NeutConstElim (subst sub e)
 subst _ (j :< NeutUniv i) = j :< NeutUniv i
 subst sub (j :< NeutMu x e) = do
-  let e' = subst sub e
+  let sub' = filter (\(y, _) -> x /= y) sub
+  let e' = subst sub' e
   j :< NeutMu x e'
 subst sub (j :< NeutHole s) = fromMaybe (j :< NeutHole s) (lookup s sub)
+
+substSigma ::
+     Subst -> [(Identifier, Neut)] -> Neut -> ([(Identifier, Neut)], Neut)
+substSigma sub [] e = ([], subst sub e)
+substSigma sub ((x, t):rest) e = do
+  let sub' = filter (\(y, _) -> y /= x) sub
+  let (xts, e') = substSigma sub' rest e
+  let t' = subst sub t
+  ((x, t') : xts, e')
+
+varIndex :: Index -> [Identifier]
+varIndex (IndexLabel x) = [x]
+varIndex _ = []
 
 type SubstPos = [(Identifier, Pos)]
 
@@ -466,3 +529,92 @@ compose s1 s2 = do
   let codS2' = map (subst s1) codS2
   let fromS1 = filter (\(ident, _) -> ident `notElem` domS2) s1
   fromS1 ++ zip domS2 codS2'
+
+reduceTerm :: Term -> WithEnv Term
+reduceTerm (TermPiElim e1 e2) = do
+  e2' <- reduceTerm e2
+  e1' <- reduceTerm e1
+  case e1' of
+    TermPiIntro arg body -> do
+      let sub = [(arg, e2')]
+      let body' = substTerm sub body
+      reduceTerm body'
+    _ -> return $ TermPiElim e1' e2'
+reduceTerm (TermSigmaIntro es) = do
+  es' <- mapM reduceTerm es
+  return $ TermSigmaIntro es'
+reduceTerm (TermSigmaElim e xs body) = do
+  e' <- reduceTerm e
+  case e of
+    TermSigmaIntro es -> do
+      es' <- mapM reduceTerm es
+      let body' = substTerm (zip xs es') body
+      reduceTerm body'
+    _ -> return $ TermSigmaElim e' xs body
+reduceTerm (TermBoxElim e) = do
+  e' <- reduceTerm e
+  case e' of
+    TermBoxIntro e'' -> reduceTerm e''
+    _ -> return $ TermBoxElim e'
+reduceTerm (TermIndexElim e branchList) = do
+  e' <- reduceTerm e
+  case e' of
+    TermIndexIntro x _ ->
+      case lookup x branchList of
+        Nothing ->
+          lift $
+          throwE $ "the index " ++ show x ++ " is not included in branchList"
+        Just body -> reduceTerm body
+    _ -> return $ TermIndexElim e' branchList
+reduceTerm (TermMu s e) = do
+  e' <- reduceTerm e
+  return $ TermMu s e'
+reduceTerm t = return t
+
+type SubstTerm = [(Identifier, Term)]
+
+substTerm :: SubstTerm -> Term -> Term
+substTerm sub (TermVar s) = fromMaybe (TermVar s) (lookup s sub)
+substTerm sub (TermPi (s, tdom) tcod) = do
+  let tdom' = substTerm sub tdom
+  let tcod' = substTerm sub tcod
+  TermPi (s, tdom') tcod'
+substTerm sub (TermPiIntro s body) = do
+  let body' = substTerm sub body
+  TermPiIntro s body'
+substTerm sub (TermPiElim e1 e2) = do
+  let e1' = substTerm sub e1
+  let e2' = substTerm sub e2
+  TermPiElim e1' e2'
+substTerm sub (TermSigma xts tcod) = do
+  let (xs, ts) = unzip xts
+  let ts' = map (substTerm sub) ts
+  let tcod' = substTerm sub tcod
+  TermSigma (zip xs ts') tcod'
+substTerm sub (TermSigmaIntro es) = TermSigmaIntro (map (substTerm sub) es)
+substTerm sub (TermSigmaElim e1 xs e2) = do
+  let e1' = substTerm sub e1
+  let e2' = substTerm sub e2
+  TermSigmaElim e1' xs e2'
+substTerm sub (TermBox e) = do
+  let e' = substTerm sub e
+  TermBox e'
+substTerm sub (TermBoxIntro e) = do
+  let e' = substTerm sub e
+  TermBoxIntro e'
+substTerm sub (TermBoxElim e) = do
+  let e' = substTerm sub e
+  TermBoxElim e'
+substTerm _ (TermIndex x) = TermIndex x
+substTerm _ (TermIndexIntro l meta) = TermIndexIntro l meta
+substTerm sub (TermIndexElim e branchList) = do
+  let e' = substTerm sub e
+  let branchList' = map (\(l, e) -> (l, substTerm sub e)) branchList
+  TermIndexElim e' branchList'
+substTerm sub (TermConst t) = TermConst (substTerm sub t)
+substTerm _ (TermConstIntro s) = TermConstIntro s
+substTerm sub (TermConstElim e) = TermConstElim (substTerm sub e)
+substTerm _ (TermUniv i) = TermUniv i
+substTerm sub (TermMu x e) = do
+  let e' = substTerm sub e
+  TermMu x e'
