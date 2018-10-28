@@ -92,6 +92,38 @@ type Neut = Cofree NeutF Identifier
 
 $(deriveShow1 ''NeutF)
 
+data Term
+  = TermVar Identifier
+  | TermPi (Identifier, Term)
+           Term
+  | TermPiIntro Identifier
+                Term
+  | TermPiElim Term
+               Term
+  | TermSigma [(Identifier, Term)]
+              Term
+  | TermSigmaIntro Int -- maximum {size-of(Term)}
+                   [Term]
+  | TermSigmaElim Int -- maximum {size-of(Term)}
+                  Term
+                  [Identifier]
+                  Term
+  | TermBox Term
+  | TermBoxIntro Term
+  | TermBoxElim Term
+  | TermIndex Identifier
+  | TermIndexIntro Index
+                   Identifier
+  | TermIndexElim Term
+                  [(Index, Term)]
+  | TermUniv UnivLevel
+  | TermConst Term -- constant modality
+  | TermConstIntro Identifier
+  | TermConstElim Term
+  | TermMu Identifier
+           Term
+  deriving (Show)
+
 data LowType
   = LowTypeSignedInt Int
   | LowTypeUnsignedInt Int
@@ -122,7 +154,8 @@ data Pos
   = PosVar Identifier
   | PosSigma [(Identifier, Pos)]
              Pos
-  | PosSigmaIntro [Pos]
+  | PosSigmaIntro Int
+                  [Pos]
   | PosIndex Identifier
   | PosIndexIntro Index
                   Identifier -- metadata to determine its type
@@ -145,7 +178,8 @@ data Neg
                Neg
   | NegPiElim Neg
               Pos
-  | NegSigmaElim Pos
+  | NegSigmaElim Int
+                 Pos
                  [Identifier]
                  Neg
   | NegIndexElim Pos
@@ -384,6 +418,7 @@ data Env = Env
   , nameEnv :: [(Identifier, Identifier)] -- used in alpha conversion
   , typeEnv :: [(Identifier, Neut)] -- type environment
   , weakTermEnv :: [(Identifier, Neut)]
+  , termEnv :: [(Identifier, Term)]
   , polEnv :: [(Identifier, Neg)]
   , modalEnv :: [(Identifier, ([Identifier], Comp))]
   , constraintEnv :: [PreConstraint]
@@ -407,6 +442,7 @@ initialEnv path =
     , nameEnv = []
     , typeEnv = []
     , weakTermEnv = []
+    , termEnv = []
     , polEnv = []
     , modalEnv = []
     , codeEnv = []
@@ -507,6 +543,9 @@ insNumConstraintEnv x =
 
 insWeakTermEnv :: Identifier -> Neut -> WithEnv ()
 insWeakTermEnv i t = modify (\e -> e {weakTermEnv = weakTermEnv e ++ [(i, t)]})
+
+insTermEnv :: Identifier -> Term -> WithEnv ()
+insTermEnv i t = modify (\e -> e {termEnv = termEnv e ++ [(i, t)]})
 
 lookupWeakTermEnv :: Identifier -> WithEnv Neut
 lookupWeakTermEnv funName = do
