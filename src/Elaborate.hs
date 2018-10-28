@@ -54,7 +54,7 @@ elaborate main e = do
   modify (\e -> e {typeEnv = tenv'})
   checkNumConstraint
   -- use the resulting substitution to elaborate `e`.
-  nonRecReduce (subst sub e) >>= exhaust >>= insWeakTermEnv main
+  nonRecReduce e >>= exhaust >>= elaborate' >>= insTermEnv main
 
 -- In short: numbers must have one of the number types. We firstly generate constraints
 -- assuming that `1`, `1.2321`, etc. have arbitrary types. After the inference finished,
@@ -88,5 +88,91 @@ checkNumConstraint = do
         "the type of " ++
         x ++ " is supposed to be a number, but is " ++ Pr.ppShow t
 
-elaborate' :: Neut -> WithEnv Neut
-elaborate' = undefined
+elaborate' :: Neut -> WithEnv Term
+elaborate' (_ :< NeutVar s) = TermVar <$> lookupNameEnv s
+elaborate' (_ :< NeutPi (s, tdom) tcod) = do
+  tdom' <- elaborate' tdom
+  tcod' <- elaborate' tcod
+  return $ TermPi (s, tdom') tcod'
+elaborate' (_ :< NeutPiIntro (s, _) e) = do
+  e' <- elaborate' e
+  return $ TermPiIntro s e'
+elaborate' (_ :< NeutPiElim e v) = do
+  e' <- elaborate' e
+  v' <- elaborate' v
+  return $ TermPiElim e' v'
+elaborate' (_ :< NeutSigma xts tcod) = do
+  let (xs, ts) = unzip xts
+  ts' <- mapM elaborate' ts
+  tcod' <- elaborate' tcod
+  return $ TermSigma (zip xs ts') tcod'
+elaborate' (i :< NeutSigmaIntro es) = do
+  t <- lookupTypeEnv' i
+  es' <- mapM elaborate' es
+  return $ TermSigmaIntro (sigmaSize t) es'
+elaborate' (_ :< NeutSigmaElim e1@(i :< _) xs e2) = do
+  t <- lookupTypeEnv' i
+  e1' <- elaborate' e1
+  e2' <- elaborate' e2
+  return $ TermSigmaElim (sigmaSize t) e1' xs e2'
+elaborate' (_ :< NeutBox t) = do
+  t' <- elaborate' t
+  return $ TermBox t'
+elaborate' (_ :< NeutBoxIntro t) = do
+  t' <- elaborate' t
+  return $ TermBoxIntro t'
+elaborate' (_ :< NeutBoxElim t) = do
+  t' <- elaborate' t
+  return $ TermBoxElim t'
+elaborate' (_ :< NeutIndex s) = return $ TermIndex s
+elaborate' (_ :< NeutIndexIntro x) = return $ TermIndexIntro x
+elaborate' (_ :< NeutIndexElim e branchList) = do
+  e' <- elaborate' e
+  branchList' <-
+    forM branchList $ \(l, body) -> do
+      body' <- elaborate' body
+      return (l, body')
+  return $ TermIndexElim e' branchList'
+elaborate' (_ :< NeutConst t) = do
+  t' <- elaborate' t
+  return $ TermConst t'
+elaborate' (_ :< NeutConstIntro s) = return $ TermConstIntro s
+elaborate' (_ :< NeutConstElim e) = do
+  e' <- elaborate' e
+  return $ TermConstElim e'
+elaborate' (_ :< NeutUniv j) = return $ TermUniv j
+elaborate' (_ :< NeutMu s e) = do
+  e' <- elaborate' e
+  return $ TermMu s e'
+elaborate' (_ :< NeutHole x) = do
+  sub <- gets substitution
+  tenv <- gets typeEnv
+  case lookup x $ sub ++ tenv of
+    Just e -> elaborate' e
+    Nothing -> lift $ throwE $ "elaborate': remaining hole: " ++ x
+
+sigmaSize :: Neut -> Int
+sigmaSize (_ :< NeutSigma xts t) = do
+  let ts = map snd xts ++ [t]
+  maximum $ map sizeOf ts
+sigmaSize _ = 64
+
+sizeOf :: Neut -> Int
+sizeOf (_ :< NeutIndex "i1") = 1
+sizeOf (_ :< NeutIndex "i2") = 2
+sizeOf (_ :< NeutIndex "i4") = 4
+sizeOf (_ :< NeutIndex "i8") = 8
+sizeOf (_ :< NeutIndex "i16") = 16
+sizeOf (_ :< NeutIndex "i32") = 32
+sizeOf (_ :< NeutIndex "i64") = 64
+sizeOf (_ :< NeutIndex "u1") = 1
+sizeOf (_ :< NeutIndex "u2") = 2
+sizeOf (_ :< NeutIndex "u4") = 4
+sizeOf (_ :< NeutIndex "u8") = 8
+sizeOf (_ :< NeutIndex "u16") = 16
+sizeOf (_ :< NeutIndex "u32") = 32
+sizeOf (_ :< NeutIndex "u64") = 64
+sizeOf (_ :< NeutIndex "f16") = 16
+sizeOf (_ :< NeutIndex "f32") = 32
+sizeOf (_ :< NeutIndex "f64") = 64
+sizeOf _ = 64
