@@ -47,7 +47,7 @@ virtualValue (ValueIndexIntro x meta) =
     IndexDefault -> return $ DataInt 0
     IndexInteger i -> return $ DataInt i
     IndexFloat x -> do
-      t <- lookupTypeEnv' meta
+      t <- lookupTypeEnv' meta >>= reduce
       case t of
         _ :< NeutIndex "f16" -> return $ DataFloat16 x
         _ :< NeutIndex "f32" -> return $ DataFloat32 x

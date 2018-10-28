@@ -47,10 +47,7 @@ elaborate main e = do
   -- update the type environment by resulting substitution
   sub <- gets substitution
   tenv <- gets typeEnv
-  tenv' <-
-    forM tenv $ \(i, t) -> do
-      t' <- reduce $ subst sub t
-      return (i, t')
+  tenv' <- forM tenv $ \(i, t) -> return (i, subst sub t)
   modify (\e -> e {typeEnv = tenv'})
   checkNumConstraint
   -- use the resulting substitution to elaborate `e`.
