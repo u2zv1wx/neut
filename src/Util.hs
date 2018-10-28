@@ -154,7 +154,7 @@ varPos (PosSigma xts t2) = do
   let (xs, ts) = unzip xts
   let vs = concatMap varPos (t2 : ts)
   filter (`notElem` xs) vs
-varPos (PosSigmaIntro es) = concatMap varPos es
+varPos (PosSigmaIntro _ es) = concatMap varPos es
 varPos (PosBox e) = varNeg e
 varPos (PosBoxIntro e) = varNeg e
 varPos (PosIndex _) = []
@@ -175,7 +175,7 @@ varNeg (NegPiIntro x e) = do
   let vs = varNeg e
   filter (/= x) vs
 varNeg (NegPiElim e1 e2) = varNeg e1 ++ varPos e2
-varNeg (NegSigmaElim e1 xs e2) = do
+varNeg (NegSigmaElim _ e1 xs e2) = do
   let vs1 = varPos e1
   let vs2 = filter (`notElem` xs) $ varNeg e2
   vs1 ++ vs2
@@ -512,3 +512,9 @@ projectionList e (xts, t) = do
   forM varList $ \v -> do
     meta <- newName
     return $ meta :< NeutSigmaElim e xiList v
+
+sizeOfLowType :: LowType -> Int
+sizeOfLowType (LowTypeSignedInt i) = max i 64
+sizeOfLowType (LowTypeUnsignedInt i) = max i 64
+sizeOfLowType (LowTypeFloat i) = max i 64
+sizeOfLowType _ = 64
