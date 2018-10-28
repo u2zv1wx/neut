@@ -62,13 +62,14 @@ polarize' (TermPiElim e1 e2) = do
   f <- newNameWith "pi"
   v <- newNameWith "arg"
   bindSeq [(v, e2), (f, e1)] (NegPiElim (NegDownElim (PosVar f)) (PosVar v))
-polarize' (TermSigma xts body) = do
-  let (xs, ts) = unzip xts
-  ys <- mapM (const (newNameWith "sigma")) xts
-  z <- newNameWith "sigma"
-  bindSeq
-    (zip (ys ++ [z]) (ts ++ [body]))
-    (NegUpIntro (PosSigma (zip xs (map PosVar ys)) (PosVar z)))
+polarize' tSigma@(TermSigma _ _)
+  | (body, xts) <- toSigmaSeqTerm tSigma = do
+    let (xs, ts) = unzip xts
+    ys <- mapM (const (newNameWith "sigma")) xts
+    z <- newNameWith "sigma"
+    bindSeq
+      (zip (ys ++ [z]) (ts ++ [body]))
+      (NegUpIntro (PosSigma (zip xs (map PosVar ys)) (PosVar z)))
 polarize' (TermSigmaIntro es) = do
   nameList <- mapM (const newName) es
   bindSeq (zip nameList es) (NegUpIntro (PosSigmaIntro (map PosVar nameList)))
