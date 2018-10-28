@@ -102,10 +102,8 @@ data Term
                Term
   | TermSigma [(Identifier, Term)]
               Term
-  | TermSigmaIntro Int -- maximum {size-of(Term)}
-                   [Term]
-  | TermSigmaElim Int -- maximum {size-of(Term)}
-                  Term
+  | TermSigmaIntro [Term]
+  | TermSigmaElim Term
                   [Identifier]
                   Term
   | TermBox Term
@@ -154,8 +152,7 @@ data Pos
   = PosVar Identifier
   | PosSigma [(Identifier, Pos)]
              Pos
-  | PosSigmaIntro Int
-                  [Pos]
+  | PosSigmaIntro [Pos]
   | PosIndex Identifier
   | PosIndexIntro Index
                   Identifier -- metadata to determine its type
@@ -178,8 +175,7 @@ data Neg
                Neg
   | NegPiElim Neg
               Pos
-  | NegSigmaElim Int
-                 Pos
+  | NegSigmaElim Pos
                  [Identifier]
                  Neg
   | NegIndexElim Pos
@@ -202,8 +198,7 @@ data Value
   = ValueVar Identifier
   | ValueSigma [(Identifier, Value)]
                Value
-  | ValueSigmaIntro Int
-                    [Value]
+  | ValueSigmaIntro [Value]
   | ValueIndex Identifier
   | ValueIndexIntro Index
                     Identifier
@@ -222,8 +217,7 @@ data Comp
            Comp
   | CompPiElimConstElim Identifier -- (unbox f) @ x1 @ ... @ xn
                         [Identifier]
-  | CompSigmaElim Int
-                  Value
+  | CompSigmaElim Value
                   [Identifier]
                   Comp
   | CompIndexElim Value
@@ -243,8 +237,7 @@ data Data
   | DataFloat16 Double
   | DataFloat32 Double
   | DataFloat64 Double
-  | DataStruct Int
-               [Data]
+  | DataStruct [Data]
   | DataArith (Arith, LowType)
               Data
               Data
@@ -265,9 +258,7 @@ data Code
                [(Index, Code)]
   | CodeExtractValue Identifier -- destination
                      Data -- base pointer
-                     -- (i, n, size) ... index i in [1 ... n], where the size of ith
-                     -- element is upto `size`.
-                     (Int, Int, Int)
+                     (Int, Int) -- (i, n, size) ... index i in [1 ... n]
                      Code -- continuation
   | CodeFree Data
              Code
@@ -299,7 +290,7 @@ data Asm
   = AsmReturn AsmData
   | AsmGetElementPtr Identifier
                      AsmData
-                     (Int, Int, Int) -- (index, length, size)
+                     (Int, Int) -- (index, length)
                      Asm
   | AsmCall Identifier
             AsmData

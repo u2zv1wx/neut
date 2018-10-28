@@ -69,15 +69,13 @@ polarize' (TermSigma xts body) = do
   bindSeq
     (zip (ys ++ [z]) (ts ++ [body]))
     (NegUpIntro (PosSigma (zip xs (map PosVar ys)) (PosVar z)))
-polarize' (TermSigmaIntro size es) = do
+polarize' (TermSigmaIntro es) = do
   nameList <- mapM (const newName) es
-  bindSeq
-    (zip nameList es)
-    (NegUpIntro (PosSigmaIntro size (map PosVar nameList)))
-polarize' (TermSigmaElim size e1 xs e2) = do
+  bindSeq (zip nameList es) (NegUpIntro (PosSigmaIntro (map PosVar nameList)))
+polarize' (TermSigmaElim e1 xs e2) = do
   e2' <- polarize' e2
   z <- newNameWith "sigma"
-  bindSeq [(z, e1)] (NegSigmaElim size (PosVar z) xs e2')
+  bindSeq [(z, e1)] (NegSigmaElim (PosVar z) xs e2')
 polarize' (TermBox e) = do
   e' <- polarize' e
   return $ NegUpIntro (PosBox e')
@@ -145,7 +143,7 @@ insCopyInt :: WithEnv ()
 insCopyInt =
   forM_ intLowTypeList $ \intLowType -> do
     x <- newNameWith "arg"
-    let pair = PosSigmaIntro (sizeOfLowType intLowType) [PosVar x, PosVar x]
+    let pair = PosSigmaIntro [PosVar x, PosVar x]
     let copy = rb $ rt $ NegPiIntro x $ NegUpIntro pair
     insPolEnv ("core." ++ show intLowType ++ ".copy") copy
 

@@ -89,7 +89,7 @@ checkNumConstraint = do
         x ++ " is supposed to be a number, but is " ++ Pr.ppShow t
 
 elaborate' :: Neut -> WithEnv Term
-elaborate' (_ :< NeutVar s) = TermVar <$> lookupNameEnv s
+elaborate' (_ :< NeutVar s) = return $ TermVar s
 elaborate' (_ :< NeutPi (s, tdom) tcod) = do
   tdom' <- elaborate' tdom
   tcod' <- elaborate' tcod
@@ -106,15 +106,13 @@ elaborate' (_ :< NeutSigma xts tcod) = do
   ts' <- mapM elaborate' ts
   tcod' <- elaborate' tcod
   return $ TermSigma (zip xs ts') tcod'
-elaborate' (i :< NeutSigmaIntro es) = do
-  t <- lookupTypeEnv' i
+elaborate' (_ :< NeutSigmaIntro es) = do
   es' <- mapM elaborate' es
-  return $ TermSigmaIntro (sigmaSize t) es'
-elaborate' (_ :< NeutSigmaElim e1@(i :< _) xs e2) = do
-  t <- lookupTypeEnv' i
+  return $ TermSigmaIntro es'
+elaborate' (_ :< NeutSigmaElim e1 xs e2) = do
   e1' <- elaborate' e1
   e2' <- elaborate' e2
-  return $ TermSigmaElim (sigmaSize t) e1' xs e2'
+  return $ TermSigmaElim e1' xs e2'
 elaborate' (_ :< NeutBox t) = do
   t' <- elaborate' t
   return $ TermBox t'
@@ -150,9 +148,3 @@ elaborate' (_ :< NeutHole x) = do
   case lookup x $ sub ++ tenv of
     Just e -> elaborate' e
     Nothing -> lift $ throwE $ "elaborate': remaining hole: " ++ x
-
-sigmaSize :: Neut -> Int
-sigmaSize (_ :< NeutSigma xts t) = do
-  let ts = map snd xts ++ [t]
-  maximum $ map sizeOf ts
-sigmaSize _ = 64

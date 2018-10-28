@@ -154,7 +154,7 @@ varPos (PosSigma xts t2) = do
   let (xs, ts) = unzip xts
   let vs = concatMap varPos (t2 : ts)
   filter (`notElem` xs) vs
-varPos (PosSigmaIntro _ es) = concatMap varPos es
+varPos (PosSigmaIntro es) = concatMap varPos es
 varPos (PosBox e) = varNeg e
 varPos (PosBoxIntro e) = varNeg e
 varPos (PosIndex _) = []
@@ -175,7 +175,7 @@ varNeg (NegPiIntro x e) = do
   let vs = varNeg e
   filter (/= x) vs
 varNeg (NegPiElim e1 e2) = varNeg e1 ++ varPos e2
-varNeg (NegSigmaElim _ e1 xs e2) = do
+varNeg (NegSigmaElim e1 xs e2) = do
   let vs1 = varPos e1
   let vs2 = filter (`notElem` xs) $ varNeg e2
   vs1 ++ vs2
@@ -363,7 +363,7 @@ substData :: [(String, Data)] -> Data -> Data
 substData sub (DataLocal x) = fromMaybe (DataLocal x) (lookup x sub)
 substData _ (DataGlobal x) = DataGlobal x
 substData _ (DataInt i) = DataInt i
-substData sub (DataStruct size ds) = DataStruct size $ map (substData sub) ds
+substData sub (DataStruct ds) = DataStruct $ map (substData sub) ds
 
 expandDirPath :: FilePath -> IO FilePath
 expandDirPath path = do

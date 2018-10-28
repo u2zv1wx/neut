@@ -185,15 +185,15 @@ reduceNeg (NegPiElim e1 e2) = do
       let body' = substNeg sub body
       reduceNeg body'
     _ -> return $ NegPiElim e1' e2
-reduceNeg (NegSigmaElim size e xs body) =
+reduceNeg (NegSigmaElim e xs body) =
   case e of
-    PosSigmaIntro _ es -> do
+    PosSigmaIntro es -> do
       let sub = zip xs es
       let body' = substNeg sub body
       reduceNeg body'
     _ -> do
       body' <- reduceNeg body
-      return $ NegSigmaElim size e xs body'
+      return $ NegSigmaElim e xs body'
 reduceNeg (NegBoxElim e) = do
   e' <- reducePos e
   case e' of
@@ -246,9 +246,9 @@ reduceComp (CompPi (x, tdom) tcod) = do
   tcod' <- reduceComp tcod
   return $ CompPi (x, tdom') tcod'
 reduceComp (CompPiElimConstElim x xs) = return $ CompPiElimConstElim x xs
-reduceComp (CompSigmaElim size e xs body) = do
+reduceComp (CompSigmaElim e xs body) = do
   body' <- reduceComp body
-  return $ CompSigmaElim size e xs body'
+  return $ CompSigmaElim e xs body'
 reduceComp (CompIndexElim e branchList) =
   case e of
     ValueIndexIntro x _ ->
@@ -332,9 +332,9 @@ substPos sub (PosSigma xts tcod) = do
   let ts' = map (substPos sub) ts
   let tcod' = substPos sub tcod
   PosSigma (zip xs ts') tcod'
-substPos sub (PosSigmaIntro size es) = do
+substPos sub (PosSigmaIntro es) = do
   let es' = map (substPos sub) es
-  PosSigmaIntro size es'
+  PosSigmaIntro es'
 substPos sub (PosBox e) = do
   let e' = substNeg sub e
   PosBox e'
@@ -369,10 +369,10 @@ substNeg sub (NegPiElim e1 e2) = do
   let e1' = substNeg sub e1
   let e2' = substPos sub e2
   NegPiElim e1' e2'
-substNeg sub (NegSigmaElim size e1 xs e2) = do
+substNeg sub (NegSigmaElim e1 xs e2) = do
   let e1' = substPos sub e1
   let e2' = substNeg sub e2
-  NegSigmaElim size e1' xs e2'
+  NegSigmaElim e1' xs e2'
 substNeg sub (NegBoxElim e) = do
   let e' = substPos sub e
   NegBoxElim e'
@@ -402,9 +402,9 @@ substValue sub (ValueSigma xts tcod) = do
   let ts' = map (substValue sub) ts
   let tcod' = substValue sub tcod
   ValueSigma (zip xs ts') tcod'
-substValue sub (ValueSigmaIntro size es) = do
+substValue sub (ValueSigmaIntro es) = do
   let es' = map (substValue sub) es
-  ValueSigmaIntro size es'
+  ValueSigmaIntro es'
 substValue sub (ValueBox e) = do
   let e' = substComp sub e
   ValueBox e'
@@ -426,10 +426,10 @@ substComp sub (CompPiElimConstElim x xs) = do
   let x' = fromMaybe x (lookup x sub)
   let xs' = map (\y -> fromMaybe y (lookup y sub)) xs
   CompPiElimConstElim x' xs'
-substComp sub (CompSigmaElim size e1 xs e2) = do
+substComp sub (CompSigmaElim e1 xs e2) = do
   let e1' = substValue sub e1
   let e2' = substComp sub e2
-  CompSigmaElim size e1' xs e2'
+  CompSigmaElim e1' xs e2'
 substComp sub (CompIndexElim e branchList) = do
   let e' = substValue sub e
   let branchList' = map (\(l, e) -> (l, substComp sub e)) branchList

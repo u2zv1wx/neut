@@ -55,8 +55,8 @@ emitAsm funName (AsmGetElementPtr x base (i, n) cont) = do
     unwords
       [ show (AsmDataLocal x)
       , "= getelementptr"
-      , showStructOfLength n ++ ","
-      , showStructOfLength n ++ "*"
+      , showStruct n ++ ","
+      , showStruct n ++ "*"
       , show base ++ ","
       , showIndex [0, i]
       ]
@@ -378,8 +378,8 @@ showLowType (LowTypeStruct ts) = "{" ++ showList ts ++ "}"
 showLowType (LowTypeArray i t) = "[" ++ show i ++ " x " ++ showLowType t ++ "]"
 showLowType (LowTypeFunction ts t) = showLowType t ++ " (" ++ showList ts ++ ")"
 
-showStructOfLength :: Int -> String
-showStructOfLength i = "{" ++ showItems (const "i8*") [1 .. i] ++ "}"
+showStruct :: Int -> String
+showStruct i = "{" ++ showItems (const "i8*") [1 .. i] ++ "}"
 
 showItems :: (a -> String) -> [a] -> String
 showItems _ [] = ""

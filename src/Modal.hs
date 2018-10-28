@@ -51,9 +51,9 @@ modalPos (PosSigma xts t) = do
   ts' <- mapM modalPos ts
   t' <- modalPos t
   return $ ValueSigma (zip xs ts') t'
-modalPos (PosSigmaIntro size es) = do
+modalPos (PosSigmaIntro es) = do
   ds <- mapM modalPos es
-  return $ ValueSigmaIntro size ds
+  return $ ValueSigmaIntro ds
 modalPos (PosIndex l) = return $ ValueIndex l
 modalPos (PosIndexIntro l meta) = return $ ValueIndexIntro l meta
 modalPos (PosDown t) = do
@@ -95,10 +95,10 @@ modalNeg app@(NegPiElim _ _) = do
   xs <- mapM (const (newNameWith "arg")) args
   app' <- commPiElim fun' xs
   bindLet (zip xs args') app'
-modalNeg (NegSigmaElim size e1 xs e2) = do
+modalNeg (NegSigmaElim e1 xs e2) = do
   e1' <- modalPos e1
   e2' <- modalNeg e2
-  return $ CompSigmaElim size e1' xs e2'
+  return $ CompSigmaElim e1' xs e2'
 modalNeg (NegIndexElim e branchList) = do
   let (labelList, es) = unzip branchList
   es' <- mapM modalNeg es
@@ -169,7 +169,7 @@ makeClosure abs = do
   cls <- newNameWith "closure"
   insModalEnv cls (envName : args) body'
   let vs = map ValueVar fvs
-  return $ ValueSigmaIntro 64 [ValueConstIntro cls, ValueSigmaIntro 64 vs]
+  return $ ValueSigmaIntro [ValueConstIntro cls, ValueSigmaIntro vs]
 
 -- Extract the values of free variables from the free-variable struct,
 -- and then evaluate the original term.
@@ -178,15 +178,14 @@ makeClosureBody _ [] funBody = modalNeg funBody
 makeClosureBody envName [x] funBody =
   modalNeg $ NegUpElim x (NegUpIntro $ PosVar envName) funBody
 makeClosureBody envName xs funBody =
-  modalNeg $ NegSigmaElim 64 (PosVar envName) xs funBody
+  modalNeg $ NegSigmaElim (PosVar envName) xs funBody
 
 callClosure :: Pos -> WithEnv Comp
 callClosure e = do
   e' <- modalPos e
   envName <- newNameWith "env"
   fun <- newNameWith "fun"
-  return $
-    CompSigmaElim 64 e' [fun, envName] (CompPiElimConstElim fun [envName])
+  return $ CompSigmaElim e' [fun, envName] (CompPiElimConstElim fun [envName])
 
 bindLet :: [(Identifier, Value)] -> Comp -> WithEnv Comp
 bindLet [] e = return e
@@ -199,9 +198,9 @@ commPiElim :: Comp -> [Identifier] -> WithEnv Comp
 commPiElim (CompPi _ _) _ = lift $ throwE "Modal.commPiElim: type error"
 commPiElim (CompPiElimConstElim f xs) args =
   return $ CompPiElimConstElim f (xs ++ args)
-commPiElim (CompSigmaElim size v xs e) args = do
+commPiElim (CompSigmaElim v xs e) args = do
   e' <- commPiElim e args
-  return $ CompSigmaElim size v xs e'
+  return $ CompSigmaElim v xs e'
 commPiElim (CompIndexElim v branchList) args = do
   let (labelList, es) = unzip branchList
   es' <- mapM (`commPiElim` args) es
