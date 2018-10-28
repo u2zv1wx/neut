@@ -483,6 +483,12 @@ newNameOfType t = do
   insTypeEnv i t
   return i
 
+newName1 :: Identifier -> Neut -> WithEnv Identifier
+newName1 baseName t = do
+  i <- newNameWith baseName
+  insTypeEnv i t
+  return i
+
 constNameWith :: Identifier -> WithEnv ()
 constNameWith s = modify (\e -> e {nameEnv = (s, s) : nameEnv e})
 
@@ -532,6 +538,13 @@ lookupCodeEnv funName = do
 
 insTypeEnv :: Identifier -> Neut -> WithEnv ()
 insTypeEnv i t = modify (\e -> e {typeEnv = (i, t) : typeEnv e})
+
+insTypeEnv1 :: [Identifier] -> Neut -> Identifier -> Neut -> WithEnv ()
+insTypeEnv1 ctx univ i t = do
+  tenv <- gets typeEnv
+  let ts = map snd $ filter (\(j, _) -> i == j) tenv
+  forM_ ts $ \t' -> insConstraintEnv ctx t t' univ
+  modify (\e -> e {typeEnv = (i, t) : typeEnv e})
 
 insNumConstraintEnv :: Identifier -> WithEnv ()
 insNumConstraintEnv x =
