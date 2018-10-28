@@ -202,7 +202,8 @@ data Value
   = ValueVar Identifier
   | ValueSigma [(Identifier, Value)]
                Value
-  | ValueSigmaIntro [Value]
+  | ValueSigmaIntro Int
+                    [Value]
   | ValueIndex Identifier
   | ValueIndexIntro Index
                     Identifier
@@ -221,7 +222,8 @@ data Comp
            Comp
   | CompPiElimConstElim Identifier -- (unbox f) @ x1 @ ... @ xn
                         [Identifier]
-  | CompSigmaElim Value
+  | CompSigmaElim Int
+                  Value
                   [Identifier]
                   Comp
   | CompIndexElim Value
