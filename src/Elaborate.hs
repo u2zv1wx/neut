@@ -101,11 +101,10 @@ elaborate' (_ :< NeutPiElim e v) = do
   e' <- elaborate' e
   v' <- elaborate' v
   return $ TermPiElim e' v'
-elaborate' (_ :< NeutSigma xts tcod) = do
-  let (xs, ts) = unzip xts
-  ts' <- mapM elaborate' ts
-  tcod' <- elaborate' tcod
-  return $ TermSigma (zip xs ts') tcod'
+elaborate' (_ :< NeutSigma (s, t1) t2) = do
+  t1' <- elaborate' t1
+  t2' <- elaborate' t2
+  return $ TermSigma (s, t1') t2'
 elaborate' (_ :< NeutSigmaIntro es) = do
   es' <- mapM elaborate' es
   return $ TermSigmaIntro es'

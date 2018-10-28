@@ -30,15 +30,12 @@ rename (i :< NeutPiElim e v) = do
   e' <- rename e
   v' <- rename v
   return $ i :< NeutPiElim e' v'
-rename (i :< NeutSigma [] tcod) = do
-  tcod' <- rename tcod
-  return $ i :< NeutSigma [] tcod'
-rename (i :< NeutSigma ((x, t):xts) tcod) = do
-  t' <- rename t
+rename (i :< NeutSigma (x, t1) t2) = do
+  t1' <- rename t1
   local $ do
     x' <- newNameWith x
-    _ :< NeutSigma xts' tcod' <- rename $ i :< NeutSigma xts tcod
-    return $ i :< NeutSigma ((x', t') : xts') tcod'
+    t2' <- rename t2
+    return $ i :< NeutSigma (x', t1') t2' -- t' <- rename t
 rename (i :< NeutSigmaIntro es) = do
   es' <- mapM rename es
   return $ i :< NeutSigmaIntro es'

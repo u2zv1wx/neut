@@ -29,11 +29,10 @@ exhaust' (_ :< NeutPiElim e1 e2) = do
   b1 <- exhaust' e1
   b2 <- exhaust' e2
   return $ b1 && b2
-exhaust' (_ :< NeutSigma xts t2) = do
-  let (_, ts) = unzip xts
-  bs <- mapM exhaust' ts
-  b2 <- exhaust' t2
-  return $ and bs && b2
+exhaust' (_ :< NeutSigma (_, tdom) tcod) = do
+  b1 <- exhaust' tdom
+  b2 <- exhaust' tcod
+  return $ b1 && b2
 exhaust' (_ :< NeutSigmaIntro es) = do
   bs <- mapM exhaust' es
   return $ and bs

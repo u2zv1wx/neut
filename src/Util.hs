@@ -62,6 +62,18 @@ toPiSeq (_ :< NeutPi (x, t) body) = do
   (body', (x, t) : args)
 toPiSeq t = (t, [])
 
+toSigmaSeq :: Neut -> (Neut, [(Identifier, Neut)])
+toSigmaSeq (_ :< NeutSigma (x, t) body) = do
+  let (body', args) = toSigmaSeq body
+  (body', (x, t) : args)
+toSigmaSeq t = (t, [])
+
+toSigmaSeqTerm :: Term -> (Term, [(Identifier, Term)])
+toSigmaSeqTerm (TermSigma (x, t) body) = do
+  let (body', args) = toSigmaSeqTerm body
+  (body', (x, t) : args)
+toSigmaSeqTerm t = (t, [])
+
 var :: Neut -> [Identifier]
 var e = fst $ varAndHole e
 
@@ -76,12 +88,10 @@ nonLinear (_ :< NeutPiElim e1 e2) = do
   let ns1 = nonLinear e1
   let ns2 = nonLinear e2
   ns1 ++ ns2
-nonLinear (_ :< NeutSigma [] t2) = nonLinear t2
-nonLinear (i :< NeutSigma ((x, t):xts) t2) = do
-  let ns1 = nonLinear (i :< NeutSigma xts t2)
-  let ns2 = nonLinear t
-  let vs = join $ map var (map snd xts ++ [t2])
-  isAffine x vs ++ ns1 ++ ns2
+nonLinear (_ :< NeutSigma (x, tdom) tcod) = do
+  let ns1 = nonLinear tdom
+  let ns2 = isAffine x $ nonLinear tcod
+  ns1 ++ ns2
 nonLinear (_ :< NeutSigmaIntro es) = join $ map nonLinear es
 nonLinear (_ :< NeutSigmaElim e1 xs e2) = do
   let ns1 = nonLinear e1
@@ -118,10 +128,11 @@ varAndHole (_ :< NeutPiIntro (x, _) e) = do
   (filter (/= x) vs1, vs2)
 varAndHole (_ :< NeutPiElim e1 e2) =
   pairwiseConcat [varAndHole e1, varAndHole e2]
-varAndHole (_ :< NeutSigma xts t2) = do
-  let (xs, ts) = unzip xts
-  let (vs1, vs2) = pairwiseConcat $ map varAndHole (t2 : ts)
-  (filter (`notElem` xs) vs1, vs2)
+varAndHole (_ :< NeutSigma (x, tdom) tcod) = do
+  let vs1 = varAndHole tdom
+  let (vs21, vs22) = varAndHole tcod
+  let vs2 = (filter (/= x) vs21, vs22)
+  pairwiseConcat [vs1, vs2]
 varAndHole (_ :< NeutSigmaIntro es) = pairwiseConcat $ map varAndHole es
 varAndHole (_ :< NeutSigmaElim e1 xs e2) = do
   let vs1 = varAndHole e1
@@ -383,19 +394,10 @@ isEq (_ :< NeutPiElim e11 e12) (_ :< NeutPiElim e21 e22) = do
   b1 <- isEq e11 e21
   b2 <- isEq e12 e22
   return $ b1 && b2
-isEq (_ :< NeutSigma [(x1, t11)] t12) (_ :< NeutSigma [(x2, t21)] t22) = do
+isEq (_ :< NeutSigma (x1, t11) t12) (_ :< NeutSigma (x2, t21) t22) = do
   vx <- toVar' x1
   b1 <- isEq t11 t21
   b2 <- isEq t12 $ subst [(x2, vx)] t22
-  return $ b1 && b2
-isEq (i :< NeutSigma ((x1, t11):xts1) t12) (j :< NeutSigma ((x2, t21):xts2) t22) = do
-  vx <- toVar' x1
-  let (xs, ts) = unzip xts2
-  let ts' = map (subst [(x2, vx)]) ts
-  let xts2' = zip xs ts'
-  let t22' = subst [(x2, vx)] t22
-  b1 <- isEq (i :< NeutSigma xts1 t12) (j :< NeutSigma xts2' t22')
-  b2 <- isEq t11 t21
   return $ b1 && b2
 isEq (_ :< NeutSigmaIntro es1) (_ :< NeutSigmaIntro es2)
   | length es1 == length es2 = do

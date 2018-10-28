@@ -62,7 +62,7 @@ data NeutF a
                 a
   | NeutPiElim a
                a
-  | NeutSigma [(Identifier, a)]
+  | NeutSigma (Identifier, a)
               a
   | NeutSigmaIntro [a]
   | NeutSigmaElim a
@@ -100,7 +100,7 @@ data Term
                 Term
   | TermPiElim Term
                Term
-  | TermSigma [(Identifier, Term)]
+  | TermSigma (Identifier, Term)
               Term
   | TermSigmaIntro [Term]
   | TermSigmaElim Term

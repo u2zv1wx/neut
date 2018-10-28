@@ -92,26 +92,24 @@ simp ((ctx, _ :< NeutPiIntro (x, _) body1, e2, t):cs) = do
   let app = appMeta :< NeutPiElim e2 var
   simp $ (ctx, body1, app, t) : cs
 simp ((ctx, e1, e2@(_ :< NeutPiIntro _ _), t):cs) = simp $ (ctx, e2, e1, t) : cs
-simp ((ctx, _ :< NeutSigma [(x, tdom1)] tcod1, _ :< NeutSigma [(y, tdom2)] tcod2, univ):cs) = do
+simp ((ctx, _ :< NeutSigma (x, tdom1) tcod1, _ :< NeutSigma (y, tdom2) tcod2, univ):cs) = do
   var <- toVar' x
   cs' <- sConstraint [(y, var)] cs >>= simp
   simp $
     (ctx, tdom1, tdom2, univ) :
     (ctx ++ [x], tcod1, subst [(y, var)] tcod2, univ) : cs'
-simp ((ctx, i :< NeutSigma ((x, tdom1):xts) tcod1, j :< NeutSigma ((y, tdom2):yts) tcod2, univ):cs) = do
-  let sig1 = i :< NeutSigma [(x, tdom1)] (i :< NeutSigma xts tcod1)
-  let sig2 = j :< NeutSigma [(y, tdom2)] (j :< NeutSigma yts tcod2)
-  simp ((ctx, sig1, sig2, univ) : cs)
-simp ((ctx, _ :< NeutSigmaIntro es1, _ :< NeutSigmaIntro es2, _ :< NeutSigma xts t):cs)
-  | length es1 == length es2 = do
+simp ((ctx, _ :< NeutSigmaIntro es1, _ :< NeutSigmaIntro es2, tSigma):cs)
+  | length es1 == length es2
+  , (t, xts) <- toSigmaSeq tSigma = do
     let ts = map snd xts ++ [t]
     let sub = zip (map fst xts) es1
     let ts' = map (subst sub) ts
     newCs <-
       forM (zip (zip es1 es2) ts') $ \((e1, e2), t') -> return (ctx, e1, e2, t')
     simp $ newCs ++ cs
-simp ((ctx, _ :< NeutSigmaIntro es, e2, _ :< NeutSigma xts t):cs)
-  | length xts + 1 == length es = do
+simp ((ctx, _ :< NeutSigmaIntro es, e2, tSigma):cs)
+  | (t, xts) <- toSigmaSeq tSigma
+  , length xts + 1 == length es = do
     prList <- projectionList e2 (xts, t)
     let sub = zip (map fst xts) es
     let ts = map (subst sub) $ map snd xts ++ [t]
@@ -142,11 +140,22 @@ simp (c@(_, _, e2, _):cs)
   | Just _ <- headMeta' [] e2 = do
     cs' <- simp cs
     return $ c : cs'
-simp (c@(_, e1, e2, _):cs) = do
+simp (c@(ctx, e1, e2, t):cs) = do
   b <- isEq e1 e2
-  if b
-    then simp cs
-    else throwError $ "cannot simplify:\n" ++ Pr.ppShow c
+  let mx = headMeta'' e1
+  let my = headMeta'' e2
+  sub <- gets substitution
+  case (b, mx, my) of
+    (True, _, _) -> simp cs
+    (_, Just x, _)
+      | Just e <- lookup x sub -> do
+        e1' <- reduce $ subst [(x, e)] e1
+        simp $ (ctx, e1', e2, t) : cs
+    (_, _, Just y)
+      | Just e <- lookup y sub -> do
+        e2' <- reduce $ subst [(y, e)] e2
+        simp $ (ctx, e1, e2', t) : cs
+    _ -> throwError $ "cannot simplify:\n" ++ Pr.ppShow c
 
 categorize :: PreConstraint -> Constraint
 categorize (ctx, _ :< NeutVar x, e2, t) = do

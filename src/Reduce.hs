@@ -36,11 +36,10 @@ reduce (i :< NeutPiElim e1 e2) = do
       let _ :< body' = subst sub body
       reduce $ i :< body'
     _ -> return $ i :< NeutPiElim e1' e2'
-reduce (i :< NeutSigma xts t) = do
-  let (xs, ts) = unzip xts
-  ts' <- mapM reduce ts
-  t' <- reduce t
-  return $ i :< NeutSigma (zip xs ts') t'
+reduce (i :< NeutSigma (x, tdom) tcod) = do
+  tdom' <- reduce tdom
+  tcod' <- reduce tcod
+  return $ i :< NeutSigma (x, tdom') tcod'
 reduce (i :< NeutSigmaIntro es) = do
   es' <- mapM reduce es
   return $ i :< NeutSigmaIntro es'
@@ -115,8 +114,8 @@ isNonRecReducible (_ :< NeutPiIntro _ e) = isNonRecReducible e
 isNonRecReducible (_ :< NeutPiElim (_ :< NeutPiIntro _ _) _) = True
 isNonRecReducible (_ :< NeutPiElim e1 e2) =
   isNonRecReducible e1 || isNonRecReducible e2
-isNonRecReducible (_ :< NeutSigma xts tcod) =
-  any isNonRecReducible $ tcod : map snd xts
+isNonRecReducible (_ :< NeutSigma (_, tdom) tcod) =
+  isNonRecReducible tdom || isNonRecReducible tcod
 isNonRecReducible (_ :< NeutSigmaIntro es) = any isNonRecReducible es
 isNonRecReducible (_ :< NeutSigmaElim (_ :< NeutSigmaIntro _) _ _) = True
 isNonRecReducible (_ :< NeutSigmaElim e _ body) =
@@ -156,11 +155,10 @@ nonRecReduce (i :< NeutPiElim e1 e2) = do
       let _ :< body' = subst sub body
       nonRecReduce $ i :< body'
     _ -> return $ i :< NeutPiElim e1' e2'
-nonRecReduce (i :< NeutSigma xts tcod) = do
-  let (xs, ts) = unzip xts
-  ts' <- mapM nonRecReduce ts
+nonRecReduce (i :< NeutSigma (x, tdom) tcod) = do
+  tdom' <- nonRecReduce tdom
   tcod' <- nonRecReduce tcod
-  return $ i :< NeutSigma (zip xs ts') tcod'
+  return $ i :< NeutSigma (x, tdom') tcod'
 nonRecReduce (i :< NeutSigmaIntro es) = do
   es' <- mapM nonRecReduce es
   return $ i :< NeutSigmaIntro es'
@@ -191,11 +189,21 @@ nonRecReduce (i :< NeutIndexElim e branchList) = do
   case e' of
     _ :< NeutIndexIntro x ->
       case lookup x branchList of
-        Nothing ->
-          lift $
-          throwE $ "the index " ++ show x ++ " is not included in branchList"
         Just body -> nonRecReduce body
-    _ -> return $ i :< NeutIndexElim e' branchList
+        Nothing ->
+          case findLabelIndex branchList of
+            Just (y, body) -> nonRecReduce $ subst [(y, e')] body
+            Nothing ->
+              case findDefault branchList of
+                Just body -> nonRecReduce body
+                Nothing ->
+                  lift $
+                  throwE $
+                  "the index " ++ show x ++ " is not included in branchList"
+    _ -> do
+      let (ls, es) = unzip branchList
+      es' <- mapM nonRecReduce es
+      return $ i :< NeutIndexElim e' (zip ls es')
 nonRecReduce e@(_ :< NeutConst _) = return e
 nonRecReduce e@(_ :< NeutConstIntro _) = return e
 nonRecReduce e@(_ :< NeutConstElim _) = return e
@@ -335,9 +343,11 @@ subst sub (j :< NeutPiElim e1 e2) = do
   let e1' = subst sub e1
   let e2' = subst sub e2
   j :< NeutPiElim e1' e2'
-subst sub (j :< NeutSigma xts t) = do
-  let (xts', t') = substSigma sub xts t
-  j :< NeutSigma xts' t'
+subst sub (j :< NeutSigma (s, tdom) tcod) = do
+  let tdom' = subst sub tdom
+  let sub' = filter (\(x, _) -> x /= s) sub
+  let tcod' = subst sub' tcod
+  j :< NeutSigma (s, tdom') tcod'
 subst sub (j :< NeutSigmaIntro es) = j :< NeutSigmaIntro (map (subst sub) es)
 subst sub (j :< NeutSigmaElim e1 xs e2) = do
   let e1' = subst sub e1
@@ -586,11 +596,10 @@ substTerm sub (TermPiElim e1 e2) = do
   let e1' = substTerm sub e1
   let e2' = substTerm sub e2
   TermPiElim e1' e2'
-substTerm sub (TermSigma xts tcod) = do
-  let (xs, ts) = unzip xts
-  let ts' = map (substTerm sub) ts
+substTerm sub (TermSigma (s, tdom) tcod) = do
+  let tdom' = substTerm sub tdom
   let tcod' = substTerm sub tcod
-  TermSigma (zip xs ts') tcod'
+  TermSigma (s, tdom') tcod'
 substTerm sub (TermSigmaIntro es) = TermSigmaIntro (map (substTerm sub) es)
 substTerm sub (TermSigmaElim e1 xs e2) = do
   let e1' = substTerm sub e1
