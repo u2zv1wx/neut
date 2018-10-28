@@ -38,9 +38,9 @@ virtualize = do
 virtualValue :: Value -> WithEnv Data
 virtualValue (ValueVar x) = globalizeIfNecessary x
 virtualValue (ValueSigma _ _) = return $ DataInt 0
-virtualValue (ValueSigmaIntro es) = do
+virtualValue (ValueSigmaIntro size es) = do
   ds <- mapM virtualValue es
-  return $ DataStruct ds
+  return $ DataStruct size ds
 virtualValue (ValueIndex _) = return $ DataInt 0
 virtualValue (ValueIndexIntro x meta) =
   case x of
@@ -78,14 +78,14 @@ virtualComp (CompPiElimConstElim f xs) = do
   f' <- globalizeIfNecessary f
   let xs' = map DataLocal xs
   return $ CodeCallTail f' xs'
-virtualComp (CompSigmaElim e1 xs e2) = do
+virtualComp (CompSigmaElim size e1 xs e2) = do
   e1' <- virtualValue e1
   e2' <- virtualComp e2
   case length xs of
     0 -> liftIO $ putStrLn "sigmaelim for empty"
     1 -> liftIO $ putStrLn "sigmaelim for singleton"
     _ -> return ()
-  return $ extract e1' (zip xs [0 ..]) (length xs) e2'
+  return $ extract e1' (zip xs [0 ..]) (length xs) size e2'
 virtualComp (CompIndexElim e branchList) = do
   let (labelList, es) = unzip branchList
   es' <- mapM virtualComp es
@@ -102,11 +102,11 @@ virtualComp (CompPrint t e) = do
   e' <- virtualValue e
   return $ CodePrint t e' $ CodeReturn (DataInt 0)
 
-extract :: Data -> [(Identifier, Int)] -> Int -> Code -> Code
-extract z [] _ cont = CodeFree z cont
-extract z ((x, i):xis) n cont = do
-  let cont' = extract z xis n cont
-  CodeExtractValue x z (i, n) cont'
+extract :: Data -> [(Identifier, Int)] -> Int -> Int -> Code -> Code
+extract z [] _ _ cont = CodeFree z cont
+extract z ((x, i):xis) n size cont = do
+  let cont' = extract z xis n size cont
+  CodeExtractValue x z (i, n, size) cont'
 
 -- Commutative conversion for up-elimination.
 commUpElim :: String -> Code -> Code -> Code
