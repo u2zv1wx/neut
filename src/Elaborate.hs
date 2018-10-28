@@ -156,23 +156,3 @@ sigmaSize (_ :< NeutSigma xts t) = do
   let ts = map snd xts ++ [t]
   maximum $ map sizeOf ts
 sigmaSize _ = 64
-
-sizeOf :: Neut -> Int
-sizeOf (_ :< NeutIndex "i1") = 1
-sizeOf (_ :< NeutIndex "i2") = 2
-sizeOf (_ :< NeutIndex "i4") = 4
-sizeOf (_ :< NeutIndex "i8") = 8
-sizeOf (_ :< NeutIndex "i16") = 16
-sizeOf (_ :< NeutIndex "i32") = 32
-sizeOf (_ :< NeutIndex "i64") = 64
-sizeOf (_ :< NeutIndex "u1") = 1
-sizeOf (_ :< NeutIndex "u2") = 2
-sizeOf (_ :< NeutIndex "u4") = 4
-sizeOf (_ :< NeutIndex "u8") = 8
-sizeOf (_ :< NeutIndex "u16") = 16
-sizeOf (_ :< NeutIndex "u32") = 32
-sizeOf (_ :< NeutIndex "u64") = 64
-sizeOf (_ :< NeutIndex "f16") = 16
-sizeOf (_ :< NeutIndex "f32") = 32
-sizeOf (_ :< NeutIndex "f64") = 64
-sizeOf _ = 64
