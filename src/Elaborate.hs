@@ -61,24 +61,25 @@ checkNumConstraint = do
   env <- get
   forM_ (numConstraintEnv env) $ \x -> do
     t <- lookupTypeEnv' x
-    case t of
-      _ :< NeutIndex "i1" -> return ()
-      _ :< NeutIndex "i2" -> return ()
-      _ :< NeutIndex "i4" -> return ()
-      _ :< NeutIndex "i8" -> return ()
-      _ :< NeutIndex "i16" -> return ()
-      _ :< NeutIndex "i32" -> return ()
-      _ :< NeutIndex "i64" -> return ()
-      _ :< NeutIndex "u1" -> return ()
-      _ :< NeutIndex "u2" -> return ()
-      _ :< NeutIndex "u4" -> return ()
-      _ :< NeutIndex "u8" -> return ()
-      _ :< NeutIndex "u16" -> return ()
-      _ :< NeutIndex "u32" -> return ()
-      _ :< NeutIndex "u64" -> return ()
-      _ :< NeutIndex "f16" -> return ()
-      _ :< NeutIndex "f32" -> return ()
-      _ :< NeutIndex "f64" -> return ()
+    t' <- elaborate' t >>= reduceTerm
+    case t' of
+      TermIndex "i1" -> return ()
+      TermIndex "i2" -> return ()
+      TermIndex "i4" -> return ()
+      TermIndex "i8" -> return ()
+      TermIndex "i16" -> return ()
+      TermIndex "i32" -> return ()
+      TermIndex "i64" -> return ()
+      TermIndex "u1" -> return ()
+      TermIndex "u2" -> return ()
+      TermIndex "u4" -> return ()
+      TermIndex "u8" -> return ()
+      TermIndex "u16" -> return ()
+      TermIndex "u32" -> return ()
+      TermIndex "u64" -> return ()
+      TermIndex "f16" -> return ()
+      TermIndex "f32" -> return ()
+      TermIndex "f64" -> return ()
       t ->
         lift $
         throwE $
@@ -140,7 +141,6 @@ elaborate' (_ :< NeutMu s e) = do
   return $ TermMu s e'
 elaborate' (_ :< NeutHole x) = do
   sub <- gets substitution
-  tenv <- gets typeEnv
-  case lookup x $ sub ++ tenv of
+  case lookup x sub of
     Just e -> elaborate' e
     Nothing -> lift $ throwE $ "elaborate': remaining hole: " ++ x
