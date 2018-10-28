@@ -33,8 +33,8 @@ import Data.Maybe (maybeToList)
 -- to `polEnv`. This function also inserts the definitions of constants to `polEnv`.
 polarize :: WithEnv ()
 polarize = do
-  wtenv <- gets weakTermEnv
-  forM_ wtenv $ \(name, e) -> do
+  tenv <- gets termEnv
+  forM_ tenv $ \(name, e) -> do
     e' <- polarize' e >>= reduceNeg
     insPolEnv name e'
   insArith
@@ -47,71 +47,70 @@ polarize = do
 --   let f := return (polarize' e2) in
 --   (force f) @ v
 -- Ignoring the `force`, one can see the order of evaluation is now made explicit.
-polarize' :: Neut -> WithEnv Neg
-polarize' (_ :< NeutVar x) = return $ NegUpIntro (PosVar x)
-polarize' (_ :< NeutPi (x, tdom) tcod) = do
+polarize' :: Term -> WithEnv Neg
+polarize' (TermVar x) = return $ NegUpIntro (PosVar x)
+polarize' (TermPi (x, tdom) tcod) = do
   dom <- newNameWith "dom"
   cod <- newNameWith "cod"
   bindSeq
     [(dom, tdom), (cod, tcod)]
     (NegUpIntro (PosDown (NegPi (x, PosVar dom) (NegUpIntro (PosVar cod)))))
-polarize' (_ :< NeutPiIntro (x, _) e) = do
+polarize' (TermPiIntro x e) = do
   e' <- polarize' e
   return $ NegUpIntro (PosDownIntro (NegPiIntro x e'))
-polarize' (_ :< NeutPiElim e1 e2) = do
+polarize' (TermPiElim e1 e2) = do
   f <- newNameWith "pi"
   v <- newNameWith "arg"
   bindSeq [(v, e2), (f, e1)] (NegPiElim (NegDownElim (PosVar f)) (PosVar v))
-polarize' (_ :< NeutSigma xts body) = do
+polarize' (TermSigma xts body) = do
   let (xs, ts) = unzip xts
   ys <- mapM (const (newNameWith "sigma")) xts
   z <- newNameWith "sigma"
   bindSeq
     (zip (ys ++ [z]) (ts ++ [body]))
     (NegUpIntro (PosSigma (zip xs (map PosVar ys)) (PosVar z)))
-polarize' (_ :< NeutSigmaIntro es) = do
+polarize' (TermSigmaIntro size es) = do
   nameList <- mapM (const newName) es
-  bindSeq (zip nameList es) (NegUpIntro (PosSigmaIntro (map PosVar nameList)))
-polarize' (_ :< NeutSigmaElim e1 xs e2) = do
+  bindSeq
+    (zip nameList es)
+    (NegUpIntro (PosSigmaIntro size (map PosVar nameList)))
+polarize' (TermSigmaElim size e1 xs e2) = do
   e2' <- polarize' e2
   z <- newNameWith "sigma"
-  bindSeq [(z, e1)] (NegSigmaElim (PosVar z) xs e2')
-polarize' (_ :< NeutBox e) = do
+  bindSeq [(z, e1)] (NegSigmaElim size (PosVar z) xs e2')
+polarize' (TermBox e) = do
   e' <- polarize' e
   return $ NegUpIntro (PosBox e')
-polarize' (_ :< NeutBoxIntro e) = do
+polarize' (TermBoxIntro e) = do
   e' <- polarize' e
   return $ NegUpIntro (PosBoxIntro e')
-polarize' (_ :< NeutBoxElim e) = do
+polarize' (TermBoxElim e) = do
   z <- newNameWith "box"
   bindSeq [(z, e)] (NegBoxElim $ PosVar z)
-polarize' (_ :< NeutIndex l) = return $ NegUpIntro (PosIndex l)
-polarize' (meta :< NeutIndexIntro l) =
-  return $ NegUpIntro (PosIndexIntro l meta)
-polarize' (_ :< NeutIndexElim e branchList) = do
+polarize' (TermIndex l) = return $ NegUpIntro (PosIndex l)
+polarize' (TermIndexIntro l meta) = return $ NegUpIntro (PosIndexIntro l meta)
+polarize' (TermIndexElim e branchList) = do
   let (labelList, es) = unzip branchList
   cs <- mapM polarize' es
   x <- newNameWith "tmp"
   bindSeq [(x, e)] (NegIndexElim (PosVar x) (zip labelList cs))
-polarize' (_ :< NeutMu x e) = do
+polarize' (TermMu x e) = do
   e' <- polarize' e
   return $ NegMu x e'
-polarize' (_ :< NeutConst t) = do
+polarize' (TermConst t) = do
   x <- newNameWith "const"
   bindSeq [(x, t)] $ NegUpIntro $ PosConst $ PosVar x
-polarize' (_ :< NeutConstIntro x) = return $ NegUpIntro (PosConstIntro x)
-polarize' (_ :< NeutConstElim e) = do
+polarize' (TermConstIntro x) = return $ NegUpIntro (PosConstIntro x)
+polarize' (TermConstElim e) = do
   x <- newNameWith "const"
   bindSeq [(x, e)] $ NegConstElim $ PosVar x
-polarize' (_ :< NeutUniv _) = return $ NegUpIntro PosUniv
-polarize' (_ :< NeutHole x) =
-  error $ "PolarizeNeg.polarize': remaining hole: " ++ x
+polarize' (TermUniv _) = return $ NegUpIntro PosUniv
 
 -- Intuitively, `bindSeq [(x1, e1), (x2, e2)] e3` is:
 --   let x1 = (polarize' e1) in
 --   let x2 = (polarize' e2) in
 --   e3.
-bindSeq :: [(Identifier, Neut)] -> Neg -> WithEnv Neg
+bindSeq :: [(Identifier, Term)] -> Neg -> WithEnv Neg
 bindSeq [] fun = return fun
 bindSeq ((formalArg, arg):rest) fun = do
   arg' <- polarize' arg
@@ -146,7 +145,7 @@ insCopyInt :: WithEnv ()
 insCopyInt =
   forM_ intLowTypeList $ \intLowType -> do
     x <- newNameWith "arg"
-    let pair = PosSigmaIntro [PosVar x, PosVar x]
+    let pair = PosSigmaIntro (sizeOfLowType intLowType) [PosVar x, PosVar x]
     let copy = rb $ rt $ NegPiIntro x $ NegUpIntro pair
     insPolEnv ("core." ++ show intLowType ++ ".copy") copy
 
