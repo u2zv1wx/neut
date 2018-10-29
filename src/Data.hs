@@ -24,6 +24,8 @@ import Data.IORef
 import Data.List
 import Data.Maybe (fromMaybe)
 
+import qualified Data.Map.Strict as Map
+
 import qualified Data.PQueue.Min as Q
 
 import qualified Text.Show.Pretty as Pr
@@ -414,7 +416,8 @@ data Env = Env
   , moduleEnv :: [(Identifier, [(Identifier, Neut)])]
   , indexEnv :: [(Identifier, [Identifier])]
   , nameEnv :: [(Identifier, Identifier)] -- used in alpha conversion
-  , typeEnv :: [(Identifier, Neut)] -- type environment
+  , typeEnv :: Map.Map Identifier Neut -- type environment
+  -- , typeEnv :: [(Identifier, Neut)] -- type environment
   , weakTermEnv :: [(Identifier, Neut)]
   , termEnv :: [(Identifier, Term)]
   , polEnv :: [(Identifier, Neg)]
@@ -438,7 +441,7 @@ initialEnv path =
     , moduleEnv = []
     , indexEnv = []
     , nameEnv = []
-    , typeEnv = []
+    , typeEnv = Map.empty
     , weakTermEnv = []
     , termEnv = []
     , polEnv = []
@@ -495,11 +498,11 @@ constNameWith :: Identifier -> WithEnv ()
 constNameWith s = modify (\e -> e {nameEnv = (s, s) : nameEnv e})
 
 lookupTypeEnv :: String -> WithEnv (Maybe Neut)
-lookupTypeEnv s = gets (lookup s . typeEnv)
+lookupTypeEnv s = gets (Map.lookup s . typeEnv)
 
 lookupTypeEnv' :: String -> WithEnv Neut
 lookupTypeEnv' s = do
-  mt <- gets (lookup s . typeEnv)
+  mt <- gets (Map.lookup s . typeEnv)
   case mt of
     Nothing -> lift $ throwE $ s ++ " is not found in the type environment."
     Just t -> return t
@@ -507,7 +510,7 @@ lookupTypeEnv' s = do
 lookupTypeEnv1 :: String -> [Identifier] -> Neut -> WithEnv Neut
 lookupTypeEnv1 s ctx univ = do
   tenv <- gets typeEnv
-  let ts = map snd $ filter (\(x, _) -> s == x) tenv
+  let ts = Map.elems $ Map.filterWithKey (\x _ -> s == x) tenv
   case ts of
     [] -> lift $ throwE $ s ++ " is not found in the type environment."
     (t:ts') -> do
@@ -539,14 +542,14 @@ lookupCodeEnv funName = do
     Nothing -> lift $ throwE $ "no such code: " ++ show funName
 
 insTypeEnv :: Identifier -> Neut -> WithEnv ()
-insTypeEnv i t = modify (\e -> e {typeEnv = (i, t) : typeEnv e})
+insTypeEnv i t = modify (\e -> e {typeEnv = Map.insert i t (typeEnv e)})
 
 insTypeEnv1 :: [Identifier] -> Neut -> Identifier -> Neut -> WithEnv ()
 insTypeEnv1 ctx univ i t = do
   tenv <- gets typeEnv
-  let ts = map snd $ filter (\(j, _) -> i == j) tenv
+  let ts = Map.elems $ Map.filterWithKey (\j _ -> i == j) tenv
   forM_ ts $ \t' -> insConstraintEnv ctx t t' univ
-  modify (\e -> e {typeEnv = (i, t) : typeEnv e})
+  modify (\e -> e {typeEnv = Map.insert i t (typeEnv e)})
 
 insNumConstraintEnv :: Identifier -> WithEnv ()
 insNumConstraintEnv x =

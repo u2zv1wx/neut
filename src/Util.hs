@@ -16,6 +16,8 @@ import Data.Maybe (fromMaybe)
 
 import qualified Text.Show.Pretty as Pr
 
+import qualified Data.Map.Strict as Map
+
 import Debug.Trace
 
 import System.Directory
@@ -295,7 +297,7 @@ boxUniv = do
 
 lookupTypeEnv'' :: String -> WithEnv Neut
 lookupTypeEnv'' s = do
-  mt <- gets (lookup s . typeEnv)
+  mt <- gets (Map.lookup s . typeEnv)
   case mt of
     Just t -> return t
     Nothing -> boxUniv
