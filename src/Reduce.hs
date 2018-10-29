@@ -86,10 +86,10 @@ reduce (i :< NeutIndexElim e branchList) = do
   e' <- reduce e
   case e' of
     _ :< NeutIndexIntro x ->
-      case lookup x branchList of
+      case lookup (Left x) branchList of
         Just body -> reduce body
         Nothing ->
-          case findLabelIndex branchList of
+          case findIndexVariable branchList of
             Just (y, body) -> reduce $ subst [(y, e')] body
             Nothing ->
               case findDefault branchList of
@@ -175,10 +175,10 @@ reduce' (i :< NeutIndexElim e branchList) = do
   e' <- reduce' e
   case e' of
     _ :< NeutIndexIntro x ->
-      case lookup x branchList of
+      case lookup (Left x) branchList of
         Just body -> reduce' body
         Nothing ->
-          case findLabelIndex branchList of
+          case findIndexVariable branchList of
             Just (y, body) -> reduce' $ subst [(y, e')] body
             Nothing ->
               case findDefault branchList of
@@ -234,20 +234,20 @@ takeIntegerList ((_ :< NeutIndexIntro (IndexInteger i)):rest) = do
   return (i : is)
 takeIntegerList _ = Nothing
 
-findLabelIndex :: [(Index, Neut)] -> Maybe (Identifier, Neut)
-findLabelIndex [] = Nothing
-findLabelIndex ((l, e):ls) =
+findIndexVariable :: [(IndexOrVar, Neut)] -> Maybe (Identifier, Neut)
+findIndexVariable [] = Nothing
+findIndexVariable ((l, e):ls) =
   case getLabelIndex l of
     Just i -> Just (i, e)
-    Nothing -> findLabelIndex ls
+    Nothing -> findIndexVariable ls
 
-getLabelIndex :: Index -> Maybe Identifier
-getLabelIndex (IndexLabel x) = Just x
+getLabelIndex :: IndexOrVar -> Maybe Identifier
+getLabelIndex (Right x) = Just x
 getLabelIndex _ = Nothing
 
-findDefault :: [(Index, Neut)] -> Maybe Neut
+findDefault :: [(IndexOrVar, Neut)] -> Maybe Neut
 findDefault [] = Nothing
-findDefault ((IndexDefault, e):_) = Just e
+findDefault ((Left IndexDefault, e):_) = Just e
 findDefault (_:rest) = findDefault rest
 
 isReducible :: Neut -> Bool
@@ -353,10 +353,10 @@ nonRecReduce (i :< NeutIndexElim e branchList) = do
   e' <- nonRecReduce e
   case e' of
     _ :< NeutIndexIntro x ->
-      case lookup x branchList of
+      case lookup (Left x) branchList of
         Just body -> nonRecReduce body
         Nothing ->
-          case findLabelIndex branchList of
+          case findIndexVariable branchList of
             Just (y, body) -> nonRecReduce $ subst [(y, e')] body
             Nothing ->
               case findDefault branchList of
@@ -419,7 +419,7 @@ reduceNeg (NegBoxElim e) = do
 reduceNeg (NegIndexElim e branchList) =
   case e of
     PosIndexIntro x _ ->
-      case lookup x branchList of
+      case lookup (Left x) branchList of
         Nothing ->
           lift $
           throwE $ "the index " ++ show x ++ " is not included in branchList"
@@ -469,7 +469,7 @@ reduceComp (CompSigmaElim e xs body) = do
 reduceComp (CompIndexElim e branchList) =
   case e of
     ValueIndexIntro x _ ->
-      case lookup x branchList of
+      case lookup (Left x) branchList of
         Nothing ->
           lift $
           throwE $ "the index " ++ show x ++ " is not included in branchList"
@@ -486,7 +486,6 @@ reduceComp (CompUpElim x e1 e2) = do
   e2' <- reduceComp e2
   case e1' of
     CompUpIntro (ValueVar y) -> reduceComp $ substComp [(x, y)] e2'
-    -- CompUpIntro (ValueConstIntro y) -> reduceComp $ substComp [(x, y)] e2'
     _ -> return $ CompUpElim x e1' e2'
 reduceComp (CompPrint t e) = do
   e' <- reduceValue e
@@ -557,8 +556,8 @@ substSigma sub ((x, t):rest) e = do
   let t' = subst sub t
   ((x, t') : xts, e')
 
-varIndex :: Index -> [Identifier]
-varIndex (IndexLabel x) = [x]
+varIndex :: IndexOrVar -> [Identifier]
+varIndex (Right x) = [x]
 varIndex _ = []
 
 type SubstPos = [(Identifier, Pos)]
@@ -735,7 +734,7 @@ reduceTerm (TermIndexElim e branchList) = do
   e' <- reduceTerm e
   case e' of
     TermIndexIntro x _ ->
-      case lookup x branchList of
+      case lookup (Left x) branchList of
         Nothing ->
           lift $
           throwE $ "the index " ++ show x ++ " is not included in branchList"
