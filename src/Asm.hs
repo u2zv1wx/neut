@@ -19,6 +19,7 @@ import Control.Monad.Identity
 import Control.Monad.State
 import Control.Monad.Trans.Except
 import Data.IORef
+import Data.List
 
 import Data
 import Reduce
@@ -169,21 +170,26 @@ asmData' ((x, d):rest) cont = do
   cont' <- asmData' rest cont
   asmData x d cont'
 
-constructSwitch :: Data -> [(Index, Code)] -> WithEnv (Asm, [(Int, Asm)])
+constructSwitch :: Data -> [(IndexOrVar, Code)] -> WithEnv (Asm, [(Int, Asm)])
 constructSwitch _ [] = lift $ throwE "empty branch"
-constructSwitch name ((IndexLabel x, code):_) = do
+constructSwitch name ((Left (IndexLabel x), code):rest) = do
+  set <- lookupIndexSet x
+  case elemIndex x set of
+    Nothing -> lift $ throwE $ "no such index defined: " ++ show name
+    Just i -> constructSwitch name ((Left $ IndexInteger i, code) : rest)
+constructSwitch name ((Right x, code):_) = do
   code' <- asmCode $ CodeLet x name code
   return (code', [])
-constructSwitch _ ((IndexDefault, code):_) = do
+constructSwitch _ ((Left IndexDefault, code):_) = do
   code' <- asmCode code
   return (code', [])
-constructSwitch name ((IndexInteger i, code):rest) = do
+constructSwitch name ((Left (IndexInteger i), code):rest) = do
   code' <- asmCode code
   (defaultCase, caseList) <- constructSwitch name rest
   return (defaultCase, (i, code') : caseList)
-constructSwitch _ ((IndexFloat _, _):_) = undefined -- IEEE754 float equality!
+constructSwitch _ ((Left (IndexFloat _), _):_) = undefined -- IEEE754 float equality!
 
-asmSwitch :: Data -> [(Index, Code)] -> WithEnv Asm
+asmSwitch :: Data -> [(IndexOrVar, Code)] -> WithEnv Asm
 asmSwitch name branchList = do
   (defaultCase, caseList) <- constructSwitch name branchList
   tmp <- newNameWith "switch"
