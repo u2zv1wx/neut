@@ -54,6 +54,25 @@ data Index
   | IndexDefault
   deriving (Show, Eq)
 
+data Arith
+  = ArithAdd
+  | ArithSub
+  | ArithMul
+  | ArithDiv
+  deriving (Show)
+
+data LowType
+  = LowTypeSignedInt Int
+  | LowTypeUnsignedInt Int
+  | LowTypeFloat Int
+  | LowTypePointer LowType
+  | LowTypeFunction [LowType]
+                    LowType
+  | LowTypeArray Int
+                 LowType
+  | LowTypeStruct [LowType]
+  deriving (Eq)
+
 data NeutF a
   = NeutVar Identifier
   | NeutPi (Identifier, a)
@@ -121,18 +140,6 @@ data Term
   | TermMu Identifier
            Term
   deriving (Show)
-
-data LowType
-  = LowTypeSignedInt Int
-  | LowTypeUnsignedInt Int
-  | LowTypeFloat Int
-  | LowTypePointer LowType
-  | LowTypeFunction [LowType]
-                    LowType
-  | LowTypeArray Int
-                 LowType
-  | LowTypeStruct [LowType]
-  deriving (Eq)
 
 instance Show LowType where
   show (LowTypeSignedInt i) = "i" ++ show i
@@ -278,13 +285,6 @@ instance Show AsmData where
   show (AsmDataGlobal x) = "@" ++ x
   show (AsmDataInt i) = show i
   show (AsmDataFloat x) = show x
-
-data Arith
-  = ArithAdd
-  | ArithSub
-  | ArithMul
-  | ArithDiv
-  deriving (Show)
 
 data Asm
   = AsmReturn AsmData
