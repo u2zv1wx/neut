@@ -340,10 +340,12 @@ data Asm
 instance (Show a) => Show (IORef a) where
   show a = show (unsafePerformIO (readIORef a))
 
-type Context = [Identifier]
+type PreContext = [Identifier]
+
+type Context = [(Identifier, Neut)]
 
 -- (Gamma, e1, e2, t)  ==  Gamma |- e1 = e2 : t
-type PreConstraint = (Context, Neut, Neut, Neut)
+type PreConstraint = (PreContext, Neut, Neut, Neut)
 
 data WeakConstraint
   = ConstraintPattern Identifier
@@ -367,7 +369,7 @@ data WeakConstraint
   deriving (Show)
 
 data Constraint =
-  Constraint Context
+  Constraint PreContext
              WeakConstraint
              Neut
   deriving (Show)
@@ -624,7 +626,7 @@ isDefinedIndexName name = do
   let indexNameList = map fst $ indexEnv env
   return $ name `elem` indexNameList
 
-insConstraintEnv :: Context -> Neut -> Neut -> Neut -> WithEnv ()
+insConstraintEnv :: PreContext -> Neut -> Neut -> Neut -> WithEnv ()
 insConstraintEnv ctx t1 t2 t =
   modify (\e -> e {constraintEnv = (ctx, t1, t2, t) : constraintEnv e})
 
