@@ -20,5 +20,5 @@ $ ./file
 Neut depends on LLVM and Clang. When you execute =neut build=, both of the commands =llc= and =clang= must be in =$PATH=.
 
 ** References
-- L. de Moura, J. Avigad, S. Kong, and C. Roux. Elaboration in Dependent Type Theory, [[https://arxiv.org/abs/1505.04324]], 2015.
-- P. Levy. Call-by-Push-Value: A Subsuming Paradigm. Ph. D. thesis, Queen Mary College, 2001.
+- L. de Moura, J. Avigad, S. Kong, and C. Roux, Elaboration in Dependent Type Theory, [[https://arxiv.org/abs/1505.04324]], 2015.
+- P. Levy, Call-by-Push-Value: A Subsuming Paradigm, Ph. D. thesis, Queen Mary College, 2001.
