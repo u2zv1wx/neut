@@ -56,6 +56,8 @@ data Index
   | IndexDefault
   deriving (Show, Eq)
 
+type IndexOrVar = Either Index Identifier
+
 data Arith
   = ArithAdd
   | ArithSub
@@ -95,7 +97,7 @@ data NeutF a
   | NeutIndex Identifier
   | NeutIndexIntro Index
   | NeutIndexElim a
-                  [(Index, a)]
+                  [(IndexOrVar, a)]
   | NeutUniv UnivLevel
   -- Constant type is a "strict" version of box type.
   -- Suppose `e` has a ordinary box type, `(box a)`. In this case, we have a side-condition
@@ -134,7 +136,7 @@ data Term
   | TermIndexIntro Index
                    Identifier
   | TermIndexElim Term
-                  [(Index, Term)]
+                  [(IndexOrVar, Term)]
   | TermUniv UnivLevel
   | TermConst Term -- constant modality
   | TermConstIntro Identifier
@@ -188,7 +190,7 @@ data Neg
                  [Identifier]
                  Neg
   | NegIndexElim Pos
-                 [(Index, Neg)]
+                 [(IndexOrVar, Neg)]
   | NegUpIntro Pos
   | NegUpElim Identifier
               Neg
@@ -230,7 +232,7 @@ data Comp
                   [Identifier]
                   Comp
   | CompIndexElim Value
-                  [(Index, Comp)]
+                  [(IndexOrVar, Comp)]
   | CompUpIntro Value
   | CompUpElim Identifier
                Comp
@@ -264,7 +266,7 @@ data Code
   | CodeCallTail Data -- the name of the function (type: Box (P1 -> ... -> Pn -> ↑P))
                  [Data] -- arguments (type : [P1, ..., Pn])
   | CodeSwitch Data
-               [(Index, Code)]
+               [(IndexOrVar, Code)]
   | CodeExtractValue Identifier -- destination
                      Data -- base pointer
                      (Int, Int) -- (i, n, size) ... index i in [1 ... n]
