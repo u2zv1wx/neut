@@ -222,7 +222,7 @@ foldMR f e (t:ts) = do
 appFold :: Neut -> [Neut] -> WithEnv Neut
 appFold e [] = return e
 appFold e@(i :< _) (term:ts) = do
-  t <- lookupTypeEnv' i >>= reduce
+  t <- lookupTypeEnv' i
   case t of
     _ :< NeutPi _ tcod -> do
       meta <- newNameWith "meta"
@@ -303,6 +303,12 @@ lookupTypeEnv'' s = do
 toVar :: Identifier -> WithEnv Neut
 toVar x = do
   t <- lookupTypeEnv' x
+  meta <- newNameWith "meta"
+  insTypeEnv meta t
+  return $ meta :< NeutVar x
+
+toVar1 :: Identifier -> Neut -> WithEnv Neut
+toVar1 x t = do
   meta <- newNameWith "meta"
   insTypeEnv meta t
   return $ meta :< NeutVar x

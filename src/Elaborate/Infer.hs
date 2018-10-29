@@ -45,24 +45,25 @@ import qualified Data.PQueue.Min as Q
 -- Dynamic Pattern Unification for Dependent Types and Records". Typed Lambda
 -- Calculi and Applications, 2011.
 infer :: Context -> Neut -> WithEnv Neut
-infer ctx (meta :< NeutVar s) = do
+infer _ (meta :< NeutVar s) = do
   univ <- boxUniv
-  t <- lookupTypeEnv1 s ctx univ >>= annot univ
+  t <- lookupTypeEnv' s >>= annot univ
+  -- t <- lookupTypeEnv1 s ctx univ >>= annot univ
   returnMeta meta t
 infer ctx (meta :< NeutPi (s, tdom) tcod) = do
   insTypeEnv s tdom
   higherUniv <- boxUniv
   univ <- boxUniv >>= annot higherUniv
   udom <- infer ctx tdom >>= annot higherUniv
-  ucod <- infer (ctx ++ [s]) tcod >>= annot higherUniv
-  insConstraintEnv (ctx ++ [s]) udom ucod higherUniv
-  insConstraintEnv ctx udom univ higherUniv
+  ucod <- infer (ctx ++ [(s, tdom)]) tcod >>= annot higherUniv
+  insConstraintEnv (map fst ctx ++ [s]) udom ucod higherUniv
+  insConstraintEnv (map fst ctx) udom univ higherUniv
   returnMeta meta univ
 infer ctx (meta :< NeutPiIntro (s, tdom) e) = do
   univ <- boxUniv
   tdom' <- annot univ tdom
-  insTypeEnv1 ctx univ s tdom'
-  let ctx' = ctx ++ [s]
+  insTypeEnv1 (map fst ctx) univ s tdom'
+  let ctx' = ctx ++ [(s, tdom')]
   tcod <- infer ctx' e >>= annot univ
   typeMeta <- newName' "meta" univ
   returnMeta meta $ typeMeta :< NeutPi (s, tdom') tcod
@@ -75,16 +76,20 @@ infer ctx (meta :< NeutPiElim e1 e2) = do
   case tPi of
     _ :< NeutPi (x, tdom') tcod' -> do
       insDef' x e2
-      insConstraintEnv ctx tdom tdom' univ
+      insConstraintEnv (map fst ctx) tdom tdom' univ
       returnMeta meta $ subst [(x, e2)] tcod'
     _ -> do
       x <- newNameOfType tdom
       -- represent tcod using hole
-      tcod <- appCtx (ctx ++ [x]) >>= annot univ
+      tcod <- appCtx (ctx ++ [(x, tdom)]) >>= annot univ
       -- add a constraint regarding the Pi-type
       typeMeta <- newNameWith "meta"
       insTypeEnv typeMeta univ
-      insConstraintEnv ctx tPi (typeMeta :< NeutPi (x, tdom) tcod) univ
+      insConstraintEnv
+        (map fst ctx)
+        tPi
+        (typeMeta :< NeutPi (x, tdom) tcod)
+        univ
       -- return the type of this elimination
       returnMeta meta $ subst [(x, e2)] tcod
 infer ctx (meta :< NeutSigma (s, t1) t2) = do
@@ -92,9 +97,9 @@ infer ctx (meta :< NeutSigma (s, t1) t2) = do
   higherUniv <- boxUniv
   univ <- boxUniv >>= annot higherUniv
   udom <- infer ctx t1 >>= annot higherUniv
-  ucod <- infer (ctx ++ [s]) t2 >>= annot higherUniv
-  insConstraintEnv (ctx ++ [s]) udom ucod higherUniv
-  insConstraintEnv ctx udom univ higherUniv
+  ucod <- infer (ctx ++ [(s, t1)]) t2 >>= annot higherUniv
+  insConstraintEnv (map fst ctx ++ [s]) udom ucod higherUniv
+  insConstraintEnv (map fst ctx) udom univ higherUniv
   returnMeta meta univ
 infer _ (_ :< NeutSigmaIntro []) = undefined
 infer _ (_ :< NeutSigmaIntro [_]) = undefined
@@ -105,7 +110,7 @@ infer ctx (meta :< NeutSigmaIntro es) = do
   xs <- forM ts $ \t -> newName1 "sigma" t
   holeList <- sigmaHole ctx xs
   let holeList' = map (subst (zip xs es)) holeList
-  forM_ (zip holeList' ts) $ \(h, t) -> insConstraintEnv ctx h t univ
+  forM_ (zip holeList' ts) $ \(h, t) -> insConstraintEnv (map fst ctx) h t univ
   let binder = zip xs (take (length holeList - 1) holeList)
   sigmaType <- toSigmaType binder (last holeList)
   returnMeta meta sigmaType
@@ -118,11 +123,11 @@ infer ctx (meta :< NeutSigmaElim e1 xs e2) = do
   let binder = zip xs (take (length holeList - 1) holeList)
   let cod = last holeList
   sigmaType <- toSigmaType binder cod
-  insConstraintEnv ctx t1 sigmaType univ
+  insConstraintEnv (map fst ctx) t1 sigmaType univ
   z <- newNameOfType t1
-  pair <- constructPair (ctx ++ xs) xs
-  typeC <- appCtx (ctx ++ xs ++ [z])
-  insConstraintEnv ctx t2 (subst [(z, pair)] typeC) univ
+  pair <- constructPair (ctx ++ zip xs holeList) xs
+  typeC <- appCtx (ctx ++ (zip xs holeList) ++ [(z, t1)])
+  insConstraintEnv (map fst ctx) t2 (subst [(z, pair)] typeC) univ
   returnMeta meta $ subst [(z, e1)] typeC
 infer ctx (meta :< NeutBox t) = infer ctx t >>= returnMeta meta
 infer ctx (meta :< NeutBoxIntro e) = do
@@ -135,7 +140,7 @@ infer ctx (meta :< NeutBoxElim e) = do
   t <- infer ctx e >>= annot univ
   resultHole <- appCtx ctx
   boxType <- wrapType $ NeutBox resultHole
-  insConstraintEnv ctx t boxType univ
+  insConstraintEnv (map fst ctx) t boxType univ
   boxConstraint ctx $ var e
   returnMeta meta resultHole
 infer _ (meta :< NeutIndex _) = boxUniv >>= returnMeta meta
@@ -168,24 +173,24 @@ infer ctx (meta :< NeutMu s e) = do
   boxType <- wrapType (NeutBox trec) >>= annot univ
   insTypeEnv s boxType
   boxConstraint ctx $ var e
-  te <- infer (ctx ++ [s]) e >>= annot univ
-  insConstraintEnv ctx te trec univ
+  te <- infer (ctx ++ [(s, boxType)]) e >>= annot univ
+  insConstraintEnv (map fst ctx) te trec univ
   returnMeta meta te
 infer ctx (meta :< NeutConst t) = infer ctx t >>= returnMeta meta
 infer ctx (meta :< NeutConstIntro s) = do
   higherUniv <- boxUniv
   univ <- boxUniv >>= annot higherUniv
-  t <- lookupTypeEnv1 s ctx univ
+  t <- lookupTypeEnv1 s (map fst ctx) univ
   insTypeEnv s t
   u <- infer ctx t >>= annot higherUniv
-  insConstraintEnv ctx univ u higherUniv
+  insConstraintEnv (map fst ctx) univ u higherUniv
   returnMeta meta t
 infer ctx (meta :< NeutConstElim e) = do
   univ <- boxUniv
   t <- infer ctx e >>= annot univ
   resultHole <- appCtx ctx
   constType <- wrapType $ NeutConst resultHole
-  insConstraintEnv ctx t constType univ
+  insConstraintEnv (map fst ctx) t constType univ
   returnMeta meta resultHole
 infer _ (meta :< NeutUniv _) = boxUniv >>= returnMeta meta
 infer ctx (meta :< NeutHole _) = appCtx ctx >>= returnMeta meta
@@ -206,14 +211,14 @@ toSigmaType ((x, t1):rest) t2@(i :< _) = do
 
 -- In context ctx == [y1, ..., yn], `sigmaHole ctx names-of-holes` generates the list of
 -- holes [name-1 @ ctx, name-2 @ ctx @ name-1, ..., name-n @ ctx @ name-1 @ ... @ name-(n-1)].
+-- sigmaHole :: Context -> [Identifier] -> WithEnv [Neut]
+-- sigmaHole ctx xs = forM (zip xs [0 ..]) $ \(_, i) -> sigmaHole' ctx xs i
 sigmaHole :: Context -> [Identifier] -> WithEnv [Neut]
-sigmaHole ctx xs = forM (zip xs [0 ..]) $ \(_, i) -> sigmaHole' ctx xs i
-
-sigmaHole' :: Context -> [Identifier] -> Int -> WithEnv Neut
-sigmaHole' ctx xs i = do
-  t <- appCtx (ctx ++ take i xs)
-  insTypeEnv (xs !! i) t
-  return t
+sigmaHole _ [] = return []
+sigmaHole ctx (x:rest) = do
+  t <- appCtx ctx
+  ts <- sigmaHole (ctx ++ [(x, t)]) rest
+  return $ t : ts
 
 inferIndex :: Context -> Index -> WithEnv (Maybe Neut)
 inferIndex ctx (IndexLabel name) = do
@@ -234,7 +239,7 @@ constrainList ctx (t1@(meta1 :< _):t2@(meta2 :< _):ts) = do
   u <- boxUniv
   insTypeEnv meta1 u
   insTypeEnv meta2 u
-  insConstraintEnv ctx t1 t2 u
+  insConstraintEnv (map fst ctx) t1 t2 u
   constrainList ctx $ t2 : ts
 
 headConstraint :: Context -> Neut -> [Neut] -> WithEnv ()
@@ -243,7 +248,7 @@ headConstraint ctx t1@(meta1 :< _) (t2@(meta2 :< _):_) = do
   u <- boxUniv
   insTypeEnv meta1 u
   insTypeEnv meta2 u
-  insConstraintEnv ctx t1 t2 u
+  insConstraintEnv (map fst ctx) t1 t2 u
 
 annot :: Neut -> Neut -> WithEnv Neut
 annot t e@(meta :< _) = insTypeEnv meta t >> return e
@@ -267,16 +272,15 @@ newName' name t = do
 -- correct type information to the environment.
 appCtx :: Context -> WithEnv Neut
 appCtx ctx = do
-  tctxs <- mapM lookupTypeEnv' ctx
   univ <- boxUniv
-  higherArrowType <- foldMR NeutPi univ $ zip ctx tctxs
+  higherArrowType <- foldMR NeutPi univ ctx
   higherHoleName <- newName' "ctx" higherArrowType
   higherMeta <- newName' "ctx" higherArrowType
   insTypeEnv higherMeta higherArrowType
   let higherHole = higherMeta :< NeutHole higherHoleName
-  varSeq <- mapM toVar ctx
+  varSeq <- mapM (uncurry toVar1) ctx
   cod <- appFold higherHole varSeq
-  arrowType <- foldMR NeutPi cod $ zip ctx tctxs
+  arrowType <- foldMR NeutPi cod ctx
   holeName <- newName' "hole" arrowType
   meta <- newName' "meta" arrowType
   appFold (meta :< NeutHole holeName) varSeq
@@ -293,4 +297,4 @@ boxConstraint ctx xs =
     h <- appCtx ctx
     boxType@(meta :< _) <- wrapType $ NeutBox h
     u <- lookupTypeEnv' meta
-    insConstraintEnv ctx t boxType u
+    insConstraintEnv (map fst ctx) t boxType u

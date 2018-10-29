@@ -96,7 +96,7 @@ synthesize q =
 -- other occurrences of `x` with new variables.
 synthesizeQuasiPattern ::
      Q.MinQueue EnrichedConstraint
-  -> Context
+  -> PreContext
   -> Identifier
   -> [Identifier]
   -> Neut
@@ -167,7 +167,7 @@ discardInactive xs indexList =
 -- `e1` and `e2`.
 synthesizeFlexRigid ::
      Q.MinQueue EnrichedConstraint
-  -> Context
+  -> PreContext
   -> Identifier
   -> [Neut]
   -> Neut
