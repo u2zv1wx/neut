@@ -1,4 +1,6 @@
-module Rename where
+module Rename
+  ( rename
+  ) where
 
 import Control.Monad.State
 import Control.Monad.Trans.Except
@@ -80,10 +82,10 @@ rename (i :< NeutMu s e) =
     return $ i :< NeutMu s' e'
 rename (i :< NeutHole x) = return $ i :< NeutHole x
 
-newNameIndex :: Index -> WithEnv Index
-newNameIndex (IndexLabel x) = do
+newNameIndex :: IndexOrVar -> WithEnv IndexOrVar
+newNameIndex (Right x) = do
   x' <- newNameWith x
-  return $ IndexLabel x'
+  return $ Right x'
 newNameIndex l = return l
 
 local :: WithEnv a -> WithEnv a
