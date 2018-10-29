@@ -111,6 +111,95 @@ reduce (i :< NeutConstElim e) = do
   return $ i :< NeutConstElim e'
 reduce t = return t
 
+reduce' :: Neut -> WithEnv Neut
+reduce' (i :< NeutPi (x, tdom) tcod) = do
+  tdom' <- reduce' tdom
+  tcod' <- reduce' tcod
+  return $ i :< NeutPi (x, tdom') tcod'
+reduce' app@(i :< NeutPiElim _ _) = do
+  let (fun, args) = toPiElimSeq app
+  args' <-
+    forM args $ \(x, e) -> do
+      e' <- reduce' e
+      return (x, e')
+  fun' <- reduce' fun
+  case fun' of
+    lam@(_ :< NeutPiIntro _ _)
+      | (body, xtms) <- toPiIntroSeq lam
+      , length xtms == length args -> do
+        let xs = map (\(x, _, _) -> x) xtms
+        let es = map snd args'
+        reduce' $ subst (zip xs es) body
+    _ ->
+      case takeConstApp fun' of
+        Just constant
+          | constant `elem` intAddConstantList
+          , Just [x, y] <- takeIntegerList (map snd args') ->
+            return $ i :< NeutIndexIntro (IndexInteger (x + y))
+        Just constant
+          | constant `elem` intSubConstantList
+          , Just [x, y] <- takeIntegerList (map snd args') ->
+            return $ i :< NeutIndexIntro (IndexInteger (x - y))
+        Just constant
+          | constant `elem` intMulConstantList
+          , Just [x, y] <- takeIntegerList (map snd args') ->
+            return $ i :< NeutIndexIntro (IndexInteger (x * y))
+        Just constant
+          | constant `elem` intDivConstantList
+          , Just [x, y] <- takeIntegerList (map snd args') ->
+            return $ i :< NeutIndexIntro (IndexInteger (x `div` y))
+        _ -> return $ fromPiElimSeq (fun', args')
+reduce' (i :< NeutSigma (x, tdom) tcod) = do
+  tdom' <- reduce' tdom
+  tcod' <- reduce' tcod
+  return $ i :< NeutSigma (x, tdom') tcod'
+reduce' (i :< NeutSigmaIntro es) = do
+  es' <- mapM reduce' es
+  return $ i :< NeutSigmaIntro es'
+reduce' (i :< NeutSigmaElim e xs body) = do
+  e' <- reduce' e
+  case e of
+    _ :< NeutSigmaIntro es -> do
+      let _ :< body' = subst (zip xs es) body
+      reduce' $ i :< body'
+    _ -> return $ i :< NeutSigmaElim e' xs body
+reduce' (i :< NeutBox t) = do
+  t' <- reduce' t
+  return $ i :< NeutBox t'
+reduce' (i :< NeutBoxElim e) = do
+  e' <- reduce' e
+  case e' of
+    _ :< NeutBoxIntro e'' -> reduce' e''
+    _ -> return $ i :< NeutBoxElim e'
+reduce' (i :< NeutIndexElim e branchList) = do
+  e' <- reduce' e
+  case e' of
+    _ :< NeutIndexIntro x ->
+      case lookup x branchList of
+        Just body -> reduce' body
+        Nothing ->
+          case findLabelIndex branchList of
+            Just (y, body) -> reduce' $ subst [(y, e')] body
+            Nothing ->
+              case findDefault branchList of
+                Just body -> reduce' body
+                Nothing ->
+                  lift $
+                  throwE $
+                  "the index " ++ show x ++ " is not included in branchList"
+    _ -> return $ i :< NeutIndexElim e' branchList
+reduce' (meta :< NeutMu s e) = do
+  boxMeta <- newNameWith "meta"
+  let box = boxMeta :< NeutBoxIntro (meta :< NeutMu s e)
+  return $ subst [(s, box)] e -- doesn't evaluate recursively
+reduce' (i :< NeutConst t) = do
+  t' <- reduce' t
+  return $ i :< NeutConst t'
+reduce' (i :< NeutConstElim e) = do
+  e' <- reduce' e
+  return $ i :< NeutConstElim e'
+reduce' t = return t
+
 toPiIntroSeq :: Neut -> (Neut, [(Identifier, Neut, Identifier)])
 toPiIntroSeq (meta :< NeutPiIntro (x, t) body) = do
   let (body', args) = toPiIntroSeq body
@@ -161,30 +250,51 @@ findDefault [] = Nothing
 findDefault ((IndexDefault, e):_) = Just e
 findDefault (_:rest) = findDefault rest
 
+isReducible :: Neut -> Bool
+isReducible (_ :< NeutVar _) = False
+isReducible (_ :< NeutPi (_, _) _) = False
+isReducible (_ :< NeutPiIntro _ _) = False
+isReducible (_ :< NeutPiElim (_ :< NeutPiIntro _ _) _) = True
+isReducible (_ :< NeutPiElim e1 _) = isReducible e1
+isReducible (_ :< NeutSigma _ _) = False
+isReducible (_ :< NeutSigmaIntro es) = any isReducible es
+isReducible (_ :< NeutSigmaElim (_ :< NeutSigmaIntro _) _ _) = True
+isReducible (_ :< NeutSigmaElim e _ _) = isReducible e
+isReducible (_ :< NeutBox _) = False
+isReducible (_ :< NeutBoxIntro _) = False
+isReducible (_ :< NeutBoxElim (_ :< NeutBoxIntro _)) = True
+isReducible (_ :< NeutBoxElim e) = isReducible e
+isReducible (_ :< NeutIndex _) = False
+isReducible (_ :< NeutIndexIntro _) = False
+isReducible (_ :< NeutIndexElim (_ :< NeutIndexIntro _) _) = True
+isReducible (_ :< NeutIndexElim e _) = isReducible e
+isReducible (_ :< NeutUniv _) = False
+isReducible (_ :< NeutConst _) = False
+isReducible (_ :< NeutConstIntro _) = False
+isReducible (_ :< NeutConstElim e) = isReducible e
+isReducible (_ :< NeutMu _ _) = True
+isReducible (_ :< NeutHole _) = False
+
 isNonRecReducible :: Neut -> Bool
 isNonRecReducible (_ :< NeutVar _) = False
 isNonRecReducible (_ :< NeutPi (_, tdom) tcod) =
   isNonRecReducible tdom || isNonRecReducible tcod
-isNonRecReducible (_ :< NeutPiIntro _ e) = isNonRecReducible e
+isNonRecReducible (_ :< NeutPiIntro _ _) = False
 isNonRecReducible (_ :< NeutPiElim (_ :< NeutPiIntro _ _) _) = True
-isNonRecReducible (_ :< NeutPiElim e1 e2) =
-  isNonRecReducible e1 || isNonRecReducible e2
+isNonRecReducible (_ :< NeutPiElim e1 _) = isNonRecReducible e1
 isNonRecReducible (_ :< NeutSigma (_, tdom) tcod) =
   isNonRecReducible tdom || isNonRecReducible tcod
 isNonRecReducible (_ :< NeutSigmaIntro es) = any isNonRecReducible es
 isNonRecReducible (_ :< NeutSigmaElim (_ :< NeutSigmaIntro _) _ _) = True
-isNonRecReducible (_ :< NeutSigmaElim e _ body) =
-  isNonRecReducible e || isNonRecReducible body
+isNonRecReducible (_ :< NeutSigmaElim e _ _) = isNonRecReducible e
 isNonRecReducible (_ :< NeutBox e) = isNonRecReducible e
-isNonRecReducible (_ :< NeutBoxIntro e) = isNonRecReducible e
+isNonRecReducible (_ :< NeutBoxIntro _) = False
 isNonRecReducible (_ :< NeutBoxElim (_ :< NeutBoxIntro _)) = True
 isNonRecReducible (_ :< NeutBoxElim e) = isNonRecReducible e
 isNonRecReducible (_ :< NeutIndex _) = False
 isNonRecReducible (_ :< NeutIndexIntro _) = False
 isNonRecReducible (_ :< NeutIndexElim (_ :< NeutIndexIntro _) _) = True
-isNonRecReducible (_ :< NeutIndexElim e branchList) = do
-  let es = map snd branchList
-  any isNonRecReducible $ e : es
+isNonRecReducible (_ :< NeutIndexElim e _) = isNonRecReducible e
 isNonRecReducible (_ :< NeutUniv _) = False
 isNonRecReducible (_ :< NeutConst _) = False
 isNonRecReducible (_ :< NeutConstIntro _) = False

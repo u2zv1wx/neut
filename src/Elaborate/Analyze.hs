@@ -20,7 +20,9 @@ import Util
 
 import Data.List
 
+import Control.Concurrent (forkIO, threadDelay)
 import Data.Maybe
+import System.Timeout
 
 import qualified Data.PQueue.Min as Q
 
@@ -52,8 +54,7 @@ analyze' c@(ctx, e1, e2, t) = do
         cs <- simp [(ctx, subst [(hole2, e)] e1, subst [(hole2, e)] e2, t)]
         analyze cs
     Constraint _ (ConstraintPattern hole args e) _ -> do
-      e' <- nonRecReduce e
-      ans <- bindFormalArgs' args e'
+      ans <- bindFormalArgs' args e
       modify (\e -> e {substitution = compose [(hole, ans)] (substitution e)})
       q <- gets constraintQueue
       updateQueue q
@@ -63,42 +64,82 @@ analyze' c@(ctx, e1, e2, t) = do
 
 simp :: [PreConstraint] -> WithEnv [PreConstraint]
 simp [] = return []
-simp ((ctx, e1, e2, t):cs)
-  | isNonRecReducible e1 = do
-    e1' <- nonRecReduce e1
-    simp $ (ctx, e1', e2, t) : cs
-simp ((ctx, e1, e2, t):cs)
-  | isNonRecReducible e2 = simp $ (ctx, e2, e1, t) : cs
-simp ((_, _ :< NeutVar s1, _ :< NeutVar s2, _):cs)
-  | s1 == s2 = simp cs
-simp ((ctx, _ :< NeutVar s1, e2, t):cs) = do
-  me <- insDef s1 e2
-  case me of
-    Nothing -> simp cs
-    Just e -> simp $ (ctx, e, e2, t) : cs
-simp ((ctx, e1, v@(_ :< NeutVar _), t):cs) = simp $ (ctx, v, e1, t) : cs
-simp ((ctx, _ :< NeutPi (x, tdom1) tcod1, _ :< NeutPi (y, tdom2) tcod2, univ):cs) = do
+simp (c@(_, e1, e2, _):cs) = do
+  b <- isEq e1 e2
+  if b
+    then simp cs
+    else simp' $ c : cs
+
+simp' :: [PreConstraint] -> WithEnv [PreConstraint]
+simp' [] = return []
+simp' ((ctx, e1, e2, t):cs)
+  | Just (f, es1) <- headMeta1 [] e1
+  , Just (g, es2) <- headMeta1 [] e2
+  , f == g
+  , length es1 == length es2 = do
+    sub <- gets substitution
+    case lookup f sub of
+      Nothing -> do
+        let newCs = map (\(p, q) -> (ctx, p, q, t)) $ zip es1 es2
+        simp $ newCs ++ cs
+      Just body ->
+        if all (not . hasMeta) es1 && all (not . hasMeta) es2
+          then do
+            let e1' = subst [(f, body)] e1
+            let e2' = subst [(g, body)] e2
+            simp $ (ctx, e1', e2', t) : cs
+          else do
+            cs' <- simp cs
+            return $ (ctx, e1, e2, t) : cs'
+simp' (c@(ctx, e1, e2, t):cs)
+  | Just f <- headMeta'' e1
+  , Just g <- headMeta'' e2 = do
+    d1 <- depth f
+    d2 <- depth g
+    sub <- gets substitution
+    case compare d1 d2 of
+      LT -- depth(f) < depth (g)
+        | Just body2 <- lookup g sub -> do
+          let e2' = subst [(g, body2)] e2
+          simp $ (ctx, e1, e2', t) : cs
+      GT -- depth(f) > depth (g)
+        | Just body1 <- lookup f sub -> do
+          let e1' = subst [(f, body1)] e1
+          simp $ (ctx, e1', e2, t) : cs
+      EQ -- depth(f) = depth (g)
+        | Just body1 <- lookup f sub
+        , Just body2 <- lookup g sub -> do
+          let e1' = subst [(f, body1)] e1
+          let e2' = subst [(g, body2)] e2
+          simp $ (ctx, e1', e2', t) : cs
+      _ -> simp'' $ c : cs
+simp' cs = simp'' cs
+
+simp'' :: [PreConstraint] -> WithEnv [PreConstraint]
+simp'' [] = return []
+simp'' ((ctx, _ :< NeutPi (x, tdom1) tcod1, _ :< NeutPi (y, tdom2) tcod2, univ):cs) = do
   var <- toVar' x
   cs' <- sConstraint [(y, var)] cs >>= simp
   simp $
     (ctx, tdom1, tdom2, univ) :
     (ctx ++ [x], tcod1, subst [(y, var)] tcod2, univ) : cs'
-simp ((ctx, _ :< NeutPiIntro (x, _) body1, _ :< NeutPiIntro (y, _) body2, t):cs) = do
+simp'' ((ctx, _ :< NeutPiIntro (x, _) body1, _ :< NeutPiIntro (y, _) body2, t):cs) = do
   var <- toVar' x
   simp $ (ctx, body1, subst [(y, var)] body2, t) : cs
-simp ((ctx, _ :< NeutPiIntro (x, _) body1, e2, t):cs) = do
+simp'' ((ctx, _ :< NeutPiIntro (x, _) body1, e2, t):cs) = do
   var <- toVar' x
   appMeta <- newNameWith "meta"
   let app = appMeta :< NeutPiElim e2 var
   simp $ (ctx, body1, app, t) : cs
-simp ((ctx, e1, e2@(_ :< NeutPiIntro _ _), t):cs) = simp $ (ctx, e2, e1, t) : cs
-simp ((ctx, _ :< NeutSigma (x, tdom1) tcod1, _ :< NeutSigma (y, tdom2) tcod2, univ):cs) = do
+simp'' ((ctx, e1, e2@(_ :< NeutPiIntro _ _), t):cs) =
+  simp $ (ctx, e2, e1, t) : cs
+simp'' ((ctx, _ :< NeutSigma (x, tdom1) tcod1, _ :< NeutSigma (y, tdom2) tcod2, univ):cs) = do
   var <- toVar' x
   cs' <- sConstraint [(y, var)] cs >>= simp
   simp $
     (ctx, tdom1, tdom2, univ) :
     (ctx ++ [x], tcod1, subst [(y, var)] tcod2, univ) : cs'
-simp ((ctx, _ :< NeutSigmaIntro es1, _ :< NeutSigmaIntro es2, tSigma):cs)
+simp'' ((ctx, _ :< NeutSigmaIntro es1, _ :< NeutSigmaIntro es2, tSigma):cs)
   | length es1 == length es2
   , (t, xts) <- toSigmaSeq tSigma = do
     let ts = map snd xts ++ [t]
@@ -107,7 +148,7 @@ simp ((ctx, _ :< NeutSigmaIntro es1, _ :< NeutSigmaIntro es2, tSigma):cs)
     newCs <-
       forM (zip (zip es1 es2) ts') $ \((e1, e2), t') -> return (ctx, e1, e2, t')
     simp $ newCs ++ cs
-simp ((ctx, _ :< NeutSigmaIntro es, e2, tSigma):cs)
+simp'' ((ctx, _ :< NeutSigmaIntro es, e2, tSigma):cs)
   | (t, xts) <- toSigmaSeq tSigma
   , length xts + 1 == length es = do
     prList <- projectionList e2 (xts, t)
@@ -116,45 +157,45 @@ simp ((ctx, _ :< NeutSigmaIntro es, e2, tSigma):cs)
     newCs <-
       forM (zip3 es prList ts) $ \(e, ithProj, t) -> return (ctx, e, ithProj, t)
     simp $ newCs ++ cs
-simp ((ctx, e1, e2@(_ :< NeutSigmaIntro es), t@(_ :< NeutSigma xts _)):cs)
+simp'' ((ctx, e1, e2@(_ :< NeutSigmaIntro es), t@(_ :< NeutSigma xts _)):cs)
   | length xts + 1 == length es = simp $ (ctx, e2, e1, t) : cs
-simp ((ctx, _ :< NeutBox t1, _ :< NeutBox t2, univ):cs) =
+simp'' ((ctx, _ :< NeutBox t1, _ :< NeutBox t2, univ):cs) =
   simp $ (ctx, t1, t2, univ) : cs
-simp ((ctx, _ :< NeutBoxIntro e1, _ :< NeutBoxIntro e2, _ :< NeutBox t):cs) =
+simp'' ((ctx, _ :< NeutBoxIntro e1, _ :< NeutBoxIntro e2, _ :< NeutBox t):cs) =
   simp $ (ctx, e1, e2, t) : cs
-simp ((ctx, _ :< NeutBoxElim e1, _ :< NeutBoxElim e2, t):cs) = do
+simp'' ((ctx, _ :< NeutBoxElim e1, _ :< NeutBoxElim e2, t):cs) = do
   meta <- newNameWith "meta"
   simp $ (ctx, e1, e2, meta :< NeutBox t) : cs
-simp ((ctx, _ :< NeutConst t1, _ :< NeutConst t2, univ):cs) =
+simp'' ((ctx, _ :< NeutConst t1, _ :< NeutConst t2, univ):cs) =
   simp $ (ctx, t1, t2, univ) : cs
-simp ((_, _ :< NeutIndex l1, _ :< NeutIndex l2, _):cs)
+simp'' ((_, _ :< NeutIndex l1, _ :< NeutIndex l2, _):cs)
   | l1 == l2 = simp cs
-simp ((_, _ :< NeutUniv i, _ :< NeutUniv j, _):cs) = do
+simp'' ((_, _ :< NeutUniv i, _ :< NeutUniv j, _):cs) = do
   insUnivConstraintEnv i j
   simp cs
-simp (c@(_, e1, _, _):cs)
+simp'' (c@(_, e1, _, _):cs)
   | Just _ <- headMeta' [] e1 = do
     cs' <- simp cs
     return $ c : cs'
-simp (c@(_, _, e2, _):cs)
+simp'' (c@(_, _, e2, _):cs)
   | Just _ <- headMeta' [] e2 = do
     cs' <- simp cs
     return $ c : cs'
-simp (c@(ctx, e1, e2, t):cs) = do
-  b <- isEq e1 e2
+simp'' ((ctx, e1, e2, t):cs)
+  | isReducible e1 = do
+    e1' <- reduce' e1
+    simp $ (ctx, e1', e2, t) : cs
+simp'' ((ctx, e1, e2, t):cs)
+  | isReducible e2 = simp $ (ctx, e2, e1, t) : cs
+simp'' (c@(ctx, e1, e2, t):cs) = do
   let mx = headMeta'' e1
   let my = headMeta'' e2
   sub <- gets substitution
-  case (b, mx, my) of
-    (True, _, _) -> simp cs
-    (_, Just x, _)
-      | Just e <- lookup x sub -> do
-        e1' <- reduce $ subst [(x, e)] e1
-        simp $ (ctx, e1', e2, t) : cs
-    (_, _, Just y)
-      | Just e <- lookup y sub -> do
-        e2' <- reduce $ subst [(y, e)] e2
-        simp $ (ctx, e1, e2', t) : cs
+  case (mx, my) of
+    (Just x, _)
+      | Just e <- lookup x sub -> simp $ (ctx, subst [(x, e)] e1, e2, t) : cs
+    (_, Just y)
+      | Just e <- lookup y sub -> simp $ (ctx, e1, subst [(y, e)] e2, t) : cs
     _ -> throwError $ "cannot simplify:\n" ++ Pr.ppShow c
 
 categorize :: PreConstraint -> Constraint

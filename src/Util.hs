@@ -448,6 +448,19 @@ headMeta' args (_ :< NeutPiElim e1 e2) = headMeta' (e2 : args) e1
 headMeta' args (_ :< NeutHole x) = Just (x, args)
 headMeta' _ _ = Nothing
 
+headMeta1 :: [Neut] -> Neut -> Maybe (Identifier, [Neut])
+headMeta1 args (_ :< NeutPiElim e1 e2) = headMeta1 (e2 : args) e1
+headMeta1 args (_ :< NeutVar x) = Just (x, args)
+headMeta1 _ _ = Nothing
+
+headMeta2 :: Neut -> Maybe Identifier
+headMeta2 (_ :< NeutHole x) = Just x
+headMeta2 (_ :< NeutPiElim e1 _) = headMeta2 e1
+headMeta2 (_ :< NeutIndexElim e _) = headMeta2 e
+headMeta2 (_ :< NeutBoxElim e) = headMeta2 e
+headMeta2 (_ :< NeutConstElim e) = headMeta2 e
+headMeta2 _ = Nothing
+
 headMeta'' :: Neut -> Maybe Identifier
 headMeta'' (_ :< NeutVar x) = Just x
 headMeta'' (_ :< NeutPiElim e1 _) = headMeta'' e1
@@ -547,3 +560,91 @@ sizeOf (_ :< NeutIndex "f16") = 16
 sizeOf (_ :< NeutIndex "f32") = 32
 sizeOf (_ :< NeutIndex "f64") = 64
 sizeOf _ = 64
+
+hasMeta :: Neut -> Bool
+hasMeta (_ :< NeutVar _) = False
+hasMeta (_ :< NeutPi (_, tdom) tcod) = hasMeta tdom || hasMeta tcod
+hasMeta (_ :< NeutPiIntro _ e) = hasMeta e
+hasMeta (_ :< NeutPiElim e1 e2) = hasMeta e1 || hasMeta e2
+hasMeta (_ :< NeutSigma (_, t1) t2) = hasMeta t1 || hasMeta t2
+hasMeta (_ :< NeutSigmaIntro es) = any hasMeta es
+hasMeta (_ :< NeutSigmaElim e1 _ e2) = hasMeta e1 || hasMeta e2
+hasMeta (_ :< NeutBox e) = hasMeta e
+hasMeta (_ :< NeutBoxIntro e) = hasMeta e
+hasMeta (_ :< NeutBoxElim e) = hasMeta e
+hasMeta (_ :< NeutIndex _) = False
+hasMeta (_ :< NeutIndexIntro _) = False
+hasMeta (_ :< NeutIndexElim e branchList) = do
+  let (_, es) = unzip branchList
+  any hasMeta (e : es)
+hasMeta (_ :< NeutUniv _) = False
+hasMeta (_ :< NeutConst _) = False
+hasMeta (_ :< NeutConstIntro _) = False
+hasMeta (_ :< NeutConstElim e) = hasMeta e
+hasMeta (_ :< NeutMu _ e) = hasMeta e
+hasMeta (_ :< NeutHole _) = True
+
+depth :: Identifier -> WithEnv Int
+depth x = do
+  sub <- gets substitution
+  case lookup x sub of
+    Nothing -> return 0
+    Just e -> do
+      let vs = var e
+      ds <- mapM depth vs
+      return $ 1 + maximum ds
+
+toTermForDebug :: Neut -> WithEnv Term
+toTermForDebug (_ :< NeutVar s) = return $ TermVar s
+toTermForDebug (_ :< NeutPi (s, tdom) tcod) = do
+  tdom' <- toTermForDebug tdom
+  tcod' <- toTermForDebug tcod
+  return $ TermPi (s, tdom') tcod'
+toTermForDebug (_ :< NeutPiIntro (s, _) e) = do
+  e' <- toTermForDebug e
+  return $ TermPiIntro s e'
+toTermForDebug (_ :< NeutPiElim e v) = do
+  e' <- toTermForDebug e
+  v' <- toTermForDebug v
+  return $ TermPiElim e' v'
+toTermForDebug (_ :< NeutSigma (s, t1) t2) = do
+  t1' <- toTermForDebug t1
+  t2' <- toTermForDebug t2
+  return $ TermSigma (s, t1') t2'
+toTermForDebug (_ :< NeutSigmaIntro es) = do
+  es' <- mapM toTermForDebug es
+  return $ TermSigmaIntro es'
+toTermForDebug (_ :< NeutSigmaElim e1 xs e2) = do
+  e1' <- toTermForDebug e1
+  e2' <- toTermForDebug e2
+  return $ TermSigmaElim e1' xs e2'
+toTermForDebug (_ :< NeutBox t) = do
+  t' <- toTermForDebug t
+  return $ TermBox t'
+toTermForDebug (_ :< NeutBoxIntro t) = do
+  t' <- toTermForDebug t
+  return $ TermBoxIntro t'
+toTermForDebug (_ :< NeutBoxElim t) = do
+  t' <- toTermForDebug t
+  return $ TermBoxElim t'
+toTermForDebug (_ :< NeutIndex s) = return $ TermIndex s
+toTermForDebug (meta :< NeutIndexIntro x) = return $ TermIndexIntro x meta
+toTermForDebug (_ :< NeutIndexElim e branchList) = do
+  e' <- toTermForDebug e
+  branchList' <-
+    forM branchList $ \(l, body) -> do
+      body' <- toTermForDebug body
+      return (l, body')
+  return $ TermIndexElim e' branchList'
+toTermForDebug (_ :< NeutConst t) = do
+  t' <- toTermForDebug t
+  return $ TermConst t'
+toTermForDebug (_ :< NeutConstIntro s) = return $ TermConstIntro s
+toTermForDebug (_ :< NeutConstElim e) = do
+  e' <- toTermForDebug e
+  return $ TermConstElim e'
+toTermForDebug (_ :< NeutUniv j) = return $ TermUniv j
+toTermForDebug (_ :< NeutMu s e) = do
+  e' <- toTermForDebug e
+  return $ TermMu s e'
+toTermForDebug (_ :< NeutHole x) = return $ TermVar $ "HOLE" ++ x

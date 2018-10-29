@@ -45,10 +45,10 @@ import qualified Data.PQueue.Min as Q
 -- Dynamic Pattern Unification for Dependent Types and Records". Typed Lambda
 -- Calculi and Applications, 2011.
 infer :: Context -> Neut -> WithEnv Neut
-infer _ (meta :< NeutVar s) = do
+infer ctx (meta :< NeutVar s) = do
   univ <- boxUniv
-  t <- lookupTypeEnv' s >>= annot univ
-  -- t <- lookupTypeEnv1 s ctx univ >>= annot univ
+  -- t <- lookupTypeEnv' s >>= annot univ
+  t <- lookupTypeEnv1 s (map fst ctx) univ >>= annot univ
   returnMeta meta t
 infer ctx (meta :< NeutPi (s, tdom) tcod) = do
   insTypeEnv s tdom
