@@ -685,3 +685,15 @@ unsignedIntLowTypeList =
 
 floatLowTypeList :: [LowType]
 floatLowTypeList = [LowTypeFloat 16, LowTypeFloat 32, LowTypeFloat 64]
+
+intAddConstantList :: [String]
+intAddConstantList = flip map intLowTypeList $ \t -> "core." ++ show t ++ ".add"
+
+intSubConstantList :: [String]
+intSubConstantList = flip map intLowTypeList $ \t -> "core." ++ show t ++ ".sub"
+
+intMulConstantList :: [String]
+intMulConstantList = flip map intLowTypeList $ \t -> "core." ++ show t ++ ".mul"
+
+intDivConstantList :: [String]
+intDivConstantList = flip map intLowTypeList $ \t -> "core." ++ show t ++ ".div"

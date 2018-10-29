@@ -20,29 +20,7 @@ import Debug.Trace
 
 import System.Directory
 import System.FilePath
-
-toPiIntroSeq :: Neut -> (Neut, [(Identifier, Neut, Identifier)])
-toPiIntroSeq (meta :< NeutPiIntro (x, t) body) = do
-  let (body', args) = toPiIntroSeq body
-  (body', (x, t, meta) : args)
-toPiIntroSeq t = (t, [])
-
-fromPiIntroSeq :: (Neut, [(Identifier, Neut, Identifier)]) -> Neut
-fromPiIntroSeq (e, []) = e
-fromPiIntroSeq (e, (x, t, meta):rest) = do
-  let e' = fromPiIntroSeq (e, rest)
-  meta :< NeutPiIntro (x, t) e'
   -- fromPiIntroSeq (meta :< NeutPiIntro (x, t) e, rest)
-
-toPiElimSeq :: Neut -> (Neut, [(Identifier, Neut)])
-toPiElimSeq (i :< NeutPiElim e1 e2) = do
-  let (fun, xs) = toPiElimSeq e1
-  (fun, (i, e2) : xs)
-toPiElimSeq c = (c, [])
-
-fromPiElimSeq :: (Neut, [(Identifier, Neut)]) -> Neut
-fromPiElimSeq (term, []) = term
-fromPiElimSeq (term, (i, v):xs) = fromPiElimSeq (i :< NeutPiElim term v, xs)
 
 toNegPiIntroSeq :: Neg -> (Neg, [Identifier])
 toNegPiIntroSeq (NegPiIntro x body) = do
@@ -467,8 +445,24 @@ headMeta' _ _ = Nothing
 headMeta'' :: Neut -> Maybe Identifier
 headMeta'' (_ :< NeutVar x) = Just x
 headMeta'' (_ :< NeutPiElim e1 _) = headMeta'' e1
+headMeta'' (_ :< NeutIndexElim e _) = headMeta'' e
 headMeta'' (_ :< NeutBoxElim e) = headMeta'' e
+headMeta'' (_ :< NeutConstElim e) = headMeta'' e
 headMeta'' _ = Nothing
+
+headMeta''' :: Neut -> Maybe (Identifier, Neut -> Neut)
+headMeta''' (_ :< NeutVar x) = Just (x, id)
+headMeta''' (i :< NeutPiElim e1 e2) = do
+  (x, f) <- headMeta''' e1
+  let g y = i :< NeutPiElim y e2
+  return (x, g . f)
+headMeta''' (i :< NeutBoxElim e) = do
+  (x, f) <- headMeta''' e
+  return (x, (\y -> i :< NeutBoxElim y) . f)
+headMeta''' (i :< NeutIndexElim e branchList) = do
+  (x, f) <- headMeta''' e
+  return (x, (\y -> i :< NeutIndexElim y branchList) . f)
+headMeta''' _ = Nothing
 
 affineCheck :: [Identifier] -> [Identifier] -> Bool
 affineCheck xs = affineCheck' xs xs

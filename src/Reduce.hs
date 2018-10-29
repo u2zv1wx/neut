@@ -27,15 +27,39 @@ reduce (i :< NeutPi (x, tdom) tcod) = do
   tdom' <- reduce tdom
   tcod' <- reduce tcod
   return $ i :< NeutPi (x, tdom') tcod'
-reduce (i :< NeutPiElim e1 e2) = do
-  e2' <- reduce e2
-  e1' <- reduce e1
-  case e1' of
-    _ :< NeutPiIntro (arg, _) body -> do
-      let sub = [(arg, e2')]
-      let _ :< body' = subst sub body
-      reduce $ i :< body'
-    _ -> return $ i :< NeutPiElim e1' e2'
+reduce app@(i :< NeutPiElim _ _) = do
+  let (fun, args) = toPiElimSeq app
+  args' <-
+    forM args $ \(x, e) -> do
+      e' <- reduce e
+      return (x, e')
+  fun' <- reduce fun
+  case fun' of
+    lam@(_ :< NeutPiIntro _ _)
+      | (body, xtms) <- toPiIntroSeq lam
+      , length xtms == length args -> do
+        let xs = map (\(x, _, _) -> x) xtms
+        let es = map snd args'
+        reduce $ subst (zip xs es) body
+    _ ->
+      case takeConstApp fun' of
+        Just constant
+          | constant `elem` intAddConstantList
+          , Just [x, y] <- takeIntegerList (map snd args') ->
+            return $ i :< NeutIndexIntro (IndexInteger (x + y))
+        Just constant
+          | constant `elem` intSubConstantList
+          , Just [x, y] <- takeIntegerList (map snd args') ->
+            return $ i :< NeutIndexIntro (IndexInteger (x - y))
+        Just constant
+          | constant `elem` intMulConstantList
+          , Just [x, y] <- takeIntegerList (map snd args') ->
+            return $ i :< NeutIndexIntro (IndexInteger (x * y))
+        Just constant
+          | constant `elem` intDivConstantList
+          , Just [x, y] <- takeIntegerList (map snd args') ->
+            return $ i :< NeutIndexIntro (IndexInteger (x `div` y))
+        _ -> return $ fromPiElimSeq (fun', args')
 reduce (i :< NeutSigma (x, tdom) tcod) = do
   tdom' <- reduce tdom
   tcod' <- reduce tcod
@@ -84,11 +108,42 @@ reduce (i :< NeutConst t) = do
   return $ i :< NeutConst t'
 reduce (i :< NeutConstElim e) = do
   e' <- reduce e
-  case e' of
-    _ :< NeutConstIntro x -> do
-      return $ i :< NeutConstElim e'
-    _ -> return $ i :< NeutConstElim e'
+  return $ i :< NeutConstElim e'
 reduce t = return t
+
+toPiIntroSeq :: Neut -> (Neut, [(Identifier, Neut, Identifier)])
+toPiIntroSeq (meta :< NeutPiIntro (x, t) body) = do
+  let (body', args) = toPiIntroSeq body
+  (body', (x, t, meta) : args)
+toPiIntroSeq t = (t, [])
+
+fromPiIntroSeq :: (Neut, [(Identifier, Neut, Identifier)]) -> Neut
+fromPiIntroSeq (e, []) = e
+fromPiIntroSeq (e, (x, t, meta):rest) = do
+  let e' = fromPiIntroSeq (e, rest)
+  meta :< NeutPiIntro (x, t) e'
+
+toPiElimSeq :: Neut -> (Neut, [(Identifier, Neut)])
+toPiElimSeq (i :< NeutPiElim e1 e2) = do
+  let (fun, xs) = toPiElimSeq e1
+  (fun, xs ++ [(i, e2)])
+toPiElimSeq c = (c, [])
+
+fromPiElimSeq :: (Neut, [(Identifier, Neut)]) -> Neut
+fromPiElimSeq (term, []) = term
+fromPiElimSeq (term, (i, v):xs) = fromPiElimSeq (i :< NeutPiElim term v, xs)
+
+takeConstApp :: Neut -> Maybe Identifier
+takeConstApp (_ :< NeutBoxElim (_ :< NeutConstElim (_ :< NeutConstIntro x))) =
+  Just x
+takeConstApp _ = Nothing
+
+takeIntegerList :: [Neut] -> Maybe [Int]
+takeIntegerList [] = Just []
+takeIntegerList ((_ :< NeutIndexIntro (IndexInteger i)):rest) = do
+  is <- takeIntegerList rest
+  return (i : is)
+takeIntegerList _ = Nothing
 
 findLabelIndex :: [(Index, Neut)] -> Maybe (Identifier, Neut)
 findLabelIndex [] = Nothing
