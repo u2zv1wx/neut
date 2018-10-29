@@ -112,22 +112,25 @@ parse (meta :< TreeAtom s) = do
     _ -> return $ meta :< NeutVar s
 parse t = lift $ throwE $ "parse: syntax error:\n" ++ Pr.ppShow t
 
-parseClause :: Tree -> WithEnv (Index, Neut)
+parseClause :: Tree -> WithEnv (IndexOrVar, Neut)
 parseClause (_ :< TreeNode [_ :< TreeAtom s, t])
   | '.' `elem` s
   , Just f <- readMaybe s = do
     e <- parse t
-    return (IndexFloat f, e)
+    return (Left $ IndexFloat f, e)
 parseClause (_ :< TreeNode [_ :< TreeAtom s, t])
   | Just i <- readMaybe s = do
     e <- parse t
-    return (IndexInteger i, e)
+    return (Left $ IndexInteger i, e)
 parseClause (_ :< TreeNode [_ :< TreeAtom "default", t]) = do
   e <- parse t
-  return (IndexDefault, e)
+  return (Left IndexDefault, e)
 parseClause (_ :< TreeNode [_ :< TreeAtom s, t]) = do
   e <- parse t
-  return (IndexLabel s, e)
+  b <- isDefinedIndex s
+  if b
+    then return (Left $ IndexLabel s, e)
+    else return (Right s, e)
 parseClause e = lift $ throwE $ "parseClause: syntax error:\n " ++ Pr.ppShow e
 
 parseArg :: Tree -> WithEnv (Identifier, Neut)
