@@ -89,14 +89,13 @@ parse (meta :< TreeAtom "universe") = do
 parse (meta :< TreeNode [_ :< TreeAtom "mu", _ :< TreeAtom x, te]) = do
   e <- parse te
   return $ meta :< NeutMu x e
-parse (meta :< TreeNode (te:tvs))
-  | not (null tvs) = do
-    e <- parse te
-    funMeta <- newNameWith "meta"
-    let e' = funMeta :< NeutBoxElim e
-    vs <- mapM parse tvs
-    _ :< tmp <- foldML NeutPiElim e' vs
-    return $ meta :< tmp
+parse (meta :< TreeNode (te:tvs)) = do
+  e <- parse te
+  funMeta <- newNameWith "meta"
+  let e' = funMeta :< NeutBoxElim e
+  vs <- mapM parse tvs
+  _ :< tmp <- foldML NeutPiElim e' vs
+  return $ meta :< tmp
 parse (meta :< TreeAtom "_") = do
   name <- newNameWith "hole"
   return $ meta :< NeutHole name
