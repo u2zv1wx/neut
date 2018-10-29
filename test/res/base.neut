@@ -1,77 +1,12 @@
-(reserve forall)
 
-(reserve lambda)
-
-(reserve apply)
-
-(reserve exists)
-
-(reserve tensor)
-
-(reserve case)
-
-(reserve universe)
-
-
-(reserve let)
-
-(reserve begin)
-
-(notation (begin e)
-  e)
-
-(notation (begin e rest+)
-  (apply (lambda ((_ _)) (begin rest+)) (begin e)))
-
-(notation (begin (let x e+) rest+)
-  (apply (lambda ((x _)) (begin rest+)) (begin e+)))
-
-(notation (begin (definition x e) rest+)
-  (apply (lambda ((x _)) (begin rest+)) (data (mu x e))))
-
-(notation (begin (definition name (x+) e+) rest+)
-  (apply (lambda ((name _)) (begin rest+)) (data (mu name (lambda (x+) (begin e+))))))
-
-(reserve arrow)
-
-(notation (arrow rest+)
-  (box (hom rest+)))
-
-(reserve definition)
-
-(notation (definition name e)
-  (let name (data (mu name e))))
-
-(notation (definition name (x+) e+)
-  (let name (data (mu name (lambda (x+) (begin e+))))))
+(include "./notation.neut")
 
 (index top unit)
 
-(index i32)
-
-(index u32)
-
-(primitive core.i32.add (arrow i32 i32 i32))
-
-;; some comment here.
-(primitive core.i32.sub (arrow i32 i32 i32))
-
-(primitive core.i32.mul ;; comment in a s-expression.
-  (arrow i32 i32 i32);; hey. コードの最中にも書ける。
-  ;; commentだけの行。
-;; spaceなしで始まるコメントだけの行。
-  ) ;; 日本語も書ける。
-
-(primitive core.i32.copy (arrow i32 (tensor i32 i32)))
-
-; (definition type (box universe))
-(let type (box universe))
+(include "./arith.neut")
 
 (include "./state.neut")
 
-(index world)
+(include "./vector.neut")
 
-(definition io
-  (state world))
-
-(primitive core.i32.print (arrow i32 (io top)))
+(include "./io.neut")

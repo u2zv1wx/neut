@@ -1,0 +1,12 @@
+(index world)
+
+(definition io
+  (state world))
+
+(index handle)
+
+(primitive stdin (box handle))
+(primitive stdout (box handle))
+(primitive stderr (box handle))
+
+(primitive core.i32.print (arrow i32 (io top)))

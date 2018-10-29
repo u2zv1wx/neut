@@ -1,7 +1,4 @@
-(index top unit)
-(index i32)
-
-(index u32)
+;; reserve primitive keywords
 
 (reserve forall)
 
@@ -21,12 +18,6 @@
 
 (reserve universe)
 
-(reserve let)
-
-(reserve begin)
-
-(reserve definition)
-
 (reserve mu)
 
 (reserve module)
@@ -34,6 +25,15 @@
 (reserve include)
 
 (reserve use)
+
+;; define basic notations
+
+;; sequential execution
+(reserve let)
+
+(reserve begin)
+
+(reserve definition)
 
 (notation (begin e)
   e)
@@ -50,46 +50,16 @@
 (notation (begin (definition name (x+) e+) rest+)
   (apply (lambda ((name _)) (begin rest+)) (data (mu name (lambda (x+) (begin e+))))))
 
-(reserve arrow)
-
-(notation (arrow rest+)
-  (box (hom rest+)))
-
-(primitive core.u32.sub (arrow u32 u32 u32))
-
-(reserve definition)
-
 (notation (definition name e)
   (let name (data (mu name e))))
 
 (notation (definition name (x+) e+)
   (let name (data (mu name (lambda (x+) (begin e+))))))
 
+;; shorthands for types
+(reserve arrow)
+
+(notation (arrow rest+)
+  (box (hom rest+)))
+
 (let type (box universe))
-
-(definition vector ((n u32) (A type))
-  (case n
-    ((1 A)
-     (m (tensor A (vector (core.u32.sub m 1) A))))))
-
-(definition string ((n u32))
-  (vector n u32))
-
-(index nat:core nat:zero nat:succ)
-
-(definition nat
-  (exists ((l nat:core))
-    (case l
-      ((nat:zero top)
-       (nat:succ (code nat))))))
-
-(let bar (pair 1 2 3))
-(ascription bar (vector 3 i32))
-
-(let buz (pair nat:zero unit))
-(ascription buz (code nat))
-
-(let succ-buz (pair nat:succ buz))
-(ascription succ-buz (code nat))
-
-unit

@@ -1,0 +1,5 @@
+
+(definition vector ((n u32) (A type))
+  (case n
+    ((0 top)
+     (m (tensor A (vector (core.u32.sub m 1) A))))))
