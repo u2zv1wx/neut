@@ -47,8 +47,8 @@ import qualified Data.PQueue.Min as Q
 infer :: Context -> Neut -> WithEnv Neut
 infer ctx (meta :< NeutVar s) = do
   univ <- boxUniv
-  -- t <- lookupTypeEnv' s >>= annot univ
-  t <- lookupTypeEnv1 s (map fst ctx) univ >>= annot univ
+  t <- lookupTypeEnv' s >>= annot univ
+  -- t <- lookupTypeEnv1 s (map fst ctx) univ >>= annot univ
   returnMeta meta t
 infer ctx (meta :< NeutPi (s, tdom) tcod) = do
   insTypeEnv s tdom
@@ -180,7 +180,8 @@ infer ctx (meta :< NeutConst t) = infer ctx t >>= returnMeta meta
 infer ctx (meta :< NeutConstIntro s) = do
   higherUniv <- boxUniv
   univ <- boxUniv >>= annot higherUniv
-  t <- lookupTypeEnv1 s (map fst ctx) univ
+  t <- lookupTypeEnv' s >>= annot univ
+  -- t <- lookupTypeEnv1 s (map fst ctx) univ
   insTypeEnv s t
   u <- infer ctx t >>= annot higherUniv
   insConstraintEnv (map fst ctx) univ u higherUniv
