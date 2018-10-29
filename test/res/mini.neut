@@ -1,0 +1,82 @@
+(index top unit)
+(index i32)
+
+(index u32)
+
+(reserve forall)
+
+(reserve hom)
+
+(reserve lambda)
+
+(reserve apply)
+
+(reserve exists)
+
+(reserve tensor)
+
+(reserve pair)
+
+(reserve case)
+
+(reserve universe)
+
+(reserve let)
+
+(reserve begin)
+
+(reserve definition)
+
+(reserve mu)
+
+(reserve module)
+
+(reserve include)
+
+(reserve use)
+
+(notation (begin e)
+  e)
+
+(notation (begin e rest+)
+  (apply (lambda ((_ _)) (begin rest+)) (begin e)))
+
+(notation (begin (let x e+) rest+)
+  (apply (lambda ((x _)) (begin rest+)) (begin e+)))
+
+(notation (begin (definition x e) rest+)
+  (apply (lambda ((x _)) (begin rest+)) (data (mu x e))))
+
+(notation (begin (definition name (x+) e+) rest+)
+  (apply (lambda ((name _)) (begin rest+)) (data (mu name (lambda (x+) (begin e+))))))
+
+(reserve arrow)
+
+(notation (arrow rest+)
+  (box (hom rest+)))
+
+(primitive core.u32.sub (arrow u32 u32 u32))
+
+(reserve definition)
+
+(notation (definition name e)
+  (let name (data (mu name e))))
+
+(notation (definition name (x+) e+)
+  (let name (data (mu name (lambda (x+) (begin e+))))))
+
+(let type (box universe))
+
+(definition vector ((n u32) (A type))
+  (case n
+    ((1 A)
+     (m (tensor A (vector (core.u32.sub m 1) A))))))
+
+(definition string ((n u32))
+  (vector n u32))
+
+(let bar (pair 1 2 3))
+(ascription bar (vector 3 i32))
+
+
+unit
