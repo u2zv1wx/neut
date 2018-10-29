@@ -172,8 +172,8 @@ infer ctx (meta :< NeutMu s e) = do
   trec <- appCtx ctx >>= annot univ
   boxType <- wrapType (NeutBox trec) >>= annot univ
   insTypeEnv s boxType
-  boxConstraint ctx $ var e
   te <- infer (ctx ++ [(s, boxType)]) e >>= annot univ
+  boxConstraint ctx $ var e
   insConstraintEnv (map fst ctx) te trec univ
   returnMeta meta te
 infer ctx (meta :< NeutConst t) = infer ctx t >>= returnMeta meta
