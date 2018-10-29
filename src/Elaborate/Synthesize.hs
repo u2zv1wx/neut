@@ -81,18 +81,90 @@ synthesize q =
       -- In this case, we do the same as in Flex-Rigid case.
       -- The distinction here is required just to ensure that we deal with
       -- constraints from easier ones.
-     -> do
-      args <- mapM toVar' preArgs
-      synthesizeFlexRigid q ctx hole args e t
+     -> synthesizeQuasiPattern q ctx hole preArgs e t
     Just (Enriched _ (Constraint ctx (ConstraintFlexRigid hole args e) t))
       -- Synthesize `hole @ arg-1 @ ... @ arg-n = e`, where arg-i is an arbitrary term.
      -> synthesizeFlexRigid q ctx hole args e t
     Just c -> throwError $ "cannot synthesize:\n" ++ Pr.ppShow c
 
--- See the section 3 of "Elaboration in Dependent Type Theory".
--- In short: Try some dependent alternatives, and if all of them fails, try to solve
--- the constraint assuming that, in `hole @ arg-1 @ ... @ arg-n = e`, the `hole`
--- doesn't use `arg-i`.
+-- Suppose that this function received a quasi-pattern ?M @ x @ x @ y @ z == e, for example.
+-- What this function do is to try two alternatives in this case:
+--   (1) ?M == lam x. lam _. lam y. lam z. e
+--   (2) ?M == lam _. lam x. lam y. lam z. e
+-- where the `_` is a new variable. In other words, this function tries all the alternatives
+-- that are obtained by choosing one `x` from the list [x, x, y, z], replacing all the
+-- other occurrences of `x` with new variables.
+synthesizeQuasiPattern ::
+     Q.MinQueue EnrichedConstraint
+  -> Context
+  -> Identifier
+  -> [Identifier]
+  -> Neut
+  -> Neut
+  -> WithEnv ()
+synthesizeQuasiPattern q ctx hole preArgs e t = do
+  argsList <- toAltList preArgs
+  meta <- newNameWith "meta"
+  lamList <- mapM (`bindFormalArgs'` e) argsList
+  let planList =
+        flip map lamList $ \lam ->
+          getQueue $ analyze [(ctx, meta :< NeutHole hole, lam, t)]
+  q' <- chain q planList
+  continue q q'
+
+-- [x, x, y, z, z] ~>
+--   [ [x, p, y, z, q]
+--   , [x, p, y, q, z]
+--   , [p, x, y, z, q]
+--   , [p, x, y, q, z]
+--   ]
+-- (p, q : fresh variables)
+toAltList :: [Identifier] -> WithEnv [[Identifier]]
+toAltList xs = mapM (discardInactive xs) $ chooseActive $ toIndexInfo xs
+
+-- [x, x, y, z, z] ~> [(x, [0, 1]), (y, [2]), (z, [3, 4])]
+toIndexInfo :: Eq a => [a] -> [(a, [Int])]
+toIndexInfo xs = toIndexInfo' $ zip xs [0 ..]
+
+toIndexInfo' :: Eq a => [(a, Int)] -> [(a, [Int])]
+toIndexInfo' [] = []
+toIndexInfo' ((x, i):xs) = do
+  let (is, xs') = toIndexInfo'' x xs
+  let xs'' = toIndexInfo' xs'
+  (x, i : is) : xs''
+
+toIndexInfo'' :: Eq a => a -> [(a, Int)] -> ([Int], [(a, Int)])
+toIndexInfo'' _ [] = ([], [])
+toIndexInfo'' x ((y, i):ys) = do
+  let (is, ys') = toIndexInfo'' x ys
+  if x == y
+    then (i : is, ys') -- remove x from the list
+    else (is, (y, i) : ys')
+
+chooseActive :: [(Identifier, [Int])] -> [[(Identifier, Int)]]
+chooseActive xs = do
+  let xs' = map (\(x, is) -> zip (repeat x) is) xs
+  pickup xs'
+
+pickup :: Eq a => [[a]] -> [[a]]
+pickup [] = [[]]
+pickup (xs:xss) = do
+  let yss = pickup xss
+  x <- xs
+  map (\ys -> x : ys) yss
+
+discardInactive :: [Identifier] -> [(Identifier, Int)] -> WithEnv [Identifier]
+discardInactive xs indexList =
+  forM (zip xs [0 ..]) $ \(x, i) ->
+    case lookup x indexList of
+      Just j
+        | i == j -> return x
+      _ -> newNameWith "hole"
+
+-- This function just tries to resolve the constraint by assuming that the meta-variable
+-- discards all the arguments. For example, given a constraint `?M @ e1 @ e2 = e`, this
+-- function tries to resolve this by `?M = lam _. lam _. e`, discarding the arguments
+-- `e1` and `e2`.
 synthesizeFlexRigid ::
      Q.MinQueue EnrichedConstraint
   -> Context
@@ -102,24 +174,11 @@ synthesizeFlexRigid ::
   -> Neut
   -> WithEnv ()
 synthesizeFlexRigid q ctx hole args e t = do
-  let (x, eArgs) = toPiElimSeq e
   newHoleList <- mapM (const (newNameWith "hole")) args -- ?M_i
-  newHoleVarList <- mapM toVar' newHoleList
-  newArgList <- mapM (const $ newNameWith "arg") eArgs -- x_i
-  newVarList <- mapM toVar' newArgList
-  argList <- forM newHoleVarList $ \h -> appFold' h newVarList -- ?M_i @ x_1 @ ... @ x_n
-  bodyList <- forM (x : args) $ \v -> appFold' v argList
-  lamList <- forM bodyList $ \body -> bindFormalArgs' newArgList body
-  let compList =
-        flip map lamList $ \lam -> do
-          left <- appFold' lam args
-          meta <- newNameWith "meta"
-          getQueue $
-            analyze [(ctx, left, e, t), (ctx, meta :< NeutHole hole, lam, t)]
   meta <- newNameWith "meta"
   lam <- bindFormalArgs' newHoleList e
   let independent = getQueue $ analyze [(ctx, meta :< NeutHole hole, lam, t)]
-  q' <- chain q $ compList ++ [independent]
+  q' <- chain q [independent]
   continue q q'
 
 getQueue :: WithEnv a -> WithEnv (Q.MinQueue EnrichedConstraint)
