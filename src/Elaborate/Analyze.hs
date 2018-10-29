@@ -56,8 +56,6 @@ analyze' c@(ctx, e1, e2, t) = do
     Constraint _ (ConstraintPattern hole args e) _ -> do
       ans <- bindFormalArgs' args e
       modify (\e -> e {substitution = compose [(hole, ans)] (substitution e)})
-      q <- gets constraintQueue
-      updateQueue q
     _ -> do
       let ec = Enriched c $ categorize c
       modify (\e -> e {constraintQueue = Q.insert ec $ constraintQueue e})
