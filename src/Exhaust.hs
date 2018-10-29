@@ -53,24 +53,26 @@ exhaust' (meta :< NeutIndexElim e1 branchList@((l, _):_)) = do
   let labelList = map fst branchList
   case t of
     _ :< NeutIndex "i32" ->
-      return $ b1 && (IndexDefault `elem` labelList || hasVar labelList)
+      return $ b1 && (Left IndexDefault `elem` labelList || hasVar labelList)
+    _
+      | Left IndexDefault `elem` labelList -> return b1
+    _
+      | hasVar labelList -> return b1
     _ ->
-      if IndexDefault `elem` labelList
-        then return b1
-        else case l of
-               IndexLabel x -> do
-                 set <- lookupIndexSet x
-                 if length set <= length (nub labelList)
-                   then return True
-                   else return False
-               _ -> return False
+      case l of
+        Left (IndexLabel x) -> do
+          set <- lookupIndexSet x
+          if length set <= length (nub labelList)
+            then return True
+            else return False
+        _ -> return False
 exhaust' (_ :< NeutConst t) = exhaust' t
 exhaust' (_ :< NeutConstIntro _) = return True
 exhaust' (_ :< NeutConstElim e) = exhaust' e
 exhaust' (_ :< NeutUniv _) = return True
 exhaust' (_ :< NeutHole _) = return False
 
-hasVar :: [Index] -> Bool
+hasVar :: [IndexOrVar] -> Bool
 hasVar [] = False
-hasVar (IndexLabel _:_) = True
+hasVar (Right _:_) = True
 hasVar (_:is) = hasVar is
