@@ -221,8 +221,12 @@ sigmaHole ctx (x:rest) = do
   ts <- sigmaHole (ctx ++ [(x, t)]) rest
   return $ t : ts
 
-inferIndex :: Context -> Index -> WithEnv (Maybe Neut)
-inferIndex ctx (IndexLabel name) = do
+inferIndex :: Context -> IndexOrVar -> WithEnv (Maybe Neut)
+inferIndex ctx (Right x) = do
+  t <- appCtx ctx
+  insTypeEnv x t
+  return $ Just t
+inferIndex ctx (Left (IndexLabel name)) = do
   ienv <- gets indexEnv
   mk <- lookupKind' name ienv
   case mk of
