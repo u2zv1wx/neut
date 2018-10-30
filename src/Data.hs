@@ -107,6 +107,24 @@ data NeutF a
   | NeutConst a -- constant modality
   | NeutConstIntro Identifier
   | NeutConstElim a
+  -- (vector L A) is essentially just a function type L -> A.
+  -- Since the type of the domain of this function type is a label type,
+  -- and since label types are interpreted using i32, we can use an vector
+  -- of type [0 x i8*]* to represent this type. Note that an vector can be understood
+  -- as a function from an integer (an index `i` of type i32) to its value (x[i]).
+  | NeutVector Identifier -- label
+               a -- the type of its content
+  -- (vector.intro ((l1 e1) ... (ln en)))
+  -- This is conceptually the same as `lam x. case x of {l1 -> e1, ..., ln -> en}`.
+  -- Since the body of this lambda abstraction must be in some kind of determined form,
+  -- we cannot use the same definition as NeutPiIntro here.
+  | NeutVectorIntro [(IndexOrVar, a)]
+  -- (vector.elim e i)
+  -- The first argument `e` is supposed to be a vector, and the second argument
+  -- is supposed to be a label, namely, an index.
+  -- In C-like syntax, this term corresponds to e[i].
+  | NeutVectorElim a
+                   a
   | NeutMu Identifier
            a
   | NeutHole Identifier
