@@ -159,6 +159,11 @@ data Term
   | TermConst Term -- constant modality
   | TermConstIntro Identifier
   | TermConstElim Term
+  | TermVector Term
+               Term
+  | TermVectorIntro [(IndexOrVar, Term)]
+  | TermVectorElim Term
+                   Term
   | TermMu Identifier
            Term
   deriving (Show)

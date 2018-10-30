@@ -138,6 +138,20 @@ elaborate' (_ :< NeutConstIntro s) = return $ TermConstIntro s
 elaborate' (_ :< NeutConstElim e) = do
   e' <- elaborate' e
   return $ TermConstElim e'
+elaborate' (_ :< NeutVector t1 t2) = do
+  t1' <- elaborate' t1
+  t2' <- elaborate' t2
+  return $ TermVector t1' t2'
+elaborate' (_ :< NeutVectorIntro branchList) = do
+  branchList' <-
+    forM branchList $ \(l, body) -> do
+      body' <- elaborate' body
+      return (l, body')
+  return $ TermVectorIntro branchList'
+elaborate' (_ :< NeutVectorElim e1 e2) = do
+  e1' <- elaborate' e1
+  e2' <- elaborate' e2
+  return $ TermVectorElim e1' e2'
 elaborate' (_ :< NeutUniv j) = return $ TermUniv j
 elaborate' (_ :< NeutMu s e) = do
   e' <- elaborate' e
