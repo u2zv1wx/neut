@@ -221,6 +221,11 @@ data Neg
   | NegDownElim Pos
   | NegBoxElim Pos
   | NegConstElim Pos
+  | NegVector Pos
+              Neg
+  | NegVectorIntro [(IndexOrVar, Neg)]
+  | NegVectorElim Neg
+                  Pos
   | NegMu Identifier
           Neg
   | NegPrint LowType

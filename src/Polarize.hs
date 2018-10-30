@@ -93,6 +93,20 @@ polarize' (TermIndexElim e branchList) = do
   cs <- mapM polarize' es
   x <- newNameWith "tmp"
   bindSeq [(x, e)] (NegIndexElim (PosVar x) (zip labelList cs))
+polarize' (TermVector t1 t2) = do
+  x1 <- newNameWith "dom"
+  x2 <- newNameWith "cod"
+  bindSeq
+    [(x1, t1), (x2, t2)]
+    (NegUpIntro (PosDown (NegVector (PosVar x1) (NegUpIntro (PosVar x2)))))
+polarize' (TermVectorIntro branchList) = do
+  let (labelList, es) = unzip branchList
+  cs <- mapM polarize' es
+  return $ NegUpIntro $ PosDownIntro $ NegVectorIntro (zip labelList cs)
+polarize' (TermVectorElim e1 e2) = do
+  f <- newNameWith "vec"
+  v <- newNameWith "index"
+  bindSeq [(v, e2), (f, e1)] (NegVectorElim (NegDownElim (PosVar f)) (PosVar v))
 polarize' (TermMu x e) = do
   e' <- polarize' e
   return $ NegMu x e'
