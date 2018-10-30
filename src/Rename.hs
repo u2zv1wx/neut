@@ -60,12 +60,7 @@ rename (i :< NeutIndex s) = return $ i :< NeutIndex s
 rename (i :< NeutIndexIntro x) = return $ i :< NeutIndexIntro x
 rename (i :< NeutIndexElim e branchList) = do
   e' <- rename e
-  branchList' <-
-    forM branchList $ \(l, body) ->
-      local $ do
-        l' <- newNameIndex l
-        body' <- rename body
-        return (l', body')
+  branchList' <- renameBranchList branchList
   return $ i :< NeutIndexElim e' branchList'
 rename (i :< NeutConst t) = do
   t' <- rename t
@@ -74,6 +69,16 @@ rename (i :< NeutConstIntro s) = return $ i :< NeutConstIntro s
 rename (i :< NeutConstElim e) = do
   e' <- rename e
   return $ i :< NeutConstElim e'
+rename (i :< NeutVector index t) = do
+  t' <- rename t
+  return $ i :< NeutVector index t'
+rename (i :< NeutVectorIntro branchList) = do
+  branchList' <- renameBranchList branchList
+  return $ i :< NeutVectorIntro branchList'
+rename (i :< NeutVectorElim e v) = do
+  e' <- rename e
+  v' <- rename v
+  return $ i :< NeutVectorElim e' v'
 rename (i :< NeutUniv j) = return $ i :< NeutUniv j
 rename (i :< NeutMu s e) =
   local $ do
@@ -81,6 +86,14 @@ rename (i :< NeutMu s e) =
     e' <- rename e
     return $ i :< NeutMu s' e'
 rename (i :< NeutHole x) = return $ i :< NeutHole x
+
+renameBranchList :: [(IndexOrVar, Neut)] -> WithEnv [(IndexOrVar, Neut)]
+renameBranchList branchList =
+  forM branchList $ \(l, body) ->
+    local $ do
+      l' <- newNameIndex l
+      body' <- rename body
+      return (l', body')
 
 newNameIndex :: IndexOrVar -> WithEnv IndexOrVar
 newNameIndex (Right x) = do
