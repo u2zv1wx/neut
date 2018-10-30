@@ -193,6 +193,36 @@ infer ctx (meta :< NeutConstElim e) = do
   constType <- wrapType $ NeutConst resultHole
   insConstraintEnv (map fst ctx) t constType univ
   returnMeta meta resultHole
+infer ctx (meta :< NeutVector t1 t2) = do
+  higherUniv <- boxUniv
+  u1 <- infer ctx t1 >>= annot higherUniv
+  u2 <- infer ctx t2 >>= annot higherUniv
+  insConstraintEnv (map fst ctx) u1 u2 higherUniv
+  returnMeta meta u1
+infer _ (_ :< NeutVectorIntro []) = lift $ throwE "empty vector"
+infer ctx (meta :< NeutVectorIntro branchList) = do
+  let (ls, es) = unzip branchList
+  univ <- boxUniv
+  tls <- mapM (inferIndex ctx) ls
+  tls' <- mapM (annot univ) $ join $ map maybeToList tls
+  ts <- mapM (infer ctx >=> annot univ) es
+  constrainList ctx tls'
+  constrainList ctx ts
+  typeMeta <- newName' "meta" univ
+  returnMeta meta $ typeMeta :< NeutVector (head tls') (head ts)
+infer ctx (meta :< NeutVectorElim e1 e2) = do
+  univ <- boxUniv
+  tVec <- infer ctx e1 >>= reduce
+  tIndex <- infer ctx e2 >>= annot univ
+  case tVec of
+    _ :< NeutVector tIndex' t -> do
+      insConstraintEnv (map fst ctx) tIndex tIndex' univ
+      returnMeta meta t
+    _ -> do
+      t <- appCtx ctx >>= annot univ
+      typeMeta <- newName' "meta" univ
+      insConstraintEnv (map fst ctx) tVec (typeMeta :< NeutVector tIndex t) univ
+      returnMeta meta t
 infer _ (meta :< NeutUniv _) = boxUniv >>= returnMeta meta
 infer ctx (meta :< NeutHole _) = appCtx ctx >>= returnMeta meta
 

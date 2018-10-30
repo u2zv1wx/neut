@@ -168,6 +168,8 @@ simp'' ((ctx, _ :< NeutConst t1, _ :< NeutConst t2, univ):cs) =
   simp $ (ctx, t1, t2, univ) : cs
 simp'' ((_, _ :< NeutIndex l1, _ :< NeutIndex l2, _):cs)
   | l1 == l2 = simp cs
+simp'' ((ctx, _ :< NeutVector t11 t12, _ :< NeutVector t21 t22, univ):cs) =
+  simp $ (ctx, t11, t21, univ) : (ctx, t12, t22, univ) : cs
 simp'' ((_, _ :< NeutUniv i, _ :< NeutUniv j, _):cs) = do
   insUnivConstraintEnv i j
   simp cs
