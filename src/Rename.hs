@@ -70,8 +70,9 @@ rename (i :< NeutConstElim e) = do
   e' <- rename e
   return $ i :< NeutConstElim e'
 rename (i :< NeutVector index t) = do
+  index' <- rename index
   t' <- rename t
-  return $ i :< NeutVector index t'
+  return $ i :< NeutVector index' t'
 rename (i :< NeutVectorIntro branchList) = do
   branchList' <- renameBranchList branchList
   return $ i :< NeutVectorIntro branchList'

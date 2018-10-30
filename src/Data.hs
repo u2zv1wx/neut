@@ -112,7 +112,7 @@ data NeutF a
   -- and since label types are interpreted using i32, we can use an vector
   -- of type [0 x i8*]* to represent this type. Note that an vector can be understood
   -- as a function from an integer (an index `i` of type i32) to its value (x[i]).
-  | NeutVector Identifier -- label
+  | NeutVector a -- label type
                a -- the type of its content
   -- (vector.intro ((l1 e1) ... (ln en)))
   -- This is conceptually the same as `lam x. case x of {l1 -> e1, ..., ln -> en}`.

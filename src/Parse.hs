@@ -83,12 +83,10 @@ parse (meta :< TreeNode [_ :< TreeAtom "case", t, _ :< TreeNode ts]) = do
   e <- parse t
   branchList <- mapM parseClause ts
   return $ meta :< NeutIndexElim e branchList
-parse (meta :< TreeNode [_ :< TreeAtom "vector", _ :< TreeAtom indexName, t]) = do
-  e <- parse t
-  b <- isDefinedIndexName indexName
-  if not b
-    then lift $ throwE $ "no such index defined: " ++ indexName
-    else return $ meta :< NeutVector indexName e
+parse (meta :< TreeNode [_ :< TreeAtom "vector", t1, t2]) = do
+  e1 <- parse t1
+  e2 <- parse t2
+  return $ meta :< NeutVector e1 e2
 parse (meta :< TreeNode [_ :< TreeAtom "vector:intro", _ :< TreeNode ts]) = do
   branchList <- mapM parseClause ts
   return $ meta :< NeutVectorIntro branchList
