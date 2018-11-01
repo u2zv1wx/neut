@@ -12,12 +12,12 @@ Neut is a programming language based on dependent modal linear type theory, focu
 
 #+BEGIN_SRC
 $ git clone https://github.com/u2zv1wx/neut
-$ stack install
-$ neut build path/to/file.neut
+$ stack build
+$ stack exec neut build test/res/fact.neut
 $ ./file
 #+END_SRC
 
-Neut depends on LLVM and Clang. When you execute =neut build=, both of the commands =llc= and =clang= must be in =$PATH=.
+Neut depends on LLVM and Clang. When you execute =neut build=, both of the commands =llc= and =clang= must be in your =$PATH=.
 
 ** References
 - L. de Moura, J. Avigad, S. Kong, and C. Roux, Elaboration in Dependent Type Theory, [[https://arxiv.org/abs/1505.04324]], 2015.
