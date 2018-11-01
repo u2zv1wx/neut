@@ -1,0 +1,7 @@
+(index choice left right)
+
+(definition coproduct ((A type) (B type))
+  (exists ((l choice))
+    (case l
+      ((left A)
+       (right B)))))

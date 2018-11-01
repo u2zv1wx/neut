@@ -7,6 +7,10 @@
 
 (include "./state.neut")
 
-(include "./vector.neut")
+(include "./coproduct.neut")
+
+;; (include "./vector.neut")
+
+(include "./nat.neut")
 
 (include "./io.neut")

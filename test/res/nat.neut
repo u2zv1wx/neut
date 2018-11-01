@@ -1,0 +1,29 @@
+(include "./coproduct.neut")
+
+(definition nat.inner
+  (coproduct top (code nat.inner)))
+
+(reserve nat)
+
+(notation nat (code nat.inner))
+
+(reserve succ)
+
+(notation (succ e)
+  (pair right e))
+
+(let zero (pair left unit))
+(ascription zero nat)
+
+(let one (succ zero))
+(ascription one nat)
+
+(let two (succ one))
+(ascription two nat)
+
+(definition next (n)
+  (pair right n))
+
+(ascription next (arrow nat nat))
+
+(let three (next two))

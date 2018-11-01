@@ -1,0 +1,12 @@
+
+(definition sized-string ((n u32))
+  (vector n u32))
+
+(definition box.string
+  (exists ((n u32))
+    (sized-string n)))
+
+(reserve string)
+
+(notation string
+  (code box.string))

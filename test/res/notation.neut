@@ -62,4 +62,6 @@
 (notation (arrow rest+)
   (box (hom rest+)))
 
-(let type (box universe))
+(reserve type)
+
+(notation type (box universe))
