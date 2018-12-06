@@ -70,6 +70,10 @@ unicode=true]{hyperref}
 
 \begin{document}
 
+% \maketitle
+
+\small
+
 \begin{framed}
   \begin{center}
     \begin{bprooftree}
@@ -79,9 +83,8 @@ unicode=true]{hyperref}
     \end{bprooftree}
     \begin{bprooftree}
       \AxiomC{\( \ctx{\Gamma} \)}
-      \AxiomC{\affine{\Gamma}}
       \RightLabel{\( \ir{(univ)} \)}
-      \BinaryInfC{\( \Gamma \vdash \univ_{i} : \univ_{i + 1} \)}
+      \UnaryInfC{\( \Gamma \vdash \univ_{i} : \univ_{i + 1} \)}
     \end{bprooftree}
     \begin{bprooftree}
       \AxiomC{\( \Gamma \vdash A : \univ_{i} \)}
@@ -97,17 +100,16 @@ unicode=true]{hyperref}
     \end{bprooftree}
     \begin{bprooftree}
       \AxiomC{\( \ctx{\Gamma, x : A} \)}
-      \AxiomC{\affine{\Gamma}}
       \RightLabel{\( \ir{(var)} \)}
-      \BinaryInfC{\( \Gamma, x : A \vdash x : A \)}
+      \UnaryInfC{\( \Gamma, x : A \vdash x : A \)}
     \end{bprooftree}
     \\
     \vspace{1.5em}
     \begin{bprooftree}
       \AxiomC{\( \Gamma \vdash A : \univ_{i} \)}
-      \AxiomC{\( \Delta\ [, x : A] \vdash B : \univ_{i} \)}
+      \AxiomC{\( \Gamma\ [, x : A] \vdash B : \univ_{i} \)}
       \RightLabel{\( (\Pi) \)}
-      \BinaryInfC{\( \Gamma, \Delta \vdash \dprod{x : A}{B} : \univ_{i} \)}
+      \BinaryInfC{\( \Gamma \vdash \dprod{x : A}{B} : \univ_{i} \)}
     \end{bprooftree}
     \\
     \vspace{1.5em}
@@ -116,37 +118,33 @@ unicode=true]{hyperref}
       \RightLabel{\( (\Pi_{\ir{i}}) \)}
       \UnaryInfC{\( \Gamma \vdash \abs{x}{e} : \dprod{x : A}{B} \)}
     \end{bprooftree}
-    \\
-    \vspace{1.5em}
     \begin{bprooftree}
       \AxiomC{\( \Gamma \vdash e_{1} : \dprod{x : A}{B}\)}
-      \AxiomC{\( \Delta \vdash e_{2} : A \)}
+      \AxiomC{\( \Gamma \vdash e_{2} : A \)}
       \RightLabel{\( (\Pi_{\ir{e}}) \)}
-      \BinaryInfC{\( \Gamma, \Delta \vdash \appE{e_{1}}{e_{2}} : B \subst{x}{e_{1}} \)}
+      \BinaryInfC{\( \Gamma \vdash \appE{e_{1}}{e_{2}} : B \subst{x}{e_{1}} \)}
     \end{bprooftree}
     \\
     \vspace{1.5em}
     \begin{bprooftree}
       \AxiomC{\( \Gamma \vdash A : \univ_{i} \)}
-      \AxiomC{\( \Delta\ [, x : A] \vdash B : \univ_{i} \)}
+      \AxiomC{\( \Gamma\ [, x : A] \vdash B : \univ_{i} \)}
       \RightLabel{\( (\Sigma) \)}
-      \BinaryInfC{\( \Gamma, \Delta \vdash \dsum{x : A}{B} : \univ_{i} \)}
+      \BinaryInfC{\( \Gamma \vdash \dsum{x : A}{B} : \univ_{i} \)}
     \end{bprooftree}
     \\
     \vspace{1.5em}
     \begin{bprooftree}
       \AxiomC{\( \Gamma \vdash e_{1} : A \)}
-      \AxiomC{\( \Delta \vdash e_{2} : B \subst{x}{e_{1}} \)}
+      \AxiomC{\( \Gamma \vdash e_{2} : B \subst{x}{e_{1}} \)}
       \RightLabel{\( (\Sigma_{\ir{i}}) \)}
-      \BinaryInfC{\( \Gamma, \Delta \vdash \pair{e_{1}}{e_{2}} : \dsum{x : A}{B} \)}
+      \BinaryInfC{\( \Gamma \vdash \pair{e_{1}}{e_{2}} : \dsum{x : A}{B} \)}
     \end{bprooftree}
-    \\
-    \vspace{1.5em}
     \begin{bprooftree}
       \AxiomC{\( \Gamma \vdash e_{1} : \dsum{x : A}{B} \)}
-      \AxiomC{\( \Delta, x : A, y : B \vdash e_{2} : C \subst{z}{\pair{x}{y}} \)}
+      \AxiomC{\( \Gamma, x : A, y : B \vdash e_{2} : C \subst{z}{\pair{x}{y}} \)}
       \RightLabel{\( (\Sigma_{\ir{e}}) \)}
-      \BinaryInfC{\( \Gamma, \Delta \vdash \LET{\pair{x}{y}}{e_{1}}{e_{2}} : C \subst{z}{e_{1}} \)}
+      \BinaryInfC{\( \Gamma \vdash \LET{\pair{x}{y}}{e_{1}}{e_{2}} : C \subst{z}{e_{1}} \)}
     \end{bprooftree}
     \\
     \vspace{1.5em}
@@ -164,26 +162,19 @@ unicode=true]{hyperref}
     \vspace{1.5em}
     \begin{bprooftree}
       \AxiomC{\( \Gamma, x : A \vdash e : A \)}
-      \AxiomC{\relevant{\Gamma}}
       \RightLabel{\( \ir{(rec)} \)}
-      \BinaryInfC{\( \Gamma \vdash \rec{x}{e} : A \)}
-    \end{bprooftree}
-    \\
-    \vspace{1.5em}
-    \begin{bprooftree}
-      \AxiomC{\( \Gamma \vdash e : A \)}
-      \AxiomC{\affine{B}}
-      \RightLabel{\( \ir{(wkg)} \)}
-      \BinaryInfC{\( \Gamma, x : B \vdash e : A \)}
-    \end{bprooftree}
-    \begin{bprooftree}
-      \AxiomC{\( \Gamma, x : B, y : B \vdash e : A \)}
-      \AxiomC{\relevant{B}}
-      \RightLabel{\( \ir{(ctr)} \)}
-      \BinaryInfC{\( \Gamma, x : B \vdash e \subst{y}{x} : A \)}
+      \UnaryInfC{\( \Gamma \vdash \rec{x}{e} : A \)}
     \end{bprooftree}
   \end{center}
 \end{framed}
+
+\normalsize
+
+A type \( A \) is relevant if \( \vdash e : A \to A \otimes A \) is derivable for some \( e \).
+
+A type \( A \) is affine if \( \vdash e : A \to \top \) is derivable for some \( e \).
+
+A term \( e \) is a well-typed closed proper term if (1) \( \vdash e : A \) is derivable for some type \( A \), and (2) for any variable \( x \) in \( e \), if it occurs more than once, then the type of \( x \) is relevant. If it doesn't occur, then the type of \( x \) is affine. (3) All the free variables in a recursion-term (\( \rec{x}{e} \)) must be relevant.
 
 \bibliographystyle{plain}
 \bibliography{library}
