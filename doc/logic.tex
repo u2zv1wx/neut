@@ -180,6 +180,30 @@ unicode=true]{hyperref}
     \\
     \vspace{1.5em}
     \begin{bprooftree}
+      \AxiomC{\( \Gamma \vdash A : \Box \luniv_{i} \)}
+      \RightLabel{\( \ir{(array)} \)}
+      \UnaryInfC{\( \Gamma \vdash \myarray{n}{A} : \Box \luniv_{i} \)}
+    \end{bprooftree}
+    \\
+    \vspace{1.5em}
+    \begin{bprooftree}
+      \AxiomC{\( \Gamma_{1} \vdash e_{1} : A \)}
+      \AxiomC{\( \ldots \)}
+      \AxiomC{\( \Gamma_{n} \vdash e_{n} : A  \)}
+      \RightLabel{\( (\ir{array}_{\ir{i}}) \)}
+      \TrinaryInfC{\( \Gamma_{1}, \ldots, \Gamma_{n} \vdash [e_{1}, \ldots, e_{n}] : \myarray{n}{A} \)}
+    \end{bprooftree}
+    \\
+    \vspace{1.5em}
+    \begin{bprooftree}
+      \AxiomC{\( \Gamma \vdash e_{1} : \myarray{n}{A} \)}
+      \AxiomC{\( \Delta, x_{1} : A, \ldots, x_{n} : A \vdash e_{2} : B \)}
+      \RightLabel{\( (\ir{array}_{\ir{e}}) \)}
+      \BinaryInfC{\( \Gamma, \Delta \vdash \slet{[x_{1}, \ldots, x_{n}]}{e_{1}}{e_{2}} : B \)}
+    \end{bprooftree}
+    \\
+    \vspace{1.5em}
+    \begin{bprooftree}
       \AxiomC{\( \Box \Gamma, x : \Box A \vdash e : \Box A \)}
       \RightLabel{\( \ir{(rec)} \)}
       \UnaryInfC{\( \Box \Gamma \vdash \rec{x}{e} : \Box A \)}
