@@ -225,14 +225,6 @@ unicode=true]{hyperref}
 
 \normalsize
 
-A type \( A \) is relevant if \( \vdash e : A \to A \otimes A \) is derivable for some \( e \).
-
-A type \( A \) is affine if \( \vdash e : A \to \top \) is derivable for some \( e \).
-
-A term \( e \) is a well-typed closed proper term if (1) \( \vdash e : A \) is derivable for some type \( A \), and (2) for any variable \( x \) in \( e \), if it occurs more than once, then the type of \( x \) is relevant. If it doesn't occur, then the type of \( x \) is affine. (3) All the free variables in a recursion-term (\( \rec{x}{e} \)) must be relevant.
-
-% \( \Box \luniv_{i} \) is a shorthand of \( \Box \luniv_{i} \).
-
 \bibliographystyle{plain}
 \bibliography{library}
 
