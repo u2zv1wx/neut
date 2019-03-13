@@ -41,7 +41,8 @@
 \newcommand{\quit}[3]{\mathsf{quit}^{#1}(#2, #3)}
 
 % notation
-\newcommand{\subst}[2]{\{ #1 := #2 \}}
+% \newcommand{\subst}[2]{\{ #1 := #2 \}}
+\newcommand{\subst}[2]{[#2/#1]}
 
 \newcommand{\downT}[1]{\mathord{\downarrow}#1}
 \newcommand{\upT}[1]{\mathord{\uparrow}#1}
@@ -116,4 +117,8 @@
 % \newcommand{\ctx}[1]{#1\,\mathsf{ctx}}
 
 \newcommand{\luniv}{\mathbb{L}}
-\newcommand{\univ}{\Box \luniv}
+% \newcommand{\univ}{\Box \luniv}
+\newcommand{\univ}{\mathbb{U}}
+
+\newcommand{\affine}[1]{\( #1 \) is affine}
+\newcommand{\relevant}[1]{\( #1 \) is relevant}

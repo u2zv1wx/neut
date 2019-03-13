@@ -107,7 +107,7 @@ unicode=true]{hyperref}
     \vspace{1.5em}
     \begin{bprooftree}
       \AxiomC{\( \Gamma \vdash A : \univ_{i} \)}
-      \AxiomC{\( \Gamma\ [, x : A] \vdash B : \univ_{i} \)}
+      \AxiomC{\( \Gamma, x : A \vdash B : \univ_{i} \)}
       \RightLabel{\( (\Pi) \)}
       \BinaryInfC{\( \Gamma \vdash \dprod{x : A}{B} : \univ_{i} \)}
     \end{bprooftree}
@@ -128,7 +128,7 @@ unicode=true]{hyperref}
     \vspace{1.5em}
     \begin{bprooftree}
       \AxiomC{\( \Gamma \vdash A : \univ_{i} \)}
-      \AxiomC{\( \Gamma\ [, x : A] \vdash B : \univ_{i} \)}
+      \AxiomC{\( \Gamma, x : A \vdash B : \univ_{i} \)}
       \RightLabel{\( (\Sigma) \)}
       \BinaryInfC{\( \Gamma \vdash \dsum{x : A}{B} : \univ_{i} \)}
     \end{bprooftree}
