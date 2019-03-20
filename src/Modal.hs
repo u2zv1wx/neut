@@ -117,6 +117,29 @@ modalNeg (NegConstElim e) = do
   e' <- modalPos e
   x <- newNameWith "const"
   bindLet [(x, e')] $ CompPiElimConstElim x []
+modalNeg (NegVector tdom tcod) = do
+  tdom' <- modalPos tdom
+  tcod' <- modalNeg tcod
+  return $ CompVector tdom' tcod'
+modalNeg (NegVectorIntro branchList) = do
+  let (labelList, es) = unzip branchList
+  es' <- mapM modalNeg es
+  return $ CompVectorIntro $ zip labelList es'
+  -- let (body, args) = toNegVectorIntroSeq lam
+  -- let xs = varNeg lam
+  -- body' <- modalNeg body
+  -- lamName <- newNameWith "lam"
+  -- insModalEnv lamName (xs ++ args) body' -- lambda-lifting
+  -- name <- newNameWith "fun"
+  -- bindLet [(name, ValueConstIntro lamName)] $
+  --   CompVectorElimConstElim name $ xs ++ args
+modalNeg (NegVectorElim _ _) = undefined
+  -- let (fun, args) = toNegVectorElimSeq app
+  -- fun' <- modalNeg fun
+  -- args' <- mapM modalPos args
+  -- xs <- mapM (const (newNameWith "arg")) args
+  -- app' <- commVectorElim fun' xs
+  -- bindLet (zip xs args') app'
 modalNeg (NegMu self e)
   -- We firstly translate `mu x e` to
   --   (mu c. lam vs. let x = box ((constElim c) @ vs) in

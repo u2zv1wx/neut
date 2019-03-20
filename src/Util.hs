@@ -42,12 +42,11 @@ toPiSeq (_ :< NeutPi (x, t) body) = do
   (body', (x, t) : args)
 toPiSeq t = (t, [])
 
-toSigmaSeq :: Neut -> (Neut, [(Identifier, Neut)])
-toSigmaSeq (_ :< NeutSigma (x, t) body) = do
-  let (body', args) = toSigmaSeq body
-  (body', (x, t) : args)
-toSigmaSeq t = (t, [])
-
+-- toSigmaSeq :: Neut -> (Neut, [(Identifier, Neut)])
+-- toSigmaSeq (_ :< NeutSigma (x, t) body) = do
+--   let (body', args) = toSigmaSeq body
+--   (body', (x, t) : args)
+-- toSigmaSeq t = (t, [])
 toSigmaSeqTerm :: Term -> (Term, [(Identifier, Term)])
 toSigmaSeqTerm (TermSigma (x, t) body) = do
   let (body', args) = toSigmaSeqTerm body
@@ -56,45 +55,6 @@ toSigmaSeqTerm t = (t, [])
 
 var :: Neut -> [Identifier]
 var e = fst $ varAndHole e
-
-nonLinear :: Neut -> [Identifier]
-nonLinear (_ :< NeutVar _) = []
-nonLinear (_ :< NeutPi (x, tdom) tcod) = do
-  let ns1 = nonLinear tdom
-  let ns2 = isAffine x $ nonLinear tcod
-  ns1 ++ ns2
-nonLinear (_ :< NeutPiIntro (x, _) e) = isAffine x (var e) ++ nonLinear e
-nonLinear (_ :< NeutPiElim e1 e2) = do
-  let ns1 = nonLinear e1
-  let ns2 = nonLinear e2
-  ns1 ++ ns2
-nonLinear (_ :< NeutSigma (x, tdom) tcod) = do
-  let ns1 = nonLinear tdom
-  let ns2 = isAffine x $ nonLinear tcod
-  ns1 ++ ns2
-nonLinear (_ :< NeutSigmaIntro es) = join $ map nonLinear es
-nonLinear (_ :< NeutSigmaElim e1 xs e2) = do
-  let ns1 = nonLinear e1
-  let ns2 = nonLinear e2
-  let vs = var e2
-  let tmp = concatMap (`isLinear` vs) xs
-  tmp ++ ns1 ++ ns2
-nonLinear (_ :< NeutBox e) = nonLinear e
-nonLinear (_ :< NeutBoxIntro e) = nonLinear e
-nonLinear (_ :< NeutBoxElim e) = nonLinear e
-nonLinear (_ :< NeutIndex _) = []
-nonLinear (_ :< NeutIndexIntro _) = []
-nonLinear (_ :< NeutIndexElim e branchList) = do
-  let vs = nonLinear e
-  let (_, es) = unzip branchList
-  let vss = map nonLinear es
-  vs ++ join vss
-nonLinear (_ :< NeutConst t) = nonLinear t
-nonLinear (_ :< NeutConstIntro _) = []
-nonLinear (_ :< NeutConstElim e) = nonLinear e
-nonLinear (_ :< NeutUniv _) = []
-nonLinear (_ :< NeutMu s e) = isLinear s (var e) ++ nonLinear e
-nonLinear (_ :< NeutHole _) = []
 
 varAndHole :: Neut -> ([Identifier], [Identifier])
 varAndHole (_ :< NeutVar s) = ([s], [])
@@ -108,20 +68,13 @@ varAndHole (_ :< NeutPiIntro (x, _) e) = do
   (filter (/= x) vs1, vs2)
 varAndHole (_ :< NeutPiElim e1 e2) =
   pairwiseConcat [varAndHole e1, varAndHole e2]
-varAndHole (_ :< NeutSigma (x, tdom) tcod) = do
-  let vs1 = varAndHole tdom
-  let (vs21, vs22) = varAndHole tcod
-  let vs2 = (filter (/= x) vs21, vs22)
-  pairwiseConcat [vs1, vs2]
+varAndHole (_ :< NeutSigma xts) = varAndHoleSigma xts
 varAndHole (_ :< NeutSigmaIntro es) = pairwiseConcat $ map varAndHole es
 varAndHole (_ :< NeutSigmaElim e1 xs e2) = do
   let vs1 = varAndHole e1
   let (vs21, vs22) = varAndHole e2
   let vs2 = (filter (`notElem` xs) vs21, vs22)
   pairwiseConcat [vs1, vs2]
-varAndHole (_ :< NeutBox e) = varAndHole e
-varAndHole (_ :< NeutBoxIntro e) = varAndHole e
-varAndHole (_ :< NeutBoxElim e) = varAndHole e
 varAndHole (_ :< NeutIndex _) = ([], [])
 varAndHole (_ :< NeutIndexIntro _) = ([], [])
 varAndHole (_ :< NeutIndexElim e branchList) = do
@@ -132,12 +85,18 @@ varAndHole (_ :< NeutIndexElim e branchList) = do
       let (vs21, vs22) = varAndHole body
       return (select i vs21, vs22)
   pairwiseConcat (vs1 : vss)
-varAndHole (_ :< NeutConst t) = varAndHole t
-varAndHole (_ :< NeutConstIntro _) = ([], [])
-varAndHole (_ :< NeutConstElim e) = varAndHole e
+varAndHole (_ :< NeutConst _) = ([], [])
 varAndHole (_ :< NeutUniv _) = ([], [])
 varAndHole (_ :< NeutMu _ e) = varAndHole e
 varAndHole (_ :< NeutHole x) = ([], [x])
+
+varAndHoleSigma :: [(Identifier, Neut)] -> ([Identifier], [Identifier])
+varAndHoleSigma [] = ([], [])
+varAndHoleSigma ((x, t):xts) = do
+  let vs1 = varAndHole t
+  let (vs21, vs22) = varAndHoleSigma xts
+  let vs2 = (filter (/= x) vs21, vs22)
+  pairwiseConcat [vs1, vs2]
 
 varPos :: Pos -> [Identifier]
 varPos (PosVar s) = [s]
@@ -291,9 +250,9 @@ pairwiseConcat ((xs, ys):rest) = do
 boxUniv :: WithEnv Neut
 boxUniv = do
   univMeta <- newNameWith "meta"
-  boxMeta <- newNameWith "meta"
+  -- boxMeta <- newNameWith "meta"
   l <- newName
-  return $ boxMeta :< NeutBox (univMeta :< NeutUniv (UnivLevelHole l))
+  return $ univMeta :< NeutUniv (UnivLevelHole l)
 
 lookupTypeEnv'' :: String -> WithEnv Neut
 lookupTypeEnv'' s = do
@@ -320,7 +279,7 @@ toConst x = do
   t <- lookupTypeEnv' x
   meta <- newNameWith "meta"
   insTypeEnv meta t
-  return $ meta :< NeutConstIntro x
+  return $ meta :< NeutConst x
   -- return $ meta :< NeutConst x t
 
 toVar' :: Identifier -> WithEnv Neut
@@ -380,11 +339,12 @@ isEq (_ :< NeutPiElim e11 e12) (_ :< NeutPiElim e21 e22) = do
   b1 <- isEq e11 e21
   b2 <- isEq e12 e22
   return $ b1 && b2
-isEq (_ :< NeutSigma (x1, t11) t12) (_ :< NeutSigma (x2, t21) t22) = do
-  vx <- toVar' x1
-  b1 <- isEq t11 t21
-  b2 <- isEq t12 $ subst [(x2, vx)] t22
-  return $ b1 && b2
+isEq (_ :< NeutSigma xts) (_ :< NeutSigma yts) = do
+  undefined
+  -- vx <- toVar' x1
+  -- b1 <- isEq t11 t21
+  -- b2 <- isEq t12 $ subst [(x2, vx)] t22
+  -- return $ b1 && b2
 isEq (_ :< NeutSigmaIntro es1) (_ :< NeutSigmaIntro es2)
   | length es1 == length es2 = do
     bs <- zipWithM isEq es1 es2
@@ -398,9 +358,6 @@ isEq (_ :< NeutSigmaElim e11 xs1 e12) (_ :< NeutSigmaElim e21 xs2 e22)
     b1 <- isEq e11 e21
     b2 <- isEq e12 e22'
     return $ b1 && b2
-isEq (_ :< NeutBox t1) (_ :< NeutBox t2) = isEq t1 t2
-isEq (_ :< NeutBoxIntro e1) (_ :< NeutBoxIntro e2) = isEq e1 e2
-isEq (_ :< NeutBoxElim e1) (_ :< NeutBoxElim e2) = isEq e1 e2
 isEq (_ :< NeutIndex l1) (_ :< NeutIndex l2) = return $ l1 == l2
 isEq (_ :< NeutIndexIntro i1) (_ :< NeutIndexIntro i2) = return $ i1 == i2
 isEq (_ :< NeutIndexElim e1 bs1) (_ :< NeutIndexElim e2 bs2) = do
@@ -408,9 +365,7 @@ isEq (_ :< NeutIndexElim e1 bs1) (_ :< NeutIndexElim e2 bs2) = do
   b2 <- isEqBranch bs1 bs2
   return $ b1 && b2
 isEq (_ :< NeutUniv l1) (_ :< NeutUniv l2) = return $ l1 == l2
-isEq (_ :< NeutConst t1) (_ :< NeutConst t2) = isEq t1 t2
-isEq (_ :< NeutConstIntro x1) (_ :< NeutConstIntro x2) = return $ x1 == x2
-isEq (_ :< NeutConstElim e1) (_ :< NeutConstElim e2) = isEq e1 e2
+isEq (_ :< NeutConst t1) (_ :< NeutConst t2) = return $ t1 == t2
 isEq (_ :< NeutMu x1 e1) (_ :< NeutMu x2 e2) = do
   vx <- toVar' x1
   isEq e1 $ subst [(x2, vx)] e2
@@ -464,16 +419,12 @@ headMeta2 :: Neut -> Maybe Identifier
 headMeta2 (_ :< NeutHole x) = Just x
 headMeta2 (_ :< NeutPiElim e1 _) = headMeta2 e1
 headMeta2 (_ :< NeutIndexElim e _) = headMeta2 e
-headMeta2 (_ :< NeutBoxElim e) = headMeta2 e
-headMeta2 (_ :< NeutConstElim e) = headMeta2 e
 headMeta2 _ = Nothing
 
 headMeta'' :: Neut -> Maybe Identifier
 headMeta'' (_ :< NeutVar x) = Just x
 headMeta'' (_ :< NeutPiElim e1 _) = headMeta'' e1
 headMeta'' (_ :< NeutIndexElim e _) = headMeta'' e
-headMeta'' (_ :< NeutBoxElim e) = headMeta'' e
-headMeta'' (_ :< NeutConstElim e) = headMeta'' e
 headMeta'' _ = Nothing
 
 headMeta''' :: Neut -> Maybe (Identifier, Neut -> Neut)
@@ -482,9 +433,6 @@ headMeta''' (i :< NeutPiElim e1 e2) = do
   (x, f) <- headMeta''' e1
   let g y = i :< NeutPiElim y e2
   return (x, g . f)
-headMeta''' (i :< NeutBoxElim e) = do
-  (x, f) <- headMeta''' e
-  return (x, (\y -> i :< NeutBoxElim y) . f)
 headMeta''' (i :< NeutIndexElim e branchList) = do
   (x, f) <- headMeta''' e
   return (x, (\y -> i :< NeutIndexElim y branchList) . f)
@@ -533,9 +481,9 @@ unsplit (ctx:ctxList) ((e1, e2):cs) (t:typeList) =
   (ctx, e1, e2, t) : unsplit ctxList cs typeList
 unsplit _ _ _ = error "Infer.unsplit: invalid arguments"
 
-projectionList :: Neut -> ([(Identifier, Neut)], Neut) -> WithEnv [Neut]
-projectionList e (xts, t) = do
-  xiList <- forM (map snd xts ++ [t]) $ \t -> newNameOfType t
+projectionList :: Neut -> [Neut] -> WithEnv [Neut]
+projectionList e ts = do
+  xiList <- forM ts $ \t -> newNameOfType t
   metaList <- mapM (const newName) xiList
   let varList = map (\(m, x) -> m :< NeutVar x) $ zip metaList xiList
   forM varList $ \v -> do
@@ -573,12 +521,11 @@ hasMeta (_ :< NeutVar _) = False
 hasMeta (_ :< NeutPi (_, tdom) tcod) = hasMeta tdom || hasMeta tcod
 hasMeta (_ :< NeutPiIntro _ e) = hasMeta e
 hasMeta (_ :< NeutPiElim e1 e2) = hasMeta e1 || hasMeta e2
-hasMeta (_ :< NeutSigma (_, t1) t2) = hasMeta t1 || hasMeta t2
+hasMeta (_ :< NeutSigma xts) = do
+  let (_, ts) = unzip xts
+  any hasMeta ts
 hasMeta (_ :< NeutSigmaIntro es) = any hasMeta es
 hasMeta (_ :< NeutSigmaElim e1 _ e2) = hasMeta e1 || hasMeta e2
-hasMeta (_ :< NeutBox e) = hasMeta e
-hasMeta (_ :< NeutBoxIntro e) = hasMeta e
-hasMeta (_ :< NeutBoxElim e) = hasMeta e
 hasMeta (_ :< NeutIndex _) = False
 hasMeta (_ :< NeutIndexIntro _) = False
 hasMeta (_ :< NeutIndexElim e branchList) = do
@@ -586,8 +533,6 @@ hasMeta (_ :< NeutIndexElim e branchList) = do
   any hasMeta (e : es)
 hasMeta (_ :< NeutUniv _) = False
 hasMeta (_ :< NeutConst _) = False
-hasMeta (_ :< NeutConstIntro _) = False
-hasMeta (_ :< NeutConstElim e) = hasMeta e
 hasMeta (_ :< NeutMu _ e) = hasMeta e
 hasMeta (_ :< NeutHole _) = True
 
@@ -614,10 +559,8 @@ toTermForDebug (_ :< NeutPiElim e v) = do
   e' <- toTermForDebug e
   v' <- toTermForDebug v
   return $ TermPiElim e' v'
-toTermForDebug (_ :< NeutSigma (s, t1) t2) = do
-  t1' <- toTermForDebug t1
-  t2' <- toTermForDebug t2
-  return $ TermSigma (s, t1') t2'
+toTermForDebug (_ :< NeutSigma xts) = do
+  undefined
 toTermForDebug (_ :< NeutSigmaIntro es) = do
   es' <- mapM toTermForDebug es
   return $ TermSigmaIntro es'
@@ -625,15 +568,6 @@ toTermForDebug (_ :< NeutSigmaElim e1 xs e2) = do
   e1' <- toTermForDebug e1
   e2' <- toTermForDebug e2
   return $ TermSigmaElim e1' xs e2'
-toTermForDebug (_ :< NeutBox t) = do
-  t' <- toTermForDebug t
-  return $ TermBox t'
-toTermForDebug (_ :< NeutBoxIntro t) = do
-  t' <- toTermForDebug t
-  return $ TermBoxIntro t'
-toTermForDebug (_ :< NeutBoxElim t) = do
-  t' <- toTermForDebug t
-  return $ TermBoxElim t'
 toTermForDebug (_ :< NeutIndex s) = return $ TermIndex s
 toTermForDebug (meta :< NeutIndexIntro x) = return $ TermIndexIntro x meta
 toTermForDebug (_ :< NeutIndexElim e branchList) = do
@@ -643,13 +577,8 @@ toTermForDebug (_ :< NeutIndexElim e branchList) = do
       body' <- toTermForDebug body
       return (l, body')
   return $ TermIndexElim e' branchList'
-toTermForDebug (_ :< NeutConst t) = do
-  t' <- toTermForDebug t
-  return $ TermConst t'
-toTermForDebug (_ :< NeutConstIntro s) = return $ TermConstIntro s
-toTermForDebug (_ :< NeutConstElim e) = do
-  e' <- toTermForDebug e
-  return $ TermConstElim e'
+toTermForDebug (_ :< NeutConst x) = do
+  undefined
 toTermForDebug (_ :< NeutUniv j) = return $ TermUniv j
 toTermForDebug (_ :< NeutMu s e) = do
   e' <- toTermForDebug e

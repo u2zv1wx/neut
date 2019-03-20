@@ -51,16 +51,19 @@ parse (meta :< TreeNode [_ :< TreeAtom "apply", t1, t2]) = do
   e1 <- parse t1
   e2 <- parse t2
   return $ meta :< NeutPiElim e1 e2
-parse (_ :< TreeNode [_ :< TreeAtom "exists", _ :< TreeNode ts, tn]) = do
+parse (meta :< TreeNode [_ :< TreeAtom "exists", _ :< TreeNode ts, tn]) = do
   its <- mapM parseArg ts
   n <- parse tn
-  foldMR NeutSigma n its
-parse (_ :< TreeNode ((_ :< TreeAtom "tensor"):ts)) = do
+  i <- newNameWith "any"
+  let xs = its ++ [(i, n)]
+  return $ meta :< NeutSigma xs
+parse (meta :< TreeNode ((_ :< TreeAtom "tensor"):ts)) = do
   typeList <- mapM parse ts
   let argList = take (length typeList - 1) typeList
   let rightMost = last typeList
-  identList <- mapM (const $ newNameWith "hole") argList
-  foldMR NeutSigma rightMost $ zip identList argList
+  identList <- mapM (const $ newNameWith "hole") (argList ++ [rightMost])
+  return $ meta :< NeutSigma (zip identList (argList ++ [rightMost]))
+  -- foldMR NeutSigma rightMost $ zip identList argList
 parse (meta :< TreeNode ((_ :< TreeAtom "pair"):ts)) = do
   es <- mapM parse ts
   return $ meta :< NeutSigmaIntro es
@@ -70,30 +73,10 @@ parse (meta :< TreeNode [_ :< TreeAtom "case", t, _ :< TreeNode [_ :< TreeNode (
   let args = map fst tmp
   body <- parse tbody
   return $ meta :< NeutSigmaElim e args body
-parse (meta :< TreeNode [_ :< TreeAtom "box", t]) = do
-  e <- parse t
-  return $ meta :< NeutBox e
-parse (meta :< TreeNode [_ :< TreeAtom "data", t]) = do
-  e <- parse t
-  return $ meta :< NeutBoxIntro e
-parse (meta :< TreeNode [_ :< TreeAtom "code", t]) = do
-  e <- parse t
-  return $ meta :< NeutBoxElim e
 parse (meta :< TreeNode [_ :< TreeAtom "case", t, _ :< TreeNode ts]) = do
   e <- parse t
   branchList <- mapM parseClause ts
   return $ meta :< NeutIndexElim e branchList
-parse (meta :< TreeNode [_ :< TreeAtom "vector", t1, t2]) = do
-  e1 <- parse t1
-  e2 <- parse t2
-  return $ meta :< NeutVector e1 e2
-parse (meta :< TreeNode [_ :< TreeAtom "vector:intro", _ :< TreeNode ts]) = do
-  branchList <- mapM parseClause ts
-  return $ meta :< NeutVectorIntro branchList
-parse (meta :< TreeNode [_ :< TreeAtom "vector:elim", t1, t2]) = do
-  e1 <- parse t1
-  e2 <- parse t2
-  return $ meta :< NeutVectorElim e1 e2
 parse (meta :< TreeAtom "universe") = do
   hole <- newNameWith "univ"
   return $ meta :< NeutUniv (UnivLevelHole hole)
@@ -102,10 +85,8 @@ parse (meta :< TreeNode [_ :< TreeAtom "mu", _ :< TreeAtom x, te]) = do
   return $ meta :< NeutMu x e
 parse (meta :< TreeNode (te:tvs)) = do
   e <- parse te
-  funMeta <- newNameWith "meta"
-  let e' = funMeta :< NeutBoxElim e
   vs <- mapM parse tvs
-  _ :< tmp <- foldML NeutPiElim e' vs
+  _ :< tmp <- foldML NeutPiElim e vs
   return $ meta :< tmp
 parse (meta :< TreeAtom "_") = do
   name <- newNameWith "hole"

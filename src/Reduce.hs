@@ -60,10 +60,11 @@ reduce app@(i :< NeutPiElim _ _) = do
           , Just [x, y] <- takeIntegerList (map snd args') ->
             return $ i :< NeutIndexIntro (IndexInteger (x `div` y))
         _ -> return $ fromPiElimSeq (fun', args')
-reduce (i :< NeutSigma (x, tdom) tcod) = do
-  tdom' <- reduce tdom
-  tcod' <- reduce tcod
-  return $ i :< NeutSigma (x, tdom') tcod'
+reduce (i :< NeutSigma xts) = do
+  let (xs, ts) = unzip xts
+  ts' <- mapM reduce ts
+  let xts' = zip xs ts'
+  return $ i :< NeutSigma xts'
 reduce (i :< NeutSigmaIntro es) = do
   es' <- mapM reduce es
   return $ i :< NeutSigmaIntro es'
@@ -74,14 +75,6 @@ reduce (i :< NeutSigmaElim e xs body) = do
       let _ :< body' = subst (zip xs es) body
       reduce $ i :< body'
     _ -> return $ i :< NeutSigmaElim e' xs body
-reduce (i :< NeutBox t) = do
-  t' <- reduce t
-  return $ i :< NeutBox t'
-reduce (i :< NeutBoxElim e) = do
-  e' <- reduce e
-  case e' of
-    _ :< NeutBoxIntro e'' -> reduce e''
-    _ -> return $ i :< NeutBoxElim e'
 reduce (i :< NeutIndexElim e branchList) = do
   e' <- reduce e
   case e' of
@@ -99,16 +92,7 @@ reduce (i :< NeutIndexElim e branchList) = do
                   throwE $
                   "the index " ++ show x ++ " is not included in branchList"
     _ -> return $ i :< NeutIndexElim e' branchList
-reduce (meta :< NeutMu s e) = do
-  boxMeta <- newNameWith "meta"
-  let box = boxMeta :< NeutBoxIntro (meta :< NeutMu s e)
-  reduce $ subst [(s, box)] e
-reduce (i :< NeutConst t) = do
-  t' <- reduce t
-  return $ i :< NeutConst t'
-reduce (i :< NeutConstElim e) = do
-  e' <- reduce e
-  return $ i :< NeutConstElim e'
+reduce (meta :< NeutMu s e) = reduce $ subst [(s, meta :< NeutMu s e)] e
 reduce t = return t
 
 reduce' :: Neut -> WithEnv Neut
@@ -149,10 +133,10 @@ reduce' app@(i :< NeutPiElim _ _) = do
           , Just [x, y] <- takeIntegerList (map snd args') ->
             return $ i :< NeutIndexIntro (IndexInteger (x `div` y))
         _ -> return $ fromPiElimSeq (fun', args')
-reduce' (i :< NeutSigma (x, tdom) tcod) = do
-  tdom' <- reduce' tdom
-  tcod' <- reduce' tcod
-  return $ i :< NeutSigma (x, tdom') tcod'
+reduce' (i :< NeutSigma xts) = do
+  let (xs, ts) = unzip xts
+  ts' <- mapM reduce' ts
+  return $ i :< NeutSigma (zip xs ts')
 reduce' (i :< NeutSigmaIntro es) = do
   es' <- mapM reduce' es
   return $ i :< NeutSigmaIntro es'
@@ -163,14 +147,6 @@ reduce' (i :< NeutSigmaElim e xs body) = do
       let _ :< body' = subst (zip xs es) body
       reduce' $ i :< body'
     _ -> return $ i :< NeutSigmaElim e' xs body
-reduce' (i :< NeutBox t) = do
-  t' <- reduce' t
-  return $ i :< NeutBox t'
-reduce' (i :< NeutBoxElim e) = do
-  e' <- reduce' e
-  case e' of
-    _ :< NeutBoxIntro e'' -> reduce' e''
-    _ -> return $ i :< NeutBoxElim e'
 reduce' (i :< NeutIndexElim e branchList) = do
   e' <- reduce' e
   case e' of
@@ -188,16 +164,8 @@ reduce' (i :< NeutIndexElim e branchList) = do
                   throwE $
                   "the index " ++ show x ++ " is not included in branchList"
     _ -> return $ i :< NeutIndexElim e' branchList
-reduce' (meta :< NeutMu s e) = do
-  boxMeta <- newNameWith "meta"
-  let box = boxMeta :< NeutBoxIntro (meta :< NeutMu s e)
-  return $ subst [(s, box)] e -- doesn't evaluate recursively
-reduce' (i :< NeutConst t) = do
-  t' <- reduce' t
-  return $ i :< NeutConst t'
-reduce' (i :< NeutConstElim e) = do
-  e' <- reduce' e
-  return $ i :< NeutConstElim e'
+reduce' (meta :< NeutMu s e) =
+  return $ subst [(s, meta :< NeutMu s e)] e -- doesn't evaluate recursively
 reduce' t = return t
 
 toPiIntroSeq :: Neut -> (Neut, [(Identifier, Neut, Identifier)])
@@ -223,8 +191,7 @@ fromPiElimSeq (term, []) = term
 fromPiElimSeq (term, (i, v):xs) = fromPiElimSeq (i :< NeutPiElim term v, xs)
 
 takeConstApp :: Neut -> Maybe Identifier
-takeConstApp (_ :< NeutBoxElim (_ :< NeutConstElim (_ :< NeutConstIntro x))) =
-  Just x
+takeConstApp (_ :< NeutConst x) = Just x
 takeConstApp _ = Nothing
 
 takeIntegerList :: [Neut] -> Maybe [Int]
@@ -252,53 +219,42 @@ findDefault (_:rest) = findDefault rest
 
 isReducible :: Neut -> Bool
 isReducible (_ :< NeutVar _) = False
+isReducible (_ :< NeutConst _) = False
 isReducible (_ :< NeutPi (_, _) _) = False
 isReducible (_ :< NeutPiIntro _ _) = False
 isReducible (_ :< NeutPiElim (_ :< NeutPiIntro _ _) _) = True
 isReducible (_ :< NeutPiElim e1 _) = isReducible e1
-isReducible (_ :< NeutSigma _ _) = False
+isReducible (_ :< NeutSigma _) = False
 isReducible (_ :< NeutSigmaIntro es) = any isReducible es
 isReducible (_ :< NeutSigmaElim (_ :< NeutSigmaIntro _) _ _) = True
 isReducible (_ :< NeutSigmaElim e _ _) = isReducible e
-isReducible (_ :< NeutBox _) = False
-isReducible (_ :< NeutBoxIntro _) = False
-isReducible (_ :< NeutBoxElim (_ :< NeutBoxIntro _)) = True
-isReducible (_ :< NeutBoxElim e) = isReducible e
 isReducible (_ :< NeutIndex _) = False
 isReducible (_ :< NeutIndexIntro _) = False
 isReducible (_ :< NeutIndexElim (_ :< NeutIndexIntro _) _) = True
 isReducible (_ :< NeutIndexElim e _) = isReducible e
 isReducible (_ :< NeutUniv _) = False
-isReducible (_ :< NeutConst _) = False
-isReducible (_ :< NeutConstIntro _) = False
-isReducible (_ :< NeutConstElim e) = isReducible e
 isReducible (_ :< NeutMu _ _) = True
 isReducible (_ :< NeutHole _) = False
 
 isNonRecReducible :: Neut -> Bool
 isNonRecReducible (_ :< NeutVar _) = False
+isNonRecReducible (_ :< NeutConst _) = False
 isNonRecReducible (_ :< NeutPi (_, tdom) tcod) =
   isNonRecReducible tdom || isNonRecReducible tcod
 isNonRecReducible (_ :< NeutPiIntro _ _) = False
 isNonRecReducible (_ :< NeutPiElim (_ :< NeutPiIntro _ _) _) = True
 isNonRecReducible (_ :< NeutPiElim e1 _) = isNonRecReducible e1
-isNonRecReducible (_ :< NeutSigma (_, tdom) tcod) =
-  isNonRecReducible tdom || isNonRecReducible tcod
+isNonRecReducible (_ :< NeutSigma xts) = do
+  let (_, ts) = unzip xts
+  any isNonRecReducible ts
 isNonRecReducible (_ :< NeutSigmaIntro es) = any isNonRecReducible es
 isNonRecReducible (_ :< NeutSigmaElim (_ :< NeutSigmaIntro _) _ _) = True
 isNonRecReducible (_ :< NeutSigmaElim e _ _) = isNonRecReducible e
-isNonRecReducible (_ :< NeutBox e) = isNonRecReducible e
-isNonRecReducible (_ :< NeutBoxIntro _) = False
-isNonRecReducible (_ :< NeutBoxElim (_ :< NeutBoxIntro _)) = True
-isNonRecReducible (_ :< NeutBoxElim e) = isNonRecReducible e
 isNonRecReducible (_ :< NeutIndex _) = False
 isNonRecReducible (_ :< NeutIndexIntro _) = False
 isNonRecReducible (_ :< NeutIndexElim (_ :< NeutIndexIntro _) _) = True
 isNonRecReducible (_ :< NeutIndexElim e _) = isNonRecReducible e
 isNonRecReducible (_ :< NeutUniv _) = False
-isNonRecReducible (_ :< NeutConst _) = False
-isNonRecReducible (_ :< NeutConstIntro _) = False
-isNonRecReducible (_ :< NeutConstElim _) = False
 isNonRecReducible (_ :< NeutMu _ _) = False
 isNonRecReducible (_ :< NeutHole _) = False
 
@@ -320,10 +276,10 @@ nonRecReduce (i :< NeutPiElim e1 e2) = do
       let _ :< body' = subst sub body
       nonRecReduce $ i :< body'
     _ -> return $ i :< NeutPiElim e1' e2'
-nonRecReduce (i :< NeutSigma (x, tdom) tcod) = do
-  tdom' <- nonRecReduce tdom
-  tcod' <- nonRecReduce tcod
-  return $ i :< NeutSigma (x, tdom') tcod'
+nonRecReduce (i :< NeutSigma xts) = do
+  let (xs, ts) = unzip xts
+  ts' <- mapM nonRecReduce ts
+  return $ i :< NeutSigma (zip xs ts')
 nonRecReduce (i :< NeutSigmaIntro es) = do
   es' <- mapM nonRecReduce es
   return $ i :< NeutSigmaIntro es'
@@ -336,17 +292,6 @@ nonRecReduce (i :< NeutSigmaElim e xs body) = do
       let _ :< body' = subst sub body
       reduce $ i :< body'
     _ -> return $ i :< NeutSigmaElim e' xs body
-nonRecReduce (i :< NeutBox e) = do
-  e' <- nonRecReduce e
-  return $ i :< NeutBox e'
-nonRecReduce (i :< NeutBoxIntro e) = do
-  e' <- nonRecReduce e
-  return $ i :< NeutBoxIntro e'
-nonRecReduce (i :< NeutBoxElim e) = do
-  e' <- nonRecReduce e
-  case e' of
-    _ :< NeutBoxIntro e'' -> nonRecReduce e''
-    _ -> return $ i :< NeutBoxElim e'
 nonRecReduce e@(_ :< NeutIndex _) = return e
 nonRecReduce e@(_ :< NeutIndexIntro _) = return e
 nonRecReduce (i :< NeutIndexElim e branchList) = do
@@ -370,8 +315,6 @@ nonRecReduce (i :< NeutIndexElim e branchList) = do
       es' <- mapM nonRecReduce es
       return $ i :< NeutIndexElim e' (zip ls es')
 nonRecReduce e@(_ :< NeutConst _) = return e
-nonRecReduce e@(_ :< NeutConstIntro _) = return e
-nonRecReduce e@(_ :< NeutConstElim _) = return e
 nonRecReduce e@(_ :< NeutUniv _) = return e
 nonRecReduce e@(_ :< NeutMu _ _) = return e
 nonRecReduce e@(_ :< NeutHole x) = do
@@ -493,6 +436,7 @@ reduceComp (CompPrint t e) = do
 
 subst :: Subst -> Neut -> Neut
 subst sub (j :< NeutVar s) = fromMaybe (j :< NeutVar s) (lookup s sub)
+subst _ (j :< NeutConst t) = j :< NeutConst t
 subst sub (j :< NeutPi (s, tdom) tcod) = do
   let tdom' = subst sub tdom
   let sub' = filter (\(x, _) -> x /= s) sub
@@ -507,26 +451,13 @@ subst sub (j :< NeutPiElim e1 e2) = do
   let e1' = subst sub e1
   let e2' = subst sub e2
   j :< NeutPiElim e1' e2'
-subst sub (j :< NeutSigma (s, tdom) tcod) = do
-  let tdom' = subst sub tdom
-  let sub' = filter (\(x, _) -> x /= s) sub
-  let tcod' = subst sub' tcod
-  j :< NeutSigma (s, tdom') tcod'
+subst sub (j :< NeutSigma xts) = j :< NeutSigma (substSigma sub xts)
 subst sub (j :< NeutSigmaIntro es) = j :< NeutSigmaIntro (map (subst sub) es)
 subst sub (j :< NeutSigmaElim e1 xs e2) = do
   let e1' = subst sub e1
   let sub' = filter (\(x, _) -> x `notElem` xs) sub
   let e2' = subst sub' e2
   j :< NeutSigmaElim e1' xs e2'
-subst sub (j :< NeutBox e) = do
-  let e' = subst sub e
-  j :< NeutBox e'
-subst sub (j :< NeutBoxIntro e) = do
-  let e' = subst sub e
-  j :< NeutBoxIntro e'
-subst sub (j :< NeutBoxElim e) = do
-  let e' = subst sub e
-  j :< NeutBoxElim e'
 subst _ (j :< NeutIndex x) = j :< NeutIndex x
 subst _ (j :< NeutIndexIntro l) = j :< NeutIndexIntro l
 subst sub (j :< NeutIndexElim e branchList) = do
@@ -537,9 +468,6 @@ subst sub (j :< NeutIndexElim e branchList) = do
           let sub' = filter (\(x, _) -> x `notElem` vs) sub
           (l, subst sub' e)
   j :< NeutIndexElim e' branchList'
-subst sub (j :< NeutConst t) = j :< NeutConst (subst sub t)
-subst _ (j :< NeutConstIntro s) = j :< NeutConstIntro s
-subst sub (j :< NeutConstElim e) = j :< NeutConstElim (subst sub e)
 subst _ (j :< NeutUniv i) = j :< NeutUniv i
 subst sub (j :< NeutMu x e) = do
   let sub' = filter (\(y, _) -> x /= y) sub
@@ -547,14 +475,13 @@ subst sub (j :< NeutMu x e) = do
   j :< NeutMu x e'
 subst sub (j :< NeutHole s) = fromMaybe (j :< NeutHole s) (lookup s sub)
 
-substSigma ::
-     Subst -> [(Identifier, Neut)] -> Neut -> ([(Identifier, Neut)], Neut)
-substSigma sub [] e = ([], subst sub e)
-substSigma sub ((x, t):rest) e = do
+substSigma :: Subst -> [(Identifier, Neut)] -> [(Identifier, Neut)]
+substSigma _ [] = []
+substSigma sub ((x, t):rest) = do
   let sub' = filter (\(y, _) -> y /= x) sub
-  let (xts, e') = substSigma sub' rest e
+  let xts = substSigma sub' rest
   let t' = subst sub t
-  ((x, t') : xts, e')
+  (x, t') : xts
 
 varIndex :: IndexOrVar -> [Identifier]
 varIndex (Right x) = [x]

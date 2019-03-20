@@ -89,7 +89,7 @@
 (let buz (pair nat:zero unit))
 (ascription buz (code nat))
 
-(let succ-buz (pair nat:succ buz))
-(ascription succ-buz (code nat))
+; (let succ-buz (pair nat:succ buz))
+; (ascription succ-buz (code nat))
 
 unit

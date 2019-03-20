@@ -16,6 +16,7 @@ rename :: Neut -> WithEnv Neut
 rename (i :< NeutVar s) = do
   t <- NeutVar <$> lookupNameEnv s
   return $ i :< t
+rename (i :< NeutConst x) = return $ i :< NeutConst x
 rename (i :< NeutPi (s, tdom) tcod) = do
   tdom' <- rename tdom
   local $ do
@@ -32,12 +33,9 @@ rename (i :< NeutPiElim e v) = do
   e' <- rename e
   v' <- rename v
   return $ i :< NeutPiElim e' v'
-rename (i :< NeutSigma (x, t1) t2) = do
-  t1' <- rename t1
-  local $ do
-    x' <- newNameWith x
-    t2' <- rename t2
-    return $ i :< NeutSigma (x', t1') t2' -- t' <- rename t
+rename (i :< NeutSigma xts) = do
+  xts' <- renameSigma xts
+  return $ i :< NeutSigma xts'
 rename (i :< NeutSigmaIntro es) = do
   es' <- mapM rename es
   return $ i :< NeutSigmaIntro es'
@@ -47,39 +45,12 @@ rename (i :< NeutSigmaElim e1 xs e2) = do
     xs' <- mapM newNameWith xs
     e2' <- rename e2
     return $ i :< NeutSigmaElim e1' xs' e2'
-rename (i :< NeutBox t) = do
-  t' <- rename t
-  return $ i :< NeutBox t'
-rename (i :< NeutBoxIntro t) = do
-  t' <- rename t
-  return $ i :< NeutBoxIntro t'
-rename (i :< NeutBoxElim t) = do
-  t' <- rename t
-  return $ i :< NeutBoxElim t'
 rename (i :< NeutIndex s) = return $ i :< NeutIndex s
 rename (i :< NeutIndexIntro x) = return $ i :< NeutIndexIntro x
 rename (i :< NeutIndexElim e branchList) = do
   e' <- rename e
   branchList' <- renameBranchList branchList
   return $ i :< NeutIndexElim e' branchList'
-rename (i :< NeutConst t) = do
-  t' <- rename t
-  return $ i :< NeutConst t'
-rename (i :< NeutConstIntro s) = return $ i :< NeutConstIntro s
-rename (i :< NeutConstElim e) = do
-  e' <- rename e
-  return $ i :< NeutConstElim e'
-rename (i :< NeutVector index t) = do
-  index' <- rename index
-  t' <- rename t
-  return $ i :< NeutVector index' t'
-rename (i :< NeutVectorIntro branchList) = do
-  branchList' <- renameBranchList branchList
-  return $ i :< NeutVectorIntro branchList'
-rename (i :< NeutVectorElim e v) = do
-  e' <- rename e
-  v' <- rename v
-  return $ i :< NeutVectorElim e' v'
 rename (i :< NeutUniv j) = return $ i :< NeutUniv j
 rename (i :< NeutMu s e) =
   local $ do
@@ -87,6 +58,15 @@ rename (i :< NeutMu s e) =
     e' <- rename e
     return $ i :< NeutMu s' e'
 rename (i :< NeutHole x) = return $ i :< NeutHole x
+
+renameSigma :: [(Identifier, Neut)] -> WithEnv [(Identifier, Neut)]
+renameSigma [] = return []
+renameSigma ((x, t):xts) = do
+  t' <- rename t
+  local $ do
+    x' <- newNameWith x
+    xts' <- renameSigma xts
+    return $ (x', t') : xts'
 
 renameBranchList :: [(IndexOrVar, Neut)] -> WithEnv [(IndexOrVar, Neut)]
 renameBranchList branchList =

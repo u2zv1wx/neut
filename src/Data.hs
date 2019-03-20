@@ -79,52 +79,23 @@ data LowType
 
 data NeutF a
   = NeutVar Identifier
+  | NeutConst Identifier
   | NeutPi (Identifier, a)
            a
   | NeutPiIntro (Identifier, a)
                 a
   | NeutPiElim a
                a
-  | NeutSigma (Identifier, a)
-              a
+  | NeutSigma [(Identifier, a)]
   | NeutSigmaIntro [a]
   | NeutSigmaElim a
                   [Identifier]
                   a
-  | NeutBox a
-  | NeutBoxIntro a
-  | NeutBoxElim a
   | NeutIndex Identifier
   | NeutIndexIntro Index
   | NeutIndexElim a
                   [(IndexOrVar, a)]
   | NeutUniv UnivLevel
-  -- Constant type is a "strict" version of box type.
-  -- Suppose `e` has a ordinary box type, `(box a)`. In this case, we have a side-condition
-  -- that all the free variables in `e` must have type of the form `(box b)`. Now, for `e`
-  -- to a constant type, the side-condition is changed to: `e` does not have any
-  -- free variables.
-  | NeutConst a -- constant modality
-  | NeutConstIntro Identifier
-  | NeutConstElim a
-  -- (vector L A) is essentially just a function type L -> A.
-  -- Since the type of the domain of this function type is a label type,
-  -- and since label types are interpreted using i32, we can use an vector
-  -- of type [0 x i8*]* to represent this type. Note that an vector can be understood
-  -- as a function from an integer (an index `i` of type i32) to its value (x[i]).
-  | NeutVector a -- label type
-               a -- the type of its content
-  -- (vector.intro ((l1 e1) ... (ln en)))
-  -- This is conceptually the same as `lam x. case x of {l1 -> e1, ..., ln -> en}`.
-  -- Since the body of this lambda abstraction must be in some kind of determined form,
-  -- we cannot use the same definition as NeutPiIntro here.
-  | NeutVectorIntro [(IndexOrVar, a)]
-  -- (vector.elim e i)
-  -- The first argument `e` is supposed to be a vector, and the second argument
-  -- is supposed to be a label, namely, an index.
-  -- In C-like syntax, this term corresponds to e[i].
-  | NeutVectorElim a
-                   a
   | NeutMu Identifier
            a
   | NeutHole Identifier
@@ -265,6 +236,11 @@ data Comp
   | CompUpElim Identifier
                Comp
                Comp
+  | CompVector Value
+               Comp
+  | CompVectorIntro [(IndexOrVar, Comp)]
+  | CompVectorElim Comp
+                   Value
   | CompPrint LowType
               Value
   deriving (Show)

@@ -1,6 +1,5 @@
 module Elaborate.Infer
   ( infer
-  , boxConstraint
   ) where
 
 import Control.Monad
@@ -45,7 +44,7 @@ import qualified Data.PQueue.Min as Q
 -- Dynamic Pattern Unification for Dependent Types and Records". Typed Lambda
 -- Calculi and Applications, 2011.
 infer :: Context -> Neut -> WithEnv Neut
-infer ctx (meta :< NeutVar s) = do
+infer _ (meta :< NeutVar s) = do
   univ <- boxUniv
   t <- lookupTypeEnv' s >>= annot univ
   -- t <- lookupTypeEnv1 s (map fst ctx) univ >>= annot univ
@@ -129,20 +128,6 @@ infer ctx (meta :< NeutSigmaElim e1 xs e2) = do
   typeC <- appCtx (ctx ++ (zip xs holeList) ++ [(z, t1)])
   insConstraintEnv (map fst ctx) t2 (subst [(z, pair)] typeC) univ
   returnMeta meta $ subst [(z, e1)] typeC
-infer ctx (meta :< NeutBox t) = infer ctx t >>= returnMeta meta
-infer ctx (meta :< NeutBoxIntro e) = do
-  univ <- boxUniv
-  t <- infer ctx e >>= annot univ
-  boxConstraint ctx $ var e
-  wrapTypeWithUniv univ (NeutBox t) >>= returnMeta meta
-infer ctx (meta :< NeutBoxElim e) = do
-  univ <- boxUniv
-  t <- infer ctx e >>= annot univ
-  resultHole <- appCtx ctx
-  boxType <- wrapType $ NeutBox resultHole
-  insConstraintEnv (map fst ctx) t boxType univ
-  boxConstraint ctx $ var e
-  returnMeta meta resultHole
 infer _ (meta :< NeutIndex _) = boxUniv >>= returnMeta meta
 infer ctx (meta :< NeutIndexIntro l) = do
   mk <- lookupKind l
@@ -170,14 +155,12 @@ infer ctx (meta :< NeutIndexElim e branchList) = do
 infer ctx (meta :< NeutMu s e) = do
   univ <- boxUniv
   trec <- appCtx ctx >>= annot univ
-  boxType <- wrapType (NeutBox trec) >>= annot univ
-  insTypeEnv s boxType
-  te <- infer (ctx ++ [(s, boxType)]) e >>= annot univ
-  boxConstraint ctx $ var e
+  -- boxType <- wrapType (NeutBox trec) >>= annot univ
+  insTypeEnv s trec
+  te <- infer (ctx ++ [(s, trec)]) e >>= annot univ
   insConstraintEnv (map fst ctx) te trec univ
   returnMeta meta te
-infer ctx (meta :< NeutConst t) = infer ctx t >>= returnMeta meta
-infer ctx (meta :< NeutConstIntro s) = do
+infer ctx (meta :< NeutConst s) = do
   higherUniv <- boxUniv
   univ <- boxUniv >>= annot higherUniv
   t <- lookupTypeEnv' s >>= annot univ
@@ -186,43 +169,7 @@ infer ctx (meta :< NeutConstIntro s) = do
   u <- infer ctx t >>= annot higherUniv
   insConstraintEnv (map fst ctx) univ u higherUniv
   returnMeta meta t
-infer ctx (meta :< NeutConstElim e) = do
-  univ <- boxUniv
-  t <- infer ctx e >>= annot univ
-  resultHole <- appCtx ctx
-  constType <- wrapType $ NeutConst resultHole
-  insConstraintEnv (map fst ctx) t constType univ
-  returnMeta meta resultHole
-infer ctx (meta :< NeutVector t1 t2) = do
-  higherUniv <- boxUniv
-  u1 <- infer ctx t1 >>= annot higherUniv
-  u2 <- infer ctx t2 >>= annot higherUniv
-  insConstraintEnv (map fst ctx) u1 u2 higherUniv
-  returnMeta meta u1
-infer _ (_ :< NeutVectorIntro []) = lift $ throwE "empty vector"
-infer ctx (meta :< NeutVectorIntro branchList) = do
-  let (ls, es) = unzip branchList
-  univ <- boxUniv
-  tls <- mapM (inferIndex ctx) ls
-  tls' <- mapM (annot univ) $ join $ map maybeToList tls
-  ts <- mapM (infer ctx >=> annot univ) es
-  constrainList ctx tls'
-  constrainList ctx ts
-  typeMeta <- newName' "meta" univ
-  returnMeta meta $ typeMeta :< NeutVector (head tls') (head ts)
-infer ctx (meta :< NeutVectorElim e1 e2) = do
-  univ <- boxUniv
-  tVec <- infer ctx e1 >>= reduce
-  tIndex <- infer ctx e2 >>= annot univ
-  case tVec of
-    _ :< NeutVector tIndex' t -> do
-      insConstraintEnv (map fst ctx) tIndex tIndex' univ
-      returnMeta meta t
-    _ -> do
-      t <- appCtx ctx >>= annot univ
-      typeMeta <- newName' "meta" univ
-      insConstraintEnv (map fst ctx) tVec (typeMeta :< NeutVector tIndex t) univ
-      returnMeta meta t
+  -- infer ctx t >>= returnMeta meta
 infer _ (meta :< NeutUniv _) = boxUniv >>= returnMeta meta
 infer ctx (meta :< NeutHole _) = appCtx ctx >>= returnMeta meta
 
@@ -324,12 +271,3 @@ returnMeta :: Identifier -> Neut -> WithEnv Neut
 returnMeta meta t = do
   insTypeEnv meta t
   return t
-
-boxConstraint :: Context -> [Identifier] -> WithEnv ()
-boxConstraint ctx xs =
-  forM_ xs $ \x -> do
-    t <- lookupTypeEnv' x
-    h <- appCtx ctx
-    boxType@(meta :< _) <- wrapType $ NeutBox h
-    u <- lookupTypeEnv' meta
-    insConstraintEnv (map fst ctx) t boxType u

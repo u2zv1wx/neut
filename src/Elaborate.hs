@@ -30,7 +30,6 @@ import qualified Data.PQueue.Min as Q
 
 -- Given a term `e` and its name `main`, this function
 --   (1) traces `e` using `infer e`, collecting type constraints,
---   (1.1) if a variable occurs more than twice in `e`, constrain it to have box type,
 --   (2) updates typeEnv for `main` by the result of `infer e`,
 --   (3) analyze the constraints, solving easy ones,
 --   (4) synthesize these analyzed constraints, solving as many solutions as possible,
@@ -42,7 +41,6 @@ elaborate :: Identifier -> Neut -> WithEnv ()
 elaborate main e = do
   t <- infer [] e
   insTypeEnv main t
-  boxConstraint [] $ nonLinear e
   -- Kantian type-inference ;)
   gets constraintEnv >>= analyze
   gets constraintQueue >>= updateQueue
@@ -91,6 +89,9 @@ checkNumConstraint = do
 
 elaborate' :: Neut -> WithEnv Term
 elaborate' (_ :< NeutVar s) = return $ TermVar s
+elaborate' (_ :< NeutConst _) = undefined
+  -- t' <- elaborate' t
+  -- return $ TermConst t'
 elaborate' (_ :< NeutPi (s, tdom) tcod) = do
   tdom' <- elaborate' tdom
   tcod' <- elaborate' tcod
@@ -113,15 +114,6 @@ elaborate' (_ :< NeutSigmaElim e1 xs e2) = do
   e1' <- elaborate' e1
   e2' <- elaborate' e2
   return $ TermSigmaElim e1' xs e2'
-elaborate' (_ :< NeutBox t) = do
-  t' <- elaborate' t
-  return $ TermBox t'
-elaborate' (_ :< NeutBoxIntro t) = do
-  t' <- elaborate' t
-  return $ TermBoxIntro t'
-elaborate' (_ :< NeutBoxElim t) = do
-  t' <- elaborate' t
-  return $ TermBoxElim t'
 elaborate' (_ :< NeutIndex s) = return $ TermIndex s
 elaborate' (meta :< NeutIndexIntro x) = return $ TermIndexIntro x meta
 elaborate' (_ :< NeutIndexElim e branchList) = do
@@ -131,27 +123,6 @@ elaborate' (_ :< NeutIndexElim e branchList) = do
       body' <- elaborate' body
       return (l, body')
   return $ TermIndexElim e' branchList'
-elaborate' (_ :< NeutConst t) = do
-  t' <- elaborate' t
-  return $ TermConst t'
-elaborate' (_ :< NeutConstIntro s) = return $ TermConstIntro s
-elaborate' (_ :< NeutConstElim e) = do
-  e' <- elaborate' e
-  return $ TermConstElim e'
-elaborate' (_ :< NeutVector t1 t2) = do
-  t1' <- elaborate' t1
-  t2' <- elaborate' t2
-  return $ TermVector t1' t2'
-elaborate' (_ :< NeutVectorIntro branchList) = do
-  branchList' <-
-    forM branchList $ \(l, body) -> do
-      body' <- elaborate' body
-      return (l, body')
-  return $ TermVectorIntro branchList'
-elaborate' (_ :< NeutVectorElim e1 e2) = do
-  e1' <- elaborate' e1
-  e2' <- elaborate' e2
-  return $ TermVectorElim e1' e2'
 elaborate' (_ :< NeutUniv j) = return $ TermUniv j
 elaborate' (_ :< NeutMu s e) = do
   e' <- elaborate' e

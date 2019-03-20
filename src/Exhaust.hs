@@ -20,6 +20,7 @@ exhaust e = do
 
 exhaust' :: Neut -> WithEnv Bool
 exhaust' (_ :< NeutVar _) = return True
+exhaust' (_ :< NeutConst _) = return True
 exhaust' (_ :< NeutPi (_, tdom) tcod) = do
   b1 <- exhaust' tdom
   b2 <- exhaust' tcod
@@ -29,10 +30,10 @@ exhaust' (_ :< NeutPiElim e1 e2) = do
   b1 <- exhaust' e1
   b2 <- exhaust' e2
   return $ b1 && b2
-exhaust' (_ :< NeutSigma (_, tdom) tcod) = do
-  b1 <- exhaust' tdom
-  b2 <- exhaust' tcod
-  return $ b1 && b2
+exhaust' (_ :< NeutSigma xts) = do
+  let (_, ts) = unzip xts
+  bs <- mapM exhaust' ts
+  return $ and bs
 exhaust' (_ :< NeutSigmaIntro es) = do
   bs <- mapM exhaust' es
   return $ and bs
@@ -40,9 +41,6 @@ exhaust' (_ :< NeutSigmaElim e1 _ e2) = do
   b1 <- exhaust' e1
   b2 <- exhaust' e2
   return $ b1 && b2
-exhaust' (_ :< NeutBox e) = exhaust' e
-exhaust' (_ :< NeutBoxIntro e) = exhaust' e
-exhaust' (_ :< NeutBoxElim e) = exhaust' e
 exhaust' (_ :< NeutMu _ e) = exhaust' e
 exhaust' (_ :< NeutIndex _) = return True
 exhaust' (_ :< NeutIndexIntro _) = return True
@@ -66,9 +64,6 @@ exhaust' (meta :< NeutIndexElim e1 branchList@((l, _):_)) = do
             then return True
             else return False
         _ -> return False
-exhaust' (_ :< NeutConst t) = exhaust' t
-exhaust' (_ :< NeutConstIntro _) = return True
-exhaust' (_ :< NeutConstElim e) = exhaust' e
 exhaust' (_ :< NeutUniv _) = return True
 exhaust' (_ :< NeutHole _) = return False
 

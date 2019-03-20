@@ -131,45 +131,47 @@ simp'' ((ctx, _ :< NeutPiIntro (x, _) body1, e2, t):cs) = do
   simp $ (ctx, body1, app, t) : cs
 simp'' ((ctx, e1, e2@(_ :< NeutPiIntro _ _), t):cs) =
   simp $ (ctx, e2, e1, t) : cs
-simp'' ((ctx, _ :< NeutSigma (x, tdom1) tcod1, _ :< NeutSigma (y, tdom2) tcod2, univ):cs) = do
+simp'' ((_, _ :< NeutSigma [], _ :< NeutSigma [], _):cs) = simp cs
+simp'' ((ctx, i :< NeutSigma ((x, tx):xts), j :< NeutSigma ((y, ty):yts), univ):cs) = do
   var <- toVar' x
   cs' <- sConstraint [(y, var)] cs >>= simp
+  let sig' = subst [(y, var)] (j :< NeutSigma yts)
   simp $
-    (ctx, tdom1, tdom2, univ) :
-    (ctx ++ [x], tcod1, subst [(y, var)] tcod2, univ) : cs'
-simp'' ((ctx, _ :< NeutSigmaIntro es1, _ :< NeutSigmaIntro es2, tSigma):cs)
+    (ctx, tx, ty, univ) : (ctx ++ [x], i :< NeutSigma xts, sig', univ) : cs'
+    -- (ctx ++ [x], tcod1, subst [(y, var)] tcod2, univ) : cs'
+-- simp'' ((ctx, _ :< NeutSigma (x, tdom1) tcod1, _ :< NeutSigma (y, tdom2) tcod2, univ):cs) = do
+--   var <- toVar' x
+--   cs' <- sConstraint [(y, var)] cs >>= simp
+--   simp $
+--     (ctx, tdom1, tdom2, univ) :
+--     (ctx ++ [x], tcod1, subst [(y, var)] tcod2, univ) : cs'
+simp'' ((ctx, _ :< NeutSigmaIntro es1, _ :< NeutSigmaIntro es2, _ :< NeutSigma xts):cs)
   | length es1 == length es2
-  , (t, xts) <- toSigmaSeq tSigma = do
-    let ts = map snd xts ++ [t]
+  -- , (t, xts) <- toSigmaSeq tSigma
+    -- let ts = map snd xts ++ [t]
+   = do
+    let (_, ts) = unzip xts
     let sub = zip (map fst xts) es1
     let ts' = map (subst sub) ts
     newCs <-
       forM (zip (zip es1 es2) ts') $ \((e1, e2), t') -> return (ctx, e1, e2, t')
     simp $ newCs ++ cs
-simp'' ((ctx, _ :< NeutSigmaIntro es, e2, tSigma):cs)
-  | (t, xts) <- toSigmaSeq tSigma
-  , length xts + 1 == length es = do
-    prList <- projectionList e2 (xts, t)
+simp'' ((ctx, _ :< NeutSigmaIntro es, e2, _ :< NeutSigma xts):cs)
+    -- (t, xts) <- toSigmaSeq tSigma
+  | length xts == length es = do
+    prList <- projectionList e2 (map snd xts)
+    -- prList <- projectionList e2 (xts, t)
     let sub = zip (map fst xts) es
-    let ts = map (subst sub) $ map snd xts ++ [t]
+    let ts = map (subst sub . snd) xts
     newCs <-
       forM (zip3 es prList ts) $ \(e, ithProj, t) -> return (ctx, e, ithProj, t)
     simp $ newCs ++ cs
-simp'' ((ctx, e1, e2@(_ :< NeutSigmaIntro es), t@(_ :< NeutSigma xts _)):cs)
-  | length xts + 1 == length es = simp $ (ctx, e2, e1, t) : cs
-simp'' ((ctx, _ :< NeutBox t1, _ :< NeutBox t2, univ):cs) =
-  simp $ (ctx, t1, t2, univ) : cs
-simp'' ((ctx, _ :< NeutBoxIntro e1, _ :< NeutBoxIntro e2, _ :< NeutBox t):cs) =
-  simp $ (ctx, e1, e2, t) : cs
-simp'' ((ctx, _ :< NeutBoxElim e1, _ :< NeutBoxElim e2, t):cs) = do
-  meta <- newNameWith "meta"
-  simp $ (ctx, e1, e2, meta :< NeutBox t) : cs
-simp'' ((ctx, _ :< NeutConst t1, _ :< NeutConst t2, univ):cs) =
-  simp $ (ctx, t1, t2, univ) : cs
+simp'' ((ctx, e1, e2@(_ :< NeutSigmaIntro es), t@(_ :< NeutSigma xts)):cs)
+  | length xts == length es = simp $ (ctx, e2, e1, t) : cs
+simp'' ((_, _ :< NeutConst x, _ :< NeutConst y, _):cs)
+  | x == y = simp cs
 simp'' ((_, _ :< NeutIndex l1, _ :< NeutIndex l2, _):cs)
   | l1 == l2 = simp cs
-simp'' ((ctx, _ :< NeutVector t11 t12, _ :< NeutVector t21 t22, univ):cs) =
-  simp $ (ctx, t11, t21, univ) : (ctx, t12, t22, univ) : cs
 simp'' ((_, _ :< NeutUniv i, _ :< NeutUniv j, _):cs) = do
   insUnivConstraintEnv i j
   simp cs
