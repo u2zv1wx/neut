@@ -52,7 +52,6 @@ infer ctx (meta :< NeutConst s) = do
   higherUniv <- boxUniv
   univ <- boxUniv >>= annot higherUniv
   t <- lookupTypeEnv' s >>= annot univ
-  -- t <- lookupTypeEnv1 s (map fst ctx) univ
   insTypeEnv s t
   u <- infer ctx t >>= annot higherUniv
   insConstraintEnv (map fst ctx) univ u higherUniv
@@ -126,13 +125,10 @@ infer ctx (meta :< NeutSigmaElim e1 xs e2) = do
   holeList <- sigmaHole ctx xs
   forM_ (zip xs holeList) $ uncurry insTypeEnv
   t2 <- infer ctx e2 >>= annot univ
-  -- let binder = zip xs (take (length holeList - 1) holeList)
-  -- let cod = last holeList
   let binder = zip xs holeList
   sigmaMeta <- newNameWith "meta"
   let sigmaType = sigmaMeta :< NeutSigma binder
   annot univ sigmaType
-  -- sigmaType <- toSigmaType binder cod
   insConstraintEnv (map fst ctx) t1 sigmaType univ
   z <- newNameOfType t1
   pair <- constructPair (ctx ++ zip xs holeList) xs
