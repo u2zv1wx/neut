@@ -37,10 +37,11 @@ virtualize = do
 
 virtualValue :: Value -> WithEnv Data
 virtualValue (ValueVar x) = globalizeIfNecessary x
-virtualValue (ValueSigma _ _) = return $ DataInt 0
+virtualValue (ValueSigma _) = return $ DataInt 0
 virtualValue (ValueSigmaIntro es) = do
   ds <- mapM virtualValue es
   return $ DataStruct ds
+virtualValue (ValueDown _) = return $ DataInt 0
 virtualValue (ValueIndex _) = return $ DataInt 0
 virtualValue (ValueIndexIntro x meta) =
   case x of
@@ -64,17 +65,11 @@ virtualValue (ValueIndexIntro x meta) =
         Just i -> return $ DataInt i
         Nothing -> lift $ throwE $ "no such index defined: " ++ show name
 virtualValue ValueUniv = return $ DataInt 0
-virtualValue (ValueBox _) = return $ DataInt 0
-virtualValue (ValueConst _) = return $ DataInt 0
-virtualValue (ValueConstIntro x) = return $ DataGlobal x
-virtualValue (ValueArith kind e1 e2) = do
-  d1 <- virtualValue e1
-  d2 <- virtualValue e2
-  return $ DataArith kind d1 d2
+virtualValue (ValueConst x) = return $ DataGlobal x
 
 virtualComp :: Comp -> WithEnv Code
 virtualComp (CompPi _ _) = return $ CodeReturn $ DataInt 0
-virtualComp (CompPiElimConstElim f xs) = do
+virtualComp (CompPiElimDownElim f xs) = do
   f' <- globalizeIfNecessary f
   let xs' = map DataLocal xs
   return $ CodeCallTail f' xs'
@@ -91,6 +86,7 @@ virtualComp (CompIndexElim e branchList) = do
   es' <- mapM virtualComp es
   e' <- virtualValue e
   return $ CodeSwitch e' $ zip labelList es'
+virtualComp (CompUp _) = return $ CodeReturn $ DataInt 0
 virtualComp (CompUpIntro v) = do
   d <- virtualValue v
   return $ CodeReturn d
@@ -98,10 +94,10 @@ virtualComp (CompUpElim x e1 e2) = do
   e1' <- virtualComp e1
   e2' <- virtualComp e2
   return $ commUpElim x e1' e2'
-virtualComp (CompPrint t e) = do
-  e' <- virtualValue e
-  return $ CodePrint t e' $ CodeReturn (DataInt 0)
 
+-- virtualComp (CompPrint t e) = do
+--   e' <- virtualValue e
+--   return $ CodePrint t e' $ CodeReturn (DataInt 0)
 extract :: Data -> [(Identifier, Int)] -> Int -> Code -> Code
 extract z [] _ cont = CodeFree z cont
 extract z ((x, i):xis) n cont = do
