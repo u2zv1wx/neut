@@ -23,10 +23,6 @@ import Data.Tuple (swap)
 import qualified Text.Show.Pretty as Pr
 
 reduce :: Neut -> WithEnv Neut
-reduce (i :< NeutPi (x, tdom) tcod) = do
-  tdom' <- reduce tdom
-  tcod' <- reduce tcod
-  return $ i :< NeutPi (x, tdom') tcod'
 reduce app@(i :< NeutPiElim _ _) = do
   let (fun, args) = toPiElimSeq app
   args' <-
@@ -60,14 +56,6 @@ reduce app@(i :< NeutPiElim _ _) = do
           , Just [x, y] <- takeIntegerList (map snd args') ->
             return $ i :< NeutIndexIntro (IndexInteger (x `div` y))
         _ -> return $ fromPiElimSeq (fun', args')
-reduce (i :< NeutSigma xts) = do
-  let (xs, ts) = unzip xts
-  ts' <- mapM reduce ts
-  let xts' = zip xs ts'
-  return $ i :< NeutSigma xts'
-reduce (i :< NeutSigmaIntro es) = do
-  es' <- mapM reduce es
-  return $ i :< NeutSigmaIntro es'
 reduce (i :< NeutSigmaElim e xs body) = do
   e' <- reduce e
   case e of
@@ -94,79 +82,6 @@ reduce (i :< NeutIndexElim e branchList) = do
     _ -> return $ i :< NeutIndexElim e' branchList
 reduce (meta :< NeutMu s e) = reduce $ subst [(s, meta :< NeutMu s e)] e
 reduce t = return t
-
-reduce' :: Neut -> WithEnv Neut
-reduce' (i :< NeutPi (x, tdom) tcod) = do
-  tdom' <- reduce' tdom
-  tcod' <- reduce' tcod
-  return $ i :< NeutPi (x, tdom') tcod'
-reduce' app@(i :< NeutPiElim _ _) = do
-  let (fun, args) = toPiElimSeq app
-  args' <-
-    forM args $ \(x, e) -> do
-      e' <- reduce' e
-      return (x, e')
-  fun' <- reduce' fun
-  case fun' of
-    lam@(_ :< NeutPiIntro _ _)
-      | (body, xtms) <- toPiIntroSeq lam
-      , length xtms == length args -> do
-        let xs = map (\(x, _, _) -> x) xtms
-        let es = map snd args'
-        reduce' $ subst (zip xs es) body
-    _ ->
-      case fun' of
-        _ :< NeutConst constant
-          | constant `elem` intAddConstantList
-          , Just [x, y] <- takeIntegerList (map snd args') ->
-            return $ i :< NeutIndexIntro (IndexInteger (x + y))
-        _ :< NeutConst constant
-          | constant `elem` intSubConstantList
-          , Just [x, y] <- takeIntegerList (map snd args') ->
-            return $ i :< NeutIndexIntro (IndexInteger (x - y))
-        _ :< NeutConst constant
-          | constant `elem` intMulConstantList
-          , Just [x, y] <- takeIntegerList (map snd args') ->
-            return $ i :< NeutIndexIntro (IndexInteger (x * y))
-        _ :< NeutConst constant
-          | constant `elem` intDivConstantList
-          , Just [x, y] <- takeIntegerList (map snd args') ->
-            return $ i :< NeutIndexIntro (IndexInteger (x `div` y))
-        _ -> return $ fromPiElimSeq (fun', args')
-reduce' (i :< NeutSigma xts) = do
-  let (xs, ts) = unzip xts
-  ts' <- mapM reduce' ts
-  return $ i :< NeutSigma (zip xs ts')
-reduce' (i :< NeutSigmaIntro es) = do
-  es' <- mapM reduce' es
-  return $ i :< NeutSigmaIntro es'
-reduce' (i :< NeutSigmaElim e xs body) = do
-  e' <- reduce' e
-  case e of
-    _ :< NeutSigmaIntro es -> do
-      let _ :< body' = subst (zip xs es) body
-      reduce' $ i :< body'
-    _ -> return $ i :< NeutSigmaElim e' xs body
-reduce' (i :< NeutIndexElim e branchList) = do
-  e' <- reduce' e
-  case e' of
-    _ :< NeutIndexIntro x ->
-      case lookup (Left x) branchList of
-        Just body -> reduce' body
-        Nothing ->
-          case findIndexVariable branchList of
-            Just (y, body) -> reduce' $ subst [(y, e')] body
-            Nothing ->
-              case findDefault branchList of
-                Just body -> reduce' body
-                Nothing ->
-                  lift $
-                  throwE $
-                  "the index " ++ show x ++ " is not included in branchList"
-    _ -> return $ i :< NeutIndexElim e' branchList
-reduce' (meta :< NeutMu s e) =
-  return $ subst [(s, meta :< NeutMu s e)] e -- doesn't evaluate recursively
-reduce' t = return t
 
 toPiIntroSeq :: Neut -> (Neut, [(Identifier, Neut, Identifier)])
 toPiIntroSeq (meta :< NeutPiIntro (x, t) body) = do
@@ -221,71 +136,6 @@ isReducible (_ :< NeutIndexElim e _) = isReducible e
 isReducible (_ :< NeutUniv _) = False
 isReducible (_ :< NeutMu _ _) = True
 isReducible (_ :< NeutHole _) = False
-
-nonRecReduce :: Neut -> WithEnv Neut
-nonRecReduce e@(_ :< NeutVar _) = return e
-nonRecReduce (i :< NeutPi (x, tdom) tcod) = do
-  tdom' <- nonRecReduce tdom
-  tcod' <- nonRecReduce tcod
-  return $ i :< NeutPi (x, tdom') tcod'
-nonRecReduce (i :< NeutPiIntro (x, tdom) e) = do
-  e' <- nonRecReduce e
-  return $ i :< NeutPiIntro (x, tdom) e'
-nonRecReduce (i :< NeutPiElim e1 e2) = do
-  e2' <- nonRecReduce e2
-  e1' <- nonRecReduce e1
-  case e1' of
-    _ :< NeutPiIntro (arg, _) body -> do
-      let sub = [(arg, e2')]
-      let _ :< body' = subst sub body
-      nonRecReduce $ i :< body'
-    _ -> return $ i :< NeutPiElim e1' e2'
-nonRecReduce (i :< NeutSigma xts) = do
-  let (xs, ts) = unzip xts
-  ts' <- mapM nonRecReduce ts
-  return $ i :< NeutSigma (zip xs ts')
-nonRecReduce (i :< NeutSigmaIntro es) = do
-  es' <- mapM nonRecReduce es
-  return $ i :< NeutSigmaIntro es'
-nonRecReduce (i :< NeutSigmaElim e xs body) = do
-  e' <- nonRecReduce e
-  case e' of
-    _ :< NeutSigmaIntro es -> do
-      es' <- mapM nonRecReduce es
-      let sub = zip xs es'
-      let _ :< body' = subst sub body
-      reduce $ i :< body'
-    _ -> return $ i :< NeutSigmaElim e' xs body
-nonRecReduce e@(_ :< NeutIndex _) = return e
-nonRecReduce e@(_ :< NeutIndexIntro _) = return e
-nonRecReduce (i :< NeutIndexElim e branchList) = do
-  e' <- nonRecReduce e
-  case e' of
-    _ :< NeutIndexIntro x ->
-      case lookup (Left x) branchList of
-        Just body -> nonRecReduce body
-        Nothing ->
-          case findIndexVariable branchList of
-            Just (y, body) -> nonRecReduce $ subst [(y, e')] body
-            Nothing ->
-              case findDefault branchList of
-                Just body -> nonRecReduce body
-                Nothing ->
-                  lift $
-                  throwE $
-                  "the index " ++ show x ++ " is not included in branchList"
-    _ -> do
-      let (ls, es) = unzip branchList
-      es' <- mapM nonRecReduce es
-      return $ i :< NeutIndexElim e' (zip ls es')
-nonRecReduce e@(_ :< NeutConst _) = return e
-nonRecReduce e@(_ :< NeutUniv _) = return e
-nonRecReduce e@(_ :< NeutMu _ _) = return e
-nonRecReduce e@(_ :< NeutHole x) = do
-  sub <- gets substitution
-  case lookup x sub of
-    Just e' -> return e'
-    Nothing -> return e
 
 reducePos :: Pos -> WithEnv Pos
 reducePos (PosDownIntro e) = do

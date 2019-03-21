@@ -173,7 +173,7 @@ simp'' (c@(_, _, e2, _):cs)
     return $ c : cs'
 simp'' ((ctx, e1, e2, t):cs)
   | isReducible e1 = do
-    e1' <- reduce' e1
+    e1' <- reduce e1
     simp $ (ctx, e1', e2, t) : cs
 simp'' ((ctx, e1, e2, t):cs)
   | isReducible e2 = simp $ (ctx, e2, e1, t) : cs

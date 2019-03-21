@@ -181,9 +181,10 @@ appFold e@(i :< _) (term:ts) = do
       meta <- newNameWith "meta"
       insTypeEnv meta tcod
       appFold (meta :< NeutPiElim e term) ts
-    _ -> do
-      e' <- nonRecReduce e
-      lift $ throwE $ "appfold. t:\n" ++ Pr.ppShow t ++ "\ne:\n" ++ Pr.ppShow e'
+    _
+      -- e' <- nonRecReduce e
+     -> do
+      lift $ throwE $ "appfold. t:\n" ++ Pr.ppShow t ++ "\ne:\n" ++ Pr.ppShow e
       -- error "Lift.appFold"
 
 appFold' :: Neut -> [Neut] -> WithEnv Neut
@@ -454,16 +455,17 @@ sConstraint s ctcs = do
   return $ unsplit ctxList (zip ts1' ts2') typeList'
 
 insDef :: Identifier -> Neut -> WithEnv (Maybe Neut)
-insDef x body = do
-  body' <- nonRecReduce body
+insDef x body
+  -- body' <- nonRecReduce body
+ = do
   sub <- gets substitution
-  modify (\e -> e {substitution = (x, body') : substitution e})
+  modify (\e -> e {substitution = (x, body) : substitution e})
   return $ lookup x sub
 
 insDef' :: Identifier -> Neut -> WithEnv ()
-insDef' x body = do
-  body' <- nonRecReduce body
-  modify (\e -> e {substitution = (x, body') : substitution e})
+insDef' x body
+  -- body' <- nonRecReduce body
+ = modify (\e -> e {substitution = (x, body) : substitution e})
 
 split :: [PreConstraint] -> ([[Identifier]], [(Neut, Neut)], [Neut])
 split [] = ([], [], [])

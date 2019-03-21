@@ -35,8 +35,7 @@ synthesize q =
       --   ?M == lam arg-1, ..., arg-n. e
       -- This kind of constraint is called a "pattern".
      -> do
-      e' <- nonRecReduce e
-      ans <- bindFormalArgs' args e'
+      ans <- bindFormalArgs' args e
       modify (\e -> e {substitution = compose [(x, ans)] (substitution e)})
       substQueue (Q.deleteMin q) >>= synthesize
     Just (Enriched _ (Constraint ctx (ConstraintBeta x body) t))

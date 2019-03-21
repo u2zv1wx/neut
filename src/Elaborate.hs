@@ -57,7 +57,8 @@ elaborate main e = do
   checkNumConstraint
   -- use the resulting substitution to elaborate `e`.
   liftIO $ putStrLn $ "checked."
-  nonRecReduce e >>= exhaust >>= elaborate' >>= insTermEnv main
+  exhaust e >>= elaborate' >>= insTermEnv main
+  -- nonRecReduce e >>= exhaust >>= elaborate' >>= insTermEnv main
 
 -- In short: numbers must have one of the number types. We firstly generate constraints
 -- assuming that `1`, `1.2321`, etc. have arbitrary types. After the inference finished,
