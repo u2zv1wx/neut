@@ -379,11 +379,11 @@ data Env = Env
   { count :: Int -- to generate fresh symbols
   , notationEnv :: [(Tree, Tree)] -- macro transformers
   , reservedEnv :: [Identifier] -- list of reserved keywords
+  , constantEnv :: [(Identifier)]
   , moduleEnv :: [(Identifier, [(Identifier, Neut)])]
   , indexEnv :: [(Identifier, [Identifier])]
   , nameEnv :: [(Identifier, Identifier)] -- used in alpha conversion
   , typeEnv :: Map.Map Identifier Neut -- type environment
-  -- , typeEnv :: [(Identifier, Neut)] -- type environment
   , weakTermEnv :: [(Identifier, Neut)]
   , termEnv :: [(Identifier, Term)]
   , polEnv :: [(Identifier, Neg)]
@@ -404,6 +404,7 @@ initialEnv path =
     { count = 0
     , notationEnv = []
     , reservedEnv = []
+    , constantEnv = []
     , moduleEnv = []
     , indexEnv = []
     , nameEnv = []

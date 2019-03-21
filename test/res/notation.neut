@@ -2,7 +2,7 @@
 
 (reserve forall)
 
-(reserve hom)
+(reserve arrow)
 
 (reserve lambda)
 
@@ -10,7 +10,7 @@
 
 (reserve exists)
 
-(reserve tensor)
+(reserve product)
 
 (reserve pair)
 
@@ -45,23 +45,18 @@
   (apply (lambda ((x _)) (begin rest+)) (begin e+)))
 
 (notation (begin (definition x e) rest+)
-  (apply (lambda ((x _)) (begin rest+)) (data (mu x e))))
+  (apply (lambda ((x _)) (begin rest+)) (mu x e)))
 
 (notation (begin (definition name (x+) e+) rest+)
-  (apply (lambda ((name _)) (begin rest+)) (data (mu name (lambda (x+) (begin e+))))))
+  (apply (lambda ((name _)) (begin rest+)) (mu name (lambda (x+) (begin e+)))))
 
 (notation (definition name e)
-  (let name (data (mu name e))))
+  (let name (mu name e)))
 
 (notation (definition name (x+) e+)
-  (let name (data (mu name (lambda (x+) (begin e+))))))
+  (let name (mu name (lambda (x+) (begin e+)))))
 
 ;; shorthands for types
-(reserve arrow)
-
-(notation (arrow rest+)
-  (box (hom rest+)))
-
 (reserve type)
 
-(notation type (box universe))
+(notation type universe)

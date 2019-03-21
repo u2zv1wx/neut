@@ -266,14 +266,6 @@ toVar1 x t = do
   insTypeEnv meta t
   return $ meta :< NeutVar x
 
-toConst :: Identifier -> WithEnv Neut
-toConst x = do
-  t <- lookupTypeEnv' x
-  meta <- newNameWith "meta"
-  insTypeEnv meta t
-  return $ meta :< NeutConst x
-  -- return $ meta :< NeutConst x t
-
 toVar' :: Identifier -> WithEnv Neut
 toVar' x = do
   meta <- newNameWith "meta"

@@ -158,6 +158,7 @@ load' ((_ :< TreeNode [_ :< TreeAtom "primitive", _ :< TreeAtom name, t]):as)
   t' <- macroExpand t >>= parse >>= rename
   name' <- newNameWith name
   insTypeEnv name' t'
+  modify (\e -> e {constantEnv = name' : constantEnv e})
   load' as
 load' ((meta :< TreeNode [_ :< TreeAtom "let", _ :< TreeAtom name, tbody]):as)
   -- `(let name body)` binds `body` to `name`.
@@ -223,7 +224,10 @@ concatDefList (DefMod sigMeta (_, name') xs:es) = do
 
 process :: Neut -> WithEnv [String]
 process e = do
+  liftIO $ putStrLn $ "parsed."
+  liftIO $ putStrLn $ Pr.ppShow e
   elaborate "main" e
+  liftIO $ putStrLn $ "elab."
   polarize
   modalize
   virtualize

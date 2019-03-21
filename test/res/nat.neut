@@ -1,11 +1,11 @@
 (include "./coproduct.neut")
 
-(definition nat.inner
-  (coproduct top (code nat.inner)))
+(definition nat
+  (coproduct top nat))
 
 (reserve nat)
 
-(notation nat (code nat.inner))
+;; (notation nat nat.inner)
 
 (reserve succ)
 

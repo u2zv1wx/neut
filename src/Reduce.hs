@@ -42,20 +42,20 @@ reduce app@(i :< NeutPiElim _ _) = do
         let es = map snd args'
         reduce $ subst (zip xs es) body
     _ ->
-      case takeConstApp fun' of
-        Just constant
+      case fun' of
+        _ :< NeutConst constant
           | constant `elem` intAddConstantList
           , Just [x, y] <- takeIntegerList (map snd args') ->
             return $ i :< NeutIndexIntro (IndexInteger (x + y))
-        Just constant
+        _ :< NeutConst constant
           | constant `elem` intSubConstantList
           , Just [x, y] <- takeIntegerList (map snd args') ->
             return $ i :< NeutIndexIntro (IndexInteger (x - y))
-        Just constant
+        _ :< NeutConst constant
           | constant `elem` intMulConstantList
           , Just [x, y] <- takeIntegerList (map snd args') ->
             return $ i :< NeutIndexIntro (IndexInteger (x * y))
-        Just constant
+        _ :< NeutConst constant
           | constant `elem` intDivConstantList
           , Just [x, y] <- takeIntegerList (map snd args') ->
             return $ i :< NeutIndexIntro (IndexInteger (x `div` y))
@@ -115,20 +115,20 @@ reduce' app@(i :< NeutPiElim _ _) = do
         let es = map snd args'
         reduce' $ subst (zip xs es) body
     _ ->
-      case takeConstApp fun' of
-        Just constant
+      case fun' of
+        _ :< NeutConst constant
           | constant `elem` intAddConstantList
           , Just [x, y] <- takeIntegerList (map snd args') ->
             return $ i :< NeutIndexIntro (IndexInteger (x + y))
-        Just constant
+        _ :< NeutConst constant
           | constant `elem` intSubConstantList
           , Just [x, y] <- takeIntegerList (map snd args') ->
             return $ i :< NeutIndexIntro (IndexInteger (x - y))
-        Just constant
+        _ :< NeutConst constant
           | constant `elem` intMulConstantList
           , Just [x, y] <- takeIntegerList (map snd args') ->
             return $ i :< NeutIndexIntro (IndexInteger (x * y))
-        Just constant
+        _ :< NeutConst constant
           | constant `elem` intDivConstantList
           , Just [x, y] <- takeIntegerList (map snd args') ->
             return $ i :< NeutIndexIntro (IndexInteger (x `div` y))
@@ -174,12 +174,6 @@ toPiIntroSeq (meta :< NeutPiIntro (x, t) body) = do
   (body', (x, t, meta) : args)
 toPiIntroSeq t = (t, [])
 
-fromPiIntroSeq :: (Neut, [(Identifier, Neut, Identifier)]) -> Neut
-fromPiIntroSeq (e, []) = e
-fromPiIntroSeq (e, (x, t, meta):rest) = do
-  let e' = fromPiIntroSeq (e, rest)
-  meta :< NeutPiIntro (x, t) e'
-
 toPiElimSeq :: Neut -> (Neut, [(Identifier, Neut)])
 toPiElimSeq (i :< NeutPiElim e1 e2) = do
   let (fun, xs) = toPiElimSeq e1
@@ -189,10 +183,6 @@ toPiElimSeq c = (c, [])
 fromPiElimSeq :: (Neut, [(Identifier, Neut)]) -> Neut
 fromPiElimSeq (term, []) = term
 fromPiElimSeq (term, (i, v):xs) = fromPiElimSeq (i :< NeutPiElim term v, xs)
-
-takeConstApp :: Neut -> Maybe Identifier
-takeConstApp (_ :< NeutConst x) = Just x
-takeConstApp _ = Nothing
 
 takeIntegerList :: [Neut] -> Maybe [Int]
 takeIntegerList [] = Just []
@@ -204,13 +194,9 @@ takeIntegerList _ = Nothing
 findIndexVariable :: [(IndexOrVar, Neut)] -> Maybe (Identifier, Neut)
 findIndexVariable [] = Nothing
 findIndexVariable ((l, e):ls) =
-  case getLabelIndex l of
-    Just i -> Just (i, e)
-    Nothing -> findIndexVariable ls
-
-getLabelIndex :: IndexOrVar -> Maybe Identifier
-getLabelIndex (Right x) = Just x
-getLabelIndex _ = Nothing
+  case l of
+    Right i -> Just (i, e)
+    _ -> findIndexVariable ls
 
 findDefault :: [(IndexOrVar, Neut)] -> Maybe Neut
 findDefault [] = Nothing
@@ -224,7 +210,7 @@ isReducible (_ :< NeutPi (_, _) _) = False
 isReducible (_ :< NeutPiIntro _ _) = False
 isReducible (_ :< NeutPiElim (_ :< NeutPiIntro _ _) _) = True
 isReducible (_ :< NeutPiElim e1 _) = isReducible e1
-isReducible (_ :< NeutSigma _) = False
+isReducible (_ :< NeutSigma es) = any isReducible $ map snd es
 isReducible (_ :< NeutSigmaIntro es) = any isReducible es
 isReducible (_ :< NeutSigmaElim (_ :< NeutSigmaIntro _) _ _) = True
 isReducible (_ :< NeutSigmaElim e _ _) = isReducible e
@@ -235,28 +221,6 @@ isReducible (_ :< NeutIndexElim e _) = isReducible e
 isReducible (_ :< NeutUniv _) = False
 isReducible (_ :< NeutMu _ _) = True
 isReducible (_ :< NeutHole _) = False
-
-isNonRecReducible :: Neut -> Bool
-isNonRecReducible (_ :< NeutVar _) = False
-isNonRecReducible (_ :< NeutConst _) = False
-isNonRecReducible (_ :< NeutPi (_, tdom) tcod) =
-  isNonRecReducible tdom || isNonRecReducible tcod
-isNonRecReducible (_ :< NeutPiIntro _ _) = False
-isNonRecReducible (_ :< NeutPiElim (_ :< NeutPiIntro _ _) _) = True
-isNonRecReducible (_ :< NeutPiElim e1 _) = isNonRecReducible e1
-isNonRecReducible (_ :< NeutSigma xts) = do
-  let (_, ts) = unzip xts
-  any isNonRecReducible ts
-isNonRecReducible (_ :< NeutSigmaIntro es) = any isNonRecReducible es
-isNonRecReducible (_ :< NeutSigmaElim (_ :< NeutSigmaIntro _) _ _) = True
-isNonRecReducible (_ :< NeutSigmaElim e _ _) = isNonRecReducible e
-isNonRecReducible (_ :< NeutIndex _) = False
-isNonRecReducible (_ :< NeutIndexIntro _) = False
-isNonRecReducible (_ :< NeutIndexElim (_ :< NeutIndexIntro _) _) = True
-isNonRecReducible (_ :< NeutIndexElim e _) = isNonRecReducible e
-isNonRecReducible (_ :< NeutUniv _) = False
-isNonRecReducible (_ :< NeutMu _ _) = False
-isNonRecReducible (_ :< NeutHole _) = False
 
 nonRecReduce :: Neut -> WithEnv Neut
 nonRecReduce e@(_ :< NeutVar _) = return e
@@ -387,40 +351,6 @@ reduceNeg (NegMu x e) = do
   e' <- reduceNeg e
   return $ NegMu x e'
 
-reduceValue :: Value -> WithEnv Value
-reduceValue = return
-
-reduceComp :: Comp -> WithEnv Comp
-reduceComp (CompPi (x, tdom) tcod) = do
-  tdom' <- reduceValue tdom
-  tcod' <- reduceComp tcod
-  return $ CompPi (x, tdom') tcod'
-reduceComp (CompPiElimDownElim x xs) = return $ CompPiElimDownElim x xs
-reduceComp (CompSigmaElim e xs body) = do
-  body' <- reduceComp body
-  return $ CompSigmaElim e xs body'
-reduceComp (CompIndexElim e branchList) =
-  case e of
-    ValueIndexIntro x _ ->
-      case lookup (Left x) branchList of
-        Nothing ->
-          lift $
-          throwE $ "the index " ++ show x ++ " is not included in branchList"
-        Just body -> reduceComp body
-    _ -> do
-      let (labelList, es) = unzip branchList
-      es' <- mapM reduceComp es
-      return $ CompIndexElim e $ zip labelList es'
-reduceComp (CompUpIntro e) = do
-  e' <- reduceValue e
-  return $ CompUpIntro e'
-reduceComp (CompUpElim x e1 e2) = do
-  e1' <- reduceComp e1
-  e2' <- reduceComp e2
-  case e1' of
-    CompUpIntro (ValueVar y) -> reduceComp $ substComp [(x, y)] e2'
-    _ -> return $ CompUpElim x e1' e2'
-
 subst :: Subst -> Neut -> Neut
 subst sub (j :< NeutVar s) = fromMaybe (j :< NeutVar s) (lookup s sub)
 subst _ (j :< NeutConst t) = j :< NeutConst t
@@ -525,56 +455,6 @@ substNeg sub (NegUpElim x e1 e2) = do
 substNeg sub (NegDownElim e) = NegDownElim (substPos sub e)
 substNeg sub (NegMu x e) = NegMu x $ substNeg sub e
 
-type SubstValue = [(Identifier, Identifier)]
-
-substValue :: SubstValue -> Value -> Value
-substValue sub (ValueVar s) = do
-  let s' = fromMaybe s (lookup s sub)
-  ValueVar s'
-substValue _ (ValueConst s) = ValueConst s
-substValue sub (ValueSigma xts) = do
-  let (xs, ts) = unzip xts
-  let ts' = map (substValue sub) ts
-  ValueSigma (zip xs ts')
-substValue sub (ValueSigmaIntro es) = do
-  let es' = map (substValue sub) es
-  ValueSigmaIntro es'
-substValue _ (ValueIndex x) = ValueIndex x
-substValue _ (ValueIndexIntro l meta) = ValueIndexIntro l meta
-substValue _ ValueUniv = ValueUniv
-
-substComp :: SubstValue -> Comp -> Comp
-substComp sub (CompPi (s, tdom) tcod) = do
-  let tdom' = substValue sub tdom
-  let tcod' = substComp sub tcod
-  CompPi (s, tdom') tcod'
-substComp sub (CompSigmaElim e1 xs e2) = do
-  let e1' = substValue sub e1
-  let e2' = substComp sub e2
-  CompSigmaElim e1' xs e2'
-substComp sub (CompIndexElim e branchList) = do
-  let e' = substValue sub e
-  let branchList' = map (\(l, e) -> (l, substComp sub e)) branchList
-  CompIndexElim e' branchList'
-substComp sub (CompUpIntro e) = CompUpIntro (substValue sub e)
-substComp sub (CompUpElim x e1 e2) = do
-  let e1' = substComp sub e1
-  let e2' = substComp sub e2
-  CompUpElim x e1' e2'
-
--- findInvVar :: Subst -> Identifier -> Maybe Identifier
--- findInvVar [] _ = Nothing
--- findInvVar ((y, _ :< NeutVar x):rest) x'
---   | x == x' =
---     if not (any (/= y) $ findInvVar' rest x')
---       then Just y
---       else Nothing
--- findInvVar ((_, _):rest) i = findInvVar rest i
--- findInvVar' :: Subst -> Identifier -> [Identifier]
--- findInvVar' [] _ = []
--- findInvVar' ((z, _ :< NeutVar x):rest) x'
---   | x /= x' = z : findInvVar' rest x'
--- findInvVar' (_:rest) x' = findInvVar' rest x'
 type SubstIdent = [(Identifier, Identifier)]
 
 substIdent :: SubstIdent -> Identifier -> Identifier

@@ -39,12 +39,16 @@ import qualified Data.PQueue.Min as Q
 -- https://arxiv.org/abs/1505.04324, 2015.
 elaborate :: Identifier -> Neut -> WithEnv ()
 elaborate main e = do
+  liftIO $ putStrLn $ "infer."
   t <- infer [] e
+  liftIO $ putStrLn $ "inferred."
   insTypeEnv main t
   -- Kantian type-inference ;)
   gets constraintEnv >>= analyze
+  liftIO $ putStrLn $ "analyzed."
   gets constraintQueue >>= updateQueue
   gets constraintQueue >>= synthesize
+  liftIO $ putStrLn $ "synthesized"
   -- update the type environment by resulting substitution
   sub <- gets substitution
   tenv <- gets typeEnv
@@ -52,6 +56,7 @@ elaborate main e = do
   modify (\e -> e {typeEnv = tenv'})
   checkNumConstraint
   -- use the resulting substitution to elaborate `e`.
+  liftIO $ putStrLn $ "checked."
   nonRecReduce e >>= exhaust >>= elaborate' >>= insTermEnv main
 
 -- In short: numbers must have one of the number types. We firstly generate constraints

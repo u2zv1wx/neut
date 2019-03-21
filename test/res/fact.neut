@@ -2,24 +2,58 @@
 
 (include "./base.neut")
 
-(module item
+;; (definition fact (x)
+;;   (case x
+;;     ((1 1)
+;;      (n (core.i32.mul n (fact (core.i32.sub n 1)))))))
 
-  (reserve some)
-  (notation (some e)
-    e)
+;; (include "./coproduct.neut")
 
-  (definition fact (x)
-    (case x
-      ((1 (some 1))
-       (n (begin
-            (let p (core.i32.copy n))
-            (case p
-              ((pair n1 n2)
-               (core.i32.mul n1 (fact (core.i32.sub n2 1))))))))))
+(definition nat
+  (coproduct top nat))
 
-  (definition foo unit)
+;; (reserve nat)
 
-  (definition bar top))
+;; (notation nat nat.inner)
+
+;; (reserve succ)
+
+;; (notation (succ e)
+;;   (pair right e))
+
+(let zero (pair left unit))
+(ascription zero nat)
+
+;; (let one (succ zero))
+;; (ascription one nat)
+
+;; (let two (succ one))
+;; (ascription two nat)
+
+;; (definition next (n)
+;;   (pair right n))
+
+;; (ascription next (arrow nat nat))
+
+;; (let three (next two))
+
+
+;; (include "./coproduct.neut")
+
+;; (module item
+
+;;   (reserve some)
+;;   (notation (some e)
+;;     e)
+
+;;   (definition fact (x)
+;;     (case x
+;;       ((1 (some 1))
+;;        (n (core.i32.mul n (fact (core.i32.sub n 1)))))))
+
+;;   (definition foo unit)
+
+;;   (definition bar top))
 
 ; (definition fact (x)
 ;   (case x
@@ -30,9 +64,9 @@
 ;             ((pair n1 n2)
 ;              (core.i32.mul n1 (fact (core.i32.sub n2 1))))))))))
 
-(use item)
+;; (use item)
 
-(core.i32.print (item:fact 10))
+;; (core.i32.print (item:fact 10))
 ; (core.i32.print (fact 10))
 
 ;; fact.neut ends here.

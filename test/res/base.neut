@@ -11,6 +11,6 @@
 
 ;; (include "./vector.neut")
 
-(include "./nat.neut")
+;; (include "./nat.neut")
 
-(include "./io.neut")
+;; (include "./io.neut")
