@@ -331,8 +331,8 @@ isEq (_ :< NeutPiElim e11 e12) (_ :< NeutPiElim e21 e22) = do
   b1 <- isEq e11 e21
   b2 <- isEq e12 e22
   return $ b1 && b2
-isEq (_ :< NeutSigma xts) (_ :< NeutSigma yts) = do
-  undefined
+isEq (_ :< NeutSigma xts) (_ :< NeutSigma yts) = isEqSigma xts yts
+  -- undefined
   -- vx <- toVar' x1
   -- b1 <- isEq t11 t21
   -- b2 <- isEq t12 $ subst [(x2, vx)] t22
@@ -363,6 +363,18 @@ isEq (_ :< NeutMu x1 e1) (_ :< NeutMu x2 e2) = do
   isEq e1 $ subst [(x2, vx)] e2
 isEq (_ :< NeutHole x1) (_ :< NeutHole x2) = return $ x1 == x2
 isEq _ _ = return False
+
+isEqSigma :: [(Identifier, Neut)] -> [(Identifier, Neut)] -> WithEnv Bool
+isEqSigma [] [] = return True
+isEqSigma ((x, tx):xts) ((y, ty):yts) = do
+  vx <- toVar' x
+  b1 <- isEq tx ty
+  let (ys, ts) = unzip yts
+  let ts' = map (subst [(y, vx)]) ts
+  let yts' = zip ys ts'
+  b2 <- isEqSigma xts yts'
+  return $ b1 && b2
+isEqSigma _ _ = return False
 
 isEqBranch :: [(IndexOrVar, Neut)] -> [(IndexOrVar, Neut)] -> WithEnv Bool
 isEqBranch [] [] = return True

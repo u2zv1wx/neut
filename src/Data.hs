@@ -500,6 +500,13 @@ lookupNameEnv' s = do
     Just s' -> return s'
     Nothing -> newNameWith s
 
+lookupNameEnv'' :: String -> WithEnv (Maybe String)
+lookupNameEnv'' s = do
+  env <- get
+  case lookup s (nameEnv env) of
+    Just s' -> return $ Just s'
+    Nothing -> return Nothing
+
 lookupCodeEnv :: Identifier -> WithEnv ([Identifier], IORef Code)
 lookupCodeEnv funName = do
   env <- get

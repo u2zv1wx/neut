@@ -113,10 +113,9 @@ load' ((meta :< TreeNode ((_ :< TreeAtom "module"):(_ :< TreeAtom moduleName):ts
   moduleName' <- newNameWith moduleName
   modify (\e -> e {moduleEnv = (moduleName', xes) : moduleEnv e})
   let es = map snd xes
-  boxMeta <- newNameWith "meta"
-  let boxSigma = boxMeta :< NeutBoxIntro (meta :< NeutSigmaIntro es)
   defList <- load' as
-  return $ DefLet meta (moduleName, moduleName') boxSigma : defList
+  return $
+    DefLet meta (moduleName, moduleName') (meta :< NeutSigmaIntro es) : defList
 load' ((meta :< TreeNode [_ :< TreeAtom "use", _ :< TreeAtom moduleName]):as)
   -- (use name) is essentially just a elimination of Sigma.
   -- Specifically, what (use name) does is:
@@ -152,26 +151,14 @@ load' ((_ :< TreeNode [_ :< TreeAtom "ascription", _ :< TreeAtom name, t]):as) =
   t' <- macroExpand t >>= parse >>= rename
   insTypeEnv name' t'
   load' as
-load' ((meta :< TreeNode [primMeta :< TreeAtom "primitive", _ :< TreeAtom name, t]):as)
+load' ((_ :< TreeNode [_ :< TreeAtom "primitive", _ :< TreeAtom name, t]):as)
   -- Declare external constants.
+  -- e.g. (primitive core.i64.add (arrow i64 i64 i64))
  = do
-  let primName = "prim." ++ name
-  primName' <- newNameWith primName
-  name' <- newNameWith name
   t' <- macroExpand t >>= parse >>= rename
-  constMeta <- newNameWith "meta"
+  name' <- newNameWith name
   insTypeEnv name' t'
-  insTypeEnv primName' $ constMeta :< NeutConst t'
-  insTypeEnv name $ constMeta :< NeutConst t'
-  defList <- load' as
-  constElimMeta <- newNameWith "meta"
-  primVarMeta <- newNameWith "meta"
-  let constElim =
-        constElimMeta :< NeutConstElim (primVarMeta :< NeutVar primName')
-  defMeta <- newNameWith "meta"
-  return $
-    DefLet defMeta (primName, primName') (primMeta :< NeutConstIntro name) :
-    DefLet meta (name, name') constElim : defList
+  load' as
 load' ((meta :< TreeNode [_ :< TreeAtom "let", _ :< TreeAtom name, tbody]):as)
   -- `(let name body)` binds `body` to `name`.
  = do
@@ -221,8 +208,7 @@ isSpecialForm _ = False
 concatDefList :: [Def] -> WithEnv Neut
 concatDefList [] = do
   meta <- newNameWith "meta"
-  return $ meta :< NeutIndexIntro (IndexLabel "unit")
-concatDefList [DefLet _ _ e] = return e
+  return $ meta :< NeutSigmaIntro []
 concatDefList (DefLet meta (_, name') e:es) = do
   cont <- concatDefList es
   h <- newNameWith "any"
@@ -233,9 +219,7 @@ concatDefList (DefLet meta (_, name') e:es) = do
 concatDefList (DefMod sigMeta (_, name') xs:es) = do
   cont <- concatDefList es
   meta <- newNameWith "meta"
-  unboxMeta <- newNameWith "meta"
-  let v = unboxMeta :< NeutBoxElim (meta :< NeutVar name')
-  return $ sigMeta :< NeutSigmaElim v xs cont
+  return $ sigMeta :< NeutSigmaElim (meta :< NeutVar name') xs cont
 
 process :: Neut -> WithEnv [String]
 process e = do

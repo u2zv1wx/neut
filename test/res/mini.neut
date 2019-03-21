@@ -1,11 +1,12 @@
 (index top unit)
+
 (index i32)
 
 (index u32)
 
 (reserve forall)
 
-(reserve hom)
+(reserve arrow)
 
 (reserve lambda)
 
@@ -13,7 +14,7 @@
 
 (reserve exists)
 
-(reserve tensor)
+(reserve product)
 
 (reserve pair)
 
@@ -45,35 +46,25 @@
   (apply (lambda ((x _)) (begin rest+)) (begin e+)))
 
 (notation (begin (definition x e) rest+)
-  (apply (lambda ((x _)) (begin rest+)) (data (mu x e))))
+  (apply (lambda ((x _)) (begin rest+)) (mu x e)))
 
 (notation (begin (definition name (x+) e+) rest+)
-  (apply (lambda ((name _)) (begin rest+)) (data (mu name (lambda (x+) (begin e+))))))
+  (apply (lambda ((name _)) (begin rest+)) (mu name (lambda (x+) (begin e+)))))
 
-(reserve arrow)
-
-(notation (arrow rest+)
-  (box (hom rest+)))
-
-(primitive core.u32.sub (arrow u32 u32 u32))
+;; (primitive core.u32.sub (arrow u32 u32 u32))
 
 (reserve definition)
 
 (notation (definition name e)
-  (let name (data (mu name e))))
+  (let name (mu name e)))
 
 (notation (definition name (x+) e+)
-  (let name (data (mu name (lambda (x+) (begin e+))))))
+  (let name (mu name (lambda (x+) (begin e+)))))
 
-(let type (box universe))
+;; (let type universe)
 
-(definition vector ((n u32) (A type))
-  (case n
-    ((1 A)
-     (m (tensor A (vector (core.u32.sub m 1) A))))))
-
-(definition string ((n u32))
-  (vector n u32))
+;; (definition string ((n u32))
+;;   (vector n u32))
 
 (index nat:core nat:zero nat:succ)
 
@@ -81,15 +72,16 @@
   (exists ((l nat:core))
     (case l
       ((nat:zero top)
-       (nat:succ (code nat))))))
+       (nat:succ nat)))))
 
 (let bar (pair 1 2 3))
-(ascription bar (vector 3 i32))
+(ascription bar (product i32 i32 u32))
+;; (ascription bar (vector 3 i32))
 
-(let buz (pair nat:zero unit))
-(ascription buz (code nat))
+;; (let buz (pair nat:zero unit))
+;; (ascription buz nat)
 
 ; (let succ-buz (pair nat:succ buz))
 ; (ascription succ-buz (code nat))
 
-unit
+;; unit

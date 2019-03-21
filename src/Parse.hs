@@ -36,7 +36,7 @@ parse (_ :< TreeNode [_ :< TreeAtom "forall", _ :< TreeNode ts, tn]) = do
   its <- mapM parseArg ts
   n <- parse tn
   foldMR NeutPi n its
-parse (_ :< TreeNode ((_ :< TreeAtom "hom"):ts)) = do
+parse (_ :< TreeNode ((_ :< TreeAtom "arrow"):ts)) = do
   typeList <- mapM parse ts
   let argList = take (length typeList - 1) typeList
   let cod = last typeList
@@ -57,7 +57,7 @@ parse (meta :< TreeNode [_ :< TreeAtom "exists", _ :< TreeNode ts, tn]) = do
   i <- newNameWith "any"
   let xs = its ++ [(i, n)]
   return $ meta :< NeutSigma xs
-parse (meta :< TreeNode ((_ :< TreeAtom "tensor"):ts)) = do
+parse (meta :< TreeNode ((_ :< TreeAtom "product"):ts)) = do
   typeList <- mapM parse ts
   let argList = take (length typeList - 1) typeList
   let rightMost = last typeList
@@ -97,10 +97,12 @@ parse (meta :< TreeAtom s)
 parse (meta :< TreeAtom s) = do
   flag1 <- isDefinedIndex s
   flag2 <- isDefinedIndexName s
-  case (flag1, flag2) of
-    (True, False) -> return $ meta :< NeutIndexIntro (IndexLabel s)
-    (False, True) -> return $ meta :< NeutIndex s
-    _ -> return $ meta :< NeutVar s
+  flag3 <- lookupNameEnv'' s
+  case (flag1, flag2, flag3) of
+    (True, False, _) -> return $ meta :< NeutIndexIntro (IndexLabel s)
+    (False, True, _) -> return $ meta :< NeutIndex s
+    (_, _, Just s') -> return $ meta :< NeutConst s'
+    (_, _, Nothing) -> return $ meta :< NeutVar s
 parse t = lift $ throwE $ "parse: syntax error:\n" ++ Pr.ppShow t
 
 parseClause :: Tree -> WithEnv (IndexOrVar, Neut)

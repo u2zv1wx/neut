@@ -119,18 +119,20 @@ infer ctx (meta :< NeutSigmaIntro es) = do
   holeList <- sigmaHole ctx xs
   let holeList' = map (subst (zip xs es)) holeList
   forM_ (zip holeList' ts) $ \(h, t) -> insConstraintEnv (map fst ctx) h t univ
-  let binder = zip xs (take (length holeList - 1) holeList)
-  sigmaType <- toSigmaType binder (last holeList)
-  returnMeta meta sigmaType
+  returnMeta meta $ meta :< NeutSigma (zip xs holeList')
 infer ctx (meta :< NeutSigmaElim e1 xs e2) = do
   univ <- boxUniv
   t1 <- infer ctx e1 >>= annot univ
   holeList <- sigmaHole ctx xs
   forM_ (zip xs holeList) $ uncurry insTypeEnv
   t2 <- infer ctx e2 >>= annot univ
-  let binder = zip xs (take (length holeList - 1) holeList)
-  let cod = last holeList
-  sigmaType <- toSigmaType binder cod
+  -- let binder = zip xs (take (length holeList - 1) holeList)
+  -- let cod = last holeList
+  let binder = zip xs holeList
+  sigmaMeta <- newNameWith "meta"
+  let sigmaType = sigmaMeta :< NeutSigma binder
+  annot univ sigmaType
+  -- sigmaType <- toSigmaType binder cod
   insConstraintEnv (map fst ctx) t1 sigmaType univ
   z <- newNameOfType t1
   pair <- constructPair (ctx ++ zip xs holeList) xs
@@ -170,15 +172,6 @@ infer ctx (meta :< NeutMu s e) = do
   returnMeta meta te
 infer _ (meta :< NeutUniv _) = boxUniv >>= returnMeta meta
 infer ctx (meta :< NeutHole _) = appCtx ctx >>= returnMeta meta
-
-toSigmaType :: [(Identifier, Neut)] -> Neut -> WithEnv Neut
-toSigmaType xts t = do
-  univ <- boxUniv
-  j <- newNameWith "meta"
-  insTypeEnv j univ
-  i <- newNameWith "any"
-  insTypeEnv i t
-  return $ j :< NeutSigma (xts ++ [(i, t)])
 
 -- In context ctx == [y1, ..., yn], `sigmaHole ctx names-of-holes` generates the list of
 -- holes [name-1 @ ctx, name-2 @ ctx @ name-1, ..., name-n @ ctx @ name-1 @ ... @ name-(n-1)].
