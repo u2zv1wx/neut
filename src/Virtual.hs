@@ -76,10 +76,6 @@ virtualComp (CompPiElimDownElim f xs) = do
 virtualComp (CompSigmaElim e1 xs e2) = do
   e1' <- virtualValue e1
   e2' <- virtualComp e2
-  case length xs of
-    0 -> liftIO $ putStrLn "sigmaelim for empty"
-    1 -> liftIO $ putStrLn "sigmaelim for singleton"
-    _ -> return ()
   return $ extract e1' (zip xs [0 ..]) (length xs) e2'
 virtualComp (CompIndexElim e branchList) = do
   let (labelList, es) = unzip branchList
@@ -95,9 +91,6 @@ virtualComp (CompUpElim x e1 e2) = do
   e2' <- virtualComp e2
   return $ commUpElim x e1' e2'
 
--- virtualComp (CompPrint t e) = do
---   e' <- virtualValue e
---   return $ CodePrint t e' $ CodeReturn (DataInt 0)
 extract :: Data -> [(Identifier, Int)] -> Int -> Code -> Code
 extract z [] _ cont = CodeFree z cont
 extract z ((x, i):xis) n cont = do
@@ -118,8 +111,6 @@ commUpElim x (CodeSwitch y branchList) cont = do
 commUpElim s (CodeExtractValue x basePointer i cont1) cont2 =
   CodeExtractValue x basePointer i $ commUpElim s cont1 cont2
 commUpElim s (CodeFree x cont1) cont2 = CodeFree x $ commUpElim s cont1 cont2
-commUpElim s (CodePrint t e' cont1) cont2 =
-  CodePrint t e' (commUpElim s cont1 cont2)
 
 globalizeIfNecessary :: Identifier -> WithEnv Data
 globalizeIfNecessary x = do
