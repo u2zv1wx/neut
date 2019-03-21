@@ -35,7 +35,7 @@ polarize :: WithEnv ()
 polarize = do
   tenv <- gets termEnv
   forM_ tenv $ \(name, e) -> do
-    e' <- polarize' e >>= reduceNeg
+    e' <- polarize' e
     insPolEnv name e'
 
 -- Given a term, polarize it to a negative term. This translation determines the
@@ -50,6 +50,10 @@ polarize' (TermConst "core.i64.add") = arith "core.i64.add"
 polarize' (TermConst "core.i64.sub") = arith "core.i64.sub"
 polarize' (TermConst "core.i64.mul") = arith "core.i64.mul"
 polarize' (TermConst "core.i64.div") = arith "core.i64.div"
+polarize' (TermConst "core.i32.add") = arith "core.i32.add"
+polarize' (TermConst "core.i32.sub") = arith "core.i32.sub"
+polarize' (TermConst "core.i32.mul") = arith "core.i32.mul"
+polarize' (TermConst "core.i32.div") = arith "core.i32.div"
 polarize' (TermConst "core.i64.print") = do
   x <- newNameWith "lam"
   x' <- newNameWith "lam"
@@ -57,7 +61,9 @@ polarize' (TermConst "core.i64.print") = do
     NegPiIntro x $
     NegUpElim x' (NegDownElim (PosVar x)) $
     NegPiElim (NegDownElim (PosConst "core.i64.print")) (PosVar x')
-polarize' (TermConst _) = undefined -- 定数ごとに異なる変換を行う
+polarize' (TermConst x) = do
+  liftIO $ putStrLn $ "const == " ++ x
+  undefined -- 定数ごとに異なる変換を行う
 polarize' (TermPi (x, tdom) tcod) = do
   tdom' <- polarize' tdom
   tcod' <- polarize' tcod
