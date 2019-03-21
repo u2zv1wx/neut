@@ -103,8 +103,7 @@ parse (meta :< TreeAtom s) = do
     (True, False, _) -> return $ meta :< NeutIndexIntro (IndexLabel s)
     (False, True, _) -> return $ meta :< NeutIndex s
     (_, _, False) -> return $ meta :< NeutVar s
-    (_, _, True) -> do
-      return $ meta :< NeutConst s
+    (_, _, True) -> return $ meta :< NeutConst s
 parse t = lift $ throwE $ "parse: syntax error:\n" ++ Pr.ppShow t
 
 parseClause :: Tree -> WithEnv (IndexOrVar, Neut)
