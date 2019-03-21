@@ -149,10 +149,10 @@ infer ctx (meta :< NeutIndexElim e branchList) = do
   let (labelList, es) = unzip branchList
   tls <- mapM (inferIndex ctx) labelList
   let tls' = join $ map maybeToList tls
-  constrainList ctx tls'
+  constrainList tls'
   headConstraint t tls'
   tes <- mapM (infer ctx) es
-  constrainList ctx tes
+  constrainList tes
   returnMeta meta $ head tes
 infer ctx (meta :< NeutMu s e) = do
   univ <- boxUniv
@@ -191,15 +191,15 @@ inferIndex ctx (Left (IndexLabel name)) = do
       return $ Just t
 inferIndex _ _ = return Nothing
 
-constrainList :: Context -> [Neut] -> WithEnv ()
-constrainList _ [] = return ()
-constrainList _ [_] = return ()
-constrainList ctx (t1@(meta1 :< _):t2@(meta2 :< _):ts) = do
+constrainList :: [Neut] -> WithEnv ()
+constrainList [] = return ()
+constrainList [_] = return ()
+constrainList (t1@(meta1 :< _):t2@(meta2 :< _):ts) = do
   u <- boxUniv
   insTypeEnv meta1 u
   insTypeEnv meta2 u
   insConstraintEnv t1 t2
-  constrainList ctx $ t2 : ts
+  constrainList $ t2 : ts
 
 headConstraint :: Neut -> [Neut] -> WithEnv ()
 headConstraint _ [] = return ()
