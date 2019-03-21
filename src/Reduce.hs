@@ -137,17 +137,10 @@ isReducible (_ :< NeutUniv _) = False
 isReducible (_ :< NeutMu _ _) = True
 isReducible (_ :< NeutHole _) = False
 
-reducePos :: Pos -> WithEnv Pos
-reducePos (PosDownIntro e) = do
-  e' <- reduceNeg e
-  return $ PosDownIntro e'
-reducePos e = return e
-
 reduceNeg :: Neg -> WithEnv Neg
 reduceNeg (NegPi (x, tdom) tcod) = do
-  tdom' <- reducePos tdom
   tcod' <- reduceNeg tcod
-  return $ NegPi (x, tdom') tcod'
+  return $ NegPi (x, tdom) tcod'
 reduceNeg (NegPiIntro x e) = do
   e' <- reduceNeg e
   return $ NegPiIntro x e'
@@ -180,23 +173,18 @@ reduceNeg (NegIndexElim e branchList) =
       let (labelList, es) = unzip branchList
       es' <- mapM reduceNeg es
       return $ NegIndexElim e $ zip labelList es'
-reduceNeg (NegUp e) = do
-  e' <- reducePos e
-  return $ NegUp e'
-reduceNeg (NegUpIntro e) = do
-  e' <- reducePos e
-  return $ NegUpIntro e'
+reduceNeg (NegUp e) = return $ NegUp e
+reduceNeg (NegUpIntro e) = return $ NegUpIntro e
 reduceNeg (NegUpElim x e1 e2) = do
   e1' <- reduceNeg e1
   e2' <- reduceNeg e2
   case e1' of
     NegUpIntro e1'' -> reduceNeg $ substNeg [(x, e1'')] e2'
     _ -> return $ NegUpElim x e1' e2'
-reduceNeg (NegDownElim e) = do
-  e' <- reducePos e
-  case e' of
+reduceNeg (NegDownElim e) =
+  case e of
     PosDownIntro e'' -> reduceNeg e''
-    _ -> return $ NegDownElim e'
+    _ -> return $ NegDownElim e
 reduceNeg (NegMu x e) = do
   e' <- reduceNeg e
   return $ NegMu x e'

@@ -130,3 +130,15 @@ commPiElim (CompUpElim x e1 e2) args = do
   e2' <- commPiElim e2 args
   return $ CompUpElim x e1 e2'
 commPiElim _ _ = lift $ throwE "Modal.commPiElim: type error"
+
+toNegPiIntroSeq :: Neg -> (Neg, [Identifier])
+toNegPiIntroSeq (NegPiIntro x body) = do
+  let (body', args) = toNegPiIntroSeq body
+  (body', x : args)
+toNegPiIntroSeq t = (t, [])
+
+toNegPiElimSeq :: Neg -> (Neg, [Pos])
+toNegPiElimSeq (NegPiElim e1 e2) = do
+  let (fun, xs) = toNegPiElimSeq e1
+  (fun, e2 : xs)
+toNegPiElimSeq c = (c, [])

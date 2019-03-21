@@ -122,3 +122,8 @@ writeResult result outputPath OutputKindObject = do
   callProcess "clang" [tmpAsmOutputPath, "-o" ++ outputPath]
   removeFile tmpOutputPath
   removeFile tmpAsmOutputPath
+
+expandDirPath :: FilePath -> IO FilePath
+expandDirPath path = do
+  current <- getCurrentDirectory
+  return $ current </> path
