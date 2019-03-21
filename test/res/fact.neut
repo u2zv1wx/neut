@@ -2,10 +2,10 @@
 
 (include "./base.neut")
 
-;; (definition fact (x)
-;;   (case x
-;;     ((1 1)
-;;      (n (core.i32.mul n (fact (core.i32.sub n 1)))))))
+(definition fact (x)
+  (case x
+    ((1 1)
+     (n (core.i32.mul n (fact (core.i32.sub n 1)))))))
 
 ;; (include "./coproduct.neut")
 

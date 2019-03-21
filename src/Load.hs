@@ -156,9 +156,8 @@ load' ((_ :< TreeNode [_ :< TreeAtom "primitive", _ :< TreeAtom name, t]):as)
   -- e.g. (primitive core.i64.add (arrow i64 i64 i64))
  = do
   t' <- macroExpand t >>= parse >>= rename
-  name' <- newNameWith name
-  insTypeEnv name' t'
-  modify (\e -> e {constantEnv = name' : constantEnv e})
+  insTypeEnv name t'
+  modify (\e -> e {constantEnv = name : constantEnv e})
   load' as
 load' ((meta :< TreeNode [_ :< TreeAtom "let", _ :< TreeAtom name, tbody]):as)
   -- `(let name body)` binds `body` to `name`.

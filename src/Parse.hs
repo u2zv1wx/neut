@@ -97,18 +97,14 @@ parse (meta :< TreeAtom s)
 parse (meta :< TreeAtom s) = do
   flag1 <- isDefinedIndex s
   flag2 <- isDefinedIndexName s
-  flag3 <- lookupNameEnv'' s
+  cenv <- gets constantEnv
+  let flag3 = s `elem` cenv
   case (flag1, flag2, flag3) of
     (True, False, _) -> return $ meta :< NeutIndexIntro (IndexLabel s)
     (False, True, _) -> return $ meta :< NeutIndex s
-    (_, _, Nothing) -> return $ meta :< NeutVar s
-    (_, _, Just s') -> do
-      cenv <- gets constantEnv
-      if s' `elem` cenv
-        then do
-          liftIO $ putStrLn $ "found a constant: " ++ s'
-          return $ meta :< NeutConst s'
-        else return $ meta :< NeutVar s
+    (_, _, False) -> return $ meta :< NeutVar s
+    (_, _, True) -> do
+      return $ meta :< NeutConst s
 parse t = lift $ throwE $ "parse: syntax error:\n" ++ Pr.ppShow t
 
 parseClause :: Tree -> WithEnv (IndexOrVar, Neut)
