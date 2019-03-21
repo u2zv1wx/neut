@@ -266,6 +266,7 @@ data Comp
 data Data
   = DataLocal Identifier
   | DataGlobal Identifier
+  | DataConst Identifier
   | DataInt Int
   | DataFloat16 Double
   | DataFloat32 Double

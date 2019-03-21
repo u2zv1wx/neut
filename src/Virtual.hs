@@ -65,7 +65,7 @@ virtualValue (ValueIndexIntro x meta) =
         Just i -> return $ DataInt i
         Nothing -> lift $ throwE $ "no such index defined: " ++ show name
 virtualValue ValueUniv = return $ DataInt 0
-virtualValue (ValueConst x) = return $ DataGlobal x
+virtualValue (ValueConst x) = return $ DataConst x
 
 virtualComp :: Comp -> WithEnv Code
 virtualComp (CompPi _ _) = return $ CodeReturn $ DataInt 0

@@ -100,6 +100,8 @@ asmData x (DataGlobal y) cont = do
     Just (args, _) -> do
       let funPtrType = toFunPtrType args
       return $ AsmBitcast x (AsmDataGlobal y) funPtrType voidPtr cont
+asmData x (DataConst y) cont = do
+  undefined
 asmData x (DataInt i) cont =
   return $ AsmIntToPointer x (AsmDataInt i) (LowTypeSignedInt 64) voidPtr cont
 asmData x (DataFloat16 f) cont = do
