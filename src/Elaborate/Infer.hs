@@ -82,7 +82,7 @@ infer ctx (meta :< NeutPiElim e1 e2) = do
   tdom <- infer ctx e2 >>= annot univ
   case tPi of
     _ :< NeutPi (x, tdom') tcod' -> do
-      insDef' x e2
+      _ <- insDef x e2
       insConstraintEnv (map fst ctx) tdom tdom' univ
       returnMeta meta $ subst [(x, e2)] tcod'
     _ -> do

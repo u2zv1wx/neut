@@ -23,51 +23,6 @@ import Debug.Trace
 import System.Directory
 import System.FilePath
 
-var :: Neut -> [Identifier]
-var e = fst $ varAndHole e
-
-varAndHole :: Neut -> ([Identifier], [Identifier])
-varAndHole (_ :< NeutVar s) = ([s], [])
-varAndHole (_ :< NeutPi (x, tdom) tcod) = do
-  let vs1 = varAndHole tdom
-  let (vs21, vs22) = varAndHole tcod
-  let vs2 = (filter (/= x) vs21, vs22)
-  pairwiseConcat [vs1, vs2]
-varAndHole (_ :< NeutPiIntro (x, _) e) = do
-  let (vs1, vs2) = varAndHole e
-  (filter (/= x) vs1, vs2)
-varAndHole (_ :< NeutPiElim e1 e2) =
-  pairwiseConcat [varAndHole e1, varAndHole e2]
-varAndHole (_ :< NeutSigma xts) = varAndHoleSigma xts
-varAndHole (_ :< NeutSigmaIntro es) = pairwiseConcat $ map varAndHole es
-varAndHole (_ :< NeutSigmaElim e1 xs e2) = do
-  let vs1 = varAndHole e1
-  let (vs21, vs22) = varAndHole e2
-  let vs2 = (filter (`notElem` xs) vs21, vs22)
-  pairwiseConcat [vs1, vs2]
-varAndHole (_ :< NeutIndex _) = ([], [])
-varAndHole (_ :< NeutIndexIntro _) = ([], [])
-varAndHole (_ :< NeutIndexElim e branchList) = do
-  let vs1 = varAndHole e
-  let select i = filter (`notElem` varIndex i)
-  vss <-
-    forM branchList $ \(i, body) -> do
-      let (vs21, vs22) = varAndHole body
-      return (select i vs21, vs22)
-  pairwiseConcat (vs1 : vss)
-varAndHole (_ :< NeutConst _) = ([], [])
-varAndHole (_ :< NeutUniv _) = ([], [])
-varAndHole (_ :< NeutMu _ e) = varAndHole e
-varAndHole (_ :< NeutHole x) = ([], [x])
-
-varAndHoleSigma :: [(Identifier, Neut)] -> ([Identifier], [Identifier])
-varAndHoleSigma [] = ([], [])
-varAndHoleSigma ((x, t):xts) = do
-  let vs1 = varAndHole t
-  let (vs21, vs22) = varAndHoleSigma xts
-  let vs2 = (filter (/= x) vs21, vs22)
-  pairwiseConcat [vs1, vs2]
-
 isLinear :: Identifier -> [Identifier] -> [Identifier]
 isLinear x xs =
   if length (filter (== x) xs) == 1
@@ -124,12 +79,6 @@ bindFormalArgs' (arg:xs) c = do
   holeMeta <- newNameWith "meta"
   return $ meta :< NeutPiIntro (arg, holeMeta :< NeutHole h) tmp
 
-pairwiseConcat :: [([a], [b])] -> ([a], [b])
-pairwiseConcat [] = ([], [])
-pairwiseConcat ((xs, ys):rest) = do
-  let (xs', ys') = pairwiseConcat rest
-  (xs ++ xs', ys ++ ys')
-
 boxUniv :: WithEnv Neut
 boxUniv = do
   univMeta <- newNameWith "meta"
@@ -159,6 +108,3 @@ insDef x body = do
   sub <- gets substitution
   modify (\e -> e {substitution = (x, body) : substitution e})
   return $ lookup x sub
-
-insDef' :: Identifier -> Neut -> WithEnv ()
-insDef' x body = modify (\e -> e {substitution = (x, body) : substitution e})

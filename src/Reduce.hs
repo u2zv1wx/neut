@@ -238,10 +238,6 @@ substSigma sub ((x, t):rest) = do
   let t' = subst sub t
   (x, t') : xts
 
-varIndex :: IndexOrVar -> [Identifier]
-varIndex (Right x) = [x]
-varIndex _ = []
-
 type SubstPos = [(Identifier, Pos)]
 
 substPos :: SubstPos -> Pos -> Pos
