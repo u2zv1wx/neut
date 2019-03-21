@@ -46,11 +46,11 @@ modalize = do
 
 modalPos :: Pos -> WithEnv Value
 modalPos (PosVar x) = return $ ValueVar x
-modalPos (PosSigma xts t) = do
+modalPos (PosConst x) = return $ ValueConst x
+modalPos (PosSigma xts) = do
   let (xs, ts) = unzip xts
   ts' <- mapM modalPos ts
-  t' <- modalPos t
-  return $ ValueSigma (zip xs ts') t'
+  return $ ValueSigma (zip xs ts')
 modalPos (PosSigmaIntro es) = do
   ds <- mapM modalPos es
   return $ ValueSigmaIntro ds
@@ -58,36 +58,21 @@ modalPos (PosIndex l) = return $ ValueIndex l
 modalPos (PosIndexIntro l meta) = return $ ValueIndexIntro l meta
 modalPos (PosDown t) = do
   t' <- modalNeg t
-  closureType t'
-modalPos (PosDownIntro e) = makeClosure e
+  return $ ValueDown t'
+modalPos (PosDownIntro e) = do
+  let (body, args) = toNegPiIntroSeq e
+  body' <- modalNeg body
+  thunkName <- newNameWith "thunk"
+  insModalEnv thunkName args body'
+  return $ ValueVar thunkName
 modalPos PosUniv = return ValueUniv
-modalPos (PosBox t) = do
-  t' <- modalNeg t
-  return $ ValueBox t'
-modalPos (PosBoxIntro e) = makeClosure e
-modalPos (PosConst t) = do
-  t' <- modalPos t
-  return $ ValueConst t'
-modalPos (PosConstIntro x) = return $ ValueConstIntro x
-modalPos (PosArith kind e1 e2) = do
-  e1' <- modalPos e1
-  e2' <- modalPos e2
-  return $ ValueArith kind e1' e2'
 
 modalNeg :: Neg -> WithEnv Comp
 modalNeg (NegPi (x, tdom) tcod) = do
   tdom' <- modalPos tdom
   tcod' <- modalNeg tcod
   return $ CompPi (x, tdom') tcod'
-modalNeg lam@(NegPiIntro _ _) = do
-  let (body, args) = toNegPiIntroSeq lam
-  let xs = varNeg lam
-  body' <- modalNeg body
-  lamName <- newNameWith "lam"
-  insModalEnv lamName (xs ++ args) body' -- lambda-lifting
-  name <- newNameWith "fun"
-  bindLet [(name, ValueConstIntro lamName)] $
-    CompPiElimConstElim name $ xs ++ args
+modalNeg lam@(NegPiIntro _ _) = modalNeg $ NegDownElim $ PosDownIntro lam
 modalNeg app@(NegPiElim _ _) = do
   let (fun, args) = toNegPiElimSeq app
   fun' <- modalNeg fun
@@ -104,6 +89,9 @@ modalNeg (NegIndexElim e branchList) = do
   es' <- mapM modalNeg es
   e' <- modalPos e
   return $ CompIndexElim e' (zip labelList es')
+modalNeg (NegUp v) = do
+  v' <- modalPos v
+  return $ CompUp v'
 modalNeg (NegUpIntro v) = do
   v' <- modalPos v
   return $ CompUpIntro v'
@@ -111,104 +99,15 @@ modalNeg (NegUpElim x e1 e2) = do
   e1' <- modalNeg e1
   e2' <- modalNeg e2
   return $ CompUpElim x e1' e2'
-modalNeg (NegDownElim e) = callClosure e
-modalNeg (NegBoxElim e) = callClosure e
-modalNeg (NegConstElim e) = do
+modalNeg (NegDownElim e) = do
   e' <- modalPos e
-  x <- newNameWith "const"
-  bindLet [(x, e')] $ CompPiElimConstElim x []
-modalNeg (NegVector tdom tcod) = do
-  tdom' <- modalPos tdom
-  tcod' <- modalNeg tcod
-  return $ CompVector tdom' tcod'
-modalNeg (NegVectorIntro branchList) = do
-  let (labelList, es) = unzip branchList
-  es' <- mapM modalNeg es
-  return $ CompVectorIntro $ zip labelList es'
-  -- let (body, args) = toNegVectorIntroSeq lam
-  -- let xs = varNeg lam
-  -- body' <- modalNeg body
-  -- lamName <- newNameWith "lam"
-  -- insModalEnv lamName (xs ++ args) body' -- lambda-lifting
-  -- name <- newNameWith "fun"
-  -- bindLet [(name, ValueConstIntro lamName)] $
-  --   CompVectorElimConstElim name $ xs ++ args
-modalNeg (NegVectorElim _ _) = undefined
-  -- let (fun, args) = toNegVectorElimSeq app
-  -- fun' <- modalNeg fun
-  -- args' <- mapM modalPos args
-  -- xs <- mapM (const (newNameWith "arg")) args
-  -- app' <- commVectorElim fun' xs
-  -- bindLet (zip xs args') app'
-modalNeg (NegMu self e)
-  -- We firstly translate `mu x e` to
-  --   (mu c. lam vs. let x = box ((constElim c) @ vs) in
-  --                  e),
-  -- where the `vs` is all the free variables in `e`. After that, we translate the
-  -- closed term `lam vs. (let x = box ((constelim c) @ vs) in e)`, obtaining a
-  -- modal term `inner'`. Then, we insert this term with name `c`, and return
-  -- `(constElim c) @ vs`.
- = do
+  thunkName <- newNameWith "thunk"
+  bindLet [(thunkName, e')] $ CompPiElimDownElim thunkName []
+modalNeg (NegMu x e) = do
   let (body, args) = toNegPiIntroSeq e
-  let xs = varNeg $ NegMu self e
-  let vs = map PosVar xs
-  fixName <- newNameWith "fix"
-  let app = foldl NegPiElim (NegConstElim (PosConstIntro fixName)) vs
-  let inner = NegUpElim self (NegUpIntro $ PosBoxIntro app) body
-  inner' <- modalNeg inner
-  insModalEnv fixName (xs ++ args) inner'
-  return $ CompPiElimConstElim fixName $ xs ++ args
-modalNeg (NegPrint t e) = do
-  e' <- modalPos e
-  return $ CompPrint t e'
-
--- closureType t == Sigma (A : Ui). (Box (A -> t)) * A
-closureType :: Comp -> WithEnv Value
-closureType t = do
-  (envInfo, piInfo, envType) <- closureType' t
-  return $ ValueSigma [envInfo, piInfo] envType
-
-type IdentPlus = (Identifier, Value)
-
-type ClsInfo = (IdentPlus, IdentPlus, Value)
-
-closureType' :: Comp -> WithEnv ClsInfo
-closureType' t = do
-  envTypeName <- newNameWith "env"
-  piArg <- newNameWith "arg"
-  let piType = CompPi (piArg, ValueVar envTypeName) t
-  let boxPiType = ValueBox piType
-  let univ = ValueUniv
-  sigmaArg <- newNameWith "arg"
-  return ((envTypeName, univ), (sigmaArg, boxPiType), ValueVar envTypeName)
-
--- e ~> (env-type, name, env) : Sigma (A : Ui). (Box (Env -> N)) * Env
-makeClosure :: Neg -> WithEnv Value
-makeClosure abs = do
-  let (body, args) = toNegPiIntroSeq abs
-  let fvs = nub $ varNeg abs
-  envName <- newNameWith "env"
-  body' <- makeClosureBody envName fvs body >>= reduceComp
-  cls <- newNameWith "closure"
-  insModalEnv cls (envName : args) body'
-  let vs = map ValueVar fvs
-  return $ ValueSigmaIntro [ValueConstIntro cls, ValueSigmaIntro vs]
-
--- Extract the values of free variables from the free-variable struct,
--- and then evaluate the original term.
-makeClosureBody :: Identifier -> [Identifier] -> Neg -> WithEnv Comp
-makeClosureBody _ [] funBody = modalNeg funBody
-makeClosureBody envName [x] funBody =
-  modalNeg $ NegUpElim x (NegUpIntro $ PosVar envName) funBody
-makeClosureBody envName xs funBody =
-  modalNeg $ NegSigmaElim (PosVar envName) xs funBody
-
-callClosure :: Pos -> WithEnv Comp
-callClosure e = do
-  e' <- modalPos e
-  envName <- newNameWith "env"
-  fun <- newNameWith "fun"
-  return $ CompSigmaElim e' [fun, envName] (CompPiElimConstElim fun [envName])
+  body' <- modalNeg body
+  insModalEnv x args body'
+  return $ CompPiElimDownElim x []
 
 bindLet :: [(Identifier, Value)] -> Comp -> WithEnv Comp
 bindLet [] e = return e
@@ -218,9 +117,8 @@ bindLet ((x, v):rest) e = do
 
 -- Commutative conversion for pi-elimination
 commPiElim :: Comp -> [Identifier] -> WithEnv Comp
-commPiElim (CompPi _ _) _ = lift $ throwE "Modal.commPiElim: type error"
-commPiElim (CompPiElimConstElim f xs) args =
-  return $ CompPiElimConstElim f (xs ++ args)
+commPiElim (CompPiElimDownElim f xs) args =
+  return $ CompPiElimDownElim f (xs ++ args)
 commPiElim (CompSigmaElim v xs e) args = do
   e' <- commPiElim e args
   return $ CompSigmaElim v xs e'
@@ -228,8 +126,7 @@ commPiElim (CompIndexElim v branchList) args = do
   let (labelList, es) = unzip branchList
   es' <- mapM (`commPiElim` args) es
   return $ CompIndexElim v (zip labelList es')
-commPiElim (CompUpIntro _) _ = lift $ throwE "Modal.commPiElim: type error"
 commPiElim (CompUpElim x e1 e2) args = do
   e2' <- commPiElim e2 args
   return $ CompUpElim x e1 e2'
-commPiElim CompPrint {} _ = lift $ throwE "Modal.commPiElim: type error"
+commPiElim _ _ = lift $ throwE "Modal.commPiElim: type error"
