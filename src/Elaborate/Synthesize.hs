@@ -202,3 +202,18 @@ chain c (e:es) = e `catchError` const (chain c es)
 substQueue ::
      Q.MinQueue EnrichedConstraint -> WithEnv (Q.MinQueue EnrichedConstraint)
 substQueue q = updateQueue q >> gets constraintQueue
+
+-- update the `constraintQueue` by `q`, updating its content using current substitution
+updateQueue :: Q.MinQueue EnrichedConstraint -> WithEnv ()
+updateQueue q = do
+  modify (\e -> e {constraintQueue = Q.empty})
+  sub <- gets substitution
+  updateQueue' sub q
+
+updateQueue' :: Subst -> Q.MinQueue EnrichedConstraint -> WithEnv ()
+updateQueue' sub q =
+  case Q.getMin q of
+    Nothing -> return ()
+    Just (Enriched (ctx, e1, e2, t) _) -> do
+      analyze [(ctx, subst sub e1, subst sub e2, t)]
+      updateQueue' sub $ Q.deleteMin q

@@ -224,10 +224,7 @@ concatDefList (DefMod sigMeta (_, name') xs:es) = do
 
 process :: Neut -> WithEnv [String]
 process e = do
-  liftIO $ putStrLn $ "parsed."
-  liftIO $ putStrLn $ Pr.ppShow e
   elaborate "main" e
-  liftIO $ putStrLn $ "elab."
   polarize
   modalize
   virtualize

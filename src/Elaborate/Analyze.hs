@@ -2,7 +2,6 @@ module Elaborate.Analyze
   ( simp
   , analyze
   , categorize
-  , updateQueue
   ) where
 
 import Control.Monad
@@ -133,13 +132,21 @@ simp'' ((ctx, _ :< NeutPiIntro (x, _) body1, e2, t):cs) = do
   simp $ (ctx, body1, app, t) : cs
 simp'' ((ctx, e1, e2@(_ :< NeutPiIntro _ _), t):cs) =
   simp $ (ctx, e2, e1, t) : cs
-simp'' ((_, _ :< NeutSigma [], _ :< NeutSigma [], _):cs) = simp cs
-simp'' ((ctx, i :< NeutSigma ((x, tx):xts), j :< NeutSigma ((y, ty):yts), univ):cs) = do
-  var <- toVar' x
-  cs' <- sConstraint [(y, var)] cs >>= simp
-  let sig' = subst [(y, var)] (j :< NeutSigma yts)
-  simp $
-    (ctx, tx, ty, univ) : (ctx ++ [x], i :< NeutSigma xts, sig', univ) : cs'
+-- simp'' ((_, _ :< NeutSigma [], _ :< NeutSigma [], _):cs) = simp cs
+-- simp'' ((ctx, i :< NeutSigma ((x, tx):xts), j :< NeutSigma ((y, ty):yts), univ):cs) = do
+--   var <- toVar' x
+--   cs' <- sConstraint [(y, var)] cs >>= simp
+--   let sig' = subst [(y, var)] (j :< NeutSigma yts)
+--   simp $
+--     (ctx, tx, ty, univ) : (ctx ++ [x], i :< NeutSigma xts, sig', univ) : cs'
+simp'' ((ctx, _ :< NeutSigma xts, _ :< NeutSigma yts, univ):cs)
+  | length xts == length yts = do
+    let (xs, txs) = unzip xts
+    vs <- mapM toVar' xs
+    let (ys, tys) = unzip yts
+    let tys' = map (subst (zip ys vs)) tys
+    newCs <- forM (zip txs tys') $ \(t1, t2) -> return (ctx, t1, t2, univ)
+    simp $ newCs ++ cs
 simp'' ((ctx, _ :< NeutSigmaIntro es1, _ :< NeutSigmaIntro es2, _ :< NeutSigma xts):cs)
   | length es1 == length es2 = do
     let (xs, ts) = unzip xts
@@ -227,21 +234,6 @@ categorize (ctx, e1, e2, t)
 categorize (ctx, e1, e2, t)
   | Just _ <- headMeta' [] e2 = categorize (ctx, e2, e1, t)
 categorize c = error $ "categorize: invalid argument:\n" ++ Pr.ppShow c
-
--- update the `constraintQueue` by `q`, updating its content using current substitution
-updateQueue :: Q.MinQueue EnrichedConstraint -> WithEnv ()
-updateQueue q = do
-  modify (\e -> e {constraintQueue = Q.empty})
-  sub <- gets substitution
-  updateQueue' sub q
-
-updateQueue' :: Subst -> Q.MinQueue EnrichedConstraint -> WithEnv ()
-updateQueue' sub q =
-  case Q.getMin q of
-    Nothing -> return ()
-    Just (Enriched (ctx, e1, e2, t) _) -> do
-      analyze [(ctx, subst sub e1, subst sub e2, t)]
-      updateQueue' sub $ Q.deleteMin q
 
 isEq :: Neut -> Neut -> WithEnv Bool
 isEq (_ :< NeutVar x1) (_ :< NeutVar x2) = return $ x1 == x2
@@ -339,12 +331,12 @@ affineCheck' xs (y:ys) fvs =
 
 projectionList :: Neut -> [Neut] -> WithEnv [Neut]
 projectionList e ts = do
-  xiList <- forM ts $ \t -> newNameOfType t
-  metaList <- mapM (const newName) xiList
-  let varList = map (\(m, x) -> m :< NeutVar x) $ zip metaList xiList
-  forM varList $ \v -> do
+  xs <- forM ts $ \t -> newNameOfType t
+  metaList <- mapM (const newName) xs
+  let varList = map (\(meta, x) -> meta :< NeutVar x) $ zip metaList xs
+  forM varList $ \x -> do
     meta <- newName
-    return $ meta :< NeutSigmaElim e xiList v
+    return $ meta :< NeutSigmaElim e xs x
 
 sConstraint :: Subst -> [PreConstraint] -> WithEnv [PreConstraint]
 sConstraint s ctcs = do
