@@ -108,3 +108,11 @@ insDef x body = do
   sub <- gets substitution
   modify (\e -> e {substitution = (x, body) : substitution e})
   return $ lookup x sub
+
+compose :: Subst -> Subst -> Subst
+compose s1 s2 = do
+  let domS2 = map fst s2
+  let codS2 = map snd s2
+  let codS2' = map (subst s1) codS2
+  let fromS1 = filter (\(ident, _) -> ident `notElem` domS2) s1
+  fromS1 ++ zip domS2 codS2'
