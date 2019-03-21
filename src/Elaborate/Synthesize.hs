@@ -28,7 +28,7 @@ synthesize :: Q.MinQueue EnrichedConstraint -> WithEnv ()
 synthesize q =
   case Q.getMin q of
     Nothing -> return ()
-    Just (Enriched _ (Constraint _ (ConstraintPattern x args e) _))
+    Just (Enriched _ (ConstraintPattern x args e))
       -- Synthesize `?M @ arg-1 @ ... @ arg-n == e`, where each arg-i is a variable,
       -- and arg-i == arg-j iff i == j. This kind of constraint is known to be able
       -- to be solved by:
@@ -38,7 +38,7 @@ synthesize q =
       ans <- bindFormalArgs' args e
       modify (\e -> e {substitution = compose [(x, ans)] (substitution e)})
       substQueue (Q.deleteMin q) >>= synthesize
-    Just (Enriched _ (Constraint ctx (ConstraintBeta x body) t))
+    Just (Enriched _ (ConstraintBeta x body))
       -- Synthesize `var == body` (note that `var` is not a meta-variable).
       -- In this case, we insert (var -> body) in the substitution environment
       -- so that we can extract this definition when needed.
@@ -50,19 +50,17 @@ synthesize q =
       case me of
         Nothing -> synthesize $ Q.deleteMin q
         Just body' -> do
-          cs <- simp [(ctx, body, body', t)]
+          cs <- simp [(body, body')]
           let q' = Q.fromList $ map (\c -> Enriched c $ categorize c) cs
           synthesize $ Q.deleteMin q `Q.union` q'
-    Just (Enriched _ (Constraint ctx (ConstraintDelta x args1 args2) t))
+    Just (Enriched _ (ConstraintDelta x args1 args2))
       -- Synthesize `x @ arg-11 @ ... @ arg-1n == x @ arg-21 @ ... @ arg-2n`.
       -- We try two alternatives:
       --   (1) assume that x is opaque and attempt to resolve this by args1 === args2.
       --   (2) unfold the definition of x and resolve (unfold x) @ args1 == (unfold x) @ args2.
       -- In (2), we use the definition that are inserted by ConstraintBeta.
      -> do
-      let plan1 = do
-            cs <- simp $ map (\(e1, e2) -> (ctx, e1, e2, t)) $ zip args1 args2
-            getQueue $ analyze cs
+      let plan1 = getQueue $ analyze $ zip args1 args2
       sub <- gets substitution
       planList <-
         case lookup x sub of
@@ -70,20 +68,20 @@ synthesize q =
           Just body -> do
             e1' <- appFold' body args1 >>= reduce
             e2' <- appFold' body args2 >>= reduce
-            cs <- simp [(ctx, e1', e2', t)]
+            cs <- simp [(e1', e2')]
             let plan2 = getQueue $ analyze cs
             return [plan1, plan2]
       q <- gets constraintQueue
       chain q planList >>= continue q
-    Just (Enriched _ (Constraint ctx (ConstraintQuasiPattern hole preArgs e) t))
+    Just (Enriched _ (ConstraintQuasiPattern hole preArgs e))
       -- Synthesize `hole @ arg-1 @ ... @ arg-n = e`, where arg-i is a variable.
       -- In this case, we do the same as in Flex-Rigid case.
       -- The distinction here is required just to ensure that we deal with
       -- constraints from easier ones.
-     -> synthesizeQuasiPattern q ctx hole preArgs e t
-    Just (Enriched _ (Constraint ctx (ConstraintFlexRigid hole args e) t))
+     -> synthesizeQuasiPattern q hole preArgs e
+    Just (Enriched _ (ConstraintFlexRigid hole args e))
       -- Synthesize `hole @ arg-1 @ ... @ arg-n = e`, where arg-i is an arbitrary term.
-     -> synthesizeFlexRigid q ctx hole args e t
+     -> synthesizeFlexRigid q hole args e
     Just c -> throwError $ "cannot synthesize:\n" ++ Pr.ppShow c
 
 -- Suppose that this function received a quasi-pattern ?M @ x @ x @ y @ z == e, for example.
@@ -95,19 +93,17 @@ synthesize q =
 -- other occurrences of `x` with new variables.
 synthesizeQuasiPattern ::
      Q.MinQueue EnrichedConstraint
-  -> PreContext
   -> Identifier
   -> [Identifier]
   -> Neut
-  -> Neut
   -> WithEnv ()
-synthesizeQuasiPattern q ctx hole preArgs e t = do
+synthesizeQuasiPattern q hole preArgs e = do
   argsList <- toAltList preArgs
   meta <- newNameWith "meta"
   lamList <- mapM (`bindFormalArgs'` e) argsList
   let planList =
         flip map lamList $ \lam ->
-          getQueue $ analyze [(ctx, meta :< NeutHole hole, lam, t)]
+          getQueue $ analyze [(meta :< NeutHole hole, lam)]
   q' <- chain q planList
   continue q q'
 
@@ -165,18 +161,12 @@ discardInactive xs indexList =
 -- function tries to resolve this by `?M = lam _. lam _. e`, discarding the arguments
 -- `e1` and `e2`.
 synthesizeFlexRigid ::
-     Q.MinQueue EnrichedConstraint
-  -> PreContext
-  -> Identifier
-  -> [Neut]
-  -> Neut
-  -> Neut
-  -> WithEnv ()
-synthesizeFlexRigid q ctx hole args e t = do
+     Q.MinQueue EnrichedConstraint -> Identifier -> [Neut] -> Neut -> WithEnv ()
+synthesizeFlexRigid q hole args e = do
   newHoleList <- mapM (const (newNameWith "hole")) args -- ?M_i
   meta <- newNameWith "meta"
   lam <- bindFormalArgs' newHoleList e
-  let independent = getQueue $ analyze [(ctx, meta :< NeutHole hole, lam, t)]
+  let independent = getQueue $ analyze [(meta :< NeutHole hole, lam)]
   q' <- chain q [independent]
   continue q q'
 
@@ -214,6 +204,6 @@ updateQueue' :: Subst -> Q.MinQueue EnrichedConstraint -> WithEnv ()
 updateQueue' sub q =
   case Q.getMin q of
     Nothing -> return ()
-    Just (Enriched (ctx, e1, e2, t) _) -> do
-      analyze [(ctx, subst sub e1, subst sub e2, t)]
+    Just (Enriched (e1, e2) _) -> do
+      analyze [(subst sub e1, subst sub e2)]
       updateQueue' sub $ Q.deleteMin q

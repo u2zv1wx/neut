@@ -363,14 +363,11 @@ data Asm
 instance (Show a) => Show (IORef a) where
   show a = show (unsafePerformIO (readIORef a))
 
-type PreContext = [Identifier]
-
 type Context = [(Identifier, Neut)]
 
--- (Gamma, e1, e2, t)  ==  Gamma |- e1 = e2 : t
-type PreConstraint = (PreContext, Neut, Neut, Neut)
+type PreConstraint = (Neut, Neut)
 
-data WeakConstraint
+data Constraint
   = ConstraintPattern Identifier
                       [Identifier]
                       Neut
@@ -391,13 +388,12 @@ data WeakConstraint
                        [Neut]
   deriving (Show)
 
-data Constraint =
-  Constraint PreContext
-             WeakConstraint
-             Neut
-  deriving (Show)
-
-constraintToInt :: WeakConstraint -> Int
+-- data Constraint =
+--   Constraint PreContext
+--              WeakConstraint
+--              Neut
+--   deriving (Show)
+constraintToInt :: Constraint -> Int
 constraintToInt ConstraintPattern {} = 0
 constraintToInt ConstraintDelta {} = 1
 constraintToInt ConstraintBeta {} = 2
@@ -405,17 +401,11 @@ constraintToInt ConstraintQuasiPattern {} = 3
 constraintToInt ConstraintFlexRigid {} = 4
 constraintToInt ConstraintFlexFlex {} = 5
 
-instance Eq WeakConstraint where
+instance Eq Constraint where
   c1 == c2 = constraintToInt c1 == constraintToInt c2
 
-instance Ord WeakConstraint where
-  compare c1 c2 = compare (constraintToInt c1) (constraintToInt c2)
-
-instance Eq Constraint where
-  (Constraint _ c1 _) == (Constraint _ c2 _) = c1 == c2
-
 instance Ord Constraint where
-  compare (Constraint _ c1 _) (Constraint _ c2 _) = compare c1 c2
+  compare c1 c2 = compare (constraintToInt c1) (constraintToInt c2)
 
 data EnrichedConstraint =
   Enriched PreConstraint
@@ -529,16 +519,6 @@ lookupTypeEnv' s = do
     Nothing -> lift $ throwE $ s ++ " is not found in the type environment."
     Just t -> return t
 
-lookupTypeEnv1 :: String -> [Identifier] -> Neut -> WithEnv Neut
-lookupTypeEnv1 s ctx univ = do
-  tenv <- gets typeEnv
-  let ts = Map.elems $ Map.filterWithKey (\x _ -> s == x) tenv
-  case ts of
-    [] -> lift $ throwE $ s ++ " is not found in the type environment."
-    (t:ts') -> do
-      forM_ ts' $ \t' -> insConstraintEnv ctx t t' univ
-      return t
-
 insNameEnv :: Identifier -> Identifier -> WithEnv ()
 insNameEnv from to = modify (\e -> e {nameEnv = (from, to) : nameEnv e})
 
@@ -577,7 +557,7 @@ insTypeEnv1 :: [Identifier] -> Neut -> Identifier -> Neut -> WithEnv ()
 insTypeEnv1 ctx univ i t = do
   tenv <- gets typeEnv
   let ts = Map.elems $ Map.filterWithKey (\j _ -> i == j) tenv
-  forM_ ts $ \t' -> insConstraintEnv ctx t t' univ
+  forM_ ts $ \t' -> insConstraintEnv t t'
   modify (\e -> e {typeEnv = Map.insert i t (typeEnv e)})
 
 insNumConstraintEnv :: Identifier -> WithEnv ()
@@ -658,9 +638,9 @@ isDefinedIndexName name = do
   let indexNameList = map fst $ indexEnv env
   return $ name `elem` indexNameList
 
-insConstraintEnv :: PreContext -> Neut -> Neut -> Neut -> WithEnv ()
-insConstraintEnv ctx t1 t2 t =
-  modify (\e -> e {constraintEnv = (ctx, t1, t2, t) : constraintEnv e})
+insConstraintEnv :: Neut -> Neut -> WithEnv ()
+insConstraintEnv t1 t2 =
+  modify (\e -> e {constraintEnv = (t1, t2) : constraintEnv e})
 
 insUnivConstraintEnv :: UnivLevel -> UnivLevel -> WithEnv ()
 insUnivConstraintEnv t1 t2 =

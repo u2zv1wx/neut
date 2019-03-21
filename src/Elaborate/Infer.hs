@@ -54,7 +54,7 @@ infer ctx (meta :< NeutConst s) = do
   t <- lookupTypeEnv' s >>= annot univ
   insTypeEnv s t
   u <- infer ctx t >>= annot higherUniv
-  insConstraintEnv (map fst ctx) univ u higherUniv
+  insConstraintEnv univ u
   returnMeta meta t
 infer ctx (meta :< NeutPi (s, tdom) tcod) = do
   insTypeEnv s tdom
@@ -62,8 +62,8 @@ infer ctx (meta :< NeutPi (s, tdom) tcod) = do
   univ <- boxUniv >>= annot higherUniv
   udom <- infer ctx tdom >>= annot higherUniv
   ucod <- infer (ctx ++ [(s, tdom)]) tcod >>= annot higherUniv
-  insConstraintEnv (map fst ctx ++ [s]) udom ucod higherUniv
-  insConstraintEnv (map fst ctx) udom univ higherUniv
+  insConstraintEnv udom ucod
+  insConstraintEnv udom univ
   returnMeta meta univ
 infer ctx (meta :< NeutPiIntro (s, tdom) e) = do
   univ <- boxUniv
@@ -82,7 +82,7 @@ infer ctx (meta :< NeutPiElim e1 e2) = do
   case tPi of
     _ :< NeutPi (x, tdom') tcod' -> do
       _ <- insDef x e2
-      insConstraintEnv (map fst ctx) tdom tdom' univ
+      insConstraintEnv tdom tdom'
       returnMeta meta $ subst [(x, e2)] tcod'
     _ -> do
       x <- newNameOfType tdom
@@ -91,12 +91,7 @@ infer ctx (meta :< NeutPiElim e1 e2) = do
       -- add a constraint regarding the Pi-type
       typeMeta <- newNameWith "meta"
       insTypeEnv typeMeta univ
-      insConstraintEnv
-        (map fst ctx)
-        tPi
-        (typeMeta :< NeutPi (x, tdom) tcod)
-        univ
-      -- return the type of this elimination
+      insConstraintEnv tPi (typeMeta :< NeutPi (x, tdom) tcod)
       returnMeta meta $ subst [(x, e2)] tcod
 infer _ (meta :< NeutSigma []) = do
   univ <- boxUniv
@@ -107,8 +102,8 @@ infer ctx (meta :< NeutSigma ((x, t):xts)) = do
   univ <- boxUniv >>= annot higherUniv
   udom <- infer ctx t >>= annot higherUniv
   ucod <- infer (ctx ++ [(x, t)]) (meta :< NeutSigma xts) >>= annot higherUniv
-  insConstraintEnv (map fst ctx ++ [x]) udom ucod higherUniv
-  insConstraintEnv (map fst ctx) udom univ higherUniv
+  insConstraintEnv udom ucod
+  insConstraintEnv udom univ
   returnMeta meta univ
 infer ctx (meta :< NeutSigmaIntro es) = do
   univ <- boxUniv
@@ -117,7 +112,7 @@ infer ctx (meta :< NeutSigmaIntro es) = do
   xs <- forM ts $ \t -> newName1 "sigma" t
   holeList <- sigmaHole ctx xs
   let holeList' = map (subst (zip xs es)) holeList
-  forM_ (zip holeList' ts) $ \(h, t) -> insConstraintEnv (map fst ctx) h t univ
+  forM_ (zip holeList' ts) $ \(h, t) -> insConstraintEnv h t
   returnMeta meta $ meta :< NeutSigma (zip xs holeList')
 infer ctx (meta :< NeutSigmaElim e1 xs e2) = do
   univ <- boxUniv
@@ -129,11 +124,11 @@ infer ctx (meta :< NeutSigmaElim e1 xs e2) = do
   sigmaMeta <- newNameWith "meta"
   let sigmaType = sigmaMeta :< NeutSigma binder
   annot univ sigmaType
-  insConstraintEnv (map fst ctx) t1 sigmaType univ
+  insConstraintEnv t1 sigmaType
   z <- newNameOfType t1
   pair <- constructPair (ctx ++ zip xs holeList) xs
   typeC <- appCtx (ctx ++ (zip xs holeList) ++ [(z, t1)])
-  insConstraintEnv (map fst ctx) t2 (subst [(z, pair)] typeC) univ
+  insConstraintEnv t2 (subst [(z, pair)] typeC)
   returnMeta meta $ subst [(z, e1)] typeC
 infer _ (meta :< NeutIndex _) = boxUniv >>= returnMeta meta
 infer ctx (meta :< NeutIndexIntro l) = do
@@ -155,7 +150,7 @@ infer ctx (meta :< NeutIndexElim e branchList) = do
   tls <- mapM (inferIndex ctx) labelList
   let tls' = join $ map maybeToList tls
   constrainList ctx tls'
-  headConstraint ctx t tls'
+  headConstraint t tls'
   tes <- mapM (infer ctx) es
   constrainList ctx tes
   returnMeta meta $ head tes
@@ -164,7 +159,7 @@ infer ctx (meta :< NeutMu s e) = do
   trec <- appCtx ctx >>= annot univ
   insTypeEnv s trec
   te <- infer (ctx ++ [(s, trec)]) e >>= annot univ
-  insConstraintEnv (map fst ctx) te trec univ
+  insConstraintEnv te trec
   returnMeta meta te
 infer _ (meta :< NeutUniv _) = boxUniv >>= returnMeta meta
 infer ctx (meta :< NeutHole _) = appCtx ctx >>= returnMeta meta
@@ -203,16 +198,16 @@ constrainList ctx (t1@(meta1 :< _):t2@(meta2 :< _):ts) = do
   u <- boxUniv
   insTypeEnv meta1 u
   insTypeEnv meta2 u
-  insConstraintEnv (map fst ctx) t1 t2 u
+  insConstraintEnv t1 t2
   constrainList ctx $ t2 : ts
 
-headConstraint :: Context -> Neut -> [Neut] -> WithEnv ()
-headConstraint _ _ [] = return ()
-headConstraint ctx t1@(meta1 :< _) (t2@(meta2 :< _):_) = do
+headConstraint :: Neut -> [Neut] -> WithEnv ()
+headConstraint _ [] = return ()
+headConstraint t1@(meta1 :< _) (t2@(meta2 :< _):_) = do
   u <- boxUniv
   insTypeEnv meta1 u
   insTypeEnv meta2 u
-  insConstraintEnv (map fst ctx) t1 t2 u
+  insConstraintEnv t1 t2
 
 annot :: Neut -> Neut -> WithEnv Neut
 annot t e@(meta :< _) = insTypeEnv meta t >> return e
