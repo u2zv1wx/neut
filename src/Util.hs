@@ -47,12 +47,11 @@ toPiSeq t = (t, [])
 --   let (body', args) = toSigmaSeq body
 --   (body', (x, t) : args)
 -- toSigmaSeq t = (t, [])
-toSigmaSeqTerm :: Term -> (Term, [(Identifier, Term)])
-toSigmaSeqTerm (TermSigma (x, t) body) = do
-  let (body', args) = toSigmaSeqTerm body
-  (body', (x, t) : args)
-toSigmaSeqTerm t = (t, [])
-
+-- toSigmaSeqTerm :: Term -> (Term, [(Identifier, Term)])
+-- toSigmaSeqTerm (TermSigma (x, t) body) = do
+--   let (body', args) = toSigmaSeqTerm body
+--   (body', (x, t) : args)
+-- toSigmaSeqTerm t = (t, [])
 var :: Neut -> [Identifier]
 var e = fst $ varAndHole e
 
@@ -100,21 +99,17 @@ varAndHoleSigma ((x, t):xts) = do
 
 varPos :: Pos -> [Identifier]
 varPos (PosVar s) = [s]
-varPos (PosSigma xts t2) = do
+varPos (PosConst _) = []
+varPos (PosSigma xts) = do
   let (xs, ts) = unzip xts
-  let vs = concatMap varPos (t2 : ts)
+  let vs = concatMap varPos ts
   filter (`notElem` xs) vs
 varPos (PosSigmaIntro es) = concatMap varPos es
-varPos (PosBox e) = varNeg e
-varPos (PosBoxIntro e) = varNeg e
 varPos (PosIndex _) = []
 varPos (PosIndexIntro _ _) = []
 varPos (PosDown e) = varNeg e
 varPos (PosDownIntro e) = varNeg e
 varPos PosUniv = []
-varPos (PosConst e) = varPos e
-varPos (PosConstIntro _) = []
-varPos (PosArith _ e1 e2) = varPos e1 ++ varPos e2
 
 varNeg :: Neg -> [Identifier]
 varNeg (NegPi (x, tdom) tcod) = do
@@ -129,7 +124,6 @@ varNeg (NegSigmaElim e1 xs e2) = do
   let vs1 = varPos e1
   let vs2 = filter (`notElem` xs) $ varNeg e2
   vs1 ++ vs2
-varNeg (NegBoxElim e) = varPos e
 varNeg (NegIndexElim e branchList) = do
   let vs1 = varPos e
   let select (i, body) = filter (`notElem` varIndex i) (varNeg body)
@@ -141,9 +135,7 @@ varNeg (NegUpElim x e1 e2) = do
   let vs2 = filter (/= x) $ varNeg e2
   vs1 ++ vs2
 varNeg (NegDownElim e) = varPos e
-varNeg (NegConstElim e) = varPos e
 varNeg (NegMu x e) = filter (/= x) $ varNeg e
-varNeg (NegPrint _ e) = varPos e
 
 isLinear :: Identifier -> [Identifier] -> [Identifier]
 isLinear x xs =

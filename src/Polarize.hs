@@ -37,9 +37,6 @@ polarize = do
   forM_ tenv $ \(name, e) -> do
     e' <- polarize' e >>= reduceNeg
     insPolEnv name e'
-  insArith
-  insCopyInt
-  insPrintInt
 
 -- Given a term, polarize it to a negative term. This translation determines the
 -- order of evaluation. For example, an application `e1 @ e2` is tranlated into
@@ -48,44 +45,41 @@ polarize = do
 --   (force f) @ v
 -- Ignoring the `force`, one can see the order of evaluation is now made explicit.
 polarize' :: Term -> WithEnv Neg
-polarize' (TermVar x) = return $ NegUpIntro (PosVar x)
+polarize' (TermVar x) = return $ NegDownElim (PosVar x)
+polarize' (TermConst "core.i64.add") = arith "core.i64.add"
+polarize' (TermConst "core.i64.sub") = arith "core.i64.sub"
+polarize' (TermConst "core.i64.mul") = arith "core.i64.mul"
+polarize' (TermConst "core.i64.div") = arith "core.i64.div"
+polarize' (TermConst "core.i64.print") = do
+  x <- newNameWith "lam"
+  x' <- newNameWith "lam"
+  return $
+    NegPiIntro x $
+    NegUpElim x' (NegDownElim (PosVar x)) $
+    NegPiElim (NegDownElim (PosConst "core.i64.print")) (PosVar x')
+polarize' (TermConst _) = undefined -- 定数ごとに異なる変換を行う
 polarize' (TermPi (x, tdom) tcod) = do
-  dom <- newNameWith "dom"
-  cod <- newNameWith "cod"
-  bindSeq
-    [(dom, tdom), (cod, tcod)]
-    (NegUpIntro (PosDown (NegPi (x, PosVar dom) (NegUpIntro (PosVar cod)))))
+  tdom' <- polarize' tdom
+  tcod' <- polarize' tcod
+  return $ NegUp (PosDown (NegPi (x, PosDown tdom') tcod'))
 polarize' (TermPiIntro x e) = do
   e' <- polarize' e
-  return $ NegUpIntro (PosDownIntro (NegPiIntro x e'))
+  return $ NegPiIntro x e'
 polarize' (TermPiElim e1 e2) = do
-  f <- newNameWith "pi"
-  v <- newNameWith "arg"
-  bindSeq [(v, e2), (f, e1)] (NegPiElim (NegDownElim (PosVar f)) (PosVar v))
-polarize' tSigma@(TermSigma _ _)
-  | (body, xts) <- toSigmaSeqTerm tSigma = do
-    let (xs, ts) = unzip xts
-    ys <- mapM (const (newNameWith "sigma")) xts
-    z <- newNameWith "sigma"
-    bindSeq
-      (zip (ys ++ [z]) (ts ++ [body]))
-      (NegUpIntro (PosSigma (zip xs (map PosVar ys)) (PosVar z)))
+  e1' <- polarize' e1
+  e2' <- polarize' e2
+  return $ NegPiElim e1' (PosDownIntro e2')
+polarize' (TermSigma xts) = do
+  let (xs, ts) = unzip xts
+  ts' <- mapM polarize' ts
+  return $ NegUp $ PosSigma $ zip xs (map PosDown ts')
 polarize' (TermSigmaIntro es) = do
-  nameList <- mapM (const newName) es
-  bindSeq (zip nameList es) (NegUpIntro (PosSigmaIntro (map PosVar nameList)))
+  es' <- mapM polarize' es
+  return $ NegUpIntro $ PosSigmaIntro (map PosDownIntro es')
 polarize' (TermSigmaElim e1 xs e2) = do
   e2' <- polarize' e2
   z <- newNameWith "sigma"
   bindSeq [(z, e1)] (NegSigmaElim (PosVar z) xs e2')
-polarize' (TermBox e) = do
-  e' <- polarize' e
-  return $ NegUpIntro (PosBox e')
-polarize' (TermBoxIntro e) = do
-  e' <- polarize' e
-  return $ NegUpIntro (PosBoxIntro e')
-polarize' (TermBoxElim e) = do
-  z <- newNameWith "box"
-  bindSeq [(z, e)] (NegBoxElim $ PosVar z)
 polarize' (TermIndex l) = return $ NegUpIntro (PosIndex l)
 polarize' (TermIndexIntro l meta) = return $ NegUpIntro (PosIndexIntro l meta)
 polarize' (TermIndexElim e branchList) = do
@@ -93,30 +87,9 @@ polarize' (TermIndexElim e branchList) = do
   cs <- mapM polarize' es
   x <- newNameWith "tmp"
   bindSeq [(x, e)] (NegIndexElim (PosVar x) (zip labelList cs))
-polarize' (TermVector t1 t2) = do
-  x1 <- newNameWith "dom"
-  x2 <- newNameWith "cod"
-  bindSeq
-    [(x1, t1), (x2, t2)]
-    (NegUpIntro (PosDown (NegVector (PosVar x1) (NegUpIntro (PosVar x2)))))
-polarize' (TermVectorIntro branchList) = do
-  let (labelList, es) = unzip branchList
-  cs <- mapM polarize' es
-  return $ NegUpIntro $ PosDownIntro $ NegVectorIntro (zip labelList cs)
-polarize' (TermVectorElim e1 e2) = do
-  f <- newNameWith "vec"
-  v <- newNameWith "index"
-  bindSeq [(v, e2), (f, e1)] (NegVectorElim (NegDownElim (PosVar f)) (PosVar v))
 polarize' (TermMu x e) = do
   e' <- polarize' e
   return $ NegMu x e'
-polarize' (TermConst t) = do
-  x <- newNameWith "const"
-  bindSeq [(x, t)] $ NegUpIntro $ PosConst $ PosVar x
-polarize' (TermConstIntro x) = return $ NegUpIntro (PosConstIntro x)
-polarize' (TermConstElim e) = do
-  x <- newNameWith "const"
-  bindSeq [(x, e)] $ NegConstElim $ PosVar x
 polarize' (TermUniv _) = return $ NegUpIntro PosUniv
 
 -- Intuitively, `bindSeq [(x1, e1), (x2, e2)] e3` is:
@@ -130,47 +103,15 @@ bindSeq ((formalArg, arg):rest) fun = do
   fun' <- bindSeq rest fun
   return $ NegUpElim formalArg arg' fun'
 
-insArith :: WithEnv ()
-insArith = do
-  let numLowTypeList = intLowTypeList ++ floatLowTypeList
-  forM_ numLowTypeList $ \numLowType -> do
-    (x, y) <- prepareVariables numLowType
-    let base e = rb $ rt $ NegPiIntro x $ rt $ NegPiIntro y $ NegUpIntro e
-    let add = base $ PosArith (ArithAdd, numLowType) (PosVar x) (PosVar y)
-    let sub = base $ PosArith (ArithSub, numLowType) (PosVar x) (PosVar y)
-    let mul = base $ PosArith (ArithMul, numLowType) (PosVar x) (PosVar y)
-    let div = base $ PosArith (ArithDiv, numLowType) (PosVar x) (PosVar y)
-    insPolEnv ("core." ++ show numLowType ++ ".add") add
-    insPolEnv ("core." ++ show numLowType ++ ".sub") sub
-    insPolEnv ("core." ++ show numLowType ++ ".mul") mul
-    insPolEnv ("core." ++ show numLowType ++ ".div") div
-
-prepareVariables :: LowType -> WithEnv (Identifier, Identifier)
-prepareVariables lowType = do
-  x <- newNameWith "arg"
-  y <- newNameWith "arg"
-  meta <- newNameWith "meta"
-  insTypeEnv x $ meta :< NeutIndex (show lowType)
-  insTypeEnv y $ meta :< NeutIndex (show lowType)
-  return (x, y)
-
-insCopyInt :: WithEnv ()
-insCopyInt =
-  forM_ intLowTypeList $ \intLowType -> do
-    x <- newNameWith "arg"
-    let pair = PosSigmaIntro [PosVar x, PosVar x]
-    let copy = rb $ rt $ NegPiIntro x $ NegUpIntro pair
-    insPolEnv ("core." ++ show intLowType ++ ".copy") copy
-
-insPrintInt :: WithEnv ()
-insPrintInt =
-  forM_ intLowTypeList $ \intLowType -> do
-    x <- newNameWith "arg"
-    let print = rb $ rt $ NegPiIntro x $ NegPrint intLowType (PosVar x)
-    insPolEnv ("core." ++ show intLowType ++ ".print") print
-
-rt :: Neg -> Neg
-rt e = NegUpIntro $ PosDownIntro e
-
-rb :: Neg -> Neg
-rb e = NegUpIntro $ PosBoxIntro e
+arith :: Identifier -> WithEnv Neg
+arith op = do
+  x <- newNameWith "lam"
+  x' <- newNameWith "lam"
+  y <- newNameWith "lam"
+  y' <- newNameWith "lam"
+  return $
+    NegPiIntro x $
+    NegPiIntro y $
+    NegUpElim x' (NegDownElim (PosVar x)) $
+    NegUpElim y' (NegDownElim (PosVar y)) $
+    NegPiElim (NegPiElim (NegDownElim (PosConst op)) (PosVar x')) (PosVar y')

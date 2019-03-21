@@ -47,7 +47,15 @@ infer :: Context -> Neut -> WithEnv Neut
 infer _ (meta :< NeutVar s) = do
   univ <- boxUniv
   t <- lookupTypeEnv' s >>= annot univ
-  -- t <- lookupTypeEnv1 s (map fst ctx) univ >>= annot univ
+  returnMeta meta t
+infer ctx (meta :< NeutConst s) = do
+  higherUniv <- boxUniv
+  univ <- boxUniv >>= annot higherUniv
+  t <- lookupTypeEnv' s >>= annot univ
+  -- t <- lookupTypeEnv1 s (map fst ctx) univ
+  insTypeEnv s t
+  u <- infer ctx t >>= annot higherUniv
+  insConstraintEnv (map fst ctx) univ u higherUniv
   returnMeta meta t
 infer ctx (meta :< NeutPi (s, tdom) tcod) = do
   insTypeEnv s tdom
@@ -91,17 +99,18 @@ infer ctx (meta :< NeutPiElim e1 e2) = do
         univ
       -- return the type of this elimination
       returnMeta meta $ subst [(x, e2)] tcod
-infer ctx (meta :< NeutSigma (s, t1) t2) = do
-  insTypeEnv s t1
+infer _ (meta :< NeutSigma []) = do
+  univ <- boxUniv
+  returnMeta meta univ
+infer ctx (meta :< NeutSigma ((x, t):xts)) = do
+  insTypeEnv x t
   higherUniv <- boxUniv
   univ <- boxUniv >>= annot higherUniv
-  udom <- infer ctx t1 >>= annot higherUniv
-  ucod <- infer (ctx ++ [(s, t1)]) t2 >>= annot higherUniv
-  insConstraintEnv (map fst ctx ++ [s]) udom ucod higherUniv
+  udom <- infer ctx t >>= annot higherUniv
+  ucod <- infer (ctx ++ [(x, t)]) (meta :< NeutSigma xts) >>= annot higherUniv
+  insConstraintEnv (map fst ctx ++ [x]) udom ucod higherUniv
   insConstraintEnv (map fst ctx) udom univ higherUniv
   returnMeta meta univ
-infer _ (_ :< NeutSigmaIntro []) = undefined
-infer _ (_ :< NeutSigmaIntro [_]) = undefined
 infer ctx (meta :< NeutSigmaIntro es) = do
   univ <- boxUniv
   ts <- mapM (infer ctx) es
@@ -155,37 +164,21 @@ infer ctx (meta :< NeutIndexElim e branchList) = do
 infer ctx (meta :< NeutMu s e) = do
   univ <- boxUniv
   trec <- appCtx ctx >>= annot univ
-  -- boxType <- wrapType (NeutBox trec) >>= annot univ
   insTypeEnv s trec
   te <- infer (ctx ++ [(s, trec)]) e >>= annot univ
   insConstraintEnv (map fst ctx) te trec univ
   returnMeta meta te
-infer ctx (meta :< NeutConst s) = do
-  higherUniv <- boxUniv
-  univ <- boxUniv >>= annot higherUniv
-  t <- lookupTypeEnv' s >>= annot univ
-  -- t <- lookupTypeEnv1 s (map fst ctx) univ
-  insTypeEnv s t
-  u <- infer ctx t >>= annot higherUniv
-  insConstraintEnv (map fst ctx) univ u higherUniv
-  returnMeta meta t
-  -- infer ctx t >>= returnMeta meta
 infer _ (meta :< NeutUniv _) = boxUniv >>= returnMeta meta
 infer ctx (meta :< NeutHole _) = appCtx ctx >>= returnMeta meta
 
 toSigmaType :: [(Identifier, Neut)] -> Neut -> WithEnv Neut
-toSigmaType [] _ = lift $ throwE "Infer.toSigmaType: invalid arguments"
-toSigmaType [(x, t1)] t2@(i :< _) = do
-  univ <- lookupTypeEnv' i
+toSigmaType xts t = do
+  univ <- boxUniv
   j <- newNameWith "meta"
   insTypeEnv j univ
-  return $ j :< NeutSigma (x, t1) t2
-toSigmaType ((x, t1):rest) t2@(i :< _) = do
-  univ <- lookupTypeEnv' i
-  j <- newNameWith "meta"
-  insTypeEnv j univ
-  t2' <- toSigmaType rest t2
-  return $ j :< NeutSigma (x, t1) t2'
+  i <- newNameWith "any"
+  insTypeEnv i t
+  return $ j :< NeutSigma (xts ++ [(i, t)])
 
 -- In context ctx == [y1, ..., yn], `sigmaHole ctx names-of-holes` generates the list of
 -- holes [name-1 @ ctx, name-2 @ ctx @ name-1, ..., name-n @ ctx @ name-1 @ ... @ name-(n-1)].

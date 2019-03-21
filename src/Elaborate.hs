@@ -89,9 +89,7 @@ checkNumConstraint = do
 
 elaborate' :: Neut -> WithEnv Term
 elaborate' (_ :< NeutVar s) = return $ TermVar s
-elaborate' (_ :< NeutConst _) = undefined
-  -- t' <- elaborate' t
-  -- return $ TermConst t'
+elaborate' (_ :< NeutConst x) = return $ TermConst x
 elaborate' (_ :< NeutPi (s, tdom) tcod) = do
   tdom' <- elaborate' tdom
   tcod' <- elaborate' tcod
@@ -103,10 +101,10 @@ elaborate' (_ :< NeutPiElim e v) = do
   e' <- elaborate' e
   v' <- elaborate' v
   return $ TermPiElim e' v'
-elaborate' (_ :< NeutSigma (s, t1) t2) = do
-  t1' <- elaborate' t1
-  t2' <- elaborate' t2
-  return $ TermSigma (s, t1') t2'
+elaborate' (_ :< NeutSigma xts) = do
+  let (xs, ts) = unzip xts
+  ts' <- mapM elaborate' ts
+  return $ TermSigma (zip xs ts')
 elaborate' (_ :< NeutSigmaIntro es) = do
   es' <- mapM elaborate' es
   return $ TermSigmaIntro es'

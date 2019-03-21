@@ -106,35 +106,24 @@ $(deriveShow1 ''NeutF)
 
 data Term
   = TermVar Identifier
+  | TermConst Identifier
   | TermPi (Identifier, Term)
            Term
   | TermPiIntro Identifier
                 Term
   | TermPiElim Term
                Term
-  | TermSigma (Identifier, Term)
-              Term
+  | TermSigma [(Identifier, Term)]
   | TermSigmaIntro [Term]
   | TermSigmaElim Term
                   [Identifier]
                   Term
-  | TermBox Term
-  | TermBoxIntro Term
-  | TermBoxElim Term
   | TermIndex Identifier
   | TermIndexIntro Index
                    Identifier
   | TermIndexElim Term
                   [(IndexOrVar, Term)]
   | TermUniv UnivLevel
-  | TermConst Term -- constant modality
-  | TermConstIntro Identifier
-  | TermConstElim Term
-  | TermVector Term
-               Term
-  | TermVectorIntro [(IndexOrVar, Term)]
-  | TermVectorElim Term
-                   Term
   | TermMu Identifier
            Term
   deriving (Show)
@@ -155,8 +144,8 @@ showList (a:as) = show a ++ ", " ++ showList as
 
 data Pos
   = PosVar Identifier
+  | PosConst Identifier
   | PosSigma [(Identifier, Pos)]
-             Pos
   | PosSigmaIntro [Pos]
   | PosIndex Identifier
   | PosIndexIntro Index
@@ -164,13 +153,6 @@ data Pos
   | PosDown Neg
   | PosDownIntro Neg
   | PosUniv
-  | PosBox Neg
-  | PosBoxIntro Neg
-  | PosConst Pos
-  | PosConstIntro Identifier
-  | PosArith (Arith, LowType)
-             Pos
-             Pos
   deriving (Show)
 
 data Neg
@@ -185,64 +167,45 @@ data Neg
                  Neg
   | NegIndexElim Pos
                  [(IndexOrVar, Neg)]
+  | NegUp Pos
   | NegUpIntro Pos
   | NegUpElim Identifier
               Neg
               Neg
   | NegDownElim Pos
-  | NegBoxElim Pos
-  | NegConstElim Pos
-  | NegVector Pos
-              Neg
-  | NegVectorIntro [(IndexOrVar, Neg)]
-  | NegVectorElim Neg
-                  Pos
   | NegMu Identifier
           Neg
-  | NegPrint LowType
-             Pos
   deriving (Show)
 
 -- positive modal normal form
 data Value
   = ValueVar Identifier
+  | ValueConst Identifier
   | ValueSigma [(Identifier, Value)]
-               Value
   | ValueSigmaIntro [Value]
+  | ValueDown Comp
   | ValueIndex Identifier
   | ValueIndexIntro Index
                     Identifier
   | ValueUniv
-  | ValueBox Comp
-  | ValueConst Value
-  | ValueConstIntro Identifier
-  | ValueArith (Arith, LowType)
-               Value
-               Value
   deriving (Show)
 
 -- negative modal normal form
 data Comp
   = CompPi (Identifier, Value)
            Comp
-  | CompPiElimConstElim Identifier -- (unbox f) @ x1 @ ... @ xn
-                        [Identifier]
+  | CompPiElimDownElim Identifier -- (force f) @ x1 @ ... @ xn
+                       [Identifier]
   | CompSigmaElim Value
                   [Identifier]
                   Comp
   | CompIndexElim Value
                   [(IndexOrVar, Comp)]
+  | CompUp Value
   | CompUpIntro Value
   | CompUpElim Identifier
                Comp
                Comp
-  | CompVector Value
-               Comp
-  | CompVectorIntro [(IndexOrVar, Comp)]
-  | CompVectorElim Comp
-                   Value
-  | CompPrint LowType
-              Value
   deriving (Show)
 
 data Data

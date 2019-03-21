@@ -354,11 +354,6 @@ reduceNeg (NegSigmaElim e xs body) =
     _ -> do
       body' <- reduceNeg body
       return $ NegSigmaElim e xs body'
-reduceNeg (NegBoxElim e) = do
-  e' <- reducePos e
-  case e' of
-    PosBoxIntro e'' -> reduceNeg e''
-    _ -> return $ NegBoxElim e'
 reduceNeg (NegIndexElim e branchList) =
   case e of
     PosIndexIntro x _ ->
@@ -371,6 +366,9 @@ reduceNeg (NegIndexElim e branchList) =
       let (labelList, es) = unzip branchList
       es' <- mapM reduceNeg es
       return $ NegIndexElim e $ zip labelList es'
+reduceNeg (NegUp e) = do
+  e' <- reducePos e
+  return $ NegUp e'
 reduceNeg (NegUpIntro e) = do
   e' <- reducePos e
   return $ NegUpIntro e'
@@ -385,14 +383,6 @@ reduceNeg (NegDownElim e) = do
   case e' of
     PosDownIntro e'' -> reduceNeg e''
     _ -> return $ NegDownElim e'
-reduceNeg (NegConstElim e) = do
-  e' <- reducePos e
-  case e' of
-    PosConstIntro x -> return $ NegConstElim $ PosConstIntro x
-    _ -> return $ NegConstElim e'
-reduceNeg (NegPrint x e) = do
-  e' <- reducePos e
-  return $ NegPrint x e'
 reduceNeg (NegMu x e) = do
   e' <- reduceNeg e
   return $ NegMu x e'
@@ -405,7 +395,7 @@ reduceComp (CompPi (x, tdom) tcod) = do
   tdom' <- reduceValue tdom
   tcod' <- reduceComp tcod
   return $ CompPi (x, tdom') tcod'
-reduceComp (CompPiElimConstElim x xs) = return $ CompPiElimConstElim x xs
+reduceComp (CompPiElimDownElim x xs) = return $ CompPiElimDownElim x xs
 reduceComp (CompSigmaElim e xs body) = do
   body' <- reduceComp body
   return $ CompSigmaElim e xs body'
@@ -430,9 +420,6 @@ reduceComp (CompUpElim x e1 e2) = do
   case e1' of
     CompUpIntro (ValueVar y) -> reduceComp $ substComp [(x, y)] e2'
     _ -> return $ CompUpElim x e1' e2'
-reduceComp (CompPrint t e) = do
-  e' <- reduceValue e
-  return $ CompPrint t e'
 
 subst :: Subst -> Neut -> Neut
 subst sub (j :< NeutVar s) = fromMaybe (j :< NeutVar s) (lookup s sub)
@@ -491,20 +478,14 @@ type SubstPos = [(Identifier, Pos)]
 
 substPos :: SubstPos -> Pos -> Pos
 substPos sub (PosVar s) = fromMaybe (PosVar s) (lookup s sub)
-substPos sub (PosSigma xts tcod) = do
+substPos _ (PosConst x) = PosConst x
+substPos sub (PosSigma xts) = do
   let (xs, ts) = unzip xts
   let ts' = map (substPos sub) ts
-  let tcod' = substPos sub tcod
-  PosSigma (zip xs ts') tcod'
+  PosSigma (zip xs ts')
 substPos sub (PosSigmaIntro es) = do
   let es' = map (substPos sub) es
   PosSigmaIntro es'
-substPos sub (PosBox e) = do
-  let e' = substNeg sub e
-  PosBox e'
-substPos sub (PosBoxIntro e) = do
-  let e' = substNeg sub e
-  PosBoxIntro e'
 substPos _ (PosIndex x) = PosIndex x
 substPos _ (PosIndexIntro l meta) = PosIndexIntro l meta
 substPos _ PosUniv = PosUniv
@@ -514,12 +495,6 @@ substPos sub (PosDown e) = do
 substPos sub (PosDownIntro e) = do
   let e' = substNeg sub e
   PosDownIntro e'
-substPos sub (PosConst s) = PosConst $ substPos sub s
-substPos _ (PosConstIntro x) = PosConstIntro x
-substPos sub (PosArith kind e1 e2) = do
-  let e1' = substPos sub e1
-  let e2' = substPos sub e2
-  PosArith kind e1' e2'
 
 substNeg :: SubstPos -> Neg -> Neg
 substNeg sub (NegPi (s, tdom) tcod) = do
@@ -537,21 +512,17 @@ substNeg sub (NegSigmaElim e1 xs e2) = do
   let e1' = substPos sub e1
   let e2' = substNeg sub e2
   NegSigmaElim e1' xs e2'
-substNeg sub (NegBoxElim e) = do
-  let e' = substPos sub e
-  NegBoxElim e'
 substNeg sub (NegIndexElim e branchList) = do
   let e' = substPos sub e
   let branchList' = map (\(l, e) -> (l, substNeg sub e)) branchList
   NegIndexElim e' branchList'
+substNeg sub (NegUp e) = NegUp (substPos sub e)
 substNeg sub (NegUpIntro e) = NegUpIntro (substPos sub e)
 substNeg sub (NegUpElim x e1 e2) = do
   let e1' = substNeg sub e1
   let e2' = substNeg sub e2
   NegUpElim x e1' e2'
 substNeg sub (NegDownElim e) = NegDownElim (substPos sub e)
-substNeg sub (NegConstElim e) = NegConstElim $ substPos sub e
-substNeg sub (NegPrint x e) = NegPrint x (substPos sub e)
 substNeg sub (NegMu x e) = NegMu x $ substNeg sub e
 
 type SubstValue = [(Identifier, Identifier)]
@@ -561,35 +532,22 @@ substValue sub (ValueVar s) = do
   let s' = fromMaybe s (lookup s sub)
   ValueVar s'
 substValue _ (ValueConst s) = ValueConst s
-substValue sub (ValueSigma xts tcod) = do
+substValue sub (ValueSigma xts) = do
   let (xs, ts) = unzip xts
   let ts' = map (substValue sub) ts
-  let tcod' = substValue sub tcod
-  ValueSigma (zip xs ts') tcod'
+  ValueSigma (zip xs ts')
 substValue sub (ValueSigmaIntro es) = do
   let es' = map (substValue sub) es
   ValueSigmaIntro es'
-substValue sub (ValueBox e) = do
-  let e' = substComp sub e
-  ValueBox e'
 substValue _ (ValueIndex x) = ValueIndex x
 substValue _ (ValueIndexIntro l meta) = ValueIndexIntro l meta
 substValue _ ValueUniv = ValueUniv
-substValue _ (ValueConstIntro x) = ValueConstIntro x
-substValue sub (ValueArith kind e1 e2) = do
-  let e1' = substValue sub e1
-  let e2' = substValue sub e2
-  ValueArith kind e1' e2'
 
 substComp :: SubstValue -> Comp -> Comp
 substComp sub (CompPi (s, tdom) tcod) = do
   let tdom' = substValue sub tdom
   let tcod' = substComp sub tcod
   CompPi (s, tdom') tcod'
-substComp sub (CompPiElimConstElim x xs) = do
-  let x' = fromMaybe x (lookup x sub)
-  let xs' = map (\y -> fromMaybe y (lookup y sub)) xs
-  CompPiElimConstElim x' xs'
 substComp sub (CompSigmaElim e1 xs e2) = do
   let e1' = substValue sub e1
   let e2' = substComp sub e2
@@ -603,7 +561,6 @@ substComp sub (CompUpElim x e1 e2) = do
   let e1' = substComp sub e1
   let e2' = substComp sub e2
   CompUpElim x e1' e2'
-substComp sub (CompPrint t e) = CompPrint t $ substValue sub e
 
 -- findInvVar :: Subst -> Identifier -> Maybe Identifier
 -- findInvVar [] _ = Nothing
@@ -652,11 +609,6 @@ reduceTerm (TermSigmaElim e xs body) = do
       let body' = substTerm (zip xs es') body
       reduceTerm body'
     _ -> return $ TermSigmaElim e' xs body
-reduceTerm (TermBoxElim e) = do
-  e' <- reduceTerm e
-  case e' of
-    TermBoxIntro e'' -> reduceTerm e''
-    _ -> return $ TermBoxElim e'
 reduceTerm (TermIndexElim e branchList) = do
   e' <- reduceTerm e
   case e' of
@@ -676,6 +628,7 @@ type SubstTerm = [(Identifier, Term)]
 
 substTerm :: SubstTerm -> Term -> Term
 substTerm sub (TermVar s) = fromMaybe (TermVar s) (lookup s sub)
+substTerm _ (TermConst x) = TermConst x
 substTerm sub (TermPi (s, tdom) tcod) = do
   let tdom' = substTerm sub tdom
   let tcod' = substTerm sub tcod
@@ -687,33 +640,21 @@ substTerm sub (TermPiElim e1 e2) = do
   let e1' = substTerm sub e1
   let e2' = substTerm sub e2
   TermPiElim e1' e2'
-substTerm sub (TermSigma (s, tdom) tcod) = do
-  let tdom' = substTerm sub tdom
-  let tcod' = substTerm sub tcod
-  TermSigma (s, tdom') tcod'
+substTerm sub (TermSigma xts) = do
+  let (xs, ts) = unzip xts
+  let ts' = map (substTerm sub) ts
+  TermSigma $ zip xs ts'
 substTerm sub (TermSigmaIntro es) = TermSigmaIntro (map (substTerm sub) es)
 substTerm sub (TermSigmaElim e1 xs e2) = do
   let e1' = substTerm sub e1
   let e2' = substTerm sub e2
   TermSigmaElim e1' xs e2'
-substTerm sub (TermBox e) = do
-  let e' = substTerm sub e
-  TermBox e'
-substTerm sub (TermBoxIntro e) = do
-  let e' = substTerm sub e
-  TermBoxIntro e'
-substTerm sub (TermBoxElim e) = do
-  let e' = substTerm sub e
-  TermBoxElim e'
 substTerm _ (TermIndex x) = TermIndex x
 substTerm _ (TermIndexIntro l meta) = TermIndexIntro l meta
 substTerm sub (TermIndexElim e branchList) = do
   let e' = substTerm sub e
   let branchList' = map (\(l, e) -> (l, substTerm sub e)) branchList
   TermIndexElim e' branchList'
-substTerm sub (TermConst t) = TermConst (substTerm sub t)
-substTerm _ (TermConstIntro s) = TermConstIntro s
-substTerm sub (TermConstElim e) = TermConstElim (substTerm sub e)
 substTerm _ (TermUniv i) = TermUniv i
 substTerm sub (TermMu x e) = do
   let e' = substTerm sub e

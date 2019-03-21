@@ -63,7 +63,6 @@ parse (meta :< TreeNode ((_ :< TreeAtom "tensor"):ts)) = do
   let rightMost = last typeList
   identList <- mapM (const $ newNameWith "hole") (argList ++ [rightMost])
   return $ meta :< NeutSigma (zip identList (argList ++ [rightMost]))
-  -- foldMR NeutSigma rightMost $ zip identList argList
 parse (meta :< TreeNode ((_ :< TreeAtom "pair"):ts)) = do
   es <- mapM parse ts
   return $ meta :< NeutSigmaIntro es
