@@ -106,25 +106,25 @@ parse (meta :< TreeAtom s) = do
     (_, _, True) -> return $ meta :< NeutConst s
 parse t = lift $ throwE $ "parse: syntax error:\n" ++ Pr.ppShow t
 
-parseClause :: Tree -> WithEnv (IndexOrVar, Neut)
+parseClause :: Tree -> WithEnv (Index, Neut)
 parseClause (_ :< TreeNode [_ :< TreeAtom s, t])
   | '.' `elem` s
   , Just f <- readMaybe s = do
     e <- parse t
-    return (Left $ IndexFloat f, e)
+    return (IndexFloat f, e)
 parseClause (_ :< TreeNode [_ :< TreeAtom s, t])
   | Just i <- readMaybe s = do
     e <- parse t
-    return (Left $ IndexInteger i, e)
-parseClause (_ :< TreeNode [_ :< TreeAtom "default", t]) = do
+    return (IndexInteger i, e)
+parseClause (_ :< TreeNode [_ :< TreeAtom "_", t]) = do
   e <- parse t
-  return (Left IndexDefault, e)
+  return (IndexDefault, e)
 parseClause (_ :< TreeNode [_ :< TreeAtom s, t]) = do
   e <- parse t
   b <- isDefinedIndex s
   if b
-    then return (Left $ IndexLabel s, e)
-    else return (Right s, e)
+    then return (IndexLabel s, e)
+    else lift $ throwE $ "no such label defined: " ++ s
 parseClause e = lift $ throwE $ "parseClause: syntax error:\n " ++ Pr.ppShow e
 
 parseArg :: Tree -> WithEnv (Identifier, Neut)

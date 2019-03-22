@@ -67,18 +67,15 @@ reduce (i :< NeutIndexElim e branchList) = do
   e' <- reduce e
   case e' of
     _ :< NeutIndexIntro x ->
-      case lookup (Left x) branchList of
+      case lookup x branchList of
         Just body -> reduce body
         Nothing ->
-          case findIndexVariable branchList of
-            Just (y, body) -> reduce $ subst [(y, e')] body
+          case findDefault branchList of
+            Just body -> reduce body
             Nothing ->
-              case findDefault branchList of
-                Just body -> reduce body
-                Nothing ->
-                  lift $
-                  throwE $
-                  "the index " ++ show x ++ " is not included in branchList"
+              lift $
+              throwE $
+              "the index " ++ show x ++ " is not included in branchList"
     _ -> return $ i :< NeutIndexElim e' branchList
 reduce (meta :< NeutMu s e) = reduce $ subst [(s, meta :< NeutMu s e)] e
 reduce t = return t
@@ -111,11 +108,7 @@ subst _ (j :< NeutIndex x) = j :< NeutIndex x
 subst _ (j :< NeutIndexIntro l) = j :< NeutIndexIntro l
 subst sub (j :< NeutIndexElim e branchList) = do
   let e' = subst sub e
-  let branchList' =
-        flip map branchList $ \(l, e) -> do
-          let vs = varIndex l
-          let sub' = filter (\(x, _) -> x `notElem` vs) sub
-          (l, subst sub' e)
+  let branchList' = flip map branchList $ \(l, e) -> (l, subst sub e)
   j :< NeutIndexElim e' branchList'
 subst _ (j :< NeutUniv i) = j :< NeutUniv i
 subst sub (j :< NeutMu x e) = do
@@ -157,7 +150,7 @@ reduceTerm (TermIndexElim e branchList) = do
   e' <- reduceTerm e
   case e' of
     TermIndexIntro x _ ->
-      case lookup (Left x) branchList of
+      case lookup x branchList of
         Nothing ->
           lift $
           throwE $ "the index " ++ show x ++ " is not included in branchList"
@@ -227,16 +220,9 @@ takeIntegerList ((_ :< NeutIndexIntro (IndexInteger i)):rest) = do
   return (i : is)
 takeIntegerList _ = Nothing
 
-findIndexVariable :: [(IndexOrVar, Neut)] -> Maybe (Identifier, Neut)
-findIndexVariable [] = Nothing
-findIndexVariable ((l, e):ls) =
-  case l of
-    Right i -> Just (i, e)
-    _ -> findIndexVariable ls
-
-findDefault :: [(IndexOrVar, Neut)] -> Maybe Neut
+findDefault :: [(Index, Neut)] -> Maybe Neut
 findDefault [] = Nothing
-findDefault ((Left IndexDefault, e):_) = Just e
+findDefault ((IndexDefault, e):_) = Just e
 findDefault (_:rest) = findDefault rest
 
 isReducible :: Neut -> Bool
@@ -285,7 +271,7 @@ reduceNeg (NegSigmaElim e xs body) =
 reduceNeg (NegIndexElim e branchList) =
   case e of
     PosIndexIntro x _ ->
-      case lookup (Left x) branchList of
+      case lookup x branchList of
         Nothing ->
           lift $
           throwE $ "the index " ++ show x ++ " is not included in branchList"

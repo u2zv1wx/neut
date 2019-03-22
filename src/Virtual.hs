@@ -33,6 +33,11 @@ virtualize = do
   menv <- gets modalEnv
   forM_ menv $ \(name, (args, code)) -> do
     code' <- virtualComp code
+    liftIO $ putStrLn $ name ++ " " ++ show args
+    liftIO $ putStrLn $ Pr.ppShow code
+    liftIO $ putStrLn $ "----------"
+    liftIO $ putStrLn $ Pr.ppShow code'
+    liftIO $ putStrLn "======================================="
     insCodeEnv name args code'
 
 virtualValue :: Value -> WithEnv Data
@@ -65,7 +70,7 @@ virtualValue (ValueIndexIntro x meta) =
         Just i -> return $ DataInt i
         Nothing -> lift $ throwE $ "no such index defined: " ++ show name
 virtualValue ValueUniv = return $ DataInt 0
-virtualValue (ValueConst x) = return $ DataConst x
+virtualValue (ValueConst x) = return $ DataGlobal x
 
 virtualComp :: Comp -> WithEnv Code
 virtualComp (CompPi _ _) = return $ CodeReturn $ DataInt 0

@@ -94,14 +94,13 @@ asmData x (DataLocal y) cont =
 asmData x (DataGlobal y) cont = do
   cenv <- gets codeEnv
   case lookup y cenv of
-    Nothing -> do
-      liftIO $ putStrLn $ "no such global label defined: " ++ y -- FIXME
+    Nothing
+      -- liftIO $ putStrLn $ "no such global label defined: " ++ y -- FIXME
+     -> do
       return $ AsmBitcast x (AsmDataGlobal y) voidPtr voidPtr cont
     Just (args, _) -> do
       let funPtrType = toFunPtrType args
       return $ AsmBitcast x (AsmDataGlobal y) funPtrType voidPtr cont
-asmData x (DataConst y) cont = do
-  undefined
 asmData x (DataInt i) cont =
   return $ AsmIntToPointer x (AsmDataInt i) (LowTypeSignedInt 64) voidPtr cont
 asmData x (DataFloat16 f) cont = do
@@ -172,26 +171,23 @@ asmData' ((x, d):rest) cont = do
   cont' <- asmData' rest cont
   asmData x d cont'
 
-constructSwitch :: Data -> [(IndexOrVar, Code)] -> WithEnv (Asm, [(Int, Asm)])
+constructSwitch :: Data -> [(Index, Code)] -> WithEnv (Asm, [(Int, Asm)])
 constructSwitch _ [] = lift $ throwE "empty branch"
-constructSwitch name ((Left (IndexLabel x), code):rest) = do
+constructSwitch name ((IndexLabel x, code):rest) = do
   set <- lookupIndexSet x
   case elemIndex x set of
     Nothing -> lift $ throwE $ "no such index defined: " ++ show name
-    Just i -> constructSwitch name ((Left $ IndexInteger i, code) : rest)
-constructSwitch name ((Right x, code):_) = do
-  code' <- asmCode $ CodeLet x name code
-  return (code', [])
-constructSwitch _ ((Left IndexDefault, code):_) = do
+    Just i -> constructSwitch name ((IndexInteger i, code) : rest)
+constructSwitch _ ((IndexDefault, code):_) = do
   code' <- asmCode code
   return (code', [])
-constructSwitch name ((Left (IndexInteger i), code):rest) = do
+constructSwitch name ((IndexInteger i, code):rest) = do
   code' <- asmCode code
   (defaultCase, caseList) <- constructSwitch name rest
   return (defaultCase, (i, code') : caseList)
-constructSwitch _ ((Left (IndexFloat _), _):_) = undefined -- IEEE754 float equality!
+constructSwitch _ ((IndexFloat _, _):_) = undefined -- IEEE754 float equality!
 
-asmSwitch :: Data -> [(IndexOrVar, Code)] -> WithEnv Asm
+asmSwitch :: Data -> [(Index, Code)] -> WithEnv Asm
 asmSwitch name branchList = do
   (defaultCase, caseList) <- constructSwitch name branchList
   tmp <- newNameWith "switch"

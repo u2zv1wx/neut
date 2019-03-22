@@ -68,19 +68,12 @@ renameSigma ((x, t):xts) = do
     xts' <- renameSigma xts
     return $ (x', t') : xts'
 
-renameBranchList :: [(IndexOrVar, Neut)] -> WithEnv [(IndexOrVar, Neut)]
+renameBranchList :: [(Index, Neut)] -> WithEnv [(Index, Neut)]
 renameBranchList branchList =
   forM branchList $ \(l, body) ->
     local $ do
-      l' <- newNameIndex l
       body' <- rename body
-      return (l', body')
-
-newNameIndex :: IndexOrVar -> WithEnv IndexOrVar
-newNameIndex (Right x) = do
-  x' <- newNameWith x
-  return $ Right x'
-newNameIndex l = return l
+      return (l, body')
 
 local :: WithEnv a -> WithEnv a
 local p = do

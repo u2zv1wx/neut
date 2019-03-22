@@ -50,15 +50,12 @@ exhaust' (meta :< NeutIndexElim e1 branchList@((l, _):_)) = do
   t <- lookupTypeEnv' meta >>= reduce
   let labelList = map fst branchList
   case t of
-    _ :< NeutIndex "i32" ->
-      return $ b1 && (Left IndexDefault `elem` labelList || hasVar labelList)
+    _ :< NeutIndex "i32" -> return $ b1 && (IndexDefault `elem` labelList)
     _
-      | Left IndexDefault `elem` labelList -> return b1
-    _
-      | hasVar labelList -> return b1
+      | IndexDefault `elem` labelList -> return b1
     _ ->
       case l of
-        Left (IndexLabel x) -> do
+        IndexLabel x -> do
           set <- lookupIndexSet x
           if length set <= length (nub labelList)
             then return True
@@ -66,8 +63,3 @@ exhaust' (meta :< NeutIndexElim e1 branchList@((l, _):_)) = do
         _ -> return False
 exhaust' (_ :< NeutUniv _) = return True
 exhaust' (_ :< NeutHole _) = return False
-
-hasVar :: [IndexOrVar] -> Bool
-hasVar [] = False
-hasVar (Right _:_) = True
-hasVar (_:is) = hasVar is

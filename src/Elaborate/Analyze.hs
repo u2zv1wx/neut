@@ -256,29 +256,24 @@ isEqSigma ((x, tx):xts) ((y, ty):yts) = do
   return $ b1 && b2
 isEqSigma _ _ = return False
 
-isEqBranch :: [(IndexOrVar, Neut)] -> [(IndexOrVar, Neut)] -> WithEnv Bool
+isEqBranch :: [(Index, Neut)] -> [(Index, Neut)] -> WithEnv Bool
 isEqBranch [] [] = return True
-isEqBranch ((Right x1, e1):es1) ((Right x2, e2):es2) = do
-  vx <- toVar' x1
-  b1 <- isEq e1 $ subst [(x2, vx)] e2
-  b2 <- isEqBranch es1 es2
-  return $ b1 && b2
-isEqBranch ((Left (IndexLabel x1), e1):es1) ((Left (IndexLabel x2), e2):es2)
+isEqBranch ((IndexLabel x1, e1):es1) ((IndexLabel x2, e2):es2)
   | x1 == x2 = do
     b1 <- isEq e1 e2
     b2 <- isEqBranch es1 es2
     return $ b1 && b2
-isEqBranch ((Left (IndexInteger i1), e1):es1) ((Left (IndexInteger i2), e2):es2)
+isEqBranch ((IndexInteger i1, e1):es1) ((IndexInteger i2, e2):es2)
   | i1 == i2 = do
     b1 <- isEq e1 e2
     b2 <- isEqBranch es1 es2
     return $ b1 && b2
-isEqBranch ((Left (IndexFloat i1), e1):es1) ((Left (IndexFloat i2), e2):es2)
+isEqBranch ((IndexFloat i1, e1):es1) ((IndexFloat i2, e2):es2)
   | i1 == i2 = do
     b1 <- isEq e1 e2
     b2 <- isEqBranch es1 es2
     return $ b1 && b2
-isEqBranch ((Left IndexDefault, e1):es1) ((Left IndexDefault, e2):es2) = do
+isEqBranch ((IndexDefault, e1):es1) ((IndexDefault, e2):es2) = do
   b1 <- isEq e1 e2
   b2 <- isEqBranch es1 es2
   return $ b1 && b2

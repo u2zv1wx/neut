@@ -5,12 +5,14 @@
 (definition fact (x)
   (case x
     ((1 1)
-     (n (core.i32.mul n (fact (core.i32.sub n 1)))))))
+     (_ (core.i32.mul x (fact (core.i32.sub x 1)))))))
 
 ;; (include "./coproduct.neut")
 
-(definition nat
-  (coproduct top nat))
+(fact 10)
+
+;; (definition nat
+;;   (coproduct top nat))
 
 ;; (reserve nat)
 
@@ -21,8 +23,8 @@
 ;; (notation (succ e)
 ;;   (pair right e))
 
-(let zero (pair left unit))
-(ascription zero nat)
+;; (let zero (pair left unit))
+;; (ascription zero nat)
 
 ;; (let one (succ zero))
 ;; (ascription one nat)

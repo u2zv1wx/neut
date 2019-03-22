@@ -36,6 +36,7 @@ polarize = do
   tenv <- gets termEnv
   forM_ tenv $ \(name, e) -> do
     e' <- polarize' e
+    liftIO $ putStrLn $ Pr.ppShow e'
     insPolEnv name e'
 
 -- Given a term, polarize it to a negative term. This translation determines the

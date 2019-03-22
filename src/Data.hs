@@ -56,8 +56,7 @@ data Index
   | IndexDefault
   deriving (Show, Eq)
 
-type IndexOrVar = Either Index Identifier
-
+-- type IndexOrVar = Either Index Identifier
 data Arith
   = ArithAdd
   | ArithSub
@@ -94,7 +93,7 @@ data NeutF a
   | NeutIndex Identifier
   | NeutIndexIntro Index
   | NeutIndexElim a
-                  [(IndexOrVar, a)]
+                  [(Index, a)]
   | NeutUniv UnivLevel
   | NeutMu Identifier
            a
@@ -130,21 +129,17 @@ varAndHole (_ :< NeutIndex _) = ([], [])
 varAndHole (_ :< NeutIndexIntro _) = ([], [])
 varAndHole (_ :< NeutIndexElim e branchList) = do
   let vs1 = varAndHole e
-  let select i = filter (`notElem` varIndex i)
-  vss <-
-    forM branchList $ \(i, body) -> do
-      let (vs21, vs22) = varAndHole body
-      return (select i vs21, vs22)
+  -- let select i = filter (`notElem` varIndex i)
+  vss <- forM branchList $ \(_, body) -> return $ varAndHole body
   pairwiseConcat (vs1 : vss)
 varAndHole (_ :< NeutConst _) = ([], [])
 varAndHole (_ :< NeutUniv _) = ([], [])
 varAndHole (_ :< NeutMu _ e) = varAndHole e
 varAndHole (_ :< NeutHole x) = ([], [x])
 
-varIndex :: IndexOrVar -> [Identifier]
-varIndex (Right x) = [x]
-varIndex _ = []
-
+-- varIndex :: IndexOrVar -> [Identifier]
+-- varIndex (Right x) = [x]
+-- varIndex _ = []
 varAndHoleSigma :: [(Identifier, Neut)] -> ([Identifier], [Identifier])
 varAndHoleSigma [] = ([], [])
 varAndHoleSigma ((x, t):xts) = do
@@ -177,7 +172,7 @@ data Term
   | TermIndexIntro Index
                    Identifier
   | TermIndexElim Term
-                  [(IndexOrVar, Term)]
+                  [(Index, Term)]
   | TermUniv UnivLevel
   | TermMu Identifier
            Term
@@ -221,7 +216,7 @@ data Neg
                  [Identifier]
                  Neg
   | NegIndexElim Pos
-                 [(IndexOrVar, Neg)]
+                 [(Index, Neg)]
   | NegUp Pos
   | NegUpIntro Pos
   | NegUpElim Identifier
@@ -255,7 +250,7 @@ data Comp
                   [Identifier]
                   Comp
   | CompIndexElim Value
-                  [(IndexOrVar, Comp)]
+                  [(Index, Comp)]
   | CompUp Value
   | CompUpIntro Value
   | CompUpElim Identifier
@@ -266,7 +261,6 @@ data Comp
 data Data
   = DataLocal Identifier
   | DataGlobal Identifier
-  | DataConst Identifier
   | DataInt Int
   | DataFloat16 Double
   | DataFloat32 Double
@@ -289,7 +283,7 @@ data Code
   | CodeCallTail Data -- the name of the function (type: Box (P1 -> ... -> Pn -> ↑P))
                  [Data] -- arguments (type : [P1, ..., Pn])
   | CodeSwitch Data
-               [(IndexOrVar, Code)]
+               [(Index, Code)]
   | CodeExtractValue Identifier -- destination
                      Data -- base pointer
                      (Int, Int) -- (i, n, size) ... index i in [1 ... n]
