@@ -58,13 +58,22 @@ modalPos (PosIndex l) = return $ ValueIndex l
 modalPos (PosIndexIntro l meta) = return $ ValueIndexIntro l meta
 modalPos (PosDown t) = do
   t' <- modalNeg t
-  return $ ValueDown t'
+  (envInfo, piInfo, envType) <- closureType' t'
+  name <- newNameWith "any"
+  return $ ValueSigma [envInfo, piInfo, (name, envType)]
 modalPos (PosDownIntro e) = do
-  let (body, args) = toNegPiIntroSeq e
-  body' <- modalNeg body
-  thunkName <- newNameWith "thunk"
-  insModalEnv thunkName args body'
-  return $ ValueVar thunkName
+  menv <- gets modalEnv
+  let ds = map fst menv
+  clsName <- newNameWith "closure"
+  makeClosure ds clsName e
+  -- let (body, args) = toNegPiIntroSeq e
+  -- let fvs = filter (\x -> x `notElem` map fst menv) $ nub $ varNeg e
+  -- envName <- newNameWith "env"
+  -- body' <- modalNeg $ NegSigmaElim (PosVar envName) fvs body
+  -- clsName <- newNameWith "closure"
+  -- insModalEnv clsName (envName : args) body'
+  -- let vs = map ValueVar fvs
+  -- return $ ValueSigmaIntro [ValueConst clsName, ValueSigmaIntro vs]
 modalPos PosUniv = return ValueUniv
 
 modalNeg :: Neg -> WithEnv Comp
@@ -99,15 +108,16 @@ modalNeg (NegUpElim x e1 e2) = do
   e1' <- modalNeg e1
   e2' <- modalNeg e2
   return $ CompUpElim x e1' e2'
-modalNeg (NegDownElim e) = do
-  e' <- modalPos e
-  thunkName <- newNameWith "thunk"
-  bindLet [(thunkName, e')] $ CompPiElimDownElim thunkName []
+modalNeg (NegDownElim e) = modalPos e >>= callClosure
 modalNeg (NegMu x e) = do
-  let (body, args) = toNegPiIntroSeq e
-  body' <- modalNeg body
-  insModalEnv x args body'
-  return $ CompPiElimDownElim x []
+  menv <- gets modalEnv
+  let ds = x : map fst menv
+  makeClosure ds x e >>= callClosure
+  -- callClosure v
+  -- let (body, args) = toNegPiIntroSeq e
+  -- body' <- modalNeg body
+  -- insModalEnv x args body'
+  -- return $ CompPiElimDownElim x []
 
 bindLet :: [(Identifier, Value)] -> Comp -> WithEnv Comp
 bindLet [] e = return e
@@ -142,3 +152,74 @@ toNegPiElimSeq (NegPiElim e1 e2) = do
   let (fun, xs) = toNegPiElimSeq e1
   (fun, e2 : xs)
 toNegPiElimSeq c = (c, [])
+
+type IdentPlus = (Identifier, Value)
+
+type ClsInfo = (IdentPlus, IdentPlus, Value)
+
+makeClosure :: [Identifier] -> Identifier -> Neg -> WithEnv Value
+makeClosure definedVarList clsName e = do
+  let (body, args) = toNegPiIntroSeq e
+  let fvs = filter (`notElem` definedVarList) $ nub $ varNeg e
+  envName <- newNameWith "env"
+  body' <- modalNeg $ NegSigmaElim (PosVar envName) fvs body
+  insModalEnv clsName (envName : args) body'
+  let vs = map ValueVar fvs
+  return $ ValueSigmaIntro [ValueConst clsName, ValueSigmaIntro vs]
+
+callClosure :: Value -> WithEnv Comp
+callClosure e = do
+  envName <- newNameWith "env"
+  clsName <- newNameWith "cls"
+  return $
+    CompSigmaElim e [clsName, envName] (CompPiElimDownElim clsName [envName])
+
+closureType' :: Comp -> WithEnv ClsInfo
+closureType' t = do
+  envTypeName <- newNameWith "env"
+  piArg <- newNameWith "arg"
+  let piType = CompPi (piArg, ValueVar envTypeName) t
+  let boxPiType = ValueDown piType
+  let univ = ValueUniv
+  sigmaArg <- newNameWith "arg"
+  return ((envTypeName, univ), (sigmaArg, boxPiType), ValueVar envTypeName)
+
+varPos :: Pos -> [Identifier]
+varPos (PosVar s) = [s]
+varPos (PosConst _) = []
+varPos (PosSigma xts) = do
+  let (xs, ts) = unzip xts
+  let vs = concatMap varPos ts
+  filter (`notElem` xs) vs
+varPos (PosSigmaIntro es) = concatMap varPos es
+varPos (PosIndex _) = []
+varPos (PosIndexIntro _ _) = []
+varPos (PosDown e) = varNeg e
+varPos (PosDownIntro e) = varNeg e
+varPos PosUniv = []
+
+varNeg :: Neg -> [Identifier]
+varNeg (NegPi (x, tdom) tcod) = do
+  let vs1 = varPos tdom
+  let vs2 = filter (/= x) $ varNeg tcod
+  vs1 ++ vs2
+varNeg (NegPiIntro x e) = do
+  let vs = varNeg e
+  filter (/= x) vs
+varNeg (NegPiElim e1 e2) = varNeg e1 ++ varPos e2
+varNeg (NegSigmaElim e1 xs e2) = do
+  let vs1 = varPos e1
+  let vs2 = filter (`notElem` xs) $ varNeg e2
+  vs1 ++ vs2
+varNeg (NegIndexElim e branchList) = do
+  let vs1 = varPos e
+  let vs2 = concatMap (varNeg . snd) branchList
+  vs1 ++ vs2
+varNeg (NegUp e) = varPos e
+varNeg (NegUpIntro e) = varPos e
+varNeg (NegUpElim x e1 e2) = do
+  let vs1 = varNeg e1
+  let vs2 = filter (/= x) $ varNeg e2
+  vs1 ++ vs2
+varNeg (NegDownElim e) = varPos e
+varNeg (NegMu x e) = filter (/= x) $ varNeg e
