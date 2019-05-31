@@ -212,7 +212,7 @@ data Neg
               Neg
               Neg
   | NegDownElim Pos
-  | NegConstElim Identifier
+  | NegConstElim Constant
                  [Pos]
   | NegMu Identifier
           Neg
@@ -230,7 +230,7 @@ data Value
 data Comp
   = CompPiElimDownElim Identifier -- (force f) @ x1 @ ... @ xn
                        [Identifier]
-  | CompConstElim Identifier
+  | CompConstElim Constant
                   [Identifier]
   | CompSigmaElim Value
                   [Identifier]

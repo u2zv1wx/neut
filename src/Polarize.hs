@@ -77,77 +77,72 @@ polarize' (TermMu x e) = do
 -- insert (possibly) environment-specific definition of constant
 insertDefinition :: Identifier -> WithEnv ()
 insertDefinition x
-  | isPrintConstant x = insertPrintDefinition x
-  | isArithBinOpConstant x = insertArithBinOp x
+  | Just c <- getPrintConstant x = insertPrintDefinition x c
+  | Just c <- getArithBinOpConstant x = insertArithBinOp x c
   | otherwise = lift $ throwE $ "No such primitive: " ++ x
 
-isPrintConstant :: Identifier -> Bool
-isPrintConstant x = do
-  let xs = wordsWhen (== '.') x
-  length xs == 3 &&
-    head xs == "core" && isArithType (xs !! 1) && xs !! 2 == "print"
+toArithLowType :: Identifier -> Maybe LowType
+toArithLowType x
+  | not (null x)
+  , Just y <- readMaybe $ tail x
+  , y > 0 =
+    case head x of
+      'i' -> Just $ LowTypeSignedInt y
+      'u' -> Just $ LowTypeUnsignedInt y
+      'f' -> Just $ LowTypeFloat y
+      _ -> Nothing
+  | otherwise = Nothing
 
-insertPrintDefinition :: Identifier -> WithEnv ()
-insertPrintDefinition op = do
+getPrintConstant :: Identifier -> Maybe Constant
+getPrintConstant x = do
+  let xs = wordsWhen (== '.') x
+  if length xs == 3 && head xs == "core" && xs !! 2 == "print"
+    then do
+      lowType <- toArithLowType $ xs !! 1
+      return $ ConstantPrint lowType
+    else Nothing
+
+insertPrintDefinition :: Identifier -> Constant -> WithEnv ()
+insertPrintDefinition op internalOp = do
   x <- newNameWith "lam"
   x' <- newNameWith "lam"
   penv <- gets polEnv
-  let internalOp = "internal." ++ op -- FIXME: this should be environment-specific
-  -- when (op `notElem` map fst penv) $
-  --   insPolEnv op $
-  --   NegPiIntro x $
-  --   NegUpElim x' (NegDownElim (PosVar x)) $
-  --   NegPiElim (NegDownElim (PosConst internalOp)) (PosVar x')
   when (op `notElem` map fst penv) $
     insPolEnv op $
     NegPiIntro x $
     NegUpElim x' (NegDownElim (PosVar x)) $ NegConstElim internalOp [PosVar x']
-    -- NegPi (NegDownElim (PosConst internalOp)) (PosVar x')
 
-isArithBinOpConstant :: Identifier -> Bool
-isArithBinOpConstant x = do
+getArithBinOpConstant :: Identifier -> Maybe Constant
+getArithBinOpConstant x = do
   let xs = wordsWhen (== '.') x
-  length xs == 3 &&
-    head xs == "core" && isArithType (xs !! 1) && isArithBinOp (xs !! 2)
+  if length xs == 3 && head xs == "core"
+    then do
+      lowType <- toArithLowType $ xs !! 1
+      binOp <- toArithBinOp $ xs !! 2
+      return $ ConstantArith lowType binOp
+    else Nothing
 
-isArithBinOp :: Identifier -> Bool
-isArithBinOp "add" = True
-isArithBinOp "sub" = True
-isArithBinOp "mul" = True
-isArithBinOp "div" = True
-isArithBinOp _ = False
+toArithBinOp :: Identifier -> Maybe Arith
+toArithBinOp "add" = Just ArithAdd
+toArithBinOp "sub" = Just ArithSub
+toArithBinOp "mul" = Just ArithMul
+toArithBinOp "div" = Just ArithDiv
+toArithBinOp _ = Nothing
 
-isArithType :: Identifier -> Bool
-isArithType x
-  | not (null x)
-  , Just y <- readMaybe $ tail x
-  , y > 0 = head x == 'i' || head x == 'u' || head x == 'f'
-  | otherwise = False
-
-insertArithBinOp :: Identifier -> WithEnv ()
-insertArithBinOp op = do
+insertArithBinOp :: Identifier -> Constant -> WithEnv ()
+insertArithBinOp op c = do
   x <- newNameWith "lam"
   x' <- newNameWith "lam"
   y <- newNameWith "lam"
   y' <- newNameWith "lam"
   penv <- gets polEnv
-  let llvmop = "llvm." ++ op
   when (op `notElem` map fst penv) $
     insPolEnv op $
     NegPiIntro x $
     NegPiIntro y $
     NegUpElim x' (NegDownElim (PosVar x)) $
     NegUpElim y' (NegDownElim (PosVar y)) $
-    NegConstElim llvmop [PosVar x', PosVar y']
-  -- when (op `notElem` map fst penv) $
-  --   insPolEnv op $
-  --   NegPiIntro x $
-  --   NegPiIntro y $
-  --   NegUpElim x' (NegDownElim (PosVar x)) $
-  --   NegUpElim y' (NegDownElim (PosVar y)) $
-  --   NegPiElim
-  --     (NegPiElim (NegDownElim (PosConst llvmop)) (PosVar x'))
-  --     (PosVar y')
+    NegConstElim c [PosVar x', PosVar y']
 
 wordsWhen :: (Char -> Bool) -> String -> [String]
 wordsWhen p s =

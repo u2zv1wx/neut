@@ -84,12 +84,10 @@ virtualComp (CompUpElim x e1 e2) = do
   e1' <- virtualComp e1
   e2' <- virtualComp e2
   return $ commUpElim x e1' e2'
-virtualComp (CompConstElim f xs) = do
-  undefined -- fの名前によって処理を変更。CodeArithみたいなものを用意する必要あり。
-  -- liftIO $ putStrLn $ "found constant app of " ++ f
-  -- f' <- globalizeIfNecessary f
-  -- let xs' = map DataLocal xs
-  -- return $ CodeCallTail f' xs'
+virtualComp (CompConstElim f xs) =
+  case f of
+    ConstantPrint lowType -> undefined
+    ConstantArith lowType kind -> undefined
 
 extract :: Data -> [(Identifier, Int)] -> Int -> Code -> Code
 extract z [] _ cont = CodeFree z cont
