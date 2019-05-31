@@ -43,12 +43,12 @@ modalize = do
   forM_ penv $ \(name, e) -> do
     e' <- modalNeg e
     insModalEnv name [] e'
-  -- menv <- gets modalEnv
-  -- forM_ menv $ \(name, (args, e)) -> do
-  --   liftIO $ putStrLn name
-  --   liftIO $ putStrLn $ show args
-  --   liftIO $ putStrLn $ Pr.ppShow e
-  --   liftIO $ putStrLn "-----------------------------"
+  menv <- gets modalEnv
+  forM_ menv $ \(name, (args, e)) -> do
+    liftIO $ putStrLn name
+    liftIO $ print args
+    liftIO $ putStrLn $ Pr.ppShow e
+    liftIO $ putStrLn "-----------------------------"
 
 modalPos :: Pos -> WithEnv Value
 modalPos (PosVar x) = return $ ValueVar x
@@ -58,9 +58,16 @@ modalPos (PosSigmaIntro es) = do
 modalPos (PosIndexIntro l meta) = return $ ValueIndexIntro l meta
 modalPos (PosDownIntro e) = do
   menv <- gets modalEnv
-  let ds = map fst menv
+  penv <- gets polEnv
+  let definedVarList = map fst menv ++ map fst penv
   clsName <- newNameWith "closure"
-  makeClosure ds clsName e
+  let fvs = filter (`notElem` definedVarList) $ nub $ varNeg e
+  envName <- newNameWith "env"
+  let (body, args) = toNegPiIntroSeq e
+  body' <- modalNeg $ NegSigmaElim (PosVar envName) fvs body
+  insModalEnv clsName (envName : args) body'
+  return $
+    ValueSigmaIntro [ValueVar clsName, ValueSigmaIntro $ map ValueVar fvs]
 
 modalNeg :: Neg -> WithEnv Comp
 modalNeg lam@(NegPiIntro _ _) = modalNeg $ NegDownElim $ PosDownIntro lam
@@ -87,22 +94,17 @@ modalNeg (NegUpElim x e1 e2) = do
   e1' <- modalNeg e1
   e2' <- modalNeg e2
   return $ CompUpElim x e1' e2'
-modalNeg (NegDownElim e) = modalPos e >>= callClosure
+modalNeg (NegDownElim e) = do
+  envName <- newNameWith "env"
+  clsName <- newNameWith "cls"
+  e' <- modalPos e
+  return $
+    CompSigmaElim e' [clsName, envName] (CompPiElimDownElim clsName [envName])
 modalNeg (NegConstElim x es) = do
   es' <- mapM modalPos es
   xs <- mapM (const (newNameWith "arg")) es
   bindLet (zip xs es') $ CompConstElim x xs
-  -- makeClosure ds x e >>= callClosure
 
--- modalNeg (NegMu x e) = do
---   e' <- modalNeg e
---   menv <- gets modalEnv
---   let ds = x : map fst menv
---   makeClosure' ds x e
---   penv <- gets polEnv
---   let fvs = filter (`notElem` ds ++ map fst penv) $ nub $ varNeg e
---   return $ CompPiElimDownElim x fvs
--- makeClosure' definedVarList clsName e = do
 bindLet :: [(Identifier, Value)] -> Comp -> WithEnv Comp
 bindLet [] e = return e
 bindLet ((x, v):rest) e = do
@@ -123,6 +125,7 @@ commPiElim (CompIndexElim v branchList) args = do
 commPiElim (CompUpElim x e1 e2) args = do
   e2' <- commPiElim e2 args
   return $ CompUpElim x e1 e2'
+commPiElim (CompConstElim f xs) args = return $ CompConstElim f (xs ++ args)
 commPiElim _ _ = lift $ throwE "Modal.commPiElim: type error"
 
 toNegPiIntroSeq :: Neg -> (Neg, [Identifier])
@@ -137,40 +140,6 @@ toNegPiElimSeq (NegPiElim e1 e2) = do
   (fun, e2 : xs)
 toNegPiElimSeq c = (c, [])
 
-makeClosure :: [Identifier] -> Identifier -> Neg -> WithEnv Value
-makeClosure definedVarList clsName e = do
-  makeClosure' definedVarList clsName e
-  penv <- gets polEnv
-  let fvs = filter (`notElem` definedVarList ++ map fst penv) $ nub $ varNeg e
-  return $
-    ValueSigmaIntro [ValueVar clsName, ValueSigmaIntro $ map ValueVar fvs]
-  -- let (body, args) = toNegPiIntroSeq e
-  -- penv <- gets polEnv
-  -- let fvs = filter (`notElem` definedVarList ++ map fst penv) $ nub $ varNeg e
-  -- envName <- newNameWith "env"
-  -- body' <- modalNeg $ NegSigmaElim (PosVar envName) fvs body
-  -- insModalEnv clsName (envName : args) body'
-  -- let vs = map ValueVar fvs
-  -- return $ ValueSigmaIntro [ValueVar clsName, ValueSigmaIntro vs]
-
-makeClosure' :: [Identifier] -> Identifier -> Neg -> WithEnv ()
-makeClosure' definedVarList clsName e = do
-  let (body, args) = toNegPiIntroSeq e
-  penv <- gets polEnv
-  let fvs = filter (`notElem` definedVarList ++ map fst penv) $ nub $ varNeg e
-  envName <- newNameWith "env"
-  body' <- modalNeg $ NegSigmaElim (PosVar envName) fvs body
-  insModalEnv clsName (envName : args) body'
-  -- let vs = map ValueVar fvs
-  -- return (clsName, fvs)
-
-callClosure :: Value -> WithEnv Comp
-callClosure e = do
-  envName <- newNameWith "env"
-  clsName <- newNameWith "cls"
-  return $
-    CompSigmaElim e [clsName, envName] (CompPiElimDownElim clsName [envName])
-
 varPos :: Pos -> [Identifier]
 varPos (PosVar s) = [s]
 varPos (PosSigmaIntro es) = concatMap varPos es
@@ -178,9 +147,7 @@ varPos (PosIndexIntro _ _) = []
 varPos (PosDownIntro e) = varNeg e
 
 varNeg :: Neg -> [Identifier]
-varNeg (NegPiIntro x e) = do
-  let vs = varNeg e
-  filter (/= x) vs
+varNeg (NegPiIntro x e) = filter (/= x) $ varNeg e
 varNeg (NegPiElim e1 e2) = varNeg e1 ++ varPos e2
 varNeg (NegSigmaElim e1 xs e2) = do
   let vs1 = varPos e1
@@ -197,4 +164,3 @@ varNeg (NegUpElim x e1 e2) = do
   vs1 ++ vs2
 varNeg (NegDownElim e) = varPos e
 varNeg (NegConstElim _ es) = concatMap varPos es
--- varNeg (NegMu x e) = filter (/= x) $ varNeg e

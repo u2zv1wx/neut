@@ -214,8 +214,6 @@ data Neg
   | NegDownElim Pos
   | NegConstElim Constant
                  [Pos]
-  -- | NegMu Identifier
-  --         Neg
   deriving (Show)
 
 -- positive modal normal form
@@ -410,7 +408,7 @@ data Env = Env
   , weakTermEnv :: [(Identifier, Neut)]
   , termEnv :: [(Identifier, Term)]
   , polEnv :: [(Identifier, Neg)]
-  , modalEnv :: [(Identifier, ([Identifier], Comp))]
+  , modalEnv :: [(Identifier, ([Identifier], Comp))] -- [(f, thunk (lam x1 ... xn. e)), ...]
   , constraintEnv :: [PreConstraint]
   , constraintQueue :: Q.MinQueue EnrichedConstraint
   , substitution :: Subst
