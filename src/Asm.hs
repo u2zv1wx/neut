@@ -95,10 +95,7 @@ asmData x (DataLocal y) cont =
 asmData x (DataGlobal y) cont = do
   cenv <- gets codeEnv
   case lookup y cenv of
-    Nothing
-      -- liftIO $ putStrLn $ "no such global label defined: " ++ y -- FIXME
-     -> do
-      return $ AsmBitcast x (AsmDataGlobal y) voidPtr voidPtr cont
+    Nothing -> lift $ throwE $ "no such global label defined: " ++ y -- FIXME
     Just (args, _) -> do
       let funPtrType = toFunPtrType args
       return $ AsmBitcast x (AsmDataGlobal y) funPtrType voidPtr cont

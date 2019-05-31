@@ -126,39 +126,51 @@ substSigma sub ((x, t):rest) = do
   (x, t') : xts
 
 reduceTerm :: Term -> WithEnv Term
-reduceTerm (TermPiElim e1 e2) = do
-  e2' <- reduceTerm e2
-  e1' <- reduceTerm e1
-  case e1' of
-    TermPiIntro arg body -> do
-      let sub = [(arg, e2')]
-      let body' = substTerm sub body
-      reduceTerm body'
-    _ -> return $ TermPiElim e1' e2'
-reduceTerm (TermSigmaIntro es) = do
-  es' <- mapM reduceTerm es
-  return $ TermSigmaIntro es'
+reduceTerm app@(TermPiElim _ _) = do
+  meta <- newNameWith "meta"
+  let (fun, args) = toTermPiElimSeq app
+  fun' <- reduceTerm fun
+  case fun' of
+    TermPiIntro x body ->
+      reduceTerm $
+      fromTermPiElimSeq (substTerm [(x, head args)] body, tail args)
+    TermConst constant -> do
+      args' <- mapM reduceTerm args
+      let b1 = constant `elem` intAddConstantList
+      let b2 = constant `elem` intSubConstantList
+      let b3 = constant `elem` intMulConstantList
+      let b4 = constant `elem` intDivConstantList
+      case (b1, b2, b3, b4, takeIntegerList' args') of
+        (True, _, _, _, Just [x, y]) ->
+          return $ TermIndexIntro (IndexInteger (x + y)) meta
+        (_, True, _, _, Just [x, y]) ->
+          return $ TermIndexIntro (IndexInteger (x - y)) meta
+        (_, _, True, _, Just [x, y]) ->
+          return $ TermIndexIntro (IndexInteger (x * y)) meta
+        (_, _, _, True, Just [x, y]) ->
+          return $ TermIndexIntro (IndexInteger (x `div` y)) meta
+        _ -> return $ fromTermPiElimSeq (fun', args')
+    _ -> return $ fromTermPiElimSeq (fun', args)
 reduceTerm (TermSigmaElim e xs body) = do
   e' <- reduceTerm e
-  case e of
-    TermSigmaIntro es -> do
-      es' <- mapM reduceTerm es
-      let body' = substTerm (zip xs es') body
-      reduceTerm body'
+  case e' of
+    TermSigmaIntro es -> reduceTerm $ substTerm (zip xs es) body
     _ -> return $ TermSigmaElim e' xs body
 reduceTerm (TermIndexElim e branchList) = do
   e' <- reduceTerm e
   case e' of
     TermIndexIntro x _ ->
       case lookup x branchList of
-        Nothing ->
-          lift $
-          throwE $ "the index " ++ show x ++ " is not included in branchList"
         Just body -> reduceTerm body
+        Nothing ->
+          case lookup IndexDefault branchList of
+            Just body -> reduceTerm body
+            Nothing ->
+              lift $
+              throwE $
+              "the index " ++ show x ++ " is not included in branchList"
     _ -> return $ TermIndexElim e' branchList
-reduceTerm (TermMu s e) = do
-  e' <- reduceTerm e
-  return $ TermMu s e'
+reduceTerm (TermMu s e) = reduceTerm $ substTerm [(s, TermMu s e)] e
 reduceTerm t = return t
 
 type SubstTerm = [(Identifier, Term)]
@@ -167,7 +179,8 @@ substTerm :: SubstTerm -> Term -> Term
 substTerm sub (TermVar s) = fromMaybe (TermVar s) (lookup s sub)
 substTerm _ (TermConst x) = TermConst x
 substTerm sub (TermPiIntro s body) = do
-  let body' = substTerm sub body
+  let sub' = filter (\(x, _) -> x /= s) sub
+  let body' = substTerm sub' body
   TermPiIntro s body'
 substTerm sub (TermPiElim e1 e2) = do
   let e1' = substTerm sub e1
@@ -176,7 +189,8 @@ substTerm sub (TermPiElim e1 e2) = do
 substTerm sub (TermSigmaIntro es) = TermSigmaIntro (map (substTerm sub) es)
 substTerm sub (TermSigmaElim e1 xs e2) = do
   let e1' = substTerm sub e1
-  let e2' = substTerm sub e2
+  let sub' = filter (\(x, _) -> x `notElem` xs) sub
+  let e2' = substTerm sub' e2
   TermSigmaElim e1' xs e2'
 substTerm _ (TermIndexIntro l meta) = TermIndexIntro l meta
 substTerm sub (TermIndexElim e branchList) = do
@@ -184,7 +198,8 @@ substTerm sub (TermIndexElim e branchList) = do
   let branchList' = map (\(l, e) -> (l, substTerm sub e)) branchList
   TermIndexElim e' branchList'
 substTerm sub (TermMu x e) = do
-  let e' = substTerm sub e
+  let sub' = filter (\(y, _) -> x /= y) sub
+  let e' = substTerm sub' e
   TermMu x e'
 
 toPiIntroSeq :: Neut -> (Neut, [(Identifier, Neut, Identifier)])
@@ -193,15 +208,31 @@ toPiIntroSeq (meta :< NeutPiIntro (x, t) body) = do
   (body', (x, t, meta) : args)
 toPiIntroSeq t = (t, [])
 
+toTermPiIntroSeq :: Term -> (Term, [Identifier])
+toTermPiIntroSeq (TermPiIntro x body) = do
+  let (body', args) = toTermPiIntroSeq body
+  (body', x : args)
+toTermPiIntroSeq t = (t, [])
+
 toPiElimSeq :: Neut -> (Neut, [(Identifier, Neut)])
 toPiElimSeq (i :< NeutPiElim e1 e2) = do
   let (fun, xs) = toPiElimSeq e1
   (fun, xs ++ [(i, e2)])
 toPiElimSeq c = (c, [])
 
+toTermPiElimSeq :: Term -> (Term, [Term])
+toTermPiElimSeq (TermPiElim e1 e2) = do
+  let (fun, xs) = toTermPiElimSeq e1
+  (fun, xs ++ [e2])
+toTermPiElimSeq c = (c, [])
+
 fromPiElimSeq :: (Neut, [(Identifier, Neut)]) -> Neut
 fromPiElimSeq (term, []) = term
 fromPiElimSeq (term, (i, v):xs) = fromPiElimSeq (i :< NeutPiElim term v, xs)
+
+fromTermPiElimSeq :: (Term, [Term]) -> Term
+fromTermPiElimSeq (term, []) = term
+fromTermPiElimSeq (term, v:xs) = fromTermPiElimSeq (TermPiElim term v, xs)
 
 takeIntegerList :: [Neut] -> Maybe [Int]
 takeIntegerList [] = Just []
@@ -209,6 +240,13 @@ takeIntegerList ((_ :< NeutIndexIntro (IndexInteger i)):rest) = do
   is <- takeIntegerList rest
   return (i : is)
 takeIntegerList _ = Nothing
+
+takeIntegerList' :: [Term] -> Maybe [Int]
+takeIntegerList' [] = Just []
+takeIntegerList' ((TermIndexIntro (IndexInteger i) _):rest) = do
+  is <- takeIntegerList' rest
+  return (i : is)
+takeIntegerList' _ = Nothing
 
 findDefault :: [(Index, Neut)] -> Maybe Neut
 findDefault [] = Nothing
@@ -278,10 +316,10 @@ reduceNeg (NegDownElim e) =
   case e of
     PosDownIntro e'' -> reduceNeg e''
     _ -> return $ NegDownElim e
-reduceNeg (NegMu x e) = do
-  e' <- reduceNeg e
-  return $ NegMu x e'
 
+-- reduceNeg (NegMu x e) = do
+--   e' <- reduceNeg e
+--   return $ NegMu x e'
 type SubstPos = [(Identifier, Pos)]
 
 substPos :: SubstPos -> Pos -> Pos
@@ -316,4 +354,4 @@ substNeg sub (NegUpElim x e1 e2) = do
   let e2' = substNeg sub e2
   NegUpElim x e1' e2'
 substNeg sub (NegDownElim e) = NegDownElim (substPos sub e)
-substNeg sub (NegMu x e) = NegMu x $ substNeg sub e
+-- substNeg sub (NegMu x e) = NegMu x $ substNeg sub e

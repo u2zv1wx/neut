@@ -214,8 +214,8 @@ data Neg
   | NegDownElim Pos
   | NegConstElim Constant
                  [Pos]
-  | NegMu Identifier
-          Neg
+  -- | NegMu Identifier
+  --         Neg
   deriving (Show)
 
 -- positive modal normal form
@@ -371,11 +371,6 @@ data Constraint
                        [Neut]
   deriving (Show)
 
--- data Constraint =
---   Constraint PreContext
---              WeakConstraint
---              Neut
---   deriving (Show)
 constraintToInt :: Constraint -> Int
 constraintToInt ConstraintPattern {} = 0
 constraintToInt ConstraintDelta {} = 1

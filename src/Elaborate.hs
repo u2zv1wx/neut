@@ -11,6 +11,7 @@ import Control.Comonad.Cofree
 
 import qualified Text.Show.Pretty as Pr
 
+import Close
 import Data
 import Exhaust
 import Reduce
@@ -51,7 +52,7 @@ elaborate main e = do
   modify (\e -> e {typeEnv = tenv'})
   checkNumConstraint
   -- use the resulting substitution to elaborate `e`.
-  exhaust e >>= elaborate' >>= insTermEnv main
+  exhaust e >>= elaborate' >>= close >>= insTermEnv main
 
 -- In short: numbers must have one of the number types. We firstly generate constraints
 -- assuming that `1`, `1.2321`, etc. have arbitrary types. After the inference finished,

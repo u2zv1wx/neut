@@ -36,12 +36,7 @@ polarize = do
   tenv <- gets termEnv
   forM_ tenv $ \(name, e) -> do
     e' <- polarize' e
-    insPolEnv name e'
-  -- penv <- gets polEnv
-  -- forM_ penv $ \(name, e) -> do
-  --   liftIO $ putStrLn name
-  --   liftIO $ putStrLn $ Pr.ppShow e
-  --   liftIO $ putStrLn "-----------------------------"
+    insPolEnv name e' -- implicit thunk
 
 polarize' :: Term -> WithEnv Neg
 polarize' (TermVar x) = return $ NegDownElim (PosVar x)
@@ -71,8 +66,10 @@ polarize' (TermIndexElim e branchList) = do
   cs <- mapM polarize' es
   return $ NegUpElim x e' (NegIndexElim (PosVar x) (zip labelList cs))
 polarize' (TermMu x e) = do
-  e' <- polarize' e
-  return $ NegMu x e'
+  e' <- polarize' e -- e doesn't have any free variables thanks to Close
+  insPolEnv x e' -- implicit thunk for e
+  return $ NegDownElim (PosVar x)
+  -- return $ NegMu x e'
 
 -- insert (possibly) environment-specific definition of constant
 insertDefinition :: Identifier -> WithEnv ()
@@ -103,14 +100,14 @@ getPrintConstant x = do
     else Nothing
 
 insertPrintDefinition :: Identifier -> Constant -> WithEnv ()
-insertPrintDefinition op internalOp = do
+insertPrintDefinition op c = do
   x <- newNameWith "lam"
   x' <- newNameWith "lam"
   penv <- gets polEnv
   when (op `notElem` map fst penv) $
     insPolEnv op $
     NegPiIntro x $
-    NegUpElim x' (NegDownElim (PosVar x)) $ NegConstElim internalOp [PosVar x']
+    NegUpElim x' (NegDownElim (PosVar x)) $ NegConstElim c [PosVar x']
 
 getArithBinOpConstant :: Identifier -> Maybe Constant
 getArithBinOpConstant x = do
@@ -131,10 +128,10 @@ toArithBinOp _ = Nothing
 
 insertArithBinOp :: Identifier -> Constant -> WithEnv ()
 insertArithBinOp op c = do
-  x <- newNameWith "lam"
-  x' <- newNameWith "lam"
-  y <- newNameWith "lam"
-  y' <- newNameWith "lam"
+  x <- newNameWith "arg1template"
+  y <- newNameWith "arg2template"
+  x' <- newNameWith "arg1"
+  y' <- newNameWith "arg2"
   penv <- gets polEnv
   when (op `notElem` map fst penv) $
     insPolEnv op $

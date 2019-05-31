@@ -34,6 +34,12 @@ virtualize = do
   forM_ menv $ \(name, (args, code)) -> do
     code' <- virtualComp code
     insCodeEnv name args code'
+  -- cenv <- gets codeEnv
+  -- forM_ cenv $ \(name, (args, e)) -> do
+  --   liftIO $ putStrLn name
+  --   liftIO $ putStrLn $ show args
+  --   liftIO $ putStrLn $ Pr.ppShow e
+  --   liftIO $ putStrLn "-----------------------------"
 
 virtualValue :: Value -> WithEnv Data
 virtualValue (ValueVar x) = globalizeIfNecessary x
@@ -64,7 +70,6 @@ virtualValue (ValueIndexIntro x meta) =
 
 virtualComp :: Comp -> WithEnv Code
 virtualComp (CompPiElimDownElim f xs) = do
-  liftIO $ putStrLn $ "non-constant app of " ++ f
   f' <- globalizeIfNecessary f
   let xs' = map DataLocal xs
   return $ CodeCallTail f' xs'
