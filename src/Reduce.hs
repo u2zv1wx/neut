@@ -166,10 +166,10 @@ type SubstTerm = [(Identifier, Term)]
 substTerm :: SubstTerm -> Term -> Term
 substTerm sub (TermVar s) = fromMaybe (TermVar s) (lookup s sub)
 substTerm _ (TermConst x) = TermConst x
-substTerm sub (TermPi (s, tdom) tcod) = do
-  let tdom' = substTerm sub tdom
-  let tcod' = substTerm sub tcod
-  TermPi (s, tdom') tcod'
+-- substTerm sub (TermPi (s, tdom) tcod) = do
+--   let tdom' = substTerm sub tdom
+--   let tcod' = substTerm sub tcod
+--   TermPi (s, tdom') tcod'
 substTerm sub (TermPiIntro s body) = do
   let body' = substTerm sub body
   TermPiIntro s body'
@@ -177,22 +177,22 @@ substTerm sub (TermPiElim e1 e2) = do
   let e1' = substTerm sub e1
   let e2' = substTerm sub e2
   TermPiElim e1' e2'
-substTerm sub (TermSigma xts) = do
-  let (xs, ts) = unzip xts
-  let ts' = map (substTerm sub) ts
-  TermSigma $ zip xs ts'
+-- substTerm sub (TermSigma xts) = do
+--   let (xs, ts) = unzip xts
+--   let ts' = map (substTerm sub) ts
+--   TermSigma $ zip xs ts'
 substTerm sub (TermSigmaIntro es) = TermSigmaIntro (map (substTerm sub) es)
 substTerm sub (TermSigmaElim e1 xs e2) = do
   let e1' = substTerm sub e1
   let e2' = substTerm sub e2
   TermSigmaElim e1' xs e2'
-substTerm _ (TermIndex x) = TermIndex x
+-- substTerm _ (TermIndex x) = TermIndex x
 substTerm _ (TermIndexIntro l meta) = TermIndexIntro l meta
 substTerm sub (TermIndexElim e branchList) = do
   let e' = substTerm sub e
   let branchList' = map (\(l, e) -> (l, substTerm sub e)) branchList
   TermIndexElim e' branchList'
-substTerm _ (TermUniv i) = TermUniv i
+-- substTerm _ (TermUniv i) = TermUniv i
 substTerm sub (TermMu x e) = do
   let e' = substTerm sub e
   TermMu x e'
@@ -245,9 +245,9 @@ isReducible (_ :< NeutMu _ _) = True
 isReducible (_ :< NeutHole _) = False
 
 reduceNeg :: Neg -> WithEnv Neg
-reduceNeg (NegPi (x, tdom) tcod) = do
-  tcod' <- reduceNeg tcod
-  return $ NegPi (x, tdom) tcod'
+-- reduceNeg (NegPi (x, tdom) tcod) = do
+--   tcod' <- reduceNeg tcod
+--   return $ NegPi (x, tdom) tcod'
 reduceNeg (NegPiIntro x e) = do
   e' <- reduceNeg e
   return $ NegPiIntro x e'
@@ -280,7 +280,7 @@ reduceNeg (NegIndexElim e branchList) =
       let (labelList, es) = unzip branchList
       es' <- mapM reduceNeg es
       return $ NegIndexElim e $ zip labelList es'
-reduceNeg (NegUp e) = return $ NegUp e
+-- reduceNeg (NegUp e) = return $ NegUp e
 reduceNeg (NegUpIntro e) = return $ NegUpIntro e
 reduceNeg (NegUpElim x e1 e2) = do
   e1' <- reduceNeg e1
@@ -301,28 +301,28 @@ type SubstPos = [(Identifier, Pos)]
 substPos :: SubstPos -> Pos -> Pos
 substPos sub (PosVar s) = fromMaybe (PosVar s) (lookup s sub)
 substPos _ (PosConst x) = PosConst x
-substPos sub (PosSigma xts) = do
-  let (xs, ts) = unzip xts
-  let ts' = map (substPos sub) ts
-  PosSigma (zip xs ts')
+-- substPos sub (PosSigma xts) = do
+--   let (xs, ts) = unzip xts
+--   let ts' = map (substPos sub) ts
+--   PosSigma (zip xs ts')
 substPos sub (PosSigmaIntro es) = do
   let es' = map (substPos sub) es
   PosSigmaIntro es'
-substPos _ (PosIndex x) = PosIndex x
+-- substPos _ (PosIndex x) = PosIndex x
 substPos _ (PosIndexIntro l meta) = PosIndexIntro l meta
-substPos _ PosUniv = PosUniv
-substPos sub (PosDown e) = do
-  let e' = substNeg sub e
-  PosDown e'
+-- substPos _ PosUniv = PosUniv
+-- substPos sub (PosDown e) = do
+--   let e' = substNeg sub e
+--   PosDown e'
 substPos sub (PosDownIntro e) = do
   let e' = substNeg sub e
   PosDownIntro e'
 
 substNeg :: SubstPos -> Neg -> Neg
-substNeg sub (NegPi (s, tdom) tcod) = do
-  let tdom' = substPos sub tdom
-  let tcod' = substNeg sub tcod
-  NegPi (s, tdom') tcod'
+-- substNeg sub (NegPi (s, tdom) tcod) = do
+--   let tdom' = substPos sub tdom
+--   let tcod' = substNeg sub tcod
+--   NegPi (s, tdom') tcod'
 substNeg sub (NegPiIntro s body) = do
   let body' = substNeg sub body
   NegPiIntro s body'
@@ -338,7 +338,7 @@ substNeg sub (NegIndexElim e branchList) = do
   let e' = substPos sub e
   let branchList' = map (\(l, e) -> (l, substNeg sub e)) branchList
   NegIndexElim e' branchList'
-substNeg sub (NegUp e) = NegUp (substPos sub e)
+-- substNeg sub (NegUp e) = NegUp (substPos sub e)
 substNeg sub (NegUpIntro e) = NegUpIntro (substPos sub e)
 substNeg sub (NegUpElim x e1 e2) = do
   let e1' = substNeg sub e1

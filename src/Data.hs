@@ -157,23 +157,23 @@ pairwiseConcat ((xs, ys):rest) = do
 data Term
   = TermVar Identifier
   | TermConst Identifier
-  | TermPi (Identifier, Term)
-           Term
+  -- | TermPi (Identifier, Term)
+  --          Term
   | TermPiIntro Identifier
                 Term
   | TermPiElim Term
                Term
-  | TermSigma [(Identifier, Term)]
+  -- | TermSigma [(Identifier, Term)]
   | TermSigmaIntro [Term]
   | TermSigmaElim Term
                   [Identifier]
                   Term
-  | TermIndex Identifier
+  -- | TermIndex Identifier
   | TermIndexIntro Index
                    Identifier
   | TermIndexElim Term
                   [(Index, Term)]
-  | TermUniv UnivLevel
+  -- | TermUniv UnivLevel
   | TermMu Identifier
            Term
   deriving (Show)
@@ -195,20 +195,18 @@ showList (a:as) = show a ++ ", " ++ showList as
 data Pos
   = PosVar Identifier
   | PosConst Identifier
-  | PosSigma [(Identifier, Pos)]
+  -- | PosSigma [(Identifier, Pos)]
   | PosSigmaIntro [Pos]
-  | PosIndex Identifier
+  -- | PosIndex Identifier
   | PosIndexIntro Index
                   Identifier -- metadata to determine its type
-  | PosDown Neg
+  -- | PosDown Neg
   | PosDownIntro Neg
-  | PosUniv
+  -- | PosUniv
   deriving (Show)
 
 data Neg
-  = NegPi (Identifier, Pos)
-          Neg
-  | NegPiIntro Identifier
+  = NegPiIntro Identifier
                Neg
   | NegPiElim Neg
               Pos
@@ -217,7 +215,7 @@ data Neg
                  Neg
   | NegIndexElim Pos
                  [(Index, Neg)]
-  | NegUp Pos
+  -- | NegUp Pos
   | NegUpIntro Pos
   | NegUpElim Identifier
               Neg
@@ -231,27 +229,25 @@ data Neg
 data Value
   = ValueVar Identifier
   | ValueConst Identifier
-  | ValueSigma [(Identifier, Value)]
+  -- | ValueSigma [(Identifier, Value)]
   | ValueSigmaIntro [Value]
-  | ValueDown Comp
-  | ValueIndex Identifier
+  -- | ValueDown Comp
+  -- | ValueIndex Identifier
   | ValueIndexIntro Index
                     Identifier
-  | ValueUniv
+  -- | ValueUniv
   deriving (Show)
 
 -- negative modal normal form
 data Comp
-  = CompPi (Identifier, Value)
-           Comp
-  | CompPiElimDownElim Identifier -- (force f) @ x1 @ ... @ xn
+  = CompPiElimDownElim Identifier -- (force f) @ x1 @ ... @ xn
                        [Identifier]
   | CompSigmaElim Value
                   [Identifier]
                   Comp
   | CompIndexElim Value
                   [(Index, Comp)]
-  | CompUp Value
+  -- | CompUp Value
   | CompUpIntro Value
   | CompUpElim Identifier
                Comp

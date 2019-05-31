@@ -60,26 +60,26 @@ checkNumConstraint :: WithEnv ()
 checkNumConstraint = do
   env <- get
   forM_ (numConstraintEnv env) $ \x -> do
-    t <- lookupTypeEnv' x
-    t' <- elaborate' t >>= reduceTerm
-    case t' of
-      TermIndex "i1" -> return ()
-      TermIndex "i2" -> return ()
-      TermIndex "i4" -> return ()
-      TermIndex "i8" -> return ()
-      TermIndex "i16" -> return ()
-      TermIndex "i32" -> return ()
-      TermIndex "i64" -> return ()
-      TermIndex "u1" -> return ()
-      TermIndex "u2" -> return ()
-      TermIndex "u4" -> return ()
-      TermIndex "u8" -> return ()
-      TermIndex "u16" -> return ()
-      TermIndex "u32" -> return ()
-      TermIndex "u64" -> return ()
-      TermIndex "f16" -> return ()
-      TermIndex "f32" -> return ()
-      TermIndex "f64" -> return ()
+    t <- lookupTypeEnv' x >>= reduce
+    -- t' <- elaborate' t >>= reduceTerm
+    case t of
+      _ :< NeutIndex "i1" -> return ()
+      _ :< NeutIndex "i2" -> return ()
+      _ :< NeutIndex "i4" -> return ()
+      _ :< NeutIndex "i8" -> return ()
+      _ :< NeutIndex "i16" -> return ()
+      _ :< NeutIndex "i32" -> return ()
+      _ :< NeutIndex "i64" -> return ()
+      _ :< NeutIndex "u1" -> return ()
+      _ :< NeutIndex "u2" -> return ()
+      _ :< NeutIndex "u4" -> return ()
+      _ :< NeutIndex "u8" -> return ()
+      _ :< NeutIndex "u16" -> return ()
+      _ :< NeutIndex "u32" -> return ()
+      _ :< NeutIndex "u64" -> return ()
+      _ :< NeutIndex "f16" -> return ()
+      _ :< NeutIndex "f32" -> return ()
+      _ :< NeutIndex "f64" -> return ()
       t ->
         lift $
         throwE $
@@ -89,10 +89,10 @@ checkNumConstraint = do
 elaborate' :: Neut -> WithEnv Term
 elaborate' (_ :< NeutVar s) = return $ TermVar s
 elaborate' (_ :< NeutConst x) = return $ TermConst x
-elaborate' (_ :< NeutPi (s, tdom) tcod) = do
-  tdom' <- elaborate' tdom
-  tcod' <- elaborate' tcod
-  return $ TermPi (s, tdom') tcod'
+elaborate' (_ :< NeutPi _ _) = return $ TermSigmaIntro []
+  -- tdom' <- elaborate' tdom
+  -- tcod' <- elaborate' tcod
+  -- return $ TermPi (s, tdom') tcod'
 elaborate' (_ :< NeutPiIntro (s, _) e) = do
   e' <- elaborate' e
   return $ TermPiIntro s e'
@@ -100,10 +100,10 @@ elaborate' (_ :< NeutPiElim e v) = do
   e' <- elaborate' e
   v' <- elaborate' v
   return $ TermPiElim e' v'
-elaborate' (_ :< NeutSigma xts) = do
-  let (xs, ts) = unzip xts
-  ts' <- mapM elaborate' ts
-  return $ TermSigma (zip xs ts')
+elaborate' (_ :< NeutSigma _) = return $ TermSigmaIntro []
+  -- let (xs, ts) = unzip xts
+  -- ts' <- mapM elaborate' ts
+  -- return $ TermSigma (zip xs ts')
 elaborate' (_ :< NeutSigmaIntro es) = do
   es' <- mapM elaborate' es
   return $ TermSigmaIntro es'
@@ -111,7 +111,8 @@ elaborate' (_ :< NeutSigmaElim e1 xs e2) = do
   e1' <- elaborate' e1
   e2' <- elaborate' e2
   return $ TermSigmaElim e1' xs e2'
-elaborate' (_ :< NeutIndex s) = return $ TermIndex s
+elaborate' (_ :< NeutIndex _) = return $ TermSigmaIntro []
+  -- return $ TermIndex s
 elaborate' (meta :< NeutIndexIntro x) = return $ TermIndexIntro x meta
 elaborate' (_ :< NeutIndexElim e branchList) = do
   e' <- elaborate' e
@@ -120,7 +121,8 @@ elaborate' (_ :< NeutIndexElim e branchList) = do
       body' <- elaborate' body
       return (l, body')
   return $ TermIndexElim e' branchList'
-elaborate' (_ :< NeutUniv j) = return $ TermUniv j
+elaborate' (_ :< NeutUniv _) = return $ TermSigmaIntro []
+  -- return $ TermUniv j
 elaborate' (_ :< NeutMu s e) = do
   e' <- elaborate' e
   return $ TermMu s e'

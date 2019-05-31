@@ -64,11 +64,11 @@ polarize' (TermConst "core.i64.print") = do
     NegPiElim (NegDownElim (PosConst "core.i64.print")) (PosVar x')
 polarize' (TermConst x) = do
   liftIO $ putStrLn $ "const == " ++ x
-  undefined -- 定数ごとに異なる変換を行う
-polarize' (TermPi (x, tdom) tcod) = do
-  tdom' <- polarize' tdom
-  tcod' <- polarize' tcod
-  return $ NegUp (PosDown (NegPi (x, PosDown tdom') tcod'))
+  undefined
+-- polarize' (TermPi (x, tdom) tcod) = do
+--   tdom' <- polarize' tdom
+--   tcod' <- polarize' tcod
+--   return $ NegUp (PosDown (NegPi (x, PosDown tdom') tcod'))
 polarize' (TermPiIntro x e) = do
   e' <- polarize' e
   return $ NegPiIntro x e'
@@ -76,10 +76,10 @@ polarize' (TermPiElim e1 e2) = do
   e1' <- polarize' e1
   e2' <- polarize' e2
   return $ NegPiElim e1' (PosDownIntro e2')
-polarize' (TermSigma xts) = do
-  let (xs, ts) = unzip xts
-  ts' <- mapM polarize' ts
-  return $ NegUp $ PosSigma $ zip xs (map PosDown ts')
+-- polarize' (TermSigma xts) = do
+--   let (xs, ts) = unzip xts
+--   ts' <- mapM polarize' ts
+--   return $ NegUp $ PosSigma $ zip xs (map PosDown ts')
 polarize' (TermSigmaIntro es) = do
   es' <- mapM polarize' es
   return $ NegUpIntro $ PosSigmaIntro (map PosDownIntro es')
@@ -87,7 +87,7 @@ polarize' (TermSigmaElim e1 xs e2) = do
   e2' <- polarize' e2
   z <- newNameWith "sigma"
   bindSeq [(z, e1)] (NegSigmaElim (PosVar z) xs e2')
-polarize' (TermIndex l) = return $ NegUpIntro (PosIndex l)
+-- polarize' (TermIndex l) = return $ NegUpIntro (PosIndex l)
 polarize' (TermIndexIntro l meta) = return $ NegUpIntro (PosIndexIntro l meta)
 polarize' (TermIndexElim e branchList) = do
   let (labelList, es) = unzip branchList
@@ -97,8 +97,8 @@ polarize' (TermIndexElim e branchList) = do
 polarize' (TermMu x e) = do
   e' <- polarize' e
   return $ NegMu x e'
-polarize' (TermUniv _) = return $ NegUpIntro PosUniv
 
+-- polarize' (TermUniv _) = return $ NegUpIntro PosUniv
 -- Intuitively, `bindSeq [(x1, e1), (x2, e2)] e3` is:
 --   let x1 = (polarize' e1) in
 --   let x2 = (polarize' e2) in

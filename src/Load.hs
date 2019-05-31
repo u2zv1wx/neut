@@ -209,6 +209,7 @@ concatDefList :: [Def] -> WithEnv Neut
 concatDefList [] = do
   meta <- newNameWith "meta"
   return $ meta :< NeutSigmaIntro []
+concatDefList [DefLet _ (_, _) e] = return e
 concatDefList (DefLet meta (_, name') e:es) = do
   cont <- concatDefList es
   h <- newNameWith "any"

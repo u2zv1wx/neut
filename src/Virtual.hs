@@ -35,19 +35,17 @@ virtualize = do
     code' <- virtualComp code
     liftIO $ putStrLn $ name ++ " " ++ show args
     liftIO $ putStrLn $ Pr.ppShow code
-    liftIO $ putStrLn $ "----------"
-    liftIO $ putStrLn $ Pr.ppShow code'
     liftIO $ putStrLn "======================================="
     insCodeEnv name args code'
 
 virtualValue :: Value -> WithEnv Data
 virtualValue (ValueVar x) = globalizeIfNecessary x
-virtualValue (ValueSigma _) = return $ DataInt 0
+-- virtualValue (ValueSigma _) = return $ DataInt 0
 virtualValue (ValueSigmaIntro es) = do
   ds <- mapM virtualValue es
   return $ DataStruct ds
-virtualValue (ValueDown _) = return $ DataInt 0
-virtualValue (ValueIndex _) = return $ DataInt 0
+-- virtualValue (ValueDown _) = return $ DataInt 0
+-- virtualValue (ValueIndex _) = return $ DataInt 0
 virtualValue (ValueIndexIntro x meta) =
   case x of
     IndexDefault -> return $ DataInt 0
@@ -69,11 +67,11 @@ virtualValue (ValueIndexIntro x meta) =
       case elemIndex name set of
         Just i -> return $ DataInt i
         Nothing -> lift $ throwE $ "no such index defined: " ++ show name
-virtualValue ValueUniv = return $ DataInt 0
+-- virtualValue ValueUniv = return $ DataInt 0
 virtualValue (ValueConst x) = return $ DataGlobal x
 
 virtualComp :: Comp -> WithEnv Code
-virtualComp (CompPi _ _) = return $ CodeReturn $ DataInt 0
+-- virtualComp (CompPi _ _) = return $ CodeReturn $ DataInt 0
 virtualComp (CompPiElimDownElim f xs) = do
   f' <- globalizeIfNecessary f
   let xs' = map DataLocal xs
@@ -87,7 +85,7 @@ virtualComp (CompIndexElim e branchList) = do
   es' <- mapM virtualComp es
   e' <- virtualValue e
   return $ CodeSwitch e' $ zip labelList es'
-virtualComp (CompUp _) = return $ CodeReturn $ DataInt 0
+-- virtualComp (CompUp _) = return $ CodeReturn $ DataInt 0
 virtualComp (CompUpIntro v) = do
   d <- virtualValue v
   return $ CodeReturn d

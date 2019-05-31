@@ -5,9 +5,9 @@
 
 (include "./arith.neut")
 
-(include "./state.neut")
+; (include "./state.neut")
 
-(include "./coproduct.neut")
+; (include "./coproduct.neut")
 
 ;; (include "./vector.neut")
 
