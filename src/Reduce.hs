@@ -243,10 +243,17 @@ takeIntegerList _ = Nothing
 
 takeIntegerList' :: [Term] -> Maybe [Int]
 takeIntegerList' [] = Just []
-takeIntegerList' ((TermIndexIntro (IndexInteger i) _):rest) = do
+takeIntegerList' (TermIndexIntro (IndexInteger i) _:rest) = do
   is <- takeIntegerList' rest
   return (i : is)
 takeIntegerList' _ = Nothing
+
+takeIntegerList'' :: [Pos] -> Maybe [Int]
+takeIntegerList'' [] = Just []
+takeIntegerList'' (PosIndexIntro (IndexInteger i) _:rest) = do
+  is <- takeIntegerList'' rest
+  return (i : is)
+takeIntegerList'' _ = Nothing
 
 findDefault :: [(Index, Neut)] -> Maybe Neut
 findDefault [] = Nothing
@@ -273,49 +280,60 @@ isReducible (_ :< NeutMu _ _) = True
 isReducible (_ :< NeutHole _) = False
 
 reduceNeg :: Neg -> WithEnv Neg
-reduceNeg (NegPiIntro x e) = do
-  e' <- reduceNeg e
-  return $ NegPiIntro x e'
 reduceNeg (NegPiElim e1 e2) = do
   e1' <- reduceNeg e1
   case e1' of
-    NegPiIntro x body -> do
-      let sub = [(x, e2)]
-      let body' = substNeg sub body
-      reduceNeg body'
+    NegPiIntro x body -> reduceNeg $ substNeg [(x, e2)] body
     _ -> return $ NegPiElim e1' e2
 reduceNeg (NegSigmaElim e xs body) =
   case e of
-    PosSigmaIntro es -> do
-      let sub = zip xs es
-      let body' = substNeg sub body
-      reduceNeg body'
-    _ -> do
-      body' <- reduceNeg body
-      return $ NegSigmaElim e xs body'
+    PosSigmaIntro es -> reduceNeg $ substNeg (zip xs es) body
+    _ -> return $ NegSigmaElim e xs body
 reduceNeg (NegIndexElim e branchList) =
   case e of
     PosIndexIntro x _ ->
       case lookup x branchList of
-        Nothing ->
-          lift $
-          throwE $ "the index " ++ show x ++ " is not included in branchList"
         Just body -> reduceNeg body
-    _ -> do
-      let (labelList, es) = unzip branchList
-      es' <- mapM reduceNeg es
-      return $ NegIndexElim e $ zip labelList es'
+        Nothing ->
+          case lookup IndexDefault branchList of
+            Just body -> reduceNeg body
+            Nothing ->
+              lift $
+              throwE $
+              "the index " ++ show x ++ " is not included in branchList"
+    _ -> return $ NegIndexElim e branchList
+      -- let (labelList, es) = unzip branchList
+      -- es' <- mapM reduceNeg es
+      -- return $ NegIndexElim e $ zip labelList es'
 reduceNeg (NegUpIntro e) = return $ NegUpIntro e
 reduceNeg (NegUpElim x e1 e2) = do
   e1' <- reduceNeg e1
-  e2' <- reduceNeg e2
   case e1' of
-    NegUpIntro e1'' -> reduceNeg $ substNeg [(x, e1'')] e2'
-    _ -> return $ NegUpElim x e1' e2'
+    NegUpIntro e1'' -> reduceNeg $ substNeg [(x, e1'')] e2
+    _ -> return $ NegUpElim x e1' e2
+reduceNeg (NegConstElim x vs) = do
+  let xs = takeIntegerList'' vs
+  meta <- newNameWith "meta" -- for now
+  case (x, xs) of
+    (ConstantArith _ ArithAdd, Just [x, y]) ->
+      return $ NegUpIntro (PosIndexIntro (IndexInteger (x + y)) meta)
+    (ConstantArith _ ArithSub, Just [x, y]) ->
+      return $ NegUpIntro (PosIndexIntro (IndexInteger (x - y)) meta)
+    (ConstantArith _ ArithMul, Just [x, y]) ->
+      return $ NegUpIntro (PosIndexIntro (IndexInteger (x * y)) meta)
+    (ConstantArith _ ArithDiv, Just [x, y]) ->
+      return $ NegUpIntro (PosIndexIntro (IndexInteger (x `div` y)) meta)
+    _ -> return $ NegConstElim x vs
 reduceNeg (NegDownElim e) =
   case e of
     PosDownIntro e'' -> reduceNeg e''
+    PosVar x -> do
+      penv <- gets polEnv
+      case lookup x penv of
+        Just e' -> return e'
+        Nothing -> return $ NegDownElim e
     _ -> return $ NegDownElim e
+reduceNeg e = return e
 
 -- reduceNeg (NegMu x e) = do
 --   e' <- reduceNeg e
@@ -354,4 +372,5 @@ substNeg sub (NegUpElim x e1 e2) = do
   let e2' = substNeg sub e2
   NegUpElim x e1' e2'
 substNeg sub (NegDownElim e) = NegDownElim (substPos sub e)
+substNeg sub (NegConstElim x vs) = NegConstElim x (map (substPos sub) vs)
 -- substNeg sub (NegMu x e) = NegMu x $ substNeg sub e
