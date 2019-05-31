@@ -286,7 +286,6 @@ type SubstPos = [(Identifier, Pos)]
 
 substPos :: SubstPos -> Pos -> Pos
 substPos sub (PosVar s) = fromMaybe (PosVar s) (lookup s sub)
-substPos _ (PosConst x) = PosConst x
 substPos sub (PosSigmaIntro es) = do
   let es' = map (substPos sub) es
   PosSigmaIntro es'

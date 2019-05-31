@@ -162,7 +162,7 @@ data Term
                   [Identifier]
                   Term
   | TermIndexIntro Index
-                   Identifier
+                   Identifier -- FIXME: this should be LowType
   | TermIndexElim Term
                   [(Index, Term)]
   | TermMu Identifier
@@ -183,9 +183,14 @@ showList [] = ""
 showList [a] = show a
 showList (a:as) = show a ++ ", " ++ showList as
 
+data Constant
+  = ConstantArith LowType
+                  Arith
+  | ConstantPrint LowType
+  deriving (Show)
+
 data Pos
   = PosVar Identifier
-  | PosConst Identifier
   | PosSigmaIntro [Pos]
   | PosIndexIntro Index
                   Identifier -- metadata to determine its type
@@ -207,6 +212,8 @@ data Neg
               Neg
               Neg
   | NegDownElim Pos
+  | NegConstElim Identifier
+                 [Pos]
   | NegMu Identifier
           Neg
   deriving (Show)
@@ -214,7 +221,6 @@ data Neg
 -- positive modal normal form
 data Value
   = ValueVar Identifier
-  | ValueConst Identifier
   | ValueSigmaIntro [Value]
   | ValueIndexIntro Index
                     Identifier
@@ -224,6 +230,8 @@ data Value
 data Comp
   = CompPiElimDownElim Identifier -- (force f) @ x1 @ ... @ xn
                        [Identifier]
+  | CompConstElim Identifier
+                  [Identifier]
   | CompSigmaElim Value
                   [Identifier]
                   Comp

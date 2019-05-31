@@ -43,10 +43,15 @@ modalize = do
   forM_ penv $ \(name, e) -> do
     e' <- modalNeg e
     insModalEnv name [] e'
+  menv <- gets modalEnv
+  forM_ menv $ \(name, (args, e)) -> do
+    liftIO $ putStrLn name
+    liftIO $ putStrLn $ show args
+    liftIO $ putStrLn $ Pr.ppShow e
+    liftIO $ putStrLn "-----------------------------"
 
 modalPos :: Pos -> WithEnv Value
 modalPos (PosVar x) = return $ ValueVar x
-modalPos (PosConst x) = return $ ValueConst x
 modalPos (PosSigmaIntro es) = do
   ds <- mapM modalPos es
   return $ ValueSigmaIntro ds
@@ -83,6 +88,10 @@ modalNeg (NegUpElim x e1 e2) = do
   e2' <- modalNeg e2
   return $ CompUpElim x e1' e2'
 modalNeg (NegDownElim e) = modalPos e >>= callClosure
+modalNeg (NegConstElim x es) = do
+  es' <- mapM modalPos es
+  xs <- mapM (const (newNameWith "arg")) es
+  bindLet (zip xs es') $ CompConstElim x xs
 modalNeg (NegMu x e) = do
   menv <- gets modalEnv
   let ds = x : map fst menv
@@ -125,12 +134,13 @@ toNegPiElimSeq c = (c, [])
 makeClosure :: [Identifier] -> Identifier -> Neg -> WithEnv Value
 makeClosure definedVarList clsName e = do
   let (body, args) = toNegPiIntroSeq e
-  let fvs = filter (`notElem` definedVarList) $ nub $ varNeg e
+  penv <- gets polEnv
+  let fvs = filter (`notElem` definedVarList ++ map fst penv) $ nub $ varNeg e
   envName <- newNameWith "env"
   body' <- modalNeg $ NegSigmaElim (PosVar envName) fvs body
   insModalEnv clsName (envName : args) body'
   let vs = map ValueVar fvs
-  return $ ValueSigmaIntro [ValueConst clsName, ValueSigmaIntro vs]
+  return $ ValueSigmaIntro [ValueVar clsName, ValueSigmaIntro vs]
 
 callClosure :: Value -> WithEnv Comp
 callClosure e = do
@@ -141,7 +151,6 @@ callClosure e = do
 
 varPos :: Pos -> [Identifier]
 varPos (PosVar s) = [s]
-varPos (PosConst _) = []
 varPos (PosSigmaIntro es) = concatMap varPos es
 varPos (PosIndexIntro _ _) = []
 varPos (PosDownIntro e) = varNeg e
@@ -165,4 +174,5 @@ varNeg (NegUpElim x e1 e2) = do
   let vs2 = filter (/= x) $ varNeg e2
   vs1 ++ vs2
 varNeg (NegDownElim e) = varPos e
+varNeg (NegConstElim _ es) = concatMap varPos es
 varNeg (NegMu x e) = filter (/= x) $ varNeg e

@@ -33,9 +33,6 @@ virtualize = do
   menv <- gets modalEnv
   forM_ menv $ \(name, (args, code)) -> do
     code' <- virtualComp code
-    liftIO $ putStrLn $ name ++ " " ++ show args
-    liftIO $ putStrLn $ Pr.ppShow code
-    liftIO $ putStrLn "======================================="
     insCodeEnv name args code'
 
 virtualValue :: Value -> WithEnv Data
@@ -64,10 +61,10 @@ virtualValue (ValueIndexIntro x meta) =
       case elemIndex name set of
         Just i -> return $ DataInt i
         Nothing -> lift $ throwE $ "no such index defined: " ++ show name
-virtualValue (ValueConst x) = return $ DataGlobal x
 
 virtualComp :: Comp -> WithEnv Code
 virtualComp (CompPiElimDownElim f xs) = do
+  liftIO $ putStrLn $ "non-constant app of " ++ f
   f' <- globalizeIfNecessary f
   let xs' = map DataLocal xs
   return $ CodeCallTail f' xs'
@@ -87,6 +84,12 @@ virtualComp (CompUpElim x e1 e2) = do
   e1' <- virtualComp e1
   e2' <- virtualComp e2
   return $ commUpElim x e1' e2'
+virtualComp (CompConstElim f xs) = do
+  undefined -- fの名前によって処理を変更。CodeArithみたいなものを用意する必要あり。
+  -- liftIO $ putStrLn $ "found constant app of " ++ f
+  -- f' <- globalizeIfNecessary f
+  -- let xs' = map DataLocal xs
+  -- return $ CodeCallTail f' xs'
 
 extract :: Data -> [(Identifier, Int)] -> Int -> Code -> Code
 extract z [] _ cont = CodeFree z cont

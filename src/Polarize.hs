@@ -27,44 +27,27 @@ import Data
 import Reduce
 import Util
 
-import Data.Maybe (maybeToList)
+import Text.Read (readMaybe)
 
--- Apply polarization to all the terms in `weakTermEnv`, and insert the results
--- to `polEnv`. This function also inserts the definitions of constants to `polEnv`.
+import Data.Maybe (isJust, maybeToList)
+
 polarize :: WithEnv ()
 polarize = do
   tenv <- gets termEnv
   forM_ tenv $ \(name, e) -> do
     e' <- polarize' e
-    liftIO $ putStrLn $ Pr.ppShow e'
     insPolEnv name e'
+  -- penv <- gets polEnv
+  -- forM_ penv $ \(name, e) -> do
+  --   liftIO $ putStrLn name
+  --   liftIO $ putStrLn $ Pr.ppShow e
+  --   liftIO $ putStrLn "-----------------------------"
 
--- Given a term, polarize it to a negative term. This translation determines the
--- order of evaluation. For example, an application `e1 @ e2` is tranlated into
---   let v := return (polarize' e1) in
---   let f := return (polarize' e2) in
---   (force f) @ v
--- Ignoring the `force`, one can see the order of evaluation is now made explicit.
 polarize' :: Term -> WithEnv Neg
 polarize' (TermVar x) = return $ NegDownElim (PosVar x)
-polarize' (TermConst "core.i64.add") = arith "core.i64.add"
-polarize' (TermConst "core.i64.sub") = arith "core.i64.sub"
-polarize' (TermConst "core.i64.mul") = arith "core.i64.mul"
-polarize' (TermConst "core.i64.div") = arith "core.i64.div"
-polarize' (TermConst "core.i32.add") = arith "core.i32.add"
-polarize' (TermConst "core.i32.sub") = arith "core.i32.sub"
-polarize' (TermConst "core.i32.mul") = arith "core.i32.mul"
-polarize' (TermConst "core.i32.div") = arith "core.i32.div"
-polarize' (TermConst "core.i64.print") = do
-  x <- newNameWith "lam"
-  x' <- newNameWith "lam"
-  return $
-    NegPiIntro x $
-    NegUpElim x' (NegDownElim (PosVar x)) $
-    NegPiElim (NegDownElim (PosConst "core.i64.print")) (PosVar x')
 polarize' (TermConst x) = do
-  liftIO $ putStrLn $ "const == " ++ x
-  undefined
+  insertDefinition x
+  return $ NegDownElim (PosVar x)
 polarize' (TermPiIntro x e) = do
   e' <- polarize' e
   return $ NegPiIntro x e'
@@ -91,15 +74,84 @@ polarize' (TermMu x e) = do
   e' <- polarize' e
   return $ NegMu x e'
 
-arith :: Identifier -> WithEnv Neg
-arith op = do
+-- insert (possibly) environment-specific definition of constant
+insertDefinition :: Identifier -> WithEnv ()
+insertDefinition x
+  | isPrintConstant x = insertPrintDefinition x
+  | isArithBinOpConstant x = insertArithBinOp x
+  | otherwise = lift $ throwE $ "No such primitive: " ++ x
+
+isPrintConstant :: Identifier -> Bool
+isPrintConstant x = do
+  let xs = wordsWhen (== '.') x
+  length xs == 3 &&
+    head xs == "core" && isArithType (xs !! 1) && xs !! 2 == "print"
+
+insertPrintDefinition :: Identifier -> WithEnv ()
+insertPrintDefinition op = do
+  x <- newNameWith "lam"
+  x' <- newNameWith "lam"
+  penv <- gets polEnv
+  let internalOp = "internal." ++ op -- FIXME: this should be environment-specific
+  -- when (op `notElem` map fst penv) $
+  --   insPolEnv op $
+  --   NegPiIntro x $
+  --   NegUpElim x' (NegDownElim (PosVar x)) $
+  --   NegPiElim (NegDownElim (PosConst internalOp)) (PosVar x')
+  when (op `notElem` map fst penv) $
+    insPolEnv op $
+    NegPiIntro x $
+    NegUpElim x' (NegDownElim (PosVar x)) $ NegConstElim internalOp [PosVar x']
+    -- NegPi (NegDownElim (PosConst internalOp)) (PosVar x')
+
+isArithBinOpConstant :: Identifier -> Bool
+isArithBinOpConstant x = do
+  let xs = wordsWhen (== '.') x
+  length xs == 3 &&
+    head xs == "core" && isArithType (xs !! 1) && isArithBinOp (xs !! 2)
+
+isArithBinOp :: Identifier -> Bool
+isArithBinOp "add" = True
+isArithBinOp "sub" = True
+isArithBinOp "mul" = True
+isArithBinOp "div" = True
+isArithBinOp _ = False
+
+isArithType :: Identifier -> Bool
+isArithType x
+  | not (null x)
+  , Just y <- readMaybe $ tail x
+  , y > 0 = head x == 'i' || head x == 'u' || head x == 'f'
+  | otherwise = False
+
+insertArithBinOp :: Identifier -> WithEnv ()
+insertArithBinOp op = do
   x <- newNameWith "lam"
   x' <- newNameWith "lam"
   y <- newNameWith "lam"
   y' <- newNameWith "lam"
-  return $
+  penv <- gets polEnv
+  let llvmop = "llvm." ++ op
+  when (op `notElem` map fst penv) $
+    insPolEnv op $
     NegPiIntro x $
     NegPiIntro y $
     NegUpElim x' (NegDownElim (PosVar x)) $
     NegUpElim y' (NegDownElim (PosVar y)) $
-    NegPiElim (NegPiElim (NegDownElim (PosConst op)) (PosVar x')) (PosVar y')
+    NegConstElim llvmop [PosVar x', PosVar y']
+  -- when (op `notElem` map fst penv) $
+  --   insPolEnv op $
+  --   NegPiIntro x $
+  --   NegPiIntro y $
+  --   NegUpElim x' (NegDownElim (PosVar x)) $
+  --   NegUpElim y' (NegDownElim (PosVar y)) $
+  --   NegPiElim
+  --     (NegPiElim (NegDownElim (PosConst llvmop)) (PosVar x'))
+  --     (PosVar y')
+
+wordsWhen :: (Char -> Bool) -> String -> [String]
+wordsWhen p s =
+  case dropWhile p s of
+    "" -> []
+    s' -> w : wordsWhen p s''
+      where (w, s'') = break p s'
