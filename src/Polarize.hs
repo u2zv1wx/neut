@@ -76,25 +76,20 @@ polarize' (TermSigmaIntro es) = do
   es' <- mapM polarize' es
   return $ NegUpIntro $ PosSigmaIntro (map PosDownIntro es')
 polarize' (TermSigmaElim e1 xs e2) = do
+  e1' <- polarize' e1
   e2' <- polarize' e2
   z <- newNameWith "sigma"
-  bindSeq [(z, e1)] (NegSigmaElim (PosVar z) xs e2')
+  return $ NegUpElim z e1' (NegSigmaElim (PosVar z) xs e2')
 polarize' (TermIndexIntro l meta) = return $ NegUpIntro (PosIndexIntro l meta)
 polarize' (TermIndexElim e branchList) = do
   let (labelList, es) = unzip branchList
-  cs <- mapM polarize' es
+  e' <- polarize' e
   x <- newNameWith "tmp"
-  bindSeq [(x, e)] (NegIndexElim (PosVar x) (zip labelList cs))
+  cs <- mapM polarize' es
+  return $ NegUpElim x e' (NegIndexElim (PosVar x) (zip labelList cs))
 polarize' (TermMu x e) = do
   e' <- polarize' e
   return $ NegMu x e'
-
-bindSeq :: [(Identifier, Term)] -> Neg -> WithEnv Neg
-bindSeq [] fun = return fun
-bindSeq ((formalArg, arg):rest) fun = do
-  arg' <- polarize' arg
-  fun' <- bindSeq rest fun
-  return $ NegUpElim formalArg arg' fun'
 
 arith :: Identifier -> WithEnv Neg
 arith op = do

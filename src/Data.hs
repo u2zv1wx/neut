@@ -222,8 +222,10 @@ data Value
 
 -- negative modal normal form
 data Comp
-  = CompPiElimDownElim Identifier -- (force f) @ x1 @ ... @ xn
-                       [Identifier]
+  = CompUpIntroDownIntroPiIntro [Identifier]
+                                Comp
+  | CompUpElimPiElimDownElim Identifier -- (force f) @ x1 @ ... @ xn
+                             [Identifier]
   | CompSigmaElim Value
                   [Identifier]
                   Comp
