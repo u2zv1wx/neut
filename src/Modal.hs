@@ -96,8 +96,8 @@ bindLet ((x, v):rest) e = do
 
 -- Commutative conversion for pi-elimination
 commPiElim :: Comp -> [Identifier] -> WithEnv Comp
-commPiElim (CompUpElimPiElimDownElim f xs) args =
-  return $ CompUpElimPiElimDownElim f (xs ++ args)
+commPiElim (CompPiElimDownElim f xs) args =
+  return $ CompPiElimDownElim f (xs ++ args)
 commPiElim (CompSigmaElim v xs e) args = do
   e' <- commPiElim e args
   return $ CompSigmaElim v xs e'
@@ -137,10 +137,7 @@ callClosure e = do
   envName <- newNameWith "env"
   clsName <- newNameWith "cls"
   return $
-    CompSigmaElim
-      e
-      [clsName, envName]
-      (CompUpElimPiElimDownElim clsName [envName])
+    CompSigmaElim e [clsName, envName] (CompPiElimDownElim clsName [envName])
 
 varPos :: Pos -> [Identifier]
 varPos (PosVar s) = [s]
