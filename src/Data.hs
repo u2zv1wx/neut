@@ -187,6 +187,7 @@ data Constant
   = ConstantArith LowType
                   Arith
   | ConstantPrint LowType
+  | ConstantDefined Identifier
   deriving (Show)
 
 data Pos

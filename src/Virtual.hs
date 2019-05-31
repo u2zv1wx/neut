@@ -37,7 +37,7 @@ virtualize = do
   -- cenv <- gets codeEnv
   -- forM_ cenv $ \(name, (args, e)) -> do
   --   liftIO $ putStrLn name
-  --   liftIO $ putStrLn $ show args
+  --   liftIO $ print args
   --   liftIO $ putStrLn $ Pr.ppShow e
   --   liftIO $ putStrLn "-----------------------------"
 
@@ -99,7 +99,11 @@ virtualComp (CompConstElim f xs) =
       | length xs == 2 -> do
         let xs' = map DataLocal xs
         return $ CodeReturn (DataArith (kind, lowType) (head xs') (xs' !! 1))
-    _ -> lift $ throwE $ "Arith mismatch for " ++ show f
+    ConstantDefined funName ->
+      return $ CodeCallTail (DataGlobal funName) (map DataLocal xs)
+    _ ->
+      lift $
+      throwE $ "Arith mismatch for " ++ show f ++ " with xs = " ++ show xs
 
 extract :: Data -> [(Identifier, Int)] -> Int -> Code -> Code
 extract z [] _ cont = CodeFree z cont

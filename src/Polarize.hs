@@ -42,16 +42,14 @@ polarize = do
   --   liftIO $ putStrLn name
   --   -- liftIO $ putStrLn $ show args
   --   liftIO $ putStrLn $ Pr.ppShow e
-  --   e' <- reduceNeg e
+  --   -- e' <- reduceNeg e
   --   liftIO $ putStrLn "----------------"
-  --   liftIO $ putStrLn $ Pr.ppShow e'
+  --   -- liftIO $ putStrLn $ Pr.ppShow e'
   --   liftIO $ putStrLn "-----------------------------"
 
 polarize' :: Term -> WithEnv Neg
 polarize' (TermVar x) = return $ NegDownElim (PosVar x)
-polarize' (TermConst x) = do
-  insertDefinition x
-  return $ NegDownElim (PosVar x)
+polarize' (TermConst x) = toDefinition x
 polarize' (TermPiIntro x e) = do
   e' <- polarize' e
   return $ NegPiIntro x e'
@@ -77,15 +75,17 @@ polarize' (TermIndexElim e branchList) = do
 polarize' (TermMu x e) = do
   e' <- polarize' e -- e doesn't have any free variables thanks to Close
   insPolEnv x e' -- implicit thunk for e
-  return $ NegDownElim (PosVar x)
+  return $ NegConstElim (ConstantDefined x) []
+  -- return $ NegDownElim (PosVar x) -- このxはconstだよね？
   -- return $ NegMu x e'
 
 -- insert (possibly) environment-specific definition of constant
-insertDefinition :: Identifier -> WithEnv ()
-insertDefinition x
-  | Just c <- getPrintConstant x = insertPrintDefinition x c
-  | Just c <- getArithBinOpConstant x = insertArithBinOp x c
-  | otherwise = lift $ throwE $ "No such primitive: " ++ x
+toDefinition :: Identifier -> WithEnv Neg
+toDefinition x
+  | Just c <- getPrintConstant x = toPrintDefinition c
+  | Just c <- getArithBinOpConstant x = toArithBinOpDefinition c
+  | otherwise = return $ NegConstElim (ConstantDefined x) []
+  -- | otherwise = lift $ throwE $ "No such primitive: " ++ x
 
 toArithLowType :: Identifier -> Maybe LowType
 toArithLowType x
@@ -108,13 +108,11 @@ getPrintConstant x = do
       return $ ConstantPrint lowType
     else Nothing
 
-insertPrintDefinition :: Identifier -> Constant -> WithEnv ()
-insertPrintDefinition op c = do
+toPrintDefinition :: Constant -> WithEnv Neg
+toPrintDefinition c = do
   x <- newNameWith "lam"
   x' <- newNameWith "lam"
-  penv <- gets polEnv
-  when (op `notElem` map fst penv) $
-    insPolEnv op $
+  return $
     NegPiIntro x $
     NegUpElim x' (NegDownElim (PosVar x)) $ NegConstElim c [PosVar x']
 
@@ -135,15 +133,13 @@ toArithBinOp "mul" = Just ArithMul
 toArithBinOp "div" = Just ArithDiv
 toArithBinOp _ = Nothing
 
-insertArithBinOp :: Identifier -> Constant -> WithEnv ()
-insertArithBinOp op c = do
-  x <- newNameWith "arg1template"
-  y <- newNameWith "arg2template"
+toArithBinOpDefinition :: Constant -> WithEnv Neg
+toArithBinOpDefinition c = do
+  x <- newNameWith "cls1"
+  y <- newNameWith "cls2"
   x' <- newNameWith "arg1"
   y' <- newNameWith "arg2"
-  penv <- gets polEnv
-  when (op `notElem` map fst penv) $
-    insPolEnv op $
+  return $
     NegPiIntro x $
     NegPiIntro y $
     NegUpElim x' (NegDownElim (PosVar x)) $
