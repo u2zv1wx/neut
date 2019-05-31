@@ -47,32 +47,17 @@ modalize = do
 modalPos :: Pos -> WithEnv Value
 modalPos (PosVar x) = return $ ValueVar x
 modalPos (PosConst x) = return $ ValueConst x
--- modalPos (PosSigma xts) = do
---   let (xs, ts) = unzip xts
---   ts' <- mapM modalPos ts
---   return $ ValueSigma (zip xs ts')
 modalPos (PosSigmaIntro es) = do
   ds <- mapM modalPos es
   return $ ValueSigmaIntro ds
--- modalPos (PosIndex l) = return $ ValueIndex l
 modalPos (PosIndexIntro l meta) = return $ ValueIndexIntro l meta
--- modalPos (PosDown t) = do
---   t' <- modalNeg t
---   (envInfo, piInfo, envType) <- closureType' t'
---   name <- newNameWith "any"
---   return $ ValueSigma [envInfo, piInfo, (name, envType)]
 modalPos (PosDownIntro e) = do
   menv <- gets modalEnv
   let ds = map fst menv
   clsName <- newNameWith "closure"
   makeClosure ds clsName e
 
--- modalPos PosUniv = return ValueUniv
 modalNeg :: Neg -> WithEnv Comp
--- modalNeg (NegPi (x, tdom) tcod) = do
---   tdom' <- modalPos tdom
---   tcod' <- modalNeg tcod
---   return $ CompPi (x, tdom') tcod'
 modalNeg lam@(NegPiIntro _ _) = modalNeg $ NegDownElim $ PosDownIntro lam
 modalNeg app@(NegPiElim _ _) = do
   let (fun, args) = toNegPiElimSeq app
@@ -90,9 +75,6 @@ modalNeg (NegIndexElim e branchList) = do
   es' <- mapM modalNeg es
   e' <- modalPos e
   return $ CompIndexElim e' (zip labelList es')
--- modalNeg (NegUp v) = do
---   v' <- modalPos v
---   return $ CompUp v'
 modalNeg (NegUpIntro v) = do
   v' <- modalPos v
   return $ CompUpIntro v'
@@ -140,8 +122,6 @@ toNegPiElimSeq (NegPiElim e1 e2) = do
   (fun, e2 : xs)
 toNegPiElimSeq c = (c, [])
 
--- type IdentPlus = (Identifier, Value)
--- type ClsInfo = (IdentPlus, IdentPlus, Value)
 makeClosure :: [Identifier] -> Identifier -> Neg -> WithEnv Value
 makeClosure definedVarList clsName e = do
   let (body, args) = toNegPiIntroSeq e
@@ -159,34 +139,14 @@ callClosure e = do
   return $
     CompSigmaElim e [clsName, envName] (CompPiElimDownElim clsName [envName])
 
--- closureType' :: Comp -> WithEnv ClsInfo
--- closureType' t = do
---   envTypeName <- newNameWith "env"
---   piArg <- newNameWith "arg"
---   let piType = CompPi (piArg, ValueVar envTypeName) t
---   let boxPiType = ValueDown piType
---   let univ = ValueUniv
---   sigmaArg <- newNameWith "arg"
---   return ((envTypeName, univ), (sigmaArg, boxPiType), ValueVar envTypeName)
 varPos :: Pos -> [Identifier]
 varPos (PosVar s) = [s]
 varPos (PosConst _) = []
--- varPos (PosSigma xts) = do
---   let (xs, ts) = unzip xts
---   let vs = concatMap varPos ts
---   filter (`notElem` xs) vs
 varPos (PosSigmaIntro es) = concatMap varPos es
--- varPos (PosIndex _) = []
 varPos (PosIndexIntro _ _) = []
--- varPos (PosDown e) = varNeg e
 varPos (PosDownIntro e) = varNeg e
 
--- varPos PosUniv = []
 varNeg :: Neg -> [Identifier]
--- varNeg (NegPi (x, tdom) tcod) = do
---   let vs1 = varPos tdom
---   let vs2 = filter (/= x) $ varNeg tcod
---   vs1 ++ vs2
 varNeg (NegPiIntro x e) = do
   let vs = varNeg e
   filter (/= x) vs
@@ -199,7 +159,6 @@ varNeg (NegIndexElim e branchList) = do
   let vs1 = varPos e
   let vs2 = concatMap (varNeg . snd) branchList
   vs1 ++ vs2
--- varNeg (NegUp e) = varPos e
 varNeg (NegUpIntro e) = varPos e
 varNeg (NegUpElim x e1 e2) = do
   let vs1 = varNeg e1

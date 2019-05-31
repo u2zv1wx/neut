@@ -90,9 +90,6 @@ elaborate' :: Neut -> WithEnv Term
 elaborate' (_ :< NeutVar s) = return $ TermVar s
 elaborate' (_ :< NeutConst x) = return $ TermConst x
 elaborate' (_ :< NeutPi _ _) = return $ TermSigmaIntro []
-  -- tdom' <- elaborate' tdom
-  -- tcod' <- elaborate' tcod
-  -- return $ TermPi (s, tdom') tcod'
 elaborate' (_ :< NeutPiIntro (s, _) e) = do
   e' <- elaborate' e
   return $ TermPiIntro s e'
@@ -101,9 +98,6 @@ elaborate' (_ :< NeutPiElim e v) = do
   v' <- elaborate' v
   return $ TermPiElim e' v'
 elaborate' (_ :< NeutSigma _) = return $ TermSigmaIntro []
-  -- let (xs, ts) = unzip xts
-  -- ts' <- mapM elaborate' ts
-  -- return $ TermSigma (zip xs ts')
 elaborate' (_ :< NeutSigmaIntro es) = do
   es' <- mapM elaborate' es
   return $ TermSigmaIntro es'
@@ -112,7 +106,6 @@ elaborate' (_ :< NeutSigmaElim e1 xs e2) = do
   e2' <- elaborate' e2
   return $ TermSigmaElim e1' xs e2'
 elaborate' (_ :< NeutIndex _) = return $ TermSigmaIntro []
-  -- return $ TermIndex s
 elaborate' (meta :< NeutIndexIntro x) = return $ TermIndexIntro x meta
 elaborate' (_ :< NeutIndexElim e branchList) = do
   e' <- elaborate' e
@@ -122,7 +115,6 @@ elaborate' (_ :< NeutIndexElim e branchList) = do
       return (l, body')
   return $ TermIndexElim e' branchList'
 elaborate' (_ :< NeutUniv _) = return $ TermSigmaIntro []
-  -- return $ TermUniv j
 elaborate' (_ :< NeutMu s e) = do
   e' <- elaborate' e
   return $ TermMu s e'

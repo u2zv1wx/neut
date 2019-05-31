@@ -129,7 +129,6 @@ varAndHole (_ :< NeutIndex _) = ([], [])
 varAndHole (_ :< NeutIndexIntro _) = ([], [])
 varAndHole (_ :< NeutIndexElim e branchList) = do
   let vs1 = varAndHole e
-  -- let select i = filter (`notElem` varIndex i)
   vss <- forM branchList $ \(_, body) -> return $ varAndHole body
   pairwiseConcat (vs1 : vss)
 varAndHole (_ :< NeutConst _) = ([], [])
@@ -137,9 +136,6 @@ varAndHole (_ :< NeutUniv _) = ([], [])
 varAndHole (_ :< NeutMu _ e) = varAndHole e
 varAndHole (_ :< NeutHole x) = ([], [x])
 
--- varIndex :: IndexOrVar -> [Identifier]
--- varIndex (Right x) = [x]
--- varIndex _ = []
 varAndHoleSigma :: [(Identifier, Neut)] -> ([Identifier], [Identifier])
 varAndHoleSigma [] = ([], [])
 varAndHoleSigma ((x, t):xts) = do
@@ -157,23 +153,18 @@ pairwiseConcat ((xs, ys):rest) = do
 data Term
   = TermVar Identifier
   | TermConst Identifier
-  -- | TermPi (Identifier, Term)
-  --          Term
   | TermPiIntro Identifier
                 Term
   | TermPiElim Term
                Term
-  -- | TermSigma [(Identifier, Term)]
   | TermSigmaIntro [Term]
   | TermSigmaElim Term
                   [Identifier]
                   Term
-  -- | TermIndex Identifier
   | TermIndexIntro Index
                    Identifier
   | TermIndexElim Term
                   [(Index, Term)]
-  -- | TermUniv UnivLevel
   | TermMu Identifier
            Term
   deriving (Show)
@@ -195,14 +186,10 @@ showList (a:as) = show a ++ ", " ++ showList as
 data Pos
   = PosVar Identifier
   | PosConst Identifier
-  -- | PosSigma [(Identifier, Pos)]
   | PosSigmaIntro [Pos]
-  -- | PosIndex Identifier
   | PosIndexIntro Index
                   Identifier -- metadata to determine its type
-  -- | PosDown Neg
   | PosDownIntro Neg
-  -- | PosUniv
   deriving (Show)
 
 data Neg
@@ -215,7 +202,6 @@ data Neg
                  Neg
   | NegIndexElim Pos
                  [(Index, Neg)]
-  -- | NegUp Pos
   | NegUpIntro Pos
   | NegUpElim Identifier
               Neg
@@ -229,13 +215,9 @@ data Neg
 data Value
   = ValueVar Identifier
   | ValueConst Identifier
-  -- | ValueSigma [(Identifier, Value)]
   | ValueSigmaIntro [Value]
-  -- | ValueDown Comp
-  -- | ValueIndex Identifier
   | ValueIndexIntro Index
                     Identifier
-  -- | ValueUniv
   deriving (Show)
 
 -- negative modal normal form
@@ -247,7 +229,6 @@ data Comp
                   Comp
   | CompIndexElim Value
                   [(Index, Comp)]
-  -- | CompUp Value
   | CompUpIntro Value
   | CompUpElim Identifier
                Comp
@@ -415,7 +396,7 @@ data Env = Env
   { count :: Int -- to generate fresh symbols
   , notationEnv :: [(Tree, Tree)] -- macro transformers
   , reservedEnv :: [Identifier] -- list of reserved keywords
-  , constantEnv :: [(Identifier)]
+  , constantEnv :: [Identifier]
   , moduleEnv :: [(Identifier, [(Identifier, Neut)])]
   , indexEnv :: [(Identifier, [Identifier])]
   , nameEnv :: [(Identifier, Identifier)] -- used in alpha conversion
