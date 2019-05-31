@@ -42,7 +42,8 @@ virtualize = do
   --   liftIO $ putStrLn "-----------------------------"
 
 virtualValue :: Value -> WithEnv Data
-virtualValue (ValueVar x) = globalizeIfNecessary x
+virtualValue (ValueVar x) = return $ DataLocal x
+virtualValue (ValueConst x) = return $ DataGlobal x
 virtualValue (ValueSigmaIntro es) = do
   ds <- mapM virtualValue es
   return $ DataStruct ds
@@ -69,10 +70,9 @@ virtualValue (ValueIndexIntro x meta) =
         Nothing -> lift $ throwE $ "no such index defined: " ++ show name
 
 virtualComp :: Comp -> WithEnv Code
-virtualComp (CompPiElimDownElim f xs) = do
-  f' <- globalizeIfNecessary f
-  let xs' = map DataLocal xs
-  return $ CodeCallTail f' xs'
+virtualComp (CompPiElimDownElim f vs) = do
+  ds <- mapM virtualValue vs
+  return $ CodeCallTail (DataLocal f) ds
 virtualComp (CompSigmaElim e1 xs e2) = do
   e1' <- virtualValue e1
   e2' <- virtualComp e2
@@ -99,17 +99,14 @@ virtualComp (CompConstElim f xs) =
       | length xs == 2 -> do
         let xs' = map DataLocal xs
         return $ CodeReturn (DataArith (kind, lowType) (head xs') (xs' !! 1))
-    ConstantDefined funName ->
-      return $ CodeCallTail (DataGlobal funName) (map DataLocal xs)
     _ ->
       lift $
       throwE $ "Arith mismatch for " ++ show f ++ " with xs = " ++ show xs
 
 extract :: Data -> [(Identifier, Int)] -> Int -> Code -> Code
 extract z [] _ cont = CodeFree z cont
-extract z ((x, i):xis) n cont = do
-  let cont' = extract z xis n cont
-  CodeExtractValue x z (i, n) cont'
+extract z ((x, i):xis) n cont =
+  CodeExtractValue x z (i, n) $ extract z xis n cont
 
 -- Commutative conversion for up-elimination.
 commUpElim :: String -> Code -> Code -> Code
@@ -127,10 +124,3 @@ commUpElim s (CodeExtractValue x basePointer i cont1) cont2 =
 commUpElim s (CodeFree x cont1) cont2 = CodeFree x $ commUpElim s cont1 cont2
 commUpElim s (CodePrint x d cont1) cont2 =
   CodePrint x d (commUpElim s cont1 cont2)
-
-globalizeIfNecessary :: Identifier -> WithEnv Data
-globalizeIfNecessary x = do
-  menv <- gets modalEnv
-  if x `elem` map fst menv
-    then return $ DataGlobal x
-    else return $ DataLocal x

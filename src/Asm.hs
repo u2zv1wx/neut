@@ -94,6 +94,7 @@ asmData x (DataLocal y) cont =
   return $ AsmBitcast x (AsmDataLocal y) voidPtr voidPtr cont
 asmData x (DataGlobal y) cont = do
   cenv <- gets codeEnv
+  liftIO $ putStrLn $ "DataGlobal. x == " ++ show x ++ ", y == " ++ show y
   case lookup y cenv of
     Nothing -> lift $ throwE $ "no such global label defined: " ++ y -- FIXME
     Just (args, _) -> do
@@ -116,8 +117,8 @@ asmData x (DataFloat64 f) cont = do
   return $
     AsmBitcast cast (AsmDataFloat f) (LowTypeFloat 64) (LowTypeSignedInt 64) $
     AsmIntToPointer x (AsmDataLocal cast) (LowTypeSignedInt 64) voidPtr cont
-asmData reg (DataStruct []) cont = asmData reg (DataInt 0) cont
-asmData reg (DataStruct [d]) cont = asmData reg d cont
+-- asmData reg (DataStruct []) cont = asmData reg (DataInt 0) cont
+-- asmData reg (DataStruct [d]) cont = asmData reg d cont
 asmData reg (DataStruct ds) cont = do
   xs <- mapM (const $ newNameWith "cursor") ds
   cast <- newNameWith "cast"

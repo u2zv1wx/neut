@@ -327,21 +327,19 @@ reduceNeg (NegConstElim x vs) = do
 reduceNeg (NegDownElim e) =
   case e of
     PosDownIntro e'' -> reduceNeg e''
-    PosVar x -> do
+    PosConst x -> do
       penv <- gets polEnv
       case lookup x penv of
-        Just e' -> return e'
+        Just e' -> return e' -- eliminating implicit thunk
         Nothing -> return $ NegDownElim e
     _ -> return $ NegDownElim e
 reduceNeg e = return e
 
--- reduceNeg (NegMu x e) = do
---   e' <- reduceNeg e
---   return $ NegMu x e'
 type SubstPos = [(Identifier, Pos)]
 
 substPos :: SubstPos -> Pos -> Pos
 substPos sub (PosVar s) = fromMaybe (PosVar s) (lookup s sub)
+substPos _ (PosConst s) = PosConst s
 substPos sub (PosSigmaIntro es) = do
   let es' = map (substPos sub) es
   PosSigmaIntro es'

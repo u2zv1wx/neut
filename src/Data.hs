@@ -187,11 +187,11 @@ data Constant
   = ConstantArith LowType
                   Arith
   | ConstantPrint LowType
-  | ConstantDefined Identifier
   deriving (Show)
 
 data Pos
   = PosVar Identifier
+  | PosConst Identifier
   | PosSigmaIntro [Pos]
   | PosIndexIntro Index
                   Identifier -- metadata to determine its type
@@ -220,6 +220,7 @@ data Neg
 -- positive modal normal form
 data Value
   = ValueVar Identifier
+  | ValueConst Identifier
   | ValueSigmaIntro [Value]
   | ValueIndexIntro Index
                     Identifier
@@ -228,7 +229,7 @@ data Value
 -- negative modal normal form
 data Comp
   = CompPiElimDownElim Identifier -- (force f) @ x1 @ ... @ xn
-                       [Identifier]
+                       [Value]
   | CompConstElim Constant
                   [Identifier]
   | CompSigmaElim Value

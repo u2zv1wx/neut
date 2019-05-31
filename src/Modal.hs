@@ -1,20 +1,3 @@
--- Before describing the behavior of this module, we firstly define *modal-normal form*.
--- A polarized term is in *modal-normal form* if the following conditions are true:
--- (A) for every application `e @ v1 @ ... @ vn`,
---   - e == (constElim x) for some variable x,
---   - vi == xi for some variable x,
--- (B) the term doesn't contain any thunk/force, box/unbox.
--- (C) for every unboxing `(constElim v)`, v == x for some variable x.
---
--- Now, this module (1) eliminates `down N` (the type of closures) and `box N` (the type of
--- functions), (2) translates a term to modal-normal form.
---
--- For (1), we treat `box N` as `down N`, and employ the following type isomorphism:
---   Down N === Sigma (P : Type). Const (P -> N) * P.
--- One may understand that this is a proof-theoretic characterization of closure conversion.
---
--- For (2), we *crop* closed term in appropriate situation, insert it into the environment,
--- and replace the original term as a variable.
 module Modal
   ( modalize
   ) where
@@ -52,31 +35,33 @@ modalize = do
 
 modalPos :: Pos -> WithEnv Value
 modalPos (PosVar x) = return $ ValueVar x
+modalPos (PosConst x) = return $ ValueConst x
 modalPos (PosSigmaIntro es) = do
   ds <- mapM modalPos es
   return $ ValueSigmaIntro ds
 modalPos (PosIndexIntro l meta) = return $ ValueIndexIntro l meta
 modalPos (PosDownIntro e) = do
-  menv <- gets modalEnv
-  penv <- gets polEnv
-  let definedVarList = map fst menv ++ map fst penv
-  clsName <- newNameWith "closure"
-  let fvs = filter (`notElem` definedVarList) $ nub $ varNeg e
-  envName <- newNameWith "env"
   let (body, args) = toNegPiIntroSeq e
+  let fvs = nub $ varNeg e
+  envName <- newNameWith "env"
   body' <- modalNeg $ NegSigmaElim (PosVar envName) fvs body
+  clsName <- newNameWith "cls"
   insModalEnv clsName (envName : args) body'
   return $
-    ValueSigmaIntro [ValueVar clsName, ValueSigmaIntro $ map ValueVar fvs]
+    ValueSigmaIntro [ValueConst clsName, ValueSigmaIntro $ map ValueVar fvs]
 
 modalNeg :: Neg -> WithEnv Comp
-modalNeg lam@(NegPiIntro _ _) = modalNeg $ NegDownElim $ PosDownIntro lam
+modalNeg lam@(NegPiIntro _ _) = do
+  v <- modalPos $ PosDownIntro lam
+  let fvs = varNeg lam
+  k <- callClosure v
+  commPiElim k [ValueSigmaIntro $ map ValueVar fvs]
 modalNeg app@(NegPiElim _ _) = do
   let (fun, args) = toNegPiElimSeq app
   fun' <- modalNeg fun
   args' <- mapM modalPos args
   xs <- mapM (const (newNameWith "arg")) args
-  app' <- commPiElim fun' xs
+  app' <- commPiElim fun' $ map ValueVar xs
   bindLet (zip xs args') app'
 modalNeg (NegSigmaElim e1 xs e2) = do
   e1' <- modalPos e1
@@ -95,15 +80,22 @@ modalNeg (NegUpElim x e1 e2) = do
   e2' <- modalNeg e2
   return $ CompUpElim x e1' e2'
 modalNeg (NegDownElim e) = do
-  envName <- newNameWith "env"
-  clsName <- newNameWith "cls"
   e' <- modalPos e
-  return $
-    CompSigmaElim e' [clsName, envName] (CompPiElimDownElim clsName [envName])
+  callClosure e'
 modalNeg (NegConstElim x es) = do
   es' <- mapM modalPos es
   xs <- mapM (const (newNameWith "arg")) es
   bindLet (zip xs es') $ CompConstElim x xs
+
+callClosure :: Value -> WithEnv Comp
+callClosure e = do
+  envName <- newNameWith "env"
+  clsName <- newNameWith "cls"
+  return $
+    CompSigmaElim
+      e
+      [clsName, envName]
+      (CompPiElimDownElim clsName [ValueVar envName])
 
 bindLet :: [(Identifier, Value)] -> Comp -> WithEnv Comp
 bindLet [] e = return e
@@ -112,7 +104,7 @@ bindLet ((x, v):rest) e = do
   return $ CompUpElim x (CompUpIntro v) e'
 
 -- Commutative conversion for pi-elimination
-commPiElim :: Comp -> [Identifier] -> WithEnv Comp
+commPiElim :: Comp -> [Value] -> WithEnv Comp
 commPiElim (CompPiElimDownElim f xs) args =
   return $ CompPiElimDownElim f (xs ++ args)
 commPiElim (CompSigmaElim v xs e) args = do
@@ -125,7 +117,7 @@ commPiElim (CompIndexElim v branchList) args = do
 commPiElim (CompUpElim x e1 e2) args = do
   e2' <- commPiElim e2 args
   return $ CompUpElim x e1 e2'
-commPiElim (CompConstElim f xs) args = return $ CompConstElim f (xs ++ args)
+-- commPiElim (CompConstElim f xs) args = return $ CompConstElim f (xs ++ args)
 commPiElim _ _ = lift $ throwE "Modal.commPiElim: type error"
 
 toNegPiIntroSeq :: Neg -> (Neg, [Identifier])
@@ -142,6 +134,7 @@ toNegPiElimSeq c = (c, [])
 
 varPos :: Pos -> [Identifier]
 varPos (PosVar s) = [s]
+varPos (PosConst _) = []
 varPos (PosSigmaIntro es) = concatMap varPos es
 varPos (PosIndexIntro _ _) = []
 varPos (PosDownIntro e) = varNeg e

@@ -36,15 +36,14 @@ polarize = do
   tenv <- gets termEnv
   forM_ tenv $ \(name, e) -> do
     e' <- polarize' e
-    insPolEnv name e' -- implicit thunk
+    insPolEnv name e'
   -- penv <- gets polEnv
   -- forM_ penv $ \(name, e) -> do
   --   liftIO $ putStrLn name
-  --   -- liftIO $ putStrLn $ show args
+  --   -- liftIO $ print args
   --   liftIO $ putStrLn $ Pr.ppShow e
-  --   -- e' <- reduceNeg e
-  --   liftIO $ putStrLn "----------------"
-  --   -- liftIO $ putStrLn $ Pr.ppShow e'
+  --   e' <- reduceNeg e
+  --   liftIO $ putStrLn $ Pr.ppShow e'
   --   liftIO $ putStrLn "-----------------------------"
 
 polarize' :: Term -> WithEnv Neg
@@ -75,17 +74,14 @@ polarize' (TermIndexElim e branchList) = do
 polarize' (TermMu x e) = do
   e' <- polarize' e -- e doesn't have any free variables thanks to Close
   insPolEnv x e' -- implicit thunk for e
-  return $ NegConstElim (ConstantDefined x) []
-  -- return $ NegDownElim (PosVar x) -- このxはconstだよね？
-  -- return $ NegMu x e'
+  return $ NegDownElim (PosConst x)
 
 -- insert (possibly) environment-specific definition of constant
 toDefinition :: Identifier -> WithEnv Neg
 toDefinition x
   | Just c <- getPrintConstant x = toPrintDefinition c
   | Just c <- getArithBinOpConstant x = toArithBinOpDefinition c
-  | otherwise = return $ NegConstElim (ConstantDefined x) []
-  -- | otherwise = lift $ throwE $ "No such primitive: " ++ x
+  | otherwise = return $ NegDownElim (PosConst x)
 
 toArithLowType :: Identifier -> Maybe LowType
 toArithLowType x
