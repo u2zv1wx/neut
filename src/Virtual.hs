@@ -86,8 +86,15 @@ virtualComp (CompUpElim x e1 e2) = do
   return $ commUpElim x e1' e2'
 virtualComp (CompConstElim f xs) =
   case f of
-    ConstantPrint lowType -> undefined
-    ConstantArith lowType kind -> undefined
+    ConstantPrint lowType
+      | length xs == 1 -> do
+        let xs' = map DataLocal xs
+        return $ CodePrint lowType (head xs') $ CodeReturn (DataInt 0)
+    ConstantArith lowType kind
+      | length xs == 2 -> do
+        let xs' = map DataLocal xs
+        return $ CodeReturn (DataArith (kind, lowType) (head xs') (xs' !! 1))
+    _ -> lift $ throwE $ "Arith mismatch for " ++ show f
 
 extract :: Data -> [(Identifier, Int)] -> Int -> Code -> Code
 extract z [] _ cont = CodeFree z cont
@@ -109,6 +116,8 @@ commUpElim x (CodeSwitch y branchList) cont = do
 commUpElim s (CodeExtractValue x basePointer i cont1) cont2 =
   CodeExtractValue x basePointer i $ commUpElim s cont1 cont2
 commUpElim s (CodeFree x cont1) cont2 = CodeFree x $ commUpElim s cont1 cont2
+commUpElim s (CodePrint x d cont1) cont2 =
+  CodePrint x d (commUpElim s cont1 cont2)
 
 globalizeIfNecessary :: Identifier -> WithEnv Data
 globalizeIfNecessary x = do

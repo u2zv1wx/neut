@@ -78,14 +78,15 @@ asmCode (CodeFree d cont) = do
   cont' <- asmCode cont
   tmp <- newNameWith "free"
   asmData' [(tmp, d)] $ AsmFree (AsmDataLocal tmp) cont'
+asmCode (CodePrint (LowTypeFloat _) _ _) = undefined
+asmCode (CodePrint t d cont) = do
+  cont' <- asmCode cont
+  tmp <- newNameWith "item"
+  cast <- newNameWith "cast"
+  asmData' [(tmp, d)] $
+    AsmPointerToInt cast (AsmDataLocal tmp) voidPtr t $
+    AsmPrint t (AsmDataLocal cast) cont'
 
--- asmCode (CodePrint t d cont) = do
---   cont' <- asmCode cont
---   tmp <- newNameWith "item"
---   cast <- newNameWith "cast"
---   asmData' [(tmp, d)] $
---     AsmPointerToInt cast (AsmDataLocal tmp) voidPtr t $
---     AsmPrint t (AsmDataLocal cast) cont'
 -- `asmData x d cont` binds the data `d` to the variable `x`, and computes then
 -- continuation `cont`.
 asmData :: Identifier -> Data -> Asm -> WithEnv Asm

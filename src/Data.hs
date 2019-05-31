@@ -275,6 +275,9 @@ data Code
                      Code -- continuation
   | CodeFree Data
              Code
+  | CodePrint LowType
+              Data
+              Code
   deriving (Show)
 
 data AsmData
