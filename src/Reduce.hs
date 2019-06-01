@@ -302,9 +302,6 @@ reduceNeg (NegIndexElim e branchList) =
               throwE $
               "the index " ++ show x ++ " is not included in branchList"
     _ -> return $ NegIndexElim e branchList
-      -- let (labelList, es) = unzip branchList
-      -- es' <- mapM reduceNeg es
-      -- return $ NegIndexElim e $ zip labelList es'
 reduceNeg (NegUpIntro e) = return $ NegUpIntro e
 reduceNeg (NegUpElim x e1 e2) = do
   e1' <- reduceNeg e1

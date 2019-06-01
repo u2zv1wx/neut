@@ -36,7 +36,7 @@ polarize = do
   tenv <- gets termEnv
   forM_ tenv $ \(name, e) -> do
     e' <- polarize' e
-    insPolEnv name e'
+    insPolEnv name $ PosDownIntro e'
   -- penv <- gets polEnv
   -- forM_ penv $ \(name, e) -> do
   --   liftIO $ putStrLn name
@@ -73,7 +73,7 @@ polarize' (TermIndexElim e branchList) = do
   return $ NegUpElim x e' (NegIndexElim (PosVar x) (zip labelList cs))
 polarize' (TermMu x e) = do
   e' <- polarize' e -- e doesn't have any free variables thanks to Close
-  insPolEnv x e' -- implicit thunk for e
+  insPolEnv x $ PosDownIntro e' -- implicit thunk for e
   return $ NegDownElim (PosConst x)
 
 -- insert (possibly) environment-specific definition of constant

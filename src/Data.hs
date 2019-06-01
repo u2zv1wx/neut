@@ -398,6 +398,18 @@ instance Ord EnrichedConstraint where
 
 type Subst = [(Identifier, Neut)]
 
+data FuncOrConst
+  = GlobalFunction [Identifier]
+                   Comp
+  | GlobalConstant Value
+  deriving (Show)
+
+data CodeOrData
+  = GlobalCode [Identifier]
+               Code
+  | GlobalData Data
+  deriving (Show)
+
 data Env = Env
   { count :: Int -- to generate fresh symbols
   , notationEnv :: [(Tree, Tree)] -- macro transformers
@@ -409,14 +421,15 @@ data Env = Env
   , typeEnv :: Map.Map Identifier Neut -- type environment
   , weakTermEnv :: [(Identifier, Neut)]
   , termEnv :: [(Identifier, Term)]
-  , polEnv :: [(Identifier, Neg)]
-  , modalEnv :: [(Identifier, ([Identifier], Comp))] -- [(f, thunk (lam x1 ... xn. e)), ...]
+  , polEnv :: [(Identifier, Pos)]
+  , modalEnv :: [(Identifier, FuncOrConst)] -- [(f, v), ...]
+  -- , modalEnv :: [(Identifier, ([Identifier], Comp))] -- [(f, thunk (lam x1 ... xn. e)), ...]
   , constraintEnv :: [PreConstraint]
   , constraintQueue :: Q.MinQueue EnrichedConstraint
   , substitution :: Subst
   , univConstraintEnv :: [(UnivLevel, UnivLevel)]
   , numConstraintEnv :: [Identifier]
-  , codeEnv :: [(Identifier, ([Identifier], IORef Code))]
+  , codeEnv :: [(Identifier, CodeOrData)]
   , asmEnv :: [(Identifier, ([Identifier], Asm))]
   , currentDir :: FilePath
   } deriving (Show)
@@ -521,11 +534,11 @@ lookupNameEnv'' s = do
     Just s' -> return $ Just s'
     Nothing -> return Nothing
 
-lookupCodeEnv :: Identifier -> WithEnv ([Identifier], IORef Code)
+lookupCodeEnv :: Identifier -> WithEnv CodeOrData
 lookupCodeEnv funName = do
   env <- get
   case lookup funName (codeEnv env) of
-    Just (args, body) -> return (args, body)
+    Just e -> return e
     Nothing -> lift $ throwE $ "no such code: " ++ show funName
 
 insTypeEnv :: Identifier -> Neut -> WithEnv ()
@@ -555,17 +568,27 @@ lookupWeakTermEnv funName = do
     Just body -> return body
     Nothing -> lift $ throwE $ "no such weakterm: " ++ show funName
 
-insCodeEnv :: Identifier -> [Identifier] -> Code -> WithEnv ()
-insCodeEnv funName args body = do
-  codeRef <- liftIO $ newIORef body
-  modify (\e -> e {codeEnv = (funName, (args, codeRef)) : codeEnv e})
+insCodeEnvCode :: Identifier -> [Identifier] -> Code -> WithEnv ()
+insCodeEnvCode funName args body =
+  modify (\e -> e {codeEnv = (funName, GlobalCode args body) : codeEnv e})
 
-insPolEnv :: Identifier -> Neg -> WithEnv ()
+insCodeEnvData :: Identifier -> Data -> WithEnv ()
+insCodeEnvData funName d =
+  modify (\e -> e {codeEnv = (funName, GlobalData d) : codeEnv e})
+
+insPolEnv :: Identifier -> Pos -> WithEnv ()
 insPolEnv name body = modify (\e -> e {polEnv = (name, body) : polEnv e})
 
-insModalEnv :: Identifier -> [Identifier] -> Comp -> WithEnv ()
-insModalEnv funName args body =
-  modify (\e -> e {modalEnv = (funName, (args, body)) : modalEnv e})
+-- insModalEnv :: Identifier -> [Identifier] -> Comp -> WithEnv ()
+-- insModalEnv funName args body =
+--   modify (\e -> e {modalEnv = (funName, (args, body)) : modalEnv e})
+insModalEnvConst :: Identifier -> Value -> WithEnv ()
+insModalEnvConst k v =
+  modify (\e -> e {modalEnv = (k, GlobalConstant v) : modalEnv e})
+
+insModalEnvFunc :: Identifier -> [Identifier] -> Comp -> WithEnv ()
+insModalEnvFunc k args body =
+  modify (\e -> e {modalEnv = (k, GlobalFunction args body) : modalEnv e})
 
 insAsmEnv :: Identifier -> [Identifier] -> Asm -> WithEnv ()
 insAsmEnv funName args asm =

@@ -116,3 +116,29 @@ compose s1 s2 = do
   let codS2' = map (subst s1) codS2
   let fromS1 = filter (\(ident, _) -> ident `notElem` domS2) s1
   fromS1 ++ zip domS2 codS2'
+
+varPos :: Pos -> [Identifier]
+varPos (PosVar s) = [s]
+varPos (PosConst _) = []
+varPos (PosSigmaIntro es) = concatMap varPos es
+varPos (PosIndexIntro _ _) = []
+varPos (PosDownIntro e) = varNeg e
+
+varNeg :: Neg -> [Identifier]
+varNeg (NegPiIntro x e) = filter (/= x) $ varNeg e
+varNeg (NegPiElim e1 e2) = varNeg e1 ++ varPos e2
+varNeg (NegSigmaElim e1 xs e2) = do
+  let vs1 = varPos e1
+  let vs2 = filter (`notElem` xs) $ varNeg e2
+  vs1 ++ vs2
+varNeg (NegIndexElim e branchList) = do
+  let vs1 = varPos e
+  let vs2 = concatMap (varNeg . snd) branchList
+  vs1 ++ vs2
+varNeg (NegUpIntro e) = varPos e
+varNeg (NegUpElim x e1 e2) = do
+  let vs1 = varNeg e1
+  let vs2 = filter (/= x) $ varNeg e2
+  vs1 ++ vs2
+varNeg (NegDownElim e) = varPos e
+varNeg (NegConstElim _ es) = concatMap varPos es

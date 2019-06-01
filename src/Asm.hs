@@ -34,10 +34,16 @@ import Debug.Trace
 assemblize :: WithEnv ()
 assemblize = do
   env <- get
-  forM_ (codeEnv env) $ \(name, (args, codeRef)) -> do
-    code <- liftIO $ readIORef codeRef
-    asm <- asmCode code
-    insAsmEnv name args asm
+  -- forM_ (codeEnv env) $ \(name, (args, codeRef)) -> do
+  --   code <- liftIO $ readIORef codeRef
+  --   asm <- asmCode code
+  --   insAsmEnv name args asm
+  forM_ (codeEnv env) $ \(name, e) -> do
+    case e of
+      GlobalData d -> undefined
+      GlobalCode args code -> do
+        asm <- asmCode code
+        insAsmEnv name args asm
 
 asmCode :: Code -> WithEnv Asm
 asmCode (CodeReturn d) = do
@@ -94,7 +100,6 @@ asmData x (DataLocal y) cont =
   return $ AsmBitcast x (AsmDataLocal y) voidPtr voidPtr cont
 asmData x (DataGlobal y) cont = do
   cenv <- gets codeEnv
-  liftIO $ putStrLn $ "DataGlobal. x == " ++ show x ++ ", y == " ++ show y
   case lookup y cenv of
     Nothing -> lift $ throwE $ "no such global label defined: " ++ y -- FIXME
     Just (args, _) -> do

@@ -31,15 +31,28 @@ import Debug.Trace
 virtualize :: WithEnv ()
 virtualize = do
   menv <- gets modalEnv
-  forM_ menv $ \(name, (args, code)) -> do
-    code' <- virtualComp code
-    insCodeEnv name args code'
+  forM_ menv $ uncurry virtual
+  -- forM_ menv $ \(name, e) -> virtual name e
+    -- case content of
+    --   GlobalConstant v -> undefined
+    --   GlobalFunction args body -> undefined
+    -- code' <- virtualValue value
+    -- undefined
+    -- insCodeEnv name args code'
   -- cenv <- gets codeEnv
   -- forM_ cenv $ \(name, (args, e)) -> do
   --   liftIO $ putStrLn name
   --   liftIO $ print args
   --   liftIO $ putStrLn $ Pr.ppShow e
   --   liftIO $ putStrLn "-----------------------------"
+
+virtual :: Identifier -> FuncOrConst -> WithEnv ()
+virtual name (GlobalFunction args body) = do
+  body' <- virtualComp body
+  insCodeEnvCode name args body'
+virtual name (GlobalConstant v) = do
+  v' <- virtualValue v
+  insCodeEnvData name v'
 
 virtualValue :: Value -> WithEnv Data
 virtualValue (ValueVar x) = return $ DataLocal x
