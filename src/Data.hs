@@ -247,6 +247,32 @@ data SNeg
                   [SPos]
   deriving (Show)
 
+data SSPos
+  = SSPosVar Identifier
+  | SSPosConst Identifier
+  | SSPosSigmaIntro [SSPos]
+  | SSPosIndexIntro Index
+                    Identifier -- metadata to determine its type
+  | SSPosBoxIntroPiIntro [Identifier] -- box (lam x1 ... xn. e)
+                         SSNeg
+  deriving (Show)
+
+data SSNeg
+  = SSNegPiElimBoxElim SSPos -- (unbox v) @ v1 @ ... @ vn
+                       [SSPos]
+  | SSNegSigmaElim SSPos
+                   [Identifier]
+                   SSNeg
+  | SSNegIndexElim SSPos
+                   [(Index, SSNeg)]
+  | SSNegUpIntro SSPos
+  | SSNegUpElim Identifier
+                SSNeg
+                SSNeg
+  | SSNegConstElim Constant
+                   [SSPos]
+  deriving (Show)
+
 -- positive modal normal form
 data Value
   = ValueVar Identifier
@@ -258,8 +284,8 @@ data Value
 
 -- negative modal normal form
 data Comp
-  = CompPiElimDownElim Identifier -- (force f) @ x1 @ ... @ xn
-                       [Value]
+  = CompPiElimBoxElim Identifier -- (force f) @ x1 @ ... @ xn
+                      [Value]
   | CompConstElim Constant
                   [Identifier]
   | CompSigmaElim Value
@@ -456,7 +482,7 @@ data Env = Env
   , strictPolEnv :: [(Identifier, SNeg)] -- implicit box
   -- , polEnv :: [(Identifier, Pos)]
   -- , modalEnv :: [(Identifier, FuncOrConst)] -- [(f, v), ...]
-  , modalEnv :: [(Identifier, ([Identifier], Comp))] -- [(f, thunk (lam x1 ... xn. e)), ...]
+  , modalEnv :: [(Identifier, ([Identifier], Comp))] -- [(f, box.intro (lam x1 ... xn. e)), ...]
   , constraintEnv :: [PreConstraint]
   , constraintQueue :: Q.MinQueue EnrichedConstraint
   , substitution :: Subst

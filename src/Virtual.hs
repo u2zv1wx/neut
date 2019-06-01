@@ -25,16 +25,21 @@ import Debug.Trace
 virtualize :: WithEnv ()
 virtualize = do
   menv <- gets modalEnv
-  forM_ menv $ uncurry virtual
+  forM_ menv $ \(name, (args, body)) -> do
+    body' <- virtualComp body
+    liftIO $ putStrLn name
+    liftIO $ putStrLn $ show args
+    liftIO $ putStrLn $ Pr.ppShow body'
+    liftIO $ putStrLn "==============================="
+    virtual name (args, body)
+   -- -> do
+  -- forM_ menv $ uncurry virtual
 
 virtual :: Identifier -> ([Identifier], Comp) -> WithEnv ()
 virtual name (args, body) = do
   body' <- virtualComp body
   insCodeEnv name args body'
 
--- virtual name (GlobalConstant v) = do
---   v' <- virtualValue v
---   insCodeEnvData name v'
 virtualValue :: Value -> WithEnv Data
 virtualValue (ValueVar x) = return $ DataLocal x
 virtualValue (ValueConst x) = return $ DataGlobal x
@@ -64,7 +69,7 @@ virtualValue (ValueIndexIntro x meta) =
         Nothing -> lift $ throwE $ "no such index defined: " ++ show name
 
 virtualComp :: Comp -> WithEnv Code
-virtualComp (CompPiElimDownElim f vs) = do
+virtualComp (CompPiElimBoxElim f vs) = do
   ds <- mapM virtualValue vs
   return $ CodeCallTail (DataLocal f) ds
 virtualComp (CompSigmaElim e1 xs e2) = do
@@ -118,3 +123,11 @@ commUpElim s (CodeExtractValue x basePointer i cont1) cont2 =
 commUpElim s (CodeFree x cont1) cont2 = CodeFree x $ commUpElim s cont1 cont2
 commUpElim s (CodePrint x d cont1) cont2 =
   CodePrint x d (commUpElim s cont1 cont2)
+-- for debug
+-- runCode :: Code -> WithEnv Data
+-- runCode (CodeReturn d) = return d
+-- runCode (CodeLet x d cont) = runCode $ substCode [(x, d)] cont
+-- runCode (CodeCall x d args cont) = undefined
+-- runCode (CodeCallTail d args) = undefined
+-- substCode :: [(Identifier, Data)] -> Code -> Code
+-- substCode = undefined

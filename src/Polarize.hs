@@ -37,15 +37,6 @@ polarize = do
   forM_ tenv $ \(name, e) -> do
     e' <- polarize' e
     insPolEnv name e' -- implicit box.intro
-  -- insPolEnv name $ PosBoxIntro e'
-  -- penv <- gets polEnv
-  -- forM_ penv $ \(name, e) -> do
-  --   liftIO $ putStrLn name
-  --   -- liftIO $ print args
-  --   liftIO $ putStrLn $ Pr.ppShow e
-  --   e' <- reduceNeg e
-  --   liftIO $ putStrLn $ Pr.ppShow e'
-  --   liftIO $ putStrLn "-----------------------------"
 
 polarize' :: Term -> WithEnv Neg
 polarize' (TermVar x) = return $ NegDownElim (PosVar x)
