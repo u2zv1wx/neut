@@ -328,24 +328,24 @@ reduceNeg (NegConstElim x vs) = do
     (ConstantArith _ ArithDiv, Just [x, y]) ->
       return $ NegUpIntro (PosIndexIntro (IndexInteger (x `div` y)) meta)
     _ -> return $ NegConstElim x vs
-reduceNeg (NegDownElim e) = do
+reduceNeg (NegDownElim e) =
   case e of
     PosDownIntro e'' -> reduceNeg e''
     PosConst x -> do
       penv <- gets polEnv
       case lookup x penv of
-        Just e' -> return e' -- eliminating implicit thunk
-        Nothing -> return $ NegDownElim e
+        Just (PosDownIntro e') -> return e' -- eliminating implicit thunk
+        _ -> return $ NegDownElim e
     _ -> return $ NegDownElim e
-reduceNeg (NegBoxElim e) =
-  case e of
-    PosBoxIntro e'' -> reduceNeg e''
-    PosConst x -> do
-      penv <- gets polEnv
-      case lookup x penv of
-        Just e' -> return e' -- eliminating implicit thunk
-        Nothing -> return $ NegBoxElim e
-    _ -> return $ NegBoxElim e
+-- reduceNeg (NegBoxElim e) =
+--   case e of
+--     PosBoxIntro e'' -> reduceNeg e''
+--     PosConst x -> do
+--       penv <- gets polEnv
+--       case lookup x penv of
+--         Just e' -> return e' -- eliminating implicit thunk
+--         Nothing -> return $ NegBoxElim e
+--     _ -> return $ NegBoxElim e
 reduceNeg e = return e
 
 reduceSNeg :: SNeg -> WithEnv SNeg
@@ -396,8 +396,8 @@ reduceSNeg (SNegBoxElim e) =
     SPosConst x -> do
       spenv <- gets strictPolEnv
       case lookup x spenv of
-        Just e' -> return e' -- eliminating implicit box
-        Nothing -> return $ SNegBoxElim e
+        Just (SPosBoxIntro e') -> return e'
+        _ -> return $ SNegBoxElim e
     _ -> return $ SNegBoxElim e
 reduceSNeg e = return e
 
@@ -413,10 +413,10 @@ substPos _ (PosIndexIntro l meta) = PosIndexIntro l meta
 substPos sub (PosDownIntro e) = do
   let e' = substNeg sub e
   PosDownIntro e'
-substPos sub (PosBoxIntro e) = do
-  let e' = substNeg sub e
-  PosBoxIntro e'
 
+-- substPos sub (PosBoxIntro e) = do
+--   let e' = substNeg sub e
+--   PosBoxIntro e'
 substNeg :: SubstPos -> Neg -> Neg
 substNeg sub (NegPiIntro s body) = do
   let sub' = filter (\(x, _) -> x /= s) sub
@@ -442,7 +442,7 @@ substNeg sub (NegUpElim x e1 e2) = do
   let e2' = substNeg sub' e2
   NegUpElim x e1' e2'
 substNeg sub (NegDownElim e) = NegDownElim (substPos sub e)
-substNeg sub (NegBoxElim e) = NegBoxElim (substPos sub e)
+-- substNeg sub (NegBoxElim e) = NegBoxElim (substPos sub e)
 substNeg sub (NegConstElim x vs) = NegConstElim x (map (substPos sub) vs)
 
 -- substNeg sub (NegMu x e) = NegMu x $ substNeg sub e

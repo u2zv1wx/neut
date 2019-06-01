@@ -1,4 +1,4 @@
--- eliminates all the free variables from every lambda-sequence
+-- eliminates all the free variables from every lambda-sequence.
 module Supply
   ( supplySPos
   , supplySNeg
@@ -38,9 +38,6 @@ supplySNeg lam@(SNegPiIntro _ _) = do
   let (args, body) = toSNegPiIntroSeq lam
   body' <- supplySNeg body
   let fvs = filter (`notElem` args) $ varSSNeg body'
-  liftIO $ putStrLn $ "fvs == " ++ show fvs
-  liftIO $ putStrLn $ "fvs ++ args == " ++ show (fvs ++ args)
-  liftIO $ putStrLn $ "v == " ++ show (map SSPosVar fvs)
   return $
     SSNegPiElimBoxElim
       (SSPosBoxIntroPiIntro (fvs ++ args) body')
@@ -102,8 +99,6 @@ varSSPos (SSPosIndexIntro _ _) = []
 varSSPos (SSPosBoxIntroPiIntro args e) = filter (`notElem` args) $ varSSNeg e
 
 varSSNeg :: SSNeg -> [Identifier]
--- varSSNeg (SSNegPiIntro x e) = filter (/= x) $ varSSNeg e
--- varSSNeg (SSNegPiElim e1 e2) = varSSNeg e1 ++ varSSPos e2
 varSSNeg (SSNegPiElimBoxElim e args) = varSSPos e ++ concatMap varSSPos args
 varSSNeg (SSNegSigmaElim e1 xs e2) = do
   let vs1 = varSSPos e1

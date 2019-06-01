@@ -196,7 +196,7 @@ data Pos
   | PosIndexIntro Index
                   Identifier -- metadata to determine its type
   | PosDownIntro Neg
-  | PosBoxIntro Neg
+  -- | PosBoxIntro Neg
   deriving (Show)
 
 data Neg
@@ -214,7 +214,6 @@ data Neg
               Neg
               Neg
   | NegDownElim Pos
-  | NegBoxElim Pos
   | NegConstElim Constant
                  [Pos]
   deriving (Show)
@@ -280,6 +279,8 @@ data Value
   | ValueSigmaIntro [Value]
   | ValueIndexIntro Index
                     Identifier
+  | ValueBoxIntroPiIntro [Identifier]
+                         Comp
   deriving (Show)
 
 -- negative modal normal form
@@ -478,14 +479,13 @@ data Env = Env
   -- , weakTermEnv :: [(Identifier, Neut)]
   -- , termEnv :: [(Identifier, Term)]
   -- , polEnv :: [(Identifier, ([Identifier], Neg))] -- x ~> box.intro (lam (x1 ... xn). e)
-  -- polEnv :: Ident ~> PosBoxIntro Neg
-  , polEnv :: [(Identifier, Neg)] -- x ~> box.intro e (implicit box)
-  -- strictPolEnv :: Ident -> SPosBoxIntro SNeg
-  , strictPolEnv :: [(Identifier, SNeg)] -- implicit box
+  , polEnv :: [(Identifier, Pos)] -- x ~> box.intro e (implicit box)
+  , strictPolEnv :: [(Identifier, SPos)]
   -- , polEnv :: [(Identifier, Pos)]
   -- , modalEnv :: [(Identifier, FuncOrConst)] -- [(f, v), ...]
   -- modalEnv : Ident ~> ValueBoxIntroPiIntro [Ident] Comp
-  , modalEnv :: [(Identifier, ([Identifier], Comp))]
+  -- , modalEnv :: [(Identifier, ([Identifier], Comp))]
+  , modalEnv :: [(Identifier, Value)]
   , constraintEnv :: [PreConstraint]
   , constraintQueue :: Q.MinQueue EnrichedConstraint
   , substitution :: Subst
@@ -639,10 +639,10 @@ insCodeEnv funName args body =
 -- insCodeEnvData :: Identifier -> Data -> WithEnv ()
 -- insCodeEnvData funName d =
 --   modify (\e -> e {codeEnv = (funName, GlobalData d) : codeEnv e})
-insPolEnv :: Identifier -> Neg -> WithEnv ()
+insPolEnv :: Identifier -> Pos -> WithEnv ()
 insPolEnv name body = modify (\e -> e {polEnv = (name, body) : polEnv e})
 
-insSPolEnv :: Identifier -> SNeg -> WithEnv ()
+insSPolEnv :: Identifier -> SPos -> WithEnv ()
 insSPolEnv name body =
   modify (\e -> e {strictPolEnv = (name, body) : strictPolEnv e})
 
@@ -651,10 +651,12 @@ insSPolEnv name body =
 --   modify (\e -> e {polEnv = (name, (args, body)) : polEnv e})
 -- insPolEnv :: Identifier -> Pos -> WithEnv ()
 -- insPolEnv name body = modify (\e -> e {polEnv = (name, body) : polEnv e})
-insModalEnv :: Identifier -> [Identifier] -> Comp -> WithEnv ()
-insModalEnv funName args body =
-  modify (\e -> e {modalEnv = (funName, (args, body)) : modalEnv e})
+insModalEnv :: Identifier -> Value -> WithEnv ()
+insModalEnv funName v = modify (\e -> e {modalEnv = (funName, v) : modalEnv e})
 
+-- insModalEnv :: Identifier -> [Identifier] -> Comp -> WithEnv ()
+-- insModalEnv funName args body =
+--   modify (\e -> e {modalEnv = (funName, (args, body)) : modalEnv e})
 -- insModalEnvConst :: Identifier -> Value -> WithEnv ()
 -- insModalEnvConst k v =
 --   modify (\e -> e {modalEnv = (k, GlobalConstant v) : modalEnv e})

@@ -123,8 +123,8 @@ varPos (PosConst _) = []
 varPos (PosSigmaIntro es) = concatMap varPos es
 varPos (PosIndexIntro _ _) = []
 varPos (PosDownIntro e) = varNeg e
-varPos (PosBoxIntro e) = varNeg e
 
+-- varPos (PosBoxIntro e) = varNeg e
 varNeg :: Neg -> [Identifier]
 varNeg (NegPiIntro x e) = filter (/= x) $ varNeg e
 varNeg (NegPiElim e1 e2) = varNeg e1 ++ varPos e2
@@ -142,5 +142,5 @@ varNeg (NegUpElim x e1 e2) = do
   let vs2 = filter (/= x) $ varNeg e2
   vs1 ++ vs2
 varNeg (NegDownElim e) = varPos e
-varNeg (NegBoxElim e) = varPos e
+-- varNeg (NegBoxElim e) = varPos e
 varNeg (NegConstElim _ es) = concatMap varPos es

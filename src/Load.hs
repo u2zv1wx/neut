@@ -26,9 +26,9 @@ import Emit
 import Exhaust
 
 import Close
-import Closure
 import Macro
 import Modal
+import Necessity
 import Parse
 import Polarize
 import Read
@@ -228,7 +228,7 @@ process :: Neut -> WithEnv [String]
 process e = do
   e' <- elaborate e >>= close
   polarize "main" e'
-  closure
+  necessity
   modalize
   virtualize
   assemblize

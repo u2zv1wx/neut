@@ -10,8 +10,8 @@ import Control.Monad.Trans.Except
 
 import Data.List
 
-import Closure
 import Data
+import Necessity
 import Reduce
 import Supply
 import Util
@@ -26,15 +26,15 @@ modalize :: WithEnv ()
 modalize = do
   spenv <- gets strictPolEnv
   forM_ spenv $ \(name, e) -> do
-    let actualTerm = SPosBoxIntro e
-    actualTerm' <- supplySPos actualTerm
-    case actualTerm' of
-      SSPosBoxIntroPiIntro args body -> do
-        liftIO $ putStrLn $ "name == " ++ show name
-        liftIO $ putStrLn $ "args == " ++ show args
-        body' <- modalNeg body
-        insModalEnv name args body'
-      _ -> lift $ throwE "non-function?"
+    actualTerm' <- supplySPos e >>= modalPos
+    insModalEnv name actualTerm'
+    -- case actualTerm' of
+    --   SSPosBoxIntroPiIntro args body -> do
+    --     liftIO $ putStrLn $ "name == " ++ show name
+    --     liftIO $ putStrLn $ "args == " ++ show args
+    --     body' <- modalNeg body
+    --     insModalEnv name args body'
+    --   _ -> lift $ throwE "non-function?"
 
 modalPos :: SSPos -> WithEnv Value
 modalPos (SSPosVar x) = return $ ValueVar x
@@ -45,11 +45,12 @@ modalPos (SSPosSigmaIntro es) = do
 modalPos (SSPosIndexIntro l meta) = return $ ValueIndexIntro l meta
 modalPos (SSPosBoxIntroPiIntro args body) = do
   body' <- modalNeg body
-  clsName <- newNameWith "cls"
-  insModalEnv clsName args body'
-  liftIO $ putStrLn $ "name == " ++ show clsName
-  liftIO $ putStrLn $ "args == " ++ show args
-  return $ ValueConst clsName
+  -- clsName <- newNameWith "cls"
+  return $ ValueBoxIntroPiIntro args body'
+  -- insModalEnv clsName args body'
+  -- liftIO $ putStrLn $ "name == " ++ show clsName
+  -- liftIO $ putStrLn $ "args == " ++ show args
+  -- return $ ValueConst clsName
 
 modalNeg :: SSNeg -> WithEnv Comp
 modalNeg (SSNegPiElimBoxElim fun args) = do

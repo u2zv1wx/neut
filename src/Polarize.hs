@@ -34,7 +34,7 @@ import Data.Maybe (isJust, maybeToList)
 polarize :: Identifier -> Term -> WithEnv ()
 polarize name e = do
   e' <- polarize' e
-  insPolEnv name e' -- implicit box.intro
+  insPolEnv name $ PosDownIntro e' -- implicit box.intro
   -- tenv <- gets termEnv
   -- forM_ tenv $ \(name, e) -> do
   --   e' <- polarize' e
@@ -67,15 +67,15 @@ polarize' (TermIndexElim e branchList) = do
   return $ NegUpElim x e' (NegIndexElim (PosVar x) (zip labelList cs))
 polarize' (TermMu x e) = do
   e' <- polarize' e -- e doesn't have any free variables thanks to Close
-  insPolEnv x e' -- x == box.intro e'
-  return $ NegBoxElim (PosConst x)
+  insPolEnv x $ PosDownIntro e' -- x == box.intro e'
+  return $ NegDownElim (PosConst x)
 
 -- insert (possibly) environment-specific definition of constant
 toDefinition :: Identifier -> WithEnv Neg
 toDefinition x
   | Just c <- getPrintConstant x = toPrintDefinition c
   | Just c <- getArithBinOpConstant x = toArithBinOpDefinition c
-  | otherwise = return $ NegBoxElim (PosConst x)
+  | otherwise = return $ NegDownElim (PosConst x)
 
 toArithLowType :: Identifier -> Maybe LowType
 toArithLowType x
