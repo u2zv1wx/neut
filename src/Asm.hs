@@ -34,16 +34,17 @@ import Debug.Trace
 assemblize :: WithEnv ()
 assemblize = do
   env <- get
-  -- forM_ (codeEnv env) $ \(name, (args, codeRef)) -> do
-  --   code <- liftIO $ readIORef codeRef
-  --   asm <- asmCode code
-  --   insAsmEnv name args asm
-  forM_ (codeEnv env) $ \(name, e) -> do
-    case e of
-      GlobalData d -> undefined
-      GlobalCode args code -> do
-        asm <- asmCode code
-        insAsmEnv name args asm
+  forM_ (codeEnv env) $ \(name, (args, code))
+    -- code <- liftIO $ readIORef codeRef
+   -> do
+    asm <- asmCode code
+    insAsmEnv name args asm
+  -- forM_ (codeEnv env) $ \(name, e) -> do
+  --   case e of
+  --     GlobalData d -> undefined
+  --     GlobalCode args code -> do
+  --       asm <- asmCode code
+  --       insAsmEnv name args asm
 
 asmCode :: Code -> WithEnv Asm
 asmCode (CodeReturn d) = do
@@ -105,6 +106,7 @@ asmData x (DataGlobal y) cont = do
     Just (args, _) -> do
       let funPtrType = toFunPtrType args
       return $ AsmBitcast x (AsmDataGlobal y) funPtrType voidPtr cont
+    -- Just (GlobalData _) -> undefined
 asmData x (DataInt i) cont =
   return $ AsmIntToPointer x (AsmDataInt i) (LowTypeSignedInt 64) voidPtr cont
 asmData x (DataFloat16 f) cont = do
@@ -122,8 +124,6 @@ asmData x (DataFloat64 f) cont = do
   return $
     AsmBitcast cast (AsmDataFloat f) (LowTypeFloat 64) (LowTypeSignedInt 64) $
     AsmIntToPointer x (AsmDataLocal cast) (LowTypeSignedInt 64) voidPtr cont
--- asmData reg (DataStruct []) cont = asmData reg (DataInt 0) cont
--- asmData reg (DataStruct [d]) cont = asmData reg d cont
 asmData reg (DataStruct ds) cont = do
   xs <- mapM (const $ newNameWith "cursor") ds
   cast <- newNameWith "cast"

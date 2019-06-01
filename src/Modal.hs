@@ -26,63 +26,77 @@ modalize :: WithEnv ()
 modalize = do
   penv <- gets polEnv
   forM_ penv $ \(name, e) -> do
-    body' <- closurePos e >>= supplyPos >>= modalPos
-    insModalEnvConst name body'
-  -- let (body, args) = takeArgsAndBody e
-  -- body' <- closureNeg body >>= supplyNeg >>= modalNeg
-  -- insModalEnv name args body'
-  -- menv <- gets modalEnv
-  -- forM_ menv $ \(name, (args, e)) -> do
-  --   liftIO $ putStrLn name
-  --   liftIO $ print args
-  --   liftIO $ putStrLn $ Pr.ppShow e
-  --   liftIO $ putStrLn "-----------------------------"
+    e' <- closureNeg e >>= supplySNeg
+    let (args, body) = toSNegPiIntroSeq e'
+    body' <- modalNeg body
+    insModalEnv name args body'
+    -- liftIO $ putStrLn "BEFORE:"
+    -- liftIO $ putStrLn $ Pr.ppShow e
+    -- liftIO $ putStrLn "-------"
+    -- liftIO $ putStrLn "BEFORE (Reduced):"
+    -- r1 <- reduceNeg e
+    -- liftIO $ putStrLn $ Pr.ppShow r1
+    -- liftIO $ putStrLn "-------"
+    -- liftIO $ putStrLn "AFTER CLOSURE CONV:"
+    -- liftIO $ putStrLn $ Pr.ppShow e1
+    -- liftIO $ putStrLn "-------"
+    -- liftIO $ putStrLn "AFTER CLOSURE CONV (Reduced):"
+    -- r2 <- reduceSNeg e1
+    -- liftIO $ putStrLn $ Pr.ppShow r2
+    -- liftIO $ putStrLn "AFTER SUPPLY (Reduced):"
+    -- r3 <- reduceSNeg e'
+    -- liftIO $ putStrLn $ Pr.ppShow r3
+    -- liftIO $ putStrLn "-------"
+    -- undefined
+    -- e' <- closureNeg e >>= supplySNeg >>= modalNeg
+    -- let (args, body) = toSNegPiIntroSeq e'
+    -- insModalEnvConst name body'
 
-modalPos :: Pos -> WithEnv Value
-modalPos (PosVar x) = return $ ValueVar x
-modalPos (PosConst x) = return $ ValueConst x
-modalPos (PosSigmaIntro es) = do
+modalPos :: SPos -> WithEnv Value
+modalPos (SPosVar x) = return $ ValueVar x
+modalPos (SPosConst x) = return $ ValueConst x
+modalPos (SPosSigmaIntro es) = do
   ds <- mapM modalPos es
   return $ ValueSigmaIntro ds
-modalPos (PosIndexIntro l meta) = return $ ValueIndexIntro l meta
-modalPos (PosDownIntro e) = do
-  let (body, args) = toNegPiIntroSeq e
+modalPos (SPosIndexIntro l meta) = return $ ValueIndexIntro l meta
+modalPos (SPosBoxIntro e) = do
+  let (args, body) = toSNegPiIntroSeq e
   body' <- modalNeg body
   clsName <- newNameWith "cls"
-  insModalEnvFunc clsName args body'
-  -- insModalEnv clsName $ ValueDownIntroPiIntro args body'
+  insModalEnv clsName args body'
+  -- insModalEnvFunc clsName args body'
   return $ ValueConst clsName
 
-modalNeg :: Neg -> WithEnv Comp
-modalNeg lam@(NegPiIntro _ _) = modalNeg $ NegDownElim $ PosDownIntro lam
-modalNeg app@(NegPiElim _ _) = do
-  let (fun, args) = toNegPiElimSeq app
+modalNeg :: SNeg -> WithEnv Comp
+modalNeg lam@(SNegPiIntro _ _) = modalNeg $ SNegBoxElim $ SPosBoxIntro lam
+modalNeg app@(SNegPiElim _ _) = do
+  let (fun, args) = toSNegPiElimSeq app
   fun' <- modalNeg fun
   args' <- mapM modalPos args
   xs <- mapM (const (newNameWith "arg")) args
   app' <- commPiElim fun' $ map ValueVar xs
   bindLet (zip xs args') app'
-modalNeg (NegSigmaElim e1 xs e2) = do
+modalNeg (SNegSigmaElim e1 xs e2) = do
   e1' <- modalPos e1
   e2' <- modalNeg e2
   return $ CompSigmaElim e1' xs e2'
-modalNeg (NegIndexElim e branchList) = do
+modalNeg (SNegIndexElim e branchList) = do
   let (labelList, es) = unzip branchList
   es' <- mapM modalNeg es
   e' <- modalPos e
   return $ CompIndexElim e' (zip labelList es')
-modalNeg (NegUpIntro v) = do
+modalNeg (SNegUpIntro v) = do
   v' <- modalPos v
   return $ CompUpIntro v'
-modalNeg (NegUpElim x e1 e2) = do
+modalNeg (SNegUpElim x e1 e2) = do
   e1' <- modalNeg e1
   e2' <- modalNeg e2
   return $ CompUpElim x e1' e2'
-modalNeg (NegDownElim e) = do
+modalNeg (SNegBoxElim e) = do
   e' <- modalPos e
   tmp <- newNameWith "tmp"
   bindLet [(tmp, e')] $ CompPiElimDownElim tmp []
-modalNeg (NegConstElim x es) = do
+modalNeg (SNegConstElim x es) = do
   es' <- mapM modalPos es
   xs <- mapM (const (newNameWith "arg")) es
   bindLet (zip xs es') $ CompConstElim x xs
@@ -109,14 +123,14 @@ commPiElim (CompUpElim x e1 e2) args = do
   return $ CompUpElim x e1 e2'
 commPiElim _ _ = lift $ throwE "Modal.commPiElim: type error"
 
-toNegPiIntroSeq :: Neg -> (Neg, [Identifier])
-toNegPiIntroSeq (NegPiIntro x body) = do
-  let (body', args) = toNegPiIntroSeq body
-  (body', x : args)
-toNegPiIntroSeq t = (t, [])
+toSNegPiIntroSeq :: SNeg -> ([Identifier], SNeg)
+toSNegPiIntroSeq (SNegPiIntro x body) = do
+  let (args, body') = toSNegPiIntroSeq body
+  (x : args, body')
+toSNegPiIntroSeq t = ([], t)
 
-toNegPiElimSeq :: Neg -> (Neg, [Pos])
-toNegPiElimSeq (NegPiElim e1 e2) = do
-  let (fun, xs) = toNegPiElimSeq e1
+toSNegPiElimSeq :: SNeg -> (SNeg, [SPos])
+toSNegPiElimSeq (SNegPiElim e1 e2) = do
+  let (fun, xs) = toSNegPiElimSeq e1
   (fun, e2 : xs)
-toNegPiElimSeq c = (c, [])
+toSNegPiElimSeq c = (c, [])

@@ -1,9 +1,3 @@
--- This module generates a virtual code from a modal-normal term.
--- The procedure here is more or less straightforward. It would be worth noting that,
--- after the elimination of Sigma-terms in virtualComp, we insert CodeFree.
--- This can be justified that our type system is linear. Incidently, memory allocation
--- is trigerred before binding the content of `DataStruct ds` to a variable, which is
--- invisible at this stage.
 module Virtual
   ( virtualize
   ) where
@@ -32,28 +26,15 @@ virtualize :: WithEnv ()
 virtualize = do
   menv <- gets modalEnv
   forM_ menv $ uncurry virtual
-  -- forM_ menv $ \(name, e) -> virtual name e
-    -- case content of
-    --   GlobalConstant v -> undefined
-    --   GlobalFunction args body -> undefined
-    -- code' <- virtualValue value
-    -- undefined
-    -- insCodeEnv name args code'
-  -- cenv <- gets codeEnv
-  -- forM_ cenv $ \(name, (args, e)) -> do
-  --   liftIO $ putStrLn name
-  --   liftIO $ print args
-  --   liftIO $ putStrLn $ Pr.ppShow e
-  --   liftIO $ putStrLn "-----------------------------"
 
-virtual :: Identifier -> FuncOrConst -> WithEnv ()
-virtual name (GlobalFunction args body) = do
+virtual :: Identifier -> ([Identifier], Comp) -> WithEnv ()
+virtual name (args, body) = do
   body' <- virtualComp body
-  insCodeEnvCode name args body'
-virtual name (GlobalConstant v) = do
-  v' <- virtualValue v
-  insCodeEnvData name v'
+  insCodeEnv name args body'
 
+-- virtual name (GlobalConstant v) = do
+--   v' <- virtualValue v
+--   insCodeEnvData name v'
 virtualValue :: Value -> WithEnv Data
 virtualValue (ValueVar x) = return $ DataLocal x
 virtualValue (ValueConst x) = return $ DataGlobal x

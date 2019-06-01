@@ -36,7 +36,8 @@ polarize = do
   tenv <- gets termEnv
   forM_ tenv $ \(name, e) -> do
     e' <- polarize' e
-    insPolEnv name $ PosDownIntro e'
+    insPolEnv name e' -- implicit box.intro
+  -- insPolEnv name $ PosBoxIntro e'
   -- penv <- gets polEnv
   -- forM_ penv $ \(name, e) -> do
   --   liftIO $ putStrLn name
@@ -73,15 +74,15 @@ polarize' (TermIndexElim e branchList) = do
   return $ NegUpElim x e' (NegIndexElim (PosVar x) (zip labelList cs))
 polarize' (TermMu x e) = do
   e' <- polarize' e -- e doesn't have any free variables thanks to Close
-  insPolEnv x $ PosDownIntro e' -- implicit thunk for e
-  return $ NegDownElim (PosConst x)
+  insPolEnv x e' -- x == box.intro e'
+  return $ NegBoxElim (PosConst x)
 
 -- insert (possibly) environment-specific definition of constant
 toDefinition :: Identifier -> WithEnv Neg
 toDefinition x
   | Just c <- getPrintConstant x = toPrintDefinition c
   | Just c <- getArithBinOpConstant x = toArithBinOpDefinition c
-  | otherwise = return $ NegDownElim (PosConst x)
+  | otherwise = return $ NegBoxElim (PosConst x)
 
 toArithLowType :: Identifier -> Maybe LowType
 toArithLowType x
@@ -148,3 +149,8 @@ wordsWhen p s =
     "" -> []
     s' -> w : wordsWhen p s''
       where (w, s'') = break p s'
+-- toNegPiIntroSeq :: Neg -> ([Identifier], Neg)
+-- toNegPiIntroSeq (NegPiIntro x body) = do
+--   let (args, body') = toNegPiIntroSeq body
+--   (x : args, body')
+-- toNegPiIntroSeq t = ([], t)
