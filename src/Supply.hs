@@ -1,3 +1,4 @@
+-- eliminates all the free variables from every lambda-sequence
 module Supply
   ( supplySPos
   , supplySNeg
@@ -30,18 +31,20 @@ supplySPos (SPosSigmaIntro es) = do
 supplySPos (SPosIndexIntro l meta) = return $ SSPosIndexIntro l meta
 supplySPos (SPosBoxIntro e) = do
   e' <- supplySNeg e
-  return $ SSPosBoxIntroPiIntro [] e' -- argが0個なのでただのboxintro.
+  return $ SSPosBoxIntroPiIntro [] e' -- ふつうのbox-intro.
 
 supplySNeg :: SNeg -> WithEnv SSNeg
 supplySNeg lam@(SNegPiIntro _ _) = do
   let (args, body) = toSNegPiIntroSeq lam
   body' <- supplySNeg body
-  let fvs = filter (`notElem` args) $ varSNeg body
+  let fvs = filter (`notElem` args) $ varSSNeg body'
+  liftIO $ putStrLn $ "fvs == " ++ show fvs
+  liftIO $ putStrLn $ "fvs ++ args == " ++ show (fvs ++ args)
+  liftIO $ putStrLn $ "v == " ++ show (map SSPosVar fvs)
   return $
     SSNegPiElimBoxElim
       (SSPosBoxIntroPiIntro (fvs ++ args) body')
       (map SSPosVar fvs)
-  -- return $ SSNegPiElimBoxElim (SSPosBoxIntroPiIntro (fvs ++ args) body') []
 supplySNeg app@(SNegPiElim _ _) = do
   let (fun, args) = toSNegPiElimSeq app
   fun' <- supplySNeg fun
@@ -91,31 +94,31 @@ commPiElim (SSNegUpElim x e1 e2) args = do
   return $ SSNegUpElim x e1 e2'
 commPiElim _ _ = lift $ throwE "Modal.commPiElim: type error"
 
-varSPos :: SPos -> [Identifier]
-varSPos (SPosVar s) = [s]
-varSPos (SPosConst _) = []
-varSPos (SPosSigmaIntro es) = concatMap varSPos es
-varSPos (SPosIndexIntro _ _) = []
-varSPos (SPosBoxIntro e) = varSNeg e
+varSSPos :: SSPos -> [Identifier]
+varSSPos (SSPosVar s) = [s]
+varSSPos (SSPosConst _) = []
+varSSPos (SSPosSigmaIntro es) = concatMap varSSPos es
+varSSPos (SSPosIndexIntro _ _) = []
+varSSPos (SSPosBoxIntroPiIntro args e) = filter (`notElem` args) $ varSSNeg e
 
-varSNeg :: SNeg -> [Identifier]
-varSNeg (SNegPiIntro x e) = filter (/= x) $ varSNeg e
-varSNeg (SNegPiElim e1 e2) = varSNeg e1 ++ varSPos e2
-varSNeg (SNegSigmaElim e1 xs e2) = do
-  let vs1 = varSPos e1
-  let vs2 = filter (`notElem` xs) $ varSNeg e2
+varSSNeg :: SSNeg -> [Identifier]
+-- varSSNeg (SSNegPiIntro x e) = filter (/= x) $ varSSNeg e
+-- varSSNeg (SSNegPiElim e1 e2) = varSSNeg e1 ++ varSSPos e2
+varSSNeg (SSNegPiElimBoxElim e args) = varSSPos e ++ concatMap varSSPos args
+varSSNeg (SSNegSigmaElim e1 xs e2) = do
+  let vs1 = varSSPos e1
+  let vs2 = filter (`notElem` xs) $ varSSNeg e2
   vs1 ++ vs2
-varSNeg (SNegIndexElim e branchList) = do
-  let vs1 = varSPos e
-  let vs2 = concatMap (varSNeg . snd) branchList
+varSSNeg (SSNegIndexElim e branchList) = do
+  let vs1 = varSSPos e
+  let vs2 = concatMap (varSSNeg . snd) branchList
   vs1 ++ vs2
-varSNeg (SNegUpIntro e) = varSPos e
-varSNeg (SNegUpElim x e1 e2) = do
-  let vs1 = varSNeg e1
-  let vs2 = filter (/= x) $ varSNeg e2
+varSSNeg (SSNegUpIntro e) = varSSPos e
+varSSNeg (SSNegUpElim x e1 e2) = do
+  let vs1 = varSSNeg e1
+  let vs2 = filter (/= x) $ varSSNeg e2
   vs1 ++ vs2
-varSNeg (SNegBoxElim e) = varSPos e
-varSNeg (SNegConstElim _ es) = concatMap varSPos es
+varSSNeg (SSNegConstElim _ es) = concatMap varSSPos es
 
 toSNegPiElimSeq :: SNeg -> (SNeg, [SPos])
 toSNegPiElimSeq (SNegPiElim e1 e2) = do

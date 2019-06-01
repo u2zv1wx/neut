@@ -475,14 +475,17 @@ data Env = Env
   , indexEnv :: [(Identifier, [Identifier])]
   , nameEnv :: [(Identifier, Identifier)] -- used in alpha conversion
   , typeEnv :: Map.Map Identifier Neut -- type environment
-  , weakTermEnv :: [(Identifier, Neut)]
-  , termEnv :: [(Identifier, Term)]
+  -- , weakTermEnv :: [(Identifier, Neut)]
+  -- , termEnv :: [(Identifier, Term)]
   -- , polEnv :: [(Identifier, ([Identifier], Neg))] -- x ~> box.intro (lam (x1 ... xn). e)
+  -- polEnv :: Ident ~> PosBoxIntro Neg
   , polEnv :: [(Identifier, Neg)] -- x ~> box.intro e (implicit box)
+  -- strictPolEnv :: Ident -> SPosBoxIntro SNeg
   , strictPolEnv :: [(Identifier, SNeg)] -- implicit box
   -- , polEnv :: [(Identifier, Pos)]
   -- , modalEnv :: [(Identifier, FuncOrConst)] -- [(f, v), ...]
-  , modalEnv :: [(Identifier, ([Identifier], Comp))] -- [(f, box.intro (lam x1 ... xn. e)), ...]
+  -- modalEnv : Ident ~> ValueBoxIntroPiIntro [Ident] Comp
+  , modalEnv :: [(Identifier, ([Identifier], Comp))]
   , constraintEnv :: [PreConstraint]
   , constraintQueue :: Q.MinQueue EnrichedConstraint
   , substitution :: Subst
@@ -505,8 +508,8 @@ initialEnv path =
     , indexEnv = []
     , nameEnv = []
     , typeEnv = Map.empty
-    , weakTermEnv = []
-    , termEnv = []
+    -- , weakTermEnv = []
+    -- , termEnv = []
     , polEnv = []
     , strictPolEnv = []
     , modalEnv = []
@@ -616,19 +619,16 @@ insNumConstraintEnv :: Identifier -> WithEnv ()
 insNumConstraintEnv x =
   modify (\e -> e {numConstraintEnv = x : numConstraintEnv e})
 
-insWeakTermEnv :: Identifier -> Neut -> WithEnv ()
-insWeakTermEnv i t = modify (\e -> e {weakTermEnv = weakTermEnv e ++ [(i, t)]})
-
-insTermEnv :: Identifier -> Term -> WithEnv ()
-insTermEnv i t = modify (\e -> e {termEnv = termEnv e ++ [(i, t)]})
-
-lookupWeakTermEnv :: Identifier -> WithEnv Neut
-lookupWeakTermEnv funName = do
-  env <- get
-  case lookup funName (weakTermEnv env) of
-    Just body -> return body
-    Nothing -> lift $ throwE $ "no such weakterm: " ++ show funName
-
+-- insWeakTermEnv :: Identifier -> Neut -> WithEnv ()
+-- insWeakTermEnv i t = modify (\e -> e {weakTermEnv = weakTermEnv e ++ [(i, t)]})
+-- insTermEnv :: Identifier -> Term -> WithEnv ()
+-- insTermEnv i t = modify (\e -> e {termEnv = termEnv e ++ [(i, t)]})
+-- lookupWeakTermEnv :: Identifier -> WithEnv Neut
+-- lookupWeakTermEnv funName = do
+--   env <- get
+--   case lookup funName (weakTermEnv env) of
+--     Just body -> return body
+--     Nothing -> lift $ throwE $ "no such weakterm: " ++ show funName
 insCodeEnv :: Identifier -> [Identifier] -> Code -> WithEnv ()
 insCodeEnv funName args body =
   modify (\e -> e {codeEnv = (funName, (args, body)) : codeEnv e})

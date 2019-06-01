@@ -38,10 +38,10 @@ import qualified Data.PQueue.Min as Q
 -- The inference algorithm in this module is based on L. de Moura, J. Avigad,
 -- S. Kong, and C. Roux. "Elaboration in Dependent Type Theory", arxiv,
 -- https://arxiv.org/abs/1505.04324, 2015.
-elaborate :: Identifier -> Neut -> WithEnv ()
-elaborate main e = do
-  t <- infer [] e
-  insTypeEnv main t
+elaborate :: Neut -> WithEnv Term
+elaborate e = do
+  _ <- infer [] e
+  -- insTypeEnv main t
   -- Kantian type-inference ;)
   gets constraintEnv >>= analyze
   gets constraintQueue >>= synthesize
@@ -52,7 +52,8 @@ elaborate main e = do
   modify (\e -> e {typeEnv = tenv'})
   checkNumConstraint
   -- use the resulting substitution to elaborate `e`.
-  exhaust e >>= elaborate' >>= close >>= insTermEnv main
+  exhaust e >>= elaborate'
+  -- exhaust e >>= elaborate' >>= close >>= insTermEnv main
 
 -- In short: numbers must have one of the number types. We firstly generate constraints
 -- assuming that `1`, `1.2321`, etc. have arbitrary types. After the inference finished,

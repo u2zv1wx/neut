@@ -1,3 +1,5 @@
+-- interpret downs using boxes.
+-- note that ↓N ~ Sigma (A : Ui). Box (A -> N) * A.
 module Closure
   ( closure
   , closurePos
@@ -72,8 +74,8 @@ closureNeg (NegUpElim x e1 e2) = do
   return $ SNegUpElim x e1' e2'
 closureNeg (NegDownElim e) = do
   e' <- closurePos e
-  envName <- newNameWith "env"
-  clsName <- newNameWith "cls"
+  envName <- newNameWith "down.elim.env"
+  clsName <- newNameWith "down.elim.cls"
   return $
     SNegSigmaElim
       e'

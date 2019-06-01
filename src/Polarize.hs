@@ -31,12 +31,14 @@ import Text.Read (readMaybe)
 
 import Data.Maybe (isJust, maybeToList)
 
-polarize :: WithEnv ()
-polarize = do
-  tenv <- gets termEnv
-  forM_ tenv $ \(name, e) -> do
-    e' <- polarize' e
-    insPolEnv name e' -- implicit box.intro
+polarize :: Identifier -> Term -> WithEnv ()
+polarize name e = do
+  e' <- polarize' e
+  insPolEnv name e' -- implicit box.intro
+  -- tenv <- gets termEnv
+  -- forM_ tenv $ \(name, e) -> do
+  --   e' <- polarize' e
+  --   insPolEnv name e' -- implicit box.intro
 
 polarize' :: Term -> WithEnv Neg
 polarize' (TermVar x) = return $ NegDownElim (PosVar x)

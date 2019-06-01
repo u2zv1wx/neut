@@ -30,6 +30,8 @@ modalize = do
     actualTerm' <- supplySPos actualTerm
     case actualTerm' of
       SSPosBoxIntroPiIntro args body -> do
+        liftIO $ putStrLn $ "name == " ++ show name
+        liftIO $ putStrLn $ "args == " ++ show args
         body' <- modalNeg body
         insModalEnv name args body'
       _ -> lift $ throwE "non-function?"
@@ -45,6 +47,8 @@ modalPos (SSPosBoxIntroPiIntro args body) = do
   body' <- modalNeg body
   clsName <- newNameWith "cls"
   insModalEnv clsName args body'
+  liftIO $ putStrLn $ "name == " ++ show clsName
+  liftIO $ putStrLn $ "args == " ++ show args
   return $ ValueConst clsName
 
 modalNeg :: SSNeg -> WithEnv Comp
