@@ -11,7 +11,6 @@ import Control.Comonad.Cofree
 
 import qualified Text.Show.Pretty as Pr
 
-import Close
 import Data
 import Exhaust
 import Reduce
@@ -112,9 +111,24 @@ elaborate' (_ :< NeutIndexElim e branchList) = do
       return (l, body')
   return $ TermIndexElim e' branchList'
 elaborate' (_ :< NeutUniv _) = return $ TermSigmaIntro []
-elaborate' (_ :< NeutMu s e) = do
+elaborate' (meta :< NeutMu x e) = do
   e' <- elaborate' e
-  return $ TermMu s e'
+  let fvs = var $ meta :< NeutMu x e
+  env <- newNameWith "env"
+  -- Let us define (x1, ..., xn) := (all the free variables in e).
+  -- We translate `mu x. e` into
+  --   (mu x. lam env. let (x1, ..., xn) := env in e {x := x @ env}) @ (x1, ..., xn)
+  -- so that `TermMu x e` doesn't have any free variables.
+  return $
+    TermPiElim
+      (TermMu x $
+       TermPiIntro
+         env
+         (TermSigmaElim
+            (TermVar env)
+            fvs
+            (substTerm [(x, TermPiElim (TermConst x) (TermVar env))] e')))
+      (TermSigmaIntro $ map TermVar fvs)
 elaborate' (_ :< NeutHole x) = do
   sub <- gets substitution
   case lookup x sub of

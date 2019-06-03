@@ -25,7 +25,6 @@ import Elaborate
 import Emit
 import Exhaust
 
-import Close
 import Macro
 import Modal
 import Parse
@@ -225,7 +224,7 @@ concatDefList (DefMod sigMeta (_, name') xs:es) = do
 
 process :: Neut -> WithEnv [String]
 process e = do
-  e' <- elaborate e >>= close
+  e' <- elaborate e
   polarize "main" e'
   modalize
   virtualize
