@@ -127,7 +127,6 @@ substSigma sub ((x, t):rest) = do
 
 reduceTerm :: Term -> WithEnv Term
 reduceTerm app@(TermPiElim _ _) = do
-  meta <- newNameWith "meta"
   let (fun, args) = toTermPiElimSeq app
   fun' <- reduceTerm fun
   case fun' of
@@ -140,15 +139,16 @@ reduceTerm app@(TermPiElim _ _) = do
       let b2 = constant `elem` intSubConstantList
       let b3 = constant `elem` intMulConstantList
       let b4 = constant `elem` intDivConstantList
+      let t = LowTypeSignedInt 64 -- for now
       case (b1, b2, b3, b4, takeIntegerList' args') of
         (True, _, _, _, Just [x, y]) ->
-          return $ TermIndexIntro (IndexInteger (x + y)) meta
+          return $ TermIndexIntro (IndexInteger (x + y)) t
         (_, True, _, _, Just [x, y]) ->
-          return $ TermIndexIntro (IndexInteger (x - y)) meta
+          return $ TermIndexIntro (IndexInteger (x - y)) t
         (_, _, True, _, Just [x, y]) ->
-          return $ TermIndexIntro (IndexInteger (x * y)) meta
+          return $ TermIndexIntro (IndexInteger (x * y)) t
         (_, _, _, True, Just [x, y]) ->
-          return $ TermIndexIntro (IndexInteger (x `div` y)) meta
+          return $ TermIndexIntro (IndexInteger (x `div` y)) t
         _ -> return $ fromTermPiElimSeq (fun', args')
     _ -> return $ fromTermPiElimSeq (fun', args)
 reduceTerm (TermSigmaElim e xs body) = do
@@ -255,12 +255,6 @@ takeIntegerList'' (PosIndexIntro (IndexInteger i) _:rest) = do
   return (i : is)
 takeIntegerList'' _ = Nothing
 
--- takeIntegerList''' :: [SPos] -> Maybe [Int]
--- takeIntegerList''' [] = Just []
--- takeIntegerList''' (SPosIndexIntro (IndexInteger i) _:rest) = do
---   is <- takeIntegerList''' rest
---   return (i : is)
--- takeIntegerList''' _ = Nothing
 findDefault :: [(Index, Neut)] -> Maybe Neut
 findDefault [] = Nothing
 findDefault ((IndexDefault, e):_) = Just e
@@ -316,16 +310,16 @@ reduceNeg (NegUpElim x e1 e2) = do
     _ -> return $ NegUpElim x e1' e2
 reduceNeg (NegConstElim x vs) = do
   let xs = takeIntegerList'' vs
-  meta <- newNameWith "meta" -- for now
+  let t = LowTypeSignedInt 64 -- for now
   case (x, xs) of
     (ConstantArith _ ArithAdd, Just [x, y]) ->
-      return $ NegUpIntro (PosIndexIntro (IndexInteger (x + y)) meta)
+      return $ NegUpIntro (PosIndexIntro (IndexInteger (x + y)) t)
     (ConstantArith _ ArithSub, Just [x, y]) ->
-      return $ NegUpIntro (PosIndexIntro (IndexInteger (x - y)) meta)
+      return $ NegUpIntro (PosIndexIntro (IndexInteger (x - y)) t)
     (ConstantArith _ ArithMul, Just [x, y]) ->
-      return $ NegUpIntro (PosIndexIntro (IndexInteger (x * y)) meta)
+      return $ NegUpIntro (PosIndexIntro (IndexInteger (x * y)) t)
     (ConstantArith _ ArithDiv, Just [x, y]) ->
-      return $ NegUpIntro (PosIndexIntro (IndexInteger (x `div` y)) meta)
+      return $ NegUpIntro (PosIndexIntro (IndexInteger (x `div` y)) t)
     _ -> return $ NegConstElim x vs
 reduceNeg (NegDownElim e) =
   case e of
@@ -336,69 +330,8 @@ reduceNeg (NegDownElim e) =
         Just e' -> return e' -- eliminating implicit thunk
         _ -> return $ NegDownElim e
     _ -> return $ NegDownElim e
--- reduceNeg (NegBoxElim e) =
---   case e of
---     PosBoxIntro e'' -> reduceNeg e''
---     PosConst x -> do
---       penv <- gets polEnv
---       case lookup x penv of
---         Just e' -> return e' -- eliminating implicit thunk
---         Nothing -> return $ NegBoxElim e
---     _ -> return $ NegBoxElim e
 reduceNeg e = return e
 
--- reduceSNeg :: SNeg -> WithEnv SNeg
--- reduceSNeg (SNegPiElim e1 e2) = do
---   e1' <- reduceSNeg e1
---   case e1' of
---     SNegPiIntro x body -> reduceSNeg $ substSNeg [(x, e2)] body
---     _ -> return $ SNegPiElim e1' e2
--- reduceSNeg (SNegSigmaElim e xs body) =
---   case e of
---     SPosSigmaIntro es -> reduceSNeg $ substSNeg (zip xs es) body
---     _ -> return $ SNegSigmaElim e xs body
--- reduceSNeg (SNegIndexElim e branchList) =
---   case e of
---     SPosIndexIntro x _ ->
---       case lookup x branchList of
---         Just body -> reduceSNeg body
---         Nothing ->
---           case lookup IndexDefault branchList of
---             Just body -> reduceSNeg body
---             Nothing ->
---               lift $
---               throwE $
---               "the index " ++ show x ++ " is not included in branchList"
---     _ -> return $ SNegIndexElim e branchList
--- reduceSNeg (SNegUpIntro e) = return $ SNegUpIntro e
--- reduceSNeg (SNegUpElim x e1 e2) = do
---   e1' <- reduceSNeg e1
---   case e1' of
---     SNegUpIntro e1'' -> reduceSNeg $ substSNeg [(x, e1'')] e2
---     _ -> return $ SNegUpElim x e1' e2
--- reduceSNeg (SNegConstElim x vs) = do
---   let xs = takeIntegerList''' vs
---   meta <- newNameWith "meta" -- for now
---   case (x, xs) of
---     (ConstantArith _ ArithAdd, Just [x, y]) ->
---       return $ SNegUpIntro (SPosIndexIntro (IndexInteger (x + y)) meta)
---     (ConstantArith _ ArithSub, Just [x, y]) ->
---       return $ SNegUpIntro (SPosIndexIntro (IndexInteger (x - y)) meta)
---     (ConstantArith _ ArithMul, Just [x, y]) ->
---       return $ SNegUpIntro (SPosIndexIntro (IndexInteger (x * y)) meta)
---     (ConstantArith _ ArithDiv, Just [x, y]) ->
---       return $ SNegUpIntro (SPosIndexIntro (IndexInteger (x `div` y)) meta)
---     _ -> return $ SNegConstElim x vs
--- reduceSNeg (SNegBoxElim e) =
---   case e of
---     SPosBoxIntro e'' -> reduceSNeg e''
---     SPosConst x -> do
---       spenv <- gets strictPolEnv
---       case lookup x spenv of
---         Just (SPosBoxIntro e') -> return e'
---         _ -> return $ SNegBoxElim e
---     _ -> return $ SNegBoxElim e
--- reduceSNeg e = return e
 type SubstPos = [(Identifier, Pos)]
 
 substPos :: SubstPos -> Pos -> Pos
@@ -412,9 +345,6 @@ substPos sub (PosDownIntro e) = do
   let e' = substNeg sub e
   PosDownIntro e'
 
--- substPos sub (PosBoxIntro e) = do
---   let e' = substNeg sub e
---   PosBoxIntro e'
 substNeg :: SubstPos -> Neg -> Neg
 substNeg sub (NegPiIntro s body) = do
   let sub' = filter (\(x, _) -> x /= s) sub
@@ -440,43 +370,4 @@ substNeg sub (NegUpElim x e1 e2) = do
   let e2' = substNeg sub' e2
   NegUpElim x e1' e2'
 substNeg sub (NegDownElim e) = NegDownElim (substPos sub e)
--- substNeg sub (NegBoxElim e) = NegBoxElim (substPos sub e)
 substNeg sub (NegConstElim x vs) = NegConstElim x (map (substPos sub) vs)
--- substNeg sub (NegMu x e) = NegMu x $ substNeg sub e
--- type SubstSPos = [(Identifier, SPos)]
--- substSPos :: SubstSPos -> SPos -> SPos
--- substSPos sub (SPosVar s) = fromMaybe (SPosVar s) (lookup s sub)
--- substSPos _ (SPosConst s) = SPosConst s
--- substSPos sub (SPosSigmaIntro es) = do
---   let es' = map (substSPos sub) es
---   SPosSigmaIntro es'
--- substSPos _ (SPosIndexIntro l meta) = SPosIndexIntro l meta
--- substSPos sub (SPosBoxIntro e) = do
---   let e' = substSNeg sub e
---   SPosBoxIntro e'
--- substSNeg :: SubstSPos -> SNeg -> SNeg
--- substSNeg sub (SNegPiIntro s body) = do
---   let sub' = filter (\(x, _) -> x /= s) sub
---   let body' = substSNeg sub' body
---   SNegPiIntro s body'
--- substSNeg sub (SNegPiElim e1 e2) = do
---   let e1' = substSNeg sub e1
---   let e2' = substSPos sub e2
---   SNegPiElim e1' e2'
--- substSNeg sub (SNegSigmaElim e1 xs e2) = do
---   let e1' = substSPos sub e1
---   let sub' = filter (\(x, _) -> x `notElem` xs) sub
---   let e2' = substSNeg sub' e2
---   SNegSigmaElim e1' xs e2'
--- substSNeg sub (SNegIndexElim e branchList) = do
---   let e' = substSPos sub e
---   let branchList' = map (\(l, e) -> (l, substSNeg sub e)) branchList
---   SNegIndexElim e' branchList'
--- substSNeg sub (SNegUpIntro e) = SNegUpIntro (substSPos sub e)
--- substSNeg sub (SNegUpElim x e1 e2) = do
---   let e1' = substSNeg sub e1
---   let sub' = filter (\(y, _) -> y /= x) sub
---   let e2' = substSNeg sub' e2
---   SNegUpElim x e1' e2'
--- substSNeg sub (SNegBoxElim e) = SNegBoxElim (substSPos sub e)
--- substSNeg sub (SNegConstElim x vs) = SNegConstElim x (map (substSPos sub) vs)

@@ -52,22 +52,22 @@ virtualValue (ValueConst x) = return $ DataGlobal x
 virtualValue (ValueSigmaIntro es) = do
   ds <- mapM virtualValue es
   return $ DataStruct ds
-virtualValue (ValueIndexIntro x meta) =
+virtualValue (ValueIndexIntro x t) =
   case x of
     IndexDefault -> return $ DataInt 0
     IndexInteger i -> return $ DataInt i
-    IndexFloat x -> do
-      t <- lookupTypeEnv' meta >>= reduce
-      case t of
-        _ :< NeutIndex "f16" -> return $ DataFloat16 x
-        _ :< NeutIndex "f32" -> return $ DataFloat32 x
-        _ :< NeutIndex "f64" -> return $ DataFloat64 x
-        _ ->
-          lift $
-          throwE $
-          show x ++
-          " is expected to be a valid floating point number, but its type is: " ++
-          show t
+    IndexFloat x
+      | LowTypeFloat 16 <- t -> return $ DataFloat16 x
+    IndexFloat x
+      | LowTypeFloat 32 <- t -> return $ DataFloat32 x
+    IndexFloat x
+      | LowTypeFloat 64 <- t -> return $ DataFloat64 x
+    IndexFloat x ->
+      lift $
+      throwE $
+      show x ++
+      " is expected to be a valid floating point number, but its type is: " ++
+      show t
     IndexLabel name -> do
       set <- lookupIndexSet name
       case elemIndex name set of

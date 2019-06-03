@@ -162,7 +162,7 @@ data Term
                   [Identifier]
                   Term
   | TermIndexIntro Index
-                   Identifier -- FIXME: this should be LowType
+                   LowType
   | TermIndexElim Term
                   [(Index, Term)]
   | TermMu Identifier
@@ -194,7 +194,7 @@ data Pos
   | PosConst Identifier
   | PosSigmaIntro [Pos]
   | PosIndexIntro Index
-                  Identifier -- metadata to determine its type
+                  LowType
   | PosDownIntro Neg
   deriving (Show)
 
@@ -223,7 +223,7 @@ data Value
   | ValueConst Identifier
   | ValueSigmaIntro [Value]
   | ValueIndexIntro Index
-                    Identifier
+                    LowType
   deriving (Show)
 
 -- negative modal normal form

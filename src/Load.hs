@@ -227,7 +227,6 @@ process :: Neut -> WithEnv [String]
 process e = do
   e' <- elaborate e >>= close
   polarize "main" e'
-  -- necessity
   modalize
   virtualize
   assemblize

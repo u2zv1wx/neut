@@ -88,6 +88,29 @@ checkNumConstraint = do
         "the type of " ++
         x ++ " is supposed to be a number, but is " ++ Pr.ppShow t
 
+getNumLowType :: Identifier -> WithEnv (Either Neut LowType)
+getNumLowType meta = do
+  t <- lookupTypeEnv' meta >>= reduce
+  case t of
+    _ :< NeutIndex "i1" -> return $ Right $ LowTypeSignedInt 1
+    _ :< NeutIndex "i2" -> return $ Right $ LowTypeSignedInt 2
+    _ :< NeutIndex "i4" -> return $ Right $ LowTypeSignedInt 4
+    _ :< NeutIndex "i8" -> return $ Right $ LowTypeSignedInt 8
+    _ :< NeutIndex "i16" -> return $ Right $ LowTypeSignedInt 16
+    _ :< NeutIndex "i32" -> return $ Right $ LowTypeSignedInt 32
+    _ :< NeutIndex "i64" -> return $ Right $ LowTypeSignedInt 64
+    _ :< NeutIndex "u1" -> return $ Right $ LowTypeUnsignedInt 1
+    _ :< NeutIndex "u2" -> return $ Right $ LowTypeUnsignedInt 2
+    _ :< NeutIndex "u4" -> return $ Right $ LowTypeUnsignedInt 4
+    _ :< NeutIndex "u8" -> return $ Right $ LowTypeUnsignedInt 8
+    _ :< NeutIndex "u16" -> return $ Right $ LowTypeUnsignedInt 16
+    _ :< NeutIndex "u32" -> return $ Right $ LowTypeUnsignedInt 32
+    _ :< NeutIndex "u64" -> return $ Right $ LowTypeUnsignedInt 64
+    _ :< NeutIndex "f16" -> return $ Right $ LowTypeFloat 16
+    _ :< NeutIndex "f32" -> return $ Right $ LowTypeFloat 32
+    _ :< NeutIndex "f64" -> return $ Right $ LowTypeFloat 64
+    t -> return $ Left t
+
 elaborate' :: Neut -> WithEnv Term
 elaborate' (_ :< NeutVar s) = return $ TermVar s
 elaborate' (_ :< NeutConst x) = return $ TermConst x
@@ -108,7 +131,15 @@ elaborate' (_ :< NeutSigmaElim e1 xs e2) = do
   e2' <- elaborate' e2
   return $ TermSigmaElim e1' xs e2'
 elaborate' (_ :< NeutIndex _) = return $ TermSigmaIntro []
-elaborate' (meta :< NeutIndexIntro x) = return $ TermIndexIntro x meta
+elaborate' (meta :< NeutIndexIntro x) = do
+  mt <- getNumLowType meta
+  case mt of
+    Right t -> return $ TermIndexIntro x t
+    Left t ->
+      lift $
+      throwE $
+      "the type of " ++
+      show x ++ " is supposed to be a number, but is " ++ Pr.ppShow t
 elaborate' (_ :< NeutIndexElim e branchList) = do
   e' <- elaborate' e
   branchList' <-

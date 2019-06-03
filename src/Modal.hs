@@ -46,7 +46,7 @@ modalPos (PosConst x) = return $ ValueConst x
 modalPos (PosSigmaIntro es) = do
   es' <- mapM modalPos es
   return $ ValueSigmaIntro es'
-modalPos (PosIndexIntro l meta) = return $ ValueIndexIntro l meta
+modalPos (PosIndexIntro l t) = return $ ValueIndexIntro l t
 modalPos (PosDownIntro e) = do
   e' <- modalNeg e
   modalPosBoxIntroPiIntro [] e'

@@ -65,7 +65,7 @@ polarize' (TermSigmaElim e1 xs e2) = do
   e2' <- polarize' e2
   z <- newNameWith "sigma"
   return $ NegUpElim z e1' (NegSigmaElim (PosVar z) xs e2')
-polarize' (TermIndexIntro l meta) = return $ NegUpIntro (PosIndexIntro l meta)
+polarize' (TermIndexIntro l t) = return $ NegUpIntro (PosIndexIntro l t)
 polarize' (TermIndexElim e branchList) = do
   let (labelList, es) = unzip branchList
   e' <- polarize' e
