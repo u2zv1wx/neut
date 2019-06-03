@@ -28,7 +28,6 @@ import Exhaust
 import Close
 import Macro
 import Modal
-import Necessity
 import Parse
 import Polarize
 import Read
