@@ -141,7 +141,6 @@ infer ctx (meta :< NeutIndexIntro l) = do
       returnMeta meta $ indexMeta :< NeutIndex k
     Nothing -> do
       hole <- appCtx ctx
-      insNumConstraintEnv meta
       returnMeta meta hole
 infer _ (_ :< NeutIndexElim _ []) = lift $ throwE "empty branch"
 infer ctx (meta :< NeutIndexElim e branchList) = do

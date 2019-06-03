@@ -41,7 +41,6 @@ polarize name e = do
 
 polarize' :: Term -> WithEnv Neg
 polarize' (TermVar x) = force (PosVar x)
--- polarize' (TermVar x) = return $ NegDownElim (PosVar x)
 polarize' (TermConst x) = toDefinition x
 polarize' (TermPiIntro x e) = do
   e' <- polarize' e
@@ -50,16 +49,9 @@ polarize' (TermPiElim e1 e2) = do
   e1' <- polarize' e1
   e2' <- polarize' e2 >>= thunk
   return $ NegPiElim e1' e2'
--- polarize' (TermPiElim e1 e2) = do
---   e1' <- polarize' e1
---   e2' <- polarize' e2
---   return $ NegPiElim e1' (PosDownIntro e2')
 polarize' (TermSigmaIntro es) = do
   es' <- mapM (polarize' >=> thunk) es
   return $ NegUpIntro $ PosSigmaIntro es'
--- polarize' (TermSigmaIntro es) = do
---   es' <- mapM polarize' es
---   return $ NegUpIntro $ PosSigmaIntro (map PosDownIntro es')
 polarize' (TermSigmaElim e1 xs e2) = do
   e1' <- polarize' e1
   e2' <- polarize' e2
@@ -74,18 +66,9 @@ polarize' (TermIndexElim e branchList) = do
   return $ NegUpElim x e' (NegIndexElim (PosVar x) (zip labelList cs))
 polarize' (TermMu x e) = do
   e' <- polarize' e
-  -- insPolEnv x $ PosDownIntro e' -- e' is closed (ここをnegativeにする)
-  insPolEnv x e' -- e' is closed (ここをnegativeにする)
+  insPolEnv x e'
   return $ NegDownElim (PosConst x)
 
--- polarize' (TermMu x e) = do
---   e' <- polarize' e
---   insPolEnv x $ PosDownIntro e' -- e' is closed
---   return $ NegDownElim (PosConst x)
--- force :: Pos -> Neg
--- force = undefined
--- thunk :: Neg -> Pos
--- thunk = undefined
 thunk :: Neg -> WithEnv Pos
 thunk e = do
   let fvs = nub $ varNeg e

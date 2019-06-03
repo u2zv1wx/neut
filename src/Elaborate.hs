@@ -41,7 +41,6 @@ import qualified Data.PQueue.Min as Q
 elaborate :: Neut -> WithEnv Term
 elaborate e = do
   _ <- infer [] e
-  -- insTypeEnv main t
   -- Kantian type-inference ;)
   gets constraintEnv >>= analyze
   gets constraintQueue >>= synthesize
@@ -50,43 +49,8 @@ elaborate e = do
   tenv <- gets typeEnv
   let tenv' = Map.map (subst sub) tenv
   modify (\e -> e {typeEnv = tenv'})
-  checkNumConstraint
   -- use the resulting substitution to elaborate `e`.
   exhaust e >>= elaborate'
-  -- exhaust e >>= elaborate' >>= close >>= insTermEnv main
-
--- In short: numbers must have one of the number types. We firstly generate constraints
--- assuming that `1`, `1.2321`, etc. have arbitrary types. After the inference finished,
--- we check if all of them have one of the number types, such as i32, f64, etc.
-checkNumConstraint :: WithEnv ()
-checkNumConstraint = do
-  env <- get
-  forM_ (numConstraintEnv env) $ \x -> do
-    t <- lookupTypeEnv' x >>= reduce
-    -- t' <- elaborate' t >>= reduceTerm
-    case t of
-      _ :< NeutIndex "i1" -> return ()
-      _ :< NeutIndex "i2" -> return ()
-      _ :< NeutIndex "i4" -> return ()
-      _ :< NeutIndex "i8" -> return ()
-      _ :< NeutIndex "i16" -> return ()
-      _ :< NeutIndex "i32" -> return ()
-      _ :< NeutIndex "i64" -> return ()
-      _ :< NeutIndex "u1" -> return ()
-      _ :< NeutIndex "u2" -> return ()
-      _ :< NeutIndex "u4" -> return ()
-      _ :< NeutIndex "u8" -> return ()
-      _ :< NeutIndex "u16" -> return ()
-      _ :< NeutIndex "u32" -> return ()
-      _ :< NeutIndex "u64" -> return ()
-      _ :< NeutIndex "f16" -> return ()
-      _ :< NeutIndex "f32" -> return ()
-      _ :< NeutIndex "f64" -> return ()
-      t ->
-        lift $
-        throwE $
-        "the type of " ++
-        x ++ " is supposed to be a number, but is " ++ Pr.ppShow t
 
 getNumLowType :: Identifier -> WithEnv (Either Neut LowType)
 getNumLowType meta = do

@@ -413,7 +413,6 @@ data Env = Env
   , constraintQueue :: Q.MinQueue EnrichedConstraint
   , substitution :: Subst
   , univConstraintEnv :: [(UnivLevel, UnivLevel)]
-  , numConstraintEnv :: [Identifier]
   , codeEnv :: [(Identifier, ([Identifier], Code))]
   , asmEnv :: [(Identifier, ([Identifier], Asm))]
   , currentDir :: FilePath
@@ -438,7 +437,6 @@ initialEnv path =
     , constraintQueue = Q.empty
     , substitution = []
     , univConstraintEnv = []
-    , numConstraintEnv = []
     , currentDir = path
     }
 
@@ -533,10 +531,6 @@ insTypeEnv1 i t = do
   let ts = Map.elems $ Map.filterWithKey (\j _ -> i == j) tenv
   forM_ ts $ \t' -> insConstraintEnv t t'
   modify (\e -> e {typeEnv = Map.insert i t (typeEnv e)})
-
-insNumConstraintEnv :: Identifier -> WithEnv ()
-insNumConstraintEnv x =
-  modify (\e -> e {numConstraintEnv = x : numConstraintEnv e})
 
 insCodeEnv :: Identifier -> [Identifier] -> Code -> WithEnv ()
 insCodeEnv funName args body =
