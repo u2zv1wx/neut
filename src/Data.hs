@@ -196,7 +196,6 @@ data Pos
   | PosIndexIntro Index
                   Identifier -- metadata to determine its type
   | PosDownIntro Neg
-  -- | PosBoxIntro Neg
   deriving (Show)
 
 data Neg
@@ -214,61 +213,8 @@ data Neg
               Neg
               Neg
   | NegDownElim Pos
-  -- | NegBoxElim Pos
   | NegConstElim Constant
                  [Pos]
-  deriving (Show)
-
--- data SPos
---   = SPosVar Identifier
---   | SPosConst Identifier
---   | SPosSigmaIntro [SPos]
---   | SPosIndexIntro Index
---                    Identifier -- metadata to determine its type
---   | SPosBoxIntro SNeg
---   deriving (Show)
--- data SNeg
---   = SNegPiIntro Identifier
---                 SNeg
---   | SNegPiElim SNeg
---                SPos
---   | SNegSigmaElim SPos
---                   [Identifier]
---                   SNeg
---   | SNegIndexElim SPos
---                   [(Index, SNeg)]
---   | SNegUpIntro SPos
---   | SNegUpElim Identifier
---                SNeg
---                SNeg
---   | SNegBoxElim SPos
---   | SNegConstElim Constant
---                   [SPos]
---   deriving (Show)
-data SSPos
-  = SSPosVar Identifier
-  | SSPosConst Identifier
-  | SSPosSigmaIntro [SSPos]
-  | SSPosIndexIntro Index
-                    Identifier -- metadata to determine its type
-  | SSPosBoxIntroPiIntro [Identifier] -- box (lam x1 ... xn. e)
-                         SSNeg
-  deriving (Show)
-
-data SSNeg
-  = SSNegPiElimBoxElim SSPos -- (unbox v) @ v1 @ ... @ vn
-                       [SSPos]
-  | SSNegSigmaElim SSPos
-                   [Identifier]
-                   SSNeg
-  | SSNegIndexElim SSPos
-                   [(Index, SSNeg)]
-  | SSNegUpIntro SSPos
-  | SSNegUpElim Identifier
-                SSNeg
-                SSNeg
-  | SSNegConstElim Constant
-                   [SSPos]
   deriving (Show)
 
 -- positive modal normal form
@@ -452,18 +398,6 @@ instance Ord EnrichedConstraint where
 
 type Subst = [(Identifier, Neut)]
 
-data FuncOrConst
-  = GlobalFunction [Identifier]
-                   Comp
-  | GlobalConstant Value
-  deriving (Show)
-
-data CodeOrData
-  = GlobalCode [Identifier]
-               Code
-  | GlobalData Data
-  deriving (Show)
-
 data Env = Env
   { count :: Int -- to generate fresh symbols
   , notationEnv :: [(Tree, Tree)] -- macro transformers
@@ -473,24 +407,14 @@ data Env = Env
   , indexEnv :: [(Identifier, [Identifier])]
   , nameEnv :: [(Identifier, Identifier)] -- used in alpha conversion
   , typeEnv :: Map.Map Identifier Neut -- type environment
-  -- , weakTermEnv :: [(Identifier, Neut)]
-  -- , termEnv :: [(Identifier, Term)]
-  -- , polEnv :: [(Identifier, ([Identifier], Neg))] -- x ~> box.intro (lam (x1 ... xn). e)
-  -- , polEnv :: [(Identifier, Pos)] -- x ~> box.intro e (implicit box)
   , polEnv :: [(Identifier, Neg)] -- x ~> box.intro e (implicit box)
-  -- , strictPolEnv :: [(Identifier, SPos)]
-  -- , polEnv :: [(Identifier, Pos)]
   , modalEnv :: [(Identifier, ([Identifier], Comp))] -- [(f, v), ...]
-  -- modalEnv : Ident ~> ValueBoxIntroPiIntro [Ident] Comp
-  -- , modalEnv :: [(Identifier, ([Identifier], Comp))] (f, quote(lam (x1 ... xn) e))
-  -- , modalEnv :: [(Identifier, Value)]
   , constraintEnv :: [PreConstraint]
   , constraintQueue :: Q.MinQueue EnrichedConstraint
   , substitution :: Subst
   , univConstraintEnv :: [(UnivLevel, UnivLevel)]
   , numConstraintEnv :: [Identifier]
   , codeEnv :: [(Identifier, ([Identifier], Code))]
-  -- , codeEnv :: [(Identifier, CodeOrData)]
   , asmEnv :: [(Identifier, ([Identifier], Asm))]
   , currentDir :: FilePath
   } deriving (Show)
@@ -506,10 +430,7 @@ initialEnv path =
     , indexEnv = []
     , nameEnv = []
     , typeEnv = Map.empty
-    -- , weakTermEnv = []
-    -- , termEnv = []
     , polEnv = []
-    -- , strictPolEnv = []
     , modalEnv = []
     , codeEnv = []
     , asmEnv = []
@@ -617,49 +538,17 @@ insNumConstraintEnv :: Identifier -> WithEnv ()
 insNumConstraintEnv x =
   modify (\e -> e {numConstraintEnv = x : numConstraintEnv e})
 
--- insWeakTermEnv :: Identifier -> Neut -> WithEnv ()
--- insWeakTermEnv i t = modify (\e -> e {weakTermEnv = weakTermEnv e ++ [(i, t)]})
--- insTermEnv :: Identifier -> Term -> WithEnv ()
--- insTermEnv i t = modify (\e -> e {termEnv = termEnv e ++ [(i, t)]})
--- lookupWeakTermEnv :: Identifier -> WithEnv Neut
--- lookupWeakTermEnv funName = do
---   env <- get
---   case lookup funName (weakTermEnv env) of
---     Just body -> return body
---     Nothing -> lift $ throwE $ "no such weakterm: " ++ show funName
 insCodeEnv :: Identifier -> [Identifier] -> Code -> WithEnv ()
 insCodeEnv funName args body =
   modify (\e -> e {codeEnv = (funName, (args, body)) : codeEnv e})
 
--- insCodeEnvCode :: Identifier -> [Identifier] -> Code -> WithEnv ()
--- insCodeEnvCode funName args body =
---   modify (\e -> e {codeEnv = (funName, GlobalCode args body) : codeEnv e})
--- insCodeEnvData :: Identifier -> Data -> WithEnv ()
--- insCodeEnvData funName d =
---   modify (\e -> e {codeEnv = (funName, GlobalData d) : codeEnv e})
 insPolEnv :: Identifier -> Neg -> WithEnv ()
 insPolEnv name body = modify (\e -> e {polEnv = (name, body) : polEnv e})
 
--- insSPolEnv :: Identifier -> SPos -> WithEnv ()
--- insSPolEnv name body =
---   modify (\e -> e {strictPolEnv = (name, body) : strictPolEnv e})
--- insPolEnv :: Identifier -> [Identifier] -> Neg -> WithEnv ()
--- insPolEnv name args body =
---   modify (\e -> e {polEnv = (name, (args, body)) : polEnv e})
--- insPolEnv :: Identifier -> Pos -> WithEnv ()
--- insPolEnv name body = modify (\e -> e {polEnv = (name, body) : polEnv e})
--- insModalEnv :: Identifier -> Value -> WithEnv ()
--- insModalEnv funName v = modify (\e -> e {modalEnv = (funName, v) : modalEnv e})
 insModalEnv :: Identifier -> [Identifier] -> Comp -> WithEnv ()
 insModalEnv funName args body =
   modify (\e -> e {modalEnv = (funName, (args, body)) : modalEnv e})
 
--- insModalEnvConst :: Identifier -> Value -> WithEnv ()
--- insModalEnvConst k v =
---   modify (\e -> e {modalEnv = (k, GlobalConstant v) : modalEnv e})
--- insModalEnvFunc :: Identifier -> [Identifier] -> Comp -> WithEnv ()
--- insModalEnvFunc k args body =
---   modify (\e -> e {modalEnv = (k, GlobalFunction args body) : modalEnv e})
 insAsmEnv :: Identifier -> [Identifier] -> Asm -> WithEnv ()
 insAsmEnv funName args asm =
   modify (\e -> e {asmEnv = (funName, (args, asm)) : asmEnv e})
