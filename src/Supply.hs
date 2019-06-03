@@ -22,59 +22,59 @@ import qualified Text.Show.Pretty as Pr
 
 import Debug.Trace
 
-supplySPos :: SPos -> WithEnv SSPos
-supplySPos (SPosVar x) = return $ SSPosVar x
-supplySPos (SPosConst x) = return $ SSPosConst x
-supplySPos (SPosSigmaIntro es) = do
+supplySPos :: Pos -> WithEnv SSPos
+supplySPos (PosVar x) = return $ SSPosVar x
+supplySPos (PosConst x) = return $ SSPosConst x
+supplySPos (PosSigmaIntro es) = do
   es' <- mapM supplySPos es
   return $ SSPosSigmaIntro es'
-supplySPos (SPosIndexIntro l meta) = return $ SSPosIndexIntro l meta
-supplySPos (SPosBoxIntro e) = do
+supplySPos (PosIndexIntro l meta) = return $ SSPosIndexIntro l meta
+supplySPos (PosDownIntro e) = do
   e' <- supplySNeg e
-  return $ SSPosBoxIntroPiIntro [] e' -- ふつうのbox-intro.
+  return $ SSPosBoxIntroPiIntro [] e'
 
-supplySNeg :: SNeg -> WithEnv SSNeg
-supplySNeg lam@(SNegPiIntro _ _) = do
-  let (args, body) = toSNegPiIntroSeq lam
+supplySNeg :: Neg -> WithEnv SSNeg
+supplySNeg lam@(NegPiIntro _ _) = do
+  let (args, body) = toNegPiIntroSeq lam
   body' <- supplySNeg body
   let fvs = filter (`notElem` args) $ varSSNeg body'
   return $
     SSNegPiElimBoxElim
       (SSPosBoxIntroPiIntro (fvs ++ args) body')
       (map SSPosVar fvs)
-supplySNeg app@(SNegPiElim _ _) = do
-  let (fun, args) = toSNegPiElimSeq app
+supplySNeg app@(NegPiElim _ _) = do
+  let (fun, args) = toNegPiElimSeq app
   fun' <- supplySNeg fun
   args' <- mapM supplySPos args
   commPiElim fun' args'
-supplySNeg (SNegSigmaElim e1 xs e2) = do
+supplySNeg (NegSigmaElim e1 xs e2) = do
   e1' <- supplySPos e1
   e2' <- supplySNeg e2
   return $ SSNegSigmaElim e1' xs e2'
-supplySNeg (SNegIndexElim e branchList) = do
+supplySNeg (NegIndexElim e branchList) = do
   let (labelList, es) = unzip branchList
   es' <- mapM supplySNeg es
   e' <- supplySPos e
   return $ SSNegIndexElim e' (zip labelList es')
-supplySNeg (SNegUpIntro v) = do
+supplySNeg (NegUpIntro v) = do
   v' <- supplySPos v
   return $ SSNegUpIntro v'
-supplySNeg (SNegUpElim x e1 e2) = do
+supplySNeg (NegUpElim x e1 e2) = do
   e1' <- supplySNeg e1
   e2' <- supplySNeg e2
   return $ SSNegUpElim x e1' e2'
-supplySNeg (SNegBoxElim e) = do
+supplySNeg (NegDownElim e) = do
   e' <- supplySPos e
-  return $ SSNegPiElimBoxElim e' [] -- ふつうのbox-elim.
-supplySNeg (SNegConstElim x es) = do
+  return $ SSNegPiElimBoxElim e' []
+supplySNeg (NegConstElim x es) = do
   es' <- mapM supplySPos es
   return $ SSNegConstElim x es'
 
-toSNegPiIntroSeq :: SNeg -> ([Identifier], SNeg)
-toSNegPiIntroSeq (SNegPiIntro x body) = do
-  let (args, body') = toSNegPiIntroSeq body
+toNegPiIntroSeq :: Neg -> ([Identifier], Neg)
+toNegPiIntroSeq (NegPiIntro x body) = do
+  let (args, body') = toNegPiIntroSeq body
   (x : args, body')
-toSNegPiIntroSeq t = ([], t)
+toNegPiIntroSeq t = ([], t)
 
 commPiElim :: SSNeg -> [SSPos] -> WithEnv SSNeg
 commPiElim (SSNegPiElimBoxElim f xs) args =
@@ -115,8 +115,8 @@ varSSNeg (SSNegUpElim x e1 e2) = do
   vs1 ++ vs2
 varSSNeg (SSNegConstElim _ es) = concatMap varSSPos es
 
-toSNegPiElimSeq :: SNeg -> (SNeg, [SPos])
-toSNegPiElimSeq (SNegPiElim e1 e2) = do
-  let (fun, xs) = toSNegPiElimSeq e1
+toNegPiElimSeq :: Neg -> (Neg, [Pos])
+toNegPiElimSeq (NegPiElim e1 e2) = do
+  let (fun, xs) = toNegPiElimSeq e1
   (fun, e2 : xs)
-toSNegPiElimSeq c = (c, [])
+toNegPiElimSeq c = (c, [])

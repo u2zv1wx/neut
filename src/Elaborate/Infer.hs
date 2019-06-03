@@ -68,7 +68,7 @@ infer ctx (meta :< NeutPi (s, tdom) tcod) = do
 infer ctx (meta :< NeutPiIntro (s, tdom) e) = do
   univ <- boxUniv
   tdom' <- annot univ tdom
-  insTypeEnv1 (map fst ctx) univ s tdom'
+  insTypeEnv1 s tdom'
   let ctx' = ctx ++ [(s, tdom')]
   tcod <- infer ctx' e >>= annot univ
   typeMeta <- newName' "meta" univ

@@ -214,38 +214,37 @@ data Neg
               Neg
               Neg
   | NegDownElim Pos
+  -- | NegBoxElim Pos
   | NegConstElim Constant
                  [Pos]
   deriving (Show)
 
-data SPos
-  = SPosVar Identifier
-  | SPosConst Identifier
-  | SPosSigmaIntro [SPos]
-  | SPosIndexIntro Index
-                   Identifier -- metadata to determine its type
-  | SPosBoxIntro SNeg
-  deriving (Show)
-
-data SNeg
-  = SNegPiIntro Identifier
-                SNeg
-  | SNegPiElim SNeg
-               SPos
-  | SNegSigmaElim SPos
-                  [Identifier]
-                  SNeg
-  | SNegIndexElim SPos
-                  [(Index, SNeg)]
-  | SNegUpIntro SPos
-  | SNegUpElim Identifier
-               SNeg
-               SNeg
-  | SNegBoxElim SPos
-  | SNegConstElim Constant
-                  [SPos]
-  deriving (Show)
-
+-- data SPos
+--   = SPosVar Identifier
+--   | SPosConst Identifier
+--   | SPosSigmaIntro [SPos]
+--   | SPosIndexIntro Index
+--                    Identifier -- metadata to determine its type
+--   | SPosBoxIntro SNeg
+--   deriving (Show)
+-- data SNeg
+--   = SNegPiIntro Identifier
+--                 SNeg
+--   | SNegPiElim SNeg
+--                SPos
+--   | SNegSigmaElim SPos
+--                   [Identifier]
+--                   SNeg
+--   | SNegIndexElim SPos
+--                   [(Index, SNeg)]
+--   | SNegUpIntro SPos
+--   | SNegUpElim Identifier
+--                SNeg
+--                SNeg
+--   | SNegBoxElim SPos
+--   | SNegConstElim Constant
+--                   [SPos]
+--   deriving (Show)
 data SSPos
   = SSPosVar Identifier
   | SSPosConst Identifier
@@ -279,13 +278,11 @@ data Value
   | ValueSigmaIntro [Value]
   | ValueIndexIntro Index
                     Identifier
-  | ValueBoxIntroPiIntro [Identifier]
-                         Comp
   deriving (Show)
 
 -- negative modal normal form
 data Comp
-  = CompPiElimBoxElim Identifier -- (force f) @ x1 @ ... @ xn
+  = CompPiElimBoxElim Value -- (force f) @ x1 @ ... @ xn
                       [Value]
   | CompConstElim Constant
                   [Identifier]
@@ -479,13 +476,14 @@ data Env = Env
   -- , weakTermEnv :: [(Identifier, Neut)]
   -- , termEnv :: [(Identifier, Term)]
   -- , polEnv :: [(Identifier, ([Identifier], Neg))] -- x ~> box.intro (lam (x1 ... xn). e)
-  , polEnv :: [(Identifier, Pos)] -- x ~> box.intro e (implicit box)
-  , strictPolEnv :: [(Identifier, SPos)]
+  -- , polEnv :: [(Identifier, Pos)] -- x ~> box.intro e (implicit box)
+  , polEnv :: [(Identifier, Neg)] -- x ~> box.intro e (implicit box)
+  -- , strictPolEnv :: [(Identifier, SPos)]
   -- , polEnv :: [(Identifier, Pos)]
-  -- , modalEnv :: [(Identifier, FuncOrConst)] -- [(f, v), ...]
+  , modalEnv :: [(Identifier, ([Identifier], Comp))] -- [(f, v), ...]
   -- modalEnv : Ident ~> ValueBoxIntroPiIntro [Ident] Comp
-  -- , modalEnv :: [(Identifier, ([Identifier], Comp))]
-  , modalEnv :: [(Identifier, Value)]
+  -- , modalEnv :: [(Identifier, ([Identifier], Comp))] (f, quote(lam (x1 ... xn) e))
+  -- , modalEnv :: [(Identifier, Value)]
   , constraintEnv :: [PreConstraint]
   , constraintQueue :: Q.MinQueue EnrichedConstraint
   , substitution :: Subst
@@ -511,7 +509,7 @@ initialEnv path =
     -- , weakTermEnv = []
     -- , termEnv = []
     , polEnv = []
-    , strictPolEnv = []
+    -- , strictPolEnv = []
     , modalEnv = []
     , codeEnv = []
     , asmEnv = []
@@ -608,8 +606,8 @@ lookupCodeEnv funName = do
 insTypeEnv :: Identifier -> Neut -> WithEnv ()
 insTypeEnv i t = modify (\e -> e {typeEnv = Map.insert i t (typeEnv e)})
 
-insTypeEnv1 :: [Identifier] -> Neut -> Identifier -> Neut -> WithEnv ()
-insTypeEnv1 ctx univ i t = do
+insTypeEnv1 :: Identifier -> Neut -> WithEnv ()
+insTypeEnv1 i t = do
   tenv <- gets typeEnv
   let ts = Map.elems $ Map.filterWithKey (\j _ -> i == j) tenv
   forM_ ts $ \t' -> insConstraintEnv t t'
@@ -639,24 +637,23 @@ insCodeEnv funName args body =
 -- insCodeEnvData :: Identifier -> Data -> WithEnv ()
 -- insCodeEnvData funName d =
 --   modify (\e -> e {codeEnv = (funName, GlobalData d) : codeEnv e})
-insPolEnv :: Identifier -> Pos -> WithEnv ()
+insPolEnv :: Identifier -> Neg -> WithEnv ()
 insPolEnv name body = modify (\e -> e {polEnv = (name, body) : polEnv e})
 
-insSPolEnv :: Identifier -> SPos -> WithEnv ()
-insSPolEnv name body =
-  modify (\e -> e {strictPolEnv = (name, body) : strictPolEnv e})
-
+-- insSPolEnv :: Identifier -> SPos -> WithEnv ()
+-- insSPolEnv name body =
+--   modify (\e -> e {strictPolEnv = (name, body) : strictPolEnv e})
 -- insPolEnv :: Identifier -> [Identifier] -> Neg -> WithEnv ()
 -- insPolEnv name args body =
 --   modify (\e -> e {polEnv = (name, (args, body)) : polEnv e})
 -- insPolEnv :: Identifier -> Pos -> WithEnv ()
 -- insPolEnv name body = modify (\e -> e {polEnv = (name, body) : polEnv e})
-insModalEnv :: Identifier -> Value -> WithEnv ()
-insModalEnv funName v = modify (\e -> e {modalEnv = (funName, v) : modalEnv e})
+-- insModalEnv :: Identifier -> Value -> WithEnv ()
+-- insModalEnv funName v = modify (\e -> e {modalEnv = (funName, v) : modalEnv e})
+insModalEnv :: Identifier -> [Identifier] -> Comp -> WithEnv ()
+insModalEnv funName args body =
+  modify (\e -> e {modalEnv = (funName, (args, body)) : modalEnv e})
 
--- insModalEnv :: Identifier -> [Identifier] -> Comp -> WithEnv ()
--- insModalEnv funName args body =
---   modify (\e -> e {modalEnv = (funName, (args, body)) : modalEnv e})
 -- insModalEnvConst :: Identifier -> Value -> WithEnv ()
 -- insModalEnvConst k v =
 --   modify (\e -> e {modalEnv = (k, GlobalConstant v) : modalEnv e})

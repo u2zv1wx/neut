@@ -27,6 +27,8 @@ import Data
 import Reduce
 import Util
 
+import Data.List (nub)
+
 import Text.Read (readMaybe)
 
 import Data.Maybe (isJust, maybeToList)
@@ -34,25 +36,30 @@ import Data.Maybe (isJust, maybeToList)
 polarize :: Identifier -> Term -> WithEnv ()
 polarize name e = do
   e' <- polarize' e
-  insPolEnv name $ PosDownIntro e' -- implicit box.intro
-  -- tenv <- gets termEnv
-  -- forM_ tenv $ \(name, e) -> do
-  --   e' <- polarize' e
-  --   insPolEnv name e' -- implicit box.intro
+  insPolEnv name e'
+  -- insPolEnv name $ PosDownIntro e'
 
 polarize' :: Term -> WithEnv Neg
-polarize' (TermVar x) = return $ NegDownElim (PosVar x)
+polarize' (TermVar x) = force (PosVar x)
+-- polarize' (TermVar x) = return $ NegDownElim (PosVar x)
 polarize' (TermConst x) = toDefinition x
 polarize' (TermPiIntro x e) = do
   e' <- polarize' e
   return $ NegPiIntro x e'
 polarize' (TermPiElim e1 e2) = do
   e1' <- polarize' e1
-  e2' <- polarize' e2
-  return $ NegPiElim e1' (PosDownIntro e2')
+  e2' <- polarize' e2 >>= thunk
+  return $ NegPiElim e1' e2'
+-- polarize' (TermPiElim e1 e2) = do
+--   e1' <- polarize' e1
+--   e2' <- polarize' e2
+--   return $ NegPiElim e1' (PosDownIntro e2')
 polarize' (TermSigmaIntro es) = do
-  es' <- mapM polarize' es
-  return $ NegUpIntro $ PosSigmaIntro (map PosDownIntro es')
+  es' <- mapM (polarize' >=> thunk) es
+  return $ NegUpIntro $ PosSigmaIntro es'
+-- polarize' (TermSigmaIntro es) = do
+--   es' <- mapM polarize' es
+--   return $ NegUpIntro $ PosSigmaIntro (map PosDownIntro es')
 polarize' (TermSigmaElim e1 xs e2) = do
   e1' <- polarize' e1
   e2' <- polarize' e2
@@ -66,9 +73,35 @@ polarize' (TermIndexElim e branchList) = do
   cs <- mapM polarize' es
   return $ NegUpElim x e' (NegIndexElim (PosVar x) (zip labelList cs))
 polarize' (TermMu x e) = do
-  e' <- polarize' e -- e doesn't have any free variables thanks to Close
-  insPolEnv x $ PosDownIntro e' -- x == box.intro e'
+  e' <- polarize' e
+  -- insPolEnv x $ PosDownIntro e' -- e' is closed (ここをnegativeにする)
+  insPolEnv x e' -- e' is closed (ここをnegativeにする)
   return $ NegDownElim (PosConst x)
+
+-- polarize' (TermMu x e) = do
+--   e' <- polarize' e
+--   insPolEnv x $ PosDownIntro e' -- e' is closed
+--   return $ NegDownElim (PosConst x)
+-- force :: Pos -> Neg
+-- force = undefined
+-- thunk :: Neg -> Pos
+-- thunk = undefined
+thunk :: Neg -> WithEnv Pos
+thunk e = do
+  let fvs = nub $ varNeg e
+  envName <- newNameWith "env"
+  let lam = NegPiIntro envName $ NegSigmaElim (PosVar envName) fvs e
+  return $ PosSigmaIntro [PosDownIntro lam, PosSigmaIntro $ map PosVar fvs]
+
+force :: Pos -> WithEnv Neg
+force v = do
+  envName <- newNameWith "down.elim.env"
+  clsName <- newNameWith "down.elim.cls"
+  return $
+    NegSigmaElim
+      v
+      [clsName, envName]
+      (NegPiElim (NegDownElim (PosVar clsName)) (PosVar envName))
 
 -- insert (possibly) environment-specific definition of constant
 toDefinition :: Identifier -> WithEnv Neg
@@ -142,8 +175,3 @@ wordsWhen p s =
     "" -> []
     s' -> w : wordsWhen p s''
       where (w, s'') = break p s'
--- toNegPiIntroSeq :: Neg -> ([Identifier], Neg)
--- toNegPiIntroSeq (NegPiIntro x body) = do
---   let (args, body') = toNegPiIntroSeq body
---   (x : args, body')
--- toNegPiIntroSeq t = ([], t)

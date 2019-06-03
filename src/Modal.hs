@@ -24,10 +24,18 @@ import Debug.Trace
 
 modalize :: WithEnv ()
 modalize = do
-  spenv <- gets strictPolEnv
-  forM_ spenv $ \(name, e) -> do
-    actualTerm' <- supplySPos e >>= modalPos
-    insModalEnv name actualTerm'
+  penv <- gets polEnv
+  forM_ penv $ \(name, e) -> do
+    let name' = name ++ ".fun"
+    e' <- supplySNeg e
+    -- let body = SSNegUpIntro actualTerm'
+    e'' <- modalNeg e'
+    insModalEnv name' [] e''
+    -- insModalEnvFunc name' [] e''
+    -- insModalEnvConst name actualTerm'
+  -- menv <- gets modalEnv
+  -- forM_ menv $ \(name, e) -> do
+  --   liftIO $ putStrLn $ "the arity of " ++ name ++ " is " ++ show (arity e)
     -- case actualTerm' of
     --   SSPosBoxIntroPiIntro args body -> do
     --     liftIO $ putStrLn $ "name == " ++ show name
@@ -45,19 +53,21 @@ modalPos (SSPosSigmaIntro es) = do
 modalPos (SSPosIndexIntro l meta) = return $ ValueIndexIntro l meta
 modalPos (SSPosBoxIntroPiIntro args body) = do
   body' <- modalNeg body
-  -- clsName <- newNameWith "cls"
-  return $ ValueBoxIntroPiIntro args body'
-  -- insModalEnv clsName args body'
+  clsName <- newNameWith "cls"
+  -- return $ ValueBoxIntroPiIntro args body'
+  insModalEnv clsName args body'
+  -- insModalEnvFunc clsName args body'
   -- liftIO $ putStrLn $ "name == " ++ show clsName
   -- liftIO $ putStrLn $ "args == " ++ show args
-  -- return $ ValueConst clsName
+  return $ ValueConst clsName
 
 modalNeg :: SSNeg -> WithEnv Comp
 modalNeg (SSNegPiElimBoxElim fun args) = do
   fun' <- modalPos fun
   args' <- mapM modalPos args
-  tmp <- newNameWith "tmp"
-  bindLet [(tmp, fun')] $ CompPiElimBoxElim tmp args'
+  return $ CompPiElimBoxElim fun' args'
+  -- tmp <- newNameWith "tmp"
+  -- bindLet [(tmp, fun')] $ CompPiElimBoxElim tmp args'
 modalNeg (SSNegSigmaElim e1 xs e2) = do
   e1' <- modalPos e1
   e2' <- modalNeg e2

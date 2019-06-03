@@ -39,9 +39,9 @@ assemblize = do
    -> do
     asm <- asmCode code
     insAsmEnv name args asm
-  -- forM_ (codeEnv env) $ \(name, e) -> do
+  -- forM_ (codeEnv env) $ \(name, e) ->
   --   case e of
-  --     GlobalData d -> undefined
+  --     GlobalData _ -> undefined
   --     GlobalCode args code -> do
   --       asm <- asmCode code
   --       insAsmEnv name args asm
@@ -49,17 +49,17 @@ assemblize = do
 asmCode :: Code -> WithEnv Asm
 asmCode (CodeReturn d) = do
   result <- newNameWith "ans"
-  asmData result d $ AsmReturn $ AsmDataLocal result
+  asmDataLet result d $ AsmReturn $ AsmDataLocal result
 asmCode (CodeLet x d cont) = do
   cont' <- asmCode cont
-  asmData x d cont'
+  asmDataLet x d cont'
 asmCode (CodeCall x fun args cont) = do
   cont' <- asmCode cont
   f <- newNameWith "fun"
   xs <- mapM (const (newNameWith "arg")) args
   let funPtrType = toFunPtrType args
   cast <- newNameWith "cast"
-  asmData' ((f, fun) : zip xs args) $
+  asmDataLet' ((f, fun) : zip xs args) $
     AsmBitcast cast (AsmDataLocal f) voidPtr funPtrType $
     AsmCall x (AsmDataLocal cast) (map AsmDataLocal xs) cont'
 asmCode (CodeCallTail fun args) = do
@@ -67,7 +67,7 @@ asmCode (CodeCallTail fun args) = do
   xs <- mapM (const (newNameWith "arg")) args
   let funPtrType = toFunPtrType args
   cast <- newNameWith "cast"
-  asmData' ((f, fun) : zip xs args) $
+  asmDataLet' ((f, fun) : zip xs args) $
     AsmBitcast cast (AsmDataLocal f) voidPtr funPtrType $
     AsmCallTail (AsmDataLocal cast) (map AsmDataLocal xs)
 asmCode (CodeSwitch x branchList) = asmSwitch x branchList
@@ -77,54 +77,55 @@ asmCode (CodeExtractValue x baseData (i, n) cont) = do
   cast <- newNameWith "cast"
   let structPtrType = toStructPtrType [1 .. n]
   loader <- newNameWith "loader"
-  asmData tmp baseData $
+  asmDataLet tmp baseData $
     AsmBitcast cast (AsmDataLocal tmp) voidPtr structPtrType $
     AsmGetElementPtr loader (AsmDataLocal cast) (i, n) $
     AsmLoad x (AsmDataLocal loader) cont'
 asmCode (CodeFree d cont) = do
   cont' <- asmCode cont
   tmp <- newNameWith "free"
-  asmData' [(tmp, d)] $ AsmFree (AsmDataLocal tmp) cont'
+  asmDataLet' [(tmp, d)] $ AsmFree (AsmDataLocal tmp) cont'
 asmCode (CodePrint (LowTypeFloat _) _ _) = undefined
 asmCode (CodePrint t d cont) = do
   cont' <- asmCode cont
   tmp <- newNameWith "item"
   cast <- newNameWith "cast"
-  asmData' [(tmp, d)] $
+  asmDataLet' [(tmp, d)] $
     AsmPointerToInt cast (AsmDataLocal tmp) voidPtr t $
     AsmPrint t (AsmDataLocal cast) cont'
 
--- `asmData x d cont` binds the data `d` to the variable `x`, and computes then
+-- `asmDataLet x d cont` binds the data `d` to the variable `x`, and computes the
 -- continuation `cont`.
-asmData :: Identifier -> Data -> Asm -> WithEnv Asm
-asmData x (DataLocal y) cont =
+asmDataLet :: Identifier -> Data -> Asm -> WithEnv Asm
+asmDataLet x (DataLocal y) cont =
   return $ AsmBitcast x (AsmDataLocal y) voidPtr voidPtr cont
-asmData x (DataGlobal y) cont = do
+asmDataLet x (DataGlobal y) cont = do
   cenv <- gets codeEnv
   case lookup y cenv of
     Nothing -> lift $ throwE $ "no such global label defined: " ++ y -- FIXME
+    -- Just (GlobalData _) -> undefined
     Just (args, _) -> do
       let funPtrType = toFunPtrType args
       return $ AsmBitcast x (AsmDataGlobal y) funPtrType voidPtr cont
     -- Just (GlobalData _) -> undefined
-asmData x (DataInt i) cont =
+asmDataLet x (DataInt i) cont =
   return $ AsmIntToPointer x (AsmDataInt i) (LowTypeSignedInt 64) voidPtr cont
-asmData x (DataFloat16 f) cont = do
+asmDataLet x (DataFloat16 f) cont = do
   cast <- newNameWith "cast"
   return $
     AsmBitcast cast (AsmDataFloat f) (LowTypeFloat 16) (LowTypeSignedInt 16) $
     AsmIntToPointer x (AsmDataLocal cast) (LowTypeSignedInt 16) voidPtr cont
-asmData x (DataFloat32 f) cont = do
+asmDataLet x (DataFloat32 f) cont = do
   cast <- newNameWith "cast"
   return $
     AsmBitcast cast (AsmDataFloat f) (LowTypeFloat 32) (LowTypeSignedInt 32) $
     AsmIntToPointer x (AsmDataLocal cast) (LowTypeSignedInt 32) voidPtr cont
-asmData x (DataFloat64 f) cont = do
+asmDataLet x (DataFloat64 f) cont = do
   cast <- newNameWith "cast"
   return $
     AsmBitcast cast (AsmDataFloat f) (LowTypeFloat 64) (LowTypeSignedInt 64) $
     AsmIntToPointer x (AsmDataLocal cast) (LowTypeSignedInt 64) voidPtr cont
-asmData reg (DataStruct ds) cont = do
+asmDataLet reg (DataStruct ds) cont = do
   xs <- mapM (const $ newNameWith "cursor") ds
   cast <- newNameWith "cast"
   let ts = map (const voidPtr) ds
@@ -133,7 +134,7 @@ asmData reg (DataStruct ds) cont = do
   asmStruct (zip xs ds) $
     AsmAlloc reg ts $ -- the result of malloc is i8*
     AsmBitcast cast (AsmDataLocal reg) voidPtr structPtrType cont''
-asmData reg (DataArith kind@(_, intType) d1 d2) cont
+asmDataLet reg (DataArith kind@(_, intType) d1 d2) cont
   | intType `elem` intLowTypeList = do
     x1 <- newNameWith "arg"
     x2 <- newNameWith "arg"
@@ -145,7 +146,7 @@ asmData reg (DataArith kind@(_, intType) d1 d2) cont
       AsmPointerToInt cast2 (AsmDataLocal x2) voidPtr intType $
       AsmArith tmp kind (AsmDataLocal cast1) (AsmDataLocal cast2) $
       AsmIntToPointer reg (AsmDataLocal tmp) intType voidPtr cont
-asmData reg (DataArith kind@(_, LowTypeFloat i) d1 d2) cont = do
+asmDataLet reg (DataArith kind@(_, LowTypeFloat i) d1 d2) cont = do
   x1 <- newNameWith "arg"
   x2 <- newNameWith "arg"
   cast11 <- newNameWith "cast"
@@ -167,13 +168,13 @@ asmData reg (DataArith kind@(_, LowTypeFloat i) d1 d2) cont = do
     -- cast the result from float to i8*
     AsmBitcast uncast (AsmDataLocal tmp) (LowTypeFloat i) intType $
     AsmIntToPointer reg (AsmDataLocal uncast) intType voidPtr cont
-asmData _ DataArith {} _ = lift $ throwE "Asm.asmData: type error"
+asmDataLet _ DataArith {} _ = lift $ throwE "Asm.asmDataLet: type error"
 
-asmData' :: [(Identifier, Data)] -> Asm -> WithEnv Asm
-asmData' [] cont = return cont
-asmData' ((x, d):rest) cont = do
-  cont' <- asmData' rest cont
-  asmData x d cont'
+asmDataLet' :: [(Identifier, Data)] -> Asm -> WithEnv Asm
+asmDataLet' [] cont = return cont
+asmDataLet' ((x, d):rest) cont = do
+  cont' <- asmDataLet' rest cont
+  asmDataLet x d cont'
 
 constructSwitch :: Data -> [(Index, Code)] -> WithEnv (Asm, [(Int, Asm)])
 constructSwitch _ [] = lift $ throwE "empty branch"
@@ -196,7 +197,7 @@ asmSwitch name branchList = do
   (defaultCase, caseList) <- constructSwitch name branchList
   tmp <- newNameWith "switch"
   cast <- newNameWith "cast"
-  asmData' [(tmp, name)] $
+  asmDataLet' [(tmp, name)] $
     AsmPointerToInt cast (AsmDataLocal tmp) voidPtr (LowTypeSignedInt 64) $
     AsmSwitch (AsmDataLocal cast) defaultCase caseList
 
@@ -217,7 +218,7 @@ asmStruct :: [(Identifier, Data)] -> Asm -> WithEnv Asm
 asmStruct [] cont = return cont
 asmStruct ((x, d):xds) cont = do
   cont' <- asmStruct xds cont
-  asmData x d cont'
+  asmDataLet x d cont'
 
 voidPtr :: LowType
 voidPtr = LowTypePointer $ LowTypeSignedInt 8

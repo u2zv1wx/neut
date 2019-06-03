@@ -25,21 +25,27 @@ import Debug.Trace
 virtualize :: WithEnv ()
 virtualize = do
   menv <- gets modalEnv
-  forM_ menv $ \(name, (args, body)) -> do
-    body' <- virtualComp body
-    liftIO $ putStrLn name
-    liftIO $ putStrLn $ show args
-    liftIO $ putStrLn $ Pr.ppShow body'
-    liftIO $ putStrLn "==============================="
-    virtual name (args, body)
+  undefined
+  forM_ menv $ uncurry virtual
+    -- undefined
+    -- body' <- virtualComp body
+    -- liftIO $ putStrLn name
+    -- liftIO $ putStrLn $ show args
+    -- liftIO $ putStrLn $ Pr.ppShow body'
+    -- liftIO $ putStrLn "==============================="
+    -- virtual name (args, body)
    -- -> do
   -- forM_ menv $ uncurry virtual
 
 virtual :: Identifier -> ([Identifier], Comp) -> WithEnv ()
 virtual name (args, body) = do
   body' <- virtualComp body
+  -- insCodeEnvCode name args body'
   insCodeEnv name args body'
 
+-- virtual name (GlobalConstant c) = do
+--   c' <- virtualValue c
+--   insCodeEnvData name c'
 virtualValue :: Value -> WithEnv Data
 virtualValue (ValueVar x) = return $ DataLocal x
 virtualValue (ValueConst x) = return $ DataGlobal x
@@ -70,8 +76,9 @@ virtualValue (ValueIndexIntro x meta) =
 
 virtualComp :: Comp -> WithEnv Code
 virtualComp (CompPiElimBoxElim f vs) = do
+  f' <- virtualValue f
   ds <- mapM virtualValue vs
-  return $ CodeCallTail (DataLocal f) ds
+  return $ CodeCallTail f' ds
 virtualComp (CompSigmaElim e1 xs e2) = do
   e1' <- virtualValue e1
   e2' <- virtualComp e2
