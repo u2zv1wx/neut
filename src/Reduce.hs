@@ -413,6 +413,23 @@ substNeg sub (NegUpElim x e1 e2) = do
 substNeg sub (NegDownElim v) = NegDownElim $ substPos sub v
 substNeg sub (NegConstElim x vs) = NegConstElim x $ map (substPos sub) vs
 
+loCommPiElim :: Comp -> [Value] -> WithEnv Comp
+loCommPiElim (CompPiElimDownElim v vs) args =
+  return $ CompPiElimDownElim v (vs ++ args)
+loCommPiElim (CompConstElim c vs) args = return $ CompConstElim c (vs ++ args)
+loCommPiElim (CompSigmaElim v xs e) args = do
+  e' <- loCommPiElim e args
+  return $ CompSigmaElim v xs e'
+loCommPiElim (CompIndexElim v branchList) args = do
+  let (labelList, es) = unzip branchList
+  es' <- mapM (`loCommPiElim` args) es
+  return $ CompIndexElim v (zip labelList es')
+loCommPiElim (CompUpIntro v) [] = return $ CompUpIntro v
+loCommPiElim (CompUpIntro _) _ = lift $ throwE "Modal.loCommPiElim: type error"
+loCommPiElim (CompUpElim x e1 e2) args = do
+  e2' <- loCommPiElim e2 args
+  return $ CompUpElim x e1 e2'
+
 reduceCompPiElimDownElim :: Value -> [Value] -> WithEnv Comp
 reduceCompPiElimDownElim v vs =
   case v of
@@ -422,12 +439,8 @@ reduceCompPiElimDownElim v vs =
         Just (args, body) -> do
           let vs' = take (length args) vs
           let rest = drop (length args) vs
-          liftIO $ putStrLn $ "vs' == " ++ show vs'
-          liftIO $ putStrLn $ "rest == " ++ show rest
-          body' <- reduceComp $ substComp (zip args vs') body
-          case body' of
-            CompPiElimDownElim w ws -> reduceCompPiElimDownElim w $ ws ++ rest
-            _ -> return body'
+          body' <- loCommPiElim (substComp (zip args vs') body) rest
+          reduceComp body'
         _ -> return $ CompPiElimDownElim v vs
     _ -> return $ CompPiElimDownElim v vs
 
@@ -450,6 +463,13 @@ reduceComp (CompSigmaElim v xs e) =
   case v of
     ValueSigmaIntro vs
       | length xs == length vs -> reduceComp $ substComp (zip xs vs) e
+    ValueConst x -> do
+      menv <- gets modalEnv
+      case lookup x menv of
+        Just ([], body) -> do
+          tmp <- newNameWith "tmp"
+          reduceComp $ CompUpElim tmp body $ CompSigmaElim (ValueVar tmp) xs e
+        _ -> return $ CompSigmaElim v xs e
     _ -> return $ CompSigmaElim v xs e
 reduceComp (CompIndexElim v branchList) =
   case v of

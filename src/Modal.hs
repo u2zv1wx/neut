@@ -25,18 +25,17 @@ modalize = do
   penv <- gets polEnv
   forM_ penv $ \(name, e) -> do
     e' <- modalNeg e
-    r0 <- reduceNeg e
-    r1 <- reduceComp e'
-    -- liftIO $ putStrLn $ Pr.ppShow e'
-    liftIO $ putStrLn $ Pr.ppShow r0
-    liftIO $ putStrLn $ Pr.ppShow r1
+    -- r1 <- reduceComp e'
+    -- liftIO $ putStrLn name
+    -- liftIO $ putStrLn $ Pr.ppShow r1
     insModalEnv name [] e'
-  -- menv <- gets modalEnv
-  -- forM_ menv $ \(name, (args, e)) -> do
-  --   liftIO $ putStrLn name
-  --   liftIO $ putStrLn $ Pr.ppShow args
-  --   liftIO $ putStrLn $ Pr.ppShow e
-  --   liftIO $ putStrLn "======================="
+  menv <- gets modalEnv
+  forM_ menv $ \(name, (args, e)) -> do
+    r0 <- reduceComp e
+    liftIO $ putStrLn name
+    liftIO $ putStrLn $ Pr.ppShow args
+    liftIO $ putStrLn $ Pr.ppShow r0
+    liftIO $ putStrLn "======================="
 
 modalPos :: Pos -> WithEnv Value
 modalPos (PosVar x) = return $ ValueVar x
@@ -105,8 +104,6 @@ commPiElim (CompIndexElim v branchList) args = do
 commPiElim (CompUpIntro v) [] = return $ CompUpIntro v
 commPiElim (CompUpIntro _) _ = lift $ throwE "Modal.commPiElim: type error"
 commPiElim (CompUpElim x e1 e2) args = do
-  liftIO $ putStrLn $ "x == " ++ show x
-  liftIO $ putStrLn $ "args == " ++ show args
   e2' <- commPiElim e2 args
   return $ CompUpElim x e1 e2'
 
