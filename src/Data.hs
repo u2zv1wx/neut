@@ -136,7 +136,9 @@ varAndHole (_ :< NeutIndexElim e branchList) = do
   pairwiseConcat (vs1 : vss)
 varAndHole (_ :< NeutConst _) = ([], [])
 varAndHole (_ :< NeutUniv _) = ([], [])
-varAndHole (_ :< NeutMu _ e) = varAndHole e
+varAndHole (_ :< NeutMu x e) = do
+  let (vs1, vs2) = varAndHole e
+  (filter (/= x) vs1, vs2)
 varAndHole (_ :< NeutHole x) = ([], [x])
 
 varAndHoleSigma :: [(Identifier, Neut)] -> ([Identifier], [Identifier])

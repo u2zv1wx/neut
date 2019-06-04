@@ -92,11 +92,15 @@ llvmCodeConstElim (ConstantArith lowType@(LowTypeSignedInt _) kind) xs
     x0 <- newNameWith "arg"
     x1 <- newNameWith "arg"
     cast1 <- newNameWith "cast"
+    let op1 = LLVMDataLocal cast1
     cast2 <- newNameWith "cast"
+    let op2 = LLVMDataLocal cast2
+    result <- newNameWith "result"
     llvmStruct [(x0, ValueVar $ head xs), (x1, ValueVar $ xs !! 1)] $
       LLVMLet cast1 (LLVMPointerToInt (LLVMDataLocal x0) voidPtr lowType) $
       LLVMLet cast2 (LLVMPointerToInt (LLVMDataLocal x1) voidPtr lowType) $
-      LLVMArith (kind, lowType) (LLVMDataLocal cast1) (LLVMDataLocal cast2)
+      LLVMLet result (LLVMArith (kind, lowType) op1 op2) $
+      LLVMIntToPointer (LLVMDataLocal result) lowType voidPtr
 llvmCodeConstElim (ConstantArith (LowTypeUnsignedInt i) kind) xs =
   llvmCodeConstElim (ConstantArith (LowTypeSignedInt i) kind) xs
 llvmCodeConstElim (ConstantArith (LowTypeFloat i) kind) xs

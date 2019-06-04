@@ -24,8 +24,9 @@ modalize :: WithEnv ()
 modalize = do
   penv <- gets polEnv
   forM_ penv $ \(name, e) -> do
-    let name' = name ++ ".fun"
     e'' <- modalNeg e
+    -- liftIO $ putStrLn $ Pr.ppShow e''
+    -- liftIO $ putStrLn "================================"
     insModalEnv name [] e''
     -- insModalEnvFunc name' [] e''
     -- insModalEnvConst name actualTerm'

@@ -37,6 +37,8 @@ polarize :: Identifier -> Term -> WithEnv ()
 polarize name e = do
   e' <- polarize' e
   insPolEnv name e'
+  -- liftIO $ putStrLn $ Pr.ppShow e'
+  -- liftIO $ putStrLn "================================"
   -- insPolEnv name $ PosDownIntro e'
 
 polarize' :: Term -> WithEnv Neg
