@@ -85,12 +85,6 @@ boxUniv = do
   l <- newName
   return $ univMeta :< NeutUniv (UnivLevelHole l)
 
--- toVar :: Identifier -> WithEnv Neut
--- toVar x = do
---   t <- lookupTypeEnv' x
---   meta <- newNameWith "meta"
---   insTypeEnv meta t
---   return $ meta :< NeutVar x
 toVar1 :: Identifier -> Neut -> WithEnv Neut
 toVar1 x t = do
   meta <- newNameWith "meta"

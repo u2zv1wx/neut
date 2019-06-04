@@ -74,6 +74,9 @@ getNumLowType meta = do
     _ :< NeutIndex "f64" -> return $ Right $ LowTypeFloat 64
     t -> return $ Left t
 
+-- This function translates a well-typed term into an untyped term in a
+-- reduction-preserving way. Here, we translate types into units (nullary product).
+-- This doesn't cause any problem since types doesn't have any beta-reduction.
 elaborate' :: Neut -> WithEnv Term
 elaborate' (_ :< NeutVar s) = return $ TermVar s
 elaborate' (_ :< NeutConst x) = return $ TermConst x

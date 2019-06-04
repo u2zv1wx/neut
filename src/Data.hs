@@ -56,7 +56,6 @@ data Index
   | IndexDefault
   deriving (Show, Eq)
 
--- type IndexOrVar = Either Index Identifier
 data Arith
   = ArithAdd
   | ArithSub

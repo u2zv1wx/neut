@@ -24,8 +24,8 @@ modalize :: WithEnv ()
 modalize = do
   penv <- gets polEnv
   forM_ penv $ \(name, e) -> do
-    e'' <- modalNeg e
-    insModalEnv name [] e''
+    e' <- modalNeg e
+    insModalEnv name [] e'
 
 modalPos :: Pos -> WithEnv Value
 modalPos (PosVar x) = return $ ValueVar x
