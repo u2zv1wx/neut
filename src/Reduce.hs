@@ -321,7 +321,8 @@ reduceNeg (NegPiElim e v) = do
     _ -> return $ NegPiElim e' v
 reduceNeg (NegSigmaElim v xs body) =
   case v of
-    PosSigmaIntro vs -> reduceNeg $ substNeg (zip xs vs) body
+    PosSigmaIntro vs
+      | length xs == length vs -> reduceNeg $ substNeg (zip xs vs) body
     _ -> return $ NegSigmaElim v xs body
 reduceNeg (NegIndexElim v branchList) =
   case v of
@@ -405,14 +406,18 @@ substNeg sub (NegDownElim v) = NegDownElim $ substPos sub v
 substNeg sub (NegConstElim x vs) = NegConstElim x $ map (substPos sub) vs
 
 reduceComp :: Comp -> WithEnv Comp
-reduceComp (CompPiElimBoxElim v vs) =
+reduceComp (CompPiElimDownElim v vs) =
   case v of
     ValueConst x -> do
       menv <- gets modalEnv
       case lookup x menv of
-        Just (args, body) -> reduceComp $ substComp (zip args vs) body
-        _ -> return $ CompPiElimBoxElim v vs
-    _ -> return $ CompPiElimBoxElim v vs
+        Just (args, body)
+          | length args == length vs -> do
+            liftIO $ putStrLn $ "name: " ++ x
+            liftIO $ putStrLn $ "assert: " ++ show args ++ " == " ++ show vs
+            reduceComp $ substComp (zip args vs) body
+        _ -> return $ CompPiElimDownElim v vs
+    _ -> return $ CompPiElimDownElim v vs
 reduceComp (CompConstElim c vs) = do
   let xs = takeIntegerList''' vs
   let t = LowTypeSignedInt 64 -- for now
@@ -428,7 +433,8 @@ reduceComp (CompConstElim c vs) = do
     _ -> return $ CompConstElim c vs
 reduceComp (CompSigmaElim v xs e) =
   case v of
-    ValueSigmaIntro vs -> reduceComp $ substComp (zip xs vs) e
+    ValueSigmaIntro vs
+      | length xs == length vs -> reduceComp $ substComp (zip xs vs) e
     _ -> return $ CompSigmaElim v xs e
 reduceComp (CompIndexElim v branchList) =
   case v of
@@ -457,8 +463,8 @@ substValue sub (ValueSigmaIntro vs) = ValueSigmaIntro $ map (substValue sub) vs
 substValue _ (ValueIndexIntro l t) = ValueIndexIntro l t
 
 substComp :: [(Identifier, Value)] -> Comp -> Comp
-substComp sub (CompPiElimBoxElim v vs) =
-  CompPiElimBoxElim (substValue sub v) (map (substValue sub) vs)
+substComp sub (CompPiElimDownElim v vs) =
+  CompPiElimDownElim (substValue sub v) (map (substValue sub) vs)
 substComp sub (CompConstElim c vs) = CompConstElim c $ map (substValue sub) vs
 substComp sub (CompSigmaElim v xs e) = do
   let v' = substValue sub v

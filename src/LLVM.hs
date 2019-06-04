@@ -28,7 +28,7 @@ toLLVM = do
     insLLVMEnv name args llvm
 
 llvmCode :: Comp -> WithEnv LLVM
-llvmCode (CompPiElimBoxElim fun args) = do
+llvmCode (CompPiElimDownElim fun args) = do
   f <- newNameWith "fun"
   xs <- mapM (const (newNameWith "arg")) args
   let funPtrType = toFunPtrType args

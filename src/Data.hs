@@ -232,8 +232,8 @@ data Value
 
 -- negative modal normal form
 data Comp
-  = CompPiElimBoxElim Value -- (force f) @ x1 @ ... @ xn
-                      [Value]
+  = CompPiElimDownElim Value -- (force f) @ x1 @ ... @ xn
+                       [Value]
   | CompConstElim Constant
                   [Value]
   | CompSigmaElim Value
