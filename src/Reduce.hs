@@ -323,6 +323,14 @@ reduceNeg (NegSigmaElim v xs body) =
   case v of
     PosSigmaIntro vs
       | length xs == length vs -> reduceNeg $ substNeg (zip xs vs) body
+    PosConst x -> do
+      penv <- gets polEnv
+      case lookup x penv of
+        Just e' -> do
+          tmp <- newNameWith "tmp"
+          reduceNeg $ NegUpElim tmp e' $ NegSigmaElim (PosVar tmp) xs body
+          -- reduceNeg e'
+        _ -> return $ NegDownElim v
     _ -> return $ NegSigmaElim v xs body
 reduceNeg (NegIndexElim v branchList) =
   case v of
@@ -405,25 +413,26 @@ substNeg sub (NegUpElim x e1 e2) = do
 substNeg sub (NegDownElim v) = NegDownElim $ substPos sub v
 substNeg sub (NegConstElim x vs) = NegConstElim x $ map (substPos sub) vs
 
-reduceComp :: Comp -> WithEnv Comp
-reduceComp (CompPiElimDownElim v vs) =
+reduceCompPiElimDownElim :: Value -> [Value] -> WithEnv Comp
+reduceCompPiElimDownElim v vs =
   case v of
     ValueConst x -> do
       menv <- gets modalEnv
       case lookup x menv of
-        Just (args, body)
-            -- let vs' = take (length args) vs
-            -- let rest = drop (length args) vs
-            -- let body' = substComp (zip args vs') body
-            -- c <- newNameWith "const"
-            -- insModalEnv c [] body'
-            -- reduceComp $ CompPiElimDownElim (ValueConst c) rest
-         -> do
-          liftIO $ putStrLn $ "name: " ++ x
-          liftIO $ putStrLn $ "assert: " ++ show args ++ " == " ++ show vs
-          reduceComp $ substComp (zip args vs) body
+        Just (args, body) -> do
+          let vs' = take (length args) vs
+          let rest = drop (length args) vs
+          liftIO $ putStrLn $ "vs' == " ++ show vs'
+          liftIO $ putStrLn $ "rest == " ++ show rest
+          body' <- reduceComp $ substComp (zip args vs') body
+          case body' of
+            CompPiElimDownElim w ws -> reduceCompPiElimDownElim w $ ws ++ rest
+            _ -> return body'
         _ -> return $ CompPiElimDownElim v vs
     _ -> return $ CompPiElimDownElim v vs
+
+reduceComp :: Comp -> WithEnv Comp
+reduceComp (CompPiElimDownElim v vs) = reduceCompPiElimDownElim v vs
 reduceComp (CompConstElim c vs) = do
   let xs = takeIntegerList''' vs
   let t = LowTypeSignedInt 64 -- for now

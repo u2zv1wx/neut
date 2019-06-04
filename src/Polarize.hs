@@ -34,18 +34,23 @@ polarize name e = do
   insPolEnv name e'
 
 polarize' :: Term -> WithEnv Neg
-polarize' (TermVar x) = force (PosVar x)
+polarize' (TermVar x) = return $ NegUpIntro $ PosVar x
 polarize' (TermConst x) = toDefinition x
 polarize' (TermPiIntro x e) = do
   e' <- polarize' e
-  return $ NegPiIntro x e'
+  lam <- thunk $ NegPiIntro x e'
+  return $ NegUpIntro lam
 polarize' (TermPiElim e1 e2) = do
   e1' <- polarize' e1
-  e2' <- polarize' e2 >>= thunk
-  return $ NegPiElim e1' e2'
+  e2' <- polarize' e2
+  f <- newNameWith "fun"
+  ff <- force $ PosVar f
+  x <- newNameWith "arg"
+  return $ NegUpElim x e2' $ NegUpElim f e1' $ NegPiElim ff (PosVar x)
 polarize' (TermSigmaIntro es) = do
-  es' <- mapM (polarize' >=> thunk) es
-  return $ NegUpIntro $ PosSigmaIntro es'
+  es' <- mapM polarize' es
+  xs <- mapM (const (newNameWith "sigma")) es'
+  return $ bindLet (zip xs es') $ NegUpIntro $ PosSigmaIntro (map PosVar xs)
 polarize' (TermSigmaElim e1 xs e2) = do
   e1' <- polarize' e1
   e2' <- polarize' e2
@@ -62,6 +67,10 @@ polarize' (TermMu x e) = do
   e' <- polarize' e
   insPolEnv x e'
   return $ NegDownElim (PosConst x)
+
+bindLet :: [(Identifier, Neg)] -> Neg -> Neg
+bindLet [] cont = cont
+bindLet ((x, e):xes) cont = NegUpElim x e $ bindLet xes cont
 
 thunk :: Neg -> WithEnv Pos
 thunk e = do
@@ -85,7 +94,7 @@ toDefinition :: Identifier -> WithEnv Neg
 toDefinition x
   | Just c <- getPrintConstant x = toPrintDefinition c
   | Just c <- getArithBinOpConstant x = toArithBinOpDefinition c
-  | otherwise = return $ NegDownElim (PosConst x)
+  | otherwise = return $ NegUpIntro $ PosConst x
 
 toArithLowType :: Identifier -> Maybe LowType
 toArithLowType x
@@ -110,10 +119,9 @@ getPrintConstant x = do
 
 toPrintDefinition :: Constant -> WithEnv Neg
 toPrintDefinition c = do
-  x <- newNameWith "lam"
-  x' <- newNameWith "lam"
-  fx <- force $ PosVar x
-  return $ NegPiIntro x $ NegUpElim x' fx $ NegConstElim c [PosVar x']
+  x <- newNameWith "arg"
+  t <- thunk $ NegPiIntro x $ NegConstElim c [PosVar x]
+  return $ NegUpIntro t
 
 getArithBinOpConstant :: Identifier -> Maybe Constant
 getArithBinOpConstant x = do
@@ -134,16 +142,11 @@ toArithBinOp _ = Nothing
 
 toArithBinOpDefinition :: Constant -> WithEnv Neg
 toArithBinOpDefinition c = do
-  x <- newNameWith "cls1"
-  y <- newNameWith "cls2"
-  x' <- newNameWith "arg1"
-  y' <- newNameWith "arg2"
-  fx <- force $ PosVar x
-  fy <- force $ PosVar y
-  return $
-    NegPiIntro x $
-    NegPiIntro y $
-    NegUpElim x' fx $ NegUpElim y' fy $ NegConstElim c [PosVar x', PosVar y']
+  x <- newNameWith "arg1"
+  y <- newNameWith "arg2"
+  lamy <- thunk $ NegPiIntro y $ NegConstElim c [PosVar x, PosVar y]
+  lamxy <- thunk $ NegPiIntro x $ NegUpIntro lamy
+  return $ NegUpIntro lamxy
 
 wordsWhen :: (Char -> Bool) -> String -> [String]
 wordsWhen p s =

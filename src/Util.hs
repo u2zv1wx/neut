@@ -134,4 +134,4 @@ varNeg (NegUpElim x e1 e2) = do
   let vs2 = filter (/= x) $ varNeg e2
   vs1 ++ vs2
 varNeg (NegDownElim v) = varPos v
-varNeg (NegConstElim _ es) = concatMap varPos es
+varNeg (NegConstElim _ vs) = concatMap varPos vs
