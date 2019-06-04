@@ -292,18 +292,19 @@ instance Show AsmData where
   show (AsmDataInt i) = show i
   show (AsmDataFloat x) = show x
 
+type MCont = Maybe (Identifier, Asm)
+
 data Asm
   = AsmReturn AsmData
   | AsmGetElementPtr Identifier
                      AsmData
                      (Int, Int) -- (index, length)
                      Asm
-  | AsmCall Identifier
-            AsmData
+  | AsmCall AsmData
             [AsmData]
-            Asm
-  | AsmCallTail AsmData
-                [AsmData]
+            MCont
+  -- | AsmCallTail AsmData
+  --               [AsmData]
   | AsmSwitch AsmData
               Asm
               [(Int, Asm)]
@@ -333,14 +334,55 @@ data Asm
              Asm
   | AsmFree AsmData
             Asm
-  | AsmArith Identifier
-             (Arith, LowType)
+  | AsmArith (Arith, LowType)
              AsmData
              AsmData
-             Asm
+             MCont
   | AsmPrint LowType
              AsmData
-             Asm
+             MCont
+  -- | AsmPrintTail LowType
+  --                AsmData
+  deriving (Show)
+
+data LLVMData
+  = LLVMDataLocal Identifier
+  | LLVMDataGlobal Identifier
+  | LLVMDataInt Int
+  | LLVMDataFloat Double
+  deriving (Show)
+
+data LLVM
+  = LLVMReturn LLVMData
+  | LLVMLet Identifier
+            LLVM
+            LLVM
+  | LLVMGetElementPtr LLVMData
+                      (Int, Int) -- (index, length)
+  | LLVMCall LLVMData
+             [LLVMData]
+  | LLVMSwitch LLVMData
+               LLVM
+               [(Int, LLVM)]
+  | LLVMBitcast LLVMData
+                LowType
+                LowType -- cast to this type
+  | LLVMIntToPointer LLVMData
+                     LowType
+                     LowType
+  | LLVMPointerToInt LLVMData
+                     LowType
+                     LowType
+  | LLVMLoad LLVMData
+  | LLVMStore (LLVMData, LowType)
+              (LLVMData, LowType)
+  | LLVMAlloc [LowType]
+  | LLVMFree LLVMData
+  | LLVMArith (Arith, LowType)
+              LLVMData
+              LLVMData
+  | LLVMPrint LowType
+              LLVMData
   deriving (Show)
 
 instance (Show a) => Show (IORef a) where
@@ -415,6 +457,7 @@ data Env = Env
   , univConstraintEnv :: [(UnivLevel, UnivLevel)]
   , codeEnv :: [(Identifier, ([Identifier], Code))]
   , asmEnv :: [(Identifier, ([Identifier], Asm))]
+  , llvmEnv :: [(Identifier, ([Identifier], LLVM))]
   , currentDir :: FilePath
   } deriving (Show)
 
@@ -433,6 +476,7 @@ initialEnv path =
     , modalEnv = []
     , codeEnv = []
     , asmEnv = []
+    , llvmEnv = []
     , constraintEnv = []
     , constraintQueue = Q.empty
     , substitution = []
@@ -546,6 +590,10 @@ insModalEnv funName args body =
 insAsmEnv :: Identifier -> [Identifier] -> Asm -> WithEnv ()
 insAsmEnv funName args asm =
   modify (\e -> e {asmEnv = (funName, (args, asm)) : asmEnv e})
+
+insLLVMEnv :: Identifier -> [Identifier] -> LLVM -> WithEnv ()
+insLLVMEnv funName args llvm =
+  modify (\e -> e {llvmEnv = (funName, (args, llvm)) : llvmEnv e})
 
 insIndexEnv :: Identifier -> [Identifier] -> WithEnv ()
 insIndexEnv name indexList =
