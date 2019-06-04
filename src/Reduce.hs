@@ -282,6 +282,13 @@ takeIntegerList'' (PosIndexIntro (IndexInteger i) _:rest) = do
   return (i : is)
 takeIntegerList'' _ = Nothing
 
+takeIntegerList''' :: [Value] -> Maybe [Int]
+takeIntegerList''' [] = Just []
+takeIntegerList''' (ValueIndexIntro (IndexInteger i) _:rest) = do
+  is <- takeIntegerList''' rest
+  return (i : is)
+takeIntegerList''' _ = Nothing
+
 findDefault :: [(Index, Neut)] -> Maybe Neut
 findDefault [] = Nothing
 findDefault ((IndexDefault, e):_) = Just e
@@ -355,11 +362,7 @@ reduceNeg (NegDownElim v) =
      -> do
       penv <- gets polEnv
       case lookup x penv of
-        Just e'
-          -- liftIO $ putStrLn $ "found the corresponding content"
-          -- liftIO $ putStrLn $ Pr.ppShow e'
-         -> do
-          reduceNeg e' -- eliminating implicit thunk
+        Just e' -> reduceNeg e' -- eliminating implicit thunk
         _ -> return $ NegDownElim v
     _ -> return $ NegDownElim v
 reduceNeg e = return e
@@ -400,3 +403,74 @@ substNeg sub (NegUpElim x e1 e2) = do
   NegUpElim x e1' e2'
 substNeg sub (NegDownElim v) = NegDownElim $ substPos sub v
 substNeg sub (NegConstElim x vs) = NegConstElim x $ map (substPos sub) vs
+
+reduceComp :: Comp -> WithEnv Comp
+reduceComp (CompPiElimBoxElim v vs) =
+  case v of
+    ValueConst x -> do
+      menv <- gets modalEnv
+      case lookup x menv of
+        Just (args, body) -> reduceComp $ substComp (zip args vs) body
+        _ -> return $ CompPiElimBoxElim v vs
+    _ -> return $ CompPiElimBoxElim v vs
+reduceComp (CompConstElim c vs) = do
+  let xs = takeIntegerList''' vs
+  let t = LowTypeSignedInt 64 -- for now
+  case (c, xs) of
+    (ConstantArith _ ArithAdd, Just [x, y]) ->
+      return $ CompUpIntro (ValueIndexIntro (IndexInteger (x + y)) t)
+    (ConstantArith _ ArithSub, Just [x, y]) ->
+      return $ CompUpIntro (ValueIndexIntro (IndexInteger (x - y)) t)
+    (ConstantArith _ ArithMul, Just [x, y]) ->
+      return $ CompUpIntro (ValueIndexIntro (IndexInteger (x * y)) t)
+    (ConstantArith _ ArithDiv, Just [x, y]) ->
+      return $ CompUpIntro (ValueIndexIntro (IndexInteger (x `div` y)) t)
+    _ -> return $ CompConstElim c vs
+reduceComp (CompSigmaElim v xs e) =
+  case v of
+    ValueSigmaIntro vs -> reduceComp $ substComp (zip xs vs) e
+    _ -> return $ CompSigmaElim v xs e
+reduceComp (CompIndexElim v branchList) =
+  case v of
+    ValueIndexIntro x _ ->
+      case lookup x branchList of
+        Just body -> reduceComp body
+        Nothing ->
+          case lookup IndexDefault branchList of
+            Just body -> reduceComp body
+            Nothing ->
+              lift $
+              throwE $
+              "the index " ++ show x ++ " is not included in branchList"
+    _ -> return $ CompIndexElim v branchList
+reduceComp (CompUpIntro v) = return $ CompUpIntro v
+reduceComp (CompUpElim x e1 e2) = do
+  e1' <- reduceComp e1
+  case e1' of
+    CompUpIntro v -> reduceComp $ substComp [(x, v)] e2
+    _ -> return $ CompUpElim x e1' e2
+
+substValue :: [(Identifier, Value)] -> Value -> Value
+substValue sub (ValueVar x) = fromMaybe (ValueVar x) (lookup x sub)
+substValue _ (ValueConst x) = ValueConst x
+substValue sub (ValueSigmaIntro vs) = ValueSigmaIntro $ map (substValue sub) vs
+substValue _ (ValueIndexIntro l t) = ValueIndexIntro l t
+
+substComp :: [(Identifier, Value)] -> Comp -> Comp
+substComp sub (CompPiElimBoxElim v vs) =
+  CompPiElimBoxElim (substValue sub v) (map (substValue sub) vs)
+substComp sub (CompConstElim c vs) = CompConstElim c $ map (substValue sub) vs
+substComp sub (CompSigmaElim v xs e) = do
+  let v' = substValue sub v
+  let e' = substComp (filter (\(x, _) -> x `notElem` xs) sub) e
+  CompSigmaElim v' xs e'
+substComp sub (CompIndexElim v branchList) = do
+  let (labelList, es) = unzip branchList
+  let v' = substValue sub v
+  let es' = map (substComp sub) es
+  CompIndexElim v' $ zip labelList es'
+substComp sub (CompUpIntro v) = CompUpIntro $ substValue sub v
+substComp sub (CompUpElim x e1 e2) = do
+  let e1' = substComp sub e1
+  let e2' = substComp (filter (\(y, _) -> y /= x) sub) e2
+  CompUpElim x e1' e2'
