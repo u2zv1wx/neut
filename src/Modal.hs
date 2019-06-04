@@ -91,14 +91,11 @@ modalNeg (NegConstElim x vs) = do
   vs' <- mapM modalPos vs
   return $ CompConstElim x vs'
 
--- 変数が被っているケースも考えると、alpha-conversionが必要かもしれない。
 commPiElim :: Comp -> [Value] -> WithEnv Comp
 commPiElim (CompPiElimDownElim v vs) args =
   return $ CompPiElimDownElim v (vs ++ args)
 commPiElim (CompConstElim c vs) args = return $ CompConstElim c (vs ++ args)
 commPiElim (CompSigmaElim v xs e) args = do
-  liftIO $ putStrLn $ "xs == " ++ show xs
-  liftIO $ putStrLn $ "args == " ++ show args
   e' <- commPiElim e args
   return $ CompSigmaElim v xs e'
 commPiElim (CompIndexElim v branchList) args = do
@@ -119,9 +116,9 @@ toNegPiIntroSeq (NegPiIntro x body) = do
 toNegPiIntroSeq t = ([], t)
 
 toNegPiElimSeq :: Neg -> (Neg, [Pos])
-toNegPiElimSeq (NegPiElim e1 e2) = do
-  let (fun, xs) = toNegPiElimSeq e1
-  (fun, xs ++ [e2])
+toNegPiElimSeq (NegPiElim e v) = do
+  let (fun, vs) = toNegPiElimSeq e
+  (fun, vs ++ [v])
 toNegPiElimSeq c = (c, [])
 
 varValue :: Value -> [Identifier]

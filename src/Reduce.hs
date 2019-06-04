@@ -412,10 +412,16 @@ reduceComp (CompPiElimDownElim v vs) =
       menv <- gets modalEnv
       case lookup x menv of
         Just (args, body)
-          | length args == length vs -> do
-            liftIO $ putStrLn $ "name: " ++ x
-            liftIO $ putStrLn $ "assert: " ++ show args ++ " == " ++ show vs
-            reduceComp $ substComp (zip args vs) body
+            -- let vs' = take (length args) vs
+            -- let rest = drop (length args) vs
+            -- let body' = substComp (zip args vs') body
+            -- c <- newNameWith "const"
+            -- insModalEnv c [] body'
+            -- reduceComp $ CompPiElimDownElim (ValueConst c) rest
+         -> do
+          liftIO $ putStrLn $ "name: " ++ x
+          liftIO $ putStrLn $ "assert: " ++ show args ++ " == " ++ show vs
+          reduceComp $ substComp (zip args vs) body
         _ -> return $ CompPiElimDownElim v vs
     _ -> return $ CompPiElimDownElim v vs
 reduceComp (CompConstElim c vs) = do

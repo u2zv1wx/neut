@@ -361,9 +361,9 @@ data Env = Env
   , substitution :: Subst -- for (dependent) type inference
   , univConstraintEnv :: [(UnivLevel, UnivLevel)]
   , currentDir :: FilePath
-  , polEnv :: [(Identifier, Neg)] -- x ~> box.intro e
-  , modalEnv :: [(Identifier, ([Identifier], Comp))] -- x ~> box (lam (x1 ... xn) e))
-  , llvmEnv :: [(Identifier, ([Identifier], LLVM))] -- x ~> box (lam (x1 ... xn) e)
+  , polEnv :: [(Identifier, Neg)] -- x ~> thunk e
+  , modalEnv :: [(Identifier, ([Identifier], Comp))] -- x ~> thunk (lam (x1 ... xn) e))
+  , llvmEnv :: [(Identifier, ([Identifier], LLVM))] -- x ~> thunk (lam (x1 ... xn) e)
   } deriving (Show)
 
 initialEnv :: FilePath -> Env
