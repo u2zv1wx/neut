@@ -207,6 +207,8 @@ data Neg
                Neg
   | NegPiElim Neg
               Pos
+  | NegConstElim Constant
+                 [Pos]
   | NegSigmaElim Pos
                  [Identifier]
                  Neg
@@ -217,8 +219,6 @@ data Neg
               Neg
               Neg
   | NegDownElim Pos
-  | NegConstElim Constant
-                 [Pos]
   deriving (Show)
 
 -- positive modal normal form
@@ -235,7 +235,7 @@ data Comp
   = CompPiElimBoxElim Value -- (force f) @ x1 @ ... @ xn
                       [Value]
   | CompConstElim Constant
-                  [Identifier]
+                  [Value]
   | CompSigmaElim Value
                   [Identifier]
                   Comp

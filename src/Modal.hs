@@ -76,16 +76,9 @@ modalNeg (NegUpElim x e1 e2) = do
 modalNeg (NegDownElim v) = do
   v' <- modalPos v
   return $ CompPiElimBoxElim v' []
-modalNeg (NegConstElim x es) = do
-  es' <- mapM modalPos es
-  xs <- mapM (const (newNameWith "arg")) es
-  bindLet (zip xs es') $ CompConstElim x xs
-
-bindLet :: [(Identifier, Value)] -> Comp -> WithEnv Comp
-bindLet [] e = return e
-bindLet ((x, v):rest) e = do
-  e' <- bindLet rest e
-  return $ CompUpElim x (CompUpIntro v) e'
+modalNeg (NegConstElim x vs) = do
+  vs' <- mapM modalPos vs
+  return $ CompConstElim x vs'
 
 commPiElim :: Comp -> [Value] -> WithEnv Comp
 commPiElim (CompPiElimBoxElim f xs) args =

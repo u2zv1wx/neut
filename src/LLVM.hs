@@ -67,7 +67,7 @@ llvmCodeSigmaElim' basePointer ((x, i):xis) n cont = do
     LLVMLet loader (LLVMGetElementPtr (LLVMDataLocal cast) (i, n)) $
     LLVMLet x (LLVMLoad (LLVMDataLocal loader)) cont'
 
-llvmCodeConstElim :: Constant -> [Identifier] -> WithEnv LLVM
+llvmCodeConstElim :: Constant -> [Value] -> WithEnv LLVM
 llvmCodeConstElim (ConstantArith lowType@(LowTypeSignedInt _) kind) xs
   | length xs == 2 = do
     x0 <- newNameWith "arg"
@@ -77,7 +77,7 @@ llvmCodeConstElim (ConstantArith lowType@(LowTypeSignedInt _) kind) xs
     cast2 <- newNameWith "cast"
     let op2 = LLVMDataLocal cast2
     result <- newNameWith "result"
-    llvmStruct [(x0, ValueVar $ head xs), (x1, ValueVar $ xs !! 1)] $
+    llvmStruct [(x0, head xs), (x1, xs !! 1)] $
       LLVMLet cast1 (LLVMPointerToInt (LLVMDataLocal x0) voidPtr lowType) $
       LLVMLet cast2 (LLVMPointerToInt (LLVMDataLocal x1) voidPtr lowType) $
       LLVMLet result (LLVMArith (kind, lowType) op1 op2) $
@@ -97,7 +97,7 @@ llvmCodeConstElim (ConstantArith (LowTypeFloat i) kind) xs
     uncast <- newNameWith "uncast"
     let si = LowTypeSignedInt i
     let op = (kind, LowTypeFloat i)
-    llvmStruct [(x0, ValueVar $ head xs), (x1, ValueVar $ xs !! 1)] $
+    llvmStruct [(x0, head xs), (x1, xs !! 1)] $
       -- cast the first argument from i8* to float
       LLVMLet cast11 (LLVMPointerToInt (LLVMDataLocal x0) voidPtr si) $
       LLVMLet cast12 (LLVMBitcast (LLVMDataLocal cast11) si (LowTypeFloat i)) $
