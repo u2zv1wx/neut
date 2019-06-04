@@ -18,7 +18,6 @@ import Control.Comonad.Cofree
 
 import Data.IORef
 
-import Asm
 import Data
 import Elaborate
 import Emit
@@ -31,7 +30,6 @@ import Polarize
 import Read
 import Reduce
 import Rename
-import Virtual
 
 import System.Directory
 import System.FilePath
@@ -225,7 +223,5 @@ process e = do
   e' <- elaborate e
   polarize "main" e'
   modalize
-  -- virtualize
-  -- assemblize
   toLLVM
   emit
