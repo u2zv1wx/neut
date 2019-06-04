@@ -112,9 +112,8 @@ toPrintDefinition :: Constant -> WithEnv Neg
 toPrintDefinition c = do
   x <- newNameWith "lam"
   x' <- newNameWith "lam"
-  return $
-    NegPiIntro x $
-    NegUpElim x' (NegDownElim (PosVar x)) $ NegConstElim c [PosVar x']
+  fx <- force $ PosVar x
+  return $ NegPiIntro x $ NegUpElim x' fx $ NegConstElim c [PosVar x']
 
 getArithBinOpConstant :: Identifier -> Maybe Constant
 getArithBinOpConstant x = do
@@ -139,12 +138,12 @@ toArithBinOpDefinition c = do
   y <- newNameWith "cls2"
   x' <- newNameWith "arg1"
   y' <- newNameWith "arg2"
+  fx <- force $ PosVar x
+  fy <- force $ PosVar y
   return $
     NegPiIntro x $
     NegPiIntro y $
-    NegUpElim x' (NegDownElim (PosVar x)) $
-    NegUpElim y' (NegDownElim (PosVar y)) $
-    NegConstElim c [PosVar x', PosVar y']
+    NegUpElim x' fx $ NegUpElim y' fy $ NegConstElim c [PosVar x', PosVar y']
 
 wordsWhen :: (Char -> Bool) -> String -> [String]
 wordsWhen p s =

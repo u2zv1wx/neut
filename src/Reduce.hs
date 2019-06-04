@@ -170,7 +170,7 @@ reduceTerm (TermIndexElim e branchList) = do
               throwE $
               "the index " ++ show x ++ " is not included in branchList"
     _ -> return $ TermIndexElim e' branchList
-reduceTerm (TermMu s e) = reduceTerm $ substTerm [(s, TermMu s e)] e
+reduceTerm (TermMu s e) = reduceTerm $ substTerm' [(s, TermMu s e)] e
 reduceTerm t = return t
 
 type SubstTerm = [(Identifier, Term)]
@@ -200,6 +200,33 @@ substTerm sub (TermIndexElim e branchList) = do
 substTerm sub (TermMu x e) = do
   let sub' = filter (\(y, _) -> x /= y) sub
   let e' = substTerm sub' e
+  TermMu x e'
+
+substTerm' :: SubstTerm -> Term -> Term
+substTerm' _ (TermVar x) = TermVar x
+substTerm' sub (TermConst x) = fromMaybe (TermConst x) (lookup x sub)
+substTerm' sub (TermPiIntro s body) = do
+  let sub' = filter (\(x, _) -> x /= s) sub
+  let body' = substTerm' sub' body
+  TermPiIntro s body'
+substTerm' sub (TermPiElim e1 e2) = do
+  let e1' = substTerm' sub e1
+  let e2' = substTerm' sub e2
+  TermPiElim e1' e2'
+substTerm' sub (TermSigmaIntro es) = TermSigmaIntro (map (substTerm' sub) es)
+substTerm' sub (TermSigmaElim e1 xs e2) = do
+  let e1' = substTerm' sub e1
+  let sub' = filter (\(x, _) -> x `notElem` xs) sub
+  let e2' = substTerm' sub' e2
+  TermSigmaElim e1' xs e2'
+substTerm' _ (TermIndexIntro l meta) = TermIndexIntro l meta
+substTerm' sub (TermIndexElim e branchList) = do
+  let e' = substTerm' sub e
+  let branchList' = map (\(l, e) -> (l, substTerm' sub e)) branchList
+  TermIndexElim e' branchList'
+substTerm' sub (TermMu x e) = do
+  let sub' = filter (\(y, _) -> x /= y) sub
+  let e' = substTerm' sub' e
   TermMu x e'
 
 toPiIntroSeq :: Neut -> (Neut, [(Identifier, Neut, Identifier)])
@@ -280,17 +307,17 @@ isReducible (_ :< NeutMu _ _) = True
 isReducible (_ :< NeutHole _) = False
 
 reduceNeg :: Neg -> WithEnv Neg
-reduceNeg (NegPiElim e1 e2) = do
-  e1' <- reduceNeg e1
-  case e1' of
-    NegPiIntro x body -> reduceNeg $ substNeg [(x, e2)] body
-    _ -> return $ NegPiElim e1' e2
-reduceNeg (NegSigmaElim e xs body) =
-  case e of
-    PosSigmaIntro es -> reduceNeg $ substNeg (zip xs es) body
-    _ -> return $ NegSigmaElim e xs body
-reduceNeg (NegIndexElim e branchList) =
-  case e of
+reduceNeg (NegPiElim e v) = do
+  e' <- reduceNeg e
+  case e' of
+    NegPiIntro x body -> reduceNeg $ substNeg [(x, v)] body
+    _ -> return $ NegPiElim e' v
+reduceNeg (NegSigmaElim v xs body) =
+  case v of
+    PosSigmaIntro vs -> reduceNeg $ substNeg (zip xs vs) body
+    _ -> return $ NegSigmaElim v xs body
+reduceNeg (NegIndexElim v branchList) =
+  case v of
     PosIndexIntro x _ ->
       case lookup x branchList of
         Just body -> reduceNeg body
@@ -301,12 +328,11 @@ reduceNeg (NegIndexElim e branchList) =
               lift $
               throwE $
               "the index " ++ show x ++ " is not included in branchList"
-    _ -> return $ NegIndexElim e branchList
-reduceNeg (NegUpIntro e) = return $ NegUpIntro e
+    _ -> return $ NegIndexElim v branchList
 reduceNeg (NegUpElim x e1 e2) = do
   e1' <- reduceNeg e1
   case e1' of
-    NegUpIntro e1'' -> reduceNeg $ substNeg [(x, e1'')] e2
+    NegUpIntro v -> reduceNeg $ substNeg [(x, v)] e2
     _ -> return $ NegUpElim x e1' e2
 reduceNeg (NegConstElim x vs) = do
   let xs = takeIntegerList'' vs
@@ -321,15 +347,21 @@ reduceNeg (NegConstElim x vs) = do
     (ConstantArith _ ArithDiv, Just [x, y]) ->
       return $ NegUpIntro (PosIndexIntro (IndexInteger (x `div` y)) t)
     _ -> return $ NegConstElim x vs
-reduceNeg (NegDownElim e) =
-  case e of
-    PosDownIntro e'' -> reduceNeg e''
-    PosConst x -> do
+reduceNeg (NegDownElim v) =
+  case v of
+    PosDownIntro e -> reduceNeg e
+    PosConst x
+      -- liftIO $ putStrLn $ "found a constant: " ++ x
+     -> do
       penv <- gets polEnv
       case lookup x penv of
-        Just e' -> return e' -- eliminating implicit thunk
-        _ -> return $ NegDownElim e
-    _ -> return $ NegDownElim e
+        Just e'
+          -- liftIO $ putStrLn $ "found the corresponding content"
+          -- liftIO $ putStrLn $ Pr.ppShow e'
+         -> do
+          reduceNeg e' -- eliminating implicit thunk
+        _ -> return $ NegDownElim v
+    _ -> return $ NegDownElim v
 reduceNeg e = return e
 
 type SubstPos = [(Identifier, Pos)]
@@ -337,37 +369,34 @@ type SubstPos = [(Identifier, Pos)]
 substPos :: SubstPos -> Pos -> Pos
 substPos sub (PosVar s) = fromMaybe (PosVar s) (lookup s sub)
 substPos _ (PosConst s) = PosConst s
-substPos sub (PosSigmaIntro es) = do
-  let es' = map (substPos sub) es
-  PosSigmaIntro es'
-substPos _ (PosIndexIntro l meta) = PosIndexIntro l meta
-substPos sub (PosDownIntro e) = do
-  let e' = substNeg sub e
-  PosDownIntro e'
+substPos sub (PosSigmaIntro vs) = do
+  let vs' = map (substPos sub) vs
+  PosSigmaIntro vs'
+substPos _ (PosIndexIntro l t) = PosIndexIntro l t
+substPos sub (PosDownIntro e) = PosDownIntro $ substNeg sub e
 
 substNeg :: SubstPos -> Neg -> Neg
 substNeg sub (NegPiIntro s body) = do
   let sub' = filter (\(x, _) -> x /= s) sub
-  let body' = substNeg sub' body
-  NegPiIntro s body'
-substNeg sub (NegPiElim e1 e2) = do
-  let e1' = substNeg sub e1
-  let e2' = substPos sub e2
-  NegPiElim e1' e2'
-substNeg sub (NegSigmaElim e1 xs e2) = do
-  let e1' = substPos sub e1
+  NegPiIntro s $ substNeg sub' body
+substNeg sub (NegPiElim e v) = do
+  let e' = substNeg sub e
+  let v' = substPos sub v
+  NegPiElim e' v'
+substNeg sub (NegSigmaElim v xs e) = do
+  let v' = substPos sub v
   let sub' = filter (\(x, _) -> x `notElem` xs) sub
-  let e2' = substNeg sub' e2
-  NegSigmaElim e1' xs e2'
-substNeg sub (NegIndexElim e branchList) = do
-  let e' = substPos sub e
+  let e' = substNeg sub' e
+  NegSigmaElim v' xs e'
+substNeg sub (NegIndexElim v branchList) = do
+  let v' = substPos sub v
   let branchList' = map (\(l, e) -> (l, substNeg sub e)) branchList
-  NegIndexElim e' branchList'
-substNeg sub (NegUpIntro e) = NegUpIntro (substPos sub e)
+  NegIndexElim v' branchList'
+substNeg sub (NegUpIntro v) = NegUpIntro $ substPos sub v
 substNeg sub (NegUpElim x e1 e2) = do
   let e1' = substNeg sub e1
   let sub' = filter (\(y, _) -> x /= y) sub
   let e2' = substNeg sub' e2
   NegUpElim x e1' e2'
-substNeg sub (NegDownElim e) = NegDownElim (substPos sub e)
-substNeg sub (NegConstElim x vs) = NegConstElim x (map (substPos sub) vs)
+substNeg sub (NegDownElim v) = NegDownElim $ substPos sub v
+substNeg sub (NegConstElim x vs) = NegConstElim x $ map (substPos sub) vs

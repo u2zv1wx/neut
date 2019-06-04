@@ -24,9 +24,6 @@ toLLVM :: WithEnv ()
 toLLVM = do
   menv <- gets modalEnv
   forM_ menv $ \(name, (args, e)) -> do
-    liftIO $ putStrLn name
-    liftIO $ putStrLn $ show args
-    liftIO $ putStrLn $ Pr.ppShow e
     llvm <- llvmCode e
     insLLVMEnv name args llvm
 
