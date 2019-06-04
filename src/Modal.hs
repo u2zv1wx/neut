@@ -102,6 +102,7 @@ commPiElim (CompIndexElim v branchList) args = do
   let (labelList, es) = unzip branchList
   es' <- mapM (`commPiElim` args) es
   return $ CompIndexElim v (zip labelList es')
+commPiElim (CompUpIntro v) [] = return $ CompUpIntro v
 commPiElim (CompUpIntro _) _ = lift $ throwE "Modal.commPiElim: type error"
 commPiElim (CompUpElim x e1 e2) args = do
   liftIO $ putStrLn $ "x == " ++ show x
