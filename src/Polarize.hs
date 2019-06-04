@@ -1,15 +1,9 @@
 -- This module "polarizes" a neutral term to a negative term. Operationally,
 -- this corresponds to determination of the order of evaluation. In proof-theoretic
 -- term, we translate a ordinary dependent calculus to a dependent variant of
--- Call-By-Push-Value calculus. The basics of Call-By-Push-Value can be found in
+-- Call-By-Push-Value calculus. You can refer Call-By-Push-Value can be found in
 -- P. Levy. "Call-by-Push-Value: A Subsuming Paradigm". Ph. D. thesis, Queen
--- Mary College, 2001. In the thesis, Levy gives a translation from a call-by-value
--- calculus to a call-by-push-value calculus. Our translation is a dependent
--- extension of the translation. The crucial point in our translation would be that,
--- in dependent setting, the distinction between the type constructor `↑(-)`
--- and the term constructor `return (-)` seems to disappear. Indeed, in this
--- translation, we only use `NegUpIntro` (the term-level construct), and
--- not `NegUp` (the type-level construct).
+-- Mary College, 2001 for further information.
 module Polarize
   ( polarize
   ) where
@@ -37,9 +31,6 @@ polarize :: Identifier -> Term -> WithEnv ()
 polarize name e = do
   e' <- polarize' e
   insPolEnv name e'
-  -- liftIO $ putStrLn $ Pr.ppShow e'
-  -- liftIO $ putStrLn "================================"
-  -- insPolEnv name $ PosDownIntro e'
 
 polarize' :: Term -> WithEnv Neg
 polarize' (TermVar x) = force (PosVar x)

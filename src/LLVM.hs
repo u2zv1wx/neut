@@ -1,14 +1,3 @@
--- This module creates a LLVM virtual code from the result of `virtualize`.
--- Remember that our calculus is dependent, whereas LLVM isn't. Therefore, we cannot
--- simply use the result of type inference of our dependent calculus here.
--- To deal with this situation, we represent all the datas as i8*, and cast it
--- when necessary. For example, if we'd like to add two variables x and y as i32,
--- the correspoing LLVM code is essentially:
---   tmp1 = cast-pointer-to-int i8* x to i32
---   tmp2 = cast-pointer-to-int i8* y to i32
---   tmp3 = add i32 tmp1, tmp2
---   result = cast-int-to-pointer i32 tmp3 to i8*
--- By this design decision, one can handle polymorphic functions in LLVM.
 module LLVM
   ( toLLVM
   ) where
@@ -37,7 +26,6 @@ toLLVM = do
   forM_ menv $ \(name, (args, code)) -> do
     llvm <- llvmCode code
     insLLVMEnv name args llvm
-    -- insLLVMEnv name args llvm
 
 llvmCode :: Comp -> WithEnv LLVM
 llvmCode (CompPiElimBoxElim fun args) = do
@@ -65,13 +53,6 @@ llvmCodeSigmaElim z xis n cont = do
   basePointer <- newNameWith "sigma"
   c <- llvmCodeSigmaElim' basePointer xis n cont
   llvmDataLet basePointer z c
-  -- cast <- newNameWith "cast"
-  -- let structPtrType = toStructPtrType [1 .. n]
-  -- loader <- newNameWith "loader"
-  -- llvmDataLet tmp z $
-  --   LLVMLet cast (LLVMBitcast (LLVMDataLocal tmp) voidPtr structPtrType) $
-  --   LLVMLet loader (LLVMGetElementPtr (LLVMDataLocal cast) (i, n)) $
-  --   LLVMLet x (LLVMLoad (LLVMDataLocal loader)) cont'
 
 llvmCodeSigmaElim' ::
      Identifier -> [(Identifier, Int)] -> Int -> Comp -> WithEnv LLVM

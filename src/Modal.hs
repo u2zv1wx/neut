@@ -25,21 +25,7 @@ modalize = do
   penv <- gets polEnv
   forM_ penv $ \(name, e) -> do
     e'' <- modalNeg e
-    -- liftIO $ putStrLn $ Pr.ppShow e''
-    -- liftIO $ putStrLn "================================"
     insModalEnv name [] e''
-    -- insModalEnvFunc name' [] e''
-    -- insModalEnvConst name actualTerm'
-  -- menv <- gets modalEnv
-  -- forM_ menv $ \(name, e) -> do
-  --   liftIO $ putStrLn $ "the arity of " ++ name ++ " is " ++ show (arity e)
-    -- case actualTerm' of
-    --   SSPosBoxIntroPiIntro args body -> do
-    --     liftIO $ putStrLn $ "name == " ++ show name
-    --     liftIO $ putStrLn $ "args == " ++ show args
-    --     body' <- modalNeg body
-    --     insModalEnv name args body'
-    --   _ -> lift $ throwE "non-function?"
 
 modalPos :: Pos -> WithEnv Value
 modalPos (PosVar x) = return $ ValueVar x
@@ -51,7 +37,6 @@ modalPos (PosIndexIntro l t) = return $ ValueIndexIntro l t
 modalPos (PosDownIntro e) = do
   e' <- modalNeg e
   modalPosBoxIntroPiIntro [] e'
-  -- return $ SSPosBoxIntroPiIntro [] e'
 
 -- translates (thunk (lam (x1 ... xn) e)).
 modalPosBoxIntroPiIntro :: [Identifier] -> Comp -> WithEnv Value
