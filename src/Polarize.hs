@@ -1,9 +1,10 @@
--- This module "polarizes" a neutral term to a negative term. Operationally,
+-- This module "polarizes" a neutral term into a negative term. Operationally,
 -- this corresponds to determination of the order of evaluation. In proof-theoretic
 -- term, we translate a ordinary dependent calculus to a dependent variant of
--- Call-By-Push-Value calculus. You can refer Call-By-Push-Value can be found in
--- P. Levy. "Call-by-Push-Value: A Subsuming Paradigm". Ph. D. thesis, Queen
--- Mary College, 2001 for further information.
+-- Call-By-Push-Value, although this translation doesn't preserve types when the
+-- given term includes dependent sigma-elimination. A detailed explanation of
+-- Call-By-Push-Value can be found in P. Levy. "Call-by-Push-Value: A Subsuming
+-- Paradigm". Ph. D. thesis, Queen Mary College, 2001.
 module Polarize
   ( polarize
   ) where
