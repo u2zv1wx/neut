@@ -76,6 +76,9 @@ data LowType
   | LowTypeStruct [LowType]
   deriving (Eq)
 
+voidPtr :: LowType
+voidPtr = LowTypePointer $ LowTypeSignedInt 8
+
 data NeutF a
   = NeutVar Identifier
   | NeutConst Identifier
@@ -243,127 +246,126 @@ data Comp
                Comp
   deriving (Show)
 
-data Data
-  = DataLocal Identifier
-  | DataGlobal Identifier
-  | DataInt Int
-  | DataFloat16 Double
-  | DataFloat32 Double
-  | DataFloat64 Double
-  | DataStruct [Data]
-  | DataArith (Arith, LowType)
-              Data
-              Data
-  deriving (Show)
-
-data Code
-  = CodeReturn Data
-  | CodeLet Identifier
-            Data
-            Code
-  | CodeCall Identifier -- the register that stores the result of a function call (type: P)
-             Data -- the name of the function (type: Box (P1 -> ... -> Pn -> ↑P))
-             [Data] -- arguments (type : [P1, ..., Pn])
-             Code -- continuation
-  | CodeCallTail Data -- the name of the function (type: Box (P1 -> ... -> Pn -> ↑P))
-                 [Data] -- arguments (type : [P1, ..., Pn])
-  | CodeSwitch Data
-               [(Index, Code)]
-  | CodeExtractValue Identifier -- destination
-                     Data -- base pointer
-                     (Int, Int) -- (i, n, size) ... index i in [1 ... n]
-                     Code -- continuation
-  | CodeFree Data
-             Code
-  | CodePrint LowType
-              Data
-              Code
-  deriving (Show)
-
-data AsmData
-  = AsmDataLocal Identifier
-  | AsmDataGlobal Identifier
-  | AsmDataInt Int
-  | AsmDataFloat Double
-
-instance Show AsmData where
-  show (AsmDataLocal x) = "%" ++ x
-  show (AsmDataGlobal x) = "@" ++ x
-  show (AsmDataInt i) = show i
-  show (AsmDataFloat x) = show x
-
-type MCont = Maybe (Identifier, Asm)
-
-data Asm
-  = AsmReturn AsmData
-  | AsmGetElementPtr Identifier
-                     AsmData
-                     (Int, Int) -- (index, length)
-                     Asm
-  | AsmCall AsmData
-            [AsmData]
-            MCont
-  -- | AsmCallTail AsmData
-  --               [AsmData]
-  | AsmSwitch AsmData
-              Asm
-              [(Int, Asm)]
-  | AsmBitcast Identifier -- store the result in this register
-               AsmData
-               LowType
-               LowType -- cast to this type
-               Asm
-  | AsmIntToPointer Identifier
-                    AsmData
-                    LowType
-                    LowType
-                    Asm
-  | AsmPointerToInt Identifier
-                    AsmData
-                    LowType
-                    LowType
-                    Asm
-  | AsmLoad Identifier
-            AsmData
-            Asm
-  | AsmStore (AsmData, LowType)
-             (AsmData, LowType)
-             Asm
-  | AsmAlloc Identifier
-             [LowType]
-             Asm
-  | AsmFree AsmData
-            Asm
-  | AsmArith (Arith, LowType)
-             AsmData
-             AsmData
-             MCont
-  | AsmPrint LowType
-             AsmData
-             MCont
-  -- | AsmPrintTail LowType
-  --                AsmData
-  deriving (Show)
-
+-- data Data
+--   = DataLocal Identifier
+--   | DataGlobal Identifier
+--   | DataInt Int
+--   | DataFloat16 Double
+--   | DataFloat32 Double
+--   | DataFloat64 Double
+--   | DataStruct [Data]
+--   | DataArith (Arith, LowType)
+--               Data
+--               Data
+--   deriving (Show)
+-- data Code
+--   = CodeReturn Data
+--   | CodeLet Identifier
+--             Data
+--             Code
+--   | CodeCall Identifier -- the register that stores the result of a function call (type: P)
+--              Data -- the name of the function (type: Box (P1 -> ... -> Pn -> ↑P))
+--              [Data] -- arguments (type : [P1, ..., Pn])
+--              Code -- continuation
+--   | CodeCallTail Data -- the name of the function (type: Box (P1 -> ... -> Pn -> ↑P))
+--                  [Data] -- arguments (type : [P1, ..., Pn])
+--   | CodeSwitch Data
+--                [(Index, Code)]
+--   | CodeExtractValue Identifier -- destination
+--                      Data -- base pointer
+--                      (Int, Int) -- (i, n, size) ... index i in [1 ... n]
+--                      Code -- continuation
+--   | CodeFree Data
+--              Code
+--   | CodePrint LowType
+--               Data
+--               Code
+--   deriving (Show)
+-- data AsmData
+--   = AsmDataLocal Identifier
+--   | AsmDataGlobal Identifier
+--   | AsmDataInt Int
+--   | AsmDataFloat Double
+-- instance Show AsmData where
+--   show (AsmDataLocal x) = "%" ++ x
+--   show (AsmDataGlobal x) = "@" ++ x
+--   show (AsmDataInt i) = show i
+--   show (AsmDataFloat x) = show x
+-- type MCont = Maybe (Identifier, Asm)
+-- data Asm
+--   = AsmReturn AsmData
+--   | AsmGetElementPtr Identifier
+--                      AsmData
+--                      (Int, Int) -- (index, length)
+--                      Asm
+--   | AsmCall AsmData
+--             [AsmData]
+--             MCont
+--   -- | AsmCallTail AsmData
+--   --               [AsmData]
+--   | AsmSwitch AsmData
+--               Asm
+--               [(Int, Asm)]
+--   | AsmBitcast Identifier -- store the result in this register
+--                AsmData
+--                LowType
+--                LowType -- cast to this type
+--                Asm
+--   | AsmIntToPointer Identifier
+--                     AsmData
+--                     LowType
+--                     LowType
+--                     Asm
+--   | AsmPointerToInt Identifier
+--                     AsmData
+--                     LowType
+--                     LowType
+--                     Asm
+--   | AsmLoad Identifier
+--             AsmData
+--             Asm
+--   | AsmStore (AsmData, LowType)
+--              (AsmData, LowType)
+--              Asm
+--   | AsmAlloc Identifier
+--              [LowType]
+--              Asm
+--   | AsmFree AsmData
+--             Asm
+--   | AsmArith (Arith, LowType)
+--              AsmData
+--              AsmData
+--              MCont
+--   | AsmPrint LowType
+--              AsmData
+--              MCont
+--   -- | AsmPrintTail LowType
+--   --                AsmData
+--   deriving (Show)
 data LLVMData
   = LLVMDataLocal Identifier
   | LLVMDataGlobal Identifier
   | LLVMDataInt Int
   | LLVMDataFloat Double
-  deriving (Show)
+
+instance Show LLVMData where
+  show (LLVMDataLocal x) = "%" ++ x
+  show (LLVMDataGlobal x) = "@" ++ x
+  show (LLVMDataInt i) = show i
+  show (LLVMDataFloat x) = show x
 
 data LLVM
-  = LLVMReturn LLVMData
-  | LLVMLet Identifier
+  = LLVMCall LLVMData -- PiElimDownElim
+             [LLVMData]
+  | LLVMSwitch LLVMData -- IndexElim
+               LLVM
+               [(Int, LLVM)]
+  | LLVMReturn LLVMData -- UpIntro
+  | LLVMLet Identifier -- UpElim
             LLVM
             LLVM
   | LLVMGetElementPtr LLVMData
                       (Int, Int) -- (index, length)
-  | LLVMCall LLVMData
-             [LLVMData]
-  | LLVMSwitch LLVMData
-               LLVM
-               [(Int, LLVM)]
   | LLVMBitcast LLVMData
                 LowType
                 LowType -- cast to this type
@@ -455,8 +457,8 @@ data Env = Env
   , constraintQueue :: Q.MinQueue EnrichedConstraint
   , substitution :: Subst
   , univConstraintEnv :: [(UnivLevel, UnivLevel)]
-  , codeEnv :: [(Identifier, ([Identifier], Code))]
-  , asmEnv :: [(Identifier, ([Identifier], Asm))]
+  -- , codeEnv :: [(Identifier, ([Identifier], Code))]
+  -- , asmEnv :: [(Identifier, ([Identifier], Asm))]
   , llvmEnv :: [(Identifier, ([Identifier], LLVM))]
   , currentDir :: FilePath
   } deriving (Show)
@@ -474,8 +476,8 @@ initialEnv path =
     , typeEnv = Map.empty
     , polEnv = []
     , modalEnv = []
-    , codeEnv = []
-    , asmEnv = []
+    -- , codeEnv = []
+    -- , asmEnv = []
     , llvmEnv = []
     , constraintEnv = []
     , constraintQueue = Q.empty
@@ -559,13 +561,12 @@ lookupNameEnv'' s = do
     Just s' -> return $ Just s'
     Nothing -> return Nothing
 
-lookupCodeEnv :: Identifier -> WithEnv ([Identifier], Code)
-lookupCodeEnv funName = do
-  env <- get
-  case lookup funName (codeEnv env) of
-    Just e -> return e
-    Nothing -> lift $ throwE $ "no such code: " ++ show funName
-
+-- lookupCodeEnv :: Identifier -> WithEnv ([Identifier], Code)
+-- lookupCodeEnv funName = do
+--   env <- get
+--   case lookup funName (codeEnv env) of
+--     Just e -> return e
+--     Nothing -> lift $ throwE $ "no such code: " ++ show funName
 insTypeEnv :: Identifier -> Neut -> WithEnv ()
 insTypeEnv i t = modify (\e -> e {typeEnv = Map.insert i t (typeEnv e)})
 
@@ -576,10 +577,9 @@ insTypeEnv1 i t = do
   forM_ ts $ \t' -> insConstraintEnv t t'
   modify (\e -> e {typeEnv = Map.insert i t (typeEnv e)})
 
-insCodeEnv :: Identifier -> [Identifier] -> Code -> WithEnv ()
-insCodeEnv funName args body =
-  modify (\e -> e {codeEnv = (funName, (args, body)) : codeEnv e})
-
+-- insCodeEnv :: Identifier -> [Identifier] -> Code -> WithEnv ()
+-- insCodeEnv funName args body =
+--   modify (\e -> e {codeEnv = (funName, (args, body)) : codeEnv e})
 insPolEnv :: Identifier -> Neg -> WithEnv ()
 insPolEnv name body = modify (\e -> e {polEnv = (name, body) : polEnv e})
 
@@ -587,10 +587,9 @@ insModalEnv :: Identifier -> [Identifier] -> Comp -> WithEnv ()
 insModalEnv funName args body =
   modify (\e -> e {modalEnv = (funName, (args, body)) : modalEnv e})
 
-insAsmEnv :: Identifier -> [Identifier] -> Asm -> WithEnv ()
-insAsmEnv funName args asm =
-  modify (\e -> e {asmEnv = (funName, (args, asm)) : asmEnv e})
-
+-- insAsmEnv :: Identifier -> [Identifier] -> Asm -> WithEnv ()
+-- insAsmEnv funName args asm =
+--   modify (\e -> e {asmEnv = (funName, (args, asm)) : asmEnv e})
 insLLVMEnv :: Identifier -> [Identifier] -> LLVM -> WithEnv ()
 insLLVMEnv funName args llvm =
   modify (\e -> e {llvmEnv = (funName, (args, llvm)) : llvmEnv e})

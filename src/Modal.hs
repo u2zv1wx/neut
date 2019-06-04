@@ -26,7 +26,7 @@ modalize = do
   forM_ penv $ \(name, e) -> do
     let name' = name ++ ".fun"
     e'' <- modalNeg e
-    insModalEnv name' [] e''
+    insModalEnv name [] e''
     -- insModalEnvFunc name' [] e''
     -- insModalEnvConst name actualTerm'
   -- menv <- gets modalEnv

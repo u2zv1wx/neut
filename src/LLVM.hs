@@ -10,7 +10,7 @@
 --   result = cast-int-to-pointer i32 tmp3 to i8*
 -- By this design decision, one can handle polymorphic functions in LLVM.
 module LLVM
-  ( assemblize
+  ( toLLVM
   ) where
 
 import Control.Monad
@@ -31,8 +31,8 @@ import qualified Text.Show.Pretty as Pr
 
 import Debug.Trace
 
-assemblize :: WithEnv ()
-assemblize = do
+toLLVM :: WithEnv ()
+toLLVM = do
   menv <- gets modalEnv
   forM_ menv $ \(name, (args, code)) -> do
     llvm <- llvmCode code
@@ -133,7 +133,7 @@ llvmDataLet :: Identifier -> Value -> LLVM -> WithEnv LLVM
 llvmDataLet x (ValueVar y) cont =
   return $ LLVMLet x (LLVMBitcast (LLVMDataLocal y) voidPtr voidPtr) cont
 llvmDataLet x (ValueConst y) cont = do
-  cenv <- gets codeEnv
+  cenv <- gets modalEnv
   case lookup y cenv of
     Nothing -> lift $ throwE $ "no such global label defined: " ++ y -- FIXME
     Just (args, _) -> do
@@ -217,9 +217,6 @@ llvmStruct [] cont = return cont
 llvmStruct ((x, d):xds) cont = do
   cont' <- llvmStruct xds cont
   llvmDataLet x d cont'
-
-voidPtr :: LowType
-voidPtr = LowTypePointer $ LowTypeSignedInt 8
 
 toFunPtrType :: [a] -> LowType
 toFunPtrType xs = do

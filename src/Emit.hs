@@ -27,98 +27,37 @@ emit :: WithEnv [String]
 emit = do
   env <- get
   g <- emitGlobal
-  xs <- forM (asmEnv env) $ uncurry emitDefinition
+  xs <- forM (llvmEnv env) $ uncurry emitDefinition
   return $ g ++ concat xs
 
-emitDefinition :: Identifier -> ([Identifier], Asm) -> WithEnv [String]
+emitDefinition :: Identifier -> ([Identifier], LLVM) -> WithEnv [String]
 emitDefinition name (args, asm) = do
   let prologue = sig name args ++ " {"
-  content <- emitAsm name asm
+  content <- emitLLVM name asm
   let epilogue = "}"
   return $ [prologue] ++ content ++ [epilogue]
 
 sig :: Identifier -> [Identifier] -> String
-sig "main" args = "define i64 @main" ++ showArgs (map AsmDataLocal args)
+sig "main" args = "define i64 @main" ++ showArgs (map LLVMDataLocal args)
 sig name args =
-  "define i8* " ++ show (AsmDataGlobal name) ++ showArgs (map AsmDataLocal args)
+  "define i8* " ++
+  show (LLVMDataGlobal name) ++ showArgs (map LLVMDataLocal args)
 
-emitBlock :: Identifier -> Identifier -> Asm -> WithEnv [String]
+emitBlock :: Identifier -> Identifier -> LLVM -> WithEnv [String]
 emitBlock funName name asm = do
-  a <- emitAsm funName asm
+  a <- emitLLVM funName asm
   return $ emitLabel name : a
 
-emitAsm :: Identifier -> Asm -> WithEnv [String]
-emitAsm funName (AsmReturn d) = emitRet funName d
-emitAsm funName (AsmGetElementPtr x base (i, n) cont) = do
-  op <-
-    emitOp $
-    unwords
-      [ show (AsmDataLocal x)
-      , "= getelementptr"
-      , showStruct n ++ ","
-      , showStruct n ++ "*"
-      , show base ++ ","
-      , showIndex [0, i]
-      ]
-  xs <- emitAsm funName cont
-  return $ op ++ xs
-emitAsm funName (AsmCall x f args cont) = do
-  op <-
-    emitOp $
-    unwords [show (AsmDataLocal x), "=", "call i8*", show f ++ showArgs args]
-  a <- emitAsm funName cont
-  return $ op ++ a
-emitAsm funName (AsmCallTail f args) = do
+emitLLVM :: Identifier -> LLVM -> WithEnv [String]
+emitLLVM funName (LLVMCall f args) = do
   tmp <- newNameWith "tmp"
   op <-
     emitOp $
     unwords
-      [show (AsmDataLocal tmp), "=", "tail call i8*", show f ++ showArgs args]
-  a <- emitRet funName (AsmDataLocal tmp)
+      [show (LLVMDataLocal tmp), "=", "tail call i8*", show f ++ showArgs args]
+  a <- emitRet funName (LLVMDataLocal tmp)
   return $ op ++ a
-emitAsm funName (AsmBitcast x d fromType toType cont) = do
-  op <-
-    emitOp $
-    unwords
-      [ show (AsmDataLocal x)
-      , "="
-      , "bitcast"
-      , showLowType fromType
-      , show d
-      , "to"
-      , showLowType toType
-      ]
-  a <- emitAsm funName cont
-  return $ op ++ a
-emitAsm funName (AsmIntToPointer x d fromType toType cont) = do
-  op <-
-    emitOp $
-    unwords
-      [ show (AsmDataLocal x)
-      , "="
-      , "inttoptr"
-      , showLowType fromType
-      , show d
-      , "to"
-      , showLowType toType
-      ]
-  a <- emitAsm funName cont
-  return $ op ++ a
-emitAsm funName (AsmPointerToInt x d fromType toType cont) = do
-  op <-
-    emitOp $
-    unwords
-      [ show (AsmDataLocal x)
-      , "="
-      , "ptrtoint"
-      , showLowType fromType
-      , show d
-      , "to"
-      , showLowType toType
-      ]
-  a <- emitAsm funName cont
-  return $ op ++ a
-emitAsm funName (AsmSwitch d defaultBranch branchList) = do
+emitLLVM funName (LLVMSwitch d defaultBranch branchList) = do
   defaultLabel <- newNameWith "default"
   labelList <- constructLabelList branchList
   op <-
@@ -128,7 +67,7 @@ emitAsm funName (AsmSwitch d defaultBranch branchList) = do
       , "i64"
       , show d ++ ","
       , "label"
-      , show (AsmDataLocal defaultLabel)
+      , show (LLVMDataLocal defaultLabel)
       , showBranchList $ zip (map fst branchList) labelList
       ]
   let asmList = map snd branchList
@@ -136,22 +75,94 @@ emitAsm funName (AsmSwitch d defaultBranch branchList) = do
     forM (zip labelList asmList ++ [(defaultLabel, defaultBranch)]) $
     uncurry (emitBlock funName)
   return $ op ++ concat xs
-emitAsm funName (AsmLoad x d cont) = do
-  op <- emitOp $ unwords [show (AsmDataLocal x), "=", "load i8*, i8**", show d]
-  a <- emitAsm funName cont
+emitLLVM funName (LLVMReturn d) = emitRet funName d
+emitLLVM funName (LLVMLet x (LLVMCall f args) cont) = do
+  op <-
+    emitOp $
+    unwords [show (LLVMDataLocal x), "=", "call i8*", show f ++ showArgs args]
+  a <- emitLLVM funName cont
   return $ op ++ a
-emitAsm funName (AsmStore (d1, t1) (d2, t2) cont) = do
+emitLLVM funName (LLVMLet x (LLVMSwitch d defaultBranch branchList) cont) = do
+  let (labelList, ls) = unzip branchList
+  let ls' = map (\l -> LLVMLet x l cont) ls
+  let defaultBranch' = LLVMLet x defaultBranch cont
+  emitLLVM funName (LLVMSwitch d defaultBranch' (zip labelList ls'))
+emitLLVM funName (LLVMLet x (LLVMReturn d) cont)
+  -- by the definition of LLVM.hs, the type of `d` is always `i8*`.
+ = emitLLVM funName (LLVMLet x (LLVMBitcast d voidPtr voidPtr) cont)
+emitLLVM funName (LLVMLet x (LLVMLet y cont1 cont2) cont3) =
+  emitLLVM funName (LLVMLet y cont1 (LLVMLet x cont2 cont3))
+emitLLVM funName (LLVMLet x (LLVMGetElementPtr base (i, n)) cont) = do
+  op <-
+    emitOp $
+    unwords
+      [ show (LLVMDataLocal x)
+      , "= getelementptr"
+      , showStruct n ++ ","
+      , showStruct n ++ "*"
+      , show base ++ ","
+      , showIndex [0, i]
+      ]
+  xs <- emitLLVM funName cont
+  return $ op ++ xs
+emitLLVM funName (LLVMLet x (LLVMBitcast d fromType toType) cont) = do
+  op <-
+    emitOp $
+    unwords
+      [ show (LLVMDataLocal x)
+      , "="
+      , "bitcast"
+      , showLowType fromType
+      , show d
+      , "to"
+      , showLowType toType
+      ]
+  a <- emitLLVM funName cont
+  return $ op ++ a
+emitLLVM funName (LLVMLet x (LLVMIntToPointer d fromType toType) cont) = do
+  op <-
+    emitOp $
+    unwords
+      [ show (LLVMDataLocal x)
+      , "="
+      , "inttoptr"
+      , showLowType fromType
+      , show d
+      , "to"
+      , showLowType toType
+      ]
+  a <- emitLLVM funName cont
+  return $ op ++ a
+emitLLVM funName (LLVMLet x (LLVMPointerToInt d fromType toType) cont) = do
+  op <-
+    emitOp $
+    unwords
+      [ show (LLVMDataLocal x)
+      , "="
+      , "ptrtoint"
+      , showLowType fromType
+      , show d
+      , "to"
+      , showLowType toType
+      ]
+  a <- emitLLVM funName cont
+  return $ op ++ a
+emitLLVM funName (LLVMLet x (LLVMLoad d) cont) = do
+  op <- emitOp $ unwords [show (LLVMDataLocal x), "=", "load i8*, i8**", show d]
+  a <- emitLLVM funName cont
+  return $ op ++ a
+emitLLVM funName (LLVMLet _ (LLVMStore (d1, t1) (d2, t2)) cont) = do
   op <-
     emitOp $
     unwords ["store", showLowType t1, show d1 ++ ",", showLowType t2, show d2]
-  a <- emitAsm funName cont
+  a <- emitLLVM funName cont
   return $ op ++ a
-emitAsm funName (AsmAlloc x ts cont) = do
+emitLLVM funName (LLVMLet x (LLVMAlloc ts) cont) = do
   size <- newNameWith "sizeptr"
   op1 <-
     emitOp $
     unwords
-      [ show (AsmDataLocal size)
+      [ show (LLVMDataLocal size)
       , "="
       , "getelementptr i64, i64* null, i32 " ++ show (length ts)
       ]
@@ -159,28 +170,28 @@ emitAsm funName (AsmAlloc x ts cont) = do
   op2 <-
     emitOp $
     unwords
-      [ show (AsmDataLocal casted)
+      [ show (LLVMDataLocal casted)
       , "="
       , "ptrtoint i64*"
-      , show (AsmDataLocal size)
+      , show (LLVMDataLocal size)
       , "to i64"
       ]
   op3 <-
     emitOp $
     unwords
-      [ show (AsmDataLocal x)
+      [ show (LLVMDataLocal x)
       , "="
       , "call"
       , "i8*"
-      , "@malloc(i64 " ++ show (AsmDataLocal casted) ++ ")"
+      , "@malloc(i64 " ++ show (LLVMDataLocal casted) ++ ")"
       ]
-  a <- emitAsm funName cont
+  a <- emitLLVM funName cont
   return $ op1 ++ op2 ++ op3 ++ a
-emitAsm funName (AsmFree d cont) = do
+emitLLVM funName (LLVMLet _ (LLVMFree d) cont) = do
   op <- emitOp $ unwords ["call", "void", "@free(i8* " ++ show d ++ ")"]
-  a <- emitAsm funName cont
+  a <- emitLLVM funName cont
   return $ op ++ a
-emitAsm funName (AsmArith x (ArithAdd, t) d1 d2 cont)
+emitLLVM funName (LLVMLet x (LLVMArith (ArithAdd, t) d1 d2) cont)
   | t `elem` intLowTypeList
   -- thanks to the two's complement representation of LLVM, these arithmetic
   -- instructions ('add', 'sub', 'mul') are valid for both signed and unsigned integers.
@@ -188,127 +199,127 @@ emitAsm funName (AsmArith x (ArithAdd, t) d1 d2 cont)
     op <-
       emitOp $
       unwords
-        [ show (AsmDataLocal x)
+        [ show (LLVMDataLocal x)
         , "="
         , "add"
         , showLowType t
         , show d1 ++ ","
         , show d2
         ]
-    a <- emitAsm funName cont
+    a <- emitLLVM funName cont
     return $ op ++ a
-emitAsm funName (AsmArith x (ArithAdd, t) d1 d2 cont) = do
+emitLLVM funName (LLVMLet x (LLVMArith (ArithAdd, t) d1 d2) cont) = do
   op <-
     emitOp $
     unwords
-      [ show (AsmDataLocal x)
+      [ show (LLVMDataLocal x)
       , "="
       , "fadd"
       , showLowType t
       , show d1 ++ ","
       , show d2
       ]
-  a <- emitAsm funName cont
+  a <- emitLLVM funName cont
   return $ op ++ a
-emitAsm funName (AsmArith x (ArithSub, t) d1 d2 cont)
+emitLLVM funName (LLVMLet x (LLVMArith (ArithSub, t) d1 d2) cont)
   | t `elem` intLowTypeList = do
     op <-
       emitOp $
       unwords
-        [ show (AsmDataLocal x)
+        [ show (LLVMDataLocal x)
         , "="
         , "sub"
         , showLowType t
         , show d1 ++ ","
         , show d2
         ]
-    a <- emitAsm funName cont
+    a <- emitLLVM funName cont
     return $ op ++ a
-emitAsm funName (AsmArith x (ArithSub, t) d1 d2 cont) = do
+emitLLVM funName (LLVMLet x (LLVMArith (ArithSub, t) d1 d2) cont) = do
   op <-
     emitOp $
     unwords
-      [ show (AsmDataLocal x)
+      [ show (LLVMDataLocal x)
       , "="
       , "fsub"
       , showLowType t
       , show d1 ++ ","
       , show d2
       ]
-  a <- emitAsm funName cont
+  a <- emitLLVM funName cont
   return $ op ++ a
-emitAsm funName (AsmArith x (ArithMul, t) d1 d2 cont)
+emitLLVM funName (LLVMLet x (LLVMArith (ArithMul, t) d1 d2) cont)
   | t `elem` intLowTypeList = do
     op <-
       emitOp $
       unwords
-        [ show (AsmDataLocal x)
+        [ show (LLVMDataLocal x)
         , "="
         , "mul"
         , showLowType t
         , show d1 ++ ","
         , show d2
         ]
-    a <- emitAsm funName cont
+    a <- emitLLVM funName cont
     return $ op ++ a
-emitAsm funName (AsmArith x (ArithMul, t) d1 d2 cont) = do
+emitLLVM funName (LLVMLet x (LLVMArith (ArithMul, t) d1 d2) cont) = do
   op <-
     emitOp $
     unwords
-      [ show (AsmDataLocal x)
+      [ show (LLVMDataLocal x)
       , "="
       , "fmul"
       , showLowType t
       , show d1 ++ ","
       , show d2
       ]
-  a <- emitAsm funName cont
+  a <- emitLLVM funName cont
   return $ op ++ a
-emitAsm funName (AsmArith x (ArithDiv, t@(LowTypeSignedInt _)) d1 d2 cont) = do
+emitLLVM funName (LLVMLet x (LLVMArith (ArithDiv, t@(LowTypeSignedInt _)) d1 d2) cont) = do
   op <-
     emitOp $
     unwords
-      [ show (AsmDataLocal x)
+      [ show (LLVMDataLocal x)
       , "="
       , "sdiv"
       , showLowType t
       , show d1 ++ ","
       , show d2
       ]
-  a <- emitAsm funName cont
+  a <- emitLLVM funName cont
   return $ op ++ a
-emitAsm funName (AsmArith x (ArithDiv, t@(LowTypeUnsignedInt _)) d1 d2 cont) = do
+emitLLVM funName (LLVMLet x (LLVMArith (ArithDiv, t@(LowTypeUnsignedInt _)) d1 d2) cont) = do
   op <-
     emitOp $
     unwords
-      [ show (AsmDataLocal x)
+      [ show (LLVMDataLocal x)
       , "="
       , "udiv"
       , showLowType t
       , show d1 ++ ","
       , show d2
       ]
-  a <- emitAsm funName cont
+  a <- emitLLVM funName cont
   return $ op ++ a
-emitAsm funName (AsmArith x (ArithDiv, t) d1 d2 cont) = do
+emitLLVM funName (LLVMLet x (LLVMArith (ArithDiv, t) d1 d2) cont) = do
   op <-
     emitOp $
     unwords
-      [ show (AsmDataLocal x)
+      [ show (LLVMDataLocal x)
       , "="
       , "fdiv"
       , showLowType t
       , show d1 ++ ","
       , show d2
       ]
-  a <- emitAsm funName cont
+  a <- emitLLVM funName cont
   return $ op ++ a
-emitAsm funName (AsmPrint t d cont) = do
+emitLLVM funName (LLVMLet _ (LLVMPrint t d) cont) = do
   fmt <- newNameWith "fmt"
   op1 <-
     emitOp $
     unwords
-      [ show (AsmDataLocal fmt)
+      [ show (LLVMDataLocal fmt)
       , "="
       , "getelementptr [3 x i8], [3 x i8]* @fmt.i32, i32 0, i32 0"
       ]
@@ -317,31 +328,34 @@ emitAsm funName (AsmPrint t d cont) = do
     unwords
       [ "call"
       , "i32 (i8*, ...)"
-      , "@printf(i8* " ++ show (AsmDataLocal fmt) ++ ","
+      , "@printf(i8* " ++ show (LLVMDataLocal fmt) ++ ","
       , showLowType t
       , show d ++ ")"
       ]
-  a <- emitAsm funName cont
+  a <- emitLLVM funName cont
   return $ op1 ++ op2 ++ a
+emitLLVM funName c = do
+  tmp <- newNameWith "result"
+  emitLLVM funName $ LLVMLet tmp c $ LLVMReturn (LLVMDataLocal tmp)
 
 emitOp :: String -> WithEnv [String]
 emitOp s = return ["  " ++ s]
 
-emitRet :: Identifier -> AsmData -> WithEnv [String]
+emitRet :: Identifier -> LLVMData -> WithEnv [String]
 emitRet "main" d = do
   tmp <- newNameWith "cast"
   op1 <-
     emitOp $
     unwords
-      [show (AsmDataLocal tmp), "=", "ptrtoint", "i8*", show d, "to", "i64"]
-  op2 <- emitOp $ unwords ["ret i64", show (AsmDataLocal tmp)]
+      [show (LLVMDataLocal tmp), "=", "ptrtoint", "i8*", show d, "to", "i64"]
+  op2 <- emitOp $ unwords ["ret i64", show (LLVMDataLocal tmp)]
   return $ op1 ++ op2
 emitRet _ d = emitOp $ unwords ["ret i8*", show d]
 
 emitLabel :: String -> String
 emitLabel s = s ++ ":"
 
-constructLabelList :: [(Int, Asm)] -> WithEnv [String]
+constructLabelList :: [(Int, LLVM)] -> WithEnv [String]
 constructLabelList [] = return []
 constructLabelList ((_, _):rest) = do
   label <- newNameWith "case"
@@ -352,17 +366,18 @@ showBranchList :: [(Int, String)] -> String
 showBranchList xs = "[" ++ showItems (uncurry showBranch) xs ++ "]"
 
 showBranch :: Int -> String -> String
-showBranch i label = "i64 " ++ show i ++ ", label " ++ show (AsmDataLocal label)
+showBranch i label =
+  "i64 " ++ show i ++ ", label " ++ show (LLVMDataLocal label)
 
 showIndex :: [Int] -> String
 showIndex [] = ""
 showIndex [i] = "i32 " ++ show i
 showIndex (i:is) = "i32 " ++ show i ++ ", " ++ showIndex is
 
-showArg :: AsmData -> String
+showArg :: LLVMData -> String
 showArg d = "i8* " ++ show d
 
-showArgs :: [AsmData] -> String
+showArgs :: [LLVMData] -> String
 showArgs ds = "(" ++ showItems showArg ds ++ ")"
 
 showLowType :: LowType -> String

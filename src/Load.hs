@@ -20,20 +20,18 @@ import Data.IORef
 
 import Asm
 import Data
-
 import Elaborate
 import Emit
 import Exhaust
-
+import LLVM
 import Macro
 import Modal
 import Parse
 import Polarize
 import Read
+import Reduce
 import Rename
 import Virtual
-
-import Reduce
 
 import System.Directory
 import System.FilePath
@@ -227,6 +225,7 @@ process e = do
   e' <- elaborate e
   polarize "main" e'
   modalize
-  virtualize
-  assemblize
+  -- virtualize
+  -- assemblize
+  toLLVM
   emit
