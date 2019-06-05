@@ -33,22 +33,34 @@ polarize name e = do
   e' <- polarize' e
   insPolEnv name e'
 
+-- Essence:
+--
+--   lam x. e
+--   ~> return (thunk (lam p. let (env, x) := p in let xs := env in e), xs)
+--
+--   e1 @ e2
+--   ~> bind x <- e2 in
+--      bind f <- e1 in
+--      let (lam, fvs) := f in
+--      (force lam) @ (fvs, x)
+--
+-- where `xs` is the free variables of `lam x. e`.
+--
+-- The key property here is: every function has exactly 1 argument.
+-- Note that, for example, `i32 -> bool -> string` is translated into
+-- the 1-ary function `↓(i32 -> ↑↓(bool -> ↑string))`. This property holds
+-- even in dependent situation where the type of a function is,
+-- for example, `Pi (x : i32). if x == 1 then i32 -> bool else i32 -> bool -> i32`.
 polarize' :: Term -> WithEnv Neg
 polarize' (TermVar x) = return $ NegUpIntro $ PosVar x
 polarize' (TermConst x) = toDefinition x
 polarize' (TermPiIntro x e) = do
   e' <- polarize' e
-  lam <- thunk $ NegPiIntro x e'
-  return $ NegUpIntro lam
+  makeClosure x e'
 polarize' (TermPiElim e1 e2) = do
   e1' <- polarize' e1
   e2' <- polarize' e2
-  f <- newNameWith "fun"
-  ff <- force $ PosVar f
-  x <- newNameWith "arg"
-  -- piElim <- commPiElim ff (PosVar x)
-  -- return $ NegUpElim x e2' $ NegUpElim f e1' piElim
-  return $ NegUpElim x e2' $ NegUpElim f e1' $ NegPiElim ff (PosVar x)
+  callClosure e1' e2'
 polarize' (TermSigmaIntro es) = do
   es' <- mapM polarize' es
   xs <- mapM (const (newNameWith "sigma")) es'
@@ -74,22 +86,36 @@ bindLet :: [(Identifier, Neg)] -> Neg -> Neg
 bindLet [] cont = cont
 bindLet ((x, e):xes) cont = NegUpElim x e $ bindLet xes cont
 
-thunk :: Neg -> WithEnv Pos
-thunk e = do
-  let fvs = nub $ varNeg e
+makeClosure :: Identifier -> Neg -> WithEnv Neg
+makeClosure x e = do
+  let fvs = filter (/= x) $ nub $ varNeg e
   envName <- newNameWith "env"
-  let lam = NegPiIntro envName $ NegSigmaElim (PosVar envName) fvs e
-  return $ PosSigmaIntro [PosDownIntro lam, PosSigmaIntro $ map PosVar fvs]
+  pairName <- newNameWith "pair"
+  let thunkLam =
+        PosDownIntro $
+        NegPiIntro pairName $
+        NegSigmaElim (PosVar pairName) [envName, x] $
+        NegSigmaElim (PosVar envName) fvs e
+  return $ NegUpIntro $ PosSigmaIntro [thunkLam, PosSigmaIntro (map PosVar fvs)]
 
-force :: Pos -> WithEnv Neg
-force v = do
+callClosure :: Neg -> Neg -> WithEnv Neg
+callClosure cls arg = do
+  argVar <- newNameWith "arg"
+  clsVar <- newNameWith "fun"
+  thunkLam <- newNameWith "down.elim.cls"
   envName <- newNameWith "down.elim.env"
-  clsName <- newNameWith "down.elim.cls"
   return $
-    NegSigmaElim
-      v
-      [clsName, envName]
-      (NegPiElim (NegDownElim (PosVar clsName)) (PosVar envName))
+    NegUpElim argVar arg $
+    NegUpElim clsVar cls $
+    NegSigmaElim (PosVar clsVar) [thunkLam, envName] $
+    NegPiElim
+      (NegDownElim (PosVar clsVar))
+      (PosSigmaIntro [PosVar envName, PosVar argVar])
+  -- return $
+  --   NegSigmaElim
+  --     v
+  --     [clsName, envName]
+  --     (NegPiElim (NegDownElim (PosVar clsName)) (PosVar envName))
 
 -- insert (possibly) environment-specific definition of constant
 toDefinition :: Identifier -> WithEnv Neg
@@ -122,8 +148,9 @@ getPrintConstant x = do
 toPrintDefinition :: Constant -> WithEnv Neg
 toPrintDefinition c = do
   x <- newNameWith "arg"
-  t <- thunk $ NegPiIntro x $ NegConstElim c [PosVar x]
-  return $ NegUpIntro t
+  makeClosure x $ NegConstElim c [PosVar x]
+  -- t <- thunk $ NegPiIntro x $ NegConstElim c [PosVar x]
+  -- return $ NegUpIntro t
 
 getArithBinOpConstant :: Identifier -> Maybe Constant
 getArithBinOpConstant x = do
@@ -146,9 +173,9 @@ toArithBinOpDefinition :: Constant -> WithEnv Neg
 toArithBinOpDefinition c = do
   x <- newNameWith "arg1"
   y <- newNameWith "arg2"
-  lamy <- thunk $ NegPiIntro y $ NegConstElim c [PosVar x, PosVar y]
-  lamxy <- thunk $ NegPiIntro x $ NegUpIntro lamy
-  return $ NegUpIntro lamxy
+  -- lamy <- thunk $ NegPiIntro y $ NegConstElim c [PosVar x, PosVar y]
+  lamy <- makeClosure y $ NegConstElim c [PosVar x, PosVar y]
+  makeClosure x lamy
 
 wordsWhen :: (Char -> Bool) -> String -> [String]
 wordsWhen p s =
