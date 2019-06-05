@@ -273,13 +273,6 @@ takeIntegerList'' (PosIndexIntro (IndexInteger i) _:rest) = do
   return (i : is)
 takeIntegerList'' _ = Nothing
 
-takeIntegerList''' :: [Value] -> Maybe [Int]
-takeIntegerList''' [] = Just []
-takeIntegerList''' (ValueIndexIntro (IndexInteger i) _:rest) = do
-  is <- takeIntegerList''' rest
-  return (i : is)
-takeIntegerList''' _ = Nothing
-
 findDefault :: [(Index, Neut)] -> Maybe Neut
 findDefault [] = Nothing
 findDefault ((IndexDefault, e):_) = Just e
@@ -306,9 +299,7 @@ isReducible (_ :< NeutHole _) = False
 
 reduceNeg :: Neg -> WithEnv Neg
 reduceNeg (NegPiElimDownElim v1 v2) =
-  case v1
-    -- PosDownIntroPiIntro arg body -> reduceNeg $ substNeg [(arg, v2)] body
-        of
+  case v1 of
     PosConst x -> do
       penv <- gets polEnv
       case lookup x penv of
@@ -374,9 +365,6 @@ substPos sub (PosSigmaIntro vs) = do
   PosSigmaIntro vs'
 substPos _ (PosIndexIntro l t) = PosIndexIntro l t
 
--- substPos sub (PosDownIntroPiIntro x e) = do
---   let sub' = filter (\(y, _) -> y /= x) sub
---   PosDownIntroPiIntro x $ substNeg sub' e
 substNeg :: SubstPos -> Neg -> Neg
 substNeg sub (NegPiElimDownElim v1 v2) = do
   let v1' = substPos sub v1
@@ -398,85 +386,3 @@ substNeg sub (NegUpElim x e1 e2) = do
   let e2' = substNeg sub' e2
   NegUpElim x e1' e2'
 substNeg sub (NegConstElim x vs) = NegConstElim x $ map (substPos sub) vs
-
-reduceComp :: Comp -> WithEnv Comp
-reduceComp (CompPiElimDownElim v1 v2) =
-  case v1 of
-    ValueConst x -> do
-      menv <- gets modalEnv
-      case lookup x menv of
-        Just e -> do
-          tmp <- newNameWith "tmp"
-          reduceComp $ CompUpElim tmp e $ CompPiElimDownElim (ValueVar tmp) v2
-          -- reduceComp $ substComp [(arg, v2)] body
-        _ -> return $ CompPiElimDownElim v1 v2
-    _ -> return $ CompPiElimDownElim v1 v2
-reduceComp (CompConstElim c vs) = do
-  let xs = takeIntegerList''' vs
-  let t = LowTypeSignedInt 64 -- for now
-  case (c, xs) of
-    (ConstantArith _ ArithAdd, Just [x, y]) ->
-      return $ CompUpIntro (ValueIndexIntro (IndexInteger (x + y)) t)
-    (ConstantArith _ ArithSub, Just [x, y]) ->
-      return $ CompUpIntro (ValueIndexIntro (IndexInteger (x - y)) t)
-    (ConstantArith _ ArithMul, Just [x, y]) ->
-      return $ CompUpIntro (ValueIndexIntro (IndexInteger (x * y)) t)
-    (ConstantArith _ ArithDiv, Just [x, y]) ->
-      return $ CompUpIntro (ValueIndexIntro (IndexInteger (x `div` y)) t)
-    _ -> return $ CompConstElim c vs
-reduceComp (CompSigmaElim v xs e) =
-  case v of
-    ValueSigmaIntro vs
-      | length xs == length vs -> reduceComp $ substComp (zip xs vs) e
-    ValueConst x -> do
-      menv <- gets modalEnv
-      case lookup x menv of
-        Just body -> do
-          tmp <- newNameWith "tmp"
-          reduceComp $ CompUpElim tmp body $ CompSigmaElim (ValueVar tmp) xs e
-        _ -> return $ CompSigmaElim v xs e
-    _ -> return $ CompSigmaElim v xs e
-reduceComp (CompIndexElim v branchList) =
-  case v of
-    ValueIndexIntro x _ ->
-      case lookup x branchList of
-        Just body -> reduceComp body
-        Nothing ->
-          case lookup IndexDefault branchList of
-            Just body -> reduceComp body
-            Nothing ->
-              lift $
-              throwE $
-              "the index " ++ show x ++ " is not included in branchList"
-    _ -> return $ CompIndexElim v branchList
-reduceComp (CompUpIntro v) = return $ CompUpIntro v
-reduceComp (CompUpElim x e1 e2) = do
-  e1' <- reduceComp e1
-  case e1' of
-    CompUpIntro v -> reduceComp $ substComp [(x, v)] e2
-    _ -> return $ CompUpElim x e1' e2
-
-substValue :: [(Identifier, Value)] -> Value -> Value
-substValue sub (ValueVar x) = fromMaybe (ValueVar x) (lookup x sub)
-substValue _ (ValueConst x) = ValueConst x
-substValue sub (ValueSigmaIntro vs) = ValueSigmaIntro $ map (substValue sub) vs
-substValue _ (ValueIndexIntro l t) = ValueIndexIntro l t
-
-substComp :: [(Identifier, Value)] -> Comp -> Comp
-substComp sub (CompPiElimDownElim v1 v2) =
-  CompPiElimDownElim (substValue sub v1) (substValue sub v2)
-substComp sub (CompConstElim c vs) = CompConstElim c $ map (substValue sub) vs
-substComp sub (CompSigmaElim v xs e) = do
-  let v' = substValue sub v
-  let e' = substComp (filter (\(x, _) -> x `notElem` xs) sub) e
-  CompSigmaElim v' xs e'
-substComp sub (CompIndexElim v branchList) = do
-  let (labelList, es) = unzip branchList
-  let v' = substValue sub v
-  let es' = map (substComp sub) es
-  CompIndexElim v' $ zip labelList es'
-substComp sub (CompUpIntro v) = CompUpIntro $ substValue sub v
-substComp sub (CompUpElim x e1 e2) = do
-  let e1' = substComp sub e1
-  let e2' = substComp (filter (\(y, _) -> y /= x) sub) e2
-  CompUpElim x e1' e2'

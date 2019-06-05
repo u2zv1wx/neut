@@ -32,21 +32,8 @@ polarize :: WithEnv ()
 polarize = do
   tenv <- gets termEnv
   forM_ tenv $ \(name, e) -> do
-    e' <- polarize' e -- returnのぶんだけズレる
-    -- return name == e'
+    e' <- polarize' e
     insPolEnv name $ BindableNeg e'
-    -- insPolEnv name e' -- ここ、lambdaを変換してるからウソでは？makeClosureしなきゃダメでは？
-  penv <- gets polEnv
-  forM_ penv $ \(name, e) -> do
-    liftIO $ putStrLn name
-    case e of
-      BindableNeg e' -> do
-        r0 <- reduceNeg e'
-        liftIO $ putStrLn $ Pr.ppShow r0
-        liftIO $ putStrLn "======================="
-      _ -> do
-        liftIO $ putStrLn "(thunk-lam)"
-        liftIO $ putStrLn "======================="
 
 -- Essence:
 --
@@ -102,7 +89,6 @@ makeClosure x e = do
   let fvs = filter (/= x) $ nub $ varNeg e
   envName <- newNameWith "env"
   pairName <- newNameWith "pair"
-  -- このthunkLamを環境に入れてしまえば、もはやmodalの出番はない。
   lamVar <- newNameWith "lam"
   let lamBody =
         NegSigmaElim (PosVar pairName) [envName, x] $
@@ -110,16 +96,7 @@ makeClosure x e = do
   -- return lamVar == return (thunk (lam (pairName) lamBody))
   -- i.e. lamVar == return (thunk (lam (pairName) lamBody))
   insPolEnv lamVar $ BindableThunkLam pairName lamBody
-  -- let thunkLam =
-  --       NegUpIntro $
-  --       PosDownIntroPiIntro pairName $
-  --       NegSigmaElim (PosVar pairName) [envName, x] $
-  --       NegSigmaElim (PosVar envName) fvs e
   let fvEnv = PosSigmaIntro $ map PosVar fvs
-  -- tmp <- newNameWith "tmp"
-  -- return $
-  --   NegUpElim tmp (NegUpIntro (PosConst lamVar)) $
-  --   NegUpIntro $ PosSigmaIntro [thunkLam, fvEnv]
   return $ NegUpIntro $ PosSigmaIntro [PosConst lamVar, fvEnv]
 
 callClosure :: Neg -> Neg -> WithEnv Neg

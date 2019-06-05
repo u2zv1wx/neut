@@ -28,8 +28,8 @@ toLLVM = do
   --   llvm <- llvmCode e
   --   insLLVMEnv name arg llvm
 
-llvmCode :: Comp -> WithEnv LLVM
-llvmCode (CompPiElimDownElim fun arg) = do
+llvmCode :: Neg -> WithEnv LLVM
+llvmCode (NegPiElimDownElim fun arg) = do
   f <- newNameWith "fun"
   x <- newNameWith "arg"
   let funPtrType = toFunPtrType [arg]
@@ -39,7 +39,7 @@ llvmCode (CompPiElimDownElim fun arg) = do
     LLVMLet cast (LLVMBitcast (LLVMDataLocal f) voidPtr funPtrType) $
     LLVMCall (LLVMDataLocal cast) [LLVMDataLocal x]
     -- LLVMCall (LLVMDataLocal cast) (map LLVMDataLocal xs)
-  -- llvmCode (CompPiElimDownElim fun args) = do
+  -- llvmCode (NegPiElimDownElim fun args) = do
 --   f <- newNameWith "fun"
 --   xs <- mapM (const (newNameWith "arg")) args
 --   let funPtrType = toFunPtrType args
@@ -47,26 +47,26 @@ llvmCode (CompPiElimDownElim fun arg) = do
 --   llvmDataLet' ((f, fun) : zip xs args) $
 --     LLVMLet cast (LLVMBitcast (LLVMDataLocal f) voidPtr funPtrType) $
 --     LLVMCall (LLVMDataLocal cast) (map LLVMDataLocal xs)
-llvmCode (CompIndexElim x branchList) = llvmSwitch x branchList
-llvmCode (CompSigmaElim v xs e) =
+llvmCode (NegIndexElim x branchList) = llvmSwitch x branchList
+llvmCode (NegSigmaElim v xs e) =
   llvmCodeSigmaElim v (zip xs [0 ..]) (length xs) e
-llvmCode (CompConstElim f args) = llvmCodeConstElim f args
-llvmCode (CompUpIntro d) = do
+llvmCode (NegConstElim f args) = llvmCodeConstElim f args
+llvmCode (NegUpIntro d) = do
   result <- newNameWith "ans"
   llvmDataLet result d $ LLVMReturn $ LLVMDataLocal result
-llvmCode (CompUpElim x cont1 cont2) = do
+llvmCode (NegUpElim x cont1 cont2) = do
   cont1' <- llvmCode cont1
   cont2' <- llvmCode cont2
   return $ LLVMLet x cont1' cont2'
 
-llvmCodeSigmaElim :: Value -> [(Identifier, Int)] -> Int -> Comp -> WithEnv LLVM
+llvmCodeSigmaElim :: Pos -> [(Identifier, Int)] -> Int -> Neg -> WithEnv LLVM
 llvmCodeSigmaElim z xis n cont = do
   basePointer <- newNameWith "sigma"
   c <- llvmCodeSigmaElim' basePointer xis n cont
   llvmDataLet basePointer z c
 
 llvmCodeSigmaElim' ::
-     Identifier -> [(Identifier, Int)] -> Int -> Comp -> WithEnv LLVM
+     Identifier -> [(Identifier, Int)] -> Int -> Neg -> WithEnv LLVM
 llvmCodeSigmaElim' _ [] _ cont = llvmCode cont
 llvmCodeSigmaElim' basePointer ((x, i):xis) n cont = do
   cont' <- llvmCodeSigmaElim' basePointer xis n cont
@@ -78,7 +78,7 @@ llvmCodeSigmaElim' basePointer ((x, i):xis) n cont = do
     LLVMLet loader (LLVMGetElementPtr (LLVMDataLocal cast) (i, n)) $
     LLVMLet x (LLVMLoad (LLVMDataLocal loader)) cont'
 
-llvmCodeConstElim :: Constant -> [Value] -> WithEnv LLVM
+llvmCodeConstElim :: Constant -> [Pos] -> WithEnv LLVM
 llvmCodeConstElim (ConstantArith lowType@(LowTypeSignedInt _) kind) xs
   | length xs == 2 = do
     x0 <- newNameWith "arg"
@@ -125,11 +125,11 @@ llvmCodeConstElim _ _ = lift $ throwE "llvmCodeConstElim"
 
 -- `llvmDataLet x d cont` binds the data `d` to the variable `x`, and computes the
 -- continuation `cont`.
-llvmDataLet :: Identifier -> Value -> LLVM -> WithEnv LLVM
-llvmDataLet x (ValueVar y) cont =
+llvmDataLet :: Identifier -> Pos -> LLVM -> WithEnv LLVM
+llvmDataLet x (PosVar y) cont =
   return $ LLVMLet x (LLVMBitcast (LLVMDataLocal y) voidPtr voidPtr) cont
-llvmDataLet x (ValueConst y) cont = do
-  cenv <- gets modalEnv
+llvmDataLet x (PosConst y) cont = do
+  cenv <- gets polEnv
   undefined
   -- case lookup y cenv of
   --   Nothing -> lift $ throwE $ "no such global label defined: " ++ y -- FIXME
@@ -137,7 +137,7 @@ llvmDataLet x (ValueConst y) cont = do
   --     let funPtrType = toFunPtrType args
   --     return $
   --       LLVMLet x (LLVMBitcast (LLVMDataGlobal y) funPtrType voidPtr) cont
-llvmDataLet reg (ValueSigmaIntro ds) cont = do
+llvmDataLet reg (PosSigmaIntro ds) cont = do
   xs <- mapM (const $ newNameWith "cursor") ds
   cast <- newNameWith "cast"
   let ts = map (const voidPtr) ds
@@ -146,26 +146,25 @@ llvmDataLet reg (ValueSigmaIntro ds) cont = do
   llvmStruct (zip xs ds) $
     LLVMLet reg (LLVMAlloc ts) $ -- the result of malloc is i8*
     LLVMLet cast (LLVMBitcast (LLVMDataLocal reg) voidPtr structPtrType) cont''
-llvmDataLet x (ValueIndexIntro (IndexInteger i) (LowTypeSignedInt j)) cont =
+llvmDataLet x (PosIndexIntro (IndexInteger i) (LowTypeSignedInt j)) cont =
   return $
   LLVMLet x (LLVMIntToPointer (LLVMDataInt i) (LowTypeSignedInt j) voidPtr) cont
-llvmDataLet x (ValueIndexIntro (IndexFloat f) (LowTypeFloat j)) cont = do
+llvmDataLet x (PosIndexIntro (IndexFloat f) (LowTypeFloat j)) cont = do
   cast <- newNameWith "cast"
   let ft = LowTypeFloat j
   let st = LowTypeSignedInt j
   return $
     LLVMLet cast (LLVMBitcast (LLVMDataFloat f) ft st) $
     LLVMLet x (LLVMIntToPointer (LLVMDataLocal cast) st voidPtr) cont
-llvmDataLet _ (ValueIndexIntro _ _) _ =
-  lift $ throwE "llvmDataLet.ValueIndexIntro"
+llvmDataLet _ (PosIndexIntro _ _) _ = lift $ throwE "llvmDataLet.PosIndexIntro"
 
-llvmDataLet' :: [(Identifier, Value)] -> LLVM -> WithEnv LLVM
+llvmDataLet' :: [(Identifier, Pos)] -> LLVM -> WithEnv LLVM
 llvmDataLet' [] cont = return cont
 llvmDataLet' ((x, d):rest) cont = do
   cont' <- llvmDataLet' rest cont
   llvmDataLet x d cont'
 
-constructSwitch :: Value -> [(Index, Comp)] -> WithEnv (LLVM, [(Int, LLVM)])
+constructSwitch :: Pos -> [(Index, Neg)] -> WithEnv (LLVM, [(Int, LLVM)])
 constructSwitch _ [] = lift $ throwE "empty branch"
 constructSwitch name ((IndexLabel x, code):rest) = do
   set <- lookupIndexSet x
@@ -181,7 +180,7 @@ constructSwitch name ((IndexInteger i, code):rest) = do
   return (defaultCase, (i, code') : caseList)
 constructSwitch _ ((IndexFloat _, _):_) = undefined -- IEEE754 float equality!
 
-llvmSwitch :: Value -> [(Index, Comp)] -> WithEnv LLVM
+llvmSwitch :: Pos -> [(Index, Neg)] -> WithEnv LLVM
 llvmSwitch name branchList = do
   (defaultCase, caseList) <- constructSwitch name branchList
   tmp <- newNameWith "switch"
@@ -209,7 +208,7 @@ setContent basePointer length ((index, dataAtIndex):sizeDataList) cont = do
          (LLVMDataLocal loader, voidPtrPtr))
       cont'
 
-llvmStruct :: [(Identifier, Value)] -> LLVM -> WithEnv LLVM
+llvmStruct :: [(Identifier, Pos)] -> LLVM -> WithEnv LLVM
 llvmStruct [] cont = return cont
 llvmStruct ((x, d):xds) cont = do
   cont' <- llvmStruct xds cont

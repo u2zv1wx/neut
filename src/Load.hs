@@ -24,7 +24,6 @@ import Emit
 import Exhaust
 import LLVM
 import Macro
-import Modal
 import Parse
 import Polarize
 import Read
@@ -221,10 +220,7 @@ concatDefList (DefMod sigMeta (_, name') xs:es) = do
 process :: Neut -> WithEnv [String]
 process e = do
   e' <- elaborate e
-  -- hole <- newNameWith "hole"
   insTermEnv "main" e'
-  -- insTermEnv "main" hole e'
   polarize
-  modalize
   toLLVM
   emit

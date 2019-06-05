@@ -197,8 +197,6 @@ data Pos
   | PosSigmaIntro [Pos]
   | PosIndexIntro Index
                   LowType
-  -- | PosDownIntroPiIntro Identifier
-  --                       Neg
   deriving (Show)
 
 data Neg
@@ -215,30 +213,6 @@ data Neg
   | NegUpElim Identifier
               Neg
               Neg
-  deriving (Show)
-
-data Value
-  = ValueVar Identifier
-  | ValueConst Identifier
-  | ValueSigmaIntro [Value]
-  | ValueIndexIntro Index
-                    LowType
-  deriving (Show)
-
-data Comp
-  = CompPiElimDownElim Value -- (force v1) @ v2
-                       Value
-  | CompConstElim Constant
-                  [Value]
-  | CompSigmaElim Value
-                  [Identifier]
-                  Comp
-  | CompIndexElim Value
-                  [(Index, Comp)]
-  | CompUpIntro Value
-  | CompUpElim Identifier
-               Comp
-               Comp
   deriving (Show)
 
 data LLVMData
@@ -365,9 +339,7 @@ data Env = Env
   -- , termEnv :: [(Identifier, Term)]
   , polEnv :: [(Identifier, Bindable)] -- x ~> thunk (lam (x) e)
   -- , polEnv :: [(Identifier, Neg)] -- x ~> thunk e
-  -- , modalEnv :: [(Identifier, ([Identifier], Comp))] -- x ~> thunk (lam (x1 ... xn) e)
   -- , llvmEnv :: [(Identifier, ([Identifier], LLVM))] -- x ~> thunk (lam (x1 ... xn) e)
-  , modalEnv :: [(Identifier, Comp)] -- x ~> thunk (lam (x) e))
   , llvmEnv :: [(Identifier, LLVM)] -- x ~> thunk (lam (x) e)
   } deriving (Show)
 
@@ -384,7 +356,6 @@ initialEnv path =
     , typeEnv = Map.empty
     , termEnv = []
     , polEnv = []
-    , modalEnv = []
     , llvmEnv = []
     , constraintEnv = []
     , constraintQueue = Q.empty
@@ -486,16 +457,10 @@ insPolEnv name b = modify (\e -> e {polEnv = (name, b) : polEnv e})
 
 -- insPolEnv :: Identifier -> Neg -> WithEnv ()
 -- insPolEnv name body = modify (\e -> e {polEnv = (name, body) : polEnv e})
-insModalEnv :: Identifier -> Comp -> WithEnv ()
-insModalEnv x e = modify (\env -> env {modalEnv = (x, e) : modalEnv env})
-
 insLLVMEnv :: Identifier -> LLVM -> WithEnv ()
 insLLVMEnv funName llvm =
   modify (\e -> e {llvmEnv = (funName, llvm) : llvmEnv e})
 
--- insModalEnv :: Identifier -> [Identifier] -> Comp -> WithEnv ()
--- insModalEnv funName args body =
---   modify (\e -> e {modalEnv = (funName, (args, body)) : modalEnv e})
 -- insLLVMEnv :: Identifier -> [Identifier] -> LLVM -> WithEnv ()
 -- insLLVMEnv funName args llvm =
 --   modify (\e -> e {llvmEnv = (funName, (args, llvm)) : llvmEnv e})
