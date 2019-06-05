@@ -30,9 +30,9 @@ emit = do
   xs <- forM (llvmEnv env) $ uncurry emitDefinition
   return $ g ++ concat xs
 
-emitDefinition :: Identifier -> ([Identifier], LLVM) -> WithEnv [String]
-emitDefinition name (args, asm) = do
-  let prologue = sig name args ++ " {"
+emitDefinition :: Identifier -> (Identifier, LLVM) -> WithEnv [String]
+emitDefinition name (arg, asm) = do
+  let prologue = sig name [arg] ++ " {"
   content <- emitLLVM name asm
   let epilogue = "}"
   return $ [prologue] ++ content ++ [epilogue]

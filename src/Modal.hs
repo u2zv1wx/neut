@@ -23,23 +23,27 @@ import Debug.Trace
 modalize :: WithEnv ()
 modalize = do
   penv <- gets polEnv
-  forM_ penv $ \(name, e) -> do
+  forM_ penv $ \(name, (arg, e)) -> do
     e' <- modalNeg e
+    -- r0 <- reduceNeg e
     -- r1 <- reduceComp e'
-    -- liftIO $ putStrLn name
-    -- liftIO $ putStrLn $ Pr.ppShow e
+    liftIO $ putStrLn name
+    liftIO $ putStrLn arg
+    liftIO $ putStrLn $ Pr.ppShow e
+    -- liftIO $ putStrLn $ Pr.ppShow r0
     -- let fvs = nub $ varComp e'
     -- liftIO $ putStrLn $ "globalfvs == " ++ show fvs
-    hole <- newNameWith "hole"
-    insModalEnv name [hole] e'
-  menv <- gets modalEnv
-  forM_ menv $ \(name, (args, e)) -> do
-    liftIO $ putStrLn name
-    liftIO $ putStrLn $ Pr.ppShow args
-    liftIO $ putStrLn $ Pr.ppShow e
-    r0 <- reduceComp e
-    liftIO $ putStrLn $ Pr.ppShow r0
-    liftIO $ putStrLn "======================="
+    -- hole <- newNameWith "hole"
+    -- insModalEnv name [hole] e'
+    insModalEnv name arg e'
+  -- menv <- gets modalEnv
+  -- forM_ menv $ \(name, (args, e)) -> do
+  --   liftIO $ putStrLn name
+  --   liftIO $ putStrLn $ Pr.ppShow args
+  --   liftIO $ putStrLn $ Pr.ppShow e
+  --   r0 <- reduceComp e
+  --   liftIO $ putStrLn $ Pr.ppShow r0
+  --   liftIO $ putStrLn "======================="
 
 modalPos :: Pos -> WithEnv Value
 modalPos (PosVar x) = return $ ValueVar x
@@ -50,15 +54,17 @@ modalPos (PosSigmaIntro es) = do
 modalPos (PosIndexIntro l t) = return $ ValueIndexIntro l t
 modalPos (PosDownIntroPiIntro x e) = do
   e' <- modalNeg e
-  modalPosDownIntroPiIntro [x] e'
-
--- translates (thunk (lam (x1 ... xn) e)).
-modalPosDownIntroPiIntro :: [Identifier] -> Comp -> WithEnv Value
-modalPosDownIntroPiIntro args body = do
+  -- modalPosDownIntroPiIntro [x] e'
   clsName <- newNameWith "cls"
-  insModalEnv clsName args body
+  insModalEnv clsName x e'
   return $ ValueConst clsName
 
+-- translates (thunk (lam (x1 ... xn) e)).
+-- modalPosDownIntroPiIntro :: [Identifier] -> Comp -> WithEnv Value
+-- modalPosDownIntroPiIntro args body = do
+--   clsName <- newNameWith "cls"
+--   insModalEnv clsName args body
+--   return $ ValueConst clsName
 modalNeg :: Neg -> WithEnv Comp
 modalNeg (NegPiElimDownElim v1 v2) = do
   v1' <- modalPos v1

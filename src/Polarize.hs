@@ -31,7 +31,8 @@ import Data.Maybe (isJust, maybeToList)
 polarize :: Identifier -> Term -> WithEnv ()
 polarize name e = do
   e' <- polarize' e
-  insPolEnv name e'
+  hole <- newNameWith "hole"
+  insPolEnv name hole e'
 
 -- Essence:
 --
@@ -57,14 +58,13 @@ polarize' (TermConst x) = toDefinition x
 polarize' (TermPiIntro x e) = do
   e' <- polarize' e
   makeClosure x e'
-polarize' (TermPiElim (TermMu x e1) e2) = do
+polarize' (TermPiElim (TermMu x (TermPiIntro arg e1)) e2) = do
   e1' <- polarize' e1
-  insPolEnv x e1'
+  insPolEnv x arg e1' -- x == thunk (lam (arg) e1')
   e2' <- polarize' e2
   z <- newNameWith "tmp"
-  -- return $ NegUpElim z e2' $ NegPiElim (NegDownElim (PosConst x)) (PosVar z)
+  -- ここではクロージャを呼び出すのではないのでcallclosureは使わない
   return $ NegUpElim z e2' $ NegPiElimDownElim (PosConst x) (PosVar z)
-  -- undefined
 polarize' (TermPiElim e1 e2) = do
   e1' <- polarize' e1
   e2' <- polarize' e2
@@ -86,9 +86,6 @@ polarize' (TermIndexElim e branchList) = do
   cs <- mapM polarize' es
   return $ NegUpElim x e' (NegIndexElim (PosVar x) (zip labelList cs))
 polarize' (TermMu _ _) = lift $ throwE "TermMu outside TermPiElim"
-  -- e' <- polarize' e
-  -- insPolEnv x e'
-  -- return $ NegDownElim (PosConst x)
 
 bindLet :: [(Identifier, Neg)] -> Neg -> Neg
 bindLet [] cont = cont
@@ -98,43 +95,30 @@ makeClosure :: Identifier -> Neg -> WithEnv Neg
 makeClosure x e = do
   let fvs = filter (/= x) $ nub $ varNeg e
   envName <- newNameWith "env"
-  pairName <- newNameWith "pair"
-  -- let thunkLam =
-  --       PosDownIntro $
-  --       NegPiIntro pairName $
-  --       NegSigmaElim (PosVar pairName) [envName, x] $
-  --       NegSigmaElim (PosVar envName) fvs e
+  pairName <- newNameWith "pair" -- 環境と引数のペア
   let thunkLam =
         PosDownIntroPiIntro pairName $
-        NegSigmaElim (PosVar pairName) [envName, x] $
-        NegSigmaElim (PosVar envName) fvs e
-  return $ NegUpIntro $ PosSigmaIntro [thunkLam, PosSigmaIntro (map PosVar fvs)]
+        NegSigmaElim (PosVar pairName) [envName, x] $ -- ペアを分解
+        NegSigmaElim (PosVar envName) fvs e -- 環境を分解して自由変数を取得してeを実行
+  let fvEnv = PosSigmaIntro $ map PosVar fvs
+  return $ NegUpIntro $ PosSigmaIntro [thunkLam, fvEnv]
 
+-- clsにはmakeClosureで作られたものが入っているという前提のもと、
+-- closureを分解して呼び出す。thunkLamに環境と引数のペアを渡せばよい。
+-- 環境はクロージャから取得。引数は今まさに適用しようとしているもの。
 callClosure :: Neg -> Neg -> WithEnv Neg
 callClosure cls arg = do
-  argVar <- newNameWith "arg"
-  clsVar <- newNameWith "fun"
-  thunkLam <- newNameWith "down.elim.cls"
-  envName <- newNameWith "down.elim.env"
+  argVarName <- newNameWith "arg"
+  clsVarName <- newNameWith "fun"
+  thunkLamVarName <- newNameWith "down.elim.cls"
+  envVarName <- newNameWith "down.elim.env"
   return $
-    NegUpElim argVar arg $
-    NegUpElim clsVar cls $
-    NegSigmaElim (PosVar clsVar) [thunkLam, envName] $
+    NegUpElim argVarName arg $
+    NegUpElim clsVarName cls $
+    NegSigmaElim (PosVar clsVarName) [thunkLamVarName, envVarName] $
     NegPiElimDownElim
-      (PosVar clsVar)
-      (PosSigmaIntro [PosVar envName, PosVar argVar])
-  -- return $
-  --   NegUpElim argVar arg $
-  --   NegUpElim clsVar cls $
-  --   NegSigmaElim (PosVar clsVar) [thunkLam, envName] $
-  --   NegPiElim
-  --     (NegDownElim (PosVar clsVar))
-  --     (PosSigmaIntro [PosVar envName, PosVar argVar])
-  -- return $
-  --   NegSigmaElim
-  --     v
-  --     [clsName, envName]
-  --     (NegPiElim (NegDownElim (PosVar clsName)) (PosVar envName))
+      (PosVar thunkLamVarName)
+      (PosSigmaIntro [PosVar envVarName, PosVar argVarName])
 
 -- insert (possibly) environment-specific definition of constant
 toDefinition :: Identifier -> WithEnv Neg
@@ -168,8 +152,6 @@ toPrintDefinition :: Constant -> WithEnv Neg
 toPrintDefinition c = do
   x <- newNameWith "arg"
   makeClosure x $ NegConstElim c [PosVar x]
-  -- t <- thunk $ NegPiIntro x $ NegConstElim c [PosVar x]
-  -- return $ NegUpIntro t
 
 getArithBinOpConstant :: Identifier -> Maybe Constant
 getArithBinOpConstant x = do
@@ -192,7 +174,6 @@ toArithBinOpDefinition :: Constant -> WithEnv Neg
 toArithBinOpDefinition c = do
   x <- newNameWith "arg1"
   y <- newNameWith "arg2"
-  -- lamy <- thunk $ NegPiIntro y $ NegConstElim c [PosVar x, PosVar y]
   lamy <- makeClosure y $ NegConstElim c [PosVar x, PosVar y]
   makeClosure x lamy
 
@@ -202,17 +183,3 @@ wordsWhen p s =
     "" -> []
     s' -> w : wordsWhen p s''
       where (w, s'') = break p s'
--- -- should perform alpha-conv?
--- commPiElim :: Neg -> Pos -> WithEnv Neg
--- commPiElim (NegSigmaElim v xs e) arg = do
---   e' <- commPiElim e arg
---   return $ NegSigmaElim v xs e'
--- commPiElim (NegIndexElim v branchList) arg = do
---   let (labelList, es) = unzip branchList
---   es' <- mapM (`commPiElim` arg) es
---   return $ NegIndexElim v (zip labelList es')
--- commPiElim (NegUpIntro _) _ = lift $ throwE "Modal.commPiElim: type error"
--- commPiElim (NegUpElim x e1 e2) arg = do
---   e2' <- commPiElim e2 arg
---   return $ NegUpElim x e1 e2'
--- commPiElim e v = return $ NegPiElim e v

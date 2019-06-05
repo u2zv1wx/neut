@@ -23,9 +23,9 @@ import Debug.Trace
 toLLVM :: WithEnv ()
 toLLVM = do
   menv <- gets modalEnv
-  forM_ menv $ \(name, (args, e)) -> do
+  forM_ menv $ \(name, (arg, e)) -> do
     llvm <- llvmCode e
-    insLLVMEnv name args llvm
+    insLLVMEnv name arg llvm
 
 llvmCode :: Comp -> WithEnv LLVM
 llvmCode (CompPiElimDownElim fun arg) = do

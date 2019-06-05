@@ -366,9 +366,12 @@ data Env = Env
   , substitution :: Subst -- for (dependent) type inference
   , univConstraintEnv :: [(UnivLevel, UnivLevel)]
   , currentDir :: FilePath
-  , polEnv :: [(Identifier, Neg)] -- x ~> thunk e
-  , modalEnv :: [(Identifier, ([Identifier], Comp))] -- x ~> thunk (lam (x1 ... xn) e))
-  , llvmEnv :: [(Identifier, ([Identifier], LLVM))] -- x ~> thunk (lam (x1 ... xn) e)
+  , polEnv :: [(Identifier, (Identifier, Neg))] -- x ~> thunk (lam (x) e)
+  -- , polEnv :: [(Identifier, Neg)] -- x ~> thunk e
+  -- , modalEnv :: [(Identifier, ([Identifier], Comp))] -- x ~> thunk (lam (x1 ... xn) e))
+  -- , llvmEnv :: [(Identifier, ([Identifier], LLVM))] -- x ~> thunk (lam (x1 ... xn) e)
+  , modalEnv :: [(Identifier, (Identifier, Comp))] -- x ~> thunk (lam (x) e))
+  , llvmEnv :: [(Identifier, (Identifier, LLVM))] -- x ~> thunk (lam (x) e)
   } deriving (Show)
 
 initialEnv :: FilePath -> Env
@@ -477,17 +480,26 @@ insTypeEnv1 i t = do
   forM_ ts $ \t' -> insConstraintEnv t t'
   modify (\e -> e {typeEnv = Map.insert i t (typeEnv e)})
 
-insPolEnv :: Identifier -> Neg -> WithEnv ()
-insPolEnv name body = modify (\e -> e {polEnv = (name, body) : polEnv e})
+insPolEnv :: Identifier -> Identifier -> Neg -> WithEnv ()
+insPolEnv name arg body =
+  modify (\e -> e {polEnv = (name, (arg, body)) : polEnv e})
 
-insModalEnv :: Identifier -> [Identifier] -> Comp -> WithEnv ()
-insModalEnv funName args body =
-  modify (\e -> e {modalEnv = (funName, (args, body)) : modalEnv e})
+-- insPolEnv :: Identifier -> Neg -> WithEnv ()
+-- insPolEnv name body = modify (\e -> e {polEnv = (name, body) : polEnv e})
+insModalEnv :: Identifier -> Identifier -> Comp -> WithEnv ()
+insModalEnv funName arg body =
+  modify (\e -> e {modalEnv = (funName, (arg, body)) : modalEnv e})
 
-insLLVMEnv :: Identifier -> [Identifier] -> LLVM -> WithEnv ()
-insLLVMEnv funName args llvm =
-  modify (\e -> e {llvmEnv = (funName, (args, llvm)) : llvmEnv e})
+insLLVMEnv :: Identifier -> Identifier -> LLVM -> WithEnv ()
+insLLVMEnv funName arg llvm =
+  modify (\e -> e {llvmEnv = (funName, (arg, llvm)) : llvmEnv e})
 
+-- insModalEnv :: Identifier -> [Identifier] -> Comp -> WithEnv ()
+-- insModalEnv funName args body =
+--   modify (\e -> e {modalEnv = (funName, (args, body)) : modalEnv e})
+-- insLLVMEnv :: Identifier -> [Identifier] -> LLVM -> WithEnv ()
+-- insLLVMEnv funName args llvm =
+--   modify (\e -> e {llvmEnv = (funName, (args, llvm)) : llvmEnv e})
 insIndexEnv :: Identifier -> [Identifier] -> WithEnv ()
 insIndexEnv name indexList =
   modify (\e -> e {indexEnv = (name, indexList) : indexEnv e})
