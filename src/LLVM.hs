@@ -22,10 +22,11 @@ import Debug.Trace
 
 toLLVM :: WithEnv ()
 toLLVM = do
-  menv <- gets modalEnv
-  forM_ menv $ \(name, (arg, e)) -> do
-    llvm <- llvmCode e
-    insLLVMEnv name arg llvm
+  undefined
+  -- menv <- gets modalEnv
+  -- forM_ menv $ \(name, (arg, e)) -> do
+  --   llvm <- llvmCode e
+  --   insLLVMEnv name arg llvm
 
 llvmCode :: Comp -> WithEnv LLVM
 llvmCode (CompPiElimDownElim fun arg) = do
@@ -129,12 +130,13 @@ llvmDataLet x (ValueVar y) cont =
   return $ LLVMLet x (LLVMBitcast (LLVMDataLocal y) voidPtr voidPtr) cont
 llvmDataLet x (ValueConst y) cont = do
   cenv <- gets modalEnv
-  case lookup y cenv of
-    Nothing -> lift $ throwE $ "no such global label defined: " ++ y -- FIXME
-    Just (args, _) -> do
-      let funPtrType = toFunPtrType args
-      return $
-        LLVMLet x (LLVMBitcast (LLVMDataGlobal y) funPtrType voidPtr) cont
+  undefined
+  -- case lookup y cenv of
+  --   Nothing -> lift $ throwE $ "no such global label defined: " ++ y -- FIXME
+  --   Just (args, _) -> do
+  --     let funPtrType = toFunPtrType args
+  --     return $
+  --       LLVMLet x (LLVMBitcast (LLVMDataGlobal y) funPtrType voidPtr) cont
 llvmDataLet reg (ValueSigmaIntro ds) cont = do
   xs <- mapM (const $ newNameWith "cursor") ds
   cast <- newNameWith "cast"

@@ -306,18 +306,30 @@ isReducible (_ :< NeutHole _) = False
 
 reduceNeg :: Neg -> WithEnv Neg
 reduceNeg (NegPiElimDownElim v1 v2) =
-  case v1 of
-    PosDownIntroPiIntro arg body -> reduceNeg $ substNeg [(arg, v2)] body
+  case v1
+    -- PosDownIntroPiIntro arg body -> reduceNeg $ substNeg [(arg, v2)] body
+        of
     PosConst x -> do
       penv <- gets polEnv
       case lookup x penv of
-        Just (arg, e) -> reduceNeg $ substNeg [(arg, v2)] e
+        Just (BindableThunkLam arg body) ->
+          reduceNeg $ substNeg [(arg, v2)] body
+        Just (BindableNeg e) -> do
+          tmp <- newNameWith "tmp"
+          reduceNeg $ NegUpElim tmp e $ NegPiElimDownElim (PosVar tmp) v2
         _ -> return $ NegPiElimDownElim v1 v2
     _ -> return $ NegPiElimDownElim v1 v2
 reduceNeg (NegSigmaElim v xs body) =
   case v of
     PosSigmaIntro vs
       | length xs == length vs -> reduceNeg $ substNeg (zip xs vs) body
+    PosConst x -> do
+      penv <- gets polEnv
+      case lookup x penv of
+        Just (BindableNeg e) -> do
+          tmp <- newNameWith "tmp"
+          reduceNeg $ NegUpElim tmp e $ NegSigmaElim (PosVar tmp) xs body
+        _ -> return $ NegSigmaElim v xs body
     _ -> return $ NegSigmaElim v xs body
 reduceNeg (NegIndexElim v branchList) =
   case v of
@@ -361,10 +373,10 @@ substPos sub (PosSigmaIntro vs) = do
   let vs' = map (substPos sub) vs
   PosSigmaIntro vs'
 substPos _ (PosIndexIntro l t) = PosIndexIntro l t
-substPos sub (PosDownIntroPiIntro x e) = do
-  let sub' = filter (\(y, _) -> y /= x) sub
-  PosDownIntroPiIntro x $ substNeg sub' e
 
+-- substPos sub (PosDownIntroPiIntro x e) = do
+--   let sub' = filter (\(y, _) -> y /= x) sub
+--   PosDownIntroPiIntro x $ substNeg sub' e
 substNeg :: SubstPos -> Neg -> Neg
 substNeg sub (NegPiElimDownElim v1 v2) = do
   let v1' = substPos sub v1
@@ -393,7 +405,10 @@ reduceComp (CompPiElimDownElim v1 v2) =
     ValueConst x -> do
       menv <- gets modalEnv
       case lookup x menv of
-        Just (arg, body) -> reduceComp $ substComp [(arg, v2)] body
+        Just e -> do
+          tmp <- newNameWith "tmp"
+          reduceComp $ CompUpElim tmp e $ CompPiElimDownElim (ValueVar tmp) v2
+          -- reduceComp $ substComp [(arg, v2)] body
         _ -> return $ CompPiElimDownElim v1 v2
     _ -> return $ CompPiElimDownElim v1 v2
 reduceComp (CompConstElim c vs) = do
@@ -416,7 +431,7 @@ reduceComp (CompSigmaElim v xs e) =
     ValueConst x -> do
       menv <- gets modalEnv
       case lookup x menv of
-        Just ([], body) -> do
+        Just body -> do
           tmp <- newNameWith "tmp"
           reduceComp $ CompUpElim tmp body $ CompSigmaElim (ValueVar tmp) xs e
         _ -> return $ CompSigmaElim v xs e

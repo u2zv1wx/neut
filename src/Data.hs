@@ -197,8 +197,8 @@ data Pos
   | PosSigmaIntro [Pos]
   | PosIndexIntro Index
                   LowType
-  | PosDownIntroPiIntro Identifier
-                        Neg
+  -- | PosDownIntroPiIntro Identifier
+  --                       Neg
   deriving (Show)
 
 data Neg
@@ -341,6 +341,12 @@ instance Ord EnrichedConstraint where
 
 type Subst = [(Identifier, Neut)]
 
+data Bindable
+  = BindableNeg Neg -- return x == e : ↑P
+  | BindableThunkLam Identifier -- return x == return (thunk (lam (x) e))
+                     Neg
+  deriving (Show)
+
 data Env = Env
   { count :: Int -- to generate fresh symbols
   , notationEnv :: [(Tree, Tree)] -- macro transformers
@@ -355,14 +361,14 @@ data Env = Env
   , substitution :: Subst -- for (dependent) type inference
   , univConstraintEnv :: [(UnivLevel, UnivLevel)]
   , currentDir :: FilePath
-  , termEnv :: [(Identifier, (Identifier, Term))] -- x ~> lam (x) e
+  , termEnv :: [(Identifier, Term)]
   -- , termEnv :: [(Identifier, Term)]
-  , polEnv :: [(Identifier, (Identifier, Neg))] -- x ~> thunk (lam (x) e)
+  , polEnv :: [(Identifier, Bindable)] -- x ~> thunk (lam (x) e)
   -- , polEnv :: [(Identifier, Neg)] -- x ~> thunk e
   -- , modalEnv :: [(Identifier, ([Identifier], Comp))] -- x ~> thunk (lam (x1 ... xn) e)
   -- , llvmEnv :: [(Identifier, ([Identifier], LLVM))] -- x ~> thunk (lam (x1 ... xn) e)
-  , modalEnv :: [(Identifier, (Identifier, Comp))] -- x ~> thunk (lam (x) e))
-  , llvmEnv :: [(Identifier, (Identifier, LLVM))] -- x ~> thunk (lam (x) e)
+  , modalEnv :: [(Identifier, Comp)] -- x ~> thunk (lam (x) e))
+  , llvmEnv :: [(Identifier, LLVM)] -- x ~> thunk (lam (x) e)
   } deriving (Show)
 
 initialEnv :: FilePath -> Env
@@ -472,23 +478,20 @@ insTypeEnv1 i t = do
   forM_ ts $ \t' -> insConstraintEnv t t'
   modify (\e -> e {typeEnv = Map.insert i t (typeEnv e)})
 
-insTermEnv :: Identifier -> Identifier -> Term -> WithEnv ()
-insTermEnv name arg e =
-  modify (\env -> env {termEnv = (name, (arg, e)) : termEnv env})
+insTermEnv :: Identifier -> Term -> WithEnv ()
+insTermEnv name e = modify (\env -> env {termEnv = (name, e) : termEnv env})
 
-insPolEnv :: Identifier -> Identifier -> Neg -> WithEnv ()
-insPolEnv name arg body =
-  modify (\e -> e {polEnv = (name, (arg, body)) : polEnv e})
+insPolEnv :: Identifier -> Bindable -> WithEnv ()
+insPolEnv name b = modify (\e -> e {polEnv = (name, b) : polEnv e})
 
 -- insPolEnv :: Identifier -> Neg -> WithEnv ()
 -- insPolEnv name body = modify (\e -> e {polEnv = (name, body) : polEnv e})
-insModalEnv :: Identifier -> Identifier -> Comp -> WithEnv ()
-insModalEnv funName arg body =
-  modify (\e -> e {modalEnv = (funName, (arg, body)) : modalEnv e})
+insModalEnv :: Identifier -> Comp -> WithEnv ()
+insModalEnv x e = modify (\env -> env {modalEnv = (x, e) : modalEnv env})
 
-insLLVMEnv :: Identifier -> Identifier -> LLVM -> WithEnv ()
-insLLVMEnv funName arg llvm =
-  modify (\e -> e {llvmEnv = (funName, (arg, llvm)) : llvmEnv e})
+insLLVMEnv :: Identifier -> LLVM -> WithEnv ()
+insLLVMEnv funName llvm =
+  modify (\e -> e {llvmEnv = (funName, llvm) : llvmEnv e})
 
 -- insModalEnv :: Identifier -> [Identifier] -> Comp -> WithEnv ()
 -- insModalEnv funName args body =

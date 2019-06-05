@@ -115,8 +115,8 @@ varPos (PosVar s) = [s]
 varPos (PosConst _) = []
 varPos (PosSigmaIntro vs) = concatMap varPos vs
 varPos (PosIndexIntro _ _) = []
-varPos (PosDownIntroPiIntro x e) = filter (/= x) $ varNeg e
 
+-- varPos (PosDownIntroPiIntro x e) = filter (/= x) $ varNeg e
 varNeg :: Neg -> [Identifier]
 varNeg (NegPiElimDownElim v1 v2) = varPos v1 ++ varPos v2
 varNeg (NegSigmaElim v xs e) = do

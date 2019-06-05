@@ -25,10 +25,11 @@ import Debug.Trace
 
 emit :: WithEnv [String]
 emit = do
-  env <- get
-  g <- emitGlobal
-  xs <- forM (llvmEnv env) $ uncurry emitDefinition
-  return $ g ++ concat xs
+  undefined
+  -- env <- get
+  -- g <- emitGlobal
+  -- xs <- forM (llvmEnv env) $ uncurry emitDefinition
+  -- return $ g ++ concat xs
 
 emitDefinition :: Identifier -> (Identifier, LLVM) -> WithEnv [String]
 emitDefinition name (arg, asm) = do

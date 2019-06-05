@@ -22,20 +22,21 @@ import Debug.Trace
 
 modalize :: WithEnv ()
 modalize = do
-  penv <- gets polEnv
-  forM_ penv $ \(name, (arg, e)) -> do
-    e' <- modalNeg e
-    r0 <- reduceNeg e
-    -- r1 <- reduceComp e'
-    liftIO $ putStrLn name
-    liftIO $ putStrLn arg
-    -- liftIO $ putStrLn $ Pr.ppShow e
-    liftIO $ putStrLn $ Pr.ppShow r0
-    -- let fvs = nub $ varComp e'
-    -- liftIO $ putStrLn $ "globalfvs == " ++ show fvs
-    -- hole <- newNameWith "hole"
-    -- insModalEnv name [hole] e'
-    insModalEnv name arg e'
+  undefined
+  -- penv <- gets polEnv
+  -- forM_ penv $ \(name, e) -> do
+  --   e' <- modalNeg e
+  --   r0 <- reduceNeg e
+  --   -- r1 <- reduceComp e'
+  --   liftIO $ putStrLn name
+  --   -- liftIO $ putStrLn arg
+  --   -- liftIO $ putStrLn $ Pr.ppShow e
+  --   liftIO $ putStrLn $ Pr.ppShow r0
+  --   -- let fvs = nub $ varComp e'
+  --   -- liftIO $ putStrLn $ "globalfvs == " ++ show fvs
+  --   -- hole <- newNameWith "hole"
+  --   -- insModalEnv name [hole] e'
+  --   insModalEnv name e'
   -- menv <- gets modalEnv
   -- forM_ menv $ \(name, (args, e)) -> do
   --   liftIO $ putStrLn name
@@ -52,18 +53,12 @@ modalPos (PosSigmaIntro es) = do
   es' <- mapM modalPos es
   return $ ValueSigmaIntro es'
 modalPos (PosIndexIntro l t) = return $ ValueIndexIntro l t
-modalPos (PosDownIntroPiIntro x e) = do
-  e' <- modalNeg e
-  -- modalPosDownIntroPiIntro [x] e'
-  clsName <- newNameWith "cls"
-  insModalEnv clsName x e'
-  return $ ValueConst clsName
 
--- translates (thunk (lam (x1 ... xn) e)).
--- modalPosDownIntroPiIntro :: [Identifier] -> Comp -> WithEnv Value
--- modalPosDownIntroPiIntro args body = do
+-- modalPos (PosDownIntroPiIntro x e) = do
+--   e' <- modalNeg e
+--   -- modalPosDownIntroPiIntro [x] e'
 --   clsName <- newNameWith "cls"
---   insModalEnv clsName args body
+--   insModalEnv clsName x e' -- return (thunk (lam (x) e))
 --   return $ ValueConst clsName
 modalNeg :: Neg -> WithEnv Comp
 modalNeg (NegPiElimDownElim v1 v2) = do
@@ -89,17 +84,3 @@ modalNeg (NegUpElim x e1 e2) = do
 modalNeg (NegConstElim x vs) = do
   vs' <- mapM modalPos vs
   return $ CompConstElim x vs'
--- varValue :: Value -> [Identifier]
--- varValue (ValueVar x) = [x]
--- varValue (ValueConst _) = []
--- varValue (ValueSigmaIntro vs) = concatMap varValue vs
--- varValue (ValueIndexIntro _ _) = []
--- varComp :: Comp -> [Identifier]
--- varComp (CompPiElimDownElim v1 v2) = varValue v1 ++ varValue v2
--- varComp (CompConstElim _ vs) = concatMap varValue vs
--- varComp (CompSigmaElim v xs e) = varValue v ++ filter (`notElem` xs) (varComp e)
--- varComp (CompIndexElim v branchList) = do
---   let (_, es) = unzip branchList
---   varValue v ++ concatMap varComp es
--- varComp (CompUpIntro v) = varValue v
--- varComp (CompUpElim x e1 e2) = varComp e1 ++ filter (/= x) (varComp e2)
