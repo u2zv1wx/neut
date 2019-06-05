@@ -172,8 +172,8 @@ data Term
                    LowType
   | TermIndexElim Term
                   [(Index, Term)]
-  | TermMu Identifier
-           Term
+  -- | TermMu Identifier
+  --          Term
   deriving (Show)
 
 instance Show LowType where
@@ -366,9 +366,10 @@ data Env = Env
   , substitution :: Subst -- for (dependent) type inference
   , univConstraintEnv :: [(UnivLevel, UnivLevel)]
   , currentDir :: FilePath
+  , termEnv :: [(Identifier, Term)]
   , polEnv :: [(Identifier, (Identifier, Neg))] -- x ~> thunk (lam (x) e)
   -- , polEnv :: [(Identifier, Neg)] -- x ~> thunk e
-  -- , modalEnv :: [(Identifier, ([Identifier], Comp))] -- x ~> thunk (lam (x1 ... xn) e))
+  -- , modalEnv :: [(Identifier, ([Identifier], Comp))] -- x ~> thunk (lam (x1 ... xn) e)
   -- , llvmEnv :: [(Identifier, ([Identifier], LLVM))] -- x ~> thunk (lam (x1 ... xn) e)
   , modalEnv :: [(Identifier, (Identifier, Comp))] -- x ~> thunk (lam (x) e))
   , llvmEnv :: [(Identifier, (Identifier, LLVM))] -- x ~> thunk (lam (x) e)
@@ -385,6 +386,7 @@ initialEnv path =
     , indexEnv = []
     , nameEnv = []
     , typeEnv = Map.empty
+    , termEnv = []
     , polEnv = []
     , modalEnv = []
     , llvmEnv = []
@@ -479,6 +481,9 @@ insTypeEnv1 i t = do
   let ts = Map.elems $ Map.filterWithKey (\j _ -> i == j) tenv
   forM_ ts $ \t' -> insConstraintEnv t t'
   modify (\e -> e {typeEnv = Map.insert i t (typeEnv e)})
+
+insTermEnv :: Identifier -> Term -> WithEnv ()
+insTermEnv name e = modify (\env -> env {termEnv = (name, e) : termEnv env})
 
 insPolEnv :: Identifier -> Identifier -> Neg -> WithEnv ()
 insPolEnv name arg body =

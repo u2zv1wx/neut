@@ -28,12 +28,18 @@ import Text.Read (readMaybe)
 
 import Data.Maybe (isJust, maybeToList)
 
-polarize :: Identifier -> Term -> WithEnv ()
-polarize name e = do
-  e' <- polarize' e
-  hole <- newNameWith "hole"
-  insPolEnv name hole e'
+polarize :: WithEnv ()
+polarize = do
+  tenv <- gets termEnv
+  forM_ tenv $ \(name, e) -> do
+    e' <- polarize' e
+    hole <- newNameWith "hole"
+    insPolEnv name hole e'
 
+-- polarize name e = do
+--   e' <- polarize' e
+--   hole <- newNameWith "hole"
+--   insPolEnv name hole e'
 -- Essence:
 --
 --   lam x. e
@@ -58,13 +64,13 @@ polarize' (TermConst x) = toDefinition x
 polarize' (TermPiIntro x e) = do
   e' <- polarize' e
   makeClosure x e'
-polarize' (TermPiElim (TermMu x (TermPiIntro arg e1)) e2) = do
-  e1' <- polarize' e1
-  insPolEnv x arg e1' -- x == thunk (lam (arg) e1')
-  e2' <- polarize' e2
-  z <- newNameWith "tmp"
-  -- ここではクロージャを呼び出すのではないのでcallclosureは使わない
-  return $ NegUpElim z e2' $ NegPiElimDownElim (PosConst x) (PosVar z)
+-- polarize' (TermPiElim (TermMu x (TermPiIntro arg e1)) e2) = do
+--   e1' <- polarize' e1
+--   insPolEnv x arg e1' -- x == thunk (lam (arg) e1')
+--   e2' <- polarize' e2
+--   z <- newNameWith "tmp"
+--   -- ここではクロージャを呼び出すのではないのでcallclosureは使わない
+--   return $ NegUpElim z e2' $ NegPiElimDownElim (PosConst x) (PosVar z)
 polarize' (TermPiElim e1 e2) = do
   e1' <- polarize' e1
   e2' <- polarize' e2
@@ -85,8 +91,8 @@ polarize' (TermIndexElim e branchList) = do
   x <- newNameWith "tmp"
   cs <- mapM polarize' es
   return $ NegUpElim x e' (NegIndexElim (PosVar x) (zip labelList cs))
-polarize' (TermMu _ _) = lift $ throwE "TermMu outside TermPiElim"
 
+-- polarize' (TermMu _ _) = lift $ throwE "TermMu outside TermPiElim"
 bindLet :: [(Identifier, Neg)] -> Neg -> Neg
 bindLet [] cont = cont
 bindLet ((x, e):xes) cont = NegUpElim x e $ bindLet xes cont

@@ -170,7 +170,7 @@ reduceTerm (TermIndexElim e branchList) = do
               throwE $
               "the index " ++ show x ++ " is not included in branchList"
     _ -> return $ TermIndexElim e' branchList
-reduceTerm (TermMu s e) = reduceTerm $ substTerm' [(s, TermMu s e)] e
+-- reduceTerm (TermMu s e) = reduceTerm $ substTerm' [(s, TermMu s e)] e
 reduceTerm t = return t
 
 type SubstTerm = [(Identifier, Term)]
@@ -197,11 +197,11 @@ substTerm sub (TermIndexElim e branchList) = do
   let e' = substTerm sub e
   let branchList' = map (\(l, e) -> (l, substTerm sub e)) branchList
   TermIndexElim e' branchList'
-substTerm sub (TermMu x e) = do
-  let sub' = filter (\(y, _) -> x /= y) sub
-  let e' = substTerm sub' e
-  TermMu x e'
 
+-- substTerm sub (TermMu x e) = do
+--   let sub' = filter (\(y, _) -> x /= y) sub
+--   let e' = substTerm sub' e
+--   TermMu x e'
 substTerm' :: SubstTerm -> Term -> Term
 substTerm' _ (TermVar x) = TermVar x
 substTerm' sub (TermConst x) = fromMaybe (TermConst x) (lookup x sub)
@@ -224,11 +224,11 @@ substTerm' sub (TermIndexElim e branchList) = do
   let e' = substTerm' sub e
   let branchList' = map (\(l, e) -> (l, substTerm' sub e)) branchList
   TermIndexElim e' branchList'
-substTerm' sub (TermMu x e) = do
-  let sub' = filter (\(y, _) -> x /= y) sub
-  let e' = substTerm' sub' e
-  TermMu x e'
 
+-- substTerm' sub (TermMu x e) = do
+--   let sub' = filter (\(y, _) -> x /= y) sub
+--   let e' = substTerm' sub' e
+--   TermMu x e'
 toPiIntroSeq :: Neut -> (Neut, [(Identifier, Neut, Identifier)])
 toPiIntroSeq (meta :< NeutPiIntro (x, t) body) = do
   let (body', args) = toPiIntroSeq body
