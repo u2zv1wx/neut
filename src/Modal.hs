@@ -26,14 +26,17 @@ modalize = do
   forM_ penv $ \(name, e) -> do
     e' <- modalNeg e
     -- r1 <- reduceComp e'
-    -- liftIO $ putStrLn name
-    -- liftIO $ putStrLn $ Pr.ppShow r1
+    liftIO $ putStrLn name
+    liftIO $ putStrLn $ Pr.ppShow e
+    -- let fvs = nub $ varComp e'
+    -- liftIO $ putStrLn $ "globalfvs == " ++ show fvs
     insModalEnv name [] e'
   menv <- gets modalEnv
   forM_ menv $ \(name, (args, e)) -> do
-    r0 <- reduceComp e
     liftIO $ putStrLn name
     liftIO $ putStrLn $ Pr.ppShow args
+    liftIO $ putStrLn $ Pr.ppShow e
+    r0 <- reduceComp e
     liftIO $ putStrLn $ Pr.ppShow r0
     liftIO $ putStrLn "======================="
 

@@ -46,6 +46,8 @@ polarize' (TermPiElim e1 e2) = do
   f <- newNameWith "fun"
   ff <- force $ PosVar f
   x <- newNameWith "arg"
+  -- piElim <- commPiElim ff (PosVar x)
+  -- return $ NegUpElim x e2' $ NegUpElim f e1' piElim
   return $ NegUpElim x e2' $ NegUpElim f e1' $ NegPiElim ff (PosVar x)
 polarize' (TermSigmaIntro es) = do
   es' <- mapM polarize' es
@@ -154,3 +156,17 @@ wordsWhen p s =
     "" -> []
     s' -> w : wordsWhen p s''
       where (w, s'') = break p s'
+-- -- should perform alpha-conv?
+-- commPiElim :: Neg -> Pos -> WithEnv Neg
+-- commPiElim (NegSigmaElim v xs e) arg = do
+--   e' <- commPiElim e arg
+--   return $ NegSigmaElim v xs e'
+-- commPiElim (NegIndexElim v branchList) arg = do
+--   let (labelList, es) = unzip branchList
+--   es' <- mapM (`commPiElim` arg) es
+--   return $ NegIndexElim v (zip labelList es')
+-- commPiElim (NegUpIntro _) _ = lift $ throwE "Modal.commPiElim: type error"
+-- commPiElim (NegUpElim x e1 e2) arg = do
+--   e2' <- commPiElim e2 arg
+--   return $ NegUpElim x e1 e2'
+-- commPiElim e v = return $ NegPiElim e v
