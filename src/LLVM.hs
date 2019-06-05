@@ -20,13 +20,18 @@ import qualified Text.Show.Pretty as Pr
 
 import Debug.Trace
 
-toLLVM :: WithEnv ()
-toLLVM = do
-  undefined
-  -- menv <- gets modalEnv
-  -- forM_ menv $ \(name, (arg, e)) -> do
-  --   llvm <- llvmCode e
-  --   insLLVMEnv name arg llvm
+toLLVM :: Neg -> WithEnv LLVM
+toLLVM mainTerm = do
+  penv <- gets polEnv
+  forM_ penv $ \(name, b) ->
+    case b of
+      DeclarationConst v -> do
+        v' <- llvmData v
+        insLLVMEnv name $ DeclarationConst v'
+      DeclarationFun arg e -> do
+        llvm <- llvmCode e
+        insLLVMEnv name $ DeclarationFun arg llvm
+  llvmCode mainTerm
 
 llvmCode :: Neg -> WithEnv LLVM
 llvmCode (NegPiElimDownElim fun arg) = do
@@ -34,19 +39,9 @@ llvmCode (NegPiElimDownElim fun arg) = do
   x <- newNameWith "arg"
   let funPtrType = toFunPtrType [arg]
   cast <- newNameWith "cast"
-  -- llvmDataLet' ((f, fun) : zip xs args) $
   llvmDataLet' [(f, fun), (x, arg)] $
     LLVMLet cast (LLVMBitcast (LLVMDataLocal f) voidPtr funPtrType) $
     LLVMCall (LLVMDataLocal cast) [LLVMDataLocal x]
-    -- LLVMCall (LLVMDataLocal cast) (map LLVMDataLocal xs)
-  -- llvmCode (NegPiElimDownElim fun args) = do
---   f <- newNameWith "fun"
---   xs <- mapM (const (newNameWith "arg")) args
---   let funPtrType = toFunPtrType args
---   cast <- newNameWith "cast"
---   llvmDataLet' ((f, fun) : zip xs args) $
---     LLVMLet cast (LLVMBitcast (LLVMDataLocal f) voidPtr funPtrType) $
---     LLVMCall (LLVMDataLocal cast) (map LLVMDataLocal xs)
 llvmCode (NegIndexElim x branchList) = llvmSwitch x branchList
 llvmCode (NegSigmaElim v xs e) =
   llvmCodeSigmaElim v (zip xs [0 ..]) (length xs) e
@@ -128,15 +123,19 @@ llvmCodeConstElim _ _ = lift $ throwE "llvmCodeConstElim"
 llvmDataLet :: Identifier -> Pos -> LLVM -> WithEnv LLVM
 llvmDataLet x (PosVar y) cont =
   return $ LLVMLet x (LLVMBitcast (LLVMDataLocal y) voidPtr voidPtr) cont
-llvmDataLet x (PosConst y) cont = do
-  cenv <- gets polEnv
-  undefined
-  -- case lookup y cenv of
-  --   Nothing -> lift $ throwE $ "no such global label defined: " ++ y -- FIXME
-  --   Just (args, _) -> do
-  --     let funPtrType = toFunPtrType args
-  --     return $
-  --       LLVMLet x (LLVMBitcast (LLVMDataGlobal y) funPtrType voidPtr) cont
+llvmDataLet x (PosConst y) cont
+  -- return $ LLVMLet x (LLVMBitcast (LLVMDataGlobal y) voidPtr voidPtr) cont
+ = do
+  penv <- gets polEnv
+  case lookup y penv of
+    Nothing -> lift $ throwE $ "no such global label defined: " ++ y -- FIXME
+    Just (DeclarationConst v)
+      -- FIXME: construct the type of v and use it to bitcast LLVMDataGlobal
+     -> llvmDataLet x v cont
+    Just (DeclarationFun args _) -> do
+      let funPtrType = toFunPtrType [args]
+      return $
+        LLVMLet x (LLVMBitcast (LLVMDataGlobal y) funPtrType voidPtr) cont
 llvmDataLet reg (PosSigmaIntro ds) cont = do
   xs <- mapM (const $ newNameWith "cursor") ds
   cast <- newNameWith "cast"
@@ -148,13 +147,16 @@ llvmDataLet reg (PosSigmaIntro ds) cont = do
     LLVMLet cast (LLVMBitcast (LLVMDataLocal reg) voidPtr structPtrType) cont''
 llvmDataLet x (PosIndexIntro (IndexInteger i) (LowTypeSignedInt j)) cont =
   return $
-  LLVMLet x (LLVMIntToPointer (LLVMDataInt i) (LowTypeSignedInt j) voidPtr) cont
+  LLVMLet
+    x
+    (LLVMIntToPointer (LLVMDataInt i j) (LowTypeSignedInt j) voidPtr)
+    cont
 llvmDataLet x (PosIndexIntro (IndexFloat f) (LowTypeFloat j)) cont = do
   cast <- newNameWith "cast"
   let ft = LowTypeFloat j
   let st = LowTypeSignedInt j
   return $
-    LLVMLet cast (LLVMBitcast (LLVMDataFloat f) ft st) $
+    LLVMLet cast (LLVMBitcast (LLVMDataFloat f j) ft st) $
     LLVMLet x (LLVMIntToPointer (LLVMDataLocal cast) st voidPtr) cont
 llvmDataLet _ (PosIndexIntro _ _) _ = lift $ throwE "llvmDataLet.PosIndexIntro"
 
@@ -223,3 +225,17 @@ toStructPtrType :: [a] -> LowType
 toStructPtrType xs = do
   let structType = LowTypeStruct $ map (const voidPtr) xs
   LowTypePointer structType
+
+llvmData :: Pos -> WithEnv LLVMData
+llvmData (PosVar x) = return $ LLVMDataLocal x
+llvmData (PosConst x) = return $ LLVMDataGlobal x
+llvmData (PosSigmaIntro vs) = do
+  vs' <- mapM llvmData vs
+  return $ LLVMDataStruct vs'
+llvmData (PosIndexIntro (IndexInteger i) (LowTypeSignedInt j)) =
+  return $ LLVMDataInt i j
+llvmData (PosIndexIntro (IndexInteger i) (LowTypeUnsignedInt j)) =
+  return $ LLVMDataInt i j -- LLVM doesn't distinguish signed from unsigned
+llvmData (PosIndexIntro (IndexFloat f) (LowTypeFloat j)) =
+  return $ LLVMDataFloat f j
+llvmData (PosIndexIntro _ _) = lift $ throwE "llvmData"

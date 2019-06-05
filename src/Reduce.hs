@@ -303,11 +303,8 @@ reduceNeg (NegPiElimDownElim v1 v2) =
     PosConst x -> do
       penv <- gets polEnv
       case lookup x penv of
-        Just (BindableThunkLam arg body) ->
-          reduceNeg $ substNeg [(arg, v2)] body
-        Just (BindableNeg e) -> do
-          tmp <- newNameWith "tmp"
-          reduceNeg $ NegUpElim tmp e $ NegPiElimDownElim (PosVar tmp) v2
+        Just (DeclarationFun arg body) -> reduceNeg $ substNeg [(arg, v2)] body
+        Just (DeclarationConst v1') -> reduceNeg $ NegPiElimDownElim v1' v2
         _ -> return $ NegPiElimDownElim v1 v2
     _ -> return $ NegPiElimDownElim v1 v2
 reduceNeg (NegSigmaElim v xs body) =
@@ -317,10 +314,10 @@ reduceNeg (NegSigmaElim v xs body) =
     PosConst x -> do
       penv <- gets polEnv
       case lookup x penv of
-        Just (BindableNeg e) -> do
-          tmp <- newNameWith "tmp"
-          reduceNeg $ NegUpElim tmp e $ NegSigmaElim (PosVar tmp) xs body
-        _ -> return $ NegSigmaElim v xs body
+        Just (DeclarationConst v') -> reduceNeg $ NegSigmaElim v' xs body
+        _ -> do
+          liftIO $ putStrLn $ "not found: " ++ show x
+          return $ NegSigmaElim v xs body
     _ -> return $ NegSigmaElim v xs body
 reduceNeg (NegIndexElim v branchList) =
   case v of

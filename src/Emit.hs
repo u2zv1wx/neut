@@ -1,5 +1,3 @@
--- Just emit the resulting LLVM code.
--- The result is [String], where each element corresponds to a line.
 module Emit
   ( emit
   ) where
@@ -23,17 +21,23 @@ import Data.List
 
 import Debug.Trace
 
-emit :: WithEnv [String]
-emit = do
-  undefined
-  -- env <- get
-  -- g <- emitGlobal
-  -- xs <- forM (llvmEnv env) $ uncurry emitDefinition
-  -- return $ g ++ concat xs
+emit :: LLVM -> WithEnv [String]
+emit mainTerm = do
+  lenv <- gets llvmEnv
+  g <- emitGlobal
+  zs <- emitDefinitionFun "main" [] mainTerm
+  xs <- forM lenv $ uncurry emitDefinition
+  return $ g ++ zs ++ concat xs
 
-emitDefinition :: Identifier -> (Identifier, LLVM) -> WithEnv [String]
-emitDefinition name (arg, asm) = do
-  let prologue = sig name [arg] ++ " {"
+emitDefinition :: Identifier -> Declaration LLVMData LLVM -> WithEnv [String]
+emitDefinition name (DeclarationConst v) = do
+  s <- emitLLVMData name v
+  return [s]
+emitDefinition name (DeclarationFun arg asm) = emitDefinitionFun name [arg] asm
+
+emitDefinitionFun :: Identifier -> [Identifier] -> LLVM -> WithEnv [String]
+emitDefinitionFun name args asm = do
+  let prologue = sig name args ++ " {"
   content <- emitLLVM name asm
   let epilogue = "}"
   return $ [prologue] ++ content ++ [epilogue]
@@ -42,7 +46,7 @@ sig :: Identifier -> [Identifier] -> String
 sig "main" args = "define i64 @main" ++ showArgs (map LLVMDataLocal args)
 sig name args =
   "define i8* " ++
-  show (LLVMDataGlobal name) ++ showArgs (map LLVMDataLocal args)
+  showLLVMData (LLVMDataGlobal name) ++ showArgs (map LLVMDataLocal args)
 
 emitBlock :: Identifier -> Identifier -> LLVM -> WithEnv [String]
 emitBlock funName name asm = do
@@ -55,7 +59,11 @@ emitLLVM funName (LLVMCall f args) = do
   op <-
     emitOp $
     unwords
-      [show (LLVMDataLocal tmp), "=", "tail call i8*", show f ++ showArgs args]
+      [ showLLVMData (LLVMDataLocal tmp)
+      , "="
+      , "tail call i8*"
+      , showLLVMData f ++ showArgs args
+      ]
   a <- emitRet funName (LLVMDataLocal tmp)
   return $ op ++ a
 emitLLVM funName (LLVMSwitch d defaultBranch branchList) = do
@@ -66,9 +74,9 @@ emitLLVM funName (LLVMSwitch d defaultBranch branchList) = do
     unwords
       [ "switch"
       , "i64"
-      , show d ++ ","
+      , showLLVMData d ++ ","
       , "label"
-      , show (LLVMDataLocal defaultLabel)
+      , showLLVMData (LLVMDataLocal defaultLabel)
       , showBranchList $ zip (map fst branchList) labelList
       ]
   let asmList = map snd branchList
@@ -80,7 +88,12 @@ emitLLVM funName (LLVMReturn d) = emitRet funName d
 emitLLVM funName (LLVMLet x (LLVMCall f args) cont) = do
   op <-
     emitOp $
-    unwords [show (LLVMDataLocal x), "=", "call i8*", show f ++ showArgs args]
+    unwords
+      [ showLLVMData (LLVMDataLocal x)
+      , "="
+      , "call i8*"
+      , showLLVMData f ++ showArgs args
+      ]
   a <- emitLLVM funName cont
   return $ op ++ a
 emitLLVM funName (LLVMLet x (LLVMSwitch d defaultBranch branchList) cont) = do
@@ -97,11 +110,11 @@ emitLLVM funName (LLVMLet x (LLVMGetElementPtr base (i, n)) cont) = do
   op <-
     emitOp $
     unwords
-      [ show (LLVMDataLocal x)
+      [ showLLVMData (LLVMDataLocal x)
       , "= getelementptr"
       , showStruct n ++ ","
       , showStruct n ++ "*"
-      , show base ++ ","
+      , showLLVMData base ++ ","
       , showIndex [0, i]
       ]
   xs <- emitLLVM funName cont
@@ -110,11 +123,11 @@ emitLLVM funName (LLVMLet x (LLVMBitcast d fromType toType) cont) = do
   op <-
     emitOp $
     unwords
-      [ show (LLVMDataLocal x)
+      [ showLLVMData (LLVMDataLocal x)
       , "="
       , "bitcast"
       , showLowType fromType
-      , show d
+      , showLLVMData d
       , "to"
       , showLowType toType
       ]
@@ -124,11 +137,11 @@ emitLLVM funName (LLVMLet x (LLVMIntToPointer d fromType toType) cont) = do
   op <-
     emitOp $
     unwords
-      [ show (LLVMDataLocal x)
+      [ showLLVMData (LLVMDataLocal x)
       , "="
       , "inttoptr"
       , showLowType fromType
-      , show d
+      , showLLVMData d
       , "to"
       , showLowType toType
       ]
@@ -138,24 +151,33 @@ emitLLVM funName (LLVMLet x (LLVMPointerToInt d fromType toType) cont) = do
   op <-
     emitOp $
     unwords
-      [ show (LLVMDataLocal x)
+      [ showLLVMData (LLVMDataLocal x)
       , "="
       , "ptrtoint"
       , showLowType fromType
-      , show d
+      , showLLVMData d
       , "to"
       , showLowType toType
       ]
   a <- emitLLVM funName cont
   return $ op ++ a
 emitLLVM funName (LLVMLet x (LLVMLoad d) cont) = do
-  op <- emitOp $ unwords [show (LLVMDataLocal x), "=", "load i8*, i8**", show d]
+  op <-
+    emitOp $
+    unwords
+      [showLLVMData (LLVMDataLocal x), "=", "load i8*, i8**", showLLVMData d]
   a <- emitLLVM funName cont
   return $ op ++ a
 emitLLVM funName (LLVMLet _ (LLVMStore (d1, t1) (d2, t2)) cont) = do
   op <-
     emitOp $
-    unwords ["store", showLowType t1, show d1 ++ ",", showLowType t2, show d2]
+    unwords
+      [ "store"
+      , showLowType t1
+      , showLLVMData d1 ++ ","
+      , showLowType t2
+      , showLLVMData d2
+      ]
   a <- emitLLVM funName cont
   return $ op ++ a
 emitLLVM funName (LLVMLet x (LLVMAlloc ts) cont) = do
@@ -163,7 +185,7 @@ emitLLVM funName (LLVMLet x (LLVMAlloc ts) cont) = do
   op1 <-
     emitOp $
     unwords
-      [ show (LLVMDataLocal size)
+      [ showLLVMData (LLVMDataLocal size)
       , "="
       , "getelementptr i64, i64* null, i32 " ++ show (length ts)
       ]
@@ -171,25 +193,25 @@ emitLLVM funName (LLVMLet x (LLVMAlloc ts) cont) = do
   op2 <-
     emitOp $
     unwords
-      [ show (LLVMDataLocal casted)
+      [ showLLVMData (LLVMDataLocal casted)
       , "="
       , "ptrtoint i64*"
-      , show (LLVMDataLocal size)
+      , showLLVMData (LLVMDataLocal size)
       , "to i64"
       ]
   op3 <-
     emitOp $
     unwords
-      [ show (LLVMDataLocal x)
+      [ showLLVMData (LLVMDataLocal x)
       , "="
       , "call"
       , "i8*"
-      , "@malloc(i64 " ++ show (LLVMDataLocal casted) ++ ")"
+      , "@malloc(i64 " ++ showLLVMData (LLVMDataLocal casted) ++ ")"
       ]
   a <- emitLLVM funName cont
   return $ op1 ++ op2 ++ op3 ++ a
 emitLLVM funName (LLVMLet _ (LLVMFree d) cont) = do
-  op <- emitOp $ unwords ["call", "void", "@free(i8* " ++ show d ++ ")"]
+  op <- emitOp $ unwords ["call", "void", "@free(i8* " ++ showLLVMData d ++ ")"]
   a <- emitLLVM funName cont
   return $ op ++ a
 emitLLVM funName (LLVMLet x (LLVMArith (ArithAdd, t) d1 d2) cont)
@@ -200,12 +222,12 @@ emitLLVM funName (LLVMLet x (LLVMArith (ArithAdd, t) d1 d2) cont)
     op <-
       emitOp $
       unwords
-        [ show (LLVMDataLocal x)
+        [ showLLVMData (LLVMDataLocal x)
         , "="
         , "add"
         , showLowType t
-        , show d1 ++ ","
-        , show d2
+        , showLLVMData d1 ++ ","
+        , showLLVMData d2
         ]
     a <- emitLLVM funName cont
     return $ op ++ a
@@ -213,12 +235,12 @@ emitLLVM funName (LLVMLet x (LLVMArith (ArithAdd, t) d1 d2) cont) = do
   op <-
     emitOp $
     unwords
-      [ show (LLVMDataLocal x)
+      [ showLLVMData (LLVMDataLocal x)
       , "="
       , "fadd"
       , showLowType t
-      , show d1 ++ ","
-      , show d2
+      , showLLVMData d1 ++ ","
+      , showLLVMData d2
       ]
   a <- emitLLVM funName cont
   return $ op ++ a
@@ -227,12 +249,12 @@ emitLLVM funName (LLVMLet x (LLVMArith (ArithSub, t) d1 d2) cont)
     op <-
       emitOp $
       unwords
-        [ show (LLVMDataLocal x)
+        [ showLLVMData (LLVMDataLocal x)
         , "="
         , "sub"
         , showLowType t
-        , show d1 ++ ","
-        , show d2
+        , showLLVMData d1 ++ ","
+        , showLLVMData d2
         ]
     a <- emitLLVM funName cont
     return $ op ++ a
@@ -240,12 +262,12 @@ emitLLVM funName (LLVMLet x (LLVMArith (ArithSub, t) d1 d2) cont) = do
   op <-
     emitOp $
     unwords
-      [ show (LLVMDataLocal x)
+      [ showLLVMData (LLVMDataLocal x)
       , "="
       , "fsub"
       , showLowType t
-      , show d1 ++ ","
-      , show d2
+      , showLLVMData d1 ++ ","
+      , showLLVMData d2
       ]
   a <- emitLLVM funName cont
   return $ op ++ a
@@ -254,12 +276,12 @@ emitLLVM funName (LLVMLet x (LLVMArith (ArithMul, t) d1 d2) cont)
     op <-
       emitOp $
       unwords
-        [ show (LLVMDataLocal x)
+        [ showLLVMData (LLVMDataLocal x)
         , "="
         , "mul"
         , showLowType t
-        , show d1 ++ ","
-        , show d2
+        , showLLVMData d1 ++ ","
+        , showLLVMData d2
         ]
     a <- emitLLVM funName cont
     return $ op ++ a
@@ -267,12 +289,12 @@ emitLLVM funName (LLVMLet x (LLVMArith (ArithMul, t) d1 d2) cont) = do
   op <-
     emitOp $
     unwords
-      [ show (LLVMDataLocal x)
+      [ showLLVMData (LLVMDataLocal x)
       , "="
       , "fmul"
       , showLowType t
-      , show d1 ++ ","
-      , show d2
+      , showLLVMData d1 ++ ","
+      , showLLVMData d2
       ]
   a <- emitLLVM funName cont
   return $ op ++ a
@@ -280,12 +302,12 @@ emitLLVM funName (LLVMLet x (LLVMArith (ArithDiv, t@(LowTypeSignedInt _)) d1 d2)
   op <-
     emitOp $
     unwords
-      [ show (LLVMDataLocal x)
+      [ showLLVMData (LLVMDataLocal x)
       , "="
       , "sdiv"
       , showLowType t
-      , show d1 ++ ","
-      , show d2
+      , showLLVMData d1 ++ ","
+      , showLLVMData d2
       ]
   a <- emitLLVM funName cont
   return $ op ++ a
@@ -293,12 +315,12 @@ emitLLVM funName (LLVMLet x (LLVMArith (ArithDiv, t@(LowTypeUnsignedInt _)) d1 d
   op <-
     emitOp $
     unwords
-      [ show (LLVMDataLocal x)
+      [ showLLVMData (LLVMDataLocal x)
       , "="
       , "udiv"
       , showLowType t
-      , show d1 ++ ","
-      , show d2
+      , showLLVMData d1 ++ ","
+      , showLLVMData d2
       ]
   a <- emitLLVM funName cont
   return $ op ++ a
@@ -306,12 +328,12 @@ emitLLVM funName (LLVMLet x (LLVMArith (ArithDiv, t) d1 d2) cont) = do
   op <-
     emitOp $
     unwords
-      [ show (LLVMDataLocal x)
+      [ showLLVMData (LLVMDataLocal x)
       , "="
       , "fdiv"
       , showLowType t
-      , show d1 ++ ","
-      , show d2
+      , showLLVMData d1 ++ ","
+      , showLLVMData d2
       ]
   a <- emitLLVM funName cont
   return $ op ++ a
@@ -320,7 +342,7 @@ emitLLVM funName (LLVMLet _ (LLVMPrint t d) cont) = do
   op1 <-
     emitOp $
     unwords
-      [ show (LLVMDataLocal fmt)
+      [ showLLVMData (LLVMDataLocal fmt)
       , "="
       , "getelementptr [3 x i8], [3 x i8]* @fmt.i32, i32 0, i32 0"
       ]
@@ -329,9 +351,9 @@ emitLLVM funName (LLVMLet _ (LLVMPrint t d) cont) = do
     unwords
       [ "call"
       , "i32 (i8*, ...)"
-      , "@printf(i8* " ++ show (LLVMDataLocal fmt) ++ ","
+      , "@printf(i8* " ++ showLLVMData (LLVMDataLocal fmt) ++ ","
       , showLowType t
-      , show d ++ ")"
+      , showLLVMData d ++ ")"
       ]
   a <- emitLLVM funName cont
   return $ op1 ++ op2 ++ a
@@ -348,10 +370,17 @@ emitRet "main" d = do
   op1 <-
     emitOp $
     unwords
-      [show (LLVMDataLocal tmp), "=", "ptrtoint", "i8*", show d, "to", "i64"]
-  op2 <- emitOp $ unwords ["ret i64", show (LLVMDataLocal tmp)]
+      [ showLLVMData (LLVMDataLocal tmp)
+      , "="
+      , "ptrtoint"
+      , "i8*"
+      , showLLVMData d
+      , "to"
+      , "i64"
+      ]
+  op2 <- emitOp $ unwords ["ret i64", showLLVMData (LLVMDataLocal tmp)]
   return $ op1 ++ op2
-emitRet _ d = emitOp $ unwords ["ret i8*", show d]
+emitRet _ d = emitOp $ unwords ["ret i8*", showLLVMData d]
 
 emitLabel :: String -> String
 emitLabel s = s ++ ":"
@@ -368,7 +397,7 @@ showBranchList xs = "[" ++ showItems (uncurry showBranch) xs ++ "]"
 
 showBranch :: Int -> String -> String
 showBranch i label =
-  "i64 " ++ show i ++ ", label " ++ show (LLVMDataLocal label)
+  "i64 " ++ show i ++ ", label " ++ showLLVMData (LLVMDataLocal label)
 
 showIndex :: [Int] -> String
 showIndex [] = ""
@@ -376,7 +405,7 @@ showIndex [i] = "i32 " ++ show i
 showIndex (i:is) = "i32 " ++ show i ++ ", " ++ showIndex is
 
 showArg :: LLVMData -> String
-showArg d = "i8* " ++ show d
+showArg d = "i8* " ++ showLLVMData d
 
 showArgs :: [LLVMData] -> String
 showArgs ds = "(" ++ showItems showArg ds ++ ")"
@@ -390,9 +419,10 @@ showLowType (LowTypeFloat 32) = "float"
 showLowType (LowTypeFloat 64) = "double"
 showLowType (LowTypeFloat i) = "f" ++ show i -- shouldn't occur
 showLowType (LowTypePointer t) = showLowType t ++ "*"
-showLowType (LowTypeStruct ts) = "{" ++ showList ts ++ "}"
+showLowType (LowTypeStruct ts) = "{" ++ showItems showLowType ts ++ "}"
 showLowType (LowTypeArray i t) = "[" ++ show i ++ " x " ++ showLowType t ++ "]"
-showLowType (LowTypeFunction ts t) = showLowType t ++ " (" ++ showList ts ++ ")"
+showLowType (LowTypeFunction ts t) =
+  showLowType t ++ " (" ++ showItems showLowType ts ++ ")"
 
 showStruct :: Int -> String
 showStruct i = "{" ++ showItems (const "i8*") [1 .. i] ++ "}"
@@ -411,3 +441,48 @@ emitGlobal =
     , "declare i8* @malloc(i64)"
     , "declare void @free(i8*)"
     ]
+
+emitLLVMData :: Identifier -> LLVMData -> WithEnv String
+emitLLVMData name d = do
+  s <- showLLVMDataWithType d
+  return $ unwords [showLLVMData (LLVMDataGlobal name), "=", "global", s]
+
+obtainLLVMDataType :: LLVMData -> WithEnv LowType
+obtainLLVMDataType (LLVMDataGlobal x) = do
+  env <- gets llvmEnv
+  case lookup x env of
+    Just (DeclarationConst v) -> obtainLLVMDataType v
+    Just (DeclarationFun _ _) ->
+      return $ LowTypePointer $ LowTypeFunction [voidPtr] voidPtr
+    _ -> undefined
+obtainLLVMDataType (LLVMDataStruct vs) = do
+  ts <- mapM obtainLLVMDataType vs
+  return $ LowTypeStruct ts
+obtainLLVMDataType (LLVMDataInt _ j) = return $ LowTypeSignedInt j
+obtainLLVMDataType (LLVMDataFloat _ j) = return $ LowTypeFloat j
+obtainLLVMDataType _ = undefined
+
+showLLVMData :: LLVMData -> String
+showLLVMData (LLVMDataLocal x) = "%" ++ x
+showLLVMData (LLVMDataGlobal x) = "@" ++ x
+showLLVMData (LLVMDataInt i _) = show i
+showLLVMData (LLVMDataFloat x _) = show x
+showLLVMData (LLVMDataStruct xs) = "{" ++ showItems showLLVMData xs ++ "}"
+
+showLLVMDataWithType :: LLVMData -> WithEnv String
+showLLVMDataWithType d@(LLVMDataLocal x) = do
+  t <- obtainLLVMDataType d
+  return $ unwords [showLowType t, "%" ++ x]
+showLLVMDataWithType d@(LLVMDataGlobal x) = do
+  t <- obtainLLVMDataType d
+  return $ unwords [showLowType t, "@" ++ x]
+showLLVMDataWithType d@(LLVMDataInt i _) = do
+  t <- obtainLLVMDataType d
+  return $ unwords [showLowType t, show i]
+showLLVMDataWithType d@(LLVMDataFloat x _) = do
+  t <- obtainLLVMDataType d
+  return $ unwords [showLowType t, show x]
+showLLVMDataWithType d@(LLVMDataStruct vs) = do
+  t <- obtainLLVMDataType d
+  ss <- mapM showLLVMDataWithType vs
+  return $ unwords [showLowType t, "{" ++ intercalate ", " ss ++ "}"]

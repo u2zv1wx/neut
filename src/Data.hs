@@ -73,7 +73,7 @@ data LowType
   | LowTypeArray Int
                  LowType
   | LowTypeStruct [LowType]
-  deriving (Eq)
+  deriving (Eq, Show)
 
 voidPtr :: LowType
 voidPtr = LowTypePointer $ LowTypeSignedInt 8
@@ -171,15 +171,6 @@ data Term
                   [(Index, Term)]
   deriving (Show)
 
-instance Show LowType where
-  show (LowTypeSignedInt i) = "i" ++ show i
-  show (LowTypeUnsignedInt i) = "u" ++ show i
-  show (LowTypeFloat i) = "f" ++ show i
-  show (LowTypePointer t) = show t ++ "*"
-  show (LowTypeFunction ts t) = show t ++ " (" ++ showList ts ++ ")"
-  show (LowTypeArray i t) = "[" ++ show i ++ " x " ++ show t ++ "]"
-  show (LowTypeStruct ts) = "{" ++ showList ts ++ "}"
-
 showList :: Show a => [a] -> String
 showList [] = ""
 showList [a] = show a
@@ -218,14 +209,12 @@ data Neg
 data LLVMData
   = LLVMDataLocal Identifier
   | LLVMDataGlobal Identifier
+  | LLVMDataStruct [LLVMData]
   | LLVMDataInt Int
+                Int
   | LLVMDataFloat Double
-
-instance Show LLVMData where
-  show (LLVMDataLocal x) = "%" ++ x
-  show (LLVMDataGlobal x) = "@" ++ x
-  show (LLVMDataInt i) = show i
-  show (LLVMDataFloat x) = show x
+                  Int
+  deriving (Show)
 
 data LLVM
   = LLVMCall LLVMData -- PiElimDownElim
@@ -315,10 +304,10 @@ instance Ord EnrichedConstraint where
 
 type Subst = [(Identifier, Neut)]
 
-data Bindable
-  = BindableNeg Neg -- return x == e : ↑P
-  | BindableThunkLam Identifier -- return x == return (thunk (lam (x) e))
-                     Neg
+data Declaration p n
+  = DeclarationConst p -- return x == e : ↑P
+  | DeclarationFun Identifier -- return x == return (thunk (lam (x) e))
+                   n
   deriving (Show)
 
 data Env = Env
@@ -335,12 +324,10 @@ data Env = Env
   , substitution :: Subst -- for (dependent) type inference
   , univConstraintEnv :: [(UnivLevel, UnivLevel)]
   , currentDir :: FilePath
-  , termEnv :: [(Identifier, Term)]
-  -- , termEnv :: [(Identifier, Term)]
-  , polEnv :: [(Identifier, Bindable)] -- x ~> thunk (lam (x) e)
-  -- , polEnv :: [(Identifier, Neg)] -- x ~> thunk e
+  , termEnv :: [(Identifier, (Identifier, Term))] -- x == lam x. e
+  , polEnv :: [(Identifier, Declaration Pos Neg)] -- x == v || x == thunk (lam (x) e)
   -- , llvmEnv :: [(Identifier, ([Identifier], LLVM))] -- x ~> thunk (lam (x1 ... xn) e)
-  , llvmEnv :: [(Identifier, LLVM)] -- x ~> thunk (lam (x) e)
+  , llvmEnv :: [(Identifier, Declaration LLVMData LLVM)] -- x ~> thunk (lam (x) e)
   } deriving (Show)
 
 initialEnv :: FilePath -> Env
@@ -449,17 +436,15 @@ insTypeEnv1 i t = do
   forM_ ts $ \t' -> insConstraintEnv t t'
   modify (\e -> e {typeEnv = Map.insert i t (typeEnv e)})
 
-insTermEnv :: Identifier -> Term -> WithEnv ()
-insTermEnv name e = modify (\env -> env {termEnv = (name, e) : termEnv env})
+insTermEnv :: Identifier -> Identifier -> Term -> WithEnv ()
+insTermEnv name arg e =
+  modify (\env -> env {termEnv = (name, (arg, e)) : termEnv env})
 
-insPolEnv :: Identifier -> Bindable -> WithEnv ()
-insPolEnv name b = modify (\e -> e {polEnv = (name, b) : polEnv e})
+insPolEnv :: Identifier -> Declaration Pos Neg -> WithEnv ()
+insPolEnv name d = modify (\e -> e {polEnv = (name, d) : polEnv e})
 
--- insPolEnv :: Identifier -> Neg -> WithEnv ()
--- insPolEnv name body = modify (\e -> e {polEnv = (name, body) : polEnv e})
-insLLVMEnv :: Identifier -> LLVM -> WithEnv ()
-insLLVMEnv funName llvm =
-  modify (\e -> e {llvmEnv = (funName, llvm) : llvmEnv e})
+insLLVMEnv :: Identifier -> Declaration LLVMData LLVM -> WithEnv ()
+insLLVMEnv funName d = modify (\e -> e {llvmEnv = (funName, d) : llvmEnv e})
 
 -- insLLVMEnv :: Identifier -> [Identifier] -> LLVM -> WithEnv ()
 -- insLLVMEnv funName args llvm =

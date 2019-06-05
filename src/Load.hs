@@ -218,9 +218,9 @@ concatDefList (DefMod sigMeta (_, name') xs:es) = do
   return $ sigMeta :< NeutSigmaElim (meta :< NeutVar name') xs cont
 
 process :: Neut -> WithEnv [String]
-process e = do
-  e' <- elaborate e
-  insTermEnv "main" e'
-  polarize
-  toLLVM
-  emit
+process = elaborate >=> polarize >=> toLLVM >=> emit
+-- process e = do
+--   e' <- elaborate e
+--   e'' <- polarize e'
+--   e''' <- toLLVM e''
+--   emit e'''

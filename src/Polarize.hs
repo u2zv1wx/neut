@@ -28,31 +28,32 @@ import Text.Read (readMaybe)
 
 import Data.Maybe (isJust, maybeToList)
 
-polarize :: WithEnv ()
-polarize = do
+polarize :: Term -> WithEnv Neg
+polarize mainTerm = do
   tenv <- gets termEnv
-  forM_ tenv $ \(name, e) -> do
-    e' <- polarize' e
-    insPolEnv name $ BindableNeg e'
+  forM_ tenv $ \(name, (arg, e)) -> do
+    e <- polarize' e
+    v <- makeClosure' arg e
+    insPolEnv name $ DeclarationConst v
+  polarize' mainTerm
+  -- r <- reduceNeg mainTerm'
+  -- liftIO $ putStrLn $ Pr.ppShow r
+  -- insPolEnv "main" $ DeclarationMain mainTerm'
+  -- penv <- gets polEnv
+  -- forM_ penv $ \(name, d) -> do
+  --   liftIO $ putStrLn name
+  --   case d of
+  --     DeclarationConst v -> do
+  --       let unit = TermSigmaIntro []
+  --       unit' <- polarize' unit
+  --       e <- callClosure (NegUpIntro v) unit'
+  --       r <- reduceNeg e
+  --       liftIO $ putStrLn $ Pr.ppShow r
+  --     _ -> liftIO $ putStrLn "(pass)"
+  --   liftIO $ putStrLn "====================="
 
--- Essence:
---
---   lam x. e
---   ~> return (thunk (lam p. let (env, x) := p in let xs := env in e), xs)
---
---   e1 @ e2
---   ~> bind x <- e2 in
---      bind f <- e1 in
---      let (lam, fvs) := f in
---      (force lam) @ (fvs, x)
---
--- where `xs` is the free variables of `lam x. e`.
---
--- The key property here is: every function has exactly 1 argument.
--- Note that, for example, `i32 -> bool -> string` is translated into
--- the 1-ary function `↓(i32 -> ↑↓(bool -> ↑string))`. This property holds
--- even in dependent situation where the type of a function is,
--- for example, `Pi (x : i32). if x == 1 then i32 -> bool else i32 -> bool -> i32`.
+-- CBPV polarization + closure conversion
+-- (In the result of this translation, every function has exactly 1 argument)
 polarize' :: Term -> WithEnv Neg
 polarize' (TermVar x) = return $ NegUpIntro $ PosVar x
 polarize' (TermConst x) = toDefinition x
@@ -85,7 +86,10 @@ bindLet [] cont = cont
 bindLet ((x, e):xes) cont = NegUpElim x e $ bindLet xes cont
 
 makeClosure :: Identifier -> Neg -> WithEnv Neg
-makeClosure x e = do
+makeClosure x e = NegUpIntro <$> makeClosure' x e
+
+makeClosure' :: Identifier -> Neg -> WithEnv Pos
+makeClosure' x e = do
   let fvs = filter (/= x) $ nub $ varNeg e
   envName <- newNameWith "env"
   pairName <- newNameWith "pair"
@@ -94,10 +98,11 @@ makeClosure x e = do
         NegSigmaElim (PosVar pairName) [envName, x] $
         NegSigmaElim (PosVar envName) fvs e
   -- return lamVar == return (thunk (lam (pairName) lamBody))
-  -- i.e. lamVar == return (thunk (lam (pairName) lamBody))
-  insPolEnv lamVar $ BindableThunkLam pairName lamBody
+  -- i.e. lamVar == thunk (lam (pairName) lamBody)
+  insPolEnv lamVar $ DeclarationFun pairName lamBody
+  -- insPolEnv lamVar $ BindableThunkLam pairName lamBody
   let fvEnv = PosSigmaIntro $ map PosVar fvs
-  return $ NegUpIntro $ PosSigmaIntro [PosConst lamVar, fvEnv]
+  return $ PosSigmaIntro [PosConst lamVar, fvEnv]
 
 callClosure :: Neg -> Neg -> WithEnv Neg
 callClosure cls arg = do
