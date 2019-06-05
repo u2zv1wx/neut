@@ -126,24 +126,12 @@ elaborate' (meta :< NeutMu x e) = do
   --   x ~> (lam env. let (x1, ..., xn) := env in e {x := x @ env}) @ (x1, ..., xn)
   -- into the term environment.
   let recTerm =
-        TermPiIntro
-          env
-          (TermSigmaElim
-             (TermVar env)
-             fvs
-             (substTerm [(x, TermPiElim (TermConst x) (TermVar env))] e'))
-  insTermEnv x recTerm
+        TermSigmaElim
+          (TermVar env)
+          fvs
+          (substTerm [(x, TermPiElim (TermConst x) (TermVar env))] e')
+  insTermEnv x env recTerm
   return $ TermPiElim (TermConst x) (TermSigmaIntro $ map TermVar fvs)
-  -- return $
-  --   TermPiElim
-  --     (TermMu x $
-  --      TermPiIntro
-  --        env
-  --        (TermSigmaElim
-  --           (TermVar env)
-  --           fvs
-  --           (substTerm [(x, TermPiElim (TermConst x) (TermVar env))] e')))
-  --     (TermSigmaIntro $ map TermVar fvs)
 elaborate' (_ :< NeutHole x) = do
   sub <- gets substitution
   case lookup x sub of

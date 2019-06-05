@@ -161,9 +161,6 @@ data Term
                 Term
   | TermPiElim Term
                Term
-  -- | TermPiElimMu Identifier -- (mu x. e1) @ e2
-  --                Term
-  --                Term
   | TermSigmaIntro [Term]
   | TermSigmaElim Term
                   [Identifier]
@@ -172,8 +169,6 @@ data Term
                    LowType
   | TermIndexElim Term
                   [(Index, Term)]
-  -- | TermMu Identifier
-  --          Term
   deriving (Show)
 
 instance Show LowType where
@@ -202,16 +197,11 @@ data Pos
   | PosSigmaIntro [Pos]
   | PosIndexIntro Index
                   LowType
-  -- | PosDownIntro Neg
   | PosDownIntroPiIntro Identifier
                         Neg
   deriving (Show)
 
 data Neg
-  -- = NegPiIntro Identifier
-  --              Neg
-  --   NegPiElim Neg
-  --             Pos
   = NegPiElimDownElim Pos
                       Pos
   | NegConstElim Constant
@@ -225,7 +215,6 @@ data Neg
   | NegUpElim Identifier
               Neg
               Neg
-  -- | NegDownElim Pos
   deriving (Show)
 
 data Value
@@ -366,7 +355,8 @@ data Env = Env
   , substitution :: Subst -- for (dependent) type inference
   , univConstraintEnv :: [(UnivLevel, UnivLevel)]
   , currentDir :: FilePath
-  , termEnv :: [(Identifier, Term)]
+  , termEnv :: [(Identifier, (Identifier, Term))] -- x ~> lam (x) e
+  -- , termEnv :: [(Identifier, Term)]
   , polEnv :: [(Identifier, (Identifier, Neg))] -- x ~> thunk (lam (x) e)
   -- , polEnv :: [(Identifier, Neg)] -- x ~> thunk e
   -- , modalEnv :: [(Identifier, ([Identifier], Comp))] -- x ~> thunk (lam (x1 ... xn) e)
@@ -482,8 +472,9 @@ insTypeEnv1 i t = do
   forM_ ts $ \t' -> insConstraintEnv t t'
   modify (\e -> e {typeEnv = Map.insert i t (typeEnv e)})
 
-insTermEnv :: Identifier -> Term -> WithEnv ()
-insTermEnv name e = modify (\env -> env {termEnv = (name, e) : termEnv env})
+insTermEnv :: Identifier -> Identifier -> Term -> WithEnv ()
+insTermEnv name arg e =
+  modify (\env -> env {termEnv = (name, (arg, e)) : termEnv env})
 
 insPolEnv :: Identifier -> Identifier -> Neg -> WithEnv ()
 insPolEnv name arg body =

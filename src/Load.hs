@@ -221,7 +221,8 @@ concatDefList (DefMod sigMeta (_, name') xs:es) = do
 process :: Neut -> WithEnv [String]
 process e = do
   e' <- elaborate e
-  insTermEnv "main" e'
+  hole <- newNameWith "hole"
+  insTermEnv "main" hole e'
   polarize
   modalize
   toLLVM

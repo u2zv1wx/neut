@@ -25,12 +25,12 @@ modalize = do
   penv <- gets polEnv
   forM_ penv $ \(name, (arg, e)) -> do
     e' <- modalNeg e
-    -- r0 <- reduceNeg e
+    r0 <- reduceNeg e
     -- r1 <- reduceComp e'
     liftIO $ putStrLn name
     liftIO $ putStrLn arg
-    liftIO $ putStrLn $ Pr.ppShow e
-    -- liftIO $ putStrLn $ Pr.ppShow r0
+    -- liftIO $ putStrLn $ Pr.ppShow e
+    liftIO $ putStrLn $ Pr.ppShow r0
     -- let fvs = nub $ varComp e'
     -- liftIO $ putStrLn $ "globalfvs == " ++ show fvs
     -- hole <- newNameWith "hole"
