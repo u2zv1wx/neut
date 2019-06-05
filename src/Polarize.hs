@@ -33,7 +33,7 @@ polarize = do
   tenv <- gets termEnv
   forM_ tenv $ \(name, (arg, e)) -> do
     e' <- polarize' e
-    insPolEnv name arg e'
+    insPolEnv name arg e' -- ここ、lambdaを変換してるからウソでは？makeClosureしなきゃダメでは？
 
 -- Essence:
 --
