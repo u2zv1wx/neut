@@ -161,6 +161,9 @@ data Term
                 Term
   | TermPiElim Term
                Term
+  -- | TermPiElimMu Identifier -- (mu x. e1) @ e2
+  --                Term
+  --                Term
   | TermSigmaIntro [Term]
   | TermSigmaElim Term
                   [Identifier]
@@ -199,14 +202,18 @@ data Pos
   | PosSigmaIntro [Pos]
   | PosIndexIntro Index
                   LowType
-  | PosDownIntro Neg
+  -- | PosDownIntro Neg
+  | PosDownIntroPiIntro Identifier
+                        Neg
   deriving (Show)
 
 data Neg
-  = NegPiIntro Identifier
-               Neg
-  | NegPiElim Neg
-              Pos
+  -- = NegPiIntro Identifier
+  --              Neg
+  --   NegPiElim Neg
+  --             Pos
+  = NegPiElimDownElim Pos
+                      Pos
   | NegConstElim Constant
                  [Pos]
   | NegSigmaElim Pos
@@ -218,10 +225,9 @@ data Neg
   | NegUpElim Identifier
               Neg
               Neg
-  | NegDownElim Pos
+  -- | NegDownElim Pos
   deriving (Show)
 
--- positive modal normal form
 data Value
   = ValueVar Identifier
   | ValueConst Identifier
@@ -230,10 +236,9 @@ data Value
                     LowType
   deriving (Show)
 
--- negative modal normal form
 data Comp
-  = CompPiElimDownElim Value -- (force f) @ x1 @ ... @ xn
-                       [Value]
+  = CompPiElimDownElim Value -- (force v1) @ v2
+                       Value
   | CompConstElim Constant
                   [Value]
   | CompSigmaElim Value

@@ -81,9 +81,9 @@ elaborate' :: Neut -> WithEnv Term
 elaborate' (_ :< NeutVar s) = return $ TermVar s
 elaborate' (_ :< NeutConst x) = return $ TermConst x
 elaborate' (_ :< NeutPi _ _) = return $ TermSigmaIntro []
-elaborate' (_ :< NeutPiIntro (s, _) e) = do
+elaborate' (_ :< NeutPiIntro (x, _) e) = do
   e' <- elaborate' e
-  return $ TermPiIntro s e'
+  return $ TermPiIntro x e'
 elaborate' (_ :< NeutPiElim e v) = do
   e' <- elaborate' e
   v' <- elaborate' v

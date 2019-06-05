@@ -28,14 +28,24 @@ toLLVM = do
     insLLVMEnv name args llvm
 
 llvmCode :: Comp -> WithEnv LLVM
-llvmCode (CompPiElimDownElim fun args) = do
+llvmCode (CompPiElimDownElim fun arg) = do
   f <- newNameWith "fun"
-  xs <- mapM (const (newNameWith "arg")) args
-  let funPtrType = toFunPtrType args
+  x <- newNameWith "arg"
+  let funPtrType = toFunPtrType [arg]
   cast <- newNameWith "cast"
-  llvmDataLet' ((f, fun) : zip xs args) $
+  -- llvmDataLet' ((f, fun) : zip xs args) $
+  llvmDataLet' [(f, fun), (x, arg)] $
     LLVMLet cast (LLVMBitcast (LLVMDataLocal f) voidPtr funPtrType) $
-    LLVMCall (LLVMDataLocal cast) (map LLVMDataLocal xs)
+    LLVMCall (LLVMDataLocal cast) [LLVMDataLocal x]
+    -- LLVMCall (LLVMDataLocal cast) (map LLVMDataLocal xs)
+  -- llvmCode (CompPiElimDownElim fun args) = do
+--   f <- newNameWith "fun"
+--   xs <- mapM (const (newNameWith "arg")) args
+--   let funPtrType = toFunPtrType args
+--   cast <- newNameWith "cast"
+--   llvmDataLet' ((f, fun) : zip xs args) $
+--     LLVMLet cast (LLVMBitcast (LLVMDataLocal f) voidPtr funPtrType) $
+--     LLVMCall (LLVMDataLocal cast) (map LLVMDataLocal xs)
 llvmCode (CompIndexElim x branchList) = llvmSwitch x branchList
 llvmCode (CompSigmaElim v xs e) =
   llvmCodeSigmaElim v (zip xs [0 ..]) (length xs) e

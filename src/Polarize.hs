@@ -57,6 +57,14 @@ polarize' (TermConst x) = toDefinition x
 polarize' (TermPiIntro x e) = do
   e' <- polarize' e
   makeClosure x e'
+polarize' (TermPiElim (TermMu x e1) e2) = do
+  e1' <- polarize' e1
+  insPolEnv x e1'
+  e2' <- polarize' e2
+  z <- newNameWith "tmp"
+  -- return $ NegUpElim z e2' $ NegPiElim (NegDownElim (PosConst x)) (PosVar z)
+  return $ NegUpElim z e2' $ NegPiElimDownElim (PosConst x) (PosVar z)
+  -- undefined
 polarize' (TermPiElim e1 e2) = do
   e1' <- polarize' e1
   e2' <- polarize' e2
@@ -77,10 +85,10 @@ polarize' (TermIndexElim e branchList) = do
   x <- newNameWith "tmp"
   cs <- mapM polarize' es
   return $ NegUpElim x e' (NegIndexElim (PosVar x) (zip labelList cs))
-polarize' (TermMu x e) = do
-  e' <- polarize' e
-  insPolEnv x e'
-  return $ NegDownElim (PosConst x)
+polarize' (TermMu _ _) = lift $ throwE "TermMu outside TermPiElim"
+  -- e' <- polarize' e
+  -- insPolEnv x e'
+  -- return $ NegDownElim (PosConst x)
 
 bindLet :: [(Identifier, Neg)] -> Neg -> Neg
 bindLet [] cont = cont
@@ -91,9 +99,13 @@ makeClosure x e = do
   let fvs = filter (/= x) $ nub $ varNeg e
   envName <- newNameWith "env"
   pairName <- newNameWith "pair"
+  -- let thunkLam =
+  --       PosDownIntro $
+  --       NegPiIntro pairName $
+  --       NegSigmaElim (PosVar pairName) [envName, x] $
+  --       NegSigmaElim (PosVar envName) fvs e
   let thunkLam =
-        PosDownIntro $
-        NegPiIntro pairName $
+        PosDownIntroPiIntro pairName $
         NegSigmaElim (PosVar pairName) [envName, x] $
         NegSigmaElim (PosVar envName) fvs e
   return $ NegUpIntro $ PosSigmaIntro [thunkLam, PosSigmaIntro (map PosVar fvs)]
@@ -108,9 +120,16 @@ callClosure cls arg = do
     NegUpElim argVar arg $
     NegUpElim clsVar cls $
     NegSigmaElim (PosVar clsVar) [thunkLam, envName] $
-    NegPiElim
-      (NegDownElim (PosVar clsVar))
+    NegPiElimDownElim
+      (PosVar clsVar)
       (PosSigmaIntro [PosVar envName, PosVar argVar])
+  -- return $
+  --   NegUpElim argVar arg $
+  --   NegUpElim clsVar cls $
+  --   NegSigmaElim (PosVar clsVar) [thunkLam, envName] $
+  --   NegPiElim
+  --     (NegDownElim (PosVar clsVar))
+  --     (PosSigmaIntro [PosVar envName, PosVar argVar])
   -- return $
   --   NegSigmaElim
   --     v
