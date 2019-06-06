@@ -19,7 +19,7 @@ import           Data.Basic
 import           Data.Env
 import           Data.Polarized
 import           Data.Term
-import           Reduce
+import           Reduce.Polarized
 import           Util
 
 polarize :: Term -> WithEnv Neg

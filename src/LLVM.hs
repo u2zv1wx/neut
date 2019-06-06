@@ -11,7 +11,6 @@ import           Data.Basic
 import           Data.Env
 import           Data.LLVM
 import           Data.Polarized
-import           Reduce
 import           Util
 
 toLLVM :: Neg -> WithEnv LLVM

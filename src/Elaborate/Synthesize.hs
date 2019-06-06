@@ -14,7 +14,7 @@ import           Data.Constraint
 import           Data.Env
 import           Data.Neut
 import           Elaborate.Analyze
-import           Reduce
+import           Reduce.Neut
 import           Util
 
 -- Given a queue of constraints (easier ones comes earlier), try to synthesize
@@ -61,8 +61,8 @@ synthesize q =
         case lookup x sub of
           Nothing -> return [plan1]
           Just body -> do
-            e1' <- appFold' body args1 >>= reduce
-            e2' <- appFold' body args2 >>= reduce
+            e1' <- appFold body args1 >>= reduce
+            e2' <- appFold body args2 >>= reduce
             cs <- simp [(e1', e2')]
             let plan2 = getQueue $ analyze cs
             return [plan1, plan2]
@@ -202,3 +202,9 @@ updateQueue' sub q =
     Just (Enriched (e1, e2) _) -> do
       analyze [(subst sub e1, subst sub e2)]
       updateQueue' sub $ Q.deleteMin q
+
+appFold :: Neut -> [Neut] -> WithEnv Neut
+appFold e [] = return e
+appFold e (term:ts) = do
+  meta <- newNameWith "meta"
+  appFold (meta :< NeutPiElim e term) ts

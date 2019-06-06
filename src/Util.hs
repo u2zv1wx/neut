@@ -10,13 +10,6 @@ import           Data.Basic
 import           Data.Env
 import           Data.Neut
 import           Data.Polarized
-import           Reduce
-
-isLinear :: Identifier -> [Identifier] -> [Identifier]
-isLinear x xs =
-  if length (filter (== x) xs) == 1
-    then []
-    else [x]
 
 foldML ::
      (Cofree f Identifier -> a -> f (Cofree f Identifier))
@@ -41,24 +34,6 @@ foldMR f e (t:ts) = do
   i <- newName
   return $ i :< x
 
-appFold :: Neut -> [Neut] -> WithEnv Neut
-appFold e [] = return e
-appFold e@(i :< _) (term:ts) = do
-  t <- lookupTypeEnv' i
-  case t of
-    _ :< NeutPi _ tcod -> do
-      meta <- newNameWith "meta"
-      insTypeEnv meta tcod
-      appFold (meta :< NeutPiElim e term) ts
-    _ ->
-      lift $ throwE $ "appfold. t:\n" ++ Pr.ppShow t ++ "\ne:\n" ++ Pr.ppShow e
-
-appFold' :: Neut -> [Neut] -> WithEnv Neut
-appFold' e [] = return e
-appFold' e (term:ts) = do
-  meta <- newNameWith "meta"
-  appFold' (meta :< NeutPiElim e term) ts
-
 bindFormalArgs' :: [Identifier] -> Neut -> WithEnv Neut
 bindFormalArgs' [] terminal = return terminal
 bindFormalArgs' (arg:xs) c = do
@@ -67,58 +42,3 @@ bindFormalArgs' (arg:xs) c = do
   h <- newNameWith "hole"
   holeMeta <- newNameWith "meta"
   return $ meta :< NeutPiIntro (arg, holeMeta :< NeutHole h) tmp
-
-boxUniv :: WithEnv Neut
-boxUniv = do
-  univMeta <- newNameWith "meta"
-  l <- newName
-  return $ univMeta :< NeutUniv (UnivLevelHole l)
-
-toVar1 :: Identifier -> Neut -> WithEnv Neut
-toVar1 x t = do
-  meta <- newNameWith "meta"
-  insTypeEnv meta t
-  return $ meta :< NeutVar x
-
-toVar' :: Identifier -> WithEnv Neut
-toVar' x = do
-  meta <- newNameWith "meta"
-  return $ meta :< NeutVar x
-
-insDef :: Identifier -> Neut -> WithEnv (Maybe Neut)
-insDef x body = do
-  sub <- gets substitution
-  modify (\e -> e {substitution = (x, body) : substitution e})
-  return $ lookup x sub
-
-compose :: Subst -> Subst -> Subst
-compose s1 s2 = do
-  let domS2 = map fst s2
-  let codS2 = map snd s2
-  let codS2' = map (subst s1) codS2
-  let fromS1 = filter (\(ident, _) -> ident `notElem` domS2) s1
-  fromS1 ++ zip domS2 codS2'
-
-varPos :: Pos -> [Identifier]
-varPos (PosVar s)          = [s]
-varPos (PosConst _)        = []
-varPos (PosSigmaIntro vs)  = concatMap varPos vs
-varPos (PosIndexIntro _ _) = []
-
--- varPos (PosDownIntroPiIntro x e) = filter (/= x) $ varNeg e
-varNeg :: Neg -> [Identifier]
-varNeg (NegPiElimDownElim v1 v2) = varPos v1 ++ varPos v2
-varNeg (NegSigmaElim v xs e) = do
-  let vs1 = varPos v
-  let vs2 = filter (`notElem` xs) $ varNeg e
-  vs1 ++ vs2
-varNeg (NegIndexElim v branchList) = do
-  let vs1 = varPos v
-  let vs2 = concatMap (varNeg . snd) branchList
-  vs1 ++ vs2
-varNeg (NegUpIntro v) = varPos v
-varNeg (NegUpElim x e1 e2) = do
-  let vs1 = varNeg e1
-  let vs2 = filter (/= x) $ varNeg e2
-  vs1 ++ vs2
-varNeg (NegConstElim _ vs) = concatMap varPos vs

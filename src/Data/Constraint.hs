@@ -50,3 +50,11 @@ instance Eq EnrichedConstraint where
 
 instance Ord EnrichedConstraint where
   compare (Enriched _ c1) (Enriched _ c2) = compare c1 c2
+
+compose :: Subst -> Subst -> Subst
+compose s1 s2 = do
+  let domS2 = map fst s2
+  let codS2 = map snd s2
+  let codS2' = map (subst s1) codS2
+  let fromS1 = filter (\(ident, _) -> ident `notElem` domS2) s1
+  fromS1 ++ zip domS2 codS2'

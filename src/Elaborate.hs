@@ -16,7 +16,7 @@ import           Data.Term
 import           Elaborate.Analyze
 import           Elaborate.Infer
 import           Elaborate.Synthesize
-import           Reduce
+import           Reduce.Neut
 import           Util
 
 -- Given a term `e` and its name `main`, this function

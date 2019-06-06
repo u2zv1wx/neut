@@ -14,7 +14,7 @@ import           Data.Constraint
 import           Data.Env
 import           Data.Neut
 import           Elaborate.Analyze
-import           Reduce
+import           Reduce.Neut
 import           Util
 
 type Context = [(Identifier, Neut)]
@@ -221,13 +221,37 @@ appCtx ctx = do
   insTypeEnv higherMeta higherArrowType
   let higherHole = higherMeta :< NeutHole higherHoleName
   varSeq <- mapM (uncurry toVar1) ctx
-  cod <- appFold higherHole varSeq
+  cod <- appFoldWithType higherHole varSeq
   arrowType <- foldMR NeutPi cod ctx
   holeName <- newName' "hole" arrowType
   meta <- newName' "meta" arrowType
-  appFold (meta :< NeutHole holeName) varSeq
+  appFoldWithType (meta :< NeutHole holeName) varSeq
+
+toVar1 :: Identifier -> Neut -> WithEnv Neut
+toVar1 x t = do
+  meta <- newNameWith "meta"
+  insTypeEnv meta t
+  return $ meta :< NeutVar x
 
 returnMeta :: Identifier -> Neut -> WithEnv Neut
 returnMeta meta t = do
   insTypeEnv meta t
   return t
+
+appFoldWithType :: Neut -> [Neut] -> WithEnv Neut
+appFoldWithType e [] = return e
+appFoldWithType e@(i :< _) (term:ts) = do
+  t <- lookupTypeEnv' i
+  case t of
+    _ :< NeutPi _ tcod -> do
+      meta <- newNameWith "meta"
+      insTypeEnv meta tcod
+      appFoldWithType (meta :< NeutPiElim e term) ts
+    _ ->
+      lift $ throwE $ "appfold. t:\n" ++ Pr.ppShow t ++ "\ne:\n" ++ Pr.ppShow e
+
+boxUniv :: WithEnv Neut
+boxUniv = do
+  univMeta <- newNameWith "meta"
+  l <- newName
+  return $ univMeta :< NeutUniv (UnivLevelHole l)

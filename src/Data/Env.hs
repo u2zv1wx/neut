@@ -240,3 +240,9 @@ wrapTypeWithUniv univ t = do
   meta <- newNameWith "meta"
   insTypeEnv meta univ
   return $ meta :< t
+
+insDef :: Identifier -> Neut -> WithEnv (Maybe Neut)
+insDef x body = do
+  sub <- gets substitution
+  modify (\e -> e {substitution = (x, body) : substitution e})
+  return $ lookup x sub

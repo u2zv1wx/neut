@@ -15,7 +15,7 @@ import           Data.Basic
 import           Data.Constraint
 import           Data.Env
 import           Data.Neut
-import           Reduce
+import           Reduce.Neut
 import           Util
 
 analyze :: [PreConstraint] -> WithEnv ()
@@ -272,6 +272,11 @@ isEqBranch ((IndexDefault, e1):es1) ((IndexDefault, e2):es2) = do
   return $ b1 && b2
 isEqBranch _ _ = return False
 
+toVar' :: Identifier -> WithEnv Neut
+toVar' x = do
+  meta <- newNameWith "meta"
+  return $ meta :< NeutVar x
+
 affineCheck :: [Identifier] -> [Identifier] -> Bool
 affineCheck xs = affineCheck' xs xs
 
@@ -281,6 +286,12 @@ affineCheck' xs (y:ys) fvs =
   if y `notElem` fvs
     then affineCheck' xs ys fvs
     else null (isLinear y xs) && affineCheck' xs ys fvs
+
+isLinear :: Identifier -> [Identifier] -> [Identifier]
+isLinear x xs =
+  if length (filter (== x) xs) == 1
+    then []
+    else [x]
 
 projectionList :: Neut -> Int -> WithEnv [Neut]
 projectionList e count = do
