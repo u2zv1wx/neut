@@ -41,12 +41,12 @@ type Context = [(Identifier, Neut)]
 -- Calculi and Applications, 2011.
 infer :: Context -> Neut -> WithEnv Neut
 infer _ (meta :< NeutVar s) = do
-  univ <- boxUniv
+  univ <- newUniv
   t <- lookupTypeEnv' s >>= annot univ
   returnMeta meta t
 infer ctx (meta :< NeutConst s) = do
-  higherUniv <- boxUniv
-  univ <- boxUniv >>= annot higherUniv
+  higherUniv <- newUniv
+  univ <- newUniv >>= annot higherUniv
   t <- lookupTypeEnv' s >>= annot univ
   insTypeEnv s t
   u <- infer ctx t >>= annot higherUniv
@@ -54,15 +54,15 @@ infer ctx (meta :< NeutConst s) = do
   returnMeta meta t
 infer ctx (meta :< NeutPi (s, tdom) tcod) = do
   insTypeEnv s tdom
-  higherUniv <- boxUniv
-  univ <- boxUniv >>= annot higherUniv
+  higherUniv <- newUniv
+  univ <- newUniv >>= annot higherUniv
   udom <- infer ctx tdom >>= annot higherUniv
   ucod <- infer (ctx ++ [(s, tdom)]) tcod >>= annot higherUniv
   insConstraintEnv udom ucod
   insConstraintEnv udom univ
   returnMeta meta univ
 infer ctx (meta :< NeutPiIntro (s, tdom) e) = do
-  univ <- boxUniv
+  univ <- newUniv
   tdom' <- annot univ tdom
   insTypeEnv1 s tdom'
   let ctx' = ctx ++ [(s, tdom')]
@@ -70,7 +70,7 @@ infer ctx (meta :< NeutPiIntro (s, tdom) e) = do
   typeMeta <- newName' "meta" univ
   returnMeta meta $ typeMeta :< NeutPi (s, tdom') tcod
 infer ctx (meta :< NeutPiElim e1 e2) = do
-  univ <- boxUniv
+  univ <- newUniv
   -- obtain the type of e1
   tPi <- infer ctx e1 >>= reduce -- forall (x : tdom). tcod
   -- infer the type of e2, and obtain (tdom, udom)
@@ -90,19 +90,19 @@ infer ctx (meta :< NeutPiElim e1 e2) = do
       insConstraintEnv tPi (typeMeta :< NeutPi (x, tdom) tcod)
       returnMeta meta $ subst [(x, e2)] tcod
 infer _ (meta :< NeutSigma []) = do
-  univ <- boxUniv
+  univ <- newUniv
   returnMeta meta univ
 infer ctx (meta :< NeutSigma ((x, t):xts)) = do
   insTypeEnv x t
-  higherUniv <- boxUniv
-  univ <- boxUniv >>= annot higherUniv
+  higherUniv <- newUniv
+  univ <- newUniv >>= annot higherUniv
   udom <- infer ctx t >>= annot higherUniv
   ucod <- infer (ctx ++ [(x, t)]) (meta :< NeutSigma xts) >>= annot higherUniv
   insConstraintEnv udom ucod
   insConstraintEnv udom univ
   returnMeta meta univ
 infer ctx (meta :< NeutSigmaIntro es) = do
-  univ <- boxUniv
+  univ <- newUniv
   ts <- mapM (infer ctx) es
   forM_ ts $ annot univ
   xs <- forM ts $ \t -> newName1 "sigma" t
@@ -111,7 +111,7 @@ infer ctx (meta :< NeutSigmaIntro es) = do
   forM_ (zip holeList' ts) $ uncurry insConstraintEnv
   returnMeta meta $ meta :< NeutSigma (zip xs holeList')
 infer ctx (meta :< NeutSigmaElim e1 xs e2) = do
-  univ <- boxUniv
+  univ <- newUniv
   t1 <- infer ctx e1 >>= annot univ
   holeList <- sigmaHole ctx xs
   forM_ (zip xs holeList) $ uncurry insTypeEnv
@@ -126,13 +126,13 @@ infer ctx (meta :< NeutSigmaElim e1 xs e2) = do
   typeC <- appCtx (ctx ++ zip xs holeList ++ [(z, t1)])
   insConstraintEnv t2 (subst [(z, pair)] typeC)
   returnMeta meta $ subst [(z, e1)] typeC
-infer _ (meta :< NeutIndex _) = boxUniv >>= returnMeta meta
+infer _ (meta :< NeutIndex _) = newUniv >>= returnMeta meta
 infer ctx (meta :< NeutIndexIntro l) = do
   mk <- lookupKind l
   case mk of
     Just k -> do
       indexMeta <- newNameWith "meta"
-      u <- boxUniv
+      u <- newUniv
       insTypeEnv indexMeta u
       returnMeta meta $ indexMeta :< NeutIndex k
     Nothing -> do
@@ -149,13 +149,13 @@ infer ctx (meta :< NeutIndexElim e branchList) = do
   constrainList tes
   returnMeta meta $ head tes
 infer ctx (meta :< NeutMu s e) = do
-  univ <- boxUniv
+  univ <- newUniv
   trec <- appCtx ctx >>= annot univ
   insTypeEnv s trec
   te <- infer (ctx ++ [(s, trec)]) e >>= annot univ
   insConstraintEnv te trec
   returnMeta meta te
-infer _ (meta :< NeutUniv _) = boxUniv >>= returnMeta meta
+infer _ (meta :< NeutUniv _) = newUniv >>= returnMeta meta
 infer ctx (meta :< NeutHole _) = appCtx ctx >>= returnMeta meta
 
 -- In context ctx == [y1, ..., yn], `sigmaHole ctx names-of-holes` generates the list of
@@ -185,7 +185,7 @@ constrainList :: [Neut] -> WithEnv ()
 constrainList [] = return ()
 constrainList [_] = return ()
 constrainList (t1@(meta1 :< _):t2@(meta2 :< _):ts) = do
-  u <- boxUniv
+  u <- newUniv
   insTypeEnv meta1 u
   insTypeEnv meta2 u
   insConstraintEnv t1 t2
@@ -213,7 +213,7 @@ newName' name t = do
 -- correct type information to the environment.
 appCtx :: Context -> WithEnv Neut
 appCtx ctx = do
-  univ <- boxUniv
+  univ <- newUniv
   higherArrowType <- withEnvFoldR NeutPi univ ctx
   higherHoleName <- newName' "ctx" higherArrowType
   higherMeta <- newName' "ctx" higherArrowType
@@ -249,8 +249,8 @@ appFoldWithType e@(i :< _) (term:ts) = do
     _ ->
       lift $ throwE $ "appfold. t:\n" ++ Pr.ppShow t ++ "\ne:\n" ++ Pr.ppShow e
 
-boxUniv :: WithEnv Neut
-boxUniv = do
+newUniv :: WithEnv Neut
+newUniv = do
   univMeta <- newNameWith "meta"
   l <- newName
   return $ univMeta :< NeutUniv (UnivLevelHole l)
