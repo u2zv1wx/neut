@@ -7,28 +7,22 @@ module Parse
   ( parse
   ) where
 
-import qualified Control.Monad.Except       as E
-import           Control.Monad.Identity
-import           Control.Monad.State        hiding (lift)
-import           Control.Monad.Trans.Except
-
 import           Control.Comonad.Cofree
+import           Control.Monad.State
+import           Control.Monad.Trans.Except
+import           System.Directory
+import           System.FilePath
+import           Text.Read                  (readMaybe)
+import qualified Text.Show.Pretty           as Pr
 
-import           Data.IORef
-
-import           Data
-
+import           Data.Basic
+import           Data.Env
+import           Data.Neut
+import           Data.Tree
 import           Parse.Interpret
 import           Parse.MacroExpand
 import           Parse.Read
 import           Parse.Rename
-
-import           System.Directory
-import           System.FilePath
-
-import           Text.Read                  (readMaybe)
-
-import qualified Text.Show.Pretty           as Pr
 
 -- Def is essentially just a correspondence from name to term.
 data Def
@@ -56,7 +50,7 @@ parse' :: [Tree] -> WithEnv [Def]
 parse' [] = return []
 parse' ((_ :< TreeNode [_ :< TreeAtom "notation", from, to]):as) =
   if not $ isSaneNotation from
-    then E.lift $
+    then lift $
          throwE
            "The '+'-suffixed name can be occurred only at the end of a list"
     else do
@@ -71,13 +65,13 @@ parse' ((_ :< TreeNode ((_ :< TreeAtom "index"):(_ :< TreeAtom name):ts)):as) = 
   parse' as
 parse' ((_ :< TreeNode [_ :< TreeAtom "include", _ :< TreeAtom pathString]):as) =
   case readMaybe pathString :: Maybe String of
-    Nothing -> E.lift $ throwE "the argument of `include` must be a string"
+    Nothing -> lift $ throwE "the argument of `include` must be a string"
     Just path -> do
       dirPath <- gets currentDir
       let nextPath = dirPath </> path
       b <- liftIO $ doesFileExist nextPath
       if not b
-        then E.lift $ throwE $ "no such file: " ++ normalise nextPath
+        then lift $ throwE $ "no such file: " ++ normalise nextPath
         else do
           content <- liftIO $ readFile nextPath
           let nextDirPath = dirPath </> takeDirectory path
@@ -115,7 +109,7 @@ parse' ((meta :< TreeNode [_ :< TreeAtom "use", _ :< TreeAtom moduleName]):as)
   menv <- gets moduleEnv
   case lookup moduleName' menv of
     Nothing ->
-      E.lift $
+      lift $
       throwE $
       "the module " ++
       moduleName ++ " is defined, but not registered in the module environment."
@@ -172,7 +166,7 @@ defToDefList (DefLet _ (name, _) e) = return [(name, e)]
 defToDefList (DefMod _ (name, name') _) = do
   menv <- gets moduleEnv
   case lookup name' menv of
-    Nothing -> E.lift $ throwE $ "no such module: " ++ name
+    Nothing -> lift $ throwE $ "no such module: " ++ name
     Just es -> return es
 
 isSpecialForm :: Tree -> Bool

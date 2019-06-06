@@ -1,27 +1,16 @@
 module Util where
 
-import           Control.Monad.Except
-import           Control.Monad.Identity
-import           Control.Monad.Trans.Except
-
-import           Control.Comonad
 import           Control.Comonad.Cofree
-
 import           Control.Monad.State
-
-import           Data
-import           Reduce
-
-import           Data.Maybe                 (fromMaybe)
-
+import           Control.Monad.Trans.Except
+import qualified Data.Map.Strict            as Map
 import qualified Text.Show.Pretty           as Pr
 
-import qualified Data.Map.Strict            as Map
-
-import           Debug.Trace
-
-import           System.Directory
-import           System.FilePath
+import           Data.Basic
+import           Data.Env
+import           Data.Neut
+import           Data.Polarized
+import           Reduce
 
 isLinear :: Identifier -> [Identifier] -> [Identifier]
 isLinear x xs =

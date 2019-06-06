@@ -2,25 +2,22 @@ module Elaborate.Infer
   ( infer
   ) where
 
-import           Control.Monad
+import           Control.Comonad.Cofree
 import           Control.Monad.Except
 import           Control.Monad.State
 import           Control.Monad.Trans.Except
-
-import           Control.Comonad.Cofree
-
+import           Data.Maybe                 (maybeToList)
 import qualified Text.Show.Pretty           as Pr
 
-import           Data
+import           Data.Basic
+import           Data.Constraint
+import           Data.Env
+import           Data.Neut
 import           Elaborate.Analyze
 import           Reduce
 import           Util
 
-import           Data.List
-
-import           Data.Maybe
-
-import qualified Data.PQueue.Min            as Q
+type Context = [(Identifier, Neut)]
 
 -- Given a term and a context, return the type of the term, updating the
 -- constraint environment. This is more or less the same process in ordinary

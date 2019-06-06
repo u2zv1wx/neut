@@ -2,16 +2,13 @@ module Parse.Read
   ( strToTree
   ) where
 
-import           Control.Monad.Except
-import           Control.Monad.Identity
+import           Control.Comonad.Cofree
 import           Control.Monad.State
 import           Control.Monad.Trans.Except
+import           Text.Parsec                hiding (count)
 
-import           Control.Comonad.Cofree
-
-import           Text.Parsec                hiding (Parsec, count)
-
-import           Data
+import           Data.Env
+import           Data.Tree
 
 type Parser a = ParsecT String () (StateT Env (ExceptT String IO)) a
 

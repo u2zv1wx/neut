@@ -4,26 +4,19 @@ module Elaborate.Analyze
   , categorize
   ) where
 
-import           Control.Monad
+import           Control.Comonad.Cofree
 import           Control.Monad.Except
 import           Control.Monad.State
 import           Control.Monad.Trans.Except
-
-import           Control.Comonad.Cofree
-
+import qualified Data.PQueue.Min            as Q
 import qualified Text.Show.Pretty           as Pr
 
-import           Data
+import           Data.Basic
+import           Data.Constraint
+import           Data.Env
+import           Data.Neut
 import           Reduce
 import           Util
-
-import           Data.List
-
-import           Control.Concurrent         (forkIO, threadDelay)
-import           Data.Maybe
-import           System.Timeout
-
-import qualified Data.PQueue.Min            as Q
 
 analyze :: [PreConstraint] -> WithEnv ()
 analyze cs = simp cs >>= mapM_ analyze'

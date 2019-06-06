@@ -2,24 +2,14 @@ module Emit
   ( emit
   ) where
 
-import           Prelude                    hiding (showList)
-
-import           Control.Monad
-import           Control.Monad.Except
-import           Control.Monad.Identity
 import           Control.Monad.State
 import           Control.Monad.Trans.Except
-import           Data.IORef
-
-import           Data
-
-import           Control.Comonad.Cofree
-
+import           Data.List
 import qualified Text.Show.Pretty           as Pr
 
-import           Data.List
-
-import           Debug.Trace
+import           Data.Basic
+import           Data.Env
+import           Data.LLVM
 
 emit :: LLVM -> WithEnv [String]
 emit mainTerm = do

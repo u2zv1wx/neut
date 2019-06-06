@@ -9,24 +9,18 @@ module Polarize
   ( polarize
   ) where
 
-import           Control.Monad
-
-import           Control.Comonad.Cofree
-
 import           Control.Monad.State
 import           Control.Monad.Trans.Except
-
+import           Data.List                  (nub)
+import           Text.Read                  (readMaybe)
 import qualified Text.Show.Pretty           as Pr
 
-import           Data
+import           Data.Basic
+import           Data.Env
+import           Data.Polarized
+import           Data.Term
 import           Reduce
 import           Util
-
-import           Data.List                  (nub)
-
-import           Text.Read                  (readMaybe)
-
-import           Data.Maybe                 (isJust, maybeToList)
 
 polarize :: Term -> WithEnv Neg
 polarize mainTerm = do

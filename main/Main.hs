@@ -1,12 +1,17 @@
 module Main where
 
-import           Control.Monad
+-- import           Control.Monad
 import           Control.Monad.State
-import           Debug.Trace
-
+import           Data.List           (intercalate)
+import           Options.Applicative
+import           System.Directory
+import           System.Environment
+import           System.FilePath
+import           System.Process
+import           Text.Read           (readMaybe)
 import qualified Text.Show.Pretty    as Pr
 
-import           Data
+import           Data.Env
 import           Elaborate
 import           Emit
 import           LLVM
@@ -14,17 +19,6 @@ import           Parse
 import           Polarize
 import           Reduce
 import           Util
-
-import           System.Directory
-import           System.Environment
-import           System.FilePath
-import           System.Process
-
-import           Data.List           (intercalate)
-
-import           Text.Read
-
-import           Options.Applicative
 
 type ImportOptScreenName = String
 

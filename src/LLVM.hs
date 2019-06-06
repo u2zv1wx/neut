@@ -2,23 +2,17 @@ module LLVM
   ( toLLVM
   ) where
 
-import           Control.Monad
-import           Control.Monad.Except
-import           Control.Monad.Identity
 import           Control.Monad.State
 import           Control.Monad.Trans.Except
-import           Data.IORef
-import           Data.List
-
-import           Data
-import           Reduce
-import           Util
-
-import           Control.Comonad.Cofree
-
+import           Data.List                  (elemIndex)
 import qualified Text.Show.Pretty           as Pr
 
-import           Debug.Trace
+import           Data.Basic
+import           Data.Env
+import           Data.LLVM
+import           Data.Polarized
+import           Reduce
+import           Util
 
 toLLVM :: Neg -> WithEnv LLVM
 toLLVM mainTerm = do

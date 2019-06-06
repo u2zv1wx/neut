@@ -2,30 +2,22 @@ module Elaborate
   ( elaborate
   ) where
 
-import           Control.Monad
-import           Control.Monad.Except
+import           Control.Comonad.Cofree
 import           Control.Monad.State
 import           Control.Monad.Trans.Except
-
-import           Control.Comonad.Cofree
-
+import           Data.List                  (nub)
+import qualified Data.Map.Strict            as Map
 import qualified Text.Show.Pretty           as Pr
 
-import           Data
-import           Reduce
-import           Util
-
+import           Data.Basic
+import           Data.Env
+import           Data.Neut
+import           Data.Term
 import           Elaborate.Analyze
 import           Elaborate.Infer
 import           Elaborate.Synthesize
-
-import           Data.List
-
-import qualified Data.Map.Strict            as Map
-
-import           Data.Maybe
-
-import qualified Data.PQueue.Min            as Q
+import           Reduce
+import           Util
 
 -- Given a term `e` and its name `main`, this function
 --   (1) traces `e` using `infer e`, collecting type constraints,

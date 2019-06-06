@@ -2,14 +2,12 @@ module Parse.Rename
   ( rename
   ) where
 
-import           Control.Monad.State
-import           Control.Monad.Trans.Except
-
 import           Control.Comonad.Cofree
+import           Control.Monad.State
 
-import           Data
-
-import qualified Text.Show.Pretty           as Pr
+import           Data.Basic
+import           Data.Env
+import           Data.Neut
 
 -- Alpha-convert all the variables so that different variables have different names.
 rename :: Neut -> WithEnv Neut

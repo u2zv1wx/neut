@@ -13,23 +13,17 @@ module Parse.Interpret
   , interpretAtom
   ) where
 
-import           Control.Monad              (void)
-import           Control.Monad.Except
-import           Control.Monad.Identity
+import           Control.Comonad.Cofree
 import           Control.Monad.State
 import           Control.Monad.Trans.Except
-
-import           Control.Comonad.Cofree
-
-import           Data
-import           Util
-
-import           Data.List
-import           Data.Maybe
-
 import           Text.Read                  (readMaybe)
-
 import qualified Text.Show.Pretty           as Pr
+
+import           Data.Basic
+import           Data.Env
+import           Data.Neut
+import           Data.Tree
+import           Util
 
 interpret :: Tree -> WithEnv Neut
 interpret (_ :< TreeNode [_ :< TreeAtom "forall", _ :< TreeNode ts, tn]) = do

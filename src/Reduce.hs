@@ -1,26 +1,16 @@
 module Reduce where
 
-import           Data
-
-import           Control.Comonad
-
 import           Control.Comonad.Cofree
-import           Control.Monad.Except
-import           Control.Monad.Identity
 import           Control.Monad.State
 import           Control.Monad.Trans.Except
-import           Text.Show.Deriving
-
-import           Data.Functor.Classes
-
-import           System.IO.Unsafe
-
-import           Data.IORef
-import           Data.List
 import           Data.Maybe                 (fromMaybe)
-import           Data.Tuple                 (swap)
-
 import qualified Text.Show.Pretty           as Pr
+
+import           Data.Basic
+import           Data.Env
+import           Data.Neut
+import           Data.Polarized
+import           Data.Term
 
 reduce :: Neut -> WithEnv Neut
 reduce app@(i :< NeutPiElim _ _) = do

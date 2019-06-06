@@ -3,15 +3,13 @@ module Parse.MacroExpand
   , isSaneNotation
   ) where
 
-import           Control.Monad
-import           Control.Monad.State
-
 import           Control.Comonad.Cofree
-
-import           Data
-import           Data.Maybe             (catMaybes, fromMaybe)
-
+import           Control.Monad.State
 import qualified Text.Show.Pretty       as Pr
+
+import           Data.Env
+import           Data.Maybe             (catMaybes, fromMaybe)
+import           Data.Tree
 
 type MacroSubst = ([(String, Tree)], [(String, [Tree])])
 
