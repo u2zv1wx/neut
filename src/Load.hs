@@ -21,7 +21,6 @@ import           Data.IORef
 import           Data
 import           Elaborate
 import           Emit
-import           Exhaust
 import           LLVM
 import           Macro
 import           Parse

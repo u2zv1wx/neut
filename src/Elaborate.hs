@@ -12,7 +12,6 @@ import           Control.Comonad.Cofree
 import qualified Text.Show.Pretty           as Pr
 
 import           Data
-import           Exhaust
 import           Reduce
 import           Util
 
@@ -137,3 +136,56 @@ elaborate' (_ :< NeutHole x) = do
   case lookup x sub of
     Just e  -> elaborate' e
     Nothing -> lift $ throwE $ "elaborate': remaining hole: " ++ x
+
+exhaust :: Neut -> WithEnv Neut
+exhaust e = do
+  b <- exhaust' e
+  if b
+    then return e
+    else lift $ throwE "non-exhaustive pattern"
+
+exhaust' :: Neut -> WithEnv Bool
+exhaust' (_ :< NeutVar _) = return True
+exhaust' (_ :< NeutConst _) = return True
+exhaust' (_ :< NeutPi (_, tdom) tcod) = do
+  b1 <- exhaust' tdom
+  b2 <- exhaust' tcod
+  return $ b1 && b2
+exhaust' (_ :< NeutPiIntro _ e) = exhaust' e
+exhaust' (_ :< NeutPiElim e1 e2) = do
+  b1 <- exhaust' e1
+  b2 <- exhaust' e2
+  return $ b1 && b2
+exhaust' (_ :< NeutSigma xts) = do
+  let (_, ts) = unzip xts
+  bs <- mapM exhaust' ts
+  return $ and bs
+exhaust' (_ :< NeutSigmaIntro es) = do
+  bs <- mapM exhaust' es
+  return $ and bs
+exhaust' (_ :< NeutSigmaElim e1 _ e2) = do
+  b1 <- exhaust' e1
+  b2 <- exhaust' e2
+  return $ b1 && b2
+exhaust' (_ :< NeutMu _ e) = exhaust' e
+exhaust' (_ :< NeutIndex _) = return True
+exhaust' (_ :< NeutIndexIntro _) = return True
+exhaust' (_ :< NeutIndexElim _ []) = return False -- empty clause?
+exhaust' (meta :< NeutIndexElim e1 branchList@((l, _):_)) = do
+  b1 <- exhaust' e1
+  t <- lookupTypeEnv' meta >>= reduce
+  let labelList = map fst branchList
+  case t of
+    _ :< NeutIndex "i32" -> return $ b1 && (IndexDefault `elem` labelList)
+    _
+      | IndexDefault `elem` labelList -> return b1
+    _ ->
+      case l of
+        IndexLabel x -> do
+          set <- lookupIndexSet x
+          if length set <= length (nub labelList)
+            then return True
+            else return False
+        _ -> return False
+exhaust' (_ :< NeutUniv _) = return True
+exhaust' (_ :< NeutHole _) = return False
