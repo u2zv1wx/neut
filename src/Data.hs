@@ -326,7 +326,7 @@ data Env = Env
   , currentDir        :: FilePath
   , termEnv           :: [(Identifier, (Identifier, Term))] -- x == lam x. e
   , polEnv            :: [(Identifier, Declaration Pos Neg)] -- x == v || x == thunk (lam (x) e)
-  , llvmEnv           :: [(Identifier, Declaration LLVMData LLVM)] -- x ~> thunk (lam (x) e)
+  , llvmEnv           :: [(Identifier, Declaration LLVMData LLVM)]
   } deriving (Show)
 
 initialEnv :: FilePath -> Env

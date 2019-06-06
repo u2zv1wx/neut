@@ -31,6 +31,10 @@ toLLVM mainTerm = do
       DeclarationFun arg e -> do
         llvm <- llvmCode e
         insLLVMEnv name $ DeclarationFun arg llvm
+  -- lenv <- gets llvmEnv
+  -- forM_ lenv $ \(name, b) -> do
+  --   liftIO $ putStrLn name
+  --   liftIO $ putStrLn $ Pr.ppShow b
   llvmCode mainTerm
 
 llvmCode :: Neg -> WithEnv LLVM
@@ -43,8 +47,12 @@ llvmCode (NegPiElimDownElim fun arg) = do
     LLVMLet cast (LLVMBitcast (LLVMDataLocal f) voidPtr funPtrType) $
     LLVMCall (LLVMDataLocal cast) [LLVMDataLocal x]
 llvmCode (NegIndexElim x branchList) = llvmSwitch x branchList
-llvmCode (NegSigmaElim v xs e) =
-  llvmCodeSigmaElim v (zip xs [0 ..]) (length xs) e
+llvmCode (NegSigmaElim v xs e) = do
+  let xis = zip xs [0 ..]
+  let n = length xs
+  basePointer <- newNameWith "sigma"
+  c <- llvmCodeSigmaElim basePointer xis n e
+  llvmDataLet basePointer v c
 llvmCode (NegConstElim f args) = llvmCodeConstElim f args
 llvmCode (NegUpIntro d) = do
   result <- newNameWith "ans"
@@ -54,17 +62,11 @@ llvmCode (NegUpElim x cont1 cont2) = do
   cont2' <- llvmCode cont2
   return $ LLVMLet x cont1' cont2'
 
-llvmCodeSigmaElim :: Pos -> [(Identifier, Int)] -> Int -> Neg -> WithEnv LLVM
-llvmCodeSigmaElim z xis n cont = do
-  basePointer <- newNameWith "sigma"
-  c <- llvmCodeSigmaElim' basePointer xis n cont
-  llvmDataLet basePointer z c
-
-llvmCodeSigmaElim' ::
+llvmCodeSigmaElim ::
      Identifier -> [(Identifier, Int)] -> Int -> Neg -> WithEnv LLVM
-llvmCodeSigmaElim' _ [] _ cont = llvmCode cont
-llvmCodeSigmaElim' basePointer ((x, i):xis) n cont = do
-  cont' <- llvmCodeSigmaElim' basePointer xis n cont
+llvmCodeSigmaElim _ [] _ cont = llvmCode cont
+llvmCodeSigmaElim basePointer ((x, i):xis) n cont = do
+  cont' <- llvmCodeSigmaElim basePointer xis n cont
   cast <- newNameWith "cast"
   let structPtrType = toStructPtrType [1 .. n]
   loader <- newNameWith "loader"
@@ -123,9 +125,7 @@ llvmCodeConstElim _ _ = lift $ throwE "llvmCodeConstElim"
 llvmDataLet :: Identifier -> Pos -> LLVM -> WithEnv LLVM
 llvmDataLet x (PosVar y) cont =
   return $ LLVMLet x (LLVMBitcast (LLVMDataLocal y) voidPtr voidPtr) cont
-llvmDataLet x (PosConst y) cont
-  -- return $ LLVMLet x (LLVMBitcast (LLVMDataGlobal y) voidPtr voidPtr) cont
- = do
+llvmDataLet x (PosConst y) cont = do
   penv <- gets polEnv
   case lookup y penv of
     Nothing -> lift $ throwE $ "no such global label defined: " ++ y -- FIXME
