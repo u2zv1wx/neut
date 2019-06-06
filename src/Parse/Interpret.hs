@@ -23,23 +23,22 @@ import           Data.Basic
 import           Data.Env
 import           Data.Neut
 import           Data.Tree
-import           Util
 
 interpret :: Tree -> WithEnv Neut
 interpret (_ :< TreeNode [_ :< TreeAtom "forall", _ :< TreeNode ts, tn]) = do
   its <- mapM interpretArg ts
   n <- interpret tn
-  foldMR NeutPi n its
+  withEnvFoldR NeutPi n its
 interpret (_ :< TreeNode ((_ :< TreeAtom "arrow"):ts)) = do
   typeList <- mapM interpret ts
   let argList = take (length typeList - 1) typeList
   let cod = last typeList
   identList <- mapM (const $ newNameWith "hole") argList
-  foldMR NeutPi cod $ zip identList argList
+  withEnvFoldR NeutPi cod $ zip identList argList
 interpret (meta :< TreeNode [_ :< TreeAtom "lambda", _ :< TreeNode ts, te]) = do
   xs <- mapM interpretArg ts
   e <- interpret te
-  _ :< term <- foldMR NeutPiIntro e xs
+  _ :< term <- withEnvFoldR NeutPiIntro e xs
   return $ meta :< term
 interpret (meta :< TreeNode [_ :< TreeAtom "apply", t1, t2]) = do
   e1 <- interpret t1
@@ -79,7 +78,7 @@ interpret (meta :< TreeNode [_ :< TreeAtom "mu", _ :< TreeAtom x, te]) = do
 interpret (meta :< TreeNode (te:tvs)) = do
   e <- interpret te
   vs <- mapM interpret tvs
-  _ :< tmp <- foldML NeutPiElim e vs
+  _ :< tmp <- withEnvFoldL NeutPiElim e vs
   return $ meta :< tmp
 interpret (meta :< TreeAtom "_") = do
   name <- newNameWith "hole"

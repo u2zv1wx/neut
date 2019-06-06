@@ -11,7 +11,6 @@ import           Data.Basic
 import           Data.Env
 import           Data.LLVM
 import           Data.Polarized
-import           Util
 
 toLLVM :: Neg -> WithEnv LLVM
 toLLVM mainTerm = do

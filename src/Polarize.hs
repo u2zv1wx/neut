@@ -20,7 +20,6 @@ import           Data.Env
 import           Data.Polarized
 import           Data.Term
 import           Reduce.Polarized
-import           Util
 
 polarize :: Term -> WithEnv Neg
 polarize mainTerm = do

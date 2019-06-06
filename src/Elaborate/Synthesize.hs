@@ -15,7 +15,6 @@ import           Data.Env
 import           Data.Neut
 import           Elaborate.Analyze
 import           Reduce.Neut
-import           Util
 
 -- Given a queue of constraints (easier ones comes earlier), try to synthesize
 -- all of them using heuristics.
@@ -30,7 +29,7 @@ synthesize q =
       --   ?M == lam arg-1, ..., arg-n. e
       -- This kind of constraint is called a "pattern".
      -> do
-      ans <- bindFormalArgs' args e
+      ans <- bindFormalArgs args e
       modify (\e -> e {substitution = compose [(x, ans)] (substitution e)})
       substQueue (Q.deleteMin q) >>= synthesize
     Just (Enriched _ (ConstraintBeta x body))
@@ -95,7 +94,7 @@ synthesizeQuasiPattern ::
 synthesizeQuasiPattern q hole preArgs e = do
   argsList <- toAltList preArgs
   meta <- newNameWith "meta"
-  lamList <- mapM (`bindFormalArgs'` e) argsList
+  lamList <- mapM (`bindFormalArgs` e) argsList
   let planList =
         flip map lamList $ \lam ->
           getQueue $ analyze [(meta :< NeutHole hole, lam)]
@@ -160,7 +159,7 @@ synthesizeFlexRigid ::
 synthesizeFlexRigid q hole args e = do
   newHoleList <- mapM (const (newNameWith "hole")) args -- ?M_i
   meta <- newNameWith "meta"
-  lam <- bindFormalArgs' newHoleList e
+  lam <- bindFormalArgs newHoleList e
   let independent = getQueue $ analyze [(meta :< NeutHole hole, lam)]
   q' <- chain q [independent]
   continue q q'

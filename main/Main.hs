@@ -17,7 +17,6 @@ import           Emit
 import           LLVM
 import           Parse
 import           Polarize
-import           Util
 
 type ImportOptScreenName = String
 

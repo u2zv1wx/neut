@@ -15,7 +15,6 @@ import           Data.Env
 import           Data.Neut
 import           Elaborate.Analyze
 import           Reduce.Neut
-import           Util
 
 type Context = [(Identifier, Neut)]
 
@@ -215,14 +214,14 @@ newName' name t = do
 appCtx :: Context -> WithEnv Neut
 appCtx ctx = do
   univ <- boxUniv
-  higherArrowType <- foldMR NeutPi univ ctx
+  higherArrowType <- withEnvFoldR NeutPi univ ctx
   higherHoleName <- newName' "ctx" higherArrowType
   higherMeta <- newName' "ctx" higherArrowType
   insTypeEnv higherMeta higherArrowType
   let higherHole = higherMeta :< NeutHole higherHoleName
   varSeq <- mapM (uncurry toVar1) ctx
   cod <- appFoldWithType higherHole varSeq
-  arrowType <- foldMR NeutPi cod ctx
+  arrowType <- withEnvFoldR NeutPi cod ctx
   holeName <- newName' "hole" arrowType
   meta <- newName' "meta" arrowType
   appFoldWithType (meta :< NeutHole holeName) varSeq

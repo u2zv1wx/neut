@@ -2,6 +2,7 @@ module Elaborate.Analyze
   ( simp
   , analyze
   , categorize
+  , bindFormalArgs
   ) where
 
 import           Control.Comonad.Cofree
@@ -16,7 +17,6 @@ import           Data.Constraint
 import           Data.Env
 import           Data.Neut
 import           Reduce.Neut
-import           Util
 
 analyze :: [PreConstraint] -> WithEnv ()
 analyze cs = simp cs >>= mapM_ analyze'
@@ -46,7 +46,7 @@ analyze' c@(e1, e2) = do
         cs <- simp [(subst [(hole2, e)] e1, subst [(hole2, e)] e2)]
         analyze cs
     ConstraintPattern hole args e -> do
-      ans <- bindFormalArgs' args e
+      ans <- bindFormalArgs args e
       modify (\e -> e {substitution = compose [(hole, ans)] (substitution e)})
     _ -> do
       let ec = Enriched c $ categorize c
@@ -308,6 +308,15 @@ sConstraint s cs = do
   let ts1' = map (subst s) ts1
   let ts2' = map (subst s) ts2
   return $ zip ts1' ts2'
+
+bindFormalArgs :: [Identifier] -> Neut -> WithEnv Neut
+bindFormalArgs [] terminal = return terminal
+bindFormalArgs (arg:xs) c = do
+  tmp <- bindFormalArgs xs c
+  meta <- newNameWith "meta"
+  h <- newNameWith "hole"
+  holeMeta <- newNameWith "meta"
+  return $ meta :< NeutPiIntro (arg, holeMeta :< NeutHole h) tmp
 
 hasMeta :: Neut -> Bool
 hasMeta (_ :< NeutVar _) = False

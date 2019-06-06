@@ -246,3 +246,24 @@ insDef x body = do
   sub <- gets substitution
   modify (\e -> e {substitution = (x, body) : substitution e})
   return $ lookup x sub
+
+withEnvFoldL ::
+     (Cofree f Identifier -> a -> f (Cofree f Identifier))
+  -> Cofree f Identifier
+  -> [a]
+  -> WithEnv (Cofree f Identifier)
+withEnvFoldL _ e [] = return e
+withEnvFoldL f e (t:ts) = do
+  i <- newName
+  withEnvFoldL f (i :< f e t) ts
+
+withEnvFoldR ::
+     (a -> Cofree f Identifier -> f (Cofree f Identifier))
+  -> Cofree f Identifier
+  -> [a]
+  -> WithEnv (Cofree f Identifier)
+withEnvFoldR _ e [] = return e
+withEnvFoldR f e (t:ts) = do
+  tmp <- withEnvFoldR f e ts
+  i <- newName
+  return $ i :< f t tmp

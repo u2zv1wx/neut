@@ -17,7 +17,6 @@ import           Elaborate.Analyze
 import           Elaborate.Infer
 import           Elaborate.Synthesize
 import           Reduce.Neut
-import           Util
 
 -- Given a term `e` and its name `main`, this function
 --   (1) traces `e` using `infer e`, collecting type constraints,
