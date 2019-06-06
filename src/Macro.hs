@@ -3,15 +3,15 @@ module Macro
   , isSaneNotation
   ) where
 
-import Control.Monad
-import Control.Monad.State
+import           Control.Monad
+import           Control.Monad.State
 
-import Control.Comonad.Cofree
+import           Control.Comonad.Cofree
 
-import Data
-import Data.Maybe (catMaybes, fromMaybe)
+import           Data
+import           Data.Maybe             (catMaybes, fromMaybe)
 
-import qualified Text.Show.Pretty as Pr
+import qualified Text.Show.Pretty       as Pr
 
 type MacroSubst = ([(String, Tree)], [(String, [Tree])])
 
@@ -50,7 +50,7 @@ try f ((p, q):as) = do
   mx <- f p
   case mx of
     Nothing -> try f as
-    Just x -> return $ Just (x, q)
+    Just x  -> return $ Just (x, q)
 
 -- `macroMatch` determines the behavior of matching.
 macroMatch ::
@@ -157,7 +157,7 @@ applyMacroSubst sub@(_, s2) (i :< TreeNode ts)
       , s `elem` map fst s2 -> do
         let ts' = map (applyMacroSubst sub) (take (length ts - 1) ts)
         case lookup s s2 of
-          Nothing -> j :< TreeNode (ts' ++ [j :< TreeAtom s])
+          Nothing   -> j :< TreeNode (ts' ++ [j :< TreeAtom s])
           Just rest -> i :< TreeNode (ts' ++ rest)
     _ -> do
       let ts' = map (applyMacroSubst sub) ts
@@ -170,4 +170,4 @@ isSaneNotation (_ :< TreeNode ts) = do
   let b = all isSaneNotation $ init ts
   case last ts of
     _ :< TreeAtom _ -> True
-    ts' -> b && isSaneNotation ts'
+    ts'             -> b && isSaneNotation ts'

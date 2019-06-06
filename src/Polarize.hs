@@ -9,24 +9,24 @@ module Polarize
   ( polarize
   ) where
 
-import Control.Monad
+import           Control.Monad
 
-import Control.Comonad.Cofree
+import           Control.Comonad.Cofree
 
-import Control.Monad.State
-import Control.Monad.Trans.Except
+import           Control.Monad.State
+import           Control.Monad.Trans.Except
 
-import qualified Text.Show.Pretty as Pr
+import qualified Text.Show.Pretty           as Pr
 
-import Data
-import Reduce
-import Util
+import           Data
+import           Reduce
+import           Util
 
-import Data.List (nub)
+import           Data.List                  (nub)
 
-import Text.Read (readMaybe)
+import           Text.Read                  (readMaybe)
 
-import Data.Maybe (isJust, maybeToList)
+import           Data.Maybe                 (isJust, maybeToList)
 
 polarize :: Term -> WithEnv Neg
 polarize mainTerm = do
@@ -36,21 +36,6 @@ polarize mainTerm = do
     v <- makeClosure' arg e
     insPolEnv name $ DeclarationConst v
   polarize' mainTerm
-  -- r <- reduceNeg mainTerm'
-  -- liftIO $ putStrLn $ Pr.ppShow r
-  -- insPolEnv "main" $ DeclarationMain mainTerm'
-  -- penv <- gets polEnv
-  -- forM_ penv $ \(name, d) -> do
-  --   liftIO $ putStrLn name
-  --   case d of
-  --     DeclarationConst v -> do
-  --       let unit = TermSigmaIntro []
-  --       unit' <- polarize' unit
-  --       e <- callClosure (NegUpIntro v) unit'
-  --       r <- reduceNeg e
-  --       liftIO $ putStrLn $ Pr.ppShow r
-  --     _ -> liftIO $ putStrLn "(pass)"
-  --   liftIO $ putStrLn "====================="
 
 -- CBPV polarization + closure conversion
 -- (In the result of this translation, every function has exactly 1 argument)
@@ -82,7 +67,7 @@ polarize' (TermIndexElim e branchList) = do
   return $ NegUpElim x e' (NegIndexElim (PosVar x) (zip labelList cs))
 
 bindLet :: [(Identifier, Neg)] -> Neg -> Neg
-bindLet [] cont = cont
+bindLet [] cont           = cont
 bindLet ((x, e):xes) cont = NegUpElim x e $ bindLet xes cont
 
 makeClosure :: Identifier -> Neg -> WithEnv Neg
@@ -134,7 +119,7 @@ toArithLowType x
       'i' -> Just $ LowTypeSignedInt y
       'u' -> Just $ LowTypeUnsignedInt y
       'f' -> Just $ LowTypeFloat y
-      _ -> Nothing
+      _   -> Nothing
   | otherwise = Nothing
 
 getPrintConstant :: Identifier -> Maybe Constant
@@ -166,7 +151,7 @@ toArithBinOp "add" = Just ArithAdd
 toArithBinOp "sub" = Just ArithSub
 toArithBinOp "mul" = Just ArithMul
 toArithBinOp "div" = Just ArithDiv
-toArithBinOp _ = Nothing
+toArithBinOp _     = Nothing
 
 toArithBinOpDefinition :: Constant -> WithEnv Neg
 toArithBinOpDefinition c = do

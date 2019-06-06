@@ -2,14 +2,14 @@ module Rename
   ( rename
   ) where
 
-import Control.Monad.State
-import Control.Monad.Trans.Except
+import           Control.Monad.State
+import           Control.Monad.Trans.Except
 
-import Control.Comonad.Cofree
+import           Control.Comonad.Cofree
 
-import Data
+import           Data
 
-import qualified Text.Show.Pretty as Pr
+import qualified Text.Show.Pretty           as Pr
 
 -- Alpha-convert all the variables so that different variables have different names.
 rename :: Neut -> WithEnv Neut

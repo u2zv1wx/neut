@@ -9,33 +9,33 @@ module Load
   ( load
   ) where
 
-import qualified Control.Monad.Except as E
-import Control.Monad.Identity
-import Control.Monad.State hiding (lift)
-import Control.Monad.Trans.Except
+import qualified Control.Monad.Except       as E
+import           Control.Monad.Identity
+import           Control.Monad.State        hiding (lift)
+import           Control.Monad.Trans.Except
 
-import Control.Comonad.Cofree
+import           Control.Comonad.Cofree
 
-import Data.IORef
+import           Data.IORef
 
-import Data
-import Elaborate
-import Emit
-import Exhaust
-import LLVM
-import Macro
-import Parse
-import Polarize
-import Read
-import Reduce
-import Rename
+import           Data
+import           Elaborate
+import           Emit
+import           Exhaust
+import           LLVM
+import           Macro
+import           Parse
+import           Polarize
+import           Read
+import           Reduce
+import           Rename
 
-import System.Directory
-import System.FilePath
+import           System.Directory
+import           System.FilePath
 
-import Text.Read (readMaybe)
+import           Text.Read                  (readMaybe)
 
-import qualified Text.Show.Pretty as Pr
+import qualified Text.Show.Pretty           as Pr
 
 -- Def is essentially just a correspondence from name to term.
 data Def
@@ -219,8 +219,3 @@ concatDefList (DefMod sigMeta (_, name') xs:es) = do
 
 process :: Neut -> WithEnv [String]
 process = elaborate >=> polarize >=> toLLVM >=> emit
--- process e = do
---   e' <- elaborate e
---   e'' <- polarize e'
---   e''' <- toLLVM e''
---   emit e'''

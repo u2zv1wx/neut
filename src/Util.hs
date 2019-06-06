@@ -1,27 +1,27 @@
 module Util where
 
-import Control.Monad.Except
-import Control.Monad.Identity
-import Control.Monad.Trans.Except
+import           Control.Monad.Except
+import           Control.Monad.Identity
+import           Control.Monad.Trans.Except
 
-import Control.Comonad
-import Control.Comonad.Cofree
+import           Control.Comonad
+import           Control.Comonad.Cofree
 
-import Control.Monad.State
+import           Control.Monad.State
 
-import Data
-import Reduce
+import           Data
+import           Reduce
 
-import Data.Maybe (fromMaybe)
+import           Data.Maybe                 (fromMaybe)
 
-import qualified Text.Show.Pretty as Pr
+import qualified Text.Show.Pretty           as Pr
 
-import qualified Data.Map.Strict as Map
+import qualified Data.Map.Strict            as Map
 
-import Debug.Trace
+import           Debug.Trace
 
-import System.Directory
-import System.FilePath
+import           System.Directory
+import           System.FilePath
 
 isLinear :: Identifier -> [Identifier] -> [Identifier]
 isLinear x xs =
@@ -111,9 +111,9 @@ compose s1 s2 = do
   fromS1 ++ zip domS2 codS2'
 
 varPos :: Pos -> [Identifier]
-varPos (PosVar s) = [s]
-varPos (PosConst _) = []
-varPos (PosSigmaIntro vs) = concatMap varPos vs
+varPos (PosVar s)          = [s]
+varPos (PosConst _)        = []
+varPos (PosSigmaIntro vs)  = concatMap varPos vs
 varPos (PosIndexIntro _ _) = []
 
 -- varPos (PosDownIntroPiIntro x e) = filter (/= x) $ varNeg e

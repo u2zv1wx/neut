@@ -2,3 +2,4 @@
 neut.cabal
 *~
 .DS_Store
+test/out/*

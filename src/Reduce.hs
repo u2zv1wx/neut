@@ -1,26 +1,26 @@
 module Reduce where
 
-import Data
+import           Data
 
-import Control.Comonad
+import           Control.Comonad
 
-import Control.Comonad.Cofree
-import Control.Monad.Except
-import Control.Monad.Identity
-import Control.Monad.State
-import Control.Monad.Trans.Except
-import Text.Show.Deriving
+import           Control.Comonad.Cofree
+import           Control.Monad.Except
+import           Control.Monad.Identity
+import           Control.Monad.State
+import           Control.Monad.Trans.Except
+import           Text.Show.Deriving
 
-import Data.Functor.Classes
+import           Data.Functor.Classes
 
-import System.IO.Unsafe
+import           System.IO.Unsafe
 
-import Data.IORef
-import Data.List
-import Data.Maybe (fromMaybe)
-import Data.Tuple (swap)
+import           Data.IORef
+import           Data.List
+import           Data.Maybe                 (fromMaybe)
+import           Data.Tuple                 (swap)
 
-import qualified Text.Show.Pretty as Pr
+import qualified Text.Show.Pretty           as Pr
 
 reduce :: Neut -> WithEnv Neut
 reduce app@(i :< NeutPiElim _ _) = do
@@ -155,7 +155,7 @@ reduceTerm (TermSigmaElim e xs body) = do
   e' <- reduceTerm e
   case e' of
     TermSigmaIntro es -> reduceTerm $ substTerm (zip xs es) body
-    _ -> return $ TermSigmaElim e' xs body
+    _                 -> return $ TermSigmaElim e' xs body
 reduceTerm (TermIndexElim e branchList) = do
   e' <- reduceTerm e
   case e' of
@@ -245,11 +245,11 @@ toTermPiElimSeq (TermPiElim e1 e2) = do
 toTermPiElimSeq c = (c, [])
 
 fromPiElimSeq :: (Neut, [(Identifier, Neut)]) -> Neut
-fromPiElimSeq (term, []) = term
+fromPiElimSeq (term, [])        = term
 fromPiElimSeq (term, (i, v):xs) = fromPiElimSeq (i :< NeutPiElim term v, xs)
 
 fromTermPiElimSeq :: (Term, [Term]) -> Term
-fromTermPiElimSeq (term, []) = term
+fromTermPiElimSeq (term, [])   = term
 fromTermPiElimSeq (term, v:xs) = fromTermPiElimSeq (TermPiElim term v, xs)
 
 takeIntegerList :: [Neut] -> Maybe [Int]
@@ -274,9 +274,9 @@ takeIntegerList'' (PosIndexIntro (IndexInteger i) _:rest) = do
 takeIntegerList'' _ = Nothing
 
 findDefault :: [(Index, Neut)] -> Maybe Neut
-findDefault [] = Nothing
+findDefault []                    = Nothing
 findDefault ((IndexDefault, e):_) = Just e
-findDefault (_:rest) = findDefault rest
+findDefault (_:rest)              = findDefault rest
 
 isReducible :: Neut -> Bool
 isReducible (_ :< NeutVar _) = False
@@ -336,7 +336,7 @@ reduceNeg (NegUpElim x e1 e2) = do
   e1' <- reduceNeg e1
   case e1' of
     NegUpIntro v -> reduceNeg $ substNeg [(x, v)] e2
-    _ -> return $ NegUpElim x e1' e2
+    _            -> return $ NegUpElim x e1' e2
 reduceNeg (NegConstElim x vs) = do
   let xs = takeIntegerList'' vs
   let t = LowTypeSignedInt 64 -- for now

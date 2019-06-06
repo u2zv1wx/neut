@@ -2,23 +2,23 @@ module LLVM
   ( toLLVM
   ) where
 
-import Control.Monad
-import Control.Monad.Except
-import Control.Monad.Identity
-import Control.Monad.State
-import Control.Monad.Trans.Except
-import Data.IORef
-import Data.List
+import           Control.Monad
+import           Control.Monad.Except
+import           Control.Monad.Identity
+import           Control.Monad.State
+import           Control.Monad.Trans.Except
+import           Data.IORef
+import           Data.List
 
-import Data
-import Reduce
-import Util
+import           Data
+import           Reduce
+import           Util
 
-import Control.Comonad.Cofree
+import           Control.Comonad.Cofree
 
-import qualified Text.Show.Pretty as Pr
+import qualified Text.Show.Pretty           as Pr
 
-import Debug.Trace
+import           Debug.Trace
 
 toLLVM :: Neg -> WithEnv LLVM
 toLLVM mainTerm = do
@@ -172,7 +172,7 @@ constructSwitch name ((IndexLabel x, code):rest) = do
   set <- lookupIndexSet x
   case elemIndex x set of
     Nothing -> lift $ throwE $ "no such index defined: " ++ show name
-    Just i -> constructSwitch name ((IndexInteger i, code) : rest)
+    Just i  -> constructSwitch name ((IndexInteger i, code) : rest)
 constructSwitch _ ((IndexDefault, code):_) = do
   code' <- llvmCode code
   return (code', [])

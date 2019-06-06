@@ -1,15 +1,15 @@
 module Exhaust where
 
-import Control.Monad.State
-import Control.Monad.Trans.Except
+import           Control.Monad.State
+import           Control.Monad.Trans.Except
 
-import Control.Comonad.Cofree
+import           Control.Comonad.Cofree
 
-import Data
-import Data.List
-import Reduce
+import           Data
+import           Data.List
+import           Reduce
 
-import qualified Text.Show.Pretty as Pr
+import qualified Text.Show.Pretty           as Pr
 
 exhaust :: Neut -> WithEnv Neut
 exhaust e = do

@@ -4,26 +4,26 @@ module Elaborate.Analyze
   , categorize
   ) where
 
-import Control.Monad
-import Control.Monad.Except
-import Control.Monad.State
-import Control.Monad.Trans.Except
+import           Control.Monad
+import           Control.Monad.Except
+import           Control.Monad.State
+import           Control.Monad.Trans.Except
 
-import Control.Comonad.Cofree
+import           Control.Comonad.Cofree
 
-import qualified Text.Show.Pretty as Pr
+import qualified Text.Show.Pretty           as Pr
 
-import Data
-import Reduce
-import Util
+import           Data
+import           Reduce
+import           Util
 
-import Data.List
+import           Data.List
 
-import Control.Concurrent (forkIO, threadDelay)
-import Data.Maybe
-import System.Timeout
+import           Control.Concurrent         (forkIO, threadDelay)
+import           Data.Maybe
+import           System.Timeout
 
-import qualified Data.PQueue.Min as Q
+import qualified Data.PQueue.Min            as Q
 
 analyze :: [PreConstraint] -> WithEnv ()
 analyze cs = simp cs >>= mapM_ analyze'
@@ -337,16 +337,16 @@ depth x = do
 
 headMeta :: [Identifier] -> Neut -> Maybe (Identifier, [Identifier])
 headMeta args (_ :< NeutPiElim e1 (_ :< NeutVar x)) = headMeta (x : args) e1
-headMeta args (_ :< NeutHole x) = Just (x, args)
-headMeta _ _ = Nothing
+headMeta args (_ :< NeutHole x)                     = Just (x, args)
+headMeta _ _                                        = Nothing
 
 headMeta' :: [Neut] -> Neut -> Maybe (Identifier, [Neut])
 headMeta' args (_ :< NeutPiElim e1 e2) = headMeta' (e2 : args) e1
-headMeta' args (_ :< NeutHole x) = Just (x, args)
-headMeta' _ _ = Nothing
+headMeta' args (_ :< NeutHole x)       = Just (x, args)
+headMeta' _ _                          = Nothing
 
 headMeta'' :: Neut -> Maybe Identifier
-headMeta'' (_ :< NeutVar x) = Just x
-headMeta'' (_ :< NeutPiElim e1 _) = headMeta'' e1
+headMeta'' (_ :< NeutVar x)         = Just x
+headMeta'' (_ :< NeutPiElim e1 _)   = headMeta'' e1
 headMeta'' (_ :< NeutIndexElim e _) = headMeta'' e
-headMeta'' _ = Nothing
+headMeta'' _                        = Nothing

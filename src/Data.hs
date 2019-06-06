@@ -1,34 +1,34 @@
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE DeriveFunctor      #-}
+{-# LANGUAGE FlexibleInstances  #-}
 {-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell    #-}
 
 module Data where
 
-import Prelude hiding (showList)
+import           Prelude                    hiding (showList)
 
-import Control.Comonad
+import           Control.Comonad
 
-import Control.Comonad.Cofree
-import Control.Monad.Except
-import Control.Monad.Identity
-import Control.Monad.State
-import Control.Monad.Trans.Except
-import Text.Show.Deriving
+import           Control.Comonad.Cofree
+import           Control.Monad.Except
+import           Control.Monad.Identity
+import           Control.Monad.State
+import           Control.Monad.Trans.Except
+import           Text.Show.Deriving
 
-import Data.Functor.Classes
+import           Data.Functor.Classes
 
-import System.IO.Unsafe
+import           System.IO.Unsafe
 
-import Data.IORef
-import Data.List
-import Data.Maybe (fromMaybe)
+import           Data.IORef
+import           Data.List
+import           Data.Maybe                 (fromMaybe)
 
-import qualified Data.Map.Strict as Map
+import qualified Data.Map.Strict            as Map
 
-import qualified Data.PQueue.Min as Q
+import qualified Data.PQueue.Min            as Q
 
-import qualified Text.Show.Pretty as Pr
+import qualified Text.Show.Pretty           as Pr
 
 type Identifier = String
 
@@ -172,8 +172,8 @@ data Term
   deriving (Show)
 
 showList :: Show a => [a] -> String
-showList [] = ""
-showList [a] = show a
+showList []     = ""
+showList [a]    = show a
 showList (a:as) = show a ++ ", " ++ showList as
 
 data Constant
@@ -278,12 +278,12 @@ data Constraint
   deriving (Show)
 
 constraintToInt :: Constraint -> Int
-constraintToInt ConstraintPattern {} = 0
-constraintToInt ConstraintDelta {} = 1
-constraintToInt ConstraintBeta {} = 2
+constraintToInt ConstraintPattern {}      = 0
+constraintToInt ConstraintDelta {}        = 1
+constraintToInt ConstraintBeta {}         = 2
 constraintToInt ConstraintQuasiPattern {} = 3
-constraintToInt ConstraintFlexRigid {} = 4
-constraintToInt ConstraintFlexFlex {} = 5
+constraintToInt ConstraintFlexRigid {}    = 4
+constraintToInt ConstraintFlexFlex {}     = 5
 
 instance Eq Constraint where
   c1 == c2 = constraintToInt c1 == constraintToInt c2
@@ -311,23 +311,22 @@ data Declaration p n
   deriving (Show)
 
 data Env = Env
-  { count :: Int -- to generate fresh symbols
-  , notationEnv :: [(Tree, Tree)] -- macro transformers
-  , reservedEnv :: [Identifier] -- list of reserved keywords
-  , constantEnv :: [Identifier]
-  , moduleEnv :: [(Identifier, [(Identifier, Neut)])]
-  , indexEnv :: [(Identifier, [Identifier])]
-  , nameEnv :: [(Identifier, Identifier)] -- used in alpha conversion
-  , typeEnv :: Map.Map Identifier Neut
-  , constraintEnv :: [PreConstraint] -- for type inference
-  , constraintQueue :: Q.MinQueue EnrichedConstraint -- for (dependent) type inference
-  , substitution :: Subst -- for (dependent) type inference
+  { count             :: Int -- to generate fresh symbols
+  , notationEnv       :: [(Tree, Tree)] -- macro transformers
+  , reservedEnv       :: [Identifier] -- list of reserved keywords
+  , constantEnv       :: [Identifier]
+  , moduleEnv         :: [(Identifier, [(Identifier, Neut)])]
+  , indexEnv          :: [(Identifier, [Identifier])]
+  , nameEnv           :: [(Identifier, Identifier)] -- used in alpha conversion
+  , typeEnv           :: Map.Map Identifier Neut
+  , constraintEnv     :: [PreConstraint] -- for type inference
+  , constraintQueue   :: Q.MinQueue EnrichedConstraint -- for (dependent) type inference
+  , substitution      :: Subst -- for (dependent) type inference
   , univConstraintEnv :: [(UnivLevel, UnivLevel)]
-  , currentDir :: FilePath
-  , termEnv :: [(Identifier, (Identifier, Term))] -- x == lam x. e
-  , polEnv :: [(Identifier, Declaration Pos Neg)] -- x == v || x == thunk (lam (x) e)
-  -- , llvmEnv :: [(Identifier, ([Identifier], LLVM))] -- x ~> thunk (lam (x1 ... xn) e)
-  , llvmEnv :: [(Identifier, Declaration LLVMData LLVM)] -- x ~> thunk (lam (x) e)
+  , currentDir        :: FilePath
+  , termEnv           :: [(Identifier, (Identifier, Term))] -- x == lam x. e
+  , polEnv            :: [(Identifier, Declaration Pos Neg)] -- x == v || x == thunk (lam (x) e)
+  , llvmEnv           :: [(Identifier, Declaration LLVMData LLVM)] -- x ~> thunk (lam (x) e)
   } deriving (Show)
 
 initialEnv :: FilePath -> Env
@@ -360,7 +359,7 @@ evalWithEnv :: (Show a) => WithEnv a -> Env -> IO (Either String a)
 evalWithEnv c env = do
   resultOrErr <- runWithEnv c env
   case resultOrErr of
-    Left err -> return $ Left err
+    Left err          -> return $ Left err
     Right (result, _) -> return $ Right result
 
 newName :: WithEnv Identifier
@@ -400,7 +399,7 @@ lookupTypeEnv' s = do
   mt <- gets (Map.lookup s . typeEnv)
   case mt of
     Nothing -> lift $ throwE $ s ++ " is not found in the type environment."
-    Just t -> return t
+    Just t  -> return t
 
 insNameEnv :: Identifier -> Identifier -> WithEnv ()
 insNameEnv from to = modify (\e -> e {nameEnv = (from, to) : nameEnv e})

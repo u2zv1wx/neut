@@ -2,24 +2,24 @@ module Emit
   ( emit
   ) where
 
-import Prelude hiding (showList)
+import           Prelude                    hiding (showList)
 
-import Control.Monad
-import Control.Monad.Except
-import Control.Monad.Identity
-import Control.Monad.State
-import Control.Monad.Trans.Except
-import Data.IORef
+import           Control.Monad
+import           Control.Monad.Except
+import           Control.Monad.Identity
+import           Control.Monad.State
+import           Control.Monad.Trans.Except
+import           Data.IORef
 
-import Data
+import           Data
 
-import Control.Comonad.Cofree
+import           Control.Comonad.Cofree
 
-import qualified Text.Show.Pretty as Pr
+import qualified Text.Show.Pretty           as Pr
 
-import Data.List
+import           Data.List
 
-import Debug.Trace
+import           Debug.Trace
 
 emit :: LLVM -> WithEnv [String]
 emit mainTerm = do
@@ -400,8 +400,8 @@ showBranch i label =
   "i64 " ++ show i ++ ", label " ++ showLLVMData (LLVMDataLocal label)
 
 showIndex :: [Int] -> String
-showIndex [] = ""
-showIndex [i] = "i32 " ++ show i
+showIndex []     = ""
+showIndex [i]    = "i32 " ++ show i
 showIndex (i:is) = "i32 " ++ show i ++ ", " ++ showIndex is
 
 showArg :: LLVMData -> String
@@ -428,8 +428,8 @@ showStruct :: Int -> String
 showStruct i = "{" ++ showItems (const "i8*") [1 .. i] ++ "}"
 
 showItems :: (a -> String) -> [a] -> String
-showItems _ [] = ""
-showItems f [a] = f a
+showItems _ []     = ""
+showItems f [a]    = f a
 showItems f (a:as) = f a ++ ", " ++ showItems f as
 
 -- for now
@@ -463,9 +463,9 @@ obtainLLVMDataType (LLVMDataFloat _ j) = return $ LowTypeFloat j
 obtainLLVMDataType _ = undefined
 
 showLLVMData :: LLVMData -> String
-showLLVMData (LLVMDataLocal x) = "%" ++ x
-showLLVMData (LLVMDataGlobal x) = "@" ++ x
-showLLVMData (LLVMDataInt i _) = show i
+showLLVMData (LLVMDataLocal x)   = "%" ++ x
+showLLVMData (LLVMDataGlobal x)  = "@" ++ x
+showLLVMData (LLVMDataInt i _)   = show i
 showLLVMData (LLVMDataFloat x _) = show x
 showLLVMData (LLVMDataStruct xs) = "{" ++ showItems showLLVMData xs ++ "}"
 

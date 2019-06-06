@@ -2,25 +2,25 @@ module Elaborate.Synthesize
   ( synthesize
   ) where
 
-import Control.Monad
-import Control.Monad.Except
-import Control.Monad.State
-import Control.Monad.Trans.Except
+import           Control.Monad
+import           Control.Monad.Except
+import           Control.Monad.State
+import           Control.Monad.Trans.Except
 
-import Control.Comonad.Cofree
+import           Control.Comonad.Cofree
 
-import qualified Text.Show.Pretty as Pr
+import qualified Text.Show.Pretty           as Pr
 
-import Data
-import Elaborate.Analyze
-import Reduce
-import Util
+import           Data
+import           Elaborate.Analyze
+import           Reduce
+import           Util
 
-import Data.List
+import           Data.List
 
-import Data.Maybe
+import           Data.Maybe
 
-import qualified Data.PQueue.Min as Q
+import qualified Data.PQueue.Min            as Q
 
 -- Given a queue of constraints (easier ones comes earlier), try to synthesize
 -- all of them using heuristics.
@@ -186,7 +186,7 @@ continue currentQueue newQueue = do
 
 -- Try the list of alternatives.
 chain :: Q.MinQueue EnrichedConstraint -> [WithEnv a] -> WithEnv a
-chain c [] = throwError $ "cannot synthesize:\n" ++ Pr.ppShow c
+chain c []     = throwError $ "cannot synthesize:\n" ++ Pr.ppShow c
 chain c (e:es) = e `catchError` const (chain c es)
 
 substQueue ::

@@ -2,31 +2,31 @@ module Elaborate
   ( elaborate
   ) where
 
-import Control.Monad
-import Control.Monad.Except
-import Control.Monad.State
-import Control.Monad.Trans.Except
+import           Control.Monad
+import           Control.Monad.Except
+import           Control.Monad.State
+import           Control.Monad.Trans.Except
 
-import Control.Comonad.Cofree
+import           Control.Comonad.Cofree
 
-import qualified Text.Show.Pretty as Pr
+import qualified Text.Show.Pretty           as Pr
 
-import Data
-import Exhaust
-import Reduce
-import Util
+import           Data
+import           Exhaust
+import           Reduce
+import           Util
 
-import Elaborate.Analyze
-import Elaborate.Infer
-import Elaborate.Synthesize
+import           Elaborate.Analyze
+import           Elaborate.Infer
+import           Elaborate.Synthesize
 
-import Data.List
+import           Data.List
 
-import qualified Data.Map.Strict as Map
+import qualified Data.Map.Strict            as Map
 
-import Data.Maybe
+import           Data.Maybe
 
-import qualified Data.PQueue.Min as Q
+import qualified Data.PQueue.Min            as Q
 
 -- Given a term `e` and its name `main`, this function
 --   (1) traces `e` using `infer e`, collecting type constraints,
@@ -55,24 +55,24 @@ getNumLowType :: Identifier -> WithEnv (Either Neut LowType)
 getNumLowType meta = do
   t <- lookupTypeEnv' meta >>= reduce
   case t of
-    _ :< NeutIndex "i1" -> return $ Right $ LowTypeSignedInt 1
-    _ :< NeutIndex "i2" -> return $ Right $ LowTypeSignedInt 2
-    _ :< NeutIndex "i4" -> return $ Right $ LowTypeSignedInt 4
-    _ :< NeutIndex "i8" -> return $ Right $ LowTypeSignedInt 8
+    _ :< NeutIndex "i1"  -> return $ Right $ LowTypeSignedInt 1
+    _ :< NeutIndex "i2"  -> return $ Right $ LowTypeSignedInt 2
+    _ :< NeutIndex "i4"  -> return $ Right $ LowTypeSignedInt 4
+    _ :< NeutIndex "i8"  -> return $ Right $ LowTypeSignedInt 8
     _ :< NeutIndex "i16" -> return $ Right $ LowTypeSignedInt 16
     _ :< NeutIndex "i32" -> return $ Right $ LowTypeSignedInt 32
     _ :< NeutIndex "i64" -> return $ Right $ LowTypeSignedInt 64
-    _ :< NeutIndex "u1" -> return $ Right $ LowTypeUnsignedInt 1
-    _ :< NeutIndex "u2" -> return $ Right $ LowTypeUnsignedInt 2
-    _ :< NeutIndex "u4" -> return $ Right $ LowTypeUnsignedInt 4
-    _ :< NeutIndex "u8" -> return $ Right $ LowTypeUnsignedInt 8
+    _ :< NeutIndex "u1"  -> return $ Right $ LowTypeUnsignedInt 1
+    _ :< NeutIndex "u2"  -> return $ Right $ LowTypeUnsignedInt 2
+    _ :< NeutIndex "u4"  -> return $ Right $ LowTypeUnsignedInt 4
+    _ :< NeutIndex "u8"  -> return $ Right $ LowTypeUnsignedInt 8
     _ :< NeutIndex "u16" -> return $ Right $ LowTypeUnsignedInt 16
     _ :< NeutIndex "u32" -> return $ Right $ LowTypeUnsignedInt 32
     _ :< NeutIndex "u64" -> return $ Right $ LowTypeUnsignedInt 64
     _ :< NeutIndex "f16" -> return $ Right $ LowTypeFloat 16
     _ :< NeutIndex "f32" -> return $ Right $ LowTypeFloat 32
     _ :< NeutIndex "f64" -> return $ Right $ LowTypeFloat 64
-    t -> return $ Left t
+    t                    -> return $ Left t
 
 -- This function translates a well-typed term into an untyped term in a
 -- reduction-preserving way. Here, we translate types into units (nullary product).
@@ -135,5 +135,5 @@ elaborate' (meta :< NeutMu x e) = do
 elaborate' (_ :< NeutHole x) = do
   sub <- gets substitution
   case lookup x sub of
-    Just e -> elaborate' e
+    Just e  -> elaborate' e
     Nothing -> lift $ throwE $ "elaborate': remaining hole: " ++ x

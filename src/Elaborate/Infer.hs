@@ -2,25 +2,25 @@ module Elaborate.Infer
   ( infer
   ) where
 
-import Control.Monad
-import Control.Monad.Except
-import Control.Monad.State
-import Control.Monad.Trans.Except
+import           Control.Monad
+import           Control.Monad.Except
+import           Control.Monad.State
+import           Control.Monad.Trans.Except
 
-import Control.Comonad.Cofree
+import           Control.Comonad.Cofree
 
-import qualified Text.Show.Pretty as Pr
+import qualified Text.Show.Pretty           as Pr
 
-import Data
-import Elaborate.Analyze
-import Reduce
-import Util
+import           Data
+import           Elaborate.Analyze
+import           Reduce
+import           Util
 
-import Data.List
+import           Data.List
 
-import Data.Maybe
+import           Data.Maybe
 
-import qualified Data.PQueue.Min as Q
+import qualified Data.PQueue.Min            as Q
 
 -- Given a term and a context, return the type of the term, updating the
 -- constraint environment. This is more or less the same process in ordinary
