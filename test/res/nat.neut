@@ -3,7 +3,7 @@
 (definition nat
   (coproduct top nat))
 
-(reserve nat)
+; (reserve nat)
 
 ;; (notation nat nat.inner)
 
@@ -23,7 +23,7 @@
 
 (definition next (n)
   (pair right n))
+(ascription next
+  (arrow nat nat))
 
-(ascription next (arrow nat nat))
-
-(let three (next two))
+; (let three (next two))

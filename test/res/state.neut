@@ -1,3 +1,2 @@
-
 (definition state ((S type) (A type))
   (arrow S (product S A)))
