@@ -35,6 +35,14 @@ polarize mainTerm = do
     e <- polarize' e
     v <- makeClosure' arg e
     insPolEnv name $ DeclarationConst v
+  -- k <- polarize' mainTerm
+  -- liftIO $ putStrLn $ Pr.ppShow k
+  -- penv <- gets polEnv
+  -- forM_ penv $ \(name, d) -> do
+  --   liftIO $ putStrLn name
+  --   liftIO $ putStrLn $ Pr.ppShow d
+  -- liftIO $ putStrLn "mainTerm"
+  -- liftIO $ putStrLn $ Pr.ppShow k
   polarize' mainTerm
 
 -- CBPV polarization + closure conversion

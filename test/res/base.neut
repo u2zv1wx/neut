@@ -5,7 +5,7 @@
 
 (include "./arith.neut")
 
-; (include "./state.neut")
+(include "./state.neut")
 
 ; (include "./coproduct.neut")
 
@@ -13,4 +13,4 @@
 
 ;; (include "./nat.neut")
 
-;; (include "./io.neut")
+(include "./io.neut")

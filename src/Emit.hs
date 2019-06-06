@@ -182,6 +182,8 @@ emitLLVM funName (LLVMLet _ (LLVMStore (d1, t1) (d2, t2)) cont) = do
   return $ op ++ a
 emitLLVM funName (LLVMLet x (LLVMAlloc ts) cont) = do
   size <- newNameWith "sizeptr"
+  -- Use getelementptr to realize `sizeof`. More info:
+  --   http://nondot.org/sabre/LLVMNotes/SizeOf-OffsetOf-VariableSizedStructs.txt
   op1 <-
     emitOp $
     unwords
@@ -337,7 +339,7 @@ emitLLVM funName (LLVMLet x (LLVMArith (ArithDiv, t) d1 d2) cont) = do
       ]
   a <- emitLLVM funName cont
   return $ op ++ a
-emitLLVM funName (LLVMLet _ (LLVMPrint t d) cont) = do
+emitLLVM funName (LLVMLet x (LLVMPrint t d) cont) = do
   fmt <- newNameWith "fmt"
   op1 <-
     emitOp $
@@ -346,16 +348,24 @@ emitLLVM funName (LLVMLet _ (LLVMPrint t d) cont) = do
       , "="
       , "getelementptr [3 x i8], [3 x i8]* @fmt.i32, i32 0, i32 0"
       ]
+  tmp <- newNameWith "tmp"
   op2 <-
     emitOp $
     unwords
-      [ "call"
+      [ showLLVMData (LLVMDataLocal tmp)
+      , "="
+      , "call"
       , "i32 (i8*, ...)"
       , "@printf(i8* " ++ showLLVMData (LLVMDataLocal fmt) ++ ","
       , showLowType t
       , showLLVMData d ++ ")"
       ]
-  a <- emitLLVM funName cont
+  a <-
+    emitLLVM funName $
+    LLVMLet
+      x
+      (LLVMIntToPointer (LLVMDataLocal tmp) (LowTypeSignedInt 32) voidPtr)
+      cont
   return $ op1 ++ op2 ++ a
 emitLLVM funName c = do
   tmp <- newNameWith "result"

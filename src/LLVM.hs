@@ -31,10 +31,6 @@ toLLVM mainTerm = do
       DeclarationFun arg e -> do
         llvm <- llvmCode e
         insLLVMEnv name $ DeclarationFun arg llvm
-  -- lenv <- gets llvmEnv
-  -- forM_ lenv $ \(name, b) -> do
-  --   liftIO $ putStrLn name
-  --   liftIO $ putStrLn $ Pr.ppShow b
   llvmCode mainTerm
 
 llvmCode :: Neg -> WithEnv LLVM
@@ -48,11 +44,23 @@ llvmCode (NegPiElimDownElim fun arg) = do
     LLVMCall (LLVMDataLocal cast) [LLVMDataLocal x]
 llvmCode (NegIndexElim x branchList) = llvmSwitch x branchList
 llvmCode (NegSigmaElim v xs e) = do
-  let xis = zip xs [0 ..]
-  let n = length xs
-  basePointer <- newNameWith "sigma"
-  c <- llvmCodeSigmaElim basePointer xis n e
-  llvmDataLet basePointer v c
+  basePointer <- newNameWith "base"
+  castedBasePointer <- newNameWith "castedBase"
+  extractAndCont <-
+    llvmCodeSigmaElim
+      basePointer
+      (zip xs [0 ..])
+      castedBasePointer
+      (length xs)
+      e
+  llvmDataLet basePointer v $
+    LLVMLet
+      castedBasePointer
+      (LLVMBitcast
+         (LLVMDataLocal basePointer)
+         voidPtr
+         (toStructPtrType [1 .. (length xs)]))
+      extractAndCont
 llvmCode (NegConstElim f args) = llvmCodeConstElim f args
 llvmCode (NegUpIntro d) = do
   result <- newNameWith "ans"
@@ -63,16 +71,18 @@ llvmCode (NegUpElim x cont1 cont2) = do
   return $ LLVMLet x cont1' cont2'
 
 llvmCodeSigmaElim ::
-     Identifier -> [(Identifier, Int)] -> Int -> Neg -> WithEnv LLVM
-llvmCodeSigmaElim _ [] _ cont = llvmCode cont
-llvmCodeSigmaElim basePointer ((x, i):xis) n cont = do
-  cont' <- llvmCodeSigmaElim basePointer xis n cont
-  cast <- newNameWith "cast"
-  let structPtrType = toStructPtrType [1 .. n]
+     Identifier
+  -> [(Identifier, Int)]
+  -> Identifier
+  -> Int
+  -> Neg
+  -> WithEnv LLVM
+llvmCodeSigmaElim _ [] _ _ cont = llvmCode cont
+llvmCodeSigmaElim basePointer ((x, i):xis) castedBasePointer n cont = do
+  cont' <- llvmCodeSigmaElim basePointer xis castedBasePointer n cont
   loader <- newNameWith "loader"
   return $
-    LLVMLet cast (LLVMBitcast (LLVMDataLocal basePointer) voidPtr structPtrType) $
-    LLVMLet loader (LLVMGetElementPtr (LLVMDataLocal cast) (i, n)) $
+    LLVMLet loader (LLVMGetElementPtr (LLVMDataLocal castedBasePointer) (i, n)) $
     LLVMLet x (LLVMLoad (LLVMDataLocal loader)) cont'
 
 llvmCodeConstElim :: Constant -> [Pos] -> WithEnv LLVM
@@ -118,7 +128,16 @@ llvmCodeConstElim (ConstantArith (LowTypeFloat i) kind) xs
       LLVMLet uncast (LLVMBitcast (LLVMDataLocal tmp) (LowTypeFloat i) si) $
       LLVMLet result (LLVMIntToPointer (LLVMDataLocal uncast) si voidPtr) $
       LLVMReturn $ LLVMDataLocal result
-llvmCodeConstElim _ _ = lift $ throwE "llvmCodeConstElim"
+llvmCodeConstElim (ConstantPrint t) [d] = do
+  p <- newNameWith "arg"
+  c <- newNameWith "cast"
+  llvmDataLet p d $
+    LLVMLet c (LLVMPointerToInt (LLVMDataLocal p) voidPtr t) $
+    LLVMPrint t (LLVMDataLocal c)
+  -- return $ LLVMPrint t d
+  -- liftIO $ putStrLn $ Pr.ppShow c
+  -- liftIO $ putStrLn $ Pr.ppShow xs
+llvmCodeConstElim _ _ = lift $ throwE "llvmCodeConstElim."
 
 -- `llvmDataLet x d cont` binds the data `d` to the variable `x`, and computes the
 -- continuation `cont`.
