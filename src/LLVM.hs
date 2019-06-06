@@ -134,9 +134,6 @@ llvmCodeConstElim (ConstantPrint t) [d] = do
   llvmDataLet p d $
     LLVMLet c (LLVMPointerToInt (LLVMDataLocal p) voidPtr t) $
     LLVMPrint t (LLVMDataLocal c)
-  -- return $ LLVMPrint t d
-  -- liftIO $ putStrLn $ Pr.ppShow c
-  -- liftIO $ putStrLn $ Pr.ppShow xs
 llvmCodeConstElim _ _ = lift $ throwE "llvmCodeConstElim."
 
 -- `llvmDataLet x d cont` binds the data `d` to the variable `x`, and computes the

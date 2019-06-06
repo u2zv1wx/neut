@@ -35,14 +35,6 @@ polarize mainTerm = do
     e <- polarize' e
     v <- makeClosure' arg e
     insPolEnv name $ DeclarationConst v
-  -- k <- polarize' mainTerm
-  -- liftIO $ putStrLn $ Pr.ppShow k
-  -- penv <- gets polEnv
-  -- forM_ penv $ \(name, d) -> do
-  --   liftIO $ putStrLn name
-  --   liftIO $ putStrLn $ Pr.ppShow d
-  -- liftIO $ putStrLn "mainTerm"
-  -- liftIO $ putStrLn $ Pr.ppShow k
   polarize' mainTerm
 
 -- CBPV polarization + closure conversion
@@ -93,7 +85,6 @@ makeClosure' x e = do
   -- return lamVar == return (thunk (lam (pairName) lamBody))
   -- i.e. lamVar == thunk (lam (pairName) lamBody)
   insPolEnv lamVar $ DeclarationFun pairName lamBody
-  -- insPolEnv lamVar $ BindableThunkLam pairName lamBody
   let fvEnv = PosSigmaIntro $ map PosVar fvs
   return $ PosSigmaIntro [PosConst lamVar, fvEnv]
 
