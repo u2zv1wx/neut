@@ -1,4 +1,4 @@
-module Read
+module Parse.Read
   ( strToTree
   ) where
 

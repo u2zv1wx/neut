@@ -1,4 +1,4 @@
-module Rename
+module Parse.Rename
   ( rename
   ) where
 

@@ -7,7 +7,12 @@ import           Debug.Trace
 import qualified Text.Show.Pretty    as Pr
 
 import           Data
-import           Load
+import           Elaborate
+import           Emit
+import           LLVM
+import           Parse
+import           Polarize
+import           Reduce
 import           Util
 
 import           System.Directory
@@ -93,7 +98,7 @@ run :: Command -> IO ()
 run (Build inputPath moutputPath outputKind) = do
   content <- readFile inputPath
   dirPath <- expandDirPath $ takeDirectory inputPath
-  resultOrErr <- evalWithEnv (load content) (initialEnv dirPath)
+  resultOrErr <- evalWithEnv (process content) (initialEnv dirPath)
   let basename = takeBaseName inputPath
   outputPath <- constructOutputPath basename moutputPath outputKind
   case resultOrErr of
@@ -127,3 +132,6 @@ expandDirPath :: FilePath -> IO FilePath
 expandDirPath path = do
   current <- getCurrentDirectory
   return $ current </> path
+
+process :: String -> WithEnv [String]
+process = parse >=> elaborate >=> polarize >=> toLLVM >=> emit

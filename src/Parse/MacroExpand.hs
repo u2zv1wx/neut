@@ -1,4 +1,4 @@
-module Macro
+module Parse.MacroExpand
   ( macroExpand
   , isSaneNotation
   ) where
