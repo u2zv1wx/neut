@@ -29,7 +29,7 @@ llvmCode (NegPiElimDownElim fun args) = do
     LLVMLet cast (LLVMBitcast (LLVMDataLocal f) voidPtr funPtrType) $
     LLVMCall (LLVMDataLocal cast) (map LLVMDataLocal xs)
 llvmCode (NegIndexElim x branchList) = llvmSwitch x branchList
-llvmCode (NegSigmaElim v xs e) = do
+llvmCode (NegSigmaElim xs v e) = do
   basePointer <- newNameWith "base"
   castedBasePointer <- newNameWith "castedBase"
   extractAndCont <-

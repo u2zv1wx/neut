@@ -43,11 +43,11 @@ reduceTerm (TermConstElim x es) = do
     Just (args, body)
       | length args == length es -> reduceTerm $ substTerm (zip args es') body
     _ -> return $ TermConstElim x es'
-reduceTerm (TermSigmaElim e xs body) = do
+reduceTerm (TermSigmaElim xs e body) = do
   e' <- reduceTerm e
   case e' of
     TermSigmaIntro es -> reduceTerm $ substTerm (zip xs es) body
-    _                 -> return $ TermSigmaElim e' xs body
+    _                 -> return $ TermSigmaElim xs e' body
 reduceTerm (TermIndexElim e branchList) = do
   e' <- reduceTerm e
   case e' of

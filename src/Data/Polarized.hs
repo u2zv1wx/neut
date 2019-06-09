@@ -17,8 +17,8 @@ data Neg
                       [Pos]
   | NegConstElim Constant
                  [Pos]
-  | NegSigmaElim Pos
-                 [Identifier]
+  | NegSigmaElim [Identifier]
+                 Pos
                  Neg
   | NegIndexElim Pos
                  [(Index, Neg)]
@@ -36,7 +36,7 @@ varPos (PosIndexIntro _ _) = []
 
 varNeg :: Neg -> [Identifier]
 varNeg (NegPiElimDownElim v vs) = varPos v ++ concatMap varPos vs
-varNeg (NegSigmaElim v xs e) = do
+varNeg (NegSigmaElim xs v e) = do
   let vs1 = varPos v
   let vs2 = filter (`notElem` xs) $ varNeg e
   vs1 ++ vs2
@@ -66,11 +66,11 @@ substNeg sub (NegPiElimDownElim v vs) = do
   let v1' = substPos sub v
   let v2' = map (substPos sub) vs
   NegPiElimDownElim v1' v2'
-substNeg sub (NegSigmaElim v xs e) = do
+substNeg sub (NegSigmaElim xs v e) = do
   let v' = substPos sub v
   let sub' = filter (\(x, _) -> x `notElem` xs) sub
   let e' = substNeg sub' e
-  NegSigmaElim v' xs e'
+  NegSigmaElim xs v' e'
 substNeg sub (NegIndexElim v branchList) = do
   let v' = substPos sub v
   let branchList' = map (\(l, e) -> (l, substNeg sub e)) branchList

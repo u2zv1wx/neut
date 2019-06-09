@@ -14,8 +14,8 @@ data Term
   | TermConstElim Identifier
                   [Term]
   | TermSigmaIntro [Term]
-  | TermSigmaElim Term
-                  [Identifier]
+  | TermSigmaElim [Identifier]
+                  Term
                   Term
   | TermIndexIntro Index
                    LowType
@@ -40,11 +40,11 @@ substTerm sub (TermConstElim x es) = do
   let es' = map (substTerm sub) es
   TermConstElim x es'
 substTerm sub (TermSigmaIntro es) = TermSigmaIntro (map (substTerm sub) es)
-substTerm sub (TermSigmaElim e1 xs e2) = do
+substTerm sub (TermSigmaElim xs e1 e2) = do
   let e1' = substTerm sub e1
   let sub' = filter (\(x, _) -> x `notElem` xs) sub
   let e2' = substTerm sub' e2
-  TermSigmaElim e1' xs e2'
+  TermSigmaElim xs e1' e2'
 substTerm _ (TermIndexIntro l meta) = TermIndexIntro l meta
 substTerm sub (TermIndexElim e branchList) = do
   let e' = substTerm sub e

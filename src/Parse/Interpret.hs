@@ -64,7 +64,7 @@ interpret (meta :< TreeNode [_ :< TreeAtom "case", t, _ :< TreeNode [_ :< TreeNo
   tmp <- mapM interpretArg ts
   let args = map fst tmp
   body <- interpret tbody
-  return $ meta :< NeutSigmaElim e args body
+  return $ meta :< NeutSigmaElim args e body
 interpret (meta :< TreeNode [_ :< TreeAtom "case", t, _ :< TreeNode ts]) = do
   e <- interpret t
   branchList <- mapM interpretClause ts

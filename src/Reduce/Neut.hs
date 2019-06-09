@@ -35,13 +35,13 @@ reduceNeut app@(i :< NeutPiElim _ _) = do
           return $ i :< NeutIndexIntro (IndexInteger (x `div` y))
         _ -> return $ fromNeutPiElimSeq (fun', args')
     _ -> return $ fromNeutPiElimSeq (fun', args')
-reduceNeut (i :< NeutSigmaElim e xs body) = do
+reduceNeut (i :< NeutSigmaElim xs e body) = do
   e' <- reduceNeut e
   case e of
     _ :< NeutSigmaIntro es -> do
       let _ :< body' = substNeut (zip xs es) body
       reduceNeut $ i :< body'
-    _ -> return $ i :< NeutSigmaElim e' xs body
+    _ -> return $ i :< NeutSigmaElim xs e' body
 reduceNeut (i :< NeutIndexElim e branchList) = do
   e' <- reduceNeut e
   case e' of

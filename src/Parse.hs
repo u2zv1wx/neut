@@ -202,4 +202,4 @@ concatDefList (DefLet meta (_, name') e:es) = do
 concatDefList (DefMod sigMeta (_, name') xs:es) = do
   cont <- concatDefList es
   meta <- newNameWith "meta"
-  return $ sigMeta :< NeutSigmaElim (meta :< NeutVar name') xs cont
+  return $ sigMeta :< NeutSigmaElim xs (meta :< NeutVar name') cont

@@ -19,11 +19,11 @@ reduceNeg (NegPiElimDownElim v vs) =
           | length args == length vs -> reduceNeg $ substNeg (zip args vs) body
         _ -> return $ NegPiElimDownElim v vs
     _ -> return $ NegPiElimDownElim v vs
-reduceNeg (NegSigmaElim v xs body) =
+reduceNeg (NegSigmaElim xs v body) =
   case v of
     PosSigmaIntro vs
       | length xs == length vs -> reduceNeg $ substNeg (zip xs vs) body
-    _ -> return $ NegSigmaElim v xs body
+    _ -> return $ NegSigmaElim xs v body
 reduceNeg (NegIndexElim v branchList) =
   case v of
     PosIndexIntro x _ ->

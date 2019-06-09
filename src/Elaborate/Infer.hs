@@ -110,7 +110,7 @@ infer ctx (meta :< NeutSigmaIntro es) = do
   let holeList' = map (substNeut (zip xs es)) holeList
   forM_ (zip holeList' ts) $ uncurry insConstraintEnv
   returnMeta meta $ meta :< NeutSigma (zip xs holeList')
-infer ctx (meta :< NeutSigmaElim e1 xs e2) = do
+infer ctx (meta :< NeutSigmaElim xs e1 e2) = do
   univ <- newUniv
   t1 <- infer ctx e1 >>= annot univ
   holeList <- sigmaHole ctx xs

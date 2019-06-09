@@ -214,7 +214,7 @@ isEq (_ :< NeutSigmaIntro es1) (_ :< NeutSigmaIntro es2)
   | length es1 == length es2 = do
     bs <- zipWithM isEq es1 es2
     return $ and bs
-isEq (_ :< NeutSigmaElim e11 xs1 e12) (_ :< NeutSigmaElim e21 xs2 e22)
+isEq (_ :< NeutSigmaElim xs1 e11 e12) (_ :< NeutSigmaElim xs2 e21 e22)
   | length xs1 == length xs2 = do
     metaList <- mapM (const $ newNameWith "meta") xs1
     let vs = map (\(meta, x) -> meta :< NeutVar x) $ zip metaList xs1
@@ -296,7 +296,7 @@ projectionList e n = do
   let varList = map (\(meta, x) -> meta :< NeutVar x) $ zip metaList xs
   forM varList $ \x -> do
     meta <- newName
-    return $ meta :< NeutSigmaElim e xs x
+    return $ meta :< NeutSigmaElim xs e x
 
 sConstraint :: SubstNeut -> [PreConstraint] -> WithEnv [PreConstraint]
 sConstraint s cs = do
@@ -323,7 +323,7 @@ hasMeta (_ :< NeutSigma xts) = do
   let (_, ts) = unzip xts
   any hasMeta ts
 hasMeta (_ :< NeutSigmaIntro es) = any hasMeta es
-hasMeta (_ :< NeutSigmaElim e1 _ e2) = hasMeta e1 || hasMeta e2
+hasMeta (_ :< NeutSigmaElim _ e1 e2) = hasMeta e1 || hasMeta e2
 hasMeta (_ :< NeutIndex _) = False
 hasMeta (_ :< NeutIndexIntro _) = False
 hasMeta (_ :< NeutIndexElim e branchList) = do

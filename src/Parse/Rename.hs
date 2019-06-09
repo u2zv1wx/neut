@@ -37,12 +37,12 @@ rename (i :< NeutSigma xts) = do
 rename (i :< NeutSigmaIntro es) = do
   es' <- mapM rename es
   return $ i :< NeutSigmaIntro es'
-rename (i :< NeutSigmaElim e1 xs e2) = do
+rename (i :< NeutSigmaElim xs e1 e2) = do
   e1' <- rename e1
   local $ do
     xs' <- mapM newNameWith xs
     e2' <- rename e2
-    return $ i :< NeutSigmaElim e1' xs' e2'
+    return $ i :< NeutSigmaElim xs' e1' e2'
 rename (i :< NeutIndex s) = return $ i :< NeutIndex s
 rename (i :< NeutIndexIntro x) = return $ i :< NeutIndexIntro x
 rename (i :< NeutIndexElim e branchList) = do

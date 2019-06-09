@@ -46,11 +46,11 @@ polarize' (TermSigmaIntro es) = do
   es' <- mapM polarize' es
   xs <- mapM (const (newNameWith "sigma")) es'
   return $ bindLet (zip xs es') $ NegUpIntro $ PosSigmaIntro (map PosVar xs)
-polarize' (TermSigmaElim e1 xs e2) = do
+polarize' (TermSigmaElim xs e1 e2) = do
   e1' <- polarize' e1
   e2' <- polarize' e2
   z <- newNameWith "sigma"
-  return $ NegUpElim z e1' (NegSigmaElim (PosVar z) xs e2')
+  return $ NegUpElim z e1' (NegSigmaElim xs (PosVar z) e2')
 polarize' (TermIndexIntro l t) = return $ NegUpIntro (PosIndexIntro l t)
 polarize' (TermIndexElim e branchList) = do
   let (labelList, es) = unzip branchList
@@ -68,7 +68,7 @@ makeClosure x e = do
   let fvs = filter (/= x) $ nub $ varNeg e
   envName <- newNameWith "env"
   lamVar <- newNameWith "lam"
-  let lamBody = NegSigmaElim (PosVar envName) fvs e
+  let lamBody = NegSigmaElim fvs (PosVar envName) e
   insPolEnv lamVar [x, envName] lamBody -- lamVar == thunk (lam (envName, x) lamBody)
   let fvEnv = PosSigmaIntro $ map PosVar fvs
   return $ NegUpIntro $ PosSigmaIntro [PosConst lamVar, fvEnv]
@@ -82,7 +82,7 @@ callClosure cls arg = do
   return $
     NegUpElim argVarName arg $
     NegUpElim clsVarName cls $
-    NegSigmaElim (PosVar clsVarName) [thunkLamVarName, envVarName] $
+    NegSigmaElim [thunkLamVarName, envVarName] (PosVar clsVarName) $
     NegPiElimDownElim
       (PosVar thunkLamVarName)
       [PosVar argVarName, PosVar envVarName]

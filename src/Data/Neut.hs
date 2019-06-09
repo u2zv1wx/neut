@@ -21,8 +21,8 @@ data NeutF a
                a
   | NeutSigma [(Identifier, a)]
   | NeutSigmaIntro [a]
-  | NeutSigmaElim a
-                  [Identifier]
+  | NeutSigmaElim [Identifier]
+                  a
                   a
   | NeutIndex Identifier
   | NeutIndexIntro Index
@@ -56,7 +56,7 @@ varAndHole (_ :< NeutPiElim e1 e2) =
   pairwiseConcat [varAndHole e1, varAndHole e2]
 varAndHole (_ :< NeutSigma xts) = varAndHoleSigma xts
 varAndHole (_ :< NeutSigmaIntro es) = pairwiseConcat $ map varAndHole es
-varAndHole (_ :< NeutSigmaElim e1 xs e2) = do
+varAndHole (_ :< NeutSigmaElim xs e1 e2) = do
   let vs1 = varAndHole e1
   let (vs21, vs22) = varAndHole e2
   let vs2 = (filter (`notElem` xs) vs21, vs22)
@@ -108,11 +108,11 @@ substNeut sub (j :< NeutPiElim e1 e2) = do
 substNeut sub (j :< NeutSigma xts) = j :< NeutSigma (substNeutSigma sub xts)
 substNeut sub (j :< NeutSigmaIntro es) =
   j :< NeutSigmaIntro (map (substNeut sub) es)
-substNeut sub (j :< NeutSigmaElim e1 xs e2) = do
+substNeut sub (j :< NeutSigmaElim xs e1 e2) = do
   let e1' = substNeut sub e1
   let sub' = filter (\(x, _) -> x `notElem` xs) sub
   let e2' = substNeut sub' e2
-  j :< NeutSigmaElim e1' xs e2'
+  j :< NeutSigmaElim xs e1' e2'
 substNeut _ (j :< NeutIndex x) = j :< NeutIndex x
 substNeut _ (j :< NeutIndexIntro l) = j :< NeutIndexIntro l
 substNeut sub (j :< NeutIndexElim e branchList) = do
@@ -144,8 +144,8 @@ isReducible (_ :< NeutPiElim (_ :< NeutPiIntro _ _) _) = True
 isReducible (_ :< NeutPiElim e1 _) = isReducible e1
 isReducible (_ :< NeutSigma _) = False
 isReducible (_ :< NeutSigmaIntro es) = any isReducible es
-isReducible (_ :< NeutSigmaElim (_ :< NeutSigmaIntro _) _ _) = True
-isReducible (_ :< NeutSigmaElim e _ _) = isReducible e
+isReducible (_ :< NeutSigmaElim _ (_ :< NeutSigmaIntro _) _) = True
+isReducible (_ :< NeutSigmaElim _ e _) = isReducible e
 isReducible (_ :< NeutIndex _) = False
 isReducible (_ :< NeutIndexIntro _) = False
 isReducible (_ :< NeutIndexElim (_ :< NeutIndexIntro _) _) = True

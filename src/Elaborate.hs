@@ -82,10 +82,10 @@ elaborate' (_ :< NeutSigma _) = return $ TermSigmaIntro []
 elaborate' (_ :< NeutSigmaIntro es) = do
   es' <- mapM elaborate' es
   return $ TermSigmaIntro es'
-elaborate' (_ :< NeutSigmaElim e1 xs e2) = do
+elaborate' (_ :< NeutSigmaElim xs e1 e2) = do
   e1' <- elaborate' e1
   e2' <- elaborate' e2
-  return $ TermSigmaElim e1' xs e2'
+  return $ TermSigmaElim xs e1' e2'
 elaborate' (_ :< NeutIndex _) = return $ TermSigmaIntro []
 elaborate' (meta :< NeutIndexIntro x) = do
   mt <- getNumLowType meta
@@ -130,7 +130,7 @@ exhaust' (_ :< NeutPiIntro _ e) = exhaust' e
 exhaust' (_ :< NeutPiElim e1 e2) = allM exhaust' [e1, e2]
 exhaust' (_ :< NeutSigma xts) = allM exhaust' $ map snd xts
 exhaust' (_ :< NeutSigmaIntro es) = allM exhaust' es
-exhaust' (_ :< NeutSigmaElim e1 _ e2) = allM exhaust' [e1, e2]
+exhaust' (_ :< NeutSigmaElim _ e1 e2) = allM exhaust' [e1, e2]
 exhaust' (_ :< NeutMu _ e) = exhaust' e
 exhaust' (_ :< NeutIndex _) = return True
 exhaust' (_ :< NeutIndexIntro _) = return True
