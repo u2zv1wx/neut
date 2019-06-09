@@ -13,7 +13,7 @@ import           Data.Neut
 
 reduceNeut :: Neut -> WithEnv Neut
 reduceNeut app@(i :< NeutPiElim _ _) = do
-  let (fun, args) = toPiElimSeq app
+  let (fun, args) = toNeutPiElimSeq app
   args' <-
     forM args $ \(x, e) -> do
       e' <- reduceNeut e
@@ -21,7 +21,7 @@ reduceNeut app@(i :< NeutPiElim _ _) = do
   fun' <- reduceNeut fun
   case fun' of
     lam@(_ :< NeutPiIntro _ _)
-      | (body, xtms) <- toPiIntroSeq lam
+      | (body, xtms) <- toNeutPiIntroSeq lam
       , length xtms == length args -> do
         let xs = map (\(x, _, _) -> x) xtms
         let es = map snd args'
@@ -44,7 +44,7 @@ reduceNeut app@(i :< NeutPiElim _ _) = do
           | constant `elem` intDivConstantList
           , Just [x, y] <- takeIntegerList (map snd args') ->
             return $ i :< NeutIndexIntro (IndexInteger (x `div` y))
-        _ -> return $ fromPiElimSeq (fun', args')
+        _ -> return $ fromNeutPiElimSeq (fun', args')
 reduceNeut (i :< NeutSigmaElim e xs body) = do
   e' <- reduceNeut e
   case e of

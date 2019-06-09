@@ -154,18 +154,19 @@ isReducible (_ :< NeutUniv _) = False
 isReducible (_ :< NeutMu _ _) = True
 isReducible (_ :< NeutHole _) = False
 
-toPiIntroSeq :: Neut -> (Neut, [(Identifier, Neut, Identifier)])
-toPiIntroSeq (meta :< NeutPiIntro (x, t) body) = do
-  let (body', args) = toPiIntroSeq body
+toNeutPiIntroSeq :: Neut -> (Neut, [(Identifier, Neut, Identifier)])
+toNeutPiIntroSeq (meta :< NeutPiIntro (x, t) body) = do
+  let (body', args) = toNeutPiIntroSeq body
   (body', (x, t, meta) : args)
-toPiIntroSeq t = (t, [])
+toNeutPiIntroSeq t = (t, [])
 
-fromPiElimSeq :: (Neut, [(Identifier, Neut)]) -> Neut
-fromPiElimSeq (term, [])        = term
-fromPiElimSeq (term, (i, v):xs) = fromPiElimSeq (i :< NeutPiElim term v, xs)
+fromNeutPiElimSeq :: (Neut, [(Identifier, Neut)]) -> Neut
+fromNeutPiElimSeq (term, []) = term
+fromNeutPiElimSeq (term, (i, v):xs) =
+  fromNeutPiElimSeq (i :< NeutPiElim term v, xs)
 
-toPiElimSeq :: Neut -> (Neut, [(Identifier, Neut)])
-toPiElimSeq (i :< NeutPiElim e1 e2) = do
-  let (fun, xs) = toPiElimSeq e1
+toNeutPiElimSeq :: Neut -> (Neut, [(Identifier, Neut)])
+toNeutPiElimSeq (i :< NeutPiElim e1 e2) = do
+  let (fun, xs) = toNeutPiElimSeq e1
   (fun, xs ++ [(i, e2)])
-toPiElimSeq c = (c, [])
+toNeutPiElimSeq c = (c, [])

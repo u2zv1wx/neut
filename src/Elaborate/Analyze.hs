@@ -167,8 +167,8 @@ categorize :: PreConstraint -> Constraint
 categorize (_ :< NeutVar x, e2) = ConstraintBeta x e2
 categorize (e1, e2@(_ :< NeutVar _)) = categorize (e2, e1)
 categorize (e1, e2)
-  | (_ :< NeutVar x, metaArgs1) <- toPiElimSeq e1
-  , (_ :< NeutVar y, metaArgs2) <- toPiElimSeq e2
+  | (_ :< NeutVar x, metaArgs1) <- toNeutPiElimSeq e1
+  , (_ :< NeutVar y, metaArgs2) <- toNeutPiElimSeq e2
   , x == y
   , length metaArgs1 == length metaArgs2 =
     ConstraintDelta x (map snd metaArgs1) (map snd metaArgs2)
