@@ -7,57 +7,57 @@ import           Control.Monad.State
 
 import           Data.Basic
 import           Data.Env
-import           Data.Neut
+import           Data.WeakTerm
 
 -- Alpha-convert all the variables so that different variables have different names.
-rename :: Neut -> WithEnv Neut
-rename (i :< NeutVar s) = do
-  t <- NeutVar <$> lookupNameEnv s
+rename :: WeakTerm -> WithEnv WeakTerm
+rename (i :< WeakTermVar s) = do
+  t <- WeakTermVar <$> lookupNameEnv s
   return $ i :< t
-rename (i :< NeutConst x) = return $ i :< NeutConst x
-rename (i :< NeutPi (s, tdom) tcod) = do
+rename (i :< WeakTermConst x) = return $ i :< WeakTermConst x
+rename (i :< WeakTermPi (s, tdom) tcod) = do
   tdom' <- rename tdom
   local $ do
     s' <- newNameWith s
     tcod' <- rename tcod
-    return $ i :< NeutPi (s', tdom') tcod'
-rename (i :< NeutPiIntro (s, tdom) e) = do
+    return $ i :< WeakTermPi (s', tdom') tcod'
+rename (i :< WeakTermPiIntro (s, tdom) e) = do
   tdom' <- rename tdom
   local $ do
     s' <- newNameWith s
     e' <- rename e
-    return $ i :< NeutPiIntro (s', tdom') e'
-rename (i :< NeutPiElim e v) = do
+    return $ i :< WeakTermPiIntro (s', tdom') e'
+rename (i :< WeakTermPiElim e v) = do
   e' <- rename e
   v' <- rename v
-  return $ i :< NeutPiElim e' v'
-rename (i :< NeutSigma xts) = do
+  return $ i :< WeakTermPiElim e' v'
+rename (i :< WeakTermSigma xts) = do
   xts' <- renameSigma xts
-  return $ i :< NeutSigma xts'
-rename (i :< NeutSigmaIntro es) = do
+  return $ i :< WeakTermSigma xts'
+rename (i :< WeakTermSigmaIntro es) = do
   es' <- mapM rename es
-  return $ i :< NeutSigmaIntro es'
-rename (i :< NeutSigmaElim xs e1 e2) = do
+  return $ i :< WeakTermSigmaIntro es'
+rename (i :< WeakTermSigmaElim xs e1 e2) = do
   e1' <- rename e1
   local $ do
     xs' <- mapM newNameWith xs
     e2' <- rename e2
-    return $ i :< NeutSigmaElim xs' e1' e2'
-rename (i :< NeutIndex s) = return $ i :< NeutIndex s
-rename (i :< NeutIndexIntro x) = return $ i :< NeutIndexIntro x
-rename (i :< NeutIndexElim e branchList) = do
+    return $ i :< WeakTermSigmaElim xs' e1' e2'
+rename (i :< WeakTermIndex s) = return $ i :< WeakTermIndex s
+rename (i :< WeakTermIndexIntro x) = return $ i :< WeakTermIndexIntro x
+rename (i :< WeakTermIndexElim e branchList) = do
   e' <- rename e
   branchList' <- renameBranchList branchList
-  return $ i :< NeutIndexElim e' branchList'
-rename (i :< NeutUniv j) = return $ i :< NeutUniv j
-rename (i :< NeutMu s e) =
+  return $ i :< WeakTermIndexElim e' branchList'
+rename (i :< WeakTermUniv j) = return $ i :< WeakTermUniv j
+rename (i :< WeakTermMu s e) =
   local $ do
     s' <- newNameWith s
     e' <- rename e
-    return $ i :< NeutMu s' e'
-rename (i :< NeutHole x) = return $ i :< NeutHole x
+    return $ i :< WeakTermMu s' e'
+rename (i :< WeakTermHole x) = return $ i :< WeakTermHole x
 
-renameSigma :: [(Identifier, Neut)] -> WithEnv [(Identifier, Neut)]
+renameSigma :: [(Identifier, WeakTerm)] -> WithEnv [(Identifier, WeakTerm)]
 renameSigma [] = return []
 renameSigma ((x, t):xts) = do
   t' <- rename t
@@ -66,7 +66,7 @@ renameSigma ((x, t):xts) = do
     xts' <- renameSigma xts
     return $ (x', t') : xts'
 
-renameBranchList :: [(Index, Neut)] -> WithEnv [(Index, Neut)]
+renameBranchList :: [(Index, WeakTerm)] -> WithEnv [(Index, WeakTerm)]
 renameBranchList branchList =
   forM branchList $ \(l, body) ->
     local $ do

@@ -11,9 +11,9 @@ import qualified Text.Show.Pretty       as Pr
 import           Data.Basic
 import           Data.Constraint
 import           Data.Env
-import           Data.Neut
+import           Data.WeakTerm
 import           Elaborate.Analyze
-import           Reduce.Neut
+import           Reduce.WeakTerm
 
 -- Given a queue of constraints (easier ones comes earlier), try to synthesize
 -- all of them using heuristics.
@@ -60,8 +60,8 @@ synthesize q =
         case lookup x sub of
           Nothing -> return [plan1]
           Just body -> do
-            e1' <- appFold body args1 >>= reduceNeut
-            e2' <- appFold body args2 >>= reduceNeut
+            e1' <- appFold body args1 >>= reduceWeakTerm
+            e2' <- appFold body args2 >>= reduceWeakTerm
             cs <- simp [(e1', e2')]
             let plan2 = getQueue $ analyze cs
             return [plan1, plan2]
@@ -89,7 +89,7 @@ synthesizeQuasiPattern ::
      Q.MinQueue EnrichedConstraint
   -> Identifier
   -> [Identifier]
-  -> Neut
+  -> WeakTerm
   -> WithEnv ()
 synthesizeQuasiPattern q hole preArgs e = do
   argsList <- toAltList preArgs
@@ -97,7 +97,7 @@ synthesizeQuasiPattern q hole preArgs e = do
   lamList <- mapM (`bindFormalArgs` e) argsList
   let planList =
         flip map lamList $ \lam ->
-          getQueue $ analyze [(meta :< NeutHole hole, lam)]
+          getQueue $ analyze [(meta :< WeakTermHole hole, lam)]
   q' <- chain q planList
   continue q q'
 
@@ -155,12 +155,12 @@ discardInactive xs indexList =
 -- function tries to resolve this by `?M = lam _. lam _. e`, discarding the arguments
 -- `e1` and `e2`.
 synthesizeFlexRigid ::
-     Q.MinQueue EnrichedConstraint -> Identifier -> [Neut] -> Neut -> WithEnv ()
+     Q.MinQueue EnrichedConstraint -> Identifier -> [WeakTerm] -> WeakTerm -> WithEnv ()
 synthesizeFlexRigid q hole args e = do
   newHoleList <- mapM (const (newNameWith "hole")) args -- ?M_i
   meta <- newNameWith "meta"
   lam <- bindFormalArgs newHoleList e
-  let independent = getQueue $ analyze [(meta :< NeutHole hole, lam)]
+  let independent = getQueue $ analyze [(meta :< WeakTermHole hole, lam)]
   q' <- chain q [independent]
   continue q q'
 
@@ -194,16 +194,16 @@ updateQueue q = do
   sub <- gets substitution
   updateQueue' sub q
 
-updateQueue' :: SubstNeut -> Q.MinQueue EnrichedConstraint -> WithEnv ()
+updateQueue' :: SubstWeakTerm -> Q.MinQueue EnrichedConstraint -> WithEnv ()
 updateQueue' sub q =
   case Q.getMin q of
     Nothing -> return ()
     Just (Enriched (e1, e2) _) -> do
-      analyze [(substNeut sub e1, substNeut sub e2)]
+      analyze [(substWeakTerm sub e1, substWeakTerm sub e2)]
       updateQueue' sub $ Q.deleteMin q
 
-appFold :: Neut -> [Neut] -> WithEnv Neut
+appFold :: WeakTerm -> [WeakTerm] -> WithEnv WeakTerm
 appFold e [] = return e
 appFold e (term:ts) = do
   meta <- newNameWith "meta"
-  appFold (meta :< NeutPiElim e term) ts
+  appFold (meta :< WeakTermPiElim e term) ts

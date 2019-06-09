@@ -16,7 +16,7 @@ import           Text.Read                  (readMaybe)
 
 import           Data.Basic
 import           Data.Env
-import           Data.Neut
+import           Data.WeakTerm
 import           Data.Tree
 import           Parse.Interpret
 import           Parse.MacroExpand
@@ -27,7 +27,7 @@ import           Parse.Rename
 data Def
   = DefLet Identifier -- meta
            (Identifier, Identifier) -- (name, alpha-converted name)
-           Neut -- content  (the `e` in `let x = e in ...`)
+           WeakTerm -- content  (the `e` in `let x = e in ...`)
   -- a module is just a tensor of its contents.
   -- DefMod can be understood as `let x = (f1, ..., fn) in ...`.
   -- The `fi`s are the third argument of DefMod.
@@ -40,7 +40,7 @@ data Def
 -- using `strToTree`. Then parse them into the list of definitions (updating the
 -- internal state of the compiler). After that, concatenate the list of definitions,
 -- obtaining a term. Finally, process the resulting term using `process`.
-parse :: String -> WithEnv Neut
+parse :: String -> WithEnv WeakTerm
 parse s = strToTree s >>= parse' >>= concatDefList
 
 -- parse s = strToTree s >>= parse' >>= concatDefList >>= process
@@ -97,7 +97,7 @@ parse' ((meta :< TreeNode ((_ :< TreeAtom "module"):(_ :< TreeAtom moduleName):t
   let es = map snd xes
   defList <- parse' as
   return $
-    DefLet meta (moduleName, moduleName') (meta :< NeutSigmaIntro es) : defList
+    DefLet meta (moduleName, moduleName') (meta :< WeakTermSigmaIntro es) : defList
 parse' ((meta :< TreeNode [_ :< TreeAtom "use", _ :< TreeAtom moduleName]):as)
   -- (use name) is essentially just a elimination of Sigma.
   -- Specifically, what (use name) does is:
@@ -160,7 +160,7 @@ parse' (a:as)
       defList <- parse' as
       return $ DefLet meta (name, name) e' : defList
 
-defToDefList :: Def -> WithEnv [(Identifier, Neut)]
+defToDefList :: Def -> WithEnv [(Identifier, WeakTerm)]
 defToDefList (DefLet _ (name, _) e) = return [(name, e)]
 defToDefList (DefMod _ (name, name') _) = do
   menv <- gets moduleEnv
@@ -187,19 +187,19 @@ isSpecialForm _ = False
 
 -- Represent the list of Defs in the target language, using `let`.
 -- (Note that `let x := e1 in e2` can be represented as `(lam x e2) e1`.)
-concatDefList :: [Def] -> WithEnv Neut
+concatDefList :: [Def] -> WithEnv WeakTerm
 concatDefList [] = do
   meta <- newNameWith "meta"
-  return $ meta :< NeutSigmaIntro []
+  return $ meta :< WeakTermSigmaIntro []
 concatDefList [DefLet _ (_, _) e] = return e
 concatDefList (DefLet meta (_, name') e:es) = do
   cont <- concatDefList es
   h <- newNameWith "any"
   holeMeta <- newNameWith "meta"
-  let hole = holeMeta :< NeutHole h
+  let hole = holeMeta :< WeakTermHole h
   lamMeta <- newNameWith "meta"
-  return $ meta :< NeutPiElim (lamMeta :< NeutPiIntro (name', hole) cont) e
+  return $ meta :< WeakTermPiElim (lamMeta :< WeakTermPiIntro (name', hole) cont) e
 concatDefList (DefMod sigMeta (_, name') xs:es) = do
   cont <- concatDefList es
   meta <- newNameWith "meta"
-  return $ sigMeta :< NeutSigmaElim xs (meta :< NeutVar name') cont
+  return $ sigMeta :< WeakTermSigmaElim xs (meta :< WeakTermVar name') cont

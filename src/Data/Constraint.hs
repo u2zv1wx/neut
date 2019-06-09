@@ -1,29 +1,29 @@
 module Data.Constraint where
 
 import           Data.Basic
-import           Data.Neut
+import           Data.WeakTerm
 
-type PreConstraint = (Neut, Neut)
+type PreConstraint = (WeakTerm, WeakTerm)
 
 data Constraint
   = ConstraintPattern Identifier
                       [Identifier]
-                      Neut
+                      WeakTerm
   | ConstraintBeta Identifier
-                   Neut
+                   WeakTerm
   | ConstraintDelta Identifier
-                    [Neut]
-                    [Neut]
+                    [WeakTerm]
+                    [WeakTerm]
   | ConstraintQuasiPattern Identifier
                            [Identifier]
-                           Neut
+                           WeakTerm
   | ConstraintFlexRigid Identifier
-                        [Neut]
-                        Neut
+                        [WeakTerm]
+                        WeakTerm
   | ConstraintFlexFlex Identifier
-                       [Neut]
+                       [WeakTerm]
                        Identifier
-                       [Neut]
+                       [WeakTerm]
   deriving (Show)
 
 constraintToInt :: Constraint -> Int
@@ -51,10 +51,10 @@ instance Eq EnrichedConstraint where
 instance Ord EnrichedConstraint where
   compare (Enriched _ c1) (Enriched _ c2) = compare c1 c2
 
-compose :: SubstNeut -> SubstNeut -> SubstNeut
+compose :: SubstWeakTerm -> SubstWeakTerm -> SubstWeakTerm
 compose s1 s2 = do
   let domS2 = map fst s2
   let codS2 = map snd s2
-  let codS2' = map (substNeut s1) codS2
+  let codS2' = map (substWeakTerm s1) codS2
   let fromS1 = filter (\(ident, _) -> ident `notElem` domS2) s1
   fromS1 ++ zip domS2 codS2'

@@ -9,7 +9,7 @@ import           Control.Monad.Trans.Except
 import           Data.Basic
 import           Data.Constraint
 import           Data.LLVM
-import           Data.Neut
+import           Data.WeakTerm
 import           Data.Polarized
 import           Data.Term
 import           Data.Tree
@@ -23,13 +23,13 @@ data Env = Env
   , notationEnv       :: [(Tree, Tree)] -- macro transformers
   , reservedEnv       :: [Identifier] -- list of reserved keywords
   , constantEnv       :: [Identifier]
-  , moduleEnv         :: [(Identifier, [(Identifier, Neut)])]
+  , moduleEnv         :: [(Identifier, [(Identifier, WeakTerm)])]
   , indexEnv          :: [(Identifier, [Identifier])]
   , nameEnv           :: [(Identifier, Identifier)] -- used in alpha conversion
-  , typeEnv           :: Map.Map Identifier Neut
+  , typeEnv           :: Map.Map Identifier WeakTerm
   , constraintEnv     :: [PreConstraint] -- for type inference
   , constraintQueue   :: Q.MinQueue EnrichedConstraint -- for (dependent) type inference
-  , substitution      :: SubstNeut -- for (dependent) type inference
+  , substitution      :: SubstWeakTerm -- for (dependent) type inference
   , univConstraintEnv :: [(UnivLevel, UnivLevel)]
   , currentDir        :: FilePath
   , termEnv           :: [(Identifier, ([Identifier], Term))] -- x == lam (x1, ..., xn). e
@@ -84,13 +84,13 @@ newNameWith s = do
   modify (\e -> e {nameEnv = (s, s') : nameEnv e})
   return s'
 
-newNameOfType :: Neut -> WithEnv Identifier
+newNameOfType :: WeakTerm -> WithEnv Identifier
 newNameOfType t = do
   i <- newName
   insTypeEnv i t
   return i
 
-newName1 :: Identifier -> Neut -> WithEnv Identifier
+newName1 :: Identifier -> WeakTerm -> WithEnv Identifier
 newName1 baseName t = do
   i <- newNameWith baseName
   insTypeEnv i t
@@ -99,10 +99,10 @@ newName1 baseName t = do
 constNameWith :: Identifier -> WithEnv ()
 constNameWith s = modify (\e -> e {nameEnv = (s, s) : nameEnv e})
 
-lookupTypeEnv :: String -> WithEnv (Maybe Neut)
+lookupTypeEnv :: String -> WithEnv (Maybe WeakTerm)
 lookupTypeEnv s = gets (Map.lookup s . typeEnv)
 
-lookupTypeEnv' :: String -> WithEnv Neut
+lookupTypeEnv' :: String -> WithEnv WeakTerm
 lookupTypeEnv' s = do
   mt <- gets (Map.lookup s . typeEnv)
   case mt of
@@ -133,10 +133,10 @@ lookupNameEnv'' s = do
     Just s' -> return $ Just s'
     Nothing -> return Nothing
 
-insTypeEnv :: Identifier -> Neut -> WithEnv ()
+insTypeEnv :: Identifier -> WeakTerm -> WithEnv ()
 insTypeEnv i t = modify (\e -> e {typeEnv = Map.insert i t (typeEnv e)})
 
-insTypeEnv1 :: Identifier -> Neut -> WithEnv ()
+insTypeEnv1 :: Identifier -> WeakTerm -> WithEnv ()
 insTypeEnv1 i t = do
   tenv <- gets typeEnv
   let ts = Map.elems $ Map.filterWithKey (\j _ -> i == j) tenv
@@ -200,7 +200,7 @@ isDefinedIndexName name = do
   let indexNameList = map fst $ indexEnv env
   return $ name `elem` indexNameList
 
-insConstraintEnv :: Neut -> Neut -> WithEnv ()
+insConstraintEnv :: WeakTerm -> WeakTerm -> WithEnv ()
 insConstraintEnv t1 t2 =
   modify (\e -> e {constraintEnv = (t1, t2) : constraintEnv e})
 
@@ -208,33 +208,33 @@ insUnivConstraintEnv :: UnivLevel -> UnivLevel -> WithEnv ()
 insUnivConstraintEnv t1 t2 =
   modify (\e -> e {univConstraintEnv = (t1, t2) : univConstraintEnv e})
 
-wrapArg :: Identifier -> WithEnv Neut
+wrapArg :: Identifier -> WithEnv WeakTerm
 wrapArg i = do
   t <- lookupTypeEnv' i
   meta <- newNameWith "meta"
   insTypeEnv meta t
-  return $ meta :< NeutVar i
+  return $ meta :< WeakTermVar i
 
 wrap :: f (Cofree f Identifier) -> WithEnv (Cofree f Identifier)
 wrap a = do
   meta <- newNameWith "meta"
   return $ meta :< a
 
-wrapType :: NeutF Neut -> WithEnv Neut
+wrapType :: WeakTermF WeakTerm -> WithEnv WeakTerm
 wrapType t = do
   meta <- newNameWith "meta"
   hole <- newName
-  u <- wrap $ NeutUniv (UnivLevelHole hole)
+  u <- wrap $ WeakTermUniv (UnivLevelHole hole)
   insTypeEnv meta u
   return $ meta :< t
 
-wrapTypeWithUniv :: Neut -> NeutF Neut -> WithEnv Neut
+wrapTypeWithUniv :: WeakTerm -> WeakTermF WeakTerm -> WithEnv WeakTerm
 wrapTypeWithUniv univ t = do
   meta <- newNameWith "meta"
   insTypeEnv meta univ
   return $ meta :< t
 
-insDef :: Identifier -> Neut -> WithEnv (Maybe Neut)
+insDef :: Identifier -> WeakTerm -> WithEnv (Maybe WeakTerm)
 insDef x body = do
   sub <- gets substitution
   modify (\e -> e {substitution = (x, body) : substitution e})
