@@ -1,5 +1,5 @@
 module Reduce.Neut
-  ( reduce
+  ( reduceNeut
   ) where
 
 import           Control.Comonad.Cofree
@@ -11,21 +11,21 @@ import           Data.Basic
 import           Data.Env
 import           Data.Neut
 
-reduce :: Neut -> WithEnv Neut
-reduce app@(i :< NeutPiElim _ _) = do
+reduceNeut :: Neut -> WithEnv Neut
+reduceNeut app@(i :< NeutPiElim _ _) = do
   let (fun, args) = toPiElimSeq app
   args' <-
     forM args $ \(x, e) -> do
-      e' <- reduce e
+      e' <- reduceNeut e
       return (x, e')
-  fun' <- reduce fun
+  fun' <- reduceNeut fun
   case fun' of
     lam@(_ :< NeutPiIntro _ _)
       | (body, xtms) <- toPiIntroSeq lam
       , length xtms == length args -> do
         let xs = map (\(x, _, _) -> x) xtms
         let es = map snd args'
-        reduce $ substNeut (zip xs es) body
+        reduceNeut $ substNeut (zip xs es) body
     _ ->
       case fun' of
         _ :< NeutConst constant
@@ -45,29 +45,30 @@ reduce app@(i :< NeutPiElim _ _) = do
           , Just [x, y] <- takeIntegerList (map snd args') ->
             return $ i :< NeutIndexIntro (IndexInteger (x `div` y))
         _ -> return $ fromPiElimSeq (fun', args')
-reduce (i :< NeutSigmaElim e xs body) = do
-  e' <- reduce e
+reduceNeut (i :< NeutSigmaElim e xs body) = do
+  e' <- reduceNeut e
   case e of
     _ :< NeutSigmaIntro es -> do
       let _ :< body' = substNeut (zip xs es) body
-      reduce $ i :< body'
+      reduceNeut $ i :< body'
     _ -> return $ i :< NeutSigmaElim e' xs body
-reduce (i :< NeutIndexElim e branchList) = do
-  e' <- reduce e
+reduceNeut (i :< NeutIndexElim e branchList) = do
+  e' <- reduceNeut e
   case e' of
     _ :< NeutIndexIntro x ->
       case lookup x branchList of
-        Just body -> reduce body
+        Just body -> reduceNeut body
         Nothing ->
           case lookup IndexDefault branchList of
-            Just body -> reduce body
+            Just body -> reduceNeut body
             Nothing ->
               lift $
               throwE $
               "the index " ++ show x ++ " is not included in branchList"
     _ -> return $ i :< NeutIndexElim e' branchList
-reduce (meta :< NeutMu s e) = reduce $ substNeut [(s, meta :< NeutMu s e)] e
-reduce t = return t
+reduceNeut (meta :< NeutMu s e) =
+  reduceNeut $ substNeut [(s, meta :< NeutMu s e)] e
+reduceNeut t = return t
 
 takeIntegerList :: [Neut] -> Maybe [Int]
 takeIntegerList [] = Just []

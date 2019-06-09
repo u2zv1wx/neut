@@ -148,7 +148,7 @@ simp'' (c@(_, e2):cs)
     return $ c : cs'
 simp'' ((e1, e2):cs)
   | isReducible e1 = do
-    e1' <- reduce e1
+    e1' <- reduceNeut e1
     simp $ (e1', e2) : cs
 simp'' ((e1, e2):cs)
   | isReducible e2 = simp $ (e2, e1) : cs

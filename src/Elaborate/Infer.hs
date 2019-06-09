@@ -70,7 +70,7 @@ infer ctx (meta :< NeutPiIntro (s, tdom) e) = do
 infer ctx (meta :< NeutPiElim e1 e2) = do
   univ <- newUniv
   -- obtain the type of e1
-  tPi <- infer ctx e1 >>= reduce -- forall (x : tdom). tcod
+  tPi <- infer ctx e1 >>= reduceNeut -- forall (x : tdom). tcod
   -- infer the type of e2, and obtain (tdom, udom)
   tdom <- infer ctx e2 >>= annot univ
   case tPi of

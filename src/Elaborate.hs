@@ -43,7 +43,7 @@ elaborate e = do
 
 getNumLowType :: Identifier -> WithEnv (Either Neut LowType)
 getNumLowType meta = do
-  t <- lookupTypeEnv' meta >>= reduce
+  t <- lookupTypeEnv' meta >>= reduceNeut
   case t of
     _ :< NeutIndex "i1"  -> return $ Right $ LowTypeSignedInt 1
     _ :< NeutIndex "i2"  -> return $ Right $ LowTypeSignedInt 2
@@ -150,7 +150,7 @@ exhaust' (_ :< NeutIndexIntro _) = return True
 exhaust' (_ :< NeutIndexElim _ []) = return False -- empty clause?
 exhaust' (meta :< NeutIndexElim e1 branchList@((l, _):_)) = do
   b1 <- exhaust' e1
-  t <- lookupTypeEnv' meta >>= reduce
+  t <- lookupTypeEnv' meta >>= reduceNeut
   let labelList = map fst branchList
   case t of
     _ :< NeutIndex "i32" -> return $ b1 && (IndexDefault `elem` labelList)

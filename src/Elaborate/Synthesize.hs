@@ -60,8 +60,8 @@ synthesize q =
         case lookup x sub of
           Nothing -> return [plan1]
           Just body -> do
-            e1' <- appFold body args1 >>= reduce
-            e2' <- appFold body args2 >>= reduce
+            e1' <- appFold body args1 >>= reduceNeut
+            e2' <- appFold body args2 >>= reduceNeut
             cs <- simp [(e1', e2')]
             let plan2 = getQueue $ analyze cs
             return [plan1, plan2]
