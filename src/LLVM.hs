@@ -72,6 +72,8 @@ llvmCodeSigmaElim basePointer ((x, i):xis) castedBasePointer n cont = do
     LLVMLet x (LLVMLoad (LLVMDataLocal loader)) cont'
 
 llvmCodeConstElim :: Constant -> [Pos] -> WithEnv LLVM
+llvmCodeConstElim (ConstantLabel funName) vs =
+  llvmCode $ NegPiElimDownElim (PosConst funName) vs
 llvmCodeConstElim (ConstantArith lowType@(LowTypeSignedInt _) kind) xs
   | length xs == 2 = do
     x0 <- newNameWith "arg"

@@ -42,7 +42,7 @@ polarize' (TermConstElim funName es) = do
   es' <- mapM polarize' es
   xs <- mapM (const (newNameWith "arg")) es'
   return $
-    bindLet (zip xs es') $ NegPiElimDownElim (PosConst funName) (map PosVar xs)
+    bindLet (zip xs es') $ NegConstElim (ConstantLabel funName) (map PosVar xs)
 polarize' (TermSigmaIntro es) = do
   es' <- mapM polarize' es
   xs <- mapM (const (newNameWith "sigma")) es'

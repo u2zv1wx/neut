@@ -21,6 +21,13 @@ data LowType
   | LowTypeStruct [LowType]
   deriving (Eq, Show)
 
+data Constant
+  = ConstantArith LowType
+                  Arith
+  | ConstantPrint LowType
+  | ConstantLabel Identifier
+  deriving (Show)
+
 voidPtr :: LowType
 voidPtr = LowTypePointer $ LowTypeSignedInt 8
 

@@ -28,12 +28,6 @@ data Neg
               Neg
   deriving (Show)
 
-data Constant
-  = ConstantArith LowType
-                  Arith
-  | ConstantPrint LowType
-  deriving (Show)
-
 varPos :: Pos -> [Identifier]
 varPos (PosVar s)          = [s]
 varPos (PosConst _)        = []
