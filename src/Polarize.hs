@@ -64,17 +64,14 @@ bindLet [] cont           = cont
 bindLet ((x, e):xes) cont = NegUpElim x e $ bindLet xes cont
 
 makeClosure :: Identifier -> Neg -> WithEnv Neg
-makeClosure x e = NegUpIntro <$> makeClosure' x e
-
-makeClosure' :: Identifier -> Neg -> WithEnv Pos
-makeClosure' x e = do
+makeClosure x e = do
   let fvs = filter (/= x) $ nub $ varNeg e
   envName <- newNameWith "env"
   lamVar <- newNameWith "lam"
   let lamBody = NegSigmaElim (PosVar envName) fvs e
   insPolEnv lamVar [x, envName] lamBody -- lamVar == thunk (lam (envName, x) lamBody)
   let fvEnv = PosSigmaIntro $ map PosVar fvs
-  return $ PosSigmaIntro [PosConst lamVar, fvEnv]
+  return $ NegUpIntro $ PosSigmaIntro [PosConst lamVar, fvEnv]
 
 callClosure :: Neg -> Neg -> WithEnv Neg
 callClosure cls arg = do

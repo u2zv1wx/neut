@@ -107,15 +107,7 @@ elaborate' (_ :< NeutUniv _) = return $ TermSigmaIntro []
 elaborate' (meta :< NeutMu x e) = do
   e' <- elaborate' e
   let fvs = varNeut $ meta :< NeutMu x e
-  -- Let us define (x1, ..., xn) := (all the free variables in e).
-  -- We translate `mu x. e` into
-  --   (mu x. lam env. let (x1, ..., xn) := env in e {x := x @ env}) @ (x1, ..., xn)
-  -- so that `TermMu x e` doesn't have any free variables.
-  -- In effect, we add
-  --   x ~> (lam env. let (x1, ..., xn) := env in e {x := x @ env}) @ (x1, ..., xn)
-  -- into the term environment.
-  let body = substTerm [(x, TermConstElim x (map TermVar fvs))] e'
-  insTermEnv x fvs body -- x == lam (x1 ... xn). body
+  insTermEnv x fvs $ substTerm [(x, TermConstElim x (map TermVar fvs))] e'
   return $ TermConstElim x (map TermVar fvs)
 elaborate' (_ :< NeutHole x) = do
   sub <- gets substitution
