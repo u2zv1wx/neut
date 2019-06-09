@@ -42,6 +42,12 @@ reduceNeg (NegUpElim x e1 e2) = do
   case e1' of
     NegUpIntro v -> reduceNeg $ substNeg [(x, v)] e2
     _            -> return $ NegUpElim x e1' e2
+reduceNeg (NegConstElim (ConstantLabel x) vs) = do
+  penv <- gets polEnv
+  case lookup x penv of
+    Just (args, body)
+      | length args == length vs -> reduceNeg $ substNeg (zip args vs) body
+    _ -> return $ NegConstElim (ConstantLabel x) vs
 reduceNeg (NegConstElim c vs) = do
   let xs = takeIntegerList vs
   let t = LowTypeSignedInt 64 -- for now
