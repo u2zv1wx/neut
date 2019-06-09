@@ -19,20 +19,20 @@ toLLVM mainTerm = do
       DeclarationConst v -> do
         v' <- llvmData v
         insLLVMEnv name $ DeclarationConst v'
-      DeclarationFun arg e -> do
+      DeclarationFun args e -> do
         llvm <- llvmCode e
-        insLLVMEnv name $ DeclarationFun arg llvm
+        insLLVMEnv name $ DeclarationFun args llvm
   llvmCode mainTerm
 
 llvmCode :: Neg -> WithEnv LLVM
-llvmCode (NegPiElimDownElim fun arg) = do
+llvmCode (NegPiElimDownElim fun args) = do
   f <- newNameWith "fun"
-  x <- newNameWith "arg"
-  let funPtrType = toFunPtrType [arg]
+  xs <- mapM (const (newNameWith "arg")) args
+  let funPtrType = toFunPtrType args
   cast <- newNameWith "cast"
-  llvmDataLet' [(f, fun), (x, arg)] $
+  llvmDataLet' ((f, fun) : zip xs args) $
     LLVMLet cast (LLVMBitcast (LLVMDataLocal f) voidPtr funPtrType) $
-    LLVMCall (LLVMDataLocal cast) [LLVMDataLocal x]
+    LLVMCall (LLVMDataLocal cast) (map LLVMDataLocal xs)
 llvmCode (NegIndexElim x branchList) = llvmSwitch x branchList
 llvmCode (NegSigmaElim v xs e) = do
   basePointer <- newNameWith "base"
@@ -139,8 +139,10 @@ llvmDataLet x (PosConst y) cont = do
     Just (DeclarationConst v)
       -- FIXME: construct the type of v and use it to bitcast LLVMDataGlobal
      -> llvmDataLet x v cont
-    Just (DeclarationFun args _) -> do
-      let funPtrType = toFunPtrType [args]
+    Just (DeclarationFun args _)
+      -- let funPtrType = toFunPtrType [args]
+     -> do
+      let funPtrType = toFunPtrType args
       return $
         LLVMLet x (LLVMBitcast (LLVMDataGlobal y) funPtrType voidPtr) cont
 llvmDataLet reg (PosSigmaIntro ds) cont = do
@@ -222,11 +224,6 @@ llvmStruct [] cont = return cont
 llvmStruct ((x, d):xds) cont = do
   cont' <- llvmStruct xds cont
   llvmDataLet x d cont'
-
-toFunPtrType :: [a] -> LowType
-toFunPtrType xs = do
-  let funType = LowTypeFunction (map (const voidPtr) xs) voidPtr
-  LowTypePointer funType
 
 toStructPtrType :: [a] -> LowType
 toStructPtrType xs = do

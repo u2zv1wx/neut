@@ -20,7 +20,7 @@ import qualified Data.PQueue.Min            as Q
 
 data Declaration p n
   = DeclarationConst p -- return x == e : ↑P
-  | DeclarationFun Identifier -- return x == return (thunk (lam (x) e))
+  | DeclarationFun [Identifier] -- return x == return (thunk (lam (x) e))
                    n
   deriving (Show)
 
@@ -38,7 +38,11 @@ data Env = Env
   , substitution      :: SubstNeut -- for (dependent) type inference
   , univConstraintEnv :: [(UnivLevel, UnivLevel)]
   , currentDir        :: FilePath
-  , termEnv           :: [(Identifier, (Identifier, Term))] -- x == lam x. e
+  , termEnv           :: [(Identifier, ([Identifier], Term))] -- x == lam (x1, ..., xn). e
+  -- FIXME: 「すべての関数は2引数である」としたほうが効率がよい。
+  -- たとえば、第1引数は「ホントの引数」、第2引数はenvなどとする。
+  -- こうすると(p, env)のペアについてのalloc/freeを省略できる。
+  -- n引数にするのはちょっと難しそう？
   , polEnv            :: [(Identifier, Declaration Pos Neg)] -- x == v || x == thunk (lam (x) e)
   , llvmEnv           :: [(Identifier, Declaration LLVMData LLVM)]
   } deriving (Show)
@@ -149,9 +153,9 @@ insTypeEnv1 i t = do
   forM_ ts $ \t' -> insConstraintEnv t t'
   modify (\e -> e {typeEnv = Map.insert i t (typeEnv e)})
 
-insTermEnv :: Identifier -> Identifier -> Term -> WithEnv ()
-insTermEnv name arg e =
-  modify (\env -> env {termEnv = (name, (arg, e)) : termEnv env})
+insTermEnv :: Identifier -> [Identifier] -> Term -> WithEnv ()
+insTermEnv name args e =
+  modify (\env -> env {termEnv = (name, (args, e)) : termEnv env})
 
 insPolEnv :: Identifier -> Declaration Pos Neg -> WithEnv ()
 insPolEnv name d = modify (\e -> e {polEnv = (name, d) : polEnv e})

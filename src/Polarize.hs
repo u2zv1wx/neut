@@ -21,10 +21,9 @@ import           Data.Term
 polarize :: Term -> WithEnv Neg
 polarize mainTerm = do
   tenv <- gets termEnv
-  forM_ tenv $ \(name, (arg, e)) -> do
+  forM_ tenv $ \(name, (args, e)) -> do
     e' <- polarize' e
-    v <- makeClosure' arg e'
-    insPolEnv name $ DeclarationConst v
+    insPolEnv name $ DeclarationFun args e'
   polarize' mainTerm
 
 -- CBV translation into CBPV + closure conversion
@@ -39,6 +38,11 @@ polarize' (TermPiElim e1 e2) = do
   e1' <- polarize' e1
   e2' <- polarize' e2
   callClosure e1' e2'
+polarize' (TermConstElim funName es) = do
+  es' <- mapM polarize' es
+  xs <- mapM (const (newNameWith "arg")) es'
+  return $
+    bindLet (zip xs es') $ NegPiElimDownElim (PosConst funName) (map PosVar xs)
 polarize' (TermSigmaIntro es) = do
   es' <- mapM polarize' es
   xs <- mapM (const (newNameWith "sigma")) es'
@@ -67,14 +71,10 @@ makeClosure' :: Identifier -> Neg -> WithEnv Pos
 makeClosure' x e = do
   let fvs = filter (/= x) $ nub $ varNeg e
   envName <- newNameWith "env"
-  pairName <- newNameWith "pair"
   lamVar <- newNameWith "lam"
-  let lamBody =
-        NegSigmaElim (PosVar pairName) [envName, x] $
-        NegSigmaElim (PosVar envName) fvs e
-  -- return lamVar == return (thunk (lam (pairName) lamBody))
-  -- i.e. lamVar == thunk (lam (pairName) lamBody)
-  insPolEnv lamVar $ DeclarationFun pairName lamBody
+  let lamBody = NegSigmaElim (PosVar envName) fvs e
+  -- lamVar == thunk (lam (envName, x) lamBody)
+  insPolEnv lamVar $ DeclarationFun [envName, x] lamBody
   let fvEnv = PosSigmaIntro $ map PosVar fvs
   return $ PosSigmaIntro [PosConst lamVar, fvEnv]
 
@@ -90,7 +90,7 @@ callClosure cls arg = do
     NegSigmaElim (PosVar clsVarName) [thunkLamVarName, envVarName] $
     NegPiElimDownElim
       (PosVar thunkLamVarName)
-      (PosSigmaIntro [PosVar envVarName, PosVar argVarName])
+      [PosVar envVarName, PosVar argVarName]
 
 -- insert (possibly) environment-specific definition of constant
 toDefinition :: Identifier -> WithEnv Neg

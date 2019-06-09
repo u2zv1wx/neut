@@ -21,7 +21,7 @@ emitDefinition :: Identifier -> Declaration LLVMData LLVM -> WithEnv [String]
 emitDefinition name (DeclarationConst v) = do
   s <- emitLLVMData name v
   return [s]
-emitDefinition name (DeclarationFun arg asm) = emitDefinitionFun name [arg] asm
+emitDefinition name (DeclarationFun args asm) = emitDefinitionFun name args asm
 
 emitDefinitionFun :: Identifier -> [Identifier] -> LLVM -> WithEnv [String]
 emitDefinitionFun name args asm = do
@@ -41,6 +41,7 @@ emitBlock funName name asm = do
   a <- emitLLVM funName asm
   return $ emitLabel name : a
 
+-- FIXME: callはcall fastccにするべきっぽい？
 emitLLVM :: Identifier -> LLVM -> WithEnv [String]
 emitLLVM funName (LLVMCall f args) = do
   tmp <- newNameWith "tmp"
@@ -450,8 +451,11 @@ obtainLLVMDataType (LLVMDataGlobal x) = do
   env <- gets llvmEnv
   case lookup x env of
     Just (DeclarationConst v) -> obtainLLVMDataType v
-    Just (DeclarationFun _ _) ->
-      return $ LowTypePointer $ LowTypeFunction [voidPtr] voidPtr
+    Just (DeclarationFun args _)
+      -- return $ LowTypePointer $ LowTypeFunction [voidPtr] voidPtr
+     -> do
+      let funPtrType = toFunPtrType args
+      return funPtrType
     _ -> undefined
 obtainLLVMDataType (LLVMDataStruct vs) = do
   ts <- mapM obtainLLVMDataType vs

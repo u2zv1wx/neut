@@ -11,6 +11,8 @@ data Term
                 Term
   | TermPiElim Term
                Term
+  | TermConstElim Identifier
+                  [Term]
   | TermSigmaIntro [Term]
   | TermSigmaElim Term
                   [Identifier]
@@ -34,6 +36,9 @@ substTerm sub (TermPiElim e1 e2) = do
   let e1' = substTerm sub e1
   let e2' = substTerm sub e2
   TermPiElim e1' e2'
+substTerm sub (TermConstElim x es) = do
+  let es' = map (substTerm sub) es
+  TermConstElim x es'
 substTerm sub (TermSigmaIntro es) = TermSigmaIntro (map (substTerm sub) es)
 substTerm sub (TermSigmaElim e1 xs e2) = do
   let e1' = substTerm sub e1

@@ -75,3 +75,8 @@ intMulConstantList = flip map intLowTypeList $ \t -> "core." ++ show t ++ ".mul"
 
 intDivConstantList :: [String]
 intDivConstantList = flip map intLowTypeList $ \t -> "core." ++ show t ++ ".div"
+
+toFunPtrType :: [a] -> LowType
+toFunPtrType xs = do
+  let funType = LowTypeFunction (map (const voidPtr) xs) voidPtr
+  LowTypePointer funType

@@ -2,8 +2,10 @@ module Reduce.Term
   ( reduceTerm
   ) where
 
+import           Control.Monad.State
 import           Control.Monad.Trans        (lift)
 import           Control.Monad.Trans.Except
+
 import           Data.Basic
 import           Data.Env
 import           Data.Term
@@ -34,6 +36,13 @@ reduceTerm app@(TermPiElim _ _) = do
           return $ TermIndexIntro (IndexInteger (x `div` y)) t
         _ -> return $ fromTermPiElimSeq (fun', args')
     _ -> return $ fromTermPiElimSeq (fun', args)
+reduceTerm (TermConstElim x es) = do
+  es' <- mapM reduceTerm es
+  env <- gets termEnv
+  case lookup x env of
+    Just (args, body)
+      | length args == length es -> reduceTerm $ substTerm (zip args es') body
+    _ -> return $ TermConstElim x es'
 reduceTerm (TermSigmaElim e xs body) = do
   e' <- reduceTerm e
   case e' of
