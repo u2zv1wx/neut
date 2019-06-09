@@ -23,7 +23,7 @@ polarize mainTerm = do
   tenv <- gets termEnv
   forM_ tenv $ \(name, (args, e)) -> do
     e' <- polarize' e
-    insPolEnv name $ DeclarationFun args e'
+    insPolEnv name args e'
   polarize' mainTerm
 
 -- CBV translation into CBPV + closure conversion
@@ -74,7 +74,7 @@ makeClosure' x e = do
   lamVar <- newNameWith "lam"
   let lamBody = NegSigmaElim (PosVar envName) fvs e
   -- lamVar == thunk (lam (envName, x) lamBody)
-  insPolEnv lamVar $ DeclarationFun [x, envName] lamBody
+  insPolEnv lamVar [x, envName] lamBody
   let fvEnv = PosSigmaIntro $ map PosVar fvs
   return $ PosSigmaIntro [PosConst lamVar, fvEnv]
 

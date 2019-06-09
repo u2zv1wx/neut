@@ -15,31 +15,14 @@ reduceNeg (NegPiElimDownElim v vs) =
     PosConst x -> do
       penv <- gets polEnv
       case lookup x penv of
-        Just (DeclarationFun args body)
+        Just (args, body)
           | length args == length vs -> reduceNeg $ substNeg (zip args vs) body
-        Just (DeclarationConst v1') -> reduceNeg $ NegPiElimDownElim v1' vs
         _ -> return $ NegPiElimDownElim v vs
     _ -> return $ NegPiElimDownElim v vs
--- reduceNeg (NegPiElimDownElim v1 v2) =
---   case v1 of
---     PosConst x -> do
---       penv <- gets polEnv
---       case lookup x penv of
---         Just (DeclarationFun arg body) -> reduceNeg $ substNeg [(arg, v2)] body
---         Just (DeclarationConst v1') -> reduceNeg $ NegPiElimDownElim v1' v2
---         _ -> return $ NegPiElimDownElim v1 v2
---     _ -> return $ NegPiElimDownElim v1 v2
 reduceNeg (NegSigmaElim v xs body) =
   case v of
     PosSigmaIntro vs
       | length xs == length vs -> reduceNeg $ substNeg (zip xs vs) body
-    PosConst x -> do
-      penv <- gets polEnv
-      case lookup x penv of
-        Just (DeclarationConst v') -> reduceNeg $ NegSigmaElim v' xs body
-        _ -> do
-          liftIO $ putStrLn $ "not found: " ++ show x
-          return $ NegSigmaElim v xs body
     _ -> return $ NegSigmaElim v xs body
 reduceNeg (NegIndexElim v branchList) =
   case v of

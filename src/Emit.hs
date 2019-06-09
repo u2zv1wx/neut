@@ -3,7 +3,6 @@ module Emit
   ) where
 
 import           Control.Monad.State
-import           Data.List
 
 import           Data.Basic
 import           Data.Env
@@ -13,18 +12,12 @@ emit :: LLVM -> WithEnv [String]
 emit mainTerm = do
   lenv <- gets llvmEnv
   g <- emitGlobal
-  zs <- emitDefinitionFun "main" [] mainTerm
-  xs <- forM lenv $ uncurry emitDefinition
+  zs <- emitDefinition "main" [] mainTerm
+  xs <- forM lenv $ \(name, (args, body)) -> emitDefinition name args body
   return $ g ++ zs ++ concat xs
 
-emitDefinition :: Identifier -> Declaration LLVMData LLVM -> WithEnv [String]
-emitDefinition name (DeclarationConst v) = do
-  s <- emitLLVMData name v
-  return [s]
-emitDefinition name (DeclarationFun args asm) = emitDefinitionFun name args asm
-
-emitDefinitionFun :: Identifier -> [Identifier] -> LLVM -> WithEnv [String]
-emitDefinitionFun name args asm = do
+emitDefinition :: Identifier -> [Identifier] -> LLVM -> WithEnv [String]
+emitDefinition name args asm = do
   let prologue = sig name args ++ " {"
   content <- emitLLVM name asm
   let epilogue = "}"
@@ -441,50 +434,9 @@ emitGlobal =
     , "declare void @free(i8*)"
     ]
 
-emitLLVMData :: Identifier -> LLVMData -> WithEnv String
-emitLLVMData name d = do
-  s <- showLLVMDataWithType d
-  return $ unwords [showLLVMData (LLVMDataGlobal name), "=", "global", s]
-
-obtainLLVMDataType :: LLVMData -> WithEnv LowType
-obtainLLVMDataType (LLVMDataGlobal x) = do
-  env <- gets llvmEnv
-  case lookup x env of
-    Just (DeclarationConst v) -> obtainLLVMDataType v
-    Just (DeclarationFun args _)
-      -- return $ LowTypePointer $ LowTypeFunction [voidPtr] voidPtr
-     -> do
-      let funPtrType = toFunPtrType args
-      return funPtrType
-    _ -> undefined
-obtainLLVMDataType (LLVMDataStruct vs) = do
-  ts <- mapM obtainLLVMDataType vs
-  return $ LowTypeStruct ts
-obtainLLVMDataType (LLVMDataInt _ j) = return $ LowTypeSignedInt j
-obtainLLVMDataType (LLVMDataFloat _ j) = return $ LowTypeFloat j
-obtainLLVMDataType _ = undefined
-
 showLLVMData :: LLVMData -> String
 showLLVMData (LLVMDataLocal x)   = "%" ++ x
 showLLVMData (LLVMDataGlobal x)  = "@" ++ x
 showLLVMData (LLVMDataInt i _)   = show i
 showLLVMData (LLVMDataFloat x _) = show x
 showLLVMData (LLVMDataStruct xs) = "{" ++ showItems showLLVMData xs ++ "}"
-
-showLLVMDataWithType :: LLVMData -> WithEnv String
-showLLVMDataWithType d@(LLVMDataLocal x) = do
-  t <- obtainLLVMDataType d
-  return $ unwords [showLowType t, "%" ++ x]
-showLLVMDataWithType d@(LLVMDataGlobal x) = do
-  t <- obtainLLVMDataType d
-  return $ unwords [showLowType t, "@" ++ x]
-showLLVMDataWithType d@(LLVMDataInt i _) = do
-  t <- obtainLLVMDataType d
-  return $ unwords [showLowType t, show i]
-showLLVMDataWithType d@(LLVMDataFloat x _) = do
-  t <- obtainLLVMDataType d
-  return $ unwords [showLowType t, show x]
-showLLVMDataWithType d@(LLVMDataStruct vs) = do
-  t <- obtainLLVMDataType d
-  ss <- mapM showLLVMDataWithType vs
-  return $ unwords [showLowType t, "{" ++ intercalate ", " ss ++ "}"]

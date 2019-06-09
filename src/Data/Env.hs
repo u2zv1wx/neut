@@ -18,12 +18,6 @@ import qualified Data.Map.Strict            as Map
 
 import qualified Data.PQueue.Min            as Q
 
-data Declaration p n
-  = DeclarationConst p -- return x == e : ↑P
-  | DeclarationFun [Identifier] -- return x == return (thunk (lam (x) e))
-                   n
-  deriving (Show)
-
 data Env = Env
   { count             :: Int -- to generate fresh symbols
   , notationEnv       :: [(Tree, Tree)] -- macro transformers
@@ -39,12 +33,8 @@ data Env = Env
   , univConstraintEnv :: [(UnivLevel, UnivLevel)]
   , currentDir        :: FilePath
   , termEnv           :: [(Identifier, ([Identifier], Term))] -- x == lam (x1, ..., xn). e
-  -- FIXME: 「すべての関数は2引数である」としたほうが効率がよい。
-  -- たとえば、第1引数は「ホントの引数」、第2引数はenvなどとする。
-  -- こうすると(p, env)のペアについてのalloc/freeを省略できる。
-  -- n引数にするのはちょっと難しそう？
-  , polEnv            :: [(Identifier, Declaration Pos Neg)] -- x == v || x == thunk (lam (x) e)
-  , llvmEnv           :: [(Identifier, Declaration LLVMData LLVM)]
+  , polEnv            :: [(Identifier, ([Identifier], Neg))] -- x == v || x == thunk (lam (x) e)
+  , llvmEnv           :: [(Identifier, ([Identifier], LLVM))]
   } deriving (Show)
 
 initialEnv :: FilePath -> Env
@@ -157,11 +147,13 @@ insTermEnv :: Identifier -> [Identifier] -> Term -> WithEnv ()
 insTermEnv name args e =
   modify (\env -> env {termEnv = (name, (args, e)) : termEnv env})
 
-insPolEnv :: Identifier -> Declaration Pos Neg -> WithEnv ()
-insPolEnv name d = modify (\e -> e {polEnv = (name, d) : polEnv e})
+insPolEnv :: Identifier -> [Identifier] -> Neg -> WithEnv ()
+insPolEnv name args e =
+  modify (\env -> env {polEnv = (name, (args, e)) : polEnv env})
 
-insLLVMEnv :: Identifier -> Declaration LLVMData LLVM -> WithEnv ()
-insLLVMEnv funName d = modify (\e -> e {llvmEnv = (funName, d) : llvmEnv e})
+insLLVMEnv :: Identifier -> [Identifier] -> LLVM -> WithEnv ()
+insLLVMEnv funName args e =
+  modify (\env -> env {llvmEnv = (funName, (args, e)) : llvmEnv env})
 
 insIndexEnv :: Identifier -> [Identifier] -> WithEnv ()
 insIndexEnv name indexList =

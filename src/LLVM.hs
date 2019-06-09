@@ -14,14 +14,9 @@ import           Data.Polarized
 toLLVM :: Neg -> WithEnv LLVM
 toLLVM mainTerm = do
   penv <- gets polEnv
-  forM_ penv $ \(name, b) ->
-    case b of
-      DeclarationConst v -> do
-        v' <- llvmData v
-        insLLVMEnv name $ DeclarationConst v'
-      DeclarationFun args e -> do
-        llvm <- llvmCode e
-        insLLVMEnv name $ DeclarationFun args llvm
+  forM_ penv $ \(name, (args, e)) -> do
+    llvm <- llvmCode e
+    insLLVMEnv name args llvm
   llvmCode mainTerm
 
 llvmCode :: Neg -> WithEnv LLVM
@@ -136,12 +131,7 @@ llvmDataLet x (PosConst y) cont = do
   penv <- gets polEnv
   case lookup y penv of
     Nothing -> lift $ throwE $ "no such global label defined: " ++ y -- FIXME
-    Just (DeclarationConst v)
-      -- FIXME: construct the type of v and use it to bitcast LLVMDataGlobal
-     -> llvmDataLet x v cont
-    Just (DeclarationFun args _)
-      -- let funPtrType = toFunPtrType [args]
-     -> do
+    Just (args, _) -> do
       let funPtrType = toFunPtrType args
       return $
         LLVMLet x (LLVMBitcast (LLVMDataGlobal y) funPtrType voidPtr) cont
@@ -229,17 +219,3 @@ toStructPtrType :: [a] -> LowType
 toStructPtrType xs = do
   let structType = LowTypeStruct $ map (const voidPtr) xs
   LowTypePointer structType
-
-llvmData :: Pos -> WithEnv LLVMData
-llvmData (PosVar x) = return $ LLVMDataLocal x
-llvmData (PosConst x) = return $ LLVMDataGlobal x
-llvmData (PosSigmaIntro vs) = do
-  vs' <- mapM llvmData vs
-  return $ LLVMDataStruct vs'
-llvmData (PosIndexIntro (IndexInteger i) (LowTypeSignedInt j)) =
-  return $ LLVMDataInt i j
-llvmData (PosIndexIntro (IndexInteger i) (LowTypeUnsignedInt j)) =
-  return $ LLVMDataInt i j -- LLVM doesn't distinguish signed from unsigned
-llvmData (PosIndexIntro (IndexFloat f) (LowTypeFloat j)) =
-  return $ LLVMDataFloat f j
-llvmData (PosIndexIntro _ _) = lift $ throwE "llvmData"
