@@ -25,7 +25,7 @@ reduce app@(i :< NeutPiElim _ _) = do
       , length xtms == length args -> do
         let xs = map (\(x, _, _) -> x) xtms
         let es = map snd args'
-        reduce $ subst (zip xs es) body
+        reduce $ substNeut (zip xs es) body
     _ ->
       case fun' of
         _ :< NeutConst constant
@@ -49,7 +49,7 @@ reduce (i :< NeutSigmaElim e xs body) = do
   e' <- reduce e
   case e of
     _ :< NeutSigmaIntro es -> do
-      let _ :< body' = subst (zip xs es) body
+      let _ :< body' = substNeut (zip xs es) body
       reduce $ i :< body'
     _ -> return $ i :< NeutSigmaElim e' xs body
 reduce (i :< NeutIndexElim e branchList) = do
@@ -66,7 +66,7 @@ reduce (i :< NeutIndexElim e branchList) = do
               throwE $
               "the index " ++ show x ++ " is not included in branchList"
     _ -> return $ i :< NeutIndexElim e' branchList
-reduce (meta :< NeutMu s e) = reduce $ subst [(s, meta :< NeutMu s e)] e
+reduce (meta :< NeutMu s e) = reduce $ substNeut [(s, meta :< NeutMu s e)] e
 reduce t = return t
 
 takeIntegerList :: [Neut] -> Maybe [Int]

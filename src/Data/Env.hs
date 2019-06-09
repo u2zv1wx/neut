@@ -35,7 +35,7 @@ data Env = Env
   , typeEnv           :: Map.Map Identifier Neut
   , constraintEnv     :: [PreConstraint] -- for type inference
   , constraintQueue   :: Q.MinQueue EnrichedConstraint -- for (dependent) type inference
-  , substitution      :: Subst -- for (dependent) type inference
+  , substitution      :: SubstNeut -- for (dependent) type inference
   , univConstraintEnv :: [(UnivLevel, UnivLevel)]
   , currentDir        :: FilePath
   , termEnv           :: [(Identifier, (Identifier, Term))] -- x == lam x. e

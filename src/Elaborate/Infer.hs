@@ -77,7 +77,7 @@ infer ctx (meta :< NeutPiElim e1 e2) = do
     _ :< NeutPi (x, tdom') tcod' -> do
       _ <- insDef x e2
       insConstraintEnv tdom tdom'
-      returnMeta meta $ subst [(x, e2)] tcod'
+      returnMeta meta $ substNeut [(x, e2)] tcod'
     _ -> do
       x <- newNameOfType tdom
       -- represent tcod using hole
@@ -86,7 +86,7 @@ infer ctx (meta :< NeutPiElim e1 e2) = do
       typeMeta <- newNameWith "meta"
       insTypeEnv typeMeta univ
       insConstraintEnv tPi (typeMeta :< NeutPi (x, tdom) tcod)
-      returnMeta meta $ subst [(x, e2)] tcod
+      returnMeta meta $ substNeut [(x, e2)] tcod
 infer _ (meta :< NeutSigma []) = do
   univ <- newUniv
   returnMeta meta univ
@@ -107,7 +107,7 @@ infer ctx (meta :< NeutSigmaIntro es) = do
   forM_ ts $ annot univ
   xs <- forM ts $ \t -> newName1 "sigma" t
   holeList <- sigmaHole ctx xs
-  let holeList' = map (subst (zip xs es)) holeList
+  let holeList' = map (substNeut (zip xs es)) holeList
   forM_ (zip holeList' ts) $ uncurry insConstraintEnv
   returnMeta meta $ meta :< NeutSigma (zip xs holeList')
 infer ctx (meta :< NeutSigmaElim e1 xs e2) = do
@@ -124,8 +124,8 @@ infer ctx (meta :< NeutSigmaElim e1 xs e2) = do
   z <- newNameOfType t1
   pair <- constructPair (ctx ++ zip xs holeList) xs
   typeC <- appCtx (ctx ++ zip xs holeList ++ [(z, t1)])
-  insConstraintEnv t2 (subst [(z, pair)] typeC)
-  returnMeta meta $ subst [(z, e1)] typeC
+  insConstraintEnv t2 (substNeut [(z, pair)] typeC)
+  returnMeta meta $ substNeut [(z, e1)] typeC
 infer _ (meta :< NeutIndex _) = newUniv >>= returnMeta meta
 infer ctx (meta :< NeutIndexIntro l) = do
   mk <- lookupKind l

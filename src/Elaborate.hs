@@ -36,7 +36,7 @@ elaborate e = do
   -- update the type environment by resulting substitution
   sub <- gets substitution
   tenv <- gets typeEnv
-  let tenv' = Map.map (subst sub) tenv
+  let tenv' = Map.map (substNeut sub) tenv
   modify (\env -> env {typeEnv = tenv'})
   -- use the resulting substitution to elaborate `e`.
   exhaust e >>= elaborate'

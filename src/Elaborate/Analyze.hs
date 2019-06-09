@@ -26,23 +26,23 @@ analyze' c@(e1, e2) = do
   case categorize c of
     ConstraintPattern hole _ _
       | Just e <- lookup hole sub -> do
-        cs <- simp [(subst [(hole, e)] e1, subst [(hole, e)] e2)]
+        cs <- simp [(substNeut [(hole, e)] e1, substNeut [(hole, e)] e2)]
         analyze cs
     ConstraintQuasiPattern hole _ _
       | Just e <- lookup hole sub -> do
-        cs <- simp [(subst [(hole, e)] e1, subst [(hole, e)] e2)]
+        cs <- simp [(substNeut [(hole, e)] e1, substNeut [(hole, e)] e2)]
         analyze cs
     ConstraintFlexRigid hole _ _
       | Just e <- lookup hole sub -> do
-        cs <- simp [(subst [(hole, e)] e1, subst [(hole, e)] e2)]
+        cs <- simp [(substNeut [(hole, e)] e1, substNeut [(hole, e)] e2)]
         analyze cs
     ConstraintFlexFlex hole1 _ _ _
       | Just e <- lookup hole1 sub -> do
-        cs <- simp [(subst [(hole1, e)] e1, subst [(hole1, e)] e2)]
+        cs <- simp [(substNeut [(hole1, e)] e1, substNeut [(hole1, e)] e2)]
         analyze cs
     ConstraintFlexFlex _ _ hole2 _
       | Just e <- lookup hole2 sub -> do
-        cs <- simp [(subst [(hole2, e)] e1, subst [(hole2, e)] e2)]
+        cs <- simp [(substNeut [(hole2, e)] e1, substNeut [(hole2, e)] e2)]
         analyze cs
     ConstraintPattern hole args e -> do
       ans <- bindFormalArgs args e
@@ -73,8 +73,8 @@ simp' ((e1, e2):cs)
       Just body ->
         if all (not . hasMeta) es1 && all (not . hasMeta) es2
           then do
-            let e1' = subst [(f, body)] e1
-            let e2' = subst [(g, body)] e2
+            let e1' = substNeut [(f, body)] e1
+            let e2' = substNeut [(g, body)] e2
             simp $ (e1', e2') : cs
           else do
             cs' <- simp cs
@@ -88,17 +88,17 @@ simp' (c@(e1, e2):cs)
     case compare d1 d2 of
       LT -- depth(f) < depth (g)
         | Just body2 <- lookup g sub -> do
-          let e2' = subst [(g, body2)] e2
+          let e2' = substNeut [(g, body2)] e2
           simp $ (e1, e2') : cs
       GT -- depth(f) > depth (g)
         | Just body1 <- lookup f sub -> do
-          let e1' = subst [(f, body1)] e1
+          let e1' = substNeut [(f, body1)] e1
           simp $ (e1', e2) : cs
       EQ -- depth(f) = depth (g)
         | Just body1 <- lookup f sub
         , Just body2 <- lookup g sub -> do
-          let e1' = subst [(f, body1)] e1
-          let e2' = subst [(g, body2)] e2
+          let e1' = substNeut [(f, body1)] e1
+          let e2' = substNeut [(g, body2)] e2
           simp $ (e1', e2') : cs
       _ -> simp'' $ c : cs
 simp' cs = simp'' cs
@@ -110,10 +110,10 @@ simp'' ((_ :< NeutConst x, _ :< NeutConst y):cs)
 simp'' ((_ :< NeutPi (x, tdom1) tcod1, _ :< NeutPi (y, tdom2) tcod2):cs) = do
   var <- toVar' x
   cs' <- sConstraint [(y, var)] cs >>= simp
-  simp $ (tdom1, tdom2) : (tcod1, subst [(y, var)] tcod2) : cs'
+  simp $ (tdom1, tdom2) : (tcod1, substNeut [(y, var)] tcod2) : cs'
 simp'' ((_ :< NeutPiIntro (x, _) body1, _ :< NeutPiIntro (y, _) body2):cs) = do
   var <- toVar' x
-  simp $ (body1, subst [(y, var)] body2) : cs
+  simp $ (body1, substNeut [(y, var)] body2) : cs
 simp'' ((_ :< NeutPiIntro (x, _) body1, e2):cs) = do
   var <- toVar' x
   appMeta <- newNameWith "meta"
@@ -125,7 +125,7 @@ simp'' ((_ :< NeutSigma xts, _ :< NeutSigma yts):cs)
     let (xs, txs) = unzip xts
     vs <- mapM toVar' xs
     let (ys, tys) = unzip yts
-    let tys' = map (subst (zip ys vs)) tys
+    let tys' = map (substNeut (zip ys vs)) tys
     simp $ zip txs tys' ++ cs
 simp'' ((_ :< NeutSigmaIntro es1, _ :< NeutSigmaIntro es2):cs)
   | length es1 == length es2 = simp $ zip es1 es2 ++ cs
@@ -158,9 +158,9 @@ simp'' (c@(e1, e2):cs) = do
   sub <- gets substitution
   case (mx, my) of
     (Just x, _)
-      | Just e <- lookup x sub -> simp $ (subst [(x, e)] e1, e2) : cs
+      | Just e <- lookup x sub -> simp $ (substNeut [(x, e)] e1, e2) : cs
     (_, Just y)
-      | Just e <- lookup y sub -> simp $ (e1, subst [(y, e)] e2) : cs
+      | Just e <- lookup y sub -> simp $ (e1, substNeut [(y, e)] e2) : cs
     _ -> throwError $ "cannot simplify:\n" ++ Pr.ppShow c
 
 categorize :: PreConstraint -> Constraint
@@ -198,12 +198,12 @@ isEq (_ :< NeutVar x1) (_ :< NeutVar x2) = return $ x1 == x2
 isEq (_ :< NeutPi (x1, t11) t12) (_ :< NeutPi (x2, t21) t22) = do
   vx <- toVar' x1
   b1 <- isEq t11 t21
-  b2 <- isEq t12 $ subst [(x2, vx)] t22
+  b2 <- isEq t12 $ substNeut [(x2, vx)] t22
   return $ b1 && b2
 isEq (_ :< NeutPiIntro (x1, t1) e1) (_ :< NeutPiIntro (x2, t2) e2) = do
   vx <- toVar' x1
   b1 <- isEq t1 t2
-  b2 <- isEq e1 $ subst [(x2, vx)] e2
+  b2 <- isEq e1 $ substNeut [(x2, vx)] e2
   return $ b1 && b2
 isEq (_ :< NeutPiElim e11 e12) (_ :< NeutPiElim e21 e22) = do
   b1 <- isEq e11 e21
@@ -219,7 +219,7 @@ isEq (_ :< NeutSigmaElim e11 xs1 e12) (_ :< NeutSigmaElim e21 xs2 e22)
     metaList <- mapM (const $ newNameWith "meta") xs1
     let vs = map (\(meta, x) -> meta :< NeutVar x) $ zip metaList xs1
     let sub = zip xs2 vs
-    let e22' = subst sub e22
+    let e22' = substNeut sub e22
     b1 <- isEq e11 e21
     b2 <- isEq e12 e22'
     return $ b1 && b2
@@ -233,7 +233,7 @@ isEq (_ :< NeutUniv l1) (_ :< NeutUniv l2) = return $ l1 == l2
 isEq (_ :< NeutConst t1) (_ :< NeutConst t2) = return $ t1 == t2
 isEq (_ :< NeutMu x1 e1) (_ :< NeutMu x2 e2) = do
   vx <- toVar' x1
-  isEq e1 $ subst [(x2, vx)] e2
+  isEq e1 $ substNeut [(x2, vx)] e2
 isEq (_ :< NeutHole x1) (_ :< NeutHole x2) = return $ x1 == x2
 isEq _ _ = return False
 
@@ -243,7 +243,7 @@ isEqSigma ((x, tx):xts) ((y, ty):yts) = do
   vx <- toVar' x
   b1 <- isEq tx ty
   let (ys, ts) = unzip yts
-  let ts' = map (subst [(y, vx)]) ts
+  let ts' = map (substNeut [(y, vx)]) ts
   let yts' = zip ys ts'
   b2 <- isEqSigma xts yts'
   return $ b1 && b2
@@ -298,11 +298,11 @@ projectionList e n = do
     meta <- newName
     return $ meta :< NeutSigmaElim e xs x
 
-sConstraint :: Subst -> [PreConstraint] -> WithEnv [PreConstraint]
+sConstraint :: SubstNeut -> [PreConstraint] -> WithEnv [PreConstraint]
 sConstraint s cs = do
   let (ts1, ts2) = unzip cs
-  let ts1' = map (subst s) ts1
-  let ts2' = map (subst s) ts2
+  let ts1' = map (substNeut s) ts1
+  let ts2' = map (substNeut s) ts2
   return $ zip ts1' ts2'
 
 bindFormalArgs :: [Identifier] -> Neut -> WithEnv Neut

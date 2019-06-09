@@ -194,12 +194,12 @@ updateQueue q = do
   sub <- gets substitution
   updateQueue' sub q
 
-updateQueue' :: Subst -> Q.MinQueue EnrichedConstraint -> WithEnv ()
+updateQueue' :: SubstNeut -> Q.MinQueue EnrichedConstraint -> WithEnv ()
 updateQueue' sub q =
   case Q.getMin q of
     Nothing -> return ()
     Just (Enriched (e1, e2) _) -> do
-      analyze [(subst sub e1, subst sub e2)]
+      analyze [(substNeut sub e1, substNeut sub e2)]
       updateQueue' sub $ Q.deleteMin q
 
 appFold :: Neut -> [Neut] -> WithEnv Neut

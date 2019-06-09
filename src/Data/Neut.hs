@@ -37,7 +37,7 @@ type Neut = Cofree NeutF Identifier
 
 $(deriveShow1 ''NeutF)
 
-type Subst = [(Identifier, Neut)]
+type SubstNeut = [(Identifier, Neut)]
 
 varNeut :: Neut -> [Identifier]
 varNeut e = fst $ varAndHole e
@@ -88,50 +88,51 @@ pairwiseConcat ((xs, ys):rest) = do
   let (xs', ys') = pairwiseConcat rest
   (xs ++ xs', ys ++ ys')
 
-subst :: Subst -> Neut -> Neut
-subst sub (j :< NeutVar s) = fromMaybe (j :< NeutVar s) (lookup s sub)
-subst _ (j :< NeutConst t) = j :< NeutConst t
-subst sub (j :< NeutPi (s, tdom) tcod) = do
-  let tdom' = subst sub tdom
+substNeut :: SubstNeut -> Neut -> Neut
+substNeut sub (j :< NeutVar s) = fromMaybe (j :< NeutVar s) (lookup s sub)
+substNeut _ (j :< NeutConst t) = j :< NeutConst t
+substNeut sub (j :< NeutPi (s, tdom) tcod) = do
+  let tdom' = substNeut sub tdom
   let sub' = filter (\(x, _) -> x /= s) sub
-  let tcod' = subst sub' tcod
+  let tcod' = substNeut sub' tcod
   j :< NeutPi (s, tdom') tcod'
-subst sub (j :< NeutPiIntro (s, tdom) body) = do
-  let tdom' = subst sub tdom
+substNeut sub (j :< NeutPiIntro (s, tdom) body) = do
+  let tdom' = substNeut sub tdom
   let sub' = filter (\(x, _) -> x /= s) sub
-  let body' = subst sub' body
+  let body' = substNeut sub' body
   j :< NeutPiIntro (s, tdom') body'
-subst sub (j :< NeutPiElim e1 e2) = do
-  let e1' = subst sub e1
-  let e2' = subst sub e2
+substNeut sub (j :< NeutPiElim e1 e2) = do
+  let e1' = substNeut sub e1
+  let e2' = substNeut sub e2
   j :< NeutPiElim e1' e2'
-subst sub (j :< NeutSigma xts) = j :< NeutSigma (substSigma sub xts)
-subst sub (j :< NeutSigmaIntro es) = j :< NeutSigmaIntro (map (subst sub) es)
-subst sub (j :< NeutSigmaElim e1 xs e2) = do
-  let e1' = subst sub e1
+substNeut sub (j :< NeutSigma xts) = j :< NeutSigma (substNeutSigma sub xts)
+substNeut sub (j :< NeutSigmaIntro es) =
+  j :< NeutSigmaIntro (map (substNeut sub) es)
+substNeut sub (j :< NeutSigmaElim e1 xs e2) = do
+  let e1' = substNeut sub e1
   let sub' = filter (\(x, _) -> x `notElem` xs) sub
-  let e2' = subst sub' e2
+  let e2' = substNeut sub' e2
   j :< NeutSigmaElim e1' xs e2'
-subst _ (j :< NeutIndex x) = j :< NeutIndex x
-subst _ (j :< NeutIndexIntro l) = j :< NeutIndexIntro l
-subst sub (j :< NeutIndexElim e branchList) = do
-  let e' = subst sub e
+substNeut _ (j :< NeutIndex x) = j :< NeutIndex x
+substNeut _ (j :< NeutIndexIntro l) = j :< NeutIndexIntro l
+substNeut sub (j :< NeutIndexElim e branchList) = do
+  let e' = substNeut sub e
   let (labelList, es) = unzip branchList
-  let es' = map (subst sub) es
+  let es' = map (substNeut sub) es
   j :< NeutIndexElim e' (zip labelList es')
-subst _ (j :< NeutUniv i) = j :< NeutUniv i
-subst sub (j :< NeutMu x e) = do
+substNeut _ (j :< NeutUniv i) = j :< NeutUniv i
+substNeut sub (j :< NeutMu x e) = do
   let sub' = filter (\(y, _) -> x /= y) sub
-  let e' = subst sub' e
+  let e' = substNeut sub' e
   j :< NeutMu x e'
-subst sub (j :< NeutHole s) = fromMaybe (j :< NeutHole s) (lookup s sub)
+substNeut sub (j :< NeutHole s) = fromMaybe (j :< NeutHole s) (lookup s sub)
 
-substSigma :: Subst -> [(Identifier, Neut)] -> [(Identifier, Neut)]
-substSigma _ [] = []
-substSigma sub ((x, t):rest) = do
+substNeutSigma :: SubstNeut -> [(Identifier, Neut)] -> [(Identifier, Neut)]
+substNeutSigma _ [] = []
+substNeutSigma sub ((x, t):rest) = do
   let sub' = filter (\(y, _) -> y /= x) sub
-  let xts = substSigma sub' rest
-  let t' = subst sub t
+  let xts = substNeutSigma sub' rest
+  let t' = substNeut sub t
   (x, t') : xts
 
 isReducible :: Neut -> Bool
