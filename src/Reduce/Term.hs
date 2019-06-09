@@ -11,13 +11,13 @@ import           Data.Term
 reduceTerm :: Term -> WithEnv Term
 reduceTerm app@(TermPiElim _ _) = do
   let (fun, args) = toTermPiElimSeq app
+  args' <- mapM reduceTerm args
   fun' <- reduceTerm fun
   case fun' of
     TermPiIntro x body ->
       reduceTerm $
-      fromTermPiElimSeq (substTerm [(x, head args)] body, tail args)
+      fromTermPiElimSeq (substTerm [(x, head args')] body, tail args')
     TermConst constant -> do
-      args' <- mapM reduceTerm args
       let b1 = constant `elem` intAddConstantList
       let b2 = constant `elem` intSubConstantList
       let b3 = constant `elem` intMulConstantList

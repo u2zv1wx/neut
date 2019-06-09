@@ -3,7 +3,6 @@ module Reduce.Neut
   ) where
 
 import           Control.Comonad.Cofree
-import           Control.Monad              (forM)
 import           Control.Monad.Trans        (lift)
 import           Control.Monad.Trans.Except
 
@@ -14,37 +13,28 @@ import           Data.Neut
 reduceNeut :: Neut -> WithEnv Neut
 reduceNeut app@(i :< NeutPiElim _ _) = do
   let (fun, args) = toNeutPiElimSeq app
-  args' <-
-    forM args $ \(x, e) -> do
-      e' <- reduceNeut e
-      return (x, e')
+  args' <- mapM (sndM reduceNeut) args
   fun' <- reduceNeut fun
   case fun' of
-    lam@(_ :< NeutPiIntro _ _)
-      | (body, xtms) <- toNeutPiIntroSeq lam
-      , length xtms == length args -> do
-        let xs = map (\(x, _, _) -> x) xtms
-        let es = map snd args'
-        reduceNeut $ substNeut (zip xs es) body
-    _ ->
-      case fun' of
-        _ :< NeutConst constant
-          | constant `elem` intAddConstantList
-          , Just [x, y] <- takeIntegerList (map snd args') ->
-            return $ i :< NeutIndexIntro (IndexInteger (x + y))
-        _ :< NeutConst constant
-          | constant `elem` intSubConstantList
-          , Just [x, y] <- takeIntegerList (map snd args') ->
-            return $ i :< NeutIndexIntro (IndexInteger (x - y))
-        _ :< NeutConst constant
-          | constant `elem` intMulConstantList
-          , Just [x, y] <- takeIntegerList (map snd args') ->
-            return $ i :< NeutIndexIntro (IndexInteger (x * y))
-        _ :< NeutConst constant
-          | constant `elem` intDivConstantList
-          , Just [x, y] <- takeIntegerList (map snd args') ->
-            return $ i :< NeutIndexIntro (IndexInteger (x `div` y))
+    _ :< NeutPiIntro (x, _) e ->
+      reduceNeut $
+      fromNeutPiElimSeq (substNeut [(x, snd $ head args')] e, tail args')
+    _ :< NeutConst constant -> do
+      let b1 = constant `elem` intAddConstantList
+      let b2 = constant `elem` intSubConstantList
+      let b3 = constant `elem` intMulConstantList
+      let b4 = constant `elem` intDivConstantList
+      case (b1, b2, b3, b4, takeIntegerList (map snd args')) of
+        (True, _, _, _, Just [x, y]) ->
+          return $ i :< NeutIndexIntro (IndexInteger (x + y))
+        (_, True, _, _, Just [x, y]) ->
+          return $ i :< NeutIndexIntro (IndexInteger (x - y))
+        (_, _, True, _, Just [x, y]) ->
+          return $ i :< NeutIndexIntro (IndexInteger (x * y))
+        (_, _, _, True, Just [x, y]) ->
+          return $ i :< NeutIndexIntro (IndexInteger (x `div` y))
         _ -> return $ fromNeutPiElimSeq (fun', args')
+    _ -> return $ fromNeutPiElimSeq (fun', args')
 reduceNeut (i :< NeutSigmaElim e xs body) = do
   e' <- reduceNeut e
   case e of
@@ -76,3 +66,8 @@ takeIntegerList ((_ :< NeutIndexIntro (IndexInteger i)):rest) = do
   is <- takeIntegerList rest
   return (i : is)
 takeIntegerList _ = Nothing
+
+sndM :: Monad m => (a -> m b) -> (c, a) -> m (c, b)
+sndM f (x, y) = do
+  y' <- f y
+  return (x, y')
