@@ -74,7 +74,7 @@ makeClosure' x e = do
   lamVar <- newNameWith "lam"
   let lamBody = NegSigmaElim (PosVar envName) fvs e
   -- lamVar == thunk (lam (envName, x) lamBody)
-  insPolEnv lamVar $ DeclarationFun [envName, x] lamBody
+  insPolEnv lamVar $ DeclarationFun [x, envName] lamBody
   let fvEnv = PosSigmaIntro $ map PosVar fvs
   return $ PosSigmaIntro [PosConst lamVar, fvEnv]
 
@@ -90,7 +90,7 @@ callClosure cls arg = do
     NegSigmaElim (PosVar clsVarName) [thunkLamVarName, envVarName] $
     NegPiElimDownElim
       (PosVar thunkLamVarName)
-      [PosVar envVarName, PosVar argVarName]
+      [PosVar argVarName, PosVar envVarName]
 
 -- insert (possibly) environment-specific definition of constant
 toDefinition :: Identifier -> WithEnv Neg
