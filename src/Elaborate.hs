@@ -114,18 +114,8 @@ elaborate' (meta :< NeutMu x e) = do
   -- In effect, we add
   --   x ~> (lam env. let (x1, ..., xn) := env in e {x := x @ env}) @ (x1, ..., xn)
   -- into the term environment.
-  -- let oldBody =
-  --       substTerm
-  --         [(x, TermPiElim (TermConst x) (TermSigmaIntro $ map TermVar fvs))]
-  --         e'
-  -- env <- newNameWith "env"
-  -- let oldRecTerm = TermSigmaElim (TermVar env) fvs oldBody
-  -- insTermEnv x env oldRecTerm -- x == lam env. let fvs := env in body
-  -- return $ TermPiElim (TermConst x) (TermSigmaIntro $ map TermVar fvs)
   let body = substTerm [(x, TermConstElim x (map TermVar fvs))] e'
-  -- env <- newNameWith "env"
-  -- let recTerm = TermSigmaElim (TermVar env) fvs body
-  insTermEnv x fvs body -- x == lam env. let fvs := env in body
+  insTermEnv x fvs body -- x == lam (x1 ... xn). body
   return $ TermConstElim x (map TermVar fvs)
 elaborate' (_ :< NeutHole x) = do
   sub <- gets substitution
