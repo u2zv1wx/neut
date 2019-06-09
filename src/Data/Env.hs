@@ -2,7 +2,6 @@
 
 module Data.Env where
 
-import           Control.Comonad
 import           Control.Comonad.Cofree
 import           Control.Monad.State
 import           Control.Monad.Trans.Except
@@ -18,8 +17,6 @@ import           Data.Tree
 import qualified Data.Map.Strict            as Map
 
 import qualified Data.PQueue.Min            as Q
-
-import qualified Text.Show.Pretty           as Pr
 
 data Declaration p n
   = DeclarationConst p -- return x == e : ↑P

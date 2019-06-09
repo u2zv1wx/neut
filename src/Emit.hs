@@ -3,9 +3,7 @@ module Emit
   ) where
 
 import           Control.Monad.State
-import           Control.Monad.Trans.Except
 import           Data.List
-import qualified Text.Show.Pretty           as Pr
 
 import           Data.Basic
 import           Data.Env

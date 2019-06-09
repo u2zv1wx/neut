@@ -5,9 +5,8 @@ module Elaborate.Synthesize
 import           Control.Comonad.Cofree
 import           Control.Monad.Except
 import           Control.Monad.State
-import           Control.Monad.Trans.Except
-import qualified Data.PQueue.Min            as Q
-import qualified Text.Show.Pretty           as Pr
+import qualified Data.PQueue.Min        as Q
+import qualified Text.Show.Pretty       as Pr
 
 import           Data.Basic
 import           Data.Constraint
@@ -30,7 +29,8 @@ synthesize q =
       -- This kind of constraint is called a "pattern".
      -> do
       ans <- bindFormalArgs args e
-      modify (\e -> e {substitution = compose [(x, ans)] (substitution e)})
+      modify
+        (\env -> env {substitution = compose [(x, ans)] (substitution env)})
       substQueue (Q.deleteMin q) >>= synthesize
     Just (Enriched _ (ConstraintBeta x body))
       -- Synthesize `var == body` (note that `var` is not a meta-variable).
@@ -65,8 +65,8 @@ synthesize q =
             cs <- simp [(e1', e2')]
             let plan2 = getQueue $ analyze cs
             return [plan1, plan2]
-      q <- gets constraintQueue
-      chain q planList >>= continue q
+      q' <- gets constraintQueue
+      chain q' planList >>= continue q'
     Just (Enriched _ (ConstraintQuasiPattern hole preArgs e))
       -- Synthesize `hole @ arg-1 @ ... @ arg-n = e`, where arg-i is a variable.
       -- In this case, we do the same as in Flex-Rigid case.
@@ -167,7 +167,7 @@ synthesizeFlexRigid q hole args e = do
 getQueue :: WithEnv a -> WithEnv (Q.MinQueue EnrichedConstraint)
 getQueue command = do
   modify (\e -> e {constraintQueue = Q.empty})
-  command
+  _ <- command
   gets constraintQueue
 
 continue ::

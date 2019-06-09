@@ -39,8 +39,8 @@ $(deriveShow1 ''NeutF)
 
 type Subst = [(Identifier, Neut)]
 
-var :: Neut -> [Identifier]
-var e = fst $ varAndHole e
+varNeut :: Neut -> [Identifier]
+varNeut e = fst $ varAndHole e
 
 varAndHole :: Neut -> ([Identifier], [Identifier])
 varAndHole (_ :< NeutVar s) = ([s], [])
@@ -116,8 +116,9 @@ subst _ (j :< NeutIndex x) = j :< NeutIndex x
 subst _ (j :< NeutIndexIntro l) = j :< NeutIndexIntro l
 subst sub (j :< NeutIndexElim e branchList) = do
   let e' = subst sub e
-  let branchList' = flip map branchList $ \(l, e) -> (l, subst sub e)
-  j :< NeutIndexElim e' branchList'
+  let (labelList, es) = unzip branchList
+  let es' = map (subst sub) es
+  j :< NeutIndexElim e' (zip labelList es')
 subst _ (j :< NeutUniv i) = j :< NeutUniv i
 subst sub (j :< NeutMu x e) = do
   let sub' = filter (\(y, _) -> x /= y) sub

@@ -37,7 +37,7 @@ elaborate e = do
   sub <- gets substitution
   tenv <- gets typeEnv
   let tenv' = Map.map (subst sub) tenv
-  modify (\e -> e {typeEnv = tenv'})
+  modify (\env -> env {typeEnv = tenv'})
   -- use the resulting substitution to elaborate `e`.
   exhaust e >>= elaborate'
 
@@ -62,7 +62,7 @@ getNumLowType meta = do
     _ :< NeutIndex "f16" -> return $ Right $ LowTypeFloat 16
     _ :< NeutIndex "f32" -> return $ Right $ LowTypeFloat 32
     _ :< NeutIndex "f64" -> return $ Right $ LowTypeFloat 64
-    t                    -> return $ Left t
+    _                    -> return $ Left t
 
 -- This function translates a well-typed term into an untyped term in a
 -- reduction-preserving way. Here, we translate types into units (nullary product).
@@ -106,7 +106,7 @@ elaborate' (_ :< NeutIndexElim e branchList) = do
 elaborate' (_ :< NeutUniv _) = return $ TermSigmaIntro []
 elaborate' (meta :< NeutMu x e) = do
   e' <- elaborate' e
-  let fvs = var $ meta :< NeutMu x e
+  let fvs = varNeut $ meta :< NeutMu x e
   env <- newNameWith "env"
   -- Let us define (x1, ..., xn) := (all the free variables in e).
   -- We translate `mu x. e` into
@@ -138,26 +138,12 @@ exhaust e = do
 exhaust' :: Neut -> WithEnv Bool
 exhaust' (_ :< NeutVar _) = return True
 exhaust' (_ :< NeutConst _) = return True
-exhaust' (_ :< NeutPi (_, tdom) tcod) = do
-  b1 <- exhaust' tdom
-  b2 <- exhaust' tcod
-  return $ b1 && b2
+exhaust' (_ :< NeutPi (_, tdom) tcod) = allM exhaust' [tdom, tcod]
 exhaust' (_ :< NeutPiIntro _ e) = exhaust' e
-exhaust' (_ :< NeutPiElim e1 e2) = do
-  b1 <- exhaust' e1
-  b2 <- exhaust' e2
-  return $ b1 && b2
-exhaust' (_ :< NeutSigma xts) = do
-  let (_, ts) = unzip xts
-  bs <- mapM exhaust' ts
-  return $ and bs
-exhaust' (_ :< NeutSigmaIntro es) = do
-  bs <- mapM exhaust' es
-  return $ and bs
-exhaust' (_ :< NeutSigmaElim e1 _ e2) = do
-  b1 <- exhaust' e1
-  b2 <- exhaust' e2
-  return $ b1 && b2
+exhaust' (_ :< NeutPiElim e1 e2) = allM exhaust' [e1, e2]
+exhaust' (_ :< NeutSigma xts) = allM exhaust' $ map snd xts
+exhaust' (_ :< NeutSigmaIntro es) = allM exhaust' es
+exhaust' (_ :< NeutSigmaElim e1 _ e2) = allM exhaust' [e1, e2]
 exhaust' (_ :< NeutMu _ e) = exhaust' e
 exhaust' (_ :< NeutIndex _) = return True
 exhaust' (_ :< NeutIndexIntro _) = return True
@@ -180,3 +166,10 @@ exhaust' (meta :< NeutIndexElim e1 branchList@((l, _):_)) = do
         _ -> return False
 exhaust' (_ :< NeutUniv _) = return True
 exhaust' (_ :< NeutHole _) = return False
+
+allM :: Monad m => (a -> m Bool) -> [a] -> m Bool
+allM _ [] = return True
+allM p (x:xs) = do
+  b1 <- p x
+  b2 <- allM p xs
+  return $ b1 && b2

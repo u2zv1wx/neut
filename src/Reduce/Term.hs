@@ -2,7 +2,6 @@ module Reduce.Term
   ( reduceTerm
   ) where
 
-import           Control.Monad              (forM)
 import           Control.Monad.Trans        (lift)
 import           Control.Monad.Trans.Except
 import           Data.Basic

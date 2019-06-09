@@ -10,10 +10,8 @@ import           Data.Maybe                 (maybeToList)
 import qualified Text.Show.Pretty           as Pr
 
 import           Data.Basic
-import           Data.Constraint
 import           Data.Env
 import           Data.Neut
-import           Elaborate.Analyze
 import           Reduce.Neut
 
 type Context = [(Identifier, Neut)]
@@ -92,7 +90,9 @@ infer ctx (meta :< NeutPiElim e1 e2) = do
 infer _ (meta :< NeutSigma []) = do
   univ <- newUniv
   returnMeta meta univ
-infer ctx (meta :< NeutSigma ((x, t):xts)) = do
+infer ctx (meta :< NeutSigma ((x, t):xts))
+  -- FIXME: Sigma (x, t) eの議論に帰着してPiと処理を統一したほうがよい
+ = do
   insTypeEnv x t
   higherUniv <- newUniv
   univ <- newUniv >>= annot higherUniv
@@ -119,7 +119,7 @@ infer ctx (meta :< NeutSigmaElim e1 xs e2) = do
   let binder = zip xs holeList
   sigmaMeta <- newNameWith "meta"
   let sigmaType = sigmaMeta :< NeutSigma binder
-  annot univ sigmaType
+  _ <- annot univ sigmaType
   insConstraintEnv t1 sigmaType
   z <- newNameOfType t1
   pair <- constructPair (ctx ++ zip xs holeList) xs

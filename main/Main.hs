@@ -1,15 +1,12 @@
 module Main where
 
--- import           Control.Monad
 import           Control.Monad.State
 import           Data.List           (intercalate)
 import           Options.Applicative
 import           System.Directory
-import           System.Environment
 import           System.FilePath
 import           System.Process
 import           Text.Read           (readMaybe)
-import qualified Text.Show.Pretty    as Pr
 
 import           Data.Env
 import           Elaborate
@@ -82,9 +79,7 @@ optParser :: ParserInfo Command
 optParser = info (helper <*> parseOpt) fullDesc
 
 main :: IO ()
-main = do
-  command <- execParser optParser
-  run command
+main = execParser optParser >>= run
 
 run :: Command -> IO ()
 run (Build inputPath moutputPath outputKind) = do

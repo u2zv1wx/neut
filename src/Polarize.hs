@@ -10,27 +10,24 @@ module Polarize
   ) where
 
 import           Control.Monad.State
-import           Control.Monad.Trans.Except
-import           Data.List                  (nub)
-import           Text.Read                  (readMaybe)
-import qualified Text.Show.Pretty           as Pr
+import           Data.List           (nub)
+import           Text.Read           (readMaybe)
 
 import           Data.Basic
 import           Data.Env
 import           Data.Polarized
 import           Data.Term
-import           Reduce.Polarized
 
 polarize :: Term -> WithEnv Neg
 polarize mainTerm = do
   tenv <- gets termEnv
   forM_ tenv $ \(name, (arg, e)) -> do
-    e <- polarize' e
-    v <- makeClosure' arg e
+    e' <- polarize' e
+    v <- makeClosure' arg e'
     insPolEnv name $ DeclarationConst v
   polarize' mainTerm
 
--- CBPV polarization + closure conversion
+-- CBV translation into CBPV + closure conversion
 -- (In the result of this translation, every function has exactly 1 argument)
 polarize' :: Term -> WithEnv Neg
 polarize' (TermVar x) = return $ NegUpIntro $ PosVar x

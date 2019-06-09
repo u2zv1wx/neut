@@ -8,9 +8,8 @@ module Elaborate.Analyze
 import           Control.Comonad.Cofree
 import           Control.Monad.Except
 import           Control.Monad.State
-import           Control.Monad.Trans.Except
-import qualified Data.PQueue.Min            as Q
-import qualified Text.Show.Pretty           as Pr
+import qualified Data.PQueue.Min        as Q
+import qualified Text.Show.Pretty       as Pr
 
 import           Data.Basic
 import           Data.Constraint
@@ -47,7 +46,8 @@ analyze' c@(e1, e2) = do
         analyze cs
     ConstraintPattern hole args e -> do
       ans <- bindFormalArgs args e
-      modify (\e -> e {substitution = compose [(hole, ans)] (substitution e)})
+      let newSub = [(hole, ans)]
+      modify (\env -> env {substitution = compose newSub (substitution env)})
     _ -> do
       let ec = Enriched c $ categorize c
       modify (\e -> e {constraintQueue = Q.insert ec $ constraintQueue e})
@@ -69,7 +69,7 @@ simp' ((e1, e2):cs)
   , length es1 == length es2 = do
     sub <- gets substitution
     case lookup f sub of
-      Nothing -> simp $ (zip es1 es2) ++ cs
+      Nothing -> simp $ zip es1 es2 ++ cs
       Just body ->
         if all (not . hasMeta) es1 && all (not . hasMeta) es2
           then do
@@ -252,25 +252,21 @@ isEqSigma _ _ = return False
 isEqBranch :: [(Index, Neut)] -> [(Index, Neut)] -> WithEnv Bool
 isEqBranch [] [] = return True
 isEqBranch ((IndexLabel x1, e1):es1) ((IndexLabel x2, e2):es2)
-  | x1 == x2 = do
-    b1 <- isEq e1 e2
-    b2 <- isEqBranch es1 es2
-    return $ b1 && b2
+  | x1 == x2 = isEqBranch' e1 es1 e2 es2
 isEqBranch ((IndexInteger i1, e1):es1) ((IndexInteger i2, e2):es2)
-  | i1 == i2 = do
-    b1 <- isEq e1 e2
-    b2 <- isEqBranch es1 es2
-    return $ b1 && b2
+  | i1 == i2 = isEqBranch' e1 es1 e2 es2
 isEqBranch ((IndexFloat i1, e1):es1) ((IndexFloat i2, e2):es2)
-  | i1 == i2 = do
-    b1 <- isEq e1 e2
-    b2 <- isEqBranch es1 es2
-    return $ b1 && b2
-isEqBranch ((IndexDefault, e1):es1) ((IndexDefault, e2):es2) = do
+  | i1 == i2 = isEqBranch' e1 es1 e2 es2
+isEqBranch ((IndexDefault, e1):es1) ((IndexDefault, e2):es2) =
+  isEqBranch' e1 es1 e2 es2
+isEqBranch _ _ = return False
+
+isEqBranch' ::
+     Neut -> [(Index, Neut)] -> Neut -> [(Index, Neut)] -> WithEnv Bool
+isEqBranch' e1 es1 e2 es2 = do
   b1 <- isEq e1 e2
   b2 <- isEqBranch es1 es2
   return $ b1 && b2
-isEqBranch _ _ = return False
 
 toVar' :: Identifier -> WithEnv Neut
 toVar' x = do
@@ -294,8 +290,8 @@ isLinear x xs =
     else [x]
 
 projectionList :: Neut -> Int -> WithEnv [Neut]
-projectionList e count = do
-  xs <- forM [1 .. count] $ \_ -> newNameWith "pr"
+projectionList e n = do
+  xs <- forM [1 .. n] $ \_ -> newNameWith "pr"
   metaList <- mapM (const newName) xs
   let varList = map (\(meta, x) -> meta :< NeutVar x) $ zip metaList xs
   forM varList $ \x -> do
@@ -344,8 +340,7 @@ depth x = do
   case lookup x sub of
     Nothing -> return 0
     Just e -> do
-      let vs = var e
-      ds <- mapM depth vs
+      ds <- mapM depth $ varNeut e
       return $ 1 + maximum ds
 
 headMeta :: [Identifier] -> Neut -> Maybe (Identifier, [Identifier])

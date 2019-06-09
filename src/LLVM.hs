@@ -5,7 +5,6 @@ module LLVM
 import           Control.Monad.State
 import           Control.Monad.Trans.Except
 import           Data.List                  (elemIndex)
-import qualified Text.Show.Pretty           as Pr
 
 import           Data.Basic
 import           Data.Env
@@ -203,14 +202,14 @@ llvmSwitch name branchList = do
 
 setContent :: Identifier -> Int -> [(Int, Identifier)] -> LLVM -> WithEnv LLVM
 setContent _ _ [] cont = return cont
-setContent basePointer length ((index, dataAtIndex):sizeDataList) cont = do
-  cont' <- setContent basePointer length sizeDataList cont
+setContent basePointer lengthOfStruct ((index, dataAtIndex):sizeDataList) cont = do
+  cont' <- setContent basePointer lengthOfStruct sizeDataList cont
   loader <- newNameWith "loader"
   hole <- newNameWith "tmp"
   let bp = LLVMDataLocal basePointer
   let voidPtrPtr = LowTypePointer voidPtr
   return $
-    LLVMLet loader (LLVMGetElementPtr bp (index, length)) $
+    LLVMLet loader (LLVMGetElementPtr bp (index, lengthOfStruct)) $
     LLVMLet
       hole
       (LLVMStore

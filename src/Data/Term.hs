@@ -43,8 +43,9 @@ substTerm sub (TermSigmaElim e1 xs e2) = do
 substTerm _ (TermIndexIntro l meta) = TermIndexIntro l meta
 substTerm sub (TermIndexElim e branchList) = do
   let e' = substTerm sub e
-  let branchList' = map (\(l, e) -> (l, substTerm sub e)) branchList
-  TermIndexElim e' branchList'
+  let (labelList, es) = unzip branchList
+  let es' = map (substTerm sub) es
+  TermIndexElim e' $ zip labelList es'
 
 toTermPiElimSeq :: Term -> (Term, [Term])
 toTermPiElimSeq (TermPiElim e1 e2) = do

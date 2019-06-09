@@ -49,10 +49,10 @@ reduceNeg (NegUpElim x e1 e2) = do
   case e1' of
     NegUpIntro v -> reduceNeg $ substNeg [(x, v)] e2
     _            -> return $ NegUpElim x e1' e2
-reduceNeg (NegConstElim x vs) = do
+reduceNeg (NegConstElim c vs) = do
   let xs = takeIntegerList vs
   let t = LowTypeSignedInt 64 -- for now
-  case (x, xs) of
+  case (c, xs) of
     (ConstantArith _ ArithAdd, Just [x, y]) ->
       return $ NegUpIntro (PosIndexIntro (IndexInteger (x + y)) t)
     (ConstantArith _ ArithSub, Just [x, y]) ->
@@ -61,7 +61,7 @@ reduceNeg (NegConstElim x vs) = do
       return $ NegUpIntro (PosIndexIntro (IndexInteger (x * y)) t)
     (ConstantArith _ ArithDiv, Just [x, y]) ->
       return $ NegUpIntro (PosIndexIntro (IndexInteger (x `div` y)) t)
-    _ -> return $ NegConstElim x vs
+    _ -> return $ NegConstElim c vs
 reduceNeg e = return e
 
 takeIntegerList :: [Pos] -> Maybe [Int]

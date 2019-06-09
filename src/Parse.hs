@@ -13,7 +13,6 @@ import           Control.Monad.Trans.Except
 import           System.Directory
 import           System.FilePath
 import           Text.Read                  (readMaybe)
-import qualified Text.Show.Pretty           as Pr
 
 import           Data.Basic
 import           Data.Env

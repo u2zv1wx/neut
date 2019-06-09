@@ -5,10 +5,9 @@ module Parse.MacroExpand
 
 import           Control.Comonad.Cofree
 import           Control.Monad.State
-import qualified Text.Show.Pretty       as Pr
 
 import           Data.Env
-import           Data.Maybe             (catMaybes, fromMaybe)
+import           Data.Maybe             (fromMaybe)
 import           Data.Tree
 
 type MacroSubst = ([(String, Tree)], [(String, [Tree])])
