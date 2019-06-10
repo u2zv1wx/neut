@@ -97,7 +97,8 @@ infer ctx (meta :< WeakTermSigma ((x, t):xts))
   higherUniv <- newUniv
   univ <- newUniv >>= annot higherUniv
   udom <- infer ctx t >>= annot higherUniv
-  ucod <- infer (ctx ++ [(x, t)]) (meta :< WeakTermSigma xts) >>= annot higherUniv
+  ucod <-
+    infer (ctx ++ [(x, t)]) (meta :< WeakTermSigma xts) >>= annot higherUniv
   insConstraintEnv udom ucod
   insConstraintEnv udom univ
   returnMeta meta univ
