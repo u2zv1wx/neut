@@ -74,7 +74,7 @@ interpret (meta :< TreeAtom "universe") = do
   return $ meta :< WeakTermUniv (UnivLevelHole hole)
 interpret (meta :< TreeNode [_ :< TreeAtom "mu", _ :< TreeAtom x, te]) = do
   e <- interpret te
-  return $ meta :< WeakTermMu x e
+  return $ meta :< WeakTermFix x e
 interpret (meta :< TreeNode (te:tvs)) = do
   e <- interpret te
   vs <- mapM interpret tvs

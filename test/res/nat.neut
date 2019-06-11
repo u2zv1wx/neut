@@ -15,15 +15,15 @@
 (let zero (pair left unit))
 (ascription zero nat)
 
-(let one (succ zero))
-(ascription one nat)
+; (let one (succ zero))
+; (ascription one nat)
 
-(let two (succ one))
-(ascription two nat)
+; (let two (succ one))
+; (ascription two nat)
 
-(definition next (n)
-  (pair right n))
-(ascription next
-  (arrow nat nat))
+; (definition next (n)
+;   (pair right n))
+; (ascription next
+;   (arrow nat nat))
 
 ; (let three (next two))

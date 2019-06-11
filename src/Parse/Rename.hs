@@ -50,11 +50,11 @@ rename (i :< WeakTermIndexElim e branchList) = do
   branchList' <- renameBranchList branchList
   return $ i :< WeakTermIndexElim e' branchList'
 rename (i :< WeakTermUniv j) = return $ i :< WeakTermUniv j
-rename (i :< WeakTermMu s e) =
+rename (i :< WeakTermFix s e) =
   local $ do
     s' <- newNameWith s
     e' <- rename e
-    return $ i :< WeakTermMu s' e'
+    return $ i :< WeakTermFix s' e'
 rename (i :< WeakTermHole x) = return $ i :< WeakTermHole x
 
 renameSigma :: [(Identifier, WeakTerm)] -> WithEnv [(Identifier, WeakTerm)]

@@ -55,7 +55,7 @@ macroMatch ::
   -> Pattern -- registered notation
   -> WithEnv (Maybe MacroSubst) -- {symbols in a pattern} -> {trees}
 macroMatch (i :< TreeAtom s1) (_ :< TreeAtom s2)
-  -- Trying to match two atoms. There are three case splits here:
+  -- Tries to match two atoms. There are three case splits here:
   --   (1) If the input `s1` and the pattern `s2` are both reserved, this matching
   --   succeeds iff s1 == s2.
   --   (2) If the input `s1` and the pattern `s2` are both unreserved, this matching

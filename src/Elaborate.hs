@@ -11,11 +11,12 @@ import qualified Text.Show.Pretty           as Pr
 
 import           Data.Basic
 import           Data.Env
-import           Data.WeakTerm
 import           Data.Term
+import           Data.WeakTerm
 import           Elaborate.Analyze
 import           Elaborate.Infer
 import           Elaborate.Synthesize
+import           Reduce.Term
 import           Reduce.WeakTerm
 
 -- Given a term `e` and its name `main`, this function
@@ -39,11 +40,21 @@ elaborate e = do
   let tenv' = Map.map (substWeakTerm sub) tenv
   modify (\env -> env {typeEnv = tenv'})
   -- use the resulting substitution to elaborate `e`.
-  exhaust e >>= elaborate'
+  e' <- exhaust e >>= elaborate'
+  -- r0 <- reduceWeakTermExceptMu e
+  -- r <- reduceTerm e'
+  liftIO $ putStrLn $ Pr.ppShow e
+  liftIO $ putStrLn $ Pr.ppShow e'
+  -- liftIO $ putStrLn $ Pr.ppShow r0
+  return e'
+  -- liftIO $ putStrLn $ Pr.ppShow e'
+  -- te <- gets termEnv
+  -- liftIO $ putStrLn $ Pr.ppShow te
+  -- exhaust e >>= elaborate'
 
 getNumLowType :: Identifier -> WithEnv (Either WeakTerm LowType)
 getNumLowType meta = do
-  t <- lookupTypeEnv' meta >>= reduceWeakTerm
+  t <- lookupTypeEnv' meta >>= reduceWeakTermExceptMu
   case t of
     _ :< WeakTermIndex "i1"  -> return $ Right $ LowTypeSignedInt 1
     _ :< WeakTermIndex "i2"  -> return $ Right $ LowTypeSignedInt 2
@@ -62,7 +73,8 @@ getNumLowType meta = do
     _ :< WeakTermIndex "f16" -> return $ Right $ LowTypeFloat 16
     _ :< WeakTermIndex "f32" -> return $ Right $ LowTypeFloat 32
     _ :< WeakTermIndex "f64" -> return $ Right $ LowTypeFloat 64
-    _                    -> return $ Left t
+    _ :< WeakTermIndex _     -> return $ Right $ LowTypeSignedInt 64 -- label is int
+    _                        -> return $ Left t
 
 -- This function translates a well-typed term into an untyped term in a
 -- reduction-preserving way. Here, we translate types into units (nullary product).
@@ -104,9 +116,9 @@ elaborate' (_ :< WeakTermIndexElim e branchList) = do
       return (l, body')
   return $ TermIndexElim e' branchList'
 elaborate' (_ :< WeakTermUniv _) = return $ TermSigmaIntro []
-elaborate' (meta :< WeakTermMu x e) = do
+elaborate' (meta :< WeakTermFix x e) = do
   e' <- elaborate' e
-  let fvs = varWeakTerm $ meta :< WeakTermMu x e
+  let fvs = varWeakTerm $ meta :< WeakTermFix x e
   insTermEnv x fvs $ substTerm [(x, TermConstElim x (map TermVar fvs))] e'
   return $ TermConstElim x (map TermVar fvs)
 elaborate' (_ :< WeakTermHole x) = do
@@ -131,13 +143,13 @@ exhaust' (_ :< WeakTermPiElim e1 e2) = allM exhaust' [e1, e2]
 exhaust' (_ :< WeakTermSigma xts) = allM exhaust' $ map snd xts
 exhaust' (_ :< WeakTermSigmaIntro es) = allM exhaust' es
 exhaust' (_ :< WeakTermSigmaElim _ e1 e2) = allM exhaust' [e1, e2]
-exhaust' (_ :< WeakTermMu _ e) = exhaust' e
+exhaust' (_ :< WeakTermFix _ e) = exhaust' e
 exhaust' (_ :< WeakTermIndex _) = return True
 exhaust' (_ :< WeakTermIndexIntro _) = return True
 exhaust' (_ :< WeakTermIndexElim _ []) = return False -- empty clause?
 exhaust' (meta :< WeakTermIndexElim e1 branchList@((l, _):_)) = do
   b1 <- exhaust' e1
-  t <- lookupTypeEnv' meta >>= reduceWeakTerm
+  t <- lookupTypeEnv' meta >>= reduceWeakTermExceptMu
   let labelList = map fst branchList
   case t of
     _ :< WeakTermIndex "i32" -> return $ b1 && (IndexDefault `elem` labelList)

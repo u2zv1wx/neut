@@ -14,23 +14,23 @@ data WeakTermF a
   = WeakTermVar Identifier
   | WeakTermConst Identifier
   | WeakTermPi (Identifier, a)
-           a
-  | WeakTermPiIntro (Identifier, a)
-                a
-  | WeakTermPiElim a
                a
+  | WeakTermPiIntro (Identifier, a)
+                    a
+  | WeakTermPiElim a
+                   a
   | WeakTermSigma [(Identifier, a)]
   | WeakTermSigmaIntro [a]
   | WeakTermSigmaElim [Identifier]
-                  a
-                  a
+                      a
+                      a
   | WeakTermIndex Identifier
   | WeakTermIndexIntro Index
   | WeakTermIndexElim a
-                  [(Index, a)]
+                      [(Index, a)]
   | WeakTermUniv UnivLevel
-  | WeakTermMu Identifier
-           a
+  | WeakTermFix Identifier
+               a
   | WeakTermHole Identifier
 
 type WeakTerm = Cofree WeakTermF Identifier
@@ -69,7 +69,7 @@ varAndHole (_ :< WeakTermIndexElim e branchList) = do
   pairwiseConcat (vs1 : vss)
 varAndHole (_ :< WeakTermConst _) = ([], [])
 varAndHole (_ :< WeakTermUniv _) = ([], [])
-varAndHole (_ :< WeakTermMu x e) = do
+varAndHole (_ :< WeakTermFix x e) = do
   let (vs1, vs2) = varAndHole e
   (filter (/= x) vs1, vs2)
 varAndHole (_ :< WeakTermHole x) = ([], [x])
@@ -89,7 +89,8 @@ pairwiseConcat ((xs, ys):rest) = do
   (xs ++ xs', ys ++ ys')
 
 substWeakTerm :: SubstWeakTerm -> WeakTerm -> WeakTerm
-substWeakTerm sub (j :< WeakTermVar s) = fromMaybe (j :< WeakTermVar s) (lookup s sub)
+substWeakTerm sub (j :< WeakTermVar s) =
+  fromMaybe (j :< WeakTermVar s) (lookup s sub)
 substWeakTerm _ (j :< WeakTermConst t) = j :< WeakTermConst t
 substWeakTerm sub (j :< WeakTermPi (s, tdom) tcod) = do
   let tdom' = substWeakTerm sub tdom
@@ -105,7 +106,8 @@ substWeakTerm sub (j :< WeakTermPiElim e1 e2) = do
   let e1' = substWeakTerm sub e1
   let e2' = substWeakTerm sub e2
   j :< WeakTermPiElim e1' e2'
-substWeakTerm sub (j :< WeakTermSigma xts) = j :< WeakTermSigma (substWeakTermSigma sub xts)
+substWeakTerm sub (j :< WeakTermSigma xts) =
+  j :< WeakTermSigma (substWeakTermSigma sub xts)
 substWeakTerm sub (j :< WeakTermSigmaIntro es) =
   j :< WeakTermSigmaIntro (map (substWeakTerm sub) es)
 substWeakTerm sub (j :< WeakTermSigmaElim xs e1 e2) = do
@@ -121,13 +123,15 @@ substWeakTerm sub (j :< WeakTermIndexElim e branchList) = do
   let es' = map (substWeakTerm sub) es
   j :< WeakTermIndexElim e' (zip labelList es')
 substWeakTerm _ (j :< WeakTermUniv i) = j :< WeakTermUniv i
-substWeakTerm sub (j :< WeakTermMu x e) = do
+substWeakTerm sub (j :< WeakTermFix x e) = do
   let sub' = filter (\(y, _) -> x /= y) sub
   let e' = substWeakTerm sub' e
-  j :< WeakTermMu x e'
-substWeakTerm sub (j :< WeakTermHole s) = fromMaybe (j :< WeakTermHole s) (lookup s sub)
+  j :< WeakTermFix x e'
+substWeakTerm sub (j :< WeakTermHole s) =
+  fromMaybe (j :< WeakTermHole s) (lookup s sub)
 
-substWeakTermSigma :: SubstWeakTerm -> [(Identifier, WeakTerm)] -> [(Identifier, WeakTerm)]
+substWeakTermSigma ::
+     SubstWeakTerm -> [(Identifier, WeakTerm)] -> [(Identifier, WeakTerm)]
 substWeakTermSigma _ [] = []
 substWeakTermSigma sub ((x, t):rest) = do
   let sub' = filter (\(y, _) -> y /= x) sub
@@ -135,26 +139,28 @@ substWeakTermSigma sub ((x, t):rest) = do
   let t' = substWeakTerm sub t
   (x, t') : xts
 
-isReducible :: WeakTerm -> Bool
-isReducible (_ :< WeakTermVar _) = False
-isReducible (_ :< WeakTermConst _) = False
-isReducible (_ :< WeakTermPi (_, _) _) = False
-isReducible (_ :< WeakTermPiIntro _ _) = False
-isReducible (_ :< WeakTermPiElim (_ :< WeakTermPiIntro _ _) _) = True
-isReducible (_ :< WeakTermPiElim e1 _) = isReducible e1
-isReducible (_ :< WeakTermSigma _) = False
-isReducible (_ :< WeakTermSigmaIntro es) = any isReducible es
-isReducible (_ :< WeakTermSigmaElim _ (_ :< WeakTermSigmaIntro _) _) = True
-isReducible (_ :< WeakTermSigmaElim _ e _) = isReducible e
-isReducible (_ :< WeakTermIndex _) = False
-isReducible (_ :< WeakTermIndexIntro _) = False
-isReducible (_ :< WeakTermIndexElim (_ :< WeakTermIndexIntro _) _) = True
-isReducible (_ :< WeakTermIndexElim e _) = isReducible e
-isReducible (_ :< WeakTermUniv _) = False
-isReducible (_ :< WeakTermMu _ _) = True
-isReducible (_ :< WeakTermHole _) = False
+isNonRecReducible :: WeakTerm -> Bool
+isNonRecReducible (_ :< WeakTermVar _) = False
+isNonRecReducible (_ :< WeakTermConst _) = False
+isNonRecReducible (_ :< WeakTermPi (_, _) _) = False
+isNonRecReducible (_ :< WeakTermPiIntro _ _) = False
+isNonRecReducible (_ :< WeakTermPiElim (_ :< WeakTermPiIntro _ _) _) = True
+isNonRecReducible (_ :< WeakTermPiElim e1 _) = isNonRecReducible e1
+isNonRecReducible (_ :< WeakTermSigma _) = False
+isNonRecReducible (_ :< WeakTermSigmaIntro es) = any isNonRecReducible es
+isNonRecReducible (_ :< WeakTermSigmaElim _ (_ :< WeakTermSigmaIntro _) _) =
+  True
+isNonRecReducible (_ :< WeakTermSigmaElim _ e _) = isNonRecReducible e
+isNonRecReducible (_ :< WeakTermIndex _) = False
+isNonRecReducible (_ :< WeakTermIndexIntro _) = False
+isNonRecReducible (_ :< WeakTermIndexElim (_ :< WeakTermIndexIntro _) _) = True
+isNonRecReducible (_ :< WeakTermIndexElim e _) = isNonRecReducible e
+isNonRecReducible (_ :< WeakTermUniv _) = False
+isNonRecReducible (_ :< WeakTermFix _ _) = False
+isNonRecReducible (_ :< WeakTermHole _) = False
 
-toWeakTermPiIntroSeq :: WeakTerm -> (WeakTerm, [(Identifier, WeakTerm, Identifier)])
+toWeakTermPiIntroSeq ::
+     WeakTerm -> (WeakTerm, [(Identifier, WeakTerm, Identifier)])
 toWeakTermPiIntroSeq (meta :< WeakTermPiIntro (x, t) body) = do
   let (body', args) = toWeakTermPiIntroSeq body
   (body', (x, t, meta) : args)

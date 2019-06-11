@@ -149,7 +149,7 @@ infer ctx (meta :< WeakTermIndexElim e branchList) = do
   tes <- mapM (infer ctx) es
   constrainList tes
   returnMeta meta $ head tes
-infer ctx (meta :< WeakTermMu s e) = do
+infer ctx (meta :< WeakTermFix s e) = do
   univ <- newUniv
   trec <- appCtx ctx >>= annot univ
   insTypeEnv s trec

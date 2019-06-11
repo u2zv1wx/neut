@@ -152,11 +152,11 @@ simp'' (c@(_, e2):cs)
     cs' <- simp cs
     return $ c : cs'
 simp'' ((e1, e2):cs)
-  | isReducible e1 = do
-    e1' <- reduceWeakTerm e1
+  | isNonRecReducible e1 = do
+    e1' <- reduceWeakTermExceptMu e1
     simp $ (e1', e2) : cs
 simp'' ((e1, e2):cs)
-  | isReducible e2 = simp $ (e2, e1) : cs
+  | isNonRecReducible e2 = simp $ (e2, e1) : cs
 simp'' (c@(e1, e2):cs) = do
   let mx = headMeta'' e1
   let my = headMeta'' e2
@@ -237,7 +237,7 @@ isEq (_ :< WeakTermIndexElim e1 bs1) (_ :< WeakTermIndexElim e2 bs2) = do
   return $ b1 && b2
 isEq (_ :< WeakTermUniv l1) (_ :< WeakTermUniv l2) = return $ l1 == l2
 isEq (_ :< WeakTermConst t1) (_ :< WeakTermConst t2) = return $ t1 == t2
-isEq (_ :< WeakTermMu x1 e1) (_ :< WeakTermMu x2 e2) = do
+isEq (_ :< WeakTermFix x1 e1) (_ :< WeakTermFix x2 e2) = do
   vx <- toVar' x1
   isEq e1 $ substWeakTerm [(x2, vx)] e2
 isEq (_ :< WeakTermHole x1) (_ :< WeakTermHole x2) = return $ x1 == x2
@@ -342,7 +342,7 @@ hasMeta (_ :< WeakTermIndexElim e branchList) = do
   any hasMeta (e : es)
 hasMeta (_ :< WeakTermUniv _) = False
 hasMeta (_ :< WeakTermConst _) = False
-hasMeta (_ :< WeakTermMu _ e) = hasMeta e
+hasMeta (_ :< WeakTermFix _ e) = hasMeta e
 hasMeta (_ :< WeakTermHole _) = True
 
 depth :: Identifier -> WithEnv Int

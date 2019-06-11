@@ -5,6 +5,7 @@ module LLVM
 import           Control.Monad.State
 import           Control.Monad.Trans.Except
 import           Data.List                  (elemIndex)
+import qualified Text.Show.Pretty           as Pr
 
 import           Data.Basic
 import           Data.Env
@@ -159,6 +160,12 @@ llvmDataLet x (PosIndexIntro (IndexFloat f) (LowTypeFloat j)) cont = do
   return $
     LLVMLet cast (LLVMBitcast (LLVMDataFloat f j) ft st) $
     LLVMLet x (LLVMIntToPointer (LLVMDataLocal cast) st voidPtr) cont
+llvmDataLet x (PosIndexIntro (IndexLabel l) (LowTypeSignedInt 64)) cont = do
+  mi <- getIndexNum l
+  case mi of
+    Nothing -> lift $ throwE $ "no such index defined: " ++ show l
+    Just i ->
+      llvmDataLet x (PosIndexIntro (IndexInteger i) (LowTypeSignedInt 64)) cont
 llvmDataLet _ (PosIndexIntro _ _) _ = lift $ throwE "llvmDataLet.PosIndexIntro"
 
 llvmDataLet' :: [(Identifier, Pos)] -> LLVM -> WithEnv LLVM

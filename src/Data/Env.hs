@@ -5,14 +5,15 @@ module Data.Env where
 import           Control.Comonad.Cofree
 import           Control.Monad.State
 import           Control.Monad.Trans.Except
+import           Data.List                  (elemIndex)
 
 import           Data.Basic
 import           Data.Constraint
 import           Data.LLVM
-import           Data.WeakTerm
 import           Data.Polarized
 import           Data.Term
 import           Data.Tree
+import           Data.WeakTerm
 
 import qualified Data.Map.Strict            as Map
 
@@ -187,6 +188,18 @@ lookupIndexSet' name ((_, ls):xs) =
   if name `elem` ls
     then return ls
     else lookupIndexSet' name xs
+
+getIndexNum :: Identifier -> WithEnv (Maybe Int)
+getIndexNum label = do
+  ienv <- gets indexEnv
+  return $ getIndexNum' label $ map snd ienv
+
+getIndexNum' :: Identifier -> [[Identifier]] -> Maybe Int
+getIndexNum' _ [] = Nothing
+getIndexNum' l (xs:xss) =
+  case elemIndex l xs of
+    Nothing -> getIndexNum' l xss
+    Just i  -> Just i
 
 isDefinedIndex :: Identifier -> WithEnv Bool
 isDefinedIndex name = do

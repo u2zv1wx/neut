@@ -155,7 +155,11 @@ discardInactive xs indexList =
 -- function tries to resolve this by `?M = lam _. lam _. e`, discarding the arguments
 -- `e1` and `e2`.
 synthesizeFlexRigid ::
-     Q.MinQueue EnrichedConstraint -> Identifier -> [WeakTerm] -> WeakTerm -> WithEnv ()
+     Q.MinQueue EnrichedConstraint
+  -> Identifier
+  -> [WeakTerm]
+  -> WeakTerm
+  -> WithEnv ()
 synthesizeFlexRigid q hole args e = do
   newHoleList <- mapM (const (newNameWith "hole")) args -- ?M_i
   meta <- newNameWith "meta"
