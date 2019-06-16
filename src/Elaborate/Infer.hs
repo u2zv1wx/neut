@@ -39,40 +39,25 @@ type Context = [(Identifier, WeakTerm)]
 -- Calculi and Applications, 2011.
 infer :: Context -> WeakTerm -> WithEnv WeakTerm
 infer _ (meta :< WeakTermVar s) = do
-  univ <- newUniv
-  t <- lookupTypeEnv' s >>= annot univ
+  t <- lookupTypeEnv' s
   returnMeta meta t
-infer ctx (meta :< WeakTermConst s) = do
-  higherUniv <- newUniv
-  univ <- newUniv >>= annot higherUniv
-  t <- lookupTypeEnv' s >>= annot univ
-  insTypeEnv s t
-  u <- infer ctx t >>= annot higherUniv
-  insConstraintEnv univ u
+infer _ (meta :< WeakTermConst s) = do
+  t <- lookupTypeEnv' s
   returnMeta meta t
 infer ctx (meta :< WeakTermPi (s, tdom) tcod) = do
   insTypeEnv s tdom
-  higherUniv <- newUniv
-  univ <- newUniv >>= annot higherUniv
-  udom <- infer ctx tdom >>= annot higherUniv
-  ucod <- infer (ctx ++ [(s, tdom)]) tcod >>= annot higherUniv
+  udom <- infer ctx tdom
+  ucod <- infer (ctx ++ [(s, tdom)]) tcod
   insConstraintEnv udom ucod
-  insConstraintEnv udom univ
-  returnMeta meta univ
+  returnMeta meta udom
 infer ctx (meta :< WeakTermPiIntro (s, tdom) e) = do
-  univ <- newUniv
-  tdom' <- annot univ tdom
-  insTypeEnv1 s tdom'
-  let ctx' = ctx ++ [(s, tdom')]
-  tcod <- infer ctx' e >>= annot univ
-  typeMeta <- newName' "meta" univ
-  returnMeta meta $ typeMeta :< WeakTermPi (s, tdom') tcod
+  insTypeEnv1 s tdom
+  tcod <- infer (ctx ++ [(s, tdom)]) e
+  metaPi <- newNameWith "meta"
+  returnMeta meta $ metaPi :< WeakTermPi (s, tdom) tcod
 infer ctx (meta :< WeakTermPiElim e1 e2) = do
-  univ <- newUniv
-  -- obtain the type of e1
-  tPi <- infer ctx e1 >>= reduceWeakTerm -- forall (x : tdom). tcod
-  -- infer the type of e2, and obtain (tdom, udom)
-  tdom <- infer ctx e2 >>= annot univ
+  tPi <- infer ctx e1 >>= reduceWeakTerm
+  tdom <- infer ctx e2
   case tPi of
     _ :< WeakTermPi (x, tdom') tcod' -> do
       _ <- insDef x e2
@@ -80,12 +65,9 @@ infer ctx (meta :< WeakTermPiElim e1 e2) = do
       returnMeta meta $ substWeakTerm [(x, e2)] tcod'
     _ -> do
       x <- newNameOfType tdom
-      -- represent tcod using hole
-      tcod <- appCtx (ctx ++ [(x, tdom)]) >>= annot univ
-      -- add a constraint regarding the Pi-type
-      typeMeta <- newNameWith "meta"
-      insTypeEnv typeMeta univ
-      insConstraintEnv tPi (typeMeta :< WeakTermPi (x, tdom) tcod)
+      tcod <- appCtx (ctx ++ [(x, tdom)])
+      metaPi <- newNameWith "meta"
+      insConstraintEnv tPi (metaPi :< WeakTermPi (x, tdom) tcod)
       returnMeta meta $ substWeakTerm [(x, e2)] tcod
 infer ctx (meta :< WeakTermSigma xts) = do
   univList <-
@@ -97,24 +79,20 @@ infer ctx (meta :< WeakTermSigma xts) = do
   constrainList $ univ : univList
   returnMeta meta univ
 infer ctx (meta :< WeakTermSigmaIntro es) = do
-  univ <- newUniv
   ts <- mapM (infer ctx) es
-  forM_ ts $ annot univ
   xs <- forM ts $ \t -> newName1 "sigma" t
   holeList <- sigmaHole ctx xs
   let holeList' = map (substWeakTerm (zip xs es)) holeList
   forM_ (zip holeList' ts) $ uncurry insConstraintEnv
   returnMeta meta $ meta :< WeakTermSigma (zip xs holeList')
 infer ctx (meta :< WeakTermSigmaElim xs e1 e2) = do
-  univ <- newUniv
-  t1 <- infer ctx e1 >>= annot univ
+  t1 <- infer ctx e1
   holeList <- sigmaHole ctx xs
   forM_ (zip xs holeList) $ uncurry insTypeEnv
-  t2 <- infer ctx e2 >>= annot univ
+  t2 <- infer ctx e2
   let binder = zip xs holeList
   sigmaMeta <- newNameWith "meta"
   let sigmaType = sigmaMeta :< WeakTermSigma binder
-  _ <- annot univ sigmaType
   insConstraintEnv t1 sigmaType
   z <- newNameOfType t1
   pair <- constructPair (ctx ++ zip xs holeList) xs
@@ -144,10 +122,9 @@ infer ctx (meta :< WeakTermIndexElim e branchList) = do
   constrainList tes
   returnMeta meta $ head tes
 infer ctx (meta :< WeakTermFix s e) = do
-  univ <- newUniv
-  trec <- appCtx ctx >>= annot univ
+  trec <- appCtx ctx
   insTypeEnv s trec
-  te <- infer (ctx ++ [(s, trec)]) e >>= annot univ
+  te <- infer (ctx ++ [(s, trec)]) e
   insConstraintEnv te trec
   returnMeta meta te
 infer _ (meta :< WeakTermUniv _) = newUniv >>= returnMeta meta
@@ -183,9 +160,6 @@ constrainList (t1@(meta1 :< _):t2@(meta2 :< _):ts) = do
   insTypeEnv meta2 u
   insConstraintEnv t1 t2
   constrainList $ t2 : ts
-
-annot :: WeakTerm -> WeakTerm -> WithEnv WeakTerm
-annot t e@(meta :< _) = insTypeEnv meta t >> return e
 
 constructPair :: Context -> [Identifier] -> WithEnv WeakTerm
 constructPair ctx xs = do
