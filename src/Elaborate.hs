@@ -16,7 +16,6 @@ import           Data.WeakTerm
 import           Elaborate.Analyze
 import           Elaborate.Infer
 import           Elaborate.Synthesize
-import           Reduce.Term
 import           Reduce.WeakTerm
 
 -- Given a term `e` and its name `main`, this function
@@ -40,16 +39,6 @@ elaborate e = do
   let tenv' = Map.map (substWeakTerm sub) tenv
   modify (\env -> env {typeEnv = tenv'})
   -- use the resulting substitution to elaborate `e`.
-  -- e' <- exhaust e >>= elaborate'
-  -- r0 <- reduceWeakTermExceptMu e
-  -- r <- reduceTerm e'
-  -- liftIO $ putStrLn $ Pr.ppShow e
-  -- liftIO $ putStrLn $ Pr.ppShow e'
-  -- liftIO $ putStrLn $ Pr.ppShow r0
-  -- return e'
-  -- liftIO $ putStrLn $ Pr.ppShow e'
-  -- te <- gets termEnv
-  -- liftIO $ putStrLn $ Pr.ppShow te
   exhaust e >>= elaborate'
 
 getNumLowType :: Identifier -> WithEnv (Either WeakTerm LowType)
