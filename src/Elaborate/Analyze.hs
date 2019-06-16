@@ -152,11 +152,11 @@ simp'' (c@(_, e2):cs)
     cs' <- simp cs
     return $ c : cs'
 simp'' ((e1, e2):cs)
-  | isNonRecReducible e1 = do
-    e1' <- reduceWeakTermExceptMu e1
+  | isReducible e1 = do
+    e1' <- reduceWeakTerm e1
     simp $ (e1', e2) : cs
 simp'' ((e1, e2):cs)
-  | isNonRecReducible e2 = simp $ (e2, e1) : cs
+  | isReducible e2 = simp $ (e2, e1) : cs
 simp'' (c@(e1, e2):cs) = do
   let mx = headMeta'' e1
   let my = headMeta'' e2

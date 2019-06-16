@@ -30,7 +30,7 @@ data WeakTermF a
                       [(Index, a)]
   | WeakTermUniv UnivLevel
   | WeakTermFix Identifier
-               a
+                a
   | WeakTermHole Identifier
 
 type WeakTerm = Cofree WeakTermF Identifier
@@ -139,25 +139,24 @@ substWeakTermSigma sub ((x, t):rest) = do
   let t' = substWeakTerm sub t
   (x, t') : xts
 
-isNonRecReducible :: WeakTerm -> Bool
-isNonRecReducible (_ :< WeakTermVar _) = False
-isNonRecReducible (_ :< WeakTermConst _) = False
-isNonRecReducible (_ :< WeakTermPi (_, _) _) = False
-isNonRecReducible (_ :< WeakTermPiIntro _ _) = False
-isNonRecReducible (_ :< WeakTermPiElim (_ :< WeakTermPiIntro _ _) _) = True
-isNonRecReducible (_ :< WeakTermPiElim e1 _) = isNonRecReducible e1
-isNonRecReducible (_ :< WeakTermSigma _) = False
-isNonRecReducible (_ :< WeakTermSigmaIntro es) = any isNonRecReducible es
-isNonRecReducible (_ :< WeakTermSigmaElim _ (_ :< WeakTermSigmaIntro _) _) =
-  True
-isNonRecReducible (_ :< WeakTermSigmaElim _ e _) = isNonRecReducible e
-isNonRecReducible (_ :< WeakTermIndex _) = False
-isNonRecReducible (_ :< WeakTermIndexIntro _) = False
-isNonRecReducible (_ :< WeakTermIndexElim (_ :< WeakTermIndexIntro _) _) = True
-isNonRecReducible (_ :< WeakTermIndexElim e _) = isNonRecReducible e
-isNonRecReducible (_ :< WeakTermUniv _) = False
-isNonRecReducible (_ :< WeakTermFix _ _) = False
-isNonRecReducible (_ :< WeakTermHole _) = False
+isReducible :: WeakTerm -> Bool
+isReducible (_ :< WeakTermVar _) = False
+isReducible (_ :< WeakTermConst _) = False
+isReducible (_ :< WeakTermPi (_, _) _) = False
+isReducible (_ :< WeakTermPiIntro _ _) = False
+isReducible (_ :< WeakTermPiElim (_ :< WeakTermPiIntro _ _) _) = True
+isReducible (_ :< WeakTermPiElim e1 _) = isReducible e1
+isReducible (_ :< WeakTermSigma _) = False
+isReducible (_ :< WeakTermSigmaIntro es) = any isReducible es
+isReducible (_ :< WeakTermSigmaElim _ (_ :< WeakTermSigmaIntro _) _) = True
+isReducible (_ :< WeakTermSigmaElim _ e _) = isReducible e
+isReducible (_ :< WeakTermIndex _) = False
+isReducible (_ :< WeakTermIndexIntro _) = False
+isReducible (_ :< WeakTermIndexElim (_ :< WeakTermIndexIntro _) _) = True
+isReducible (_ :< WeakTermIndexElim e _) = isReducible e
+isReducible (_ :< WeakTermUniv _) = False
+isReducible (_ :< WeakTermFix _ _) = True
+isReducible (_ :< WeakTermHole _) = False
 
 toWeakTermPiIntroSeq ::
      WeakTerm -> (WeakTerm, [(Identifier, WeakTerm, Identifier)])

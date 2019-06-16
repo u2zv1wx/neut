@@ -1,7 +1,16 @@
 (include "./coproduct.neut")
 
+;; nat := Sigma (n : u32). vector n top とするべきかもしれない
 (definition nat
   (coproduct top nat))
+
+; natでfixの中身をproductで包めばreductionが無限ループになるのを避けられる。
+; nat := fix x. (product (top + x))
+; このときはzeroとかoneとかはsingleton pairになる。
+; zero == pair (left(*))
+; one  == pair (right(pair (left(*))))
+; (definition nat
+;   (product (coproduct top nat)))
 
 ; (reserve nat)
 

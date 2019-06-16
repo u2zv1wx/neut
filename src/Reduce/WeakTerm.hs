@@ -1,6 +1,5 @@
 module Reduce.WeakTerm
   ( reduceWeakTerm
-  , reduceWeakTermExceptMu
   ) where
 
 import           Control.Comonad.Cofree
@@ -61,55 +60,6 @@ reduceWeakTerm (i :< WeakTermIndexElim e branchList) = do
 reduceWeakTerm (meta :< WeakTermFix s e) =
   reduceWeakTerm $ substWeakTerm [(s, meta :< WeakTermFix s e)] e
 reduceWeakTerm t = return t
-
-reduceWeakTermExceptMu :: WeakTerm -> WithEnv WeakTerm
-reduceWeakTermExceptMu app@(i :< WeakTermPiElim _ _) = do
-  let (fun, args) = toWeakTermPiElimSeq app
-  args' <- mapM (sndM reduceWeakTermExceptMu) args
-  fun' <- reduceWeakTermExceptMu fun
-  case fun' of
-    _ :< WeakTermPiIntro (x, _) e ->
-      reduceWeakTermExceptMu $
-      fromWeakTermPiElimSeq
-        (substWeakTerm [(x, snd $ head args')] e, tail args')
-    _ :< WeakTermConst constant -> do
-      let b1 = constant `elem` intAddConstantList
-      let b2 = constant `elem` intSubConstantList
-      let b3 = constant `elem` intMulConstantList
-      let b4 = constant `elem` intDivConstantList
-      case (b1, b2, b3, b4, takeIntegerList (map snd args')) of
-        (True, _, _, _, Just [x, y]) ->
-          return $ i :< WeakTermIndexIntro (IndexInteger (x + y))
-        (_, True, _, _, Just [x, y]) ->
-          return $ i :< WeakTermIndexIntro (IndexInteger (x - y))
-        (_, _, True, _, Just [x, y]) ->
-          return $ i :< WeakTermIndexIntro (IndexInteger (x * y))
-        (_, _, _, True, Just [x, y]) ->
-          return $ i :< WeakTermIndexIntro (IndexInteger (x `div` y))
-        _ -> return $ fromWeakTermPiElimSeq (fun', args')
-    _ -> return $ fromWeakTermPiElimSeq (fun', args')
-reduceWeakTermExceptMu (i :< WeakTermSigmaElim xs e body) = do
-  e' <- reduceWeakTermExceptMu e
-  case e of
-    _ :< WeakTermSigmaIntro es -> do
-      let _ :< body' = substWeakTerm (zip xs es) body
-      reduceWeakTermExceptMu $ i :< body'
-    _ -> return $ i :< WeakTermSigmaElim xs e' body
-reduceWeakTermExceptMu (i :< WeakTermIndexElim e branchList) = do
-  e' <- reduceWeakTermExceptMu e
-  case e' of
-    _ :< WeakTermIndexIntro x ->
-      case lookup x branchList of
-        Just body -> reduceWeakTermExceptMu body
-        Nothing ->
-          case lookup IndexDefault branchList of
-            Just body -> reduceWeakTermExceptMu body
-            Nothing ->
-              lift $
-              throwE $
-              "the index " ++ show x ++ " is not included in branchList"
-    _ -> return $ i :< WeakTermIndexElim e' branchList
-reduceWeakTermExceptMu t = return t
 
 takeIntegerList :: [WeakTerm] -> Maybe [Int]
 takeIntegerList [] = Just []

@@ -6,6 +6,7 @@
   (case x
     ((1 1)
      (_ (core.i32.mul x (fact (core.i32.sub x 1)))))))
-(ascription fact (arrow i32 i32))
+(ascription fact
+  (arrow i32 i32))
 
 (core.i32.print (fact 10))

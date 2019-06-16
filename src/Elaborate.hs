@@ -40,21 +40,21 @@ elaborate e = do
   let tenv' = Map.map (substWeakTerm sub) tenv
   modify (\env -> env {typeEnv = tenv'})
   -- use the resulting substitution to elaborate `e`.
-  e' <- exhaust e >>= elaborate'
+  -- e' <- exhaust e >>= elaborate'
   -- r0 <- reduceWeakTermExceptMu e
   -- r <- reduceTerm e'
-  liftIO $ putStrLn $ Pr.ppShow e
-  liftIO $ putStrLn $ Pr.ppShow e'
+  -- liftIO $ putStrLn $ Pr.ppShow e
+  -- liftIO $ putStrLn $ Pr.ppShow e'
   -- liftIO $ putStrLn $ Pr.ppShow r0
-  return e'
+  -- return e'
   -- liftIO $ putStrLn $ Pr.ppShow e'
   -- te <- gets termEnv
   -- liftIO $ putStrLn $ Pr.ppShow te
-  -- exhaust e >>= elaborate'
+  exhaust e >>= elaborate'
 
 getNumLowType :: Identifier -> WithEnv (Either WeakTerm LowType)
 getNumLowType meta = do
-  t <- lookupTypeEnv' meta >>= reduceWeakTermExceptMu
+  t <- lookupTypeEnv' meta >>= reduceWeakTerm
   case t of
     _ :< WeakTermIndex "i1"  -> return $ Right $ LowTypeSignedInt 1
     _ :< WeakTermIndex "i2"  -> return $ Right $ LowTypeSignedInt 2
@@ -149,7 +149,7 @@ exhaust' (_ :< WeakTermIndexIntro _) = return True
 exhaust' (_ :< WeakTermIndexElim _ []) = return False -- empty clause?
 exhaust' (meta :< WeakTermIndexElim e1 branchList@((l, _):_)) = do
   b1 <- exhaust' e1
-  t <- lookupTypeEnv' meta >>= reduceWeakTermExceptMu
+  t <- lookupTypeEnv' meta >>= reduceWeakTerm
   let labelList = map fst branchList
   case t of
     _ :< WeakTermIndex "i32" -> return $ b1 && (IndexDefault `elem` labelList)
