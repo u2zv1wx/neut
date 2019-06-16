@@ -87,20 +87,14 @@ infer ctx (meta :< WeakTermPiElim e1 e2) = do
       insTypeEnv typeMeta univ
       insConstraintEnv tPi (typeMeta :< WeakTermPi (x, tdom) tcod)
       returnMeta meta $ substWeakTerm [(x, e2)] tcod
-infer _ (meta :< WeakTermSigma []) = do
+infer ctx (meta :< WeakTermSigma xts) = do
+  univList <-
+    forM (map (`take` xts) [1 .. length xts]) $ \zts -> do
+      let zs = take (length zts - 1) zts
+      let t = snd $ last zts
+      infer (ctx ++ zs) t
   univ <- newUniv
-  returnMeta meta univ
-infer ctx (meta :< WeakTermSigma ((x, t):xts))
-  -- FIXME: Sigma (x, t) eの議論に帰着してPiと処理を統一したほうがよい
- = do
-  insTypeEnv x t
-  higherUniv <- newUniv
-  univ <- newUniv >>= annot higherUniv
-  udom <- infer ctx t >>= annot higherUniv
-  ucod <-
-    infer (ctx ++ [(x, t)]) (meta :< WeakTermSigma xts) >>= annot higherUniv
-  insConstraintEnv udom ucod
-  insConstraintEnv udom univ
+  constrainList $ univ : univList
   returnMeta meta univ
 infer ctx (meta :< WeakTermSigmaIntro es) = do
   univ <- newUniv
@@ -161,8 +155,6 @@ infer ctx (meta :< WeakTermHole _) = appCtx ctx >>= returnMeta meta
 
 -- In context ctx == [y1, ..., yn], `sigmaHole ctx names-of-holes` generates the list of
 -- holes [name-1 @ ctx, name-2 @ ctx @ name-1, ..., name-n @ ctx @ name-1 @ ... @ name-(n-1)].
--- sigmaHole :: Context -> [Identifier] -> WithEnv [WeakTerm]
--- sigmaHole ctx xs = forM (zip xs [0 ..]) $ \(_, i) -> sigmaHole' ctx xs i
 sigmaHole :: Context -> [Identifier] -> WithEnv [WeakTerm]
 sigmaHole _ [] = return []
 sigmaHole ctx (x:rest) = do
