@@ -152,14 +152,12 @@ simp'' (c@(_, e2):cs)
   | Just _ <- headMeta' [] e2 = do
     cs' <- simp cs
     return $ c : cs'
-simp'' ((e1, e2):cs)
-  | isReducible e1
-    -- let k = \x -> liftIO $ timeout 1000000 x
-    -- let red' x = x >>= \p -> reduceWeakTerm p
-    -- foo <- k $ (reduceWeakTerm e1)
-   = do
-    let e1' = reduceWeakTerm e1
-    simp $ (e1', e2) : cs
+simp'' (c@(e1, e2):cs)
+  | isReducible e1 = do
+    me1' <- liftIO $ timeout 5000000 $ return $ reduceWeakTerm e1 -- 5 sec
+    case me1' of
+      Just e1' -> simp $ (e1', e2) : cs
+      Nothing  -> throwError $ "cannot simplify [TIMEOUT]:\n" ++ Pr.ppShow c
 simp'' ((e1, e2):cs)
   | isReducible e2 = simp $ (e2, e1) : cs
 simp'' (c@(e1, e2):cs) = do
