@@ -9,6 +9,7 @@ import           Control.Comonad.Cofree
 import           Control.Monad.Except
 import           Control.Monad.State
 import qualified Data.PQueue.Min        as Q
+import           System.Timeout
 import qualified Text.Show.Pretty       as Pr
 
 import           Data.Basic
@@ -152,8 +153,12 @@ simp'' (c@(_, e2):cs)
     cs' <- simp cs
     return $ c : cs'
 simp'' ((e1, e2):cs)
-  | isReducible e1 = do
-    e1' <- reduceWeakTerm e1
+  | isReducible e1
+    -- let k = \x -> liftIO $ timeout 1000000 x
+    -- let red' x = x >>= \p -> reduceWeakTerm p
+    -- foo <- k $ (reduceWeakTerm e1)
+   = do
+    let e1' = reduceWeakTerm e1
     simp $ (e1', e2) : cs
 simp'' ((e1, e2):cs)
   | isReducible e2 = simp $ (e2, e1) : cs

@@ -56,7 +56,7 @@ infer ctx (meta :< WeakTermPiIntro (s, tdom) e) = do
   metaPi <- newNameWith "meta"
   returnMeta meta $ metaPi :< WeakTermPi (s, tdom) tcod
 infer ctx (meta :< WeakTermPiElim e1 e2) = do
-  tPi <- infer ctx e1 >>= reduceWeakTerm
+  tPi <- reduceWeakTerm <$> infer ctx e1
   tdom <- infer ctx e2
   case tPi of
     _ :< WeakTermPi (x, tdom') tcod' -> do

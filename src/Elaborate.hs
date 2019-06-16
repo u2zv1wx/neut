@@ -43,7 +43,7 @@ elaborate e = do
 
 getNumLowType :: Identifier -> WithEnv (Either WeakTerm LowType)
 getNumLowType meta = do
-  t <- lookupTypeEnv' meta >>= reduceWeakTerm
+  t <- reduceWeakTerm <$> lookupTypeEnv' meta
   case t of
     _ :< WeakTermIndex "i1"  -> return $ Right $ LowTypeSignedInt 1
     _ :< WeakTermIndex "i2"  -> return $ Right $ LowTypeSignedInt 2
@@ -138,7 +138,7 @@ exhaust' (_ :< WeakTermIndexIntro _) = return True
 exhaust' (_ :< WeakTermIndexElim _ []) = return False -- empty clause?
 exhaust' (meta :< WeakTermIndexElim e1 branchList@((l, _):_)) = do
   b1 <- exhaust' e1
-  t <- lookupTypeEnv' meta >>= reduceWeakTerm
+  t <- reduceWeakTerm <$> lookupTypeEnv' meta
   let labelList = map fst branchList
   case t of
     _ :< WeakTermIndex "i32" -> return $ b1 && (IndexDefault `elem` labelList)
