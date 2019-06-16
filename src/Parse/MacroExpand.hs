@@ -14,6 +14,7 @@ type MacroSubst = ([(String, Tree)], [(String, [Tree])])
 
 type Pattern = Tree
 
+-- CBV-like macro expansion
 macroExpand :: Tree -> WithEnv Tree
 macroExpand = recurM macroExpand1
 
