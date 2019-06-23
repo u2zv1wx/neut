@@ -2,12 +2,16 @@ module Data.Basic where
 
 type Identifier = String
 
-data Index
-  = IndexLabel Identifier
-  | IndexInteger Int
-  | IndexFloat Double
-  | IndexDefault
+data Literal
+  = LiteralInteger Int
+  | LiteralFloat Double
+  | LiteralLabel Identifier
   deriving (Show, Eq)
+
+data Case
+  = CaseLiteral Literal
+  | CaseDefault
+  deriving (Show)
 
 data LowType
   = LowTypeSignedInt Int

@@ -1,5 +1,6 @@
-{-# LANGUAGE DeriveFunctor   #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DeriveFunctor      #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TemplateHaskell    #-}
 
 module Data.WeakTerm where
 
@@ -10,27 +11,40 @@ import           Text.Show.Deriving
 
 import           Data.Basic
 
+type Upsilon = (Sortal, Identifier)
+
+data Sortal
+  = SortalPrimitive
+  | SortalModality WeakTerm
+
+deriving instance Show Sortal
+
 data WeakTermF a
-  = WeakTermVar Identifier
-  | WeakTermConst Identifier
-  | WeakTermPi (Identifier, a)
-               a
-  | WeakTermPiIntro (Identifier, a)
+  = WeakTermEpsilon Identifier
+  | WeakTermEpsilonIntro Literal
+  | WeakTermEpsilonElim a
+                        [(Case, a)]
+  | WeakTermUpsilon Upsilon
+  | WeakTermPi Sortal
+               [(Upsilon, a)]
+  | WeakTermPiIntro Sortal
+                    [(Upsilon, a)]
                     a
-  | WeakTermPiElim a
+  | WeakTermPiElim Sortal
                    a
-  | WeakTermSigma [(Identifier, a)]
-  | WeakTermSigmaIntro [a]
-  | WeakTermSigmaElim [Identifier]
+                   [a]
+  | WeakTermSigma Sortal
+                  [(Upsilon, a)]
+  | WeakTermSigmaIntro Sortal
+                       [a]
+  | WeakTermSigmaElim Sortal
+                      [(Upsilon, a)]
                       a
                       a
-  | WeakTermIndex Identifier
-  | WeakTermIndexIntro Index
-  | WeakTermIndexElim a
-                      [(Index, a)]
   | WeakTermUniv UnivLevel
-  | WeakTermFix Identifier
-                a
+  | WeakTermRecurse Upsilon
+                    a
+  | WeakTermConstant Identifier
   | WeakTermHole Identifier
 
 type WeakTerm = Cofree WeakTermF Identifier
@@ -61,9 +75,9 @@ varAndHole (_ :< WeakTermSigmaElim xs e1 e2) = do
   let (vs21, vs22) = varAndHole e2
   let vs2 = (filter (`notElem` xs) vs21, vs22)
   pairwiseConcat [vs1, vs2]
-varAndHole (_ :< WeakTermIndex _) = ([], [])
-varAndHole (_ :< WeakTermIndexIntro _) = ([], [])
-varAndHole (_ :< WeakTermIndexElim e branchList) = do
+varAndHole (_ :< WeakTermEpsilon _) = ([], [])
+varAndHole (_ :< WeakTermEpsilonIntro _) = ([], [])
+varAndHole (_ :< WeakTermEpsilonElim e branchList) = do
   let vs1 = varAndHole e
   vss <- forM branchList $ \(_, body) -> return $ varAndHole body
   pairwiseConcat (vs1 : vss)
@@ -115,13 +129,13 @@ substWeakTerm sub (j :< WeakTermSigmaElim xs e1 e2) = do
   let sub' = filter (\(x, _) -> x `notElem` xs) sub
   let e2' = substWeakTerm sub' e2
   j :< WeakTermSigmaElim xs e1' e2'
-substWeakTerm _ (j :< WeakTermIndex x) = j :< WeakTermIndex x
-substWeakTerm _ (j :< WeakTermIndexIntro l) = j :< WeakTermIndexIntro l
-substWeakTerm sub (j :< WeakTermIndexElim e branchList) = do
+substWeakTerm _ (j :< WeakTermEpsilon x) = j :< WeakTermEpsilon x
+substWeakTerm _ (j :< WeakTermEpsilonIntro l) = j :< WeakTermEpsilonIntro l
+substWeakTerm sub (j :< WeakTermEpsilonElim e branchList) = do
   let e' = substWeakTerm sub e
   let (labelList, es) = unzip branchList
   let es' = map (substWeakTerm sub) es
-  j :< WeakTermIndexElim e' (zip labelList es')
+  j :< WeakTermEpsilonElim e' (zip labelList es')
 substWeakTerm _ (j :< WeakTermUniv i) = j :< WeakTermUniv i
 substWeakTerm sub (j :< WeakTermFix x e) = do
   let sub' = filter (\(y, _) -> x /= y) sub
@@ -150,10 +164,10 @@ isReducible (_ :< WeakTermSigma _) = False
 isReducible (_ :< WeakTermSigmaIntro es) = any isReducible es
 isReducible (_ :< WeakTermSigmaElim _ (_ :< WeakTermSigmaIntro _) _) = True
 isReducible (_ :< WeakTermSigmaElim _ e _) = isReducible e
-isReducible (_ :< WeakTermIndex _) = False
-isReducible (_ :< WeakTermIndexIntro _) = False
-isReducible (_ :< WeakTermIndexElim (_ :< WeakTermIndexIntro _) _) = True
-isReducible (_ :< WeakTermIndexElim e _) = isReducible e
+isReducible (_ :< WeakTermEpsilon _) = False
+isReducible (_ :< WeakTermEpsilonIntro _) = False
+isReducible (_ :< WeakTermEpsilonElim (_ :< WeakTermEpsilonIntro _) _) = True
+isReducible (_ :< WeakTermEpsilonElim e _) = isReducible e
 isReducible (_ :< WeakTermUniv _) = False
 isReducible (_ :< WeakTermFix _ _) = True
 isReducible (_ :< WeakTermHole _) = False

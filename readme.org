@@ -25,7 +25,7 @@ m    ::= primitive
 e, A ::= u
        | (epsilon x)
        | (epsilon-intro x)
-       | (epsilon-elim x e (b1 e1) ... (bn en))
+       | (epsilon-elim x e (c1 e1) ... (cn en))
        | (pi m ((u1 A1) ... (un An)) A)
        | (pi-intro m ((u1 A1) ... (un An)) e)
        | (pi-elim m e e1 ... en)
@@ -35,9 +35,8 @@ e, A ::= u
        | (recurse (u A) e)
        | (universe <int>)
 
--- branch
-b    ::= (epsilon-intro x)
-       | u
+-- case
+c    ::= (epsilon-intro x)
        | (default)
 #+END_SRC
 
