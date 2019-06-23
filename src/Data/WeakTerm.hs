@@ -209,22 +209,9 @@ isReducibleSortal :: Sortal -> Bool
 isReducibleSortal SortalPrimitive = False
 isReducibleSortal (SortalTerm e)  = isReducible e
 
-toWeakTermPiIntroSeq ::
-     WeakTerm -> (WeakTerm, [(Identifier, WeakTerm, Identifier)])
-toWeakTermPiIntroSeq = undefined
-
--- toWeakTermPiIntroSeq (meta :< WeakTermPiIntro (x, t) body) = do
---   let (body', args) = toWeakTermPiIntroSeq body
---   (body', (x, t, meta) : args)
--- toWeakTermPiIntroSeq t = (t, [])
-fromWeakTermPiElimSeq :: (WeakTerm, [(Identifier, WeakTerm)]) -> WeakTerm
-fromWeakTermPiElimSeq (term, [])        = term
-fromWeakTermPiElimSeq (term, (i, v):xs) = undefined
-  -- fromWeakTermPiElimSeq (i :< WeakTermPiElim term v, xs)
-
-toWeakTermPiElimSeq :: WeakTerm -> (WeakTerm, [(Identifier, WeakTerm)])
-toWeakTermPiElimSeq = undefined
--- toWeakTermPiElimSeq (i :< WeakTermPiElim e1 e2) = do
---   let (fun, xs) = toWeakTermPiElimSeq e1
---   (fun, xs ++ [(i, e2)])
--- toWeakTermPiElimSeq c = (c, [])
+toWeakTermPiElimSeq ::
+     WeakTerm -> (WeakTerm, [(Identifier, Sortal, [WeakTerm])])
+toWeakTermPiElimSeq (i :< WeakTermPiElim s e es) = do
+  let (fun, xs) = toWeakTermPiElimSeq e
+  (fun, xs ++ [(i, s, es)])
+toWeakTermPiElimSeq c = (c, [])
