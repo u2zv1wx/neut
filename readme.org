@@ -5,8 +5,50 @@
 Neut is a programming language based on dependent modal linear type theory, focusing on canonicity and orthogonality. The key features of Neut include:
 
 - Expressive power of dependent type theory
-- Static, predictable memory allocation/deallocation by linearity and modality
+- Static, predictable memory allocation/deallocation
 - Dependent type inference by non-chronological backtracking
+
+** Syntax
+
+#+BEGIN_SRC
+-- identifier
+x    ::= <string>
+
+-- variable
+u    ::= (upsilon s x)
+
+-- resource modality
+s    ::= primitive
+       | e
+
+-- term
+e, A ::= u
+       | (epsilon x)
+       | (epsilon-intro x)
+       | (epsilon-elim x e (b1 e1) ... (bn en))
+       | (pi s ((u1 A1) ... (un An)) A)
+       | (pi-intro s ((u1 A1) ... (un An)) e)
+       | (pi-elim s e e1 ... en)
+       | (sigma s ((u1 A1) ... (un An)) e)
+       | (sigma-intro s e1 ... en)
+       | (sigma-elim s ((u1 A1) ... (un An)) e1 e2)
+       | (recurse (u A) e)
+       | (universe <int>)
+
+-- branch
+b    ::= (epsilon-intro x)
+       | u
+       | (default)
+#+END_SRC
+
+Built-in modality:
+#+BEGIN_SRC
+cartesian ::= epsilon "cartesian"
+relevant ::= epsilon "relevant"
+affine ::= epsilon "affine"
+linear ::= epsilon "linear"
+#+END_SRC
+
 
 ** Installation
 
