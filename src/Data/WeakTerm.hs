@@ -178,15 +178,17 @@ substWeakTermSortal sub (SortalTerm e) = SortalTerm $ substWeakTerm sub e
 
 isReducible :: WeakTerm -> Bool
 isReducible (_ :< WeakTermUniv _) = False
-isReducible (_ :< WeakTermUpsilon (s, _)) = isReducibleSortal s
+isReducible (_ :< WeakTermUpsilon u) = isReducibleUpsilon u
 isReducible (_ :< WeakTermEpsilon _) = False
 isReducible (_ :< WeakTermEpsilonIntro _) = False
 isReducible (_ :< WeakTermEpsilonElim (_ :< WeakTermEpsilonIntro l) branchList) = do
   let (caseList, _) = unzip branchList
   CaseLiteral l `elem` caseList || CaseDefault `elem` caseList
 isReducible (_ :< WeakTermEpsilonElim e _) = isReducible e
-isReducible (_ :< WeakTermPi s _) = isReducibleSortal s
-isReducible (_ :< WeakTermPiIntro s _ _) = isReducibleSortal s
+isReducible (_ :< WeakTermPi s uts) =
+  isReducibleSortal s || any isReducibleUpsilon (map fst uts)
+isReducible (_ :< WeakTermPiIntro s uts _) =
+  isReducibleSortal s || any isReducibleUpsilon (map fst uts)
 isReducible (_ :< WeakTermPiElim _ (_ :< WeakTermPiIntro _ uts _) es)
   | length uts == length es = True
 isReducible (_ :< WeakTermPiElim _ (_ :< WeakTermRec _ _) _) = True -- CBV recursion
@@ -194,20 +196,24 @@ isReducible (_ :< WeakTermPiElim _ (_ :< WeakTermConst c) [_ :< WeakTermEpsilonI
   | c `elem` intArithConstantList = True
 isReducible (_ :< WeakTermPiElim s e es) =
   isReducibleSortal s || isReducible e || any isReducible es
-isReducible (_ :< WeakTermSigma s _) = isReducibleSortal s
+isReducible (_ :< WeakTermSigma s uts) =
+  isReducibleSortal s || any isReducibleUpsilon (map fst uts)
 isReducible (_ :< WeakTermSigmaIntro s es) =
   isReducibleSortal s || any isReducible es
 isReducible (_ :< WeakTermSigmaElim _ uts (_ :< WeakTermSigmaIntro _ es) _)
   | length uts == length es = True
-isReducible (_ :< WeakTermSigmaElim s _ e _) =
-  isReducibleSortal s || isReducible e
-isReducible (_ :< WeakTermRec ((s, _), _) _) = isReducibleSortal s
+isReducible (_ :< WeakTermSigmaElim s uts e1 _) =
+  any isReducibleUpsilon (map fst uts) || isReducibleSortal s || isReducible e1
+isReducible (_ :< WeakTermRec (u, _) _) = isReducibleUpsilon u
 isReducible (_ :< WeakTermConst _) = False
 isReducible (_ :< WeakTermHole _) = False
 
 isReducibleSortal :: Sortal -> Bool
 isReducibleSortal SortalPrimitive = False
 isReducibleSortal (SortalTerm e)  = isReducible e
+
+isReducibleUpsilon :: Upsilon -> Bool
+isReducibleUpsilon (s, _) = isReducibleSortal s
 
 toWeakTermPiElimSeq ::
      WeakTerm -> (WeakTerm, [(Identifier, Sortal, [WeakTerm])])
