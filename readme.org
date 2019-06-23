@@ -24,7 +24,7 @@ m    ::= primitive
 -- term
 e, A ::= u
        | (epsilon x)
-       | (epsilon-intro x)
+       | (epsilon-intro x A)
        | (epsilon-elim x e (c1 e1) ... (cn en))
        | (pi m ((u1 A1) ... (un An)) A)
        | (pi-intro m ((u1 A1) ... (un An)) e)
