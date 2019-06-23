@@ -15,16 +15,16 @@ type Upsilon = (Sortal, Identifier)
 
 data Sortal
   = SortalPrimitive
-  | SortalModality WeakTerm
+  | SortalTerm WeakTerm
 
 deriving instance Show Sortal
 
 data WeakTermF a
-  = WeakTermEpsilon Identifier
+  = WeakTermUpsilon Upsilon
+  | WeakTermEpsilon Identifier
   | WeakTermEpsilonIntro Literal
   | WeakTermEpsilonElim a
                         [(Case, a)]
-  | WeakTermUpsilon Upsilon
   | WeakTermPi Sortal
                [(Upsilon, a)]
   | WeakTermPiIntro Sortal
