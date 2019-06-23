@@ -4,30 +4,13 @@ type Identifier = String
 
 data Literal
   = LiteralInteger Int
-                   Identifier
   | LiteralFloat Double
-                 Identifier
   | LiteralLabel Identifier
-                 Identifier
   deriving (Show, Eq)
 
 data Case
   = CaseLiteral Literal
   | CaseDefault
-  deriving (Show, Eq)
-
-data WeakLiteral
-  = WeakLiteralInteger Int
-                       (Maybe Identifier)
-  | WeakLiteralFloat Double
-                     (Maybe Identifier)
-  | WeakLiteralLabel Identifier
-                     (Maybe Identifier)
-  deriving (Show, Eq)
-
-data WeakCase
-  = WeakCaseLiteral WeakLiteral
-  | WeakCaseDefault
   deriving (Show, Eq)
 
 data LowType

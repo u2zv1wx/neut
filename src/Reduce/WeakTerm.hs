@@ -14,10 +14,10 @@ reduceWeakTerm (i :< WeakTermEpsilonElim e branchList) = do
   let e' = reduceWeakTerm e
   case e' of
     _ :< WeakTermEpsilonIntro l ->
-      case lookup (WeakCaseLiteral l) branchList of
+      case lookup (CaseLiteral l) branchList of
         Just body -> reduceWeakTerm body
         Nothing ->
-          case lookup WeakCaseDefault branchList of
+          case lookup CaseDefault branchList of
             Just body -> reduceWeakTerm body
             Nothing   -> i :< WeakTermEpsilonElim e' branchList
     _ -> i :< WeakTermEpsilonElim e' branchList
@@ -40,21 +40,18 @@ reduceWeakTerm (i :< WeakTermPiElim s e es) = do
       let self' = substWeakTerm [(x, self)] body
       reduceWeakTerm (i :< WeakTermPiElim s' self' es')
     _ :< WeakTermConst constant
-      | [_ :< WeakTermEpsilonIntro (WeakLiteralInteger x ma), _ :< WeakTermEpsilonIntro (WeakLiteralInteger y _)] <-
+      | [_ :< WeakTermEpsilonIntro (LiteralInteger x), _ :< WeakTermEpsilonIntro (LiteralInteger y)] <-
          es' -> do
         let b1 = constant `elem` intAddConstantList
         let b2 = constant `elem` intSubConstantList
         let b3 = constant `elem` intMulConstantList
         let b4 = constant `elem` intDivConstantList
         case (b1, b2, b3, b4) of
-          (True, _, _, _) ->
-            i :< WeakTermEpsilonIntro (WeakLiteralInteger (x + y) ma)
-          (_, True, _, _) ->
-            i :< WeakTermEpsilonIntro (WeakLiteralInteger (x - y) ma)
-          (_, _, True, _) ->
-            i :< WeakTermEpsilonIntro (WeakLiteralInteger (x * y) ma)
+          (True, _, _, _) -> i :< WeakTermEpsilonIntro (LiteralInteger (x + y))
+          (_, True, _, _) -> i :< WeakTermEpsilonIntro (LiteralInteger (x - y))
+          (_, _, True, _) -> i :< WeakTermEpsilonIntro (LiteralInteger (x * y))
           (_, _, _, True) ->
-            i :< WeakTermEpsilonIntro (WeakLiteralInteger (x `div` y) ma)
+            i :< WeakTermEpsilonIntro (LiteralInteger (x `div` y))
           _ -> i :< WeakTermPiElim s' e' es'
     _ -> i :< WeakTermPiElim s' e' es'
 reduceWeakTerm (i :< WeakTermSigma s uts) = do
