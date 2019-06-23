@@ -11,7 +11,7 @@ data Literal
 data Case
   = CaseLiteral Literal
   | CaseDefault
-  deriving (Show)
+  deriving (Show, Eq)
 
 data LowType
   = LowTypeSignedInt Int
@@ -86,6 +86,11 @@ intMulConstantList = flip map intLowTypeList $ \t -> "core." ++ show t ++ ".mul"
 
 intDivConstantList :: [String]
 intDivConstantList = flip map intLowTypeList $ \t -> "core." ++ show t ++ ".div"
+
+intArithConstantList :: [String]
+intArithConstantList =
+  intAddConstantList ++
+  intSubConstantList ++ intMulConstantList ++ intDivConstantList
 
 toFunPtrType :: [a] -> LowType
 toFunPtrType xs = do
