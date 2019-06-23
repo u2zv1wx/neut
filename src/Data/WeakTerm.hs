@@ -107,56 +107,74 @@ pairwiseConcat ((xs, ys):rest) = do
   (xs ++ xs', ys ++ ys')
 
 substWeakTerm :: SubstWeakTerm -> WeakTerm -> WeakTerm
-substWeakTerm = undefined
-
--- substWeakTerm sub (j :< WeakTermUpsilon s) =
---   fromMaybe (j :< WeakTermVar s) (lookup s sub)
--- substWeakTerm _ (j :< WeakTermEpsilon x) = j :< WeakTermEpsilon x
--- substWeakTerm _ (j :< WeakTermEpsilonIntro l) = j :< WeakTermEpsilonIntro l
--- substWeakTerm sub (j :< WeakTermEpsilonElim e branchList) = do
---   let e' = substWeakTerm sub e
---   let (labelList, es) = unzip branchList
---   let es' = map (substWeakTerm sub) es
---   j :< WeakTermEpsilonElim e' (zip labelList es')
--- substWeakTerm sub (j :< WeakTermPi (s, tdom) tcod) = do
---   let tdom' = substWeakTerm sub tdom
---   let sub' = filter (\(x, _) -> x /= s) sub
---   let tcod' = substWeakTerm sub' tcod
---   j :< WeakTermPi (s, tdom') tcod'
--- substWeakTerm sub (j :< WeakTermPiIntro (s, tdom) body) = do
---   let tdom' = substWeakTerm sub tdom
---   let sub' = filter (\(x, _) -> x /= s) sub
---   let body' = substWeakTerm sub' body
---   j :< WeakTermPiIntro (s, tdom') body'
--- substWeakTerm sub (j :< WeakTermPiElim e1 e2) = do
---   let e1' = substWeakTerm sub e1
---   let e2' = substWeakTerm sub e2
---   j :< WeakTermPiElim e1' e2'
--- substWeakTerm sub (j :< WeakTermSigma xts) =
---   j :< WeakTermSigma (substWeakTermSigma sub xts)
--- substWeakTerm sub (j :< WeakTermSigmaIntro es) =
---   j :< WeakTermSigmaIntro (map (substWeakTerm sub) es)
--- substWeakTerm sub (j :< WeakTermSigmaElim xs e1 e2) = do
---   let e1' = substWeakTerm sub e1
---   let sub' = filter (\(x, _) -> x `notElem` xs) sub
---   let e2' = substWeakTerm sub' e2
---   j :< WeakTermSigmaElim xs e1' e2'
--- substWeakTerm _ (j :< WeakTermUniv i) = j :< WeakTermUniv i
--- substWeakTerm sub (j :< WeakTermRec x e) = do
---   let sub' = filter (\(y, _) -> x /= y) sub
---   let e' = substWeakTerm sub' e
---   j :< WeakTermFix x e'
--- substWeakTerm _ (j :< WeakTermConst t) = j :< WeakTermConst t
--- substWeakTerm sub (j :< WeakTermHole s) =
---   fromMaybe (j :< WeakTermHole s) (lookup s sub)
-substWeakTermSigma ::
-     SubstWeakTerm -> [(Identifier, WeakTerm)] -> [(Identifier, WeakTerm)]
-substWeakTermSigma _ [] = []
-substWeakTermSigma sub ((x, t):rest) = do
-  let sub' = filter (\(y, _) -> y /= x) sub
-  let xts = substWeakTermSigma sub' rest
+substWeakTerm _ (j :< WeakTermUniv i) = j :< WeakTermUniv i
+substWeakTerm sub (j :< WeakTermUpsilon (s, x)) = do
+  let s' = substWeakTermSortal sub s
+  fromMaybe (j :< WeakTermUpsilon (s', x)) (lookup x sub)
+substWeakTerm _ (j :< WeakTermEpsilon x) = j :< WeakTermEpsilon x
+substWeakTerm _ (j :< WeakTermEpsilonIntro l) = j :< WeakTermEpsilonIntro l
+substWeakTerm sub (j :< WeakTermEpsilonElim e branchList) = do
+  let e' = substWeakTerm sub e
+  let (caseList, es) = unzip branchList
+  let es' = map (substWeakTerm sub) es
+  j :< WeakTermEpsilonElim e' (zip caseList es')
+substWeakTerm sub (j :< WeakTermPi s uts) = do
+  let s' = substWeakTermSortal sub s
+  let uts' = substWeakTermBindings sub uts
+  j :< WeakTermPi s' uts'
+substWeakTerm sub (j :< WeakTermPiIntro s uts body) = do
+  let s' = substWeakTermSortal sub s
+  let (uts', body') = substWeakTermBindingsWithBody sub uts body
+  j :< WeakTermPiIntro s' uts' body'
+substWeakTerm sub (j :< WeakTermPiElim s e es) = do
+  let s' = substWeakTermSortal sub s
+  let e' = substWeakTerm sub e
+  let es' = map (substWeakTerm sub) es
+  j :< WeakTermPiElim s' e' es'
+substWeakTerm sub (j :< WeakTermSigma s uts) = do
+  let s' = substWeakTermSortal sub s
+  let uts' = substWeakTermBindings sub uts
+  j :< WeakTermSigma s' uts'
+substWeakTerm sub (j :< WeakTermSigmaIntro s es) = do
+  let s' = substWeakTermSortal sub s
+  let es' = map (substWeakTerm sub) es
+  j :< WeakTermSigmaIntro s' es'
+substWeakTerm sub (j :< WeakTermSigmaElim s uts e1 e2) = do
+  let s' = substWeakTermSortal sub s
+  let e1' = substWeakTerm sub e1
+  let (uts', e2') = substWeakTermBindingsWithBody sub uts e2
+  j :< WeakTermSigmaElim s' uts' e1' e2'
+substWeakTerm sub (j :< WeakTermRec ((s, x), t) e) = do
+  let s' = substWeakTermSortal sub s
   let t' = substWeakTerm sub t
-  (x, t') : xts
+  let e' = substWeakTerm (filter (\(k, _) -> k /= x) sub) e
+  j :< WeakTermRec ((s', x), t') e'
+substWeakTerm _ (j :< WeakTermConst t) = j :< WeakTermConst t
+substWeakTerm sub (j :< WeakTermHole s) =
+  fromMaybe (j :< WeakTermHole s) (lookup s sub)
+
+substWeakTermBindings ::
+     SubstWeakTerm -> [(Upsilon, WeakTerm)] -> [(Upsilon, WeakTerm)]
+substWeakTermBindings _ [] = []
+substWeakTermBindings sub (((s, x), t):uts) = do
+  let sub' = filter (\(k, _) -> k /= x) sub
+  let uts' = substWeakTermBindings sub' uts
+  ((substWeakTermSortal sub s, x), substWeakTerm sub t) : uts'
+
+substWeakTermBindingsWithBody ::
+     SubstWeakTerm
+  -> [(Upsilon, WeakTerm)]
+  -> WeakTerm
+  -> ([(Upsilon, WeakTerm)], WeakTerm)
+substWeakTermBindingsWithBody sub [] e = ([], substWeakTerm sub e)
+substWeakTermBindingsWithBody sub (((s, x), t):uts) e = do
+  let sub' = filter (\(k, _) -> k /= x) sub
+  let (uts', e') = substWeakTermBindingsWithBody sub' uts e
+  (((substWeakTermSortal sub s, x), substWeakTerm sub t) : uts', e')
+
+substWeakTermSortal :: SubstWeakTerm -> Sortal -> Sortal
+substWeakTermSortal _ SortalPrimitive  = SortalPrimitive
+substWeakTermSortal sub (SortalTerm e) = SortalTerm $ substWeakTerm sub e
 
 isReducible :: WeakTerm -> Bool
 isReducible = undefined
