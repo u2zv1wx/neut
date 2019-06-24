@@ -77,12 +77,12 @@ reduceWeakTerm (i :< WeakTermRec ut e) =
 reduceWeakTerm (_ :< WeakTermAscription e _) = reduceWeakTerm e
 reduceWeakTerm t = t
 
-reduceWeakTermSortal :: Sortal -> Sortal
-reduceWeakTermSortal SortalPrimitive = SortalPrimitive
-reduceWeakTermSortal (SortalTerm e)  = SortalTerm $ reduceWeakTerm e
+reduceWeakTermSortal :: WeakSortal -> WeakSortal
+reduceWeakTermSortal WeakSortalPrimitive = WeakSortalPrimitive
+reduceWeakTermSortal (WeakSortalTerm e)  = WeakSortalTerm $ reduceWeakTerm e
 
-reduceWeakTermUpsilon :: Upsilon -> Upsilon
+reduceWeakTermUpsilon :: WeakUpsilon -> WeakUpsilon
 reduceWeakTermUpsilon (s, x) = (reduceWeakTermSortal s, x)
 
-reduceWeakTermUpsilonPlus :: (WeakTerm, Upsilon) -> (WeakTerm, Upsilon)
+reduceWeakTermUpsilonPlus :: WeakUpsilonPlus -> WeakUpsilonPlus
 reduceWeakTermUpsilonPlus (t, u) = (t, reduceWeakTermUpsilon u)

@@ -110,7 +110,7 @@ interpret t@(meta :< TreeAtom x) = do
               return $ meta :< WeakTermUpsilon (s, x)
 interpret t = lift $ throwE $ "interpret: syntax error:\n" ++ Pr.ppShow t
 
-interpretUpsilonPlus :: Tree -> WithEnv (WeakTerm, Upsilon)
+interpretUpsilonPlus :: Tree -> WithEnv WeakUpsilonPlus
 interpretUpsilonPlus u@(_ :< TreeAtom _) = do
   hole <- newHole
   u' <- interpretUpsilon u
@@ -122,7 +122,7 @@ interpretUpsilonPlus (_ :< TreeNode [u, t]) = do
 interpretUpsilonPlus ut =
   lift $ throwE $ "interpretUpsilonPlus: syntax error:\n" ++ Pr.ppShow ut
 
-interpretUpsilon :: Tree -> WithEnv Upsilon
+interpretUpsilon :: Tree -> WithEnv WeakUpsilon
 interpretUpsilon (_ :< TreeAtom x) = do
   s <- newSortal
   return (s, x)
@@ -170,18 +170,18 @@ interpretCase c = do
     Just l -> return $ CaseLiteral l
     Nothing -> lift $ throwE $ "interpretCase: syntax error:\n" ++ Pr.ppShow c
 
-interpretSortal :: Tree -> WithEnv Sortal
-interpretSortal (_ :< TreeAtom "primitive") = return SortalPrimitive
-interpretSortal s                           = SortalTerm <$> interpret s
+interpretSortal :: Tree -> WithEnv WeakSortal
+interpretSortal (_ :< TreeAtom "primitive") = return WeakSortalPrimitive
+interpretSortal s                           = WeakSortalTerm <$> interpret s
 
-newUpsilon :: WithEnv Upsilon
+newUpsilon :: WithEnv WeakUpsilon
 newUpsilon = do
   x <- newNameWith "hole"
   s <- newSortal
   return (s, x)
 
-newSortal :: WithEnv Sortal
-newSortal = SortalTerm <$> newHole
+newSortal :: WithEnv WeakSortal
+newSortal = WeakSortalTerm <$> newHole
 
 newHole :: WithEnv WeakTerm
 newHole = do

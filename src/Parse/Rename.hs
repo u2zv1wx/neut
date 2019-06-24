@@ -63,13 +63,13 @@ rename (i :< WeakTermAscription e t) = do
   return $ i :< WeakTermAscription e' t'
 rename (i :< WeakTermHole x) = return $ i :< WeakTermHole x
 
-renameSortal :: Sortal -> WithEnv Sortal
-renameSortal SortalPrimitive = return SortalPrimitive
-renameSortal (SortalTerm e) = do
+renameSortal :: WeakSortal -> WithEnv WeakSortal
+renameSortal WeakSortalPrimitive = return WeakSortalPrimitive
+renameSortal (WeakSortalTerm e) = do
   e' <- rename e
-  return $ SortalTerm e'
+  return $ WeakSortalTerm e'
 
-renameBindings :: [(WeakTerm, Upsilon)] -> WithEnv [(WeakTerm, Upsilon)]
+renameBindings :: [WeakUpsilonPlus] -> WithEnv [WeakUpsilonPlus]
 renameBindings [] = return []
 renameBindings ((t, u):tus) = do
   t' <- rename t
@@ -79,9 +79,7 @@ renameBindings ((t, u):tus) = do
     return $ (t', u') : tus'
 
 renameBindingsWithBody ::
-     [(WeakTerm, Upsilon)]
-  -> WeakTerm
-  -> WithEnv ([(WeakTerm, Upsilon)], WeakTerm)
+     [WeakUpsilonPlus] -> WeakTerm -> WithEnv ([WeakUpsilonPlus], WeakTerm)
 renameBindingsWithBody [] e = do
   e' <- rename e
   return ([], e')
@@ -92,13 +90,13 @@ renameBindingsWithBody ((t, u):tus) e = do
     (tus', e') <- renameBindingsWithBody tus e
     return ((t', u') : tus', e')
 
-newUpsilonWith :: Upsilon -> WithEnv Upsilon
+newUpsilonWith :: WeakUpsilon -> WithEnv WeakUpsilon
 newUpsilonWith (s, x) = do
   s' <- renameSortal s -- `s` must be renamed first
   x' <- newNameWith x
   return (s', x')
 
-newUpsilonPlusWith :: (WeakTerm, Upsilon) -> WithEnv (WeakTerm, Upsilon)
+newUpsilonPlusWith :: WeakUpsilonPlus -> WithEnv WeakUpsilonPlus
 newUpsilonPlusWith (t, u) = do
   t' <- rename t
   u' <- newUpsilonWith u
