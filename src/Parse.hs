@@ -1,8 +1,3 @@
--- This module translates the content of file using `strToTree`, and
--- update the state of the compiler according to the head element of the
--- resulting list of S-expressions. After parseing all the S-expressions
--- in the list, this module concatenates all the definitions in the tree in some
--- appropriate way, obtaining a term.
 module Parse
   ( parse
   ) where
