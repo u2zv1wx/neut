@@ -23,16 +23,11 @@ import           Parse.MacroExpand
 import           Parse.Read
 import           Parse.Rename
 
--- Def is essentially just a correspondence from name to term.
 data Def =
   DefLet Identifier -- meta
-         WeakUpsilonPlus
-         WeakTerm -- content  (the `e` in `let x = e in ...`)
+         WeakUpsilonPlus -- the `x` in `let x = e`
+         WeakTerm -- the `e` in `let x = e`
 
--- Given a content of a file, translate it into the list of corresponding S-expressions
--- using `strToTree`. Then parse them into the list of definitions (updating the
--- internal state of the compiler). After that, concatenate the list of definitions,
--- obtaining a term. Finally, process the resulting term using `process`.
 parse :: String -> WithEnv WeakTerm
 parse s = strToTree s >>= parse' >>= concatDefList
 
@@ -111,9 +106,11 @@ parse' ((_ :< TreeNode [_ :< TreeAtom "extern", _ :< TreeAtom name]):as)
 parse' ((meta :< TreeNode [_ :< TreeAtom "let", tsu, e]):as) = do
   e' <- macroExpand e >>= interpret >>= rename
   (t, (s, x)) <- macroExpand tsu >>= interpretUpsilonPlus
+  t' <- rename t
+  s' <- renameSortal s
   x' <- nameInModule x >>= newNameWith
   defList <- parse' as
-  return $ DefLet meta (t, (s, x')) e' : defList
+  return $ DefLet meta (t', (s', x')) e' : defList
 parse' (a:as)
   -- If the head element is not a special form, we interpret it as an ordinary term.
  = do

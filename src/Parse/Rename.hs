@@ -1,5 +1,6 @@
 module Parse.Rename
   ( rename
+  , renameSortal
   , nameInModule
   ) where
 
