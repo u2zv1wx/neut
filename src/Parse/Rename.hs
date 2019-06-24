@@ -11,64 +11,102 @@ import           Data.WeakTerm
 
 -- Alpha-convert all the variables so that different variables have different names.
 rename :: WeakTerm -> WithEnv WeakTerm
-rename (i :< WeakTermVar s) = do
-  t <- WeakTermVar <$> lookupNameEnv s
-  return $ i :< t
-rename (i :< WeakTermConst x) = return $ i :< WeakTermConst x
-rename (i :< WeakTermPi (s, tdom) tcod) = do
-  tdom' <- rename tdom
-  local $ do
-    s' <- newNameWith s
-    tcod' <- rename tcod
-    return $ i :< WeakTermPi (s', tdom') tcod'
-rename (i :< WeakTermPiIntro (s, tdom) e) = do
-  tdom' <- rename tdom
-  local $ do
-    s' <- newNameWith s
-    e' <- rename e
-    return $ i :< WeakTermPiIntro (s', tdom') e'
-rename (i :< WeakTermPiElim e v) = do
-  e' <- rename e
-  v' <- rename v
-  return $ i :< WeakTermPiElim e' v'
-rename (i :< WeakTermSigma xts) = do
-  xts' <- renameSigma xts
-  return $ i :< WeakTermSigma xts'
-rename (i :< WeakTermSigmaIntro es) = do
-  es' <- mapM rename es
-  return $ i :< WeakTermSigmaIntro es'
-rename (i :< WeakTermSigmaElim xs e1 e2) = do
-  e1' <- rename e1
-  local $ do
-    xs' <- mapM newNameWith xs
-    e2' <- rename e2
-    return $ i :< WeakTermSigmaElim xs' e1' e2'
-rename (i :< WeakTermIndex s) = return $ i :< WeakTermIndex s
-rename (i :< WeakTermIndexIntro x) = return $ i :< WeakTermIndexIntro x
-rename (i :< WeakTermIndexElim e branchList) = do
-  e' <- rename e
-  branchList' <- renameBranchList branchList
-  return $ i :< WeakTermIndexElim e' branchList'
 rename (i :< WeakTermUniv j) = return $ i :< WeakTermUniv j
-rename (i :< WeakTermFix s e) =
-  local $ do
-    s' <- newNameWith s
-    e' <- rename e
-    return $ i :< WeakTermFix s' e'
-rename (i :< WeakTermHole x) = return $ i :< WeakTermHole x
-
-renameSigma :: [(Identifier, WeakTerm)] -> WithEnv [(Identifier, WeakTerm)]
-renameSigma [] = return []
-renameSigma ((x, t):xts) = do
+rename (i :< WeakTermUpsilon (s, x)) = do
+  x' <- lookupNameEnv x
+  s' <- renameSortal s
+  return $ i :< WeakTermUpsilon (s', x')
+rename (i :< WeakTermEpsilon s) = return $ i :< WeakTermEpsilon s
+rename (i :< WeakTermEpsilonIntro x) = return $ i :< WeakTermEpsilonIntro x
+rename (i :< WeakTermEpsilonElim (t, u) e caseList) = do
+  e' <- rename e
   t' <- rename t
   local $ do
-    x' <- newNameWith x
-    xts' <- renameSigma xts
-    return $ (x', t') : xts'
+    u' <- newUpsilonWith u
+    caseList' <- renameCaseList caseList
+    return $ i :< WeakTermEpsilonElim (t', u') e' caseList'
+rename (i :< WeakTermPi s tus) = do
+  s' <- renameSortal s
+  tus' <- renameBindings tus
+  return $ i :< WeakTermPi s' tus'
+rename (i :< WeakTermPiIntro s tus e) = do
+  s' <- renameSortal s
+  (tus', e') <- renameBindingsWithBody tus e
+  return $ i :< WeakTermPiIntro s' tus' e'
+rename (i :< WeakTermPiElim s e es) = do
+  s' <- renameSortal s
+  e' <- rename e
+  es' <- mapM rename es
+  return $ i :< WeakTermPiElim s' e' es'
+rename (i :< WeakTermSigma s tus) = do
+  s' <- renameSortal s
+  tus' <- renameBindings tus
+  return $ i :< WeakTermSigma s' tus'
+rename (i :< WeakTermSigmaIntro s es) = do
+  s' <- renameSortal s
+  es' <- mapM rename es
+  return $ i :< WeakTermSigmaIntro s' es'
+rename (i :< WeakTermSigmaElim s tus e1 e2) = do
+  s' <- renameSortal s
+  e1' <- rename e1
+  (tus', e2') <- renameBindingsWithBody tus e2
+  return $ i :< WeakTermSigmaElim s' tus' e1' e2'
+rename (i :< WeakTermRec ut e) =
+  local $ do
+    ut' <- newUpsilonPlusWith ut
+    e' <- rename e
+    return $ i :< WeakTermRec ut' e'
+rename (i :< WeakTermConst x) = return $ i :< WeakTermConst x
+rename (i :< WeakTermAscription e t) = do
+  e' <- rename e
+  t' <- rename t
+  return $ i :< WeakTermAscription e' t'
+rename (i :< WeakTermHole x) = return $ i :< WeakTermHole x
 
-renameBranchList :: [(Index, WeakTerm)] -> WithEnv [(Index, WeakTerm)]
-renameBranchList branchList =
-  forM branchList $ \(l, body) ->
+renameSortal :: Sortal -> WithEnv Sortal
+renameSortal SortalPrimitive = return SortalPrimitive
+renameSortal (SortalTerm e) = do
+  e' <- rename e
+  return $ SortalTerm e'
+
+renameBindings :: [(WeakTerm, Upsilon)] -> WithEnv [(WeakTerm, Upsilon)]
+renameBindings [] = return []
+renameBindings ((t, u):tus) = do
+  t' <- rename t
+  local $ do
+    u' <- newUpsilonWith u
+    tus' <- renameBindings tus
+    return $ (t', u') : tus'
+
+renameBindingsWithBody ::
+     [(WeakTerm, Upsilon)]
+  -> WeakTerm
+  -> WithEnv ([(WeakTerm, Upsilon)], WeakTerm)
+renameBindingsWithBody [] e = do
+  e' <- rename e
+  return ([], e')
+renameBindingsWithBody ((t, u):tus) e = do
+  t' <- rename t
+  local $ do
+    u' <- newUpsilonWith u
+    (tus', e') <- renameBindingsWithBody tus e
+    return ((t', u') : tus', e')
+
+newUpsilonWith :: Upsilon -> WithEnv Upsilon
+newUpsilonWith (s, x) = do
+  s' <- renameSortal s -- `s` must be renamed first
+  x' <- newNameWith x
+  return (s', x')
+
+newUpsilonPlusWith :: (WeakTerm, Upsilon) -> WithEnv (WeakTerm, Upsilon)
+newUpsilonPlusWith (t, u) = do
+  t' <- rename t
+  u' <- newUpsilonWith u
+  return (t', u')
+
+renameCaseList :: [(Case, WeakTerm)] -> WithEnv [(Case, WeakTerm)]
+renameCaseList caseList =
+  forM caseList $ \(l, body) ->
     local $ do
       body' <- rename body
       return (l, body')
