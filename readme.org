@@ -15,20 +15,20 @@ Neut is a programming language based on dependent modal linear type theory, focu
 x    ::= <string>
 
 -- variable
-u    ::= (upsilon m x)
+u    ::= (m x)
 
 -- literal
 l    ::= x
        | <int>
        | <float>
 
--- modality
+-- sortal
 m    ::= primitive
        | e
 
 -- term
 e, A ::= (universe <int>)
-       | u
+       | (upsilon m x)
        | (epsilon x)
        | (epsilon-intro l)
        | (epsilon-elim x e (c1 e1) ... (cn en))
