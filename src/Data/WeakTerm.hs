@@ -17,33 +17,31 @@ data Sortal
   = SortalPrimitive
   | SortalTerm WeakTerm
 
-deriving instance Show Sortal
-
 data WeakTermF a
   = WeakTermUniv UnivLevel
   | WeakTermUpsilon Upsilon
   | WeakTermEpsilon Identifier
   | WeakTermEpsilonIntro Literal
-  | WeakTermEpsilonElim (Upsilon, a)
+  | WeakTermEpsilonElim (a, Upsilon)
                         a
                         [(Case, a)]
   | WeakTermPi Sortal
-               [(Upsilon, a)]
+               [(a, Upsilon)]
   | WeakTermPiIntro Sortal
-                    [(Upsilon, a)]
+                    [(a, Upsilon)]
                     a
   | WeakTermPiElim Sortal
                    a
                    [a]
   | WeakTermSigma Sortal
-                  [(Upsilon, a)]
+                  [(a, Upsilon)]
   | WeakTermSigmaIntro Sortal
                        [a]
   | WeakTermSigmaElim Sortal
-                      [(Upsilon, a)]
+                      [(a, Upsilon)]
                       a
                       a
-  | WeakTermRec (Upsilon, a)
+  | WeakTermRec (a, Upsilon)
                 a
   | WeakTermConst Identifier
   | WeakTermAscription a
@@ -52,12 +50,113 @@ data WeakTermF a
 
 type WeakTerm = Cofree WeakTermF Identifier
 
-$(deriveShow1 ''WeakTermF)
+type DUpsilon = (DSortal, Identifier)
+
+data DSortal
+  = DSortalPrimitive
+  | DSortalTerm DTerm
+
+deriving instance Show DSortal
+
+data DTermF a
+  = DTermUniv UnivLevel
+  | DTermDUpsilon DUpsilon
+  | DTermEpsilon Identifier
+  | DTermEpsilonIntro Literal
+  | DTermEpsilonElim (DUpsilon, a)
+                     a
+                     [(Case, a)]
+  | DTermPi DSortal
+            [(DUpsilon, a)]
+  | DTermPiIntro DSortal
+                 [(DUpsilon, a)]
+                 a
+  | DTermPiElim DSortal
+                a
+                [a]
+  | DTermSigma DSortal
+               [(DUpsilon, a)]
+  | DTermSigmaIntro DSortal
+                    [a]
+  | DTermSigmaElim DSortal
+                   [(DUpsilon, a)]
+                   a
+                   a
+  | DTermRec (DUpsilon, a)
+             a
+  | DTermConst Identifier
+  | DTermAscription a
+                    a
+  | DTermHole Identifier
+
+type DTerm = Cofree DTermF Identifier
+
+$(deriveShow1 ''DTermF)
 
 type SubstWeakTerm = [(Identifier, WeakTerm)]
 
 varWeakTerm :: WeakTerm -> [Identifier]
 varWeakTerm e = fst $ varAndHole e
+
+toDTerm :: WeakTerm -> DTerm
+toDTerm (meta :< WeakTermUniv i) = meta :< DTermUniv i
+toDTerm (meta :< WeakTermUpsilon (s, x)) =
+  meta :< DTermDUpsilon (toDTermSortal s, x)
+toDTerm (meta :< WeakTermEpsilon x) = meta :< DTermEpsilon x
+toDTerm (meta :< WeakTermEpsilonIntro l) = meta :< DTermEpsilonIntro l
+toDTerm (meta :< WeakTermEpsilonElim (t, (s, x)) e branchList) = do
+  let (cs, es) = unzip branchList
+  let es' = map toDTerm es
+  let t' = toDTerm t
+  meta :< DTermEpsilonElim ((toDTermSortal s, x), t') (toDTerm e) (zip cs es')
+toDTerm (meta :< WeakTermPi s tus) = do
+  let uts = toDTermUpsilonPlus tus
+  let s' = toDTermSortal s
+  meta :< DTermPi s' uts
+toDTerm (meta :< WeakTermPiIntro s tus e) = do
+  let s' = toDTermSortal s
+  let uts = toDTermUpsilonPlus tus
+  let e' = toDTerm e
+  meta :< DTermPiIntro s' uts e'
+toDTerm (meta :< WeakTermPiElim s e es) = do
+  let s' = toDTermSortal s
+  let e' = toDTerm e
+  let es' = map toDTerm es
+  meta :< DTermPiElim s' e' es'
+toDTerm (meta :< WeakTermSigma s tus) = do
+  let uts = toDTermUpsilonPlus tus
+  let s' = toDTermSortal s
+  meta :< DTermSigma s' uts
+toDTerm (meta :< WeakTermSigmaIntro s es) = do
+  let s' = toDTermSortal s
+  let es' = map toDTerm es
+  meta :< DTermSigmaIntro s' es'
+toDTerm (meta :< WeakTermSigmaElim s tus e1 e2) = do
+  let s' = toDTermSortal s
+  let uts = toDTermUpsilonPlus tus
+  let e1' = toDTerm e1
+  let e2' = toDTerm e2
+  meta :< DTermSigmaElim s' uts e1' e2'
+toDTerm (meta :< WeakTermRec (t, u) e) =
+  meta :< DTermRec (toDTermUpsilon u, toDTerm t) (toDTerm e)
+toDTerm (meta :< WeakTermConst c) = meta :< DTermConst c
+toDTerm (meta :< WeakTermAscription t e) = do
+  let t' = toDTerm t
+  let e' = toDTerm e
+  meta :< DTermAscription t' e'
+toDTerm (meta :< WeakTermHole x) = meta :< DTermHole x
+
+toDTermSortal :: Sortal -> DSortal
+toDTermSortal SortalPrimitive = DSortalPrimitive
+toDTermSortal (SortalTerm e)  = DSortalTerm $ toDTerm e
+
+toDTermUpsilon :: Upsilon -> DUpsilon
+toDTermUpsilon (s, x) = (toDTermSortal s, x)
+
+toDTermUpsilonPlus :: [(WeakTerm, Upsilon)] -> [(DUpsilon, DTerm)]
+toDTermUpsilonPlus [] = []
+toDTermUpsilonPlus ((t, u):tus) =
+  (toDTermUpsilon u, toDTerm t) : toDTermUpsilonPlus tus
 
 varAndHole :: WeakTerm -> ([Identifier], [Identifier])
 varAndHole (_ :< WeakTermUniv _) = ([], [])
@@ -66,7 +165,7 @@ varAndHole (_ :< WeakTermUpsilon (s, x)) = do
   (x : xs, hs)
 varAndHole (_ :< WeakTermEpsilon _) = ([], [])
 varAndHole (_ :< WeakTermEpsilonIntro _) = ([], [])
-varAndHole (_ :< WeakTermEpsilonElim ((s, x), t) e branchList) = do
+varAndHole (_ :< WeakTermEpsilonElim (t, (s, x)) e branchList) = do
   let xhs1 = varAndHoleSortal s
   let xhs2 = varAndHole t
   let xhs3 = varAndHole e
@@ -75,18 +174,18 @@ varAndHole (_ :< WeakTermEpsilonElim ((s, x), t) e branchList) = do
       let (xs, hs) = varAndHole body
       return (filter (/= x) xs, hs)
   pairwiseConcat (xhs1 : xhs2 : xhs3 : xhss)
-varAndHole (_ :< WeakTermPi s uts) = do
+varAndHole (_ :< WeakTermPi s tus) = do
   let (xs1, hs1) = varAndHoleSortal s
-  let (xs2, hs2) = varAndHoleBindings uts []
+  let (xs2, hs2) = varAndHoleBindings tus []
   (xs1 ++ xs2, hs1 ++ hs2)
-varAndHole (_ :< WeakTermPiIntro s uts e) = do
+varAndHole (_ :< WeakTermPiIntro s tus e) = do
   let (xs1, hs1) = varAndHoleSortal s
-  let (xs2, hs2) = varAndHoleBindings uts [e]
+  let (xs2, hs2) = varAndHoleBindings tus [e]
   (xs1 ++ xs2, hs1 ++ hs2)
 varAndHole (_ :< WeakTermPiElim s e es) =
   pairwiseConcat (varAndHoleSortal s : varAndHole e : map varAndHole es)
-varAndHole (_ :< WeakTermSigma s uts) =
-  pairwiseConcat [varAndHoleSortal s, varAndHoleBindings uts []]
+varAndHole (_ :< WeakTermSigma s tus) =
+  pairwiseConcat [varAndHoleSortal s, varAndHoleBindings tus []]
 varAndHole (_ :< WeakTermSigmaIntro s es) =
   pairwiseConcat $ varAndHoleSortal s : map varAndHole es
 varAndHole (_ :< WeakTermSigmaElim s us e1 e2) =
@@ -102,12 +201,12 @@ varAndHoleSortal SortalPrimitive = ([], [])
 varAndHoleSortal (SortalTerm e)  = varAndHole e
 
 varAndHoleBindings ::
-     [(Upsilon, WeakTerm)] -> [WeakTerm] -> ([Identifier], [Identifier])
+     [(WeakTerm, Upsilon)] -> [WeakTerm] -> ([Identifier], [Identifier])
 varAndHoleBindings [] es = pairwiseConcat $ map varAndHole es
-varAndHoleBindings (((s, x), t):uts) es = do
+varAndHoleBindings ((t, (s, x)):tus) es = do
   let (xs1, hs1) = varAndHoleSortal s
   let (xs2, hs2) = varAndHole t
-  let (xs3, hs3) = varAndHoleBindings uts es
+  let (xs3, hs3) = varAndHoleBindings tus es
   (xs1 ++ xs2 ++ filter (/= x) xs3, hs1 ++ hs2 ++ hs3)
 
 pairwiseConcat :: [([a], [b])] -> ([a], [b])
@@ -123,45 +222,45 @@ substWeakTerm sub (j :< WeakTermUpsilon (s, x)) = do
   fromMaybe (j :< WeakTermUpsilon (s', x)) (lookup x sub)
 substWeakTerm _ (j :< WeakTermEpsilon x) = j :< WeakTermEpsilon x
 substWeakTerm _ (j :< WeakTermEpsilonIntro l) = j :< WeakTermEpsilonIntro l
-substWeakTerm sub (j :< WeakTermEpsilonElim ((s, x), t) e branchList) = do
+substWeakTerm sub (j :< WeakTermEpsilonElim (t, (s, x)) e branchList) = do
   let s' = substWeakTermSortal sub s
   let t' = substWeakTerm sub t
   let e' = substWeakTerm sub e
   let (caseList, es) = unzip branchList
   let sub' = filter (\(k, _) -> k /= x) sub
   let es' = map (substWeakTerm sub') es
-  j :< WeakTermEpsilonElim ((s', x), t') e' (zip caseList es')
-substWeakTerm sub (j :< WeakTermPi s uts) = do
+  j :< WeakTermEpsilonElim (t', (s', x)) e' (zip caseList es')
+substWeakTerm sub (j :< WeakTermPi s tus) = do
   let s' = substWeakTermSortal sub s
-  let uts' = substWeakTermBindings sub uts
-  j :< WeakTermPi s' uts'
-substWeakTerm sub (j :< WeakTermPiIntro s uts body) = do
+  let tus' = substWeakTermBindings sub tus
+  j :< WeakTermPi s' tus'
+substWeakTerm sub (j :< WeakTermPiIntro s tus body) = do
   let s' = substWeakTermSortal sub s
-  let (uts', body') = substWeakTermBindingsWithBody sub uts body
-  j :< WeakTermPiIntro s' uts' body'
+  let (tus', body') = substWeakTermBindingsWithBody sub tus body
+  j :< WeakTermPiIntro s' tus' body'
 substWeakTerm sub (j :< WeakTermPiElim s e es) = do
   let s' = substWeakTermSortal sub s
   let e' = substWeakTerm sub e
   let es' = map (substWeakTerm sub) es
   j :< WeakTermPiElim s' e' es'
-substWeakTerm sub (j :< WeakTermSigma s uts) = do
+substWeakTerm sub (j :< WeakTermSigma s tus) = do
   let s' = substWeakTermSortal sub s
-  let uts' = substWeakTermBindings sub uts
-  j :< WeakTermSigma s' uts'
+  let tus' = substWeakTermBindings sub tus
+  j :< WeakTermSigma s' tus'
 substWeakTerm sub (j :< WeakTermSigmaIntro s es) = do
   let s' = substWeakTermSortal sub s
   let es' = map (substWeakTerm sub) es
   j :< WeakTermSigmaIntro s' es'
-substWeakTerm sub (j :< WeakTermSigmaElim s uts e1 e2) = do
+substWeakTerm sub (j :< WeakTermSigmaElim s tus e1 e2) = do
   let s' = substWeakTermSortal sub s
   let e1' = substWeakTerm sub e1
-  let (uts', e2') = substWeakTermBindingsWithBody sub uts e2
-  j :< WeakTermSigmaElim s' uts' e1' e2'
-substWeakTerm sub (j :< WeakTermRec ((s, x), t) e) = do
+  let (tus', e2') = substWeakTermBindingsWithBody sub tus e2
+  j :< WeakTermSigmaElim s' tus' e1' e2'
+substWeakTerm sub (j :< WeakTermRec (t, (s, x)) e) = do
   let s' = substWeakTermSortal sub s
   let t' = substWeakTerm sub t
   let e' = substWeakTerm (filter (\(k, _) -> k /= x) sub) e
-  j :< WeakTermRec ((s', x), t') e'
+  j :< WeakTermRec (t', (s', x)) e'
 substWeakTerm _ (j :< WeakTermConst t) = j :< WeakTermConst t
 substWeakTerm sub (j :< WeakTermAscription e t) = do
   let e' = substWeakTerm sub e
@@ -171,23 +270,23 @@ substWeakTerm sub (j :< WeakTermHole s) =
   fromMaybe (j :< WeakTermHole s) (lookup s sub)
 
 substWeakTermBindings ::
-     SubstWeakTerm -> [(Upsilon, WeakTerm)] -> [(Upsilon, WeakTerm)]
+     SubstWeakTerm -> [(WeakTerm, Upsilon)] -> [(WeakTerm, Upsilon)]
 substWeakTermBindings _ [] = []
-substWeakTermBindings sub (((s, x), t):uts) = do
+substWeakTermBindings sub ((t, (s, x)):tus) = do
   let sub' = filter (\(k, _) -> k /= x) sub
-  let uts' = substWeakTermBindings sub' uts
-  ((substWeakTermSortal sub s, x), substWeakTerm sub t) : uts'
+  let tus' = substWeakTermBindings sub' tus
+  (substWeakTerm sub t, (substWeakTermSortal sub s, x)) : tus'
 
 substWeakTermBindingsWithBody ::
      SubstWeakTerm
-  -> [(Upsilon, WeakTerm)]
+  -> [(WeakTerm, Upsilon)]
   -> WeakTerm
-  -> ([(Upsilon, WeakTerm)], WeakTerm)
+  -> ([(WeakTerm, Upsilon)], WeakTerm)
 substWeakTermBindingsWithBody sub [] e = ([], substWeakTerm sub e)
-substWeakTermBindingsWithBody sub (((s, x), t):uts) e = do
+substWeakTermBindingsWithBody sub ((t, (s, x)):tus) e = do
   let sub' = filter (\(k, _) -> k /= x) sub
-  let (uts', e') = substWeakTermBindingsWithBody sub' uts e
-  (((substWeakTermSortal sub s, x), substWeakTerm sub t) : uts', e')
+  let (tus', e') = substWeakTermBindingsWithBody sub' tus e
+  ((substWeakTerm sub t, (substWeakTermSortal sub s, x)) : tus', e')
 
 substWeakTermSortal :: SubstWeakTerm -> Sortal -> Sortal
 substWeakTermSortal _ SortalPrimitive  = SortalPrimitive
@@ -201,28 +300,28 @@ isReducible (_ :< WeakTermEpsilonIntro _) = False
 isReducible (_ :< WeakTermEpsilonElim _ (_ :< WeakTermEpsilonIntro l) branchList) = do
   let (caseList, _) = unzip branchList
   CaseLiteral l `elem` caseList || CaseDefault `elem` caseList
-isReducible (_ :< WeakTermEpsilonElim ((s, _), _) e _) =
+isReducible (_ :< WeakTermEpsilonElim (_, (s, _)) e _) =
   isReducibleSortal s || isReducible e
-isReducible (_ :< WeakTermPi s uts) =
-  isReducibleSortal s || any isReducibleUpsilon (map fst uts)
-isReducible (_ :< WeakTermPiIntro s uts _) =
-  isReducibleSortal s || any isReducibleUpsilon (map fst uts)
-isReducible (_ :< WeakTermPiElim _ (_ :< WeakTermPiIntro _ uts _) es)
-  | length uts == length es = True
+isReducible (_ :< WeakTermPi s tus) =
+  isReducibleSortal s || any isReducibleUpsilon (map snd tus)
+isReducible (_ :< WeakTermPiIntro s tus _) =
+  isReducibleSortal s || any isReducibleUpsilon (map snd tus)
+isReducible (_ :< WeakTermPiElim _ (_ :< WeakTermPiIntro _ tus _) es)
+  | length tus == length es = True
 isReducible (_ :< WeakTermPiElim _ (_ :< WeakTermRec _ _) _) = True -- CBV recursion
 isReducible (_ :< WeakTermPiElim _ (_ :< WeakTermConst c) [_ :< WeakTermEpsilonIntro (LiteralInteger _), _ :< WeakTermEpsilonIntro (LiteralInteger _)]) -- constant application
   | c `elem` intArithConstantList = True
 isReducible (_ :< WeakTermPiElim s e es) =
   isReducibleSortal s || isReducible e || any isReducible es
-isReducible (_ :< WeakTermSigma s uts) =
-  isReducibleSortal s || any isReducibleUpsilon (map fst uts)
+isReducible (_ :< WeakTermSigma s tus) =
+  isReducibleSortal s || any isReducibleUpsilon (map snd tus)
 isReducible (_ :< WeakTermSigmaIntro s es) =
   isReducibleSortal s || any isReducible es
-isReducible (_ :< WeakTermSigmaElim _ uts (_ :< WeakTermSigmaIntro _ es) _)
-  | length uts == length es = True
-isReducible (_ :< WeakTermSigmaElim s uts e1 _) =
-  any isReducibleUpsilon (map fst uts) || isReducibleSortal s || isReducible e1
-isReducible (_ :< WeakTermRec (u, _) _) = isReducibleUpsilon u
+isReducible (_ :< WeakTermSigmaElim _ tus (_ :< WeakTermSigmaIntro _ es) _)
+  | length tus == length es = True
+isReducible (_ :< WeakTermSigmaElim s tus e1 _) =
+  any isReducibleUpsilon (map snd tus) || isReducibleSortal s || isReducible e1
+isReducible (_ :< WeakTermRec (_, u) _) = isReducibleUpsilon u
 isReducible (_ :< WeakTermConst _) = False
 isReducible (_ :< WeakTermAscription _ _) = True
 isReducible (_ :< WeakTermHole _) = False

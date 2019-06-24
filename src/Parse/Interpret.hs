@@ -37,7 +37,7 @@ interpret (meta :< TreeNode [_ :< TreeAtom "pi", s, _ :< TreeNode uts, t]) = do
   uts' <- mapM interpretUpsilonPlus uts
   t' <- interpret t
   uhole <- newUpsilon
-  return $ meta :< WeakTermPi s' (uts' ++ [(uhole, t')])
+  return $ meta :< WeakTermPi s' (uts' ++ [(t', uhole)])
 interpret (meta :< TreeNode [_ :< TreeAtom "pi-intro", s, _ :< TreeNode uts, e]) = do
   s' <- interpretSortal s
   uts' <- mapM interpretUpsilonPlus uts
@@ -53,7 +53,7 @@ interpret (meta :< TreeNode [_ :< TreeAtom "sigma", s, _ :< TreeNode uts, t]) = 
   uts' <- mapM interpretUpsilonPlus uts
   t' <- interpret t
   hole <- newUpsilon
-  return $ meta :< WeakTermSigma s' (uts' ++ [(hole, t')])
+  return $ meta :< WeakTermSigma s' (uts' ++ [(t', hole)])
 interpret (meta :< TreeNode ((_ :< TreeAtom "sigma-intro"):s:es)) = do
   s' <- interpretSortal s
   es' <- mapM interpret es
@@ -82,12 +82,12 @@ interpret (meta :< TreeNode ((_ :< TreeAtom "arrow"):s:ts)) = do
   s' <- interpretSortal s
   ts' <- mapM interpret ts
   us <- mapM (const newUpsilon) ts'
-  return $ meta :< WeakTermPi s' (zip us ts')
+  return $ meta :< WeakTermPi s' (zip ts' us)
 interpret (meta :< TreeNode ((_ :< TreeAtom "product"):s:ts)) = do
   s' <- interpretSortal s
   ts' <- mapM interpret ts
   us <- mapM (const newUpsilon) ts'
-  return $ meta :< WeakTermSigma s' (zip us ts')
+  return $ meta :< WeakTermSigma s' (zip ts' us)
 interpret (meta :< TreeNode (e:es)) = do
   e' <- interpret e
   es' <- mapM interpret es
@@ -110,15 +110,15 @@ interpret t@(meta :< TreeAtom x) = do
               return $ meta :< WeakTermUpsilon (s, x)
 interpret t = lift $ throwE $ "interpret: syntax error:\n" ++ Pr.ppShow t
 
-interpretUpsilonPlus :: Tree -> WithEnv (Upsilon, WeakTerm)
+interpretUpsilonPlus :: Tree -> WithEnv (WeakTerm, Upsilon)
 interpretUpsilonPlus u@(_ :< TreeAtom _) = do
   hole <- newHole
   u' <- interpretUpsilon u
-  return (u', hole)
+  return (hole, u')
 interpretUpsilonPlus (_ :< TreeNode [u, t]) = do
   u' <- interpretUpsilon u
   t' <- interpret t
-  return (u', t')
+  return (t', u')
 interpretUpsilonPlus ut =
   lift $ throwE $ "interpretUpsilonPlus: syntax error:\n" ++ Pr.ppShow ut
 

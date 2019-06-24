@@ -10,7 +10,7 @@ import           Data.WeakTerm
 reduceWeakTerm :: WeakTerm -> WeakTerm
 reduceWeakTerm (i :< WeakTermUpsilon u) =
   i :< WeakTermUpsilon (reduceWeakTermUpsilon u)
-reduceWeakTerm (i :< WeakTermEpsilonElim ((s, x), t) e branchList) = do
+reduceWeakTerm (i :< WeakTermEpsilonElim (t, (s, x)) e branchList) = do
   let e' = reduceWeakTerm e
   case e' of
     _ :< WeakTermEpsilonIntro l ->
@@ -19,24 +19,24 @@ reduceWeakTerm (i :< WeakTermEpsilonElim ((s, x), t) e branchList) = do
         Nothing ->
           case lookup CaseDefault branchList of
             Just body -> reduceWeakTerm $ substWeakTerm [(x, e')] body
-            Nothing   -> i :< WeakTermEpsilonElim ((s, x), t) e' branchList
-    _ -> i :< WeakTermEpsilonElim ((s, x), t) e' branchList
-reduceWeakTerm (i :< WeakTermPi s uts) = do
-  let uts' = map reduceWeakTermUpsilon' uts
-  i :< WeakTermPi (reduceWeakTermSortal s) uts'
-reduceWeakTerm (i :< WeakTermPiIntro s uts e) = do
-  let uts' = map reduceWeakTermUpsilon' uts
-  i :< WeakTermPiIntro (reduceWeakTermSortal s) uts' e
+            Nothing   -> i :< WeakTermEpsilonElim (t, (s, x)) e' branchList
+    _ -> i :< WeakTermEpsilonElim (t, (s, x)) e' branchList
+reduceWeakTerm (i :< WeakTermPi s tus) = do
+  let tus' = map reduceWeakTermUpsilonPlus tus
+  i :< WeakTermPi (reduceWeakTermSortal s) tus'
+reduceWeakTerm (i :< WeakTermPiIntro s tus e) = do
+  let tus' = map reduceWeakTermUpsilonPlus tus
+  i :< WeakTermPiIntro (reduceWeakTermSortal s) tus' e
 reduceWeakTerm (i :< WeakTermPiElim s e es) = do
   let s' = reduceWeakTermSortal s
   let es' = map reduceWeakTerm es
   let e' = reduceWeakTerm e
   case e' of
-    _ :< WeakTermPiIntro _ uts body
-      | length uts == length es -> do
-        let xs = map (snd . fst) uts
+    _ :< WeakTermPiIntro _ tus body
+      | length tus == length es -> do
+        let xs = map (snd . snd) tus
         reduceWeakTerm $ substWeakTerm (zip xs es') body
-    self@(_ :< WeakTermRec ((_, x), _) body) -> do
+    self@(_ :< WeakTermRec (_, (_, x)) body) -> do
       let self' = substWeakTerm [(x, self)] body
       reduceWeakTerm (i :< WeakTermPiElim s' self' es')
     _ :< WeakTermConst constant
@@ -54,26 +54,26 @@ reduceWeakTerm (i :< WeakTermPiElim s e es) = do
             i :< WeakTermEpsilonIntro (LiteralInteger (x `div` y))
           _ -> i :< WeakTermPiElim s' e' es'
     _ -> i :< WeakTermPiElim s' e' es'
-reduceWeakTerm (i :< WeakTermSigma s uts) = do
-  let uts' = map reduceWeakTermUpsilon' uts
-  i :< WeakTermSigma (reduceWeakTermSortal s) uts'
+reduceWeakTerm (i :< WeakTermSigma s tus) = do
+  let tus' = map reduceWeakTermUpsilonPlus tus
+  i :< WeakTermSigma (reduceWeakTermSortal s) tus'
 reduceWeakTerm (i :< WeakTermSigmaIntro s es) = do
   let s' = reduceWeakTermSortal s
   let es' = map reduceWeakTerm es
   i :< WeakTermSigmaIntro s' es'
-reduceWeakTerm (i :< WeakTermSigmaElim s uts e1 e2) = do
+reduceWeakTerm (i :< WeakTermSigmaElim s tus e1 e2) = do
   let s' = reduceWeakTermSortal s
   let e1' = reduceWeakTerm e1
   case e1' of
     _ :< WeakTermSigmaIntro _ es
-      | length es == length uts -> do
-        let xs = map (snd . fst) uts
+      | length es == length tus -> do
+        let xs = map (snd . snd) tus
         reduceWeakTerm $ substWeakTerm (zip xs es) e2
     _ -> do
-      let uts' = map reduceWeakTermUpsilon' uts
-      i :< WeakTermSigmaElim s' uts' e1' e2
+      let tus' = map reduceWeakTermUpsilonPlus tus
+      i :< WeakTermSigmaElim s' tus' e1' e2
 reduceWeakTerm (i :< WeakTermRec ut e) =
-  i :< WeakTermRec (reduceWeakTermUpsilon' ut) e
+  i :< WeakTermRec (reduceWeakTermUpsilonPlus ut) e
 reduceWeakTerm (_ :< WeakTermAscription e _) = reduceWeakTerm e
 reduceWeakTerm t = t
 
@@ -84,5 +84,5 @@ reduceWeakTermSortal (SortalTerm e)  = SortalTerm $ reduceWeakTerm e
 reduceWeakTermUpsilon :: Upsilon -> Upsilon
 reduceWeakTermUpsilon (s, x) = (reduceWeakTermSortal s, x)
 
-reduceWeakTermUpsilon' :: (Upsilon, WeakTerm) -> (Upsilon, WeakTerm)
-reduceWeakTermUpsilon' (u, t) = (reduceWeakTermUpsilon u, t)
+reduceWeakTermUpsilonPlus :: (WeakTerm, Upsilon) -> (WeakTerm, Upsilon)
+reduceWeakTermUpsilonPlus (t, u) = (t, reduceWeakTermUpsilon u)
