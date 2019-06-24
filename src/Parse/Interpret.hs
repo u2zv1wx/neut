@@ -32,38 +32,38 @@ interpret (meta :< TreeNode [_ :< TreeAtom "epsilon-elim", u, e, _ :< TreeNode c
   e' <- interpret e
   caseList' <- mapM interpretClause caseList
   return $ meta :< WeakTermEpsilonElim u' e' caseList'
-interpret (meta :< TreeNode [_ :< TreeAtom "pi", s, _ :< TreeNode uts, t]) = do
+interpret (meta :< TreeNode [_ :< TreeAtom "pi", s, _ :< TreeNode tus, t]) = do
   s' <- interpretSortal s
-  uts' <- mapM interpretUpsilonPlus uts
+  tus' <- mapM interpretUpsilonPlus tus
   t' <- interpret t
   uhole <- newUpsilon
-  return $ meta :< WeakTermPi s' (uts' ++ [(t', uhole)])
-interpret (meta :< TreeNode [_ :< TreeAtom "pi-intro", s, _ :< TreeNode uts, e]) = do
+  return $ meta :< WeakTermPi s' (tus' ++ [(t', uhole)])
+interpret (meta :< TreeNode [_ :< TreeAtom "pi-intro", s, _ :< TreeNode tus, e]) = do
   s' <- interpretSortal s
-  uts' <- mapM interpretUpsilonPlus uts
+  tus' <- mapM interpretUpsilonPlus tus
   e' <- interpret e
-  return $ meta :< WeakTermPiIntro s' uts' e'
+  return $ meta :< WeakTermPiIntro s' tus' e'
 interpret (meta :< TreeNode ((_ :< TreeAtom "pi-elim"):s:e:es)) = do
   s' <- interpretSortal s
   e' <- interpret e
   es' <- mapM interpret es
   return $ meta :< WeakTermPiElim s' e' es'
-interpret (meta :< TreeNode [_ :< TreeAtom "sigma", s, _ :< TreeNode uts, t]) = do
+interpret (meta :< TreeNode [_ :< TreeAtom "sigma", s, _ :< TreeNode tus, t]) = do
   s' <- interpretSortal s
-  uts' <- mapM interpretUpsilonPlus uts
+  tus' <- mapM interpretUpsilonPlus tus
   t' <- interpret t
   hole <- newUpsilon
-  return $ meta :< WeakTermSigma s' (uts' ++ [(t', hole)])
+  return $ meta :< WeakTermSigma s' (tus' ++ [(t', hole)])
 interpret (meta :< TreeNode ((_ :< TreeAtom "sigma-intro"):s:es)) = do
   s' <- interpretSortal s
   es' <- mapM interpret es
   return $ meta :< WeakTermSigmaIntro s' es'
-interpret (meta :< TreeNode [_ :< TreeAtom "sigma-elim", s, _ :< TreeNode uts, e1, e2]) = do
+interpret (meta :< TreeNode [_ :< TreeAtom "sigma-elim", s, _ :< TreeNode tus, e1, e2]) = do
   s' <- interpretSortal s
-  uts' <- mapM interpretUpsilonPlus uts
+  tus' <- mapM interpretUpsilonPlus tus
   e1' <- interpret e1
   e2' <- interpret e2
-  return $ meta :< WeakTermSigmaElim s' uts' e1' e2'
+  return $ meta :< WeakTermSigmaElim s' tus' e1' e2'
 interpret (meta :< TreeNode [_ :< TreeAtom "recurse", ut, e]) = do
   ut' <- interpretUpsilonPlus ut
   e' <- interpret e
