@@ -10,17 +10,17 @@ import           Data.WeakTerm
 reduceWeakTerm :: WeakTerm -> WeakTerm
 reduceWeakTerm (i :< WeakTermUpsilon u) =
   i :< WeakTermUpsilon (reduceWeakTermUpsilon u)
-reduceWeakTerm (i :< WeakTermEpsilonElim e branchList) = do
+reduceWeakTerm (i :< WeakTermEpsilonElim ((s, x), t) e branchList) = do
   let e' = reduceWeakTerm e
   case e' of
     _ :< WeakTermEpsilonIntro l ->
       case lookup (CaseLiteral l) branchList of
-        Just body -> reduceWeakTerm body
+        Just body -> reduceWeakTerm $ substWeakTerm [(x, e')] body
         Nothing ->
           case lookup CaseDefault branchList of
-            Just body -> reduceWeakTerm body
-            Nothing   -> i :< WeakTermEpsilonElim e' branchList
-    _ -> i :< WeakTermEpsilonElim e' branchList
+            Just body -> reduceWeakTerm $ substWeakTerm [(x, e')] body
+            Nothing   -> i :< WeakTermEpsilonElim ((s, x), t) e' branchList
+    _ -> i :< WeakTermEpsilonElim ((s, x), t) e' branchList
 reduceWeakTerm (i :< WeakTermPi s uts) = do
   let uts' = map reduceWeakTermUpsilon' uts
   i :< WeakTermPi (reduceWeakTermSortal s) uts'

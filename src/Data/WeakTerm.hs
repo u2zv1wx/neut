@@ -24,7 +24,8 @@ data WeakTermF a
   | WeakTermUpsilon Upsilon
   | WeakTermEpsilon Identifier
   | WeakTermEpsilonIntro Literal
-  | WeakTermEpsilonElim a
+  | WeakTermEpsilonElim (Upsilon, a)
+                        a
                         [(Case, a)]
   | WeakTermPi Sortal
                [(Upsilon, a)]
@@ -65,10 +66,15 @@ varAndHole (_ :< WeakTermUpsilon (s, x)) = do
   (x : xs, hs)
 varAndHole (_ :< WeakTermEpsilon _) = ([], [])
 varAndHole (_ :< WeakTermEpsilonIntro _) = ([], [])
-varAndHole (_ :< WeakTermEpsilonElim e branchList) = do
-  let vs1 = varAndHole e
-  vss <- forM branchList $ \(_, body) -> return $ varAndHole body
-  pairwiseConcat (vs1 : vss)
+varAndHole (_ :< WeakTermEpsilonElim ((s, x), t) e branchList) = do
+  let xhs1 = varAndHoleSortal s
+  let xhs2 = varAndHole t
+  let xhs3 = varAndHole e
+  xhss <-
+    forM branchList $ \(_, body) -> do
+      let (xs, hs) = varAndHole body
+      return (filter (/= x) xs, hs)
+  pairwiseConcat (xhs1 : xhs2 : xhs3 : xhss)
 varAndHole (_ :< WeakTermPi s uts) = do
   let (xs1, hs1) = varAndHoleSortal s
   let (xs2, hs2) = varAndHoleBindings uts []
@@ -117,11 +123,14 @@ substWeakTerm sub (j :< WeakTermUpsilon (s, x)) = do
   fromMaybe (j :< WeakTermUpsilon (s', x)) (lookup x sub)
 substWeakTerm _ (j :< WeakTermEpsilon x) = j :< WeakTermEpsilon x
 substWeakTerm _ (j :< WeakTermEpsilonIntro l) = j :< WeakTermEpsilonIntro l
-substWeakTerm sub (j :< WeakTermEpsilonElim e branchList) = do
+substWeakTerm sub (j :< WeakTermEpsilonElim ((s, x), t) e branchList) = do
+  let s' = substWeakTermSortal sub s
+  let t' = substWeakTerm sub t
   let e' = substWeakTerm sub e
   let (caseList, es) = unzip branchList
-  let es' = map (substWeakTerm sub) es
-  j :< WeakTermEpsilonElim e' (zip caseList es')
+  let sub' = filter (\(k, _) -> k /= x) sub
+  let es' = map (substWeakTerm sub') es
+  j :< WeakTermEpsilonElim ((s', x), t') e' (zip caseList es')
 substWeakTerm sub (j :< WeakTermPi s uts) = do
   let s' = substWeakTermSortal sub s
   let uts' = substWeakTermBindings sub uts
@@ -189,10 +198,11 @@ isReducible (_ :< WeakTermUniv _) = False
 isReducible (_ :< WeakTermUpsilon u) = isReducibleUpsilon u
 isReducible (_ :< WeakTermEpsilon _) = False
 isReducible (_ :< WeakTermEpsilonIntro _) = False
-isReducible (_ :< WeakTermEpsilonElim (_ :< WeakTermEpsilonIntro l) branchList) = do
+isReducible (_ :< WeakTermEpsilonElim _ (_ :< WeakTermEpsilonIntro l) branchList) = do
   let (caseList, _) = unzip branchList
   CaseLiteral l `elem` caseList || CaseDefault `elem` caseList
-isReducible (_ :< WeakTermEpsilonElim e _) = isReducible e
+isReducible (_ :< WeakTermEpsilonElim ((s, _), _) e _) =
+  isReducibleSortal s || isReducible e
 isReducible (_ :< WeakTermPi s uts) =
   isReducibleSortal s || any isReducibleUpsilon (map fst uts)
 isReducible (_ :< WeakTermPiIntro s uts _) =

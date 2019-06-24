@@ -27,7 +27,8 @@ m    ::= primitive
        | e
 
 -- term
-e, A ::= u
+e, A ::= (universe <int>)
+       | u
        | (epsilon x)
        | (epsilon-intro l)
        | (epsilon-elim x e (c1 e1) ... (cn en))
@@ -38,7 +39,6 @@ e, A ::= u
        | (sigma-intro m e1 ... en)
        | (sigma-elim m ((u1 A1) ... (un An)) e1 e2)
        | (recurse (u A) e)
-       | (universe <int>)
        | (ascription e A)
 
 -- case
