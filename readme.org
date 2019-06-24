@@ -17,6 +17,11 @@ x    ::= <string>
 -- variable
 u    ::= (upsilon m x)
 
+-- literal
+l    ::= x
+       | <int>
+       | <float>
+
 -- modality
 m    ::= primitive
        | e
@@ -24,7 +29,7 @@ m    ::= primitive
 -- term
 e, A ::= u
        | (epsilon x)
-       | (epsilon-intro x A)
+       | (epsilon-intro l)
        | (epsilon-elim x e (c1 e1) ... (cn en))
        | (pi m ((u1 A1) ... (un An)) A)
        | (pi-intro m ((u1 A1) ... (un An)) e)
@@ -34,6 +39,7 @@ e, A ::= u
        | (sigma-elim m ((u1 A1) ... (un An)) e1 e2)
        | (recurse (u A) e)
        | (universe <int>)
+       | (ascription e A)
 
 -- case
 c    ::= (epsilon-intro x)

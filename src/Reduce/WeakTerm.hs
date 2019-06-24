@@ -74,6 +74,7 @@ reduceWeakTerm (i :< WeakTermSigmaElim s uts e1 e2) = do
       i :< WeakTermSigmaElim s' uts' e1' e2
 reduceWeakTerm (i :< WeakTermRec ut e) =
   i :< WeakTermRec (reduceWeakTermUpsilon' ut) e
+reduceWeakTerm (_ :< WeakTermAscription e _) = reduceWeakTerm e
 reduceWeakTerm t = t
 
 reduceWeakTermSortal :: Sortal -> Sortal

@@ -24,7 +24,6 @@ data WeakTermF a
   | WeakTermUpsilon Upsilon
   | WeakTermEpsilon Identifier
   | WeakTermEpsilonIntro Literal
-                         a
   | WeakTermEpsilonElim a
                         [(Case, a)]
   | WeakTermPi Sortal
@@ -46,6 +45,8 @@ data WeakTermF a
   | WeakTermRec (Upsilon, a)
                 a
   | WeakTermConst Identifier
+  | WeakTermAscription a
+                       a
   | WeakTermHole Identifier
 
 type WeakTerm = Cofree WeakTermF Identifier
@@ -63,7 +64,7 @@ varAndHole (_ :< WeakTermUpsilon (s, x)) = do
   let (xs, hs) = varAndHoleSortal s
   (x : xs, hs)
 varAndHole (_ :< WeakTermEpsilon _) = ([], [])
-varAndHole (_ :< WeakTermEpsilonIntro _ t) = varAndHole t
+varAndHole (_ :< WeakTermEpsilonIntro _) = ([], [])
 varAndHole (_ :< WeakTermEpsilonElim e branchList) = do
   let vs1 = varAndHole e
   vss <- forM branchList $ \(_, body) -> return $ varAndHole body
@@ -86,6 +87,8 @@ varAndHole (_ :< WeakTermSigmaElim s us e1 e2) =
   pairwiseConcat [varAndHole e1, varAndHoleSortal s, varAndHoleBindings us [e2]]
 varAndHole (_ :< WeakTermRec ut e) = varAndHoleBindings [ut] [e]
 varAndHole (_ :< WeakTermConst _) = ([], [])
+varAndHole (_ :< WeakTermAscription e t) =
+  pairwiseConcat [varAndHole e, varAndHole t]
 varAndHole (_ :< WeakTermHole x) = ([], [x])
 
 varAndHoleSortal :: Sortal -> ([Identifier], [Identifier])
@@ -113,9 +116,7 @@ substWeakTerm sub (j :< WeakTermUpsilon (s, x)) = do
   let s' = substWeakTermSortal sub s
   fromMaybe (j :< WeakTermUpsilon (s', x)) (lookup x sub)
 substWeakTerm _ (j :< WeakTermEpsilon x) = j :< WeakTermEpsilon x
-substWeakTerm sub (j :< WeakTermEpsilonIntro l t) = do
-  let t' = substWeakTerm sub t
-  j :< WeakTermEpsilonIntro l t'
+substWeakTerm _ (j :< WeakTermEpsilonIntro l) = j :< WeakTermEpsilonIntro l
 substWeakTerm sub (j :< WeakTermEpsilonElim e branchList) = do
   let e' = substWeakTerm sub e
   let (caseList, es) = unzip branchList
@@ -153,6 +154,10 @@ substWeakTerm sub (j :< WeakTermRec ((s, x), t) e) = do
   let e' = substWeakTerm (filter (\(k, _) -> k /= x) sub) e
   j :< WeakTermRec ((s', x), t') e'
 substWeakTerm _ (j :< WeakTermConst t) = j :< WeakTermConst t
+substWeakTerm sub (j :< WeakTermAscription e t) = do
+  let e' = substWeakTerm sub e
+  let t' = substWeakTerm sub t
+  j :< WeakTermAscription e' t'
 substWeakTerm sub (j :< WeakTermHole s) =
   fromMaybe (j :< WeakTermHole s) (lookup s sub)
 
@@ -183,8 +188,8 @@ isReducible :: WeakTerm -> Bool
 isReducible (_ :< WeakTermUniv _) = False
 isReducible (_ :< WeakTermUpsilon u) = isReducibleUpsilon u
 isReducible (_ :< WeakTermEpsilon _) = False
-isReducible (_ :< WeakTermEpsilonIntro _ _) = False
-isReducible (_ :< WeakTermEpsilonElim (_ :< WeakTermEpsilonIntro l _) branchList) = do
+isReducible (_ :< WeakTermEpsilonIntro _) = False
+isReducible (_ :< WeakTermEpsilonElim (_ :< WeakTermEpsilonIntro l) branchList) = do
   let (caseList, _) = unzip branchList
   CaseLiteral l `elem` caseList || CaseDefault `elem` caseList
 isReducible (_ :< WeakTermEpsilonElim e _) = isReducible e
@@ -195,7 +200,7 @@ isReducible (_ :< WeakTermPiIntro s uts _) =
 isReducible (_ :< WeakTermPiElim _ (_ :< WeakTermPiIntro _ uts _) es)
   | length uts == length es = True
 isReducible (_ :< WeakTermPiElim _ (_ :< WeakTermRec _ _) _) = True -- CBV recursion
-isReducible (_ :< WeakTermPiElim _ (_ :< WeakTermConst c) [_ :< WeakTermEpsilonIntro (LiteralInteger _) _, _ :< WeakTermEpsilonIntro (LiteralInteger _) _]) -- constant application
+isReducible (_ :< WeakTermPiElim _ (_ :< WeakTermConst c) [_ :< WeakTermEpsilonIntro (LiteralInteger _), _ :< WeakTermEpsilonIntro (LiteralInteger _)]) -- constant application
   | c `elem` intArithConstantList = True
 isReducible (_ :< WeakTermPiElim s e es) =
   isReducibleSortal s || isReducible e || any isReducible es
@@ -209,6 +214,7 @@ isReducible (_ :< WeakTermSigmaElim s uts e1 _) =
   any isReducibleUpsilon (map fst uts) || isReducibleSortal s || isReducible e1
 isReducible (_ :< WeakTermRec (u, _) _) = isReducibleUpsilon u
 isReducible (_ :< WeakTermConst _) = False
+isReducible (_ :< WeakTermAscription _ _) = True
 isReducible (_ :< WeakTermHole _) = False
 
 isReducibleSortal :: Sortal -> Bool
