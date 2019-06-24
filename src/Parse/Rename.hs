@@ -57,10 +57,6 @@ rename (i :< WeakTermRec ut e) =
     e' <- rename e
     return $ i :< WeakTermRec ut' e'
 rename (i :< WeakTermConst x) = return $ i :< WeakTermConst x
-rename (i :< WeakTermAscription e t) = do
-  e' <- rename e
-  t' <- rename t
-  return $ i :< WeakTermAscription e' t'
 rename (i :< WeakTermHole x) = return $ i :< WeakTermHole x
 
 renameSortal :: WeakSortal -> WithEnv WeakSortal

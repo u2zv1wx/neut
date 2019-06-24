@@ -68,10 +68,6 @@ interpret (meta :< TreeNode [_ :< TreeAtom "recurse", ut, e]) = do
   ut' <- interpretUpsilonPlus ut
   e' <- interpret e
   return $ meta :< WeakTermRec ut' e'
-interpret (meta :< TreeNode [_ :< TreeAtom "ascription", e, t]) = do
-  e' <- interpret e
-  t' <- interpret t
-  return $ meta :< WeakTermAscription e' t'
 interpret (meta :< TreeAtom "_") = do
   name <- newNameWith "hole"
   return $ meta :< WeakTermHole name

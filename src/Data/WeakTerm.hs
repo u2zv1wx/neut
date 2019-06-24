@@ -46,8 +46,6 @@ data WeakTermF a
   | WeakTermRec (a, WeakUpsilon)
                 a
   | WeakTermConst Identifier
-  | WeakTermAscription a
-                       a
   | WeakTermHole Identifier
 
 type WeakTerm = Cofree WeakTermF Identifier
@@ -87,8 +85,6 @@ data DTermF a
   | DTermRec (DUpsilon, a)
              a
   | DTermConst Identifier
-  | DTermAscription a
-                    a
   | DTermHole Identifier
 
 type DTerm = Cofree DTermF Identifier
@@ -142,10 +138,6 @@ toDTerm (meta :< WeakTermSigmaElim s tus e1 e2) = do
 toDTerm (meta :< WeakTermRec (t, u) e) =
   meta :< DTermRec (toDTermUpsilon u, toDTerm t) (toDTerm e)
 toDTerm (meta :< WeakTermConst c) = meta :< DTermConst c
-toDTerm (meta :< WeakTermAscription t e) = do
-  let t' = toDTerm t
-  let e' = toDTerm e
-  meta :< DTermAscription t' e'
 toDTerm (meta :< WeakTermHole x) = meta :< DTermHole x
 
 toDTermSortal :: WeakSortal -> DSortal
@@ -194,8 +186,6 @@ varAndHole (_ :< WeakTermSigmaElim s us e1 e2) =
   pairwiseConcat [varAndHole e1, varAndHoleSortal s, varAndHoleBindings us [e2]]
 varAndHole (_ :< WeakTermRec ut e) = varAndHoleBindings [ut] [e]
 varAndHole (_ :< WeakTermConst _) = ([], [])
-varAndHole (_ :< WeakTermAscription e t) =
-  pairwiseConcat [varAndHole e, varAndHole t]
 varAndHole (_ :< WeakTermHole x) = ([], [x])
 
 varAndHoleSortal :: WeakSortal -> ([Identifier], [Identifier])
@@ -264,10 +254,6 @@ substWeakTerm sub (j :< WeakTermRec (t, (s, x)) e) = do
   let e' = substWeakTerm (filter (\(k, _) -> k /= x) sub) e
   j :< WeakTermRec (t', (s', x)) e'
 substWeakTerm _ (j :< WeakTermConst t) = j :< WeakTermConst t
-substWeakTerm sub (j :< WeakTermAscription e t) = do
-  let e' = substWeakTerm sub e
-  let t' = substWeakTerm sub t
-  j :< WeakTermAscription e' t'
 substWeakTerm sub (j :< WeakTermHole s) =
   fromMaybe (j :< WeakTermHole s) (lookup s sub)
 
@@ -325,7 +311,6 @@ isReducible (_ :< WeakTermSigmaElim s tus e1 _) =
   any isReducibleUpsilon (map snd tus) || isReducibleSortal s || isReducible e1
 isReducible (_ :< WeakTermRec (_, u) _) = isReducibleUpsilon u
 isReducible (_ :< WeakTermConst _) = False
-isReducible (_ :< WeakTermAscription _ _) = True
 isReducible (_ :< WeakTermHole _) = False
 
 isReducibleSortal :: WeakSortal -> Bool
