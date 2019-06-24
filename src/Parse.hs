@@ -66,23 +66,13 @@ parse' ((_ :< TreeNode [_ :< TreeAtom "include", _ :< TreeAtom pathString]):as) 
           modify (\e -> e {currentDir = dirPath})
           defList <- parse' as
           return $ includedDefList ++ defList
-parse' ((_ :< TreeNode [_ :< TreeAtom "begin", _ :< TreeAtom moduleName]):as) = do
-  modify (\env -> env {moduleEnv = moduleEnv env ++ [moduleName]})
-  parse' as
-parse' ((_ :< TreeNode [_ :< TreeAtom "end", _ :< TreeAtom moduleName]):as) = do
+parse' ((_ :< TreeNode ((_ :< TreeAtom "module"):(_ :< TreeAtom moduleName):ss)):as) = do
   menv <- gets moduleEnv
-  if length menv <= 0
-    then lift $
-         throwE $ "cannot close " ++ moduleName ++ " since no module is open"
-    else do
-      let n = last menv
-      if n /= moduleName
-        then lift $
-             throwE $ "cannot close " ++ n ++ " without closing " ++ moduleName
-        else do
-          let menv' = take (length menv - 1) menv
-          modify (\env -> env {moduleEnv = menv'})
-          parse' as
+  modify (\env -> env {moduleEnv = menv ++ [moduleName]})
+  defList1 <- parse' ss
+  modify (\env -> env {moduleEnv = menv})
+  defList2 <- parse' as
+  return $ defList1 ++ defList2
 parse' ((_ :< TreeNode [_ :< TreeAtom "use", _ :< TreeAtom moduleName]):as) = do
   modify (\env -> env {prefixEnv = moduleName : prefixEnv env})
   parse' as
@@ -132,8 +122,8 @@ isSpecialForm (_ :< TreeNode [_ :< TreeAtom "reserve", _ :< TreeAtom _]) = True
 isSpecialForm (_ :< TreeNode ((_ :< TreeAtom "sortal"):(_ :< TreeAtom _):_)) =
   True
 isSpecialForm (_ :< TreeNode [_ :< TreeAtom "include", _ :< TreeAtom _]) = True
-isSpecialForm (_ :< TreeNode [_ :< TreeAtom "begin", _ :< TreeAtom _]) = True
-isSpecialForm (_ :< TreeNode [_ :< TreeAtom "end", _ :< TreeAtom _]) = True
+isSpecialForm (_ :< TreeNode ((_ :< TreeAtom "module"):(_ :< TreeAtom _):_)) =
+  True
 isSpecialForm (_ :< TreeNode [_ :< TreeAtom "use", _ :< TreeAtom _]) = True
 isSpecialForm (_ :< TreeNode [_ :< TreeAtom "unuse", _ :< TreeAtom _]) = True
 isSpecialForm (_ :< TreeNode [_ :< TreeAtom "extern", _ :< TreeAtom _]) = True
