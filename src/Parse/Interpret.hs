@@ -154,7 +154,16 @@ interpretLiteral l = do
       lift $ throwE $ "interpretLiteral: syntax error:\n" ++ Pr.ppShow l
 
 interpretCase :: Tree -> WithEnv Case
+--
+-- foundational
+--
+interpretCase (_ :< TreeNode [_ :< TreeAtom "epsilon-intro", l]) = do
+  l' <- interpretLiteral l
+  return $ CaseLiteral l'
 interpretCase (_ :< TreeAtom "default") = return CaseDefault
+--
+-- auxiliary
+--
 interpretCase c = do
   mc' <- interpretLiteralMaybe c
   case mc' of
