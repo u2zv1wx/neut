@@ -1,7 +1,7 @@
 module Parse.Interpret
   ( interpret
-  , interpretAtom
   , interpretUpsilonPlus
+  , extractIdentifier
   ) where
 
 import           Control.Comonad.Cofree
@@ -188,7 +188,7 @@ interpretClause (_ :< TreeNode [c, e]) = do
 interpretClause e =
   lift $ throwE $ "interpretClause: syntax error:\n " ++ Pr.ppShow e
 
-interpretAtom :: Tree -> WithEnv Identifier
-interpretAtom (_ :< TreeAtom s) = return s
-interpretAtom t =
+extractIdentifier :: Tree -> WithEnv Identifier
+extractIdentifier (_ :< TreeAtom s) = return s
+extractIdentifier t =
   lift $ throwE $ "interpretAtom: syntax error:\n" ++ Pr.ppShow t

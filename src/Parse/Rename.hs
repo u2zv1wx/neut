@@ -1,9 +1,12 @@
 module Parse.Rename
   ( rename
+  , nameInModule
   ) where
 
 import           Control.Comonad.Cofree
 import           Control.Monad.State
+import           Control.Monad.Trans.Except
+import           Data.List                  (intercalate)
 
 import           Data.Basic
 import           Data.Env
@@ -13,9 +16,24 @@ import           Data.WeakTerm
 rename :: WeakTerm -> WithEnv WeakTerm
 rename (i :< WeakTermUniv j) = return $ i :< WeakTermUniv j
 rename (i :< WeakTermUpsilon (s, x)) = do
-  x' <- lookupNameEnv x
+  let x' = normalForm x
   s' <- renameSortal s
-  return $ i :< WeakTermUpsilon (s', x')
+  let isAbsolute = '.' `elem` x'
+  if isAbsolute
+    then do
+      x'' <- lookupNameEnv x'
+      return $ i :< WeakTermUpsilon (s', x'')
+    else do
+      mx <- nameInModule x' >>= lookupNameEnv''
+      case mx of
+        Just x'' -> return $ i :< WeakTermUpsilon (s', x'')
+        Nothing -> do
+          penv <- gets prefixEnv
+          let candidateList = map (\prefix -> prefix ++ "." ++ x') penv
+          my <- lookupNameEnvByList candidateList
+          case my of
+            Just y  -> return $ i :< WeakTermUpsilon (s', y)
+            Nothing -> lift $ throwE $ "unbound variable: " ++ x
 rename (i :< WeakTermEpsilon s) = return $ i :< WeakTermEpsilon s
 rename (i :< WeakTermEpsilonIntro x) = return $ i :< WeakTermEpsilonIntro x
 rename (i :< WeakTermEpsilonElim (t, u) e caseList) = do
@@ -89,8 +107,8 @@ renameBindingsWithBody ((t, u):tus) e = do
 newUpsilonWith :: WeakUpsilon -> WithEnv WeakUpsilon
 newUpsilonWith (s, x) = do
   s' <- renameSortal s -- `s` must be renamed first
-  x' <- newNameWith x
-  return (s', x')
+  x'' <- nameInModule x >>= newNameWith
+  return (s', x'')
 
 newUpsilonPlusWith :: WeakUpsilonPlus -> WithEnv WeakUpsilonPlus
 newUpsilonPlusWith (t, u) = do
@@ -105,9 +123,25 @@ renameCaseList caseList =
       body' <- rename body
       return (l, body')
 
+normalForm :: Identifier -> Identifier
+normalForm x = intercalate "." $ filter (/= "") $ wordsWhen (== '.') x
+
+nameInModule :: Identifier -> WithEnv Identifier
+nameInModule x = do
+  menv <- gets moduleEnv
+  return $ intercalate "." $ menv ++ [x]
+
 local :: WithEnv a -> WithEnv a
 local p = do
   env <- get
   x <- p
   modify (\e -> env {count = count e})
   return x
+
+wordsWhen :: (Char -> Bool) -> String -> [String]
+wordsWhen p s =
+  case dropWhile p s of
+    "" -> []
+    s' -> do
+      let (w, s'') = break p s'
+      w : wordsWhen p s''

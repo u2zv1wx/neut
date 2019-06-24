@@ -24,9 +24,11 @@ data Env = Env
   , notationEnv       :: [(Tree, Tree)] -- macro transformers
   , reservedEnv       :: [Identifier] -- list of reserved keywords
   , constantEnv       :: [Identifier]
-  , moduleEnv         :: [(Identifier, [(Identifier, WeakTerm)])]
+  -- , moduleEnv :: [(Identifier, (WeakSortal, [(WeakUpsilonPlus, WeakTerm)]))]
+  , moduleEnv         :: [Identifier] -- "foo.bar" ~ ["foo", "bar"]
+  , prefixEnv         :: [Identifier]
   , indexEnv          :: [(Identifier, [Identifier])]
-  , nameEnv           :: [(Identifier, Identifier)] -- used in alpha conversion
+  , nameEnv           :: [(Identifier, Identifier)] -- [("foo.bar.buz", "foo.bar.buz.13"), ...]
   , typeEnv           :: Map.Map Identifier WeakTerm
   , constraintEnv     :: [PreConstraint] -- for type inference
   , constraintQueue   :: Q.MinQueue EnrichedConstraint -- for (dependent) type inference
@@ -36,7 +38,7 @@ data Env = Env
   , termEnv           :: [(Identifier, ([Identifier], Term))] -- x == lam (x1, ..., xn). e
   , polEnv            :: [(Identifier, ([Identifier], Neg))] -- x == v || x == thunk (lam (x) e)
   , llvmEnv           :: [(Identifier, ([Identifier], LLVM))]
-  } deriving (Show)
+  }
 
 initialEnv :: FilePath -> Env
 initialEnv path =
@@ -46,6 +48,7 @@ initialEnv path =
     , reservedEnv = []
     , constantEnv = []
     , moduleEnv = []
+    , prefixEnv = []
     , indexEnv = []
     , nameEnv = []
     , typeEnv = Map.empty
@@ -76,7 +79,7 @@ newName = do
   env <- get
   let i = count env
   modify (\e -> e {count = i + 1})
-  return $ "." ++ show i
+  return $ "-" ++ show i
 
 newNameWith :: Identifier -> WithEnv Identifier
 newNameWith s = do
@@ -110,9 +113,6 @@ lookupTypeEnv' s = do
     Nothing -> lift $ throwE $ s ++ " is not found in the type environment."
     Just t  -> return t
 
-insNameEnv :: Identifier -> Identifier -> WithEnv ()
-insNameEnv from to = modify (\e -> e {nameEnv = (from, to) : nameEnv e})
-
 lookupNameEnv :: String -> WithEnv String
 lookupNameEnv s = do
   env <- get
@@ -133,6 +133,14 @@ lookupNameEnv'' s = do
   case lookup s (nameEnv env) of
     Just s' -> return $ Just s'
     Nothing -> return Nothing
+
+lookupNameEnvByList :: [String] -> WithEnv (Maybe String)
+lookupNameEnvByList [] = return Nothing
+lookupNameEnvByList (x:xs) = do
+  my <- lookupNameEnv'' x
+  case my of
+    Nothing -> lookupNameEnvByList xs
+    Just y  -> return $ Just y
 
 insTypeEnv :: Identifier -> WeakTerm -> WithEnv ()
 insTypeEnv i t = modify (\e -> e {typeEnv = Map.insert i t (typeEnv e)})
@@ -160,11 +168,10 @@ insIndexEnv :: Identifier -> [Identifier] -> WithEnv ()
 insIndexEnv name indexList =
   modify (\e -> e {indexEnv = (name, indexList) : indexEnv e})
 
-lookupKind :: Index -> WithEnv (Maybe Identifier)
-lookupKind IndexDefault = return Nothing
-lookupKind (IndexInteger _) = return Nothing
-lookupKind (IndexFloat _) = return Nothing
-lookupKind (IndexLabel name) = do
+lookupKind :: Literal -> WithEnv (Maybe Identifier)
+lookupKind (LiteralInteger _) = return Nothing
+lookupKind (LiteralFloat _) = return Nothing
+lookupKind (LiteralLabel name) = do
   env <- get
   lookupKind' name $ indexEnv env
 
@@ -221,13 +228,6 @@ insUnivConstraintEnv :: UnivLevel -> UnivLevel -> WithEnv ()
 insUnivConstraintEnv t1 t2 =
   modify (\e -> e {univConstraintEnv = (t1, t2) : univConstraintEnv e})
 
-wrapArg :: Identifier -> WithEnv WeakTerm
-wrapArg i = do
-  t <- lookupTypeEnv' i
-  meta <- newNameWith "meta"
-  insTypeEnv meta t
-  return $ meta :< WeakTermVar i
-
 wrap :: f (Cofree f Identifier) -> WithEnv (Cofree f Identifier)
 wrap a = do
   meta <- newNameWith "meta"
@@ -273,3 +273,9 @@ withEnvFoldR f e (t:ts) = do
   tmp <- withEnvFoldR f e ts
   i <- newName
   return $ i :< f t tmp
+
+newHole :: WithEnv WeakTerm
+newHole = do
+  h <- newNameWith "hole"
+  m <- newNameWith "meta"
+  return $ m :< WeakTermHole h

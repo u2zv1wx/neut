@@ -31,30 +31,30 @@
 ;; sequential execution
 (reserve let)
 
-(reserve begin)
+(reserve do)
 
 (reserve definition)
 
-(notation (begin e)
+(notation (do e)
   e)
 
-(notation (begin e rest+)
-  (apply (lambda ((_ _)) (begin rest+)) (begin e)))
+(notation (do e rest+)
+  (apply (lambda ((_ _)) (do rest+)) (do e)))
 
-(notation (begin (let x e+) rest+)
-  (apply (lambda ((x _)) (begin rest+)) (begin e+)))
+(notation (do (let x e+) rest+)
+  (apply (lambda ((x _)) (do rest+)) (do e+)))
 
-(notation (begin (definition x e) rest+)
-  (apply (lambda ((x _)) (begin rest+)) (mu x e)))
+(notation (do (definition x e) rest+)
+  (apply (lambda ((x _)) (do rest+)) (mu x e)))
 
-(notation (begin (definition name (x+) e+) rest+)
-  (apply (lambda ((name _)) (begin rest+)) (mu name (lambda (x+) (begin e+)))))
+(notation (do (definition name (x+) e+) rest+)
+  (apply (lambda ((name _)) (do rest+)) (mu name (lambda (x+) (do e+)))))
 
 (notation (definition name e)
   (let name (mu name e)))
 
 (notation (definition name (x+) e+)
-  (let name (mu name (lambda (x+) (begin e+)))))
+  (let name (mu name (lambda (x+) (do e+)))))
 
 ;; shorthands for types
 (reserve type)
