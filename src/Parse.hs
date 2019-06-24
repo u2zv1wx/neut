@@ -79,12 +79,7 @@ parse' ((_ :< TreeNode [_ :< TreeAtom "use", _ :< TreeAtom moduleName]):as) = do
 parse' ((_ :< TreeNode [_ :< TreeAtom "unuse", _ :< TreeAtom moduleName]):as) = do
   modify (\env -> env {prefixEnv = filter (/= moduleName) $ prefixEnv env})
   parse' as
-parse' ((_ :< TreeNode ((_ :< TreeAtom "statement"):as1)):as2)
-  -- (statement stmt-1 ... stmt-n) is just a list of statements.
-  -- This statement is useful when defining new statements using `notation`.
-  -- For example, one may define `(import name path)` as:
-  --   (statement (module name (include path)) (use name)).
- = do
+parse' ((_ :< TreeNode ((_ :< TreeAtom "statement"):as1)):as2) = do
   defList1 <- parse' as1
   defList2 <- parse' as2
   return $ defList1 ++ defList2
