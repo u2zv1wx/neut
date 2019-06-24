@@ -1,6 +1,7 @@
 module Parse.Interpret
   ( interpret
   , interpretAtom
+  , interpretUpsilonPlus
   ) where
 
 import           Control.Comonad.Cofree
@@ -178,12 +179,6 @@ newUpsilon = do
 
 newSortal :: WithEnv WeakSortal
 newSortal = WeakSortalTerm <$> newHole
-
-newHole :: WithEnv WeakTerm
-newHole = do
-  h <- newNameWith "hole"
-  m <- newNameWith "meta"
-  return $ m :< WeakTermHole h
 
 interpretClause :: Tree -> WithEnv (Case, WeakTerm)
 interpretClause (_ :< TreeNode [c, e]) = do

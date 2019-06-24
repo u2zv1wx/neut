@@ -25,22 +25,24 @@ import           Parse.Rename
 
 -- Def is essentially just a correspondence from name to term.
 data Def
+  -- (let s (A x) e)
   = DefLet Identifier -- meta
-           (Identifier, Identifier) -- (name, alpha-converted name)
+           WeakUpsilonPlus
            WeakTerm -- content  (the `e` in `let x = e in ...`)
+  -- (module x e1 ... en)
   -- a module is just a tensor of its contents.
   -- DefMod can be understood as `let x = (f1, ..., fn) in ...`.
   -- The `fi`s are the third argument of DefMod.
-  | DefMod Identifier -- metaa
-           (Identifier, Identifier) -- (name, alpha-converted name)
-           [Identifier] -- list of the names of the contents
+  | DefMod Identifier -- meta
+           WeakUpsilon
+           [WeakUpsilonPlus] -- list of the names of the contents
 
 -- Given a content of a file, translate it into the list of corresponding S-expressions
 -- using `strToTree`. Then parse them into the list of definitions (updating the
 -- internal state of the compiler). After that, concatenate the list of definitions,
 -- obtaining a term. Finally, process the resulting term using `process`.
 parse :: String -> WithEnv WeakTerm
-parse s = strToTree s >>= parse' >>= concatDefList
+parse s = strToTree s >>= parse' >>= concatDefList >>= rename
 
 -- parse s = strToTree s >>= parse' >>= concatDefList >>= process
 -- Parse the head element of the input list.
@@ -90,36 +92,34 @@ parse' ((meta :< TreeNode ((_ :< TreeAtom "module"):(_ :< TreeAtom moduleName):t
   renv <- gets reservedEnv
   moduleDefList <- parse' ts
   modify (\e -> e {notationEnv = nenv, reservedEnv = renv})
-  xes <- join <$> mapM defToDefList moduleDefList
-  moduleName' <- newNameWith moduleName
-  modify (\e -> e {moduleEnv = (moduleName', xes) : moduleEnv e})
-  let es = map snd xes
+  tues <- join <$> mapM defToDefList moduleDefList
   s <- newCartesian
+  modify (\e -> e {moduleEnv = (moduleName, (s, tues)) : moduleEnv e})
+  let es = map snd tues
+  let tus = map fst tues
+  typeMeta <- newNameWith "meta"
+  let t = typeMeta :< WeakTermSigma s tus
   defList <- parse' as
   return $
-    DefLet meta (moduleName, moduleName') (meta :< WeakTermSigmaIntro s es) :
-    defList
+    DefLet meta (t, (s, moduleName)) (meta :< WeakTermSigmaIntro s es) : defList
 parse' ((meta :< TreeNode [_ :< TreeAtom "use", _ :< TreeAtom moduleName]):as)
   -- (use name) is essentially just a elimination of Sigma.
   -- Specifically, what (use name) does is:
   --   (1) lookup the moduleEnv, obtaining the list of names [name-1, ..., name-m].
   --   (2) create a sigma-decomposition `let (name.name-1, ..., name.name-m) = name`.
  = do
-  moduleName' <- lookupNameEnv moduleName
   menv <- gets moduleEnv
-  case lookup moduleName' menv of
+  case lookup moduleName menv of
     Nothing ->
       lift $
       throwE $
       "the module " ++
       moduleName ++ " is defined, but not registered in the module environment."
-    Just xes -> do
-      let (nameList, _) = unzip xes
-      let nameList' = map (\s -> moduleName ++ "." ++ s) nameList
-      ns <- mapM newNameWith nameList'
-      forM_ (zip nameList' ns) $ uncurry insNameEnv
+    Just (smod, tues) -> do
+      let tus = map fst tues
+      let tus' = map (\(t, (s, x)) -> (t, (s, moduleName ++ "." ++ x))) tus
       defList <- parse' as
-      return $ DefMod meta (moduleName, moduleName') ns : defList
+      return $ DefMod meta (smod, moduleName) tus' : defList
 parse' ((_ :< TreeNode ((_ :< TreeAtom "statement"):as1)):as2)
   -- (statement stmt-1 ... stmt-n) is just a list of statements.
   -- This statement is useful when defining new statements using `notation`.
@@ -129,21 +129,19 @@ parse' ((_ :< TreeNode ((_ :< TreeAtom "statement"):as1)):as2)
   defList1 <- parse' as1
   defList2 <- parse' as2
   return $ defList1 ++ defList2
-parse' ((_ :< TreeNode [_ :< TreeAtom "constant", _ :< TreeAtom name, t]):as)
+parse' ((_ :< TreeNode [_ :< TreeAtom "extern", _ :< TreeAtom name]):as)
   -- Declare external constants.
-  -- e.g. (primitive core.i64.add (arrow i64 i64 i64))
  = do
-  t' <- macroExpand t >>= interpret >>= rename
-  insTypeEnv name t'
   modify (\e -> e {constantEnv = name : constantEnv e})
   parse' as
-parse' ((meta :< TreeNode [_ :< TreeAtom "let", _ :< TreeAtom name, tbody]):as)
+parse' ((meta :< TreeNode [_ :< TreeAtom "let", tsu, e]):as)
+  -- (let tsu e)
   -- `(let name body)` binds `body` to `name`.
  = do
-  e <- macroExpand tbody >>= interpret >>= rename
-  name' <- newNameWith name
+  tsu' <- macroExpand tsu >>= interpretUpsilonPlus
+  e' <- macroExpand e >>= interpret
   defList <- parse' as
-  return $ DefLet meta (name, name') e : defList
+  return $ DefLet meta tsu' e' : defList
 parse' (a:as)
   -- If the head element is not a special form, we interpret it as an ordinary term.
  = do
@@ -151,18 +149,20 @@ parse' (a:as)
   if isSpecialForm e
     then parse' $ e : as
     else do
-      e'@(meta :< _) <- interpret e >>= rename
+      e'@(meta :< _) <- interpret e
       name <- newNameWith "hole"
+      s <- newSortalHole
+      t <- newHole
       defList <- parse' as
-      return $ DefLet meta (name, name) e' : defList
+      return $ DefLet meta (t, (s, name)) e' : defList
 
-defToDefList :: Def -> WithEnv [(Identifier, WeakTerm)]
-defToDefList (DefLet _ (name, _) e) = return [(name, e)]
-defToDefList (DefMod _ (name, name') _) = do
+defToDefList :: Def -> WithEnv [(WeakUpsilonPlus, WeakTerm)]
+defToDefList (DefLet _ tu e) = return [(tu, e)]
+defToDefList (DefMod _ (_, name) _) = do
   menv <- gets moduleEnv
-  case lookup name' menv of
-    Nothing -> lift $ throwE $ "no such module: " ++ name
-    Just es -> return es
+  case lookup name menv of
+    Nothing         -> lift $ throwE $ "no such module: " ++ name
+    Just (_, tsues) -> return tsues -- FIXME: Modify name?
 
 isSpecialForm :: Tree -> Bool
 isSpecialForm (_ :< TreeNode [_ :< TreeAtom "notation", _, _]) = True
@@ -199,22 +199,15 @@ concatDefList [] = do
   s <- newCartesian
   return $ meta :< WeakTermSigmaIntro s []
 concatDefList [DefLet _ (_, _) e] = return e
-concatDefList (DefLet meta (_, name') e:es) = do
+concatDefList (DefLet meta (t, (s, x)) e:es) = do
   cont <- concatDefList es
-  h <- newNameWith "any"
-  holeMeta <- newNameWith "meta"
-  let hole = holeMeta :< WeakTermHole h
   lamMeta <- newNameWith "meta"
-  s <- newCartesian
-  sh <- newSortalHole
+  sc <- newCartesian
   return $
     meta :<
-    WeakTermPiElim
-      s
-      (lamMeta :< WeakTermPiIntro s [(hole, (sh, name'))] cont)
-      [e]
-concatDefList (DefMod sigMeta (_, name') xs:es) = do
+    WeakTermPiElim sc (lamMeta :< WeakTermPiIntro sc [(t, (s, x))] cont) [e]
+concatDefList (DefMod sigMeta (s, x) xs:es) = do
   cont <- concatDefList es
   meta <- newNameWith "meta"
-  s <- newCartesian
-  return $ sigMeta :< WeakTermSigmaElim s xs (meta :< WeakTermVar name') cont
+  return $
+    sigMeta :< WeakTermSigmaElim s xs (meta :< WeakTermUpsilon (s, x)) cont
