@@ -27,47 +27,47 @@ interpret (meta :< TreeNode [_ :< TreeAtom "upsilon", _ :< TreeAtom x]) =
 interpret (meta :< TreeNode [_ :< TreeAtom "epsilon-intro", l]) = do
   l' <- interpretLiteral l
   return $ meta :< WeakTermEpsilonIntro l'
-interpret (meta :< TreeNode [_ :< TreeAtom "epsilon-elim", u, e, _ :< TreeNode caseList]) = do
-  u' <- interpretIdentifierPlus u
+interpret (meta :< TreeNode [_ :< TreeAtom "epsilon-elim", tx, e, _ :< TreeNode caseList]) = do
+  tx' <- interpretIdentifierPlus tx
   e' <- interpret e
   caseList' <- mapM interpretClause caseList
-  return $ meta :< WeakTermEpsilonElim u' e' caseList'
-interpret (meta :< TreeNode [_ :< TreeAtom "pi", s, _ :< TreeNode tus, t]) = do
+  return $ meta :< WeakTermEpsilonElim tx' e' caseList'
+interpret (meta :< TreeNode [_ :< TreeAtom "pi", s, _ :< TreeNode txs, t]) = do
   s' <- interpretSortal s
-  tus' <- mapM interpretIdentifierPlus tus
+  txs' <- mapM interpretIdentifierPlus txs
   t' <- interpret t
   hole <- newNameWith "hole"
-  return $ meta :< WeakTermPi s' (tus' ++ [(t', hole)])
-interpret (meta :< TreeNode [_ :< TreeAtom "pi-intro", s, _ :< TreeNode tus, e]) = do
+  return $ meta :< WeakTermPi s' (txs' ++ [(t', hole)])
+interpret (meta :< TreeNode [_ :< TreeAtom "pi-intro", s, _ :< TreeNode txs, e]) = do
   s' <- interpretSortal s
-  tus' <- mapM interpretIdentifierPlus tus
+  txs' <- mapM interpretIdentifierPlus txs
   e' <- interpret e
-  return $ meta :< WeakTermPiIntro s' tus' e'
+  return $ meta :< WeakTermPiIntro s' txs' e'
 interpret (meta :< TreeNode ((_ :< TreeAtom "pi-elim"):s:e:es)) = do
   s' <- interpretSortal s
   e' <- interpret e
   es' <- mapM interpret es
   return $ meta :< WeakTermPiElim s' e' es'
-interpret (meta :< TreeNode [_ :< TreeAtom "sigma", s, _ :< TreeNode tus, t]) = do
+interpret (meta :< TreeNode [_ :< TreeAtom "sigma", s, _ :< TreeNode txs, t]) = do
   s' <- interpretSortal s
-  tus' <- mapM interpretIdentifierPlus tus
+  txs' <- mapM interpretIdentifierPlus txs
   t' <- interpret t
   hole <- newNameWith "hole"
-  return $ meta :< WeakTermSigma s' (tus' ++ [(t', hole)])
+  return $ meta :< WeakTermSigma s' (txs' ++ [(t', hole)])
 interpret (meta :< TreeNode ((_ :< TreeAtom "sigma-intro"):s:es)) = do
   s' <- interpretSortal s
   es' <- mapM interpret es
   return $ meta :< WeakTermSigmaIntro s' es'
-interpret (meta :< TreeNode [_ :< TreeAtom "sigma-elim", s, _ :< TreeNode tus, e1, e2]) = do
+interpret (meta :< TreeNode [_ :< TreeAtom "sigma-elim", s, _ :< TreeNode txs, e1, e2]) = do
   s' <- interpretSortal s
-  tus' <- mapM interpretIdentifierPlus tus
+  txs' <- mapM interpretIdentifierPlus txs
   e1' <- interpret e1
   e2' <- interpret e2
-  return $ meta :< WeakTermSigmaElim s' tus' e1' e2'
-interpret (meta :< TreeNode [_ :< TreeAtom "recurse", ut, e]) = do
-  ut' <- interpretIdentifierPlus ut
+  return $ meta :< WeakTermSigmaElim s' txs' e1' e2'
+interpret (meta :< TreeNode [_ :< TreeAtom "recurse", tx, e]) = do
+  tx' <- interpretIdentifierPlus tx
   e' <- interpret e
-  return $ meta :< WeakTermRec ut' e'
+  return $ meta :< WeakTermRec tx' e'
 interpret (meta :< TreeAtom "_") = do
   name <- newNameWith "hole"
   return $ meta :< WeakTermHole name
@@ -77,13 +77,13 @@ interpret (meta :< TreeAtom "_") = do
 interpret (meta :< TreeNode ((_ :< TreeAtom "arrow"):s:ts)) = do
   s' <- interpretSortal s
   ts' <- mapM interpret ts
-  us <- mapM (const $ newNameWith "hole") ts'
-  return $ meta :< WeakTermPi s' (zip ts' us)
+  xs <- mapM (const $ newNameWith "hole") ts'
+  return $ meta :< WeakTermPi s' (zip ts' xs)
 interpret (meta :< TreeNode ((_ :< TreeAtom "product"):s:ts)) = do
   s' <- interpretSortal s
   ts' <- mapM interpret ts
-  us <- mapM (const $ newNameWith "hole") ts'
-  return $ meta :< WeakTermSigma s' (zip ts' us)
+  xs <- mapM (const $ newNameWith "hole") ts'
+  return $ meta :< WeakTermSigma s' (zip ts' xs)
 interpret (meta :< TreeNode (e:es)) = do
   e' <- interpret e
   es' <- mapM interpret es

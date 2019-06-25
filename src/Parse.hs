@@ -83,9 +83,9 @@ parse' ((_ :< TreeNode [_ :< TreeAtom "extern", _ :< TreeAtom name]):as)
  = do
   modify (\e -> e {constantEnv = name : constantEnv e})
   parse' as
-parse' ((meta :< TreeNode [_ :< TreeAtom "let", tsu, e]):as) = do
+parse' ((meta :< TreeNode [_ :< TreeAtom "let", tx, e]):as) = do
   e' <- macroExpand e >>= interpret >>= rename
-  (t, x) <- macroExpand tsu >>= interpretIdentifierPlus
+  (t, x) <- macroExpand tx >>= interpretIdentifierPlus
   t' <- rename t
   x' <- nameInModule x >>= newNameWith
   defList <- parse' as
