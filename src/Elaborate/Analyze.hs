@@ -59,12 +59,8 @@ analyze' c@(e1, e2) = do
       modify (\e -> e {constraintQueue = Q.insert ec $ constraintQueue e})
 
 simp :: [PreConstraint] -> WithEnv [PreConstraint]
-simp [] = return []
-simp (c@(e1, e2):cs) = do
-  b <- isEq e1 e2
-  if b
-    then simp cs
-    else simp' $ c : cs
+simp []     = return []
+simp (c:cs) = simp' $ c : cs
 
 simp' :: [PreConstraint] -> WithEnv [PreConstraint]
 simp' [] = return []
@@ -118,18 +114,11 @@ simp'' ((_ :< WeakTermEpsilon l1, _ :< WeakTermEpsilon l2):cs) = do
   simpEpsilon l1 l2
   simp cs
 simp'' ((_ :< WeakTermPi s1 txs1, _ :< WeakTermPi s2 txs2):cs)
-  | length txs1 == length txs2 = do
-    let (ts1, xs1) = unzip txs1
-    vs1 <- mapM toVar' xs1
-    let (ts2, xs2) = unzip txs2
-    let ts2' = map (substWeakTerm (zip xs2 vs1)) ts2
-    simp $ (s1, s2) : zip ts1 ts2' ++ cs
+  | length txs1 == length txs2 = simpPiOrSigma s1 txs1 s2 txs2 cs
 simp'' ((_ :< WeakTermPiIntro s1 txs1 body1, _ :< WeakTermPiIntro s2 txs2 body2):cs) = do
-  let (ts1, xs1) = unzip txs1
-  vs1 <- mapM toVar' xs1
-  let (ts2, xs2) = unzip txs2
-  let ts2' = map (substWeakTerm (zip xs2 vs1)) ts2
-  simp $ (s1, s2) : (body1, body2) : zip ts1 ts2' ++ cs
+  h1 <- newNameWith "hole"
+  h2 <- newNameWith "hole"
+  simpPiOrSigma s1 (txs1 ++ [(body1, h1)]) s2 (txs2 ++ [(body2, h2)]) cs
 simp'' ((_ :< WeakTermPiIntro s txs body1, e2):cs) = do
   let (_, xs) = unzip txs
   vs <- mapM toVar' xs
@@ -137,12 +126,7 @@ simp'' ((_ :< WeakTermPiIntro s txs body1, e2):cs) = do
   simp $ (body1, appMeta :< WeakTermPiElim s e2 vs) : cs
 simp'' ((e1, e2@(_ :< WeakTermPiIntro {})):cs) = simp $ (e2, e1) : cs
 simp'' ((_ :< WeakTermSigma s1 txs1, _ :< WeakTermSigma s2 txs2):cs)
-  | length txs1 == length txs2 = do
-    let (ts1, xs1) = unzip txs1
-    vs1 <- mapM toVar' xs1
-    let (ts2, xs2) = unzip txs2
-    let ts2' = map (substWeakTerm (zip xs2 vs1)) ts2
-    simp $ (s1, s2) : zip ts1 ts2' ++ cs
+  | length txs1 == length txs2 = simpPiOrSigma s1 txs1 s2 txs2 cs
 simp'' ((_ :< WeakTermSigmaIntro s1 es1, _ :< WeakTermSigmaIntro s2 es2):cs)
   | length es1 == length es2 = simp $ (s1, s2) : zip es1 es2 ++ cs
 simp'' ((_ :< WeakTermSigmaIntro s1 es, e2):cs) = do
@@ -186,6 +170,22 @@ simpEpsilon (WeakEpsilonIdentifier _) (WeakEpsilonHole _) = undefined
 simpEpsilon (WeakEpsilonHole _) (WeakEpsilonIdentifier _) = undefined
 simpEpsilon _ _ = throwError "cannot simplify (simpEpsilon)"
 
+simpPiOrSigma ::
+     WeakTerm
+  -> [(WeakTerm, Identifier)]
+  -> WeakTerm
+  -> [(WeakTerm, Identifier)]
+  -> [(WeakTerm, WeakTerm)]
+  -> StateT Env (ExceptT String IO) [PreConstraint]
+simpPiOrSigma s1 txs1 s2 txs2 cs = do
+  let (ts1, xs1) = unzip txs1
+  vs1 <- mapM toVar' xs1
+  let (ts2, xs2) = unzip txs2
+  let ts2' = map (substWeakTerm (zip xs2 vs1)) ts2
+  simp $ (s1, s2) : zip ts1 ts2' ++ cs
+
+-- ConstraintDeltaは消える気がする。定義がないので。
+-- 実際、x @ (e11, ..., e1n) = x @ (e21, ..., e2n)は、simpによってe1i = e2iに帰着される。
 categorize :: PreConstraint -> Constraint
 categorize (_ :< WeakTermUpsilon x, e2) = ConstraintBeta x e2
 categorize (e1, e2@(_ :< WeakTermUpsilon _)) = categorize (e2, e1)
@@ -216,102 +216,6 @@ categorize (e1, e2)
 categorize (e1, e2)
   | Just _ <- interpretAsFlex e2 = categorize (e2, e1)
 categorize _ = error "categorize: invalid argument"
-
-isEq :: WeakTerm -> WeakTerm -> WithEnv Bool
-isEq (_ :< WeakTermUpsilon x1) (_ :< WeakTermUpsilon x2) = return $ x1 == x2
-isEq (_ :< WeakTermPi s1 txs1) (_ :< WeakTermPi s2 txs2) = do
-  b1 <- isEq s1 s2
-  b2 <- isEqSigma txs1 txs2
-  return $ b1 && b2
-isEq (_ :< WeakTermPiIntro s1 txs1 e1) (_ :< WeakTermPiIntro s2 txs2 e2) = do
-  b1 <- isEq s1 s2
-  let (ts1, xs1) = unzip txs1
-  let (ts2, xs2) = unzip txs2
-  bs1 <- zipWithM isEq ts1 ts2
-  metaList <- mapM (const $ newNameWith "meta") xs1
-  let vs = map (\(meta, x) -> meta :< WeakTermUpsilon x) $ zip metaList xs1
-  b2 <- isEq e1 $ substWeakTerm (zip xs2 vs) e2
-  return $ b1 && and bs1 && b2
-isEq (_ :< WeakTermPiElim s1 e1 es1) (_ :< WeakTermPiElim s2 e2 es2) = do
-  b1 <- isEq s1 s2
-  b2 <- isEq e1 e2
-  bs <- zipWithM isEq es1 es2
-  return $ b1 && b2 && and bs
-isEq (_ :< WeakTermSigma s1 txs1) (_ :< WeakTermSigma s2 txs2) = do
-  b1 <- isEq s1 s2
-  b2 <- isEqSigma txs1 txs2
-  return $ b1 && b2
-isEq (_ :< WeakTermSigmaIntro s1 es1) (_ :< WeakTermSigmaIntro s2 es2)
-  | length es1 == length es2 = do
-    b1 <- isEq s1 s2
-    bs <- zipWithM isEq es1 es2
-    return $ b1 && and bs
-isEq (_ :< WeakTermSigmaElim s1 txs1 e11 e12) (_ :< WeakTermSigmaElim s2 txs2 e21 e22)
-  | length txs1 == length txs2 = do
-    metaList <- mapM (const $ newNameWith "meta") txs1
-    let vs =
-          map (\(meta, (_, x)) -> meta :< WeakTermUpsilon x) $ zip metaList txs1
-    let e22' = substWeakTerm (zip (map snd txs2) vs) e22
-    b1 <- isEq s1 s2
-    b2 <- isEq e11 e21
-    b3 <- isEq e12 e22'
-    return $ b1 && b2 && b3
-isEq (_ :< WeakTermEpsilon l1) (_ :< WeakTermEpsilon l2) =
-  return $ isEqEpsilon l1 l2
-isEq (_ :< WeakTermEpsilonIntro i1) (_ :< WeakTermEpsilonIntro i2) =
-  return $ i1 == i2
-isEq (_ :< WeakTermEpsilonElim (t1, x1) e1 bs1) (_ :< WeakTermEpsilonElim (t2, x2) e2 bs2) = do
-  b1 <- isEq e1 e2
-  b2 <- isEqBranch bs1 bs2
-  return $ b1 && b2
-isEq (_ :< WeakTermUniv l1) (_ :< WeakTermUniv l2) = return $ l1 == l2
-isEq (_ :< WeakTermConst t1) (_ :< WeakTermConst t2) = return $ t1 == t2
-isEq (_ :< WeakTermRec (t1, x1) e1) (_ :< WeakTermRec (t2, x2) e2) = do
-  b1 <- isEq t1 t2
-  vx <- toVar' x1
-  b2 <- isEq e1 $ substWeakTerm [(x2, vx)] e2
-  return $ b1 && b2
-isEq (_ :< WeakTermHole x1) (_ :< WeakTermHole x2) = return $ x1 == x2
-isEq _ _ = return False
-
-isEqSigma ::
-     [(WeakTerm, Identifier)] -> [(WeakTerm, Identifier)] -> WithEnv Bool
-isEqSigma [] [] = return True
-isEqSigma ((tx, x):txs) ((ty, y):tys) = do
-  vx <- toVar' x
-  b1 <- isEq tx ty
-  let (ts, ys) = unzip tys
-  let ts' = map (substWeakTerm [(y, vx)]) ts
-  let tys' = zip ts' ys
-  b2 <- isEqSigma txs tys'
-  return $ b1 && b2
-isEqSigma _ _ = return False
-
-isEqEpsilon :: WeakEpsilon -> WeakEpsilon -> Bool
-isEqEpsilon = undefined
-
-isEqBranch :: [(Case, WeakTerm)] -> [(Case, WeakTerm)] -> WithEnv Bool
-isEqBranch [] [] = return True
-isEqBranch ((CaseLiteral (LiteralLabel x1), e1):es1) ((CaseLiteral (LiteralLabel x2), e2):es2)
-  | x1 == x2 = isEqBranch' e1 es1 e2 es2
-isEqBranch ((CaseLiteral (LiteralInteger i1), e1):es1) ((CaseLiteral (LiteralInteger i2), e2):es2)
-  | i1 == i2 = isEqBranch' e1 es1 e2 es2
-isEqBranch ((CaseLiteral (LiteralFloat i1), e1):es1) ((CaseLiteral (LiteralFloat i2), e2):es2)
-  | i1 == i2 = isEqBranch' e1 es1 e2 es2
-isEqBranch ((CaseDefault, e1):es1) ((CaseDefault, e2):es2) =
-  isEqBranch' e1 es1 e2 es2
-isEqBranch _ _ = return False
-
-isEqBranch' ::
-     WeakTerm
-  -> [(Case, WeakTerm)]
-  -> WeakTerm
-  -> [(Case, WeakTerm)]
-  -> WithEnv Bool
-isEqBranch' e1 es1 e2 es2 = do
-  b1 <- isEq e1 e2
-  b2 <- isEqBranch es1 es2
-  return $ b1 && b2
 
 toVar' :: Identifier -> WithEnv WeakTerm
 toVar' x = do
