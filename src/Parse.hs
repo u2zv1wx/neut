@@ -20,7 +20,7 @@ import           Parse.Rename
 
 data Def =
   DefLet Identifier -- meta
-         WeakUpsilonPlus -- the `x` in `let x = e`
+         IdentifierPlus -- the `(x : t)` in `let (x : t) = e`
          WeakTerm -- the `e` in `let x = e`
 
 parse :: String -> WithEnv WeakTerm
@@ -85,12 +85,11 @@ parse' ((_ :< TreeNode [_ :< TreeAtom "extern", _ :< TreeAtom name]):as)
   parse' as
 parse' ((meta :< TreeNode [_ :< TreeAtom "let", tsu, e]):as) = do
   e' <- macroExpand e >>= interpret >>= rename
-  (t, (s, x)) <- macroExpand tsu >>= interpretUpsilonPlus
+  (t, x) <- macroExpand tsu >>= interpretIdentifierPlus
   t' <- rename t
-  s' <- rename s
   x' <- nameInModule x >>= newNameWith
   defList <- parse' as
-  return $ DefLet meta (t', (s', x')) e' : defList
+  return $ DefLet meta (t', x') e' : defList
 parse' (a:as)
   -- If the head element is not a special form, we interpret it as an ordinary term.
  = do
@@ -101,10 +100,9 @@ parse' (a:as)
       e'@(meta :< _) <- interpret e >>= rename
       name <- newNameWith "hole"
       name' <- nameInModule name
-      s <- newHole
       t <- newHole
       defList <- parse' as
-      return $ DefLet meta (t, (s, name')) e' : defList
+      return $ DefLet meta (t, name') e' : defList
 
 isSpecialForm :: Tree -> Bool
 isSpecialForm (_ :< TreeNode [_ :< TreeAtom "notation", _, _]) = True

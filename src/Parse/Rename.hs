@@ -15,24 +15,23 @@ import           Data.WeakTerm
 -- Alpha-convert all the variables so that different variables have different names.
 rename :: WeakTerm -> WithEnv WeakTerm
 rename (i :< WeakTermUniv j) = return $ i :< WeakTermUniv j
-rename (i :< WeakTermUpsilon (s, x)) = do
+rename (i :< WeakTermUpsilon x) = do
   let x' = normalForm x
-  s' <- rename s
   let isAbsolute = '.' `elem` x'
   if isAbsolute
     then do
       x'' <- lookupNameEnv x'
-      return $ i :< WeakTermUpsilon (s', x'')
+      return $ i :< WeakTermUpsilon x''
     else do
       mx <- nameInModule x' >>= lookupNameEnv''
       case mx of
-        Just x'' -> return $ i :< WeakTermUpsilon (s', x'')
+        Just x'' -> return $ i :< WeakTermUpsilon x''
         Nothing -> do
           penv <- gets prefixEnv
           let candidateList = map (\prefix -> prefix ++ "." ++ x') penv
           my <- lookupNameEnvByList candidateList
           case my of
-            Just y  -> return $ i :< WeakTermUpsilon (s', y)
+            Just y  -> return $ i :< WeakTermUpsilon y
             Nothing -> lift $ throwE $ "unbound variable: " ++ x
 rename (i :< WeakTermEpsilon s) = return $ i :< WeakTermEpsilon s
 rename (i :< WeakTermEpsilonIntro x) = return $ i :< WeakTermEpsilonIntro x
@@ -40,7 +39,7 @@ rename (i :< WeakTermEpsilonElim (t, u) e caseList) = do
   e' <- rename e
   t' <- rename t
   local $ do
-    u' <- newUpsilonWith u
+    u' <- newIdentifierWith u
     caseList' <- renameCaseList caseList
     return $ i :< WeakTermEpsilonElim (t', u') e' caseList'
 rename (i :< WeakTermPi s tus) = do
@@ -71,43 +70,40 @@ rename (i :< WeakTermSigmaElim s tus e1 e2) = do
   return $ i :< WeakTermSigmaElim s' tus' e1' e2'
 rename (i :< WeakTermRec ut e) =
   local $ do
-    ut' <- newUpsilonPlusWith ut
+    ut' <- newIdentifierPlusWith ut
     e' <- rename e
     return $ i :< WeakTermRec ut' e'
 rename (i :< WeakTermConst x) = return $ i :< WeakTermConst x
 rename (i :< WeakTermHole x) = return $ i :< WeakTermHole x
 
-renameBindings :: [WeakUpsilonPlus] -> WithEnv [WeakUpsilonPlus]
+renameBindings :: [IdentifierPlus] -> WithEnv [IdentifierPlus]
 renameBindings [] = return []
 renameBindings ((t, u):tus) = do
   t' <- rename t
   local $ do
-    u' <- newUpsilonWith u
+    u' <- newIdentifierWith u
     tus' <- renameBindings tus
     return $ (t', u') : tus'
 
 renameBindingsWithBody ::
-     [WeakUpsilonPlus] -> WeakTerm -> WithEnv ([WeakUpsilonPlus], WeakTerm)
+     [IdentifierPlus] -> WeakTerm -> WithEnv ([IdentifierPlus], WeakTerm)
 renameBindingsWithBody [] e = do
   e' <- rename e
   return ([], e')
 renameBindingsWithBody ((t, u):tus) e = do
   t' <- rename t
   local $ do
-    u' <- newUpsilonWith u
+    u' <- newIdentifierWith u
     (tus', e') <- renameBindingsWithBody tus e
     return ((t', u') : tus', e')
 
-newUpsilonWith :: WeakUpsilon -> WithEnv WeakUpsilon
-newUpsilonWith (s, x) = do
-  s' <- rename s -- `s` must be renamed first
-  x'' <- nameInModule x >>= newNameWith
-  return (s', x'')
+newIdentifierWith :: Identifier -> WithEnv Identifier
+newIdentifierWith x = nameInModule x >>= newNameWith
 
-newUpsilonPlusWith :: WeakUpsilonPlus -> WithEnv WeakUpsilonPlus
-newUpsilonPlusWith (t, u) = do
+newIdentifierPlusWith :: IdentifierPlus -> WithEnv IdentifierPlus
+newIdentifierPlusWith (t, u) = do
   t' <- rename t
-  u' <- newUpsilonWith u
+  u' <- newIdentifierWith u
   return (t', u')
 
 renameCaseList :: [(Case, WeakTerm)] -> WithEnv [(Case, WeakTerm)]

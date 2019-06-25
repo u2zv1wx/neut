@@ -28,7 +28,7 @@ m    ::= primitive
 
 -- term
 e, A ::= (universe <int>)
-       | (upsilon m x)
+       | (upsilon x)
        | (epsilon x)
        | (epsilon-intro l)
        | (epsilon-elim x e (c1 e1) ... (cn en))
