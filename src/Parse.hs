@@ -119,12 +119,6 @@ isSpecialForm (_ :< TreeNode ((_ :< TreeAtom "statement"):_)) = True
 isSpecialForm (_ :< TreeNode [_ :< TreeAtom "let", _, _]) = True
 isSpecialForm _ = False
 
-newCartesian :: WithEnv WeakSortal
-newCartesian = do
-  c <- newNameWith "cartesian"
-  m <- newNameWith "meta"
-  return $ m :< WeakTermEpsilonIntro (LiteralLabel c)
-
 -- Represent the list of Defs in the target language, using `let`.
 -- (Note that `let x := e1 in e2` can be represented as `(lam x e2) e1`.)
 concatDefList :: [Def] -> WithEnv WeakTerm
