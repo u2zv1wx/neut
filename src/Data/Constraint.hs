@@ -6,25 +6,27 @@ import           Data.WeakTerm
 type PreConstraint = (WeakTerm, WeakTerm)
 
 data Constraint
-  = ConstraintPattern Identifier
+  = ConstraintPattern WeakSortal
+                      Identifier
                       [Identifier]
                       WeakTerm
   | ConstraintBeta Identifier
                    WeakTerm
   | ConstraintDelta Identifier
-                    [WeakTerm]
-                    [WeakTerm]
-  | ConstraintQuasiPattern Identifier
+                    (WeakSortal, [WeakTerm])
+                    (WeakSortal, [WeakTerm])
+  | ConstraintQuasiPattern WeakSortal
+                           Identifier
                            [Identifier]
                            WeakTerm
-  | ConstraintFlexRigid Identifier
+  | ConstraintFlexRigid WeakSortal
+                        Identifier
                         [WeakTerm]
                         WeakTerm
   | ConstraintFlexFlex Identifier
-                       [WeakTerm]
+                       (WeakSortal, [WeakTerm])
                        Identifier
-                       [WeakTerm]
-  deriving (Show)
+                       (WeakSortal, [WeakTerm])
 
 constraintToInt :: Constraint -> Int
 constraintToInt ConstraintPattern {}      = 0
@@ -43,7 +45,6 @@ instance Ord Constraint where
 data EnrichedConstraint =
   Enriched PreConstraint
            Constraint
-  deriving (Show)
 
 instance Eq EnrichedConstraint where
   (Enriched _ c1) == (Enriched _ c2) = c1 == c2
