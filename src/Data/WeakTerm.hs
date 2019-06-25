@@ -13,10 +13,15 @@ import           Data.Basic
 
 type IdentifierPlus = (WeakTerm, Identifier)
 
+data WeakEpsilon
+  = WeakEpsilonIdentifier Identifier
+  | WeakEpsilonHole Identifier
+  deriving (Show)
+
 data WeakTermF a
   = WeakTermUniv UnivLevel
   | WeakTermUpsilon Identifier
-  | WeakTermEpsilon Identifier
+  | WeakTermEpsilon WeakEpsilon
   | WeakTermEpsilonIntro Literal
   | WeakTermEpsilonElim (a, Identifier)
                         a
@@ -51,7 +56,7 @@ type DUpsilon = Identifier
 data DTermF a
   = DTermUniv UnivLevel
   | DTermDUpsilon DUpsilon
-  | DTermEpsilon Identifier
+  | DTermEpsilon WeakEpsilon
   | DTermEpsilonIntro Literal
   | DTermEpsilonElim (DUpsilon, a)
                      a

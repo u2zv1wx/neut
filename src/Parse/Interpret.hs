@@ -96,7 +96,7 @@ interpret t@(meta :< TreeAtom x) = do
     Nothing -> do
       isSortal <- isDefinedIndexName x
       if isSortal
-        then return $ meta :< WeakTermEpsilon x
+        then return $ meta :< WeakTermEpsilon (WeakEpsilonIdentifier x)
         else do
           cenv <- gets constantEnv
           if x `elem` cenv
