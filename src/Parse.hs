@@ -87,7 +87,7 @@ parse' ((meta :< TreeNode [_ :< TreeAtom "let", tsu, e]):as) = do
   e' <- macroExpand e >>= interpret >>= rename
   (t, (s, x)) <- macroExpand tsu >>= interpretUpsilonPlus
   t' <- rename t
-  s' <- renameSortal s
+  s' <- rename s
   x' <- nameInModule x >>= newNameWith
   defList <- parse' as
   return $ DefLet meta (t', (s', x')) e' : defList
@@ -101,7 +101,7 @@ parse' (a:as)
       e'@(meta :< _) <- interpret e >>= rename
       name <- newNameWith "hole"
       name' <- nameInModule name
-      s <- newSortalHole
+      s <- newHole
       t <- newHole
       defList <- parse' as
       return $ DefLet meta (t, (s, name')) e' : defList
@@ -125,13 +125,7 @@ newCartesian :: WithEnv WeakSortal
 newCartesian = do
   c <- newNameWith "cartesian"
   m <- newNameWith "meta"
-  return $ WeakSortalTerm (m :< WeakTermEpsilonIntro (LiteralLabel c))
-
-newSortalHole :: WithEnv WeakSortal
-newSortalHole = do
-  h <- newNameWith "hole"
-  m <- newNameWith "meta"
-  return $ WeakSortalTerm (m :< WeakTermHole h)
+  return $ m :< WeakTermEpsilonIntro (LiteralLabel c)
 
 -- Represent the list of Defs in the target language, using `let`.
 -- (Note that `let x := e1 in e2` can be represented as `(lam x e2) e1`.)

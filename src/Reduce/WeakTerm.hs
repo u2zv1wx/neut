@@ -23,12 +23,12 @@ reduceWeakTerm (i :< WeakTermEpsilonElim (t, (s, x)) e branchList) = do
     _ -> i :< WeakTermEpsilonElim (t, (s, x)) e' branchList
 reduceWeakTerm (i :< WeakTermPi s tus) = do
   let tus' = map reduceWeakTermUpsilonPlus tus
-  i :< WeakTermPi (reduceWeakTermSortal s) tus'
+  i :< WeakTermPi (reduceWeakTerm s) tus'
 reduceWeakTerm (i :< WeakTermPiIntro s tus e) = do
   let tus' = map reduceWeakTermUpsilonPlus tus
-  i :< WeakTermPiIntro (reduceWeakTermSortal s) tus' e
+  i :< WeakTermPiIntro (reduceWeakTerm s) tus' e
 reduceWeakTerm (i :< WeakTermPiElim s e es) = do
-  let s' = reduceWeakTermSortal s
+  let s' = reduceWeakTerm s
   let es' = map reduceWeakTerm es
   let e' = reduceWeakTerm e
   case e' of
@@ -56,13 +56,13 @@ reduceWeakTerm (i :< WeakTermPiElim s e es) = do
     _ -> i :< WeakTermPiElim s' e' es'
 reduceWeakTerm (i :< WeakTermSigma s tus) = do
   let tus' = map reduceWeakTermUpsilonPlus tus
-  i :< WeakTermSigma (reduceWeakTermSortal s) tus'
+  i :< WeakTermSigma (reduceWeakTerm s) tus'
 reduceWeakTerm (i :< WeakTermSigmaIntro s es) = do
-  let s' = reduceWeakTermSortal s
+  let s' = reduceWeakTerm s
   let es' = map reduceWeakTerm es
   i :< WeakTermSigmaIntro s' es'
 reduceWeakTerm (i :< WeakTermSigmaElim s tus e1 e2) = do
-  let s' = reduceWeakTermSortal s
+  let s' = reduceWeakTerm s
   let e1' = reduceWeakTerm e1
   case e1' of
     _ :< WeakTermSigmaIntro _ es
@@ -76,12 +76,8 @@ reduceWeakTerm (i :< WeakTermRec ut e) =
   i :< WeakTermRec (reduceWeakTermUpsilonPlus ut) e
 reduceWeakTerm t = t
 
-reduceWeakTermSortal :: WeakSortal -> WeakSortal
-reduceWeakTermSortal WeakSortalPrimitive = WeakSortalPrimitive
-reduceWeakTermSortal (WeakSortalTerm e)  = WeakSortalTerm $ reduceWeakTerm e
-
 reduceWeakTermUpsilon :: WeakUpsilon -> WeakUpsilon
-reduceWeakTermUpsilon (s, x) = (reduceWeakTermSortal s, x)
+reduceWeakTermUpsilon (s, x) = (reduceWeakTerm s, x)
 
 reduceWeakTermUpsilonPlus :: WeakUpsilonPlus -> WeakUpsilonPlus
 reduceWeakTermUpsilonPlus (t, u) = (t, reduceWeakTermUpsilon u)

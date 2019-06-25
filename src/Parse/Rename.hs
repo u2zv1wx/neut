@@ -1,6 +1,5 @@
 module Parse.Rename
   ( rename
-  , renameSortal
   , nameInModule
   ) where
 
@@ -18,7 +17,7 @@ rename :: WeakTerm -> WithEnv WeakTerm
 rename (i :< WeakTermUniv j) = return $ i :< WeakTermUniv j
 rename (i :< WeakTermUpsilon (s, x)) = do
   let x' = normalForm x
-  s' <- renameSortal s
+  s' <- rename s
   let isAbsolute = '.' `elem` x'
   if isAbsolute
     then do
@@ -45,28 +44,28 @@ rename (i :< WeakTermEpsilonElim (t, u) e caseList) = do
     caseList' <- renameCaseList caseList
     return $ i :< WeakTermEpsilonElim (t', u') e' caseList'
 rename (i :< WeakTermPi s tus) = do
-  s' <- renameSortal s
+  s' <- rename s
   tus' <- renameBindings tus
   return $ i :< WeakTermPi s' tus'
 rename (i :< WeakTermPiIntro s tus e) = do
-  s' <- renameSortal s
+  s' <- rename s
   (tus', e') <- renameBindingsWithBody tus e
   return $ i :< WeakTermPiIntro s' tus' e'
 rename (i :< WeakTermPiElim s e es) = do
-  s' <- renameSortal s
+  s' <- rename s
   e' <- rename e
   es' <- mapM rename es
   return $ i :< WeakTermPiElim s' e' es'
 rename (i :< WeakTermSigma s tus) = do
-  s' <- renameSortal s
+  s' <- rename s
   tus' <- renameBindings tus
   return $ i :< WeakTermSigma s' tus'
 rename (i :< WeakTermSigmaIntro s es) = do
-  s' <- renameSortal s
+  s' <- rename s
   es' <- mapM rename es
   return $ i :< WeakTermSigmaIntro s' es'
 rename (i :< WeakTermSigmaElim s tus e1 e2) = do
-  s' <- renameSortal s
+  s' <- rename s
   e1' <- rename e1
   (tus', e2') <- renameBindingsWithBody tus e2
   return $ i :< WeakTermSigmaElim s' tus' e1' e2'
@@ -77,12 +76,6 @@ rename (i :< WeakTermRec ut e) =
     return $ i :< WeakTermRec ut' e'
 rename (i :< WeakTermConst x) = return $ i :< WeakTermConst x
 rename (i :< WeakTermHole x) = return $ i :< WeakTermHole x
-
-renameSortal :: WeakSortal -> WithEnv WeakSortal
-renameSortal WeakSortalPrimitive = return WeakSortalPrimitive
-renameSortal (WeakSortalTerm e) = do
-  e' <- rename e
-  return $ WeakSortalTerm e'
 
 renameBindings :: [WeakUpsilonPlus] -> WithEnv [WeakUpsilonPlus]
 renameBindings [] = return []
@@ -107,7 +100,7 @@ renameBindingsWithBody ((t, u):tus) e = do
 
 newUpsilonWith :: WeakUpsilon -> WithEnv WeakUpsilon
 newUpsilonWith (s, x) = do
-  s' <- renameSortal s -- `s` must be renamed first
+  s' <- rename s -- `s` must be renamed first
   x'' <- nameInModule x >>= newNameWith
   return (s', x'')
 

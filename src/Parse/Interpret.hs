@@ -168,17 +168,15 @@ interpretCase c = do
     Nothing -> lift $ throwE $ "interpretCase: syntax error:\n" ++ Pr.ppShow c
 
 interpretSortal :: Tree -> WithEnv WeakSortal
-interpretSortal (_ :< TreeAtom "primitive") = return WeakSortalPrimitive
-interpretSortal s                           = WeakSortalTerm <$> interpret s
+interpretSortal (meta :< TreeAtom "primitive") =
+  return $ meta :< WeakTermConst "primitive"
+interpretSortal s = interpret s
 
 newUpsilon :: WithEnv WeakUpsilon
 newUpsilon = do
   x <- newNameWith "hole"
   s <- newSortal
   return (s, x)
-
-newSortal :: WithEnv WeakSortal
-newSortal = WeakSortalTerm <$> newHole
 
 interpretClause :: Tree -> WithEnv (Case, WeakTerm)
 interpretClause (_ :< TreeNode [c, e]) = do
