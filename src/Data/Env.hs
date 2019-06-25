@@ -24,7 +24,6 @@ data Env = Env
   , notationEnv       :: [(Tree, Tree)] -- macro transformers
   , reservedEnv       :: [Identifier] -- list of reserved keywords
   , constantEnv       :: [Identifier]
-  -- , moduleEnv :: [(Identifier, (WeakSortal, [(WeakUpsilonPlus, WeakTerm)]))]
   , moduleEnv         :: [Identifier] -- "foo.bar" ~ ["foo", "bar"]
   , prefixEnv         :: [Identifier]
   , indexEnv          :: [(Identifier, [Identifier])]
