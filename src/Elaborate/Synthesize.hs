@@ -21,14 +21,14 @@ synthesize :: Q.MinQueue EnrichedConstraint -> WithEnv ()
 synthesize q =
   case Q.getMin q of
     Nothing -> return ()
-    Just (Enriched _ (ConstraintPattern x args e))
+    Just (Enriched _ (ConstraintPattern s x args e))
       -- Synthesize `?M @ arg-1 @ ... @ arg-n == e`, where each arg-i is a variable,
       -- and arg-i == arg-j iff i == j. This kind of constraint is known to be able
       -- to be solved by:
       --   ?M == lam arg-1, ..., arg-n. e
       -- This kind of constraint is called a "pattern".
      -> do
-      ans <- bindFormalArgs args e
+      ans <- bindFormalArgs s args e
       modify
         (\env -> env {substitution = compose [(x, ans)] (substitution env)})
       substQueue (Q.deleteMin q) >>= synthesize
@@ -47,7 +47,7 @@ synthesize q =
           cs <- simp [(body, body')]
           let q' = Q.fromList $ map (\c -> Enriched c $ categorize c) cs
           synthesize $ Q.deleteMin q `Q.union` q'
-    Just (Enriched _ (ConstraintDelta x args1 args2))
+    Just (Enriched _ (ConstraintDelta x (s1, args1) (s2, args2)))
       -- Synthesize `x @ arg-11 @ ... @ arg-1n == x @ arg-21 @ ... @ arg-2n`.
       -- We try two alternatives:
       --   (1) assume that x is opaque and attempt to resolve this by args1 === args2.
@@ -60,23 +60,23 @@ synthesize q =
         case lookup x sub of
           Nothing -> return [plan1]
           Just body -> do
-            e1' <- reduceWeakTerm <$> appFold body args1
-            e2' <- reduceWeakTerm <$> appFold body args2
+            e1' <- reduceWeakTerm <$> appFold s1 body args1
+            e2' <- reduceWeakTerm <$> appFold s2 body args2
             cs <- simp [(e1', e2')]
             let plan2 = getQueue $ analyze cs
             return [plan1, plan2]
       q' <- gets constraintQueue
       chain q' planList >>= continue q'
-    Just (Enriched _ (ConstraintQuasiPattern hole preArgs e))
+    Just (Enriched _ (ConstraintQuasiPattern s hole preArgs e))
       -- Synthesize `hole @ arg-1 @ ... @ arg-n = e`, where arg-i is a variable.
       -- In this case, we do the same as in Flex-Rigid case.
       -- The distinction here is required just to ensure that we deal with
       -- constraints from easier ones.
-     -> synthesizeQuasiPattern q hole preArgs e
-    Just (Enriched _ (ConstraintFlexRigid hole args e))
+     -> synthesizeQuasiPattern q s hole preArgs e
+    Just (Enriched _ (ConstraintFlexRigid s hole args e))
       -- Synthesize `hole @ arg-1 @ ... @ arg-n = e`, where arg-i is an arbitrary term.
-     -> synthesizeFlexRigid q hole args e
-    Just c -> throwError $ "cannot synthesize:\n" ++ Pr.ppShow c
+     -> synthesizeFlexRigid q s hole args e
+    Just c -> throwError "cannot synthesize(synth)"
 
 -- Suppose that this function received a quasi-pattern ?M @ x @ x @ y @ z == e, for example.
 -- What this function do is to try two alternatives in this case:
@@ -87,14 +87,15 @@ synthesize q =
 -- other occurrences of `x` with new variables.
 synthesizeQuasiPattern ::
      Q.MinQueue EnrichedConstraint
+  -> WeakSortal
   -> Identifier
   -> [Identifier]
   -> WeakTerm
   -> WithEnv ()
-synthesizeQuasiPattern q hole preArgs e = do
+synthesizeQuasiPattern q s hole preArgs e = do
   argsList <- toAltList preArgs
   meta <- newNameWith "meta"
-  lamList <- mapM (`bindFormalArgs` e) argsList
+  lamList <- mapM (\xs -> bindFormalArgs s xs e) argsList
   let planList =
         flip map lamList $ \lam ->
           getQueue $ analyze [(meta :< WeakTermHole hole, lam)]
@@ -156,14 +157,15 @@ discardInactive xs indexList =
 -- `e1` and `e2`.
 synthesizeFlexRigid ::
      Q.MinQueue EnrichedConstraint
+  -> WeakSortal
   -> Identifier
   -> [WeakTerm]
   -> WeakTerm
   -> WithEnv ()
-synthesizeFlexRigid q hole args e = do
+synthesizeFlexRigid q s hole args e = do
   newHoleList <- mapM (const (newNameWith "hole")) args -- ?M_i
   meta <- newNameWith "meta"
-  lam <- bindFormalArgs newHoleList e
+  lam <- bindFormalArgs s newHoleList e
   let independent = getQueue $ analyze [(meta :< WeakTermHole hole, lam)]
   q' <- chain q [independent]
   continue q q'
@@ -184,7 +186,7 @@ continue currentQueue newQueue = do
 
 -- Try the list of alternatives.
 chain :: Q.MinQueue EnrichedConstraint -> [WithEnv a] -> WithEnv a
-chain c []     = throwError $ "cannot synthesize:\n" ++ Pr.ppShow c
+chain c []     = throwError "cannot synthesize(chain)"
 chain c (e:es) = e `catchError` const (chain c es)
 
 substQueue ::
@@ -206,8 +208,7 @@ updateQueue' sub q =
       analyze [(substWeakTerm sub e1, substWeakTerm sub e2)]
       updateQueue' sub $ Q.deleteMin q
 
-appFold :: WeakTerm -> [WeakTerm] -> WithEnv WeakTerm
-appFold e [] = return e
-appFold e (term:ts) = do
+appFold :: WeakSortal -> WeakTerm -> [WeakTerm] -> WithEnv WeakTerm
+appFold s e es = do
   meta <- newNameWith "meta"
-  appFold (meta :< WeakTermPiElim e term) ts
+  return $ meta :< WeakTermPiElim s e es
