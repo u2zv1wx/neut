@@ -75,8 +75,7 @@ analyze ((e1, e2):cs) = do
     (Just (StuckPiElimStrict s1 m1 xs1, _), _)
       | isSolvable e2 m1 xs1 -> do
         ans <- bindFormalArgs s1 xs1 e2
-        let newSub = [(m1, ans)]
-        modify (\env -> env {substitution = compose newSub (substitution env)})
+        modify (\env -> env {substEnv = compose [(m1, ans)] (substEnv env)})
         analyze cs
     (_, Just (StuckPiElimStrict _ m2 xs2, _))
       | isSolvable e1 m2 xs2 -> analyze $ (e2, e1) : cs
@@ -99,8 +98,10 @@ analyze ((e1, e2):cs) = do
 analyzeEpsilon :: WeakEpsilon -> WeakEpsilon -> WithEnv ()
 analyzeEpsilon (WeakEpsilonIdentifier x) (WeakEpsilonIdentifier y)
   | x == y = return ()
-analyzeEpsilon (WeakEpsilonIdentifier _) (WeakEpsilonHole _) = undefined
-analyzeEpsilon (WeakEpsilonHole _) (WeakEpsilonIdentifier _) = undefined
+analyzeEpsilon (WeakEpsilonIdentifier x) (WeakEpsilonHole m) =
+  modify (\env -> env {epsilonEnv = (m, x) : epsilonEnv env})
+analyzeEpsilon (WeakEpsilonHole m) (WeakEpsilonIdentifier y) =
+  modify (\env -> env {epsilonEnv = (m, y) : epsilonEnv env})
 analyzeEpsilon _ _ = throwError "cannot analyzelify (analyzeEpsilon)"
 
 analyzePiOrSigma ::

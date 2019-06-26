@@ -31,7 +31,8 @@ data Env = Env
   , typeEnv           :: Map.Map Identifier WeakTerm
   , constraintEnv     :: [PreConstraint] -- for type inference
   , constraintQueue   :: Q.MinQueue EnrichedConstraint -- for (dependent) type inference
-  , substitution      :: SubstWeakTerm -- for (dependent) type inference
+  , substEnv          :: SubstWeakTerm -- for (dependent) type inference
+  , epsilonEnv        :: [(Identifier, Identifier)]
   , univConstraintEnv :: [(UnivLevel, UnivLevel)]
   , currentDir        :: FilePath
   , termEnv           :: [(Identifier, ([Identifier], Term))] -- x == lam (x1, ..., xn). e
@@ -56,7 +57,8 @@ initialEnv path =
     , llvmEnv = []
     , constraintEnv = []
     , constraintQueue = Q.empty
-    , substitution = []
+    , substEnv = []
+    , epsilonEnv = []
     , univConstraintEnv = []
     , currentDir = path
     }
@@ -235,7 +237,6 @@ wrap a = do
 wrapType :: WeakTermF WeakTerm -> WithEnv WeakTerm
 wrapType t = do
   meta <- newNameWith "meta"
-  hole <- newName
   return $ meta :< t
 
 wrapTypeWithUniv :: WeakTerm -> WeakTermF WeakTerm -> WithEnv WeakTerm
@@ -246,8 +247,8 @@ wrapTypeWithUniv univ t = do
 
 insDef :: Identifier -> WeakTerm -> WithEnv (Maybe WeakTerm)
 insDef x body = do
-  sub <- gets substitution
-  modify (\e -> e {substitution = (x, body) : substitution e})
+  sub <- gets substEnv
+  modify (\e -> e {substEnv = (x, body) : substEnv e})
   return $ lookup x sub
 
 withEnvFoldL ::
