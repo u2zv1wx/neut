@@ -66,10 +66,12 @@ analyze ((_ :< WeakTermSigma s1 txs1, _ :< WeakTermSigma s2 txs2):cs)
   | length txs1 == length txs2 = analyzePiOrSigma s1 txs1 s2 txs2 cs
 analyze ((_ :< WeakTermSigmaIntro s1 es1, _ :< WeakTermSigmaIntro s2 es2):cs)
   | length es1 == length es2 = analyze $ (s1, s2) : zip es1 es2 ++ cs
-analyze ((_ :< WeakTermSigmaIntro s1 es, e2):cs) = do
-  prList <- projectionList s1 e2 (length es)
-  analyze $ zip es prList ++ cs
-analyze ((e1, e2@(_ :< WeakTermSigmaIntro _ _)):cs) = analyze $ (e2, e1) : cs
+analyze ((_ :< WeakTermSigmaElim s txs e1 e2, e):cs) = do
+  hs <- mapM (const newHole) txs
+  sigmaIntro <- wrapType $ WeakTermSigmaIntro s hs
+  let e2' = substWeakTerm (zip (map snd txs) hs) e2
+  analyze $ (e1, sigmaIntro) : (e2', e) : cs
+analyze ((e1, e2@(_ :< WeakTermSigmaElim {})):cs) = analyze $ (e2, e1) : cs
 analyze ((_ :< WeakTermConst x, _ :< WeakTermConst y):cs)
   | x == y = analyze cs
 analyze ((e1, e2):cs) = do
@@ -175,16 +177,6 @@ isLinear x xs =
   if length (filter (== x) xs) == 1
     then []
     else [x]
-
-projectionList :: WeakSortal -> WeakTerm -> Int -> WithEnv [WeakTerm]
-projectionList s e n = do
-  xs <- forM [1 .. n] $ \_ -> newNameWith "pr"
-  ts <- mapM (const newHole) xs
-  metaList <- mapM (const newName) xs
-  let varList = map (\(meta, x) -> meta :< WeakTermUpsilon x) $ zip metaList xs
-  forM varList $ \x -> do
-    meta <- newName
-    return $ meta :< WeakTermSigmaElim s (zip ts xs) e x
 
 bindFormalArgs :: WeakSortal -> [Identifier] -> WeakTerm -> WithEnv WeakTerm
 bindFormalArgs s xs e = do
