@@ -23,12 +23,13 @@ synthesize q = do
     Nothing -> return ()
     Just (Enriched (e1, e2) ms _)
       | Just (m, e) <- lookupAny ms sub -> resolveStuck q e1 e2 m e
-    Just (Enriched _ _ (ConstraintPattern s m es e)) ->
-      resolveFlexRigid q s m es e
+    Just (Enriched _ _ (ConstraintPattern s m es e)) -> resolvePiElim q s m es e
     Just (Enriched _ _ (ConstraintQuasiPattern s m es e)) ->
-      resolveFlexRigid q s m es e
+      resolvePiElim q s m es e
     Just (Enriched _ _ (ConstraintFlexRigid s m es e)) ->
-      resolveFlexRigid q s m es e
+      resolvePiElim q s m es e
+    Just (Enriched _ _ (ConstraintFlexFlex s m es e)) ->
+      resolvePiElim q s m es e
     Just _ -> throwError "cannot synthesize(synth)"
 
 resolveStuck ::
@@ -55,14 +56,14 @@ resolveStuck q e1 e2 hole e = do
 -- If the given pattern is a flex-rigid pattern like ?M @ x @ x @ e1 @ y == e,
 -- this function replaces all the arguments that are not variable by
 -- fresh variables, and try to resolve the new quasi-pattern ?M @ x @ x @ z @ y == e.
-resolveFlexRigid ::
+resolvePiElim ::
      Q.MinQueue EnrichedConstraint
   -> WeakTerm
   -> Identifier
   -> [WeakTerm]
   -> WeakTerm
   -> WithEnv ()
-resolveFlexRigid q s m es e = do
+resolvePiElim q s m es e = do
   xs <- forceVarList es
   xss <- toAltList xs
   lamList <- mapM (\ys -> bindFormalArgs s ys e) xss

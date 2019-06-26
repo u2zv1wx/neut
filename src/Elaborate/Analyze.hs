@@ -96,6 +96,11 @@ analyze ((e1, e2):cs) = do
       let c = Enriched (e1, e2) [m1] $ ConstraintFlexRigid s1 m1 es1 e2
       return $ c : cs'
     (Nothing, Just (StuckPiElim {}, _)) -> analyze $ (e2, e1) : cs
+    (Just (StuckPiElim s1 m1 es1, _), _) -> do
+      cs' <- analyze cs
+      let c = Enriched (e1, e2) [m1] $ ConstraintFlexFlex s1 m1 es1 e2
+      return $ c : cs'
+    (_, Just (StuckPiElim {}, _)) -> analyze $ (e2, e1) : cs
     (Just (_, m1), Just (_, m2)) -> do
       cs' <- analyze cs
       let c = Enriched (e1, e2) [m1, m2] ConstraintOther

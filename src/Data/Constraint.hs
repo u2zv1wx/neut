@@ -18,13 +18,18 @@ data Constraint
                         Identifier
                         [WeakTerm]
                         WeakTerm
+  | ConstraintFlexFlex WeakSortal
+                       Identifier
+                       [WeakTerm]
+                       WeakTerm
   | ConstraintOther
 
 constraintToInt :: Constraint -> Int
 constraintToInt ConstraintPattern {}      = 0
 constraintToInt ConstraintQuasiPattern {} = 1
 constraintToInt ConstraintFlexRigid {}    = 2
-constraintToInt ConstraintOther {}        = 3
+constraintToInt ConstraintFlexFlex {}     = 3
+constraintToInt ConstraintOther {}        = 4
 
 instance Eq Constraint where
   c1 == c2 = constraintToInt c1 == constraintToInt c2
