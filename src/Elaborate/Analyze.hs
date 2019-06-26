@@ -72,27 +72,27 @@ analyze ((e1, e2):cs) = do
   let ms1 = asStuckedTerm e1
   let ms2 = asStuckedTerm e2
   case (ms1, ms2) of
-    (Just (StuckQuasiPattern s1 x1 xs1), _)
-      | isStrict e2 x1 xs1 -> do
+    (Just (StuckPiElimStrict s1 m1 xs1, _), _)
+      | isSolvable e2 m1 xs1 -> do
         ans <- bindFormalArgs s1 xs1 e2
-        let newSub = [(x1, ans)]
+        let newSub = [(m1, ans)]
         modify (\env -> env {substitution = compose newSub (substitution env)})
         analyze cs
-    (_, Just (StuckQuasiPattern _ x2 xs2))
-      | isStrict e1 x2 xs2 -> analyze $ (e2, e1) : cs
-    (Just (StuckQuasiPattern s1 x1 xs1), _) -> do
+    (_, Just (StuckPiElimStrict _ m2 xs2, _))
+      | isSolvable e1 m2 xs2 -> analyze $ (e2, e1) : cs
+    (Just (StuckPiElimStrict s1 m1 xs1, _), _) -> do
       cs' <- analyze cs
-      return $ Enriched (e1, e2) (ConstraintQuasiPattern s1 x1 xs1 e2) : cs'
-    (_, Just StuckQuasiPattern {}) -> analyze $ (e2, e1) : cs
-    (Just (StuckFlexPattern s1 x1 es1), Just (StuckFlexPattern s2 x2 es2)) -> do
-      cs' <- analyze cs
-      let c = Enriched (e1, e2) (ConstraintFlexFlex x1 (s1, es1) x2 (s2, es2))
-      return $ c : cs'
-    (Just (StuckFlexPattern s1 x1 es1), _) -> do
+      return $ Enriched (e1, e2) (ConstraintQuasiPattern s1 m1 xs1 e2) : cs'
+    (_, Just (StuckPiElimStrict {}, _)) -> analyze $ (e2, e1) : cs
+    (Just (StuckPiElim s1 x1 es1, _), Nothing) -> do
       cs' <- analyze cs
       let c = Enriched (e1, e2) $ ConstraintFlexRigid s1 x1 es1 e2
       return $ c : cs'
-    (_, Just StuckFlexPattern {}) -> analyze $ (e2, e1) : cs
+    (Nothing, Just (StuckPiElim {}, _)) -> analyze $ (e2, e1) : cs
+    (Just (_, m1), Just (_, m2)) -> do
+      cs' <- analyze cs
+      let c = Enriched (e1, e2) $ ConstraintOther [m1, m2]
+      return $ c : cs'
     _ ->
       throwError $ "cannot analyzelify:\n" ++ Pr.ppShow (toDTerm e1, toDTerm e2)
 
@@ -118,26 +118,34 @@ analyzePiOrSigma s1 txs1 s2 txs2 cs = do
   analyze $ (s1, s2) : zip ts1 ts2' ++ cs
 
 data Stuck
-  = StuckFlexPattern WeakSortal
-                     Identifier
-                     [WeakTerm]
-  | StuckQuasiPattern WeakSortal
+  = StuckPiElim WeakSortal
+                Identifier
+                [WeakTerm]
+  | StuckPiElimStrict WeakSortal
                       Identifier
                       [Identifier]
+  | StuckOther
 
-asStuckedTerm :: WeakTerm -> Maybe Stuck
-asStuckedTerm = undefined
+asStuckedTerm :: WeakTerm -> Maybe (Stuck, Identifier)
+asStuckedTerm (_ :< WeakTermPiElim s (_ :< WeakTermHole x) es) =
+  case mapM interpretAsUpsilon es of
+    Nothing -> Just (StuckPiElim s x es, x)
+    Just xs -> Just (StuckPiElimStrict s x xs, x)
+asStuckedTerm (_ :< WeakTermSigmaElim _ _ e1 _)
+  | Just m <- obtainStuckReason e1 = Just (StuckOther, m)
+asStuckedTerm (_ :< WeakTermEpsilonElim _ e _)
+  | Just m <- obtainStuckReason e = Just (StuckOther, m)
+asStuckedTerm _ = Nothing
 
-asQuasiPattern :: Stuck -> Maybe Stuck
-asQuasiPattern (StuckFlexPattern s x es) = do
-  let mxs = mapM interpretAsUpsilon es
-  case mxs of
-    Just xs -> Just (StuckQuasiPattern s x xs)
-    Nothing -> Nothing
-asQuasiPattern s@StuckQuasiPattern {} = Just s
+obtainStuckReason :: WeakTerm -> Maybe Identifier
+obtainStuckReason (_ :< WeakTermHole x)             = Just x
+obtainStuckReason (_ :< WeakTermPiElim _ e _)       = obtainStuckReason e
+obtainStuckReason (_ :< WeakTermSigmaElim _ _ e1 _) = obtainStuckReason e1
+obtainStuckReason (_ :< WeakTermEpsilonElim _ e _)  = obtainStuckReason e
+obtainStuckReason _                                 = Nothing
 
-isStrict :: WeakTerm -> Identifier -> [Identifier] -> Bool
-isStrict e x xs = do
+isSolvable :: WeakTerm -> Identifier -> [Identifier] -> Bool
+isSolvable e x xs = do
   let (fvs, fmvs) = varAndHole e
   affineCheck xs fvs && x `notElem` fmvs
 
@@ -178,21 +186,6 @@ bindFormalArgs s xs e = do
   meta <- newNameWith "meta"
   return $ meta :< WeakTermPiIntro s (zip ts xs) e
 
-interpretAsQuasiPattern ::
-     WeakTerm -> Maybe (WeakSortal, Identifier, [Identifier])
-interpretAsQuasiPattern (_ :< WeakTermPiElim s (_ :< WeakTermHole x) es) = do
-  xs <- mapM interpretAsUpsilon es
-  return (s, x, xs)
-interpretAsQuasiPattern _ = Nothing
-
 interpretAsUpsilon :: WeakTerm -> Maybe Identifier
 interpretAsUpsilon (_ :< WeakTermUpsilon x) = Just x
 interpretAsUpsilon _                        = Nothing
-
-interpretAsUpsilonList :: [WeakTerm] -> Maybe [Identifier]
-interpretAsUpsilonList = mapM interpretAsUpsilon
-
-interpretAsFlex :: WeakTerm -> Maybe (WeakSortal, Identifier, [WeakTerm])
-interpretAsFlex (_ :< WeakTermPiElim s (_ :< WeakTermHole x) es) =
-  Just (s, x, es)
-interpretAsFlex _ = Nothing

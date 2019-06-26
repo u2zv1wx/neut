@@ -13,7 +13,6 @@ import           Data.Constraint
 import           Data.Env
 import           Data.WeakTerm
 import           Elaborate.Analyze
-import           Reduce.WeakTerm
 
 -- Given a queue of constraints (easier ones comes earlier), try to synthesize
 -- all of them using heuristics.
@@ -22,14 +21,12 @@ synthesize q = do
   sub <- gets substitution
   case Q.getMin q of
     Nothing -> return ()
-    Just (Enriched (e1, e2) (ConstraintQuasiPattern _ hole _ _))
-      | Just e <- lookup hole sub -> resolveHole q e1 e2 hole e
-    Just (Enriched (e1, e2) (ConstraintFlexRigid _ hole _ _))
-      | Just e <- lookup hole sub -> resolveHole q e1 e2 hole e
-    Just (Enriched (e1, e2) (ConstraintFlexFlex hole1 _ _ _))
-      | Just e <- lookup hole1 sub -> resolveHole q e1 e2 hole1 e
-    Just (Enriched (e1, e2) (ConstraintFlexFlex _ _ hole2 _))
-      | Just e <- lookup hole2 sub -> resolveHole q e1 e2 hole2 e
+    Just (Enriched (e1, e2) (ConstraintQuasiPattern _ m _ _))
+      | Just e <- lookup m sub -> resolveStuck q e1 e2 m e
+    Just (Enriched (e1, e2) (ConstraintFlexRigid _ m _ _))
+      | Just e <- lookup m sub -> resolveStuck q e1 e2 m e
+    Just (Enriched (e1, e2) (ConstraintOther ms))
+      | Just (m, e) <- lookupAny ms sub -> resolveStuck q e1 e2 m e
     Just (Enriched _ (ConstraintBeta x body))
       -- Synthesize `var == body` (note that `var` is not a meta-variable).
       -- In this case, we insert (var -> body) in the substitution environment
@@ -55,14 +52,14 @@ synthesize q = do
      -> synthesizeFlexRigid q s hole args e
     Just c -> throwError "cannot synthesize(synth)"
 
-resolveHole ::
+resolveStuck ::
      Q.MinQueue EnrichedConstraint
   -> WeakTerm
   -> WeakTerm
   -> Identifier
   -> WeakTerm
   -> WithEnv ()
-resolveHole q e1 e2 hole e = do
+resolveStuck q e1 e2 hole e = do
   let e1' = substWeakTerm [(hole, e)] e1
   let e2' = substWeakTerm [(hole, e)] e2
   cs <- analyze [(e1', e2')]
@@ -195,10 +192,12 @@ updateQueue' sub q =
   case Q.getMin q of
     Nothing -> return ()
     Just (Enriched (e1, e2) _) -> do
-      analyze [(substWeakTerm sub e1, substWeakTerm sub e2)]
+      analyzePlus [(substWeakTerm sub e1, substWeakTerm sub e2)]
       updateQueue' sub $ Q.deleteMin q
 
-appFold :: WeakSortal -> WeakTerm -> [WeakTerm] -> WithEnv WeakTerm
-appFold s e es = do
-  meta <- newNameWith "meta"
-  return $ meta :< WeakTermPiElim s e es
+lookupAny :: [Identifier] -> [(Identifier, a)] -> Maybe (Identifier, a)
+lookupAny [] _ = Nothing
+lookupAny (k:ks) sub =
+  case lookup k sub of
+    Just v  -> Just (k, v)
+    Nothing -> lookupAny ks sub
