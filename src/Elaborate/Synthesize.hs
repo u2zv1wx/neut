@@ -39,10 +39,10 @@ resolveStuck ::
   -> Identifier
   -> WeakTerm
   -> WithEnv ()
-resolveStuck q e1 e2 hole e = do
-  let e1' = substWeakTerm [(hole, e)] e1
-  let e2' = substWeakTerm [(hole, e)] e2
-  cs <- analyze [(e1', e2')]
+resolveStuck q e1 e2 m e = do
+  let e1' = substWeakTerm [(m, e)] e1
+  let e2' = substWeakTerm [(m, e)] e2
+  cs <- simp [(e1', e2')]
   synthesize $ Q.deleteMin q `Q.union` Q.fromList cs
 
 -- Synthesize `hole @ arg-1 @ ... @ arg-n = e`, where arg-i is a variable.
