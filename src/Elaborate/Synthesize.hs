@@ -64,26 +64,26 @@ resolvePiElim ::
   -> WeakTerm
   -> WithEnv ()
 resolvePiElim q s m es e = do
-  xs <- forceVarList es
+  xs <- toVarList es
   xss <- toAltList xs
   lamList <- mapM (\ys -> bindFormalArgs s ys e) xss
   chain q $
     flip map lamList $ \lam -> do
       modify (\env -> env {substEnv = compose [(m, lam)] (substEnv env)})
-      let current = Q.deleteMin q
-      let (q1, q2) = Q.partition (\(Enriched _ ms _) -> m `elem` ms) current
+      let rest = Q.deleteMin q
+      let (q1, q2) = Q.partition (\(Enriched _ ms _) -> m `elem` ms) rest
       synthesize q1
       synthesize q2
 
 -- [e, x, y, y, e2, e3, z] ~> [p, x, y, y, q, r, z]  (p, q, r: new variables)
-forceVarList :: [WeakTerm] -> WithEnv [Identifier]
-forceVarList [] = return []
-forceVarList ((_ :< WeakTermUpsilon x):es) = do
-  xs <- forceVarList es
+toVarList :: [WeakTerm] -> WithEnv [Identifier]
+toVarList [] = return []
+toVarList ((_ :< WeakTermUpsilon x):es) = do
+  xs <- toVarList es
   return $ x : xs
-forceVarList (_:es) = do
+toVarList (_:es) = do
   x <- newNameWith "hole"
-  xs <- forceVarList es
+  xs <- toVarList es
   return $ x : xs
 
 -- [x, x, y, z, z] ~>
