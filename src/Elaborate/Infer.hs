@@ -49,8 +49,6 @@ infer _ (meta :< WeakTermEpsilonIntro l) = do
     Nothing -> do
       h <- newHoleInCtx []
       returnMeta meta h
-      -- hole <- newNameWith "hole"
-      -- returnMeta meta $ epsilonMeta :< WeakTermEpsilon (WeakEpsilonHole hole)
 infer ctx (meta :< WeakTermEpsilonElim (t, x) e branchList) = do
   te <- infer ctx e
   insTypeEnv x t

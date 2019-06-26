@@ -7,6 +7,7 @@ import           Control.Monad.State
 import           Control.Monad.Trans.Except
 import           Data.List                  (nub)
 import qualified Data.Map.Strict            as Map
+import           Text.Read                  (readMaybe)
 import qualified Text.Show.Pretty           as Pr
 
 import           Data.Basic
@@ -46,17 +47,15 @@ elaborate e = do
 -- reduction-preserving way. Here, we translate types into units (nullary product).
 -- This doesn't cause any problem since types doesn't have any beta-reduction.
 elaborate' :: WeakTerm -> WithEnv Term
+elaborate' (_ :< WeakTermUniv _) = return zero
 elaborate' (_ :< WeakTermUpsilon x) = return $ TermUpsilon x
 elaborate' (_ :< WeakTermEpsilon _) = return zero
 elaborate' (meta :< WeakTermEpsilonIntro x) = do
-  mt <- getNumLowType meta
-  case mt of
-    Right t -> return $ TermEpsilonIntro x t
-    Left t ->
-      lift $
-      throwE $
-      "the type of " ++
-      show x ++ " is supposed to be a number, but is " ++ Pr.ppShow (toDTerm t)
+  t <- lookupTypeEnv' meta
+  mi <- obtainEpsilon t
+  case mi of
+    Just i  -> return $ TermEpsilonIntro x (asLowType i)
+    Nothing -> lift $ throwE "epsilon"
 elaborate' (_ :< WeakTermEpsilonElim (_, x) e branchList) = do
   e' <- elaborate' e
   branchList' <-
@@ -85,7 +84,6 @@ elaborate' (_ :< WeakTermSigmaElim s txs e1 e2) = do
   e1' <- elaborate' e1
   e2' <- elaborate' e2
   return $ TermSigmaElim s' (map snd txs) e1' e2'
-elaborate' (_ :< WeakTermUniv _) = return zero
 elaborate' (meta :< WeakTermRec (t, x) e) =
   case reduceWeakTerm t of
     _ :< WeakTermPi _ _ -> do
@@ -117,11 +115,8 @@ exhaust' (_ :< WeakTermEpsilonElim (t, _) e1 branchList) = do
   b1 <- exhaust' e1
   let labelList = map fst branchList
   case reduceWeakTerm t of
-    _ :< WeakTermEpsilon (WeakEpsilonHole m) ->
-      exhaustEpsilonHole m labelList b1
-    _ :< WeakTermEpsilon (WeakEpsilonIdentifier x) ->
-      exhaustEpsilonIdentifier x labelList b1
-    _ -> lift $ throwE "type error (exhaust)"
+    _ :< WeakTermEpsilon x -> exhaustEpsilonIdentifier x labelList b1
+    _                      -> lift $ throwE "type error (exhaust)"
 exhaust' (_ :< WeakTermPi s txs) = allM exhaust' $ s : map fst txs
 exhaust' (_ :< WeakTermPiIntro s _ e) = allM exhaust' [s, e]
 exhaust' (_ :< WeakTermPiElim s e es) = allM exhaust' $ s : e : es
@@ -131,14 +126,6 @@ exhaust' (_ :< WeakTermSigmaElim s _ e1 e2) = allM exhaust' [s, e1, e2]
 exhaust' (_ :< WeakTermRec _ e) = exhaust' e
 exhaust' (_ :< WeakTermConst _) = return True
 exhaust' (_ :< WeakTermHole _) = return False
-
-exhaustEpsilonHole :: Identifier -> [Case] -> Bool -> WithEnv Bool
-exhaustEpsilonHole m labelList b1 = do
-  eenv <- gets epsilonEnv
-  case lookup m eenv of
-    Nothing                        -> lift $ throwE "exhaustEpsilonHole"
-    Just (WeakEpsilonIdentifier x) -> exhaustEpsilonIdentifier x labelList b1
-    Just (WeakEpsilonHole m')      -> exhaustEpsilonHole m' labelList b1
 
 exhaustEpsilonIdentifier :: Identifier -> [Case] -> Bool -> WithEnv Bool
 exhaustEpsilonIdentifier x labelList b1 = do
@@ -160,6 +147,9 @@ allM p (x:xs) = do
 zero :: Term
 zero = TermEpsilonIntro (LiteralInteger 0) $ LowTypeSignedInt 64
 
+obtainEpsilon :: WeakSortal -> WithEnv (Maybe Identifier)
+obtainEpsilon = undefined
+
 interpretSortal :: WeakSortal -> WithEnv Identifier
 interpretSortal s =
   case reduceWeakTerm s of
@@ -169,53 +159,22 @@ interpretSortal s =
         _              -> undefined
     _ -> undefined
 
-getNumLowType :: Identifier -> WithEnv (Either WeakTerm LowType)
-getNumLowType meta = do
-  t <- reduceWeakTerm <$> lookupTypeEnv' meta
-  getNumLowType' t
-
-getNumLowType' :: WeakTerm -> WithEnv (Either WeakTerm LowType)
-getNumLowType' t =
-  case t of
-    _ :< WeakTermEpsilon (WeakEpsilonIdentifier "i1") ->
-      return $ Right $ LowTypeSignedInt 1
-    _ :< WeakTermEpsilon (WeakEpsilonIdentifier "i2") ->
-      return $ Right $ LowTypeSignedInt 2
-    _ :< WeakTermEpsilon (WeakEpsilonIdentifier "i4") ->
-      return $ Right $ LowTypeSignedInt 4
-    _ :< WeakTermEpsilon (WeakEpsilonIdentifier "i8") ->
-      return $ Right $ LowTypeSignedInt 8
-    _ :< WeakTermEpsilon (WeakEpsilonIdentifier "i16") ->
-      return $ Right $ LowTypeSignedInt 16
-    _ :< WeakTermEpsilon (WeakEpsilonIdentifier "i32") ->
-      return $ Right $ LowTypeSignedInt 32
-    _ :< WeakTermEpsilon (WeakEpsilonIdentifier "i64") ->
-      return $ Right $ LowTypeSignedInt 64
-    _ :< WeakTermEpsilon (WeakEpsilonIdentifier "u1") ->
-      return $ Right $ LowTypeUnsignedInt 1
-    _ :< WeakTermEpsilon (WeakEpsilonIdentifier "u2") ->
-      return $ Right $ LowTypeUnsignedInt 2
-    _ :< WeakTermEpsilon (WeakEpsilonIdentifier "u4") ->
-      return $ Right $ LowTypeUnsignedInt 4
-    _ :< WeakTermEpsilon (WeakEpsilonIdentifier "u8") ->
-      return $ Right $ LowTypeUnsignedInt 8
-    _ :< WeakTermEpsilon (WeakEpsilonIdentifier "u16") ->
-      return $ Right $ LowTypeUnsignedInt 16
-    _ :< WeakTermEpsilon (WeakEpsilonIdentifier "u32") ->
-      return $ Right $ LowTypeUnsignedInt 32
-    _ :< WeakTermEpsilon (WeakEpsilonIdentifier "u64") ->
-      return $ Right $ LowTypeUnsignedInt 64
-    _ :< WeakTermEpsilon (WeakEpsilonIdentifier "f16") ->
-      return $ Right $ LowTypeFloat 16
-    _ :< WeakTermEpsilon (WeakEpsilonIdentifier "f32") ->
-      return $ Right $ LowTypeFloat 32
-    _ :< WeakTermEpsilon (WeakEpsilonIdentifier "f64") ->
-      return $ Right $ LowTypeFloat 64
-    _ :< WeakTermEpsilon (WeakEpsilonIdentifier _) ->
-      return $ Right $ LowTypeSignedInt 64 -- label is int
-    _ :< WeakTermEpsilon (WeakEpsilonHole m) -> do
-      eenv <- gets epsilonEnv
-      case lookup m eenv of
-        Nothing -> lift $ throwE "getNumLowtype"
-        Just e  -> wrapType (WeakTermEpsilon e) >>= getNumLowType'
-    _ -> return $ Left t
+asLowType :: Identifier -> LowType
+asLowType x
+  | length x > 1
+  , 'i' <- head x
+  , Just i <- readMaybe (tail x)
+  , 1 <= i
+  , i <= 2 ^ (23 :: Int) - 1 = LowTypeSignedInt i
+asLowType x
+  | length x > 1
+  , 'u' <- head x
+  , Just i <- readMaybe (tail x)
+  , 1 <= i
+  , i <= 2 ^ (23 :: Int) - 1 = LowTypeUnsignedInt i
+asLowType x
+  | length x > 1
+  , 'f' <- head x
+  , Just i <- readMaybe (tail x)
+  , i `elem` [16, 32, 64] = LowTypeFloat i
+asLowType _ = LowTypeSignedInt 64 -- sortals are represented as int
