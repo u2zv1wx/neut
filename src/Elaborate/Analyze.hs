@@ -32,7 +32,7 @@ analyze ((e1, e2):cs)
       Nothing -> do
         let e1' = toDTerm e1
         let e2' = toDTerm e2
-        throwError $ "cannot analyzelify [TIMEOUT]:\n" ++ Pr.ppShow (e1', e2')
+        throwError $ "cannot simplify [TIMEOUT]:\n" ++ Pr.ppShow (e1', e2')
 analyze ((e1, e2):cs)
   | isReducible e2 = analyze $ (e2, e1) : cs
 analyze ((e1, e2):cs)
@@ -92,8 +92,7 @@ analyze ((e1, e2):cs) = do
       cs' <- analyze cs
       let c = Enriched (e1, e2) $ ConstraintOther [m1, m2]
       return $ c : cs'
-    _ ->
-      throwError $ "cannot analyzelify:\n" ++ Pr.ppShow (toDTerm e1, toDTerm e2)
+    _ -> throwError $ "cannot simplify:\n" ++ Pr.ppShow (toDTerm e1, toDTerm e2)
 
 analyzeEpsilon :: WeakEpsilon -> WeakEpsilon -> WithEnv ()
 analyzeEpsilon (WeakEpsilonIdentifier x) (WeakEpsilonIdentifier y)

@@ -2,11 +2,10 @@ module Elaborate.Synthesize
   ( synthesize
   ) where
 
-import           Control.Comonad.Cofree
 import           Control.Monad.Except
 import           Control.Monad.State
-import qualified Data.PQueue.Min        as Q
-import qualified Text.Show.Pretty       as Pr
+import qualified Data.PQueue.Min      as Q
+import qualified Text.Show.Pretty     as Pr
 
 import           Data.Basic
 import           Data.Constraint
