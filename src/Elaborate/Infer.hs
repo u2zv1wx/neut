@@ -45,15 +45,15 @@ infer _ (meta :< WeakTermEpsilonIntro l) = do
   mk <- lookupKind l
   epsilonMeta <- newNameWith "meta"
   case mk of
-    Just k ->
-      returnMeta meta $ epsilonMeta :< WeakTermEpsilon (WeakEpsilonIdentifier k)
+    Just k -> returnMeta meta $ epsilonMeta :< WeakTermEpsilon k
     Nothing -> do
-      hole <- newNameWith "hole"
-      returnMeta meta $ epsilonMeta :< WeakTermEpsilon (WeakEpsilonHole hole)
+      h <- newHoleInCtx []
+      returnMeta meta h
+      -- hole <- newNameWith "hole"
+      -- returnMeta meta $ epsilonMeta :< WeakTermEpsilon (WeakEpsilonHole hole)
 infer ctx (meta :< WeakTermEpsilonElim (t, x) e branchList) = do
   te <- infer ctx e
   insTypeEnv x t
-  constrainEpsilon te
   insConstraintEnv t te
   if null branchList
     then newHole >>= returnMeta meta -- ex falso quodlibet
@@ -67,13 +67,12 @@ infer ctx (meta :< WeakTermEpsilonElim (t, x) e branchList) = do
       returnMeta meta $ substWeakTerm [(x, e)] $ head ts
 infer ctx (meta :< WeakTermPi s txs) = inferPiOrSigma ctx meta s txs
 infer ctx (meta :< WeakTermPiIntro s txs e) = do
-  infer ctx s >>= constrainEpsilon
+  _ <- infer ctx s
   forM_ txs $ \(t, x) -> insTypeEnv x t
   cod <- infer (ctx ++ txs) e >>= withPlaceholder
-  metaPi <- newNameWith "meta"
-  returnMeta meta $ metaPi :< WeakTermPi s (txs ++ [cod])
+  wrapType (WeakTermPi s (txs ++ [cod])) >>= returnMeta meta
 infer ctx (meta :< WeakTermPiElim s e es) = do
-  infer ctx s >>= constrainEpsilon
+  _ <- infer ctx s
   tPi <- infer ctx e
   binder <- inferList ctx es
   cod <- newHoleInCtx (ctx ++ binder) >>= withPlaceholder
@@ -82,11 +81,11 @@ infer ctx (meta :< WeakTermPiElim s e es) = do
   returnMeta meta $ substWeakTerm (zip (map snd binder) es) $ fst cod
 infer ctx (meta :< WeakTermSigma s txs) = inferPiOrSigma ctx meta s txs
 infer ctx (meta :< WeakTermSigmaIntro s es) = do
-  infer ctx s >>= constrainEpsilon
+  _ <- infer ctx s
   binder <- inferList ctx es
   returnMeta meta $ meta :< WeakTermSigma s binder
 infer ctx (meta :< WeakTermSigmaElim s txs e1 e2) = do
-  infer ctx s >>= constrainEpsilon
+  _ <- infer ctx s
   t1 <- infer ctx e1
   forM_ txs $ \(t, x) -> insTypeEnv x t
   varSeq <- mapM (uncurry toVar1) txs
@@ -113,7 +112,7 @@ infer ctx (meta :< WeakTermHole _) = newHoleInCtx ctx >>= returnMeta meta
 inferPiOrSigma ::
      Context -> Identifier -> WeakTerm -> [IdentifierPlus] -> WithEnv WeakTerm
 inferPiOrSigma ctx meta s txs = do
-  infer ctx s >>= constrainEpsilon
+  _ <- infer ctx s
   univList <-
     forM (map (`take` txs) [1 .. length txs]) $ \zts ->
       infer (ctx ++ init zts) (fst $ last zts)
@@ -167,17 +166,9 @@ inferCase (CaseLiteral (LiteralLabel name)) = do
   ienv <- gets indexEnv
   mk <- lookupKind' name ienv
   case mk of
-    Just k -> Just <$> wrapType (WeakTermEpsilon $ WeakEpsilonIdentifier k)
-    Nothing -> do
-      hole <- newNameWith "hole"
-      Just <$> wrapType (WeakTermEpsilon $ WeakEpsilonHole hole)
+    Just k  -> Just <$> wrapType (WeakTermEpsilon k)
+    Nothing -> return Nothing
 inferCase _ = return Nothing
-
-constrainEpsilon :: WeakTerm -> WithEnv ()
-constrainEpsilon t = do
-  h <- newNameWith "hole"
-  meta <- newNameWith "meta"
-  insConstraintEnv t (meta :< WeakTermEpsilon (WeakEpsilonHole h))
 
 inferList :: Context -> [WeakTerm] -> WithEnv Context
 inferList ctx es = do

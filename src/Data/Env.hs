@@ -32,7 +32,6 @@ data Env = Env
   , constraintEnv     :: [PreConstraint] -- for type inference
   , constraintQueue   :: Q.MinQueue EnrichedConstraint -- for (dependent) type inference
   , substEnv          :: SubstWeakTerm -- for (dependent) type inference
-  , epsilonEnv        :: [(Identifier, WeakEpsilon)]
   , univConstraintEnv :: [(UnivLevel, UnivLevel)]
   , currentDir        :: FilePath
   , termEnv           :: [(Identifier, ([Identifier], Term))] -- x == lam (x1, ..., xn). e
@@ -58,7 +57,6 @@ initialEnv path =
     , constraintEnv = []
     , constraintQueue = Q.empty
     , substEnv = []
-    , epsilonEnv = []
     , univConstraintEnv = []
     , currentDir = path
     }
@@ -169,6 +167,7 @@ insIndexEnv :: Identifier -> [Identifier] -> WithEnv ()
 insIndexEnv name indexList =
   modify (\e -> e {indexEnv = (name, indexList) : indexEnv e})
 
+-- FIXME: cartesian.fooみたいなやつを自動でcartesianだと判別できるようにする
 lookupKind :: Literal -> WithEnv (Maybe Identifier)
 lookupKind (LiteralInteger _) = return Nothing
 lookupKind (LiteralFloat _) = return Nothing

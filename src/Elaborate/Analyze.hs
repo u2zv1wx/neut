@@ -45,9 +45,8 @@ simp ((_ :< WeakTermUniv i, _ :< WeakTermUniv j):cs) = do
   simp cs
 simp ((_ :< WeakTermUpsilon x1, _ :< WeakTermUpsilon x2):cs)
   | x1 == x2 = simp cs
-simp ((_ :< WeakTermEpsilon l1, _ :< WeakTermEpsilon l2):cs) = do
-  simpEpsilon l1 l2
-  simp cs
+simp ((_ :< WeakTermEpsilon l1, _ :< WeakTermEpsilon l2):cs)
+  | l1 == l2 = simp cs
 simp ((_ :< WeakTermEpsilonIntro l1, _ :< WeakTermEpsilonIntro l2):cs)
   | l1 == l2 = simp cs
 simp ((_ :< WeakTermPi s1 txs1, _ :< WeakTermPi s2 txs2):cs)
@@ -107,15 +106,6 @@ simp ((e1, e2):cs) = do
       return $ c : cs'
     (_, Just (StuckOther, _)) -> simp $ (e2, e1) : cs
     _ -> throwError $ "cannot simplify:\n" ++ Pr.ppShow (toDTerm e1, toDTerm e2)
-
-simpEpsilon :: WeakEpsilon -> WeakEpsilon -> WithEnv ()
-simpEpsilon (WeakEpsilonIdentifier x) (WeakEpsilonIdentifier y)
-  | x == y = return ()
-simpEpsilon (WeakEpsilonHole m) y =
-  modify (\env -> env {epsilonEnv = (m, y) : epsilonEnv env})
-simpEpsilon x (WeakEpsilonHole m) =
-  modify (\env -> env {epsilonEnv = (m, x) : epsilonEnv env})
-simpEpsilon _ _ = throwError "cannot simplify (simpEpsilon)"
 
 simpPiOrSigma ::
      WeakTerm
