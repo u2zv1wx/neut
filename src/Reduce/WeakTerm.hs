@@ -28,7 +28,8 @@ reduceWeakTerm (i :< WeakTermPiElim s e es) = do
   let e' = reduceWeakTerm e
   case e' of
     _ :< WeakTermPiIntro _ txs body
-      | length txs == length es -> do
+      | length txs == length es'
+      , all isValue es' -> do
         let xs = map snd txs
         reduceWeakTerm $ substWeakTerm (zip xs es') body
     self@(_ :< WeakTermRec (_, x) body) -> do

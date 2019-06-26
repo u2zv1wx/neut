@@ -289,3 +289,14 @@ toWeakTermPiElimSeq (i :< WeakTermPiElim s e es) = do
   let (fun, xs) = toWeakTermPiElimSeq e
   (fun, xs ++ [(i, s, es)])
 toWeakTermPiElimSeq c = (c, [])
+
+isValue :: WeakTerm -> Bool
+isValue (_ :< WeakTermUniv _)          = True
+isValue (_ :< WeakTermUpsilon _)       = True
+isValue (_ :< WeakTermEpsilon _)       = True
+isValue (_ :< WeakTermEpsilonIntro _)  = True
+isValue (_ :< WeakTermPi {})           = True
+isValue (_ :< WeakTermPiIntro s _ _)   = isValue s
+isValue (_ :< WeakTermSigma {})        = True
+isValue (_ :< WeakTermSigmaIntro s es) = all isValue $ s : es
+isValue _                              = False

@@ -139,8 +139,6 @@ asStuckedTerm (_ :< WeakTermPiElim s (_ :< WeakTermHole x) es) =
   case mapM interpretAsUpsilon es of
     Nothing -> Just (StuckPiElim s x es, x)
     Just xs -> Just (StuckPiElimStrict s x (zip es xs), x)
-asStuckedTerm (_ :< WeakTermSigmaElim _ _ e1 _)
-  | Just m <- obtainStuckReason e1 = Just (StuckOther, m)
 asStuckedTerm (_ :< WeakTermEpsilonElim _ e _)
   | Just m <- obtainStuckReason e = Just (StuckOther, m)
 asStuckedTerm _ = Nothing

@@ -32,7 +32,7 @@ data Env = Env
   , constraintEnv     :: [PreConstraint] -- for type inference
   , constraintQueue   :: Q.MinQueue EnrichedConstraint -- for (dependent) type inference
   , substEnv          :: SubstWeakTerm -- for (dependent) type inference
-  , epsilonEnv        :: [(Identifier, Identifier)]
+  , epsilonEnv        :: [(Identifier, WeakEpsilon)]
   , univConstraintEnv :: [(UnivLevel, UnivLevel)]
   , currentDir        :: FilePath
   , termEnv           :: [(Identifier, ([Identifier], Term))] -- x == lam (x1, ..., xn). e
