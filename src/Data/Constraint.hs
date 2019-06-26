@@ -6,16 +6,7 @@ import           Data.WeakTerm
 type PreConstraint = (WeakTerm, WeakTerm)
 
 data Constraint
-  = ConstraintPattern WeakSortal
-                      Identifier
-                      [Identifier]
-                      WeakTerm
-  | ConstraintBeta Identifier
-                   WeakTerm
-  | ConstraintDelta Identifier
-                    (WeakSortal, [WeakTerm])
-                    (WeakSortal, [WeakTerm])
-  | ConstraintQuasiPattern WeakSortal
+  = ConstraintQuasiPattern WeakSortal
                            Identifier
                            [Identifier]
                            WeakTerm
@@ -23,18 +14,12 @@ data Constraint
                         Identifier
                         [WeakTerm]
                         WeakTerm
-  | ConstraintFlexFlex Identifier
-                       (WeakSortal, [WeakTerm])
-                       Identifier
-                       (WeakSortal, [WeakTerm])
+  | ConstraintOther [Identifier] -- list of metavariables that cause stuck
 
 constraintToInt :: Constraint -> Int
-constraintToInt ConstraintPattern {}      = 0
-constraintToInt ConstraintDelta {}        = 1
-constraintToInt ConstraintBeta {}         = 2
-constraintToInt ConstraintQuasiPattern {} = 3
-constraintToInt ConstraintFlexRigid {}    = 4
-constraintToInt ConstraintFlexFlex {}     = 5
+constraintToInt ConstraintQuasiPattern {} = 0
+constraintToInt ConstraintFlexRigid {}    = 1
+constraintToInt ConstraintOther {}        = 2
 
 instance Eq Constraint where
   c1 == c2 = constraintToInt c1 == constraintToInt c2
