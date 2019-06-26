@@ -43,9 +43,13 @@ analyze ((e1, e2):cs)
 analyze ((_ :< WeakTermUniv i, _ :< WeakTermUniv j):cs) = do
   insUnivConstraintEnv i j
   analyze cs
+analyze ((_ :< WeakTermUpsilon x1, _ :< WeakTermUpsilon x2):cs)
+  | x1 == x2 = analyze cs
 analyze ((_ :< WeakTermEpsilon l1, _ :< WeakTermEpsilon l2):cs) = do
   analyzeEpsilon l1 l2
   analyze cs
+analyze ((_ :< WeakTermEpsilonIntro l1, _ :< WeakTermEpsilonIntro l2):cs)
+  | l1 == l2 = analyze cs
 analyze ((_ :< WeakTermPi s1 txs1, _ :< WeakTermPi s2 txs2):cs)
   | length txs1 == length txs2 = analyzePiOrSigma s1 txs1 s2 txs2 cs
 analyze ((_ :< WeakTermPiIntro s1 txs1 body1, _ :< WeakTermPiIntro s2 txs2 body2):cs) = do
@@ -72,35 +76,37 @@ analyze ((e1, e2):cs) = do
   let ms1 = asStuckedTerm e1
   let ms2 = asStuckedTerm e2
   case (ms1, ms2) of
-    (Just (StuckPiElimStrict s1 m1 xs1, _), _)
-      | isSolvable e2 m1 xs1 -> do
-        ans <- bindFormalArgs s1 xs1 e2
-        modify (\env -> env {substEnv = compose [(m1, ans)] (substEnv env)})
-        analyze cs
-    (_, Just (StuckPiElimStrict _ m2 xs2, _))
-      | isSolvable e1 m2 xs2 -> analyze $ (e2, e1) : cs
-    (Just (StuckPiElimStrict s1 m1 xs1, _), _) -> do
+    (Just (StuckPiElimStrict s1 m1 exs1, _), _)
+      | (es1, xs1) <- unzip exs1
+      , isSolvable e2 m1 xs1 -> do
+        cs' <- analyze cs
+        return $ Enriched (e1, e2) [m1] (ConstraintPattern s1 m1 es1 e2) : cs'
+    (_, Just (StuckPiElimStrict _ m2 exs2, _))
+      | isSolvable e1 m2 (map snd exs2) -> analyze $ (e2, e1) : cs
+    (Just (StuckPiElimStrict s1 m1 exs1, _), _) -> do
       cs' <- analyze cs
-      return $ Enriched (e1, e2) (ConstraintQuasiPattern s1 m1 xs1 e2) : cs'
+      return $
+        Enriched (e1, e2) [m1] (ConstraintQuasiPattern s1 m1 (map fst exs1) e2) :
+        cs'
     (_, Just (StuckPiElimStrict {}, _)) -> analyze $ (e2, e1) : cs
-    (Just (StuckPiElim s1 x1 es1, _), Nothing) -> do
+    (Just (StuckPiElim s1 m1 es1, _), Nothing) -> do
       cs' <- analyze cs
-      let c = Enriched (e1, e2) $ ConstraintFlexRigid s1 x1 es1 e2
+      let c = Enriched (e1, e2) [m1] $ ConstraintFlexRigid s1 m1 es1 e2
       return $ c : cs'
     (Nothing, Just (StuckPiElim {}, _)) -> analyze $ (e2, e1) : cs
     (Just (_, m1), Just (_, m2)) -> do
       cs' <- analyze cs
-      let c = Enriched (e1, e2) $ ConstraintOther [m1, m2]
+      let c = Enriched (e1, e2) [m1, m2] ConstraintOther
       return $ c : cs'
     _ -> throwError $ "cannot simplify:\n" ++ Pr.ppShow (toDTerm e1, toDTerm e2)
 
 analyzeEpsilon :: WeakEpsilon -> WeakEpsilon -> WithEnv ()
 analyzeEpsilon (WeakEpsilonIdentifier x) (WeakEpsilonIdentifier y)
   | x == y = return ()
-analyzeEpsilon (WeakEpsilonIdentifier x) (WeakEpsilonHole m) =
-  modify (\env -> env {epsilonEnv = (m, x) : epsilonEnv env})
-analyzeEpsilon (WeakEpsilonHole m) (WeakEpsilonIdentifier y) =
+analyzeEpsilon (WeakEpsilonHole m) y =
   modify (\env -> env {epsilonEnv = (m, y) : epsilonEnv env})
+analyzeEpsilon x (WeakEpsilonHole m) =
+  modify (\env -> env {epsilonEnv = (m, x) : epsilonEnv env})
 analyzeEpsilon _ _ = throwError "cannot analyzelify (analyzeEpsilon)"
 
 analyzePiOrSigma ::
@@ -123,14 +129,14 @@ data Stuck
                 [WeakTerm]
   | StuckPiElimStrict WeakSortal
                       Identifier
-                      [Identifier]
+                      [(WeakTerm, Identifier)]
   | StuckOther
 
 asStuckedTerm :: WeakTerm -> Maybe (Stuck, Identifier)
 asStuckedTerm (_ :< WeakTermPiElim s (_ :< WeakTermHole x) es) =
   case mapM interpretAsUpsilon es of
     Nothing -> Just (StuckPiElim s x es, x)
-    Just xs -> Just (StuckPiElimStrict s x xs, x)
+    Just xs -> Just (StuckPiElimStrict s x (zip es xs), x)
 asStuckedTerm (_ :< WeakTermSigmaElim _ _ e1 _)
   | Just m <- obtainStuckReason e1 = Just (StuckOther, m)
 asStuckedTerm (_ :< WeakTermEpsilonElim _ e _)

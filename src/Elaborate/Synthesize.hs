@@ -2,10 +2,11 @@ module Elaborate.Synthesize
   ( synthesize
   ) where
 
+import           Control.Comonad.Cofree
 import           Control.Monad.Except
 import           Control.Monad.State
-import qualified Data.PQueue.Min      as Q
-import qualified Text.Show.Pretty     as Pr
+import qualified Data.PQueue.Min        as Q
+import qualified Text.Show.Pretty       as Pr
 
 import           Data.Basic
 import           Data.Constraint
@@ -20,39 +21,14 @@ synthesize q = do
   sub <- gets substEnv
   case Q.getMin q of
     Nothing -> return ()
-    Just (Enriched (e1, e2) (ConstraintQuasiPattern _ m _ _))
-      | Just e <- lookup m sub -> resolveStuck q e1 e2 m e
-    Just (Enriched (e1, e2) (ConstraintFlexRigid _ m _ _))
-      | Just e <- lookup m sub -> resolveStuck q e1 e2 m e
-    Just (Enriched (e1, e2) (ConstraintOther ms))
+    Just (Enriched (e1, e2) ms _)
       | Just (m, e) <- lookupAny ms sub -> resolveStuck q e1 e2 m e
-    Just (Enriched _ (ConstraintQuasiPattern s m preArgs e))
-      -- Synthesize `hole @ arg-1 @ ... @ arg-n = e`, where arg-i is a variable.
-      -- Suppose that we received a quasi-pattern ?M @ x @ x @ y @ z == e.
-      -- What this function do is to try two alternatives in this case:
-      --   (1) ?M == lam x. lam _. lam y. lam z. e
-      --   (2) ?M == lam _. lam x. lam y. lam z. e
-      -- where `_` are new variables. In other words, this function tries
-      -- all the alternatives that are obtained by choosing one `x` from the
-      -- list [x, x, y, z], replacing all the other occurrences of `x` with new variables.
-     -> do
-      argsList <- toAltList preArgs
-      lamList <- mapM (\xs -> bindFormalArgs s xs e) argsList
-      chain q $
-        flip map lamList $ \lam -> do
-          modify (\env -> env {substEnv = compose [(m, lam)] (substEnv env)})
-          synthesize $ Q.deleteMin q
-    Just (Enriched _ (ConstraintFlexRigid s m args e))
-      -- Synthesize `hole @ arg-1 @ ... @ arg-n = e`, where arg-i is an arbitrary term.
-      -- We try to resolve the constraint by assuming that the meta-variable
-      -- discards all the arguments. For example, given a constraint `?M @ e1 @ e2 = e`, this
-      -- function tries to resolve this by `?M = lam _. lam _. e`, discarding the arguments
-      -- `e1` and `e2`.
-     -> do
-      newHoleList <- mapM (const (newNameWith "hole")) args -- ?M_i
-      lam <- bindFormalArgs s newHoleList e
-      modify (\env -> env {substEnv = compose [(m, lam)] (substEnv env)})
-      synthesize $ Q.deleteMin q
+    Just (Enriched _ _ (ConstraintPattern s m es e)) ->
+      resolveFlexRigid q s m es e
+    Just (Enriched _ _ (ConstraintQuasiPattern s m es e)) ->
+      resolveFlexRigid q s m es e
+    Just (Enriched _ _ (ConstraintFlexRigid s m es e)) ->
+      resolveFlexRigid q s m es e
     Just _ -> throwError "cannot synthesize(synth)"
 
 resolveStuck ::
@@ -67,6 +43,47 @@ resolveStuck q e1 e2 hole e = do
   let e2' = substWeakTerm [(hole, e)] e2
   cs <- analyze [(e1', e2')]
   synthesize $ Q.deleteMin q `Q.union` Q.fromList cs
+
+-- Synthesize `hole @ arg-1 @ ... @ arg-n = e`, where arg-i is a variable.
+-- Suppose that we received a quasi-pattern ?M @ x @ x @ y @ z == e.
+-- What this function do is to try two alternatives in this case:
+--   (1) ?M == lam x. lam _. lam y. lam z. e
+--   (2) ?M == lam _. lam x. lam y. lam z. e
+-- where `_` are new variables. In other words, this function tries
+-- all the alternatives that are obtained by choosing one `x` from the
+-- list [x, x, y, z], replacing all the other occurrences of `x` with new variables.
+-- If the given pattern is a flex-rigid pattern like ?M @ x @ x @ e1 @ y == e,
+-- this function replaces all the arguments that are not variable by
+-- fresh variables, and try to resolve the new quasi-pattern ?M @ x @ x @ z @ y == e.
+resolveFlexRigid ::
+     Q.MinQueue EnrichedConstraint
+  -> WeakTerm
+  -> Identifier
+  -> [WeakTerm]
+  -> WeakTerm
+  -> WithEnv ()
+resolveFlexRigid q s m es e = do
+  xs <- forceVarList es
+  xss <- toAltList xs
+  lamList <- mapM (\ys -> bindFormalArgs s ys e) xss
+  chain q $
+    flip map lamList $ \lam -> do
+      modify (\env -> env {substEnv = compose [(m, lam)] (substEnv env)})
+      let current = Q.deleteMin q
+      let (q1, q2) = Q.partition (\(Enriched _ ms _) -> m `elem` ms) current
+      synthesize q1
+      synthesize q2
+
+-- [e, x, y, y, e2, e3, z] ~> [p, x, y, y, q, r, z]  (p, q, r: new variables)
+forceVarList :: [WeakTerm] -> WithEnv [Identifier]
+forceVarList [] = return []
+forceVarList ((_ :< WeakTermUpsilon x):es) = do
+  xs <- forceVarList es
+  return $ x : xs
+forceVarList (_:es) = do
+  x <- newNameWith "hole"
+  xs <- forceVarList es
+  return $ x : xs
 
 -- [x, x, y, z, z] ~>
 --   [ [x, p, y, z, q]
