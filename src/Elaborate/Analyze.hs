@@ -101,10 +101,11 @@ analyze ((e1, e2):cs) = do
       let c = Enriched (e1, e2) [m1] $ ConstraintFlexFlex s1 m1 es1 e2
       return $ c : cs'
     (_, Just (StuckPiElim {}, _)) -> analyze $ (e2, e1) : cs
-    (Just (_, m1), Just (_, m2)) -> do
+    (Just (StuckOther, m1), _) -> do
       cs' <- analyze cs
-      let c = Enriched (e1, e2) [m1, m2] ConstraintOther
+      let c = Enriched (e1, e2) [m1] ConstraintOther
       return $ c : cs'
+    (_, Just (StuckOther, _)) -> analyze $ (e2, e1) : cs
     _ -> throwError $ "cannot simplify:\n" ++ Pr.ppShow (toDTerm e1, toDTerm e2)
 
 analyzeEpsilon :: WeakEpsilon -> WeakEpsilon -> WithEnv ()
