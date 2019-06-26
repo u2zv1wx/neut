@@ -76,7 +76,7 @@ infer ctx (meta :< WeakTermPiElim s e es) = do
   infer ctx s >>= constrainEpsilon
   tPi <- infer ctx e
   binder <- inferList ctx es
-  cod <- newTypeVar (ctx ++ binder) >>= withPlaceholder
+  cod <- newHoleInCtx (ctx ++ binder) >>= withPlaceholder
   metaPi <- newNameWith "meta"
   insConstraintEnv tPi (metaPi :< WeakTermPi s (binder ++ [cod]))
   returnMeta meta $ substWeakTerm (zip (map snd binder) es) $ fst cod
@@ -95,7 +95,7 @@ infer ctx (meta :< WeakTermSigmaElim s txs e1 e2) = do
   insConstraintEnv t1 sigmaType
   z <- newNameOfType t1
   varTuple <- constructTuple (ctx ++ binder) s (map snd binder)
-  typeC <- newTypeVar (ctx ++ binder ++ [(t1, z)])
+  typeC <- newHoleInCtx (ctx ++ binder ++ [(t1, z)])
   t2 <- infer (ctx ++ binder) e2
   insConstraintEnv t2 (substWeakTerm [(z, varTuple)] typeC)
   returnMeta meta $ substWeakTerm [(z, e1)] typeC
@@ -108,7 +108,7 @@ infer _ (meta :< WeakTermConst x) = do
   h <- newHole -- constants do not depend on their context
   insTypeEnv x h
   returnMeta meta h
-infer ctx (meta :< WeakTermHole _) = newTypeVar ctx >>= returnMeta meta
+infer ctx (meta :< WeakTermHole _) = newHoleInCtx ctx >>= returnMeta meta
 
 inferPiOrSigma ::
      Context -> Identifier -> WeakTerm -> [IdentifierPlus] -> WithEnv WeakTerm
@@ -121,19 +121,26 @@ inferPiOrSigma ctx meta s txs = do
   constrainList $ univ : univList
   returnMeta meta univ
 
--- In a context (x1 : A1, ..., xn : An), this function creates a metavariable
---   ?M : Pi (x1 : A1, ..., xn : An). Ui
--- and return ?M @ (x1, ..., xn) : Ui.
-newTypeVar :: Context -> WithEnv WeakTerm
-newTypeVar ctx = do
+-- In a context (x1 : A1, ..., xn : An), this function creates metavariables
+--   ?M  : Pi (x1 : A1, ..., xn : An). ?Mt @ (x1, ..., xn)
+--   ?Mt : Pi (x1 : A1, ..., xn : An). Ui
+-- and return ?M @ (x1, ..., xn) : ?Mt @ (x1, ..., xn).
+-- Note that we can't just set `?M : Pi (x1 : A1, ..., xn : An). Ui` since
+-- WeakTermHole might be used as a term which is not a type.
+newHoleInCtx :: Context -> WithEnv WeakTerm
+newHoleInCtx ctx = do
   univ <- newUniv >>= withPlaceholder
-  s <- newCartesian
-  pi <- wrapType $ WeakTermPi s $ ctx ++ [univ]
-  hole <- newHoleOfType pi
+  s1 <- newCartesian
+  higherPi <- wrapType $ WeakTermPi s1 $ ctx ++ [univ]
+  higherHole <- newHoleOfType higherPi
   varSeq <- mapM (uncurry toVar1) ctx
-  wrapType $ WeakTermPiElim s hole varSeq
+  app <- wrapType (WeakTermPiElim s1 higherHole varSeq) >>= withPlaceholder
+  s2 <- newCartesian
+  pi <- wrapType $ WeakTermPi s2 $ ctx ++ [app]
+  hole <- newHoleOfType pi
+  wrapType $ WeakTermPiElim s2 hole varSeq
 
--- In context ctx == [x1, ..., xn], `newTypeVarList ctx names-of-holes` generates
+-- In context ctx == [x1, ..., xn], `newHoleListInCtx ctx names-of-holes` generates
 -- the following list of holes:
 --
 --   [m1 @ ctx,
@@ -142,12 +149,12 @@ newTypeVar ctx = do
 --    mn @ ctx @ y1 @ ... @ y{n-1}]
 --
 -- inserting type information `yi : mi @ ctx @ y1 @ ... @ y{i-1}`.
-newTypeVarList :: Context -> [Identifier] -> WithEnv [WeakTerm]
-newTypeVarList _ [] = return []
-newTypeVarList ctx (x:rest) = do
-  t <- newTypeVar ctx
+newHoleListInCtx :: Context -> [Identifier] -> WithEnv [WeakTerm]
+newHoleListInCtx _ [] = return []
+newHoleListInCtx ctx (x:rest) = do
+  t <- newHoleInCtx ctx
   insTypeEnv x t
-  ts <- newTypeVarList (ctx ++ [(t, x)]) rest
+  ts <- newHoleListInCtx (ctx ++ [(t, x)]) rest
   return $ t : ts
 
 withPlaceholder :: WeakTerm -> WithEnv IdentifierPlus
@@ -175,7 +182,7 @@ constrainEpsilon t = do
 inferList :: Context -> [WeakTerm] -> WithEnv Context
 inferList ctx es = do
   xs <- mapM (const $ newNameWith "hole") es
-  holeList <- newTypeVarList ctx xs
+  holeList <- newHoleListInCtx ctx xs
   let holeList' = map (substWeakTerm (zip xs es)) holeList
   ts <- mapM (infer ctx) es
   forM_ (zip holeList' ts) $ uncurry insConstraintEnv
