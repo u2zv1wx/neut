@@ -18,20 +18,18 @@ import           Reduce.WeakTerm
 -- Given a queue of constraints (easier ones comes earlier), try to synthesize
 -- all of them using heuristics.
 synthesize :: Q.MinQueue EnrichedConstraint -> WithEnv ()
-synthesize q =
+synthesize q = do
+  sub <- gets substitution
   case Q.getMin q of
     Nothing -> return ()
-    Just (Enriched _ (ConstraintPattern s x args e))
-      -- Synthesize `?M @ arg-1 @ ... @ arg-n == e`, where each arg-i is a variable,
-      -- and arg-i == arg-j iff i == j. This kind of constraint is known to be able
-      -- to be solved by:
-      --   ?M == lam arg-1, ..., arg-n. e
-      -- This kind of constraint is called a "pattern".
-     -> do
-      ans <- bindFormalArgs s args e
-      modify
-        (\env -> env {substitution = compose [(x, ans)] (substitution env)})
-      substQueue (Q.deleteMin q) >>= synthesize
+    Just (Enriched (e1, e2) (ConstraintQuasiPattern _ hole _ _))
+      | Just e <- lookup hole sub -> resolveHole q e1 e2 hole e
+    Just (Enriched (e1, e2) (ConstraintFlexRigid _ hole _ _))
+      | Just e <- lookup hole sub -> resolveHole q e1 e2 hole e
+    Just (Enriched (e1, e2) (ConstraintFlexFlex hole1 _ _ _))
+      | Just e <- lookup hole1 sub -> resolveHole q e1 e2 hole1 e
+    Just (Enriched (e1, e2) (ConstraintFlexFlex _ _ hole2 _))
+      | Just e <- lookup hole2 sub -> resolveHole q e1 e2 hole2 e
     Just (Enriched _ (ConstraintBeta x body))
       -- Synthesize `var == body` (note that `var` is not a meta-variable).
       -- In this case, we insert (var -> body) in the substitution environment
@@ -44,29 +42,8 @@ synthesize q =
       case me of
         Nothing -> synthesize $ Q.deleteMin q
         Just body' -> do
-          cs <- simp [(body, body')]
-          let q' = Q.fromList $ map (\c -> Enriched c $ categorize c) cs
-          synthesize $ Q.deleteMin q `Q.union` q'
-    Just (Enriched _ (ConstraintDelta x (s1, args1) (s2, args2)))
-      -- Synthesize `x @ arg-11 @ ... @ arg-1n == x @ arg-21 @ ... @ arg-2n`.
-      -- We try two alternatives:
-      --   (1) assume that x is opaque and attempt to resolve this by args1 === args2.
-      --   (2) unfold the definition of x and resolve (unfold x) @ args1 == (unfold x) @ args2.
-      -- In (2), we use the definition that are inserted by ConstraintBeta.
-     -> do
-      let plan1 = getQueue $ analyze $ zip args1 args2
-      sub <- gets substitution
-      planList <-
-        case lookup x sub of
-          Nothing -> return [plan1]
-          Just body -> do
-            e1' <- reduceWeakTerm <$> appFold s1 body args1
-            e2' <- reduceWeakTerm <$> appFold s2 body args2
-            cs <- simp [(e1', e2')]
-            let plan2 = getQueue $ analyze cs
-            return [plan1, plan2]
-      q' <- gets constraintQueue
-      chain q' planList >>= continue q'
+          cs <- analyze [(body, body')]
+          synthesize $ Q.deleteMin q `Q.union` Q.fromList cs
     Just (Enriched _ (ConstraintQuasiPattern s hole preArgs e))
       -- Synthesize `hole @ arg-1 @ ... @ arg-n = e`, where arg-i is a variable.
       -- In this case, we do the same as in Flex-Rigid case.
@@ -77,6 +54,19 @@ synthesize q =
       -- Synthesize `hole @ arg-1 @ ... @ arg-n = e`, where arg-i is an arbitrary term.
      -> synthesizeFlexRigid q s hole args e
     Just c -> throwError "cannot synthesize(synth)"
+
+resolveHole ::
+     Q.MinQueue EnrichedConstraint
+  -> WeakTerm
+  -> WeakTerm
+  -> Identifier
+  -> WeakTerm
+  -> WithEnv ()
+resolveHole q e1 e2 hole e = do
+  let e1' = substWeakTerm [(hole, e)] e1
+  let e2' = substWeakTerm [(hole, e)] e2
+  cs <- analyze [(e1', e2')]
+  synthesize $ Q.deleteMin q `Q.union` Q.fromList cs
 
 -- Suppose that this function received a quasi-pattern ?M @ x @ x @ y @ z == e, for example.
 -- What this function do is to try two alternatives in this case:
