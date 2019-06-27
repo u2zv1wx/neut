@@ -16,13 +16,14 @@ import           Elaborate.Analyze
 
 -- Given a queue of constraints (easier ones comes earlier), try to synthesize
 -- all of them using heuristics.
-synthesize :: Q.MinQueue EnrichedConstraint -> WithEnv ()
+synthesize :: ConstraintQueue -> WithEnv ()
 synthesize q = do
   sub <- gets substEnv
   case Q.getMin q of
     Nothing -> return ()
     Just (Enriched (e1, e2) ms _)
       | Just (m, e) <- lookupAny ms sub -> resolveStuck q e1 e2 m e
+    Just (Enriched _ _ (ConstraintImmediate m e)) -> resolveHole q m e
     Just (Enriched _ _ (ConstraintPattern s m es e)) -> resolvePiElim q s m es e
     Just (Enriched _ _ (ConstraintQuasiPattern s m es e)) ->
       resolvePiElim q s m es e
@@ -33,7 +34,7 @@ synthesize q = do
     Just _ -> throwError "cannot synthesize(synth)"
 
 resolveStuck ::
-     Q.MinQueue EnrichedConstraint
+     ConstraintQueue
   -> WeakTerm
   -> WeakTerm
   -> Identifier
@@ -57,7 +58,7 @@ resolveStuck q e1 e2 m e = do
 -- this function replaces all the arguments that are not variable by
 -- fresh variables, and try to resolve the new quasi-pattern ?M @ x @ x @ z @ y == e.
 resolvePiElim ::
-     Q.MinQueue EnrichedConstraint
+     ConstraintQueue
   -> WeakTerm
   -> Identifier
   -> [WeakTerm]
@@ -67,13 +68,15 @@ resolvePiElim q s m es e = do
   xs <- toVarList es
   xss <- toAltList xs
   lamList <- mapM (\ys -> bindFormalArgs s ys e) xss
-  chain q $
-    flip map lamList $ \lam -> do
-      modify (\env -> env {substEnv = compose [(m, lam)] (substEnv env)})
-      let rest = Q.deleteMin q
-      let (q1, q2) = Q.partition (\(Enriched _ ms _) -> m `elem` ms) rest
-      synthesize q1
-      synthesize q2
+  chain q $ flip map lamList $ \lam -> resolveHole q m lam
+
+resolveHole :: ConstraintQueue -> Identifier -> WeakTerm -> WithEnv ()
+resolveHole q m e = do
+  modify (\env -> env {substEnv = compose [(m, e)] (substEnv env)})
+  let rest = Q.deleteMin q
+  let (q1, q2) = Q.partition (\(Enriched _ ms _) -> m `elem` ms) rest
+  synthesize q1
+  synthesize q2
 
 -- [e, x, y, y, e2, e3, z] ~> [p, x, y, y, q, r, z]  (p, q, r: new variables)
 toVarList :: [WeakTerm] -> WithEnv [Identifier]
@@ -136,7 +139,7 @@ discardInactive xs indexList =
       _ -> newNameWith "hole"
 
 -- Try the list of alternatives.
-chain :: Q.MinQueue EnrichedConstraint -> [WithEnv a] -> WithEnv a
+chain :: ConstraintQueue -> [WithEnv a] -> WithEnv a
 chain _ []     = throwError "cannot synthesize(chain)"
 chain c (e:es) = e `catchError` const (chain c es)
 

@@ -19,6 +19,8 @@ import qualified Data.Map.Strict            as Map
 
 import qualified Data.PQueue.Min            as Q
 
+type ConstraintQueue = Q.MinQueue EnrichedConstraint
+
 data Env = Env
   { count             :: Int -- to generate fresh symbols
   , notationEnv       :: [(Tree, Tree)] -- macro transformers
@@ -30,7 +32,7 @@ data Env = Env
   , nameEnv           :: [(Identifier, Identifier)] -- [("foo.bar.buz", "foo.bar.buz.13"), ...]
   , typeEnv           :: Map.Map Identifier WeakTerm
   , constraintEnv     :: [PreConstraint] -- for type inference
-  , constraintQueue   :: Q.MinQueue EnrichedConstraint -- for (dependent) type inference
+  , constraintQueue   :: ConstraintQueue -- for (dependent) type inference
   , substEnv          :: SubstWeakTerm -- for (dependent) type inference
   , univConstraintEnv :: [(UnivLevel, UnivLevel)]
   , currentDir        :: FilePath

@@ -36,10 +36,13 @@ simp ((e1, e2):cs)
 simp ((e1, e2):cs)
   | isReducible e2 = simp $ (e2, e1) : cs
 simp ((e1, e2):cs)
-  | _ :< WeakTermPiElim _ (_ :< WeakTermUpsilon f) es1 <- e1
-  , _ :< WeakTermPiElim _ (_ :< WeakTermUpsilon g) es2 <- e2
+  | _ :< WeakTermPiElim s1 (_ :< WeakTermUpsilon f) es1 <- e1
+  , _ :< WeakTermPiElim s2 (_ :< WeakTermUpsilon g) es2 <- e2
   , f == g
-  , length es1 == length es2 = simp $ zip es1 es2 ++ cs
+  , length es1 == length es2 = do
+    cs1 <- simpStrict [(s1, s2)]
+    cs2 <- simp $ zip es1 es2 ++ cs
+    return $ cs1 ++ cs2
 simp ((_ :< WeakTermUniv i, _ :< WeakTermUniv j):cs) = do
   insUnivConstraintEnv i j
   simp cs
@@ -64,7 +67,10 @@ simp ((e1, e2@(_ :< WeakTermPiIntro {})):cs) = simp $ (e2, e1) : cs
 simp ((_ :< WeakTermSigma s1 txs1, _ :< WeakTermSigma s2 txs2):cs)
   | length txs1 == length txs2 = simpPiOrSigma s1 txs1 s2 txs2 cs
 simp ((_ :< WeakTermSigmaIntro s1 es1, _ :< WeakTermSigmaIntro s2 es2):cs)
-  | length es1 == length es2 = simp $ (s1, s2) : zip es1 es2 ++ cs
+  | length es1 == length es2 = do
+    cs1 <- simpStrict [(s1, s2)]
+    cs2 <- simp $ zip es1 es2 ++ cs
+    return $ cs1 ++ cs2
 simp ((_ :< WeakTermSigmaElim s txs e1 e2, e):cs) = do
   hs <- mapM (const newHole) txs
   sigmaIntro <- wrapType $ WeakTermSigmaIntro s hs
@@ -77,6 +83,10 @@ simp ((e1, e2):cs) = do
   let ms1 = asStuckedTerm e1
   let ms2 = asStuckedTerm e2
   case (ms1, ms2) of
+    (Just (StuckHole m, _), _) -> do
+      cs' <- simp cs
+      return $ Enriched (e1, e2) [m] (ConstraintImmediate m e2) : cs'
+    (_, Just (StuckHole _, _)) -> simp $ (e2, e1) : cs
     (Just (StuckPiElimStrict s1 m1 exs1, _), _)
       | (es1, xs1) <- unzip exs1
       , isSolvable e2 m1 xs1 -> do
@@ -119,10 +129,81 @@ simpPiOrSigma s1 txs1 s2 txs2 cs = do
   vs1 <- mapM toVar' xs1
   let (ts2, xs2) = unzip txs2
   let ts2' = map (substWeakTerm (zip xs2 vs1)) ts2
-  simp $ (s1, s2) : zip ts1 ts2' ++ cs
+  cs1 <- simpStrict [(s1, s2)]
+  cs2 <- simp $ zip ts1 ts2' ++ cs
+  return $ cs1 ++ cs2
+
+simpStrict :: [PreConstraint] -> WithEnv [EnrichedConstraint]
+simpStrict [] = return []
+simpStrict ((_ :< WeakTermUniv i, _ :< WeakTermUniv j):cs) = do
+  insUnivConstraintEnv i j
+  simpStrict cs
+simpStrict ((_ :< WeakTermUpsilon x1, _ :< WeakTermUpsilon x2):cs)
+  | x1 == x2 = simpStrict cs
+simpStrict ((_ :< WeakTermEpsilon l1, _ :< WeakTermEpsilon l2):cs)
+  | l1 == l2 = simpStrict cs
+simpStrict ((_ :< WeakTermEpsilonIntro l1, _ :< WeakTermEpsilonIntro l2):cs)
+  | l1 == l2 = simpStrict cs
+simpStrict ((_ :< WeakTermEpsilonElim (_, x1) e1 bs1, _ :< WeakTermEpsilonElim (_, x2) e2 bs2):cs)
+  | length bs1 == length bs2 = do
+    let (caseList1, es1) = unzip bs1
+    let (caseList2, es2) = unzip bs2
+    zipWithM_ simpStrictCase caseList1 caseList2
+    v1 <- toVar' x1
+    let es2' = map (substWeakTerm [(x2, v1)]) es2
+    simpStrict $ (e1, e2) : zip es1 es2' ++ cs
+simpStrict ((_ :< WeakTermPi s1 txs1, _ :< WeakTermPi s2 txs2):cs) =
+  simpStrictPiOrSigma s1 txs1 s2 txs2 cs
+simpStrict ((_ :< WeakTermPiIntro s1 txs1 body1, _ :< WeakTermPiIntro s2 txs2 body2):cs) = do
+  h1 <- newNameWith "hole"
+  h2 <- newNameWith "hole"
+  simpStrictPiOrSigma s1 (txs1 ++ [(body1, h1)]) s2 (txs2 ++ [(body2, h2)]) cs
+simpStrict ((_ :< WeakTermPiElim s1 e1 es1, _ :< WeakTermPiElim s2 e2 es2):cs)
+  | length es1 == length es2 =
+    simpStrict $ (s1, s2) : (e1, e2) : zip es1 es2 ++ cs
+simpStrict ((_ :< WeakTermSigma s1 txs1, _ :< WeakTermSigma s2 txs2):cs) =
+  simpStrictPiOrSigma s1 txs1 s2 txs2 cs
+simpStrict ((_ :< WeakTermSigmaIntro s1 es1, _ :< WeakTermSigmaIntro s2 es2):cs)
+  | length es1 == length es2 = simpStrict $ (s1, s2) : zip es1 es2 ++ cs
+simpStrict ((_ :< WeakTermSigmaElim s1 txs1 e11 e12, _ :< WeakTermSigmaElim s2 txs2 e21 e22):cs) = do
+  vs1 <- mapM (toVar' . snd) txs1
+  let e22' = substWeakTerm (zip (map snd txs2) vs1) e22
+  simpStrict $ (s1, s2) : (e11, e21) : (e12, e22') : cs
+simpStrict ((_ :< WeakTermConst x, _ :< WeakTermConst y):cs)
+  | x == y = simpStrict cs
+simpStrict ((e1@(_ :< WeakTermHole m), e2):cs) = do
+  cs' <- simpStrict cs
+  return $ Enriched (e1, e2) [m] (ConstraintImmediate m e2) : cs'
+simpStrict ((e1, e2@(_ :< WeakTermHole _)):cs) = simp $ (e2, e1) : cs
+simpStrict ((e1, e2):_) =
+  throwError $
+  "these two terms are not literally equal: " ++
+  Pr.ppShow (toDTerm e1, toDTerm e2)
+
+simpStrictCase :: Case -> Case -> WithEnv ()
+simpStrictCase CaseDefault CaseDefault = return ()
+simpStrictCase (CaseLiteral l1) (CaseLiteral l2)
+  | l1 == l2 = return ()
+simpStrictCase c1 c2 =
+  throwError $ "these two cases are not literally equal: " ++ Pr.ppShow (c1, c2)
+
+simpStrictPiOrSigma ::
+     WeakTerm
+  -> [(WeakTerm, Identifier)]
+  -> WeakTerm
+  -> [(WeakTerm, Identifier)]
+  -> [(WeakTerm, WeakTerm)]
+  -> WithEnv [EnrichedConstraint]
+simpStrictPiOrSigma s1 txs1 s2 txs2 cs = do
+  let (ts1, xs1) = unzip txs1
+  vs1 <- mapM toVar' xs1
+  let (ts2, xs2) = unzip txs2
+  let ts2' = map (substWeakTerm (zip xs2 vs1)) ts2
+  simpStrict $ (s1, s2) : zip ts1 ts2' ++ cs
 
 data Stuck
-  = StuckPiElim WeakSortal
+  = StuckHole Identifier
+  | StuckPiElim WeakSortal
                 Identifier
                 [WeakTerm]
   | StuckPiElimStrict WeakSortal
@@ -131,6 +212,7 @@ data Stuck
   | StuckOther
 
 asStuckedTerm :: WeakTerm -> Maybe (Stuck, Identifier)
+asStuckedTerm (_ :< WeakTermHole m) = Just (StuckHole m, m)
 asStuckedTerm (_ :< WeakTermPiElim s (_ :< WeakTermHole x) es) =
   case mapM interpretAsUpsilon es of
     Nothing -> Just (StuckPiElim s x es, x)

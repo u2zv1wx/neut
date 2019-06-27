@@ -47,7 +47,7 @@ infer _ (meta :< WeakTermEpsilonIntro l) = do
   case mk of
     Just k -> returnMeta meta $ epsilonMeta :< WeakTermEpsilon k
     Nothing -> do
-      h <- newHoleInCtx []
+      h <- newHole
       returnMeta meta h
 infer ctx (meta :< WeakTermEpsilonElim (t, x) e branchList) = do
   te <- infer ctx e

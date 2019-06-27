@@ -6,7 +6,9 @@ import           Data.WeakTerm
 type PreConstraint = (WeakTerm, WeakTerm)
 
 data Constraint
-  = ConstraintPattern WeakSortal
+  = ConstraintImmediate Identifier
+                        WeakTerm
+  | ConstraintPattern WeakSortal
                       Identifier
                       [WeakTerm]
                       WeakTerm
@@ -25,11 +27,12 @@ data Constraint
   | ConstraintOther
 
 constraintToInt :: Constraint -> Int
-constraintToInt ConstraintPattern {}      = 0
-constraintToInt ConstraintQuasiPattern {} = 1
-constraintToInt ConstraintFlexRigid {}    = 2
-constraintToInt ConstraintFlexFlex {}     = 3
-constraintToInt ConstraintOther {}        = 4
+constraintToInt ConstraintImmediate {}    = 0
+constraintToInt ConstraintPattern {}      = 1
+constraintToInt ConstraintQuasiPattern {} = 2
+constraintToInt ConstraintFlexRigid {}    = 3
+constraintToInt ConstraintFlexFlex {}     = 4
+constraintToInt ConstraintOther {}        = 5
 
 instance Eq Constraint where
   c1 == c2 = constraintToInt c1 == constraintToInt c2
