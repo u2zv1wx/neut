@@ -19,11 +19,7 @@ reduceWeakTerm (i :< WeakTermEpsilonElim (t, x) e branchList) = do
             Just body -> reduceWeakTerm $ substWeakTerm [(x, e')] body
             Nothing   -> i :< WeakTermEpsilonElim (t, x) e' branchList
     _ -> i :< WeakTermEpsilonElim (t, x) e' branchList
-reduceWeakTerm (i :< WeakTermPi s txs) = i :< WeakTermPi (reduceWeakTerm s) txs
-reduceWeakTerm (i :< WeakTermPiIntro s txs e) =
-  i :< WeakTermPiIntro (reduceWeakTerm s) txs e
 reduceWeakTerm (i :< WeakTermPiElim s e es) = do
-  let s' = reduceWeakTerm s
   let es' = map reduceWeakTerm es
   let e' = reduceWeakTerm e
   case e' of
@@ -34,7 +30,7 @@ reduceWeakTerm (i :< WeakTermPiElim s e es) = do
         reduceWeakTerm $ substWeakTerm (zip xs es') body
     self@(_ :< WeakTermRec (_, x) body) -> do
       let self' = substWeakTerm [(x, self)] body
-      reduceWeakTerm (i :< WeakTermPiElim s' self' es')
+      reduceWeakTerm (i :< WeakTermPiElim s self' es')
     _ :< WeakTermConst constant
       | [_ :< WeakTermEpsilonIntro (LiteralInteger x), _ :< WeakTermEpsilonIntro (LiteralInteger y)] <-
          es' -> do
@@ -48,21 +44,17 @@ reduceWeakTerm (i :< WeakTermPiElim s e es) = do
           (_, _, True, _) -> i :< WeakTermEpsilonIntro (LiteralInteger (x * y))
           (_, _, _, True) ->
             i :< WeakTermEpsilonIntro (LiteralInteger (x `div` y))
-          _ -> i :< WeakTermPiElim s' e' es'
-    _ -> i :< WeakTermPiElim s' e' es'
-reduceWeakTerm (i :< WeakTermSigma s txs) =
-  i :< WeakTermSigma (reduceWeakTerm s) txs
+          _ -> i :< WeakTermPiElim s e' es'
+    _ -> i :< WeakTermPiElim s e' es'
 reduceWeakTerm (i :< WeakTermSigmaIntro s es) = do
-  let s' = reduceWeakTerm s
   let es' = map reduceWeakTerm es
-  i :< WeakTermSigmaIntro s' es'
+  i :< WeakTermSigmaIntro s es'
 reduceWeakTerm (i :< WeakTermSigmaElim s txs e1 e2) = do
-  let s' = reduceWeakTerm s
   let e1' = reduceWeakTerm e1
   case e1' of
     _ :< WeakTermSigmaIntro _ es
       | length es == length txs -> do
         let xs = map snd txs
         reduceWeakTerm $ substWeakTerm (zip xs es) e2
-    _ -> i :< WeakTermSigmaElim s' txs e1' e2
+    _ -> i :< WeakTermSigmaElim s txs e1' e2
 reduceWeakTerm t = t
