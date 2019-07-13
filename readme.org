@@ -5,7 +5,7 @@
 Neut is a programming language based on dependent modal linear type theory, focusing on canonicity and orthogonality. The key features of Neut include:
 
 - Expressive power of dependent type theory
-- Static, predictable memory allocation/deallocation
+- Static, predictable memory allocation/deallocation by modality
 - Dependent type inference by non-chronological backtracking
 
 ** Syntax
@@ -19,38 +19,40 @@ l    ::= x
        | <int>
        | <float>
 
--- sortal
-s    ::= x
-       | (epsilon-intro x)
+-- level
+i    ::= x
+       | (+ i <uint>)
+       | (- i <uint>)
+       | (min i1 ... in)
+
+-- meta-level
+m   ::= i
+      | static
 
 -- term
-e, A ::= (universe <int>)
+e, A ::= (universe m)
        | (upsilon x)
-       | (epsilon x)
-       | (epsilon-intro l)
-       | (epsilon-elim x e (c1 e1) ... (cn en))
-       | (pi s ((A1 x1) ... (An xn)) A)
-       | (pi-intro s ((A1 x1) ... (An xn)) e)
+       | (epsilon x i)
+       | (epsilon-intro i l)
+       | (epsilon-elim i x e (c1 e1) ... (cn en))
+       | (pi ((A1 x1) ... (An xn)) A)
+       | (pi-intro ((A1 x1) ... (An xn)) e)
        | (pi-elim e e1 ... en)
-       | (sigma s ((A1 x1) ... (An xn)) e)
-       | (sigma-intro s e1 ... en)
+       | (sigma ((A1 x1) ... (An xn)) e)
+       | (sigma-intro e1 ... en)
        | (sigma-elim ((A1 x1) ... (An xn)) e1 e2)
+       | (tau A)
+       | (tau-intro e)
+       | (tau-elim e)
+       | (zeta x A)
+       | (zeta-intro x e)
+       | (zeta-elim e i)
        | (mu (A x) e)
-       | (iota ((A1 x1) ... (An xn)) e)
 
 -- case
 c    ::= (epsilon-intro x)
        | (default)
 #+END_SRC
-
-Built-in modality:
-#+BEGIN_SRC
-cartesian ::= epsilon "cartesian"
-relevant ::= epsilon "relevant"
-affine ::= epsilon "affine"
-linear ::= epsilon "linear"
-#+END_SRC
-
 
 ** Installation
 
