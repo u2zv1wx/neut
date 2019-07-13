@@ -32,9 +32,9 @@ m   ::= i
 -- term
 e, A ::= (universe m)
        | (upsilon x)
-       | (epsilon x i)
-       | (epsilon-intro i l)
-       | (epsilon-elim i x e (c1 e1) ... (cn en))
+       | (epsilon x)
+       | (epsilon-intro l)
+       | (epsilon-elim x e (c1 e1) ... (cn en))
        | (pi ((A1 x1) ... (An xn)) A)
        | (pi-intro ((A1 x1) ... (An xn)) e)
        | (pi-elim e e1 ... en)
@@ -50,7 +50,7 @@ e, A ::= (universe m)
        | (mu (A x) e)
 
 -- case
-c    ::= (epsilon-intro x)
+c    ::= (epsilon-intro l)
        | (default)
 #+END_SRC
 
