@@ -20,27 +20,21 @@ l    ::= x
        | <float>
 
 -- level
-i    ::= x
-       | (+ i <uint>)
-       | (- i <uint>)
-       | (min i1 ... in)
-
--- meta-level
-m   ::= i
-      | static
+i    ::= (+ x <int>)
+       | static
 
 -- term
-e, A ::= (universe m)
+e, A ::= (universe i)
        | (upsilon x)
        | (epsilon x)
        | (epsilon-intro l)
        | (epsilon-elim x e (c1 e1) ... (cn en))
-       | (pi ((A1 x1) ... (An xn)) A)
-       | (pi-intro ((A1 x1) ... (An xn)) e)
-       | (pi-elim e e1 ... en)
-       | (sigma ((A1 x1) ... (An xn)) e)
-       | (sigma-intro e1 ... en)
-       | (sigma-elim ((A1 x1) ... (An xn)) e1 e2)
+       | (pi i ((A1 x1) ... (An xn)) A)
+       | (pi-intro i ((A1 x1) ... (An xn)) e)
+       | (pi-elim i e e1 ... en)
+       | (sigma i ((A1 x1) ... (An xn)) e)
+       | (sigma-intro i e1 ... en)
+       | (sigma-elim i ((A1 x1) ... (An xn)) e1 e2)
        | (tau A)
        | (tau-intro e)
        | (tau-elim e)
