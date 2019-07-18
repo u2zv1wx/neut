@@ -11,31 +11,46 @@ import           Data.Env
 import           Data.Term
 
 reduceTerm :: Term -> WithEnv Term
-reduceTerm app@(TermPiElim _ _) = do
-  let (fun, args) = toTermPiElimSeq app
-  args' <- mapM reduceTerm args
-  fun' <- reduceTerm fun
-  case fun' of
-    TermPiIntro x body ->
-      reduceTerm $
-      fromTermPiElimSeq (substTerm [(x, head args')] body, tail args')
-    TermConst constant -> do
-      let b1 = constant `elem` intAddConstantList
-      let b2 = constant `elem` intSubConstantList
-      let b3 = constant `elem` intMulConstantList
-      let b4 = constant `elem` intDivConstantList
-      let t = LowTypeSignedInt 64 -- for now
-      case (b1, b2, b3, b4, takeIntegerList args') of
-        (True, _, _, _, Just [x, y]) ->
-          return $ TermIndexIntro (IndexInteger (x + y)) t
-        (_, True, _, _, Just [x, y]) ->
-          return $ TermIndexIntro (IndexInteger (x - y)) t
-        (_, _, True, _, Just [x, y]) ->
-          return $ TermIndexIntro (IndexInteger (x * y)) t
-        (_, _, _, True, Just [x, y]) ->
-          return $ TermIndexIntro (IndexInteger (x `div` y)) t
-        _ -> return $ fromTermPiElimSeq (fun', args')
-    _ -> return $ fromTermPiElimSeq (fun', args)
+reduceTerm (TermEpsilonElim x e branchList) = do
+  e' <- reduceTerm e
+  case e' of
+    TermEpsilonIntro l _ ->
+      case lookup (CaseLiteral l) branchList of
+        Just body -> reduceTerm $ substTerm [(x, e')] body
+        Nothing ->
+          case lookup CaseDefault branchList of
+            Just body -> reduceTerm $ substTerm [(x, e')] body
+            Nothing ->
+              lift $
+              throwE $
+              "the index " ++ show x ++ " is not included in branchList"
+    _ -> return $ TermEpsilonElim x e' branchList
+reduceTerm (TermPiElim e es) = do
+  es' <- mapM reduceTerm es
+  e' <- reduceTerm e
+  case e' of
+    TermPiIntro _ xs body
+      | length xs == length es -> do
+        let sub = zip xs es
+        reduceTerm $ substTerm sub body
+    TermConst constant
+      | [TermEpsilonIntro (LiteralInteger x) sx, TermEpsilonIntro (LiteralInteger y) _] <-
+         es' -> do
+        let b1 = constant `elem` intAddConstantList
+        let b2 = constant `elem` intSubConstantList
+        let b3 = constant `elem` intMulConstantList
+        let b4 = constant `elem` intDivConstantList
+        case (b1, b2, b3, b4) of
+          (True, _, _, _) ->
+            return $ TermEpsilonIntro (LiteralInteger (x + y)) sx
+          (_, True, _, _) ->
+            return $ TermEpsilonIntro (LiteralInteger (x - y)) sx
+          (_, _, True, _) ->
+            return $ TermEpsilonIntro (LiteralInteger (x * y)) sx
+          (_, _, _, True) ->
+            return $ TermEpsilonIntro (LiteralInteger (x `div` y)) sx
+          _ -> return $ TermPiElim e' es'
+    _ -> return $ TermPiElim e' es'
 reduceTerm (TermConstElim x es) = do
   es' <- mapM reduceTerm es
   env <- gets termEnv
@@ -46,27 +61,7 @@ reduceTerm (TermConstElim x es) = do
 reduceTerm (TermSigmaElim xs e body) = do
   e' <- reduceTerm e
   case e' of
-    TermSigmaIntro es -> reduceTerm $ substTerm (zip xs es) body
-    _                 -> return $ TermSigmaElim xs e' body
-reduceTerm (TermIndexElim e branchList) = do
-  e' <- reduceTerm e
-  case e' of
-    TermIndexIntro x _ ->
-      case lookup x branchList of
-        Just body -> reduceTerm body
-        Nothing ->
-          case lookup IndexDefault branchList of
-            Just body -> reduceTerm body
-            Nothing ->
-              lift $
-              throwE $
-              "the index " ++ show x ++ " is not included in branchList"
-    _ -> return $ TermIndexElim e' branchList
+    TermSigmaIntro _ es -> reduceTerm $ substTerm (zip xs es) body
+    _                   -> return $ TermSigmaElim xs e' body
+reduceTerm (TermTauElim (TermTauIntro e)) = reduceTerm e
 reduceTerm t = return t
-
-takeIntegerList :: [Term] -> Maybe [Int]
-takeIntegerList [] = Just []
-takeIntegerList (TermIndexIntro (IndexInteger i) _:rest) = do
-  is <- takeIntegerList rest
-  return (i : is)
-takeIntegerList _ = Nothing
