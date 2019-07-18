@@ -8,20 +8,16 @@ type PreConstraint = (WeakTerm, WeakTerm)
 data Constraint
   = ConstraintImmediate Identifier
                         WeakTerm
-  | ConstraintPattern WeakSortal
-                      Identifier
+  | ConstraintPattern Identifier
                       [WeakTerm]
                       WeakTerm
-  | ConstraintQuasiPattern WeakSortal
-                           Identifier
+  | ConstraintQuasiPattern Identifier
                            [WeakTerm]
                            WeakTerm
-  | ConstraintFlexRigid WeakSortal
-                        Identifier
+  | ConstraintFlexRigid Identifier
                         [WeakTerm]
                         WeakTerm
-  | ConstraintFlexFlex WeakSortal
-                       Identifier
+  | ConstraintFlexFlex Identifier
                        [WeakTerm]
                        WeakTerm
   | ConstraintOther
