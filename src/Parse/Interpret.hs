@@ -19,76 +19,68 @@ interpret :: Tree -> WithEnv WeakTerm
 --
 -- foundational interpretations
 --
-interpret (meta :< TreeAtom "universe") = do
-  hole <- newNameWith "univ"
-  return $ meta :< WeakTermUniv (UnivLevelHole hole)
+interpret (meta :< TreeNode [_ :< TreeAtom "universe", _ :< TreeAtom x])
+  | Just i <- readMaybe x = return $ meta :< WeakTermUniv (WeakLevelInt i)
+interpret (meta :< TreeNode [_ :< TreeAtom "universe", _ :< TreeAtom "infinity"]) =
+  return $ meta :< WeakTermUniv WeakLevelInfinity
+interpret (meta :< TreeNode [_ :< TreeAtom "universe", _ :< TreeAtom "_"]) = do
+  h <- newNameWith "hole"
+  return $ meta :< WeakTermUniv (WeakLevelHole h)
 interpret (meta :< TreeNode [_ :< TreeAtom "upsilon", _ :< TreeAtom x]) =
   return $ meta :< WeakTermUpsilon x
 interpret (meta :< TreeNode [_ :< TreeAtom "epsilon-intro", l]) = do
   l' <- interpretLiteral l
   return $ meta :< WeakTermEpsilonIntro l'
-interpret (meta :< TreeNode [_ :< TreeAtom "epsilon-elim", tx, e, _ :< TreeNode caseList]) = do
-  tx' <- interpretIdentifierPlus tx
+interpret (meta :< TreeNode [_ :< TreeAtom "epsilon-elim", xt, e, _ :< TreeNode caseList]) = do
+  xt' <- interpretIdentifierPlus xt
   e' <- interpret e
   caseList' <- mapM interpretClause caseList
-  return $ meta :< WeakTermEpsilonElim tx' e' caseList'
-interpret (meta :< TreeNode [_ :< TreeAtom "pi", s, _ :< TreeNode txs, t]) = do
-  s' <- interpretSortal s
-  txs' <- mapM interpretIdentifierPlus txs
-  t' <- interpret t
-  hole <- newNameWith "hole"
-  return $ meta :< WeakTermPi s' (txs' ++ [(t', hole)])
-interpret (meta :< TreeNode [_ :< TreeAtom "pi-intro", s, _ :< TreeNode txs, e]) = do
-  s' <- interpretSortal s
-  txs' <- mapM interpretIdentifierPlus txs
+  return $ meta :< WeakTermEpsilonElim xt' e' caseList'
+interpret (meta :< TreeNode [_ :< TreeAtom "pi", _ :< TreeNode xts, t]) = do
+  binder <- interpretBinder xts t
+  return $ meta :< WeakTermPi binder
+interpret (meta :< TreeNode [_ :< TreeAtom "pi-intro", _ :< TreeNode xts, e]) = do
+  xts' <- mapM interpretIdentifierPlus xts
   e' <- interpret e
-  return $ meta :< WeakTermPiIntro s' txs' e'
-interpret (meta :< TreeNode ((_ :< TreeAtom "pi-elim"):s:e:es)) = do
-  s' <- interpretSortal s
+  return $ meta :< WeakTermPiIntro xts' e'
+interpret (meta :< TreeNode ((_ :< TreeAtom "pi-elim"):e:es)) = do
   e' <- interpret e
   es' <- mapM interpret es
-  return $ meta :< WeakTermPiElim s' e' es'
-interpret (meta :< TreeNode [_ :< TreeAtom "sigma", s, _ :< TreeNode txs, t]) = do
-  s' <- interpretSortal s
-  txs' <- mapM interpretIdentifierPlus txs
-  t' <- interpret t
-  hole <- newNameWith "hole"
-  return $ meta :< WeakTermSigma s' (txs' ++ [(t', hole)])
-interpret (meta :< TreeNode ((_ :< TreeAtom "sigma-intro"):s:es)) = do
-  s' <- interpretSortal s
+  return $ meta :< WeakTermPiElim e' es'
+interpret (meta :< TreeNode [_ :< TreeAtom "sigma", _ :< TreeNode xts, t]) = do
+  binder <- interpretBinder xts t
+  return $ meta :< WeakTermPi binder
+interpret (meta :< TreeNode ((_ :< TreeAtom "sigma-intro"):es)) = do
   es' <- mapM interpret es
-  return $ meta :< WeakTermSigmaIntro s' es'
-interpret (meta :< TreeNode [_ :< TreeAtom "sigma-elim", s, _ :< TreeNode txs, e1, e2]) = do
-  s' <- interpretSortal s
-  txs' <- mapM interpretIdentifierPlus txs
+  return $ meta :< WeakTermSigmaIntro es'
+interpret (meta :< TreeNode [_ :< TreeAtom "sigma-elim", _ :< TreeNode xts, e1, e2]) = do
+  xts' <- mapM interpretIdentifierPlus xts
   e1' <- interpret e1
   e2' <- interpret e2
-  return $ meta :< WeakTermSigmaElim s' txs' e1' e2'
-interpret (meta :< TreeNode [_ :< TreeAtom "recurse", tx, e]) = do
-  tx' <- interpretIdentifierPlus tx
+  return $ meta :< WeakTermSigmaElim xts' e1' e2'
+interpret (meta :< TreeNode [_ :< TreeAtom "recurse", xt, e]) = do
+  xt' <- interpretIdentifierPlus xt
   e' <- interpret e
-  return $ meta :< WeakTermRec tx' e'
+  return $ meta :< WeakTermMu xt' e'
 interpret (meta :< TreeAtom "_") = do
   name <- newNameWith "hole"
   return $ meta :< WeakTermHole name
 --
 -- auxiliary interpretations
 --
-interpret (meta :< TreeNode ((_ :< TreeAtom "arrow"):s:ts)) = do
-  s' <- interpretSortal s
+interpret (meta :< TreeAtom "universe") = do
+  hole <- newNameWith "univ"
+  return $ meta :< WeakTermUniv (WeakLevelHole hole)
+interpret (meta :< TreeNode ((_ :< TreeAtom "arrow"):ts)) = do
   ts' <- mapM interpret ts
   xs <- mapM (const $ newNameWith "hole") ts'
-  return $ meta :< WeakTermPi s' (zip ts' xs)
-interpret (meta :< TreeNode ((_ :< TreeAtom "product"):s:ts)) = do
-  s' <- interpretSortal s
+  return $ meta :< WeakTermPi (zip xs ts')
+interpret (meta :< TreeNode ((_ :< TreeAtom "product"):ts)) = do
   ts' <- mapM interpret ts
   xs <- mapM (const $ newNameWith "hole") ts'
-  return $ meta :< WeakTermSigma s' (zip ts' xs)
-interpret (meta :< TreeNode (e:es)) = do
-  e' <- interpret e
-  es' <- mapM interpret es
-  s <- newHole
-  return $ meta :< WeakTermPiElim s e' es'
+  return $ meta :< WeakTermSigma (zip xs ts')
+interpret (meta :< TreeNode (e:es)) =
+  interpret $ meta :< TreeNode (("" :< TreeAtom "pi-elim") : e : es)
 interpret t@(meta :< TreeAtom x) = do
   ml <- interpretLiteralMaybe t
   case ml of
@@ -96,7 +88,7 @@ interpret t@(meta :< TreeAtom x) = do
     Nothing -> do
       isSortal <- isDefinedIndexName x
       if isSortal
-        then return $ meta :< WeakTermEpsilon (WeakEpsilonIdentifier x)
+        then return $ meta :< WeakTermEpsilon x
         else do
           cenv <- gets constantEnv
           if x `elem` cenv
@@ -107,10 +99,10 @@ interpret t = lift $ throwE $ "interpret: syntax error:\n" ++ Pr.ppShow t
 interpretIdentifierPlus :: Tree -> WithEnv IdentifierPlus
 interpretIdentifierPlus (_ :< TreeAtom x) = do
   t <- newHole
-  return (t, x)
+  return (x, t)
 interpretIdentifierPlus (_ :< TreeNode [t, _ :< TreeAtom x]) = do
   t' <- interpret t
-  return (t', x)
+  return (x, t')
 interpretIdentifierPlus ut =
   lift $ throwE $ "interpretIdentifierPlus: syntax error:\n" ++ Pr.ppShow ut
 
@@ -135,6 +127,13 @@ interpretLiteral l = do
     Nothing ->
       lift $ throwE $ "interpretLiteral: syntax error:\n" ++ Pr.ppShow l
 
+interpretBinder :: [Tree] -> Tree -> WithEnv [IdentifierPlus]
+interpretBinder xts t = do
+  xts' <- mapM interpretIdentifierPlus xts
+  t' <- interpret t
+  hole <- newNameWith "hole"
+  return $ xts' ++ [(hole, t')]
+
 interpretCase :: Tree -> WithEnv Case
 --
 -- foundational
@@ -151,11 +150,6 @@ interpretCase c = do
   case mc' of
     Just l -> return $ CaseLiteral l
     Nothing -> lift $ throwE $ "interpretCase: syntax error:\n" ++ Pr.ppShow c
-
-interpretSortal :: Tree -> WithEnv WeakSortal
-interpretSortal (meta :< TreeAtom "primitive") =
-  return $ meta :< WeakTermConst "primitive"
-interpretSortal s = interpret s
 
 interpretClause :: Tree -> WithEnv (Case, WeakTerm)
 interpretClause (_ :< TreeNode [c, e]) = do
