@@ -83,13 +83,13 @@ parse' ((_ :< TreeNode [_ :< TreeAtom "extern", _ :< TreeAtom name]):as)
  = do
   modify (\e -> e {constantEnv = name : constantEnv e})
   parse' as
-parse' ((meta :< TreeNode [_ :< TreeAtom "let", tx, e]):as) = do
+parse' ((meta :< TreeNode [_ :< TreeAtom "let", xt, e]):as) = do
   e' <- macroExpand e >>= interpret >>= rename
-  (t, x) <- macroExpand tx >>= interpretIdentifierPlus
+  (x, t) <- macroExpand xt >>= interpretIdentifierPlus
   t' <- rename t
   x' <- nameInModule x >>= newNameWith
   defList <- parse' as
-  return $ DefLet meta (t', x') e' : defList
+  return $ DefLet meta (x', t') e' : defList
 parse' (a:as)
   -- If the head element is not a special form, we interpret it as an ordinary term.
  = do
@@ -102,7 +102,7 @@ parse' (a:as)
       name' <- nameInModule name
       t <- newHole
       defList <- parse' as
-      return $ DefLet meta (t, name') e' : defList
+      return $ DefLet meta (name', t) e' : defList
 
 isSpecialForm :: Tree -> Bool
 isSpecialForm (_ :< TreeNode [_ :< TreeAtom "notation", _, _]) = True
@@ -124,11 +124,8 @@ isSpecialForm _ = False
 concatDefList :: [Def] -> WithEnv WeakTerm
 concatDefList [] = do
   meta <- newNameWith "meta"
-  s <- newCartesian
-  return $ meta :< WeakTermSigmaIntro s []
+  return $ meta :< WeakTermSigmaIntro []
 concatDefList (DefLet meta tu e:es) = do
   cont <- concatDefList es
   lamMeta <- newNameWith "meta"
-  sc <- newCartesian
-  return $
-    meta :< WeakTermPiElim sc (lamMeta :< WeakTermPiIntro sc [tu] cont) [e]
+  return $ meta :< WeakTermPiElim (lamMeta :< WeakTermPiIntro [tu] cont) [e]
