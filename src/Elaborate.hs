@@ -8,7 +8,6 @@ import           Control.Monad.Trans.Except
 import           Data.List                  (nub)
 import qualified Data.Map.Strict            as Map
 import           Text.Read                  (readMaybe)
-import qualified Text.Show.Pretty           as Pr
 
 import           Data.Basic
 import           Data.Env
@@ -41,63 +40,80 @@ elaborate e = do
   modify (\env -> env {typeEnv = tenv'})
   -- use the resulting substitution to elaborate `e`.
   let e' = substWeakTerm sub e
-  exhaust e' >>= elaborate'
+  exhaust e' >>= elaborate' 0
 
 -- This function translates a well-typed term into an untyped term in a
 -- reduction-preserving way. Here, we translate types into units (nullary product).
 -- This doesn't cause any problem since types doesn't have any beta-reduction.
-elaborate' :: WeakTerm -> WithEnv Term
-elaborate' (_ :< WeakTermUniv _) = return zero
-elaborate' (_ :< WeakTermUpsilon x) = return $ TermUpsilon x
-elaborate' (_ :< WeakTermEpsilon _) = return zero
-elaborate' (meta :< WeakTermEpsilonIntro x) = do
+elaborate' :: Int -> WeakTerm -> WithEnv Term
+elaborate' _ (_ :< WeakTermUniv _) = return zero
+elaborate' _ (_ :< WeakTermUpsilon x) = return $ TermUpsilon x
+elaborate' _ (_ :< WeakTermEpsilon _) = return zero
+elaborate' _ (meta :< WeakTermEpsilonIntro x) = do
   t <- lookupTypeEnv' meta
-  mi <- obtainEpsilon t
-  case mi of
-    Just i  -> return $ TermEpsilonIntro x (asLowType i)
-    Nothing -> lift $ throwE "epsilon"
-elaborate' (_ :< WeakTermEpsilonElim (_, x) e branchList) = do
-  e' <- elaborate' e
+  case reduceWeakTerm t of
+    _ :< WeakTermEpsilon i -> return $ TermEpsilonIntro x (asLowType i)
+    _                      -> lift $ throwE "epsilon"
+elaborate' i (_ :< WeakTermEpsilonElim (x, _) e branchList) = do
+  e' <- elaborate' i e
   branchList' <-
     forM branchList $ \(l, body) -> do
-      body' <- elaborate' body
+      body' <- elaborate' i body
       return (l, body')
   return $ TermEpsilonElim x e' branchList'
-elaborate' (_ :< WeakTermConst x) = return $ TermConst x
-elaborate' (_ :< WeakTermPi _ _) = return zero
-elaborate' (_ :< WeakTermPiIntro s txs e) = do
-  s' <- interpretSortal s
-  e' <- elaborate' e
-  return $ TermPiIntro s' (map snd txs) e'
-elaborate' (_ :< WeakTermPiElim s e es) = do
-  s' <- interpretSortal s
-  e' <- elaborate' e
-  es' <- mapM elaborate' es
-  return $ TermPiElim s' e' es'
-elaborate' (_ :< WeakTermSigma _ _) = return zero
-elaborate' (_ :< WeakTermSigmaIntro s es) = do
-  s' <- interpretSortal s
-  es' <- mapM elaborate' es
-  return $ TermSigmaIntro s' es'
-elaborate' (_ :< WeakTermSigmaElim s txs e1 e2) = do
-  s' <- interpretSortal s
-  e1' <- elaborate' e1
-  e2' <- elaborate' e2
-  return $ TermSigmaElim s' (map snd txs) e1' e2'
-elaborate' (meta :< WeakTermRec (t, x) e) =
+elaborate' _ (_ :< WeakTermConst x) = return $ TermConst x
+elaborate' _ (_ :< WeakTermPi _) = return zero
+elaborate' i (m :< WeakTermPiIntro xts e) = do
+  e' <- elaborate' i e
+  l <- obtainLevel m
+  return $ TermPiIntro l (map fst xts) e'
+elaborate' i (_ :< WeakTermPiElim e es) = do
+  e' <- elaborate' i e
+  es' <- mapM (elaborate' i) es
+  return $ TermPiElim e' es'
+elaborate' _ (_ :< WeakTermSigma _) = return zero
+elaborate' i (m :< WeakTermSigmaIntro es) = do
+  es' <- mapM (elaborate' i) es
+  l <- obtainLevel m
+  return $ TermSigmaIntro l es'
+elaborate' i (_ :< WeakTermSigmaElim xts e1 e2) = do
+  e1' <- elaborate' i e1
+  e2' <- elaborate' i e2
+  return $ TermSigmaElim (map fst xts) e1' e2'
+elaborate' _ (_ :< WeakTermTau _) = return zero
+elaborate' i (_ :< WeakTermTauIntro e) = do
+  e' <- elaborate' (i + 1) e
+  return $ TermTauIntro e'
+elaborate' i (_ :< WeakTermTauElim e) = do
+  e' <- elaborate' (i - 1) e
+  return $ TermTauElim e'
+elaborate' _ (_ :< WeakTermTheta _) = return zero
+elaborate' i (_ :< WeakTermThetaIntro e) = do
+  l <- withOffset i
+  o <- obtainOrigin
+  e' <- elaborate' i e
+  l' <- withOffset' $ -i
+  return $
+    TermPiIntro LevelInfinity [o] (TermPiElim (TermPiIntro l [o] e') [l'])
+elaborate' i (_ :< WeakTermThetaElim e) = do
+  l <- withOffset' i
+  e' <- elaborate' i e
+  return $ TermPiElim e' [l]
+elaborate' i (meta :< WeakTermMu (x, t) e) =
   case reduceWeakTerm t of
-    _ :< WeakTermPi _ _ -> do
-      e' <- elaborate' e
-      let fvs = varWeakTerm $ meta :< WeakTermRec (t, x) e
+    _ :< WeakTermPi _ -> do
+      e' <- elaborate' i e
+      let fvs = varWeakTerm $ meta :< WeakTermMu (x, t) e
       insTermEnv x fvs $
         substTerm [(x, TermConstElim x (map TermUpsilon fvs))] e'
       return $ TermConstElim x (map TermUpsilon fvs)
     _ -> lift $ throwE "CBV recursion is allowed only for Pi-types"
-elaborate' (_ :< WeakTermHole x) = do
+elaborate' i (_ :< WeakTermIota e _) = elaborate' i e
+elaborate' i (_ :< WeakTermHole x) = do
   sub <- gets substEnv
   case lookup x sub of
-    Just e  -> elaborate' e
-    Nothing -> lift $ throwE $ "elaborate': remaining hole: " ++ x
+    Just e  -> elaborate' i e
+    Nothing -> lift $ throwE $ "elaborate' i: remaining hole: " ++ x
 
 exhaust :: WeakTerm -> WithEnv WeakTerm
 exhaust e = do
@@ -111,19 +127,26 @@ exhaust' (_ :< WeakTermUniv _) = return True
 exhaust' (_ :< WeakTermUpsilon _) = return True
 exhaust' (_ :< WeakTermEpsilon _) = return True
 exhaust' (_ :< WeakTermEpsilonIntro _) = return True
-exhaust' (_ :< WeakTermEpsilonElim (t, _) e1 branchList) = do
+exhaust' (_ :< WeakTermEpsilonElim (_, t) e1 branchList) = do
   b1 <- exhaust' e1
   let labelList = map fst branchList
   case reduceWeakTerm t of
     _ :< WeakTermEpsilon x -> exhaustEpsilonIdentifier x labelList b1
     _                      -> lift $ throwE "type error (exhaust)"
-exhaust' (_ :< WeakTermPi s txs) = allM exhaust' $ s : map fst txs
-exhaust' (_ :< WeakTermPiIntro s _ e) = allM exhaust' [s, e]
-exhaust' (_ :< WeakTermPiElim s e es) = allM exhaust' $ s : e : es
-exhaust' (_ :< WeakTermSigma s txs) = allM exhaust' $ s : map fst txs
-exhaust' (_ :< WeakTermSigmaIntro s es) = allM exhaust' $ s : es
-exhaust' (_ :< WeakTermSigmaElim s _ e1 e2) = allM exhaust' [s, e1, e2]
-exhaust' (_ :< WeakTermRec _ e) = exhaust' e
+exhaust' (_ :< WeakTermPi xts) = allM exhaust' $ map snd xts
+exhaust' (_ :< WeakTermPiIntro _ e) = exhaust' e
+exhaust' (_ :< WeakTermPiElim e es) = allM exhaust' $ e : es
+exhaust' (_ :< WeakTermSigma xts) = allM exhaust' $ map snd xts
+exhaust' (_ :< WeakTermSigmaIntro es) = allM exhaust' es
+exhaust' (_ :< WeakTermSigmaElim _ e1 e2) = allM exhaust' [e1, e2]
+exhaust' (_ :< WeakTermTau t) = exhaust' t
+exhaust' (_ :< WeakTermTauIntro e) = exhaust' e
+exhaust' (_ :< WeakTermTauElim e) = exhaust' e
+exhaust' (_ :< WeakTermTheta t) = exhaust' t
+exhaust' (_ :< WeakTermThetaIntro e) = exhaust' e
+exhaust' (_ :< WeakTermThetaElim e) = exhaust' e
+exhaust' (_ :< WeakTermMu _ e) = exhaust' e
+exhaust' (_ :< WeakTermIota e _) = exhaust' e
 exhaust' (_ :< WeakTermConst _) = return True
 exhaust' (_ :< WeakTermHole _) = return False
 
@@ -147,17 +170,29 @@ allM p (x:xs) = do
 zero :: Term
 zero = TermEpsilonIntro (LiteralInteger 0) $ LowTypeSignedInt 64
 
-obtainEpsilon :: WeakSortal -> WithEnv (Maybe Identifier)
-obtainEpsilon = undefined
+obtainLevel :: Identifier -> WithEnv Level
+obtainLevel m = do
+  typeMeta :< _ <- lookupTypeEnv' m
+  u <- lookupTypeEnv' typeMeta
+  case reduceWeakTerm u of
+    _ :< WeakTermUniv wl ->
+      case wl of
+        WeakLevelInt i    -> withOffset i
+        WeakLevelInfinity -> return LevelInfinity
+        WeakLevelHole _   -> undefined
+    _ -> lift $ throwE "obtainLevel"
 
-interpretSortal :: WeakSortal -> WithEnv Identifier
-interpretSortal s =
-  case reduceWeakTerm s of
-    _ :< WeakTermEpsilonIntro l ->
-      case l of
-        LiteralLabel x -> return x
-        _              -> undefined
-    _ -> undefined
+withOffset :: Int -> WithEnv Level
+withOffset i = LevelInt <$> withOffset' i
+  -- o <- obtainOrigin
+  -- let l = TermEpsilonIntro (LiteralInteger i) (LowTypeSignedInt 64)
+  -- return $ LevelInt $ TermConstElim "core.i64.add" [TermUpsilon o, l]
+
+withOffset' :: Int -> WithEnv Term
+withOffset' i = do
+  o <- obtainOrigin
+  let l = TermEpsilonIntro (LiteralInteger i) (LowTypeSignedInt 64)
+  return $ TermConstElim "core.i64.add" [TermUpsilon o, l]
 
 asLowType :: Identifier -> LowType
 asLowType x
