@@ -19,13 +19,9 @@ interpret :: Tree -> WithEnv WeakTerm
 --
 -- foundational interpretations
 --
-interpret (meta :< TreeNode [_ :< TreeAtom "universe", _ :< TreeAtom x])
-  | Just i <- readMaybe x = return $ meta :< WeakTermUniv (WeakLevelInt i)
-interpret (meta :< TreeNode [_ :< TreeAtom "universe", _ :< TreeAtom "infinity"]) =
-  return $ meta :< WeakTermUniv WeakLevelInfinity
-interpret (meta :< TreeNode [_ :< TreeAtom "universe", _ :< TreeAtom "_"]) = do
-  h <- newNameWith "hole"
-  return $ meta :< WeakTermUniv (WeakLevelHole h)
+interpret (meta :< TreeNode [_ :< TreeAtom "universe", _ :< TreeAtom x]) = do
+  l <- interpretWeakLevel x
+  return $ meta :< WeakTermUniv l
 interpret (meta :< TreeNode [_ :< TreeAtom "upsilon", _ :< TreeAtom x]) =
   return $ meta :< WeakTermUpsilon x
 interpret (meta :< TreeNode [_ :< TreeAtom "epsilon-intro", l]) = do
@@ -58,10 +54,32 @@ interpret (meta :< TreeNode [_ :< TreeAtom "sigma-elim", _ :< TreeNode xts, e1, 
   e1' <- interpret e1
   e2' <- interpret e2
   return $ meta :< WeakTermSigmaElim xts' e1' e2'
-interpret (meta :< TreeNode [_ :< TreeAtom "recurse", xt, e]) = do
+interpret (meta :< TreeNode [_ :< TreeAtom "tau", t]) = do
+  t' <- interpret t
+  return $ meta :< WeakTermTau t'
+interpret (meta :< TreeNode [_ :< TreeAtom "tau-intro", e]) = do
+  e' <- interpret e
+  return $ meta :< WeakTermTauIntro e'
+interpret (meta :< TreeNode [_ :< TreeAtom "tau-elim", e]) = do
+  e' <- interpret e
+  return $ meta :< WeakTermTauElim e'
+interpret (meta :< TreeNode [_ :< TreeAtom "theta", t]) = do
+  t' <- interpret t
+  return $ meta :< WeakTermTheta t'
+interpret (meta :< TreeNode [_ :< TreeAtom "theta-intro", e]) = do
+  e' <- interpret e
+  return $ meta :< WeakTermThetaIntro e'
+interpret (meta :< TreeNode [_ :< TreeAtom "theta-elim", e]) = do
+  e' <- interpret e
+  return $ meta :< WeakTermThetaElim e'
+interpret (meta :< TreeNode [_ :< TreeAtom "mu", xt, e]) = do
   xt' <- interpretIdentifierPlus xt
   e' <- interpret e
   return $ meta :< WeakTermMu xt' e'
+interpret (meta :< TreeNode [_ :< TreeAtom "iota", e, _ :< TreeAtom x]) = do
+  l <- interpretWeakLevel x
+  e' <- interpret e
+  return $ meta :< WeakTermIota e' l
 interpret (meta :< TreeAtom "_") = do
   name <- newNameWith "hole"
   return $ meta :< WeakTermHole name
@@ -133,6 +151,16 @@ interpretBinder xts t = do
   t' <- interpret t
   hole <- newNameWith "hole"
   return $ xts' ++ [(hole, t')]
+
+interpretWeakLevel :: String -> WithEnv WeakLevel
+interpretWeakLevel x
+  | Just i <- readMaybe x = return $ WeakLevelInt i
+interpretWeakLevel "infinity" = return WeakLevelInfinity
+interpretWeakLevel "_" = do
+  h <- newNameWith "hole"
+  return $ WeakLevelHole h
+interpretWeakLevel s =
+  lift $ throwE $ "interpretWeakLevel: syntax error:\n" ++ s
 
 interpretCase :: Tree -> WithEnv Case
 --
