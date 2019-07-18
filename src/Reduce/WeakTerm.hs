@@ -8,7 +8,7 @@ import           Data.Basic
 import           Data.WeakTerm
 
 reduceWeakTerm :: WeakTerm -> WeakTerm
-reduceWeakTerm (i :< WeakTermEpsilonElim (t, x) e branchList) = do
+reduceWeakTerm (i :< WeakTermEpsilonElim (x, t) e branchList) = do
   let e' = reduceWeakTerm e
   case e' of
     _ :< WeakTermEpsilonIntro l ->
@@ -17,20 +17,20 @@ reduceWeakTerm (i :< WeakTermEpsilonElim (t, x) e branchList) = do
         Nothing ->
           case lookup CaseDefault branchList of
             Just body -> reduceWeakTerm $ substWeakTerm [(x, e')] body
-            Nothing   -> i :< WeakTermEpsilonElim (t, x) e' branchList
-    _ -> i :< WeakTermEpsilonElim (t, x) e' branchList
-reduceWeakTerm (i :< WeakTermPiElim s e es) = do
+            Nothing   -> i :< WeakTermEpsilonElim (x, t) e' branchList
+    _ -> i :< WeakTermEpsilonElim (x, t) e' branchList
+reduceWeakTerm (i :< WeakTermPiElim e es) = do
   let es' = map reduceWeakTerm es
   let e' = reduceWeakTerm e
   case e' of
-    _ :< WeakTermPiIntro _ txs body
-      | length txs == length es'
+    _ :< WeakTermPiIntro xts body
+      | length xts == length es'
       , all isValue es' -> do
-        let xs = map snd txs
+        let xs = map fst xts
         reduceWeakTerm $ substWeakTerm (zip xs es') body
-    self@(_ :< WeakTermRec (_, x) body) -> do
+    self@(_ :< WeakTermMu (x, _) body) -> do
       let self' = substWeakTerm [(x, self)] body
-      reduceWeakTerm (i :< WeakTermPiElim s self' es')
+      reduceWeakTerm (i :< WeakTermPiElim self' es')
     _ :< WeakTermConst constant
       | [_ :< WeakTermEpsilonIntro (LiteralInteger x), _ :< WeakTermEpsilonIntro (LiteralInteger y)] <-
          es' -> do
@@ -44,17 +44,28 @@ reduceWeakTerm (i :< WeakTermPiElim s e es) = do
           (_, _, True, _) -> i :< WeakTermEpsilonIntro (LiteralInteger (x * y))
           (_, _, _, True) ->
             i :< WeakTermEpsilonIntro (LiteralInteger (x `div` y))
-          _ -> i :< WeakTermPiElim s e' es'
-    _ -> i :< WeakTermPiElim s e' es'
-reduceWeakTerm (i :< WeakTermSigmaIntro s es) = do
+          _ -> i :< WeakTermPiElim e' es'
+    _ -> i :< WeakTermPiElim e' es'
+reduceWeakTerm (i :< WeakTermSigmaIntro es) = do
   let es' = map reduceWeakTerm es
-  i :< WeakTermSigmaIntro s es'
-reduceWeakTerm (i :< WeakTermSigmaElim s txs e1 e2) = do
+  i :< WeakTermSigmaIntro es'
+reduceWeakTerm (i :< WeakTermSigmaElim xts e1 e2) = do
   let e1' = reduceWeakTerm e1
   case e1' of
-    _ :< WeakTermSigmaIntro _ es
-      | length es == length txs -> do
-        let xs = map snd txs
+    _ :< WeakTermSigmaIntro es
+      | length es == length xts -> do
+        let xs = map fst xts
         reduceWeakTerm $ substWeakTerm (zip xs es) e2
-    _ -> i :< WeakTermSigmaElim s txs e1' e2
+    _ -> i :< WeakTermSigmaElim xts e1' e2
+reduceWeakTerm (i :< WeakTermTauElim e) = do
+  let e' = reduceWeakTerm e
+  case e' of
+    _ :< WeakTermTauIntro e'' -> reduceWeakTerm e''
+    _                         -> i :< WeakTermTauElim e'
+reduceWeakTerm (i :< WeakTermThetaElim e) = do
+  let e' = reduceWeakTerm e
+  case e' of
+    _ :< WeakTermThetaIntro e'' -> reduceWeakTerm e''
+    _                           -> i :< WeakTermThetaElim e'
+reduceWeakTerm (_ :< WeakTermIota e _) = reduceWeakTerm e
 reduceWeakTerm t = t
