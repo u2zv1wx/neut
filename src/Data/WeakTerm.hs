@@ -49,7 +49,7 @@ data WeakTermF a
   | WeakTermMu (Identifier, a)
                a
   | WeakTermIota a -- level annotation
-                 Int
+                 WeakLevel
   | WeakTermConst Identifier
   | WeakTermHole Identifier
 
