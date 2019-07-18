@@ -25,7 +25,7 @@ i    ::= <int>
 
 -- term
 e, A ::= (universe i)
-       | (upsilon x A)
+       | (upsilon x)
        | (epsilon x)
        | (epsilon-intro l)
        | (epsilon-elim x e (c1 e1) ... (cn en))
