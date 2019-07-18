@@ -79,7 +79,14 @@ varAndHole (_ :< WeakTermSigma txs) = varAndHoleBindings txs []
 varAndHole (_ :< WeakTermSigmaIntro es) = pairwiseConcat $ map varAndHole es
 varAndHole (_ :< WeakTermSigmaElim us e1 e2) =
   pairwiseConcat [varAndHole e1, varAndHoleBindings us [e2]]
+varAndHole (_ :< WeakTermTau t) = varAndHole t
+varAndHole (_ :< WeakTermTauIntro e) = varAndHole e
+varAndHole (_ :< WeakTermTauElim e) = varAndHole e
+varAndHole (_ :< WeakTermTheta t) = varAndHole t
+varAndHole (_ :< WeakTermThetaIntro e) = varAndHole e
+varAndHole (_ :< WeakTermThetaElim e) = varAndHole e
 varAndHole (_ :< WeakTermMu ut e) = varAndHoleBindings [ut] [e]
+varAndHole (_ :< WeakTermIota e _) = varAndHole e
 varAndHole (_ :< WeakTermConst _) = ([], [])
 varAndHole (_ :< WeakTermHole x) = ([], [x])
 
@@ -130,10 +137,23 @@ substWeakTerm sub (j :< WeakTermSigmaElim txs e1 e2) = do
   let e1' = substWeakTerm sub e1
   let (txs', e2') = substWeakTermBindingsWithBody sub txs e2
   j :< WeakTermSigmaElim txs' e1' e2'
+substWeakTerm sub (j :< WeakTermTau t) = j :< WeakTermTau (substWeakTerm sub t)
+substWeakTerm sub (j :< WeakTermTauIntro e) =
+  j :< WeakTermTauIntro (substWeakTerm sub e)
+substWeakTerm sub (j :< WeakTermTauElim e) =
+  j :< WeakTermTauElim (substWeakTerm sub e)
+substWeakTerm sub (j :< WeakTermTheta t) =
+  j :< WeakTermTheta (substWeakTerm sub t)
+substWeakTerm sub (j :< WeakTermThetaIntro e) =
+  j :< WeakTermThetaIntro (substWeakTerm sub e)
+substWeakTerm sub (j :< WeakTermThetaElim e) =
+  j :< WeakTermThetaElim (substWeakTerm sub e)
 substWeakTerm sub (j :< WeakTermMu (x, t) e) = do
   let t' = substWeakTerm sub t
   let e' = substWeakTerm (filter (\(k, _) -> k /= x) sub) e
   j :< WeakTermMu (x, t') e'
+substWeakTerm sub (j :< WeakTermIota e i) =
+  j :< WeakTermIota (substWeakTerm sub e) i
 substWeakTerm _ (j :< WeakTermConst t) = j :< WeakTermConst t
 substWeakTerm sub (j :< WeakTermHole s) =
   fromMaybe (j :< WeakTermHole s) (lookup s sub)
@@ -178,7 +198,14 @@ isReducible (_ :< WeakTermSigmaIntro es) = any isReducible es
 isReducible (_ :< WeakTermSigmaElim txs (_ :< WeakTermSigmaIntro es) _)
   | length txs == length es = True
 isReducible (_ :< WeakTermSigmaElim _ e1 _) = isReducible e1
+isReducible (_ :< WeakTermTau _) = False
+isReducible (_ :< WeakTermTauIntro e) = isReducible e
+isReducible (_ :< WeakTermTauElim e) = isReducible e
+isReducible (_ :< WeakTermTheta _) = False
+isReducible (_ :< WeakTermThetaIntro e) = isReducible e
+isReducible (_ :< WeakTermThetaElim e) = isReducible e
 isReducible (_ :< WeakTermMu _ _) = False
+isReducible (_ :< WeakTermIota e _) = isReducible e
 isReducible (_ :< WeakTermConst _) = False
 isReducible (_ :< WeakTermHole _) = False
 
