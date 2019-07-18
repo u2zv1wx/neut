@@ -20,6 +20,9 @@ data WeakLevel
   deriving (Show, Eq)
 
 data WeakTermF a
+  -- The "level" of WeakTermUniv is the one of modality, and thus not the one of
+  -- universe hierarchy. We allow "univ : univ" since we've already allowed
+  -- unlimited fixed point operator, which makes the system inconsistent as logic.
   = WeakTermUniv WeakLevel
   | WeakTermUpsilon Identifier
   | WeakTermEpsilon Identifier
@@ -37,15 +40,15 @@ data WeakTermF a
   | WeakTermSigmaElim [(Identifier, a)]
                       a
                       a
-  | WeakTermTau a
+  | WeakTermTau a -- K modality
   | WeakTermTauIntro a
   | WeakTermTauElim a
-  | WeakTermTheta a
+  | WeakTermTheta a -- S4 modality
   | WeakTermThetaIntro a
   | WeakTermThetaElim a
   | WeakTermMu (Identifier, a)
                a
-  | WeakTermIota a
+  | WeakTermIota a -- level annotation
                  WeakLevel
   | WeakTermConst Identifier
   | WeakTermHole Identifier
