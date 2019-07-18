@@ -15,6 +15,7 @@ type IdentifierPlus = (Identifier, WeakTerm)
 
 data WeakLevel
   = WeakLevelInt Int
+  | WeakLevelInfinity
   | WeakLevelHole Identifier
   deriving (Show, Eq)
 
