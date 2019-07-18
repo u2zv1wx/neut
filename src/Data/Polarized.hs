@@ -8,7 +8,7 @@ data Pos
   = PosVar Identifier
   | PosConst Identifier
   | PosSigmaIntro [Pos]
-  | PosIndexIntro Index
+  | PosIndexIntro Literal
                   LowType
   deriving (Show)
 
@@ -21,7 +21,7 @@ data Neg
                  Pos
                  Neg
   | NegIndexElim Pos
-                 [(Index, Neg)]
+                 [(Case, Neg)]
   | NegUpIntro Pos
   | NegUpElim Identifier
               Neg
