@@ -65,10 +65,16 @@ simp ((_ :< WeakTermSigmaIntro es1, _ :< WeakTermSigmaIntro es2):cs)
   | length es1 == length es2 = simp $ zip es1 es2 ++ cs
 simp ((_ :< WeakTermSigmaElim xts e1 e2, e):cs) = do
   hs <- mapM (const newHole) xts
-  sigmaIntro <- wrapType $ WeakTermSigmaIntro hs
+  sigmaIntro <- wrap $ WeakTermSigmaIntro hs
   let e2' = substWeakTerm (zip (map fst xts) hs) e2
   simp $ (e1, sigmaIntro) : (e2', e) : cs
 simp ((e1, e2@(_ :< WeakTermSigmaElim {})):cs) = simp $ (e2, e1) : cs
+simp ((_ :< WeakTermTau t1, _ :< WeakTermTau t2):cs) = simp $ (t1, t2) : cs
+simp ((_ :< WeakTermTauIntro e1, _ :< WeakTermTauIntro e2):cs) =
+  simp $ (e1, e2) : cs
+simp ((_ :< WeakTermTheta t1, _ :< WeakTermTheta t2):cs) = simp $ (t1, t2) : cs
+simp ((_ :< WeakTermThetaIntro e1, _ :< WeakTermThetaIntro e2):cs) =
+  simp $ (e1, e2) : cs
 simp ((_ :< WeakTermConst x, _ :< WeakTermConst y):cs)
   | x == y = simp cs
 simp ((e1, e2):cs) = do
