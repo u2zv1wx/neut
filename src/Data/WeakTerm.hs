@@ -180,6 +180,14 @@ substWeakTermBindingsWithBody sub ((x, t):xts) e = do
   let (xts', e') = substWeakTermBindingsWithBody sub' xts e
   ((x, substWeakTerm sub t) : xts', e')
 
+type SubstWeakLevel = [(Identifier, WeakLevel)]
+
+substWeakLevel :: SubstWeakLevel -> WeakLevel -> WeakLevel
+substWeakLevel _ (WeakLevelInt i) = WeakLevelInt i
+substWeakLevel _ WeakLevelInfinity = WeakLevelInfinity
+substWeakLevel sub (WeakLevelHole h) =
+  fromMaybe (WeakLevelHole h) (lookup h sub)
+
 isReducible :: WeakTerm -> Bool
 isReducible (_ :< WeakTermUniv _) = False
 isReducible (_ :< WeakTermUpsilon _) = False
