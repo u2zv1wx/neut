@@ -235,11 +235,6 @@ wrap a = do
   meta <- newNameWith "meta"
   return $ meta :< a
 
-wrapType :: WeakTermF WeakTerm -> WithEnv WeakTerm
-wrapType t = do
-  meta <- newNameWith "meta"
-  return $ meta :< t
-
 wrapTypeWithUniv :: WeakTerm -> WeakTermF WeakTerm -> WithEnv WeakTerm
 wrapTypeWithUniv univ t = do
   meta <- newNameWith "meta"
@@ -258,9 +253,3 @@ newHoleOfType t = do
   m <- newNameWith "meta"
   insTypeEnv m t
   return $ m :< WeakTermHole h
-
-newCartesian :: WithEnv WeakSortal
-newCartesian = do
-  c <- newNameWith "cartesian"
-  m <- newNameWith "meta"
-  return $ m :< WeakTermEpsilonIntro (LiteralLabel c)
