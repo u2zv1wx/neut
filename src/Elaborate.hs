@@ -175,18 +175,20 @@ obtainLevel m = do
   typeMeta :< _ <- lookupTypeEnv' m
   u <- lookupTypeEnv' typeMeta
   case reduceWeakTerm u of
-    _ :< WeakTermUniv wl ->
-      case wl of
-        WeakLevelInt i    -> withOffset i
-        WeakLevelInfinity -> return LevelInfinity
-        WeakLevelHole _   -> undefined
-    _ -> lift $ throwE "obtainLevel"
+    _ :< WeakTermUniv wl -> obtainLevel' wl
+    _                    -> lift $ throwE "obtainLevel"
+
+obtainLevel' :: WeakLevel -> WithEnv Level
+obtainLevel' (WeakLevelInt i) = withOffset i
+obtainLevel' WeakLevelInfinity = return LevelInfinity
+obtainLevel' (WeakLevelHole h) = do
+  lenv <- gets levelEnv
+  case lookup h lenv of
+    Just l  -> obtainLevel' l
+    Nothing -> lift $ throwE "obtainLevel'"
 
 withOffset :: Int -> WithEnv Level
 withOffset i = LevelInt <$> withOffset' i
-  -- o <- obtainOrigin
-  -- let l = TermEpsilonIntro (LiteralInteger i) (LowTypeSignedInt 64)
-  -- return $ LevelInt $ TermConstElim "core.i64.add" [TermUpsilon o, l]
 
 withOffset' :: Int -> WithEnv Term
 withOffset' i = do
