@@ -54,3 +54,11 @@ compose s1 s2 = do
   let codS2' = map (substWeakTerm s1) codS2
   let fromS1 = filter (\(ident, _) -> ident `notElem` domS2) s1
   fromS1 ++ zip domS2 codS2'
+
+composeWeakLevel :: SubstWeakLevel -> SubstWeakLevel -> SubstWeakLevel
+composeWeakLevel s1 s2 = do
+  let domS2 = map fst s2
+  let codS2 = map snd s2
+  let codS2' = map (substWeakLevel s1) codS2
+  let fromS1 = filter (\(ident, _) -> ident `notElem` domS2) s1
+  fromS1 ++ zip domS2 codS2'

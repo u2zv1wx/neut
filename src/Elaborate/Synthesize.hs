@@ -6,7 +6,6 @@ import           Control.Comonad.Cofree
 import           Control.Monad.Except
 import           Control.Monad.State
 import qualified Data.PQueue.Min        as Q
-import qualified Text.Show.Pretty       as Pr
 
 import           Data.Basic
 import           Data.Constraint
@@ -24,13 +23,11 @@ synthesize q = do
     Just (Enriched (e1, e2) ms _)
       | Just (m, e) <- lookupAny ms sub -> resolveStuck q e1 e2 m e
     Just (Enriched _ _ (ConstraintImmediate m e)) -> resolveHole q m e
-    Just (Enriched _ _ (ConstraintPattern s m es e)) -> resolvePiElim q s m es e
-    Just (Enriched _ _ (ConstraintQuasiPattern s m es e)) ->
-      resolvePiElim q s m es e
-    Just (Enriched _ _ (ConstraintFlexRigid s m es e)) ->
-      resolvePiElim q s m es e
-    Just (Enriched _ _ (ConstraintFlexFlex s m es e)) ->
-      resolvePiElim q s m es e
+    Just (Enriched _ _ (ConstraintPattern m es e)) -> resolvePiElim q m es e
+    Just (Enriched _ _ (ConstraintQuasiPattern m es e)) ->
+      resolvePiElim q m es e
+    Just (Enriched _ _ (ConstraintFlexRigid m es e)) -> resolvePiElim q m es e
+    Just (Enriched _ _ (ConstraintFlexFlex m es e)) -> resolvePiElim q m es e
     Just _ -> throwError "cannot synthesize(synth)"
 
 resolveStuck ::
@@ -58,16 +55,11 @@ resolveStuck q e1 e2 m e = do
 -- this function replaces all the arguments that are not variable by
 -- fresh variables, and try to resolve the new quasi-pattern ?M @ x @ x @ z @ y == e.
 resolvePiElim ::
-     ConstraintQueue
-  -> WeakTerm
-  -> Identifier
-  -> [WeakTerm]
-  -> WeakTerm
-  -> WithEnv ()
-resolvePiElim q s m es e = do
+     ConstraintQueue -> Identifier -> [WeakTerm] -> WeakTerm -> WithEnv ()
+resolvePiElim q m es e = do
   xs <- toVarList es
   xss <- toAltList xs
-  lamList <- mapM (\ys -> bindFormalArgs s ys e) xss
+  lamList <- mapM (`bindFormalArgs` e) xss
   chain q $ flip map lamList $ \lam -> resolveHole q m lam
 
 resolveHole :: ConstraintQueue -> Identifier -> WeakTerm -> WithEnv ()

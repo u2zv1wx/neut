@@ -33,11 +33,6 @@ simp ((e1, e2):cs)
         throwError $ "cannot simplify [TIMEOUT]:\n" ++ Pr.ppShow (e1, e2)
 simp ((e1, e2):cs)
   | isReducible e2 = simp $ (e2, e1) : cs
-simp ((e1, e2):cs)
-  | _ :< WeakTermPiElim (_ :< WeakTermUpsilon f) es1 <- e1
-  , _ :< WeakTermPiElim (_ :< WeakTermUpsilon g) es2 <- e2
-  , f == g
-  , length es1 == length es2 = simp $ zip es1 es2 ++ cs
 simp ((_ :< WeakTermUniv i, _ :< WeakTermUniv j):cs) = do
   simpLevel i j
   simp cs
@@ -63,12 +58,6 @@ simp ((_ :< WeakTermSigma xts1, _ :< WeakTermSigma xts2):cs)
   | length xts1 == length xts2 = simpPiOrSigma xts1 xts2 cs
 simp ((_ :< WeakTermSigmaIntro es1, _ :< WeakTermSigmaIntro es2):cs)
   | length es1 == length es2 = simp $ zip es1 es2 ++ cs
-simp ((_ :< WeakTermSigmaElim xts e1 e2, e):cs) = do
-  hs <- mapM (const newHole) xts
-  sigmaIntro <- wrap $ WeakTermSigmaIntro hs
-  let e2' = substWeakTerm (zip (map fst xts) hs) e2
-  simp $ (e1, sigmaIntro) : (e2', e) : cs
-simp ((e1, e2@(_ :< WeakTermSigmaElim {})):cs) = simp $ (e2, e1) : cs
 simp ((_ :< WeakTermTau t1, _ :< WeakTermTau t2):cs) = simp $ (t1, t2) : cs
 simp ((_ :< WeakTermTauIntro e1, _ :< WeakTermTauIntro e2):cs) =
   simp $ (e1, e2) : cs
@@ -77,6 +66,11 @@ simp ((_ :< WeakTermThetaIntro e1, _ :< WeakTermThetaIntro e2):cs) =
   simp $ (e1, e2) : cs
 simp ((_ :< WeakTermConst x, _ :< WeakTermConst y):cs)
   | x == y = simp cs
+simp ((e1, e2):cs)
+  | _ :< WeakTermPiElim (_ :< WeakTermUpsilon f) es1 <- e1
+  , _ :< WeakTermPiElim (_ :< WeakTermUpsilon g) es2 <- e2
+  , f == g
+  , length es1 == length es2 = simp $ zip es1 es2 ++ cs
 simp ((e1, e2):cs) = do
   let ms1 = asStuckedTerm e1
   let ms2 = asStuckedTerm e2
@@ -119,7 +113,8 @@ simpLevel :: WeakLevel -> WeakLevel -> WithEnv ()
 simpLevel (WeakLevelInt i1) (WeakLevelInt i2)
   | i1 == i2 = return ()
 simpLevel WeakLevelInfinity WeakLevelInfinity = return ()
-simpLevel (WeakLevelHole _) _ = return () -- FIXME: update level environment
+simpLevel (WeakLevelHole h) l =
+  modify (\env -> env {levelEnv = composeWeakLevel [(h, l)] (levelEnv env)})
 simpLevel l (WeakLevelHole h) = simpLevel (WeakLevelHole h) l
 simpLevel l1 l2 =
   throwError $ "LevelError: cannot simplify: " ++ show l1 ++ " with " ++ show l2
@@ -155,10 +150,12 @@ asStuckedTerm (_ :< WeakTermEpsilonElim _ e _)
 asStuckedTerm _ = Nothing
 
 obtainStuckReason :: WeakTerm -> Maybe Identifier
-obtainStuckReason (_ :< WeakTermHole x)            = Just x
+obtainStuckReason (_ :< WeakTermEpsilonElim _ e _) = obtainStuckReason e
 obtainStuckReason (_ :< WeakTermPiElim e _)        = obtainStuckReason e
 obtainStuckReason (_ :< WeakTermSigmaElim _ e1 _)  = obtainStuckReason e1
-obtainStuckReason (_ :< WeakTermEpsilonElim _ e _) = obtainStuckReason e
+obtainStuckReason (_ :< WeakTermTauElim e)         = obtainStuckReason e
+obtainStuckReason (_ :< WeakTermThetaElim e)       = obtainStuckReason e
+obtainStuckReason (_ :< WeakTermHole x)            = Just x
 obtainStuckReason _                                = Nothing
 
 isSolvable :: WeakTerm -> Identifier -> [Identifier] -> Bool

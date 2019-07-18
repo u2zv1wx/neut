@@ -34,11 +34,13 @@ data Env = Env
   , constraintEnv     :: [PreConstraint] -- for type inference
   , constraintQueue   :: ConstraintQueue -- for (dependent) type inference
   , substEnv          :: SubstWeakTerm -- for (dependent) type inference
+  , levelEnv          :: [(Identifier, WeakLevel)]
   , univConstraintEnv :: [(UnivLevel, UnivLevel)]
   , currentDir        :: FilePath
   , termEnv           :: [(Identifier, ([Identifier], Term))] -- x == lam (x1, ..., xn). e
   , polEnv            :: [(Identifier, ([Identifier], Neg))] -- x == v || x == thunk (lam (x) e)
   , llvmEnv           :: [(Identifier, ([Identifier], LLVM))]
+  , origin            :: Maybe Identifier
   }
 
 initialEnv :: FilePath -> Env
@@ -59,8 +61,10 @@ initialEnv path =
     , constraintEnv = []
     , constraintQueue = Q.empty
     , substEnv = []
+    , levelEnv = []
     , univConstraintEnv = []
     , currentDir = path
+    , origin = Nothing
     }
 
 type WithEnv a = StateT Env (ExceptT String IO) a
@@ -253,3 +257,13 @@ newHoleOfType t = do
   m <- newNameWith "meta"
   insTypeEnv m t
   return $ m :< WeakTermHole h
+
+obtainOrigin :: WithEnv Identifier
+obtainOrigin = do
+  mo <- gets origin
+  case mo of
+    Just o -> return o
+    Nothing -> do
+      o <- newNameWith "origin"
+      modify (\env -> env {origin = Just o})
+      return o
