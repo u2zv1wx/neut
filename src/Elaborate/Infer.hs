@@ -67,7 +67,7 @@ infer ctx (meta :< WeakTermPi xts) = inferPiOrSigma ctx meta xts
 infer ctx (meta :< WeakTermPiIntro xts e) = do
   forM_ xts $ uncurry insTypeEnv
   cod <- infer (ctx ++ xts) e >>= withPlaceholder
-  wrapType (WeakTermPi (xts ++ [cod])) >>= returnMeta meta
+  wrap (WeakTermPi (xts ++ [cod])) >>= returnMeta meta
 infer ctx (meta :< WeakTermPiElim e es) = do
   tPi <- infer ctx e
   binder <- inferList ctx es
@@ -84,7 +84,7 @@ infer ctx (meta :< WeakTermSigmaElim xts e1 e2) = do
   forM_ xts $ uncurry insTypeEnv
   varSeq <- mapM (uncurry toVar1) xts
   binder <- inferList ctx varSeq
-  sigmaType <- wrapType $ WeakTermSigma binder
+  sigmaType <- wrap $ WeakTermSigma binder
   insConstraintEnv t1 sigmaType
   z <- newNameOfType t1
   varTuple <- constructTuple (ctx ++ binder) (map fst binder)
@@ -158,13 +158,13 @@ inferPiOrSigma ctx meta xts = do
 newHoleInCtx :: Context -> WithEnv WeakTerm
 newHoleInCtx ctx = do
   univ <- newUniv >>= withPlaceholder
-  higherPi <- wrapType $ WeakTermPi $ ctx ++ [univ]
+  higherPi <- wrap $ WeakTermPi $ ctx ++ [univ]
   higherHole <- newHoleOfType higherPi
   varSeq <- mapM (uncurry toVar1) ctx
-  app <- wrapType (WeakTermPiElim higherHole varSeq) >>= withPlaceholder
-  pi <- wrapType $ WeakTermPi $ ctx ++ [app]
+  app <- wrap (WeakTermPiElim higherHole varSeq) >>= withPlaceholder
+  pi <- wrap $ WeakTermPi $ ctx ++ [app]
   hole <- newHoleOfType pi
-  wrapType $ WeakTermPiElim hole varSeq
+  wrap $ WeakTermPiElim hole varSeq
 
 -- In context ctx == [x1, ..., xn], `newHoleListInCtx ctx names-of-holes` generates
 -- the following list of holes:
@@ -193,7 +193,7 @@ inferCase (CaseLiteral (LiteralLabel name)) = do
   ienv <- gets indexEnv
   mk <- lookupKind' name ienv
   case mk of
-    Just k  -> Just <$> wrapType (WeakTermEpsilon k)
+    Just k  -> Just <$> wrap (WeakTermEpsilon k)
     Nothing -> return Nothing
 inferCase _ = return Nothing
 
