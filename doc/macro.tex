@@ -11,6 +11,7 @@
 
 % operator
 \newcommand{\abs}[2]{\lambda #1.\,#2}
+\newcommand{\iabs}[3]{\lambda^{#1} #2.\,#3}
 \newcommand{\Abs}[2]{\underbar{\lambda} #1.\,#2}
 
 \newcommand{\absP}[2]{\zeta #1.\,#2}
@@ -20,6 +21,7 @@
 \newcommand{\App}[2]{#1 \mathbin{\underline{\lhd}} #2}
 
 \newcommand{\appE}[2]{#1 \mathbin{@} #2}
+\newcommand{\iappE}[3]{#2 \mathbin{@}^{#1} #3}
 \newcommand{\AppE}[2]{#1 \mathbin{\underline{@}} #2}
 
 \newcommand{\appT}[2]{#1 \LHD #2}
@@ -32,8 +34,12 @@
 \newcommand{\coapp}[2]{#1 \diamond #2}
 \newcommand{\pair}[2]{(#1, #2)}
 \newcommand{\simnot}{\mathord{\sim}}
-\newcommand{\LET}[3]{\mathsf{let}\ #1 = #2\ \mathsf{in}\ #3}
-\newcommand{\slet}[3]{\mathsf{let}\ #1 = #2\ \mathsf{in}\ #3}
+\newcommand{\LET}[3]{\mathsf{let}\ #1 := #2\ \mathsf{in}\ #3}
+\newcommand{\slet}[3]{\mathsf{let}\ #1 := #2\ \mathsf{in}\ #3}
+
+\DeclarePairedDelimiter\floor{\lfloor}{\rfloor}
+
+\newcommand{\shriek}[1]{\mathord{!}#1}
 
 % \newcommand{\xabs}[2]{\Lambda #1.\,#2}
 \newcommand{\xabs}[2]{\thunkS{(\abs{#1}{#2})}}
@@ -42,8 +48,8 @@
 \newcommand{\quit}[3]{\mathsf{quit}^{#1}(#2, #3)}
 
 % notation
-% \newcommand{\subst}[2]{\{ #1 := #2 \}}
-\newcommand{\subst}[2]{[#2/#1]}
+\newcommand{\subst}[2]{\{ #1 := #2 \}}
+% \newcommand{\subst}[2]{[#2/#1]}
 
 \newcommand{\downT}[1]{\mathord{\downarrow}#1}
 \newcommand{\upT}[1]{\mathord{\uparrow}#1}
@@ -58,7 +64,9 @@
 \newcommand{\delimit}[1]{\langle #1 \rangle}
 
 \newcommand{\dprod}[2]{\Pi (#1).\,#2}
+\newcommand{\idprod}[3]{\Pi^{#1} (#2).\,#3}
 \newcommand{\dsum}[2]{\Sigma (#1).\,#2}
+\newcommand{\idsum}[3]{\Sigma^{#1} (#2).\,#3}
 
 \newcommand{\Dprod}[2]{\hat{\Pi} (#1).\,#2}
 \newcommand{\Dsum}[2]{\widehat{\Sigma} (#1).\,#2}
@@ -79,6 +87,8 @@
 \newcommand{\vdata}[1]{\mathsf{data}\,#1}
 \newcommand{\mybox}[1]{\mathsf{box}\,#1}
 \newcommand{\myunbox}[1]{\mathsf{unbox}\,#1}
+\newcommand{\mylift}[1]{\mathsf{lift}\,#1}
+\newcommand{\myunlift}[1]{\mathsf{unlift}\,#1}
 \newcommand{\vcocode}[1]{\mathsf{cocode}\,#1}
 \newcommand{\vcodata}[1]{\mathsf{codata}\,#1}
 
@@ -97,6 +107,7 @@
 \newcommand{\print}[1]{\mathsf{print}\,#1}
 
 \newcommand{\rec}[2]{\mathsf{rec}\,#1.\,#2}
+\newcommand{\fix}[2]{\mathsf{fix}\,#1.\,#2}
 \newcommand{\corec}[2]{\mathsf{corec}\,#1\,#2}
 
 \newcommand{\myzero}{\mathsf{zero}}
@@ -105,6 +116,8 @@
 
 \newcommand{\FA}[2]{\forall #1.\,#2}
 \newcommand{\EX}[2]{\exists #1.\,#2}
+
+\newcommand{\Eps}{\mathbb{E}}
 
 \newcommand{\deref}[1]{\mathsf{deref}\,#1}
 \newcommand{\mydia}[1]{\mathsf{dia}\,#1}
@@ -118,6 +131,8 @@
 
 \newcommand{\ctx}[1]{\Vdash #1}
 % \newcommand{\ctx}[1]{#1\,\mathsf{ctx}}
+\newcommand{\ictx}[2]{\Vdash^{#1} #2}
+\newcommand{\infer}[1]{\vdash^{#1}}
 
 \newcommand{\luniv}{\mathbb{L}}
 % \newcommand{\univ}{\Box \luniv}
