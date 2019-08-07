@@ -32,71 +32,79 @@ interpret (m :< TreeNode [_ :< TreeAtom "epsilon-elim", xt, e, _ :< TreeNode cas
   e' <- interpret e
   caseList' <- mapM interpretClause caseList
   return $ m :< WeakTermEpsilonElim xt' e' caseList'
-interpret (m :< TreeNode [_ :< TreeAtom "pi", _ :< TreeNode xts, t]) = do
+interpret (m :< TreeNode [_ :< TreeAtom "pi", _ :< TreeAtom i, _ :< TreeNode xts, t]) = do
+  i' <- interpretWeakLevel i
   binder <- interpretBinder xts t
-  return $ m :< WeakTermPi binder
-interpret (m :< TreeNode [_ :< TreeAtom "pi-intro", _ :< TreeNode xts, e]) = do
+  return $ m :< WeakTermPi i' binder
+interpret (m :< TreeNode [_ :< TreeAtom "pi-intro", _ :< TreeAtom i, _ :< TreeNode xts, e]) = do
+  i' <- interpretWeakLevel i
   xts' <- mapM interpretIdentifierPlus xts
   e' <- interpret e
-  return $ m :< WeakTermPiIntro xts' e'
-interpret (m :< TreeNode ((_ :< TreeAtom "pi-elim"):e:es)) = do
+  return $ m :< WeakTermPiIntro i' xts' e'
+interpret (m :< TreeNode ((_ :< TreeAtom "pi-elim"):(_ :< TreeAtom i):e:es)) = do
+  i' <- interpretWeakLevel i
   e' <- interpret e
   es' <- mapM interpret es
-  return $ m :< WeakTermPiElim e' es'
-interpret (m :< TreeNode [_ :< TreeAtom "sigma", _ :< TreeNode xts, t]) = do
+  return $ m :< WeakTermPiElim i' e' es'
+interpret (m :< TreeNode [_ :< TreeAtom "sigma", _ :< TreeAtom i, _ :< TreeNode xts, t]) = do
+  i' <- interpretWeakLevel i
   binder <- interpretBinder xts t
-  return $ m :< WeakTermPi binder
-interpret (m :< TreeNode ((_ :< TreeAtom "sigma-intro"):es)) = do
+  return $ m :< WeakTermSigma i' binder
+interpret (m :< TreeNode ((_ :< TreeAtom "sigma-intro"):(_ :< TreeAtom i):es)) = do
+  i' <- interpretWeakLevel i
   es' <- mapM interpret es
-  return $ m :< WeakTermSigmaIntro es'
-interpret (m :< TreeNode [_ :< TreeAtom "sigma-elim", _ :< TreeNode xts, e1, e2]) = do
+  return $ m :< WeakTermSigmaIntro i' es'
+interpret (m :< TreeNode [_ :< TreeAtom "sigma-elim", _ :< TreeAtom i, _ :< TreeNode xts, e1, e2]) = do
+  i' <- interpretWeakLevel i
   xts' <- mapM interpretIdentifierPlus xts
   e1' <- interpret e1
   e2' <- interpret e2
-  return $ m :< WeakTermSigmaElim xts' e1' e2'
-interpret (m :< TreeNode [_ :< TreeAtom "tau", t]) = do
+  return $ m :< WeakTermSigmaElim i' xts' e1' e2'
+interpret (m :< TreeNode [_ :< TreeAtom "tau", _ :< TreeAtom i, t]) = do
+  i' <- interpretWeakLevel i
   t' <- interpret t
-  return $ m :< WeakTermTau t'
-interpret (m :< TreeNode [_ :< TreeAtom "tau-intro", e]) = do
+  return $ m :< WeakTermTau i' t'
+interpret (m :< TreeNode [_ :< TreeAtom "tau-intro", _ :< TreeAtom i, e]) = do
+  i' <- interpretWeakLevel i
   e' <- interpret e
-  return $ m :< WeakTermTauIntro e'
-interpret (m :< TreeNode [_ :< TreeAtom "tau-elim", e]) = do
+  return $ m :< WeakTermTauIntro i' e'
+interpret (m :< TreeNode [_ :< TreeAtom "tau-elim", _ :< TreeAtom i, e]) = do
+  i' <- interpretWeakLevel i
   e' <- interpret e
-  return $ m :< WeakTermTauElim e'
+  return $ m :< WeakTermTauElim i' e'
 interpret (m :< TreeNode [_ :< TreeAtom "theta", t]) = do
   t' <- interpret t
   return $ m :< WeakTermTheta t'
 interpret (m :< TreeNode [_ :< TreeAtom "theta-intro", e]) = do
   e' <- interpret e
   return $ m :< WeakTermThetaIntro e'
-interpret (m :< TreeNode [_ :< TreeAtom "theta-elim", e]) = do
+interpret (m :< TreeNode [_ :< TreeAtom "theta-elim", e, _ :< TreeAtom i]) = do
   e' <- interpret e
-  return $ m :< WeakTermThetaElim e'
+  i' <- interpretWeakLevel i
+  return $ m :< WeakTermThetaElim e' i'
 interpret (m :< TreeNode [_ :< TreeAtom "mu", xt, e]) = do
   xt' <- interpretIdentifierPlus xt
   e' <- interpret e
   return $ m :< WeakTermMu xt' e'
-interpret (m :< TreeNode [_ :< TreeAtom "iota", e, _ :< TreeAtom x]) = do
-  l <- interpretWeakLevel x
-  e' <- interpret e
-  return $ m :< WeakTermIota e' l
 interpret (m :< TreeAtom "_") = do
   name <- newNameWith "hole"
-  return $ m :< WeakTermHole name
+  return $ m :< WeakTermHole (name, 0)
 --
 -- auxiliary interpretations
 --
 interpret (m :< TreeAtom "universe") = do
-  hole <- newNameWith "univ"
-  return $ m :< WeakTermUniv (WeakLevelHole hole)
-interpret (m :< TreeNode ((_ :< TreeAtom "arrow"):ts)) = do
+  name <- newNameWith "univ"
+  return $ m :< WeakTermUniv (WeakLevelHole (name, 0))
+interpret (m :< TreeNode ((_ :< TreeAtom "arrow"):(_ :< TreeAtom i):ts)) = do
+  i' <- interpretWeakLevel i
   ts' <- mapM interpret ts
   xs <- mapM (const $ newNameWith "hole") ts'
-  return $ m :< WeakTermPi (zip xs ts')
-interpret (m :< TreeNode ((_ :< TreeAtom "product"):ts)) = do
+  return $ m :< WeakTermPi i' (zip xs ts')
+interpret (m :< TreeNode ((_ :< TreeAtom "product"):(_ :< TreeAtom i):ts)) = do
+  i' <- interpretWeakLevel i
   ts' <- mapM interpret ts
   xs <- mapM (const $ newNameWith "hole") ts'
-  return $ m :< WeakTermSigma (zip xs ts')
+  return $ m :< WeakTermSigma i' (zip xs ts')
 interpret (m :< TreeNode (e:es)) =
   interpret $ m :< TreeNode (("" :< TreeAtom "pi-elim") : e : es)
 interpret t@(m :< TreeAtom x) = do
@@ -158,7 +166,7 @@ interpretWeakLevel x
 interpretWeakLevel "infinity" = return WeakLevelInfinity
 interpretWeakLevel "_" = do
   h <- newNameWith "hole"
-  return $ WeakLevelHole h
+  return $ WeakLevelHole (h, 0)
 interpretWeakLevel s =
   lift $ throwE $ "interpretWeakLevel: syntax error:\n" ++ s
 
