@@ -13,11 +13,14 @@ import           Data.Basic
 
 type IdentifierPlus = (Identifier, WeakTerm)
 
+type LevelDiff = Int
+
+type Hole = (Identifier, LevelDiff)
+
 data WeakLevel
   = WeakLevelInt Int
   | WeakLevelInfinity
-  | WeakLevelHole Identifier
-                  Int
+  | WeakLevelHole Hole
   deriving (Show, Eq)
 
 data WeakTermF a
@@ -60,8 +63,7 @@ data WeakTermF a
   | WeakTermMu (Identifier, a)
                a
   | WeakTermConst Identifier
-  | WeakTermHole Identifier
-                 Int -- level diff
+  | WeakTermHole Hole
 
 type WeakTerm = Cofree WeakTermF Identifier
 
@@ -72,7 +74,7 @@ type SubstWeakTerm = [(Identifier, WeakTerm)]
 varWeakTerm :: WeakTerm -> [Identifier]
 varWeakTerm e = fst $ varAndHole e
 
-varAndHole :: WeakTerm -> ([Identifier], [Identifier])
+varAndHole :: WeakTerm -> ([Identifier], [Hole])
 varAndHole (_ :< WeakTermUniv _) = ([], [])
 varAndHole (_ :< WeakTermUpsilon x) = ([x], [])
 varAndHole (_ :< WeakTermEpsilon _) = ([], [])
@@ -109,19 +111,18 @@ varAndHole (_ :< WeakTermThetaElim e i) =
   pairwiseConcat [varAndHole e, varAndHoleLevel i]
 varAndHole (_ :< WeakTermMu ut e) = varAndHoleBindings [ut] [e]
 varAndHole (_ :< WeakTermConst _) = ([], [])
-varAndHole (_ :< WeakTermHole x _) = ([], [x])
+varAndHole (_ :< WeakTermHole h) = ([], [h])
 
-varAndHoleBindings ::
-     [IdentifierPlus] -> [WeakTerm] -> ([Identifier], [Identifier])
+varAndHoleBindings :: [IdentifierPlus] -> [WeakTerm] -> ([Identifier], [Hole])
 varAndHoleBindings [] es = pairwiseConcat $ map varAndHole es
 varAndHoleBindings ((x, t):xts) es = do
   let (xs1, hs1) = varAndHole t
   let (xs2, hs2) = varAndHoleBindings xts es
   (xs1 ++ filter (/= x) xs2, hs1 ++ hs2)
 
-varAndHoleLevel :: WeakLevel -> ([Identifier], [Identifier])
-varAndHoleLevel (WeakLevelHole h _) = ([], [h])
-varAndHoleLevel _                   = ([], [])
+varAndHoleLevel :: WeakLevel -> ([Identifier], [Hole])
+varAndHoleLevel (WeakLevelHole h) = ([], [h])
+varAndHoleLevel _                 = ([], [])
 
 pairwiseConcat :: [([a], [b])] -> ([a], [b])
 pairwiseConcat [] = ([], [])
@@ -179,8 +180,10 @@ substWeakTerm sub (m :< WeakTermMu (x, t) e) = do
   let e' = substWeakTerm (filter (\(k, _) -> k /= x) sub) e
   m :< WeakTermMu (x, t') e'
 substWeakTerm _ (m :< WeakTermConst t) = m :< WeakTermConst t
-substWeakTerm sub (m :< WeakTermHole s i) =
-  fromMaybe (m :< WeakTermHole s i) (lookup s sub)
+substWeakTerm sub (m :< WeakTermHole (s, i)) =
+  case lookup s sub of
+    Just e  -> shiftWeakTerm i e -- (?M^{+i}){?M := e} ~> e^{+i}
+    Nothing -> m :< WeakTermHole (s, i)
 
 substWeakTermBindings :: SubstWeakTerm -> [IdentifierPlus] -> [IdentifierPlus]
 substWeakTermBindings _ [] = []
@@ -251,13 +254,15 @@ substWeakLevel sub (m :< WeakTermMu (x, t) e) = do
   let e' = substWeakLevel (filter (\(k, _) -> k /= x) sub) e
   m :< WeakTermMu (x, t') e'
 substWeakLevel _ (m :< WeakTermConst t) = m :< WeakTermConst t
-substWeakLevel _ (m :< WeakTermHole s i) = m :< WeakTermHole s i
+substWeakLevel _ (m :< WeakTermHole h) = m :< WeakTermHole h
 
 substWeakLevel' :: SubstWeakLevel -> WeakLevel -> WeakLevel
 substWeakLevel' _ (WeakLevelInt i) = WeakLevelInt i
 substWeakLevel' _ WeakLevelInfinity = WeakLevelInfinity
-substWeakLevel' sub (WeakLevelHole h i) =
-  fromMaybe (WeakLevelHole h i) (lookup h sub)
+substWeakLevel' sub (WeakLevelHole (h, i)) =
+  case lookup h sub of
+    Just l  -> shiftWeakLevel i l -- (?M^{+i}){?M := l} ~> l + i
+    Nothing -> WeakLevelHole (h, i)
 
 substWeakLevelBindings :: SubstWeakLevel -> [IdentifierPlus] -> [IdentifierPlus]
 substWeakLevelBindings _ [] = []
@@ -325,7 +330,7 @@ shiftWeakTerm k (m :< WeakTermMu (x, t) e) = do
   let e' = shiftWeakTerm k e
   m :< WeakTermMu (x, t') e'
 shiftWeakTerm _ (m :< WeakTermConst t) = m :< WeakTermConst t
-shiftWeakTerm k (m :< WeakTermHole s i) = m :< WeakTermHole s (i + k)
+shiftWeakTerm k (m :< WeakTermHole (s, i)) = m :< WeakTermHole (s, i + k)
 
 shiftWeakTermBindings :: Int -> [IdentifierPlus] -> [IdentifierPlus]
 shiftWeakTermBindings _ [] = []
@@ -341,11 +346,10 @@ shiftWeakTermBindingsWithBody i ((x, t):xts) e = do
   ((x, shiftWeakTerm i t) : xts', e')
 
 shiftWeakLevel :: Int -> WeakLevel -> WeakLevel
-shiftWeakLevel k (WeakLevelInt i)    = WeakLevelInt (i + k)
-shiftWeakLevel _ WeakLevelInfinity   = WeakLevelInfinity
-shiftWeakLevel k (WeakLevelHole h i) = WeakLevelHole h (i + k)
+shiftWeakLevel k (WeakLevelInt i)       = WeakLevelInt (i + k)
+shiftWeakLevel _ WeakLevelInfinity      = WeakLevelInfinity
+shiftWeakLevel k (WeakLevelHole (h, i)) = WeakLevelHole (h, i + k)
 
--- TODO: reduceのときにレベルについての条件を追加すべき
 isReducible :: WeakTerm -> Bool
 isReducible (_ :< WeakTermUniv _) = False
 isReducible (_ :< WeakTermUpsilon _) = False
@@ -370,8 +374,7 @@ isReducible (_ :< WeakTermSigmaElim _ xts (_ :< WeakTermSigmaIntro _ es) _)
 isReducible (_ :< WeakTermSigmaElim _ _ e1 _) = isReducible e1
 isReducible (_ :< WeakTermTau _ _) = False
 isReducible (_ :< WeakTermTauIntro _ e) = isReducible e
-isReducible (_ :< WeakTermTauElim i (_ :< WeakTermTauIntro j _))
-  | i == j = True
+isReducible (_ :< WeakTermTauElim _ (_ :< WeakTermTauIntro _ _)) = True
 isReducible (_ :< WeakTermTauElim _ e) = isReducible e
 isReducible (_ :< WeakTermTheta _) = False
 isReducible (_ :< WeakTermThetaIntro e) = isReducible e
@@ -379,7 +382,7 @@ isReducible (_ :< WeakTermThetaElim (_ :< WeakTermThetaIntro _) _) = True
 isReducible (_ :< WeakTermThetaElim e _) = isReducible e
 isReducible (_ :< WeakTermMu _ _) = False
 isReducible (_ :< WeakTermConst _) = False
-isReducible (_ :< WeakTermHole _ _) = False
+isReducible (_ :< WeakTermHole _) = False
 
 toWeakTermPiElimSeq :: WeakTerm -> (WeakTerm, [(Identifier, [WeakTerm])])
 toWeakTermPiElimSeq (m :< WeakTermPiElim _ e es) = do
@@ -396,4 +399,8 @@ isValue (_ :< WeakTermPi {})           = True
 isValue (_ :< WeakTermPiIntro {})      = True
 isValue (_ :< WeakTermSigma {})        = True
 isValue (_ :< WeakTermSigmaIntro _ es) = all isValue es
+isValue (_ :< WeakTermTau {})          = True
+isValue (_ :< WeakTermTauIntro _ e)    = isValue e
+isValue (_ :< WeakTermTheta _)         = True
+isValue (_ :< WeakTermThetaIntro e)    = isValue e
 isValue _                              = False
