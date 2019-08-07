@@ -13,13 +13,15 @@ import           Data.Basic
 
 type IdentifierPlus = (Identifier, WeakTerm)
 
-type LevelDiff = Int
+type LevelDiff = WeakLevel
 
 type Hole = (Identifier, LevelDiff)
 
 data WeakLevel
   = WeakLevelInt Int
   | WeakLevelInfinity
+  | WeakLevelAdd WeakLevel
+                 WeakLevel
   | WeakLevelHole Hole
   deriving (Show, Eq)
 
@@ -259,9 +261,13 @@ substWeakLevel _ (m :< WeakTermHole h) = m :< WeakTermHole h
 substWeakLevel' :: SubstWeakLevel -> WeakLevel -> WeakLevel
 substWeakLevel' _ (WeakLevelInt i) = WeakLevelInt i
 substWeakLevel' _ WeakLevelInfinity = WeakLevelInfinity
+substWeakLevel' sub (WeakLevelAdd l1 l2) = do
+  let l1' = substWeakLevel' sub l1
+  let l2' = substWeakLevel' sub l2
+  WeakLevelAdd l1' l2'
 substWeakLevel' sub (WeakLevelHole (h, i)) =
   case lookup h sub of
-    Just l  -> shiftWeakLevel i l -- (?M^{+i}){?M := l} ~> l + i
+    Just l  -> WeakLevelAdd i l -- (?M^{+i}){?M := l} ~> l + i
     Nothing -> WeakLevelHole (h, i)
 
 substWeakLevelBindings :: SubstWeakLevel -> [IdentifierPlus] -> [IdentifierPlus]
@@ -283,7 +289,7 @@ substWeakLevelBindingsWithBody sub ((x, t):xts) e = do
   ((x, substWeakLevel sub t) : xts', e')
 
 -- compute A^{+i}
-shiftWeakTerm :: Int -> WeakTerm -> WeakTerm
+shiftWeakTerm :: WeakLevel -> WeakTerm -> WeakTerm
 shiftWeakTerm _ (m :< WeakTermUniv i) = m :< WeakTermUniv i
 shiftWeakTerm _ (m :< WeakTermUpsilon x) = m :< WeakTermUpsilon x
 shiftWeakTerm _ (m :< WeakTermEpsilon x) = m :< WeakTermEpsilon x
@@ -296,59 +302,56 @@ shiftWeakTerm k (m :< WeakTermEpsilonElim (x, t) e branchList) = do
   m :< WeakTermEpsilonElim (x, t') e' (zip caseList es')
 shiftWeakTerm k (m :< WeakTermPi i xts) = do
   let xts' = shiftWeakTermBindings k xts
-  m :< WeakTermPi (shiftWeakLevel k i) xts'
+  m :< WeakTermPi (WeakLevelAdd k i) xts'
 shiftWeakTerm k (m :< WeakTermPiIntro i xts body) = do
   let (xts', body') = shiftWeakTermBindingsWithBody k xts body
-  m :< WeakTermPiIntro (shiftWeakLevel k i) xts' body'
+  m :< WeakTermPiIntro (WeakLevelAdd k i) xts' body'
 shiftWeakTerm k (m :< WeakTermPiElim i e es) = do
   let e' = shiftWeakTerm k e
   let es' = map (shiftWeakTerm k) es
-  m :< WeakTermPiElim (shiftWeakLevel k i) e' es'
+  m :< WeakTermPiElim (WeakLevelAdd k i) e' es'
 shiftWeakTerm k (m :< WeakTermSigma i xts) = do
   let xts' = shiftWeakTermBindings k xts
-  m :< WeakTermSigma (shiftWeakLevel k i) xts'
+  m :< WeakTermSigma (WeakLevelAdd k i) xts'
 shiftWeakTerm k (m :< WeakTermSigmaIntro i es) = do
   let es' = map (shiftWeakTerm k) es
-  m :< WeakTermSigmaIntro (shiftWeakLevel k i) es'
+  m :< WeakTermSigmaIntro (WeakLevelAdd k i) es'
 shiftWeakTerm k (m :< WeakTermSigmaElim i xts e1 e2) = do
   let e1' = shiftWeakTerm k e1
   let (xts', e2') = shiftWeakTermBindingsWithBody k xts e2
-  m :< WeakTermSigmaElim (shiftWeakLevel k i) xts' e1' e2'
+  m :< WeakTermSigmaElim (WeakLevelAdd k i) xts' e1' e2'
 shiftWeakTerm k (m :< WeakTermTau i t) =
-  m :< WeakTermTau (shiftWeakLevel k i) (shiftWeakTerm k t)
+  m :< WeakTermTau (WeakLevelAdd k i) (shiftWeakTerm k t)
 shiftWeakTerm k (m :< WeakTermTauIntro i e) =
-  m :< WeakTermTauIntro (shiftWeakLevel k i) (shiftWeakTerm k e)
+  m :< WeakTermTauIntro (WeakLevelAdd k i) (shiftWeakTerm k e)
 shiftWeakTerm k (m :< WeakTermTauElim i e) =
-  m :< WeakTermTauElim (shiftWeakLevel k i) (shiftWeakTerm k e)
+  m :< WeakTermTauElim (WeakLevelAdd k i) (shiftWeakTerm k e)
 shiftWeakTerm k (m :< WeakTermTheta t) = m :< WeakTermTheta (shiftWeakTerm k t)
 shiftWeakTerm k (m :< WeakTermThetaIntro e) =
   m :< WeakTermThetaIntro (shiftWeakTerm k e)
 shiftWeakTerm k (m :< WeakTermThetaElim e i) =
-  m :< WeakTermThetaElim e (shiftWeakLevel k i)
+  m :< WeakTermThetaElim e (WeakLevelAdd k i)
 shiftWeakTerm k (m :< WeakTermMu (x, t) e) = do
   let t' = shiftWeakTerm k t
   let e' = shiftWeakTerm k e
   m :< WeakTermMu (x, t') e'
 shiftWeakTerm _ (m :< WeakTermConst t) = m :< WeakTermConst t
-shiftWeakTerm k (m :< WeakTermHole (s, i)) = m :< WeakTermHole (s, i + k)
+shiftWeakTerm k (m :< WeakTermHole (s, i)) = do
+  let newLevel = WeakLevelAdd k i
+  m :< WeakTermHole (s, newLevel)
 
-shiftWeakTermBindings :: Int -> [IdentifierPlus] -> [IdentifierPlus]
+shiftWeakTermBindings :: WeakLevel -> [IdentifierPlus] -> [IdentifierPlus]
 shiftWeakTermBindings _ [] = []
 shiftWeakTermBindings i ((x, t):xts) = do
   let xts' = shiftWeakTermBindings i xts
   (x, shiftWeakTerm i t) : xts'
 
 shiftWeakTermBindingsWithBody ::
-     Int -> [IdentifierPlus] -> WeakTerm -> ([IdentifierPlus], WeakTerm)
+     WeakLevel -> [IdentifierPlus] -> WeakTerm -> ([IdentifierPlus], WeakTerm)
 shiftWeakTermBindingsWithBody i [] e = ([], shiftWeakTerm i e)
 shiftWeakTermBindingsWithBody i ((x, t):xts) e = do
   let (xts', e') = shiftWeakTermBindingsWithBody i xts e
   ((x, shiftWeakTerm i t) : xts', e')
-
-shiftWeakLevel :: Int -> WeakLevel -> WeakLevel
-shiftWeakLevel k (WeakLevelInt i)       = WeakLevelInt (i + k)
-shiftWeakLevel _ WeakLevelInfinity      = WeakLevelInfinity
-shiftWeakLevel k (WeakLevelHole (h, i)) = WeakLevelHole (h, i + k)
 
 isReducible :: WeakTerm -> Bool
 isReducible (_ :< WeakTermUniv _) = False

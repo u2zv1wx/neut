@@ -254,14 +254,14 @@ newHole :: WithEnv WeakTerm
 newHole = do
   h <- newNameWith "hole"
   m <- newNameWith "meta"
-  return $ m :< WeakTermHole (h, 0)
+  return $ m :< WeakTermHole (h, WeakLevelInt 0)
 
 newHoleOfType :: WeakTerm -> WithEnv WeakTerm
 newHoleOfType t = do
   h <- newNameWith "hole"
   m <- newNameWith "meta"
   insTypeEnv m t
-  return $ m :< WeakTermHole (h, 0)
+  return $ m :< WeakTermHole (h, WeakLevelInt 0)
 
 obtainOrigin :: WithEnv Identifier
 obtainOrigin = do
