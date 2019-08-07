@@ -90,27 +90,27 @@ simp ((e1, e2):cs) = do
       cs' <- simp cs
       return $ Enriched (e1, e2) [m] (ConstraintImmediate m e2) : cs'
     (_, Just (StuckHole _, _)) -> simp $ (e2, e1) : cs
-    (Just (StuckPiElimStrict m1 exs1, _), _)
+    (Just (StuckPiElimStrict i m1 exs1, _), _)
       | (es1, xs1) <- unzip exs1
       , isSolvable e2 (fst m1) xs1 -> do
         cs' <- simp cs
-        return $ Enriched (e1, e2) [m1] (ConstraintPattern m1 es1 e2) : cs'
-    (_, Just (StuckPiElimStrict m2 exs2, _))
+        return $ Enriched (e1, e2) [m1] (ConstraintPattern i m1 es1 e2) : cs'
+    (_, Just (StuckPiElimStrict _ m2 exs2, _))
       | isSolvable e1 (fst m2) (map snd exs2) -> simp $ (e2, e1) : cs
-    (Just (StuckPiElimStrict m1 exs1, _), _) -> do
+    (Just (StuckPiElimStrict i m1 exs1, _), _) -> do
       cs' <- simp cs
       return $
-        Enriched (e1, e2) [m1] (ConstraintQuasiPattern m1 (map fst exs1) e2) :
+        Enriched (e1, e2) [m1] (ConstraintQuasiPattern i m1 (map fst exs1) e2) :
         cs'
     (_, Just (StuckPiElimStrict {}, _)) -> simp $ (e2, e1) : cs
-    (Just (StuckPiElim m1 es1, _), Nothing) -> do
+    (Just (StuckPiElim i m1 es1, _), Nothing) -> do
       cs' <- simp cs
-      let c = Enriched (e1, e2) [m1] $ ConstraintFlexRigid m1 es1 e2
+      let c = Enriched (e1, e2) [m1] $ ConstraintFlexRigid i m1 es1 e2
       return $ c : cs'
     (Nothing, Just (StuckPiElim {}, _)) -> simp $ (e2, e1) : cs
-    (Just (StuckPiElim m1 es1, _), _) -> do
+    (Just (StuckPiElim i m1 es1, _), _) -> do
       cs' <- simp cs
-      let c = Enriched (e1, e2) [m1] $ ConstraintFlexFlex m1 es1 e2
+      let c = Enriched (e1, e2) [m1] $ ConstraintFlexFlex i m1 es1 e2
       return $ c : cs'
     (_, Just (StuckPiElim {}, _)) -> simp $ (e2, e1) : cs
     (Just (StuckOther, m1), _) -> do
@@ -120,6 +120,7 @@ simp ((e1, e2):cs) = do
     (_, Just (StuckOther, _)) -> simp $ (e2, e1) : cs
     _ -> throwError $ "cannot simplify:\n" ++ Pr.ppShow (e1, e2)
 
+-- FIXME: ここのsimpは実際には結構まとまった量の処理になる
 simpLevel :: WeakLevel -> WeakLevel -> WithEnv ()
 simpLevel (WeakLevelInt i1) (WeakLevelInt i2)
   | i1 == i2 = return ()
@@ -145,18 +146,20 @@ simpPiOrSigma xts1 xts2 cs = do
 
 data Stuck
   = StuckHole Hole
-  | StuckPiElim Hole
+  | StuckPiElim WeakLevel
+                Hole
                 [WeakTerm]
-  | StuckPiElimStrict Hole
+  | StuckPiElimStrict WeakLevel
+                      Hole
                       [(WeakTerm, Identifier)]
   | StuckOther
 
 asStuckedTerm :: WeakTerm -> Maybe (Stuck, Hole)
 asStuckedTerm (_ :< WeakTermHole m) = Just (StuckHole m, m)
-asStuckedTerm (_ :< WeakTermPiElim _ (_ :< WeakTermHole x) es) =
+asStuckedTerm (_ :< WeakTermPiElim i (_ :< WeakTermHole x) es) =
   case mapM interpretAsUpsilon es of
-    Nothing -> Just (StuckPiElim x es, x)
-    Just xs -> Just (StuckPiElimStrict x (zip es xs), x)
+    Nothing -> Just (StuckPiElim i x es, x)
+    Just xs -> Just (StuckPiElimStrict i x (zip es xs), x)
 asStuckedTerm (_ :< WeakTermEpsilonElim _ e _)
   | Just m <- obtainStuckReason e = Just (StuckOther, m)
 asStuckedTerm _ = Nothing

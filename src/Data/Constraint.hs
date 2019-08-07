@@ -7,16 +7,20 @@ type PreConstraint = (WeakTerm, WeakTerm)
 data Constraint
   = ConstraintImmediate Hole
                         WeakTerm
-  | ConstraintPattern Hole
+  | ConstraintPattern WeakLevel
+                      Hole
                       [WeakTerm]
                       WeakTerm
-  | ConstraintQuasiPattern Hole
+  | ConstraintQuasiPattern WeakLevel
+                           Hole
                            [WeakTerm]
                            WeakTerm
-  | ConstraintFlexRigid Hole
+  | ConstraintFlexRigid WeakLevel
+                        Hole
                         [WeakTerm]
                         WeakTerm
-  | ConstraintFlexFlex Hole
+  | ConstraintFlexFlex WeakLevel
+                       Hole
                        [WeakTerm]
                        WeakTerm
   | ConstraintOther

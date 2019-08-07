@@ -23,23 +23,20 @@ synthesize q = do
     Just (Enriched (e1, e2) ms _)
       | Just (m, e) <- lookupAny ms sub -> resolveStuck q e1 e2 m e
     Just (Enriched _ _ (ConstraintImmediate m e)) -> resolveHole q m e
-    Just (Enriched _ _ (ConstraintPattern m es e)) -> resolvePiElim q m es e
-    Just (Enriched _ _ (ConstraintQuasiPattern m es e)) ->
-      resolvePiElim q m es e
-    Just (Enriched _ _ (ConstraintFlexRigid m es e)) -> resolvePiElim q m es e
-    Just (Enriched _ _ (ConstraintFlexFlex m es e)) -> resolvePiElim q m es e
+    Just (Enriched _ _ (ConstraintPattern i m es e)) -> resolvePiElim q i m es e
+    Just (Enriched _ _ (ConstraintQuasiPattern i m es e)) ->
+      resolvePiElim q i m es e
+    Just (Enriched _ _ (ConstraintFlexRigid i m es e)) ->
+      resolvePiElim q i m es e
+    Just (Enriched _ _ (ConstraintFlexFlex i m es e)) ->
+      resolvePiElim q i m es e
     Just _ -> throwError "cannot synthesize(synth)"
 
 resolveStuck ::
-     ConstraintQueue
-  -> WeakTerm
-  -> WeakTerm
-  -> Identifier
-  -> WeakTerm
-  -> WithEnv ()
-resolveStuck q e1 e2 m e = do
-  let e1' = substWeakTerm [(m, e)] e1
-  let e2' = substWeakTerm [(m, e)] e2
+     ConstraintQueue -> WeakTerm -> WeakTerm -> Hole -> WeakTerm -> WithEnv ()
+resolveStuck q e1 e2 (h, i) e = do
+  let e1' = substWeakTerm [(h, shiftWeakTerm i e)] e1
+  let e2' = substWeakTerm [(h, shiftWeakTerm i e)] e2
   cs <- simp [(e1', e2')]
   synthesize $ Q.deleteMin q `Q.union` Q.fromList cs
 
@@ -55,18 +52,25 @@ resolveStuck q e1 e2 m e = do
 -- this function replaces all the arguments that are not variable by
 -- fresh variables, and try to resolve the new quasi-pattern ?M @ x @ x @ z @ y == e.
 resolvePiElim ::
-     ConstraintQueue -> Identifier -> [WeakTerm] -> WeakTerm -> WithEnv ()
-resolvePiElim q m es e = do
+     ConstraintQueue
+  -> WeakLevel
+  -> Hole
+  -> [WeakTerm]
+  -> WeakTerm
+  -> WithEnv ()
+resolvePiElim q i m es e = do
   xs <- toVarList es
   xss <- toAltList xs
-  lamList <- mapM (`bindFormalArgs` e) xss
+  lamList <- mapM (bindFormalArgs i e) xss
   chain q $ flip map lamList $ \lam -> resolveHole q m lam
 
-resolveHole :: ConstraintQueue -> Identifier -> WeakTerm -> WithEnv ()
-resolveHole q m e = do
-  modify (\env -> env {substEnv = compose [(m, e)] (substEnv env)})
+-- ?M^{+k} = e ~~> ?M = e^{-k}
+resolveHole :: ConstraintQueue -> Hole -> WeakTerm -> WithEnv ()
+resolveHole q (h, i) e = do
+  let e' = shiftWeakTerm (WeakLevelNegate i) e
+  modify (\env -> env {substEnv = compose [(h, e')] (substEnv env)})
   let rest = Q.deleteMin q
-  let (q1, q2) = Q.partition (\(Enriched _ ms _) -> m `elem` ms) rest
+  let (q1, q2) = Q.partition (\(Enriched _ ms _) -> h `elem` map fst ms) rest
   synthesize q1
   synthesize q2
 
@@ -135,9 +139,15 @@ chain :: ConstraintQueue -> [WithEnv a] -> WithEnv a
 chain _ []     = throwError "cannot synthesize(chain)"
 chain c (e:es) = e `catchError` const (chain c es)
 
-lookupAny :: [Identifier] -> [(Identifier, a)] -> Maybe (Identifier, a)
+lookupAny :: [Hole] -> [(Identifier, a)] -> Maybe (Hole, a)
 lookupAny [] _ = Nothing
-lookupAny (k:ks) sub =
-  case lookup k sub of
-    Just v  -> Just (k, v)
+lookupAny ((h, i):ks) sub =
+  case lookup h sub of
+    Just v  -> Just ((h, i), v)
     Nothing -> lookupAny ks sub
+
+bindFormalArgs :: WeakLevel -> WeakTerm -> [Identifier] -> WithEnv WeakTerm
+bindFormalArgs i e xs = do
+  ts <- mapM (const newHole) xs
+  meta <- newNameWith "meta"
+  return $ meta :< WeakTermPiIntro i (zip xs ts) e

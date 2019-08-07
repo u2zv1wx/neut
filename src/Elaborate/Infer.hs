@@ -41,6 +41,7 @@ infer _ (meta :< WeakTermUniv i) = do
     WeakLevelInt _    -> return ()
     WeakLevelHole _   -> return () -- TODO: add a constaint: "h < ∞"
     WeakLevelAdd _ _  -> return () -- TODO: add constraints: "l1 < ∞, l2 < ∞"
+    WeakLevelNegate _ -> return () -- TODO: add a constaint: "l < ∞"
     WeakLevelInfinity -> throwError "Univ{∞} cannot be used as a term"
   u <- newUnivAt WeakLevelInfinity
   returnMeta meta u

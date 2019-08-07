@@ -22,6 +22,7 @@ data WeakLevel
   | WeakLevelInfinity
   | WeakLevelAdd WeakLevel
                  WeakLevel
+  | WeakLevelNegate WeakLevel
   | WeakLevelHole Hole
   deriving (Show, Eq)
 
@@ -265,6 +266,8 @@ substWeakLevel' sub (WeakLevelAdd l1 l2) = do
   let l1' = substWeakLevel' sub l1
   let l2' = substWeakLevel' sub l2
   WeakLevelAdd l1' l2'
+substWeakLevel' sub (WeakLevelNegate l) =
+  WeakLevelNegate $ substWeakLevel' sub l
 substWeakLevel' sub (WeakLevelHole (h, i)) =
   case lookup h sub of
     Just l  -> WeakLevelAdd i l -- (?M^{+i}){?M := l} ~> l + i
