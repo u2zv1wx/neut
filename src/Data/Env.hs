@@ -22,25 +22,25 @@ import qualified Data.PQueue.Min            as Q
 type ConstraintQueue = Q.MinQueue EnrichedConstraint
 
 data Env = Env
-  { count             :: Int -- to generate fresh symbols
-  , notationEnv       :: [(Tree, Tree)] -- macro transformers
-  , reservedEnv       :: [Identifier] -- list of reserved keywords
-  , constantEnv       :: [Identifier]
-  , moduleEnv         :: [Identifier] -- "foo.bar" ~ ["foo", "bar"]
-  , prefixEnv         :: [Identifier]
-  , indexEnv          :: [(Identifier, [Identifier])]
-  , nameEnv           :: [(Identifier, Identifier)] -- [("foo.bar.buz", "foo.bar.buz.13"), ...]
-  , typeEnv           :: Map.Map Identifier WeakTerm
-  , constraintEnv     :: [PreConstraint] -- for type inference
-  , constraintQueue   :: ConstraintQueue -- for (dependent) type inference
-  , substEnv          :: SubstWeakTerm -- for (dependent) type inference
-  , levelEnv          :: [(Identifier, WeakLevel)]
-  , univConstraintEnv :: [(UnivLevel, UnivLevel)]
-  , currentDir        :: FilePath
-  , termEnv           :: [(Identifier, ([Identifier], Term))] -- x == lam (x1, ..., xn). e
-  , polEnv            :: [(Identifier, ([Identifier], Neg))] -- x == v || x == thunk (lam (x) e)
-  , llvmEnv           :: [(Identifier, ([Identifier], LLVM))]
-  , origin            :: Maybe Identifier
+  { count              :: Int -- to generate fresh symbols
+  , notationEnv        :: [(Tree, Tree)] -- macro transformers
+  , reservedEnv        :: [Identifier] -- list of reserved keywords
+  , constantEnv        :: [Identifier]
+  , moduleEnv          :: [Identifier] -- "foo.bar" ~ ["foo", "bar"]
+  , prefixEnv          :: [Identifier]
+  , indexEnv           :: [(Identifier, [Identifier])]
+  , nameEnv            :: [(Identifier, Identifier)] -- [("foo.bar.buz", "foo.bar.buz.13"), ...]
+  , typeEnv            :: Map.Map Identifier WeakTerm
+  , constraintEnv      :: [PreConstraint] -- for type inference
+  , constraintQueue    :: ConstraintQueue -- for (dependent) type inference
+  , substEnv           :: SubstWeakTerm -- for (dependent) type inference
+  , levelEnv           :: [(Identifier, WeakLevel)]
+  , levelConstraintEnv :: [(WeakLevel, WeakLevel)]
+  , currentDir         :: FilePath
+  , termEnv            :: [(Identifier, ([Identifier], Term))] -- x == lam (x1, ..., xn). e
+  , polEnv             :: [(Identifier, ([Identifier], Neg))] -- x == v || x == thunk (lam (x) e)
+  , llvmEnv            :: [(Identifier, ([Identifier], LLVM))]
+  , origin             :: Maybe Identifier
   }
 
 initialEnv :: FilePath -> Env
@@ -62,12 +62,17 @@ initialEnv path =
     , constraintQueue = Q.empty
     , substEnv = []
     , levelEnv = []
-    , univConstraintEnv = []
+    , levelConstraintEnv = []
     , currentDir = path
     , origin = Nothing
     }
 
 type WithEnv a = StateT Env (ExceptT String IO) a
+
+liftToWithEnv :: (IO a -> IO b) -> WithEnv a -> WithEnv b
+liftToWithEnv f e = do
+  e' <- e
+  liftIO $ f (return e')
 
 runWithEnv :: WithEnv a -> Env -> IO (Either String (a, Env))
 runWithEnv c env = runExceptT (runStateT c env)
@@ -230,9 +235,9 @@ insConstraintEnv :: WeakTerm -> WeakTerm -> WithEnv ()
 insConstraintEnv t1 t2 =
   modify (\e -> e {constraintEnv = (t1, t2) : constraintEnv e})
 
-insUnivConstraintEnv :: UnivLevel -> UnivLevel -> WithEnv ()
-insUnivConstraintEnv t1 t2 =
-  modify (\e -> e {univConstraintEnv = (t1, t2) : univConstraintEnv e})
+insLevelConstraintEnv :: WeakLevel -> WeakLevel -> WithEnv ()
+insLevelConstraintEnv t1 t2 =
+  modify (\e -> e {levelConstraintEnv = (t1, t2) : levelConstraintEnv e})
 
 wrap :: f (Cofree f Identifier) -> WithEnv (Cofree f Identifier)
 wrap a = do
@@ -249,14 +254,14 @@ newHole :: WithEnv WeakTerm
 newHole = do
   h <- newNameWith "hole"
   m <- newNameWith "meta"
-  return $ m :< WeakTermHole h
+  return $ m :< WeakTermHole (h, 0)
 
 newHoleOfType :: WeakTerm -> WithEnv WeakTerm
 newHoleOfType t = do
   h <- newNameWith "hole"
   m <- newNameWith "meta"
   insTypeEnv m t
-  return $ m :< WeakTermHole h
+  return $ m :< WeakTermHole (h, 0)
 
 obtainOrigin :: WithEnv Identifier
 obtainOrigin = do

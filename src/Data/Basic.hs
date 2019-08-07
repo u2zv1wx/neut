@@ -42,11 +42,6 @@ data Arith
   | ArithDiv
   deriving (Show)
 
-data UnivLevel
-  = UnivLevelHole Identifier
-  | UnivLevelNext UnivLevel
-  deriving (Show, Eq)
-
 intLowTypeList :: [LowType]
 intLowTypeList = signedIntLowTypeList ++ unsignedIntLowTypeList
 
