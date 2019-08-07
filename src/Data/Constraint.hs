@@ -1,23 +1,22 @@
 module Data.Constraint where
 
-import           Data.Basic
 import           Data.WeakTerm
 
 type PreConstraint = (WeakTerm, WeakTerm)
 
 data Constraint
-  = ConstraintImmediate Identifier
+  = ConstraintImmediate Hole
                         WeakTerm
-  | ConstraintPattern Identifier
+  | ConstraintPattern Hole
                       [WeakTerm]
                       WeakTerm
-  | ConstraintQuasiPattern Identifier
+  | ConstraintQuasiPattern Hole
                            [WeakTerm]
                            WeakTerm
-  | ConstraintFlexRigid Identifier
+  | ConstraintFlexRigid Hole
                         [WeakTerm]
                         WeakTerm
-  | ConstraintFlexFlex Identifier
+  | ConstraintFlexFlex Hole
                        [WeakTerm]
                        WeakTerm
   | ConstraintOther
@@ -38,7 +37,7 @@ instance Ord Constraint where
 
 data EnrichedConstraint =
   Enriched PreConstraint
-           [Identifier] -- list of metavariables that cause stuck
+           [Hole] -- list of metavariables that cause stuck
            Constraint
 
 instance Eq EnrichedConstraint where
