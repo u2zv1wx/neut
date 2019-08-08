@@ -11,12 +11,14 @@ import qualified Data.Map.Strict            as Map
 import           Text.Read                  (readMaybe)
 
 import           Data.Basic
+import           Data.Constraint
 import           Data.Env
 import           Data.Term
 import           Data.WeakTerm
 import           Elaborate.Analyze
 import           Elaborate.Infer
 import           Elaborate.Synthesize
+import           Reduce.Term
 import           Reduce.WeakTerm
 
 -- Given a term `e` and its name `main`, this function
@@ -35,12 +37,14 @@ elaborate e = do
   gets constraintEnv >>= analyze
   gets constraintQueue >>= synthesize
   -- update the type environment by resulting substitution
+  lenv <- gets levelEnv
   sub <- gets substEnv
   tenv <- gets typeEnv
-  let tenv' = Map.map (substWeakTerm sub) tenv
+  let tenv' = Map.map (substWeakLevel lenv . substWeakTerm sub) tenv
   modify (\env -> env {typeEnv = tenv'})
   -- use the resulting substitution to elaborate `e`.
   let e' = substWeakTerm sub e
+  checkLevelSanity -- check if all the level constraints are satisfied
   exhaust e' >>= elaborate' 0 >>= setupTopLevel
 
 -- This function translates a well-typed term into an untyped term in a
@@ -231,3 +235,73 @@ asLowType x
   , Just i <- readMaybe (tail x)
   , i `elem` [16, 32, 64] = LowTypeFloat i
 asLowType _ = LowTypeSignedInt 64 -- sortals are represented as int
+
+checkLevelSanity :: WithEnv ()
+checkLevelSanity = do
+  cs <- gets levelConstraintEnv
+  checkLevelSanity' cs
+
+checkLevelSanity' :: [LevelConstraint] -> WithEnv ()
+checkLevelSanity' [] = return ()
+checkLevelSanity' (LevelConstraintEQ l1 l2:cs) =
+  checkLevelSanity'' (==) l1 l2 cs
+checkLevelSanity' (LevelConstraintLE l1 l2:cs) =
+  checkLevelSanity'' (<=) l1 l2 cs
+checkLevelSanity' (LevelConstraintLEType l1 t:cs) = do
+  l2 <- obtainLevel t
+  checkLevelSanity'' (<=) l1 l2 cs
+checkLevelSanity' (LevelConstraintFinite l:cs) = do
+  l' <- elaborateLevel l
+  case l' of
+    LevelInfinity -> throwError "levelconstraintfinite"
+    _             -> checkLevelSanity' cs
+checkLevelSanity' (LevelConstraintInfiniteType t:cs) = do
+  l <- obtainLevel t >>= elaborateLevel
+  case l of
+    LevelInfinity -> checkLevelSanity' cs
+    _             -> throwError "levelconstraintinfinitetype"
+
+checkLevelSanity'' ::
+     (Int -> Int -> Bool)
+  -> WeakLevel
+  -> WeakLevel
+  -> [LevelConstraint]
+  -> WithEnv ()
+checkLevelSanity'' f l1 l2 cs = do
+  l1' <- elaborateLevel l1
+  l2' <- elaborateLevel l2
+  case (l1', l2') of
+    (LevelInfinity, LevelInfinity) -> checkLevelSanity' cs
+    (LevelInt e1, LevelInt e2) -> do
+      e1' <- reduceTerm e1
+      e2' <- reduceTerm e2
+      case (e1', e2') of
+        (TermEpsilonIntro (LiteralInteger i1) _, TermEpsilonIntro (LiteralInteger i2) _)
+          | f i1 i2 -> checkLevelSanity' cs
+        _ -> throwError "levelconstrainteq"
+    _ -> throwError "levelconstrainteq"
+
+obtainLevel :: WeakTerm -> WithEnv WeakLevel
+obtainLevel t = do
+  sub <- gets substEnv
+  reduceWeakTerm (substWeakTerm sub t) >>= obtainLevel'
+
+obtainLevel' :: WeakTerm -> WithEnv WeakLevel
+obtainLevel' t =
+  case t of
+    _ :< WeakTermUniv l -> do
+      l' <- elaborateLevel l
+      case l' of
+        LevelInfinity -> throwError "obtainLevel.LevelInfinity"
+        _             -> return WeakLevelInfinity
+    _ :< WeakTermUpsilon x -> do
+      u <- lookupTypeEnv' x
+      case u of
+        _ :< WeakTermUniv l -> return l
+        _ -> throwError $ "obtainLevel.WeakTermUpsilon, x = " ++ x
+    _ :< WeakTermEpsilon _ -> return WeakLevelInfinity
+    _ :< WeakTermPi l _ -> return l
+    _ :< WeakTermSigma l _ -> return l
+    _ :< WeakTermTau _ t' -> obtainLevel t'
+    _ :< WeakTermTheta _ -> return WeakLevelInfinity
+    _ -> throwError "obtainLevel"

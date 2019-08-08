@@ -240,11 +240,10 @@ insLevelConstraintEnvEQ l1 l2 = do
   let c = LevelConstraintEQ l1 l2
   modify (\e -> e {levelConstraintEnv = c : levelConstraintEnv e})
 
-insLevelConstraintEnvEQType :: WeakTerm -> WeakLevel -> WithEnv ()
-insLevelConstraintEnvEQType t l = do
-  let c = LevelConstraintEQType t l
-  modify (\e -> e {levelConstraintEnv = c : levelConstraintEnv e})
-
+-- insLevelConstraintEnvEQType :: WeakLevel -> WeakTerm -> WithEnv ()
+-- insLevelConstraintEnvEQType l t = do
+--   let c = LevelConstraintEQType l t
+--   modify (\e -> e {levelConstraintEnv = c : levelConstraintEnv e})
 insLevelConstraintEnvLE :: WeakLevel -> WeakLevel -> WithEnv ()
 insLevelConstraintEnvLE l1 l2 = do
   let c = LevelConstraintLE l1 l2

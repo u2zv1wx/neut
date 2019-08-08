@@ -75,7 +75,10 @@ reduceWeakTerm (m :< WeakTermThetaElim e i) = do
   e' <- reduceWeakTerm e
   case e' of
     _ :< WeakTermThetaIntro e'' -> reduceWeakTerm $ shiftWeakTerm i e''
-    _                           -> return $ m :< WeakTermThetaElim e' i
+    self@(_ :< WeakTermMu (x, _) body) -> do
+      let self' = substWeakTerm [(x, self)] body
+      reduceWeakTerm (m :< WeakTermThetaElim self' i)
+    _ -> return $ m :< WeakTermThetaElim e' i
 reduceWeakTerm t = return t
 
 reduceWeakLevel :: WeakLevel -> WithEnv WeakLevel

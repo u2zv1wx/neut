@@ -49,9 +49,6 @@ instance Ord EnrichedConstraint where
 data LevelConstraint
   = LevelConstraintEQ WeakLevel
                       WeakLevel
-  -- The level of the type WEAKTERM equals to WEAKLEVEL
-  | LevelConstraintEQType WeakTerm
-                          WeakLevel
   | LevelConstraintLE WeakLevel
                       WeakLevel
   | LevelConstraintLEType WeakLevel
