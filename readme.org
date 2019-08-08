@@ -19,28 +19,18 @@ l    ::= x
        | <int>
        | <float>
 
--- level
-i    ::= <int>
-       | infinity
-
 -- term
-e, A ::= (universe i)
+e, A ::= universe
        | (upsilon x)
        | (epsilon x)
        | (epsilon-intro l)
        | (epsilon-elim x e (c1 e1) ... (cn en))
-       | (pi i ((x1 A1) ... (xn An)) A)
-       | (pi-intro i ((x1 A1) ... (xn An)) e)
-       | (pi-elim i e e1 ... en)
-       | (sigma i ((x1 A1) ... (xn An)) e)
-       | (sigma-intro i e1 ... en)
-       | (sigma-elim i ((x1 A1) ... (xn An)) e1 e2)
-       | (tau i A)
-       | (tau-intro i e)
-       | (tau-elim i e)
-       | (theta A)
-       | (theta-intro e)
-       | (theta-elim e i)
+       | (pi ((x1 A1) ... (xn An)) A)
+       | (pi-intro ((x1 A1) ... (xn An)) e)
+       | (pi-elim e e1 ... en)
+       | (sigma ((x1 A1) ... (xn An)) e)
+       | (sigma-intro e1 ... en)
+       | (sigma-elim ((x1 A1) ... (xn An)) e1 e2)
        | (mu (x A) e)
 
 -- case
