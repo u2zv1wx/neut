@@ -27,7 +27,7 @@ reduceWeakTerm (m :< WeakTermPiElim i e es) = do
     _ :< WeakTermPiIntro j xts body
       | length xts == length es'
       , all isValue es' -> do
-        insLevelConstraintEnv i j
+        insLevelConstraintEnvEQ i j
         let xs = map fst xts
         reduceWeakTerm $ substWeakTerm (zip xs es') body
     self@(_ :< WeakTermMu (x, _) body) -> do
@@ -59,7 +59,7 @@ reduceWeakTerm (m :< WeakTermSigmaElim i xts e1 e2) = do
   case e1' of
     _ :< WeakTermSigmaIntro j es
       | length es == length xts -> do
-        insLevelConstraintEnv i j
+        insLevelConstraintEnvEQ i j
         let xs = map fst xts
         reduceWeakTerm $ substWeakTerm (zip xs es) e2
     _ -> return $ m :< WeakTermSigmaElim i xts e1' e2
@@ -67,7 +67,7 @@ reduceWeakTerm (m :< WeakTermTauElim i e) = do
   e' <- reduceWeakTerm e
   case e' of
     _ :< WeakTermTauIntro j e'' -> do
-      insLevelConstraintEnv i j
+      insLevelConstraintEnvEQ i j
       reduceWeakTerm e''
     _ -> return $ m :< WeakTermTauElim i e'
 reduceWeakTerm (m :< WeakTermThetaElim e i) = do

@@ -108,7 +108,6 @@ elaborate' i (meta :< WeakTermMu (x, t) e) =
         substTerm [(x, TermConstElim x (map TermUpsilon fvs))] e'
       return $ TermConstElim x (map TermUpsilon fvs)
     _ -> lift $ throwE "CBV recursion is allowed only for Pi-types"
-elaborate' i (_ :< WeakTermIota e _) = elaborate' i e
 elaborate' i (_ :< WeakTermHole x) = do
   sub <- gets substEnv
   case lookup x sub of
@@ -146,7 +145,6 @@ exhaust' (_ :< WeakTermTheta t) = exhaust' t
 exhaust' (_ :< WeakTermThetaIntro e) = exhaust' e
 exhaust' (_ :< WeakTermThetaElim e) = exhaust' e
 exhaust' (_ :< WeakTermMu _ e) = exhaust' e
-exhaust' (_ :< WeakTermIota e _) = exhaust' e
 exhaust' (_ :< WeakTermConst _) = return True
 exhaust' (_ :< WeakTermHole _) = return False
 

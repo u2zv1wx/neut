@@ -54,12 +54,15 @@ instance Ord EnrichedConstraint where
 data LevelConstraint
   = LevelConstraintEQ WeakLevel
                       WeakLevel
-  -- The level of the type obtained from IDENTIFIER is WEAKLEVEL
-  | LevelConstraintEQMeta Identifier
+  -- The level of the type WEAKTERM equals to WEAKLEVEL
+  | LevelConstraintEQType WeakTerm
                           WeakLevel
   | LevelConstraintLE WeakLevel
                       WeakLevel
+  | LevelConstraintLEType WeakLevel
+                          WeakTerm
   | LevelConstraintFinite WeakLevel
+  | LevelConstraintInfiniteType WeakTerm
   deriving (Show)
 
 compose :: SubstWeakTerm -> SubstWeakTerm -> SubstWeakTerm

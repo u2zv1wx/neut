@@ -240,9 +240,9 @@ insLevelConstraintEnvEQ l1 l2 = do
   let c = LevelConstraintEQ l1 l2
   modify (\e -> e {levelConstraintEnv = c : levelConstraintEnv e})
 
-insLevelConstraintEnvEQMeta :: Identifier -> WeakLevel -> WithEnv ()
-insLevelConstraintEnvEQMeta m l = do
-  let c = LevelConstraintEQMeta m l
+insLevelConstraintEnvEQType :: WeakTerm -> WeakLevel -> WithEnv ()
+insLevelConstraintEnvEQType t l = do
+  let c = LevelConstraintEQType t l
   modify (\e -> e {levelConstraintEnv = c : levelConstraintEnv e})
 
 insLevelConstraintEnvLE :: WeakLevel -> WeakLevel -> WithEnv ()
@@ -250,9 +250,19 @@ insLevelConstraintEnvLE l1 l2 = do
   let c = LevelConstraintLE l1 l2
   modify (\e -> e {levelConstraintEnv = c : levelConstraintEnv e})
 
+insLevelConstraintEnvLEType :: WeakLevel -> WeakTerm -> WithEnv ()
+insLevelConstraintEnvLEType l t = do
+  let c = LevelConstraintLEType l t
+  modify (\e -> e {levelConstraintEnv = c : levelConstraintEnv e})
+
 insLevelConstraintEnvFinite :: WeakLevel -> WithEnv ()
 insLevelConstraintEnvFinite l = do
   let c = LevelConstraintFinite l
+  modify (\e -> e {levelConstraintEnv = c : levelConstraintEnv e})
+
+insLevelConstraintEnvInfiniteType :: WeakTerm -> WithEnv ()
+insLevelConstraintEnvInfiniteType t = do
+  let c = LevelConstraintInfiniteType t
   modify (\e -> e {levelConstraintEnv = c : levelConstraintEnv e})
 
 wrap :: f (Cofree f Identifier) -> WithEnv (Cofree f Identifier)
