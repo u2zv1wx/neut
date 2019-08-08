@@ -41,7 +41,7 @@ elaborate e = do
   modify (\env -> env {typeEnv = tenv'})
   -- use the resulting substitution to elaborate `e`.
   let e' = substWeakTerm sub e
-  exhaust e' >>= elaborate' 0
+  exhaust e' >>= elaborate' 0 >>= setupTopLevel
 
 -- This function translates a well-typed term into an untyped term in a
 -- reduction-preserving way. Here, we translate types into units (nullary product).
@@ -67,7 +67,7 @@ elaborate' _ (_ :< WeakTermConst x) = return $ TermConst x
 elaborate' _ (_ :< WeakTermPi _ _) = return zero
 elaborate' i (_ :< WeakTermPiIntro j xts e) = do
   e' <- elaborate' i e
-  j' <- elaborateLevel j
+  j' <- elaborateLevel j >>= withOffset
   return $ TermPiIntro j' (map fst xts) e'
 elaborate' i (_ :< WeakTermPiElim _ e es) = do
   e' <- elaborate' i e
@@ -76,7 +76,7 @@ elaborate' i (_ :< WeakTermPiElim _ e es) = do
 elaborate' _ (_ :< WeakTermSigma _ _) = return zero
 elaborate' i (_ :< WeakTermSigmaIntro j es) = do
   es' <- mapM (elaborate' i) es
-  j' <- elaborateLevel j
+  j' <- elaborateLevel j >>= withOffset
   return $ TermSigmaIntro j' es'
 elaborate' i (_ :< WeakTermSigmaElim _ xts e1 e2) = do
   e1' <- elaborate' i e1
@@ -150,6 +150,19 @@ elaborateLevel (WeakLevelHole x) = do
   case lookup x lenv of
     Just i  -> elaborateLevel i
     Nothing -> throwError $ "Unresolved level hole: " ++ x
+
+withOffset :: Level -> WithEnv Level
+withOffset (LevelInt e) = do
+  o <- obtainOrigin
+  return $ LevelInt $ TermConstElim "core.i64.add" [TermUpsilon o, e]
+withOffset LevelInfinity = return LevelInfinity
+
+-- e ~> (lam ORIGIN. e) @ 0
+setupTopLevel :: Term -> WithEnv Term
+setupTopLevel e = do
+  o <- obtainOrigin
+  let z = TermEpsilonIntro (LiteralInteger 0) (LowTypeSignedInt 64)
+  return $ TermPiElim (TermPiIntro LevelInfinity [o] e) [z]
 
 exhaust' :: WeakTerm -> WithEnv Bool
 exhaust' (_ :< WeakTermUniv _) = return True
