@@ -172,7 +172,7 @@ inferPiOrSigma i ctx j meta xts = do
 newHoleLevel :: WithEnv WeakLevel
 newHoleLevel = do
   h <- newNameWith "hole"
-  return $ WeakLevelHole (h, WeakLevelInt 0)
+  return $ WeakLevelHole h
 
 -- In a context (x1 : A1, ..., xn : An), this function creates metavariables
 --   ?M  : Pi (x1 : A1, ..., xn : An). ?Mt @ (x1, ..., xn)
@@ -268,7 +268,7 @@ returnMeta meta t = do
 newUniv :: WithEnv WeakTerm
 newUniv = do
   l <- newName
-  newUnivAt (WeakLevelHole (l, WeakLevelInt 0))
+  newUnivAt $ WeakLevelHole l
 
 newUnivAt :: WeakLevel -> WithEnv WeakTerm
 newUnivAt l = do

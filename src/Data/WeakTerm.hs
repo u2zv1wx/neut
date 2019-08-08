@@ -23,7 +23,7 @@ data WeakLevel
   | WeakLevelAdd WeakLevel
                  WeakLevel
   | WeakLevelNegate WeakLevel
-  | WeakLevelHole Hole
+  | WeakLevelHole Identifier
   deriving (Show, Eq)
 
 data WeakTermF a
@@ -77,7 +77,7 @@ type SubstWeakTerm = [(Identifier, WeakTerm)]
 varWeakTerm :: WeakTerm -> [Identifier]
 varWeakTerm e = fst $ varAndHole e
 
-varAndHole :: WeakTerm -> ([Identifier], [Hole])
+varAndHole :: WeakTerm -> ([Identifier], [Identifier])
 varAndHole (_ :< WeakTermUniv _) = ([], [])
 varAndHole (_ :< WeakTermUpsilon x) = ([x], [])
 varAndHole (_ :< WeakTermEpsilon _) = ([], [])
@@ -114,16 +114,17 @@ varAndHole (_ :< WeakTermThetaElim e i) =
   pairwiseConcat [varAndHole e, varAndHoleLevel i]
 varAndHole (_ :< WeakTermMu ut e) = varAndHoleBindings [ut] [e]
 varAndHole (_ :< WeakTermConst _) = ([], [])
-varAndHole (_ :< WeakTermHole h) = ([], [h])
+varAndHole (_ :< WeakTermHole (h, _)) = ([], [h])
 
-varAndHoleBindings :: [IdentifierPlus] -> [WeakTerm] -> ([Identifier], [Hole])
+varAndHoleBindings ::
+     [IdentifierPlus] -> [WeakTerm] -> ([Identifier], [Identifier])
 varAndHoleBindings [] es = pairwiseConcat $ map varAndHole es
 varAndHoleBindings ((x, t):xts) es = do
   let (xs1, hs1) = varAndHole t
   let (xs2, hs2) = varAndHoleBindings xts es
   (xs1 ++ filter (/= x) xs2, hs1 ++ hs2)
 
-varAndHoleLevel :: WeakLevel -> ([Identifier], [Hole])
+varAndHoleLevel :: WeakLevel -> ([Identifier], [Identifier])
 varAndHoleLevel (WeakLevelHole h) = ([], [h])
 varAndHoleLevel _                 = ([], [])
 
@@ -268,10 +269,8 @@ substWeakLevel' sub (WeakLevelAdd l1 l2) = do
   WeakLevelAdd l1' l2'
 substWeakLevel' sub (WeakLevelNegate l) =
   WeakLevelNegate $ substWeakLevel' sub l
-substWeakLevel' sub (WeakLevelHole (h, i)) =
-  case lookup h sub of
-    Just l  -> WeakLevelAdd i l -- (?M^{+i}){?M := l} ~> l + i
-    Nothing -> WeakLevelHole (h, i)
+substWeakLevel' sub (WeakLevelHole h) =
+  fromMaybe (WeakLevelHole h) (lookup h sub)
 
 substWeakLevelBindings :: SubstWeakLevel -> [IdentifierPlus] -> [IdentifierPlus]
 substWeakLevelBindings _ [] = []

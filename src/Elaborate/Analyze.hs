@@ -137,9 +137,8 @@ simpLevel l1 l2 = do
           "LevelError: cannot simplify: " ++ show l1 ++ " with " ++ show l2
 
 simpLevel' :: StuckLevel -> WeakLevel -> WithEnv ()
-simpLevel' (StuckLevelHole (h, i)) l = do
-  let l' = WeakLevelAdd l (WeakLevelNegate i)
-  modify (\env -> env {levelEnv = composeWeakLevel [(h, l')] (levelEnv env)})
+simpLevel' (StuckLevelHole h) l =
+  modify (\env -> env {levelEnv = composeWeakLevel [(h, l)] (levelEnv env)})
 simpLevel' (StuckLevelAdd s l1) l2 =
   simpLevel' s (WeakLevelAdd l2 (WeakLevelNegate l1))
 simpLevel' (StuckLevelNegate s) l = simpLevel' s (WeakLevelNegate l)
@@ -186,7 +185,7 @@ obtainStuckReason (_ :< WeakTermHole x)             = Just x
 obtainStuckReason _                                 = Nothing
 
 data StuckLevel
-  = StuckLevelHole Hole
+  = StuckLevelHole Identifier
   | StuckLevelAdd StuckLevel
                   WeakLevel
   | StuckLevelNegate StuckLevel
@@ -208,7 +207,7 @@ asStuckedLevel (WeakLevelHole h) = Just $ StuckLevelHole h
 isSolvable :: WeakTerm -> Identifier -> [Identifier] -> Bool
 isSolvable e x xs = do
   let (fvs, fmvs) = varAndHole e
-  affineCheck xs fvs && x `notElem` map fst fmvs
+  affineCheck xs fvs && x `notElem` fmvs
 
 toVar' :: Identifier -> WithEnv WeakTerm
 toVar' x = do

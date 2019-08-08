@@ -94,7 +94,7 @@ interpret (m :< TreeAtom "_") = do
 --
 interpret (m :< TreeAtom "universe") = do
   name <- newNameWith "univ"
-  return $ m :< WeakTermUniv (WeakLevelHole (name, WeakLevelInt 0))
+  return $ m :< WeakTermUniv (WeakLevelHole name)
 interpret (m :< TreeNode ((_ :< TreeAtom "arrow"):(_ :< TreeAtom i):ts)) = do
   i' <- interpretWeakLevel i
   ts' <- mapM interpret ts
@@ -166,7 +166,7 @@ interpretWeakLevel x
 interpretWeakLevel "infinity" = return WeakLevelInfinity
 interpretWeakLevel "_" = do
   h <- newNameWith "hole"
-  return $ WeakLevelHole (h, WeakLevelInt 0)
+  return $ WeakLevelHole h
 interpretWeakLevel s =
   lift $ throwE $ "interpretWeakLevel: syntax error:\n" ++ s
 
