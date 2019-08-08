@@ -3,6 +3,7 @@ module Elaborate
   ) where
 
 import           Control.Comonad.Cofree
+import           Control.Monad.Except
 import           Control.Monad.State
 import           Control.Monad.Trans.Except
 import           Data.List                  (nub)
@@ -29,7 +30,7 @@ import           Reduce.WeakTerm
 -- https://arxiv.org/abs/1505.04324, 2015.
 elaborate :: WeakTerm -> WithEnv Term
 elaborate e = do
-  _ <- infer [] e
+  _ <- infer 0 [] e
   -- Kantian type-inference ;)
   gets constraintEnv >>= analyze
   gets constraintQueue >>= synthesize
@@ -51,7 +52,8 @@ elaborate' _ (_ :< WeakTermUpsilon x) = return $ TermUpsilon x
 elaborate' _ (_ :< WeakTermEpsilon _) = return zero
 elaborate' _ (meta :< WeakTermEpsilonIntro x) = do
   t <- lookupTypeEnv' meta
-  case reduceWeakTerm t of
+  t' <- reduceWeakTerm t
+  case t' of
     _ :< WeakTermEpsilon i -> return $ TermEpsilonIntro x (asLowType i)
     _                      -> lift $ throwE "epsilon"
 elaborate' i (_ :< WeakTermEpsilonElim (x, _) e branchList) = do
@@ -62,56 +64,60 @@ elaborate' i (_ :< WeakTermEpsilonElim (x, _) e branchList) = do
       return (l, body')
   return $ TermEpsilonElim x e' branchList'
 elaborate' _ (_ :< WeakTermConst x) = return $ TermConst x
-elaborate' _ (_ :< WeakTermPi _) = return zero
-elaborate' i (m :< WeakTermPiIntro xts e) = do
+elaborate' _ (_ :< WeakTermPi _ _) = return zero
+elaborate' i (_ :< WeakTermPiIntro j xts e) = do
   e' <- elaborate' i e
-  l <- obtainLevel m
-  return $ TermPiIntro l (map fst xts) e'
-elaborate' i (_ :< WeakTermPiElim e es) = do
+  j' <- elaborateLevel j
+  return $ TermPiIntro j' (map fst xts) e'
+elaborate' i (_ :< WeakTermPiElim _ e es) = do
   e' <- elaborate' i e
   es' <- mapM (elaborate' i) es
   return $ TermPiElim e' es'
-elaborate' _ (_ :< WeakTermSigma _) = return zero
-elaborate' i (m :< WeakTermSigmaIntro es) = do
+elaborate' _ (_ :< WeakTermSigma _ _) = return zero
+elaborate' i (_ :< WeakTermSigmaIntro j es) = do
   es' <- mapM (elaborate' i) es
-  l <- obtainLevel m
-  return $ TermSigmaIntro l es'
-elaborate' i (_ :< WeakTermSigmaElim xts e1 e2) = do
+  j' <- elaborateLevel j
+  return $ TermSigmaIntro j' es'
+elaborate' i (_ :< WeakTermSigmaElim _ xts e1 e2) = do
   e1' <- elaborate' i e1
   e2' <- elaborate' i e2
   return $ TermSigmaElim (map fst xts) e1' e2'
-elaborate' _ (_ :< WeakTermTau _) = return zero
-elaborate' i (_ :< WeakTermTauIntro e) = do
+elaborate' _ (_ :< WeakTermTau _ _) = return zero
+elaborate' i (_ :< WeakTermTauIntro _ e) = do
   e' <- elaborate' (i + 1) e
   return $ TermTauIntro e'
-elaborate' i (_ :< WeakTermTauElim e) = do
+elaborate' i (_ :< WeakTermTauElim _ e) = do
   e' <- elaborate' (i - 1) e
   return $ TermTauElim e'
 elaborate' _ (_ :< WeakTermTheta _) = return zero
 elaborate' i (_ :< WeakTermThetaIntro e) = do
-  l <- withOffset i
   o <- obtainOrigin
   e' <- elaborate' i e
-  l' <- withOffset' $ -i
-  return $
-    TermPiIntro LevelInfinity [o] (TermPiElim (TermPiIntro l [o] e') [l'])
-elaborate' i (_ :< WeakTermThetaElim e) = do
-  l <- withOffset' i
-  e' <- elaborate' i e
-  return $ TermPiElim e' [l]
-elaborate' i (meta :< WeakTermMu (x, t) e) =
-  case reduceWeakTerm t of
-    _ :< WeakTermPi _ -> do
+  return $ TermPiIntro LevelInfinity [o] e'
+elaborate' i (_ :< WeakTermThetaElim e j) = do
+  j' <- elaborateLevel j
+  case j' of
+    LevelInfinity -> throwError "theta-elim with infinity"
+    LevelInt k -> do
+      o <- obtainOrigin
+      let l = TermConstElim "core.i64.add" [TermUpsilon o, k]
       e' <- elaborate' i e
-      let fvs = varWeakTerm $ meta :< WeakTermMu (x, t) e
-      insTermEnv x fvs $
-        substTerm [(x, TermConstElim x (map TermUpsilon fvs))] e'
-      return $ TermConstElim x (map TermUpsilon fvs)
-    _ -> lift $ throwE "CBV recursion is allowed only for Pi-types"
-elaborate' i (_ :< WeakTermHole x) = do
+      return $ TermPiElim e' [l]
+elaborate' i (meta :< WeakTermMu (x, t) e) = do
+  t' <- reduceWeakTerm t
+  let fvs = varWeakTerm $ meta :< WeakTermMu (x, t) e
+  e' <- elaborate' i e
+  let fvs' = map TermUpsilon fvs
+  insTermEnv x fvs $ substTerm [(x, TermConstElim x fvs')] e'
+  case t' of
+    _ :< WeakTermPi _ _ -> return $ TermConstElim x fvs'
+    _ :< WeakTermTheta _ -> return $ TermConstElim x fvs'
+    _ ->
+      lift $ throwE "CBV recursion is allowed only for Pi-types and Theta-types"
+elaborate' i (_ :< WeakTermHole (x, j)) = do
   sub <- gets substEnv
   case lookup x sub of
-    Just e  -> elaborate' i e
+    Just e  -> elaborate' i $ shiftWeakTerm j e
     Nothing -> lift $ throwE $ "elaborate' i: remaining hole: " ++ x
 
 exhaust :: WeakTerm -> WithEnv WeakTerm
@@ -121,6 +127,30 @@ exhaust e = do
     then return e
     else lift $ throwE "non-exhaustive pattern"
 
+elaborateLevel :: WeakLevel -> WithEnv Level
+elaborateLevel (WeakLevelInt i) =
+  return $ LevelInt (TermEpsilonIntro (LiteralInteger i) (LowTypeSignedInt 64))
+elaborateLevel WeakLevelInfinity = return LevelInfinity
+elaborateLevel (WeakLevelAdd i1 i2) = do
+  i1' <- elaborateLevel i1
+  i2' <- elaborateLevel i2
+  case (i1', i2') of
+    (LevelInt j1, LevelInt j2) ->
+      return $ LevelInt $ TermConstElim "core.i64.add" [j1, j2]
+    _ -> return LevelInfinity
+elaborateLevel (WeakLevelNegate i) = do
+  i' <- elaborateLevel i
+  case i' of
+    LevelInt j -> do
+      let z = TermEpsilonIntro (LiteralInteger 0) (LowTypeSignedInt 64)
+      return $ LevelInt $ TermConstElim "core.i64.sub" [z, j]
+    _ -> throwError "Negating infinity"
+elaborateLevel (WeakLevelHole x) = do
+  lenv <- gets levelEnv
+  case lookup x lenv of
+    Just i  -> elaborateLevel i
+    Nothing -> throwError $ "Unresolved level hole: " ++ x
+
 exhaust' :: WeakTerm -> WithEnv Bool
 exhaust' (_ :< WeakTermUniv _) = return True
 exhaust' (_ :< WeakTermUpsilon _) = return True
@@ -129,21 +159,22 @@ exhaust' (_ :< WeakTermEpsilonIntro _) = return True
 exhaust' (_ :< WeakTermEpsilonElim (_, t) e1 branchList) = do
   b1 <- exhaust' e1
   let labelList = map fst branchList
-  case reduceWeakTerm t of
+  t' <- reduceWeakTerm t
+  case t' of
     _ :< WeakTermEpsilon x -> exhaustEpsilonIdentifier x labelList b1
     _                      -> lift $ throwE "type error (exhaust)"
-exhaust' (_ :< WeakTermPi xts) = allM exhaust' $ map snd xts
-exhaust' (_ :< WeakTermPiIntro _ e) = exhaust' e
-exhaust' (_ :< WeakTermPiElim e es) = allM exhaust' $ e : es
-exhaust' (_ :< WeakTermSigma xts) = allM exhaust' $ map snd xts
-exhaust' (_ :< WeakTermSigmaIntro es) = allM exhaust' es
-exhaust' (_ :< WeakTermSigmaElim _ e1 e2) = allM exhaust' [e1, e2]
-exhaust' (_ :< WeakTermTau t) = exhaust' t
-exhaust' (_ :< WeakTermTauIntro e) = exhaust' e
-exhaust' (_ :< WeakTermTauElim e) = exhaust' e
+exhaust' (_ :< WeakTermPi _ xts) = allM exhaust' $ map snd xts
+exhaust' (_ :< WeakTermPiIntro _ _ e) = exhaust' e
+exhaust' (_ :< WeakTermPiElim _ e es) = allM exhaust' $ e : es
+exhaust' (_ :< WeakTermSigma _ xts) = allM exhaust' $ map snd xts
+exhaust' (_ :< WeakTermSigmaIntro _ es) = allM exhaust' es
+exhaust' (_ :< WeakTermSigmaElim _ _ e1 e2) = allM exhaust' [e1, e2]
+exhaust' (_ :< WeakTermTau _ t) = exhaust' t
+exhaust' (_ :< WeakTermTauIntro _ e) = exhaust' e
+exhaust' (_ :< WeakTermTauElim _ e) = exhaust' e
 exhaust' (_ :< WeakTermTheta t) = exhaust' t
 exhaust' (_ :< WeakTermThetaIntro e) = exhaust' e
-exhaust' (_ :< WeakTermThetaElim e) = exhaust' e
+exhaust' (_ :< WeakTermThetaElim e _) = exhaust' e
 exhaust' (_ :< WeakTermMu _ e) = exhaust' e
 exhaust' (_ :< WeakTermConst _) = return True
 exhaust' (_ :< WeakTermHole _) = return False
@@ -167,32 +198,6 @@ allM p (x:xs) = do
 
 zero :: Term
 zero = TermEpsilonIntro (LiteralInteger 0) $ LowTypeSignedInt 64
-
-obtainLevel :: Identifier -> WithEnv Level
-obtainLevel m = do
-  typeMeta :< _ <- lookupTypeEnv' m
-  u <- lookupTypeEnv' typeMeta
-  case reduceWeakTerm u of
-    _ :< WeakTermUniv wl -> obtainLevel' wl
-    _                    -> lift $ throwE "obtainLevel"
-
-obtainLevel' :: WeakLevel -> WithEnv Level
-obtainLevel' (WeakLevelInt i) = withOffset i
-obtainLevel' WeakLevelInfinity = return LevelInfinity
-obtainLevel' (WeakLevelHole h) = do
-  lenv <- gets levelEnv
-  case lookup h lenv of
-    Just l  -> obtainLevel' l
-    Nothing -> lift $ throwE "obtainLevel'"
-
-withOffset :: Int -> WithEnv Level
-withOffset i = LevelInt <$> withOffset' i
-
-withOffset' :: Int -> WithEnv Term
-withOffset' i = do
-  o <- obtainOrigin
-  let l = TermEpsilonIntro (LiteralInteger i) (LowTypeSignedInt 64)
-  return $ TermConstElim "core.i64.add" [TermUpsilon o, l]
 
 asLowType :: Identifier -> LowType
 asLowType x
