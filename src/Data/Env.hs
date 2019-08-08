@@ -35,7 +35,7 @@ data Env = Env
   , constraintQueue    :: ConstraintQueue -- for (dependent) type inference
   , substEnv           :: SubstWeakTerm -- for (dependent) type inference
   , levelEnv           :: [(Identifier, WeakLevel)]
-  , levelConstraintEnv :: [(WeakLevel, WeakLevel)]
+  , levelConstraintEnv :: [LevelConstraint]
   , currentDir         :: FilePath
   , termEnv            :: [(Identifier, ([Identifier], Term))] -- x == lam (x1, ..., xn). e
   , polEnv             :: [(Identifier, ([Identifier], Neg))] -- x == v || x == thunk (lam (x) e)
@@ -235,9 +235,25 @@ insConstraintEnv :: WeakTerm -> WeakTerm -> WithEnv ()
 insConstraintEnv t1 t2 =
   modify (\e -> e {constraintEnv = (t1, t2) : constraintEnv e})
 
-insLevelConstraintEnv :: WeakLevel -> WeakLevel -> WithEnv ()
-insLevelConstraintEnv t1 t2 =
-  modify (\e -> e {levelConstraintEnv = (t1, t2) : levelConstraintEnv e})
+insLevelConstraintEnvEQ :: WeakLevel -> WeakLevel -> WithEnv ()
+insLevelConstraintEnvEQ l1 l2 = do
+  let c = LevelConstraintEQ l1 l2
+  modify (\e -> e {levelConstraintEnv = c : levelConstraintEnv e})
+
+insLevelConstraintEnvEQMeta :: Identifier -> WeakLevel -> WithEnv ()
+insLevelConstraintEnvEQMeta m l = do
+  let c = LevelConstraintEQMeta m l
+  modify (\e -> e {levelConstraintEnv = c : levelConstraintEnv e})
+
+insLevelConstraintEnvLE :: WeakLevel -> WeakLevel -> WithEnv ()
+insLevelConstraintEnvLE l1 l2 = do
+  let c = LevelConstraintLE l1 l2
+  modify (\e -> e {levelConstraintEnv = c : levelConstraintEnv e})
+
+insLevelConstraintEnvFinite :: WeakLevel -> WithEnv ()
+insLevelConstraintEnvFinite l = do
+  let c = LevelConstraintFinite l
+  modify (\e -> e {levelConstraintEnv = c : levelConstraintEnv e})
 
 wrap :: f (Cofree f Identifier) -> WithEnv (Cofree f Identifier)
 wrap a = do

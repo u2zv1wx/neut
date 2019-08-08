@@ -1,5 +1,6 @@
 module Data.Constraint where
 
+import           Data.Basic
 import           Data.WeakTerm
 
 type PreConstraint = (WeakTerm, WeakTerm)
@@ -49,6 +50,17 @@ instance Eq EnrichedConstraint where
 
 instance Ord EnrichedConstraint where
   compare (Enriched _ _ c1) (Enriched _ _ c2) = compare c1 c2
+
+data LevelConstraint
+  = LevelConstraintEQ WeakLevel
+                      WeakLevel
+  -- The level of the type obtained from IDENTIFIER is WEAKLEVEL
+  | LevelConstraintEQMeta Identifier
+                          WeakLevel
+  | LevelConstraintLE WeakLevel
+                      WeakLevel
+  | LevelConstraintFinite WeakLevel
+  deriving (Show)
 
 compose :: SubstWeakTerm -> SubstWeakTerm -> SubstWeakTerm
 compose s1 s2 = do
