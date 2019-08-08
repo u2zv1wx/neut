@@ -120,17 +120,29 @@ simp ((e1, e2):cs) = do
     (_, Just (StuckOther, _)) -> simp $ (e2, e1) : cs
     _ -> throwError $ "cannot simplify:\n" ++ Pr.ppShow (e1, e2)
 
--- FIXME: ここのsimpは実際には結構まとまった量の処理になる
 simpLevel :: WeakLevel -> WeakLevel -> WithEnv ()
-simpLevel (WeakLevelInt i1) (WeakLevelInt i2)
-  | i1 == i2 = return ()
-simpLevel WeakLevelInfinity WeakLevelInfinity = return ()
-simpLevel (WeakLevelHole (h, i)) l = do
-  let l' = WeakLevelAdd l i
+simpLevel l1 l2 = do
+  l1' <- reduceWeakLevel l1
+  l2' <- reduceWeakLevel l2
+  case (l1', l2') of
+    (WeakLevelInt i1, WeakLevelInt i2)
+      | i1 == i2 -> return ()
+    (WeakLevelInfinity, WeakLevelInfinity) -> return ()
+    _ ->
+      case (asStuckedLevel l1', asStuckedLevel l2') of
+        (Just s, _) -> simpLevel' s l2
+        (_, Just s) -> simpLevel' s l1
+        _ ->
+          throwError $
+          "LevelError: cannot simplify: " ++ show l1 ++ " with " ++ show l2
+
+simpLevel' :: StuckLevel -> WeakLevel -> WithEnv ()
+simpLevel' (StuckLevelHole (h, i)) l = do
+  let l' = WeakLevelAdd l (WeakLevelNegate i)
   modify (\env -> env {levelEnv = composeWeakLevel [(h, l')] (levelEnv env)})
-simpLevel l (WeakLevelHole h) = simpLevel (WeakLevelHole h) l
-simpLevel l1 l2 =
-  throwError $ "LevelError: cannot simplify: " ++ show l1 ++ " with " ++ show l2
+simpLevel' (StuckLevelAdd s l1) l2 =
+  simpLevel' s (WeakLevelAdd l2 (WeakLevelNegate l1))
+simpLevel' (StuckLevelNegate s) l = simpLevel' s (WeakLevelNegate l)
 
 simpPiOrSigma ::
      [(Identifier, WeakTerm)]
@@ -172,6 +184,26 @@ obtainStuckReason (_ :< WeakTermTauElim _ e)        = obtainStuckReason e
 obtainStuckReason (_ :< WeakTermThetaElim e _)      = obtainStuckReason e
 obtainStuckReason (_ :< WeakTermHole x)             = Just x
 obtainStuckReason _                                 = Nothing
+
+data StuckLevel
+  = StuckLevelHole Hole
+  | StuckLevelAdd StuckLevel
+                  WeakLevel
+  | StuckLevelNegate StuckLevel
+
+asStuckedLevel :: WeakLevel -> Maybe StuckLevel
+asStuckedLevel (WeakLevelInt _) = Nothing
+asStuckedLevel WeakLevelInfinity = Nothing
+asStuckedLevel (WeakLevelAdd l1 l2) =
+  case (asStuckedLevel l1, asStuckedLevel l2) of
+    (Just s, _) -> Just $ StuckLevelAdd s l2
+    (_, Just s) -> Just $ StuckLevelAdd s l1
+    _           -> Nothing
+asStuckedLevel (WeakLevelNegate l) =
+  case asStuckedLevel l of
+    Just s  -> Just $ StuckLevelNegate s
+    Nothing -> Nothing
+asStuckedLevel (WeakLevelHole h) = Just $ StuckLevelHole h
 
 isSolvable :: WeakTerm -> Identifier -> [Identifier] -> Bool
 isSolvable e x xs = do

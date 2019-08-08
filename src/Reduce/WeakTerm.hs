@@ -1,5 +1,6 @@
 module Reduce.WeakTerm
   ( reduceWeakTerm
+  , reduceWeakLevel
   ) where
 
 import           Control.Comonad.Cofree
@@ -76,3 +77,19 @@ reduceWeakTerm (m :< WeakTermThetaElim e i) = do
     _ :< WeakTermThetaIntro e'' -> reduceWeakTerm $ shiftWeakTerm i e''
     _                           -> return $ m :< WeakTermThetaElim e' i
 reduceWeakTerm t = return t
+
+reduceWeakLevel :: WeakLevel -> WithEnv WeakLevel
+reduceWeakLevel (WeakLevelAdd l1 l2) = do
+  l1' <- reduceWeakLevel l1
+  l2' <- reduceWeakLevel l2
+  case (l1', l2') of
+    (WeakLevelInt i, WeakLevelInt j)    -> return $ WeakLevelInt $ i + j
+    (WeakLevelInfinity, WeakLevelInt _) -> return WeakLevelInfinity
+    (WeakLevelInt _, WeakLevelInfinity) -> return WeakLevelInfinity
+    _                                   -> return $ WeakLevelAdd l1' l2'
+reduceWeakLevel (WeakLevelNegate l) = do
+  l' <- reduceWeakLevel l
+  case l' of
+    WeakLevelInt i -> return $ WeakLevelInt $ -i
+    _              -> return $ WeakLevelNegate l'
+reduceWeakLevel l = return l
