@@ -140,6 +140,9 @@ infer i ctx (meta :< WeakTermThetaElim e j) = do
   metaTheta <- newNameWith "theta"
   insConstraintEnv t (metaTheta :< WeakTermTheta h)
   insLevelConstraintEnvFinite j
+  -- add a constraint `i <= A + j`, which is equivalent to `k <= A` where `k := i - j`.
+  let k = WeakLevelAdd (WeakLevelInt i) (WeakLevelNegate j)
+  insLevelConstraintEnvLEType k h
   returnMeta meta $ shiftWeakTerm j h
 infer i ctx (meta :< WeakTermMu (x, t) e) = do
   insTypeEnv x t
