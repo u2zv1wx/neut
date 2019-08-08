@@ -86,38 +86,41 @@ simp ((e1, e2):cs) = do
   let ms1 = asStuckedTerm e1
   let ms2 = asStuckedTerm e2
   case (ms1, ms2) of
-    (Just (StuckHole m, _), _) -> do
+    (Just (StuckHole m), _) -> do
       cs' <- simp cs
       return $ Enriched (e1, e2) [m] (ConstraintImmediate m e2) : cs'
-    (_, Just (StuckHole _, _)) -> simp $ (e2, e1) : cs
-    (Just (StuckPiElimStrict i m1 exs1, _), _)
-      | (es1, xs1) <- unzip exs1
-      , isSolvable e2 (fst m1) xs1 -> do
+    (_, Just (StuckHole _)) -> simp $ (e2, e1) : cs
+    (Just (StuckPiElimStrict m1 iexs1), _)
+      | (is1, exs1) <- unzip iexs1
+      , all (isSolvable e2 (fst m1)) (map (map snd) exs1) -> do
         cs' <- simp cs
-        return $ Enriched (e1, e2) [m1] (ConstraintPattern i m1 es1 e2) : cs'
-    (_, Just (StuckPiElimStrict _ m2 exs2, _))
-      | isSolvable e1 (fst m2) (map snd exs2) -> simp $ (e2, e1) : cs
-    (Just (StuckPiElimStrict i m1 exs1, _), _) -> do
+        let ies1 = zip is1 (map (map fst) exs1)
+        return $ Enriched (e1, e2) [m1] (ConstraintPattern m1 ies1 e2) : cs'
+    (_, Just (StuckPiElimStrict m2 iexs2))
+      | (_, exs2) <- unzip iexs2
+      , all (isSolvable e1 (fst m2)) (map (map snd) exs2) ->
+        simp $ (e2, e1) : cs
+    (Just (StuckPiElimStrict m1 iexs1), _) -> do
       cs' <- simp cs
-      return $
-        Enriched (e1, e2) [m1] (ConstraintQuasiPattern i m1 (map fst exs1) e2) :
-        cs'
-    (_, Just (StuckPiElimStrict {}, _)) -> simp $ (e2, e1) : cs
-    (Just (StuckPiElim i m1 es1, _), Nothing) -> do
+      let (is1, exs1) = unzip iexs1
+      let ies1 = zip is1 (map (map fst) exs1)
+      return $ Enriched (e1, e2) [m1] (ConstraintQuasiPattern m1 ies1 e2) : cs'
+    (_, Just StuckPiElimStrict {}) -> simp $ (e2, e1) : cs
+    (Just (StuckPiElim m1 ies1), Nothing) -> do
       cs' <- simp cs
-      let c = Enriched (e1, e2) [m1] $ ConstraintFlexRigid i m1 es1 e2
+      let c = Enriched (e1, e2) [m1] $ ConstraintFlexRigid m1 ies1 e2
       return $ c : cs'
-    (Nothing, Just (StuckPiElim {}, _)) -> simp $ (e2, e1) : cs
-    (Just (StuckPiElim i m1 es1, _), _) -> do
+    (Nothing, Just StuckPiElim {}) -> simp $ (e2, e1) : cs
+    (Just (StuckPiElim m1 ies1), _) -> do
       cs' <- simp cs
-      let c = Enriched (e1, e2) [m1] $ ConstraintFlexFlex i m1 es1 e2
+      let c = Enriched (e1, e2) [m1] $ ConstraintFlexFlex m1 ies1 e2
       return $ c : cs'
-    (_, Just (StuckPiElim {}, _)) -> simp $ (e2, e1) : cs
-    (Just (StuckOther, m1), _) -> do
+    (_, Just StuckPiElim {}) -> simp $ (e2, e1) : cs
+    (Just (StuckOther m1), _) -> do
       cs' <- simp cs
       let c = Enriched (e1, e2) [m1] ConstraintOther
       return $ c : cs'
-    (_, Just (StuckOther, _)) -> simp $ (e2, e1) : cs
+    (_, Just (StuckOther _)) -> simp $ (e2, e1) : cs
     _ -> throwError $ "cannot simplify:\n" ++ Pr.ppShow (e1, e2)
 
 simpLevel :: WeakLevel -> WeakLevel -> WithEnv ()
@@ -157,22 +160,35 @@ simpPiOrSigma xts1 xts2 cs = do
 
 data Stuck
   = StuckHole Hole
-  | StuckPiElim WeakLevel
-                Hole
-                [WeakTerm]
-  | StuckPiElimStrict WeakLevel
-                      Hole
-                      [(WeakTerm, Identifier)]
-  | StuckOther
+  | StuckPiElim Hole
+                [(WeakLevel, [WeakTerm])]
+  | StuckPiElimStrict Hole
+                      [(WeakLevel, [(WeakTerm, Identifier)])]
+  | StuckOther Hole
 
-asStuckedTerm :: WeakTerm -> Maybe (Stuck, Hole)
-asStuckedTerm (_ :< WeakTermHole m) = Just (StuckHole m, m)
-asStuckedTerm (_ :< WeakTermPiElim i (_ :< WeakTermHole x) es) =
-  case mapM interpretAsUpsilon es of
-    Nothing -> Just (StuckPiElim i x es, x)
-    Just xs -> Just (StuckPiElimStrict i x (zip es xs), x)
-asStuckedTerm (_ :< WeakTermEpsilonElim _ e _)
-  | Just m <- obtainStuckReason e = Just (StuckOther, m)
+asStuckedTerm :: WeakTerm -> Maybe Stuck
+asStuckedTerm (_ :< WeakTermPiElim i e es)
+  | Just xs <- mapM interpretAsUpsilon es =
+    case asStuckedTerm e of
+      Just (StuckHole m) -> Just $ StuckPiElimStrict m [(i, zip es xs)]
+      Just (StuckPiElim m iess) -> Just $ StuckPiElim m (iess ++ [(i, es)])
+      Just (StuckPiElimStrict m iexss) ->
+        Just $ StuckPiElimStrict m $ iexss ++ [(i, zip es xs)]
+      Just (StuckOther m) -> Just $ StuckOther m
+      Nothing -> Nothing
+asStuckedTerm (_ :< WeakTermPiElim i e es) =
+  case asStuckedTerm e of
+    Just (StuckHole m) -> Just $ StuckPiElim m [(i, es)]
+    Just (StuckPiElim m iess) -> Just $ StuckPiElim m $ iess ++ [(i, es)]
+    Just (StuckPiElimStrict m iexss) -> do
+      let (is, exss) = unzip iexss
+      let ess = map (map fst) exss
+      Just $ StuckPiElim m $ zip is ess ++ [(i, es)]
+    Just (StuckOther m) -> Just $ StuckOther m
+    Nothing -> Nothing
+asStuckedTerm (_ :< WeakTermHole m) = Just $ StuckHole m
+asStuckedTerm e
+  | Just m <- obtainStuckReason e = Just $ StuckOther m
 asStuckedTerm _ = Nothing
 
 obtainStuckReason :: WeakTerm -> Maybe Hole

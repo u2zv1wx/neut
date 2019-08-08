@@ -1,6 +1,5 @@
 module Data.Constraint where
 
-import           Data.Basic
 import           Data.WeakTerm
 
 type PreConstraint = (WeakTerm, WeakTerm)
@@ -8,21 +7,17 @@ type PreConstraint = (WeakTerm, WeakTerm)
 data Constraint
   = ConstraintImmediate Hole
                         WeakTerm
-  | ConstraintPattern WeakLevel
-                      Hole
-                      [WeakTerm]
+  | ConstraintPattern Hole
+                      [(WeakLevel, [WeakTerm])]
                       WeakTerm
-  | ConstraintQuasiPattern WeakLevel
-                           Hole
-                           [WeakTerm]
+  | ConstraintQuasiPattern Hole
+                           [(WeakLevel, [WeakTerm])]
                            WeakTerm
-  | ConstraintFlexRigid WeakLevel
-                        Hole
-                        [WeakTerm]
+  | ConstraintFlexRigid Hole
+                        [(WeakLevel, [WeakTerm])]
                         WeakTerm
-  | ConstraintFlexFlex WeakLevel
-                       Hole
-                       [WeakTerm]
+  | ConstraintFlexFlex Hole
+                       [(WeakLevel, [WeakTerm])]
                        WeakTerm
   | ConstraintOther
 
