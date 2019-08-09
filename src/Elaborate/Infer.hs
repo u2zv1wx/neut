@@ -14,8 +14,6 @@ import           Data.WeakTerm
 
 type Context = [(Identifier, WeakTerm)]
 
-type Level = Int
-
 -- Given a term and a context, return the type of the term, updating the
 -- constraint environment. This is more or less the same process in ordinary
 -- Hindley-Milner type inference algorithm. The difference is that, when we
@@ -37,13 +35,13 @@ type Level = Int
 -- Interested readers are referred to A. Abel and B. Pientka. "Higher-Order
 -- Dynamic Pattern Unification for Dependent Types and Records". Typed Lambda
 -- Calculi and Applications, 2011.
-infer :: Level -> Context -> WeakTerm -> WithEnv WeakTerm
-infer _ _ (meta :< WeakTermUniverse) = newUniv >>= returnMeta meta
-infer _ _ (meta :< WeakTermUpsilon x) = do
+infer :: Context -> WeakTerm -> WithEnv WeakTerm
+infer _ (meta :< WeakTermUniverse) = newUniv >>= returnMeta meta
+infer _ (meta :< WeakTermUpsilon x) = do
   t <- lookupTypeEnv' x
   returnMeta meta t
-infer _ _ (meta :< WeakTermEpsilon _) = newUniv >>= returnMeta meta
-infer _ _ (meta :< WeakTermEpsilonIntro l) = do
+infer _ (meta :< WeakTermEpsilon _) = newUniv >>= returnMeta meta
+infer _ (meta :< WeakTermEpsilonIntro l) = do
   mk <- lookupKind l
   epsilonMeta <- newNameWith "meta"
   case mk of
@@ -51,8 +49,8 @@ infer _ _ (meta :< WeakTermEpsilonIntro l) = do
     Nothing -> do
       h <- newHole
       returnMeta meta h
-infer i ctx (meta :< WeakTermEpsilonElim (x, t) e branchList) = do
-  te <- infer i ctx e
+infer ctx (meta :< WeakTermEpsilonElim (x, t) e branchList) = do
+  te <- infer ctx e
   insTypeEnv x t
   insConstraintEnv t te
   if null branchList
@@ -62,55 +60,54 @@ infer i ctx (meta :< WeakTermEpsilonElim (x, t) e branchList) = do
       tls <- mapM inferCase caseList
       let tls' = join $ map maybeToList tls
       constrainList $ te : tls'
-      ts <- mapM (infer i $ ctx ++ [(x, t)]) es
+      ts <- mapM (infer $ ctx ++ [(x, t)]) es
       constrainList ts
       returnMeta meta $ substWeakTerm [(x, e)] $ head ts
-infer i ctx (meta :< WeakTermPi xts) = inferPiOrSigma i ctx meta xts
-infer i ctx (meta :< WeakTermPiIntro xts e) = do
+infer ctx (meta :< WeakTermPi xts) = inferPiOrSigma ctx meta xts
+infer ctx (meta :< WeakTermPiIntro xts e) = do
   forM_ xts $ uncurry insTypeEnv
-  cod <- infer i (ctx ++ xts) e >>= withPlaceholder
+  cod <- infer (ctx ++ xts) e >>= withPlaceholder
   wrap (WeakTermPi (xts ++ [cod])) >>= returnMeta meta
-infer i ctx (meta :< WeakTermPiElim e es) = do
-  tPi <- infer i ctx e
-  binder <- inferList i ctx es
+infer ctx (meta :< WeakTermPiElim e es) = do
+  tPi <- infer ctx e
+  binder <- inferList ctx es
   cod <- newHoleInCtx (ctx ++ binder) >>= withPlaceholder
   metaPi <- newNameWith "meta"
   insConstraintEnv tPi (metaPi :< WeakTermPi (binder ++ [cod]))
   returnMeta meta $ substWeakTerm (zip (map fst binder) es) $ snd cod
-infer i ctx (meta :< WeakTermSigma xts) = inferPiOrSigma i ctx meta xts
-infer i ctx (meta :< WeakTermSigmaIntro es) = do
-  binder <- inferList i ctx es
+infer ctx (meta :< WeakTermSigma xts) = inferPiOrSigma ctx meta xts
+infer ctx (meta :< WeakTermSigmaIntro es) = do
+  binder <- inferList ctx es
   returnMeta meta $ meta :< WeakTermSigma binder
-infer i ctx (meta :< WeakTermSigmaElim xts e1 e2) = do
-  t1 <- infer i ctx e1
+infer ctx (meta :< WeakTermSigmaElim xts e1 e2) = do
+  t1 <- infer ctx e1
   forM_ xts $ uncurry insTypeEnv
   varSeq <- mapM (uncurry toVar1) xts
-  binder <- inferList i ctx varSeq
+  binder <- inferList ctx varSeq
   sigmaType <- wrap $ WeakTermSigma binder
   insConstraintEnv t1 sigmaType
   z <- newNameOfType t1
-  varTuple <- constructTuple i (ctx ++ binder) (map fst binder)
+  varTuple <- constructTuple (ctx ++ binder) (map fst binder)
   typeC <- newHoleInCtx (ctx ++ binder ++ [(z, t1)])
-  t2 <- infer i (ctx ++ binder) e2
+  t2 <- infer (ctx ++ binder) e2
   insConstraintEnv t2 (substWeakTerm [(z, varTuple)] typeC)
   returnMeta meta $ substWeakTerm [(z, e1)] typeC
-infer i ctx (meta :< WeakTermMu (x, t) e) = do
+infer ctx (meta :< WeakTermMu (x, t) e) = do
   insTypeEnv x t
-  te <- infer i (ctx ++ [(x, t)]) e
+  te <- infer (ctx ++ [(x, t)]) e
   insConstraintEnv te t
   returnMeta meta te
-infer _ _ (meta :< WeakTermConst x) = do
+infer _ (meta :< WeakTermConst x) = do
   h <- newHole -- constants do not depend on their context
   insTypeEnv x h
   returnMeta meta h
-infer _ ctx (meta :< WeakTermHole _) = newHoleInCtx ctx >>= returnMeta meta
+infer ctx (meta :< WeakTermHole _) = newHoleInCtx ctx >>= returnMeta meta
 
-inferPiOrSigma ::
-     Level -> Context -> Identifier -> [IdentifierPlus] -> WithEnv WeakTerm
-inferPiOrSigma i ctx meta xts = do
+inferPiOrSigma :: Context -> Identifier -> [IdentifierPlus] -> WithEnv WeakTerm
+inferPiOrSigma ctx meta xts = do
   univList <-
     forM (map (`take` xts) [1 .. length xts]) $ \zts ->
-      infer i (ctx ++ init zts) (snd $ last zts)
+      infer (ctx ++ init zts) (snd $ last zts)
   univ <- newUniv
   constrainList $ univ : univList
   returnMeta meta univ
@@ -163,12 +160,12 @@ inferCase (CaseLiteral (LiteralLabel name)) = do
     Nothing -> return Nothing
 inferCase _ = return Nothing
 
-inferList :: Level -> Context -> [WeakTerm] -> WithEnv Context
-inferList i ctx es = do
+inferList :: Context -> [WeakTerm] -> WithEnv Context
+inferList ctx es = do
   xs <- mapM (const $ newNameWith "hole") es
   holeList <- newHoleListInCtx ctx xs
   let holeList' = map (substWeakTerm (zip xs es)) holeList
-  ts <- mapM (infer i ctx) es
+  ts <- mapM (infer ctx) es
   forM_ (zip holeList' ts) $ uncurry insConstraintEnv
   return $ zip xs holeList
 
@@ -182,13 +179,13 @@ constrainList (t1@(meta1 :< _):t2@(meta2 :< _):ts) = do
   insConstraintEnv t1 t2
   constrainList $ t2 : ts
 
-constructTuple :: Level -> Context -> [Identifier] -> WithEnv WeakTerm
-constructTuple i ctx xs = do
+constructTuple :: Context -> [Identifier] -> WithEnv WeakTerm
+constructTuple ctx xs = do
   eMeta <- newName
   metaList <- mapM (const newName) xs
   let varList = map (\(m, x) -> m :< WeakTermUpsilon x) $ zip metaList xs
   let pair = eMeta :< WeakTermSigmaIntro varList
-  _ <- infer i ctx pair
+  _ <- infer ctx pair
   return pair
 
 toVar1 :: Identifier -> WeakTerm -> WithEnv WeakTerm
