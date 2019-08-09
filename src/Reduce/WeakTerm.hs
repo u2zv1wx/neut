@@ -1,6 +1,5 @@
 module Reduce.WeakTerm
   ( reduceWeakTerm
-  , reduceWeakLevel
   ) where
 
 import           Control.Comonad.Cofree
@@ -21,19 +20,18 @@ reduceWeakTerm (m :< WeakTermEpsilonElim (x, t) e branchList) = do
             Just body -> reduceWeakTerm $ substWeakTerm [(x, e')] body
             Nothing -> return $ m :< WeakTermEpsilonElim (x, t) e' branchList
     _ -> return $ m :< WeakTermEpsilonElim (x, t) e' branchList
-reduceWeakTerm (m :< WeakTermPiElim i e es) = do
+reduceWeakTerm (m :< WeakTermPiElim e es) = do
   es' <- mapM reduceWeakTerm es
   e' <- reduceWeakTerm e
   case e' of
-    _ :< WeakTermPiIntro j xts body
+    _ :< WeakTermPiIntro xts body
       | length xts == length es'
       , all isValue es' -> do
-        insLevelConstraintEnvEQ i j
         let xs = map fst xts
         reduceWeakTerm $ substWeakTerm (zip xs es') body
     self@(_ :< WeakTermMu (x, _) body) -> do
       let self' = substWeakTerm [(x, self)] body
-      reduceWeakTerm (m :< WeakTermPiElim i self' es')
+      reduceWeakTerm (m :< WeakTermPiElim self' es')
     _ :< WeakTermConst constant
       | [_ :< WeakTermEpsilonIntro (LiteralInteger x), _ :< WeakTermEpsilonIntro (LiteralInteger y)] <-
          es' -> do
@@ -50,49 +48,17 @@ reduceWeakTerm (m :< WeakTermPiElim i e es) = do
             return $ m :< WeakTermEpsilonIntro (LiteralInteger (x * y))
           (_, _, _, True) ->
             return $ m :< WeakTermEpsilonIntro (LiteralInteger (x `div` y))
-          _ -> return $ m :< WeakTermPiElim i e' es'
-    _ -> return $ m :< WeakTermPiElim i e' es'
-reduceWeakTerm (m :< WeakTermSigmaIntro i es) = do
+          _ -> return $ m :< WeakTermPiElim e' es'
+    _ -> return $ m :< WeakTermPiElim e' es'
+reduceWeakTerm (m :< WeakTermSigmaIntro es) = do
   es' <- mapM reduceWeakTerm es
-  return $ m :< WeakTermSigmaIntro i es'
-reduceWeakTerm (m :< WeakTermSigmaElim i xts e1 e2) = do
+  return $ m :< WeakTermSigmaIntro es'
+reduceWeakTerm (m :< WeakTermSigmaElim xts e1 e2) = do
   e1' <- reduceWeakTerm e1
   case e1' of
-    _ :< WeakTermSigmaIntro j es
+    _ :< WeakTermSigmaIntro es
       | length es == length xts -> do
-        insLevelConstraintEnvEQ i j
         let xs = map fst xts
         reduceWeakTerm $ substWeakTerm (zip xs es) e2
-    _ -> return $ m :< WeakTermSigmaElim i xts e1' e2
-reduceWeakTerm (m :< WeakTermTauElim i e) = do
-  e' <- reduceWeakTerm e
-  case e' of
-    _ :< WeakTermTauIntro j e'' -> do
-      insLevelConstraintEnvEQ i j
-      reduceWeakTerm e''
-    _ -> return $ m :< WeakTermTauElim i e'
-reduceWeakTerm (m :< WeakTermThetaElim e i) = do
-  e' <- reduceWeakTerm e
-  case e' of
-    _ :< WeakTermThetaIntro e'' -> reduceWeakTerm $ shiftWeakTerm i e''
-    self@(_ :< WeakTermMu (x, _) body) -> do
-      let self' = substWeakTerm [(x, self)] body
-      reduceWeakTerm (m :< WeakTermThetaElim self' i)
-    _ -> return $ m :< WeakTermThetaElim e' i
+    _ -> return $ m :< WeakTermSigmaElim xts e1' e2
 reduceWeakTerm t = return t
-
-reduceWeakLevel :: WeakLevel -> WithEnv WeakLevel
-reduceWeakLevel (WeakLevelAdd l1 l2) = do
-  l1' <- reduceWeakLevel l1
-  l2' <- reduceWeakLevel l2
-  case (l1', l2') of
-    (WeakLevelInt i, WeakLevelInt j)    -> return $ WeakLevelInt $ i + j
-    (WeakLevelInfinity, WeakLevelInt _) -> return WeakLevelInfinity
-    (WeakLevelInt _, WeakLevelInfinity) -> return WeakLevelInfinity
-    _                                   -> return $ WeakLevelAdd l1' l2'
-reduceWeakLevel (WeakLevelNegate l) = do
-  l' <- reduceWeakLevel l
-  case l' of
-    WeakLevelInt i -> return $ WeakLevelInt $ -i
-    _              -> return $ WeakLevelNegate l'
-reduceWeakLevel l = return l
