@@ -8,20 +8,20 @@ data Constraint
   = ConstraintImmediate Hole
                         WeakTerm
   | ConstraintPattern Hole
-                      [(WeakLevel, [WeakTerm])]
+                      [[WeakTerm]]
                       WeakTerm
   | ConstraintQuasiPattern Hole
-                           [(WeakLevel, [WeakTerm])]
+                           [[WeakTerm]]
                            WeakTerm
   | ConstraintFlexRigid Hole
-                        [(WeakLevel, [WeakTerm])]
+                        [[WeakTerm]]
                         WeakTerm
   | ConstraintFlexFlex Hole
-                       [(WeakLevel, [WeakTerm])]
+                       [[WeakTerm]]
                        WeakTerm
   | ConstraintOther
 
-constraintToInt :: Constraint -> Int
+constraintToInt :: Constraint -> Int --
 constraintToInt ConstraintImmediate {}    = 0
 constraintToInt ConstraintPattern {}      = 1
 constraintToInt ConstraintQuasiPattern {} = 2
@@ -46,29 +46,10 @@ instance Eq EnrichedConstraint where
 instance Ord EnrichedConstraint where
   compare (Enriched _ _ c1) (Enriched _ _ c2) = compare c1 c2
 
-data LevelConstraint
-  = LevelConstraintEQ WeakLevel
-                      WeakLevel
-  | LevelConstraintLE WeakLevel
-                      WeakLevel
-  | LevelConstraintLEType WeakLevel
-                          WeakTerm
-  | LevelConstraintFinite WeakLevel
-  | LevelConstraintInfiniteType WeakTerm
-  deriving (Show)
-
 compose :: SubstWeakTerm -> SubstWeakTerm -> SubstWeakTerm
 compose s1 s2 = do
   let domS2 = map fst s2
   let codS2 = map snd s2
   let codS2' = map (substWeakTerm s1) codS2
-  let fromS1 = filter (\(ident, _) -> ident `notElem` domS2) s1
-  fromS1 ++ zip domS2 codS2'
-
-composeWeakLevel :: SubstWeakLevel -> SubstWeakLevel -> SubstWeakLevel
-composeWeakLevel s1 s2 = do
-  let domS2 = map fst s2
-  let codS2 = map snd s2
-  let codS2' = map (substWeakLevel' s1) codS2
   let fromS1 = filter (\(ident, _) -> ident `notElem` domS2) s1
   fromS1 ++ zip domS2 codS2'
