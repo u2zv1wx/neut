@@ -5,34 +5,34 @@ import           Data.Maybe (fromMaybe)
 import           Data.Basic
 
 data Pos
-  = PosVar Identifier
-  | PosConst Identifier
+  = PosUpsilon Identifier
+  | PosEpsilonIntro Literal
+                    LowType
   | PosSigmaIntro [Pos]
-  | PosIndexIntro Literal
-                  LowType
+  | PosConst Identifier
   deriving (Show)
 
 data Neg
-  = NegPiElimDownElim Pos
+  = NegEpsilonElim Pos
+                   [(Case, Neg)]
+  | NegPiElimDownElim Pos
                       [Pos]
-  | NegConstElim Constant
-                 [Pos]
   | NegSigmaElim [Identifier]
                  Pos
                  Neg
-  | NegIndexElim Pos
-                 [(Case, Neg)]
   | NegUpIntro Pos
   | NegUpElim Identifier
               Neg
               Neg
+  | NegConstElim Constant
+                 [Pos]
   deriving (Show)
 
 varPos :: Pos -> [Identifier]
-varPos (PosVar s)          = [s]
-varPos (PosConst _)        = []
-varPos (PosSigmaIntro vs)  = concatMap varPos vs
-varPos (PosIndexIntro _ _) = []
+varPos (PosUpsilon s)        = [s]
+varPos (PosConst _)          = []
+varPos (PosSigmaIntro vs)    = concatMap varPos vs
+varPos (PosEpsilonIntro _ _) = []
 
 varNeg :: Neg -> [Identifier]
 varNeg (NegPiElimDownElim v vs) = varPos v ++ concatMap varPos vs
@@ -40,7 +40,7 @@ varNeg (NegSigmaElim xs v e) = do
   let vs1 = varPos v
   let vs2 = filter (`notElem` xs) $ varNeg e
   vs1 ++ vs2
-varNeg (NegIndexElim v branchList) = do
+varNeg (NegEpsilonElim v branchList) = do
   let vs1 = varPos v
   let vs2 = concatMap (varNeg . snd) branchList
   vs1 ++ vs2
@@ -54,12 +54,12 @@ varNeg (NegConstElim _ vs) = concatMap varPos vs
 type SubstPos = [(Identifier, Pos)]
 
 substPos :: SubstPos -> Pos -> Pos
-substPos sub (PosVar s) = fromMaybe (PosVar s) (lookup s sub)
+substPos sub (PosUpsilon s) = fromMaybe (PosUpsilon s) (lookup s sub)
 substPos _ (PosConst s) = PosConst s
 substPos sub (PosSigmaIntro vs) = do
   let vs' = map (substPos sub) vs
   PosSigmaIntro vs'
-substPos _ (PosIndexIntro l t) = PosIndexIntro l t
+substPos _ (PosEpsilonIntro l t) = PosEpsilonIntro l t
 
 substNeg :: SubstPos -> Neg -> Neg
 substNeg sub (NegPiElimDownElim v vs) = do
@@ -71,10 +71,10 @@ substNeg sub (NegSigmaElim xs v e) = do
   let sub' = filter (\(x, _) -> x `notElem` xs) sub
   let e' = substNeg sub' e
   NegSigmaElim xs v' e'
-substNeg sub (NegIndexElim v branchList) = do
+substNeg sub (NegEpsilonElim v branchList) = do
   let v' = substPos sub v
   let branchList' = map (\(l, e) -> (l, substNeg sub e)) branchList
-  NegIndexElim v' branchList'
+  NegEpsilonElim v' branchList'
 substNeg sub (NegUpIntro v) = NegUpIntro $ substPos sub v
 substNeg sub (NegUpElim x e1 e2) = do
   let e1' = substNeg sub e1

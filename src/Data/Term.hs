@@ -21,8 +21,6 @@ data Term
   | TermSigmaElim [Identifier]
                   Term
                   Term
-  | TermTauIntro Term
-  | TermTauElim Term
   | TermConst Identifier
   deriving (Show)
 
@@ -56,6 +54,4 @@ substTerm sub (TermSigmaElim xs e1 e2) = do
   let sub' = filter (\(k, _) -> k `notElem` xs) sub
   let e2' = substTerm sub' e2
   TermSigmaElim xs e1' e2'
-substTerm sub (TermTauIntro e) = TermTauIntro $ substTerm sub e
-substTerm sub (TermTauElim e) = TermTauElim $ substTerm sub e
 substTerm _ (TermConst x) = TermConst x

@@ -63,5 +63,4 @@ reduceTerm (TermSigmaElim xs e body) = do
   case e' of
     TermSigmaIntro es -> reduceTerm $ substTerm (zip xs es) body
     _                 -> return $ TermSigmaElim xs e' body
-reduceTerm (TermTauElim (TermTauIntro e)) = reduceTerm e
 reduceTerm t = return t

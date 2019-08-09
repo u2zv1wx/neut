@@ -28,64 +28,65 @@ polarize mainTerm = do
 
 -- CBV translation into CBPV + closure conversion
 polarize' :: Term -> WithEnv Neg
-polarize' (TermVar x) = return $ NegUpIntro $ PosVar x
-polarize' (TermConst x) = toDefinition x
-polarize' (TermPiIntro x e) = do
+polarize' (TermUpsilon x) = return $ NegUpIntro $ PosUpsilon x
+polarize' (TermEpsilonIntro l t) = return $ NegUpIntro (PosEpsilonIntro l t)
+polarize' (TermEpsilonElim x e branchList) = do
+  let (labelList, es) = unzip branchList
   e' <- polarize' e
-  makeClosure x e'
-polarize' (TermPiElim e1 e2) = do
-  e1' <- polarize' e1
-  e2' <- polarize' e2
-  callClosure e1' e2'
+  cs <- mapM polarize' es
+  return $ NegUpElim x e' (NegEpsilonElim (PosUpsilon x) (zip labelList cs))
+polarize' (TermConst x) = toDefinition x
+polarize' (TermPiIntro xs e) = do
+  e' <- polarize' e
+  makeClosure xs e'
+polarize' (TermPiElim e es) = do
+  e' <- polarize' e
+  es' <- mapM polarize' es
+  callClosure e' es'
 polarize' (TermConstElim funName es) = do
   es' <- mapM polarize' es
   xs <- mapM (const (newNameWith "arg")) es'
   return $
-    bindLet (zip xs es') $ NegConstElim (ConstantLabel funName) (map PosVar xs)
+    bindLet (zip xs es') $
+    NegConstElim (ConstantLabel funName) (map PosUpsilon xs)
 polarize' (TermSigmaIntro es) = do
   es' <- mapM polarize' es
   xs <- mapM (const (newNameWith "sigma")) es'
-  return $ bindLet (zip xs es') $ NegUpIntro $ PosSigmaIntro (map PosVar xs)
+  return $ bindLet (zip xs es') $ NegUpIntro $ PosSigmaIntro (map PosUpsilon xs)
 polarize' (TermSigmaElim xs e1 e2) = do
   e1' <- polarize' e1
   e2' <- polarize' e2
   z <- newNameWith "sigma"
-  return $ NegUpElim z e1' (NegSigmaElim xs (PosVar z) e2')
-polarize' (TermIndexIntro l t) = return $ NegUpIntro (PosIndexIntro l t)
-polarize' (TermIndexElim e branchList) = do
-  let (labelList, es) = unzip branchList
-  e' <- polarize' e
-  x <- newNameWith "tmp"
-  cs <- mapM polarize' es
-  return $ NegUpElim x e' (NegIndexElim (PosVar x) (zip labelList cs))
+  return $ NegUpElim z e1' (NegSigmaElim xs (PosUpsilon z) e2')
 
 bindLet :: [(Identifier, Neg)] -> Neg -> Neg
 bindLet [] cont           = cont
 bindLet ((x, e):xes) cont = NegUpElim x e $ bindLet xes cont
 
-makeClosure :: Identifier -> Neg -> WithEnv Neg
-makeClosure x e = do
-  let fvs = filter (/= x) $ nub $ varNeg e
+makeClosure :: [Identifier] -> Neg -> WithEnv Neg
+makeClosure xs e = do
+  let fvs = filter (`notElem` xs) $ nub $ varNeg e
   envName <- newNameWith "env"
   lamVar <- newNameWith "lam"
-  let lamBody = NegSigmaElim fvs (PosVar envName) e
-  insPolEnv lamVar [x, envName] lamBody -- lamVar == thunk (lam (envName, x) lamBody)
-  let fvEnv = PosSigmaIntro $ map PosVar fvs
+  let lamBody = NegSigmaElim fvs (PosUpsilon envName) e
+  -- lamVar == thunk (lam (envName, x1, ..., xn) lamBody)
+  insPolEnv lamVar (envName : xs) lamBody
+  let fvEnv = PosSigmaIntro $ map PosUpsilon fvs
   return $ NegUpIntro $ PosSigmaIntro [PosConst lamVar, fvEnv]
 
-callClosure :: Neg -> Neg -> WithEnv Neg
-callClosure cls arg = do
-  argVarName <- newNameWith "arg"
+callClosure :: Neg -> [Neg] -> WithEnv Neg
+callClosure e es = do
+  argVarNameList <- mapM (const $ newNameWith "arg") es
   clsVarName <- newNameWith "fun"
   thunkLamVarName <- newNameWith "down.elim.cls"
   envVarName <- newNameWith "down.elim.env"
   return $
-    NegUpElim argVarName arg $
-    NegUpElim clsVarName cls $
-    NegSigmaElim [thunkLamVarName, envVarName] (PosVar clsVarName) $
+    bindLet (zip argVarNameList es) $
+    NegUpElim clsVarName e $
+    NegSigmaElim [thunkLamVarName, envVarName] (PosUpsilon clsVarName) $
     NegPiElimDownElim
-      (PosVar thunkLamVarName)
-      [PosVar argVarName, PosVar envVarName]
+      (PosUpsilon thunkLamVarName)
+      (PosUpsilon envVarName : map PosUpsilon argVarNameList)
 
 -- insert (possibly) environment-specific definition of constant
 toDefinition :: Identifier -> WithEnv Neg
@@ -118,7 +119,7 @@ getPrintConstant x = do
 toPrintDefinition :: Constant -> WithEnv Neg
 toPrintDefinition c = do
   x <- newNameWith "arg"
-  makeClosure x $ NegConstElim c [PosVar x]
+  makeClosure [x] $ NegConstElim c [PosUpsilon x]
 
 getArithBinOpConstant :: Identifier -> Maybe Constant
 getArithBinOpConstant x = do
@@ -141,8 +142,8 @@ toArithBinOpDefinition :: Constant -> WithEnv Neg
 toArithBinOpDefinition c = do
   x <- newNameWith "arg1"
   y <- newNameWith "arg2"
-  lamy <- makeClosure y $ NegConstElim c [PosVar x, PosVar y]
-  makeClosure x lamy
+  lamy <- makeClosure [y] $ NegConstElim c [PosUpsilon x, PosUpsilon y]
+  makeClosure [x] lamy
 
 wordsWhen :: (Char -> Bool) -> String -> [String]
 wordsWhen p s =
