@@ -21,6 +21,7 @@ toLLVM mainTerm = do
   llvmCode mainTerm
 
 llvmCode :: Neg -> WithEnv LLVM
+llvmCode (NegEpsilonElim x branchList) = llvmSwitch x branchList
 llvmCode (NegPiElimDownElim fun args) = do
   f <- newNameWith "fun"
   xs <- mapM (const (newNameWith "arg")) args
@@ -29,7 +30,6 @@ llvmCode (NegPiElimDownElim fun args) = do
   llvmDataLet' ((f, fun) : zip xs args) $
     LLVMLet cast (LLVMBitcast (LLVMDataLocal f) voidPtr funPtrType) $
     LLVMCall (LLVMDataLocal cast) (map LLVMDataLocal xs)
-llvmCode (NegEpsilonElim x branchList) = llvmSwitch x branchList
 llvmCode (NegSigmaElim xs v e) = do
   basePointer <- newNameWith "base"
   castedBasePointer <- newNameWith "castedBase"
@@ -48,7 +48,6 @@ llvmCode (NegSigmaElim xs v e) = do
          voidPtr
          (toStructPtrType [1 .. (length xs)]))
       extractAndCont
-llvmCode (NegConstElim f args) = llvmCodeConstElim f args
 llvmCode (NegUpIntro d) = do
   result <- newNameWith "ans"
   llvmDataLet result d $ LLVMReturn $ LLVMDataLocal result
@@ -56,6 +55,7 @@ llvmCode (NegUpElim x cont1 cont2) = do
   cont1' <- llvmCode cont1
   cont2' <- llvmCode cont2
   return $ LLVMLet x cont1' cont2'
+llvmCode (NegConstElim f args) = llvmCodeConstElim f args
 
 llvmCodeSigmaElim ::
      Identifier
@@ -130,23 +130,6 @@ llvmCodeConstElim _ _ = lift $ throwE "llvmCodeConstElim."
 llvmDataLet :: Identifier -> Pos -> LLVM -> WithEnv LLVM
 llvmDataLet x (PosUpsilon y) cont =
   return $ LLVMLet x (LLVMBitcast (LLVMDataLocal y) voidPtr voidPtr) cont
-llvmDataLet x (PosConst y) cont = do
-  penv <- gets polEnv
-  case lookup y penv of
-    Nothing -> lift $ throwE $ "no such global label defined: " ++ y -- FIXME
-    Just (args, _) -> do
-      let funPtrType = toFunPtrType args
-      return $
-        LLVMLet x (LLVMBitcast (LLVMDataGlobal y) funPtrType voidPtr) cont
-llvmDataLet reg (PosSigmaIntro ds) cont = do
-  xs <- mapM (const $ newNameWith "cursor") ds
-  cast <- newNameWith "cast"
-  let ts = map (const voidPtr) ds
-  let structPtrType = toStructPtrType ds
-  cont'' <- setContent cast (length xs) (zip [0 ..] xs) cont
-  llvmStruct (zip xs ds) $
-    LLVMLet reg (LLVMAlloc ts) $ -- the result of malloc is i8*
-    LLVMLet cast (LLVMBitcast (LLVMDataLocal reg) voidPtr structPtrType) cont''
 llvmDataLet x (PosEpsilonIntro (LiteralInteger i) (LowTypeSignedInt j)) cont =
   return $
   LLVMLet
@@ -171,6 +154,23 @@ llvmDataLet x (PosEpsilonIntro (LiteralLabel l) (LowTypeSignedInt 64)) cont = do
         cont
 llvmDataLet _ (PosEpsilonIntro _ _) _ =
   lift $ throwE "llvmDataLet.PosEpsilonIntro"
+llvmDataLet reg (PosSigmaIntro ds) cont = do
+  xs <- mapM (const $ newNameWith "cursor") ds
+  cast <- newNameWith "cast"
+  let ts = map (const voidPtr) ds
+  let structPtrType = toStructPtrType ds
+  cont'' <- setContent cast (length xs) (zip [0 ..] xs) cont
+  llvmStruct (zip xs ds) $
+    LLVMLet reg (LLVMAlloc ts) $ -- the result of malloc is i8*
+    LLVMLet cast (LLVMBitcast (LLVMDataLocal reg) voidPtr structPtrType) cont''
+llvmDataLet x (PosConst y) cont = do
+  penv <- gets polEnv
+  case lookup y penv of
+    Nothing -> lift $ throwE $ "no such global label defined: " ++ y -- FIXME
+    Just (args, _) -> do
+      let funPtrType = toFunPtrType args
+      return $
+        LLVMLet x (LLVMBitcast (LLVMDataGlobal y) funPtrType voidPtr) cont
 
 llvmDataLet' :: [(Identifier, Pos)] -> LLVM -> WithEnv LLVM
 llvmDataLet' [] cont = return cont

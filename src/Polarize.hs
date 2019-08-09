@@ -81,8 +81,8 @@ callClosure e es = do
   thunkLamVarName <- newNameWith "down.elim.cls"
   envVarName <- newNameWith "down.elim.env"
   return $
-    bindLet (zip argVarNameList es) $
     NegUpElim clsVarName e $
+    bindLet (zip argVarNameList es) $
     NegSigmaElim [thunkLamVarName, envVarName] (PosUpsilon clsVarName) $
     NegPiElimDownElim
       (PosUpsilon thunkLamVarName)

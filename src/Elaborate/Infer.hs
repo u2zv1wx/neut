@@ -82,7 +82,7 @@ infer ctx (meta :< WeakTermSigmaIntro es) = do
 infer ctx (meta :< WeakTermSigmaElim xts e1 e2) = do
   t1 <- infer ctx e1
   forM_ xts $ uncurry insTypeEnv
-  varSeq <- mapM (uncurry toVar1) xts
+  varSeq <- mapM (uncurry toVar) xts
   binder <- inferList ctx varSeq
   sigmaType <- wrap $ WeakTermSigma binder
   insConstraintEnv t1 sigmaType
@@ -123,7 +123,7 @@ newHoleInCtx ctx = do
   univ <- newUniv >>= withPlaceholder
   higherPi <- wrap $ WeakTermPi $ ctx ++ [univ]
   higherHole <- newHoleOfType higherPi
-  varSeq <- mapM (uncurry toVar1) ctx
+  varSeq <- mapM (uncurry toVar) ctx
   app <- wrap (WeakTermPiElim higherHole varSeq) >>= withPlaceholder
   pi <- wrap $ WeakTermPi $ ctx ++ [app]
   hole <- newHoleOfType pi
@@ -188,8 +188,8 @@ constructTuple ctx xs = do
   _ <- infer ctx pair
   return pair
 
-toVar1 :: Identifier -> WeakTerm -> WithEnv WeakTerm
-toVar1 x t = do
+toVar :: Identifier -> WeakTerm -> WithEnv WeakTerm
+toVar x t = do
   meta <- newNameWith "meta"
   insTypeEnv meta t
   insTypeEnv x t
