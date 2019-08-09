@@ -29,7 +29,7 @@ llvmCode (NegPiElimDownElim fun args) = do
   llvmDataLet' ((f, fun) : zip xs args) $
     LLVMLet cast (LLVMBitcast (LLVMDataLocal f) voidPtr funPtrType) $
     LLVMCall (LLVMDataLocal cast) (map LLVMDataLocal xs)
-llvmCode (NegIndexElim x branchList) = llvmSwitch x branchList
+llvmCode (NegEpsilonElim x branchList) = llvmSwitch x branchList
 llvmCode (NegSigmaElim xs v e) = do
   basePointer <- newNameWith "base"
   castedBasePointer <- newNameWith "castedBase"
@@ -128,7 +128,7 @@ llvmCodeConstElim _ _ = lift $ throwE "llvmCodeConstElim."
 -- `llvmDataLet x d cont` binds the data `d` to the variable `x`, and computes the
 -- continuation `cont`.
 llvmDataLet :: Identifier -> Pos -> LLVM -> WithEnv LLVM
-llvmDataLet x (PosVar y) cont =
+llvmDataLet x (PosUpsilon y) cont =
   return $ LLVMLet x (LLVMBitcast (LLVMDataLocal y) voidPtr voidPtr) cont
 llvmDataLet x (PosConst y) cont = do
   penv <- gets polEnv
@@ -147,26 +147,30 @@ llvmDataLet reg (PosSigmaIntro ds) cont = do
   llvmStruct (zip xs ds) $
     LLVMLet reg (LLVMAlloc ts) $ -- the result of malloc is i8*
     LLVMLet cast (LLVMBitcast (LLVMDataLocal reg) voidPtr structPtrType) cont''
-llvmDataLet x (PosIndexIntro (IndexInteger i) (LowTypeSignedInt j)) cont =
+llvmDataLet x (PosEpsilonIntro (LiteralInteger i) (LowTypeSignedInt j)) cont =
   return $
   LLVMLet
     x
     (LLVMIntToPointer (LLVMDataInt i j) (LowTypeSignedInt j) voidPtr)
     cont
-llvmDataLet x (PosIndexIntro (IndexFloat f) (LowTypeFloat j)) cont = do
+llvmDataLet x (PosEpsilonIntro (LiteralFloat f) (LowTypeFloat j)) cont = do
   cast <- newNameWith "cast"
   let ft = LowTypeFloat j
   let st = LowTypeSignedInt j
   return $
     LLVMLet cast (LLVMBitcast (LLVMDataFloat f j) ft st) $
     LLVMLet x (LLVMIntToPointer (LLVMDataLocal cast) st voidPtr) cont
-llvmDataLet x (PosIndexIntro (IndexLabel l) (LowTypeSignedInt 64)) cont = do
+llvmDataLet x (PosEpsilonIntro (LiteralLabel l) (LowTypeSignedInt 64)) cont = do
   mi <- getIndexNum l
   case mi of
     Nothing -> lift $ throwE $ "no such index defined: " ++ show l
     Just i ->
-      llvmDataLet x (PosIndexIntro (IndexInteger i) (LowTypeSignedInt 64)) cont
-llvmDataLet _ (PosIndexIntro _ _) _ = lift $ throwE "llvmDataLet.PosIndexIntro"
+      llvmDataLet
+        x
+        (PosEpsilonIntro (LiteralInteger i) (LowTypeSignedInt 64))
+        cont
+llvmDataLet _ (PosEpsilonIntro _ _) _ =
+  lift $ throwE "llvmDataLet.PosEpsilonIntro"
 
 llvmDataLet' :: [(Identifier, Pos)] -> LLVM -> WithEnv LLVM
 llvmDataLet' [] cont = return cont
@@ -174,23 +178,24 @@ llvmDataLet' ((x, d):rest) cont = do
   cont' <- llvmDataLet' rest cont
   llvmDataLet x d cont'
 
-constructSwitch :: Pos -> [(Index, Neg)] -> WithEnv (LLVM, [(Int, LLVM)])
+constructSwitch :: Pos -> [(Case, Neg)] -> WithEnv (LLVM, [(Int, LLVM)])
 constructSwitch _ [] = lift $ throwE "empty branch"
-constructSwitch name ((IndexLabel x, code):rest) = do
+constructSwitch name ((CaseLiteral (LiteralLabel x), code):rest) = do
   set <- lookupIndexSet x
   case elemIndex x set of
     Nothing -> lift $ throwE $ "no such index defined: " ++ show name
-    Just i  -> constructSwitch name ((IndexInteger i, code) : rest)
-constructSwitch _ ((IndexDefault, code):_) = do
+    Just i ->
+      constructSwitch name ((CaseLiteral (LiteralInteger i), code) : rest)
+constructSwitch _ ((CaseDefault, code):_) = do
   code' <- llvmCode code
   return (code', [])
-constructSwitch name ((IndexInteger i, code):rest) = do
+constructSwitch name ((CaseLiteral (LiteralInteger i), code):rest) = do
   code' <- llvmCode code
   (defaultCase, caseList) <- constructSwitch name rest
   return (defaultCase, (i, code') : caseList)
-constructSwitch _ ((IndexFloat _, _):_) = undefined -- IEEE754 float equality!
+constructSwitch _ ((CaseLiteral (LiteralFloat _), _):_) = undefined -- IEEE754 float equality!
 
-llvmSwitch :: Pos -> [(Index, Neg)] -> WithEnv LLVM
+llvmSwitch :: Pos -> [(Case, Neg)] -> WithEnv LLVM
 llvmSwitch name branchList = do
   (defaultCase, caseList) <- constructSwitch name branchList
   tmp <- newNameWith "switch"
@@ -203,7 +208,7 @@ llvmSwitch name branchList = do
 
 setContent :: Identifier -> Int -> [(Int, Identifier)] -> LLVM -> WithEnv LLVM
 setContent _ _ [] cont = return cont
-setContent basePointer lengthOfStruct ((index, dataAtIndex):sizeDataList) cont = do
+setContent basePointer lengthOfStruct ((index, dataAtEpsilon):sizeDataList) cont = do
   cont' <- setContent basePointer lengthOfStruct sizeDataList cont
   loader <- newNameWith "loader"
   hole <- newNameWith "tmp"
@@ -214,7 +219,7 @@ setContent basePointer lengthOfStruct ((index, dataAtIndex):sizeDataList) cont =
     LLVMLet
       hole
       (LLVMStore
-         (LLVMDataLocal dataAtIndex, voidPtr)
+         (LLVMDataLocal dataAtEpsilon, voidPtr)
          (LLVMDataLocal loader, voidPtrPtr))
       cont'
 
