@@ -34,9 +34,9 @@ synthesize q = do
 
 resolveStuck ::
      ConstraintQueue -> WeakTerm -> WeakTerm -> Hole -> WeakTerm -> WithEnv ()
-resolveStuck q e1 e2 (h, i) e = do
-  let e1' = substWeakTerm [(h, shiftWeakTerm i e)] e1
-  let e2' = substWeakTerm [(h, shiftWeakTerm i e)] e2
+resolveStuck q e1 e2 h e = do
+  let e1' = substWeakTerm [(h, e)] e1
+  let e2' = substWeakTerm [(h, e)] e2
   cs <- simp [(e1', e2')]
   synthesize $ Q.deleteMin q `Q.union` Q.fromList cs
 
@@ -52,27 +52,20 @@ resolveStuck q e1 e2 (h, i) e = do
 -- this function replaces all the arguments that are not variable by
 -- fresh variables, and try to resolve the new quasi-pattern ?M @ x @ x @ z @ y == e.
 resolvePiElim ::
-     ConstraintQueue
-  -> Hole
-  -> [(WeakLevel, [WeakTerm])]
-  -> WeakTerm
-  -> WithEnv ()
-resolvePiElim q m iess e = do
-  let (is, ess) = unzip iess
+     ConstraintQueue -> Hole -> [[WeakTerm]] -> WeakTerm -> WithEnv ()
+resolvePiElim q m ess e = do
   let lengthInfo = map length ess
   let es = concat ess
   xss <- toVarList es >>= toAltList
   let xsss = map (takeByCount lengthInfo) xss
-  lamList <- mapM (bindFormalArgs e . zip is) xsss
+  lamList <- mapM (bindFormalArgs e) xsss
   chain q $ map (resolveHole q m) lamList
 
--- ?M^{+k} = e ~~> ?M = e^{-k}
 resolveHole :: ConstraintQueue -> Hole -> WeakTerm -> WithEnv ()
-resolveHole q (h, i) e = do
-  let e' = shiftWeakTerm (WeakLevelNegate i) e
-  modify (\env -> env {substEnv = compose [(h, e')] (substEnv env)})
+resolveHole q h e = do
+  modify (\env -> env {substEnv = compose [(h, e)] (substEnv env)})
   let rest = Q.deleteMin q
-  let (q1, q2) = Q.partition (\(Enriched _ ms _) -> h `elem` map fst ms) rest
+  let (q1, q2) = Q.partition (\(Enriched _ ms _) -> h `elem` ms) rest
   synthesize q1
   synthesize q2
 
@@ -143,18 +136,18 @@ chain c (e:es) = e `catchError` const (chain c es)
 
 lookupAny :: [Hole] -> [(Identifier, a)] -> Maybe (Hole, a)
 lookupAny [] _ = Nothing
-lookupAny ((h, i):ks) sub =
+lookupAny (h:ks) sub =
   case lookup h sub of
-    Just v  -> Just ((h, i), v)
+    Just v  -> Just (h, v)
     Nothing -> lookupAny ks sub
 
-bindFormalArgs :: WeakTerm -> [(WeakLevel, [Identifier])] -> WithEnv WeakTerm
+bindFormalArgs :: WeakTerm -> [[Identifier]] -> WithEnv WeakTerm
 bindFormalArgs e [] = return e
-bindFormalArgs e ((i, xs):ixs) = do
+bindFormalArgs e (xs:xss) = do
   ts <- mapM (const newHole) xs
   meta <- newNameWith "meta"
-  e' <- bindFormalArgs e ixs
-  return $ meta :< WeakTermPiIntro i (zip xs ts) e'
+  e' <- bindFormalArgs e xss
+  return $ meta :< WeakTermPiIntro (zip xs ts) e'
 
 -- takeByCount [1, 3, 2] [a, b, c, d, e, f, g, h] ~> [[a], [b, c, d], [e, f]]
 takeByCount :: [Int] -> [a] -> [[a]]
