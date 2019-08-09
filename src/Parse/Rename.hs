@@ -14,7 +14,7 @@ import           Data.WeakTerm
 
 -- Alpha-convert all the variables so that different variables have different names.
 rename :: WeakTerm -> WithEnv WeakTerm
-rename (m :< WeakTermUniv j) = return $ m :< WeakTermUniv j
+rename (m :< WeakTermUniverse) = return $ m :< WeakTermUniverse
 rename (m :< WeakTermUpsilon x) = do
   let x' = normalForm x
   let isAbsolute = '.' `elem` x'
@@ -42,44 +42,26 @@ rename (m :< WeakTermEpsilonElim (x, t) e caseList) = do
     x' <- newIdentifierWith x
     caseList' <- renameCaseList caseList
     return $ m :< WeakTermEpsilonElim (x', t') e' caseList'
-rename (m :< WeakTermPi i xts) = do
+rename (m :< WeakTermPi xts) = do
   xts' <- renameBindings xts
-  return $ m :< WeakTermPi i xts'
-rename (m :< WeakTermPiIntro i xts e) = do
+  return $ m :< WeakTermPi xts'
+rename (m :< WeakTermPiIntro xts e) = do
   (xts', e') <- renameBindingsWithBody xts e
-  return $ m :< WeakTermPiIntro i xts' e'
-rename (m :< WeakTermPiElim i e es) = do
+  return $ m :< WeakTermPiIntro xts' e'
+rename (m :< WeakTermPiElim e es) = do
   e' <- rename e
   es' <- mapM rename es
-  return $ m :< WeakTermPiElim i e' es'
-rename (m :< WeakTermSigma i xts) = do
+  return $ m :< WeakTermPiElim e' es'
+rename (m :< WeakTermSigma xts) = do
   xts' <- renameBindings xts
-  return $ m :< WeakTermSigma i xts'
-rename (m :< WeakTermSigmaIntro i es) = do
+  return $ m :< WeakTermSigma xts'
+rename (m :< WeakTermSigmaIntro es) = do
   es' <- mapM rename es
-  return $ m :< WeakTermSigmaIntro i es'
-rename (m :< WeakTermSigmaElim i xts e1 e2) = do
+  return $ m :< WeakTermSigmaIntro es'
+rename (m :< WeakTermSigmaElim xts e1 e2) = do
   e1' <- rename e1
   (xts', e2') <- renameBindingsWithBody xts e2
-  return $ m :< WeakTermSigmaElim i xts' e1' e2'
-rename (m :< WeakTermTau i t) = do
-  t' <- rename t
-  return $ m :< WeakTermTau i t'
-rename (m :< WeakTermTauIntro i e) = do
-  e' <- rename e
-  return $ m :< WeakTermTauIntro i e'
-rename (m :< WeakTermTauElim i e) = do
-  e' <- rename e
-  return $ m :< WeakTermTauElim i e'
-rename (m :< WeakTermTheta t) = do
-  t' <- rename t
-  return $ m :< WeakTermTheta t'
-rename (m :< WeakTermThetaIntro e) = do
-  e' <- rename e
-  return $ m :< WeakTermThetaIntro e'
-rename (m :< WeakTermThetaElim e i) = do
-  e' <- rename e
-  return $ m :< WeakTermThetaElim e' i
+  return $ m :< WeakTermSigmaElim xts' e1' e2'
 rename (m :< WeakTermMu xt e) =
   local $ do
     xt' <- newIdentifierPlusWith xt
