@@ -29,7 +29,7 @@ reduceTerm (TermPiElim e es) = do
   es' <- mapM reduceTerm es
   e' <- reduceTerm e
   case e' of
-    TermPiIntro _ xs body
+    TermPiIntro xs body
       | length xs == length es -> do
         let sub = zip xs es
         reduceTerm $ substTerm sub body
@@ -61,7 +61,7 @@ reduceTerm (TermConstElim x es) = do
 reduceTerm (TermSigmaElim xs e body) = do
   e' <- reduceTerm e
   case e' of
-    TermSigmaIntro _ es -> reduceTerm $ substTerm (zip xs es) body
-    _                   -> return $ TermSigmaElim xs e' body
+    TermSigmaIntro es -> reduceTerm $ substTerm (zip xs es) body
+    _                 -> return $ TermSigmaElim xs e' body
 reduceTerm (TermTauElim (TermTauIntro e)) = reduceTerm e
 reduceTerm t = return t
