@@ -124,9 +124,8 @@ isSpecialForm _ = False
 concatDefList :: [Def] -> WithEnv WeakTerm
 concatDefList [] = do
   meta <- newNameWith "meta"
-  return $ meta :< WeakTermSigmaIntro (WeakLevelInt 0) []
+  return $ meta :< WeakTermSigmaIntro []
 concatDefList (DefLet meta tu e:es) = do
   cont <- concatDefList es
   lamMeta <- newNameWith "meta"
-  let z = WeakLevelInt 0
-  return $ meta :< WeakTermPiElim z (lamMeta :< WeakTermPiIntro z [tu] cont) [e]
+  return $ meta :< WeakTermPiElim (lamMeta :< WeakTermPiIntro [tu] cont) [e]
