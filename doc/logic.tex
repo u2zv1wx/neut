@@ -175,101 +175,6 @@ initial system:
 
 \newpage
 
-after closure conversion:
-\begin{framed}
-  \begin{center}
-    \begin{bprooftree}
-      \AxiomC{\( \vphantom{\Gamma} \)}
-      \RightLabel{\( \ir{(empty)} \)}
-      \UnaryInfC{\( \ctx{\emptyset} \)}
-    \end{bprooftree}
-    \begin{bprooftree}
-      \AxiomC{\( \ctx{\Gamma} \)}
-      \RightLabel{\( \ir{(univ)} \)}
-      \UnaryInfC{\( \Gamma \vdash \univ_{i} : \univ_{i + 1} \)}
-    \end{bprooftree}
-    \begin{bprooftree}
-      \AxiomC{\( \Gamma \vdash A : \univ_{i} \)}
-      \RightLabel{\( \ir{(hier)} \)}
-      \UnaryInfC{\( \Gamma \vdash A : \univ_{i + 1} \)}
-    \end{bprooftree}
-    \\
-    \vspace{1.5em}
-    \begin{bprooftree}
-      \AxiomC{\( \Gamma \vdash A : \univ_{i} \)}
-      \RightLabel{\( \ir{(ext)} \)}
-      \UnaryInfC{\( \ctx{\Gamma, x : A} \)}
-    \end{bprooftree}
-    \begin{bprooftree}
-      \AxiomC{\( \ctx{\Gamma, x : A} \)}
-      \RightLabel{\( \ir{(var)} \)}
-      \UnaryInfC{\( \Gamma, x : A \vdash x : A \)}
-    \end{bprooftree}
-    \\
-    \vspace{1.5em}
-    \begin{bprooftree}
-      \AxiomC{\( \Gamma \vdash A : \univ_{i} \)}
-      \AxiomC{\( \Gamma, x : A \vdash B : \univ_{i} \)}
-      \RightLabel{\( (\Pi) \)}
-      \BinaryInfC{\( \Gamma \vdash \dprod{x : A}{B} : \univ_{i} \)}
-    \end{bprooftree}
-    \\
-    \vspace{1.5em}
-    \begin{bprooftree}
-      \AxiomC{\( x_{1} : A_{1}, \ldots, x_{n} : A_{n} \vdash e : B \)}
-      \RightLabel{\( (\Pi_{\ir{i}}) \)}
-      \UnaryInfC{\( \Gamma \vdash \abs{(x_{1}, \ldots, x_{n})}{e} : \dprod{x_{1} : A_{1}, \ldots, x_{n} : A_{n}}{B} \)}
-    \end{bprooftree}
-    \\
-    \vspace{1.5em}
-    \begin{bprooftree}
-      \AxiomC{\( \Gamma \vdash e : \dprod{x_{1} : A_{1}, \ldots, x_{n} : A_{n}}{B}\)}
-      \AxiomC{\( \Gamma \vdash e_{1} : A_{1} \hspace{1em} \ldots \hspace{1em} \Gamma \vdash e_{n} : A_{n} \)}
-      \RightLabel{\( (\Pi_{\ir{e}}) \)}
-      \BinaryInfC{\( \Gamma \vdash \appE{e}{(e_{1}, \ldots, e_{n})} : B \subst{x_{i}}{e_{i}} \)}
-    \end{bprooftree}
-    \\
-    \vspace{1.5em}
-    \begin{bprooftree}
-      \AxiomC{\( \Gamma \vdash A : \univ_{i} \)}
-      \AxiomC{\( \Gamma, x : A \vdash B : \univ_{i} \)}
-      \RightLabel{\( (\Sigma) \)}
-      \BinaryInfC{\( \Gamma \vdash \dsum{x : A}{B} : \univ_{i} \)}
-    \end{bprooftree}
-    \\
-    \vspace{1.5em}
-    \begin{bprooftree}
-      \AxiomC{\( \Gamma \vdash e_{1} : A_{1} \)}
-      \AxiomC{\( \ldots \)}
-      \AxiomC{\( \Gamma \vdash e_{n} : A_{n} \subst{x_{1}}{e_{1}}\ldots\subst{x_{n-1}}{e_{n-1}} \)}
-      \RightLabel{\( (\Sigma_{\ir{i}}) \)}
-      \TrinaryInfC{\( \Gamma \vdash (e_{1}, \ldots, e_{n}) : \dsum{x_{1} : A_{1}, \ldots, x_{n-1} : A_{n-1}}{A_{n}} \)}
-    \end{bprooftree}
-    \\
-    \vspace{1.5em}
-    \begin{bprooftree}
-      \AxiomC{\( \Gamma \vdash e_{1} : \dsum{x_{1} : A_{1}, \ldots, x_{n-1} : A_{n-1}}{A_{n}} \)}
-      \AxiomC{\( \Gamma, x_{1} : A_{1}, \ldots, x_{n} : A_{n} \vdash e_{2} : B \subst{z}{(x_{1}, \ldots, x_{n})} \)}
-      \RightLabel{\( (\Sigma_{\ir{e}}) \)}
-      \BinaryInfC{\( \Gamma \vdash \LET{(x_{1}, \ldots, x_{n})}{e_{1}}{e_{2}} : B \subst{z}{e_{1}} \)}
-    \end{bprooftree}
-    \\
-    \vspace{1.5em}
-    \begin{bprooftree}
-      \AxiomC{\( x : A \vdash e : A \)}
-      \RightLabel{\( \ir{(rec)} \)}
-      \UnaryInfC{\( \Gamma \vdash \rec{x}{e} : A \)}
-    \end{bprooftree}
-    \begin{bprooftree}
-      \AxiomC{\( \vphantom{\Gamma} \)}
-      \RightLabel{\( \ir{(constant)} \)}
-      \UnaryInfC{\( \Gamma \vdash c : A_{c} \)}
-    \end{bprooftree}
-  \end{center}
-\end{framed}
-
-\newpage
-
 polarize:
 \begin{framed}
   \begin{center}
@@ -281,17 +186,10 @@ polarize:
     \begin{bprooftree}
       \AxiomC{\( \ctx{\Gamma} \)}
       \RightLabel{\( \ir{(univ)} \)}
-      \UnaryInfC{\( \Gamma \vdash \univ_{i} : \univ_{i + 1} \)}
+      \UnaryInfC{\( \Gamma \vdash \univ : \univ \)}
     \end{bprooftree}
     \begin{bprooftree}
-      \AxiomC{\( \Gamma \vdash A : \univ_{i} \)}
-      \RightLabel{\( \ir{(hier)} \)}
-      \UnaryInfC{\( \Gamma \vdash A : \univ_{i + 1} \)}
-    \end{bprooftree}
-    \\
-    \vspace{1.5em}
-    \begin{bprooftree}
-      \AxiomC{\( \Gamma \vdash P : \univ_{i} \)}
+      \AxiomC{\( \Gamma \vdash P : \univ \)}
       \RightLabel{\( \ir{(ext)} \)}
       \UnaryInfC{\( \ctx{\Gamma, x : P} \)}
     \end{bprooftree}
@@ -303,57 +201,73 @@ polarize:
     \\
     \vspace{1.5em}
     \begin{bprooftree}
-      \AxiomC{\( \Gamma \vdash P : \univ_{i} \)}
-      \AxiomC{\( \Gamma, x : P \vdash N : \univ_{i} \)}
+      \AxiomC{\( \ctx{\Gamma} \)}
+      \RightLabel{\( (\Eps) \)}
+      \UnaryInfC{\( \Gamma \infer \Eps_{k} : \univ \)}
+    \end{bprooftree}
+    \begin{bprooftree}
+      \AxiomC{\( \ctx{\Gamma} \)}
+      \AxiomC{\( c \in \Eps_{k} \)}
+      \RightLabel{\( (\Eps_{\ir{i}}) \)}
+      \BinaryInfC{\( \Gamma \infer c : \Eps_{k} \)}
+    \end{bprooftree}
+    \begin{bprooftree}
+      \AxiomC{\( \Gamma \infer e : \Eps_{k} \)}
+      \AxiomC{\( (\Gamma, x : \Eps_{k} \infer e_{c} : N)_{c \in \Eps_{k}} \)}
+      \RightLabel{\( (\Eps_{\ir{e}}) \)}
+      \BinaryInfC{\( \Gamma \infer \LET{x}{e}{(c \Rightarrow e_{c})} : N \subst{x}{e} \)}
+    \end{bprooftree}
+    \\
+    \vspace{1.5em}
+    \begin{bprooftree}
+      \AxiomC{\( \Gamma \infer P_{0} : \univ \hspace{2em} \cdots \hspace{2em} \Gamma, x_{0} : P_{0}, \ldots, x_{n-1} : P_{n-1} \infer N : \univ \)}
       \RightLabel{\( (\Pi) \)}
-      \BinaryInfC{\( \Gamma \vdash \dprod{x : P}{N} : \univ_{i} \)}
+      \UnaryInfC{\( \Gamma \infer \dprod{x_{0} : P_{0}, \ldots, x_{n-1} : P_{n-1}}{N} : \univ \)}
     \end{bprooftree}
     \\
     \vspace{1.5em}
     \begin{bprooftree}
-      \AxiomC{\( \Gamma, x : P \vdash e : N \)}
+      \AxiomC{\( \Gamma, x_{0} : P_{0}, \ldots, x_{n-1} : P_{n-1} \infer e : N \)}
       \RightLabel{\( (\Pi_{\ir{i}}) \)}
-      \UnaryInfC{\( \Gamma \vdash \abs{x}{e} : \dprod{x : P}{N} \)}
+      \UnaryInfC{\( \Gamma \infer \abs{x}{e} : \dprod{x_{0} : P_{0}, \ldots, x_{n-1} : P_{n-1}}{N} \)}
     \end{bprooftree}
     \\
     \vspace{1.5em}
     \begin{bprooftree}
-      \AxiomC{\( \Gamma \vdash e_{1} : \dprod{x : P}{N} \)}
-      \AxiomC{\( \Gamma \vdash e_{2} : P \)}
+      \AxiomC{\( \Gamma \infer e : \dprod{x_{0} : P_{0}, \ldots, x_{n-1} : P_{n-1}}{N} \hspace{2em} \Gamma \infer e_{0} : P_{0} \hspace{2em} \cdots \hspace{2em} \Gamma \infer e_{n-1} : P_{n-1} \subst{x_{k}}{e_{k}} \)}
       \RightLabel{\( (\Pi_{\ir{e}}) \)}
-      \BinaryInfC{\( \Gamma \vdash \appE{e_{1}}{e_{2}} : N \subst{x}{e_{1}} \)}
+      \UnaryInfC{\( \Gamma \infer \appE{e}{(e_{0}, \ldots, e_{n-1})} : N \subst{x_{k}}{e_{k}} \)}
     \end{bprooftree}
     \\
     \vspace{1.5em}
     \begin{bprooftree}
-      \AxiomC{\( \Gamma \vdash P : \univ_{i} \)}
-      \AxiomC{\( \Gamma, x : P \vdash Q : \univ_{i} \)}
+      \AxiomC{\( \Gamma \infer P_{0} : \univ \hspace{2em} \cdots \hspace{2em} \Gamma, x_{0} : P_{0}, \ldots, x_{n-1} : P_{n-1} \infer P_{n} : \univ \)}
       \RightLabel{\( (\Sigma) \)}
-      \BinaryInfC{\( \Gamma \vdash \dsum{x : P}{Q} : \univ_{i} \)}
+      \UnaryInfC{\( \Gamma \infer \dsum{x_{0} : P_{0}, \ldots, x_{n-1} : P_{n-1}}{P_{n}} : \univ \)}
     \end{bprooftree}
     \\
     \vspace{1.5em}
     \begin{bprooftree}
-      \AxiomC{\( \Gamma \vdash e_{1} : P_{1} \)}
+      \AxiomC{\( \Gamma \infer e_{0} : P_{0} \)}
       \AxiomC{\( \ldots \)}
-      \AxiomC{\( \Gamma \vdash e_{n} : P_{n} \subst{x_{1}}{e_{1}}\ldots\subst{x_{n-1}}{e_{n-1}} \)}
+      \AxiomC{\( \Gamma \infer e_{n} : P_{n} \subst{x_{k}}{e_{k}} \)}
       \RightLabel{\( (\Sigma_{\ir{i}}) \)}
-      \TrinaryInfC{\( \Gamma \vdash (e_{1}, \ldots, e_{n}) : \dsum{x_{1} : P_{1}, \ldots, x_{n-1} : P_{n-1}}{P_{n}} \)}
+      \TrinaryInfC{\( \Gamma \infer (e_{1}, \ldots, e_{n}) : \dsum{x_{1} : P_{0}, \ldots, x_{n-1} : P_{n-1}}{P_{n}} \)}
     \end{bprooftree}
     \\
     \vspace{1.5em}
     \begin{bprooftree}
-      \AxiomC{\( \Gamma \vdash e_{1} : \dsum{x_{1} : P_{1}, \ldots, x_{n-1} : P_{n-1}}{P_{n}} \)}
-      \AxiomC{\( \Gamma, x_{1} : P_{1}, \ldots, x_{n} : P_{n} \vdash e_{2} : N \subst{z}{(x_{1}, \ldots, x_{n})} \)}
+      \AxiomC{\( \Gamma \infer e_{1} : \dsum{x_{1} : P_{0}, \ldots, x_{n-1} : P_{n-1}}{P_{n}} \)}
+      \AxiomC{\( \Gamma, x_{0} : P_{0}, \ldots, x_{n} : P_{n} \infer e_{2} : N \subst{z}{(x_{0}, \ldots, x_{n})} \)}
       \RightLabel{\( (\Sigma_{\ir{e}}) \)}
-      \BinaryInfC{\( \Gamma \vdash \LET{(x_{1}, \ldots, x_{n})}{e_{1}}{e_{2}} : N \subst{z}{e_{1}} \)}
+      \BinaryInfC{\( \Gamma \infer \LET{(x_{0}, \ldots, x_{n})}{e_{1}}{e_{2}} : N \subst{z}{e_{1}} \)}
     \end{bprooftree}
     \\
     \vspace{1.5em}
     \begin{bprooftree}
-      \AxiomC{\( \Gamma \vdash P : \univ_{i} \)}
+      \AxiomC{\( \Gamma \vdash P : \univ \)}
       \RightLabel{\( (\uparrow) \)}
-      \UnaryInfC{\( \Gamma \vdash \upT{P} : \univ_{i} \)}
+      \UnaryInfC{\( \Gamma \vdash \upT{P} : \univ \)}
     \end{bprooftree}
     \begin{bprooftree}
       \AxiomC{\( \Gamma \vdash e : P \)}
@@ -369,9 +283,9 @@ polarize:
     \\
     \vspace{1.5em}
     \begin{bprooftree}
-      \AxiomC{\( \Gamma \vdash N : \univ_{i} \)}
+      \AxiomC{\( \Gamma \vdash N : \univ \)}
       \RightLabel{\( (\downarrow) \)}
-      \UnaryInfC{\( \Gamma \vdash \downT{N} : \univ_{i} \)}
+      \UnaryInfC{\( \Gamma \vdash \downT{N} : \univ \)}
     \end{bprooftree}
     \begin{bprooftree}
       \AxiomC{\( \Gamma \vdash e : N \)}
@@ -387,8 +301,8 @@ polarize:
     \vspace{1.5em}
     \begin{bprooftree}
       \AxiomC{\( \Gamma, x : \downT{N} \vdash e : N \)}
-      \RightLabel{\( \ir{(rec)} \)}
-      \UnaryInfC{\( \Gamma \vdash \rec{x}{e} : N \)}
+      \RightLabel{\( \ir{(fix)} \)}
+      \UnaryInfC{\( \Gamma \vdash \fix{x}{e} : N \)}
     \end{bprooftree}
     \begin{bprooftree}
       \AxiomC{\( \vphantom{\Gamma} \)}
@@ -411,17 +325,10 @@ after closure conversion:
     \begin{bprooftree}
       \AxiomC{\( \ctx{\Gamma} \)}
       \RightLabel{\( \ir{(univ)} \)}
-      \UnaryInfC{\( \Gamma \vdash \univ_{i} : \univ_{i + 1} \)}
+      \UnaryInfC{\( \Gamma \vdash \univ : \univ \)}
     \end{bprooftree}
     \begin{bprooftree}
-      \AxiomC{\( \Gamma \vdash A : \univ_{i} \)}
-      \RightLabel{\( \ir{(hier)} \)}
-      \UnaryInfC{\( \Gamma \vdash A : \univ_{i + 1} \)}
-    \end{bprooftree}
-    \\
-    \vspace{1.5em}
-    \begin{bprooftree}
-      \AxiomC{\( \Gamma \vdash P : \univ_{i} \)}
+      \AxiomC{\( \Gamma \vdash P : \univ \)}
       \RightLabel{\( \ir{(ext)} \)}
       \UnaryInfC{\( \ctx{\Gamma, x : P} \)}
     \end{bprooftree}
@@ -433,10 +340,10 @@ after closure conversion:
     \\
     \vspace{1.5em}
     \begin{bprooftree}
-      \AxiomC{\( \Gamma \vdash P : \univ_{i} \)}
-      \AxiomC{\( \Gamma, x : P \vdash N : \univ_{i} \)}
+      \AxiomC{\( \Gamma \vdash P : \univ \)}
+      \AxiomC{\( \Gamma, x : P \vdash N : \univ \)}
       \RightLabel{\( (\Pi) \)}
-      \BinaryInfC{\( \Gamma \vdash \dprod{x : P}{N} : \univ_{i} \)}
+      \BinaryInfC{\( \Gamma \vdash \dprod{x : P}{N} : \univ \)}
     \end{bprooftree}
     \\
     \vspace{1.5em}
@@ -457,10 +364,10 @@ after closure conversion:
     \\
     \vspace{1.5em}
     \begin{bprooftree}
-      \AxiomC{\( \Gamma \vdash P : \univ_{i} \)}
-      \AxiomC{\( \Gamma, x : P \vdash Q : \univ_{i} \)}
+      \AxiomC{\( \Gamma \vdash P : \univ \)}
+      \AxiomC{\( \Gamma, x : P \vdash Q : \univ \)}
       \RightLabel{\( (\Sigma) \)}
-      \BinaryInfC{\( \Gamma \vdash \dsum{x : P}{Q} : \univ_{i} \)}
+      \BinaryInfC{\( \Gamma \vdash \dsum{x : P}{Q} : \univ \)}
     \end{bprooftree}
     \\
     \vspace{1.5em}
@@ -469,7 +376,7 @@ after closure conversion:
       \AxiomC{\( \ldots \)}
       \AxiomC{\( \Gamma \vdash e_{n} : P_{n} \subst{x_{1}}{e_{1}}\ldots\subst{x_{n-1}}{e_{n-1}} \)}
       \RightLabel{\( (\Sigma_{\ir{i}}) \)}
-      \TrinaryInfC{\( \Gamma \vdash \vret{(e_{1}, \ldots, e_{n})} : \dsum{x_{1} : P_{1}, \ldots, x_{n-1} : P_{n-1}}{P_{n}} \)}
+      \TrinaryInfC{\( \Gamma \vdash (e_{1}, \ldots, e_{n}) : \dsum{x_{1} : P_{1}, \ldots, x_{n-1} : P_{n-1}}{P_{n}} \)}
     \end{bprooftree}
     \\
     \vspace{1.5em}
@@ -482,9 +389,9 @@ after closure conversion:
     \\
     \vspace{1.5em}
     \begin{bprooftree}
-      \AxiomC{\( \Gamma \vdash P : \univ_{i} \)}
+      \AxiomC{\( \Gamma \vdash P : \univ \)}
       \RightLabel{\( (\uparrow) \)}
-      \UnaryInfC{\( \Gamma \vdash \upT{P} : \univ_{i} \)}
+      \UnaryInfC{\( \Gamma \vdash \upT{P} : \univ \)}
     \end{bprooftree}
     \begin{bprooftree}
       \AxiomC{\( \Gamma \vdash e : P \)}
@@ -501,8 +408,8 @@ after closure conversion:
     \vspace{1.5em}
     \begin{bprooftree}
       \AxiomC{\( x : \downT{N} \vdash e : N \)}
-      \RightLabel{\( \ir{(rec)} \)}
-      \UnaryInfC{\( \Gamma \vdash \rec{x}{e} : N \)}
+      \RightLabel{\( \ir{(fix)} \)}
+      \UnaryInfC{\( \Gamma \vdash \fix{x}{e} : N \)}
     \end{bprooftree}
     \begin{bprooftree}
       \AxiomC{\( \vphantom{\Gamma} \)}
