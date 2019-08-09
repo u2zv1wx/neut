@@ -62,7 +62,7 @@ interpret (m :< TreeNode [_ :< TreeAtom "mu", xt, e]) = do
   xt' <- interpretIdentifierPlus xt
   e' <- interpret e
   return $ m :< WeakTermMu xt' e'
-interpret (m :< TreeNode [_ :< TreeAtom "hole", _ :< TreeAtom x]) = do
+interpret (m :< TreeNode [_ :< TreeAtom "meta-variable", _ :< TreeAtom x]) = do
   x' <- interpretAtom x
   return $ m :< WeakTermHole x'
 --
@@ -81,9 +81,10 @@ interpret t@(m :< TreeAtom x) = do
           if x `elem` cenv
             then return $ m :< WeakTermConst x
             else return $ m :< WeakTermUpsilon x
-interpret (m :< TreeNode (e:es)) =
-  interpret $ m :< TreeNode (("" :< TreeAtom "pi-elimination") : e : es)
-interpret t = lift $ throwE $ "interpret: syntax error:\n" ++ Pr.ppShow t
+interpret t@(m :< TreeNode es) =
+  if null es
+    then throwError $ "interpret: syntax error:\n" ++ Pr.ppShow t
+    else interpret $ m :< TreeNode ((m :< TreeAtom "pi-elimination") : es)
 
 interpretIdentifierPlus :: Tree -> WithEnv IdentifierPlus
 interpretIdentifierPlus (_ :< TreeAtom x) = do
