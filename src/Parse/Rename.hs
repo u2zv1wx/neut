@@ -23,7 +23,7 @@ rename (m :< WeakTermUpsilon x) = do
       x'' <- lookupNameEnv x'
       return $ m :< WeakTermUpsilon x''
     else do
-      mx <- nameInModule x' >>= lookupNameEnv''
+      mx <- nameInModule x' >>= lookupNameEnvMaybe
       case mx of
         Just x'' -> return $ m :< WeakTermUpsilon x''
         Nothing -> do

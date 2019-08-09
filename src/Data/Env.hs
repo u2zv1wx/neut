@@ -126,15 +126,8 @@ lookupNameEnv s = do
     Just s' -> return s'
     Nothing -> lift $ throwE $ "undefined variable: " ++ show s
 
-lookupNameEnv' :: String -> WithEnv String
-lookupNameEnv' s = do
-  env <- get
-  case lookup s (nameEnv env) of
-    Just s' -> return s'
-    Nothing -> newNameWith s
-
-lookupNameEnv'' :: String -> WithEnv (Maybe String)
-lookupNameEnv'' s = do
+lookupNameEnvMaybe :: String -> WithEnv (Maybe String)
+lookupNameEnvMaybe s = do
   env <- get
   case lookup s (nameEnv env) of
     Just s' -> return $ Just s'
@@ -143,7 +136,7 @@ lookupNameEnv'' s = do
 lookupNameEnvByList :: [String] -> WithEnv (Maybe String)
 lookupNameEnvByList [] = return Nothing
 lookupNameEnvByList (x:xs) = do
-  my <- lookupNameEnv'' x
+  my <- lookupNameEnvMaybe x
   case my of
     Nothing -> lookupNameEnvByList xs
     Just y  -> return $ Just y
