@@ -24,19 +24,19 @@ reduceNeg (NegSigmaElim xs v body) =
     PosSigmaIntro vs
       | length xs == length vs -> reduceNeg $ substNeg (zip xs vs) body
     _ -> return $ NegSigmaElim xs v body
-reduceNeg (NegIndexElim v branchList) =
+reduceNeg (NegEpsilonElim v branchList) =
   case v of
-    PosIndexIntro x _ ->
-      case lookup x branchList of
+    PosEpsilonIntro l _ ->
+      case lookup (CaseLiteral l) branchList of
         Just body -> reduceNeg body
         Nothing ->
-          case lookup IndexDefault branchList of
+          case lookup CaseDefault branchList of
             Just body -> reduceNeg body
             Nothing ->
               lift $
               throwE $
-              "the index " ++ show x ++ " is not included in branchList"
-    _ -> return $ NegIndexElim v branchList
+              "the index " ++ show l ++ " is not included in branchList"
+    _ -> return $ NegEpsilonElim v branchList
 reduceNeg (NegUpElim x e1 e2) = do
   e1' <- reduceNeg e1
   case e1' of
@@ -53,19 +53,19 @@ reduceNeg (NegConstElim c vs) = do
   let t = LowTypeSignedInt 64 -- for now
   case (c, xs) of
     (ConstantArith _ ArithAdd, Just [x, y]) ->
-      return $ NegUpIntro (PosIndexIntro (IndexInteger (x + y)) t)
+      return $ NegUpIntro (PosEpsilonIntro (LiteralInteger (x + y)) t)
     (ConstantArith _ ArithSub, Just [x, y]) ->
-      return $ NegUpIntro (PosIndexIntro (IndexInteger (x - y)) t)
+      return $ NegUpIntro (PosEpsilonIntro (LiteralInteger (x - y)) t)
     (ConstantArith _ ArithMul, Just [x, y]) ->
-      return $ NegUpIntro (PosIndexIntro (IndexInteger (x * y)) t)
+      return $ NegUpIntro (PosEpsilonIntro (LiteralInteger (x * y)) t)
     (ConstantArith _ ArithDiv, Just [x, y]) ->
-      return $ NegUpIntro (PosIndexIntro (IndexInteger (x `div` y)) t)
+      return $ NegUpIntro (PosEpsilonIntro (LiteralInteger (x `div` y)) t)
     _ -> return $ NegConstElim c vs
 reduceNeg e = return e
 
 takeIntegerList :: [Pos] -> Maybe [Int]
 takeIntegerList [] = Just []
-takeIntegerList (PosIndexIntro (IndexInteger i) _:rest) = do
+takeIntegerList (PosEpsilonIntro (LiteralInteger i) _:rest) = do
   is <- takeIntegerList rest
   return (i : is)
 takeIntegerList _ = Nothing
