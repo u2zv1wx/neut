@@ -22,25 +22,23 @@ import qualified Data.PQueue.Min            as Q
 type ConstraintQueue = Q.MinQueue EnrichedConstraint
 
 data Env = Env
-  { count              :: Int -- to generate fresh symbols
-  , notationEnv        :: [(Tree, Tree)] -- macro transformers
-  , reservedEnv        :: [Identifier] -- list of reserved keywords
-  , constantEnv        :: [Identifier]
-  , moduleEnv          :: [Identifier] -- "foo.bar" ~ ["foo", "bar"]
-  , prefixEnv          :: [Identifier]
-  , indexEnv           :: [(Identifier, [Identifier])]
-  , nameEnv            :: [(Identifier, Identifier)] -- [("foo.bar.buz", "foo.bar.buz.13"), ...]
-  , typeEnv            :: Map.Map Identifier WeakTerm
-  , constraintEnv      :: [PreConstraint] -- for type inference
-  , constraintQueue    :: ConstraintQueue -- for (dependent) type inference
-  , substEnv           :: SubstWeakTerm -- for (dependent) type inference
-  , levelEnv           :: [(Identifier, WeakLevel)]
-  , levelConstraintEnv :: [LevelConstraint]
-  , currentDir         :: FilePath
-  , termEnv            :: [(Identifier, ([Identifier], Term))] -- x == lam (x1, ..., xn). e
-  , polEnv             :: [(Identifier, ([Identifier], Neg))] -- x == v || x == thunk (lam (x) e)
-  , llvmEnv            :: [(Identifier, ([Identifier], LLVM))]
-  , origin             :: Maybe Identifier
+  { count           :: Int -- to generate fresh symbols
+  , notationEnv     :: [(Tree, Tree)] -- macro transformers
+  , reservedEnv     :: [Identifier] -- list of reserved keywords
+  , constantEnv     :: [Identifier]
+  , moduleEnv       :: [Identifier] -- "foo.bar" ~ ["foo", "bar"]
+  , prefixEnv       :: [Identifier]
+  , indexEnv        :: [(Identifier, [Identifier])]
+  , nameEnv         :: [(Identifier, Identifier)] -- [("foo.bar.buz", "foo.bar.buz.13"), ...]
+  , typeEnv         :: Map.Map Identifier WeakTerm
+  , constraintEnv   :: [PreConstraint] -- for type inference
+  , constraintQueue :: ConstraintQueue -- for (dependent) type inference
+  , substEnv        :: SubstWeakTerm -- for (dependent) type inference
+  , currentDir      :: FilePath
+  , termEnv         :: [(Identifier, ([Identifier], Term))] -- x == lam (x1, ..., xn). e
+  , polEnv          :: [(Identifier, ([Identifier], Neg))] -- x == v || x == thunk (lam (x) e)
+  , llvmEnv         :: [(Identifier, ([Identifier], LLVM))]
+  , origin          :: Maybe Identifier
   }
 
 initialEnv :: FilePath -> Env
@@ -61,8 +59,6 @@ initialEnv path =
     , constraintEnv = []
     , constraintQueue = Q.empty
     , substEnv = []
-    , levelEnv = []
-    , levelConstraintEnv = []
     , currentDir = path
     , origin = Nothing
     }
@@ -235,35 +231,6 @@ insConstraintEnv :: WeakTerm -> WeakTerm -> WithEnv ()
 insConstraintEnv t1 t2 =
   modify (\e -> e {constraintEnv = (t1, t2) : constraintEnv e})
 
-insLevelConstraintEnvEQ :: WeakLevel -> WeakLevel -> WithEnv ()
-insLevelConstraintEnvEQ l1 l2 = do
-  let c = LevelConstraintEQ l1 l2
-  modify (\e -> e {levelConstraintEnv = c : levelConstraintEnv e})
-
--- insLevelConstraintEnvEQType :: WeakLevel -> WeakTerm -> WithEnv ()
--- insLevelConstraintEnvEQType l t = do
---   let c = LevelConstraintEQType l t
---   modify (\e -> e {levelConstraintEnv = c : levelConstraintEnv e})
-insLevelConstraintEnvLE :: WeakLevel -> WeakLevel -> WithEnv ()
-insLevelConstraintEnvLE l1 l2 = do
-  let c = LevelConstraintLE l1 l2
-  modify (\e -> e {levelConstraintEnv = c : levelConstraintEnv e})
-
-insLevelConstraintEnvLEType :: WeakLevel -> WeakTerm -> WithEnv ()
-insLevelConstraintEnvLEType l t = do
-  let c = LevelConstraintLEType l t
-  modify (\e -> e {levelConstraintEnv = c : levelConstraintEnv e})
-
-insLevelConstraintEnvFinite :: WeakLevel -> WithEnv ()
-insLevelConstraintEnvFinite l = do
-  let c = LevelConstraintFinite l
-  modify (\e -> e {levelConstraintEnv = c : levelConstraintEnv e})
-
-insLevelConstraintEnvInfiniteType :: WeakTerm -> WithEnv ()
-insLevelConstraintEnvInfiniteType t = do
-  let c = LevelConstraintInfiniteType t
-  modify (\e -> e {levelConstraintEnv = c : levelConstraintEnv e})
-
 wrap :: f (Cofree f Identifier) -> WithEnv (Cofree f Identifier)
 wrap a = do
   meta <- newNameWith "meta"
@@ -279,14 +246,14 @@ newHole :: WithEnv WeakTerm
 newHole = do
   h <- newNameWith "hole"
   m <- newNameWith "meta"
-  return $ m :< WeakTermHole (h, WeakLevelInt 0)
+  return $ m :< WeakTermHole h
 
 newHoleOfType :: WeakTerm -> WithEnv WeakTerm
 newHoleOfType t = do
   h <- newNameWith "hole"
   m <- newNameWith "meta"
   insTypeEnv m t
-  return $ m :< WeakTermHole (h, WeakLevelInt 0)
+  return $ m :< WeakTermHole h
 
 obtainOrigin :: WithEnv Identifier
 obtainOrigin = do
