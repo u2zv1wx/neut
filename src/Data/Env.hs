@@ -27,16 +27,15 @@ data Env = Env
   , reservedEnv     :: [Identifier] -- list of reserved keywords
   , constantEnv     :: [Identifier]
   , indexEnv        :: [(Identifier, [Identifier])]
-  , nameEnv         :: [(Identifier, Identifier)] -- [("foo.bar.buz", "foo.bar.buz.13"), ...]
+  , nameEnv         :: [(Identifier, Identifier)] -- [("foo", "foo.13"), ...]
   , typeEnv         :: Map.Map Identifier WeakTerm
   , constraintEnv   :: [PreConstraint] -- for type inference
   , constraintQueue :: ConstraintQueue -- for (dependent) type inference
   , substEnv        :: SubstWeakTerm -- for (dependent) type inference
   , currentDir      :: FilePath
-  , termEnv         :: [(Identifier, ([Identifier], Term))] -- x == lam (x1, ..., xn). e
-  , polEnv          :: [(Identifier, ([Identifier], Neg))] -- x == v || x == thunk (lam (x) e)
+  , termEnv         :: [(Identifier, ([Identifier], Term))] -- f ~> (lam (x1 ... xn) e)
+  , polEnv          :: [(Identifier, ([Identifier], Neg))] -- f ~> thunk (lam (x1 ... xn) e)
   , llvmEnv         :: [(Identifier, ([Identifier], LLVM))]
-  , origin          :: Maybe Identifier
   }
 
 initialEnv :: FilePath -> Env
@@ -56,7 +55,6 @@ initialEnv path =
     , constraintQueue = Q.empty
     , substEnv = []
     , currentDir = path
-    , origin = Nothing
     }
 
 type WithEnv a = StateT Env (ExceptT String IO) a
@@ -163,7 +161,6 @@ insIndexEnv :: Identifier -> [Identifier] -> WithEnv ()
 insIndexEnv name indexList =
   modify (\e -> e {indexEnv = (name, indexList) : indexEnv e})
 
--- FIXME: cartesian.fooみたいなやつを自動でcartesianだと判別できるようにする
 lookupKind :: Literal -> WithEnv (Maybe Identifier)
 lookupKind (LiteralInteger _) = return Nothing
 lookupKind (LiteralFloat _) = return Nothing
@@ -225,12 +222,6 @@ wrap a = do
   meta <- newNameWith "meta"
   return $ meta :< a
 
-wrapTypeWithUniv :: WeakTerm -> WeakTermF WeakTerm -> WithEnv WeakTerm
-wrapTypeWithUniv univ t = do
-  meta <- newNameWith "meta"
-  insTypeEnv meta univ
-  return $ meta :< t
-
 newHole :: WithEnv WeakTerm
 newHole = do
   h <- newNameWith "hole"
@@ -243,13 +234,3 @@ newHoleOfType t = do
   m <- newNameWith "meta"
   insTypeEnv m t
   return $ m :< WeakTermHole h
-
-obtainOrigin :: WithEnv Identifier
-obtainOrigin = do
-  mo <- gets origin
-  case mo of
-    Just o -> return o
-    Nothing -> do
-      o <- newNameWith "origin"
-      modify (\env -> env {origin = Just o})
-      return o
