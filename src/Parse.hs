@@ -61,13 +61,6 @@ parse' ((_ :< TreeNode [_ :< TreeAtom "include", _ :< TreeAtom pathString]):as) 
           modify (\e -> e {currentDir = dirPath})
           defList <- parse' as
           return $ includedDefList ++ defList
-parse' ((_ :< TreeNode ((_ :< TreeAtom "module"):(_ :< TreeAtom moduleName):ss)):as) = do
-  menv <- gets moduleEnv
-  modify (\env -> env {moduleEnv = menv ++ [moduleName]})
-  defList1 <- parse' ss
-  modify (\env -> env {moduleEnv = menv})
-  defList2 <- parse' as
-  return $ defList1 ++ defList2
 parse' ((_ :< TreeNode [_ :< TreeAtom "use", _ :< TreeAtom moduleName]):as) = do
   modify (\env -> env {prefixEnv = moduleName : prefixEnv env})
   parse' as
@@ -87,7 +80,7 @@ parse' ((meta :< TreeNode [_ :< TreeAtom "let", xt, e]):as) = do
   e' <- macroExpand e >>= interpret >>= rename
   (x, t) <- macroExpand xt >>= interpretIdentifierPlus
   t' <- rename t
-  x' <- nameInModule x >>= newNameWith
+  x' <- newNameWith x
   defList <- parse' as
   return $ DefLet meta (x', t') e' : defList
 parse' (a:as)
@@ -99,10 +92,9 @@ parse' (a:as)
     else do
       e'@(meta :< _) <- interpret e >>= rename
       name <- newNameWith "hole"
-      name' <- nameInModule name
       t <- newHole
       defList <- parse' as
-      return $ DefLet meta (name', t) e' : defList
+      return $ DefLet meta (name, t) e' : defList
 
 isSpecialForm :: Tree -> Bool
 isSpecialForm (_ :< TreeNode [_ :< TreeAtom "notation", _, _]) = True
@@ -110,8 +102,6 @@ isSpecialForm (_ :< TreeNode [_ :< TreeAtom "reserve", _ :< TreeAtom _]) = True
 isSpecialForm (_ :< TreeNode ((_ :< TreeAtom "sortal"):(_ :< TreeAtom _):_)) =
   True
 isSpecialForm (_ :< TreeNode [_ :< TreeAtom "include", _ :< TreeAtom _]) = True
-isSpecialForm (_ :< TreeNode ((_ :< TreeAtom "module"):(_ :< TreeAtom _):_)) =
-  True
 isSpecialForm (_ :< TreeNode [_ :< TreeAtom "use", _ :< TreeAtom _]) = True
 isSpecialForm (_ :< TreeNode [_ :< TreeAtom "unuse", _ :< TreeAtom _]) = True
 isSpecialForm (_ :< TreeNode [_ :< TreeAtom "extern", _ :< TreeAtom _]) = True

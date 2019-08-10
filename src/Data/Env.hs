@@ -26,7 +26,6 @@ data Env = Env
   , notationEnv     :: [(Tree, Tree)] -- macro transformers
   , reservedEnv     :: [Identifier] -- list of reserved keywords
   , constantEnv     :: [Identifier]
-  , moduleEnv       :: [Identifier] -- "foo.bar" ~ ["foo", "bar"]
   , prefixEnv       :: [Identifier]
   , indexEnv        :: [(Identifier, [Identifier])]
   , nameEnv         :: [(Identifier, Identifier)] -- [("foo.bar.buz", "foo.bar.buz.13"), ...]
@@ -48,7 +47,6 @@ initialEnv path =
     , notationEnv = []
     , reservedEnv = []
     , constantEnv = []
-    , moduleEnv = []
     , prefixEnv = []
     , indexEnv = []
     , nameEnv = []
