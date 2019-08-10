@@ -47,7 +47,7 @@ simp ((_ :< WeakTermPiIntro xts1 body1, _ :< WeakTermPiIntro xts2 body2):cs) = d
   simpPiOrSigma (xts1 ++ [(h1, body1)]) (xts2 ++ [(h2, body2)]) cs
 simp ((_ :< WeakTermPiIntro xts body1, e2):cs) = do
   let (xs, _) = unzip xts
-  vs <- mapM toVar' xs
+  vs <- mapM toVar xs
   appMeta <- newNameWith "meta"
   simp $ (body1, appMeta :< WeakTermPiElim e2 vs) : cs
 simp ((e1, e2@(_ :< WeakTermPiIntro {})):cs) = simp $ (e2, e1) : cs
@@ -106,7 +106,7 @@ simpPiOrSigma ::
   -> WithEnv [EnrichedConstraint]
 simpPiOrSigma xts1 xts2 cs = do
   let (xs1, ts1) = unzip xts1
-  vs1 <- mapM toVar' xs1
+  vs1 <- mapM toVar xs1
   let (xs2, ts2) = unzip xts2
   let ts2' = map (substWeakTerm (zip xs2 vs1)) ts2
   simp $ zip ts1 ts2' ++ cs
@@ -155,8 +155,8 @@ isSolvable e x xs = do
   let (fvs, fmvs) = varAndHole e
   affineCheck xs fvs && x `notElem` fmvs
 
-toVar' :: Identifier -> WithEnv WeakTerm
-toVar' x = do
+toVar :: Identifier -> WithEnv WeakTerm
+toVar x = do
   meta <- newNameWith "meta"
   return $ meta :< WeakTermUpsilon x
 
