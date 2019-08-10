@@ -94,18 +94,6 @@ newNameOfType t = do
   insTypeEnv i t
   return i
 
-newName1 :: Identifier -> WeakTerm -> WithEnv Identifier
-newName1 baseName t = do
-  i <- newNameWith baseName
-  insTypeEnv i t
-  return i
-
-constNameWith :: Identifier -> WithEnv ()
-constNameWith s = modify (\e -> e {nameEnv = (s, s) : nameEnv e})
-
-lookupTypeEnv :: String -> WithEnv (Maybe WeakTerm)
-lookupTypeEnv s = gets (Map.lookup s . typeEnv)
-
 lookupTypeEnv' :: String -> WithEnv WeakTerm
 lookupTypeEnv' s = do
   mt <- gets (Map.lookup s . typeEnv)
@@ -127,23 +115,8 @@ lookupNameEnvMaybe s = do
     Just s' -> return $ Just s'
     Nothing -> return Nothing
 
-lookupNameEnvByList :: [String] -> WithEnv (Maybe String)
-lookupNameEnvByList [] = return Nothing
-lookupNameEnvByList (x:xs) = do
-  my <- lookupNameEnvMaybe x
-  case my of
-    Nothing -> lookupNameEnvByList xs
-    Just y  -> return $ Just y
-
 insTypeEnv :: Identifier -> WeakTerm -> WithEnv ()
 insTypeEnv i t = modify (\e -> e {typeEnv = Map.insert i t (typeEnv e)})
-
-insTypeEnv1 :: Identifier -> WeakTerm -> WithEnv ()
-insTypeEnv1 i t = do
-  tenv <- gets typeEnv
-  let ts = Map.elems $ Map.filterWithKey (\j _ -> i == j) tenv
-  forM_ ts $ \t' -> insConstraintEnv t t'
-  modify (\e -> e {typeEnv = Map.insert i t (typeEnv e)})
 
 insTermEnv :: Identifier -> [Identifier] -> Term -> WithEnv ()
 insTermEnv name args e =
