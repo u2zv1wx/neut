@@ -61,12 +61,6 @@ parse' ((_ :< TreeNode [_ :< TreeAtom "include", _ :< TreeAtom pathString]):as) 
           modify (\e -> e {currentDir = dirPath})
           defList <- parse' as
           return $ includedDefList ++ defList
-parse' ((_ :< TreeNode [_ :< TreeAtom "use", _ :< TreeAtom moduleName]):as) = do
-  modify (\env -> env {prefixEnv = moduleName : prefixEnv env})
-  parse' as
-parse' ((_ :< TreeNode [_ :< TreeAtom "unuse", _ :< TreeAtom moduleName]):as) = do
-  modify (\env -> env {prefixEnv = filter (/= moduleName) $ prefixEnv env})
-  parse' as
 parse' ((_ :< TreeNode ((_ :< TreeAtom "statement"):as1)):as2) = do
   defList1 <- parse' as1
   defList2 <- parse' as2
@@ -102,8 +96,6 @@ isSpecialForm (_ :< TreeNode [_ :< TreeAtom "reserve", _ :< TreeAtom _]) = True
 isSpecialForm (_ :< TreeNode ((_ :< TreeAtom "sortal"):(_ :< TreeAtom _):_)) =
   True
 isSpecialForm (_ :< TreeNode [_ :< TreeAtom "include", _ :< TreeAtom _]) = True
-isSpecialForm (_ :< TreeNode [_ :< TreeAtom "use", _ :< TreeAtom _]) = True
-isSpecialForm (_ :< TreeNode [_ :< TreeAtom "unuse", _ :< TreeAtom _]) = True
 isSpecialForm (_ :< TreeNode [_ :< TreeAtom "extern", _ :< TreeAtom _]) = True
 isSpecialForm (_ :< TreeNode ((_ :< TreeAtom "statement"):_)) = True
 isSpecialForm (_ :< TreeNode [_ :< TreeAtom "let", _, _]) = True

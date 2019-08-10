@@ -26,7 +26,6 @@ data Env = Env
   , notationEnv     :: [(Tree, Tree)] -- macro transformers
   , reservedEnv     :: [Identifier] -- list of reserved keywords
   , constantEnv     :: [Identifier]
-  , prefixEnv       :: [Identifier]
   , indexEnv        :: [(Identifier, [Identifier])]
   , nameEnv         :: [(Identifier, Identifier)] -- [("foo.bar.buz", "foo.bar.buz.13"), ...]
   , typeEnv         :: Map.Map Identifier WeakTerm
@@ -47,7 +46,6 @@ initialEnv path =
     , notationEnv = []
     , reservedEnv = []
     , constantEnv = []
-    , prefixEnv = []
     , indexEnv = []
     , nameEnv = []
     , typeEnv = Map.empty
