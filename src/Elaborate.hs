@@ -49,7 +49,7 @@ elaborate e = do
 elaborate' :: WeakTerm -> WithEnv Term
 elaborate' (_ :< WeakTermUniverse) = return zero
 elaborate' (_ :< WeakTermUpsilon x) = return $ TermUpsilon x
-elaborate' (_ :< WeakTermEpsilon _) = return zero
+elaborate' (_ :< WeakTermEpsilon _) = return one -- immediate type
 elaborate' (meta :< WeakTermEpsilonIntro x) = do
   t <- lookupTypeEnv' meta
   t' <- reduceWeakTerm t
@@ -144,6 +144,9 @@ allM p (x:xs) = do
 
 zero :: Term
 zero = TermEpsilonIntro (LiteralInteger 0) $ LowTypeSignedInt 64
+
+one :: Term
+one = TermEpsilonIntro (LiteralInteger 1) $ LowTypeSignedInt 64
 
 asLowType :: Identifier -> LowType
 asLowType x

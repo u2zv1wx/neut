@@ -148,12 +148,12 @@ initial system:
       \AxiomC{\( \ldots \)}
       \AxiomC{\( \Gamma \infer e_{n} : A_{n} \subst{x_{k}}{e_{k}} \)}
       \RightLabel{\( (\Sigma_{\ir{i}}) \)}
-      \TrinaryInfC{\( \Gamma \infer (e_{1}, \ldots, e_{n}) : \dsum{x_{1} : A_{0}, \ldots, x_{n-1} : A_{n-1}}{A_{n}} \)}
+      \TrinaryInfC{\( \Gamma \infer (e_{0}, \ldots, e_{n}) : \dsum{x_{0} : A_{0}, \ldots, x_{n-1} : A_{n-1}}{A_{n}} \)}
     \end{bprooftree}
     \\
     \vspace{1.5em}
     \begin{bprooftree}
-      \AxiomC{\( \Gamma \infer e_{1} : \dsum{x_{1} : A_{0}, \ldots, x_{n-1} : A_{n-1}}{A_{n}} \)}
+      \AxiomC{\( \Gamma \infer e_{1} : \dsum{x_{0} : A_{0}, \ldots, x_{n-1} : A_{n-1}}{A_{n}} \)}
       \AxiomC{\( \Gamma, x_{0} : A_{0}, \ldots, x_{n} : A_{n} \infer e_{2} : B \subst{z}{(x_{0}, \ldots, x_{n})} \)}
       \RightLabel{\( (\Sigma_{\ir{e}}) \)}
       \BinaryInfC{\( \Gamma \infer \LET{(x_{0}, \ldots, x_{n})}{e_{1}}{e_{2}} : B \subst{z}{e_{1}} \)}
@@ -252,12 +252,12 @@ polarize:
       \AxiomC{\( \ldots \)}
       \AxiomC{\( \Gamma \infer e_{n} : P_{n} \subst{x_{k}}{e_{k}} \)}
       \RightLabel{\( (\Sigma_{\ir{i}}) \)}
-      \TrinaryInfC{\( \Gamma \infer (e_{1}, \ldots, e_{n}) : \dsum{x_{1} : P_{0}, \ldots, x_{n-1} : P_{n-1}}{P_{n}} \)}
+      \TrinaryInfC{\( \Gamma \infer (e_{0}, \ldots, e_{n}) : \dsum{x_{0} : P_{0}, \ldots, x_{n-1} : P_{n-1}}{P_{n}} \)}
     \end{bprooftree}
     \\
     \vspace{1.5em}
     \begin{bprooftree}
-      \AxiomC{\( \Gamma \infer e_{1} : \dsum{x_{1} : P_{0}, \ldots, x_{n-1} : P_{n-1}}{P_{n}} \)}
+      \AxiomC{\( \Gamma \infer e_{1} : \dsum{x_{0} : P_{0}, \ldots, x_{n-1} : P_{n-1}}{P_{n}} \)}
       \AxiomC{\( \Gamma, x_{0} : P_{0}, \ldots, x_{n} : P_{n} \infer e_{2} : N \subst{z}{(x_{0}, \ldots, x_{n})} \)}
       \RightLabel{\( (\Sigma_{\ir{e}}) \)}
       \BinaryInfC{\( \Gamma \infer \LET{(x_{0}, \ldots, x_{n})}{e_{1}}{e_{2}} : N \subst{z}{e_{1}} \)}
@@ -391,12 +391,12 @@ after closure conversion:
       \AxiomC{\( \ldots \)}
       \AxiomC{\( \Gamma \infer e_{n} : P_{n} \subst{x_{k}}{e_{k}} \)}
       \RightLabel{\( (\Sigma_{\ir{i}}) \)}
-      \TrinaryInfC{\( \Gamma \infer (e_{1}, \ldots, e_{n}) : \dsum{x_{1} : P_{0}, \ldots, x_{n-1} : P_{n-1}}{P_{n}} \)}
+      \TrinaryInfC{\( \Gamma \infer (e_{0}, \ldots, e_{n}) : \dsum{x_{0} : P_{0}, \ldots, x_{n-1} : P_{n-1}}{P_{n}} \)}
     \end{bprooftree}
     \\
     \vspace{1.5em}
     \begin{bprooftree}
-      \AxiomC{\( \Gamma \infer e_{1} : \dsum{x_{1} : P_{0}, \ldots, x_{n-1} : P_{n-1}}{P_{n}} \)}
+      \AxiomC{\( \Gamma \infer e_{1} : \dsum{x_{0} : P_{0}, \ldots, x_{n-1} : P_{n-1}}{P_{n}} \)}
       \AxiomC{\( \Gamma, x_{0} : P_{0}, \ldots, x_{n} : P_{n} \infer e_{2} : N \subst{z}{(x_{0}, \ldots, x_{n})} \)}
       \RightLabel{\( (\Sigma_{\ir{e}}) \)}
       \BinaryInfC{\( \Gamma \infer \LET{(x_{0}, \ldots, x_{n})}{e_{1}}{e_{2}} : N \subst{z}{e_{1}} \)}
