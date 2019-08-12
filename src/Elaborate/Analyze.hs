@@ -25,7 +25,7 @@ simp :: [PreConstraint] -> WithEnv [EnrichedConstraint]
 simp [] = return []
 simp ((e1, e2):cs)
   | isReducible e1 = do
-    me1' <- liftToWithEnv (timeout 5000000) $ reduceWeakTerm e1 -- 5 sec
+    me1' <- reduceWeakTerm e1 >>= \e1' -> liftIO $ timeout 5000000 $ return e1'
     case me1' of
       Just e1' -> simp $ (e1', e2) : cs
       Nothing ->
@@ -48,7 +48,7 @@ simp ((_ :< WeakTermPiIntro xts1 body1, _ :< WeakTermPiIntro xts2 body2):cs) = d
 simp ((_ :< WeakTermPiIntro xts body1, e2):cs) = do
   let (xs, _) = unzip xts
   vs <- mapM toVar xs
-  appMeta <- newNameWith "meta"
+  appMeta <- emptyMeta
   simp $ (body1, appMeta :< WeakTermPiElim e2 vs) : cs
 simp ((e1, e2@(_ :< WeakTermPiIntro {})):cs) = simp $ (e2, e1) : cs
 simp ((_ :< WeakTermSigma xts1, _ :< WeakTermSigma xts2):cs)
@@ -157,7 +157,7 @@ isSolvable e x xs = do
 
 toVar :: Identifier -> WithEnv WeakTerm
 toVar x = do
-  meta <- newNameWith "meta"
+  meta <- emptyMeta
   return $ meta :< WeakTermUpsilon x
 
 affineCheck :: [Identifier] -> [Identifier] -> Bool
