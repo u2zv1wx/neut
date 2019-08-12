@@ -20,7 +20,7 @@ l    ::= x
        | <float>
 
 -- term
-e, A ::= universe
+e, A ::= (universe)
        | (upsilon A x)
        | (epsilon A x)
        | (epsilon-introduction A l)
@@ -31,7 +31,7 @@ e, A ::= universe
        | (sigma A ((x1 A1) ... (xn An)) B)
        | (sigma-introduction A e1 ... en)
        | (sigma-elimination A ((x1 A1) ... (xn An)) e1 e2)
-       | (mu A (x A) e)
+       | (mu (x A) e)
        | (meta-variable x)
 
 -- case
