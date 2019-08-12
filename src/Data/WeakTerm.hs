@@ -10,6 +10,7 @@ import           Data.Maybe             (fromMaybe)
 import           Text.Show.Deriving
 
 import           Data.Basic
+import           Data.Tree
 
 type IdentifierPlus = (Identifier, WeakTerm)
 
@@ -38,9 +39,19 @@ data WeakTermF a
   | WeakTermConst Identifier
   | WeakTermHole Hole
 
-type WeakTerm = Cofree WeakTermF Identifier
+type WeakTerm = Cofree WeakTermF WeakMeta
+
+-- data PlaceHolder
+--   = PlaceHolderType WeakTerm
+--   | PlaceHolderNothing Identifier
+data WeakMeta = WeakMeta
+  { weakMetaType     :: Either Identifier WeakTerm
+  , weakMetaLocation :: Maybe (Int, Int)
+  }
 
 $(deriveShow1 ''WeakTermF)
+
+deriving instance Show WeakMeta
 
 type SubstWeakTerm = [(Identifier, WeakTerm)]
 
@@ -171,7 +182,7 @@ isReducible (_ :< WeakTermMu _ _) = False
 isReducible (_ :< WeakTermConst _) = False
 isReducible (_ :< WeakTermHole _) = False
 
-toWeakTermPiElimSeq :: WeakTerm -> (WeakTerm, [(Identifier, [WeakTerm])])
+toWeakTermPiElimSeq :: WeakTerm -> (WeakTerm, [(WeakMeta, [WeakTerm])])
 toWeakTermPiElimSeq (m :< WeakTermPiElim e es) = do
   let (fun, xs) = toWeakTermPiElimSeq e
   (fun, xs ++ [(m, es)])

@@ -19,4 +19,11 @@ deriving instance Functor TreeF
 
 $(deriveShow1 ''TreeF)
 
-type Tree = Cofree TreeF Identifier
+type Tree = Cofree TreeF TreeMeta
+
+newtype TreeMeta = TreeMeta
+  { treeMetaLocation :: Maybe (Int, Int)
+  } deriving (Show)
+
+emptyTreeMeta :: TreeMeta
+emptyTreeMeta = TreeMeta {treeMetaLocation = Nothing}

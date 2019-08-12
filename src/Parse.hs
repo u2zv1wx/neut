@@ -19,7 +19,7 @@ import           Parse.Read
 import           Parse.Rename
 
 data Def =
-  DefLet Identifier -- meta
+  DefLet WeakMeta -- meta
          IdentifierPlus -- the `(x : t)` in `let (x : t) = e`
          WeakTerm -- the `e` in `let x = e`
 
@@ -70,13 +70,14 @@ parse' ((_ :< TreeNode [_ :< TreeAtom "extern", _ :< TreeAtom name]):as)
  = do
   modify (\e -> e {constantEnv = name : constantEnv e})
   parse' as
-parse' ((meta :< TreeNode [_ :< TreeAtom "let", xt, e]):as) = do
+parse' ((_ :< TreeNode [_ :< TreeAtom "let", xt, e]):as) = do
   e' <- macroExpand e >>= interpret >>= rename
   (x, t) <- macroExpand xt >>= interpretIdentifierPlus
   t' <- rename t
   x' <- newNameWith x
   defList <- parse' as
-  return $ DefLet meta (x', t') e' : defList
+  m <- emptyMeta
+  return $ DefLet m (x', t') e' : defList
 parse' (a:as)
   -- If the head element is not a special form, we interpret it as an ordinary term.
  = do
@@ -105,9 +106,9 @@ isSpecialForm _ = False
 -- (Note that `let x := e1 in e2` can be represented as `(lam x e2) e1`.)
 concatDefList :: [Def] -> WithEnv WeakTerm
 concatDefList [] = do
-  meta <- newNameWith "meta"
-  return $ meta :< WeakTermSigmaIntro []
+  m <- emptyMeta
+  return $ m :< WeakTermSigmaIntro []
 concatDefList (DefLet meta tu e:es) = do
   cont <- concatDefList es
-  lamMeta <- newNameWith "meta"
-  return $ meta :< WeakTermPiElim (lamMeta :< WeakTermPiIntro [tu] cont) [e]
+  m <- emptyMeta
+  return $ meta :< WeakTermPiElim (m :< WeakTermPiIntro [tu] cont) [e]

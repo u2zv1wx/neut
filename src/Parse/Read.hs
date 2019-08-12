@@ -32,23 +32,14 @@ parseAtom :: Parser Tree
 parseAtom = do
   s <- symbol
   _ <- skip
-  i <- newNameParser
-  return $ i :< TreeAtom s
+  return $ emptyTreeMeta :< TreeAtom s
 
 parseNode :: Parser Tree
 parseNode = do
   _ <- char '(' >> skip
   itemList <- many parseStr
   _ <- skip >> char ')' >> skip
-  i <- newNameParser
-  return $ i :< TreeNode itemList
-
-newNameParser :: Parser String
-newNameParser = do
-  env <- get
-  let i = count env
-  modify (\e -> e {count = i + 1})
-  return $ "meta." ++ show i
+  return $ emptyTreeMeta :< TreeNode itemList
 
 skip :: Parser ()
 skip = spaces >> (comment <|> spaces)

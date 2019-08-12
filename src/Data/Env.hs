@@ -198,12 +198,25 @@ wrap a = do
 newHole :: WithEnv WeakTerm
 newHole = do
   h <- newNameWith "hole"
-  m <- newNameWith "meta"
+  m <- emptyMeta
   return $ m :< WeakTermHole h
 
 newHoleOfType :: WeakTerm -> WithEnv WeakTerm
 newHoleOfType t = do
   h <- newNameWith "hole"
-  m <- newNameWith "meta"
-  insTypeEnv m t
-  return $ m :< WeakTermHole h
+  -- insTypeEnv m t
+  return $ metaOfType t :< WeakTermHole h
+
+emptyMeta :: WithEnv WeakMeta
+emptyMeta = do
+  i <- newNameWith "hole"
+  return $ WeakMeta {weakMetaType = Left i, weakMetaLocation = Nothing}
+
+metaOfType :: WeakTerm -> WeakMeta
+metaOfType t = WeakMeta {weakMetaType = Right t, weakMetaLocation = Nothing}
+
+toWeakMeta :: TreeMeta -> WithEnv WeakMeta
+toWeakMeta m = do
+  i <- newNameWith "hole"
+  return $
+    WeakMeta {weakMetaType = Left i, weakMetaLocation = treeMetaLocation m}
