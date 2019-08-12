@@ -43,7 +43,7 @@ infer _ (meta :< WeakTermUpsilon x) = do
 infer _ (meta :< WeakTermEpsilon _) = newUniv >>= returnMeta meta
 infer _ (meta :< WeakTermEpsilonIntro l) = do
   mk <- lookupKind l
-  epsilonMeta <- newNameWith "meta"
+  epsilonMeta <- emptyMeta
   case mk of
     Just k -> returnMeta meta $ epsilonMeta :< WeakTermEpsilon k
     Nothing -> do
@@ -72,7 +72,7 @@ infer ctx (meta :< WeakTermPiElim e es) = do
   tPi <- infer ctx e
   binder <- inferList ctx es
   cod <- newHoleInCtx (ctx ++ binder) >>= withPlaceholder
-  metaPi <- newNameWith "meta"
+  metaPi <- emptyMeta
   insConstraintEnv tPi (metaPi :< WeakTermPi (binder ++ [cod]))
   returnMeta meta $ substWeakTerm (zip (map fst binder) es) $ snd cod
 infer ctx (meta :< WeakTermSigma xts) = inferPiOrSigma ctx meta xts
@@ -103,7 +103,7 @@ infer _ (meta :< WeakTermConst x) = do
   returnMeta meta h
 infer ctx (meta :< WeakTermHole _) = newHoleInCtx ctx >>= returnMeta meta
 
-inferPiOrSigma :: Context -> Identifier -> [IdentifierPlus] -> WithEnv WeakTerm
+inferPiOrSigma :: Context -> WeakMeta -> [IdentifierPlus] -> WithEnv WeakTerm
 inferPiOrSigma ctx meta xts = do
   univList <-
     forM (map (`take` xts) [1 .. length xts]) $ \zts ->
@@ -174,15 +174,15 @@ constrainList [] = return ()
 constrainList [_] = return ()
 constrainList (t1@(meta1 :< _):t2@(meta2 :< _):ts) = do
   u <- newUniv
-  insTypeEnv meta1 u
-  insTypeEnv meta2 u
+  registerTypeIfNecessary meta1 u
+  registerTypeIfNecessary meta2 u
   insConstraintEnv t1 t2
   constrainList $ t2 : ts
 
 constructTuple :: Context -> [Identifier] -> WithEnv WeakTerm
 constructTuple ctx xs = do
-  eMeta <- newName
-  metaList <- mapM (const newName) xs
+  eMeta <- emptyMeta
+  metaList <- mapM (const emptyMeta) xs
   let varList = map (\(m, x) -> m :< WeakTermUpsilon x) $ zip metaList xs
   let pair = eMeta :< WeakTermSigmaIntro varList
   _ <- infer ctx pair
@@ -190,17 +190,23 @@ constructTuple ctx xs = do
 
 toVar :: Identifier -> WeakTerm -> WithEnv WeakTerm
 toVar x t = do
-  meta <- newNameWith "meta"
-  insTypeEnv meta t
+  meta <- emptyMeta
+  registerTypeIfNecessary meta t
   insTypeEnv x t
   return $ meta :< WeakTermUpsilon x
 
-returnMeta :: Identifier -> WeakTerm -> WithEnv WeakTerm
+returnMeta :: WeakMeta -> WeakTerm -> WithEnv WeakTerm
 returnMeta meta t = do
-  insTypeEnv meta t
+  registerTypeIfNecessary meta t
   return t
 
 newUniv :: WithEnv WeakTerm
 newUniv = do
-  univMeta <- newNameWith "meta"
+  univMeta <- emptyMeta
   return $ univMeta :< WeakTermUniverse
+
+registerTypeIfNecessary :: WeakMeta -> WeakTerm -> WithEnv ()
+registerTypeIfNecessary m t =
+  case weakMetaType m of
+    Left i -> insTypeEnv i t
+    _      -> return ()
