@@ -21,17 +21,18 @@ l    ::= x
 
 -- term
 e, A ::= universe
-       | (upsilon x)
-       | (epsilon x)
-       | (epsilon-intro l)
-       | (epsilon-elim x e (c1 e1) ... (cn en))
-       | (pi ((x1 A1) ... (xn An)) A)
-       | (pi-intro ((x1 A1) ... (xn An)) e)
-       | (pi-elim e e1 ... en)
-       | (sigma ((x1 A1) ... (xn An)) e)
-       | (sigma-intro e1 ... en)
-       | (sigma-elim ((x1 A1) ... (xn An)) e1 e2)
-       | (mu (x A) e)
+       | (upsilon A x)
+       | (epsilon A x)
+       | (epsilon-introduction A l)
+       | (epsilon-elimination A x e (c1 e1) ... (cn en))
+       | (pi A ((x1 A1) ... (xn An)) B)
+       | (pi-introduction A ((x1 A1) ... (xn An)) e)
+       | (pi-elimination A e e1 ... en)
+       | (sigma A ((x1 A1) ... (xn An)) B)
+       | (sigma-introduction A e1 ... en)
+       | (sigma-elimination A ((x1 A1) ... (xn An)) e1 e2)
+       | (mu A (x A) e)
+       | (meta-variable x)
 
 -- case
 c    ::= (epsilon-intro l)
