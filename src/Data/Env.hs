@@ -24,16 +24,16 @@ type ConstraintQueue = Q.MinQueue EnrichedConstraint
 
 data Env = Env
   { count           :: Int -- to generate fresh symbols
-  , notationEnv     :: [(Tree, Tree)] -- macro transformers
+  , currentDir      :: FilePath
   , reservedEnv     :: [Identifier] -- list of reserved keywords
+  , notationEnv     :: [(Tree, Tree)] -- macro transformers
   , constantEnv     :: [Identifier]
   , epsilonEnv      :: [(Identifier, [Identifier])]
   , nameEnv         :: [(Identifier, Identifier)] -- [("foo", "foo.13"), ...]
-  , typeEnv         :: Map.Map Identifier WeakTerm
+  , typeEnv         :: Map.Map Identifier WeakTerm -- var ~> typeof(var)
   , constraintEnv   :: [PreConstraint] -- for type inference
   , constraintQueue :: ConstraintQueue -- for (dependent) type inference
-  , substEnv        :: SubstWeakTerm -- for (dependent) type inference
-  , currentDir      :: FilePath
+  , substEnv        :: SubstWeakTerm -- metavar ~> beta-equivalent weakterm
   , termEnv         :: [(Identifier, ([Identifier], Term))] -- f ~> (lam (x1 ... xn) e)
   , polEnv          :: [(Identifier, ([Identifier], Neg))] -- f ~> thunk (lam (x1 ... xn) e)
   , llvmEnv         :: [(Identifier, ([Identifier], LLVM))]
@@ -95,17 +95,24 @@ newNameOfType t = do
   insTypeEnv i t
   return i
 
-lookupTypeEnv' :: String -> WithEnv WeakTerm
-lookupTypeEnv' s = do
+lookupTypeEnv :: String -> WithEnv WeakTerm
+lookupTypeEnv s = do
+  mt <- lookupTypeEnvMaybe s
+  case mt of
+    Just t  -> return t
+    Nothing -> lift $ throwE $ s ++ " is not found in the type environment."
+
+lookupTypeEnvMaybe :: String -> WithEnv (Maybe WeakTerm)
+lookupTypeEnvMaybe s = do
   mt <- gets (Map.lookup s . typeEnv)
   case mt of
-    Nothing -> lift $ throwE $ s ++ " is not found in the type environment."
-    Just t  -> return t
+    Nothing -> return Nothing
+    Just t  -> return $ Just t
 
 lookupNameEnv :: String -> WithEnv String
 lookupNameEnv s = do
-  env <- get
-  case lookup s (nameEnv env) of
+  ms <- lookupNameEnvMaybe s
+  case ms of
     Just s' -> return s'
     Nothing -> lift $ throwE $ "undefined variable: " ++ show s
 
