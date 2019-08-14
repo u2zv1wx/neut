@@ -34,7 +34,7 @@ data WeakTermF a
   | WeakTermMu (Identifier, a)
                a
   | WeakTermTheta Identifier
-  | WeakTermHole Identifier
+  | WeakTermZeta Identifier
 
 type WeakTerm = Cofree WeakTermF WeakMeta
 
@@ -84,7 +84,7 @@ varWeakTerm (_ :< WeakTermSigmaElim us e1 e2) =
   pairwiseConcat [varWeakTerm e1, varWeakTermBindings us [e2]]
 varWeakTerm (_ :< WeakTermMu ut e) = varWeakTermBindings [ut] [e]
 varWeakTerm (_ :< WeakTermTheta _) = ([], [])
-varWeakTerm (_ :< WeakTermHole h) = ([], [h])
+varWeakTerm (_ :< WeakTermZeta h) = ([], [h])
 
 varWeakTermBindings ::
      [IdentifierPlus] -> [WeakTerm] -> ([Identifier], [Identifier])
@@ -138,8 +138,8 @@ substWeakTerm sub (m :< WeakTermMu (x, t) e) = do
   let e' = substWeakTerm (filter (\(k, _) -> k /= x) sub) e
   m :< WeakTermMu (x, t') e'
 substWeakTerm _ (m :< WeakTermTheta t) = m :< WeakTermTheta t
-substWeakTerm sub (m :< WeakTermHole s) =
-  fromMaybe (m :< WeakTermHole s) (lookup s sub)
+substWeakTerm sub (m :< WeakTermZeta s) =
+  fromMaybe (m :< WeakTermZeta s) (lookup s sub)
 
 substWeakTermBindings :: SubstWeakTerm -> [IdentifierPlus] -> [IdentifierPlus]
 substWeakTermBindings _ [] = []
@@ -183,7 +183,7 @@ isReducible (_ :< WeakTermSigmaElim xts (_ :< WeakTermSigmaIntro es) _)
 isReducible (_ :< WeakTermSigmaElim _ e1 _) = isReducible e1
 isReducible (_ :< WeakTermMu _ _) = False
 isReducible (_ :< WeakTermTheta _) = False
-isReducible (_ :< WeakTermHole _) = False
+isReducible (_ :< WeakTermZeta _) = False
 
 isValue :: WeakTerm -> Bool
 isValue (_ :< WeakTermTau)            = True
