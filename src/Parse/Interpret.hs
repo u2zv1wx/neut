@@ -24,8 +24,8 @@ interpret (m :< TreeAtom "universe") = withMeta m WeakTermUniverse
 interpret (m :< TreeNode [_ :< TreeAtom "upsilon", _ :< TreeAtom x]) =
   withMeta m $ WeakTermUpsilon x
 interpret (m :< TreeNode [_ :< TreeAtom "epsilon", _ :< TreeAtom x]) = do
-  isSortal <- isDefinedIndexName x
-  if not isSortal
+  isEpsilon <- isDefinedEpsilonName x
+  if not isEpsilon
     then throwError $ "No such epsilon-type defined: " ++ x
     else withMeta m $ WeakTermEpsilon x
 interpret (m :< TreeNode [_ :< TreeAtom "epsilon-introduction", l]) = do
@@ -73,8 +73,8 @@ interpret t@(m :< TreeAtom x) = do
   case ml of
     Just l -> withMeta m $ WeakTermEpsilonIntro l
     Nothing -> do
-      isSortal <- isDefinedIndexName x
-      if isSortal
+      isEpsilon <- isDefinedEpsilonName x
+      if isEpsilon
         then withMeta m $ WeakTermEpsilon x
         else do
           cenv <- gets constantEnv
@@ -108,7 +108,7 @@ interpretLiteralMaybe (_ :< TreeAtom x)
 interpretLiteralMaybe (_ :< TreeAtom x)
   | Just i <- readMaybe x = return $ Just $ LiteralInteger i
 interpretLiteralMaybe (_ :< TreeAtom x) = do
-  b <- isDefinedIndex x
+  b <- isDefinedEpsilon x
   if b
     then return $ Just $ LiteralLabel x
     else lift $ throwE $ "no such label defined: " ++ x
