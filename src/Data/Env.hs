@@ -27,7 +27,7 @@ data Env = Env
   , notationEnv     :: [(Tree, Tree)] -- macro transformers
   , reservedEnv     :: [Identifier] -- list of reserved keywords
   , constantEnv     :: [Identifier]
-  , indexEnv        :: [(Identifier, [Identifier])]
+  , epsilonEnv      :: [(Identifier, [Identifier])]
   , nameEnv         :: [(Identifier, Identifier)] -- [("foo", "foo.13"), ...]
   , typeEnv         :: Map.Map Identifier WeakTerm
   , constraintEnv   :: [PreConstraint] -- for type inference
@@ -46,7 +46,7 @@ initialEnv path =
     , notationEnv = []
     , reservedEnv = []
     , constantEnv = []
-    , indexEnv = []
+    , epsilonEnv = []
     , nameEnv = []
     , typeEnv = Map.empty
     , termEnv = []
@@ -131,16 +131,16 @@ insLLVMEnv :: Identifier -> [Identifier] -> LLVM -> WithEnv ()
 insLLVMEnv funName args e =
   modify (\env -> env {llvmEnv = (funName, (args, e)) : llvmEnv env})
 
-insIndexEnv :: Identifier -> [Identifier] -> WithEnv ()
-insIndexEnv name indexList =
-  modify (\e -> e {indexEnv = (name, indexList) : indexEnv e})
+insEpsilonEnv :: Identifier -> [Identifier] -> WithEnv ()
+insEpsilonEnv name epsilonList =
+  modify (\e -> e {epsilonEnv = (name, epsilonList) : epsilonEnv e})
 
 lookupKind :: Literal -> WithEnv (Maybe Identifier)
 lookupKind (LiteralInteger _) = return Nothing
 lookupKind (LiteralFloat _) = return Nothing
 lookupKind (LiteralLabel name) = do
   env <- get
-  lookupKind' name $ indexEnv env
+  lookupKind' name $ epsilonEnv env
 
 lookupKind' ::
      Identifier -> [(Identifier, [Identifier])] -> WithEnv (Maybe Identifier)
@@ -150,42 +150,43 @@ lookupKind' i ((j, ls):xs) =
     then return $ Just j
     else lookupKind' i xs
 
-lookupIndexSet :: Identifier -> WithEnv [Identifier]
-lookupIndexSet name = do
+lookupEpsilonSet :: Identifier -> WithEnv [Identifier]
+lookupEpsilonSet name = do
   env <- get
-  lookupIndexSet' name $ indexEnv env
+  lookupEpsilonSet' name $ epsilonEnv env
 
-lookupIndexSet' ::
+lookupEpsilonSet' ::
      Identifier -> [(Identifier, [Identifier])] -> WithEnv [Identifier]
-lookupIndexSet' name [] = lift $ throwE $ "no such index defined: " ++ show name
-lookupIndexSet' name ((_, ls):xs) =
+lookupEpsilonSet' name [] =
+  lift $ throwE $ "no such epsilon defined: " ++ show name
+lookupEpsilonSet' name ((_, ls):xs) =
   if name `elem` ls
     then return ls
-    else lookupIndexSet' name xs
+    else lookupEpsilonSet' name xs
 
-getIndexNum :: Identifier -> WithEnv (Maybe Int)
-getIndexNum label = do
-  ienv <- gets indexEnv
-  return $ getIndexNum' label $ map snd ienv
+getEpsilonNum :: Identifier -> WithEnv (Maybe Int)
+getEpsilonNum label = do
+  ienv <- gets epsilonEnv
+  return $ getEpsilonNum' label $ map snd ienv
 
-getIndexNum' :: Identifier -> [[Identifier]] -> Maybe Int
-getIndexNum' _ [] = Nothing
-getIndexNum' l (xs:xss) =
+getEpsilonNum' :: Identifier -> [[Identifier]] -> Maybe Int
+getEpsilonNum' _ [] = Nothing
+getEpsilonNum' l (xs:xss) =
   case elemIndex l xs of
-    Nothing -> getIndexNum' l xss
+    Nothing -> getEpsilonNum' l xss
     Just i  -> Just i
 
-isDefinedIndex :: Identifier -> WithEnv Bool
-isDefinedIndex name = do
+isDefinedEpsilon :: Identifier -> WithEnv Bool
+isDefinedEpsilon name = do
   env <- get
-  let labelList = join $ map snd $ indexEnv env
+  let labelList = join $ map snd $ epsilonEnv env
   return $ name `elem` labelList
 
-isDefinedIndexName :: Identifier -> WithEnv Bool
-isDefinedIndexName name = do
+isDefinedEpsilonName :: Identifier -> WithEnv Bool
+isDefinedEpsilonName name = do
   env <- get
-  let indexNameList = map fst $ indexEnv env
-  return $ name `elem` indexNameList
+  let epsilonNameList = map fst $ epsilonEnv env
+  return $ name `elem` epsilonNameList
 
 insConstraintEnv :: WeakTerm -> WeakTerm -> WithEnv ()
 insConstraintEnv t1 t2 =
