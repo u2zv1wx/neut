@@ -15,6 +15,7 @@ import           Data.Basic
 
 data WeakTermF a
   = WeakTermTau
+  | WeakTermTheta Identifier
   | WeakTermUpsilon Identifier
   | WeakTermEpsilon Identifier
   | WeakTermEpsilonIntro Literal
@@ -33,7 +34,6 @@ data WeakTermF a
                       a
   | WeakTermMu (Identifier, a)
                a
-  | WeakTermTheta Identifier
   | WeakTermZeta Identifier
 
 type WeakTerm = Cofree WeakTermF WeakMeta
@@ -63,6 +63,7 @@ type IdentifierPlus = (Identifier, WeakTerm)
 
 varWeakTerm :: WeakTerm -> ([Identifier], [Hole])
 varWeakTerm (_ :< WeakTermTau) = ([], [])
+varWeakTerm (_ :< WeakTermTheta _) = ([], [])
 varWeakTerm (_ :< WeakTermUpsilon x) = ([x], [])
 varWeakTerm (_ :< WeakTermEpsilon _) = ([], [])
 varWeakTerm (_ :< WeakTermEpsilonIntro _) = ([], [])
@@ -83,7 +84,6 @@ varWeakTerm (_ :< WeakTermSigmaIntro es) = pairwiseConcat $ map varWeakTerm es
 varWeakTerm (_ :< WeakTermSigmaElim us e1 e2) =
   pairwiseConcat [varWeakTerm e1, varWeakTermBindings us [e2]]
 varWeakTerm (_ :< WeakTermMu ut e) = varWeakTermBindings [ut] [e]
-varWeakTerm (_ :< WeakTermTheta _) = ([], [])
 varWeakTerm (_ :< WeakTermZeta h) = ([], [h])
 
 varWeakTermBindings ::
@@ -102,6 +102,7 @@ pairwiseConcat ((xs, ys):rest) = do
 
 substWeakTerm :: SubstWeakTerm -> WeakTerm -> WeakTerm
 substWeakTerm _ (m :< WeakTermTau) = m :< WeakTermTau
+substWeakTerm _ (m :< WeakTermTheta t) = m :< WeakTermTheta t
 substWeakTerm sub (m :< WeakTermUpsilon x) =
   fromMaybe (m :< WeakTermUpsilon x) (lookup x sub)
 substWeakTerm _ (m :< WeakTermEpsilon x) = m :< WeakTermEpsilon x
@@ -137,7 +138,6 @@ substWeakTerm sub (m :< WeakTermMu (x, t) e) = do
   let t' = substWeakTerm sub t
   let e' = substWeakTerm (filter (\(k, _) -> k /= x) sub) e
   m :< WeakTermMu (x, t') e'
-substWeakTerm _ (m :< WeakTermTheta t) = m :< WeakTermTheta t
 substWeakTerm sub (m :< WeakTermZeta s) =
   fromMaybe (m :< WeakTermZeta s) (lookup s sub)
 
@@ -161,6 +161,7 @@ substWeakTermBindingsWithBody sub ((x, t):xts) e = do
 
 isReducible :: WeakTerm -> Bool
 isReducible (_ :< WeakTermTau) = False
+isReducible (_ :< WeakTermTheta _) = False
 isReducible (_ :< WeakTermUpsilon _) = False
 isReducible (_ :< WeakTermEpsilon _) = False
 isReducible (_ :< WeakTermEpsilonIntro _) = False
@@ -182,7 +183,6 @@ isReducible (_ :< WeakTermSigmaElim xts (_ :< WeakTermSigmaIntro es) _)
   | length xts == length es = True
 isReducible (_ :< WeakTermSigmaElim _ e1 _) = isReducible e1
 isReducible (_ :< WeakTermMu _ _) = False
-isReducible (_ :< WeakTermTheta _) = False
 isReducible (_ :< WeakTermZeta _) = False
 
 isValue :: WeakTerm -> Bool
