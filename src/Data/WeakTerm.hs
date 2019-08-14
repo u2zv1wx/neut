@@ -14,7 +14,7 @@ import           Text.Show.Deriving
 import           Data.Basic
 
 data WeakTermF a
-  = WeakTermUniverse
+  = WeakTermTau
   | WeakTermUpsilon Identifier
   | WeakTermEpsilon Identifier
   | WeakTermEpsilonIntro Literal
@@ -42,12 +42,8 @@ newtype Ref a =
   Ref (IORef a)
 
 data WeakMeta = WeakMeta
-  -- `Either Identifier WeakTerm`:
-  --   Identifier: The name of a subterm. This name is required to update weakterm
-  --     by the result of type inference.
-  --   WeakTerm: The type of a subterm.
   -- The `Ref` here is required to represent "univ : univ".
-  { weakMetaType     :: Ref (Either Identifier WeakTerm)
+  { weakMetaType     :: Ref (Maybe WeakTerm)
   -- Location (row, cloumn) of a subterm in a file.
   , weakMetaLocation :: Maybe (Int, Int)
   }
@@ -66,7 +62,7 @@ type Hole = Identifier
 type IdentifierPlus = (Identifier, WeakTerm)
 
 varWeakTerm :: WeakTerm -> ([Identifier], [Hole])
-varWeakTerm (_ :< WeakTermUniverse) = ([], [])
+varWeakTerm (_ :< WeakTermTau) = ([], [])
 varWeakTerm (_ :< WeakTermUpsilon x) = ([x], [])
 varWeakTerm (_ :< WeakTermEpsilon _) = ([], [])
 varWeakTerm (_ :< WeakTermEpsilonIntro _) = ([], [])
@@ -105,7 +101,7 @@ pairwiseConcat ((xs, ys):rest) = do
   (xs ++ xs', ys ++ ys')
 
 substWeakTerm :: SubstWeakTerm -> WeakTerm -> WeakTerm
-substWeakTerm _ (m :< WeakTermUniverse) = m :< WeakTermUniverse
+substWeakTerm _ (m :< WeakTermTau) = m :< WeakTermTau
 substWeakTerm sub (m :< WeakTermUpsilon x) =
   fromMaybe (m :< WeakTermUpsilon x) (lookup x sub)
 substWeakTerm _ (m :< WeakTermEpsilon x) = m :< WeakTermEpsilon x
@@ -164,7 +160,7 @@ substWeakTermBindingsWithBody sub ((x, t):xts) e = do
   ((x, substWeakTerm sub t) : xts', e')
 
 isReducible :: WeakTerm -> Bool
-isReducible (_ :< WeakTermUniverse) = False
+isReducible (_ :< WeakTermTau) = False
 isReducible (_ :< WeakTermUpsilon _) = False
 isReducible (_ :< WeakTermEpsilon _) = False
 isReducible (_ :< WeakTermEpsilonIntro _) = False
@@ -190,7 +186,7 @@ isReducible (_ :< WeakTermConst _) = False
 isReducible (_ :< WeakTermHole _) = False
 
 isValue :: WeakTerm -> Bool
-isValue (_ :< WeakTermUniverse)       = True
+isValue (_ :< WeakTermTau)            = True
 isValue (_ :< WeakTermUpsilon _)      = True
 isValue (_ :< WeakTermEpsilon _)      = True
 isValue (_ :< WeakTermEpsilonIntro _) = True
