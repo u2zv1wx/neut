@@ -33,7 +33,7 @@ data WeakTermF a
                       a
   | WeakTermMu (Identifier, a)
                a
-  | WeakTermConst Identifier
+  | WeakTermTheta Identifier
   | WeakTermHole Identifier
 
 type WeakTerm = Cofree WeakTermF WeakMeta
@@ -83,7 +83,7 @@ varWeakTerm (_ :< WeakTermSigmaIntro es) = pairwiseConcat $ map varWeakTerm es
 varWeakTerm (_ :< WeakTermSigmaElim us e1 e2) =
   pairwiseConcat [varWeakTerm e1, varWeakTermBindings us [e2]]
 varWeakTerm (_ :< WeakTermMu ut e) = varWeakTermBindings [ut] [e]
-varWeakTerm (_ :< WeakTermConst _) = ([], [])
+varWeakTerm (_ :< WeakTermTheta _) = ([], [])
 varWeakTerm (_ :< WeakTermHole h) = ([], [h])
 
 varWeakTermBindings ::
@@ -137,7 +137,7 @@ substWeakTerm sub (m :< WeakTermMu (x, t) e) = do
   let t' = substWeakTerm sub t
   let e' = substWeakTerm (filter (\(k, _) -> k /= x) sub) e
   m :< WeakTermMu (x, t') e'
-substWeakTerm _ (m :< WeakTermConst t) = m :< WeakTermConst t
+substWeakTerm _ (m :< WeakTermTheta t) = m :< WeakTermTheta t
 substWeakTerm sub (m :< WeakTermHole s) =
   fromMaybe (m :< WeakTermHole s) (lookup s sub)
 
@@ -173,7 +173,7 @@ isReducible (_ :< WeakTermPiIntro {}) = False
 isReducible (_ :< WeakTermPiElim (_ :< WeakTermPiIntro xts _) es)
   | length xts == length es = True
 isReducible (_ :< WeakTermPiElim (_ :< WeakTermMu _ _) _) = True -- CBV recursion
-isReducible (_ :< WeakTermPiElim (_ :< WeakTermConst c) [_ :< WeakTermEpsilonIntro (LiteralInteger _), _ :< WeakTermEpsilonIntro (LiteralInteger _)]) -- constant application
+isReducible (_ :< WeakTermPiElim (_ :< WeakTermTheta c) [_ :< WeakTermEpsilonIntro (LiteralInteger _), _ :< WeakTermEpsilonIntro (LiteralInteger _)]) -- constant application
   | c `elem` intArithConstantList = True
 isReducible (_ :< WeakTermPiElim e es) = isReducible e || any isReducible es
 isReducible (_ :< WeakTermSigma _) = False
@@ -182,7 +182,7 @@ isReducible (_ :< WeakTermSigmaElim xts (_ :< WeakTermSigmaIntro es) _)
   | length xts == length es = True
 isReducible (_ :< WeakTermSigmaElim _ e1 _) = isReducible e1
 isReducible (_ :< WeakTermMu _ _) = False
-isReducible (_ :< WeakTermConst _) = False
+isReducible (_ :< WeakTermTheta _) = False
 isReducible (_ :< WeakTermHole _) = False
 
 isValue :: WeakTerm -> Bool
