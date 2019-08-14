@@ -21,17 +21,18 @@ reduceWeakTerm (m :< WeakTermEpsilonElim (x, t) e branchList) = do
             Nothing -> return $ m :< WeakTermEpsilonElim (x, t) e' branchList
     _ -> return $ m :< WeakTermEpsilonElim (x, t) e' branchList
 reduceWeakTerm (m :< WeakTermPiElim e es) = do
-  es' <- mapM reduceWeakTerm es
   e' <- reduceWeakTerm e
+  es' <- mapM reduceWeakTerm es
   case e' of
     _ :< WeakTermPiIntro xts body
       | length xts == length es'
       , all isValue es' -> do
         let xs = map fst xts
         reduceWeakTerm $ substWeakTerm (zip xs es') body
-    self@(_ :< WeakTermMu (x, _) body) -> do
-      let self' = substWeakTerm [(x, self)] body
-      reduceWeakTerm (m :< WeakTermPiElim self' es')
+    self@(_ :< WeakTermMu (x, _) body)
+      | all isValue es' -> do
+        let self' = substWeakTerm [(x, self)] body
+        reduceWeakTerm (m :< WeakTermPiElim self' es')
     _ :< WeakTermConst constant
       | [_ :< WeakTermEpsilonIntro (LiteralInteger x), _ :< WeakTermEpsilonIntro (LiteralInteger y)] <-
          es' -> do
@@ -57,7 +58,8 @@ reduceWeakTerm (m :< WeakTermSigmaElim xts e1 e2) = do
   e1' <- reduceWeakTerm e1
   case e1' of
     _ :< WeakTermSigmaIntro es
-      | length es == length xts -> do
+      | length es == length xts
+      , all isValue es -> do
         let xs = map fst xts
         reduceWeakTerm $ substWeakTerm (zip xs es) e2
     _ -> return $ m :< WeakTermSigmaElim xts e1' e2
