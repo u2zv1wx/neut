@@ -5,6 +5,7 @@ module Data.Env where
 import           Control.Comonad.Cofree
 import           Control.Monad.State
 import           Control.Monad.Trans.Except
+import           Data.IORef
 import           Data.List                  (elemIndex)
 
 import           Data.Basic
@@ -190,9 +191,9 @@ insConstraintEnv :: WeakTerm -> WeakTerm -> WithEnv ()
 insConstraintEnv t1 t2 =
   modify (\e -> e {constraintEnv = (t1, t2) : constraintEnv e})
 
-wrap :: f (Cofree f Identifier) -> WithEnv (Cofree f Identifier)
+wrap :: f (Cofree f WeakMeta) -> WithEnv (Cofree f WeakMeta)
 wrap a = do
-  meta <- newNameWith "meta"
+  meta <- emptyMeta
   return $ meta :< a
 
 newHole :: WithEnv WeakTerm
@@ -204,19 +205,23 @@ newHole = do
 newHoleOfType :: WeakTerm -> WithEnv WeakTerm
 newHoleOfType t = do
   h <- newNameWith "hole"
-  -- insTypeEnv m t
-  return $ metaOfType t :< WeakTermHole h
+  m <- metaOfType t
+  return $ m :< WeakTermHole h
 
 emptyMeta :: WithEnv WeakMeta
 emptyMeta = do
   i <- newNameWith "hole"
-  return $ WeakMeta {weakMetaType = Left i, weakMetaLocation = Nothing}
+  t <- liftIO $ newIORef (Left i)
+  return $ WeakMeta {weakMetaType = Ref t, weakMetaLocation = Nothing}
 
-metaOfType :: WeakTerm -> WeakMeta
-metaOfType t = WeakMeta {weakMetaType = Right t, weakMetaLocation = Nothing}
+metaOfType :: WeakTerm -> WithEnv WeakMeta
+metaOfType t = do
+  t' <- liftIO $ newIORef (Right t)
+  return $ WeakMeta {weakMetaType = Ref t', weakMetaLocation = Nothing}
 
 toWeakMeta :: TreeMeta -> WithEnv WeakMeta
 toWeakMeta m = do
   i <- newNameWith "hole"
+  t <- liftIO $ newIORef (Left i)
   return $
-    WeakMeta {weakMetaType = Left i, weakMetaLocation = treeMetaLocation m}
+    WeakMeta {weakMetaType = Ref t, weakMetaLocation = treeMetaLocation m}
