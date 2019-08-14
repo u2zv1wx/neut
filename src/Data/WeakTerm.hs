@@ -6,15 +6,12 @@ module Data.WeakTerm where
 
 import           Control.Comonad.Cofree
 import           Control.Monad          (forM)
+import           Data.IORef
 import           Data.Maybe             (fromMaybe)
+import           System.IO.Unsafe       (unsafePerformIO)
 import           Text.Show.Deriving
 
 import           Data.Basic
-import           Data.Tree
-
-type IdentifierPlus = (Identifier, WeakTerm)
-
-type Hole = Identifier
 
 data WeakTermF a
   = WeakTermUniverse
@@ -37,58 +34,68 @@ data WeakTermF a
   | WeakTermMu (Identifier, a)
                a
   | WeakTermConst Identifier
-  | WeakTermHole Hole
+  | WeakTermHole Identifier
 
 type WeakTerm = Cofree WeakTermF WeakMeta
 
--- data PlaceHolder
---   = PlaceHolderType WeakTerm
---   | PlaceHolderNothing Identifier
+newtype Ref a =
+  Ref (IORef a)
+
 data WeakMeta = WeakMeta
-  { weakMetaType     :: Either Identifier WeakTerm
+  -- `Either Identifier WeakTerm`:
+  --   Identifier: The name of a subterm. This name is required to update weakterm
+  --     by the result of type inference.
+  --   WeakTerm: The type of a subterm.
+  -- The `Ref` here is required to represent "univ : univ".
+  { weakMetaType     :: Ref (Either Identifier WeakTerm)
+  -- Location (row, cloumn) of a subterm in a file.
   , weakMetaLocation :: Maybe (Int, Int)
   }
 
 $(deriveShow1 ''WeakTermF)
 
+instance (Show a) => Show (Ref a) where
+  show (Ref x) = show $ unsafePerformIO (readIORef x)
+
 deriving instance Show WeakMeta
 
 type SubstWeakTerm = [(Identifier, WeakTerm)]
 
-varWeakTerm :: WeakTerm -> [Identifier]
-varWeakTerm e = fst $ varAndHole e
+type Hole = Identifier
 
-varAndHole :: WeakTerm -> ([Identifier], [Identifier])
-varAndHole (_ :< WeakTermUniverse) = ([], [])
-varAndHole (_ :< WeakTermUpsilon x) = ([x], [])
-varAndHole (_ :< WeakTermEpsilon _) = ([], [])
-varAndHole (_ :< WeakTermEpsilonIntro _) = ([], [])
-varAndHole (_ :< WeakTermEpsilonElim (x, t) e branchList) = do
-  let xhs1 = varAndHole t
-  let xhs2 = varAndHole e
+type IdentifierPlus = (Identifier, WeakTerm)
+
+varWeakTerm :: WeakTerm -> ([Identifier], [Hole])
+varWeakTerm (_ :< WeakTermUniverse) = ([], [])
+varWeakTerm (_ :< WeakTermUpsilon x) = ([x], [])
+varWeakTerm (_ :< WeakTermEpsilon _) = ([], [])
+varWeakTerm (_ :< WeakTermEpsilonIntro _) = ([], [])
+varWeakTerm (_ :< WeakTermEpsilonElim (x, t) e branchList) = do
+  let xhs1 = varWeakTerm t
+  let xhs2 = varWeakTerm e
   xhss <-
     forM branchList $ \(_, body) -> do
-      let (xs, hs) = varAndHole body
+      let (xs, hs) = varWeakTerm body
       return (filter (/= x) xs, hs)
   pairwiseConcat (xhs1 : xhs2 : xhss)
-varAndHole (_ :< WeakTermPi xts) = varAndHoleBindings xts []
-varAndHole (_ :< WeakTermPiIntro xts e) = varAndHoleBindings xts [e]
-varAndHole (_ :< WeakTermPiElim e es) =
-  pairwiseConcat $ varAndHole e : map varAndHole es
-varAndHole (_ :< WeakTermSigma xts) = varAndHoleBindings xts []
-varAndHole (_ :< WeakTermSigmaIntro es) = pairwiseConcat $ map varAndHole es
-varAndHole (_ :< WeakTermSigmaElim us e1 e2) =
-  pairwiseConcat [varAndHole e1, varAndHoleBindings us [e2]]
-varAndHole (_ :< WeakTermMu ut e) = varAndHoleBindings [ut] [e]
-varAndHole (_ :< WeakTermConst _) = ([], [])
-varAndHole (_ :< WeakTermHole h) = ([], [h])
+varWeakTerm (_ :< WeakTermPi xts) = varWeakTermBindings xts []
+varWeakTerm (_ :< WeakTermPiIntro xts e) = varWeakTermBindings xts [e]
+varWeakTerm (_ :< WeakTermPiElim e es) =
+  pairwiseConcat $ varWeakTerm e : map varWeakTerm es
+varWeakTerm (_ :< WeakTermSigma xts) = varWeakTermBindings xts []
+varWeakTerm (_ :< WeakTermSigmaIntro es) = pairwiseConcat $ map varWeakTerm es
+varWeakTerm (_ :< WeakTermSigmaElim us e1 e2) =
+  pairwiseConcat [varWeakTerm e1, varWeakTermBindings us [e2]]
+varWeakTerm (_ :< WeakTermMu ut e) = varWeakTermBindings [ut] [e]
+varWeakTerm (_ :< WeakTermConst _) = ([], [])
+varWeakTerm (_ :< WeakTermHole h) = ([], [h])
 
-varAndHoleBindings ::
+varWeakTermBindings ::
      [IdentifierPlus] -> [WeakTerm] -> ([Identifier], [Identifier])
-varAndHoleBindings [] es = pairwiseConcat $ map varAndHole es
-varAndHoleBindings ((x, t):xts) es = do
-  let (xs1, hs1) = varAndHole t
-  let (xs2, hs2) = varAndHoleBindings xts es
+varWeakTermBindings [] es = pairwiseConcat $ map varWeakTerm es
+varWeakTermBindings ((x, t):xts) es = do
+  let (xs1, hs1) = varWeakTerm t
+  let (xs2, hs2) = varWeakTermBindings xts es
   (xs1 ++ filter (/= x) xs2, hs1 ++ hs2)
 
 pairwiseConcat :: [([a], [b])] -> ([a], [b])
@@ -181,12 +188,6 @@ isReducible (_ :< WeakTermSigmaElim _ e1 _) = isReducible e1
 isReducible (_ :< WeakTermMu _ _) = False
 isReducible (_ :< WeakTermConst _) = False
 isReducible (_ :< WeakTermHole _) = False
-
-toWeakTermPiElimSeq :: WeakTerm -> (WeakTerm, [(WeakMeta, [WeakTerm])])
-toWeakTermPiElimSeq (m :< WeakTermPiElim e es) = do
-  let (fun, xs) = toWeakTermPiElimSeq e
-  (fun, xs ++ [(m, es)])
-toWeakTermPiElimSeq c = (c, [])
 
 isValue :: WeakTerm -> Bool
 isValue (_ :< WeakTermUniverse)       = True
