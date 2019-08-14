@@ -5,6 +5,7 @@ module Elaborate.Infer
 import           Control.Comonad.Cofree
 import           Control.Monad.Except
 import           Control.Monad.State
+import           Data.IORef
 import           Data.Maybe             (maybeToList)
 import           Prelude                hiding (pi)
 
@@ -36,18 +37,22 @@ type Context = [(Identifier, WeakTerm)]
 -- Dynamic Pattern Unification for Dependent Types and Records". Typed Lambda
 -- Calculi and Applications, 2011.
 infer :: Context -> WeakTerm -> WithEnv WeakTerm
-infer _ (meta :< WeakTermUniverse) = newUniv >>= returnMeta meta
+infer _ u@(meta :< WeakTermUniverse) = do
+  registerTypeIfNecessary meta u
+  let Ref r = weakMetaType meta
+  liftIO $ writeIORef r (Just u)
+  return u
 infer _ (meta :< WeakTermUpsilon x) = do
-  t <- lookupTypeEnv' x
+  t <- lookupTypeEnv x
   returnMeta meta t
 infer _ (meta :< WeakTermEpsilon _) = newUniv >>= returnMeta meta
-infer _ (meta :< WeakTermEpsilonIntro l) = do
+infer ctx (meta :< WeakTermEpsilonIntro l) = do
   mk <- lookupKind l
-  epsilonMeta <- emptyMeta
   case mk of
-    Just k -> returnMeta meta $ epsilonMeta :< WeakTermEpsilon k
+    Just k -> wrapInfer ctx (WeakTermEpsilon k) >>= returnMeta meta
     Nothing -> do
-      h <- newHole
+      u <- newUniv
+      h <- newHoleOfType u
       returnMeta meta h
 infer ctx (meta :< WeakTermEpsilonElim (x, t) e branchList) = do
   te <- infer ctx e
@@ -67,13 +72,13 @@ infer ctx (meta :< WeakTermPi xts) = inferPiOrSigma ctx meta xts
 infer ctx (meta :< WeakTermPiIntro xts e) = do
   forM_ xts $ uncurry insTypeEnv
   cod <- infer (ctx ++ xts) e >>= withPlaceholder
-  wrap (WeakTermPi (xts ++ [cod])) >>= returnMeta meta
+  wrapInfer ctx (WeakTermPi (xts ++ [cod])) >>= returnMeta meta
 infer ctx (meta :< WeakTermPiElim e es) = do
   tPi <- infer ctx e
   binder <- inferList ctx es
   cod <- newHoleInCtx (ctx ++ binder) >>= withPlaceholder
-  metaPi <- emptyMeta
-  insConstraintEnv tPi (metaPi :< WeakTermPi (binder ++ [cod]))
+  tPi' <- wrapInfer ctx $ WeakTermPi (binder ++ [cod])
+  insConstraintEnv tPi tPi'
   returnMeta meta $ substWeakTerm (zip (map fst binder) es) $ snd cod
 infer ctx (meta :< WeakTermSigma xts) = inferPiOrSigma ctx meta xts
 infer ctx (meta :< WeakTermSigmaIntro es) = do
@@ -84,7 +89,7 @@ infer ctx (meta :< WeakTermSigmaElim xts e1 e2) = do
   forM_ xts $ uncurry insTypeEnv
   varSeq <- mapM (uncurry toVar) xts
   binder <- inferList ctx varSeq
-  sigmaType <- wrap $ WeakTermSigma binder
+  sigmaType <- wrapInfer ctx $ WeakTermSigma binder
   insConstraintEnv t1 sigmaType
   z <- newNameOfType t1
   varTuple <- constructTuple (ctx ++ binder) (map fst binder)
@@ -120,14 +125,15 @@ inferPiOrSigma ctx meta xts = do
 -- WeakTermHole might be used as a term which is not a type.
 newHoleInCtx :: Context -> WithEnv WeakTerm
 newHoleInCtx ctx = do
-  univ <- newUniv >>= withPlaceholder
-  higherPi <- wrap $ WeakTermPi $ ctx ++ [univ]
+  univPlus <- newUniv >>= withPlaceholder
+  higherPi <- wrapInfer ctx $ WeakTermPi $ ctx ++ [univPlus]
   higherHole <- newHoleOfType higherPi
   varSeq <- mapM (uncurry toVar) ctx
-  app <- wrap (WeakTermPiElim higherHole varSeq) >>= withPlaceholder
-  pi <- wrap $ WeakTermPi $ ctx ++ [app]
+  let u = snd univPlus
+  app <- wrapWithType u (WeakTermPiElim higherHole varSeq) >>= withPlaceholder
+  pi <- wrapInfer ctx $ WeakTermPi $ ctx ++ [app]
   hole <- newHoleOfType pi
-  wrap $ WeakTermPiElim hole varSeq
+  wrapWithType (snd app) (WeakTermPiElim hole varSeq)
 
 -- In context ctx == [x1, ..., xn], `newHoleListInCtx ctx names-of-holes` generates
 -- the following list of holes:
@@ -153,10 +159,10 @@ withPlaceholder t = do
 
 inferCase :: Case -> WithEnv (Maybe WeakTerm)
 inferCase (CaseLiteral (LiteralLabel name)) = do
-  ienv <- gets indexEnv
+  ienv <- gets epsilonEnv
   mk <- lookupKind' name ienv
   case mk of
-    Just k  -> Just <$> wrap (WeakTermEpsilon k)
+    Just k  -> Just <$> wrapInfer [] (WeakTermEpsilon k)
     Nothing -> return Nothing
 inferCase _ = return Nothing
 
@@ -172,41 +178,48 @@ inferList ctx es = do
 constrainList :: [WeakTerm] -> WithEnv ()
 constrainList [] = return ()
 constrainList [_] = return ()
-constrainList (t1@(meta1 :< _):t2@(meta2 :< _):ts) = do
-  u <- newUniv
-  registerTypeIfNecessary meta1 u
-  registerTypeIfNecessary meta2 u
+constrainList (t1:t2:ts) = do
   insConstraintEnv t1 t2
   constrainList $ t2 : ts
 
 constructTuple :: Context -> [Identifier] -> WithEnv WeakTerm
 constructTuple ctx xs = do
-  eMeta <- emptyMeta
-  metaList <- mapM (const emptyMeta) xs
-  let varList = map (\(m, x) -> m :< WeakTermUpsilon x) $ zip metaList xs
-  let pair = eMeta :< WeakTermSigmaIntro varList
-  _ <- infer ctx pair
-  return pair
+  varList <- mapM (wrapInfer ctx . WeakTermUpsilon) xs
+  wrapInfer ctx $ WeakTermSigmaIntro varList
 
 toVar :: Identifier -> WeakTerm -> WithEnv WeakTerm
 toVar x t = do
-  meta <- emptyMeta
-  registerTypeIfNecessary meta t
   insTypeEnv x t
-  return $ meta :< WeakTermUpsilon x
+  wrapWithType t (WeakTermUpsilon x)
 
 returnMeta :: WeakMeta -> WeakTerm -> WithEnv WeakTerm
 returnMeta meta t = do
   registerTypeIfNecessary meta t
   return t
 
+-- `newUniv` returns an "inferred" universe.
 newUniv :: WithEnv WeakTerm
 newUniv = do
-  univMeta <- emptyMeta
-  return $ univMeta :< WeakTermUniverse
+  m <- emptyMeta
+  let u = m :< WeakTermUniverse
+  _ <- infer [] u
+  return u
 
 registerTypeIfNecessary :: WeakMeta -> WeakTerm -> WithEnv ()
-registerTypeIfNecessary m t =
-  case weakMetaType m of
-    Left i -> insTypeEnv i t
-    _      -> return ()
+registerTypeIfNecessary m t = do
+  let Ref r = weakMetaType m
+  identOrType <- liftIO $ readIORef r
+  case identOrType of
+    Nothing -> liftIO $ writeIORef r (Just t)
+    Just t' -> insConstraintEnv t t'
+
+wrapInfer :: Context -> WeakTermF WeakTerm -> WithEnv WeakTerm
+wrapInfer ctx t = do
+  t' <- wrap t
+  _ <- infer ctx t'
+  return t'
+
+wrapWithType :: WeakTerm -> WeakTermF WeakTerm -> WithEnv WeakTerm
+wrapWithType t e = do
+  m <- metaOfType t
+  return $ m :< e
