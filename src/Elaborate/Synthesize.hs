@@ -5,13 +5,15 @@ module Elaborate.Synthesize
 import           Control.Comonad.Cofree
 import           Control.Monad.Except
 import           Control.Monad.State
-import qualified Data.PQueue.Min        as Q
+import           Control.Monad.Trans.Except
+import qualified Data.PQueue.Min            as Q
 
 import           Data.Basic
 import           Data.Constraint
 import           Data.Env
 import           Data.WeakTerm
 import           Elaborate.Analyze
+import           Elaborate.Infer            (readWeakMetaType)
 
 -- Given a queue of constraints (easier ones comes earlier), try to synthesize
 -- all of them using heuristics.
@@ -70,15 +72,17 @@ resolveHole q h e = do
   synthesize q2
 
 -- [e, x, y, y, e2, e3, z] ~> [p, x, y, y, q, r, z]  (p, q, r: new variables)
-toVarList :: [WeakTerm] -> WithEnv [Identifier]
+toVarList :: [WeakTerm] -> WithEnv [IdentifierPlus]
 toVarList [] = return []
 toVarList ((_ :< WeakTermUpsilon x):es) = do
-  xs <- toVarList es
-  return $ x : xs
-toVarList (_:es) = do
+  xts <- toVarList es
+  t <- lookupTypeEnv x
+  return $ (x, t) : xts
+toVarList ((m :< _):es) = do
+  xts <- toVarList es
   x <- newNameWith "hole"
-  xs <- toVarList es
-  return $ x : xs
+  t <- obtainType m
+  return $ (x, t) : xts
 
 -- [x, x, y, z, z] ~>
 --   [ [x, p, y, z, q]
@@ -87,8 +91,9 @@ toVarList (_:es) = do
 --   , [p, x, y, q, z]
 --   ]
 -- (p, q : fresh variables)
-toAltList :: [Identifier] -> WithEnv [[Identifier]]
-toAltList xs = mapM (discardInactive xs) $ chooseActive $ toIndexInfo xs
+toAltList :: [IdentifierPlus] -> WithEnv [[IdentifierPlus]]
+toAltList xts =
+  mapM (discardInactive xts) $ chooseActive $ toIndexInfo (map fst xts)
 
 -- [x, x, y, z, z] ~> [(x, [0, 1]), (y, [2]), (z, [3, 4])]
 toIndexInfo :: Eq a => [a] -> [(a, [Int])]
@@ -121,13 +126,16 @@ pickup (xs:xss) = do
   x <- xs
   map (\ys -> x : ys) yss
 
-discardInactive :: [Identifier] -> [(Identifier, Int)] -> WithEnv [Identifier]
+discardInactive ::
+     [IdentifierPlus] -> [(Identifier, Int)] -> WithEnv [IdentifierPlus]
 discardInactive xs indexList =
-  forM (zip xs [0 ..]) $ \(x, i) ->
+  forM (zip xs [0 ..]) $ \((x, t), i) ->
     case lookup x indexList of
       Just j
-        | i == j -> return x
-      _ -> newNameWith "hole"
+        | i == j -> return (x, t)
+      _ -> do
+        y <- newNameWith "hole"
+        return (y, t)
 
 -- Try the list of alternatives.
 chain :: ConstraintQueue -> [WithEnv a] -> WithEnv a
@@ -141,13 +149,16 @@ lookupAny (h:ks) sub =
     Just v  -> Just (h, v)
     Nothing -> lookupAny ks sub
 
-bindFormalArgs :: WeakTerm -> [[Identifier]] -> WithEnv WeakTerm
+bindFormalArgs :: WeakTerm -> [[IdentifierPlus]] -> WithEnv WeakTerm
 bindFormalArgs e [] = return e
-bindFormalArgs e (xs:xss) = do
-  ts <- mapM (const newHole) xs
-  meta <- newMeta
-  e' <- bindFormalArgs e xss
-  return $ meta :< WeakTermPiIntro (zip xs ts) e'
+bindFormalArgs e (xts:xtss) = do
+  e'@(m :< _) <- bindFormalArgs e xtss
+  t <- obtainType m
+  h <- newNameWith "hole"
+  insTypeEnv h t
+  let tPi = newMetaTerminal :< WeakTermPi (xts ++ [(h, t)])
+  meta <- newMetaOfType tPi
+  return $ meta :< WeakTermPiIntro xts e'
 
 -- takeByCount [1, 3, 2] [a, b, c, d, e, f, g, h] ~> [[a], [b, c, d], [e, f]]
 takeByCount :: [Int] -> [a] -> [[a]]
@@ -156,3 +167,10 @@ takeByCount (i:is) xs = do
   let ys = take i xs
   let yss = takeByCount is (drop i xs)
   ys : yss
+
+obtainType :: WeakMeta -> WithEnv WeakTerm
+obtainType m = do
+  mt <- readWeakMetaType m
+  case mt of
+    Just t  -> return t
+    Nothing -> lift $ throwE "obtainType"
