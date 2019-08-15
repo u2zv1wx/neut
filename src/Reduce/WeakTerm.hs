@@ -33,7 +33,7 @@ reduceWeakTerm (m :< WeakTermPiElim e es) = do
       | all isValue es' -> do
         let self' = substWeakTerm [(x, self)] body
         reduceWeakTerm (m :< WeakTermPiElim self' es')
-    _ :< WeakTermConst constant
+    _ :< WeakTermTheta constant
       | [_ :< WeakTermEpsilonIntro (LiteralInteger x), _ :< WeakTermEpsilonIntro (LiteralInteger y)] <-
          es' -> do
         let b1 = constant `elem` intAddConstantList
