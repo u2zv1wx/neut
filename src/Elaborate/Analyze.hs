@@ -6,6 +6,7 @@ module Elaborate.Analyze
 import           Control.Comonad.Cofree
 import           Control.Monad.Except
 import           Control.Monad.State
+import           Data.IORef
 import qualified Data.PQueue.Min        as Q
 import           System.Timeout
 import qualified Text.Show.Pretty       as Pr
@@ -14,6 +15,8 @@ import           Data.Basic
 import           Data.Constraint
 import           Data.Env
 import           Data.WeakTerm
+import           Elaborate.Infer        (newUniv, readWeakMetaType,
+                                         writeWeakMetaType)
 import           Reduce.WeakTerm
 
 analyze :: [PreConstraint] -> WithEnv ()
@@ -32,72 +35,107 @@ simp ((e1, e2):cs)
         throwError $ "cannot simplify [TIMEOUT]:\n" ++ Pr.ppShow (e1, e2)
 simp ((e1, e2):cs)
   | isReducible e2 = simp $ (e2, e1) : cs
-simp ((_ :< WeakTermTau, _ :< WeakTermTau):cs) = simp cs
-simp ((_ :< WeakTermTheta x, _ :< WeakTermTheta y):cs)
-  | x == y = simp cs
-simp ((_ :< WeakTermUpsilon x1, _ :< WeakTermUpsilon x2):cs)
-  | x1 == x2 = simp cs
-simp ((_ :< WeakTermEpsilon l1, _ :< WeakTermEpsilon l2):cs)
-  | l1 == l2 = simp cs
-simp ((_ :< WeakTermEpsilonIntro l1, _ :< WeakTermEpsilonIntro l2):cs)
-  | l1 == l2 = simp cs
-simp ((_ :< WeakTermPi xts1, _ :< WeakTermPi xts2):cs)
-  | length xts1 == length xts2 = simpPiOrSigma xts1 xts2 cs
-simp ((_ :< WeakTermPiIntro xts1 body1, _ :< WeakTermPiIntro xts2 body2):cs) = do
+simp ((m1 :< WeakTermTau, m2 :< WeakTermTau):cs) = simpMetaRet m1 m2 (simp cs)
+simp ((m1 :< WeakTermTheta x, m2 :< WeakTermTheta y):cs)
+  | x == y = simpMetaRet m1 m2 (simp cs)
+simp ((m1 :< WeakTermUpsilon x1, m2 :< WeakTermUpsilon x2):cs)
+  | x1 == x2 = simpMetaRet m1 m2 (simp cs)
+simp ((m1 :< WeakTermEpsilon l1, m2 :< WeakTermEpsilon l2):cs)
+  | l1 == l2 = simpMetaRet m1 m2 (simp cs)
+simp ((m1 :< WeakTermEpsilonIntro l1, m2 :< WeakTermEpsilonIntro l2):cs)
+  | l1 == l2 = simpMetaRet m1 m2 (simp cs)
+simp ((m1 :< WeakTermPi xts1, m2 :< WeakTermPi xts2):cs)
+  | length xts1 == length xts2 = simpMetaRet m1 m2 $ simpPiOrSigma xts1 xts2 cs
+simp ((m1 :< WeakTermPiIntro xts1 body1, m2 :< WeakTermPiIntro xts2 body2):cs) = do
   h1 <- newNameWith "hole"
   h2 <- newNameWith "hole"
-  simpPiOrSigma (xts1 ++ [(h1, body1)]) (xts2 ++ [(h2, body2)]) cs
-simp ((_ :< WeakTermPiIntro xts body1, e2):cs) = do
-  let (xs, _) = unzip xts
-  vs <- mapM toVar xs
+  simpMetaRet m1 m2 $
+    simpPiOrSigma (xts1 ++ [(h1, body1)]) (xts2 ++ [(h2, body2)]) cs
+simp ((m1 :< WeakTermPiIntro xts body1@(bodyMeta :< _), e2@(m2 :< _)):cs) = do
+  vs <- mapM (uncurry toVar) xts
+  mt <- readWeakMetaType bodyMeta
   appMeta <- newMeta
-  simp $ (body1, appMeta :< WeakTermPiElim e2 vs) : cs
+  writeWeakMetaType appMeta mt
+  let comp = simp $ (body1, appMeta :< WeakTermPiElim e2 vs) : cs
+  simpMetaRet m1 m2 comp
 simp ((e1, e2@(_ :< WeakTermPiIntro {})):cs) = simp $ (e2, e1) : cs
-simp ((_ :< WeakTermSigma xts1, _ :< WeakTermSigma xts2):cs)
-  | length xts1 == length xts2 = simpPiOrSigma xts1 xts2 cs
-simp ((_ :< WeakTermSigmaIntro es1, _ :< WeakTermSigmaIntro es2):cs)
-  | length es1 == length es2 = simp $ zip es1 es2 ++ cs
+simp ((m1 :< WeakTermSigma xts1, m2 :< WeakTermSigma xts2):cs)
+  | length xts1 == length xts2 = simpMetaRet m1 m2 $ simpPiOrSigma xts1 xts2 cs
+simp ((m1 :< WeakTermSigmaIntro es1, m2 :< WeakTermSigmaIntro es2):cs)
+  | length es1 == length es2 = simpMetaRet m1 m2 $ simp $ zip es1 es2 ++ cs
 simp ((e1, e2):cs)
-  | _ :< WeakTermPiElim (_ :< WeakTermUpsilon f) es1 <- e1
-  , _ :< WeakTermPiElim (_ :< WeakTermUpsilon g) es2 <- e2
+  | m1 :< WeakTermPiElim (_ :< WeakTermUpsilon f) es1 <- e1
+  , m2 :< WeakTermPiElim (_ :< WeakTermUpsilon g) es2 <- e2
   , f == g
-  , length es1 == length es2 = simp $ zip es1 es2 ++ cs
-simp ((e1, e2):cs) = do
+  , length es1 == length es2 = simpMetaRet m1 m2 $ simp $ zip es1 es2 ++ cs
+simp ((e1@(m1 :< _), e2@(m2 :< _)):cs) = do
   let ms1 = asStuckedTerm e1
   let ms2 = asStuckedTerm e2
   case (ms1, ms2) of
-    (Just (StuckHole m), _) -> do
-      cs' <- simp cs
-      return $ Enriched (e1, e2) [m] (ConstraintImmediate m e2) : cs'
+    (Just (StuckHole h), _) -> do
+      cs' <- simpMetaRet m1 m2 $ simp cs
+      return $ Enriched (e1, e2) [h] (ConstraintImmediate h e2) : cs'
     (_, Just (StuckHole _)) -> simp $ (e2, e1) : cs
-    (Just (StuckPiElimStrict m1 exs1), _)
-      | all (isSolvable e2 m1) (map (map snd) exs1) -> do
-        cs' <- simp cs
+    (Just (StuckPiElimStrict h1 exs1), _)
+      | all (isSolvable e2 h1) (map (map snd) exs1) -> do
+        cs' <- simpMetaRet m1 m2 $ simp cs
         let es1 = map (map fst) exs1
-        return $ Enriched (e1, e2) [m1] (ConstraintPattern m1 es1 e2) : cs'
-    (_, Just (StuckPiElimStrict m2 exs2))
-      | all (isSolvable e1 m2) (map (map snd) exs2) -> simp $ (e2, e1) : cs
-    (Just (StuckPiElimStrict m1 exs1), _) -> do
-      cs' <- simp cs
+        return $ Enriched (e1, e2) [h1] (ConstraintPattern h1 es1 e2) : cs'
+    (_, Just (StuckPiElimStrict h2 exs2))
+      | all (isSolvable e1 h2) (map (map snd) exs2) ->
+        simpMetaRet m1 m2 $ simp $ (e2, e1) : cs
+    (Just (StuckPiElimStrict h1 exs1), _) -> do
+      cs' <- simpMetaRet m1 m2 $ simp cs
       let es1 = map (map fst) exs1
-      return $ Enriched (e1, e2) [m1] (ConstraintQuasiPattern m1 es1 e2) : cs'
+      return $ Enriched (e1, e2) [h1] (ConstraintQuasiPattern h1 es1 e2) : cs'
     (_, Just StuckPiElimStrict {}) -> simp $ (e2, e1) : cs
-    (Just (StuckPiElim m1 ies1), Nothing) -> do
-      cs' <- simp cs
-      let c = Enriched (e1, e2) [m1] $ ConstraintFlexRigid m1 ies1 e2
+    (Just (StuckPiElim h1 ies1), Nothing) -> do
+      cs' <- simpMetaRet m1 m2 $ simp cs
+      let c = Enriched (e1, e2) [h1] $ ConstraintFlexRigid h1 ies1 e2
       return $ c : cs'
     (Nothing, Just StuckPiElim {}) -> simp $ (e2, e1) : cs
-    (Just (StuckPiElim m1 ies1), _) -> do
-      cs' <- simp cs
-      let c = Enriched (e1, e2) [m1] $ ConstraintFlexFlex m1 ies1 e2
+    (Just (StuckPiElim h1 ies1), _) -> do
+      cs' <- simpMetaRet m1 m2 $ simp cs
+      let c = Enriched (e1, e2) [h1] $ ConstraintFlexFlex h1 ies1 e2
       return $ c : cs'
     (_, Just StuckPiElim {}) -> simp $ (e2, e1) : cs
-    (Just (StuckOther m1), _) -> do
-      cs' <- simp cs
-      let c = Enriched (e1, e2) [m1] ConstraintOther
+    (Just (StuckOther h1), _) -> do
+      cs' <- simpMetaRet m1 m2 $ simp cs
+      let c = Enriched (e1, e2) [h1] ConstraintOther
       return $ c : cs'
     (_, Just (StuckOther _)) -> simp $ (e2, e1) : cs
     _ -> throwError $ "cannot simplify:\n" ++ Pr.ppShow (e1, e2)
+
+simpMetaRet ::
+     WeakMeta
+  -> WeakMeta
+  -> WithEnv [EnrichedConstraint]
+  -> WithEnv [EnrichedConstraint]
+simpMetaRet m1 m2 comp = do
+  cs1 <- simpMeta m1 m2
+  cs2 <- comp
+  return $ cs1 ++ cs2
+
+simpMeta :: WeakMeta -> WeakMeta -> WithEnv [EnrichedConstraint]
+simpMeta (WeakMetaTerminal _) (WeakMetaTerminal _) = return []
+simpMeta m1@(WeakMetaTerminal _) (WeakMetaNonTerminal (Ref r) _) = do
+  mt <- liftIO $ readIORef r
+  case mt of
+    Just (m :< WeakTermTau) -> simpMeta m1 m
+    Just (m :< t) -> undefined
+    Nothing -> do
+      let foo = newMetaTerminal :< WeakTermTau
+      liftIO $ writeIORef r $ Just foo
+      return []
+simpMeta m1@WeakMetaNonTerminal {} m2@(WeakMetaTerminal _) = simpMeta m2 m1
+simpMeta (WeakMetaNonTerminal (Ref r1) _) (WeakMetaNonTerminal (Ref r2) _) = do
+  mt1 <- liftIO $ readIORef r1
+  mt2 <- liftIO $ readIORef r2
+  case (mt1, mt2) of
+    (Just t1, Just t2) -> simp [(t1, t2)]
+    (Just _, Nothing)  -> liftIO (writeIORef r2 mt1) >> return []
+    (Nothing, Just _)  -> liftIO (writeIORef r1 mt2) >> return []
+    _                  -> return []
 
 simpPiOrSigma ::
      [(Identifier, WeakTerm)]
@@ -105,11 +143,10 @@ simpPiOrSigma ::
   -> [(WeakTerm, WeakTerm)]
   -> WithEnv [EnrichedConstraint]
 simpPiOrSigma xts1 xts2 cs = do
-  let (xs1, ts1) = unzip xts1
-  vs1 <- mapM toVar xs1
+  vs1 <- mapM (uncurry toVar) xts1
   let (xs2, ts2) = unzip xts2
   let ts2' = map (substWeakTerm (zip xs2 vs1)) ts2
-  simp $ zip ts1 ts2' ++ cs
+  simp $ zip (map snd xts1) ts2' ++ cs
 
 data Stuck
   = StuckHole Hole
@@ -155,9 +192,9 @@ isSolvable e x xs = do
   let (fvs, fmvs) = varWeakTerm e
   affineCheck xs fvs && x `notElem` fmvs
 
-toVar :: Identifier -> WithEnv WeakTerm
-toVar x = do
-  meta <- newMeta
+toVar :: Identifier -> WeakTerm -> WithEnv WeakTerm
+toVar x t = do
+  meta <- newMetaOfType t
   return $ meta :< WeakTermUpsilon x
 
 affineCheck :: [Identifier] -> [Identifier] -> Bool
