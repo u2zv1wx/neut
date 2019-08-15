@@ -145,7 +145,7 @@ bindFormalArgs :: WeakTerm -> [[Identifier]] -> WithEnv WeakTerm
 bindFormalArgs e [] = return e
 bindFormalArgs e (xs:xss) = do
   ts <- mapM (const newHole) xs
-  meta <- emptyMeta
+  meta <- newMeta
   e' <- bindFormalArgs e xss
   return $ meta :< WeakTermPiIntro (zip xs ts) e'
 

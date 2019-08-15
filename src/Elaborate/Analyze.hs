@@ -32,7 +32,9 @@ simp ((e1, e2):cs)
         throwError $ "cannot simplify [TIMEOUT]:\n" ++ Pr.ppShow (e1, e2)
 simp ((e1, e2):cs)
   | isReducible e2 = simp $ (e2, e1) : cs
-simp ((_ :< WeakTermUniverse, _ :< WeakTermUniverse):cs) = simp cs
+simp ((_ :< WeakTermTau, _ :< WeakTermTau):cs) = simp cs
+simp ((_ :< WeakTermTheta x, _ :< WeakTermTheta y):cs)
+  | x == y = simp cs
 simp ((_ :< WeakTermUpsilon x1, _ :< WeakTermUpsilon x2):cs)
   | x1 == x2 = simp cs
 simp ((_ :< WeakTermEpsilon l1, _ :< WeakTermEpsilon l2):cs)
@@ -48,15 +50,13 @@ simp ((_ :< WeakTermPiIntro xts1 body1, _ :< WeakTermPiIntro xts2 body2):cs) = d
 simp ((_ :< WeakTermPiIntro xts body1, e2):cs) = do
   let (xs, _) = unzip xts
   vs <- mapM toVar xs
-  appMeta <- emptyMeta
+  appMeta <- newMeta
   simp $ (body1, appMeta :< WeakTermPiElim e2 vs) : cs
 simp ((e1, e2@(_ :< WeakTermPiIntro {})):cs) = simp $ (e2, e1) : cs
 simp ((_ :< WeakTermSigma xts1, _ :< WeakTermSigma xts2):cs)
   | length xts1 == length xts2 = simpPiOrSigma xts1 xts2 cs
 simp ((_ :< WeakTermSigmaIntro es1, _ :< WeakTermSigmaIntro es2):cs)
   | length es1 == length es2 = simp $ zip es1 es2 ++ cs
-simp ((_ :< WeakTermConst x, _ :< WeakTermConst y):cs)
-  | x == y = simp cs
 simp ((e1, e2):cs)
   | _ :< WeakTermPiElim (_ :< WeakTermUpsilon f) es1 <- e1
   , _ :< WeakTermPiElim (_ :< WeakTermUpsilon g) es2 <- e2
@@ -138,7 +138,7 @@ asStuckedTerm (_ :< WeakTermPiElim e es) =
       Just $ StuckPiElim m $ ess ++ [es]
     Just (StuckOther m) -> Just $ StuckOther m
     Nothing -> Nothing
-asStuckedTerm (_ :< WeakTermHole m) = Just $ StuckHole m
+asStuckedTerm (_ :< WeakTermZeta m) = Just $ StuckHole m
 asStuckedTerm e
   | Just m <- obtainStuckReason e = Just $ StuckOther m
 asStuckedTerm _ = Nothing
@@ -147,17 +147,17 @@ obtainStuckReason :: WeakTerm -> Maybe Hole
 obtainStuckReason (_ :< WeakTermEpsilonElim _ e _) = obtainStuckReason e
 obtainStuckReason (_ :< WeakTermPiElim e _)        = obtainStuckReason e
 obtainStuckReason (_ :< WeakTermSigmaElim _ e1 _)  = obtainStuckReason e1
-obtainStuckReason (_ :< WeakTermHole x)            = Just x
+obtainStuckReason (_ :< WeakTermZeta x)            = Just x
 obtainStuckReason _                                = Nothing
 
 isSolvable :: WeakTerm -> Identifier -> [Identifier] -> Bool
 isSolvable e x xs = do
-  let (fvs, fmvs) = varAndHole e
+  let (fvs, fmvs) = varWeakTerm e
   affineCheck xs fvs && x `notElem` fmvs
 
 toVar :: Identifier -> WithEnv WeakTerm
 toVar x = do
-  meta <- emptyMeta
+  meta <- newMeta
   return $ meta :< WeakTermUpsilon x
 
 affineCheck :: [Identifier] -> [Identifier] -> Bool
