@@ -9,7 +9,6 @@ import           System.Directory
 import           System.FilePath
 import           Text.Read                  (readMaybe)
 
-import           Data.Basic
 import           Data.Env
 import           Data.Tree
 import           Data.WeakTerm
@@ -42,7 +41,7 @@ parse' ((_ :< TreeNode [_ :< TreeAtom "reserve", _ :< TreeAtom s]):as) = do
   parse' as
 parse' ((_ :< TreeNode ((_ :< TreeAtom "sortal"):(_ :< TreeAtom name):ts)):as) = do
   indexList <- mapM extractIdentifier ts
-  insIndexEnv name indexList
+  insEpsilonEnv name indexList
   parse' as
 parse' ((_ :< TreeNode [_ :< TreeAtom "include", _ :< TreeAtom pathString]):as) =
   case readMaybe pathString :: Maybe String of
@@ -76,7 +75,7 @@ parse' ((_ :< TreeNode [_ :< TreeAtom "let", xt, e]):as) = do
   t' <- rename t
   x' <- newNameWith x
   defList <- parse' as
-  m <- emptyMeta
+  m <- newMeta
   return $ DefLet m (x', t') e' : defList
 parse' (a:as)
   -- If the head element is not a special form, we interpret it as an ordinary term.
@@ -106,9 +105,9 @@ isSpecialForm _ = False
 -- (Note that `let x := e1 in e2` can be represented as `(lam x e2) e1`.)
 concatDefList :: [Def] -> WithEnv WeakTerm
 concatDefList [] = do
-  m <- emptyMeta
+  m <- newMeta
   return $ m :< WeakTermSigmaIntro []
 concatDefList (DefLet meta tu e:es) = do
   cont <- concatDefList es
-  m <- emptyMeta
+  m <- newMeta
   return $ meta :< WeakTermPiElim (m :< WeakTermPiIntro [tu] cont) [e]
