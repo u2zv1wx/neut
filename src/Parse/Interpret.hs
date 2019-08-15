@@ -20,7 +20,9 @@ interpret :: Tree -> WithEnv WeakTerm
 --
 -- foundational interpretations
 --
-interpret (m :< TreeAtom "universe") = withMeta m WeakTermUniverse
+interpret (m :< TreeAtom "tau") = withMeta m WeakTermTau
+interpret (m :< TreeNode [_ :< TreeAtom "theta", _ :< TreeAtom x]) =
+  withMeta m $ WeakTermTheta x
 interpret (m :< TreeNode [_ :< TreeAtom "upsilon", _ :< TreeAtom x]) =
   withMeta m $ WeakTermUpsilon x
 interpret (m :< TreeNode [_ :< TreeAtom "epsilon", _ :< TreeAtom x]) = do
@@ -62,9 +64,9 @@ interpret (m :< TreeNode [_ :< TreeAtom "mu", xt, e]) = do
   xt' <- interpretIdentifierPlus xt
   e' <- interpret e
   withMeta m $ WeakTermMu xt' e'
-interpret (m :< TreeNode [_ :< TreeAtom "meta-variable", _ :< TreeAtom x]) = do
+interpret (m :< TreeNode [_ :< TreeAtom "zeta", _ :< TreeAtom x]) = do
   x' <- interpretAtom x
-  withMeta m $ WeakTermHole x'
+  withMeta m $ WeakTermZeta x'
 --
 -- auxiliary interpretations
 --
@@ -79,7 +81,7 @@ interpret t@(m :< TreeAtom x) = do
         else do
           cenv <- gets constantEnv
           if x `elem` cenv
-            then withMeta m $ WeakTermConst x
+            then withMeta m $ WeakTermTheta x
             else withMeta m $ WeakTermUpsilon x
 interpret t@(m :< TreeNode es) =
   if null es
