@@ -4,8 +4,6 @@ import           Data.WeakTerm
 
 type PreConstraint = (WeakTerm, WeakTerm)
 
-type Hole = String
-
 data Constraint
   = ConstraintImmediate Hole
                         WeakTerm

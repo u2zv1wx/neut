@@ -2,14 +2,7 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell    #-}
 
-module Data.WeakTerm
-  ( WeakTerm
-  , WeakMeta
-  , varWeakTerm
-  , substWeakTerm
-  , isReducible
-  , isValue
-  ) where
+module Data.WeakTerm where
 
 import           Control.Comonad.Cofree
 import           Control.Monad          (forM)
