@@ -153,24 +153,24 @@ asStuckedTerm :: WeakTerm -> Maybe Stuck
 asStuckedTerm (_ :< WeakTermPiElim e es)
   | Just xs <- mapM interpretAsUpsilon es =
     case asStuckedTerm e of
-      Just (StuckHole m) -> Just $ StuckPiElimStrict m [zip es xs]
-      Just (StuckPiElim m iess) -> Just $ StuckPiElim m (iess ++ [es])
-      Just (StuckPiElimStrict m iexss) ->
-        Just $ StuckPiElimStrict m $ iexss ++ [zip es xs]
-      Just (StuckOther m) -> Just $ StuckOther m
+      Just (StuckHole h) -> Just $ StuckPiElimStrict h [zip es xs]
+      Just (StuckPiElim h iess) -> Just $ StuckPiElim h (iess ++ [es])
+      Just (StuckPiElimStrict h iexss) ->
+        Just $ StuckPiElimStrict h $ iexss ++ [zip es xs]
+      Just (StuckOther h) -> Just $ StuckOther h
       Nothing -> Nothing
 asStuckedTerm (_ :< WeakTermPiElim e es) =
   case asStuckedTerm e of
-    Just (StuckHole m) -> Just $ StuckPiElim m [es]
-    Just (StuckPiElim m iess) -> Just $ StuckPiElim m $ iess ++ [es]
-    Just (StuckPiElimStrict m exss) -> do
+    Just (StuckHole h) -> Just $ StuckPiElim h [es]
+    Just (StuckPiElim h iess) -> Just $ StuckPiElim h $ iess ++ [es]
+    Just (StuckPiElimStrict h exss) -> do
       let ess = map (map fst) exss
-      Just $ StuckPiElim m $ ess ++ [es]
-    Just (StuckOther m) -> Just $ StuckOther m
+      Just $ StuckPiElim h $ ess ++ [es]
+    Just (StuckOther h) -> Just $ StuckOther h
     Nothing -> Nothing
-asStuckedTerm (_ :< WeakTermZeta m) = Just $ StuckHole m
+asStuckedTerm (_ :< WeakTermZeta h) = Just $ StuckHole h
 asStuckedTerm e
-  | Just m <- obtainStuckReason e = Just $ StuckOther m
+  | Just h <- obtainStuckReason e = Just $ StuckOther h
 asStuckedTerm _ = Nothing
 
 obtainStuckReason :: WeakTerm -> Maybe Hole
