@@ -41,10 +41,10 @@ type WeakTerm = Cofree WeakTermF WeakMeta
 newtype Ref a =
   Ref (IORef a)
 
-data WeakMeta = WeakMeta
-  { weakMetaTypeRef  :: Ref (Maybe WeakTerm) -- "Ref" is for "type : type"
-  , weakMetaLocation :: Maybe (Int, Int)
-  }
+data WeakMeta
+  = WeakMetaTerminal (Maybe (Int, Int))
+  | WeakMetaNonTerminal (Ref (Maybe WeakTerm))
+                        (Maybe (Int, Int))
 
 $(deriveShow1 ''WeakTermF)
 
