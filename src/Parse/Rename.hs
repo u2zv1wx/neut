@@ -11,7 +11,8 @@ import           Data.WeakTerm
 
 -- Alpha-convert all the variables so that different variables have different names.
 rename :: WeakTerm -> WithEnv WeakTerm
-rename (m :< WeakTermUniverse) = return $ m :< WeakTermUniverse
+rename (m :< WeakTermTau) = return $ m :< WeakTermTau
+rename (m :< WeakTermTheta x) = return $ m :< WeakTermTheta x
 rename (m :< WeakTermUpsilon x) = do
   x' <- lookupNameEnv x
   return $ m :< WeakTermUpsilon x'
@@ -50,8 +51,7 @@ rename (m :< WeakTermMu (x, t) e) =
     x' <- newNameWith x
     e' <- rename e
     return $ m :< WeakTermMu (x', t') e'
-rename (m :< WeakTermConst x) = return $ m :< WeakTermConst x
-rename (m :< WeakTermHole h) = return $ m :< WeakTermHole h
+rename (m :< WeakTermZeta h) = return $ m :< WeakTermZeta h
 
 renameBindings :: [IdentifierPlus] -> WithEnv [IdentifierPlus]
 renameBindings [] = return []
