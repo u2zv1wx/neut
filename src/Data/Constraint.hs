@@ -4,6 +4,8 @@ import           Data.WeakTerm
 
 type PreConstraint = (WeakTerm, WeakTerm)
 
+type Hole = String
+
 data Constraint
   = ConstraintImmediate Hole
                         WeakTerm
@@ -21,7 +23,7 @@ data Constraint
                        WeakTerm
   | ConstraintOther
 
-constraintToInt :: Constraint -> Int --
+constraintToInt :: Constraint -> Int
 constraintToInt ConstraintImmediate {}    = 0
 constraintToInt ConstraintPattern {}      = 1
 constraintToInt ConstraintQuasiPattern {} = 2
