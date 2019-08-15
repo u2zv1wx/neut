@@ -2,39 +2,39 @@ module Reduce.Term
   ( reduceTerm
   ) where
 
-import           Control.Monad.State
-import           Control.Monad.Trans        (lift)
-import           Control.Monad.Trans.Except
+import           Control.Comonad.Cofree
 
 import           Data.Basic
 import           Data.Env
 import           Data.Term
 
 reduceTerm :: Term -> WithEnv Term
-reduceTerm (TermEpsilonElim x e branchList) = do
+reduceTerm (m :< TermEpsilonElim (x, t) e branchList) = do
   e' <- reduceTerm e
   case e' of
-    TermEpsilonIntro l _ ->
+    _ :< TermEpsilonIntro l ->
       case lookup (CaseLiteral l) branchList of
         Just body -> reduceTerm $ substTerm [(x, e')] body
         Nothing ->
           case lookup CaseDefault branchList of
             Just body -> reduceTerm $ substTerm [(x, e')] body
-            Nothing ->
-              lift $
-              throwE $
-              "the index " ++ show x ++ " is not included in branchList"
-    _ -> return $ TermEpsilonElim x e' branchList
-reduceTerm (TermPiElim e es) = do
-  es' <- mapM reduceTerm es
+            Nothing   -> return $ m :< TermEpsilonElim (x, t) e' branchList
+    _ -> return $ m :< TermEpsilonElim (x, t) e' branchList
+reduceTerm (m :< TermPiElim e es) = do
   e' <- reduceTerm e
+  es' <- mapM reduceTerm es
   case e' of
-    TermPiIntro xs body
-      | length xs == length es -> do
-        let sub = zip xs es
-        reduceTerm $ substTerm sub body
-    TermConst constant
-      | [TermEpsilonIntro (LiteralInteger x) sx, TermEpsilonIntro (LiteralInteger y) _] <-
+    _ :< TermPiIntro xts body
+      | length xts == length es'
+      , all isValue es' -> do
+        let xs = map fst xts
+        reduceTerm $ substTerm (zip xs es') body
+    self@(_ :< TermMu (x, _) body)
+      | all isValue es' -> do
+        let self' = substTerm [(x, self)] body
+        reduceTerm (m :< TermPiElim self' es')
+    _ :< TermTheta constant
+      | [_ :< TermEpsilonIntro (LiteralInteger x), _ :< TermEpsilonIntro (LiteralInteger y)] <-
          es' -> do
         let b1 = constant `elem` intAddConstantList
         let b2 = constant `elem` intSubConstantList
@@ -42,25 +42,25 @@ reduceTerm (TermPiElim e es) = do
         let b4 = constant `elem` intDivConstantList
         case (b1, b2, b3, b4) of
           (True, _, _, _) ->
-            return $ TermEpsilonIntro (LiteralInteger (x + y)) sx
+            return $ m :< TermEpsilonIntro (LiteralInteger (x + y))
           (_, True, _, _) ->
-            return $ TermEpsilonIntro (LiteralInteger (x - y)) sx
+            return $ m :< TermEpsilonIntro (LiteralInteger (x - y))
           (_, _, True, _) ->
-            return $ TermEpsilonIntro (LiteralInteger (x * y)) sx
+            return $ m :< TermEpsilonIntro (LiteralInteger (x * y))
           (_, _, _, True) ->
-            return $ TermEpsilonIntro (LiteralInteger (x `div` y)) sx
-          _ -> return $ TermPiElim e' es'
-    _ -> return $ TermPiElim e' es'
-reduceTerm (TermConstElim x es) = do
+            return $ m :< TermEpsilonIntro (LiteralInteger (x `div` y))
+          _ -> return $ m :< TermPiElim e' es'
+    _ -> return $ m :< TermPiElim e' es'
+reduceTerm (m :< TermSigmaIntro es) = do
   es' <- mapM reduceTerm es
-  env <- gets termEnv
-  case lookup x env of
-    Just (args, body)
-      | length args == length es -> reduceTerm $ substTerm (zip args es') body
-    _ -> return $ TermConstElim x es'
-reduceTerm (TermSigmaElim xs e body) = do
-  e' <- reduceTerm e
-  case e' of
-    TermSigmaIntro es -> reduceTerm $ substTerm (zip xs es) body
-    _                 -> return $ TermSigmaElim xs e' body
+  return $ m :< TermSigmaIntro es'
+reduceTerm (m :< TermSigmaElim xts e1 e2) = do
+  e1' <- reduceTerm e1
+  case e1' of
+    _ :< TermSigmaIntro es
+      | length es == length xts
+      , all isValue es -> do
+        let xs = map fst xts
+        reduceTerm $ substTerm (zip xs es) e2
+    _ -> return $ m :< TermSigmaElim xts e1' e2
 reduceTerm t = return t

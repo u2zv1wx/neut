@@ -64,25 +64,22 @@ elaborate' (m :< WeakTermEpsilonIntro x) = do
   m' <- toMeta m
   return $ m' :< TermEpsilonIntro x
 elaborate' (m :< WeakTermEpsilonElim (x, t) e branchList) = do
-  m' <- toMeta m
   t' <- elaborate' t >>= reduceTerm
-  e' <- elaborate' e
-  branchList' <-
-    forM branchList $ \(l, body) -> do
-      body' <- elaborate' body
-      return (l, body')
-  -- FIXME: check if t' is Epsilon type
   case t' of
-    _ :< TermEpsilon _ -> return $ m' :< TermEpsilonElim (x, t') e' branchList'
+    _ :< TermEpsilon _ -> do
+      m' <- toMeta m
+      e' <- elaborate' e
+      branchList' <- forM branchList elaboratePlus
+      return $ m' :< TermEpsilonElim (x, t') e' branchList'
     _ -> throwError "epsilonElim"
 elaborate' (m :< WeakTermPi xts) = do
   m' <- toMeta m
-  xts' <- mapM elaborateIdentifierPlus xts
+  xts' <- mapM elaboratePlus xts
   return $ m' :< TermPi xts'
 elaborate' (m :< WeakTermPiIntro xts e) = do
   m' <- toMeta m
   e' <- elaborate' e
-  xts' <- mapM elaborateIdentifierPlus xts
+  xts' <- mapM elaboratePlus xts
   return $ m' :< TermPiIntro xts' e'
 elaborate' (m :< WeakTermPiElim e es) = do
   m' <- toMeta m
@@ -91,7 +88,7 @@ elaborate' (m :< WeakTermPiElim e es) = do
   return $ m' :< TermPiElim e' es'
 elaborate' (m :< WeakTermSigma xts) = do
   m' <- toMeta m
-  xts' <- mapM elaborateIdentifierPlus xts
+  xts' <- mapM elaboratePlus xts
   return $ m' :< TermSigma xts'
 elaborate' (m :< WeakTermSigmaIntro es) = do
   m' <- toMeta m
@@ -101,23 +98,15 @@ elaborate' (m :< WeakTermSigmaElim xts e1 e2) = do
   m' <- toMeta m
   e1' <- elaborate' e1
   e2' <- elaborate' e2
-  xts' <- mapM elaborateIdentifierPlus xts
+  xts' <- mapM elaboratePlus xts
   return $ m' :< TermSigmaElim xts' e1' e2'
 elaborate' (m :< WeakTermMu (x, t) e) = do
-  t' <- reduceWeakTerm t
-  let fvs = fst $ varWeakTerm $ m :< WeakTermMu (x, t) e
-  fvs' <-
-    forM fvs $ \y -> do
-      meta <- lookupTypeEnv y >>= newMetaOfType >>= toMeta
-      return $ meta :< TermUpsilon y
-  m' <- toMeta m
-  xMeta <- newMetaOfType t >>= toMeta
-  let x' = xMeta :< TermTheta x
-  e' <- elaborate' e
-  insTermEnv x fvs $ substTerm [(x, m' :< TermPiElim x' fvs')] e'
-  -- insTermEnv x fvs $ substTerm [(x, m1 :< TermThetaElim x fvs')] e'
+  t' <- elaborate' t >>= reduceTerm
   case t' of
-    _ :< WeakTermPi _ -> return $ m' :< TermPiElim x' fvs'
+    _ :< TermPi _ -> do
+      m' <- toMeta m
+      e' <- elaborate' e
+      return $ m' :< TermMu (x, t') e'
     _ -> lift $ throwE "CBV recursion is allowed only for Pi-types"
 elaborate' (_ :< WeakTermZeta x) = do
   sub <- gets substEnv
@@ -125,8 +114,8 @@ elaborate' (_ :< WeakTermZeta x) = do
     Just e  -> elaborate' e
     Nothing -> lift $ throwE $ "elaborate' i: remaining hole: " ++ x
 
-elaborateIdentifierPlus :: (Identifier, WeakTerm) -> WithEnv (Identifier, Term)
-elaborateIdentifierPlus (x, t) = do
+elaboratePlus :: (a, WeakTerm) -> WithEnv (a, Term)
+elaboratePlus (x, t) = do
   t' <- elaborate' t
   return (x, t')
 
@@ -176,25 +165,6 @@ allM p (x:xs) = do
   b2 <- allM p xs
   return $ b1 && b2
 
--- asLowType :: Identifier -> LowType
--- asLowType x
---   | length x > 1
---   , 'i' <- head x
---   , Just i <- readMaybe (tail x)
---   , 1 <= i
---   , i <= 2 ^ (23 :: Int) - 1 = LowTypeSignedInt i
--- asLowType x
---   | length x > 1
---   , 'u' <- head x
---   , Just i <- readMaybe (tail x)
---   , 1 <= i
---   , i <= 2 ^ (23 :: Int) - 1 = LowTypeUnsignedInt i
--- asLowType x
---   | length x > 1
---   , 'f' <- head x
---   , Just i <- readMaybe (tail x)
---   , i `elem` [16, 32, 64] = LowTypeFloat i
--- asLowType _ = LowTypeSignedInt 64 -- sortals are represented as int
 toMeta :: WeakMeta -> WithEnv Meta
 toMeta (WeakMetaTerminal l) = return $ MetaTerminal l
 toMeta (WeakMetaNonTerminal (Ref r) l) = do
