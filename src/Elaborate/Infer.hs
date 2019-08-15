@@ -5,7 +5,6 @@ module Elaborate.Infer
 import           Control.Comonad.Cofree
 import           Control.Monad.Except
 import           Control.Monad.State
-import           Data.IORef
 import           Data.Maybe             (maybeToList)
 import           Prelude                hiding (pi)
 
@@ -39,8 +38,7 @@ type Context = [(Identifier, WeakTerm)]
 infer :: Context -> WeakTerm -> WithEnv WeakTerm
 infer _ u@(meta :< WeakTermTau) = do
   registerTypeIfNecessary meta u
-  let Ref r = weakMetaType meta
-  liftIO $ writeIORef r (Just u)
+  writeWeakMetaType meta (Just u)
   return u
 infer _ (meta :< WeakTermTheta x) = do
   h <- newHole -- constants do not depend on their context
@@ -207,10 +205,9 @@ newUniv = do
 
 registerTypeIfNecessary :: WeakMeta -> WeakTerm -> WithEnv ()
 registerTypeIfNecessary m t = do
-  let Ref r = weakMetaType m
-  identOrType <- liftIO $ readIORef r
-  case identOrType of
-    Nothing -> liftIO $ writeIORef r (Just t)
+  mt <- readWeakMetaType m
+  case mt of
+    Nothing -> writeWeakMetaType m (Just t)
     Just t' -> insConstraintEnv t t'
 
 wrapInfer :: Context -> WeakTermF WeakTerm -> WithEnv WeakTerm

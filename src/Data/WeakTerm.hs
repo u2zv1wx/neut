@@ -42,7 +42,7 @@ newtype Ref a =
   Ref (IORef a)
 
 data WeakMeta = WeakMeta
-  { weakMetaType     :: Ref (Maybe WeakTerm) -- "Ref" is for "type : type"
+  { weakMetaTypeRef  :: Ref (Maybe WeakTerm) -- "Ref" is for "type : type"
   , weakMetaLocation :: Maybe (Int, Int)
   }
 

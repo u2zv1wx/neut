@@ -219,15 +219,25 @@ newHoleOfType t = do
 newMeta :: WithEnv WeakMeta
 newMeta = do
   t <- liftIO $ newIORef Nothing
-  return $ WeakMeta {weakMetaType = Ref t, weakMetaLocation = Nothing}
+  return $ WeakMeta {weakMetaTypeRef = Ref t, weakMetaLocation = Nothing}
 
 newMetaOfType :: WeakTerm -> WithEnv WeakMeta
 newMetaOfType t = do
   t' <- liftIO $ newIORef (Just t)
-  return $ WeakMeta {weakMetaType = Ref t', weakMetaLocation = Nothing}
+  return $ WeakMeta {weakMetaTypeRef = Ref t', weakMetaLocation = Nothing}
 
 toWeakMeta :: TreeMeta -> WithEnv WeakMeta
 toWeakMeta m = do
   t <- liftIO $ newIORef Nothing
   return $
-    WeakMeta {weakMetaType = Ref t, weakMetaLocation = treeMetaLocation m}
+    WeakMeta {weakMetaTypeRef = Ref t, weakMetaLocation = treeMetaLocation m}
+
+readWeakMetaType :: WeakMeta -> WithEnv (Maybe WeakTerm)
+readWeakMetaType m = do
+  let Ref r = weakMetaTypeRef m
+  liftIO $ readIORef r
+
+writeWeakMetaType :: WeakMeta -> Maybe WeakTerm -> WithEnv ()
+writeWeakMetaType m mt = do
+  let Ref r = weakMetaTypeRef m
+  liftIO $ writeIORef r mt
