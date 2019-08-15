@@ -15,8 +15,7 @@ import           Data.Basic
 import           Data.Constraint
 import           Data.Env
 import           Data.WeakTerm
-import           Elaborate.Infer        (newUniv, readWeakMetaType,
-                                         writeWeakMetaType)
+import           Elaborate.Infer        (readWeakMetaType, writeWeakMetaType)
 import           Reduce.WeakTerm
 
 analyze :: [PreConstraint] -> WithEnv ()
@@ -118,15 +117,9 @@ simpMetaRet m1 m2 comp = do
 
 simpMeta :: WeakMeta -> WeakMeta -> WithEnv [EnrichedConstraint]
 simpMeta (WeakMetaTerminal _) (WeakMetaTerminal _) = return []
-simpMeta m1@(WeakMetaTerminal _) (WeakMetaNonTerminal (Ref r) _) = do
-  mt <- liftIO $ readIORef r
-  case mt of
-    Just (m :< WeakTermTau) -> simpMeta m1 m
-    Just (m :< t) -> undefined
-    Nothing -> do
-      let foo = newMetaTerminal :< WeakTermTau
-      liftIO $ writeIORef r $ Just foo
-      return []
+simpMeta (WeakMetaTerminal _) m2@(WeakMetaNonTerminal _ _) = do
+  r1 <- liftIO $ newIORef (Just $ newMetaTerminal :< WeakTermTau)
+  simpMeta (WeakMetaNonTerminal (Ref r1) Nothing) m2
 simpMeta m1@WeakMetaNonTerminal {} m2@(WeakMetaTerminal _) = simpMeta m2 m1
 simpMeta (WeakMetaNonTerminal (Ref r1) _) (WeakMetaNonTerminal (Ref r2) _) = do
   mt1 <- liftIO $ readIORef r1
