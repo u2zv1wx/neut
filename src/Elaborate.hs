@@ -62,7 +62,10 @@ elaborate' (m :< WeakTermEpsilon k) = do
   return $ m' :< TermEpsilon k
 elaborate' (m :< WeakTermEpsilonIntro x) = do
   m' <- toMeta m
-  return $ m' :< TermEpsilonIntro x
+  t <- reduceTerm $ obtainType m'
+  case t of
+    _ :< TermEpsilon _ -> return $ m' :< TermEpsilonIntro x
+    _                  -> throwError "epsilonIntro"
 elaborate' (m :< WeakTermEpsilonElim (x, t) e branchList) = do
   t' <- elaborate' t >>= reduceTerm
   case t' of
@@ -174,3 +177,7 @@ toMeta (WeakMetaNonTerminal (Ref r) l) = do
     Just t -> do
       t' <- elaborate' t
       return $ MetaNonTerminal t' l
+
+obtainType :: Meta -> Term
+obtainType (MetaTerminal _)      = MetaTerminal Nothing :< TermTau
+obtainType (MetaNonTerminal t _) = t
