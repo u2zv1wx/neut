@@ -1,10 +1,14 @@
 module Elaborate.Infer
   ( infer
+  , newUniv
+  , readWeakMetaType
+  , writeWeakMetaType
   ) where
 
 import           Control.Comonad.Cofree
 import           Control.Monad.Except
 import           Control.Monad.State
+import           Data.IORef
 import           Data.Maybe             (catMaybes)
 import           Prelude                hiding (pi)
 
@@ -36,7 +40,8 @@ type Context = [(Identifier, WeakTerm)]
 -- Dynamic Pattern Unification for Dependent Types and Records". Typed Lambda
 -- Calculi and Applications, 2011.
 infer :: Context -> WeakTerm -> WithEnv WeakTerm
-infer _ u@(meta :< WeakTermTau) = returnAfterUpdate meta u -- univ : univ
+infer _ (meta :< WeakTermTau) =
+  returnAfterUpdate meta (newMetaTerminal :< WeakTermTau) -- univ : univ
 infer _ (meta :< WeakTermTheta x) = do
   h <- newHoleInCtx [] -- constants do not depend on their context
   insTypeEnv x h
@@ -219,3 +224,16 @@ wrapWithType :: WeakTerm -> WeakTermF WeakTerm -> WithEnv WeakTerm
 wrapWithType t e = do
   m <- newMetaOfType t
   return $ m :< e
+
+readWeakMetaType :: WeakMeta -> WithEnv (Maybe WeakTerm)
+readWeakMetaType (WeakMetaNonTerminal (Ref r) _) = liftIO $ readIORef r
+readWeakMetaType (WeakMetaTerminal _)            = Just <$> newUniv
+
+writeWeakMetaType :: WeakMeta -> Maybe WeakTerm -> WithEnv ()
+writeWeakMetaType (WeakMetaNonTerminal (Ref r) _) mt = liftIO $ writeIORef r mt
+writeWeakMetaType (WeakMetaTerminal _) mt =
+  case mt of
+    Nothing -> return ()
+    Just t -> do
+      u <- newUniv
+      insConstraintEnv u t
