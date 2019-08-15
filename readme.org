@@ -1,15 +1,5 @@
 * Neut
-
-** About
-
-Neut is a programming language based on dependent modal linear type theory, focusing on canonicity and orthogonality. The key features of Neut include:
-
-- Expressive power of dependent type theory
-- Static, predictable memory allocation/deallocation by modality
-- Dependent type inference by non-chronological backtracking
-
 ** Syntax
-
 #+BEGIN_SRC
 -- identifier
 x    ::= <string>
@@ -19,35 +9,34 @@ l    ::= x
        | <int>
        | <float>
 
--- term
-e, A ::= (universe)
-       | (upsilon A x)
-       | (epsilon A x)
-       | (epsilon-introduction A l)
-       | (epsilon-elimination A x e (c1 e1) ... (cn en))
-       | (pi A ((x1 A1) ... (xn An)) B)
-       | (pi-introduction A ((x1 A1) ... (xn An)) e)
-       | (pi-elimination A e e1 ... en)
-       | (sigma A ((x1 A1) ... (xn An)) B)
-       | (sigma-introduction A e1 ... en)
-       | (sigma-elimination A ((x1 A1) ... (xn An)) e1 e2)
-       | (mu (x A) e)
-       | (meta-variable x)
-
 -- case
 c    ::= (epsilon-intro l)
        | (default)
+
+-- pre-term
+p, A ::= (tau)
+       | (theta x)
+       | (upsilon x)
+       | (epsilon x)
+       | (epsilon-introduction l)
+       | (epsilon-elimination (x A) e (c1 e1) ... (cn en))
+       | (pi ((x1 A1) ... (xn An)) A)
+       | (pi-introduction ((x1 A1) ... (xn An)) e)
+       | (pi-elimination e e1 ... en)
+       | (sigma ((x1 A1) ... (xn An)) B)
+       | (sigma-introduction e1 ... en)
+       | (sigma-elimination ((x1 A1) ... (xn An)) e1 e2)
+       | (mu (x A) e)
+       | (zeta x)
 #+END_SRC
 
 ** Installation
-
 #+BEGIN_SRC
 $ git clone https://github.com/u2zv1wx/neut
 $ stack build
 $ stack exec neut build test/res/fact.neut
 $ ./file
 #+END_SRC
-
 Neut depends on LLVM and Clang. When you execute =neut build=, both of the commands =llc= and =clang= must be in your =$PATH=.
 
 ** References
