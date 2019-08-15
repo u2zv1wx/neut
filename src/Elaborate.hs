@@ -6,6 +6,7 @@ import           Control.Comonad.Cofree
 import           Control.Monad.Except
 import           Control.Monad.State
 import           Control.Monad.Trans.Except
+import           Data.IORef
 import           Data.List                  (nub)
 import qualified Data.Map.Strict            as Map
 import           Text.Read                  (readMaybe)
@@ -47,11 +48,12 @@ elaborate e = do
 -- reduction-preserving way. Here, we translate types into units (nullary product).
 -- This doesn't cause any problem since types doesn't have any beta-reduction.
 elaborate' :: WeakTerm -> WithEnv Term
-elaborate' (_ :< WeakTermUniverse) = return zero
+elaborate' (_ :< WeakTermTau) = return zero
+elaborate' (_ :< WeakTermTheta x) = return $ TermTheta x
 elaborate' (_ :< WeakTermUpsilon x) = return $ TermUpsilon x
 elaborate' (_ :< WeakTermEpsilon _) = return one -- immediate type
 elaborate' (meta :< WeakTermEpsilonIntro x) = do
-  t <- lookupTypeEnv' meta
+  t <- obtainType meta
   t' <- reduceWeakTerm t
   case t' of
     _ :< WeakTermEpsilon i -> return $ TermEpsilonIntro x (asLowType i)
@@ -63,7 +65,6 @@ elaborate' (_ :< WeakTermEpsilonElim (x, _) e branchList) = do
       body' <- elaborate' body
       return (l, body')
   return $ TermEpsilonElim x e' branchList'
-elaborate' (_ :< WeakTermConst x) = return $ TermConst x
 elaborate' (_ :< WeakTermPi _) = return zero
 elaborate' (_ :< WeakTermPiIntro xts e) = do
   e' <- elaborate' e
@@ -82,15 +83,15 @@ elaborate' (_ :< WeakTermSigmaElim xts e1 e2) = do
   return $ TermSigmaElim (map fst xts) e1' e2'
 elaborate' (meta :< WeakTermMu (x, t) e) = do
   t' <- reduceWeakTerm t
-  let fvs = varWeakTerm $ meta :< WeakTermMu (x, t) e
+  let fvs = fst $ varWeakTerm $ meta :< WeakTermMu (x, t) e
   e' <- elaborate' e
   let fvs' = map TermUpsilon fvs
-  insTermEnv x fvs $ substTerm [(x, TermConstElim x fvs')] e'
+  insTermEnv x fvs $ substTerm [(x, TermThetaElim x fvs')] e'
   case t' of
-    _ :< WeakTermPi _ -> return $ TermConstElim x fvs'
+    _ :< WeakTermPi _ -> return $ TermThetaElim x fvs'
     _ ->
       lift $ throwE "CBV recursion is allowed only for Pi-types and Theta-types"
-elaborate' (_ :< WeakTermHole x) = do
+elaborate' (_ :< WeakTermZeta x) = do
   sub <- gets substEnv
   case lookup x sub of
     Just e  -> elaborate' e
@@ -104,7 +105,8 @@ exhaust e = do
     else lift $ throwE "non-exhaustive pattern"
 
 exhaust' :: WeakTerm -> WithEnv Bool
-exhaust' (_ :< WeakTermUniverse) = return True
+exhaust' (_ :< WeakTermTau) = return True
+exhaust' (_ :< WeakTermTheta _) = return True
 exhaust' (_ :< WeakTermUpsilon _) = return True
 exhaust' (_ :< WeakTermEpsilon _) = return True
 exhaust' (_ :< WeakTermEpsilonIntro _) = return True
@@ -122,12 +124,11 @@ exhaust' (_ :< WeakTermSigma xts) = allM exhaust' $ map snd xts
 exhaust' (_ :< WeakTermSigmaIntro es) = allM exhaust' es
 exhaust' (_ :< WeakTermSigmaElim _ e1 e2) = allM exhaust' [e1, e2]
 exhaust' (_ :< WeakTermMu _ e) = exhaust' e
-exhaust' (_ :< WeakTermConst _) = return True
-exhaust' (_ :< WeakTermHole _) = return False
+exhaust' (_ :< WeakTermZeta _) = return False
 
 exhaustEpsilonIdentifier :: Identifier -> [Case] -> Bool -> WithEnv Bool
 exhaustEpsilonIdentifier x labelList b1 = do
-  ienv <- gets indexEnv
+  ienv <- gets epsilonEnv
   case lookup x ienv of
     Nothing -> undefined -- xはi32とかそのへんのやつ
     Just ls ->
@@ -167,3 +168,11 @@ asLowType x
   , Just i <- readMaybe (tail x)
   , i `elem` [16, 32, 64] = LowTypeFloat i
 asLowType _ = LowTypeSignedInt 64 -- sortals are represented as int
+
+obtainType :: WeakMeta -> WithEnv WeakTerm
+obtainType m = do
+  let Ref r = weakMetaType m
+  mt <- liftIO $ readIORef r
+  case mt of
+    Nothing -> throwError "ambiguous type"
+    Just t  -> return t
