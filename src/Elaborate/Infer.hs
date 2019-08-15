@@ -37,11 +37,15 @@ type Context = [(Identifier, WeakTerm)]
 -- Dynamic Pattern Unification for Dependent Types and Records". Typed Lambda
 -- Calculi and Applications, 2011.
 infer :: Context -> WeakTerm -> WithEnv WeakTerm
-infer _ u@(meta :< WeakTermUniverse) = do
+infer _ u@(meta :< WeakTermTau) = do
   registerTypeIfNecessary meta u
   let Ref r = weakMetaType meta
   liftIO $ writeIORef r (Just u)
   return u
+infer _ (meta :< WeakTermTheta x) = do
+  h <- newHole -- constants do not depend on their context
+  insTypeEnv x h
+  returnMeta meta h
 infer _ (meta :< WeakTermUpsilon x) = do
   t <- lookupTypeEnv x
   returnMeta meta t
@@ -102,11 +106,7 @@ infer ctx (meta :< WeakTermMu (x, t) e) = do
   te <- infer (ctx ++ [(x, t)]) e
   insConstraintEnv te t
   returnMeta meta te
-infer _ (meta :< WeakTermConst x) = do
-  h <- newHole -- constants do not depend on their context
-  insTypeEnv x h
-  returnMeta meta h
-infer ctx (meta :< WeakTermHole _) = newHoleInCtx ctx >>= returnMeta meta
+infer ctx (meta :< WeakTermZeta _) = newHoleInCtx ctx >>= returnMeta meta
 
 inferPiOrSigma :: Context -> WeakMeta -> [IdentifierPlus] -> WithEnv WeakTerm
 inferPiOrSigma ctx meta xts = do
@@ -122,7 +122,7 @@ inferPiOrSigma ctx meta xts = do
 --   ?Mt : Pi (x1 : A1, ..., xn : An). Ui
 -- and return ?M @ (x1, ..., xn) : ?Mt @ (x1, ..., xn).
 -- Note that we can't just set `?M : Pi (x1 : A1, ..., xn : An). Ui` since
--- WeakTermHole might be used as a term which is not a type.
+-- WeakTermZeta might be used as a term which is not a type.
 newHoleInCtx :: Context -> WithEnv WeakTerm
 newHoleInCtx ctx = do
   univPlus <- newUniv >>= withPlaceholder
@@ -200,8 +200,8 @@ returnMeta meta t = do
 -- `newUniv` returns an "inferred" universe.
 newUniv :: WithEnv WeakTerm
 newUniv = do
-  m <- emptyMeta
-  let u = m :< WeakTermUniverse
+  m <- newMeta
+  let u = m :< WeakTermTau
   _ <- infer [] u
   return u
 
@@ -221,5 +221,5 @@ wrapInfer ctx t = do
 
 wrapWithType :: WeakTerm -> WeakTermF WeakTerm -> WithEnv WeakTerm
 wrapWithType t e = do
-  m <- metaOfType t
+  m <- newMetaOfType t
   return $ m :< e
