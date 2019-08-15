@@ -5,7 +5,7 @@ module Elaborate.Infer
 import           Control.Comonad.Cofree
 import           Control.Monad.Except
 import           Control.Monad.State
-import           Data.Maybe             (maybeToList)
+import           Data.Maybe             (catMaybes)
 import           Prelude                hiding (pi)
 
 import           Data.Basic
@@ -36,56 +36,53 @@ type Context = [(Identifier, WeakTerm)]
 -- Dynamic Pattern Unification for Dependent Types and Records". Typed Lambda
 -- Calculi and Applications, 2011.
 infer :: Context -> WeakTerm -> WithEnv WeakTerm
-infer _ u@(meta :< WeakTermTau) = do
-  registerTypeIfNecessary meta u
-  writeWeakMetaType meta (Just u)
-  return u
+infer _ u@(meta :< WeakTermTau) = returnAfterUpdate meta u -- univ : univ
 infer _ (meta :< WeakTermTheta x) = do
-  h <- newHole -- constants do not depend on their context
+  h <- newHoleInCtx [] -- constants do not depend on their context
   insTypeEnv x h
-  returnMeta meta h
+  returnAfterUpdate meta h
 infer _ (meta :< WeakTermUpsilon x) = do
   t <- lookupTypeEnv x
-  returnMeta meta t
-infer _ (meta :< WeakTermEpsilon _) = newUniv >>= returnMeta meta
+  returnAfterUpdate meta t
+infer _ (meta :< WeakTermEpsilon _) = newUniv >>= returnAfterUpdate meta
 infer ctx (meta :< WeakTermEpsilonIntro l) = do
   mk <- lookupKind l
   case mk of
-    Just k -> wrapInfer ctx (WeakTermEpsilon k) >>= returnMeta meta
+    Just k -> wrapInfer ctx (WeakTermEpsilon k) >>= returnAfterUpdate meta
+    -- when l is numeric literal such as `1`, `-231`, etc.
     Nothing -> do
       u <- newUniv
       h <- newHoleOfType u
-      returnMeta meta h
+      returnAfterUpdate meta h
 infer ctx (meta :< WeakTermEpsilonElim (x, t) e branchList) = do
   te <- infer ctx e
   insTypeEnv x t
   insConstraintEnv t te
   if null branchList
-    then newHole >>= returnMeta meta -- ex falso quodlibet
+    then newHoleInCtx ctx >>= returnAfterUpdate meta -- ex falso quodlibet
     else do
       let (caseList, es) = unzip branchList
       tls <- mapM inferCase caseList
-      let tls' = join $ map maybeToList tls
-      constrainList $ te : tls'
+      constrainList $ te : catMaybes tls
       ts <- mapM (infer $ ctx ++ [(x, t)]) es
       constrainList ts
-      returnMeta meta $ substWeakTerm [(x, e)] $ head ts
+      returnAfterUpdate meta $ substWeakTerm [(x, e)] $ head ts
 infer ctx (meta :< WeakTermPi xts) = inferPiOrSigma ctx meta xts
 infer ctx (meta :< WeakTermPiIntro xts e) = do
   forM_ xts $ uncurry insTypeEnv
   cod <- infer (ctx ++ xts) e >>= withPlaceholder
-  wrapInfer ctx (WeakTermPi (xts ++ [cod])) >>= returnMeta meta
+  wrapInfer ctx (WeakTermPi (xts ++ [cod])) >>= returnAfterUpdate meta
 infer ctx (meta :< WeakTermPiElim e es) = do
   tPi <- infer ctx e
   binder <- inferList ctx es
   cod <- newHoleInCtx (ctx ++ binder) >>= withPlaceholder
   tPi' <- wrapInfer ctx $ WeakTermPi (binder ++ [cod])
   insConstraintEnv tPi tPi'
-  returnMeta meta $ substWeakTerm (zip (map fst binder) es) $ snd cod
+  returnAfterUpdate meta $ substWeakTerm (zip (map fst binder) es) $ snd cod
 infer ctx (meta :< WeakTermSigma xts) = inferPiOrSigma ctx meta xts
 infer ctx (meta :< WeakTermSigmaIntro es) = do
   binder <- inferList ctx es
-  returnMeta meta $ meta :< WeakTermSigma binder
+  returnAfterUpdate meta $ meta :< WeakTermSigma binder
 infer ctx (meta :< WeakTermSigmaElim xts e1 e2) = do
   t1 <- infer ctx e1
   forM_ xts $ uncurry insTypeEnv
@@ -98,13 +95,17 @@ infer ctx (meta :< WeakTermSigmaElim xts e1 e2) = do
   typeC <- newHoleInCtx (ctx ++ binder ++ [(z, t1)])
   t2 <- infer (ctx ++ binder) e2
   insConstraintEnv t2 (substWeakTerm [(z, varTuple)] typeC)
-  returnMeta meta $ substWeakTerm [(z, e1)] typeC
+  returnAfterUpdate meta $ substWeakTerm [(z, e1)] typeC
 infer ctx (meta :< WeakTermMu (x, t) e) = do
   insTypeEnv x t
   te <- infer (ctx ++ [(x, t)]) e
   insConstraintEnv te t
-  returnMeta meta te
-infer ctx (meta :< WeakTermZeta _) = newHoleInCtx ctx >>= returnMeta meta
+  returnAfterUpdate meta te
+infer ctx (meta :< WeakTermZeta _) = do
+  mt <- readWeakMetaType meta
+  case mt of
+    Just t  -> return t
+    Nothing -> newHoleInCtx ctx >>= returnAfterUpdate meta
 
 inferPiOrSigma :: Context -> WeakMeta -> [IdentifierPlus] -> WithEnv WeakTerm
 inferPiOrSigma ctx meta xts = do
@@ -113,7 +114,7 @@ inferPiOrSigma ctx meta xts = do
       infer (ctx ++ init zts) (snd $ last zts)
   univ <- newUniv
   constrainList $ univ : univList
-  returnMeta meta univ
+  returnAfterUpdate meta univ
 
 -- In a context (x1 : A1, ..., xn : An), this function creates metavariables
 --   ?M  : Pi (x1 : A1, ..., xn : An). ?Mt @ (x1, ..., xn)
@@ -190,25 +191,17 @@ toVar x t = do
   insTypeEnv x t
   wrapWithType t (WeakTermUpsilon x)
 
-returnMeta :: WeakMeta -> WeakTerm -> WithEnv WeakTerm
-returnMeta meta t = do
-  registerTypeIfNecessary meta t
-  return t
-
--- `newUniv` returns an "inferred" universe.
-newUniv :: WithEnv WeakTerm
-newUniv = do
-  m <- newMeta
-  let u = m :< WeakTermTau
-  _ <- infer [] u
-  return u
-
-registerTypeIfNecessary :: WeakMeta -> WeakTerm -> WithEnv ()
-registerTypeIfNecessary m t = do
+returnAfterUpdate :: WeakMeta -> WeakTerm -> WithEnv WeakTerm
+returnAfterUpdate m t = do
   mt <- readWeakMetaType m
   case mt of
     Nothing -> writeWeakMetaType m (Just t)
     Just t' -> insConstraintEnv t t'
+  return t
+
+-- `newUniv` returns an "inferred" universe.
+newUniv :: WithEnv WeakTerm
+newUniv = wrapInfer [] WeakTermTau
 
 wrapInfer :: Context -> WeakTermF WeakTerm -> WithEnv WeakTerm
 wrapInfer ctx t = do
