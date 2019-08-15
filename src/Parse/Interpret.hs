@@ -90,7 +90,8 @@ interpret t@(m :< TreeNode es) =
 
 interpretIdentifierPlus :: Tree -> WithEnv IdentifierPlus
 interpretIdentifierPlus (_ :< TreeAtom x) = do
-  t <- newHole
+  u <- wrap WeakTermTau
+  t <- newHoleOfType u
   return (x, t)
 interpretIdentifierPlus (_ :< TreeNode [_ :< TreeAtom x, t]) = do
   x' <- interpretAtom x

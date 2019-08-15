@@ -204,12 +204,6 @@ wrap a = do
   meta <- newMeta
   return $ meta :< a
 
-newHole :: WithEnv WeakTerm
-newHole = do
-  h <- newNameWith "hole"
-  m <- newMeta
-  return $ m :< WeakTermZeta h
-
 newHoleOfType :: WeakTerm -> WithEnv WeakTerm
 newHoleOfType t = do
   h <- newNameWith "hole"
