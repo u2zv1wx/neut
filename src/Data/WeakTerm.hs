@@ -2,7 +2,14 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell    #-}
 
-module Data.WeakTerm where
+module Data.WeakTerm
+  ( WeakTerm
+  , WeakMeta
+  , varWeakTerm
+  , substWeakTerm
+  , isReducible
+  , isValue
+  ) where
 
 import           Control.Comonad.Cofree
 import           Control.Monad          (forM)
@@ -42,16 +49,14 @@ newtype Ref a =
   Ref (IORef a)
 
 data WeakMeta = WeakMeta
-  -- The `Ref` here is required to represent "univ : univ".
-  { weakMetaType     :: Ref (Maybe WeakTerm)
-  -- Location (row, cloumn) of a subterm in a file.
+  { weakMetaType     :: Ref (Maybe WeakTerm) -- "Ref" is for "type : type"
   , weakMetaLocation :: Maybe (Int, Int)
   }
 
 $(deriveShow1 ''WeakTermF)
 
 instance (Show a) => Show (Ref a) where
-  show (Ref x) = show $ unsafePerformIO (readIORef x)
+  show (Ref x) = show $ unsafePerformIO $ readIORef x
 
 deriving instance Show WeakMeta
 
