@@ -70,12 +70,12 @@ infer ctx (meta :< WeakTermEpsilonElim (x, t) e branchList) = do
 infer ctx (meta :< WeakTermPi xts) = inferPiOrSigma ctx meta xts
 infer ctx (meta :< WeakTermPiIntro xts e) = do
   forM_ xts $ uncurry insTypeEnv
-  cod <- infer (ctx ++ xts) e >>= withPlaceholder
+  cod <- infer (ctx ++ xts) e >>= withHole
   wrapInfer ctx (WeakTermPi (xts ++ [cod])) >>= returnAfterUpdate meta
 infer ctx (meta :< WeakTermPiElim e es) = do
   tPi <- infer ctx e
   binder <- inferList ctx es
-  cod <- newHoleInCtx (ctx ++ binder) >>= withPlaceholder
+  cod <- newHoleInCtx (ctx ++ binder) >>= withHole
   tPi' <- wrapInfer ctx $ WeakTermPi (binder ++ [cod])
   insConstraintEnv tPi tPi'
   returnAfterUpdate meta $ substWeakTerm (zip (map fst binder) es) $ snd cod
@@ -124,15 +124,16 @@ inferPiOrSigma ctx meta xts = do
 -- WeakTermZeta might be used as a term which is not a type.
 newHoleInCtx :: Context -> WithEnv WeakTerm
 newHoleInCtx ctx = do
-  univPlus <- newUniv >>= withPlaceholder
+  univPlus <- newUniv >>= withHole
   higherPi <- wrapInfer ctx $ WeakTermPi $ ctx ++ [univPlus]
   higherHole <- newHoleOfType higherPi
   varSeq <- mapM (uncurry toVar) ctx
-  let u = snd univPlus
-  app <- wrapWithType u (WeakTermPiElim higherHole varSeq) >>= withPlaceholder
-  pi <- wrapInfer ctx $ WeakTermPi $ ctx ++ [app]
+  let univ = snd univPlus
+  appPlus <- wrapWithType univ (WeakTermPiElim higherHole varSeq) >>= withHole
+  pi <- wrapInfer ctx $ WeakTermPi $ ctx ++ [appPlus]
   hole <- newHoleOfType pi
-  wrapWithType (snd app) (WeakTermPiElim hole varSeq)
+  let app = snd appPlus
+  wrapWithType app (WeakTermPiElim hole varSeq)
 
 -- In context ctx == [x1, ..., xn], `newHoleListInCtx ctx names-of-holes` generates
 -- the following list of holes:
@@ -151,8 +152,8 @@ newHoleListInCtx ctx (x:rest) = do
   ts <- newHoleListInCtx (ctx ++ [(x, t)]) rest
   return $ t : ts
 
-withPlaceholder :: WeakTerm -> WithEnv IdentifierPlus
-withPlaceholder t = do
+withHole :: WeakTerm -> WithEnv IdentifierPlus
+withHole t = do
   h <- newNameWith "hole"
   return (h, t)
 
@@ -183,12 +184,17 @@ constrainList (t1:t2:ts) = do
 
 constructTuple :: Context -> [Identifier] -> WithEnv WeakTerm
 constructTuple ctx xs = do
-  varList <- mapM (wrapInfer ctx . WeakTermUpsilon) xs
+  varList <- mapM toVar' xs
   wrapInfer ctx $ WeakTermSigmaIntro varList
 
 toVar :: Identifier -> WeakTerm -> WithEnv WeakTerm
 toVar x t = do
   insTypeEnv x t
+  wrapWithType t (WeakTermUpsilon x)
+
+toVar' :: Identifier -> WithEnv WeakTerm
+toVar' x = do
+  t <- lookupTypeEnv x
   wrapWithType t (WeakTermUpsilon x)
 
 returnAfterUpdate :: WeakMeta -> WeakTerm -> WithEnv WeakTerm
