@@ -9,61 +9,62 @@ module Polarize
   ( polarize
   ) where
 
+import           Control.Comonad.Cofree
 import           Control.Monad.State
-import           Data.List           (nub)
-import           Text.Read           (readMaybe)
+import           Data.List              (nub)
+import           Text.Read              (readMaybe)
 
 import           Data.Basic
 import           Data.Env
 import           Data.Polarized
 import           Data.Term
 
-polarize :: Term -> WithEnv Neg
-polarize mainTerm = do
-  tenv <- gets termEnv
-  forM_ tenv $ \(name, (args, e)) -> do
-    e' <- polarize' e
-    insPolEnv name args e' -- name = thunk (lam args. e')
-  polarize' mainTerm
+polarize :: TermPlus -> WithEnv NegPlus
+polarize mainTerm
+  -- forM_ tenv $ \(name, (args, e)) -> do
+  --   e' <- polarize' e
+  --   insPolEnv name args e' -- name = thunk (lam args. e')
+ = polarize' mainTerm
 
 -- CBV translation into CBPV + closure conversion
-polarize' :: Term -> WithEnv Neg
-polarize' (TermUpsilon x) = return $ NegUpIntro $ PosUpsilon x
-polarize' (TermEpsilonIntro l t) = return $ NegUpIntro (PosEpsilonIntro l t)
-polarize' (TermEpsilonElim x e branchList) = do
+polarize' :: TermPlus -> WithEnv NegPlus
+polarize' (_, TermTau) = undefined
+polarize' (_, TermTheta x) = toDefinition x
+polarize' (_, TermUpsilon x) = return $ NegUpIntro $ PosUpsilon x
+polarize' (_, TermEpsilonIntro l) = return $ NegUpIntro (PosEpsilonIntro l t)
+polarize' (_, TermEpsilonElim x e branchList) = do
   let (labelList, es) = unzip branchList
   e' <- polarize' e
   cs <- mapM polarize' es
   return $ NegUpElim x e' (NegEpsilonElim (PosUpsilon x) (zip labelList cs))
-polarize' (TermConst x) = toDefinition x
-polarize' (TermPiIntro xs e) = do
+polarize' (_, TermPiIntro xts e) = do
   e' <- polarize' e
-  makeClosure xs e'
-polarize' (TermPiElim e es) = do
+  makeClosure xts e'
+polarize' (_, TermPiElim e es) = do
   e' <- polarize' e
   es' <- mapM polarize' es
   callClosure e' es'
-polarize' (TermConstElim funName es) = do
-  es' <- mapM polarize' es
-  xs <- mapM (const (newNameWith "arg")) es'
-  return $
-    bindLet (zip xs es') $
-    NegConstElim (ConstantLabel funName) (map PosUpsilon xs)
-polarize' (TermSigmaIntro es) = do
+-- polarize' (TermConstElim funName es) = do
+--   es' <- mapM polarize' es
+--   xs <- mapM (const (newNameWith "arg")) es'
+--   return $
+--     bindLet (zip xs es') $
+--     NegConstElim (ConstantLabel funName) (map PosUpsilon xs)
+polarize' (_, TermSigmaIntro es) = do
   es' <- mapM polarize' es
   xs <- mapM (const (newNameWith "sigma")) es'
   return $ bindLet (zip xs es') $ NegUpIntro $ PosSigmaIntro (map PosUpsilon xs)
-polarize' (TermSigmaElim xs e1 e2) = do
+polarize' (_, TermSigmaElim xts e1 e2) = do
   e1' <- polarize' e1
   e2' <- polarize' e2
   z <- newNameWith "sigma"
-  return $ NegUpElim z e1' (NegSigmaElim xs (PosUpsilon z) e2')
+  return $ NegUpElim z e1' (NegSigmaElim xts (PosUpsilon z) e2')
 
-bindLet :: [(Identifier, Neg)] -> Neg -> Neg
+bindLet :: [(Identifier, NegPlus)] -> Neg -> Neg
 bindLet [] cont           = cont
 bindLet ((x, e):xes) cont = NegUpElim x e $ bindLet xes cont
 
-makeClosure :: [Identifier] -> Neg -> WithEnv Neg
+makeClosure :: [IdentifierPlus] -> Neg -> WithEnv Neg
 makeClosure xs e = do
   let fvs = filter (`notElem` xs) $ nub $ varNeg e
   envName <- newNameWith "env"
@@ -74,7 +75,7 @@ makeClosure xs e = do
   let fvEnv = PosSigmaIntro $ map PosUpsilon fvs
   return $ NegUpIntro $ PosSigmaIntro [PosConst lamVar, fvEnv]
 
-callClosure :: Neg -> [Neg] -> WithEnv Neg
+callClosure :: NegPlus -> [NegPlus] -> WithEnv NegPlus
 callClosure e es = do
   argVarNameList <- mapM (const $ newNameWith "arg") es
   clsVarName <- newNameWith "fun"
@@ -89,7 +90,7 @@ callClosure e es = do
       (PosUpsilon envVarName : map PosUpsilon argVarNameList)
 
 -- insert (possibly) environment-specific definition of constant
-toDefinition :: Identifier -> WithEnv Neg
+toDefinition :: Identifier -> WithEnv NegPlus
 toDefinition x
   | Just c <- getPrintConstant x = toPrintDefinition c
   | Just c <- getArithBinOpConstant x = toArithBinOpDefinition c
