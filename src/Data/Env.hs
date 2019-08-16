@@ -2,7 +2,7 @@
 
 module Data.Env where
 
-import           Control.Comonad.Cofree
+-- import           Control.Comonad.Cofree
 import           Control.Monad.State
 import           Control.Monad.Trans.Except
 import           Data.IORef
@@ -12,7 +12,6 @@ import           Data.Basic
 import           Data.Constraint
 import           Data.LLVM
 import           Data.Polarized
-import           Data.Term
 import           Data.Tree
 import           Data.WeakTerm
 
@@ -30,11 +29,10 @@ data Env = Env
   , constantEnv     :: [Identifier]
   , epsilonEnv      :: [(Identifier, [Identifier])]
   , nameEnv         :: [(Identifier, Identifier)] -- [("foo", "foo.13"), ...]
-  , typeEnv         :: Map.Map Identifier WeakTerm -- var ~> typeof(var)
+  , typeEnv         :: Map.Map Identifier WeakTermPlus -- var ~> typeof(var)
   , constraintEnv   :: [PreConstraint] -- for type inference
   , constraintQueue :: ConstraintQueue -- for (dependent) type inference
   , substEnv        :: SubstWeakTerm -- metavar ~> beta-equivalent weakterm
-  , termEnv         :: [(Identifier, ([Identifier], Term))] -- f ~> (lam (x1 ... xn) e)
   , polEnv          :: [(Identifier, ([Identifier], Neg))] -- f ~> thunk (lam (x1 ... xn) e)
   , llvmEnv         :: [(Identifier, ([Identifier], LLVM))]
   }
@@ -49,7 +47,6 @@ initialEnv path =
     , epsilonEnv = []
     , nameEnv = []
     , typeEnv = Map.empty
-    , termEnv = []
     , polEnv = []
     , llvmEnv = []
     , constraintEnv = []
@@ -89,20 +86,20 @@ newNameWith s = do
   modify (\e -> e {nameEnv = (s, s') : nameEnv e})
   return s'
 
-newNameOfType :: WeakTerm -> WithEnv Identifier
+newNameOfType :: WeakTermPlus -> WithEnv Identifier
 newNameOfType t = do
   i <- newName
   insTypeEnv i t
   return i
 
-lookupTypeEnv :: String -> WithEnv WeakTerm
+lookupTypeEnv :: String -> WithEnv WeakTermPlus
 lookupTypeEnv s = do
   mt <- lookupTypeEnvMaybe s
   case mt of
     Just t  -> return t
     Nothing -> lift $ throwE $ s ++ " is not found in the type environment."
 
-lookupTypeEnvMaybe :: String -> WithEnv (Maybe WeakTerm)
+lookupTypeEnvMaybe :: String -> WithEnv (Maybe WeakTermPlus)
 lookupTypeEnvMaybe s = do
   mt <- gets (Map.lookup s . typeEnv)
   case mt of
@@ -123,12 +120,8 @@ lookupNameEnvMaybe s = do
     Just s' -> return $ Just s'
     Nothing -> return Nothing
 
-insTypeEnv :: Identifier -> WeakTerm -> WithEnv ()
+insTypeEnv :: Identifier -> WeakTermPlus -> WithEnv ()
 insTypeEnv i t = modify (\e -> e {typeEnv = Map.insert i t (typeEnv e)})
-
-insTermEnv :: Identifier -> [Identifier] -> Term -> WithEnv ()
-insTermEnv name args e =
-  modify (\env -> env {termEnv = (name, (args, e)) : termEnv env})
 
 insPolEnv :: Identifier -> [Identifier] -> Neg -> WithEnv ()
 insPolEnv name args e =
@@ -195,20 +188,20 @@ isDefinedEpsilonName name = do
   let epsilonNameList = map fst $ epsilonEnv env
   return $ name `elem` epsilonNameList
 
-insConstraintEnv :: WeakTerm -> WeakTerm -> WithEnv ()
+insConstraintEnv :: WeakTermPlus -> WeakTermPlus -> WithEnv ()
 insConstraintEnv t1 t2 =
   modify (\e -> e {constraintEnv = (t1, t2) : constraintEnv e})
 
-wrap :: f (Cofree f WeakMeta) -> WithEnv (Cofree f WeakMeta)
+wrap :: a -> WithEnv (WeakMeta, a)
 wrap a = do
   meta <- newMeta
-  return $ meta :< a
+  return (meta, a)
 
-newHoleOfType :: WeakTerm -> WithEnv WeakTerm
+newHoleOfType :: WeakTermPlus -> WithEnv WeakTermPlus
 newHoleOfType t = do
   h <- newNameWith "hole"
   m <- newMetaOfType t
-  return $ m :< WeakTermZeta h
+  return (m, WeakTermZeta h)
 
 newMeta :: WithEnv WeakMeta
 newMeta = do
@@ -218,7 +211,7 @@ newMeta = do
 newMetaTerminal :: WeakMeta
 newMetaTerminal = WeakMetaTerminal Nothing
 
-newMetaOfType :: WeakTerm -> WithEnv WeakMeta
+newMetaOfType :: WeakTermPlus -> WithEnv WeakMeta
 newMetaOfType t = do
   t' <- liftIO $ newIORef (Just t)
   return $ WeakMetaNonTerminal (Ref t') Nothing
