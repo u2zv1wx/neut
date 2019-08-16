@@ -71,28 +71,32 @@ infer ctx (meta, WeakTermEpsilonElim (x, t) e branchList) = do
       ts <- mapM (infer $ ctx ++ [(x, t)]) es
       constrainList ts
       returnAfterUpdate meta $ substWeakTermPlus [(x, e)] $ head ts
-infer ctx (meta, WeakTermPi xts) = inferPiOrSigma ctx meta xts
+infer ctx (meta, WeakTermPi xts t) = do
+  xt <- withHole t
+  inferPiOrSigma ctx meta $ xts ++ [xt]
 infer ctx (meta, WeakTermPiIntro xts e) = do
   forM_ xts $ uncurry insTypeEnv
-  cod <- infer (ctx ++ xts) e >>= withHole
-  wrapInfer ctx (WeakTermPi (xts ++ [cod])) >>= returnAfterUpdate meta
+  cod <- infer (ctx ++ xts) e
+  wrapInfer ctx (WeakTermPi xts cod) >>= returnAfterUpdate meta
 infer ctx (meta, WeakTermPiElim e es) = do
   tPi <- infer ctx e
   binder <- inferList ctx es
-  cod <- newHoleInCtx (ctx ++ binder) >>= withHole
-  tPi' <- wrapInfer ctx $ WeakTermPi (binder ++ [cod])
+  cod <- newHoleInCtx (ctx ++ binder)
+  tPi' <- wrapInfer ctx $ WeakTermPi binder cod
   insConstraintEnv tPi tPi'
-  returnAfterUpdate meta $ substWeakTermPlus (zip (map fst binder) es) $ snd cod
-infer ctx (meta, WeakTermSigma xts) = inferPiOrSigma ctx meta xts
-infer ctx (meta, WeakTermSigmaIntro es) = do
-  binder <- inferList ctx es
-  returnAfterUpdate meta (meta, WeakTermSigma binder)
-infer ctx (meta, WeakTermSigmaElim xts e1 e2) = do
+  returnAfterUpdate meta $ substWeakTermPlus (zip (map fst binder) es) cod
+infer ctx (meta, WeakTermSigma xts t) = do
+  xt <- withHole t
+  inferPiOrSigma ctx meta $ xts ++ [xt]
+infer ctx (meta, WeakTermSigmaIntro es e) = do
+  binder <- inferList ctx $ es ++ [e]
+  returnAfterUpdate meta (meta, WeakTermSigma (init binder) (snd (last binder)))
+infer ctx (meta, WeakTermSigmaElim xts xt e1 e2) = do
   t1 <- infer ctx e1
   forM_ xts $ uncurry insTypeEnv
-  varSeq <- mapM (uncurry toVar) xts
+  varSeq <- mapM (uncurry toVar) $ xts ++ [xt]
   binder <- inferList ctx varSeq
-  sigmaType <- wrapInfer ctx $ WeakTermSigma binder
+  sigmaType <- wrapInfer ctx $ WeakTermSigma (init binder) (snd (last binder))
   insConstraintEnv t1 sigmaType
   z <- newNameOfType t1
   varTuple <- constructTuple (ctx ++ binder) (map fst binder)
@@ -129,15 +133,13 @@ inferPiOrSigma ctx meta xts = do
 -- WeakTermZeta might be used as a term which is not a type.
 newHoleInCtx :: Context -> WithEnv WeakTermPlus
 newHoleInCtx ctx = do
-  univPlus <- newUniv >>= withHole
-  higherPi <- wrapInfer ctx $ WeakTermPi $ ctx ++ [univPlus]
+  univ <- newUniv
+  higherPi <- wrapInfer ctx $ WeakTermPi ctx univ
   higherHole <- newHoleOfType higherPi
   varSeq <- mapM (uncurry toVar) ctx
-  let univ = snd univPlus
-  appPlus <- wrapWithType univ (WeakTermPiElim higherHole varSeq) >>= withHole
-  pi <- wrapInfer ctx $ WeakTermPi $ ctx ++ [appPlus]
+  app <- wrapWithType univ (WeakTermPiElim higherHole varSeq)
+  pi <- wrapInfer ctx $ WeakTermPi ctx app
   hole <- newHoleOfType pi
-  let app = snd appPlus
   wrapWithType app (WeakTermPiElim hole varSeq)
 
 -- In context ctx == [x1, ..., xn], `newHoleListInCtx ctx names-of-holes` generates
@@ -190,7 +192,7 @@ constrainList (t1:t2:ts) = do
 constructTuple :: Context -> [Identifier] -> WithEnv WeakTermPlus
 constructTuple ctx xs = do
   varList <- mapM toVar' xs
-  wrapInfer ctx $ WeakTermSigmaIntro varList
+  wrapInfer ctx $ WeakTermSigmaIntro (init varList) (last varList)
 
 toVar :: Identifier -> WeakTermPlus -> WithEnv WeakTermPlus
 toVar x t = do
