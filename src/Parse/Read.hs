@@ -2,7 +2,6 @@ module Parse.Read
   ( strToTree
   ) where
 
--- import           Control.Comonad.Cofree
 import           Control.Monad.State
 import           Control.Monad.Trans.Except
 import           Text.Parsec                hiding (count)
