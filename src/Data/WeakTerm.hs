@@ -1,42 +1,37 @@
-{-# LANGUAGE DeriveFunctor      #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE TemplateHaskell    #-}
+{-# LANGUAGE TypeOperators #-}
 
 module Data.WeakTerm where
 
-import           Control.Comonad.Cofree
-import           Control.Monad          (forM)
+import           Control.Monad    (forM)
 import           Data.IORef
-import           Data.Maybe             (fromMaybe)
-import           System.IO.Unsafe       (unsafePerformIO)
-import           Text.Show.Deriving
+import           Data.Maybe       (fromMaybe)
+import           System.IO.Unsafe (unsafePerformIO)
 
 import           Data.Basic
 
-data WeakTermF a
+data WeakTerm
   = WeakTermTau
   | WeakTermTheta Identifier
   | WeakTermUpsilon Identifier
   | WeakTermEpsilon Identifier
   | WeakTermEpsilonIntro Literal
-  | WeakTermEpsilonElim (Identifier, a)
-                        a
-                        [(Case, a)]
-  | WeakTermPi [(Identifier, a)]
-  | WeakTermPiIntro [(Identifier, a)]
-                    a
-  | WeakTermPiElim a
-                   [a]
-  | WeakTermSigma [(Identifier, a)]
-  | WeakTermSigmaIntro [a]
-  | WeakTermSigmaElim [(Identifier, a)]
-                      a
-                      a
-  | WeakTermMu (Identifier, a)
-               a
+  | WeakTermEpsilonElim (Identifier, WeakTermPlus)
+                        WeakTermPlus
+                        [(Case, WeakTermPlus)]
+  | WeakTermPi [(Identifier, WeakTermPlus)]
+  | WeakTermPiIntro [(Identifier, WeakTermPlus)]
+                    WeakTermPlus
+  | WeakTermPiElim WeakTermPlus
+                   [WeakTermPlus]
+  | WeakTermSigma [(Identifier, WeakTermPlus)]
+  | WeakTermSigmaIntro [WeakTermPlus]
+  | WeakTermSigmaElim [(Identifier, WeakTermPlus)]
+                      WeakTermPlus
+                      WeakTermPlus
+  | WeakTermMu (Identifier, WeakTermPlus)
+               WeakTermPlus
   | WeakTermZeta Identifier
-
-type WeakTerm = Cofree WeakTermF WeakMeta
+  deriving (Show)
 
 newtype Ref a =
   Ref (IORef a)
@@ -45,51 +40,53 @@ data WeakMeta
   = WeakMetaTerminal (Maybe (Int, Int))
   | WeakMetaNonTerminal (Ref (Maybe WeakTerm))
                         (Maybe (Int, Int))
+  deriving (Show)
 
-$(deriveShow1 ''WeakTermF)
+data WeakTermPlus =
+  WeakMeta :< WeakTerm
+  deriving (Show)
 
 instance (Show a) => Show (Ref a) where
   show (Ref x) = show $ unsafePerformIO $ readIORef x
 
-deriving instance Show WeakMeta
-
-type SubstWeakTerm = [(Identifier, WeakTerm)]
+type SubstWeakTerm = [(Identifier, WeakTermPlus)]
 
 type Hole = Identifier
 
-type IdentifierPlus = (Identifier, WeakTerm)
+type IdentifierPlus = (Identifier, WeakTermPlus)
 
-varWeakTerm :: WeakTerm -> ([Identifier], [Hole])
-varWeakTerm (_ :< WeakTermTau) = ([], [])
-varWeakTerm (_ :< WeakTermTheta _) = ([], [])
-varWeakTerm (_ :< WeakTermUpsilon x) = ([x], [])
-varWeakTerm (_ :< WeakTermEpsilon _) = ([], [])
-varWeakTerm (_ :< WeakTermEpsilonIntro _) = ([], [])
-varWeakTerm (_ :< WeakTermEpsilonElim (x, t) e branchList) = do
-  let xhs1 = varWeakTerm t
-  let xhs2 = varWeakTerm e
+varWeakTermPlus :: WeakTermPlus -> ([Identifier], [Hole])
+varWeakTermPlus (_ :< WeakTermTau) = ([], [])
+varWeakTermPlus (_ :< WeakTermTheta _) = ([], [])
+varWeakTermPlus (_ :< WeakTermUpsilon x) = ([x], [])
+varWeakTermPlus (_ :< WeakTermEpsilon _) = ([], [])
+varWeakTermPlus (_ :< WeakTermEpsilonIntro _) = ([], [])
+varWeakTermPlus (_ :< WeakTermEpsilonElim (x, t) e branchList) = do
+  let xhs1 = varWeakTermPlus t
+  let xhs2 = varWeakTermPlus e
   xhss <-
     forM branchList $ \(_, body) -> do
-      let (xs, hs) = varWeakTerm body
+      let (xs, hs) = varWeakTermPlus body
       return (filter (/= x) xs, hs)
   pairwiseConcat (xhs1 : xhs2 : xhss)
-varWeakTerm (_ :< WeakTermPi xts) = varWeakTermBindings xts []
-varWeakTerm (_ :< WeakTermPiIntro xts e) = varWeakTermBindings xts [e]
-varWeakTerm (_ :< WeakTermPiElim e es) =
-  pairwiseConcat $ varWeakTerm e : map varWeakTerm es
-varWeakTerm (_ :< WeakTermSigma xts) = varWeakTermBindings xts []
-varWeakTerm (_ :< WeakTermSigmaIntro es) = pairwiseConcat $ map varWeakTerm es
-varWeakTerm (_ :< WeakTermSigmaElim us e1 e2) =
-  pairwiseConcat [varWeakTerm e1, varWeakTermBindings us [e2]]
-varWeakTerm (_ :< WeakTermMu ut e) = varWeakTermBindings [ut] [e]
-varWeakTerm (_ :< WeakTermZeta h) = ([], [h])
+varWeakTermPlus (_ :< WeakTermPi xts) = varWeakTermPlusBindings xts []
+varWeakTermPlus (_ :< WeakTermPiIntro xts e) = varWeakTermPlusBindings xts [e]
+varWeakTermPlus (_ :< WeakTermPiElim e es) =
+  pairwiseConcat $ varWeakTermPlus e : map varWeakTermPlus es
+varWeakTermPlus (_ :< WeakTermSigma xts) = varWeakTermPlusBindings xts []
+varWeakTermPlus (_ :< WeakTermSigmaIntro es) =
+  pairwiseConcat $ map varWeakTermPlus es
+varWeakTermPlus (_ :< WeakTermSigmaElim us e1 e2) =
+  pairwiseConcat [varWeakTermPlus e1, varWeakTermPlusBindings us [e2]]
+varWeakTermPlus (_ :< WeakTermMu ut e) = varWeakTermPlusBindings [ut] [e]
+varWeakTermPlus (_ :< WeakTermZeta h) = ([], [h])
 
-varWeakTermBindings ::
-     [IdentifierPlus] -> [WeakTerm] -> ([Identifier], [Identifier])
-varWeakTermBindings [] es = pairwiseConcat $ map varWeakTerm es
-varWeakTermBindings ((x, t):xts) es = do
-  let (xs1, hs1) = varWeakTerm t
-  let (xs2, hs2) = varWeakTermBindings xts es
+varWeakTermPlusBindings ::
+     [IdentifierPlus] -> [WeakTermPlus] -> ([Identifier], [Identifier])
+varWeakTermPlusBindings [] es = pairwiseConcat $ map varWeakTermPlus es
+varWeakTermPlusBindings ((x, t):xts) es = do
+  let (xs1, hs1) = varWeakTermPlus t
+  let (xs2, hs2) = varWeakTermPlusBindings xts es
   (xs1 ++ filter (/= x) xs2, hs1 ++ hs2)
 
 pairwiseConcat :: [([a], [b])] -> ([a], [b])
@@ -98,66 +95,67 @@ pairwiseConcat ((xs, ys):rest) = do
   let (xs', ys') = pairwiseConcat rest
   (xs ++ xs', ys ++ ys')
 
-substWeakTerm :: SubstWeakTerm -> WeakTerm -> WeakTerm
-substWeakTerm _ (m :< WeakTermTau) = m :< WeakTermTau
-substWeakTerm _ (m :< WeakTermTheta t) = m :< WeakTermTheta t
-substWeakTerm sub (m :< WeakTermUpsilon x) =
+substWeakTermPlus :: SubstWeakTerm -> WeakTermPlus -> WeakTermPlus
+substWeakTermPlus _ (m :< WeakTermTau) = m :< WeakTermTau
+substWeakTermPlus _ (m :< WeakTermTheta t) = m :< WeakTermTheta t
+substWeakTermPlus sub (m :< WeakTermUpsilon x) =
   fromMaybe (m :< WeakTermUpsilon x) (lookup x sub)
-substWeakTerm _ (m :< WeakTermEpsilon x) = m :< WeakTermEpsilon x
-substWeakTerm _ (m :< WeakTermEpsilonIntro l) = m :< WeakTermEpsilonIntro l
-substWeakTerm sub (m :< WeakTermEpsilonElim (x, t) e branchList) = do
-  let t' = substWeakTerm sub t
-  let e' = substWeakTerm sub e
+substWeakTermPlus _ (m :< WeakTermEpsilon x) = m :< WeakTermEpsilon x
+substWeakTermPlus _ (m :< WeakTermEpsilonIntro l) = m :< WeakTermEpsilonIntro l
+substWeakTermPlus sub (m :< WeakTermEpsilonElim (x, t) e branchList) = do
+  let t' = substWeakTermPlus sub t
+  let e' = substWeakTermPlus sub e
   let (caseList, es) = unzip branchList
   let sub' = filter (\(k, _) -> k /= x) sub
-  let es' = map (substWeakTerm sub') es
+  let es' = map (substWeakTermPlus sub') es
   m :< WeakTermEpsilonElim (x, t') e' (zip caseList es')
-substWeakTerm sub (m :< WeakTermPi xts) = do
-  let xts' = substWeakTermBindings sub xts
+substWeakTermPlus sub (m :< WeakTermPi xts) = do
+  let xts' = substWeakTermPlusBindings sub xts
   m :< WeakTermPi xts'
-substWeakTerm sub (m :< WeakTermPiIntro xts body) = do
-  let (xts', body') = substWeakTermBindingsWithBody sub xts body
+substWeakTermPlus sub (m :< WeakTermPiIntro xts body) = do
+  let (xts', body') = substWeakTermPlusBindingsWithBody sub xts body
   m :< WeakTermPiIntro xts' body'
-substWeakTerm sub (m :< WeakTermPiElim e es) = do
-  let e' = substWeakTerm sub e
-  let es' = map (substWeakTerm sub) es
+substWeakTermPlus sub (m :< WeakTermPiElim e es) = do
+  let e' = substWeakTermPlus sub e
+  let es' = map (substWeakTermPlus sub) es
   m :< WeakTermPiElim e' es'
-substWeakTerm sub (m :< WeakTermSigma xts) = do
-  let xts' = substWeakTermBindings sub xts
+substWeakTermPlus sub (m :< WeakTermSigma xts) = do
+  let xts' = substWeakTermPlusBindings sub xts
   m :< WeakTermSigma xts'
-substWeakTerm sub (m :< WeakTermSigmaIntro es) = do
-  let es' = map (substWeakTerm sub) es
+substWeakTermPlus sub (m :< WeakTermSigmaIntro es) = do
+  let es' = map (substWeakTermPlus sub) es
   m :< WeakTermSigmaIntro es'
-substWeakTerm sub (m :< WeakTermSigmaElim xts e1 e2) = do
-  let e1' = substWeakTerm sub e1
-  let (xts', e2') = substWeakTermBindingsWithBody sub xts e2
+substWeakTermPlus sub (m :< WeakTermSigmaElim xts e1 e2) = do
+  let e1' = substWeakTermPlus sub e1
+  let (xts', e2') = substWeakTermPlusBindingsWithBody sub xts e2
   m :< WeakTermSigmaElim xts' e1' e2'
-substWeakTerm sub (m :< WeakTermMu (x, t) e) = do
-  let t' = substWeakTerm sub t
-  let e' = substWeakTerm (filter (\(k, _) -> k /= x) sub) e
+substWeakTermPlus sub (m :< WeakTermMu (x, t) e) = do
+  let t' = substWeakTermPlus sub t
+  let e' = substWeakTermPlus (filter (\(k, _) -> k /= x) sub) e
   m :< WeakTermMu (x, t') e'
-substWeakTerm sub (m :< WeakTermZeta s) =
+substWeakTermPlus sub (m :< WeakTermZeta s) =
   fromMaybe (m :< WeakTermZeta s) (lookup s sub)
 
-substWeakTermBindings :: SubstWeakTerm -> [IdentifierPlus] -> [IdentifierPlus]
-substWeakTermBindings _ [] = []
-substWeakTermBindings sub ((x, t):xts) = do
+substWeakTermPlusBindings ::
+     SubstWeakTerm -> [IdentifierPlus] -> [IdentifierPlus]
+substWeakTermPlusBindings _ [] = []
+substWeakTermPlusBindings sub ((x, t):xts) = do
   let sub' = filter (\(k, _) -> k /= x) sub
-  let xts' = substWeakTermBindings sub' xts
-  (x, substWeakTerm sub t) : xts'
+  let xts' = substWeakTermPlusBindings sub' xts
+  (x, substWeakTermPlus sub t) : xts'
 
-substWeakTermBindingsWithBody ::
+substWeakTermPlusBindingsWithBody ::
      SubstWeakTerm
   -> [IdentifierPlus]
-  -> WeakTerm
-  -> ([IdentifierPlus], WeakTerm)
-substWeakTermBindingsWithBody sub [] e = ([], substWeakTerm sub e)
-substWeakTermBindingsWithBody sub ((x, t):xts) e = do
+  -> WeakTermPlus
+  -> ([IdentifierPlus], WeakTermPlus)
+substWeakTermPlusBindingsWithBody sub [] e = ([], substWeakTermPlus sub e)
+substWeakTermPlusBindingsWithBody sub ((x, t):xts) e = do
   let sub' = filter (\(k, _) -> k /= x) sub
-  let (xts', e') = substWeakTermBindingsWithBody sub' xts e
-  ((x, substWeakTerm sub t) : xts', e')
+  let (xts', e') = substWeakTermPlusBindingsWithBody sub' xts e
+  ((x, substWeakTermPlus sub t) : xts', e')
 
-isReducible :: WeakTerm -> Bool
+isReducible :: WeakTermPlus -> Bool
 isReducible (_ :< WeakTermTau) = False
 isReducible (_ :< WeakTermTheta _) = False
 isReducible (_ :< WeakTermUpsilon _) = False
@@ -183,7 +181,7 @@ isReducible (_ :< WeakTermSigmaElim _ e1 _) = isReducible e1
 isReducible (_ :< WeakTermMu _ _) = False
 isReducible (_ :< WeakTermZeta _) = False
 
-isValue :: WeakTerm -> Bool
+isValue :: WeakTermPlus -> Bool
 isValue (_ :< WeakTermTau)            = True
 isValue (_ :< WeakTermUpsilon _)      = True
 isValue (_ :< WeakTermEpsilon _)      = True
