@@ -38,8 +38,8 @@ interpret (m, TreeNode [(_, TreeAtom "epsilon-elimination"), xt, e, (_, TreeNode
   cs' <- mapM interpretClause cs
   withMeta m $ WeakTermEpsilonElim xt' e' cs'
 interpret (m, TreeNode [(_, TreeAtom "pi"), (_, TreeNode xts), t]) = do
-  binder <- interpretBinder xts t
-  withMeta m $ WeakTermPi binder
+  (xts', t') <- interpretBinder xts t
+  withMeta m $ WeakTermPi xts' t'
 interpret (m, TreeNode [(_, TreeAtom "pi-introduction"), (_, TreeNode xts), e]) = do
   xts' <- mapM interpretIdentifierPlus xts
   e' <- interpret e
@@ -49,16 +49,20 @@ interpret (m, TreeNode ((_, TreeAtom "pi-elimination"):e:es)) = do
   es' <- mapM interpret es
   withMeta m $ WeakTermPiElim e' es'
 interpret (m, TreeNode [(_, TreeAtom "sigma"), (_, TreeNode xts), t]) = do
-  binder <- interpretBinder xts t
-  withMeta m $ WeakTermSigma binder
+  (xts', t') <- interpretBinder xts t
+  withMeta m $ WeakTermSigma xts' t'
 interpret (m, TreeNode ((_, TreeAtom "sigma-introduction"):es)) = do
   es' <- mapM interpret es
-  withMeta m $ WeakTermSigmaIntro es'
+  if not (null es')
+    then withMeta m $ WeakTermSigmaIntro (init es') (last es')
+    else throwError "Empty sigma-intro"
 interpret (m, TreeNode [(_, TreeAtom "sigma-elimination"), (_, TreeNode xts), e1, e2]) = do
   xts' <- mapM interpretIdentifierPlus xts
   e1' <- interpret e1
   e2' <- interpret e2
-  withMeta m $ WeakTermSigmaElim xts' e1' e2'
+  if not (null xts')
+    then withMeta m $ WeakTermSigmaElim (init xts') (last xts') e1' e2'
+    else throwError "Empty sigma-elim"
 interpret (m, TreeNode [(_, TreeAtom "mu"), xt, e]) = do
   xt' <- interpretIdentifierPlus xt
   e' <- interpret e
@@ -124,12 +128,12 @@ interpretLiteral l = do
     Nothing ->
       lift $ throwE $ "interpretLiteral: syntax error:\n" ++ Pr.ppShow l
 
-interpretBinder :: [TreePlus] -> TreePlus -> WithEnv [IdentifierPlus]
+interpretBinder ::
+     [TreePlus] -> TreePlus -> WithEnv ([IdentifierPlus], WeakTermPlus)
 interpretBinder xts t = do
   xts' <- mapM interpretIdentifierPlus xts
   t' <- interpret t
-  hole <- newNameWith "hole"
-  return $ xts' ++ [(hole, t')]
+  return (xts', t')
 
 interpretCase :: TreePlus -> WithEnv Case
 --
