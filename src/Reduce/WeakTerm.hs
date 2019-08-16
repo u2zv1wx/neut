@@ -1,4 +1,4 @@
-module Reduce.WeakTermPlus
+module Reduce.WeakTerm
   ( reduceWeakTermPlus
   ) where
 
