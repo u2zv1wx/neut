@@ -43,13 +43,11 @@ simp (((m1, WeakTermEpsilon l1), (m2, WeakTermEpsilon l2)):cs)
   | l1 == l2 = simpMetaRet m1 m2 (simp cs)
 simp (((m1, WeakTermEpsilonIntro l1), (m2, WeakTermEpsilonIntro l2)):cs)
   | l1 == l2 = simpMetaRet m1 m2 (simp cs)
-simp (((m1, WeakTermPi xts1), (m2, WeakTermPi xts2)):cs)
-  | length xts1 == length xts2 = simpMetaRet m1 m2 $ simpPiOrSigma xts1 xts2 cs
-simp (((m1, WeakTermPiIntro xts1 body1), (m2, WeakTermPiIntro xts2 body2)):cs) = do
-  h1 <- newNameWith "hole"
-  h2 <- newNameWith "hole"
-  simpMetaRet m1 m2 $
-    simpPiOrSigma (xts1 ++ [(h1, body1)]) (xts2 ++ [(h2, body2)]) cs
+simp (((m1, WeakTermPi xts1 t1), (m2, WeakTermPi xts2 t2)):cs)
+  | length xts1 == length xts2 =
+    simpMetaRet m1 m2 $ simpPiOrSigma xts1 t1 xts2 t2 cs
+simp (((m1, WeakTermPiIntro xts1 body1), (m2, WeakTermPiIntro xts2 body2)):cs) =
+  simpMetaRet m1 m2 $ simpPiOrSigma xts1 body1 xts2 body2 cs
 simp (((m1, WeakTermPiIntro xts body1@(bodyMeta, _)), e2@(m2, _)):cs) = do
   vs <- mapM (uncurry toVar) xts
   mt <- readWeakMetaType bodyMeta
@@ -58,10 +56,12 @@ simp (((m1, WeakTermPiIntro xts body1@(bodyMeta, _)), e2@(m2, _)):cs) = do
   let comp = simp $ (body1, (appMeta, WeakTermPiElim e2 vs)) : cs
   simpMetaRet m1 m2 comp
 simp ((e1, e2@(_, WeakTermPiIntro {})):cs) = simp $ (e2, e1) : cs
-simp (((m1, WeakTermSigma xts1), (m2, WeakTermSigma xts2)):cs)
-  | length xts1 == length xts2 = simpMetaRet m1 m2 $ simpPiOrSigma xts1 xts2 cs
-simp (((m1, WeakTermSigmaIntro es1), (m2, WeakTermSigmaIntro es2)):cs)
-  | length es1 == length es2 = simpMetaRet m1 m2 $ simp $ zip es1 es2 ++ cs
+simp (((m1, WeakTermSigma xts1 t1), (m2, WeakTermSigma xts2 t2)):cs)
+  | length xts1 == length xts2 =
+    simpMetaRet m1 m2 $ simpPiOrSigma xts1 t1 xts2 t2 cs
+simp (((m1, WeakTermSigmaIntro es1 e1), (m2, WeakTermSigmaIntro es2 e2)):cs)
+  | length es1 == length es2 =
+    simpMetaRet m1 m2 $ simp $ zip es1 es2 ++ [(e1, e2)] ++ cs
 simp ((e1, e2):cs)
   | (m1, WeakTermPiElim (_, WeakTermUpsilon f) es1) <- e1
   , (m2, WeakTermPiElim (_, WeakTermUpsilon g) es2) <- e2
@@ -132,14 +132,20 @@ simpMeta (WeakMetaNonTerminal (Ref r1) _) (WeakMetaNonTerminal (Ref r2) _) = do
 
 simpPiOrSigma ::
      [IdentifierPlus]
+  -> WeakTermPlus
   -> [IdentifierPlus]
+  -> WeakTermPlus
   -> [PreConstraint]
   -> WithEnv [EnrichedConstraint]
-simpPiOrSigma xts1 xts2 cs = do
-  vs1 <- mapM (uncurry toVar) xts1
-  let (xs2, ts2) = unzip xts2
-  let ts2' = map (substWeakTermPlus (zip xs2 vs1)) ts2
-  simp $ zip (map snd xts1) ts2' ++ cs
+simpPiOrSigma xts1 t1 xts2 t2 cs = do
+  y1 <- newNameWith "hole"
+  y2 <- newNameWith "hole"
+  let xts1' = xts1 ++ [(y1, t1)]
+  let xts2' = xts2 ++ [(y2, t2)]
+  vs1' <- mapM (uncurry toVar) xts1'
+  let (xs2', ts2') = unzip xts2'
+  let ts2'' = map (substWeakTermPlus (zip xs2' vs1')) ts2'
+  simp $ zip (map snd xts1') ts2'' ++ cs
 
 data Stuck
   = StuckHole Hole
@@ -174,11 +180,11 @@ asStuckedTerm e
 asStuckedTerm _ = Nothing
 
 obtainStuckReason :: WeakTermPlus -> Maybe Hole
-obtainStuckReason (_, WeakTermEpsilonElim _ e _) = obtainStuckReason e
-obtainStuckReason (_, WeakTermPiElim e _)        = obtainStuckReason e
-obtainStuckReason (_, WeakTermSigmaElim _ e1 _)  = obtainStuckReason e1
-obtainStuckReason (_, WeakTermZeta x)            = Just x
-obtainStuckReason _                              = Nothing
+obtainStuckReason (_, WeakTermEpsilonElim _ e _)  = obtainStuckReason e
+obtainStuckReason (_, WeakTermPiElim e _)         = obtainStuckReason e
+obtainStuckReason (_, WeakTermSigmaElim _ _ e1 _) = obtainStuckReason e1
+obtainStuckReason (_, WeakTermZeta x)             = Just x
+obtainStuckReason _                               = Nothing
 
 isSolvable :: WeakTermPlus -> Identifier -> [Identifier] -> Bool
 isSolvable e x xs = do
