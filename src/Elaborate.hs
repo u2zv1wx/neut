@@ -2,7 +2,6 @@ module Elaborate
   ( elaborate
   ) where
 
-import           Control.Comonad.Cofree
 import           Control.Monad.Except
 import           Control.Monad.State
 import           Control.Monad.Trans.Except
@@ -29,7 +28,7 @@ import           Reduce.WeakTerm
 -- The inference algorithm in this module is based on L. de Moura, J. Avigad,
 -- S. Kong, and C. Roux. "Elaboration in Dependent Type Theory", arxiv,
 -- https://arxiv.org/abs/1505.04324, 2015.
-elaborate :: WeakTerm -> WithEnv Term
+elaborate :: WeakTermPlus -> WithEnv TermPlus
 elaborate e = do
   _ <- infer [] e
   -- Kantian type-inference ;)
@@ -38,118 +37,118 @@ elaborate e = do
   -- update the type environment by resulting substitution
   sub <- gets substEnv
   tenv <- gets typeEnv
-  let tenv' = Map.map (substWeakTerm sub) tenv
+  let tenv' = Map.map (substWeakTermPlus sub) tenv
   modify (\env -> env {typeEnv = tenv'})
   -- use the resulting substitution to elaborate `e`.
-  let e' = substWeakTerm sub e
+  let e' = substWeakTermPlus sub e
   exhaust e' >>= elaborate'
 
 -- This function translates a well-typed term into an untyped term in a
 -- reduction-preserving way. Here, we translate types into units (nullary product).
 -- This doesn't cause any problem since types doesn't have any beta-reduction.
-elaborate' :: WeakTerm -> WithEnv Term
-elaborate' (m :< WeakTermTau) = do
+elaborate' :: WeakTermPlus -> WithEnv TermPlus
+elaborate' (m, WeakTermTau) = do
   m' <- toMeta m
-  return $ m' :< TermTau
-elaborate' (m :< WeakTermTheta x) = do
+  return (m', TermTau)
+elaborate' (m, WeakTermTheta x) = do
   m' <- toMeta m
-  return $ m' :< TermTheta x
-elaborate' (m :< WeakTermUpsilon x) = do
+  return (m', TermTheta x)
+elaborate' (m, WeakTermUpsilon x) = do
   m' <- toMeta m
-  return $ m' :< TermUpsilon x
-elaborate' (m :< WeakTermEpsilon k) = do
+  return (m', TermUpsilon x)
+elaborate' (m, WeakTermEpsilon k) = do
   m' <- toMeta m
-  return $ m' :< TermEpsilon k
-elaborate' (m :< WeakTermEpsilonIntro x) = do
+  return (m', TermEpsilon k)
+elaborate' (m, WeakTermEpsilonIntro x) = do
   m' <- toMeta m
-  t <- reduceTerm $ obtainType m'
+  t <- reduceTermPlus $ obtainType m'
   case t of
-    _ :< TermEpsilon _ -> return $ m' :< TermEpsilonIntro x
+    (_, TermEpsilon _) -> return (m', TermEpsilonIntro x)
     _                  -> throwError "epsilonIntro"
-elaborate' (m :< WeakTermEpsilonElim (x, t) e branchList) = do
-  t' <- elaborate' t >>= reduceTerm
+elaborate' (m, WeakTermEpsilonElim (x, t) e branchList) = do
+  t' <- elaborate' t >>= reduceTermPlus
   case t' of
-    _ :< TermEpsilon _ -> do
+    (_, TermEpsilon _) -> do
       m' <- toMeta m
       e' <- elaborate' e
       branchList' <- forM branchList elaboratePlus
-      return $ m' :< TermEpsilonElim (x, t') e' branchList'
+      return (m', TermEpsilonElim (x, t') e' branchList')
     _ -> throwError "epsilonElim"
-elaborate' (m :< WeakTermPi xts) = do
+elaborate' (m, WeakTermPi xts) = do
   m' <- toMeta m
   xts' <- mapM elaboratePlus xts
-  return $ m' :< TermPi xts'
-elaborate' (m :< WeakTermPiIntro xts e) = do
+  return (m', TermPi xts')
+elaborate' (m, WeakTermPiIntro xts e) = do
   m' <- toMeta m
   e' <- elaborate' e
   xts' <- mapM elaboratePlus xts
-  return $ m' :< TermPiIntro xts' e'
-elaborate' (m :< WeakTermPiElim e es) = do
+  return (m', TermPiIntro xts' e')
+elaborate' (m, WeakTermPiElim e es) = do
   m' <- toMeta m
   e' <- elaborate' e
   es' <- mapM elaborate' es
-  return $ m' :< TermPiElim e' es'
-elaborate' (m :< WeakTermSigma xts) = do
+  return (m', TermPiElim e' es')
+elaborate' (m, WeakTermSigma xts) = do
   m' <- toMeta m
   xts' <- mapM elaboratePlus xts
-  return $ m' :< TermSigma xts'
-elaborate' (m :< WeakTermSigmaIntro es) = do
+  return (m', TermSigma xts')
+elaborate' (m, WeakTermSigmaIntro es) = do
   m' <- toMeta m
   es' <- mapM elaborate' es
-  return $ m' :< TermSigmaIntro es'
-elaborate' (m :< WeakTermSigmaElim xts e1 e2) = do
+  return (m', TermSigmaIntro es')
+elaborate' (m, WeakTermSigmaElim xts e1 e2) = do
   m' <- toMeta m
   e1' <- elaborate' e1
   e2' <- elaborate' e2
   xts' <- mapM elaboratePlus xts
-  return $ m' :< TermSigmaElim xts' e1' e2'
-elaborate' (m :< WeakTermMu (x, t) e) = do
-  t' <- elaborate' t >>= reduceTerm
+  return (m', TermSigmaElim xts' e1' e2')
+elaborate' (m, WeakTermMu (x, t) e) = do
+  t' <- elaborate' t >>= reduceTermPlus
   case t' of
-    _ :< TermPi _ -> do
+    (_, TermPi _) -> do
       m' <- toMeta m
       e' <- elaborate' e
-      return $ m' :< TermMu (x, t') e'
+      return (m', TermMu (x, t') e')
     _ -> lift $ throwE "CBV recursion is allowed only for Pi-types"
-elaborate' (_ :< WeakTermZeta x) = do
+elaborate' (_, WeakTermZeta x) = do
   sub <- gets substEnv
   case lookup x sub of
     Just e  -> elaborate' e
     Nothing -> lift $ throwE $ "elaborate' i: remaining hole: " ++ x
 
-elaboratePlus :: (a, WeakTerm) -> WithEnv (a, Term)
+elaboratePlus :: (a, WeakTermPlus) -> WithEnv (a, TermPlus)
 elaboratePlus (x, t) = do
   t' <- elaborate' t
   return (x, t')
 
-exhaust :: WeakTerm -> WithEnv WeakTerm
+exhaust :: WeakTermPlus -> WithEnv WeakTermPlus
 exhaust e = do
   b <- exhaust' e
   if b
     then return e
     else lift $ throwE "non-exhaustive pattern"
 
-exhaust' :: WeakTerm -> WithEnv Bool
-exhaust' (_ :< WeakTermTau) = return True
-exhaust' (_ :< WeakTermTheta _) = return True
-exhaust' (_ :< WeakTermUpsilon _) = return True
-exhaust' (_ :< WeakTermEpsilon _) = return True
-exhaust' (_ :< WeakTermEpsilonIntro _) = return True
-exhaust' (_ :< WeakTermEpsilonElim (_, t) e1 branchList) = do
+exhaust' :: WeakTermPlus -> WithEnv Bool
+exhaust' (_, WeakTermTau) = return True
+exhaust' (_, WeakTermTheta _) = return True
+exhaust' (_, WeakTermUpsilon _) = return True
+exhaust' (_, WeakTermEpsilon _) = return True
+exhaust' (_, WeakTermEpsilonIntro _) = return True
+exhaust' (_, WeakTermEpsilonElim (_, t) e1 branchList) = do
   b1 <- exhaust' e1
   let labelList = map fst branchList
-  t' <- reduceWeakTerm t
+  t' <- reduceWeakTermPlus t
   case t' of
-    _ :< WeakTermEpsilon x -> exhaustEpsilonIdentifier x labelList b1
+    (_, WeakTermEpsilon x) -> exhaustEpsilonIdentifier x labelList b1
     _                      -> lift $ throwE "type error (exhaust)"
-exhaust' (_ :< WeakTermPi xts) = allM exhaust' $ map snd xts
-exhaust' (_ :< WeakTermPiIntro _ e) = exhaust' e
-exhaust' (_ :< WeakTermPiElim e es) = allM exhaust' $ e : es
-exhaust' (_ :< WeakTermSigma xts) = allM exhaust' $ map snd xts
-exhaust' (_ :< WeakTermSigmaIntro es) = allM exhaust' es
-exhaust' (_ :< WeakTermSigmaElim _ e1 e2) = allM exhaust' [e1, e2]
-exhaust' (_ :< WeakTermMu _ e) = exhaust' e
-exhaust' (_ :< WeakTermZeta _) = return False
+exhaust' (_, WeakTermPi xts) = allM exhaust' $ map snd xts
+exhaust' (_, WeakTermPiIntro _ e) = exhaust' e
+exhaust' (_, WeakTermPiElim e es) = allM exhaust' $ e : es
+exhaust' (_, WeakTermSigma xts) = allM exhaust' $ map snd xts
+exhaust' (_, WeakTermSigmaIntro es) = allM exhaust' es
+exhaust' (_, WeakTermSigmaElim _ e1 e2) = allM exhaust' [e1, e2]
+exhaust' (_, WeakTermMu _ e) = exhaust' e
+exhaust' (_, WeakTermZeta _) = return False
 
 exhaustEpsilonIdentifier :: Identifier -> [Case] -> Bool -> WithEnv Bool
 exhaustEpsilonIdentifier x labelList b1 = do
@@ -178,6 +177,6 @@ toMeta (WeakMetaNonTerminal (Ref r) l) = do
       t' <- elaborate' t
       return $ MetaNonTerminal t' l
 
-obtainType :: Meta -> Term
-obtainType (MetaTerminal _)      = MetaTerminal Nothing :< TermTau
+obtainType :: Meta -> TermPlus
+obtainType (MetaTerminal _)      = (MetaTerminal Nothing, TermTau)
 obtainType (MetaNonTerminal t _) = t
