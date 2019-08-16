@@ -11,7 +11,7 @@ data Term
   | TermUpsilon Identifier
   | TermEpsilon Identifier
   | TermEpsilonIntro Literal
-  | TermEpsilonElim (Identifier, TermPlus)
+  | TermEpsilonElim IdentifierPlus
                     TermPlus
                     [(Case, TermPlus)]
   | TermPi [IdentifierPlus]
