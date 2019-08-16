@@ -2,23 +2,23 @@ module Data.Constraint where
 
 import           Data.WeakTerm
 
-type PreConstraint = (WeakTerm, WeakTerm)
+type PreConstraint = (WeakTermPlus, WeakTermPlus)
 
 data Constraint
   = ConstraintImmediate Hole
-                        WeakTerm
+                        WeakTermPlus
   | ConstraintPattern Hole
-                      [[WeakTerm]]
-                      WeakTerm
+                      [[WeakTermPlus]]
+                      WeakTermPlus
   | ConstraintQuasiPattern Hole
-                           [[WeakTerm]]
-                           WeakTerm
+                           [[WeakTermPlus]]
+                           WeakTermPlus
   | ConstraintFlexRigid Hole
-                        [[WeakTerm]]
-                        WeakTerm
+                        [[WeakTermPlus]]
+                        WeakTermPlus
   | ConstraintFlexFlex Hole
-                       [[WeakTerm]]
-                       WeakTerm
+                       [[WeakTermPlus]]
+                       WeakTermPlus
   | ConstraintOther
 
 constraintToInt :: Constraint -> Int
@@ -50,6 +50,6 @@ compose :: SubstWeakTerm -> SubstWeakTerm -> SubstWeakTerm
 compose s1 s2 = do
   let domS2 = map fst s2
   let codS2 = map snd s2
-  let codS2' = map (substWeakTerm s1) codS2
+  let codS2' = map (substWeakTermPlus s1) codS2
   let fromS1 = filter (\(ident, _) -> ident `notElem` domS2) s1
   fromS1 ++ zip domS2 codS2'
