@@ -3,19 +3,18 @@ module Elaborate.Analyze
   , simp
   ) where
 
-import           Control.Comonad.Cofree
 import           Control.Monad.Except
 import           Control.Monad.State
 import           Data.IORef
-import qualified Data.PQueue.Min        as Q
+import qualified Data.PQueue.Min      as Q
 import           System.Timeout
-import qualified Text.Show.Pretty       as Pr
+import qualified Text.Show.Pretty     as Pr
 
 import           Data.Basic
 import           Data.Constraint
 import           Data.Env
 import           Data.WeakTerm
-import           Elaborate.Infer        (readWeakMetaType, writeWeakMetaType)
+import           Elaborate.Infer      (readWeakMetaType, writeWeakMetaType)
 import           Reduce.WeakTerm
 
 analyze :: [PreConstraint] -> WithEnv ()
@@ -27,47 +26,48 @@ simp :: [PreConstraint] -> WithEnv [EnrichedConstraint]
 simp [] = return []
 simp ((e1, e2):cs)
   | isReducible e1 = do
-    me1' <- reduceWeakTerm e1 >>= \e1' -> liftIO $ timeout 5000000 $ return e1'
+    me1' <-
+      reduceWeakTermPlus e1 >>= \e1' -> liftIO $ timeout 5000000 $ return e1'
     case me1' of
       Just e1' -> simp $ (e1', e2) : cs
       Nothing ->
         throwError $ "cannot simplify [TIMEOUT]:\n" ++ Pr.ppShow (e1, e2)
 simp ((e1, e2):cs)
   | isReducible e2 = simp $ (e2, e1) : cs
-simp ((m1 :< WeakTermTau, m2 :< WeakTermTau):cs) = simpMetaRet m1 m2 (simp cs)
-simp ((m1 :< WeakTermTheta x, m2 :< WeakTermTheta y):cs)
+simp (((m1, WeakTermTau), (m2, WeakTermTau)):cs) = simpMetaRet m1 m2 (simp cs)
+simp (((m1, WeakTermTheta x), (m2, WeakTermTheta y)):cs)
   | x == y = simpMetaRet m1 m2 (simp cs)
-simp ((m1 :< WeakTermUpsilon x1, m2 :< WeakTermUpsilon x2):cs)
+simp (((m1, WeakTermUpsilon x1), (m2, WeakTermUpsilon x2)):cs)
   | x1 == x2 = simpMetaRet m1 m2 (simp cs)
-simp ((m1 :< WeakTermEpsilon l1, m2 :< WeakTermEpsilon l2):cs)
+simp (((m1, WeakTermEpsilon l1), (m2, WeakTermEpsilon l2)):cs)
   | l1 == l2 = simpMetaRet m1 m2 (simp cs)
-simp ((m1 :< WeakTermEpsilonIntro l1, m2 :< WeakTermEpsilonIntro l2):cs)
+simp (((m1, WeakTermEpsilonIntro l1), (m2, WeakTermEpsilonIntro l2)):cs)
   | l1 == l2 = simpMetaRet m1 m2 (simp cs)
-simp ((m1 :< WeakTermPi xts1, m2 :< WeakTermPi xts2):cs)
+simp (((m1, WeakTermPi xts1), (m2, WeakTermPi xts2)):cs)
   | length xts1 == length xts2 = simpMetaRet m1 m2 $ simpPiOrSigma xts1 xts2 cs
-simp ((m1 :< WeakTermPiIntro xts1 body1, m2 :< WeakTermPiIntro xts2 body2):cs) = do
+simp (((m1, WeakTermPiIntro xts1 body1), (m2, WeakTermPiIntro xts2 body2)):cs) = do
   h1 <- newNameWith "hole"
   h2 <- newNameWith "hole"
   simpMetaRet m1 m2 $
     simpPiOrSigma (xts1 ++ [(h1, body1)]) (xts2 ++ [(h2, body2)]) cs
-simp ((m1 :< WeakTermPiIntro xts body1@(bodyMeta :< _), e2@(m2 :< _)):cs) = do
+simp (((m1, WeakTermPiIntro xts body1@(bodyMeta, _)), e2@(m2, _)):cs) = do
   vs <- mapM (uncurry toVar) xts
   mt <- readWeakMetaType bodyMeta
   appMeta <- newMeta
   writeWeakMetaType appMeta mt
-  let comp = simp $ (body1, appMeta :< WeakTermPiElim e2 vs) : cs
+  let comp = simp $ (body1, (appMeta, WeakTermPiElim e2 vs)) : cs
   simpMetaRet m1 m2 comp
-simp ((e1, e2@(_ :< WeakTermPiIntro {})):cs) = simp $ (e2, e1) : cs
-simp ((m1 :< WeakTermSigma xts1, m2 :< WeakTermSigma xts2):cs)
+simp ((e1, e2@(_, WeakTermPiIntro {})):cs) = simp $ (e2, e1) : cs
+simp (((m1, WeakTermSigma xts1), (m2, WeakTermSigma xts2)):cs)
   | length xts1 == length xts2 = simpMetaRet m1 m2 $ simpPiOrSigma xts1 xts2 cs
-simp ((m1 :< WeakTermSigmaIntro es1, m2 :< WeakTermSigmaIntro es2):cs)
+simp (((m1, WeakTermSigmaIntro es1), (m2, WeakTermSigmaIntro es2)):cs)
   | length es1 == length es2 = simpMetaRet m1 m2 $ simp $ zip es1 es2 ++ cs
 simp ((e1, e2):cs)
-  | m1 :< WeakTermPiElim (_ :< WeakTermUpsilon f) es1 <- e1
-  , m2 :< WeakTermPiElim (_ :< WeakTermUpsilon g) es2 <- e2
+  | (m1, WeakTermPiElim (_, WeakTermUpsilon f) es1) <- e1
+  , (m2, WeakTermPiElim (_, WeakTermUpsilon g) es2) <- e2
   , f == g
   , length es1 == length es2 = simpMetaRet m1 m2 $ simp $ zip es1 es2 ++ cs
-simp ((e1@(m1 :< _), e2@(m2 :< _)):cs) = do
+simp ((e1@(m1, _), e2@(m2, _)):cs) = do
   let ms1 = asStuckedTerm e1
   let ms2 = asStuckedTerm e2
   case (ms1, ms2) of
@@ -118,7 +118,7 @@ simpMetaRet m1 m2 comp = do
 simpMeta :: WeakMeta -> WeakMeta -> WithEnv [EnrichedConstraint]
 simpMeta (WeakMetaTerminal _) (WeakMetaTerminal _) = return []
 simpMeta (WeakMetaTerminal _) m2@(WeakMetaNonTerminal _ _) = do
-  r1 <- liftIO $ newIORef (Just $ newMetaTerminal :< WeakTermTau)
+  r1 <- liftIO $ newIORef (Just (newMetaTerminal, WeakTermTau))
   simpMeta (WeakMetaNonTerminal (Ref r1) Nothing) m2
 simpMeta m1@WeakMetaNonTerminal {} m2@(WeakMetaTerminal _) = simpMeta m2 m1
 simpMeta (WeakMetaNonTerminal (Ref r1) _) (WeakMetaNonTerminal (Ref r2) _) = do
@@ -131,26 +131,26 @@ simpMeta (WeakMetaNonTerminal (Ref r1) _) (WeakMetaNonTerminal (Ref r2) _) = do
     _                  -> return []
 
 simpPiOrSigma ::
-     [(Identifier, WeakTerm)]
-  -> [(Identifier, WeakTerm)]
-  -> [(WeakTerm, WeakTerm)]
+     [IdentifierPlus]
+  -> [IdentifierPlus]
+  -> [PreConstraint]
   -> WithEnv [EnrichedConstraint]
 simpPiOrSigma xts1 xts2 cs = do
   vs1 <- mapM (uncurry toVar) xts1
   let (xs2, ts2) = unzip xts2
-  let ts2' = map (substWeakTerm (zip xs2 vs1)) ts2
+  let ts2' = map (substWeakTermPlus (zip xs2 vs1)) ts2
   simp $ zip (map snd xts1) ts2' ++ cs
 
 data Stuck
   = StuckHole Hole
   | StuckPiElim Hole
-                [[WeakTerm]]
+                [[WeakTermPlus]]
   | StuckPiElimStrict Hole
-                      [[(WeakTerm, Identifier)]]
+                      [[(WeakTermPlus, Identifier)]]
   | StuckOther Hole
 
-asStuckedTerm :: WeakTerm -> Maybe Stuck
-asStuckedTerm (_ :< WeakTermPiElim e es)
+asStuckedTerm :: WeakTermPlus -> Maybe Stuck
+asStuckedTerm (_, WeakTermPiElim e es)
   | Just xs <- mapM interpretAsUpsilon es =
     case asStuckedTerm e of
       Just (StuckHole h) -> Just $ StuckPiElimStrict h [zip es xs]
@@ -159,7 +159,7 @@ asStuckedTerm (_ :< WeakTermPiElim e es)
         Just $ StuckPiElimStrict h $ iexss ++ [zip es xs]
       Just (StuckOther h) -> Just $ StuckOther h
       Nothing -> Nothing
-asStuckedTerm (_ :< WeakTermPiElim e es) =
+asStuckedTerm (_, WeakTermPiElim e es) =
   case asStuckedTerm e of
     Just (StuckHole h) -> Just $ StuckPiElim h [es]
     Just (StuckPiElim h iess) -> Just $ StuckPiElim h $ iess ++ [es]
@@ -168,27 +168,27 @@ asStuckedTerm (_ :< WeakTermPiElim e es) =
       Just $ StuckPiElim h $ ess ++ [es]
     Just (StuckOther h) -> Just $ StuckOther h
     Nothing -> Nothing
-asStuckedTerm (_ :< WeakTermZeta h) = Just $ StuckHole h
+asStuckedTerm (_, WeakTermZeta h) = Just $ StuckHole h
 asStuckedTerm e
   | Just h <- obtainStuckReason e = Just $ StuckOther h
 asStuckedTerm _ = Nothing
 
-obtainStuckReason :: WeakTerm -> Maybe Hole
-obtainStuckReason (_ :< WeakTermEpsilonElim _ e _) = obtainStuckReason e
-obtainStuckReason (_ :< WeakTermPiElim e _)        = obtainStuckReason e
-obtainStuckReason (_ :< WeakTermSigmaElim _ e1 _)  = obtainStuckReason e1
-obtainStuckReason (_ :< WeakTermZeta x)            = Just x
-obtainStuckReason _                                = Nothing
+obtainStuckReason :: WeakTermPlus -> Maybe Hole
+obtainStuckReason (_, WeakTermEpsilonElim _ e _) = obtainStuckReason e
+obtainStuckReason (_, WeakTermPiElim e _)        = obtainStuckReason e
+obtainStuckReason (_, WeakTermSigmaElim _ e1 _)  = obtainStuckReason e1
+obtainStuckReason (_, WeakTermZeta x)            = Just x
+obtainStuckReason _                              = Nothing
 
-isSolvable :: WeakTerm -> Identifier -> [Identifier] -> Bool
+isSolvable :: WeakTermPlus -> Identifier -> [Identifier] -> Bool
 isSolvable e x xs = do
-  let (fvs, fmvs) = varWeakTerm e
+  let (fvs, fmvs) = varWeakTermPlus e
   affineCheck xs fvs && x `notElem` fmvs
 
-toVar :: Identifier -> WeakTerm -> WithEnv WeakTerm
+toVar :: Identifier -> WeakTermPlus -> WithEnv WeakTermPlus
 toVar x t = do
   meta <- newMetaOfType t
-  return $ meta :< WeakTermUpsilon x
+  return (meta, WeakTermUpsilon x)
 
 affineCheck :: [Identifier] -> [Identifier] -> Bool
 affineCheck xs = affineCheck' xs xs
@@ -206,6 +206,6 @@ isLinear x xs =
     then []
     else [x]
 
-interpretAsUpsilon :: WeakTerm -> Maybe Identifier
-interpretAsUpsilon (_ :< WeakTermUpsilon x) = Just x
-interpretAsUpsilon _                        = Nothing
+interpretAsUpsilon :: WeakTermPlus -> Maybe Identifier
+interpretAsUpsilon (_, WeakTermUpsilon x) = Just x
+interpretAsUpsilon _                      = Nothing
