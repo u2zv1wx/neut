@@ -24,9 +24,10 @@ rename (m, WeakTermEpsilonElim (x, t) e caseList) = do
     x' <- newNameWith x
     caseList' <- renameCaseList caseList
     return (m, WeakTermEpsilonElim (x', t') e' caseList')
-rename (m, WeakTermPi xts) = do
+rename (m, WeakTermPi xts t) = do
   xts' <- renameBindings xts
-  return (m, WeakTermPi xts')
+  t' <- rename t
+  return (m, WeakTermPi xts' t')
 rename (m, WeakTermPiIntro xts e) = do
   (xts', e') <- renameBindingsWithBody xts e
   return (m, WeakTermPiIntro xts' e')
@@ -34,16 +35,19 @@ rename (m, WeakTermPiElim e es) = do
   e' <- rename e
   es' <- mapM rename es
   return (m, WeakTermPiElim e' es')
-rename (m, WeakTermSigma xts) = do
+rename (m, WeakTermSigma xts t) = do
   xts' <- renameBindings xts
-  return (m, WeakTermSigma xts')
-rename (m, WeakTermSigmaIntro es) = do
+  t' <- rename t
+  return (m, WeakTermSigma xts' t')
+rename (m, WeakTermSigmaIntro es e) = do
   es' <- mapM rename es
-  return (m, WeakTermSigmaIntro es')
-rename (m, WeakTermSigmaElim xts e1 e2) = do
+  e' <- rename e
+  return (m, WeakTermSigmaIntro es' e')
+rename (m, WeakTermSigmaElim xts xt e1 e2) = do
   e1' <- rename e1
-  (xts', e2') <- renameBindingsWithBody xts e2
-  return (m, WeakTermSigmaElim xts' e1' e2')
+  let yts = xts ++ [xt]
+  (yts', e2') <- renameBindingsWithBody yts e2
+  return (m, WeakTermSigmaElim (init yts') (last yts') e1' e2')
 rename (m, WeakTermMu (x, t) e) =
   local $ do
     t' <- rename t
