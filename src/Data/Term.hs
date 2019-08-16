@@ -14,14 +14,18 @@ data Term
   | TermEpsilonElim (Identifier, TermPlus)
                     TermPlus
                     [(Case, TermPlus)]
-  | TermPi [(Identifier, TermPlus)]
-  | TermPiIntro [(Identifier, TermPlus)]
+  | TermPi [IdentifierPlus]
+           TermPlus
+  | TermPiIntro [IdentifierPlus]
                 TermPlus
   | TermPiElim TermPlus
                [TermPlus]
-  | TermSigma [(Identifier, TermPlus)]
+  | TermSigma [IdentifierPlus]
+              TermPlus
   | TermSigmaIntro [TermPlus]
-  | TermSigmaElim [(Identifier, TermPlus)]
+                   TermPlus
+  | TermSigmaElim [IdentifierPlus]
+                  IdentifierPlus
                   TermPlus
                   TermPlus
   | TermMu (Identifier, TermPlus)
@@ -56,14 +60,17 @@ varTermPlus (_, TermEpsilonElim (x, t) e branchList) = do
       let (xs, hs) = varTermPlus body
       return (filter (/= x) xs, hs)
   pairwiseConcat (xhs1 : xhs2 : xhss)
-varTermPlus (_, TermPi xts) = varTermPlusBindings xts []
+varTermPlus (_, TermPi xts t) =
+  pairwiseConcat [varTermPlusBindings xts [], varTermPlus t]
 varTermPlus (_, TermPiIntro xts e) = varTermPlusBindings xts [e]
 varTermPlus (_, TermPiElim e es) =
   pairwiseConcat $ varTermPlus e : map varTermPlus es
-varTermPlus (_, TermSigma xts) = varTermPlusBindings xts []
-varTermPlus (_, TermSigmaIntro es) = pairwiseConcat $ map varTermPlus es
-varTermPlus (_, TermSigmaElim us e1 e2) =
-  pairwiseConcat [varTermPlus e1, varTermPlusBindings us [e2]]
+varTermPlus (_, TermSigma xts t) =
+  pairwiseConcat [varTermPlusBindings xts [], varTermPlus t]
+varTermPlus (_, TermSigmaIntro es e) =
+  pairwiseConcat $ varTermPlus e : map varTermPlus es
+varTermPlus (_, TermSigmaElim xts xt e1 e2) =
+  pairwiseConcat [varTermPlus e1, varTermPlusBindings (xts ++ [xt]) [e2]]
 varTermPlus (_, TermMu ut e) = varTermPlusBindings [ut] [e]
 
 varTermPlusBindings ::
@@ -94,9 +101,10 @@ substTermPlus sub (m, TermEpsilonElim (x, t) e branchList) = do
   let sub' = filter (\(k, _) -> k /= x) sub
   let es' = map (substTermPlus sub') es
   (m, TermEpsilonElim (x, t') e' (zip caseList es'))
-substTermPlus sub (m, TermPi xts) = do
+substTermPlus sub (m, TermPi xts t) = do
   let xts' = substTermPlusBindings sub xts
-  (m, TermPi xts')
+  let t' = substTermPlus (filter (\(k, _) -> k `notElem` map fst xts) sub) t
+  (m, TermPi xts' t')
 substTermPlus sub (m, TermPiIntro xts body) = do
   let (xts', body') = substTermPlusBindingsWithBody sub xts body
   (m, TermPiIntro xts' body')
@@ -104,16 +112,21 @@ substTermPlus sub (m, TermPiElim e es) = do
   let e' = substTermPlus sub e
   let es' = map (substTermPlus sub) es
   (m, TermPiElim e' es')
-substTermPlus sub (m, TermSigma xts) = do
+substTermPlus sub (m, TermSigma xts t) = do
   let xts' = substTermPlusBindings sub xts
-  (m, TermSigma xts')
-substTermPlus sub (m, TermSigmaIntro es) = do
+  let t' = substTermPlus (filter (\(k, _) -> k `notElem` map fst xts) sub) t
+  (m, TermSigma xts' t')
+substTermPlus sub (m, TermSigmaIntro es e) = do
   let es' = map (substTermPlus sub) es
-  (m, TermSigmaIntro es')
-substTermPlus sub (m, TermSigmaElim xts e1 e2) = do
-  let e1' = substTermPlus sub e1
-  let (xts', e2') = substTermPlusBindingsWithBody sub xts e2
-  (m, TermSigmaElim xts' e1' e2')
+  let e' = substTermPlus sub e
+  (m, TermSigmaIntro es' e')
+substTermPlus sub (m, TermSigmaElim xts xt e1 e2) = do
+  let yts = xts ++ [xt]
+  let e1' = substTermPlus (filter (\(k, _) -> k `notElem` map fst yts) sub) e1
+  let (yts', e2') = substTermPlusBindingsWithBody sub yts e2
+  let xts' = init yts'
+  let xt' = last yts'
+  (m, TermSigmaElim xts' xt' e1' e2')
 substTermPlus sub (m, TermMu (x, t) e) = do
   let t' = substTermPlus sub t
   let e' = substTermPlus (filter (\(k, _) -> k /= x) sub) e
@@ -144,7 +157,7 @@ isReducible (_, TermEpsilonElim _ (_, TermEpsilonIntro l) branchList) = do
   let (caseList, _) = unzip branchList
   CaseLiteral l `elem` caseList || CaseDefault `elem` caseList
 isReducible (_, TermEpsilonElim (_, _) e _) = isReducible e
-isReducible (_, TermPi _) = False
+isReducible (_, TermPi _ _) = False
 isReducible (_, TermPiIntro {}) = False
 isReducible (_, TermPiElim (_, TermPiIntro xts _) es)
   | length xts == length es = True
@@ -152,20 +165,20 @@ isReducible (_, TermPiElim (_, TermMu _ _) _) = True -- CBV recursion
 isReducible (_, TermPiElim (_, TermTheta c) [(_, TermEpsilonIntro (LiteralInteger _)), (_, TermEpsilonIntro (LiteralInteger _))]) -- constant application
   | c `elem` intArithConstantList = True
 isReducible (_, TermPiElim e es) = isReducible e || any isReducible es
-isReducible (_, TermSigma _) = False
-isReducible (_, TermSigmaIntro es) = any isReducible es
-isReducible (_, TermSigmaElim xts (_, TermSigmaIntro es) _)
+isReducible (_, TermSigma _ _) = False
+isReducible (_, TermSigmaIntro es e) = any isReducible es || isReducible e
+isReducible (_, TermSigmaElim xts _ (_, TermSigmaIntro es _) _)
   | length xts == length es = True
-isReducible (_, TermSigmaElim _ e1 _) = isReducible e1
+isReducible (_, TermSigmaElim _ _ e1 _) = isReducible e1
 isReducible (_, TermMu _ _) = False
 
 isValue :: TermPlus -> Bool
-isValue (_, TermTau)            = True
-isValue (_, TermUpsilon _)      = True
-isValue (_, TermEpsilon _)      = True
-isValue (_, TermEpsilonIntro _) = True
-isValue (_, TermPi {})          = True
-isValue (_, TermPiIntro {})     = True
-isValue (_, TermSigma {})       = True
-isValue (_, TermSigmaIntro es)  = all isValue es
-isValue _                       = False
+isValue (_, TermTau)             = True
+isValue (_, TermUpsilon _)       = True
+isValue (_, TermEpsilon _)       = True
+isValue (_, TermEpsilonIntro _)  = True
+isValue (_, TermPi {})           = True
+isValue (_, TermPiIntro {})      = True
+isValue (_, TermSigma {})        = True
+isValue (_, TermSigmaIntro es e) = all isValue es && isValue e
+isValue _                        = False
