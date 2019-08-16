@@ -2,7 +2,6 @@ module Elaborate.Synthesize
   ( synthesize
   ) where
 
-import           Control.Comonad.Cofree
 import           Control.Monad.Except
 import           Control.Monad.State
 import           Control.Monad.Trans.Except
@@ -35,10 +34,15 @@ synthesize q = do
     Just _ -> throwError "cannot synthesize(synth)"
 
 resolveStuck ::
-     ConstraintQueue -> WeakTerm -> WeakTerm -> Hole -> WeakTerm -> WithEnv ()
+     ConstraintQueue
+  -> WeakTermPlus
+  -> WeakTermPlus
+  -> Hole
+  -> WeakTermPlus
+  -> WithEnv ()
 resolveStuck q e1 e2 h e = do
-  let e1' = substWeakTerm [(h, e)] e1
-  let e2' = substWeakTerm [(h, e)] e2
+  let e1' = substWeakTermPlus [(h, e)] e1
+  let e2' = substWeakTermPlus [(h, e)] e2
   cs <- simp [(e1', e2')]
   synthesize $ Q.deleteMin q `Q.union` Q.fromList cs
 
@@ -54,7 +58,7 @@ resolveStuck q e1 e2 h e = do
 -- this function replaces all the arguments that are not variable by
 -- fresh variables, and try to resolve the new quasi-pattern ?M @ x @ x @ z @ y == e.
 resolvePiElim ::
-     ConstraintQueue -> Hole -> [[WeakTerm]] -> WeakTerm -> WithEnv ()
+     ConstraintQueue -> Hole -> [[WeakTermPlus]] -> WeakTermPlus -> WithEnv ()
 resolvePiElim q m ess e = do
   let lengthInfo = map length ess
   let es = concat ess
@@ -63,7 +67,7 @@ resolvePiElim q m ess e = do
   lamList <- mapM (bindFormalArgs e) xsss
   chain q $ map (resolveHole q m) lamList
 
-resolveHole :: ConstraintQueue -> Hole -> WeakTerm -> WithEnv ()
+resolveHole :: ConstraintQueue -> Hole -> WeakTermPlus -> WithEnv ()
 resolveHole q h e = do
   modify (\env -> env {substEnv = compose [(h, e)] (substEnv env)})
   let rest = Q.deleteMin q
@@ -72,13 +76,13 @@ resolveHole q h e = do
   synthesize q2
 
 -- [e, x, y, y, e2, e3, z] ~> [p, x, y, y, q, r, z]  (p, q, r: new variables)
-toVarList :: [WeakTerm] -> WithEnv [IdentifierPlus]
+toVarList :: [WeakTermPlus] -> WithEnv [IdentifierPlus]
 toVarList [] = return []
-toVarList ((_ :< WeakTermUpsilon x):es) = do
+toVarList ((_, WeakTermUpsilon x):es) = do
   xts <- toVarList es
   t <- lookupTypeEnv x
   return $ (x, t) : xts
-toVarList ((m :< _):es) = do
+toVarList ((m, _):es) = do
   xts <- toVarList es
   x <- newNameWith "hole"
   t <- obtainType m
@@ -151,16 +155,16 @@ lookupAny (h:ks) sub =
     Just v  -> Just (h, v)
     Nothing -> lookupAny ks sub
 
-bindFormalArgs :: WeakTerm -> [[IdentifierPlus]] -> WithEnv WeakTerm
+bindFormalArgs :: WeakTermPlus -> [[IdentifierPlus]] -> WithEnv WeakTermPlus
 bindFormalArgs e [] = return e
 bindFormalArgs e (xts:xtss) = do
-  e'@(m :< _) <- bindFormalArgs e xtss
+  e'@(m, _) <- bindFormalArgs e xtss
   t <- obtainType m
   h <- newNameWith "hole"
   insTypeEnv h t
-  let tPi = newMetaTerminal :< WeakTermPi (xts ++ [(h, t)])
+  let tPi = (newMetaTerminal, WeakTermPi (xts ++ [(h, t)]))
   meta <- newMetaOfType tPi
-  return $ meta :< WeakTermPiIntro xts e'
+  return (meta, WeakTermPiIntro xts e')
 
 -- takeByCount [1, 3, 2] [a, b, c, d, e, f, g, h] ~> [[a], [b, c, d], [e, f]]
 takeByCount :: [Int] -> [a] -> [[a]]
@@ -170,7 +174,7 @@ takeByCount (i:is) xs = do
   let yss = takeByCount is (drop i xs)
   ys : yss
 
-obtainType :: WeakMeta -> WithEnv WeakTerm
+obtainType :: WeakMeta -> WithEnv WeakTermPlus
 obtainType m = do
   mt <- readWeakMetaType m
   case mt of
