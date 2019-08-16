@@ -4,7 +4,6 @@ module Parse.Interpret
   , extractIdentifier
   ) where
 
-import           Control.Comonad.Cofree
 import           Control.Monad.Except
 import           Control.Monad.State
 import           Control.Monad.Trans.Except
@@ -16,61 +15,61 @@ import           Data.Env
 import           Data.Tree
 import           Data.WeakTerm
 
-interpret :: Tree -> WithEnv WeakTerm
+interpret :: TreePlus -> WithEnv WeakTermPlus
 --
 -- foundational interpretations
 --
-interpret (m :< TreeAtom "tau") = withMeta m WeakTermTau
-interpret (m :< TreeNode [_ :< TreeAtom "theta", _ :< TreeAtom x]) =
+interpret (m, TreeAtom "tau") = withMeta m WeakTermTau
+interpret (m, TreeNode [(_, TreeAtom "theta"), (_, TreeAtom x)]) =
   withMeta m $ WeakTermTheta x
-interpret (m :< TreeNode [_ :< TreeAtom "upsilon", _ :< TreeAtom x]) =
+interpret (m, TreeNode [(_, TreeAtom "upsilon"), (_, TreeAtom x)]) =
   withMeta m $ WeakTermUpsilon x
-interpret (m :< TreeNode [_ :< TreeAtom "epsilon", _ :< TreeAtom x]) = do
+interpret (m, TreeNode [(_, TreeAtom "epsilon"), (_, TreeAtom x)]) = do
   isEpsilon <- isDefinedEpsilonName x
   if not isEpsilon
     then throwError $ "No such epsilon-type defined: " ++ x
     else withMeta m $ WeakTermEpsilon x
-interpret (m :< TreeNode [_ :< TreeAtom "epsilon-introduction", l]) = do
+interpret (m, TreeNode [(_, TreeAtom "epsilon-introduction"), l]) = do
   l' <- interpretLiteral l
   withMeta m $ WeakTermEpsilonIntro l'
-interpret (m :< TreeNode [_ :< TreeAtom "epsilon-elimination", xt, e, _ :< TreeNode cs]) = do
+interpret (m, TreeNode [(_, TreeAtom "epsilon-elimination"), xt, e, (_, TreeNode cs)]) = do
   xt' <- interpretIdentifierPlus xt
   e' <- interpret e
   cs' <- mapM interpretClause cs
   withMeta m $ WeakTermEpsilonElim xt' e' cs'
-interpret (m :< TreeNode [_ :< TreeAtom "pi", _ :< TreeNode xts, t]) = do
+interpret (m, TreeNode [(_, TreeAtom "pi"), (_, TreeNode xts), t]) = do
   binder <- interpretBinder xts t
   withMeta m $ WeakTermPi binder
-interpret (m :< TreeNode [_ :< TreeAtom "pi-introduction", _ :< TreeNode xts, e]) = do
+interpret (m, TreeNode [(_, TreeAtom "pi-introduction"), (_, TreeNode xts), e]) = do
   xts' <- mapM interpretIdentifierPlus xts
   e' <- interpret e
   withMeta m $ WeakTermPiIntro xts' e'
-interpret (m :< TreeNode ((_ :< TreeAtom "pi-elimination"):e:es)) = do
+interpret (m, TreeNode ((_, TreeAtom "pi-elimination"):e:es)) = do
   e' <- interpret e
   es' <- mapM interpret es
   withMeta m $ WeakTermPiElim e' es'
-interpret (m :< TreeNode [_ :< TreeAtom "sigma", _ :< TreeNode xts, t]) = do
+interpret (m, TreeNode [(_, TreeAtom "sigma"), (_, TreeNode xts), t]) = do
   binder <- interpretBinder xts t
   withMeta m $ WeakTermSigma binder
-interpret (m :< TreeNode ((_ :< TreeAtom "sigma-introduction"):es)) = do
+interpret (m, TreeNode ((_, TreeAtom "sigma-introduction"):es)) = do
   es' <- mapM interpret es
   withMeta m $ WeakTermSigmaIntro es'
-interpret (m :< TreeNode [_ :< TreeAtom "sigma-elimination", _ :< TreeNode xts, e1, e2]) = do
+interpret (m, TreeNode [(_, TreeAtom "sigma-elimination"), (_, TreeNode xts), e1, e2]) = do
   xts' <- mapM interpretIdentifierPlus xts
   e1' <- interpret e1
   e2' <- interpret e2
   withMeta m $ WeakTermSigmaElim xts' e1' e2'
-interpret (m :< TreeNode [_ :< TreeAtom "mu", xt, e]) = do
+interpret (m, TreeNode [(_, TreeAtom "mu"), xt, e]) = do
   xt' <- interpretIdentifierPlus xt
   e' <- interpret e
   withMeta m $ WeakTermMu xt' e'
-interpret (m :< TreeNode [_ :< TreeAtom "zeta", _ :< TreeAtom x]) = do
+interpret (m, TreeNode [(_, TreeAtom "zeta"), (_, TreeAtom x)]) = do
   x' <- interpretAtom x
   withMeta m $ WeakTermZeta x'
 --
 -- auxiliary interpretations
 --
-interpret t@(m :< TreeAtom x) = do
+interpret t@(m, TreeAtom x) = do
   ml <- interpretLiteralMaybe t
   case ml of
     Just l -> withMeta m $ WeakTermEpsilonIntro l
@@ -83,17 +82,17 @@ interpret t@(m :< TreeAtom x) = do
           if x `elem` cenv
             then withMeta m $ WeakTermTheta x
             else withMeta m $ WeakTermUpsilon x
-interpret t@(m :< TreeNode es) =
+interpret t@(m, TreeNode es) =
   if null es
     then throwError $ "interpret: syntax error:\n" ++ Pr.ppShow t
-    else interpret $ m :< TreeNode ((m :< TreeAtom "pi-elimination") : es)
+    else interpret (m, TreeNode ((m, TreeAtom "pi-elimination") : es))
 
-interpretIdentifierPlus :: Tree -> WithEnv IdentifierPlus
-interpretIdentifierPlus (_ :< TreeAtom x) = do
+interpretIdentifierPlus :: TreePlus -> WithEnv IdentifierPlus
+interpretIdentifierPlus (_, TreeAtom x) = do
   u <- wrap WeakTermTau
   t <- newHoleOfType u
   return (x, t)
-interpretIdentifierPlus (_ :< TreeNode [_ :< TreeAtom x, t]) = do
+interpretIdentifierPlus (_, TreeNode [(_, TreeAtom x), t]) = do
   x' <- interpretAtom x
   t' <- interpret t
   return (x', t')
@@ -104,20 +103,20 @@ interpretAtom :: String -> WithEnv String
 interpretAtom "_" = newNameWith "hole"
 interpretAtom x   = return x
 
-interpretLiteralMaybe :: Tree -> WithEnv (Maybe Literal)
-interpretLiteralMaybe (_ :< TreeAtom x)
+interpretLiteralMaybe :: TreePlus -> WithEnv (Maybe Literal)
+interpretLiteralMaybe (_, TreeAtom x)
   | Just f <- readMaybe x
   , '.' `elem` x = return $ Just $ LiteralFloat f
-interpretLiteralMaybe (_ :< TreeAtom x)
+interpretLiteralMaybe (_, TreeAtom x)
   | Just i <- readMaybe x = return $ Just $ LiteralInteger i
-interpretLiteralMaybe (_ :< TreeAtom x) = do
+interpretLiteralMaybe (_, TreeAtom x) = do
   b <- isDefinedEpsilon x
   if b
     then return $ Just $ LiteralLabel x
     else lift $ throwE $ "no such label defined: " ++ x
 interpretLiteralMaybe _ = return Nothing
 
-interpretLiteral :: Tree -> WithEnv Literal
+interpretLiteral :: TreePlus -> WithEnv Literal
 interpretLiteral l = do
   ml' <- interpretLiteralMaybe l
   case ml' of
@@ -125,21 +124,21 @@ interpretLiteral l = do
     Nothing ->
       lift $ throwE $ "interpretLiteral: syntax error:\n" ++ Pr.ppShow l
 
-interpretBinder :: [Tree] -> Tree -> WithEnv [IdentifierPlus]
+interpretBinder :: [TreePlus] -> TreePlus -> WithEnv [IdentifierPlus]
 interpretBinder xts t = do
   xts' <- mapM interpretIdentifierPlus xts
   t' <- interpret t
   hole <- newNameWith "hole"
   return $ xts' ++ [(hole, t')]
 
-interpretCase :: Tree -> WithEnv Case
+interpretCase :: TreePlus -> WithEnv Case
 --
 -- foundational
 --
-interpretCase (_ :< TreeNode [_ :< TreeAtom "epsilon-introduction", l]) = do
+interpretCase (_, TreeNode [(_, TreeAtom "epsilon-introduction"), l]) = do
   l' <- interpretLiteral l
   return $ CaseLiteral l'
-interpretCase (_ :< TreeAtom "default") = return CaseDefault
+interpretCase (_, TreeAtom "default") = return CaseDefault
 --
 -- auxiliary
 --
@@ -149,20 +148,20 @@ interpretCase c = do
     Just l -> return $ CaseLiteral l
     Nothing -> lift $ throwE $ "interpretCase: syntax error:\n" ++ Pr.ppShow c
 
-interpretClause :: Tree -> WithEnv (Case, WeakTerm)
-interpretClause (_ :< TreeNode [c, e]) = do
+interpretClause :: TreePlus -> WithEnv (Case, WeakTermPlus)
+interpretClause (_, TreeNode [c, e]) = do
   c' <- interpretCase c
   e' <- interpret e
   return (c', e')
 interpretClause e =
   lift $ throwE $ "interpretClause: syntax error:\n " ++ Pr.ppShow e
 
-withMeta :: TreeMeta -> WeakTermF WeakTerm -> WithEnv WeakTerm
+withMeta :: TreeMeta -> WeakTerm -> WithEnv WeakTermPlus
 withMeta m e = do
   m' <- toWeakMeta m
-  return $ m' :< e
+  return (m', e)
 
-extractIdentifier :: Tree -> WithEnv Identifier
-extractIdentifier (_ :< TreeAtom s) = return s
+extractIdentifier :: TreePlus -> WithEnv Identifier
+extractIdentifier (_, TreeAtom s) = return s
 extractIdentifier t =
   lift $ throwE $ "interpretAtom: syntax error:\n" ++ Pr.ppShow t
