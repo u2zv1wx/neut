@@ -1,7 +1,6 @@
 module Data.WeakCode where
 
-import           Control.Monad (forM)
-import           Data.Maybe    (fromMaybe)
+import           Data.Maybe (fromMaybe)
 
 import           Data.Basic
 
@@ -75,11 +74,8 @@ varWeakDataPlus (_, WeakDataDownIntro e) = varWeakCodePlus e
 
 varWeakCodePlus :: WeakCodePlus -> [Identifier]
 varWeakCodePlus (_, WeakCodeEpsilonElim (x, _) v branchList) = do
-  xss <-
-    forM branchList $ \(_, body) -> do
-      let xs = varWeakCodePlus body
-      return (filter (/= x) xs)
-  varWeakDataPlus v ++ concat xss
+  let (_, es) = unzip branchList
+  varWeakDataPlus v ++ filter (/= x) (concatMap varWeakCodePlus es)
 varWeakCodePlus (_, WeakCodePi xps n) =
   filter (`notElem` map fst xps) $ varWeakCodePlus n
 varWeakCodePlus (_, WeakCodePiIntro xps e) =
