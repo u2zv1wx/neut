@@ -50,19 +50,16 @@ interpret (m, TreeNode ((_, TreeAtom "pi-elimination"):e:es)) = do
   withMeta m $ WeakTermPiElim e' es'
 interpret (m, TreeNode [(_, TreeAtom "sigma"), (_, TreeNode xts), t]) = do
   (xts', t') <- interpretBinder xts t
-  withMeta m $ WeakTermSigma xts' t'
+  h <- newNameWith "hole"
+  withMeta m $ WeakTermSigma $ xts' ++ [(h, t')]
 interpret (m, TreeNode ((_, TreeAtom "sigma-introduction"):es)) = do
   es' <- mapM interpret es
-  if not (null es')
-    then withMeta m $ WeakTermSigmaIntro (init es') (last es')
-    else throwError "Empty sigma-intro"
+  withMeta m $ WeakTermSigmaIntro es'
 interpret (m, TreeNode [(_, TreeAtom "sigma-elimination"), (_, TreeNode xts), e1, e2]) = do
   xts' <- mapM interpretIdentifierPlus xts
   e1' <- interpret e1
   e2' <- interpret e2
-  if not (null xts')
-    then withMeta m $ WeakTermSigmaElim (init xts') (last xts') e1' e2'
-    else throwError "Empty sigma-elim"
+  withMeta m $ WeakTermSigmaElim xts' e1' e2'
 interpret (m, TreeNode [(_, TreeAtom "mu"), xt, e]) = do
   xt' <- interpretIdentifierPlus xt
   e' <- interpret e
