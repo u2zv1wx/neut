@@ -66,30 +66,33 @@ varWeakData (_, WeakDataTheta _) = []
 varWeakData (_, WeakDataUpsilon x) = [x]
 varWeakData (_, WeakDataEpsilon _) = []
 varWeakData (_, WeakDataEpsilonIntro _) = []
-varWeakData (_, WeakDataSigma xts t) = undefined
-varWeakData (_, WeakDataSigmaIntro es e) =
-  varWeakData e ++ concatMap varWeakData es
-varWeakData (_, WeakDataDown e) = undefined
-varWeakData (_, WeakDataDownIntro e) = undefined
+varWeakData (_, WeakDataSigma xps p) =
+  filter (`notElem` map fst xps) $ varWeakData p
+varWeakData (_, WeakDataSigmaIntro vs v) =
+  concatMap varWeakData vs ++ varWeakData v
+varWeakData (_, WeakDataDown n) = varWeakCode n
+varWeakData (_, WeakDataDownIntro e) = varWeakCode e
 
 varWeakCode :: WeakCodePlus -> [Identifier]
-varWeakCode (_, WeakCodeEpsilonElim (x, t) e branchList) = do
-  let xhs1 = varWeakData t
-  let xhs2 = varWeakData e
-  xhss <-
+varWeakCode (_, WeakCodeEpsilonElim (x, _) v branchList) = do
+  xss <-
     forM branchList $ \(_, body) -> do
       let xs = varWeakCode body
       return (filter (/= x) xs)
-  xhs1 ++ xhs2 ++ concat xhss
-varWeakCode (_, WeakCodePi xts t) = undefined
-varWeakCode (_, WeakCodePiIntro xts e) = undefined
-varWeakCode (_, WeakCodePiElim e es) = undefined
-varWeakCode (_, WeakCodeSigmaElim xts xt e1 e2) = undefined
-varWeakCode (_, WeakCodeMu ut e) = undefined
-varWeakCode (_, WeakCodeUp _) = undefined
-varWeakCode (_, WeakCodeUpIntro _) = undefined
-varWeakCode (_, WeakCodeUpElim _ _ _) = undefined
-varWeakCode (_, WeakCodeDownElim _) = undefined
+  varWeakData v ++ concat xss
+varWeakCode (_, WeakCodePi xps n) =
+  filter (`notElem` map fst xps) $ varWeakCode n
+varWeakCode (_, WeakCodePiIntro xps e) =
+  filter (`notElem` map fst xps) $ varWeakCode e
+varWeakCode (_, WeakCodePiElim e vs) = varWeakCode e ++ concatMap varWeakData vs
+varWeakCode (_, WeakCodeSigmaElim xps (x, _) v e) =
+  varWeakData v ++ filter (`notElem` x : map fst xps) (varWeakCode e)
+varWeakCode (_, WeakCodeUp p) = varWeakData p
+varWeakCode (_, WeakCodeUpIntro v) = varWeakData v
+varWeakCode (_, WeakCodeUpElim (x, _) e1 e2) =
+  varWeakCode e1 ++ filter (/= x) (varWeakCode e2)
+varWeakCode (_, WeakCodeDownElim e) = varWeakData e
+varWeakCode (_, WeakCodeMu (x, _) e) = filter (/= x) $ varWeakCode e
 -- substWeakData :: SubstWeakData -> WeakData -> WeakData
 -- substWeakData sub (WeakDataUpsilon s) = fromMaybe (WeakDataUpsilon s) (lookup s sub)
 -- substWeakData _ (WeakDataConst s) = WeakDataConst s
