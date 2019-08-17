@@ -9,9 +9,9 @@ import           Data.IORef
 import           Data.List                  (elemIndex)
 
 import           Data.Basic
+import           Data.Code
 import           Data.Constraint
 import           Data.LLVM
-import           Data.Polarized
 import           Data.Tree
 import           Data.WeakTerm
 
@@ -33,7 +33,7 @@ data Env = Env
   , constraintEnv   :: [PreConstraint] -- for type inference
   , constraintQueue :: ConstraintQueue -- for (dependent) type inference
   , substEnv        :: SubstWeakTerm -- metavar ~> beta-equivalent weakterm
-  , polEnv          :: [(Identifier, ([Identifier], Neg))] -- f ~> thunk (lam (x1 ... xn) e)
+  , polEnv          :: [(Identifier, ([Identifier], Code))] -- f ~> thunk (lam (x1 ... xn) e)
   , llvmEnv         :: [(Identifier, ([Identifier], LLVM))]
   }
 
@@ -123,7 +123,7 @@ lookupNameEnvMaybe s = do
 insTypeEnv :: Identifier -> WeakTermPlus -> WithEnv ()
 insTypeEnv i t = modify (\e -> e {typeEnv = Map.insert i t (typeEnv e)})
 
-insPolEnv :: Identifier -> [Identifier] -> Neg -> WithEnv ()
+insPolEnv :: Identifier -> [Identifier] -> Code -> WithEnv ()
 insPolEnv name args e =
   modify (\env -> env {polEnv = (name, (args, e)) : polEnv env})
 
