@@ -30,8 +30,6 @@ data Code
   | CodeUpElim IdentifierPlus
                CodePlus
                CodePlus
-  | CodeMu IdentifierPlus
-           CodePlus
   deriving (Show)
 
 type IdentifierPlus = (Identifier, DataPlus)
@@ -78,7 +76,6 @@ varCodePlus (_, CodeUp p) = varDataPlus p
 varCodePlus (_, CodeUpIntro v) = varDataPlus v
 varCodePlus (_, CodeUpElim (x, _) e1 e2) =
   varCodePlus e1 ++ filter (/= x) (varCodePlus e2)
-varCodePlus (_, CodeMu (x, _) e) = filter (/= x) $ varCodePlus e
 
 varCodePlusPi :: [IdentifierPlus] -> CodePlus -> [Identifier]
 varCodePlusPi [] n = varCodePlus n
@@ -154,11 +151,6 @@ substCodePlus sub (m, CodeUpElim (x, p) e1 e2) = do
   let e2' = substCodePlus (filter (\(y, _) -> y /= x) sub) e2
   let m' = substCodeMeta sub m
   (m', CodeUpElim (x, p') e1' e2')
-substCodePlus sub (m, CodeMu (x, p) e) = do
-  let p' = substDataPlus sub p
-  let e' = substCodePlus (filter (\(y, _) -> y /= x) sub) e
-  let m' = substCodeMeta sub m
-  (m', CodeMu (x, p') e')
 
 substCodeMeta :: SubstDataPlus -> CodeMeta -> CodeMeta
 substCodeMeta sub (CodeMetaNonTerminal n ml) =
