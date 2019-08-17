@@ -96,7 +96,7 @@ infer ctx (meta, WeakTermSigmaElim xts e1 e2) = do
   binder <- inferList ctx varSeq
   sigmaType <- wrapInfer ctx $ WeakTermSigma binder
   insConstraintEnv t1 sigmaType
-  z <- newNameOfType t1
+  z <- newNameOfType t1 "hole"
   varTuple <- constructTuple (ctx ++ binder) (map fst binder)
   typeC <- newHoleInCtx (ctx ++ binder ++ [(z, t1)])
   t2 <- infer (ctx ++ binder) e2
