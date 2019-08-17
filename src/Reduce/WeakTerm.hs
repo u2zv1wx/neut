@@ -49,17 +49,16 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
             return (m, WeakTermEpsilonIntro (LiteralInteger (x `div` y)))
           _ -> return (m, WeakTermPiElim e' es')
     _ -> return (m, WeakTermPiElim e' es')
-reduceWeakTermPlus (m, WeakTermSigmaIntro es e) = do
+reduceWeakTermPlus (m, WeakTermSigmaIntro es) = do
   es' <- mapM reduceWeakTermPlus es
-  e' <- reduceWeakTermPlus e
-  return (m, WeakTermSigmaIntro es' e')
-reduceWeakTermPlus (m, WeakTermSigmaElim xts (x, t) e1 e2) = do
+  return (m, WeakTermSigmaIntro es')
+reduceWeakTermPlus (m, WeakTermSigmaElim xts e1 e2) = do
   e1' <- reduceWeakTermPlus e1
   case e1' of
-    (_, WeakTermSigmaIntro es e)
+    (_, WeakTermSigmaIntro es)
       | length es == length xts
       , all isValue es -> do
         let xs = map fst xts
-        reduceWeakTermPlus $ substWeakTermPlus (zip xs es ++ [(x, e)]) e2
-    _ -> return (m, WeakTermSigmaElim xts (x, t) e1' e2)
+        reduceWeakTermPlus $ substWeakTermPlus (zip xs es) e2
+    _ -> return (m, WeakTermSigmaElim xts e1' e2)
 reduceWeakTermPlus t = return t
