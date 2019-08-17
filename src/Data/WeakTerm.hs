@@ -69,19 +69,13 @@ varWeakTermPlus (_, WeakTermEpsilonElim (x, t) e branchList) = do
       let (xs, hs) = varWeakTermPlus body
       return (filter (/= x) xs, hs)
   pairwiseConcat (xhs1 : xhs2 : xhss)
--- varWeakTermPlus (_, WeakTermPi xts) = varWeakTermPlusBindings xts []
 varWeakTermPlus (_, WeakTermPi xts t) =
   pairwiseConcat [varWeakTermPlusBindings xts [], varWeakTermPlus t]
 varWeakTermPlus (_, WeakTermPiIntro xts e) = varWeakTermPlusBindings xts [e]
 varWeakTermPlus (_, WeakTermPiElim e es) =
   pairwiseConcat $ varWeakTermPlus e : map varWeakTermPlus es
--- varWeakTermPlus (_, WeakTermSigma xts) = varWeakTermPlusBindings xts []
 varWeakTermPlus (_, WeakTermSigma xts t) =
   pairwiseConcat [varWeakTermPlusBindings xts [], varWeakTermPlus t]
--- varWeakTermPlus (_, WeakTermSigmaIntro es) =
---   pairwiseConcat $ map varWeakTermPlus es
--- varWeakTermPlus (_, WeakTermSigmaElim us e1 e2) =
---   pairwiseConcat [varWeakTermPlus e1, varWeakTermPlusBindings us [e2]]
 varWeakTermPlus (_, WeakTermSigmaIntro es e) =
   pairwiseConcat $ varWeakTermPlus e : map varWeakTermPlus es
 varWeakTermPlus (_, WeakTermSigmaElim xts xt e1 e2) =
@@ -118,9 +112,6 @@ substWeakTermPlus sub (m, WeakTermEpsilonElim (x, t) e branchList) = do
   let sub' = filter (\(k, _) -> k /= x) sub
   let es' = map (substWeakTermPlus sub') es
   (m, WeakTermEpsilonElim (x, t') e' (zip caseList es'))
--- substWeakTermPlus sub (m, WeakTermPi xts) = do
---   let xts' = substWeakTermPlusBindings sub xts
---   (m, WeakTermPi xts')
 substWeakTermPlus sub (m, WeakTermPi xts t) = do
   let xts' = substWeakTermPlusBindings sub xts
   let t' = substWeakTermPlus (filter (\(k, _) -> k `notElem` map fst xts) sub) t
@@ -136,16 +127,6 @@ substWeakTermPlus sub (m, WeakTermSigma xts t) = do
   let xts' = substWeakTermPlusBindings sub xts
   let t' = substWeakTermPlus (filter (\(k, _) -> k `notElem` map fst xts) sub) t
   (m, WeakTermSigma xts' t')
--- substWeakTermPlus sub (m, WeakTermSigma xts) = do
---   let xts' = substWeakTermPlusBindings sub xts
---   (m, WeakTermSigma xts')
--- substWeakTermPlus sub (m, WeakTermSigmaIntro es) = do
---   let es' = map (substWeakTermPlus sub) es
---   (m, WeakTermSigmaIntro es')
--- substWeakTermPlus sub (m, WeakTermSigmaElim xts e1 e2) = do
---   let e1' = substWeakTermPlus sub e1
---   let (xts', e2') = substWeakTermPlusBindingsWithBody sub xts e2
---   (m, WeakTermSigmaElim xts' e1' e2')
 substWeakTermPlus sub (m, WeakTermSigmaIntro es e) = do
   let es' = map (substWeakTermPlus sub) es
   let e' = substWeakTermPlus sub e
