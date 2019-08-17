@@ -60,39 +60,40 @@ type WeakDataPlus = (WeakDataMeta, WeakData)
 
 type WeakCodePlus = (WeakCodeMeta, WeakCode)
 
-varWeakData :: WeakDataPlus -> [Identifier]
-varWeakData (_, WeakDataTau) = []
-varWeakData (_, WeakDataTheta _) = []
-varWeakData (_, WeakDataUpsilon x) = [x]
-varWeakData (_, WeakDataEpsilon _) = []
-varWeakData (_, WeakDataEpsilonIntro _) = []
-varWeakData (_, WeakDataSigma xps p) =
-  filter (`notElem` map fst xps) $ varWeakData p
-varWeakData (_, WeakDataSigmaIntro vs v) =
-  concatMap varWeakData vs ++ varWeakData v
-varWeakData (_, WeakDataDown n) = varWeakCode n
-varWeakData (_, WeakDataDownIntro e) = varWeakCode e
+varWeakDataPlus :: WeakDataPlus -> [Identifier]
+varWeakDataPlus (_, WeakDataTau) = []
+varWeakDataPlus (_, WeakDataTheta _) = []
+varWeakDataPlus (_, WeakDataUpsilon x) = [x]
+varWeakDataPlus (_, WeakDataEpsilon _) = []
+varWeakDataPlus (_, WeakDataEpsilonIntro _) = []
+varWeakDataPlus (_, WeakDataSigma xps p) =
+  filter (`notElem` map fst xps) $ varWeakDataPlus p
+varWeakDataPlus (_, WeakDataSigmaIntro vs v) =
+  concatMap varWeakDataPlus vs ++ varWeakDataPlus v
+varWeakDataPlus (_, WeakDataDown n) = varWeakCodePlus n
+varWeakDataPlus (_, WeakDataDownIntro e) = varWeakCodePlus e
 
-varWeakCode :: WeakCodePlus -> [Identifier]
-varWeakCode (_, WeakCodeEpsilonElim (x, _) v branchList) = do
+varWeakCodePlus :: WeakCodePlus -> [Identifier]
+varWeakCodePlus (_, WeakCodeEpsilonElim (x, _) v branchList) = do
   xss <-
     forM branchList $ \(_, body) -> do
-      let xs = varWeakCode body
+      let xs = varWeakCodePlus body
       return (filter (/= x) xs)
-  varWeakData v ++ concat xss
-varWeakCode (_, WeakCodePi xps n) =
-  filter (`notElem` map fst xps) $ varWeakCode n
-varWeakCode (_, WeakCodePiIntro xps e) =
-  filter (`notElem` map fst xps) $ varWeakCode e
-varWeakCode (_, WeakCodePiElim e vs) = varWeakCode e ++ concatMap varWeakData vs
-varWeakCode (_, WeakCodeSigmaElim xps (x, _) v e) =
-  varWeakData v ++ filter (`notElem` x : map fst xps) (varWeakCode e)
-varWeakCode (_, WeakCodeUp p) = varWeakData p
-varWeakCode (_, WeakCodeUpIntro v) = varWeakData v
-varWeakCode (_, WeakCodeUpElim (x, _) e1 e2) =
-  varWeakCode e1 ++ filter (/= x) (varWeakCode e2)
-varWeakCode (_, WeakCodeDownElim v) = varWeakData v
-varWeakCode (_, WeakCodeMu (x, _) e) = filter (/= x) $ varWeakCode e
+  varWeakDataPlus v ++ concat xss
+varWeakCodePlus (_, WeakCodePi xps n) =
+  filter (`notElem` map fst xps) $ varWeakCodePlus n
+varWeakCodePlus (_, WeakCodePiIntro xps e) =
+  filter (`notElem` map fst xps) $ varWeakCodePlus e
+varWeakCodePlus (_, WeakCodePiElim e vs) =
+  varWeakCodePlus e ++ concatMap varWeakDataPlus vs
+varWeakCodePlus (_, WeakCodeSigmaElim xps (x, _) v e) =
+  varWeakDataPlus v ++ filter (`notElem` x : map fst xps) (varWeakCodePlus e)
+varWeakCodePlus (_, WeakCodeUp p) = varWeakDataPlus p
+varWeakCodePlus (_, WeakCodeUpIntro v) = varWeakDataPlus v
+varWeakCodePlus (_, WeakCodeUpElim (x, _) e1 e2) =
+  varWeakCodePlus e1 ++ filter (/= x) (varWeakCodePlus e2)
+varWeakCodePlus (_, WeakCodeDownElim v) = varWeakDataPlus v
+varWeakCodePlus (_, WeakCodeMu (x, _) e) = filter (/= x) $ varWeakCodePlus e
 
 type SubstWeakDataPlus = [IdentifierPlus]
 
