@@ -33,12 +33,14 @@ polarize (_, TermEpsilonElim (x, t) e bs) = do
 polarize (_, TermPi xts t) = do
   let (xs, ts) = unzip xts
   (ys', yts') <- unzip <$> mapM polarize' ts
-  t' <- polarize t
+  (z, zt) <- polarize' t
   bindLet
-    yts'
+    (yts' ++ [zt])
     ( undefined
     , WeakCodeUpIntro
-        (undefined, WeakDataDown (undefined, WeakCodePi (zip xs ys') t')))
+        ( undefined
+        , WeakDataDown
+            (undefined, WeakCodePi (zip xs ys') (undefined, WeakCodeUp z))))
 polarize (_, TermPiIntro xts e) = do
   let (xs, ts) = unzip xts
   (ys', yts') <- unzip <$> mapM polarize' ts
@@ -73,9 +75,8 @@ polarize (_, TermSigmaElim xts e1 e2) = do
 polarize (_, TermMu (x, t) e) = do
   (y', yt') <- polarize' t
   (k', kt') <- polarize' e
-  bindLet
-    [kt', yt']
-    (undefined, WeakCodeMu (x, y') (undefined, WeakCodeDownElim k'))
+  inner <- bindLet [kt'] (undefined, WeakCodeDownElim k')
+  bindLet [yt'] (undefined, WeakCodeMu (x, y') inner)
 
 polarize' :: TermPlus -> WithEnv (WeakDataPlus, (Identifier, WeakCodePlus))
 polarize' e = do
