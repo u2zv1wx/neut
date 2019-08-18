@@ -86,9 +86,9 @@ newNameWith s = do
   modify (\e -> e {nameEnv = (s, s') : nameEnv e})
   return s'
 
-newNameOfType :: WeakTermPlus -> WithEnv Identifier
-newNameOfType t = do
-  i <- newName
+newNameOfType :: WeakTermPlus -> Identifier -> WithEnv Identifier
+newNameOfType t s = do
+  i <- newNameWith s
   insTypeEnv i t
   return i
 

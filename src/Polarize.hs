@@ -77,10 +77,16 @@ polarize (_, TermMu (x, t) e) = do
   bindLet [(k, e'), yt'] (undefined, WeakCodeMu (x, y') e')
 
 polarize' :: TermPlus -> WithEnv (WeakDataPlus, (Identifier, WeakCodePlus))
-polarize' = undefined
+polarize' e = do
+  e' <- polarize e
+  x <- newNameWith "var"
+  return ((undefined, WeakDataUpsilon x), (x, e'))
 
 bindLet :: [(Identifier, WeakCodePlus)] -> WeakCodePlus -> WithEnv WeakCodePlus
-bindLet = undefined
+bindLet [] cont = return cont
+bindLet ((x, e):xes) cont = do
+  e' <- bindLet xes cont
+  return (undefined, WeakCodeUpElim (x, undefined) e e')
 
 -- bindLet [] cont           = cont
 -- bindLet ((x, e):xes) cont = undefined
