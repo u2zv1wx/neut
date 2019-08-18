@@ -71,10 +71,11 @@ polarize (_, TermSigmaElim xts e1 e2) = do
   e2' <- polarize e2
   bindLet (ze1' : yts') (undefined, WeakCodeSigmaElim (zip xs ys') z' e2')
 polarize (_, TermMu (x, t) e) = do
-  k <- newNameWith "mu"
-  e' <- polarize e
   (y', yt') <- polarize' t
-  bindLet [(k, e'), yt'] (undefined, WeakCodeMu (x, y') e')
+  (k', kt') <- polarize' e
+  bindLet
+    [kt', yt']
+    (undefined, WeakCodeMu (x, y') (undefined, WeakCodeDownElim k'))
 
 polarize' :: TermPlus -> WithEnv (WeakDataPlus, (Identifier, WeakCodePlus))
 polarize' e = do
