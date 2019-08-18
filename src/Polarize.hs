@@ -9,146 +9,181 @@ module Polarize
   ( polarize
   ) where
 
-import           Control.Comonad.Cofree
-import           Control.Monad.State
-import           Data.List              (nub)
-import           Text.Read              (readMaybe)
-
 import           Data.Basic
 import           Data.Env
-import           Data.Polarized
 import           Data.Term
+import           Data.WeakCode
 
-polarize :: TermPlus -> WithEnv NegPlus
-polarize mainTerm
-  -- forM_ tenv $ \(name, (args, e)) -> do
-  --   e' <- polarize' e
-  --   insPolEnv name args e' -- name = thunk (lam args. e')
- = polarize' mainTerm
-
--- CBV translation into CBPV + closure conversion
-polarize' :: TermPlus -> WithEnv NegPlus
-polarize' (_, TermTau) = undefined
-polarize' (_, TermTheta x) = toDefinition x
-polarize' (_, TermUpsilon x) = return $ NegUpIntro $ PosUpsilon x
-polarize' (_, TermEpsilonIntro l) = return $ NegUpIntro (PosEpsilonIntro l t)
-polarize' (_, TermEpsilonElim x e branchList) = do
-  let (labelList, es) = unzip branchList
-  e' <- polarize' e
-  cs <- mapM polarize' es
-  return $ NegUpElim x e' (NegEpsilonElim (PosUpsilon x) (zip labelList cs))
-polarize' (_, TermPiIntro xts e) = do
-  e' <- polarize' e
-  makeClosure xts e'
-polarize' (_, TermPiElim e es) = do
-  e' <- polarize' e
-  es' <- mapM polarize' es
-  callClosure e' es'
--- polarize' (TermConstElim funName es) = do
---   es' <- mapM polarize' es
---   xs <- mapM (const (newNameWith "arg")) es'
---   return $
---     bindLet (zip xs es') $
---     NegConstElim (ConstantLabel funName) (map PosUpsilon xs)
-polarize' (_, TermSigmaIntro es) = do
-  es' <- mapM polarize' es
-  xs <- mapM (const (newNameWith "sigma")) es'
-  return $ bindLet (zip xs es') $ NegUpIntro $ PosSigmaIntro (map PosUpsilon xs)
-polarize' (_, TermSigmaElim xts e1 e2) = do
-  e1' <- polarize' e1
-  e2' <- polarize' e2
+polarize :: TermPlus -> WithEnv WeakCodePlus
+polarize (_, TermTau) =
+  return (undefined, WeakCodeUpIntro (undefined, WeakDataTau))
+polarize (m, TermTheta x) = polarizeTheta m x
+polarize (_, TermUpsilon x) =
+  return (undefined, WeakCodeUpIntro (undefined, WeakDataUpsilon x))
+polarize (_, TermEpsilon x) =
+  return (undefined, WeakCodeUpIntro (undefined, WeakDataEpsilon x))
+polarize (_, TermEpsilonIntro l) =
+  return (undefined, WeakCodeUpIntro (undefined, WeakDataEpsilonIntro l))
+polarize (_, TermEpsilonElim (x, _) e bs) = do
+  let (cs, es) = unzip bs
+  es' <- mapM polarize es
+  e' <- polarize e
+  y <- newNameWith "epsilon"
+  return
+    ( undefined
+    , WeakCodeUpElim
+        (y, undefined)
+        e'
+        ( undefined
+        , WeakCodeEpsilonElim
+            (x, undefined)
+            (undefined, WeakDataUpsilon y)
+            (zip cs es')))
+polarize (_, TermPi xts t) = do
+  let (xs, ts) = unzip xts
+  ts' <- mapM polarize ts
+  ys <- mapM (const $ newNameWith "pi") ts'
+  t' <- polarize t
+  ys' <- mapM undefined ys -- tovar
+  bindLet
+    (zip ys ts')
+    ( undefined
+    , WeakCodeUpIntro
+        (undefined, WeakDataDown (undefined, WeakCodePi (zip xs ys') t')))
+polarize (_, TermPiIntro xts e) = do
+  let (xs, ts) = unzip xts
+  ts' <- mapM polarize ts
+  ys <- mapM (const $ newNameWith "lam") ts'
+  ys' <- mapM undefined ys -- tovar
+  e' <- polarize e
+  bindLet
+    (zip ys ts')
+    ( undefined
+    , WeakCodeUpIntro
+        ( undefined
+        , WeakDataDownIntro (undefined, WeakCodePiIntro (zip xs ys') e')))
+polarize (_, TermPiElim e es) = do
+  e' <- polarize e
+  f <- newNameWith "fun"
+  f' <- undefined f
+  es' <- mapM polarize es
+  xs <- mapM (const $ newNameWith "arg") es'
+  xs' <- mapM undefined xs
+  bindLet
+    ((f, e') : zip xs es')
+    (undefined, WeakCodePiElim (undefined, WeakCodeDownElim f') xs')
+polarize (_, TermSigma xts) = do
+  let (xs, ts) = unzip xts
+  ts' <- mapM polarize ts
+  ys <- mapM (const $ newNameWith "pi") ts'
+  ys' <- mapM undefined ys -- tovar
+  bindLet
+    (zip ys ts')
+    (undefined, WeakCodeUpIntro (undefined, WeakDataSigma (zip xs ys')))
+polarize (_, TermSigmaIntro es) = do
+  es' <- mapM polarize es
+  xs <- mapM (const $ newNameWith "sigma") es'
+  ys <- mapM undefined xs -- tovar
+  bindLet
+    (zip xs es')
+    (undefined, WeakCodeUpIntro (undefined, WeakDataSigmaIntro ys))
+polarize (_, TermSigmaElim xts e1 e2) = do
+  e1' <- polarize e1
   z <- newNameWith "sigma"
-  return $ NegUpElim z e1' (NegSigmaElim xts (PosUpsilon z) e2')
+  let (xs, ts) = unzip xts
+  ts' <- mapM polarize ts
+  ys <- mapM (const $ newNameWith "sigma") ts'
+  z' <- undefined z -- toVar
+  ys' <- mapM undefined ys -- toVar
+  e2' <- polarize e2
+  bindLet
+    ((z, e1') : zip ys ts')
+    (undefined, WeakCodeSigmaElim (zip xs ys') z' e2')
+polarize (_, TermMu (x, t) e) = do
+  k <- newNameWith "mu"
+  e' <- polarize e
+  t' <- polarize t
+  y <- newNameWith "mu"
+  y' <- undefined y
+  bindLet [(k, e'), (y, t')] (undefined, WeakCodeMu (x, y') e')
+  -- es' <- mapM polarize es
+  -- xs <- mapM (const (newNameWith "sigma")) es'
+  -- undefined
+  -- return $
+  --   bindLet (zip xs es') $
+  --   WeakCodeUpIntro $ WeakDataSigmaIntro (map WeakDataUpsilon xs)
+  -- let (labelList, es) = unzip branchList
+  -- e' <- polarize e
+  -- cs <- mapM polarize es
+  -- undefined
+  -- return $
+  --   WeakCodeUpElim
+  --     x
+  --     e'
+  --     (WeakCodeEpsilonElim (WeakDataUpsilon x) (zip labelList cs))
+  -- WeakCodeUpElim x e $ bindLet xes cont
 
-bindLet :: [(Identifier, NegPlus)] -> Neg -> Neg
-bindLet [] cont           = cont
-bindLet ((x, e):xes) cont = NegUpElim x e $ bindLet xes cont
+bindLet :: [(Identifier, WeakCodePlus)] -> WeakCodePlus -> WithEnv WeakCodePlus
+bindLet = undefined
 
-makeClosure :: [IdentifierPlus] -> Neg -> WithEnv Neg
-makeClosure xs e = do
-  let fvs = filter (`notElem` xs) $ nub $ varNeg e
-  envName <- newNameWith "env"
-  lamVar <- newNameWith "lam"
-  let lamBody = NegSigmaElim fvs (PosUpsilon envName) e
-  -- lamVar == thunk (lam (envName, x1, ..., xn) lamBody)
-  insPolEnv lamVar (envName : xs) lamBody
-  let fvEnv = PosSigmaIntro $ map PosUpsilon fvs
-  return $ NegUpIntro $ PosSigmaIntro [PosConst lamVar, fvEnv]
-
-callClosure :: NegPlus -> [NegPlus] -> WithEnv NegPlus
-callClosure e es = do
-  argVarNameList <- mapM (const $ newNameWith "arg") es
-  clsVarName <- newNameWith "fun"
-  thunkLamVarName <- newNameWith "down.elim.cls"
-  envVarName <- newNameWith "down.elim.env"
-  return $
-    NegUpElim clsVarName e $
-    bindLet (zip argVarNameList es) $
-    NegSigmaElim [thunkLamVarName, envVarName] (PosUpsilon clsVarName) $
-    NegPiElimDownElim
-      (PosUpsilon thunkLamVarName)
-      (PosUpsilon envVarName : map PosUpsilon argVarNameList)
-
--- insert (possibly) environment-specific definition of constant
-toDefinition :: Identifier -> WithEnv NegPlus
-toDefinition x
-  | Just c <- getPrintConstant x = toPrintDefinition c
-  | Just c <- getArithBinOpConstant x = toArithBinOpDefinition c
-  | otherwise = return $ NegUpIntro $ PosConst x
-
-toArithLowType :: Identifier -> Maybe LowType
-toArithLowType x
-  | not (null x)
-  , Just y <- readMaybe $ tail x
-  , y > 0 =
-    case head x of
-      'i' -> Just $ LowTypeSignedInt y
-      'u' -> Just $ LowTypeUnsignedInt y
-      'f' -> Just $ LowTypeFloat y
-      _   -> Nothing
-  | otherwise = Nothing
-
-getPrintConstant :: Identifier -> Maybe Constant
-getPrintConstant x = do
-  let xs = wordsWhen (== '.') x
-  if length xs == 3 && head xs == "core" && xs !! 2 == "print"
-    then do
-      lowType <- toArithLowType $ xs !! 1
-      return $ ConstantPrint lowType
-    else Nothing
-
-toPrintDefinition :: Constant -> WithEnv Neg
-toPrintDefinition c = do
-  x <- newNameWith "arg"
-  makeClosure [x] $ NegConstElim c [PosUpsilon x]
-
-getArithBinOpConstant :: Identifier -> Maybe Constant
-getArithBinOpConstant x = do
-  let xs = wordsWhen (== '.') x
-  if length xs == 3 && head xs == "core"
-    then do
-      lowType <- toArithLowType $ xs !! 1
-      binOp <- toArithBinOp $ xs !! 2
-      return $ ConstantArith lowType binOp
-    else Nothing
-
-toArithBinOp :: Identifier -> Maybe Arith
-toArithBinOp "add" = Just ArithAdd
-toArithBinOp "sub" = Just ArithSub
-toArithBinOp "mul" = Just ArithMul
-toArithBinOp "div" = Just ArithDiv
-toArithBinOp _     = Nothing
-
-toArithBinOpDefinition :: Constant -> WithEnv Neg
-toArithBinOpDefinition c = do
-  x <- newNameWith "arg1"
-  y <- newNameWith "arg2"
-  lamy <- makeClosure [y] $ NegConstElim c [PosUpsilon x, PosUpsilon y]
-  makeClosure [x] lamy
-
-wordsWhen :: (Char -> Bool) -> String -> [String]
-wordsWhen p s =
-  case dropWhile p s of
-    "" -> []
-    s' -> w : wordsWhen p s''
-      where (w, s'') = break p s'
+-- bindLet [] cont           = cont
+-- bindLet ((x, e):xes) cont = undefined
+-- expand definitions of constants
+polarizeTheta :: Meta -> Identifier -> WithEnv WeakCodePlus
+polarizeTheta _ _ = undefined
+--   -- | Just c <- getPrintConstant x = toPrintDefinition c
+--   -- | Just c <- getArithBinOpConstant x = toArithBinOpDefinition c
+--   -- | otherwise = return $ WeakCodeUpIntro $ WeakDataConst x
+-- toArithLowType :: Identifier -> Maybe LowType
+-- toArithLowType x
+--   | not (null x)
+--   , Just y <- readMaybe $ tail x
+--   , y > 0 =
+--     case head x of
+--       'i' -> Just $ LowTypeSignedInt y
+--       'u' -> Just $ LowTypeUnsignedInt y
+--       'f' -> Just $ LowTypeFloat y
+--       _   -> Nothing
+--   | otherwise = Nothing
+-- getPrintConstant :: Identifier -> Maybe Constant
+-- getPrintConstant x = do
+--   let xs = wordsWhen (== '.') x
+--   if length xs == 3 && head xs == "core" && xs !! 2 == "print"
+--     then do
+--       lowType <- toArithLowType $ xs !! 1
+--       return $ ConstantPrint lowType
+--     else Nothing
+-- toPrintDefinition :: Constant -> WithEnv WeakCode
+-- toPrintDefinition c = do
+--   x <- newNameWith "arg"
+--   undefined
+--   -- makeClosure [x] $ WeakCodeConstElim c [WeakDataUpsilon x]
+-- getArithBinOpConstant :: Identifier -> Maybe Constant
+-- getArithBinOpConstant x = do
+--   let xs = wordsWhen (== '.') x
+--   if length xs == 3 && head xs == "core"
+--     then do
+--       lowType <- toArithLowType $ xs !! 1
+--       binOp <- toArithBinOp $ xs !! 2
+--       return $ ConstantArith lowType binOp
+--     else Nothing
+-- toArithBinOp :: Identifier -> Maybe Arith
+-- toArithBinOp "add" = Just ArithAdd
+-- toArithBinOp "sub" = Just ArithSub
+-- toArithBinOp "mul" = Just ArithMul
+-- toArithBinOp "div" = Just ArithDiv
+-- toArithBinOp _     = Nothing
+-- toArithBinOpDefinition :: Constant -> WithEnv WeakCode
+-- toArithBinOpDefinition c = do
+--   undefined
+--   -- x <- newNameWith "arg1"
+--   -- y <- newNameWith "arg2"
+--   -- lamy <-
+--   --   makeClosure [y] $ WeakCodeConstElim c [WeakDataUpsilon x, WeakDataUpsilon y]
+--   -- makeClosure [x] lamy
+-- wordsWhen :: (Char -> Bool) -> String -> [String]
+-- wordsWhen p s =
+--   case dropWhile p s of
+--     "" -> []
+--     s' -> w : wordsWhen p s''
+--       where (w, s'') = break p s'
