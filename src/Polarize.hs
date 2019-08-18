@@ -9,8 +9,6 @@ module Polarize
   ( polarize
   ) where
 
-import           Control.Monad
-
 import           Data.Basic
 import           Data.Env
 import           Data.Term
@@ -26,84 +24,60 @@ polarize (_, TermEpsilon x) =
   return (undefined, WeakCodeUpIntro (undefined, WeakDataEpsilon x))
 polarize (_, TermEpsilonIntro l) =
   return (undefined, WeakCodeUpIntro (undefined, WeakDataEpsilonIntro l))
-polarize (_, TermEpsilonElim (x, _) e bs) = do
+polarize (_, TermEpsilonElim (x, t) e bs) = do
   let (cs, es) = unzip bs
   es' <- mapM polarize es
-  e' <- polarize e
-  y <- newNameWith "epsilon"
-  return
-    ( undefined
-    , WeakCodeUpElim
-        (y, undefined)
-        e'
-        ( undefined
-        , WeakCodeEpsilonElim
-            (x, undefined)
-            (undefined, WeakDataUpsilon y)
-            (zip cs es')))
+  (y, ye) <- polarize' e
+  (z, zt) <- polarize' t
+  bindLet [ye, zt] (undefined, WeakCodeEpsilonElim (x, z) y (zip cs es'))
 polarize (_, TermPi xts t) = do
   let (xs, ts) = unzip xts
-  ts' <- mapM polarize ts
-  (ys, ys') <- unzip <$> mapM newVarFor ts'
+  (ys', yts') <- unzip <$> mapM polarize' ts
   t' <- polarize t
   bindLet
-    (zip ys ts')
+    yts'
     ( undefined
     , WeakCodeUpIntro
         (undefined, WeakDataDown (undefined, WeakCodePi (zip xs ys') t')))
 polarize (_, TermPiIntro xts e) = do
   let (xs, ts) = unzip xts
-  ts' <- mapM polarize ts
-  (ys, ys') <- unzip <$> mapM newVarFor ts'
+  (ys', yts') <- unzip <$> mapM polarize' ts
   e' <- polarize e
   bindLet
-    (zip ys ts')
+    yts'
     ( undefined
     , WeakCodeUpIntro
         ( undefined
         , WeakDataDownIntro (undefined, WeakCodePiIntro (zip xs ys') e')))
 polarize (_, TermPiElim e es) = do
-  e' <- polarize e
-  (f, f') <- newVarFor e'
-  es' <- mapM polarize es
-  (xs, xs') <- unzip <$> mapM newVarFor es'
+  (f', fe') <- polarize' e
+  (xs', xes') <- unzip <$> mapM polarize' es
   bindLet
-    ((f, e') : zip xs es')
+    (fe' : xes')
     (undefined, WeakCodePiElim (undefined, WeakCodeDownElim f') xs')
 polarize (_, TermSigma xts) = do
   let (xs, ts) = unzip xts
-  ts' <- mapM polarize ts
-  (ys, ys') <- unzip <$> mapM newVarFor ts'
+  (ys', yts') <- unzip <$> mapM polarize' ts
   bindLet
-    (zip ys ts')
+    yts'
     (undefined, WeakCodeUpIntro (undefined, WeakDataSigma (zip xs ys')))
 polarize (_, TermSigmaIntro es) = do
-  es' <- mapM polarize es
-  xs <- mapM (const $ newNameWith "sigma") es'
-  ys <- mapM undefined xs -- tovar
-  bindLet
-    (zip xs es')
-    (undefined, WeakCodeUpIntro (undefined, WeakDataSigmaIntro ys))
+  (xs, xes) <- unzip <$> mapM polarize' es
+  bindLet xes (undefined, WeakCodeUpIntro (undefined, WeakDataSigmaIntro xs))
 polarize (_, TermSigmaElim xts e1 e2) = do
-  e1' <- polarize e1
-  (z, z') <- newVarFor e1'
+  (z', ze1') <- polarize' e1
   let (xs, ts) = unzip xts
-  ts' <- mapM polarize ts
-  (ys, ys') <- unzip <$> mapM newVarFor ts'
+  (ys', yts') <- unzip <$> mapM polarize' ts
   e2' <- polarize e2
-  bindLet
-    ((z, e1') : zip ys ts')
-    (undefined, WeakCodeSigmaElim (zip xs ys') z' e2')
+  bindLet (ze1' : yts') (undefined, WeakCodeSigmaElim (zip xs ys') z' e2')
 polarize (_, TermMu (x, t) e) = do
   k <- newNameWith "mu"
   e' <- polarize e
-  t' <- polarize t
-  (y, y') <- newVarFor t'
-  bindLet [(k, e'), (y, t')] (undefined, WeakCodeMu (x, y') e')
-  -- WeakCodeUpElim x e $ bindLet xes cont
+  (y', yt') <- polarize' t
+  bindLet [(k, e'), yt'] (undefined, WeakCodeMu (x, y') e')
 
-newVarFor :: WeakCodePlus -> WithEnv (Identifier, WeakDataPlus)
-newVarFor = undefined
+polarize' :: TermPlus -> WithEnv (WeakDataPlus, (Identifier, WeakCodePlus))
+polarize' = undefined
 
 bindLet :: [(Identifier, WeakCodePlus)] -> WeakCodePlus -> WithEnv WeakCodePlus
 bindLet = undefined
