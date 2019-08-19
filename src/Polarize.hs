@@ -99,12 +99,17 @@ bindLet :: [(Identifier, WeakCodePlus)] -> WeakCodePlus -> WithEnv WeakCodePlus
 bindLet [] cont = return cont
 bindLet ((x, e):xes) cont = do
   e' <- bindLet xes cont
-  -- ここのbindLetの型は怪しくて、つまり、fst e'にすると依存が壊れそう。
-  return (fst e', WeakCodeUpElim (x, undefined) e e') -- upの削除が必要
+  let (typeOfCont, ml) = bar $ fst e'
+  let t = (WeakCodeMetaTerminal ml, WeakCodeUpElim (x, undefined) e typeOfCont)
+  return (negSelf t ml, WeakCodeUpElim (x, undefined) e e') -- upの削除が必要
 
 obtainInfo :: Meta -> (TermPlus, Maybe (Int, Int))
 obtainInfo (MetaTerminal ml)      = ((MetaTerminal ml, TermTau), ml)
 obtainInfo (MetaNonTerminal t ml) = (t, ml)
+
+bar :: WeakCodeMeta -> (WeakCodePlus, Maybe (Int, Int))
+bar (WeakCodeMetaTerminal ml) = ((WeakCodeMetaTerminal ml, WeakCodeTau), ml)
+bar (WeakCodeMetaNonTerminal t ml) = (t, ml)
 
 polarizePlus ::
      [(a, TermPlus)]
