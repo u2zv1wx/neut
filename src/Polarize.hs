@@ -51,6 +51,7 @@ polarize (m, TermPiIntro xts e) = do
   (ys', yts', xs) <- polarizePlus xts
   e' <- polarize e
   -- FIXME: ↓AからAを取り出す、という操作に相当することを行いたい。
+  -- 素朴にcaseでmatchするのは、reduceが必要になるので微妙。できれば避けたい。
   -- それとも、中身からPiの型を手で構成すればよいのか？
   -- それ、alpha-変換で壊れてたりしない？あまりロバストじゃないように感じられるが…？
   bindLet
@@ -59,12 +60,13 @@ polarize (m, TermPiIntro xts e) = do
     , WeakCodeUpIntro
         ( posSelf z1 ml
         , WeakDataDownIntro (undefined, WeakCodePiIntro (zip xs ys') e')))
-polarize (_, TermPiElim e es) = do
+polarize (m, TermPiElim e es) = do
+  (z1, zt1, ml) <- polarizeMeta m
   (f', fe') <- polarize' e
   (xs', xes') <- unzip <$> mapM polarize' es
   bindLet
-    (fe' : xes')
-    (undefined, WeakCodePiElim (undefined, WeakCodeDownElim f') xs')
+    (zt1 : fe' : xes')
+    (up z1 ml, WeakCodePiElim (undefined, WeakCodeDownElim f') xs')
 polarize (m, TermSigma xts) = do
   (z1, zt1, ml) <- polarizeMeta m
   (ys', yts', xs) <- polarizePlus xts
@@ -93,7 +95,7 @@ polarize' :: TermPlus -> WithEnv (WeakDataPlus, (Identifier, WeakCodePlus))
 polarize' e = do
   e' <- polarize e
   x <- newNameWith "var"
-  return ((undefined, WeakDataUpsilon x), (x, e')) -- upの削除が必要
+  return ((undefined, WeakDataUpsilon x), (x, e')) -- upの削除が必要。e' : ↑Pからx : Pとしたい。
 
 bindLet :: [(Identifier, WeakCodePlus)] -> WeakCodePlus -> WithEnv WeakCodePlus
 bindLet [] cont = return cont
