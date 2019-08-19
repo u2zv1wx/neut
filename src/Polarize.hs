@@ -15,41 +15,49 @@ import           Data.Term
 import           Data.WeakCode
 
 polarize :: TermPlus -> WithEnv WeakCodePlus
-polarize (_, TermTau) =
-  return (undefined, WeakCodeUpIntro (undefined, WeakDataTau))
+polarize (m, TermTau) = do
+  (z, zt, ml) <- polarizeMeta m
+  bindLet [zt] (up z ml, WeakCodeUpIntro (posSelf z ml, WeakDataTau))
 polarize (m, TermTheta x) = polarizeTheta m x
-polarize (_, TermUpsilon x) =
-  return (undefined, WeakCodeUpIntro (undefined, WeakDataUpsilon x))
-polarize (_, TermEpsilon x) =
-  return (undefined, WeakCodeUpIntro (undefined, WeakDataEpsilon x))
-polarize (_, TermEpsilonIntro l) =
-  return (undefined, WeakCodeUpIntro (undefined, WeakDataEpsilonIntro l))
-polarize (_, TermEpsilonElim (x, t) e bs) = do
+polarize (m, TermUpsilon x) = do
+  (z, zt, ml) <- polarizeMeta m
+  bindLet [zt] (up z ml, WeakCodeUpIntro (posSelf z ml, WeakDataUpsilon x))
+polarize (m, TermEpsilon x) = do
+  (z, zt, ml) <- polarizeMeta m
+  bindLet [zt] (up z ml, WeakCodeUpIntro (posSelf z ml, WeakDataEpsilon x))
+polarize (m, TermEpsilonIntro l) = do
+  (z, zt, ml) <- polarizeMeta m
+  bindLet [zt] (up z ml, WeakCodeUpIntro (posSelf z ml, WeakDataEpsilonIntro l))
+polarize (m, TermEpsilonElim (x, t) e bs) = do
+  (z1, zt1, ml) <- polarizeMeta m
   let (cs, es) = unzip bs
   es' <- mapM polarize es
   (y, ye) <- polarize' e
   (z, zt) <- polarize' t
-  bindLet [ye, zt] (undefined, WeakCodeEpsilonElim (x, z) y (zip cs es'))
-polarize (_, TermPi xts t) = do
-  let (xs, ts) = unzip xts
-  (ys', yts') <- unzip <$> mapM polarize' ts
+  bindLet [zt1, ye, zt] (up z1 ml, WeakCodeEpsilonElim (x, z) y (zip cs es'))
+polarize (m, TermPi xts t) = do
+  (z1, zt1, ml) <- polarizeMeta m
+  (ys', yts', xs) <- polarizePlus xts
   (z, zt) <- polarize' t
   bindLet
-    (yts' ++ [zt])
-    ( undefined
+    (zt1 : yts' ++ [zt])
+    ( up z1 ml
     , WeakCodeUpIntro
-        ( undefined
+        ( posSelf z1 ml
         , WeakDataDown
-            (undefined, WeakCodePi (zip xs ys') (undefined, WeakCodeUp z))))
-polarize (_, TermPiIntro xts e) = do
-  let (xs, ts) = unzip xts
-  (ys', yts') <- unzip <$> mapM polarize' ts
+            (negUniv ml, WeakCodePi (zip xs ys') (fst $ snd zt, WeakCodeUp z))))
+polarize (m, TermPiIntro xts e) = do
+  (z1, zt1, ml) <- polarizeMeta m
+  (ys', yts', xs) <- polarizePlus xts
   e' <- polarize e
+  -- FIXME: ↓AからAを取り出す、という操作に相当することを行いたい。
+  -- それとも、中身からPiの型を手で構成すればよいのか？
+  -- それ、alpha-変換で壊れてたりしない？あまりロバストじゃないように感じられるが…？
   bindLet
-    yts'
-    ( undefined
+    (zt1 : yts')
+    ( up z1 ml
     , WeakCodeUpIntro
-        ( undefined
+        ( posSelf z1 ml
         , WeakDataDownIntro (undefined, WeakCodePiIntro (zip xs ys') e')))
 polarize (_, TermPiElim e es) = do
   (f', fe') <- polarize' e
@@ -57,21 +65,24 @@ polarize (_, TermPiElim e es) = do
   bindLet
     (fe' : xes')
     (undefined, WeakCodePiElim (undefined, WeakCodeDownElim f') xs')
-polarize (_, TermSigma xts) = do
-  let (xs, ts) = unzip xts
-  (ys', yts') <- unzip <$> mapM polarize' ts
+polarize (m, TermSigma xts) = do
+  (z1, zt1, ml) <- polarizeMeta m
+  (ys', yts', xs) <- polarizePlus xts
   bindLet
-    yts'
-    (undefined, WeakCodeUpIntro (undefined, WeakDataSigma (zip xs ys')))
-polarize (_, TermSigmaIntro es) = do
+    (zt1 : yts')
+    (up z1 ml, WeakCodeUpIntro (posSelf z1 ml, WeakDataSigma (zip xs ys')))
+polarize (m, TermSigmaIntro es) = do
+  (z1, zt1, ml) <- polarizeMeta m
   (xs, xes) <- unzip <$> mapM polarize' es
-  bindLet xes (undefined, WeakCodeUpIntro (undefined, WeakDataSigmaIntro xs))
-polarize (_, TermSigmaElim xts e1 e2) = do
+  bindLet
+    (zt1 : xes)
+    (up z1 ml, WeakCodeUpIntro (posSelf z1 ml, WeakDataSigmaIntro xs))
+polarize (m, TermSigmaElim xts e1 e2) = do
+  (z1, zt1, ml) <- polarizeMeta m
   (z', ze1') <- polarize' e1
-  let (xs, ts) = unzip xts
-  (ys', yts') <- unzip <$> mapM polarize' ts
+  (ys', yts', xs) <- polarizePlus xts
   e2' <- polarize e2
-  bindLet (ze1' : yts') (undefined, WeakCodeSigmaElim (zip xs ys') z' e2')
+  bindLet (zt1 : ze1' : yts') (up z1 ml, WeakCodeSigmaElim (zip xs ys') z' e2')
 polarize (_, TermMu (x, t) e) = do
   (y', yt') <- polarize' t
   (k', kt') <- polarize' e
@@ -82,19 +93,66 @@ polarize' :: TermPlus -> WithEnv (WeakDataPlus, (Identifier, WeakCodePlus))
 polarize' e = do
   e' <- polarize e
   x <- newNameWith "var"
-  return ((undefined, WeakDataUpsilon x), (x, e'))
+  return ((undefined, WeakDataUpsilon x), (x, e')) -- upの削除が必要
 
 bindLet :: [(Identifier, WeakCodePlus)] -> WeakCodePlus -> WithEnv WeakCodePlus
 bindLet [] cont = return cont
 bindLet ((x, e):xes) cont = do
   e' <- bindLet xes cont
-  return (undefined, WeakCodeUpElim (x, undefined) e e')
+  -- ここのbindLetの型は怪しくて、つまり、fst e'にすると依存が壊れそう。
+  return (fst e', WeakCodeUpElim (x, undefined) e e') -- upの削除が必要
 
--- bindLet [] cont           = cont
--- bindLet ((x, e):xes) cont = undefined
+obtainInfo :: Meta -> (TermPlus, Maybe (Int, Int))
+obtainInfo (MetaTerminal ml)      = ((MetaTerminal ml, TermTau), ml)
+obtainInfo (MetaNonTerminal t ml) = (t, ml)
+
+polarizePlus ::
+     [(a, TermPlus)]
+  -> WithEnv ([WeakDataPlus], [(Identifier, WeakCodePlus)], [a])
+polarizePlus xts = do
+  let (xs, ts) = unzip xts
+  (ys', yts') <- unzip <$> mapM polarize' ts
+  return (ys', yts', xs)
+
+polarizeMeta ::
+     Meta
+  -> WithEnv (WeakDataPlus, (Identifier, WeakCodePlus), Maybe (Int, Int))
+polarizeMeta m = do
+  let (t, ml) = obtainInfo m
+  (z, zt) <- polarize' t
+  return (z, zt, ml)
+
+posSelf :: WeakDataPlus -> Maybe (Int, Int) -> WeakDataMeta
+posSelf = WeakDataMetaNonTerminal
+
+negSelf :: WeakCodePlus -> Maybe (Int, Int) -> WeakCodeMeta
+negSelf = WeakCodeMetaNonTerminal
+
+up :: WeakDataPlus -> Maybe (Int, Int) -> WeakCodeMeta
+up z ml = WeakCodeMetaNonTerminal (WeakCodeMetaTerminal ml, WeakCodeUp z) ml
+
+negUniv :: Maybe (Int, Int) -> WeakCodeMeta
+negUniv = WeakCodeMetaTerminal
+
 -- expand definitions of constants
 polarizeTheta :: Meta -> Identifier -> WithEnv WeakCodePlus
 polarizeTheta _ _ = undefined
+-- foo m body = do
+--   case m of
+--     MetaNonTerminal t ml -> do
+--       (z, zt) <- polarize' t
+--       let m1 = WeakDataMetaNonTerminal z ml
+--       let m2 = WeakCodeMetaNonTerminal (undefined, WeakCodeUp z) ml
+--       bindLet [zt] body
+--     MetaTerminal ml -> do
+--       let m1 = WeakDataMetaTerminal ml
+--       let empty1 = WeakDataMetaTerminal ml
+--       let empty2 = WeakCodeMetaTerminal ml
+--       let m2 =
+--             WeakCodeMetaNonTerminal
+--               (empty2, WeakCodeUp (empty1, WeakDataTau))
+--               ml
+--       return (m2, WeakCodeUpIntro (m1, WeakDataTau))
 --   -- | Just c <- getPrintConstant x = toPrintDefinition c
 --   -- | Just c <- getArithBinOpConstant x = toArithBinOpDefinition c
 --   -- | otherwise = return $ WeakCodeUpIntro $ WeakDataConst x

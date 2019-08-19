@@ -42,16 +42,18 @@ data WeakCode
 type IdentifierPlus = (Identifier, WeakDataPlus)
 
 data WeakDataMeta
-  = WeakDataMetaTerminal (Maybe (Int, Int))
+  = WeakDataMetaTerminal (Maybe (Int, Int)) -- positive universe (univ+ : univ+)
   | WeakDataMetaNonTerminal WeakDataPlus
                             (Maybe (Int, Int))
   deriving (Show)
 
-data WeakCodeMeta =
-  WeakCodeMetaNonTerminal WeakCodePlus
-                          (Maybe (Int, Int))
+data WeakCodeMeta
+  = WeakCodeMetaTerminal (Maybe (Int, Int)) -- negative universe (↑univ+ : univ-)
+  | WeakCodeMetaNonTerminal WeakCodePlus
+                            (Maybe (Int, Int))
   deriving (Show)
 
+-- FIXME: (WeakData, WeakDataMeta)としたほうがe : Aに揃って読みやすいかもしれない。
 type WeakDataPlus = (WeakDataMeta, WeakData)
 
 type WeakCodePlus = (WeakCodeMeta, WeakCode)
@@ -188,6 +190,7 @@ substWeakCodePlus sub (m, WeakCodeMu (x, p) e) = do
   (m', WeakCodeMu (x, p') e')
 
 substWeakCodeMeta :: SubstWeakDataPlus -> WeakCodeMeta -> WeakCodeMeta
+substWeakCodeMeta _ (WeakCodeMetaTerminal ml) = WeakCodeMetaTerminal ml
 substWeakCodeMeta sub (WeakCodeMetaNonTerminal n ml) =
   WeakCodeMetaNonTerminal (substWeakCodePlus sub n) ml
 
