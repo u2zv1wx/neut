@@ -17,7 +17,8 @@ data WeakData
   deriving (Show)
 
 data WeakCode
-  = WeakCodeEpsilonElim IdentifierPlus
+  = WeakCodeTau
+  | WeakCodeEpsilonElim IdentifierPlus
                         WeakDataPlus
                         [(Case, WeakCodePlus)]
   | WeakCodePi [IdentifierPlus]
@@ -75,6 +76,7 @@ varWeakDataPlusSigma ((x, p):xps) =
   varWeakDataPlus p ++ filter (/= x) (varWeakDataPlusSigma xps)
 
 varWeakCodePlus :: WeakCodePlus -> [Identifier]
+varWeakCodePlus (_, WeakCodeTau) = []
 varWeakCodePlus (_, WeakCodeEpsilonElim (x, _) v branchList) = do
   let (_, es) = unzip branchList
   varWeakDataPlus v ++ filter (/= x) (concatMap varWeakCodePlus es)
@@ -139,6 +141,7 @@ substWeakDataMeta sub (WeakDataMetaNonTerminal p ml) =
   WeakDataMetaNonTerminal (substWeakDataPlus sub p) ml
 
 substWeakCodePlus :: SubstWeakDataPlus -> WeakCodePlus -> WeakCodePlus
+substWeakCodePlus _ (m, WeakCodeTau) = (m, WeakCodeTau)
 substWeakCodePlus sub (m, WeakCodeEpsilonElim (x, p) v branchList) = do
   let p' = substWeakDataPlus sub p
   let v' = substWeakDataPlus sub v
