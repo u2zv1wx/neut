@@ -9,10 +9,13 @@ module Polarize
   ( polarize
   ) where
 
+import           Control.Monad.Except
+
 import           Data.Basic
 import           Data.Env
 import           Data.Term
 import           Data.WeakCode
+import           Reduce.WeakCode
 
 polarize :: TermPlus -> WithEnv WeakCodePlus
 polarize (m, TermTau) = do
@@ -47,26 +50,31 @@ polarize (m, TermPi xts t) = do
         , WeakDataDown
             (negUniv ml, WeakCodePi (zip xs ys') (fst $ snd zt, WeakCodeUp z))))
 polarize (m, TermPiIntro xts e) = do
-  (z1, zt1, ml) <- polarizeMeta m
+  (_, zt1, ml) <- polarizeMeta m
   (ys', yts', xs) <- polarizePlus xts
   e' <- polarize e
-  -- FIXME: ↓AからAを取り出す、という操作に相当することを行いたい。
-  -- 素朴にcaseでmatchするのは、reduceが必要になるので微妙。できれば避けたい。
-  -- それとも、中身からPiの型を手で構成すればよいのか？
-  -- それ、alpha-変換で壊れてたりしない？あまりロバストじゃないように感じられるが…？
-  bindLet
-    (zt1 : yts')
-    ( up z1 ml
-    , WeakCodeUpIntro
-        ( posSelf z1 ml
-        , WeakDataDownIntro (undefined, WeakCodePiIntro (zip xs ys') e')))
-polarize (m, TermPiElim e es) = do
+  upDownPi <- reduceWeakCodePlus $ snd zt1
+  case upDownPi of
+    u@(_, WeakCodeUp d@(_, WeakDataDown p)) ->
+      bindLet
+        yts'
+        ( negSelf u ml
+        , WeakCodeUpIntro
+            ( posSelf d ml
+            , WeakDataDownIntro (negSelf p ml, WeakCodePiIntro (zip xs ys') e')))
+    _ -> throwError "polarize.pi-intro"
+polarize (m, TermPiElim e@(me, _) es) = do
   (z1, zt1, ml) <- polarizeMeta m
   (f', fe') <- polarize' e
   (xs', xes') <- unzip <$> mapM polarize' es
-  bindLet
-    (zt1 : fe' : xes')
-    (up z1 ml, WeakCodePiElim (undefined, WeakCodeDownElim f') xs')
+  (_, zt2, ml2) <- polarizeMeta me
+  upDownPi <- reduceWeakCodePlus $ snd zt2
+  case upDownPi of
+    (_, WeakCodeUp (_, WeakDataDown p@(_, WeakCodePi _ _))) ->
+      bindLet
+        (zt1 : fe' : xes')
+        (up z1 ml, WeakCodePiElim (negSelf p ml2, WeakCodeDownElim f') xs')
+    _ -> throwError "polarize.pi-elim"
 polarize (m, TermSigma xts) = do
   (z1, zt1, ml) <- polarizeMeta m
   (ys', yts', xs) <- polarizePlus xts
@@ -85,25 +93,36 @@ polarize (m, TermSigmaElim xts e1 e2) = do
   (ys', yts', xs) <- polarizePlus xts
   e2' <- polarize e2
   bindLet (zt1 : ze1' : yts') (up z1 ml, WeakCodeSigmaElim (zip xs ys') z' e2')
-polarize (_, TermMu (x, t) e) = do
+polarize (m, TermMu (x, t) e) = do
+  (_, (_, t1), ml) <- polarizeMeta m
   (y', yt') <- polarize' t
   (k', kt') <- polarize' e
-  inner <- bindLet [kt'] (undefined, WeakCodeDownElim k')
-  bindLet [yt'] (undefined, WeakCodeMu (x, y') inner)
+  inner <- bindLet [kt'] (negSelf t1 ml, WeakCodeDownElim k')
+  bindLet [yt'] (negSelf t1 ml, WeakCodeMu (x, y') inner)
 
 polarize' :: TermPlus -> WithEnv (WeakDataPlus, (Identifier, WeakCodePlus))
-polarize' e = do
+polarize' e@(m, _) = do
   e' <- polarize e
-  x <- newNameWith "var"
-  return ((undefined, WeakDataUpsilon x), (x, e')) -- upの削除が必要。e' : ↑Pからx : Pとしたい。
+  (_, zt, ml) <- polarizeMeta m
+  t <- reduceWeakCodePlus $ snd zt
+  case t of
+    (_, WeakCodeUp d) -> do
+      x <- newNameWith "var"
+      return ((posSelf d ml, WeakDataUpsilon x), (x, e'))
+    _ -> throwError "polarize'"
 
 bindLet :: [(Identifier, WeakCodePlus)] -> WeakCodePlus -> WithEnv WeakCodePlus
 bindLet [] cont = return cont
-bindLet ((x, e):xes) cont = do
+bindLet ((x, e@(m, _)):xes) cont = do
   e' <- bindLet xes cont
   let (typeOfCont, ml) = bar $ fst e'
-  let t = (WeakCodeMetaTerminal ml, WeakCodeUpElim (x, undefined) e typeOfCont)
-  return (negSelf t ml, WeakCodeUpElim (x, undefined) e e') -- upの削除が必要
+  let (t2, _) = bar m
+  t2' <- reduceWeakCodePlus t2
+  case t2' of
+    (_, WeakCodeUp d) -> do
+      let t = (WeakCodeMetaTerminal ml, WeakCodeUpElim (x, d) e typeOfCont)
+      return (negSelf t ml, WeakCodeUpElim (x, d) e e')
+    _ -> throwError "bindLet"
 
 obtainInfo :: Meta -> (TermPlus, Maybe (Int, Int))
 obtainInfo (MetaTerminal ml)      = ((MetaTerminal ml, TermTau), ml)
