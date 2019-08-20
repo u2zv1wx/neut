@@ -140,19 +140,20 @@ bindLet :: [(Identifier, WeakCodePlus)] -> WeakCodePlus -> WithEnv WeakCodePlus
 bindLet [] cont = return cont
 bindLet ((x, e@(m, _)):xes) cont = do
   e' <- bindLet xes cont
-  let (typeOfCont, ml) = bar $ fst e'
-  let (t2, _) = bar m
+  let (typeOfCont, ml) = obtainInfoWeakMeta $ fst e'
+  let (t2, _) = obtainInfoWeakMeta m
   case t2 of
     (_, WeakDataUp d) -> return (self typeOfCont ml, WeakCodeUpElim (x, d) e e')
     _ -> throwError "bindLet"
 
-obtainInfo :: Meta -> (TermPlus, Maybe (Int, Int))
-obtainInfo (MetaTerminal ml)      = ((MetaTerminal ml, TermTau), ml)
-obtainInfo (MetaNonTerminal t ml) = (t, ml)
+obtainInfoMeta :: Meta -> (TermPlus, Maybe (Int, Int))
+obtainInfoMeta (MetaTerminal ml)      = ((MetaTerminal ml, TermTau), ml)
+obtainInfoMeta (MetaNonTerminal t ml) = (t, ml)
 
-bar :: WeakMeta -> (WeakDataPlus, Maybe (Int, Int))
-bar (WeakMetaTerminal ml)      = ((WeakMetaTerminal ml, WeakDataTau), ml)
-bar (WeakMetaNonTerminal t ml) = (t, ml)
+obtainInfoWeakMeta :: WeakMeta -> (WeakDataPlus, Maybe (Int, Int))
+obtainInfoWeakMeta (WeakMetaTerminal ml) =
+  ((WeakMetaTerminal ml, WeakDataTau), ml)
+obtainInfoWeakMeta (WeakMetaNonTerminal t ml) = (t, ml)
 
 polarizePlus ::
      [(a, TermPlus)]
@@ -164,7 +165,7 @@ polarizePlus xts = do
 
 polarizeMeta :: Meta -> WithEnv (WeakCodePlus, Maybe (Int, Int))
 polarizeMeta m = do
-  let (t, ml) = obtainInfo m
+  let (t, ml) = obtainInfoMeta m
   t' <- polarize t >>= reduceWeakCodePlus
   return (t', ml)
 
