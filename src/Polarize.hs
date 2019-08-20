@@ -19,120 +19,123 @@ import           Reduce.WeakCode
 
 polarize :: TermPlus -> WithEnv WeakCodePlus
 polarize (m, TermTau) = do
-  (t, ml) <- polarizeMeta' m
+  (t, ml) <- polarizeMeta m
   case t of
-    n@(_, WeakCodeUp p) ->
-      return (negSelf n ml, WeakCodeUp (posSelf p ml, WeakDataTau))
+    (_, WeakCodeUpIntro u@(_, WeakDataUp p)) ->
+      return
+        ( self u ml
+        , WeakCodeUpIntro (undefined, WeakDataUp (self p ml, WeakDataTau)))
     _ -> throwError "polarize.tau"
 polarize (m, TermTheta x) = polarizeTheta m x
 polarize (m, TermUpsilon x) = do
-  (t, ml) <- polarizeMeta' m
+  (t, ml) <- polarizeMeta m
   case t of
-    u@(_, WeakCodeUp d@(_, WeakDataTau))
-     -- type variable: x ~> ↑x
-     -> return (negSelf u ml, WeakCodeUp (posSelf d ml, WeakDataUpsilon x))
-    u@(_, WeakCodeUp d)
-     -- ordinary variable: x ~> return x
-     -> return (negSelf u ml, WeakCodeUpIntro (posSelf d ml, WeakDataUpsilon x))
+    (_, WeakCodeUpIntro u@(_, WeakDataUp p)) ->
+      return (self u ml, WeakCodeUpIntro (self p ml, WeakDataUpsilon x))
     _ -> throwError "polarize.upsilon"
 polarize (m, TermEpsilon x) = do
-  (t, ml) <- polarizeMeta' m
+  (t, ml) <- polarizeMeta m
   case t of
-    u@(_, WeakCodeUp d) ->
-      return (negSelf u ml, WeakCodeUp (posSelf d ml, WeakDataEpsilon x))
+    (_, WeakCodeUpIntro u@(_, WeakDataUp p)) ->
+      return (self u ml, WeakCodeUpIntro (self p ml, WeakDataEpsilon x))
     _ -> throwError "polarize.epsilon"
 polarize (m, TermEpsilonIntro l) = do
-  (t, ml) <- polarizeMeta' m
+  (t, ml) <- polarizeMeta m
   case t of
-    u@(_, WeakCodeUp d) ->
-      return
-        (negSelf u ml, WeakCodeUpIntro (posSelf d ml, WeakDataEpsilonIntro l))
+    (_, WeakCodeUpIntro u@(_, WeakDataUp p)) ->
+      return (self u ml, WeakCodeUpIntro (self p ml, WeakDataEpsilonIntro l))
     _ -> throwError "polarize.epsilon-intro"
 polarize (m, TermEpsilonElim (x, t) e bs) = do
-  (t1, ml) <- polarizeMeta' m
-  let (cs, es) = unzip bs
-  es' <- mapM polarize es
-  (y, ye) <- polarize' e
-  (z, zt) <- polarize' t
-  bindLet [ye, zt] (negSelf t1 ml, WeakCodeEpsilonElim (x, z) y (zip cs es'))
-polarize (m, TermPi xts t) = do
-  (z1, zt1, ml) <- polarizeMeta m
-  (ys', yts', xs) <- polarizePlus xts
-  (z, zt) <- polarize' t
-  bindLet
-    (zt1 : yts' ++ [zt]) -- zt1はup-introじゃなくupかもしれないのでbindはできないのでは…？
-    ( up z1 ml
-    , WeakCodeUp
-        ( posSelf z1 ml
-        , WeakDataDown
-            (negUniv ml, WeakCodePi (zip xs ys') (fst $ snd zt, WeakCodeUp z))))
-polarize (m, TermPiIntro xts e) = do
-  (t1, ml) <- polarizeMeta' m
+  (t1, ml) <- polarizeMeta m
   case t1 of
-    u@(_, WeakCodeUp d@(_, WeakDataDown p)) -> do
+    (_, WeakCodeUpIntro u@(_, WeakDataUp _)) -> do
+      let (cs, es) = unzip bs
+      es' <- mapM polarize es
+      (y, ye) <- polarize' e
+      (z, zt) <- polarize' t
+      bindLet [ye, zt] (self u ml, WeakCodeEpsilonElim (x, z) y (zip cs es'))
+    _ -> throwError "polarize.epsilon-elim"
+polarize (_, TermPi _) = undefined
+  -- (z, zt) <- polarize' t
+  -- bindLet
+  --   (zt1 : yts' ++ [zt])
+  --   ( up z1 ml
+  --   , WeakDataUp
+  --       ( self z1 ml
+  --       , WeakDataDown
+  --           (undefined, WeakCodePi (zip xs ys') (fst $ snd zt, WeakDataUp z))))
+polarize (m, TermPiIntro xts e) = do
+  (t, ml) <- polarizeMeta m
+  case t of
+    (_, WeakCodeUpIntro u@(_, WeakDataUp d@(_, WeakDataDown n))) -> do
       (ys', yts', xs) <- polarizePlus xts
       e' <- polarize e
       bindLet
         yts'
-        ( negSelf u ml
+        ( self u ml
         , WeakCodeUpIntro
-            ( posSelf d ml
-            , WeakDataDownIntro (negSelf p ml, WeakCodePiIntro (zip xs ys') e')))
+            ( self d ml
+            , WeakDataDownIntro (self n ml, WeakCodePiIntro (zip xs ys') e')))
     _ -> throwError "polarize.pi-intro"
 polarize (m, TermPiElim e@(me, _) es) = do
-  (t1, ml1) <- polarizeMeta' me
+  (t1, ml1) <- polarizeMeta me
+  (_, ml2) <- polarizeMeta m
   case t1 of
-    (_, WeakCodeUp (_, WeakDataDown p@(_, WeakCodePi _ _))) -> do
-      (n, ml) <- polarizeMeta' m
+    (_, WeakCodeUpIntro (_, WeakDataUp (_, WeakDataDown p))) -> do
       (f', fe') <- polarize' e
       (xs', xes') <- unzip <$> mapM polarize' es
       bindLet
         (fe' : xes')
-        (negSelf n ml, WeakCodePiElim (negSelf p ml1, WeakCodeDownElim f') xs')
+        ( self undefined ml2
+        , WeakCodePiElim (self p ml1, WeakCodeDownElim f') xs')
     _ -> throwError "polarize.pi-elim"
 polarize (m, TermSigma xts) = do
-  (t, ml) <- polarizeMeta' m
-  -- (z1, zt1, ml) <- polarizeMeta m
+  (t, ml) <- polarizeMeta m
   (ys', yts', xs) <- polarizePlus xts
   case t of
-    u@(_, WeakCodeUp d) ->
+    (_, WeakCodeUpIntro u@(_, WeakDataUp p)) ->
       bindLet
         yts'
-        ( negSelf u ml
-        , WeakCodeUpIntro (posSelf d ml, WeakDataSigma (zip xs ys')))
+        ( undefined
+        , WeakCodeUpIntro
+            (self u ml, WeakDataUp (self p ml, WeakDataSigma (zip xs ys'))))
     _ -> throwError "polarize.epsilon-intro"
-  -- (z1, zt1, ml) <- polarizeMeta m
-  -- (ys', yts', xs) <- polarizePlus xts
-  -- bindLet
-  --   (zt1 : yts')
-  --   (up z1 ml, WeakCodeUpIntro (posSelf z1 ml, WeakDataSigma (zip xs ys')))
 polarize (m, TermSigmaIntro es) = do
-  (z1, zt1, ml) <- polarizeMeta m
-  (xs, xes) <- unzip <$> mapM polarize' es
-  bindLet
-    (zt1 : xes)
-    (up z1 ml, WeakCodeUpIntro (posSelf z1 ml, WeakDataSigmaIntro xs))
+  (t, ml) <- polarizeMeta m
+  case t of
+    (_, WeakCodeUpIntro u@(_, WeakDataUp p)) -> do
+      (xs, xes) <- unzip <$> mapM polarize' es
+      bindLet
+        xes
+        (self u ml, WeakCodeUpIntro (self p ml, WeakDataSigmaIntro xs))
+    _ -> throwError "polarize.sigma-intro"
 polarize (m, TermSigmaElim xts e1 e2) = do
-  (z1, zt1, ml) <- polarizeMeta m
-  (z', ze1') <- polarize' e1
-  (ys', yts', xs) <- polarizePlus xts
-  e2' <- polarize e2
-  bindLet (zt1 : ze1' : yts') (up z1 ml, WeakCodeSigmaElim (zip xs ys') z' e2')
+  (t, ml) <- polarizeMeta m
+  case t of
+    (_, WeakCodeUpIntro u@(_, WeakDataUp _)) -> do
+      (z', ze1') <- polarize' e1
+      (ys', yts', xs) <- polarizePlus xts
+      e2' <- polarize e2
+      bindLet (ze1' : yts') (self u ml, WeakCodeSigmaElim (zip xs ys') z' e2')
+    _ -> throwError "polarize.sigma-elim"
 polarize (m, TermMu (x, t) e) = do
-  (t1, ml) <- polarizeMeta' m
-  (y', yt') <- polarize' t
-  (k', kt') <- polarize' e
-  inner <- bindLet [kt'] (negSelf t1 ml, WeakCodeDownElim k')
-  bindLet [yt'] (negSelf t1 ml, WeakCodeMu (x, y') inner)
+  (t1, ml) <- polarizeMeta m
+  case t1 of
+    (_, WeakCodeUpIntro u@(_, WeakDataUp _)) -> do
+      (y', yt') <- polarize' t
+      (k', kt') <- polarize' e
+      inner <- bindLet [kt'] (self u ml, WeakCodeDownElim k')
+      bindLet [yt'] (self u ml, WeakCodeMu (x, y') inner)
+    _ -> throwError "polarize.mu"
 
 polarize' :: TermPlus -> WithEnv (WeakDataPlus, (Identifier, WeakCodePlus))
 polarize' e@(m, _) = do
   e' <- polarize e
-  (t, ml) <- polarizeMeta' m
+  (t, ml) <- polarizeMeta m
   case t of
-    (_, WeakCodeUp d) -> do
+    (_, WeakCodeUpIntro (_, WeakDataUp p)) -> do
       x <- newNameWith "var"
-      return ((posSelf d ml, WeakDataUpsilon x), (x, e'))
+      return ((self p ml, WeakDataUpsilon x), (x, e'))
     _ -> throwError "polarize'"
 
 bindLet :: [(Identifier, WeakCodePlus)] -> WeakCodePlus -> WithEnv WeakCodePlus
@@ -141,20 +144,21 @@ bindLet ((x, e@(m, _)):xes) cont = do
   e' <- bindLet xes cont
   let (typeOfCont, ml) = bar $ fst e'
   let (t2, _) = bar m
-  t2' <- reduceWeakCodePlus t2
-  case t2' of
-    (_, WeakCodeUp d) -> do
-      let t = (WeakCodeMetaTerminal ml, WeakCodeUpElim (x, d) e typeOfCont)
-      return (negSelf t ml, WeakCodeUpElim (x, d) e e')
+  case t2 of
+    (_, WeakDataUp d)
+      -- let t = (WeakMetaTerminal ml, WeakCodeUpElim (x, d) e typeOfCont)
+      -- return (self t ml, WeakCodeUpElim (x, d) e e')
+     -> do
+      return (undefined, WeakCodeUpElim (x, d) e e')
     _ -> throwError "bindLet"
 
 obtainInfo :: Meta -> (TermPlus, Maybe (Int, Int))
 obtainInfo (MetaTerminal ml)      = ((MetaTerminal ml, TermTau), ml)
 obtainInfo (MetaNonTerminal t ml) = (t, ml)
 
-bar :: WeakCodeMeta -> (WeakCodePlus, Maybe (Int, Int))
-bar (WeakCodeMetaTerminal ml) = ((WeakCodeMetaTerminal ml, WeakCodeTau), ml)
-bar (WeakCodeMetaNonTerminal t ml) = (t, ml)
+bar :: WeakMeta -> (WeakDataPlus, Maybe (Int, Int))
+bar (WeakMetaTerminal ml)      = ((WeakMetaTerminal ml, WeakDataTau), ml)
+bar (WeakMetaNonTerminal t ml) = (t, ml)
 
 polarizePlus ::
      [(a, TermPlus)]
@@ -164,31 +168,14 @@ polarizePlus xts = do
   (ys', yts') <- unzip <$> mapM polarize' ts
   return (ys', yts', xs)
 
-polarizeMeta ::
-     Meta
-  -> WithEnv (WeakDataPlus, (Identifier, WeakCodePlus), Maybe (Int, Int))
+polarizeMeta :: Meta -> WithEnv (WeakCodePlus, Maybe (Int, Int))
 polarizeMeta m = do
-  let (t, ml) = obtainInfo m
-  (z, zt) <- polarize' t
-  return (z, zt, ml)
-
-polarizeMeta' :: Meta -> WithEnv (WeakCodePlus, Maybe (Int, Int))
-polarizeMeta' m = do
   let (t, ml) = obtainInfo m
   t' <- polarize t >>= reduceWeakCodePlus
   return (t', ml)
 
-posSelf :: WeakDataPlus -> Maybe (Int, Int) -> WeakDataMeta
-posSelf = WeakDataMetaNonTerminal
-
-negSelf :: WeakCodePlus -> Maybe (Int, Int) -> WeakCodeMeta
-negSelf = WeakCodeMetaNonTerminal
-
-up :: WeakDataPlus -> Maybe (Int, Int) -> WeakCodeMeta
-up z ml = WeakCodeMetaNonTerminal (WeakCodeMetaTerminal ml, WeakCodeUp z) ml
-
-negUniv :: Maybe (Int, Int) -> WeakCodeMeta
-negUniv = WeakCodeMetaTerminal
+self :: WeakDataPlus -> Maybe (Int, Int) -> WeakMeta
+self = WeakMetaNonTerminal
 
 -- expand definitions of constants
 polarizeTheta :: Meta -> Identifier -> WithEnv WeakCodePlus
@@ -198,7 +185,7 @@ polarizeTheta _ _ = undefined
 --     MetaNonTerminal t ml -> do
 --       (z, zt) <- polarize' t
 --       let m1 = WeakDataMetaNonTerminal z ml
---       let m2 = WeakCodeMetaNonTerminal (undefined, WeakCodeUp z) ml
+--       let m2 = WeakCodeMetaNonTerminal (undefined, WeakDataUp z) ml
 --       bindLet [zt] body
 --     MetaTerminal ml -> do
 --       let m1 = WeakDataMetaTerminal ml
@@ -206,12 +193,12 @@ polarizeTheta _ _ = undefined
 --       let empty2 = WeakCodeMetaTerminal ml
 --       let m2 =
 --             WeakCodeMetaNonTerminal
---               (empty2, WeakCodeUp (empty1, WeakDataTau))
+--               (empty2, WeakDataUp (empty1, WeakDataTau))
 --               ml
---       return (m2, WeakCodeUpIntro (m1, WeakDataTau))
+--       return (m2, WeakDataUpIntro (m1, WeakDataTau))
 --   -- | Just c <- getPrintConstant x = toPrintDefinition c
 --   -- | Just c <- getArithBinOpConstant x = toArithBinOpDefinition c
---   -- | otherwise = return $ WeakCodeUpIntro $ WeakDataConst x
+--   -- | otherwise = return $ WeakDataUpIntro $ WeakDataConst x
 -- toArithLowType :: Identifier -> Maybe LowType
 -- toArithLowType x
 --   | not (null x)
