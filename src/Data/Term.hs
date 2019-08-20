@@ -15,7 +15,6 @@ data Term
                     TermPlus
                     [(Case, TermPlus)]
   | TermPi [IdentifierPlus]
-           TermPlus
   | TermPiIntro [IdentifierPlus]
                 TermPlus
   | TermPiElim TermPlus
@@ -57,8 +56,7 @@ varTermPlus (_, TermEpsilonElim (x, t) e branchList) = do
       let (xs, hs) = varTermPlus body
       return (filter (/= x) xs, hs)
   pairwiseConcat (xhs1 : xhs2 : xhss)
-varTermPlus (_, TermPi xts t) =
-  pairwiseConcat [varTermPlusBindings xts [], varTermPlus t]
+varTermPlus (_, TermPi xts) = varTermPlusBindings xts []
 varTermPlus (_, TermPiIntro xts e) = varTermPlusBindings xts [e]
 varTermPlus (_, TermPiElim e es) =
   pairwiseConcat $ varTermPlus e : map varTermPlus es
@@ -96,10 +94,9 @@ substTermPlus sub (m, TermEpsilonElim (x, t) e branchList) = do
   let sub' = filter (\(k, _) -> k /= x) sub
   let es' = map (substTermPlus sub') es
   (m, TermEpsilonElim (x, t') e' (zip caseList es'))
-substTermPlus sub (m, TermPi xts t) = do
+substTermPlus sub (m, TermPi xts) = do
   let xts' = substTermPlusBindings sub xts
-  let t' = substTermPlus (filter (\(k, _) -> k `notElem` map fst xts) sub) t
-  (m, TermPi xts' t')
+  (m, TermPi xts')
 substTermPlus sub (m, TermPiIntro xts body) = do
   let (xts', body') = substTermPlusBindingsWithBody sub xts body
   (m, TermPiIntro xts' body')
@@ -147,7 +144,7 @@ isReducible (_, TermEpsilonElim _ (_, TermEpsilonIntro l) branchList) = do
   let (caseList, _) = unzip branchList
   CaseLiteral l `elem` caseList || CaseDefault `elem` caseList
 isReducible (_, TermEpsilonElim (_, _) e _) = isReducible e
-isReducible (_, TermPi _ _) = False
+isReducible (_, TermPi _) = False
 isReducible (_, TermPiIntro {}) = False
 isReducible (_, TermPiElim (_, TermPiIntro xts _) es)
   | length xts == length es = True

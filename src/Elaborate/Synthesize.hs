@@ -160,7 +160,8 @@ bindFormalArgs e [] = return e
 bindFormalArgs e (xts:xtss) = do
   e'@(m, _) <- bindFormalArgs e xtss
   t <- obtainType m
-  let tPi = (newMetaTerminal, WeakTermPi xts t)
+  h <- newNameWith "hole"
+  let tPi = (newMetaTerminal, WeakTermPi $ xts ++ [(h, t)])
   meta <- newMetaOfType tPi
   return (meta, WeakTermPiIntro xts e')
 

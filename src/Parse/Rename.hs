@@ -24,10 +24,9 @@ rename (m, WeakTermEpsilonElim (x, t) e caseList) = do
     x' <- newNameWith x
     caseList' <- renameCaseList caseList
     return (m, WeakTermEpsilonElim (x', t') e' caseList')
-rename (m, WeakTermPi xts t) = do
+rename (m, WeakTermPi xts) = do
   xts' <- renameBindings xts
-  t' <- rename t
-  return (m, WeakTermPi xts' t')
+  return (m, WeakTermPi xts')
 rename (m, WeakTermPiIntro xts e) = do
   (xts', e') <- renameBindingsWithBody xts e
   return (m, WeakTermPiIntro xts' e')

@@ -71,20 +71,18 @@ infer ctx (meta, WeakTermEpsilonElim (x, t) e branchList) = do
       ts <- mapM (infer $ ctx ++ [(x, t)]) es
       constrainList ts
       returnAfterUpdate meta $ substWeakTermPlus [(x, e)] $ head ts
-infer ctx (meta, WeakTermPi xts t) = do
-  xt <- withHole t
-  inferPiOrSigma ctx meta $ xts ++ [xt]
+infer ctx (meta, WeakTermPi xts) = inferPiOrSigma ctx meta xts
 infer ctx (meta, WeakTermPiIntro xts e) = do
   forM_ xts $ uncurry insTypeEnv
-  cod <- infer (ctx ++ xts) e
-  wrapInfer ctx (WeakTermPi xts cod) >>= returnAfterUpdate meta
+  cod <- infer (ctx ++ xts) e >>= withHole
+  wrapInfer ctx (WeakTermPi $ xts ++ [cod]) >>= returnAfterUpdate meta
 infer ctx (meta, WeakTermPiElim e es) = do
   tPi <- infer ctx e
   binder <- inferList ctx es
-  cod <- newHoleInCtx (ctx ++ binder)
-  tPi' <- wrapInfer ctx $ WeakTermPi binder cod
+  cod <- newHoleInCtx (ctx ++ binder) >>= withHole
+  tPi' <- wrapInfer ctx $ WeakTermPi $ binder ++ [cod]
   insConstraintEnv tPi tPi'
-  returnAfterUpdate meta $ substWeakTermPlus (zip (map fst binder) es) cod
+  returnAfterUpdate meta $ substWeakTermPlus (zip (map fst binder) es) $ snd cod
 infer ctx (meta, WeakTermSigma xts) = inferPiOrSigma ctx meta xts
 infer ctx (meta, WeakTermSigmaIntro es) = do
   binder <- inferList ctx es
@@ -131,14 +129,15 @@ inferPiOrSigma ctx meta xts = do
 -- WeakTermZeta might be used as a term which is not a type.
 newHoleInCtx :: Context -> WithEnv WeakTermPlus
 newHoleInCtx ctx = do
-  univ <- newUniv
-  higherPi <- wrapInfer ctx $ WeakTermPi ctx univ
+  univPlus <- newUniv >>= withHole
+  higherPi <- wrapInfer ctx $ WeakTermPi $ ctx ++ [univPlus]
   higherHole <- newHoleOfType higherPi
   varSeq <- mapM (uncurry toVar) ctx
-  app <- wrapWithType univ (WeakTermPiElim higherHole varSeq)
-  pi <- wrapInfer ctx $ WeakTermPi ctx app
+  appPlus <-
+    wrapWithType (snd univPlus) (WeakTermPiElim higherHole varSeq) >>= withHole
+  pi <- wrapInfer ctx $ WeakTermPi $ ctx ++ [appPlus]
   hole <- newHoleOfType pi
-  wrapWithType app (WeakTermPiElim hole varSeq)
+  wrapWithType (snd appPlus) (WeakTermPiElim hole varSeq)
 
 -- In context ctx == [x1, ..., xn], `newHoleListInCtx ctx names-of-holes` generates
 -- the following list of holes:

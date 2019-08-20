@@ -74,11 +74,10 @@ elaborate' (m, WeakTermEpsilonElim (x, t) e branchList) = do
       branchList' <- forM branchList elaboratePlus
       return (m', TermEpsilonElim (x, t') e' branchList')
     _ -> throwError "epsilonElim"
-elaborate' (m, WeakTermPi xts t) = do
+elaborate' (m, WeakTermPi xts) = do
   m' <- toMeta m
   xts' <- mapM elaboratePlus xts
-  t' <- elaborate' t
-  return (m', TermPi xts' t')
+  return (m', TermPi xts')
 elaborate' (m, WeakTermPiIntro xts e) = do
   m' <- toMeta m
   e' <- elaborate' e
@@ -106,7 +105,7 @@ elaborate' (m, WeakTermSigmaElim xts e1 e2) = do
 elaborate' (m, WeakTermMu (x, t) e) = do
   t' <- elaborate' t >>= reduceTermPlus
   case t' of
-    (_, TermPi _ _) -> do
+    (_, TermPi _) -> do
       m' <- toMeta m
       e' <- elaborate' e
       return (m', TermMu (x, t') e')
@@ -142,7 +141,7 @@ exhaust' (_, WeakTermEpsilonElim (_, t) e1 branchList) = do
   case t' of
     (_, WeakTermEpsilon x) -> exhaustEpsilonIdentifier x labelList b1
     _                      -> lift $ throwE "type error (exhaust)"
-exhaust' (_, WeakTermPi xts t) = allM exhaust' $ map snd xts ++ [t]
+exhaust' (_, WeakTermPi xts) = allM exhaust' $ map snd xts
 exhaust' (_, WeakTermPiIntro _ e) = exhaust' e
 exhaust' (_, WeakTermPiElim e es) = allM exhaust' $ e : es
 exhaust' (_, WeakTermSigma xts) = allM exhaust' $ map snd xts
