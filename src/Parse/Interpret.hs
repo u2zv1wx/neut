@@ -53,12 +53,16 @@ interpret (m, TreeNode [(_, TreeAtom "sigma"), (_, TreeNode xts), t]) = do
   withMeta m $ WeakTermSigma xts' t'
 interpret (m, TreeNode ((_, TreeAtom "sigma-introduction"):es)) = do
   es' <- mapM interpret es
-  withMeta m $ WeakTermSigmaIntro es'
+  if null es'
+    then throwError "empty sigma-intro"
+    else withMeta m $ WeakTermSigmaIntro es'
 interpret (m, TreeNode [(_, TreeAtom "sigma-elimination"), (_, TreeNode xts), e1, e2]) = do
   xts' <- mapM interpretIdentifierPlus xts
   e1' <- interpret e1
   e2' <- interpret e2
-  withMeta m $ WeakTermSigmaElim xts' e1' e2'
+  if null xts'
+    then throwError "empty sigma-elim"
+    else withMeta m $ WeakTermSigmaElim xts' e1' e2'
 interpret (m, TreeNode [(_, TreeAtom "mu"), xt, e]) = do
   xt' <- interpretIdentifierPlus xt
   e' <- interpret e
