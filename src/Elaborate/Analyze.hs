@@ -43,12 +43,14 @@ simp (((m1, WeakTermEpsilon l1), (m2, WeakTermEpsilon l2)):cs)
   | l1 == l2 = simpMetaRet m1 m2 (simp cs)
 simp (((m1, WeakTermEpsilonIntro l1), (m2, WeakTermEpsilonIntro l2)):cs)
   | l1 == l2 = simpMetaRet m1 m2 (simp cs)
-simp (((m1, WeakTermPi xts1), (m2, WeakTermPi xts2)):cs)
-  | length xts1 == length xts2 = simpMetaRet m1 m2 $ simpPiOrSigma xts1 xts2 cs
-simp (((m1, WeakTermPiIntro xts1 e1), (m2, WeakTermPiIntro xts2 e2)):cs) = do
-  h1 <- newNameWith "hole"
-  h2 <- newNameWith "hole"
-  simpMetaRet m1 m2 $ simpPiOrSigma (xts1 ++ [(h1, e1)]) (xts2 ++ [(h2, e2)]) cs
+simp (((m1, WeakTermPi xts1 t1), (m2, WeakTermPi xts2 t2)):cs)
+  | length xts1 == length xts2 =
+    simpMetaRet m1 m2 $ simpBinder xts1 t1 xts2 t2 cs
+simp (((m1, WeakTermPiIntro xts1 e1), (m2, WeakTermPiIntro xts2 e2)):cs) =
+  simpMetaRet m1 m2 $ simpBinder xts1 e1 xts2 e2 cs
+  -- h1 <- newNameWith "hole"
+  -- h2 <- newNameWith "hole"
+  -- simpMetaRet m1 m2 $ simpPiOrSigma (xts1 ++ [(h1, e1)]) (xts2 ++ [(h2, e2)]) cs
 simp (((m1, WeakTermPiIntro xts body1@(bodyMeta, _)), e2@(m2, _)):cs) = do
   vs <- mapM (uncurry toVar) xts
   mt <- readWeakMetaType bodyMeta
@@ -57,8 +59,9 @@ simp (((m1, WeakTermPiIntro xts body1@(bodyMeta, _)), e2@(m2, _)):cs) = do
   let comp = simp $ (body1, (appMeta, WeakTermPiElim e2 vs)) : cs
   simpMetaRet m1 m2 comp
 simp ((e1, e2@(_, WeakTermPiIntro {})):cs) = simp $ (e2, e1) : cs
-simp (((m1, WeakTermSigma xts1), (m2, WeakTermSigma xts2)):cs)
-  | length xts1 == length xts2 = simpMetaRet m1 m2 $ simpPiOrSigma xts1 xts2 cs
+simp (((m1, WeakTermSigma xts1 t1), (m2, WeakTermSigma xts2 t2)):cs)
+  | length xts1 == length xts2 =
+    simpMetaRet m1 m2 $ simpBinder xts1 t1 xts2 t2 cs
 simp (((m1, WeakTermSigmaIntro es1), (m2, WeakTermSigmaIntro es2)):cs)
   | length es1 == length es2 = simpMetaRet m1 m2 $ simp $ zip es1 es2 ++ cs
 simp ((e1, e2):cs)
@@ -129,16 +132,17 @@ simpMeta (WeakMetaNonTerminal (Ref r1) _) (WeakMetaNonTerminal (Ref r2) _) = do
     (Nothing, Just _)  -> liftIO (writeIORef r1 mt2) >> return []
     _                  -> return []
 
-simpPiOrSigma ::
+simpBinder ::
      [IdentifierPlus]
+  -> WeakTermPlus
   -> [IdentifierPlus]
+  -> WeakTermPlus
   -> [PreConstraint]
   -> WithEnv [EnrichedConstraint]
-simpPiOrSigma xts1 xts2 cs = do
+simpBinder xts1 t1 xts2 t2 cs = do
   vs1' <- mapM (uncurry toVar) xts1
-  let (xs2', ts2') = unzip xts2
-  let ts2'' = map (substWeakTermPlus (zip xs2' vs1')) ts2'
-  simp $ zip (map snd xts1) ts2'' ++ cs
+  let s = substWeakTermPlus (zip (map fst xts2) vs1')
+  simp $ zip (map snd xts1) (map (s . snd) xts2) ++ [(t1, s t2)] ++ cs
 
 data Stuck
   = StuckHole Hole
