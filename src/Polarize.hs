@@ -59,12 +59,13 @@ polarize (m, TermPi xts t) = do
   case (tm, t') of
     ((_, WeakCodeUpIntro u), (_, WeakCodeUpIntro p)) -> do
       (xs', xts', xs) <- polarizePlus xts
-      let z' = (WeakCodeMetaTerminal ml, WeakCodeUp p)
+      let negMeta = WeakCodeMetaTerminal ml
+      let z' = (negMeta, WeakCodeUp p)
       bindLet
         xts'
         ( up u ml
         , WeakCodeUpIntro
-            (posSelf u ml, WeakDataDown (undefined, WeakCodePi (zip xs xs') z')))
+            (posSelf u ml, WeakDataDown (negMeta, WeakCodePi (zip xs xs') z')))
     _ -> throwError "polarize.pi"
 polarize (m, TermPiIntro xts e) = do
   (t, ml) <- polarizeMeta m
