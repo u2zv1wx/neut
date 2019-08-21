@@ -17,11 +17,13 @@ data WeakTerm
                         WeakTermPlus
                         [(Case, WeakTermPlus)]
   | WeakTermPi [IdentifierPlus]
+               WeakTermPlus
   | WeakTermPiIntro [IdentifierPlus]
                     WeakTermPlus
   | WeakTermPiElim WeakTermPlus
                    [WeakTermPlus]
   | WeakTermSigma [IdentifierPlus]
+                  WeakTermPlus
   | WeakTermSigmaIntro [WeakTermPlus]
   | WeakTermSigmaElim [IdentifierPlus]
                       WeakTermPlus
@@ -65,11 +67,13 @@ varWeakTermPlus (_, WeakTermEpsilonElim (x, t) e branchList) = do
       let (xs, hs) = varWeakTermPlus body
       return (filter (/= x) xs, hs)
   pairwiseConcat (xhs1 : xhs2 : xhss)
-varWeakTermPlus (_, WeakTermPi xts) = varWeakTermPlusBindings xts []
+varWeakTermPlus (_, WeakTermPi xts t) =
+  pairwiseConcat [varWeakTermPlusBindings xts [], varWeakTermPlus t]
 varWeakTermPlus (_, WeakTermPiIntro xts e) = varWeakTermPlusBindings xts [e]
 varWeakTermPlus (_, WeakTermPiElim e es) =
   pairwiseConcat $ varWeakTermPlus e : map varWeakTermPlus es
-varWeakTermPlus (_, WeakTermSigma xts) = varWeakTermPlusBindings xts []
+varWeakTermPlus (_, WeakTermSigma xts t) =
+  pairwiseConcat [varWeakTermPlusBindings xts [], varWeakTermPlus t]
 varWeakTermPlus (_, WeakTermSigmaIntro es) =
   pairwiseConcat $ map varWeakTermPlus es
 varWeakTermPlus (_, WeakTermSigmaElim xts e1 e2) =
@@ -105,9 +109,10 @@ substWeakTermPlus sub (m, WeakTermEpsilonElim (x, t) e branchList) = do
   let sub' = filter (\(k, _) -> k /= x) sub
   let es' = map (substWeakTermPlus sub') es
   (m, WeakTermEpsilonElim (x, t') e' (zip caseList es'))
-substWeakTermPlus sub (m, WeakTermPi xts) = do
+substWeakTermPlus sub (m, WeakTermPi xts t) = do
   let xts' = substWeakTermPlusBindings sub xts
-  (m, WeakTermPi xts')
+  let t' = substWeakTermPlus (filter (\(k, _) -> k `notElem` map fst xts) sub) t
+  (m, WeakTermPi xts' t')
 substWeakTermPlus sub (m, WeakTermPiIntro xts body) = do
   let (xts', body') = substWeakTermPlusBindingsWithBody sub xts body
   (m, WeakTermPiIntro xts' body')
@@ -115,9 +120,10 @@ substWeakTermPlus sub (m, WeakTermPiElim e es) = do
   let e' = substWeakTermPlus sub e
   let es' = map (substWeakTermPlus sub) es
   (m, WeakTermPiElim e' es')
-substWeakTermPlus sub (m, WeakTermSigma xts) = do
+substWeakTermPlus sub (m, WeakTermSigma xts t) = do
   let xts' = substWeakTermPlusBindings sub xts
-  (m, WeakTermSigma xts')
+  let t' = substWeakTermPlus (filter (\(k, _) -> k `notElem` map fst xts) sub) t
+  (m, WeakTermSigma xts' t')
 substWeakTermPlus sub (m, WeakTermSigmaIntro es) = do
   let es' = map (substWeakTermPlus sub) es
   (m, WeakTermSigmaIntro es')
@@ -162,7 +168,7 @@ isReducible (_, WeakTermEpsilonElim _ (_, WeakTermEpsilonIntro l) branchList) = 
   let (caseList, _) = unzip branchList
   CaseLiteral l `elem` caseList || CaseDefault `elem` caseList
 isReducible (_, WeakTermEpsilonElim (_, _) e _) = isReducible e
-isReducible (_, WeakTermPi _) = False
+isReducible (_, WeakTermPi _ _) = False
 isReducible (_, WeakTermPiIntro {}) = False
 isReducible (_, WeakTermPiElim (_, WeakTermPiIntro xts _) es)
   | length xts == length es = True
@@ -170,7 +176,7 @@ isReducible (_, WeakTermPiElim (_, WeakTermMu _ _) _) = True -- CBV recursion
 isReducible (_, WeakTermPiElim (_, WeakTermTheta c) [(_, WeakTermEpsilonIntro (LiteralInteger _)), (_, WeakTermEpsilonIntro (LiteralInteger _))]) -- constant application
   | c `elem` intArithConstantList = True
 isReducible (_, WeakTermPiElim e es) = isReducible e || any isReducible es
-isReducible (_, WeakTermSigma _) = False
+isReducible (_, WeakTermSigma _ _) = False
 isReducible (_, WeakTermSigmaIntro es) = any isReducible es
 isReducible (_, WeakTermSigmaElim xts (_, WeakTermSigmaIntro es) _)
   | length xts == length es = True
