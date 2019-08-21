@@ -3,7 +3,7 @@
 -- term, we translate a ordinary dependent calculus to a dependent variant of
 -- Call-By-Push-Value, although this translation doesn't preserve types when the
 -- given term includes dependent sigma-elimination. A detailed explanation of
--- Call-By-Push-Value can be found in P. Levy. "Call-by-Push-Value: A Subsuming
+-- Call-By-Push-Value can be found in P. Levy, "Call-by-Push-Value: A Subsuming
 -- Paradigm". Ph. D. thesis, Queen Mary College, 2001.
 module Polarize
   ( polarize
@@ -84,12 +84,12 @@ polarize (m, TermPiElim e@(me, _) es) = do
   (t1, ml1) <- polarizeMeta me
   (t2, ml2) <- polarizeMeta m
   case (t1, t2) of
-    ((_, WeakCodeUpIntro (_, WeakDataDown p)), (_, WeakCodeUpIntro t)) -> do
+    ((_, WeakCodeUpIntro (_, WeakDataDown n)), (_, WeakCodeUpIntro t)) -> do
       (f', fe') <- polarize' e
       (xs', xes') <- unzip <$> mapM polarize' es
       bindLet
         (fe' : xes')
-        (up t ml2, WeakCodePiElim (negSelf p ml1, WeakCodeDownElim f') xs')
+        (up t ml2, WeakCodePiElim (negSelf n ml1, WeakCodeDownElim f') xs')
     _ -> throwError "polarize.pi-elim"
 polarize (m, TermSigma xts t) = do
   (tm, ml) <- polarizeMeta m
@@ -146,9 +146,18 @@ bindLet ((x, e@(m, _)):xes) cont = do
   let (typeOfCont, ml) = obtainInfoWeakCodeMeta $ fst e'
   let (t2, _) = obtainInfoWeakCodeMeta m
   case t2 of
-    (_, WeakCodeUp d) -> do
-      let foo = (fst typeOfCont, WeakCodeUpElim (x, d) e typeOfCont)
-      return (negSelf foo ml, WeakCodeUpElim (x, d) e e')
+    (_, WeakCodeUp p) -> do
+      let ke = (fst typeOfCont, WeakCodeUpElim (x, p) e typeOfCont)
+      -- "ke" here stands for "Kleisli Extension" (i.e. dependent up-elimination).
+      -- Notes on this concept can be found in Section 16.3 of Levy's paper, and also in
+      -- M. Vákár, "An Effectful Treatment of Dependent Types", arXiv:1603.04298, 2016.
+      -- Vákár's approarch:
+      --   type of `e2` : N {z := thunk (return x)}
+      --   type of `bind x := e1 in e2` N {z := thunk e}
+      -- Our approach:
+      --   type of `e2` : N
+      --   type of `bind x := e1 in e2` : bind x := e1 in N
+      return (negSelf ke ml, WeakCodeUpElim (x, p) e e')
     _ -> throwError "bindLet"
 
 obtainInfoMeta :: Meta -> (TermPlus, Maybe (Int, Int))
@@ -183,25 +192,31 @@ negSelf = WeakCodeMetaNonTerminal
 up :: WeakDataPlus -> Maybe (Int, Int) -> WeakCodeMeta
 up u ml = WeakCodeMetaNonTerminal (WeakCodeMetaTerminal ml, WeakCodeUp u) ml
 
+down :: WeakCodePlus -> Maybe (Int, Int) -> WeakDataMeta
+down u ml = WeakDataMetaNonTerminal (WeakDataMetaTerminal ml, WeakDataDown u) ml
+
 -- expand definitions of constants
 polarizeTheta :: Meta -> Identifier -> WithEnv WeakCodePlus
-polarizeTheta _ _ = undefined
--- foo m body = do
---   case m of
---     MetaNonTerminal t ml -> do
---       (z, zt) <- polarize' t
---       let m1 = WeakDataMetaNonTerminal z ml
---       let m2 = WeakCodeMetaNonTerminal (undefined, WeakDataUp z) ml
---       bindLet [zt] body
---     MetaTerminal ml -> do
---       let m1 = WeakDataMetaTerminal ml
---       let empty1 = WeakDataMetaTerminal ml
---       let empty2 = WeakCodeMetaTerminal ml
---       let m2 =
---             WeakCodeMetaNonTerminal
---               (empty2, WeakDataUp (empty1, WeakDataTau))
---               ml
---       return (m2, WeakDataUpIntro (m1, WeakDataTau))
+polarizeTheta _ "core.i8.add" = undefined
+polarizeTheta _ "core.i16.add" = undefined
+polarizeTheta _ "core.i32.add" = undefined
+polarizeTheta _ "core.i64.add" = do
+  x <- newNameWith "arg1"
+  y <- newNameWith "arg2"
+  let int = (WeakDataMetaTerminal Nothing, WeakDataEpsilon "i64")
+  let piType = undefined
+  return
+    ( up undefined Nothing
+    , WeakCodeUpIntro
+        ( down piType Nothing
+        , WeakDataDownIntro
+            ( negSelf piType Nothing
+            , WeakCodePiIntro [(x, int), (y, int)] undefined)))
+  -- lamy <-
+  --   makeClosure [y] $ WeakCodeConstElim c [WeakDataUpsilon x, WeakDataUpsilon y]
+  -- makeClosure [x] lamy
+polarizeTheta _ "core.print.i64" = undefined
+polarizeTheta _ _ = throwError "polarize.theta"
 --   -- | Just c <- getPrintConstant x = toPrintDefinition c
 --   -- | Just c <- getArithBinOpConstant x = toArithBinOpDefinition c
 --   -- | otherwise = return $ WeakDataUpIntro $ WeakDataConst x
