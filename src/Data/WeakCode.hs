@@ -10,18 +10,20 @@ data WeakData
   | WeakDataUpsilon Identifier
   | WeakDataEpsilon Identifier
   | WeakDataEpsilonIntro Literal
-  | WeakDataPi [IdentifierPlus]
   | WeakDataSigma [IdentifierPlus]
+                  WeakDataPlus
   | WeakDataSigmaIntro [WeakDataPlus]
-  | WeakDataUp WeakDataPlus
-  | WeakDataDown WeakDataPlus
+  | WeakDataDown WeakCodePlus
   | WeakDataDownIntro WeakCodePlus
   deriving (Show)
 
 data WeakCode
-  = WeakCodeEpsilonElim IdentifierPlus
+  = WeakCodeTau
+  | WeakCodeEpsilonElim IdentifierPlus
                         WeakDataPlus
                         [(Case, WeakCodePlus)]
+  | WeakCodePi [IdentifierPlus]
+               WeakCodePlus
   | WeakCodePiIntro [IdentifierPlus]
                     WeakCodePlus
   | WeakCodePiElim WeakCodePlus
@@ -29,6 +31,7 @@ data WeakCode
   | WeakCodeSigmaElim [IdentifierPlus]
                       WeakDataPlus
                       WeakCodePlus
+  | WeakCodeUp WeakDataPlus
   | WeakCodeUpIntro WeakDataPlus
   | WeakCodeUpElim IdentifierPlus
                    WeakCodePlus
@@ -52,27 +55,29 @@ type WeakDataPlus = (WeakMeta, WeakData)
 type WeakCodePlus = (WeakMeta, WeakCode)
 
 varWeakDataPlus :: WeakDataPlus -> [Identifier]
-varWeakDataPlus (_, WeakDataTau)            = []
-varWeakDataPlus (_, WeakDataTheta _)        = []
-varWeakDataPlus (_, WeakDataUpsilon x)      = [x]
-varWeakDataPlus (_, WeakDataEpsilon _)      = []
+varWeakDataPlus (_, WeakDataTau) = []
+varWeakDataPlus (_, WeakDataTheta _) = []
+varWeakDataPlus (_, WeakDataUpsilon x) = [x]
+varWeakDataPlus (_, WeakDataEpsilon _) = []
 varWeakDataPlus (_, WeakDataEpsilonIntro _) = []
-varWeakDataPlus (_, WeakDataPi xps)         = varWeakDataPlusPiOrSigma xps
-varWeakDataPlus (_, WeakDataSigma xps)      = varWeakDataPlusPiOrSigma xps
-varWeakDataPlus (_, WeakDataSigmaIntro vs)  = concatMap varWeakDataPlus vs
-varWeakDataPlus (_, WeakDataUp p)           = varWeakDataPlus p
-varWeakDataPlus (_, WeakDataDown p)         = varWeakDataPlus p
-varWeakDataPlus (_, WeakDataDownIntro e)    = varWeakCodePlus e
+varWeakDataPlus (_, WeakDataSigma xps p) =
+  varWeakDataPlusPiOrSigma xps (varWeakDataPlus p)
+varWeakDataPlus (_, WeakDataSigmaIntro vs) = concatMap varWeakDataPlus vs
+varWeakDataPlus (_, WeakDataDown n) = varWeakCodePlus n
+varWeakDataPlus (_, WeakDataDownIntro e) = varWeakCodePlus e
 
-varWeakDataPlusPiOrSigma :: [IdentifierPlus] -> [Identifier]
-varWeakDataPlusPiOrSigma [] = []
-varWeakDataPlusPiOrSigma ((x, p):xps) =
-  varWeakDataPlus p ++ filter (/= x) (varWeakDataPlusPiOrSigma xps)
+varWeakDataPlusPiOrSigma :: [IdentifierPlus] -> [Identifier] -> [Identifier]
+varWeakDataPlusPiOrSigma [] xs = xs
+varWeakDataPlusPiOrSigma ((x, p):xps) xs =
+  varWeakDataPlus p ++ filter (/= x) (varWeakDataPlusPiOrSigma xps xs)
 
 varWeakCodePlus :: WeakCodePlus -> [Identifier]
+varWeakCodePlus (_, WeakCodeTau) = []
 varWeakCodePlus (_, WeakCodeEpsilonElim (x, _) v branchList) = do
   let (_, es) = unzip branchList
   varWeakDataPlus v ++ filter (/= x) (concatMap varWeakCodePlus es)
+varWeakCodePlus (_, WeakCodePi xps n) =
+  varWeakDataPlusPiOrSigma xps (varWeakCodePlus n)
 varWeakCodePlus (_, WeakCodePiIntro xps e) =
   filter (`notElem` map fst xps) $
   concatMap (varWeakDataPlus . snd) xps ++ varWeakCodePlus e
@@ -80,6 +85,7 @@ varWeakCodePlus (_, WeakCodePiElim e vs) =
   varWeakCodePlus e ++ concatMap varWeakDataPlus vs
 varWeakCodePlus (_, WeakCodeSigmaElim xps v e) =
   varWeakDataPlus v ++ filter (`notElem` map fst xps) (varWeakCodePlus e)
+varWeakCodePlus (_, WeakCodeUp p) = varWeakDataPlus p
 varWeakCodePlus (_, WeakCodeUpIntro v) = varWeakDataPlus v
 varWeakCodePlus (_, WeakCodeUpElim (x, _) e1 e2) =
   varWeakCodePlus e1 ++ filter (/= x) (varWeakCodePlus e2)
@@ -109,26 +115,18 @@ substWeakDataPlus sub (m, WeakDataEpsilon k) = do
 substWeakDataPlus sub (m, WeakDataEpsilonIntro l) = do
   let m' = substWeakMeta sub m
   (m', WeakDataEpsilonIntro l)
-substWeakDataPlus sub (m, WeakDataPi xps) = do
-  let xps' = substWeakDataPlusPiOrSigma sub xps
+substWeakDataPlus sub (m, WeakDataSigma xps p) = do
+  let (xps', p') = substWeakDataPlusSigma sub xps p
   let m' = substWeakMeta sub m
-  (m', WeakDataPi xps')
-substWeakDataPlus sub (m, WeakDataSigma xps) = do
-  let xps' = substWeakDataPlusPiOrSigma sub xps
-  let m' = substWeakMeta sub m
-  (m', WeakDataSigma xps')
+  (m', WeakDataSigma xps' p')
 substWeakDataPlus sub (m, WeakDataSigmaIntro vs) = do
   let vs' = map (substWeakDataPlus sub) vs
   let m' = substWeakMeta sub m
   (m', WeakDataSigmaIntro vs')
-substWeakDataPlus sub (m, WeakDataUp p) = do
-  let p' = substWeakDataPlus sub p
+substWeakDataPlus sub (m, WeakDataDown n) = do
+  let n' = substWeakCodePlus sub n
   let m' = substWeakMeta sub m
-  (m', WeakDataUp p')
-substWeakDataPlus sub (m, WeakDataDown p) = do
-  let p' = substWeakDataPlus sub p
-  let m' = substWeakMeta sub m
-  (m', WeakDataDown p')
+  (m', WeakDataDown n')
 substWeakDataPlus sub (m, WeakDataDownIntro e) = do
   let e' = substWeakCodePlus sub e
   let m' = substWeakMeta sub m
@@ -140,6 +138,9 @@ substWeakMeta sub (WeakMetaNonTerminal p ml) =
   WeakMetaNonTerminal (substWeakDataPlus sub p) ml
 
 substWeakCodePlus :: SubstWeakDataPlus -> WeakCodePlus -> WeakCodePlus
+substWeakCodePlus sub (m, WeakCodeTau) = do
+  let m' = substWeakMeta sub m
+  (m', WeakCodeTau)
 substWeakCodePlus sub (m, WeakCodeEpsilonElim (x, p) v branchList) = do
   let p' = substWeakDataPlus sub p
   let v' = substWeakDataPlus sub v
@@ -148,6 +149,10 @@ substWeakCodePlus sub (m, WeakCodeEpsilonElim (x, p) v branchList) = do
   let branchList' = zip cs es'
   let m' = substWeakMeta sub m
   (m', WeakCodeEpsilonElim (x, p') v' branchList')
+substWeakCodePlus sub (m, WeakCodePi xps n) = do
+  let (xps', n') = substWeakDataPlusPi sub xps n
+  let m' = substWeakMeta sub m
+  (m', WeakCodePi xps' n')
 substWeakCodePlus sub (m, WeakCodePiIntro xps e) = do
   let (xps', e') = substWeakCodePlusPi sub xps e
   let m' = substWeakMeta sub m
@@ -162,6 +167,10 @@ substWeakCodePlus sub (m, WeakCodeSigmaElim xps v e) = do
   let (xps', e') = substWeakDataPlusSigmaElim sub xps e
   let m' = substWeakMeta sub m
   (m', WeakCodeSigmaElim xps' v' e')
+substWeakCodePlus sub (m, WeakCodeUp p) = do
+  let p' = substWeakDataPlus sub p
+  let m' = substWeakMeta sub m
+  (m', WeakCodeUp p')
 substWeakCodePlus sub (m, WeakCodeUpIntro v) = do
   let v' = substWeakDataPlus sub v
   let m' = substWeakMeta sub m
@@ -189,6 +198,26 @@ substWeakDataPlusPiOrSigma sub ((x, p):xps) = do
   let xps' = substWeakDataPlusPiOrSigma (filter (\(y, _) -> y /= x) sub) xps
   let p' = substWeakDataPlus sub p
   (x, p') : xps'
+
+substWeakDataPlusPi ::
+     SubstWeakDataPlus
+  -> [IdentifierPlus]
+  -> WeakCodePlus
+  -> ([IdentifierPlus], WeakCodePlus)
+substWeakDataPlusPi sub [] n = ([], substWeakCodePlus sub n)
+substWeakDataPlusPi sub ((x, p):xps) n = do
+  let (xps', n') = substWeakDataPlusPi (filter (\(y, _) -> y /= x) sub) xps n
+  ((x, substWeakDataPlus sub p) : xps', n')
+
+substWeakDataPlusSigma ::
+     SubstWeakDataPlus
+  -> [IdentifierPlus]
+  -> WeakDataPlus
+  -> ([IdentifierPlus], WeakDataPlus)
+substWeakDataPlusSigma sub [] q = ([], substWeakDataPlus sub q)
+substWeakDataPlusSigma sub ((x, p):xps) q = do
+  let (xps', q') = substWeakDataPlusSigma (filter (\(y, _) -> y /= x) sub) xps q
+  ((x, substWeakDataPlus sub p) : xps', q')
 
 substWeakCodePlusPi ::
      SubstWeakDataPlus
