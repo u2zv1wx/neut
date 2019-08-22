@@ -1,4 +1,4 @@
--- This module "polarizes" a neutral term into a negative term. Operationally,
+-- This module "polarizes" a neutral term into a negMetaative term. Operationally,
 -- this corresponds to determination of the order of evaluation. In proof-theoretic
 -- term, we translate a ordinary dependent calculus to a dependent variant of
 -- Call-By-Push-Value, although this translation doesn't preserve types when the
@@ -10,6 +10,7 @@ module Polarize
   ) where
 
 import           Control.Monad.Except
+import           Prelude              hiding (pi)
 
 import           Data.Basic
 import           Data.Env
@@ -22,26 +23,32 @@ polarize (m, TermTau) = do
   (t, ml) <- polarizeMeta m
   case t of
     (_, WeakCodeUpIntro u) ->
-      return (up u ml, WeakCodeUpIntro (posSelf u ml, WeakDataTau))
+      return (negMeta (up u ml) ml, WeakCodeUpIntro (posMeta u ml, WeakDataTau))
     _ -> throwError "polarize.tau"
 polarize (m, TermTheta x) = polarizeTheta m x
 polarize (m, TermUpsilon x) = do
   (t, ml) <- polarizeMeta m
   case t of
     (_, WeakCodeUpIntro u) ->
-      return (up u ml, WeakCodeUpIntro (posSelf u ml, WeakDataUpsilon x))
+      return
+        ( negMeta (up u ml) ml
+        , WeakCodeUpIntro (posMeta u ml, WeakDataUpsilon x))
     _ -> throwError "polarize.upsilon"
 polarize (m, TermEpsilon x) = do
   (t, ml) <- polarizeMeta m
   case t of
     (_, WeakCodeUpIntro u) ->
-      return (up u ml, WeakCodeUpIntro (posSelf u ml, WeakDataEpsilon x))
+      return
+        ( negMeta (up u ml) ml
+        , WeakCodeUpIntro (posMeta u ml, WeakDataEpsilon x))
     _ -> throwError "polarize.epsilon"
 polarize (m, TermEpsilonIntro l) = do
   (t, ml) <- polarizeMeta m
   case t of
     (_, WeakCodeUpIntro u) ->
-      return (up u ml, WeakCodeUpIntro (posSelf u ml, WeakDataEpsilonIntro l))
+      return
+        ( negMeta (up u ml) ml
+        , WeakCodeUpIntro (posMeta u ml, WeakDataEpsilonIntro l))
     _ -> throwError "polarize.epsilon-intro"
 polarize (m, TermEpsilonElim (x, t) e bs) = do
   (t1, ml) <- polarizeMeta m
@@ -51,7 +58,9 @@ polarize (m, TermEpsilonElim (x, t) e bs) = do
       es' <- mapM polarize es
       (y, ye) <- polarize' e
       (z, zt) <- polarize' t
-      bindLet [ye, zt] (up u ml, WeakCodeEpsilonElim (x, z) y (zip cs es'))
+      bindLet
+        [ye, zt]
+        (negMeta (up u ml) ml, WeakCodeEpsilonElim (x, z) y (zip cs es'))
     _ -> throwError "polarize.epsilon-elim"
 polarize (m, TermPi xts t) = do
   (tm, ml) <- polarizeMeta m
@@ -59,13 +68,14 @@ polarize (m, TermPi xts t) = do
   case (tm, t') of
     ((_, WeakCodeUpIntro u), (_, WeakCodeUpIntro p)) -> do
       (xs', xts', xs) <- polarizePlus xts
-      let negMeta = WeakCodeMetaTerminal ml
-      let z' = (negMeta, WeakCodeUp p)
+      let negMetaMeta = WeakCodeMetaTerminal ml
+      let z' = (negMetaMeta, WeakCodeUp p)
       bindLet
         xts'
-        ( up u ml
+        ( negMeta (up u ml) ml
         , WeakCodeUpIntro
-            (posSelf u ml, WeakDataDown (negMeta, WeakCodePi (zip xs xs') z')))
+            ( posMeta u ml
+            , WeakDataDown (negMetaMeta, WeakCodePi (zip xs xs') z')))
     _ -> throwError "polarize.pi"
 polarize (m, TermPiIntro xts e) = do
   (t, ml) <- polarizeMeta m
@@ -75,10 +85,10 @@ polarize (m, TermPiIntro xts e) = do
       e' <- polarize e
       bindLet
         yts'
-        ( up d ml
+        ( negMeta (up d ml) ml
         , WeakCodeUpIntro
-            ( posSelf d ml
-            , WeakDataDownIntro (negSelf n ml, WeakCodePiIntro (zip xs ys') e')))
+            ( posMeta d ml
+            , WeakDataDownIntro (negMeta n ml, WeakCodePiIntro (zip xs ys') e')))
     _ -> throwError "polarize.pi-intro"
 polarize (m, TermPiElim e@(me, _) es) = do
   (t1, ml1) <- polarizeMeta me
@@ -89,7 +99,8 @@ polarize (m, TermPiElim e@(me, _) es) = do
       (xs', xes') <- unzip <$> mapM polarize' es
       bindLet
         (fe' : xes')
-        (up t ml2, WeakCodePiElim (negSelf n ml1, WeakCodeDownElim f') xs')
+        ( negMeta (up t ml2) ml2
+        , WeakCodePiElim (negMeta n ml1, WeakCodeDownElim f') xs')
     _ -> throwError "polarize.pi-elim"
 polarize (m, TermSigma xts t) = do
   (tm, ml) <- polarizeMeta m
@@ -99,7 +110,8 @@ polarize (m, TermSigma xts t) = do
       (ys', yts', xs) <- polarizePlus xts
       bindLet
         yts'
-        (up u ml, WeakCodeUpIntro (posSelf u ml, WeakDataSigma (zip xs ys') p))
+        ( negMeta (up u ml) ml
+        , WeakCodeUpIntro (posMeta u ml, WeakDataSigma (zip xs ys') p))
     _ -> throwError "polarize.epsilon-intro"
 polarize (m, TermSigmaIntro es) = do
   (t, ml) <- polarizeMeta m
@@ -108,7 +120,8 @@ polarize (m, TermSigmaIntro es) = do
       (xs, xes) <- unzip <$> mapM polarize' es
       bindLet
         xes
-        (up u ml, WeakCodeUpIntro (posSelf u ml, WeakDataSigmaIntro xs))
+        ( negMeta (up u ml) ml
+        , WeakCodeUpIntro (posMeta u ml, WeakDataSigmaIntro xs))
     _ -> throwError "polarize.sigma-intro"
 polarize (m, TermSigmaElim xts e1 e2) = do
   (t, ml) <- polarizeMeta m
@@ -117,7 +130,9 @@ polarize (m, TermSigmaElim xts e1 e2) = do
       (z', ze1') <- polarize' e1
       (ys', yts', xs) <- polarizePlus xts
       e2' <- polarize e2
-      bindLet (ze1' : yts') (up u ml, WeakCodeSigmaElim (zip xs ys') z' e2')
+      bindLet
+        (ze1' : yts')
+        (negMeta (up u ml) ml, WeakCodeSigmaElim (zip xs ys') z' e2')
     _ -> throwError "polarize.sigma-elim"
 polarize (m, TermMu (x, t) e) = do
   (t1, ml) <- polarizeMeta m
@@ -125,8 +140,8 @@ polarize (m, TermMu (x, t) e) = do
     (_, WeakCodeUpIntro u) -> do
       (y', yt') <- polarize' t
       (k', kt') <- polarize' e
-      inner <- bindLet [kt'] (up u ml, WeakCodeDownElim k')
-      bindLet [yt'] (up u ml, WeakCodeMu (x, y') inner)
+      inner <- bindLet [kt'] (negMeta (up u ml) ml, WeakCodeDownElim k')
+      bindLet [yt'] (negMeta (up u ml) ml, WeakCodeMu (x, y') inner)
     _ -> throwError "polarize.mu"
 
 polarize' :: TermPlus -> WithEnv (WeakDataPlus, (Identifier, WeakCodePlus))
@@ -136,7 +151,7 @@ polarize' e@(m, _) = do
   case t of
     (_, WeakCodeUpIntro p) -> do
       x <- newNameWith "var"
-      return ((posSelf p ml, WeakDataUpsilon x), (x, e'))
+      return ((posMeta p ml, WeakDataUpsilon x), (x, e'))
     _ -> throwError "polarize'"
 
 bindLet :: [(Identifier, WeakCodePlus)] -> WeakCodePlus -> WithEnv WeakCodePlus
@@ -157,7 +172,7 @@ bindLet ((x, e@(m, _)):xes) cont = do
       -- Our approach:
       --   type of `e2` : N
       --   type of `bind x := e1 in e2` : bind x := e1 in N
-      return (negSelf ke ml, WeakCodeUpElim (x, p) e e')
+      return (negMeta ke ml, WeakCodeUpElim (x, p) e e')
     _ -> throwError "bindLet"
 
 obtainInfoMeta :: Meta -> (TermPlus, Maybe (Int, Int))
@@ -183,93 +198,79 @@ polarizeMeta m = do
   t' <- polarize t >>= reduceWeakCodePlus
   return (t', ml)
 
-posSelf :: WeakDataPlus -> Maybe (Int, Int) -> WeakDataMeta
-posSelf = WeakDataMetaNonTerminal
+posMeta :: WeakDataPlus -> Maybe (Int, Int) -> WeakDataMeta
+posMeta = WeakDataMetaNonTerminal
 
-negSelf :: WeakCodePlus -> Maybe (Int, Int) -> WeakCodeMeta
-negSelf = WeakCodeMetaNonTerminal
+negMeta :: WeakCodePlus -> Maybe (Int, Int) -> WeakCodeMeta
+negMeta = WeakCodeMetaNonTerminal
 
-up :: WeakDataPlus -> Maybe (Int, Int) -> WeakCodeMeta
-up u ml = WeakCodeMetaNonTerminal (WeakCodeMetaTerminal ml, WeakCodeUp u) ml
+up :: WeakDataPlus -> Maybe (Int, Int) -> WeakCodePlus
+up u ml = (WeakCodeMetaTerminal ml, WeakCodeUp u)
 
-down :: WeakCodePlus -> Maybe (Int, Int) -> WeakDataMeta
-down u ml = WeakDataMetaNonTerminal (WeakDataMetaTerminal ml, WeakDataDown u) ml
+up' :: WeakDataPlus -> WeakCodePlus
+up' u = (WeakCodeMetaTerminal Nothing, WeakCodeUp u)
+
+down :: WeakCodePlus -> Maybe (Int, Int) -> WeakDataPlus
+down u ml = (WeakDataMetaTerminal ml, WeakDataDown u)
 
 -- expand definitions of constants
 polarizeTheta :: Meta -> Identifier -> WithEnv WeakCodePlus
-polarizeTheta _ "core.i8.add" = undefined
-polarizeTheta _ "core.i16.add" = undefined
-polarizeTheta _ "core.i32.add" = undefined
-polarizeTheta _ "core.i64.add" = do
-  x <- newNameWith "arg1"
-  y <- newNameWith "arg2"
-  let int = (WeakDataMetaTerminal Nothing, WeakDataEpsilon "i64")
-  let piType = undefined
-  return
-    ( up undefined Nothing
-    , WeakCodeUpIntro
-        ( down piType Nothing
-        , WeakDataDownIntro
-            ( negSelf piType Nothing
-            , WeakCodePiIntro [(x, int), (y, int)] undefined)))
-  -- lamy <-
-  --   makeClosure [y] $ WeakCodeConstElim c [WeakDataUpsilon x, WeakDataUpsilon y]
-  -- makeClosure [x] lamy
-polarizeTheta _ "core.print.i64" = undefined
-polarizeTheta _ _ = throwError "polarize.theta"
---   -- | Just c <- getPrintConstant x = toPrintDefinition c
---   -- | Just c <- getArithBinOpConstant x = toArithBinOpDefinition c
---   -- | otherwise = return $ WeakDataUpIntro $ WeakDataConst x
--- toArithLowType :: Identifier -> Maybe LowType
--- toArithLowType x
---   | not (null x)
---   , Just y <- readMaybe $ tail x
---   , y > 0 =
---     case head x of
---       'i' -> Just $ LowTypeSignedInt y
---       'u' -> Just $ LowTypeUnsignedInt y
---       'f' -> Just $ LowTypeFloat y
---       _   -> Nothing
---   | otherwise = Nothing
--- getPrintConstant :: Identifier -> Maybe Constant
--- getPrintConstant x = do
---   let xs = wordsWhen (== '.') x
---   if length xs == 3 && head xs == "core" && xs !! 2 == "print"
---     then do
---       lowType <- toArithLowType $ xs !! 1
---       return $ ConstantPrint lowType
---     else Nothing
--- toPrintDefinition :: Constant -> WithEnv WeakCode
--- toPrintDefinition c = do
---   x <- newNameWith "arg"
---   undefined
---   -- makeClosure [x] $ WeakCodeConstElim c [WeakDataUpsilon x]
--- getArithBinOpConstant :: Identifier -> Maybe Constant
--- getArithBinOpConstant x = do
---   let xs = wordsWhen (== '.') x
---   if length xs == 3 && head xs == "core"
---     then do
---       lowType <- toArithLowType $ xs !! 1
---       binOp <- toArithBinOp $ xs !! 2
---       return $ ConstantArith lowType binOp
---     else Nothing
--- toArithBinOp :: Identifier -> Maybe Arith
--- toArithBinOp "add" = Just ArithAdd
--- toArithBinOp "sub" = Just ArithSub
--- toArithBinOp "mul" = Just ArithMul
--- toArithBinOp "div" = Just ArithDiv
--- toArithBinOp _     = Nothing
--- toArithBinOpDefinition :: Constant -> WithEnv WeakCode
--- toArithBinOpDefinition c = do
---   undefined
---   -- x <- newNameWith "arg1"
---   -- y <- newNameWith "arg2"
---   -- lamy <-
---   --   makeClosure [y] $ WeakCodeConstElim c [WeakDataUpsilon x, WeakDataUpsilon y]
---   -- makeClosure [x] lamy
--- wordsWhen :: (Char -> Bool) -> String -> [String]
--- wordsWhen p s =
---   case dropWhile p s of
---     "" -> []
---     s' -> w : wordsWhen p s''
---       where (w, s'') = break p s'
+polarizeTheta m "core.i8.add"    = polarizeThetaArith ArithAdd m
+polarizeTheta m "core.i16.add"   = polarizeThetaArith ArithAdd m
+polarizeTheta m "core.i32.add"   = polarizeThetaArith ArithAdd m
+polarizeTheta m "core.i64.add"   = polarizeThetaArith ArithAdd m
+polarizeTheta m "core.i8.sub"    = polarizeThetaArith ArithSub m
+polarizeTheta m "core.i16.sub"   = polarizeThetaArith ArithSub m
+polarizeTheta m "core.i32.sub"   = polarizeThetaArith ArithSub m
+polarizeTheta m "core.i64.sub"   = polarizeThetaArith ArithSub m
+polarizeTheta m "core.i8.mul"    = polarizeThetaArith ArithMul m
+polarizeTheta m "core.i16.mul"   = polarizeThetaArith ArithMul m
+polarizeTheta m "core.i32.mul"   = polarizeThetaArith ArithMul m
+polarizeTheta m "core.i64.mul"   = polarizeThetaArith ArithMul m
+polarizeTheta m "core.i8.div"    = polarizeThetaArith ArithDiv m
+polarizeTheta m "core.i16.div"   = polarizeThetaArith ArithDiv m
+polarizeTheta m "core.i32.div"   = polarizeThetaArith ArithDiv m
+polarizeTheta m "core.i64.div"   = polarizeThetaArith ArithDiv m
+polarizeTheta m "core.print.i64" = polarizeThetaPrint m
+polarizeTheta _ _                = throwError "polarize.theta"
+
+polarizeThetaArith :: Arith -> Meta -> WithEnv WeakCodePlus
+polarizeThetaArith op m = do
+  (upT, ml) <- polarizeMeta m
+  case upT of
+    (_, WeakCodeUpIntro (_, WeakDataDownIntro pi@(_, WeakCodePi _ (_, WeakCodeUp int)))) -> do
+      (x, varX) <- varOfType int
+      (y, varY) <- varOfType int
+      return
+        ( negMeta (up' (down pi ml)) ml
+        , WeakCodeUpIntro
+            ( posMeta (down pi ml) ml
+            , WeakDataDownIntro
+                ( negMeta pi ml
+                , WeakCodePiIntro
+                    [(x, int), (y, int)]
+                    ( negMeta (up int ml) ml
+                    , WeakCodeTheta (ThetaArith op varX varY)))))
+    _ -> throwError "polarize.theta.arith"
+
+polarizeThetaPrint :: Meta -> WithEnv WeakCodePlus
+polarizeThetaPrint m = do
+  (upT, ml) <- polarizeMeta m
+  case upT of
+    (_, WeakCodeUpIntro (_, WeakDataDownIntro pi@(_, WeakCodePi [(_, int)] cod))) -> do
+      (x, varX) <- varOfType int
+      return
+        ( negMeta (up' (down pi ml)) ml
+        , WeakCodeUpIntro
+            ( posMeta (down pi ml) ml
+            , WeakDataDownIntro
+                ( negMeta pi ml
+                , WeakCodePiIntro
+                    [(x, int)]
+                    (negMeta cod ml, WeakCodeTheta (ThetaPrint varX)))))
+    _ -> throwError "polarize.theta.print"
+
+varOfType :: WeakDataPlus -> WithEnv (Identifier, WeakDataPlus)
+varOfType t = do
+  x <- newNameWith "arg"
+  return (x, (posMeta t Nothing, WeakDataUpsilon x))
