@@ -2,11 +2,40 @@ module Reduce.WeakCode
   ( reduceWeakCodePlus
   ) where
 
+import           Control.Monad.Trans
+
 import           Data.Basic
 import           Data.Env
 import           Data.WeakCode
 
 reduceWeakCodePlus :: WeakCodePlus -> WithEnv WeakCodePlus
+reduceWeakCodePlus (m, WeakCodeTheta theta) =
+  case theta of
+    ThetaArith ArithAdd (m1, WeakDataEpsilonIntro (LiteralInteger i1)) (_, WeakDataEpsilonIntro (LiteralInteger i2)) ->
+      return
+        ( m
+        , WeakCodeUpIntro (m1, WeakDataEpsilonIntro (LiteralInteger $ i1 + i2)))
+    ThetaArith ArithSub (m1, WeakDataEpsilonIntro (LiteralInteger i1)) (_, WeakDataEpsilonIntro (LiteralInteger i2)) ->
+      return
+        ( m
+        , WeakCodeUpIntro (m1, WeakDataEpsilonIntro (LiteralInteger $ i1 - i2)))
+    ThetaArith ArithMul (m1, WeakDataEpsilonIntro (LiteralInteger i1)) (_, WeakDataEpsilonIntro (LiteralInteger i2)) ->
+      return
+        ( m
+        , WeakCodeUpIntro (m1, WeakDataEpsilonIntro (LiteralInteger $ i1 * i2)))
+    ThetaArith ArithDiv (m1, WeakDataEpsilonIntro (LiteralInteger i1)) (_, WeakDataEpsilonIntro (LiteralInteger i2)) ->
+      return
+        ( m
+        , WeakCodeUpIntro
+            (m1, WeakDataEpsilonIntro (LiteralInteger $ i1 `div` i2)))
+    ThetaPrint (_, WeakDataEpsilonIntro (LiteralInteger i)) -> do
+      liftIO $ putStr $ show i
+      let topType = (WeakDataMetaTerminal Nothing, WeakDataEpsilon "top")
+      let topMeta = WeakDataMetaNonTerminal topType Nothing
+      return
+        ( m
+        , WeakCodeUpIntro (topMeta, WeakDataEpsilonIntro (LiteralLabel "unit")))
+    _ -> return (m, WeakCodeTheta theta)
 reduceWeakCodePlus (m, WeakCodeEpsilonElim (x, t) v branchList) =
   case v of
     (_, WeakDataEpsilonIntro l) ->
@@ -29,24 +58,6 @@ reduceWeakCodePlus (m, WeakCodePiElim e vs) = do
       let x' = (meta, WeakDataDownIntro self)
       let self' = substWeakCodePlus [(x, x')] body
       reduceWeakCodePlus (m, WeakCodePiElim self' vs)
-    (_, WeakCodeDownElim (_, WeakDataTheta constant))
-      | [(m1, WeakDataEpsilonIntro (LiteralInteger x)), (_, WeakDataEpsilonIntro (LiteralInteger y))] <-
-         vs -> do
-        let b1 = constant `elem` intAddConstantList
-        let b2 = constant `elem` intSubConstantList
-        let b3 = constant `elem` intMulConstantList
-        let b4 = constant `elem` intDivConstantList
-        let up d = return (m, WeakCodeUpIntro d)
-        case (b1, b2, b3, b4) of
-          (True, _, _, _) ->
-            up (m1, WeakDataEpsilonIntro (LiteralInteger (x + y)))
-          (_, True, _, _) ->
-            up (m1, WeakDataEpsilonIntro (LiteralInteger (x - y)))
-          (_, _, True, _) ->
-            up (m1, WeakDataEpsilonIntro (LiteralInteger (x * y)))
-          (_, _, _, True) ->
-            up (m1, WeakDataEpsilonIntro (LiteralInteger (x `div` y)))
-          _ -> return (m, WeakCodePiElim e' vs)
     _ -> return (m, WeakCodePiElim e' vs)
 reduceWeakCodePlus (m, WeakCodeSigmaElim xts v e) =
   case v of
