@@ -53,11 +53,6 @@ reduceWeakCodePlus (m, WeakCodePiElim e vs) = do
       | length xts == length vs -> do
         let xs = map fst xts
         reduceWeakCodePlus $ substWeakCodePlus (zip xs vs) body
-    self@(m', WeakCodeMu (x, t) body) -> do
-      let meta = WeakDataMetaNonTerminal t (obtainLocation m')
-      let x' = (meta, WeakDataDownIntro self)
-      let self' = substWeakCodePlus [(x, x')] body
-      reduceWeakCodePlus (m, WeakCodePiElim self' vs)
     _ -> return (m, WeakCodePiElim e' vs)
 reduceWeakCodePlus (m, WeakCodeSigmaElim xts v e) =
   case v of
@@ -75,6 +70,10 @@ reduceWeakCodePlus (m, WeakCodeDownElim v) =
   case v of
     (_, WeakDataDownIntro e) -> reduceWeakCodePlus e
     _                        -> return (m, WeakCodeDownElim v)
+reduceWeakCodePlus self@(m', WeakCodeMu (x, t) body) = do
+  let meta = WeakDataMetaNonTerminal t (obtainLocation m')
+  let x' = (meta, WeakDataDownIntro self)
+  reduceWeakCodePlus $ substWeakCodePlus [(x, x')] body
 reduceWeakCodePlus t = return t
 
 obtainLocation :: WeakCodeMeta -> Maybe (Int, Int)

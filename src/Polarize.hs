@@ -58,17 +58,25 @@ polarize (m, TermPi xts t) = do
         (posMeta u ml, WeakDataDown (negMetaMeta, WeakCodePi (zip xs xs') z')))
 polarize (m, TermPiIntro xts e) = do
   (d, ml) <- polarizeMeta m
+  pi <- extractFromDown d
   (ys', yts', xs) <- polarizePlus xts
   e' <- polarize e
   bindLet
     yts'
     ( negMeta (up d ml) ml
-    , WeakCodeUpIntro (posMeta d ml, WeakDataDownIntroPiIntro (zip xs ys') e'))
-polarize (m, TermPiElim e es) = do
+    , WeakCodeUpIntro
+        ( posMeta d ml
+        , WeakDataDownIntro (negMeta pi ml, WeakCodePiIntro (zip xs ys') e')))
+polarize (m, TermPiElim e@(me, _) es) = do
   (t, ml2) <- polarizeMeta m
   (f', fe') <- polarize' e
   (xs', xes') <- unzip <$> mapM polarize' es
-  bindLet (fe' : xes') (negMeta (up t ml2) ml2, WeakCodePiElimDownElim f' xs')
+  (tpi, tml) <- polarizeMeta me
+  pi <- extractFromDown tpi
+  bindLet
+    (fe' : xes')
+    ( negMeta (up t ml2) ml2
+    , WeakCodePiElim (negMeta pi tml, WeakCodeDownElim f') xs')
 polarize (m, TermSigma xts t) = do
   (u, ml) <- polarizeMeta m
   p <- polarize t >>= reduceWeakCodePlus >>= extract
@@ -96,7 +104,7 @@ polarize (m, TermMu (x, t) e) = do
   (u, ml) <- polarizeMeta m
   (y', yt') <- polarize' t
   (k', kt') <- polarize' e
-  inner <- bindLet [kt'] (negMeta (up u ml) ml, WeakCodePiElimDownElim k' [])
+  inner <- bindLet [kt'] (negMeta (up u ml) ml, WeakCodeDownElim k')
   bindLet [yt'] (negMeta (up u ml) ml, WeakCodeMu (x, y') inner)
 
 polarize' :: TermPlus -> WithEnv (WeakDataPlus, (Identifier, WeakCodePlus))
@@ -153,6 +161,12 @@ extract e =
     (_, WeakCodeUpIntro d) -> return d
     _                      -> throwError "extract"
 
+extractFromDown :: WeakDataPlus -> WithEnv WeakCodePlus
+extractFromDown e =
+  case e of
+    (_, WeakDataDown d) -> return d
+    _                   -> throwError "extract"
+
 posMeta :: WeakDataPlus -> Maybe (Int, Int) -> WeakDataMeta
 posMeta = WeakDataMetaNonTerminal
 
@@ -187,32 +201,36 @@ polarizeThetaArith :: Arith -> Meta -> WithEnv WeakCodePlus
 polarizeThetaArith op m = do
   (upT, ml) <- polarizeMeta m
   case upT of
-    pi@(_, WeakDataDown (_, WeakCodePi _ (_, WeakCodeUp int))) -> do
+    d@(_, WeakDataDown pi@(_, WeakCodePi _ (_, WeakCodeUp int))) -> do
       (x, varX) <- varOfType int
       (y, varY) <- varOfType int
       return
-        ( negMeta (up pi ml) ml
+        ( negMeta (up d ml) ml
         , WeakCodeUpIntro
-            ( posMeta pi ml
-            , WeakDataDownIntroPiIntro
-                [(x, int), (y, int)]
-                ( negMeta (up int ml) ml
-                , WeakCodeTheta (ThetaArith op varX varY))))
+            ( posMeta d ml
+            , WeakDataDownIntro
+                ( negMeta pi ml
+                , WeakCodePiIntro
+                    [(x, int), (y, int)]
+                    ( negMeta (up int ml) ml
+                    , WeakCodeTheta (ThetaArith op varX varY)))))
     _ -> throwError "polarize.theta.arith"
 
 polarizeThetaPrint :: Meta -> WithEnv WeakCodePlus
 polarizeThetaPrint m = do
   (upT, ml) <- polarizeMeta m
   case upT of
-    pi@(_, WeakDataDown (_, WeakCodePi [(_, int)] cod)) -> do
+    d@(_, WeakDataDown pi@(_, WeakCodePi [(_, int)] cod)) -> do
       (x, varX) <- varOfType int
       return
-        ( negMeta (up pi ml) ml
+        ( negMeta (up d ml) ml
         , WeakCodeUpIntro
-            ( posMeta pi ml
-            , WeakDataDownIntroPiIntro
-                [(x, int)]
-                (negMeta cod ml, WeakCodeTheta (ThetaPrint varX))))
+            ( posMeta d ml
+            , WeakDataDownIntro
+                ( negMeta pi ml
+                , WeakCodePiIntro
+                    [(x, int)]
+                    (negMeta cod ml, WeakCodeTheta (ThetaPrint varX)))))
     _ -> throwError "polarize.theta.print"
 
 varOfType :: WeakDataPlus -> WithEnv (Identifier, WeakDataPlus)
