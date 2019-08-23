@@ -11,24 +11,24 @@ import           Data.WeakCode
 reduceWeakCodePlus :: WeakCodePlus -> WithEnv WeakCodePlus
 reduceWeakCodePlus (m, WeakCodeTheta theta) =
   case theta of
-    ThetaArith ArithAdd (m1, WeakDataEpsilonIntro (LiteralInteger i1)) (_, WeakDataEpsilonIntro (LiteralInteger i2)) ->
+    WeakThetaArith ArithAdd (m1, WeakDataEpsilonIntro (LiteralInteger i1)) (_, WeakDataEpsilonIntro (LiteralInteger i2)) ->
       return
         ( m
         , WeakCodeUpIntro (m1, WeakDataEpsilonIntro (LiteralInteger $ i1 + i2)))
-    ThetaArith ArithSub (m1, WeakDataEpsilonIntro (LiteralInteger i1)) (_, WeakDataEpsilonIntro (LiteralInteger i2)) ->
+    WeakThetaArith ArithSub (m1, WeakDataEpsilonIntro (LiteralInteger i1)) (_, WeakDataEpsilonIntro (LiteralInteger i2)) ->
       return
         ( m
         , WeakCodeUpIntro (m1, WeakDataEpsilonIntro (LiteralInteger $ i1 - i2)))
-    ThetaArith ArithMul (m1, WeakDataEpsilonIntro (LiteralInteger i1)) (_, WeakDataEpsilonIntro (LiteralInteger i2)) ->
+    WeakThetaArith ArithMul (m1, WeakDataEpsilonIntro (LiteralInteger i1)) (_, WeakDataEpsilonIntro (LiteralInteger i2)) ->
       return
         ( m
         , WeakCodeUpIntro (m1, WeakDataEpsilonIntro (LiteralInteger $ i1 * i2)))
-    ThetaArith ArithDiv (m1, WeakDataEpsilonIntro (LiteralInteger i1)) (_, WeakDataEpsilonIntro (LiteralInteger i2)) ->
+    WeakThetaArith ArithDiv (m1, WeakDataEpsilonIntro (LiteralInteger i1)) (_, WeakDataEpsilonIntro (LiteralInteger i2)) ->
       return
         ( m
         , WeakCodeUpIntro
             (m1, WeakDataEpsilonIntro (LiteralInteger $ i1 `div` i2)))
-    ThetaPrint (_, WeakDataEpsilonIntro (LiteralInteger i)) -> do
+    WeakThetaPrint (_, WeakDataEpsilonIntro (LiteralInteger i)) -> do
       liftIO $ putStr $ show i
       let topType = (WeakDataMetaTerminal Nothing, WeakDataEpsilon "top")
       let topMeta = WeakDataMetaNonTerminal topType Nothing

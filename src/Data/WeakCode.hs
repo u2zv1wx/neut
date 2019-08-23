@@ -18,7 +18,7 @@ data WeakData
 
 data WeakCode
   = WeakCodeTau
-  | WeakCodeTheta Theta
+  | WeakCodeTheta WeakTheta
   | WeakCodeEpsilonElim IdentifierPlus
                         WeakDataPlus
                         [(Case, WeakCodePlus)]
@@ -41,11 +41,11 @@ data WeakCode
                WeakCodePlus
   deriving (Show)
 
-data Theta
-  = ThetaArith Arith
-               WeakDataPlus
-               WeakDataPlus
-  | ThetaPrint WeakDataPlus
+data WeakTheta
+  = WeakThetaArith Arith
+                   WeakDataPlus
+                   WeakDataPlus
+  | WeakThetaPrint WeakDataPlus
   deriving (Show)
 
 type IdentifierPlus = (Identifier, WeakDataPlus)
@@ -85,7 +85,7 @@ varWeakDataPlusPiOrSigma ((x, p):xps) xs =
 
 varWeakCodePlus :: WeakCodePlus -> [Identifier]
 varWeakCodePlus (_, WeakCodeTau) = []
-varWeakCodePlus (_, WeakCodeTheta e) = varTheta e
+varWeakCodePlus (_, WeakCodeTheta e) = varWeakTheta e
 varWeakCodePlus (_, WeakCodeEpsilonElim (x, _) v branchList) = do
   let (_, es) = unzip branchList
   varWeakDataPlus v ++ filter (/= x) (concatMap varWeakCodePlus es)
@@ -110,8 +110,8 @@ varWeakDataPlusPi [] n = varWeakDataPlus n
 varWeakDataPlusPi ((x, p):xps) n =
   varWeakDataPlus p ++ filter (/= x) (varWeakDataPlusPi xps n)
 
-varTheta :: Theta -> [Identifier]
-varTheta = undefined
+varWeakTheta :: WeakTheta -> [Identifier]
+varWeakTheta = undefined
 
 type SubstWeakDataPlus = [IdentifierPlus]
 
@@ -161,7 +161,7 @@ substWeakCodePlus sub (m, WeakCodeTau) = do
   (m', WeakCodeTau)
 substWeakCodePlus sub (m, WeakCodeTheta theta) = do
   let m' = substWeakCodeMeta sub m
-  let theta' = substTheta sub theta
+  let theta' = substWeakTheta sub theta
   (m', WeakCodeTheta theta')
 substWeakCodePlus sub (m, WeakCodeEpsilonElim (x, p) v branchList) = do
   let p' = substWeakDataPlus sub p
@@ -213,12 +213,12 @@ substWeakCodePlus sub (m, WeakCodeMu (x, p) e) = do
   let m' = substWeakCodeMeta sub m
   (m', WeakCodeMu (x, p') e')
 
-substTheta :: SubstWeakDataPlus -> Theta -> Theta
-substTheta sub (ThetaArith a v1 v2) = do
+substWeakTheta :: SubstWeakDataPlus -> WeakTheta -> WeakTheta
+substWeakTheta sub (WeakThetaArith a v1 v2) = do
   let v1' = substWeakDataPlus sub v1
   let v2' = substWeakDataPlus sub v2
-  ThetaArith a v1' v2'
-substTheta sub (ThetaPrint v) = ThetaPrint $ substWeakDataPlus sub v
+  WeakThetaArith a v1' v2'
+substWeakTheta sub (WeakThetaPrint v) = WeakThetaPrint $ substWeakDataPlus sub v
 
 substWeakDataPlusPiOrSigma ::
      SubstWeakDataPlus -> [IdentifierPlus] -> [IdentifierPlus]

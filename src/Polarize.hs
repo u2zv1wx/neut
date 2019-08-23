@@ -213,7 +213,7 @@ polarizeThetaArith op m = do
                 , WeakCodePiIntro
                     [(x, int), (y, int)]
                     ( negMeta (up int ml) ml
-                    , WeakCodeTheta (ThetaArith op varX varY)))))
+                    , WeakCodeTheta (WeakThetaArith op varX varY)))))
     _ -> throwError "polarize.theta.arith"
 
 polarizeThetaPrint :: Meta -> WithEnv WeakCodePlus
@@ -230,7 +230,7 @@ polarizeThetaPrint m = do
                 ( negMeta pi ml
                 , WeakCodePiIntro
                     [(x, int)]
-                    (negMeta cod ml, WeakCodeTheta (ThetaPrint varX)))))
+                    (negMeta cod ml, WeakCodeTheta (WeakThetaPrint varX)))))
     _ -> throwError "polarize.theta.print"
 
 varOfType :: WeakDataPlus -> WithEnv (Identifier, WeakDataPlus)
