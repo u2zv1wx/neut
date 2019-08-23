@@ -13,7 +13,6 @@ import           Data.Code
 import           Data.Constraint
 import           Data.LLVM
 import           Data.Tree
-import           Data.WeakCode
 import           Data.WeakTerm
 
 import qualified Data.Map.Strict            as Map
@@ -23,19 +22,19 @@ import qualified Data.PQueue.Min            as Q
 type ConstraintQueue = Q.MinQueue EnrichedConstraint
 
 data Env = Env
-  { count :: Int -- to generate fresh symbols
-  , currentDir :: FilePath
-  , reservedEnv :: [Identifier] -- list of reserved keywords
-  , notationEnv :: [(Tree, Tree)] -- macro transformers
-  , constantEnv :: [Identifier]
-  , epsilonEnv :: [(Identifier, [Identifier])]
-  , nameEnv :: [(Identifier, Identifier)] -- [("foo", "foo.13"), ...]
-  , typeEnv :: Map.Map Identifier WeakTermPlus -- var ~> typeof(var)
-  , constraintEnv :: [PreConstraint] -- for type inference
+  { count           :: Int -- to generate fresh symbols
+  , currentDir      :: FilePath
+  , reservedEnv     :: [Identifier] -- list of reserved keywords
+  , notationEnv     :: [(Tree, Tree)] -- macro transformers
+  , constantEnv     :: [Identifier]
+  , epsilonEnv      :: [(Identifier, [Identifier])]
+  , nameEnv         :: [(Identifier, Identifier)] -- [("foo", "foo.13"), ...]
+  , typeEnv         :: Map.Map Identifier WeakTermPlus -- var ~> typeof(var)
+  , constraintEnv   :: [PreConstraint] -- for type inference
   , constraintQueue :: ConstraintQueue -- for (dependent) type inference
-  , substEnv :: SubstWeakTerm -- metavar ~> beta-equivalent weakterm
-  , polEnv :: [(Identifier, ([(Identifier, WeakDataPlus)], WeakCodePlus))] -- f ~> thunk (lam (x1 ... xn) e)
-  , llvmEnv :: [(Identifier, ([Identifier], LLVM))]
+  , substEnv        :: SubstWeakTerm -- metavar ~> beta-equivalent weakterm
+  , polEnv          :: [(Identifier, ([(Identifier, DataPlus)], CodePlus))] -- f ~> thunk (lam (x1 ... xn) e)
+  , llvmEnv         :: [(Identifier, ([Identifier], LLVM))]
   }
 
 initialEnv :: FilePath -> Env
@@ -124,8 +123,7 @@ lookupNameEnvMaybe s = do
 insTypeEnv :: Identifier -> WeakTermPlus -> WithEnv ()
 insTypeEnv i t = modify (\e -> e {typeEnv = Map.insert i t (typeEnv e)})
 
-insPolEnv ::
-     Identifier -> [(Identifier, WeakDataPlus)] -> WeakCodePlus -> WithEnv ()
+insPolEnv :: Identifier -> [(Identifier, DataPlus)] -> CodePlus -> WithEnv ()
 insPolEnv name args e =
   modify (\env -> env {polEnv = (name, (args, e)) : polEnv env})
 
