@@ -6,6 +6,7 @@ import           Data.Basic
 
 data WeakData
   = WeakDataTau
+  | WeakDataTheta Identifier -- global variable
   | WeakDataUpsilon Identifier
   | WeakDataEpsilon Identifier
   | WeakDataEpsilonIntro Literal
@@ -77,6 +78,7 @@ obtainInfoWeakDataMeta (WeakDataMetaNonTerminal t ml) = (t, ml)
 
 varWeakDataPlus :: WeakDataPlus -> [IdentifierPlus]
 varWeakDataPlus (_, WeakDataTau) = []
+varWeakDataPlus (_, WeakDataTheta _) = []
 varWeakDataPlus (m, WeakDataUpsilon x) = [(x, fst $ obtainInfoWeakDataMeta m)]
 varWeakDataPlus (_, WeakDataEpsilon _) = []
 varWeakDataPlus (_, WeakDataEpsilonIntro _) = []
@@ -129,6 +131,9 @@ substWeakDataPlus :: SubstWeakDataPlus -> WeakDataPlus -> WeakDataPlus
 substWeakDataPlus sub (m, WeakDataTau) = do
   let m' = substWeakDataMeta sub m
   (m', WeakDataTau)
+substWeakDataPlus sub (m, WeakDataTheta x) = do
+  let m' = substWeakDataMeta sub m
+  (m', WeakDataTheta x)
 substWeakDataPlus sub (m, WeakDataUpsilon s) = do
   let m' = substWeakDataMeta sub m
   fromMaybe (m', WeakDataUpsilon s) (lookup s sub)

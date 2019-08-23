@@ -36,7 +36,12 @@ closeData (m, WeakDataDown n) = do
   m' <- closeDataMeta m
   n' <- closeCode n
   return (m', DataDown n')
-closeData (_, WeakDataDownIntro _) = undefined
+closeData (m, WeakDataDownIntro e) = do
+  m' <- closeDataMeta m
+  let xs = varWeakCodePlus e
+  e' <- closeCode e
+  cls <- makeClosure (zip xs undefined) e'
+  return (m', undefined)
 
 closeDataMeta :: WeakDataMeta -> WithEnv DataMeta
 closeDataMeta (WeakDataMetaTerminal ml) = return $ DataMetaTerminal ml
@@ -98,7 +103,7 @@ closeCodeMeta = undefined
 closeTheta :: WeakTheta -> WithEnv Theta
 closeTheta = undefined
 
-makeClosure :: [(Identifier, DataPlus)] -> CodePlus -> WithEnv WeakCodePlus
+makeClosure :: [(Identifier, DataPlus)] -> CodePlus -> WithEnv CodePlus
 makeClosure = undefined
   -- let lamBody = WeakCodeSigmaElim fvs (PosUpsilon envName) e
   -- -- lamVar == thunk (lam (envName, x1, ..., xn) lamBody)
@@ -111,7 +116,7 @@ makeClosure = undefined
 --   envName <- newNameWith "env"
 --   lamVar <- newNameWith "lam"
 --   undefined
-callClosure :: WeakCodePlus -> [WeakCodePlus] -> WithEnv WeakCodePlus
+callClosure :: WeakCodePlus -> [WeakCodePlus] -> WithEnv CodePlus
 callClosure = undefined
 -- callClosure e es = do
 --   argVarNameList <- mapM (const $ newNameWith "arg") es

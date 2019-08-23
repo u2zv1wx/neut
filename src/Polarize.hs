@@ -57,28 +57,7 @@ polarize (m, TermPi xts t) = do
     , WeakCodeUpIntro
         (posMeta u ml, WeakDataDown (negMetaMeta, WeakCodePi (zip xs xs') z')))
 polarize (m, TermPiIntro xts e) = makeClosure m xts e
-  -- (d, ml) <- polarizeMeta m
-  -- pi <- extractFromDown d
-  -- (ys', yts', xs) <- polarizePlus xts
-  -- e' <- polarize e
-  -- -- makeClosure m xps e'
-  -- let vs = varWeakCodePlus e'
-  -- bindLet
-  --   yts'
-  --   ( negMeta (up d ml) ml
-  --   , WeakCodeUpIntro
-  --       ( posMeta d ml
-  --       , WeakDataDownIntro (negMeta pi ml, WeakCodePiIntro (zip xs ys') e')))
 polarize (m, TermPiElim e es) = callClosure m e es
-  -- (t, ml2) <- polarizeMeta m
-  -- (f', fe') <- polarize' e
-  -- (xs', xes') <- unzip <$> mapM polarize' es
-  -- (tpi, tml) <- polarizeMeta me
-  -- pi <- extractFromDown tpi
-  -- bindLet
-  --   (fe' : xes')
-  --   ( negMeta (up t ml2) ml2
-  --   , WeakCodePiElim (negMeta pi tml, WeakCodeDownElim f') xs')
 polarize (m, TermSigma xts t) = do
   (u, ml) <- polarizeMeta m
   p <- polarize t >>= reduceWeakCodePlus >>= extract
@@ -107,9 +86,6 @@ polarize (m, TermMu (x, t) e) = do
   let fvs = varWeakCodePlus e'
   lamVar <- newNameWith "cls"
   envName <- newNameWith "env"
-  -- let (x1, ..., xn) := env in
-  -- bind x := (down-elim z) @ (x1, ..., xn) in
-  -- e
   let lamBody =
         ( undefined
         , WeakCodeSigmaElim
@@ -126,7 +102,7 @@ polarize (m, TermMu (x, t) e) = do
   insPolEnv lamVar ((envName, undefined) : undefined) lamBody
   return
     ( undefined
-    , WeakCodePiElimDownElim (undefined, WeakDataUpsilon lamVar) (map toVar fvs))
+    , WeakCodePiElimDownElim (undefined, WeakDataTheta lamVar) (map toVar fvs))
   -- mu . e ~> (down-elim f) @ fvs
   -- (u, ml) <- polarizeMeta m
   -- (y', yt') <- polarize' t
@@ -155,7 +131,7 @@ makeClosure m xts e = do
     ( undefined
     , WeakCodeUpIntro
         ( undefined
-        , WeakDataSigmaIntro [(undefined, WeakDataUpsilon lamVar), fvEnv]))
+        , WeakDataSigmaIntro [(undefined, WeakDataTheta lamVar), fvEnv]))
   -- bindLet
   --   yts'
   --   ( negMeta (up d ml) ml
@@ -176,7 +152,7 @@ callClosure m e es = do
   clsVarName <- newNameWith "fun"
   thunkLamVarName <- newNameWith "down.elim.cls"
   envVarName <- newNameWith "down.elim.env"
-  foo <-
+  cont <-
     bindLet
       (zip argVarNameList es')
       ( undefined
@@ -188,7 +164,7 @@ callClosure m e es = do
               (undefined, WeakDataUpsilon thunkLamVarName)
               ((undefined, WeakDataUpsilon envVarName) :
                map undefined argVarNameList)))
-  return (undefined, WeakCodeUpElim (clsVarName, undefined) e' foo)
+  return (undefined, WeakCodeUpElim (clsVarName, undefined) e' cont)
           -- ( undefined
           -- , WeakCodeSigmaElim
           --     [thunkLamVarName, envVarName]
@@ -204,11 +180,6 @@ callClosure m e es = do
   --     (PosUpsilon thunkLamVarName)
   --     (PosUpsilon envVarName : map PosUpsilon argVarNameList)
 
---   argVarNameList <- mapM (const $ newNameWith "arg") es
---   clsVarName <- newNameWith "fun"
---   thunkLamVarName <- newNameWith "down.elim.cls"
---   envVarName <- newNameWith "down.elim.env"
---   undefined
 toVar :: (Identifier, WeakDataPlus) -> WeakDataPlus
 toVar = undefined
 
@@ -246,8 +217,6 @@ polarizePlus' xts = do
   let (xs, ts) = unzip xts
   ps <- mapM (polarize >=> reduceWeakCodePlus >=> extract) ts
   return $ zip xs ps
-  -- (ys', yts') <- unzip <$> mapM polarize' ts
-  -- return (ys', yts', xs)
 
 polarizeMeta :: Meta -> WithEnv (WeakDataPlus, Maybe (Int, Int))
 polarizeMeta m = do
