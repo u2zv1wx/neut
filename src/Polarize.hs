@@ -56,27 +56,29 @@ polarize (m, TermPi xts t) = do
     ( negMeta (up u ml) ml
     , WeakCodeUpIntro
         (posMeta u ml, WeakDataDown (negMetaMeta, WeakCodePi (zip xs xs') z')))
-polarize (m, TermPiIntro xts e) = do
-  (d, ml) <- polarizeMeta m
-  pi <- extractFromDown d
-  (ys', yts', xs) <- polarizePlus xts
-  e' <- polarize e
-  bindLet
-    yts'
-    ( negMeta (up d ml) ml
-    , WeakCodeUpIntro
-        ( posMeta d ml
-        , WeakDataDownIntro (negMeta pi ml, WeakCodePiIntro (zip xs ys') e')))
-polarize (m, TermPiElim e@(me, _) es) = do
-  (t, ml2) <- polarizeMeta m
-  (f', fe') <- polarize' e
-  (xs', xes') <- unzip <$> mapM polarize' es
-  (tpi, tml) <- polarizeMeta me
-  pi <- extractFromDown tpi
-  bindLet
-    (fe' : xes')
-    ( negMeta (up t ml2) ml2
-    , WeakCodePiElim (negMeta pi tml, WeakCodeDownElim f') xs')
+polarize (m, TermPiIntro xts e) = makeClosure m xts e
+  -- (d, ml) <- polarizeMeta m
+  -- pi <- extractFromDown d
+  -- (ys', yts', xs) <- polarizePlus xts
+  -- e' <- polarize e
+  -- -- makeClosure m xps e'
+  -- let vs = varWeakCodePlus e'
+  -- bindLet
+  --   yts'
+  --   ( negMeta (up d ml) ml
+  --   , WeakCodeUpIntro
+  --       ( posMeta d ml
+  --       , WeakDataDownIntro (negMeta pi ml, WeakCodePiIntro (zip xs ys') e')))
+polarize (m, TermPiElim e es) = callClosure m e es
+  -- (t, ml2) <- polarizeMeta m
+  -- (f', fe') <- polarize' e
+  -- (xs', xes') <- unzip <$> mapM polarize' es
+  -- (tpi, tml) <- polarizeMeta me
+  -- pi <- extractFromDown tpi
+  -- bindLet
+  --   (fe' : xes')
+  --   ( negMeta (up t ml2) ml2
+  --   , WeakCodePiElim (negMeta pi tml, WeakCodeDownElim f') xs')
 polarize (m, TermSigma xts t) = do
   (u, ml) <- polarizeMeta m
   p <- polarize t >>= reduceWeakCodePlus >>= extract
@@ -101,11 +103,114 @@ polarize (m, TermSigmaElim xts e1 e2) = do
     (ze1' : yts')
     (negMeta (up u ml) ml, WeakCodeSigmaElim (zip xs ys') z' e2')
 polarize (m, TermMu (x, t) e) = do
-  (u, ml) <- polarizeMeta m
-  (y', yt') <- polarize' t
-  (k', kt') <- polarize' e
-  inner <- bindLet [kt'] (negMeta (up u ml) ml, WeakCodeDownElim k')
-  bindLet [yt'] (negMeta (up u ml) ml, WeakCodeMu (x, y') inner)
+  e' <- polarize e
+  let fvs = varWeakCodePlus e'
+  lamVar <- newNameWith "cls"
+  envName <- newNameWith "env"
+  -- let (x1, ..., xn) := env in
+  -- bind x := (down-elim z) @ (x1, ..., xn) in
+  -- e
+  let lamBody =
+        ( undefined
+        , WeakCodeSigmaElim
+            fvs
+            (undefined, WeakDataUpsilon envName)
+            ( undefined
+            , WeakCodeUpElim
+                (x, undefined)
+                ( undefined
+                , WeakCodePiElimDownElim
+                    (undefined, WeakDataUpsilon lamVar)
+                    (map toVar fvs))
+                e'))
+  insPolEnv lamVar ((envName, undefined) : undefined) lamBody
+  return
+    ( undefined
+    , WeakCodePiElimDownElim (undefined, WeakDataUpsilon lamVar) (map toVar fvs))
+  -- mu . e ~> (down-elim f) @ fvs
+  -- (u, ml) <- polarizeMeta m
+  -- (y', yt') <- polarize' t
+  -- (k', kt') <- polarize' e
+  -- inner <- bindLet [kt'] (negMeta (up u ml) ml, WeakCodeDownElim k')
+  -- bindLet [yt'] (negMeta (up u ml) ml, WeakCodeMu (x, y') inner)
+
+makeClosure ::
+     Meta -> [(Identifier, TermPlus)] -> TermPlus -> WithEnv WeakCodePlus
+makeClosure m xts e = do
+  (d, ml) <- polarizeMeta m
+  pi <- extractFromDown d
+  -- (ys', yts', xs) <- polarizePlus xts
+  xps <- polarizePlus' xts
+  e' <- polarize e
+  let vs = varWeakCodePlus e'
+  lamVar <- newNameWith "cls"
+  envName <- newNameWith "env"
+  let lamBody =
+        ( undefined
+        , WeakCodeSigmaElim vs (undefined, WeakDataUpsilon envName) e')
+  -- lamVar == thunk (lam (envName, x1, ..., xn) lamBody)
+  insPolEnv lamVar ((envName, undefined) : xps) lamBody
+  let fvEnv = (undefined, WeakDataSigmaIntro $ map toVar vs)
+  return
+    ( undefined
+    , WeakCodeUpIntro
+        ( undefined
+        , WeakDataSigmaIntro [(undefined, WeakDataUpsilon lamVar), fvEnv]))
+  -- bindLet
+  --   yts'
+  --   ( negMeta (up d ml) ml
+  --   , WeakCodeUpIntro
+  --       ( posMeta d ml
+  --       , WeakDataDownIntro (negMeta pi ml, WeakCodePiIntro (zip xs ys') e')))
+  -- let lamBody = WeakCodeSigmaElim fvs (PosUpsilon envName) e
+  -- -- lamVar == thunk (lam (envName, x1, ..., xn) lamBody)
+  -- insPolEnv lamVar (envName : xs) lamBody
+  -- let fvEnv = PosSigmaIntro $ map PosUpsilon fvs
+  -- return $ WeakCodeUpIntro $ PosSigmaIntro [PosConst lamVar, fvEnv]
+
+callClosure :: Meta -> TermPlus -> [TermPlus] -> WithEnv WeakCodePlus
+callClosure m e es = do
+  e' <- polarize e
+  es' <- mapM polarize es
+  argVarNameList <- mapM (const $ newNameWith "arg") es
+  clsVarName <- newNameWith "fun"
+  thunkLamVarName <- newNameWith "down.elim.cls"
+  envVarName <- newNameWith "down.elim.env"
+  foo <-
+    bindLet
+      (zip argVarNameList es')
+      ( undefined
+      , WeakCodeSigmaElim
+          [(thunkLamVarName, undefined), (envVarName, undefined)]
+          (undefined, WeakDataUpsilon clsVarName)
+          ( undefined
+          , WeakCodePiElimDownElim
+              (undefined, WeakDataUpsilon thunkLamVarName)
+              ((undefined, WeakDataUpsilon envVarName) :
+               map undefined argVarNameList)))
+  return (undefined, WeakCodeUpElim (clsVarName, undefined) e' foo)
+          -- ( undefined
+          -- , WeakCodeSigmaElim
+          --     [thunkLamVarName, envVarName]
+          --     (PosUpsilon clsVarName) $
+          --   WeakCodePiElimDownElim
+          --     (PosUpsilon thunkLamVarName)
+          --     (PosUpsilon envVarName : map PosUpsilon argVarNameList))
+  -- return $
+  --   WeakCodeUpElim clsVarName e $
+  --   bindLet (zip argVarNameList es) $
+  --   WeakCodeSigmaElim [thunkLamVarName, envVarName] (PosUpsilon clsVarName) $
+  --   WeakCodePiElimDownElim
+  --     (PosUpsilon thunkLamVarName)
+  --     (PosUpsilon envVarName : map PosUpsilon argVarNameList)
+
+--   argVarNameList <- mapM (const $ newNameWith "arg") es
+--   clsVarName <- newNameWith "fun"
+--   thunkLamVarName <- newNameWith "down.elim.cls"
+--   envVarName <- newNameWith "down.elim.env"
+--   undefined
+toVar :: (Identifier, WeakDataPlus) -> WeakDataPlus
+toVar = undefined
 
 polarize' :: TermPlus -> WithEnv (WeakDataPlus, (Identifier, WeakCodePlus))
 polarize' e@(m, _) = do
@@ -120,26 +225,13 @@ bindLet ((x, e@(m, _)):xes) cont = do
   e' <- bindLet xes cont
   let (typeOfCont, ml) = obtainInfoWeakCodeMeta $ fst e'
   p <- extract $ fst $ obtainInfoWeakCodeMeta m
+  -- kleisli extension (i.e. dependent up-elimination)
   let ke = (fst typeOfCont, WeakCodeUpElim (x, p) e typeOfCont)
-  -- "ke" here stands for "Kleisli Extension" (i.e. dependent up-elimination).
-  -- Notes on this concept can be found in Section 16.3 of Levy's paper, and also in
-  -- M. Vákár, "An Effectful Treatment of Dependent Types", arXiv:1603.04298, 2016.
-  -- Vákár's approarch:
-  --   type of `e2` : N {z := thunk (return x)}
-  --   type of `bind x := e1 in e2` N {z := thunk e}
-  -- Our approach:
-  --   type of `e2` : N
-  --   type of `bind x := e1 in e2` : bind x := e1 in N
   return (negMeta ke ml, WeakCodeUpElim (x, p) e e')
 
 obtainInfoMeta :: Meta -> (TermPlus, Maybe (Int, Int))
 obtainInfoMeta (MetaTerminal ml)      = ((MetaTerminal ml, TermTau), ml)
 obtainInfoMeta (MetaNonTerminal t ml) = (t, ml)
-
-obtainInfoWeakCodeMeta :: WeakCodeMeta -> (WeakCodePlus, Maybe (Int, Int))
-obtainInfoWeakCodeMeta (WeakCodeMetaTerminal ml) =
-  ((WeakCodeMetaTerminal ml, WeakCodeTau), ml)
-obtainInfoWeakCodeMeta (WeakCodeMetaNonTerminal t ml) = (t, ml)
 
 polarizePlus ::
      [(a, TermPlus)]
@@ -148,6 +240,14 @@ polarizePlus xts = do
   let (xs, ts) = unzip xts
   (ys', yts') <- unzip <$> mapM polarize' ts
   return (ys', yts', xs)
+
+polarizePlus' :: [(a, TermPlus)] -> WithEnv [(a, WeakDataPlus)]
+polarizePlus' xts = do
+  let (xs, ts) = unzip xts
+  ps <- mapM (polarize >=> reduceWeakCodePlus >=> extract) ts
+  return $ zip xs ps
+  -- (ys', yts') <- unzip <$> mapM polarize' ts
+  -- return (ys', yts', xs)
 
 polarizeMeta :: Meta -> WithEnv (WeakDataPlus, Maybe (Int, Int))
 polarizeMeta m = do
@@ -201,36 +301,32 @@ polarizeThetaArith :: Arith -> Meta -> WithEnv WeakCodePlus
 polarizeThetaArith op m = do
   (upT, ml) <- polarizeMeta m
   case upT of
-    d@(_, WeakDataDown pi@(_, WeakCodePi _ (_, WeakCodeUp int))) -> do
+    d@(_, WeakDataDown (_, WeakCodePi _ (_, WeakCodeUp int))) -> do
       (x, varX) <- varOfType int
       (y, varY) <- varOfType int
       return
         ( negMeta (up d ml) ml
         , WeakCodeUpIntro
             ( posMeta d ml
-            , WeakDataDownIntro
-                ( negMeta pi ml
-                , WeakCodePiIntro
-                    [(x, int), (y, int)]
-                    ( negMeta (up int ml) ml
-                    , WeakCodeTheta (WeakThetaArith op varX varY)))))
+            , WeakDataDownIntroPiIntro
+                [(x, int), (y, int)]
+                ( negMeta (up int ml) ml
+                , WeakCodeTheta (WeakThetaArith op varX varY))))
     _ -> throwError "polarize.theta.arith"
 
 polarizeThetaPrint :: Meta -> WithEnv WeakCodePlus
 polarizeThetaPrint m = do
   (upT, ml) <- polarizeMeta m
   case upT of
-    d@(_, WeakDataDown pi@(_, WeakCodePi [(_, int)] cod)) -> do
+    d@(_, WeakDataDown (_, WeakCodePi [(_, int)] cod)) -> do
       (x, varX) <- varOfType int
       return
         ( negMeta (up d ml) ml
         , WeakCodeUpIntro
             ( posMeta d ml
-            , WeakDataDownIntro
-                ( negMeta pi ml
-                , WeakCodePiIntro
-                    [(x, int)]
-                    (negMeta cod ml, WeakCodeTheta (WeakThetaPrint varX)))))
+            , WeakDataDownIntroPiIntro
+                [(x, int)]
+                (negMeta cod ml, WeakCodeTheta (WeakThetaPrint varX))))
     _ -> throwError "polarize.theta.print"
 
 varOfType :: WeakDataPlus -> WithEnv (Identifier, WeakDataPlus)
