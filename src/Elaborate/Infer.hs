@@ -71,7 +71,11 @@ infer ctx (meta, WeakTermEpsilonElim (x, t) e branchList) = do
       ts <- mapM (infer $ ctx ++ [(x, t)]) es
       constrainList ts
       returnAfterUpdate meta $ substWeakTermPlus [(x, e)] $ head ts
-infer ctx (meta, WeakTermPi xts t) = inferPiOrSigma ctx meta xts t
+infer ctx (meta, WeakTermPi xts t) = do
+  univList <- inferPlus ctx xts
+  univ <- infer (ctx ++ xts) t
+  constrainList $ univ : univList
+  returnAfterUpdate meta univ
 infer ctx (meta, WeakTermPiIntro xts e) = do
   forM_ xts $ uncurry insTypeEnv
   cod <- infer (ctx ++ xts) e
@@ -83,18 +87,22 @@ infer ctx (meta, WeakTermPiElim e es) = do
   tPi' <- wrapInfer ctx $ WeakTermPi binder cod
   insConstraintEnv tPi tPi'
   returnAfterUpdate meta $ substWeakTermPlus (zip (map fst binder) es) cod
-infer ctx (meta, WeakTermSigma xts t) = inferPiOrSigma ctx meta xts t
+infer ctx (meta, WeakTermSigma xts) = do
+  univList <- inferPlus ctx xts
+  univ <- newUniv
+  constrainList $ univ : univList
+  returnAfterUpdate meta univ
 infer ctx (meta, WeakTermSigmaIntro es) = do
   binder <- inferList ctx es
-  let (xts, (_, t)) = initLast binder
-  returnAfterUpdate meta (meta, WeakTermSigma xts t)
+  -- let (xts, (_, t)) = initLast binder
+  returnAfterUpdate meta (meta, WeakTermSigma binder)
 infer ctx (meta, WeakTermSigmaElim xts e1 e2) = do
   t1 <- infer ctx e1
   forM_ xts $ uncurry insTypeEnv
   varSeq <- mapM (uncurry toVar) xts
   binder <- inferList ctx varSeq
-  let (yts, (_, t)) = initLast binder
-  sigmaType <- wrapInfer ctx $ WeakTermSigma yts t
+  -- let (yts, (_, t)) = initLast binder
+  sigmaType <- wrapInfer ctx $ WeakTermSigma binder
   insConstraintEnv t1 sigmaType
   z <- newNameOfType t1 "hole"
   varTuple <- constructTuple (ctx ++ binder) (map fst binder)
@@ -113,19 +121,10 @@ infer ctx (meta, WeakTermZeta _) = do
     Just t  -> return t
     Nothing -> newHoleInCtx ctx >>= returnAfterUpdate meta
 
-inferPiOrSigma ::
-     Context
-  -> WeakMeta
-  -> [IdentifierPlus]
-  -> WeakTermPlus
-  -> WithEnv WeakTermPlus
-inferPiOrSigma ctx meta xts t = do
-  univList <-
-    forM (map (`take` xts) [1 .. length xts]) $ \zts ->
-      infer (ctx ++ init zts) (snd $ last zts)
-  univ <- infer (ctx ++ xts) t
-  constrainList $ univ : univList
-  returnAfterUpdate meta univ
+inferPlus :: Context -> [(Identifier, WeakTermPlus)] -> WithEnv [WeakTermPlus]
+inferPlus ctx xts =
+  forM (map (`take` xts) [1 .. length xts]) $ \zts ->
+    infer (ctx ++ init zts) (snd $ last zts)
 
 -- In a context (x1 : A1, ..., xn : An), this function creates metavariables
 --   ?M  : Pi (x1 : A1, ..., xn : An). ?Mt @ (x1, ..., xn)
@@ -236,6 +235,3 @@ writeWeakMetaType (WeakMetaTerminal _) mt =
     Just t -> do
       u <- newUniv
       insConstraintEnv u t
-
-initLast :: [a] -> ([a], a)
-initLast = undefined

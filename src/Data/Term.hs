@@ -21,7 +21,6 @@ data Term
   | TermPiElim TermPlus
                [TermPlus]
   | TermSigma [IdentifierPlus]
-              TermPlus
   | TermSigmaIntro [TermPlus]
   | TermSigmaElim [IdentifierPlus]
                   TermPlus
@@ -63,8 +62,7 @@ varTermPlus (_, TermPi xts t) =
 varTermPlus (_, TermPiIntro xts e) = varTermPlusBindings xts [e]
 varTermPlus (_, TermPiElim e es) =
   pairwiseConcat $ varTermPlus e : map varTermPlus es
-varTermPlus (_, TermSigma xts t) =
-  pairwiseConcat [varTermPlusBindings xts [], varTermPlus t]
+varTermPlus (_, TermSigma xts) = varTermPlusBindings xts []
 varTermPlus (_, TermSigmaIntro es) = pairwiseConcat $ map varTermPlus es
 varTermPlus (_, TermSigmaElim xts e1 e2) =
   pairwiseConcat [varTermPlus e1, varTermPlusBindings xts [e2]]
@@ -109,10 +107,9 @@ substTermPlus sub (m, TermPiElim e es) = do
   let e' = substTermPlus sub e
   let es' = map (substTermPlus sub) es
   (m, TermPiElim e' es')
-substTermPlus sub (m, TermSigma xts t) = do
+substTermPlus sub (m, TermSigma xts) = do
   let xts' = substTermPlusBindings sub xts
-  let t' = substTermPlus (filter (\(k, _) -> k `notElem` map fst xts) sub) t
-  (m, TermSigma xts' t')
+  (m, TermSigma xts')
 substTermPlus sub (m, TermSigmaIntro es) = do
   let es' = map (substTermPlus sub) es
   (m, TermSigmaIntro es')
@@ -158,7 +155,7 @@ isReducible (_, TermPiElim (_, TermMu _ _) _) = True -- CBV recursion
 isReducible (_, TermPiElim (_, TermTheta c) [(_, TermEpsilonIntro (LiteralInteger _)), (_, TermEpsilonIntro (LiteralInteger _))]) -- constant application
   | c `elem` intArithConstantList = True
 isReducible (_, TermPiElim e es) = isReducible e || any isReducible es
-isReducible (_, TermSigma _ _) = False
+isReducible (_, TermSigma _) = False
 isReducible (_, TermSigmaIntro es) = any isReducible es
 isReducible (_, TermSigmaElim xts (_, TermSigmaIntro es) _)
   | length xts == length es = True

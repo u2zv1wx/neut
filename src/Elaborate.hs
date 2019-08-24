@@ -89,11 +89,10 @@ elaborate' (m, WeakTermPiElim e es) = do
   e' <- elaborate' e
   es' <- mapM elaborate' es
   return (m', TermPiElim e' es')
-elaborate' (m, WeakTermSigma xts t) = do
+elaborate' (m, WeakTermSigma xts) = do
   m' <- toMeta m
   xts' <- mapM elaboratePlus xts
-  t' <- elaborate t
-  return (m', TermSigma xts' t')
+  return (m', TermSigma xts')
 elaborate' (m, WeakTermSigmaIntro es) = do
   m' <- toMeta m
   es' <- mapM elaborate' es
@@ -146,7 +145,7 @@ exhaust' (_, WeakTermEpsilonElim (_, t) e1 branchList) = do
 exhaust' (_, WeakTermPi xts t) = allM exhaust' $ map snd xts ++ [t]
 exhaust' (_, WeakTermPiIntro _ e) = exhaust' e
 exhaust' (_, WeakTermPiElim e es) = allM exhaust' $ e : es
-exhaust' (_, WeakTermSigma xts t) = allM exhaust' $ map snd xts ++ [t]
+exhaust' (_, WeakTermSigma xts) = allM exhaust' $ map snd xts
 exhaust' (_, WeakTermSigmaIntro es) = allM exhaust' es
 exhaust' (_, WeakTermSigmaElim _ e1 e2) = allM exhaust' [e1, e2]
 exhaust' (_, WeakTermMu _ e) = exhaust' e

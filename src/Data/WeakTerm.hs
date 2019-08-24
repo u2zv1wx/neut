@@ -23,7 +23,6 @@ data WeakTerm
   | WeakTermPiElim WeakTermPlus
                    [WeakTermPlus]
   | WeakTermSigma [IdentifierPlus]
-                  WeakTermPlus
   | WeakTermSigmaIntro [WeakTermPlus]
   | WeakTermSigmaElim [IdentifierPlus]
                       WeakTermPlus
@@ -72,8 +71,7 @@ varWeakTermPlus (_, WeakTermPi xts t) =
 varWeakTermPlus (_, WeakTermPiIntro xts e) = varWeakTermPlusBindings xts [e]
 varWeakTermPlus (_, WeakTermPiElim e es) =
   pairwiseConcat $ varWeakTermPlus e : map varWeakTermPlus es
-varWeakTermPlus (_, WeakTermSigma xts t) =
-  pairwiseConcat [varWeakTermPlusBindings xts [], varWeakTermPlus t]
+varWeakTermPlus (_, WeakTermSigma xts) = varWeakTermPlusBindings xts []
 varWeakTermPlus (_, WeakTermSigmaIntro es) =
   pairwiseConcat $ map varWeakTermPlus es
 varWeakTermPlus (_, WeakTermSigmaElim xts e1 e2) =
@@ -120,10 +118,9 @@ substWeakTermPlus sub (m, WeakTermPiElim e es) = do
   let e' = substWeakTermPlus sub e
   let es' = map (substWeakTermPlus sub) es
   (m, WeakTermPiElim e' es')
-substWeakTermPlus sub (m, WeakTermSigma xts t) = do
+substWeakTermPlus sub (m, WeakTermSigma xts) = do
   let xts' = substWeakTermPlusBindings sub xts
-  let t' = substWeakTermPlus (filter (\(k, _) -> k `notElem` map fst xts) sub) t
-  (m, WeakTermSigma xts' t')
+  (m, WeakTermSigma xts')
 substWeakTermPlus sub (m, WeakTermSigmaIntro es) = do
   let es' = map (substWeakTermPlus sub) es
   (m, WeakTermSigmaIntro es')
@@ -176,7 +173,7 @@ isReducible (_, WeakTermPiElim (_, WeakTermMu _ _) _) = True -- CBV recursion
 isReducible (_, WeakTermPiElim (_, WeakTermTheta c) [(_, WeakTermEpsilonIntro (LiteralInteger _)), (_, WeakTermEpsilonIntro (LiteralInteger _))]) -- constant application
   | c `elem` intArithConstantList = True
 isReducible (_, WeakTermPiElim e es) = isReducible e || any isReducible es
-isReducible (_, WeakTermSigma _ _) = False
+isReducible (_, WeakTermSigma _) = False
 isReducible (_, WeakTermSigmaIntro es) = any isReducible es
 isReducible (_, WeakTermSigmaElim xts (_, WeakTermSigmaIntro es) _)
   | length xts == length es = True
