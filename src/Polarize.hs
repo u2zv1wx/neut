@@ -51,7 +51,25 @@ polarize (m, TermPi xts t) = do
     ( negMeta (up u ml) ml
     , CodeUpIntro (posMeta u ml, DataDown (negMetaMeta, CodePi (zip xs xs') z')))
 polarize (m, TermPiIntro xts e) = makeClosure m xts e
+polarize (m, TermMuPiIntro xts e) = do
+  (u, ml) <- polarizeMeta m
+  xps' <- polarizePlus' xts
+  e' <- polarize e
+  (lamThetaName, lamTheta) <- newTheta u ml
+  insPolEnv lamThetaName xps' e'
+  return (negMeta (up u ml) ml, CodeUpIntro lamTheta)
 polarize (m, TermPiElim e es) = callClosure m e es
+polarize (m, TermPiElimMu e es) = do
+  (u, ml) <- polarizeMeta m
+  e' <- polarize e
+  t <- typeOf e'
+  (funVarName, funVar) <- newVarOfType t
+  es' <- mapM polarize es
+  ts <- mapM typeOf es'
+  argList <- mapM newVarOfType ts
+  bindLet
+    ((funVarName, e') : zip (map fst argList) es')
+    (negMeta (up u ml) ml, CodePiElimDownElim funVar (map toVar argList))
 polarize (m, TermSigma xts) = do
   (u, ml) <- polarizeMeta m
   (ys', yts', xs) <- polarizePlus xts
@@ -114,9 +132,9 @@ makeClosure m xts e = do
   piType' <- toPiType ml (Left envType : map Right xpsPi) codType
   -- downPiType' = ↓((ENV, A1, ..., An) -> ↑B)
   let downPiType' = down piType' ml
-  (lamVarName, lamVar) <- newTheta downPiType' ml
-  -- lamVarName ~> thunk (lam (envVarName, x1, ..., xn) lamBody)
-  insPolEnv lamVarName ((envVarName, envType) : xps) lamBody
+  (lamThetaName, lamTheta) <- newTheta downPiType' ml
+  -- lamThetaName ~> thunk (lam (envVarName, x1, ..., xn) lamBody)
+  insPolEnv lamThetaName ((envVarName, envType) : xps) lamBody
   let fvSigmaIntro = (posMeta envType ml, DataSigmaIntro $ map toVar fvs)
   (typeVarName, typeVar) <- newVarOfType (DataMetaTerminal ml, DataTau)
   -- piType'  : ↓(((C1, ..., Cn), A) -> ↑B)
@@ -134,31 +152,7 @@ makeClosure m xts e = do
   return
     ( negMeta (up clsType ml) ml
     , CodeUpIntro
-        (posMeta clsType ml, DataSigmaIntro [envType, lamVar, fvSigmaIntro]))
-
-toSigmaType ::
-     Maybe (Int, Int)
-  -> [Either DataPlus (Identifier, DataPlus)]
-  -> WithEnv DataPlus
-toSigmaType ml xps = do
-  xps' <- mapM supplyName xps
-  return (DataMetaTerminal ml, DataSigma xps')
-
-toPiType ::
-     Maybe (Int, Int)
-  -> [Either DataPlus (Identifier, DataPlus)]
-  -> CodePlus
-  -> WithEnv CodePlus
-toPiType ml xps n = do
-  xps' <- mapM supplyName xps
-  return (CodeMetaTerminal ml, CodePi xps' n)
-
-supplyName ::
-     Either DataPlus (Identifier, DataPlus) -> WithEnv (Identifier, DataPlus)
-supplyName (Left t) = do
-  x <- newNameWith "hole"
-  return (x, t)
-supplyName (Right (x, t)) = return (x, t)
+        (posMeta clsType ml, DataSigmaIntro [envType, lamTheta, fvSigmaIntro]))
 
 callClosure :: Meta -> TermPlus -> [TermPlus] -> WithEnv CodePlus
 callClosure m e@(funMeta, _) es = do
@@ -195,6 +189,30 @@ callClosure m e@(funMeta, _) es = do
           , CodePiElimDownElim lamVar (envVar : map toVar argList)))
   return (negMeta (up u ml) ml, CodeUpElim (clsVarName, clsType) e' cont)
 
+toSigmaType ::
+     Maybe (Int, Int)
+  -> [Either DataPlus (Identifier, DataPlus)]
+  -> WithEnv DataPlus
+toSigmaType ml xps = do
+  xps' <- mapM supplyName xps
+  return (DataMetaTerminal ml, DataSigma xps')
+
+toPiType ::
+     Maybe (Int, Int)
+  -> [Either DataPlus (Identifier, DataPlus)]
+  -> CodePlus
+  -> WithEnv CodePlus
+toPiType ml xps n = do
+  xps' <- mapM supplyName xps
+  return (CodeMetaTerminal ml, CodePi xps' n)
+
+supplyName ::
+     Either DataPlus (Identifier, DataPlus) -> WithEnv (Identifier, DataPlus)
+supplyName (Left t) = do
+  x <- newNameWith "hole"
+  return (x, t)
+supplyName (Right (x, t)) = return (x, t)
+
 typeOf :: CodePlus -> WithEnv DataPlus
 typeOf (m, _) = extract $ fst $ obtainInfoCodeMeta m
 
@@ -219,10 +237,6 @@ bindLet ((x, e):xes) cont = do
   -- kleisli extension (i.e. dependent up-elimination)
   let ke = (fst typeOfCont, CodeUpElim (x, p) e typeOfCont)
   return (negMeta ke ml, CodeUpElim (x, p) e e')
-
-obtainInfoMeta :: Meta -> (TermPlus, Maybe (Int, Int))
-obtainInfoMeta (MetaTerminal ml)      = ((MetaTerminal ml, TermTau), ml)
-obtainInfoMeta (MetaNonTerminal t ml) = (t, ml)
 
 polarizePlus ::
      [(a, TermPlus)] -> WithEnv ([DataPlus], [(Identifier, CodePlus)], [a])
