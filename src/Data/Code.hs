@@ -13,7 +13,6 @@ data Data
   | DataDownIntroPiIntro [IdentifierPlus]
                          CodePlus
   | DataSigma [IdentifierPlus]
-              DataPlus
   | DataSigmaIntro [DataPlus]
   | DataDown CodePlus
   deriving (Show)
@@ -83,7 +82,7 @@ varDataPlus (_, DataEpsilonIntro _) = []
 varDataPlus (_, DataDownIntroPiIntro xps e) =
   filterPlus (`notElem` map fst xps) $
   concatMap (varDataPlus . snd) xps ++ varCodePlus e
-varDataPlus (_, DataSigma xps p) = varDataPlusPiOrSigma xps (varDataPlus p)
+varDataPlus (_, DataSigma xps) = varDataPlusPiOrSigma xps []
 varDataPlus (_, DataSigmaIntro vs) = concatMap varDataPlus vs
 varDataPlus (_, DataDown n) = varCodePlus n
 
@@ -142,10 +141,10 @@ substDataPlus sub (m, DataDownIntroPiIntro xps e) = do
   let (xps', e') = substCodePlusPi sub xps e
   let m' = substDataMeta sub m
   (m', DataDownIntroPiIntro xps' e')
-substDataPlus sub (m, DataSigma xps p) = do
-  let (xps', p') = substDataPlusSigma sub xps p
+substDataPlus sub (m, DataSigma xps) = do
+  let xps' = substDataPlusSigma sub xps
   let m' = substDataMeta sub m
-  (m', DataSigma xps' p')
+  (m', DataSigma xps')
 substDataPlus sub (m, DataSigmaIntro vs) = do
   let vs' = map (substDataPlus sub) vs
   let m' = substDataMeta sub m
@@ -239,15 +238,11 @@ substDataPlusPi sub ((x, p):xps) n = do
   let (xps', n') = substDataPlusPi (filter (\(y, _) -> y /= x) sub) xps n
   ((x, substDataPlus sub p) : xps', n')
 
-substDataPlusSigma ::
-     SubstDataPlus
-  -> [IdentifierPlus]
-  -> DataPlus
-  -> ([IdentifierPlus], DataPlus)
-substDataPlusSigma sub [] q = ([], substDataPlus sub q)
-substDataPlusSigma sub ((x, p):xps) q = do
-  let (xps', q') = substDataPlusSigma (filter (\(y, _) -> y /= x) sub) xps q
-  ((x, substDataPlus sub p) : xps', q')
+substDataPlusSigma :: SubstDataPlus -> [IdentifierPlus] -> [IdentifierPlus]
+substDataPlusSigma _ [] = []
+substDataPlusSigma sub ((x, p):xps) = do
+  let xps' = substDataPlusSigma (filter (\(y, _) -> y /= x) sub) xps
+  (x, substDataPlus sub p) : xps'
 
 substCodePlusPi ::
      SubstDataPlus

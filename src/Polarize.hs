@@ -51,13 +51,12 @@ polarize (m, TermPi xts t) = do
     , CodeUpIntro (posMeta u ml, DataDown (negMetaMeta, CodePi (zip xs xs') z')))
 polarize (m, TermPiIntro xts e) = makeClosure m xts e
 polarize (m, TermPiElim e es) = callClosure m e es
-polarize (m, TermSigma xts t) = do
+polarize (m, TermSigma xts) = do
   (u, ml) <- polarizeMeta m
-  p <- polarize t >>= reduceCodePlus >>= extract
   (ys', yts', xs) <- polarizePlus xts
   bindLet
     yts'
-    (negMeta (up u ml) ml, CodeUpIntro (posMeta u ml, DataSigma (zip xs ys') p))
+    (negMeta (up u ml) ml, CodeUpIntro (posMeta u ml, DataSigma (zip xs ys')))
 polarize (m, TermSigmaIntro es) = do
   (u, ml) <- polarizeMeta m
   (xs, xes) <- unzip <$> mapM polarize' es
@@ -105,7 +104,6 @@ makeClosure m xts e = do
   e' <- polarize e
   let fvs = varCodePlus e' -- FIXME: nub fvs
   -- envType = (C1, ..., Cn), where Ci is the types of the free variables in e'
-  -- FIXME: allow nullary sigma-type (i.e. unit-type as degenerated sigma-type)
   envType <- toSigmaType $ map (Left . snd) fvs
   (envVarName, envVar) <- newVarOfType envType
   -- (codType, _) <- polarizeMeta codMeta
