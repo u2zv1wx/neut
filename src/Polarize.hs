@@ -161,45 +161,42 @@ supplyName (Left t) = do
 supplyName (Right (x, t)) = return (x, t)
 
 callClosure :: Meta -> TermPlus -> [TermPlus] -> WithEnv CodePlus
-callClosure m e es = do
+callClosure m e@(funMeta, _) es = do
   (u, ml) <- polarizeMeta m
   e' <- polarize e
   es' <- mapM polarize es
-  argVarNameList <- mapM (const $ newNameWith "arg") es
-  clsVarName <- newNameWith "fun"
-  envTypeVarName <- newNameWith "down.elim.env"
-  thunkLamVarName <- newNameWith "down.elim.cls"
-  envVarName <- newNameWith "down.elim.env"
+  ts <- mapM typeOf es'
+  (typeVarName, typeVar) <- newVarOfType (DataMetaTerminal ml, DataTau)
+  (downPiType, mlPi) <- polarizeMeta funMeta
+  (xpsPi, codType) <- extractFromDownPi downPiType
+  piType'' <- toPiType mlPi (Left typeVar : map Right xpsPi) codType
+  clsType <-
+    toSigmaType
+      ml
+      [ Right (typeVarName, (DataMetaTerminal mlPi, DataTau))
+      , Left (down piType'' mlPi)
+      , Left typeVar
+      ]
+  argList <- mapM newVarOfType ts
+  (clsVarName, clsVar) <- newVarOfType clsType
+  (lamVarName, lamVar) <- newVarOfType (down piType'' mlPi)
+  (envVarName, envVar) <- newVarOfType typeVar
   cont <-
     bindLet
-      (zip argVarNameList es')
-      ( undefined
+      (zip (map fst argList) es')
+      ( negMeta (up u ml) ml
       , CodeSigmaElim
-          [ (envTypeVarName, undefined)
-          , (thunkLamVarName, undefined)
-          , (envVarName, (undefined, DataUpsilon envTypeVarName))
+          [ (typeVarName, (DataMetaTerminal mlPi, DataTau))
+          , (lamVarName, down piType'' mlPi)
+          , (envVarName, typeVar)
           ]
-          (undefined, DataUpsilon clsVarName)
-          ( undefined
-          , CodePiElimDownElim
-              (undefined, DataUpsilon thunkLamVarName)
-              ((undefined, DataUpsilon envVarName) :
-               map undefined argVarNameList)))
-  return (negMeta (up u ml) ml, CodeUpElim (clsVarName, undefined) e' cont)
-          -- ( undefined
-          -- , CodeSigmaElim
-          --     [thunkLamVarName, envVarName]
-          --     (PosUpsilon clsVarName) $
-          --   CodePiElimDownElim
-          --     (PosUpsilon thunkLamVarName)
-          --     (PosUpsilon envVarName : map PosUpsilon argVarNameList))
-  -- return $
-  --   CodeUpElim clsVarName e $
-  --   bindLet (zip argVarNameList es) $
-  --   CodeSigmaElim [thunkLamVarName, envVarName] (PosUpsilon clsVarName) $
-  --   CodePiElimDownElim
-  --     (PosUpsilon thunkLamVarName)
-  --     (PosUpsilon envVarName : map PosUpsilon argVarNameList)
+          clsVar
+          ( negMeta (up u ml) ml
+          , CodePiElimDownElim lamVar (envVar : map toVar argList)))
+  return (negMeta (up u ml) ml, CodeUpElim (clsVarName, clsType) e' cont)
+
+typeOf :: CodePlus -> WithEnv DataPlus
+typeOf (m, _) = extract $ fst $ obtainInfoCodeMeta m
 
 toVar :: (Identifier, DataPlus) -> DataPlus
 toVar = undefined
@@ -213,10 +210,10 @@ polarize' e@(m, _) = do
 
 bindLet :: [(Identifier, CodePlus)] -> CodePlus -> WithEnv CodePlus
 bindLet [] cont = return cont
-bindLet ((x, e@(m, _)):xes) cont = do
+bindLet ((x, e):xes) cont = do
   e' <- bindLet xes cont
   let (typeOfCont, ml) = obtainInfoCodeMeta $ fst e'
-  p <- extract $ fst $ obtainInfoCodeMeta m
+  p <- typeOf e
   -- kleisli extension (i.e. dependent up-elimination)
   let ke = (fst typeOfCont, CodeUpElim (x, p) e typeOfCont)
   return (negMeta ke ml, CodeUpElim (x, p) e e')
