@@ -10,6 +10,7 @@ module Polarize
   ) where
 
 import           Control.Monad.Except
+import           Data.List            (nubBy)
 import           Prelude              hiding (pi)
 
 import           Data.Basic
@@ -102,15 +103,15 @@ makeClosure m xts e = do
   (downPiType, ml) <- polarizeMeta m
   xps <- polarizePlus' xts
   e' <- polarize e
-  let fvs = varCodePlus e' -- FIXME: nub fvs
+  let fvs = nubBy (\x y -> fst x == fst y) $ varCodePlus e'
   -- envType = (C1, ..., Cn), where Ci is the types of the free variables in e'
-  envType <- toSigmaType $ map (Left . snd) fvs
+  envType <- toSigmaType ml $ map (Left . snd) fvs
   (envVarName, envVar) <- newVarOfType envType
   -- (codType, _) <- polarizeMeta codMeta
   (xpsPi, codType) <- extractFromDownPi downPiType
   let lamBody = (negMeta codType ml, CodeSigmaElim fvs envVar e')
   -- ((A1, ..., An) -> ↑B) ~> ((ENV, A1, ..., An) -> ↑B)
-  piType' <- toPiType (Left envType : map Right xpsPi) codType
+  piType' <- toPiType ml (Left envType : map Right xpsPi) codType
   -- downPiType' = ↓((ENV, A1, ..., An) -> ↑B)
   let downPiType' = down piType' ml
   (lamVarName, lamVar) <- newTheta downPiType' ml
@@ -121,10 +122,11 @@ makeClosure m xts e = do
   -- piType'  : ↓(((C1, ..., Cn), A) -> ↑B)
   -- piType'' : ↓((typeVar, A) -> ↑B)
   -- i.e. piType' = piType'' {typeVar := (C1, ..., Cn)}
-  piType'' <- toPiType (Left typeVar : map Right xpsPi) codType
+  piType'' <- toPiType ml (Left typeVar : map Right xpsPi) codType
   -- clsType = Sigma (typeVar : U). (↓((typeVar, A) -> ↑B), typeVar)
   clsType <-
     toSigmaType
+      ml
       [ Right (typeVarName, (DataMetaTerminal ml, DataTau))
       , Left (down piType'' ml)
       , Left typeVar
@@ -133,20 +135,30 @@ makeClosure m xts e = do
     ( negMeta (up clsType ml) ml
     , CodeUpIntro
         (posMeta clsType ml, DataSigmaIntro [envType, lamVar, fvSigmaIntro]))
-  -- let lamBody = CodeSigmaElim fvs (PosUpsilon envName) e
-  -- -- lamVar == thunk (lam (envName, x1, ..., xn) lamBody)
-  -- insPolEnv lamVar (envName : xs) lamBody
-  -- let fvEnv = PosSigmaIntro $ map PosUpsilon fvs
-  -- return $ CodeUpIntro $ PosSigmaIntro [PosConst lamVar, fvEnv]
 
-toSigmaType :: [Either DataPlus (Identifier, DataPlus)] -> WithEnv DataPlus
-toSigmaType = undefined
+toSigmaType ::
+     Maybe (Int, Int)
+  -> [Either DataPlus (Identifier, DataPlus)]
+  -> WithEnv DataPlus
+toSigmaType ml xps = do
+  xps' <- mapM supplyName xps
+  return (DataMetaTerminal ml, DataSigma xps')
 
--- toSigmaType :: [(Identifier, DataPlus)] -> WithEnv DataPlus
--- toSigmaType = undefined
 toPiType ::
-     [Either DataPlus (Identifier, DataPlus)] -> CodePlus -> WithEnv CodePlus
-toPiType = undefined
+     Maybe (Int, Int)
+  -> [Either DataPlus (Identifier, DataPlus)]
+  -> CodePlus
+  -> WithEnv CodePlus
+toPiType ml xps n = do
+  xps' <- mapM supplyName xps
+  return (CodeMetaTerminal ml, CodePi xps' n)
+
+supplyName ::
+     Either DataPlus (Identifier, DataPlus) -> WithEnv (Identifier, DataPlus)
+supplyName (Left t) = do
+  x <- newNameWith "hole"
+  return (x, t)
+supplyName (Right (x, t)) = return (x, t)
 
 callClosure :: Meta -> TermPlus -> [TermPlus] -> WithEnv CodePlus
 callClosure m e es = do
