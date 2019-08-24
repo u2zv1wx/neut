@@ -199,7 +199,9 @@ typeOf :: CodePlus -> WithEnv DataPlus
 typeOf (m, _) = extract $ fst $ obtainInfoCodeMeta m
 
 toVar :: (Identifier, DataPlus) -> DataPlus
-toVar = undefined
+toVar (x, t) = do
+  let (_, ml) = obtainInfoDataMeta $ fst t
+  (DataMetaNonTerminal t ml, DataUpsilon x)
 
 polarize' :: TermPlus -> WithEnv (DataPlus, (Identifier, CodePlus))
 polarize' e@(m, _) = do
