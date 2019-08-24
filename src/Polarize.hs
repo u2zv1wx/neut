@@ -72,7 +72,8 @@ polarize (m, TermSigmaElim xts e1 e2) = do
   bindLet
     (ze1' : yts')
     (negMeta (up u ml) ml, CodeSigmaElim (zip xs ys') z' e2')
-polarize (m, TermMu (x, t) e) = do
+polarize (m, TermMu (x, _) e) = do
+  (u, ml) <- polarizeMeta m
   e' <- polarize e
   let fvs = varCodePlus e'
   lamVar <- newNameWith "cls"
@@ -87,57 +88,76 @@ polarize (m, TermMu (x, t) e) = do
                 (x, undefined)
                 ( undefined
                 , CodePiElimDownElim
-                    (undefined, DataUpsilon lamVar)
+                    (undefined, DataTheta lamVar)
                     (map toVar fvs))
                 e'))
-  insPolEnv lamVar ((envName, undefined) : undefined) lamBody
+  insPolEnv lamVar fvs lamBody
   return
-    ( undefined
-    , CodePiElimDownElim (undefined, DataTheta lamVar) (map toVar fvs))
-  -- mu . e ~> (down-elim f) @ fvs
-  -- (u, ml) <- polarizeMeta m
-  -- (y', yt') <- polarize' t
-  -- (k', kt') <- polarize' e
-  -- inner <- bindLet [kt'] (negMeta (up u ml) ml, CodeDownElim k')
-  -- bindLet [yt'] (negMeta (up u ml) ml, CodeMu (x, y') inner)
+    ( negMeta (up u ml) ml
+    , CodePiElimDownElim
+        (undefined, DataTheta lamVar)
+        [(undefined, DataSigmaIntro (map toVar fvs))])
 
 makeClosure :: Meta -> [(Identifier, TermPlus)] -> TermPlus -> WithEnv CodePlus
 makeClosure m xts e = do
-  (d, ml) <- polarizeMeta m
-  pi <- extractFromDown d
-  -- (ys', yts', xs) <- polarizePlus xts
+  (downPiType, ml) <- polarizeMeta m
   xps <- polarizePlus' xts
   e' <- polarize e
-  let vs = varCodePlus e'
-  lamVar <- newNameWith "cls"
-  envName <- newNameWith "env"
-  let lamBody =
-        (undefined, CodeSigmaElim vs (undefined, DataUpsilon envName) e')
-  -- lamVar == thunk (lam (envName, x1, ..., xn) lamBody)
-  insPolEnv lamVar ((envName, undefined) : xps) lamBody
-  let fvEnv = (undefined, DataSigmaIntro $ map toVar vs)
+  let fvs = varCodePlus e' -- FIXME: nub fvs
+  -- envType = (C1, ..., Cn), where Ci is the types of the free variables in e'
+  -- FIXME: allow nullary sigma-type (i.e. unit-type as degenerated sigma-type)
+  envType <- toSigmaType $ map (Left . snd) fvs
+  (envVarName, envVar) <- newVarOfType envType
+  -- (codType, _) <- polarizeMeta codMeta
+  (xpsPi, codType) <- extractFromDownPi downPiType
+  let lamBody = (negMeta codType ml, CodeSigmaElim fvs envVar e')
+  -- ((A1, ..., An) -> ↑B) ~> ((ENV, A1, ..., An) -> ↑B)
+  piType' <- toPiType (Left envType : map Right xpsPi) codType
+  -- downPiType' = ↓((ENV, A1, ..., An) -> ↑B)
+  let downPiType' = down piType' ml
+  (lamVarName, lamVar) <- newTheta downPiType' ml
+  -- lamVarName ~> thunk (lam (envVarName, x1, ..., xn) lamBody)
+  insPolEnv lamVarName ((envVarName, envType) : xps) lamBody
+  let fvSigmaIntro = (posMeta envType ml, DataSigmaIntro $ map toVar fvs)
+  (typeVarName, typeVar) <- newVarOfType (DataMetaTerminal ml, DataTau)
+  -- piType'  : ↓(((C1, ..., Cn), A) -> ↑B)
+  -- piType'' : ↓((typeVar, A) -> ↑B)
+  -- i.e. piType' = piType'' {typeVar := (C1, ..., Cn)}
+  piType'' <- toPiType (Left typeVar : map Right xpsPi) codType
+  -- clsType = Sigma (typeVar : U). (↓((typeVar, A) -> ↑B), typeVar)
+  clsType <-
+    toSigmaType
+      [ Right (typeVarName, (DataMetaTerminal ml, DataTau))
+      , Left (down piType'' ml)
+      , Left typeVar
+      ]
   return
-    ( undefined
+    ( negMeta (up clsType ml) ml
     , CodeUpIntro
-        (undefined, DataSigmaIntro [(undefined, DataTheta lamVar), fvEnv]))
-  -- bindLet
-  --   yts'
-  --   ( negMeta (up d ml) ml
-  --   , CodeUpIntro
-  --       ( posMeta d ml
-  --       , DataDownIntro (negMeta pi ml, CodePiIntro (zip xs ys') e')))
+        (posMeta clsType ml, DataSigmaIntro [envType, lamVar, fvSigmaIntro]))
   -- let lamBody = CodeSigmaElim fvs (PosUpsilon envName) e
   -- -- lamVar == thunk (lam (envName, x1, ..., xn) lamBody)
   -- insPolEnv lamVar (envName : xs) lamBody
   -- let fvEnv = PosSigmaIntro $ map PosUpsilon fvs
   -- return $ CodeUpIntro $ PosSigmaIntro [PosConst lamVar, fvEnv]
 
+toSigmaType :: [Either DataPlus (Identifier, DataPlus)] -> WithEnv DataPlus
+toSigmaType = undefined
+
+-- toSigmaType :: [(Identifier, DataPlus)] -> WithEnv DataPlus
+-- toSigmaType = undefined
+toPiType ::
+     [Either DataPlus (Identifier, DataPlus)] -> CodePlus -> WithEnv CodePlus
+toPiType = undefined
+
 callClosure :: Meta -> TermPlus -> [TermPlus] -> WithEnv CodePlus
 callClosure m e es = do
+  (u, ml) <- polarizeMeta m
   e' <- polarize e
   es' <- mapM polarize es
   argVarNameList <- mapM (const $ newNameWith "arg") es
   clsVarName <- newNameWith "fun"
+  envTypeVarName <- newNameWith "down.elim.env"
   thunkLamVarName <- newNameWith "down.elim.cls"
   envVarName <- newNameWith "down.elim.env"
   cont <-
@@ -145,14 +165,17 @@ callClosure m e es = do
       (zip argVarNameList es')
       ( undefined
       , CodeSigmaElim
-          [(thunkLamVarName, undefined), (envVarName, undefined)]
+          [ (envTypeVarName, undefined)
+          , (thunkLamVarName, undefined)
+          , (envVarName, (undefined, DataUpsilon envTypeVarName))
+          ]
           (undefined, DataUpsilon clsVarName)
           ( undefined
           , CodePiElimDownElim
               (undefined, DataUpsilon thunkLamVarName)
               ((undefined, DataUpsilon envVarName) :
                map undefined argVarNameList)))
-  return (undefined, CodeUpElim (clsVarName, undefined) e' cont)
+  return (negMeta (up u ml) ml, CodeUpElim (clsVarName, undefined) e' cont)
           -- ( undefined
           -- , CodeSigmaElim
           --     [thunkLamVarName, envVarName]
@@ -217,11 +240,11 @@ extract e =
     (_, CodeUpIntro d) -> return d
     _                  -> throwError "extract"
 
-extractFromDown :: DataPlus -> WithEnv CodePlus
-extractFromDown e =
+extractFromDownPi :: DataPlus -> WithEnv ([(Identifier, DataPlus)], CodePlus)
+extractFromDownPi e =
   case e of
-    (_, DataDown d) -> return d
-    _               -> throwError "extract"
+    (_, DataDown (_, CodePi xps n)) -> return (xps, n)
+    _                               -> throwError "extract"
 
 posMeta :: DataPlus -> Maybe (Int, Int) -> DataMeta
 posMeta = DataMetaNonTerminal
@@ -231,6 +254,9 @@ negMeta = CodeMetaNonTerminal
 
 up :: DataPlus -> Maybe (Int, Int) -> CodePlus
 up u ml = (CodeMetaTerminal ml, CodeUp u)
+
+down :: CodePlus -> Maybe (Int, Int) -> DataPlus
+down n ml = (DataMetaTerminal ml, DataDown n)
 
 -- expand definitions of constants
 polarizeTheta :: Meta -> Identifier -> WithEnv CodePlus
@@ -258,8 +284,8 @@ polarizeThetaArith op m = do
   (upT, ml) <- polarizeMeta m
   case upT of
     d@(_, DataDown (_, CodePi _ (_, CodeUp int))) -> do
-      (x, varX) <- varOfType int
-      (y, varY) <- varOfType int
+      (x, varX) <- newVarOfType int
+      (y, varY) <- newVarOfType int
       return
         ( negMeta (up d ml) ml
         , CodeUpIntro
@@ -274,7 +300,7 @@ polarizeThetaPrint m = do
   (upT, ml) <- polarizeMeta m
   case upT of
     d@(_, DataDown (_, CodePi [(_, int)] cod)) -> do
-      (x, varX) <- varOfType int
+      (x, varX) <- newVarOfType int
       return
         ( negMeta (up d ml) ml
         , CodeUpIntro
@@ -284,7 +310,12 @@ polarizeThetaPrint m = do
                 (negMeta cod ml, CodeTheta (ThetaPrint varX))))
     _ -> throwError "polarize.theta.print"
 
-varOfType :: DataPlus -> WithEnv (Identifier, DataPlus)
-varOfType t = do
+newVarOfType :: DataPlus -> WithEnv (Identifier, DataPlus)
+newVarOfType t = do
   x <- newNameWith "arg"
   return (x, (posMeta t Nothing, DataUpsilon x))
+
+newTheta :: DataPlus -> Maybe (Int, Int) -> WithEnv (Identifier, DataPlus)
+newTheta t ml = do
+  x <- newNameWith "theta"
+  return (x, (posMeta t ml, DataTheta x))
