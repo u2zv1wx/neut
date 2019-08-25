@@ -79,25 +79,24 @@ polarize (m, TermSigmaElim xts e1 e2) = do
     (ze1' : yts')
     (negMeta (up u ml) ml, CodeSigmaElim (zip xs ys') z' e2')
 polarize (m, TermMu (f, t) e) = do
-  (u, ml) <- polarizeMeta m
+  (_, ml) <- polarizeMeta m
   let vs = nubBy (\x y -> fst x == fst y) $ varTermPlus e
-  envType <- toTermSigmaType ml $ map (Left . snd) vs
-  (envVarName, envVar) <- newTermVarOfType envType
+  let (xs, ts) = unzip vs
+  ts' <- mapM (polarize >=> reduceCodePlus >=> extract) ts
+  let vs' = map toTermVar vs
+  vs'' <- mapM polarize vs'
+  let clsMuType = (MetaTerminal ml, TermPi vs t)
   let lamBody =
-        ( fst e
-        , TermSigmaElim
-            vs
-            envVar
-            (substTermPlus
-               [ ( f
-                 , ( MetaNonTerminal t ml
-                   , TermPiElim (undefined, TermTheta f) (map undefined vs)))
-               ]
-               e))
+        substTermPlus
+          [ ( f
+            , ( MetaNonTerminal t ml
+              , TermPiElim (MetaNonTerminal clsMuType ml, TermTheta f) vs'))
+          ]
+          e
   lamBody' <- polarize lamBody
-  envType' <- polarize envType >>= reduceCodePlus >>= extract
-  cls <- makeClosureWithName f undefined [(envVarName, envType')] lamBody'
-  callClosure m cls (map undefined vs)
+  let clsMeta = MetaNonTerminal clsMuType ml
+  cls <- makeClosureWithName f clsMeta (zip xs ts') lamBody'
+  callClosure m cls vs''
 
 makeClosure :: Meta -> [(Identifier, DataPlus)] -> CodePlus -> WithEnv CodePlus
 makeClosure m xps e = do
@@ -187,14 +186,6 @@ toSigmaType ml xps = do
   xps' <- mapM supplyName xps
   return (DataMetaTerminal ml, DataSigma xps')
 
-toTermSigmaType ::
-     Maybe (Int, Int)
-  -> [Either TermPlus (Identifier, TermPlus)]
-  -> WithEnv TermPlus
-toTermSigmaType ml xps = do
-  xps' <- mapM supplyName xps
-  return (MetaTerminal ml, TermSigma xps')
-
 toPiType ::
      Maybe (Int, Int)
   -> [Either DataPlus (Identifier, DataPlus)]
@@ -217,6 +208,11 @@ toVar :: (Identifier, DataPlus) -> DataPlus
 toVar (x, t) = do
   let (_, ml) = obtainInfoDataMeta $ fst t
   (DataMetaNonTerminal t ml, DataUpsilon x)
+
+toTermVar :: (Identifier, TermPlus) -> TermPlus
+toTermVar (x, t) = do
+  let (_, ml) = obtainInfoMeta $ fst t
+  (MetaNonTerminal t ml, TermUpsilon x)
 
 polarize' :: TermPlus -> WithEnv (DataPlus, (Identifier, CodePlus))
 polarize' e@(m, _) = do
@@ -334,8 +330,3 @@ newVarOfType :: DataPlus -> WithEnv (Identifier, DataPlus)
 newVarOfType t = do
   x <- newNameWith "arg"
   return (x, (posMeta t Nothing, DataUpsilon x))
-
-newTermVarOfType :: TermPlus -> WithEnv (Identifier, TermPlus)
-newTermVarOfType t = do
-  x <- newNameWith "arg"
-  return (x, (MetaNonTerminal t Nothing, TermUpsilon x))
