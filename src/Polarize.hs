@@ -78,23 +78,25 @@ polarize (m, TermSigmaElim xts e1 e2) = do
   bindLet
     (ze1' : yts')
     (negMeta (up u ml) ml, CodeSigmaElim (zip xs ys') z' e2')
-polarize (m, TermMu (f, _) e) = do
+polarize (m, TermMu (f, t) e) = do
   (u, ml) <- polarizeMeta m
   let vs = nubBy (\x y -> fst x == fst y) $ varTermPlus e
-  envVar <- newNameWith "env"
+  envType <- toTermSigmaType ml $ map (Left . snd) vs
+  (envVarName, envVar) <- newTermVarOfType envType
   let lamBody =
-        ( undefined
+        ( fst e
         , TermSigmaElim
             vs
-            (undefined, TermUpsilon envVar)
+            envVar
             (substTermPlus
                [ ( f
-                 , ( undefined
+                 , ( MetaNonTerminal t ml
                    , TermPiElim (undefined, TermTheta f) (map undefined vs)))
                ]
                e))
   lamBody' <- polarize lamBody
-  cls <- makeClosureWithName f undefined [(envVar, undefined)] lamBody'
+  envType' <- polarize envType >>= reduceCodePlus >>= extract
+  cls <- makeClosureWithName f undefined [(envVarName, envType')] lamBody'
   callClosure m cls (map undefined vs)
 
 makeClosure :: Meta -> [(Identifier, DataPlus)] -> CodePlus -> WithEnv CodePlus
@@ -185,6 +187,14 @@ toSigmaType ml xps = do
   xps' <- mapM supplyName xps
   return (DataMetaTerminal ml, DataSigma xps')
 
+toTermSigmaType ::
+     Maybe (Int, Int)
+  -> [Either TermPlus (Identifier, TermPlus)]
+  -> WithEnv TermPlus
+toTermSigmaType ml xps = do
+  xps' <- mapM supplyName xps
+  return (MetaTerminal ml, TermSigma xps')
+
 toPiType ::
      Maybe (Int, Int)
   -> [Either DataPlus (Identifier, DataPlus)]
@@ -194,8 +204,7 @@ toPiType ml xps n = do
   xps' <- mapM supplyName xps
   return (CodeMetaTerminal ml, CodePi xps' n)
 
-supplyName ::
-     Either DataPlus (Identifier, DataPlus) -> WithEnv (Identifier, DataPlus)
+supplyName :: Either b (Identifier, b) -> WithEnv (Identifier, b)
 supplyName (Left t) = do
   x <- newNameWith "hole"
   return (x, t)
@@ -325,3 +334,8 @@ newVarOfType :: DataPlus -> WithEnv (Identifier, DataPlus)
 newVarOfType t = do
   x <- newNameWith "arg"
   return (x, (posMeta t Nothing, DataUpsilon x))
+
+newTermVarOfType :: TermPlus -> WithEnv (Identifier, TermPlus)
+newTermVarOfType t = do
+  x <- newNameWith "arg"
+  return (x, (MetaNonTerminal t Nothing, TermUpsilon x))
