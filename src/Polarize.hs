@@ -53,7 +53,8 @@ polarize (m, TermPi xts t) = do
 polarize (m, TermPiIntro xts e) = do
   xps <- polarizePlus' xts
   e' <- polarize e
-  makeClosure m xps e'
+  lamName <- newNameWith "theta"
+  makeClosure lamName m xps e'
 polarize (m, TermPiElim e es) = do
   e' <- polarize e
   es' <- mapM polarize es
@@ -95,21 +96,16 @@ polarize (m, TermMu (f, t) e) = do
           e
   lamBody' <- polarize lamBody
   let clsMeta = MetaNonTerminal clsMuType ml
-  cls <- makeClosureWithName f clsMeta (zip xs ts') lamBody'
+  cls <- makeClosure f clsMeta (zip xs ts') lamBody'
   callClosure m cls vs''
 
-makeClosure :: Meta -> [(Identifier, DataPlus)] -> CodePlus -> WithEnv CodePlus
-makeClosure m xps e = do
-  lamName <- newNameWith "theta"
-  makeClosureWithName lamName m xps e
-
-makeClosureWithName ::
+makeClosure ::
      Identifier
   -> Meta
   -> [(Identifier, DataPlus)]
   -> CodePlus
   -> WithEnv CodePlus
-makeClosureWithName lamThetaName m xps e = do
+makeClosure lamThetaName m xps e = do
   (downPiType, ml) <- polarizeMeta m
   let fvs = nubBy (\x y -> fst x == fst y) $ varCodePlus e
   -- envType = (C1, ..., Cn), where Ci is the types of the free variables in e'
