@@ -80,8 +80,8 @@ llvmCodeTheta :: CodeMeta -> Theta -> WithEnv LLVM
 llvmCodeTheta _ (ThetaArith op v1@(m1, _) v2) = do
   let t1 = fst $ obtainInfoDataMeta m1
   case t1 of
-    (_, DataEpsilon intType)
-      | Just lowType@(LowTypeSignedInt _) <- asSignedIntType intType -> do
+    (_, DataEpsilon intTypeName)
+      | Just lowType@(LowTypeSignedInt _) <- asSignedIntType intTypeName -> do
         x0 <- newNameWith "arg"
         x1 <- newNameWith "arg"
         cast1 <- newNameWith "cast"
@@ -94,8 +94,8 @@ llvmCodeTheta _ (ThetaArith op v1@(m1, _) v2) = do
           LLVMLet cast2 (LLVMPointerToInt (LLVMDataLocal x1) voidPtr lowType) $
           LLVMLet result (LLVMArith (op, lowType) op1 op2) $
           LLVMIntToPointer (LLVMDataLocal result) lowType voidPtr
-    (_, DataEpsilon floatType)
-      | Just (LowTypeFloat i) <- asFloatType floatType -> do
+    (_, DataEpsilon floatTypeName)
+      | Just (LowTypeFloat i) <- asFloatType floatTypeName -> do
         x0 <- newNameWith "arg"
         x1 <- newNameWith "arg"
         y11 <- newNameWith "y"
@@ -144,32 +144,34 @@ llvmDataLet x (_, DataTheta y) cont = do
 llvmDataLet x (_, DataUpsilon y) cont =
   return $ LLVMLet x (LLVMBitcast (LLVMDataLocal y) voidPtr voidPtr) cont
 llvmDataLet _ (_, DataEpsilon _) _ = undefined
-llvmDataLet x (_, DataEpsilonIntro (LiteralInteger i)) cont = undefined
-  -- return $
-  -- LLVMLet
-  --   x
-  --   (LLVMIntToPointer (LLVMDataInt i j) (LowTypeSignedInt j) voidPtr)
-  --   cont
--- llvmDataLet x (DataEpsilonIntro (LiteralInteger i) (LowTypeSignedInt j)) cont =
-llvmDataLet x (m, DataEpsilonIntro (LiteralFloat f)) cont = do
-  cast <- newNameWith "cast"
-  undefined -- let ft = LowTypeFloat j
-  -- let st = LowTypeSignedInt j
-  -- return $
-  --   LLVMLet cast (LLVMBitcast (LLVMDataFloat f j) ft st) $
-  --   LLVMLet x (LLVMIntToPointer (LLVMDataLocal cast) st voidPtr) cont
--- llvmDataLet x (DataEpsilonIntro (LiteralFloat f) (LowTypeFloat j)) cont = do
-llvmDataLet x (_, DataEpsilonIntro (LiteralLabel l)) cont = do
-  mi <- getEpsilonNum l
-  case mi of
-    Nothing -> lift $ throwE $ "no such index defined: " ++ show l
-    Just i  -> undefined -- llvmDataLet
-      --   x
-      --   (DataEpsilonIntro (LiteralInteger i) (LowTypeSignedInt 64))
-      --   cont
--- llvmDataLet x (DataEpsilonIntro (LiteralLabel l) (LowTypeSignedInt 64)) cont = do
-llvmDataLet _ (_, DataEpsilonIntro _) _ =
-  lift $ throwE "llvmDataLet.DataEpsilonIntro"
+llvmDataLet x (m, DataEpsilonIntro l) cont =
+  case (l, fst $ obtainInfoDataMeta m) of
+    (LiteralInteger i, (_, DataEpsilon intTypeName))
+      | Just (LowTypeSignedInt j) <- asSignedIntType intTypeName ->
+        return $
+        LLVMLet
+          x
+          (LLVMIntToPointer (LLVMDataInt i j) (LowTypeSignedInt j) voidPtr)
+          cont
+    (LiteralFloat f, (_, DataEpsilon floatTypeName))
+      | Just (LowTypeFloat j) <- asFloatType floatTypeName -> do
+        cast <- newNameWith "cast"
+        let ft = LowTypeFloat j
+        let st = LowTypeSignedInt j
+        return $
+          LLVMLet cast (LLVMBitcast (LLVMDataFloat f j) ft st) $
+          LLVMLet x (LLVMIntToPointer (LLVMDataLocal cast) st voidPtr) cont
+    (LiteralLabel label, _) -> do
+      mi <- getEpsilonNum label
+      case mi of
+        Nothing -> lift $ throwE $ "no such epsilon is defined: " ++ show label
+        Just i -> do
+          let m' =
+                DataMetaNonTerminal
+                  (DataMetaTerminal Nothing, DataEpsilon "i64")
+                  Nothing
+          llvmDataLet x (m', DataEpsilonIntro (LiteralInteger i)) cont
+    _ -> throwError "llvmDataLet.DataEpsilonIntro"
 llvmDataLet _ (_, DataDownPi _ _) _ = undefined
 llvmDataLet _ (_, DataSigma _) _ = undefined
 llvmDataLet reg (_, DataSigmaIntro ds) cont = do
