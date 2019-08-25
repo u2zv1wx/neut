@@ -286,6 +286,14 @@ polarizeTheta m name@"core.i8.div"    = polarizeThetaArith name ArithDiv m
 polarizeTheta m name@"core.i16.div"   = polarizeThetaArith name ArithDiv m
 polarizeTheta m name@"core.i32.div"   = polarizeThetaArith name ArithDiv m
 polarizeTheta m name@"core.i64.div"   = polarizeThetaArith name ArithDiv m
+polarizeTheta m name@"core.f32.add"   = polarizeThetaArith name ArithAdd m
+polarizeTheta m name@"core.f64.add"   = polarizeThetaArith name ArithAdd m
+polarizeTheta m name@"core.f32.sub"   = polarizeThetaArith name ArithSub m
+polarizeTheta m name@"core.f64.sub"   = polarizeThetaArith name ArithSub m
+polarizeTheta m name@"core.f32.mul"   = polarizeThetaArith name ArithMul m
+polarizeTheta m name@"core.f64.mul"   = polarizeThetaArith name ArithMul m
+polarizeTheta m name@"core.f32.div"   = polarizeThetaArith name ArithDiv m
+polarizeTheta m name@"core.f64.div"   = polarizeThetaArith name ArithDiv m
 polarizeTheta m name@"core.print.i64" = polarizeThetaPrint name m
 polarizeTheta _ _                     = throwError "polarize.theta"
 
@@ -293,14 +301,14 @@ polarizeThetaArith :: Identifier -> Arith -> Meta -> WithEnv CodePlus
 polarizeThetaArith name op m = do
   (upT, ml) <- polarizeMeta m
   case upT of
-    (_, DataDownPi _ (_, CodeUp int)) -> do
-      (x, varX) <- newVarOfType int
-      (y, varY) <- newVarOfType int
+    (_, DataDownPi _ (_, CodeUp numType)) -> do
+      (x, varX) <- newVarOfType numType
+      (y, varY) <- newVarOfType numType
       makeClosure
         name
         m
-        [(x, int), (y, int)]
-        (negMeta (up int ml) ml, CodeTheta (ThetaArith op varX varY))
+        [(x, numType), (y, numType)]
+        (negMeta (up numType ml) ml, CodeTheta (ThetaArith op varX varY))
     _ -> throwError "polarize.theta.arith"
 
 polarizeThetaPrint :: Identifier -> Meta -> WithEnv CodePlus

@@ -12,8 +12,6 @@ data Data
   | DataEpsilonIntro Literal
   | DataDownPi [IdentifierPlus]
                CodePlus
-  | DataDownIntroPiIntro [IdentifierPlus]
-                         CodePlus
   | DataSigma [IdentifierPlus]
   | DataSigmaIntro [DataPlus]
   deriving (Show)
@@ -71,17 +69,14 @@ obtainInfoDataMeta (DataMetaTerminal ml) = ((DataMetaTerminal ml, DataTau), ml)
 obtainInfoDataMeta (DataMetaNonTerminal t ml) = (t, ml)
 
 varDataPlus :: DataPlus -> [IdentifierPlus]
-varDataPlus (_, DataTau) = []
-varDataPlus (_, DataTheta _) = []
-varDataPlus (m, DataUpsilon x) = [(x, fst $ obtainInfoDataMeta m)]
-varDataPlus (_, DataEpsilon _) = []
+varDataPlus (_, DataTau)            = []
+varDataPlus (_, DataTheta _)        = []
+varDataPlus (m, DataUpsilon x)      = [(x, fst $ obtainInfoDataMeta m)]
+varDataPlus (_, DataEpsilon _)      = []
 varDataPlus (_, DataEpsilonIntro _) = []
-varDataPlus (_, DataDownPi xps n) = varDataPlusPiOrSigma xps (varCodePlus n)
-varDataPlus (_, DataDownIntroPiIntro xps e) =
-  filterPlus (`notElem` map fst xps) $
-  concatMap (varDataPlus . snd) xps ++ varCodePlus e
-varDataPlus (_, DataSigma xps) = varDataPlusPiOrSigma xps []
-varDataPlus (_, DataSigmaIntro vs) = concatMap varDataPlus vs
+varDataPlus (_, DataDownPi xps n)   = varDataPlusPiOrSigma xps (varCodePlus n)
+varDataPlus (_, DataSigma xps)      = varDataPlusPiOrSigma xps []
+varDataPlus (_, DataSigmaIntro vs)  = concatMap varDataPlus vs
 
 varDataPlusPiOrSigma :: [IdentifierPlus] -> [IdentifierPlus] -> [IdentifierPlus]
 varDataPlusPiOrSigma [] xs = xs
@@ -136,10 +131,6 @@ substDataPlus sub (m, DataDownPi xps n) = do
   let (xps', n') = substDataPlusPi sub xps n
   let m' = substDataMeta sub m
   (m', DataDownPi xps' n')
-substDataPlus sub (m, DataDownIntroPiIntro xps e) = do
-  let (xps', e') = substCodePlusPi sub xps e
-  let m' = substDataMeta sub m
-  (m', DataDownIntroPiIntro xps' e')
 substDataPlus sub (m, DataSigma xps) = do
   let xps' = substDataPlusSigma sub xps
   let m' = substDataMeta sub m

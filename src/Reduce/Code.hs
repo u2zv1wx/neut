@@ -2,7 +2,7 @@ module Reduce.Code
   ( reduceCodePlus
   ) where
 
-import           Control.Monad.Trans
+import           Control.Monad.State
 
 import           Data.Basic
 import           Data.Code
@@ -36,15 +36,13 @@ reduceCodePlus (m, CodeEpsilonElim (x, t) v branchList) =
             Just body -> reduceCodePlus $ substCodePlus [(x, v)] body
             Nothing   -> return (m, CodeEpsilonElim (x, t) v branchList)
     _ -> return (m, CodeEpsilonElim (x, t) v branchList)
-reduceCodePlus (m, CodePiElimDownElim v vs)
-  -- e' <- reduceCodePlus e
- = do
-  case v of
-    (_, DataDownIntroPiIntro xts body)
-      | length xts == length vs -> do
-        let xs = map fst xts
-        reduceCodePlus $ substCodePlus (zip xs vs) body
-    _ -> return (m, CodePiElimDownElim v vs)
+reduceCodePlus (m, CodePiElimDownElim v@(_, DataTheta x) vs) = do
+  penv <- gets polEnv
+  case lookup x penv of
+    Nothing -> return (m, CodePiElimDownElim v vs)
+    Just (xts, body) -> do
+      let xs = map fst xts
+      reduceCodePlus $ substCodePlus (zip xs vs) body
 reduceCodePlus (m, CodeSigmaElim xts v e) =
   case v of
     (_, DataSigmaIntro es)
@@ -57,12 +55,4 @@ reduceCodePlus (m, CodeUpElim (x, t) e1 e2) = do
   case e1' of
     (_, CodeUpIntro v) -> reduceCodePlus $ substCodePlus [(x, v)] e2
     _                  -> return (m, CodeUpElim (x, t) e1' e2)
--- reduceCodePlus self@(m', CodeMu (x, t) body) = do
---   let meta = DataMetaNonTerminal t (obtainLocation m')
---   let x' = (meta, DataDownIntro self)
---   reduceCodePlus $ substCodePlus [(x, x')] body
 reduceCodePlus t = return t
-
-obtainLocation :: CodeMeta -> Maybe (Int, Int)
-obtainLocation (CodeMetaTerminal ml)      = ml
-obtainLocation (CodeMetaNonTerminal _ ml) = ml
