@@ -10,11 +10,12 @@ data Data
   | DataUpsilon Identifier
   | DataEpsilon Identifier
   | DataEpsilonIntro Literal
+  | DataDownPi [IdentifierPlus]
+               CodePlus
   | DataDownIntroPiIntro [IdentifierPlus]
                          CodePlus
   | DataSigma [IdentifierPlus]
   | DataSigmaIntro [DataPlus]
-  | DataDown CodePlus
   deriving (Show)
 
 data Code
@@ -23,8 +24,6 @@ data Code
   | CodeEpsilonElim IdentifierPlus
                     DataPlus
                     [(Case, CodePlus)]
-  | CodePi [IdentifierPlus]
-           CodePlus
   | CodePiElimDownElim DataPlus
                        [DataPlus]
   | CodeSigmaElim [IdentifierPlus]
@@ -77,12 +76,12 @@ varDataPlus (_, DataTheta _) = []
 varDataPlus (m, DataUpsilon x) = [(x, fst $ obtainInfoDataMeta m)]
 varDataPlus (_, DataEpsilon _) = []
 varDataPlus (_, DataEpsilonIntro _) = []
+varDataPlus (_, DataDownPi xps n) = varDataPlusPiOrSigma xps (varCodePlus n)
 varDataPlus (_, DataDownIntroPiIntro xps e) =
   filterPlus (`notElem` map fst xps) $
   concatMap (varDataPlus . snd) xps ++ varCodePlus e
 varDataPlus (_, DataSigma xps) = varDataPlusPiOrSigma xps []
 varDataPlus (_, DataSigmaIntro vs) = concatMap varDataPlus vs
-varDataPlus (_, DataDown n) = varCodePlus n
 
 varDataPlusPiOrSigma :: [IdentifierPlus] -> [IdentifierPlus] -> [IdentifierPlus]
 varDataPlusPiOrSigma [] xs = xs
@@ -95,7 +94,6 @@ varCodePlus (_, CodeTheta e) = varTheta e
 varCodePlus (_, CodeEpsilonElim (x, _) v branchList) = do
   let (_, es) = unzip branchList
   varDataPlus v ++ filterPlus (/= x) (concatMap varCodePlus es)
-varCodePlus (_, CodePi xps n) = varDataPlusPiOrSigma xps (varCodePlus n)
 varCodePlus (_, CodePiElimDownElim v vs) =
   varDataPlus v ++ concatMap varDataPlus vs
 varCodePlus (_, CodeSigmaElim xps v e) =
@@ -134,6 +132,10 @@ substDataPlus sub (m, DataEpsilon k) = do
 substDataPlus sub (m, DataEpsilonIntro l) = do
   let m' = substDataMeta sub m
   (m', DataEpsilonIntro l)
+substDataPlus sub (m, DataDownPi xps n) = do
+  let (xps', n') = substDataPlusPi sub xps n
+  let m' = substDataMeta sub m
+  (m', DataDownPi xps' n')
 substDataPlus sub (m, DataDownIntroPiIntro xps e) = do
   let (xps', e') = substCodePlusPi sub xps e
   let m' = substDataMeta sub m
@@ -146,10 +148,6 @@ substDataPlus sub (m, DataSigmaIntro vs) = do
   let vs' = map (substDataPlus sub) vs
   let m' = substDataMeta sub m
   (m', DataSigmaIntro vs')
-substDataPlus sub (m, DataDown n) = do
-  let n' = substCodePlus sub n
-  let m' = substDataMeta sub m
-  (m', DataDown n')
 
 substDataMeta :: SubstDataPlus -> DataMeta -> DataMeta
 substDataMeta _ (DataMetaTerminal ml) = DataMetaTerminal ml
@@ -177,10 +175,6 @@ substCodePlus sub (m, CodeEpsilonElim (x, p) v branchList) = do
   let branchList' = zip cs es'
   let m' = substCodeMeta sub m
   (m', CodeEpsilonElim (x, p') v' branchList')
-substCodePlus sub (m, CodePi xps n) = do
-  let (xps', n') = substDataPlusPi sub xps n
-  let m' = substCodeMeta sub m
-  (m', CodePi xps' n')
 substCodePlus sub (m, CodePiElimDownElim v vs) = do
   let v' = substDataPlus sub v
   let vs' = map (substDataPlus sub) vs
