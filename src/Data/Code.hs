@@ -35,8 +35,6 @@ data Code
   | CodeUpElim IdentifierPlus
                CodePlus
                CodePlus
-  | CodeMu IdentifierPlus
-           CodePlus
   deriving (Show)
 
 data Theta
@@ -106,7 +104,6 @@ varCodePlus (_, CodeUp p) = varDataPlus p
 varCodePlus (_, CodeUpIntro v) = varDataPlus v
 varCodePlus (_, CodeUpElim (x, _) e1 e2) =
   varCodePlus e1 ++ filterPlus (/= x) (varCodePlus e2)
-varCodePlus (_, CodeMu (x, _) e) = filterPlus (/= x) $ varCodePlus e
 
 varDataPlusPi :: [IdentifierPlus] -> DataPlus -> [IdentifierPlus]
 varDataPlusPi [] n = varDataPlus n
@@ -208,11 +205,6 @@ substCodePlus sub (m, CodeUpElim (x, p) e1 e2) = do
   let e2' = substCodePlus (filter (\(y, _) -> y /= x) sub) e2
   let m' = substCodeMeta sub m
   (m', CodeUpElim (x, p') e1' e2')
-substCodePlus sub (m, CodeMu (x, p) e) = do
-  let p' = substDataPlus sub p
-  let e' = substCodePlus (filter (\(y, _) -> y /= x) sub) e
-  let m' = substCodeMeta sub m
-  (m', CodeMu (x, p') e')
 
 substTheta :: SubstDataPlus -> Theta -> Theta
 substTheta sub (ThetaArith a v1 v2) = do
