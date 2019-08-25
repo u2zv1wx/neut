@@ -10,6 +10,7 @@ module Polarize
   ) where
 
 import           Control.Monad.Except
+import           Control.Monad.State
 import           Data.List            (nubBy)
 import           Prelude              hiding (pi)
 
@@ -118,7 +119,9 @@ makeClosure lamThetaName m xps e = do
   downPiType' <- toDownPiType ml (Left envType : map Right xpsPi) codType
   let lamTheta = (posMeta downPiType' ml, DataTheta lamThetaName)
   -- lamThetaName ~> thunk (lam (envVarName, x1, ..., xn) lamBody)
-  insPolEnv lamThetaName ((envVarName, envType) : xps) lamBody
+  penv <- gets polEnv
+  when (lamThetaName `elem` map fst penv) $
+    insPolEnv lamThetaName ((envVarName, envType) : xps) lamBody
   let fvSigmaIntro = (posMeta envType ml, DataSigmaIntro $ map toVar fvs)
   (typeVarName, typeVar) <- newVarOfType (DataMetaTerminal ml, DataTau)
   -- piType'  : ↓(((C1, ..., Cn), A) -> ↑B)
@@ -267,54 +270,50 @@ up u ml = (CodeMetaTerminal ml, CodeUp u)
 
 -- expand definitions of constants
 polarizeTheta :: Meta -> Identifier -> WithEnv CodePlus
-polarizeTheta m "core.i8.add"    = polarizeThetaArith ArithAdd m
-polarizeTheta m "core.i16.add"   = polarizeThetaArith ArithAdd m
-polarizeTheta m "core.i32.add"   = polarizeThetaArith ArithAdd m
-polarizeTheta m "core.i64.add"   = polarizeThetaArith ArithAdd m
-polarizeTheta m "core.i8.sub"    = polarizeThetaArith ArithSub m
-polarizeTheta m "core.i16.sub"   = polarizeThetaArith ArithSub m
-polarizeTheta m "core.i32.sub"   = polarizeThetaArith ArithSub m
-polarizeTheta m "core.i64.sub"   = polarizeThetaArith ArithSub m
-polarizeTheta m "core.i8.mul"    = polarizeThetaArith ArithMul m
-polarizeTheta m "core.i16.mul"   = polarizeThetaArith ArithMul m
-polarizeTheta m "core.i32.mul"   = polarizeThetaArith ArithMul m
-polarizeTheta m "core.i64.mul"   = polarizeThetaArith ArithMul m
-polarizeTheta m "core.i8.div"    = polarizeThetaArith ArithDiv m
-polarizeTheta m "core.i16.div"   = polarizeThetaArith ArithDiv m
-polarizeTheta m "core.i32.div"   = polarizeThetaArith ArithDiv m
-polarizeTheta m "core.i64.div"   = polarizeThetaArith ArithDiv m
-polarizeTheta m "core.print.i64" = polarizeThetaPrint m
-polarizeTheta _ _                = throwError "polarize.theta"
+polarizeTheta m name@"core.i8.add"    = polarizeThetaArith name ArithAdd m
+polarizeTheta m name@"core.i16.add"   = polarizeThetaArith name ArithAdd m
+polarizeTheta m name@"core.i32.add"   = polarizeThetaArith name ArithAdd m
+polarizeTheta m name@"core.i64.add"   = polarizeThetaArith name ArithAdd m
+polarizeTheta m name@"core.i8.sub"    = polarizeThetaArith name ArithSub m
+polarizeTheta m name@"core.i16.sub"   = polarizeThetaArith name ArithSub m
+polarizeTheta m name@"core.i32.sub"   = polarizeThetaArith name ArithSub m
+polarizeTheta m name@"core.i64.sub"   = polarizeThetaArith name ArithSub m
+polarizeTheta m name@"core.i8.mul"    = polarizeThetaArith name ArithMul m
+polarizeTheta m name@"core.i16.mul"   = polarizeThetaArith name ArithMul m
+polarizeTheta m name@"core.i32.mul"   = polarizeThetaArith name ArithMul m
+polarizeTheta m name@"core.i64.mul"   = polarizeThetaArith name ArithMul m
+polarizeTheta m name@"core.i8.div"    = polarizeThetaArith name ArithDiv m
+polarizeTheta m name@"core.i16.div"   = polarizeThetaArith name ArithDiv m
+polarizeTheta m name@"core.i32.div"   = polarizeThetaArith name ArithDiv m
+polarizeTheta m name@"core.i64.div"   = polarizeThetaArith name ArithDiv m
+polarizeTheta m name@"core.print.i64" = polarizeThetaPrint name m
+polarizeTheta _ _                     = throwError "polarize.theta"
 
-polarizeThetaArith :: Arith -> Meta -> WithEnv CodePlus
-polarizeThetaArith op m = do
+polarizeThetaArith :: Identifier -> Arith -> Meta -> WithEnv CodePlus
+polarizeThetaArith name op m = do
   (upT, ml) <- polarizeMeta m
   case upT of
-    d@(_, DataDownPi _ (_, CodeUp int)) -> do
+    (_, DataDownPi _ (_, CodeUp int)) -> do
       (x, varX) <- newVarOfType int
       (y, varY) <- newVarOfType int
-      return
-        ( negMeta (up d ml) ml
-        , CodeUpIntro
-            ( posMeta d ml
-            , DataDownIntroPiIntro
-                [(x, int), (y, int)]
-                (negMeta (up int ml) ml, CodeTheta (ThetaArith op varX varY))))
+      makeClosure
+        name
+        m
+        [(x, int), (y, int)]
+        (negMeta (up int ml) ml, CodeTheta (ThetaArith op varX varY))
     _ -> throwError "polarize.theta.arith"
 
-polarizeThetaPrint :: Meta -> WithEnv CodePlus
-polarizeThetaPrint m = do
+polarizeThetaPrint :: Identifier -> Meta -> WithEnv CodePlus
+polarizeThetaPrint name m = do
   (upT, ml) <- polarizeMeta m
   case upT of
-    d@(_, DataDownPi [(_, int)] cod) -> do
+    (_, DataDownPi [(_, int)] cod) -> do
       (x, varX) <- newVarOfType int
-      return
-        ( negMeta (up d ml) ml
-        , CodeUpIntro
-            ( posMeta d ml
-            , DataDownIntroPiIntro
-                [(x, int)]
-                (negMeta cod ml, CodeTheta (ThetaPrint varX))))
+      makeClosure
+        name
+        m
+        [(x, int)]
+        (negMeta cod ml, CodeTheta (ThetaPrint varX))
     _ -> throwError "polarize.theta.print"
 
 newVarOfType :: DataPlus -> WithEnv (Identifier, DataPlus)
