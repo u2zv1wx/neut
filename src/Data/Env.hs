@@ -25,7 +25,7 @@ data Env = Env
   { count           :: Int -- to generate fresh symbols
   , currentDir      :: FilePath
   , reservedEnv     :: [Identifier] -- list of reserved keywords
-  , notationEnv     :: [(Tree, Tree)] -- macro transformers
+  , notationEnv     :: [(TreePlus, TreePlus)] -- macro transformers
   , constantEnv     :: [Identifier]
   , epsilonEnv      :: [(Identifier, [Identifier])]
   , nameEnv         :: [(Identifier, Identifier)] -- [("foo", "foo.13"), ...]

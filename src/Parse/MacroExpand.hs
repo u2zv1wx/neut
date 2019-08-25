@@ -3,26 +3,25 @@ module Parse.MacroExpand
   , isSaneNotation
   ) where
 
-import           Control.Comonad.Cofree
 import           Control.Monad.State
 
 import           Data.Env
-import           Data.Maybe             (fromMaybe)
+import           Data.Maybe          (fromMaybe)
 import           Data.Tree
 
-type MacroSubst = ([(String, Tree)], [(String, [Tree])])
+type MacroSubst = ([(String, TreePlus)], [(String, [TreePlus])])
 
-type Pattern = Tree
+type Pattern = TreePlus
 
 -- CBV-like macro expansion
-macroExpand :: Tree -> WithEnv Tree
+macroExpand :: TreePlus -> WithEnv TreePlus
 macroExpand = recurM macroExpand1
 
-recurM :: (Monad m) => (Tree -> m Tree) -> Tree -> m Tree
-recurM f (meta :< TreeAtom s) = f (meta :< TreeAtom s)
-recurM f (meta :< TreeNode tis) = do
+recurM :: (Monad m) => (TreePlus -> m TreePlus) -> TreePlus -> m TreePlus
+recurM f (meta, TreeAtom s) = f (meta, TreeAtom s)
+recurM f (meta, TreeNode tis) = do
   tis' <- mapM (recurM f) tis
-  f (meta :< TreeNode tis')
+  f (meta, TreeNode tis')
 
 -- Given a S-expression, check if the expression matches one of the registered
 -- notations.
@@ -31,13 +30,13 @@ recurM f (meta :< TreeNode tis) = do
 --   macro-expand the resulting expression.
 --   (2) If the S-expression doesn't match with any registered notations, just return
 --   the S-expression itself.
-macroExpand1 :: Tree -> WithEnv Tree
-macroExpand1 t@(i :< _) = do
+macroExpand1 :: TreePlus -> WithEnv TreePlus
+macroExpand1 t@(i, _) = do
   nenv <- gets notationEnv
   mMatch <- try (macroMatch t) nenv
   case mMatch of
-    Just (subst, _ :< template) -> do
-      let t' = applyMacroSubst subst (i :< template)
+    Just (subst, (_, template)) -> do
+      let t' = applyMacroSubst subst (i, template)
       macroExpand t'
     Nothing -> return t
 
@@ -52,10 +51,10 @@ try f ((p, q):as) = do
 
 -- `macroMatch` determines the behavior of matching.
 macroMatch ::
-     Tree -- input tree
+     TreePlus -- input tree
   -> Pattern -- registered notation
   -> WithEnv (Maybe MacroSubst) -- {symbols in a pattern} -> {trees}
-macroMatch (i :< TreeAtom s1) (_ :< TreeAtom s2)
+macroMatch (i, TreeAtom s1) (_, TreeAtom s2)
   -- Tries to match two atoms. There are three case splits here:
   --   (1) If the input `s1` and the pattern `s2` are both reserved, this matching
   --   succeeds iff s1 == s2.
@@ -68,9 +67,9 @@ macroMatch (i :< TreeAtom s1) (_ :< TreeAtom s2)
   case (s1 `elem` renv, s2 `elem` renv) of
     (True, True)
       | s1 == s2 -> return $ Just ([], [])
-    (False, False) -> return $ Just ([(s2, i :< TreeAtom s1)], [])
+    (False, False) -> return $ Just ([(s2, (i, TreeAtom s1))], [])
     _ -> return Nothing
-macroMatch t (_ :< TreeAtom s)
+macroMatch t (_, TreeAtom s)
   -- The input is a S-expression, and the pattern is (supposed to be) a variable.
   -- We firstly check that the `s` is in fact a variable, that is, not a reserved
   -- keyword. After that, we generate a new substitution from the variable `s` to the
@@ -80,11 +79,11 @@ macroMatch t (_ :< TreeAtom s)
   if s `notElem` renv
     then return $ Just ([(s, t)], [])
     else return Nothing
-macroMatch (_ :< TreeAtom _) (_ :< _)
+macroMatch (_, TreeAtom _) (_, _)
   -- The input is an atom, and the pattern is a S-expression, which is not an atom.
   -- An atom can't be matched with a tree, so this case immediately fails.
  = return Nothing
-macroMatch (_ :< TreeNode ts1) (_ :< TreeNode ts2)
+macroMatch (_, TreeNode ts1) (_, TreeNode ts2)
   -- The input is list of S-expressions, and also the pattern is.
   -- We fistly check that the last element of `ts2` is an atom with a name that
   -- ends by '+'. We regard such a names as a name of multiple S-expressions.
@@ -97,7 +96,7 @@ macroMatch (_ :< TreeNode ts1) (_ :< TreeNode ts2)
   -- in the object-language (namely, WeakTerm).
  =
   case last ts2 of
-    (_ :< TreeAtom sym)
+    (_, TreeAtom sym)
       | last sym == '+'
       , length ts1 >= length ts2
       -- If the last element is such a '+'-suffixed name, we'll try to generate a substitution
@@ -136,10 +135,10 @@ macroMatch (_ :< TreeNode ts1) (_ :< TreeNode ts2)
 -- The first projection of MacroSubst is an "ordinary" substitution, namely just a
 -- mapping from a name to a tree. The second projection is a "multiple" substitution,
 -- namely a mapping from a name to a list of trees.
-applyMacroSubst :: MacroSubst -> Pattern -> Tree
-applyMacroSubst (s1, _) (i :< TreeAtom s) =
-  fromMaybe (i :< TreeAtom s) (lookup s s1)
-applyMacroSubst sub@(_, s2) (i :< TreeNode ts)
+applyMacroSubst :: MacroSubst -> Pattern -> TreePlus
+applyMacroSubst (s1, _) (i, TreeAtom s) =
+  fromMaybe (i, TreeAtom s) (lookup s s1)
+applyMacroSubst sub@(_, s2) (i, TreeNode ts)
   -- When we need to replace the last variable of a list, we check if the variable
   -- is a '+'-suffixed one. If it is, we lookup the list of trees from the
   -- substitution `sub` by the '+'-suffixed name, and concatenate the list of
@@ -150,22 +149,22 @@ applyMacroSubst sub@(_, s2) (i :< TreeNode ts)
   -- (e1' e2' 3 4 5).
  =
   case last ts of
-    (j :< TreeAtom s)
+    (j, TreeAtom s)
       | last s == '+'
       , s `elem` map fst s2 -> do
         let ts' = map (applyMacroSubst sub) (take (length ts - 1) ts)
         case lookup s s2 of
-          Nothing   -> j :< TreeNode (ts' ++ [j :< TreeAtom s])
-          Just rest -> i :< TreeNode (ts' ++ rest)
+          Nothing   -> (j, TreeNode (ts' ++ [(j, TreeAtom s)]))
+          Just rest -> (i, TreeNode (ts' ++ rest))
     _ -> do
       let ts' = map (applyMacroSubst sub) ts
-      i :< TreeNode ts'
+      (i, TreeNode ts')
 
 -- The '+'-suffixed name can be occurred only at the end of a list
 isSaneNotation :: Pattern -> Bool
-isSaneNotation (_ :< TreeAtom s) = last s /= '+'
-isSaneNotation (_ :< TreeNode ts) = do
+isSaneNotation (_, TreeAtom s) = last s /= '+'
+isSaneNotation (_, TreeNode ts) = do
   let b = all isSaneNotation $ init ts
   case last ts of
-    _ :< TreeAtom _ -> True
+    (_, TreeAtom _) -> True
     ts'             -> b && isSaneNotation ts'
