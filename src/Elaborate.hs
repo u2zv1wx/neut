@@ -109,28 +109,30 @@ elaborate' (m, WeakTermMu (x, t) e) = do
     (_, TermPi _ _) -> do
       m' <- toMeta m
       e' <- elaborate' e
-      let vs = varTermPlus e'
-      envVar <- newNameWith "env"
-      return
-        ( undefined
-        , TermMu
-            (x, undefined)
-            ( undefined
-            , TermMuPiIntro
-                [(envVar, undefined)]
-                ( undefined
-                , TermSigmaElim
-                    vs
-                    (undefined, TermUpsilon envVar)
-                    (substTermPlus
-                       [ ( x
-                         , ( undefined
-                           , TermPiElimMu
-                               (undefined, TermUpsilon x)
-                               (map undefined vs)))
-                       ]
-                       e'))))
-      -- return (m', TermMu (x, t') e')
+      -- let vs = varTermPlus e'
+      -- envVar <- newNameWith "env"
+      -- vsがemptyかそうでないかで場合分けを行うこともできる
+      -- (emptyならsigmaelimの部分が不要になる→インライン展開すれば結局同じことでは)
+      -- return
+      --   ( undefined
+      --   , TermMu
+      --       (x, undefined)
+      --       ( undefined
+      --       , TermMuPiIntro
+      --           [(envVar, undefined)]
+      --           ( undefined
+      --           , TermSigmaElim
+      --               vs
+      --               (undefined, TermUpsilon envVar)
+      --               (substTermPlus
+      --                  [ ( x
+      --                    , ( undefined
+      --                      , TermPiElimMu
+      --                          (undefined, TermUpsilon x)
+      --                          (map undefined vs)))
+      --                  ]
+      --                  e'))))
+      return (m', TermMu (x, t') e')
     _ -> lift $ throwE "CBV recursion is allowed only for Pi-types"
 elaborate' (_, WeakTermZeta x) = do
   sub <- gets substEnv

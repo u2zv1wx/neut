@@ -18,12 +18,8 @@ data Term
            TermPlus
   | TermPiIntro [IdentifierPlus]
                 TermPlus
-  | TermMuPiIntro [IdentifierPlus]
-                  TermPlus
   | TermPiElim TermPlus
                [TermPlus]
-  | TermPiElimMu TermPlus
-                 [TermPlus]
   | TermSigma [IdentifierPlus]
   | TermSigmaIntro [TermPlus]
   | TermSigmaElim [IdentifierPlus]
@@ -67,9 +63,7 @@ varTermPlus (_, TermEpsilonElim (x, t) e branchList) = do
   concat (xhs1 : xhs2 : xhss)
 varTermPlus (_, TermPi xts t) = varTermPlusBindings xts [] ++ varTermPlus t
 varTermPlus (_, TermPiIntro xts e) = varTermPlusBindings xts [e]
-varTermPlus (_, TermMuPiIntro xts e) = varTermPlusBindings xts [e]
 varTermPlus (_, TermPiElim e es) = varTermPlus e ++ concatMap varTermPlus es
-varTermPlus (_, TermPiElimMu e es) = varTermPlus e ++ concatMap varTermPlus es
 varTermPlus (_, TermSigma xts) = varTermPlusBindings xts []
 varTermPlus (_, TermSigmaIntro es) = concatMap varTermPlus es
 varTermPlus (_, TermSigmaElim xts e1 e2) =
@@ -110,17 +104,10 @@ substTermPlus sub (m, TermPi xts t) = do
 substTermPlus sub (m, TermPiIntro xts body) = do
   let (xts', body') = substTermPlusBindingsWithBody sub xts body
   (m, TermPiIntro xts' body')
-substTermPlus sub (m, TermMuPiIntro xts body) = do
-  let (xts', body') = substTermPlusBindingsWithBody sub xts body
-  (m, TermMuPiIntro xts' body')
 substTermPlus sub (m, TermPiElim e es) = do
   let e' = substTermPlus sub e
   let es' = map (substTermPlus sub) es
   (m, TermPiElim e' es')
-substTermPlus sub (m, TermPiElimMu e es) = do
-  let e' = substTermPlus sub e
-  let es' = map (substTermPlus sub) es
-  (m, TermPiElimMu e' es')
 substTermPlus sub (m, TermSigma xts) = do
   let xts' = substTermPlusBindings sub xts
   (m, TermSigma xts')
@@ -163,19 +150,12 @@ isReducible (_, TermEpsilonElim _ (_, TermEpsilonIntro l) branchList) = do
 isReducible (_, TermEpsilonElim (_, _) e _) = isReducible e
 isReducible (_, TermPi _ _) = False
 isReducible (_, TermPiIntro {}) = False
-isReducible (_, TermMuPiIntro {}) = False
 isReducible (_, TermPiElim (_, TermPiIntro xts _) es)
   | length xts == length es = True
 isReducible (_, TermPiElim (_, TermMu _ _) _) = True -- CBV recursion
 isReducible (_, TermPiElim (_, TermTheta c) [(_, TermEpsilonIntro (LiteralInteger _)), (_, TermEpsilonIntro (LiteralInteger _))]) -- constant application
   | c `elem` intArithConstantList = True
 isReducible (_, TermPiElim e es) = isReducible e || any isReducible es
-isReducible (_, TermPiElimMu (_, TermMuPiIntro xts _) es)
-  | length xts == length es = True
-isReducible (_, TermPiElimMu (_, TermMu _ _) _) = True -- CBV recursion
-isReducible (_, TermPiElimMu (_, TermTheta c) [(_, TermEpsilonIntro (LiteralInteger _)), (_, TermEpsilonIntro (LiteralInteger _))]) -- constant application
-  | c `elem` intArithConstantList = True
-isReducible (_, TermPiElimMu e es) = isReducible e || any isReducible es
 isReducible (_, TermSigma _) = False
 isReducible (_, TermSigmaIntro es) = any isReducible es
 isReducible (_, TermSigmaElim xts (_, TermSigmaIntro es) _)
@@ -190,7 +170,6 @@ isValue (_, TermEpsilon _)      = True
 isValue (_, TermEpsilonIntro _) = True
 isValue (_, TermPi {})          = True
 isValue (_, TermPiIntro {})     = True
-isValue (_, TermMuPiIntro {})   = True
 isValue (_, TermSigma {})       = True
 isValue (_, TermSigmaIntro es)  = all isValue es
 isValue _                       = False
