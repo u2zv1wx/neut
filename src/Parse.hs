@@ -105,7 +105,8 @@ isSpecialForm _                                                        = False
 concatDefList :: [Def] -> WithEnv WeakTermPlus
 concatDefList [] = do
   m <- newMeta
-  return (m, WeakTermSigmaIntro [])
+  -- return (m, WeakTermSigmaIntro [])
+  return (m, WeakTermTau)
 concatDefList (DefLet meta tu e:es) = do
   cont <- concatDefList es
   m <- newMeta

@@ -22,11 +22,6 @@ data WeakTerm
                     WeakTermPlus
   | WeakTermPiElim WeakTermPlus
                    [WeakTermPlus]
-  | WeakTermSigma [IdentifierPlus]
-  | WeakTermSigmaIntro [WeakTermPlus]
-  | WeakTermSigmaElim [IdentifierPlus]
-                      WeakTermPlus
-                      WeakTermPlus
   | WeakTermMu IdentifierPlus
                WeakTermPlus
   | WeakTermZeta Identifier
@@ -71,11 +66,6 @@ varWeakTermPlus (_, WeakTermPi xts t) =
 varWeakTermPlus (_, WeakTermPiIntro xts e) = varWeakTermPlusBindings xts [e]
 varWeakTermPlus (_, WeakTermPiElim e es) =
   pairwiseConcat $ varWeakTermPlus e : map varWeakTermPlus es
-varWeakTermPlus (_, WeakTermSigma xts) = varWeakTermPlusBindings xts []
-varWeakTermPlus (_, WeakTermSigmaIntro es) =
-  pairwiseConcat $ map varWeakTermPlus es
-varWeakTermPlus (_, WeakTermSigmaElim xts e1 e2) =
-  pairwiseConcat [varWeakTermPlus e1, varWeakTermPlusBindings xts [e2]]
 varWeakTermPlus (_, WeakTermMu ut e) = varWeakTermPlusBindings [ut] [e]
 varWeakTermPlus (_, WeakTermZeta h) = ([], [h])
 
@@ -118,17 +108,6 @@ substWeakTermPlus sub (m, WeakTermPiElim e es) = do
   let e' = substWeakTermPlus sub e
   let es' = map (substWeakTermPlus sub) es
   (m, WeakTermPiElim e' es')
-substWeakTermPlus sub (m, WeakTermSigma xts) = do
-  let xts' = substWeakTermPlusBindings sub xts
-  (m, WeakTermSigma xts')
-substWeakTermPlus sub (m, WeakTermSigmaIntro es) = do
-  let es' = map (substWeakTermPlus sub) es
-  (m, WeakTermSigmaIntro es')
-substWeakTermPlus sub (m, WeakTermSigmaElim xts e1 e2) = do
-  let e1' =
-        substWeakTermPlus (filter (\(k, _) -> k `notElem` map fst xts) sub) e1
-  let (xts', e2') = substWeakTermPlusBindingsWithBody sub xts e2
-  (m, WeakTermSigmaElim xts' e1' e2')
 substWeakTermPlus sub (m, WeakTermMu (x, t) e) = do
   let t' = substWeakTermPlus sub t
   let e' = substWeakTermPlus (filter (\(k, _) -> k /= x) sub) e
@@ -173,11 +152,6 @@ isReducible (_, WeakTermPiElim (_, WeakTermMu _ _) _) = True -- CBV recursion
 isReducible (_, WeakTermPiElim (_, WeakTermTheta c) [(_, WeakTermEpsilonIntro (LiteralInteger _)), (_, WeakTermEpsilonIntro (LiteralInteger _))]) -- constant application
   | c `elem` intArithConstantList = True
 isReducible (_, WeakTermPiElim e es) = isReducible e || any isReducible es
-isReducible (_, WeakTermSigma _) = False
-isReducible (_, WeakTermSigmaIntro es) = any isReducible es
-isReducible (_, WeakTermSigmaElim xts (_, WeakTermSigmaIntro es) _)
-  | length xts == length es = True
-isReducible (_, WeakTermSigmaElim _ e1 _) = isReducible e1
 isReducible (_, WeakTermMu _ _) = False
 isReducible (_, WeakTermZeta _) = False
 
@@ -188,6 +162,4 @@ isValue (_, WeakTermEpsilon _)      = True
 isValue (_, WeakTermEpsilonIntro _) = True
 isValue (_, WeakTermPi {})          = True
 isValue (_, WeakTermPiIntro {})     = True
-isValue (_, WeakTermSigma {})       = True
-isValue (_, WeakTermSigmaIntro es)  = all isValue es
 isValue _                           = False

@@ -48,19 +48,6 @@ interpret (m, TreeNode ((_, TreeAtom "pi-elimination"):e:es)) = do
   e' <- interpret e
   es' <- mapM interpret es
   withMeta m $ WeakTermPiElim e' es'
-interpret (m, TreeNode [(_, TreeAtom "sigma"), (_, TreeNode xts), t]) = do
-  xts' <- mapM interpretIdentifierPlus xts
-  t' <- interpret t
-  h <- newNameWith "hole"
-  withMeta m $ WeakTermSigma $ xts' ++ [(h, t')]
-interpret (m, TreeNode ((_, TreeAtom "sigma-introduction"):es)) = do
-  es' <- mapM interpret es
-  withMeta m $ WeakTermSigmaIntro es'
-interpret (m, TreeNode [(_, TreeAtom "sigma-elimination"), (_, TreeNode xts), e1, e2]) = do
-  xts' <- mapM interpretIdentifierPlus xts
-  e1' <- interpret e1
-  e2' <- interpret e2
-  withMeta m $ WeakTermSigmaElim xts' e1' e2'
 interpret (m, TreeNode [(_, TreeAtom "mu"), xt, e]) = do
   xt' <- interpretIdentifierPlus xt
   e' <- interpret e

@@ -49,16 +49,4 @@ reduceTermPlus (m, TermPiElim e es) = do
             return (m, TermEpsilonIntro (LiteralInteger (x `div` y)))
           _ -> return (m, TermPiElim e' es')
     _ -> return (m, TermPiElim e' es')
-reduceTermPlus (m, TermSigmaIntro es) = do
-  es' <- mapM reduceTermPlus es
-  return (m, TermSigmaIntro es')
-reduceTermPlus (m, TermSigmaElim xts e1 e2) = do
-  e1' <- reduceTermPlus e1
-  case e1' of
-    (_, TermSigmaIntro es)
-      | length es == length xts
-      , all isValue es -> do
-        let xs = map fst xts
-        reduceTermPlus $ substTermPlus (zip xs es) e2
-    _ -> return (m, TermSigmaElim xts e1' e2)
 reduceTermPlus t = return t

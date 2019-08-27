@@ -34,16 +34,6 @@ rename (m, WeakTermPiElim e es) = do
   e' <- rename e
   es' <- mapM rename es
   return (m, WeakTermPiElim e' es')
-rename (m, WeakTermSigma xts) = do
-  xts' <- renameBinderSigma xts
-  return (m, WeakTermSigma xts')
-rename (m, WeakTermSigmaIntro es) = do
-  es' <- mapM rename es
-  return (m, WeakTermSigmaIntro es')
-rename (m, WeakTermSigmaElim xts e1 e2) = do
-  e1' <- rename e1
-  (xts', e2') <- renameBinder xts e2
-  return (m, WeakTermSigmaElim xts' e1' e2')
 rename (m, WeakTermMu (x, t) e) =
   local $ do
     t' <- rename t
@@ -65,15 +55,6 @@ renameBinder ((x, t):xts) e = do
     x' <- newNameWith x
     (xts', e') <- renameBinder xts e
     return ((x', t') : xts', e')
-
-renameBinderSigma :: [IdentifierPlus] -> WithEnv [IdentifierPlus]
-renameBinderSigma [] = return []
-renameBinderSigma ((x, t):xts) = do
-  t' <- rename t
-  local $ do
-    x' <- newNameWith x
-    xts' <- renameBinderSigma xts
-    return $ (x', t') : xts'
 
 renameCaseList :: [(Case, WeakTermPlus)] -> WithEnv [(Case, WeakTermPlus)]
 renameCaseList caseList =

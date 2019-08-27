@@ -87,29 +87,6 @@ infer ctx (meta, WeakTermPiElim e es) = do
   tPi' <- wrapInfer ctx $ WeakTermPi binder cod
   insConstraintEnv tPi tPi'
   returnAfterUpdate meta $ substWeakTermPlus (zip (map fst binder) es) cod
-infer ctx (meta, WeakTermSigma xts) = do
-  univList <- inferPlus ctx xts
-  univ <- newUniv
-  constrainList $ univ : univList
-  returnAfterUpdate meta univ
-infer ctx (meta, WeakTermSigmaIntro es) = do
-  binder <- inferList ctx es
-  -- let (xts, (_, t)) = initLast binder
-  returnAfterUpdate meta (meta, WeakTermSigma binder)
-infer ctx (meta, WeakTermSigmaElim xts e1 e2) = do
-  t1 <- infer ctx e1
-  forM_ xts $ uncurry insTypeEnv
-  varSeq <- mapM (uncurry toVar) xts
-  binder <- inferList ctx varSeq
-  -- let (yts, (_, t)) = initLast binder
-  sigmaType <- wrapInfer ctx $ WeakTermSigma binder
-  insConstraintEnv t1 sigmaType
-  z <- newNameOfType t1 "hole"
-  varTuple <- constructTuple (ctx ++ binder) (map fst binder)
-  typeC <- newHoleInCtx (ctx ++ binder ++ [(z, t1)])
-  t2 <- infer (ctx ++ binder) e2
-  insConstraintEnv t2 (substWeakTermPlus [(z, varTuple)] typeC)
-  returnAfterUpdate meta $ substWeakTermPlus [(z, e1)] typeC
 infer ctx (meta, WeakTermMu (x, t) e) = do
   insTypeEnv x t
   te <- infer (ctx ++ [(x, t)]) e
@@ -185,19 +162,9 @@ constrainList (t1:t2:ts) = do
   insConstraintEnv t1 t2
   constrainList $ t2 : ts
 
-constructTuple :: Context -> [Identifier] -> WithEnv WeakTermPlus
-constructTuple ctx xs = do
-  varList <- mapM toVar' xs
-  wrapInfer ctx $ WeakTermSigmaIntro varList
-
 toVar :: Identifier -> WeakTermPlus -> WithEnv WeakTermPlus
 toVar x t = do
   insTypeEnv x t
-  wrapWithType t (WeakTermUpsilon x)
-
-toVar' :: Identifier -> WithEnv WeakTermPlus
-toVar' x = do
-  t <- lookupTypeEnv x
   wrapWithType t (WeakTermUpsilon x)
 
 returnAfterUpdate :: WeakMeta -> WeakTermPlus -> WithEnv WeakTermPlus

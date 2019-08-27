@@ -60,26 +60,6 @@ polarize (m, TermPiElim e es) = do
   e' <- polarize e
   es' <- mapM polarize es
   callClosure m e' es'
-polarize (m, TermSigma xts) = do
-  (u, ml) <- polarizeMeta m
-  (ys', yts', xs) <- polarizePlus xts
-  bindLet
-    yts'
-    (negMeta (up u ml) ml, CodeUpIntro (posMeta u ml, DataSigma (zip xs ys')))
-polarize (m, TermSigmaIntro es) = do
-  (u, ml) <- polarizeMeta m
-  (xs, xes) <- unzip <$> mapM polarize' es
-  bindLet
-    xes
-    (negMeta (up u ml) ml, CodeUpIntro (posMeta u ml, DataSigmaIntro xs))
-polarize (m, TermSigmaElim xts e1 e2) = do
-  (u, ml) <- polarizeMeta m
-  (z', ze1') <- polarize' e1
-  (ys', yts', xs) <- polarizePlus xts
-  e2' <- polarize e2
-  bindLet
-    (ze1' : yts')
-    (negMeta (up u ml) ml, CodeSigmaElim (zip xs ys') z' e2')
 polarize (m, TermMu (f, t) e) = do
   (_, ml) <- polarizeMeta m
   let vs = nubBy (\x y -> fst x == fst y) $ varTermPlus e

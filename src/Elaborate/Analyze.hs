@@ -56,10 +56,6 @@ simp (((m1, WeakTermPiIntro xts body1@(bodyMeta, _)), e2@(m2, _)):cs) = do
   let comp = simp $ (body1, (appMeta, WeakTermPiElim e2 vs)) : cs
   simpMetaRet m1 m2 comp
 simp ((e1, e2@(_, WeakTermPiIntro {})):cs) = simp $ (e2, e1) : cs
-simp (((m1, WeakTermSigma xts1), (m2, WeakTermSigma xts2)):cs)
-  | length xts1 == length xts2 = simpMetaRet m1 m2 $ simpBinder' xts1 xts2 cs
-simp (((m1, WeakTermSigmaIntro es1), (m2, WeakTermSigmaIntro es2)):cs)
-  | length es1 == length es2 = simpMetaRet m1 m2 $ simp $ zip es1 es2 ++ cs
 simp ((e1, e2):cs)
   | (m1, WeakTermPiElim (_, WeakTermUpsilon f) es1) <- e1
   , (m2, WeakTermPiElim (_, WeakTermUpsilon g) es2) <- e2
@@ -185,7 +181,6 @@ asStuckedTerm _ = Nothing
 obtainStuckReason :: WeakTermPlus -> Maybe Hole
 obtainStuckReason (_, WeakTermEpsilonElim _ e _) = obtainStuckReason e
 obtainStuckReason (_, WeakTermPiElim e _)        = obtainStuckReason e
-obtainStuckReason (_, WeakTermSigmaElim _ e1 _)  = obtainStuckReason e1
 obtainStuckReason (_, WeakTermZeta x)            = Just x
 obtainStuckReason _                              = Nothing
 
