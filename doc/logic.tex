@@ -134,30 +134,30 @@ initial system:
       \RightLabel{\( (\Pi_{\ir{e}}) \)}
       \UnaryInfC{\( \Gamma \infer \appE{e}{(e_{0}, \ldots, e_{n-1})} : A_{n} \subst{x_{k}}{e_{k}} \)}
     \end{bprooftree}
-    \\
-    \vspace{1.5em}
-    \begin{bprooftree}
-      \AxiomC{\( \Gamma \infer A_{0} : \univ \hspace{2em} \cdots \hspace{2em} \Gamma, x_{0} : A_{0}, \ldots, x_{n-1} : A_{n-1} \infer A_{n} : \univ \)}
-      \RightLabel{\( (\Sigma) \)}
-      \UnaryInfC{\( \Gamma \infer \dsum{x_{0} : A_{0}, \ldots, x_{n-1} : A_{n-1}}{A_{n}} : \univ \)}
-    \end{bprooftree}
-    \\
-    \vspace{1.5em}
-    \begin{bprooftree}
-      \AxiomC{\( \Gamma \infer e_{0} : A_{0} \)}
-      \AxiomC{\( \ldots \)}
-      \AxiomC{\( \Gamma \infer e_{n} : A_{n} \subst{x_{k}}{e_{k}} \)}
-      \RightLabel{\( (\Sigma_{\ir{i}}) \)}
-      \TrinaryInfC{\( \Gamma \infer (e_{0}, \ldots, e_{n}) : \dsum{x_{0} : A_{0}, \ldots, x_{n-1} : A_{n-1}}{A_{n}} \)}
-    \end{bprooftree}
-    \\
-    \vspace{1.5em}
-    \begin{bprooftree}
-      \AxiomC{\( \Gamma \infer e_{1} : \dsum{x_{0} : A_{0}, \ldots, x_{n-1} : A_{n-1}}{A_{n}} \)}
-      \AxiomC{\( \Gamma, x_{0} : A_{0}, \ldots, x_{n} : A_{n} \infer e_{2} : B \subst{z}{(x_{0}, \ldots, x_{n})} \)}
-      \RightLabel{\( (\Sigma_{\ir{e}}) \)}
-      \BinaryInfC{\( \Gamma \infer \LET{(x_{0}, \ldots, x_{n})}{e_{1}}{e_{2}} : B \subst{z}{e_{1}} \)}
-    \end{bprooftree}
+    % \\
+    % \vspace{1.5em}
+    % \begin{bprooftree}
+    %   \AxiomC{\( \Gamma \infer A_{0} : \univ \hspace{2em} \cdots \hspace{2em} \Gamma, x_{0} : A_{0}, \ldots, x_{n-1} : A_{n-1} \infer A_{n} : \univ \)}
+    %   \RightLabel{\( (\Sigma) \)}
+    %   \UnaryInfC{\( \Gamma \infer \dsum{x_{0} : A_{0}, \ldots, x_{n-1} : A_{n-1}}{A_{n}} : \univ \)}
+    % \end{bprooftree}
+    % \\
+    % \vspace{1.5em}
+    % \begin{bprooftree}
+    %   \AxiomC{\( \Gamma \infer e_{0} : A_{0} \)}
+    %   \AxiomC{\( \ldots \)}
+    %   \AxiomC{\( \Gamma \infer e_{n} : A_{n} \subst{x_{k}}{e_{k}} \)}
+    %   \RightLabel{\( (\Sigma_{\ir{i}}) \)}
+    %   \TrinaryInfC{\( \Gamma \infer (e_{0}, \ldots, e_{n}) : \dsum{x_{0} : A_{0}, \ldots, x_{n-1} : A_{n-1}}{A_{n}} \)}
+    % \end{bprooftree}
+    % \\
+    % \vspace{1.5em}
+    % \begin{bprooftree}
+    %   \AxiomC{\( \Gamma \infer e_{1} : \dsum{x_{0} : A_{0}, \ldots, x_{n-1} : A_{n-1}}{A_{n}} \)}
+    %   \AxiomC{\( \Gamma, x_{0} : A_{0}, \ldots, x_{n} : A_{n} \infer e_{2} : B \subst{z}{(x_{0}, \ldots, x_{n})} \)}
+    %   \RightLabel{\( (\Sigma_{\ir{e}}) \)}
+    %   \BinaryInfC{\( \Gamma \infer \LET{(x_{0}, \ldots, x_{n})}{e_{1}}{e_{2}} : B \subst{z}{e_{1}} \)}
+    % \end{bprooftree}
     \\
     \vspace{1.5em}
     \begin{bprooftree}
