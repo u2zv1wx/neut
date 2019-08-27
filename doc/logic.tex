@@ -240,30 +240,30 @@ polarize:
     \end{bprooftree}
     \\
     \vspace{1.5em}
-    \begin{bprooftree}
-      \AxiomC{\( \Gamma \infer P_{0} : \univ \hspace{2em} \cdots \hspace{2em} \Gamma, x_{0} : P_{0}, \ldots, x_{n-1} : P_{n-1} \infer P_{n} : \univ \)}
-      \RightLabel{\( (\Sigma) \)}
-      \UnaryInfC{\( \Gamma \infer \dsum{x_{0} : P_{0}, \ldots, x_{n-1} : P_{n-1}}{P_{n}} : \univ \)}
-    \end{bprooftree}
-    \\
-    \vspace{1.5em}
-    \begin{bprooftree}
-      \AxiomC{\( \Gamma \infer e_{0} : P_{0} \)}
-      \AxiomC{\( \ldots \)}
-      \AxiomC{\( \Gamma \infer e_{n} : P_{n} \subst{x_{k}}{e_{k}} \)}
-      \RightLabel{\( (\Sigma_{\ir{i}}) \)}
-      \TrinaryInfC{\( \Gamma \infer (e_{0}, \ldots, e_{n}) : \dsum{x_{0} : P_{0}, \ldots, x_{n-1} : P_{n-1}}{P_{n}} \)}
-    \end{bprooftree}
-    \\
-    \vspace{1.5em}
-    \begin{bprooftree}
-      \AxiomC{\( \Gamma \infer e_{1} : \dsum{x_{0} : P_{0}, \ldots, x_{n-1} : P_{n-1}}{P_{n}} \)}
-      \AxiomC{\( \Gamma, x_{0} : P_{0}, \ldots, x_{n} : P_{n} \infer e_{2} : N \subst{z}{(x_{0}, \ldots, x_{n})} \)}
-      \RightLabel{\( (\Sigma_{\ir{e}}) \)}
-      \BinaryInfC{\( \Gamma \infer \LET{(x_{0}, \ldots, x_{n})}{e_{1}}{e_{2}} : N \subst{z}{e_{1}} \)}
-    \end{bprooftree}
-    \\
-    \vspace{1.5em}
+    % \begin{bprooftree}
+    %   \AxiomC{\( \Gamma \infer P_{0} : \univ \hspace{2em} \cdots \hspace{2em} \Gamma, x_{0} : P_{0}, \ldots, x_{n-1} : P_{n-1} \infer P_{n} : \univ \)}
+    %   \RightLabel{\( (\Sigma) \)}
+    %   \UnaryInfC{\( \Gamma \infer \dsum{x_{0} : P_{0}, \ldots, x_{n-1} : P_{n-1}}{P_{n}} : \univ \)}
+    % \end{bprooftree}
+    % \\
+    % \vspace{1.5em}
+    % \begin{bprooftree}
+    %   \AxiomC{\( \Gamma \infer e_{0} : P_{0} \)}
+    %   \AxiomC{\( \ldots \)}
+    %   \AxiomC{\( \Gamma \infer e_{n} : P_{n} \subst{x_{k}}{e_{k}} \)}
+    %   \RightLabel{\( (\Sigma_{\ir{i}}) \)}
+    %   \TrinaryInfC{\( \Gamma \infer (e_{0}, \ldots, e_{n}) : \dsum{x_{0} : P_{0}, \ldots, x_{n-1} : P_{n-1}}{P_{n}} \)}
+    % \end{bprooftree}
+    % \\
+    % \vspace{1.5em}
+    % \begin{bprooftree}
+    %   \AxiomC{\( \Gamma \infer e_{1} : \dsum{x_{0} : P_{0}, \ldots, x_{n-1} : P_{n-1}}{P_{n}} \)}
+    %   \AxiomC{\( \Gamma, x_{0} : P_{0}, \ldots, x_{n} : P_{n} \infer e_{2} : N \subst{z}{(x_{0}, \ldots, x_{n})} \)}
+    %   \RightLabel{\( (\Sigma_{\ir{e}}) \)}
+    %   \BinaryInfC{\( \Gamma \infer \LET{(x_{0}, \ldots, x_{n})}{e_{1}}{e_{2}} : N \subst{z}{e_{1}} \)}
+    % \end{bprooftree}
+    % \\
+    % \vspace{1.5em}
     \begin{bprooftree}
       \AxiomC{\( \Gamma \vdash P : \univ \)}
       \RightLabel{\( (\uparrow) \)}
@@ -380,26 +380,26 @@ after closure conversion:
     \\
     \vspace{1.5em}
     \begin{bprooftree}
-      \AxiomC{\( \Gamma \infer P_{0} : \univ \hspace{2em} \cdots \hspace{2em} \Gamma, x_{0} : P_{0}, \ldots, x_{n-1} : P_{n-1} \infer P_{n} : \univ \)}
-      \RightLabel{\( (\Sigma) \)}
-      \UnaryInfC{\( \Gamma \infer \dsum{x_{0} : P_{0}, \ldots, x_{n-1} : P_{n-1}}{P_{n}} : \univ \)}
+      \AxiomC{\( \Gamma \infer P_{0} : \univ \hspace{2em} \cdots \hspace{2em} \infer P_{n} : \univ \)}
+      \RightLabel{\( (\times) \)}
+      \UnaryInfC{\( \Gamma \infer P_{0} \times \cdots \times P_{n} : \univ \)}
     \end{bprooftree}
     \\
     \vspace{1.5em}
     \begin{bprooftree}
       \AxiomC{\( \Gamma \infer e_{0} : P_{0} \)}
       \AxiomC{\( \ldots \)}
-      \AxiomC{\( \Gamma \infer e_{n} : P_{n} \subst{x_{k}}{e_{k}} \)}
-      \RightLabel{\( (\Sigma_{\ir{i}}) \)}
-      \TrinaryInfC{\( \Gamma \infer (e_{0}, \ldots, e_{n}) : \dsum{x_{0} : P_{0}, \ldots, x_{n-1} : P_{n-1}}{P_{n}} \)}
+      \AxiomC{\( \Gamma \infer e_{n} : P_{n} \)}
+      \RightLabel{\( (\times_{\ir{i}}) \)}
+      \TrinaryInfC{\( \Gamma \infer (e_{0}, \ldots, e_{n}) : P_{0} \times \cdots \times P_{n} \)}
     \end{bprooftree}
     \\
     \vspace{1.5em}
     \begin{bprooftree}
-      \AxiomC{\( \Gamma \infer e_{1} : \dsum{x_{0} : P_{0}, \ldots, x_{n-1} : P_{n-1}}{P_{n}} \)}
-      \AxiomC{\( \Gamma, x_{0} : P_{0}, \ldots, x_{n} : P_{n} \infer e_{2} : N \subst{z}{(x_{0}, \ldots, x_{n})} \)}
-      \RightLabel{\( (\Sigma_{\ir{e}}) \)}
-      \BinaryInfC{\( \Gamma \infer \LET{(x_{0}, \ldots, x_{n})}{e_{1}}{e_{2}} : N \subst{z}{e_{1}} \)}
+      \AxiomC{\( \Gamma \infer e_{1} : P_{0} \times \cdots \times P_{n} \)}
+      \AxiomC{\( \Gamma, x_{0} : P_{0}, \ldots, x_{n} : P_{n} \infer e_{2} : N \)}
+      \RightLabel{\( (\times_{\ir{e}}) \)}
+      \BinaryInfC{\( \Gamma \infer \LET{(x_{0}, \ldots, x_{n})}{e_{1}}{e_{2}} : N \)}
     \end{bprooftree}
     \\
     \vspace{1.5em}
