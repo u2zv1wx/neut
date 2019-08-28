@@ -97,7 +97,7 @@ makeClosure ::
 makeClosure lamThetaName m xps e = do
   let ml = snd $ obtainInfoMeta m
   let fvs = nubBy (\x y -> fst x == fst y) $ varCodePlus e
-  envExp <- exponentSigma $ map (Left . snd) fvs
+  envExp <- exponentSigma ml $ map (Left . snd) fvs
   (envVarName, envVar) <- newVarOfType envExp
   let lamBody = (ml, CodeSigmaElim (map fst fvs) envVar e)
   triv <- exponentTrivialLabel
@@ -169,8 +169,11 @@ exponentTrivial = do
 --     ((ys1[0], ..., ysm[0]), ..., (ys1[n], ..., ysm[n]))
 --
 -- (Note that Sigma (y1 : t1, ..., yn : tn) must be closed.)
-exponentSigma :: [Either DataPlus (Identifier, DataPlus)] -> WithEnv DataPlus
-exponentSigma mxts = do
+exponentSigma ::
+     Maybe (Int, Int)
+  -> [Either DataPlus (Identifier, DataPlus)]
+  -> WithEnv DataPlus
+exponentSigma ml mxts = do
   xts <- mapM supplyName mxts
   triv <- exponentTrivialLabel
   lamThetaName <- newNameWith "exp.sigma"
@@ -178,16 +181,16 @@ exponentSigma mxts = do
   let sigmaExp = (DataMetaNonTerminal triv Nothing, DataTheta lamThetaName)
   (sigVarName, sigVar) <- newVarOfType sigmaExp
   let lamBody =
-        (Nothing, CodeSigmaElim (map fst xts) sigVar (undefined xts countVar))
+        (ml, CodeSigmaElim (map fst xts) sigVar (undefined xts countVar))
   insPolEnv lamThetaName [countVarName, sigVarName] lamBody
   return sigmaExp
 
--- FIXME: 使い回すように変更
+-- FIXME: 同じ関数を使い回すように変更すべき
 exponentClosure :: WithEnv DataPlus
 exponentClosure = do
   triv <- exponentTrivialLabel
   (typeVarName, typeVar) <- newVarOfType triv
-  exponentSigma [Right (typeVarName, triv), Left typeVar, Left triv]
+  exponentSigma Nothing [Right (typeVarName, triv), Left typeVar, Left triv]
 
 supplyName :: Either b (Identifier, b) -> WithEnv (Identifier, b)
 supplyName (Left t) = do
