@@ -76,19 +76,14 @@ makeClosure lamThetaName m xps e = do
   -- envType = (C1, ..., Cn), where Ci is the types of the free variables in e'
   envExp <- exponentSigma $ map (Left . snd) fvs
   (envVarName, envVar) <- newVarOfType envExp
-  let codType = fst $ obtainInfoCodeMeta $ fst e
+  -- let codType = fst $ obtainInfoCodeMeta $ fst e
   let lamBody = (negMeta codType ml, CodeSigmaElim (map fst fvs) envVar e)
-  -- ((A1, ..., An) -> ↑B) ~> ((ENV, A1, ..., An) -> ↑B)
-  downPiExp <- exponentTrivialLabel
-  let lamTheta = (posMeta downPiExp ml, DataTheta lamThetaName)
-  -- lamThetaName ~> thunk (lam (envVarName, x1, ..., xn) lamBody)
+  triv <- exponentTrivialLabel
+  let lamTheta = (posMeta triv ml, DataTheta lamThetaName)
   penv <- gets polEnv
   when (lamThetaName `elem` map fst penv) $
     insPolEnv lamThetaName (envVarName : xps) lamBody
   let fvSigmaIntro = (posMeta envExp ml, DataSigmaIntro $ map toVar fvs)
-  -- piType'  : ↓(((C1, ..., Cn), A) -> ↑B)
-  -- piType'' : ↓((typeVar, A) -> ↑B)
-  -- i.e. piType' = piType'' {typeVar := (C1, ..., Cn)}
   clsExp <- exponentClosure
   return
     ( negMeta (up clsExp ml) ml
@@ -100,12 +95,12 @@ callClosure m e es = do
   (u, ml) <- polarizeMeta m
   ts <- mapM typeOf es
   triv <- exponentTrivialLabel
-  (typeVarName, typeVar) <- newVarOfType triv
   clsType <- exponentClosure
   argList <- mapM newVarOfType ts
   (clsVarName, clsVar) <- newVarOfType clsType
-  (lamVarName, lamVar) <- newVarOfType triv
+  (typeVarName, typeVar) <- newVarOfType triv
   (envVarName, envVar) <- newVarOfType typeVar
+  (lamVarName, lamVar) <- newVarOfType triv
   cont <-
     bindLet
       (zip (map fst argList) es)
@@ -169,18 +164,8 @@ up u ml = (CodeMetaTerminal ml, CodeUp u)
 
 -- return LABEL_OF_TRIVAL_EXPONENT
 -- (LABEL_OF_TRIVAL_EXPONENT ~> lam (n, x). (x, ..., x))
--- FIXME: 同じ名前を利用するように変更すること
 exponentTrivialLabel :: WithEnv DataPlus
-exponentTrivialLabel = do
-  trivThetaName <- newNameWith "triv"
-  -- triv <- exponentTrivialLabel
-  (countVarName, countVar) <- newVarOfType undefined
-  (argVarName, argVar) <- newVarOfType undefined
-  -- n-ary copy (nが不明なので構文が必要)
-  let lamBody =
-        (undefined, CodeUpIntro (undefined, DataSigmaIntroN countVar argVar))
-  insPolEnv trivThetaName [countVarName, argVarName] lamBody
-  return (posMeta undefined Nothing, DataTheta trivThetaName)
+exponentTrivialLabel = return (DataMetaTerminal Nothing, DataTheta "_TRIVIAL_")
 
 exponentTrivial :: WithEnv CodePlus
 exponentTrivial = do
@@ -193,21 +178,24 @@ supplyName (Left t) = do
   return (x, t)
 supplyName (Right (x, t)) = return (x, t)
 
+-- Sigma (y1 : t1, ..., yn : tn) ~>
+--   lam (n, z).
+--     let (y1, ..., yn) := z in
+--     bind ys1 = t1 @ (n, y1) in
+--     ...
+--     bind ysn = tn @ (n, yn) in
+--     ((ys1[0], ..., ysm[0]), ..., (ys1[n], ..., ysm[n]))
+--
+-- (Note that Sigma (y1 : t1, ..., yn : tn) must be closed.)
 exponentSigma :: [Either DataPlus (Identifier, DataPlus)] -> WithEnv DataPlus
-exponentSigma xs = do
-  yts <- mapM supplyName xs
+exponentSigma mxts = do
+  xts <- mapM supplyName mxts
   triv <- exponentTrivialLabel
   lamThetaName <- newNameWith "exp.sigma"
-  -- lam (n, z).
-  --   let (y1, ..., yn) := z in
-  --   bind ys1 = t1 @ (n, y1) in
-  --   ...
-  --   bind ysn = tn @ (n, yn) in
-  --   ((ys1[0], ..., ysm[0]), ..., (ys1[n], ..., ysm[n]))
   (countVarName, countVar) <- newVarOfType triv -- int
-  (sigVarName, sigVar) <- newVarOfType undefined -- sigma
+  (sigVarName, sigVar) <- newVarOfType undefined -- sigma (IORefでlamThetaNameにすべき？)
   let lamBody =
-        (undefined, CodeSigmaElim (map fst yts) sigVar (undefined yts countVar))
+        (undefined, CodeSigmaElim (map fst xts) sigVar (undefined xts countVar))
   insPolEnv lamThetaName [countVarName, sigVarName] lamBody
   return (posMeta triv Nothing, DataTheta lamThetaName)
 
