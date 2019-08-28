@@ -218,13 +218,14 @@ exponentSigma xs = do
   --   bind ys1 = t1 @ (n, y1) in
   --   ...
   --   bind ysn = tn @ (n, yn) in
-  --   ZIP [ys1, ..., ysn]
+  --   ((ys1[0], ..., ysm[0]), ..., (ys1[n], ..., ysm[n]))
   (countVarName, countVar) <- newVarOfType triv -- int
   (sigVarName, sigVar) <- newVarOfType undefined -- sigma
   let lamBody = (undefined, CodeSigmaElim yts sigVar (undefined yts countVar))
   insPolEnv lamThetaName [countVarName, sigVarName] lamBody
   return (posMeta triv Nothing, DataTheta lamThetaName)
 
+-- FIXME: 使い回すように変更
 exponentClosure :: WithEnv DataPlus
 exponentClosure = do
   triv <- exponentTrivialLabel
