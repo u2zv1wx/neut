@@ -23,19 +23,16 @@ polarize :: TermPlus -> WithEnv CodePlus
 polarize (_, TermTau) = exponentTrivial
 polarize (m, TermTheta x) = polarizeTheta m x
 polarize (m, TermUpsilon x) = do
-  (y, yts) <- polarize' $ fst $ obtainInfoMeta m
-  let ml = snd $ obtainInfoMeta m
+  (y, yts, ml) <- polarizeMeta m
   bindLet yts (negMeta (up y ml) ml, CodeUpIntro (posMeta y ml, DataUpsilon x))
 polarize (_, TermEpsilon _) = exponentTrivial
 polarize (m, TermEpsilonIntro l) = do
-  (u, ues) <- polarize' $ fst $ obtainInfoMeta m
-  let ml = snd $ obtainInfoMeta m
+  (u, ues, ml) <- polarizeMeta m
   bindLet
     ues
     (negMeta (up u ml) ml, CodeUpIntro (posMeta u ml, DataEpsilonIntro l))
 polarize (m, TermEpsilonElim (x, t) e bs) = do
-  (u, uts) <- polarize' $ fst $ obtainInfoMeta m
-  let ml = snd $ obtainInfoMeta m
+  (u, uts, ml) <- polarizeMeta m
   let (cs, es) = unzip bs
   es' <- mapM polarize es
   (y, yts) <- polarize' e
@@ -44,8 +41,7 @@ polarize (m, TermEpsilonElim (x, t) e bs) = do
     (uts ++ yts ++ zts)
     (negMeta (up u ml) ml, CodeEpsilonElim (x, z) y (zip cs es'))
 polarize (m, TermPi _ _) = do
-  (u, uts) <- polarize' $ fst $ obtainInfoMeta m
-  let ml = snd $ obtainInfoMeta m
+  (u, uts, ml) <- polarizeMeta m
   clsExp <- exponentClosure
   bindLet uts (negMeta (up u ml) ml, CodeUpIntro clsExp)
 polarize (m, TermPiIntro xts e) = do
@@ -98,12 +94,9 @@ makeClosure lamThetaName m xps e = do
 callClosure :: Meta -> CodePlus -> [TermPlus] -> WithEnv CodePlus
 callClosure m e es = do
   (xs, xes) <- unzip <$> mapM polarize' es
-  (u, ues) <- polarize' $ fst $ obtainInfoMeta m
-  let ml = snd $ obtainInfoMeta m
-  -- ts <- mapM typeOf es'
+  (u, ues, ml) <- polarizeMeta m
   triv <- exponentTrivialLabel
   clsType <- exponentClosure
-  -- argList <- mapM newVarOfType ts
   (clsVarName, clsVar) <- newVarOfType clsType
   (typeVarName, typeVar) <- newVarOfType triv
   (envVarName, envVar) <- newVarOfType typeVar
@@ -138,9 +131,16 @@ polarize' e@(m, _) = do
       (varName, var) <- newVarOfType' triv ml
       return (var, [(varName, e')])
     MetaNonTerminal t ml -> do
-      (p, xes) <- polarize' t
-      (varName, var) <- newVarOfType' p ml
+      (x, xes) <- polarize' t
+      (varName, var) <- newVarOfType' x ml
       return (var, xes ++ [(varName, e')])
+
+polarizeMeta ::
+     Meta -> WithEnv (DataPlus, [(Identifier, CodePlus)], Maybe (Int, Int))
+polarizeMeta m = do
+  (x, xes) <- polarize' $ fst $ obtainInfoMeta m
+  let ml = snd $ obtainInfoMeta m
+  return (x, xes, ml)
 
 bindLet :: [(Identifier, CodePlus)] -> CodePlus -> WithEnv CodePlus
 bindLet [] cont = return cont
@@ -234,10 +234,7 @@ polarizeTheta m name@"core.print.i64" = polarizeThetaPrint name m
 polarizeTheta _ _                     = throwError "polarize.theta"
 
 polarizeThetaArith :: Identifier -> Arith -> Meta -> WithEnv CodePlus
-polarizeThetaArith name op m
-  -- (_, _, ml) <- polarizeMeta m
-  -- (u, ue) <- polarize' $ fst $ obtainInfoMeta m
- = do
+polarizeThetaArith name op m = do
   let ml = snd $ obtainInfoMeta m
   numExp <- exponentTrivialLabel
   (x, varX) <- newVarOfType numExp
@@ -249,10 +246,7 @@ polarizeThetaArith name op m
     (negMeta (up numExp ml) ml, CodeTheta (ThetaArith op varX varY))
 
 polarizeThetaPrint :: Identifier -> Meta -> WithEnv CodePlus
-polarizeThetaPrint name m
-  -- (_, _, ml) <- polarizeMeta m
-  -- (u, ue) <- polarize' $ fst $ obtainInfoMeta m
- = do
+polarizeThetaPrint name m = do
   let ml = snd $ obtainInfoMeta m
   intExp <- exponentTrivialLabel
   codExp <- exponentTrivial
