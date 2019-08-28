@@ -77,7 +77,7 @@ makeClosure lamThetaName m xps e = do
   envExp <- exponentSigma $ map (Left . snd) fvs
   (envVarName, envVar) <- newVarOfType envExp
   let codType = fst $ obtainInfoCodeMeta $ fst e
-  let lamBody = (negMeta codType ml, CodeSigmaElim fvs envVar e)
+  let lamBody = (negMeta codType ml, CodeSigmaElim (map fst fvs) envVar e)
   -- ((A1, ..., An) -> ↑B) ~> ((ENV, A1, ..., An) -> ↑B)
   downPiExp <- exponentTrivialLabel
   let lamTheta = (posMeta downPiExp ml, DataTheta lamThetaName)
@@ -101,36 +101,22 @@ callClosure m e es = do
   ts <- mapM typeOf es
   triv <- exponentTrivialLabel
   (typeVarName, typeVar) <- newVarOfType triv
-  -- let (_, mlPi) = obtainInfoCodeMeta funMeta
-  -- downPiType <- reduceCodePlus upDownPiType >>= extract
-  -- (xpsPi, codType) <- extractFromDownPi downPiType
-  downPiType'' <- exponentTrivialLabel
   clsType <- exponentClosure
   argList <- mapM newVarOfType ts
   (clsVarName, clsVar) <- newVarOfType clsType
-  (lamVarName, lamVar) <- newVarOfType downPiType''
+  (lamVarName, lamVar) <- newVarOfType triv
   (envVarName, envVar) <- newVarOfType typeVar
   cont <-
     bindLet
       (zip (map fst argList) es)
       ( negMeta (up u ml) ml
       , CodeSigmaElim
-          [ (typeVarName, triv)
-          , (lamVarName, downPiType'')
-          , (envVarName, typeVar)
-          ]
+          [typeVarName, envVarName, lamVarName]
           clsVar
           ( negMeta (up u ml) ml
           , CodePiElimDownElim lamVar (envVar : map toVar argList)))
-  return (negMeta (up u ml) ml, CodeUpElim (clsVarName, clsType) e cont)
+  return (negMeta (up u ml) ml, CodeUpElim clsVarName e cont)
 
--- toSigmaType ::
---      Maybe (Int, Int)
---   -> [Either DataPlus (Identifier, DataPlus)]
---   -> WithEnv DataPlus
--- toSigmaType ml xps = do
---   xps' <- mapM supplyName xps
---   return (DataMetaTerminal ml, DataSigma xps')
 typeOf :: CodePlus -> WithEnv DataPlus
 typeOf (m, _) = extract $ fst $ obtainInfoCodeMeta m
 
@@ -156,10 +142,9 @@ bindLet [] cont = return cont
 bindLet ((x, e):xes) cont = do
   e' <- bindLet xes cont
   let (typeOfCont, ml) = obtainInfoCodeMeta $ fst e'
-  p <- typeOf e
   -- kleisli extension (i.e. dependent up-elimination)
-  let ke = (fst typeOfCont, CodeUpElim (x, p) e typeOfCont)
-  return (negMeta ke ml, CodeUpElim (x, p) e e')
+  let ke = (fst typeOfCont, CodeUpElim x e typeOfCont)
+  return (negMeta ke ml, CodeUpElim x e e')
 
 polarizeMeta :: Meta -> WithEnv (DataPlus, Maybe (Int, Int))
 polarizeMeta m = do
@@ -221,7 +206,8 @@ exponentSigma xs = do
   --   ((ys1[0], ..., ysm[0]), ..., (ys1[n], ..., ysm[n]))
   (countVarName, countVar) <- newVarOfType triv -- int
   (sigVarName, sigVar) <- newVarOfType undefined -- sigma
-  let lamBody = (undefined, CodeSigmaElim yts sigVar (undefined yts countVar))
+  let lamBody =
+        (undefined, CodeSigmaElim (map fst yts) sigVar (undefined yts countVar))
   insPolEnv lamThetaName [countVarName, sigVarName] lamBody
   return (posMeta triv Nothing, DataTheta lamThetaName)
 

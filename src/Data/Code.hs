@@ -22,12 +22,12 @@ data Code
                     [(Case, CodePlus)]
   | CodePiElimDownElim DataPlus
                        [DataPlus]
-  | CodeSigmaElim [IdentifierPlus]
+  | CodeSigmaElim [Identifier]
                   DataPlus
                   CodePlus
   | CodeUp DataPlus
   | CodeUpIntro DataPlus
-  | CodeUpElim IdentifierPlus
+  | CodeUpElim Identifier
                CodePlus
                CodePlus
   deriving (Show)
@@ -88,11 +88,11 @@ varCodePlus (_, CodeEpsilonElim (x, _) v branchList) = do
   varDataPlus v ++ filterPlus (/= x) (concatMap varCodePlus es)
 varCodePlus (_, CodePiElimDownElim v vs) =
   varDataPlus v ++ concatMap varDataPlus vs
-varCodePlus (_, CodeSigmaElim xps v e) =
-  varDataPlus v ++ filterPlus (`notElem` map fst xps) (varCodePlus e)
+varCodePlus (_, CodeSigmaElim xs v e) =
+  varDataPlus v ++ filterPlus (`notElem` xs) (varCodePlus e)
 varCodePlus (_, CodeUp p) = varDataPlus p
 varCodePlus (_, CodeUpIntro v) = varDataPlus v
-varCodePlus (_, CodeUpElim (x, _) e1 e2) =
+varCodePlus (_, CodeUpElim x e1 e2) =
   varCodePlus e1 ++ filterPlus (/= x) (varCodePlus e2)
 
 varDataPlusPi :: [IdentifierPlus] -> DataPlus -> [IdentifierPlus]
@@ -158,11 +158,11 @@ substCodePlus sub (m, CodePiElimDownElim v vs) = do
   let vs' = map (substDataPlus sub) vs
   let m' = substCodeMeta sub m
   (m', CodePiElimDownElim v' vs')
-substCodePlus sub (m, CodeSigmaElim xps v e) = do
+substCodePlus sub (m, CodeSigmaElim xs v e) = do
   let v' = substDataPlus sub v
-  let (xps', e') = substDataPlusSigmaElim sub xps e
+  let (xs', e') = substDataPlusSigmaElim sub xs e
   let m' = substCodeMeta sub m
-  (m', CodeSigmaElim xps' v' e')
+  (m', CodeSigmaElim xs' v' e')
 substCodePlus sub (m, CodeUp p) = do
   let p' = substDataPlus sub p
   let m' = substCodeMeta sub m
@@ -171,12 +171,11 @@ substCodePlus sub (m, CodeUpIntro v) = do
   let v' = substDataPlus sub v
   let m' = substCodeMeta sub m
   (m', CodeUpIntro v')
-substCodePlus sub (m, CodeUpElim (x, p) e1 e2) = do
-  let p' = substDataPlus sub p
+substCodePlus sub (m, CodeUpElim x e1 e2) = do
   let e1' = substCodePlus sub e1
   let e2' = substCodePlus (filter (\(y, _) -> y /= x) sub) e2
   let m' = substCodeMeta sub m
-  (m', CodeUpElim (x, p') e1' e2')
+  (m', CodeUpElim x e1' e2')
 
 substTheta :: SubstDataPlus -> Theta -> Theta
 substTheta sub (ThetaArith a v1 v2) = do
@@ -220,15 +219,11 @@ substCodePlusPi sub ((x, p):xps) n = do
   ((x, p') : xps', n')
 
 substDataPlusSigmaElim ::
-     SubstDataPlus
-  -> [IdentifierPlus]
-  -> CodePlus
-  -> ([IdentifierPlus], CodePlus)
+     SubstDataPlus -> [Identifier] -> CodePlus -> ([Identifier], CodePlus)
 substDataPlusSigmaElim sub [] e = do
   let e' = substCodePlus sub e
   ([], e')
-substDataPlusSigmaElim sub ((x, p):xps) e = do
+substDataPlusSigmaElim sub (x:xs) e = do
   let sub' = filter (\(y, _) -> y /= x) sub
-  let (xps', e') = substDataPlusSigmaElim sub' xps e
-  let p' = substDataPlus sub p
-  ((x, p') : xps', e')
+  let (xs', e') = substDataPlusSigmaElim sub' xs e
+  (x : xs', e')
