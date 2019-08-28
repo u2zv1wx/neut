@@ -21,16 +21,12 @@ import           Data.Term
 import           Reduce.Code
 
 polarize :: TermPlus -> WithEnv CodePlus
-polarize (m, TermTau) = do
-  (u, ml) <- polarizeMeta m
-  return (negMeta (up u ml) ml, CodeUpIntro (posMeta u ml, DataTau))
+polarize (_, TermTau) = exponentTrivial
 polarize (m, TermTheta x) = polarizeTheta m x
 polarize (m, TermUpsilon x) = do
   (u, ml) <- polarizeMeta m
   return (negMeta (up u ml) ml, CodeUpIntro (posMeta u ml, DataUpsilon x))
-polarize (m, TermEpsilon x) = do
-  (u, ml) <- polarizeMeta m
-  return (negMeta (up u ml) ml, CodeUpIntro (posMeta u ml, DataEpsilon x))
+polarize (_, TermEpsilon _) = exponentTrivial
 polarize (m, TermEpsilonIntro l) = do
   (u, ml) <- polarizeMeta m
   return (negMeta (up u ml) ml, CodeUpIntro (posMeta u ml, DataEpsilonIntro l))
@@ -41,16 +37,10 @@ polarize (m, TermEpsilonElim (x, t) e bs) = do
   (y, ye) <- polarize' e
   (z, zt) <- polarize' t
   bindLet [ye, zt] (negMeta (up u ml) ml, CodeEpsilonElim (x, z) y (zip cs es'))
-polarize (m, TermPi xts t) = do
+polarize (m, TermPi _ _) = do
   (u, ml) <- polarizeMeta m
-  p <- polarize t >>= reduceCodePlus >>= extract
-  (xs', xts', xs) <- polarizePlus xts
-  let negMetaMeta = CodeMetaTerminal ml
-  let z' = (negMetaMeta, CodeUp p)
-  bindLet
-    xts'
-    ( negMeta (up u ml) ml
-    , CodeUpIntro (posMeta u ml, DataDownPi (zip xs xs') z'))
+  clsExp <- exponentClosure
+  return (negMeta (up u ml) ml, CodeUpIntro clsExp)
 polarize (m, TermPiIntro xts e) = do
   xps <- polarizePlus' xts
   e' <- polarize e
@@ -87,56 +77,41 @@ makeClosure ::
   -> CodePlus
   -> WithEnv CodePlus
 makeClosure lamThetaName m xps e = do
-  (downPiType, ml) <- polarizeMeta m
+  (_, ml) <- polarizeMeta m
   let fvs = nubBy (\x y -> fst x == fst y) $ varCodePlus e
   -- envType = (C1, ..., Cn), where Ci is the types of the free variables in e'
-  envType <- toSigmaType ml $ map (Left . snd) fvs
-  (envVarName, envVar) <- newVarOfType envType
-  (xpsPi, codType) <- extractFromDownPi downPiType
+  envExp <- exponentSigma $ map (Left . snd) fvs
+  (envVarName, envVar) <- newVarOfType envExp
+  let codType = fst $ obtainInfoCodeMeta $ fst e
   let lamBody = (negMeta codType ml, CodeSigmaElim fvs envVar e)
   -- ((A1, ..., An) -> ↑B) ~> ((ENV, A1, ..., An) -> ↑B)
-  -- downPiType' = ↓((ENV, A1, ..., An) -> ↑B)
-  downPiType' <- toDownPiType ml (Left envType : map Right xpsPi) codType
-  let lamTheta = (posMeta downPiType' ml, DataTheta lamThetaName)
+  downPiExp <- exponentTrivialLabel
+  let lamTheta = (posMeta downPiExp ml, DataTheta lamThetaName)
   -- lamThetaName ~> thunk (lam (envVarName, x1, ..., xn) lamBody)
   penv <- gets polEnv
   when (lamThetaName `elem` map fst penv) $
-    insPolEnv lamThetaName ((envVarName, envType) : xps) lamBody
-  let fvSigmaIntro = (posMeta envType ml, DataSigmaIntro $ map toVar fvs)
-  (typeVarName, typeVar) <- newVarOfType (DataMetaTerminal ml, DataTau)
+    insPolEnv lamThetaName ((envVarName, envExp) : xps) lamBody
+  let fvSigmaIntro = (posMeta envExp ml, DataSigmaIntro $ map toVar fvs)
   -- piType'  : ↓(((C1, ..., Cn), A) -> ↑B)
   -- piType'' : ↓((typeVar, A) -> ↑B)
   -- i.e. piType' = piType'' {typeVar := (C1, ..., Cn)}
-  downPiType'' <- toDownPiType ml (Left typeVar : map Right xpsPi) codType
-  -- clsType = Sigma (typeVar : U). (↓((typeVar, A) -> ↑B), typeVar)
-  clsType <-
-    toSigmaType
-      ml
-      [ Right (typeVarName, (DataMetaTerminal ml, DataTau))
-      , Left downPiType''
-      , Left typeVar
-      ]
+  clsExp <- exponentClosure
   return
-    ( negMeta (up clsType ml) ml
+    ( negMeta (up clsExp ml) ml
     , CodeUpIntro
-        (posMeta clsType ml, DataSigmaIntro [envType, lamTheta, fvSigmaIntro]))
+        (posMeta clsExp ml, DataSigmaIntro [envExp, fvSigmaIntro, lamTheta]))
 
 callClosure :: Meta -> CodePlus -> [CodePlus] -> WithEnv CodePlus
-callClosure m e@(funMeta, _) es = do
+callClosure m e es = do
   (u, ml) <- polarizeMeta m
   ts <- mapM typeOf es
-  (typeVarName, typeVar) <- newVarOfType (DataMetaTerminal ml, DataTau)
-  let (upDownPiType, mlPi) = obtainInfoCodeMeta funMeta
-  downPiType <- reduceCodePlus upDownPiType >>= extract
-  (xpsPi, codType) <- extractFromDownPi downPiType
-  downPiType'' <- toDownPiType mlPi (Left typeVar : map Right xpsPi) codType
-  clsType <-
-    toSigmaType
-      ml
-      [ Right (typeVarName, (DataMetaTerminal mlPi, DataTau))
-      , Left downPiType''
-      , Left typeVar
-      ]
+  triv <- exponentTrivialLabel
+  (typeVarName, typeVar) <- newVarOfType triv
+  -- let (_, mlPi) = obtainInfoCodeMeta funMeta
+  -- downPiType <- reduceCodePlus upDownPiType >>= extract
+  -- (xpsPi, codType) <- extractFromDownPi downPiType
+  downPiType'' <- exponentTrivialLabel
+  clsType <- exponentClosure
   argList <- mapM newVarOfType ts
   (clsVarName, clsVar) <- newVarOfType clsType
   (lamVarName, lamVar) <- newVarOfType downPiType''
@@ -146,7 +121,7 @@ callClosure m e@(funMeta, _) es = do
       (zip (map fst argList) es)
       ( negMeta (up u ml) ml
       , CodeSigmaElim
-          [ (typeVarName, (DataMetaTerminal mlPi, DataTau))
+          [ (typeVarName, triv)
           , (lamVarName, downPiType'')
           , (envVarName, typeVar)
           ]
@@ -155,29 +130,18 @@ callClosure m e@(funMeta, _) es = do
           , CodePiElimDownElim lamVar (envVar : map toVar argList)))
   return (negMeta (up u ml) ml, CodeUpElim (clsVarName, clsType) e cont)
 
-toSigmaType ::
-     Maybe (Int, Int)
-  -> [Either DataPlus (Identifier, DataPlus)]
-  -> WithEnv DataPlus
-toSigmaType ml xps = do
-  xps' <- mapM supplyName xps
-  return (DataMetaTerminal ml, DataSigma xps')
-
-toDownPiType ::
-     Maybe (Int, Int)
-  -> [Either DataPlus (Identifier, DataPlus)]
-  -> CodePlus
-  -> WithEnv DataPlus
-toDownPiType ml xps n = do
-  xps' <- mapM supplyName xps
-  return (DataMetaTerminal ml, DataDownPi xps' n)
-
-supplyName :: Either b (Identifier, b) -> WithEnv (Identifier, b)
-supplyName (Left t) = do
-  x <- newNameWith "hole"
-  return (x, t)
-supplyName (Right (x, t)) = return (x, t)
-
+-- toSigmaType ::
+--      Maybe (Int, Int)
+--   -> [Either DataPlus (Identifier, DataPlus)]
+--   -> WithEnv DataPlus
+-- toSigmaType ml xps = do
+--   xps' <- mapM supplyName xps
+--   return (DataMetaTerminal ml, DataSigma xps')
+-- supplyName :: Either b (Identifier, b) -> WithEnv (Identifier, b)
+-- supplyName (Left t) = do
+--   x <- newNameWith "hole"
+--   return (x, t)
+-- supplyName (Right (x, t)) = return (x, t)
 typeOf :: CodePlus -> WithEnv DataPlus
 typeOf (m, _) = extract $ fst $ obtainInfoCodeMeta m
 
@@ -208,13 +172,12 @@ bindLet ((x, e):xes) cont = do
   let ke = (fst typeOfCont, CodeUpElim (x, p) e typeOfCont)
   return (negMeta ke ml, CodeUpElim (x, p) e e')
 
-polarizePlus ::
-     [(a, TermPlus)] -> WithEnv ([DataPlus], [(Identifier, CodePlus)], [a])
-polarizePlus xts = do
-  let (xs, ts) = unzip xts
-  (ys', yts') <- unzip <$> mapM polarize' ts
-  return (ys', yts', xs)
-
+-- polarizePlus ::
+--      [(a, TermPlus)] -> WithEnv ([DataPlus], [(Identifier, CodePlus)], [a])
+-- polarizePlus xts = do
+--   let (xs, ts) = unzip xts
+--   (ys', yts') <- unzip <$> mapM polarize' ts
+--   return (ys', yts', xs)
 polarizePlus' :: [(a, TermPlus)] -> WithEnv [(a, DataPlus)]
 polarizePlus' xts = do
   let (xs, ts) = unzip xts
@@ -233,12 +196,6 @@ extract e =
     (_, CodeUpIntro d) -> return d
     _                  -> throwError "extract"
 
-extractFromDownPi :: DataPlus -> WithEnv ([(Identifier, DataPlus)], CodePlus)
-extractFromDownPi e =
-  case e of
-    (_, DataDownPi xps n) -> return (xps, n)
-    _                     -> throwError "extract"
-
 posMeta :: DataPlus -> Maybe (Int, Int) -> DataMeta
 posMeta = DataMetaNonTerminal
 
@@ -247,6 +204,25 @@ negMeta = CodeMetaNonTerminal
 
 up :: DataPlus -> Maybe (Int, Int) -> CodePlus
 up u ml = (CodeMetaTerminal ml, CodeUp u)
+
+-- return LABEL_OF_TRIVAL_EXPONENT
+-- (LABEL_OF_TRIVAL_EXPONENT ~> lam (n, x). (x, ..., x))
+exponentTrivialLabel :: WithEnv DataPlus
+exponentTrivialLabel = undefined
+
+exponentTrivial :: WithEnv CodePlus
+exponentTrivial = do
+  triv <- exponentTrivialLabel
+  return (negMeta (up triv Nothing) Nothing, CodeUpIntro triv)
+
+exponentSigma :: [Either DataPlus (Identifier, DataPlus)] -> WithEnv DataPlus
+exponentSigma = undefined
+
+exponentClosure :: WithEnv DataPlus
+exponentClosure = do
+  triv <- exponentTrivialLabel
+  (typeVarName, typeVar) <- newVarOfType triv
+  exponentSigma [Right (typeVarName, triv), Left typeVar, Left triv]
 
 -- expand definitions of constants
 polarizeTheta :: Meta -> Identifier -> WithEnv CodePlus
@@ -279,30 +255,27 @@ polarizeTheta _ _                     = throwError "polarize.theta"
 
 polarizeThetaArith :: Identifier -> Arith -> Meta -> WithEnv CodePlus
 polarizeThetaArith name op m = do
-  (upT, ml) <- polarizeMeta m
-  case upT of
-    (_, DataDownPi _ (_, CodeUp numType)) -> do
-      (x, varX) <- newVarOfType numType
-      (y, varY) <- newVarOfType numType
-      makeClosure
-        name
-        m
-        [(x, numType), (y, numType)]
-        (negMeta (up numType ml) ml, CodeTheta (ThetaArith op varX varY))
-    _ -> throwError "polarize.theta.arith"
+  (_, ml) <- polarizeMeta m
+  numExp <- exponentTrivialLabel
+  (x, varX) <- newVarOfType numExp
+  (y, varY) <- newVarOfType numExp
+  makeClosure
+    name
+    m
+    [(x, numExp), (y, numExp)]
+    (negMeta (up numExp ml) ml, CodeTheta (ThetaArith op varX varY))
 
 polarizeThetaPrint :: Identifier -> Meta -> WithEnv CodePlus
 polarizeThetaPrint name m = do
-  (upT, ml) <- polarizeMeta m
-  case upT of
-    (_, DataDownPi [(_, int)] cod) -> do
-      (x, varX) <- newVarOfType int
-      makeClosure
-        name
-        m
-        [(x, int)]
-        (negMeta cod ml, CodeTheta (ThetaPrint varX))
-    _ -> throwError "polarize.theta.print"
+  (_, ml) <- polarizeMeta m
+  intExp <- exponentTrivialLabel
+  codExp <- exponentTrivial
+  (x, varX) <- newVarOfType intExp
+  makeClosure
+    name
+    m
+    [(x, intExp)]
+    (negMeta codExp ml, CodeTheta (ThetaPrint varX))
 
 newVarOfType :: DataPlus -> WithEnv (Identifier, DataPlus)
 newVarOfType t = do
