@@ -57,6 +57,11 @@ obtainInfoDataMeta (DataMetaTerminal ml) =
   ((DataMetaTerminal ml, undefined), ml)
 obtainInfoDataMeta (DataMetaNonTerminal t ml) = (t, ml)
 
+toDataUpsilon :: (Identifier, DataPlus) -> DataPlus
+toDataUpsilon (x, t) = do
+  let (_, ml) = obtainInfoDataMeta $ fst t
+  (DataMetaNonTerminal t ml, DataUpsilon x)
+
 varDataPlus :: DataPlus -> [IdentifierPlus]
 varDataPlus (_, DataTheta _)           = []
 varDataPlus (m, DataUpsilon x)         = [(x, fst $ obtainInfoDataMeta m)]

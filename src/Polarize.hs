@@ -26,22 +26,26 @@ import           Data.Env
 import           Data.Term
 
 polarize :: TermPlus -> WithEnv CodePlus
-polarize (_, TermTau) = exponentTrivial
+polarize (_, TermTau) =
+  exponentTrivial >>= \triv -> return (Nothing, CodeUpIntro triv)
 polarize (m, TermTheta x) = polarizeTheta m x
 polarize (m, TermUpsilon x) = do
   (y, yts, ml) <- polarizeMeta m
-  bindLet yts (ml, CodeUpIntro (DataMetaNonTerminal y ml, DataUpsilon x))
-polarize (_, TermEpsilon _) = exponentTrivial
+  return $
+    bindLet yts (ml, CodeUpIntro (DataMetaNonTerminal y ml, DataUpsilon x))
+polarize (_, TermEpsilon _) =
+  exponentTrivial >>= \triv -> return (Nothing, CodeUpIntro triv)
 polarize (m, TermEpsilonIntro l) = do
   (u, ues, ml) <- polarizeMeta m
-  bindLet ues (ml, CodeUpIntro (DataMetaNonTerminal u ml, DataEpsilonIntro l))
+  return $
+    bindLet ues (ml, CodeUpIntro (DataMetaNonTerminal u ml, DataEpsilonIntro l))
 polarize (m, TermEpsilonElim (x, t) e bs) = do
   let ml = snd $ obtainInfoMeta m
   let (cs, es) = unzip bs
   es' <- mapM polarize es
   (yts, y) <- polarize' e
   (zts, z) <- polarize' t
-  bindLet (yts ++ zts) (ml, CodeEpsilonElim (x, z) y (zip cs es'))
+  return $ bindLet (yts ++ zts) (ml, CodeEpsilonElim (x, z) y (zip cs es'))
 polarize (m, TermPi _ _) = do
   (_, _, ml) <- polarizeMeta m
   clsExp <- exponentClosure
@@ -57,7 +61,7 @@ polarize (m, TermMu (f, t) e) = do
   let ml = snd $ obtainInfoMeta m
   let vs = nubBy (\x y -> fst x == fst y) $ varTermPlus e
   let (xs, _) = unzip vs
-  let vs' = map toTermVar vs
+  let vs' = map toTermUpsilon vs
   let clsMuType = (MetaTerminal ml, TermPi vs t)
   let lamBody =
         substTermPlus
@@ -71,8 +75,9 @@ polarize (m, TermMu (f, t) e) = do
   cls <- makeClosure f clsMeta xs lamBody'
   callClosure m cls vs'
 
--- 「DataPlusを使えるのは、[(Identifier, CodePlus)]をすべてbindしてから」
-polarize' :: TermPlus -> WithEnv ([(Identifier, CodePlus)], DataPlus)
+type Binder = [(Identifier, CodePlus)]
+
+polarize' :: TermPlus -> WithEnv (Binder, DataPlus)
 polarize' e@(m, _) = do
   e' <- polarize e
   case m of
@@ -85,8 +90,7 @@ polarize' e@(m, _) = do
       (varName, var) <- newVarOfType' x ml
       return (xes ++ [(varName, e')], var)
 
-polarizeMeta ::
-     Meta -> WithEnv (DataPlus, [(Identifier, CodePlus)], Maybe (Int, Int))
+polarizeMeta :: Meta -> WithEnv (DataPlus, Binder, Maybe (Int, Int))
 polarizeMeta m = do
   (xes, x) <- polarize' $ fst $ obtainInfoMeta m
   let ml = snd $ obtainInfoMeta m
@@ -100,13 +104,13 @@ makeClosure lamThetaName m xps e = do
   envExp <- exponentSigma ml $ map (Left . snd) fvs
   (envVarName, envVar) <- newVarOfType envExp
   let lamBody = (ml, CodeSigmaElim (map fst fvs) envVar e)
-  triv <- exponentTrivialLabel
+  triv <- exponentTrivial
   let lamTheta = (DataMetaNonTerminal triv ml, DataTheta lamThetaName)
   penv <- gets polEnv
   when (lamThetaName `elem` map fst penv) $
     insPolEnv lamThetaName (envVarName : xps) lamBody
   let fvSigmaIntro =
-        (DataMetaNonTerminal envExp ml, DataSigmaIntro $ map toVar fvs)
+        (DataMetaNonTerminal envExp ml, DataSigmaIntro $ map toDataUpsilon fvs)
   clsExp <- exponentClosure
   return
     ( ml
@@ -118,47 +122,37 @@ callClosure :: Meta -> CodePlus -> [TermPlus] -> WithEnv CodePlus
 callClosure m e es = do
   (xes, xs) <- unzip <$> mapM polarize' es
   (_, ues, ml) <- polarizeMeta m
-  triv <- exponentTrivialLabel
+  triv <- exponentTrivial
   clsType <- exponentClosure
   (clsVarName, clsVar) <- newVarOfType clsType
   (typeVarName, typeVar) <- newVarOfType triv
   (envVarName, envVar) <- newVarOfType typeVar
   (lamVarName, lamVar) <- newVarOfType triv
-  cont <-
+  return $
     bindLet
-      (concat xes)
+      ues
       ( ml
-      , CodeSigmaElim
-          [typeVarName, envVarName, lamVarName]
-          clsVar
-          (ml, CodePiElimDownElim lamVar (envVar : xs)))
-  bindLet ues (ml, CodeUpElim clsVarName e cont)
+      , CodeUpElim
+          clsVarName
+          e
+          (bindLet
+             (concat xes)
+             ( ml
+             , CodeSigmaElim
+                 [typeVarName, envVarName, lamVarName]
+                 clsVar
+                 (ml, CodePiElimDownElim lamVar (envVar : xs)))))
 
-toVar :: (Identifier, DataPlus) -> DataPlus
-toVar (x, t) = do
-  let (_, ml) = obtainInfoDataMeta $ fst t
-  (DataMetaNonTerminal t ml, DataUpsilon x)
-
-toTermVar :: (Identifier, TermPlus) -> TermPlus
-toTermVar (x, t) = do
-  let (_, ml) = obtainInfoMeta $ fst t
-  (MetaNonTerminal t ml, TermUpsilon x)
-
-bindLet :: [(Identifier, CodePlus)] -> CodePlus -> WithEnv CodePlus
-bindLet [] cont = return cont
+bindLet :: Binder -> CodePlus -> CodePlus
+bindLet [] cont = cont
 bindLet ((x, e):xes) cont = do
-  e' <- bindLet xes cont
-  return (fst e', CodeUpElim x e e')
+  let e' = bindLet xes cont
+  (fst e', CodeUpElim x e e')
 
 -- return LABEL_OF_TRIVAL_EXPONENT
 -- (LABEL_OF_TRIVAL_EXPONENT ~> lam (n, x). (x, ..., x))
-exponentTrivialLabel :: WithEnv DataPlus
-exponentTrivialLabel = return (DataMetaTerminal Nothing, DataTheta "_TRIVIAL_")
-
-exponentTrivial :: WithEnv CodePlus
-exponentTrivial = do
-  triv <- exponentTrivialLabel
-  return (Nothing, CodeUpIntro triv)
+exponentTrivial :: WithEnv DataPlus
+exponentTrivial = return (DataMetaTerminal Nothing, DataTheta "_TRIVIAL_")
 
 -- Sigma (y1 : t1, ..., yn : tn) ~>
 --   lam (n, z).
@@ -175,7 +169,7 @@ exponentSigma ::
   -> WithEnv DataPlus
 exponentSigma ml mxts = do
   xts <- mapM supplyName mxts
-  triv <- exponentTrivialLabel
+  triv <- exponentTrivial
   lamThetaName <- newNameWith "exp.sigma"
   (countVarName, countVar) <- newVarOfType triv -- int
   let sigmaExp = (DataMetaNonTerminal triv Nothing, DataTheta lamThetaName)
@@ -188,15 +182,15 @@ exponentSigma ml mxts = do
 -- FIXME: 同じ関数を使い回すように変更すべき
 exponentClosure :: WithEnv DataPlus
 exponentClosure = do
-  triv <- exponentTrivialLabel
+  triv <- exponentTrivial
   (typeVarName, typeVar) <- newVarOfType triv
   exponentSigma Nothing [Right (typeVarName, triv), Left typeVar, Left triv]
 
 supplyName :: Either b (Identifier, b) -> WithEnv (Identifier, b)
+supplyName (Right (x, t)) = return (x, t)
 supplyName (Left t) = do
   x <- newNameWith "hole"
   return (x, t)
-supplyName (Right (x, t)) = return (x, t)
 
 -- expand definitions of constants
 polarizeTheta :: Meta -> Identifier -> WithEnv CodePlus
@@ -230,7 +224,7 @@ polarizeTheta _ _                     = throwError "polarize.theta"
 polarizeThetaArith :: Identifier -> Arith -> Meta -> WithEnv CodePlus
 polarizeThetaArith name op m = do
   let ml = snd $ obtainInfoMeta m
-  numExp <- exponentTrivialLabel
+  numExp <- exponentTrivial
   (x, varX) <- newVarOfType numExp
   (y, varY) <- newVarOfType numExp
   makeClosure name m [x, y] (ml, CodeTheta (ThetaArith op varX varY))
@@ -238,14 +232,12 @@ polarizeThetaArith name op m = do
 polarizeThetaPrint :: Identifier -> Meta -> WithEnv CodePlus
 polarizeThetaPrint name m = do
   let ml = snd $ obtainInfoMeta m
-  intExp <- exponentTrivialLabel
+  intExp <- exponentTrivial
   (x, varX) <- newVarOfType intExp
   makeClosure name m [x] (ml, CodeTheta (ThetaPrint varX))
 
 newVarOfType :: DataPlus -> WithEnv (Identifier, DataPlus)
-newVarOfType t = do
-  x <- newNameWith "arg"
-  return (x, (DataMetaNonTerminal t Nothing, DataUpsilon x))
+newVarOfType t = newVarOfType' t Nothing
 
 newVarOfType' :: DataPlus -> Maybe (Int, Int) -> WithEnv (Identifier, DataPlus)
 newVarOfType' t ml = do

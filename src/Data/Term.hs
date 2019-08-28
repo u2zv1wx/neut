@@ -42,6 +42,11 @@ obtainInfoMeta :: Meta -> (TermPlus, Maybe (Int, Int))
 obtainInfoMeta (MetaTerminal ml)      = ((MetaTerminal ml, TermTau), ml)
 obtainInfoMeta (MetaNonTerminal t ml) = (t, ml)
 
+toTermUpsilon :: (Identifier, TermPlus) -> TermPlus
+toTermUpsilon (x, t) = do
+  let (_, ml) = obtainInfoMeta $ fst t
+  (MetaNonTerminal t ml, TermUpsilon x)
+
 varTermPlus :: TermPlus -> [IdentifierPlus]
 varTermPlus (_, TermTau) = []
 varTermPlus (_, TermTheta _) = []
