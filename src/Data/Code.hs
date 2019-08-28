@@ -69,11 +69,12 @@ obtainInfoDataMeta (DataMetaTerminal ml) =
 obtainInfoDataMeta (DataMetaNonTerminal t ml) = (t, ml)
 
 varDataPlus :: DataPlus -> [IdentifierPlus]
-varDataPlus (_, DataTheta _)        = []
-varDataPlus (m, DataUpsilon x)      = [(x, fst $ obtainInfoDataMeta m)]
-varDataPlus (_, DataEpsilonIntro _) = []
-varDataPlus (_, DataSigma xps)      = varDataPlusPiOrSigma xps []
-varDataPlus (_, DataSigmaIntro vs)  = concatMap varDataPlus vs
+varDataPlus (_, DataTheta _)           = []
+varDataPlus (m, DataUpsilon x)         = [(x, fst $ obtainInfoDataMeta m)]
+varDataPlus (_, DataEpsilonIntro _)    = []
+varDataPlus (_, DataSigma xps)         = varDataPlusPiOrSigma xps []
+varDataPlus (_, DataSigmaIntro vs)     = concatMap varDataPlus vs
+varDataPlus (_, DataSigmaIntroN v1 v2) = varDataPlus v1 ++ varDataPlus v2
 
 varDataPlusPiOrSigma :: [IdentifierPlus] -> [IdentifierPlus] -> [IdentifierPlus]
 varDataPlusPiOrSigma [] xs = xs
@@ -126,6 +127,11 @@ substDataPlus sub (m, DataSigmaIntro vs) = do
   let vs' = map (substDataPlus sub) vs
   let m' = substDataMeta sub m
   (m', DataSigmaIntro vs')
+substDataPlus sub (m, DataSigmaIntroN v1 v2) = do
+  let v1' = substDataPlus sub v1
+  let v2' = substDataPlus sub v2
+  let m' = substDataMeta sub m
+  (m', DataSigmaIntroN v1' v2')
 
 substDataMeta :: SubstDataPlus -> DataMeta -> DataMeta
 substDataMeta _ (DataMetaTerminal ml) = DataMetaTerminal ml
