@@ -178,11 +178,12 @@ exponentSigma mxts = do
   triv <- exponentTrivialLabel
   lamThetaName <- newNameWith "exp.sigma"
   (countVarName, countVar) <- newVarOfType triv -- int
-  (sigVarName, sigVar) <- newVarOfType undefined -- sigma (IORefでlamThetaNameにすべき？)
+  let sigmaExp = (posMeta triv Nothing, DataTheta lamThetaName)
+  (sigVarName, sigVar) <- newVarOfType sigmaExp
   let lamBody =
         (Nothing, CodeSigmaElim (map fst xts) sigVar (undefined xts countVar))
   insPolEnv lamThetaName [countVarName, sigVarName] lamBody
-  return (posMeta triv Nothing, DataTheta lamThetaName)
+  return sigmaExp
 
 -- FIXME: 使い回すように変更
 exponentClosure :: WithEnv DataPlus
