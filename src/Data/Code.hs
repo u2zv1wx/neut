@@ -8,7 +8,6 @@ data Data
   = DataTheta Identifier -- global variable
   | DataUpsilon Identifier
   | DataEpsilonIntro Literal
-  | DataSigma [IdentifierPlus]
   | DataSigmaIntro [DataPlus]
   | DataSigmaIntroN DataPlus
                     DataPlus
@@ -62,7 +61,6 @@ varDataPlus :: DataPlus -> [IdentifierPlus]
 varDataPlus (_, DataTheta _)           = []
 varDataPlus (m, DataUpsilon x)         = [(x, fst $ obtainInfoDataMeta m)]
 varDataPlus (_, DataEpsilonIntro _)    = []
-varDataPlus (_, DataSigma xps)         = varDataPlusPiOrSigma xps []
 varDataPlus (_, DataSigmaIntro vs)     = concatMap varDataPlus vs
 varDataPlus (_, DataSigmaIntroN v1 v2) = varDataPlus v1 ++ varDataPlus v2
 
@@ -107,10 +105,6 @@ substDataPlus sub (m, DataUpsilon s) = do
 substDataPlus sub (m, DataEpsilonIntro l) = do
   let m' = substDataMeta sub m
   (m', DataEpsilonIntro l)
-substDataPlus sub (m, DataSigma xps) = do
-  let xps' = substDataPlusSigma sub xps
-  let m' = substDataMeta sub m
-  (m', DataSigma xps')
 substDataPlus sub (m, DataSigmaIntro vs) = do
   let vs' = map (substDataPlus sub) vs
   let m' = substDataMeta sub m

@@ -22,7 +22,6 @@ toLLVM mainTerm = do
   llvmCode mainTerm
 
 llvmCode :: CodePlus -> WithEnv LLVM
-llvmCode (_, CodeTau) = undefined
 llvmCode (m, CodeTheta theta) = llvmCodeTheta m theta
 llvmCode (_, CodeEpsilonElim (x, _) v branchList) =
   llvmCodeEpsilonElim x v branchList
@@ -52,7 +51,6 @@ llvmCode (_, CodeSigmaElim xs v e) = do
          voidPtr
          (toStructPtrType [1 .. (length xs)]))
       extractAndCont
-llvmCode (_, CodeUp _) = undefined
 llvmCode (_, CodeUpIntro d) = do
   result <- newNameWith "ans"
   llvmDataLet result d $ LLVMReturn $ LLVMDataLocal result
@@ -132,7 +130,6 @@ llvmCodeTheta _ (ThetaPrint v) = do
 -- `llvmDataLet x d cont` binds the data `d` to the variable `x`, and computes the
 -- continuation `cont`.
 llvmDataLet :: Identifier -> DataPlus -> LLVM -> WithEnv LLVM
-llvmDataLet _ (_, DataTau) _ = undefined
 llvmDataLet x (_, DataTheta y) cont = do
   penv <- gets polEnv
   case lookup y penv of
@@ -143,7 +140,6 @@ llvmDataLet x (_, DataTheta y) cont = do
         LLVMLet x (LLVMBitcast (LLVMDataGlobal y) funPtrType voidPtr) cont
 llvmDataLet x (_, DataUpsilon y) cont =
   return $ LLVMLet x (LLVMBitcast (LLVMDataLocal y) voidPtr voidPtr) cont
-llvmDataLet _ (_, DataEpsilon _) _ = undefined
 llvmDataLet x (m, DataEpsilonIntro l) cont =
   case (l, fst $ obtainInfoDataMeta m) of
     (LiteralInteger i, (_, DataEpsilon intTypeName))
@@ -172,8 +168,6 @@ llvmDataLet x (m, DataEpsilonIntro l) cont =
                   Nothing
           llvmDataLet x (m', DataEpsilonIntro (LiteralInteger i)) cont
     _ -> throwError "llvmDataLet.DataEpsilonIntro"
-llvmDataLet _ (_, DataDownPi _ _) _ = undefined
-llvmDataLet _ (_, DataSigma _) _ = undefined
 llvmDataLet reg (_, DataSigmaIntro ds) cont = do
   xs <- mapM (const $ newNameWith "cursor") ds
   cast <- newNameWith "cast"
