@@ -1,10 +1,9 @@
--- This module "polarizes" a neutral term into a negMetaative term. Operationally,
+-- This module "polarizes" a neutral term into a negative term. Operationally,
 -- this corresponds to determination of the order of evaluation. In proof-theoretic
 -- term, we translate a ordinary dependent calculus to a dependent variant of
--- Call-By-Push-Value, although this translation doesn't preserve types when the
--- given term includes dependent sigma-elimination. A detailed explanation of
--- Call-By-Push-Value can be found in P. Levy, "Call-by-Push-Value: A Subsuming
--- Paradigm". Ph. D. thesis, Queen Mary College, 2001.
+-- Call-By-Push-Value. A detailed explanation of Call-By-Push-Value can be found
+-- in P. Levy, "Call-by-Push-Value: A Subsuming Paradigm". Ph. D. thesis,
+-- Queen Mary College, 2001.
 --
 -- Every type is converted into an "exponent", which is a function that receives
 -- an integer `n` and a term `e` of that type, and returns n-copy of `e`, namely,
