@@ -10,6 +10,8 @@ data Data
   | DataEpsilonIntro Literal
   | DataSigma [IdentifierPlus]
   | DataSigmaIntro [DataPlus]
+  | DataSigmaIntroN DataPlus
+                    DataPlus
   deriving (Show)
 
 data Code
