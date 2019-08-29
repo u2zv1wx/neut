@@ -81,11 +81,11 @@ polarize' e@(m, _) = do
   case m of
     MetaTerminal ml -> do
       i <- exponentImmediate
-      (varName, var) <- newVarOfType' i ml
+      (varName, var) <- newDataUpsilon' i ml
       return ([(varName, e')], var)
     MetaNonTerminal t ml -> do
       (xes, x) <- polarize' t
-      (varName, var) <- newVarOfType' x ml
+      (varName, var) <- newDataUpsilon' x ml
       return (xes ++ [(varName, e')], var)
 
 polarizeMeta :: Meta -> WithEnv (DataPlus, Binder, Maybe (Int, Int))
@@ -101,7 +101,7 @@ makeClosure lamThetaName m xps e = do
   let fvs = nubBy (\x y -> fst x == fst y) $ varCodePlus e
   envExpName <- newNameWith "exp"
   envExp <- exponentSigma envExpName ml $ map (Left . snd) fvs
-  (envVarName, envVar) <- newVarOfType envExp
+  (envVarName, envVar) <- newDataUpsilon envExp
   let lamBody = (ml, CodeSigmaElim (map fst fvs) envVar e)
   i <- exponentImmediate
   let lamTheta = (DataMetaNonTerminal i ml, DataTheta lamThetaName)
@@ -123,10 +123,10 @@ callClosure m e es = do
   let ml = snd $ obtainInfoMeta m
   i <- exponentImmediate
   clsExp <- exponentClosure
-  (clsVarName, clsVar) <- newVarOfType clsExp
-  (typeVarName, typeVar) <- newVarOfType i
-  (envVarName, envVar) <- newVarOfType typeVar
-  (lamVarName, lamVar) <- newVarOfType i
+  (clsVarName, clsVar) <- newDataUpsilon clsExp
+  (typeVarName, typeVar) <- newDataUpsilon i
+  (envVarName, envVar) <- newDataUpsilon typeVar
+  (lamVarName, lamVar) <- newDataUpsilon i
   return
     ( ml
     , CodeUpElim
@@ -175,8 +175,8 @@ exponentSigma lamThetaName ml mxts = do
     Just _ -> return sigmaExp
     Nothing -> do
       xts <- mapM supplyName mxts
-      (countVarName, countVar) <- newVarOfType i
-      (sigVarName, sigVar) <- newVarOfType sigmaExp
+      (countVarName, countVar) <- newDataUpsilon i
+      (sigVarName, sigVar) <- newDataUpsilon sigmaExp
       let lamBody =
             (ml, CodeSigmaElim (map fst xts) sigVar (undefined xts countVar))
       insPolEnv lamThetaName [countVarName, sigVarName] lamBody
@@ -185,7 +185,7 @@ exponentSigma lamThetaName ml mxts = do
 exponentClosure :: WithEnv DataPlus
 exponentClosure = do
   i <- exponentImmediate
-  (typeVarName, typeVar) <- newVarOfType i
+  (typeVarName, typeVar) <- newDataUpsilon i
   exponentSigma
     "EXPONENT.CLOSURE"
     Nothing
@@ -230,21 +230,22 @@ polarizeThetaArith :: Identifier -> Arith -> Meta -> WithEnv CodePlus
 polarizeThetaArith name op m = do
   let ml = snd $ obtainInfoMeta m
   numExp <- exponentImmediate
-  (x, varX) <- newVarOfType numExp
-  (y, varY) <- newVarOfType numExp
+  (x, varX) <- newDataUpsilon numExp
+  (y, varY) <- newDataUpsilon numExp
   makeClosure name m [x, y] (ml, CodeTheta (ThetaArith op varX varY))
 
 polarizeThetaPrint :: Identifier -> Meta -> WithEnv CodePlus
 polarizeThetaPrint name m = do
   let ml = snd $ obtainInfoMeta m
   intExp <- exponentImmediate
-  (x, varX) <- newVarOfType intExp
+  (x, varX) <- newDataUpsilon intExp
   makeClosure name m [x] (ml, CodeTheta (ThetaPrint varX))
 
-newVarOfType :: DataPlus -> WithEnv (Identifier, DataPlus)
-newVarOfType t = newVarOfType' t Nothing
+newDataUpsilon :: DataPlus -> WithEnv (Identifier, DataPlus)
+newDataUpsilon t = newDataUpsilon' t Nothing
 
-newVarOfType' :: DataPlus -> Maybe (Int, Int) -> WithEnv (Identifier, DataPlus)
-newVarOfType' t ml = do
+newDataUpsilon' ::
+     DataPlus -> Maybe (Int, Int) -> WithEnv (Identifier, DataPlus)
+newDataUpsilon' t ml = do
   x <- newNameWith "arg"
   return (x, (DataMetaNonTerminal t ml, DataUpsilon x))
