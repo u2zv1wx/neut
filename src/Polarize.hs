@@ -178,12 +178,13 @@ exponentSigma lamThetaName ml mxts = do
                  (ml, CodePiElimDownElim t [countVar, toDataUpsilon (x, fst t)]))
               xts
       ys <- mapM (const $ newNameWith "var") xts
+      let ys' = map toDataUpsilon' ys
       let lamBody =
             ( ml
             , CodeSigmaElim
                 (map fst xts)
                 sigVar
-                (bindLet (zip ys appList) undefined))
+                (bindLet (zip ys appList) (ml, CodeTranspose countVar ys')))
       insPolEnv lamThetaName [countVarName, sigVarName] lamBody
       return sigmaExp
 

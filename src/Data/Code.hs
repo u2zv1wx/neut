@@ -27,6 +27,13 @@ data Code
   | CodeUpElim Identifier
                CodePlus
                CodePlus
+  --    CodeTranspose m [y1, ..., yn]
+  -- ~> let (y1-1, ..., y1-m) := y1 in
+  --    ...
+  --    let (yn-1, ..., yn-m) := yn in
+  --    return ((y1-1, ..., yn-1), ..., (y1-m, yn-m))
+  | CodeTranspose DataPlus -- Supposed to be a natural number `m`
+                  [DataPlus] -- List of sigma-intro. Each sigma-intro has `m` elements.
   deriving (Show)
 
 data Theta
@@ -46,6 +53,9 @@ type CodePlus = (CodeMeta, Code)
 
 toDataUpsilon :: (Identifier, Maybe Loc) -> DataPlus
 toDataUpsilon (x, ml) = (ml, DataUpsilon x)
+
+toDataUpsilon' :: Identifier -> DataPlus
+toDataUpsilon' x = (Nothing, DataUpsilon x)
 
 varDataPlus :: DataPlus -> [Identifier]
 varDataPlus (_, DataTheta _)           = []
