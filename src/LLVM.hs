@@ -58,6 +58,8 @@ llvmCode (_, CodeUpElim x cont1 cont2) = do
   cont1' <- llvmCode cont1
   cont2' <- llvmCode cont2
   return $ LLVMLet x cont1' cont2'
+llvmCode (_, CodeCopyN _ _) = undefined
+llvmCode (_, CodeTransposeN _ _) = undefined
 
 llvmCodeSigmaElim ::
      Identifier
