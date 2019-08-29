@@ -23,6 +23,7 @@ import           Data.Basic
 import           Data.Code
 import           Data.Env
 import           Data.Term
+import           Reduce.Term
 
 polarize :: TermPlus -> WithEnv CodePlus
 polarize (m, TermTau) = do
@@ -36,8 +37,13 @@ polarize (m, TermEpsilon _) = do
   i <- exponentImmediate
   return (snd $ obtainInfoMeta m, CodeUpIntro i)
 polarize (m, TermEpsilonIntro l) = do
-  let ml = snd $ obtainInfoMeta m
-  return (ml, CodeUpIntro (ml, DataEpsilonIntro l))
+  let (t, ml) = obtainInfoMeta m
+  t' <- reduceTermPlus t
+  case t' of
+    (_, TermEpsilon i)
+      | Just lowType <- asLowType i ->
+        return (ml, CodeUpIntro (ml, DataEpsilonIntro l lowType))
+    _ -> undefined
 polarize (m, TermEpsilonElim (x, t) e bs) = do
   let (cs, es) = unzip bs
   es' <- mapM polarize es
@@ -216,39 +222,68 @@ supplyName (Left t) = do
 
 -- expand definitions of constants
 polarizeTheta :: Meta -> Identifier -> WithEnv CodePlus
-polarizeTheta m name@"core.i8.add"    = polarizeThetaArith name ArithAdd m
-polarizeTheta m name@"core.i16.add"   = polarizeThetaArith name ArithAdd m
-polarizeTheta m name@"core.i32.add"   = polarizeThetaArith name ArithAdd m
-polarizeTheta m name@"core.i64.add"   = polarizeThetaArith name ArithAdd m
-polarizeTheta m name@"core.i8.sub"    = polarizeThetaArith name ArithSub m
-polarizeTheta m name@"core.i16.sub"   = polarizeThetaArith name ArithSub m
-polarizeTheta m name@"core.i32.sub"   = polarizeThetaArith name ArithSub m
-polarizeTheta m name@"core.i64.sub"   = polarizeThetaArith name ArithSub m
-polarizeTheta m name@"core.i8.mul"    = polarizeThetaArith name ArithMul m
-polarizeTheta m name@"core.i16.mul"   = polarizeThetaArith name ArithMul m
-polarizeTheta m name@"core.i32.mul"   = polarizeThetaArith name ArithMul m
-polarizeTheta m name@"core.i64.mul"   = polarizeThetaArith name ArithMul m
-polarizeTheta m name@"core.i8.div"    = polarizeThetaArith name ArithDiv m
-polarizeTheta m name@"core.i16.div"   = polarizeThetaArith name ArithDiv m
-polarizeTheta m name@"core.i32.div"   = polarizeThetaArith name ArithDiv m
-polarizeTheta m name@"core.i64.div"   = polarizeThetaArith name ArithDiv m
-polarizeTheta m name@"core.f32.add"   = polarizeThetaArith name ArithAdd m
-polarizeTheta m name@"core.f64.add"   = polarizeThetaArith name ArithAdd m
-polarizeTheta m name@"core.f32.sub"   = polarizeThetaArith name ArithSub m
-polarizeTheta m name@"core.f64.sub"   = polarizeThetaArith name ArithSub m
-polarizeTheta m name@"core.f32.mul"   = polarizeThetaArith name ArithMul m
-polarizeTheta m name@"core.f64.mul"   = polarizeThetaArith name ArithMul m
-polarizeTheta m name@"core.f32.div"   = polarizeThetaArith name ArithDiv m
-polarizeTheta m name@"core.f64.div"   = polarizeThetaArith name ArithDiv m
+polarizeTheta m name@"core.i8.add" =
+  polarizeThetaArith name ArithAdd (LowTypeSignedInt 8) m
+polarizeTheta m name@"core.i16.add" =
+  polarizeThetaArith name ArithAdd (LowTypeSignedInt 16) m
+polarizeTheta m name@"core.i32.add" =
+  polarizeThetaArith name ArithAdd (LowTypeSignedInt 32) m
+polarizeTheta m name@"core.i64.add" =
+  polarizeThetaArith name ArithAdd (LowTypeSignedInt 64) m
+polarizeTheta m name@"core.i8.sub" =
+  polarizeThetaArith name ArithSub (LowTypeSignedInt 8) m
+polarizeTheta m name@"core.i16.sub" =
+  polarizeThetaArith name ArithSub (LowTypeSignedInt 16) m
+polarizeTheta m name@"core.i32.sub" =
+  polarizeThetaArith name ArithSub (LowTypeSignedInt 32) m
+polarizeTheta m name@"core.i64.sub" =
+  polarizeThetaArith name ArithSub (LowTypeSignedInt 64) m
+polarizeTheta m name@"core.i8.mul" =
+  polarizeThetaArith name ArithMul (LowTypeSignedInt 8) m
+polarizeTheta m name@"core.i16.mul" =
+  polarizeThetaArith name ArithMul (LowTypeSignedInt 16) m
+polarizeTheta m name@"core.i32.mul" =
+  polarizeThetaArith name ArithMul (LowTypeSignedInt 32) m
+polarizeTheta m name@"core.i64.mul" =
+  polarizeThetaArith name ArithMul (LowTypeSignedInt 64) m
+polarizeTheta m name@"core.i8.div" =
+  polarizeThetaArith name ArithDiv (LowTypeSignedInt 8) m
+polarizeTheta m name@"core.i16.div" =
+  polarizeThetaArith name ArithDiv (LowTypeSignedInt 16) m
+polarizeTheta m name@"core.i32.div" =
+  polarizeThetaArith name ArithDiv (LowTypeSignedInt 32) m
+polarizeTheta m name@"core.i64.div" =
+  polarizeThetaArith name ArithDiv (LowTypeSignedInt 64) m
+polarizeTheta m name@"core.f32.add" =
+  polarizeThetaArith name ArithAdd (LowTypeFloat 32) m
+polarizeTheta m name@"core.f64.add" =
+  polarizeThetaArith name ArithAdd (LowTypeFloat 64) m
+polarizeTheta m name@"core.f32.sub" =
+  polarizeThetaArith name ArithSub (LowTypeFloat 32) m
+polarizeTheta m name@"core.f64.sub" =
+  polarizeThetaArith name ArithSub (LowTypeFloat 64) m
+polarizeTheta m name@"core.f32.mul" =
+  polarizeThetaArith name ArithMul (LowTypeFloat 32) m
+polarizeTheta m name@"core.f64.mul" =
+  polarizeThetaArith name ArithMul (LowTypeFloat 64) m
+polarizeTheta m name@"core.f32.div" =
+  polarizeThetaArith name ArithDiv (LowTypeFloat 32) m
+polarizeTheta m name@"core.f64.div" =
+  polarizeThetaArith name ArithDiv (LowTypeFloat 64) m
 polarizeTheta m name@"core.print.i64" = polarizeThetaPrint name m
-polarizeTheta _ _                     = throwError "polarize.theta"
+polarizeTheta _ _ = throwError "polarize.theta"
 
-polarizeThetaArith :: Identifier -> Arith -> Meta -> WithEnv CodePlus
-polarizeThetaArith name op m = do
+polarizeThetaArith :: Identifier -> Arith -> LowType -> Meta -> WithEnv CodePlus
+polarizeThetaArith name op lowType m = do
   let ml = snd $ obtainInfoMeta m
   (x, varX) <- newDataUpsilon
   (y, varY) <- newDataUpsilon
-  makeClosure' [] name m [x, y] (ml, CodeTheta (ThetaArith op varX varY))
+  makeClosure'
+    []
+    name
+    m
+    [x, y]
+    (ml, CodeTheta (ThetaArith op lowType varX varY))
 
 polarizeThetaPrint :: Identifier -> Meta -> WithEnv CodePlus
 polarizeThetaPrint name m = do
@@ -263,3 +298,10 @@ newDataUpsilon' :: Maybe Loc -> WithEnv (Identifier, DataPlus)
 newDataUpsilon' ml = do
   x <- newNameWith "arg"
   return (x, (ml, DataUpsilon x))
+
+-- asSignedIntType :: Identifier -> Maybe LowType
+-- asSignedIntType = undefined
+-- asFloatType :: Identifier -> Maybe LowType
+-- asFloatType = undefined
+asLowType :: Identifier -> Maybe LowType
+asLowType = undefined

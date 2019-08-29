@@ -18,7 +18,7 @@ toLLVM mainTerm = do
   penv <- gets polEnv
   forM_ penv $ \(name, (args, e)) -> do
     llvm <- llvmCode e
-    insLLVMEnv name (map fst args) llvm
+    insLLVMEnv name args llvm
   llvmCode mainTerm
 
 llvmCode :: CodePlus -> WithEnv LLVM
@@ -39,7 +39,7 @@ llvmCode (_, CodeSigmaElim xs v e) = do
   extractAndCont <-
     llvmCodeSigmaElim
       basePointer
-      (zip (map fst xs) [0 ..])
+      (zip xs [0 ..])
       castedBasePointer
       (length xs)
       e
@@ -54,7 +54,7 @@ llvmCode (_, CodeSigmaElim xs v e) = do
 llvmCode (_, CodeUpIntro d) = do
   result <- newNameWith "ans"
   llvmDataLet result d $ LLVMReturn $ LLVMDataLocal result
-llvmCode (_, CodeUpElim (x, _) cont1 cont2) = do
+llvmCode (_, CodeUpElim x cont1 cont2) = do
   cont1' <- llvmCode cont1
   cont2' <- llvmCode cont2
   return $ LLVMLet x cont1' cont2'
@@ -75,52 +75,49 @@ llvmCodeSigmaElim basePointer ((x, i):xis) castedBasePointer n cont = do
     LLVMLet x (LLVMLoad (LLVMDataLocal loader)) cont'
 
 llvmCodeTheta :: CodeMeta -> Theta -> WithEnv LLVM
-llvmCodeTheta _ (ThetaArith op v1@(m1, _) v2) = do
-  let t1 = fst $ obtainInfoDataMeta m1
-  case t1 of
-    (_, DataEpsilon intTypeName)
-      | Just lowType@(LowTypeSignedInt _) <- asSignedIntType intTypeName -> do
-        x0 <- newNameWith "arg"
-        x1 <- newNameWith "arg"
-        cast1 <- newNameWith "cast"
-        let op1 = LLVMDataLocal cast1
-        cast2 <- newNameWith "cast"
-        let op2 = LLVMDataLocal cast2
-        result <- newNameWith "result"
-        llvmStruct [(x0, v1), (x1, v2)] $
-          LLVMLet cast1 (LLVMPointerToInt (LLVMDataLocal x0) voidPtr lowType) $
-          LLVMLet cast2 (LLVMPointerToInt (LLVMDataLocal x1) voidPtr lowType) $
-          LLVMLet result (LLVMArith (op, lowType) op1 op2) $
-          LLVMIntToPointer (LLVMDataLocal result) lowType voidPtr
-    (_, DataEpsilon floatTypeName)
-      | Just (LowTypeFloat i) <- asFloatType floatTypeName -> do
-        x0 <- newNameWith "arg"
-        x1 <- newNameWith "arg"
-        y11 <- newNameWith "y"
-        y12 <- newNameWith "float"
-        y21 <- newNameWith "y"
-        y22 <- newNameWith "float"
-        tmp <- newNameWith "arith"
-        result <- newNameWith "result"
-        y <- newNameWith "uny"
-        let si = LowTypeSignedInt i
-        let op' = (op, LowTypeFloat i)
-        llvmStruct [(x0, v1), (x1, v2)] $
+llvmCodeTheta _ (ThetaArith op lowType v1 v2) =
+  case lowType of
+    LowTypeSignedInt _ -> do
+      x0 <- newNameWith "arg"
+      x1 <- newNameWith "arg"
+      cast1 <- newNameWith "cast"
+      let op1 = LLVMDataLocal cast1
+      cast2 <- newNameWith "cast"
+      let op2 = LLVMDataLocal cast2
+      result <- newNameWith "result"
+      llvmStruct [(x0, v1), (x1, v2)] $
+        LLVMLet cast1 (LLVMPointerToInt (LLVMDataLocal x0) voidPtr lowType) $
+        LLVMLet cast2 (LLVMPointerToInt (LLVMDataLocal x1) voidPtr lowType) $
+        LLVMLet result (LLVMArith (op, lowType) op1 op2) $
+        LLVMIntToPointer (LLVMDataLocal result) lowType voidPtr
+    LowTypeFloat i -> do
+      x0 <- newNameWith "arg"
+      x1 <- newNameWith "arg"
+      y11 <- newNameWith "y"
+      y12 <- newNameWith "float"
+      y21 <- newNameWith "y"
+      y22 <- newNameWith "float"
+      tmp <- newNameWith "arith"
+      result <- newNameWith "result"
+      y <- newNameWith "uny"
+      let si = LowTypeSignedInt i
+      let op' = (op, LowTypeFloat i)
+      llvmStruct [(x0, v1), (x1, v2)] $
           -- cast the first argument from i8* to float
-          LLVMLet y11 (LLVMPointerToInt (LLVMDataLocal x0) voidPtr si) $
-          LLVMLet y12 (LLVMBitcast (LLVMDataLocal y11) si (LowTypeFloat i)) $
+        LLVMLet y11 (LLVMPointerToInt (LLVMDataLocal x0) voidPtr si) $
+        LLVMLet y12 (LLVMBitcast (LLVMDataLocal y11) si (LowTypeFloat i)) $
           -- cast the second argument from i8* to float
-          LLVMLet y21 (LLVMPointerToInt (LLVMDataLocal x1) voidPtr si) $
-          LLVMLet y22 (LLVMBitcast (LLVMDataLocal y21) si (LowTypeFloat i)) $
+        LLVMLet y21 (LLVMPointerToInt (LLVMDataLocal x1) voidPtr si) $
+        LLVMLet y22 (LLVMBitcast (LLVMDataLocal y21) si (LowTypeFloat i)) $
           -- compute
-          LLVMLet tmp (LLVMArith op' (LLVMDataLocal y12) (LLVMDataLocal y22)) $
+        LLVMLet tmp (LLVMArith op' (LLVMDataLocal y12) (LLVMDataLocal y22)) $
           -- cast the result from float to i8*
-          LLVMLet y (LLVMBitcast (LLVMDataLocal tmp) (LowTypeFloat i) si) $
-          LLVMLet result (LLVMIntToPointer (LLVMDataLocal y) si voidPtr) $
-          LLVMReturn $ LLVMDataLocal result
+        LLVMLet y (LLVMBitcast (LLVMDataLocal tmp) (LowTypeFloat i) si) $
+        LLVMLet result (LLVMIntToPointer (LLVMDataLocal y) si voidPtr) $
+        LLVMReturn $ LLVMDataLocal result
     _ -> throwError "llvmCodeTheta.ThetaArith"
 llvmCodeTheta _ (ThetaPrint v) = do
-  let t = undefined
+  let t = LowTypeSignedInt 64
   p <- newNameWith "arg"
   c <- newNameWith "cast"
   llvmDataLet p v $
@@ -140,34 +137,30 @@ llvmDataLet x (_, DataTheta y) cont = do
         LLVMLet x (LLVMBitcast (LLVMDataGlobal y) funPtrType voidPtr) cont
 llvmDataLet x (_, DataUpsilon y) cont =
   return $ LLVMLet x (LLVMBitcast (LLVMDataLocal y) voidPtr voidPtr) cont
-llvmDataLet x (m, DataEpsilonIntro l) cont =
-  case (l, fst $ obtainInfoDataMeta m) of
-    (LiteralInteger i, (_, DataEpsilon intTypeName))
-      | Just (LowTypeSignedInt j) <- asSignedIntType intTypeName ->
-        return $
-        LLVMLet
-          x
-          (LLVMIntToPointer (LLVMDataInt i j) (LowTypeSignedInt j) voidPtr)
-          cont
-    (LiteralFloat f, (_, DataEpsilon floatTypeName))
-      | Just (LowTypeFloat j) <- asFloatType floatTypeName -> do
-        cast <- newNameWith "cast"
-        let ft = LowTypeFloat j
-        let st = LowTypeSignedInt j
-        return $
-          LLVMLet cast (LLVMBitcast (LLVMDataFloat f j) ft st) $
-          LLVMLet x (LLVMIntToPointer (LLVMDataLocal cast) st voidPtr) cont
-    (LiteralLabel label, _) -> do
-      mi <- getEpsilonNum label
-      case mi of
-        Nothing -> lift $ throwE $ "no such epsilon is defined: " ++ show label
-        Just i -> do
-          let m' =
-                DataMetaNonTerminal
-                  (DataMetaTerminal Nothing, DataEpsilon "i64")
-                  Nothing
-          llvmDataLet x (m', DataEpsilonIntro (LiteralInteger i)) cont
-    _ -> throwError "llvmDataLet.DataEpsilonIntro"
+llvmDataLet x (_, DataEpsilonIntro (LiteralInteger i) (LowTypeSignedInt j)) cont =
+  return $
+  LLVMLet
+    x
+    (LLVMIntToPointer (LLVMDataInt i j) (LowTypeSignedInt j) voidPtr)
+    cont
+llvmDataLet x (_, DataEpsilonIntro (LiteralFloat f) (LowTypeFloat j)) cont = do
+  cast <- newNameWith "cast"
+  let ft = LowTypeFloat j
+  let st = LowTypeSignedInt j
+  return $
+    LLVMLet cast (LLVMBitcast (LLVMDataFloat f j) ft st) $
+    LLVMLet x (LLVMIntToPointer (LLVMDataLocal cast) st voidPtr) cont
+llvmDataLet x (m, DataEpsilonIntro (LiteralLabel label) _) cont = do
+  mi <- getEpsilonNum label
+  case mi of
+    Nothing -> lift $ throwE $ "no such epsilon is defined: " ++ show label
+    Just i ->
+      llvmDataLet
+        x
+        (m, DataEpsilonIntro (LiteralInteger i) (LowTypeSignedInt 64))
+        cont
+llvmDataLet _ (_, DataEpsilonIntro _ _) _ =
+  throwError "llvmDataLet.DataEpsilonIntro"
 llvmDataLet reg (_, DataSigmaIntro ds) cont = do
   xs <- mapM (const $ newNameWith "cursor") ds
   cast <- newNameWith "cast"
@@ -240,9 +233,3 @@ toStructPtrType :: [a] -> LowType
 toStructPtrType xs = do
   let structType = LowTypeStruct $ map (const voidPtr) xs
   LowTypePointer structType
-
-asSignedIntType :: Identifier -> Maybe LowType
-asSignedIntType = undefined
-
-asFloatType :: Identifier -> Maybe LowType
-asFloatType = undefined

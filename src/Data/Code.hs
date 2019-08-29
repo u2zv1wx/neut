@@ -8,6 +8,7 @@ data Data
   = DataTheta Identifier -- global variable
   | DataUpsilon Identifier
   | DataEpsilonIntro Literal
+                     LowType
   | DataSigmaIntro [DataPlus]
   deriving (Show)
 
@@ -40,6 +41,7 @@ data Code
 
 data Theta
   = ThetaArith Arith
+               LowType
                DataPlus
                DataPlus
   | ThetaPrint DataPlus
@@ -60,10 +62,10 @@ toDataUpsilon' :: Identifier -> DataPlus
 toDataUpsilon' x = (Nothing, DataUpsilon x)
 
 varDataPlus :: DataPlus -> [Identifier]
-varDataPlus (_, DataTheta _)        = []
-varDataPlus (_, DataUpsilon x)      = [x]
-varDataPlus (_, DataEpsilonIntro _) = []
-varDataPlus (_, DataSigmaIntro vs)  = concatMap varDataPlus vs
+varDataPlus (_, DataTheta _)          = []
+varDataPlus (_, DataUpsilon x)        = [x]
+varDataPlus (_, DataEpsilonIntro _ _) = []
+varDataPlus (_, DataSigmaIntro vs)    = concatMap varDataPlus vs
 
 varDataPlusPiOrSigma :: [IdentifierPlus] -> [Identifier] -> [Identifier]
 varDataPlusPiOrSigma [] xs = xs
@@ -102,15 +104,12 @@ substDataPlus :: SubstDataPlus -> DataPlus -> DataPlus
 substDataPlus _ (m, DataTheta x) = (m, DataTheta x)
 substDataPlus sub (m, DataUpsilon s) =
   fromMaybe (m, DataUpsilon s) (lookup s sub)
-substDataPlus _ (m, DataEpsilonIntro l) = (m, DataEpsilonIntro l)
+substDataPlus _ (m, DataEpsilonIntro l lowType) =
+  (m, DataEpsilonIntro l lowType)
 substDataPlus sub (m, DataSigmaIntro vs) = do
   let vs' = map (substDataPlus sub) vs
   (m, DataSigmaIntro vs')
 
--- substDataMeta :: SubstDataPlus -> DataMeta -> DataMeta
--- substDataMeta _ (DataMetaTerminal ml) = DataMetaTerminal ml
--- substDataMeta sub (DataMetaNonTerminal p ml) =
---   DataMetaNonTerminal (substDataPlus sub p) ml
 substCodePlus :: SubstDataPlus -> CodePlus -> CodePlus
 substCodePlus sub (m, CodeTheta theta) = do
   let theta' = substTheta sub theta
@@ -147,10 +146,10 @@ substCodePlus sub (m, CodeTransposeN v vs) = do
   (m, CodeTransposeN v' vs')
 
 substTheta :: SubstDataPlus -> Theta -> Theta
-substTheta sub (ThetaArith a v1 v2) = do
+substTheta sub (ThetaArith a lowType v1 v2) = do
   let v1' = substDataPlus sub v1
   let v2' = substDataPlus sub v2
-  ThetaArith a v1' v2'
+  ThetaArith a lowType v1' v2'
 substTheta sub (ThetaPrint v) = ThetaPrint $ substDataPlus sub v
 
 substDataPlusPiOrSigma :: SubstDataPlus -> [IdentifierPlus] -> [IdentifierPlus]
