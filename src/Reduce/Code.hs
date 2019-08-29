@@ -59,16 +59,22 @@ reduceCodePlus (m, CodeTransposeN v vs) =
   case v of
     (_, DataEpsilonIntro (LiteralInteger n)) -> do
       xss <- mapM (const $ newNameList n) vs
-      let xvss = zip xss vs
-      let yss = map (map toDataUpsilon') $ transpose xss
-      let foo = map (\ys -> (Nothing, DataSigmaIntro ys)) yss
-      let result = (Nothing, CodeUpIntro (Nothing, DataSigmaIntro foo))
-      return $ toSigmaElimSeq xvss result
+      return $
+        toSigmaElimSeq
+          (zip xss vs)
+          ( Nothing
+          , CodeUpIntro
+              ( Nothing
+              , DataSigmaIntro
+                  (map (toSigmaIntro . map toDataUpsilon') $ transpose xss)))
     _ -> return (m, CodeTransposeN v vs)
 reduceCodePlus t = return t
 
 newNameList :: Int -> WithEnv [Identifier]
 newNameList i = mapM (const $ newNameWith "var") [1 .. i]
+
+toSigmaIntro :: [DataPlus] -> DataPlus
+toSigmaIntro ds = (Nothing, DataSigmaIntro ds)
 
 toSigmaElimSeq :: [([Identifier], DataPlus)] -> CodePlus -> CodePlus
 toSigmaElimSeq [] cont = cont
