@@ -50,9 +50,8 @@ polarize (m, TermPi _ _) = do
   clsExp <- exponentClosure
   return (ml, CodeUpIntro clsExp)
 polarize (m, TermPiIntro xts e) = do
-  e' <- polarize e
   lamName <- newNameWith "theta"
-  makeClosure lamName m (map fst xts) e'
+  makeClosure lamName m (map fst xts) e
 polarize (m, TermPiElim e es) = do
   e' <- polarize e
   callClosure m e' es
@@ -68,9 +67,8 @@ polarize (m, TermMu (f, t) e) = do
               , TermPiElim (MetaNonTerminal clsMuType ml, TermTheta f) vs'))
           ]
           e
-  lamBody' <- polarize lamBody
   let clsMeta = MetaNonTerminal clsMuType ml
-  cls <- makeClosure f clsMeta (map fst vs) lamBody'
+  cls <- makeClosure f clsMeta (map fst vs) lamBody
   callClosure m cls vs'
 
 type Binder = [(Identifier, CodePlus)]
@@ -95,27 +93,44 @@ polarizeMeta m = do
   return (x, xes, ml)
 
 makeClosure ::
-     Identifier -> Meta -> [Identifier] -> CodePlus -> WithEnv CodePlus
-makeClosure lamThetaName m xps e = do
+     Identifier -> Meta -> [Identifier] -> TermPlus -> WithEnv CodePlus
+makeClosure lamThetaName m xs e = do
+  let vs = nubBy (\x y -> fst x == fst y) $ varTermPlus e
+  let fvs = filter (\(x, _) -> x `notElem` xs) vs
+  e' <- polarize e
+  makeClosure' fvs lamThetaName m xs e'
+
+makeClosure' ::
+     [(Identifier, TermPlus)]
+  -> Identifier
+  -> Meta
+  -> [Identifier]
+  -> CodePlus
+  -> WithEnv CodePlus
+makeClosure' fvs lamThetaName m xs e = do
   let ml = snd $ obtainInfoMeta m
-  let fvs = nubBy (\x y -> fst x == fst y) $ varCodePlus e
+  let (freeVarNameList, freeVarTypeList) = unzip fvs
+  (yess, ys) <- unzip <$> mapM polarize' freeVarTypeList
   envExpName <- newNameWith "exp"
-  envExp <- exponentSigma envExpName ml $ map (Left . snd) fvs
+  envExp <- exponentSigma envExpName ml $ map Left ys
   (envVarName, envVar) <- newDataUpsilon envExp
   let lamBody = (ml, CodeSigmaElim (map fst fvs) envVar e)
   i <- exponentImmediate
   let lamTheta = (DataMetaNonTerminal i ml, DataTheta lamThetaName)
   penv <- gets polEnv
   when (lamThetaName `elem` map fst penv) $
-    insPolEnv lamThetaName (envVarName : xps) lamBody
+    insPolEnv lamThetaName (envVarName : xs) lamBody
   let fvSigmaIntro =
-        (DataMetaNonTerminal envExp ml, DataSigmaIntro $ map toDataUpsilon fvs)
+        ( DataMetaNonTerminal envExp ml
+        , DataSigmaIntro $ zipWith (curry toDataUpsilon) freeVarNameList ys)
   clsExp <- exponentClosure
-  return
-    ( ml
-    , CodeUpIntro
-        ( DataMetaNonTerminal clsExp ml
-        , DataSigmaIntro [envExp, fvSigmaIntro, lamTheta]))
+  return $
+    bindLet
+      (concat yess)
+      ( ml
+      , CodeUpIntro
+          ( DataMetaNonTerminal clsExp ml
+          , DataSigmaIntro [envExp, fvSigmaIntro, lamTheta]))
 
 callClosure :: Meta -> CodePlus -> [TermPlus] -> WithEnv CodePlus
 callClosure m e es = do
@@ -177,8 +192,18 @@ exponentSigma lamThetaName ml mxts = do
       xts <- mapM supplyName mxts
       (countVarName, countVar) <- newDataUpsilon i
       (sigVarName, sigVar) <- newDataUpsilon sigmaExp
+      let appList =
+            map
+              (\(x, t) ->
+                 (ml, CodePiElimDownElim t [countVar, toDataUpsilon (x, t)]))
+              xts
+      ys <- mapM (const $ newNameWith "var") xts
       let lamBody =
-            (ml, CodeSigmaElim (map fst xts) sigVar (undefined xts countVar))
+            ( ml
+            , CodeSigmaElim
+                (map fst xts)
+                sigVar
+                (bindLet (zip ys appList) undefined))
       insPolEnv lamThetaName [countVarName, sigVarName] lamBody
       return sigmaExp
 
@@ -232,14 +257,14 @@ polarizeThetaArith name op m = do
   numExp <- exponentImmediate
   (x, varX) <- newDataUpsilon numExp
   (y, varY) <- newDataUpsilon numExp
-  makeClosure name m [x, y] (ml, CodeTheta (ThetaArith op varX varY))
+  makeClosure' [] name m [x, y] (ml, CodeTheta (ThetaArith op varX varY))
 
 polarizeThetaPrint :: Identifier -> Meta -> WithEnv CodePlus
 polarizeThetaPrint name m = do
   let ml = snd $ obtainInfoMeta m
   intExp <- exponentImmediate
   (x, varX) <- newDataUpsilon intExp
-  makeClosure name m [x] (ml, CodeTheta (ThetaPrint varX))
+  makeClosure' [] name m [x] (ml, CodeTheta (ThetaPrint varX))
 
 newDataUpsilon :: DataPlus -> WithEnv (Identifier, DataPlus)
 newDataUpsilon t = newDataUpsilon' t Nothing
