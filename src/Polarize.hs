@@ -144,7 +144,19 @@ bindLet ((x, e):xes) cont = do
   (fst e', CodeUpElim x e e')
 
 exponentImmediate :: WithEnv DataPlus
-exponentImmediate = return (Nothing, DataTheta "EXPONENT.IMMEDIATE")
+exponentImmediate = do
+  penv <- gets polEnv
+  let thetaName = "EXPONENT.IMMEDIATE"
+  let immExp = (Nothing, DataTheta thetaName)
+  case lookup thetaName penv of
+    Just _ -> return immExp
+    Nothing -> do
+      (countVarName, countVar) <- newDataUpsilon
+      (immVarName, immVar) <- newDataUpsilon
+      let lamBody =
+            (Nothing, CodeUpIntro (Nothing, DataSigmaIntroN countVar immVar))
+      insPolEnv thetaName [countVarName, immVarName] lamBody
+      return (Nothing, DataTheta thetaName)
 
 -- Sigma (y1 : t1, ..., yn : tn) ~>
 --   lam (m, z).
