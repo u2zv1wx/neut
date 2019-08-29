@@ -38,43 +38,28 @@ data Theta
 
 type IdentifierPlus = (Identifier, DataPlus)
 
-data DataMeta
-  = DataMetaTerminal (Maybe Loc)
-  | DataMetaNonTerminal DataPlus
-                        (Maybe Loc)
-  deriving (Show)
-
 type CodeMeta = Maybe Loc
 
--- FIXME: (Data, DataMeta)としたほうがe : Aに揃って読みやすいかもしれない。
-type DataPlus = (DataMeta, Data)
+type DataPlus = (CodeMeta, Data)
 
 type CodePlus = (CodeMeta, Code)
 
--- fixme: undefind ~> exponentTrivial
-obtainInfoDataMeta :: DataMeta -> (DataPlus, Maybe Loc)
-obtainInfoDataMeta (DataMetaTerminal ml) =
-  ((DataMetaTerminal ml, undefined), ml)
-obtainInfoDataMeta (DataMetaNonTerminal t ml) = (t, ml)
+toDataUpsilon :: (Identifier, Maybe Loc) -> DataPlus
+toDataUpsilon (x, ml) = (ml, DataUpsilon x)
 
-toDataUpsilon :: (Identifier, DataPlus) -> DataPlus
-toDataUpsilon (x, t) = do
-  let (_, ml) = obtainInfoDataMeta $ fst t
-  (DataMetaNonTerminal t ml, DataUpsilon x)
-
-varDataPlus :: DataPlus -> [IdentifierPlus]
+varDataPlus :: DataPlus -> [Identifier]
 varDataPlus (_, DataTheta _)           = []
-varDataPlus (m, DataUpsilon x)         = [(x, fst $ obtainInfoDataMeta m)]
+varDataPlus (_, DataUpsilon x)         = [x]
 varDataPlus (_, DataEpsilonIntro _)    = []
 varDataPlus (_, DataSigmaIntro vs)     = concatMap varDataPlus vs
 varDataPlus (_, DataSigmaIntroN v1 v2) = varDataPlus v1 ++ varDataPlus v2
 
-varDataPlusPiOrSigma :: [IdentifierPlus] -> [IdentifierPlus] -> [IdentifierPlus]
+varDataPlusPiOrSigma :: [IdentifierPlus] -> [Identifier] -> [Identifier]
 varDataPlusPiOrSigma [] xs = xs
 varDataPlusPiOrSigma ((x, p):xps) xs =
   varDataPlus p ++ filterPlus (/= x) (varDataPlusPiOrSigma xps xs)
 
-varCodePlus :: CodePlus -> [IdentifierPlus]
+varCodePlus :: CodePlus -> [Identifier]
 varCodePlus (_, CodeTheta e) = varTheta e
 varCodePlus (_, CodeEpsilonElim (x, _) v branchList) = do
   let (_, es) = unzip branchList
@@ -87,44 +72,36 @@ varCodePlus (_, CodeUpIntro v) = varDataPlus v
 varCodePlus (_, CodeUpElim x e1 e2) =
   varCodePlus e1 ++ filterPlus (/= x) (varCodePlus e2)
 
-varDataPlusPi :: [IdentifierPlus] -> DataPlus -> [IdentifierPlus]
+varDataPlusPi :: [IdentifierPlus] -> DataPlus -> [Identifier]
 varDataPlusPi [] n = varDataPlus n
 varDataPlusPi ((x, p):xps) n =
   varDataPlus p ++ filterPlus (/= x) (varDataPlusPi xps n)
 
-varTheta :: Theta -> [IdentifierPlus]
+varTheta :: Theta -> [Identifier]
 varTheta = undefined
 
-filterPlus :: (Identifier -> Bool) -> [IdentifierPlus] -> [IdentifierPlus]
+filterPlus :: (Identifier -> Bool) -> [Identifier] -> [Identifier]
 filterPlus = undefined
 
 type SubstDataPlus = [IdentifierPlus]
 
 substDataPlus :: SubstDataPlus -> DataPlus -> DataPlus
-substDataPlus sub (m, DataTheta x) = do
-  let m' = substDataMeta sub m
-  (m', DataTheta x)
-substDataPlus sub (m, DataUpsilon s) = do
-  let m' = substDataMeta sub m
-  fromMaybe (m', DataUpsilon s) (lookup s sub)
-substDataPlus sub (m, DataEpsilonIntro l) = do
-  let m' = substDataMeta sub m
-  (m', DataEpsilonIntro l)
+substDataPlus _ (m, DataTheta x) = (m, DataTheta x)
+substDataPlus sub (m, DataUpsilon s) =
+  fromMaybe (m, DataUpsilon s) (lookup s sub)
+substDataPlus _ (m, DataEpsilonIntro l) = (m, DataEpsilonIntro l)
 substDataPlus sub (m, DataSigmaIntro vs) = do
   let vs' = map (substDataPlus sub) vs
-  let m' = substDataMeta sub m
-  (m', DataSigmaIntro vs')
+  (m, DataSigmaIntro vs')
 substDataPlus sub (m, DataSigmaIntroN v1 v2) = do
   let v1' = substDataPlus sub v1
   let v2' = substDataPlus sub v2
-  let m' = substDataMeta sub m
-  (m', DataSigmaIntroN v1' v2')
+  (m, DataSigmaIntroN v1' v2')
 
-substDataMeta :: SubstDataPlus -> DataMeta -> DataMeta
-substDataMeta _ (DataMetaTerminal ml) = DataMetaTerminal ml
-substDataMeta sub (DataMetaNonTerminal p ml) =
-  DataMetaNonTerminal (substDataPlus sub p) ml
-
+-- substDataMeta :: SubstDataPlus -> DataMeta -> DataMeta
+-- substDataMeta _ (DataMetaTerminal ml) = DataMetaTerminal ml
+-- substDataMeta sub (DataMetaNonTerminal p ml) =
+--   DataMetaNonTerminal (substDataPlus sub p) ml
 substCodePlus :: SubstDataPlus -> CodePlus -> CodePlus
 substCodePlus sub (m, CodeTheta theta) = do
   let theta' = substTheta sub theta
