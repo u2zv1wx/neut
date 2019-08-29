@@ -3,6 +3,7 @@ module Reduce.Code
   ) where
 
 import           Control.Monad.State
+import           Data.List           (transpose)
 
 import           Data.Basic
 import           Data.Code
@@ -22,9 +23,7 @@ reduceCodePlus (m, CodeTheta theta) =
         (m, CodeUpIntro (m1, DataEpsilonIntro (LiteralInteger $ i1 `div` i2)))
     ThetaPrint (_, DataEpsilonIntro (LiteralInteger i)) -> do
       liftIO $ putStr $ show i
-      let topType = (DataMetaTerminal Nothing, DataEpsilon "top")
-      let topMeta = DataMetaNonTerminal topType Nothing
-      return (m, CodeUpIntro (topMeta, DataEpsilonIntro (LiteralLabel "unit")))
+      return (m, CodeUpIntro (Nothing, DataEpsilonIntro (LiteralLabel "unit")))
     _ -> return (m, CodeTheta theta)
 reduceCodePlus (m, CodeEpsilonElim (x, t) v branchList) =
   case v of
@@ -39,20 +38,39 @@ reduceCodePlus (m, CodeEpsilonElim (x, t) v branchList) =
 reduceCodePlus (m, CodePiElimDownElim v@(_, DataTheta x) vs) = do
   penv <- gets polEnv
   case lookup x penv of
-    Nothing -> return (m, CodePiElimDownElim v vs)
-    Just (xts, body) -> do
-      let xs = map fst xts
-      reduceCodePlus $ substCodePlus (zip xs vs) body
-reduceCodePlus (m, CodeSigmaElim xts v e) =
+    Nothing         -> return (m, CodePiElimDownElim v vs)
+    Just (xs, body) -> reduceCodePlus $ substCodePlus (zip xs vs) body
+reduceCodePlus (m, CodeSigmaElim xs v e) =
   case v of
     (_, DataSigmaIntro es)
-      | length es == length xts -> do
-        let xs = map fst xts
-        reduceCodePlus $ substCodePlus (zip xs es) e
-    _ -> return (m, CodeSigmaElim xts v e)
-reduceCodePlus (m, CodeUpElim (x, t) e1 e2) = do
+      | length es == length xs -> reduceCodePlus $ substCodePlus (zip xs es) e
+    _ -> return (m, CodeSigmaElim xs v e)
+reduceCodePlus (m, CodeUpElim x e1 e2) = do
   e1' <- reduceCodePlus e1
   case e1' of
     (_, CodeUpIntro v) -> reduceCodePlus $ substCodePlus [(x, v)] e2
-    _                  -> return (m, CodeUpElim (x, t) e1' e2)
+    _                  -> return (m, CodeUpElim x e1' e2)
+reduceCodePlus (m, CodeCopyN v1 v2) =
+  case v1 of
+    (_, DataEpsilonIntro (LiteralInteger i)) ->
+      return (m, CodeUpIntro (m, DataSigmaIntro (replicate i v2)))
+    _ -> return (m, CodeCopyN v1 v2)
+reduceCodePlus (m, CodeTransposeN v vs) =
+  case v of
+    (_, DataEpsilonIntro (LiteralInteger n)) -> do
+      xss <- mapM (const $ newNameList n) vs
+      let xvss = zip xss vs
+      let yss = map (map toDataUpsilon') $ transpose xss
+      let foo = map (\ys -> (Nothing, DataSigmaIntro ys)) yss
+      let result = (Nothing, CodeUpIntro (Nothing, DataSigmaIntro foo))
+      return $ toSigmaElimSeq xvss result
+    _ -> return (m, CodeTransposeN v vs)
 reduceCodePlus t = return t
+
+newNameList :: Int -> WithEnv [Identifier]
+newNameList i = mapM (const $ newNameWith "var") [1 .. i]
+
+toSigmaElimSeq :: [([Identifier], DataPlus)] -> CodePlus -> CodePlus
+toSigmaElimSeq [] cont = cont
+toSigmaElimSeq ((xs, d):xsds) cont =
+  (Nothing, CodeSigmaElim xs d (toSigmaElimSeq xsds cont))

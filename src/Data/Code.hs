@@ -9,8 +9,6 @@ data Data
   | DataUpsilon Identifier
   | DataEpsilonIntro Literal
   | DataSigmaIntro [DataPlus]
-  | DataSigmaIntroN DataPlus
-                    DataPlus
   deriving (Show)
 
 data Code
@@ -27,13 +25,17 @@ data Code
   | CodeUpElim Identifier
                CodePlus
                CodePlus
-  --    CodeTranspose m [y1, ..., yn]
-  -- ~> let (y1-1, ..., y1-m) := y1 in
+  --    CodeCopyN n v
+  -- ~> return (v, ..., v)  (n-pairs)
+  | CodeCopyN DataPlus
+              DataPlus
+  --    CodeTransposeN n [y1, ..., yk]
+  -- ~> let (y1-1, ..., y1-n) := y1 in
   --    ...
-  --    let (yn-1, ..., yn-m) := yn in
-  --    return ((y1-1, ..., yn-1), ..., (y1-m, yn-m))
-  | CodeTranspose DataPlus -- Supposed to be a natural number `m`
-                  [DataPlus] -- List of sigma-intro. Each sigma-intro has `m` elements.
+  --    let (yk-1, ..., yk-n) := yk in
+  --    return ((y1-1, ..., yk-1), ..., (y1-n, ..., yk-n))
+  | CodeTransposeN DataPlus -- Supposed to be a natural number `n`
+                   [DataPlus] -- List of sigma-intro. Each sigma-intro has `n` elements.
   deriving (Show)
 
 data Theta
@@ -58,11 +60,10 @@ toDataUpsilon' :: Identifier -> DataPlus
 toDataUpsilon' x = (Nothing, DataUpsilon x)
 
 varDataPlus :: DataPlus -> [Identifier]
-varDataPlus (_, DataTheta _)           = []
-varDataPlus (_, DataUpsilon x)         = [x]
-varDataPlus (_, DataEpsilonIntro _)    = []
-varDataPlus (_, DataSigmaIntro vs)     = concatMap varDataPlus vs
-varDataPlus (_, DataSigmaIntroN v1 v2) = varDataPlus v1 ++ varDataPlus v2
+varDataPlus (_, DataTheta _)        = []
+varDataPlus (_, DataUpsilon x)      = [x]
+varDataPlus (_, DataEpsilonIntro _) = []
+varDataPlus (_, DataSigmaIntro vs)  = concatMap varDataPlus vs
 
 varDataPlusPiOrSigma :: [IdentifierPlus] -> [Identifier] -> [Identifier]
 varDataPlusPiOrSigma [] xs = xs
@@ -81,6 +82,8 @@ varCodePlus (_, CodeSigmaElim xs v e) =
 varCodePlus (_, CodeUpIntro v) = varDataPlus v
 varCodePlus (_, CodeUpElim x e1 e2) =
   varCodePlus e1 ++ filterPlus (/= x) (varCodePlus e2)
+varCodePlus (_, CodeCopyN v1 v2) = varDataPlus v1 ++ varDataPlus v2
+varCodePlus (_, CodeTransposeN v vs) = varDataPlus v ++ concatMap varDataPlus vs
 
 varDataPlusPi :: [IdentifierPlus] -> DataPlus -> [Identifier]
 varDataPlusPi [] n = varDataPlus n
@@ -103,10 +106,6 @@ substDataPlus _ (m, DataEpsilonIntro l) = (m, DataEpsilonIntro l)
 substDataPlus sub (m, DataSigmaIntro vs) = do
   let vs' = map (substDataPlus sub) vs
   (m, DataSigmaIntro vs')
-substDataPlus sub (m, DataSigmaIntroN v1 v2) = do
-  let v1' = substDataPlus sub v1
-  let v2' = substDataPlus sub v2
-  (m, DataSigmaIntroN v1' v2')
 
 -- substDataMeta :: SubstDataPlus -> DataMeta -> DataMeta
 -- substDataMeta _ (DataMetaTerminal ml) = DataMetaTerminal ml
@@ -138,6 +137,14 @@ substCodePlus sub (m, CodeUpElim x e1 e2) = do
   let e1' = substCodePlus sub e1
   let e2' = substCodePlus (filter (\(y, _) -> y /= x) sub) e2
   (m, CodeUpElim x e1' e2')
+substCodePlus sub (m, CodeCopyN v1 v2) = do
+  let v1' = substDataPlus sub v1
+  let v2' = substDataPlus sub v2
+  (m, CodeCopyN v1' v2')
+substCodePlus sub (m, CodeTransposeN v vs) = do
+  let v' = substDataPlus sub v
+  let vs' = map (substDataPlus sub) vs
+  (m, CodeTransposeN v' vs')
 
 substTheta :: SubstDataPlus -> Theta -> Theta
 substTheta sub (ThetaArith a v1 v2) = do

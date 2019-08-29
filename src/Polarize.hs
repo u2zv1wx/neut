@@ -153,8 +153,7 @@ exponentImmediate = do
     Nothing -> do
       (countVarName, countVar) <- newDataUpsilon
       (immVarName, immVar) <- newDataUpsilon
-      let lamBody =
-            (Nothing, CodeUpIntro (Nothing, DataSigmaIntroN countVar immVar))
+      let lamBody = (Nothing, CodeCopyN countVar immVar)
       insPolEnv thetaName [countVarName, immVarName] lamBody
       return (Nothing, DataTheta thetaName)
 
@@ -196,7 +195,7 @@ exponentSigma lamThetaName ml mxts = do
             , CodeSigmaElim
                 (map fst xts)
                 sigVar
-                (bindLet (zip ys appList) (ml, CodeTranspose countVar ys')))
+                (bindLet (zip ys appList) (ml, CodeTransposeN countVar ys')))
       insPolEnv lamThetaName [countVarName, sigVarName] lamBody
       return sigmaExp
 
