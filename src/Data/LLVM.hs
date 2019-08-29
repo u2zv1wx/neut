@@ -23,7 +23,7 @@ data LLVM
             LLVM
             LLVM
   | LLVMGetElementPtr LLVMData
-                      (Int, Int) -- (index, length)
+                      Loc -- (index, length)
   | LLVMBitcast LLVMData
                 LowType
                 LowType -- cast to this type

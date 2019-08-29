@@ -39,12 +39,12 @@ data Theta
 type IdentifierPlus = (Identifier, DataPlus)
 
 data DataMeta
-  = DataMetaTerminal (Maybe (Int, Int))
+  = DataMetaTerminal (Maybe Loc)
   | DataMetaNonTerminal DataPlus
-                        (Maybe (Int, Int))
+                        (Maybe Loc)
   deriving (Show)
 
-type CodeMeta = Maybe (Int, Int)
+type CodeMeta = Maybe Loc
 
 -- FIXME: (Data, DataMeta)としたほうがe : Aに揃って読みやすいかもしれない。
 type DataPlus = (DataMeta, Data)
@@ -52,7 +52,7 @@ type DataPlus = (DataMeta, Data)
 type CodePlus = (CodeMeta, Code)
 
 -- fixme: undefind ~> exponentTrivial
-obtainInfoDataMeta :: DataMeta -> (DataPlus, Maybe (Int, Int))
+obtainInfoDataMeta :: DataMeta -> (DataPlus, Maybe Loc)
 obtainInfoDataMeta (DataMetaTerminal ml) =
   ((DataMetaTerminal ml, undefined), ml)
 obtainInfoDataMeta (DataMetaNonTerminal t ml) = (t, ml)

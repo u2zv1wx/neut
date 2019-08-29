@@ -10,7 +10,7 @@ data Tree
 type TreePlus = (TreeMeta, Tree)
 
 newtype TreeMeta = TreeMeta
-  { treeMetaLocation :: Maybe (Int, Int)
+  { treeMetaLocation :: Maybe Loc
   } deriving (Show)
 
 emptyTreeMeta :: TreeMeta

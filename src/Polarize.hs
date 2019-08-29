@@ -88,7 +88,7 @@ polarize' e@(m, _) = do
       (varName, var) <- newDataUpsilon' x ml
       return (xes ++ [(varName, e')], var)
 
-polarizeMeta :: Meta -> WithEnv (DataPlus, Binder, Maybe (Int, Int))
+polarizeMeta :: Meta -> WithEnv (DataPlus, Binder, Maybe Loc)
 polarizeMeta m = do
   (xes, x) <- polarize' $ fst $ obtainInfoMeta m
   let ml = snd $ obtainInfoMeta m
@@ -164,7 +164,7 @@ exponentImmediate =
 -- (Note that Sigma (y1 : t1, ..., yn : tn) must be closed.)
 exponentSigma ::
      Identifier
-  -> Maybe (Int, Int)
+  -> Maybe Loc
   -> [Either DataPlus (Identifier, DataPlus)]
   -> WithEnv DataPlus
 exponentSigma lamThetaName ml mxts = do
@@ -244,8 +244,7 @@ polarizeThetaPrint name m = do
 newDataUpsilon :: DataPlus -> WithEnv (Identifier, DataPlus)
 newDataUpsilon t = newDataUpsilon' t Nothing
 
-newDataUpsilon' ::
-     DataPlus -> Maybe (Int, Int) -> WithEnv (Identifier, DataPlus)
+newDataUpsilon' :: DataPlus -> Maybe Loc -> WithEnv (Identifier, DataPlus)
 newDataUpsilon' t ml = do
   x <- newNameWith "arg"
   return (x, (DataMetaNonTerminal t ml, DataUpsilon x))

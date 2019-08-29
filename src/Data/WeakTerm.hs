@@ -31,9 +31,9 @@ newtype Ref a =
   Ref (IORef a)
 
 data WeakMeta
-  = WeakMetaTerminal (Maybe (Int, Int))
+  = WeakMetaTerminal (Maybe Loc)
   | WeakMetaNonTerminal (Ref (Maybe WeakTermPlus))
-                        (Maybe (Int, Int))
+                        (Maybe Loc)
   deriving (Show)
 
 type WeakTermPlus = (WeakMeta, WeakTerm)

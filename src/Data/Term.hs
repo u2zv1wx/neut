@@ -25,9 +25,9 @@ data Term
   deriving (Show)
 
 data Meta
-  = MetaTerminal (Maybe (Int, Int))
+  = MetaTerminal (Maybe Loc)
   | MetaNonTerminal TermPlus
-                    (Maybe (Int, Int))
+                    (Maybe Loc)
   deriving (Show)
 
 type TermPlus = (Meta, Term)
@@ -38,7 +38,7 @@ type Hole = Identifier
 
 type IdentifierPlus = (Identifier, TermPlus)
 
-obtainInfoMeta :: Meta -> (TermPlus, Maybe (Int, Int))
+obtainInfoMeta :: Meta -> (TermPlus, Maybe Loc)
 obtainInfoMeta (MetaTerminal ml)      = ((MetaTerminal ml, TermTau), ml)
 obtainInfoMeta (MetaNonTerminal t ml) = (t, ml)
 

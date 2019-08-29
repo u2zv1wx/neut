@@ -2,6 +2,8 @@ module Data.Basic where
 
 type Identifier = String
 
+type Loc = (Int, Int)
+
 data Literal
   = LiteralInteger Int
   | LiteralFloat Double
