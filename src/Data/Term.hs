@@ -144,6 +144,24 @@ isReducible (_, TermPiElim (_, TermTheta c) [(_, TermEpsilonIntro (LiteralIntege
 isReducible (_, TermPiElim e es) = isReducible e || any isReducible es
 isReducible (_, TermMu _ _) = False
 
+isPure :: TermPlus -> Bool
+isPure (_, TermTau) = True
+isPure (_, TermTheta theta) = isPureConstant theta
+isPure (_, TermUpsilon _) = True
+isPure (_, TermEpsilon _) = True
+isPure (_, TermEpsilonIntro _) = True
+isPure (_, TermEpsilonElim _ (_, TermEpsilonIntro l) branchList) = do
+  let (caseList, _) = unzip branchList
+  CaseLiteral l `elem` caseList || CaseDefault `elem` caseList
+isPure (_, TermEpsilonElim (_, _) e _) = isPure e
+isPure (_, TermPi _ _) = True
+isPure (_, TermPiIntro {}) = True
+isPure (_, TermPiElim e es) = isPure e || all isPure es
+isPure (_, TermMu _ _) = True
+
+isPureConstant :: Identifier -> Bool
+isPureConstant = undefined
+
 isValue :: TermPlus -> Bool
 isValue (_, TermTau)            = True
 isValue (_, TermUpsilon _)      = True
