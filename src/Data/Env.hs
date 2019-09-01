@@ -33,7 +33,8 @@ data Env = Env
   , constraintEnv   :: [PreConstraint] -- for type inference
   , constraintQueue :: ConstraintQueue -- for (dependent) type inference
   , substEnv        :: SubstWeakTerm -- metavar ~> beta-equivalent weakterm
-  , polEnv          :: [(Identifier, ([Identifier], CodePlus))] -- f ~> thunk (lam (x1 ... xn) e)
+  , polEnv          :: [(Identifier, ([(Identifier, DataPlus)], CodePlus))] -- f ~> thunk (lam (x1 ... xn) e)
+  -- , polEnv          :: [(Identifier, ([Identifier], CodePlus))] -- f ~> thunk (lam (x1 ... xn) e)
   , llvmEnv         :: [(Identifier, ([Identifier], LLVM))]
   }
 
@@ -123,7 +124,7 @@ lookupNameEnvMaybe s = do
 insTypeEnv :: Identifier -> WeakTermPlus -> WithEnv ()
 insTypeEnv i t = modify (\e -> e {typeEnv = Map.insert i t (typeEnv e)})
 
-insPolEnv :: Identifier -> [Identifier] -> CodePlus -> WithEnv ()
+insPolEnv :: Identifier -> [(Identifier, DataPlus)] -> CodePlus -> WithEnv ()
 insPolEnv name args e =
   modify (\env -> env {polEnv = (name, (args, e)) : polEnv env})
 
