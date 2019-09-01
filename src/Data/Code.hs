@@ -266,7 +266,7 @@ data Code
 
 data Theta
   = ThetaArith Arith
-               LowType
+               DataPlus
                DataPlus
                DataPlus
   | ThetaPrint DataPlus
@@ -380,10 +380,11 @@ substCodePlus sub (m, CodeUpElim x e1 e2) = do
 --   let vs' = map (substDataPlus sub) vs
 --   (m, CodeTransposeN v' vs')
 substTheta :: SubstDataPlus -> Theta -> Theta
-substTheta sub (ThetaArith a lowType v1 v2) = do
+substTheta sub (ThetaArith a t v1 v2) = do
+  let t' = substDataPlus sub t
   let v1' = substDataPlus sub v1
   let v2' = substDataPlus sub v2
-  ThetaArith a lowType v1' v2'
+  ThetaArith a t' v1' v2'
 substTheta sub (ThetaPrint v) = ThetaPrint $ substDataPlus sub v
 
 substDataPlusPiOrSigma :: SubstDataPlus -> [IdentifierPlus] -> [IdentifierPlus]
