@@ -5,13 +5,10 @@ import           Data.Maybe (fromMaybe)
 import           Data.Basic
 
 data Data
-  = DataTau
+  = DataImmediate -- DataImmediate, DataEpsilon, DataDownPi
   | DataTheta Identifier -- global variable
   | DataUpsilon Identifier
-  | DataEpsilon Identifier
   | DataEpsilonIntro Literal
-  | DataDownPi [IdentifierPlus]
-               CodePlus
   | DataDownIntroPiIntro [IdentifierPlus]
                          CodePlus
   | DataSigma [IdentifierPlus]
@@ -69,16 +66,15 @@ obtainInfoCodeMeta (CodeMetaTerminal ml) = ((CodeMetaTerminal ml, CodeTau), ml)
 obtainInfoCodeMeta (CodeMetaNonTerminal t ml) = (t, ml)
 
 obtainInfoDataMeta :: DataMeta -> (DataPlus, Maybe (Int, Int))
-obtainInfoDataMeta (DataMetaTerminal ml) = ((DataMetaTerminal ml, DataTau), ml)
+obtainInfoDataMeta (DataMetaTerminal ml) =
+  ((DataMetaTerminal ml, DataImmediate), ml)
 obtainInfoDataMeta (DataMetaNonTerminal t ml) = (t, ml)
 
 varDataPlus :: DataPlus -> [IdentifierPlus]
-varDataPlus (_, DataTau) = []
+varDataPlus (_, DataImmediate) = []
 varDataPlus (_, DataTheta _) = []
 varDataPlus (m, DataUpsilon x) = [(x, fst $ obtainInfoDataMeta m)]
-varDataPlus (_, DataEpsilon _) = []
 varDataPlus (_, DataEpsilonIntro _) = []
-varDataPlus (_, DataDownPi xps n) = varDataPlusPiOrSigma xps (varCodePlus n)
 varDataPlus (_, DataDownIntroPiIntro xps e) =
   filterPlus (`notElem` map fst xps) $
   concatMap (varDataPlus . snd) xps ++ varCodePlus e
@@ -120,25 +116,18 @@ filterPlus = undefined
 type SubstDataPlus = [IdentifierPlus]
 
 substDataPlus :: SubstDataPlus -> DataPlus -> DataPlus
-substDataPlus sub (m, DataTau) = do
+substDataPlus sub (m, DataImmediate) = do
   let m' = substDataMeta sub m
-  (m', DataTau)
+  (m', DataImmediate)
 substDataPlus sub (m, DataTheta x) = do
   let m' = substDataMeta sub m
   (m', DataTheta x)
 substDataPlus sub (m, DataUpsilon s) = do
   let m' = substDataMeta sub m
   fromMaybe (m', DataUpsilon s) (lookup s sub)
-substDataPlus sub (m, DataEpsilon k) = do
-  let m' = substDataMeta sub m
-  (m', DataEpsilon k)
 substDataPlus sub (m, DataEpsilonIntro l) = do
   let m' = substDataMeta sub m
   (m', DataEpsilonIntro l)
-substDataPlus sub (m, DataDownPi xps n) = do
-  let (xps', n') = substDataPlusPi sub xps n
-  let m' = substDataMeta sub m
-  (m', DataDownPi xps' n')
 substDataPlus sub (m, DataDownIntroPiIntro xps e) = do
   let (xps', e') = substCodePlusPi sub xps e
   let m' = substDataMeta sub m
