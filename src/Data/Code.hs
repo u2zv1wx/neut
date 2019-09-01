@@ -230,8 +230,9 @@ data Data
   = DataImmediate
   | DataTheta Identifier -- global variable
   | DataUpsilon Identifier
+  | DataEpsilon Identifier
   | DataEpsilonIntro Literal
-                     LowType
+                     DataPlus
   | DataSigma [(Identifier, DataPlus)]
   | DataSigmaIntro [DataPlus]
   deriving (Show)
@@ -289,7 +290,8 @@ varDataPlus :: DataPlus -> [Identifier]
 varDataPlus (_, DataImmediate)        = []
 varDataPlus (_, DataTheta _)          = []
 varDataPlus (_, DataUpsilon x)        = [x]
-varDataPlus (_, DataEpsilonIntro _ _) = []
+varDataPlus (_, DataEpsilon _)        = []
+varDataPlus (_, DataEpsilonIntro _ p) = varDataPlus p
 varDataPlus (_, DataSigma xps)        = varDataPlusPiOrSigma xps []
 varDataPlus (_, DataSigmaIntro vs)    = concatMap varDataPlus vs
 
@@ -334,8 +336,10 @@ substDataPlus sub (m, DataUpsilon s) =
 substDataPlus sub (m, DataSigma xps) = do
   let xps' = substDataPlusSigma sub xps
   (m, DataSigma xps')
-substDataPlus _ (m, DataEpsilonIntro l lowType) =
-  (m, DataEpsilonIntro l lowType)
+substDataPlus _ (m, DataEpsilon x) = (m, DataEpsilon x)
+substDataPlus sub (m, DataEpsilonIntro l p) = do
+  let p' = substDataPlus sub p
+  (m, DataEpsilonIntro l p')
 substDataPlus sub (m, DataSigmaIntro vs) = do
   let vs' = map (substDataPlus sub) vs
   (m, DataSigmaIntro vs')
