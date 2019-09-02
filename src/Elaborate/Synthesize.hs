@@ -12,7 +12,7 @@ import           Data.Constraint
 import           Data.Env
 import           Data.WeakTerm
 import           Elaborate.Analyze
-import           Elaborate.Infer            (readWeakMetaType)
+import           Elaborate.Infer            (readWeakMetaType, withHole)
 
 -- Given a queue of constraints (easier ones comes earlier), try to synthesize
 -- all of them using heuristics.
@@ -159,8 +159,8 @@ bindFormalArgs :: WeakTermPlus -> [[IdentifierPlus]] -> WithEnv WeakTermPlus
 bindFormalArgs e [] = return e
 bindFormalArgs e (xts:xtss) = do
   e'@(m, _) <- bindFormalArgs e xtss
-  t <- obtainType m
-  let tPi = (newMetaTerminal, WeakTermPi xts t)
+  (_, tPlus) <- obtainType m >>= withHole
+  let tPi = (newMetaTerminal, WeakTermPi $ xts ++ [tPlus])
   meta <- newMetaOfType tPi
   return (meta, WeakTermPiIntro xts e')
 

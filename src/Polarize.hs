@@ -12,16 +12,72 @@
 -- eta-expansion.
 module Polarize
   ( polarize
+  , inline
   ) where
 
 import           Control.Monad.Except
 import           Control.Monad.State
+import           Prelude              hiding (pi)
+
 import           Data.Basic
 import           Data.Code
+import           Data.Comp
 import           Data.Env
 import           Data.List            (nubBy)
 import           Data.Term
-import           Prelude              hiding (pi)
+import           Reduce.Code
+
+inline :: WithEnv ()
+inline = do
+  penv <- gets polEnv
+  forM_ penv $ \(thetaName, (args, body)) -> do
+    body' <- inlineCodePlus body
+    unless (checkSanityCode body') $ throwError "sanity"
+    body'' <- processCode body'
+    insCompEnv thetaName args body''
+
+processData :: DataPlus -> WithEnv ValuePlus
+processData (_, DataImmediate)            = exponentImmediate
+processData (_, DataTheta _)              = undefined
+processData (_, DataUpsilon _)            = undefined
+processData (_, DataEpsilon _)            = exponentImmediate
+processData (_, DataEpsilonIntro _ _)     = undefined
+processData (_, DataDownIntroPiIntro _ _) = undefined
+processData (_, DataSigma xts)            = undefined
+processData (_, DataSigmaIntro _)         = undefined
+
+processCode :: CodePlus -> WithEnv CompPlus
+processCode (m, CodeTheta theta) = do
+  theta' <- processTheta theta
+  return (m, CompTheta theta')
+processCode (_, CodeEpsilonElim {}) = undefined
+processCode (_, CodePiElimDownElim {}) = undefined
+processCode (_, CodeSigmaElim {}) = undefined
+processCode (_, CodeUpIntro {}) = undefined
+processCode (_, CodeUpElim {}) = undefined
+
+processTheta :: Theta -> WithEnv ValueTheta
+processTheta = undefined
+
+checkSanityData :: DataPlus -> Bool
+checkSanityData (_, DataEpsilonIntro _ p) = null $ varDataPlus p
+checkSanityData (_, DataSigma xts) = do
+  let (xs, ts) = unzip xts
+  all (`elem` xs) (concatMap varDataPlus ts) -- sigma must be closed
+checkSanityData _ = True
+
+checkSanityCode :: CodePlus -> Bool
+checkSanityCode (_, CodeTheta _) = True
+checkSanityCode (_, CodeEpsilonElim _ d branchList) = do
+  let (_, es) = unzip branchList
+  checkSanityData d && all checkSanityCode es
+checkSanityCode (_, CodePiElimDownElim d ds) =
+  checkSanityData d && all checkSanityData ds
+checkSanityCode (_, CodeSigmaElim _ v e) =
+  checkSanityData v && checkSanityCode e
+checkSanityCode (_, CodeUpIntro v) = checkSanityData v
+checkSanityCode (_, CodeUpElim _ e1 e2) =
+  checkSanityCode e1 && checkSanityCode e2
 
 polarize :: TermPlus -> WithEnv CodePlus
 polarize (m, TermTau) = do
@@ -61,8 +117,11 @@ polarize (m, TermPi _ _) = do
             , (tmp2, (ml, DataImmediate)) -- label to function
             ]))
 polarize (m, TermPiIntro xts e) = do
-  lamName <- newNameWith "theta"
-  makeClosure lamName m (map fst xts) e
+  let xs = map fst xts
+  let vs = nubBy (\x y -> fst x == fst y) $ varTermPlus e
+  let fvs = filter (\(x, _) -> x `notElem` xs) vs
+  e' <- polarize e
+  makeClosureNonRec fvs m xs e'
 polarize (m, TermPiElim e es) = do
   e' <- polarize e
   callClosure m e' es
@@ -125,6 +184,29 @@ makeClosure' fvs lamThetaName m xs e = do
       (concat yess)
       (ml, CodeUpIntro (ml, DataSigmaIntro [envExp, fvSigmaIntro, lamTheta]))
 
+makeClosureNonRec ::
+     [(Identifier, TermPlus)]
+  -> Meta
+  -> [Identifier]
+  -> CodePlus
+  -> WithEnv CodePlus
+makeClosureNonRec fvs m xs e = do
+  let ml = snd $ obtainInfoMeta m
+  let (freeVarNameList, freeVarTypeList) = unzip fvs
+  (yess, ys) <- unzip <$> mapM polarize' freeVarTypeList
+  envExp <- toSigmaType ml $ map Left ys
+  (envVarName, envVar) <- newDataUpsilon
+  let lamBody = (ml, CodeSigmaElim (map fst fvs) envVar e)
+  let lam = (ml, DataDownIntroPiIntro (envVarName : xs) lamBody)
+  let fvSigmaIntro =
+        ( ml
+        , DataSigmaIntro $
+          zipWith (curry toDataUpsilon) freeVarNameList (map fst ys))
+  return $
+    bindLet
+      (concat yess)
+      (ml, CodeUpIntro (ml, DataSigmaIntro [envExp, fvSigmaIntro, lam]))
+
 callClosure :: Meta -> CodePlus -> [TermPlus] -> WithEnv CodePlus
 callClosure m e es = do
   (xess, xs) <- unzip <$> mapM polarize' es
@@ -161,19 +243,20 @@ toSigmaType ml xps = do
   xps' <- mapM supplyName xps
   return (ml, DataSigma xps')
 
--- exponentImmediate :: WithEnv DataPlus
--- exponentImmediate = do
---   penv <- gets polEnv
---   let thetaName = "EXPONENT.IMMEDIATE"
---   let immExp = (Nothing, DataTheta thetaName)
---   case lookup thetaName penv of
---     Just _ -> return immExp
---     Nothing -> do
---       (countVarName, countVar) <- newDataUpsilon
---       (immVarName, immVar) <- newDataUpsilon
---       let lamBody = (Nothing, CodeCopyN countVar immVar)
---       insPolEnv thetaName [countVarName, immVarName] lamBody
---       return (Nothing, DataTheta thetaName)
+exponentImmediate :: WithEnv ValuePlus
+exponentImmediate = do
+  penv <- gets polEnv
+  let thetaName = "EXPONENT.IMMEDIATE"
+  let immExp = (Nothing, ValueTheta thetaName)
+  case lookup thetaName penv of
+    Just _ -> return immExp
+    Nothing -> do
+      (countVarName, countVar) <- newValueUpsilon
+      (immVarName, immVar) <- newValueUpsilon
+      let lamBody = (Nothing, CompCopyN countVar immVar)
+      insCompEnv thetaName [countVarName, immVarName] lamBody
+      return (Nothing, ValueTheta thetaName)
+
 -- Sigma (y1 : t1, ..., yn : tn) ~>
 --   lam (m, z).
 --     let (y1, ..., yn) := z in
@@ -186,43 +269,52 @@ toSigmaType ml xps = do
 --     ((ys1-1, ..., ysn-1), ..., (ys1-m, ..., ysn-m))
 --
 -- (Note that Sigma (y1 : t1, ..., yn : tn) must be closed.)
--- exponentSigma ::
---      Identifier
---   -> Maybe Loc
---   -> [Either DataPlus (Identifier, DataPlus)]
---   -> WithEnv DataPlus
--- exponentSigma lamThetaName ml mxts = do
---   penv <- gets polEnv
---   let sigmaExp = (ml, DataTheta lamThetaName)
---   case lookup lamThetaName penv of
---     Just _ -> return sigmaExp
---     Nothing -> do
---       xts <- mapM supplyName mxts
---       (countVarName, countVar) <- newDataUpsilon
---       (sigVarName, sigVar) <- newDataUpsilon
---       let appList =
---             map
---               (\(x, t) ->
---                  (ml, CodePiElimDownElim t [countVar, toDataUpsilon (x, fst t)]))
---               xts
---       ys <- mapM (const $ newNameWith "var") xts
---       let ys' = map toDataUpsilon' ys
---       let lamBody =
---             ( ml
---             , CodeSigmaElim
---                 (map fst xts)
---                 sigVar
---                 (bindLet (zip ys appList) (ml, CodeTransposeN countVar ys')))
---       insPolEnv lamThetaName [countVarName, sigVarName] lamBody
---       return sigmaExp
--- exponentClosure :: WithEnv DataPlus
--- exponentClosure = do
---   i <- exponentImmediate
---   (typeVarName, typeVar) <- newDataUpsilon
---   exponentSigma
---     "EXPONENT.CLOSURE"
---     Nothing
---     [Right (typeVarName, i), Left typeVar, Left i]
+exponentSigma ::
+     Identifier
+  -> Maybe Loc
+  -> [Either ValuePlus (Identifier, ValuePlus)]
+  -> WithEnv ValuePlus
+exponentSigma lamThetaName ml mxts = do
+  penv <- gets polEnv
+  let sigmaExp = (ml, ValueTheta lamThetaName)
+  case lookup lamThetaName penv of
+    Just _ -> return sigmaExp
+    Nothing -> do
+      xts <- mapM supplyName mxts
+      (countVarName, countVar) <- newValueUpsilon
+      (sigVarName, sigVar) <- newValueUpsilon
+      let appList =
+            map
+              (\(x, t) ->
+                 ( ml
+                 , CompPiElimDownElim t [countVar, toValueUpsilon (x, fst t)]))
+              xts
+      ys <- mapM (const $ newNameWith "var") xts
+      let ys' = map toValueUpsilon' ys
+      let lamBody =
+            ( ml
+            , CompSigmaElim
+                (map fst xts)
+                sigVar
+                (bindLetComp (zip ys appList) (ml, CompTransposeN countVar ys')))
+      insCompEnv lamThetaName [countVarName, sigVarName] lamBody
+      return sigmaExp
+
+bindLetComp :: [(Identifier, CompPlus)] -> CompPlus -> CompPlus
+bindLetComp [] cont = cont
+bindLetComp ((x, e):xes) cont = do
+  let e' = bindLetComp xes cont
+  (fst e', CompUpElim x e e')
+
+exponentClosure :: WithEnv ValuePlus
+exponentClosure = do
+  i <- exponentImmediate
+  (typeVarName, typeVar) <- newValueUpsilon
+  exponentSigma
+    "EXPONENT.CLOSURE"
+    Nothing
+    [Right (typeVarName, i), Left typeVar, Left i]
+
 supplyName :: Either b (Identifier, b) -> WithEnv (Identifier, b)
 supplyName (Right (x, t)) = return (x, t)
 supplyName (Left t) = do
@@ -310,3 +402,11 @@ newDataUpsilon' :: Maybe Loc -> WithEnv (Identifier, DataPlus)
 newDataUpsilon' ml = do
   x <- newNameWith "arg"
   return (x, (ml, DataUpsilon x))
+
+newValueUpsilon :: WithEnv (Identifier, ValuePlus)
+newValueUpsilon = newValueUpsilon' Nothing
+
+newValueUpsilon' :: Maybe Loc -> WithEnv (Identifier, ValuePlus)
+newValueUpsilon' ml = do
+  x <- newNameWith "arg"
+  return (x, (ml, ValueUpsilon x))

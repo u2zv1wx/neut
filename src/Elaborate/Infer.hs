@@ -3,6 +3,7 @@ module Elaborate.Infer
   , newUniv
   , readWeakMetaType
   , writeWeakMetaType
+  , withHole
   ) where
 
 import           Control.Monad.Except
@@ -71,20 +72,21 @@ infer ctx (meta, WeakTermEpsilonElim (x, t) e branchList) = do
       ts <- mapM (infer $ ctx ++ [(x, t)]) es
       constrainList ts
       returnAfterUpdate meta $ substWeakTermPlus [(x, e)] $ head ts
-infer ctx (meta, WeakTermPi xts t) = do
+infer ctx (meta, WeakTermPi xts) = do
   univList <- inferPlus ctx xts
-  univ <- infer (ctx ++ xts) t
+  -- univ <- infer (ctx ++ xts) t
+  univ <- newUniv
   constrainList $ univ : univList
   returnAfterUpdate meta univ
 infer ctx (meta, WeakTermPiIntro xts e) = do
   forM_ xts $ uncurry insTypeEnv
-  cod <- infer (ctx ++ xts) e
-  wrapInfer ctx (WeakTermPi xts cod) >>= returnAfterUpdate meta
+  (_, codPlus) <- infer (ctx ++ xts) e >>= withHole
+  wrapInfer ctx (WeakTermPi $ xts ++ [codPlus]) >>= returnAfterUpdate meta
 infer ctx (meta, WeakTermPiElim e es) = do
   tPi <- infer ctx e
   binder <- inferList ctx es
-  cod <- newHoleInCtx (ctx ++ binder)
-  tPi' <- wrapInfer ctx $ WeakTermPi binder cod
+  (cod, codPlus) <- newHoleInCtx (ctx ++ binder) >>= withHole
+  tPi' <- wrapInfer ctx $ WeakTermPi $ binder ++ [codPlus]
   insConstraintEnv tPi tPi'
   returnAfterUpdate meta $ substWeakTermPlus (zip (map fst binder) es) cod
 infer ctx (meta, WeakTermMu (x, t) e) = do
@@ -111,12 +113,13 @@ inferPlus ctx xts =
 -- WeakTermZeta might be used as a term which is not a type.
 newHoleInCtx :: Context -> WithEnv WeakTermPlus
 newHoleInCtx ctx = do
-  univ <- newUniv
-  higherPi <- wrapInfer ctx $ WeakTermPi ctx univ
+  (univ, univPlus) <- newUniv >>= withHole
+  higherPi <- wrapInfer ctx $ WeakTermPi $ ctx ++ [univPlus]
   higherHole <- newHoleOfType higherPi
   varSeq <- mapM (uncurry toVar) ctx
-  app <- wrapWithType univ (WeakTermPiElim higherHole varSeq)
-  pi <- wrapInfer ctx $ WeakTermPi ctx app
+  (app, appPlus) <-
+    wrapWithType univ (WeakTermPiElim higherHole varSeq) >>= withHole
+  pi <- wrapInfer ctx $ WeakTermPi $ ctx ++ [appPlus]
   hole <- newHoleOfType pi
   wrapWithType app (WeakTermPiElim hole varSeq)
 
@@ -178,6 +181,11 @@ returnAfterUpdate m t = do
 -- `newUniv` returns an "inferred" universe.
 newUniv :: WithEnv WeakTermPlus
 newUniv = wrapInfer [] WeakTermTau
+
+withHole :: WeakTermPlus -> WithEnv (WeakTermPlus, IdentifierPlus)
+withHole t = do
+  h <- newNameWith "hole"
+  return (t, (h, t))
 
 wrapInfer :: Context -> WeakTerm -> WithEnv WeakTermPlus
 wrapInfer ctx t = do

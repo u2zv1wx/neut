@@ -39,7 +39,8 @@ interpret (m, TreeNode [(_, TreeAtom "epsilon-elimination"), xt, e, (_, TreeNode
   withMeta m $ WeakTermEpsilonElim xt' e' cs'
 interpret (m, TreeNode [(_, TreeAtom "pi"), (_, TreeNode xts), t]) = do
   (xts', t') <- interpretBinder xts t
-  withMeta m $ WeakTermPi xts' t'
+  h <- newNameWith "hole"
+  withMeta m $ WeakTermPi $ xts' ++ [(h, t')]
 interpret (m, TreeNode [(_, TreeAtom "pi-introduction"), (_, TreeNode xts), e]) = do
   xts' <- mapM interpretIdentifierPlus xts
   e' <- interpret e

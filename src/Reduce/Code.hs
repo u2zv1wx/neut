@@ -116,11 +116,8 @@ inlineCodePlus (m, CodeEpsilonElim (x, t) v branchList) =
               es' <- mapM inlineCodePlus es
               return (m, CodeEpsilonElim (x, t) v (zip cs es'))
     _ -> return (m, CodeEpsilonElim (x, t) v branchList)
-inlineCodePlus (m, CodePiElimDownElim v@(_, DataTheta x) vs) = do
-  penv <- gets polEnv
-  case lookup x penv of
-    Nothing         -> return (m, CodePiElimDownElim v vs)
-    Just (xs, body) -> inlineCodePlus $ substCodePlus (zip xs vs) body
+inlineCodePlus (_, CodePiElimDownElim (_, DataDownIntroPiIntro xs body) vs) =
+  inlineCodePlus $ substCodePlus (zip xs vs) body
 inlineCodePlus (m, CodeSigmaElim xs v e) =
   case v of
     (_, DataSigmaIntro es)

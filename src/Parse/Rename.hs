@@ -24,11 +24,11 @@ rename (m, WeakTermEpsilonElim (x, t) e caseList) = do
     x' <- newNameWith x
     caseList' <- renameCaseList caseList
     return (m, WeakTermEpsilonElim (x', t') e' caseList')
-rename (m, WeakTermPi xts t) = do
-  (xts', t') <- renameBinder xts t
-  return (m, WeakTermPi xts' t')
+rename (m, WeakTermPi xts) = do
+  xts' <- renameBinder xts
+  return (m, WeakTermPi xts')
 rename (m, WeakTermPiIntro xts e) = do
-  (xts', e') <- renameBinder xts e
+  (xts', e') <- renameBinderWithBody xts e
   return (m, WeakTermPiIntro xts' e')
 rename (m, WeakTermPiElim e es) = do
   e' <- rename e
@@ -42,18 +42,27 @@ rename (m, WeakTermMu (x, t) e) =
     return (m, WeakTermMu (x', t') e')
 rename (m, WeakTermZeta h) = return (m, WeakTermZeta h)
 
-renameBinder ::
-     [IdentifierPlus]
-  -> WeakTermPlus
-  -> WithEnv ([IdentifierPlus], WeakTermPlus)
-renameBinder [] e = do
-  e' <- rename e
-  return ([], e')
-renameBinder ((x, t):xts) e = do
+renameBinder :: [IdentifierPlus] -> WithEnv [IdentifierPlus]
+renameBinder [] = return []
+renameBinder ((x, t):xts) = do
   t' <- rename t
   local $ do
     x' <- newNameWith x
-    (xts', e') <- renameBinder xts e
+    xts' <- renameBinder xts
+    return $ (x', t') : xts'
+
+renameBinderWithBody ::
+     [IdentifierPlus]
+  -> WeakTermPlus
+  -> WithEnv ([IdentifierPlus], WeakTermPlus)
+renameBinderWithBody [] e = do
+  e' <- rename e
+  return ([], e')
+renameBinderWithBody ((x, t):xts) e = do
+  t' <- rename t
+  local $ do
+    x' <- newNameWith x
+    (xts', e') <- renameBinderWithBody xts e
     return ((x', t') : xts', e')
 
 renameCaseList :: [(Case, WeakTermPlus)] -> WithEnv [(Case, WeakTermPlus)]

@@ -10,6 +10,7 @@ import           Data.List                  (elemIndex)
 
 import           Data.Basic
 import           Data.Code
+import           Data.Comp
 import           Data.Constraint
 import           Data.LLVM
 import           Data.Tree
@@ -35,6 +36,7 @@ data Env = Env
   , substEnv        :: SubstWeakTerm -- metavar ~> beta-equivalent weakterm
   -- , polEnv          :: [(Identifier, ([(Identifier, DataPlus)], CodePlus))] -- f ~> thunk (lam (x1 ... xn) e)
   , polEnv          :: [(Identifier, ([Identifier], CodePlus))] -- f ~> thunk (lam (x1 ... xn) e)
+  , compEnv         :: [(Identifier, ([Identifier], CompPlus))] -- f ~> thunk (lam (x1 ... xn) e)
   , llvmEnv         :: [(Identifier, ([Identifier], LLVM))]
   }
 
@@ -49,6 +51,7 @@ initialEnv path =
     , nameEnv = []
     , typeEnv = Map.empty
     , polEnv = []
+    , compEnv = []
     , llvmEnv = []
     , constraintEnv = []
     , constraintQueue = Q.empty
@@ -127,6 +130,10 @@ insTypeEnv i t = modify (\e -> e {typeEnv = Map.insert i t (typeEnv e)})
 insPolEnv :: Identifier -> [Identifier] -> CodePlus -> WithEnv ()
 insPolEnv name args e =
   modify (\env -> env {polEnv = (name, (args, e)) : polEnv env})
+
+insCompEnv :: Identifier -> [Identifier] -> CompPlus -> WithEnv ()
+insCompEnv name args e =
+  modify (\env -> env {compEnv = (name, (args, e)) : compEnv env})
 
 insLLVMEnv :: Identifier -> [Identifier] -> LLVM -> WithEnv ()
 insLLVMEnv funName args e =
