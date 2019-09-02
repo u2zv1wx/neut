@@ -33,7 +33,7 @@ reduceLowCodePlus (m, LowCodeTheta theta) =
       liftIO $ putStr $ show i
       return (m, LowCodeUpIntro (Nothing, LowDataSigmaIntro []))
     _ -> return (m, LowCodeTheta theta)
-reduceLowCodePlus (m, LowCodeEpsilonElim (x, t) v branchList) =
+reduceLowCodePlus (m, LowCodeEpsilonElim x v branchList) =
   case v of
     (_, LowDataEpsilonIntro l _) ->
       case lookup (CaseLiteral l) branchList of
@@ -41,24 +41,23 @@ reduceLowCodePlus (m, LowCodeEpsilonElim (x, t) v branchList) =
         Nothing ->
           case lookup CaseDefault branchList of
             Just body -> reduceLowCodePlus $ substLowCodePlus [(x, v)] body
-            Nothing   -> return (m, LowCodeEpsilonElim (x, t) v branchList)
-    _ -> return (m, LowCodeEpsilonElim (x, t) v branchList)
-reduceLowCodePlus (m, LowCodePiElimDownElim v@(_, LowDataTheta x) vs) = do
-  cenv <- gets lowCodeEnv
-  case lookup x cenv of
-    Nothing         -> return (m, LowCodePiElimDownElim v vs)
-    Just (xs, body) -> reduceLowCodePlus $ substLowCodePlus (zip xs vs) body
+            Nothing   -> return (m, LowCodeEpsilonElim x v branchList)
+    _ -> return (m, LowCodeEpsilonElim x v branchList)
+reduceLowCodePlus (m, LowCodePiElimDownElim v@(_, LowDataTheta x) es) = do
+  es' <- mapM reduceLowCodePlus es
+  case extractUpIntro es' of
+    Nothing -> return (m, LowCodePiElimDownElim v es')
+    Just vs -> do
+      cenv <- gets lowCodeEnv
+      case lookup x cenv of
+        Nothing -> return (m, LowCodePiElimDownElim v es')
+        Just (xs, body) -> reduceLowCodePlus $ substLowCodePlus (zip xs vs) body
 reduceLowCodePlus (m, LowCodeSigmaElim xs v e) =
   case v of
     (_, LowDataSigmaIntro es)
       | length es == length xs ->
         reduceLowCodePlus $ substLowCodePlus (zip xs es) e
     _ -> return (m, LowCodeSigmaElim xs v e)
-reduceLowCodePlus (m, LowCodeUpElim x e1 e2) = do
-  e1' <- reduceLowCodePlus e1
-  case e1' of
-    (_, LowCodeUpIntro v) -> reduceLowCodePlus $ substLowCodePlus [(x, v)] e2
-    _                     -> return (m, LowCodeUpElim x e1' e2)
 reduceLowCodePlus (m, LowCodeCopyN v1 v2) =
   case v1 of
     (_, LowDataEpsilonIntro (LiteralInteger i) _) ->
@@ -78,6 +77,13 @@ reduceLowCodePlus (m, LowCodeTransposeN v vs) =
                   (map (toSigmaIntro . map toLowDataUpsilon') $ transpose xss)))
     _ -> return (m, LowCodeTransposeN v vs)
 reduceLowCodePlus t = return t
+
+extractUpIntro :: [LowCodePlus] -> Maybe [LowDataPlus]
+extractUpIntro [] = Just []
+extractUpIntro ((_, LowCodeUpIntro v):es) = do
+  vs <- extractUpIntro es
+  return $ v : vs
+extractUpIntro _ = Nothing
 
 newNameList :: Int -> WithEnv [Identifier]
 newNameList i = mapM (const $ newNameWith "var") [1 .. i]
