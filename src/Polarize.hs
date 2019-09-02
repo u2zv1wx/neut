@@ -74,6 +74,8 @@ polarize (m, TermMu (f, t) e) = do
           e
   let clsMeta = MetaNonTerminal clsMuType ml
   lamBody' <- polarize lamBody
+  -- ここはクロージャではなく直接呼び出すように最適化が可能
+  -- (その場合は上のsubstTermPlusの中のTermPiElimを「直接の」callへと書き換える必要がある)
   cls <- makeClosure (Just f) [] clsMeta (map fst fvs) lamBody'
   callClosure m cls fvs'
 
