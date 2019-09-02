@@ -53,21 +53,18 @@ polarize (m, TermPi xts) = do
   return (ml, CodeUpIntro closureType)
 polarize (m, TermPiIntro xts e) = do
   let xs = map fst xts
-  -- let vs = nubBy (\x y -> fst x == fst y) $ varTermPlus e
-  -- let fvs = filter (\(x, _) -> x `notElem` xs) vs
   let fvs = obtainFreeVarList xs e
   e' <- polarize e
-  makeClosureNonRec Nothing fvs m xs e'
+  makeClosure Nothing fvs m xs e'
 polarize (m, TermPiElim e es) = do
   e' <- polarize e
   callClosure m e' es
 polarize (m, TermMu (f, t) e) = do
   let ml = snd $ obtainInfoMeta m
-  -- let vs = nubBy (\x y -> fst x == fst y) $ varTermPlus e
   let fvs = obtainFreeVarList [f] e
   let fvs' = map toTermUpsilon fvs
-  -- let clsMuType = (MetaTerminal ml, TermPi vs t)
-  let clsMuType = (MetaTerminal ml, undefined)
+  h <- newNameWith "hole"
+  let clsMuType = (MetaTerminal ml, TermPi $ fvs ++ [(h, t)])
   let lamBody =
         substTermPlus
           [ ( f
@@ -76,12 +73,8 @@ polarize (m, TermMu (f, t) e) = do
           ]
           e
   let clsMeta = MetaNonTerminal clsMuType ml
-  -- let vs = nubBy (\x y -> fst x == fst y) $ varTermPlus lamBody
-  -- let fvs = filter (\(y, _) -> y /= f) vs
-  -- let fvs = obtainFreeVarList [f] lamBody
-  -- cls <- makeClosure f clsMeta (map fst vs) lamBody
   lamBody' <- polarize lamBody
-  cls <- makeClosureNonRec (Just f) fvs clsMeta [f] lamBody'
+  cls <- makeClosure (Just f) [] clsMeta (map fst fvs) lamBody'
   callClosure m cls fvs'
 
 obtainFreeVarList :: [Identifier] -> TermPlus -> [(Identifier, TermPlus)]
@@ -103,47 +96,14 @@ upElimUp ml e = do
   (varName, var) <- newDataUpsilon' ml
   return (ml, CodeUpElim varName e' (ml, CodeUp var))
 
--- makeClosure ::
---      Identifier -> Meta -> [Identifier] -> TermPlus -> WithEnv CodePlus
--- makeClosure lamThetaName m xs e = do
---   let vs = nubBy (\x y -> fst x == fst y) $ varTermPlus e
---   let fvs = filter (\(x, _) -> x `notElem` xs) vs
---   e' <- polarize e
---   let ml = snd $ obtainInfoMeta m
---   let (freeVarNameList, freeVarTypeList) = unzip fvs
---   (yess, ys) <- unzip <$> mapM polarize' freeVarTypeList
---   envExp <- toSigmaType ml $ map Left ys
---   (envVarName, envVar) <- newDataUpsilon
---   let lamBody = (ml, CodeSigmaElim (map fst fvs) envVar e')
---   let lamTheta = (ml, DataTheta lamThetaName)
---   penv <- gets polEnv
---   when (lamThetaName `elem` map fst penv) $
---     insPolEnv lamThetaName (envVarName : xs) lamBody
---   let fvSigmaIntro =
---         ( ml
---         , DataSigmaIntro $
---           zipWith (curry toDataUpsilon) freeVarNameList (map fst ys))
---   return $
---     bindLet
---       (concat yess)
---       (ml, CodeUpIntro (ml, DataSigmaIntro [envExp, fvSigmaIntro, lamTheta]))
---   makeClosure' fvs lamThetaName m xs e'
--- makeClosure' ::
---      [(Identifier, TermPlus)]
---   -> Identifier
---   -> Meta
---   -> [Identifier]
---   -> CodePlus
---   -> WithEnv CodePlus
--- makeClosure' fvs lamThetaName m xs e = do
-makeClosureNonRec ::
-     Maybe Identifier
-  -> [(Identifier, TermPlus)]
-  -> Meta
-  -> [Identifier]
-  -> CodePlus
+makeClosure ::
+     Maybe Identifier -- the name of newly created closure
+  -> [(Identifier, TermPlus)] -- list of free variables in `lam (x1, ..., xn). e`
+  -> Meta -- meta of lambda
+  -> [Identifier] -- the `(x1, ..., xn)` in `lam (x1, ..., xn). e`
+  -> CodePlus -- the `e` in `lam (x1, ..., xn). e`
   -> WithEnv CodePlus
-makeClosureNonRec mName fvs m xs e = do
+makeClosure mName fvs m xs e = do
   let ml = snd $ obtainInfoMeta m
   let (freeVarNameList, freeVarTypeList) = unzip fvs
   (yess, ys) <- unzip <$> mapM polarize' freeVarTypeList
@@ -189,7 +149,8 @@ callClosure m e es = do
            (concat xess)
            ( ml
            , CodeSigmaElim
-               -- optimizable: ここでのtypevarの取得は省略可能
+               -- ここでのtypevarの取得は実際は省略可。
+               -- とはいえ、typeVarはexponentでクロージャをcopyするときに使うので落とすことはできない。
                [typeVarName, envVarName, lamVarName]
                clsVar
                (ml, CodePiElimDownElim lamVar (envVar : xs)))))
@@ -214,53 +175,32 @@ supplyName (Left t) = do
   x <- newNameWith "hole"
   return (x, t)
 
--- expand definitions of constants
 polarizeTheta :: Meta -> Identifier -> WithEnv CodePlus
-polarizeTheta m name@"core.i8.add" = polarizeThetaArith name ArithAdd (int 8) m
-polarizeTheta m name@"core.i16.add" =
-  polarizeThetaArith name ArithAdd (int 16) m
-polarizeTheta m name@"core.i32.add" =
-  polarizeThetaArith name ArithAdd (int 32) m
-polarizeTheta m name@"core.i64.add" =
-  polarizeThetaArith name ArithAdd (int 64) m
-polarizeTheta m name@"core.i8.sub" = polarizeThetaArith name ArithSub (int 8) m
-polarizeTheta m name@"core.i16.sub" =
-  polarizeThetaArith name ArithSub (int 16) m
-polarizeTheta m name@"core.i32.sub" =
-  polarizeThetaArith name ArithSub (int 32) m
-polarizeTheta m name@"core.i64.sub" =
-  polarizeThetaArith name ArithSub (int 64) m
-polarizeTheta m name@"core.i8.mul" = polarizeThetaArith name ArithMul (int 8) m
-polarizeTheta m name@"core.i16.mul" =
-  polarizeThetaArith name ArithMul (int 16) m
-polarizeTheta m name@"core.i32.mul" =
-  polarizeThetaArith name ArithMul (int 32) m
-polarizeTheta m name@"core.i64.mul" =
-  polarizeThetaArith name ArithMul (int 64) m
-polarizeTheta m name@"core.i8.div" = polarizeThetaArith name ArithDiv (int 8) m
-polarizeTheta m name@"core.i16.div" =
-  polarizeThetaArith name ArithDiv (int 16) m
-polarizeTheta m name@"core.i32.div" =
-  polarizeThetaArith name ArithDiv (int 32) m
-polarizeTheta m name@"core.i64.div" =
-  polarizeThetaArith name ArithDiv (int 64) m
-polarizeTheta m name@"core.f32.add" =
-  polarizeThetaArith name ArithAdd (float 32) m
-polarizeTheta m name@"core.f64.add" =
-  polarizeThetaArith name ArithAdd (float 64) m
-polarizeTheta m name@"core.f32.sub" =
-  polarizeThetaArith name ArithSub (float 32) m
-polarizeTheta m name@"core.f64.sub" =
-  polarizeThetaArith name ArithSub (float 64) m
-polarizeTheta m name@"core.f32.mul" =
-  polarizeThetaArith name ArithMul (float 32) m
-polarizeTheta m name@"core.f64.mul" =
-  polarizeThetaArith name ArithMul (float 64) m
-polarizeTheta m name@"core.f32.div" =
-  polarizeThetaArith name ArithDiv (float 32) m
-polarizeTheta m name@"core.f64.div" =
-  polarizeThetaArith name ArithDiv (float 64) m
-polarizeTheta m name@"core.print.i64" = polarizeThetaPrint name m
+polarizeTheta m name@"core.i8.add" = polarizeArith name ArithAdd (int 8) m
+polarizeTheta m name@"core.i16.add" = polarizeArith name ArithAdd (int 16) m
+polarizeTheta m name@"core.i32.add" = polarizeArith name ArithAdd (int 32) m
+polarizeTheta m name@"core.i64.add" = polarizeArith name ArithAdd (int 64) m
+polarizeTheta m name@"core.i8.sub" = polarizeArith name ArithSub (int 8) m
+polarizeTheta m name@"core.i16.sub" = polarizeArith name ArithSub (int 16) m
+polarizeTheta m name@"core.i32.sub" = polarizeArith name ArithSub (int 32) m
+polarizeTheta m name@"core.i64.sub" = polarizeArith name ArithSub (int 64) m
+polarizeTheta m name@"core.i8.mul" = polarizeArith name ArithMul (int 8) m
+polarizeTheta m name@"core.i16.mul" = polarizeArith name ArithMul (int 16) m
+polarizeTheta m name@"core.i32.mul" = polarizeArith name ArithMul (int 32) m
+polarizeTheta m name@"core.i64.mul" = polarizeArith name ArithMul (int 64) m
+polarizeTheta m name@"core.i8.div" = polarizeArith name ArithDiv (int 8) m
+polarizeTheta m name@"core.i16.div" = polarizeArith name ArithDiv (int 16) m
+polarizeTheta m name@"core.i32.div" = polarizeArith name ArithDiv (int 32) m
+polarizeTheta m name@"core.i64.div" = polarizeArith name ArithDiv (int 64) m
+polarizeTheta m name@"core.f32.add" = polarizeArith name ArithAdd (float 32) m
+polarizeTheta m name@"core.f64.add" = polarizeArith name ArithAdd (float 64) m
+polarizeTheta m name@"core.f32.sub" = polarizeArith name ArithSub (float 32) m
+polarizeTheta m name@"core.f64.sub" = polarizeArith name ArithSub (float 64) m
+polarizeTheta m name@"core.f32.mul" = polarizeArith name ArithMul (float 32) m
+polarizeTheta m name@"core.f64.mul" = polarizeArith name ArithMul (float 64) m
+polarizeTheta m name@"core.f32.div" = polarizeArith name ArithDiv (float 32) m
+polarizeTheta m name@"core.f64.div" = polarizeArith name ArithDiv (float 64) m
+polarizeTheta m name@"core.print.i64" = polarizePrint name m
 polarizeTheta _ _ = throwError "polarize.theta"
 
 int :: Int -> DataPlus
@@ -269,24 +209,23 @@ int i = (Nothing, DataEpsilon $ "i" ++ show i)
 float :: Int -> DataPlus
 float i = (Nothing, DataEpsilon $ "f" ++ show i)
 
-polarizeThetaArith ::
-     Identifier -> Arith -> DataPlus -> Meta -> WithEnv CodePlus
-polarizeThetaArith name op lowType m = do
+polarizeArith :: Identifier -> Arith -> DataPlus -> Meta -> WithEnv CodePlus
+polarizeArith name op lowType m = do
   let ml = snd $ obtainInfoMeta m
   (x, varX) <- newDataUpsilon
   (y, varY) <- newDataUpsilon
-  makeClosureNonRec
+  makeClosure
     (Just name)
     []
     m
     [x, y]
     (ml, CodeTheta (ThetaArith op lowType varX varY))
 
-polarizeThetaPrint :: Identifier -> Meta -> WithEnv CodePlus
-polarizeThetaPrint name m = do
+polarizePrint :: Identifier -> Meta -> WithEnv CodePlus
+polarizePrint name m = do
   let ml = snd $ obtainInfoMeta m
   (x, varX) <- newDataUpsilon
-  makeClosureNonRec (Just name) [] m [x] (ml, CodeTheta (ThetaPrint varX))
+  makeClosure (Just name) [] m [x] (ml, CodeTheta (ThetaPrint varX))
 
 newDataUpsilon :: WithEnv (Identifier, DataPlus)
 newDataUpsilon = newDataUpsilon' Nothing
