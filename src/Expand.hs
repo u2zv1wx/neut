@@ -20,8 +20,8 @@ expandData (m, DataTheta theta) = return (m, LowDataTheta theta)
 expandData (m, DataUpsilon x) = return (m, LowDataUpsilon x)
 expandData (_, DataEpsilon _) = exponentImmediate
 expandData (m, DataEpsilonIntro l t) = do
-  case t of
-    _ -> undefined
+  lowType <- asLowType t
+  return (m, LowDataEpsilonIntro l lowType)
 expandData (_, DataDownPi _) = exponentImmediate
 expandData (m, DataDownIntroPiIntro xs e) = do
   lamThetaName <- newNameWith "theta"
@@ -45,10 +45,10 @@ expandCode (m, CodeEpsilonElim x v branchList) = do
   v' <- expandData v
   es' <- mapM expandCode es
   return (m, LowCodeEpsilonElim x v' (zip cs es'))
-expandCode (m, CodePiElimDownElim v vs) = do
+expandCode (m, CodePiElimDownElim v es) = do
   v' <- expandData v
-  vs' <- mapM expandData vs
-  return (m, LowCodePiElimDownElim v' vs')
+  es' <- mapM expandCode es
+  return (m, LowCodePiElimDownElim v' es')
 expandCode (m, CodeSigmaElim xs v e) = do
   v' <- expandData v
   e' <- expandCode e
@@ -59,17 +59,20 @@ expandCode (m, CodeUp v) = do
 expandCode (m, CodeUpIntro v) = do
   v' <- expandData v
   return (m, LowCodeUpIntro v')
-expandCode (m, CodeUpElim x e1 e2) = do
-  e1' <- expandCode e1
-  e2' <- expandCode e2
-  return (m, LowCodeUpElim x e1' e2')
 
 expandTheta :: Theta -> WithEnv LowDataTheta
-expandTheta = undefined
+expandTheta (ThetaArith op t v1 v2) = do
+  lowType <- asLowType t
+  v1' <- expandData v1
+  v2' <- expandData v2
+  return $ LowDataThetaArith op lowType v1' v2'
+expandTheta (ThetaPrint v) = do
+  v' <- expandData v
+  return $ LowDataThetaPrint v'
 
 exponentImmediate :: WithEnv LowDataPlus
 exponentImmediate = do
-  penv <- gets polEnv
+  penv <- gets codeEnv
   let thetaName = "EXPONENT.IMMEDIATE"
   let immExp = (Nothing, LowDataTheta thetaName)
   case lookup thetaName penv of
@@ -99,7 +102,7 @@ exponentSigma ::
   -> [Either LowDataPlus (Identifier, LowDataPlus)]
   -> WithEnv LowDataPlus
 exponentSigma lamThetaName ml mxts = do
-  penv <- gets polEnv
+  penv <- gets codeEnv
   let sigmaExp = (ml, LowDataTheta lamThetaName)
   case lookup lamThetaName penv of
     Just _ -> return sigmaExp
@@ -113,85 +116,47 @@ exponentSigma lamThetaName ml mxts = do
                  ( ml
                  , LowCodePiElimDownElim
                      t
-                     [countVar, toLowDataUpsilon (x, fst t)]))
+                     [ (Nothing, LowCodeUpIntro countVar)
+                     , (Nothing, LowCodeUpIntro $ toLowDataUpsilon (x, fst t))
+                     ]))
               xts
       ys <- mapM (const $ newNameWith "var") xts
       let ys' = map toLowDataUpsilon' ys
-      let lamBody =
-            ( ml
-            , LowCodeSigmaElim
-                (map fst xts)
-                sigVar
-                (bindLetLowCode
-                   (zip ys appList)
-                   (ml, LowCodeTransposeN countVar ys')))
+      cont <-
+        bindLetLowCode (zip ys appList) (ml, LowCodeTransposeN countVar ys')
+      let lamBody = (ml, LowCodeSigmaElim (map fst xts) sigVar cont)
       insLowCodeEnv lamThetaName [countVarName, sigVarName] lamBody
       return sigmaExp
 
-bindLetLowCode :: [(Identifier, LowCodePlus)] -> LowCodePlus -> LowCodePlus
-bindLetLowCode [] cont = cont
+bindLetLowCode ::
+     [(Identifier, LowCodePlus)] -> LowCodePlus -> WithEnv LowCodePlus
+bindLetLowCode [] cont = return cont
 bindLetLowCode ((x, e):xes) cont = do
-  let e' = bindLetLowCode xes cont
-  (fst e', LowCodeUpElim x e e')
+  e' <- bindLetLowCode xes cont
+  upElim (fst e') x e e'
 
--- exponentClosure :: WithEnv LowDataPlus
--- exponentClosure = do
---   i <- exponentImmediate
---   (typeVarName, typeVar) <- newLowDataUpsilon
---   exponentSigma
---     "EXPONENT.CLOSURE"
---     Nothing
---     [Right (typeVarName, i), Left typeVar, Left i]
+upElim ::
+     Maybe Loc
+  -> Identifier
+  -> LowCodePlus
+  -> LowCodePlus
+  -> WithEnv LowCodePlus
+upElim ml x e1 e2 = do
+  lamThetaName <- newNameWith "lam"
+  insLowCodeEnv lamThetaName [x] e2
+  return (ml, LowCodePiElimDownElim (ml, LowDataTheta lamThetaName) [e1])
+
 newLowDataUpsilon :: WithEnv (Identifier, LowDataPlus)
-newLowDataUpsilon = newLowDataUpsilon' Nothing
-
-newLowDataUpsilon' :: Maybe Loc -> WithEnv (Identifier, LowDataPlus)
-newLowDataUpsilon' ml = do
+newLowDataUpsilon = do
   x <- newNameWith "arg"
-  return (x, (ml, LowDataUpsilon x))
--- inline :: WithEnv ()
--- inline = do
---   penv <- gets polEnv
---   forM_ penv $ \(thetaName, (args, body)) -> do
---     body' <- inlineCodePlus body
---     unless (checkSanityCode body') $ throwError "sanity"
---     body'' <- processCode body'
---     insLowCodeEnv thetaName args body''
--- processData :: DataPlus -> WithEnv LowDataPlus
--- processData (_, DataImmediate)            = exponentImmediate
--- processData (_, DataTheta _)              = undefined
--- processData (_, DataUpsilon _)            = undefined
--- processData (_, DataEpsilon _)            = exponentImmediate
--- processData (_, DataEpsilonIntro _ _)     = undefined
--- processData (_, DataDownIntroPiIntro _ _) = undefined
--- processData (_, DataSigma xts)            = undefined
--- processData (_, DataSigmaIntro _)         = undefined
--- processCode :: CodePlus -> WithEnv LowCodePlus
--- processCode (m, CodeTheta theta) = do
---   theta' <- processTheta theta
---   return (m, LowCodeTheta theta')
--- processCode (_, CodeEpsilonElim {}) = undefined
--- processCode (_, CodePiElimDownElim {}) = undefined
--- processCode (_, CodeSigmaElim {}) = undefined
--- processCode (_, CodeUpIntro {}) = undefined
--- processCode (_, CodeUpElim {}) = undefined
--- processTheta :: Theta -> WithEnv LowDataTheta
--- processTheta = undefined
--- checkSanityData :: DataPlus -> Bool
--- checkSanityData (_, DataEpsilonIntro _ p) = null $ varDataPlus p
--- checkSanityData (_, DataSigma xts) = do
---   let (xs, ts) = unzip xts
---   all (`elem` xs) (concatMap varDataPlus ts) -- sigma must be closed
--- checkSanityData _ = True
--- checkSanityCode :: CodePlus -> Bool
--- checkSanityCode (_, CodeTheta _) = True
--- checkSanityCode (_, CodeEpsilonElim _ d branchList) = do
---   let (_, es) = unzip branchList
---   checkSanityData d && all checkSanityCode es
--- checkSanityCode (_, CodePiElimDownElim d ds) =
---   checkSanityData d && all checkSanityData ds
--- checkSanityCode (_, CodeSigmaElim _ v e) =
---   checkSanityData v && checkSanityCode e
--- checkSanityCode (_, CodeUpIntro v) = checkSanityData v
--- checkSanityCode (_, CodeUpElim _ e1 e2) =
---   checkSanityCode e1 && checkSanityCode e2
+  return (x, (Nothing, LowDataUpsilon x))
+
+asLowType :: DataPlus -> WithEnv LowType
+asLowType t =
+  case t of
+    (_, DataEpsilon x)
+      | Just lowType <- asLowType' x -> return lowType
+    _ -> throwError "expandData.epsilon-intro"
+
+asLowType' :: Identifier -> Maybe LowType
+asLowType' = undefined

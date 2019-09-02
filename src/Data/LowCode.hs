@@ -17,14 +17,11 @@ data LowCode
                        LowDataPlus
                        [(Case, LowCodePlus)]
   | LowCodePiElimDownElim LowDataPlus
-                          [LowDataPlus]
+                          [LowCodePlus]
   | LowCodeSigmaElim [Identifier]
                      LowDataPlus
                      LowCodePlus
   | LowCodeUpIntro LowDataPlus
-  | LowCodeUpElim Identifier
-                  LowCodePlus
-                  LowCodePlus
   | LowCodeCopyN LowDataPlus
                  LowDataPlus
   | LowCodeTransposeN LowDataPlus -- Supposed to be a natural number `n`
@@ -69,13 +66,11 @@ varLowCodePlus (_, LowCodeTheta e) = varTheta e
 varLowCodePlus (_, LowCodeEpsilonElim x v branchList) = do
   let (_, es) = unzip branchList
   varLowDataPlus v ++ filterPlus (/= x) (concatMap varLowCodePlus es)
-varLowCodePlus (_, LowCodePiElimDownElim v vs) =
-  varLowDataPlus v ++ concatMap varLowDataPlus vs
+varLowCodePlus (_, LowCodePiElimDownElim v es) =
+  varLowDataPlus v ++ concatMap varLowCodePlus es
 varLowCodePlus (_, LowCodeSigmaElim xs v e) =
   varLowDataPlus v ++ filterPlus (`notElem` xs) (varLowCodePlus e)
 varLowCodePlus (_, LowCodeUpIntro v) = varLowDataPlus v
-varLowCodePlus (_, LowCodeUpElim x e1 e2) =
-  varLowCodePlus e1 ++ filterPlus (/= x) (varLowCodePlus e2)
 varLowCodePlus (_, LowCodeCopyN v1 v2) = varLowDataPlus v1 ++ varLowDataPlus v2
 varLowCodePlus (_, LowCodeTransposeN v vs) =
   varLowDataPlus v ++ concatMap varLowDataPlus vs
@@ -113,10 +108,10 @@ substLowCodePlus sub (m, LowCodeEpsilonElim x v branchList) = do
   let es' = map (substLowCodePlus (filter (\(y, _) -> y /= x) sub)) es
   let branchList' = zip cs es'
   (m, LowCodeEpsilonElim x v' branchList')
-substLowCodePlus sub (m, LowCodePiElimDownElim v vs) = do
+substLowCodePlus sub (m, LowCodePiElimDownElim v es) = do
   let v' = substLowDataPlus sub v
-  let vs' = map (substLowDataPlus sub) vs
-  (m, LowCodePiElimDownElim v' vs')
+  let es' = map (substLowCodePlus sub) es
+  (m, LowCodePiElimDownElim v' es')
 substLowCodePlus sub (m, LowCodeSigmaElim xs v e) = do
   let v' = substLowDataPlus sub v
   let (xs', e') = substLowDataPlusSigmaElim sub xs e
@@ -124,10 +119,6 @@ substLowCodePlus sub (m, LowCodeSigmaElim xs v e) = do
 substLowCodePlus sub (m, LowCodeUpIntro v) = do
   let v' = substLowDataPlus sub v
   (m, LowCodeUpIntro v')
-substLowCodePlus sub (m, LowCodeUpElim x e1 e2) = do
-  let e1' = substLowCodePlus sub e1
-  let e2' = substLowCodePlus (filter (\(y, _) -> y /= x) sub) e2
-  (m, LowCodeUpElim x e1' e2')
 substLowCodePlus sub (m, LowCodeCopyN v1 v2) = do
   let v1' = substLowDataPlus sub v1
   let v2' = substLowDataPlus sub v2

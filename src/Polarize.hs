@@ -96,7 +96,6 @@ upElimUp ml e = do
   e' <- polarize e
   (varName, var) <- newDataUpsilon' ml
   return $ upElim ml varName e' (ml, CodeUp var)
-  -- return (ml, CodeUpElim varName e' (ml, CodeUp var))
 
 makeClosure ::
      Maybe Identifier -- the name of newly created closure

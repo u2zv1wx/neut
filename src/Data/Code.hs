@@ -184,3 +184,22 @@ substDataPlusSigmaElim sub (x:xs) e = do
   let sub' = filter (\(y, _) -> y /= x) sub
   let (xs', e') = substDataPlusSigmaElim sub' xs e
   (x : xs', e')
+
+checkSanityData :: DataPlus -> Bool
+checkSanityData (_, DataEpsilonIntro _ p) = null $ varDataPlus p
+checkSanityData (_, DataSigma xts) = do
+  let (xs, ts) = unzip xts
+  all (`elem` xs) (concatMap varDataPlus ts) -- sigma must be closed
+checkSanityData _ = True
+
+checkSanityCode :: CodePlus -> Bool
+checkSanityCode (_, CodeTheta _) = True
+checkSanityCode (_, CodeEpsilonElim _ d branchList) = do
+  let (_, es) = unzip branchList
+  checkSanityData d && all checkSanityCode es
+checkSanityCode (_, CodePiElimDownElim d es) =
+  checkSanityData d && all checkSanityCode es
+checkSanityCode (_, CodeSigmaElim _ v e) =
+  checkSanityData v && checkSanityCode e
+checkSanityCode (_, CodeUp v) = checkSanityData v
+checkSanityCode (_, CodeUpIntro v) = checkSanityData v
