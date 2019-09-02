@@ -185,21 +185,32 @@ substDataPlusSigmaElim sub (x:xs) e = do
   let (xs', e') = substDataPlusSigmaElim sub' xs e
   (x : xs', e')
 
-checkSanityData :: DataPlus -> Bool
-checkSanityData (_, DataEpsilonIntro _ p) = null $ varDataPlus p
-checkSanityData (_, DataSigma xts) = do
+isEtaExpandableData :: DataPlus -> Bool
+isEtaExpandableData (_, DataTau) = True
+isEtaExpandableData (_, DataTheta _) = True
+isEtaExpandableData (_, DataUpsilon _) = True
+isEtaExpandableData (_, DataEpsilon _) = True
+isEtaExpandableData (_, DataEpsilonIntro _ p) = isEtaExpandableData p
+isEtaExpandableData (_, DataDownPi xps) = all isEtaExpandableCode $ map snd xps
+isEtaExpandableData (_, DataDownIntroPiIntro _ e) = isEtaExpandableCode e
+isEtaExpandableData (_, DataSigma xts) = do
   let (xs, ts) = unzip xts
   all (`elem` xs) (concatMap varDataPlus ts) -- sigma must be closed
-checkSanityData _ = True
+isEtaExpandableData (_, DataSigmaIntro vs) = all isEtaExpandableData vs
 
-checkSanityCode :: CodePlus -> Bool
-checkSanityCode (_, CodeTheta _) = True
-checkSanityCode (_, CodeEpsilonElim _ d branchList) = do
+isEtaExpandableCode :: CodePlus -> Bool
+isEtaExpandableCode (_, CodeTheta theta) = isEtaExpandableTheta theta
+isEtaExpandableCode (_, CodeEpsilonElim _ d branchList) = do
   let (_, es) = unzip branchList
-  checkSanityData d && all checkSanityCode es
-checkSanityCode (_, CodePiElimDownElim d es) =
-  checkSanityData d && all checkSanityCode es
-checkSanityCode (_, CodeSigmaElim _ v e) =
-  checkSanityData v && checkSanityCode e
-checkSanityCode (_, CodeUp v) = checkSanityData v
-checkSanityCode (_, CodeUpIntro v) = checkSanityData v
+  isEtaExpandableData d && all isEtaExpandableCode es
+isEtaExpandableCode (_, CodePiElimDownElim d es) =
+  isEtaExpandableData d && all isEtaExpandableCode es
+isEtaExpandableCode (_, CodeSigmaElim _ v e) =
+  isEtaExpandableData v && isEtaExpandableCode e
+isEtaExpandableCode (_, CodeUp v) = isEtaExpandableData v
+isEtaExpandableCode (_, CodeUpIntro v) = isEtaExpandableData v
+
+isEtaExpandableTheta :: Theta -> Bool
+isEtaExpandableTheta (ThetaArith _ t v1 v2) =
+  all isEtaExpandableData [t, v1, v2]
+isEtaExpandableTheta (ThetaPrint v) = isEtaExpandableData v

@@ -4,7 +4,7 @@
 -- when the integer `n` equals to 1, this exponential operation degenerates to
 -- eta-expansion.
 module Expand
-  ( expandCode
+  ( expand
   ) where
 
 import           Control.Monad.Except
@@ -16,6 +16,20 @@ import           Data.Basic
 import           Data.Code
 import           Data.Env
 import           Data.LowCode
+import           Reduce.Code
+
+expand :: CodePlus -> WithEnv LowCodePlus
+expand mainTerm = do
+  cenv <- gets codeEnv
+  forM_ cenv $ \(lamThetaName, (args, body)) -> do
+    body' <- inlineCodePlus body
+    if isEtaExpandableCode body'
+      then expandCode body' >>= insLowCodeEnv lamThetaName args
+      else throwError "expand"
+  mainTerm' <- inlineCodePlus mainTerm
+  if isEtaExpandableCode mainTerm'
+    then expandCode mainTerm'
+    else throwError "expand"
 
 expandData :: DataPlus -> WithEnv LowDataPlus
 expandData (_, DataTau) = exponentImmediate
@@ -92,8 +106,8 @@ exponentImmediate = do
 --     let (y1, ..., yn) := z in
 --     bind ys1 = t1 @ (m, y1) in
 --     ...
---     bind ysn = tn @ (m, yn) in -- ここまではコードとしてstaticに書ける
---     let (ys1-1, ..., ys1-m) := ys1 in -- ここでm-elimが必要になる。
+--     bind ysn = tn @ (m, yn) in
+--     let (ys1-1, ..., ys1-m) := ys1 in
 --     ...
 --     let (ysn-1, ..., ysn-m) := ysn in
 --     ((ys1-1, ..., ysn-1), ..., (ys1-m, ..., ysn-m))
