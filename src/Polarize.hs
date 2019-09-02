@@ -33,13 +33,12 @@ polarize (m, TermEpsilonIntro l) = do
   let (t, ml) = obtainInfoMeta m
   (xts, x) <- polarize' t
   return $ bindLet xts (ml, CodeUpIntro (ml, DataEpsilonIntro l x))
-polarize (m, TermEpsilonElim (x, t) e bs) = do
+polarize (m, TermEpsilonElim (x, _) e bs) = do
   let (cs, es) = unzip bs
   es' <- mapM polarize es
   (yts, y) <- polarize' e
-  (zts, z) <- polarize' t
   let ml = snd $ obtainInfoMeta m
-  return $ bindLet (yts ++ zts) (ml, CodeEpsilonElim (x, z) y (zip cs es'))
+  return $ bindLet yts (ml, CodeEpsilonElim x y (zip cs es'))
 polarize (m, TermPi xts) = do
   let ml = snd $ obtainInfoMeta m
   let (xs, ts) = unzip xts
@@ -130,9 +129,9 @@ makeClosure mName fvs m xs e = do
                 , (ml, DataDownIntroPiIntro (envVarName : xs) lamBody)
                 ]))
     Just lamThetaName -> do
-      penv <- gets polEnv
+      penv <- gets codeEnv
       when (lamThetaName `elem` map fst penv) $
-        insPolEnv lamThetaName (envVarName : xs) lamBody
+        insCodeEnv lamThetaName (envVarName : xs) lamBody
       return $
         bindLet
           (concat yess)
@@ -178,12 +177,6 @@ toSigmaType ::
 toSigmaType ml xps = do
   xps' <- mapM supplyName xps
   return (ml, DataSigma xps')
-
-supplyName :: Either b (Identifier, b) -> WithEnv (Identifier, b)
-supplyName (Right (x, t)) = return (x, t)
-supplyName (Left t) = do
-  x <- newNameWith "hole"
-  return (x, t)
 
 polarizeTheta :: Meta -> Identifier -> WithEnv CodePlus
 polarizeTheta m name@"core.i8.add" = polarizeArith name ArithAdd (int 8) m

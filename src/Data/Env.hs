@@ -10,9 +10,9 @@ import           Data.List                  (elemIndex)
 
 import           Data.Basic
 import           Data.Code
-import           Data.Comp
 import           Data.Constraint
 import           Data.LLVM
+import           Data.LowCode
 import           Data.Tree
 import           Data.WeakTerm
 
@@ -34,9 +34,9 @@ data Env = Env
   , constraintEnv   :: [PreConstraint] -- for type inference
   , constraintQueue :: ConstraintQueue -- for (dependent) type inference
   , substEnv        :: SubstWeakTerm -- metavar ~> beta-equivalent weakterm
-  -- , polEnv          :: [(Identifier, ([(Identifier, DataPlus)], CodePlus))] -- f ~> thunk (lam (x1 ... xn) e)
-  , polEnv          :: [(Identifier, ([Identifier], CodePlus))] -- f ~> thunk (lam (x1 ... xn) e)
-  , compEnv         :: [(Identifier, ([Identifier], CompPlus))] -- f ~> thunk (lam (x1 ... xn) e)
+  -- , codeEnv          :: [(Identifier, ([(Identifier, DataPlus)], CodePlus))] -- f ~> thunk (lam (x1 ... xn) e)
+  , codeEnv         :: [(Identifier, ([Identifier], CodePlus))] -- f ~> thunk (lam (x1 ... xn) e)
+  , lowCodeEnv      :: [(Identifier, ([Identifier], LowCodePlus))] -- f ~> thunk (lam (x1 ... xn) e)
   , llvmEnv         :: [(Identifier, ([Identifier], LLVM))]
   }
 
@@ -50,8 +50,8 @@ initialEnv path =
     , epsilonEnv = []
     , nameEnv = []
     , typeEnv = Map.empty
-    , polEnv = []
-    , compEnv = []
+    , codeEnv = []
+    , lowCodeEnv = []
     , llvmEnv = []
     , constraintEnv = []
     , constraintQueue = Q.empty
@@ -127,13 +127,13 @@ lookupNameEnvMaybe s = do
 insTypeEnv :: Identifier -> WeakTermPlus -> WithEnv ()
 insTypeEnv i t = modify (\e -> e {typeEnv = Map.insert i t (typeEnv e)})
 
-insPolEnv :: Identifier -> [Identifier] -> CodePlus -> WithEnv ()
-insPolEnv name args e =
-  modify (\env -> env {polEnv = (name, (args, e)) : polEnv env})
+insCodeEnv :: Identifier -> [Identifier] -> CodePlus -> WithEnv ()
+insCodeEnv name args e =
+  modify (\env -> env {codeEnv = (name, (args, e)) : codeEnv env})
 
-insCompEnv :: Identifier -> [Identifier] -> CompPlus -> WithEnv ()
-insCompEnv name args e =
-  modify (\env -> env {compEnv = (name, (args, e)) : compEnv env})
+insLowCodeEnv :: Identifier -> [Identifier] -> LowCodePlus -> WithEnv ()
+insLowCodeEnv name args e =
+  modify (\env -> env {lowCodeEnv = (name, (args, e)) : lowCodeEnv env})
 
 insLLVMEnv :: Identifier -> [Identifier] -> LLVM -> WithEnv ()
 insLLVMEnv funName args e =
@@ -228,3 +228,9 @@ toWeakMeta :: TreeMeta -> WithEnv WeakMeta
 toWeakMeta m = do
   t <- liftIO $ newIORef Nothing
   return $ WeakMetaNonTerminal (Ref t) (treeMetaLocation m)
+
+supplyName :: Either b (Identifier, b) -> WithEnv (Identifier, b)
+supplyName (Right (x, t)) = return (x, t)
+supplyName (Left t) = do
+  x <- newNameWith "hole"
+  return (x, t)
