@@ -25,14 +25,16 @@ llvmLowCode :: LowCodePlus -> WithEnv LLVM
 llvmLowCode (m, LowCodeTheta theta) = llvmLowCodeTheta m theta
 llvmLowCode (_, LowCodeEpsilonElim x v branchList) =
   llvmLowCodeEpsilonElim x v branchList
-llvmLowCode (_, LowCodePiElimDownElim fun args) = undefined
-  -- f <- newNameWith "fun"
-  -- xs <- mapM (const (newNameWith "arg")) args
-  -- let funPtrType = toFunPtrType args
-  -- cast <- newNameWith "cast"
-  -- llvmLowDataLet' ((f, fun) : zip xs args) $
-  --   LLVMLet cast (LLVMBitcast (LLVMDataLocal f) voidPtr funPtrType) $
-  --   LLVMCall (LLVMDataLocal cast) (map LLVMDataLocal xs)
+llvmLowCode (_, LowCodePiElimDownElim v es) = do
+  f <- newNameWith "fun"
+  es' <- mapM llvmLowCode es
+  xs <- mapM (const (newNameWith "arg")) es'
+  cast <- newNameWith "cast"
+  let funPtrType = toFunPtrType es
+  llvmLowDataLet' [(f, v)] $
+    llvmLowCodeLet (zip xs es') $
+    LLVMLet cast (LLVMBitcast (LLVMDataLocal f) voidPtr funPtrType) $
+    LLVMCall (LLVMDataLocal cast) (map LLVMDataLocal xs)
 llvmLowCode (_, LowCodeSigmaElim xs v e) = do
   basePointer <- newNameWith "base"
   castedBasePointer <- newNameWith "castedBase"
@@ -54,10 +56,6 @@ llvmLowCode (_, LowCodeSigmaElim xs v e) = do
 llvmLowCode (_, LowCodeUpIntro d) = do
   result <- newNameWith "ans"
   llvmLowDataLet result d $ LLVMReturn $ LLVMDataLocal result
--- llvmLowCode (_, LowCodeUpElim x cont1 cont2) = do
---   cont1' <- llvmLowCode cont1
---   cont2' <- llvmLowCode cont2
---   return $ LLVMLet x cont1' cont2'
 llvmLowCode (_, LowCodeCopyN _ _) = undefined
 llvmLowCode (_, LowCodeTransposeN _ _) = undefined
 
@@ -125,6 +123,10 @@ llvmLowCodeTheta _ (LowDataThetaPrint v) = do
   llvmLowDataLet p v $
     LLVMLet c (LLVMPointerToInt (LLVMDataLocal p) voidPtr t) $
     LLVMPrint t (LLVMDataLocal c)
+
+llvmLowCodeLet :: [(Identifier, LLVM)] -> LLVM -> LLVM
+llvmLowCodeLet [] cont           = cont
+llvmLowCodeLet ((x, e):xes) cont = LLVMLet x e $ llvmLowCodeLet xes cont
 
 -- `llvmLowDataLet x d cont` binds the data `d` to the variable `x`, and computes the
 -- continuation `cont`.
