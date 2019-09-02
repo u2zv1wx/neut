@@ -117,14 +117,19 @@ makeClosure mName fvs m xs e = do
         , DataSigmaIntro $
           zipWith (curry toDataUpsilon) freeVarNameList (map fst ys))
   case mName of
-    Nothing -> do
-      let lam = (ml, DataDownIntroPiIntro (envVarName : xs) lamBody)
+    Nothing ->
       return $
-        bindLet
-          (concat yess)
-          (ml, CodeUpIntro (ml, DataSigmaIntro [envExp, fvSigmaIntro, lam]))
+      bindLet
+        (concat yess)
+        ( ml
+        , CodeUpIntro
+            ( ml
+            , DataSigmaIntro
+                [ envExp
+                , fvSigmaIntro
+                , (ml, DataDownIntroPiIntro (envVarName : xs) lamBody)
+                ]))
     Just lamThetaName -> do
-      let lamTheta = (ml, DataTheta lamThetaName)
       penv <- gets polEnv
       when (lamThetaName `elem` map fst penv) $
         insPolEnv lamThetaName (envVarName : xs) lamBody
@@ -132,7 +137,10 @@ makeClosure mName fvs m xs e = do
         bindLet
           (concat yess)
           ( ml
-          , CodeUpIntro (ml, DataSigmaIntro [envExp, fvSigmaIntro, lamTheta]))
+          , CodeUpIntro
+              ( ml
+              , DataSigmaIntro
+                  [envExp, fvSigmaIntro, (ml, DataTheta lamThetaName)]))
 
 callClosure :: Meta -> CodePlus -> [TermPlus] -> WithEnv CodePlus
 callClosure m e es = do
