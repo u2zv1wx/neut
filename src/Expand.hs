@@ -171,19 +171,18 @@ newLowDataUpsilon = do
 asLowType :: DataPlus -> WithEnv LowType
 asLowType t =
   case t of
-    (_, DataEpsilon x)
-      | Just lowType <- asLowType' x -> return lowType
-    _ -> throwError "expandData.epsilon-intro"
+    (_, DataEpsilon x) -> return $ asLowType' x
+    _                  -> throwError "expandData.epsilon-intro"
 
-asLowType' :: Identifier -> Maybe LowType
+asLowType' :: Identifier -> LowType
 asLowType' x
   | Just ('i', numStr) <- destructMaybe x
-  , Just i <- readMaybe numStr = Just $ LowTypeSignedInt i
+  , Just i <- readMaybe numStr = LowTypeSignedInt i
   | Just ('u', numStr) <- destructMaybe x
-  , Just i <- readMaybe numStr = Just $ LowTypeUnsignedInt i
+  , Just i <- readMaybe numStr = LowTypeUnsignedInt i
   | Just ('f', numStr) <- destructMaybe x
-  , Just i <- readMaybe numStr = Just $ LowTypeFloat i
-  | otherwise = Just $ LowTypeSignedInt 64
+  , Just i <- readMaybe numStr = LowTypeFloat i
+  | otherwise = LowTypeSignedInt 64
 
 destructMaybe :: [a] -> Maybe (a, [a])
 destructMaybe []     = Nothing
