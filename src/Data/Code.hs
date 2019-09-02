@@ -1,238 +1,18 @@
--- module Data.Code where
--- import           Data.Maybe (fromMaybe)
--- import           Data.Basic
--- data Data
---   = DataImmediate -- DataImmediate, DataEpsilon, DataDownPi
---   | DataTheta Identifier -- global variable
---   | DataUpsilon Identifier
---   | DataEpsilonIntro Literal
---   | DataDownIntroPiIntro [IdentifierPlus]
---                          CodePlus
---   | DataSigma [IdentifierPlus]
---   | DataSigmaIntro [DataPlus]
---   deriving (Show)
--- data Code
---   = CodeTau
---   | CodeTheta Theta
---   | CodeEpsilonElim IdentifierPlus
---                     DataPlus
---                     [(Case, CodePlus)]
---   | CodePiElimDownElim DataPlus
---                        [DataPlus]
---   | CodeSigmaElim [IdentifierPlus]
---                   DataPlus
---                   CodePlus
---   | CodeUp DataPlus
---   | CodeUpIntro DataPlus
---   | CodeUpElim IdentifierPlus
---                CodePlus
---                CodePlus
---   | CodeMu IdentifierPlus
---            CodePlus
---   deriving (Show)
--- data Theta
---   = ThetaArith Arith
---                DataPlus
---                DataPlus
---   | ThetaPrint DataPlus
---   deriving (Show)
--- type IdentifierPlus = (Identifier, DataPlus)
--- -- data CodeMeta
--- --   = CodeMetaTerminal (Maybe (Int, Int))
--- --   | CodeMetaNonTerminal DataPlus
--- --                         (Maybe (Int, Int))
--- --   deriving (Show)
--- type CodeMeta = Maybe Loc -- = CodeMetaTerminal (Maybe (Int, Int))
---   -- | CodeMetaNonTerminal CodePlus
---   --                       (Maybe (Int, Int))
---   -- deriving (Show)
--- -- FIXME: (Data, CodeMeta)としたほうがe : Aに揃って読みやすいかもしれない。
--- type DataPlus = (CodeMeta, Data)
--- type CodePlus = (CodeMeta, Code)
--- -- obtainInfoCodeMeta :: CodeMeta -> (CodePlus, Maybe (Int, Int))
--- -- obtainInfoCodeMeta (CodeMetaTerminal ml) = ((CodeMetaTerminal ml, CodeTau), ml)
--- -- obtainInfoCodeMeta (CodeMetaNonTerminal t ml) = (t, ml)
--- -- obtainInfoCodeMeta :: CodeMeta -> (DataPlus, Maybe (Int, Int))
--- -- obtainInfoCodeMeta (CodeMetaTerminal ml) =
--- --   ((CodeMetaTerminal ml, DataImmediate), ml)
--- -- obtainInfoCodeMeta (CodeMetaNonTerminal t ml) = (t, ml)
--- varDataPlus :: DataPlus -> [IdentifierPlus]
--- varDataPlus (_, DataImmediate) = []
--- varDataPlus (_, DataTheta _) = []
--- varDataPlus (m, DataUpsilon x) = [(x, fst $ obtainInfoCodeMeta m)]
--- varDataPlus (_, DataEpsilonIntro _) = []
--- varDataPlus (_, DataDownIntroPiIntro xps e) =
---   filterPlus (`notElem` map fst xps) $
---   concatMap (varDataPlus . snd) xps ++ varCodePlus e
--- varDataPlus (_, DataSigma xps) = varDataPlusPiOrSigma xps []
--- varDataPlus (_, DataSigmaIntro vs) = concatMap varDataPlus vs
--- varDataPlusPiOrSigma :: [IdentifierPlus] -> [IdentifierPlus] -> [IdentifierPlus]
--- varDataPlusPiOrSigma [] xs = xs
--- varDataPlusPiOrSigma ((x, p):xps) xs =
---   varDataPlus p ++ filterPlus (/= x) (varDataPlusPiOrSigma xps xs)
--- varCodePlus :: CodePlus -> [IdentifierPlus]
--- varCodePlus (_, CodeTau) = []
--- varCodePlus (_, CodeTheta e) = varTheta e
--- varCodePlus (_, CodeEpsilonElim (x, _) v branchList) = do
---   let (_, es) = unzip branchList
---   varDataPlus v ++ filterPlus (/= x) (concatMap varCodePlus es)
--- varCodePlus (_, CodePiElimDownElim v vs) =
---   varDataPlus v ++ concatMap varDataPlus vs
--- varCodePlus (_, CodeSigmaElim xps v e) =
---   varDataPlus v ++ filterPlus (`notElem` map fst xps) (varCodePlus e)
--- varCodePlus (_, CodeUp p) = varDataPlus p
--- varCodePlus (_, CodeUpIntro v) = varDataPlus v
--- varCodePlus (_, CodeUpElim (x, _) e1 e2) =
---   varCodePlus e1 ++ filterPlus (/= x) (varCodePlus e2)
--- varCodePlus (_, CodeMu (x, _) e) = filterPlus (/= x) $ varCodePlus e
--- varDataPlusPi :: [IdentifierPlus] -> DataPlus -> [IdentifierPlus]
--- varDataPlusPi [] n = varDataPlus n
--- varDataPlusPi ((x, p):xps) n =
---   varDataPlus p ++ filterPlus (/= x) (varDataPlusPi xps n)
--- varTheta :: Theta -> [IdentifierPlus]
--- varTheta = undefined
--- filterPlus :: (Identifier -> Bool) -> [IdentifierPlus] -> [IdentifierPlus]
--- filterPlus = undefined
--- type SubstDataPlus = [IdentifierPlus]
--- substDataPlus :: SubstDataPlus -> DataPlus -> DataPlus
--- substDataPlus sub (m, DataImmediate) = do
---   let m' = substCodeMeta sub m
---   (m', DataImmediate)
--- substDataPlus sub (m, DataTheta x) = do
---   let m' = substCodeMeta sub m
---   (m', DataTheta x)
--- substDataPlus sub (m, DataUpsilon s) = do
---   let m' = substCodeMeta sub m
---   fromMaybe (m', DataUpsilon s) (lookup s sub)
--- substDataPlus sub (m, DataEpsilonIntro l) = do
---   let m' = substCodeMeta sub m
---   (m', DataEpsilonIntro l)
--- substDataPlus sub (m, DataDownIntroPiIntro xps e) = do
---   let (xps', e') = substCodePlusPi sub xps e
---   let m' = substCodeMeta sub m
---   (m', DataDownIntroPiIntro xps' e')
--- substDataPlus sub (m, DataSigma xps) = do
---   let xps' = substDataPlusSigma sub xps
---   let m' = substCodeMeta sub m
---   (m', DataSigma xps')
--- substDataPlus sub (m, DataSigmaIntro vs) = do
---   let vs' = map (substDataPlus sub) vs
---   let m' = substCodeMeta sub m
---   (m', DataSigmaIntro vs')
--- -- substCodeMeta :: SubstDataPlus -> CodeMeta -> CodeMeta
--- -- substCodeMeta _ (CodeMetaTerminal ml) = CodeMetaTerminal ml
--- -- substCodeMeta sub (CodeMetaNonTerminal p ml) =
--- --   CodeMetaNonTerminal (substDataPlus sub p) ml
--- -- substCodeMeta :: SubstDataPlus -> CodeMeta -> CodeMeta
--- -- substCodeMeta _ (CodeMetaTerminal ml) = CodeMetaTerminal ml
--- -- substCodeMeta sub (CodeMetaNonTerminal p ml) =
--- --   CodeMetaNonTerminal (substCodePlus sub p) ml
--- substCodePlus :: SubstDataPlus -> CodePlus -> CodePlus
--- substCodePlus sub (m, CodeTau) = do
---   let m' = substCodeMeta sub m
---   (m', CodeTau)
--- substCodePlus sub (m, CodeTheta theta) = do
---   let m' = substCodeMeta sub m
---   let theta' = substTheta sub theta
---   (m', CodeTheta theta')
--- substCodePlus sub (m, CodeEpsilonElim (x, p) v branchList) = do
---   let p' = substDataPlus sub p
---   let v' = substDataPlus sub v
---   let (cs, es) = unzip branchList
---   let es' = map (substCodePlus (filter (\(y, _) -> y /= x) sub)) es
---   let branchList' = zip cs es'
---   let m' = substCodeMeta sub m
---   (m', CodeEpsilonElim (x, p') v' branchList')
--- substCodePlus sub (m, CodePiElimDownElim v vs) = do
---   let v' = substDataPlus sub v
---   let vs' = map (substDataPlus sub) vs
---   let m' = substCodeMeta sub m
---   (m', CodePiElimDownElim v' vs')
--- substCodePlus sub (m, CodeSigmaElim xps v e) = do
---   let v' = substDataPlus sub v
---   let (xps', e') = substDataPlusSigmaElim sub xps e
---   let m' = substCodeMeta sub m
---   (m', CodeSigmaElim xps' v' e')
--- substCodePlus sub (m, CodeUp p) = do
---   let p' = substDataPlus sub p
---   let m' = substCodeMeta sub m
---   (m', CodeUp p')
--- substCodePlus sub (m, CodeUpIntro v) = do
---   let v' = substDataPlus sub v
---   let m' = substCodeMeta sub m
---   (m', CodeUpIntro v')
--- substCodePlus sub (m, CodeUpElim (x, p) e1 e2) = do
---   let p' = substDataPlus sub p
---   let e1' = substCodePlus sub e1
---   let e2' = substCodePlus (filter (\(y, _) -> y /= x) sub) e2
---   let m' = substCodeMeta sub m
---   (m', CodeUpElim (x, p') e1' e2')
--- substCodePlus sub (m, CodeMu (x, p) e) = do
---   let p' = substDataPlus sub p
---   let e' = substCodePlus (filter (\(y, _) -> y /= x) sub) e
---   let m' = substCodeMeta sub m
---   (m', CodeMu (x, p') e')
--- substTheta :: SubstDataPlus -> Theta -> Theta
--- substTheta sub (ThetaArith a v1 v2) = do
---   let v1' = substDataPlus sub v1
---   let v2' = substDataPlus sub v2
---   ThetaArith a v1' v2'
--- substTheta sub (ThetaPrint v) = ThetaPrint $ substDataPlus sub v
--- substDataPlusPiOrSigma :: SubstDataPlus -> [IdentifierPlus] -> [IdentifierPlus]
--- substDataPlusPiOrSigma _ [] = []
--- substDataPlusPiOrSigma sub ((x, p):xps) = do
---   let xps' = substDataPlusPiOrSigma (filter (\(y, _) -> y /= x) sub) xps
---   let p' = substDataPlus sub p
---   (x, p') : xps'
--- substDataPlusPi ::
---      SubstDataPlus
---   -> [IdentifierPlus]
---   -> CodePlus
---   -> ([IdentifierPlus], CodePlus)
--- substDataPlusPi sub [] n = ([], substCodePlus sub n)
--- substDataPlusPi sub ((x, p):xps) n = do
---   let (xps', n') = substDataPlusPi (filter (\(y, _) -> y /= x) sub) xps n
---   ((x, substDataPlus sub p) : xps', n')
--- substDataPlusSigma :: SubstDataPlus -> [IdentifierPlus] -> [IdentifierPlus]
--- substDataPlusSigma _ [] = []
--- substDataPlusSigma sub ((x, p):xps) = do
---   let xps' = substDataPlusSigma (filter (\(y, _) -> y /= x) sub) xps
---   (x, substDataPlus sub p) : xps'
--- substCodePlusPi ::
---      SubstDataPlus
---   -> [IdentifierPlus]
---   -> CodePlus
---   -> ([IdentifierPlus], CodePlus)
--- substCodePlusPi sub [] n = ([], substCodePlus sub n)
--- substCodePlusPi sub ((x, p):xps) n = do
---   let (xps', n') = substCodePlusPi (filter (\(y, _) -> y /= x) sub) xps n
---   let p' = substDataPlus sub p
---   ((x, p') : xps', n')
--- substDataPlusSigmaElim ::
---      SubstDataPlus
---   -> [IdentifierPlus]
---   -> CodePlus
---   -> ([IdentifierPlus], CodePlus)
--- substDataPlusSigmaElim sub [] e = do
---   let e' = substCodePlus sub e
---   ([], e')
--- substDataPlusSigmaElim sub ((x, p):xps) e = do
---   let sub' = filter (\(y, _) -> y /= x) sub
---   let (xps', e') = substDataPlusSigmaElim sub' xps e
---   let p' = substDataPlus sub p
---   ((x, p') : xps', e')
 module Data.Code where
 
 import           Data.Basic
 import           Data.Maybe (fromMaybe)
 
 data Data
-  = DataImmediate
+  = DataTau
   | DataTheta Identifier -- global variable
   | DataUpsilon Identifier
   | DataEpsilon Identifier
   | DataEpsilonIntro Literal
                      DataPlus
+  | DataDownPi [(Identifier, CodePlus)]
+  | DataDownIntroPiIntro [Identifier]
+                         CodePlus
   | DataSigma [(Identifier, DataPlus)]
   | DataSigmaIntro [DataPlus]
   deriving (Show)
@@ -251,17 +31,6 @@ data Code
   | CodeUpElim Identifier
                CodePlus
                CodePlus
-  --    CodeCopyN n v
-  -- ~> return (v, ..., v)  (n-pairs)
-  -- | CodeCopyN DataPlus
-  --             DataPlus
-  --    CodeTransposeN n [y1, ..., yk]
-  -- ~> let (y1-1, ..., y1-n) := y1 in
-  --    ...
-  --    let (yk-1, ..., yk-n) := yk in
-  --    return ((y1-1, ..., yk-1), ..., (y1-n, ..., yk-n))
-  -- | CodeTransposeN DataPlus -- Supposed to be a natural number `n`
-  --                  [DataPlus] -- List of sigma-intro. Each sigma-intro has `n` elements.
   deriving (Show)
 
 data Theta
@@ -287,18 +56,26 @@ toDataUpsilon' :: Identifier -> DataPlus
 toDataUpsilon' x = (Nothing, DataUpsilon x)
 
 varDataPlus :: DataPlus -> [Identifier]
-varDataPlus (_, DataImmediate)        = []
-varDataPlus (_, DataTheta _)          = []
-varDataPlus (_, DataUpsilon x)        = [x]
-varDataPlus (_, DataEpsilon _)        = []
+varDataPlus (_, DataTau) = []
+varDataPlus (_, DataTheta _) = []
+varDataPlus (_, DataUpsilon x) = [x]
+varDataPlus (_, DataEpsilon _) = []
 varDataPlus (_, DataEpsilonIntro _ p) = varDataPlus p
-varDataPlus (_, DataSigma xps)        = varDataPlusPiOrSigma xps []
-varDataPlus (_, DataSigmaIntro vs)    = concatMap varDataPlus vs
+varDataPlus (_, DataDownPi xns) = varDataPlusPi xns
+varDataPlus (_, DataDownIntroPiIntro xs e) =
+  filter (`notElem` xs) $ varCodePlus e
+varDataPlus (_, DataSigma xps) = varDataPlusSigma xps []
+varDataPlus (_, DataSigmaIntro vs) = concatMap varDataPlus vs
 
-varDataPlusPiOrSigma :: [IdentifierPlus] -> [Identifier] -> [Identifier]
-varDataPlusPiOrSigma [] xs = xs
-varDataPlusPiOrSigma ((x, p):xps) xs =
-  varDataPlus p ++ filterPlus (/= x) (varDataPlusPiOrSigma xps xs)
+varDataPlusPi :: [(Identifier, CodePlus)] -> [Identifier]
+varDataPlusPi [] = []
+varDataPlusPi ((x, n):xns) =
+  varCodePlus n ++ filterPlus (/= x) (varDataPlusPi xns)
+
+varDataPlusSigma :: [IdentifierPlus] -> [Identifier] -> [Identifier]
+varDataPlusSigma [] xs = xs
+varDataPlusSigma ((x, p):xps) xs =
+  varDataPlus p ++ filterPlus (/= x) (varDataPlusSigma xps xs)
 
 varCodePlus :: CodePlus -> [Identifier]
 varCodePlus (_, CodeTheta e) = varTheta e
@@ -313,13 +90,6 @@ varCodePlus (_, CodeUpIntro v) = varDataPlus v
 varCodePlus (_, CodeUpElim x e1 e2) =
   varCodePlus e1 ++ filterPlus (/= x) (varCodePlus e2)
 
--- varCodePlus (_, CodeCopyN v1 v2) = varDataPlus v1 ++ varDataPlus v2
--- varCodePlus (_, CodeTransposeN v vs) = varDataPlus v ++ concatMap varDataPlus vs
-varDataPlusPi :: [IdentifierPlus] -> DataPlus -> [Identifier]
-varDataPlusPi [] n = varDataPlus n
-varDataPlusPi ((x, p):xps) n =
-  varDataPlus p ++ filterPlus (/= x) (varDataPlusPi xps n)
-
 varTheta :: Theta -> [Identifier]
 varTheta = undefined
 
@@ -329,17 +99,24 @@ filterPlus = undefined
 type SubstDataPlus = [IdentifierPlus]
 
 substDataPlus :: SubstDataPlus -> DataPlus -> DataPlus
-substDataPlus _ (m, DataImmediate) = (m, DataImmediate)
+substDataPlus _ (m, DataTau) = (m, DataTau)
 substDataPlus _ (m, DataTheta x) = (m, DataTheta x)
 substDataPlus sub (m, DataUpsilon s) =
   fromMaybe (m, DataUpsilon s) (lookup s sub)
-substDataPlus sub (m, DataSigma xps) = do
-  let xps' = substDataPlusSigma sub xps
-  (m, DataSigma xps')
 substDataPlus _ (m, DataEpsilon x) = (m, DataEpsilon x)
 substDataPlus sub (m, DataEpsilonIntro l p) = do
   let p' = substDataPlus sub p
   (m, DataEpsilonIntro l p')
+substDataPlus sub (m, DataDownPi xns) = do
+  let xns' = substDataPlusPi sub xns
+  (m, DataDownPi xns')
+substDataPlus sub (m, DataDownIntroPiIntro xs e) = do
+  let sub' = filter (\(y, _) -> y `notElem` xs) sub
+  let e' = substCodePlus sub' e
+  (m, DataDownIntroPiIntro xs e')
+substDataPlus sub (m, DataSigma xps) = do
+  let xps' = substDataPlusSigma sub xps
+  (m, DataSigma xps')
 substDataPlus sub (m, DataSigmaIntro vs) = do
   let vs' = map (substDataPlus sub) vs
   (m, DataSigmaIntro vs')
@@ -371,14 +148,6 @@ substCodePlus sub (m, CodeUpElim x e1 e2) = do
   let e2' = substCodePlus (filter (\(y, _) -> y /= x) sub) e2
   (m, CodeUpElim x e1' e2')
 
--- substCodePlus sub (m, CodeCopyN v1 v2) = do
---   let v1' = substDataPlus sub v1
---   let v2' = substDataPlus sub v2
---   (m, CodeCopyN v1' v2')
--- substCodePlus sub (m, CodeTransposeN v vs) = do
---   let v' = substDataPlus sub v
---   let vs' = map (substDataPlus sub) vs
---   (m, CodeTransposeN v' vs')
 substTheta :: SubstDataPlus -> Theta -> Theta
 substTheta sub (ThetaArith a t v1 v2) = do
   let t' = substDataPlus sub t
@@ -387,22 +156,12 @@ substTheta sub (ThetaArith a t v1 v2) = do
   ThetaArith a t' v1' v2'
 substTheta sub (ThetaPrint v) = ThetaPrint $ substDataPlus sub v
 
-substDataPlusPiOrSigma :: SubstDataPlus -> [IdentifierPlus] -> [IdentifierPlus]
-substDataPlusPiOrSigma _ [] = []
-substDataPlusPiOrSigma sub ((x, p):xps) = do
-  let xps' = substDataPlusPiOrSigma (filter (\(y, _) -> y /= x) sub) xps
-  let p' = substDataPlus sub p
-  (x, p') : xps'
-
 substDataPlusPi ::
-     SubstDataPlus
-  -> [IdentifierPlus]
-  -> CodePlus
-  -> ([IdentifierPlus], CodePlus)
-substDataPlusPi sub [] n = ([], substCodePlus sub n)
-substDataPlusPi sub ((x, p):xps) n = do
-  let (xps', n') = substDataPlusPi (filter (\(y, _) -> y /= x) sub) xps n
-  ((x, substDataPlus sub p) : xps', n')
+     SubstDataPlus -> [(Identifier, CodePlus)] -> [(Identifier, CodePlus)]
+substDataPlusPi _ [] = []
+substDataPlusPi sub ((x, p):xns) = do
+  let xns' = substDataPlusPi (filter (\(y, _) -> y /= x) sub) xns
+  (x, substCodePlus sub p) : xns'
 
 substDataPlusSigma :: SubstDataPlus -> [IdentifierPlus] -> [IdentifierPlus]
 substDataPlusSigma _ [] = []
