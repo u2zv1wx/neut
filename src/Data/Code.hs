@@ -27,6 +27,7 @@ data Code
   | CodeSigmaElim [Identifier]
                   DataPlus
                   CodePlus
+  | CodeUp DataPlus
   | CodeUpIntro DataPlus
   | CodeUpElim Identifier
                CodePlus
@@ -86,6 +87,7 @@ varCodePlus (_, CodePiElimDownElim v vs) =
   varDataPlus v ++ concatMap varDataPlus vs
 varCodePlus (_, CodeSigmaElim xs v e) =
   varDataPlus v ++ filterPlus (`notElem` xs) (varCodePlus e)
+varCodePlus (_, CodeUp v) = varDataPlus v
 varCodePlus (_, CodeUpIntro v) = varDataPlus v
 varCodePlus (_, CodeUpElim x e1 e2) =
   varCodePlus e1 ++ filterPlus (/= x) (varCodePlus e2)
@@ -140,6 +142,9 @@ substCodePlus sub (m, CodeSigmaElim xs v e) = do
   let v' = substDataPlus sub v
   let (xs', e') = substDataPlusSigmaElim sub xs e
   (m, CodeSigmaElim xs' v' e')
+substCodePlus sub (m, CodeUp v) = do
+  let v' = substDataPlus sub v
+  (m, CodeUp v')
 substCodePlus sub (m, CodeUpIntro v) = do
   let v' = substDataPlus sub v
   (m, CodeUpIntro v')
