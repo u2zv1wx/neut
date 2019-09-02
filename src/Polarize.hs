@@ -95,7 +95,8 @@ upElimUp :: Maybe Loc -> TermPlus -> WithEnv CodePlus
 upElimUp ml e = do
   e' <- polarize e
   (varName, var) <- newDataUpsilon' ml
-  return (ml, CodeUpElim varName e' (ml, CodeUp var))
+  return $ upElim ml varName e' (ml, CodeUp var)
+  -- return (ml, CodeUpElim varName e' (ml, CodeUp var))
 
 makeClosure ::
      Maybe Identifier -- the name of newly created closure
@@ -149,26 +150,31 @@ callClosure m e es = do
   (typeVarName, _) <- newDataUpsilon
   (envVarName, envVar) <- newDataUpsilon
   (lamVarName, lamVar) <- newDataUpsilon
-  return
-    ( ml
-    , CodeUpElim
-        clsVarName
-        e
-        (bindLet
-           (concat xess)
-           ( ml
-           , CodeSigmaElim
+  let args = map (\v -> (ml, CodeUpIntro v)) $ envVar : xs
+  return $
+    upElim
+      ml
+      clsVarName
+      e
+      (bindLet
+         (concat xess)
+         ( ml
+         , CodeSigmaElim
                -- ここでのtypevarの取得は実際は省略可。
                -- とはいえ、typeVarはexponentでクロージャをcopyするときに使うので落とすことはできない。
-               [typeVarName, envVarName, lamVarName]
-               clsVar
-               (ml, CodePiElimDownElim lamVar (envVar : xs)))))
+             [typeVarName, envVarName, lamVarName]
+             clsVar
+             (ml, CodePiElimDownElim lamVar args)))
 
 bindLet :: Binder -> CodePlus -> CodePlus
 bindLet [] cont = cont
 bindLet ((x, e):xes) cont = do
   let e' = bindLet xes cont
-  (fst e', CodeUpElim x e e')
+  upElim (fst e') x e e'
+
+upElim :: Maybe Loc -> Identifier -> CodePlus -> CodePlus -> CodePlus
+upElim ml x e1 e2 =
+  (ml, CodePiElimDownElim (ml, DataDownIntroPiIntro [x] e2) [e1])
 
 toSigmaType ::
      Maybe (Int, Int)

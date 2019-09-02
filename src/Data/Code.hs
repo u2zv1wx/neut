@@ -23,15 +23,12 @@ data Code
                     DataPlus
                     [(Case, CodePlus)]
   | CodePiElimDownElim DataPlus
-                       [DataPlus]
+                       [CodePlus]
   | CodeSigmaElim [Identifier]
                   DataPlus
                   CodePlus
   | CodeUp DataPlus
   | CodeUpIntro DataPlus
-  | CodeUpElim Identifier
-               CodePlus
-               CodePlus
   deriving (Show)
 
 data Theta
@@ -83,14 +80,12 @@ varCodePlus (_, CodeTheta e) = varTheta e
 varCodePlus (_, CodeEpsilonElim x v branchList) = do
   let (_, es) = unzip branchList
   varDataPlus v ++ filterPlus (/= x) (concatMap varCodePlus es)
-varCodePlus (_, CodePiElimDownElim v vs) =
-  varDataPlus v ++ concatMap varDataPlus vs
+varCodePlus (_, CodePiElimDownElim v es) =
+  varDataPlus v ++ concatMap varCodePlus es
 varCodePlus (_, CodeSigmaElim xs v e) =
   varDataPlus v ++ filterPlus (`notElem` xs) (varCodePlus e)
 varCodePlus (_, CodeUp v) = varDataPlus v
 varCodePlus (_, CodeUpIntro v) = varDataPlus v
-varCodePlus (_, CodeUpElim x e1 e2) =
-  varCodePlus e1 ++ filterPlus (/= x) (varCodePlus e2)
 
 varTheta :: Theta -> [Identifier]
 varTheta = undefined
@@ -133,10 +128,10 @@ substCodePlus sub (m, CodeEpsilonElim x v branchList) = do
   let es' = map (substCodePlus (filter (\(y, _) -> y /= x) sub)) es
   let branchList' = zip cs es'
   (m, CodeEpsilonElim x v' branchList')
-substCodePlus sub (m, CodePiElimDownElim v vs) = do
+substCodePlus sub (m, CodePiElimDownElim v es) = do
   let v' = substDataPlus sub v
-  let vs' = map (substDataPlus sub) vs
-  (m, CodePiElimDownElim v' vs')
+  let es' = map (substCodePlus sub) es
+  (m, CodePiElimDownElim v' es')
 substCodePlus sub (m, CodeSigmaElim xs v e) = do
   let v' = substDataPlus sub v
   let (xs', e') = substDataPlusSigmaElim sub xs e
@@ -147,10 +142,6 @@ substCodePlus sub (m, CodeUp v) = do
 substCodePlus sub (m, CodeUpIntro v) = do
   let v' = substDataPlus sub v
   (m, CodeUpIntro v')
-substCodePlus sub (m, CodeUpElim x e1 e2) = do
-  let e1' = substCodePlus sub e1
-  let e2' = substCodePlus (filter (\(y, _) -> y /= x) sub) e2
-  (m, CodeUpElim x e1' e2')
 
 substTheta :: SubstDataPlus -> Theta -> Theta
 substTheta sub (ThetaArith a t v1 v2) = do
