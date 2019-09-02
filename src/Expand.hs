@@ -3,11 +3,14 @@
 -- returns (e, ..., e). This operation roughly corresponds to eta-expansion. Indeed,
 -- when the integer `n` equals to 1, this exponential operation degenerates to
 -- eta-expansion.
-module Expand where
+module Expand
+  ( expandCode
+  ) where
 
 import           Control.Monad.Except
 import           Control.Monad.State
 import           Prelude              hiding (pi)
+import           Text.Read            (readMaybe)
 
 import           Data.Basic
 import           Data.Code
@@ -159,4 +162,15 @@ asLowType t =
     _ -> throwError "expandData.epsilon-intro"
 
 asLowType' :: Identifier -> Maybe LowType
-asLowType' = undefined
+asLowType' x
+  | Just ('i', numStr) <- destructMaybe x
+  , Just i <- readMaybe numStr = Just $ LowTypeSignedInt i
+  | Just ('u', numStr) <- destructMaybe x
+  , Just i <- readMaybe numStr = Just $ LowTypeUnsignedInt i
+  | Just ('f', numStr) <- destructMaybe x
+  , Just i <- readMaybe numStr = Just $ LowTypeFloat i
+  | otherwise = Just $ LowTypeSignedInt 64
+
+destructMaybe :: [a] -> Maybe (a, [a])
+destructMaybe []     = Nothing
+destructMaybe (x:xs) = Just (x, xs)
