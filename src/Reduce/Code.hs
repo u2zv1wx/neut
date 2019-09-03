@@ -4,12 +4,10 @@ module Reduce.Code
   ) where
 
 import           Control.Monad.State
-import           Data.List           (transpose)
 
 import           Data.Basic
 import           Data.Code
 import           Data.Env
-import           Polarize            (bindLet)
 
 reduceCodePlus :: CodePlus -> WithEnv CodePlus
 reduceCodePlus (m, CodeTheta theta) =
