@@ -18,6 +18,7 @@ toLLVM mainTerm = do
   penv <- gets lowCodeEnv
   forM_ penv $ \(name, (args, e)) -> do
     llvm <- llvmLowCode e
+    -- mainTermの中で必要になったものだけinsLLVMEnvするようにしたほうがよさそう。
     insLLVMEnv name args llvm
   llvmLowCode mainTerm
 

@@ -6,6 +6,7 @@
 -- Queen Mary College, 2001.
 module Polarize
   ( polarize
+  , bindLet
   ) where
 
 import           Control.Monad.Except
