@@ -11,6 +11,7 @@ data Term
   | TermUpsilon Identifier
   | TermEpsilon Identifier
   | TermEpsilonIntro Literal
+                     LowType
   | TermEpsilonElim IdentifierPlus
                     TermPlus
                     [(Case, TermPlus)]
@@ -51,7 +52,7 @@ varTermPlus (_, TermTau) = []
 varTermPlus (_, TermTheta _) = []
 varTermPlus (m, TermUpsilon x) = [(x, fst $ obtainInfoMeta m)]
 varTermPlus (_, TermEpsilon _) = []
-varTermPlus (_, TermEpsilonIntro _) = []
+varTermPlus (_, TermEpsilonIntro _ _) = []
 varTermPlus (_, TermEpsilonElim (x, t) e branchList) = do
   let xhs1 = varTermPlus t
   let xhs2 = varTermPlus e
@@ -84,7 +85,8 @@ substTermPlus _ (m, TermTheta t) = (m, TermTheta t)
 substTermPlus sub (m, TermUpsilon x) =
   fromMaybe (m, TermUpsilon x) (lookup x sub)
 substTermPlus _ (m, TermEpsilon x) = (m, TermEpsilon x)
-substTermPlus _ (m, TermEpsilonIntro l) = (m, TermEpsilonIntro l)
+substTermPlus _ (m, TermEpsilonIntro l lowType) =
+  (m, TermEpsilonIntro l lowType)
 substTermPlus sub (m, TermEpsilonElim (x, t) e branchList) = do
   let t' = substTermPlus sub t
   let e' = substTermPlus sub e
@@ -127,8 +129,8 @@ isReducible (_, TermTau) = False
 isReducible (_, TermTheta _) = False
 isReducible (_, TermUpsilon _) = False
 isReducible (_, TermEpsilon _) = False
-isReducible (_, TermEpsilonIntro _) = False
-isReducible (_, TermEpsilonElim _ (_, TermEpsilonIntro l) branchList) = do
+isReducible (_, TermEpsilonIntro _ _) = False
+isReducible (_, TermEpsilonElim _ (_, TermEpsilonIntro l _) branchList) = do
   let (caseList, _) = unzip branchList
   CaseLiteral l `elem` caseList || CaseDefault `elem` caseList
 isReducible (_, TermEpsilonElim (_, _) e _) = isReducible e
@@ -137,7 +139,7 @@ isReducible (_, TermPiIntro {}) = False
 isReducible (_, TermPiElim (_, TermPiIntro xts _) es)
   | length xts == length es = True
 isReducible (_, TermPiElim (_, TermMu _ _) _) = True -- CBV recursion
-isReducible (_, TermPiElim (_, TermTheta c) [(_, TermEpsilonIntro (LiteralInteger _)), (_, TermEpsilonIntro (LiteralInteger _))]) -- constant application
+isReducible (_, TermPiElim (_, TermTheta c) [(_, TermEpsilonIntro (LiteralInteger _) _), (_, TermEpsilonIntro (LiteralInteger _) _)]) -- constant application
   | c `elem` intArithConstantList = True
 isReducible (_, TermPiElim e es) = isReducible e || any isReducible es
 isReducible (_, TermMu _ _) = False
@@ -147,8 +149,8 @@ isPure (_, TermTau) = True
 isPure (_, TermTheta theta) = isPureConstant theta
 isPure (_, TermUpsilon _) = True
 isPure (_, TermEpsilon _) = True
-isPure (_, TermEpsilonIntro _) = True
-isPure (_, TermEpsilonElim _ (_, TermEpsilonIntro l) branchList) = do
+isPure (_, TermEpsilonIntro _ _) = True
+isPure (_, TermEpsilonElim _ (_, TermEpsilonIntro l _) branchList) = do
   let (caseList, _) = unzip branchList
   CaseLiteral l `elem` caseList || CaseDefault `elem` caseList
 isPure (_, TermEpsilonElim (_, _) e _) = isPure e
@@ -161,10 +163,10 @@ isPureConstant :: Identifier -> Bool
 isPureConstant = undefined
 
 isValue :: TermPlus -> Bool
-isValue (_, TermTau)            = True
-isValue (_, TermUpsilon _)      = True
-isValue (_, TermEpsilon _)      = True
-isValue (_, TermEpsilonIntro _) = True
-isValue (_, TermPi {})          = True
-isValue (_, TermPiIntro {})     = True
-isValue _                       = False
+isValue (_, TermTau)              = True
+isValue (_, TermUpsilon _)        = True
+isValue (_, TermEpsilon _)        = True
+isValue (_, TermEpsilonIntro _ _) = True
+isValue (_, TermPi {})            = True
+isValue (_, TermPiIntro {})       = True
+isValue _                         = False

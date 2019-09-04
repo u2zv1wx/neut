@@ -9,44 +9,44 @@ import           Data.List                  (elemIndex)
 import qualified Text.Show.Pretty           as Pr
 
 import           Data.Basic
+import           Data.Code
 import           Data.Env
 import           Data.LLVM
-import           Data.LowCode
 
-toLLVM :: LowCodePlus -> WithEnv LLVM
+toLLVM :: CodePlus -> WithEnv LLVM
 toLLVM mainTerm = do
-  penv <- gets lowCodeEnv
+  penv <- gets codeEnv
   forM_ penv $ \(name, (args, e)) -> do
-    llvm <- llvmLowCode e
+    llvm <- llvmCode e
     -- mainTermの中で必要になったものだけinsLLVMEnvするようにしたほうがよさそう。
     insLLVMEnv name args llvm
-  llvmLowCode mainTerm
+  llvmCode mainTerm
 
-llvmLowCode :: LowCodePlus -> WithEnv LLVM
-llvmLowCode (m, LowCodeTheta theta) = llvmLowCodeTheta m theta
-llvmLowCode (_, LowCodeEpsilonElim x v branchList) =
-  llvmLowCodeEpsilonElim x v branchList
-llvmLowCode (_, LowCodePiElimDownElim v es) = do
+llvmCode :: CodePlus -> WithEnv LLVM
+llvmCode (m, CodeTheta theta) = llvmCodeTheta m theta
+llvmCode (_, CodeEpsilonElim x v branchList) =
+  llvmCodeEpsilonElim x v branchList
+llvmCode (_, CodePiElimDownElim v es) = do
   f <- newNameWith "fun"
-  es' <- mapM llvmLowCode es
+  es' <- mapM llvmCode es
   xs <- mapM (const (newNameWith "arg")) es'
   cast <- newNameWith "cast"
   let funPtrType = toFunPtrType es
-  llvmLowDataLet' [(f, v)] $
-    llvmLowCodeLet (zip xs es') $
+  llvmDataLet' [(f, v)] $
+    llvmCodeLet (zip xs es') $
     LLVMLet cast (LLVMBitcast (LLVMDataLocal f) voidPtr funPtrType) $
     LLVMCall (LLVMDataLocal cast) (map LLVMDataLocal xs)
-llvmLowCode (_, LowCodeSigmaElim xs v e) = do
+llvmCode (_, CodeSigmaElim xs v e) = do
   basePointer <- newNameWith "base"
   castedBasePointer <- newNameWith "castedBase"
   extractAndCont <-
-    llvmLowCodeSigmaElim
+    llvmCodeSigmaElim
       basePointer
       (zip xs [0 ..])
       castedBasePointer
       (length xs)
       e
-  llvmLowDataLet basePointer v $
+  llvmDataLet basePointer v $
     LLVMLet
       castedBasePointer
       (LLVMBitcast
@@ -54,34 +54,35 @@ llvmLowCode (_, LowCodeSigmaElim xs v e) = do
          voidPtr
          (toStructPtrType [1 .. (length xs)]))
       extractAndCont
-llvmLowCode (_, LowCodeUpIntro d) = do
+llvmCode (_, CodeUp _) = throwError "llvmCode.unresolved-type-term"
+llvmCode (_, CodeUpIntro d) = do
   result <- newNameWith "ans"
-  llvmLowDataLet result d $ LLVMReturn $ LLVMDataLocal result
-llvmLowCode (_, LowCodeCopyN len v)
-  -- allocで領域を確保する
-  -- 領域のそれぞれの要素としてvの値を入れる (setContentが使える)
-  -- 最初に確保した領域へのポインタを返す
- = do
-  undefined
-llvmLowCode (_, LowCodeTransposeN _ _) = undefined
+  llvmDataLet result d $ LLVMReturn $ LLVMDataLocal result
 
-llvmLowCodeSigmaElim ::
+-- llvmCode (_, CodeCopyN len v)
+--   -- allocで領域を確保する
+--   -- 領域のそれぞれの要素としてvの値を入れる (setContentが使える)
+--   -- 最初に確保した領域へのポインタを返す
+--  = do
+--   undefined
+-- llvmCode (_, CodeTransposeN _ _) = undefined
+llvmCodeSigmaElim ::
      Identifier
   -> [(Identifier, Int)]
   -> Identifier
   -> Int
-  -> LowCodePlus
+  -> CodePlus
   -> WithEnv LLVM
-llvmLowCodeSigmaElim _ [] _ _ cont = llvmLowCode cont
-llvmLowCodeSigmaElim basePointer ((x, i):xis) castedBasePointer n cont = do
-  cont' <- llvmLowCodeSigmaElim basePointer xis castedBasePointer n cont
+llvmCodeSigmaElim _ [] _ _ cont = llvmCode cont
+llvmCodeSigmaElim basePointer ((x, i):xis) castedBasePointer n cont = do
+  cont' <- llvmCodeSigmaElim basePointer xis castedBasePointer n cont
   loader <- newNameWith "loader"
   return $
     LLVMLet loader (LLVMGetElementPtr (LLVMDataLocal castedBasePointer) (i, n)) $
     LLVMLet x (LLVMLoad (LLVMDataLocal loader)) cont'
 
-llvmLowCodeTheta :: LowCodeMeta -> LowDataTheta -> WithEnv LLVM
-llvmLowCodeTheta _ (LowDataThetaArith op lowType v1 v2) =
+llvmCodeTheta :: CodeMeta -> Theta -> WithEnv LLVM
+llvmCodeTheta _ (ThetaArith op lowType v1 v2) =
   case lowType of
     LowTypeSignedInt _ -> do
       x0 <- newNameWith "arg"
@@ -121,57 +122,58 @@ llvmLowCodeTheta _ (LowDataThetaArith op lowType v1 v2) =
         LLVMLet y (LLVMBitcast (LLVMDataLocal tmp) (LowTypeFloat i) si) $
         LLVMLet result (LLVMIntToPointer (LLVMDataLocal y) si voidPtr) $
         LLVMReturn $ LLVMDataLocal result
-    _ -> throwError "llvmLowCodeTheta.ThetaArith"
-llvmLowCodeTheta _ (LowDataThetaPrint v) = do
+    _ -> throwError "llvmCodeTheta.ThetaArith"
+llvmCodeTheta _ (ThetaPrint v) = do
   let t = LowTypeSignedInt 64
   p <- newNameWith "arg"
   c <- newNameWith "cast"
-  llvmLowDataLet p v $
+  llvmDataLet p v $
     LLVMLet c (LLVMPointerToInt (LLVMDataLocal p) voidPtr t) $
     LLVMPrint t (LLVMDataLocal c)
 
-llvmLowCodeLet :: [(Identifier, LLVM)] -> LLVM -> LLVM
-llvmLowCodeLet [] cont           = cont
-llvmLowCodeLet ((x, e):xes) cont = LLVMLet x e $ llvmLowCodeLet xes cont
+llvmCodeLet :: [(Identifier, LLVM)] -> LLVM -> LLVM
+llvmCodeLet [] cont           = cont
+llvmCodeLet ((x, e):xes) cont = LLVMLet x e $ llvmCodeLet xes cont
 
--- `llvmLowDataLet x d cont` binds the data `d` to the variable `x`, and computes the
+-- `llvmDataLet x d cont` binds the data `d` to the variable `x`, and computes the
 -- continuation `cont`.
-llvmLowDataLet :: Identifier -> LowDataPlus -> LLVM -> WithEnv LLVM
-llvmLowDataLet x (_, LowDataTheta y) cont = do
-  penv <- gets lowCodeEnv
+llvmDataLet :: Identifier -> DataPlus -> LLVM -> WithEnv LLVM
+llvmDataLet x (_, DataTheta y) cont = do
+  penv <- gets codeEnv
   case lookup y penv of
     Nothing -> lift $ throwE $ "no such global label defined: " ++ y -- FIXME
     Just (args, _) -> do
       let funPtrType = toFunPtrType args
       return $
         LLVMLet x (LLVMBitcast (LLVMDataGlobal y) funPtrType voidPtr) cont
-llvmLowDataLet x (_, LowDataUpsilon y) cont =
+llvmDataLet x (_, DataUpsilon y) cont =
   return $ LLVMLet x (LLVMBitcast (LLVMDataLocal y) voidPtr voidPtr) cont
-llvmLowDataLet x (_, LowDataEpsilonIntro (LiteralInteger i) (LowTypeSignedInt j)) cont =
+llvmDataLet x (_, DataEpsilonIntro (LiteralInteger i) (LowTypeSignedInt j)) cont =
   return $
   LLVMLet
     x
     (LLVMIntToPointer (LLVMDataInt i j) (LowTypeSignedInt j) voidPtr)
     cont
-llvmLowDataLet x (_, LowDataEpsilonIntro (LiteralFloat f) (LowTypeFloat j)) cont = do
+llvmDataLet x (_, DataEpsilonIntro (LiteralFloat f) (LowTypeFloat j)) cont = do
   cast <- newNameWith "cast"
   let ft = LowTypeFloat j
   let st = LowTypeSignedInt j
   return $
     LLVMLet cast (LLVMBitcast (LLVMDataFloat f j) ft st) $
     LLVMLet x (LLVMIntToPointer (LLVMDataLocal cast) st voidPtr) cont
-llvmLowDataLet x (m, LowDataEpsilonIntro (LiteralLabel label) _) cont = do
+llvmDataLet x (m, DataEpsilonIntro (LiteralLabel label) _) cont = do
   mi <- getEpsilonNum label
   case mi of
     Nothing -> lift $ throwE $ "no such epsilon is defined: " ++ show label
     Just i ->
-      llvmLowDataLet
+      llvmDataLet
         x
-        (m, LowDataEpsilonIntro (LiteralInteger i) (LowTypeSignedInt 64))
+        (m, DataEpsilonIntro (LiteralInteger i) (LowTypeSignedInt 64))
         cont
-llvmLowDataLet _ (_, LowDataEpsilonIntro _ _) _ =
-  throwError "llvmLowDataLet.LowDataEpsilonIntro"
-llvmLowDataLet reg (_, LowDataSigmaIntro ds) cont = do
+llvmDataLet _ (_, DataEpsilonIntro _ _) _ =
+  throwError "llvmDataLet.DataEpsilonIntro"
+llvmDataLet _ (_, DataDownIntroPiIntro _ _) _ = undefined
+llvmDataLet reg (_, DataSigmaIntro ds) cont = do
   xs <- mapM (const $ newNameWith "cursor") ds
   cast <- newNameWith "cast"
   let size = length ds
@@ -180,15 +182,16 @@ llvmLowDataLet reg (_, LowDataSigmaIntro ds) cont = do
   llvmStruct (zip xs ds) $
     LLVMLet reg (LLVMAlloc size) $ -- the result of malloc is i8*
     LLVMLet cast (LLVMBitcast (LLVMDataLocal reg) voidPtr structPtrType) cont''
+llvmDataLet _ _ _ = throwError "llvmDataLet.unresolved-type-term"
 
-llvmLowDataLet' :: [(Identifier, LowDataPlus)] -> LLVM -> WithEnv LLVM
-llvmLowDataLet' [] cont = return cont
-llvmLowDataLet' ((x, d):rest) cont = do
-  cont' <- llvmLowDataLet' rest cont
-  llvmLowDataLet x d cont'
+llvmDataLet' :: [(Identifier, DataPlus)] -> LLVM -> WithEnv LLVM
+llvmDataLet' [] cont = return cont
+llvmDataLet' ((x, d):rest) cont = do
+  cont' <- llvmDataLet' rest cont
+  llvmDataLet x d cont'
 
 constructSwitch ::
-     LowDataPlus -> [(Case, LowCodePlus)] -> WithEnv (LLVM, [(Int, LLVM)])
+     DataPlus -> [(Case, CodePlus)] -> WithEnv (LLVM, [(Int, LLVM)])
 constructSwitch _ [] = lift $ throwE "empty branch"
 constructSwitch name ((CaseLiteral (LiteralLabel x), code):rest) = do
   set <- lookupEpsilonSet x
@@ -197,20 +200,20 @@ constructSwitch name ((CaseLiteral (LiteralLabel x), code):rest) = do
     Just i ->
       constructSwitch name ((CaseLiteral (LiteralInteger i), code) : rest)
 constructSwitch _ ((CaseDefault, code):_) = do
-  code' <- llvmLowCode code
+  code' <- llvmCode code
   return (code', [])
 constructSwitch name ((CaseLiteral (LiteralInteger i), code):rest) = do
-  code' <- llvmLowCode code
+  code' <- llvmCode code
   (defaultCase, caseList) <- constructSwitch name rest
   return (defaultCase, (i, code') : caseList)
 constructSwitch _ ((CaseLiteral (LiteralFloat _), _):_) = undefined -- IEEE754 float equality!
 
-llvmLowCodeEpsilonElim ::
-     Identifier -> LowDataPlus -> [(Case, LowCodePlus)] -> WithEnv LLVM
-llvmLowCodeEpsilonElim x v branchList = do
+llvmCodeEpsilonElim ::
+     Identifier -> DataPlus -> [(Case, CodePlus)] -> WithEnv LLVM
+llvmCodeEpsilonElim x v branchList = do
   (defaultCase, caseList) <- constructSwitch v branchList
   cast <- newNameWith "cast"
-  llvmLowDataLet' [(x, v)] $
+  llvmDataLet' [(x, v)] $
     LLVMLet
       cast
       (LLVMPointerToInt (LLVMDataLocal x) voidPtr (LowTypeSignedInt 64)) $
@@ -218,8 +221,8 @@ llvmLowCodeEpsilonElim x v branchList = do
 
 setContent :: Identifier -> Int -> [(Int, Identifier)] -> LLVM -> WithEnv LLVM
 setContent _ _ [] cont = return cont
-setContent basePointer lengthOfStruct ((index, dataAtEpsilon):sizeLowDataList) cont = do
-  cont' <- setContent basePointer lengthOfStruct sizeLowDataList cont
+setContent basePointer lengthOfStruct ((index, dataAtEpsilon):sizeDataList) cont = do
+  cont' <- setContent basePointer lengthOfStruct sizeDataList cont
   loader <- newNameWith "loader"
   hole <- newNameWith "tmp"
   let bp = LLVMDataLocal basePointer
@@ -233,11 +236,11 @@ setContent basePointer lengthOfStruct ((index, dataAtEpsilon):sizeLowDataList) c
          (LLVMDataLocal loader, voidPtrPtr))
       cont'
 
-llvmStruct :: [(Identifier, LowDataPlus)] -> LLVM -> WithEnv LLVM
+llvmStruct :: [(Identifier, DataPlus)] -> LLVM -> WithEnv LLVM
 llvmStruct [] cont = return cont
 llvmStruct ((x, d):xds) cont = do
   cont' <- llvmStruct xds cont
-  llvmLowDataLet x d cont'
+  llvmDataLet x d cont'
 
 toStructPtrType :: [a] -> LowType
 toStructPtrType xs = do

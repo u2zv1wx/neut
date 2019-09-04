@@ -30,10 +30,9 @@ polarize (m, TermUpsilon x) = do
 polarize (m, TermEpsilon x) = do
   let ml = snd $ obtainInfoMeta m
   return (ml, CodeUpIntro (ml, DataEpsilon x))
-polarize (m, TermEpsilonIntro l) = do
-  let (t, ml) = obtainInfoMeta m
-  (xts, x) <- polarize' t
-  return $ bindLet xts (ml, CodeUpIntro (ml, DataEpsilonIntro l x))
+polarize (m, TermEpsilonIntro l lowType) = do
+  let ml = snd $ obtainInfoMeta m
+  return (ml, CodeUpIntro (ml, DataEpsilonIntro l lowType))
 polarize (m, TermEpsilonElim (x, _) e bs) = do
   let (cs, es) = unzip bs
   es' <- mapM polarize es
@@ -212,13 +211,13 @@ polarizeTheta m name@"core.f64.div" = polarizeArith name ArithDiv (float 64) m
 polarizeTheta m name@"core.print.i64" = polarizePrint name m
 polarizeTheta _ _ = throwError "polarize.theta"
 
-int :: Int -> DataPlus
-int i = (Nothing, DataEpsilon $ "i" ++ show i)
+int :: Int -> LowType
+int = LowTypeSignedInt
 
-float :: Int -> DataPlus
-float i = (Nothing, DataEpsilon $ "f" ++ show i)
+float :: Int -> LowType
+float = LowTypeFloat
 
-polarizeArith :: Identifier -> Arith -> DataPlus -> Meta -> WithEnv CodePlus
+polarizeArith :: Identifier -> Arith -> LowType -> Meta -> WithEnv CodePlus
 polarizeArith name op lowType m = do
   let ml = snd $ obtainInfoMeta m
   (x, varX) <- newDataUpsilon

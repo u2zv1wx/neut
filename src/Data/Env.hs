@@ -36,7 +36,7 @@ data Env = Env
   , substEnv        :: SubstWeakTerm -- metavar ~> beta-equivalent weakterm
   -- , codeEnv          :: [(Identifier, ([(Identifier, DataPlus)], CodePlus))] -- f ~> thunk (lam (x1 ... xn) e)
   , codeEnv         :: [(Identifier, ([Identifier], CodePlus))] -- f ~> thunk (lam (x1 ... xn) e)
-  , lowCodeEnv      :: [(Identifier, ([Identifier], LowCodePlus))] -- f ~> thunk (lam (x1 ... xn) e)
+  -- , lowCodeEnv      :: [(Identifier, ([Identifier], LowCodePlus))] -- f ~> thunk (lam (x1 ... xn) e)
   , llvmEnv         :: [(Identifier, ([Identifier], LLVM))]
   }
 
@@ -51,7 +51,7 @@ initialEnv path =
     , nameEnv = []
     , typeEnv = Map.empty
     , codeEnv = []
-    , lowCodeEnv = []
+    -- , lowCodeEnv = []
     , llvmEnv = []
     , constraintEnv = []
     , constraintQueue = Q.empty
@@ -131,10 +131,9 @@ insCodeEnv :: Identifier -> [Identifier] -> CodePlus -> WithEnv ()
 insCodeEnv name args e =
   modify (\env -> env {codeEnv = (name, (args, e)) : codeEnv env})
 
-insLowCodeEnv :: Identifier -> [Identifier] -> LowCodePlus -> WithEnv ()
-insLowCodeEnv name args e =
-  modify (\env -> env {lowCodeEnv = (name, (args, e)) : lowCodeEnv env})
-
+-- insLowCodeEnv :: Identifier -> [Identifier] -> LowCodePlus -> WithEnv ()
+-- insLowCodeEnv name args e =
+--   modify (\env -> env {lowCodeEnv = (name, (args, e)) : lowCodeEnv env})
 insLLVMEnv :: Identifier -> [Identifier] -> LLVM -> WithEnv ()
 insLLVMEnv funName args e =
   modify (\env -> env {llvmEnv = (funName, (args, e)) : llvmEnv env})

@@ -9,7 +9,7 @@ data Data
   | DataUpsilon Identifier
   | DataEpsilon Identifier
   | DataEpsilonIntro Literal
-                     DataPlus
+                     LowType
   | DataDownPi [(Identifier, CodePlus)]
   | DataDownIntroPiIntro [Identifier]
                          CodePlus
@@ -33,7 +33,7 @@ data Code
 
 data Theta
   = ThetaArith Arith
-               DataPlus
+               LowType
                DataPlus
                DataPlus
   | ThetaPrint DataPlus
@@ -58,7 +58,7 @@ varDataPlus (_, DataTau) = []
 varDataPlus (_, DataTheta _) = []
 varDataPlus (_, DataUpsilon x) = [x]
 varDataPlus (_, DataEpsilon _) = []
-varDataPlus (_, DataEpsilonIntro _ p) = varDataPlus p
+varDataPlus (_, DataEpsilonIntro _ _) = []
 varDataPlus (_, DataDownPi xns) = varDataPlusPi xns
 varDataPlus (_, DataDownIntroPiIntro xs e) =
   filter (`notElem` xs) $ varCodePlus e
@@ -101,9 +101,7 @@ substDataPlus _ (m, DataTheta x) = (m, DataTheta x)
 substDataPlus sub (m, DataUpsilon s) =
   fromMaybe (m, DataUpsilon s) (lookup s sub)
 substDataPlus _ (m, DataEpsilon x) = (m, DataEpsilon x)
-substDataPlus sub (m, DataEpsilonIntro l p) = do
-  let p' = substDataPlus sub p
-  (m, DataEpsilonIntro l p')
+substDataPlus _ (m, DataEpsilonIntro l p) = (m, DataEpsilonIntro l p)
 substDataPlus sub (m, DataDownPi xns) = do
   let xns' = substDataPlusPi sub xns
   (m, DataDownPi xns')
@@ -145,10 +143,9 @@ substCodePlus sub (m, CodeUpIntro v) = do
 
 substTheta :: SubstDataPlus -> Theta -> Theta
 substTheta sub (ThetaArith a t v1 v2) = do
-  let t' = substDataPlus sub t
   let v1' = substDataPlus sub v1
   let v2' = substDataPlus sub v2
-  ThetaArith a t' v1' v2'
+  ThetaArith a t v1' v2'
 substTheta sub (ThetaPrint v) = ThetaPrint $ substDataPlus sub v
 
 substDataPlusPi ::
@@ -190,7 +187,7 @@ isEtaExpandableData (_, DataTau) = True
 isEtaExpandableData (_, DataTheta _) = True
 isEtaExpandableData (_, DataUpsilon _) = True
 isEtaExpandableData (_, DataEpsilon _) = True
-isEtaExpandableData (_, DataEpsilonIntro _ p) = isEtaExpandableData p
+isEtaExpandableData (_, DataEpsilonIntro _ _) = True
 isEtaExpandableData (_, DataDownPi xps) = all isEtaExpandableCode $ map snd xps
 isEtaExpandableData (_, DataDownIntroPiIntro _ e) = isEtaExpandableCode e
 isEtaExpandableData (_, DataSigma xts) = do
@@ -211,6 +208,5 @@ isEtaExpandableCode (_, CodeUp v) = isEtaExpandableData v
 isEtaExpandableCode (_, CodeUpIntro v) = isEtaExpandableData v
 
 isEtaExpandableTheta :: Theta -> Bool
-isEtaExpandableTheta (ThetaArith _ t v1 v2) =
-  all isEtaExpandableData [t, v1, v2]
-isEtaExpandableTheta (ThetaPrint v) = isEtaExpandableData v
+isEtaExpandableTheta (ThetaArith _ _ v1 v2) = all isEtaExpandableData [v1, v2]
+isEtaExpandableTheta (ThetaPrint v)         = isEtaExpandableData v
