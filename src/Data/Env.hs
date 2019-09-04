@@ -12,7 +12,6 @@ import           Data.Basic
 import           Data.Code
 import           Data.Constraint
 import           Data.LLVM
-import           Data.LowCode
 import           Data.Tree
 import           Data.WeakTerm
 
@@ -34,9 +33,7 @@ data Env = Env
   , constraintEnv   :: [PreConstraint] -- for type inference
   , constraintQueue :: ConstraintQueue -- for (dependent) type inference
   , substEnv        :: SubstWeakTerm -- metavar ~> beta-equivalent weakterm
-  -- , codeEnv          :: [(Identifier, ([(Identifier, DataPlus)], CodePlus))] -- f ~> thunk (lam (x1 ... xn) e)
   , codeEnv         :: [(Identifier, ([Identifier], CodePlus))] -- f ~> thunk (lam (x1 ... xn) e)
-  -- , lowCodeEnv      :: [(Identifier, ([Identifier], LowCodePlus))] -- f ~> thunk (lam (x1 ... xn) e)
   , llvmEnv         :: [(Identifier, ([Identifier], LLVM))]
   }
 
