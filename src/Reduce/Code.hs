@@ -171,12 +171,9 @@ inlineCodePlus (m, CodePiElimDownElim v es) = do
           exponentSigma i xps w >>= inlineCodePlus
         ((_, DataDownIntroPiIntro xs body), _) ->
           inlineCodePlus $ substCodePlus (zip xs vs) body
+        -- FIXME: reduce theta when the theta is exponent
+        -- i.e. reduce `A` recursively in `exponent-i A e`
         _ -> return (m, CodePiElimDownElim v es')
-  -- es' <- mapM inlineCodePlus es
-  -- case extractUpIntro es' of
-  --   Nothing ->
-  --     return (m1, CodePiElimDownElim (m2, DataDownIntroPiIntro xs body) es')
-  --   Just vs -> inlineCodePlus $ substCodePlus (zip xs vs) body
 inlineCodePlus (m, CodeSigmaElim xs v e) =
   case v of
     (_, DataSigmaIntro es)
