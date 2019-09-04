@@ -162,7 +162,7 @@ emitLLVM funName (LLVMLet _ (LLVMStore (d1, t1) (d2, t2)) cont) = do
       ]
   a <- emitLLVM funName cont
   return $ op ++ a
-emitLLVM funName (LLVMLet x (LLVMAlloc ts) cont) = do
+emitLLVM funName (LLVMLet x (LLVMAlloc len) cont) = do
   size <- newNameWith "sizeptr"
   -- Use getelementptr to realize `sizeof`. More info:
   --   http://nondot.org/sabre/LLVMNotes/SizeOf-OffsetOf-VariableSizedStructs.txt
@@ -171,7 +171,7 @@ emitLLVM funName (LLVMLet x (LLVMAlloc ts) cont) = do
     unwords
       [ showLLVMData (LLVMDataLocal size)
       , "="
-      , "getelementptr i64, i64* null, i32 " ++ show (length ts)
+      , "getelementptr i64, i64* null, i32 " ++ show len
       ]
   casted <- newNameWith "size"
   op2 <-

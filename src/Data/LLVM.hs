@@ -36,7 +36,7 @@ data LLVM
   | LLVMLoad LLVMData
   | LLVMStore (LLVMData, LowType)
               (LLVMData, LowType)
-  | LLVMAlloc [LowType]
+  | LLVMAlloc Int
   | LLVMFree LLVMData
   | LLVMArith (Arith, LowType)
               LLVMData

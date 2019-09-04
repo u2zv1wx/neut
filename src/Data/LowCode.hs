@@ -22,8 +22,8 @@ data LowCode
                      LowDataPlus
                      LowCodePlus
   | LowCodeUpIntro LowDataPlus
-  | LowCodeCopyN LowDataPlus
-                 LowDataPlus
+  | LowCodeSigmaIntroN LowDataPlus
+                       LowDataPlus
   | LowCodeTransposeN LowDataPlus -- Supposed to be a natural number `n`
                       [LowDataPlus] -- List of sigma-intro. Each sigma-intro has `n` elements.
   deriving (Show)
@@ -71,7 +71,8 @@ varLowCodePlus (_, LowCodePiElimDownElim v es) =
 varLowCodePlus (_, LowCodeSigmaElim xs v e) =
   varLowDataPlus v ++ filterPlus (`notElem` xs) (varLowCodePlus e)
 varLowCodePlus (_, LowCodeUpIntro v) = varLowDataPlus v
-varLowCodePlus (_, LowCodeCopyN v1 v2) = varLowDataPlus v1 ++ varLowDataPlus v2
+varLowCodePlus (_, LowCodeSigmaIntroN v1 v2) =
+  varLowDataPlus v1 ++ varLowDataPlus v2
 varLowCodePlus (_, LowCodeTransposeN v vs) =
   varLowDataPlus v ++ concatMap varLowDataPlus vs
 
@@ -119,10 +120,10 @@ substLowCodePlus sub (m, LowCodeSigmaElim xs v e) = do
 substLowCodePlus sub (m, LowCodeUpIntro v) = do
   let v' = substLowDataPlus sub v
   (m, LowCodeUpIntro v')
-substLowCodePlus sub (m, LowCodeCopyN v1 v2) = do
+substLowCodePlus sub (m, LowCodeSigmaIntroN v1 v2) = do
   let v1' = substLowDataPlus sub v1
   let v2' = substLowDataPlus sub v2
-  (m, LowCodeCopyN v1' v2')
+  (m, LowCodeSigmaIntroN v1' v2')
 substLowCodePlus sub (m, LowCodeTransposeN v vs) = do
   let v' = substLowDataPlus sub v
   let vs' = map (substLowDataPlus sub) vs

@@ -57,7 +57,12 @@ llvmLowCode (_, LowCodeSigmaElim xs v e) = do
 llvmLowCode (_, LowCodeUpIntro d) = do
   result <- newNameWith "ans"
   llvmLowDataLet result d $ LLVMReturn $ LLVMDataLocal result
-llvmLowCode (_, LowCodeCopyN _ _) = undefined
+llvmLowCode (_, LowCodeCopyN len v)
+  -- allocで領域を確保する
+  -- 領域のそれぞれの要素としてvの値を入れる (setContentが使える)
+  -- 最初に確保した領域へのポインタを返す
+ = do
+  undefined
 llvmLowCode (_, LowCodeTransposeN _ _) = undefined
 
 llvmLowCodeSigmaElim ::
@@ -169,11 +174,11 @@ llvmLowDataLet _ (_, LowDataEpsilonIntro _ _) _ =
 llvmLowDataLet reg (_, LowDataSigmaIntro ds) cont = do
   xs <- mapM (const $ newNameWith "cursor") ds
   cast <- newNameWith "cast"
-  let ts = map (const voidPtr) ds
+  let size = length ds
   let structPtrType = toStructPtrType ds
   cont'' <- setContent cast (length xs) (zip [0 ..] xs) cont
   llvmStruct (zip xs ds) $
-    LLVMLet reg (LLVMAlloc ts) $ -- the result of malloc is i8*
+    LLVMLet reg (LLVMAlloc size) $ -- the result of malloc is i8*
     LLVMLet cast (LLVMBitcast (LLVMDataLocal reg) voidPtr structPtrType) cont''
 
 llvmLowDataLet' :: [(Identifier, LowDataPlus)] -> LLVM -> WithEnv LLVM

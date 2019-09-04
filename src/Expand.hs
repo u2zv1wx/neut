@@ -97,7 +97,7 @@ exponentImmediate = do
     Nothing -> do
       (countVarName, countVar) <- newLowDataUpsilon
       (immVarName, immVar) <- newLowDataUpsilon
-      let lamBody = (Nothing, LowCodeCopyN countVar immVar)
+      let lamBody = (Nothing, LowCodeSigmaIntroN countVar immVar)
       insLowCodeEnv thetaName [countVarName, immVarName] lamBody
       return (Nothing, LowDataTheta thetaName)
 
