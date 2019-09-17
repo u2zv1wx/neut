@@ -12,12 +12,13 @@ import           Data.Basic
 import           Data.Code
 import           Data.Env
 import           Data.LLVM
+import           Reduce.Code
 
 toLLVM :: CodePlus -> WithEnv LLVM
 toLLVM mainTerm = do
   penv <- gets codeEnv
   forM_ penv $ \(name, (args, e)) -> do
-    llvm <- llvmCode e
+    llvm <- inlineCodePlus e >>= llvmCode
     -- mainTermの中で必要になったものだけinsLLVMEnvするようにしたほうがよさそう。
     insLLVMEnv name args llvm
   llvmCode mainTerm

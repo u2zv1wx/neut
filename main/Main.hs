@@ -11,7 +11,6 @@ import           Text.Read           (readMaybe)
 import           Data.Env
 import           Elaborate
 import           Emit
-import           Expand
 import           LLVM
 import           Parse
 import           Polarize
@@ -122,4 +121,4 @@ expandDirPath path = do
   return $ current </> path
 
 process :: String -> WithEnv [String]
-process = parse >=> elaborate >=> polarize >=> expand >=> toLLVM >=> emit
+process = parse >=> elaborate >=> polarize >=> toLLVM >=> emit
