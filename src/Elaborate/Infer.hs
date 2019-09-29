@@ -6,15 +6,15 @@ module Elaborate.Infer
   , withHole
   ) where
 
-import           Control.Monad.Except
-import           Control.Monad.State
-import           Data.IORef
-import           Data.Maybe           (catMaybes)
-import           Prelude              hiding (pi)
+import Control.Monad.Except
+import Control.Monad.State
+import Data.IORef
+import Data.Maybe (catMaybes)
+import Prelude hiding (pi)
 
-import           Data.Basic
-import           Data.Env
-import           Data.WeakTerm
+import Data.Basic
+import Data.Env
+import Data.WeakTerm
 
 type Context = [(Identifier, WeakTermPlus)]
 
@@ -97,7 +97,7 @@ infer ctx (meta, WeakTermMu (x, t) e) = do
 infer ctx (meta, WeakTermZeta _) = do
   mt <- readWeakMetaType meta
   case mt of
-    Just t  -> return t
+    Just t -> return t
     Nothing -> newHoleInCtx ctx >>= returnAfterUpdate meta
 
 inferPlus :: Context -> [(Identifier, WeakTermPlus)] -> WithEnv [WeakTermPlus]
@@ -145,7 +145,7 @@ inferCase (CaseLiteral (LiteralLabel name)) = do
   ienv <- gets epsilonEnv
   mk <- lookupKind' name ienv
   case mk of
-    Just k  -> Just <$> wrapInfer [] (WeakTermEpsilon k)
+    Just k -> Just <$> wrapInfer [] (WeakTermEpsilon k)
     Nothing -> return Nothing
 inferCase _ = return Nothing
 
@@ -200,7 +200,7 @@ wrapWithType t e = do
 
 readWeakMetaType :: WeakMeta -> WithEnv (Maybe WeakTermPlus)
 readWeakMetaType (WeakMetaNonTerminal (Ref r) _) = liftIO $ readIORef r
-readWeakMetaType (WeakMetaTerminal _)            = Just <$> newUniv
+readWeakMetaType (WeakMetaTerminal _) = Just <$> newUniv
 
 writeWeakMetaType :: WeakMeta -> Maybe WeakTermPlus -> WithEnv ()
 writeWeakMetaType (WeakMetaNonTerminal (Ref r) _) mt = liftIO $ writeIORef r mt

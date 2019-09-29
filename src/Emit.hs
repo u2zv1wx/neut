@@ -2,11 +2,11 @@ module Emit
   ( emit
   ) where
 
-import           Control.Monad.State
+import Control.Monad.State
 
-import           Data.Basic
-import           Data.Env
-import           Data.LLVM
+import Data.Basic
+import Data.Env
+import Data.LLVM
 
 emit :: LLVM -> WithEnv [String]
 emit mainTerm = do
@@ -392,8 +392,8 @@ showBranch i label =
   "i64 " ++ show i ++ ", label " ++ showLLVMData (LLVMDataLocal label)
 
 showIndex :: [Int] -> String
-showIndex []     = ""
-showIndex [i]    = "i32 " ++ show i
+showIndex [] = ""
+showIndex [i] = "i32 " ++ show i
 showIndex (i:is) = "i32 " ++ show i ++ ", " ++ showIndex is
 
 showArg :: LLVMData -> String
@@ -420,8 +420,8 @@ showStruct :: Int -> String
 showStruct i = "{" ++ showItems (const "i8*") [1 .. i] ++ "}"
 
 showItems :: (a -> String) -> [a] -> String
-showItems _ []     = ""
-showItems f [a]    = f a
+showItems _ [] = ""
+showItems f [a] = f a
 showItems f (a:as) = f a ++ ", " ++ showItems f as
 
 -- for now
@@ -435,8 +435,8 @@ emitGlobal =
     ]
 
 showLLVMData :: LLVMData -> String
-showLLVMData (LLVMDataLocal x)   = "%" ++ x
-showLLVMData (LLVMDataGlobal x)  = "@" ++ x
-showLLVMData (LLVMDataInt i _)   = show i
+showLLVMData (LLVMDataLocal x) = "%" ++ x
+showLLVMData (LLVMDataGlobal x) = "@" ++ x
+showLLVMData (LLVMDataInt i _) = show i
 showLLVMData (LLVMDataFloat x _) = show x
 showLLVMData (LLVMDataStruct xs) = "{" ++ showItems showLLVMData xs ++ "}"

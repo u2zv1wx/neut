@@ -3,11 +3,11 @@ module Parse.MacroExpand
   , isSaneNotation
   ) where
 
-import           Control.Monad.State
+import Control.Monad.State
 
-import           Data.Env
-import           Data.Maybe          (fromMaybe)
-import           Data.Tree
+import Data.Env
+import Data.Maybe (fromMaybe)
+import Data.Tree
 
 type MacroSubst = ([(String, TreePlus)], [(String, [TreePlus])])
 
@@ -47,7 +47,7 @@ try f ((p, q):as) = do
   mx <- f p
   case mx of
     Nothing -> try f as
-    Just x  -> return $ Just (x, q)
+    Just x -> return $ Just (x, q)
 
 -- `macroMatch` determines the behavior of matching.
 macroMatch ::
@@ -154,7 +154,7 @@ applyMacroSubst sub@(_, s2) (i, TreeNode ts)
       , s `elem` map fst s2 -> do
         let ts' = map (applyMacroSubst sub) (take (length ts - 1) ts)
         case lookup s s2 of
-          Nothing   -> (j, TreeNode (ts' ++ [(j, TreeAtom s)]))
+          Nothing -> (j, TreeNode (ts' ++ [(j, TreeAtom s)]))
           Just rest -> (i, TreeNode (ts' ++ rest))
     _ -> do
       let ts' = map (applyMacroSubst sub) ts
@@ -167,4 +167,4 @@ isSaneNotation (_, TreeNode ts) = do
   let b = all isSaneNotation $ init ts
   case last ts of
     (_, TreeAtom _) -> True
-    ts'             -> b && isSaneNotation ts'
+    ts' -> b && isSaneNotation ts'

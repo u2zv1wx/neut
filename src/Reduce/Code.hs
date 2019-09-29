@@ -3,13 +3,13 @@ module Reduce.Code
   , inlineCodePlus
   ) where
 
-import           Control.Monad.State
-import           Data.List           (transpose)
+import Control.Monad.State
+import Data.List (transpose)
 
-import           Data.Basic
-import           Data.Code
-import           Data.Env
-import           Polarize            (bindLet)
+import Data.Basic
+import Data.Code
+import Data.Env
+import Polarize (bindLet)
 
 reduceCodePlus :: CodePlus -> WithEnv CodePlus
 reduceCodePlus (m, CodeTheta theta) =
@@ -38,7 +38,7 @@ reduceCodePlus (m, CodeEpsilonElim x v branchList) =
         Nothing ->
           case lookup CaseDefault branchList of
             Just body -> reduceCodePlus $ substCodePlus [(x, v)] body
-            Nothing   -> return (m, CodeEpsilonElim x v branchList)
+            Nothing -> return (m, CodeEpsilonElim x v branchList)
     _ -> return (m, CodeEpsilonElim x v branchList)
 reduceCodePlus (m, CodePiElimDownElim v es) = do
   es' <- mapM reduceCodePlus es

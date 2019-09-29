@@ -3,19 +3,19 @@ module Elaborate.Analyze
   , simp
   ) where
 
-import           Control.Monad.Except
-import           Control.Monad.State
-import           Data.IORef
-import qualified Data.PQueue.Min      as Q
-import           System.Timeout
-import qualified Text.Show.Pretty     as Pr
+import Control.Monad.Except
+import Control.Monad.State
+import Data.IORef
+import qualified Data.PQueue.Min as Q
+import System.Timeout
+import qualified Text.Show.Pretty as Pr
 
-import           Data.Basic
-import           Data.Constraint
-import           Data.Env
-import           Data.WeakTerm
-import           Elaborate.Infer      (readWeakMetaType, writeWeakMetaType)
-import           Reduce.WeakTerm
+import Data.Basic
+import Data.Constraint
+import Data.Env
+import Data.WeakTerm
+import Elaborate.Infer (readWeakMetaType, writeWeakMetaType)
+import Reduce.WeakTerm
 
 analyze :: [PreConstraint] -> WithEnv ()
 analyze cs = do
@@ -119,9 +119,9 @@ simpMeta (WeakMetaNonTerminal (Ref r1) _) (WeakMetaNonTerminal (Ref r2) _) = do
   mt2 <- liftIO $ readIORef r2
   case (mt1, mt2) of
     (Just t1, Just t2) -> simp [(t1, t2)]
-    (Just _, Nothing)  -> liftIO (writeIORef r2 mt1) >> return []
-    (Nothing, Just _)  -> liftIO (writeIORef r1 mt2) >> return []
-    _                  -> return []
+    (Just _, Nothing) -> liftIO (writeIORef r2 mt1) >> return []
+    (Nothing, Just _) -> liftIO (writeIORef r1 mt2) >> return []
+    _ -> return []
 
 simpBinder ::
      [IdentifierPlus]
@@ -147,10 +147,8 @@ simpBinder' xts1 xts2 cs = do
 
 data Stuck
   = StuckHole Hole
-  | StuckPiElim Hole
-                [[WeakTermPlus]]
-  | StuckPiElimStrict Hole
-                      [[(WeakTermPlus, Identifier)]]
+  | StuckPiElim Hole [[WeakTermPlus]]
+  | StuckPiElimStrict Hole [[(WeakTermPlus, Identifier)]]
   | StuckOther Hole
 
 asStuckedTerm :: WeakTermPlus -> Maybe Stuck
@@ -179,9 +177,9 @@ asStuckedTerm _ = Nothing
 
 obtainStuckReason :: WeakTermPlus -> Maybe Hole
 obtainStuckReason (_, WeakTermEpsilonElim _ e _) = obtainStuckReason e
-obtainStuckReason (_, WeakTermPiElim e _)        = obtainStuckReason e
-obtainStuckReason (_, WeakTermZeta x)            = Just x
-obtainStuckReason _                              = Nothing
+obtainStuckReason (_, WeakTermPiElim e _) = obtainStuckReason e
+obtainStuckReason (_, WeakTermZeta x) = Just x
+obtainStuckReason _ = Nothing
 
 isSolvable :: WeakTermPlus -> Identifier -> [Identifier] -> Bool
 isSolvable e x xs = do
@@ -211,4 +209,4 @@ isLinear x xs =
 
 interpretAsUpsilon :: WeakTermPlus -> Maybe Identifier
 interpretAsUpsilon (_, WeakTermUpsilon x) = Just x
-interpretAsUpsilon _                      = Nothing
+interpretAsUpsilon _ = Nothing

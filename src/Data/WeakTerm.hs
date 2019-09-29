@@ -1,11 +1,11 @@
 module Data.WeakTerm where
 
-import           Control.Monad    (forM)
-import           Data.IORef
-import           Data.Maybe       (fromMaybe)
-import           System.IO.Unsafe (unsafePerformIO)
+import Control.Monad (forM)
+import Data.IORef
+import Data.Maybe (fromMaybe)
+import System.IO.Unsafe (unsafePerformIO)
 
-import           Data.Basic
+import Data.Basic
 
 data WeakTerm
   = WeakTermTau
@@ -13,16 +13,11 @@ data WeakTerm
   | WeakTermUpsilon Identifier
   | WeakTermEpsilon Identifier
   | WeakTermEpsilonIntro Literal
-  | WeakTermEpsilonElim IdentifierPlus
-                        WeakTermPlus
-                        [(Case, WeakTermPlus)]
+  | WeakTermEpsilonElim IdentifierPlus WeakTermPlus [(Case, WeakTermPlus)]
   | WeakTermPi [IdentifierPlus]
-  | WeakTermPiIntro [IdentifierPlus]
-                    WeakTermPlus
-  | WeakTermPiElim WeakTermPlus
-                   [WeakTermPlus]
-  | WeakTermMu IdentifierPlus
-               WeakTermPlus
+  | WeakTermPiIntro [IdentifierPlus] WeakTermPlus
+  | WeakTermPiElim WeakTermPlus [WeakTermPlus]
+  | WeakTermMu IdentifierPlus WeakTermPlus
   | WeakTermZeta Identifier
   deriving (Show)
 
@@ -31,8 +26,7 @@ newtype Ref a =
 
 data WeakMeta
   = WeakMetaTerminal (Maybe Loc)
-  | WeakMetaNonTerminal (Ref (Maybe WeakTermPlus))
-                        (Maybe Loc)
+  | WeakMetaNonTerminal (Ref (Maybe WeakTermPlus)) (Maybe Loc)
   deriving (Show)
 
 type WeakTermPlus = (WeakMeta, WeakTerm)
@@ -153,10 +147,10 @@ isReducible (_, WeakTermMu _ _) = False
 isReducible (_, WeakTermZeta _) = False
 
 isValue :: WeakTermPlus -> Bool
-isValue (_, WeakTermTau)            = True
-isValue (_, WeakTermUpsilon _)      = True
-isValue (_, WeakTermEpsilon _)      = True
+isValue (_, WeakTermTau) = True
+isValue (_, WeakTermUpsilon _) = True
+isValue (_, WeakTermEpsilon _) = True
 isValue (_, WeakTermEpsilonIntro _) = True
-isValue (_, WeakTermPi {})          = True
-isValue (_, WeakTermPiIntro {})     = True
-isValue _                           = False
+isValue (_, WeakTermPi {}) = True
+isValue (_, WeakTermPiIntro {}) = True
+isValue _ = False

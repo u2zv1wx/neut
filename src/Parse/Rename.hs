@@ -2,11 +2,11 @@ module Parse.Rename
   ( rename
   ) where
 
-import           Control.Monad.State
+import Control.Monad.State
 
-import           Data.Basic
-import           Data.Env
-import           Data.WeakTerm
+import Data.Basic
+import Data.Env
+import Data.WeakTerm
 
 -- Alpha-convert all the variables so that different variables have different names.
 rename :: WeakTermPlus -> WithEnv WeakTermPlus

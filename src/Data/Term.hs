@@ -1,33 +1,26 @@
 module Data.Term where
 
-import           Control.Monad (forM)
-import           Data.Maybe    (fromMaybe)
+import Control.Monad (forM)
+import Data.Maybe (fromMaybe)
 
-import           Data.Basic
+import Data.Basic
 
 data Term
   = TermTau
   | TermTheta Identifier
   | TermUpsilon Identifier
   | TermEpsilon Identifier
-  | TermEpsilonIntro Literal
-                     LowType
-  | TermEpsilonElim IdentifierPlus
-                    TermPlus
-                    [(Case, TermPlus)]
+  | TermEpsilonIntro Literal LowType
+  | TermEpsilonElim IdentifierPlus TermPlus [(Case, TermPlus)]
   | TermPi [IdentifierPlus]
-  | TermPiIntro [IdentifierPlus]
-                TermPlus
-  | TermPiElim TermPlus
-               [TermPlus]
-  | TermMu (Identifier, TermPlus)
-           TermPlus
+  | TermPiIntro [IdentifierPlus] TermPlus
+  | TermPiElim TermPlus [TermPlus]
+  | TermMu (Identifier, TermPlus) TermPlus
   deriving (Show)
 
 data Meta
   = MetaTerminal (Maybe Loc)
-  | MetaNonTerminal TermPlus
-                    (Maybe Loc)
+  | MetaNonTerminal TermPlus (Maybe Loc)
   deriving (Show)
 
 type TermPlus = (Meta, Term)
@@ -39,7 +32,7 @@ type Hole = Identifier
 type IdentifierPlus = (Identifier, TermPlus)
 
 obtainInfoMeta :: Meta -> (TermPlus, Maybe Loc)
-obtainInfoMeta (MetaTerminal ml)      = ((MetaTerminal ml, TermTau), ml)
+obtainInfoMeta (MetaTerminal ml) = ((MetaTerminal ml, TermTau), ml)
 obtainInfoMeta (MetaNonTerminal t ml) = (t, ml)
 
 toTermUpsilon :: (Identifier, TermPlus) -> TermPlus
@@ -163,10 +156,10 @@ isPureConstant :: Identifier -> Bool
 isPureConstant = undefined
 
 isValue :: TermPlus -> Bool
-isValue (_, TermTau)              = True
-isValue (_, TermUpsilon _)        = True
-isValue (_, TermEpsilon _)        = True
+isValue (_, TermTau) = True
+isValue (_, TermUpsilon _) = True
+isValue (_, TermEpsilon _) = True
 isValue (_, TermEpsilonIntro _ _) = True
-isValue (_, TermPi {})            = True
-isValue (_, TermPiIntro {})       = True
-isValue _                         = False
+isValue (_, TermPi {}) = True
+isValue (_, TermPiIntro {}) = True
+isValue _ = False

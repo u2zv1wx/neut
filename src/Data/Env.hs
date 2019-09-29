@@ -3,39 +3,40 @@
 module Data.Env where
 
 -- import           Control.Comonad.Cofree
-import           Control.Monad.State
-import           Control.Monad.Trans.Except
-import           Data.IORef
-import           Data.List                  (elemIndex)
+import Control.Monad.State
+import Control.Monad.Trans.Except
+import Data.IORef
+import Data.List (elemIndex)
 
-import           Data.Basic
-import           Data.Code
-import           Data.Constraint
-import           Data.LLVM
-import           Data.Tree
-import           Data.WeakTerm
+import Data.Basic
+import Data.Code
+import Data.Constraint
+import Data.LLVM
+import Data.Tree
+import Data.WeakTerm
 
-import qualified Data.Map.Strict            as Map
+import qualified Data.Map.Strict as Map
 
-import qualified Data.PQueue.Min            as Q
+import qualified Data.PQueue.Min as Q
 
 type ConstraintQueue = Q.MinQueue EnrichedConstraint
 
-data Env = Env
-  { count           :: Int -- to generate fresh symbols
-  , currentDir      :: FilePath
-  , reservedEnv     :: [Identifier] -- list of reserved keywords
-  , notationEnv     :: [(TreePlus, TreePlus)] -- macro transformers
-  , constantEnv     :: [Identifier]
-  , epsilonEnv      :: [(Identifier, [Identifier])]
-  , nameEnv         :: [(Identifier, Identifier)] -- [("foo", "foo.13"), ...]
-  , typeEnv         :: Map.Map Identifier WeakTermPlus -- var ~> typeof(var)
-  , constraintEnv   :: [PreConstraint] -- for type inference
-  , constraintQueue :: ConstraintQueue -- for (dependent) type inference
-  , substEnv        :: SubstWeakTerm -- metavar ~> beta-equivalent weakterm
-  , codeEnv         :: [(Identifier, ([Identifier], CodePlus))] -- f ~> thunk (lam (x1 ... xn) e)
-  , llvmEnv         :: [(Identifier, ([Identifier], LLVM))]
-  }
+data Env =
+  Env
+    { count :: Int -- to generate fresh symbols
+    , currentDir :: FilePath
+    , reservedEnv :: [Identifier] -- list of reserved keywords
+    , notationEnv :: [(TreePlus, TreePlus)] -- macro transformers
+    , constantEnv :: [Identifier]
+    , epsilonEnv :: [(Identifier, [Identifier])]
+    , nameEnv :: [(Identifier, Identifier)] -- [("foo", "foo.13"), ...]
+    , typeEnv :: Map.Map Identifier WeakTermPlus -- var ~> typeof(var)
+    , constraintEnv :: [PreConstraint] -- for type inference
+    , constraintQueue :: ConstraintQueue -- for (dependent) type inference
+    , substEnv :: SubstWeakTerm -- metavar ~> beta-equivalent weakterm
+    , codeEnv :: [(Identifier, ([Identifier], CodePlus))] -- f ~> thunk (lam (x1 ... xn) e)
+    , llvmEnv :: [(Identifier, ([Identifier], LLVM))]
+    }
 
 initialEnv :: FilePath -> Env
 initialEnv path =
@@ -70,7 +71,7 @@ evalWithEnv :: (Show a) => WithEnv a -> Env -> IO (Either String a)
 evalWithEnv c env = do
   resultOrErr <- runWithEnv c env
   case resultOrErr of
-    Left err          -> return $ Left err
+    Left err -> return $ Left err
     Right (result, _) -> return $ Right result
 
 newName :: WithEnv Identifier
@@ -97,7 +98,7 @@ lookupTypeEnv :: String -> WithEnv WeakTermPlus
 lookupTypeEnv s = do
   mt <- lookupTypeEnvMaybe s
   case mt of
-    Just t  -> return t
+    Just t -> return t
     Nothing -> lift $ throwE $ s ++ " is not found in the type environment."
 
 lookupTypeEnvMaybe :: String -> WithEnv (Maybe WeakTermPlus)
@@ -105,7 +106,7 @@ lookupTypeEnvMaybe s = do
   mt <- gets (Map.lookup s . typeEnv)
   case mt of
     Nothing -> return Nothing
-    Just t  -> return $ Just t
+    Just t -> return $ Just t
 
 lookupNameEnv :: String -> WithEnv String
 lookupNameEnv s = do
@@ -178,7 +179,7 @@ getEpsilonNum' _ [] = Nothing
 getEpsilonNum' l (xs:xss) =
   case elemIndex l xs of
     Nothing -> getEpsilonNum' l xss
-    Just i  -> Just i
+    Just i -> Just i
 
 isDefinedEpsilon :: Identifier -> WithEnv Bool
 isDefinedEpsilon name = do

@@ -4,16 +4,16 @@ module Parse.Interpret
   , extractIdentifier
   ) where
 
-import           Control.Monad.Except
-import           Control.Monad.State
-import           Control.Monad.Trans.Except
-import           Text.Read                  (readMaybe)
-import qualified Text.Show.Pretty           as Pr
+import Control.Monad.Except
+import Control.Monad.State
+import Control.Monad.Trans.Except
+import Text.Read (readMaybe)
+import qualified Text.Show.Pretty as Pr
 
-import           Data.Basic
-import           Data.Env
-import           Data.Tree
-import           Data.WeakTerm
+import Data.Basic
+import Data.Env
+import Data.Tree
+import Data.WeakTerm
 
 interpret :: TreePlus -> WithEnv WeakTermPlus
 --
@@ -91,7 +91,7 @@ interpretIdentifierPlus ut =
 
 interpretAtom :: String -> WithEnv String
 interpretAtom "_" = newNameWith "hole"
-interpretAtom x   = return x
+interpretAtom x = return x
 
 interpretLiteralMaybe :: TreePlus -> WithEnv (Maybe Literal)
 interpretLiteralMaybe (_, TreeAtom x)

@@ -2,22 +2,22 @@ module Elaborate
   ( elaborate
   ) where
 
-import           Control.Monad.Except
-import           Control.Monad.State
-import           Control.Monad.Trans.Except
-import           Data.IORef
-import           Data.List                  (nub)
-import qualified Data.Map.Strict            as Map
+import Control.Monad.Except
+import Control.Monad.State
+import Control.Monad.Trans.Except
+import Data.IORef
+import Data.List (nub)
+import qualified Data.Map.Strict as Map
 
-import           Data.Basic
-import           Data.Env
-import           Data.Term
-import           Data.WeakTerm
-import           Elaborate.Analyze
-import           Elaborate.Infer
-import           Elaborate.Synthesize
-import           Reduce.Term
-import           Reduce.WeakTerm
+import Data.Basic
+import Data.Env
+import Data.Term
+import Data.WeakTerm
+import Elaborate.Analyze
+import Elaborate.Infer
+import Elaborate.Synthesize
+import Reduce.Term
+import Reduce.WeakTerm
 
 -- Given a term `e` and its name `main`, this function
 --   (1) traces `e` using `infer e`, collecting type constraints,
@@ -99,7 +99,7 @@ elaborate' (m, WeakTermMu (x, t) e) = do
 elaborate' (_, WeakTermZeta x) = do
   sub <- gets substEnv
   case lookup x sub of
-    Just e  -> elaborate' e
+    Just e -> elaborate' e
     Nothing -> lift $ throwE $ "elaborate' i: remaining hole: " ++ x
 
 elaboratePlus :: (a, WeakTermPlus) -> WithEnv (a, TermPlus)
@@ -126,7 +126,7 @@ exhaust' (_, WeakTermEpsilonElim (_, t) e1 branchList) = do
   t' <- reduceWeakTermPlus t
   case t' of
     (_, WeakTermEpsilon x) -> exhaustEpsilonIdentifier x labelList b1
-    _                      -> lift $ throwE "type error (exhaust)"
+    _ -> lift $ throwE "type error (exhaust)"
 exhaust' (_, WeakTermPi xts) = allM exhaust' $ map snd xts
 exhaust' (_, WeakTermPiIntro _ e) = exhaust' e
 exhaust' (_, WeakTermPiElim e es) = allM exhaust' $ e : es
@@ -155,7 +155,7 @@ ensuringTypePurity t@(MetaNonTerminal t1 ml, e) =
       t1' <- reduceTermPlus t1 -- t1はpureだと分かっているので普通にreduceしてよい
       case t1' of
         (_, TermTau) -> ensuringTypePurity (MetaTerminal ml, e)
-        _            -> return t
+        _ -> return t
 
 allM :: Monad m => (a -> m Bool) -> [a] -> m Bool
 allM _ [] = return True
@@ -175,5 +175,5 @@ toMeta (WeakMetaNonTerminal (Ref r) l) = do
       return $ MetaNonTerminal t' l
 
 obtainType :: Meta -> TermPlus
-obtainType (MetaTerminal _)      = (MetaTerminal Nothing, TermTau)
+obtainType (MetaTerminal _) = (MetaTerminal Nothing, TermTau)
 obtainType (MetaNonTerminal t _) = t

@@ -2,25 +2,26 @@ module Parse
   ( parse
   ) where
 
-import           Control.Monad.State
-import           Control.Monad.Trans.Except
-import           System.Directory
-import           System.FilePath
-import           Text.Read                  (readMaybe)
+import Control.Monad.State
+import Control.Monad.Trans.Except
+import System.Directory
+import System.FilePath
+import Text.Read (readMaybe)
 
-import           Data.Basic
-import           Data.Env
-import           Data.Tree
-import           Data.WeakTerm
-import           Parse.Interpret
-import           Parse.MacroExpand
-import           Parse.Read
-import           Parse.Rename
+import Data.Basic
+import Data.Env
+import Data.Tree
+import Data.WeakTerm
+import Parse.Interpret
+import Parse.MacroExpand
+import Parse.Read
+import Parse.Rename
 
 data Def =
-  DefLet WeakMeta -- meta
-         IdentifierPlus -- the `(x : t)` in `let (x : t) = e`
-         WeakTermPlus -- the `e` in `let x = e`
+  DefLet
+    WeakMeta -- meta
+    IdentifierPlus -- the `(x : t)` in `let (x : t) = e`
+    WeakTermPlus -- the `e` in `let x = e`
 
 parse :: String -> WithEnv WeakTermPlus
 parse s = strToTree s >>= parse' >>= concatDefList
@@ -92,14 +93,14 @@ parse' (a:as)
       return $ DefLet meta (name, t) e' : defList
 
 isSpecialForm :: TreePlus -> Bool
-isSpecialForm (_, TreeNode [(_, TreeAtom "notation"), _, _])           = True
+isSpecialForm (_, TreeNode [(_, TreeAtom "notation"), _, _]) = True
 isSpecialForm (_, TreeNode [(_, TreeAtom "reserve"), (_, TreeAtom _)]) = True
 isSpecialForm (_, TreeNode ((_, TreeAtom "sortal"):(_, TreeAtom _):_)) = True
 isSpecialForm (_, TreeNode [(_, TreeAtom "include"), (_, TreeAtom _)]) = True
-isSpecialForm (_, TreeNode [(_, TreeAtom "extern"), (_, TreeAtom _)])  = True
-isSpecialForm (_, TreeNode ((_, TreeAtom "statement"):_))              = True
-isSpecialForm (_, TreeNode [(_, TreeAtom "let"), _, _])                = True
-isSpecialForm _                                                        = False
+isSpecialForm (_, TreeNode [(_, TreeAtom "extern"), (_, TreeAtom _)]) = True
+isSpecialForm (_, TreeNode ((_, TreeAtom "statement"):_)) = True
+isSpecialForm (_, TreeNode [(_, TreeAtom "let"), _, _]) = True
+isSpecialForm _ = False
 
 -- Represent the list of Defs in the target language, using `let`.
 -- (Note that `let x := e1 in e2` can be represented as `(lam x e2) e1`.)

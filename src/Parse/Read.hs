@@ -2,12 +2,12 @@ module Parse.Read
   ( strToTree
   ) where
 
-import           Control.Monad.State
-import           Control.Monad.Trans.Except
-import           Text.Parsec                hiding (count)
+import Control.Monad.State
+import Control.Monad.Trans.Except
+import Text.Parsec hiding (count)
 
-import           Data.Env
-import           Data.Tree
+import Data.Env
+import Data.Tree
 
 type Parser a = ParsecT String () (StateT Env (ExceptT String IO)) a
 
@@ -16,7 +16,7 @@ strToTree input = do
   t <- runParserT (skip >> parseSExpList) () "read" input
   case t of
     Left err -> lift $ throwE (show err)
-    Right p  -> return p
+    Right p -> return p
 
 parseSExpList :: Parser [TreePlus]
 parseSExpList = sepEndBy parseStr skip

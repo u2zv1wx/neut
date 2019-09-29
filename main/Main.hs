@@ -1,19 +1,19 @@
 module Main where
 
-import           Control.Monad.State
-import           Data.List           (intercalate)
-import           Options.Applicative
-import           System.Directory
-import           System.FilePath
-import           System.Process
-import           Text.Read           (readMaybe)
+import Control.Monad.State
+import Data.List (intercalate)
+import Options.Applicative
+import System.Directory
+import System.FilePath
+import System.Process
+import Text.Read (readMaybe)
 
-import           Data.Env
-import           Elaborate
-import           Emit
-import           LLVM
-import           Parse
-import           Polarize
+import Data.Env
+import Elaborate
+import Emit
+import LLVM
+import Parse
+import Polarize
 
 type ImportOptScreenName = String
 
@@ -28,13 +28,11 @@ data OutputKind
 
 instance Read OutputKind where
   readsPrec _ "object" = [(OutputKindObject, [])]
-  readsPrec _ "llvm"   = [(OutputKindLLVM, [])]
-  readsPrec _ _        = []
+  readsPrec _ "llvm" = [(OutputKindLLVM, [])]
+  readsPrec _ _ = []
 
 data Command =
-  Build BuildOptInputPath
-        (Maybe BuildOptOutputPath)
-        OutputKind
+  Build BuildOptInputPath (Maybe BuildOptOutputPath) OutputKind
 
 parseBuildOpt :: Parser Command
 parseBuildOpt = do
@@ -64,7 +62,7 @@ kindReader = do
   s <- str
   case readMaybe s of
     Nothing -> readerError $ "unknown mode:" ++ s
-    Just m  -> return m
+    Just m -> return m
 
 parseOpt :: Parser Command
 parseOpt =
@@ -89,7 +87,7 @@ run (Build inputPath moutputPath outputKind) = do
   let basename = takeBaseName inputPath
   outputPath <- constructOutputPath basename moutputPath outputKind
   case resultOrErr of
-    Left err     -> putStrLn err
+    Left err -> putStrLn err
     Right result -> writeResult result outputPath outputKind
 
 constructOutputPath :: String -> Maybe FilePath -> OutputKind -> IO FilePath

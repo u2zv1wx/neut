@@ -2,9 +2,9 @@ module Reduce.Term
   ( reduceTermPlus
   ) where
 
-import           Data.Basic
-import           Data.Env
-import           Data.Term
+import Data.Basic
+import Data.Env
+import Data.Term
 
 reduceTermPlus :: TermPlus -> WithEnv TermPlus
 reduceTermPlus (m, TermEpsilonElim (x, t) e branchList) = do
@@ -16,7 +16,7 @@ reduceTermPlus (m, TermEpsilonElim (x, t) e branchList) = do
         Nothing ->
           case lookup CaseDefault branchList of
             Just body -> reduceTermPlus $ substTermPlus [(x, e')] body
-            Nothing   -> return (m, TermEpsilonElim (x, t) e' branchList)
+            Nothing -> return (m, TermEpsilonElim (x, t) e' branchList)
     _ -> return (m, TermEpsilonElim (x, t) e' branchList)
 reduceTermPlus (m, TermPiElim e es) = do
   e' <- reduceTermPlus e

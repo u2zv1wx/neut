@@ -2,17 +2,17 @@ module Elaborate.Synthesize
   ( synthesize
   ) where
 
-import           Control.Monad.Except
-import           Control.Monad.State
-import           Control.Monad.Trans.Except
-import qualified Data.PQueue.Min            as Q
+import Control.Monad.Except
+import Control.Monad.State
+import Control.Monad.Trans.Except
+import qualified Data.PQueue.Min as Q
 
-import           Data.Basic
-import           Data.Constraint
-import           Data.Env
-import           Data.WeakTerm
-import           Elaborate.Analyze
-import           Elaborate.Infer            (readWeakMetaType, withHole)
+import Data.Basic
+import Data.Constraint
+import Data.Env
+import Data.WeakTerm
+import Elaborate.Analyze
+import Elaborate.Infer (readWeakMetaType, withHole)
 
 -- Given a queue of constraints (easier ones comes earlier), try to synthesize
 -- all of them using heuristics.
@@ -145,14 +145,14 @@ discardInactive xs indexList =
 
 -- Try the list of alternatives.
 chain :: ConstraintQueue -> [WithEnv a] -> WithEnv a
-chain _ []     = throwError "cannot synthesize(chain)"
+chain _ [] = throwError "cannot synthesize(chain)"
 chain c (e:es) = e `catchError` const (chain c es)
 
 lookupAny :: [Hole] -> [(Identifier, a)] -> Maybe (Hole, a)
 lookupAny [] _ = Nothing
 lookupAny (h:ks) sub =
   case lookup h sub of
-    Just v  -> Just (h, v)
+    Just v -> Just (h, v)
     Nothing -> lookupAny ks sub
 
 bindFormalArgs :: WeakTermPlus -> [[IdentifierPlus]] -> WithEnv WeakTermPlus
@@ -176,5 +176,5 @@ obtainType :: WeakMeta -> WithEnv WeakTermPlus
 obtainType m = do
   mt <- readWeakMetaType m
   case mt of
-    Just t  -> return t
+    Just t -> return t
     Nothing -> lift $ throwE "obtainType"

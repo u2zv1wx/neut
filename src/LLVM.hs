@@ -2,17 +2,17 @@ module LLVM
   ( toLLVM
   ) where
 
-import           Control.Monad.Except
-import           Control.Monad.State
-import           Control.Monad.Trans.Except
-import           Data.List                  (elemIndex)
-import qualified Text.Show.Pretty           as Pr
+import Control.Monad.Except
+import Control.Monad.State
+import Control.Monad.Trans.Except
+import Data.List (elemIndex)
+import qualified Text.Show.Pretty as Pr
 
-import           Data.Basic
-import           Data.Code
-import           Data.Env
-import           Data.LLVM
-import           Reduce.Code
+import Data.Basic
+import Data.Code
+import Data.Env
+import Data.LLVM
+import Reduce.Code
 
 toLLVM :: CodePlus -> WithEnv LLVM
 toLLVM mainTerm = do
@@ -111,15 +111,15 @@ llvmCodeTheta _ (ThetaArith op lowType v1 v2) =
       let si = LowTypeSignedInt i
       let op' = (op, LowTypeFloat i)
       llvmStruct [(x0, v1), (x1, v2)] $
-          -- cast the first argument from i8* to float
+        -- cast the first argument from i8* to float
         LLVMLet y11 (LLVMPointerToInt (LLVMDataLocal x0) voidPtr si) $
         LLVMLet y12 (LLVMBitcast (LLVMDataLocal y11) si (LowTypeFloat i)) $
-          -- cast the second argument from i8* to float
+        -- cast the second argument from i8* to float
         LLVMLet y21 (LLVMPointerToInt (LLVMDataLocal x1) voidPtr si) $
         LLVMLet y22 (LLVMBitcast (LLVMDataLocal y21) si (LowTypeFloat i)) $
-          -- compute
+        -- compute
         LLVMLet tmp (LLVMArith op' (LLVMDataLocal y12) (LLVMDataLocal y22)) $
-          -- cast the result from float to i8*
+        -- cast the result from float to i8*
         LLVMLet y (LLVMBitcast (LLVMDataLocal tmp) (LowTypeFloat i) si) $
         LLVMLet result (LLVMIntToPointer (LLVMDataLocal y) si voidPtr) $
         LLVMReturn $ LLVMDataLocal result
@@ -133,7 +133,7 @@ llvmCodeTheta _ (ThetaPrint v) = do
     LLVMPrint t (LLVMDataLocal c)
 
 llvmCodeLet :: [(Identifier, LLVM)] -> LLVM -> LLVM
-llvmCodeLet [] cont           = cont
+llvmCodeLet [] cont = cont
 llvmCodeLet ((x, e):xes) cont = LLVMLet x e $ llvmCodeLet xes cont
 
 -- `llvmDataLet x d cont` binds the data `d` to the variable `x`, and computes the

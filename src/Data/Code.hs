@@ -1,41 +1,31 @@
 module Data.Code where
 
-import           Data.Basic
-import           Data.Maybe (fromMaybe)
+import Data.Basic
+import Data.Maybe (fromMaybe)
 
 data Data
   = DataTau
   | DataTheta Identifier -- global variable
   | DataUpsilon Identifier
   | DataEpsilon Identifier
-  | DataEpsilonIntro Literal
-                     LowType
+  | DataEpsilonIntro Literal LowType
   | DataDownPi [(Identifier, CodePlus)]
-  | DataDownIntroPiIntro [Identifier]
-                         CodePlus
+  | DataDownIntroPiIntro [Identifier] CodePlus
   | DataSigma [(Identifier, DataPlus)]
   | DataSigmaIntro [DataPlus]
   deriving (Show)
 
 data Code
   = CodeTheta Theta
-  | CodeEpsilonElim Identifier
-                    DataPlus
-                    [(Case, CodePlus)]
-  | CodePiElimDownElim DataPlus
-                       [CodePlus]
-  | CodeSigmaElim [Identifier]
-                  DataPlus
-                  CodePlus
+  | CodeEpsilonElim Identifier DataPlus [(Case, CodePlus)]
+  | CodePiElimDownElim DataPlus [CodePlus]
+  | CodeSigmaElim [Identifier] DataPlus CodePlus
   | CodeUp DataPlus
   | CodeUpIntro DataPlus
   deriving (Show)
 
 data Theta
-  = ThetaArith Arith
-               LowType
-               DataPlus
-               DataPlus
+  = ThetaArith Arith LowType DataPlus DataPlus
   | ThetaPrint DataPlus
   deriving (Show)
 
@@ -209,4 +199,4 @@ isEtaExpandableCode (_, CodeUpIntro v) = isEtaExpandableData v
 
 isEtaExpandableTheta :: Theta -> Bool
 isEtaExpandableTheta (ThetaArith _ _ v1 v2) = all isEtaExpandableData [v1, v2]
-isEtaExpandableTheta (ThetaPrint v)         = isEtaExpandableData v
+isEtaExpandableTheta (ThetaPrint v) = isEtaExpandableData v

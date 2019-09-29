@@ -9,15 +9,15 @@ module Polarize
   , bindLet
   ) where
 
-import           Control.Monad.Except
-import           Control.Monad.State
-import           Prelude              hiding (pi)
+import Control.Monad.Except
+import Control.Monad.State
+import Prelude hiding (pi)
 
-import           Data.Basic
-import           Data.Code
-import           Data.Env
-import           Data.List            (nubBy)
-import           Data.Term
+import Data.Basic
+import Data.Code
+import Data.Env
+import Data.List (nubBy)
+import Data.Term
 
 polarize :: TermPlus -> WithEnv CodePlus
 polarize (m, TermTau) = do

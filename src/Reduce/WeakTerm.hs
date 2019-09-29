@@ -2,9 +2,9 @@ module Reduce.WeakTerm
   ( reduceWeakTermPlus
   ) where
 
-import           Data.Basic
-import           Data.Env
-import           Data.WeakTerm
+import Data.Basic
+import Data.Env
+import Data.WeakTerm
 
 reduceWeakTermPlus :: WeakTermPlus -> WithEnv WeakTermPlus
 reduceWeakTermPlus (m, WeakTermEpsilonElim (x, t) e branchList) = do
