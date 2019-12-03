@@ -78,6 +78,7 @@ polarize (m, TermMu (f, t) e) = do
   cls <- makeClosure (Just f) [] clsMeta (map fst fvs) lamBody'
   callClosure m cls fvs'
 
+-- ここを適切に型をたどるように変更すればsigmaをすべてclosedにできる
 obtainFreeVarList :: [Identifier] -> TermPlus -> [(Identifier, TermPlus)]
 obtainFreeVarList xs e = do
   let vs = nubBy (\x y -> fst x == fst y) $ varTermPlus e
@@ -182,6 +183,20 @@ toSigmaType ::
 toSigmaType ml xps = do
   xps' <- mapM supplyName xps
   return (ml, DataSigma xps')
+
+exponentImmediate :: WithEnv DataPlus
+exponentImmediate = do
+  cenv <- gets codeEnv
+  let thetaName = "EXPONENT.IMMEDIATE"
+  let immExp = (Nothing, DataTheta thetaName)
+  case lookup thetaName cenv of
+    Just _ -> return immExp
+    Nothing -> do
+      (countVarName, countVar) <- newDataUpsilon
+      (immVarName, immVar) <- newDataUpsilon
+      let lamBody = (Nothing, CodeCopyN countVar immVar)
+      insCodeEnv thetaName [countVarName, immVarName] lamBody
+      return (Nothing, DataTheta thetaName)
 
 polarizeTheta :: Meta -> Identifier -> WithEnv CodePlus
 polarizeTheta m name@"core.i8.add" = polarizeArith name ArithAdd (int 8) m
