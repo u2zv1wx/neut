@@ -79,6 +79,8 @@ varCodePlus (_, CodePiElimDownElim v es) =
 varCodePlus (_, CodeSigmaElim xs v e) =
   varDataPlus v ++ filterPlus (`notElem` xs) (varCodePlus e)
 varCodePlus (_, CodeUpIntro v) = varDataPlus v
+varCodePlus (_, CodeCopyN v1 v2) = varDataPlus v1 ++ varDataPlus v2
+varCodePlus (_, CodeTransposeN v vs) = varDataPlus v ++ concatMap varDataPlus vs
 
 varTheta :: Theta -> [Identifier]
 varTheta = undefined
@@ -122,6 +124,14 @@ substCodePlus sub (m, CodeSigmaElim xs v e) = do
 substCodePlus sub (m, CodeUpIntro v) = do
   let v' = substDataPlus sub v
   (m, CodeUpIntro v')
+substCodePlus sub (m, CodeCopyN v1 v2) = do
+  let v1' = substDataPlus sub v1
+  let v2' = substDataPlus sub v2
+  (m, CodeCopyN v1' v2')
+substCodePlus sub (m, CodeTransposeN v vs) = do
+  let v' = substDataPlus sub v
+  let vs' = map (substDataPlus sub) vs
+  (m, CodeTransposeN v' vs')
 
 substTheta :: SubstDataPlus -> Theta -> Theta
 substTheta sub (ThetaArith a t v1 v2) = do
