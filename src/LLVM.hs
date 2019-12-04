@@ -55,7 +55,6 @@ llvmCode (_, CodeSigmaElim xs v e) = do
          voidPtr
          (toStructPtrType [1 .. (length xs)]))
       extractAndCont
-llvmCode (_, CodeUp _) = throwError "llvmCode.unresolved-type-term"
 llvmCode (_, CodeUpIntro d) = do
   result <- newNameWith "ans"
   llvmDataLet result d $ LLVMReturn $ LLVMDataLocal result
@@ -183,7 +182,6 @@ llvmDataLet reg (_, DataSigmaIntro ds) cont = do
   llvmStruct (zip xs ds) $
     LLVMLet reg (LLVMAlloc size) $ -- the result of malloc is i8*
     LLVMLet cast (LLVMBitcast (LLVMDataLocal reg) voidPtr structPtrType) cont''
-llvmDataLet _ _ _ = throwError "llvmDataLet.unresolved-type-term"
 
 llvmDataLet' :: [(Identifier, DataPlus)] -> LLVM -> WithEnv LLVM
 llvmDataLet' [] cont = return cont
