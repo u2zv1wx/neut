@@ -3,25 +3,33 @@ module Data.Code where
 import Data.Basic
 import Data.Maybe (fromMaybe)
 
+-- The definition of `Data` doesn't contain those type-level definitions like `DataTau`
+-- since they are translated to "exponents" immediately after polarization (and thus in Polarize.hs).
 data Data
-  = DataTau
-  | DataTheta Identifier -- global variable
+  = DataTheta Identifier -- global variable
   | DataUpsilon Identifier
-  | DataEpsilon Identifier
   | DataEpsilonIntro Literal LowType
-  | DataDownPi [(Identifier, CodePlus)]
   | DataDownIntroPiIntro [Identifier] CodePlus
-  | DataSigma [(Identifier, DataPlus)]
   | DataSigmaIntro [DataPlus]
   deriving (Show)
 
 data Code
   = CodeTheta Theta
   | CodeEpsilonElim Identifier DataPlus [(Case, CodePlus)]
-  | CodePiElimDownElim DataPlus [CodePlus]
+  -- In contrast with CBPV, the arguments are negative since they are supposed to be of type ↑P.
+  -- This modification is essential when we consider a dependent variant of CBPV translation.
+  -- Or more concretely: Since we don't have the distinction between terms and types anymore, the `A` in
+  -- `Pi (x : A). B` must be translated using the same function for terms. Thus, the `A` is
+  -- translated into a negative term `return v`, where `v` is some positive term which is supposed to be
+  -- beta-equivalent to a positive type. To extract this `v` part without resorting
+  -- pattern-matching in compiler, we need some tricks here. And the trick is: set the type of
+  -- domain of Pi-types to be negative, and translate that `A` into `bind z := A^# in ↑z`.
+  -- This is why the domain of Pi-type must be negative in dependent CBPV.
+  | CodePiElimDownElim DataPlus [CodePlus] -- ((force v) e1 ... en)
   | CodeSigmaElim [Identifier] DataPlus CodePlus
-  | CodeUp DataPlus
   | CodeUpIntro DataPlus
+  | CodeCopyN DataPlus DataPlus
+  | CodeTransposeN DataPlus [DataPlus]
   deriving (Show)
 
 data Theta
@@ -44,15 +52,11 @@ toDataUpsilon' :: Identifier -> DataPlus
 toDataUpsilon' x = (Nothing, DataUpsilon x)
 
 varDataPlus :: DataPlus -> [Identifier]
-varDataPlus (_, DataTau) = []
 varDataPlus (_, DataTheta _) = []
 varDataPlus (_, DataUpsilon x) = [x]
-varDataPlus (_, DataEpsilon _) = []
 varDataPlus (_, DataEpsilonIntro _ _) = []
-varDataPlus (_, DataDownPi xns) = varDataPlusPi xns
 varDataPlus (_, DataDownIntroPiIntro xs e) =
   filter (`notElem` xs) $ varCodePlus e
-varDataPlus (_, DataSigma xps) = varDataPlusSigma xps []
 varDataPlus (_, DataSigmaIntro vs) = concatMap varDataPlus vs
 
 varDataPlusPi :: [(Identifier, CodePlus)] -> [Identifier]
@@ -74,7 +78,6 @@ varCodePlus (_, CodePiElimDownElim v es) =
   varDataPlus v ++ concatMap varCodePlus es
 varCodePlus (_, CodeSigmaElim xs v e) =
   varDataPlus v ++ filterPlus (`notElem` xs) (varCodePlus e)
-varCodePlus (_, CodeUp v) = varDataPlus v
 varCodePlus (_, CodeUpIntro v) = varDataPlus v
 
 varTheta :: Theta -> [Identifier]
@@ -86,22 +89,14 @@ filterPlus = undefined
 type SubstDataPlus = [IdentifierPlus]
 
 substDataPlus :: SubstDataPlus -> DataPlus -> DataPlus
-substDataPlus _ (m, DataTau) = (m, DataTau)
 substDataPlus _ (m, DataTheta x) = (m, DataTheta x)
 substDataPlus sub (m, DataUpsilon s) =
   fromMaybe (m, DataUpsilon s) (lookup s sub)
-substDataPlus _ (m, DataEpsilon x) = (m, DataEpsilon x)
 substDataPlus _ (m, DataEpsilonIntro l p) = (m, DataEpsilonIntro l p)
-substDataPlus sub (m, DataDownPi xns) = do
-  let xns' = substDataPlusPi sub xns
-  (m, DataDownPi xns')
 substDataPlus sub (m, DataDownIntroPiIntro xs e) = do
   let sub' = filter (\(y, _) -> y `notElem` xs) sub
   let e' = substCodePlus sub' e
   (m, DataDownIntroPiIntro xs e')
-substDataPlus sub (m, DataSigma xps) = do
-  let xps' = substDataPlusSigma sub xps
-  (m, DataSigma xps')
 substDataPlus sub (m, DataSigmaIntro vs) = do
   let vs' = map (substDataPlus sub) vs
   (m, DataSigmaIntro vs')
@@ -124,9 +119,6 @@ substCodePlus sub (m, CodeSigmaElim xs v e) = do
   let v' = substDataPlus sub v
   let (xs', e') = substDataPlusSigmaElim sub xs e
   (m, CodeSigmaElim xs' v' e')
-substCodePlus sub (m, CodeUp v) = do
-  let v' = substDataPlus sub v
-  (m, CodeUp v')
 substCodePlus sub (m, CodeUpIntro v) = do
   let v' = substDataPlus sub v
   (m, CodeUpIntro v')
@@ -171,32 +163,3 @@ substDataPlusSigmaElim sub (x:xs) e = do
   let sub' = filter (\(y, _) -> y /= x) sub
   let (xs', e') = substDataPlusSigmaElim sub' xs e
   (x : xs', e')
-
-isEtaExpandableData :: DataPlus -> Bool
-isEtaExpandableData (_, DataTau) = True
-isEtaExpandableData (_, DataTheta _) = True
-isEtaExpandableData (_, DataUpsilon _) = True
-isEtaExpandableData (_, DataEpsilon _) = True
-isEtaExpandableData (_, DataEpsilonIntro _ _) = True
-isEtaExpandableData (_, DataDownPi xps) = all isEtaExpandableCode $ map snd xps
-isEtaExpandableData (_, DataDownIntroPiIntro _ e) = isEtaExpandableCode e
-isEtaExpandableData (_, DataSigma xts) = do
-  let (xs, ts) = unzip xts
-  all (`elem` xs) (concatMap varDataPlus ts) -- sigma must be closed
-isEtaExpandableData (_, DataSigmaIntro vs) = all isEtaExpandableData vs
-
-isEtaExpandableCode :: CodePlus -> Bool
-isEtaExpandableCode (_, CodeTheta theta) = isEtaExpandableTheta theta
-isEtaExpandableCode (_, CodeEpsilonElim _ d branchList) = do
-  let (_, es) = unzip branchList
-  isEtaExpandableData d && all isEtaExpandableCode es
-isEtaExpandableCode (_, CodePiElimDownElim d es) =
-  isEtaExpandableData d && all isEtaExpandableCode es
-isEtaExpandableCode (_, CodeSigmaElim _ v e) =
-  isEtaExpandableData v && isEtaExpandableCode e
-isEtaExpandableCode (_, CodeUp v) = isEtaExpandableData v
-isEtaExpandableCode (_, CodeUpIntro v) = isEtaExpandableData v
-
-isEtaExpandableTheta :: Theta -> Bool
-isEtaExpandableTheta (ThetaArith _ _ v1 v2) = all isEtaExpandableData [v1, v2]
-isEtaExpandableTheta (ThetaPrint v) = isEtaExpandableData v

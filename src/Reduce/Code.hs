@@ -9,7 +9,6 @@ import Data.List (transpose)
 import Data.Basic
 import Data.Code
 import Data.Env
-import Polarize (bindLet)
 
 reduceCodePlus :: CodePlus -> WithEnv CodePlus
 reduceCodePlus (m, CodeTheta theta) =
@@ -47,11 +46,6 @@ reduceCodePlus (m, CodePiElimDownElim v es) = do
     Just vs -> do
       cenv <- gets codeEnv
       case (v, exponentArgs es') of
-        ((_, DataTau), Just (i, w)) -> return $ exponentImmediate i w
-        ((_, DataEpsilon _), Just (i, w)) -> return $ exponentImmediate i w
-        ((_, DataDownPi _), Just (i, w)) -> return $ exponentImmediate i w
-        ((_, DataSigma xps), Just (i, w)) ->
-          exponentSigma i xps w >>= reduceCodePlus
         ((_, DataDownIntroPiIntro xs body), _) ->
           reduceCodePlus $ substCodePlus (zip xs vs) body
         ((_, DataTheta x), _)
@@ -63,7 +57,28 @@ reduceCodePlus (m, CodeSigmaElim xs v e) =
     (_, DataSigmaIntro es)
       | length es == length xs -> reduceCodePlus $ substCodePlus (zip xs es) e
     _ -> return (m, CodeSigmaElim xs v e)
+reduceCodePlus (m, CodeCopyN v1 v2) =
+  case v1 of
+    (_, DataEpsilonIntro (LiteralInteger i) _) ->
+      return (m, CodeUpIntro (m, DataSigmaIntro (replicate i v2)))
+    _ -> return (m, CodeCopyN v1 v2)
+reduceCodePlus (m, CodeTransposeN v vs) =
+  case v of
+    (_, DataEpsilonIntro (LiteralInteger n) _) -> do
+      xss <- mapM (const $ newNameList n) vs
+      return $
+        toSigmaElimSeq
+          (zip xss vs)
+          ( Nothing
+          , CodeUpIntro
+              ( Nothing
+              , DataSigmaIntro
+                  (map (toSigmaIntro . map toDataUpsilon') $ transpose xss)))
+    _ -> return (m, CodeTransposeN v vs)
 reduceCodePlus t = return t
+
+newNameList :: Int -> WithEnv [Identifier]
+newNameList i = mapM (const $ newNameWith "var") [1 .. i]
 
 extractUpIntro :: [CodePlus] -> Maybe [DataPlus]
 extractUpIntro [] = Just []
@@ -76,47 +91,6 @@ exponentArgs :: [CodePlus] -> Maybe (Int, DataPlus)
 exponentArgs [(_, CodeUpIntro (_, DataEpsilonIntro (LiteralInteger i) _)), (_, CodeUpIntro v)] =
   Just (i, v)
 exponentArgs _ = Nothing
-
-exponentImmediate :: Int -> DataPlus -> CodePlus
-exponentImmediate i v = do
-  let ml = fst v
-  (ml, CodeUpIntro (ml, DataSigmaIntro $ replicate i v))
-
--- Sigma (y1 : t1, ..., yn : tn) ~>
---   lam (m, z).
---     let (y1, ..., yn) := z in
---     bind ys1 = t1 @ (m, y1) in
---     ...
---     bind ysn = tn @ (m, yn) in
---     let (ys1-1, ..., ys1-m) := ys1 in
---     ...
---     let (ysn-1, ..., ysn-m) := ysn in
---     ((ys1-1, ..., ysn-1), ..., (ys1-m, ..., ysn-m))
-exponentSigma :: Int -> [(Identifier, DataPlus)] -> DataPlus -> WithEnv CodePlus
-exponentSigma n xps v = do
-  let (xs, ps) = unzip xps
-  let vs = map (\x -> (Nothing, CodeUpIntro (toDataUpsilon' x))) xs
-  let vps = zip vs ps
-  let lenAsEpsilon = (Nothing, DataEpsilonIntro (LiteralInteger n) undefined)
-  let bar = (Nothing, CodeUpIntro lenAsEpsilon)
-  let appList = map (\(w, p) -> (Nothing, CodePiElimDownElim p [bar, w])) vps
-  ys <- mapM (const $ newNameWith "var") xps
-  let ys' = map toDataUpsilon' ys
-  let yss = map (replicate n) ys
-  zss <- mapM (mapM (const $ newNameWith "var")) yss
-  return
-    ( Nothing
-    , CodeSigmaElim -- let (x-1, ..., x-m) := v
-        xs
-        v
-        (bindLet (zip ys appList) $ -- let xs-k := TYPE @ (n, x-k) (k = 1, ..., m)
-         toSigmaElimSeq
-           (zip zss ys') -- let (xs-k-1, ..., xs-k-n) := xs-k in (k = 1, ..., m)
-           ( Nothing
-           , CodeUpIntro
-               ( Nothing
-               , DataSigmaIntro
-                   (map (toSigmaIntro . map toDataUpsilon') $ transpose zss)))))
 
 toSigmaIntro :: [DataPlus] -> DataPlus
 toSigmaIntro ds = (Nothing, DataSigmaIntro ds)
@@ -164,11 +138,6 @@ inlineCodePlus (m, CodePiElimDownElim v es) = do
     Nothing -> return (m, CodePiElimDownElim v es')
     Just vs ->
       case (v, exponentArgs es') of
-        ((_, DataTau), Just (i, w)) -> return $ exponentImmediate i w
-        ((_, DataEpsilon _), Just (i, w)) -> return $ exponentImmediate i w
-        ((_, DataDownPi _), Just (i, w)) -> return $ exponentImmediate i w
-        ((_, DataSigma xps), Just (i, w)) ->
-          exponentSigma i xps w >>= inlineCodePlus
         ((_, DataDownIntroPiIntro xs body), _) ->
           inlineCodePlus $ substCodePlus (zip xs vs) body
         -- FIXME: reduce theta when the theta is exponent
@@ -181,4 +150,22 @@ inlineCodePlus (m, CodeSigmaElim xs v e) =
     _ -> do
       e' <- inlineCodePlus e
       return (m, CodeSigmaElim xs v e')
+inlineCodePlus (m, CodeCopyN v1 v2) =
+  case v1 of
+    (_, DataEpsilonIntro (LiteralInteger i) _) ->
+      return (m, CodeUpIntro (m, DataSigmaIntro (replicate i v2)))
+    _ -> return (m, CodeCopyN v1 v2)
+inlineCodePlus (m, CodeTransposeN v vs) =
+  case v of
+    (_, DataEpsilonIntro (LiteralInteger n) _) -> do
+      xss <- mapM (const $ newNameList n) vs
+      return $
+        toSigmaElimSeq
+          (zip xss vs)
+          ( Nothing
+          , CodeUpIntro
+              ( Nothing
+              , DataSigmaIntro
+                  (map (toSigmaIntro . map toDataUpsilon') $ transpose xss)))
+    _ -> return (m, CodeTransposeN v vs)
 inlineCodePlus t = return t

@@ -22,14 +22,16 @@ import Data.Term
 polarize :: TermPlus -> WithEnv CodePlus
 polarize (m, TermTau) = do
   let ml = snd $ obtainInfoMeta m
-  return (ml, CodeUpIntro (ml, DataTau))
+  v <- exponentImmediate ml
+  return (ml, CodeUpIntro v)
 polarize (m, TermTheta x) = polarizeTheta m x
 polarize (m, TermUpsilon x) = do
   let ml = snd $ obtainInfoMeta m
   return (ml, CodeUpIntro (ml, DataUpsilon x))
-polarize (m, TermEpsilon x) = do
+polarize (m, TermEpsilon _) = do
   let ml = snd $ obtainInfoMeta m
-  return (ml, CodeUpIntro (ml, DataEpsilon x))
+  v <- exponentImmediate ml
+  return (ml, CodeUpIntro v)
 polarize (m, TermEpsilonIntro l lowType) = do
   let ml = snd $ obtainInfoMeta m
   return (ml, CodeUpIntro (ml, DataEpsilonIntro l lowType))
@@ -39,16 +41,12 @@ polarize (m, TermEpsilonElim (x, _) e bs) = do
   (yts, y) <- polarize' e
   let ml = snd $ obtainInfoMeta m
   return $ bindLet yts (ml, CodeEpsilonElim x y (zip cs es'))
-polarize (m, TermPi xts) = do
+polarize (m, TermPi _) = do
   let ml = snd $ obtainInfoMeta m
-  let (xs, ts) = unzip xts
-  ns <- mapM (upElimUp ml) ts
-  let downPiType = (ml, DataDownPi $ zip xs ns)
+  v <- exponentImmediate ml
   (envVarName, envVar) <- newDataUpsilon
   closureType <-
-    toSigmaType
-      ml
-      [Right (envVarName, (ml, DataTau)), Left envVar, Left downPiType]
+    exponentSigma "CLOSURE" ml [Right (envVarName, v), Left envVar, Left v]
   return (ml, CodeUpIntro closureType)
 polarize (m, TermPiIntro xts e) = do
   let xs = map fst xts
@@ -92,12 +90,6 @@ polarize' e@(m, _) = do
   (varName, var) <- newDataUpsilon' $ snd $ obtainInfoMeta m
   return ([(varName, e')], var)
 
-upElimUp :: Maybe Loc -> TermPlus -> WithEnv CodePlus
-upElimUp ml e = do
-  e' <- polarize e
-  (varName, var) <- newDataUpsilon' ml
-  return $ upElim ml varName e' (ml, CodeUp var)
-
 makeClosure ::
      Maybe Identifier -- the name of newly created closure
   -> [(Identifier, TermPlus)] -- list of free variables in `lam (x1, ..., xn). e`
@@ -109,7 +101,8 @@ makeClosure mName fvs m xs e = do
   let ml = snd $ obtainInfoMeta m
   let (freeVarNameList, freeVarTypeList) = unzip fvs
   (yess, ys) <- unzip <$> mapM polarize' freeVarTypeList
-  envExp <- toSigmaType ml $ map Left ys
+  expName <- newNameWith "exp"
+  envExp <- exponentSigma expName ml $ map Left ys
   (envVarName, envVar) <- newDataUpsilon
   let lamBody = (ml, CodeSigmaElim (map fst fvs) envVar e)
   let fvSigmaIntro =
@@ -176,27 +169,19 @@ upElim :: Maybe Loc -> Identifier -> CodePlus -> CodePlus -> CodePlus
 upElim ml x e1 e2 =
   (ml, CodePiElimDownElim (ml, DataDownIntroPiIntro [x] e2) [e1])
 
-toSigmaType ::
-     Maybe (Int, Int)
-  -> [Either DataPlus (Identifier, DataPlus)]
-  -> WithEnv DataPlus
-toSigmaType ml xps = do
-  xps' <- mapM supplyName xps
-  return (ml, DataSigma xps')
-
-exponentImmediate :: WithEnv DataPlus
-exponentImmediate = do
+exponentImmediate :: Maybe Loc -> WithEnv DataPlus
+exponentImmediate ml = do
   cenv <- gets codeEnv
   let thetaName = "EXPONENT.IMMEDIATE"
-  let immExp = (Nothing, DataTheta thetaName)
+  let immExp = (ml, DataTheta thetaName)
   case lookup thetaName cenv of
     Just _ -> return immExp
     Nothing -> do
       (countVarName, countVar) <- newDataUpsilon
       (immVarName, immVar) <- newDataUpsilon
-      let lamBody = (Nothing, CodeCopyN countVar immVar)
+      let lamBody = (ml, CodeCopyN countVar immVar)
       insCodeEnv thetaName [countVarName, immVarName] lamBody
-      return (Nothing, DataTheta thetaName)
+      return (ml, DataTheta thetaName)
 
 -- Sigma (y1 : t1, ..., yn : tn) ~>
 --   lam (m, z).
@@ -216,9 +201,9 @@ exponentSigma ::
   -> [Either DataPlus (Identifier, DataPlus)]
   -> WithEnv DataPlus
 exponentSigma lamThetaName ml mxts = do
-  penv <- gets codeEnv
+  cenv <- gets codeEnv
   let sigmaExp = (ml, DataTheta lamThetaName)
-  case lookup lamThetaName penv of
+  case lookup lamThetaName cenv of
     Just _ -> return sigmaExp
     Nothing -> do
       xts <- mapM supplyName mxts
@@ -233,13 +218,12 @@ exponentSigma lamThetaName ml mxts = do
               xts
       ys <- mapM (const $ newNameWith "var") xts
       let ys' = map toDataUpsilon' ys
-      let ys'' = map (\(ml', v) -> (ml', CodeUpIntro (ml', v))) ys'
       let lamBody =
             ( ml
             , CodeSigmaElim
                 (map fst xts)
                 sigVar
-                (bindLet (zip ys appList) (ml, CodeTransposeN countVar ys'')))
+                (bindLet (zip ys appList) (ml, CodeTransposeN countVar ys')))
       insCodeEnv lamThetaName [countVarName, sigVarName] lamBody
       return sigmaExp
 
