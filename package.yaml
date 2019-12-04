@@ -3,7 +3,7 @@ version:             0.1.0.0
 license:             GPL-3
 license-file:        LICENSE
 author:              "u2zv1wx"
-maintainer:          "u2zv1wx@protonmail.ch "
+maintainer:          "u2zv1wx@protonmail.ch"
 
 extra-source-files:
   - readme.org
