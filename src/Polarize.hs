@@ -115,6 +115,7 @@ makeClosure mName fvs m xs e = do
       Just lamThetaName -> return lamThetaName
       Nothing -> newNameWith "cls"
   penv <- gets codeEnv
+  -- TODO: このlamBodyの冒頭で、xsの使用回数がlinearになるよう適切にcopyをおこなう必要がある。
   when (name `elem` map fst penv) $ insCodeEnv name (envVarName : xs) lamBody
   return $
     bindLet
@@ -135,7 +136,7 @@ callClosure m e es = do
   return $
     ( ml
     , CodeUpElim
-        clsVarName
+        clsVarName -- このclsVarはlinearに使用されるのでexponentの挿入は不要。
         e
         (bindLet
            (concat xess)
@@ -143,6 +144,9 @@ callClosure m e es = do
            , CodeSigmaElim
                -- ここでのtypevarの取得は実際は省略可。
                -- とはいえ、typeVarはexponentでクロージャをcopyするときに使うので落とすことはできない。
+               -- exponentについて。このsigmaElimによっては、typeVarNameはただで捨てられるから放置でよく、
+               -- かつenvVarとlamVarはlinearに使用されているから放置でよく、
+               -- したがってexponent関連の処理をおこなう必要はない。
                [typeVarName, envVarName, lamVarName]
                clsVar
                (ml, CodePiElimDownElim lamVar args))))
@@ -151,8 +155,13 @@ bindLet :: Binder -> CodePlus -> CodePlus
 bindLet [] cont = cont
 bindLet ((x, e):xes) cont = do
   let e' = bindLet xes cont
+  -- TODO: xの使用回数にあわせてここでxについてのexponentをおこなう必要がある。
   (fst e', CodeUpElim x e e')
 
+-- imm n v ~> (v, ..., v) (n times)
+-- ここでは「変数はlinearに使用されなければならない」という制約ははたらかない。
+-- exponentがprimitiveとしてあるような言語において変数がlinearに使用されている、ってのがポイントなので。
+-- exponentの中身は変数の仕様についての治外法権。
 exponentImmediate :: Maybe Loc -> WithEnv DataPlus
 exponentImmediate ml = do
   cenv <- gets codeEnv
@@ -179,6 +188,7 @@ exponentImmediate ml = do
 --     ((ys1-1, ..., ysn-1), ..., (ys1-m, ..., ysn-m))
 --
 -- (Note that Sigma (y1 : t1, ..., yn : tn) must be closed.)
+-- ここでも変数がlinearに使用されなければならないという制約は働かない。
 exponentSigma ::
      Identifier
   -> Maybe Loc
