@@ -9,7 +9,6 @@ data Data
   = DataTheta Identifier -- global variable
   | DataUpsilon Identifier
   | DataEpsilonIntro Literal LowType
-  | DataDownIntroPiIntro [Identifier] CodePlus
   | DataSigmaIntro [DataPlus]
   deriving (Show)
 
@@ -28,6 +27,7 @@ data Code
   | CodePiElimDownElim DataPlus [CodePlus] -- ((force v) e1 ... en)
   | CodeSigmaElim [Identifier] DataPlus CodePlus
   | CodeUpIntro DataPlus
+  | CodeUpElim Identifier CodePlus CodePlus
   | CodeCopyN DataPlus DataPlus
   | CodeTransposeN DataPlus [DataPlus]
   deriving (Show)
@@ -55,8 +55,6 @@ varDataPlus :: DataPlus -> [Identifier]
 varDataPlus (_, DataTheta _) = []
 varDataPlus (_, DataUpsilon x) = [x]
 varDataPlus (_, DataEpsilonIntro _ _) = []
-varDataPlus (_, DataDownIntroPiIntro xs e) =
-  filter (`notElem` xs) $ varCodePlus e
 varDataPlus (_, DataSigmaIntro vs) = concatMap varDataPlus vs
 
 varDataPlusPi :: [(Identifier, CodePlus)] -> [Identifier]
@@ -79,6 +77,8 @@ varCodePlus (_, CodePiElimDownElim v es) =
 varCodePlus (_, CodeSigmaElim xs v e) =
   varDataPlus v ++ filterPlus (`notElem` xs) (varCodePlus e)
 varCodePlus (_, CodeUpIntro v) = varDataPlus v
+varCodePlus (_, CodeUpElim x e1 e2) =
+  varCodePlus e1 ++ filterPlus (/= x) (varCodePlus e2)
 varCodePlus (_, CodeCopyN v1 v2) = varDataPlus v1 ++ varDataPlus v2
 varCodePlus (_, CodeTransposeN v vs) = varDataPlus v ++ concatMap varDataPlus vs
 
@@ -95,10 +95,6 @@ substDataPlus _ (m, DataTheta x) = (m, DataTheta x)
 substDataPlus sub (m, DataUpsilon s) =
   fromMaybe (m, DataUpsilon s) (lookup s sub)
 substDataPlus _ (m, DataEpsilonIntro l p) = (m, DataEpsilonIntro l p)
-substDataPlus sub (m, DataDownIntroPiIntro xs e) = do
-  let sub' = filter (\(y, _) -> y `notElem` xs) sub
-  let e' = substCodePlus sub' e
-  (m, DataDownIntroPiIntro xs e')
 substDataPlus sub (m, DataSigmaIntro vs) = do
   let vs' = map (substDataPlus sub) vs
   (m, DataSigmaIntro vs')
@@ -124,6 +120,10 @@ substCodePlus sub (m, CodeSigmaElim xs v e) = do
 substCodePlus sub (m, CodeUpIntro v) = do
   let v' = substDataPlus sub v
   (m, CodeUpIntro v')
+substCodePlus sub (m, CodeUpElim x e1 e2) = do
+  let e1' = substCodePlus sub e1
+  let e2' = substCodePlus sub e2
+  (m, CodeUpElim x e1' e2')
 substCodePlus sub (m, CodeCopyN v1 v2) = do
   let v1' = substDataPlus sub v1
   let v2' = substDataPlus sub v2

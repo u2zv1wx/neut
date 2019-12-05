@@ -77,6 +77,7 @@ polarize (m, TermMu (f, t) e) = do
   callClosure m cls fvs'
 
 -- ここを適切に型をたどるように変更すればsigmaをすべてclosedにできる
+-- varTermPlusのほうを修正する感じか。……termplusのほうなのか。
 obtainFreeVarList :: [Identifier] -> TermPlus -> [(Identifier, TermPlus)]
 obtainFreeVarList xs e = do
   let vs = nubBy (\x y -> fst x == fst y) $ varTermPlus e
@@ -109,31 +110,18 @@ makeClosure mName fvs m xs e = do
         ( ml
         , DataSigmaIntro $
           zipWith (curry toDataUpsilon) freeVarNameList (map fst ys))
-  case mName of
-    Nothing ->
-      return $
-      bindLet
-        (concat yess)
-        ( ml
-        , CodeUpIntro
-            ( ml
-            , DataSigmaIntro
-                [ envExp
-                , fvSigmaIntro
-                , (ml, DataDownIntroPiIntro (envVarName : xs) lamBody)
-                ]))
-    Just lamThetaName -> do
-      penv <- gets codeEnv
-      when (lamThetaName `elem` map fst penv) $
-        insCodeEnv lamThetaName (envVarName : xs) lamBody
-      return $
-        bindLet
-          (concat yess)
-          ( ml
-          , CodeUpIntro
-              ( ml
-              , DataSigmaIntro
-                  [envExp, fvSigmaIntro, (ml, DataTheta lamThetaName)]))
+  name <-
+    case mName of
+      Just lamThetaName -> return lamThetaName
+      Nothing -> newNameWith "cls"
+  penv <- gets codeEnv
+  when (name `elem` map fst penv) $ insCodeEnv name (envVarName : xs) lamBody
+  return $
+    bindLet
+      (concat yess)
+      ( ml
+      , CodeUpIntro
+          (ml, DataSigmaIntro [envExp, fvSigmaIntro, (ml, DataTheta name)]))
 
 callClosure :: Meta -> CodePlus -> [TermPlus] -> WithEnv CodePlus
 callClosure m e es = do
@@ -145,29 +133,25 @@ callClosure m e es = do
   (lamVarName, lamVar) <- newDataUpsilon
   let args = map (\v -> (ml, CodeUpIntro v)) $ envVar : xs
   return $
-    upElim
-      ml
-      clsVarName
-      e
-      (bindLet
-         (concat xess)
-         ( ml
-         , CodeSigmaElim
+    ( ml
+    , CodeUpElim
+        clsVarName
+        e
+        (bindLet
+           (concat xess)
+           ( ml
+           , CodeSigmaElim
                -- ここでのtypevarの取得は実際は省略可。
                -- とはいえ、typeVarはexponentでクロージャをcopyするときに使うので落とすことはできない。
-             [typeVarName, envVarName, lamVarName]
-             clsVar
-             (ml, CodePiElimDownElim lamVar args)))
+               [typeVarName, envVarName, lamVarName]
+               clsVar
+               (ml, CodePiElimDownElim lamVar args))))
 
 bindLet :: Binder -> CodePlus -> CodePlus
 bindLet [] cont = cont
 bindLet ((x, e):xes) cont = do
   let e' = bindLet xes cont
-  upElim (fst e') x e e'
-
-upElim :: Maybe Loc -> Identifier -> CodePlus -> CodePlus -> CodePlus
-upElim ml x e1 e2 =
-  (ml, CodePiElimDownElim (ml, DataDownIntroPiIntro [x] e2) [e1])
+  (fst e', CodeUpElim x e e')
 
 exponentImmediate :: Maybe Loc -> WithEnv DataPlus
 exponentImmediate ml = do

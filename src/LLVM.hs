@@ -172,7 +172,6 @@ llvmDataLet x (m, DataEpsilonIntro (LiteralLabel label) _) cont = do
         cont
 llvmDataLet _ (_, DataEpsilonIntro _ _) _ =
   throwError "llvmDataLet.DataEpsilonIntro"
-llvmDataLet _ (_, DataDownIntroPiIntro _ _) _ = undefined
 llvmDataLet reg (_, DataSigmaIntro ds) cont = do
   xs <- mapM (const $ newNameWith "cursor") ds
   cast <- newNameWith "cast"

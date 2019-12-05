@@ -46,8 +46,6 @@ reduceCodePlus (m, CodePiElimDownElim v es) = do
     Just vs -> do
       cenv <- gets codeEnv
       case (v, exponentArgs es') of
-        ((_, DataDownIntroPiIntro xs body), _) ->
-          reduceCodePlus $ substCodePlus (zip xs vs) body
         ((_, DataTheta x), _)
           | Just (xs, body) <- lookup x cenv ->
             reduceCodePlus $ substCodePlus (zip xs vs) body
@@ -137,11 +135,12 @@ inlineCodePlus (m, CodePiElimDownElim v es) = do
   case extractUpIntro es' of
     Nothing -> return (m, CodePiElimDownElim v es')
     Just vs ->
-      case (v, exponentArgs es') of
-        ((_, DataDownIntroPiIntro xs body), _) ->
-          inlineCodePlus $ substCodePlus (zip xs vs) body
+      case (v, exponentArgs es')
+        -- ((_, DataDownIntroPiIntro xs body), _) ->
+        --   inlineCodePlus $ substCodePlus (zip xs vs) body
         -- FIXME: reduce theta when the theta is exponent
         -- i.e. reduce `A` recursively in `exponent-i A e`
+            of
         _ -> return (m, CodePiElimDownElim v es')
 inlineCodePlus (m, CodeSigmaElim xs v e) =
   case v of
