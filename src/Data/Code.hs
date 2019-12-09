@@ -1,7 +1,9 @@
 module Data.Code where
 
-import Data.Basic
 import Data.Maybe (fromMaybe)
+
+import Data.Basic
+import Data.Env
 
 -- The definition of `Data` doesn't contain those type-level definitions like `DataTau`
 -- since they are translated to "exponents" immediately after polarization (and thus in Polarize.hs).
@@ -50,43 +52,6 @@ toDataUpsilon (x, ml) = (ml, DataUpsilon x)
 
 toDataUpsilon' :: Identifier -> DataPlus
 toDataUpsilon' x = (Nothing, DataUpsilon x)
-
-varDataPlus :: DataPlus -> [Identifier]
-varDataPlus (_, DataTheta _) = []
-varDataPlus (_, DataUpsilon x) = [x]
-varDataPlus (_, DataEpsilonIntro _ _) = []
-varDataPlus (_, DataSigmaIntro vs) = concatMap varDataPlus vs
-
-varDataPlusPi :: [(Identifier, CodePlus)] -> [Identifier]
-varDataPlusPi [] = []
-varDataPlusPi ((x, n):xns) =
-  varCodePlus n ++ filterPlus (/= x) (varDataPlusPi xns)
-
-varDataPlusSigma :: [IdentifierPlus] -> [Identifier] -> [Identifier]
-varDataPlusSigma [] xs = xs
-varDataPlusSigma ((x, p):xps) xs =
-  varDataPlus p ++ filterPlus (/= x) (varDataPlusSigma xps xs)
-
-varCodePlus :: CodePlus -> [Identifier]
-varCodePlus (_, CodeTheta e) = varTheta e
-varCodePlus (_, CodeEpsilonElim x v branchList) = do
-  let (_, es) = unzip branchList
-  varDataPlus v ++ filterPlus (/= x) (concatMap varCodePlus es)
-varCodePlus (_, CodePiElimDownElim v es) =
-  varDataPlus v ++ concatMap varCodePlus es
-varCodePlus (_, CodeSigmaElim xs v e) =
-  varDataPlus v ++ filterPlus (`notElem` xs) (varCodePlus e)
-varCodePlus (_, CodeUpIntro v) = varDataPlus v
-varCodePlus (_, CodeUpElim x e1 e2) =
-  varCodePlus e1 ++ filterPlus (/= x) (varCodePlus e2)
-varCodePlus (_, CodeCopyN v1 v2) = varDataPlus v1 ++ varDataPlus v2
-varCodePlus (_, CodeTransposeN v vs) = varDataPlus v ++ concatMap varDataPlus vs
-
-varTheta :: Theta -> [Identifier]
-varTheta = undefined
-
-filterPlus :: (Identifier -> Bool) -> [Identifier] -> [Identifier]
-filterPlus = undefined
 
 type SubstDataPlus = [IdentifierPlus]
 
@@ -173,3 +138,8 @@ substDataPlusSigmaElim sub (x:xs) e = do
   let sub' = filter (\(y, _) -> y /= x) sub
   let (xs', e') = substDataPlusSigmaElim sub' xs e
   (x : xs', e')
+
+-- varSpecializeCode x (foo @ (x, (1, x)) @ y @ (z, x))
+-- ~> ([x1, x2, x3], (foo @ (x1, (1, x2)) @ y @ (z, x3)))
+varSpecializeCode :: Identifier -> CodePlus -> WithEnv ([Identifier], CodePlus)
+varSpecializeCode = undefined
