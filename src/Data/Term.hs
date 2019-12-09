@@ -1,6 +1,7 @@
 module Data.Term where
 
 import Control.Monad (forM)
+import Data.List (nubBy)
 import Data.Maybe (fromMaybe)
 
 import Data.Basic
@@ -41,29 +42,36 @@ toTermUpsilon (x, t) = do
   (MetaNonTerminal t ml, TermUpsilon x)
 
 varTermPlus :: TermPlus -> [IdentifierPlus]
-varTermPlus (_, TermTau) = []
-varTermPlus (_, TermTheta _) = []
-varTermPlus (m, TermUpsilon x) = [(x, fst $ obtainInfoMeta m)]
-varTermPlus (_, TermEpsilon _) = []
-varTermPlus (_, TermEpsilonIntro _ _) = []
-varTermPlus (_, TermEpsilonElim (x, t) e branchList) = do
-  let xhs1 = varTermPlus t
-  let xhs2 = varTermPlus e
+varTermPlus e = nubBy (\x y -> fst x == fst y) $ getClosedVarChain e
+
+getClosedVarChain :: TermPlus -> [IdentifierPlus]
+getClosedVarChain (_, TermTau) = []
+getClosedVarChain (_, TermTheta _) = []
+getClosedVarChain (m, TermUpsilon x) =
+  case m of
+    MetaTerminal _ -> [(x, (m, TermTau))]
+    MetaNonTerminal t _ -> getClosedVarChain t ++ [(x, t)]
+getClosedVarChain (_, TermEpsilon _) = []
+getClosedVarChain (_, TermEpsilonIntro _ _) = []
+getClosedVarChain (_, TermEpsilonElim (x, t) e branchList) = do
+  let xhs1 = getClosedVarChain t
+  let xhs2 = getClosedVarChain e
   xhss <-
     forM branchList $ \(_, body) -> do
-      let xs = varTermPlus body
+      let xs = getClosedVarChain body
       return (filter (\(y, _) -> y /= x) xs)
   concat (xhs1 : xhs2 : xhss)
-varTermPlus (_, TermPi xts) = varTermPlusBindings xts []
-varTermPlus (_, TermPiIntro xts e) = varTermPlusBindings xts [e]
-varTermPlus (_, TermPiElim e es) = varTermPlus e ++ concatMap varTermPlus es
-varTermPlus (_, TermMu ut e) = varTermPlusBindings [ut] [e]
+getClosedVarChain (_, TermPi xts) = getClosedVarChainBindings xts []
+getClosedVarChain (_, TermPiIntro xts e) = getClosedVarChainBindings xts [e]
+getClosedVarChain (_, TermPiElim e es) =
+  getClosedVarChain e ++ concatMap getClosedVarChain es
+getClosedVarChain (_, TermMu ut e) = getClosedVarChainBindings [ut] [e]
 
-varTermPlusBindings :: [IdentifierPlus] -> [TermPlus] -> [IdentifierPlus]
-varTermPlusBindings [] es = concatMap varTermPlus es
-varTermPlusBindings ((x, t):xts) es = do
-  let xs1 = varTermPlus t
-  let xs2 = varTermPlusBindings xts es
+getClosedVarChainBindings :: [IdentifierPlus] -> [TermPlus] -> [IdentifierPlus]
+getClosedVarChainBindings [] es = concatMap getClosedVarChain es
+getClosedVarChainBindings ((x, t):xts) es = do
+  let xs1 = getClosedVarChain t
+  let xs2 = getClosedVarChainBindings xts es
   xs1 ++ filter (\(y, _) -> y /= x) xs2
 
 pairwiseConcat :: [([a], [b])] -> ([a], [b])
