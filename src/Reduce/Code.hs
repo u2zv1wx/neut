@@ -39,12 +39,7 @@ reduceCodePlus (m, CodeEpsilonElim x v branchList) =
             Just body -> reduceCodePlus $ substCodePlus [(x, v)] body
             Nothing -> return (m, CodeEpsilonElim x v branchList)
     _ -> return (m, CodeEpsilonElim x v branchList)
-reduceCodePlus (m, CodePiElimDownElim v ds)
-  -- ds' <- mapM reduceDataPlus ds
-  -- case extractUpIntro ds' of
-  --   Nothing -> return (m, CodePiElimDownElim v ds')
-  --   Just vs -> do
- = do
+reduceCodePlus (m, CodePiElimDownElim v ds) = do
   cenv <- gets codeEnv
   case v of
     (_, DataTheta x)
