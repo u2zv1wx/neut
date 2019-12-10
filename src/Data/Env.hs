@@ -240,10 +240,57 @@ discernData z d@(ml, DataUpsilon x) =
       x' <- newNameWith z
       return ([x'], (ml, DataUpsilon x'))
 discernData z (ml, DataSigmaIntro ds) = do
-  xsds <- mapM (discernData z) ds
-  let (xss, ds') = unzip xsds
-  return (concat xss, (ml, DataSigmaIntro ds'))
+  (vss, ds') <- unzip <$> mapM (discernData z) ds
+  return (concat vss, (ml, DataSigmaIntro ds'))
 discernData _ d = return ([], d)
 
 discernCode :: Identifier -> CodePlus -> WithEnv ([Identifier], CodePlus)
-discernCode = undefined
+discernCode z (ml, CodeTheta theta) = do
+  (vs, theta') <- discernTheta z theta
+  return (vs, (ml, CodeTheta theta'))
+discernCode z (ml, CodeEpsilonElim x d branchList) = do
+  (vs, d') <- discernData z d
+  if x == z
+    then return (vs, (ml, CodeEpsilonElim x d' branchList))
+    else do
+      let (cs, es) = unzip branchList
+      (vss, es') <- unzip <$> mapM (discernCode z) es
+      return (vs ++ concat vss, (ml, CodeEpsilonElim x d' (zip cs es')))
+discernCode z (ml, CodePiElimDownElim d es) = do
+  (vs, d') <- discernData z d
+  (vss, es') <- unzip <$> mapM (discernCode z) es
+  return (vs ++ concat vss, (ml, CodePiElimDownElim d' es'))
+discernCode z (ml, CodeSigmaElim xs d e) = do
+  (vs1, d') <- discernData z d
+  if z `elem` xs
+    then return (vs1, (ml, CodeSigmaElim vs1 d' e))
+    else do
+      (vs2, e') <- discernCode z e
+      return (vs1 ++ vs2, (ml, CodeSigmaElim vs1 d' e'))
+discernCode z (ml, CodeUpIntro d) = do
+  (vs, d') <- discernData z d
+  return (vs, (ml, CodeUpIntro d'))
+discernCode z (ml, CodeUpElim x e1 e2) = do
+  (vs1, e1') <- discernCode z e1
+  if x == z
+    then return (vs1, (ml, CodeUpElim x e1' e2))
+    else do
+      (vs2, e2') <- discernCode z e2
+      return (vs1 ++ vs2, (ml, CodeUpElim x e1' e2'))
+discernCode z (ml, CodeCopyN d1 d2) = do
+  (vs1, d1') <- discernData z d1
+  (vs2, d2') <- discernData z d2
+  return (vs1 ++ vs2, (ml, CodeCopyN d1' d2'))
+discernCode z (ml, CodeTransposeN d ds) = do
+  (vs, d') <- discernData z d
+  (vss, ds') <- unzip <$> mapM (discernData z) ds
+  return (vs ++ concat vss, (ml, CodeTransposeN d' ds'))
+
+discernTheta :: Identifier -> Theta -> WithEnv ([Identifier], Theta)
+discernTheta z (ThetaArith arith lowType d1 d2) = do
+  (vs1, d1') <- discernData z d1
+  (vs2, d2') <- discernData z d2
+  return (vs1 ++ vs2, ThetaArith arith lowType d1' d2')
+discernTheta z (ThetaPrint d) = do
+  (vs, d') <- discernData z d
+  return (vs, ThetaPrint d')
