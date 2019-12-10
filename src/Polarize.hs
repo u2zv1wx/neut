@@ -203,10 +203,6 @@ exponentImmediate ml = do
       insCodeEnv thetaName [countVarName, immVarName] lamBody
       return (ml, DataTheta thetaName)
 
--- exponentSigmaを、
---   SigmaIntroN n v    === (v, ..., v) (n times)
---   SigmaElimN n x v e === let (x1, ..., xn) := v in e{x := x1, ..., xn}
--- をつかって実装できるだろうか？
 -- exponentSigma [y1, return t1, ..., yn, return tn]  (where yi : ti)  ~>
 --   lam (m, z).
 --     let (y1, ..., yn) := z in

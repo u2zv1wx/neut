@@ -61,13 +61,6 @@ llvmCode (_, CodeUpElim x e1 e2) = do
   e2' <- llvmCode e2
   return $ LLVMLet x e1' e2'
 
--- llvmCode (_, CodeCopyN len v)
---   -- allocで領域を確保する
---   -- 領域のそれぞれの要素としてvの値を入れる (setContentが使える)
---   -- 最初に確保した領域へのポインタを返す
---  = do
---   undefined
--- llvmCode (_, CodeTransposeN _ _) = undefined
 llvmCodeSigmaElim ::
      Identifier
   -> [(Identifier, Int)]
