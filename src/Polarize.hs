@@ -107,14 +107,15 @@ makeClosure ::
   -> CodePlus -- the `e` in `lam (x1, ..., xn). e`
   -> WithEnv CodePlus
 makeClosure mName fvs m xts e = do
-  let (xs, ts) = unzip xts
+  let (xs, _) = unzip xts
   let ml = snd $ obtainInfoMeta m
   let (freeVarNameList, locList, freeVarTypeList) = unzip3 fvs
   negTypeList <- mapM polarize freeVarTypeList
   expName <- newNameWith "exp"
   envExp <- exponentSigma expName ml $ map Left negTypeList
   (envVarName, envVar) <- newDataUpsilon
-  let lamBody = (ml, CodeSigmaElim freeVarNameList envVar e) -- ここのeの前にヘッダを入れる
+  e' <- withHeader (zip freeVarNameList freeVarTypeList ++ xts) e
+  let lamBody = (ml, CodeSigmaElim freeVarNameList envVar e') -- ここのeの前にヘッダを入れる
   let fvSigmaIntro =
         ( ml
         , DataSigmaIntro $ zipWith (curry toDataUpsilon) freeVarNameList locList)
@@ -155,6 +156,42 @@ callClosure m e es = do
                [typeVarName, envVarName, lamVarName]
                clsVar
                (ml, CodePiElimDownElim lamVar args))))
+
+-- withHeader [(x1, t1), (x2, t2)] e ~>
+--   bind c1 := t1^# in
+--   bind xs1 := c1 @ (n1, x1) in
+--   let (x11, ..., x1{n1}) := xs1 in
+--   bind c2 := t2^# in
+--   bind xs2 := c2 @ (n2, x2) in
+--   let (x21, ..., x2{n2}) := xs2 in
+--   e {x1 := x11, ..., x1{n1}}{x2 := x21, ..., x2{n2}}
+withHeader :: [(Identifier, TermPlus)] -> CodePlus -> WithEnv CodePlus
+withHeader [] lamBody = return lamBody
+withHeader ((x, t):xts) lamBody = do
+  e <- withHeader xts lamBody
+  (xs, e') <- discernCode x e
+  expName <- newNameWith "exp"
+  sigName <- newNameWith "sig"
+  t' <- polarize t
+  let ml = fst t'
+  return
+    ( ml
+    , CodeUpElim
+        expName
+        t'
+        ( ml
+        , CodeUpElim
+            sigName
+            ( ml
+            , CodePiElimDownElim
+                (ml, DataUpsilon expName)
+                [toRetInt ml (length xs), (ml, CodeUpIntro (ml, DataUpsilon x))])
+            (ml, CodeSigmaElim xs (ml, DataUpsilon sigName) e')))
+
+toRetInt :: Maybe Loc -> Int -> CodePlus
+toRetInt ml x =
+  ( ml
+  , CodeUpIntro (ml, DataEpsilonIntro (LiteralInteger x) (LowTypeSignedInt 64)))
 
 bindLet :: Binder -> CodePlus -> CodePlus
 bindLet [] cont = cont
