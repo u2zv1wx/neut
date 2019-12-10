@@ -3,12 +3,11 @@ module Data.Code where
 import Data.Maybe (fromMaybe)
 
 import Data.Basic
-import Data.Env
 
 -- The definition of `Data` doesn't contain those type-level definitions like `DataTau`
 -- since they are translated to "exponents" immediately after polarization (and thus in Polarize.hs).
 data Data
-  = DataTheta Identifier -- global variable
+  = DataTheta Identifier
   | DataUpsilon Identifier
   | DataEpsilonIntro Literal LowType
   | DataSigmaIntro [DataPlus]
@@ -138,8 +137,3 @@ substDataPlusSigmaElim sub (x:xs) e = do
   let sub' = filter (\(y, _) -> y /= x) sub
   let (xs', e') = substDataPlusSigmaElim sub' xs e
   (x : xs', e')
-
--- varSpecializeCode x (foo @ (x, (1, x)) @ y @ (z, x))
--- ~> ([x1, x2, x3], (foo @ (x1, (1, x2)) @ y @ (z, x3)))
-varSpecializeCode :: Identifier -> CodePlus -> WithEnv ([Identifier], CodePlus)
-varSpecializeCode = undefined

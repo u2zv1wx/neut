@@ -231,3 +231,19 @@ supplyName (Right (x, t)) = return (x, t)
 supplyName (Left t) = do
   x <- newNameWith "hole"
   return (x, t)
+
+discernData :: Identifier -> DataPlus -> WithEnv ([Identifier], DataPlus)
+discernData z d@(ml, DataUpsilon x) =
+  if x /= z
+    then return ([], d)
+    else do
+      x' <- newNameWith z
+      return ([x'], (ml, DataUpsilon x'))
+discernData z (ml, DataSigmaIntro ds) = do
+  xsds <- mapM (discernData z) ds
+  let (xss, ds') = unzip xsds
+  return (concat xss, (ml, DataSigmaIntro ds'))
+discernData _ d = return ([], d)
+
+discernCode :: Identifier -> CodePlus -> WithEnv ([Identifier], CodePlus)
+discernCode = undefined
