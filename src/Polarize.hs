@@ -52,11 +52,13 @@ polarize (m, TermPi _) = do
       ml
       [Right (envVarName, retTau), Left retEnvVar, Left retTau]
   return (ml, CodeUpIntro closureType)
-polarize (m, TermPiIntro xts e) = do
+polarize (m, TermPiIntro xts e)
+  -- let (xs, ts) = unzip xts
+ = do
   let xs = map fst xts
   let fvs = obtainFreeVarList xs e
   e' <- polarize e
-  makeClosure Nothing fvs m xs e'
+  makeClosure Nothing fvs m xts e'
 polarize (m, TermPiElim e es) = do
   e' <- polarize e
   callClosure m e' es
@@ -78,7 +80,7 @@ polarize (m, TermMu (f, t) e) = do
   lamBody' <- polarize lamBody
   -- ここはクロージャではなく直接呼び出すように最適化が可能
   -- (その場合は上のsubstTermPlusの中のTermPiElimを「直接の」callへと書き換える必要がある)
-  cls <- makeClosure (Just f) [] clsMeta nameList lamBody'
+  cls <- makeClosure (Just f) [] clsMeta fvs lamBody'
   -- cls <- makeClosure (Just f) [] clsMeta (map fst fvs) lamBody'
   callClosure m cls fvs'
 
@@ -101,10 +103,11 @@ makeClosure ::
      Maybe Identifier -- the name of newly created closure
   -> [(Identifier, Maybe Loc, TermPlus)] -- list of free variables in `lam (x1, ..., xn). e`
   -> Meta -- meta of lambda
-  -> [Identifier] -- the `(x1, ..., xn)` in `lam (x1, ..., xn). e`
+  -> [(Identifier, TermPlus)] -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
   -> CodePlus -- the `e` in `lam (x1, ..., xn). e`
   -> WithEnv CodePlus
-makeClosure mName fvs m xs e = do
+makeClosure mName fvs m xts e = do
+  let (xs, ts) = unzip xts
   let ml = snd $ obtainInfoMeta m
   let (freeVarNameList, locList, freeVarTypeList) = unzip3 fvs
   negTypeList <- mapM polarize freeVarTypeList
@@ -174,7 +177,7 @@ exponentImmediate ml = do
     Nothing -> do
       (countVarName, countVar) <- newDataUpsilon
       (immVarName, immVar) <- newDataUpsilon
-      let lamBody = (ml, CodeCopyN countVar immVar)
+      let lamBody = (ml, CodeUpIntroSigmaIntroN countVar immVar)
       insCodeEnv thetaName [countVarName, immVarName] lamBody
       return (ml, DataTheta thetaName)
 
@@ -218,7 +221,9 @@ exponentSigma lamThetaName ml mxes = do
             , CodeSigmaElim
                 (map fst xes)
                 sigVar
-                (bindLet (zip ys appList) (ml, CodeTransposeN countVar ys')))
+                (bindLet
+                   (zip ys appList)
+                   (ml, CodeSigmaElimUpIntroSigmaIntroN countVar ys')))
       insCodeEnv lamThetaName [countVarName, sigVarName] lamBody
       return sigmaExp
 
@@ -274,18 +279,21 @@ polarizeArith name op lowType m = do
   let ml = snd $ obtainInfoMeta m
   (x, varX) <- newDataUpsilon
   (y, varY) <- newDataUpsilon
+  -- どうせexponentImmediateに噛ませるのでepsilonなら何でもオーケー
+  let immediateType = (MetaTerminal ml, TermEpsilon "i64")
   makeClosure
     (Just name)
     []
     m
-    [x, y]
+    [(x, immediateType), (y, immediateType)]
     (ml, CodeTheta (ThetaArith op lowType varX varY))
 
 polarizePrint :: Identifier -> Meta -> WithEnv CodePlus
 polarizePrint name m = do
   let ml = snd $ obtainInfoMeta m
   (x, varX) <- newDataUpsilon
-  makeClosure (Just name) [] m [x] (ml, CodeTheta (ThetaPrint varX))
+  let i64Type = (MetaTerminal ml, TermEpsilon "i64")
+  makeClosure (Just name) [] m [(x, i64Type)] (ml, CodeTheta (ThetaPrint varX))
 
 newDataUpsilon :: WithEnv (Identifier, DataPlus)
 newDataUpsilon = newDataUpsilon' Nothing
