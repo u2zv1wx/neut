@@ -55,12 +55,12 @@ reduceCodePlus (m, CodeSigmaElim xs v e) =
     (_, DataSigmaIntro es)
       | length es == length xs -> reduceCodePlus $ substCodePlus (zip xs es) e
     _ -> return (m, CodeSigmaElim xs v e)
-reduceCodePlus (m, CodeCopyN v1 v2) =
+reduceCodePlus (m, CodeUpIntroSigmaIntroN v1 v2) =
   case v1 of
     (_, DataEpsilonIntro (LiteralInteger i) _) ->
       return (m, CodeUpIntro (m, DataSigmaIntro (replicate i v2)))
-    _ -> return (m, CodeCopyN v1 v2)
-reduceCodePlus (m, CodeTransposeN v vs) =
+    _ -> return (m, CodeUpIntroSigmaIntroN v1 v2)
+reduceCodePlus (m, CodeSigmaElimUpIntroSigmaIntroN v vs) =
   case v of
     (_, DataEpsilonIntro (LiteralInteger n) _) -> do
       xss <- mapM (const $ newNameList n) vs
@@ -72,7 +72,7 @@ reduceCodePlus (m, CodeTransposeN v vs) =
               ( Nothing
               , DataSigmaIntro
                   (map (toSigmaIntro . map toDataUpsilon') $ transpose xss)))
-    _ -> return (m, CodeTransposeN v vs)
+    _ -> return (m, CodeSigmaElimUpIntroSigmaIntroN v vs)
 reduceCodePlus t = return t
 
 newNameList :: Int -> WithEnv [Identifier]
@@ -149,12 +149,12 @@ inlineCodePlus (m, CodeSigmaElim xs v e) =
     _ -> do
       e' <- inlineCodePlus e
       return (m, CodeSigmaElim xs v e')
-inlineCodePlus (m, CodeCopyN v1 v2) =
+inlineCodePlus (m, CodeUpIntroSigmaIntroN v1 v2) =
   case v1 of
     (_, DataEpsilonIntro (LiteralInteger i) _) ->
       return (m, CodeUpIntro (m, DataSigmaIntro (replicate i v2)))
-    _ -> return (m, CodeCopyN v1 v2)
-inlineCodePlus (m, CodeTransposeN v vs) =
+    _ -> return (m, CodeUpIntroSigmaIntroN v1 v2)
+inlineCodePlus (m, CodeSigmaElimUpIntroSigmaIntroN v vs) =
   case v of
     (_, DataEpsilonIntro (LiteralInteger n) _) -> do
       xss <- mapM (const $ newNameList n) vs
@@ -166,5 +166,5 @@ inlineCodePlus (m, CodeTransposeN v vs) =
               ( Nothing
               , DataSigmaIntro
                   (map (toSigmaIntro . map toDataUpsilon') $ transpose xss)))
-    _ -> return (m, CodeTransposeN v vs)
+    _ -> return (m, CodeSigmaElimUpIntroSigmaIntroN v vs)
 inlineCodePlus t = return t

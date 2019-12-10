@@ -277,14 +277,14 @@ discernCode z (ml, CodeUpElim x e1 e2) = do
     else do
       (vs2, e2') <- discernCode z e2
       return (vs1 ++ vs2, (ml, CodeUpElim x e1' e2'))
-discernCode z (ml, CodeCopyN d1 d2) = do
+discernCode z (ml, CodeUpIntroSigmaIntroN d1 d2) = do
   (vs1, d1') <- discernData z d1
   (vs2, d2') <- discernData z d2
-  return (vs1 ++ vs2, (ml, CodeCopyN d1' d2'))
-discernCode z (ml, CodeTransposeN d ds) = do
+  return (vs1 ++ vs2, (ml, CodeUpIntroSigmaIntroN d1' d2'))
+discernCode z (ml, CodeSigmaElimUpIntroSigmaIntroN d ds) = do
   (vs, d') <- discernData z d
   (vss, ds') <- unzip <$> mapM (discernData z) ds
-  return (vs ++ concat vss, (ml, CodeTransposeN d' ds'))
+  return (vs ++ concat vss, (ml, CodeSigmaElimUpIntroSigmaIntroN d' ds'))
 
 discernTheta :: Identifier -> Theta -> WithEnv ([Identifier], Theta)
 discernTheta z (ThetaArith arith lowType d1 d2) = do

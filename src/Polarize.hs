@@ -111,7 +111,7 @@ makeClosure mName fvs m xs e = do
   expName <- newNameWith "exp"
   envExp <- exponentSigma expName ml $ map Left negTypeList
   (envVarName, envVar) <- newDataUpsilon
-  let lamBody = (ml, CodeSigmaElim freeVarNameList envVar e)
+  let lamBody = (ml, CodeSigmaElim freeVarNameList envVar e) -- ここのeの前にヘッダを入れる
   let fvSigmaIntro =
         ( ml
         , DataSigmaIntro $ zipWith (curry toDataUpsilon) freeVarNameList locList)
@@ -178,6 +178,10 @@ exponentImmediate ml = do
       insCodeEnv thetaName [countVarName, immVarName] lamBody
       return (ml, DataTheta thetaName)
 
+-- exponentSigmaを、
+--   SigmaIntroN n v    === (v, ..., v) (n times)
+--   SigmaElimN n x v e === let (x1, ..., xn) := v in e{x := x1, ..., xn}
+-- をつかって実装できるだろうか？
 -- exponentSigma [y1, return t1, ..., yn, return tn]  (where yi : ti)  ~>
 --   lam (m, z).
 --     let (y1, ..., yn) := z in

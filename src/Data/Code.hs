@@ -13,6 +13,8 @@ data Data
   | DataSigmaIntro [DataPlus]
   deriving (Show)
 
+-- SigmaIntroN n v    === (v, ..., v) (n times)
+-- SigmaElimN n x v e === let (x1, ..., xn) := v in e{x := x1, ..., xn}
 data Code
   = CodeTheta Theta
   | CodeEpsilonElim Identifier DataPlus [(Case, CodePlus)]
@@ -29,8 +31,8 @@ data Code
   | CodeSigmaElim [Identifier] DataPlus CodePlus
   | CodeUpIntro DataPlus
   | CodeUpElim Identifier CodePlus CodePlus
-  | CodeCopyN DataPlus DataPlus
-  | CodeTransposeN DataPlus [DataPlus]
+  | CodeUpIntroSigmaIntroN DataPlus DataPlus
+  | CodeSigmaElimUpIntroSigmaIntroN DataPlus [DataPlus]
   deriving (Show)
 
 data Theta
@@ -88,14 +90,14 @@ substCodePlus sub (m, CodeUpElim x e1 e2) = do
   let e1' = substCodePlus sub e1
   let e2' = substCodePlus sub e2
   (m, CodeUpElim x e1' e2')
-substCodePlus sub (m, CodeCopyN v1 v2) = do
+substCodePlus sub (m, CodeUpIntroSigmaIntroN v1 v2) = do
   let v1' = substDataPlus sub v1
   let v2' = substDataPlus sub v2
-  (m, CodeCopyN v1' v2')
-substCodePlus sub (m, CodeTransposeN v vs) = do
+  (m, CodeUpIntroSigmaIntroN v1' v2')
+substCodePlus sub (m, CodeSigmaElimUpIntroSigmaIntroN v vs) = do
   let v' = substDataPlus sub v
   let vs' = map (substDataPlus sub) vs
-  (m, CodeTransposeN v' vs')
+  (m, CodeSigmaElimUpIntroSigmaIntroN v' vs')
 
 substTheta :: SubstDataPlus -> Theta -> Theta
 substTheta sub (ThetaArith a t v1 v2) = do
