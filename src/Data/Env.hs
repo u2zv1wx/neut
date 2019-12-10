@@ -256,10 +256,10 @@ discernCode z (ml, CodeEpsilonElim x d branchList) = do
       let (cs, es) = unzip branchList
       (vss, es') <- unzip <$> mapM (discernCode z) es
       return (vs ++ concat vss, (ml, CodeEpsilonElim x d' (zip cs es')))
-discernCode z (ml, CodePiElimDownElim d es) = do
+discernCode z (ml, CodePiElimDownElim d ds) = do
   (vs, d') <- discernData z d
-  (vss, es') <- unzip <$> mapM (discernCode z) es
-  return (vs ++ concat vss, (ml, CodePiElimDownElim d' es'))
+  (vss, ds') <- unzip <$> mapM (discernData z) ds
+  return (vs ++ concat vss, (ml, CodePiElimDownElim d' ds'))
 discernCode z (ml, CodeSigmaElim xs d e) = do
   (vs1, d') <- discernData z d
   if z `elem` xs

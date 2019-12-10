@@ -53,9 +53,7 @@ polarize (m, TermPi _) = do
       ml
       [Right (envVarName, retTau), Left retEnvVar, Left retTau]
   return (ml, CodeUpIntro closureType)
-polarize (m, TermPiIntro xts e)
-  -- let (xs, ts) = unzip xts
- = do
+polarize (m, TermPiIntro xts e) = do
   let xs = map fst xts
   let fvs = obtainFreeVarList xs e
   e' <- polarize e
@@ -140,7 +138,6 @@ callClosure m e es = do
   (typeVarName, _) <- newDataUpsilon
   (envVarName, envVar) <- newDataUpsilon
   (lamVarName, lamVar) <- newDataUpsilon
-  let args = map (\v -> (ml, CodeUpIntro v)) $ envVar : xs
   return $
     bindLet
       ((clsVarName, e) : concat xess)
@@ -148,7 +145,7 @@ callClosure m e es = do
       , CodeSigmaElim
           [typeVarName, envVarName, lamVarName]
           clsVar
-          (ml, CodePiElimDownElim lamVar args))
+          (ml, CodePiElimDownElim lamVar (envVar : xs)))
 
 -- withHeader [(x1, t1), (x2, t2)] e ~>
 --   bind c1 := t1^# in
@@ -175,13 +172,11 @@ withHeader ((x, t):xts) lamBody = do
           ( ml
           , CodePiElimDownElim
               expVar
-              [toRetInt ml (length xs), (ml, CodeUpIntro (ml, DataUpsilon x))])
+              [toInt ml (length xs), (ml, DataUpsilon x)])
           (ml, CodeSigmaElim xs (ml, DataUpsilon sigName) e'))
 
-toRetInt :: Maybe Loc -> Int -> CodePlus
-toRetInt ml x =
-  ( ml
-  , CodeUpIntro (ml, DataEpsilonIntro (LiteralInteger x) (LowTypeSignedInt 64)))
+toInt :: Maybe Loc -> Int -> DataPlus
+toInt ml x = (ml, DataEpsilonIntro (LiteralInteger x) (LowTypeSignedInt 64))
 
 -- 注意：bindLetが束縛する変数はlinearに使用されなければならない。
 bindLet :: Binder -> CodePlus -> CodePlus
@@ -258,14 +253,13 @@ toExponentApp ::
      (CodeMeta, Data) -> Maybe Loc -> Identifier -> CodePlus -> WithEnv CodePlus
 toExponentApp countVar ml x e = do
   let ds = [countVar, toDataUpsilon (x, fst e)]
-  let ds' = map (\(ml', v) -> (ml', CodeUpIntro (ml', v))) ds
   exponentName <- newNameWith "ty"
   return
     ( ml
     , CodeUpElim
         exponentName
         e
-        (ml, CodePiElimDownElim (ml, DataUpsilon exponentName) ds'))
+        (ml, CodePiElimDownElim (ml, DataUpsilon exponentName) ds))
 
 polarizeTheta :: Meta -> Identifier -> WithEnv CodePlus
 polarizeTheta m name@"core.i8.add" = polarizeArith name ArithAdd (int 8) m

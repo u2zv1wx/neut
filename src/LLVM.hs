@@ -27,14 +27,12 @@ llvmCode :: CodePlus -> WithEnv LLVM
 llvmCode (m, CodeTheta theta) = llvmCodeTheta m theta
 llvmCode (_, CodeEpsilonElim x v branchList) =
   llvmCodeEpsilonElim x v branchList
-llvmCode (_, CodePiElimDownElim v es) = do
+llvmCode (_, CodePiElimDownElim v ds) = do
   f <- newNameWith "fun"
-  es' <- mapM llvmCode es
-  xs <- mapM (const (newNameWith "arg")) es'
+  xs <- mapM (const (newNameWith "arg")) ds
   cast <- newNameWith "cast"
-  let funPtrType = toFunPtrType es
-  llvmDataLet' [(f, v)] $
-    llvmCodeLet (zip xs es') $
+  let funPtrType = toFunPtrType ds
+  llvmDataLet' ((f, v) : zip xs ds) $
     LLVMLet cast (LLVMBitcast (LLVMDataLocal f) voidPtr funPtrType) $
     LLVMCall (LLVMDataLocal cast) (map LLVMDataLocal xs)
 llvmCode (_, CodeSigmaElim xs v e) = do
@@ -130,10 +128,6 @@ llvmCodeTheta _ (ThetaPrint v) = do
   llvmDataLet p v $
     LLVMLet c (LLVMPointerToInt (LLVMDataLocal p) voidPtr t) $
     LLVMPrint t (LLVMDataLocal c)
-
-llvmCodeLet :: [(Identifier, LLVM)] -> LLVM -> LLVM
-llvmCodeLet [] cont = cont
-llvmCodeLet ((x, e):xes) cont = LLVMLet x e $ llvmCodeLet xes cont
 
 -- `llvmDataLet x d cont` binds the data `d` to the variable `x`, and computes the
 -- continuation `cont`.

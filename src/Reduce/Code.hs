@@ -39,17 +39,18 @@ reduceCodePlus (m, CodeEpsilonElim x v branchList) =
             Just body -> reduceCodePlus $ substCodePlus [(x, v)] body
             Nothing -> return (m, CodeEpsilonElim x v branchList)
     _ -> return (m, CodeEpsilonElim x v branchList)
-reduceCodePlus (m, CodePiElimDownElim v es) = do
-  es' <- mapM reduceCodePlus es
-  case extractUpIntro es' of
-    Nothing -> return (m, CodePiElimDownElim v es')
-    Just vs -> do
-      cenv <- gets codeEnv
-      case (v, exponentArgs es') of
-        ((_, DataTheta x), _)
-          | Just (xs, body) <- lookup x cenv ->
-            reduceCodePlus $ substCodePlus (zip xs vs) body
-        _ -> return (m, CodePiElimDownElim v es')
+reduceCodePlus (m, CodePiElimDownElim v ds)
+  -- ds' <- mapM reduceDataPlus ds
+  -- case extractUpIntro ds' of
+  --   Nothing -> return (m, CodePiElimDownElim v ds')
+  --   Just vs -> do
+ = do
+  cenv <- gets codeEnv
+  case v of
+    (_, DataTheta x)
+      | Just (xs, body) <- lookup x cenv ->
+        reduceCodePlus $ substCodePlus (zip xs ds) body
+    _ -> return (m, CodePiElimDownElim v ds)
 reduceCodePlus (m, CodeSigmaElim xs v e) =
   case v of
     (_, DataSigmaIntro es)
@@ -77,18 +78,6 @@ reduceCodePlus t = return t
 
 newNameList :: Int -> WithEnv [Identifier]
 newNameList i = mapM (const $ newNameWith "var") [1 .. i]
-
-extractUpIntro :: [CodePlus] -> Maybe [DataPlus]
-extractUpIntro [] = Just []
-extractUpIntro ((_, CodeUpIntro v):es) = do
-  vs <- extractUpIntro es
-  return $ v : vs
-extractUpIntro _ = Nothing
-
-exponentArgs :: [CodePlus] -> Maybe (Int, DataPlus)
-exponentArgs [(_, CodeUpIntro (_, DataEpsilonIntro (LiteralInteger i) _)), (_, CodeUpIntro v)] =
-  Just (i, v)
-exponentArgs _ = Nothing
 
 toSigmaIntro :: [DataPlus] -> DataPlus
 toSigmaIntro ds = (Nothing, DataSigmaIntro ds)
@@ -130,18 +119,10 @@ inlineCodePlus (m, CodeEpsilonElim x v branchList) =
               es' <- mapM inlineCodePlus es
               return (m, CodeEpsilonElim x v (zip cs es'))
     _ -> return (m, CodeEpsilonElim x v branchList)
-inlineCodePlus (m, CodePiElimDownElim v es) = do
-  es' <- mapM inlineCodePlus es
-  case extractUpIntro es' of
-    Nothing -> return (m, CodePiElimDownElim v es')
-    Just vs ->
-      case (v, exponentArgs es')
-        -- ((_, DataDownIntroPiIntro xs body), _) ->
-        --   inlineCodePlus $ substCodePlus (zip xs vs) body
-        -- FIXME: reduce theta when the theta is exponent
-        -- i.e. reduce `A` recursively in `exponent-i A e`
-            of
-        _ -> return (m, CodePiElimDownElim v es')
+inlineCodePlus (m, CodePiElimDownElim v ds)
+  -- FIXME: reduce theta when the theta is exponent
+  -- i.e. reduce `A` recursively in `exponent-i A e`
+ = return (m, CodePiElimDownElim v ds)
 inlineCodePlus (m, CodeSigmaElim xs v e) =
   case v of
     (_, DataSigmaIntro es)

@@ -18,16 +18,7 @@ data Data
 data Code
   = CodeTheta Theta
   | CodeEpsilonElim Identifier DataPlus [(Case, CodePlus)]
-  -- In contrast with CBPV, the arguments are negative since they are supposed to be of type ↑P.
-  -- This modification is essential when we consider a dependent variant of CBPV translation.
-  -- Or more concretely: Since we don't have the distinction between terms and types anymore, the `A` in
-  -- `Pi (x : A). B` must be translated using the same function for terms. Thus, the `A` is
-  -- translated into a negative term `return v`, where `v` is some positive term which is supposed to be
-  -- beta-equivalent to a positive type. To extract this `v` part without resorting
-  -- pattern-matching in compiler, we need some tricks here. And the trick is: set the type of
-  -- domain of Pi-types to be negative, and translate that `A` into `bind z := A^# in ↑z`.
-  -- This is why the domain of Pi-type must be negative in dependent CBPV.
-  | CodePiElimDownElim DataPlus [CodePlus] -- ((force v) e1 ... en)
+  | CodePiElimDownElim DataPlus [DataPlus] -- ((force v) e1 ... en)
   | CodeSigmaElim [Identifier] DataPlus CodePlus
   | CodeUpIntro DataPlus
   | CodeUpElim Identifier CodePlus CodePlus
@@ -75,10 +66,10 @@ substCodePlus sub (m, CodeEpsilonElim x v branchList) = do
   let es' = map (substCodePlus (filter (\(y, _) -> y /= x) sub)) es
   let branchList' = zip cs es'
   (m, CodeEpsilonElim x v' branchList')
-substCodePlus sub (m, CodePiElimDownElim v es) = do
+substCodePlus sub (m, CodePiElimDownElim v ds) = do
   let v' = substDataPlus sub v
-  let es' = map (substCodePlus sub) es
-  (m, CodePiElimDownElim v' es')
+  let ds' = map (substDataPlus sub) ds
+  (m, CodePiElimDownElim v' ds')
 substCodePlus sub (m, CodeSigmaElim xs v e) = do
   let v' = substDataPlus sub v
   let (xs', e') = substDataPlusSigmaElim sub xs e
