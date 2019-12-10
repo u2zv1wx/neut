@@ -39,6 +39,7 @@ polarize (m, TermEpsilonElim (x, _) e bs) = do
   es' <- mapM polarize es
   (yts, y) <- polarize' e
   let ml = snd $ obtainInfoMeta m
+  -- ここではyがlinearに使用されていることに注意。
   return $ bindLet yts (ml, CodeEpsilonElim x y (zip cs es'))
 polarize (m, TermPi _) = do
   let ml = snd $ obtainInfoMeta m
@@ -93,6 +94,7 @@ obtainFreeVarList xs e = do
 
 type Binder = [(Identifier, CodePlus)]
 
+-- polarize'がつくった変数はlinearに使用するようにすること。
 polarize' :: TermPlus -> WithEnv (Binder, DataPlus)
 polarize' e@(m, _) = do
   e' <- polarize e
@@ -140,22 +142,13 @@ callClosure m e es = do
   (lamVarName, lamVar) <- newDataUpsilon
   let args = map (\v -> (ml, CodeUpIntro v)) $ envVar : xs
   return $
-    ( ml
-    , CodeUpElim
-        clsVarName -- このclsVarはlinearに使用されるのでexponentの挿入は不要。
-        e
-        (bindLet
-           (concat xess)
-           ( ml
-           , CodeSigmaElim
-               -- ここでのtypevarの取得は実際は省略可。
-               -- とはいえ、typeVarはexponentでクロージャをcopyするときに使うので落とすことはできない。
-               -- exponentについて。このsigmaElimによっては、typeVarNameはただで捨てられるから放置でよく、
-               -- かつenvVarとlamVarはlinearに使用されているから放置でよく、
-               -- したがってexponent関連の処理をおこなう必要はない。
-               [typeVarName, envVarName, lamVarName]
-               clsVar
-               (ml, CodePiElimDownElim lamVar args))))
+    bindLet
+      ((clsVarName, e) : concat xess)
+      ( ml
+      , CodeSigmaElim
+          [typeVarName, envVarName, lamVarName]
+          clsVar
+          (ml, CodePiElimDownElim lamVar args))
 
 -- withHeader [(x1, t1), (x2, t2)] e ~>
 --   bind c1 := t1^# in
@@ -170,34 +163,31 @@ withHeader [] lamBody = return lamBody
 withHeader ((x, t):xts) lamBody = do
   e <- withHeader xts lamBody
   (xs, e') <- discernCode x e
-  expName <- newNameWith "exp"
   sigName <- newNameWith "sig"
-  t' <- polarize t
-  let ml = fst t'
-  return
-    ( ml
-    , CodeUpElim
-        expName
-        t'
-        ( ml
-        , CodeUpElim
-            sigName
-            ( ml
-            , CodePiElimDownElim
-                (ml, DataUpsilon expName)
-                [toRetInt ml (length xs), (ml, CodeUpIntro (ml, DataUpsilon x))])
-            (ml, CodeSigmaElim xs (ml, DataUpsilon sigName) e')))
+  let ml = fst e
+  (xt, expVar) <- polarize' t
+  return $
+    bindLet
+      xt
+      ( ml
+      , CodeUpElim
+          sigName
+          ( ml
+          , CodePiElimDownElim
+              expVar
+              [toRetInt ml (length xs), (ml, CodeUpIntro (ml, DataUpsilon x))])
+          (ml, CodeSigmaElim xs (ml, DataUpsilon sigName) e'))
 
 toRetInt :: Maybe Loc -> Int -> CodePlus
 toRetInt ml x =
   ( ml
   , CodeUpIntro (ml, DataEpsilonIntro (LiteralInteger x) (LowTypeSignedInt 64)))
 
+-- 注意：bindLetが束縛する変数はlinearに使用されなければならない。
 bindLet :: Binder -> CodePlus -> CodePlus
 bindLet [] cont = cont
 bindLet ((x, e):xes) cont = do
   let e' = bindLet xes cont
-  -- TODO: xの使用回数にあわせてここでxについてのexponentをおこなう必要がある。
   (fst e', CodeUpElim x e e')
 
 -- imm n v ~> (v, ..., v) (n times)
