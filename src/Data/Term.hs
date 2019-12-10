@@ -41,16 +41,16 @@ toTermUpsilon (x, t) = do
   let (_, ml) = obtainInfoMeta $ fst t
   (MetaNonTerminal t ml, TermUpsilon x)
 
-varTermPlus :: TermPlus -> [IdentifierPlus]
-varTermPlus e = nubBy (\x y -> fst x == fst y) $ getClosedVarChain e
+varTermPlus :: TermPlus -> [(Identifier, Maybe Loc, TermPlus)]
+varTermPlus e = nubBy (\(x, _, _) (y, _, _) -> x == y) $ getClosedVarChain e
 
-getClosedVarChain :: TermPlus -> [IdentifierPlus]
+getClosedVarChain :: TermPlus -> [(Identifier, Maybe Loc, TermPlus)]
 getClosedVarChain (_, TermTau) = []
 getClosedVarChain (_, TermTheta _) = []
 getClosedVarChain (m, TermUpsilon x) =
   case m of
-    MetaTerminal _ -> [(x, (m, TermTau))]
-    MetaNonTerminal t _ -> getClosedVarChain t ++ [(x, t)]
+    MetaTerminal ml -> [(x, ml, (m, TermTau))]
+    MetaNonTerminal t ml -> getClosedVarChain t ++ [(x, ml, t)]
 getClosedVarChain (_, TermEpsilon _) = []
 getClosedVarChain (_, TermEpsilonIntro _ _) = []
 getClosedVarChain (_, TermEpsilonElim (x, t) e branchList) = do
@@ -59,7 +59,7 @@ getClosedVarChain (_, TermEpsilonElim (x, t) e branchList) = do
   xhss <-
     forM branchList $ \(_, body) -> do
       let xs = getClosedVarChain body
-      return (filter (\(y, _) -> y /= x) xs)
+      return (filter (\(y, _, _) -> y /= x) xs)
   concat (xhs1 : xhs2 : xhss)
 getClosedVarChain (_, TermPi xts) = getClosedVarChainBindings xts []
 getClosedVarChain (_, TermPiIntro xts e) = getClosedVarChainBindings xts [e]
@@ -67,12 +67,15 @@ getClosedVarChain (_, TermPiElim e es) =
   getClosedVarChain e ++ concatMap getClosedVarChain es
 getClosedVarChain (_, TermMu ut e) = getClosedVarChainBindings [ut] [e]
 
-getClosedVarChainBindings :: [IdentifierPlus] -> [TermPlus] -> [IdentifierPlus]
+getClosedVarChainBindings ::
+     [(Identifier, TermPlus)]
+  -> [TermPlus]
+  -> [(Identifier, Maybe Loc, TermPlus)]
 getClosedVarChainBindings [] es = concatMap getClosedVarChain es
 getClosedVarChainBindings ((x, t):xts) es = do
   let xs1 = getClosedVarChain t
   let xs2 = getClosedVarChainBindings xts es
-  xs1 ++ filter (\(y, _) -> y /= x) xs2
+  xs1 ++ filter (\(y, _, _) -> y /= x) xs2
 
 pairwiseConcat :: [([a], [b])] -> ([a], [b])
 pairwiseConcat [] = ([], [])

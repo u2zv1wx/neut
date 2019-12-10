@@ -16,7 +16,6 @@ import Prelude hiding (pi)
 import Data.Basic
 import Data.Code
 import Data.Env
-import Data.List (nubBy)
 import Data.Term
 
 polarize :: TermPlus -> WithEnv CodePlus
@@ -63,7 +62,8 @@ polarize (m, TermPiElim e es) = do
   callClosure m e' es
 polarize (m, TermMu (f, t) e) = do
   let ml = snd $ obtainInfoMeta m
-  let fvs = obtainFreeVarList [f] e
+  let (nameList, _, typeList) = unzip3 $ obtainFreeVarList [f] e
+  let fvs = zip nameList typeList
   let fvs' = map toTermUpsilon fvs
   h <- newNameWith "hole"
   let clsMuType = (MetaTerminal ml, TermPi $ fvs ++ [(h, t)])
@@ -78,15 +78,16 @@ polarize (m, TermMu (f, t) e) = do
   lamBody' <- polarize lamBody
   -- ここはクロージャではなく直接呼び出すように最適化が可能
   -- (その場合は上のsubstTermPlusの中のTermPiElimを「直接の」callへと書き換える必要がある)
-  cls <- makeClosure (Just f) [] clsMeta (map fst fvs) lamBody'
+  cls <- makeClosure (Just f) [] clsMeta nameList lamBody'
+  -- cls <- makeClosure (Just f) [] clsMeta (map fst fvs) lamBody'
   callClosure m cls fvs'
 
 -- ここを適切に型をたどるように変更すればsigmaをすべてclosedにできる
 -- varTermPlusのほうを修正する感じか。……termplusのほうなのか。
-obtainFreeVarList :: [Identifier] -> TermPlus -> [(Identifier, TermPlus)]
+obtainFreeVarList ::
+     [Identifier] -> TermPlus -> [(Identifier, Maybe Loc, TermPlus)]
 obtainFreeVarList xs e = do
-  let vs = nubBy (\x y -> fst x == fst y) $ varTermPlus e
-  filter (\(x, _) -> x `notElem` xs) vs
+  filter (\(x, _, _) -> x `notElem` xs) $ varTermPlus e
 
 type Binder = [(Identifier, CodePlus)]
 
@@ -98,20 +99,19 @@ polarize' e@(m, _) = do
 
 makeClosure ::
      Maybe Identifier -- the name of newly created closure
-  -> [(Identifier, TermPlus)] -- list of free variables in `lam (x1, ..., xn). e`
+  -> [(Identifier, Maybe Loc, TermPlus)] -- list of free variables in `lam (x1, ..., xn). e`
   -> Meta -- meta of lambda
   -> [Identifier] -- the `(x1, ..., xn)` in `lam (x1, ..., xn). e`
   -> CodePlus -- the `e` in `lam (x1, ..., xn). e`
   -> WithEnv CodePlus
 makeClosure mName fvs m xs e = do
   let ml = snd $ obtainInfoMeta m
-  let (freeVarNameList, freeVarTypeList) = unzip fvs
+  let (freeVarNameList, locList, freeVarTypeList) = unzip3 fvs
   negTypeList <- mapM polarize freeVarTypeList
   expName <- newNameWith "exp"
   envExp <- exponentSigma expName ml $ map Left negTypeList
   (envVarName, envVar) <- newDataUpsilon
-  let lamBody = (ml, CodeSigmaElim (map fst fvs) envVar e)
-  let locList = map fst negTypeList
+  let lamBody = (ml, CodeSigmaElim freeVarNameList envVar e)
   let fvSigmaIntro =
         ( ml
         , DataSigmaIntro $ zipWith (curry toDataUpsilon) freeVarNameList locList)
