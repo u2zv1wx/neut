@@ -13,7 +13,7 @@ l    ::= x
 c    ::= (epsilon-intro l)
        | (default)
 
--- pre-term
+-- term
 p, A ::= (tau)
        | (theta x)
        | (upsilon x)
@@ -23,9 +23,6 @@ p, A ::= (tau)
        | (pi ((x1 A1) ... (xn An)) A)
        | (pi-introduction ((x1 A1) ... (xn An)) e)
        | (pi-elimination e e1 ... en)
-       | (sigma ((x1 A1) ... (xn An)) B)
-       | (sigma-introduction e1 ... en)
-       | (sigma-elimination ((x1 A1) ... (xn An)) e1 e2)
        | (mu (x A) e)
        | (zeta x)
 #+END_SRC
