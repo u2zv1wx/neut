@@ -156,10 +156,14 @@ callClosure m e es = do
 --   let (x21, ..., x2{n2}) := xs2 in
 --   e {x1 := x11, ..., x1{n1}}{x2 := x21, ..., x2{n2}}
 withHeader :: [(Identifier, TermPlus)] -> CodePlus -> WithEnv CodePlus
-withHeader [] lamBody = return lamBody
-withHeader ((x, t):xts) lamBody = do
-  e <- withHeader xts lamBody
+withHeader [] body = return body
+withHeader ((x, t):xts) body = do
+  e <- withHeader xts body
   (xs, e') <- discernCode x e
+  case xs of
+    [] -> withHeaderAffine x t e'
+    [x'] -> withHeaderLinear x t x' e'
+    _ -> withHeaderRelevant x t xs e'
   sigName <- newNameWith "sig"
   let ml = fst e
   (xt, expVar) <- polarize' t
@@ -174,6 +178,12 @@ withHeader ((x, t):xts) lamBody = do
               expVar
               [toInt ml (length xs), (ml, DataUpsilon x)])
           (ml, CodeSigmaElim xs (ml, DataUpsilon sigName) e'))
+
+withHeaderAffine = undefined
+
+withHeaderLinear = undefined
+
+withHeaderRelevant = undefined
 
 toInt :: Maybe Loc -> Int -> DataPlus
 toInt ml x = (ml, DataEpsilonIntro (LiteralInteger x) (LowTypeSignedInt 64))
@@ -415,12 +425,16 @@ toAffineApp ml x e = do
     , CodeUpElim
         expVarName
         e
-        ( Nothing
+        ( ml
         , CodeSigmaElim
             [affVarName, relVarName]
             expVar
             (ml, CodePiElimDownElim affVar [toDataUpsilon (x, fst e)])))
 
+-- toRelevantApp ML x e ~>
+--   bind f := e in
+--   let (aff, rel) := f in
+--   rel @ x
 toRelevantApp :: Maybe Loc -> Identifier -> CodePlus -> WithEnv CodePlus
 toRelevantApp ml x e = do
   (expVarName, expVar) <- newDataUpsilon
@@ -431,7 +445,7 @@ toRelevantApp ml x e = do
     , CodeUpElim
         expVarName
         e
-        ( Nothing
+        ( ml
         , CodeSigmaElim
             [affVarName, relVarName]
             expVar
