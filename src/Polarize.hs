@@ -195,28 +195,88 @@ exponentImmediateAffine :: Maybe Loc -> WithEnv DataPlus
 exponentImmediateAffine ml = do
   cenv <- gets codeEnv
   let thetaName = "EXPONENT.IMMEDIATE.AFFINE"
-  let immExp = (ml, DataTheta thetaName)
+  let theta = (ml, DataTheta thetaName)
   case lookup thetaName cenv of
-    Just _ -> return immExp
+    Just _ -> return theta
     Nothing -> do
       immVarName <- newNameWith "var"
-      let affineLamBody = (Nothing, CodeUpIntro (Nothing, DataSigmaIntro []))
-      insCodeEnv thetaName [immVarName] affineLamBody
-      return immExp
+      insCodeEnv
+        thetaName
+        [immVarName]
+        (Nothing, CodeUpIntro (Nothing, DataSigmaIntro []))
+      return theta
 
 exponentImmediateRelevant :: Maybe Loc -> WithEnv DataPlus
 exponentImmediateRelevant ml = do
   cenv <- gets codeEnv
   let thetaName = "EXPONENT.IMMEDIATE.RELEVANT"
-  let immExp = (ml, DataTheta thetaName)
+  let theta = (ml, DataTheta thetaName)
   case lookup thetaName cenv of
-    Just _ -> return immExp
+    Just _ -> return theta
     Nothing -> do
       (immVarName, immVar) <- newDataUpsilon
-      let relevantLamBody =
-            (Nothing, CodeUpIntro (Nothing, DataSigmaIntro [immVar, immVar]))
-      insCodeEnv thetaName [immVarName] relevantLamBody
-      return immExp
+      insCodeEnv
+        thetaName
+        [immVarName]
+        (Nothing, CodeUpIntro (Nothing, DataSigmaIntro [immVar, immVar]))
+      return theta
+
+exponentUniv :: Maybe Loc -> WithEnv DataPlus
+exponentUniv ml = do
+  aff <- exponentUnivAffine ml
+  rel <- exponentUnivRelevant ml
+  return (ml, DataSigmaIntro [aff, rel])
+
+-- \x -> let (_, _) := x in unit
+exponentUnivAffine :: Maybe Loc -> WithEnv DataPlus
+exponentUnivAffine ml = do
+  cenv <- gets codeEnv
+  let thetaName = "EXPONENT.UNIV.AFFINE"
+  let theta = (ml, DataTheta thetaName)
+  case lookup thetaName cenv of
+    Just _ -> return theta
+    Nothing -> do
+      (univVarName, univVar) <- newDataUpsilon
+      affVarName <- newNameWith "var"
+      relVarName <- newNameWith "var"
+      insCodeEnv
+        thetaName
+        [univVarName]
+        -- let (a, b) := x in return ()
+        ( Nothing
+        , CodeSigmaElim
+            [affVarName, relVarName]
+            univVar
+            (Nothing, CodeUpIntro (Nothing, DataSigmaIntro [])))
+      return theta
+
+exponentUnivRelevant :: Maybe Loc -> WithEnv DataPlus
+exponentUnivRelevant ml = do
+  cenv <- gets codeEnv
+  let thetaName = "EXPONENT.UNIV.RELEVANT"
+  let theta = (ml, DataTheta thetaName)
+  case lookup thetaName cenv of
+    Just _ -> return theta
+    Nothing -> do
+      (univVarName, univVar) <- newDataUpsilon
+      (affVarName, affVar) <- newDataUpsilon
+      (relVarName, relVar) <- newDataUpsilon
+      insCodeEnv
+        thetaName
+        [univVarName]
+        -- let (a, b) := x in return ((a, b), (a, b))
+        ( Nothing
+        , CodeSigmaElim
+            [affVarName, relVarName]
+            univVar
+            ( Nothing
+            , CodeUpIntro
+                ( Nothing
+                , DataSigmaIntro
+                    [ (Nothing, DataSigmaIntro [affVar, relVar])
+                    , (Nothing, DataSigmaIntro [affVar, relVar])
+                    ])))
+      return theta
 
 -- exponentSigma [y1, return t1, ..., yn, return tn]  (where yi : ti)  ~>
 --   lam (m, z).
