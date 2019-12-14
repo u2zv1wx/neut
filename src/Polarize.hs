@@ -160,37 +160,103 @@ withHeader [] body = return body
 withHeader ((x, t):xts) body = do
   e <- withHeader xts body
   (xs, e') <- discernCode x e
+  t' <- polarize t
   case xs of
-    [] -> withHeaderAffine x t e'
-    [x'] -> withHeaderLinear x t x' e'
-    _ -> withHeaderRelevant x t xs e'
-  sigName <- newNameWith "sig"
+    [] -> withHeaderAffine x t' e'
+    [_] -> return e -- already linear
+    (y1:y2:ys) -> withHeaderRelevant x t' y1 y2 ys e'
+
+-- withHeaderAffine x t e ~>
+--   bind _ :=
+--     bind exp := t^# in
+--     let (aff, rel) := exp in
+--     aff @ x in
+--   e
+withHeaderAffine :: Identifier -> CodePlus -> CodePlus -> WithEnv CodePlus
+withHeaderAffine x t e = do
+  hole <- newNameWith "var"
+  discardUnusedVar <- toAffineApp Nothing x t
+  return (Nothing, CodeUpElim hole discardUnusedVar e)
+
+-- withHeaderRelevant x t [x1, ..., xn] e ~>
+--   bind exp := t^# in
+--   let (aff, rel) := exp in
+--   let sigTmp1 := rel @ x in
+--   let (x1, tmp1) := sigTmp1 in
+--   ...
+--   let sigTmp{N-1} := rel @ tmp{N-2} in
+--   let (x{N-1}, x{N}) := sigTmp{N-1} in
+--   e
+withHeaderRelevant ::
+     Identifier
+  -> CodePlus
+  -> Identifier
+  -> Identifier
+  -> [Identifier]
+  -> CodePlus
+  -> WithEnv CodePlus
+withHeaderRelevant x t y1 y2 ys e = do
+  (expVarName, expVar) <- newDataUpsilon
+  (affVarName, _) <- newDataUpsilon
+  (relVarName, relVar) <- newDataUpsilon
   let ml = fst e
-  (xt, expVar) <- polarize' t
+  rel <- withHeaderRelevant' relVar (ml, DataUpsilon x) y1 y2 ys e
+  return
+    ( ml
+    , CodeUpElim
+        expVarName
+        t
+        (ml, CodeSigmaElim [affVarName, relVarName] expVar rel))
+
+-- withHeaderRelevant' relVar x y1 y2 [y3, y4] e ~>
+--   bind sigVar1 := relVar @ x in
+--   let (y1, tmp1) := sigVar1 in
+--   bind sigVar2 := relVar @ tmp1 in
+--   let (y2, tmp2) := sigVar2 in
+--   bind sigVar3 := relVar @ tmp2 in
+--   let (y3, y4) := sigVar3 in
+--   e
+withHeaderRelevant' ::
+     DataPlus
+  -> DataPlus -- copy from
+  -> Identifier -- copy to (1)
+  -> Identifier -- copy to (2)
+  -> [Identifier]
+  -> CodePlus
+  -> WithEnv CodePlus
+withHeaderRelevant' relVar x y1 y2 [] e = do
+  let ml = fst e
+  (sigVarName, sigVar) <- newDataUpsilon
   return $
-    bindLet
-      xt
-      ( ml
-      , CodeUpElim
-          sigName
-          ( ml
-          , CodePiElimDownElim
-              expVar
-              [toInt ml (length xs), (ml, DataUpsilon x)])
-          (ml, CodeSigmaElim xs (ml, DataUpsilon sigName) e'))
+    ( ml
+    , CodeUpElim
+        sigVarName
+        (ml, CodePiElimDownElim relVar [x])
+        (ml, CodeSigmaElim [y1, y2] sigVar e))
+withHeaderRelevant' relVar x y1 y2 (y:ys) e = do
+  (tmpVarName, tmpVar) <- newDataUpsilon
+  let ml = fst e
+  (sigVarName, sigVar) <- newDataUpsilon
+  -- e' =
+  --   bind someNewVar := relVar @ tmpVar in
+  --   let (y2, NOT_KNOWN_YET) := someNewVar in
+  --   ...
+  --   e
+  e' <- withHeaderRelevant' relVar tmpVar y2 y ys e
+  -- resulting term:
+  --   bind sigVar := relVar @ x in
+  --   let (y1, tmpVar) := sigVar in
+  --   bind someNewVar := relVar @ tmpVar in     ---
+  --   let (y2, NOT_KNOWN_YET) := someNewVar in  ---  e'
+  --   ...                                       ---
+  --   e                                         ---
+  return $
+    ( ml
+    , CodeUpElim
+        sigVarName
+        (ml, CodePiElimDownElim relVar [x])
+        (ml, CodeSigmaElim [y1, tmpVarName] sigVar e'))
 
-withHeaderAffine :: Identifier -> TermPlus -> CodePlus -> WithEnv CodePlus
-withHeaderAffine = undefined
-
-withHeaderLinear :: Identifier -> TermPlus -> Identifier -> WithEnv CodePlus
-withHeaderLinear = undefined
-
-withHeaderRelevant = undefined
-
-toInt :: Maybe Loc -> Int -> DataPlus
-toInt ml x = (ml, DataEpsilonIntro (LiteralInteger x) (LowTypeSignedInt 64))
-
--- 注意：bindLetが束縛する変数はlinearに使用されなければならない。
 bindLet :: Binder -> CodePlus -> CodePlus
 bindLet [] cont = cont
 bindLet ((x, e):xes) cont = do
