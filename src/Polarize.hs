@@ -179,8 +179,10 @@ withHeader ((x, t):xts) body = do
               [toInt ml (length xs), (ml, DataUpsilon x)])
           (ml, CodeSigmaElim xs (ml, DataUpsilon sigName) e'))
 
+withHeaderAffine :: Identifier -> TermPlus -> CodePlus -> WithEnv CodePlus
 withHeaderAffine = undefined
 
+withHeaderLinear :: Identifier -> TermPlus -> Identifier -> WithEnv CodePlus
 withHeaderLinear = undefined
 
 withHeaderRelevant = undefined
