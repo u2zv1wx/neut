@@ -37,8 +37,8 @@ parse' ((_, TreeNode [(_, TreeAtom "notation"), from, to]):as) =
     else do
       modify (\e -> e {notationEnv = (from, to) : notationEnv e})
       parse' as
-parse' ((_, TreeNode [(_, TreeAtom "reserve"), (_, TreeAtom s)]):as) = do
-  modify (\e -> e {reservedEnv = s : reservedEnv e})
+parse' ((_, TreeNode [(_, TreeAtom "keyword"), (_, TreeAtom s)]):as) = do
+  modify (\e -> e {keyworddEnv = s : keyworddEnv e})
   parse' as
 parse' ((_, TreeNode ((_, TreeAtom "epsilon"):(_, TreeAtom name):ts)):as) = do
   indexList <- mapM extractIdentifier ts
@@ -94,7 +94,7 @@ parse' (a:as)
 
 isSpecialForm :: TreePlus -> Bool
 isSpecialForm (_, TreeNode [(_, TreeAtom "notation"), _, _]) = True
-isSpecialForm (_, TreeNode [(_, TreeAtom "reserve"), (_, TreeAtom _)]) = True
+isSpecialForm (_, TreeNode [(_, TreeAtom "keyword"), (_, TreeAtom _)]) = True
 isSpecialForm (_, TreeNode ((_, TreeAtom "epsilon"):(_, TreeAtom _):_)) = True
 isSpecialForm (_, TreeNode [(_, TreeAtom "include"), (_, TreeAtom _)]) = True
 isSpecialForm (_, TreeNode [(_, TreeAtom "extern"), (_, TreeAtom _)]) = True

@@ -1,39 +1,39 @@
-;; reserve primitive keywords
+;; reserve keywords
 
-(reserve forall)
+(keyword forall)
 
-(reserve arrow)
+(keyword arrow)
 
-(reserve lambda)
+(keyword lambda)
 
-(reserve apply)
+(keyword apply)
 
-(reserve exists)
+(keyword exists)
 
-(reserve product)
+(keyword product)
 
-(reserve pair)
+(keyword pair)
 
-(reserve case)
+(keyword case)
 
-(reserve universe)
+(keyword universe)
 
-(reserve mu)
+(keyword mu)
 
-(reserve module)
+(keyword module)
 
-(reserve include)
+(keyword include)
 
-(reserve use)
+(keyword use)
 
 ;; define basic notations
 
 ;; sequential execution
-(reserve let)
+(keyword let)
 
-(reserve do)
+(keyword do)
 
-(reserve definition)
+(keyword definition)
 
 (notation (do e)
   e)
@@ -57,6 +57,6 @@
   (let name (mu name (lambda (x+) (do e+)))))
 
 ;; shorthands for types
-(reserve type)
+(keyword type)
 
 (notation type universe)
