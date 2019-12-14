@@ -185,23 +185,38 @@ bindLet ((x, e):xes) cont = do
   let e' = bindLet xes cont
   (fst e', CodeUpElim x e e')
 
--- imm n v ~> (v, ..., v) (n times)
--- ここでは「変数はlinearに使用されなければならない」という制約ははたらかない。
--- exponentがprimitiveとしてあるような言語において変数がlinearに使用されている、ってのがポイントなので。
--- exponentの中身は変数の仕様についての治外法権。
 exponentImmediate :: Maybe Loc -> WithEnv DataPlus
 exponentImmediate ml = do
+  aff <- exponentImmediateAffine ml
+  rel <- exponentImmediateRelevant ml
+  return (ml, DataSigmaIntro [aff, rel])
+
+exponentImmediateAffine :: Maybe Loc -> WithEnv DataPlus
+exponentImmediateAffine ml = do
   cenv <- gets codeEnv
-  let thetaName = "EXPONENT.IMMEDIATE"
+  let thetaName = "EXPONENT.IMMEDIATE.AFFINE"
   let immExp = (ml, DataTheta thetaName)
   case lookup thetaName cenv of
     Just _ -> return immExp
     Nothing -> do
-      (countVarName, countVar) <- newDataUpsilon
+      immVarName <- newNameWith "var"
+      let affineLamBody = (Nothing, CodeUpIntro (Nothing, DataSigmaIntro []))
+      insCodeEnv thetaName [immVarName] affineLamBody
+      return immExp
+
+exponentImmediateRelevant :: Maybe Loc -> WithEnv DataPlus
+exponentImmediateRelevant ml = do
+  cenv <- gets codeEnv
+  let thetaName = "EXPONENT.IMMEDIATE.RELEVANT"
+  let immExp = (ml, DataTheta thetaName)
+  case lookup thetaName cenv of
+    Just _ -> return immExp
+    Nothing -> do
       (immVarName, immVar) <- newDataUpsilon
-      let lamBody = (ml, CodeUpIntroSigmaIntroN countVar immVar)
-      insCodeEnv thetaName [countVarName, immVarName] lamBody
-      return (ml, DataTheta thetaName)
+      let relevantLamBody =
+            (Nothing, CodeUpIntro (Nothing, DataSigmaIntro [immVar, immVar]))
+      insCodeEnv thetaName [immVarName] relevantLamBody
+      return immExp
 
 -- exponentSigma [y1, return t1, ..., yn, return tn]  (where yi : ti)  ~>
 --   lam (m, z).
