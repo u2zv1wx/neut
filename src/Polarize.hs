@@ -79,12 +79,10 @@ polarize (m, TermMu (f, t) e) = do
   lamBody' <- polarize lamBody
   -- ここはクロージャではなく直接呼び出すように最適化が可能
   -- (その場合は上のsubstTermPlusの中のTermPiElimを「直接の」callへと書き換える必要がある)
+  -- いや、clsにすぐcallClosureしてるから、インライン展開で結局直接の呼び出しになるのでは？
   cls <- makeClosure (Just f) [] clsMeta fvs lamBody'
-  -- cls <- makeClosure (Just f) [] clsMeta (map fst fvs) lamBody'
   callClosure m cls fvs'
 
--- ここを適切に型をたどるように変更すればsigmaをすべてclosedにできる
--- varTermPlusのほうを修正する感じか。……termplusのほうなのか。
 obtainFreeVarList ::
      [Identifier] -> TermPlus -> [(Identifier, Maybe Loc, TermPlus)]
 obtainFreeVarList xs e = do
@@ -115,7 +113,7 @@ makeClosure mName fvs m xts e = do
   envExp <- cartesianSigma expName ml $ map Left negTypeList
   (envVarName, envVar) <- newDataUpsilon
   e' <- withHeader (zip freeVarNameList freeVarTypeList ++ xts) e
-  let lamBody = (ml, CodeSigmaElim freeVarNameList envVar e') -- ここのeの前にヘッダを入れる
+  let lamBody = (ml, CodeSigmaElim freeVarNameList envVar e')
   let fvSigmaIntro =
         ( ml
         , DataSigmaIntro $ zipWith (curry toDataUpsilon) freeVarNameList locList)
