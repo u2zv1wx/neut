@@ -182,8 +182,8 @@ toInt ml x = (ml, DataEpsilonIntro (LiteralInteger x) (LowTypeSignedInt 64))
 bindLet :: Binder -> CodePlus -> CodePlus
 bindLet [] cont = cont
 bindLet ((x, e):xes) cont = do
-  let e' = bindLet xes cont
-  (fst e', CodeUpElim x e e')
+  let cont' = bindLet xes cont
+  (fst cont', CodeUpElim x e cont')
 
 exponentImmediate :: Maybe Loc -> WithEnv DataPlus
 exponentImmediate ml = do
@@ -278,60 +278,176 @@ exponentUnivRelevant ml = do
                     ])))
       return theta
 
--- exponentSigma [y1, return t1, ..., yn, return tn]  (where yi : ti)  ~>
---   lam (m, z).
---     let (y1, ..., yn) := z in
---     bind f1 = return t1 in
---     bind ys1 = f1 @ (m, y1) in
---     ...
---     bind fn = return tn in
---     bind ysn = fn @ (m, yn) in -- ここまではコードとしてstaticに書ける
---     let (ys1-1, ..., ys1-m) := ys1 in -- ここでm-elimが必要になる。
---     ...
---     let (ysn-1, ..., ysn-m) := ysn in
---     ((ys1-1, ..., ysn-1), ..., (ys1-m, ..., ysn-m))
---
--- (Note that Sigma (y1 : t1, ..., yn : tn) must be closed.)
 exponentSigma ::
      Identifier
   -> Maybe Loc
   -> [Either CodePlus (Identifier, CodePlus)]
   -> WithEnv DataPlus
-exponentSigma lamThetaName ml mxes = do
+exponentSigma thetaName ml mxes = do
+  aff <- exponentSigmaAffine thetaName ml mxes
+  rel <- exponentSigmaRelevant thetaName ml mxes
+  return (ml, DataSigmaIntro [aff, rel])
+
+-- (Assuming `ei` = `return di` for some `di` such that `xi : di`)
+-- exponentSigmaAffine NAME LOC [x1, e1, ..., xn, en]   ~>
+--   update CodeEnv with NAME ~> (thunk LAM), where LAM is:
+--   lam z.
+--     let (x1, ..., xn) := z in
+--     bind y1 :=
+--       bind f1 = e1 in              ---
+--       let (aff-1, rel-1) = f1 in   ---  APP-1
+--       aff-1 @ x1 in                ---
+--     ...
+--     bind yn :=
+--       bind fn = en in              ---
+--       let (aff-n, rel-n) := fn in  --- APP-n
+--       aff-n @ xn in                ---
+--     return ()
+-- (Note that sigma-elim for yi is not necessary since all of them are units.)
+exponentSigmaAffine ::
+     Identifier
+  -> Maybe Loc
+  -> [Either CodePlus (Identifier, CodePlus)]
+  -> WithEnv DataPlus
+exponentSigmaAffine thetaName ml mxes = do
   cenv <- gets codeEnv
-  let sigmaExp = (ml, DataTheta lamThetaName)
-  case lookup lamThetaName cenv of
-    Just _ -> return sigmaExp
+  let theta = (ml, DataTheta thetaName)
+  case lookup thetaName cenv of
+    Just _ -> return theta
     Nothing -> do
       xes <- mapM supplyName mxes
-      (countVarName, countVar) <- newDataUpsilon
       (sigVarName, sigVar) <- newDataUpsilon
-      appList <- forM xes $ \(x, e) -> toExponentApp countVar ml x e
+      -- appList == [APP-1, ..., APP-n]
+      appList <- forM xes $ \(x, e) -> toAffineApp ml x e
       ys <- mapM (const $ newNameWith "var") xes
-      let ys' = map toDataUpsilon' ys
-      let lamBody =
-            ( ml
-            , CodeSigmaElim
-                (map fst xes)
-                sigVar
-                (bindLet
-                   (zip ys appList)
-                   (ml, CodeSigmaElimUpIntroSigmaIntroN countVar ys')))
-      insCodeEnv lamThetaName [countVarName, sigVarName] lamBody
-      return sigmaExp
+      insCodeEnv
+        thetaName
+        [sigVarName]
+        ( ml
+        , CodeSigmaElim
+            (map fst xes)
+            sigVar
+            (bindLet (zip ys appList) (ml, CodeUpIntro (ml, DataSigmaIntro []))))
+      return theta
 
-toExponentApp ::
-     (CodeMeta, Data) -> Maybe Loc -> Identifier -> CodePlus -> WithEnv CodePlus
-toExponentApp countVar ml x e = do
-  let ds = [countVar, toDataUpsilon (x, fst e)]
-  exponentName <- newNameWith "ty"
+-- (Assuming `ei` = `return di` for some `di` such that `xi : di`)
+-- exponentSigmaRelevant NAME LOC [x1, e1, ..., xn, en]   ~>
+--   update CodeEnv with NAME ~> (thunk LAM), where LAM is:
+--   lam z.
+--     let (x1, ..., xn) := z in
+--     bind pair-1 :=
+--       bind f1 = e1 in              ---
+--       let (aff-1, rel-1) = f1 in   ---  APP-1
+--       rel-1 @ x1 in                ---
+--     ...
+--     bind pair-n :=
+--       bind fn = en in              ---
+--       let (aff-n, rel-n) := fn in  --- APP-n
+--       rel-n @ xn in                ---
+--     let (p11, p12) := pair-1 in               ---
+--     ...                                       --- TRANSPOSE-SIGMA
+--     let (pn1, pn2) := pair-n in               ---
+--     return ((p11, ..., pn1), (p12, ..., pn2)) ---
+exponentSigmaRelevant ::
+     Identifier
+  -> Maybe Loc
+  -> [Either CodePlus (Identifier, CodePlus)]
+  -> WithEnv DataPlus
+exponentSigmaRelevant thetaName ml mxes = do
+  cenv <- gets codeEnv
+  let theta = (ml, DataTheta thetaName)
+  case lookup thetaName cenv of
+    Just _ -> return theta
+    Nothing -> do
+      xes <- mapM supplyName mxes
+      (sigVarName, sigVar) <- newDataUpsilon
+      -- appList == [APP-1, ..., APP-n]
+      appList <- forM xes $ \(x, e) -> toRelevantApp ml x e
+      (pairVarNameList, pairVarList) <-
+        unzip <$> mapM (const $ newDataUpsilon) xes
+      transposedPair <- transposeSigma pairVarList
+      insCodeEnv
+        thetaName
+        [sigVarName]
+        ( ml
+        , CodeSigmaElim
+            (map fst xes)
+            sigVar
+            (bindLet (zip pairVarNameList appList) transposedPair))
+      return theta
+
+-- transposeSigma [d1, ..., dn] :=
+--   let (x1, y1) := d1 in
+--   ...
+--   let (xn, yn) := dn in
+--   return ((x1, ..., xn), (y1, ..., yn))
+transposeSigma :: [DataPlus] -> WithEnv CodePlus
+transposeSigma ds = do
+  (xVarNameList, xVarList) <- unzip <$> mapM (const $ newDataUpsilon) ds
+  (yVarNameList, yVarList) <- unzip <$> mapM (const $ newDataUpsilon) ds
+  return $
+    bindSigmaElim (zip (zip xVarNameList yVarNameList) ds) $
+    ( Nothing
+    , CodeUpIntro
+        ( Nothing
+        , DataSigmaIntro
+            [ (Nothing, DataSigmaIntro xVarList)
+            , (Nothing, DataSigmaIntro yVarList)
+            ]))
+
+bindSigmaElim :: [((Identifier, Identifier), DataPlus)] -> CodePlus -> CodePlus
+bindSigmaElim [] cont = cont
+bindSigmaElim (((x, y), d):xyds) cont = do
+  let cont' = bindSigmaElim xyds cont
+  (fst cont', CodeSigmaElim [x, y] d cont')
+
+-- toAffineApp ML x e ~>
+--   bind f := e in
+--   let (aff, rel) := f in
+--   aff @ x
+toAffineApp :: Maybe Loc -> Identifier -> CodePlus -> WithEnv CodePlus
+toAffineApp ml x e = do
+  (expVarName, expVar) <- newDataUpsilon
+  (affVarName, affVar) <- newDataUpsilon
+  (relVarName, _) <- newDataUpsilon
   return
     ( ml
     , CodeUpElim
-        exponentName
+        expVarName
         e
-        (ml, CodePiElimDownElim (ml, DataUpsilon exponentName) ds))
+        ( Nothing
+        , CodeSigmaElim
+            [affVarName, relVarName]
+            expVar
+            (ml, CodePiElimDownElim affVar [toDataUpsilon (x, fst e)])))
 
+toRelevantApp :: Maybe Loc -> Identifier -> CodePlus -> WithEnv CodePlus
+toRelevantApp ml x e = do
+  (expVarName, expVar) <- newDataUpsilon
+  (affVarName, _) <- newDataUpsilon
+  (relVarName, relVar) <- newDataUpsilon
+  return
+    ( ml
+    , CodeUpElim
+        expVarName
+        e
+        ( Nothing
+        , CodeSigmaElim
+            [affVarName, relVarName]
+            expVar
+            (ml, CodePiElimDownElim relVar [toDataUpsilon (x, fst e)])))
+
+-- toExponentApp ::
+--      (CodeMeta, Data) -> Maybe Loc -> Identifier -> CodePlus -> WithEnv CodePlus
+-- toExponentApp countVar ml x e = do
+--   let ds = [countVar, toDataUpsilon (x, fst e)]
+--   exponentName <- newNameWith "ty"
+--   return
+--     ( ml
+--     , CodeUpElim
+--         exponentName
+--         e
+--         (ml, CodePiElimDownElim (ml, DataUpsilon exponentName) ds))
 polarizeTheta :: Meta -> Identifier -> WithEnv CodePlus
 polarizeTheta m name@"core.i8.add" = polarizeArith name ArithAdd (int 8) m
 polarizeTheta m name@"core.i16.add" = polarizeArith name ArithAdd (int 16) m
