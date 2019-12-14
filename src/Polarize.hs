@@ -147,14 +147,6 @@ callClosure m e es = do
           clsVar
           (ml, CodePiElimDownElim lamVar (envVar : xs)))
 
--- withHeader [(x1, t1), (x2, t2)] e ~>
---   bind c1 := t1^# in
---   bind xs1 := c1 @ (n1, x1) in
---   let (x11, ..., x1{n1}) := xs1 in
---   bind c2 := t2^# in
---   bind xs2 := c2 @ (n2, x2) in
---   let (x21, ..., x2{n2}) := xs2 in
---   e {x1 := x11, ..., x1{n1}}{x2 := x21, ..., x2{n2}}
 withHeader :: [(Identifier, TermPlus)] -> CodePlus -> WithEnv CodePlus
 withHeader [] body = return body
 withHeader ((x, t):xts) body = do
@@ -178,7 +170,7 @@ withHeaderAffine x t e = do
   discardUnusedVar <- toAffineApp Nothing x t
   return (Nothing, CodeUpElim hole discardUnusedVar e)
 
--- withHeaderRelevant x t [x1, ..., xn] e ~>
+-- withHeaderRelevant x t [x1, ..., x{N}] e ~>
 --   bind exp := t^# in
 --   let (aff, rel) := exp in
 --   let sigTmp1 := rel @ x in
