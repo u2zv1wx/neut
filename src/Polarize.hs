@@ -21,7 +21,7 @@ import Data.Term
 polarize :: TermPlus -> WithEnv CodePlus
 polarize (m, TermTau) = do
   let ml = snd $ obtainInfoMeta m
-  v <- exponentUniv ml
+  v <- cartesianUniv ml
   return (ml, CodeUpIntro v)
 polarize (m, TermTheta x) = polarizeTheta m x
 polarize (m, TermUpsilon x) = do
@@ -29,7 +29,7 @@ polarize (m, TermUpsilon x) = do
   return (ml, CodeUpIntro (ml, DataUpsilon x))
 polarize (m, TermEpsilon _) = do
   let ml = snd $ obtainInfoMeta m
-  v <- exponentImmediate ml
+  v <- cartesianImmediate ml
   return (ml, CodeUpIntro v)
 polarize (m, TermEpsilonIntro l lowType) = do
   let ml = snd $ obtainInfoMeta m
@@ -43,12 +43,12 @@ polarize (m, TermEpsilonElim (x, _) e bs) = do
   return $ bindLet yts (ml, CodeEpsilonElim x y (zip cs es'))
 polarize (m, TermPi _) = do
   let ml = snd $ obtainInfoMeta m
-  tau <- exponentImmediate ml
+  tau <- cartesianImmediate ml
   (envVarName, envVar) <- newDataUpsilon
   let retTau = (ml, CodeUpIntro tau)
   let retEnvVar = (ml, CodeUpIntro envVar)
   closureType <-
-    exponentSigma
+    cartesianSigma
       "CLS"
       ml
       [Right (envVarName, retTau), Left retEnvVar, Left retTau]
@@ -112,7 +112,7 @@ makeClosure mName fvs m xts e = do
   let (freeVarNameList, locList, freeVarTypeList) = unzip3 fvs
   negTypeList <- mapM polarize freeVarTypeList
   expName <- newNameWith "exp"
-  envExp <- exponentSigma expName ml $ map Left negTypeList
+  envExp <- cartesianSigma expName ml $ map Left negTypeList
   (envVarName, envVar) <- newDataUpsilon
   e' <- withHeader (zip freeVarNameList freeVarTypeList ++ xts) e
   let lamBody = (ml, CodeSigmaElim freeVarNameList envVar e') -- ここのeの前にヘッダを入れる
@@ -185,14 +185,14 @@ bindLet ((x, e):xes) cont = do
   let cont' = bindLet xes cont
   (fst cont', CodeUpElim x e cont')
 
-exponentImmediate :: Maybe Loc -> WithEnv DataPlus
-exponentImmediate ml = do
-  aff <- exponentImmediateAffine ml
-  rel <- exponentImmediateRelevant ml
+cartesianImmediate :: Maybe Loc -> WithEnv DataPlus
+cartesianImmediate ml = do
+  aff <- affineImmediate ml
+  rel <- relevantImmediate ml
   return (ml, DataSigmaIntro [aff, rel])
 
-exponentImmediateAffine :: Maybe Loc -> WithEnv DataPlus
-exponentImmediateAffine ml = do
+affineImmediate :: Maybe Loc -> WithEnv DataPlus
+affineImmediate ml = do
   cenv <- gets codeEnv
   let thetaName = "EXPONENT.IMMEDIATE.AFFINE"
   let theta = (ml, DataTheta thetaName)
@@ -206,8 +206,8 @@ exponentImmediateAffine ml = do
         (Nothing, CodeUpIntro (Nothing, DataSigmaIntro []))
       return theta
 
-exponentImmediateRelevant :: Maybe Loc -> WithEnv DataPlus
-exponentImmediateRelevant ml = do
+relevantImmediate :: Maybe Loc -> WithEnv DataPlus
+relevantImmediate ml = do
   cenv <- gets codeEnv
   let thetaName = "EXPONENT.IMMEDIATE.RELEVANT"
   let theta = (ml, DataTheta thetaName)
@@ -221,15 +221,15 @@ exponentImmediateRelevant ml = do
         (Nothing, CodeUpIntro (Nothing, DataSigmaIntro [immVar, immVar]))
       return theta
 
-exponentUniv :: Maybe Loc -> WithEnv DataPlus
-exponentUniv ml = do
-  aff <- exponentUnivAffine ml
-  rel <- exponentUnivRelevant ml
+cartesianUniv :: Maybe Loc -> WithEnv DataPlus
+cartesianUniv ml = do
+  aff <- affineUniv ml
+  rel <- relevantUniv ml
   return (ml, DataSigmaIntro [aff, rel])
 
 -- \x -> let (_, _) := x in unit
-exponentUnivAffine :: Maybe Loc -> WithEnv DataPlus
-exponentUnivAffine ml = do
+affineUniv :: Maybe Loc -> WithEnv DataPlus
+affineUniv ml = do
   cenv <- gets codeEnv
   let thetaName = "EXPONENT.UNIV.AFFINE"
   let theta = (ml, DataTheta thetaName)
@@ -250,8 +250,8 @@ exponentUnivAffine ml = do
             (Nothing, CodeUpIntro (Nothing, DataSigmaIntro [])))
       return theta
 
-exponentUnivRelevant :: Maybe Loc -> WithEnv DataPlus
-exponentUnivRelevant ml = do
+relevantUniv :: Maybe Loc -> WithEnv DataPlus
+relevantUniv ml = do
   cenv <- gets codeEnv
   let thetaName = "EXPONENT.UNIV.RELEVANT"
   let theta = (ml, DataTheta thetaName)
@@ -278,18 +278,18 @@ exponentUnivRelevant ml = do
                     ])))
       return theta
 
-exponentSigma ::
+cartesianSigma ::
      Identifier
   -> Maybe Loc
   -> [Either CodePlus (Identifier, CodePlus)]
   -> WithEnv DataPlus
-exponentSigma thetaName ml mxes = do
-  aff <- exponentSigmaAffine thetaName ml mxes
-  rel <- exponentSigmaRelevant thetaName ml mxes
+cartesianSigma thetaName ml mxes = do
+  aff <- affineSigma thetaName ml mxes
+  rel <- relevantSigma thetaName ml mxes
   return (ml, DataSigmaIntro [aff, rel])
 
 -- (Assuming `ei` = `return di` for some `di` such that `xi : di`)
--- exponentSigmaAffine NAME LOC [x1, e1, ..., xn, en]   ~>
+-- affineSigma NAME LOC [x1, e1, ..., xn, en]   ~>
 --   update CodeEnv with NAME ~> (thunk LAM), where LAM is:
 --   lam z.
 --     let (x1, ..., xn) := z in
@@ -304,12 +304,12 @@ exponentSigma thetaName ml mxes = do
 --       aff-n @ xn in                ---
 --     return ()
 -- (Note that sigma-elim for yi is not necessary since all of them are units.)
-exponentSigmaAffine ::
+affineSigma ::
      Identifier
   -> Maybe Loc
   -> [Either CodePlus (Identifier, CodePlus)]
   -> WithEnv DataPlus
-exponentSigmaAffine thetaName ml mxes = do
+affineSigma thetaName ml mxes = do
   cenv <- gets codeEnv
   let theta = (ml, DataTheta thetaName)
   case lookup thetaName cenv of
@@ -331,7 +331,7 @@ exponentSigmaAffine thetaName ml mxes = do
       return theta
 
 -- (Assuming `ei` = `return di` for some `di` such that `xi : di`)
--- exponentSigmaRelevant NAME LOC [x1, e1, ..., xn, en]   ~>
+-- relevantSigma NAME LOC [x1, e1, ..., xn, en]   ~>
 --   update CodeEnv with NAME ~> (thunk LAM), where LAM is:
 --   lam z.
 --     let (x1, ..., xn) := z in
@@ -348,12 +348,12 @@ exponentSigmaAffine thetaName ml mxes = do
 --     ...                                       --- TRANSPOSE-SIGMA
 --     let (pn1, pn2) := pair-n in               ---
 --     return ((p11, ..., pn1), (p12, ..., pn2)) ---
-exponentSigmaRelevant ::
+relevantSigma ::
      Identifier
   -> Maybe Loc
   -> [Either CodePlus (Identifier, CodePlus)]
   -> WithEnv DataPlus
-exponentSigmaRelevant thetaName ml mxes = do
+relevantSigma thetaName ml mxes = do
   cenv <- gets codeEnv
   let theta = (ml, DataTheta thetaName)
   case lookup thetaName cenv of
@@ -476,7 +476,7 @@ polarizeArith name op lowType m = do
   let ml = snd $ obtainInfoMeta m
   (x, varX) <- newDataUpsilon
   (y, varY) <- newDataUpsilon
-  -- どうせexponentImmediateに噛ませるのでepsilonなら何でもオーケー
+  -- どうせcartesianImmediateに噛ませるのでepsilonなら何でもオーケー
   let immediateType = (MetaTerminal ml, TermEpsilon "i64")
   makeClosure
     (Just name)
