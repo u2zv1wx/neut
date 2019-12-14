@@ -4,7 +4,6 @@ module Reduce.Code
   ) where
 
 import Control.Monad.State
-import Data.List (transpose)
 
 import Data.Basic
 import Data.Code
@@ -51,36 +50,7 @@ reduceCodePlus (m, CodeSigmaElim xs v e) =
     (_, DataSigmaIntro es)
       | length es == length xs -> reduceCodePlus $ substCodePlus (zip xs es) e
     _ -> return (m, CodeSigmaElim xs v e)
-reduceCodePlus (m, CodeUpIntroSigmaIntroN v1 v2) =
-  case v1 of
-    (_, DataEpsilonIntro (LiteralInteger i) _) ->
-      return (m, CodeUpIntro (m, DataSigmaIntro (replicate i v2)))
-    _ -> return (m, CodeUpIntroSigmaIntroN v1 v2)
-reduceCodePlus (m, CodeSigmaElimUpIntroSigmaIntroN v vs) =
-  case v of
-    (_, DataEpsilonIntro (LiteralInteger n) _) -> do
-      xss <- mapM (const $ newNameList n) vs
-      return $
-        toSigmaElimSeq
-          (zip xss vs)
-          ( Nothing
-          , CodeUpIntro
-              ( Nothing
-              , DataSigmaIntro
-                  (map (toSigmaIntro . map toDataUpsilon') $ transpose xss)))
-    _ -> return (m, CodeSigmaElimUpIntroSigmaIntroN v vs)
 reduceCodePlus t = return t
-
-newNameList :: Int -> WithEnv [Identifier]
-newNameList i = mapM (const $ newNameWith "var") [1 .. i]
-
-toSigmaIntro :: [DataPlus] -> DataPlus
-toSigmaIntro ds = (Nothing, DataSigmaIntro ds)
-
-toSigmaElimSeq :: [([Identifier], DataPlus)] -> CodePlus -> CodePlus
-toSigmaElimSeq [] cont = cont
-toSigmaElimSeq ((xs, d):xsds) cont =
-  (Nothing, CodeSigmaElim xs d (toSigmaElimSeq xsds cont))
 
 inlineCodePlus :: CodePlus -> WithEnv CodePlus
 inlineCodePlus (m, CodeTheta theta) =
@@ -125,22 +95,4 @@ inlineCodePlus (m, CodeSigmaElim xs v e) =
     _ -> do
       e' <- inlineCodePlus e
       return (m, CodeSigmaElim xs v e')
-inlineCodePlus (m, CodeUpIntroSigmaIntroN v1 v2) =
-  case v1 of
-    (_, DataEpsilonIntro (LiteralInteger i) _) ->
-      return (m, CodeUpIntro (m, DataSigmaIntro (replicate i v2)))
-    _ -> return (m, CodeUpIntroSigmaIntroN v1 v2)
-inlineCodePlus (m, CodeSigmaElimUpIntroSigmaIntroN v vs) =
-  case v of
-    (_, DataEpsilonIntro (LiteralInteger n) _) -> do
-      xss <- mapM (const $ newNameList n) vs
-      return $
-        toSigmaElimSeq
-          (zip xss vs)
-          ( Nothing
-          , CodeUpIntro
-              ( Nothing
-              , DataSigmaIntro
-                  (map (toSigmaIntro . map toDataUpsilon') $ transpose xss)))
-    _ -> return (m, CodeSigmaElimUpIntroSigmaIntroN v vs)
 inlineCodePlus t = return t
