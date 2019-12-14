@@ -437,17 +437,6 @@ toRelevantApp ml x e = do
             expVar
             (ml, CodePiElimDownElim relVar [toDataUpsilon (x, fst e)])))
 
--- toExponentApp ::
---      (CodeMeta, Data) -> Maybe Loc -> Identifier -> CodePlus -> WithEnv CodePlus
--- toExponentApp countVar ml x e = do
---   let ds = [countVar, toDataUpsilon (x, fst e)]
---   exponentName <- newNameWith "ty"
---   return
---     ( ml
---     , CodeUpElim
---         exponentName
---         e
---         (ml, CodePiElimDownElim (ml, DataUpsilon exponentName) ds))
 polarizeTheta :: Meta -> Identifier -> WithEnv CodePlus
 polarizeTheta m name@"core.i8.add" = polarizeArith name ArithAdd (int 8) m
 polarizeTheta m name@"core.i16.add" = polarizeArith name ArithAdd (int 16) m
