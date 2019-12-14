@@ -21,7 +21,7 @@ import Data.Term
 polarize :: TermPlus -> WithEnv CodePlus
 polarize (m, TermTau) = do
   let ml = snd $ obtainInfoMeta m
-  v <- exponentImmediate ml
+  v <- exponentUniv ml
   return (ml, CodeUpIntro v)
 polarize (m, TermTheta x) = polarizeTheta m x
 polarize (m, TermUpsilon x) = do
