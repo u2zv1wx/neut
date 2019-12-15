@@ -4,7 +4,7 @@ module Parse.Read
 
 import Control.Monad.State
 import Control.Monad.Trans.Except
-import Text.Parsec hiding (count)
+import Text.Parsec
 
 import Data.Env
 import Data.Tree
