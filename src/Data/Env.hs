@@ -57,6 +57,13 @@ initialEnv path =
 
 type WithEnv a = StateT Env (ExceptT String IO) a
 
+evalWithEnv :: (Show a) => WithEnv a -> Env -> IO (Either String a)
+evalWithEnv c env = do
+  resultOrErr <- runExceptT (runStateT c env)
+  case resultOrErr of
+    Left err -> return $ Left err
+    Right (result, _) -> return $ Right result
+
 newName :: WithEnv Identifier
 newName = do
   env <- get

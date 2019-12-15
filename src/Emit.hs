@@ -418,7 +418,6 @@ showLowType (LowTypeFloat 64) = "double"
 showLowType (LowTypeFloat i) = "f" ++ show i -- shouldn't occur
 showLowType (LowTypePointer t) = showLowType t ++ "*"
 showLowType (LowTypeStruct ts) = "{" ++ showItems showLowType ts ++ "}"
-showLowType (LowTypeArray i t) = "[" ++ show i ++ " x " ++ showLowType t ++ "]"
 showLowType (LowTypeFunction ts t) =
   showLowType t ++ " (" ++ showItems showLowType ts ++ ")"
 
