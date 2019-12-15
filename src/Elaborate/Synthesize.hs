@@ -31,7 +31,6 @@ synthesize q = do
       resolvePiElim q m iess e
     Just (Enriched _ _ (ConstraintFlexFlex m iess e)) ->
       resolvePiElim q m iess e
-    Just _ -> throwError "cannot synthesize(synth)"
 
 resolveStuck ::
      ConstraintQueue
