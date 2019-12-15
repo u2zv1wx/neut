@@ -58,7 +58,6 @@ llvmCode (_, CodeUpElim x e1 e2) = do
   e2' <- llvmCode e2
   return $ LLVMLet x e1' e2'
 
--- FIXME: freeすること。baseCaseでbasePointerをfreeすればいいだけっぽい？
 llvmCodeSigmaElim ::
      Identifier
   -> [(Identifier, Int)]
@@ -140,29 +139,11 @@ llvmDataLet x (_, DataTheta y) cont = do
         LLVMLet x (LLVMBitcast (LLVMDataGlobal y) funPtrType voidPtr) cont
 llvmDataLet x (_, DataUpsilon y) cont =
   return $ LLVMLet x (LLVMBitcast (LLVMDataLocal y) voidPtr voidPtr) cont
--- llvmDataLet x (_, DataEpsilonIntro (LiteralInteger i) (LowTypeSignedInt j)) cont =
---   return $
---   LLVMLet
---     x
---     (LLVMIntToPointer (LLVMDataInt i j) (LowTypeSignedInt j) voidPtr)
---     cont
--- llvmDataLet x (_, DataEpsilonIntro (LiteralFloat f) (LowTypeFloat j)) cont = do
---   cast <- newNameWith "cast"
---   let ft = LowTypeFloat j
---   let st = LowTypeSignedInt j
---   return $
---     LLVMLet cast (LLVMBitcast (LLVMDataFloat f j) ft st) $
---     LLVMLet x (LLVMIntToPointer (LLVMDataLocal cast) st voidPtr) cont
-llvmDataLet x (_, DataEpsilonIntro label (LowTypeSignedInt j)) cont = do
+llvmDataLet x (m, DataEpsilonIntro label (LowTypeSignedInt j)) cont = do
   mi <- getEpsilonNum label
   case mi of
     Nothing -> lift $ throwE $ "no such epsilon is defined: " ++ show label
-    Just i ->
-      return $
-      LLVMLet
-        x
-        (LLVMIntToPointer (LLVMDataInt i j) (LowTypeSignedInt j) voidPtr)
-        cont
+    Just i -> llvmDataLet x (m, DataInt i (LowTypeSignedInt j)) cont
 llvmDataLet _ (_, DataEpsilonIntro _ _) _ =
   throwError "llvmDataLet.DataEpsilonIntro"
 llvmDataLet reg (_, DataSigmaIntro ds) cont = do
@@ -174,6 +155,21 @@ llvmDataLet reg (_, DataSigmaIntro ds) cont = do
   llvmStruct (zip xs ds) $
     LLVMLet reg (LLVMAlloc size) $ -- the result of malloc is i8*
     LLVMLet cast (LLVMBitcast (LLVMDataLocal reg) voidPtr structPtrType) cont''
+llvmDataLet x (_, DataInt i (LowTypeSignedInt j)) cont =
+  return $
+  LLVMLet
+    x
+    (LLVMIntToPointer (LLVMDataInt i j) (LowTypeSignedInt j) voidPtr)
+    cont
+llvmDataLet _ (_, DataInt _ _) _ = throwError "llvmDataLet.DataInt"
+llvmDataLet x (_, DataFloat f (LowTypeFloat j)) cont = do
+  cast <- newNameWith "cast"
+  let ft = LowTypeFloat j
+  let st = LowTypeSignedInt j
+  return $
+    LLVMLet cast (LLVMBitcast (LLVMDataFloat f j) ft st) $
+    LLVMLet x (LLVMIntToPointer (LLVMDataLocal cast) st voidPtr) cont
+llvmDataLet _ (_, DataFloat _ _) _ = throwError "llvmDataLet.DataFloat"
 
 llvmDataLet' :: [(Identifier, DataPlus)] -> LLVM -> WithEnv LLVM
 llvmDataLet' [] cont = return cont

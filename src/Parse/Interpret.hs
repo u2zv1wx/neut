@@ -56,9 +56,17 @@ interpret (m, TreeNode [(_, TreeAtom "mu"), xt, e]) = do
 interpret (m, TreeNode [(_, TreeAtom "zeta"), (_, TreeAtom x)]) = do
   x' <- interpretAtom x
   withMeta m $ WeakTermZeta x'
+interpret (m, TreeNode [(_, TreeAtom "int"), (_, TreeAtom x)])
+  | Just x' <- readMaybe x = do withMeta m $ WeakTermInt x'
+interpret (m, TreeNode [(_, TreeAtom "float"), (_, TreeAtom x)])
+  | Just x' <- readMaybe x = do withMeta m $ WeakTermFloat x'
 --
 -- auxiliary interpretations
 --
+interpret (m, TreeAtom x)
+  | Just x' <- readMaybe x = withMeta m $ WeakTermInt x'
+interpret (m, TreeAtom x)
+  | Just x' <- readMaybe x = withMeta m $ WeakTermFloat x'
 interpret t@(m, TreeAtom x) = do
   ml <- interpretLabelMaybe t
   case ml of
@@ -93,11 +101,6 @@ interpretAtom :: String -> WithEnv String
 interpretAtom "_" = newNameWith "hole"
 interpretAtom x = return x
 
--- interpretLiteralMaybe (_, TreeAtom x)
---   | Just f <- readMaybe x
---   , '.' `elem` x = return $ Just $ LiteralFloat f
--- interpretLiteralMaybe (_, TreeAtom x)
---   | Just i <- readMaybe x = return $ Just $ LiteralInteger i
 interpretLabelMaybe :: TreePlus -> WithEnv (Maybe Identifier)
 interpretLabelMaybe (_, TreeAtom x) = do
   b <- isDefinedEpsilon x
@@ -126,21 +129,13 @@ interpretCase :: TreePlus -> WithEnv Case
 --
 interpretCase (_, TreeNode [(_, TreeAtom "epsilon-introduction"), (_, TreeAtom x)]) = do
   return $ CaseLabel x
--- interpretCase (_, TreeNode [(_, TreeAtom "epsilon-introduction"), l]) = do
---   l' <- interpretLabel l
---   return $ CaseLiteral l'
-interpretCase (_, TreeAtom "default") = return CaseDefault -- case mc' of
-  --   Just l -> return $ CaseLiteral l
-  --   Nothing -> lift $ throwE $ "interpretCase: syntax error:\n" ++ Pr.ppShow c
+interpretCase (_, TreeAtom "default") = return CaseDefault
 --
 -- auxiliary
 --
--- interpretCase (_, TreeAtom x) = return $ CaseLabel x -- mc' <- interpretLabelMaybe c
 interpretCase c = do
-  mc' <- interpretLabelMaybe c
-  case mc' of
-    Just l -> return $ CaseLabel l
-    _ -> lift $ throwE $ "interpretCase: syntax error:\n" ++ Pr.ppShow c
+  l <- interpretLabel c
+  return $ CaseLabel l
 
 interpretClause :: TreePlus -> WithEnv (Case, WeakTermPlus)
 interpretClause (_, TreeNode [c, e]) = do

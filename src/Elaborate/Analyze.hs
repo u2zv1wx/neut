@@ -60,6 +60,10 @@ simp ((e1, e2):cs)
   , (m2, WeakTermPiElim (_, WeakTermUpsilon g) es2) <- e2
   , f == g
   , length es1 == length es2 = simpMetaRet m1 m2 $ simp $ zip es1 es2 ++ cs
+simp (((m1, WeakTermInt l1), (m2, WeakTermInt l2)):cs)
+  | l1 == l2 = simpMetaRet m1 m2 (simp cs)
+simp (((m1, WeakTermFloat l1), (m2, WeakTermFloat l2)):cs)
+  | l1 == l2 = simpMetaRet m1 m2 (simp cs)
 simp ((e1@(m1, _), e2@(m2, _)):cs) = do
   let ms1 = asStuckedTerm e1
   let ms2 = asStuckedTerm e2

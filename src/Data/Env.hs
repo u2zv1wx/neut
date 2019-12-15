@@ -121,23 +121,16 @@ insEpsilonEnv :: Identifier -> [Identifier] -> WithEnv ()
 insEpsilonEnv name epsilonList =
   modify (\e -> e {epsilonEnv = (name, epsilonList) : epsilonEnv e})
 
--- lookupKind :: Literal -> WithEnv (Maybe Identifier)
--- lookupKind (LiteralInteger _) = return Nothing
--- lookupKind (LiteralFloat _) = return Nothing
--- lookupKind (LiteralLabel name) = do
---   env <- get
---   lookupKind' name $ epsilonEnv env
-lookupKind :: Identifier -> WithEnv (Maybe Identifier)
+lookupKind :: Identifier -> WithEnv Identifier
 lookupKind name = do
   env <- get
   lookupKind' name $ epsilonEnv env
 
-lookupKind' ::
-     Identifier -> [(Identifier, [Identifier])] -> WithEnv (Maybe Identifier)
-lookupKind' _ [] = return Nothing
+lookupKind' :: Identifier -> [(Identifier, [Identifier])] -> WithEnv Identifier
+lookupKind' i [] = lift $ throwE $ "no such epsilon-intro is defined: " ++ i
 lookupKind' i ((j, ls):xs) =
   if i `elem` ls
-    then return $ Just j
+    then return j
     else lookupKind' i xs
 
 lookupEpsilonSet :: Identifier -> WithEnv [Identifier]

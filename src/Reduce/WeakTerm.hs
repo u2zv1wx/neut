@@ -31,39 +31,29 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
       | all isValue es' -> do
         let self' = substWeakTermPlus [(x, self)] body
         reduceWeakTermPlus (m, WeakTermPiElim self' es')
-    -- (_, WeakTermTheta constant)
-    --   | [(_, WeakTermEpsilonIntro (LiteralInteger x)), (_, WeakTermEpsilonIntro (LiteralInteger y))] <-
-    --      es' -> do
-    --     let b1 = constant `elem` intAddConstantList
-    --     let b2 = constant `elem` intSubConstantList
-    --     let b3 = constant `elem` intMulConstantList
-    --     let b4 = constant `elem` intDivConstantList
-    --     case (b1, b2, b3, b4) of
-    --       (True, _, _, _) ->
-    --         return (m, WeakTermEpsilonIntro (LiteralInteger (x + y)))
-    --       (_, True, _, _) ->
-    --         return (m, WeakTermEpsilonIntro (LiteralInteger (x - y)))
-    --       (_, _, True, _) ->
-    --         return (m, WeakTermEpsilonIntro (LiteralInteger (x * y)))
-    --       (_, _, _, True) ->
-    --         return (m, WeakTermEpsilonIntro (LiteralInteger (x `div` y)))
-    --       _ -> return (m, WeakTermPiElim e' es')
-    -- (_, WeakTermTheta constant)
-    --   | [(_, WeakTermEpsilonIntro (LiteralFloat x)), (_, WeakTermEpsilonIntro (LiteralFloat y))] <-
-    --      es' -> do
-    --     let b1 = constant `elem` floatAddConstantList
-    --     let b2 = constant `elem` floatSubConstantList
-    --     let b3 = constant `elem` floatMulConstantList
-    --     let b4 = constant `elem` floatDivConstantList
-    --     case (b1, b2, b3, b4) of
-    --       (True, _, _, _) ->
-    --         return (m, WeakTermEpsilonIntro (LiteralFloat (x + y)))
-    --       (_, True, _, _) ->
-    --         return (m, WeakTermEpsilonIntro (LiteralFloat (x - y)))
-    --       (_, _, True, _) ->
-    --         return (m, WeakTermEpsilonIntro (LiteralFloat (x * y)))
-    --       (_, _, _, True) ->
-    --         return (m, WeakTermEpsilonIntro (LiteralFloat (x / y)))
-    --       _ -> return (m, WeakTermPiElim e' es')
+    (_, WeakTermTheta constant)
+      | [(_, WeakTermInt x), (_, WeakTermInt y)] <- es' -> do
+        let b1 = constant `elem` intAddConstantList
+        let b2 = constant `elem` intSubConstantList
+        let b3 = constant `elem` intMulConstantList
+        let b4 = constant `elem` intDivConstantList
+        case (b1, b2, b3, b4) of
+          (True, _, _, _) -> return (m, WeakTermInt (x + y))
+          (_, True, _, _) -> return (m, WeakTermInt (x - y))
+          (_, _, True, _) -> return (m, WeakTermInt (x * y))
+          (_, _, _, True) -> return (m, WeakTermInt (x `div` y))
+          _ -> return (m, WeakTermPiElim e' es')
+    (_, WeakTermTheta constant)
+      | [(_, WeakTermFloat x), (_, WeakTermFloat y)] <- es' -> do
+        let b1 = constant `elem` floatAddConstantList
+        let b2 = constant `elem` floatSubConstantList
+        let b3 = constant `elem` floatMulConstantList
+        let b4 = constant `elem` floatDivConstantList
+        case (b1, b2, b3, b4) of
+          (True, _, _, _) -> return (m, WeakTermFloat (x + y))
+          (_, True, _, _) -> return (m, WeakTermFloat (x - y))
+          (_, _, True, _) -> return (m, WeakTermFloat (x * y))
+          (_, _, _, True) -> return (m, WeakTermFloat (x / y))
+          _ -> return (m, WeakTermPiElim e' es')
     _ -> return (m, WeakTermPiElim e' es')
 reduceWeakTermPlus t = return t

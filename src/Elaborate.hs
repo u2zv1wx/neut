@@ -100,6 +100,31 @@ elaborate' (_, WeakTermZeta x) = do
   case lookup x sub of
     Just e -> elaborate' e
     Nothing -> lift $ throwE $ "elaborate' i: remaining hole: " ++ x
+elaborate' (m, WeakTermInt x) = do
+  m' <- toMeta m
+  t <- reduceTermPlus $ obtainType m'
+  case t of
+    (_, TermTheta intType) ->
+      case asLowTypeMaybe intType of
+        Just lowType@(LowTypeSignedInt _) -> return (m', TermInt x lowType)
+        Just lowType@(LowTypeUnsignedInt _) -> return (m', TermInt x lowType)
+        Just (LowTypeFloat _) ->
+          throwError $ show x ++ " should be int, but is float"
+        _ -> throwError $ show x ++ " should be int, but is " ++ intType
+    _ -> throwError "epsilonIntro"
+elaborate' (m, WeakTermFloat x) = do
+  m' <- toMeta m
+  t <- reduceTermPlus $ obtainType m'
+  case t of
+    (_, TermTheta floatType) ->
+      case asLowTypeMaybe floatType of
+        Just (LowTypeSignedInt _) ->
+          throwError $ show x ++ " should be float, but is int"
+        Just (LowTypeUnsignedInt _) ->
+          throwError $ show x ++ " should be float, but is int"
+        Just lowType@(LowTypeFloat _) -> return (m', TermFloat x lowType)
+        _ -> throwError $ show x ++ " should be float, but is " ++ floatType
+    _ -> throwError "epsilonIntro"
 
 elaboratePlus :: (a, WeakTermPlus) -> WithEnv (a, TermPlus)
 elaboratePlus (x, t) = do
@@ -131,6 +156,8 @@ exhaust' (_, WeakTermPiIntro _ e) = exhaust' e
 exhaust' (_, WeakTermPiElim e es) = allM exhaust' $ e : es
 exhaust' (_, WeakTermMu _ e) = exhaust' e
 exhaust' (_, WeakTermZeta _) = return False
+exhaust' (_, WeakTermInt _) = return True
+exhaust' (_, WeakTermFloat _) = return True
 
 exhaustEpsilonIdentifier :: Identifier -> [Case] -> Bool -> WithEnv Bool
 exhaustEpsilonIdentifier x labelList b1 = do

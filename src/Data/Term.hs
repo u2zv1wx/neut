@@ -17,6 +17,8 @@ data Term
   | TermPiIntro [IdentifierPlus] TermPlus
   | TermPiElim TermPlus [TermPlus]
   | TermMu (Identifier, TermPlus) TermPlus
+  | TermInt Int LowType
+  | TermFloat Double LowType
   deriving (Show)
 
 data Meta
@@ -65,6 +67,8 @@ getClosedVarChain (_, TermPiIntro xts e) = getClosedVarChainBindings xts [e]
 getClosedVarChain (_, TermPiElim e es) =
   getClosedVarChain e ++ concatMap getClosedVarChain es
 getClosedVarChain (_, TermMu ut e) = getClosedVarChainBindings [ut] [e]
+getClosedVarChain (_, TermInt _ _) = []
+getClosedVarChain (_, TermFloat _ _) = []
 
 getClosedVarChainBindings ::
      [(Identifier, TermPlus)]
@@ -104,6 +108,8 @@ substTermPlus sub (m, TermMu (x, t) e) = do
   let t' = substTermPlus sub t
   let e' = substTermPlus (filter (\(k, _) -> k /= x) sub) e
   (m, TermMu (x, t') e')
+substTermPlus _ (m, TermInt x lowType) = (m, TermInt x lowType)
+substTermPlus _ (m, TermFloat x lowType) = (m, TermFloat x lowType)
 
 substTermPlusBindings :: SubstTerm -> [IdentifierPlus] -> [IdentifierPlus]
 substTermPlusBindings _ [] = []

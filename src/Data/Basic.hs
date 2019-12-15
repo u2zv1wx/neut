@@ -120,3 +120,12 @@ asLowType ('u':cs)
 asLowType ('f':cs)
   | Just n <- read cs = LowTypeFloat n
 asLowType _ = LowTypeSignedInt 64 -- labels are i64
+
+asLowTypeMaybe :: Identifier -> Maybe LowType
+asLowTypeMaybe ('i':cs)
+  | Just n <- read cs = Just $ LowTypeSignedInt n
+asLowTypeMaybe ('u':cs)
+  | Just n <- read cs = Just $ LowTypeUnsignedInt n
+asLowTypeMaybe ('f':cs)
+  | Just n <- read cs = Just $ LowTypeFloat n
+asLowTypeMaybe _ = Nothing

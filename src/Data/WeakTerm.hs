@@ -19,6 +19,8 @@ data WeakTerm
   | WeakTermPiElim WeakTermPlus [WeakTermPlus]
   | WeakTermMu IdentifierPlus WeakTermPlus
   | WeakTermZeta Identifier
+  | WeakTermInt Int
+  | WeakTermFloat Double
   deriving (Show)
 
 newtype Ref a =
@@ -60,6 +62,8 @@ varWeakTermPlus (_, WeakTermPiElim e es) =
   pairwiseConcat $ varWeakTermPlus e : map varWeakTermPlus es
 varWeakTermPlus (_, WeakTermMu ut e) = varWeakTermPlusBindings [ut] [e]
 varWeakTermPlus (_, WeakTermZeta h) = ([], [h])
+varWeakTermPlus (_, WeakTermInt _) = ([], [])
+varWeakTermPlus (_, WeakTermFloat _) = ([], [])
 
 varWeakTermPlusBindings ::
      [IdentifierPlus] -> [WeakTermPlus] -> ([Identifier], [Identifier])
@@ -105,6 +109,8 @@ substWeakTermPlus sub (m, WeakTermMu (x, t) e) = do
   (m, WeakTermMu (x, t') e')
 substWeakTermPlus sub (m, WeakTermZeta s) =
   fromMaybe (m, WeakTermZeta s) (lookup s sub)
+substWeakTermPlus _ (m, WeakTermInt x) = (m, WeakTermInt x)
+substWeakTermPlus _ (m, WeakTermFloat x) = (m, WeakTermFloat x)
 
 substWeakTermPlusBindings ::
      SubstWeakTerm -> [IdentifierPlus] -> [IdentifierPlus]
@@ -140,14 +146,15 @@ isReducible (_, WeakTermPiIntro {}) = False
 isReducible (_, WeakTermPiElim (_, WeakTermPiIntro xts _) es)
   | length xts == length es = True
 isReducible (_, WeakTermPiElim (_, WeakTermMu _ _) _) = True -- CBV recursion
--- isReducible (_, WeakTermPiElim (_, WeakTermTheta c) [(_, WeakTermEpsilonIntro (LiteralInteger _)), (_, WeakTermEpsilonIntro (LiteralInteger _))]) -- constant application
---   | c `elem` intArithConstantList = True
--- isReducible (_, WeakTermPiElim (_, WeakTermTheta c) [(_, WeakTermEpsilonIntro (LiteralFloat _)), (_, WeakTermEpsilonIntro (LiteralFloat _))])
---  -- constant application
---   | c `elem` floatArithConstantList = True
+isReducible (_, WeakTermPiElim (_, WeakTermTheta c) [(_, WeakTermInt _), (_, WeakTermInt _)])
+  | c `elem` intArithConstantList = True
+isReducible (_, WeakTermPiElim (_, WeakTermTheta c) [(_, WeakTermFloat _), (_, WeakTermFloat _)])
+  | c `elem` floatArithConstantList = True
 isReducible (_, WeakTermPiElim e es) = isReducible e || any isReducible es
 isReducible (_, WeakTermMu _ _) = False
 isReducible (_, WeakTermZeta _) = False
+isReducible (_, WeakTermInt _) = False
+isReducible (_, WeakTermFloat _) = False
 
 isValue :: WeakTermPlus -> Bool
 isValue (_, WeakTermTau) = True
@@ -156,4 +163,6 @@ isValue (_, WeakTermEpsilon _) = True
 isValue (_, WeakTermEpsilonIntro _) = True
 isValue (_, WeakTermPi {}) = True
 isValue (_, WeakTermPiIntro {}) = True
+isValue (_, WeakTermInt _) = True
+isValue (_, WeakTermFloat _) = True
 isValue _ = False

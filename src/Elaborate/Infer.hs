@@ -51,14 +51,8 @@ infer _ (meta, WeakTermUpsilon x) = do
   returnAfterUpdate meta t
 infer _ (meta, WeakTermEpsilon _) = newUniv >>= returnAfterUpdate meta
 infer ctx (meta, WeakTermEpsilonIntro l) = do
-  mk <- lookupKind l
-  case mk of
-    Just k -> wrapInfer ctx (WeakTermEpsilon k) >>= returnAfterUpdate meta
-    -- when l is numeric literal such as `1`, `-231`, etc.
-    Nothing -> do
-      u <- newUniv
-      h <- newHoleOfType u
-      returnAfterUpdate meta h
+  k <- lookupKind l
+  wrapInfer ctx (WeakTermEpsilon k) >>= returnAfterUpdate meta
 infer ctx (meta, WeakTermEpsilonElim (x, t) e branchList) = do
   te <- infer ctx e
   insTypeEnv x t
@@ -74,7 +68,6 @@ infer ctx (meta, WeakTermEpsilonElim (x, t) e branchList) = do
       returnAfterUpdate meta $ substWeakTermPlus [(x, e)] $ head ts
 infer ctx (meta, WeakTermPi xts) = do
   univList <- inferPlus ctx xts
-  -- univ <- infer (ctx ++ xts) t
   univ <- newUniv
   constrainList $ univ : univList
   returnAfterUpdate meta univ
@@ -99,6 +92,12 @@ infer ctx (meta, WeakTermZeta _) = do
   case mt of
     Just t -> return t
     Nothing -> newHoleInCtx ctx >>= returnAfterUpdate meta
+infer _ (meta, WeakTermInt _) = do
+  h <- newHoleInCtx []
+  returnAfterUpdate meta h
+infer _ (meta, WeakTermFloat _) = do
+  h <- newHoleInCtx []
+  returnAfterUpdate meta h
 
 inferPlus :: Context -> [(Identifier, WeakTermPlus)] -> WithEnv [WeakTermPlus]
 inferPlus ctx xts =
@@ -141,13 +140,10 @@ newHoleListInCtx ctx (x:rest) = do
   return $ t : ts
 
 inferCase :: Case -> WithEnv (Maybe WeakTermPlus)
--- inferCase (CaseLiteral (LiteralLabel name)) = do
 inferCase (CaseLabel name) = do
   ienv <- gets epsilonEnv
-  mk <- lookupKind' name ienv
-  case mk of
-    Just k -> Just <$> wrapInfer [] (WeakTermEpsilon k)
-    Nothing -> return Nothing
+  k <- lookupKind' name ienv
+  Just <$> wrapInfer [] (WeakTermEpsilon k)
 inferCase _ = return Nothing
 
 inferList :: Context -> [WeakTermPlus] -> WithEnv Context
@@ -181,7 +177,7 @@ returnAfterUpdate m t = do
 
 -- `newUniv` returns an "inferred" universe.
 newUniv :: WithEnv WeakTermPlus
-newUniv = wrapInfer [] WeakTermTau
+newUniv = return (WeakMetaTerminal Nothing, WeakTermTau)
 
 withHole :: WeakTermPlus -> WithEnv (WeakTermPlus, IdentifierPlus)
 withHole t = do

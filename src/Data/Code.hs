@@ -11,6 +11,8 @@ data Data
   | DataUpsilon Identifier
   | DataEpsilonIntro Identifier LowType
   | DataSigmaIntro [DataPlus]
+  | DataInt Int LowType
+  | DataFloat Double LowType
   deriving (Show)
 
 data Code
@@ -48,6 +50,8 @@ substDataPlus _ (m, DataEpsilonIntro l p) = (m, DataEpsilonIntro l p)
 substDataPlus sub (m, DataSigmaIntro vs) = do
   let vs' = map (substDataPlus sub) vs
   (m, DataSigmaIntro vs')
+substDataPlus _ (m, DataInt l p) = (m, DataInt l p)
+substDataPlus _ (m, DataFloat l p) = (m, DataFloat l p)
 
 substCodePlus :: SubstDataPlus -> CodePlus -> CodePlus
 substCodePlus sub (m, CodeTheta theta) = do
