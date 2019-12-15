@@ -63,8 +63,8 @@ macroMatch (i, TreeAtom s1) (_, TreeAtom s2)
   --   in a pattern is regarded as a variable to be filled by pattern matching.
   --   (3) The other cases result in failure.
  = do
-  renv <- gets reservedEnv
-  case (s1 `elem` renv, s2 `elem` renv) of
+  kenv <- gets keywordEnv
+  case (s1 `elem` kenv, s2 `elem` kenv) of
     (True, True)
       | s1 == s2 -> return $ Just ([], [])
     (False, False) -> return $ Just ([(s2, (i, TreeAtom s1))], [])
@@ -75,8 +75,8 @@ macroMatch t (_, TreeAtom s)
   -- keyword. After that, we generate a new substitution from the variable `s` to the
   -- tree `t`.
  = do
-  renv <- gets reservedEnv
-  if s `notElem` renv
+  kenv <- gets keywordEnv
+  if s `notElem` kenv
     then return $ Just ([(s, t)], [])
     else return Nothing
 macroMatch (_, TreeAtom _) (_, _)

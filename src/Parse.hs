@@ -38,7 +38,7 @@ parse' ((_, TreeNode [(_, TreeAtom "notation"), from, to]):as) =
       modify (\e -> e {notationEnv = (from, to) : notationEnv e})
       parse' as
 parse' ((_, TreeNode [(_, TreeAtom "keyword"), (_, TreeAtom s)]):as) = do
-  modify (\e -> e {reservedEnv = s : reservedEnv e})
+  modify (\e -> e {keywordEnv = s : keywordEnv e})
   parse' as
 parse' ((_, TreeNode ((_, TreeAtom "epsilon"):(_, TreeAtom name):ts)):as) = do
   indexList <- mapM extractIdentifier ts
