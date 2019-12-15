@@ -108,10 +108,10 @@ emitLLVM funName (LLVMLet x (LLVMBitcast d fromType toType) cont) = do
       [ showLLVMData (LLVMDataLocal x)
       , "="
       , "bitcast"
-      , showLowType fromType
+      , showLowTypeEmit fromType
       , showLLVMData d
       , "to"
-      , showLowType toType
+      , showLowTypeEmit toType
       ]
   a <- emitLLVM funName cont
   return $ op ++ a
@@ -122,10 +122,10 @@ emitLLVM funName (LLVMLet x (LLVMIntToPointer d fromType toType) cont) = do
       [ showLLVMData (LLVMDataLocal x)
       , "="
       , "inttoptr"
-      , showLowType fromType
+      , showLowTypeEmit fromType
       , showLLVMData d
       , "to"
-      , showLowType toType
+      , showLowTypeEmit toType
       ]
   a <- emitLLVM funName cont
   return $ op ++ a
@@ -136,10 +136,10 @@ emitLLVM funName (LLVMLet x (LLVMPointerToInt d fromType toType) cont) = do
       [ showLLVMData (LLVMDataLocal x)
       , "="
       , "ptrtoint"
-      , showLowType fromType
+      , showLowTypeEmit fromType
       , showLLVMData d
       , "to"
-      , showLowType toType
+      , showLowTypeEmit toType
       ]
   a <- emitLLVM funName cont
   return $ op ++ a
@@ -155,9 +155,9 @@ emitLLVM funName (LLVMLet _ (LLVMStore (d1, t1) (d2, t2)) cont) = do
     emitOp $
     unwords
       [ "store"
-      , showLowType t1
+      , showLowTypeEmit t1
       , showLLVMData d1 ++ ","
-      , showLowType t2
+      , showLowTypeEmit t2
       , showLLVMData d2
       ]
   a <- emitLLVM funName cont
@@ -205,7 +205,7 @@ emitLLVM funName (LLVMLet x (LLVMArith (ArithAdd, t@(LowTypeSignedInt _)) d1 d2)
       [ showLLVMData (LLVMDataLocal x)
       , "="
       , "add"
-      , showLowType t
+      , showLowTypeEmit t
       , showLLVMData d1 ++ ","
       , showLLVMData d2
       ]
@@ -222,7 +222,7 @@ emitLLVM funName (LLVMLet x (LLVMArith (ArithAdd, t) d1 d2) cont) = do
       [ showLLVMData (LLVMDataLocal x)
       , "="
       , "fadd"
-      , showLowType t
+      , showLowTypeEmit t
       , showLLVMData d1 ++ ","
       , showLLVMData d2
       ]
@@ -235,7 +235,7 @@ emitLLVM funName (LLVMLet x (LLVMArith (ArithSub, t@(LowTypeSignedInt _)) d1 d2)
       [ showLLVMData (LLVMDataLocal x)
       , "="
       , "sub"
-      , showLowType t
+      , showLowTypeEmit t
       , showLLVMData d1 ++ ","
       , showLLVMData d2
       ]
@@ -252,7 +252,7 @@ emitLLVM funName (LLVMLet x (LLVMArith (ArithSub, t) d1 d2) cont) = do
       [ showLLVMData (LLVMDataLocal x)
       , "="
       , "fsub"
-      , showLowType t
+      , showLowTypeEmit t
       , showLLVMData d1 ++ ","
       , showLLVMData d2
       ]
@@ -265,7 +265,7 @@ emitLLVM funName (LLVMLet x (LLVMArith (ArithMul, t@(LowTypeSignedInt _)) d1 d2)
       [ showLLVMData (LLVMDataLocal x)
       , "="
       , "mul"
-      , showLowType t
+      , showLowTypeEmit t
       , showLLVMData d1 ++ ","
       , showLLVMData d2
       ]
@@ -282,7 +282,7 @@ emitLLVM funName (LLVMLet x (LLVMArith (ArithMul, t) d1 d2) cont) = do
       [ showLLVMData (LLVMDataLocal x)
       , "="
       , "fmul"
-      , showLowType t
+      , showLowTypeEmit t
       , showLLVMData d1 ++ ","
       , showLLVMData d2
       ]
@@ -295,7 +295,7 @@ emitLLVM funName (LLVMLet x (LLVMArith (ArithDiv, t@(LowTypeSignedInt _)) d1 d2)
       [ showLLVMData (LLVMDataLocal x)
       , "="
       , "sdiv"
-      , showLowType t
+      , showLowTypeEmit t
       , showLLVMData d1 ++ ","
       , showLLVMData d2
       ]
@@ -308,7 +308,7 @@ emitLLVM funName (LLVMLet x (LLVMArith (ArithDiv, t@(LowTypeUnsignedInt _)) d1 d
       [ showLLVMData (LLVMDataLocal x)
       , "="
       , "udiv"
-      , showLowType t
+      , showLowTypeEmit t
       , showLLVMData d1 ++ ","
       , showLLVMData d2
       ]
@@ -321,7 +321,7 @@ emitLLVM funName (LLVMLet x (LLVMArith (ArithDiv, t) d1 d2) cont) = do
       [ showLLVMData (LLVMDataLocal x)
       , "="
       , "fdiv"
-      , showLowType t
+      , showLowTypeEmit t
       , showLLVMData d1 ++ ","
       , showLLVMData d2
       ]
@@ -345,7 +345,7 @@ emitLLVM funName (LLVMLet x (LLVMPrint t d) cont) = do
       , "call"
       , "i32 (i8*, ...)"
       , "@printf(i8* " ++ showLLVMData (LLVMDataLocal fmt) ++ ","
-      , showLowType t
+      , showLowTypeEmit t
       , showLLVMData d ++ ")"
       ]
   a <-
@@ -408,26 +408,21 @@ showArg d = "i8* " ++ showLLVMData d
 showArgs :: [LLVMData] -> String
 showArgs ds = "(" ++ showItems showArg ds ++ ")"
 
-showLowType :: LowType -> String
-showLowType (LowTypeSignedInt i) = "i" ++ show i
+showLowTypeEmit :: LowType -> String
+showLowTypeEmit (LowTypeSignedInt i) = "i" ++ show i
 -- LLVM doesn't distinguish unsigned integers from signed ones
-showLowType (LowTypeUnsignedInt i) = "i" ++ show i
-showLowType (LowTypeFloat 16) = "half"
-showLowType (LowTypeFloat 32) = "float"
-showLowType (LowTypeFloat 64) = "double"
-showLowType (LowTypeFloat i) = "f" ++ show i -- shouldn't occur
-showLowType (LowTypePointer t) = showLowType t ++ "*"
-showLowType (LowTypeStruct ts) = "{" ++ showItems showLowType ts ++ "}"
-showLowType (LowTypeFunction ts t) =
-  showLowType t ++ " (" ++ showItems showLowType ts ++ ")"
+showLowTypeEmit (LowTypeUnsignedInt i) = "i" ++ show i
+showLowTypeEmit (LowTypeFloat 16) = "half"
+showLowTypeEmit (LowTypeFloat 32) = "float"
+showLowTypeEmit (LowTypeFloat 64) = "double"
+showLowTypeEmit (LowTypeFloat i) = "f" ++ show i -- shouldn't occur
+showLowTypeEmit (LowTypePointer t) = showLowTypeEmit t ++ "*"
+showLowTypeEmit (LowTypeStruct ts) = "{" ++ showItems showLowTypeEmit ts ++ "}"
+showLowTypeEmit (LowTypeFunction ts t) =
+  showLowTypeEmit t ++ " (" ++ showItems showLowTypeEmit ts ++ ")"
 
 showStruct :: Int -> String
 showStruct i = "{" ++ showItems (const "i8*") [1 .. i] ++ "}"
-
-showItems :: (a -> String) -> [a] -> String
-showItems _ [] = ""
-showItems f [a] = f a
-showItems f (a:as) = f a ++ ", " ++ showItems f as
 
 -- for now
 emitGlobal :: WithEnv [String]
