@@ -15,7 +15,7 @@ data LLVM
       LLVMData -- PiElimDownElim
       [LLVMData]
   | LLVMSwitch
-      LLVMData -- IndexElim
+      (LLVMData, LowType) -- IndexElim
       LLVM
       [(Int, LLVM)]
   | LLVMReturn LLVMData -- UpIntro

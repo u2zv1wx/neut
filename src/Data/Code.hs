@@ -15,7 +15,7 @@ data Data
 
 data Code
   = CodeTheta Theta
-  | CodeEpsilonElim Identifier DataPlus [(Case, CodePlus)]
+  | CodeEpsilonElim (Identifier, LowType) DataPlus [(Case, CodePlus)]
   | CodePiElimDownElim DataPlus [DataPlus] -- ((force v) v1 ... vn)
   | CodeSigmaElim [Identifier] DataPlus CodePlus
   | CodeUpIntro DataPlus
@@ -53,12 +53,12 @@ substCodePlus :: SubstDataPlus -> CodePlus -> CodePlus
 substCodePlus sub (m, CodeTheta theta) = do
   let theta' = substTheta sub theta
   (m, CodeTheta theta')
-substCodePlus sub (m, CodeEpsilonElim x v branchList) = do
+substCodePlus sub (m, CodeEpsilonElim (x, lowType) v branchList) = do
   let v' = substDataPlus sub v
   let (cs, es) = unzip branchList
   let es' = map (substCodePlus (filter (\(y, _) -> y /= x) sub)) es
   let branchList' = zip cs es'
-  (m, CodeEpsilonElim x v' branchList')
+  (m, CodeEpsilonElim (x, lowType) v' branchList')
 substCodePlus sub (m, CodePiElimDownElim v ds) = do
   let v' = substDataPlus sub v
   let ds' = map (substDataPlus sub) ds

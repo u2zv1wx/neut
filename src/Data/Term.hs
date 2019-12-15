@@ -12,7 +12,7 @@ data Term
   | TermUpsilon Identifier
   | TermEpsilon Identifier
   | TermEpsilonIntro Literal LowType
-  | TermEpsilonElim IdentifierPlus TermPlus [(Case, TermPlus)]
+  | TermEpsilonElim (Identifier, LowType) TermPlus [(Case, TermPlus)]
   | TermPi [IdentifierPlus]
   | TermPiIntro [IdentifierPlus] TermPlus
   | TermPiElim TermPlus [TermPlus]
@@ -53,14 +53,13 @@ getClosedVarChain (m, TermUpsilon x) =
     MetaNonTerminal t ml -> getClosedVarChain t ++ [(x, ml, t)]
 getClosedVarChain (_, TermEpsilon _) = []
 getClosedVarChain (_, TermEpsilonIntro _ _) = []
-getClosedVarChain (_, TermEpsilonElim (x, t) e branchList) = do
-  let xhs1 = getClosedVarChain t
-  let xhs2 = getClosedVarChain e
+getClosedVarChain (_, TermEpsilonElim (x, _) e branchList) = do
+  let xhs = getClosedVarChain e
   xhss <-
     forM branchList $ \(_, body) -> do
       let xs = getClosedVarChain body
       return (filter (\(y, _, _) -> y /= x) xs)
-  concat (xhs1 : xhs2 : xhss)
+  concat (xhs : xhss)
 getClosedVarChain (_, TermPi xts) = getClosedVarChainBindings xts []
 getClosedVarChain (_, TermPiIntro xts e) = getClosedVarChainBindings xts [e]
 getClosedVarChain (_, TermPiElim e es) =
@@ -85,13 +84,12 @@ substTermPlus sub (m, TermUpsilon x) =
 substTermPlus _ (m, TermEpsilon x) = (m, TermEpsilon x)
 substTermPlus _ (m, TermEpsilonIntro l lowType) =
   (m, TermEpsilonIntro l lowType)
-substTermPlus sub (m, TermEpsilonElim (x, t) e branchList) = do
-  let t' = substTermPlus sub t
+substTermPlus sub (m, TermEpsilonElim (x, lowType) e branchList) = do
   let e' = substTermPlus sub e
   let (caseList, es) = unzip branchList
   let sub' = filter (\(k, _) -> k /= x) sub
   let es' = map (substTermPlus sub') es
-  (m, TermEpsilonElim (x, t') e' (zip caseList es'))
+  (m, TermEpsilonElim (x, lowType) e' (zip caseList es'))
 substTermPlus sub (m, TermPi xts) = do
   let xts' = substTermPlusBindings sub xts
   (m, TermPi xts')

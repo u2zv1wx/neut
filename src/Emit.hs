@@ -48,18 +48,18 @@ emitLLVM funName (LLVMCall f args) = do
       ]
   a <- emitRet funName (LLVMDataLocal tmp)
   return $ op ++ a
-emitLLVM funName (LLVMSwitch d defaultBranch branchList) = do
+emitLLVM funName (LLVMSwitch (d, lowType) defaultBranch branchList) = do
   defaultLabel <- newNameWith "default"
   labelList <- constructLabelList branchList
   op <-
     emitOp $
     unwords
       [ "switch"
-      , "i64"
+      , showLowTypeEmit lowType
       , showLLVMData d ++ ","
       , "label"
       , showLLVMData (LLVMDataLocal defaultLabel)
-      , showBranchList $ zip (map fst branchList) labelList
+      , showBranchList lowType $ zip (map fst branchList) labelList
       ]
   let asmList = map snd branchList
   xs <-
@@ -391,12 +391,14 @@ constructLabelList ((_, _):rest) = do
   labelList <- constructLabelList rest
   return $ label : labelList
 
-showBranchList :: [(Int, String)] -> String
-showBranchList xs = "[" ++ showItems (uncurry showBranch) xs ++ "]"
+showBranchList :: LowType -> [(Int, String)] -> String
+showBranchList lowType xs =
+  "[" ++ showItems (uncurry (showBranch lowType)) xs ++ "]"
 
-showBranch :: Int -> String -> String
-showBranch i label =
-  "i64 " ++ show i ++ ", label " ++ showLLVMData (LLVMDataLocal label)
+showBranch :: LowType -> Int -> String -> String
+showBranch lowType i label =
+  showLowTypeEmit lowType ++
+  " " ++ show i ++ ", label " ++ showLLVMData (LLVMDataLocal label)
 
 showIndex :: [Int] -> String
 showIndex [] = ""

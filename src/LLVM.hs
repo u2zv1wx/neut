@@ -22,8 +22,8 @@ toLLVM mainTerm = do
 
 llvmCode :: CodePlus -> WithEnv LLVM
 llvmCode (m, CodeTheta theta) = llvmCodeTheta m theta
-llvmCode (_, CodeEpsilonElim x v branchList) =
-  llvmCodeEpsilonElim x v branchList
+llvmCode (_, CodeEpsilonElim xt v branchList) =
+  llvmCodeEpsilonElim xt v branchList
 llvmCode (_, CodePiElimDownElim v ds) = do
   f <- newNameWith "fun"
   xs <- mapM (const (newNameWith "arg")) ds
@@ -180,7 +180,6 @@ llvmDataLet' ((x, d):rest) cont = do
   cont' <- llvmDataLet' rest cont
   llvmDataLet x d cont'
 
--- これやっぱMaybeになるやつか。
 constructSwitch :: [(Case, CodePlus)] -> WithEnv (Maybe (LLVM, [(Int, LLVM)]))
 constructSwitch [] = return Nothing
 constructSwitch [(CaseLiteral (LiteralLabel _), code)] -- 最後のlabelだからdefault確定
@@ -206,18 +205,19 @@ constructSwitch ((CaseLiteral (LiteralFloat _), _):_) = undefined -- IEEE754 flo
 
 -- floatかどうかで場合分けする必要がありそう？
 llvmCodeEpsilonElim ::
-     Identifier -> DataPlus -> [(Case, CodePlus)] -> WithEnv LLVM
-llvmCodeEpsilonElim x v branchList = do
+     (Identifier, LowType) -> DataPlus -> [(Case, CodePlus)] -> WithEnv LLVM
+llvmCodeEpsilonElim (_, LowTypeFloat _) _ _ = undefined
+llvmCodeEpsilonElim (x, LowTypeUnsignedInt i) v branchList =
+  llvmCodeEpsilonElim (x, LowTypeSignedInt i) v branchList
+llvmCodeEpsilonElim (x, t) v branchList = do
   m <- constructSwitch branchList
   case m of
     Nothing -> llvmDataLet' [(x, v)] LLVMUnreachable
     Just (defaultCase, caseList) -> do
       cast <- newNameWith "cast"
       llvmDataLet' [(x, v)] $
-        LLVMLet
-          cast
-          (LLVMPointerToInt (LLVMDataLocal x) voidPtr (LowTypeSignedInt 64)) $
-        LLVMSwitch (LLVMDataLocal cast) defaultCase caseList
+        LLVMLet cast (LLVMPointerToInt (LLVMDataLocal x) voidPtr t) $
+        LLVMSwitch (LLVMDataLocal cast, t) defaultCase caseList
 
 setContent :: Identifier -> Int -> [(Int, Identifier)] -> LLVM -> WithEnv LLVM
 setContent _ _ [] cont = return cont
