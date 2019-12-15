@@ -180,34 +180,44 @@ llvmDataLet' ((x, d):rest) cont = do
   cont' <- llvmDataLet' rest cont
   llvmDataLet x d cont'
 
-constructSwitch ::
-     DataPlus -> [(Case, CodePlus)] -> WithEnv (LLVM, [(Int, LLVM)])
-constructSwitch _ [] = lift $ throwE "empty branch"
-constructSwitch name ((CaseLiteral (LiteralLabel x), code):rest) = do
+-- これやっぱMaybeになるやつか。
+constructSwitch :: [(Case, CodePlus)] -> WithEnv (Maybe (LLVM, [(Int, LLVM)]))
+constructSwitch [] = return Nothing
+constructSwitch [(CaseLiteral (LiteralLabel _), code)] -- 最後のlabelだからdefault確定
+ = do
+  code' <- llvmCode code
+  return $ Just (code', [])
+constructSwitch ((CaseLiteral (LiteralLabel x), code):rest) = do
   set <- lookupEpsilonSet x
   case elemIndex x set of
-    Nothing -> lift $ throwE $ "no such index defined: " ++ show name
-    Just i ->
-      constructSwitch name ((CaseLiteral (LiteralInteger i), code) : rest)
-constructSwitch _ ((CaseDefault, code):_) = do
+    Nothing -> lift $ throwE $ "no such index defined: " ++ show x
+    Just i -> constructSwitch ((CaseLiteral (LiteralInteger i), code) : rest)
+constructSwitch ((CaseDefault, code):_) = do
   code' <- llvmCode code
-  return (code', [])
-constructSwitch name ((CaseLiteral (LiteralInteger i), code):rest) = do
+  return $ Just (code', [])
+constructSwitch ((CaseLiteral (LiteralInteger i), code):rest) = do
   code' <- llvmCode code
-  (defaultCase, caseList) <- constructSwitch name rest
-  return (defaultCase, (i, code') : caseList)
-constructSwitch _ ((CaseLiteral (LiteralFloat _), _):_) = undefined -- IEEE754 float equality!
+  m <- constructSwitch rest
+  case m of
+    Just (defaultCase, caseList) ->
+      return $ Just (defaultCase, (i, code') : caseList)
+    Nothing -> return Nothing
+constructSwitch ((CaseLiteral (LiteralFloat _), _):_) = undefined -- IEEE754 float equality!
 
+-- floatかどうかで場合分けする必要がありそう？
 llvmCodeEpsilonElim ::
      Identifier -> DataPlus -> [(Case, CodePlus)] -> WithEnv LLVM
 llvmCodeEpsilonElim x v branchList = do
-  (defaultCase, caseList) <- constructSwitch v branchList
-  cast <- newNameWith "cast"
-  llvmDataLet' [(x, v)] $
-    LLVMLet
-      cast
-      (LLVMPointerToInt (LLVMDataLocal x) voidPtr (LowTypeSignedInt 64)) $
-    LLVMSwitch (LLVMDataLocal cast) defaultCase caseList
+  m <- constructSwitch branchList
+  case m of
+    Nothing -> llvmDataLet' [(x, v)] LLVMUnreachable
+    Just (defaultCase, caseList) -> do
+      cast <- newNameWith "cast"
+      llvmDataLet' [(x, v)] $
+        LLVMLet
+          cast
+          (LLVMPointerToInt (LLVMDataLocal x) voidPtr (LowTypeSignedInt 64)) $
+        LLVMSwitch (LLVMDataLocal cast) defaultCase caseList
 
 setContent :: Identifier -> Int -> [(Int, Identifier)] -> LLVM -> WithEnv LLVM
 setContent _ _ [] cont = return cont

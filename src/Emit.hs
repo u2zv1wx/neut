@@ -355,6 +355,7 @@ emitLLVM funName (LLVMLet x (LLVMPrint t d) cont) = do
       (LLVMIntToPointer (LLVMDataLocal tmp) (LowTypeSignedInt 32) voidPtr)
       cont
   return $ op1 ++ op2 ++ a
+emitLLVM _ LLVMUnreachable = emitOp $ unwords ["unreachable"]
 emitLLVM funName c = do
   tmp <- newNameWith "result"
   emitLLVM funName $ LLVMLet tmp c $ LLVMReturn (LLVMDataLocal tmp)
