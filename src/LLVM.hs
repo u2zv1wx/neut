@@ -6,20 +6,17 @@ import Control.Monad.Except
 import Control.Monad.State
 import Control.Monad.Trans.Except
 import Data.List (elemIndex)
-import qualified Text.Show.Pretty as Pr
 
 import Data.Basic
 import Data.Code
 import Data.Env
 import Data.LLVM
-import Reduce.Code
 
 toLLVM :: CodePlus -> WithEnv LLVM
 toLLVM mainTerm = do
   penv <- gets codeEnv
   forM_ penv $ \(name, (args, e)) -> do
-    llvm <- inlineCodePlus e >>= llvmCode
-    -- mainTermの中で必要になったものだけinsLLVMEnvするようにしたほうがよさそう。
+    llvm <- llvmCode e
     insLLVMEnv name args llvm
   llvmCode mainTerm
 
@@ -61,6 +58,7 @@ llvmCode (_, CodeUpElim x e1 e2) = do
   e2' <- llvmCode e2
   return $ LLVMLet x e1' e2'
 
+-- FIXME: freeすること。baseCaseでbasePointerをfreeすればいいだけっぽい？
 llvmCodeSigmaElim ::
      Identifier
   -> [(Identifier, Int)]
