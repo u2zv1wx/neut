@@ -169,7 +169,7 @@ withHeaderAffine x t e = do
   return (Nothing, CodeUpElim hole discardUnusedVar e)
 
 -- withHeaderRelevant x t [x1, ..., x{N}] e ~>
---   bind exp := t^# in
+--   bind exp := t in
 --   let (aff, rel) := exp in
 --   let sigTmp1 := rel @ x in
 --   let (x1, tmp1) := sigTmp1 in
