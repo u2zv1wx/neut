@@ -202,9 +202,6 @@ constructSwitch ((CaseDefault, code):_) = do
 -- floatかどうかで場合分けする必要がありそう？
 llvmCodeEpsilonElim ::
      (Identifier, LowType) -> DataPlus -> [(Case, CodePlus)] -> WithEnv LLVM
-llvmCodeEpsilonElim (_, LowTypeFloat _) _ _ = undefined
-llvmCodeEpsilonElim (x, LowTypeUnsignedInt i) v branchList =
-  llvmCodeEpsilonElim (x, LowTypeSignedInt i) v branchList
 llvmCodeEpsilonElim (x, t) v branchList = do
   m <- constructSwitch branchList
   case m of
