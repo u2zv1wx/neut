@@ -46,21 +46,21 @@ elaborate e = do
 elaborate' :: WeakTermPlus -> WithEnv TermPlus
 elaborate' (m, WeakTermTau) = do
   m' <- toMeta m
-  ensuringTypePurity (m', TermTau)
+  return (m', TermTau)
 elaborate' (m, WeakTermTheta x) = do
   m' <- toMeta m
-  ensuringTypePurity (m', TermTheta x)
+  return (m', TermTheta x)
 elaborate' (m, WeakTermUpsilon x) = do
   m' <- toMeta m
-  ensuringTypePurity (m', TermUpsilon x)
+  return (m', TermUpsilon x)
 elaborate' (m, WeakTermEpsilon k) = do
   m' <- toMeta m
-  ensuringTypePurity (m', TermEpsilon k)
+  return (m', TermEpsilon k)
 elaborate' (m, WeakTermEpsilonIntro x) = do
   m' <- toMeta m
   t <- reduceTermPlus $ obtainType m'
   case t of
-    (_, TermEpsilon _) -> ensuringTypePurity (m', TermEpsilonIntro x undefined)
+    (_, TermEpsilon _) -> return (m', TermEpsilonIntro x undefined)
     _ -> throwError "epsilonIntro"
 elaborate' (m, WeakTermEpsilonElim (x, t) e branchList) = do
   t' <- elaborate' t >>= reduceTermPlus
@@ -69,29 +69,29 @@ elaborate' (m, WeakTermEpsilonElim (x, t) e branchList) = do
       m' <- toMeta m
       e' <- elaborate' e
       branchList' <- forM branchList elaboratePlus
-      ensuringTypePurity (m', TermEpsilonElim (x, t') e' branchList')
+      return (m', TermEpsilonElim (x, t') e' branchList')
     _ -> throwError "epsilonElim"
 elaborate' (m, WeakTermPi xts) = do
   m' <- toMeta m
   xts' <- mapM elaboratePlus xts
-  ensuringTypePurity (m', TermPi xts')
+  return (m', TermPi xts')
 elaborate' (m, WeakTermPiIntro xts e) = do
   m' <- toMeta m
   e' <- elaborate' e
   xts' <- mapM elaboratePlus xts
-  ensuringTypePurity (m', TermPiIntro xts' e')
+  return (m', TermPiIntro xts' e')
 elaborate' (m, WeakTermPiElim e es) = do
   m' <- toMeta m
   e' <- elaborate' e
   es' <- mapM elaborate' es
-  ensuringTypePurity (m', TermPiElim e' es')
+  return (m', TermPiElim e' es')
 elaborate' (m, WeakTermMu (x, t) e) = do
   t' <- elaborate' t >>= reduceTermPlus
   case t' of
     (_, TermPi _) -> do
       m' <- toMeta m
       e' <- elaborate' e
-      ensuringTypePurity (m', TermMu (x, t') e')
+      return (m', TermMu (x, t') e')
     _ -> lift $ throwE "CBV recursion is allowed only for Pi-types"
 elaborate' (_, WeakTermZeta x) = do
   sub <- gets substEnv
@@ -139,20 +139,6 @@ exhaustEpsilonIdentifier x labelList b1 = do
       if length ls <= length (nub labelList)
         then return $ b1 && True
         else return False
-
-ensuringTypePurity :: TermPlus -> WithEnv TermPlus
-ensuringTypePurity t@(MetaTerminal _, _) =
-  if not (isPure t)
-    then throwError "impure type"
-    else return t
-ensuringTypePurity t@(MetaNonTerminal t1 ml, e) =
-  if not (isPure t1)
-    then throwError "impure type"
-    else do
-      t1' <- reduceTermPlus t1 -- t1はpureだと分かっているので普通にreduceしてよい
-      case t1' of
-        (_, TermTau) -> ensuringTypePurity (MetaTerminal ml, e)
-        _ -> return t
 
 allM :: Monad m => (a -> m Bool) -> [a] -> m Bool
 allM _ [] = return True
