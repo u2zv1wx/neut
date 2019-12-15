@@ -132,9 +132,11 @@ exhaust' (_, WeakTermZeta _) = return False
 
 exhaustEpsilonIdentifier :: Identifier -> [Case] -> Bool -> WithEnv Bool
 exhaustEpsilonIdentifier x labelList b1 = do
-  ienv <- gets epsilonEnv
-  case lookup x ienv of
-    Nothing -> undefined -- xはi32とかそのへんのやつ
+  eenv <- gets epsilonEnv
+  case lookup x eenv of
+    Nothing
+    -- xはi32とかそのへんのやつ。このときはlabelListにdefaultが入っていないとダメ。
+     -> return $ CaseDefault `elem` labelList
     Just ls ->
       if length ls <= length (nub labelList)
         then return $ b1 && True
