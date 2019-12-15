@@ -122,26 +122,6 @@ substTermPlusBindingsWithBody sub ((x, t):xts) e = do
   let (xts', e') = substTermPlusBindingsWithBody sub' xts e
   ((x, substTermPlus sub t) : xts', e')
 
-isReducible :: TermPlus -> Bool
-isReducible (_, TermTau) = False
-isReducible (_, TermTheta _) = False
-isReducible (_, TermUpsilon _) = False
-isReducible (_, TermEpsilon _) = False
-isReducible (_, TermEpsilonIntro _ _) = False
-isReducible (_, TermEpsilonElim _ (_, TermEpsilonIntro l _) branchList) = do
-  let (caseList, _) = unzip branchList
-  CaseLiteral l `elem` caseList || CaseDefault `elem` caseList
-isReducible (_, TermEpsilonElim (_, _) e _) = isReducible e
-isReducible (_, TermPi _) = False
-isReducible (_, TermPiIntro {}) = False
-isReducible (_, TermPiElim (_, TermPiIntro xts _) es)
-  | length xts == length es = True
-isReducible (_, TermPiElim (_, TermMu _ _) _) = True -- CBV recursion
-isReducible (_, TermPiElim (_, TermTheta c) [(_, TermEpsilonIntro (LiteralInteger _) _), (_, TermEpsilonIntro (LiteralInteger _) _)]) -- constant application
-  | c `elem` intArithConstantList = True
-isReducible (_, TermPiElim e es) = isReducible e || any isReducible es
-isReducible (_, TermMu _ _) = False
-
 isPure :: TermPlus -> Bool
 isPure (_, TermTau) = True
 isPure (_, TermTheta theta) = isPureConstant theta
