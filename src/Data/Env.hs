@@ -2,7 +2,6 @@
 
 module Data.Env where
 
--- import           Control.Comonad.Cofree
 import Control.Monad.State
 import Control.Monad.Trans.Except
 import Data.IORef
@@ -49,7 +48,6 @@ initialEnv path =
     , nameEnv = []
     , typeEnv = Map.empty
     , codeEnv = []
-    -- , lowCodeEnv = []
     , llvmEnv = []
     , constraintEnv = []
     , constraintQueue = Q.empty
@@ -58,21 +56,6 @@ initialEnv path =
     }
 
 type WithEnv a = StateT Env (ExceptT String IO) a
-
-liftToWithEnv :: (IO a -> IO b) -> WithEnv a -> WithEnv b
-liftToWithEnv f e = do
-  e' <- e
-  liftIO $ f (return e')
-
-runWithEnv :: WithEnv a -> Env -> IO (Either String (a, Env))
-runWithEnv c env = runExceptT (runStateT c env)
-
-evalWithEnv :: (Show a) => WithEnv a -> Env -> IO (Either String a)
-evalWithEnv c env = do
-  resultOrErr <- runWithEnv c env
-  case resultOrErr of
-    Left err -> return $ Left err
-    Right (result, _) -> return $ Right result
 
 newName :: WithEnv Identifier
 newName = do
@@ -87,12 +70,6 @@ newNameWith s = do
   let s' = s ++ i
   modify (\e -> e {nameEnv = (s, s') : nameEnv e})
   return s'
-
-newNameOfType :: WeakTermPlus -> Identifier -> WithEnv Identifier
-newNameOfType t s = do
-  i <- newNameWith s
-  insTypeEnv i t
-  return i
 
 lookupTypeEnv :: String -> WithEnv WeakTermPlus
 lookupTypeEnv s = do
@@ -129,9 +106,6 @@ insCodeEnv :: Identifier -> [Identifier] -> CodePlus -> WithEnv ()
 insCodeEnv name args e =
   modify (\env -> env {codeEnv = (name, (args, e)) : codeEnv env})
 
--- insLowCodeEnv :: Identifier -> [Identifier] -> LowCodePlus -> WithEnv ()
--- insLowCodeEnv name args e =
---   modify (\env -> env {lowCodeEnv = (name, (args, e)) : lowCodeEnv env})
 insLLVMEnv :: Identifier -> [Identifier] -> LLVM -> WithEnv ()
 insLLVMEnv funName args e =
   modify (\env -> env {llvmEnv = (funName, (args, e)) : llvmEnv env})
