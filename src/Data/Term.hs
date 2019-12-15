@@ -77,12 +77,6 @@ getClosedVarChainBindings ((x, t):xts) es = do
   let xs2 = getClosedVarChainBindings xts es
   xs1 ++ filter (\(y, _, _) -> y /= x) xs2
 
-pairwiseConcat :: [([a], [b])] -> ([a], [b])
-pairwiseConcat [] = ([], [])
-pairwiseConcat ((xs, ys):rest) = do
-  let (xs', ys') = pairwiseConcat rest
-  (xs ++ xs', ys ++ ys')
-
 substTermPlus :: SubstTerm -> TermPlus -> TermPlus
 substTermPlus _ (m, TermTau) = (m, TermTau)
 substTermPlus _ (m, TermTheta t) = (m, TermTheta t)
