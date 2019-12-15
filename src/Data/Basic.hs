@@ -78,8 +78,3 @@ intArithConstantList :: [String]
 intArithConstantList =
   intAddConstantList ++
   intSubConstantList ++ intMulConstantList ++ intDivConstantList
-
-toFunPtrType :: [a] -> LowType
-toFunPtrType xs = do
-  let funType = LowTypeFunction (map (const voidPtr) xs) voidPtr
-  LowTypePointer funType

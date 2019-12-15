@@ -235,3 +235,8 @@ toStructPtrType :: [a] -> LowType
 toStructPtrType xs = do
   let structType = LowTypeStruct $ map (const voidPtr) xs
   LowTypePointer structType
+
+toFunPtrType :: [a] -> LowType
+toFunPtrType xs = do
+  let funType = LowTypeFunction (map (const voidPtr) xs) voidPtr
+  LowTypePointer funType
