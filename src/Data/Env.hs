@@ -27,7 +27,7 @@ data Env =
     , keywordEnv :: [Identifier] -- list of reserved keywords
     , notationEnv :: [(TreePlus, TreePlus)] -- macro transformers
     , constantEnv :: [Identifier]
-    , epsilonEnv :: [(Identifier, [Identifier])]
+    , epsilonEnv :: [(Identifier, [Identifier])] -- [("choice", ["left", "right"]), ...]
     , nameEnv :: [(Identifier, Identifier)] -- [("foo", "foo.13"), ...]
     , typeEnv :: Map.Map Identifier WeakTermPlus -- var ~> typeof(var)
     , constraintEnv :: [PreConstraint] -- for type inference
