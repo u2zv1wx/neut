@@ -33,5 +33,5 @@ data LLVM
   | LLVMFree LLVMData
   | LLVMArith (Arith, LowType) LLVMData LLVMData
   | LLVMPrint LowType LLVMData
-  | LLVMUnreachable
+  | LLVMUnreachable -- for empty case analysis
   deriving (Show)
