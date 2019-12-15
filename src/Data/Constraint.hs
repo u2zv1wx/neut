@@ -10,7 +10,6 @@ data Constraint
   | ConstraintQuasiPattern Hole [[WeakTermPlus]] WeakTermPlus
   | ConstraintFlexRigid Hole [[WeakTermPlus]] WeakTermPlus
   | ConstraintFlexFlex Hole [[WeakTermPlus]] WeakTermPlus
-  | ConstraintOther
 
 constraintToInt :: Constraint -> Int
 constraintToInt ConstraintImmediate {} = 0
@@ -18,7 +17,6 @@ constraintToInt ConstraintPattern {} = 1
 constraintToInt ConstraintQuasiPattern {} = 2
 constraintToInt ConstraintFlexRigid {} = 3
 constraintToInt ConstraintFlexFlex {} = 4
-constraintToInt ConstraintOther {} = 5
 
 instance Eq Constraint where
   c1 == c2 = constraintToInt c1 == constraintToInt c2

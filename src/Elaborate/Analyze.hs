@@ -86,17 +86,12 @@ simp ((e1@(m1, _), e2@(m2, _)):cs) = do
       let c = Enriched (e1, e2) [h1] $ ConstraintFlexRigid h1 ies1 e2
       return $ c : cs'
     (Nothing, Just StuckPiElim {}) -> simp $ (e2, e1) : cs
-    (Just (StuckPiElim h1 ies1), _) -> do
+    (Just (StuckPiElim h1 ies1), Just (StuckPiElim h2 _)) -> do
       cs' <- simpMetaRet m1 m2 $ simp cs
-      let c = Enriched (e1, e2) [h1] $ ConstraintFlexFlex h1 ies1 e2
+      let c = Enriched (e1, e2) [h1, h2] $ ConstraintFlexFlex h1 ies1 e2
       return $ c : cs'
-    (_, Just StuckPiElim {}) -> simp $ (e2, e1) : cs
-    (Just (StuckOther h1), _) -> do
-      cs' <- simpMetaRet m1 m2 $ simp cs
-      let c = Enriched (e1, e2) [h1] ConstraintOther
-      return $ c : cs'
-    (_, Just (StuckOther _)) -> simp $ (e2, e1) : cs
-    _ -> throwError $ "cannot simplify:\n" ++ Pr.ppShow (e1, e2)
+    (Nothing, Nothing) ->
+      throwError $ "cannot simplify:\n" ++ Pr.ppShow (e1, e2)
 
 simpMetaRet ::
      WeakMeta
@@ -149,8 +144,8 @@ data Stuck
   = StuckHole Hole
   | StuckPiElim Hole [[WeakTermPlus]]
   | StuckPiElimStrict Hole [[(WeakTermPlus, Identifier)]]
-  | StuckOther Hole
 
+-- a stucked term is a term that cannot be evaluated due to unresolved holes.
 asStuckedTerm :: WeakTermPlus -> Maybe Stuck
 asStuckedTerm (_, WeakTermPiElim e es)
   | Just xs <- mapM interpretAsUpsilon es =
@@ -159,7 +154,6 @@ asStuckedTerm (_, WeakTermPiElim e es)
       Just (StuckPiElim h iess) -> Just $ StuckPiElim h (iess ++ [es])
       Just (StuckPiElimStrict h iexss) ->
         Just $ StuckPiElimStrict h $ iexss ++ [zip es xs]
-      Just (StuckOther h) -> Just $ StuckOther h
       Nothing -> Nothing
 asStuckedTerm (_, WeakTermPiElim e es) =
   case asStuckedTerm e of
@@ -168,18 +162,9 @@ asStuckedTerm (_, WeakTermPiElim e es) =
     Just (StuckPiElimStrict h exss) -> do
       let ess = map (map fst) exss
       Just $ StuckPiElim h $ ess ++ [es]
-    Just (StuckOther h) -> Just $ StuckOther h
     Nothing -> Nothing
 asStuckedTerm (_, WeakTermZeta h) = Just $ StuckHole h
-asStuckedTerm e
-  | Just h <- obtainStuckReason e = Just $ StuckOther h
 asStuckedTerm _ = Nothing
-
-obtainStuckReason :: WeakTermPlus -> Maybe Hole
-obtainStuckReason (_, WeakTermEpsilonElim _ e _) = obtainStuckReason e
-obtainStuckReason (_, WeakTermPiElim e _) = obtainStuckReason e
-obtainStuckReason (_, WeakTermZeta x) = Just x
-obtainStuckReason _ = Nothing
 
 isSolvable :: WeakTermPlus -> Identifier -> [Identifier] -> Bool
 isSolvable e x xs = do
