@@ -152,7 +152,7 @@ toMeta (WeakMetaTerminal l) = return $ MetaTerminal l
 toMeta (WeakMetaNonTerminal (Ref r) l) = do
   mt <- liftIO $ readIORef r
   case mt of
-    Nothing -> undefined
+    Nothing -> throwError "found an unresolved type (compiler bug)"
     Just t -> do
       t' <- elaborate' t
       return $ MetaNonTerminal t' l
