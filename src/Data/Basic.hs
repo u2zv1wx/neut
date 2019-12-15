@@ -21,7 +21,6 @@ data LowType
   | LowTypeFloat Int
   | LowTypePointer LowType
   | LowTypeFunction [LowType] LowType
-  | LowTypeArray Int LowType
   | LowTypeStruct [LowType]
   deriving (Eq, Show)
 
