@@ -108,8 +108,6 @@ elaborate' (m, WeakTermInt x) = do
       case asLowTypeMaybe intType of
         Just lowType@(LowTypeSignedInt _) -> return (m', TermInt x lowType)
         Just lowType@(LowTypeUnsignedInt _) -> return (m', TermInt x lowType)
-        Just (LowTypeFloat _) ->
-          throwError $ show x ++ " should be int, but is float"
         _ -> throwError $ show x ++ " should be int, but is " ++ intType
     _ -> throwError "epsilonIntro"
 elaborate' (m, WeakTermFloat x) = do
@@ -118,10 +116,6 @@ elaborate' (m, WeakTermFloat x) = do
   case t of
     (_, TermTheta floatType) ->
       case asLowTypeMaybe floatType of
-        Just (LowTypeSignedInt _) ->
-          throwError $ show x ++ " should be float, but is int"
-        Just (LowTypeUnsignedInt _) ->
-          throwError $ show x ++ " should be float, but is int"
         Just lowType@(LowTypeFloat _) -> return (m', TermFloat x lowType)
         _ -> throwError $ show x ++ " should be float, but is " ++ floatType
     _ -> throwError "epsilonIntro"
