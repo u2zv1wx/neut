@@ -8,7 +8,6 @@ import System.Directory
 import System.FilePath
 import Text.Read (readMaybe)
 
-import Data.Basic
 import Data.Env
 import Data.Tree
 import Data.WeakTerm
@@ -106,9 +105,9 @@ isSpecialForm _ = False
 -- (Note that `let x := e1 in e2` can be represented as `(lam x e2) e1`.)
 concatDefList :: [Def] -> WithEnv WeakTermPlus
 concatDefList [] = do
-  let t = (WeakMetaTerminal Nothing, WeakTermEpsilon "i64")
+  let t = (WeakMetaTerminal Nothing, WeakTermEpsilon "top")
   m <- newMetaOfType t
-  return (m, WeakTermEpsilonIntro (LiteralInteger 0))
+  return (m, WeakTermEpsilonIntro "unit")
 concatDefList (DefLet meta tu e:es) = do
   cont <- concatDefList es
   m <- newMeta

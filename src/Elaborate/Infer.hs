@@ -141,7 +141,8 @@ newHoleListInCtx ctx (x:rest) = do
   return $ t : ts
 
 inferCase :: Case -> WithEnv (Maybe WeakTermPlus)
-inferCase (CaseLiteral (LiteralLabel name)) = do
+-- inferCase (CaseLiteral (LiteralLabel name)) = do
+inferCase (CaseLabel name) = do
   ienv <- gets epsilonEnv
   mk <- lookupKind' name ienv
   case mk of

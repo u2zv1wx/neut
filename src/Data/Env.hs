@@ -121,10 +121,14 @@ insEpsilonEnv :: Identifier -> [Identifier] -> WithEnv ()
 insEpsilonEnv name epsilonList =
   modify (\e -> e {epsilonEnv = (name, epsilonList) : epsilonEnv e})
 
-lookupKind :: Literal -> WithEnv (Maybe Identifier)
-lookupKind (LiteralInteger _) = return Nothing
-lookupKind (LiteralFloat _) = return Nothing
-lookupKind (LiteralLabel name) = do
+-- lookupKind :: Literal -> WithEnv (Maybe Identifier)
+-- lookupKind (LiteralInteger _) = return Nothing
+-- lookupKind (LiteralFloat _) = return Nothing
+-- lookupKind (LiteralLabel name) = do
+--   env <- get
+--   lookupKind' name $ epsilonEnv env
+lookupKind :: Identifier -> WithEnv (Maybe Identifier)
+lookupKind name = do
   env <- get
   lookupKind' name $ epsilonEnv env
 

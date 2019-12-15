@@ -9,7 +9,7 @@ import Data.Basic
 data Data
   = DataTheta Identifier
   | DataUpsilon Identifier
-  | DataEpsilonIntro Literal LowType
+  | DataEpsilonIntro Identifier LowType
   | DataSigmaIntro [DataPlus]
   deriving (Show)
 

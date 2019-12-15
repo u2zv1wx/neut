@@ -30,7 +30,7 @@ interpret (m, TreeNode [(_, TreeAtom "epsilon"), (_, TreeAtom x)]) = do
     then throwError $ "No such epsilon-type defined: " ++ x
     else withMeta m $ WeakTermEpsilon x
 interpret (m, TreeNode [(_, TreeAtom "epsilon-introduction"), l]) = do
-  l' <- interpretLiteral l
+  l' <- interpretLabel l
   withMeta m $ WeakTermEpsilonIntro l'
 interpret (m, TreeNode [(_, TreeAtom "epsilon-elimination"), xt, e, (_, TreeNode cs)]) = do
   xt' <- interpretIdentifierPlus xt
@@ -60,10 +60,10 @@ interpret (m, TreeNode [(_, TreeAtom "zeta"), (_, TreeAtom x)]) = do
 -- auxiliary interpretations
 --
 interpret t@(m, TreeAtom x) = do
-  ml <- interpretLiteralMaybe t
+  ml <- interpretLabelMaybe t
   case ml of
     Just l -> withMeta m $ WeakTermEpsilonIntro l
-    Nothing -> do
+    _ -> do
       isEpsilon <- isDefinedEpsilonName x
       if isEpsilon
         then withMeta m $ WeakTermEpsilon x
@@ -93,26 +93,25 @@ interpretAtom :: String -> WithEnv String
 interpretAtom "_" = newNameWith "hole"
 interpretAtom x = return x
 
-interpretLiteralMaybe :: TreePlus -> WithEnv (Maybe Literal)
-interpretLiteralMaybe (_, TreeAtom x)
-  | Just f <- readMaybe x
-  , '.' `elem` x = return $ Just $ LiteralFloat f
-interpretLiteralMaybe (_, TreeAtom x)
-  | Just i <- readMaybe x = return $ Just $ LiteralInteger i
-interpretLiteralMaybe (_, TreeAtom x) = do
+-- interpretLiteralMaybe (_, TreeAtom x)
+--   | Just f <- readMaybe x
+--   , '.' `elem` x = return $ Just $ LiteralFloat f
+-- interpretLiteralMaybe (_, TreeAtom x)
+--   | Just i <- readMaybe x = return $ Just $ LiteralInteger i
+interpretLabelMaybe :: TreePlus -> WithEnv (Maybe Identifier)
+interpretLabelMaybe (_, TreeAtom x) = do
   b <- isDefinedEpsilon x
   if b
-    then return $ Just $ LiteralLabel x
+    then return $ Just x
     else lift $ throwE $ "no such label defined: " ++ x
-interpretLiteralMaybe _ = return Nothing
+interpretLabelMaybe _ = return Nothing
 
-interpretLiteral :: TreePlus -> WithEnv Literal
-interpretLiteral l = do
-  ml' <- interpretLiteralMaybe l
+interpretLabel :: TreePlus -> WithEnv Identifier
+interpretLabel l = do
+  ml' <- interpretLabelMaybe l
   case ml' of
     Just l' -> return l'
-    Nothing ->
-      lift $ throwE $ "interpretLiteral: syntax error:\n" ++ Pr.ppShow l
+    Nothing -> lift $ throwE $ "interpretLabel: syntax error:\n" ++ Pr.ppShow l
 
 interpretBinder ::
      [TreePlus] -> TreePlus -> WithEnv ([IdentifierPlus], WeakTermPlus)
@@ -125,18 +124,23 @@ interpretCase :: TreePlus -> WithEnv Case
 --
 -- foundational
 --
-interpretCase (_, TreeNode [(_, TreeAtom "epsilon-introduction"), l]) = do
-  l' <- interpretLiteral l
-  return $ CaseLiteral l'
-interpretCase (_, TreeAtom "default") = return CaseDefault
+interpretCase (_, TreeNode [(_, TreeAtom "epsilon-introduction"), (_, TreeAtom x)]) = do
+  return $ CaseLabel x
+-- interpretCase (_, TreeNode [(_, TreeAtom "epsilon-introduction"), l]) = do
+--   l' <- interpretLabel l
+--   return $ CaseLiteral l'
+interpretCase (_, TreeAtom "default") = return CaseDefault -- case mc' of
+  --   Just l -> return $ CaseLiteral l
+  --   Nothing -> lift $ throwE $ "interpretCase: syntax error:\n" ++ Pr.ppShow c
 --
 -- auxiliary
 --
+-- interpretCase (_, TreeAtom x) = return $ CaseLabel x -- mc' <- interpretLabelMaybe c
 interpretCase c = do
-  mc' <- interpretLiteralMaybe c
+  mc' <- interpretLabelMaybe c
   case mc' of
-    Just l -> return $ CaseLiteral l
-    Nothing -> lift $ throwE $ "interpretCase: syntax error:\n" ++ Pr.ppShow c
+    Just l -> return $ CaseLabel l
+    _ -> lift $ throwE $ "interpretCase: syntax error:\n" ++ Pr.ppShow c
 
 interpretClause :: TreePlus -> WithEnv (Case, WeakTermPlus)
 interpretClause (_, TreeNode [c, e]) = do

@@ -4,14 +4,8 @@ type Identifier = String
 
 type Loc = (Int, Int)
 
-data Literal
-  = LiteralInteger Int
-  | LiteralFloat Double
-  | LiteralLabel Identifier
-  deriving (Show, Eq)
-
 data Case
-  = CaseLiteral Literal
+  = CaseLabel Identifier
   | CaseDefault
   deriving (Show, Eq)
 

@@ -11,7 +11,7 @@ data Term
   | TermTheta Identifier
   | TermUpsilon Identifier
   | TermEpsilon Identifier
-  | TermEpsilonIntro Literal LowType
+  | TermEpsilonIntro Identifier LowType
   | TermEpsilonElim (Identifier, LowType) TermPlus [(Case, TermPlus)]
   | TermPi [IdentifierPlus]
   | TermPiIntro [IdentifierPlus] TermPlus

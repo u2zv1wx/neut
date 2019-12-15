@@ -140,27 +140,28 @@ llvmDataLet x (_, DataTheta y) cont = do
         LLVMLet x (LLVMBitcast (LLVMDataGlobal y) funPtrType voidPtr) cont
 llvmDataLet x (_, DataUpsilon y) cont =
   return $ LLVMLet x (LLVMBitcast (LLVMDataLocal y) voidPtr voidPtr) cont
-llvmDataLet x (_, DataEpsilonIntro (LiteralInteger i) (LowTypeSignedInt j)) cont =
-  return $
-  LLVMLet
-    x
-    (LLVMIntToPointer (LLVMDataInt i j) (LowTypeSignedInt j) voidPtr)
-    cont
-llvmDataLet x (_, DataEpsilonIntro (LiteralFloat f) (LowTypeFloat j)) cont = do
-  cast <- newNameWith "cast"
-  let ft = LowTypeFloat j
-  let st = LowTypeSignedInt j
-  return $
-    LLVMLet cast (LLVMBitcast (LLVMDataFloat f j) ft st) $
-    LLVMLet x (LLVMIntToPointer (LLVMDataLocal cast) st voidPtr) cont
-llvmDataLet x (m, DataEpsilonIntro (LiteralLabel label) _) cont = do
+-- llvmDataLet x (_, DataEpsilonIntro (LiteralInteger i) (LowTypeSignedInt j)) cont =
+--   return $
+--   LLVMLet
+--     x
+--     (LLVMIntToPointer (LLVMDataInt i j) (LowTypeSignedInt j) voidPtr)
+--     cont
+-- llvmDataLet x (_, DataEpsilonIntro (LiteralFloat f) (LowTypeFloat j)) cont = do
+--   cast <- newNameWith "cast"
+--   let ft = LowTypeFloat j
+--   let st = LowTypeSignedInt j
+--   return $
+--     LLVMLet cast (LLVMBitcast (LLVMDataFloat f j) ft st) $
+--     LLVMLet x (LLVMIntToPointer (LLVMDataLocal cast) st voidPtr) cont
+llvmDataLet x (_, DataEpsilonIntro label (LowTypeSignedInt j)) cont = do
   mi <- getEpsilonNum label
   case mi of
     Nothing -> lift $ throwE $ "no such epsilon is defined: " ++ show label
     Just i ->
-      llvmDataLet
+      return $
+      LLVMLet
         x
-        (m, DataEpsilonIntro (LiteralInteger i) (LowTypeSignedInt 64))
+        (LLVMIntToPointer (LLVMDataInt i j) (LowTypeSignedInt j) voidPtr)
         cont
 llvmDataLet _ (_, DataEpsilonIntro _ _) _ =
   throwError "llvmDataLet.DataEpsilonIntro"
@@ -180,28 +181,27 @@ llvmDataLet' ((x, d):rest) cont = do
   cont' <- llvmDataLet' rest cont
   llvmDataLet x d cont'
 
+-- returns Nothing iff the branch list is empty
 constructSwitch :: [(Case, CodePlus)] -> WithEnv (Maybe (LLVM, [(Int, LLVM)]))
 constructSwitch [] = return Nothing
-constructSwitch [(CaseLiteral (LiteralLabel _), code)] -- 最後のlabelだからdefault確定
+constructSwitch [(CaseLabel _, code)] -- 最後のlabelだからdefault確定
  = do
   code' <- llvmCode code
   return $ Just (code', [])
-constructSwitch ((CaseLiteral (LiteralLabel x), code):rest) = do
+constructSwitch ((CaseLabel x, code):rest) = do
   set <- lookupEpsilonSet x
   case elemIndex x set of
     Nothing -> lift $ throwE $ "no such index defined: " ++ show x
-    Just i -> constructSwitch ((CaseLiteral (LiteralInteger i), code) : rest)
+    Just i -> do
+      code' <- llvmCode code
+      m <- constructSwitch rest
+      case m of
+        Nothing -> return Nothing
+        Just (defaultCase, caseList) ->
+          return $ Just (defaultCase, (i, code') : caseList)
 constructSwitch ((CaseDefault, code):_) = do
   code' <- llvmCode code
   return $ Just (code', [])
-constructSwitch ((CaseLiteral (LiteralInteger i), code):rest) = do
-  code' <- llvmCode code
-  m <- constructSwitch rest
-  case m of
-    Just (defaultCase, caseList) ->
-      return $ Just (defaultCase, (i, code') : caseList)
-    Nothing -> return Nothing
-constructSwitch ((CaseLiteral (LiteralFloat _), _):_) = undefined -- IEEE754 float equality!
 
 -- floatかどうかで場合分けする必要がありそう？
 llvmCodeEpsilonElim ::
