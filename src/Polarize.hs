@@ -357,7 +357,7 @@ cartesianSigma thetaName ml mxes = do
   return (ml, DataSigmaIntro [aff, rel])
 
 -- (Assuming `ei` = `return di` for some `di` such that `xi : di`)
--- affineSigma NAME LOC [x1, e1, ..., xn, en]   ~>
+-- affineSigma NAME LOC [x1 : e1, ..., xn : en]   ~>
 --   update CodeEnv with NAME ~> (thunk LAM), where LAM is:
 --   lam z.
 --     let (x1, ..., xn) := z in
@@ -368,7 +368,7 @@ cartesianSigma thetaName ml mxes = do
 --     ...
 --     bind yn :=
 --       bind fn = en in              ---
---       let (aff-n, rel-n) := fn in  --- APP-n
+--       let (aff-n, rel-n) := fn in  ---  APP-n
 --       aff-n @ xn in                ---
 --     return ()
 -- (Note that sigma-elim for yi is not necessary since all of them are units.)
@@ -410,10 +410,10 @@ affineSigma thetaName ml mxes = do
 --     ...
 --     bind pair-n :=
 --       bind fn = en in              ---
---       let (aff-n, rel-n) := fn in  --- APP-n
+--       let (aff-n, rel-n) := fn in  ---  APP-n
 --       rel-n @ xn in                ---
 --     let (p11, p12) := pair-1 in               ---
---     ...                                       --- TRANSPOSE-SIGMA
+--     ...                                       ---  TRANSPOSE-SIGMA
 --     let (pn1, pn2) := pair-n in               ---
 --     return ((p11, ..., pn1), (p12, ..., pn2)) ---
 relevantSigma ::
