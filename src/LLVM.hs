@@ -66,7 +66,10 @@ llvmCodeSigmaElim ::
   -> Int
   -> CodePlus
   -> WithEnv LLVM
-llvmCodeSigmaElim _ [] _ _ cont = llvmCode cont
+llvmCodeSigmaElim basePointer [] _ _ cont = do
+  hole <- newNameWith "hole"
+  cont' <- llvmCode cont
+  return $ LLVMLet hole (LLVMFree (LLVMDataLocal basePointer)) cont'
 llvmCodeSigmaElim basePointer ((x, i):xis) castedBasePointer n cont = do
   cont' <- llvmCodeSigmaElim basePointer xis castedBasePointer n cont
   loader <- newNameWith "loader"
