@@ -117,3 +117,12 @@ showItems :: (a -> String) -> [a] -> String
 showItems _ [] = ""
 showItems f [a] = f a
 showItems f (a:as) = f a ++ ", " ++ showItems f as
+
+asLowType :: Identifier -> LowType
+asLowType ('i':cs)
+  | Just n <- read cs = LowTypeSignedInt n
+asLowType ('u':cs)
+  | Just n <- read cs = LowTypeUnsignedInt n
+asLowType ('f':cs)
+  | Just n <- read cs = LowTypeFloat n
+asLowType _ = LowTypeSignedInt 64 -- labels are i64
