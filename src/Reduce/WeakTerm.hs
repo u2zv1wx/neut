@@ -48,5 +48,22 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
           (_, _, _, True) ->
             return (m, WeakTermEpsilonIntro (LiteralInteger (x `div` y)))
           _ -> return (m, WeakTermPiElim e' es')
+    (_, WeakTermTheta constant)
+      | [(_, WeakTermEpsilonIntro (LiteralFloat x)), (_, WeakTermEpsilonIntro (LiteralFloat y))] <-
+         es' -> do
+        let b1 = constant `elem` floatAddConstantList
+        let b2 = constant `elem` floatSubConstantList
+        let b3 = constant `elem` floatMulConstantList
+        let b4 = constant `elem` floatDivConstantList
+        case (b1, b2, b3, b4) of
+          (True, _, _, _) ->
+            return (m, WeakTermEpsilonIntro (LiteralFloat (x + y)))
+          (_, True, _, _) ->
+            return (m, WeakTermEpsilonIntro (LiteralFloat (x - y)))
+          (_, _, True, _) ->
+            return (m, WeakTermEpsilonIntro (LiteralFloat (x * y)))
+          (_, _, _, True) ->
+            return (m, WeakTermEpsilonIntro (LiteralFloat (x / y)))
+          _ -> return (m, WeakTermPiElim e' es')
     _ -> return (m, WeakTermPiElim e' es')
 reduceWeakTermPlus t = return t

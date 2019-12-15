@@ -59,22 +59,61 @@ unsignedIntLowTypeList =
   , LowTypeUnsignedInt 64
   ]
 
-floatLowTypeList :: [LowType]
-floatLowTypeList = [LowTypeFloat 16, LowTypeFloat 32, LowTypeFloat 64]
-
 intAddConstantList :: [String]
-intAddConstantList = flip map intLowTypeList $ \t -> "core." ++ show t ++ ".add"
+intAddConstantList =
+  flip map intLowTypeList $ \t -> "core." ++ showLowType t ++ ".add"
 
 intSubConstantList :: [String]
-intSubConstantList = flip map intLowTypeList $ \t -> "core." ++ show t ++ ".sub"
+intSubConstantList =
+  flip map intLowTypeList $ \t -> "core." ++ showLowType t ++ ".sub"
 
 intMulConstantList :: [String]
-intMulConstantList = flip map intLowTypeList $ \t -> "core." ++ show t ++ ".mul"
+intMulConstantList =
+  flip map intLowTypeList $ \t -> "core." ++ showLowType t ++ ".mul"
 
 intDivConstantList :: [String]
-intDivConstantList = flip map intLowTypeList $ \t -> "core." ++ show t ++ ".div"
+intDivConstantList =
+  flip map intLowTypeList $ \t -> "core." ++ showLowType t ++ ".div"
 
 intArithConstantList :: [String]
 intArithConstantList =
   intAddConstantList ++
   intSubConstantList ++ intMulConstantList ++ intDivConstantList
+
+floatLowTypeList :: [LowType]
+floatLowTypeList = [LowTypeFloat 16, LowTypeFloat 32, LowTypeFloat 64]
+
+floatAddConstantList :: [String]
+floatAddConstantList =
+  flip map floatLowTypeList $ \t -> "core." ++ showLowType t ++ ".add"
+
+floatSubConstantList :: [String]
+floatSubConstantList =
+  flip map floatLowTypeList $ \t -> "core." ++ showLowType t ++ ".sub"
+
+floatMulConstantList :: [String]
+floatMulConstantList =
+  flip map floatLowTypeList $ \t -> "core." ++ showLowType t ++ ".mul"
+
+floatDivConstantList :: [String]
+floatDivConstantList =
+  flip map floatLowTypeList $ \t -> "core." ++ showLowType t ++ ".div"
+
+floatArithConstantList :: [String]
+floatArithConstantList =
+  floatAddConstantList ++
+  floatSubConstantList ++ floatMulConstantList ++ floatDivConstantList
+
+showLowType :: LowType -> String
+showLowType (LowTypeSignedInt i) = "i" ++ show i
+showLowType (LowTypeUnsignedInt i) = "u" ++ show i
+showLowType (LowTypeFloat i) = "f" ++ show i -- shouldn't occur
+showLowType (LowTypePointer t) = showLowType t ++ "*"
+showLowType (LowTypeStruct ts) = "{" ++ showItems showLowType ts ++ "}"
+showLowType (LowTypeFunction ts t) =
+  showLowType t ++ " (" ++ showItems showLowType ts ++ ")"
+
+showItems :: (a -> String) -> [a] -> String
+showItems _ [] = ""
+showItems f [a] = f a
+showItems f (a:as) = f a ++ ", " ++ showItems f as

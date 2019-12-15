@@ -142,6 +142,9 @@ isReducible (_, WeakTermPiElim (_, WeakTermPiIntro xts _) es)
 isReducible (_, WeakTermPiElim (_, WeakTermMu _ _) _) = True -- CBV recursion
 isReducible (_, WeakTermPiElim (_, WeakTermTheta c) [(_, WeakTermEpsilonIntro (LiteralInteger _)), (_, WeakTermEpsilonIntro (LiteralInteger _))]) -- constant application
   | c `elem` intArithConstantList = True
+isReducible (_, WeakTermPiElim (_, WeakTermTheta c) [(_, WeakTermEpsilonIntro (LiteralFloat _)), (_, WeakTermEpsilonIntro (LiteralFloat _))])
+ -- constant application
+  | c `elem` floatArithConstantList = True
 isReducible (_, WeakTermPiElim e es) = isReducible e || any isReducible es
 isReducible (_, WeakTermMu _ _) = False
 isReducible (_, WeakTermZeta _) = False
