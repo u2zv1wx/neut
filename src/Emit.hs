@@ -198,23 +198,23 @@ emitLLVM funName (LLVMLet _ (LLVMFree d) cont) = do
   op <- emitOp $ unwords ["call", "void", "@free(i8* " ++ showLLVMData d ++ ")"]
   a <- emitLLVM funName cont
   return $ op ++ a
-emitLLVM funName (LLVMLet x (LLVMArith (ArithAdd, t) d1 d2) cont)
-  | t `elem` intLowTypeList
-  -- thanks to the two's complement representation of LLVM, these arithmetic
-  -- instructions ('add', 'sub', 'mul') are valid for both signed and unsigned integers.
-   = do
-    op <-
-      emitOp $
-      unwords
-        [ showLLVMData (LLVMDataLocal x)
-        , "="
-        , "add"
-        , showLowType t
-        , showLLVMData d1 ++ ","
-        , showLLVMData d2
-        ]
-    a <- emitLLVM funName cont
-    return $ op ++ a
+emitLLVM funName (LLVMLet x (LLVMArith (ArithAdd, t@(LowTypeSignedInt _)) d1 d2) cont) = do
+  op <-
+    emitOp $
+    unwords
+      [ showLLVMData (LLVMDataLocal x)
+      , "="
+      , "add"
+      , showLowType t
+      , showLLVMData d1 ++ ","
+      , showLLVMData d2
+      ]
+  a <- emitLLVM funName cont
+  return $ op ++ a
+emitLLVM funName (LLVMLet x (LLVMArith (ArithAdd, LowTypeUnsignedInt size) d1 d2) cont) =
+  emitLLVM
+    funName
+    (LLVMLet x (LLVMArith (ArithAdd, LowTypeSignedInt size) d1 d2) cont) -- thanks to the two's complement representation
 emitLLVM funName (LLVMLet x (LLVMArith (ArithAdd, t) d1 d2) cont) = do
   op <-
     emitOp $
@@ -228,20 +228,23 @@ emitLLVM funName (LLVMLet x (LLVMArith (ArithAdd, t) d1 d2) cont) = do
       ]
   a <- emitLLVM funName cont
   return $ op ++ a
-emitLLVM funName (LLVMLet x (LLVMArith (ArithSub, t) d1 d2) cont)
-  | t `elem` intLowTypeList = do
-    op <-
-      emitOp $
-      unwords
-        [ showLLVMData (LLVMDataLocal x)
-        , "="
-        , "sub"
-        , showLowType t
-        , showLLVMData d1 ++ ","
-        , showLLVMData d2
-        ]
-    a <- emitLLVM funName cont
-    return $ op ++ a
+emitLLVM funName (LLVMLet x (LLVMArith (ArithSub, t@(LowTypeSignedInt _)) d1 d2) cont) = do
+  op <-
+    emitOp $
+    unwords
+      [ showLLVMData (LLVMDataLocal x)
+      , "="
+      , "sub"
+      , showLowType t
+      , showLLVMData d1 ++ ","
+      , showLLVMData d2
+      ]
+  a <- emitLLVM funName cont
+  return $ op ++ a
+emitLLVM funName (LLVMLet x (LLVMArith (ArithSub, LowTypeUnsignedInt size) d1 d2) cont) =
+  emitLLVM
+    funName
+    (LLVMLet x (LLVMArith (ArithSub, LowTypeSignedInt size) d1 d2) cont) -- thanks to the two's complement representation
 emitLLVM funName (LLVMLet x (LLVMArith (ArithSub, t) d1 d2) cont) = do
   op <-
     emitOp $
@@ -255,20 +258,23 @@ emitLLVM funName (LLVMLet x (LLVMArith (ArithSub, t) d1 d2) cont) = do
       ]
   a <- emitLLVM funName cont
   return $ op ++ a
-emitLLVM funName (LLVMLet x (LLVMArith (ArithMul, t) d1 d2) cont)
-  | t `elem` intLowTypeList = do
-    op <-
-      emitOp $
-      unwords
-        [ showLLVMData (LLVMDataLocal x)
-        , "="
-        , "mul"
-        , showLowType t
-        , showLLVMData d1 ++ ","
-        , showLLVMData d2
-        ]
-    a <- emitLLVM funName cont
-    return $ op ++ a
+emitLLVM funName (LLVMLet x (LLVMArith (ArithMul, t@(LowTypeSignedInt _)) d1 d2) cont) = do
+  op <-
+    emitOp $
+    unwords
+      [ showLLVMData (LLVMDataLocal x)
+      , "="
+      , "mul"
+      , showLowType t
+      , showLLVMData d1 ++ ","
+      , showLLVMData d2
+      ]
+  a <- emitLLVM funName cont
+  return $ op ++ a
+emitLLVM funName (LLVMLet x (LLVMArith (ArithMul, LowTypeUnsignedInt size) d1 d2) cont) =
+  emitLLVM
+    funName
+    (LLVMLet x (LLVMArith (ArithMul, LowTypeSignedInt size) d1 d2) cont) -- thanks to the two's complement representation
 emitLLVM funName (LLVMLet x (LLVMArith (ArithMul, t) d1 d2) cont) = do
   op <-
     emitOp $
