@@ -102,19 +102,18 @@ inferPlus ctx xts =
     infer (ctx ++ init zts) (snd $ last zts)
 
 -- In a context (x1 : A1, ..., xn : An), this function creates metavariables
---   ?M  : Pi (x1 : A1, ..., xn : An). ?Mt @ (x1, ..., xn)
---   ?Mt : Pi (x1 : A1, ..., xn : An). Ui
--- and return ?M @ (x1, ..., xn) : ?Mt @ (x1, ..., xn).
+--   ?M  : Pi (x1 : A1, ..., xn : An). ?Mt @ (x1, ..., xn) -- pi
+--   ?Mt : Pi (x1 : A1, ..., xn : An). Univ                -- higherPi
+-- and return ?M @ (x1, ..., xn) : ?Mt @ (x1, ..., xn).    -- ?Mt == higherHole
 -- Note that we can't just set `?M : Pi (x1 : A1, ..., xn : An). Ui` since
 -- WeakTermZeta might be used as a term which is not a type.
 newHoleInCtx :: Context -> WithEnv WeakTermPlus
 newHoleInCtx ctx = do
-  (univ, univPlus) <- withHole newUniv
+  (_, univPlus) <- withHole newUniv
   let higherPi = (newMetaTerminal, WeakTermPi $ ctx ++ [univPlus])
   higherHole <- newHoleOfType higherPi
   varSeq <- mapM (uncurry toVar) ctx
-  (app, appPlus) <-
-    wrapWithType univ (WeakTermPiElim higherHole varSeq) >>= withHole
+  (app, appPlus) <- withHole (newMetaTerminal, WeakTermPiElim higherHole varSeq)
   let pi = (newMetaTerminal, WeakTermPi $ ctx ++ [appPlus])
   hole <- newHoleOfType pi
   wrapWithType app (WeakTermPiElim hole varSeq)
