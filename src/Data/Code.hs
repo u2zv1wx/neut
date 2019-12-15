@@ -13,12 +13,10 @@ data Data
   | DataSigmaIntro [DataPlus]
   deriving (Show)
 
--- SigmaIntroN n v    === (v, ..., v) (n times)
--- SigmaElimN n x v e === let (x1, ..., xn) := v in e{x := x1, ..., xn}
 data Code
   = CodeTheta Theta
   | CodeEpsilonElim Identifier DataPlus [(Case, CodePlus)]
-  | CodePiElimDownElim DataPlus [DataPlus] -- ((force v) e1 ... en)
+  | CodePiElimDownElim DataPlus [DataPlus] -- ((force v) v1 ... vn)
   | CodeSigmaElim [Identifier] DataPlus CodePlus
   | CodeUpIntro DataPlus
   | CodeUpElim Identifier CodePlus CodePlus
@@ -39,9 +37,6 @@ type CodePlus = (CodeMeta, Code)
 
 toDataUpsilon :: (Identifier, Maybe Loc) -> DataPlus
 toDataUpsilon (x, ml) = (ml, DataUpsilon x)
-
-toDataUpsilon' :: Identifier -> DataPlus
-toDataUpsilon' x = (Nothing, DataUpsilon x)
 
 type SubstDataPlus = [IdentifierPlus]
 
