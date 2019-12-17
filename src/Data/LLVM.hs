@@ -32,6 +32,7 @@ data LLVM
   | LLVMAlloc Int
   | LLVMFree LLVMData
   | LLVMArith (Arith, LowType) LLVMData LLVMData
+  | LLVMCompare (Compare, LowType) LLVMData LLVMData
   | LLVMPrint LowType LLVMData
   | LLVMUnreachable -- for empty case analysis
   deriving (Show)
