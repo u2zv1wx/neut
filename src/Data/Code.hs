@@ -26,6 +26,7 @@ data Code
 
 data Theta
   = ThetaArith Arith LowType DataPlus DataPlus
+  | ThetaCompare Compare LowType DataPlus DataPlus
   | ThetaPrint DataPlus
   deriving (Show)
 
@@ -84,6 +85,10 @@ substTheta sub (ThetaArith a t v1 v2) = do
   let v1' = substDataPlus sub v1
   let v2' = substDataPlus sub v2
   ThetaArith a t v1' v2'
+substTheta sub (ThetaCompare a t v1 v2) = do
+  let v1' = substDataPlus sub v1
+  let v2' = substDataPlus sub v2
+  ThetaCompare a t v1' v2'
 substTheta sub (ThetaPrint v) = ThetaPrint $ substDataPlus sub v
 
 substDataPlusPi ::
