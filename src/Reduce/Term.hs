@@ -2,6 +2,7 @@ module Reduce.Term
   ( reduceTermPlus
   ) where
 
+import Data.Fixed (mod')
 import Unsafe.Coerce -- for int -> word, word -> int
 
 import Data.Basic
@@ -50,6 +51,7 @@ reduceTermPlus (m, TermPiElim e es) = do
           BinaryOpSub -> return (m, TermInt (x - y) t)
           BinaryOpMul -> return (m, TermInt (x * y) t)
           BinaryOpDiv -> return (m, TermInt (x `div` y) t)
+          BinaryOpRem -> return (m, TermInt (x `rem` y) t)
           _ -> return (m, TermPiElim e' es')
     (_, TermTheta constant)
       | [(_, TermInt x _), (_, TermInt y _)] <- es'
@@ -66,6 +68,11 @@ reduceTermPlus (m, TermPiElim e es) = do
             let y' = unsafeCoerce y :: Word
             let z = x' `div` y'
             return (m, TermInt (unsafeCoerce z) t)
+          BinaryOpRem -> do
+            let x' = unsafeCoerce x :: Word
+            let y' = unsafeCoerce y :: Word
+            let z = x' `rem` y'
+            return (m, TermInt (unsafeCoerce z) t)
           _ -> return (m, TermPiElim e' es')
     (_, TermTheta constant)
       | [(_, TermFloat x _), (_, TermFloat y _)] <- es'
@@ -78,6 +85,7 @@ reduceTermPlus (m, TermPiElim e es) = do
           BinaryOpSub -> return (m, TermFloat (x - y) t)
           BinaryOpMul -> return (m, TermFloat (x * y) t)
           BinaryOpDiv -> return (m, TermFloat (x / y) t)
+          BinaryOpRem -> return (m, TermFloat (x `mod'` y) t)
           _ -> return (m, TermPiElim e' es')
     (_, TermTheta constant)
       | [(_, TermInt x _), (_, TermInt y _)] <- es'

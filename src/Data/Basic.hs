@@ -30,6 +30,7 @@ data BinaryOp
   | BinaryOpSub
   | BinaryOpMul
   | BinaryOpDiv
+  | BinaryOpRem
   | BinaryOpEQ
   | BinaryOpNE
   | BinaryOpGT
@@ -39,7 +40,7 @@ data BinaryOp
   deriving (Eq, Show)
 
 arithOpList :: [BinaryOp]
-arithOpList = [BinaryOpAdd, BinaryOpSub, BinaryOpMul, BinaryOpDiv]
+arithOpList = [BinaryOpAdd, BinaryOpSub, BinaryOpMul, BinaryOpDiv, BinaryOpRem]
 
 compareOpList :: [BinaryOp]
 compareOpList =
@@ -77,6 +78,7 @@ asBinaryOpMaybe "add" = Just BinaryOpAdd
 asBinaryOpMaybe "sub" = Just BinaryOpSub
 asBinaryOpMaybe "mul" = Just BinaryOpMul
 asBinaryOpMaybe "div" = Just BinaryOpDiv
+asBinaryOpMaybe "rem" = Just BinaryOpRem
 asBinaryOpMaybe "eq" = Just BinaryOpEQ
 asBinaryOpMaybe "ne" = Just BinaryOpNE
 asBinaryOpMaybe "gt" = Just BinaryOpGT

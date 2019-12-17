@@ -188,6 +188,12 @@ emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpDiv, t@(LowTypeUnsignedInt _)
   emitBinaryOp funName x t "udiv" d1 d2 cont
 emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpDiv, t@(LowTypeFloat _)) d1 d2) cont) = do
   emitBinaryOp funName x t "fdiv" d1 d2 cont
+emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpRem, t@(LowTypeSignedInt _)) d1 d2) cont) = do
+  emitBinaryOp funName x t "srem" d1 d2 cont
+emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpRem, t@(LowTypeUnsignedInt _)) d1 d2) cont) = do
+  emitBinaryOp funName x t "urem" d1 d2 cont
+emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpRem, t@(LowTypeFloat _)) d1 d2) cont) = do
+  emitBinaryOp funName x t "frem" d1 d2 cont
 emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpEQ, t@(LowTypeSignedInt _)) d1 d2) cont) =
   emitBinaryOp funName x t "icmp eq" d1 d2 cont
 emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpEQ, t@(LowTypeUnsignedInt _)) d1 d2) cont) =

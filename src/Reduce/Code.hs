@@ -3,6 +3,7 @@ module Reduce.Code
   ) where
 
 import Control.Monad.State
+import Data.Fixed (mod')
 import Unsafe.Coerce -- for int -> word, word -> int
 
 import Data.Basic
@@ -43,6 +44,7 @@ reduceCodePlus (m, CodeTheta theta) =
           BinaryOpSub -> return (m, CodeUpIntro (m1, DataInt (i1 - i2) t))
           BinaryOpMul -> return (m, CodeUpIntro (m1, DataInt (i1 * i2) t))
           BinaryOpDiv -> return (m, CodeUpIntro (m1, DataInt (i1 `div` i2) t))
+          BinaryOpRem -> return (m, CodeUpIntro (m1, DataInt (i1 `rem` i2) t))
           _ -> return (m, CodeTheta theta)
     ThetaBinaryOp op t@(LowTypeUnsignedInt _) (m1, DataInt i1 _) (_, DataInt i2 _)
       | op `elem` arithOpList -> do
@@ -55,6 +57,11 @@ reduceCodePlus (m, CodeTheta theta) =
             let i2' = unsafeCoerce i2 :: Word
             let i = i1' `div` i2'
             return (m, CodeUpIntro (m1, DataInt (unsafeCoerce i) t))
+          BinaryOpRem -> do
+            let i1' = unsafeCoerce i1 :: Word
+            let i2' = unsafeCoerce i2 :: Word
+            let i = i1' `rem` i2'
+            return (m, CodeUpIntro (m1, DataInt (unsafeCoerce i) t))
           _ -> return (m, CodeTheta theta)
     ThetaBinaryOp op t@(LowTypeFloat _) (m1, DataFloat i1 _) (_, DataFloat i2 _)
       | op `elem` arithOpList -> do
@@ -63,6 +70,8 @@ reduceCodePlus (m, CodeTheta theta) =
           BinaryOpSub -> return (m, CodeUpIntro (m1, DataFloat (i1 - i2) t))
           BinaryOpMul -> return (m, CodeUpIntro (m1, DataFloat (i1 * i2) t))
           BinaryOpDiv -> return (m, CodeUpIntro (m1, DataFloat (i1 / i2) t))
+          BinaryOpRem ->
+            return (m, CodeUpIntro (m1, DataFloat (i1 `mod'` i2) t))
           _ -> return (m, CodeTheta theta)
     ThetaBinaryOp op t@(LowTypeSignedInt _) (m1, DataInt i1 _) (_, DataInt i2 _)
       | op `elem` compareOpList -> do

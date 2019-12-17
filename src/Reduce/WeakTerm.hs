@@ -2,6 +2,7 @@ module Reduce.WeakTerm
   ( reduceWeakTermPlus
   ) where
 
+import Data.Fixed (mod')
 import Unsafe.Coerce -- for int -> word, word -> int
 
 import Data.Basic
@@ -50,6 +51,7 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
           BinaryOpSub -> return (m, WeakTermInt (x - y))
           BinaryOpMul -> return (m, WeakTermInt (x * y))
           BinaryOpDiv -> return (m, WeakTermInt (x `div` y))
+          BinaryOpRem -> return (m, WeakTermInt (x `rem` y))
           _ -> return (m, WeakTermPiElim e' es')
     (_, WeakTermTheta constant)
       | [(_, WeakTermInt x), (_, WeakTermInt y)] <- es'
@@ -66,6 +68,11 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
             let y' = unsafeCoerce y :: Word
             let z = x' `div` y'
             return (m, WeakTermInt (unsafeCoerce z))
+          BinaryOpRem -> do
+            let x' = unsafeCoerce x :: Word
+            let y' = unsafeCoerce y :: Word
+            let z = x' `rem` y'
+            return (m, WeakTermInt (unsafeCoerce z))
           _ -> return (m, WeakTermPiElim e' es')
     (_, WeakTermTheta constant)
       | [(_, WeakTermFloat x), (_, WeakTermFloat y)] <- es'
@@ -78,6 +85,7 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
           BinaryOpSub -> return (m, WeakTermFloat (x - y))
           BinaryOpMul -> return (m, WeakTermFloat (x * y))
           BinaryOpDiv -> return (m, WeakTermFloat (x / y))
+          BinaryOpRem -> return (m, WeakTermFloat (x `mod'` y))
           _ -> return (m, WeakTermPiElim e' es')
     (_, WeakTermTheta constant)
       | [(_, WeakTermInt x), (_, WeakTermInt y)] <- es'

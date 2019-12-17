@@ -518,7 +518,7 @@ toRelevantApp ml x e = do
 
 polarizeTheta :: Meta -> Identifier -> WithEnv CodePlus
 polarizeTheta m name
-  | [typeStr, opStr] <- wordsBy '.' name -- e.g. name == "i8.add"
+  | [typeStr, opStr] <- wordsBy '.' name -- e.g. name == "f32.neg"
   , Just lowType <- asLowTypeMaybe typeStr
   , Just op <- asUnaryOpMaybe opStr = polarizeUnaryOp name op lowType m
 polarizeTheta m name
