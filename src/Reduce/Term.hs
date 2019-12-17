@@ -37,8 +37,9 @@ reduceTermPlus (m, TermPiElim e es) = do
       | [(_, TermInt x _), (_, TermInt y _)] <- es'
       , [typeStr, opStr] <- wordsBy '.' constant
       , Just t@(LowTypeSignedInt _) <- asLowTypeMaybe typeStr
-      , Just arith <- asBinOpMaybe opStr -> do
-        case arith of
+      , Just op <- asBinOpMaybe opStr
+      , op `elem` arithOpList -> do
+        case op of
           BinOpAdd -> return (m, TermInt (x + y) t)
           BinOpSub -> return (m, TermInt (x - y) t)
           BinOpMul -> return (m, TermInt (x * y) t)
@@ -48,8 +49,9 @@ reduceTermPlus (m, TermPiElim e es) = do
       | [(_, TermInt x _), (_, TermInt y _)] <- es'
       , [typeStr, opStr] <- wordsBy '.' constant
       , Just t@(LowTypeUnsignedInt _) <- asLowTypeMaybe typeStr
-      , Just arith <- asBinOpMaybe opStr -> do
-        case arith of
+      , Just op <- asBinOpMaybe opStr
+      , op `elem` arithOpList -> do
+        case op of
           BinOpAdd -> return (m, TermInt (x + y) t)
           BinOpSub -> return (m, TermInt (x - y) t)
           BinOpMul -> return (m, TermInt (x * y) t)
@@ -63,12 +65,61 @@ reduceTermPlus (m, TermPiElim e es) = do
       | [(_, TermFloat x _), (_, TermFloat y _)] <- es'
       , [typeStr, opStr] <- wordsBy '.' constant
       , Just t@(LowTypeFloat _) <- asLowTypeMaybe typeStr
-      , Just arith <- asBinOpMaybe opStr -> do
-        case arith of
+      , Just op <- asBinOpMaybe opStr
+      , op `elem` arithOpList -> do
+        case op of
           BinOpAdd -> return (m, TermFloat (x + y) t)
           BinOpSub -> return (m, TermFloat (x - y) t)
           BinOpMul -> return (m, TermFloat (x * y) t)
           BinOpDiv -> return (m, TermFloat (x / y) t)
           _ -> return (m, TermPiElim e' es')
+    (_, TermTheta constant)
+      | [(_, TermInt x _), (_, TermInt y _)] <- es'
+      , [typeStr, opStr] <- wordsBy '.' constant
+      , Just t@(LowTypeSignedInt _) <- asLowTypeMaybe typeStr
+      , Just op <- asBinOpMaybe opStr
+      , op `elem` compareOpList -> do
+        case op of
+          BinOpEQ -> return (m, asEpsilon t $ x == y)
+          BinOpNE -> return (m, asEpsilon t $ x /= y)
+          BinOpGT -> return (m, asEpsilon t $ x > y)
+          BinOpGE -> return (m, asEpsilon t $ x >= y)
+          BinOpLT -> return (m, asEpsilon t $ x < y)
+          BinOpLE -> return (m, asEpsilon t $ x <= y)
+          _ -> return (m, TermPiElim e' es')
+    (_, TermTheta constant)
+      | [(_, TermInt x _), (_, TermInt y _)] <- es'
+      , [typeStr, opStr] <- wordsBy '.' constant
+      , Just t@(LowTypeUnsignedInt _) <- asLowTypeMaybe typeStr
+      , Just op <- asBinOpMaybe opStr
+      , op `elem` compareOpList -> do
+        let x' = unsafeCoerce x :: Word
+        let y' = unsafeCoerce y :: Word
+        case op of
+          BinOpEQ -> return (m, asEpsilon t $ x' == y')
+          BinOpNE -> return (m, asEpsilon t $ x' /= y')
+          BinOpGT -> return (m, asEpsilon t $ x' > y')
+          BinOpGE -> return (m, asEpsilon t $ x' >= y')
+          BinOpLT -> return (m, asEpsilon t $ x' < y')
+          BinOpLE -> return (m, asEpsilon t $ x' <= y')
+          _ -> return (m, TermPiElim e' es')
+    (_, TermTheta constant)
+      | [(_, TermFloat x _), (_, TermFloat y _)] <- es'
+      , [typeStr, opStr] <- wordsBy '.' constant
+      , Just t@(LowTypeFloat _) <- asLowTypeMaybe typeStr
+      , Just op <- asBinOpMaybe opStr
+      , op `elem` compareOpList -> do
+        case op of
+          BinOpEQ -> return (m, asEpsilon t $ x == y)
+          BinOpNE -> return (m, asEpsilon t $ x /= y)
+          BinOpGT -> return (m, asEpsilon t $ x > y)
+          BinOpGE -> return (m, asEpsilon t $ x >= y)
+          BinOpLT -> return (m, asEpsilon t $ x < y)
+          BinOpLE -> return (m, asEpsilon t $ x <= y)
+          _ -> return (m, TermPiElim e' es')
     _ -> return (m, TermPiElim e' es')
 reduceTermPlus t = return t
+
+asEpsilon :: LowType -> Bool -> Term
+asEpsilon t True = TermEpsilonIntro "true" t
+asEpsilon t False = TermEpsilonIntro "false" t

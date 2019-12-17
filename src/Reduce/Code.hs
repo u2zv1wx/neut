@@ -12,33 +12,66 @@ import Data.Env
 reduceCodePlus :: CodePlus -> WithEnv CodePlus
 reduceCodePlus (m, CodeTheta theta) =
   case theta of
-    ThetaBinOp BinOpAdd t@(LowTypeSignedInt _) (m1, DataInt i1 _) (_, DataInt i2 _) ->
-      return (m, CodeUpIntro (m1, DataInt (i1 + i2) t))
-    ThetaBinOp BinOpSub t@(LowTypeSignedInt _) (m1, DataInt i1 _) (_, DataInt i2 _) ->
-      return (m, CodeUpIntro (m1, DataInt (i1 - i2) t))
-    ThetaBinOp BinOpMul t@(LowTypeSignedInt _) (m1, DataInt i1 _) (_, DataInt i2 _) ->
-      return (m, CodeUpIntro (m1, DataInt (i1 * i2) t))
-    ThetaBinOp BinOpDiv t@(LowTypeSignedInt _) (m1, DataInt i1 _) (_, DataInt i2 _) ->
-      return (m, CodeUpIntro (m1, DataInt (i1 `div` i2) t))
-    ThetaBinOp BinOpAdd t@(LowTypeUnsignedInt _) (m1, DataInt i1 _) (_, DataInt i2 _) ->
-      return (m, CodeUpIntro (m1, DataInt (i1 + i2) t))
-    ThetaBinOp BinOpSub t@(LowTypeUnsignedInt _) (m1, DataInt i1 _) (_, DataInt i2 _) ->
-      return (m, CodeUpIntro (m1, DataInt (i1 - i2) t))
-    ThetaBinOp BinOpMul t@(LowTypeUnsignedInt _) (m1, DataInt i1 _) (_, DataInt i2 _) ->
-      return (m, CodeUpIntro (m1, DataInt (i1 * i2) t))
-    ThetaBinOp BinOpDiv t@(LowTypeUnsignedInt _) (m1, DataInt i1 _) (_, DataInt i2 _) -> do
-      let i1' = unsafeCoerce i1 :: Word
-      let i2' = unsafeCoerce i2 :: Word
-      let i = i1' `div` i2'
-      return (m, CodeUpIntro (m1, DataInt (unsafeCoerce i) t))
-    ThetaBinOp BinOpAdd t@(LowTypeFloat _) (m1, DataFloat i1 _) (_, DataFloat i2 _) ->
-      return (m, CodeUpIntro (m1, DataFloat (i1 + i2) t))
-    ThetaBinOp BinOpSub t@(LowTypeFloat _) (m1, DataFloat i1 _) (_, DataFloat i2 _) ->
-      return (m, CodeUpIntro (m1, DataFloat (i1 - i2) t))
-    ThetaBinOp BinOpMul t@(LowTypeFloat _) (m1, DataFloat i1 _) (_, DataFloat i2 _) ->
-      return (m, CodeUpIntro (m1, DataFloat (i1 * i2) t))
-    ThetaBinOp BinOpDiv t@(LowTypeFloat _) (m1, DataFloat i1 _) (_, DataFloat i2 _) ->
-      return (m, CodeUpIntro (m1, DataFloat (i1 / i2) t))
+    ThetaBinOp op t@(LowTypeSignedInt _) (m1, DataInt i1 _) (_, DataInt i2 _)
+      | op `elem` arithOpList -> do
+        case op of
+          BinOpAdd -> return (m, CodeUpIntro (m1, DataInt (i1 + i2) t))
+          BinOpSub -> return (m, CodeUpIntro (m1, DataInt (i1 - i2) t))
+          BinOpMul -> return (m, CodeUpIntro (m1, DataInt (i1 * i2) t))
+          BinOpDiv -> return (m, CodeUpIntro (m1, DataInt (i1 `div` i2) t))
+          _ -> return (m, CodeTheta theta)
+    ThetaBinOp op t@(LowTypeUnsignedInt _) (m1, DataInt i1 _) (_, DataInt i2 _)
+      | op `elem` arithOpList -> do
+        case op of
+          BinOpAdd -> return (m, CodeUpIntro (m1, DataInt (i1 + i2) t))
+          BinOpSub -> return (m, CodeUpIntro (m1, DataInt (i1 - i2) t))
+          BinOpMul -> return (m, CodeUpIntro (m1, DataInt (i1 * i2) t))
+          BinOpDiv -> do
+            let i1' = unsafeCoerce i1 :: Word
+            let i2' = unsafeCoerce i2 :: Word
+            let i = i1' `div` i2'
+            return (m, CodeUpIntro (m1, DataInt (unsafeCoerce i) t))
+          _ -> return (m, CodeTheta theta)
+    ThetaBinOp op t@(LowTypeFloat _) (m1, DataFloat i1 _) (_, DataFloat i2 _)
+      | op `elem` arithOpList -> do
+        case op of
+          BinOpAdd -> return (m, CodeUpIntro (m1, DataFloat (i1 + i2) t))
+          BinOpSub -> return (m, CodeUpIntro (m1, DataFloat (i1 - i2) t))
+          BinOpMul -> return (m, CodeUpIntro (m1, DataFloat (i1 * i2) t))
+          BinOpDiv -> return (m, CodeUpIntro (m1, DataFloat (i1 / i2) t))
+          _ -> return (m, CodeTheta theta)
+    ThetaBinOp op t@(LowTypeSignedInt _) (m1, DataInt i1 _) (_, DataInt i2 _)
+      | op `elem` compareOpList -> do
+        case op of
+          BinOpEQ -> return (m, CodeUpIntro (m1, asData t $ i1 == i2))
+          BinOpNE -> return (m, CodeUpIntro (m1, asData t $ i1 /= i2))
+          BinOpGT -> return (m, CodeUpIntro (m1, asData t $ i1 > i2))
+          BinOpGE -> return (m, CodeUpIntro (m1, asData t $ i1 >= i2))
+          BinOpLT -> return (m, CodeUpIntro (m1, asData t $ i1 < i2))
+          BinOpLE -> return (m, CodeUpIntro (m1, asData t $ i1 <= i2))
+          _ -> return (m, CodeTheta theta)
+    ThetaBinOp op t@(LowTypeUnsignedInt _) (m1, DataInt i1 _) (_, DataInt i2 _)
+      | op `elem` compareOpList -> do
+        let i1' = unsafeCoerce i1 :: Word
+        let i2' = unsafeCoerce i2 :: Word
+        case op of
+          BinOpEQ -> return (m, CodeUpIntro (m1, asData t $ i1' == i2'))
+          BinOpNE -> return (m, CodeUpIntro (m1, asData t $ i1' /= i2'))
+          BinOpGT -> return (m, CodeUpIntro (m1, asData t $ i1' > i2'))
+          BinOpGE -> return (m, CodeUpIntro (m1, asData t $ i1' >= i2'))
+          BinOpLT -> return (m, CodeUpIntro (m1, asData t $ i1' < i2'))
+          BinOpLE -> return (m, CodeUpIntro (m1, asData t $ i1' <= i2'))
+          _ -> return (m, CodeTheta theta)
+    ThetaBinOp op t@(LowTypeFloat _) (m1, DataFloat i1 _) (_, DataFloat i2 _)
+      | op `elem` compareOpList -> do
+        case op of
+          BinOpEQ -> return (m, CodeUpIntro (m1, asData t $ i1 == i2))
+          BinOpNE -> return (m, CodeUpIntro (m1, asData t $ i1 /= i2))
+          BinOpGT -> return (m, CodeUpIntro (m1, asData t $ i1 > i2))
+          BinOpGE -> return (m, CodeUpIntro (m1, asData t $ i1 >= i2))
+          BinOpLT -> return (m, CodeUpIntro (m1, asData t $ i1 < i2))
+          BinOpLE -> return (m, CodeUpIntro (m1, asData t $ i1 <= i2))
+          _ -> return (m, CodeTheta theta)
     ThetaPrint (_, DataInt i _) -> do
       liftIO $ putStr $ show i
       return (m, CodeUpIntro (Nothing, DataSigmaIntro []))
@@ -66,3 +99,7 @@ reduceCodePlus (m, CodeSigmaElim xs v e) =
       | length es == length xs -> reduceCodePlus $ substCodePlus (zip xs es) e
     _ -> return (m, CodeSigmaElim xs v e)
 reduceCodePlus t = return t
+
+asData :: LowType -> Bool -> Data
+asData t True = DataInt 1 t
+asData t False = DataInt 0 t

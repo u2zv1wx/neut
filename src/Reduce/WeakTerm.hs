@@ -37,8 +37,9 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
       | [(_, WeakTermInt x), (_, WeakTermInt y)] <- es'
       , [typeStr, opStr] <- wordsBy '.' constant
       , Just (LowTypeSignedInt _) <- asLowTypeMaybe typeStr
-      , Just arith <- asBinOpMaybe opStr -> do
-        case arith of
+      , Just op <- asBinOpMaybe opStr
+      , op `elem` arithOpList -> do
+        case op of
           BinOpAdd -> return (m, WeakTermInt (x + y))
           BinOpSub -> return (m, WeakTermInt (x - y))
           BinOpMul -> return (m, WeakTermInt (x * y))
@@ -48,8 +49,9 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
       | [(_, WeakTermInt x), (_, WeakTermInt y)] <- es'
       , [typeStr, opStr] <- wordsBy '.' constant
       , Just (LowTypeUnsignedInt _) <- asLowTypeMaybe typeStr
-      , Just arith <- asBinOpMaybe opStr -> do
-        case arith of
+      , Just op <- asBinOpMaybe opStr
+      , op `elem` arithOpList -> do
+        case op of
           BinOpAdd -> return (m, WeakTermInt (x + y))
           BinOpSub -> return (m, WeakTermInt (x - y))
           BinOpMul -> return (m, WeakTermInt (x * y))
@@ -63,12 +65,61 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
       | [(_, WeakTermFloat x), (_, WeakTermFloat y)] <- es'
       , [typeStr, opStr] <- wordsBy '.' constant
       , Just (LowTypeFloat _) <- asLowTypeMaybe typeStr
-      , Just arith <- asBinOpMaybe opStr -> do
-        case arith of
+      , Just op <- asBinOpMaybe opStr
+      , op `elem` arithOpList -> do
+        case op of
           BinOpAdd -> return (m, WeakTermFloat (x + y))
           BinOpSub -> return (m, WeakTermFloat (x - y))
           BinOpMul -> return (m, WeakTermFloat (x * y))
           BinOpDiv -> return (m, WeakTermFloat (x / y))
           _ -> return (m, WeakTermPiElim e' es')
+    (_, WeakTermTheta constant)
+      | [(_, WeakTermInt x), (_, WeakTermInt y)] <- es'
+      , [typeStr, opStr] <- wordsBy '.' constant
+      , Just (LowTypeSignedInt _) <- asLowTypeMaybe typeStr
+      , Just op <- asBinOpMaybe opStr
+      , op `elem` compareOpList -> do
+        case op of
+          BinOpEQ -> return (m, asEpsilon $ x == y)
+          BinOpNE -> return (m, asEpsilon $ x /= y)
+          BinOpGT -> return (m, asEpsilon $ x > y)
+          BinOpGE -> return (m, asEpsilon $ x >= y)
+          BinOpLT -> return (m, asEpsilon $ x < y)
+          BinOpLE -> return (m, asEpsilon $ x <= y)
+          _ -> return (m, WeakTermPiElim e' es')
+    (_, WeakTermTheta constant)
+      | [(_, WeakTermInt x), (_, WeakTermInt y)] <- es'
+      , [typeStr, opStr] <- wordsBy '.' constant
+      , Just (LowTypeUnsignedInt _) <- asLowTypeMaybe typeStr
+      , Just op <- asBinOpMaybe opStr
+      , op `elem` compareOpList -> do
+        let x' = unsafeCoerce x :: Word
+        let y' = unsafeCoerce y :: Word
+        case op of
+          BinOpEQ -> return (m, asEpsilon $ x' == y')
+          BinOpNE -> return (m, asEpsilon $ x' /= y')
+          BinOpGT -> return (m, asEpsilon $ x' > y')
+          BinOpGE -> return (m, asEpsilon $ x' >= y')
+          BinOpLT -> return (m, asEpsilon $ x' < y')
+          BinOpLE -> return (m, asEpsilon $ x' <= y')
+          _ -> return (m, WeakTermPiElim e' es')
+    (_, WeakTermTheta constant)
+      | [(_, WeakTermFloat x), (_, WeakTermFloat y)] <- es'
+      , [typeStr, opStr] <- wordsBy '.' constant
+      , Just (LowTypeFloat _) <- asLowTypeMaybe typeStr
+      , Just op <- asBinOpMaybe opStr
+      , op `elem` compareOpList -> do
+        case op of
+          BinOpEQ -> return (m, asEpsilon $ x == y)
+          BinOpNE -> return (m, asEpsilon $ x /= y)
+          BinOpGT -> return (m, asEpsilon $ x > y)
+          BinOpGE -> return (m, asEpsilon $ x >= y)
+          BinOpLT -> return (m, asEpsilon $ x < y)
+          BinOpLE -> return (m, asEpsilon $ x <= y)
+          _ -> return (m, WeakTermPiElim e' es')
     _ -> return (m, WeakTermPiElim e' es')
 reduceWeakTermPlus t = return t
+
+asEpsilon :: Bool -> WeakTerm
+asEpsilon True = WeakTermEpsilonIntro "true"
+asEpsilon False = WeakTermEpsilonIntro "false"
