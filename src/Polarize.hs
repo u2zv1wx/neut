@@ -518,9 +518,9 @@ toRelevantApp ml x e = do
 
 polarizeTheta :: Meta -> Identifier -> WithEnv CodePlus
 polarizeTheta m name
-  | [typeStr, opStr] <- wordsBy '.' name -- for arithmetic operations e.g. name == "i8.add"
+  | [typeStr, opStr] <- wordsBy '.' name -- e.g. name == "i8.add"
   , Just lowType <- asLowTypeMaybe typeStr
-  , Just arith <- asBinOpMaybe opStr = polarizeBinOp name arith lowType m
+  , Just op <- asBinOpMaybe opStr = polarizeBinOp name op lowType m
 polarizeTheta m name@"core.print.i64" = polarizePrint name m
 polarizeTheta _ _ = throwError "polarize.theta"
 
