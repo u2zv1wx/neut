@@ -77,6 +77,11 @@ llvmCodeSigmaElim basePointer ((x, i):xis) castedBasePointer n cont = do
     LLVMLet x (LLVMLoad (LLVMDataLocal loader)) cont'
 
 llvmCodeTheta :: CodeMeta -> Theta -> WithEnv LLVM
+llvmCodeTheta _ (ThetaUnaryOp op lowType v) =
+  case lowType of
+    LowTypeFloat i
+      | op == UnaryOpNeg -> llvmCodeNegFloat i v
+    _ -> throwError "llvmCodeTheta.ThetaUnaryOp"
 llvmCodeTheta _ (ThetaBinOp op lowType v1 v2) =
   case lowType of
     LowTypeSignedInt _
@@ -100,6 +105,15 @@ llvmCodeTheta _ (ThetaPrint v) = do
     LLVMLet c (LLVMPointerToInt (LLVMDataLocal p) voidPtr t) $
     LLVMPrint t (LLVMDataLocal c)
 
+llvmCodeNegFloat :: Int -> DataPlus -> WithEnv LLVM
+llvmCodeNegFloat i v = do
+  (x, castThen) <- llvmCastToFloat v i
+  result <- newNameWith "result"
+  castResultToVoidPtr <- castFloatToVoidPtr result i
+  castThen $
+    LLVMLet result (LLVMUnaryOp (UnaryOpNeg, LowTypeFloat i) x) $
+    castResultToVoidPtr
+
 llvmCodeArithInt :: BinOp -> LowType -> DataPlus -> DataPlus -> WithEnv LLVM
 llvmCodeArithInt op lowType v1 v2 = do
   (x1, cast1then) <- llvmCastToInt v1 lowType
@@ -107,23 +121,30 @@ llvmCodeArithInt op lowType v1 v2 = do
   result <- newNameWith "result"
   (cast1then >=> cast2then) $
     LLVMLet result (LLVMBinOp (op, lowType) x1 x2) $
-    LLVMIntToPointer (LLVMDataLocal result) lowType voidPtr
+    castIntToVoidPtr result lowType
+
+castIntToVoidPtr :: Identifier -> LowType -> LLVM
+castIntToVoidPtr result lowType =
+  LLVMIntToPointer (LLVMDataLocal result) lowType voidPtr
 
 llvmCodeArithFloat :: BinOp -> Int -> DataPlus -> DataPlus -> WithEnv LLVM
 llvmCodeArithFloat op i v1 v2 = do
   let lowType = LowTypeFloat i
-  (x1, cast1then) <- llvmCastToFloat v1 lowType i
-  (x2, cast2then) <- llvmCastToFloat v2 lowType i
-  tmp <- newNameWith "arith"
-  result <- newNameWith "result"
-  y <- newNameWith "uny"
-  let si = LowTypeSignedInt i
+  (x1, cast1then) <- llvmCastToFloat v1 i
+  (x2, cast2then) <- llvmCastToFloat v2 i
+  result <- newNameWith "arith"
+  castResultToVoidPtr <- castFloatToVoidPtr result i
   (cast1then >=> cast2then) $
-    LLVMLet tmp (LLVMBinOp (op, lowType) x1 x2) $
-        -- cast the result from float to i8*
-    LLVMLet y (LLVMBitcast (LLVMDataLocal tmp) (LowTypeFloat i) si) $
-    LLVMLet result (LLVMIntToPointer (LLVMDataLocal y) si voidPtr) $
-    LLVMReturn $ LLVMDataLocal result
+    LLVMLet result (LLVMBinOp (op, lowType) x1 x2) castResultToVoidPtr
+
+castFloatToVoidPtr :: Identifier -> Int -> WithEnv LLVM
+castFloatToVoidPtr floatResult i = do
+  let floatType = LowTypeFloat i
+  let intType = LowTypeSignedInt i
+  tmp <- newNameWith "tmp"
+  return $
+    LLVMLet tmp (LLVMBitcast (LLVMDataLocal floatResult) floatType intType) $
+    LLVMIntToPointer (LLVMDataLocal tmp) intType voidPtr
 
 llvmCodeCompareInt :: BinOp -> LowType -> DataPlus -> DataPlus -> WithEnv LLVM
 llvmCodeCompareInt op lowType v1 v2 = do
@@ -137,8 +158,8 @@ llvmCodeCompareInt op lowType v1 v2 = do
 
 llvmCodeCompareFloat :: BinOp -> Int -> DataPlus -> DataPlus -> WithEnv LLVM
 llvmCodeCompareFloat op i v1 v2 = do
-  (x1, cast1then) <- llvmCastToFloat v1 (LowTypeFloat i) i
-  (x2, cast2then) <- llvmCastToFloat v2 (LowTypeFloat i) i
+  (x1, cast1then) <- llvmCastToFloat v1 i
+  (x2, cast2then) <- llvmCastToFloat v2 i
   result <- newNameWith "result"
   let boolType = LowTypeSignedInt 1
   (cast1then >=> cast2then) $
@@ -155,19 +176,19 @@ llvmCastToInt v lowType = do
         llvmDataLet x v $
           LLVMLet y (LLVMPointerToInt (LLVMDataLocal x) voidPtr lowType) $ cont)
 
-llvmCastToFloat ::
-     DataPlus -> LowType -> Int -> WithEnv (LLVMData, LLVM -> WithEnv LLVM)
-llvmCastToFloat v lowType size = do
+llvmCastToFloat :: DataPlus -> Int -> WithEnv (LLVMData, LLVM -> WithEnv LLVM)
+llvmCastToFloat v size = do
+  let floatType = LowTypeFloat size
+  let intType = LowTypeSignedInt size
   x <- newNameWith "arg"
   y <- newNameWith "tmp"
   z <- newNameWith "cast"
-  let si = LowTypeSignedInt size
   return
     ( LLVMDataLocal z
     , \cont -> do
         llvmDataLet x v $
-          LLVMLet y (LLVMPointerToInt (LLVMDataLocal x) voidPtr si) $
-          LLVMLet z (LLVMBitcast (LLVMDataLocal y) si lowType) cont)
+          LLVMLet y (LLVMPointerToInt (LLVMDataLocal x) voidPtr intType) $
+          LLVMLet z (LLVMBitcast (LLVMDataLocal y) intType floatType) cont)
 
 -- `llvmDataLet x d cont` binds the data `d` to the variable `x`, and computes the
 -- continuation `cont`.

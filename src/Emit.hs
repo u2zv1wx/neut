@@ -162,6 +162,8 @@ emitLLVM funName (LLVMLet _ (LLVMFree d) cont) = do
   op <- emitOp $ unwords ["call", "void", "@free(i8* " ++ showLLVMData d ++ ")"]
   a <- emitLLVM funName cont
   return $ op ++ a
+emitLLVM funName (LLVMLet x (LLVMUnaryOp (UnaryOpNeg, t@(LowTypeFloat _)) d) cont) = do
+  emitUnaryOp funName x t "fneg" d cont
 emitLLVM funName (LLVMLet x (LLVMBinOp (BinOpAdd, t@(LowTypeSignedInt _)) d1 d2) cont) = do
   emitBinaryOp funName x t "add" d1 d2 cont
 emitLLVM funName (LLVMLet x (LLVMBinOp (BinOpAdd, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
@@ -255,6 +257,27 @@ emitLLVM funName c = do
   tmp <- newNameWith "result"
   emitLLVM funName $ LLVMLet tmp c $ LLVMReturn (LLVMDataLocal tmp)
 
+emitUnaryOp ::
+     Identifier
+  -> Identifier
+  -> LowType
+  -> String
+  -> LLVMData
+  -> LLVM
+  -> WithEnv [String]
+emitUnaryOp funName x t inst d cont = do
+  op <-
+    emitOp $
+    unwords
+      [ showLLVMData (LLVMDataLocal x)
+      , "="
+      , inst
+      , showLowTypeEmit t
+      , showLLVMData d
+      ]
+  a <- emitLLVM funName cont
+  return $ op ++ a
+
 emitBinaryOp ::
      Identifier
   -> Identifier
@@ -264,13 +287,13 @@ emitBinaryOp ::
   -> LLVMData
   -> LLVM
   -> WithEnv [String]
-emitBinaryOp funName x t cmp d1 d2 cont = do
+emitBinaryOp funName x t inst d1 d2 cont = do
   op <-
     emitOp $
     unwords
       [ showLLVMData (LLVMDataLocal x)
       , "="
-      , cmp
+      , inst
       , showLowTypeEmit t
       , showLLVMData d1 ++ ","
       , showLLVMData d2

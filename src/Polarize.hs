@@ -520,9 +520,26 @@ polarizeTheta :: Meta -> Identifier -> WithEnv CodePlus
 polarizeTheta m name
   | [typeStr, opStr] <- wordsBy '.' name -- e.g. name == "i8.add"
   , Just lowType <- asLowTypeMaybe typeStr
+  , Just op <- asUnaryOpMaybe opStr = polarizeUnaryOp name op lowType m
+polarizeTheta m name
+  | [typeStr, opStr] <- wordsBy '.' name -- e.g. name == "i8.add"
+  , Just lowType <- asLowTypeMaybe typeStr
   , Just op <- asBinOpMaybe opStr = polarizeBinOp name op lowType m
 polarizeTheta m name@"core.print.i64" = polarizePrint name m
 polarizeTheta _ _ = throwError "polarize.theta"
+
+polarizeUnaryOp :: Identifier -> UnaryOp -> LowType -> Meta -> WithEnv CodePlus
+polarizeUnaryOp name op lowType m = do
+  let ml = snd $ obtainInfoMeta m
+  (x, varX) <- newDataUpsilon
+  -- どうせcartesianImmediateに噛ませるのでepsilonなら何でもオーケー
+  let immediateType = (MetaTerminal ml, TermEpsilon "top")
+  makeClosure
+    (Just name)
+    []
+    m
+    [(x, immediateType)]
+    (ml, CodeTheta (ThetaUnaryOp op lowType varX))
 
 polarizeBinOp :: Identifier -> BinOp -> LowType -> Meta -> WithEnv CodePlus
 polarizeBinOp name op lowType m = do

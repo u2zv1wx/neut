@@ -21,6 +21,10 @@ data LowType
 voidPtr :: LowType
 voidPtr = LowTypePointer $ LowTypeSignedInt 8
 
+data UnaryOp =
+  UnaryOpNeg
+  deriving (Eq, Show)
+
 data BinOp
   = BinOpAdd
   | BinOpSub
@@ -63,6 +67,10 @@ asLowTypeMaybe ('f':cs)
   | Just n <- read cs = Just $ LowTypeFloat n
 asLowTypeMaybe _ = Nothing
 
+asUnaryOpMaybe :: Identifier -> Maybe UnaryOp
+asUnaryOpMaybe "neg" = Just UnaryOpNeg
+asUnaryOpMaybe _ = Nothing
+
 asBinOpMaybe :: Identifier -> Maybe BinOp
 asBinOpMaybe "add" = Just BinOpAdd
 asBinOpMaybe "sub" = Just BinOpSub
@@ -76,7 +84,6 @@ asBinOpMaybe "lt" = Just BinOpLT
 asBinOpMaybe "le" = Just BinOpLE
 asBinOpMaybe _ = Nothing
 
--- https://stackoverflow.com/questions/4978578/how-to-split-a-string-in-haskell
 wordsBy :: Char -> String -> [String]
 wordsBy c s =
   case dropWhile (== c) s of

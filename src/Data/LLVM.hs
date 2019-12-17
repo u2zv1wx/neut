@@ -31,6 +31,7 @@ data LLVM
   | LLVMStore (LLVMData, LowType) (LLVMData, LowType)
   | LLVMAlloc Int
   | LLVMFree LLVMData
+  | LLVMUnaryOp (UnaryOp, LowType) LLVMData
   | LLVMBinOp (BinOp, LowType) LLVMData LLVMData
   | LLVMPrint LowType LLVMData
   | LLVMUnreachable -- for empty case analysis
