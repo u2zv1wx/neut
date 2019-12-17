@@ -550,7 +550,7 @@ polarizeArith name op lowType m = do
   (x, varX) <- newDataUpsilon
   (y, varY) <- newDataUpsilon
   -- どうせcartesianImmediateに噛ませるのでepsilonなら何でもオーケー
-  let immediateType = (MetaTerminal ml, TermEpsilon "i64")
+  let immediateType = (MetaTerminal ml, TermEpsilon "top")
   makeClosure
     (Just name)
     []
@@ -563,7 +563,7 @@ polarizeCompare name cmp lowType m = do
   let ml = snd $ obtainInfoMeta m
   (x, varX) <- newDataUpsilon
   (y, varY) <- newDataUpsilon
-  let immediateType = (MetaTerminal ml, TermEpsilon "i64")
+  let immediateType = (MetaTerminal ml, TermEpsilon "top")
   makeClosure
     (Just name)
     []
