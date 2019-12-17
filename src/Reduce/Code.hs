@@ -10,6 +10,28 @@ import Data.Code
 import Data.Env
 
 reduceCodePlus :: CodePlus -> WithEnv CodePlus
+reduceCodePlus (m, CodeEpsilonElim (x, lowType) v branchList) =
+  case v of
+    (_, DataEpsilonIntro l _) ->
+      case lookup (CaseLabel l) branchList of
+        Just body -> reduceCodePlus $ substCodePlus [(x, v)] body
+        Nothing ->
+          case lookup CaseDefault branchList of
+            Just body -> reduceCodePlus $ substCodePlus [(x, v)] body
+            Nothing -> return (m, CodeEpsilonElim (x, lowType) v branchList)
+    _ -> return (m, CodeEpsilonElim (x, lowType) v branchList)
+reduceCodePlus (m, CodePiElimDownElim v ds) = do
+  cenv <- gets codeEnv
+  case v of
+    (_, DataTheta x)
+      | Just (xs, body) <- lookup x cenv ->
+        reduceCodePlus $ substCodePlus (zip xs ds) body
+    _ -> return (m, CodePiElimDownElim v ds)
+reduceCodePlus (m, CodeSigmaElim xs v e) =
+  case v of
+    (_, DataSigmaIntro es)
+      | length es == length xs -> reduceCodePlus $ substCodePlus (zip xs es) e
+    _ -> return (m, CodeSigmaElim xs v e)
 reduceCodePlus (m, CodeTheta theta) =
   case theta of
     ThetaBinOp op t@(LowTypeSignedInt _) (m1, DataInt i1 _) (_, DataInt i2 _)
@@ -76,28 +98,6 @@ reduceCodePlus (m, CodeTheta theta) =
       liftIO $ putStr $ show i
       return (m, CodeUpIntro (Nothing, DataSigmaIntro []))
     _ -> return (m, CodeTheta theta)
-reduceCodePlus (m, CodeEpsilonElim (x, lowType) v branchList) =
-  case v of
-    (_, DataEpsilonIntro l _) ->
-      case lookup (CaseLabel l) branchList of
-        Just body -> reduceCodePlus $ substCodePlus [(x, v)] body
-        Nothing ->
-          case lookup CaseDefault branchList of
-            Just body -> reduceCodePlus $ substCodePlus [(x, v)] body
-            Nothing -> return (m, CodeEpsilonElim (x, lowType) v branchList)
-    _ -> return (m, CodeEpsilonElim (x, lowType) v branchList)
-reduceCodePlus (m, CodePiElimDownElim v ds) = do
-  cenv <- gets codeEnv
-  case v of
-    (_, DataTheta x)
-      | Just (xs, body) <- lookup x cenv ->
-        reduceCodePlus $ substCodePlus (zip xs ds) body
-    _ -> return (m, CodePiElimDownElim v ds)
-reduceCodePlus (m, CodeSigmaElim xs v e) =
-  case v of
-    (_, DataSigmaIntro es)
-      | length es == length xs -> reduceCodePlus $ substCodePlus (zip xs es) e
-    _ -> return (m, CodeSigmaElim xs v e)
 reduceCodePlus t = return t
 
 asData :: LowType -> Bool -> Data
