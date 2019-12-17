@@ -103,7 +103,6 @@ llvmCodeTheta _ (ThetaArith op lowType v1 v2) =
       result <- newNameWith "result"
       y <- newNameWith "uny"
       let si = LowTypeSignedInt i
-      let op' = (op, LowTypeFloat i)
       llvmStruct [(x0, v1), (x1, v2)] $
         -- cast the first argument from i8* to float
         LLVMLet y11 (LLVMPointerToInt (LLVMDataLocal x0) voidPtr si) $
@@ -112,12 +111,20 @@ llvmCodeTheta _ (ThetaArith op lowType v1 v2) =
         LLVMLet y21 (LLVMPointerToInt (LLVMDataLocal x1) voidPtr si) $
         LLVMLet y22 (LLVMBitcast (LLVMDataLocal y21) si (LowTypeFloat i)) $
         -- compute
-        LLVMLet tmp (LLVMArith op' (LLVMDataLocal y12) (LLVMDataLocal y22)) $
+        LLVMLet
+          tmp
+          (LLVMArith (op, lowType) (LLVMDataLocal y12) (LLVMDataLocal y22)) $
         -- cast the result from float to i8*
         LLVMLet y (LLVMBitcast (LLVMDataLocal tmp) (LowTypeFloat i) si) $
         LLVMLet result (LLVMIntToPointer (LLVMDataLocal y) si voidPtr) $
         LLVMReturn $ LLVMDataLocal result
     _ -> throwError "llvmCodeTheta.ThetaArith"
+llvmCodeTheta _ (ThetaCompare op lowType v1 v2) =
+  case lowType of
+    LowTypeSignedInt _ -> llvmCodeThetaCompareInt op lowType v1 v2
+    LowTypeUnsignedInt _ -> llvmCodeThetaCompareInt op lowType v1 v2
+    LowTypeFloat i -> llvmCodeThetaCompareFloat op i v1 v2
+    _ -> throwError "llvmCodeTheta.ThetaCompare"
 llvmCodeTheta _ (ThetaPrint v) = do
   let t = LowTypeSignedInt 64
   p <- newNameWith "arg"
@@ -125,6 +132,50 @@ llvmCodeTheta _ (ThetaPrint v) = do
   llvmDataLet p v $
     LLVMLet c (LLVMPointerToInt (LLVMDataLocal p) voidPtr t) $
     LLVMPrint t (LLVMDataLocal c)
+
+llvmCodeThetaCompareInt ::
+     Compare -> LowType -> DataPlus -> DataPlus -> WithEnv LLVM
+llvmCodeThetaCompareInt op lowType v1 v2 = do
+  let boolType = LowTypeSignedInt 1
+  x0 <- newNameWith "arg"
+  x1 <- newNameWith "arg"
+  cast1 <- newNameWith "cast"
+  let op1 = LLVMDataLocal cast1
+  cast2 <- newNameWith "cast"
+  let op2 = LLVMDataLocal cast2
+  result <- newNameWith "result"
+  llvmStruct [(x0, v1), (x1, v2)] $
+    LLVMLet cast1 (LLVMPointerToInt (LLVMDataLocal x0) voidPtr lowType) $
+    LLVMLet cast2 (LLVMPointerToInt (LLVMDataLocal x1) voidPtr lowType) $
+    LLVMLet result (LLVMCompare (op, lowType) op1 op2) $
+    LLVMIntToPointer (LLVMDataLocal result) boolType voidPtr
+
+llvmCodeThetaCompareFloat ::
+     Compare -> Int -> DataPlus -> DataPlus -> WithEnv LLVM
+llvmCodeThetaCompareFloat op i v1 v2 = do
+  x0 <- newNameWith "arg"
+  x1 <- newNameWith "arg"
+  y11 <- newNameWith "y"
+  y12 <- newNameWith "float"
+  y21 <- newNameWith "y"
+  y22 <- newNameWith "float"
+  result <- newNameWith "result"
+  let si = LowTypeSignedInt i
+  let lowType = LowTypeFloat i
+  let boolType = LowTypeSignedInt 1
+  llvmStruct [(x0, v1), (x1, v2)] $
+        -- cast the first argument from i8* to float
+    LLVMLet y11 (LLVMPointerToInt (LLVMDataLocal x0) voidPtr si) $
+    LLVMLet y12 (LLVMBitcast (LLVMDataLocal y11) si (LowTypeFloat i)) $
+        -- cast the second argument from i8* to float
+    LLVMLet y21 (LLVMPointerToInt (LLVMDataLocal x1) voidPtr si) $
+    LLVMLet y22 (LLVMBitcast (LLVMDataLocal y21) si (LowTypeFloat i)) $
+        -- compute
+    LLVMLet
+      result
+      (LLVMCompare (op, lowType) (LLVMDataLocal y12) (LLVMDataLocal y22)) $
+        -- cast the result from bool to i8*
+    LLVMIntToPointer (LLVMDataLocal result) boolType voidPtr
 
 -- `llvmDataLet x d cont` binds the data `d` to the variable `x`, and computes the
 -- continuation `cont`.
