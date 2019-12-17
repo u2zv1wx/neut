@@ -11,21 +11,21 @@ import Data.Env
 reduceCodePlus :: CodePlus -> WithEnv CodePlus
 reduceCodePlus (m, CodeTheta theta) =
   case theta of
-    ThetaArith ArithAdd t (m1, DataInt i1 _) (_, DataInt i2 _) ->
+    ThetaBinOp BinOpAdd t (m1, DataInt i1 _) (_, DataInt i2 _) ->
       return (m, CodeUpIntro (m1, DataInt (i1 + i2) t))
-    ThetaArith ArithSub t (m1, DataInt i1 _) (_, DataInt i2 _) ->
+    ThetaBinOp BinOpSub t (m1, DataInt i1 _) (_, DataInt i2 _) ->
       return (m, CodeUpIntro (m1, DataInt (i1 - i2) t))
-    ThetaArith ArithMul t (m1, DataInt i1 _) (_, DataInt i2 _) ->
+    ThetaBinOp BinOpMul t (m1, DataInt i1 _) (_, DataInt i2 _) ->
       return (m, CodeUpIntro (m1, DataInt (i1 * i2) t))
-    ThetaArith ArithDiv t (m1, DataInt i1 _) (_, DataInt i2 _) ->
+    ThetaBinOp BinOpDiv t (m1, DataInt i1 _) (_, DataInt i2 _) ->
       return (m, CodeUpIntro (m1, DataInt (i1 `div` i2) t))
-    ThetaArith ArithAdd t (m1, DataFloat i1 _) (_, DataFloat i2 _) ->
+    ThetaBinOp BinOpAdd t (m1, DataFloat i1 _) (_, DataFloat i2 _) ->
       return (m, CodeUpIntro (m1, DataFloat (i1 + i2) t))
-    ThetaArith ArithSub t (m1, DataFloat i1 _) (_, DataFloat i2 _) ->
+    ThetaBinOp BinOpSub t (m1, DataFloat i1 _) (_, DataFloat i2 _) ->
       return (m, CodeUpIntro (m1, DataFloat (i1 - i2) t))
-    ThetaArith ArithMul t (m1, DataFloat i1 _) (_, DataFloat i2 _) ->
+    ThetaBinOp BinOpMul t (m1, DataFloat i1 _) (_, DataFloat i2 _) ->
       return (m, CodeUpIntro (m1, DataFloat (i1 * i2) t))
-    ThetaArith ArithDiv t (m1, DataFloat i1 _) (_, DataFloat i2 _) ->
+    ThetaBinOp BinOpDiv t (m1, DataFloat i1 _) (_, DataFloat i2 _) ->
       return (m, CodeUpIntro (m1, DataFloat (i1 / i2) t))
     ThetaPrint (_, DataInt i _) -> do
       liftIO $ putStr $ show i
