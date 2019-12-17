@@ -199,134 +199,29 @@ emitLLVM funName (LLVMLet _ (LLVMFree d) cont) = do
   a <- emitLLVM funName cont
   return $ op ++ a
 emitLLVM funName (LLVMLet x (LLVMArith (ArithAdd, t@(LowTypeSignedInt _)) d1 d2) cont) = do
-  op <-
-    emitOp $
-    unwords
-      [ showLLVMData (LLVMDataLocal x)
-      , "="
-      , "add"
-      , showLowTypeEmit t
-      , showLLVMData d1 ++ ","
-      , showLLVMData d2
-      ]
-  a <- emitLLVM funName cont
-  return $ op ++ a
-emitLLVM funName (LLVMLet x (LLVMArith (ArithAdd, LowTypeUnsignedInt size) d1 d2) cont) =
-  emitLLVM
-    funName
-    (LLVMLet x (LLVMArith (ArithAdd, LowTypeSignedInt size) d1 d2) cont) -- thanks to the two's complement representation
-emitLLVM funName (LLVMLet x (LLVMArith (ArithAdd, t) d1 d2) cont) = do
-  op <-
-    emitOp $
-    unwords
-      [ showLLVMData (LLVMDataLocal x)
-      , "="
-      , "fadd"
-      , showLowTypeEmit t
-      , showLLVMData d1 ++ ","
-      , showLLVMData d2
-      ]
-  a <- emitLLVM funName cont
-  return $ op ++ a
+  emitLLVMCompare funName x t "add" d1 d2 cont
+emitLLVM funName (LLVMLet x (LLVMArith (ArithAdd, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
+  emitLLVMCompare funName x t "add" d1 d2 cont
+emitLLVM funName (LLVMLet x (LLVMArith (ArithAdd, t@(LowTypeFloat _)) d1 d2) cont) = do
+  emitLLVMCompare funName x t "fadd" d1 d2 cont
 emitLLVM funName (LLVMLet x (LLVMArith (ArithSub, t@(LowTypeSignedInt _)) d1 d2) cont) = do
-  op <-
-    emitOp $
-    unwords
-      [ showLLVMData (LLVMDataLocal x)
-      , "="
-      , "sub"
-      , showLowTypeEmit t
-      , showLLVMData d1 ++ ","
-      , showLLVMData d2
-      ]
-  a <- emitLLVM funName cont
-  return $ op ++ a
-emitLLVM funName (LLVMLet x (LLVMArith (ArithSub, LowTypeUnsignedInt size) d1 d2) cont) =
-  emitLLVM
-    funName
-    (LLVMLet x (LLVMArith (ArithSub, LowTypeSignedInt size) d1 d2) cont) -- thanks to the two's complement representation
-emitLLVM funName (LLVMLet x (LLVMArith (ArithSub, t) d1 d2) cont) = do
-  op <-
-    emitOp $
-    unwords
-      [ showLLVMData (LLVMDataLocal x)
-      , "="
-      , "fsub"
-      , showLowTypeEmit t
-      , showLLVMData d1 ++ ","
-      , showLLVMData d2
-      ]
-  a <- emitLLVM funName cont
-  return $ op ++ a
+  emitLLVMCompare funName x t "sub" d1 d2 cont
+emitLLVM funName (LLVMLet x (LLVMArith (ArithSub, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
+  emitLLVMCompare funName x t "sub" d1 d2 cont
+emitLLVM funName (LLVMLet x (LLVMArith (ArithSub, t@(LowTypeFloat _)) d1 d2) cont) = do
+  emitLLVMCompare funName x t "fsub" d1 d2 cont
 emitLLVM funName (LLVMLet x (LLVMArith (ArithMul, t@(LowTypeSignedInt _)) d1 d2) cont) = do
-  op <-
-    emitOp $
-    unwords
-      [ showLLVMData (LLVMDataLocal x)
-      , "="
-      , "mul"
-      , showLowTypeEmit t
-      , showLLVMData d1 ++ ","
-      , showLLVMData d2
-      ]
-  a <- emitLLVM funName cont
-  return $ op ++ a
-emitLLVM funName (LLVMLet x (LLVMArith (ArithMul, LowTypeUnsignedInt size) d1 d2) cont) =
-  emitLLVM
-    funName
-    (LLVMLet x (LLVMArith (ArithMul, LowTypeSignedInt size) d1 d2) cont) -- thanks to the two's complement representation
-emitLLVM funName (LLVMLet x (LLVMArith (ArithMul, t) d1 d2) cont) = do
-  op <-
-    emitOp $
-    unwords
-      [ showLLVMData (LLVMDataLocal x)
-      , "="
-      , "fmul"
-      , showLowTypeEmit t
-      , showLLVMData d1 ++ ","
-      , showLLVMData d2
-      ]
-  a <- emitLLVM funName cont
-  return $ op ++ a
+  emitLLVMCompare funName x t "mul" d1 d2 cont
+emitLLVM funName (LLVMLet x (LLVMArith (ArithMul, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
+  emitLLVMCompare funName x t "mul" d1 d2 cont
+emitLLVM funName (LLVMLet x (LLVMArith (ArithMul, t@(LowTypeFloat _)) d1 d2) cont) = do
+  emitLLVMCompare funName x t "fmul" d1 d2 cont
 emitLLVM funName (LLVMLet x (LLVMArith (ArithDiv, t@(LowTypeSignedInt _)) d1 d2) cont) = do
-  op <-
-    emitOp $
-    unwords
-      [ showLLVMData (LLVMDataLocal x)
-      , "="
-      , "sdiv"
-      , showLowTypeEmit t
-      , showLLVMData d1 ++ ","
-      , showLLVMData d2
-      ]
-  a <- emitLLVM funName cont
-  return $ op ++ a
+  emitLLVMCompare funName x t "sdiv" d1 d2 cont
 emitLLVM funName (LLVMLet x (LLVMArith (ArithDiv, t@(LowTypeUnsignedInt _)) d1 d2) cont) = do
-  op <-
-    emitOp $
-    unwords
-      [ showLLVMData (LLVMDataLocal x)
-      , "="
-      , "udiv"
-      , showLowTypeEmit t
-      , showLLVMData d1 ++ ","
-      , showLLVMData d2
-      ]
-  a <- emitLLVM funName cont
-  return $ op ++ a
-emitLLVM funName (LLVMLet x (LLVMArith (ArithDiv, t) d1 d2) cont) = do
-  op <-
-    emitOp $
-    unwords
-      [ showLLVMData (LLVMDataLocal x)
-      , "="
-      , "fdiv"
-      , showLowTypeEmit t
-      , showLLVMData d1 ++ ","
-      , showLLVMData d2
-      ]
-  a <- emitLLVM funName cont
-  return $ op ++ a
+  emitLLVMCompare funName x t "udiv" d1 d2 cont
+emitLLVM funName (LLVMLet x (LLVMArith (ArithDiv, t@(LowTypeFloat _)) d1 d2) cont) = do
+  emitLLVMCompare funName x t "fdiv" d1 d2 cont
 emitLLVM funName (LLVMLet x (LLVMCompare (CompareEQ, t@(LowTypeSignedInt _)) d1 d2) cont) =
   emitLLVMCompare funName x t "icmp eq" d1 d2 cont
 emitLLVM funName (LLVMLet x (LLVMCompare (CompareEQ, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
