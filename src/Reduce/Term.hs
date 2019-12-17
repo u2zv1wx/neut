@@ -45,92 +45,55 @@ reduceTermPlus (m, TermPiElim e es) = do
       | [(_, TermInt x _), (_, TermInt y _)] <- es'
       , [typeStr, opStr] <- wordsBy '.' constant
       , Just t@(LowTypeSignedInt _) <- asLowTypeMaybe typeStr
-      , Just op <- asBinaryOpMaybe opStr
-      , op `elem` arithOpList -> do
+      , Just op <- asBinaryOpMaybe opStr -> do
         case op of
           BinaryOpAdd -> return (m, TermInt (x + y) t)
           BinaryOpSub -> return (m, TermInt (x - y) t)
           BinaryOpMul -> return (m, TermInt (x * y) t)
           BinaryOpDiv -> return (m, TermInt (x `div` y) t)
           BinaryOpRem -> return (m, TermInt (x `rem` y) t)
-          BinaryOpShl -> return (m, TermInt (shiftL x y) t)
-          BinaryOpLshr -> return (m, TermInt (ushiftR x y) t)
-          BinaryOpAshr -> return (m, TermInt (shiftR x y) t)
-          _ -> return (m, TermPiElim e' es')
-    (_, TermTheta constant)
-      | [(_, TermInt x _), (_, TermInt y _)] <- es'
-      , [typeStr, opStr] <- wordsBy '.' constant
-      , Just t@(LowTypeUnsignedInt _) <- asLowTypeMaybe typeStr
-      , Just op <- asBinaryOpMaybe opStr
-      , op `elem` arithOpList -> do
-        case op of
-          BinaryOpAdd -> return (m, TermInt (x + y) t)
-          BinaryOpSub -> return (m, TermInt (x - y) t)
-          BinaryOpMul -> return (m, TermInt (x * y) t)
-          BinaryOpDiv -> do
-            let x' = unsafeCoerce x :: Word
-            let y' = unsafeCoerce y :: Word
-            let z = x' `div` y'
-            return (m, TermInt (unsafeCoerce z) t)
-          BinaryOpRem -> do
-            let x' = unsafeCoerce x :: Word
-            let y' = unsafeCoerce y :: Word
-            let z = x' `rem` y'
-            return (m, TermInt (unsafeCoerce z) t)
-          BinaryOpShl -> return (m, TermInt (shiftL x y) t)
-          BinaryOpLshr -> return (m, TermInt (ushiftR x y) t)
-          BinaryOpAshr -> return (m, TermInt (shiftR x y) t)
-          _ -> return (m, TermPiElim e' es')
-    (_, TermTheta constant)
-      | [(_, TermFloat x _), (_, TermFloat y _)] <- es'
-      , [typeStr, opStr] <- wordsBy '.' constant
-      , Just t@(LowTypeFloat _) <- asLowTypeMaybe typeStr
-      , Just op <- asBinaryOpMaybe opStr
-      , op `elem` arithOpList -> do
-        case op of
-          BinaryOpAdd -> return (m, TermFloat (x + y) t)
-          BinaryOpSub -> return (m, TermFloat (x - y) t)
-          BinaryOpMul -> return (m, TermFloat (x * y) t)
-          BinaryOpDiv -> return (m, TermFloat (x / y) t)
-          BinaryOpRem -> return (m, TermFloat (x `mod'` y) t)
-          _ -> return (m, TermPiElim e' es')
-    (_, TermTheta constant)
-      | [(_, TermInt x _), (_, TermInt y _)] <- es'
-      , [typeStr, opStr] <- wordsBy '.' constant
-      , Just t@(LowTypeSignedInt _) <- asLowTypeMaybe typeStr
-      , Just op <- asBinaryOpMaybe opStr
-      , op `elem` compareOpList -> do
-        case op of
           BinaryOpEQ -> return (m, asEpsilon t $ x == y)
           BinaryOpNE -> return (m, asEpsilon t $ x /= y)
           BinaryOpGT -> return (m, asEpsilon t $ x > y)
           BinaryOpGE -> return (m, asEpsilon t $ x >= y)
           BinaryOpLT -> return (m, asEpsilon t $ x < y)
           BinaryOpLE -> return (m, asEpsilon t $ x <= y)
-          _ -> return (m, TermPiElim e' es')
+          BinaryOpShl -> return (m, TermInt (shiftL x y) t)
+          BinaryOpLshr -> return (m, TermInt (ushiftR x y) t)
+          BinaryOpAshr -> return (m, TermInt (shiftR x y) t)
     (_, TermTheta constant)
       | [(_, TermInt x _), (_, TermInt y _)] <- es'
       , [typeStr, opStr] <- wordsBy '.' constant
       , Just t@(LowTypeUnsignedInt _) <- asLowTypeMaybe typeStr
-      , Just op <- asBinaryOpMaybe opStr
-      , op `elem` compareOpList -> do
+      , Just op <- asBinaryOpMaybe opStr -> do
         let x' = unsafeCoerce x :: Word
         let y' = unsafeCoerce y :: Word
         case op of
+          BinaryOpAdd -> return (m, TermInt (x + y) t)
+          BinaryOpSub -> return (m, TermInt (x - y) t)
+          BinaryOpMul -> return (m, TermInt (x * y) t)
+          BinaryOpDiv -> return (m, TermInt (unsafeCoerce (x' `div` y')) t)
+          BinaryOpRem -> return (m, TermInt (unsafeCoerce (x' `rem` y')) t)
           BinaryOpEQ -> return (m, asEpsilon t $ x' == y')
           BinaryOpNE -> return (m, asEpsilon t $ x' /= y')
           BinaryOpGT -> return (m, asEpsilon t $ x' > y')
           BinaryOpGE -> return (m, asEpsilon t $ x' >= y')
           BinaryOpLT -> return (m, asEpsilon t $ x' < y')
           BinaryOpLE -> return (m, asEpsilon t $ x' <= y')
-          _ -> return (m, TermPiElim e' es')
+          BinaryOpShl -> return (m, TermInt (shiftL x y) t)
+          BinaryOpLshr -> return (m, TermInt (ushiftR x y) t)
+          BinaryOpAshr -> return (m, TermInt (shiftR x y) t)
     (_, TermTheta constant)
       | [(_, TermFloat x _), (_, TermFloat y _)] <- es'
       , [typeStr, opStr] <- wordsBy '.' constant
       , Just t@(LowTypeFloat _) <- asLowTypeMaybe typeStr
-      , Just op <- asBinaryOpMaybe opStr
-      , op `elem` compareOpList -> do
+      , Just op <- asBinaryOpMaybe opStr -> do
         case op of
+          BinaryOpAdd -> return (m, TermFloat (x + y) t)
+          BinaryOpSub -> return (m, TermFloat (x - y) t)
+          BinaryOpMul -> return (m, TermFloat (x * y) t)
+          BinaryOpDiv -> return (m, TermFloat (x / y) t)
+          BinaryOpRem -> return (m, TermFloat (x `mod'` y) t)
           BinaryOpEQ -> return (m, asEpsilon t $ x == y)
           BinaryOpNE -> return (m, asEpsilon t $ x /= y)
           BinaryOpGT -> return (m, asEpsilon t $ x > y)
