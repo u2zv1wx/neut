@@ -80,18 +80,27 @@ llvmCodeTheta :: CodeMeta -> Theta -> WithEnv LLVM
 llvmCodeTheta _ (ThetaArith op lowType v1 v2) =
   case lowType of
     LowTypeSignedInt _ -> do
-      x0 <- newNameWith "arg"
-      x1 <- newNameWith "arg"
-      cast1 <- newNameWith "cast"
-      let op1 = LLVMDataLocal cast1
-      cast2 <- newNameWith "cast"
-      let op2 = LLVMDataLocal cast2
+      (y1, cast1then) <- llvmCastInt v1 lowType
+      (y2, cast2then) <- llvmCastInt v2 lowType
       result <- newNameWith "result"
-      llvmStruct [(x0, v1), (x1, v2)] $
-        LLVMLet cast1 (LLVMPointerToInt (LLVMDataLocal x0) voidPtr lowType) $
-        LLVMLet cast2 (LLVMPointerToInt (LLVMDataLocal x1) voidPtr lowType) $
-        LLVMLet result (LLVMArith (op, lowType) op1 op2) $
+      (cast1then >=> cast2then) $
+        LLVMLet result (LLVMArith (op, lowType) y1 y2) $
         LLVMIntToPointer (LLVMDataLocal result) lowType voidPtr
+      -- LLVMLet result (LLVMCompare (op, lowType) y1 y2) $
+      -- LLVMIntToPointer (LLVMDataLocal result) boolType voidPtr
+      -- result <- newNameWith "result"
+      -- x0 <- newNameWith "arg"
+      -- x1 <- newNameWith "arg"
+      -- cast1 <- newNameWith "cast"
+      -- let op1 = LLVMDataLocal cast1
+      -- cast2 <- newNameWith "cast"
+      -- let op2 = LLVMDataLocal cast2
+      -- result <- newNameWith "result"
+      -- llvmStruct [(x0, v1), (x1, v2)] $
+      --   LLVMLet cast1 (LLVMPointerToInt (LLVMDataLocal x0) voidPtr lowType) $
+      --   LLVMLet cast2 (LLVMPointerToInt (LLVMDataLocal x1) voidPtr lowType) $
+      --   LLVMLet result (LLVMArith (op, lowType) op1 op2) $
+      --   LLVMIntToPointer (LLVMDataLocal result) lowType voidPtr
     LowTypeFloat i -> do
       x0 <- newNameWith "arg"
       x1 <- newNameWith "arg"
@@ -137,19 +146,55 @@ llvmCodeThetaCompareInt ::
      Compare -> LowType -> DataPlus -> DataPlus -> WithEnv LLVM
 llvmCodeThetaCompareInt op lowType v1 v2 = do
   let boolType = LowTypeSignedInt 1
-  x0 <- newNameWith "arg"
-  x1 <- newNameWith "arg"
-  cast1 <- newNameWith "cast"
-  let op1 = LLVMDataLocal cast1
-  cast2 <- newNameWith "cast"
-  let op2 = LLVMDataLocal cast2
+  (y1, cast1then) <- llvmCastInt v1 lowType
+  (y2, cast2then) <- llvmCastInt v2 lowType
   result <- newNameWith "result"
-  llvmStruct [(x0, v1), (x1, v2)] $
-    LLVMLet cast1 (LLVMPointerToInt (LLVMDataLocal x0) voidPtr lowType) $
-    LLVMLet cast2 (LLVMPointerToInt (LLVMDataLocal x1) voidPtr lowType) $
-    LLVMLet result (LLVMCompare (op, lowType) op1 op2) $
+  (cast1then >=> cast2then) $
+    LLVMLet result (LLVMCompare (op, lowType) y1 y2) $
     LLVMIntToPointer (LLVMDataLocal result) boolType voidPtr
+  -- ([y1, y2], f) <- llvmCastInt [v1, v2] lowType -- ysの長さが2であることが表現できない？
+  -- result <- newNameWith "result"
+  -- f $
+  --   LLVMLet result (LLVMCompare (op, lowType) y1 y2) $
+  --   LLVMIntToPointer (LLVMDataLocal result) boolType voidPtr
+  -- x0 <- newNameWith "arg"
+  -- x1 <- newNameWith "arg"
+  -- cast1 <- newNameWith "cast"
+  -- let op1 = LLVMDataLocal cast1
+  -- cast2 <- newNameWith "cast"
+  -- let op2 = LLVMDataLocal cast2
+  -- result <- newNameWith "result"
+  -- llvmStruct [(x0, v1), (x1, v2)] $
+  --   LLVMLet cast1 (LLVMPointerToInt (LLVMDataLocal x0) voidPtr lowType) $
+  --   LLVMLet cast2 (LLVMPointerToInt (LLVMDataLocal x1) voidPtr lowType) $
+  --   LLVMLet result (LLVMCompare (op, lowType) op1 op2) $
+  --   LLVMIntToPointer (LLVMDataLocal result) boolType voidPtr
 
+llvmCastInt :: DataPlus -> LowType -> WithEnv (LLVMData, LLVM -> WithEnv LLVM)
+llvmCastInt v lowType = do
+  x <- newNameWith "arg"
+  y <- newNameWith "cast"
+  return
+    ( LLVMDataLocal y
+    , \cont -> do
+        llvmDataLet x v $
+          LLVMLet y (LLVMPointerToInt (LLVMDataLocal x) voidPtr lowType) $ cont)
+
+-- llvmCastInt ::
+--      [DataPlus] -> LowType -> WithEnv ([LLVMData], LLVM -> WithEnv LLVM)
+-- llvmCastInt vs lowType = do
+--   xs <- mapM (const $ newNameWith "arg") vs
+--   ys <- mapM (const $ newNameWith "cast") vs
+--   return
+--     ( map LLVMDataLocal ys
+--     , \cont -> do
+--         let cont' = withCastHeader (zip ys xs) lowType cont
+--         llvmStruct (zip xs vs) cont')
+-- withCastHeader :: [(Identifier, Identifier)] -> LowType -> LLVM -> LLVM
+-- withCastHeader [] _ cont = cont
+-- withCastHeader ((castTo, castFrom):xys) lowType cont =
+--   LLVMLet castTo (LLVMPointerToInt (LLVMDataLocal castFrom) voidPtr lowType) $
+--   withCastHeader xys lowType cont
 llvmCodeThetaCompareFloat ::
      Compare -> Int -> DataPlus -> DataPlus -> WithEnv LLVM
 llvmCodeThetaCompareFloat op i v1 v2 = do
