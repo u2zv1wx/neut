@@ -147,9 +147,20 @@ isReducible (_, WeakTermPiElim (_, WeakTermPiIntro xts _) es)
   | length xts == length es = True
 isReducible (_, WeakTermPiElim (_, WeakTermMu _ _) _) = True -- CBV recursion
 isReducible (_, WeakTermPiElim (_, WeakTermTheta c) [(_, WeakTermInt _), (_, WeakTermInt _)])
-  | c `elem` intArithConstantList = True
+  | [typeStr, opStr] <- wordsBy '.' c
+  , Just (LowTypeSignedInt _) <- asLowTypeMaybe typeStr
+  , Just arith <- asBinOpMaybe opStr
+  , arith `elem` arithOpList = True
+isReducible (_, WeakTermPiElim (_, WeakTermTheta c) [(_, WeakTermInt _), (_, WeakTermInt _)])
+  | [typeStr, opStr] <- wordsBy '.' c
+  , Just (LowTypeUnsignedInt _) <- asLowTypeMaybe typeStr
+  , Just arith <- asBinOpMaybe opStr
+  , arith `elem` arithOpList = True
 isReducible (_, WeakTermPiElim (_, WeakTermTheta c) [(_, WeakTermFloat _), (_, WeakTermFloat _)])
-  | c `elem` floatArithConstantList = True
+  | [typeStr, opStr] <- wordsBy '.' c
+  , Just (LowTypeFloat _) <- asLowTypeMaybe typeStr
+  , Just arith <- asBinOpMaybe opStr
+  , arith `elem` arithOpList = True
 isReducible (_, WeakTermPiElim e es) = isReducible e || any isReducible es
 isReducible (_, WeakTermMu _ _) = False
 isReducible (_, WeakTermZeta _) = False
