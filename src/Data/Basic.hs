@@ -30,7 +30,7 @@ data Arith
 
 data Compare
   = CompareEQ
-  | CompaneNE
+  | CompareNE
   | CompareGT
   | CompareGE
   | CompareLT
