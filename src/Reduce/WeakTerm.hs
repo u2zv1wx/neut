@@ -34,6 +34,12 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
         let self' = substWeakTermPlus [(x, self)] body
         reduceWeakTermPlus (m, WeakTermPiElim self' es')
     (_, WeakTermTheta constant)
+      | [(_, WeakTermFloat x)] <- es'
+      , [typeStr, opStr] <- wordsBy '.' constant
+      , Just (LowTypeFloat _) <- asLowTypeMaybe typeStr
+      , Just op <- asUnaryOpMaybe opStr
+      , op == UnaryOpNeg -> return (m, WeakTermFloat (-x))
+    (_, WeakTermTheta constant)
       | [(_, WeakTermInt x), (_, WeakTermInt y)] <- es'
       , [typeStr, opStr] <- wordsBy '.' constant
       , Just (LowTypeSignedInt _) <- asLowTypeMaybe typeStr

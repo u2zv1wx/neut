@@ -34,6 +34,8 @@ reduceCodePlus (m, CodeSigmaElim xs v e) =
     _ -> return (m, CodeSigmaElim xs v e)
 reduceCodePlus (m, CodeTheta theta) =
   case theta of
+    ThetaUnaryOp op t@(LowTypeFloat _) (m1, DataFloat i1 _)
+      | op == UnaryOpNeg -> return (m, CodeUpIntro (m1, DataFloat (-i1) t))
     ThetaBinaryOp op t@(LowTypeSignedInt _) (m1, DataInt i1 _) (_, DataInt i2 _)
       | op `elem` arithOpList -> do
         case op of

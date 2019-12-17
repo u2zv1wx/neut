@@ -34,6 +34,12 @@ reduceTermPlus (m, TermPiElim e es) = do
         let self' = substTermPlus [(x, self)] body
         reduceTermPlus (m, TermPiElim self' es')
     (_, TermTheta constant)
+      | [(_, TermFloat x t)] <- es'
+      , [typeStr, opStr] <- wordsBy '.' constant
+      , Just (LowTypeFloat _) <- asLowTypeMaybe typeStr
+      , Just op <- asUnaryOpMaybe opStr
+      , op == UnaryOpNeg -> return (m, TermFloat (-x) t)
+    (_, TermTheta constant)
       | [(_, TermInt x _), (_, TermInt y _)] <- es'
       , [typeStr, opStr] <- wordsBy '.' constant
       , Just t@(LowTypeSignedInt _) <- asLowTypeMaybe typeStr
