@@ -80,21 +80,21 @@ llvmCodeTheta :: CodeMeta -> Theta -> WithEnv LLVM
 llvmCodeTheta _ (ThetaArith op lowType v1 v2) =
   case lowType of
     LowTypeSignedInt _ -> do
-      (y1, cast1then) <- llvmCastToInt v1 lowType
-      (y2, cast2then) <- llvmCastToInt v2 lowType
+      (x1, cast1then) <- llvmCastToInt v1 lowType
+      (x2, cast2then) <- llvmCastToInt v2 lowType
       result <- newNameWith "result"
       (cast1then >=> cast2then) $
-        LLVMLet result (LLVMArith (op, lowType) y1 y2) $
+        LLVMLet result (LLVMArith (op, lowType) x1 x2) $
         LLVMIntToPointer (LLVMDataLocal result) lowType voidPtr
     LowTypeFloat i -> do
-      (y1, cast1then) <- llvmCastToFloat v1 lowType i
-      (y2, cast2then) <- llvmCastToFloat v2 lowType i
+      (x1, cast1then) <- llvmCastToFloat v1 lowType i
+      (x2, cast2then) <- llvmCastToFloat v2 lowType i
       tmp <- newNameWith "arith"
       result <- newNameWith "result"
       y <- newNameWith "uny"
       let si = LowTypeSignedInt i
       (cast1then >=> cast2then) $
-        LLVMLet tmp (LLVMArith (op, lowType) y1 y2) $
+        LLVMLet tmp (LLVMArith (op, lowType) x1 x2) $
         -- cast the result from float to i8*
         LLVMLet y (LLVMBitcast (LLVMDataLocal tmp) (LowTypeFloat i) si) $
         LLVMLet result (LLVMIntToPointer (LLVMDataLocal y) si voidPtr) $
@@ -118,11 +118,11 @@ llvmCodeThetaCompareInt ::
      Compare -> LowType -> DataPlus -> DataPlus -> WithEnv LLVM
 llvmCodeThetaCompareInt op lowType v1 v2 = do
   let boolType = LowTypeSignedInt 1
-  (y1, cast1then) <- llvmCastToInt v1 lowType
-  (y2, cast2then) <- llvmCastToInt v2 lowType
+  (x1, cast1then) <- llvmCastToInt v1 lowType
+  (x2, cast2then) <- llvmCastToInt v2 lowType
   result <- newNameWith "result"
   (cast1then >=> cast2then) $
-    LLVMLet result (LLVMCompare (op, lowType) y1 y2) $
+    LLVMLet result (LLVMCompare (op, lowType) x1 x2) $
     LLVMIntToPointer (LLVMDataLocal result) boolType voidPtr
 
 llvmCastToInt :: DataPlus -> LowType -> WithEnv (LLVMData, LLVM -> WithEnv LLVM)
@@ -153,12 +153,12 @@ llvmCastToFloat v lowType size = do
 llvmCodeThetaCompareFloat ::
      Compare -> Int -> DataPlus -> DataPlus -> WithEnv LLVM
 llvmCodeThetaCompareFloat op i v1 v2 = do
-  (y1, cast1then) <- llvmCastToFloat v1 (LowTypeFloat i) i
-  (y2, cast2then) <- llvmCastToFloat v2 (LowTypeFloat i) i
+  (x1, cast1then) <- llvmCastToFloat v1 (LowTypeFloat i) i
+  (x2, cast2then) <- llvmCastToFloat v2 (LowTypeFloat i) i
   result <- newNameWith "result"
   let boolType = LowTypeSignedInt 1
   (cast1then >=> cast2then) $
-    LLVMLet result (LLVMCompare (op, LowTypeFloat i) y1 y2) $
+    LLVMLet result (LLVMCompare (op, LowTypeFloat i) x1 x2) $
     LLVMIntToPointer (LLVMDataLocal result) boolType voidPtr
 
 -- `llvmDataLet x d cont` binds the data `d` to the variable `x`, and computes the
