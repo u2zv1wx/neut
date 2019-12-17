@@ -149,17 +149,17 @@ isReducible (_, WeakTermPiElim (_, WeakTermMu _ _) _) = True -- CBV recursion
 isReducible (_, WeakTermPiElim (_, WeakTermTheta c) [(_, WeakTermInt _), (_, WeakTermInt _)])
   | [typeStr, opStr] <- wordsBy '.' c
   , Just (LowTypeSignedInt _) <- asLowTypeMaybe typeStr
-  , Just arith <- asBinaryOpMaybe opStr
+  , Just arith <- asBinaryOpMaybe' opStr
   , arith `elem` arithOpList = True
 isReducible (_, WeakTermPiElim (_, WeakTermTheta c) [(_, WeakTermInt _), (_, WeakTermInt _)])
   | [typeStr, opStr] <- wordsBy '.' c
   , Just (LowTypeUnsignedInt _) <- asLowTypeMaybe typeStr
-  , Just arith <- asBinaryOpMaybe opStr
+  , Just arith <- asBinaryOpMaybe' opStr
   , arith `elem` arithOpList = True
 isReducible (_, WeakTermPiElim (_, WeakTermTheta c) [(_, WeakTermFloat _), (_, WeakTermFloat _)])
   | [typeStr, opStr] <- wordsBy '.' c
   , Just (LowTypeFloat _) <- asLowTypeMaybe typeStr
-  , Just arith <- asBinaryOpMaybe opStr
+  , Just arith <- asBinaryOpMaybe' opStr
   , arith `elem` arithOpList = True
 isReducible (_, WeakTermPiElim e es) = isReducible e || any isReducible es
 isReducible (_, WeakTermMu _ _) = False
