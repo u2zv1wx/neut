@@ -28,6 +28,15 @@ data Arith
   | ArithDiv
   deriving (Show)
 
+data Compare
+  = CompareEQ
+  | CompaneNE
+  | CompareGT
+  | CompareGE
+  | CompareLT
+  | CompareLE
+  deriving (Show)
+
 intLowTypeList :: [LowType]
 intLowTypeList = signedIntLowTypeList ++ unsignedIntLowTypeList
 
