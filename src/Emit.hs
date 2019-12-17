@@ -327,6 +327,42 @@ emitLLVM funName (LLVMLet x (LLVMArith (ArithDiv, t) d1 d2) cont) = do
       ]
   a <- emitLLVM funName cont
   return $ op ++ a
+emitLLVM funName (LLVMLet x (LLVMCompare (CompareEQ, t@(LowTypeSignedInt _)) d1 d2) cont) =
+  emitLLVMCompare funName x t "icmp eq" d1 d2 cont
+emitLLVM funName (LLVMLet x (LLVMCompare (CompareEQ, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
+  emitLLVMCompare funName x t "icmp eq" d1 d2 cont
+emitLLVM funName (LLVMLet x (LLVMCompare (CompareEQ, t@(LowTypeFloat _)) d1 d2) cont) =
+  emitLLVMCompare funName x t "fcmp oeq" d1 d2 cont
+emitLLVM funName (LLVMLet x (LLVMCompare (CompareNE, t@(LowTypeSignedInt _)) d1 d2) cont) =
+  emitLLVMCompare funName x t "icmp ne" d1 d2 cont
+emitLLVM funName (LLVMLet x (LLVMCompare (CompareNE, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
+  emitLLVMCompare funName x t "icmp ne" d1 d2 cont
+emitLLVM funName (LLVMLet x (LLVMCompare (CompareNE, t@(LowTypeFloat _)) d1 d2) cont) =
+  emitLLVMCompare funName x t "fcmp one" d1 d2 cont
+emitLLVM funName (LLVMLet x (LLVMCompare (CompareGT, t@(LowTypeSignedInt _)) d1 d2) cont) =
+  emitLLVMCompare funName x t "icmp sgt" d1 d2 cont
+emitLLVM funName (LLVMLet x (LLVMCompare (CompareGT, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
+  emitLLVMCompare funName x t "icmp ugt" d1 d2 cont
+emitLLVM funName (LLVMLet x (LLVMCompare (CompareGT, t@(LowTypeFloat _)) d1 d2) cont) =
+  emitLLVMCompare funName x t "fcmp ogt" d1 d2 cont
+emitLLVM funName (LLVMLet x (LLVMCompare (CompareGE, t@(LowTypeSignedInt _)) d1 d2) cont) =
+  emitLLVMCompare funName x t "icmp sge" d1 d2 cont
+emitLLVM funName (LLVMLet x (LLVMCompare (CompareGE, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
+  emitLLVMCompare funName x t "icmp uge" d1 d2 cont
+emitLLVM funName (LLVMLet x (LLVMCompare (CompareGE, t@(LowTypeFloat _)) d1 d2) cont) =
+  emitLLVMCompare funName x t "fcmp oge" d1 d2 cont
+emitLLVM funName (LLVMLet x (LLVMCompare (CompareLT, t@(LowTypeSignedInt _)) d1 d2) cont) =
+  emitLLVMCompare funName x t "icmp slt" d1 d2 cont
+emitLLVM funName (LLVMLet x (LLVMCompare (CompareLT, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
+  emitLLVMCompare funName x t "icmp ult" d1 d2 cont
+emitLLVM funName (LLVMLet x (LLVMCompare (CompareLT, t@(LowTypeFloat _)) d1 d2) cont) =
+  emitLLVMCompare funName x t "fcmp olt" d1 d2 cont
+emitLLVM funName (LLVMLet x (LLVMCompare (CompareLE, t@(LowTypeSignedInt _)) d1 d2) cont) =
+  emitLLVMCompare funName x t "icmp sle" d1 d2 cont
+emitLLVM funName (LLVMLet x (LLVMCompare (CompareLE, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
+  emitLLVMCompare funName x t "icmp ule" d1 d2 cont
+emitLLVM funName (LLVMLet x (LLVMCompare (CompareLE, t@(LowTypeFloat _)) d1 d2) cont) =
+  emitLLVMCompare funName x t "fcmp ole" d1 d2 cont
 emitLLVM funName (LLVMLet x (LLVMPrint t d) cont) = do
   fmt <- newNameWith "fmt"
   op1 <-
@@ -359,6 +395,29 @@ emitLLVM _ LLVMUnreachable = emitOp $ unwords ["unreachable"]
 emitLLVM funName c = do
   tmp <- newNameWith "result"
   emitLLVM funName $ LLVMLet tmp c $ LLVMReturn (LLVMDataLocal tmp)
+
+emitLLVMCompare ::
+     Identifier
+  -> Identifier
+  -> LowType
+  -> String
+  -> LLVMData
+  -> LLVMData
+  -> LLVM
+  -> WithEnv [String]
+emitLLVMCompare funName x t cmp d1 d2 cont = do
+  op <-
+    emitOp $
+    unwords
+      [ showLLVMData (LLVMDataLocal x)
+      , "="
+      , cmp
+      , showLowTypeEmit t
+      , showLLVMData d1 ++ ","
+      , showLLVMData d2
+      ]
+  a <- emitLLVM funName cont
+  return $ op ++ a
 
 emitOp :: String -> WithEnv [String]
 emitOp s = return ["  " ++ s]
