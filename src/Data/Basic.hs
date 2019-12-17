@@ -25,24 +25,25 @@ data UnaryOp =
   UnaryOpNeg
   deriving (Eq, Show)
 
-data BinOp
-  = BinOpAdd
-  | BinOpSub
-  | BinOpMul
-  | BinOpDiv
-  | BinOpEQ
-  | BinOpNE
-  | BinOpGT
-  | BinOpGE
-  | BinOpLT
-  | BinOpLE
+data BinaryOp
+  = BinaryOpAdd
+  | BinaryOpSub
+  | BinaryOpMul
+  | BinaryOpDiv
+  | BinaryOpEQ
+  | BinaryOpNE
+  | BinaryOpGT
+  | BinaryOpGE
+  | BinaryOpLT
+  | BinaryOpLE
   deriving (Eq, Show)
 
-arithOpList :: [BinOp]
-arithOpList = [BinOpAdd, BinOpSub, BinOpMul, BinOpDiv]
+arithOpList :: [BinaryOp]
+arithOpList = [BinaryOpAdd, BinaryOpSub, BinaryOpMul, BinaryOpDiv]
 
-compareOpList :: [BinOp]
-compareOpList = [BinOpEQ, BinOpNE, BinOpGT, BinOpGE, BinOpLT, BinOpLE]
+compareOpList :: [BinaryOp]
+compareOpList =
+  [BinaryOpEQ, BinaryOpNE, BinaryOpGT, BinaryOpGE, BinaryOpLT, BinaryOpLE]
 
 showItems :: (a -> String) -> [a] -> String
 showItems _ [] = ""
@@ -71,18 +72,18 @@ asUnaryOpMaybe :: Identifier -> Maybe UnaryOp
 asUnaryOpMaybe "neg" = Just UnaryOpNeg
 asUnaryOpMaybe _ = Nothing
 
-asBinOpMaybe :: Identifier -> Maybe BinOp
-asBinOpMaybe "add" = Just BinOpAdd
-asBinOpMaybe "sub" = Just BinOpSub
-asBinOpMaybe "mul" = Just BinOpMul
-asBinOpMaybe "div" = Just BinOpDiv
-asBinOpMaybe "eq" = Just BinOpEQ
-asBinOpMaybe "ne" = Just BinOpNE
-asBinOpMaybe "gt" = Just BinOpGT
-asBinOpMaybe "ge" = Just BinOpGE
-asBinOpMaybe "lt" = Just BinOpLT
-asBinOpMaybe "le" = Just BinOpLE
-asBinOpMaybe _ = Nothing
+asBinaryOpMaybe :: Identifier -> Maybe BinaryOp
+asBinaryOpMaybe "add" = Just BinaryOpAdd
+asBinaryOpMaybe "sub" = Just BinaryOpSub
+asBinaryOpMaybe "mul" = Just BinaryOpMul
+asBinaryOpMaybe "div" = Just BinaryOpDiv
+asBinaryOpMaybe "eq" = Just BinaryOpEQ
+asBinaryOpMaybe "ne" = Just BinaryOpNE
+asBinaryOpMaybe "gt" = Just BinaryOpGT
+asBinaryOpMaybe "ge" = Just BinaryOpGE
+asBinaryOpMaybe "lt" = Just BinaryOpLT
+asBinaryOpMaybe "le" = Just BinaryOpLE
+asBinaryOpMaybe _ = Nothing
 
 wordsBy :: Char -> String -> [String]
 wordsBy c s =

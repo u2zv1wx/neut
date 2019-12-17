@@ -164,65 +164,65 @@ emitLLVM funName (LLVMLet _ (LLVMFree d) cont) = do
   return $ op ++ a
 emitLLVM funName (LLVMLet x (LLVMUnaryOp (UnaryOpNeg, t@(LowTypeFloat _)) d) cont) = do
   emitUnaryOp funName x t "fneg" d cont
-emitLLVM funName (LLVMLet x (LLVMBinOp (BinOpAdd, t@(LowTypeSignedInt _)) d1 d2) cont) = do
+emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpAdd, t@(LowTypeSignedInt _)) d1 d2) cont) = do
   emitBinaryOp funName x t "add" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinOp (BinOpAdd, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
+emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpAdd, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
   emitBinaryOp funName x t "add" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinOp (BinOpAdd, t@(LowTypeFloat _)) d1 d2) cont) = do
+emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpAdd, t@(LowTypeFloat _)) d1 d2) cont) = do
   emitBinaryOp funName x t "fadd" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinOp (BinOpSub, t@(LowTypeSignedInt _)) d1 d2) cont) = do
+emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpSub, t@(LowTypeSignedInt _)) d1 d2) cont) = do
   emitBinaryOp funName x t "sub" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinOp (BinOpSub, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
+emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpSub, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
   emitBinaryOp funName x t "sub" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinOp (BinOpSub, t@(LowTypeFloat _)) d1 d2) cont) = do
+emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpSub, t@(LowTypeFloat _)) d1 d2) cont) = do
   emitBinaryOp funName x t "fsub" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinOp (BinOpMul, t@(LowTypeSignedInt _)) d1 d2) cont) = do
+emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpMul, t@(LowTypeSignedInt _)) d1 d2) cont) = do
   emitBinaryOp funName x t "mul" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinOp (BinOpMul, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
+emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpMul, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
   emitBinaryOp funName x t "mul" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinOp (BinOpMul, t@(LowTypeFloat _)) d1 d2) cont) = do
+emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpMul, t@(LowTypeFloat _)) d1 d2) cont) = do
   emitBinaryOp funName x t "fmul" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinOp (BinOpDiv, t@(LowTypeSignedInt _)) d1 d2) cont) = do
+emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpDiv, t@(LowTypeSignedInt _)) d1 d2) cont) = do
   emitBinaryOp funName x t "sdiv" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinOp (BinOpDiv, t@(LowTypeUnsignedInt _)) d1 d2) cont) = do
+emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpDiv, t@(LowTypeUnsignedInt _)) d1 d2) cont) = do
   emitBinaryOp funName x t "udiv" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinOp (BinOpDiv, t@(LowTypeFloat _)) d1 d2) cont) = do
+emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpDiv, t@(LowTypeFloat _)) d1 d2) cont) = do
   emitBinaryOp funName x t "fdiv" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinOp (BinOpEQ, t@(LowTypeSignedInt _)) d1 d2) cont) =
+emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpEQ, t@(LowTypeSignedInt _)) d1 d2) cont) =
   emitBinaryOp funName x t "icmp eq" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinOp (BinOpEQ, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
+emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpEQ, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
   emitBinaryOp funName x t "icmp eq" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinOp (BinOpEQ, t@(LowTypeFloat _)) d1 d2) cont) =
+emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpEQ, t@(LowTypeFloat _)) d1 d2) cont) =
   emitBinaryOp funName x t "fcmp oeq" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinOp (BinOpNE, t@(LowTypeSignedInt _)) d1 d2) cont) =
+emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpNE, t@(LowTypeSignedInt _)) d1 d2) cont) =
   emitBinaryOp funName x t "icmp ne" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinOp (BinOpNE, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
+emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpNE, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
   emitBinaryOp funName x t "icmp ne" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinOp (BinOpNE, t@(LowTypeFloat _)) d1 d2) cont) =
+emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpNE, t@(LowTypeFloat _)) d1 d2) cont) =
   emitBinaryOp funName x t "fcmp one" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinOp (BinOpGT, t@(LowTypeSignedInt _)) d1 d2) cont) =
+emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpGT, t@(LowTypeSignedInt _)) d1 d2) cont) =
   emitBinaryOp funName x t "icmp sgt" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinOp (BinOpGT, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
+emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpGT, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
   emitBinaryOp funName x t "icmp ugt" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinOp (BinOpGT, t@(LowTypeFloat _)) d1 d2) cont) =
+emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpGT, t@(LowTypeFloat _)) d1 d2) cont) =
   emitBinaryOp funName x t "fcmp ogt" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinOp (BinOpGE, t@(LowTypeSignedInt _)) d1 d2) cont) =
+emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpGE, t@(LowTypeSignedInt _)) d1 d2) cont) =
   emitBinaryOp funName x t "icmp sge" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinOp (BinOpGE, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
+emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpGE, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
   emitBinaryOp funName x t "icmp uge" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinOp (BinOpGE, t@(LowTypeFloat _)) d1 d2) cont) =
+emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpGE, t@(LowTypeFloat _)) d1 d2) cont) =
   emitBinaryOp funName x t "fcmp oge" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinOp (BinOpLT, t@(LowTypeSignedInt _)) d1 d2) cont) =
+emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpLT, t@(LowTypeSignedInt _)) d1 d2) cont) =
   emitBinaryOp funName x t "icmp slt" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinOp (BinOpLT, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
+emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpLT, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
   emitBinaryOp funName x t "icmp ult" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinOp (BinOpLT, t@(LowTypeFloat _)) d1 d2) cont) =
+emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpLT, t@(LowTypeFloat _)) d1 d2) cont) =
   emitBinaryOp funName x t "fcmp olt" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinOp (BinOpLE, t@(LowTypeSignedInt _)) d1 d2) cont) =
+emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpLE, t@(LowTypeSignedInt _)) d1 d2) cont) =
   emitBinaryOp funName x t "icmp sle" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinOp (BinOpLE, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
+emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpLE, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
   emitBinaryOp funName x t "icmp ule" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinOp (BinOpLE, t@(LowTypeFloat _)) d1 d2) cont) =
+emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpLE, t@(LowTypeFloat _)) d1 d2) cont) =
   emitBinaryOp funName x t "fcmp ole" d1 d2 cont
 emitLLVM funName (LLVMLet x (LLVMPrint t d) cont) = do
   fmt <- newNameWith "fmt"

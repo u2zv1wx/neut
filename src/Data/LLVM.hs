@@ -32,7 +32,7 @@ data LLVM
   | LLVMAlloc Int
   | LLVMFree LLVMData
   | LLVMUnaryOp (UnaryOp, LowType) LLVMData
-  | LLVMBinOp (BinOp, LowType) LLVMData LLVMData
+  | LLVMBinaryOp (BinaryOp, LowType) LLVMData LLVMData
   | LLVMPrint LowType LLVMData
   | LLVMUnreachable -- for empty case analysis
   deriving (Show)

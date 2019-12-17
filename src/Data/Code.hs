@@ -26,7 +26,7 @@ data Code
 
 data Theta
   = ThetaUnaryOp UnaryOp LowType DataPlus
-  | ThetaBinOp BinOp LowType DataPlus DataPlus
+  | ThetaBinaryOp BinaryOp LowType DataPlus DataPlus
   | ThetaPrint DataPlus
   deriving (Show)
 
@@ -84,10 +84,10 @@ substTheta :: SubstDataPlus -> Theta -> Theta
 substTheta sub (ThetaUnaryOp a t v) = do
   let v' = substDataPlus sub v
   ThetaUnaryOp a t v'
-substTheta sub (ThetaBinOp a t v1 v2) = do
+substTheta sub (ThetaBinaryOp a t v1 v2) = do
   let v1' = substDataPlus sub v1
   let v2' = substDataPlus sub v2
-  ThetaBinOp a t v1' v2'
+  ThetaBinaryOp a t v1' v2'
 substTheta sub (ThetaPrint v) = ThetaPrint $ substDataPlus sub v
 
 substDataPlusPi ::
