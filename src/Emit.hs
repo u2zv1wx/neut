@@ -102,11 +102,11 @@ emitLLVM funName (LLVMLet x (LLVMGetElementPtr base (i, n)) cont) = do
   xs <- emitLLVM funName cont
   return $ op ++ xs
 emitLLVM funName (LLVMLet x (LLVMBitcast d fromType toType) cont) = do
-  emitCast funName x "bitcast" d fromType toType cont
+  emitConvOp funName x "bitcast" d fromType toType cont
 emitLLVM funName (LLVMLet x (LLVMIntToPointer d fromType toType) cont) = do
-  emitCast funName x "inttoptr" d fromType toType cont
+  emitConvOp funName x "inttoptr" d fromType toType cont
 emitLLVM funName (LLVMLet x (LLVMPointerToInt d fromType toType) cont) = do
-  emitCast funName x "ptrtoint" d fromType toType cont
+  emitConvOp funName x "ptrtoint" d fromType toType cont
 emitLLVM funName (LLVMLet x (LLVMLoad d) cont) = do
   op <-
     emitOp $
@@ -164,6 +164,30 @@ emitLLVM funName (LLVMLet _ (LLVMFree d) cont) = do
   return $ op ++ a
 emitLLVM funName (LLVMLet x (LLVMUnaryOp (UnaryOpNeg, t@(LowTypeFloat _)) d) cont) = do
   emitUnaryOp funName x t "fneg" d cont
+emitLLVM funName (LLVMLet x (LLVMUnaryOp ((UnaryOpTrunc t2@(LowTypeSignedInt i2)), t1@(LowTypeSignedInt i1)) d) cont)
+  | i1 > i2 = do emitConvOp funName x "trunc" d t1 t2 cont
+emitLLVM funName (LLVMLet x (LLVMUnaryOp ((UnaryOpTrunc t2@(LowTypeUnsignedInt i2)), t1@(LowTypeUnsignedInt i1)) d) cont)
+  | i1 > i2 = do emitConvOp funName x "trunc" d t1 t2 cont
+emitLLVM funName (LLVMLet x (LLVMUnaryOp ((UnaryOpTrunc t2@(LowTypeFloat i2)), t1@(LowTypeFloat i1)) d) cont)
+  | i1 > i2 = do emitConvOp funName x "fptrunc" d t1 t2 cont
+emitLLVM funName (LLVMLet x (LLVMUnaryOp ((UnaryOpZext t2@(LowTypeSignedInt i2)), t1@(LowTypeSignedInt i1)) d) cont)
+  | i1 < i2 = do emitConvOp funName x "zext" d t1 t2 cont
+emitLLVM funName (LLVMLet x (LLVMUnaryOp ((UnaryOpZext t2@(LowTypeUnsignedInt i2)), t1@(LowTypeUnsignedInt i1)) d) cont)
+  | i1 < i2 = do emitConvOp funName x "zext" d t1 t2 cont
+emitLLVM funName (LLVMLet x (LLVMUnaryOp ((UnaryOpSext t2@(LowTypeSignedInt i2)), t1@(LowTypeSignedInt i1)) d) cont)
+  | i1 < i2 = do emitConvOp funName x "sext" d t1 t2 cont
+emitLLVM funName (LLVMLet x (LLVMUnaryOp ((UnaryOpSext t2@(LowTypeUnsignedInt i2)), t1@(LowTypeUnsignedInt i1)) d) cont)
+  | i1 < i2 = do emitConvOp funName x "sext" d t1 t2 cont
+emitLLVM funName (LLVMLet x (LLVMUnaryOp ((UnaryOpFpExt t2@(LowTypeFloat i2)), t1@(LowTypeFloat i1)) d) cont)
+  | i1 < i2 = do emitConvOp funName x "fpext" d t1 t2 cont
+emitLLVM funName (LLVMLet x (LLVMUnaryOp ((UnaryOpTo t2@(LowTypeFloat _)), t1@(LowTypeSignedInt _)) d) cont) = do
+  emitConvOp funName x "sitofp" d t1 t2 cont
+emitLLVM funName (LLVMLet x (LLVMUnaryOp ((UnaryOpTo t2@(LowTypeFloat _)), t1@(LowTypeUnsignedInt _)) d) cont) = do
+  emitConvOp funName x "uitofp" d t1 t2 cont
+emitLLVM funName (LLVMLet x (LLVMUnaryOp ((UnaryOpTo t2@(LowTypeSignedInt _)), t1@(LowTypeFloat _)) d) cont) = do
+  emitConvOp funName x "fptosi" d t1 t2 cont
+emitLLVM funName (LLVMLet x (LLVMUnaryOp ((UnaryOpTo t2@(LowTypeUnsignedInt _)), t1@(LowTypeFloat _)) d) cont) = do
+  emitConvOp funName x "fptoui" d t1 t2 cont
 emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpAdd, t@(LowTypeSignedInt _)) d1 d2) cont) = do
   emitBinaryOp funName x t "add" d1 d2 cont
 emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpAdd, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
@@ -331,7 +355,7 @@ emitBinaryOp funName x t inst d1 d2 cont = do
   a <- emitLLVM funName cont
   return $ op ++ a
 
-emitCast ::
+emitConvOp ::
      Identifier
   -> Identifier
   -> String
@@ -340,7 +364,7 @@ emitCast ::
   -> LowType
   -> LLVM
   -> WithEnv [String]
-emitCast funName x cast d fromType toType cont = do
+emitConvOp funName x cast d fromType toType cont = do
   op <-
     emitOp $
     unwords
