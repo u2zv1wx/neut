@@ -77,12 +77,10 @@ llvmCodeSigmaElim basePointer ((x, i):xis) castedBasePointer n cont = do
     LLVMLet x (LLVMLoad (LLVMDataLocal loader)) cont'
 
 llvmCodeTheta :: CodeMeta -> Theta -> WithEnv LLVM
-llvmCodeTheta _ (ThetaUnaryOp op lowType v) =
-  case lowType of
-    LowTypeFloat _
-      | UnaryOpNeg <- op -> llvmCodeUnaryOp op lowType lowType v
-      | Just codType <- getCodType op -> llvmCodeUnaryOp op lowType codType v
-    _ -> throwError "llvmCodeTheta.ThetaUnaryOp"
+llvmCodeTheta _ (ThetaUnaryOp op lowType v)
+  | UnaryOpNeg <- op = llvmCodeUnaryOp op lowType lowType v
+  | Just codType <- getCodType op = llvmCodeUnaryOp op lowType codType v
+  | otherwise = throwError "llvmCodeTheta.ThetaUnaryOp"
 llvmCodeTheta _ (ThetaBinaryOp op lowType v1 v2)
   | isArithOp op = llvmCodeBinaryOp op lowType lowType v1 v2
   | isCompareOp op = llvmCodeBinaryOp op lowType (LowTypeSignedInt 1) v1 v2
