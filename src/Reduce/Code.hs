@@ -3,6 +3,7 @@ module Reduce.Code
   ) where
 
 import Control.Monad.State
+import Unsafe.Coerce -- for int -> word, word -> int
 
 import Data.Basic
 import Data.Code
@@ -11,21 +12,32 @@ import Data.Env
 reduceCodePlus :: CodePlus -> WithEnv CodePlus
 reduceCodePlus (m, CodeTheta theta) =
   case theta of
-    ThetaBinOp BinOpAdd t (m1, DataInt i1 _) (_, DataInt i2 _) ->
+    ThetaBinOp BinOpAdd t@(LowTypeSignedInt _) (m1, DataInt i1 _) (_, DataInt i2 _) ->
       return (m, CodeUpIntro (m1, DataInt (i1 + i2) t))
-    ThetaBinOp BinOpSub t (m1, DataInt i1 _) (_, DataInt i2 _) ->
+    ThetaBinOp BinOpSub t@(LowTypeSignedInt _) (m1, DataInt i1 _) (_, DataInt i2 _) ->
       return (m, CodeUpIntro (m1, DataInt (i1 - i2) t))
-    ThetaBinOp BinOpMul t (m1, DataInt i1 _) (_, DataInt i2 _) ->
+    ThetaBinOp BinOpMul t@(LowTypeSignedInt _) (m1, DataInt i1 _) (_, DataInt i2 _) ->
       return (m, CodeUpIntro (m1, DataInt (i1 * i2) t))
-    ThetaBinOp BinOpDiv t (m1, DataInt i1 _) (_, DataInt i2 _) ->
+    ThetaBinOp BinOpDiv t@(LowTypeSignedInt _) (m1, DataInt i1 _) (_, DataInt i2 _) ->
       return (m, CodeUpIntro (m1, DataInt (i1 `div` i2) t))
-    ThetaBinOp BinOpAdd t (m1, DataFloat i1 _) (_, DataFloat i2 _) ->
+    ThetaBinOp BinOpAdd t@(LowTypeUnsignedInt _) (m1, DataInt i1 _) (_, DataInt i2 _) ->
+      return (m, CodeUpIntro (m1, DataInt (i1 + i2) t))
+    ThetaBinOp BinOpSub t@(LowTypeUnsignedInt _) (m1, DataInt i1 _) (_, DataInt i2 _) ->
+      return (m, CodeUpIntro (m1, DataInt (i1 - i2) t))
+    ThetaBinOp BinOpMul t@(LowTypeUnsignedInt _) (m1, DataInt i1 _) (_, DataInt i2 _) ->
+      return (m, CodeUpIntro (m1, DataInt (i1 * i2) t))
+    ThetaBinOp BinOpDiv t@(LowTypeUnsignedInt _) (m1, DataInt i1 _) (_, DataInt i2 _) -> do
+      let i1' = unsafeCoerce i1 :: Word
+      let i2' = unsafeCoerce i2 :: Word
+      let i = i1' `div` i2'
+      return (m, CodeUpIntro (m1, DataInt (unsafeCoerce i) t))
+    ThetaBinOp BinOpAdd t@(LowTypeFloat _) (m1, DataFloat i1 _) (_, DataFloat i2 _) ->
       return (m, CodeUpIntro (m1, DataFloat (i1 + i2) t))
-    ThetaBinOp BinOpSub t (m1, DataFloat i1 _) (_, DataFloat i2 _) ->
+    ThetaBinOp BinOpSub t@(LowTypeFloat _) (m1, DataFloat i1 _) (_, DataFloat i2 _) ->
       return (m, CodeUpIntro (m1, DataFloat (i1 - i2) t))
-    ThetaBinOp BinOpMul t (m1, DataFloat i1 _) (_, DataFloat i2 _) ->
+    ThetaBinOp BinOpMul t@(LowTypeFloat _) (m1, DataFloat i1 _) (_, DataFloat i2 _) ->
       return (m, CodeUpIntro (m1, DataFloat (i1 * i2) t))
-    ThetaBinOp BinOpDiv t (m1, DataFloat i1 _) (_, DataFloat i2 _) ->
+    ThetaBinOp BinOpDiv t@(LowTypeFloat _) (m1, DataFloat i1 _) (_, DataFloat i2 _) ->
       return (m, CodeUpIntro (m1, DataFloat (i1 / i2) t))
     ThetaPrint (_, DataInt i _) -> do
       liftIO $ putStr $ show i
