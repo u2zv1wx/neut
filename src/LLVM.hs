@@ -112,6 +112,7 @@ llvmCodeBinaryOp op domType codType v1 v2 = do
   (cast1then >=> cast2then) $
     LLVMLet result (LLVMBinaryOp (op, domType) x1 x2) uncast
 
+-- cast: voidPtr -> {some-concrete-type}
 llvmCast :: DataPlus -> LowType -> WithEnv (LLVMData, LLVM -> WithEnv LLVM)
 llvmCast v lowType@(LowTypeSignedInt _) = llvmCastInt v lowType
 llvmCast v lowType@(LowTypeUnsignedInt _) = llvmCastInt v lowType
@@ -142,6 +143,7 @@ llvmCastFloat v size = do
           LLVMLet y (LLVMPointerToInt (LLVMDataLocal x) voidPtr intType) $
           LLVMLet z (LLVMBitcast (LLVMDataLocal y) intType floatType) cont)
 
+-- uncast: {some-concrete-type} -> voidPtr
 llvmUncast :: Identifier -> LowType -> WithEnv LLVM
 llvmUncast result lowType@(LowTypeSignedInt _) =
   return $ llvmUncastInt result lowType
