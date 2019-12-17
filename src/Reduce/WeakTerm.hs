@@ -2,6 +2,7 @@ module Reduce.WeakTerm
   ( reduceWeakTermPlus
   ) where
 
+import Data.Bits
 import Data.Fixed (mod')
 import Unsafe.Coerce -- for int -> word, word -> int
 
@@ -52,6 +53,9 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
           BinaryOpMul -> return (m, WeakTermInt (x * y))
           BinaryOpDiv -> return (m, WeakTermInt (x `div` y))
           BinaryOpRem -> return (m, WeakTermInt (x `rem` y))
+          BinaryOpShl -> return (m, WeakTermInt (shiftL x y))
+          BinaryOpLshr -> return (m, WeakTermInt (ushiftR x y))
+          BinaryOpAshr -> return (m, WeakTermInt (shiftR x y))
           _ -> return (m, WeakTermPiElim e' es')
     (_, WeakTermTheta constant)
       | [(_, WeakTermInt x), (_, WeakTermInt y)] <- es'
@@ -73,6 +77,9 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
             let y' = unsafeCoerce y :: Word
             let z = x' `rem` y'
             return (m, WeakTermInt (unsafeCoerce z))
+          BinaryOpShl -> return (m, WeakTermInt (shiftL x y))
+          BinaryOpLshr -> return (m, WeakTermInt (ushiftR x y))
+          BinaryOpAshr -> return (m, WeakTermInt (shiftR x y))
           _ -> return (m, WeakTermPiElim e' es')
     (_, WeakTermTheta constant)
       | [(_, WeakTermFloat x), (_, WeakTermFloat y)] <- es'

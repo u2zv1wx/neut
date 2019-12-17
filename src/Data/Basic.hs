@@ -1,5 +1,7 @@
 module Data.Basic where
 
+import Data.Bits
+
 type Identifier = String
 
 type Loc = (Int, Int)
@@ -37,10 +39,22 @@ data BinaryOp
   | BinaryOpGE
   | BinaryOpLT
   | BinaryOpLE
+  | BinaryOpShl
+  | BinaryOpLshr
+  | BinaryOpAshr
   deriving (Eq, Show)
 
 arithOpList :: [BinaryOp]
-arithOpList = [BinaryOpAdd, BinaryOpSub, BinaryOpMul, BinaryOpDiv, BinaryOpRem]
+arithOpList =
+  [ BinaryOpAdd
+  , BinaryOpSub
+  , BinaryOpMul
+  , BinaryOpDiv
+  , BinaryOpRem
+  , BinaryOpShl
+  , BinaryOpLshr
+  , BinaryOpAshr
+  ]
 
 compareOpList :: [BinaryOp]
 compareOpList =
@@ -85,6 +99,9 @@ asBinaryOpMaybe "gt" = Just BinaryOpGT
 asBinaryOpMaybe "ge" = Just BinaryOpGE
 asBinaryOpMaybe "lt" = Just BinaryOpLT
 asBinaryOpMaybe "le" = Just BinaryOpLE
+asBinaryOpMaybe "shl" = Just BinaryOpShl
+asBinaryOpMaybe "lshr" = Just BinaryOpLshr
+asBinaryOpMaybe "ashr" = Just BinaryOpAshr
 asBinaryOpMaybe _ = Nothing
 
 wordsBy :: Char -> String -> [String]
@@ -94,3 +111,6 @@ wordsBy c s =
     s' -> do
       let (w, s'') = break (== c) s'
       w : wordsBy c s''
+
+ushiftR :: Int -> Int -> Int
+ushiftR n k = fromIntegral (fromIntegral n `shiftR` k :: Word)

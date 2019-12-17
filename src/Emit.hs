@@ -230,6 +230,18 @@ emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpLE, t@(LowTypeUnsignedInt _))
   emitBinaryOp funName x t "icmp ule" d1 d2 cont
 emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpLE, t@(LowTypeFloat _)) d1 d2) cont) =
   emitBinaryOp funName x t "fcmp ole" d1 d2 cont
+emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpShl, t@(LowTypeSignedInt _)) d1 d2) cont) = do
+  emitBinaryOp funName x t "shl" d1 d2 cont
+emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpShl, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
+  emitBinaryOp funName x t "shl" d1 d2 cont
+emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpLshr, t@(LowTypeSignedInt _)) d1 d2) cont) = do
+  emitBinaryOp funName x t "lshr" d1 d2 cont
+emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpLshr, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
+  emitBinaryOp funName x t "lshr" d1 d2 cont
+emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpAshr, t@(LowTypeSignedInt _)) d1 d2) cont) = do
+  emitBinaryOp funName x t "ashr" d1 d2 cont
+emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpAshr, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
+  emitBinaryOp funName x t "ashr" d1 d2 cont
 emitLLVM funName (LLVMLet x (LLVMPrint t d) cont) = do
   fmt <- newNameWith "fmt"
   op1 <-

@@ -2,6 +2,7 @@ module Reduce.Term
   ( reduceTermPlus
   ) where
 
+import Data.Bits
 import Data.Fixed (mod')
 import Unsafe.Coerce -- for int -> word, word -> int
 
@@ -52,6 +53,9 @@ reduceTermPlus (m, TermPiElim e es) = do
           BinaryOpMul -> return (m, TermInt (x * y) t)
           BinaryOpDiv -> return (m, TermInt (x `div` y) t)
           BinaryOpRem -> return (m, TermInt (x `rem` y) t)
+          BinaryOpShl -> return (m, TermInt (shiftL x y) t)
+          BinaryOpLshr -> return (m, TermInt (ushiftR x y) t)
+          BinaryOpAshr -> return (m, TermInt (shiftR x y) t)
           _ -> return (m, TermPiElim e' es')
     (_, TermTheta constant)
       | [(_, TermInt x _), (_, TermInt y _)] <- es'
@@ -73,6 +77,9 @@ reduceTermPlus (m, TermPiElim e es) = do
             let y' = unsafeCoerce y :: Word
             let z = x' `rem` y'
             return (m, TermInt (unsafeCoerce z) t)
+          BinaryOpShl -> return (m, TermInt (shiftL x y) t)
+          BinaryOpLshr -> return (m, TermInt (ushiftR x y) t)
+          BinaryOpAshr -> return (m, TermInt (shiftR x y) t)
           _ -> return (m, TermPiElim e' es')
     (_, TermTheta constant)
       | [(_, TermFloat x _), (_, TermFloat y _)] <- es'
