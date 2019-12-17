@@ -150,17 +150,17 @@ isReducible (_, WeakTermPiElim (_, WeakTermTheta c) [(_, WeakTermInt _), (_, Wea
   | [typeStr, opStr] <- wordsBy '.' c
   , Just (LowTypeSignedInt _) <- asLowTypeMaybe typeStr
   , Just arith <- asBinaryOpMaybe' opStr
-  , arith `elem` arithOpList = True
+  , isArithOp arith = True
 isReducible (_, WeakTermPiElim (_, WeakTermTheta c) [(_, WeakTermInt _), (_, WeakTermInt _)])
   | [typeStr, opStr] <- wordsBy '.' c
   , Just (LowTypeUnsignedInt _) <- asLowTypeMaybe typeStr
   , Just arith <- asBinaryOpMaybe' opStr
-  , arith `elem` arithOpList = True
+  , isArithOp arith = True
 isReducible (_, WeakTermPiElim (_, WeakTermTheta c) [(_, WeakTermFloat _), (_, WeakTermFloat _)])
   | [typeStr, opStr] <- wordsBy '.' c
   , Just (LowTypeFloat _) <- asLowTypeMaybe typeStr
   , Just arith <- asBinaryOpMaybe' opStr
-  , arith `elem` arithOpList = True
+  , isArithOp arith = True
 isReducible (_, WeakTermPiElim e es) = isReducible e || any isReducible es
 isReducible (_, WeakTermMu _ _) = False
 isReducible (_, WeakTermZeta _) = False

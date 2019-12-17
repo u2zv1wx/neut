@@ -32,6 +32,14 @@ data UnaryOp
   | UnaryOpTo LowType -- fp-to-ui, fp-to-si, ui-to-fp, si-to-fp (f32.to.i32, i32.to.f64, etc.)
   deriving (Eq, Show)
 
+getCodType :: UnaryOp -> Maybe LowType
+getCodType (UnaryOpTrunc lowType) = Just lowType
+getCodType (UnaryOpZext lowType) = Just lowType
+getCodType (UnaryOpSext lowType) = Just lowType
+getCodType (UnaryOpFpExt lowType) = Just lowType
+getCodType (UnaryOpTo lowType) = Just lowType
+getCodType _ = Nothing
+
 data BinaryOp
   = BinaryOpAdd
   | BinaryOpSub
@@ -52,24 +60,28 @@ data BinaryOp
   | BinaryOpXor
   deriving (Eq, Show)
 
-arithOpList :: [BinaryOp]
-arithOpList =
-  [ BinaryOpAdd
-  , BinaryOpSub
-  , BinaryOpMul
-  , BinaryOpDiv
-  , BinaryOpRem
-  , BinaryOpShl
-  , BinaryOpLshr
-  , BinaryOpAshr
-  , BinaryOpAnd
-  , BinaryOpOr
-  , BinaryOpXor
-  ]
+isArithOp :: BinaryOp -> Bool
+isArithOp BinaryOpAdd = True
+isArithOp BinaryOpSub = True
+isArithOp BinaryOpMul = True
+isArithOp BinaryOpDiv = True
+isArithOp BinaryOpRem = True
+isArithOp BinaryOpShl = True
+isArithOp BinaryOpLshr = True
+isArithOp BinaryOpAshr = True
+isArithOp BinaryOpAnd = True
+isArithOp BinaryOpOr = True
+isArithOp BinaryOpXor = True
+isArithOp _ = False
 
-compareOpList :: [BinaryOp]
-compareOpList =
-  [BinaryOpEQ, BinaryOpNE, BinaryOpGT, BinaryOpGE, BinaryOpLT, BinaryOpLE]
+isCompareOp :: BinaryOp -> Bool
+isCompareOp BinaryOpEQ = True
+isCompareOp BinaryOpNE = True
+isCompareOp BinaryOpGT = True
+isCompareOp BinaryOpGE = True
+isCompareOp BinaryOpLT = True
+isCompareOp BinaryOpLE = True
+isCompareOp _ = False
 
 showItems :: (a -> String) -> [a] -> String
 showItems _ [] = ""
