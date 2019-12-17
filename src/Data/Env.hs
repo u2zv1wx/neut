@@ -222,6 +222,8 @@ discernData z (ml, DataSigmaIntro ds) = do
   return (concat vss, (ml, DataSigmaIntro ds'))
 discernData _ d = return ([], d)
 
+-- FIXME: これのEpsilonElimのところの取り扱いがおかしい気がする。
+-- freeすべきかどうかはbranchによって変わるはず。
 discernCode :: Identifier -> CodePlus -> WithEnv ([Identifier], CodePlus)
 discernCode z (ml, CodeTheta theta) = do
   (vs, theta') <- discernTheta z theta

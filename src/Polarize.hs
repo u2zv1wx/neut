@@ -146,6 +146,8 @@ callClosure m e es = do
       ((clsVarName, e) : concat xess)
       ( ml
       , CodeSigmaElim
+          -- FIXME: typeを(aff, rel)のペアに変換することにしたので、ここの
+          -- typeVarNameも明示的にfreeする必要がある
           [typeVarName, envVarName, lamVarName]
           clsVar
           (ml, CodePiElimDownElim lamVar (envVar : xs)))
@@ -515,38 +517,19 @@ toRelevantApp ml x e = do
             (ml, CodePiElimDownElim relVar [toDataUpsilon (x, fst e)])))
 
 polarizeTheta :: Meta -> Identifier -> WithEnv CodePlus
-polarizeTheta m name@"core.i8.add" = polarizeArith name ArithAdd (int 8) m
-polarizeTheta m name@"core.i16.add" = polarizeArith name ArithAdd (int 16) m
-polarizeTheta m name@"core.i32.add" = polarizeArith name ArithAdd (int 32) m
-polarizeTheta m name@"core.i64.add" = polarizeArith name ArithAdd (int 64) m
-polarizeTheta m name@"core.i8.sub" = polarizeArith name ArithSub (int 8) m
-polarizeTheta m name@"core.i16.sub" = polarizeArith name ArithSub (int 16) m
-polarizeTheta m name@"core.i32.sub" = polarizeArith name ArithSub (int 32) m
-polarizeTheta m name@"core.i64.sub" = polarizeArith name ArithSub (int 64) m
-polarizeTheta m name@"core.i8.mul" = polarizeArith name ArithMul (int 8) m
-polarizeTheta m name@"core.i16.mul" = polarizeArith name ArithMul (int 16) m
-polarizeTheta m name@"core.i32.mul" = polarizeArith name ArithMul (int 32) m
-polarizeTheta m name@"core.i64.mul" = polarizeArith name ArithMul (int 64) m
-polarizeTheta m name@"core.i8.div" = polarizeArith name ArithDiv (int 8) m
-polarizeTheta m name@"core.i16.div" = polarizeArith name ArithDiv (int 16) m
-polarizeTheta m name@"core.i32.div" = polarizeArith name ArithDiv (int 32) m
-polarizeTheta m name@"core.i64.div" = polarizeArith name ArithDiv (int 64) m
-polarizeTheta m name@"core.f32.add" = polarizeArith name ArithAdd (float 32) m
-polarizeTheta m name@"core.f64.add" = polarizeArith name ArithAdd (float 64) m
-polarizeTheta m name@"core.f32.sub" = polarizeArith name ArithSub (float 32) m
-polarizeTheta m name@"core.f64.sub" = polarizeArith name ArithSub (float 64) m
-polarizeTheta m name@"core.f32.mul" = polarizeArith name ArithMul (float 32) m
-polarizeTheta m name@"core.f64.mul" = polarizeArith name ArithMul (float 64) m
-polarizeTheta m name@"core.f32.div" = polarizeArith name ArithDiv (float 32) m
-polarizeTheta m name@"core.f64.div" = polarizeArith name ArithDiv (float 64) m
+polarizeTheta m name
+  | [typeStr, opStr] <- wordsBy '.' name -- for arithmetic operations e.g. name == "i8.add"
+  , Just lowType <- asLowTypeMaybe typeStr
+  , Just arith <- asArithMaybe opStr = polarizeArith name arith lowType m
 polarizeTheta m name@"core.print.i64" = polarizePrint name m
 polarizeTheta _ _ = throwError "polarize.theta"
 
-int :: Int -> LowType
-int = LowTypeSignedInt
-
-float :: Int -> LowType
-float = LowTypeFloat
+asArithMaybe :: Identifier -> Maybe Arith
+asArithMaybe "add" = Just ArithAdd
+asArithMaybe "sub" = Just ArithSub
+asArithMaybe "mul" = Just ArithMul
+asArithMaybe "div" = Just ArithDiv
+asArithMaybe _ = Nothing
 
 polarizeArith :: Identifier -> Arith -> LowType -> Meta -> WithEnv CodePlus
 polarizeArith name op lowType m = do

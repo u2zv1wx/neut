@@ -129,3 +129,12 @@ asLowTypeMaybe ('u':cs)
 asLowTypeMaybe ('f':cs)
   | Just n <- read cs = Just $ LowTypeFloat n
 asLowTypeMaybe _ = Nothing
+
+-- https://stackoverflow.com/questions/4978578/how-to-split-a-string-in-haskell
+wordsBy :: Char -> String -> [String]
+wordsBy c s =
+  case dropWhile (== c) s of
+    "" -> []
+    s' -> do
+      let (w, s'') = break (== c) s'
+      w : wordsBy c s''
