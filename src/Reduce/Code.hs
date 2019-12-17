@@ -54,6 +54,9 @@ reduceCodePlus (m, CodeTheta theta) =
         BinaryOpShl -> upIntroData m (m1, DataInt (shiftL x y) t)
         BinaryOpLshr -> upIntroData m (m1, DataInt (ushiftR x y) t)
         BinaryOpAshr -> upIntroData m (m1, DataInt (shiftR x y) t)
+        BinaryOpAnd -> upIntroData m (m1, DataInt (x .&. y) t)
+        BinaryOpOr -> upIntroData m (m1, DataInt (x .|. y) t)
+        BinaryOpXor -> upIntroData m (m1, DataInt (x `xor` y) t)
     ThetaBinaryOp op t@(LowTypeUnsignedInt _) (m1, DataInt x _) (_, DataInt y _) -> do
       let x' = unsafeCoerce x :: Word
       let y' = unsafeCoerce y :: Word
@@ -74,6 +77,9 @@ reduceCodePlus (m, CodeTheta theta) =
         BinaryOpShl -> upIntroData m (m1, DataInt (shiftL x y) t)
         BinaryOpLshr -> upIntroData m (m1, DataInt (ushiftR x y) t)
         BinaryOpAshr -> upIntroData m (m1, DataInt (shiftR x y) t)
+        BinaryOpAnd -> upIntroData m (m1, DataInt (x .&. y) t)
+        BinaryOpOr -> upIntroData m (m1, DataInt (x .|. y) t)
+        BinaryOpXor -> upIntroData m (m1, DataInt (x `xor` y) t)
     ThetaBinaryOp op t@(LowTypeFloat _) (m1, DataFloat x _) (_, DataFloat y _) -> do
       case op of
         BinaryOpAdd -> upIntroData m (m1, DataFloat (x + y) t)

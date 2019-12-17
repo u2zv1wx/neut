@@ -242,6 +242,18 @@ emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpAshr, t@(LowTypeSignedInt _))
   emitBinaryOp funName x t "ashr" d1 d2 cont
 emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpAshr, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
   emitBinaryOp funName x t "ashr" d1 d2 cont
+emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpAnd, t@(LowTypeSignedInt _)) d1 d2) cont) = do
+  emitBinaryOp funName x t "and" d1 d2 cont
+emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpAnd, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
+  emitBinaryOp funName x t "and" d1 d2 cont
+emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpOr, t@(LowTypeSignedInt _)) d1 d2) cont) = do
+  emitBinaryOp funName x t "or" d1 d2 cont
+emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpOr, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
+  emitBinaryOp funName x t "or" d1 d2 cont
+emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpXor, t@(LowTypeSignedInt _)) d1 d2) cont) = do
+  emitBinaryOp funName x t "xor" d1 d2 cont
+emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpXor, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
+  emitBinaryOp funName x t "xor" d1 d2 cont
 emitLLVM funName (LLVMLet x (LLVMPrint t d) cont) = do
   fmt <- newNameWith "fmt"
   op1 <-

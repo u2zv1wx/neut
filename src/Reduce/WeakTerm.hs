@@ -61,6 +61,9 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
           BinaryOpShl -> return (m, WeakTermInt (shiftL x y))
           BinaryOpLshr -> return (m, WeakTermInt (ushiftR x y))
           BinaryOpAshr -> return (m, WeakTermInt (shiftR x y))
+          BinaryOpAnd -> return (m, WeakTermInt (x .&. y))
+          BinaryOpOr -> return (m, WeakTermInt (x .|. y))
+          BinaryOpXor -> return (m, WeakTermInt (x `xor` y))
     (_, WeakTermTheta constant)
       | [(_, WeakTermInt x), (_, WeakTermInt y)] <- es'
       , [typeStr, opStr] <- wordsBy '.' constant
@@ -83,6 +86,9 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
           BinaryOpShl -> return (m, WeakTermInt (shiftL x y))
           BinaryOpLshr -> return (m, WeakTermInt (ushiftR x y))
           BinaryOpAshr -> return (m, WeakTermInt (shiftR x y))
+          BinaryOpAnd -> return (m, WeakTermInt (x .&. y))
+          BinaryOpOr -> return (m, WeakTermInt (x .|. y))
+          BinaryOpXor -> return (m, WeakTermInt (x `xor` y))
     (_, WeakTermTheta constant)
       | [(_, WeakTermFloat x), (_, WeakTermFloat y)] <- es'
       , [typeStr, opStr] <- wordsBy '.' constant

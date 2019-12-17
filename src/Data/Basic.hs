@@ -42,6 +42,9 @@ data BinaryOp
   | BinaryOpShl
   | BinaryOpLshr
   | BinaryOpAshr
+  | BinaryOpAnd
+  | BinaryOpOr
+  | BinaryOpXor
   deriving (Eq, Show)
 
 arithOpList :: [BinaryOp]
@@ -54,6 +57,9 @@ arithOpList =
   , BinaryOpShl
   , BinaryOpLshr
   , BinaryOpAshr
+  , BinaryOpAnd
+  , BinaryOpOr
+  , BinaryOpXor
   ]
 
 compareOpList :: [BinaryOp]
@@ -102,6 +108,9 @@ asBinaryOpMaybe "le" = Just BinaryOpLE
 asBinaryOpMaybe "shl" = Just BinaryOpShl
 asBinaryOpMaybe "lshr" = Just BinaryOpLshr
 asBinaryOpMaybe "ashr" = Just BinaryOpAshr
+asBinaryOpMaybe "and" = Just BinaryOpAnd
+asBinaryOpMaybe "or" = Just BinaryOpOr
+asBinaryOpMaybe "xor" = Just BinaryOpXor
 asBinaryOpMaybe _ = Nothing
 
 wordsBy :: Char -> String -> [String]

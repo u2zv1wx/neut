@@ -61,6 +61,9 @@ reduceTermPlus (m, TermPiElim e es) = do
           BinaryOpShl -> return (m, TermInt (shiftL x y) t)
           BinaryOpLshr -> return (m, TermInt (ushiftR x y) t)
           BinaryOpAshr -> return (m, TermInt (shiftR x y) t)
+          BinaryOpAnd -> return (m, TermInt (x .&. y) t)
+          BinaryOpOr -> return (m, TermInt (x .|. y) t)
+          BinaryOpXor -> return (m, TermInt (x `xor` y) t)
     (_, TermTheta constant)
       | [(_, TermInt x _), (_, TermInt y _)] <- es'
       , [typeStr, opStr] <- wordsBy '.' constant
@@ -83,6 +86,9 @@ reduceTermPlus (m, TermPiElim e es) = do
           BinaryOpShl -> return (m, TermInt (shiftL x y) t)
           BinaryOpLshr -> return (m, TermInt (ushiftR x y) t)
           BinaryOpAshr -> return (m, TermInt (shiftR x y) t)
+          BinaryOpAnd -> return (m, TermInt (x .&. y) t)
+          BinaryOpOr -> return (m, TermInt (x .|. y) t)
+          BinaryOpXor -> return (m, TermInt (x `xor` y) t)
     (_, TermTheta constant)
       | [(_, TermFloat x _), (_, TermFloat y _)] <- es'
       , [typeStr, opStr] <- wordsBy '.' constant
