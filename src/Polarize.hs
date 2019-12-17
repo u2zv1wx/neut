@@ -520,32 +520,25 @@ polarizeTheta :: Meta -> Identifier -> WithEnv CodePlus
 polarizeTheta m name
   | [typeStr, opStr] <- wordsBy '.' name -- for arithmetic operations e.g. name == "i8.add"
   , Just lowType <- asLowTypeMaybe typeStr
-  , Just arith <- asArithMaybe opStr = polarizeArith name arith lowType m
-polarizeTheta m name
-  | [typeStr, opStr] <- wordsBy '.' name -- for comparing operations e.g. name == "i8.eq"
-  , Just lowType <- asLowTypeMaybe typeStr
-  , Just cmp <- asCompareMaybe opStr = polarizeCompare name cmp lowType m
+  , Just arith <- asBinOpMaybe opStr = polarizeBinOp name arith lowType m
 polarizeTheta m name@"core.print.i64" = polarizePrint name m
 polarizeTheta _ _ = throwError "polarize.theta"
 
-asArithMaybe :: Identifier -> Maybe Arith
-asArithMaybe "add" = Just ArithAdd
-asArithMaybe "sub" = Just ArithSub
-asArithMaybe "mul" = Just ArithMul
-asArithMaybe "div" = Just ArithDiv
-asArithMaybe _ = Nothing
+asBinOpMaybe :: Identifier -> Maybe BinOp
+asBinOpMaybe "add" = Just BinOpAdd
+asBinOpMaybe "sub" = Just BinOpSub
+asBinOpMaybe "mul" = Just BinOpMul
+asBinOpMaybe "div" = Just BinOpDiv
+asBinOpMaybe "eq" = Just BinOpEQ
+asBinOpMaybe "ne" = Just BinOpNE
+asBinOpMaybe "gt" = Just BinOpGT
+asBinOpMaybe "ge" = Just BinOpGE
+asBinOpMaybe "lt" = Just BinOpLT
+asBinOpMaybe "le" = Just BinOpLE
+asBinOpMaybe _ = Nothing
 
-asCompareMaybe :: Identifier -> Maybe Compare
-asCompareMaybe "eq" = Just CompareEQ
-asCompareMaybe "ne" = Just CompareNE
-asCompareMaybe "gt" = Just CompareGT
-asCompareMaybe "ge" = Just CompareGE
-asCompareMaybe "lt" = Just CompareLT
-asCompareMaybe "le" = Just CompareLE
-asCompareMaybe _ = Nothing
-
-polarizeArith :: Identifier -> Arith -> LowType -> Meta -> WithEnv CodePlus
-polarizeArith name op lowType m = do
+polarizeBinOp :: Identifier -> BinOp -> LowType -> Meta -> WithEnv CodePlus
+polarizeBinOp name op lowType m = do
   let ml = snd $ obtainInfoMeta m
   (x, varX) <- newDataUpsilon
   (y, varY) <- newDataUpsilon
@@ -556,20 +549,7 @@ polarizeArith name op lowType m = do
     []
     m
     [(x, immediateType), (y, immediateType)]
-    (ml, CodeTheta (ThetaArith op lowType varX varY))
-
-polarizeCompare :: Identifier -> Compare -> LowType -> Meta -> WithEnv CodePlus
-polarizeCompare name cmp lowType m = do
-  let ml = snd $ obtainInfoMeta m
-  (x, varX) <- newDataUpsilon
-  (y, varY) <- newDataUpsilon
-  let immediateType = (MetaTerminal ml, TermEpsilon "top")
-  makeClosure
-    (Just name)
-    []
-    m
-    [(x, immediateType), (y, immediateType)]
-    (ml, CodeTheta (ThetaCompare cmp lowType varX varY))
+    (ml, CodeTheta (ThetaBinOp op lowType varX varY))
 
 polarizePrint :: Identifier -> Meta -> WithEnv CodePlus
 polarizePrint name m = do

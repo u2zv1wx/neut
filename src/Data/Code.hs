@@ -25,8 +25,7 @@ data Code
   deriving (Show)
 
 data Theta
-  = ThetaArith Arith LowType DataPlus DataPlus
-  | ThetaCompare Compare LowType DataPlus DataPlus
+  = ThetaBinOp BinOp LowType DataPlus DataPlus
   | ThetaPrint DataPlus
   deriving (Show)
 
@@ -81,14 +80,10 @@ substCodePlus sub (m, CodeUpElim x e1 e2) = do
   (m, CodeUpElim x e1' e2')
 
 substTheta :: SubstDataPlus -> Theta -> Theta
-substTheta sub (ThetaArith a t v1 v2) = do
+substTheta sub (ThetaBinOp a t v1 v2) = do
   let v1' = substDataPlus sub v1
   let v2' = substDataPlus sub v2
-  ThetaArith a t v1' v2'
-substTheta sub (ThetaCompare a t v1 v2) = do
-  let v1' = substDataPlus sub v1
-  let v2' = substDataPlus sub v2
-  ThetaCompare a t v1' v2'
+  ThetaBinOp a t v1' v2'
 substTheta sub (ThetaPrint v) = ThetaPrint $ substDataPlus sub v
 
 substDataPlusPi ::

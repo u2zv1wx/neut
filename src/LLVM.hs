@@ -77,35 +77,21 @@ llvmCodeSigmaElim basePointer ((x, i):xis) castedBasePointer n cont = do
     LLVMLet x (LLVMLoad (LLVMDataLocal loader)) cont'
 
 llvmCodeTheta :: CodeMeta -> Theta -> WithEnv LLVM
-llvmCodeTheta _ (ThetaArith op lowType v1 v2) =
+llvmCodeTheta _ (ThetaBinOp op lowType v1 v2) =
   case lowType of
-    LowTypeSignedInt _ -> do
-      (x1, cast1then) <- llvmCastToInt v1 lowType
-      (x2, cast2then) <- llvmCastToInt v2 lowType
-      result <- newNameWith "result"
-      (cast1then >=> cast2then) $
-        LLVMLet result (LLVMArith (op, lowType) x1 x2) $
-        LLVMIntToPointer (LLVMDataLocal result) lowType voidPtr
-    LowTypeFloat i -> do
-      (x1, cast1then) <- llvmCastToFloat v1 lowType i
-      (x2, cast2then) <- llvmCastToFloat v2 lowType i
-      tmp <- newNameWith "arith"
-      result <- newNameWith "result"
-      y <- newNameWith "uny"
-      let si = LowTypeSignedInt i
-      (cast1then >=> cast2then) $
-        LLVMLet tmp (LLVMArith (op, lowType) x1 x2) $
-        -- cast the result from float to i8*
-        LLVMLet y (LLVMBitcast (LLVMDataLocal tmp) (LowTypeFloat i) si) $
-        LLVMLet result (LLVMIntToPointer (LLVMDataLocal y) si voidPtr) $
-        LLVMReturn $ LLVMDataLocal result
-    _ -> throwError "llvmCodeTheta.ThetaArith"
-llvmCodeTheta _ (ThetaCompare op lowType v1 v2) =
-  case lowType of
-    LowTypeSignedInt _ -> llvmCodeThetaCompareInt op lowType v1 v2
-    LowTypeUnsignedInt _ -> llvmCodeThetaCompareInt op lowType v1 v2
-    LowTypeFloat i -> llvmCodeThetaCompareFloat op i v1 v2
-    _ -> throwError "llvmCodeTheta.ThetaCompare"
+    LowTypeSignedInt _
+      | op `elem` arithOpList -> llvmCodeArithInt op lowType v1 v2
+    LowTypeUnsignedInt _
+      | op `elem` arithOpList -> llvmCodeArithInt op lowType v1 v2
+    LowTypeFloat i
+      | op `elem` arithOpList -> llvmCodeArithFloat op i v1 v2
+    LowTypeSignedInt _
+      | op `elem` compareOpList -> llvmCodeCompareInt op lowType v1 v2
+    LowTypeUnsignedInt _
+      | op `elem` compareOpList -> llvmCodeCompareInt op lowType v1 v2
+    LowTypeFloat i
+      | op `elem` compareOpList -> llvmCodeCompareFloat op i v1 v2
+    _ -> throwError "llvmCodeTheta.ThetaBinOp"
 llvmCodeTheta _ (ThetaPrint v) = do
   let t = LowTypeSignedInt 64
   p <- newNameWith "arg"
@@ -114,15 +100,49 @@ llvmCodeTheta _ (ThetaPrint v) = do
     LLVMLet c (LLVMPointerToInt (LLVMDataLocal p) voidPtr t) $
     LLVMPrint t (LLVMDataLocal c)
 
-llvmCodeThetaCompareInt ::
-     Compare -> LowType -> DataPlus -> DataPlus -> WithEnv LLVM
-llvmCodeThetaCompareInt op lowType v1 v2 = do
+llvmCodeArithInt :: BinOp -> LowType -> DataPlus -> DataPlus -> WithEnv LLVM
+llvmCodeArithInt op lowType v1 v2 = do
+  (x1, cast1then) <- llvmCastToInt v1 lowType
+  (x2, cast2then) <- llvmCastToInt v2 lowType
+  result <- newNameWith "result"
+  (cast1then >=> cast2then) $
+    LLVMLet result (LLVMBinOp (op, lowType) x1 x2) $
+    LLVMIntToPointer (LLVMDataLocal result) lowType voidPtr
+
+llvmCodeArithFloat :: BinOp -> Int -> DataPlus -> DataPlus -> WithEnv LLVM
+llvmCodeArithFloat op i v1 v2 = do
+  let lowType = LowTypeFloat i
+  (x1, cast1then) <- llvmCastToFloat v1 lowType i
+  (x2, cast2then) <- llvmCastToFloat v2 lowType i
+  tmp <- newNameWith "arith"
+  result <- newNameWith "result"
+  y <- newNameWith "uny"
+  let si = LowTypeSignedInt i
+  (cast1then >=> cast2then) $
+    LLVMLet tmp (LLVMBinOp (op, lowType) x1 x2) $
+        -- cast the result from float to i8*
+    LLVMLet y (LLVMBitcast (LLVMDataLocal tmp) (LowTypeFloat i) si) $
+    LLVMLet result (LLVMIntToPointer (LLVMDataLocal y) si voidPtr) $
+    LLVMReturn $ LLVMDataLocal result
+
+llvmCodeCompareInt :: BinOp -> LowType -> DataPlus -> DataPlus -> WithEnv LLVM
+llvmCodeCompareInt op lowType v1 v2 = do
   let boolType = LowTypeSignedInt 1
   (x1, cast1then) <- llvmCastToInt v1 lowType
   (x2, cast2then) <- llvmCastToInt v2 lowType
   result <- newNameWith "result"
   (cast1then >=> cast2then) $
-    LLVMLet result (LLVMCompare (op, lowType) x1 x2) $
+    LLVMLet result (LLVMBinOp (op, lowType) x1 x2) $
+    LLVMIntToPointer (LLVMDataLocal result) boolType voidPtr
+
+llvmCodeCompareFloat :: BinOp -> Int -> DataPlus -> DataPlus -> WithEnv LLVM
+llvmCodeCompareFloat op i v1 v2 = do
+  (x1, cast1then) <- llvmCastToFloat v1 (LowTypeFloat i) i
+  (x2, cast2then) <- llvmCastToFloat v2 (LowTypeFloat i) i
+  result <- newNameWith "result"
+  let boolType = LowTypeSignedInt 1
+  (cast1then >=> cast2then) $
+    LLVMLet result (LLVMBinOp (op, LowTypeFloat i) x1 x2) $
     LLVMIntToPointer (LLVMDataLocal result) boolType voidPtr
 
 llvmCastToInt :: DataPlus -> LowType -> WithEnv (LLVMData, LLVM -> WithEnv LLVM)
@@ -135,7 +155,6 @@ llvmCastToInt v lowType = do
         llvmDataLet x v $
           LLVMLet y (LLVMPointerToInt (LLVMDataLocal x) voidPtr lowType) $ cont)
 
--- castToFloatのほうがわかりやすいか。
 llvmCastToFloat ::
      DataPlus -> LowType -> Int -> WithEnv (LLVMData, LLVM -> WithEnv LLVM)
 llvmCastToFloat v lowType size = do
@@ -149,17 +168,6 @@ llvmCastToFloat v lowType size = do
         llvmDataLet x v $
           LLVMLet y (LLVMPointerToInt (LLVMDataLocal x) voidPtr si) $
           LLVMLet z (LLVMBitcast (LLVMDataLocal y) si lowType) cont)
-
-llvmCodeThetaCompareFloat ::
-     Compare -> Int -> DataPlus -> DataPlus -> WithEnv LLVM
-llvmCodeThetaCompareFloat op i v1 v2 = do
-  (x1, cast1then) <- llvmCastToFloat v1 (LowTypeFloat i) i
-  (x2, cast2then) <- llvmCastToFloat v2 (LowTypeFloat i) i
-  result <- newNameWith "result"
-  let boolType = LowTypeSignedInt 1
-  (cast1then >=> cast2then) $
-    LLVMLet result (LLVMCompare (op, LowTypeFloat i) x1 x2) $
-    LLVMIntToPointer (LLVMDataLocal result) boolType voidPtr
 
 -- `llvmDataLet x d cont` binds the data `d` to the variable `x`, and computes the
 -- continuation `cont`.

@@ -21,21 +21,24 @@ data LowType
 voidPtr :: LowType
 voidPtr = LowTypePointer $ LowTypeSignedInt 8
 
-data Arith
-  = ArithAdd
-  | ArithSub
-  | ArithMul
-  | ArithDiv
-  deriving (Show)
+data BinOp
+  = BinOpAdd
+  | BinOpSub
+  | BinOpMul
+  | BinOpDiv
+  | BinOpEQ
+  | BinOpNE
+  | BinOpGT
+  | BinOpGE
+  | BinOpLT
+  | BinOpLE
+  deriving (Eq, Show)
 
-data Compare
-  = CompareEQ
-  | CompareNE
-  | CompareGT
-  | CompareGE
-  | CompareLT
-  | CompareLE
-  deriving (Show)
+arithOpList :: [BinOp]
+arithOpList = [BinOpAdd, BinOpSub, BinOpMul, BinOpDiv]
+
+compareOpList :: [BinOp]
+compareOpList = [BinOpEQ, BinOpNE, BinOpGT, BinOpGE, BinOpLT, BinOpLE]
 
 intLowTypeList :: [LowType]
 intLowTypeList = signedIntLowTypeList ++ unsignedIntLowTypeList

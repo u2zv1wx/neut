@@ -260,10 +260,10 @@ discernCode z (ml, CodeUpElim x e1 e2) = do
       return (vs1 ++ vs2, (ml, CodeUpElim x e1' e2'))
 
 discernTheta :: Identifier -> Theta -> WithEnv ([Identifier], Theta)
-discernTheta z (ThetaArith arith lowType d1 d2) = do
+discernTheta z (ThetaBinOp op lowType d1 d2) = do
   (vs1, d1') <- discernData z d1
   (vs2, d2') <- discernData z d2
-  return (vs1 ++ vs2, ThetaArith arith lowType d1' d2')
+  return (vs1 ++ vs2, ThetaBinOp op lowType d1' d2')
 discernTheta z (ThetaPrint d) = do
   (vs, d') <- discernData z d
   return (vs, ThetaPrint d')
