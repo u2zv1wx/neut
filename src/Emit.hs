@@ -102,47 +102,11 @@ emitLLVM funName (LLVMLet x (LLVMGetElementPtr base (i, n)) cont) = do
   xs <- emitLLVM funName cont
   return $ op ++ xs
 emitLLVM funName (LLVMLet x (LLVMBitcast d fromType toType) cont) = do
-  op <-
-    emitOp $
-    unwords
-      [ showLLVMData (LLVMDataLocal x)
-      , "="
-      , "bitcast"
-      , showLowTypeEmit fromType
-      , showLLVMData d
-      , "to"
-      , showLowTypeEmit toType
-      ]
-  a <- emitLLVM funName cont
-  return $ op ++ a
+  emitCast funName x "bitcast" d fromType toType cont
 emitLLVM funName (LLVMLet x (LLVMIntToPointer d fromType toType) cont) = do
-  op <-
-    emitOp $
-    unwords
-      [ showLLVMData (LLVMDataLocal x)
-      , "="
-      , "inttoptr"
-      , showLowTypeEmit fromType
-      , showLLVMData d
-      , "to"
-      , showLowTypeEmit toType
-      ]
-  a <- emitLLVM funName cont
-  return $ op ++ a
+  emitCast funName x "inttoptr" d fromType toType cont
 emitLLVM funName (LLVMLet x (LLVMPointerToInt d fromType toType) cont) = do
-  op <-
-    emitOp $
-    unwords
-      [ showLLVMData (LLVMDataLocal x)
-      , "="
-      , "ptrtoint"
-      , showLowTypeEmit fromType
-      , showLLVMData d
-      , "to"
-      , showLowTypeEmit toType
-      ]
-  a <- emitLLVM funName cont
-  return $ op ++ a
+  emitCast funName x "ptrtoint" d fromType toType cont
 emitLLVM funName (LLVMLet x (LLVMLoad d) cont) = do
   op <-
     emitOp $
@@ -310,6 +274,30 @@ emitBinaryOp funName x t cmp d1 d2 cont = do
       , showLowTypeEmit t
       , showLLVMData d1 ++ ","
       , showLLVMData d2
+      ]
+  a <- emitLLVM funName cont
+  return $ op ++ a
+
+emitCast ::
+     Identifier
+  -> Identifier
+  -> String
+  -> LLVMData
+  -> LowType
+  -> LowType
+  -> LLVM
+  -> WithEnv [String]
+emitCast funName x cast d fromType toType cont = do
+  op <-
+    emitOp $
+    unwords
+      [ showLLVMData (LLVMDataLocal x)
+      , "="
+      , cast
+      , showLowTypeEmit fromType
+      , showLLVMData d
+      , "to"
+      , showLowTypeEmit toType
       ]
   a <- emitLLVM funName cont
   return $ op ++ a
