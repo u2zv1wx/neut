@@ -66,20 +66,16 @@ unsignedIntLowTypeList =
   ]
 
 intAddConstantList :: [String]
-intAddConstantList =
-  flip map intLowTypeList $ \t -> "core." ++ showLowType t ++ ".add"
+intAddConstantList = flip map intLowTypeList $ \t -> showLowType t ++ ".add"
 
 intSubConstantList :: [String]
-intSubConstantList =
-  flip map intLowTypeList $ \t -> "core." ++ showLowType t ++ ".sub"
+intSubConstantList = flip map intLowTypeList $ \t -> showLowType t ++ ".sub"
 
 intMulConstantList :: [String]
-intMulConstantList =
-  flip map intLowTypeList $ \t -> "core." ++ showLowType t ++ ".mul"
+intMulConstantList = flip map intLowTypeList $ \t -> showLowType t ++ ".mul"
 
 intDivConstantList :: [String]
-intDivConstantList =
-  flip map intLowTypeList $ \t -> "core." ++ showLowType t ++ ".div"
+intDivConstantList = flip map intLowTypeList $ \t -> showLowType t ++ ".div"
 
 intArithConstantList :: [String]
 intArithConstantList =
@@ -90,20 +86,16 @@ floatLowTypeList :: [LowType]
 floatLowTypeList = [LowTypeFloat 16, LowTypeFloat 32, LowTypeFloat 64]
 
 floatAddConstantList :: [String]
-floatAddConstantList =
-  flip map floatLowTypeList $ \t -> "core." ++ showLowType t ++ ".add"
+floatAddConstantList = flip map floatLowTypeList $ \t -> showLowType t ++ ".add"
 
 floatSubConstantList :: [String]
-floatSubConstantList =
-  flip map floatLowTypeList $ \t -> "core." ++ showLowType t ++ ".sub"
+floatSubConstantList = flip map floatLowTypeList $ \t -> showLowType t ++ ".sub"
 
 floatMulConstantList :: [String]
-floatMulConstantList =
-  flip map floatLowTypeList $ \t -> "core." ++ showLowType t ++ ".mul"
+floatMulConstantList = flip map floatLowTypeList $ \t -> showLowType t ++ ".mul"
 
 floatDivConstantList :: [String]
-floatDivConstantList =
-  flip map floatLowTypeList $ \t -> "core." ++ showLowType t ++ ".div"
+floatDivConstantList = flip map floatLowTypeList $ \t -> showLowType t ++ ".div"
 
 floatArithConstantList :: [String]
 floatArithConstantList =
@@ -141,6 +133,19 @@ asLowTypeMaybe ('u':cs)
 asLowTypeMaybe ('f':cs)
   | Just n <- read cs = Just $ LowTypeFloat n
 asLowTypeMaybe _ = Nothing
+
+asBinOpMaybe :: Identifier -> Maybe BinOp
+asBinOpMaybe "add" = Just BinOpAdd
+asBinOpMaybe "sub" = Just BinOpSub
+asBinOpMaybe "mul" = Just BinOpMul
+asBinOpMaybe "div" = Just BinOpDiv
+asBinOpMaybe "eq" = Just BinOpEQ
+asBinOpMaybe "ne" = Just BinOpNE
+asBinOpMaybe "gt" = Just BinOpGT
+asBinOpMaybe "ge" = Just BinOpGE
+asBinOpMaybe "lt" = Just BinOpLT
+asBinOpMaybe "le" = Just BinOpLE
+asBinOpMaybe _ = Nothing
 
 -- https://stackoverflow.com/questions/4978578/how-to-split-a-string-in-haskell
 wordsBy :: Char -> String -> [String]

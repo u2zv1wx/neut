@@ -2,6 +2,8 @@ module Reduce.WeakTerm
   ( reduceWeakTermPlus
   ) where
 
+import Unsafe.Coerce -- for int -> word, word -> int
+
 import Data.Basic
 import Data.Env
 import Data.WeakTerm
@@ -32,28 +34,41 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
         let self' = substWeakTermPlus [(x, self)] body
         reduceWeakTermPlus (m, WeakTermPiElim self' es')
     (_, WeakTermTheta constant)
-      | [(_, WeakTermInt x), (_, WeakTermInt y)] <- es' -> do
-        let b1 = constant `elem` intAddConstantList
-        let b2 = constant `elem` intSubConstantList
-        let b3 = constant `elem` intMulConstantList
-        let b4 = constant `elem` intDivConstantList
-        case (b1, b2, b3, b4) of
-          (True, _, _, _) -> return (m, WeakTermInt (x + y))
-          (_, True, _, _) -> return (m, WeakTermInt (x - y))
-          (_, _, True, _) -> return (m, WeakTermInt (x * y))
-          (_, _, _, True) -> return (m, WeakTermInt (x `div` y))
+      | [(_, WeakTermInt x), (_, WeakTermInt y)] <- es'
+      , [typeStr, opStr] <- wordsBy '.' constant
+      , Just (LowTypeSignedInt _) <- asLowTypeMaybe typeStr
+      , Just arith <- asBinOpMaybe opStr -> do
+        case arith of
+          BinOpAdd -> return (m, WeakTermInt (x + y))
+          BinOpSub -> return (m, WeakTermInt (x - y))
+          BinOpMul -> return (m, WeakTermInt (x * y))
+          BinOpDiv -> return (m, WeakTermInt (x `div` y))
           _ -> return (m, WeakTermPiElim e' es')
     (_, WeakTermTheta constant)
-      | [(_, WeakTermFloat x), (_, WeakTermFloat y)] <- es' -> do
-        let b1 = constant `elem` floatAddConstantList
-        let b2 = constant `elem` floatSubConstantList
-        let b3 = constant `elem` floatMulConstantList
-        let b4 = constant `elem` floatDivConstantList
-        case (b1, b2, b3, b4) of
-          (True, _, _, _) -> return (m, WeakTermFloat (x + y))
-          (_, True, _, _) -> return (m, WeakTermFloat (x - y))
-          (_, _, True, _) -> return (m, WeakTermFloat (x * y))
-          (_, _, _, True) -> return (m, WeakTermFloat (x / y))
+      | [(_, WeakTermInt x), (_, WeakTermInt y)] <- es'
+      , [typeStr, opStr] <- wordsBy '.' constant
+      , Just (LowTypeUnsignedInt _) <- asLowTypeMaybe typeStr
+      , Just arith <- asBinOpMaybe opStr -> do
+        case arith of
+          BinOpAdd -> return (m, WeakTermInt (x + y))
+          BinOpSub -> return (m, WeakTermInt (x - y))
+          BinOpMul -> return (m, WeakTermInt (x * y))
+          BinOpDiv -> do
+            let x' = unsafeCoerce x :: Word
+            let y' = unsafeCoerce y :: Word
+            let z = x' `div` y'
+            return (m, WeakTermInt (unsafeCoerce z))
+          _ -> return (m, WeakTermPiElim e' es')
+    (_, WeakTermTheta constant)
+      | [(_, WeakTermFloat x), (_, WeakTermFloat y)] <- es'
+      , [typeStr, opStr] <- wordsBy '.' constant
+      , Just (LowTypeFloat _) <- asLowTypeMaybe typeStr
+      , Just arith <- asBinOpMaybe opStr -> do
+        case arith of
+          BinOpAdd -> return (m, WeakTermFloat (x + y))
+          BinOpSub -> return (m, WeakTermFloat (x - y))
+          BinOpMul -> return (m, WeakTermFloat (x * y))
+          BinOpDiv -> return (m, WeakTermFloat (x / y))
           _ -> return (m, WeakTermPiElim e' es')
     _ -> return (m, WeakTermPiElim e' es')
 reduceWeakTermPlus t = return t

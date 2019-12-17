@@ -524,19 +524,6 @@ polarizeTheta m name
 polarizeTheta m name@"core.print.i64" = polarizePrint name m
 polarizeTheta _ _ = throwError "polarize.theta"
 
-asBinOpMaybe :: Identifier -> Maybe BinOp
-asBinOpMaybe "add" = Just BinOpAdd
-asBinOpMaybe "sub" = Just BinOpSub
-asBinOpMaybe "mul" = Just BinOpMul
-asBinOpMaybe "div" = Just BinOpDiv
-asBinOpMaybe "eq" = Just BinOpEQ
-asBinOpMaybe "ne" = Just BinOpNE
-asBinOpMaybe "gt" = Just BinOpGT
-asBinOpMaybe "ge" = Just BinOpGE
-asBinOpMaybe "lt" = Just BinOpLT
-asBinOpMaybe "le" = Just BinOpLE
-asBinOpMaybe _ = Nothing
-
 polarizeBinOp :: Identifier -> BinOp -> LowType -> Meta -> WithEnv CodePlus
 polarizeBinOp name op lowType m = do
   let ml = snd $ obtainInfoMeta m
