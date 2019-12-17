@@ -113,13 +113,13 @@ llvmCodeBinaryOp op domType codType v1 v2 = do
     LLVMLet result (LLVMBinaryOp (op, domType) x1 x2) uncast
 
 llvmCast :: DataPlus -> LowType -> WithEnv (LLVMData, LLVM -> WithEnv LLVM)
-llvmCast v lowType@(LowTypeSignedInt _) = llvmCastToInt v lowType
-llvmCast v lowType@(LowTypeUnsignedInt _) = llvmCastToInt v lowType
-llvmCast v (LowTypeFloat i) = llvmCastToFloat v i
+llvmCast v lowType@(LowTypeSignedInt _) = llvmCastInt v lowType
+llvmCast v lowType@(LowTypeUnsignedInt _) = llvmCastInt v lowType
+llvmCast v (LowTypeFloat i) = llvmCastFloat v i
 llvmCast _ _ = throwError "llvmCast"
 
-llvmCastToInt :: DataPlus -> LowType -> WithEnv (LLVMData, LLVM -> WithEnv LLVM)
-llvmCastToInt v lowType = do
+llvmCastInt :: DataPlus -> LowType -> WithEnv (LLVMData, LLVM -> WithEnv LLVM)
+llvmCastInt v lowType = do
   x <- newNameWith "arg"
   y <- newNameWith "cast"
   return
@@ -128,8 +128,8 @@ llvmCastToInt v lowType = do
         llvmDataLet x v $
           LLVMLet y (LLVMPointerToInt (LLVMDataLocal x) voidPtr lowType) $ cont)
 
-llvmCastToFloat :: DataPlus -> Int -> WithEnv (LLVMData, LLVM -> WithEnv LLVM)
-llvmCastToFloat v size = do
+llvmCastFloat :: DataPlus -> Int -> WithEnv (LLVMData, LLVM -> WithEnv LLVM)
+llvmCastFloat v size = do
   let floatType = LowTypeFloat size
   let intType = LowTypeSignedInt size
   x <- newNameWith "arg"
