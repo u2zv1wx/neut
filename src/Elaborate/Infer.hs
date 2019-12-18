@@ -88,6 +88,10 @@ infer ctx (meta, WeakTermZeta _) = do
   case mt of
     Just t -> return t
     Nothing -> newHoleInCtx ctx >>= returnAfterUpdate meta
+infer _ (meta, WeakTermIntS size _) = do
+  returnAfterUpdate meta (newMetaTerminal, WeakTermTheta $ "i" ++ show size)
+infer _ (meta, WeakTermIntU size _) = do
+  returnAfterUpdate meta (newMetaTerminal, WeakTermTheta $ "u" ++ show size)
 infer _ (meta, WeakTermInt _) = do
   h <- newHoleInCtx []
   returnAfterUpdate meta h
@@ -97,7 +101,7 @@ infer _ (meta, WeakTermFloat32 _) =
   returnAfterUpdate meta (newMetaTerminal, WeakTermTheta "f32")
 infer _ (meta, WeakTermFloat64 _) =
   returnAfterUpdate meta (newMetaTerminal, WeakTermTheta "f64")
-infer _ (meta, WeakTermFloatUnknown _) = do
+infer _ (meta, WeakTermFloat _) = do
   h <- newHoleInCtx []
   returnAfterUpdate meta h -- f64 or "any float"
 
