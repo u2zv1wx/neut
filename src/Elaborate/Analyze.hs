@@ -62,7 +62,11 @@ simp ((e1, e2):cs)
   , length es1 == length es2 = simpMetaRet m1 m2 $ simp $ zip es1 es2 ++ cs
 simp (((m1, WeakTermInt l1), (m2, WeakTermInt l2)):cs)
   | l1 == l2 = simpMetaRet m1 m2 (simp cs)
-simp (((m1, WeakTermFloat l1), (m2, WeakTermFloat l2)):cs)
+simp (((m1, WeakTermFloat16 l1), (m2, WeakTermFloat16 l2)):cs)
+  | l1 == l2 = simpMetaRet m1 m2 (simp cs)
+simp (((m1, WeakTermFloat32 l1), (m2, WeakTermFloat32 l2)):cs)
+  | l1 == l2 = simpMetaRet m1 m2 (simp cs)
+simp (((m1, WeakTermFloat64 l1), (m2, WeakTermFloat64 l2)):cs)
   | l1 == l2 = simpMetaRet m1 m2 (simp cs)
 simp ((e1@(m1, _), e2@(m2, _)):cs) = do
   let ms1 = asStuckedTerm e1
