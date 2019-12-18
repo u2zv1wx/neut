@@ -118,10 +118,12 @@ reduceWeakTermPlusBinary ::
   -> WithEnv WeakTermPlus
 reduceWeakTermPlusBinary orig arg1 arg2 m lowType op = do
   case getBinaryArgInfo lowType arg1 arg2 of
-    Just (BinaryArgInfoIntS size x y) ->
-      asWeakTermPlus m (computeIntS x y op) (WeakTermIntS size)
-    Just (BinaryArgInfoIntU size x y) ->
-      asWeakTermPlus m (computeIntU x y op) (WeakTermIntU size)
+    Just (BinaryArgInfoIntS size x y) -> do
+      let s = toInteger size
+      asWeakTermPlus m (computeInt asIntS s x y op) (WeakTermIntS size)
+    Just (BinaryArgInfoIntU size x y) -> do
+      let s = toInteger size
+      asWeakTermPlus m (computeInt asIntU s x y op) (WeakTermIntU size)
     Just (BinaryArgInfoFloat16 x y) ->
       asWeakTermPlus m (computeFloat x y op (snd orig)) WeakTermFloat16
     Just (BinaryArgInfoFloat32 x y) ->
@@ -233,30 +235,31 @@ getBinaryArgInfo (LowTypeFloat FloatSize64) (_, WeakTermFloat x) (_, WeakTermFlo
 -- otherwise (invalid arguments)
 getBinaryArgInfo _ _ _ = Nothing
 
-computeIntS :: (Integral a, Bits a) => a -> a -> BinaryOp -> Either WeakTerm a
-computeIntS = undefined
-
-computeIntU :: (Integral a, Bits a) => a -> a -> BinaryOp -> Either WeakTerm a
-computeIntU = undefined
-
-computeInt :: (Integral a, Bits a) => a -> a -> BinaryOp -> Either WeakTerm a
-computeInt x y BinaryOpAdd = Right $ x + y
-computeInt x y BinaryOpSub = Right $ x - y
-computeInt x y BinaryOpMul = Right $ x * y
-computeInt x y BinaryOpDiv = Right $ x `div` y
-computeInt x y BinaryOpRem = Right $ x `rem` y
-computeInt x y BinaryOpEQ = Left $ asEpsilon $ x == y
-computeInt x y BinaryOpNE = Left $ asEpsilon $ x /= y
-computeInt x y BinaryOpGT = Left $ asEpsilon $ x > y
-computeInt x y BinaryOpGE = Left $ asEpsilon $ x >= y
-computeInt x y BinaryOpLT = Left $ asEpsilon $ x < y
-computeInt x y BinaryOpLE = Left $ asEpsilon $ x <= y
-computeInt x y BinaryOpShl = Right $ shiftL x (unsafeCoerce y)
-computeInt x y BinaryOpLshr = Right $ ushiftR' x (unsafeCoerce y)
-computeInt x y BinaryOpAshr = Right $ shiftR x (unsafeCoerce y)
-computeInt x y BinaryOpAnd = Right $ x .&. y
-computeInt x y BinaryOpOr = Right $ x .|. y
-computeInt x y BinaryOpXor = Right $ x `xor` y
+computeInt ::
+     (Integral a, Bits a)
+  => (a -> a -> a) -- asIntS or asIntU
+  -> a
+  -> a
+  -> a
+  -> BinaryOp
+  -> Either WeakTerm a
+computeInt k m x y BinaryOpAdd = Right $ k m $ x + y
+computeInt k m x y BinaryOpSub = Right $ k m $ x - y
+computeInt k m x y BinaryOpMul = Right $ k m $ x * y
+computeInt k m x y BinaryOpDiv = Right $ k m $ x `div` y
+computeInt k m x y BinaryOpRem = Right $ k m $ x `rem` y
+computeInt _ _ x y BinaryOpEQ = Left $ asEpsilon $ x == y
+computeInt _ _ x y BinaryOpNE = Left $ asEpsilon $ x /= y
+computeInt _ _ x y BinaryOpGT = Left $ asEpsilon $ x > y
+computeInt _ _ x y BinaryOpGE = Left $ asEpsilon $ x >= y
+computeInt _ _ x y BinaryOpLT = Left $ asEpsilon $ x < y
+computeInt _ _ x y BinaryOpLE = Left $ asEpsilon $ x <= y
+computeInt k m x y BinaryOpShl = Right $ k m $ shiftL x (unsafeCoerce y)
+computeInt k m x y BinaryOpLshr = Right $ k m $ ushiftR' x (unsafeCoerce y)
+computeInt k m x y BinaryOpAshr = Right $ k m $ shiftR x (unsafeCoerce y)
+computeInt _ _ x y BinaryOpAnd = Right $ x .&. y
+computeInt _ _ x y BinaryOpOr = Right $ x .|. y
+computeInt _ _ x y BinaryOpXor = Right $ x `xor` y
 
 computeFloat ::
      (Real a, Fractional a)
