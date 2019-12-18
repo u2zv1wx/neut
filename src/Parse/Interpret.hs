@@ -55,8 +55,12 @@ interpret (m, TreeNode [(_, TreeAtom "mu"), xt, e]) = do
 interpret (m, TreeNode [(_, TreeAtom "zeta"), (_, TreeAtom x)]) = do
   x' <- interpretAtom x
   withMeta m $ WeakTermZeta x'
-interpret (m, TreeNode [(_, TreeAtom "int"), (_, TreeAtom x)])
-  | Just x' <- readMaybe x = do withMeta m $ WeakTermInt x'
+interpret (m, TreeNode [(_, TreeAtom t), (_, TreeAtom x)])
+  | Just (LowTypeSignedInt i) <- asLowTypeMaybe t
+  , Just x' <- readMaybe x = withMeta m $ WeakTermIntS i x'
+interpret (m, TreeNode [(_, TreeAtom t), (_, TreeAtom x)])
+  | Just (LowTypeUnsignedInt i) <- asLowTypeMaybe t
+  , Just x' <- readMaybe x = withMeta m $ WeakTermIntU i x'
 interpret (m, TreeNode [(_, TreeAtom "f16"), (_, TreeAtom x)])
   | Just x' <- readMaybe x = do withMeta m $ WeakTermFloat16 x'
 interpret (m, TreeNode [(_, TreeAtom "f32"), (_, TreeAtom x)])
@@ -69,7 +73,7 @@ interpret (m, TreeNode [(_, TreeAtom "f64"), (_, TreeAtom x)])
 interpret (m, TreeAtom x)
   | Just x' <- readMaybe x = withMeta m $ WeakTermInt x'
 interpret (m, TreeAtom x)
-  | Just x' <- readMaybe x = withMeta m $ WeakTermFloatUnknown x'
+  | Just x' <- readMaybe x = withMeta m $ WeakTermFloat x'
 interpret t@(m, TreeAtom x) = do
   ml <- interpretLabelMaybe t
   case ml of
