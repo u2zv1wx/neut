@@ -180,7 +180,7 @@ llvmDataLet x (m, DataEpsilonIntro label) cont = do
   mi <- getEpsilonNum label
   case mi of
     Nothing -> lift $ throwE $ "no such epsilon is defined: " ++ show label
-    Just i -> llvmDataLet x (m, DataInt i (LowTypeSignedInt 64)) cont
+    Just i -> llvmDataLet x (m, DataIntS 64 (toInteger i)) cont
 llvmDataLet reg (_, DataSigmaIntro ds) cont = do
   xs <- mapM (const $ newNameWith "cursor") ds
   cast <- newNameWith "cast"
@@ -190,13 +190,18 @@ llvmDataLet reg (_, DataSigmaIntro ds) cont = do
   llvmStruct (zip xs ds) $
     LLVMLet reg (LLVMAlloc size) $ -- the result of malloc is i8*
     LLVMLet cast (LLVMBitcast (LLVMDataLocal reg) voidPtr structPtrType) cont''
-llvmDataLet x (_, DataInt i (LowTypeSignedInt j)) cont =
+llvmDataLet x (_, DataIntS j i) cont =
   return $
   LLVMLet
     x
-    (LLVMIntToPointer (LLVMDataInt i j) (LowTypeSignedInt j) voidPtr)
+    (LLVMIntToPointer (LLVMDataIntS j i) (LowTypeSignedInt j) voidPtr)
     cont
-llvmDataLet _ (_, DataInt _ _) _ = throwError "llvmDataLet.DataInt"
+llvmDataLet x (_, DataIntU j i) cont =
+  return $
+  LLVMLet
+    x
+    (LLVMIntToPointer (LLVMDataIntU j i) (LowTypeSignedInt j) voidPtr)
+    cont
 llvmDataLet x (_, DataFloat16 f) cont =
   llvmDataLetFloat x (LLVMDataFloat16 f) FloatSize16 cont
 llvmDataLet x (_, DataFloat32 f) cont =
