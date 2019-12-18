@@ -59,19 +59,12 @@ elaborate' (m, WeakTermEpsilon k) = do
   return (m', TermEpsilon k)
 elaborate' (m, WeakTermEpsilonIntro x) = do
   m' <- toMeta m
-  t <- reduceTermPlus $ obtainType m'
-  case t of
-    (_, TermEpsilon _) -> return (m', TermEpsilonIntro x)
-    _ -> throwError "epsilonIntro"
-elaborate' (m, WeakTermEpsilonElim (x, t) e branchList) = do
-  t' <- elaborate' t >>= reduceTermPlus
-  case t' of
-    (_, TermEpsilon _) -> do
-      m' <- toMeta m
-      e' <- elaborate' e
-      branchList' <- forM branchList elaboratePlus
-      return (m', TermEpsilonElim x e' branchList')
-    _ -> throwError "epsilonElim"
+  return (m', TermEpsilonIntro x)
+elaborate' (m, WeakTermEpsilonElim (x, _) e branchList) = do
+  m' <- toMeta m
+  e' <- elaborate' e
+  branchList' <- forM branchList elaboratePlus
+  return (m', TermEpsilonElim x e' branchList')
 elaborate' (m, WeakTermPi xts) = do
   m' <- toMeta m
   xts' <- mapM elaboratePlus xts
