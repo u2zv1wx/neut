@@ -13,13 +13,27 @@ data Case
   deriving (Show, Eq)
 
 data LowType
-  = LowTypeSignedInt Int
-  | LowTypeUnsignedInt Int
+  = LowTypeSignedInt IntSize
+  | LowTypeUnsignedInt IntSize
   | LowTypeFloat FloatSize
   | LowTypePointer LowType
   | LowTypeFunction [LowType] LowType
   | LowTypeStruct [LowType]
   deriving (Eq, Show)
+
+type IntSize = Int
+
+asIntS :: Integral a => a -> a -> a
+asIntS size n = do
+  let upperBound = 2 ^ (size - 1)
+  let m = 2 * upperBound
+  let a = mod n m
+  if a >= upperBound
+    then a - m
+    else a
+
+asIntU :: Integral a => a -> a -> a
+asIntU size n = mod n (2 ^ size)
 
 data FloatSize
   = FloatSize16
