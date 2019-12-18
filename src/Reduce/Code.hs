@@ -39,47 +39,15 @@ reduceCodePlus (m, CodeTheta theta) =
     ThetaUnaryOp op (LowTypeFloat _) (m1, DataFloat64 x)
       | op == UnaryOpNeg -> upIntroData m (m1, DataFloat64 (-x))
     ThetaBinaryOp op t@(LowTypeSignedInt _) (m1, DataInt x _) (_, DataInt y _) -> do
-      case op of
-        BinaryOpAdd -> upIntroData m (m1, DataInt (x + y) t)
-        BinaryOpSub -> upIntroData m (m1, DataInt (x - y) t)
-        BinaryOpMul -> upIntroData m (m1, DataInt (x * y) t)
-        BinaryOpDiv -> upIntroData m (m1, DataInt (x `div` y) t)
-        BinaryOpRem -> upIntroData m (m1, DataInt (x `rem` y) t)
-        BinaryOpEQ -> upIntroData m (m1, asData $ x == y)
-        BinaryOpNE -> upIntroData m (m1, asData $ x /= y)
-        BinaryOpGT -> upIntroData m (m1, asData $ x > y)
-        BinaryOpGE -> upIntroData m (m1, asData $ x >= y)
-        BinaryOpLT -> upIntroData m (m1, asData $ x < y)
-        BinaryOpLE -> upIntroData m (m1, asData $ x <= y)
-        BinaryOpShl -> upIntroData m (m1, DataInt (shiftL x y) t)
-        BinaryOpLshr -> upIntroData m (m1, DataInt (ushiftR x y) t)
-        BinaryOpAshr -> upIntroData m (m1, DataInt (shiftR x y) t)
-        BinaryOpAnd -> upIntroData m (m1, DataInt (x .&. y) t)
-        BinaryOpOr -> upIntroData m (m1, DataInt (x .|. y) t)
-        BinaryOpXor -> upIntroData m (m1, DataInt (x `xor` y) t)
+      case computeInt x y op of
+        Left d -> upIntroData m (m1, d)
+        Right z -> upIntroData m (m1, DataInt z t)
     ThetaBinaryOp op t@(LowTypeUnsignedInt _) (m1, DataInt x _) (_, DataInt y _) -> do
       let x' = unsafeCoerce x :: Word
       let y' = unsafeCoerce y :: Word
-      case op of
-        BinaryOpAdd -> upIntroData m (m1, DataInt (x + y) t)
-        BinaryOpSub -> upIntroData m (m1, DataInt (x - y) t)
-        BinaryOpMul -> upIntroData m (m1, DataInt (x * y) t)
-        BinaryOpDiv ->
-          upIntroData m (m1, DataInt (unsafeCoerce (x' `div` y')) t)
-        BinaryOpRem ->
-          upIntroData m (m1, DataInt (unsafeCoerce (x' `rem` y')) t)
-        BinaryOpEQ -> upIntroData m (m1, asData $ x' == y')
-        BinaryOpNE -> upIntroData m (m1, asData $ x' /= y')
-        BinaryOpGT -> upIntroData m (m1, asData $ x' > y')
-        BinaryOpGE -> upIntroData m (m1, asData $ x' >= y')
-        BinaryOpLT -> upIntroData m (m1, asData $ x' < y')
-        BinaryOpLE -> upIntroData m (m1, asData $ x' <= y')
-        BinaryOpShl -> upIntroData m (m1, DataInt (shiftL x y) t)
-        BinaryOpLshr -> upIntroData m (m1, DataInt (ushiftR x y) t)
-        BinaryOpAshr -> upIntroData m (m1, DataInt (shiftR x y) t)
-        BinaryOpAnd -> upIntroData m (m1, DataInt (x .&. y) t)
-        BinaryOpOr -> upIntroData m (m1, DataInt (x .|. y) t)
-        BinaryOpXor -> upIntroData m (m1, DataInt (x `xor` y) t)
+      case computeInt x' y' op of
+        Left d -> upIntroData m (m1, d)
+        Right z -> upIntroData m (m1, DataInt (unsafeCoerce z) t)
     ThetaBinaryOp op (LowTypeFloat _) (m1, DataFloat16 x) (_, DataFloat16 y) -> do
       case computeFloat x y op of
         Just (Left d) -> upIntroData m (m1, d)
@@ -100,6 +68,25 @@ reduceCodePlus (m, CodeTheta theta) =
       return (m, CodeUpIntro (Nothing, DataSigmaIntro []))
     _ -> return (m, CodeTheta theta)
 reduceCodePlus t = return t
+
+computeInt :: (Integral a, Bits a) => a -> a -> BinaryOp -> Either Data a
+computeInt x y BinaryOpAdd = Right $ x + y
+computeInt x y BinaryOpSub = Right $ x - y
+computeInt x y BinaryOpMul = Right $ x * y
+computeInt x y BinaryOpDiv = Right $ x `div` y
+computeInt x y BinaryOpRem = Right $ x `rem` y
+computeInt x y BinaryOpEQ = Left $ asData $ x == y
+computeInt x y BinaryOpNE = Left $ asData $ x /= y
+computeInt x y BinaryOpGT = Left $ asData $ x > y
+computeInt x y BinaryOpGE = Left $ asData $ x >= y
+computeInt x y BinaryOpLT = Left $ asData $ x < y
+computeInt x y BinaryOpLE = Left $ asData $ x <= y
+computeInt x y BinaryOpShl = Right $ shiftL x (unsafeCoerce y)
+computeInt x y BinaryOpLshr = Right $ ushiftR' x (unsafeCoerce y)
+computeInt x y BinaryOpAshr = Right $ shiftR x (unsafeCoerce y)
+computeInt x y BinaryOpAnd = Right $ x .&. y
+computeInt x y BinaryOpOr = Right $ x .|. y
+computeInt x y BinaryOpXor = Right $ x `xor` y
 
 computeFloat ::
      (Real a, Fractional a) => a -> a -> BinaryOp -> Maybe (Either Data a)
