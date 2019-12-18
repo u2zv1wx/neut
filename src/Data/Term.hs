@@ -12,8 +12,8 @@ data Term
   | TermTheta Identifier
   | TermUpsilon Identifier
   | TermEpsilon Identifier
-  | TermEpsilonIntro Identifier LowType
-  | TermEpsilonElim (Identifier, LowType) TermPlus [(Case, TermPlus)]
+  | TermEpsilonIntro Identifier
+  | TermEpsilonElim Identifier TermPlus [(Case, TermPlus)]
   | TermPi [IdentifierPlus]
   | TermPiIntro [IdentifierPlus] TermPlus
   | TermPiElim TermPlus [TermPlus]
@@ -57,8 +57,8 @@ getClosedVarChain (m, TermUpsilon x) =
     MetaTerminal ml -> [(x, ml, (m, TermTau))]
     MetaNonTerminal t ml -> getClosedVarChain t ++ [(x, ml, t)]
 getClosedVarChain (_, TermEpsilon _) = []
-getClosedVarChain (_, TermEpsilonIntro _ _) = []
-getClosedVarChain (_, TermEpsilonElim (x, _) e branchList) = do
+getClosedVarChain (_, TermEpsilonIntro _) = []
+getClosedVarChain (_, TermEpsilonElim x e branchList) = do
   let xhs = getClosedVarChain e
   xhss <-
     forM branchList $ \(_, body) -> do
@@ -91,14 +91,13 @@ substTermPlus _ (m, TermTheta t) = (m, TermTheta t)
 substTermPlus sub (m, TermUpsilon x) =
   fromMaybe (m, TermUpsilon x) (lookup x sub)
 substTermPlus _ (m, TermEpsilon x) = (m, TermEpsilon x)
-substTermPlus _ (m, TermEpsilonIntro l lowType) =
-  (m, TermEpsilonIntro l lowType)
-substTermPlus sub (m, TermEpsilonElim (x, lowType) e branchList) = do
+substTermPlus _ (m, TermEpsilonIntro l) = (m, TermEpsilonIntro l)
+substTermPlus sub (m, TermEpsilonElim x e branchList) = do
   let e' = substTermPlus sub e
   let (caseList, es) = unzip branchList
   let sub' = filter (\(k, _) -> k /= x) sub
   let es' = map (substTermPlus sub') es
-  (m, TermEpsilonElim (x, lowType) e' (zip caseList es'))
+  (m, TermEpsilonElim x e' (zip caseList es'))
 substTermPlus sub (m, TermPi xts) = do
   let xts' = substTermPlusBindings sub xts
   (m, TermPi xts')
@@ -137,7 +136,7 @@ isValue :: TermPlus -> Bool
 isValue (_, TermTau) = True
 isValue (_, TermUpsilon _) = True
 isValue (_, TermEpsilon _) = True
-isValue (_, TermEpsilonIntro _ _) = True
+isValue (_, TermEpsilonIntro _) = True
 isValue (_, TermPi {}) = True
 isValue (_, TermPiIntro {}) = True
 isValue _ = False

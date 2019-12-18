@@ -177,13 +177,11 @@ llvmDataLet x (_, DataTheta y) cont = do
         LLVMLet x (LLVMBitcast (LLVMDataGlobal y) funPtrType voidPtr) cont
 llvmDataLet x (_, DataUpsilon y) cont =
   return $ LLVMLet x (LLVMBitcast (LLVMDataLocal y) voidPtr voidPtr) cont
-llvmDataLet x (m, DataEpsilonIntro label (LowTypeSignedInt j)) cont = do
+llvmDataLet x (m, DataEpsilonIntro label) cont = do
   mi <- getEpsilonNum label
   case mi of
     Nothing -> lift $ throwE $ "no such epsilon is defined: " ++ show label
-    Just i -> llvmDataLet x (m, DataInt i (LowTypeSignedInt j)) cont
-llvmDataLet _ (_, DataEpsilonIntro _ _) _ =
-  throwError "llvmDataLet.DataEpsilonIntro"
+    Just i -> llvmDataLet x (m, DataInt i (LowTypeSignedInt 64)) cont
 llvmDataLet reg (_, DataSigmaIntro ds) cont = do
   xs <- mapM (const $ newNameWith "cursor") ds
   cast <- newNameWith "cast"
@@ -245,8 +243,9 @@ constructSwitch ((CaseDefault, code):_) = do
   return $ Just (code', [])
 
 llvmCodeEpsilonElim ::
-     (Identifier, LowType) -> DataPlus -> [(Case, CodePlus)] -> WithEnv LLVM
-llvmCodeEpsilonElim (x, t) v branchList = do
+     Identifier -> DataPlus -> [(Case, CodePlus)] -> WithEnv LLVM
+llvmCodeEpsilonElim x v branchList = do
+  let t = LowTypeSignedInt 64
   m <- constructSwitch branchList
   case m of
     Nothing -> llvmDataLet' [(x, v)] LLVMUnreachable

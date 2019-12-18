@@ -31,15 +31,15 @@ polarize (m, TermEpsilon _) = do
   let ml = snd $ obtainInfoMeta m
   v <- cartesianImmediate ml
   return (ml, CodeUpIntro v)
-polarize (m, TermEpsilonIntro l lowType) = do
+polarize (m, TermEpsilonIntro l) = do
   let ml = snd $ obtainInfoMeta m
-  return (ml, CodeUpIntro (ml, DataEpsilonIntro l lowType))
-polarize (m, TermEpsilonElim (x, lowType) e bs) = do
+  return (ml, CodeUpIntro (ml, DataEpsilonIntro l))
+polarize (m, TermEpsilonElim x e bs) = do
   let (cs, es) = unzip bs
   es' <- mapM polarize es
   (yts, y) <- polarize' e
   let ml = snd $ obtainInfoMeta m
-  return $ bindLet yts (ml, CodeEpsilonElim (x, lowType) y (zip cs es'))
+  return $ bindLet yts (ml, CodeEpsilonElim x y (zip cs es'))
 polarize (m, TermPi _) = do
   let ml = snd $ obtainInfoMeta m
   tau <- cartesianImmediate ml

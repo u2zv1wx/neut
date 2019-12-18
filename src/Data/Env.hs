@@ -228,15 +228,14 @@ discernCode :: Identifier -> CodePlus -> WithEnv ([Identifier], CodePlus)
 discernCode z (ml, CodeTheta theta) = do
   (vs, theta') <- discernTheta z theta
   return (vs, (ml, CodeTheta theta'))
-discernCode z (ml, CodeEpsilonElim (x, lowType) d branchList) = do
+discernCode z (ml, CodeEpsilonElim x d branchList) = do
   (vs, d') <- discernData z d
   if x == z
-    then return (vs, (ml, CodeEpsilonElim (x, lowType) d' branchList))
+    then return (vs, (ml, CodeEpsilonElim x d' branchList))
     else do
       let (cs, es) = unzip branchList
       (vss, es') <- unzip <$> mapM (discernCode z) es
-      return
-        (vs ++ concat vss, (ml, CodeEpsilonElim (x, lowType) d' (zip cs es')))
+      return (vs ++ concat vss, (ml, CodeEpsilonElim x d' (zip cs es')))
 discernCode z (ml, CodePiElimDownElim d ds) = do
   (vs, d') <- discernData z d
   (vss, ds') <- unzip <$> mapM (discernData z) ds

@@ -11,20 +11,21 @@ import Data.Env
 import Data.Term
 
 reduceTermPlus :: TermPlus -> WithEnv TermPlus
-reduceTermPlus (m, TermEpsilonElim (x, t) e branchList) = do
+reduceTermPlus (m, TermEpsilonElim x e branchList) = do
   e' <- reduceTermPlus e
   case e' of
-    (_, TermEpsilonIntro l _) ->
+    (_, TermEpsilonIntro l) ->
       case lookup (CaseLabel l) branchList of
         Just body -> reduceTermPlus $ substTermPlus [(x, e')] body
         Nothing ->
           case lookup CaseDefault branchList of
             Just body -> reduceTermPlus $ substTermPlus [(x, e')] body
-            Nothing -> return (m, TermEpsilonElim (x, t) e' branchList)
-    _ -> return (m, TermEpsilonElim (x, t) e' branchList)
+            Nothing -> return (m, TermEpsilonElim x e' branchList)
+    _ -> return (m, TermEpsilonElim x e' branchList)
 reduceTermPlus (m, TermPiElim e es) = do
   e' <- reduceTermPlus e
   es' <- mapM reduceTermPlus es
+  let app = TermPiElim e' es'
   case e' of
     (_, TermPiIntro xts body)
       | length xts == length es'
@@ -40,70 +41,76 @@ reduceTermPlus (m, TermPiElim e es) = do
       , Just (LowTypeFloat _, op) <- asUnaryOpMaybe constant ->
         case op of
           UnaryOpNeg -> return (m, TermFloat64 (-x))
-          _ -> return (m, TermPiElim e' es')
+          _ -> return (m, app)
     (_, TermTheta constant)
       | [(_, TermInt x _), (_, TermInt y _)] <- es'
       , Just (t@(LowTypeSignedInt _), op) <- asBinaryOpMaybe constant ->
-        case op of
-          BinaryOpAdd -> return (m, TermInt (x + y) t)
-          BinaryOpSub -> return (m, TermInt (x - y) t)
-          BinaryOpMul -> return (m, TermInt (x * y) t)
-          BinaryOpDiv -> return (m, TermInt (x `div` y) t)
-          BinaryOpRem -> return (m, TermInt (x `rem` y) t)
-          BinaryOpEQ -> return (m, asEpsilon t $ x == y)
-          BinaryOpNE -> return (m, asEpsilon t $ x /= y)
-          BinaryOpGT -> return (m, asEpsilon t $ x > y)
-          BinaryOpGE -> return (m, asEpsilon t $ x >= y)
-          BinaryOpLT -> return (m, asEpsilon t $ x < y)
-          BinaryOpLE -> return (m, asEpsilon t $ x <= y)
-          BinaryOpShl -> return (m, TermInt (shiftL x y) t)
-          BinaryOpLshr -> return (m, TermInt (ushiftR x y) t)
-          BinaryOpAshr -> return (m, TermInt (shiftR x y) t)
-          BinaryOpAnd -> return (m, TermInt (x .&. y) t)
-          BinaryOpOr -> return (m, TermInt (x .|. y) t)
-          BinaryOpXor -> return (m, TermInt (x `xor` y) t)
+        case computeInt x y op of
+          Left b -> return (m, b)
+          Right i -> return (m, TermInt i t)
     (_, TermTheta constant)
       | [(_, TermInt x _), (_, TermInt y _)] <- es'
       , Just (t@(LowTypeUnsignedInt _), op) <- asBinaryOpMaybe constant -> do
         let x' = unsafeCoerce x :: Word
         let y' = unsafeCoerce y :: Word
-        case op of
-          BinaryOpAdd -> return (m, TermInt (x + y) t)
-          BinaryOpSub -> return (m, TermInt (x - y) t)
-          BinaryOpMul -> return (m, TermInt (x * y) t)
-          BinaryOpDiv -> return (m, TermInt (unsafeCoerce (x' `div` y')) t)
-          BinaryOpRem -> return (m, TermInt (unsafeCoerce (x' `rem` y')) t)
-          BinaryOpEQ -> return (m, asEpsilon t $ x' == y')
-          BinaryOpNE -> return (m, asEpsilon t $ x' /= y')
-          BinaryOpGT -> return (m, asEpsilon t $ x' > y')
-          BinaryOpGE -> return (m, asEpsilon t $ x' >= y')
-          BinaryOpLT -> return (m, asEpsilon t $ x' < y')
-          BinaryOpLE -> return (m, asEpsilon t $ x' <= y')
-          BinaryOpShl -> return (m, TermInt (shiftL x y) t)
-          BinaryOpLshr -> return (m, TermInt (ushiftR x y) t)
-          BinaryOpAshr -> return (m, TermInt (shiftR x y) t)
-          BinaryOpAnd -> return (m, TermInt (x .&. y) t)
-          BinaryOpOr -> return (m, TermInt (x .|. y) t)
-          BinaryOpXor -> return (m, TermInt (x `xor` y) t)
+        case computeInt x' y' op of
+          Left b -> return (m, b)
+          Right i -> return (m, TermInt (unsafeCoerce i) t)
+    (_, TermTheta constant)
+      | [(_, TermFloat16 x), (_, TermFloat16 y)] <- es'
+      , Just ((LowTypeFloat FloatSize16), op) <- asBinaryOpMaybe constant ->
+        case computeFloat x y op app of
+          Left b -> return (m, b)
+          Right z -> return (m, TermFloat16 z)
+    (_, TermTheta constant)
+      | [(_, TermFloat32 x), (_, TermFloat32 y)] <- es'
+      , Just ((LowTypeFloat FloatSize32), op) <- asBinaryOpMaybe constant ->
+        case computeFloat x y op app of
+          Left b -> return (m, b)
+          Right z -> return (m, TermFloat32 z)
     (_, TermTheta constant)
       | [(_, TermFloat64 x), (_, TermFloat64 y)] <- es'
-      , Just (t@(LowTypeFloat _), op) <- asBinaryOpMaybe constant ->
-        case op of
-          BinaryOpAdd -> return (m, TermFloat64 (x + y))
-          BinaryOpSub -> return (m, TermFloat64 (x - y))
-          BinaryOpMul -> return (m, TermFloat64 (x * y))
-          BinaryOpDiv -> return (m, TermFloat64 (x / y))
-          BinaryOpRem -> return (m, TermFloat64 (x `mod'` y))
-          BinaryOpEQ -> return (m, asEpsilon t $ x == y)
-          BinaryOpNE -> return (m, asEpsilon t $ x /= y)
-          BinaryOpGT -> return (m, asEpsilon t $ x > y)
-          BinaryOpGE -> return (m, asEpsilon t $ x >= y)
-          BinaryOpLT -> return (m, asEpsilon t $ x < y)
-          BinaryOpLE -> return (m, asEpsilon t $ x <= y)
-          _ -> return (m, TermPiElim e' es')
-    _ -> return (m, TermPiElim e' es')
+      , Just ((LowTypeFloat FloatSize64), op) <- asBinaryOpMaybe constant ->
+        case computeFloat x y op app of
+          Left b -> return (m, b)
+          Right z -> return (m, TermFloat64 z)
+    _ -> return (m, app)
 reduceTermPlus t = return t
 
-asEpsilon :: LowType -> Bool -> Term
-asEpsilon t True = TermEpsilonIntro "true" t
-asEpsilon t False = TermEpsilonIntro "false" t
+computeInt :: (Integral a, Bits a) => a -> a -> BinaryOp -> Either Term a
+computeInt x y BinaryOpAdd = Right $ x + y
+computeInt x y BinaryOpSub = Right $ x - y
+computeInt x y BinaryOpMul = Right $ x * y
+computeInt x y BinaryOpDiv = Right $ x `div` y
+computeInt x y BinaryOpRem = Right $ x `rem` y
+computeInt x y BinaryOpEQ = Left $ asEpsilon $ x == y
+computeInt x y BinaryOpNE = Left $ asEpsilon $ x /= y
+computeInt x y BinaryOpGT = Left $ asEpsilon $ x > y
+computeInt x y BinaryOpGE = Left $ asEpsilon $ x >= y
+computeInt x y BinaryOpLT = Left $ asEpsilon $ x < y
+computeInt x y BinaryOpLE = Left $ asEpsilon $ x <= y
+computeInt x y BinaryOpShl = Right $ shiftL x (unsafeCoerce y)
+computeInt x y BinaryOpLshr = Right $ ushiftR' x (unsafeCoerce y)
+computeInt x y BinaryOpAshr = Right $ shiftR x (unsafeCoerce y)
+computeInt x y BinaryOpAnd = Right $ x .&. y
+computeInt x y BinaryOpOr = Right $ x .|. y
+computeInt x y BinaryOpXor = Right $ x `xor` y
+
+computeFloat ::
+     (Real a, Fractional a) => a -> a -> BinaryOp -> Term -> Either Term a
+computeFloat x y BinaryOpAdd _ = Right $ x + y
+computeFloat x y BinaryOpSub _ = Right $ x - y
+computeFloat x y BinaryOpMul _ = Right $ x * y
+computeFloat x y BinaryOpDiv _ = Right $ x / y
+computeFloat x y BinaryOpRem _ = Right $ x `mod'` y
+computeFloat x y BinaryOpEQ _ = Left $ asEpsilon $ x == y
+computeFloat x y BinaryOpNE _ = Left $ asEpsilon $ x /= y
+computeFloat x y BinaryOpGT _ = Left $ asEpsilon $ x > y
+computeFloat x y BinaryOpGE _ = Left $ asEpsilon $ x >= y
+computeFloat x y BinaryOpLT _ = Left $ asEpsilon $ x < y
+computeFloat x y BinaryOpLE _ = Left $ asEpsilon $ x <= y
+computeFloat _ _ _ e = Left e
+
+asEpsilon :: Bool -> Term
+asEpsilon True = TermEpsilonIntro "true"
+asEpsilon False = TermEpsilonIntro "false"

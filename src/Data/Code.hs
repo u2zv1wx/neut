@@ -10,7 +10,7 @@ import Data.Basic
 data Data
   = DataTheta Identifier
   | DataUpsilon Identifier
-  | DataEpsilonIntro Identifier LowType
+  | DataEpsilonIntro Identifier
   | DataSigmaIntro [DataPlus]
   | DataInt Int LowType
   | DataFloat16 Half
@@ -20,7 +20,7 @@ data Data
 
 data Code
   = CodeTheta Theta
-  | CodeEpsilonElim (Identifier, LowType) DataPlus [(Case, CodePlus)]
+  | CodeEpsilonElim Identifier DataPlus [(Case, CodePlus)]
   | CodePiElimDownElim DataPlus [DataPlus] -- ((force v) v1 ... vn)
   | CodeSigmaElim [Identifier] DataPlus CodePlus
   | CodeUpIntro DataPlus
@@ -50,7 +50,7 @@ substDataPlus :: SubstDataPlus -> DataPlus -> DataPlus
 substDataPlus _ (m, DataTheta x) = (m, DataTheta x)
 substDataPlus sub (m, DataUpsilon s) =
   fromMaybe (m, DataUpsilon s) (lookup s sub)
-substDataPlus _ (m, DataEpsilonIntro l p) = (m, DataEpsilonIntro l p)
+substDataPlus _ (m, DataEpsilonIntro l) = (m, DataEpsilonIntro l)
 substDataPlus sub (m, DataSigmaIntro vs) = do
   let vs' = map (substDataPlus sub) vs
   (m, DataSigmaIntro vs')
@@ -63,12 +63,12 @@ substCodePlus :: SubstDataPlus -> CodePlus -> CodePlus
 substCodePlus sub (m, CodeTheta theta) = do
   let theta' = substTheta sub theta
   (m, CodeTheta theta')
-substCodePlus sub (m, CodeEpsilonElim (x, lowType) v branchList) = do
+substCodePlus sub (m, CodeEpsilonElim x v branchList) = do
   let v' = substDataPlus sub v
   let (cs, es) = unzip branchList
   let es' = map (substCodePlus (filter (\(y, _) -> y /= x) sub)) es
   let branchList' = zip cs es'
-  (m, CodeEpsilonElim (x, lowType) v' branchList')
+  (m, CodeEpsilonElim x v' branchList')
 substCodePlus sub (m, CodePiElimDownElim v ds) = do
   let v' = substDataPlus sub v
   let ds' = map (substDataPlus sub) ds
