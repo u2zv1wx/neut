@@ -52,51 +52,87 @@ reduceTermPlusTheta orig es m constant
 
 reduceTermPlusUnary ::
      TermPlus -> TermPlus -> Meta -> LowType -> UnaryOp -> WithEnv TermPlus
-reduceTermPlusUnary orig arg _ lowType _ = do
+reduceTermPlusUnary orig arg m lowType op = do
   case getUnaryArgInfo lowType arg of
-    Just (UnaryArgInfoIntS _ _) -> undefined
-    Just (UnaryArgInfoIntU _ _) -> undefined
-    Just (UnaryArgInfoFloat16 _) -> undefined
-    Just (UnaryArgInfoFloat32 _) -> undefined
-    Just (UnaryArgInfoFloat64 _) -> undefined
+    Just (UnaryArgInfoIntS s1 x) ->
+      case op of
+        UnaryOpTrunc (LowTypeSignedInt s2)
+          | s1 > s2 -> return (m, TermIntS s2 (x .&. (2 ^ s2 - 1))) -- e.g. trunc 257 to i8 ~> 257 .&. 255 ~> 1
+        UnaryOpZext (LowTypeSignedInt s2)
+          | s1 < s2 -> do
+            let s1' = toInteger s1
+            let s2' = toInteger s2
+            return (m, TermIntS s2 (asIntS s2' (asIntU s1' x)))
+        UnaryOpSext (LowTypeSignedInt s2)
+          | s1 < s2 -> return (m, TermIntS s2 x) -- sext over int doesn't alter interpreted value
+        UnaryOpTo (LowTypeFloat FloatSize16) ->
+          return (m, TermFloat16 (fromIntegral x))
+        UnaryOpTo (LowTypeFloat FloatSize32) ->
+          return (m, TermFloat32 (fromIntegral x))
+        UnaryOpTo (LowTypeFloat FloatSize64) ->
+          return (m, TermFloat64 (fromIntegral x))
+        _ -> return orig
+    Just (UnaryArgInfoIntU s1 x) ->
+      case op of
+        UnaryOpTrunc (LowTypeUnsignedInt s2)
+          | s1 > s2 -> return (m, TermIntU s2 (x .&. (2 ^ s2 - 1))) -- e.g. trunc 257 to i8 ~> 257 .&. 255 ~> 1
+        UnaryOpZext (LowTypeUnsignedInt s2)
+          | s1 < s2 -> return (m, TermIntU s2 x) -- zext over uint doesn't alter interpreted value
+        UnaryOpSext (LowTypeUnsignedInt s2)
+          | s1 < s2 -> do
+            let s1' = toInteger s1
+            let s2' = toInteger s2
+            return (m, TermIntU s2 (asIntU s2' (asIntS s1' x)))
+        UnaryOpTo (LowTypeFloat FloatSize16) ->
+          return (m, TermFloat16 (fromIntegral x))
+        UnaryOpTo (LowTypeFloat FloatSize32) ->
+          return (m, TermFloat32 (fromIntegral x))
+        UnaryOpTo (LowTypeFloat FloatSize64) ->
+          return (m, TermFloat64 (fromIntegral x))
+        _ -> return orig
+    Just (UnaryArgInfoFloat16 x) ->
+      case op of
+        UnaryOpNeg -> return (m, TermFloat16 (-x))
+        UnaryOpFpExt (LowTypeFloat FloatSize32) ->
+          return (m, TermFloat32 (realToFrac x))
+        UnaryOpFpExt (LowTypeFloat FloatSize64) ->
+          return (m, TermFloat64 (realToFrac x))
+        UnaryOpTo (LowTypeSignedInt s) -> do
+          let s' = toInteger s
+          return (m, TermIntS s (asIntS s' (round x)))
+        UnaryOpTo (LowTypeUnsignedInt s) -> do
+          let s' = toInteger s
+          return (m, TermIntU s (asIntU s' (round x)))
+        _ -> return orig
+    Just (UnaryArgInfoFloat32 x) ->
+      case op of
+        UnaryOpNeg -> return (m, TermFloat32 (-x))
+        UnaryOpTrunc (LowTypeFloat FloatSize16) ->
+          return (m, TermFloat16 (realToFrac x))
+        UnaryOpFpExt (LowTypeFloat FloatSize64) ->
+          return (m, TermFloat64 (realToFrac x))
+        UnaryOpTo (LowTypeSignedInt s) -> do
+          let s' = toInteger s
+          return (m, TermIntS s (asIntS s' (round x)))
+        UnaryOpTo (LowTypeUnsignedInt s) -> do
+          let s' = toInteger s
+          return (m, TermIntU s (asIntU s' (round x)))
+        _ -> return orig
+    Just (UnaryArgInfoFloat64 x) ->
+      case op of
+        UnaryOpNeg -> return (m, TermFloat64 (-x))
+        UnaryOpTrunc (LowTypeFloat FloatSize16) ->
+          return (m, TermFloat16 (realToFrac x))
+        UnaryOpTrunc (LowTypeFloat FloatSize32) ->
+          return (m, TermFloat32 (realToFrac x))
+        UnaryOpTo (LowTypeSignedInt s) -> do
+          let s' = toInteger s
+          return (m, TermIntS s (asIntS s' (round x)))
+        UnaryOpTo (LowTypeUnsignedInt s) -> do
+          let s' = toInteger s
+          return (m, TermIntU s (asIntU s' (round x)))
+        _ -> return orig
     Nothing -> return orig
-  -- case op of
-  --   UnaryOpNeg -> undefined
-  --   UnaryOpTrunc _ -> undefined
-  --   UnaryOpZext _ -> undefined
-  --   UnaryOpSext _ -> undefined
-  --   UnaryOpFpExt _ -> undefined
-  --   UnaryOpTo _ -> undefined
-  --   _ -> return orig
-    -- (_, TermTheta constant)
-    --   | [(_, TermInt x)] <- es'
-    --   , Just (LowTypeSignedInt _, op) <- asUnaryOpMaybe constant -> do
-    --     case op of
-    --       UnaryOpTrunc _ -> undefined
-    --       UnaryOpZext _ -> return (m, TermInt x)
-    --       UnaryOpSext _ -> undefined
-    --       UnaryOpTo (LowTypeFloat _) ->
-    --         return (m, TermFloat64 (fromIntegral x))
-    --       _ -> return (m, app)
-    -- (_, TermTheta constant)
-    --   | [(_, TermInt x)] <- es'
-    --   , Just (LowTypeUnsignedInt _, op) <- asUnaryOpMaybe constant -> do
-    --     case op of
-    --       UnaryOpTrunc _ -> undefined
-    --       UnaryOpZext _ -> return (m, TermInt x)
-    --       UnaryOpSext _ -> undefined
-    --       UnaryOpTo (LowTypeFloat _) ->
-    --         return (m, TermFloat64 (fromIntegral x))
-    --       _ -> return (m, app)
-    -- (_, TermTheta constant)
-    --   | [(_, TermFloat64 x)] <- es'
-    --   , Just (LowTypeFloat _, op) <- asUnaryOpMaybe constant ->
-    --     case op of
-    --       UnaryOpNeg -> return (m, TermFloat64 (-x))
-    --       UnaryOpTrunc _ -> undefined
-    --       UnaryOpFpExt _ -> undefined
-    --       UnaryOpTo _ -> undefined
-    --       _ -> return (m, app)
 
 reduceTermPlusBinary ::
      TermPlus
