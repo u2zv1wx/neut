@@ -67,19 +67,63 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
           UnaryOpTo _ -> undefined
           _ -> return (m, app)
     (_, WeakTermTheta constant)
-      | [(_, WeakTermInt x), (_, WeakTermInt y)] <- es'
-      , Just (LowTypeSignedInt _, op) <- asBinaryOpMaybe constant ->
+      | [(_, WeakTermIntS s1 x), (_, WeakTermIntS s2 y)] <- es'
+      , Just (LowTypeSignedInt s, op) <- asBinaryOpMaybe constant
+      , s == s1
+      , s == s2 ->
         case computeInt x y op of
           Left b -> return (m, b)
-          Right i -> return (m, WeakTermInt i)
+          Right i -> return (m, WeakTermIntS s i)
+    (_, WeakTermTheta constant)
+      | [(_, WeakTermIntU s1 x), (_, WeakTermIntU s2 y)] <- es'
+      , Just (LowTypeUnsignedInt s, op) <- asBinaryOpMaybe constant
+      , s == s1
+      , s == s2 ->
+        case computeInt x y op of
+          Left b -> return (m, b)
+          Right i -> return (m, WeakTermIntU s i)
+    (_, WeakTermTheta constant)
+      | [(_, WeakTermInt x), (_, WeakTermIntS s2 y)] <- es'
+      , Just (LowTypeSignedInt s, op) <- asBinaryOpMaybe constant
+      , s == s2 ->
+        case computeInt x y op of
+          Left b -> return (m, b)
+          Right i -> return (m, WeakTermIntS s i)
+    (_, WeakTermTheta constant)
+      | [(_, WeakTermIntS s1 x), (_, WeakTermInt y)] <- es'
+      , Just (LowTypeSignedInt s, op) <- asBinaryOpMaybe constant
+      , s == s1 ->
+        case computeInt x y op of
+          Left b -> return (m, b)
+          Right i -> return (m, WeakTermIntS s i)
+    (_, WeakTermTheta constant)
+      | [(_, WeakTermInt x), (_, WeakTermIntU s2 y)] <- es'
+      , Just (LowTypeUnsignedInt s, op) <- asBinaryOpMaybe constant
+      , s == s2 ->
+        case computeInt x y op of
+          Left b -> return (m, b)
+          Right i -> return (m, WeakTermIntU s i)
+    (_, WeakTermTheta constant)
+      | [(_, WeakTermIntU s1 x), (_, WeakTermInt y)] <- es'
+      , Just (LowTypeUnsignedInt s, op) <- asBinaryOpMaybe constant
+      , s == s1 ->
+        case computeInt x y op of
+          Left b -> return (m, b)
+          Right i -> return (m, WeakTermIntU s i)
     (_, WeakTermTheta constant)
       | [(_, WeakTermInt x), (_, WeakTermInt y)] <- es'
-      , Just (LowTypeUnsignedInt _, op) <- asBinaryOpMaybe constant -> do
+      , Just (LowTypeSignedInt s, op) <- asBinaryOpMaybe constant ->
+        case computeInt x y op of
+          Left b -> return (m, b)
+          Right i -> return (m, WeakTermIntS s i)
+    (_, WeakTermTheta constant)
+      | [(_, WeakTermInt x), (_, WeakTermInt y)] <- es'
+      , Just (LowTypeUnsignedInt s, op) <- asBinaryOpMaybe constant -> do
         let x' = unsafeCoerce x :: Word
         let y' = unsafeCoerce y :: Word
         case computeInt x' y' op of
           Left b -> return (m, b)
-          Right i -> return (m, WeakTermInt $ unsafeCoerce i)
+          Right i -> return (m, WeakTermIntU s $ unsafeCoerce i)
     (_, WeakTermTheta constant)
       | [(_, WeakTermFloat16 x), (_, WeakTermFloat16 y)] <- es'
       , Just (LowTypeFloat FloatSize16, op) <- asBinaryOpMaybe constant ->
@@ -145,23 +189,22 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
 reduceWeakTermPlus t = return t
 
 anyPlusF16 :: [WeakTermPlus] -> Maybe (Double, Half)
-anyPlusF16 [(_, WeakTermFloatUnknown x), (_, WeakTermFloat16 y)] = Just (x, y)
-anyPlusF16 [(_, WeakTermFloat16 x), (_, WeakTermFloatUnknown y)] = Just (y, x)
+anyPlusF16 [(_, WeakTermFloat x), (_, WeakTermFloat16 y)] = Just (x, y)
+anyPlusF16 [(_, WeakTermFloat16 x), (_, WeakTermFloat y)] = Just (y, x)
 anyPlusF16 _ = Nothing
 
 anyPlusF32 :: [WeakTermPlus] -> Maybe (Double, Float)
-anyPlusF32 [(_, WeakTermFloatUnknown x), (_, WeakTermFloat32 y)] = Just (x, y)
-anyPlusF32 [(_, WeakTermFloat32 x), (_, WeakTermFloatUnknown y)] = Just (y, x)
+anyPlusF32 [(_, WeakTermFloat x), (_, WeakTermFloat32 y)] = Just (x, y)
+anyPlusF32 [(_, WeakTermFloat32 x), (_, WeakTermFloat y)] = Just (y, x)
 anyPlusF32 _ = Nothing
 
 anyPlusF64 :: [WeakTermPlus] -> Maybe (Double, Double)
-anyPlusF64 [(_, WeakTermFloatUnknown x), (_, WeakTermFloat64 y)] = Just (x, y)
-anyPlusF64 [(_, WeakTermFloat64 x), (_, WeakTermFloatUnknown y)] = Just (y, x)
+anyPlusF64 [(_, WeakTermFloat x), (_, WeakTermFloat64 y)] = Just (x, y)
+anyPlusF64 [(_, WeakTermFloat64 x), (_, WeakTermFloat y)] = Just (y, x)
 anyPlusF64 _ = Nothing
 
 anyPlusAny :: [WeakTermPlus] -> Maybe (Double, Double)
-anyPlusAny [(_, WeakTermFloatUnknown x), (_, WeakTermFloatUnknown y)] =
-  Just (x, y)
+anyPlusAny [(_, WeakTermFloat x), (_, WeakTermFloat y)] = Just (x, y)
 anyPlusAny _ = Nothing
 
 computeInt :: (Integral a, Bits a) => a -> a -> BinaryOp -> Either WeakTerm a
