@@ -20,11 +20,13 @@ data WeakTerm
   | WeakTermPiElim WeakTermPlus [WeakTermPlus]
   | WeakTermMu IdentifierPlus WeakTermPlus
   | WeakTermZeta Identifier
-  | WeakTermInt Int
+  | WeakTermIntS IntSize Integer
+  | WeakTermIntU IntSize Integer
+  | WeakTermInt Integer
   | WeakTermFloat16 Half
   | WeakTermFloat32 Float
   | WeakTermFloat64 Double
-  | WeakTermFloatUnknown Double
+  | WeakTermFloat Double
   deriving (Show)
 
 newtype Ref a =
@@ -65,11 +67,13 @@ varWeakTermPlus (_, WeakTermPiElim e es) =
   pairwiseConcat $ varWeakTermPlus e : map varWeakTermPlus es
 varWeakTermPlus (_, WeakTermMu ut e) = varWeakTermPlusBindings [ut] [e]
 varWeakTermPlus (_, WeakTermZeta h) = ([], [h])
+varWeakTermPlus (_, WeakTermIntS _ _) = ([], [])
+varWeakTermPlus (_, WeakTermIntU _ _) = ([], [])
 varWeakTermPlus (_, WeakTermInt _) = ([], [])
 varWeakTermPlus (_, WeakTermFloat16 _) = ([], [])
 varWeakTermPlus (_, WeakTermFloat32 _) = ([], [])
 varWeakTermPlus (_, WeakTermFloat64 _) = ([], [])
-varWeakTermPlus (_, WeakTermFloatUnknown _) = ([], [])
+varWeakTermPlus (_, WeakTermFloat _) = ([], [])
 
 varWeakTermPlusBindings ::
      [IdentifierPlus] -> [WeakTermPlus] -> ([Identifier], [Identifier])
@@ -113,11 +117,13 @@ substWeakTermPlus sub (m, WeakTermMu (x, t) e) = do
   (m, WeakTermMu (x, t') e')
 substWeakTermPlus sub (m, WeakTermZeta s) =
   fromMaybe (m, WeakTermZeta s) (lookup s sub)
+substWeakTermPlus _ (m, WeakTermIntS size x) = (m, WeakTermIntS size x)
+substWeakTermPlus _ (m, WeakTermIntU size x) = (m, WeakTermIntU size x)
 substWeakTermPlus _ (m, WeakTermInt x) = (m, WeakTermInt x)
 substWeakTermPlus _ (m, WeakTermFloat16 x) = (m, WeakTermFloat16 x)
 substWeakTermPlus _ (m, WeakTermFloat32 x) = (m, WeakTermFloat32 x)
 substWeakTermPlus _ (m, WeakTermFloat64 x) = (m, WeakTermFloat64 x)
-substWeakTermPlus _ (m, WeakTermFloatUnknown x) = (m, WeakTermFloat64 x)
+substWeakTermPlus _ (m, WeakTermFloat x) = (m, WeakTermFloat64 x)
 
 substWeakTermPlusBindings ::
      SubstWeakTerm -> [IdentifierPlus] -> [IdentifierPlus]
@@ -153,29 +159,42 @@ isReducible (_, WeakTermPiIntro {}) = False
 isReducible (_, WeakTermPiElim (_, WeakTermPiIntro xts _) es)
   | length xts == length es = True
 isReducible (_, WeakTermPiElim (_, WeakTermMu _ _) _) = True -- CBV recursion
-isReducible (_, WeakTermPiElim (_, WeakTermTheta c) [(_, WeakTermInt _), (_, WeakTermInt _)])
+isReducible (_, WeakTermPiElim (_, WeakTermTheta c) [(_, WeakTermIntS _ _), (_, WeakTermIntS _ _)])
   | [typeStr, opStr] <- wordsBy '.' c
   , Just (LowTypeSignedInt _) <- asLowTypeMaybe typeStr
   , Just arith <- asBinaryOpMaybe' opStr
   , isArithOp arith = True
-isReducible (_, WeakTermPiElim (_, WeakTermTheta c) [(_, WeakTermInt _), (_, WeakTermInt _)])
+isReducible (_, WeakTermPiElim (_, WeakTermTheta c) [(_, WeakTermIntU _ _), (_, WeakTermIntU _ _)])
   | [typeStr, opStr] <- wordsBy '.' c
   , Just (LowTypeUnsignedInt _) <- asLowTypeMaybe typeStr
   , Just arith <- asBinaryOpMaybe' opStr
   , isArithOp arith = True
+-- FIXME: isReducible for Float
+isReducible (_, WeakTermPiElim (_, WeakTermTheta c) [(_, WeakTermFloat16 _), (_, WeakTermFloat16 _)])
+  | [typeStr, opStr] <- wordsBy '.' c
+  , Just (LowTypeFloat FloatSize16) <- asLowTypeMaybe typeStr
+  , Just arith <- asBinaryOpMaybe' opStr
+  , isArithOp arith = True
+isReducible (_, WeakTermPiElim (_, WeakTermTheta c) [(_, WeakTermFloat32 _), (_, WeakTermFloat32 _)])
+  | [typeStr, opStr] <- wordsBy '.' c
+  , Just (LowTypeFloat FloatSize32) <- asLowTypeMaybe typeStr
+  , Just arith <- asBinaryOpMaybe' opStr
+  , isArithOp arith = True
 isReducible (_, WeakTermPiElim (_, WeakTermTheta c) [(_, WeakTermFloat64 _), (_, WeakTermFloat64 _)])
   | [typeStr, opStr] <- wordsBy '.' c
-  , Just (LowTypeFloat _) <- asLowTypeMaybe typeStr
+  , Just (LowTypeFloat FloatSize64) <- asLowTypeMaybe typeStr
   , Just arith <- asBinaryOpMaybe' opStr
   , isArithOp arith = True
 isReducible (_, WeakTermPiElim e es) = isReducible e || any isReducible es
 isReducible (_, WeakTermMu _ _) = False
 isReducible (_, WeakTermZeta _) = False
+isReducible (_, WeakTermIntS _ _) = False
+isReducible (_, WeakTermIntU _ _) = False
 isReducible (_, WeakTermInt _) = False
-isReducible (_, WeakTermFloatUnknown _) = False
 isReducible (_, WeakTermFloat16 _) = False
 isReducible (_, WeakTermFloat32 _) = False
 isReducible (_, WeakTermFloat64 _) = False
+isReducible (_, WeakTermFloat _) = False
 
 isValue :: WeakTermPlus -> Bool
 isValue (_, WeakTermTau) = True
@@ -184,9 +203,11 @@ isValue (_, WeakTermEpsilon _) = True
 isValue (_, WeakTermEpsilonIntro _) = True
 isValue (_, WeakTermPi {}) = True
 isValue (_, WeakTermPiIntro {}) = True
+isValue (_, WeakTermIntS _ _) = True
+isValue (_, WeakTermIntU _ _) = True
 isValue (_, WeakTermInt _) = True
-isValue (_, WeakTermFloatUnknown _) = True
 isValue (_, WeakTermFloat16 _) = True
 isValue (_, WeakTermFloat32 _) = True
 isValue (_, WeakTermFloat64 _) = True
+isValue (_, WeakTermFloat _) = True
 isValue _ = False
