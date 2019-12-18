@@ -37,175 +37,207 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
       | all isValue es' -> do
         let self' = substWeakTermPlus [(x, self)] body
         reduceWeakTermPlus (m, WeakTermPiElim self' es')
-    (_, WeakTermTheta constant)
-      | [(_, WeakTermInt x)] <- es'
-      , Just (LowTypeSignedInt _, op) <- asUnaryOpMaybe constant -> do
-        case op of
-          UnaryOpTrunc _ -> undefined
-          UnaryOpZext _ -> return (m, WeakTermInt x)
-          UnaryOpSext _ -> undefined
-          UnaryOpTo (LowTypeFloat _) ->
-            return (m, WeakTermFloat64 (fromIntegral x))
-          _ -> return (m, app)
-    (_, WeakTermTheta constant)
-      | [(_, WeakTermInt x)] <- es'
-      , Just (LowTypeUnsignedInt _, op) <- asUnaryOpMaybe constant -> do
-        case op of
-          UnaryOpTrunc _ -> undefined
-          UnaryOpZext _ -> return (m, WeakTermInt x)
-          UnaryOpSext _ -> undefined
-          UnaryOpTo (LowTypeFloat _) ->
-            return (m, WeakTermFloat64 (fromIntegral x))
-          _ -> return (m, app)
-    (_, WeakTermTheta constant)
-      | [(_, WeakTermFloat64 x)] <- es'
-      , Just (LowTypeFloat _, op) <- asUnaryOpMaybe constant ->
-        case op of
-          UnaryOpNeg -> return (m, WeakTermFloat64 (-x))
-          UnaryOpTrunc _ -> undefined
-          UnaryOpFpExt _ -> undefined
-          UnaryOpTo _ -> undefined
-          _ -> return (m, app)
-    (_, WeakTermTheta constant)
-      | [(_, WeakTermIntS s1 x), (_, WeakTermIntS s2 y)] <- es'
-      , Just (LowTypeSignedInt s, op) <- asBinaryOpMaybe constant
-      , s == s1
-      , s == s2 ->
-        case computeInt x y op of
-          Left b -> return (m, b)
-          Right i -> return (m, WeakTermIntS s i)
-    (_, WeakTermTheta constant)
-      | [(_, WeakTermIntU s1 x), (_, WeakTermIntU s2 y)] <- es'
-      , Just (LowTypeUnsignedInt s, op) <- asBinaryOpMaybe constant
-      , s == s1
-      , s == s2 ->
-        case computeInt x y op of
-          Left b -> return (m, b)
-          Right i -> return (m, WeakTermIntU s i)
-    (_, WeakTermTheta constant)
-      | [(_, WeakTermInt x), (_, WeakTermIntS s2 y)] <- es'
-      , Just (LowTypeSignedInt s, op) <- asBinaryOpMaybe constant
-      , s == s2 ->
-        case computeInt x y op of
-          Left b -> return (m, b)
-          Right i -> return (m, WeakTermIntS s i)
-    (_, WeakTermTheta constant)
-      | [(_, WeakTermIntS s1 x), (_, WeakTermInt y)] <- es'
-      , Just (LowTypeSignedInt s, op) <- asBinaryOpMaybe constant
-      , s == s1 ->
-        case computeInt x y op of
-          Left b -> return (m, b)
-          Right i -> return (m, WeakTermIntS s i)
-    (_, WeakTermTheta constant)
-      | [(_, WeakTermInt x), (_, WeakTermIntU s2 y)] <- es'
-      , Just (LowTypeUnsignedInt s, op) <- asBinaryOpMaybe constant
-      , s == s2 ->
-        case computeInt x y op of
-          Left b -> return (m, b)
-          Right i -> return (m, WeakTermIntU s i)
-    (_, WeakTermTheta constant)
-      | [(_, WeakTermIntU s1 x), (_, WeakTermInt y)] <- es'
-      , Just (LowTypeUnsignedInt s, op) <- asBinaryOpMaybe constant
-      , s == s1 ->
-        case computeInt x y op of
-          Left b -> return (m, b)
-          Right i -> return (m, WeakTermIntU s i)
-    (_, WeakTermTheta constant)
-      | [(_, WeakTermInt x), (_, WeakTermInt y)] <- es'
-      , Just (LowTypeSignedInt s, op) <- asBinaryOpMaybe constant ->
-        case computeInt x y op of
-          Left b -> return (m, b)
-          Right i -> return (m, WeakTermIntS s i)
-    (_, WeakTermTheta constant)
-      | [(_, WeakTermInt x), (_, WeakTermInt y)] <- es'
-      , Just (LowTypeUnsignedInt s, op) <- asBinaryOpMaybe constant -> do
-        let x' = unsafeCoerce x :: Word
-        let y' = unsafeCoerce y :: Word
-        case computeInt x' y' op of
-          Left b -> return (m, b)
-          Right i -> return (m, WeakTermIntU s $ unsafeCoerce i)
-    (_, WeakTermTheta constant)
-      | [(_, WeakTermFloat16 x), (_, WeakTermFloat16 y)] <- es'
-      , Just (LowTypeFloat FloatSize16, op) <- asBinaryOpMaybe constant ->
-        case computeFloat x y op app of
-          Left b -> return (m, b)
-          Right z -> return (m, WeakTermFloat16 z)
-    (_, WeakTermTheta constant)
-      | [(_, WeakTermFloat32 x), (_, WeakTermFloat32 y)] <- es'
-      , Just (LowTypeFloat FloatSize32, op) <- asBinaryOpMaybe constant ->
-        case computeFloat x y op app of
-          Left b -> return (m, b)
-          Right z -> return (m, WeakTermFloat32 z)
-    (_, WeakTermTheta constant)
-      | [(_, WeakTermFloat64 x), (_, WeakTermFloat64 y)] <- es'
-      , Just (LowTypeFloat FloatSize64, op) <- asBinaryOpMaybe constant ->
-        case computeFloat x y op app of
-          Left b -> return (m, b)
-          Right z -> return (m, WeakTermFloat64 z)
-    (_, WeakTermTheta constant)
-      | Just (x, y) <- anyPlusF16 es'
-      , Just (LowTypeFloat FloatSize16, op) <- asBinaryOpMaybe constant -> do
-        let x' = realToFrac x
-        case computeFloat x' y op app of
-          Left b -> return (m, b)
-          Right z -> return (m, WeakTermFloat16 z)
-    (_, WeakTermTheta constant)
-      | Just (x, y) <- anyPlusF32 es'
-      , Just (LowTypeFloat FloatSize32, op) <- asBinaryOpMaybe constant -> do
-        let x' = realToFrac x
-        case computeFloat x' y op app of
-          Left b -> return (m, b)
-          Right z -> return (m, WeakTermFloat32 z)
-    (_, WeakTermTheta constant)
-      | Just (x, y) <- anyPlusF64 es'
-      , Just (LowTypeFloat FloatSize64, op) <- asBinaryOpMaybe constant -> do
-        let x' = realToFrac x
-        case computeFloat x' y op app of
-          Left b -> return (m, b)
-          Right z -> return (m, WeakTermFloat64 z)
-    (_, WeakTermTheta constant)
-      | Just (x, y) <- anyPlusAny es'
-      , Just (LowTypeFloat FloatSize16, op) <- asBinaryOpMaybe constant -> do
-        let x' = realToFrac x
-        let y' = realToFrac y
-        case computeFloat x' y' op app of
-          Left b -> return (m, b)
-          Right z -> return (m, WeakTermFloat16 z)
-    (_, WeakTermTheta constant)
-      | Just (x, y) <- anyPlusAny es'
-      , Just (LowTypeFloat FloatSize32, op) <- asBinaryOpMaybe constant -> do
-        let x' = realToFrac x
-        let y' = realToFrac y
-        case computeFloat x' y' op app of
-          Left b -> return (m, b)
-          Right z -> return (m, WeakTermFloat32 z)
-    (_, WeakTermTheta constant)
-      | Just (x, y) <- anyPlusAny es'
-      , Just (LowTypeFloat FloatSize64, op) <- asBinaryOpMaybe constant -> do
-        case computeFloat x y op app of
-          Left b -> return (m, b)
-          Right z -> return (m, WeakTermFloat64 z)
+    (_, WeakTermTheta constant) ->
+      reduceWeakTermPlusTheta (m, app) es' m constant
     _ -> return (m, app)
 reduceWeakTermPlus t = return t
 
-anyPlusF16 :: [WeakTermPlus] -> Maybe (Double, Half)
-anyPlusF16 [(_, WeakTermFloat x), (_, WeakTermFloat16 y)] = Just (x, y)
-anyPlusF16 [(_, WeakTermFloat16 x), (_, WeakTermFloat y)] = Just (y, x)
-anyPlusF16 _ = Nothing
+reduceWeakTermPlusTheta ::
+     WeakTermPlus
+  -> [WeakTermPlus]
+  -> WeakMeta
+  -> Identifier
+  -> WithEnv WeakTermPlus
+reduceWeakTermPlusTheta orig es m constant
+  | Just (lowType, op) <- asUnaryOpMaybe constant
+  , [arg] <- es = reduceWeakTermPlusUnary orig arg m lowType op
+  | Just (lowType, op) <- asBinaryOpMaybe constant
+  , [arg1, arg2] <- es = reduceWeakTermPlusBinary orig arg1 arg2 m lowType op
+  | otherwise = return orig
 
-anyPlusF32 :: [WeakTermPlus] -> Maybe (Double, Float)
-anyPlusF32 [(_, WeakTermFloat x), (_, WeakTermFloat32 y)] = Just (x, y)
-anyPlusF32 [(_, WeakTermFloat32 x), (_, WeakTermFloat y)] = Just (y, x)
-anyPlusF32 _ = Nothing
+reduceWeakTermPlusUnary ::
+     WeakTermPlus
+  -> WeakTermPlus
+  -> WeakMeta
+  -> LowType
+  -> UnaryOp
+  -> WithEnv WeakTermPlus
+reduceWeakTermPlusUnary orig arg _ lowType _ = do
+  case getUnaryArgInfo lowType arg of
+    Just (UnaryArgInfoIntS _ _) -> undefined
+    Just (UnaryArgInfoIntU _ _) -> undefined
+    Just (UnaryArgInfoFloat16 _) -> undefined
+    Just (UnaryArgInfoFloat32 _) -> undefined
+    Just (UnaryArgInfoFloat64 _) -> undefined
+    Nothing -> return orig
+  -- case op of
+  --   UnaryOpNeg -> undefined
+  --   UnaryOpTrunc _ -> undefined
+  --   UnaryOpZext _ -> undefined
+  --   UnaryOpSext _ -> undefined
+  --   UnaryOpFpExt _ -> undefined
+  --   UnaryOpTo _ -> undefined
+  --   _ -> return orig
+    -- (_, WeakTermTheta constant)
+    --   | [(_, WeakTermInt x)] <- es'
+    --   , Just (LowTypeSignedInt _, op) <- asUnaryOpMaybe constant -> do
+    --     case op of
+    --       UnaryOpTrunc _ -> undefined
+    --       UnaryOpZext _ -> return (m, WeakTermInt x)
+    --       UnaryOpSext _ -> undefined
+    --       UnaryOpTo (LowTypeFloat _) ->
+    --         return (m, WeakTermFloat64 (fromIntegral x))
+    --       _ -> return (m, app)
+    -- (_, WeakTermTheta constant)
+    --   | [(_, WeakTermInt x)] <- es'
+    --   , Just (LowTypeUnsignedInt _, op) <- asUnaryOpMaybe constant -> do
+    --     case op of
+    --       UnaryOpTrunc _ -> undefined
+    --       UnaryOpZext _ -> return (m, WeakTermInt x)
+    --       UnaryOpSext _ -> undefined
+    --       UnaryOpTo (LowTypeFloat _) ->
+    --         return (m, WeakTermFloat64 (fromIntegral x))
+    --       _ -> return (m, app)
+    -- (_, WeakTermTheta constant)
+    --   | [(_, WeakTermFloat64 x)] <- es'
+    --   , Just (LowTypeFloat _, op) <- asUnaryOpMaybe constant ->
+    --     case op of
+    --       UnaryOpNeg -> return (m, WeakTermFloat64 (-x))
+    --       UnaryOpTrunc _ -> undefined
+    --       UnaryOpFpExt _ -> undefined
+    --       UnaryOpTo _ -> undefined
+    --       _ -> return (m, app)
 
-anyPlusF64 :: [WeakTermPlus] -> Maybe (Double, Double)
-anyPlusF64 [(_, WeakTermFloat x), (_, WeakTermFloat64 y)] = Just (x, y)
-anyPlusF64 [(_, WeakTermFloat64 x), (_, WeakTermFloat y)] = Just (y, x)
-anyPlusF64 _ = Nothing
+reduceWeakTermPlusBinary ::
+     WeakTermPlus
+  -> WeakTermPlus
+  -> WeakTermPlus
+  -> WeakMeta
+  -> LowType
+  -> BinaryOp
+  -> WithEnv WeakTermPlus
+reduceWeakTermPlusBinary orig arg1 arg2 m lowType op = do
+  case getBinaryArgInfo lowType arg1 arg2 of
+    Just (BinaryArgInfoIntS size x y) ->
+      asWeakTermPlus m (computeIntS x y op) (WeakTermIntS size)
+    Just (BinaryArgInfoIntU size x y) ->
+      asWeakTermPlus m (computeIntU x y op) (WeakTermIntU size)
+    Just (BinaryArgInfoFloat16 x y) ->
+      asWeakTermPlus m (computeFloat x y op (snd orig)) WeakTermFloat16
+    Just (BinaryArgInfoFloat32 x y) ->
+      asWeakTermPlus m (computeFloat x y op (snd orig)) WeakTermFloat32
+    Just (BinaryArgInfoFloat64 x y) ->
+      asWeakTermPlus m (computeFloat x y op (snd orig)) WeakTermFloat64
+    Nothing -> return orig
 
-anyPlusAny :: [WeakTermPlus] -> Maybe (Double, Double)
-anyPlusAny [(_, WeakTermFloat x), (_, WeakTermFloat y)] = Just (x, y)
-anyPlusAny _ = Nothing
+asWeakTermPlus :: Monad m => a -> Either b t -> (t -> b) -> m (a, b)
+asWeakTermPlus m boolOrCalcResult f =
+  case boolOrCalcResult of
+    Left b -> return (m, b)
+    Right i -> return (m, f i)
+
+data UnaryArgInfo
+  = UnaryArgInfoIntS IntSize Integer
+  | UnaryArgInfoIntU IntSize Integer
+  | UnaryArgInfoFloat16 Half
+  | UnaryArgInfoFloat32 Float
+  | UnaryArgInfoFloat64 Double
+  deriving (Show, Eq)
+
+getUnaryArgInfo :: LowType -> WeakTermPlus -> Maybe UnaryArgInfo
+-- IntS
+getUnaryArgInfo (LowTypeSignedInt s) (_, WeakTermIntS s1 x)
+  | s == s1 = return $ UnaryArgInfoIntS s x
+-- IntU
+getUnaryArgInfo (LowTypeUnsignedInt s) (_, WeakTermIntU s1 x)
+  | s == s1 = return $ UnaryArgInfoIntU s x
+-- Int with size specified by lowType
+getUnaryArgInfo (LowTypeSignedInt s) (_, WeakTermInt x) =
+  return $ UnaryArgInfoIntS s x
+-- Float16
+getUnaryArgInfo (LowTypeFloat FloatSize16) (_, WeakTermFloat16 x) =
+  return $ UnaryArgInfoFloat16 x
+-- Float32
+getUnaryArgInfo (LowTypeFloat FloatSize32) (_, WeakTermFloat32 x) =
+  return $ UnaryArgInfoFloat32 x
+-- Float64
+getUnaryArgInfo (LowTypeFloat FloatSize64) (_, WeakTermFloat64 x) =
+  return $ UnaryArgInfoFloat64 x
+-- Float with size specified by lowType
+getUnaryArgInfo (LowTypeFloat FloatSize16) (_, WeakTermFloat x) =
+  return $ UnaryArgInfoFloat16 (realToFrac x)
+getUnaryArgInfo (LowTypeFloat FloatSize32) (_, WeakTermFloat x) =
+  return $ UnaryArgInfoFloat32 (realToFrac x)
+getUnaryArgInfo (LowTypeFloat FloatSize64) (_, WeakTermFloat x) =
+  return $ UnaryArgInfoFloat64 (realToFrac x)
+-- otherwise (invalid argument)
+getUnaryArgInfo _ _ = Nothing
+
+data BinaryArgInfo
+  = BinaryArgInfoIntS IntSize Integer Integer
+  | BinaryArgInfoIntU IntSize Integer Integer
+  | BinaryArgInfoFloat16 Half Half
+  | BinaryArgInfoFloat32 Float Float
+  | BinaryArgInfoFloat64 Double Double
+  deriving (Show, Eq)
+
+getBinaryArgInfo ::
+     LowType -> WeakTermPlus -> WeakTermPlus -> Maybe BinaryArgInfo
+-- IntS
+getBinaryArgInfo (LowTypeSignedInt s) (_, WeakTermIntS s1 x) (_, WeakTermIntS s2 y)
+  | s == s1 && s == s2 = return $ BinaryArgInfoIntS s x y
+getBinaryArgInfo (LowTypeSignedInt s) (_, WeakTermInt x) (_, WeakTermIntS s2 y)
+  | s == s2 = return $ BinaryArgInfoIntS s x y
+getBinaryArgInfo (LowTypeSignedInt s) (_, WeakTermIntS s1 x) (_, WeakTermInt y)
+  | s == s1 = return $ BinaryArgInfoIntS s x y
+-- IntU
+getBinaryArgInfo (LowTypeUnsignedInt s) (_, WeakTermIntU s1 x) (_, WeakTermIntU s2 y)
+  | s == s1 && s == s2 = return $ BinaryArgInfoIntU s x y
+getBinaryArgInfo (LowTypeUnsignedInt s) (_, WeakTermInt x) (_, WeakTermIntU s2 y)
+  | s == s2 = return $ BinaryArgInfoIntU s x y
+getBinaryArgInfo (LowTypeUnsignedInt s) (_, WeakTermIntU s1 x) (_, WeakTermInt y)
+  | s == s1 = return $ BinaryArgInfoIntU s x y
+-- Int with size specified by lowType
+getBinaryArgInfo (LowTypeSignedInt s) (_, WeakTermInt x) (_, WeakTermInt y) =
+  return $ BinaryArgInfoIntS s x y
+getBinaryArgInfo (LowTypeUnsignedInt s) (_, WeakTermInt x) (_, WeakTermInt y) =
+  return $ BinaryArgInfoIntU s x y
+-- Float16
+getBinaryArgInfo (LowTypeFloat FloatSize16) (_, WeakTermFloat16 x) (_, WeakTermFloat16 y) =
+  return $ BinaryArgInfoFloat16 x y
+getBinaryArgInfo (LowTypeFloat FloatSize16) (_, WeakTermFloat x) (_, WeakTermFloat16 y) =
+  return $ BinaryArgInfoFloat16 (realToFrac x) y
+getBinaryArgInfo (LowTypeFloat FloatSize16) (_, WeakTermFloat16 x) (_, WeakTermFloat y) =
+  return $ BinaryArgInfoFloat16 x (realToFrac y)
+-- Float32
+getBinaryArgInfo (LowTypeFloat FloatSize32) (_, WeakTermFloat32 x) (_, WeakTermFloat32 y) =
+  return $ BinaryArgInfoFloat32 x y
+getBinaryArgInfo (LowTypeFloat FloatSize32) (_, WeakTermFloat x) (_, WeakTermFloat32 y) =
+  return $ BinaryArgInfoFloat32 (realToFrac x) y
+getBinaryArgInfo (LowTypeFloat FloatSize32) (_, WeakTermFloat32 x) (_, WeakTermFloat y) =
+  return $ BinaryArgInfoFloat32 x (realToFrac y)
+-- Float64
+getBinaryArgInfo (LowTypeFloat FloatSize64) (_, WeakTermFloat64 x) (_, WeakTermFloat64 y) =
+  return $ BinaryArgInfoFloat64 x y
+getBinaryArgInfo (LowTypeFloat FloatSize64) (_, WeakTermFloat x) (_, WeakTermFloat64 y) =
+  return $ BinaryArgInfoFloat64 (realToFrac x) y
+getBinaryArgInfo (LowTypeFloat FloatSize64) (_, WeakTermFloat64 x) (_, WeakTermFloat y) =
+  return $ BinaryArgInfoFloat64 x (realToFrac y)
+-- Float with size specified by lowType
+getBinaryArgInfo (LowTypeFloat FloatSize16) (_, WeakTermFloat x) (_, WeakTermFloat y) =
+  return $ BinaryArgInfoFloat16 (realToFrac x) (realToFrac y)
+getBinaryArgInfo (LowTypeFloat FloatSize32) (_, WeakTermFloat x) (_, WeakTermFloat y) =
+  return $ BinaryArgInfoFloat32 (realToFrac x) (realToFrac y)
+getBinaryArgInfo (LowTypeFloat FloatSize64) (_, WeakTermFloat x) (_, WeakTermFloat y) =
+  return $ BinaryArgInfoFloat64 x y
+-- otherwise (invalid arguments)
+getBinaryArgInfo _ _ _ = Nothing
+
+computeIntS :: (Integral a, Bits a) => a -> a -> BinaryOp -> Either WeakTerm a
+computeIntS = undefined
+
+computeIntU :: (Integral a, Bits a) => a -> a -> BinaryOp -> Either WeakTerm a
+computeIntU = undefined
 
 computeInt :: (Integral a, Bits a) => a -> a -> BinaryOp -> Either WeakTerm a
 computeInt x y BinaryOpAdd = Right $ x + y
