@@ -175,3 +175,6 @@ wordsBy c s =
 
 ushiftR :: Int -> Int -> Int
 ushiftR n k = fromIntegral (fromIntegral n `shiftR` k :: Word)
+
+ushiftR' :: (Integral a) => a -> Int -> a
+ushiftR' n k = fromIntegral (fromIntegral n `shiftR` k :: Word)

@@ -68,47 +68,17 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
     (_, WeakTermTheta constant)
       | [(_, WeakTermInt x), (_, WeakTermInt y)] <- es'
       , Just (LowTypeSignedInt _, op) <- asBinaryOpMaybe constant ->
-        case op of
-          BinaryOpAdd -> return (m, WeakTermInt (x + y))
-          BinaryOpSub -> return (m, WeakTermInt (x - y))
-          BinaryOpMul -> return (m, WeakTermInt (x * y))
-          BinaryOpDiv -> return (m, WeakTermInt (x `div` y))
-          BinaryOpRem -> return (m, WeakTermInt (x `rem` y))
-          BinaryOpEQ -> return (m, asEpsilon $ x == y)
-          BinaryOpNE -> return (m, asEpsilon $ x /= y)
-          BinaryOpGT -> return (m, asEpsilon $ x > y)
-          BinaryOpGE -> return (m, asEpsilon $ x >= y)
-          BinaryOpLT -> return (m, asEpsilon $ x < y)
-          BinaryOpLE -> return (m, asEpsilon $ x <= y)
-          BinaryOpShl -> return (m, WeakTermInt (shiftL x y))
-          BinaryOpLshr -> return (m, WeakTermInt (ushiftR x y))
-          BinaryOpAshr -> return (m, WeakTermInt (shiftR x y))
-          BinaryOpAnd -> return (m, WeakTermInt (x .&. y))
-          BinaryOpOr -> return (m, WeakTermInt (x .|. y))
-          BinaryOpXor -> return (m, WeakTermInt (x `xor` y))
+        case computeInt x y op of
+          Left b -> return (m, b)
+          Right i -> return (m, WeakTermInt i)
     (_, WeakTermTheta constant)
       | [(_, WeakTermInt x), (_, WeakTermInt y)] <- es'
       , Just (LowTypeUnsignedInt _, op) <- asBinaryOpMaybe constant -> do
         let x' = unsafeCoerce x :: Word
         let y' = unsafeCoerce y :: Word
-        case op of
-          BinaryOpAdd -> return (m, WeakTermInt (unsafeCoerce $ x' + y'))
-          BinaryOpSub -> return (m, WeakTermInt (unsafeCoerce $ x' - y'))
-          BinaryOpMul -> return (m, WeakTermInt (unsafeCoerce $ x' * y'))
-          BinaryOpDiv -> return (m, WeakTermInt (unsafeCoerce (x' `div` y')))
-          BinaryOpRem -> return (m, WeakTermInt (unsafeCoerce $ x' `rem` y'))
-          BinaryOpEQ -> return (m, asEpsilon $ x' == y')
-          BinaryOpNE -> return (m, asEpsilon $ x' /= y')
-          BinaryOpGT -> return (m, asEpsilon $ x' > y')
-          BinaryOpGE -> return (m, asEpsilon $ x' >= y')
-          BinaryOpLT -> return (m, asEpsilon $ x' < y')
-          BinaryOpLE -> return (m, asEpsilon $ x' <= y')
-          BinaryOpShl -> return (m, WeakTermInt (shiftL x y))
-          BinaryOpLshr -> return (m, WeakTermInt (ushiftR x y))
-          BinaryOpAshr -> return (m, WeakTermInt (shiftR x y))
-          BinaryOpAnd -> return (m, WeakTermInt (x .&. y))
-          BinaryOpOr -> return (m, WeakTermInt (x .|. y))
-          BinaryOpXor -> return (m, WeakTermInt (x `xor` y))
+        case computeInt x' y' op of
+          Left b -> return (m, b)
+          Right i -> return (m, WeakTermInt $ unsafeCoerce i)
     (_, WeakTermTheta constant)
       | [(_, WeakTermFloat16 x), (_, WeakTermFloat16 y)] <- es'
       , Just (LowTypeFloat FloatSize16, op) <- asBinaryOpMaybe constant ->
@@ -129,6 +99,25 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
           Right z -> return (m, WeakTermFloat64 z)
     _ -> return (m, app)
 reduceWeakTermPlus t = return t
+
+computeInt :: (Integral a, Bits a) => a -> a -> BinaryOp -> Either WeakTerm a
+computeInt x y BinaryOpAdd = Right $ x + y
+computeInt x y BinaryOpSub = Right $ x - y
+computeInt x y BinaryOpMul = Right $ x * y
+computeInt x y BinaryOpDiv = Right $ x `div` y
+computeInt x y BinaryOpRem = Right $ x `rem` y
+computeInt x y BinaryOpEQ = Left $ asEpsilon $ x == y
+computeInt x y BinaryOpNE = Left $ asEpsilon $ x /= y
+computeInt x y BinaryOpGT = Left $ asEpsilon $ x > y
+computeInt x y BinaryOpGE = Left $ asEpsilon $ x >= y
+computeInt x y BinaryOpLT = Left $ asEpsilon $ x < y
+computeInt x y BinaryOpLE = Left $ asEpsilon $ x <= y
+computeInt x y BinaryOpShl = Right $ shiftL x (unsafeCoerce y)
+computeInt x y BinaryOpLshr = Right $ ushiftR' x (unsafeCoerce y)
+computeInt x y BinaryOpAshr = Right $ shiftR x (unsafeCoerce y)
+computeInt x y BinaryOpAnd = Right $ x .&. y
+computeInt x y BinaryOpOr = Right $ x .|. y
+computeInt x y BinaryOpXor = Right $ x `xor` y
 
 computeFloat ::
      (Real a, Fractional a)
