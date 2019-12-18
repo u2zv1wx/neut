@@ -25,6 +25,7 @@ reduceWeakTermPlus (m, WeakTermEpsilonElim (x, t) e branchList) = do
 reduceWeakTermPlus (m, WeakTermPiElim e es) = do
   e' <- reduceWeakTermPlus e
   es' <- mapM reduceWeakTermPlus es
+  let app = WeakTermPiElim e' es'
   case e' of
     (_, WeakTermPiIntro xts body)
       | length xts == length es'
@@ -44,7 +45,7 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
           UnaryOpSext _ -> undefined
           UnaryOpTo (LowTypeFloat _) ->
             return (m, WeakTermFloat64 (fromIntegral x))
-          _ -> return (m, WeakTermPiElim e' es')
+          _ -> return (m, app)
     (_, WeakTermTheta constant)
       | [(_, WeakTermInt x)] <- es'
       , Just (LowTypeUnsignedInt _, op) <- asUnaryOpMaybe constant -> do
@@ -54,7 +55,7 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
           UnaryOpSext _ -> undefined
           UnaryOpTo (LowTypeFloat _) ->
             return (m, WeakTermFloat64 (fromIntegral x))
-          _ -> return (m, WeakTermPiElim e' es')
+          _ -> return (m, app)
     (_, WeakTermTheta constant)
       | [(_, WeakTermFloat64 x)] <- es'
       , Just (LowTypeFloat _, op) <- asUnaryOpMaybe constant ->
@@ -63,7 +64,7 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
           UnaryOpTrunc _ -> undefined
           UnaryOpFpExt _ -> undefined
           UnaryOpTo _ -> undefined
-          _ -> return (m, WeakTermPiElim e' es')
+          _ -> return (m, app)
     (_, WeakTermTheta constant)
       | [(_, WeakTermInt x), (_, WeakTermInt y)] <- es'
       , Just (LowTypeSignedInt _, op) <- asBinaryOpMaybe constant ->
@@ -109,23 +110,45 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
           BinaryOpOr -> return (m, WeakTermInt (x .|. y))
           BinaryOpXor -> return (m, WeakTermInt (x `xor` y))
     (_, WeakTermTheta constant)
+      | [(_, WeakTermFloat16 x), (_, WeakTermFloat16 y)] <- es'
+      , Just (LowTypeFloat FloatSize16, op) <- asBinaryOpMaybe constant ->
+        case computeFloat x y op app of
+          Left b -> return (m, b)
+          Right z -> return (m, WeakTermFloat16 z)
+    (_, WeakTermTheta constant)
+      | [(_, WeakTermFloat32 x), (_, WeakTermFloat32 y)] <- es'
+      , Just (LowTypeFloat FloatSize32, op) <- asBinaryOpMaybe constant ->
+        case computeFloat x y op app of
+          Left b -> return (m, b)
+          Right z -> return (m, WeakTermFloat32 z)
+    (_, WeakTermTheta constant)
       | [(_, WeakTermFloat64 x), (_, WeakTermFloat64 y)] <- es'
-      , Just (LowTypeFloat _, op) <- asBinaryOpMaybe constant ->
-        case op of
-          BinaryOpAdd -> return (m, WeakTermFloat64 (x + y))
-          BinaryOpSub -> return (m, WeakTermFloat64 (x - y))
-          BinaryOpMul -> return (m, WeakTermFloat64 (x * y))
-          BinaryOpDiv -> return (m, WeakTermFloat64 (x / y))
-          BinaryOpRem -> return (m, WeakTermFloat64 (x `mod'` y))
-          BinaryOpEQ -> return (m, asEpsilon $ x == y)
-          BinaryOpNE -> return (m, asEpsilon $ x /= y)
-          BinaryOpGT -> return (m, asEpsilon $ x > y)
-          BinaryOpGE -> return (m, asEpsilon $ x >= y)
-          BinaryOpLT -> return (m, asEpsilon $ x < y)
-          BinaryOpLE -> return (m, asEpsilon $ x <= y)
-          _ -> return (m, WeakTermPiElim e' es')
-    _ -> return (m, WeakTermPiElim e' es')
+      , Just (LowTypeFloat FloatSize64, op) <- asBinaryOpMaybe constant ->
+        case computeFloat x y op app of
+          Left b -> return (m, b)
+          Right z -> return (m, WeakTermFloat64 z)
+    _ -> return (m, app)
 reduceWeakTermPlus t = return t
+
+computeFloat ::
+     (Real a, Fractional a)
+  => a
+  -> a
+  -> BinaryOp
+  -> WeakTerm
+  -> Either WeakTerm a
+computeFloat x y BinaryOpAdd _ = Right $ x + y
+computeFloat x y BinaryOpSub _ = Right $ x - y
+computeFloat x y BinaryOpMul _ = Right $ x * y
+computeFloat x y BinaryOpDiv _ = Right $ x / y
+computeFloat x y BinaryOpRem _ = Right $ x `mod'` y
+computeFloat x y BinaryOpEQ _ = Left $ asEpsilon $ x == y
+computeFloat x y BinaryOpNE _ = Left $ asEpsilon $ x /= y
+computeFloat x y BinaryOpGT _ = Left $ asEpsilon $ x > y
+computeFloat x y BinaryOpGE _ = Left $ asEpsilon $ x >= y
+computeFloat x y BinaryOpLT _ = Left $ asEpsilon $ x < y
+computeFloat x y BinaryOpLE _ = Left $ asEpsilon $ x <= y
+computeFloat _ _ _ e = Left e
 
 asEpsilon :: Bool -> WeakTerm
 asEpsilon True = WeakTermEpsilonIntro "true"
