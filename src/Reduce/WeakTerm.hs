@@ -79,7 +79,7 @@ reduceWeakTermPlusUnary orig arg m lowType op = do
             -- (the newly-inserted sign bit is always 0)
             return (m, WeakTermIntS s2 (asIntS s2' (asIntU s1' x)))
         UnaryOpSext (LowTypeSignedInt s2)
-          | s1 < s2 -> return (m, WeakTermIntS s2 x) -- sext over int doesn't alter value
+          | s1 < s2 -> return (m, WeakTermIntS s2 x) -- sext over int doesn't alter interpreted value
         UnaryOpTo (LowTypeFloat FloatSize16) ->
           return (m, WeakTermFloat16 (fromIntegral x))
         UnaryOpTo (LowTypeFloat FloatSize32) ->
@@ -92,7 +92,7 @@ reduceWeakTermPlusUnary orig arg m lowType op = do
         UnaryOpTrunc (LowTypeUnsignedInt s2)
           | s1 > s2 -> return (m, WeakTermIntU s2 (x .&. (2 ^ s2 - 1))) -- e.g. trunc 257 to i8 ~> 257 .&. 255 ~> 1
         UnaryOpZext (LowTypeUnsignedInt s2)
-          | s1 < s2 -> return (m, WeakTermIntU s2 x) -- zext over uint doesn't alter value
+          | s1 < s2 -> return (m, WeakTermIntU s2 x) -- zext over uint doesn't alter interpreted value
         UnaryOpSext (LowTypeUnsignedInt s2)
           | s1 < s2 -> do
             let s1' = toInteger s1
