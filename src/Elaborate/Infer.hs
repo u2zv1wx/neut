@@ -92,9 +92,13 @@ infer ctx (meta, WeakTermZeta _) = do
 infer _ (meta, WeakTermInt _) = do
   h <- newHoleInCtx []
   returnAfterUpdate meta h
-infer _ (meta, WeakTermFloat _) = do
+infer _ (meta, WeakTermFloat16 _) =
+  returnAfterUpdate meta (newMetaTerminal, WeakTermTheta "f16")
+infer _ (meta, WeakTermFloat32 _) =
+  returnAfterUpdate meta (newMetaTerminal, WeakTermTheta "f32")
+infer _ (meta, WeakTermFloat64 _) = do
   h <- newHoleInCtx []
-  returnAfterUpdate meta h
+  returnAfterUpdate meta h -- f64 or "any float"
 
 inferPlus :: Context -> [(Identifier, WeakTermPlus)] -> WithEnv [WeakTermPlus]
 inferPlus ctx xts =
