@@ -8,7 +8,8 @@ data LLVMData
   = LLVMDataLocal Identifier
   | LLVMDataGlobal Identifier
   | LLVMDataStruct [LLVMData]
-  | LLVMDataInt Int Int
+  | LLVMDataIntS IntSize Integer
+  | LLVMDataIntU IntSize Integer
   | LLVMDataFloat16 Half
   | LLVMDataFloat32 Float
   | LLVMDataFloat64 Double

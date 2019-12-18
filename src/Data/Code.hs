@@ -12,7 +12,8 @@ data Data
   | DataUpsilon Identifier
   | DataEpsilonIntro Identifier
   | DataSigmaIntro [DataPlus]
-  | DataInt Int LowType
+  | DataIntS IntSize Integer
+  | DataIntU IntSize Integer
   | DataFloat16 Half
   | DataFloat32 Float
   | DataFloat64 Double
@@ -54,7 +55,8 @@ substDataPlus _ (m, DataEpsilonIntro l) = (m, DataEpsilonIntro l)
 substDataPlus sub (m, DataSigmaIntro vs) = do
   let vs' = map (substDataPlus sub) vs
   (m, DataSigmaIntro vs')
-substDataPlus _ (m, DataInt l p) = (m, DataInt l p)
+substDataPlus _ (m, DataIntS size l) = (m, DataIntS size l)
+substDataPlus _ (m, DataIntU size l) = (m, DataIntU size l)
 substDataPlus _ (m, DataFloat16 l) = (m, DataFloat16 l)
 substDataPlus _ (m, DataFloat32 l) = (m, DataFloat32 l)
 substDataPlus _ (m, DataFloat64 l) = (m, DataFloat64 l)

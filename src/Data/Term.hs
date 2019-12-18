@@ -18,7 +18,8 @@ data Term
   | TermPiIntro [IdentifierPlus] TermPlus
   | TermPiElim TermPlus [TermPlus]
   | TermMu (Identifier, TermPlus) TermPlus
-  | TermInt Int LowType
+  | TermIntS IntSize Integer
+  | TermIntU IntSize Integer
   | TermFloat16 Half
   | TermFloat32 Float
   | TermFloat64 Double
@@ -67,7 +68,8 @@ getClosedVarChain (_, TermPiIntro xts e) = getClosedVarChainBindings xts [e]
 getClosedVarChain (_, TermPiElim e es) =
   getClosedVarChain e ++ concatMap getClosedVarChain es
 getClosedVarChain (_, TermMu ut e) = getClosedVarChainBindings [ut] [e]
-getClosedVarChain (_, TermInt _ _) = []
+getClosedVarChain (_, TermIntS _ _) = []
+getClosedVarChain (_, TermIntU _ _) = []
 getClosedVarChain (_, TermFloat16 _) = []
 getClosedVarChain (_, TermFloat32 _) = []
 getClosedVarChain (_, TermFloat64 _) = []
@@ -108,7 +110,8 @@ substTermPlus sub (m, TermMu (x, t) e) = do
   let t' = substTermPlus sub t
   let e' = substTermPlus (filter (\(k, _) -> k /= x) sub) e
   (m, TermMu (x, t') e')
-substTermPlus _ (m, TermInt x lowType) = (m, TermInt x lowType)
+substTermPlus _ (m, TermIntS size x) = (m, TermIntS size x)
+substTermPlus _ (m, TermIntU size x) = (m, TermIntU size x)
 substTermPlus _ (m, TermFloat16 x) = (m, TermFloat16 x)
 substTermPlus _ (m, TermFloat32 x) = (m, TermFloat32 x)
 substTermPlus _ (m, TermFloat64 x) = (m, TermFloat64 x)
