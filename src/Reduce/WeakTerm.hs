@@ -62,10 +62,60 @@ reduceWeakTermPlusUnary ::
   -> LowType
   -> UnaryOp
   -> WithEnv WeakTermPlus
-reduceWeakTermPlusUnary orig arg _ lowType _ = do
+reduceWeakTermPlusUnary orig arg m lowType op = do
   case getUnaryArgInfo lowType arg of
-    Just (UnaryArgInfoIntS _ _) -> undefined
-    Just (UnaryArgInfoIntU _ _) -> undefined
+    Just (UnaryArgInfoIntS s1 x) ->
+      case op of
+        UnaryOpTrunc (LowTypeSignedInt s2)
+          | s1 > s2 -> return (m, WeakTermIntS s2 (x .&. (2 ^ s2 - 1))) -- e.g. trunc 257 to i8 ~> 257 .&. 255 ~> 1
+        UnaryOpZext (LowTypeSignedInt s2)
+          | s1 < s2 -> do
+            let s1' = toInteger s1
+            let s2' = toInteger s2
+            --                      -10 in  i8 {bitseq =           1111 0110}
+            -- ~> (asIntU 8)    ~>  246 in  u8 {bitseq =           1111 0110}
+            -- ~> (zero extend) ~>  246 in u16 {bitseq = 0000 0000 1111 0110}
+            -- ~> (asIntS 16)   ~>  246 in i16 {bitseq = 0000 0000 1111 0110}
+            -- (the newly-inserted sign bit is always 0)
+            return (m, WeakTermIntS s2 (asIntS s2' (asIntU s1' x)))
+        UnaryOpSext (LowTypeSignedInt s2)
+          | s1 < s2 -> return (m, WeakTermIntS s2 x) -- sext over int doesn't alter value
+        UnaryOpTo (LowTypeFloat FloatSize16) ->
+          return (m, WeakTermFloat16 (fromIntegral x))
+        UnaryOpTo (LowTypeFloat FloatSize32) ->
+          return (m, WeakTermFloat32 (fromIntegral x))
+        UnaryOpTo (LowTypeFloat FloatSize64) ->
+          return (m, WeakTermFloat64 (fromIntegral x))
+        _ -> return orig
+    Just (UnaryArgInfoIntU s1 x) ->
+      case op of
+        UnaryOpTrunc (LowTypeUnsignedInt s2)
+          | s1 > s2 -> return (m, WeakTermIntU s2 (x .&. (2 ^ s2 - 1))) -- e.g. trunc 257 to i8 ~> 257 .&. 255 ~> 1
+        UnaryOpZext (LowTypeUnsignedInt s2)
+          | s1 < s2 -> return (m, WeakTermIntU s2 x) -- zext over uint doesn't alter value
+        UnaryOpSext (LowTypeUnsignedInt s2)
+          | s1 < s2 -> do
+            let s1' = toInteger s1
+            let s2' = toInteger s2
+            -- when the highest bit is 1:
+            --                        246 in  u8 {bitseq =           1111 0110}
+            -- ~> (asIntS 8)    ~>    -10 in  i8 {bitseq =           1111 0110}
+            -- ~> (sign extend) ~>    -10 in i16 {bitseq = 1111 1111 1111 0110}
+            -- ~> (asIntU 16)   ~>  65526 in u16 {bitseq = 1111 1111 1111 0110}
+            --
+            -- when the highest bit is 0:
+            --                      118 in  u8 {bitseq =           0111 0110}
+            -- ~> (asIntS 8)    ~>  118 in  i8 {bitseq =           0111 0110}
+            -- ~> (sign extend) ~>  118 in i16 {bitseq = 0000 0000 1111 0110}
+            -- ~> (asIntU 16)   ~>  118 in u16 {bitseq = 0000 0000 1111 0110}
+            return (m, WeakTermIntU s2 (asIntU s2' (asIntS s1' x)))
+        UnaryOpTo (LowTypeFloat FloatSize16) ->
+          return (m, WeakTermFloat16 (fromIntegral x))
+        UnaryOpTo (LowTypeFloat FloatSize32) ->
+          return (m, WeakTermFloat32 (fromIntegral x))
+        UnaryOpTo (LowTypeFloat FloatSize64) ->
+          return (m, WeakTermFloat64 (fromIntegral x))
+        _ -> return orig
     Just (UnaryArgInfoFloat16 _) -> undefined
     Just (UnaryArgInfoFloat32 _) -> undefined
     Just (UnaryArgInfoFloat64 _) -> undefined
@@ -78,26 +128,6 @@ reduceWeakTermPlusUnary orig arg _ lowType _ = do
   --   UnaryOpFpExt _ -> undefined
   --   UnaryOpTo _ -> undefined
   --   _ -> return orig
-    -- (_, WeakTermTheta constant)
-    --   | [(_, WeakTermInt x)] <- es'
-    --   , Just (LowTypeSignedInt _, op) <- asUnaryOpMaybe constant -> do
-    --     case op of
-    --       UnaryOpTrunc _ -> undefined
-    --       UnaryOpZext _ -> return (m, WeakTermInt x)
-    --       UnaryOpSext _ -> undefined
-    --       UnaryOpTo (LowTypeFloat _) ->
-    --         return (m, WeakTermFloat64 (fromIntegral x))
-    --       _ -> return (m, app)
-    -- (_, WeakTermTheta constant)
-    --   | [(_, WeakTermInt x)] <- es'
-    --   , Just (LowTypeUnsignedInt _, op) <- asUnaryOpMaybe constant -> do
-    --     case op of
-    --       UnaryOpTrunc _ -> undefined
-    --       UnaryOpZext _ -> return (m, WeakTermInt x)
-    --       UnaryOpSext _ -> undefined
-    --       UnaryOpTo (LowTypeFloat _) ->
-    --         return (m, WeakTermFloat64 (fromIntegral x))
-    --       _ -> return (m, app)
     -- (_, WeakTermTheta constant)
     --   | [(_, WeakTermFloat64 x)] <- es'
     --   , Just (LowTypeFloat _, op) <- asUnaryOpMaybe constant ->
