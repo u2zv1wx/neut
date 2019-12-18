@@ -22,8 +22,7 @@ toLLVM mainTerm = do
 
 llvmCode :: CodePlus -> WithEnv LLVM
 llvmCode (m, CodeTheta theta) = llvmCodeTheta m theta
-llvmCode (_, CodeEpsilonElim xt v branchList) =
-  llvmCodeEpsilonElim xt v branchList
+llvmCode (_, CodeEpsilonElim v branchList) = llvmCodeEpsilonElim v branchList
 llvmCode (_, CodePiElimDownElim v ds) = do
   f <- newNameWith "fun"
   xs <- mapM (const (newNameWith "arg")) ds
@@ -242,11 +241,11 @@ constructSwitch ((CaseDefault, code):_) = do
   code' <- llvmCode code
   return $ Just (code', [])
 
-llvmCodeEpsilonElim ::
-     Identifier -> DataPlus -> [(Case, CodePlus)] -> WithEnv LLVM
-llvmCodeEpsilonElim x v branchList = do
+llvmCodeEpsilonElim :: DataPlus -> [(Case, CodePlus)] -> WithEnv LLVM
+llvmCodeEpsilonElim v branchList = do
   let t = LowTypeSignedInt 64
   m <- constructSwitch branchList
+  x <- newNameWith "eps"
   case m of
     Nothing -> llvmDataLet' [(x, v)] LLVMUnreachable
     Just (defaultCase, caseList) -> do

@@ -34,12 +34,12 @@ polarize (m, TermEpsilon _) = do
 polarize (m, TermEpsilonIntro l) = do
   let ml = snd $ obtainInfoMeta m
   return (ml, CodeUpIntro (ml, DataEpsilonIntro l))
-polarize (m, TermEpsilonElim x e bs) = do
+polarize (m, TermEpsilonElim e bs) = do
   let (cs, es) = unzip bs
   es' <- mapM polarize es
   (yts, y) <- polarize' e
   let ml = snd $ obtainInfoMeta m
-  return $ bindLet yts (ml, CodeEpsilonElim x y (zip cs es'))
+  return $ bindLet yts (ml, CodeEpsilonElim y (zip cs es'))
 polarize (m, TermPi _) = do
   let ml = snd $ obtainInfoMeta m
   tau <- cartesianImmediate ml

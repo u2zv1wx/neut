@@ -18,7 +18,6 @@ import Elaborate.Analyze
 import Elaborate.Infer
 import Elaborate.Synthesize
 import Reduce.Term
-import Reduce.WeakTerm
 
 -- Given a term `e` and its name `main`, this function
 --   (1) traces `e` using `infer e`, collecting type constraints,
@@ -60,11 +59,11 @@ elaborate' (m, WeakTermEpsilon k) = do
 elaborate' (m, WeakTermEpsilonIntro x) = do
   m' <- toMeta m
   return (m', TermEpsilonIntro x)
-elaborate' (m, WeakTermEpsilonElim (x, _) e branchList) = do
+elaborate' (m, WeakTermEpsilonElim e branchList) = do
   m' <- toMeta m
   e' <- elaborate' e
   branchList' <- forM branchList elaboratePlus
-  return (m', TermEpsilonElim x e' branchList')
+  return (m', TermEpsilonElim e' branchList')
 elaborate' (m, WeakTermPi xts) = do
   m' <- toMeta m
   xts' <- mapM elaboratePlus xts
@@ -161,12 +160,13 @@ exhaust' (_, WeakTermTheta _) = return True
 exhaust' (_, WeakTermUpsilon _) = return True
 exhaust' (_, WeakTermEpsilon _) = return True
 exhaust' (_, WeakTermEpsilonIntro _) = return True
-exhaust' (_, WeakTermEpsilonElim (_, t) e1 branchList) = do
-  b1 <- exhaust' e1
+exhaust' (_, WeakTermEpsilonElim e branchList) = do
+  b <- exhaust' e
   let labelList = map fst branchList
-  t' <- reduceWeakTermPlus t
+  t <- obtainType <$> (toMeta $ fst e)
+  t' <- reduceTermPlus t
   case t' of
-    (_, WeakTermEpsilon x) -> exhaustEpsilonIdentifier x labelList b1
+    (_, TermEpsilon x) -> exhaustEpsilonIdentifier x labelList b
     _ -> lift $ throwE "type error (exhaust)"
 exhaust' (_, WeakTermPi xts) = allM exhaust' $ map snd xts
 exhaust' (_, WeakTermPiIntro _ e) = exhaust' e

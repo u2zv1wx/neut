@@ -51,19 +51,18 @@ infer _ (meta, WeakTermEpsilon _) = returnAfterUpdate meta newUniv
 infer _ (meta, WeakTermEpsilonIntro l) = do
   k <- lookupKind l
   returnAfterUpdate meta (newMetaTerminal, WeakTermEpsilon k)
-infer ctx (meta, WeakTermEpsilonElim (x, t) e branchList) = do
+infer ctx (meta, WeakTermEpsilonElim e branchList) = do
   te <- infer ctx e
-  insTypeEnv x t
-  insConstraintEnv t te
+  -- FIXME: elimで型をbranchごとに変化させることを許すよう修正すること。
   if null branchList
     then newHoleInCtx ctx >>= returnAfterUpdate meta -- ex falso quodlibet
     else do
       let (caseList, es) = unzip branchList
       tls <- mapM inferCase caseList
       constrainList $ te : catMaybes tls
-      ts <- mapM (infer $ ctx ++ [(x, t)]) es
+      ts <- mapM (infer ctx) es
       constrainList ts
-      returnAfterUpdate meta $ substWeakTermPlus [(x, e)] $ head ts
+      returnAfterUpdate meta $ head ts
 infer ctx (meta, WeakTermPi xts) = do
   univList <- inferPlus ctx xts
   constrainList $ newUniv : univList

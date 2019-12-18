@@ -11,17 +11,17 @@ import Data.Env
 import Data.Term
 
 reduceTermPlus :: TermPlus -> WithEnv TermPlus
-reduceTermPlus (m, TermEpsilonElim x e branchList) = do
+reduceTermPlus (m, TermEpsilonElim e branchList) = do
   e' <- reduceTermPlus e
   case e' of
     (_, TermEpsilonIntro l) ->
       case lookup (CaseLabel l) branchList of
-        Just body -> reduceTermPlus $ substTermPlus [(x, e')] body
+        Just body -> reduceTermPlus body
         Nothing ->
           case lookup CaseDefault branchList of
-            Just body -> reduceTermPlus $ substTermPlus [(x, e')] body
-            Nothing -> return (m, TermEpsilonElim x e' branchList)
-    _ -> return (m, TermEpsilonElim x e' branchList)
+            Just body -> reduceTermPlus body
+            Nothing -> return (m, TermEpsilonElim e' branchList)
+    _ -> return (m, TermEpsilonElim e' branchList)
 reduceTermPlus (m, TermPiElim e es) = do
   e' <- reduceTermPlus e
   es' <- mapM reduceTermPlus es

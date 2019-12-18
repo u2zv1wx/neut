@@ -12,16 +12,16 @@ import Data.Code
 import Data.Env
 
 reduceCodePlus :: CodePlus -> WithEnv CodePlus
-reduceCodePlus (m, CodeEpsilonElim x v branchList) =
+reduceCodePlus (m, CodeEpsilonElim v branchList) =
   case v of
     (_, DataEpsilonIntro l) ->
       case lookup (CaseLabel l) branchList of
-        Just body -> reduceCodePlus $ substCodePlus [(x, v)] body
+        Just body -> reduceCodePlus body
         Nothing ->
           case lookup CaseDefault branchList of
-            Just body -> reduceCodePlus $ substCodePlus [(x, v)] body
-            Nothing -> return (m, CodeEpsilonElim x v branchList)
-    _ -> return (m, CodeEpsilonElim x v branchList)
+            Just body -> reduceCodePlus body
+            Nothing -> return (m, CodeEpsilonElim v branchList)
+    _ -> return (m, CodeEpsilonElim v branchList)
 reduceCodePlus (m, CodePiElimDownElim v ds) = do
   cenv <- gets codeEnv
   case v of

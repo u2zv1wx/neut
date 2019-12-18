@@ -12,17 +12,17 @@ import Data.Env
 import Data.WeakTerm
 
 reduceWeakTermPlus :: WeakTermPlus -> WithEnv WeakTermPlus
-reduceWeakTermPlus (m, WeakTermEpsilonElim (x, t) e branchList) = do
+reduceWeakTermPlus (m, WeakTermEpsilonElim e branchList) = do
   e' <- reduceWeakTermPlus e
   case e' of
     (_, WeakTermEpsilonIntro l) ->
       case lookup (CaseLabel l) branchList of
-        Just body -> reduceWeakTermPlus $ substWeakTermPlus [(x, e')] body
+        Just body -> reduceWeakTermPlus body
         Nothing ->
           case lookup CaseDefault branchList of
-            Just body -> reduceWeakTermPlus $ substWeakTermPlus [(x, e')] body
-            Nothing -> return (m, WeakTermEpsilonElim (x, t) e' branchList)
-    _ -> return (m, WeakTermEpsilonElim (x, t) e' branchList)
+            Just body -> reduceWeakTermPlus body
+            Nothing -> return (m, WeakTermEpsilonElim e' branchList)
+    _ -> return (m, WeakTermEpsilonElim e' branchList)
 reduceWeakTermPlus (m, WeakTermPiElim e es) = do
   e' <- reduceWeakTermPlus e
   es' <- mapM reduceWeakTermPlus es

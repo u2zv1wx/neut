@@ -32,11 +32,10 @@ interpret (m, TreeNode [(_, TreeAtom "epsilon"), (_, TreeAtom x)]) = do
 interpret (m, TreeNode [(_, TreeAtom "epsilon-introduction"), l]) = do
   l' <- interpretLabel l
   withMeta m $ WeakTermEpsilonIntro l'
-interpret (m, TreeNode [(_, TreeAtom "epsilon-elimination"), xt, e, (_, TreeNode cs)]) = do
-  xt' <- interpretIdentifierPlus xt
+interpret (m, TreeNode [(_, TreeAtom "epsilon-elimination"), e, (_, TreeNode cs)]) = do
   e' <- interpret e
   cs' <- mapM interpretClause cs
-  withMeta m $ WeakTermEpsilonElim xt' e' cs'
+  withMeta m $ WeakTermEpsilonElim e' cs'
 interpret (m, TreeNode [(_, TreeAtom "pi"), (_, TreeNode xts), t]) = do
   (xts', t') <- interpretBinder xts t
   h <- newNameWith "hole"

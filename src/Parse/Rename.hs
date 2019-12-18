@@ -17,13 +17,10 @@ rename (m, WeakTermUpsilon x) = do
   return (m, WeakTermUpsilon x')
 rename (m, WeakTermEpsilon s) = return (m, WeakTermEpsilon s)
 rename (m, WeakTermEpsilonIntro x) = return (m, WeakTermEpsilonIntro x)
-rename (m, WeakTermEpsilonElim (x, t) e caseList) = do
+rename (m, WeakTermEpsilonElim e caseList) = do
   e' <- rename e
-  t' <- rename t
-  local $ do
-    x' <- newNameWith x
-    caseList' <- renameCaseList caseList
-    return (m, WeakTermEpsilonElim (x', t') e' caseList')
+  caseList' <- renameCaseList caseList
+  return (m, WeakTermEpsilonElim e' caseList')
 rename (m, WeakTermPi xts) = do
   xts' <- renameBinder xts
   return (m, WeakTermPi xts')

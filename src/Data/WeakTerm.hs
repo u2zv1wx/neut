@@ -14,7 +14,7 @@ data WeakTerm
   | WeakTermUpsilon Identifier
   | WeakTermEpsilon Identifier
   | WeakTermEpsilonIntro Identifier
-  | WeakTermEpsilonElim IdentifierPlus WeakTermPlus [(Case, WeakTermPlus)]
+  | WeakTermEpsilonElim WeakTermPlus [(Case, WeakTermPlus)]
   | WeakTermPi [IdentifierPlus]
   | WeakTermPiIntro [IdentifierPlus] WeakTermPlus
   | WeakTermPiElim WeakTermPlus [WeakTermPlus]
@@ -52,14 +52,13 @@ varWeakTermPlus (_, WeakTermTheta _) = ([], [])
 varWeakTermPlus (_, WeakTermUpsilon x) = ([x], [])
 varWeakTermPlus (_, WeakTermEpsilon _) = ([], [])
 varWeakTermPlus (_, WeakTermEpsilonIntro _) = ([], [])
-varWeakTermPlus (_, WeakTermEpsilonElim (x, t) e branchList) = do
-  let xhs1 = varWeakTermPlus t
-  let xhs2 = varWeakTermPlus e
+varWeakTermPlus (_, WeakTermEpsilonElim e branchList) = do
+  let xhs = varWeakTermPlus e
   xhss <-
     forM branchList $ \(_, body) -> do
       let (xs, hs) = varWeakTermPlus body
-      return (filter (/= x) xs, hs)
-  pairwiseConcat (xhs1 : xhs2 : xhss)
+      return (xs, hs)
+  pairwiseConcat (xhs : xhss)
 varWeakTermPlus (_, WeakTermPi xts) = varWeakTermPlusBindings xts []
 varWeakTermPlus (_, WeakTermPiIntro xts e) = varWeakTermPlusBindings xts [e]
 varWeakTermPlus (_, WeakTermPiElim e es) =
@@ -93,13 +92,11 @@ substWeakTermPlus sub (m, WeakTermUpsilon x) =
   fromMaybe (m, WeakTermUpsilon x) (lookup x sub)
 substWeakTermPlus _ (m, WeakTermEpsilon x) = (m, WeakTermEpsilon x)
 substWeakTermPlus _ (m, WeakTermEpsilonIntro l) = (m, WeakTermEpsilonIntro l)
-substWeakTermPlus sub (m, WeakTermEpsilonElim (x, t) e branchList) = do
-  let t' = substWeakTermPlus sub t
+substWeakTermPlus sub (m, WeakTermEpsilonElim e branchList) = do
   let e' = substWeakTermPlus sub e
   let (caseList, es) = unzip branchList
-  let sub' = filter (\(k, _) -> k /= x) sub
-  let es' = map (substWeakTermPlus sub') es
-  (m, WeakTermEpsilonElim (x, t') e' (zip caseList es'))
+  let es' = map (substWeakTermPlus sub) es
+  (m, WeakTermEpsilonElim e' (zip caseList es'))
 substWeakTermPlus sub (m, WeakTermPi xts) = do
   let xts' = substWeakTermPlusBindings sub xts
   (m, WeakTermPi xts')
@@ -147,10 +144,10 @@ isReducible (_, WeakTermTheta _) = False
 isReducible (_, WeakTermUpsilon _) = False
 isReducible (_, WeakTermEpsilon _) = False
 isReducible (_, WeakTermEpsilonIntro _) = False
-isReducible (_, WeakTermEpsilonElim _ (_, WeakTermEpsilonIntro l) branchList) = do
+isReducible (_, WeakTermEpsilonElim (_, WeakTermEpsilonIntro l) branchList) = do
   let (caseList, _) = unzip branchList
   CaseLabel l `elem` caseList || CaseDefault `elem` caseList
-isReducible (_, WeakTermEpsilonElim (_, _) e _) = isReducible e
+isReducible (_, WeakTermEpsilonElim e _) = isReducible e
 isReducible (_, WeakTermPi _) = False
 isReducible (_, WeakTermPiIntro {}) = False
 isReducible (_, WeakTermPiElim (_, WeakTermPiIntro xts _) es)
