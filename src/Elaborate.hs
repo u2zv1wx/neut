@@ -8,6 +8,7 @@ import Control.Monad.Trans.Except
 import Data.IORef
 import Data.List (nub)
 import qualified Data.Map.Strict as Map
+import Numeric.Half
 
 import Data.Basic
 import Data.Env
@@ -110,13 +111,44 @@ elaborate' (m, WeakTermInt x) = do
         Just lowType@(LowTypeUnsignedInt _) -> return (m', TermInt x lowType)
         _ -> throwError $ show x ++ " should be int, but is " ++ intType
     _ -> throwError "epsilonIntro"
-elaborate' (m, WeakTermFloat x) = do
+elaborate' (m, WeakTermFloat16 x) = do
   m' <- toMeta m
   t <- reduceTermPlus $ obtainType m'
   case t of
-    (_, TermTheta floatType) ->
+    (_, TermTheta floatType) -> do
       case asLowTypeMaybe floatType of
-        Just lowType@(LowTypeFloat _) -> return (m', TermFloat x lowType)
+        Just (LowTypeFloat FloatSize16) -> return (m', TermFloat16 x)
+        _ -> throwError $ show x ++ " should be f16, but is " ++ floatType
+    _ -> throwError "epsilonIntro"
+elaborate' (m, WeakTermFloat32 x) = do
+  m' <- toMeta m
+  t <- reduceTermPlus $ obtainType m'
+  case t of
+    (_, TermTheta floatType) -> do
+      case asLowTypeMaybe floatType of
+        Just (LowTypeFloat FloatSize32) -> return (m', TermFloat32 x)
+        _ -> throwError $ show x ++ " should be f32, but is " ++ floatType
+    _ -> throwError "epsilonIntro"
+elaborate' (m, WeakTermFloat64 x) = do
+  m' <- toMeta m
+  t <- reduceTermPlus $ obtainType m'
+  case t of
+    (_, TermTheta floatType) -> do
+      case asLowTypeMaybe floatType of
+        Just (LowTypeFloat FloatSize64) -> return (m', TermFloat64 x)
+        _ -> throwError $ show x ++ " should be f64, but is " ++ floatType
+    _ -> throwError "epsilonIntro"
+elaborate' (m, WeakTermFloatUnknown x) = do
+  m' <- toMeta m
+  t <- reduceTermPlus $ obtainType m'
+  case t of
+    (_, TermTheta floatType) -> do
+      let x16 = realToFrac x :: Half
+      let x32 = realToFrac x :: Float
+      case asLowTypeMaybe floatType of
+        Just (LowTypeFloat FloatSize16) -> return (m', TermFloat16 x16)
+        Just (LowTypeFloat FloatSize32) -> return (m', TermFloat32 x32)
+        Just (LowTypeFloat FloatSize64) -> return (m', TermFloat64 x)
         _ -> throwError $ show x ++ " should be float, but is " ++ floatType
     _ -> throwError "epsilonIntro"
 
@@ -151,7 +183,10 @@ exhaust' (_, WeakTermPiElim e es) = allM exhaust' $ e : es
 exhaust' (_, WeakTermMu _ e) = exhaust' e
 exhaust' (_, WeakTermZeta _) = return False
 exhaust' (_, WeakTermInt _) = return True
-exhaust' (_, WeakTermFloat _) = return True
+exhaust' (_, WeakTermFloat16 _) = return True
+exhaust' (_, WeakTermFloat32 _) = return True
+exhaust' (_, WeakTermFloat64 _) = return True
+exhaust' (_, WeakTermFloatUnknown _) = return True
 
 exhaustEpsilonIdentifier :: Identifier -> [Case] -> Bool -> WithEnv Bool
 exhaustEpsilonIdentifier x labelList b1 = do

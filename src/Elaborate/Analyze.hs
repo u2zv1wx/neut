@@ -68,6 +68,8 @@ simp (((m1, WeakTermFloat32 l1), (m2, WeakTermFloat32 l2)):cs)
   | l1 == l2 = simpMetaRet m1 m2 (simp cs)
 simp (((m1, WeakTermFloat64 l1), (m2, WeakTermFloat64 l2)):cs)
   | l1 == l2 = simpMetaRet m1 m2 (simp cs)
+simp (((m1, WeakTermFloatUnknown l1), (m2, WeakTermFloatUnknown l2)):cs)
+  | l1 == l2 = simpMetaRet m1 m2 (simp cs)
 simp ((e1@(m1, _), e2@(m2, _)):cs) = do
   let ms1 = asStuckedTerm e1
   let ms2 = asStuckedTerm e2

@@ -1,6 +1,7 @@
 module Data.Code where
 
 import Data.Maybe (fromMaybe)
+import Numeric.Half
 
 import Data.Basic
 
@@ -12,7 +13,9 @@ data Data
   | DataEpsilonIntro Identifier LowType
   | DataSigmaIntro [DataPlus]
   | DataInt Int LowType
-  | DataFloat Double LowType
+  | DataFloat16 Half
+  | DataFloat32 Float
+  | DataFloat64 Double
   deriving (Show)
 
 data Code
@@ -52,7 +55,9 @@ substDataPlus sub (m, DataSigmaIntro vs) = do
   let vs' = map (substDataPlus sub) vs
   (m, DataSigmaIntro vs')
 substDataPlus _ (m, DataInt l p) = (m, DataInt l p)
-substDataPlus _ (m, DataFloat l p) = (m, DataFloat l p)
+substDataPlus _ (m, DataFloat16 l) = (m, DataFloat16 l)
+substDataPlus _ (m, DataFloat32 l) = (m, DataFloat32 l)
+substDataPlus _ (m, DataFloat64 l) = (m, DataFloat64 l)
 
 substCodePlus :: SubstDataPlus -> CodePlus -> CodePlus
 substCodePlus sub (m, CodeTheta theta) = do

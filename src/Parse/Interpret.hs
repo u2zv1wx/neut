@@ -70,7 +70,7 @@ interpret (m, TreeNode [(_, TreeAtom "f64"), (_, TreeAtom x)])
 interpret (m, TreeAtom x)
   | Just x' <- readMaybe x = withMeta m $ WeakTermInt x'
 interpret (m, TreeAtom x)
-  | Just x' <- readMaybe x = withMeta m $ WeakTermFloat64 x'
+  | Just x' <- readMaybe x = withMeta m $ WeakTermFloatUnknown x'
 interpret t@(m, TreeAtom x) = do
   ml <- interpretLabelMaybe t
   case ml of

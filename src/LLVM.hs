@@ -127,10 +127,11 @@ llvmCastInt v lowType = do
         llvmDataLet x v $
           LLVMLet y (LLVMPointerToInt (LLVMDataLocal x) voidPtr lowType) $ cont)
 
-llvmCastFloat :: DataPlus -> Int -> WithEnv (LLVMData, LLVM -> WithEnv LLVM)
+llvmCastFloat ::
+     DataPlus -> FloatSize -> WithEnv (LLVMData, LLVM -> WithEnv LLVM)
 llvmCastFloat v size = do
   let floatType = LowTypeFloat size
-  let intType = LowTypeSignedInt size
+  let intType = LowTypeSignedInt $ sizeAsInt size
   x <- newNameWith "arg"
   y <- newNameWith "tmp"
   z <- newNameWith "cast"
@@ -154,10 +155,10 @@ llvmUncastInt :: Identifier -> LowType -> LLVM
 llvmUncastInt result lowType =
   LLVMIntToPointer (LLVMDataLocal result) lowType voidPtr
 
-llvmUncastFloat :: Identifier -> Int -> WithEnv LLVM
+llvmUncastFloat :: Identifier -> FloatSize -> WithEnv LLVM
 llvmUncastFloat floatResult i = do
   let floatType = LowTypeFloat i
-  let intType = LowTypeSignedInt i
+  let intType = LowTypeSignedInt $ sizeAsInt i
   tmp <- newNameWith "tmp"
   return $
     LLVMLet tmp (LLVMBitcast (LLVMDataLocal floatResult) floatType intType) $
@@ -199,14 +200,21 @@ llvmDataLet x (_, DataInt i (LowTypeSignedInt j)) cont =
     (LLVMIntToPointer (LLVMDataInt i j) (LowTypeSignedInt j) voidPtr)
     cont
 llvmDataLet _ (_, DataInt _ _) _ = throwError "llvmDataLet.DataInt"
-llvmDataLet x (_, DataFloat f (LowTypeFloat j)) cont = do
+llvmDataLet x (_, DataFloat16 f) cont =
+  llvmDataLetFloat x (LLVMDataFloat16 f) FloatSize16 cont
+llvmDataLet x (_, DataFloat32 f) cont =
+  llvmDataLetFloat x (LLVMDataFloat32 f) FloatSize32 cont
+llvmDataLet x (_, DataFloat64 f) cont =
+  llvmDataLetFloat x (LLVMDataFloat64 f) FloatSize64 cont
+
+llvmDataLetFloat :: Identifier -> LLVMData -> FloatSize -> LLVM -> WithEnv LLVM
+llvmDataLetFloat x f size cont = do
   cast <- newNameWith "cast"
-  let ft = LowTypeFloat j
-  let st = LowTypeSignedInt j
+  let ft = LowTypeFloat size
+  let st = LowTypeSignedInt $ sizeAsInt size
   return $
-    LLVMLet cast (LLVMBitcast (LLVMDataFloat f j) ft st) $
+    LLVMLet cast (LLVMBitcast f ft st) $
     LLVMLet x (LLVMIntToPointer (LLVMDataLocal cast) st voidPtr) cont
-llvmDataLet _ (_, DataFloat _ _) _ = throwError "llvmDataLet.DataFloat"
 
 llvmDataLet' :: [(Identifier, DataPlus)] -> LLVM -> WithEnv LLVM
 llvmDataLet' [] cont = return cont
@@ -236,7 +244,6 @@ constructSwitch ((CaseDefault, code):_) = do
   code' <- llvmCode code
   return $ Just (code', [])
 
--- floatかどうかで場合分けする必要がありそう？
 llvmCodeEpsilonElim ::
      (Identifier, LowType) -> DataPlus -> [(Case, CodePlus)] -> WithEnv LLVM
 llvmCodeEpsilonElim (x, t) v branchList = do

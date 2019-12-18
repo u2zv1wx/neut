@@ -42,7 +42,10 @@ rename (m, WeakTermMu (x, t) e) =
     return (m, WeakTermMu (x', t') e')
 rename (m, WeakTermZeta h) = return (m, WeakTermZeta h)
 rename (m, WeakTermInt x) = return (m, WeakTermInt x)
-rename (m, WeakTermFloat x) = return (m, WeakTermFloat x)
+rename (m, WeakTermFloat16 x) = return (m, WeakTermFloat16 x)
+rename (m, WeakTermFloat32 x) = return (m, WeakTermFloat32 x)
+rename (m, WeakTermFloat64 x) = return (m, WeakTermFloat64 x)
+rename (m, WeakTermFloatUnknown x) = return (m, WeakTermFloatUnknown x)
 
 renameBinder :: [IdentifierPlus] -> WithEnv [IdentifierPlus]
 renameBinder [] = return []

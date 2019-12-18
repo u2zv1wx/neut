@@ -1,5 +1,7 @@
 module Data.LLVM where
 
+import Numeric.Half
+
 import Data.Basic
 
 data LLVMData
@@ -7,7 +9,9 @@ data LLVMData
   | LLVMDataGlobal Identifier
   | LLVMDataStruct [LLVMData]
   | LLVMDataInt Int Int
-  | LLVMDataFloat Double Int
+  | LLVMDataFloat16 Half
+  | LLVMDataFloat32 Float
+  | LLVMDataFloat64 Double
   deriving (Show)
 
 data LLVM

@@ -169,7 +169,7 @@ emitLLVM funName (LLVMLet x (LLVMUnaryOp ((UnaryOpTrunc t2@(LowTypeSignedInt i2)
 emitLLVM funName (LLVMLet x (LLVMUnaryOp ((UnaryOpTrunc t2@(LowTypeUnsignedInt i2)), t1@(LowTypeUnsignedInt i1)) d) cont)
   | i1 > i2 = do emitConvOp funName x "trunc" d t1 t2 cont
 emitLLVM funName (LLVMLet x (LLVMUnaryOp ((UnaryOpTrunc t2@(LowTypeFloat i2)), t1@(LowTypeFloat i1)) d) cont)
-  | i1 > i2 = do emitConvOp funName x "fptrunc" d t1 t2 cont
+  | sizeAsInt i1 > sizeAsInt i2 = do emitConvOp funName x "fptrunc" d t1 t2 cont
 emitLLVM funName (LLVMLet x (LLVMUnaryOp ((UnaryOpZext t2@(LowTypeSignedInt i2)), t1@(LowTypeSignedInt i1)) d) cont)
   | i1 < i2 = do emitConvOp funName x "zext" d t1 t2 cont
 emitLLVM funName (LLVMLet x (LLVMUnaryOp ((UnaryOpZext t2@(LowTypeUnsignedInt i2)), t1@(LowTypeUnsignedInt i1)) d) cont)
@@ -179,7 +179,7 @@ emitLLVM funName (LLVMLet x (LLVMUnaryOp ((UnaryOpSext t2@(LowTypeSignedInt i2))
 emitLLVM funName (LLVMLet x (LLVMUnaryOp ((UnaryOpSext t2@(LowTypeUnsignedInt i2)), t1@(LowTypeUnsignedInt i1)) d) cont)
   | i1 < i2 = do emitConvOp funName x "sext" d t1 t2 cont
 emitLLVM funName (LLVMLet x (LLVMUnaryOp ((UnaryOpFpExt t2@(LowTypeFloat i2)), t1@(LowTypeFloat i1)) d) cont)
-  | i1 < i2 = do emitConvOp funName x "fpext" d t1 t2 cont
+  | sizeAsInt i1 < sizeAsInt i2 = do emitConvOp funName x "fpext" d t1 t2 cont
 emitLLVM funName (LLVMLet x (LLVMUnaryOp ((UnaryOpTo t2@(LowTypeFloat _)), t1@(LowTypeSignedInt _)) d) cont) = do
   emitConvOp funName x "sitofp" d t1 t2 cont
 emitLLVM funName (LLVMLet x (LLVMUnaryOp ((UnaryOpTo t2@(LowTypeFloat _)), t1@(LowTypeUnsignedInt _)) d) cont) = do
@@ -434,10 +434,9 @@ showLowTypeEmit :: LowType -> String
 showLowTypeEmit (LowTypeSignedInt i) = "i" ++ show i
 -- LLVM doesn't distinguish unsigned integers from signed ones
 showLowTypeEmit (LowTypeUnsignedInt i) = "i" ++ show i
-showLowTypeEmit (LowTypeFloat 16) = "half"
-showLowTypeEmit (LowTypeFloat 32) = "float"
-showLowTypeEmit (LowTypeFloat 64) = "double"
-showLowTypeEmit (LowTypeFloat i) = "f" ++ show i -- shouldn't occur
+showLowTypeEmit (LowTypeFloat FloatSize16) = "half"
+showLowTypeEmit (LowTypeFloat FloatSize32) = "float"
+showLowTypeEmit (LowTypeFloat FloatSize64) = "double"
 showLowTypeEmit (LowTypePointer t) = showLowTypeEmit t ++ "*"
 showLowTypeEmit (LowTypeStruct ts) = "{" ++ showItems showLowTypeEmit ts ++ "}"
 showLowTypeEmit (LowTypeFunction ts t) =
@@ -460,5 +459,7 @@ showLLVMData :: LLVMData -> String
 showLLVMData (LLVMDataLocal x) = "%" ++ x
 showLLVMData (LLVMDataGlobal x) = "@" ++ x
 showLLVMData (LLVMDataInt i _) = show i
-showLLVMData (LLVMDataFloat x _) = show x
+showLLVMData (LLVMDataFloat16 x) = show x
+showLLVMData (LLVMDataFloat32 x) = show x
+showLLVMData (LLVMDataFloat64 x) = show x
 showLLVMData (LLVMDataStruct xs) = "{" ++ showItems showLLVMData xs ++ "}"

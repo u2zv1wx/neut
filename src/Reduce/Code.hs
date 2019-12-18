@@ -36,8 +36,8 @@ reduceCodePlus (m, CodeSigmaElim xs v e) =
     _ -> return (m, CodeSigmaElim xs v e)
 reduceCodePlus (m, CodeTheta theta) =
   case theta of
-    ThetaUnaryOp op t@(LowTypeFloat _) (m1, DataFloat x _)
-      | op == UnaryOpNeg -> upIntroData m (m1, DataFloat (-x) t)
+    ThetaUnaryOp op (LowTypeFloat _) (m1, DataFloat64 x)
+      | op == UnaryOpNeg -> upIntroData m (m1, DataFloat64 (-x))
     ThetaBinaryOp op t@(LowTypeSignedInt _) (m1, DataInt x _) (_, DataInt y _) -> do
       case op of
         BinaryOpAdd -> upIntroData m (m1, DataInt (x + y) t)
@@ -80,13 +80,13 @@ reduceCodePlus (m, CodeTheta theta) =
         BinaryOpAnd -> upIntroData m (m1, DataInt (x .&. y) t)
         BinaryOpOr -> upIntroData m (m1, DataInt (x .|. y) t)
         BinaryOpXor -> upIntroData m (m1, DataInt (x `xor` y) t)
-    ThetaBinaryOp op t@(LowTypeFloat _) (m1, DataFloat x _) (_, DataFloat y _) -> do
+    ThetaBinaryOp op t@(LowTypeFloat _) (m1, DataFloat64 x) (_, DataFloat64 y) -> do
       case op of
-        BinaryOpAdd -> upIntroData m (m1, DataFloat (x + y) t)
-        BinaryOpSub -> upIntroData m (m1, DataFloat (x - y) t)
-        BinaryOpMul -> upIntroData m (m1, DataFloat (x * y) t)
-        BinaryOpDiv -> upIntroData m (m1, DataFloat (x / y) t)
-        BinaryOpRem -> upIntroData m (m1, DataFloat (x `mod'` y) t)
+        BinaryOpAdd -> upIntroData m (m1, DataFloat64 (x + y))
+        BinaryOpSub -> upIntroData m (m1, DataFloat64 (x - y))
+        BinaryOpMul -> upIntroData m (m1, DataFloat64 (x * y))
+        BinaryOpDiv -> upIntroData m (m1, DataFloat64 (x / y))
+        BinaryOpRem -> upIntroData m (m1, DataFloat64 (x `mod'` y))
         BinaryOpEQ -> upIntroData m (m1, asData t $ x == y)
         BinaryOpNE -> upIntroData m (m1, asData t $ x /= y)
         BinaryOpGT -> upIntroData m (m1, asData t $ x > y)

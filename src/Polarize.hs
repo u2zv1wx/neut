@@ -84,9 +84,15 @@ polarize (m, TermMu (f, t) e) = do
 polarize (m, TermInt l lowType) = do
   let ml = snd $ obtainInfoMeta m
   return (ml, CodeUpIntro (ml, DataInt l lowType))
-polarize (m, TermFloat l lowType) = do
+polarize (m, TermFloat16 l) = do
   let ml = snd $ obtainInfoMeta m
-  return (ml, CodeUpIntro (ml, DataFloat l lowType))
+  return (ml, CodeUpIntro (ml, DataFloat16 l))
+polarize (m, TermFloat32 l) = do
+  let ml = snd $ obtainInfoMeta m
+  return (ml, CodeUpIntro (ml, DataFloat32 l))
+polarize (m, TermFloat64 l) = do
+  let ml = snd $ obtainInfoMeta m
+  return (ml, CodeUpIntro (ml, DataFloat64 l))
 
 obtainFreeVarList ::
      [Identifier] -> TermPlus -> [(Identifier, Maybe Loc, TermPlus)]

@@ -36,16 +36,37 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
         let self' = substWeakTermPlus [(x, self)] body
         reduceWeakTermPlus (m, WeakTermPiElim self' es')
     (_, WeakTermTheta constant)
-      | [(_, WeakTermFloat x)] <- es'
-      , [typeStr, opStr] <- wordsBy '.' constant
-      , Just (LowTypeFloat _) <- asLowTypeMaybe typeStr
-      , Just op <- asUnaryOpMaybe opStr
-      , op == UnaryOpNeg -> return (m, WeakTermFloat (-x))
+      | [(_, WeakTermInt x)] <- es'
+      , Just (LowTypeSignedInt _, op) <- asUnaryOpMaybe constant -> do
+        case op of
+          UnaryOpTrunc _ -> undefined
+          UnaryOpZext _ -> return (m, WeakTermInt x)
+          UnaryOpSext _ -> undefined
+          UnaryOpTo (LowTypeFloat _) ->
+            return (m, WeakTermFloat64 (fromIntegral x))
+          _ -> return (m, WeakTermPiElim e' es')
+    (_, WeakTermTheta constant)
+      | [(_, WeakTermInt x)] <- es'
+      , Just (LowTypeUnsignedInt _, op) <- asUnaryOpMaybe constant -> do
+        case op of
+          UnaryOpTrunc _ -> undefined
+          UnaryOpZext _ -> return (m, WeakTermInt x)
+          UnaryOpSext _ -> undefined
+          UnaryOpTo (LowTypeFloat _) ->
+            return (m, WeakTermFloat64 (fromIntegral x))
+          _ -> return (m, WeakTermPiElim e' es')
+    (_, WeakTermTheta constant)
+      | [(_, WeakTermFloat64 x)] <- es'
+      , Just (LowTypeFloat _, op) <- asUnaryOpMaybe constant ->
+        case op of
+          UnaryOpNeg -> return (m, WeakTermFloat64 (-x))
+          UnaryOpTrunc _ -> undefined
+          UnaryOpFpExt _ -> undefined
+          UnaryOpTo _ -> undefined
+          _ -> return (m, WeakTermPiElim e' es')
     (_, WeakTermTheta constant)
       | [(_, WeakTermInt x), (_, WeakTermInt y)] <- es'
-      , [typeStr, opStr] <- wordsBy '.' constant
-      , Just (LowTypeSignedInt _) <- asLowTypeMaybe typeStr
-      , Just op <- asBinaryOpMaybe opStr -> do
+      , Just (LowTypeSignedInt _, op) <- asBinaryOpMaybe constant ->
         case op of
           BinaryOpAdd -> return (m, WeakTermInt (x + y))
           BinaryOpSub -> return (m, WeakTermInt (x - y))
@@ -66,9 +87,7 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
           BinaryOpXor -> return (m, WeakTermInt (x `xor` y))
     (_, WeakTermTheta constant)
       | [(_, WeakTermInt x), (_, WeakTermInt y)] <- es'
-      , [typeStr, opStr] <- wordsBy '.' constant
-      , Just (LowTypeUnsignedInt _) <- asLowTypeMaybe typeStr
-      , Just op <- asBinaryOpMaybe opStr -> do
+      , Just (LowTypeUnsignedInt _, op) <- asBinaryOpMaybe constant -> do
         let x' = unsafeCoerce x :: Word
         let y' = unsafeCoerce y :: Word
         case op of
@@ -90,16 +109,14 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
           BinaryOpOr -> return (m, WeakTermInt (x .|. y))
           BinaryOpXor -> return (m, WeakTermInt (x `xor` y))
     (_, WeakTermTheta constant)
-      | [(_, WeakTermFloat x), (_, WeakTermFloat y)] <- es'
-      , [typeStr, opStr] <- wordsBy '.' constant
-      , Just (LowTypeFloat _) <- asLowTypeMaybe typeStr
-      , Just op <- asBinaryOpMaybe opStr -> do
+      | [(_, WeakTermFloat64 x), (_, WeakTermFloat64 y)] <- es'
+      , Just (LowTypeFloat _, op) <- asBinaryOpMaybe constant ->
         case op of
-          BinaryOpAdd -> return (m, WeakTermFloat (x + y))
-          BinaryOpSub -> return (m, WeakTermFloat (x - y))
-          BinaryOpMul -> return (m, WeakTermFloat (x * y))
-          BinaryOpDiv -> return (m, WeakTermFloat (x / y))
-          BinaryOpRem -> return (m, WeakTermFloat (x `mod'` y))
+          BinaryOpAdd -> return (m, WeakTermFloat64 (x + y))
+          BinaryOpSub -> return (m, WeakTermFloat64 (x - y))
+          BinaryOpMul -> return (m, WeakTermFloat64 (x * y))
+          BinaryOpDiv -> return (m, WeakTermFloat64 (x / y))
+          BinaryOpRem -> return (m, WeakTermFloat64 (x `mod'` y))
           BinaryOpEQ -> return (m, asEpsilon $ x == y)
           BinaryOpNE -> return (m, asEpsilon $ x /= y)
           BinaryOpGT -> return (m, asEpsilon $ x > y)

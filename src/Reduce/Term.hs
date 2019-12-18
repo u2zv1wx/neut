@@ -36,16 +36,14 @@ reduceTermPlus (m, TermPiElim e es) = do
         let self' = substTermPlus [(x, self)] body
         reduceTermPlus (m, TermPiElim self' es')
     (_, TermTheta constant)
-      | [(_, TermFloat x t)] <- es'
-      , [typeStr, opStr] <- wordsBy '.' constant
-      , Just (LowTypeFloat _) <- asLowTypeMaybe typeStr
-      , Just op <- asUnaryOpMaybe opStr
-      , op == UnaryOpNeg -> return (m, TermFloat (-x) t)
+      | [(_, TermFloat64 x)] <- es'
+      , Just (LowTypeFloat _, op) <- asUnaryOpMaybe constant ->
+        case op of
+          UnaryOpNeg -> return (m, TermFloat64 (-x))
+          _ -> return (m, TermPiElim e' es')
     (_, TermTheta constant)
       | [(_, TermInt x _), (_, TermInt y _)] <- es'
-      , [typeStr, opStr] <- wordsBy '.' constant
-      , Just t@(LowTypeSignedInt _) <- asLowTypeMaybe typeStr
-      , Just op <- asBinaryOpMaybe opStr -> do
+      , Just (t@(LowTypeSignedInt _), op) <- asBinaryOpMaybe constant ->
         case op of
           BinaryOpAdd -> return (m, TermInt (x + y) t)
           BinaryOpSub -> return (m, TermInt (x - y) t)
@@ -66,9 +64,7 @@ reduceTermPlus (m, TermPiElim e es) = do
           BinaryOpXor -> return (m, TermInt (x `xor` y) t)
     (_, TermTheta constant)
       | [(_, TermInt x _), (_, TermInt y _)] <- es'
-      , [typeStr, opStr] <- wordsBy '.' constant
-      , Just t@(LowTypeUnsignedInt _) <- asLowTypeMaybe typeStr
-      , Just op <- asBinaryOpMaybe opStr -> do
+      , Just (t@(LowTypeUnsignedInt _), op) <- asBinaryOpMaybe constant -> do
         let x' = unsafeCoerce x :: Word
         let y' = unsafeCoerce y :: Word
         case op of
@@ -90,16 +86,14 @@ reduceTermPlus (m, TermPiElim e es) = do
           BinaryOpOr -> return (m, TermInt (x .|. y) t)
           BinaryOpXor -> return (m, TermInt (x `xor` y) t)
     (_, TermTheta constant)
-      | [(_, TermFloat x _), (_, TermFloat y _)] <- es'
-      , [typeStr, opStr] <- wordsBy '.' constant
-      , Just t@(LowTypeFloat _) <- asLowTypeMaybe typeStr
-      , Just op <- asBinaryOpMaybe opStr -> do
+      | [(_, TermFloat64 x), (_, TermFloat64 y)] <- es'
+      , Just (t@(LowTypeFloat _), op) <- asBinaryOpMaybe constant ->
         case op of
-          BinaryOpAdd -> return (m, TermFloat (x + y) t)
-          BinaryOpSub -> return (m, TermFloat (x - y) t)
-          BinaryOpMul -> return (m, TermFloat (x * y) t)
-          BinaryOpDiv -> return (m, TermFloat (x / y) t)
-          BinaryOpRem -> return (m, TermFloat (x `mod'` y) t)
+          BinaryOpAdd -> return (m, TermFloat64 (x + y))
+          BinaryOpSub -> return (m, TermFloat64 (x - y))
+          BinaryOpMul -> return (m, TermFloat64 (x * y))
+          BinaryOpDiv -> return (m, TermFloat64 (x / y))
+          BinaryOpRem -> return (m, TermFloat64 (x `mod'` y))
           BinaryOpEQ -> return (m, asEpsilon t $ x == y)
           BinaryOpNE -> return (m, asEpsilon t $ x /= y)
           BinaryOpGT -> return (m, asEpsilon t $ x > y)

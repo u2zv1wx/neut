@@ -96,7 +96,9 @@ infer _ (meta, WeakTermFloat16 _) =
   returnAfterUpdate meta (newMetaTerminal, WeakTermTheta "f16")
 infer _ (meta, WeakTermFloat32 _) =
   returnAfterUpdate meta (newMetaTerminal, WeakTermTheta "f32")
-infer _ (meta, WeakTermFloat64 _) = do
+infer _ (meta, WeakTermFloat64 _) =
+  returnAfterUpdate meta (newMetaTerminal, WeakTermTheta "f64")
+infer _ (meta, WeakTermFloatUnknown _) = do
   h <- newHoleInCtx []
   returnAfterUpdate meta h -- f64 or "any float"
 

@@ -24,6 +24,7 @@ data WeakTerm
   | WeakTermFloat16 Half
   | WeakTermFloat32 Float
   | WeakTermFloat64 Double
+  | WeakTermFloatUnknown Double
   deriving (Show)
 
 newtype Ref a =
@@ -69,6 +70,7 @@ varWeakTermPlus (_, WeakTermInt _) = ([], [])
 varWeakTermPlus (_, WeakTermFloat16 _) = ([], [])
 varWeakTermPlus (_, WeakTermFloat32 _) = ([], [])
 varWeakTermPlus (_, WeakTermFloat64 _) = ([], [])
+varWeakTermPlus (_, WeakTermFloatUnknown _) = ([], [])
 
 varWeakTermPlusBindings ::
      [IdentifierPlus] -> [WeakTermPlus] -> ([Identifier], [Identifier])
@@ -118,6 +120,7 @@ substWeakTermPlus _ (m, WeakTermInt x) = (m, WeakTermInt x)
 substWeakTermPlus _ (m, WeakTermFloat16 x) = (m, WeakTermFloat16 x)
 substWeakTermPlus _ (m, WeakTermFloat32 x) = (m, WeakTermFloat32 x)
 substWeakTermPlus _ (m, WeakTermFloat64 x) = (m, WeakTermFloat64 x)
+substWeakTermPlus _ (m, WeakTermFloatUnknown x) = (m, WeakTermFloat64 x)
 
 substWeakTermPlusBindings ::
      SubstWeakTerm -> [IdentifierPlus] -> [IdentifierPlus]
@@ -172,6 +175,7 @@ isReducible (_, WeakTermPiElim e es) = isReducible e || any isReducible es
 isReducible (_, WeakTermMu _ _) = False
 isReducible (_, WeakTermZeta _) = False
 isReducible (_, WeakTermInt _) = False
+isReducible (_, WeakTermFloatUnknown _) = False
 isReducible (_, WeakTermFloat16 _) = False
 isReducible (_, WeakTermFloat32 _) = False
 isReducible (_, WeakTermFloat64 _) = False
@@ -184,6 +188,7 @@ isValue (_, WeakTermEpsilonIntro _) = True
 isValue (_, WeakTermPi {}) = True
 isValue (_, WeakTermPiIntro {}) = True
 isValue (_, WeakTermInt _) = True
+isValue (_, WeakTermFloatUnknown _) = True
 isValue (_, WeakTermFloat16 _) = True
 isValue (_, WeakTermFloat32 _) = True
 isValue (_, WeakTermFloat64 _) = True

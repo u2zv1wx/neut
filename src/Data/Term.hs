@@ -3,6 +3,7 @@ module Data.Term where
 import Control.Monad (forM)
 import Data.List (nubBy)
 import Data.Maybe (fromMaybe)
+import Numeric.Half
 
 import Data.Basic
 
@@ -18,7 +19,9 @@ data Term
   | TermPiElim TermPlus [TermPlus]
   | TermMu (Identifier, TermPlus) TermPlus
   | TermInt Int LowType
-  | TermFloat Double LowType
+  | TermFloat16 Half
+  | TermFloat32 Float
+  | TermFloat64 Double
   deriving (Show)
 
 data Meta
@@ -68,7 +71,9 @@ getClosedVarChain (_, TermPiElim e es) =
   getClosedVarChain e ++ concatMap getClosedVarChain es
 getClosedVarChain (_, TermMu ut e) = getClosedVarChainBindings [ut] [e]
 getClosedVarChain (_, TermInt _ _) = []
-getClosedVarChain (_, TermFloat _ _) = []
+getClosedVarChain (_, TermFloat16 _) = []
+getClosedVarChain (_, TermFloat32 _) = []
+getClosedVarChain (_, TermFloat64 _) = []
 
 getClosedVarChainBindings ::
      [(Identifier, TermPlus)]
@@ -109,7 +114,9 @@ substTermPlus sub (m, TermMu (x, t) e) = do
   let e' = substTermPlus (filter (\(k, _) -> k /= x) sub) e
   (m, TermMu (x, t') e')
 substTermPlus _ (m, TermInt x lowType) = (m, TermInt x lowType)
-substTermPlus _ (m, TermFloat x lowType) = (m, TermFloat x lowType)
+substTermPlus _ (m, TermFloat16 x) = (m, TermFloat16 x)
+substTermPlus _ (m, TermFloat32 x) = (m, TermFloat32 x)
+substTermPlus _ (m, TermFloat64 x) = (m, TermFloat64 x)
 
 substTermPlusBindings :: SubstTerm -> [IdentifierPlus] -> [IdentifierPlus]
 substTermPlusBindings _ [] = []

@@ -1,6 +1,7 @@
 module Data.Basic where
 
 import Data.Bits
+import Data.Maybe (fromMaybe)
 
 type Identifier = String
 
@@ -14,11 +15,22 @@ data Case
 data LowType
   = LowTypeSignedInt Int
   | LowTypeUnsignedInt Int
-  | LowTypeFloat Int
+  | LowTypeFloat FloatSize
   | LowTypePointer LowType
   | LowTypeFunction [LowType] LowType
   | LowTypeStruct [LowType]
   deriving (Eq, Show)
+
+data FloatSize
+  = FloatSize16
+  | FloatSize32
+  | FloatSize64
+  deriving (Eq, Show)
+
+sizeAsInt :: FloatSize -> Int
+sizeAsInt FloatSize16 = 16
+sizeAsInt FloatSize32 = 32
+sizeAsInt FloatSize64 = 64
 
 voidPtr :: LowType
 voidPtr = LowTypePointer $ LowTypeSignedInt 8
@@ -89,13 +101,7 @@ showItems f [a] = f a
 showItems f (a:as) = f a ++ ", " ++ showItems f as
 
 asLowType :: Identifier -> LowType
-asLowType ('i':cs)
-  | Just n <- read cs = LowTypeSignedInt n
-asLowType ('u':cs)
-  | Just n <- read cs = LowTypeUnsignedInt n
-asLowType ('f':cs)
-  | Just n <- read cs = LowTypeFloat n
-asLowType _ = LowTypeSignedInt 64 -- labels are i64
+asLowType n = fromMaybe (LowTypeSignedInt 64) (asLowTypeMaybe n)
 
 asLowTypeMaybe :: Identifier -> Maybe LowType
 asLowTypeMaybe ('i':cs)
@@ -103,8 +109,15 @@ asLowTypeMaybe ('i':cs)
 asLowTypeMaybe ('u':cs)
   | Just n <- read cs = Just $ LowTypeUnsignedInt n
 asLowTypeMaybe ('f':cs)
-  | Just n <- read cs = Just $ LowTypeFloat n
+  | Just n <- read cs
+  , Just size <- asFloatSize n = Just $ LowTypeFloat size
 asLowTypeMaybe _ = Nothing
+
+asFloatSize :: Int -> Maybe FloatSize
+asFloatSize 16 = Just FloatSize16
+asFloatSize 32 = Just FloatSize32
+asFloatSize 64 = Just FloatSize64
+asFloatSize _ = Nothing
 
 asUnaryOpMaybe :: Identifier -> Maybe (LowType, UnaryOp)
 asUnaryOpMaybe name
