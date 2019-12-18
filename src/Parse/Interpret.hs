@@ -58,15 +58,19 @@ interpret (m, TreeNode [(_, TreeAtom "zeta"), (_, TreeAtom x)]) = do
   withMeta m $ WeakTermZeta x'
 interpret (m, TreeNode [(_, TreeAtom "int"), (_, TreeAtom x)])
   | Just x' <- readMaybe x = do withMeta m $ WeakTermInt x'
-interpret (m, TreeNode [(_, TreeAtom "float"), (_, TreeAtom x)])
-  | Just x' <- readMaybe x = do withMeta m $ WeakTermFloat x'
+interpret (m, TreeNode [(_, TreeAtom "f16"), (_, TreeAtom x)])
+  | Just x' <- readMaybe x = do withMeta m $ WeakTermFloat16 x'
+interpret (m, TreeNode [(_, TreeAtom "f32"), (_, TreeAtom x)])
+  | Just x' <- readMaybe x = do withMeta m $ WeakTermFloat32 x'
+interpret (m, TreeNode [(_, TreeAtom "f64"), (_, TreeAtom x)])
+  | Just x' <- readMaybe x = do withMeta m $ WeakTermFloat64 x'
 --
 -- auxiliary interpretations
 --
 interpret (m, TreeAtom x)
   | Just x' <- readMaybe x = withMeta m $ WeakTermInt x'
 interpret (m, TreeAtom x)
-  | Just x' <- readMaybe x = withMeta m $ WeakTermFloat x'
+  | Just x' <- readMaybe x = withMeta m $ WeakTermFloat64 x'
 interpret t@(m, TreeAtom x) = do
   ml <- interpretLabelMaybe t
   case ml of
