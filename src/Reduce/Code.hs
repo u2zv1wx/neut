@@ -45,12 +45,12 @@ reduceCodePlus (m, CodeTheta theta) =
         BinaryOpMul -> upIntroData m (m1, DataInt (x * y) t)
         BinaryOpDiv -> upIntroData m (m1, DataInt (x `div` y) t)
         BinaryOpRem -> upIntroData m (m1, DataInt (x `rem` y) t)
-        BinaryOpEQ -> upIntroData m (m1, asData t $ x == y)
-        BinaryOpNE -> upIntroData m (m1, asData t $ x /= y)
-        BinaryOpGT -> upIntroData m (m1, asData t $ x > y)
-        BinaryOpGE -> upIntroData m (m1, asData t $ x >= y)
-        BinaryOpLT -> upIntroData m (m1, asData t $ x < y)
-        BinaryOpLE -> upIntroData m (m1, asData t $ x <= y)
+        BinaryOpEQ -> upIntroData m (m1, asData $ x == y)
+        BinaryOpNE -> upIntroData m (m1, asData $ x /= y)
+        BinaryOpGT -> upIntroData m (m1, asData $ x > y)
+        BinaryOpGE -> upIntroData m (m1, asData $ x >= y)
+        BinaryOpLT -> upIntroData m (m1, asData $ x < y)
+        BinaryOpLE -> upIntroData m (m1, asData $ x <= y)
         BinaryOpShl -> upIntroData m (m1, DataInt (shiftL x y) t)
         BinaryOpLshr -> upIntroData m (m1, DataInt (ushiftR x y) t)
         BinaryOpAshr -> upIntroData m (m1, DataInt (shiftR x y) t)
@@ -68,41 +68,57 @@ reduceCodePlus (m, CodeTheta theta) =
           upIntroData m (m1, DataInt (unsafeCoerce (x' `div` y')) t)
         BinaryOpRem ->
           upIntroData m (m1, DataInt (unsafeCoerce (x' `rem` y')) t)
-        BinaryOpEQ -> upIntroData m (m1, asData t $ x' == y')
-        BinaryOpNE -> upIntroData m (m1, asData t $ x' /= y')
-        BinaryOpGT -> upIntroData m (m1, asData t $ x' > y')
-        BinaryOpGE -> upIntroData m (m1, asData t $ x' >= y')
-        BinaryOpLT -> upIntroData m (m1, asData t $ x' < y')
-        BinaryOpLE -> upIntroData m (m1, asData t $ x' <= y')
+        BinaryOpEQ -> upIntroData m (m1, asData $ x' == y')
+        BinaryOpNE -> upIntroData m (m1, asData $ x' /= y')
+        BinaryOpGT -> upIntroData m (m1, asData $ x' > y')
+        BinaryOpGE -> upIntroData m (m1, asData $ x' >= y')
+        BinaryOpLT -> upIntroData m (m1, asData $ x' < y')
+        BinaryOpLE -> upIntroData m (m1, asData $ x' <= y')
         BinaryOpShl -> upIntroData m (m1, DataInt (shiftL x y) t)
         BinaryOpLshr -> upIntroData m (m1, DataInt (ushiftR x y) t)
         BinaryOpAshr -> upIntroData m (m1, DataInt (shiftR x y) t)
         BinaryOpAnd -> upIntroData m (m1, DataInt (x .&. y) t)
         BinaryOpOr -> upIntroData m (m1, DataInt (x .|. y) t)
         BinaryOpXor -> upIntroData m (m1, DataInt (x `xor` y) t)
-    ThetaBinaryOp op t@(LowTypeFloat _) (m1, DataFloat64 x) (_, DataFloat64 y) -> do
-      case op of
-        BinaryOpAdd -> upIntroData m (m1, DataFloat64 (x + y))
-        BinaryOpSub -> upIntroData m (m1, DataFloat64 (x - y))
-        BinaryOpMul -> upIntroData m (m1, DataFloat64 (x * y))
-        BinaryOpDiv -> upIntroData m (m1, DataFloat64 (x / y))
-        BinaryOpRem -> upIntroData m (m1, DataFloat64 (x `mod'` y))
-        BinaryOpEQ -> upIntroData m (m1, asData t $ x == y)
-        BinaryOpNE -> upIntroData m (m1, asData t $ x /= y)
-        BinaryOpGT -> upIntroData m (m1, asData t $ x > y)
-        BinaryOpGE -> upIntroData m (m1, asData t $ x >= y)
-        BinaryOpLT -> upIntroData m (m1, asData t $ x < y)
-        BinaryOpLE -> upIntroData m (m1, asData t $ x <= y)
-        _ -> return (m, CodeTheta theta)
+    ThetaBinaryOp op (LowTypeFloat _) (m1, DataFloat16 x) (_, DataFloat16 y) -> do
+      case computeFloat x y op of
+        Just (Left d) -> upIntroData m (m1, d)
+        Just (Right z) -> upIntroData m (m1, DataFloat16 z)
+        Nothing -> return (m, CodeTheta theta)
+    ThetaBinaryOp op (LowTypeFloat _) (m1, DataFloat32 x) (_, DataFloat32 y) -> do
+      case computeFloat x y op of
+        Just (Left d) -> upIntroData m (m1, d)
+        Just (Right z) -> upIntroData m (m1, DataFloat32 z)
+        Nothing -> return (m, CodeTheta theta)
+    ThetaBinaryOp op (LowTypeFloat _) (m1, DataFloat64 x) (_, DataFloat64 y) -> do
+      case computeFloat x y op of
+        Just (Left d) -> upIntroData m (m1, d)
+        Just (Right z) -> upIntroData m (m1, DataFloat64 z)
+        Nothing -> return (m, CodeTheta theta)
     ThetaPrint (_, DataInt i _) -> do
       liftIO $ putStr $ show i
       return (m, CodeUpIntro (Nothing, DataSigmaIntro []))
     _ -> return (m, CodeTheta theta)
 reduceCodePlus t = return t
 
-asData :: LowType -> Bool -> Data
-asData t True = DataInt 1 t
-asData t False = DataInt 0 t
+computeFloat ::
+     (Real a, Fractional a) => a -> a -> BinaryOp -> Maybe (Either Data a)
+computeFloat x y BinaryOpAdd = Just $ Right $ x + y
+computeFloat x y BinaryOpSub = Just $ Right $ x - y
+computeFloat x y BinaryOpMul = Just $ Right $ x * y
+computeFloat x y BinaryOpDiv = Just $ Right $ x / y
+computeFloat x y BinaryOpRem = Just $ Right $ x `mod'` y
+computeFloat x y BinaryOpEQ = Just $ Left $ asData $ x == y
+computeFloat x y BinaryOpNE = Just $ Left $ asData $ x /= y
+computeFloat x y BinaryOpGT = Just $ Left $ asData $ x > y
+computeFloat x y BinaryOpGE = Just $ Left $ asData $ x >= y
+computeFloat x y BinaryOpLT = Just $ Left $ asData $ x < y
+computeFloat x y BinaryOpLE = Just $ Left $ asData $ x <= y
+computeFloat _ _ _ = Nothing
+
+asData :: Bool -> Data
+asData True = DataInt 1 (LowTypeSignedInt 64) -- epsilon ~> i64
+asData False = DataInt 0 (LowTypeSignedInt 64)
 
 upIntroData :: Monad m => a -> DataPlus -> m (a, Code)
 upIntroData m d = return (m, CodeUpIntro d)
