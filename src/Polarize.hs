@@ -81,9 +81,12 @@ polarize (m, TermMu (f, t) e) = do
   -- いや、clsにすぐcallClosureしてるから、インライン展開で結局直接の呼び出しになるのでは？
   cls <- makeClosure (Just f) [] clsMeta fvs lamBody'
   callClosure m cls fvs'
-polarize (m, TermInt l lowType) = do
+polarize (m, TermIntS size l) = do
   let ml = snd $ obtainInfoMeta m
-  return (ml, CodeUpIntro (ml, DataInt l lowType))
+  return (ml, CodeUpIntro (ml, DataIntS size l))
+polarize (m, TermIntU size l) = do
+  let ml = snd $ obtainInfoMeta m
+  return (ml, CodeUpIntro (ml, DataIntU size l))
 polarize (m, TermFloat16 l) = do
   let ml = snd $ obtainInfoMeta m
   return (ml, CodeUpIntro (ml, DataFloat16 l))
