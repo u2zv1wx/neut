@@ -3,6 +3,7 @@ module Data.WeakTerm where
 import Control.Monad (forM)
 import Data.IORef
 import Data.Maybe (fromMaybe)
+import Numeric.Half
 import System.IO.Unsafe (unsafePerformIO)
 
 import Data.Basic
@@ -20,7 +21,9 @@ data WeakTerm
   | WeakTermMu IdentifierPlus WeakTermPlus
   | WeakTermZeta Identifier
   | WeakTermInt Int
-  | WeakTermFloat Double
+  | WeakTermFloat16 Half
+  | WeakTermFloat32 Float
+  | WeakTermFloat64 Double
   deriving (Show)
 
 newtype Ref a =
@@ -63,7 +66,9 @@ varWeakTermPlus (_, WeakTermPiElim e es) =
 varWeakTermPlus (_, WeakTermMu ut e) = varWeakTermPlusBindings [ut] [e]
 varWeakTermPlus (_, WeakTermZeta h) = ([], [h])
 varWeakTermPlus (_, WeakTermInt _) = ([], [])
-varWeakTermPlus (_, WeakTermFloat _) = ([], [])
+varWeakTermPlus (_, WeakTermFloat16 _) = ([], [])
+varWeakTermPlus (_, WeakTermFloat32 _) = ([], [])
+varWeakTermPlus (_, WeakTermFloat64 _) = ([], [])
 
 varWeakTermPlusBindings ::
      [IdentifierPlus] -> [WeakTermPlus] -> ([Identifier], [Identifier])
@@ -110,7 +115,9 @@ substWeakTermPlus sub (m, WeakTermMu (x, t) e) = do
 substWeakTermPlus sub (m, WeakTermZeta s) =
   fromMaybe (m, WeakTermZeta s) (lookup s sub)
 substWeakTermPlus _ (m, WeakTermInt x) = (m, WeakTermInt x)
-substWeakTermPlus _ (m, WeakTermFloat x) = (m, WeakTermFloat x)
+substWeakTermPlus _ (m, WeakTermFloat16 x) = (m, WeakTermFloat16 x)
+substWeakTermPlus _ (m, WeakTermFloat32 x) = (m, WeakTermFloat32 x)
+substWeakTermPlus _ (m, WeakTermFloat64 x) = (m, WeakTermFloat64 x)
 
 substWeakTermPlusBindings ::
      SubstWeakTerm -> [IdentifierPlus] -> [IdentifierPlus]
@@ -156,7 +163,7 @@ isReducible (_, WeakTermPiElim (_, WeakTermTheta c) [(_, WeakTermInt _), (_, Wea
   , Just (LowTypeUnsignedInt _) <- asLowTypeMaybe typeStr
   , Just arith <- asBinaryOpMaybe' opStr
   , isArithOp arith = True
-isReducible (_, WeakTermPiElim (_, WeakTermTheta c) [(_, WeakTermFloat _), (_, WeakTermFloat _)])
+isReducible (_, WeakTermPiElim (_, WeakTermTheta c) [(_, WeakTermFloat64 _), (_, WeakTermFloat64 _)])
   | [typeStr, opStr] <- wordsBy '.' c
   , Just (LowTypeFloat _) <- asLowTypeMaybe typeStr
   , Just arith <- asBinaryOpMaybe' opStr
@@ -165,7 +172,9 @@ isReducible (_, WeakTermPiElim e es) = isReducible e || any isReducible es
 isReducible (_, WeakTermMu _ _) = False
 isReducible (_, WeakTermZeta _) = False
 isReducible (_, WeakTermInt _) = False
-isReducible (_, WeakTermFloat _) = False
+isReducible (_, WeakTermFloat16 _) = False
+isReducible (_, WeakTermFloat32 _) = False
+isReducible (_, WeakTermFloat64 _) = False
 
 isValue :: WeakTermPlus -> Bool
 isValue (_, WeakTermTau) = True
@@ -175,5 +184,7 @@ isValue (_, WeakTermEpsilonIntro _) = True
 isValue (_, WeakTermPi {}) = True
 isValue (_, WeakTermPiIntro {}) = True
 isValue (_, WeakTermInt _) = True
-isValue (_, WeakTermFloat _) = True
+isValue (_, WeakTermFloat16 _) = True
+isValue (_, WeakTermFloat32 _) = True
+isValue (_, WeakTermFloat64 _) = True
 isValue _ = False
