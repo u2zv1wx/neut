@@ -458,7 +458,8 @@ emitGlobal =
 showLLVMData :: LLVMData -> String
 showLLVMData (LLVMDataLocal x) = "%" ++ x
 showLLVMData (LLVMDataGlobal x) = "@" ++ x
-showLLVMData (LLVMDataInt i _) = show i
+showLLVMData (LLVMDataIntS _ i) = show i
+showLLVMData (LLVMDataIntU _ i) = show i
 showLLVMData (LLVMDataFloat16 x) = show x
 showLLVMData (LLVMDataFloat32 x) = show x
 showLLVMData (LLVMDataFloat64 x) = show x
