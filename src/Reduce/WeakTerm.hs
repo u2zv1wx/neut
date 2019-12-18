@@ -4,6 +4,7 @@ module Reduce.WeakTerm
 
 import Data.Bits
 import Data.Fixed (mod')
+import Numeric.Half
 import Unsafe.Coerce -- for int -> word, word -> int
 
 import Data.Basic
@@ -97,8 +98,71 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
         case computeFloat x y op app of
           Left b -> return (m, b)
           Right z -> return (m, WeakTermFloat64 z)
+    (_, WeakTermTheta constant)
+      | Just (x, y) <- anyPlusF16 es'
+      , Just (LowTypeFloat FloatSize16, op) <- asBinaryOpMaybe constant -> do
+        let x' = realToFrac x
+        case computeFloat x' y op app of
+          Left b -> return (m, b)
+          Right z -> return (m, WeakTermFloat16 z)
+    (_, WeakTermTheta constant)
+      | Just (x, y) <- anyPlusF32 es'
+      , Just (LowTypeFloat FloatSize32, op) <- asBinaryOpMaybe constant -> do
+        let x' = realToFrac x
+        case computeFloat x' y op app of
+          Left b -> return (m, b)
+          Right z -> return (m, WeakTermFloat32 z)
+    (_, WeakTermTheta constant)
+      | Just (x, y) <- anyPlusF64 es'
+      , Just (LowTypeFloat FloatSize64, op) <- asBinaryOpMaybe constant -> do
+        let x' = realToFrac x
+        case computeFloat x' y op app of
+          Left b -> return (m, b)
+          Right z -> return (m, WeakTermFloat64 z)
+    (_, WeakTermTheta constant)
+      | Just (x, y) <- anyPlusAny es'
+      , Just (LowTypeFloat FloatSize16, op) <- asBinaryOpMaybe constant -> do
+        let x' = realToFrac x
+        let y' = realToFrac y
+        case computeFloat x' y' op app of
+          Left b -> return (m, b)
+          Right z -> return (m, WeakTermFloat16 z)
+    (_, WeakTermTheta constant)
+      | Just (x, y) <- anyPlusAny es'
+      , Just (LowTypeFloat FloatSize32, op) <- asBinaryOpMaybe constant -> do
+        let x' = realToFrac x
+        let y' = realToFrac y
+        case computeFloat x' y' op app of
+          Left b -> return (m, b)
+          Right z -> return (m, WeakTermFloat32 z)
+    (_, WeakTermTheta constant)
+      | Just (x, y) <- anyPlusAny es'
+      , Just (LowTypeFloat FloatSize64, op) <- asBinaryOpMaybe constant -> do
+        case computeFloat x y op app of
+          Left b -> return (m, b)
+          Right z -> return (m, WeakTermFloat64 z)
     _ -> return (m, app)
 reduceWeakTermPlus t = return t
+
+anyPlusF16 :: [WeakTermPlus] -> Maybe (Double, Half)
+anyPlusF16 [(_, WeakTermFloatUnknown x), (_, WeakTermFloat16 y)] = Just (x, y)
+anyPlusF16 [(_, WeakTermFloat16 x), (_, WeakTermFloatUnknown y)] = Just (y, x)
+anyPlusF16 _ = Nothing
+
+anyPlusF32 :: [WeakTermPlus] -> Maybe (Double, Float)
+anyPlusF32 [(_, WeakTermFloatUnknown x), (_, WeakTermFloat32 y)] = Just (x, y)
+anyPlusF32 [(_, WeakTermFloat32 x), (_, WeakTermFloatUnknown y)] = Just (y, x)
+anyPlusF32 _ = Nothing
+
+anyPlusF64 :: [WeakTermPlus] -> Maybe (Double, Double)
+anyPlusF64 [(_, WeakTermFloatUnknown x), (_, WeakTermFloat64 y)] = Just (x, y)
+anyPlusF64 [(_, WeakTermFloat64 x), (_, WeakTermFloatUnknown y)] = Just (y, x)
+anyPlusF64 _ = Nothing
+
+anyPlusAny :: [WeakTermPlus] -> Maybe (Double, Double)
+anyPlusAny [(_, WeakTermFloatUnknown x), (_, WeakTermFloatUnknown y)] =
+  Just (x, y)
+anyPlusAny _ = Nothing
 
 computeInt :: (Integral a, Bits a) => a -> a -> BinaryOp -> Either WeakTerm a
 computeInt x y BinaryOpAdd = Right $ x + y
