@@ -116,27 +116,49 @@ reduceWeakTermPlusUnary orig arg m lowType op = do
         UnaryOpTo (LowTypeFloat FloatSize64) ->
           return (m, WeakTermFloat64 (fromIntegral x))
         _ -> return orig
-    Just (UnaryArgInfoFloat16 _) -> undefined
-    Just (UnaryArgInfoFloat32 _) -> undefined
-    Just (UnaryArgInfoFloat64 _) -> undefined
+    Just (UnaryArgInfoFloat16 x) ->
+      case op of
+        UnaryOpNeg -> return (m, WeakTermFloat16 (-x))
+        UnaryOpFpExt (LowTypeFloat FloatSize32) ->
+          return (m, WeakTermFloat32 (realToFrac x))
+        UnaryOpFpExt (LowTypeFloat FloatSize64) ->
+          return (m, WeakTermFloat64 (realToFrac x))
+        UnaryOpTo (LowTypeSignedInt s) -> do
+          let s' = toInteger s
+          return (m, WeakTermIntS s (asIntS s' (round x)))
+        UnaryOpTo (LowTypeUnsignedInt s) -> do
+          let s' = toInteger s
+          return (m, WeakTermIntU s (asIntU s' (round x)))
+        _ -> return orig
+    Just (UnaryArgInfoFloat32 x) ->
+      case op of
+        UnaryOpNeg -> return (m, WeakTermFloat32 (-x))
+        UnaryOpTrunc (LowTypeFloat FloatSize16) ->
+          return (m, WeakTermFloat16 (realToFrac x))
+        UnaryOpFpExt (LowTypeFloat FloatSize64) ->
+          return (m, WeakTermFloat64 (realToFrac x))
+        UnaryOpTo (LowTypeSignedInt s) -> do
+          let s' = toInteger s
+          return (m, WeakTermIntS s (asIntS s' (round x)))
+        UnaryOpTo (LowTypeUnsignedInt s) -> do
+          let s' = toInteger s
+          return (m, WeakTermIntU s (asIntU s' (round x)))
+        _ -> return orig
+    Just (UnaryArgInfoFloat64 x) ->
+      case op of
+        UnaryOpNeg -> return (m, WeakTermFloat64 (-x))
+        UnaryOpTrunc (LowTypeFloat FloatSize16) ->
+          return (m, WeakTermFloat16 (realToFrac x))
+        UnaryOpTrunc (LowTypeFloat FloatSize32) ->
+          return (m, WeakTermFloat32 (realToFrac x))
+        UnaryOpTo (LowTypeSignedInt s) -> do
+          let s' = toInteger s
+          return (m, WeakTermIntS s (asIntS s' (round x)))
+        UnaryOpTo (LowTypeUnsignedInt s) -> do
+          let s' = toInteger s
+          return (m, WeakTermIntU s (asIntU s' (round x)))
+        _ -> return orig
     Nothing -> return orig
-  -- case op of
-  --   UnaryOpNeg -> undefined
-  --   UnaryOpTrunc _ -> undefined
-  --   UnaryOpZext _ -> undefined
-  --   UnaryOpSext _ -> undefined
-  --   UnaryOpFpExt _ -> undefined
-  --   UnaryOpTo _ -> undefined
-  --   _ -> return orig
-    -- (_, WeakTermTheta constant)
-    --   | [(_, WeakTermFloat64 x)] <- es'
-    --   , Just (LowTypeFloat _, op) <- asUnaryOpMaybe constant ->
-    --     case op of
-    --       UnaryOpNeg -> return (m, WeakTermFloat64 (-x))
-    --       UnaryOpTrunc _ -> undefined
-    --       UnaryOpFpExt _ -> undefined
-    --       UnaryOpTo _ -> undefined
-    --       _ -> return (m, app)
 
 reduceWeakTermPlusBinary ::
      WeakTermPlus
