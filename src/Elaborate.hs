@@ -91,44 +91,32 @@ elaborate' (_, WeakTermZeta x) = do
   case lookup x sub of
     Just e -> elaborate' e
     Nothing -> lift $ throwE $ "elaborate' i: remaining hole: " ++ x
+elaborate' (m, WeakTermIntS size x) = do
+  m' <- toMeta m
+  return (m', TermIntS size x)
+elaborate' (m, WeakTermIntU size x) = do
+  m' <- toMeta m
+  return (m', TermIntU size x)
 elaborate' (m, WeakTermInt x) = do
   m' <- toMeta m
   t <- reduceTermPlus $ obtainType m'
   case t of
     (_, TermTheta intType) ->
       case asLowTypeMaybe intType of
-        Just lowType@(LowTypeSignedInt _) -> return (m', TermInt x lowType)
-        Just lowType@(LowTypeUnsignedInt _) -> return (m', TermInt x lowType)
+        Just (LowTypeSignedInt size) -> return (m', TermIntS size x)
+        Just (LowTypeUnsignedInt size) -> return (m', TermIntU size x)
         _ -> throwError $ show x ++ " should be int, but is " ++ intType
     _ -> throwError "epsilonIntro"
 elaborate' (m, WeakTermFloat16 x) = do
   m' <- toMeta m
-  t <- reduceTermPlus $ obtainType m'
-  case t of
-    (_, TermTheta floatType) -> do
-      case asLowTypeMaybe floatType of
-        Just (LowTypeFloat FloatSize16) -> return (m', TermFloat16 x)
-        _ -> throwError $ show x ++ " should be f16, but is " ++ floatType
-    _ -> throwError "epsilonIntro"
+  return (m', TermFloat16 x)
 elaborate' (m, WeakTermFloat32 x) = do
   m' <- toMeta m
-  t <- reduceTermPlus $ obtainType m'
-  case t of
-    (_, TermTheta floatType) -> do
-      case asLowTypeMaybe floatType of
-        Just (LowTypeFloat FloatSize32) -> return (m', TermFloat32 x)
-        _ -> throwError $ show x ++ " should be f32, but is " ++ floatType
-    _ -> throwError "epsilonIntro"
+  return (m', TermFloat32 x)
 elaborate' (m, WeakTermFloat64 x) = do
   m' <- toMeta m
-  t <- reduceTermPlus $ obtainType m'
-  case t of
-    (_, TermTheta floatType) -> do
-      case asLowTypeMaybe floatType of
-        Just (LowTypeFloat FloatSize64) -> return (m', TermFloat64 x)
-        _ -> throwError $ show x ++ " should be f64, but is " ++ floatType
-    _ -> throwError "epsilonIntro"
-elaborate' (m, WeakTermFloatUnknown x) = do
+  return (m', TermFloat64 x)
+elaborate' (m, WeakTermFloat x) = do
   m' <- toMeta m
   t <- reduceTermPlus $ obtainType m'
   case t of
@@ -173,11 +161,13 @@ exhaust' (_, WeakTermPiIntro _ e) = exhaust' e
 exhaust' (_, WeakTermPiElim e es) = allM exhaust' $ e : es
 exhaust' (_, WeakTermMu _ e) = exhaust' e
 exhaust' (_, WeakTermZeta _) = return False
+exhaust' (_, WeakTermIntS _ _) = return True
+exhaust' (_, WeakTermIntU _ _) = return True
 exhaust' (_, WeakTermInt _) = return True
 exhaust' (_, WeakTermFloat16 _) = return True
 exhaust' (_, WeakTermFloat32 _) = return True
 exhaust' (_, WeakTermFloat64 _) = return True
-exhaust' (_, WeakTermFloatUnknown _) = return True
+exhaust' (_, WeakTermFloat _) = return True
 
 exhaustEpsilonIdentifier :: Identifier -> [Case] -> Bool -> WithEnv Bool
 exhaustEpsilonIdentifier x labelList b1 = do
