@@ -50,7 +50,10 @@ rename (m, WeakTermArray kind from to) = do
   to' <- rename to
   return (m, WeakTermArray kind from' to')
 rename (m, WeakTermArrayIntro kind les) = do
-  les' <- renameCaseList les
+  les' <-
+    forM les $ \(l, body) -> do
+      body' <- rename body
+      return (l, body')
   return (m, WeakTermArrayIntro kind les')
 rename (m, WeakTermArrayElim kind e1 e2) = do
   e1' <- rename e1

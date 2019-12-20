@@ -77,7 +77,9 @@ interpret (m, TreeNode [(_, TreeAtom str), from, to])
 interpret (m, TreeNode [(_, TreeAtom str), (_, TreeNode cs)])
   | Just kind <- withKindPrefix str "array-introduction" = do
     cs' <- mapM interpretClause cs
-    withMeta m $ WeakTermArrayIntro kind cs'
+    let (ls, es) = unzip cs'
+    ls' <- mapM asArrayIntro ls
+    withMeta m $ WeakTermArrayIntro kind (zip ls' es)
 interpret (m, TreeNode [(_, TreeAtom str), e1, e2])
   | Just kind <- withKindPrefix str "array-elimination" = do
     e1' <- interpret e1
@@ -167,6 +169,11 @@ interpretClause (_, TreeNode [c, e]) = do
   return (c', e')
 interpretClause e =
   lift $ throwE $ "interpretClause: syntax error:\n " ++ Pr.ppShow e
+
+asArrayIntro :: Case -> WithEnv Identifier
+asArrayIntro (CaseLabel l) = return l
+asArrayIntro CaseDefault =
+  lift $ throwE "`default` cannot be used in array-intro"
 
 withMeta :: TreeMeta -> WeakTerm -> WithEnv WeakTermPlus
 withMeta m e = do
