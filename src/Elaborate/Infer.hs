@@ -112,7 +112,7 @@ infer ctx (meta, WeakTermArray _ from to) = do
 infer ctx (meta, WeakTermArrayIntro kind les) = do
   tCod <- inferKind kind
   let (ls, es) = unzip les
-  tls <- mapM inferCase ls
+  tls <- mapM (inferCase . CaseLabel) ls
   constrainList $ catMaybes tls
   ts <- mapM (infer ctx) es
   constrainList $ tCod : ts
