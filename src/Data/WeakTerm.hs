@@ -1,6 +1,5 @@
 module Data.WeakTerm where
 
-import Control.Monad (forM)
 import Data.IORef
 import Data.Maybe (fromMaybe)
 import Numeric.Half
@@ -27,6 +26,9 @@ data WeakTerm
   | WeakTermFloat32 Float
   | WeakTermFloat64 Double
   | WeakTermFloat Double
+  | WeakTermArray ArrayKind WeakTermPlus WeakTermPlus
+  | WeakTermArrayIntro ArrayKind [(EpsilonLabel, WeakTermPlus)]
+  | WeakTermArrayElim ArrayKind WeakTermPlus WeakTermPlus
   deriving (Show)
 
 newtype Ref a =
@@ -56,10 +58,7 @@ varWeakTermPlus (_, WeakTermEpsilon _) = ([], [])
 varWeakTermPlus (_, WeakTermEpsilonIntro _) = ([], [])
 varWeakTermPlus (_, WeakTermEpsilonElim e branchList) = do
   let xhs = varWeakTermPlus e
-  xhss <-
-    forM branchList $ \(_, body) -> do
-      let (xs, hs) = varWeakTermPlus body
-      return (xs, hs)
+  let xhss = map (\(_, body) -> varWeakTermPlus body) branchList
   pairwiseConcat (xhs : xhss)
 varWeakTermPlus (_, WeakTermPi xts) = varWeakTermPlusBindings xts []
 varWeakTermPlus (_, WeakTermPiIntro xts e) = varWeakTermPlusBindings xts [e]
@@ -74,6 +73,13 @@ varWeakTermPlus (_, WeakTermFloat16 _) = ([], [])
 varWeakTermPlus (_, WeakTermFloat32 _) = ([], [])
 varWeakTermPlus (_, WeakTermFloat64 _) = ([], [])
 varWeakTermPlus (_, WeakTermFloat _) = ([], [])
+varWeakTermPlus (_, WeakTermArray _ e1 e2) =
+  pairwiseConcat $ [varWeakTermPlus e1, varWeakTermPlus e2]
+varWeakTermPlus (_, WeakTermArrayIntro _ les) = do
+  let xhss = map (\(_, body) -> varWeakTermPlus body) les
+  pairwiseConcat xhss
+varWeakTermPlus (_, WeakTermArrayElim _ e1 e2) =
+  pairwiseConcat $ [varWeakTermPlus e1, varWeakTermPlus e2]
 
 varWeakTermPlusBindings ::
      [IdentifierPlus] -> [WeakTermPlus] -> ([Identifier], [Identifier])
@@ -123,7 +129,19 @@ substWeakTermPlus _ (m, WeakTermInt x) = (m, WeakTermInt x)
 substWeakTermPlus _ (m, WeakTermFloat16 x) = (m, WeakTermFloat16 x)
 substWeakTermPlus _ (m, WeakTermFloat32 x) = (m, WeakTermFloat32 x)
 substWeakTermPlus _ (m, WeakTermFloat64 x) = (m, WeakTermFloat64 x)
-substWeakTermPlus _ (m, WeakTermFloat x) = (m, WeakTermFloat64 x)
+substWeakTermPlus _ (m, WeakTermFloat x) = (m, WeakTermFloat x)
+substWeakTermPlus sub (m, WeakTermArray kind from to) = do
+  let from' = substWeakTermPlus sub from
+  let to' = substWeakTermPlus sub to
+  (m, WeakTermArray kind from' to')
+substWeakTermPlus sub (m, WeakTermArrayIntro kind les) = do
+  let (ls, es) = unzip les
+  let es' = map (substWeakTermPlus sub) es
+  (m, WeakTermArrayIntro kind (zip ls es'))
+substWeakTermPlus sub (m, WeakTermArrayElim kind e1 e2) = do
+  let e1' = substWeakTermPlus sub e1
+  let e2' = substWeakTermPlus sub e2
+  (m, WeakTermArrayElim kind e1' e2')
 
 substWeakTermPlusBindings ::
      SubstWeakTerm -> [IdentifierPlus] -> [IdentifierPlus]
@@ -170,6 +188,7 @@ isReducible (_, WeakTermPiElim (_, WeakTermTheta c) [(_, WeakTermIntU _ _), (_, 
   , Just arith <- asBinaryOpMaybe' opStr
   , isArithOp arith = True
 -- FIXME: isReducible for Float
+-- FIXME: rewrite here using asBinaryOpMaybe
 isReducible (_, WeakTermPiElim (_, WeakTermTheta c) [(_, WeakTermFloat16 _), (_, WeakTermFloat16 _)])
   | [typeStr, opStr] <- wordsBy '.' c
   , Just (LowTypeFloat FloatSize16) <- asLowTypeMaybe typeStr
@@ -195,6 +214,11 @@ isReducible (_, WeakTermFloat16 _) = False
 isReducible (_, WeakTermFloat32 _) = False
 isReducible (_, WeakTermFloat64 _) = False
 isReducible (_, WeakTermFloat _) = False
+isReducible (_, WeakTermArray {}) = False
+isReducible (_, WeakTermArrayIntro _ les) = any isReducible $ map snd les
+isReducible (_, WeakTermArrayElim _ (_, WeakTermArrayIntro _ les) (_, WeakTermEpsilonIntro l))
+  | l `elem` map fst les = True
+isReducible (_, WeakTermArrayElim _ e1 e2) = isReducible e1 || isReducible e2
 
 isValue :: WeakTermPlus -> Bool
 isValue (_, WeakTermTau) = True
@@ -210,4 +234,6 @@ isValue (_, WeakTermFloat16 _) = True
 isValue (_, WeakTermFloat32 _) = True
 isValue (_, WeakTermFloat64 _) = True
 isValue (_, WeakTermFloat _) = True
+isValue (_, WeakTermArray {}) = True
+isValue (_, WeakTermArrayIntro _ les) = all isValue $ map snd les
 isValue _ = False

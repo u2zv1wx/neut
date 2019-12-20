@@ -7,6 +7,8 @@ type Identifier = String
 
 type Loc = (Int, Int)
 
+type EpsilonLabel = Identifier
+
 data Case
   = CaseLabel Identifier
   | CaseDefault
@@ -45,6 +47,13 @@ sizeAsInt :: FloatSize -> Int
 sizeAsInt FloatSize16 = 16
 sizeAsInt FloatSize32 = 32
 sizeAsInt FloatSize64 = 64
+
+data ArrayKind
+  = ArrayKindIntS Int
+  | ArrayKindIntU Int
+  | ArrayKindFloat FloatSize
+  | ArrayKindAny
+  deriving (Show, Eq)
 
 voidPtr :: LowType
 voidPtr = LowTypePointer $ LowTypeSignedInt 8
