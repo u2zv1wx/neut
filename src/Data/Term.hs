@@ -23,6 +23,9 @@ data Term
   | TermFloat16 Half
   | TermFloat32 Float
   | TermFloat64 Double
+  | TermArray ArrayKind TermPlus TermPlus
+  | TermArrayIntro ArrayKind [(Identifier, TermPlus)]
+  | TermArrayElim ArrayKind TermPlus TermPlus
   deriving (Show)
 
 data Meta
@@ -73,6 +76,13 @@ getClosedVarChain (_, TermIntU _ _) = []
 getClosedVarChain (_, TermFloat16 _) = []
 getClosedVarChain (_, TermFloat32 _) = []
 getClosedVarChain (_, TermFloat64 _) = []
+getClosedVarChain (_, TermArray _ dom cod) =
+  getClosedVarChain dom ++ getClosedVarChain cod
+getClosedVarChain (_, TermArrayIntro _ les) = do
+  let (_, es) = unzip les
+  concat $ map getClosedVarChain es
+getClosedVarChain (_, TermArrayElim _ e1 e2) = do
+  getClosedVarChain e1 ++ getClosedVarChain e2
 
 getClosedVarChainBindings ::
      [(Identifier, TermPlus)]
@@ -84,6 +94,7 @@ getClosedVarChainBindings ((x, t):xts) es = do
   let xs2 = getClosedVarChainBindings xts es
   xs1 ++ filter (\(y, _, _) -> y /= x) xs2
 
+-- FIXME: このときmetaについてもsubstすべき
 substTermPlus :: SubstTerm -> TermPlus -> TermPlus
 substTermPlus _ (m, TermTau) = (m, TermTau)
 substTermPlus _ (m, TermTheta t) = (m, TermTheta t)
@@ -115,6 +126,18 @@ substTermPlus _ (m, TermIntU size x) = (m, TermIntU size x)
 substTermPlus _ (m, TermFloat16 x) = (m, TermFloat16 x)
 substTermPlus _ (m, TermFloat32 x) = (m, TermFloat32 x)
 substTermPlus _ (m, TermFloat64 x) = (m, TermFloat64 x)
+substTermPlus sub (m, TermArray k dom cod) = do
+  let dom' = substTermPlus sub dom
+  let cod' = substTermPlus sub cod
+  (m, TermArray k dom' cod')
+substTermPlus sub (m, TermArrayIntro k les) = do
+  let (ls, es) = unzip les
+  let es' = map (substTermPlus sub) es
+  (m, TermArrayIntro k (zip ls es'))
+substTermPlus sub (m, TermArrayElim k e1 e2) = do
+  let e1' = substTermPlus sub e1
+  let e2' = substTermPlus sub e2
+  (m, TermArrayElim k e1' e2')
 
 substTermPlusBindings :: SubstTerm -> [IdentifierPlus] -> [IdentifierPlus]
 substTermPlusBindings _ [] = []
