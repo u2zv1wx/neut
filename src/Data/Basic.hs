@@ -55,6 +55,12 @@ data ArrayKind
   | ArrayKindAny
   deriving (Show, Eq)
 
+asArrayKind :: LowType -> Maybe ArrayKind
+asArrayKind (LowTypeSignedInt i) = Just $ ArrayKindIntS i
+asArrayKind (LowTypeUnsignedInt i) = Just $ ArrayKindIntU i
+asArrayKind (LowTypeFloat size) = Just $ ArrayKindFloat size
+asArrayKind _ = Nothing
+
 voidPtr :: LowType
 voidPtr = LowTypePointer $ LowTypeSignedInt 8
 

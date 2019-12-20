@@ -27,7 +27,7 @@ data WeakTerm
   | WeakTermFloat64 Double
   | WeakTermFloat Double
   | WeakTermArray ArrayKind WeakTermPlus WeakTermPlus
-  | WeakTermArrayIntro ArrayKind [(EpsilonLabel, WeakTermPlus)]
+  | WeakTermArrayIntro ArrayKind [(Case, WeakTermPlus)]
   | WeakTermArrayElim ArrayKind WeakTermPlus WeakTermPlus
   deriving (Show)
 
@@ -217,7 +217,7 @@ isReducible (_, WeakTermFloat _) = False
 isReducible (_, WeakTermArray {}) = False
 isReducible (_, WeakTermArrayIntro _ les) = any isReducible $ map snd les
 isReducible (_, WeakTermArrayElim _ (_, WeakTermArrayIntro _ les) (_, WeakTermEpsilonIntro l))
-  | l `elem` map fst les = True
+  | CaseLabel l `elem` map fst les || CaseDefault `elem` map fst les = True
 isReducible (_, WeakTermArrayElim _ e1 e2) = isReducible e1 || isReducible e2
 
 isValue :: WeakTermPlus -> Bool

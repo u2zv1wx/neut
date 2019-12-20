@@ -69,17 +69,20 @@ interpret (m, TreeNode [(_, TreeAtom "f32"), (_, TreeAtom x)])
   | Just x' <- readMaybe x = do withMeta m $ WeakTermFloat32 x'
 interpret (m, TreeNode [(_, TreeAtom "f64"), (_, TreeAtom x)])
   | Just x' <- readMaybe x = do withMeta m $ WeakTermFloat64 x'
-interpret (m, TreeNode [(_, TreeAtom arrayStr), from, to])
-  | [t, "array"] <- wordsBy '-' arrayStr -- e.g. u8-array
-  , Just t' <- asLowTypeMaybe t
-  , Just kind <- asArrayKind t' = do
+interpret (m, TreeNode [(_, TreeAtom str), from, to])
+  | Just kind <- withKindPrefix str "array" = do
     from' <- interpret from
     to' <- interpret to
     withMeta m $ WeakTermArray kind from' to'
-interpret (m, TreeNode [(_, TreeAtom "array"), from, to]) = do
-  from' <- interpret from
-  to' <- interpret to
-  withMeta m $ WeakTermArray ArrayKindAny from' to'
+interpret (m, TreeNode [(_, TreeAtom str), (_, TreeNode cs)])
+  | Just kind <- withKindPrefix str "array-introduction" = do
+    cs' <- mapM interpretClause cs
+    withMeta m $ WeakTermArrayIntro kind cs'
+interpret (m, TreeNode [(_, TreeAtom str), e1, e2])
+  | Just kind <- withKindPrefix str "array-elimination" = do
+    e1' <- interpret e1
+    e2' <- interpret e2
+    withMeta m $ WeakTermArrayElim kind e1' e2'
 --
 -- auxiliary interpretations
 --
@@ -174,3 +177,13 @@ extractIdentifier :: TreePlus -> WithEnv Identifier
 extractIdentifier (_, TreeAtom s) = return s
 extractIdentifier t =
   lift $ throwE $ "interpretAtom: syntax error:\n" ++ Pr.ppShow t
+
+withKindPrefix :: String -> String -> Maybe ArrayKind
+withKindPrefix str base
+  | [t, base'] <- wordsBy '-' str -- e.g. u8-array
+  , base == base'
+  , Just t' <- asLowTypeMaybe t
+  , Just kind <- asArrayKind t' = Just kind
+withKindPrefix str base
+  | str == base = Just ArrayKindAny
+withKindPrefix _ _ = Nothing
