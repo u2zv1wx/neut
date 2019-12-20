@@ -69,6 +69,17 @@ interpret (m, TreeNode [(_, TreeAtom "f32"), (_, TreeAtom x)])
   | Just x' <- readMaybe x = do withMeta m $ WeakTermFloat32 x'
 interpret (m, TreeNode [(_, TreeAtom "f64"), (_, TreeAtom x)])
   | Just x' <- readMaybe x = do withMeta m $ WeakTermFloat64 x'
+interpret (m, TreeNode [(_, TreeAtom arrayStr), from, to])
+  | [t, "array"] <- wordsBy '-' arrayStr -- e.g. u8-array
+  , Just t' <- asLowTypeMaybe t
+  , Just kind <- asArrayKind t' = do
+    from' <- interpret from
+    to' <- interpret to
+    withMeta m $ WeakTermArray kind from' to'
+interpret (m, TreeNode [(_, TreeAtom "array"), from, to]) = do
+  from' <- interpret from
+  to' <- interpret to
+  withMeta m $ WeakTermArray ArrayKindAny from' to'
 --
 -- auxiliary interpretations
 --
