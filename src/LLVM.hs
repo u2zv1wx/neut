@@ -177,10 +177,8 @@ llvmDataLet x (_, DataTheta y) cont = do
 llvmDataLet x (_, DataUpsilon y) cont =
   return $ LLVMLet x (LLVMBitcast (LLVMDataLocal y) voidPtr voidPtr) cont
 llvmDataLet x (m, DataEpsilonIntro label) cont = do
-  mi <- getEpsilonNum label
-  case mi of
-    Nothing -> lift $ throwE $ "no such epsilon is defined: " ++ show label
-    Just i -> llvmDataLet x (m, DataIntS 64 (toInteger i)) cont
+  i <- getEpsilonNum label
+  llvmDataLet x (m, DataIntS 64 (toInteger i)) cont
 llvmDataLet reg (_, DataSigmaIntro ds) cont = do
   xs <- mapM (const $ newNameWith "cursor") ds
   cast <- newNameWith "cast"

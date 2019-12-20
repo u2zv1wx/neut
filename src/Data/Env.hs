@@ -147,10 +147,12 @@ lookupEpsilonSet' name ((_, ls):xs) =
     then return ls
     else lookupEpsilonSet' name xs
 
-getEpsilonNum :: Identifier -> WithEnv (Maybe Int)
+getEpsilonNum :: Identifier -> WithEnv Int
 getEpsilonNum label = do
   ienv <- gets epsilonEnv
-  return $ getEpsilonNum' label $ map snd ienv
+  case (getEpsilonNum' label $ map snd ienv) of
+    Nothing -> lift $ throwE $ "no such epsilon is defined: " ++ show label
+    Just i -> return i
 
 getEpsilonNum' :: Identifier -> [[Identifier]] -> Maybe Int
 getEpsilonNum' _ [] = Nothing
