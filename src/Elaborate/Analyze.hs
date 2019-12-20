@@ -6,6 +6,7 @@ module Elaborate.Analyze
 import Control.Monad.Except
 import Control.Monad.State
 import Data.IORef
+import Data.List
 import qualified Data.PQueue.Min as Q
 import System.Timeout
 import qualified Text.Show.Pretty as Pr
@@ -96,6 +97,18 @@ simp (((m1, WeakTermFloat64 l1), (m2, WeakTermFloat l2)):cs)
   | l1 == l2 = simpMetaRet m1 m2 (simp cs)
 simp (((m1, WeakTermFloat l1), (m2, WeakTermFloat l2)):cs)
   | l1 == l2 = simpMetaRet m1 m2 (simp cs)
+simp (((m1, WeakTermArray k1 dom1 cod1), (m2, WeakTermArray k2 dom2 cod2)):cs)
+  | k1 == k2 = simpMetaRet m1 m2 $ simp $ (dom1, dom2) : (cod1, cod2) : cs
+simp (((m1, WeakTermArrayIntro k1 les1), (m2, WeakTermArrayIntro k2 les2)):cs)
+  | k1 == k2 = do
+    csArray <- simpArrayIntro les1 les2
+    csCont <- simpMetaRet m1 m2 $ simp cs
+    return $ csArray ++ csCont
+simp ((e1, e2):cs)
+  | (m1, WeakTermArrayElim k1 (_, WeakTermUpsilon f) eps1) <- e1
+  , (m2, WeakTermArrayElim k2 (_, WeakTermUpsilon g) eps2) <- e2
+  , k1 == k2
+  , f == g = simpMetaRet m1 m2 $ simp $ (eps1, eps2) : cs
 simp ((e1@(m1, _), e2@(m2, _)):cs) = do
   let ms1 = asStuckedTerm e1
   let ms2 = asStuckedTerm e2
@@ -175,6 +188,19 @@ simpBinder' xts1 xts2 cs = do
   vs1' <- mapM (uncurry toVar) xts1
   let s = substWeakTermPlus (zip (map fst xts2) vs1')
   simp $ zip (map snd xts1) (map (s . snd) xts2) ++ cs
+
+simpArrayIntro ::
+     [(Identifier, WeakTermPlus)]
+  -> [(Identifier, WeakTermPlus)]
+  -> WithEnv [EnrichedConstraint]
+simpArrayIntro les1 les2 = do
+  let les1' = sortBy (\x y -> fst x `compare` fst y) les1
+  let les2' = sortBy (\x y -> fst x `compare` fst y) les2
+  let (ls1, es1) = unzip les1'
+  let (ls2, es2) = unzip les2'
+  if ls1 /= ls2
+    then throwError "simpArrayIntro"
+    else simp $ zip es1 es2
 
 data Stuck
   = StuckHole Hole
