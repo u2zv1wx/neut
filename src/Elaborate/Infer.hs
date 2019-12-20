@@ -104,6 +104,34 @@ infer _ (meta, WeakTermFloat64 _) =
 infer _ (meta, WeakTermFloat _) = do
   h <- newHoleInCtx []
   returnAfterUpdate meta h -- f64 or "any float"
+infer ctx (meta, WeakTermArray _ from to) = do
+  uDom <- infer ctx from
+  uCod <- infer ctx to
+  insConstraintEnv uDom uCod
+  returnAfterUpdate meta uDom
+infer ctx (meta, WeakTermArrayIntro kind les) = do
+  tCod <- inferKind kind
+  let (ls, es) = unzip les
+  tls <- mapM inferCase ls
+  constrainList $ catMaybes tls
+  ts <- mapM (infer ctx) es
+  constrainList $ tCod : ts
+  returnAfterUpdate meta tCod
+infer ctx (meta, WeakTermArrayElim kind e1 e2) = do
+  tCod <- inferKind kind
+  tDom <- infer ctx e2
+  tDomToCod <- infer ctx e1
+  insConstraintEnv tDomToCod (newMetaTerminal, WeakTermArray kind tDom tCod)
+  returnAfterUpdate meta tCod
+
+inferKind :: ArrayKind -> WithEnv WeakTermPlus
+inferKind (ArrayKindIntS i) =
+  return (newMetaTerminal, WeakTermTheta $ "i" ++ show i)
+inferKind (ArrayKindIntU i) =
+  return (newMetaTerminal, WeakTermTheta $ "u" ++ show i)
+inferKind (ArrayKindFloat size) =
+  return (newMetaTerminal, WeakTermTheta $ "f" ++ show (sizeAsInt size))
+inferKind ArrayKindAny = newHoleInCtx []
 
 inferPlus :: Context -> [(Identifier, WeakTermPlus)] -> WithEnv [WeakTermPlus]
 inferPlus ctx xts =
