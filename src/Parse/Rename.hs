@@ -45,6 +45,17 @@ rename (m, WeakTermFloat16 x) = return (m, WeakTermFloat16 x)
 rename (m, WeakTermFloat32 x) = return (m, WeakTermFloat32 x)
 rename (m, WeakTermFloat64 x) = return (m, WeakTermFloat64 x)
 rename (m, WeakTermFloat x) = return (m, WeakTermFloat x)
+rename (m, WeakTermArray kind from to) = do
+  from' <- rename from
+  to' <- rename to
+  return (m, WeakTermArray kind from' to')
+rename (m, WeakTermArrayIntro kind les) = do
+  les' <- renameCaseList les
+  return (m, WeakTermArrayIntro kind les')
+rename (m, WeakTermArrayElim kind e1 e2) = do
+  e1' <- rename e1
+  e2' <- rename e2
+  return (m, WeakTermArrayElim kind e1' e2')
 
 renameBinder :: [IdentifierPlus] -> WithEnv [IdentifierPlus]
 renameBinder [] = return []
