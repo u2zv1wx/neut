@@ -129,6 +129,21 @@ elaborate' (m, WeakTermFloat x) = do
         Just (LowTypeFloat FloatSize64) -> return (m', TermFloat64 x)
         _ -> throwError $ show x ++ " should be float, but is " ++ floatType
     _ -> throwError "epsilonIntro"
+elaborate' (m, WeakTermArray k dom cod) = do
+  m' <- toMeta m
+  dom' <- elaborate dom
+  cod' <- elaborate cod
+  return (m', TermArray k dom' cod')
+elaborate' (m, WeakTermArrayIntro k les) = do
+  m' <- toMeta m
+  let (ls, es) = unzip les
+  es' <- mapM elaborate' es
+  return (m', TermArrayIntro k (zip ls es'))
+elaborate' (m, WeakTermArrayElim k e1 e2) = do
+  m' <- toMeta m
+  e1' <- elaborate' e1
+  e2' <- elaborate' e2
+  return (m', TermArrayElim k e1' e2')
 
 elaboratePlus :: (a, WeakTermPlus) -> WithEnv (a, TermPlus)
 elaboratePlus (x, t) = do
@@ -142,6 +157,9 @@ exhaust e = do
     then return e
     else lift $ throwE "non-exhaustive pattern"
 
+-- FIXME: exhaust'はmetaも検査するべき
+-- FIXME: exhaust'はTermに対して定義されるべき
+-- FIXME: exhaustはunitを返すようにするべき
 exhaust' :: WeakTermPlus -> WithEnv Bool
 exhaust' (_, WeakTermTau) = return True
 exhaust' (_, WeakTermTheta _) = return True
@@ -168,6 +186,11 @@ exhaust' (_, WeakTermFloat16 _) = return True
 exhaust' (_, WeakTermFloat32 _) = return True
 exhaust' (_, WeakTermFloat64 _) = return True
 exhaust' (_, WeakTermFloat _) = return True
+exhaust' (_, WeakTermArray _ dom cod) = allM exhaust' [dom, cod]
+exhaust' (_, WeakTermArrayIntro _ les) = do
+  let (_, es) = unzip les
+  allM exhaust' es
+exhaust' (_, WeakTermArrayElim _ e1 e2) = allM exhaust' [e1, e2]
 
 exhaustEpsilonIdentifier :: Identifier -> [Case] -> Bool -> WithEnv Bool
 exhaustEpsilonIdentifier x labelList b1 = do
