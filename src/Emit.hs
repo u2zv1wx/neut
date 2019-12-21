@@ -71,7 +71,7 @@ emitLLVM funName (LLVMSwitch (d, lowType) defaultBranch branchList) = do
 emitLLVM funName (LLVMCont op cont) = do
   h <- newNameWith "hole"
   emitLLVM funName $ LLVMLet h op cont
-emitLLVM funName (LLVMAlloc x size cont) = emitLLVMLetAlloc funName x size cont
+emitLLVM funName (LLVMAlloc x size cont) = emitLLVMAlloc funName x size cont
 emitLLVM funName (LLVMLet x (LLVMOpPrint t d) cont) = do
   fmt <- newNameWith "fmt"
   op1 <-
@@ -107,9 +107,9 @@ emitLLVM funName (LLVMLet x op cont) = do
   return $ str ++ a
 emitLLVM _ LLVMUnreachable = emitOp $ unwords ["unreachable"]
 
-emitLLVMLetAlloc ::
+emitLLVMAlloc ::
      Identifier -> Identifier -> AllocSize -> LLVM -> WithEnv [String]
-emitLLVMLetAlloc funName x (AllocSizeExact size) cont = do
+emitLLVMAlloc funName x (AllocSizeExact size) cont = do
   op <-
     emitOp $
     unwords
@@ -121,7 +121,7 @@ emitLLVMLetAlloc funName x (AllocSizeExact size) cont = do
       ]
   a <- emitLLVM funName cont
   return $ op ++ a
-emitLLVMLetAlloc funName x (AllocSizePtrList len) cont = do
+emitLLVMAlloc funName x (AllocSizePtrList len) cont = do
   size <- newNameWith "sizeptr"
   -- Use getelementptr to realize `sizeof`. More info:
   --   http://nondot.org/sabre/LLVMNotes/SizeOf-OffsetOf-VariableSizedStructs.txt
