@@ -2,6 +2,7 @@ module Emit
   ( emit
   ) where
 
+import Control.Monad.Except
 import Control.Monad.State
 
 import Data.Basic
@@ -36,6 +37,7 @@ emitBlock funName name asm = do
 
 -- FIXME: callはcall fastccにするべきっぽい？
 emitLLVM :: Identifier -> LLVM -> WithEnv [String]
+emitLLVM funName (LLVMReturn d) = emitRet funName d
 emitLLVM funName (LLVMCall f args) = do
   tmp <- newNameWith "tmp"
   op <-
@@ -66,78 +68,61 @@ emitLLVM funName (LLVMSwitch (d, lowType) defaultBranch branchList) = do
     forM (zip labelList asmList ++ [(defaultLabel, defaultBranch)]) $
     uncurry (emitBlock funName)
   return $ op ++ concat xs
-emitLLVM funName (LLVMReturn d) = emitRet funName d
-emitLLVM funName (LLVMLet x (LLVMCall f args) cont) = do
-  op <-
+emitLLVM funName (LLVMCont op cont) = do
+  h <- newNameWith "hole"
+  emitLLVM funName $ LLVMLet h op cont
+emitLLVM funName (LLVMLet x (LLVMOpAlloc size) cont) =
+  emitLLVMLetAlloc funName x size cont
+emitLLVM funName (LLVMLet x (LLVMOpPrint t d) cont) = do
+  fmt <- newNameWith "fmt"
+  op1 <-
     emitOp $
     unwords
-      [ showLLVMData (LLVMDataLocal x)
+      [ showLLVMData (LLVMDataLocal fmt)
       , "="
-      , "call i8*"
-      , showLLVMData f ++ showArgs args
+      , "getelementptr [3 x i8], [3 x i8]* @fmt.i32, i32 0, i32 0"
       ]
-  a <- emitLLVM funName cont
-  return $ op ++ a
-emitLLVM funName (LLVMLet x (LLVMSwitch d defaultBranch branchList) cont) = do
-  let (labelList, ls) = unzip branchList
-  let ls' = map (\l -> LLVMLet x l cont) ls
-  let defaultBranch' = LLVMLet x defaultBranch cont
-  emitLLVM funName (LLVMSwitch d defaultBranch' (zip labelList ls'))
-emitLLVM funName (LLVMLet x (LLVMReturn d) cont)
-  -- by the definition of LLVM.hs, the type of `d` is always `i8*`.
- = emitLLVM funName (LLVMLet x (LLVMBitcast d voidPtr voidPtr) cont)
-emitLLVM funName (LLVMLet x (LLVMLet y cont1 cont2) cont3) =
-  emitLLVM funName (LLVMLet y cont1 (LLVMLet x cont2 cont3))
-emitLLVM funName (LLVMLet x (LLVMGetElementPtr (base, n) i) cont) = do
-  op <-
+  tmp <- newNameWith "tmp"
+  op2 <-
     emitOp $
     unwords
-      [ showLLVMData (LLVMDataLocal x)
-      , "= getelementptr"
-      -- , showStruct n ++ ","
-      -- , showStruct n ++ "*"
-      , showLowTypeAsIfNonPtr n ++ ","
-      , showLowType n ++ "*"
-      , showLLVMData base ++ ","
-      -- , showIndex [0, i]
-      , "i32 0,"
-      , "i32 " ++ showLLVMData i
-      -- , showIndex [0, i]
-      ]
-  xs <- emitLLVM funName cont
-  return $ op ++ xs
-emitLLVM funName (LLVMLet x (LLVMBitcast d fromType toType) cont) = do
-  emitConvOp funName x "bitcast" d fromType toType cont
-emitLLVM funName (LLVMLet x (LLVMIntToPointer d fromType toType) cont) = do
-  emitConvOp funName x "inttoptr" d fromType toType cont
-emitLLVM funName (LLVMLet x (LLVMPointerToInt d fromType toType) cont) = do
-  emitConvOp funName x "ptrtoint" d fromType toType cont
-emitLLVM funName (LLVMLet x (LLVMLoad d lowType) cont) = do
-  op <-
-    emitOp $
-    unwords
-      [ showLLVMData (LLVMDataLocal x)
+      [ showLLVMData (LLVMDataLocal tmp)
       , "="
-      , "load"
-      , showLowType lowType ++ ","
-      , showLowTypeAsIfPtr lowType ++ ","
-      , showLLVMData d -- load data from d
-      ]
-  a <- emitLLVM funName cont
-  return $ op ++ a
-emitLLVM funName (LLVMLet _ (LLVMStore t d1 d2) cont) = do
-  op <-
-    emitOp $
-    unwords
-      [ "store"
+      , "call"
+      , "i32 (i8*, ...)"
+      , "@printf(i8* " ++ showLLVMData (LLVMDataLocal fmt) ++ ","
       , showLowType t
-      , showLLVMData d1 ++ ","
-      , showLowTypeAsIfPtr t
-      , showLLVMData d2
+      , showLLVMData d ++ ")"
+      ]
+  a <-
+    emitLLVM funName $
+    LLVMLet
+      x
+      (LLVMOpIntToPointer (LLVMDataLocal tmp) (LowTypeSignedInt 32) voidPtr)
+      cont
+  return $ op1 ++ op2 ++ a
+emitLLVM funName (LLVMLet x op cont) = do
+  s <- emitLLVMOp op
+  str <- emitOp $ showLLVMData (LLVMDataLocal x) ++ " = " ++ s
+  a <- emitLLVM funName cont
+  return $ str ++ a
+emitLLVM _ LLVMUnreachable = emitOp $ unwords ["unreachable"]
+
+emitLLVMLetAlloc ::
+     Identifier -> Identifier -> AllocSize -> LLVM -> WithEnv [String]
+emitLLVMLetAlloc funName x (AllocSizeExact size) cont = do
+  op <-
+    emitOp $
+    unwords
+      [ showLLVMData (LLVMDataLocal x)
+      , "="
+      , "call"
+      , "i8*"
+      , "@malloc(i64 " ++ show size ++ ")"
       ]
   a <- emitLLVM funName cont
   return $ op ++ a
-emitLLVM funName (LLVMLet x (LLVMAlloc (AllocSizePtrList len)) cont) = do
+emitLLVMLetAlloc funName x (AllocSizePtrList len) cont = do
   size <- newNameWith "sizeptr"
   -- Use getelementptr to realize `sizeof`. More info:
   --   http://nondot.org/sabre/LLVMNotes/SizeOf-OffsetOf-VariableSizedStructs.txt
@@ -169,233 +154,176 @@ emitLLVM funName (LLVMLet x (LLVMAlloc (AllocSizePtrList len)) cont) = do
       ]
   a <- emitLLVM funName cont
   return $ op1 ++ op2 ++ op3 ++ a
-emitLLVM funName (LLVMLet x (LLVMAlloc (AllocSizeExact size)) cont) = do
-  op <-
-    emitOp $
-    unwords
-      [ showLLVMData (LLVMDataLocal x)
-      , "="
-      , "call"
-      , "i8*"
-      , "@malloc(i64 " ++ show size ++ ")"
-      ]
-  a <- emitLLVM funName cont
-  return $ op ++ a
-emitLLVM funName (LLVMLet _ (LLVMFree d) cont) = do
-  op <- emitOp $ unwords ["call", "void", "@free(i8* " ++ showLLVMData d ++ ")"]
-  a <- emitLLVM funName cont
-  return $ op ++ a
-emitLLVM funName (LLVMLet x (LLVMUnaryOp (UnaryOpNeg, t@(LowTypeFloat _)) d) cont) = do
-  emitUnaryOp funName x t "fneg" d cont
-emitLLVM funName (LLVMLet x (LLVMUnaryOp ((UnaryOpTrunc t2@(LowTypeSignedInt i2)), t1@(LowTypeSignedInt i1)) d) cont)
-  | i1 > i2 = do emitConvOp funName x "trunc" d t1 t2 cont
-emitLLVM funName (LLVMLet x (LLVMUnaryOp ((UnaryOpTrunc t2@(LowTypeUnsignedInt i2)), t1@(LowTypeUnsignedInt i1)) d) cont)
-  | i1 > i2 = do emitConvOp funName x "trunc" d t1 t2 cont
-emitLLVM funName (LLVMLet x (LLVMUnaryOp ((UnaryOpTrunc t2@(LowTypeFloat i2)), t1@(LowTypeFloat i1)) d) cont)
-  | sizeAsInt i1 > sizeAsInt i2 = do emitConvOp funName x "fptrunc" d t1 t2 cont
-emitLLVM funName (LLVMLet x (LLVMUnaryOp ((UnaryOpZext t2@(LowTypeSignedInt i2)), t1@(LowTypeSignedInt i1)) d) cont)
-  | i1 < i2 = do emitConvOp funName x "zext" d t1 t2 cont
-emitLLVM funName (LLVMLet x (LLVMUnaryOp ((UnaryOpZext t2@(LowTypeUnsignedInt i2)), t1@(LowTypeUnsignedInt i1)) d) cont)
-  | i1 < i2 = do emitConvOp funName x "zext" d t1 t2 cont
-emitLLVM funName (LLVMLet x (LLVMUnaryOp ((UnaryOpSext t2@(LowTypeSignedInt i2)), t1@(LowTypeSignedInt i1)) d) cont)
-  | i1 < i2 = do emitConvOp funName x "sext" d t1 t2 cont
-emitLLVM funName (LLVMLet x (LLVMUnaryOp ((UnaryOpSext t2@(LowTypeUnsignedInt i2)), t1@(LowTypeUnsignedInt i1)) d) cont)
-  | i1 < i2 = do emitConvOp funName x "sext" d t1 t2 cont
-emitLLVM funName (LLVMLet x (LLVMUnaryOp ((UnaryOpFpExt t2@(LowTypeFloat i2)), t1@(LowTypeFloat i1)) d) cont)
-  | sizeAsInt i1 < sizeAsInt i2 = do emitConvOp funName x "fpext" d t1 t2 cont
-emitLLVM funName (LLVMLet x (LLVMUnaryOp ((UnaryOpTo t2@(LowTypeFloat _)), t1@(LowTypeSignedInt _)) d) cont) = do
-  emitConvOp funName x "sitofp" d t1 t2 cont
-emitLLVM funName (LLVMLet x (LLVMUnaryOp ((UnaryOpTo t2@(LowTypeFloat _)), t1@(LowTypeUnsignedInt _)) d) cont) = do
-  emitConvOp funName x "uitofp" d t1 t2 cont
-emitLLVM funName (LLVMLet x (LLVMUnaryOp ((UnaryOpTo t2@(LowTypeSignedInt _)), t1@(LowTypeFloat _)) d) cont) = do
-  emitConvOp funName x "fptosi" d t1 t2 cont
-emitLLVM funName (LLVMLet x (LLVMUnaryOp ((UnaryOpTo t2@(LowTypeUnsignedInt _)), t1@(LowTypeFloat _)) d) cont) = do
-  emitConvOp funName x "fptoui" d t1 t2 cont
-emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpAdd, t@(LowTypeSignedInt _)) d1 d2) cont) = do
-  emitBinaryOp funName x t "add" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpAdd, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
-  emitBinaryOp funName x t "add" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpAdd, t@(LowTypeFloat _)) d1 d2) cont) = do
-  emitBinaryOp funName x t "fadd" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpSub, t@(LowTypeSignedInt _)) d1 d2) cont) = do
-  emitBinaryOp funName x t "sub" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpSub, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
-  emitBinaryOp funName x t "sub" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpSub, t@(LowTypeFloat _)) d1 d2) cont) = do
-  emitBinaryOp funName x t "fsub" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpMul, t@(LowTypeSignedInt _)) d1 d2) cont) = do
-  emitBinaryOp funName x t "mul" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpMul, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
-  emitBinaryOp funName x t "mul" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpMul, t@(LowTypeFloat _)) d1 d2) cont) = do
-  emitBinaryOp funName x t "fmul" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpDiv, t@(LowTypeSignedInt _)) d1 d2) cont) = do
-  emitBinaryOp funName x t "sdiv" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpDiv, t@(LowTypeUnsignedInt _)) d1 d2) cont) = do
-  emitBinaryOp funName x t "udiv" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpDiv, t@(LowTypeFloat _)) d1 d2) cont) = do
-  emitBinaryOp funName x t "fdiv" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpRem, t@(LowTypeSignedInt _)) d1 d2) cont) = do
-  emitBinaryOp funName x t "srem" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpRem, t@(LowTypeUnsignedInt _)) d1 d2) cont) = do
-  emitBinaryOp funName x t "urem" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpRem, t@(LowTypeFloat _)) d1 d2) cont) = do
-  emitBinaryOp funName x t "frem" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpEQ, t@(LowTypeSignedInt _)) d1 d2) cont) =
-  emitBinaryOp funName x t "icmp eq" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpEQ, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
-  emitBinaryOp funName x t "icmp eq" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpEQ, t@(LowTypeFloat _)) d1 d2) cont) =
-  emitBinaryOp funName x t "fcmp oeq" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpNE, t@(LowTypeSignedInt _)) d1 d2) cont) =
-  emitBinaryOp funName x t "icmp ne" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpNE, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
-  emitBinaryOp funName x t "icmp ne" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpNE, t@(LowTypeFloat _)) d1 d2) cont) =
-  emitBinaryOp funName x t "fcmp one" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpGT, t@(LowTypeSignedInt _)) d1 d2) cont) =
-  emitBinaryOp funName x t "icmp sgt" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpGT, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
-  emitBinaryOp funName x t "icmp ugt" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpGT, t@(LowTypeFloat _)) d1 d2) cont) =
-  emitBinaryOp funName x t "fcmp ogt" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpGE, t@(LowTypeSignedInt _)) d1 d2) cont) =
-  emitBinaryOp funName x t "icmp sge" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpGE, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
-  emitBinaryOp funName x t "icmp uge" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpGE, t@(LowTypeFloat _)) d1 d2) cont) =
-  emitBinaryOp funName x t "fcmp oge" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpLT, t@(LowTypeSignedInt _)) d1 d2) cont) =
-  emitBinaryOp funName x t "icmp slt" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpLT, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
-  emitBinaryOp funName x t "icmp ult" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpLT, t@(LowTypeFloat _)) d1 d2) cont) =
-  emitBinaryOp funName x t "fcmp olt" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpLE, t@(LowTypeSignedInt _)) d1 d2) cont) =
-  emitBinaryOp funName x t "icmp sle" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpLE, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
-  emitBinaryOp funName x t "icmp ule" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpLE, t@(LowTypeFloat _)) d1 d2) cont) =
-  emitBinaryOp funName x t "fcmp ole" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpShl, t@(LowTypeSignedInt _)) d1 d2) cont) = do
-  emitBinaryOp funName x t "shl" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpShl, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
-  emitBinaryOp funName x t "shl" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpLshr, t@(LowTypeSignedInt _)) d1 d2) cont) = do
-  emitBinaryOp funName x t "lshr" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpLshr, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
-  emitBinaryOp funName x t "lshr" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpAshr, t@(LowTypeSignedInt _)) d1 d2) cont) = do
-  emitBinaryOp funName x t "ashr" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpAshr, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
-  emitBinaryOp funName x t "ashr" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpAnd, t@(LowTypeSignedInt _)) d1 d2) cont) = do
-  emitBinaryOp funName x t "and" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpAnd, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
-  emitBinaryOp funName x t "and" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpOr, t@(LowTypeSignedInt _)) d1 d2) cont) = do
-  emitBinaryOp funName x t "or" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpOr, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
-  emitBinaryOp funName x t "or" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpXor, t@(LowTypeSignedInt _)) d1 d2) cont) = do
-  emitBinaryOp funName x t "xor" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMBinaryOp (BinaryOpXor, t@(LowTypeUnsignedInt _)) d1 d2) cont) =
-  emitBinaryOp funName x t "xor" d1 d2 cont
-emitLLVM funName (LLVMLet x (LLVMPrint t d) cont) = do
-  fmt <- newNameWith "fmt"
-  op1 <-
-    emitOp $
-    unwords
-      [ showLLVMData (LLVMDataLocal fmt)
-      , "="
-      , "getelementptr [3 x i8], [3 x i8]* @fmt.i32, i32 0, i32 0"
-      ]
-  tmp <- newNameWith "tmp"
-  op2 <-
-    emitOp $
-    unwords
-      [ showLLVMData (LLVMDataLocal tmp)
-      , "="
-      , "call"
-      , "i32 (i8*, ...)"
-      , "@printf(i8* " ++ showLLVMData (LLVMDataLocal fmt) ++ ","
-      , showLowType t
-      , showLLVMData d ++ ")"
-      ]
-  a <-
-    emitLLVM funName $
-    LLVMLet
-      x
-      (LLVMIntToPointer (LLVMDataLocal tmp) (LowTypeSignedInt 32) voidPtr)
-      cont
-  return $ op1 ++ op2 ++ a
-emitLLVM _ LLVMUnreachable = emitOp $ unwords ["unreachable"]
-emitLLVM funName c = do
-  tmp <- newNameWith "result"
-  emitLLVM funName $ LLVMLet tmp c $ LLVMReturn (LLVMDataLocal tmp)
 
-emitUnaryOp ::
-     Identifier
-  -> Identifier
-  -> LowType
-  -> String
-  -> LLVMData
-  -> LLVM
-  -> WithEnv [String]
-emitUnaryOp funName x t inst d cont = do
-  op <-
-    emitOp $
+emitLLVMOp :: LLVMOp -> WithEnv String
+emitLLVMOp (LLVMOpCall d ds) = do
+  return $ unwords ["call i8*", showLLVMData d ++ showArgs ds]
+emitLLVMOp (LLVMOpGetElementPtr (base, n) i) = do
+  return $
     unwords
-      [showLLVMData (LLVMDataLocal x), "=", inst, showLowType t, showLLVMData d]
-  a <- emitLLVM funName cont
-  return $ op ++ a
-
-emitBinaryOp ::
-     Identifier
-  -> Identifier
-  -> LowType
-  -> String
-  -> LLVMData
-  -> LLVMData
-  -> LLVM
-  -> WithEnv [String]
-emitBinaryOp funName x t inst d1 d2 cont = do
-  op <-
-    emitOp $
+      [ "getelementptr"
+      , showLowTypeAsIfNonPtr n ++ ","
+      , showLowType n ++ "*"
+      , showLLVMData base ++ ","
+      , "i32 0,"
+      , "i32 " ++ showLLVMData i
+      ]
+emitLLVMOp (LLVMOpBitcast d fromType toType) =
+  emitLLVMConvOp "bitcast" d fromType toType
+emitLLVMOp (LLVMOpIntToPointer d fromType toType) =
+  emitLLVMConvOp "inttoptr" d fromType toType
+emitLLVMOp (LLVMOpPointerToInt d fromType toType) =
+  emitLLVMConvOp "ptrtoint" d fromType toType
+emitLLVMOp (LLVMOpLoad d lowType) = do
+  return $
     unwords
-      [ showLLVMData (LLVMDataLocal x)
-      , "="
-      , inst
+      [ "load"
+      , showLowType lowType ++ ","
+      , showLowTypeAsIfPtr lowType ++ ","
+      , showLLVMData d
+      ]
+emitLLVMOp (LLVMOpStore t d1 d2) = do
+  return $
+    unwords
+      [ "store"
       , showLowType t
       , showLLVMData d1 ++ ","
+      , showLowTypeAsIfPtr t
       , showLLVMData d2
       ]
-  a <- emitLLVM funName cont
-  return $ op ++ a
+emitLLVMOp (LLVMOpFree d) = do
+  return $ unwords ["call", "void", "@free(i8* " ++ showLLVMData d ++ ")"]
+emitLLVMOp (LLVMOpUnaryOp (UnaryOpNeg, t@(LowTypeFloat _)) d) = do
+  emitUnaryOp t "fneg" d
+emitLLVMOp (LLVMOpUnaryOp ((UnaryOpTrunc t2@(LowTypeSignedInt i2)), t1@(LowTypeSignedInt i1)) d)
+  | i1 > i2 = emitLLVMConvOp "trunc" d t1 t2
+emitLLVMOp (LLVMOpUnaryOp ((UnaryOpTrunc t2@(LowTypeUnsignedInt i2)), t1@(LowTypeUnsignedInt i1)) d)
+  | i1 > i2 = emitLLVMConvOp "trunc" d t1 t2
+emitLLVMOp (LLVMOpUnaryOp ((UnaryOpTrunc t2@(LowTypeFloat i2)), t1@(LowTypeFloat i1)) d)
+  | sizeAsInt i1 > sizeAsInt i2 = emitLLVMConvOp "fptrunc" d t1 t2
+emitLLVMOp (LLVMOpUnaryOp ((UnaryOpZext t2@(LowTypeSignedInt i2)), t1@(LowTypeSignedInt i1)) d)
+  | i1 < i2 = emitLLVMConvOp "zext" d t1 t2
+emitLLVMOp (LLVMOpUnaryOp ((UnaryOpZext t2@(LowTypeUnsignedInt i2)), t1@(LowTypeUnsignedInt i1)) d)
+  | i1 < i2 = emitLLVMConvOp "zext" d t1 t2
+emitLLVMOp (LLVMOpUnaryOp ((UnaryOpSext t2@(LowTypeSignedInt i2)), t1@(LowTypeSignedInt i1)) d)
+  | i1 < i2 = emitLLVMConvOp "sext" d t1 t2
+emitLLVMOp (LLVMOpUnaryOp ((UnaryOpSext t2@(LowTypeUnsignedInt i2)), t1@(LowTypeUnsignedInt i1)) d)
+  | i1 < i2 = emitLLVMConvOp "sext" d t1 t2
+emitLLVMOp (LLVMOpUnaryOp ((UnaryOpFpExt t2@(LowTypeFloat i2)), t1@(LowTypeFloat i1)) d)
+  | sizeAsInt i1 < sizeAsInt i2 = emitLLVMConvOp "fpext" d t1 t2
+emitLLVMOp (LLVMOpUnaryOp ((UnaryOpTo t2@(LowTypeFloat _)), t1@(LowTypeSignedInt _)) d) =
+  emitLLVMConvOp "sitofp" d t1 t2
+emitLLVMOp (LLVMOpUnaryOp ((UnaryOpTo t2@(LowTypeFloat _)), t1@(LowTypeUnsignedInt _)) d) =
+  emitLLVMConvOp "uitofp" d t1 t2
+emitLLVMOp (LLVMOpUnaryOp ((UnaryOpTo t2@(LowTypeSignedInt _)), t1@(LowTypeFloat _)) d) =
+  emitLLVMConvOp "fptosi" d t1 t2
+emitLLVMOp (LLVMOpUnaryOp ((UnaryOpTo t2@(LowTypeUnsignedInt _)), t1@(LowTypeFloat _)) d) =
+  emitLLVMConvOp "fptoui" d t1 t2
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpAdd, t@(LowTypeSignedInt _)) d1 d2) =
+  emitBinaryOp t "add" d1 d2
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpAdd, t@(LowTypeUnsignedInt _)) d1 d2) =
+  emitBinaryOp t "add" d1 d2
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpAdd, t@(LowTypeFloat _)) d1 d2) =
+  emitBinaryOp t "fadd" d1 d2
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpSub, t@(LowTypeSignedInt _)) d1 d2) =
+  emitBinaryOp t "sub" d1 d2
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpSub, t@(LowTypeUnsignedInt _)) d1 d2) =
+  emitBinaryOp t "sub" d1 d2
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpSub, t@(LowTypeFloat _)) d1 d2) =
+  emitBinaryOp t "fsub" d1 d2
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpMul, t@(LowTypeSignedInt _)) d1 d2) =
+  emitBinaryOp t "mul" d1 d2
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpMul, t@(LowTypeUnsignedInt _)) d1 d2) =
+  emitBinaryOp t "mul" d1 d2
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpMul, t@(LowTypeFloat _)) d1 d2) =
+  emitBinaryOp t "fmul" d1 d2
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpDiv, t@(LowTypeSignedInt _)) d1 d2) =
+  emitBinaryOp t "sdiv" d1 d2
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpDiv, t@(LowTypeUnsignedInt _)) d1 d2) =
+  emitBinaryOp t "udiv" d1 d2
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpDiv, t@(LowTypeFloat _)) d1 d2) =
+  emitBinaryOp t "fdiv" d1 d2
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpRem, t@(LowTypeSignedInt _)) d1 d2) =
+  emitBinaryOp t "srem" d1 d2
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpRem, t@(LowTypeUnsignedInt _)) d1 d2) =
+  emitBinaryOp t "urem" d1 d2
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpRem, t@(LowTypeFloat _)) d1 d2) =
+  emitBinaryOp t "frem" d1 d2
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpEQ, t@(LowTypeSignedInt _)) d1 d2) =
+  emitBinaryOp t "icmp eq" d1 d2
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpEQ, t@(LowTypeUnsignedInt _)) d1 d2) =
+  emitBinaryOp t "icmp eq" d1 d2
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpEQ, t@(LowTypeFloat _)) d1 d2) =
+  emitBinaryOp t "fcmp oeq" d1 d2
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpNE, t@(LowTypeSignedInt _)) d1 d2) =
+  emitBinaryOp t "icmp ne" d1 d2
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpNE, t@(LowTypeUnsignedInt _)) d1 d2) =
+  emitBinaryOp t "icmp ne" d1 d2
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpNE, t@(LowTypeFloat _)) d1 d2) =
+  emitBinaryOp t "fcmp one" d1 d2
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpGT, t@(LowTypeSignedInt _)) d1 d2) =
+  emitBinaryOp t "icmp sgt" d1 d2
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpGT, t@(LowTypeUnsignedInt _)) d1 d2) =
+  emitBinaryOp t "icmp ugt" d1 d2
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpGT, t@(LowTypeFloat _)) d1 d2) =
+  emitBinaryOp t "fcmp ogt" d1 d2
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpGE, t@(LowTypeSignedInt _)) d1 d2) =
+  emitBinaryOp t "icmp sge" d1 d2
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpGE, t@(LowTypeUnsignedInt _)) d1 d2) =
+  emitBinaryOp t "icmp uge" d1 d2
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpGE, t@(LowTypeFloat _)) d1 d2) =
+  emitBinaryOp t "fcmp oge" d1 d2
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpLT, t@(LowTypeSignedInt _)) d1 d2) =
+  emitBinaryOp t "icmp slt" d1 d2
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpLT, t@(LowTypeUnsignedInt _)) d1 d2) =
+  emitBinaryOp t "icmp ult" d1 d2
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpLT, t@(LowTypeFloat _)) d1 d2) =
+  emitBinaryOp t "fcmp olt" d1 d2
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpLE, t@(LowTypeSignedInt _)) d1 d2) =
+  emitBinaryOp t "icmp sle" d1 d2
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpLE, t@(LowTypeUnsignedInt _)) d1 d2) =
+  emitBinaryOp t "icmp ule" d1 d2
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpLE, t@(LowTypeFloat _)) d1 d2) =
+  emitBinaryOp t "fcmp ole" d1 d2
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpShl, t@(LowTypeSignedInt _)) d1 d2) =
+  emitBinaryOp t "shl" d1 d2
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpShl, t@(LowTypeUnsignedInt _)) d1 d2) =
+  emitBinaryOp t "shl" d1 d2
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpLshr, t@(LowTypeSignedInt _)) d1 d2) =
+  emitBinaryOp t "lshr" d1 d2
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpLshr, t@(LowTypeUnsignedInt _)) d1 d2) =
+  emitBinaryOp t "lshr" d1 d2
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpAshr, t@(LowTypeSignedInt _)) d1 d2) =
+  emitBinaryOp t "ashr" d1 d2
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpAshr, t@(LowTypeUnsignedInt _)) d1 d2) =
+  emitBinaryOp t "ashr" d1 d2
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpAnd, t@(LowTypeSignedInt _)) d1 d2) =
+  emitBinaryOp t "and" d1 d2
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpAnd, t@(LowTypeUnsignedInt _)) d1 d2) =
+  emitBinaryOp t "and" d1 d2
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpOr, t@(LowTypeSignedInt _)) d1 d2) =
+  emitBinaryOp t "or" d1 d2
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpOr, t@(LowTypeUnsignedInt _)) d1 d2) =
+  emitBinaryOp t "or" d1 d2
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpXor, t@(LowTypeSignedInt _)) d1 d2) =
+  emitBinaryOp t "xor" d1 d2
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpXor, t@(LowTypeUnsignedInt _)) d1 d2) =
+  emitBinaryOp t "xor" d1 d2
+emitLLVMOp _ = throwError "emitLLVMOp"
 
-emitConvOp ::
-     Identifier
-  -> Identifier
-  -> String
-  -> LLVMData
-  -> LowType
-  -> LowType
-  -> LLVM
-  -> WithEnv [String]
-emitConvOp funName x cast d fromType toType cont = do
-  op <-
-    emitOp $
-    unwords
-      [ showLLVMData (LLVMDataLocal x)
-      , "="
-      , cast
-      , showLowType fromType
-      , showLLVMData d
-      , "to"
-      , showLowType toType
-      ]
-  a <- emitLLVM funName cont
-  return $ op ++ a
+emitUnaryOp :: LowType -> String -> LLVMData -> WithEnv String
+emitUnaryOp t inst d = do
+  return $ unwords [inst, showLowType t, showLLVMData d]
+
+emitBinaryOp :: LowType -> String -> LLVMData -> LLVMData -> WithEnv String
+emitBinaryOp t inst d1 d2 = do
+  return $
+    unwords [inst, showLowType t, showLLVMData d1 ++ ",", showLLVMData d2]
+
+emitLLVMConvOp :: String -> LLVMData -> LowType -> LowType -> WithEnv String
+emitLLVMConvOp cast d dom cod = do
+  return $
+    unwords [cast, showLowType dom, showLLVMData d, "to", showLowType cod]
 
 emitOp :: String -> WithEnv [String]
 emitOp s = return ["  " ++ s]
@@ -451,7 +379,6 @@ showLowType (LowTypeFloat FloatSize16) = "half"
 showLowType (LowTypeFloat FloatSize32) = "float"
 showLowType (LowTypeFloat FloatSize64) = "double"
 showLowType LowTypeVoidPtr = "i8*"
--- showLowType (LowTypePointer t) = showLowType t ++ "*"
 showLowType (LowTypeStructPtr ts) = "{" ++ showItems showLowType ts ++ "}*"
 showLowType (LowTypeFunctionPtr ts t) =
   showLowType t ++ " (" ++ showItems showLowType ts ++ ")*"
@@ -483,4 +410,3 @@ showLLVMData (LLVMDataIntU _ i) = show i
 showLLVMData (LLVMDataFloat16 x) = show x
 showLLVMData (LLVMDataFloat32 x) = show x
 showLLVMData (LLVMDataFloat64 x) = show x
-showLLVMData (LLVMDataStruct xs) = "{" ++ showItems showLLVMData xs ++ "}"

@@ -38,7 +38,7 @@ llvmCode (_, CodeUpIntro d) = do
 llvmCode (_, CodeUpElim x e1 e2) = do
   e1' <- llvmCode e1
   e2' <- llvmCode e2
-  return $ LLVMLet x e1' e2'
+  return $ commConv x e1' e2'
 llvmCode (_, CodeArrayElim k d1 d2) = do
   (idxName, idx) <- newDataLocal "idx"
   result <- newNameWith "ans"
@@ -73,14 +73,13 @@ loadContent' ::
 loadContent' bp bt _ [] cont = do
   l <- llvmUncast bp bt
   tmp <- newNameWith "base"
-  hole <- newNameWith "hole"
-  return $ LLVMLet tmp l $ LLVMLet hole (LLVMFree (LLVMDataLocal tmp)) cont
+  return $ commConv tmp l $ LLVMCont (LLVMOpFree (LLVMDataLocal tmp)) cont
 loadContent' bp bt et ((i, x):xis) cont = do
   cont' <- loadContent' bp bt et xis cont
   (posName, pos) <- newDataLocal "pos"
   return $
-    LLVMLet posName (LLVMGetElementPtr (bp, bt) i) $
-    LLVMLet x (LLVMLoad pos et) cont'
+    LLVMLet posName (LLVMOpGetElementPtr (bp, bt) i) $
+    LLVMLet x (LLVMOpLoad pos et) cont'
 
 llvmCodeTheta :: CodeMeta -> Theta -> WithEnv LLVM
 llvmCodeTheta _ (ThetaUnaryOp op lowType v)
@@ -95,15 +94,17 @@ llvmCodeTheta _ (ThetaPrint v) = do
   let t = LowTypeSignedInt 64
   (pName, p) <- newDataLocal "arg"
   c <- newNameWith "cast"
+  retZero <- llvmUncast (LLVMDataIntS 64 0) t
   llvmDataLet pName v $
-    LLVMLet c (LLVMPointerToInt p voidPtr t) $ LLVMPrint t (LLVMDataLocal c)
+    LLVMLet c (LLVMOpPointerToInt p voidPtr t) $
+    LLVMCont (LLVMOpPrint t (LLVMDataLocal c)) retZero
 
 llvmCodeUnaryOp :: UnaryOp -> LowType -> LowType -> DataPlus -> WithEnv LLVM
 llvmCodeUnaryOp op domType codType d = do
   (x, castThen) <- llvmCast d domType
   result <- newNameWith "result"
   uncast <- llvmUncast (LLVMDataLocal result) codType
-  castThen $ LLVMLet result (LLVMUnaryOp (op, domType) x) uncast
+  castThen $ LLVMLet result (LLVMOpUnaryOp (op, domType) x) uncast
 
 llvmCodeBinaryOp ::
      BinaryOp -> LowType -> LowType -> DataPlus -> DataPlus -> WithEnv LLVM
@@ -113,7 +114,7 @@ llvmCodeBinaryOp op domType codType v1 v2 = do
   result <- newNameWith "result"
   uncast <- llvmUncast (LLVMDataLocal result) codType
   (cast1then >=> cast2then) $
-    LLVMLet result (LLVMBinaryOp (op, domType) x1 x2) uncast
+    LLVMLet result (LLVMOpBinaryOp (op, domType) x1 x2) uncast
 
 llvmCast :: DataPlus -> LowType -> WithEnv (LLVMData, LLVM -> WithEnv LLVM)
 llvmCast v lowType@(LowTypeSignedInt _) = llvmCastInt v lowType
@@ -126,7 +127,7 @@ llvmCast v ptrType = do
     , \cont -> do
         tmp <- newNameWith "var"
         llvmDataLet tmp v $
-          LLVMLet x (LLVMBitcast (LLVMDataLocal tmp) voidPtr ptrType) cont)
+          LLVMLet x (LLVMOpBitcast (LLVMDataLocal tmp) voidPtr ptrType) cont)
 
 llvmCastInt :: DataPlus -> LowType -> WithEnv (LLVMData, LLVM -> WithEnv LLVM)
 llvmCastInt v lowType = do
@@ -136,7 +137,8 @@ llvmCastInt v lowType = do
     ( LLVMDataLocal y
     , \cont -> do
         llvmDataLet x v $
-          LLVMLet y (LLVMPointerToInt (LLVMDataLocal x) voidPtr lowType) $ cont)
+          LLVMLet y (LLVMOpPointerToInt (LLVMDataLocal x) voidPtr lowType) $
+          cont)
 
 llvmCastFloat ::
      DataPlus -> FloatSize -> WithEnv (LLVMData, LLVM -> WithEnv LLVM)
@@ -150,35 +152,44 @@ llvmCastFloat v size = do
     ( LLVMDataLocal z
     , \cont -> do
         llvmDataLet xName v $
-          LLVMLet yName (LLVMPointerToInt x voidPtr intType) $
-          LLVMLet z (LLVMBitcast y intType floatType) cont)
+          LLVMLet yName (LLVMOpPointerToInt x voidPtr intType) $
+          LLVMLet z (LLVMOpBitcast y intType floatType) cont)
 
 -- uncast: {some-concrete-type} -> voidPtr
 llvmUncast :: LLVMData -> LowType -> WithEnv LLVM
-llvmUncast result lowType@(LowTypeSignedInt _) =
-  return $ llvmUncastInt result lowType
-llvmUncast result lowType@(LowTypeUnsignedInt _) =
-  return $ llvmUncastInt result lowType
+llvmUncast result lowType@(LowTypeSignedInt _) = llvmUncastInt result lowType
+llvmUncast result lowType@(LowTypeUnsignedInt _) = llvmUncastInt result lowType
 llvmUncast result (LowTypeFloat i) = llvmUncastFloat result i
-llvmUncast result ptrType = return $ LLVMBitcast result ptrType voidPtr
+llvmUncast result ptrType = do
+  x <- newNameWith "res"
+  return $
+    LLVMLet x (LLVMOpBitcast result ptrType voidPtr) $
+    LLVMReturn (LLVMDataLocal x)
 
-llvmUncastInt :: LLVMData -> LowType -> LLVM
-llvmUncastInt result lowType = LLVMIntToPointer result lowType voidPtr
+llvmUncastInt :: LLVMData -> LowType -> WithEnv LLVM
+llvmUncastInt result lowType = do
+  x <- newNameWith "res"
+  return $
+    LLVMLet x (LLVMOpIntToPointer result lowType voidPtr) $
+    LLVMReturn (LLVMDataLocal x)
 
 llvmUncastFloat :: LLVMData -> FloatSize -> WithEnv LLVM
 llvmUncastFloat floatResult i = do
   let floatType = LowTypeFloat i
   let intType = LowTypeSignedInt $ sizeAsInt i
   tmp <- newNameWith "tmp"
+  x <- newNameWith "res"
   return $
-    LLVMLet tmp (LLVMBitcast floatResult floatType intType) $
-    LLVMIntToPointer (LLVMDataLocal tmp) intType voidPtr
+    LLVMLet tmp (LLVMOpBitcast floatResult floatType intType) $
+    LLVMLet x (LLVMOpIntToPointer (LLVMDataLocal tmp) intType voidPtr) $
+    LLVMReturn (LLVMDataLocal x)
 
 llvmUncastLet :: Identifier -> LLVMData -> LowType -> LLVM -> WithEnv LLVM
 llvmUncastLet x d lowType cont = do
   l <- llvmUncast d lowType
-  return $ LLVMLet x l cont
+  return $ commConv x l cont
 
+-- LLVMLet x e1' e2'
 -- `llvmDataLet x d cont` binds the data `d` to the variable `x`, and computes the
 -- continuation `cont`.
 llvmDataLet :: Identifier -> DataPlus -> LLVM -> WithEnv LLVM
@@ -191,8 +202,8 @@ llvmDataLet x (_, DataTheta y) cont = do
 llvmDataLet x (_, DataUpsilon y) cont =
   llvmUncastLet x (LLVMDataLocal y) voidPtr cont
 llvmDataLet x (m, DataEpsilonIntro label) cont = do
-  i <- getEpsilonNum label
-  llvmDataLet x (m, DataIntS 64 (toInteger i)) cont
+  i <- toInteger <$> getEpsilonNum label
+  llvmDataLet x (m, DataIntS 64 i) cont
 llvmDataLet reg (_, DataSigmaIntro ds) cont = do
   storeContent reg voidPtr (toStructPtrType $ length ds) ds cont
 llvmDataLet x (_, DataIntS j i) cont =
@@ -257,7 +268,7 @@ storeContent reg elemType aggPtrType ds cont = do
   cont' <- storeContent' cast aggPtrType elemType (zip [0 ..] ds) cont
   cont'' <- castThen $ cont'
   let size = lowTypeToAllocSize aggPtrType
-  return $ LLVMLet reg (LLVMAlloc size) cont''
+  return $ LLVMLet reg (LLVMOpAlloc size) cont''
 
 storeContent' ::
      LLVMData -- base pointer
@@ -270,11 +281,10 @@ storeContent' _ _ _ [] cont = return cont
 storeContent' bp bt et ((i, d):ids) cont = do
   cont' <- storeContent' bp bt et ids cont
   (locName, loc) <- newDataLocal "loc"
-  hole <- newNameWith "tmp"
   (cast, castThen) <- llvmCast d et
   castThen $
-    LLVMLet locName (LLVMGetElementPtr (bp, bt) (LLVMDataIntS 64 i)) $
-    LLVMLet hole (LLVMStore (cast, et) (loc, et)) cont'
+    LLVMLet locName (LLVMOpGetElementPtr (bp, bt) (LLVMDataIntS 64 i)) $
+    LLVMCont (LLVMOpStore et cast loc) cont'
 
 toFunPtrType :: [a] -> LowType
 toFunPtrType xs = do
