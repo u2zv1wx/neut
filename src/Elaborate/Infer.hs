@@ -47,22 +47,6 @@ infer _ (meta, WeakTermTheta x) = do
 infer _ (meta, WeakTermUpsilon x) = do
   t <- lookupTypeEnv x
   returnAfterUpdate meta t
-infer _ (meta, WeakTermEpsilon _) = returnAfterUpdate meta newUniv
-infer _ (meta, WeakTermEpsilonIntro l) = do
-  k <- lookupKind l
-  returnAfterUpdate meta (newMetaTerminal, WeakTermEpsilon k)
-infer ctx (meta, WeakTermEpsilonElim e branchList) = do
-  te <- infer ctx e
-  -- FIXME: elimで型をbranchごとに変化させることを許すよう修正すること。
-  if null branchList
-    then newHoleInCtx ctx >>= returnAfterUpdate meta -- ex falso quodlibet
-    else do
-      let (caseList, es) = unzip branchList
-      tls <- mapM inferCase caseList
-      constrainList $ te : catMaybes tls
-      ts <- mapM (infer ctx) es
-      constrainList ts
-      returnAfterUpdate meta $ head ts
 infer ctx (meta, WeakTermPi xts) = do
   univList <- inferPlus ctx xts
   constrainList $ newUniv : univList
@@ -104,6 +88,22 @@ infer _ (meta, WeakTermFloat64 _) =
 infer _ (meta, WeakTermFloat _) = do
   h <- newHoleInCtx []
   returnAfterUpdate meta h -- f64 or "any float"
+infer _ (meta, WeakTermEnum _) = returnAfterUpdate meta newUniv
+infer _ (meta, WeakTermEnumIntro l) = do
+  k <- lookupKind l
+  returnAfterUpdate meta (newMetaTerminal, WeakTermEnum k)
+infer ctx (meta, WeakTermEnumElim e branchList) = do
+  te <- infer ctx e
+  -- FIXME: elimで型をbranchごとに変化させることを許すよう修正すること。
+  if null branchList
+    then newHoleInCtx ctx >>= returnAfterUpdate meta -- ex falso quodlibet
+    else do
+      let (caseList, es) = unzip branchList
+      tls <- mapM inferCase caseList
+      constrainList $ te : catMaybes tls
+      ts <- mapM (infer ctx) es
+      constrainList ts
+      returnAfterUpdate meta $ head ts
 infer ctx (meta, WeakTermArray _ from to) = do
   uDom <- infer ctx from
   uCod <- infer ctx to
@@ -173,9 +173,9 @@ newHoleListInCtx ctx (x:rest) = do
 
 inferCase :: Case -> WithEnv (Maybe WeakTermPlus)
 inferCase (CaseLabel name) = do
-  ienv <- gets epsilonEnv
+  ienv <- gets enumEnv
   k <- lookupKind' name ienv
-  return $ Just (newMetaTerminal, WeakTermEpsilon k)
+  return $ Just (newMetaTerminal, WeakTermEnum k)
 inferCase _ = return Nothing
 
 inferList :: Context -> [WeakTermPlus] -> WithEnv Context

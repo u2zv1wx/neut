@@ -11,9 +11,6 @@ data Term
   = TermTau
   | TermTheta Identifier
   | TermUpsilon Identifier
-  | TermEpsilon Identifier
-  | TermEpsilonIntro Identifier
-  | TermEpsilonElim TermPlus [(Case, TermPlus)]
   | TermPi [IdentifierPlus]
   | TermPiIntro [IdentifierPlus] TermPlus
   | TermPiElim TermPlus [TermPlus]
@@ -23,6 +20,9 @@ data Term
   | TermFloat16 Half
   | TermFloat32 Float
   | TermFloat64 Double
+  | TermEnum Identifier
+  | TermEnumIntro Identifier
+  | TermEnumElim TermPlus [(Case, TermPlus)]
   | TermArray ArrayKind TermPlus TermPlus
   | TermArrayIntro ArrayKind [(Identifier, TermPlus)]
   | TermArrayElim ArrayKind TermPlus TermPlus
@@ -60,12 +60,6 @@ getClosedVarChain (m, TermUpsilon x) =
   case m of
     MetaTerminal ml -> [(x, ml, (m, TermTau))]
     MetaNonTerminal t ml -> getClosedVarChain t ++ [(x, ml, t)]
-getClosedVarChain (_, TermEpsilon _) = []
-getClosedVarChain (_, TermEpsilonIntro _) = []
-getClosedVarChain (_, TermEpsilonElim e branchList) = do
-  let xhs = getClosedVarChain e
-  xhss <- forM branchList $ \(_, body) -> do return $ getClosedVarChain body
-  concat (xhs : xhss)
 getClosedVarChain (_, TermPi xts) = getClosedVarChainBindings xts []
 getClosedVarChain (_, TermPiIntro xts e) = getClosedVarChainBindings xts [e]
 getClosedVarChain (_, TermPiElim e es) =
@@ -76,6 +70,12 @@ getClosedVarChain (_, TermIntU _ _) = []
 getClosedVarChain (_, TermFloat16 _) = []
 getClosedVarChain (_, TermFloat32 _) = []
 getClosedVarChain (_, TermFloat64 _) = []
+getClosedVarChain (_, TermEnum _) = []
+getClosedVarChain (_, TermEnumIntro _) = []
+getClosedVarChain (_, TermEnumElim e branchList) = do
+  let xhs = getClosedVarChain e
+  xhss <- forM branchList $ \(_, body) -> do return $ getClosedVarChain body
+  concat (xhs : xhss)
 getClosedVarChain (_, TermArray _ dom cod) =
   getClosedVarChain dom ++ getClosedVarChain cod
 getClosedVarChain (_, TermArrayIntro _ les) = do
@@ -100,13 +100,6 @@ substTermPlus _ (m, TermTau) = (m, TermTau)
 substTermPlus _ (m, TermTheta t) = (m, TermTheta t)
 substTermPlus sub (m, TermUpsilon x) =
   fromMaybe (m, TermUpsilon x) (lookup x sub)
-substTermPlus _ (m, TermEpsilon x) = (m, TermEpsilon x)
-substTermPlus _ (m, TermEpsilonIntro l) = (m, TermEpsilonIntro l)
-substTermPlus sub (m, TermEpsilonElim e branchList) = do
-  let e' = substTermPlus sub e
-  let (caseList, es) = unzip branchList
-  let es' = map (substTermPlus sub) es
-  (m, TermEpsilonElim e' (zip caseList es'))
 substTermPlus sub (m, TermPi xts) = do
   let xts' = substTermPlusBindings sub xts
   (m, TermPi xts')
@@ -126,6 +119,13 @@ substTermPlus _ (m, TermIntU size x) = (m, TermIntU size x)
 substTermPlus _ (m, TermFloat16 x) = (m, TermFloat16 x)
 substTermPlus _ (m, TermFloat32 x) = (m, TermFloat32 x)
 substTermPlus _ (m, TermFloat64 x) = (m, TermFloat64 x)
+substTermPlus _ (m, TermEnum x) = (m, TermEnum x)
+substTermPlus _ (m, TermEnumIntro l) = (m, TermEnumIntro l)
+substTermPlus sub (m, TermEnumElim e branchList) = do
+  let e' = substTermPlus sub e
+  let (caseList, es) = unzip branchList
+  let es' = map (substTermPlus sub) es
+  (m, TermEnumElim e' (zip caseList es'))
 substTermPlus sub (m, TermArray k dom cod) = do
   let dom' = substTermPlus sub dom
   let cod' = substTermPlus sub cod
@@ -157,8 +157,8 @@ substTermPlusBindingsWithBody sub ((x, t):xts) e = do
 isValue :: TermPlus -> Bool
 isValue (_, TermTau) = True
 isValue (_, TermUpsilon _) = True
-isValue (_, TermEpsilon _) = True
-isValue (_, TermEpsilonIntro _) = True
 isValue (_, TermPi {}) = True
 isValue (_, TermPiIntro {}) = True
+isValue (_, TermEnum _) = True
+isValue (_, TermEnumIntro _) = True
 isValue _ = False

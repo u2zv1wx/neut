@@ -21,7 +21,6 @@ toLLVM mainTerm = do
 
 llvmCode :: CodePlus -> WithEnv LLVM
 llvmCode (m, CodeTheta theta) = llvmCodeTheta m theta
-llvmCode (_, CodeEpsilonElim v branchList) = llvmCodeEpsilonElim v branchList
 llvmCode (_, CodePiElimDownElim v ds) = do
   xs <- mapM (const (newNameWith "arg")) ds
   (fun, castThen) <- llvmCast v $ toFunPtrType ds
@@ -38,6 +37,7 @@ llvmCode (_, CodeUpElim x e1 e2) = do
   e1' <- llvmCode e1
   e2' <- llvmCode e2
   return $ commConv x e1' e2'
+llvmCode (_, CodeEnumElim v branchList) = llvmCodeEnumElim v branchList
 llvmCode (_, CodeArrayElim k d1 d2) = do
   (idxName, idx) <- newDataLocal "idx"
   result <- newNameWith "ans"
@@ -200,9 +200,6 @@ llvmDataLet x (_, DataTheta y) cont = do
       llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType args) cont
 llvmDataLet x (_, DataUpsilon y) cont =
   llvmUncastLet x (LLVMDataLocal y) voidPtr cont
-llvmDataLet x (m, DataEpsilonIntro label) cont = do
-  i <- toInteger <$> getEpsilonNum label
-  llvmDataLet x (m, DataIntS 64 i) cont
 llvmDataLet reg (_, DataSigmaIntro ds) cont = do
   storeContent reg voidPtr (toStructPtrType $ length ds) ds cont
 llvmDataLet x (_, DataIntS j i) cont =
@@ -215,6 +212,9 @@ llvmDataLet x (_, DataFloat32 f) cont =
   llvmUncastLet x (LLVMDataFloat32 f) (LowTypeFloat FloatSize32) cont
 llvmDataLet x (_, DataFloat64 f) cont =
   llvmUncastLet x (LLVMDataFloat64 f) (LowTypeFloat FloatSize64) cont
+llvmDataLet x (m, DataEnumIntro label) cont = do
+  i <- toInteger <$> getEnumNum label
+  llvmDataLet x (m, DataIntS 64 i) cont
 llvmDataLet x (_, DataArrayIntro k lds) cont = do
   ds <- reorder lds
   let elemType = arrayKindToLowType k
@@ -224,7 +224,7 @@ llvmDataLet x (_, DataArrayIntro k lds) cont = do
 reorder :: [(Identifier, a)] -> WithEnv [a]
 reorder lds = do
   let (ls, ds) = unzip lds
-  is <- mapM getEpsilonNum ls
+  is <- mapM getEnumNum ls
   return $ map snd $ sortBy (\(i, _) (j, _) -> i `compare` j) $ zip is ds
 
 llvmDataLet' :: [(Identifier, DataPlus)] -> LLVM -> WithEnv LLVM
@@ -240,7 +240,7 @@ constructSwitch [(CaseLabel _, code)] = do
   code' <- llvmCode code
   return $ Just (code', [])
 constructSwitch ((CaseLabel x, code):rest) = do
-  i <- getEpsilonNum x
+  i <- getEnumNum x
   code' <- llvmCode code
   m <- constructSwitch rest
   return $ do
@@ -250,8 +250,8 @@ constructSwitch ((CaseDefault, code):_) = do
   code' <- llvmCode code
   return $ Just (code', [])
 
-llvmCodeEpsilonElim :: DataPlus -> [(Case, CodePlus)] -> WithEnv LLVM
-llvmCodeEpsilonElim v branchList = do
+llvmCodeEnumElim :: DataPlus -> [(Case, CodePlus)] -> WithEnv LLVM
+llvmCodeEnumElim v branchList = do
   m <- constructSwitch branchList
   case m of
     Nothing -> return LLVMUnreachable

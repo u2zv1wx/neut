@@ -27,19 +27,6 @@ polarize (m, TermTheta x) = polarizeTheta m x
 polarize (m, TermUpsilon x) = do
   let ml = snd $ obtainInfoMeta m
   return (ml, CodeUpIntro (ml, DataUpsilon x))
-polarize (m, TermEpsilon _) = do
-  let ml = snd $ obtainInfoMeta m
-  v <- cartesianImmediate ml
-  return (ml, CodeUpIntro v)
-polarize (m, TermEpsilonIntro l) = do
-  let ml = snd $ obtainInfoMeta m
-  return (ml, CodeUpIntro (ml, DataEpsilonIntro l))
-polarize (m, TermEpsilonElim e bs) = do
-  let (cs, es) = unzip bs
-  es' <- mapM polarize es
-  (yts, y) <- polarize' e
-  let ml = snd $ obtainInfoMeta m
-  return $ bindLet yts (ml, CodeEpsilonElim y (zip cs es'))
 polarize (m, TermPi _) = do
   let ml = snd $ obtainInfoMeta m
   tau <- cartesianImmediate ml
@@ -96,6 +83,19 @@ polarize (m, TermFloat32 l) = do
 polarize (m, TermFloat64 l) = do
   let ml = snd $ obtainInfoMeta m
   return (ml, CodeUpIntro (ml, DataFloat64 l))
+polarize (m, TermEnum _) = do
+  let ml = snd $ obtainInfoMeta m
+  v <- cartesianImmediate ml
+  return (ml, CodeUpIntro v)
+polarize (m, TermEnumIntro l) = do
+  let ml = snd $ obtainInfoMeta m
+  return (ml, CodeUpIntro (ml, DataEnumIntro l))
+polarize (m, TermEnumElim e bs) = do
+  let (cs, es) = unzip bs
+  es' <- mapM polarize es
+  (yts, y) <- polarize' e
+  let ml = snd $ obtainInfoMeta m
+  return $ bindLet yts (ml, CodeEnumElim y (zip cs es'))
 polarize (m, TermArray _ _ _) = do
   let ml = snd $ obtainInfoMeta m
   tau <- cartesianImmediate ml
@@ -592,8 +592,8 @@ polarizeUnaryOp :: Identifier -> UnaryOp -> LowType -> Meta -> WithEnv CodePlus
 polarizeUnaryOp name op lowType m = do
   let ml = snd $ obtainInfoMeta m
   (x, varX) <- newDataUpsilon
-  -- どうせcartesianImmediateに噛ませるのでepsilonなら何でもオーケー
-  let immediateType = (MetaTerminal ml, TermEpsilon "top")
+  -- どうせcartesianImmediateに噛ませるのでenumなら何でもオーケー
+  let immediateType = (MetaTerminal ml, TermEnum "top")
   makeClosure
     (Just name)
     []
@@ -607,8 +607,8 @@ polarizeBinaryOp name op lowType m = do
   let ml = snd $ obtainInfoMeta m
   (x, varX) <- newDataUpsilon
   (y, varY) <- newDataUpsilon
-  -- どうせcartesianImmediateに噛ませるのでepsilonなら何でもオーケー
-  let immediateType = (MetaTerminal ml, TermEpsilon "top")
+  -- どうせcartesianImmediateに噛ませるのでenumなら何でもオーケー
+  let immediateType = (MetaTerminal ml, TermEnum "top")
   makeClosure
     (Just name)
     []
@@ -620,7 +620,7 @@ polarizePrint :: Identifier -> Meta -> WithEnv CodePlus
 polarizePrint name m = do
   let ml = snd $ obtainInfoMeta m
   (x, varX) <- newDataUpsilon
-  let i64Type = (MetaTerminal ml, TermEpsilon "i64")
+  let i64Type = (MetaTerminal ml, TermEnum "i64")
   makeClosure (Just name) [] m [(x, i64Type)] (ml, CodeTheta (ThetaPrint varX))
 
 newDataUpsilon :: WithEnv (Identifier, DataPlus)

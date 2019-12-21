@@ -27,7 +27,7 @@ data Env =
     , keywordEnv :: [Identifier] -- list of reserved keywords
     , notationEnv :: [(TreePlus, TreePlus)] -- macro transformers
     , constantEnv :: [Identifier]
-    , epsilonEnv :: [(Identifier, [Identifier])] -- [("choice", ["left", "right"]), ...]
+    , enumEnv :: [(Identifier, [Identifier])] -- [("choice", ["left", "right"]), ...]
     , nameEnv :: [(Identifier, Identifier)] -- [("foo", "foo.13"), ...]
     , typeEnv :: Map.Map Identifier WeakTermPlus -- var ~> typeof(var)
     , constraintEnv :: [PreConstraint] -- for type inference
@@ -44,7 +44,7 @@ initialEnv path =
     , notationEnv = []
     , keywordEnv = []
     , constantEnv = []
-    , epsilonEnv = []
+    , enumEnv = []
     , nameEnv = []
     , typeEnv = Map.empty
     , codeEnv = []
@@ -117,61 +117,60 @@ insLLVMEnv :: Identifier -> [Identifier] -> LLVM -> WithEnv ()
 insLLVMEnv funName args e =
   modify (\env -> env {llvmEnv = (funName, (args, e)) : llvmEnv env})
 
-insEpsilonEnv :: Identifier -> [Identifier] -> WithEnv ()
-insEpsilonEnv name epsilonList =
-  modify (\e -> e {epsilonEnv = (name, epsilonList) : epsilonEnv e})
+insEnumEnv :: Identifier -> [Identifier] -> WithEnv ()
+insEnumEnv name enumList =
+  modify (\e -> e {enumEnv = (name, enumList) : enumEnv e})
 
 lookupKind :: Identifier -> WithEnv Identifier
 lookupKind name = do
   env <- get
-  lookupKind' name $ epsilonEnv env
+  lookupKind' name $ enumEnv env
 
 lookupKind' :: Identifier -> [(Identifier, [Identifier])] -> WithEnv Identifier
-lookupKind' i [] = throwError $ "no such epsilon-intro is defined: " ++ i
+lookupKind' i [] = throwError $ "no such enum-intro is defined: " ++ i
 lookupKind' i ((j, ls):xs) =
   if i `elem` ls
     then return j
     else lookupKind' i xs
 
-lookupEpsilonSet :: Identifier -> WithEnv [Identifier]
-lookupEpsilonSet name = do
+lookupEnumSet :: Identifier -> WithEnv [Identifier]
+lookupEnumSet name = do
   env <- get
-  lookupEpsilonSet' name $ epsilonEnv env
+  lookupEnumSet' name $ enumEnv env
 
-lookupEpsilonSet' ::
+lookupEnumSet' ::
      Identifier -> [(Identifier, [Identifier])] -> WithEnv [Identifier]
-lookupEpsilonSet' name [] =
-  throwError $ "no such epsilon defined: " ++ show name
-lookupEpsilonSet' name ((_, ls):xs) =
+lookupEnumSet' name [] = throwError $ "no such enum defined: " ++ show name
+lookupEnumSet' name ((_, ls):xs) =
   if name `elem` ls
     then return ls
-    else lookupEpsilonSet' name xs
+    else lookupEnumSet' name xs
 
-getEpsilonNum :: Identifier -> WithEnv Int
-getEpsilonNum label = do
-  ienv <- gets epsilonEnv
-  case (getEpsilonNum' label $ map snd ienv) of
-    Nothing -> throwError $ "no such epsilon is defined: " ++ show label
+getEnumNum :: Identifier -> WithEnv Int
+getEnumNum label = do
+  ienv <- gets enumEnv
+  case (getEnumNum' label $ map snd ienv) of
+    Nothing -> throwError $ "no such enum is defined: " ++ show label
     Just i -> return i
 
-getEpsilonNum' :: Identifier -> [[Identifier]] -> Maybe Int
-getEpsilonNum' _ [] = Nothing
-getEpsilonNum' l (xs:xss) =
+getEnumNum' :: Identifier -> [[Identifier]] -> Maybe Int
+getEnumNum' _ [] = Nothing
+getEnumNum' l (xs:xss) =
   case elemIndex l xs of
-    Nothing -> getEpsilonNum' l xss
+    Nothing -> getEnumNum' l xss
     Just i -> Just i
 
-isDefinedEpsilon :: Identifier -> WithEnv Bool
-isDefinedEpsilon name = do
+isDefinedEnum :: Identifier -> WithEnv Bool
+isDefinedEnum name = do
   env <- get
-  let labelList = join $ map snd $ epsilonEnv env
+  let labelList = join $ map snd $ enumEnv env
   return $ name `elem` labelList
 
-isDefinedEpsilonName :: Identifier -> WithEnv Bool
-isDefinedEpsilonName name = do
+isDefinedEnumName :: Identifier -> WithEnv Bool
+isDefinedEnumName name = do
   env <- get
-  let epsilonNameList = map fst $ epsilonEnv env
-  return $ name `elem` epsilonNameList
+  let enumNameList = map fst $ enumEnv env
+  return $ name `elem` enumNameList
 
 insConstraintEnv :: WeakTermPlus -> WeakTermPlus -> WithEnv ()
 insConstraintEnv t1 t2 =
@@ -224,17 +223,17 @@ discernData z (ml, DataSigmaIntro ds) = do
   return (concat vss, (ml, DataSigmaIntro ds'))
 discernData _ d = return ([], d)
 
--- FIXME: これのEpsilonElimのところの取り扱いがおかしい気がする。
+-- FIXME: これのEnumElimのところの取り扱いがおかしい気がする。
 -- freeすべきかどうかはbranchによって変わるはず。
 discernCode :: Identifier -> CodePlus -> WithEnv ([Identifier], CodePlus)
 discernCode z (ml, CodeTheta theta) = do
   (vs, theta') <- discernTheta z theta
   return (vs, (ml, CodeTheta theta'))
-discernCode z (ml, CodeEpsilonElim d branchList) = do
+discernCode z (ml, CodeEnumElim d branchList) = do
   (vs, d') <- discernData z d
   let (cs, es) = unzip branchList
   (vss, es') <- unzip <$> mapM (discernCode z) es
-  return (vs ++ concat vss, (ml, CodeEpsilonElim d' (zip cs es')))
+  return (vs ++ concat vss, (ml, CodeEnumElim d' (zip cs es')))
 discernCode z (ml, CodePiElimDownElim d ds) = do
   (vs, d') <- discernData z d
   (vss, ds') <- unzip <$> mapM (discernData z) ds

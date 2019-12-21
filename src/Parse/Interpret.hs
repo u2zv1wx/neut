@@ -23,18 +23,6 @@ interpret (m, TreeNode [(_, TreeAtom "theta"), (_, TreeAtom x)]) =
   withMeta m $ WeakTermTheta x
 interpret (m, TreeNode [(_, TreeAtom "upsilon"), (_, TreeAtom x)]) =
   withMeta m $ WeakTermUpsilon x
-interpret (m, TreeNode [(_, TreeAtom "epsilon"), (_, TreeAtom x)]) = do
-  isEpsilon <- isDefinedEpsilonName x
-  if not isEpsilon
-    then throwError $ "No such epsilon-type defined: " ++ x
-    else withMeta m $ WeakTermEpsilon x
-interpret (m, TreeNode [(_, TreeAtom "epsilon-introduction"), l]) = do
-  l' <- interpretLabel l
-  withMeta m $ WeakTermEpsilonIntro l'
-interpret (m, TreeNode [(_, TreeAtom "epsilon-elimination"), e, (_, TreeNode cs)]) = do
-  e' <- interpret e
-  cs' <- mapM interpretClause cs
-  withMeta m $ WeakTermEpsilonElim e' cs'
 interpret (m, TreeNode [(_, TreeAtom "pi"), (_, TreeNode xts), t]) = do
   (xts', t') <- interpretBinder xts t
   h <- newNameWith "hole"
@@ -68,6 +56,18 @@ interpret (m, TreeNode [(_, TreeAtom "f32"), (_, TreeAtom x)])
   | Just x' <- readMaybe x = do withMeta m $ WeakTermFloat32 x'
 interpret (m, TreeNode [(_, TreeAtom "f64"), (_, TreeAtom x)])
   | Just x' <- readMaybe x = do withMeta m $ WeakTermFloat64 x'
+interpret (m, TreeNode [(_, TreeAtom "enum"), (_, TreeAtom x)]) = do
+  isEnum <- isDefinedEnumName x
+  if not isEnum
+    then throwError $ "No such enum-type defined: " ++ x
+    else withMeta m $ WeakTermEnum x
+interpret (m, TreeNode [(_, TreeAtom "enum-introduction"), l]) = do
+  l' <- interpretLabel l
+  withMeta m $ WeakTermEnumIntro l'
+interpret (m, TreeNode [(_, TreeAtom "enum-elimination"), e, (_, TreeNode cs)]) = do
+  e' <- interpret e
+  cs' <- mapM interpretClause cs
+  withMeta m $ WeakTermEnumElim e' cs'
 interpret (m, TreeNode [(_, TreeAtom str), from, to])
   | Just kind <- withKindPrefix str "array" = do
     from' <- interpret from
@@ -94,11 +94,11 @@ interpret (m, TreeAtom x)
 interpret t@(m, TreeAtom x) = do
   ml <- interpretLabelMaybe t
   case ml of
-    Just l -> withMeta m $ WeakTermEpsilonIntro l
+    Just l -> withMeta m $ WeakTermEnumIntro l
     _ -> do
-      isEpsilon <- isDefinedEpsilonName x
-      if isEpsilon
-        then withMeta m $ WeakTermEpsilon x
+      isEnum <- isDefinedEnumName x
+      if isEnum
+        then withMeta m $ WeakTermEnum x
         else do
           cenv <- gets constantEnv
           if x `elem` cenv
@@ -127,7 +127,7 @@ interpretAtom x = return x
 
 interpretLabelMaybe :: TreePlus -> WithEnv (Maybe Identifier)
 interpretLabelMaybe (_, TreeAtom x) = do
-  b <- isDefinedEpsilon x
+  b <- isDefinedEnum x
   if b
     then return $ Just x
     else throwError $ "no such label defined: " ++ x
@@ -151,7 +151,7 @@ interpretCase :: TreePlus -> WithEnv Case
 --
 -- foundational
 --
-interpretCase (_, TreeNode [(_, TreeAtom "epsilon-introduction"), (_, TreeAtom x)]) = do
+interpretCase (_, TreeNode [(_, TreeAtom "enum-introduction"), (_, TreeAtom x)]) = do
   return $ CaseLabel x
 interpretCase (_, TreeAtom "default") = return CaseDefault
 --

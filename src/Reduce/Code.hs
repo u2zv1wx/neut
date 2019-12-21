@@ -13,16 +13,6 @@ import Data.Code
 import Data.Env
 
 reduceCodePlus :: CodePlus -> WithEnv CodePlus
-reduceCodePlus (m, CodeEpsilonElim v branchList) =
-  case v of
-    (_, DataEpsilonIntro l) ->
-      case lookup (CaseLabel l) branchList of
-        Just body -> reduceCodePlus body
-        Nothing ->
-          case lookup CaseDefault branchList of
-            Just body -> reduceCodePlus body
-            Nothing -> return (m, CodeEpsilonElim v branchList)
-    _ -> return (m, CodeEpsilonElim v branchList)
 reduceCodePlus (m, CodePiElimDownElim v ds) = do
   cenv <- gets codeEnv
   case v of
@@ -35,6 +25,16 @@ reduceCodePlus (m, CodeSigmaElim xs v e) =
     (_, DataSigmaIntro es)
       | length es == length xs -> reduceCodePlus $ substCodePlus (zip xs es) e
     _ -> return (m, CodeSigmaElim xs v e)
+reduceCodePlus (m, CodeEnumElim v branchList) =
+  case v of
+    (_, DataEnumIntro l) ->
+      case lookup (CaseLabel l) branchList of
+        Just body -> reduceCodePlus body
+        Nothing ->
+          case lookup CaseDefault branchList of
+            Just body -> reduceCodePlus body
+            Nothing -> return (m, CodeEnumElim v branchList)
+    _ -> return (m, CodeEnumElim v branchList)
 reduceCodePlus (m, CodeTheta theta) =
   case theta of
     ThetaUnaryOp op (LowTypeIntS s) (m1, DataIntS s1 x)

@@ -15,12 +15,6 @@ rename (m, WeakTermTheta x) = return (m, WeakTermTheta x)
 rename (m, WeakTermUpsilon x) = do
   x' <- lookupNameEnv x
   return (m, WeakTermUpsilon x')
-rename (m, WeakTermEpsilon s) = return (m, WeakTermEpsilon s)
-rename (m, WeakTermEpsilonIntro x) = return (m, WeakTermEpsilonIntro x)
-rename (m, WeakTermEpsilonElim e caseList) = do
-  e' <- rename e
-  caseList' <- renameCaseList caseList
-  return (m, WeakTermEpsilonElim e' caseList')
 rename (m, WeakTermPi xts) = do
   xts' <- renameBinder xts
   return (m, WeakTermPi xts')
@@ -45,6 +39,12 @@ rename (m, WeakTermFloat16 x) = return (m, WeakTermFloat16 x)
 rename (m, WeakTermFloat32 x) = return (m, WeakTermFloat32 x)
 rename (m, WeakTermFloat64 x) = return (m, WeakTermFloat64 x)
 rename (m, WeakTermFloat x) = return (m, WeakTermFloat x)
+rename (m, WeakTermEnum s) = return (m, WeakTermEnum s)
+rename (m, WeakTermEnumIntro x) = return (m, WeakTermEnumIntro x)
+rename (m, WeakTermEnumElim e caseList) = do
+  e' <- rename e
+  caseList' <- renameCaseList caseList
+  return (m, WeakTermEnumElim e' caseList')
 rename (m, WeakTermArray kind from to) = do
   from' <- rename from
   to' <- rename to

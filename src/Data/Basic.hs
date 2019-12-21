@@ -7,8 +7,6 @@ type Identifier = String
 
 type Loc = (Int, Int)
 
-type EpsilonLabel = Identifier
-
 data Case
   = CaseLabel Identifier
   | CaseDefault

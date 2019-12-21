@@ -17,7 +17,7 @@ data LLVM
   = LLVMReturn LLVMData -- UpIntro
   | LLVMLet Identifier LLVMOp LLVM -- UpElim
   | LLVMCont LLVMOp LLVM -- LLVMLet that discards the result of LLVMOp
-  | LLVMSwitch (LLVMData, LowType) LLVM [(Int, LLVM)] -- EpsilonElim
+  | LLVMSwitch (LLVMData, LowType) LLVM [(Int, LLVM)] -- EnumElim
   | LLVMCall LLVMData [LLVMData]
   | LLVMUnreachable -- for empty case analysis
   deriving (Show)

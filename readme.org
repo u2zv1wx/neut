@@ -10,19 +10,19 @@ l    ::= x
        | <float>
 
 -- case
-c    ::= (epsilon-intro l)
+c    ::= (enum-introduction l)
        | (default)
 
 -- term
 p, A ::= (tau)
        | (theta x)
        | (upsilon x)
-       | (epsilon x)
-       | (epsilon-introduction l)
-       | (epsilon-elimination (x A) e (c1 e1) ... (cn en))
        | (pi ((x1 A1) ... (xn An)) A)
        | (pi-introduction ((x1 A1) ... (xn An)) e)
        | (pi-elimination e e1 ... en)
+       | (enum x)
+       | (enum-introduction l)
+       | (enum-elimination (x A) e (c1 e1) ... (cn en))
        | (mu (x A) e)
        | (zeta x)
 #+END_SRC

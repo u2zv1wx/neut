@@ -10,7 +10,7 @@ import Data.Basic
 data Data
   = DataTheta Identifier
   | DataUpsilon Identifier
-  | DataEpsilonIntro Identifier
+  | DataEnumIntro Identifier
   | DataSigmaIntro [DataPlus]
   | DataIntS IntSize Integer
   | DataIntU IntSize Integer
@@ -22,11 +22,11 @@ data Data
 
 data Code
   = CodeTheta Theta
-  | CodeEpsilonElim DataPlus [(Case, CodePlus)]
   | CodePiElimDownElim DataPlus [DataPlus] -- ((force v) v1 ... vn)
   | CodeSigmaElim [Identifier] DataPlus CodePlus
   | CodeUpIntro DataPlus
   | CodeUpElim Identifier CodePlus CodePlus
+  | CodeEnumElim DataPlus [(Case, CodePlus)]
   | CodeArrayElim ArrayKind DataPlus DataPlus
   deriving (Show)
 
@@ -53,7 +53,6 @@ substDataPlus :: SubstDataPlus -> DataPlus -> DataPlus
 substDataPlus _ (m, DataTheta x) = (m, DataTheta x)
 substDataPlus sub (m, DataUpsilon s) =
   fromMaybe (m, DataUpsilon s) (lookup s sub)
-substDataPlus _ (m, DataEpsilonIntro l) = (m, DataEpsilonIntro l)
 substDataPlus sub (m, DataSigmaIntro vs) = do
   let vs' = map (substDataPlus sub) vs
   (m, DataSigmaIntro vs')
@@ -62,17 +61,12 @@ substDataPlus _ (m, DataIntU size l) = (m, DataIntU size l)
 substDataPlus _ (m, DataFloat16 l) = (m, DataFloat16 l)
 substDataPlus _ (m, DataFloat32 l) = (m, DataFloat32 l)
 substDataPlus _ (m, DataFloat64 l) = (m, DataFloat64 l)
+substDataPlus _ (m, DataEnumIntro l) = (m, DataEnumIntro l)
 
 substCodePlus :: SubstDataPlus -> CodePlus -> CodePlus
 substCodePlus sub (m, CodeTheta theta) = do
   let theta' = substTheta sub theta
   (m, CodeTheta theta')
-substCodePlus sub (m, CodeEpsilonElim v branchList) = do
-  let v' = substDataPlus sub v
-  let (cs, es) = unzip branchList
-  let es' = map (substCodePlus sub) es
-  let branchList' = zip cs es'
-  (m, CodeEpsilonElim v' branchList')
 substCodePlus sub (m, CodePiElimDownElim v ds) = do
   let v' = substDataPlus sub v
   let ds' = map (substDataPlus sub) ds
@@ -88,6 +82,12 @@ substCodePlus sub (m, CodeUpElim x e1 e2) = do
   let e1' = substCodePlus sub e1
   let e2' = substCodePlus sub e2
   (m, CodeUpElim x e1' e2')
+substCodePlus sub (m, CodeEnumElim v branchList) = do
+  let v' = substDataPlus sub v
+  let (cs, es) = unzip branchList
+  let es' = map (substCodePlus sub) es
+  let branchList' = zip cs es'
+  (m, CodeEnumElim v' branchList')
 
 substTheta :: SubstDataPlus -> Theta -> Theta
 substTheta sub (ThetaUnaryOp a t v) = do

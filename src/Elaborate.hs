@@ -52,17 +52,6 @@ elaborate' (m, WeakTermTheta x) = do
 elaborate' (m, WeakTermUpsilon x) = do
   m' <- toMeta m
   return (m', TermUpsilon x)
-elaborate' (m, WeakTermEpsilon k) = do
-  m' <- toMeta m
-  return (m', TermEpsilon k)
-elaborate' (m, WeakTermEpsilonIntro x) = do
-  m' <- toMeta m
-  return (m', TermEpsilonIntro x)
-elaborate' (m, WeakTermEpsilonElim e branchList) = do
-  m' <- toMeta m
-  e' <- elaborate' e
-  branchList' <- forM branchList elaboratePlus
-  return (m', TermEpsilonElim e' branchList')
 elaborate' (m, WeakTermPi xts) = do
   m' <- toMeta m
   xts' <- mapM elaboratePlus xts
@@ -105,7 +94,7 @@ elaborate' (m, WeakTermInt x) = do
         Just (LowTypeIntS size) -> return (m', TermIntS size x)
         Just (LowTypeIntU size) -> return (m', TermIntU size x)
         _ -> throwError $ show x ++ " should be int, but is " ++ intType
-    _ -> throwError "epsilonIntro"
+    _ -> throwError "elaborate.WeakTermInt"
 elaborate' (m, WeakTermFloat16 x) = do
   m' <- toMeta m
   return (m', TermFloat16 x)
@@ -127,7 +116,18 @@ elaborate' (m, WeakTermFloat x) = do
         Just (LowTypeFloat FloatSize32) -> return (m', TermFloat32 x32)
         Just (LowTypeFloat FloatSize64) -> return (m', TermFloat64 x)
         _ -> throwError $ show x ++ " should be float, but is " ++ floatType
-    _ -> throwError "epsilonIntro"
+    _ -> throwError "elaborate.WeakTermFloat"
+elaborate' (m, WeakTermEnum k) = do
+  m' <- toMeta m
+  return (m', TermEnum k)
+elaborate' (m, WeakTermEnumIntro x) = do
+  m' <- toMeta m
+  return (m', TermEnumIntro x)
+elaborate' (m, WeakTermEnumElim e branchList) = do
+  m' <- toMeta m
+  e' <- elaborate' e
+  branchList' <- forM branchList elaboratePlus
+  return (m', TermEnumElim e' branchList')
 elaborate' (m, WeakTermArray k dom cod) = do
   m' <- toMeta m
   dom' <- elaborate dom
@@ -163,16 +163,6 @@ exhaust' :: WeakTermPlus -> WithEnv Bool
 exhaust' (_, WeakTermTau) = return True
 exhaust' (_, WeakTermTheta _) = return True
 exhaust' (_, WeakTermUpsilon _) = return True
-exhaust' (_, WeakTermEpsilon _) = return True
-exhaust' (_, WeakTermEpsilonIntro _) = return True
-exhaust' (_, WeakTermEpsilonElim e branchList) = do
-  b <- exhaust' e
-  let labelList = map fst branchList
-  t <- obtainType <$> (toMeta $ fst e)
-  t' <- reduceTermPlus t
-  case t' of
-    (_, TermEpsilon x) -> exhaustEpsilonIdentifier x labelList b
-    _ -> throwError "type error (exhaust)"
 exhaust' (_, WeakTermPi xts) = allM exhaust' $ map snd xts
 exhaust' (_, WeakTermPiIntro _ e) = exhaust' e
 exhaust' (_, WeakTermPiElim e es) = allM exhaust' $ e : es
@@ -185,15 +175,25 @@ exhaust' (_, WeakTermFloat16 _) = return True
 exhaust' (_, WeakTermFloat32 _) = return True
 exhaust' (_, WeakTermFloat64 _) = return True
 exhaust' (_, WeakTermFloat _) = return True
+exhaust' (_, WeakTermEnum _) = return True
+exhaust' (_, WeakTermEnumIntro _) = return True
+exhaust' (_, WeakTermEnumElim e branchList) = do
+  b <- exhaust' e
+  let labelList = map fst branchList
+  t <- obtainType <$> (toMeta $ fst e)
+  t' <- reduceTermPlus t
+  case t' of
+    (_, TermEnum x) -> exhaustEnumIdentifier x labelList b
+    _ -> throwError "type error (exhaust)"
 exhaust' (_, WeakTermArray _ dom cod) = allM exhaust' [dom, cod]
 exhaust' (_, WeakTermArrayIntro _ les) = do
   let (_, es) = unzip les
   allM exhaust' es
 exhaust' (_, WeakTermArrayElim _ e1 e2) = allM exhaust' [e1, e2]
 
-exhaustEpsilonIdentifier :: Identifier -> [Case] -> Bool -> WithEnv Bool
-exhaustEpsilonIdentifier x labelList b1 = do
-  eenv <- gets epsilonEnv
+exhaustEnumIdentifier :: Identifier -> [Case] -> Bool -> WithEnv Bool
+exhaustEnumIdentifier x labelList b1 = do
+  eenv <- gets enumEnv
   case lookup x eenv of
     Nothing
     -- xはi32とかそのへんのやつ。このときはlabelListにdefaultが入っていないとダメ。

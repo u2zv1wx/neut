@@ -12,17 +12,6 @@ import Data.Env
 import Data.WeakTerm
 
 reduceWeakTermPlus :: WeakTermPlus -> WithEnv WeakTermPlus
-reduceWeakTermPlus (m, WeakTermEpsilonElim e branchList) = do
-  e' <- reduceWeakTermPlus e
-  case e' of
-    (_, WeakTermEpsilonIntro l) ->
-      case lookup (CaseLabel l) branchList of
-        Just body -> reduceWeakTermPlus body
-        Nothing ->
-          case lookup CaseDefault branchList of
-            Just body -> reduceWeakTermPlus body
-            Nothing -> return (m, WeakTermEpsilonElim e' branchList)
-    _ -> return (m, WeakTermEpsilonElim e' branchList)
 reduceWeakTermPlus (m, WeakTermPiElim e es) = do
   e' <- reduceWeakTermPlus e
   es' <- mapM reduceWeakTermPlus es
@@ -40,6 +29,17 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
     (_, WeakTermTheta constant) ->
       reduceWeakTermPlusTheta (m, app) es' m constant
     _ -> return (m, app)
+reduceWeakTermPlus (m, WeakTermEnumElim e branchList) = do
+  e' <- reduceWeakTermPlus e
+  case e' of
+    (_, WeakTermEnumIntro l) ->
+      case lookup (CaseLabel l) branchList of
+        Just body -> reduceWeakTermPlus body
+        Nothing ->
+          case lookup CaseDefault branchList of
+            Just body -> reduceWeakTermPlus body
+            Nothing -> return (m, WeakTermEnumElim e' branchList)
+    _ -> return (m, WeakTermEnumElim e' branchList)
 reduceWeakTermPlus t = return t
 
 reduceWeakTermPlusTheta ::
@@ -300,12 +300,12 @@ computeInt k m x y BinaryOpSub = Right $ k m $ x - y
 computeInt k m x y BinaryOpMul = Right $ k m $ x * y
 computeInt k m x y BinaryOpDiv = Right $ k m $ x `div` y
 computeInt k m x y BinaryOpRem = Right $ k m $ x `rem` y
-computeInt _ _ x y BinaryOpEQ = Left $ asEpsilon $ x == y
-computeInt _ _ x y BinaryOpNE = Left $ asEpsilon $ x /= y
-computeInt _ _ x y BinaryOpGT = Left $ asEpsilon $ x > y
-computeInt _ _ x y BinaryOpGE = Left $ asEpsilon $ x >= y
-computeInt _ _ x y BinaryOpLT = Left $ asEpsilon $ x < y
-computeInt _ _ x y BinaryOpLE = Left $ asEpsilon $ x <= y
+computeInt _ _ x y BinaryOpEQ = Left $ asEnum $ x == y
+computeInt _ _ x y BinaryOpNE = Left $ asEnum $ x /= y
+computeInt _ _ x y BinaryOpGT = Left $ asEnum $ x > y
+computeInt _ _ x y BinaryOpGE = Left $ asEnum $ x >= y
+computeInt _ _ x y BinaryOpLT = Left $ asEnum $ x < y
+computeInt _ _ x y BinaryOpLE = Left $ asEnum $ x <= y
 computeInt k m x y BinaryOpShl = Right $ k m $ shiftL x (unsafeCoerce y)
 computeInt k m x y BinaryOpLshr = Right $ k m $ ushiftR' x (unsafeCoerce y)
 computeInt k m x y BinaryOpAshr = Right $ k m $ shiftR x (unsafeCoerce y)
@@ -325,14 +325,14 @@ computeFloat x y BinaryOpSub _ = Right $ x - y
 computeFloat x y BinaryOpMul _ = Right $ x * y
 computeFloat x y BinaryOpDiv _ = Right $ x / y
 computeFloat x y BinaryOpRem _ = Right $ x `mod'` y
-computeFloat x y BinaryOpEQ _ = Left $ asEpsilon $ x == y
-computeFloat x y BinaryOpNE _ = Left $ asEpsilon $ x /= y
-computeFloat x y BinaryOpGT _ = Left $ asEpsilon $ x > y
-computeFloat x y BinaryOpGE _ = Left $ asEpsilon $ x >= y
-computeFloat x y BinaryOpLT _ = Left $ asEpsilon $ x < y
-computeFloat x y BinaryOpLE _ = Left $ asEpsilon $ x <= y
+computeFloat x y BinaryOpEQ _ = Left $ asEnum $ x == y
+computeFloat x y BinaryOpNE _ = Left $ asEnum $ x /= y
+computeFloat x y BinaryOpGT _ = Left $ asEnum $ x > y
+computeFloat x y BinaryOpGE _ = Left $ asEnum $ x >= y
+computeFloat x y BinaryOpLT _ = Left $ asEnum $ x < y
+computeFloat x y BinaryOpLE _ = Left $ asEnum $ x <= y
 computeFloat _ _ _ e = Left e
 
-asEpsilon :: Bool -> WeakTerm
-asEpsilon True = WeakTermEpsilonIntro "true"
-asEpsilon False = WeakTermEpsilonIntro "false"
+asEnum :: Bool -> WeakTerm
+asEnum True = WeakTermEnumIntro "true"
+asEnum False = WeakTermEnumIntro "false"

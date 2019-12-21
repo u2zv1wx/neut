@@ -38,9 +38,9 @@ parse' ((_, TreeNode [(_, TreeAtom "notation"), from, to]):as) =
 parse' ((_, TreeNode [(_, TreeAtom "keyword"), (_, TreeAtom s)]):as) = do
   modify (\e -> e {keywordEnv = s : keywordEnv e})
   parse' as
-parse' ((_, TreeNode ((_, TreeAtom "epsilon"):(_, TreeAtom name):ts)):as) = do
+parse' ((_, TreeNode ((_, TreeAtom "enum"):(_, TreeAtom name):ts)):as) = do
   indexList <- mapM extractIdentifier ts
-  insEpsilonEnv name indexList
+  insEnumEnv name indexList
   parse' as
 parse' ((_, TreeNode [(_, TreeAtom "include"), (_, TreeAtom pathString)]):as) =
   case readMaybe pathString :: Maybe String of
@@ -93,7 +93,7 @@ parse' (a:as)
 isSpecialForm :: TreePlus -> Bool
 isSpecialForm (_, TreeNode [(_, TreeAtom "notation"), _, _]) = True
 isSpecialForm (_, TreeNode [(_, TreeAtom "keyword"), (_, TreeAtom _)]) = True
-isSpecialForm (_, TreeNode ((_, TreeAtom "epsilon"):(_, TreeAtom _):_)) = True
+isSpecialForm (_, TreeNode ((_, TreeAtom "enum"):(_, TreeAtom _):_)) = True
 isSpecialForm (_, TreeNode [(_, TreeAtom "include"), (_, TreeAtom _)]) = True
 isSpecialForm (_, TreeNode [(_, TreeAtom "constant"), (_, TreeAtom _)]) = True
 isSpecialForm (_, TreeNode ((_, TreeAtom "statement"):_)) = True
@@ -104,9 +104,9 @@ isSpecialForm _ = False
 -- (Note that `let x := e1 in e2` can be represented as `(lam x e2) e1`.)
 concatDefList :: [Def] -> WithEnv WeakTermPlus
 concatDefList [] = do
-  let t = (WeakMetaTerminal Nothing, WeakTermEpsilon "top")
+  let t = (WeakMetaTerminal Nothing, WeakTermEnum "top")
   m <- newMetaOfType t
-  return (m, WeakTermEpsilonIntro "unit")
+  return (m, WeakTermEnumIntro "unit")
 concatDefList (DefLet meta tu e:es) = do
   cont <- concatDefList es
   m <- newMeta
