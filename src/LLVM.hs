@@ -29,7 +29,7 @@ llvmCode (_, CodePiElimDownElim v ds) = do
   cont <- castThen $ LLVMCall fun (map LLVMDataLocal xs)
   llvmDataLet' (zip xs ds) $ cont
 llvmCode (_, CodeSigmaElim xs v e) = do
-  let structPtrType = toStructPtrType $ [1 .. length xs]
+  let structPtrType = LowTypePointer $ toStructType $ length xs
   let idxList = map (LLVMDataIntS 64) [0 ..]
   loadContent v structPtrType (zip idxList xs) voidPtr e
 llvmCode (_, CodeUpIntro d) = do
@@ -43,8 +43,8 @@ llvmCode (_, CodeArrayElim k d1 d2) = do
   (idxName, idx) <- newDataLocal "idx"
   result <- newNameWith "ans"
   let elemType = arrayKindToLowType k
-  let arrayType = LowTypeArray 0 elemType
-  l <- loadContent d1 arrayType [(idx, result)] elemType (retUp result)
+  let arrayPtrType = LowTypePointer $ LowTypeArray 0 elemType
+  l <- loadContent d1 arrayPtrType [(idx, result)] elemType (retUp result)
   llvmDataLet' [(idxName, d2)] l
 
 retUp :: Identifier -> CodePlus
@@ -57,11 +57,11 @@ loadContent ::
   -> LowType -- the type of elements
   -> CodePlus -- continuation
   -> WithEnv LLVM
-loadContent v aggType ixs elemType cont = do
-  (bp, castThen) <- llvmCast v aggType
+loadContent v bt ixs et cont = do
+  (bp, castThen) <- llvmCast v bt
   cont' <- llvmCode cont
-  extractAndCont <- loadContent' bp aggType elemType ixs cont'
-  castThen extractAndCont
+  extractThenFreeThenCont <- loadContent' bp bt et ixs cont'
+  castThen extractThenFreeThenCont
 
 loadContent' ::
      LLVMData -- base pointer
@@ -279,11 +279,6 @@ storeContent' bp bt et ((i, d):ids) cont = do
   castThen $
     LLVMLet locName (LLVMGetElementPtr (bp, bt) (LLVMDataIntS 64 i)) $
     LLVMLet hole (LLVMStore (cast, et) (loc, LowTypePointer et)) cont'
-
-toStructPtrType :: [a] -> LowType
-toStructPtrType xs = do
-  let structType = LowTypeStruct $ map (const voidPtr) xs
-  LowTypePointer structType
 
 toFunPtrType :: [a] -> LowType
 toFunPtrType xs = do
