@@ -196,19 +196,23 @@ callClosure m e es = do
   (xess, xs) <- unzip <$> mapM polarize' es
   let ml = snd $ obtainInfoMeta m
   (clsVarName, clsVar) <- newDataUpsilon
-  (typeVarName, _) <- newDataUpsilon
+  (typeVarName, typeVar) <- newDataUpsilon
   (envVarName, envVar) <- newDataUpsilon
   (lamVarName, lamVar) <- newDataUpsilon
+  affVarName <- newNameWith "aff"
+  relVarName <- newNameWith "rel"
   return $
     bindLet
       ((clsVarName, e) : concat xess)
       ( ml
       , CodeSigmaElim
-          -- FIXME: typeを(aff, rel)のペアに変換することにしたので、ここの
-          -- typeVarNameも明示的にfreeする必要がある
           [typeVarName, envVarName, lamVarName]
           clsVar
-          (ml, CodePiElimDownElim lamVar (envVar : xs)))
+          ( ml
+          , CodeSigmaElim
+              [affVarName, relVarName]
+              typeVar
+              (ml, CodePiElimDownElim lamVar (envVar : xs))))
 
 withHeader :: [(Identifier, TermPlus)] -> CodePlus -> WithEnv CodePlus
 withHeader [] body = return body
