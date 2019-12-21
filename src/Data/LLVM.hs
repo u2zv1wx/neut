@@ -19,6 +19,7 @@ data LLVM
   | LLVMCont LLVMOp LLVM -- LLVMLet that discards the result of LLVMOp
   | LLVMSwitch (LLVMData, LowType) LLVM [(Int, LLVM)] -- EnumElim
   | LLVMCall LLVMData [LLVMData]
+  | LLVMAlloc Identifier AllocSize LLVM
   | LLVMUnreachable -- for empty case analysis
   deriving (Show)
 
@@ -35,7 +36,6 @@ data LLVMOp
   | LLVMOpPointerToInt LLVMData LowType LowType
   | LLVMOpLoad LLVMData LowType
   | LLVMOpStore LowType LLVMData LLVMData
-  | LLVMOpAlloc AllocSize
   | LLVMOpFree LLVMData
   | LLVMOpUnaryOp (UnaryOp, LowType) LLVMData
   | LLVMOpBinaryOp (BinaryOp, LowType) LLVMData LLVMData
@@ -60,6 +60,8 @@ commConv x (LLVMSwitch (d, t) defaultCase caseList) cont2 = do
   let defaultCase' = commConv x defaultCase cont2
   LLVMSwitch (d, t) defaultCase' caseList'
 commConv x (LLVMCall d ds) cont2 = LLVMLet x (LLVMOpCall d ds) cont2
+commConv x (LLVMAlloc y size cont1) cont2 =
+  LLVMAlloc y size $ commConv x cont1 cont2
 commConv _ LLVMUnreachable _ = LLVMUnreachable
 
 showLLVMData :: LLVMData -> String

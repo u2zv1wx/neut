@@ -71,8 +71,7 @@ emitLLVM funName (LLVMSwitch (d, lowType) defaultBranch branchList) = do
 emitLLVM funName (LLVMCont op cont) = do
   h <- newNameWith "hole"
   emitLLVM funName $ LLVMLet h op cont
-emitLLVM funName (LLVMLet x (LLVMOpAlloc size) cont) =
-  emitLLVMLetAlloc funName x size cont
+emitLLVM funName (LLVMAlloc x size cont) = emitLLVMLetAlloc funName x size cont
 emitLLVM funName (LLVMLet x (LLVMOpPrint t d) cont) = do
   fmt <- newNameWith "fmt"
   op1 <-

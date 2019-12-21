@@ -267,7 +267,7 @@ storeContent reg elemType aggPtrType ds cont = do
   cont' <- storeContent' cast aggPtrType elemType (zip [0 ..] ds) cont
   cont'' <- castThen $ cont'
   let size = lowTypeToAllocSize aggPtrType
-  return $ LLVMLet reg (LLVMOpAlloc size) cont''
+  return $ LLVMAlloc reg size cont''
 
 storeContent' ::
      LLVMData -- base pointer
