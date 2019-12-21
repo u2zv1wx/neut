@@ -256,7 +256,8 @@ storeContent reg elemType aggPtrType ds cont = do
   (cast, castThen) <- llvmCast (Nothing, DataUpsilon reg) aggPtrType
   cont' <- storeContent' cast aggPtrType elemType (zip [0 ..] ds) cont
   cont'' <- castThen $ cont'
-  return $ LLVMLet reg (LLVMAlloc undefined) cont''
+  let size = lowTypeToAllocSize aggPtrType
+  return $ LLVMLet reg (LLVMAlloc size) cont''
 
 storeContent' ::
      LLVMData -- base pointer
@@ -286,3 +287,24 @@ newDataLocal :: Identifier -> WithEnv (Identifier, LLVMData)
 newDataLocal name = do
   x <- newNameWith name
   return $ (x, LLVMDataLocal x)
+
+lowTypeToAllocSize :: LowType -> AllocSize
+lowTypeToAllocSize (LowTypeSignedInt i) = AllocSizeExact $ lowTypeToAllocSize' i
+lowTypeToAllocSize (LowTypeUnsignedInt i) =
+  AllocSizeExact $ lowTypeToAllocSize' i
+lowTypeToAllocSize (LowTypeFloat size) =
+  AllocSizeExact $ lowTypeToAllocSize' $ sizeAsInt size
+lowTypeToAllocSize LowTypeVoidPtr = AllocSizePtrList 1
+lowTypeToAllocSize (LowTypeFunctionPtr _ _) = AllocSizePtrList 1
+lowTypeToAllocSize (LowTypeStructPtr ts) = AllocSizePtrList $ length ts
+lowTypeToAllocSize (LowTypeArrayPtr i t) =
+  case lowTypeToAllocSize t of
+    AllocSizeExact s -> AllocSizeExact $ s * i
+    AllocSizePtrList s -> AllocSizePtrList $ s * i -- shouldn't occur
+
+lowTypeToAllocSize' :: Int -> Int
+lowTypeToAllocSize' i = do
+  let (q, r) = quotRem i 8
+  if r == 0
+    then q
+    else q + 1

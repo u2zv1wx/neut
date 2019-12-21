@@ -28,16 +28,23 @@ data LLVM
       Identifier -- UpElim
       LLVM
       LLVM
-  | LLVMGetElementPtr LLVMData Loc -- (index, length)
+  | LLVMGetElementPtr
+      (LLVMData, LowType) -- (base pointer, the type of base pointer)
+      LLVMData -- index
   | LLVMBitcast LLVMData LowType LowType -- cast to this type
   | LLVMIntToPointer LLVMData LowType LowType
   | LLVMPointerToInt LLVMData LowType LowType
-  | LLVMLoad LLVMData
+  | LLVMLoad LLVMData LowType
   | LLVMStore (LLVMData, LowType) (LLVMData, LowType)
-  | LLVMAlloc Int
+  | LLVMAlloc AllocSize
   | LLVMFree LLVMData
   | LLVMUnaryOp (UnaryOp, LowType) LLVMData
   | LLVMBinaryOp (BinaryOp, LowType) LLVMData LLVMData
   | LLVMPrint LowType LLVMData
   | LLVMUnreachable -- for empty case analysis
+  deriving (Show)
+
+data AllocSize
+  = AllocSizeExact Int
+  | AllocSizePtrList Int
   deriving (Show)
