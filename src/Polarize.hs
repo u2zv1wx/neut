@@ -96,6 +96,55 @@ polarize (m, TermFloat32 l) = do
 polarize (m, TermFloat64 l) = do
   let ml = snd $ obtainInfoMeta m
   return (ml, CodeUpIntro (ml, DataFloat64 l))
+polarize (m, TermArray _ _ _) = do
+  let ml = snd $ obtainInfoMeta m
+  tau <- cartesianImmediate ml
+  (arrVarName, arrVar) <- newDataUpsilon
+  let retTau = (ml, CodeUpIntro tau)
+  let retArrVar = (ml, CodeUpIntro arrVar)
+  arrayClsType <-
+    cartesianSigma "ARRAYCLS" ml [Right (arrVarName, retTau), Left retArrVar]
+  return (ml, CodeUpIntro arrayClsType)
+polarize (m, TermArrayIntro k les) = do
+  let ml = snd $ obtainInfoMeta m
+  let retKindType = (ml, CodeUpIntro $ kindAsType k)
+  -- arrayType = Sigma [_ : A, ..., _ : A]
+  name <- newNameWith "array"
+  arrayType <-
+    cartesianSigma name ml $ map Left $ replicate (length les) retKindType
+  let (ls, es) = unzip les
+  (xess, xs) <- unzip <$> mapM polarize' es
+  return $
+    bindLet (concat xess) $
+    ( ml
+    , CodeUpIntro $
+      (ml, DataSigmaIntro [arrayType, (ml, DataArrayIntro k (zip ls xs))]))
+polarize (m, TermArrayElim k e1 e2) = do
+  let ml = snd $ obtainInfoMeta m
+  e1' <- polarize e1
+  e2' <- polarize e2
+  (arrVarName, arrVar) <- newDataUpsilon
+  (idxVarName, idxVar) <- newDataUpsilon
+  affVarName <- newNameWith "aff"
+  relVarName <- newNameWith "rel"
+  (arrTypeVarName, arrTypeVar) <- newDataUpsilon
+  return $
+    bindLet [(arrVarName, e1'), (idxVarName, e2')] $
+    ( ml
+    , CodeSigmaElim
+        [arrTypeVarName, arrVarName]
+        arrVar
+        ( ml
+        , CodeSigmaElim
+            [affVarName, relVarName]
+            arrTypeVar
+            (ml, CodeArrayElim k arrVar idxVar)))
+
+kindAsType :: ArrayKind -> DataPlus
+kindAsType (ArrayKindIntS i) = (Nothing, (DataTheta $ "i" ++ show i))
+kindAsType (ArrayKindIntU i) = (Nothing, (DataTheta $ "u" ++ show i))
+kindAsType (ArrayKindFloat size) =
+  (Nothing, (DataTheta $ "f" ++ show (sizeAsInt size)))
 
 obtainFreeVarList ::
      [Identifier] -> TermPlus -> [(Identifier, Maybe Loc, TermPlus)]

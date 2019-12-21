@@ -17,6 +17,7 @@ data Data
   | DataFloat16 Half
   | DataFloat32 Float
   | DataFloat64 Double
+  | DataArrayIntro ArrayKind [(Identifier, DataPlus)]
   deriving (Show)
 
 data Code
@@ -26,6 +27,7 @@ data Code
   | CodeSigmaElim [Identifier] DataPlus CodePlus
   | CodeUpIntro DataPlus
   | CodeUpElim Identifier CodePlus CodePlus
+  | CodeArrayElim ArrayKind DataPlus DataPlus
   deriving (Show)
 
 data Theta
