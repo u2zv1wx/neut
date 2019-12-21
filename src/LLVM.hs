@@ -174,6 +174,11 @@ llvmUncastFloat floatResult i = do
     LLVMLet tmp (LLVMBitcast floatResult floatType intType) $
     LLVMIntToPointer (LLVMDataLocal tmp) intType voidPtr
 
+llvmUncastLet :: Identifier -> LLVMData -> LowType -> LLVM -> WithEnv LLVM
+llvmUncastLet x d lowType cont = do
+  l <- llvmUncast d lowType
+  return $ LLVMLet x l cont
+
 -- `llvmDataLet x d cont` binds the data `d` to the variable `x`, and computes the
 -- continuation `cont`.
 llvmDataLet :: Identifier -> DataPlus -> LLVM -> WithEnv LLVM
@@ -181,32 +186,25 @@ llvmDataLet x (_, DataTheta y) cont = do
   penv <- gets codeEnv
   case lookup y penv of
     Nothing -> lift $ throwE $ "no such global label defined: " ++ y -- FIXME
-    Just (args, _) -> do
-      l <- llvmUncast (LLVMDataGlobal y) (toFunPtrType args)
-      return $ LLVMLet x l cont
-llvmDataLet x (_, DataUpsilon y) cont = do
-  l <- llvmUncast (LLVMDataLocal y) voidPtr
-  return $ LLVMLet x l cont
+    Just (args, _) ->
+      llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType args) cont
+llvmDataLet x (_, DataUpsilon y) cont =
+  llvmUncastLet x (LLVMDataLocal y) voidPtr cont
 llvmDataLet x (m, DataEpsilonIntro label) cont = do
   i <- getEpsilonNum label
   llvmDataLet x (m, DataIntS 64 (toInteger i)) cont
 llvmDataLet reg (_, DataSigmaIntro ds) cont = do
   storeContent reg voidPtr (toStructPtrType $ length ds) ds cont
-llvmDataLet x (_, DataIntS j i) cont = do
-  l <- llvmUncast (LLVMDataIntS j i) (LowTypeSignedInt j)
-  return $ LLVMLet x l cont
-llvmDataLet x (_, DataIntU j i) cont = do
-  l <- llvmUncast (LLVMDataIntU j i) (LowTypeUnsignedInt j)
-  return $ LLVMLet x l cont
-llvmDataLet x (_, DataFloat16 f) cont = do
-  l <- llvmUncast (LLVMDataFloat16 f) (LowTypeFloat FloatSize16)
-  return $ LLVMLet x l cont
-llvmDataLet x (_, DataFloat32 f) cont = do
-  l <- llvmUncast (LLVMDataFloat32 f) (LowTypeFloat FloatSize32)
-  return $ LLVMLet x l cont
-llvmDataLet x (_, DataFloat64 f) cont = do
-  l <- llvmUncast (LLVMDataFloat64 f) (LowTypeFloat FloatSize64)
-  return $ LLVMLet x l cont
+llvmDataLet x (_, DataIntS j i) cont =
+  llvmUncastLet x (LLVMDataIntS j i) (LowTypeSignedInt j) cont
+llvmDataLet x (_, DataIntU j i) cont =
+  llvmUncastLet x (LLVMDataIntU j i) (LowTypeUnsignedInt j) cont
+llvmDataLet x (_, DataFloat16 f) cont =
+  llvmUncastLet x (LLVMDataFloat16 f) (LowTypeFloat FloatSize16) cont
+llvmDataLet x (_, DataFloat32 f) cont =
+  llvmUncastLet x (LLVMDataFloat32 f) (LowTypeFloat FloatSize32) cont
+llvmDataLet x (_, DataFloat64 f) cont =
+  llvmUncastLet x (LLVMDataFloat64 f) (LowTypeFloat FloatSize64) cont
 llvmDataLet x (_, DataArrayIntro k lds) cont = do
   ds <- reorder lds
   let elemType = arrayKindToLowType k
