@@ -94,12 +94,11 @@ infer _ (meta, WeakTermEnumIntro l) = do
   returnAfterUpdate meta (newMetaTerminal, WeakTermEnum k)
 infer ctx (meta, WeakTermEnumElim e branchList) = do
   te <- infer ctx e
-  -- FIXME: elimで型をbranchごとに変化させることを許すよう修正すること。
   if null branchList
     then newHoleInCtx ctx >>= returnAfterUpdate meta -- ex falso quodlibet
     else do
-      let (caseList, es) = unzip branchList
-      tls <- mapM inferCase caseList
+      let (ls, es) = unzip branchList
+      tls <- mapM inferCase ls
       constrainList $ te : catMaybes tls
       ts <- mapM (infer ctx) es
       constrainList ts
