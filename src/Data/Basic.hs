@@ -18,9 +18,11 @@ data LowType
   = LowTypeSignedInt IntSize
   | LowTypeUnsignedInt IntSize
   | LowTypeFloat FloatSize
-  | LowTypePointer LowType
-  | LowTypeFunction [LowType] LowType
-  | LowTypeStruct [LowType]
+  -- | LowTypePointer LowType
+  | LowTypeVoidPtr
+  | LowTypeFunctionPtr [LowType] LowType
+  | LowTypeStructPtr [LowType]
+  | LowTypeArrayPtr Int LowType -- [n x LOWTYPE]
   deriving (Eq, Show)
 
 type IntSize = Int
@@ -60,8 +62,14 @@ asArrayKind (LowTypeUnsignedInt i) = Just $ ArrayKindIntU i
 asArrayKind (LowTypeFloat size) = Just $ ArrayKindFloat size
 asArrayKind _ = Nothing
 
+arrayKindToLowType :: ArrayKind -> LowType
+arrayKindToLowType (ArrayKindIntS i) = LowTypeSignedInt i
+arrayKindToLowType (ArrayKindIntU i) = LowTypeUnsignedInt i
+arrayKindToLowType (ArrayKindFloat size) = LowTypeFloat size
+
 voidPtr :: LowType
-voidPtr = LowTypePointer $ LowTypeSignedInt 8
+-- voidPtr = LowTypePointer $ LowTypeSignedInt 8
+voidPtr = LowTypeVoidPtr
 
 data UnaryOp
   = UnaryOpNeg -- fneg

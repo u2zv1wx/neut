@@ -29,7 +29,7 @@ llvmCode (_, CodePiElimDownElim v ds) = do
   cont <- castThen $ LLVMCall fun (map LLVMDataLocal xs)
   llvmDataLet' (zip xs ds) $ cont
 llvmCode (_, CodeSigmaElim xs v e) = do
-  let structPtrType = LowTypePointer $ toStructType $ length xs
+  let structPtrType = toStructPtrType $ length xs
   let idxList = map (LLVMDataIntS 64) [0 ..]
   loadContent v structPtrType (zip idxList xs) voidPtr e
 llvmCode (_, CodeUpIntro d) = do
@@ -43,7 +43,7 @@ llvmCode (_, CodeArrayElim k d1 d2) = do
   (idxName, idx) <- newDataLocal "idx"
   result <- newNameWith "ans"
   let elemType = arrayKindToLowType k
-  let arrayPtrType = LowTypePointer $ LowTypeArray 0 elemType
+  let arrayPtrType = LowTypeArrayPtr 0 elemType
   l <- loadContent d1 arrayPtrType [(idx, result)] elemType (retUp result)
   llvmDataLet' [(idxName, d2)] l
 
@@ -115,20 +115,18 @@ llvmCodeBinaryOp op domType codType v1 v2 = do
   (cast1then >=> cast2then) $
     LLVMLet result (LLVMBinaryOp (op, domType) x1 x2) uncast
 
--- cast: voidPtr -> {some-concrete-type}
--- llvmCastPointerもほしい？
---  LowTypePointer LowType
---  LowTypeFunction [LowType] LowType
---  LowTypeStruct [LowType]
---  LowTypeArray LowType -- [0 x LOWTYPE]
--- llvmDataLet' ((f, v) : zip xs ds) $
---   LLVMLet cast (LLVMBitcast (LLVMDataLocal f) voidPtr funPtrType) $
---   LLVMCall (LLVMDataLocal cast) (map LLVMDataLocal xs)
 llvmCast :: DataPlus -> LowType -> WithEnv (LLVMData, LLVM -> WithEnv LLVM)
 llvmCast v lowType@(LowTypeSignedInt _) = llvmCastInt v lowType
 llvmCast v lowType@(LowTypeUnsignedInt _) = llvmCastInt v lowType
 llvmCast v (LowTypeFloat i) = llvmCastFloat v i
-llvmCast _ _ = throwError "llvmCast"
+llvmCast v ptrType = do
+  x <- newNameWith "var"
+  return
+    ( LLVMDataLocal x
+    , \cont -> do
+        tmp <- newNameWith "var"
+        llvmDataLet tmp v $
+          LLVMLet x (LLVMBitcast (LLVMDataLocal tmp) voidPtr ptrType) cont)
 
 llvmCastInt :: DataPlus -> LowType -> WithEnv (LLVMData, LLVM -> WithEnv LLVM)
 llvmCastInt v lowType = do
@@ -162,7 +160,7 @@ llvmUncast result lowType@(LowTypeSignedInt _) =
 llvmUncast result lowType@(LowTypeUnsignedInt _) =
   return $ llvmUncastInt result lowType
 llvmUncast result (LowTypeFloat i) = llvmUncastFloat result i
-llvmUncast _ _ = throwError "llvmUncast"
+llvmUncast result ptrType = return $ LLVMBitcast result ptrType voidPtr
 
 llvmUncastInt :: LLVMData -> LowType -> LLVM
 llvmUncastInt result lowType = LLVMIntToPointer result lowType voidPtr
@@ -193,7 +191,7 @@ llvmDataLet x (m, DataEpsilonIntro label) cont = do
   i <- getEpsilonNum label
   llvmDataLet x (m, DataIntS 64 (toInteger i)) cont
 llvmDataLet reg (_, DataSigmaIntro ds) cont = do
-  storeContent reg voidPtr (toStructType $ length ds) ds cont
+  storeContent reg voidPtr (toStructPtrType $ length ds) ds cont
 llvmDataLet x (_, DataIntS j i) cont = do
   l <- llvmUncast (LLVMDataIntS j i) (LowTypeSignedInt j)
   return $ LLVMLet x l cont
@@ -212,7 +210,7 @@ llvmDataLet x (_, DataFloat64 f) cont = do
 llvmDataLet x (_, DataArrayIntro k lds) cont = do
   ds <- reorder lds
   let elemType = arrayKindToLowType k
-  let arrayType = LowTypeArray (length ds) elemType
+  let arrayType = LowTypeArrayPtr (length ds) elemType
   storeContent x elemType arrayType ds cont
 
 reorder :: [(Identifier, a)] -> WithEnv [a]
@@ -256,10 +254,9 @@ llvmCodeEpsilonElim v branchList = do
 
 storeContent ::
      Identifier -> LowType -> LowType -> [DataPlus] -> LLVM -> WithEnv LLVM
-storeContent reg elemType aggType ds cont = do
-  let aggPtrType = LowTypePointer aggType
+storeContent reg elemType aggPtrType ds cont = do
   (cast, castThen) <- llvmCast (Nothing, DataUpsilon reg) aggPtrType
-  cont' <- storeContent' cast aggType elemType (zip [0 ..] ds) cont
+  cont' <- storeContent' cast aggPtrType elemType (zip [0 ..] ds) cont
   cont'' <- castThen $ cont'
   return $ LLVMLet reg (LLVMAlloc undefined) cont''
 
@@ -278,15 +275,14 @@ storeContent' bp bt et ((i, d):ids) cont = do
   (cast, castThen) <- llvmCast d et
   castThen $
     LLVMLet locName (LLVMGetElementPtr (bp, bt) (LLVMDataIntS 64 i)) $
-    LLVMLet hole (LLVMStore (cast, et) (loc, LowTypePointer et)) cont'
+    LLVMLet hole (LLVMStore (cast, et) (loc, et)) cont'
 
 toFunPtrType :: [a] -> LowType
 toFunPtrType xs = do
-  let funType = LowTypeFunction (map (const voidPtr) xs) voidPtr
-  LowTypePointer funType
+  LowTypeFunctionPtr (map (const voidPtr) xs) voidPtr
 
-toStructType :: Int -> LowType
-toStructType i = LowTypeStruct $ map (const voidPtr) [1 .. i]
+toStructPtrType :: Int -> LowType
+toStructPtrType i = LowTypeStructPtr $ map (const voidPtr) [1 .. i]
 
 newDataLocal :: Identifier -> WithEnv (Identifier, LLVMData)
 newDataLocal name = do
