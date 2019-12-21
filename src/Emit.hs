@@ -19,10 +19,10 @@ emit mainTerm = do
 
 emitDefinition :: Identifier -> [Identifier] -> LLVM -> WithEnv [String]
 emitDefinition name args asm = do
-  let prologue = sig name args ++ " {"
+  let header = sig name args ++ " {"
   content <- emitLLVM name asm
-  let epilogue = "}"
-  return $ [prologue] ++ content ++ [epilogue]
+  let footer = "}"
+  return $ [header] ++ content ++ [footer]
 
 sig :: Identifier -> [Identifier] -> String
 sig "main" args = "define i64 @main" ++ showArgs (map LLVMDataLocal args)
