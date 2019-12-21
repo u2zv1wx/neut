@@ -7,8 +7,7 @@ import Data.Basic
 data LLVMData
   = LLVMDataLocal Identifier
   | LLVMDataGlobal Identifier
-  | LLVMDataIntS IntSize Integer
-  | LLVMDataIntU IntSize Integer
+  | LLVMDataInt IntSize Integer
   | LLVMDataFloat16 Half
   | LLVMDataFloat32 Float
   | LLVMDataFloat64 Double

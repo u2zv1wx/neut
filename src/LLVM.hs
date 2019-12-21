@@ -30,7 +30,7 @@ llvmCode (_, CodePiElimDownElim v ds) = do
   llvmDataLet' (zip xs ds) $ cont
 llvmCode (_, CodeSigmaElim xs v e) = do
   let structPtrType = toStructPtrType $ length xs
-  let idxList = map (LLVMDataIntS 64) [0 ..]
+  let idxList = map (LLVMDataInt 64) [0 ..]
   loadContent v structPtrType (zip idxList xs) voidPtr e
 llvmCode (_, CodeUpIntro d) = do
   result <- newNameWith "ans"
@@ -94,7 +94,7 @@ llvmCodeTheta _ (ThetaPrint v) = do
   let t = LowTypeIntS 64
   (pName, p) <- newDataLocal "arg"
   c <- newNameWith "cast"
-  retZero <- llvmUncast (LLVMDataIntS 64 0) t
+  retZero <- llvmUncast (LLVMDataInt 64 0) t
   llvmDataLet pName v $
     LLVMLet c (LLVMOpPointerToInt p voidPtr t) $
     LLVMCont (LLVMOpPrint t (LLVMDataLocal c)) retZero
@@ -207,9 +207,9 @@ llvmDataLet x (m, DataEpsilonIntro label) cont = do
 llvmDataLet reg (_, DataSigmaIntro ds) cont = do
   storeContent reg voidPtr (toStructPtrType $ length ds) ds cont
 llvmDataLet x (_, DataIntS j i) cont =
-  llvmUncastLet x (LLVMDataIntS j i) (LowTypeIntS j) cont
+  llvmUncastLet x (LLVMDataInt j i) (LowTypeIntS j) cont
 llvmDataLet x (_, DataIntU j i) cont =
-  llvmUncastLet x (LLVMDataIntU j i) (LowTypeIntU j) cont
+  llvmUncastLet x (LLVMDataInt j i) (LowTypeIntU j) cont
 llvmDataLet x (_, DataFloat16 f) cont =
   llvmUncastLet x (LLVMDataFloat16 f) (LowTypeFloat FloatSize16) cont
 llvmDataLet x (_, DataFloat32 f) cont =
@@ -283,7 +283,7 @@ storeContent' bp bt et ((i, d):ids) cont = do
   (locName, loc) <- newDataLocal "loc"
   (cast, castThen) <- llvmCast d et
   castThen $
-    LLVMLet locName (LLVMOpGetElementPtr (bp, bt) (LLVMDataIntS 64 i)) $
+    LLVMLet locName (LLVMOpGetElementPtr (bp, bt) (LLVMDataInt 64 i)) $
     LLVMCont (LLVMOpStore et cast loc) cont'
 
 toFunPtrType :: [a] -> LowType
