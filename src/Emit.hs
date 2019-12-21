@@ -371,21 +371,6 @@ showArg d = "i8* " ++ showLLVMData d
 showArgs :: [LLVMData] -> String
 showArgs ds = "(" ++ showItems showArg ds ++ ")"
 
-showLowType :: LowType -> String
-showLowType (LowTypeIntS i) = "i" ++ show i
--- LLVM doesn't distinguish unsigned integers from signed ones
-showLowType (LowTypeIntU i) = "i" ++ show i
-showLowType (LowTypeFloat FloatSize16) = "half"
-showLowType (LowTypeFloat FloatSize32) = "float"
-showLowType (LowTypeFloat FloatSize64) = "double"
-showLowType LowTypeVoidPtr = "i8*"
-showLowType (LowTypeStructPtr ts) = "{" ++ showItems showLowType ts ++ "}*"
-showLowType (LowTypeFunctionPtr ts t) =
-  showLowType t ++ " (" ++ showItems showLowType ts ++ ")*"
-showLowType (LowTypeArrayPtr i t) = do
-  let s = showLowType t
-  "[" ++ show i ++ " x " ++ s ++ "]*"
-
 showLowTypeAsIfPtr :: LowType -> String
 showLowTypeAsIfPtr t = showLowType t ++ "*"
 
@@ -401,11 +386,3 @@ emitGlobal =
     , "declare i8* @malloc(i64)"
     , "declare void @free(i8*)"
     ]
-
-showLLVMData :: LLVMData -> String
-showLLVMData (LLVMDataLocal x) = "%" ++ x
-showLLVMData (LLVMDataGlobal x) = "@" ++ x
-showLLVMData (LLVMDataInt _ i) = show i
-showLLVMData (LLVMDataFloat16 x) = show x
-showLLVMData (LLVMDataFloat32 x) = show x
-showLLVMData (LLVMDataFloat64 x) = show x

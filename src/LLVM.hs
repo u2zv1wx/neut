@@ -4,7 +4,6 @@ module LLVM
 
 import Control.Monad.Except
 import Control.Monad.State
-import Control.Monad.Trans.Except
 import Data.List (sortBy)
 
 import Data.Basic
@@ -196,7 +195,7 @@ llvmDataLet :: Identifier -> DataPlus -> LLVM -> WithEnv LLVM
 llvmDataLet x (_, DataTheta y) cont = do
   penv <- gets codeEnv
   case lookup y penv of
-    Nothing -> lift $ throwE $ "no such global label defined: " ++ y -- FIXME
+    Nothing -> throwError $ "no such global label defined: " ++ y -- FIXME
     Just (args, _) ->
       llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType args) cont
 llvmDataLet x (_, DataUpsilon y) cont =

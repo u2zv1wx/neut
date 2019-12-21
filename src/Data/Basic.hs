@@ -26,6 +26,21 @@ data LowType
 
 type IntSize = Int
 
+showLowType :: LowType -> String
+showLowType (LowTypeIntS i) = "i" ++ show i
+-- LLVM doesn't distinguish unsigned integers from signed ones
+showLowType (LowTypeIntU i) = "i" ++ show i
+showLowType (LowTypeFloat FloatSize16) = "half"
+showLowType (LowTypeFloat FloatSize32) = "float"
+showLowType (LowTypeFloat FloatSize64) = "double"
+showLowType LowTypeVoidPtr = "i8*"
+showLowType (LowTypeStructPtr ts) = "{" ++ showItems showLowType ts ++ "}*"
+showLowType (LowTypeFunctionPtr ts t) =
+  showLowType t ++ " (" ++ showItems showLowType ts ++ ")*"
+showLowType (LowTypeArrayPtr i t) = do
+  let s = showLowType t
+  "[" ++ show i ++ " x " ++ s ++ "]*"
+
 asIntS :: Integral a => a -> a -> a
 asIntS size n = do
   let upperBound = 2 ^ (size - 1)

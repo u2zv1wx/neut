@@ -4,7 +4,6 @@ module Elaborate
 
 import Control.Monad.Except
 import Control.Monad.State
-import Control.Monad.Trans.Except
 import Data.IORef
 import Data.List (nub)
 import qualified Data.Map.Strict as Map
@@ -85,12 +84,12 @@ elaborate' (m, WeakTermMu (x, t) e) = do
       m' <- toMeta m
       e' <- elaborate' e
       return (m', TermMu (x, t') e')
-    _ -> lift $ throwE "CBV recursion is allowed only for Pi-types"
+    _ -> throwError "CBV recursion is allowed only for Pi-types"
 elaborate' (_, WeakTermZeta x) = do
   sub <- gets substEnv
   case lookup x sub of
     Just e -> elaborate' e
-    Nothing -> lift $ throwE $ "elaborate' i: remaining hole: " ++ x
+    Nothing -> throwError $ "elaborate' i: remaining hole: " ++ x
 elaborate' (m, WeakTermIntS size x) = do
   m' <- toMeta m
   return (m', TermIntS size x)
@@ -155,7 +154,7 @@ exhaust e = do
   b <- exhaust' e
   if b
     then return e
-    else lift $ throwE "non-exhaustive pattern"
+    else throwError "non-exhaustive pattern"
 
 -- FIXME: exhaust'はmetaも検査するべき
 -- FIXME: exhaust'はTermに対して定義されるべき
@@ -173,7 +172,7 @@ exhaust' (_, WeakTermEpsilonElim e branchList) = do
   t' <- reduceTermPlus t
   case t' of
     (_, TermEpsilon x) -> exhaustEpsilonIdentifier x labelList b
-    _ -> lift $ throwE "type error (exhaust)"
+    _ -> throwError "type error (exhaust)"
 exhaust' (_, WeakTermPi xts) = allM exhaust' $ map snd xts
 exhaust' (_, WeakTermPiIntro _ e) = exhaust' e
 exhaust' (_, WeakTermPiElim e es) = allM exhaust' $ e : es

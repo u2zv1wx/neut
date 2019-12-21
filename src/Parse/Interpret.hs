@@ -6,7 +6,6 @@ module Parse.Interpret
 
 import Control.Monad.Except
 import Control.Monad.State
-import Control.Monad.Trans.Except
 import Text.Read (readMaybe)
 import qualified Text.Show.Pretty as Pr
 
@@ -120,7 +119,7 @@ interpretIdentifierPlus (_, TreeNode [(_, TreeAtom x), t]) = do
   t' <- interpret t
   return (x', t')
 interpretIdentifierPlus ut =
-  lift $ throwE $ "interpretIdentifierPlus: syntax error:\n" ++ Pr.ppShow ut
+  throwError $ "interpretIdentifierPlus: syntax error:\n" ++ Pr.ppShow ut
 
 interpretAtom :: String -> WithEnv String
 interpretAtom "_" = newNameWith "hole"
@@ -131,7 +130,7 @@ interpretLabelMaybe (_, TreeAtom x) = do
   b <- isDefinedEpsilon x
   if b
     then return $ Just x
-    else lift $ throwE $ "no such label defined: " ++ x
+    else throwError $ "no such label defined: " ++ x
 interpretLabelMaybe _ = return Nothing
 
 interpretLabel :: TreePlus -> WithEnv Identifier
@@ -139,7 +138,7 @@ interpretLabel l = do
   ml' <- interpretLabelMaybe l
   case ml' of
     Just l' -> return l'
-    Nothing -> lift $ throwE $ "interpretLabel: syntax error:\n" ++ Pr.ppShow l
+    Nothing -> throwError $ "interpretLabel: syntax error:\n" ++ Pr.ppShow l
 
 interpretBinder ::
      [TreePlus] -> TreePlus -> WithEnv ([IdentifierPlus], WeakTermPlus)
@@ -168,12 +167,11 @@ interpretClause (_, TreeNode [c, e]) = do
   e' <- interpret e
   return (c', e')
 interpretClause e =
-  lift $ throwE $ "interpretClause: syntax error:\n " ++ Pr.ppShow e
+  throwError $ "interpretClause: syntax error:\n " ++ Pr.ppShow e
 
 asArrayIntro :: Case -> WithEnv Identifier
 asArrayIntro (CaseLabel l) = return l
-asArrayIntro CaseDefault =
-  lift $ throwE "`default` cannot be used in array-intro"
+asArrayIntro CaseDefault = throwError "`default` cannot be used in array-intro"
 
 withMeta :: TreeMeta -> WeakTerm -> WithEnv WeakTermPlus
 withMeta m e = do
@@ -183,7 +181,7 @@ withMeta m e = do
 extractIdentifier :: TreePlus -> WithEnv Identifier
 extractIdentifier (_, TreeAtom s) = return s
 extractIdentifier t =
-  lift $ throwE $ "interpretAtom: syntax error:\n" ++ Pr.ppShow t
+  throwError $ "interpretAtom: syntax error:\n" ++ Pr.ppShow t
 
 withKindPrefix :: String -> String -> Maybe ArrayKind
 withKindPrefix str base

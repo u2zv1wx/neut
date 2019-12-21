@@ -4,7 +4,6 @@ module Elaborate.Synthesize
 
 import Control.Monad.Except
 import Control.Monad.State
-import Control.Monad.Trans.Except
 import qualified Data.PQueue.Min as Q
 
 import Data.Basic
@@ -176,4 +175,4 @@ obtainType m = do
   mt <- readWeakMetaType m
   case mt of
     Just t -> return t
-    Nothing -> lift $ throwE "obtainType"
+    Nothing -> throwError "obtainType"

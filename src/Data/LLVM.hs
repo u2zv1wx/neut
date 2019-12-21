@@ -47,7 +47,7 @@ data AllocSize
   | AllocSizePtrList Int
   deriving (Show)
 
--- so-called commutative conversion
+-- commutative conversion
 commConv :: Identifier -> LLVM -> LLVM -> LLVM
 commConv x (LLVMReturn d) cont =
   LLVMLet x (LLVMOpBitcast d voidPtr voidPtr) cont -- nop
@@ -61,3 +61,11 @@ commConv x (LLVMSwitch (d, t) defaultCase caseList) cont2 = do
   LLVMSwitch (d, t) defaultCase' caseList'
 commConv x (LLVMCall d ds) cont2 = LLVMLet x (LLVMOpCall d ds) cont2
 commConv _ LLVMUnreachable _ = LLVMUnreachable
+
+showLLVMData :: LLVMData -> String
+showLLVMData (LLVMDataLocal x) = "%" ++ x
+showLLVMData (LLVMDataGlobal x) = "@" ++ x
+showLLVMData (LLVMDataInt _ i) = show i
+showLLVMData (LLVMDataFloat16 x) = show x
+showLLVMData (LLVMDataFloat32 x) = show x
+showLLVMData (LLVMDataFloat64 x) = show x

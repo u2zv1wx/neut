@@ -2,8 +2,8 @@ module Parse
   ( parse
   ) where
 
+import Control.Monad.Except
 import Control.Monad.State
-import Control.Monad.Trans.Except
 import System.Directory
 import System.FilePath
 import Text.Read (readMaybe)
@@ -30,8 +30,7 @@ parse' :: [TreePlus] -> WithEnv [Def]
 parse' [] = return []
 parse' ((_, TreeNode [(_, TreeAtom "notation"), from, to]):as) =
   if not $ isSaneNotation from
-    then lift $
-         throwE
+    then throwError
            "The '+'-suffixed name can be occurred only at the end of a list"
     else do
       modify (\e -> e {notationEnv = (from, to) : notationEnv e})
@@ -45,13 +44,13 @@ parse' ((_, TreeNode ((_, TreeAtom "epsilon"):(_, TreeAtom name):ts)):as) = do
   parse' as
 parse' ((_, TreeNode [(_, TreeAtom "include"), (_, TreeAtom pathString)]):as) =
   case readMaybe pathString :: Maybe String of
-    Nothing -> lift $ throwE "the argument of `include` must be a string"
+    Nothing -> throwError "the argument of `include` must be a string"
     Just path -> do
       dirPath <- gets currentDir
       let nextPath = dirPath </> path
       b <- liftIO $ doesFileExist nextPath
       if not b
-        then lift $ throwE $ "no such file: " ++ normalise nextPath
+        then throwError $ "no such file: " ++ normalise nextPath
         else do
           content <- liftIO $ readFile nextPath
           let nextDirPath = dirPath </> takeDirectory path

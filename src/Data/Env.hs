@@ -2,8 +2,8 @@
 
 module Data.Env where
 
+import Control.Monad.Except
 import Control.Monad.State
-import Control.Monad.Trans.Except
 import Data.IORef
 import Data.List (elemIndex)
 
@@ -83,7 +83,7 @@ lookupTypeEnv s = do
   mt <- lookupTypeEnvMaybe s
   case mt of
     Just t -> return t
-    Nothing -> lift $ throwE $ s ++ " is not found in the type environment."
+    Nothing -> throwError $ s ++ " is not found in the type environment."
 
 lookupTypeEnvMaybe :: String -> WithEnv (Maybe WeakTermPlus)
 lookupTypeEnvMaybe s = do
@@ -97,7 +97,7 @@ lookupNameEnv s = do
   ms <- lookupNameEnvMaybe s
   case ms of
     Just s' -> return s'
-    Nothing -> lift $ throwE $ "undefined variable: " ++ show s
+    Nothing -> throwError $ "undefined variable: " ++ show s
 
 lookupNameEnvMaybe :: String -> WithEnv (Maybe String)
 lookupNameEnvMaybe s = do
@@ -127,7 +127,7 @@ lookupKind name = do
   lookupKind' name $ epsilonEnv env
 
 lookupKind' :: Identifier -> [(Identifier, [Identifier])] -> WithEnv Identifier
-lookupKind' i [] = lift $ throwE $ "no such epsilon-intro is defined: " ++ i
+lookupKind' i [] = throwError $ "no such epsilon-intro is defined: " ++ i
 lookupKind' i ((j, ls):xs) =
   if i `elem` ls
     then return j
@@ -141,7 +141,7 @@ lookupEpsilonSet name = do
 lookupEpsilonSet' ::
      Identifier -> [(Identifier, [Identifier])] -> WithEnv [Identifier]
 lookupEpsilonSet' name [] =
-  lift $ throwE $ "no such epsilon defined: " ++ show name
+  throwError $ "no such epsilon defined: " ++ show name
 lookupEpsilonSet' name ((_, ls):xs) =
   if name `elem` ls
     then return ls
@@ -151,7 +151,7 @@ getEpsilonNum :: Identifier -> WithEnv Int
 getEpsilonNum label = do
   ienv <- gets epsilonEnv
   case (getEpsilonNum' label $ map snd ienv) of
-    Nothing -> lift $ throwE $ "no such epsilon is defined: " ++ show label
+    Nothing -> throwError $ "no such epsilon is defined: " ++ show label
     Just i -> return i
 
 getEpsilonNum' :: Identifier -> [[Identifier]] -> Maybe Int
