@@ -7,10 +7,11 @@ import Data.Basic
 data LLVMData
   = LLVMDataLocal Identifier
   | LLVMDataGlobal Identifier
-  | LLVMDataInt IntSize Integer
+  | LLVMDataInt Integer
   | LLVMDataFloat16 Half
   | LLVMDataFloat32 Float
   | LLVMDataFloat64 Double
+  | LLVMDataNull
   deriving (Show)
 
 data LLVM
@@ -19,7 +20,6 @@ data LLVM
   | LLVMCont LLVMOp LLVM -- LLVMLet that discards the result of LLVMOp
   | LLVMSwitch (LLVMData, LowType) LLVM [(Int, LLVM)] -- EnumElim
   | LLVMCall LLVMData [LLVMData]
-  | LLVMAlloc Identifier AllocSize LLVM
   | LLVMUnreachable -- for empty case analysis
   deriving (Show)
 
@@ -27,7 +27,7 @@ data LLVMOp
   = LLVMOpCall LLVMData [LLVMData]
   | LLVMOpGetElementPtr
       (LLVMData, LowType) -- (base pointer, the type of base pointer)
-      LLVMData -- index
+      [LLVMData] -- index
   | LLVMOpBitcast
       LLVMData
       LowType -- cast from
@@ -36,6 +36,7 @@ data LLVMOp
   | LLVMOpPointerToInt LLVMData LowType LowType
   | LLVMOpLoad LLVMData LowType
   | LLVMOpStore LowType LLVMData LLVMData
+  | LLVMOpAlloc LLVMData -- size
   | LLVMOpFree LLVMData
   | LLVMOpUnaryOp (UnaryOp, LowType) LLVMData
   | LLVMOpBinaryOp (BinaryOp, LowType) LLVMData LLVMData
@@ -60,14 +61,13 @@ commConv x (LLVMSwitch (d, t) defaultCase caseList) cont2 = do
   let defaultCase' = commConv x defaultCase cont2
   LLVMSwitch (d, t) defaultCase' caseList'
 commConv x (LLVMCall d ds) cont2 = LLVMLet x (LLVMOpCall d ds) cont2
-commConv x (LLVMAlloc y size cont1) cont2 =
-  LLVMAlloc y size $ commConv x cont1 cont2
 commConv _ LLVMUnreachable _ = LLVMUnreachable
 
 showLLVMData :: LLVMData -> String
 showLLVMData (LLVMDataLocal x) = "%" ++ x
 showLLVMData (LLVMDataGlobal x) = "@" ++ x
-showLLVMData (LLVMDataInt _ i) = show i
+showLLVMData (LLVMDataInt i) = show i
 showLLVMData (LLVMDataFloat16 x) = show x
 showLLVMData (LLVMDataFloat32 x) = show x
 showLLVMData (LLVMDataFloat64 x) = show x
+showLLVMData LLVMDataNull = "null"

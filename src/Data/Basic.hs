@@ -20,6 +20,7 @@ data LowType
   | LowTypeFunctionPtr [LowType] LowType
   | LowTypeStructPtr [LowType]
   | LowTypeArrayPtr Int LowType -- [n x LOWTYPE]*
+  | LowTypeIntS64Ptr
   deriving (Eq, Show)
 
 type IntSize = Int
@@ -38,6 +39,7 @@ showLowType (LowTypeFunctionPtr ts t) =
 showLowType (LowTypeArrayPtr i t) = do
   let s = showLowType t
   "[" ++ show i ++ " x " ++ s ++ "]*"
+showLowType LowTypeIntS64Ptr = "i64*"
 
 asIntS :: Integral a => a -> a -> a
 asIntS size n = do

@@ -71,7 +71,6 @@ emitLLVM funName (LLVMSwitch (d, lowType) defaultBranch branchList) = do
 emitLLVM funName (LLVMCont op cont) = do
   h <- newNameWith "hole"
   emitLLVM funName $ LLVMLet h op cont
-emitLLVM funName (LLVMAlloc x size cont) = emitLLVMAlloc funName x size cont
 emitLLVM funName (LLVMLet x (LLVMOpPrint t d) cont) = do
   fmt <- newNameWith "fmt"
   op1 <-
@@ -107,65 +106,17 @@ emitLLVM funName (LLVMLet x op cont) = do
   return $ str ++ a
 emitLLVM _ LLVMUnreachable = emitOp $ unwords ["unreachable"]
 
-emitLLVMAlloc ::
-     Identifier -> Identifier -> AllocSize -> LLVM -> WithEnv [String]
-emitLLVMAlloc funName x (AllocSizeExact size) cont = do
-  op <-
-    emitOp $
-    unwords
-      [ showLLVMData (LLVMDataLocal x)
-      , "="
-      , "call"
-      , "i8*"
-      , "@malloc(i64 " ++ show size ++ ")"
-      ]
-  a <- emitLLVM funName cont
-  return $ op ++ a
-emitLLVMAlloc funName x (AllocSizePtrList len) cont = do
-  size <- newNameWith "sizeptr"
-  -- Use getelementptr to realize `sizeof`. More info:
-  --   http://nondot.org/sabre/LLVMNotes/SizeOf-OffsetOf-VariableSizedStructs.txt
-  op1 <-
-    emitOp $
-    unwords
-      [ showLLVMData (LLVMDataLocal size)
-      , "="
-      , "getelementptr i64, i64* null, i32 " ++ show len
-      ]
-  casted <- newNameWith "size"
-  op2 <-
-    emitOp $
-    unwords
-      [ showLLVMData (LLVMDataLocal casted)
-      , "="
-      , "ptrtoint i64*"
-      , showLLVMData (LLVMDataLocal size)
-      , "to i64"
-      ]
-  op3 <-
-    emitOp $
-    unwords
-      [ showLLVMData (LLVMDataLocal x)
-      , "="
-      , "call"
-      , "i8*"
-      , "@malloc(i64 " ++ showLLVMData (LLVMDataLocal casted) ++ ")"
-      ]
-  a <- emitLLVM funName cont
-  return $ op1 ++ op2 ++ op3 ++ a
-
 emitLLVMOp :: LLVMOp -> WithEnv String
 emitLLVMOp (LLVMOpCall d ds) = do
   return $ unwords ["call i8*", showLLVMData d ++ showArgs ds]
-emitLLVMOp (LLVMOpGetElementPtr (base, n) i) = do
+emitLLVMOp (LLVMOpGetElementPtr (base, n) is) = do
   return $
     unwords
       [ "getelementptr"
       , showLowTypeAsIfNonPtr n ++ ","
       , showLowType n ++ "*"
       , showLLVMData base ++ ","
-      , "i32 0,"
-      , "i32 " ++ showLLVMData i
+      , showIndex is
       ]
 emitLLVMOp (LLVMOpBitcast d fromType toType) =
   emitLLVMConvOp "bitcast" d fromType toType
@@ -190,6 +141,8 @@ emitLLVMOp (LLVMOpStore t d1 d2) = do
       , showLowTypeAsIfPtr t
       , showLLVMData d2
       ]
+emitLLVMOp (LLVMOpAlloc d) = do
+  return $ unwords ["call", "i8*", "@malloc(i64 " ++ showLLVMData d ++ ")"]
 emitLLVMOp (LLVMOpFree d) = do
   return $ unwords ["call", "void", "@free(i8* " ++ showLLVMData d ++ ")"]
 emitLLVMOp (LLVMOpUnaryOp (UnaryOpNeg, t@(LowTypeFloat _)) d) = do
@@ -358,6 +311,11 @@ constructLabelList ((_, _):rest) = do
 showBranchList :: LowType -> [(Int, String)] -> String
 showBranchList lowType xs =
   "[" ++ showItems (uncurry (showBranch lowType)) xs ++ "]"
+
+showIndex :: [LLVMData] -> String
+showIndex [] = ""
+showIndex [d] = "i64 " ++ showLLVMData d
+showIndex (d:ds) = "i64 " ++ showLLVMData d ++ ", " ++ showIndex ds
 
 showBranch :: LowType -> Int -> String -> String
 showBranch lowType i label =

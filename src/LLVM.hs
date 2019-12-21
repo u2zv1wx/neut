@@ -28,7 +28,7 @@ llvmCode (_, CodePiElimDownElim v ds) = do
   llvmDataLet' (zip xs ds) $ cont
 llvmCode (_, CodeSigmaElim xs v e) = do
   let structPtrType = toStructPtrType $ length xs
-  let idxList = map (LLVMDataInt 64) [0 ..]
+  let idxList = map LLVMDataInt [0 ..]
   loadContent v structPtrType (zip idxList xs) voidPtr e
 llvmCode (_, CodeUpIntro d) = do
   result <- newNameWith "ans"
@@ -39,12 +39,12 @@ llvmCode (_, CodeUpElim x e1 e2) = do
   return $ commConv x e1' e2'
 llvmCode (_, CodeEnumElim v branchList) = llvmCodeEnumElim v branchList
 llvmCode (_, CodeArrayElim k d1 d2) = do
-  (idxName, idx) <- newDataLocal "idx"
   result <- newNameWith "ans"
-  let elemType = arrayKindToLowType k
-  let arrayPtrType = LowTypeArrayPtr 0 elemType
-  l <- loadContent d1 arrayPtrType [(idx, result)] elemType (retUp result)
-  llvmDataLet' [(idxName, d2)] l
+  let et = arrayKindToLowType k -- elem type
+  let bt = LowTypeArrayPtr 0 et -- base pointer type
+  (cast, castThen) <- llvmCast d2 $ LowTypeIntS 64 -- enum ~> i64
+  loadThenFreeThenCont <- loadContent d1 bt [(cast, result)] et (retUp result)
+  castThen loadThenFreeThenCont
 
 retUp :: Identifier -> CodePlus
 retUp result = (Nothing, CodeUpIntro (Nothing, DataUpsilon result))
@@ -77,7 +77,7 @@ loadContent' bp bt et ((i, x):xis) cont = do
   cont' <- loadContent' bp bt et xis cont
   (posName, pos) <- newDataLocal "pos"
   return $
-    LLVMLet posName (LLVMOpGetElementPtr (bp, bt) i) $
+    LLVMLet posName (LLVMOpGetElementPtr (bp, bt) [LLVMDataInt 0, i]) $
     LLVMLet x (LLVMOpLoad pos et) cont'
 
 llvmCodeTheta :: CodeMeta -> Theta -> WithEnv LLVM
@@ -93,7 +93,7 @@ llvmCodeTheta _ (ThetaPrint v) = do
   let t = LowTypeIntS 64
   (pName, p) <- newDataLocal "arg"
   c <- newNameWith "cast"
-  retZero <- llvmUncast (LLVMDataInt 64 0) t
+  retZero <- llvmUncast (LLVMDataInt 0) t
   llvmDataLet pName v $
     LLVMLet c (LLVMOpPointerToInt p voidPtr t) $
     LLVMCont (LLVMOpPrint t (LLVMDataLocal c)) retZero
@@ -203,9 +203,9 @@ llvmDataLet x (_, DataUpsilon y) cont =
 llvmDataLet reg (_, DataSigmaIntro ds) cont = do
   storeContent reg voidPtr (toStructPtrType $ length ds) ds cont
 llvmDataLet x (_, DataIntS j i) cont =
-  llvmUncastLet x (LLVMDataInt j i) (LowTypeIntS j) cont
+  llvmUncastLet x (LLVMDataInt i) (LowTypeIntS j) cont
 llvmDataLet x (_, DataIntU j i) cont =
-  llvmUncastLet x (LLVMDataInt j i) (LowTypeIntU j) cont
+  llvmUncastLet x (LLVMDataInt i) (LowTypeIntU j) cont
 llvmDataLet x (_, DataFloat16 f) cont =
   llvmUncastLet x (LLVMDataFloat16 f) (LowTypeFloat FloatSize16) cont
 llvmDataLet x (_, DataFloat32 f) cont =
@@ -264,10 +264,29 @@ storeContent ::
      Identifier -> LowType -> LowType -> [DataPlus] -> LLVM -> WithEnv LLVM
 storeContent reg elemType aggPtrType ds cont = do
   (cast, castThen) <- llvmCast (Nothing, DataUpsilon reg) aggPtrType
-  cont' <- storeContent' cast aggPtrType elemType (zip [0 ..] ds) cont
-  cont'' <- castThen $ cont'
-  let size = lowTypeToAllocSize aggPtrType
-  return $ LLVMAlloc reg size cont''
+  storeThenCont <- storeContent' cast aggPtrType elemType (zip [0 ..] ds) cont
+  castThenStoreThenCont <- castThen $ storeThenCont
+  case lowTypeToAllocSize aggPtrType of
+    AllocSizeExact i ->
+      return $
+      LLVMLet
+        reg
+        (LLVMOpAlloc (LLVMDataInt (toInteger i)))
+        castThenStoreThenCont
+    AllocSizePtrList n -> do
+      (c, cVar) <- newDataLocal "cast"
+      (i, iVar) <- newDataLocal "size"
+      -- Use getelementptr to realize `sizeof`. More info:
+      --   http://nondot.org/sabre/LLVMNotes/SizeOf-OffsetOf-VariableSizedStructs.txt
+      return $
+        LLVMLet
+          c
+          (LLVMOpGetElementPtr
+             (LLVMDataNull, LowTypeIntS64Ptr)
+             [LLVMDataInt (toInteger n)]) $
+        LLVMLet i (LLVMOpPointerToInt cVar LowTypeIntS64Ptr (LowTypeIntS 64)) $
+        LLVMLet reg (LLVMOpAlloc iVar) castThenStoreThenCont
+      -- return $ LLVMAlloc reg size cont''
 
 storeContent' ::
      LLVMData -- base pointer
@@ -282,7 +301,9 @@ storeContent' bp bt et ((i, d):ids) cont = do
   (locName, loc) <- newDataLocal "loc"
   (cast, castThen) <- llvmCast d et
   castThen $
-    LLVMLet locName (LLVMOpGetElementPtr (bp, bt) (LLVMDataInt 64 i)) $
+    LLVMLet
+      locName
+      (LLVMOpGetElementPtr (bp, bt) [LLVMDataInt 0, LLVMDataInt i]) $
     LLVMCont (LLVMOpStore et cast loc) cont'
 
 toFunPtrType :: [a] -> LowType
@@ -309,6 +330,7 @@ lowTypeToAllocSize (LowTypeArrayPtr i t) =
   case lowTypeToAllocSize t of
     AllocSizeExact s -> AllocSizeExact $ s * i
     AllocSizePtrList s -> AllocSizePtrList $ s * i -- shouldn't occur
+lowTypeToAllocSize LowTypeIntS64Ptr = AllocSizePtrList 1
 
 lowTypeToAllocSize' :: Int -> Int
 lowTypeToAllocSize' i = do
