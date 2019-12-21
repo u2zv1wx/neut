@@ -55,7 +55,7 @@ emitLLVM funName (LLVMSwitch (d, lowType) defaultBranch branchList) = do
     emitOp $
     unwords
       [ "switch"
-      , showLowTypeEmit lowType
+      , showLowType lowType
       , showLLVMData d ++ ","
       , "label"
       , showLLVMData (LLVMDataLocal defaultLabel)
@@ -88,16 +88,21 @@ emitLLVM funName (LLVMLet x (LLVMReturn d) cont)
  = emitLLVM funName (LLVMLet x (LLVMBitcast d voidPtr voidPtr) cont)
 emitLLVM funName (LLVMLet x (LLVMLet y cont1 cont2) cont3) =
   emitLLVM funName (LLVMLet y cont1 (LLVMLet x cont2 cont3))
-emitLLVM funName (LLVMLet x (LLVMGetElementPtr base (i, n)) cont) = do
+emitLLVM funName (LLVMLet x (LLVMGetElementPtr (base, n) i) cont) = do
   op <-
     emitOp $
     unwords
       [ showLLVMData (LLVMDataLocal x)
       , "= getelementptr"
-      , showStruct n ++ ","
-      , showStruct n ++ "*"
+      -- , showStruct n ++ ","
+      -- , showStruct n ++ "*"
+      , showLowTypeAsIfNonPtr n ++ ","
+      , showLowType n ++ "*"
       , showLLVMData base ++ ","
-      , showIndex [0, i]
+      -- , showIndex [0, i]
+      , "i32 0,"
+      , "i32 " ++ showLLVMData i
+      -- , showIndex [0, i]
       ]
   xs <- emitLLVM funName cont
   return $ op ++ xs
@@ -107,26 +112,32 @@ emitLLVM funName (LLVMLet x (LLVMIntToPointer d fromType toType) cont) = do
   emitConvOp funName x "inttoptr" d fromType toType cont
 emitLLVM funName (LLVMLet x (LLVMPointerToInt d fromType toType) cont) = do
   emitConvOp funName x "ptrtoint" d fromType toType cont
-emitLLVM funName (LLVMLet x (LLVMLoad d) cont) = do
+emitLLVM funName (LLVMLet x (LLVMLoad d lowType) cont) = do
   op <-
     emitOp $
     unwords
-      [showLLVMData (LLVMDataLocal x), "=", "load i8*, i8**", showLLVMData d]
+      [ showLLVMData (LLVMDataLocal x)
+      , "="
+      , "load"
+      , showLowType lowType ++ ","
+      , showLowTypeAsIfPtr lowType ++ ","
+      , showLLVMData d -- load data from d
+      ]
   a <- emitLLVM funName cont
   return $ op ++ a
-emitLLVM funName (LLVMLet _ (LLVMStore (d1, t1) (d2, t2)) cont) = do
+emitLLVM funName (LLVMLet _ (LLVMStore t d1 d2) cont) = do
   op <-
     emitOp $
     unwords
       [ "store"
-      , showLowTypeEmit t1
+      , showLowType t
       , showLLVMData d1 ++ ","
-      , showLowTypeEmit t2
+      , showLowTypeAsIfPtr t
       , showLLVMData d2
       ]
   a <- emitLLVM funName cont
   return $ op ++ a
-emitLLVM funName (LLVMLet x (LLVMAlloc len) cont) = do
+emitLLVM funName (LLVMLet x (LLVMAlloc (AllocSizePtrList len)) cont) = do
   size <- newNameWith "sizeptr"
   -- Use getelementptr to realize `sizeof`. More info:
   --   http://nondot.org/sabre/LLVMNotes/SizeOf-OffsetOf-VariableSizedStructs.txt
@@ -158,6 +169,18 @@ emitLLVM funName (LLVMLet x (LLVMAlloc len) cont) = do
       ]
   a <- emitLLVM funName cont
   return $ op1 ++ op2 ++ op3 ++ a
+emitLLVM funName (LLVMLet x (LLVMAlloc (AllocSizeExact size)) cont) = do
+  op <-
+    emitOp $
+    unwords
+      [ showLLVMData (LLVMDataLocal x)
+      , "="
+      , "call"
+      , "i8*"
+      , "@malloc(i64 " ++ show size ++ ")"
+      ]
+  a <- emitLLVM funName cont
+  return $ op ++ a
 emitLLVM funName (LLVMLet _ (LLVMFree d) cont) = do
   op <- emitOp $ unwords ["call", "void", "@free(i8* " ++ showLLVMData d ++ ")"]
   a <- emitLLVM funName cont
@@ -296,7 +319,7 @@ emitLLVM funName (LLVMLet x (LLVMPrint t d) cont) = do
       , "call"
       , "i32 (i8*, ...)"
       , "@printf(i8* " ++ showLLVMData (LLVMDataLocal fmt) ++ ","
-      , showLowTypeEmit t
+      , showLowType t
       , showLLVMData d ++ ")"
       ]
   a <-
@@ -323,12 +346,7 @@ emitUnaryOp funName x t inst d cont = do
   op <-
     emitOp $
     unwords
-      [ showLLVMData (LLVMDataLocal x)
-      , "="
-      , inst
-      , showLowTypeEmit t
-      , showLLVMData d
-      ]
+      [showLLVMData (LLVMDataLocal x), "=", inst, showLowType t, showLLVMData d]
   a <- emitLLVM funName cont
   return $ op ++ a
 
@@ -348,7 +366,7 @@ emitBinaryOp funName x t inst d1 d2 cont = do
       [ showLLVMData (LLVMDataLocal x)
       , "="
       , inst
-      , showLowTypeEmit t
+      , showLowType t
       , showLLVMData d1 ++ ","
       , showLLVMData d2
       ]
@@ -371,10 +389,10 @@ emitConvOp funName x cast d fromType toType cont = do
       [ showLLVMData (LLVMDataLocal x)
       , "="
       , cast
-      , showLowTypeEmit fromType
+      , showLowType fromType
       , showLLVMData d
       , "to"
-      , showLowTypeEmit toType
+      , showLowType toType
       ]
   a <- emitLLVM funName cont
   return $ op ++ a
@@ -416,13 +434,8 @@ showBranchList lowType xs =
 
 showBranch :: LowType -> Int -> String -> String
 showBranch lowType i label =
-  showLowTypeEmit lowType ++
+  showLowType lowType ++
   " " ++ show i ++ ", label " ++ showLLVMData (LLVMDataLocal label)
-
-showIndex :: [Int] -> String
-showIndex [] = ""
-showIndex [i] = "i32 " ++ show i
-showIndex (i:is) = "i32 " ++ show i ++ ", " ++ showIndex is
 
 showArg :: LLVMData -> String
 showArg d = "i8* " ++ showLLVMData d
@@ -430,20 +443,27 @@ showArg d = "i8* " ++ showLLVMData d
 showArgs :: [LLVMData] -> String
 showArgs ds = "(" ++ showItems showArg ds ++ ")"
 
-showLowTypeEmit :: LowType -> String
-showLowTypeEmit (LowTypeSignedInt i) = "i" ++ show i
+showLowType :: LowType -> String
+showLowType (LowTypeSignedInt i) = "i" ++ show i
 -- LLVM doesn't distinguish unsigned integers from signed ones
-showLowTypeEmit (LowTypeUnsignedInt i) = "i" ++ show i
-showLowTypeEmit (LowTypeFloat FloatSize16) = "half"
-showLowTypeEmit (LowTypeFloat FloatSize32) = "float"
-showLowTypeEmit (LowTypeFloat FloatSize64) = "double"
-showLowTypeEmit (LowTypePointer t) = showLowTypeEmit t ++ "*"
-showLowTypeEmit (LowTypeStruct ts) = "{" ++ showItems showLowTypeEmit ts ++ "}"
-showLowTypeEmit (LowTypeFunction ts t) =
-  showLowTypeEmit t ++ " (" ++ showItems showLowTypeEmit ts ++ ")"
+showLowType (LowTypeUnsignedInt i) = "i" ++ show i
+showLowType (LowTypeFloat FloatSize16) = "half"
+showLowType (LowTypeFloat FloatSize32) = "float"
+showLowType (LowTypeFloat FloatSize64) = "double"
+showLowType LowTypeVoidPtr = "i8*"
+-- showLowType (LowTypePointer t) = showLowType t ++ "*"
+showLowType (LowTypeStructPtr ts) = "{" ++ showItems showLowType ts ++ "}*"
+showLowType (LowTypeFunctionPtr ts t) =
+  showLowType t ++ " (" ++ showItems showLowType ts ++ ")*"
+showLowType (LowTypeArrayPtr i t) = do
+  let s = showLowType t
+  "[" ++ show i ++ " x " ++ s ++ "]*"
 
-showStruct :: Int -> String
-showStruct i = "{" ++ showItems (const "i8*") [1 .. i] ++ "}"
+showLowTypeAsIfPtr :: LowType -> String
+showLowTypeAsIfPtr t = showLowType t ++ "*"
+
+showLowTypeAsIfNonPtr :: LowType -> String
+showLowTypeAsIfNonPtr t = init $ showLowType t
 
 -- for now
 emitGlobal :: WithEnv [String]
