@@ -191,6 +191,4 @@ withKindPrefix str base
   , base == base'
   , Just t' <- asLowTypeMaybe t
   , Just kind <- asArrayKind t' = Just kind
-withKindPrefix str base
-  | str == base = Just ArrayKindAny
 withKindPrefix _ _ = Nothing

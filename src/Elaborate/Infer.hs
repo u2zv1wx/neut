@@ -131,7 +131,6 @@ inferKind (ArrayKindIntU i) =
   return (newMetaTerminal, WeakTermTheta $ "u" ++ show i)
 inferKind (ArrayKindFloat size) =
   return (newMetaTerminal, WeakTermTheta $ "f" ++ show (sizeAsInt size))
-inferKind ArrayKindAny = newHoleInCtx []
 
 inferPlus :: Context -> [(Identifier, WeakTermPlus)] -> WithEnv [WeakTermPlus]
 inferPlus ctx xts =

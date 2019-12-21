@@ -52,7 +52,6 @@ data ArrayKind
   = ArrayKindIntS Int
   | ArrayKindIntU Int
   | ArrayKindFloat FloatSize
-  | ArrayKindAny
   deriving (Show, Eq)
 
 asArrayKind :: LowType -> Maybe ArrayKind
