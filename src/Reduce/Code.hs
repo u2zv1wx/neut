@@ -35,6 +35,12 @@ reduceCodePlus (m, CodeEnumElim v branchList) =
             Just body -> reduceCodePlus body
             Nothing -> return (m, CodeEnumElim v branchList)
     _ -> return (m, CodeEnumElim v branchList)
+reduceCodePlus (m, CodeArrayElim k d1 d2) = do
+  case (d1, d2) of
+    ((_, DataArrayIntro k' les), (_, DataEnumIntro l))
+      | k == k'
+      , Just d <- lookup l les -> return (m, CodeUpIntro d)
+    _ -> return (m, CodeArrayElim k d1 d2)
 reduceCodePlus (m, CodeTheta theta) =
   case theta of
     ThetaUnaryOp op (LowTypeIntS s) (m1, DataIntS s1 x)

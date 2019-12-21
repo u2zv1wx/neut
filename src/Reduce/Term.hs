@@ -39,6 +39,14 @@ reduceTermPlus (m, TermEnumElim e branchList) = do
             Just body -> reduceTermPlus body
             Nothing -> return (m, TermEnumElim e' branchList)
     _ -> return (m, TermEnumElim e' branchList)
+reduceTermPlus (m, TermArrayElim k e1 e2) = do
+  e1' <- reduceTermPlus e1
+  e2' <- reduceTermPlus e2
+  case (e1', e2') of
+    ((_, TermArrayIntro k' les), (_, TermEnumIntro l))
+      | k == k'
+      , Just e <- lookup l les -> reduceTermPlus e
+    _ -> return (m, TermArrayElim k e1' e2')
 reduceTermPlus t = return t
 
 reduceTermPlusTheta ::

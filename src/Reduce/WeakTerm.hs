@@ -40,6 +40,14 @@ reduceWeakTermPlus (m, WeakTermEnumElim e branchList) = do
             Just body -> reduceWeakTermPlus body
             Nothing -> return (m, WeakTermEnumElim e' branchList)
     _ -> return (m, WeakTermEnumElim e' branchList)
+reduceWeakTermPlus (m, WeakTermArrayElim k e1 e2) = do
+  e1' <- reduceWeakTermPlus e1
+  e2' <- reduceWeakTermPlus e2
+  case (e1', e2') of
+    ((_, WeakTermArrayIntro k' les), (_, WeakTermEnumIntro l))
+      | k == k'
+      , Just e <- lookup l les -> reduceWeakTermPlus e
+    _ -> return (m, WeakTermArrayElim k e1' e2')
 reduceWeakTermPlus t = return t
 
 reduceWeakTermPlusTheta ::
