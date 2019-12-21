@@ -62,6 +62,10 @@ substDataPlus _ (m, DataFloat16 l) = (m, DataFloat16 l)
 substDataPlus _ (m, DataFloat32 l) = (m, DataFloat32 l)
 substDataPlus _ (m, DataFloat64 l) = (m, DataFloat64 l)
 substDataPlus _ (m, DataEnumIntro l) = (m, DataEnumIntro l)
+substDataPlus sub (m, DataArrayIntro k lds) = do
+  let (ls, ds) = unzip lds
+  let ds' = map (substDataPlus sub) ds
+  (m, DataArrayIntro k $ zip ls ds')
 
 substCodePlus :: SubstDataPlus -> CodePlus -> CodePlus
 substCodePlus sub (m, CodeTheta theta) = do
@@ -88,6 +92,10 @@ substCodePlus sub (m, CodeEnumElim v branchList) = do
   let es' = map (substCodePlus sub) es
   let branchList' = zip cs es'
   (m, CodeEnumElim v' branchList')
+substCodePlus sub (m, CodeArrayElim k d1 d2) = do
+  let d1' = substDataPlus sub d1
+  let d2' = substDataPlus sub d2
+  (m, CodeArrayElim k d1' d2')
 
 substTheta :: SubstDataPlus -> Theta -> Theta
 substTheta sub (ThetaUnaryOp a t v) = do
