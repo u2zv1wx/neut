@@ -37,17 +37,17 @@ reduceCodePlus (m, CodeSigmaElim xs v e) =
     _ -> return (m, CodeSigmaElim xs v e)
 reduceCodePlus (m, CodeTheta theta) =
   case theta of
-    ThetaUnaryOp op (LowTypeSignedInt s) (m1, DataIntS s1 x)
+    ThetaUnaryOp op (LowTypeIntS s) (m1, DataIntS s1 x)
       | s == s1 ->
         case op of
-          UnaryOpTrunc (LowTypeSignedInt s2)
+          UnaryOpTrunc (LowTypeIntS s2)
             | s1 > s2 -> upIntroData m (m1, DataIntS s2 (x .&. (2 ^ s2 - 1)))
-          UnaryOpZext (LowTypeSignedInt s2)
+          UnaryOpZext (LowTypeIntS s2)
             | s1 < s2 -> do
               let s1' = toInteger s1
               let s2' = toInteger s2
               upIntroData m (m1, DataIntS s2 (asIntS s2' (asIntU s1' x)))
-          UnaryOpSext (LowTypeSignedInt s2)
+          UnaryOpSext (LowTypeIntS s2)
             | s1 < s2 -> upIntroData m (m1, DataIntS s2 x)
           UnaryOpTo (LowTypeFloat FloatSize16) ->
             upIntroData m (m1, DataFloat16 (fromIntegral x))
@@ -56,14 +56,14 @@ reduceCodePlus (m, CodeTheta theta) =
           UnaryOpTo (LowTypeFloat FloatSize64) ->
             upIntroData m (m1, DataFloat64 (fromIntegral x))
           _ -> return (m, CodeTheta theta)
-    ThetaUnaryOp op (LowTypeUnsignedInt s) (m1, DataIntU s1 x)
+    ThetaUnaryOp op (LowTypeIntU s) (m1, DataIntU s1 x)
       | s == s1 ->
         case op of
-          UnaryOpTrunc (LowTypeUnsignedInt s2)
+          UnaryOpTrunc (LowTypeIntU s2)
             | s1 > s2 -> upIntroData m (m1, DataIntU s2 (x .&. (2 ^ s2 - 1)))
-          UnaryOpZext (LowTypeUnsignedInt s2)
+          UnaryOpZext (LowTypeIntU s2)
             | s1 < s2 -> upIntroData m (m1, DataIntU s2 x)
-          UnaryOpSext (LowTypeUnsignedInt s2)
+          UnaryOpSext (LowTypeIntU s2)
             | s1 < s2 -> do
               let s1' = toInteger s1
               let s2' = toInteger s2
@@ -82,10 +82,10 @@ reduceCodePlus (m, CodeTheta theta) =
           upIntroData m (m1, DataFloat32 (realToFrac x))
         UnaryOpFpExt (LowTypeFloat FloatSize64) ->
           upIntroData m (m1, DataFloat64 (realToFrac x))
-        UnaryOpTo (LowTypeSignedInt s) -> do
+        UnaryOpTo (LowTypeIntS s) -> do
           let s' = toInteger s
           upIntroData m (m1, DataIntS s (asIntS s' (round x)))
-        UnaryOpTo (LowTypeUnsignedInt s) -> do
+        UnaryOpTo (LowTypeIntU s) -> do
           let s' = toInteger s
           upIntroData m (m1, DataIntU s (asIntU s' (round x)))
         _ -> return (m, CodeTheta theta)
@@ -96,10 +96,10 @@ reduceCodePlus (m, CodeTheta theta) =
           upIntroData m (m1, DataFloat16 (realToFrac x))
         UnaryOpFpExt (LowTypeFloat FloatSize64) ->
           upIntroData m (m1, DataFloat64 (realToFrac x))
-        UnaryOpTo (LowTypeSignedInt s) -> do
+        UnaryOpTo (LowTypeIntS s) -> do
           let s' = toInteger s
           upIntroData m (m1, DataIntS s (asIntS s' (round x)))
-        UnaryOpTo (LowTypeUnsignedInt s) -> do
+        UnaryOpTo (LowTypeIntU s) -> do
           let s' = toInteger s
           upIntroData m (m1, DataIntU s (asIntU s' (round x)))
         _ -> return (m, CodeTheta theta)
@@ -110,19 +110,19 @@ reduceCodePlus (m, CodeTheta theta) =
           upIntroData m (m1, DataFloat16 (realToFrac x))
         UnaryOpTrunc (LowTypeFloat FloatSize32) ->
           upIntroData m (m1, DataFloat32 (realToFrac x))
-        UnaryOpTo (LowTypeSignedInt s) -> do
+        UnaryOpTo (LowTypeIntS s) -> do
           let s' = toInteger s
           upIntroData m (m1, DataIntS s (asIntS s' (round x)))
-        UnaryOpTo (LowTypeUnsignedInt s) -> do
+        UnaryOpTo (LowTypeIntU s) -> do
           let s' = toInteger s
           upIntroData m (m1, DataIntU s (asIntU s' (round x)))
         _ -> return (m, CodeTheta theta)
-    ThetaBinaryOp op (LowTypeSignedInt s) (m1, DataIntS s1 x) (_, DataIntS s2 y)
+    ThetaBinaryOp op (LowTypeIntS s) (m1, DataIntS s1 x) (_, DataIntS s2 y)
       | s == s1 && s == s2 -> do
         case computeInt asIntS (toInteger s) x y op of
           Left d -> upIntroData m (m1, d)
           Right z -> upIntroData m (m1, DataIntS s z)
-    ThetaBinaryOp op (LowTypeUnsignedInt s) (m1, DataIntU s1 x) (_, DataIntU s2 y)
+    ThetaBinaryOp op (LowTypeIntU s) (m1, DataIntU s1 x) (_, DataIntU s2 y)
       | s == s1 && s == s2 -> do
         case computeInt asIntU (toInteger s) x y op of
           Left d -> upIntroData m (m1, d)

@@ -56,14 +56,14 @@ reduceTermPlusUnary orig arg m lowType op = do
   case getUnaryArgInfo lowType arg of
     Just (UnaryArgInfoIntS s1 x) ->
       case op of
-        UnaryOpTrunc (LowTypeSignedInt s2)
+        UnaryOpTrunc (LowTypeIntS s2)
           | s1 > s2 -> return (m, TermIntS s2 (x .&. (2 ^ s2 - 1))) -- e.g. trunc 257 to i8 ~> 257 .&. 255 ~> 1
-        UnaryOpZext (LowTypeSignedInt s2)
+        UnaryOpZext (LowTypeIntS s2)
           | s1 < s2 -> do
             let s1' = toInteger s1
             let s2' = toInteger s2
             return (m, TermIntS s2 (asIntS s2' (asIntU s1' x)))
-        UnaryOpSext (LowTypeSignedInt s2)
+        UnaryOpSext (LowTypeIntS s2)
           | s1 < s2 -> return (m, TermIntS s2 x) -- sext over int doesn't alter interpreted value
         UnaryOpTo (LowTypeFloat FloatSize16) ->
           return (m, TermFloat16 (fromIntegral x))
@@ -74,11 +74,11 @@ reduceTermPlusUnary orig arg m lowType op = do
         _ -> return orig
     Just (UnaryArgInfoIntU s1 x) ->
       case op of
-        UnaryOpTrunc (LowTypeUnsignedInt s2)
+        UnaryOpTrunc (LowTypeIntU s2)
           | s1 > s2 -> return (m, TermIntU s2 (x .&. (2 ^ s2 - 1))) -- e.g. trunc 257 to i8 ~> 257 .&. 255 ~> 1
-        UnaryOpZext (LowTypeUnsignedInt s2)
+        UnaryOpZext (LowTypeIntU s2)
           | s1 < s2 -> return (m, TermIntU s2 x) -- zext over uint doesn't alter interpreted value
-        UnaryOpSext (LowTypeUnsignedInt s2)
+        UnaryOpSext (LowTypeIntU s2)
           | s1 < s2 -> do
             let s1' = toInteger s1
             let s2' = toInteger s2
@@ -97,10 +97,10 @@ reduceTermPlusUnary orig arg m lowType op = do
           return (m, TermFloat32 (realToFrac x))
         UnaryOpFpExt (LowTypeFloat FloatSize64) ->
           return (m, TermFloat64 (realToFrac x))
-        UnaryOpTo (LowTypeSignedInt s) -> do
+        UnaryOpTo (LowTypeIntS s) -> do
           let s' = toInteger s
           return (m, TermIntS s (asIntS s' (round x)))
-        UnaryOpTo (LowTypeUnsignedInt s) -> do
+        UnaryOpTo (LowTypeIntU s) -> do
           let s' = toInteger s
           return (m, TermIntU s (asIntU s' (round x)))
         _ -> return orig
@@ -111,10 +111,10 @@ reduceTermPlusUnary orig arg m lowType op = do
           return (m, TermFloat16 (realToFrac x))
         UnaryOpFpExt (LowTypeFloat FloatSize64) ->
           return (m, TermFloat64 (realToFrac x))
-        UnaryOpTo (LowTypeSignedInt s) -> do
+        UnaryOpTo (LowTypeIntS s) -> do
           let s' = toInteger s
           return (m, TermIntS s (asIntS s' (round x)))
-        UnaryOpTo (LowTypeUnsignedInt s) -> do
+        UnaryOpTo (LowTypeIntU s) -> do
           let s' = toInteger s
           return (m, TermIntU s (asIntU s' (round x)))
         _ -> return orig
@@ -125,10 +125,10 @@ reduceTermPlusUnary orig arg m lowType op = do
           return (m, TermFloat16 (realToFrac x))
         UnaryOpTrunc (LowTypeFloat FloatSize32) ->
           return (m, TermFloat32 (realToFrac x))
-        UnaryOpTo (LowTypeSignedInt s) -> do
+        UnaryOpTo (LowTypeIntS s) -> do
           let s' = toInteger s
           return (m, TermIntS s (asIntS s' (round x)))
-        UnaryOpTo (LowTypeUnsignedInt s) -> do
+        UnaryOpTo (LowTypeIntU s) -> do
           let s' = toInteger s
           return (m, TermIntU s (asIntU s' (round x)))
         _ -> return orig
@@ -174,10 +174,10 @@ data UnaryArgInfo
 
 getUnaryArgInfo :: LowType -> TermPlus -> Maybe UnaryArgInfo
 -- IntS
-getUnaryArgInfo (LowTypeSignedInt s) (_, TermIntS s1 x)
+getUnaryArgInfo (LowTypeIntS s) (_, TermIntS s1 x)
   | s == s1 = return $ UnaryArgInfoIntS s x
 -- IntU
-getUnaryArgInfo (LowTypeUnsignedInt s) (_, TermIntU s1 x)
+getUnaryArgInfo (LowTypeIntU s) (_, TermIntU s1 x)
   | s == s1 = return $ UnaryArgInfoIntU s x
 -- Float16
 getUnaryArgInfo (LowTypeFloat FloatSize16) (_, TermFloat16 x) =
@@ -201,10 +201,10 @@ data BinaryArgInfo
 
 getBinaryArgInfo :: LowType -> TermPlus -> TermPlus -> Maybe BinaryArgInfo
 -- IntS
-getBinaryArgInfo (LowTypeSignedInt s) (_, TermIntS s1 x) (_, TermIntS s2 y)
+getBinaryArgInfo (LowTypeIntS s) (_, TermIntS s1 x) (_, TermIntS s2 y)
   | s == s1 && s == s2 = return $ BinaryArgInfoIntS s x y
 -- IntU
-getBinaryArgInfo (LowTypeUnsignedInt s) (_, TermIntU s1 x) (_, TermIntU s2 y)
+getBinaryArgInfo (LowTypeIntU s) (_, TermIntU s1 x) (_, TermIntU s2 y)
   | s == s1 && s == s2 = return $ BinaryArgInfoIntU s x y
 -- Float16
 getBinaryArgInfo (LowTypeFloat FloatSize16) (_, TermFloat16 x) (_, TermFloat16 y) =

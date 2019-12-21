@@ -56,11 +56,11 @@ interpret (m, TreeNode [(_, TreeAtom "zeta"), (_, TreeAtom x)]) = do
   x' <- interpretAtom x
   withMeta m $ WeakTermZeta x'
 interpret (m, TreeNode [(_, TreeAtom t), (_, TreeAtom x)])
-  | Just (LowTypeSignedInt i) <- asLowTypeMaybe t
+  | Just (LowTypeIntS i) <- asLowTypeMaybe t
   , i > 0
   , Just x' <- readMaybe x = withMeta m $ WeakTermIntS i x'
 interpret (m, TreeNode [(_, TreeAtom t), (_, TreeAtom x)])
-  | Just (LowTypeUnsignedInt i) <- asLowTypeMaybe t
+  | Just (LowTypeIntU i) <- asLowTypeMaybe t
   , i > 0
   , Just x' <- readMaybe x = withMeta m $ WeakTermIntU i x'
 interpret (m, TreeNode [(_, TreeAtom "f16"), (_, TreeAtom x)])

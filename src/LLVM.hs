@@ -88,10 +88,10 @@ llvmCodeTheta _ (ThetaUnaryOp op lowType v)
   | otherwise = throwError "llvmCodeTheta.ThetaUnaryOp"
 llvmCodeTheta _ (ThetaBinaryOp op lowType v1 v2)
   | isArithOp op = llvmCodeBinaryOp op lowType lowType v1 v2
-  | isCompareOp op = llvmCodeBinaryOp op lowType (LowTypeSignedInt 1) v1 v2
+  | isCompareOp op = llvmCodeBinaryOp op lowType (LowTypeIntS 1) v1 v2
   | otherwise = throwError "llvmCodeTheta.ThetaBinaryOp"
 llvmCodeTheta _ (ThetaPrint v) = do
-  let t = LowTypeSignedInt 64
+  let t = LowTypeIntS 64
   (pName, p) <- newDataLocal "arg"
   c <- newNameWith "cast"
   retZero <- llvmUncast (LLVMDataIntS 64 0) t
@@ -117,8 +117,8 @@ llvmCodeBinaryOp op domType codType v1 v2 = do
     LLVMLet result (LLVMOpBinaryOp (op, domType) x1 x2) uncast
 
 llvmCast :: DataPlus -> LowType -> WithEnv (LLVMData, LLVM -> WithEnv LLVM)
-llvmCast v lowType@(LowTypeSignedInt _) = llvmCastInt v lowType
-llvmCast v lowType@(LowTypeUnsignedInt _) = llvmCastInt v lowType
+llvmCast v lowType@(LowTypeIntS _) = llvmCastInt v lowType
+llvmCast v lowType@(LowTypeIntU _) = llvmCastInt v lowType
 llvmCast v (LowTypeFloat i) = llvmCastFloat v i
 llvmCast v ptrType = do
   x <- newNameWith "var"
@@ -144,7 +144,7 @@ llvmCastFloat ::
      DataPlus -> FloatSize -> WithEnv (LLVMData, LLVM -> WithEnv LLVM)
 llvmCastFloat v size = do
   let floatType = LowTypeFloat size
-  let intType = LowTypeSignedInt $ sizeAsInt size
+  let intType = LowTypeIntS $ sizeAsInt size
   (xName, x) <- newDataLocal "arg"
   (yName, y) <- newDataLocal "tmp"
   z <- newNameWith "cast"
@@ -157,8 +157,8 @@ llvmCastFloat v size = do
 
 -- uncast: {some-concrete-type} -> voidPtr
 llvmUncast :: LLVMData -> LowType -> WithEnv LLVM
-llvmUncast result lowType@(LowTypeSignedInt _) = llvmUncastInt result lowType
-llvmUncast result lowType@(LowTypeUnsignedInt _) = llvmUncastInt result lowType
+llvmUncast result lowType@(LowTypeIntS _) = llvmUncastInt result lowType
+llvmUncast result lowType@(LowTypeIntU _) = llvmUncastInt result lowType
 llvmUncast result (LowTypeFloat i) = llvmUncastFloat result i
 llvmUncast result ptrType = do
   x <- newNameWith "res"
@@ -176,7 +176,7 @@ llvmUncastInt result lowType = do
 llvmUncastFloat :: LLVMData -> FloatSize -> WithEnv LLVM
 llvmUncastFloat floatResult i = do
   let floatType = LowTypeFloat i
-  let intType = LowTypeSignedInt $ sizeAsInt i
+  let intType = LowTypeIntS $ sizeAsInt i
   tmp <- newNameWith "tmp"
   x <- newNameWith "res"
   return $
@@ -207,9 +207,9 @@ llvmDataLet x (m, DataEpsilonIntro label) cont = do
 llvmDataLet reg (_, DataSigmaIntro ds) cont = do
   storeContent reg voidPtr (toStructPtrType $ length ds) ds cont
 llvmDataLet x (_, DataIntS j i) cont =
-  llvmUncastLet x (LLVMDataIntS j i) (LowTypeSignedInt j) cont
+  llvmUncastLet x (LLVMDataIntS j i) (LowTypeIntS j) cont
 llvmDataLet x (_, DataIntU j i) cont =
-  llvmUncastLet x (LLVMDataIntU j i) (LowTypeUnsignedInt j) cont
+  llvmUncastLet x (LLVMDataIntU j i) (LowTypeIntU j) cont
 llvmDataLet x (_, DataFloat16 f) cont =
   llvmUncastLet x (LLVMDataFloat16 f) (LowTypeFloat FloatSize16) cont
 llvmDataLet x (_, DataFloat32 f) cont =
@@ -257,7 +257,7 @@ llvmCodeEpsilonElim v branchList = do
   case m of
     Nothing -> return LLVMUnreachable
     Just (defaultCase, caseList) -> do
-      let t = LowTypeSignedInt 64
+      let t = LowTypeIntS 64
       (cast, castThen) <- llvmCast v t
       castThen $ LLVMSwitch (cast, t) defaultCase caseList
 
@@ -299,9 +299,8 @@ newDataLocal name = do
   return $ (x, LLVMDataLocal x)
 
 lowTypeToAllocSize :: LowType -> AllocSize
-lowTypeToAllocSize (LowTypeSignedInt i) = AllocSizeExact $ lowTypeToAllocSize' i
-lowTypeToAllocSize (LowTypeUnsignedInt i) =
-  AllocSizeExact $ lowTypeToAllocSize' i
+lowTypeToAllocSize (LowTypeIntS i) = AllocSizeExact $ lowTypeToAllocSize' i
+lowTypeToAllocSize (LowTypeIntU i) = AllocSizeExact $ lowTypeToAllocSize' i
 lowTypeToAllocSize (LowTypeFloat size) =
   AllocSizeExact $ lowTypeToAllocSize' $ sizeAsInt size
 lowTypeToAllocSize LowTypeVoidPtr = AllocSizePtrList 1

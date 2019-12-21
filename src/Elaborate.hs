@@ -103,8 +103,8 @@ elaborate' (m, WeakTermInt x) = do
   case t of
     (_, TermTheta intType) ->
       case asLowTypeMaybe intType of
-        Just (LowTypeSignedInt size) -> return (m', TermIntS size x)
-        Just (LowTypeUnsignedInt size) -> return (m', TermIntU size x)
+        Just (LowTypeIntS size) -> return (m', TermIntS size x)
+        Just (LowTypeIntU size) -> return (m', TermIntU size x)
         _ -> throwError $ show x ++ " should be int, but is " ++ intType
     _ -> throwError "epsilonIntro"
 elaborate' (m, WeakTermFloat16 x) = do

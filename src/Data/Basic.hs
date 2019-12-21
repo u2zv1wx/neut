@@ -15,8 +15,8 @@ data Case
   deriving (Show, Eq)
 
 data LowType
-  = LowTypeSignedInt IntSize
-  | LowTypeUnsignedInt IntSize
+  = LowTypeIntS IntSize
+  | LowTypeIntU IntSize
   | LowTypeFloat FloatSize
   | LowTypeVoidPtr
   | LowTypeFunctionPtr [LowType] LowType
@@ -56,18 +56,18 @@ data ArrayKind
   deriving (Show, Eq)
 
 asArrayKind :: LowType -> Maybe ArrayKind
-asArrayKind (LowTypeSignedInt i) = Just $ ArrayKindIntS i
-asArrayKind (LowTypeUnsignedInt i) = Just $ ArrayKindIntU i
+asArrayKind (LowTypeIntS i) = Just $ ArrayKindIntS i
+asArrayKind (LowTypeIntU i) = Just $ ArrayKindIntU i
 asArrayKind (LowTypeFloat size) = Just $ ArrayKindFloat size
 asArrayKind _ = Nothing
 
 arrayKindToLowType :: ArrayKind -> LowType
-arrayKindToLowType (ArrayKindIntS i) = LowTypeSignedInt i
-arrayKindToLowType (ArrayKindIntU i) = LowTypeUnsignedInt i
+arrayKindToLowType (ArrayKindIntS i) = LowTypeIntS i
+arrayKindToLowType (ArrayKindIntU i) = LowTypeIntU i
 arrayKindToLowType (ArrayKindFloat size) = LowTypeFloat size
 
 voidPtr :: LowType
--- voidPtr = LowTypePointer $ LowTypeSignedInt 8
+-- voidPtr = LowTypePointer $ LowTypeIntS 8
 voidPtr = LowTypeVoidPtr
 
 data UnaryOp
@@ -136,13 +136,13 @@ showItems f [a] = f a
 showItems f (a:as) = f a ++ ", " ++ showItems f as
 
 asLowType :: Identifier -> LowType
-asLowType n = fromMaybe (LowTypeSignedInt 64) (asLowTypeMaybe n)
+asLowType n = fromMaybe (LowTypeIntS 64) (asLowTypeMaybe n)
 
 asLowTypeMaybe :: Identifier -> Maybe LowType
 asLowTypeMaybe ('i':cs)
-  | Just n <- read cs = Just $ LowTypeSignedInt n
+  | Just n <- read cs = Just $ LowTypeIntS n
 asLowTypeMaybe ('u':cs)
-  | Just n <- read cs = Just $ LowTypeUnsignedInt n
+  | Just n <- read cs = Just $ LowTypeIntU n
 asLowTypeMaybe ('f':cs)
   | Just n <- read cs
   , Just size <- asFloatSize n = Just $ LowTypeFloat size
