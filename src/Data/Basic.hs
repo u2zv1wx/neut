@@ -18,11 +18,10 @@ data LowType
   = LowTypeSignedInt IntSize
   | LowTypeUnsignedInt IntSize
   | LowTypeFloat FloatSize
-  -- | LowTypePointer LowType
   | LowTypeVoidPtr
   | LowTypeFunctionPtr [LowType] LowType
   | LowTypeStructPtr [LowType]
-  | LowTypeArrayPtr Int LowType -- [n x LOWTYPE]
+  | LowTypeArrayPtr Int LowType -- [n x LOWTYPE]*
   deriving (Eq, Show)
 
 type IntSize = Int
