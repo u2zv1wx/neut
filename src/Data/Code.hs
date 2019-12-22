@@ -146,13 +146,25 @@ varData (_, DataUpsilon x) = [x]
 varData (_, DataSigmaIntro ds) = concatMap varData ds
 varData (_, DataArrayIntro _ lds) = concatMap (varData . snd) lds
 varData _ = []
-  -- = DataTheta Identifier
-  -- | DataUpsilon Identifier
-  -- | DataEnumIntro Identifier
-  -- | DataSigmaIntro [DataPlus]
-  -- | DataIntS IntSize Integer
-  -- | DataIntU IntSize Integer
-  -- | DataFloat16 Half
-  -- | DataFloat32 Float
-  -- | DataFloat64 Double
-  -- | DataArrayIntro ArrayKind [(Identifier, DataPlus)]
+
+varCode :: CodePlus -> [Identifier]
+varCode (_, CodeTheta theta) = varTheta theta
+varCode (_, CodePiElimDownElim d ds) = concatMap varData $ d : ds
+varCode (_, CodeSigmaElim xs d e) =
+  varData d ++ (filter (`notElem` xs) $ varCode e)
+varCode (_, CodeUpIntro d) = varData d
+varCode (_, CodeUpElim x e1 e2) = varCode e1 ++ (filter ((/=) x) $ varCode e2)
+varCode (_, CodeEnumElim d les) = do
+  let (_, es) = unzip les
+  varData d ++ concatMap varCode es
+varCode (_, CodeArrayElim _ d1 d2) = varData d1 ++ varData d2
+
+varTheta :: Theta -> [Identifier]
+varTheta (ThetaUnaryOp _ _ d) = varData d
+varTheta (ThetaBinaryOp _ _ d1 d2) = varData d1 ++ varData d2
+varTheta (ThetaPrint d) = varData d
+
+-- varAffineCode xs eは、eのなかに含まれる自由変数のうち、xsに含まれないものを返す。
+-- だから結局varData, varCodeも必要ということ。
+varAffineCode :: [Identifier] -> CodePlus -> [Identifier]
+varAffineCode xs e = filter (\y -> y `notElem` xs) $ varCode e
