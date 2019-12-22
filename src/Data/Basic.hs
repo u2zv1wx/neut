@@ -122,6 +122,10 @@ data BinaryOp
   | BinaryOpXor
   deriving (Eq, Show)
 
+data SysCall =
+  SysCallWrite
+  deriving (Eq, Show)
+
 isArithOp :: BinaryOp -> Bool
 isArithOp BinaryOpAdd = True
 isArithOp BinaryOpSub = True

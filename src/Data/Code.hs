@@ -34,6 +34,7 @@ data Theta
   = ThetaUnaryOp UnaryOp LowType DataPlus
   | ThetaBinaryOp BinaryOp LowType DataPlus DataPlus
   | ThetaPrint DataPlus
+  | ThetaSysCall SysCall [DataPlus]
   deriving (Show)
 
 type IdentifierPlus = (Identifier, DataPlus)

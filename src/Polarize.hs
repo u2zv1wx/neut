@@ -617,6 +617,8 @@ polarizeTheta m name
 polarizeTheta m name
   | Just (lowType, op) <- asBinaryOpMaybe name =
     polarizeBinaryOp name op lowType m
+polarizeTheta m name@"unsafe-write"
+  | sysCall <- undefined = polarizeSysCall name sysCall 4 [1, 2, 3] m
 polarizeTheta m name@"core.print.i64" = polarizePrint name m
 polarizeTheta _ _ = throwError "polarize.theta"
 
@@ -654,6 +656,31 @@ polarizePrint name m = do
   (x, varX) <- newDataUpsilon
   let i64Type = (MetaTerminal ml, TermEnum "i64")
   makeClosure (Just name) [] m [(x, i64Type)] (ml, CodeTheta (ThetaPrint varX))
+
+polarizeSysCall ::
+     Identifier -- the name of theta
+  -> SysCall -- the kind of system call
+  -> Int -- the length of the arguments of the theta
+  -> [Int] -- used (or, non-discarded) arguments in its actual implementation (index starts from zero)
+  -> Meta -- the meta of the theta
+  -> WithEnv CodePlus
+polarizeSysCall name sysCall argLen argIdxList m = do
+  let (t, ml) = obtainInfoMeta m
+  case t of
+    (_, TermPi xts)
+      -- (+1) is required since xts containts the type of cod
+      | length xts == argLen + 1 -> do
+        let ys = map (\i -> toVar $ fst $ xts !! i) argIdxList
+        makeClosure
+          (Just name)
+          []
+          m
+          xts
+          (ml, CodeTheta (ThetaSysCall sysCall ys))
+    _ -> throwError $ "the type of " ++ name ++ " is wrong"
+
+toVar :: Identifier -> DataPlus
+toVar x = (Nothing, DataUpsilon x)
 
 newDataUpsilon :: WithEnv (Identifier, DataPlus)
 newDataUpsilon = newDataUpsilon' Nothing
