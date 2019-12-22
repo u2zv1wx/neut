@@ -126,6 +126,14 @@ data SysCall =
   SysCallWrite
   deriving (Eq, Show)
 
+type ArgLen = Int
+
+type UsedArgIndexList = [Int]
+
+asSysCallMaybe :: Identifier -> Maybe (SysCall, ArgLen, UsedArgIndexList)
+asSysCallMaybe "unsafe-write" = Just (SysCallWrite, 4, [1, 2, 3])
+asSysCallMaybe _ = Nothing
+
 isArithOp :: BinaryOp -> Bool
 isArithOp BinaryOpAdd = True
 isArithOp BinaryOpSub = True

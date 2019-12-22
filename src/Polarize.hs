@@ -617,8 +617,9 @@ polarizeTheta m name
 polarizeTheta m name
   | Just (lowType, op) <- asBinaryOpMaybe name =
     polarizeBinaryOp name op lowType m
-polarizeTheta m name@"unsafe-write"
-  | sysCall <- undefined = polarizeSysCall name sysCall 4 [1, 2, 3] m
+polarizeTheta m name
+  | Just (sysCall, len, idxList) <- asSysCallMaybe name =
+    polarizeSysCall name sysCall len idxList m
 polarizeTheta m name@"core.print.i64" = polarizePrint name m
 polarizeTheta _ _ = throwError "polarize.theta"
 
