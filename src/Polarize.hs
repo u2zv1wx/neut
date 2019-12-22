@@ -621,6 +621,7 @@ polarizeTheta m name
   | Just (sysCall, len, idxList) <- asSysCallMaybe name =
     polarizeSysCall name sysCall len idxList m
 polarizeTheta m name@"core.print.i64" = polarizePrint name m
+polarizeTheta m "unsafe.eval-io" = polarizeEvalIO m
 polarizeTheta _ _ = throwError "polarize.theta"
 
 polarizeUnaryOp :: Identifier -> UnaryOp -> LowType -> Meta -> WithEnv CodePlus
@@ -657,6 +658,41 @@ polarizePrint name m = do
   (x, varX) <- newDataUpsilon
   let i64Type = (MetaTerminal ml, TermEnum "i64")
   makeClosure (Just name) [] m [(x, i64Type)] (ml, CodeTheta (ThetaPrint varX))
+
+--    unsafe.eval-io
+-- ~> lam x.
+--      bind sig := call-closure(x, [0]) in
+--      let (resultEnv, value) := sig in
+--      return value
+--    (as closure)
+polarizeEvalIO :: Meta -> WithEnv CodePlus
+polarizeEvalIO m = do
+  let (t, ml) = obtainInfoMeta m
+  case t of
+    (_, TermPi [arg, _]) -> do
+      (resultValue, resultValueVar) <- newDataUpsilon
+      (sig, sigVar) <- newDataUpsilon
+      resultEnv <- newNameWith "env"
+      arg' <- polarize $ toTermUpsilon arg
+      -- IO Top == Top -> (Bottom, Top)
+      evalArgWithZero <- callClosure m arg' [toTermInt64 0]
+      makeClosure
+        (Just "unsafe.eval-io")
+        []
+        m
+        [arg]
+        ( ml
+        , CodeUpElim
+            sig
+            evalArgWithZero
+            ( ml
+            , CodeSigmaElim
+                -- since `resultEnv` is supposed to be evaluated into 0,
+                -- we can safely discard this variable.
+                [resultEnv, resultValue] -- (Bottom, Top)
+                sigVar
+                (ml, CodeUpIntro resultValueVar)))
+    _ -> throwError "the type of unsafe.eval-io is wrong"
 
 polarizeSysCall ::
      Identifier -- the name of theta

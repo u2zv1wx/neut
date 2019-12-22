@@ -50,6 +50,11 @@ toTermUpsilon (x, t) = do
   let (_, ml) = obtainInfoMeta $ fst t
   (MetaNonTerminal t ml, TermUpsilon x)
 
+toTermInt64 :: Integer -> TermPlus
+toTermInt64 i =
+  ( MetaNonTerminal (MetaTerminal Nothing, TermTheta "i64") Nothing
+  , TermIntS 64 i)
+
 varTermPlus :: TermPlus -> [(Identifier, Maybe Loc, TermPlus)]
 varTermPlus e = nubBy (\(x, _, _) (y, _, _) -> x == y) $ getClosedVarChain e
 
