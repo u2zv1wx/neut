@@ -218,21 +218,19 @@ callClosure m e es = do
 -- xtsは「eのなかでlinearに出現するべき変数」。
 withHeader :: [(Identifier, TermPlus)] -> CodePlus -> WithEnv CodePlus
 withHeader xts e@(m, CodeSigmaElim ys d cont) = do
-  let as = filter (`notElem` varCode e) $ map fst xts -- `as` is the variables that are not used in e
-  let xts' = filter (\(x, _) -> x `notElem` ys ++ as) xts
+  let xts' = filter (\(x, _) -> x `notElem` ys ++ varCode e) xts -- eで使用されていない変数は「こっち」でfreeするので不要
   cont' <- withHeader xts' cont
   adjust xts (m, CodeSigmaElim ys d cont')
 withHeader xts e@(m, CodeUpElim x e1 e2) = do
-  let as = filter (`notElem` varCode e) $ map fst xts
+  let as = filter (`notElem` varCode e) $ map fst xts -- `a` here stands for affine (list of variables that are used in the affine way)
   let xts1' = filter (\(y, _) -> y `notElem` as) xts
   e1' <- withHeader xts1' e1
   let xts2' = filter (\(y, _) -> y `notElem` x : as) xts
   e2' <- withHeader xts2' e2
   adjust xts (m, CodeUpElim x e1' e2')
 withHeader xts e@(m, CodeEnumElim d les) = do
-  let as = filter (`notElem` varCode e) $ map fst xts
   let (ls, es) = unzip les
-  let xts' = filter (\(x, _) -> x `notElem` as) xts
+  let xts' = filter (\(x, _) -> x `notElem` varCode e) xts
   es' <- mapM (withHeader xts') es
   adjust xts (m, CodeEnumElim d $ zip ls es')
 withHeader xts e = adjust xts e -- eのなかにCodePlusが含まれないケース
