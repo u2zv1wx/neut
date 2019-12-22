@@ -140,3 +140,19 @@ substDataPlusSigmaElim sub (x:xs) e = do
   let sub' = filter (\(y, _) -> y /= x) sub
   let (xs', e') = substDataPlusSigmaElim sub' xs e
   (x : xs', e')
+
+varData :: DataPlus -> [Identifier]
+varData (_, DataUpsilon x) = [x]
+varData (_, DataSigmaIntro ds) = concatMap varData ds
+varData (_, DataArrayIntro _ lds) = concatMap (varData . snd) lds
+varData _ = []
+  -- = DataTheta Identifier
+  -- | DataUpsilon Identifier
+  -- | DataEnumIntro Identifier
+  -- | DataSigmaIntro [DataPlus]
+  -- | DataIntS IntSize Integer
+  -- | DataIntU IntSize Integer
+  -- | DataFloat16 Half
+  -- | DataFloat32 Float
+  -- | DataFloat64 Double
+  -- | DataArrayIntro ArrayKind [(Identifier, DataPlus)]

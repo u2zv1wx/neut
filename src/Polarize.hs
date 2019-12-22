@@ -6,11 +6,11 @@
 -- Queen Mary College, 2001.
 module Polarize
   ( polarize
-  , bindLet
   ) where
 
 import Control.Monad.Except
 import Control.Monad.State
+import Data.List
 import Prelude hiding (pi)
 
 import Data.Basic
@@ -176,7 +176,7 @@ makeClosure mName fvs m xts e = do
   envExp <- cartesianSigma expName ml $ map Left negTypeList
   (envVarName, envVar) <- newDataUpsilon
   e' <- withHeader (zip freeVarNameList freeVarTypeList ++ xts) e
-  let lamBody = (ml, CodeSigmaElim freeVarNameList envVar e')
+  let lamBody = (ml, CodeSigmaElim freeVarNameList envVar e') -- このSigmaElimは「特別」なやつ（これだけ非線形でありうる）
   let fvSigmaIntro =
         ( ml
         , DataSigmaIntro $ zipWith (curry toDataUpsilon) freeVarNameList locList)
@@ -214,16 +214,45 @@ callClosure m e es = do
               typeVar
               (ml, CodePiElimDownElim lamVar (envVar : xs))))
 
+-- withHeader x eは、xtsで指定された変数がeのなかでlinearに使用されるようにする。
 withHeader :: [(Identifier, TermPlus)] -> CodePlus -> WithEnv CodePlus
-withHeader [] body = return body
-withHeader ((x, t):xts) body = do
-  e <- withHeader xts body
-  (xs, e') <- discernCode x e
+withHeader xts e@(m, CodeSigmaElim ys d cont) = do
+  let as = varAffineCode (map fst xts) e
+  let xts' = filter (\(x, _) -> x `notElem` ys ++ as) xts
+  cont' <- withHeader xts' cont
+  adjust xts (m, CodeSigmaElim ys d cont')
+withHeader xts e@(m, CodeUpElim x e1 e2) = do
+  let as = varAffineCode (map fst xts) e
+  let xts1' = filter (\(y, _) -> y `notElem` as) xts
+  e1' <- withHeader xts1' e1
+  let xts2' = filter (\(y, _) -> y `notElem` x : as) xts
+  e2' <- withHeader xts2' e2
+  adjust xts (m, CodeUpElim x e1' e2')
+withHeader xts e@(m, CodeEnumElim d les) = do
+  let as = varAffineCode (map fst xts) e
+  let (ls, es) = unzip les
+  let xts' = filter (\(x, _) -> x `notElem` as) xts
+  es' <- mapM (withHeader xts') es
+  adjust xts (m, CodeEnumElim d $ zip ls es')
+withHeader xts e = adjust xts e -- eのなかにCodePlusが含まれないケース
+
+adjust :: [(Identifier, TermPlus)] -> CodePlus -> WithEnv CodePlus
+adjust xts e = do
+  (xtzss, e') <- disC xts e
+  adjust' xtzss e'
+
+adjust' ::
+     [(Identifier, TermPlus, [Identifier])] -> CodePlus -> WithEnv CodePlus
+adjust' [] e = return e
+adjust' ((x, t, []):xtzss) e = do
+  e' <- adjust' xtzss e
   t' <- polarize t
-  case xs of
-    [] -> withHeaderAffine x t' e'
-    [_] -> return e -- already linear
-    (y1:y2:ys) -> withHeaderRelevant x t' y1 y2 ys e'
+  withHeaderAffine x t' e'
+adjust' ((_, _, [_]):xtzss) e = adjust' xtzss e
+adjust' ((x, t, (z1:z2:zs)):xtzss) e = do
+  e' <- adjust' xtzss e
+  t' <- polarize t
+  withHeaderRelevant x t' z1 z2 zs e'
 
 -- withHeaderAffine x t e ~>
 --   bind _ :=

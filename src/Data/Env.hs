@@ -11,6 +11,7 @@ import Data.Basic
 import Data.Code
 import Data.Constraint
 import Data.LLVM
+import Data.Term
 import Data.Tree
 import Data.WeakTerm
 
@@ -210,6 +211,21 @@ supplyName (Right (x, t)) = return (x, t)
 supplyName (Left t) = do
   x <- newNameWith "hole"
   return (x, t)
+
+disD ::
+     [(Identifier, TermPlus)]
+  -> DataPlus
+  -> WithEnv ([(Identifier, TermPlus, [Identifier])], DataPlus)
+disD = undefined
+
+disC ::
+     [(Identifier, TermPlus)]
+  -> CodePlus
+  -> WithEnv ([(Identifier, TermPlus, [Identifier])], CodePlus)
+disC = undefined
+
+varAffineCode :: [Identifier] -> CodePlus -> [Identifier]
+varAffineCode = undefined
 
 discernData :: Identifier -> DataPlus -> WithEnv ([Identifier], DataPlus)
 discernData z d@(ml, DataUpsilon x) =

@@ -266,6 +266,7 @@ storeContent reg elemType aggPtrType ds cont = do
   (cast, castThen) <- llvmCast (Nothing, DataUpsilon reg) aggPtrType
   storeThenCont <- storeContent' cast aggPtrType elemType (zip [0 ..] ds) cont
   castThenStoreThenCont <- castThen $ storeThenCont
+  -- FIXME: getelementptrでsizeofを実現する方式を使えばallocsizeを計算する必要はそもそもないはず？
   case lowTypeToAllocSize aggPtrType of
     AllocSizeExact i ->
       return $
@@ -286,7 +287,6 @@ storeContent reg elemType aggPtrType ds cont = do
              [LLVMDataInt (toInteger n)]) $
         LLVMLet i (LLVMOpPointerToInt cVar LowTypeIntS64Ptr (LowTypeIntS 64)) $
         LLVMLet reg (LLVMOpAlloc iVar) castThenStoreThenCont
-      -- return $ LLVMAlloc reg size cont''
 
 storeContent' ::
      LLVMData -- base pointer
