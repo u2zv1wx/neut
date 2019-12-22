@@ -92,8 +92,9 @@ llvmCodeTheta _ (ThetaBinaryOp op lowType v1 v2)
 llvmCodeTheta _ (ThetaSysCall num args) = do
   (xs, vs) <- unzip <$> mapM (const $ newDataLocal "arg") args
   res <- newNameWith "result"
+  num' <- sysCallNumAsInt num
   llvmDataLet' (zip xs args) $
-    LLVMLet res (LLVMOpSysCall num vs) $ LLVMReturn (LLVMDataLocal res)
+    LLVMLet res (LLVMOpSysCall $ num' : vs) $ LLVMReturn (LLVMDataLocal res)
 llvmCodeTheta _ (ThetaPrint v) = do
   let t = LowTypeIntS 64
   (pName, p) <- newDataLocal "arg"
@@ -231,6 +232,9 @@ reorder lds = do
   let (ls, ds) = unzip lds
   is <- mapM getEnumNum ls
   return $ map snd $ sortBy (\(i, _) (j, _) -> i `compare` j) $ zip is ds
+
+sysCallNumAsInt :: SysCall -> WithEnv LLVMData
+sysCallNumAsInt = undefined
 
 llvmDataLet' :: [(Identifier, DataPlus)] -> LLVM -> WithEnv LLVM
 llvmDataLet' [] cont = return cont

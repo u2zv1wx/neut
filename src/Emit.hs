@@ -145,6 +145,8 @@ emitLLVMOp (LLVMOpAlloc d) = do
   return $ unwords ["call", "i8*", "@malloc(i64 " ++ showLLVMData d ++ ")"]
 emitLLVMOp (LLVMOpFree d) = do
   return $ unwords ["call", "void", "@free(i8* " ++ showLLVMData d ++ ")"]
+emitLLVMOp (LLVMOpSysCall ds) = do
+  emitSysCallOp ds
 emitLLVMOp (LLVMOpUnaryOp (UnaryOpNeg, t@(LowTypeFloat _)) d) = do
   emitUnaryOp t "fneg" d
 emitLLVMOp (LLVMOpUnaryOp ((UnaryOpTrunc t2@(LowTypeIntS i2)), t1@(LowTypeIntS i1)) d)
@@ -277,6 +279,45 @@ emitLLVMConvOp cast d dom cod = do
   return $
     unwords [cast, showLowType dom, showLLVMData d, "to", showLowType cod]
 
+-- call i64 asm sideeffect "syscall", "=r,{rax},{rdi},{rsi},{rdx}" (i64 %raxArg, i64 %rdiArg, i64 %rsiArg, i64 %rdxArg)
+emitSysCallOp :: [LLVMData] -> WithEnv String
+emitSysCallOp ds = do
+  target <- undefined
+  regList <- getRegList
+  currentArch <- getArch
+  case currentArch of
+    Arch64 ->
+      return $
+      unwords
+        [ "call i64 asm sideeffect \"syscall\" \"=r,"
+        , undefined $ take (length ds) regList
+        , "\" ("
+        , showDataListWithType voidPtr ds
+        , ")"
+        ]
+  -- case target of
+  --   TargetLinux -> do
+  --     let linuxRegList = ["rax", "rdi", "rsi", "rdx", "rcx", "r8", "r9"]
+  --     return $
+  --       unwords
+  --         [ "call i64 asm sideeffect \"syscall\" \"=r,"
+  --         , undefined $ take (length ds) linuxRegList
+  --         , "\" ("
+  --         , showDataListWithType voidPtr ds
+  --         , ")"
+  --         ]
+  --   TargetDarwin -> do
+  --     let darwinRegList = ["rax", "rdi", "rsi", "rdx", "r10", "r8", "r9"]
+  --     return $
+  --       unwords
+  --         [ "call i64 asm sideeffect \"syscall\" \"=r,"
+  --         , undefined $ take (length ds) darwinRegList
+  --         , "\" ("
+  --         , showDataListWithType voidPtr ds
+  --         , ")"
+  --         ]
+  --   _ -> throwError "emitSysCallOp"
+
 emitOp :: String -> WithEnv [String]
 emitOp s = return ["  " ++ s]
 
@@ -312,11 +353,18 @@ showBranchList :: LowType -> [(Int, String)] -> String
 showBranchList lowType xs =
   "[" ++ showItems (uncurry (showBranch lowType)) xs ++ "]"
 
-showIndex :: [LLVMData] -> String
-showIndex [] = ""
-showIndex [d] = "i64 " ++ showLLVMData d
-showIndex (d:ds) = "i64 " ++ showLLVMData d ++ ", " ++ showIndex ds
+showDataListWithType :: LowType -> [LLVMData] -> String
+showDataListWithType _ [] = ""
+showDataListWithType t [d] = showLowType t ++ " " ++ showLLVMData d
+showDataListWithType t (d:ds) =
+  showLowType t ++ " " ++ showLLVMData d ++ ", " ++ showIndex ds
 
+showIndex :: [LLVMData] -> String
+showIndex ds = showDataListWithType (LowTypeIntS 64) ds
+
+-- showIndex [] = ""
+-- showIndex [d] = "i64 " ++ showLLVMData d
+-- showIndex (d:ds) = "i64 " ++ showLLVMData d ++ ", " ++ showIndex ds
 showBranch :: LowType -> Int -> String -> String
 showBranch lowType i label =
   showLowType lowType ++
@@ -343,3 +391,10 @@ emitGlobal =
     , "declare i8* @malloc(i64)"
     , "declare void @free(i8*)"
     ]
+
+getRegList :: WithEnv [String]
+getRegList = do
+  targetOS <- getOS
+  case targetOS of
+    TargetLinux -> return ["rax", "rdi", "rsi", "rdx", "rcx", "r8", "r9"]
+    TargetDarwin -> return ["rax", "rdi", "rsi", "rdx", "r10", "r8", "r9"]

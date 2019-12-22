@@ -134,6 +134,17 @@ asSysCallMaybe :: Identifier -> Maybe (SysCall, ArgLen, UsedArgIndexList)
 asSysCallMaybe "unsafe-write" = Just (SysCallWrite, 4, [1, 2, 3])
 asSysCallMaybe _ = Nothing
 
+type Target = (OS, Arch)
+
+data OS
+  = OSLinux
+  | OSDarwin
+  deriving (Eq, Show)
+
+data Arch =
+  Arch64
+  deriving (Eq, Show)
+
 isArithOp :: BinaryOp -> Bool
 isArithOp BinaryOpAdd = True
 isArithOp BinaryOpSub = True

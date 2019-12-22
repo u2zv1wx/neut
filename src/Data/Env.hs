@@ -6,6 +6,7 @@ import Control.Monad.Except
 import Control.Monad.State
 import Data.IORef
 import Data.List (elemIndex)
+import System.Info
 
 import Data.Basic
 import Data.Code
@@ -24,6 +25,7 @@ type ConstraintQueue = Q.MinQueue EnrichedConstraint
 data Env =
   Env
     { count :: Int -- to generate fresh symbols
+    , target :: Maybe Target
     , currentDir :: FilePath
     , keywordEnv :: [Identifier] -- list of reserved keywords
     , notationEnv :: [(TreePlus, TreePlus)] -- macro transformers
@@ -42,6 +44,7 @@ initialEnv :: FilePath -> Env
 initialEnv path =
   Env
     { count = 0
+    , target = Nothing
     , notationEnv = []
     , keywordEnv = []
     , constantEnv = []
@@ -212,6 +215,29 @@ supplyName (Left t) = do
   x <- newNameWith "hole"
   return (x, t)
 
+getTarget :: WithEnv Target
+getTarget = do
+  mtarget <- gets target
+  case mtarget of
+    Just t -> return t
+    Nothing -> do
+      currentOS <- getOS
+      currentArch <- getArch
+      return (currentOS, currentArch)
+
+getOS :: WithEnv OS
+getOS = do
+  case os of
+    "linux" -> return OSLinux
+    "darwin" -> return OSDarwin
+    s -> throwError $ "unsupported target os: " ++ show s
+
+getArch :: WithEnv Arch
+getArch = do
+  case arch of
+    "x86_64" -> return Arch64
+    s -> throwError $ "unsupported target arch: " ++ show s
+
 -- distinguish [(x1, t1), ..., (xn, tn)] eは、は、eにおけるxiの出現をすべて新しい名前で置き換え、そうして得られたtermをe'として、
 -- ([(x1, t1, {list-of-new-names-for-x1}), ..., (xm, tm, {list-of-new-names-for-xm})], e')を返す。
 distinguish ::
@@ -282,3 +308,6 @@ distinguishTheta z (ThetaBinaryOp op lowType d1 d2) = do
 distinguishTheta z (ThetaPrint d) = do
   (vs, d') <- distinguishData z d
   return (vs, ThetaPrint d')
+distinguishTheta z (ThetaSysCall num ds) = do
+  (vss, ds') <- unzip <$> mapM (distinguishData z) ds
+  return (concat vss, ThetaSysCall num ds')
