@@ -219,6 +219,9 @@ callClosure m e es = do
 withHeader :: [(Identifier, TermPlus)] -> CodePlus -> WithEnv CodePlus
 withHeader xts e@(m, CodeSigmaElim ys d cont) = do
   let xts' = filter (\(x, _) -> x `notElem` ys ++ varCode e) xts -- eで使用されていない変数は「こっち」でfreeするので不要
+  -- eの中で使用されていない変数をxtsから除外することでより早い段階でfreeを挿入することができるようになる。
+  -- （使わない変数をずっと保持して関数の末尾になってようやくfreeする、なんてのは無駄なのでこれは最適化として機能する）
+  -- CodeSigmaElimだけでなくUpElim, EnumElimに対しても同様の最適化をおこなっている。
   cont' <- withHeader xts' cont
   adjust xts (m, CodeSigmaElim ys d cont')
 withHeader xts e@(m, CodeUpElim x e1 e2) = do
