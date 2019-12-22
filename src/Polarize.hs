@@ -175,7 +175,7 @@ makeClosure mName fvs m xts e = do
   expName <- newNameWith "exp"
   envExp <- cartesianSigma expName ml $ map Left negTypeList
   (envVarName, envVar) <- newDataUpsilon
-  e' <- withHeader (zip freeVarNameList freeVarTypeList ++ xts) e
+  e' <- linearize (zip freeVarNameList freeVarTypeList ++ xts) e
   let lamBody = (ml, CodeSigmaElim freeVarNameList envVar e') -- このSigmaElimは「特別」なやつ（これだけ非線形でありうる）
   let fvSigmaIntro =
         ( ml
@@ -214,45 +214,45 @@ callClosure m e es = do
               typeVar
               (ml, CodePiElimDownElim lamVar (envVar : xs))))
 
--- withHeader xts eは、xtsで指定された変数がeのなかでlinearに使用されるようにする。
+-- linearize xts eは、xtsで指定された変数がeのなかでlinearに使用されるようにする。
 -- xtsは「eのなかでlinearに出現するべき変数」。
-withHeader :: [(Identifier, TermPlus)] -> CodePlus -> WithEnv CodePlus
-withHeader xts e@(m, CodeSigmaElim ys d cont) = do
+linearize :: [(Identifier, TermPlus)] -> CodePlus -> WithEnv CodePlus
+linearize xts e@(m, CodeSigmaElim ys d cont) = do
   let xts' = filter (\(x, _) -> x `notElem` ys ++ varCode e) xts -- eで使用されていない変数は「こっち」でfreeするので不要
   -- eの中で使用されていない変数をxtsから除外することでより早い段階でfreeを挿入することができるようになる。
   -- （使わない変数をずっと保持して関数の末尾になってようやくfreeする、なんてのは無駄なのでこれは最適化として機能する）
   -- CodeSigmaElimだけでなくUpElim, EnumElimに対しても同様の最適化をおこなっている。
-  cont' <- withHeader xts' cont
-  adjust xts (m, CodeSigmaElim ys d cont')
-withHeader xts e@(m, CodeUpElim x e1 e2) = do
+  cont' <- linearize xts' cont
+  withHeader xts (m, CodeSigmaElim ys d cont')
+linearize xts e@(m, CodeUpElim x e1 e2) = do
   let as = filter (`notElem` varCode e) $ map fst xts -- `a` here stands for affine (list of variables that are used in the affine way)
   let xts1' = filter (\(y, _) -> y `notElem` as) xts
-  e1' <- withHeader xts1' e1
+  e1' <- linearize xts1' e1
   let xts2' = filter (\(y, _) -> y `notElem` x : as) xts
-  e2' <- withHeader xts2' e2
-  adjust xts (m, CodeUpElim x e1' e2')
-withHeader xts e@(m, CodeEnumElim d les) = do
+  e2' <- linearize xts2' e2
+  withHeader xts (m, CodeUpElim x e1' e2')
+linearize xts e@(m, CodeEnumElim d les) = do
   let (ls, es) = unzip les
   let xts' = filter (\(x, _) -> x `notElem` varCode e) xts
-  es' <- mapM (withHeader xts') es
-  adjust xts (m, CodeEnumElim d $ zip ls es')
-withHeader xts e = adjust xts e -- eのなかにCodePlusが含まれないケース
+  es' <- mapM (linearize xts') es
+  withHeader xts (m, CodeEnumElim d $ zip ls es')
+linearize xts e = withHeader xts e -- eのなかにCodePlusが含まれないケース
 
-adjust :: [(Identifier, TermPlus)] -> CodePlus -> WithEnv CodePlus
-adjust xts e = do
+withHeader :: [(Identifier, TermPlus)] -> CodePlus -> WithEnv CodePlus
+withHeader xts e = do
   (xtzss, e') <- distinguish xts e
-  adjust' xtzss e'
+  withHeader' xtzss e'
 
-adjust' ::
+withHeader' ::
      [(Identifier, TermPlus, [Identifier])] -> CodePlus -> WithEnv CodePlus
-adjust' [] e = return e
-adjust' ((x, t, []):xtzss) e = do
-  e' <- adjust' xtzss e
+withHeader' [] e = return e
+withHeader' ((x, t, []):xtzss) e = do
+  e' <- withHeader' xtzss e
   t' <- polarize t
   withHeaderAffine x t' e'
-adjust' ((_, _, [_]):xtzss) e = adjust' xtzss e
-adjust' ((x, t, (z1:z2:zs)):xtzss) e = do
-  e' <- adjust' xtzss e
+withHeader' ((_, _, [_]):xtzss) e = withHeader' xtzss e -- already linear
+withHeader' ((x, t, (z1:z2:zs)):xtzss) e = do
+  e' <- withHeader' xtzss e
   t' <- polarize t
   withHeaderRelevant x t' z1 z2 zs e'
 
