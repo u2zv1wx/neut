@@ -85,7 +85,7 @@ parse' (a:as)
     else do
       e'@(meta, _) <- interpret e >>= rename
       name <- newNameWith "hole"
-      u <- wrap WeakTermTau
+      let u = (WeakMetaTerminal Nothing, WeakTermTau)
       t <- newHoleOfType u
       defList <- parse' as
       return $ DefLet meta (name, t) e' : defList
