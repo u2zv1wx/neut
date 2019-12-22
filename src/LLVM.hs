@@ -22,10 +22,10 @@ toLLVM mainTerm = do
 llvmCode :: CodePlus -> WithEnv LLVM
 llvmCode (m, CodeTheta theta) = llvmCodeTheta m theta
 llvmCode (_, CodePiElimDownElim v ds) = do
-  xs <- mapM (const (newNameWith "arg")) ds
+  (xs, vs) <- unzip <$> mapM (const $ newDataLocal "arg") ds
   (fun, castThen) <- llvmCast v $ toFunPtrType ds
-  cont <- castThen $ LLVMCall fun (map LLVMDataLocal xs)
-  llvmDataLet' (zip xs ds) $ cont
+  castThenCall <- castThen $ LLVMCall fun vs
+  llvmDataLet' (zip xs ds) $ castThenCall
 llvmCode (_, CodeSigmaElim xs v e) = do
   let structPtrType = toStructPtrType $ length xs
   let idxList = map LLVMDataInt [0 ..]
@@ -89,6 +89,11 @@ llvmCodeTheta _ (ThetaBinaryOp op lowType v1 v2)
   | isArithOp op = llvmCodeBinaryOp op lowType lowType v1 v2
   | isCompareOp op = llvmCodeBinaryOp op lowType (LowTypeIntS 1) v1 v2
   | otherwise = throwError "llvmCodeTheta.ThetaBinaryOp"
+llvmCodeTheta _ (ThetaSysCall num args) = do
+  (xs, vs) <- unzip <$> mapM (const $ newDataLocal "arg") args
+  res <- newNameWith "result"
+  llvmDataLet' (zip xs args) $
+    LLVMLet res (LLVMOpSysCall num vs) $ LLVMReturn (LLVMDataLocal res)
 llvmCodeTheta _ (ThetaPrint v) = do
   let t = LowTypeIntS 64
   (pName, p) <- newDataLocal "arg"

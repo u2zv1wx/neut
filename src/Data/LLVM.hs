@@ -41,6 +41,7 @@ data LLVMOp
   | LLVMOpUnaryOp (UnaryOp, LowType) LLVMData
   | LLVMOpBinaryOp (BinaryOp, LowType) LLVMData LLVMData
   | LLVMOpPrint LowType LLVMData
+  | LLVMOpSysCall SysCall [LLVMData]
   deriving (Show)
 
 data AllocSize
