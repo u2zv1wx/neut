@@ -212,74 +212,73 @@ supplyName (Left t) = do
   x <- newNameWith "hole"
   return (x, t)
 
-disD ::
-     [(Identifier, TermPlus)]
-  -> DataPlus
-  -> WithEnv ([(Identifier, TermPlus, [Identifier])], DataPlus)
-disD = undefined
-
-disC ::
+-- distinguish [(x1, t1), ..., (xn, tn)] eは、は、eにおけるxiの出現をすべて新しい名前で置き換え、そうして得られたtermをe'として、
+-- ([(x1, t1, {list-of-new-names-for-x1}), ..., (xm, tm, {list-of-new-names-for-xm})], e')を返す。
+distinguish ::
      [(Identifier, TermPlus)]
   -> CodePlus
   -> WithEnv ([(Identifier, TermPlus, [Identifier])], CodePlus)
-disC = undefined
+distinguish [] e = return ([], e)
+distinguish ((x, t):xts) e = do
+  (xtzss, e') <- distinguish xts e
+  (xs, e'') <- distinguishCode x e'
+  return ((x, t, xs) : xtzss, e'')
 
-varAffineCode :: [Identifier] -> CodePlus -> [Identifier]
-varAffineCode = undefined
-
-discernData :: Identifier -> DataPlus -> WithEnv ([Identifier], DataPlus)
-discernData z d@(ml, DataUpsilon x) =
+distinguishData :: Identifier -> DataPlus -> WithEnv ([Identifier], DataPlus)
+distinguishData z d@(ml, DataUpsilon x) =
   if x /= z
     then return ([], d)
     else do
       x' <- newNameWith z
       return ([x'], (ml, DataUpsilon x'))
-discernData z (ml, DataSigmaIntro ds) = do
-  (vss, ds') <- unzip <$> mapM (discernData z) ds
+distinguishData z (ml, DataSigmaIntro ds) = do
+  (vss, ds') <- unzip <$> mapM (distinguishData z) ds
   return (concat vss, (ml, DataSigmaIntro ds'))
-discernData _ d = return ([], d)
+distinguishData _ d = return ([], d)
 
--- FIXME: これのEnumElimのところの取り扱いがおかしい気がする。
--- freeすべきかどうかはbranchによって変わるはず。
-discernCode :: Identifier -> CodePlus -> WithEnv ([Identifier], CodePlus)
-discernCode z (ml, CodeTheta theta) = do
-  (vs, theta') <- discernTheta z theta
+distinguishCode :: Identifier -> CodePlus -> WithEnv ([Identifier], CodePlus)
+distinguishCode z (ml, CodeTheta theta) = do
+  (vs, theta') <- distinguishTheta z theta
   return (vs, (ml, CodeTheta theta'))
-discernCode z (ml, CodeEnumElim d branchList) = do
-  (vs, d') <- discernData z d
-  let (cs, es) = unzip branchList
-  (vss, es') <- unzip <$> mapM (discernCode z) es
-  return (vs ++ concat vss, (ml, CodeEnumElim d' (zip cs es')))
-discernCode z (ml, CodePiElimDownElim d ds) = do
-  (vs, d') <- discernData z d
-  (vss, ds') <- unzip <$> mapM (discernData z) ds
+distinguishCode z (ml, CodePiElimDownElim d ds) = do
+  (vs, d') <- distinguishData z d
+  (vss, ds') <- unzip <$> mapM (distinguishData z) ds
   return (vs ++ concat vss, (ml, CodePiElimDownElim d' ds'))
-discernCode z (ml, CodeSigmaElim xs d e) = do
-  (vs1, d') <- discernData z d
+distinguishCode z (ml, CodeSigmaElim xs d e) = do
+  (vs1, d') <- distinguishData z d
   if z `elem` xs
     then return (vs1, (ml, CodeSigmaElim vs1 d' e))
     else do
-      (vs2, e') <- discernCode z e
+      (vs2, e') <- distinguishCode z e
       return (vs1 ++ vs2, (ml, CodeSigmaElim vs1 d' e'))
-discernCode z (ml, CodeUpIntro d) = do
-  (vs, d') <- discernData z d
+distinguishCode z (ml, CodeUpIntro d) = do
+  (vs, d') <- distinguishData z d
   return (vs, (ml, CodeUpIntro d'))
-discernCode z (ml, CodeUpElim x e1 e2) = do
-  (vs1, e1') <- discernCode z e1
+distinguishCode z (ml, CodeUpElim x e1 e2) = do
+  (vs1, e1') <- distinguishCode z e1
   if x == z
     then return (vs1, (ml, CodeUpElim x e1' e2))
     else do
-      (vs2, e2') <- discernCode z e2
+      (vs2, e2') <- distinguishCode z e2
       return (vs1 ++ vs2, (ml, CodeUpElim x e1' e2'))
+distinguishCode z (ml, CodeEnumElim d branchList) = do
+  (vs, d') <- distinguishData z d
+  let (cs, es) = unzip branchList
+  (vss, es') <- unzip <$> mapM (distinguishCode z) es
+  return (vs ++ concat vss, (ml, CodeEnumElim d' (zip cs es')))
+distinguishCode z (ml, CodeArrayElim k d1 d2) = do
+  (vs1, d1') <- distinguishData z d1
+  (vs2, d2') <- distinguishData z d2
+  return (vs1 ++ vs2, (ml, CodeArrayElim k d1' d2'))
 
-discernTheta :: Identifier -> Theta -> WithEnv ([Identifier], Theta)
-discernTheta z (ThetaUnaryOp op lowType d) = do
-  (vs, d') <- discernData z d
+distinguishTheta :: Identifier -> Theta -> WithEnv ([Identifier], Theta)
+distinguishTheta z (ThetaUnaryOp op lowType d) = do
+  (vs, d') <- distinguishData z d
   return (vs, ThetaUnaryOp op lowType d')
-discernTheta z (ThetaBinaryOp op lowType d1 d2) = do
-  (vs1, d1') <- discernData z d1
-  (vs2, d2') <- discernData z d2
+distinguishTheta z (ThetaBinaryOp op lowType d1 d2) = do
+  (vs1, d1') <- distinguishData z d1
+  (vs2, d2') <- distinguishData z d2
   return (vs1 ++ vs2, ThetaBinaryOp op lowType d1' d2')
-discernTheta z (ThetaPrint d) = do
-  (vs, d') <- discernData z d
+distinguishTheta z (ThetaPrint d) = do
+  (vs, d') <- distinguishData z d
   return (vs, ThetaPrint d')
