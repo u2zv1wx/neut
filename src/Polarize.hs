@@ -214,22 +214,23 @@ callClosure m e es = do
               typeVar
               (ml, CodePiElimDownElim lamVar (envVar : xs))))
 
--- withHeader x eは、xtsで指定された変数がeのなかでlinearに使用されるようにする。
+-- withHeader xts eは、xtsで指定された変数がeのなかでlinearに使用されるようにする。
+-- xtsは「eのなかでlinearに出現するべき変数」。
 withHeader :: [(Identifier, TermPlus)] -> CodePlus -> WithEnv CodePlus
 withHeader xts e@(m, CodeSigmaElim ys d cont) = do
-  let as = varAffineCode (map fst xts) e
+  let as = filter (`notElem` varCode e) $ map fst xts -- `as` is the variables that are not used in e
   let xts' = filter (\(x, _) -> x `notElem` ys ++ as) xts
   cont' <- withHeader xts' cont
   adjust xts (m, CodeSigmaElim ys d cont')
 withHeader xts e@(m, CodeUpElim x e1 e2) = do
-  let as = varAffineCode (map fst xts) e
+  let as = filter (`notElem` varCode e) $ map fst xts
   let xts1' = filter (\(y, _) -> y `notElem` as) xts
   e1' <- withHeader xts1' e1
   let xts2' = filter (\(y, _) -> y `notElem` x : as) xts
   e2' <- withHeader xts2' e2
   adjust xts (m, CodeUpElim x e1' e2')
 withHeader xts e@(m, CodeEnumElim d les) = do
-  let as = varAffineCode (map fst xts) e
+  let as = filter (`notElem` varCode e) $ map fst xts
   let (ls, es) = unzip les
   let xts' = filter (\(x, _) -> x `notElem` as) xts
   es' <- mapM (withHeader xts') es
@@ -238,7 +239,7 @@ withHeader xts e = adjust xts e -- eのなかにCodePlusが含まれないケー
 
 adjust :: [(Identifier, TermPlus)] -> CodePlus -> WithEnv CodePlus
 adjust xts e = do
-  (xtzss, e') <- disC xts e
+  (xtzss, e') <- distinguish xts e
   adjust' xtzss e'
 
 adjust' ::
@@ -275,6 +276,7 @@ withHeaderAffine x t e = do
 --   let sigTmp{N-1} := rel @ tmp{N-2} in
 --   let (x{N-1}, x{N}) := sigTmp{N-1} in
 --   e
+-- (assuming N >= 2)
 withHeaderRelevant ::
      Identifier
   -> CodePlus
@@ -283,12 +285,12 @@ withHeaderRelevant ::
   -> [Identifier]
   -> CodePlus
   -> WithEnv CodePlus
-withHeaderRelevant x t y1 y2 ys e = do
+withHeaderRelevant x t x1 x2 xs e = do
   (expVarName, expVar) <- newDataUpsilon
   (affVarName, _) <- newDataUpsilon
   (relVarName, relVar) <- newDataUpsilon
   let ml = fst e
-  rel <- withHeaderRelevant' relVar (ml, DataUpsilon x) y1 y2 ys e
+  rel <- withHeaderRelevant' relVar (ml, DataUpsilon x) x1 x2 xs e
   return
     ( ml
     , CodeUpElim

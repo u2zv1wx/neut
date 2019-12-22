@@ -163,8 +163,7 @@ varTheta :: Theta -> [Identifier]
 varTheta (ThetaUnaryOp _ _ d) = varData d
 varTheta (ThetaBinaryOp _ _ d1 d2) = varData d1 ++ varData d2
 varTheta (ThetaPrint d) = varData d
-
 -- varAffineCode xs eは、eのなかに含まれる自由変数のうち、xsに含まれないものを返す。
 -- だから結局varData, varCodeも必要ということ。
-varAffineCode :: [Identifier] -> CodePlus -> [Identifier]
-varAffineCode xs e = filter (\y -> y `notElem` xs) $ varCode e
+-- varAffineCode :: [Identifier] -> CodePlus -> [Identifier]
+-- varAffineCode xs e = filter (\y -> y `notElem` xs) $ varCode e
