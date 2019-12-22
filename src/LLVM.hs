@@ -17,7 +17,14 @@ toLLVM mainTerm = do
   forM_ penv $ \(name, (args, e)) -> do
     llvm <- llvmCode e
     insLLVMEnv name args llvm
-  llvmCode mainTerm
+  l <- llvmCode mainTerm
+  (result, resultVar) <- newDataLocal "result"
+  (cast, castVar) <- newDataLocal "cast"
+  let intType = LowTypeIntS 64
+  return $
+    commConv result l $
+    LLVMLet cast (LLVMOpPointerToInt resultVar voidPtr intType) $
+    LLVMReturn castVar
 
 llvmCode :: CodePlus -> WithEnv LLVM
 llvmCode (m, CodeTheta theta) = llvmCodeTheta m theta

@@ -299,21 +299,7 @@ emitOp :: String -> WithEnv [String]
 emitOp s = return ["  " ++ s]
 
 emitRet :: Identifier -> LLVMData -> WithEnv [String]
-emitRet "main" d = do
-  tmp <- newNameWith "cast"
-  op1 <-
-    emitOp $
-    unwords
-      [ showLLVMData (LLVMDataLocal tmp)
-      , "="
-      , "ptrtoint"
-      , "i8*"
-      , showLLVMData d
-      , "to"
-      , "i64"
-      ]
-  op2 <- emitOp $ unwords ["ret i64", showLLVMData (LLVMDataLocal tmp)]
-  return $ op1 ++ op2
+emitRet "main" d = emitOp $ unwords ["ret i64", showLLVMData d]
 emitRet _ d = emitOp $ unwords ["ret i8*", showLLVMData d]
 
 emitLabel :: String -> String
