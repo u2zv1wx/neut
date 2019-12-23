@@ -10,14 +10,14 @@ import Data.Basic
 data Data
   = DataTheta Identifier
   | DataUpsilon Identifier
-  | DataEnumIntro Identifier
+  | DataEnumIntro EnumValue
   | DataSigmaIntro [DataPlus]
   | DataIntS IntSize Integer
   | DataIntU IntSize Integer
   | DataFloat16 Half
   | DataFloat32 Float
   | DataFloat64 Double
-  | DataArrayIntro ArrayKind [(Identifier, DataPlus)]
+  | DataArrayIntro ArrayKind [(EnumValue, DataPlus)]
   deriving (Show)
 
 data Code
