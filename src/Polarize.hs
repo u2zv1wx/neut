@@ -619,11 +619,20 @@ polarizeTheta m name
 polarizeTheta m name
   | Just (sysCall, len, idxList) <- asSysCallMaybe name =
     polarizeSysCall name sysCall len idxList m
+polarizeTheta m name
+  | Just _ <- asLowTypeMaybe name = polarize (m, TermEnum $ EnumTypeLabel "top")
 polarizeTheta m "is-enum" = polarizeIsEnum m
 polarizeTheta m name@"core.print.i64" = polarizePrint name m
 polarizeTheta m "unsafe.eval-io" = polarizeEvalIO m
+polarizeTheta m "file-descriptor" = polarize (m, TermTheta "i64")
+polarizeTheta m "stdin" = polarize (m, TermIntS 64 0)
+polarizeTheta m "stdout" = polarize (m, TermIntS 64 1)
+polarizeTheta m "stderr" = polarize (m, TermIntS 64 2)
 polarizeTheta _ _ = throwError "polarize.theta"
 
+-- polarize (m, TermIntS size l) = do
+--   let ml = snd $ obtainInfoMeta m
+--   return (ml, CodeUpIntro (ml, DataIntS size l))
 polarizeUnaryOp :: Identifier -> UnaryOp -> LowType -> Meta -> WithEnv CodePlus
 polarizeUnaryOp name op lowType m = do
   let (t, ml) = obtainInfoMeta m
