@@ -39,7 +39,7 @@ type Context = [(Identifier, WeakTermPlus)]
 -- Dynamic Pattern Unification for Dependent Types and Records". Typed Lambda
 -- Calculi and Applications, 2011.
 infer :: Context -> WeakTermPlus -> WithEnv WeakTermPlus
-infer _ (meta, WeakTermTau) = returnAfterUpdate meta newUniv -- univ : univ
+infer _ (meta, WeakTermTau) = returnAfterUpdate meta univ -- univ : univ
 infer _ (meta, WeakTermTheta x) = do
   h <- newHoleInCtx [] -- constants do not depend on their context
   insTypeEnv x h
@@ -49,20 +49,24 @@ infer _ (meta, WeakTermUpsilon x) = do
   returnAfterUpdate meta t
 infer ctx (meta, WeakTermPi xts) = do
   univList <- inferPlus ctx xts
-  constrainList $ newUniv : univList
-  returnAfterUpdate meta newUniv
-infer ctx (meta, WeakTermPiIntro xts e) = do
-  forM_ xts $ uncurry insTypeEnv
-  (_, codPlus) <- infer (ctx ++ xts) e >>= withHole
-  returnAfterUpdate meta (newMetaTerminal, WeakTermPi $ xts ++ [codPlus])
+  constrainList $ univ : univList
+  returnAfterUpdate meta univ
+infer ctx (meta, WeakTermPiIntro xts e) = inferPiIntro ctx meta xts e
 infer ctx (meta, WeakTermPiElim e es) = do
   tPi <- infer ctx e
-  binder <- inferList ctx es
-  (cod, codPlus) <- newHoleInCtx (ctx ++ binder) >>= withHole
-  let tPi' = (newMetaTerminal, WeakTermPi $ binder ++ [codPlus])
+  -- xts == [(x1, t1), ..., (xn, tn)] with xi : ti and ei : ti
+  xts <- inferList ctx es
+  -- codHole = ?M
+  -- cod = ?M @ ctx @ x1 @ ... @ xn
+  (codHole, cod) <- newHoleInCtx' (ctx ++ xts)
+  h <- newNameWith "hole"
+  let tPi' = (newMetaTerminal, WeakTermPi $ xts ++ [(h, cod)])
   insConstraintEnv tPi tPi'
-  returnAfterUpdate meta $ substWeakTermPlus (zip (map fst binder) es) cod
+  -- codAfterElim == ?M @ ctx @ e1 @ ... @ en
+  codAfterElim <- newCtxAppHole ctx codHole es
+  returnAfterUpdate meta codAfterElim
 infer ctx (meta, WeakTermMu (x, t) e) = do
+  inferType ctx t
   insTypeEnv x t
   te <- infer (ctx ++ [(x, t)]) e
   insConstraintEnv te t
@@ -88,7 +92,7 @@ infer _ (meta, WeakTermFloat64 _) =
 infer _ (meta, WeakTermFloat _) = do
   h <- newHoleInCtx []
   returnAfterUpdate meta h -- f64 or "any float"
-infer _ (meta, WeakTermEnum _) = returnAfterUpdate meta newUniv
+infer _ (meta, WeakTermEnum _) = returnAfterUpdate meta univ
 infer _ (meta, WeakTermEnumIntro l) = do
   k <- lookupKind l
   returnAfterUpdate meta (newMetaTerminal, WeakTermEnum k)
@@ -123,6 +127,11 @@ infer ctx (meta, WeakTermArrayElim kind e1 e2) = do
   insConstraintEnv tDomToCod (newMetaTerminal, WeakTermArray kind tDom tCod)
   returnAfterUpdate meta tCod
 
+inferType :: Context -> WeakTermPlus -> WithEnv ()
+inferType ctx t = do
+  u <- infer ctx t
+  insConstraintEnv u univ
+
 inferKind :: ArrayKind -> WithEnv WeakTermPlus
 inferKind (ArrayKindIntS i) =
   return (newMetaTerminal, WeakTermTheta $ "i" ++ show i)
@@ -130,6 +139,25 @@ inferKind (ArrayKindIntU i) =
   return (newMetaTerminal, WeakTermTheta $ "u" ++ show i)
 inferKind (ArrayKindFloat size) =
   return (newMetaTerminal, WeakTermTheta $ "f" ++ show (sizeAsInt size))
+
+inferPiIntro ::
+     Context -> WeakMeta -> Context -> WeakTermPlus -> WithEnv WeakTermPlus
+inferPiIntro ctx meta xts e = inferPiIntro' ctx meta xts xts e
+
+inferPiIntro' ::
+     Context
+  -> WeakMeta
+  -> Context
+  -> Context
+  -> WeakTermPlus
+  -> WithEnv WeakTermPlus
+inferPiIntro' ctx meta [] zts e = do
+  (_, codPlus) <- infer ctx e >>= withHole
+  returnAfterUpdate meta (newMetaTerminal, WeakTermPi $ zts ++ [codPlus])
+inferPiIntro' ctx meta ((x, t):xts) zts e = do
+  inferType ctx t
+  insTypeEnv x t
+  inferPiIntro' (ctx ++ [(x, t)]) meta xts zts e
 
 inferPlus :: Context -> [(Identifier, WeakTermPlus)] -> WithEnv [WeakTermPlus]
 inferPlus ctx xts =
@@ -143,32 +171,38 @@ inferPlus ctx xts =
 -- Note that we can't just set `?M : Pi (x1 : A1, ..., xn : An). Ui` since
 -- WeakTermZeta might be used as a term which is not a type.
 newHoleInCtx :: Context -> WithEnv WeakTermPlus
-newHoleInCtx ctx = do
-  (_, univPlus) <- withHole newUniv
+newHoleInCtx ctx = snd <$> newHoleInCtx' ctx
+
+newHoleInCtx' :: Context -> WithEnv (WeakTermPlus, WeakTermPlus)
+newHoleInCtx' ctx = do
+  (_, univPlus) <- withHole univ
   let higherPi = (newMetaTerminal, WeakTermPi $ ctx ++ [univPlus])
   higherHole <- newHoleOfType higherPi
   varSeq <- mapM (uncurry toVar) ctx
-  (app, appPlus) <- withHole (newMetaTerminal, WeakTermPiElim higherHole varSeq)
+  (_, appPlus) <- withHole (newMetaTerminal, WeakTermPiElim higherHole varSeq)
   let pi = (newMetaTerminal, WeakTermPi $ ctx ++ [appPlus])
   hole <- newHoleOfType pi
-  wrapWithType app (WeakTermPiElim hole varSeq)
+  newHoleInCtx'' ctx hole
 
--- In context ctx == [x1, ..., xn], `newHoleListInCtx ctx names-of-holes` generates
--- the following list of holes:
---
---   [m1 @ ctx,
---    m2 @ ctx @ y1,
---    ...,
---    mn @ ctx @ y1 @ ... @ y{n-1}]
---
--- inserting type information `yi : mi @ ctx @ y1 @ ... @ y{i-1}`.
-newHoleListInCtx :: Context -> [Identifier] -> WithEnv [WeakTermPlus]
-newHoleListInCtx _ [] = return []
-newHoleListInCtx ctx (x:rest) = do
-  t <- newHoleInCtx ctx
-  insTypeEnv x t
-  ts <- newHoleListInCtx (ctx ++ [(x, t)]) rest
-  return $ t : ts
+newHoleInCtx'' ::
+     Context -> WeakTermPlus -> WithEnv (WeakTermPlus, WeakTermPlus)
+newHoleInCtx'' ctx hole = do
+  (_, univPlus) <- withHole univ
+  let higherPi = (newMetaTerminal, WeakTermPi $ ctx ++ [univPlus])
+  higherHole <- newHoleOfType higherPi
+  varSeq <- mapM (uncurry toVar) ctx
+  (app, _) <- withHole (newMetaTerminal, WeakTermPiElim higherHole varSeq)
+  app' <- wrapWithType app (WeakTermPiElim hole varSeq)
+  return (hole, app')
+
+--    newCtxAppHole ctx [e1, ..., en]
+-- ~> ?M @ ctx @ e1 @ ... @ en
+newCtxAppHole ::
+     Context -> WeakTermPlus -> [WeakTermPlus] -> WithEnv WeakTermPlus
+newCtxAppHole ctx hole es = do
+  xs <- mapM (const $ newNameWith "arg") es
+  (_, appHole) <- newHoleInCtx'' (ctx ++ zip xs es) hole
+  return appHole
 
 inferCase :: Case -> WithEnv (Maybe WeakTermPlus)
 inferCase (CaseLabel name) = do
@@ -177,14 +211,17 @@ inferCase (CaseLabel name) = do
   return $ Just (newMetaTerminal, WeakTermEnum k)
 inferCase _ = return Nothing
 
+--    inferList ctx [e1, ..., en]
+-- ~> [(x1, t1), ..., (xn, tn)] with xi : ti, ei : ti
 inferList :: Context -> [WeakTermPlus] -> WithEnv Context
-inferList ctx es = do
-  xs <- mapM (const $ newNameWith "hole") es
-  holeList <- newHoleListInCtx ctx xs
-  let holeList' = map (substWeakTermPlus (zip xs es)) holeList
-  ts <- mapM (infer ctx) es
-  forM_ (zip holeList' ts) $ uncurry insConstraintEnv
-  return $ zip xs holeList
+inferList _ [] = return []
+inferList ctx (e:es) = do
+  t <- infer ctx e
+  x <- newNameWith "hole"
+  inferType ctx t
+  insTypeEnv x t
+  xts <- inferList (ctx ++ [(x, t)]) es
+  return $ (x, t) : xts
 
 constrainList :: [WeakTermPlus] -> WithEnv ()
 constrainList [] = return ()
@@ -206,8 +243,8 @@ returnAfterUpdate m t = do
     Just t' -> insConstraintEnv t t'
   return t
 
-newUniv :: WeakTermPlus
-newUniv = (WeakMetaTerminal Nothing, WeakTermTau)
+univ :: WeakTermPlus
+univ = (WeakMetaTerminal Nothing, WeakTermTau)
 
 withHole :: WeakTermPlus -> WithEnv (WeakTermPlus, IdentifierPlus)
 withHole t = do
@@ -221,11 +258,11 @@ wrapWithType t e = do
 
 readWeakMetaType :: WeakMeta -> WithEnv (Maybe WeakTermPlus)
 readWeakMetaType (WeakMetaNonTerminal (Ref r) _) = liftIO $ readIORef r
-readWeakMetaType (WeakMetaTerminal _) = return $ Just newUniv
+readWeakMetaType (WeakMetaTerminal _) = return $ Just univ
 
 writeWeakMetaType :: WeakMeta -> Maybe WeakTermPlus -> WithEnv ()
 writeWeakMetaType (WeakMetaNonTerminal (Ref r) _) mt = liftIO $ writeIORef r mt
 writeWeakMetaType (WeakMetaTerminal _) mt =
   case mt of
     Nothing -> return ()
-    Just t -> insConstraintEnv newUniv t
+    Just t -> insConstraintEnv univ t
