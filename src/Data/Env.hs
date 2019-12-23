@@ -139,16 +139,10 @@ lookupKind' i ((j, ls):xs) =
 
 lookupEnumSet :: Identifier -> WithEnv [Identifier]
 lookupEnumSet name = do
-  env <- get
-  lookupEnumSet' name $ enumEnv env
-
-lookupEnumSet' ::
-     Identifier -> [(Identifier, [Identifier])] -> WithEnv [Identifier]
-lookupEnumSet' name [] = throwError $ "no such enum defined: " ++ show name
-lookupEnumSet' name ((_, ls):xs) =
-  if name `elem` ls
-    then return ls
-    else lookupEnumSet' name xs
+  eenv <- gets enumEnv
+  case lookup name eenv of
+    Nothing -> throwError $ "no such enum defined: " ++ show name
+    Just ls -> return ls
 
 getEnumNum :: Identifier -> WithEnv Int
 getEnumNum label = do

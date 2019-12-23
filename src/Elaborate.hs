@@ -195,14 +195,15 @@ exhaust' (_, WeakTermArrayIntro _ les) = do
 exhaust' (_, WeakTermArrayElim _ e1 e2) = allM exhaust' [e1, e2]
 
 exhaustEnumIdentifier :: EnumType -> [Case] -> Bool -> WithEnv Bool
-exhaustEnumIdentifier (EnumTypeLabel x) labelList b1 = do
-  eenv <- gets enumEnv
-  case lookup x eenv of
-    Nothing -> return $ CaseDefault `elem` labelList
-    Just ls ->
-      if length ls <= length (nub labelList)
-        then return $ b1 && True
-        else return False
+exhaustEnumIdentifier (EnumTypeLabel x) labelList b = do
+  ls <- lookupEnumSet x
+  return $ b && exhaustEnumIdentifier' (length ls) labelList
+exhaustEnumIdentifier (EnumTypeNatNum i) labelList b = do
+  return $ b && exhaustEnumIdentifier' i labelList
+
+exhaustEnumIdentifier' :: Int -> [Case] -> Bool
+exhaustEnumIdentifier' i labelList =
+  i <= length (nub labelList) || CaseDefault `elem` labelList
 
 allM :: Monad m => (a -> m Bool) -> [a] -> m Bool
 allM _ [] = return True
