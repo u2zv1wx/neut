@@ -91,9 +91,13 @@ infer _ (meta, WeakTermFloat _) = do
   h <- newHoleInCtx []
   returnAfterUpdate meta h -- f64 or "any float"
 infer _ (meta, WeakTermEnum _) = returnAfterUpdate meta univ
-infer _ (meta, WeakTermEnumIntro l) = do
-  k <- lookupKind l
-  returnAfterUpdate meta (newMetaTerminal, WeakTermEnum k)
+infer _ (meta, WeakTermEnumIntro labelOrNum) = do
+  case labelOrNum of
+    EnumValueLabel l -> do
+      k <- lookupKind l
+      returnAfterUpdate meta (newMetaTerminal, WeakTermEnum k)
+    EnumValueNatNum i _ ->
+      returnAfterUpdate meta (newMetaTerminal, WeakTermEnum $ "n" ++ show i)
 infer ctx (meta, WeakTermEnumElim e branchList) = do
   te <- infer ctx e
   if null branchList
@@ -208,10 +212,12 @@ newCtxAppHole ctx hole es = do
   return appHole
 
 inferCase :: Case -> WithEnv (Maybe WeakTermPlus)
-inferCase (CaseLabel name) = do
+inferCase (CaseLabel (EnumValueLabel name)) = do
   ienv <- gets enumEnv
   k <- lookupKind' name ienv
   return $ Just (newMetaTerminal, WeakTermEnum k)
+inferCase (CaseLabel (EnumValueNatNum i _)) =
+  return $ Just (newMetaTerminal, WeakTermEnum $ "n" ++ show i)
 inferCase _ = return Nothing
 
 --    inferList ctx [e1, ..., en]
