@@ -21,10 +21,12 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
       | length xts == length es'
       , all isValue es' -> do
         let xs = map fst xts
-        reduceWeakTermPlus $ substWeakTermPlus (zip xs es') body
+        body' <- substWeakTermPlus (zip xs es') body
+        reduceWeakTermPlus body'
+        -- reduceWeakTermPlus $ substWeakTermPlus (zip xs es') body
     self@(_, WeakTermMu (x, _) body)
       | all isValue es' -> do
-        let self' = substWeakTermPlus [(x, self)] body
+        self' <- substWeakTermPlus [(x, self)] body
         reduceWeakTermPlus (m, WeakTermPiElim self' es')
     (_, WeakTermTheta constant) ->
       reduceWeakTermPlusTheta (m, app) es' m constant

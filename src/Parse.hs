@@ -8,7 +8,6 @@ import System.Directory
 import System.FilePath
 import Text.Read (readMaybe)
 
-import Data.Basic
 import Data.Env
 import Data.Tree
 import Data.WeakTerm

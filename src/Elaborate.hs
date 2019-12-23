@@ -6,7 +6,6 @@ import Control.Monad.Except
 import Control.Monad.State
 import Data.IORef
 import Data.List (nub)
-import qualified Data.Map.Strict as Map
 import Numeric.Half
 
 import Data.Basic
@@ -35,9 +34,12 @@ elaborate e = do
   gets constraintQueue >>= synthesize
   -- update the type environment by resulting substitution
   sub <- gets substEnv
-  modify (\env -> env {typeEnv = Map.map (substWeakTermPlus sub) $ typeEnv env})
+  tenv <- gets typeEnv
+  tenv' <- mapM (substWeakTermPlus sub) tenv
+  modify (\env -> env {typeEnv = tenv'})
   -- elaborate `e` using the resulting substitution
-  exhaust (substWeakTermPlus sub e) >>= elaborate'
+  e' <- substWeakTermPlus sub e
+  exhaust e' >>= elaborate'
 
 -- This function translates a well-typed term into an untyped term in a
 -- reduction-preserving way. Here, we translate types into units (nullary product).

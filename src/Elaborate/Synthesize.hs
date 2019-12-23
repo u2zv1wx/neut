@@ -39,8 +39,8 @@ resolveStuck ::
   -> WeakTermPlus
   -> WithEnv ()
 resolveStuck q e1 e2 h e = do
-  let e1' = substWeakTermPlus [(h, e)] e1
-  let e2' = substWeakTermPlus [(h, e)] e2
+  e1' <- substWeakTermPlus [(h, e)] e1
+  e2' <- substWeakTermPlus [(h, e)] e2
   cs <- simp [(e1', e2')]
   synthesize $ Q.deleteMin q `Q.union` Q.fromList cs
 
@@ -67,7 +67,10 @@ resolvePiElim q m ess e = do
 
 resolveHole :: ConstraintQueue -> Hole -> WeakTermPlus -> WithEnv ()
 resolveHole q h e = do
-  modify (\env -> env {substEnv = compose [(h, e)] (substEnv env)})
+  senv <- gets substEnv
+  senv' <- compose [(h, e)] senv
+  -- modify (\env -> env {substEnv = compose [(h, e)] (substEnv env)})
+  modify (\env -> env {substEnv = senv'})
   let rest = Q.deleteMin q
   let (q1, q2) = Q.partition (\(Enriched _ ms _) -> h `elem` ms) rest
   synthesize q1

@@ -187,7 +187,9 @@ simpBinder' ::
 simpBinder' xts1 xts2 cs = do
   vs1' <- mapM (uncurry toVar) xts1
   let s = substWeakTermPlus (zip (map fst xts2) vs1')
-  simp $ zip (map snd xts1) (map (s . snd) xts2) ++ cs
+  xts2' <- mapM (s . snd) xts2
+  -- simp $ zip (map snd xts1) (map (s . snd) xts2) ++ cs
+  simp $ zip (map snd xts1) xts2' ++ cs
 
 simpArrayIntro ::
      [(Identifier, WeakTermPlus)]
