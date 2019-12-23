@@ -139,7 +139,8 @@ concatDefList [] = do
   m <- newMetaOfType t
   return (m, WeakTermEnumIntro $ EnumValueLabel "unit")
 concatDefList [DefLet meta xt@(x, t) e] = do
-  let varX = undefined x t
+  mx <- newMetaOfType t
+  let varX = (mx, WeakTermUpsilon x)
   m <- newMeta
   m1 <- newMeta
   m2 <- newMeta
