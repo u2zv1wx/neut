@@ -619,7 +619,7 @@ polarizeTheta m name
 polarizeTheta m name
   | Just (sysCall, len, idxList) <- asSysCallMaybe name =
     polarizeSysCall name sysCall len idxList m
-polarizeTheta m "is-enum" = undefined
+polarizeTheta m "is-enum" = polarizeIsEnum m
 polarizeTheta m name@"core.print.i64" = polarizePrint name m
 polarizeTheta m "unsafe.eval-io" = polarizeEvalIO m
 polarizeTheta _ _ = throwError "polarize.theta"
@@ -660,6 +660,23 @@ polarizePrint name m = do
   (x, varX) <- newDataUpsilon
   let i64Type = (MetaTerminal ml, TermEnum $ EnumTypeLabel "i64")
   makeClosure (Just name) [] m [(x, i64Type)] (ml, CodeTheta (ThetaPrint varX))
+
+polarizeIsEnum :: Meta -> WithEnv CodePlus
+polarizeIsEnum m = do
+  let (t, ml) = obtainInfoMeta m
+  case t of
+    (_, TermPi [(x, tx)] _) -> do
+      v <- cartesianImmediate ml
+      let varX = toDataUpsilon (x, Nothing)
+      aff <- newNameWith "aff"
+      rel <- newNameWith "rel"
+      makeClosure
+        (Just "is-enum")
+        []
+        m
+        [(x, tx)]
+        (ml, CodeSigmaElim [aff, rel] varX (ml, CodeUpIntro v))
+    _ -> throwError $ "the type of is-enum is wrong"
 
 --    unsafe.eval-io
 -- ~> lam x.
