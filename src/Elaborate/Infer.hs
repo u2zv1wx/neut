@@ -108,8 +108,8 @@ infer ctx (meta, WeakTermEnumElim e branchList) = do
       constrainList ts
       returnAfterUpdate meta $ head ts
 infer ctx (meta, WeakTermArray _ from to) = do
-  uDom <- infer ctx from
-  uCod <- infer ctx to
+  uDom <- inferType ctx from
+  uCod <- inferType ctx to
   insConstraintEnv uDom uCod
   returnAfterUpdate meta uDom
 infer ctx (meta, WeakTermArrayIntro kind les) = do
