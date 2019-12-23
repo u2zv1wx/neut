@@ -50,7 +50,10 @@ elaborate' (m, WeakTermTau) = do
   return (m', TermTau)
 elaborate' (m, WeakTermTheta x) = do
   m' <- toMeta m
-  return (m', TermTheta x)
+  mi <- elaborateIsEnum x
+  case mi of
+    Nothing -> return (m', TermTheta x)
+    Just i -> return (m', TermIntU 64 i)
 elaborate' (m, WeakTermUpsilon x) = do
   m' <- toMeta m
   return (m', TermUpsilon x)
@@ -158,6 +161,22 @@ exhaust e = do
   if b
     then return e
     else throwError "non-exhaustive pattern"
+
+-- enum.n{i}   ~> Just i
+-- enum.choice ~> Just 2 (assuming choice = {left, right})
+-- otherwise   ~> Nothing
+elaborateIsEnum :: Identifier -> WithEnv (Maybe Integer)
+elaborateIsEnum x
+  | Just i <- asEnumNatNumConstant x = return $ Just i
+elaborateIsEnum x
+  | ["enum", enumStr] <- wordsBy '.' x = do
+    b <- isDefinedEnum enumStr
+    if not b
+      then return Nothing
+      else do
+        ls <- lookupEnumSet enumStr
+        return $ Just $ toInteger $ length ls
+elaborateIsEnum _ = return Nothing
 
 -- FIXME: exhaust'はmetaも検査するべき
 -- FIXME: exhaust'はTermに対して定義されるべき

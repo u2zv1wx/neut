@@ -619,6 +619,7 @@ polarizeTheta m name
 polarizeTheta m name
   | Just (sysCall, len, idxList) <- asSysCallMaybe name =
     polarizeSysCall name sysCall len idxList m
+polarizeTheta m "is-enum" = undefined
 polarizeTheta m name@"core.print.i64" = polarizePrint name m
 polarizeTheta m "unsafe.eval-io" = polarizeEvalIO m
 polarizeTheta _ _ = throwError "polarize.theta"
