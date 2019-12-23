@@ -48,8 +48,8 @@ infer _ (meta, WeakTermUpsilon x) = do
   t <- lookupTypeEnv x
   returnAfterUpdate meta t
 infer ctx (meta, WeakTermPi xts) = do
-  univList <- inferPlus ctx xts
-  constrainList $ univ : univList
+  us <- inferPi ctx xts
+  constrainList $ univ : us
   returnAfterUpdate meta univ
 infer ctx (meta, WeakTermPiIntro xts e) = inferPiIntro ctx meta xts e
 infer ctx (meta, WeakTermPiElim e es) = do
@@ -66,7 +66,7 @@ infer ctx (meta, WeakTermPiElim e es) = do
   codAfterElim <- newCtxAppHole ctx codHole es
   returnAfterUpdate meta codAfterElim
 infer ctx (meta, WeakTermMu (x, t) e) = do
-  inferType ctx t
+  _ <- inferType ctx t
   insTypeEnv x t
   te <- infer (ctx ++ [(x, t)]) e
   insConstraintEnv te t
@@ -127,10 +127,11 @@ infer ctx (meta, WeakTermArrayElim kind e1 e2) = do
   insConstraintEnv tDomToCod (newMetaTerminal, WeakTermArray kind tDom tCod)
   returnAfterUpdate meta tCod
 
-inferType :: Context -> WeakTermPlus -> WithEnv ()
+inferType :: Context -> WeakTermPlus -> WithEnv WeakTermPlus
 inferType ctx t = do
   u <- infer ctx t
   insConstraintEnv u univ
+  return u
 
 inferKind :: ArrayKind -> WithEnv WeakTermPlus
 inferKind (ArrayKindIntS i) =
@@ -155,14 +156,17 @@ inferPiIntro' ctx meta [] zts e = do
   (_, codPlus) <- infer ctx e >>= withHole
   returnAfterUpdate meta (newMetaTerminal, WeakTermPi $ zts ++ [codPlus])
 inferPiIntro' ctx meta ((x, t):xts) zts e = do
-  inferType ctx t
+  _ <- inferType ctx t
   insTypeEnv x t
   inferPiIntro' (ctx ++ [(x, t)]) meta xts zts e
 
-inferPlus :: Context -> [(Identifier, WeakTermPlus)] -> WithEnv [WeakTermPlus]
-inferPlus ctx xts =
-  forM (map (`take` xts) [1 .. length xts]) $ \zts ->
-    infer (ctx ++ init zts) (snd $ last zts)
+inferPi :: Context -> [(Identifier, WeakTermPlus)] -> WithEnv [WeakTermPlus]
+inferPi _ [] = return []
+inferPi ctx ((x, t):xts) = do
+  u <- inferType ctx t
+  insTypeEnv x t
+  us <- inferPi (ctx ++ [(x, t)]) xts
+  return $ u : us
 
 -- In a context (x1 : A1, ..., xn : An), this function creates metavariables
 --   ?M  : Pi (x1 : A1, ..., xn : An). ?Mt @ (x1, ..., xn) -- pi
@@ -218,7 +222,7 @@ inferList _ [] = return []
 inferList ctx (e:es) = do
   t <- infer ctx e
   x <- newNameWith "hole"
-  inferType ctx t
+  _ <- inferType ctx t
   insTypeEnv x t
   xts <- inferList (ctx ++ [(x, t)]) es
   return $ (x, t) : xts
