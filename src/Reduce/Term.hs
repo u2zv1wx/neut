@@ -268,5 +268,5 @@ computeFloat x y BinaryOpLE _ = Left $ asEnum $ x <= y
 computeFloat _ _ _ e = Left e
 
 asEnum :: Bool -> Term
-asEnum True = TermEnumIntro "true"
-asEnum False = TermEnumIntro "false"
+asEnum True = TermEnumIntro $ EnumValueLabel "true"
+asEnum False = TermEnumIntro $ EnumValueLabel "false"

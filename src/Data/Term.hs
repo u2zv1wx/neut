@@ -21,10 +21,10 @@ data Term
   | TermFloat32 Float
   | TermFloat64 Double
   | TermEnum Identifier
-  | TermEnumIntro Identifier
+  | TermEnumIntro EnumValue
   | TermEnumElim TermPlus [(Case, TermPlus)]
   | TermArray ArrayKind TermPlus TermPlus
-  | TermArrayIntro ArrayKind [(Identifier, TermPlus)]
+  | TermArrayIntro ArrayKind [(EnumValue, TermPlus)]
   | TermArrayElim ArrayKind TermPlus TermPlus
   deriving (Show)
 
