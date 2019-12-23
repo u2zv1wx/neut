@@ -8,6 +8,7 @@ import System.Directory
 import System.FilePath
 import Text.Read (readMaybe)
 
+import Data.Basic
 import Data.Env
 import Data.Tree
 import Data.WeakTerm
@@ -106,7 +107,7 @@ concatDefList :: [Def] -> WithEnv WeakTermPlus
 concatDefList [] = do
   let t = (WeakMetaTerminal Nothing, WeakTermEnum "top")
   m <- newMetaOfType t
-  return (m, WeakTermEnumIntro "unit")
+  return (m, WeakTermEnumIntro $ EnumValueLabel "unit")
 concatDefList [DefLet meta xt@(x, t) e] = do
   let varX = undefined x t
   m <- newMeta
