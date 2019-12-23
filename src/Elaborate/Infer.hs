@@ -57,7 +57,7 @@ infer ctx (meta, WeakTermPiElim e es) = do
   xts <- inferList ctx es
   -- codHole = ?M
   -- cod = ?M @ ctx @ x1 @ ... @ xn
-  (codHole, cod) <- newHoleInCtx' (ctx ++ xts)
+  (codHole, cod) <- newHoleInCtx' (ctx ++ xts) Nothing
   let tPi' = (newMetaTerminal, WeakTermPi xts cod)
   insConstraintEnv tPi tPi'
   -- codAfterElim == ?M @ ctx @ e1 @ ... @ en
@@ -179,38 +179,32 @@ inferPi ctx ((x, t):xts) cod = do
 -- Note that we can't just set `?M : Pi (x1 : A1, ..., xn : An). Ui` since
 -- WeakTermZeta might be used as a term which is not a type.
 newHoleInCtx :: Context -> WithEnv WeakTermPlus
-newHoleInCtx ctx = snd <$> newHoleInCtx' ctx
+newHoleInCtx ctx = snd <$> newHoleInCtx' ctx Nothing
 
-newHoleInCtx' :: Context -> WithEnv (WeakTermPlus, WeakTermPlus)
-newHoleInCtx' ctx = do
+newHoleInCtx' ::
+     Context
+  -> Maybe WeakTermPlus -- if specified, use this term instead of ?M
+  -> WithEnv (WeakTermPlus, WeakTermPlus) -- (?M, ?M @ ctx)
+newHoleInCtx' ctx mhole = do
   let higherPi = (newMetaTerminal, WeakTermPi ctx univ)
   higherHole <- newHoleOfType higherPi
   varSeq <- mapM (uncurry toVar) ctx
   let app = (newMetaTerminal, WeakTermPiElim higherHole varSeq)
-  let pi = (newMetaTerminal, WeakTermPi ctx app)
-  hole <- newHoleOfType pi
-  newHoleInCtx'' ctx hole
-
-newHoleInCtx'' ::
-     Context -> WeakTermPlus -> WithEnv (WeakTermPlus, WeakTermPlus)
-newHoleInCtx'' ctx hole
-  -- (_, univPlus) <- withHole univ
-  -- let higherPi = (newMetaTerminal, WeakTermPi $ ctx ++ [univPlus])
- = do
-  let higherPi = (newMetaTerminal, WeakTermPi ctx univ)
-  higherHole <- newHoleOfType higherPi
-  varSeq <- mapM (uncurry toVar) ctx
-  let app = (newMetaTerminal, WeakTermPiElim higherHole varSeq)
+  hole <- setupHole mhole (newMetaTerminal, WeakTermPi ctx app)
   app' <- wrapWithType app (WeakTermPiElim hole varSeq)
   return (hole, app')
 
---    newCtxAppHole ctx [e1, ..., en]
--- ~> ?M @ ctx @ e1 @ ... @ en
+setupHole :: Maybe WeakTermPlus -> WeakTermPlus -> WithEnv WeakTermPlus
+setupHole Nothing pi = newHoleOfType pi
+setupHole (Just t) _ = return t
+
+--    newCtxAppHole ctx SPECIFIED_HOLE [e1, ..., en]
+-- ~> SPECIFIED_HOLE @ ctx @ e1 @ ... @ en
 newCtxAppHole ::
      Context -> WeakTermPlus -> [WeakTermPlus] -> WithEnv WeakTermPlus
 newCtxAppHole ctx hole es = do
   xs <- mapM (const $ newNameWith "arg") es
-  (_, appHole) <- newHoleInCtx'' (ctx ++ zip xs es) hole
+  (_, appHole) <- newHoleInCtx' (ctx ++ zip xs es) (Just hole)
   return appHole
 
 inferCase :: Case -> WithEnv (Maybe WeakTermPlus)
