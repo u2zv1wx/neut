@@ -27,10 +27,10 @@ data WeakTerm
   | WeakTermFloat64 Double
   | WeakTermFloat Double
   | WeakTermEnum Identifier
-  | WeakTermEnumIntro Identifier
+  | WeakTermEnumIntro EnumValue
   | WeakTermEnumElim WeakTermPlus [(Case, WeakTermPlus)]
   | WeakTermArray ArrayKind WeakTermPlus WeakTermPlus
-  | WeakTermArrayIntro ArrayKind [(Identifier, WeakTermPlus)]
+  | WeakTermArrayIntro ArrayKind [(EnumValue, WeakTermPlus)]
   | WeakTermArrayElim ArrayKind WeakTermPlus WeakTermPlus
   deriving (Show)
 

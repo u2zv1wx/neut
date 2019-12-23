@@ -8,8 +8,13 @@ type Identifier = String
 type Loc = (Int, Int)
 
 data Case
-  = CaseLabel Identifier
+  = CaseLabel EnumValue
   | CaseDefault
+  deriving (Show, Eq)
+
+data EnumValue
+  = EnumValueLabel Identifier
+  | EnumValueNatNum Int Int
   deriving (Show, Eq)
 
 data LowType

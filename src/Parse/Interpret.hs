@@ -55,13 +55,15 @@ interpret (m, TreeNode [(_, TreeAtom "f32"), (_, TreeAtom x)])
   | Just x' <- readMaybe x = do withMeta m $ WeakTermFloat32 x'
 interpret (m, TreeNode [(_, TreeAtom "f64"), (_, TreeAtom x)])
   | Just x' <- readMaybe x = do withMeta m $ WeakTermFloat64 x'
+interpret (m, TreeNode [(_, TreeAtom "enum"), (_, TreeAtom x)])
+  | Just i <- readNatEnumType x = withMeta m $ WeakTermEnum $ "n" ++ show i
 interpret (m, TreeNode [(_, TreeAtom "enum"), (_, TreeAtom x)]) = do
   isEnum <- isDefinedEnumName x
   if not isEnum
     then throwError $ "No such enum-type defined: " ++ x
     else withMeta m $ WeakTermEnum x
 interpret (m, TreeNode [(_, TreeAtom "enum-introduction"), l]) = do
-  l' <- interpretLabel l
+  l' <- interpretEnumValue l
   withMeta m $ WeakTermEnumIntro l'
 interpret (m, TreeNode [(_, TreeAtom "enum-elimination"), e, (_, TreeNode cs)]) = do
   e' <- interpret e
@@ -90,8 +92,13 @@ interpret (m, TreeAtom x)
   | Just x' <- readMaybe x = withMeta m $ WeakTermInt x'
 interpret (m, TreeAtom x)
   | Just x' <- readMaybe x = withMeta m $ WeakTermFloat x'
+interpret (m, TreeAtom x)
+  | Just i <- readNatEnumType x = withMeta m $ WeakTermEnum $ "n" ++ show i
+interpret (m, TreeAtom x)
+  | Just (i, j) <- readNatEnumValue x =
+    withMeta m $ WeakTermEnumIntro $ EnumValueNatNum i j
 interpret t@(m, TreeAtom x) = do
-  ml <- interpretLabelMaybe t
+  ml <- interpretEnumValueMaybe t
   case ml of
     Just l -> withMeta m $ WeakTermEnumIntro l
     _ -> do
@@ -124,20 +131,22 @@ interpretAtom :: String -> WithEnv String
 interpretAtom "_" = newNameWith "hole"
 interpretAtom x = return x
 
-interpretLabelMaybe :: TreePlus -> WithEnv (Maybe Identifier)
-interpretLabelMaybe (_, TreeAtom x) = do
+interpretEnumValueMaybe :: TreePlus -> WithEnv (Maybe EnumValue)
+interpretEnumValueMaybe (_, TreeAtom x)
+  | Just (i, j) <- readNatEnumValue x = return $ Just $ EnumValueNatNum i j
+interpretEnumValueMaybe (_, TreeAtom x) = do
   b <- isDefinedEnum x
   if b
-    then return $ Just x
+    then return $ Just $ EnumValueLabel x
     else throwError $ "no such label defined: " ++ x
-interpretLabelMaybe _ = return Nothing
+interpretEnumValueMaybe _ = return Nothing
 
-interpretLabel :: TreePlus -> WithEnv Identifier
-interpretLabel l = do
-  ml' <- interpretLabelMaybe l
+interpretEnumValue :: TreePlus -> WithEnv EnumValue
+interpretEnumValue l = do
+  ml' <- interpretEnumValueMaybe l
   case ml' of
     Just l' -> return l'
-    Nothing -> throwError $ "interpretLabel: syntax error:\n" ++ Pr.ppShow l
+    Nothing -> throwError $ "interpretEnumValue: syntax error:\n" ++ Pr.ppShow l
 
 interpretBinder ::
      [TreePlus] -> TreePlus -> WithEnv ([IdentifierPlus], WeakTermPlus)
@@ -150,14 +159,14 @@ interpretCase :: TreePlus -> WithEnv Case
 --
 -- foundational
 --
-interpretCase (_, TreeNode [(_, TreeAtom "enum-introduction"), (_, TreeAtom x)]) = do
-  return $ CaseLabel x
+interpretCase (_, TreeNode [(_, TreeAtom "enum-introduction"), l]) = do
+  CaseLabel <$> interpretEnumValue l
 interpretCase (_, TreeAtom "default") = return CaseDefault
 --
 -- auxiliary
 --
 interpretCase c = do
-  l <- interpretLabel c
+  l <- interpretEnumValue c
   return $ CaseLabel l
 
 interpretClause :: TreePlus -> WithEnv (Case, WeakTermPlus)
@@ -168,7 +177,26 @@ interpretClause (_, TreeNode [c, e]) = do
 interpretClause e =
   throwError $ "interpretClause: syntax error:\n " ++ Pr.ppShow e
 
-asArrayIntro :: Case -> WithEnv Identifier
+readNatEnumType :: Identifier -> (Maybe Integer)
+readNatEnumType str -- n1, n2, ..., n{i}, ..., n{2^64}
+  | length str >= 2
+  , head str == 'n'
+  , Just i <- read (tail str)
+  , 1 <= i && i <= 2 ^ (64 :: Integer) = Just i
+readNatEnumType _ = Nothing
+
+readNatEnumValue :: Identifier -> (Maybe (Int, Int))
+readNatEnumValue str -- n1-0, n2-0, n2-1, ...
+  | length str >= 4
+  , head str == 'n'
+  , [iStr, jStr] <- wordsBy '-' (tail str)
+  , Just i <- read iStr
+  , 1 <= i && i <= 2 ^ (64 :: Integer)
+  , Just j <- read jStr
+  , 0 <= j && j <= i - 1 = Just (i, j)
+readNatEnumValue _ = Nothing
+
+asArrayIntro :: Case -> WithEnv EnumValue
 asArrayIntro (CaseLabel l) = return l
 asArrayIntro CaseDefault = throwError "`default` cannot be used in array-intro"
 
