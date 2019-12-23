@@ -108,14 +108,19 @@ interpret t@(m, TreeAtom x) = do
       if isEnum
         then withMeta m $ WeakTermEnum $ EnumTypeLabel x
         else do
-          cenv <- gets constantEnv
-          if x `elem` cenv
+          b <- isConstant x
+          if b
             then withMeta m $ WeakTermTheta x
             else withMeta m $ WeakTermUpsilon x
 interpret t@(m, TreeNode es) =
   if null es
     then throwError $ "interpret: syntax error:\n" ++ Pr.ppShow t
     else interpret (m, TreeNode ((m, TreeAtom "pi-elimination") : es))
+
+isConstant :: Identifier -> WithEnv Bool
+isConstant x = do
+  cenv <- gets constantEnv
+  return $ isEnumNatNumConstant x || x `elem` cenv
 
 interpretIdentifierPlus :: TreePlus -> WithEnv IdentifierPlus
 interpretIdentifierPlus (_, TreeAtom x) = do
@@ -178,25 +183,6 @@ interpretClause (_, TreeNode [c, e]) = do
   return (c', e')
 interpretClause e =
   throwError $ "interpretClause: syntax error:\n " ++ Pr.ppShow e
-
-readNatEnumType :: Identifier -> (Maybe Integer)
-readNatEnumType str -- n1, n2, ..., n{i}, ..., n{2^64}
-  | length str >= 2
-  , head str == 'n'
-  , Just i <- read (tail str)
-  , 1 <= i && i <= 2 ^ (64 :: Integer) = Just i
-readNatEnumType _ = Nothing
-
-readNatEnumValue :: Identifier -> (Maybe (Int, Int))
-readNatEnumValue str -- n1-0, n2-0, n2-1, ...
-  | length str >= 4
-  , head str == 'n'
-  , [iStr, jStr] <- wordsBy '-' (tail str)
-  , Just i <- read iStr
-  , 1 <= i && i <= 2 ^ (64 :: Integer)
-  , Just j <- read jStr
-  , 0 <= j && j <= i - 1 = Just (i, j)
-readNatEnumValue _ = Nothing
 
 asArrayIntro :: Case -> WithEnv EnumValue
 asArrayIntro (CaseValue l) = return l

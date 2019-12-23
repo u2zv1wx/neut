@@ -17,6 +17,32 @@ data EnumType
   | EnumTypeNatNum Int
   deriving (Show, Eq)
 
+readNatEnumType :: Identifier -> (Maybe Integer)
+readNatEnumType str -- n1, n2, ..., n{i}, ..., n{2^64}
+  | length str >= 2
+  , head str == 'n'
+  , Just i <- read (tail str)
+  , 1 <= i && i <= 2 ^ (64 :: Integer) = Just i
+readNatEnumType _ = Nothing
+
+readNatEnumValue :: Identifier -> (Maybe (Int, Int))
+readNatEnumValue str -- n1-0, n2-0, n2-1, ...
+  | length str >= 4
+  , head str == 'n'
+  , [iStr, jStr] <- wordsBy '-' (tail str)
+  , Just i <- read iStr
+  , 1 <= i && i <= 2 ^ (64 :: Integer)
+  , Just j <- read jStr
+  , 0 <= j && j <= i - 1 = Just (i, j)
+readNatEnumValue _ = Nothing
+
+isEnumNatNumConstant :: Identifier -> Bool
+isEnumNatNumConstant x
+  | length x >= 7 -- length "enum.n4" == 7
+  , ["enum", y] <- wordsBy '.' x
+  , Just _ <- readNatEnumType y = True -- enum.n{i} is a constant
+isEnumNatNumConstant _ = False
+
 data EnumValue
   = EnumValueLabel Identifier
   | EnumValueNatNum Int Int
