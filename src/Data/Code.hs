@@ -107,6 +107,9 @@ substTheta sub (ThetaBinaryOp a t v1 v2) = do
   let v2' = substDataPlus sub v2
   ThetaBinaryOp a t v1' v2'
 substTheta sub (ThetaPrint v) = ThetaPrint $ substDataPlus sub v
+substTheta sub (ThetaSysCall sysCall ds) = do
+  let ds' = map (substDataPlus sub) ds
+  ThetaSysCall sysCall ds'
 
 substDataPlusPi ::
      SubstDataPlus -> [(Identifier, CodePlus)] -> [(Identifier, CodePlus)]
@@ -164,3 +167,4 @@ varTheta :: Theta -> [Identifier]
 varTheta (ThetaUnaryOp _ _ d) = varData d
 varTheta (ThetaBinaryOp _ _ d1 d2) = varData d1 ++ varData d2
 varTheta (ThetaPrint d) = varData d
+varTheta (ThetaSysCall _ ds) = concatMap varData ds
