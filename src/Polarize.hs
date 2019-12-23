@@ -626,31 +626,33 @@ polarizeTheta _ _ = throwError "polarize.theta"
 
 polarizeUnaryOp :: Identifier -> UnaryOp -> LowType -> Meta -> WithEnv CodePlus
 polarizeUnaryOp name op lowType m = do
-  let ml = snd $ obtainInfoMeta m
-  (x, varX) <- newDataUpsilon
-  -- どうせcartesianImmediateに噛ませるのでenumなら何でもオーケー
-  let immediateType = (MetaTerminal ml, TermEnum "top")
-  makeClosure
-    (Just name)
-    []
-    m
-    [(x, immediateType)]
-    (ml, CodeTheta (ThetaUnaryOp op lowType varX))
+  let (t, ml) = obtainInfoMeta m
+  case t of
+    (_, TermPi [(x, tx), _]) -> do
+      let varX = toDataUpsilon (x, Nothing)
+      makeClosure
+        (Just name)
+        []
+        m
+        [(x, tx)]
+        (ml, CodeTheta (ThetaUnaryOp op lowType varX))
+    _ -> throwError $ "the arity of " ++ name ++ " is wrongi"
 
 polarizeBinaryOp ::
      Identifier -> BinaryOp -> LowType -> Meta -> WithEnv CodePlus
 polarizeBinaryOp name op lowType m = do
-  let ml = snd $ obtainInfoMeta m
-  (x, varX) <- newDataUpsilon
-  (y, varY) <- newDataUpsilon
-  -- どうせcartesianImmediateに噛ませるのでenumなら何でもオーケー
-  let immediateType = (MetaTerminal ml, TermEnum "top")
-  makeClosure
-    (Just name)
-    []
-    m
-    [(x, immediateType), (y, immediateType)]
-    (ml, CodeTheta (ThetaBinaryOp op lowType varX varY))
+  let (t, ml) = obtainInfoMeta m
+  case t of
+    (_, TermPi [(x, tx), (y, ty), _]) -> do
+      let varX = toDataUpsilon (x, Nothing)
+      let varY = toDataUpsilon (y, Nothing)
+      makeClosure
+        (Just name)
+        []
+        m
+        [(x, tx), (y, ty)]
+        (ml, CodeTheta (ThetaBinaryOp op lowType varX varY))
+    _ -> throwError $ "the arity of " ++ name ++ " is wrongi"
 
 polarizePrint :: Identifier -> Meta -> WithEnv CodePlus
 polarizePrint name m = do
