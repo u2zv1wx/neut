@@ -6,6 +6,9 @@ module Parse.Interpret
 
 import Control.Monad.Except
 import Control.Monad.State
+import Data.Bits ((.&.), shiftR)
+import Data.Char (ord)
+import Data.Word (Word8)
 import Text.Read (readMaybe)
 import qualified Text.Show.Pretty as Pr
 
@@ -99,6 +102,13 @@ interpret (m, TreeAtom x)
 interpret (m, TreeAtom x)
   | Just (i, j) <- readNatEnumValue x =
     withMeta m $ WeakTermEnumIntro $ EnumValueNatNum i j
+interpret (m, TreeAtom x)
+  | Just str <- readMaybe x = do
+    u8s <- forM (encode str) $ \u -> withMeta m (WeakTermIntU 8 (toInteger u))
+    let len = length u8s
+    let ns = map (\i -> EnumValueNatNum len i) [0 .. (len - 1)]
+    -- parse string as utf-8 encoded u8 array
+    withMeta m $ WeakTermArrayIntro (ArrayKindIntU 8) (zip ns u8s)
 interpret t@(m, TreeAtom x) = do
   ml <- interpretEnumValueMaybe t
   case ml of
@@ -207,3 +217,26 @@ withKindPrefix str base
   , Just t' <- asLowTypeMaybe t
   , Just kind <- asArrayKind t' = Just kind
 withKindPrefix _ _ = Nothing
+
+-- adopted from https://hackage.haskell.org/package/utf8-string-1.0.1.1/docs/src/Codec-Binary-UTF8-String.html
+encodeChar :: Char -> [Word8]
+encodeChar = map fromIntegral . go . ord
+  where
+    go oc
+      | oc <= 0x7f = [oc]
+      | oc <= 0x7ff = [0xc0 + (oc `shiftR` 6), 0x80 + oc .&. 0x3f]
+      | oc <= 0xffff =
+        [ 0xe0 + (oc `shiftR` 12)
+        , 0x80 + ((oc `shiftR` 6) .&. 0x3f)
+        , 0x80 + oc .&. 0x3f
+        ]
+      | otherwise =
+        [ 0xf0 + (oc `shiftR` 18)
+        , 0x80 + ((oc `shiftR` 12) .&. 0x3f)
+        , 0x80 + ((oc `shiftR` 6) .&. 0x3f)
+        , 0x80 + oc .&. 0x3f
+        ]
+
+-- adopted from https://hackage.haskell.org/package/utf8-string-1.0.1.1/docs/src/Codec-Binary-UTF8-String.html
+encode :: String -> [Word8]
+encode = concatMap encodeChar
