@@ -42,7 +42,26 @@ parse' ((_, TreeNode [(_, TreeAtom "keyword"), (_, TreeAtom s)]):as) = do
 parse' ((_, TreeNode ((_, TreeAtom "enum"):(_, TreeAtom name):ts)):as) = do
   indexList <- mapM extractIdentifier ts
   insEnumEnv name indexList
-  parse' as
+  -- `constName` is a proof term that `name` is indeed an enum.
+  -- e.g.) enum.choice : is-enum choice
+  -- example usage:
+  --   print: Pi (A : Univ, prf : is-enum A, str : u8-array A). IO top
+  -- This proof term is translated into the number of the contents of the corresponding enum type.
+  -- Thus, `enum.choice` is, for example, translated into 2, assuming that choice = {left, right}.
+  -- In the example of `print`, this integer in turn represents the length of the array `str`,
+  -- which is indispensable for the system call `write`.
+  let constName = "enum." ++ name
+  modify (\e -> e {constantEnv = constName : constantEnv e})
+  -- type constraint for constName
+  -- e.g. t == is-enum @ (choice)
+  isEnumType <- toIsEnumType name
+  h <- newNameWith "hole"
+  m1 <- newMeta
+  m2 <- newMeta
+  -- add `let (_, is-enum choice) := enum.choice` to defList in order to insert appropriate type constraint
+  let ascription = DefLet m1 (h, isEnumType) (m2, WeakTermTheta constName)
+  defList <- parse' as
+  return $ ascription : defList
 parse' ((_, TreeNode [(_, TreeAtom "include"), (_, TreeAtom pathString)]):as) =
   case readMaybe pathString :: Maybe String of
     Nothing -> throwError "the argument of `include` must be a string"
@@ -100,6 +119,17 @@ isSpecialForm (_, TreeNode [(_, TreeAtom "constant"), (_, TreeAtom _)]) = True
 isSpecialForm (_, TreeNode ((_, TreeAtom "statement"):_)) = True
 isSpecialForm (_, TreeNode [(_, TreeAtom "let"), _, _]) = True
 isSpecialForm _ = False
+
+toIsEnumType :: Identifier -> WithEnv WeakTermPlus
+toIsEnumType name = do
+  m1 <- newMeta
+  m2 <- newMeta
+  m3 <- newMeta
+  return
+    ( m1
+    , WeakTermPiElim
+        (m2, WeakTermTheta "is-enum")
+        [(m3, WeakTermEnum $ EnumTypeLabel name)])
 
 -- Represent the list of Defs in the target language, using `let`.
 -- (Note that `let x := e1 in e2` can be represented as `(lam x e2) e1`.)
