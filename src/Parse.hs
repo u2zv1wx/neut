@@ -8,6 +8,7 @@ import System.Directory
 import System.FilePath
 import Text.Read (readMaybe)
 
+import Data.Basic
 import Data.Env
 import Data.Tree
 import Data.WeakTerm
@@ -107,7 +108,22 @@ concatDefList [] = do
   let t = (WeakMetaTerminal Nothing, WeakTermEnum "top")
   m <- newMetaOfType t
   return (m, WeakTermEnumIntro "unit")
-concatDefList (DefLet meta tu e:es) = do
+concatDefList [DefLet meta xt@(x, t) e] = do
+  let varX = undefined x t
+  m <- newMeta
+  m1 <- newMeta
+  m2 <- newMeta
+  -- let x : t := e in
+  -- unsafe.eval-io x
+  return
+    ( meta
+    , WeakTermPiElim
+        ( m
+        , WeakTermPiIntro
+            [xt]
+            (m1, WeakTermPiElim (m2, WeakTermTheta "unsafe.eval-io") [varX]))
+        [e])
+concatDefList (DefLet meta xt e:es) = do
   cont <- concatDefList es
   m <- newMeta
-  return (meta, WeakTermPiElim (m, WeakTermPiIntro [tu] cont) [e])
+  return (meta, WeakTermPiElim (m, WeakTermPiIntro [xt] cont) [e])
