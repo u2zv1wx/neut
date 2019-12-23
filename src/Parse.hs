@@ -105,7 +105,7 @@ isSpecialForm _ = False
 -- (Note that `let x := e1 in e2` can be represented as `(lam x e2) e1`.)
 concatDefList :: [Def] -> WithEnv WeakTermPlus
 concatDefList [] = do
-  let t = (WeakMetaTerminal Nothing, WeakTermEnum "top")
+  let t = (WeakMetaTerminal Nothing, WeakTermEnum $ EnumTypeLabel "top")
   m <- newMetaOfType t
   return (m, WeakTermEnumIntro $ EnumValueLabel "unit")
 concatDefList [DefLet meta xt@(x, t) e] = do
