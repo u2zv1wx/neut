@@ -36,12 +36,12 @@ readNatEnumValue str -- n1-0, n2-0, n2-1, ...
   , 0 <= j && j <= i - 1 = Just (i, j)
 readNatEnumValue _ = Nothing
 
-isEnumNatNumConstant :: Identifier -> Bool
-isEnumNatNumConstant x
+asEnumNatNumConstant :: Identifier -> Maybe Integer
+asEnumNatNumConstant x
   | length x >= 7 -- length "enum.n4" == 7
   , ["enum", y] <- wordsBy '.' x
-  , Just _ <- readNatEnumType y = True -- enum.n{i} is a constant
-isEnumNatNumConstant _ = False
+  , Just i <- readNatEnumType y = Just i -- enum.n{i} is a constant
+asEnumNatNumConstant _ = Nothing
 
 data EnumValue
   = EnumValueLabel Identifier

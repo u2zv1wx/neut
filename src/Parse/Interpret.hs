@@ -118,9 +118,11 @@ interpret t@(m, TreeNode es) =
     else interpret (m, TreeNode ((m, TreeAtom "pi-elimination") : es))
 
 isConstant :: Identifier -> WithEnv Bool
-isConstant x = do
-  cenv <- gets constantEnv
-  return $ isEnumNatNumConstant x || x `elem` cenv
+isConstant x
+  | Just _ <- asEnumNatNumConstant x = return True
+  | otherwise = do
+    cenv <- gets constantEnv
+    return $ x `elem` cenv
 
 interpretIdentifierPlus :: TreePlus -> WithEnv IdentifierPlus
 interpretIdentifierPlus (_, TreeAtom x) = do

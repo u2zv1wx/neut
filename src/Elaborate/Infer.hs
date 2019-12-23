@@ -39,10 +39,14 @@ type Context = [(Identifier, WeakTermPlus)]
 -- Calculi and Applications, 2011.
 infer :: Context -> WeakTermPlus -> WithEnv WeakTermPlus
 infer _ (meta, WeakTermTau) = returnAfterUpdate meta univ -- univ : univ
-infer _ (meta, WeakTermTheta x) = do
-  h <- newHoleInCtx [] -- constants do not depend on their context
-  insTypeEnv x h
-  returnAfterUpdate meta h
+infer _ (meta, WeakTermTheta x)
+  | Just i <- asEnumNatNumConstant x = do
+    t <- toIsEnumType $ fromInteger i
+    returnAfterUpdate meta t -- enum.n{i} : is-enum n{i}
+  | otherwise = do
+    h <- newHoleInCtx [] -- constants do not depend on their context
+    insTypeEnv x h
+    returnAfterUpdate meta h
 infer _ (meta, WeakTermUpsilon x) = do
   t <- lookupTypeEnv x
   returnAfterUpdate meta t
@@ -270,3 +274,20 @@ writeWeakMetaType (WeakMetaTerminal _) mt =
   case mt of
     Nothing -> return ()
     Just t -> insConstraintEnv univ t
+
+-- is-enum n{i}
+toIsEnumType :: Int -> WithEnv WeakTermPlus
+toIsEnumType i = do
+  piType <- univToUniv
+  piMeta <- newMetaOfType piType
+  return
+    ( newMetaTerminal
+    , WeakTermPiElim
+        (piMeta, WeakTermTheta "is-enum")
+        [(newMetaTerminal, WeakTermEnum $ EnumTypeNatNum i)])
+
+-- Univ -> Univ
+univToUniv :: WithEnv WeakTermPlus
+univToUniv = do
+  h <- newNameWith "hole"
+  return (newMetaTerminal, WeakTermPi [(h, univ)] univ)
