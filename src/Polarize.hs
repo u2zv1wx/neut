@@ -657,7 +657,7 @@ polarizePrint :: Identifier -> Meta -> WithEnv CodePlus
 polarizePrint name m = do
   let ml = snd $ obtainInfoMeta m
   (x, varX) <- newDataUpsilon
-  let i64Type = (MetaTerminal ml, TermEnum "i64")
+  let i64Type = (MetaTerminal ml, TermEnum $ EnumTypeLabel "i64")
   makeClosure (Just name) [] m [(x, i64Type)] (ml, CodeTheta (ThetaPrint varX))
 
 --    unsafe.eval-io

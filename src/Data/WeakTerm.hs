@@ -26,7 +26,7 @@ data WeakTerm
   | WeakTermFloat32 Float
   | WeakTermFloat64 Double
   | WeakTermFloat Double
-  | WeakTermEnum Identifier
+  | WeakTermEnum EnumType
   | WeakTermEnumIntro EnumValue
   | WeakTermEnumElim WeakTermPlus [(Case, WeakTermPlus)]
   | WeakTermArray ArrayKind WeakTermPlus WeakTermPlus

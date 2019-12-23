@@ -20,7 +20,7 @@ data Term
   | TermFloat16 Half
   | TermFloat32 Float
   | TermFloat64 Double
-  | TermEnum Identifier
+  | TermEnum EnumType
   | TermEnumIntro EnumValue
   | TermEnumElim TermPlus [(Case, TermPlus)]
   | TermArray ArrayKind TermPlus TermPlus

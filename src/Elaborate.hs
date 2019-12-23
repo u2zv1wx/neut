@@ -194,13 +194,11 @@ exhaust' (_, WeakTermArrayIntro _ les) = do
   allM exhaust' es
 exhaust' (_, WeakTermArrayElim _ e1 e2) = allM exhaust' [e1, e2]
 
-exhaustEnumIdentifier :: Identifier -> [Case] -> Bool -> WithEnv Bool
-exhaustEnumIdentifier x labelList b1 = do
+exhaustEnumIdentifier :: EnumType -> [Case] -> Bool -> WithEnv Bool
+exhaustEnumIdentifier (EnumTypeLabel x) labelList b1 = do
   eenv <- gets enumEnv
   case lookup x eenv of
-    Nothing
-    -- xはi32とかそのへんのやつ。このときはlabelListにdefaultが入っていないとダメ。
-     -> return $ CaseDefault `elem` labelList
+    Nothing -> return $ CaseDefault `elem` labelList
     Just ls ->
       if length ls <= length (nub labelList)
         then return $ b1 && True

@@ -12,6 +12,11 @@ data Case
   | CaseDefault
   deriving (Show, Eq)
 
+data EnumType
+  = EnumTypeLabel Identifier
+  | EnumTypeNatNum Int
+  deriving (Show, Eq)
+
 data EnumValue
   = EnumValueLabel Identifier
   | EnumValueNatNum Int Int

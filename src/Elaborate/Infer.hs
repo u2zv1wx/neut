@@ -95,9 +95,9 @@ infer _ (meta, WeakTermEnumIntro labelOrNum) = do
   case labelOrNum of
     EnumValueLabel l -> do
       k <- lookupKind l
-      returnAfterUpdate meta (newMetaTerminal, WeakTermEnum k)
+      returnAfterUpdate meta (newMetaTerminal, WeakTermEnum $ EnumTypeLabel k)
     EnumValueNatNum i _ ->
-      returnAfterUpdate meta (newMetaTerminal, WeakTermEnum $ "n" ++ show i)
+      returnAfterUpdate meta (newMetaTerminal, WeakTermEnum $ EnumTypeNatNum i)
 infer ctx (meta, WeakTermEnumElim e branchList) = do
   te <- infer ctx e
   if null branchList
@@ -215,9 +215,9 @@ inferCase :: Case -> WithEnv (Maybe WeakTermPlus)
 inferCase (CaseValue (EnumValueLabel name)) = do
   ienv <- gets enumEnv
   k <- lookupKind' name ienv
-  return $ Just (newMetaTerminal, WeakTermEnum k)
+  return $ Just (newMetaTerminal, WeakTermEnum $ EnumTypeLabel k)
 inferCase (CaseValue (EnumValueNatNum i _)) =
-  return $ Just (newMetaTerminal, WeakTermEnum $ "n" ++ show i)
+  return $ Just (newMetaTerminal, WeakTermEnum $ EnumTypeNatNum i)
 inferCase _ = return Nothing
 
 --    inferList ctx [e1, ..., en]

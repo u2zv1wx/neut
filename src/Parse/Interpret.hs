@@ -56,12 +56,13 @@ interpret (m, TreeNode [(_, TreeAtom "f32"), (_, TreeAtom x)])
 interpret (m, TreeNode [(_, TreeAtom "f64"), (_, TreeAtom x)])
   | Just x' <- readMaybe x = do withMeta m $ WeakTermFloat64 x'
 interpret (m, TreeNode [(_, TreeAtom "enum"), (_, TreeAtom x)])
-  | Just i <- readNatEnumType x = withMeta m $ WeakTermEnum $ "n" ++ show i
+  | Just i <- readNatEnumType x =
+    withMeta m $ WeakTermEnum $ EnumTypeNatNum $ fromInteger i
 interpret (m, TreeNode [(_, TreeAtom "enum"), (_, TreeAtom x)]) = do
   isEnum <- isDefinedEnumName x
   if not isEnum
     then throwError $ "No such enum-type defined: " ++ x
-    else withMeta m $ WeakTermEnum x
+    else withMeta m $ WeakTermEnum $ EnumTypeLabel x
 interpret (m, TreeNode [(_, TreeAtom "enum-introduction"), l]) = do
   l' <- interpretEnumValue l
   withMeta m $ WeakTermEnumIntro l'
@@ -93,7 +94,8 @@ interpret (m, TreeAtom x)
 interpret (m, TreeAtom x)
   | Just x' <- readMaybe x = withMeta m $ WeakTermFloat x'
 interpret (m, TreeAtom x)
-  | Just i <- readNatEnumType x = withMeta m $ WeakTermEnum $ "n" ++ show i
+  | Just i <- readNatEnumType x =
+    withMeta m $ WeakTermEnum $ EnumTypeNatNum $ fromInteger i
 interpret (m, TreeAtom x)
   | Just (i, j) <- readNatEnumValue x =
     withMeta m $ WeakTermEnumIntro $ EnumValueNatNum i j
@@ -104,7 +106,7 @@ interpret t@(m, TreeAtom x) = do
     _ -> do
       isEnum <- isDefinedEnumName x
       if isEnum
-        then withMeta m $ WeakTermEnum x
+        then withMeta m $ WeakTermEnum $ EnumTypeLabel x
         else do
           cenv <- gets constantEnv
           if x `elem` cenv
