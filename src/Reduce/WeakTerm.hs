@@ -344,5 +344,5 @@ computeFloat x y BinaryOpLE _ = Left $ asEnum $ x <= y
 computeFloat _ _ _ e = Left e
 
 asEnum :: Bool -> WeakTerm
-asEnum True = WeakTermEnumIntro "true"
-asEnum False = WeakTermEnumIntro "false"
+asEnum True = WeakTermEnumIntro $ EnumValueLabel "true"
+asEnum False = WeakTermEnumIntro $ EnumValueLabel "false"

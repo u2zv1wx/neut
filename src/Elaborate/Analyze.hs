@@ -193,8 +193,8 @@ simpBinder' xts1 xts2 cs = do
   simp $ zip (map snd xts1) xts2' ++ cs
 
 simpArrayIntro ::
-     [(Identifier, WeakTermPlus)]
-  -> [(Identifier, WeakTermPlus)]
+     [(EnumValue, WeakTermPlus)]
+  -> [(EnumValue, WeakTermPlus)]
   -> WithEnv [EnrichedConstraint]
 simpArrayIntro les1 les2 = do
   let les1' = sortBy (\x y -> fst x `compare` fst y) les1

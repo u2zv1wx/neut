@@ -15,7 +15,7 @@ data Case
 data EnumValue
   = EnumValueLabel Identifier
   | EnumValueNatNum Int Int
-  deriving (Show, Eq)
+  deriving (Show, Eq, Ord)
 
 data LowType
   = LowTypeIntS IntSize
