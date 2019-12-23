@@ -14,7 +14,7 @@ data WeakTerm
   = WeakTermTau
   | WeakTermTheta Identifier
   | WeakTermUpsilon Identifier
-  | WeakTermPi [IdentifierPlus]
+  | WeakTermPi [IdentifierPlus] WeakTermPlus
   | WeakTermPiIntro [IdentifierPlus] WeakTermPlus
   | WeakTermPiElim WeakTermPlus [WeakTermPlus]
   | WeakTermMu IdentifierPlus WeakTermPlus
@@ -57,7 +57,7 @@ varWeakTermPlus :: WeakTermPlus -> ([Identifier], [Hole])
 varWeakTermPlus (_, WeakTermTau) = ([], [])
 varWeakTermPlus (_, WeakTermTheta _) = ([], [])
 varWeakTermPlus (_, WeakTermUpsilon x) = ([x], [])
-varWeakTermPlus (_, WeakTermPi xts) = varWeakTermPlusBindings xts []
+varWeakTermPlus (_, WeakTermPi xts t) = varWeakTermPlusBindings xts [t]
 varWeakTermPlus (_, WeakTermPiIntro xts e) = varWeakTermPlusBindings xts [e]
 varWeakTermPlus (_, WeakTermPiElim e es) =
   pairwiseConcat $ varWeakTermPlus e : map varWeakTermPlus es
@@ -112,10 +112,10 @@ substWeakTermPlus sub (m, WeakTermTheta t) = do
 substWeakTermPlus sub (m, WeakTermUpsilon x) = do
   m' <- substWeakMeta sub m
   return $ fromMaybe (m', WeakTermUpsilon x) (lookup x sub)
-substWeakTermPlus sub (m, WeakTermPi xts) = do
+substWeakTermPlus sub (m, WeakTermPi xts t) = do
   m' <- substWeakMeta sub m
-  xts' <- substWeakTermPlusBindings sub xts
-  return (m', WeakTermPi xts')
+  (xts', t') <- substWeakTermPlusBindingsWithBody sub xts t
+  return (m', WeakTermPi xts' t')
 substWeakTermPlus sub (m, WeakTermPiIntro xts body) = do
   m' <- substWeakMeta sub m
   (xts', body') <- substWeakTermPlusBindingsWithBody sub xts body
@@ -182,18 +182,6 @@ substWeakTermPlus sub (m, WeakTermArrayElim kind e1 e2) = do
   e2' <- substWeakTermPlus sub e2
   return (m', WeakTermArrayElim kind e1' e2')
 
-substWeakTermPlusBindings ::
-     (MonadIO m, MonadError String m)
-  => SubstWeakTerm
-  -> [IdentifierPlus]
-  -> m [IdentifierPlus]
-substWeakTermPlusBindings _ [] = return []
-substWeakTermPlusBindings sub ((x, t):xts) = do
-  let sub' = filter (\(k, _) -> k /= x) sub
-  xts' <- substWeakTermPlusBindings sub' xts
-  t' <- substWeakTermPlus sub t
-  return $ (x, t') : xts'
-
 substWeakTermPlusBindingsWithBody ::
      (MonadIO m, MonadError String m)
   => SubstWeakTerm
@@ -225,7 +213,7 @@ isReducible :: WeakTermPlus -> Bool
 isReducible (_, WeakTermTau) = False
 isReducible (_, WeakTermTheta _) = False
 isReducible (_, WeakTermUpsilon _) = False
-isReducible (_, WeakTermPi _) = False
+isReducible (_, WeakTermPi _ _) = False
 isReducible (_, WeakTermPiIntro {}) = False
 isReducible (_, WeakTermPiElim (_, WeakTermPiIntro xts _) es)
   | length xts == length es = True

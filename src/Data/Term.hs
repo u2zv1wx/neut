@@ -11,7 +11,7 @@ data Term
   = TermTau
   | TermTheta Identifier
   | TermUpsilon Identifier
-  | TermPi [IdentifierPlus]
+  | TermPi [IdentifierPlus] TermPlus
   | TermPiIntro [IdentifierPlus] TermPlus
   | TermPiElim TermPlus [TermPlus]
   | TermMu (Identifier, TermPlus) TermPlus
@@ -65,7 +65,7 @@ getClosedVarChain (m, TermUpsilon x) =
   case m of
     MetaTerminal ml -> [(x, ml, (m, TermTau))]
     MetaNonTerminal t ml -> getClosedVarChain t ++ [(x, ml, t)]
-getClosedVarChain (_, TermPi xts) = getClosedVarChainBindings xts []
+getClosedVarChain (_, TermPi xts t) = getClosedVarChainBindings xts [t]
 getClosedVarChain (_, TermPiIntro xts e) = getClosedVarChainBindings xts [e]
 getClosedVarChain (_, TermPiElim e es) =
   getClosedVarChain e ++ concatMap getClosedVarChain es
@@ -104,9 +104,9 @@ substTermPlus sub (m, TermTau) = (substMeta sub m, TermTau)
 substTermPlus sub (m, TermTheta t) = (substMeta sub m, TermTheta t)
 substTermPlus sub (m, TermUpsilon x) =
   fromMaybe (substMeta sub m, TermUpsilon x) (lookup x sub)
-substTermPlus sub (m, TermPi xts) = do
-  let xts' = substTermPlusBindings sub xts
-  (substMeta sub m, TermPi xts')
+substTermPlus sub (m, TermPi xts t) = do
+  let (xts', t') = substTermPlusBindingsWithBody sub xts t
+  (substMeta sub m, TermPi xts' t')
 substTermPlus sub (m, TermPiIntro xts body) = do
   let (xts', body') = substTermPlusBindingsWithBody sub xts body
   (substMeta sub m, TermPiIntro xts' body')
@@ -142,13 +142,6 @@ substTermPlus sub (m, TermArrayElim k e1 e2) = do
   let e1' = substTermPlus sub e1
   let e2' = substTermPlus sub e2
   (substMeta sub m, TermArrayElim k e1' e2')
-
-substTermPlusBindings :: SubstTerm -> [IdentifierPlus] -> [IdentifierPlus]
-substTermPlusBindings _ [] = []
-substTermPlusBindings sub ((x, t):xts) = do
-  let sub' = filter (\(k, _) -> k /= x) sub
-  let xts' = substTermPlusBindings sub' xts
-  (x, substTermPlus sub t) : xts'
 
 substTermPlusBindingsWithBody ::
      SubstTerm -> [IdentifierPlus] -> TermPlus -> ([IdentifierPlus], TermPlus)

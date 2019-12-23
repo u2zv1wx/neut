@@ -27,7 +27,7 @@ polarize (m, TermTheta x) = polarizeTheta m x
 polarize (m, TermUpsilon x) = do
   let ml = snd $ obtainInfoMeta m
   return (ml, CodeUpIntro (ml, DataUpsilon x))
-polarize (m, TermPi _) = do
+polarize (m, TermPi _ _) = do
   let ml = snd $ obtainInfoMeta m
   tau <- cartesianImmediate ml
   (envVarName, envVar) <- newDataUpsilon
@@ -52,8 +52,7 @@ polarize (m, TermMu (f, t) e) = do
   let (nameList, _, typeList) = unzip3 $ obtainFreeVarList [f] e
   let fvs = zip nameList typeList
   let fvs' = map toTermUpsilon fvs
-  h <- newNameWith "hole"
-  let clsMuType = (MetaTerminal ml, TermPi $ fvs ++ [(h, t)])
+  let clsMuType = (MetaTerminal ml, TermPi fvs t)
   let lamBody =
         substTermPlus
           [ ( f
@@ -628,7 +627,7 @@ polarizeUnaryOp :: Identifier -> UnaryOp -> LowType -> Meta -> WithEnv CodePlus
 polarizeUnaryOp name op lowType m = do
   let (t, ml) = obtainInfoMeta m
   case t of
-    (_, TermPi [(x, tx), _]) -> do
+    (_, TermPi [(x, tx)] _) -> do
       let varX = toDataUpsilon (x, Nothing)
       makeClosure
         (Just name)
@@ -643,7 +642,7 @@ polarizeBinaryOp ::
 polarizeBinaryOp name op lowType m = do
   let (t, ml) = obtainInfoMeta m
   case t of
-    (_, TermPi [(x, tx), (y, ty), _]) -> do
+    (_, TermPi [(x, tx), (y, ty)] _) -> do
       let varX = toDataUpsilon (x, Nothing)
       let varY = toDataUpsilon (y, Nothing)
       makeClosure
@@ -671,7 +670,7 @@ polarizeEvalIO :: Meta -> WithEnv CodePlus
 polarizeEvalIO m = do
   let (t, ml) = obtainInfoMeta m
   case t of
-    (_, TermPi [arg, _]) -> do
+    (_, TermPi [arg] _) -> do
       (resultValue, resultValueVar) <- newDataUpsilon
       (sig, sigVar) <- newDataUpsilon
       resultEnv <- newNameWith "env"
@@ -706,9 +705,8 @@ polarizeSysCall ::
 polarizeSysCall name sysCall argLen argIdxList m = do
   let (t, ml) = obtainInfoMeta m
   case t of
-    (_, TermPi xts)
-      -- (+1) is required since xts containts the type of cod
-      | length xts == argLen + 1 -> do
+    (_, TermPi xts _)
+      | length xts == argLen -> do
         let ys = map (\i -> toVar $ fst $ xts !! i) argIdxList
         makeClosure
           (Just name)

@@ -54,10 +54,11 @@ elaborate' (m, WeakTermTheta x) = do
 elaborate' (m, WeakTermUpsilon x) = do
   m' <- toMeta m
   return (m', TermUpsilon x)
-elaborate' (m, WeakTermPi xts) = do
+elaborate' (m, WeakTermPi xts t) = do
   m' <- toMeta m
   xts' <- mapM elaboratePlus xts
-  return (m', TermPi xts')
+  t' <- elaborate' t
+  return (m', TermPi xts' t')
 elaborate' (m, WeakTermPiIntro xts e) = do
   m' <- toMeta m
   e' <- elaborate' e
@@ -71,7 +72,7 @@ elaborate' (m, WeakTermPiElim e es) = do
 elaborate' (m, WeakTermMu (x, t) e) = do
   t' <- elaborate' t >>= reduceTermPlus
   case t' of
-    (_, TermPi _) -> do
+    (_, TermPi _ _) -> do
       m' <- toMeta m
       e' <- elaborate' e
       return (m', TermMu (x, t') e')
@@ -165,7 +166,7 @@ exhaust' :: WeakTermPlus -> WithEnv Bool
 exhaust' (_, WeakTermTau) = return True
 exhaust' (_, WeakTermTheta _) = return True
 exhaust' (_, WeakTermUpsilon _) = return True
-exhaust' (_, WeakTermPi xts) = allM exhaust' $ map snd xts
+exhaust' (_, WeakTermPi xts t) = allM exhaust' $ t : map snd xts
 exhaust' (_, WeakTermPiIntro _ e) = exhaust' e
 exhaust' (_, WeakTermPiElim e es) = allM exhaust' $ e : es
 exhaust' (_, WeakTermMu _ e) = exhaust' e

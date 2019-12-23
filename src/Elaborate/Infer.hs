@@ -2,7 +2,6 @@ module Elaborate.Infer
   ( infer
   , readWeakMetaType
   , writeWeakMetaType
-  , withHole
   ) where
 
 import Control.Monad.Except
@@ -47,8 +46,8 @@ infer _ (meta, WeakTermTheta x) = do
 infer _ (meta, WeakTermUpsilon x) = do
   t <- lookupTypeEnv x
   returnAfterUpdate meta t
-infer ctx (meta, WeakTermPi xts) = do
-  us <- inferPi ctx xts
+infer ctx (meta, WeakTermPi xts t) = do
+  us <- inferPi ctx xts t
   constrainList $ univ : us
   returnAfterUpdate meta univ
 infer ctx (meta, WeakTermPiIntro xts e) = inferPiIntro ctx meta xts e
@@ -59,8 +58,7 @@ infer ctx (meta, WeakTermPiElim e es) = do
   -- codHole = ?M
   -- cod = ?M @ ctx @ x1 @ ... @ xn
   (codHole, cod) <- newHoleInCtx' (ctx ++ xts)
-  h <- newNameWith "hole"
-  let tPi' = (newMetaTerminal, WeakTermPi $ xts ++ [(h, cod)])
+  let tPi' = (newMetaTerminal, WeakTermPi xts cod)
   insConstraintEnv tPi tPi'
   -- codAfterElim == ?M @ ctx @ e1 @ ... @ en
   codAfterElim <- newCtxAppHole ctx codHole es
@@ -153,19 +151,25 @@ inferPiIntro' ::
   -> WeakTermPlus
   -> WithEnv WeakTermPlus
 inferPiIntro' ctx meta [] zts e = do
-  (_, codPlus) <- infer ctx e >>= withHole
-  returnAfterUpdate meta (newMetaTerminal, WeakTermPi $ zts ++ [codPlus])
+  cod <- infer ctx e
+  returnAfterUpdate meta (newMetaTerminal, WeakTermPi zts cod)
 inferPiIntro' ctx meta ((x, t):xts) zts e = do
   _ <- inferType ctx t
   insTypeEnv x t
   inferPiIntro' (ctx ++ [(x, t)]) meta xts zts e
 
-inferPi :: Context -> [(Identifier, WeakTermPlus)] -> WithEnv [WeakTermPlus]
-inferPi _ [] = return []
-inferPi ctx ((x, t):xts) = do
+inferPi ::
+     Context
+  -> [(Identifier, WeakTermPlus)]
+  -> WeakTermPlus
+  -> WithEnv [WeakTermPlus]
+inferPi ctx [] cod = do
+  u <- inferType ctx cod
+  return [u]
+inferPi ctx ((x, t):xts) cod = do
   u <- inferType ctx t
   insTypeEnv x t
-  us <- inferPi (ctx ++ [(x, t)]) xts
+  us <- inferPi (ctx ++ [(x, t)]) xts cod
   return $ u : us
 
 -- In a context (x1 : A1, ..., xn : An), this function creates metavariables
@@ -179,23 +183,24 @@ newHoleInCtx ctx = snd <$> newHoleInCtx' ctx
 
 newHoleInCtx' :: Context -> WithEnv (WeakTermPlus, WeakTermPlus)
 newHoleInCtx' ctx = do
-  (_, univPlus) <- withHole univ
-  let higherPi = (newMetaTerminal, WeakTermPi $ ctx ++ [univPlus])
+  let higherPi = (newMetaTerminal, WeakTermPi ctx univ)
   higherHole <- newHoleOfType higherPi
   varSeq <- mapM (uncurry toVar) ctx
-  (_, appPlus) <- withHole (newMetaTerminal, WeakTermPiElim higherHole varSeq)
-  let pi = (newMetaTerminal, WeakTermPi $ ctx ++ [appPlus])
+  let app = (newMetaTerminal, WeakTermPiElim higherHole varSeq)
+  let pi = (newMetaTerminal, WeakTermPi ctx app)
   hole <- newHoleOfType pi
   newHoleInCtx'' ctx hole
 
 newHoleInCtx'' ::
      Context -> WeakTermPlus -> WithEnv (WeakTermPlus, WeakTermPlus)
-newHoleInCtx'' ctx hole = do
-  (_, univPlus) <- withHole univ
-  let higherPi = (newMetaTerminal, WeakTermPi $ ctx ++ [univPlus])
+newHoleInCtx'' ctx hole
+  -- (_, univPlus) <- withHole univ
+  -- let higherPi = (newMetaTerminal, WeakTermPi $ ctx ++ [univPlus])
+ = do
+  let higherPi = (newMetaTerminal, WeakTermPi ctx univ)
   higherHole <- newHoleOfType higherPi
   varSeq <- mapM (uncurry toVar) ctx
-  (app, _) <- withHole (newMetaTerminal, WeakTermPiElim higherHole varSeq)
+  let app = (newMetaTerminal, WeakTermPiElim higherHole varSeq)
   app' <- wrapWithType app (WeakTermPiElim hole varSeq)
   return (hole, app')
 
@@ -249,11 +254,6 @@ returnAfterUpdate m t = do
 
 univ :: WeakTermPlus
 univ = (WeakMetaTerminal Nothing, WeakTermTau)
-
-withHole :: WeakTermPlus -> WithEnv (WeakTermPlus, IdentifierPlus)
-withHole t = do
-  h <- newNameWith "hole"
-  return (t, (h, t))
 
 wrapWithType :: WeakTermPlus -> WeakTerm -> WithEnv WeakTermPlus
 wrapWithType t e = do

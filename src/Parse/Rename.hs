@@ -15,9 +15,9 @@ rename (m, WeakTermTheta x) = return (m, WeakTermTheta x)
 rename (m, WeakTermUpsilon x) = do
   x' <- lookupNameEnv x
   return (m, WeakTermUpsilon x')
-rename (m, WeakTermPi xts) = do
-  xts' <- renameBinder xts
-  return (m, WeakTermPi xts')
+rename (m, WeakTermPi xts t) = do
+  (xts', t') <- renameBinderWithBody xts t
+  return (m, WeakTermPi xts' t')
 rename (m, WeakTermPiIntro xts e) = do
   (xts', e') <- renameBinderWithBody xts e
   return (m, WeakTermPiIntro xts' e')
@@ -59,15 +59,6 @@ rename (m, WeakTermArrayElim kind e1 e2) = do
   e1' <- rename e1
   e2' <- rename e2
   return (m, WeakTermArrayElim kind e1' e2')
-
-renameBinder :: [IdentifierPlus] -> WithEnv [IdentifierPlus]
-renameBinder [] = return []
-renameBinder ((x, t):xts) = do
-  t' <- rename t
-  local $ do
-    x' <- newNameWith x
-    xts' <- renameBinder xts
-    return $ (x', t') : xts'
 
 renameBinderWithBody ::
      [IdentifierPlus]

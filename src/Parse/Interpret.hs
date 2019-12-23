@@ -25,8 +25,7 @@ interpret (m, TreeNode [(_, TreeAtom "upsilon"), (_, TreeAtom x)]) =
   withMeta m $ WeakTermUpsilon x
 interpret (m, TreeNode [(_, TreeAtom "pi"), (_, TreeNode xts), t]) = do
   (xts', t') <- interpretBinder xts t
-  h <- newNameWith "hole"
-  withMeta m $ WeakTermPi $ xts' ++ [(h, t')]
+  withMeta m $ WeakTermPi xts' t'
 interpret (m, TreeNode [(_, TreeAtom "pi-introduction"), (_, TreeNode xts), e]) = do
   xts' <- mapM interpretIdentifierPlus xts
   e' <- interpret e

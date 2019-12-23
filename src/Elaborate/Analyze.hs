@@ -40,8 +40,9 @@ simp (((m1, WeakTermTheta x), (m2, WeakTermTheta y)):cs)
   | x == y = simpMetaRet m1 m2 (simp cs)
 simp (((m1, WeakTermUpsilon x1), (m2, WeakTermUpsilon x2)):cs)
   | x1 == x2 = simpMetaRet m1 m2 (simp cs)
-simp (((m1, WeakTermPi xts1), (m2, WeakTermPi xts2)):cs)
-  | length xts1 == length xts2 = simpMetaRet m1 m2 $ simpBinder' xts1 xts2 cs
+simp (((m1, WeakTermPi xts1 cod1), (m2, WeakTermPi xts2 cod2)):cs)
+  | length xts1 == length xts2 =
+    simpMetaRet m1 m2 $ simpBinder xts1 cod1 xts2 cod2 cs
 simp (((m1, WeakTermPiIntro xts1 e1), (m2, WeakTermPiIntro xts2 e2)):cs) =
   simpMetaRet m1 m2 $ simpBinder xts1 e1 xts2 e2 cs
 simp (((m1, WeakTermPiIntro xts body1@(bodyMeta, _)), e2@(m2, _)):cs) = do
