@@ -226,8 +226,8 @@ llvmDataLet x (_, DataFloat32 f) cont =
   llvmUncastLet x (LLVMDataFloat32 f) (LowTypeFloat FloatSize32) cont
 llvmDataLet x (_, DataFloat64 f) cont =
   llvmUncastLet x (LLVMDataFloat64 f) (LowTypeFloat FloatSize64) cont
-llvmDataLet x (m, DataEnumIntro label) cont = do
-  i <- toInteger <$> getEnumNum label
+llvmDataLet x (m, DataEnumIntro labelOrNat) cont = do
+  i <- enumValueToInteger labelOrNat
   llvmDataLet x (m, DataIntS 64 i) cont
 llvmDataLet x (_, DataArrayIntro k lds) cont = do
   ds <- reorder lds
@@ -235,11 +235,17 @@ llvmDataLet x (_, DataArrayIntro k lds) cont = do
   let arrayType = LowTypeArrayPtr (length ds) elemType
   storeContent x elemType arrayType ds cont
 
-reorder :: [(Identifier, a)] -> WithEnv [a]
+reorder :: [(EnumValue, a)] -> WithEnv [a]
 reorder lds = do
   let (ls, ds) = unzip lds
-  is <- mapM getEnumNum ls
+  is <- mapM enumValueToInteger ls
   return $ map snd $ sortBy (\(i, _) (j, _) -> i `compare` j) $ zip is ds
+
+enumValueToInteger :: EnumValue -> WithEnv Integer
+enumValueToInteger labelOrNat =
+  case labelOrNat of
+    EnumValueLabel l -> toInteger <$> getEnumNum l
+    EnumValueNatNum _ j -> return $ toInteger j
 
 sysCallNumAsInt :: SysCall -> WithEnv LLVMData
 sysCallNumAsInt num = do
@@ -264,8 +270,8 @@ constructSwitch [] = return Nothing
 constructSwitch [(CaseLabel _, code)] = do
   code' <- llvmCode code
   return $ Just (code', [])
-constructSwitch ((CaseLabel x, code):rest) = do
-  i <- getEnumNum x
+constructSwitch ((CaseLabel l, code):rest) = do
+  i <- fromInteger <$> enumValueToInteger l
   code' <- llvmCode code
   m <- constructSwitch rest
   return $ do
