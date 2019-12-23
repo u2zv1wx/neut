@@ -117,7 +117,7 @@ infer ctx (meta, WeakTermArray _ from to) = do
 infer ctx (meta, WeakTermArrayIntro kind les) = do
   tCod <- inferKind kind
   let (ls, es) = unzip les
-  tls <- mapM (inferCase . CaseLabel) ls
+  tls <- mapM (inferCase . CaseValue) ls
   constrainList $ catMaybes tls
   ts <- mapM (infer ctx) es
   constrainList $ tCod : ts
@@ -212,11 +212,11 @@ newCtxAppHole ctx hole es = do
   return appHole
 
 inferCase :: Case -> WithEnv (Maybe WeakTermPlus)
-inferCase (CaseLabel (EnumValueLabel name)) = do
+inferCase (CaseValue (EnumValueLabel name)) = do
   ienv <- gets enumEnv
   k <- lookupKind' name ienv
   return $ Just (newMetaTerminal, WeakTermEnum k)
-inferCase (CaseLabel (EnumValueNatNum i _)) =
+inferCase (CaseValue (EnumValueNatNum i _)) =
   return $ Just (newMetaTerminal, WeakTermEnum $ "n" ++ show i)
 inferCase _ = return Nothing
 

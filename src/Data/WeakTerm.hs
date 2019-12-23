@@ -259,7 +259,7 @@ isReducible (_, WeakTermEnum _) = False
 isReducible (_, WeakTermEnumIntro _) = False
 isReducible (_, WeakTermEnumElim (_, WeakTermEnumIntro l) branchList) = do
   let (caseList, _) = unzip branchList
-  CaseLabel l `elem` caseList || CaseDefault `elem` caseList
+  CaseValue l `elem` caseList || CaseDefault `elem` caseList
 isReducible (_, WeakTermEnumElim e _) = isReducible e
 isReducible (_, WeakTermArray {}) = False
 isReducible (_, WeakTermArrayIntro _ les) = any isReducible $ map snd les

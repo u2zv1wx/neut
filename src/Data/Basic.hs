@@ -8,7 +8,7 @@ type Identifier = String
 type Loc = (Int, Int)
 
 data Case
-  = CaseLabel EnumValue
+  = CaseValue EnumValue
   | CaseDefault
   deriving (Show, Eq)
 

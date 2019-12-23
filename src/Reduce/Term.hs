@@ -32,7 +32,7 @@ reduceTermPlus (m, TermEnumElim e branchList) = do
   e' <- reduceTermPlus e
   case e' of
     (_, TermEnumIntro l) ->
-      case lookup (CaseLabel l) branchList of
+      case lookup (CaseValue l) branchList of
         Just body -> reduceTermPlus body
         Nothing ->
           case lookup CaseDefault branchList of

@@ -35,7 +35,7 @@ reduceWeakTermPlus (m, WeakTermEnumElim e branchList) = do
   e' <- reduceWeakTermPlus e
   case e' of
     (_, WeakTermEnumIntro l) ->
-      case lookup (CaseLabel l) branchList of
+      case lookup (CaseValue l) branchList of
         Just body -> reduceWeakTermPlus body
         Nothing ->
           case lookup CaseDefault branchList of

@@ -160,14 +160,14 @@ interpretCase :: TreePlus -> WithEnv Case
 -- foundational
 --
 interpretCase (_, TreeNode [(_, TreeAtom "enum-introduction"), l]) = do
-  CaseLabel <$> interpretEnumValue l
+  CaseValue <$> interpretEnumValue l
 interpretCase (_, TreeAtom "default") = return CaseDefault
 --
 -- auxiliary
 --
 interpretCase c = do
   l <- interpretEnumValue c
-  return $ CaseLabel l
+  return $ CaseValue l
 
 interpretClause :: TreePlus -> WithEnv (Case, WeakTermPlus)
 interpretClause (_, TreeNode [c, e]) = do
@@ -197,7 +197,7 @@ readNatEnumValue str -- n1-0, n2-0, n2-1, ...
 readNatEnumValue _ = Nothing
 
 asArrayIntro :: Case -> WithEnv EnumValue
-asArrayIntro (CaseLabel l) = return l
+asArrayIntro (CaseValue l) = return l
 asArrayIntro CaseDefault = throwError "`default` cannot be used in array-intro"
 
 withMeta :: TreeMeta -> WeakTerm -> WithEnv WeakTermPlus
