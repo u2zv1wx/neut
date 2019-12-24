@@ -620,9 +620,6 @@ polarizeTheta m "stdout" = polarize (m, TermIntS 64 1)
 polarizeTheta m "stderr" = polarize (m, TermIntS 64 2)
 polarizeTheta _ _ = throwError "polarize.theta"
 
--- polarize (m, TermIntS size l) = do
---   let ml = snd $ obtainInfoMeta m
---   return (ml, CodeUpIntro (ml, DataIntS size l))
 polarizeUnaryOp :: Identifier -> UnaryOp -> LowType -> Meta -> WithEnv CodePlus
 polarizeUnaryOp name op lowType m = do
   let (t, ml) = obtainInfoMeta m
@@ -705,6 +702,13 @@ polarizeEvalIO m = do
                 (ml, CodeUpIntro resultValueVar)))
     _ -> throwError "the type of unsafe.eval-io is wrong"
 
+-- インデックス部分についての説明。たとえばsystem callとしてのwriteは、対象言語では
+--   unsafe.write : Pi (A : Univ, out : file-descriptor, str : u8-array a, len : is-enum A). top
+-- などと宣言されることになる。他方で実際のsystem callの引数は
+--   write(FILE_DESCRIPTOR, STRING_BUFFER, LENGTH)
+-- という感じなので、unsafe.writeの引数Aの部分が不要である。この不要な部分と必要な部分を指定するためにpolarizeSyscallは
+-- 引数としてインデックスの情報をとっている。unsafe.writeの例で言えば、長さについての情報は4であり、"used arguments" を
+-- 指定する配列は、zero-indexであることに注意して [1, 2, 3] となる。
 polarizeSysCall ::
      Identifier -- the name of theta
   -> SysCall -- the kind of system call
