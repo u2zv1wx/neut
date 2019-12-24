@@ -5,7 +5,6 @@ module Elaborate.Analyze
 
 import Control.Monad.Except
 import Control.Monad.State
-import Data.IORef
 import Data.List
 import qualified Data.PQueue.Min as Q
 import System.Timeout
@@ -15,7 +14,7 @@ import Data.Basic
 import Data.Constraint
 import Data.Env
 import Data.WeakTerm
-import Elaborate.Infer (readWeakMetaType, writeWeakMetaType)
+import Elaborate.Infer (obtainType, readWeakMetaType, univ)
 import Reduce.WeakTerm
 
 analyze :: [PreConstraint] -> WithEnv ()
@@ -47,9 +46,8 @@ simp (((m1, WeakTermPiIntro xts1 e1), (m2, WeakTermPiIntro xts2 e2)):cs) =
   simpMetaRet m1 m2 $ simpBinder xts1 e1 xts2 e2 cs
 simp (((m1, WeakTermPiIntro xts body1@(bodyMeta, _)), e2@(m2, _)):cs) = do
   vs <- mapM (uncurry toVar) xts
-  mt <- readWeakMetaType bodyMeta
-  appMeta <- newMeta
-  writeWeakMetaType appMeta mt
+  t <- obtainType bodyMeta
+  appMeta <- newMetaOfType t
   let comp = simp $ (body1, (appMeta, WeakTermPiElim e2 vs)) : cs
   simpMetaRet m1 m2 comp
 simp ((e1, e2@(_, WeakTermPiIntro {})):cs) = simp $ (e2, e1) : cs
@@ -161,17 +159,21 @@ simpMetaRet m1 m2 comp = do
 simpMeta :: WeakMeta -> WeakMeta -> WithEnv [EnrichedConstraint]
 simpMeta (WeakMetaTerminal _) (WeakMetaTerminal _) = return []
 simpMeta (WeakMetaTerminal _) m2@(WeakMetaNonTerminal _ _) = do
-  r1 <- liftIO $ newIORef (Just (newMetaTerminal, WeakTermTau))
-  simpMeta (WeakMetaNonTerminal (Ref r1) Nothing) m2
+  simpMeta (WeakMetaNonTerminal (Right univ) Nothing) m2
 simpMeta m1@WeakMetaNonTerminal {} m2@(WeakMetaTerminal _) = simpMeta m2 m1
-simpMeta (WeakMetaNonTerminal (Ref r1) _) (WeakMetaNonTerminal (Ref r2) _) = do
-  mt1 <- liftIO $ readIORef r1
-  mt2 <- liftIO $ readIORef r2
-  case (mt1, mt2) of
-    (Just t1, Just t2) -> simp [(t1, t2)]
-    (Just _, Nothing) -> liftIO (writeIORef r2 mt1) >> return []
-    (Nothing, Just _) -> liftIO (writeIORef r1 mt2) >> return []
+simpMeta m1 m2 = do
+  case (readWeakMetaType m1, readWeakMetaType m2) of
+    (Right t1, Right t2) -> simp [(t1, t2)]
+    (Right t1, Left i2) -> simpMeta' i2 t1
+    (Left i1, Right t2) -> simpMeta' i1 t2
     _ -> return []
+
+simpMeta' :: Identifier -> WeakTermPlus -> WithEnv [EnrichedConstraint]
+simpMeta' i t = do
+  mt <- lookupSubstEnv i
+  case mt of
+    Just t' -> simp [(t, t')]
+    Nothing -> return []
 
 simpBinder ::
      [IdentifierPlus]
@@ -194,7 +196,6 @@ simpBinder' xts1 xts2 cs = do
   vs1' <- mapM (uncurry toVar) xts1
   let s = substWeakTermPlus (zip (map fst xts2) vs1')
   xts2' <- mapM (s . snd) xts2
-  -- simp $ zip (map snd xts1) (map (s . snd) xts2) ++ cs
   simp $ zip (map snd xts1) xts2' ++ cs
 
 simpArrayIntro ::

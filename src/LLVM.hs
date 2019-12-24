@@ -13,6 +13,7 @@ import Data.LLVM
 
 toLLVM :: CodePlus -> WithEnv LLVM
 toLLVM mainTerm = do
+  liftIO $ putStrLn $ "toLLVM"
   penv <- gets codeEnv
   forM_ penv $ \(name, (args, e)) -> do
     llvm <- llvmCode e

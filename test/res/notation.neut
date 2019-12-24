@@ -53,5 +53,8 @@
 (notation (definition name (x+) e+)
   (let name (mu name (lambda (x+) e+))))
 
+(constant is-enum)
+
+
 ;; just for test
 (enum top unit)

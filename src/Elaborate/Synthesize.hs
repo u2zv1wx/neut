@@ -11,7 +11,9 @@ import Data.Constraint
 import Data.Env
 import Data.WeakTerm
 import Elaborate.Analyze
-import Elaborate.Infer (readWeakMetaType)
+import Elaborate.Infer (obtainType)
+
+import qualified Text.Show.Pretty as Pr
 
 -- Given a queue of constraints (easier ones comes earlier), try to synthesize
 -- all of them using heuristics.
@@ -69,7 +71,6 @@ resolveHole :: ConstraintQueue -> Hole -> WeakTermPlus -> WithEnv ()
 resolveHole q h e = do
   senv <- gets substEnv
   senv' <- compose [(h, e)] senv
-  -- modify (\env -> env {substEnv = compose [(h, e)] (substEnv env)})
   modify (\env -> env {substEnv = senv'})
   let rest = Q.deleteMin q
   let (q1, q2) = Q.partition (\(Enriched _ ms _) -> h `elem` ms) rest
@@ -172,10 +173,3 @@ takeByCount (i:is) xs = do
   let ys = take i xs
   let yss = takeByCount is (drop i xs)
   ys : yss
-
-obtainType :: WeakMeta -> WithEnv WeakTermPlus
-obtainType m = do
-  mt <- readWeakMetaType m
-  case mt of
-    Just t -> return t
-    Nothing -> throwError "obtainType"

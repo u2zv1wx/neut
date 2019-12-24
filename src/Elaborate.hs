@@ -4,7 +4,6 @@ module Elaborate
 
 import Control.Monad.Except
 import Control.Monad.State
-import Data.IORef
 import Data.List (nub)
 import Numeric.Half
 
@@ -16,6 +15,8 @@ import Elaborate.Analyze
 import Elaborate.Infer
 import Elaborate.Synthesize
 import Reduce.Term
+
+import qualified Text.Show.Pretty as Pr
 
 -- Given a term `e` and its name `main`, this function
 --   (1) traces `e` using `infer e`, collecting type constraints,
@@ -96,7 +97,7 @@ elaborate' (m, WeakTermIntU size x) = do
   return (m', TermIntU size x)
 elaborate' (m, WeakTermInt x) = do
   m' <- toMeta m
-  t <- reduceTermPlus $ obtainType m'
+  t <- reduceTermPlus $ obtainTermType m'
   case t of
     (_, TermTheta intType) ->
       case asLowTypeMaybe intType of
@@ -115,7 +116,7 @@ elaborate' (m, WeakTermFloat64 x) = do
   return (m', TermFloat64 x)
 elaborate' (m, WeakTermFloat x) = do
   m' <- toMeta m
-  t <- reduceTermPlus $ obtainType m'
+  t <- reduceTermPlus $ obtainTermType m'
   case t of
     (_, TermTheta floatType) -> do
       let x16 = realToFrac x :: Half
@@ -195,7 +196,7 @@ caseCheck (m, TermEnumIntro _) = caseCheckMeta m
 caseCheck (m, TermEnumElim e branchList) = do
   caseCheckMeta m
   let labelList = map fst branchList
-  t' <- reduceTermPlus $ obtainType $ fst e
+  t' <- reduceTermPlus $ obtainTermType $ fst e
   case t' of
     (_, TermEnum x) -> caseCheckEnumIdentifier x labelList
     _ -> throwError "type error (caseCheck)"
@@ -227,14 +228,17 @@ caseCheckEnumIdentifier' i labelList =
 
 toMeta :: WeakMeta -> WithEnv Meta
 toMeta (WeakMetaTerminal l) = return $ MetaTerminal l
-toMeta (WeakMetaNonTerminal (Ref r) l) = do
-  mt <- liftIO $ readIORef r
+toMeta (WeakMetaNonTerminal (Right t) l) = do
+  t' <- elaborate' t
+  return $ MetaNonTerminal t' l
+toMeta (WeakMetaNonTerminal (Left i) l) = do
+  mt <- lookupSubstEnv i
   case mt of
     Nothing -> throwError "found an unresolved type (compiler bug)"
     Just t -> do
       t' <- elaborate' t
       return $ MetaNonTerminal t' l
 
-obtainType :: Meta -> TermPlus
-obtainType (MetaTerminal _) = (MetaTerminal Nothing, TermTau)
-obtainType (MetaNonTerminal t _) = t
+obtainTermType :: Meta -> TermPlus
+obtainTermType (MetaTerminal _) = (MetaTerminal Nothing, TermTau)
+obtainTermType (MetaNonTerminal t _) = t

@@ -2,11 +2,12 @@ module Elaborate.Infer
   ( infer
   , readWeakMetaType
   , writeWeakMetaType
+  , obtainType
+  , univ
   ) where
 
 import Control.Monad.Except
 import Control.Monad.State
-import Data.IORef
 import Data.Maybe (catMaybes)
 import Prelude hiding (pi)
 
@@ -74,10 +75,7 @@ infer ctx (meta, WeakTermMu (x, t) e) = do
   insConstraintEnv te t
   returnAfterUpdate meta te
 infer ctx (meta, WeakTermZeta _) = do
-  mt <- readWeakMetaType meta
-  case mt of
-    Just t -> return t
-    Nothing -> newHoleInCtx ctx >>= returnAfterUpdate meta
+  newHoleInCtx ctx >>= returnAfterUpdate meta
 infer _ (meta, WeakTermIntS size _) = do
   returnAfterUpdate meta (newMetaTerminal, WeakTermTheta $ "i" ++ show size)
 infer _ (meta, WeakTermIntU size _) = do
@@ -249,10 +247,9 @@ toVar x t = do
 
 returnAfterUpdate :: WeakMeta -> WeakTermPlus -> WithEnv WeakTermPlus
 returnAfterUpdate m t = do
-  mt <- readWeakMetaType m
-  case mt of
-    Nothing -> writeWeakMetaType m (Just t)
-    Just t' -> insConstraintEnv t t'
+  case readWeakMetaType m of
+    Right t' -> insConstraintEnv t t'
+    Left i -> writeWeakMetaType i t -- i should be beta-equivalent to t
   return t
 
 univ :: WeakTermPlus
@@ -263,16 +260,25 @@ wrapWithType t e = do
   m <- newMetaOfType t
   return (m, e)
 
-readWeakMetaType :: WeakMeta -> WithEnv (Maybe WeakTermPlus)
-readWeakMetaType (WeakMetaNonTerminal (Ref r) _) = liftIO $ readIORef r
-readWeakMetaType (WeakMetaTerminal _) = return $ Just univ
+readWeakMetaType :: WeakMeta -> Either Identifier WeakTermPlus
+readWeakMetaType (WeakMetaNonTerminal mt _) = mt
+readWeakMetaType (WeakMetaTerminal _) = Right univ
 
-writeWeakMetaType :: WeakMeta -> Maybe WeakTermPlus -> WithEnv ()
-writeWeakMetaType (WeakMetaNonTerminal (Ref r) _) mt = liftIO $ writeIORef r mt
-writeWeakMetaType (WeakMetaTerminal _) mt =
+writeWeakMetaType :: Identifier -> WeakTermPlus -> WithEnv ()
+writeWeakMetaType i t = do
+  mt <- lookupSubstEnv i
   case mt of
-    Nothing -> return ()
-    Just t -> insConstraintEnv univ t
+    Just t' -> insConstraintEnv t t' -- the beta-equivalent representation of `i` is already known
+    Nothing -> modify (\env -> env {substEnv = (i, t) : (substEnv env)})
+
+obtainType :: WeakMeta -> WithEnv WeakTermPlus
+obtainType (WeakMetaTerminal _) = return univ
+obtainType (WeakMetaNonTerminal (Right t) _) = return t
+obtainType (WeakMetaNonTerminal (Left i) _) = do
+  mt <- lookupSubstEnv i
+  case mt of
+    Just t -> return t
+    Nothing -> error "readWeakMetaType'"
 
 -- is-enum n{i}
 toIsEnumType :: Int -> WithEnv WeakTermPlus
