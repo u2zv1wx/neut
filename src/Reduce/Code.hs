@@ -148,9 +148,6 @@ reduceCodePlus (m, CodeTheta theta) =
         Just (Left d) -> upIntroData m (m1, d)
         Just (Right z) -> upIntroData m (m1, DataFloat64 z)
         Nothing -> return (m, CodeTheta theta)
-    ThetaPrint (_, DataIntS _ i) -> do
-      liftIO $ putStr $ show i
-      return (m, CodeUpIntro (Nothing, DataSigmaIntro []))
     _ -> return (m, CodeTheta theta)
 reduceCodePlus t = return t
 

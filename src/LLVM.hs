@@ -103,14 +103,6 @@ llvmCodeTheta _ (ThetaSysCall num args) = do
   args' <- undefined args -- FIXME: ここでargsを適切に並び替える必要がある
   llvmDataLet' (zip xs args') $
     LLVMLet res (LLVMOpSysCall $ num' : vs) $ LLVMReturn (LLVMDataLocal res)
-llvmCodeTheta _ (ThetaPrint v) = do
-  let t = LowTypeIntS 64
-  (pName, p) <- newDataLocal "arg"
-  c <- newNameWith "cast"
-  retZero <- llvmUncast (LLVMDataInt 0) t
-  llvmDataLet pName v $
-    LLVMLet c (LLVMOpPointerToInt p voidPtr t) $
-    LLVMCont (LLVMOpPrint t (LLVMDataLocal c)) retZero
 
 llvmCodeUnaryOp :: UnaryOp -> LowType -> LowType -> DataPlus -> WithEnv LLVM
 llvmCodeUnaryOp op domType codType d = do

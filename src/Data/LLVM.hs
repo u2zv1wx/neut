@@ -40,7 +40,6 @@ data LLVMOp
   | LLVMOpFree LLVMData
   | LLVMOpUnaryOp (UnaryOp, LowType) LLVMData
   | LLVMOpBinaryOp (BinaryOp, LowType) LLVMData LLVMData
-  | LLVMOpPrint LowType LLVMData
   | LLVMOpSysCall [LLVMData]
   deriving (Show)
 

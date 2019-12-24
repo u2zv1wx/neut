@@ -299,9 +299,6 @@ distinguishTheta z (ThetaBinaryOp op lowType d1 d2) = do
   (vs1, d1') <- distinguishData z d1
   (vs2, d2') <- distinguishData z d2
   return (vs1 ++ vs2, ThetaBinaryOp op lowType d1' d2')
-distinguishTheta z (ThetaPrint d) = do
-  (vs, d') <- distinguishData z d
-  return (vs, ThetaPrint d')
 distinguishTheta z (ThetaSysCall num ds) = do
   (vss, ds') <- unzip <$> mapM (distinguishData z) ds
   return (concat vss, ThetaSysCall num ds')

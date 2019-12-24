@@ -617,7 +617,6 @@ polarizeTheta m name
 polarizeTheta m name
   | Just _ <- asLowTypeMaybe name = polarize (m, TermEnum $ EnumTypeLabel "top")
 polarizeTheta m "is-enum" = polarizeIsEnum m
-polarizeTheta m name@"core.print.i64" = polarizePrint name m
 polarizeTheta m "unsafe.eval-io" = polarizeEvalIO m
 polarizeTheta m "file-descriptor" = polarize (m, TermTheta "i64")
 polarizeTheta m "stdin" = polarize (m, TermIntS 64 0)
@@ -657,13 +656,6 @@ polarizeBinaryOp name op lowType m = do
         [(x, tx), (y, ty)]
         (ml, CodeTheta (ThetaBinaryOp op lowType varX varY))
     _ -> throwError $ "the arity of " ++ name ++ " is wrongi"
-
-polarizePrint :: Identifier -> Meta -> WithEnv CodePlus
-polarizePrint name m = do
-  let ml = snd $ obtainInfoMeta m
-  (x, varX) <- newDataUpsilon
-  let i64Type = (MetaTerminal ml, TermEnum $ EnumTypeLabel "i64")
-  makeClosure (Just name) [] m [(x, i64Type)] (ml, CodeTheta (ThetaPrint varX))
 
 polarizeIsEnum :: Meta -> WithEnv CodePlus
 polarizeIsEnum m = do

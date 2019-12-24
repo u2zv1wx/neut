@@ -71,34 +71,6 @@ emitLLVM funName (LLVMSwitch (d, lowType) defaultBranch branchList) = do
 emitLLVM funName (LLVMCont op cont) = do
   h <- newNameWith "hole"
   emitLLVM funName $ LLVMLet h op cont
-emitLLVM funName (LLVMLet x (LLVMOpPrint t d) cont) = do
-  fmt <- newNameWith "fmt"
-  op1 <-
-    emitOp $
-    unwords
-      [ showLLVMData (LLVMDataLocal fmt)
-      , "="
-      , "getelementptr [3 x i8], [3 x i8]* @fmt.i32, i32 0, i32 0"
-      ]
-  tmp <- newNameWith "tmp"
-  op2 <-
-    emitOp $
-    unwords
-      [ showLLVMData (LLVMDataLocal tmp)
-      , "="
-      , "call"
-      , "i32 (i8*, ...)"
-      , "@printf(i8* " ++ showLLVMData (LLVMDataLocal fmt) ++ ","
-      , showLowType t
-      , showLLVMData d ++ ")"
-      ]
-  a <-
-    emitLLVM funName $
-    LLVMLet
-      x
-      (LLVMOpIntToPointer (LLVMDataLocal tmp) (LowTypeIntS 32) voidPtr)
-      cont
-  return $ op1 ++ op2 ++ a
 emitLLVM funName (LLVMLet x op cont) = do
   s <- emitLLVMOp op
   str <- emitOp $ showLLVMData (LLVMDataLocal x) ++ " = " ++ s
