@@ -217,34 +217,17 @@ isReducible (_, WeakTermPi _ _) = False
 isReducible (_, WeakTermPiIntro {}) = False
 isReducible (_, WeakTermPiElim (_, WeakTermPiIntro xts _) es)
   | length xts == length es = True
-isReducible (_, WeakTermPiElim (_, WeakTermMu _ _) _) = True -- CBV recursion
+isReducible (_, WeakTermPiElim (_, WeakTermMu _ _) _) = True
 isReducible (_, WeakTermPiElim (_, WeakTermTheta c) [(_, WeakTermIntS _ _), (_, WeakTermIntS _ _)])
-  | [typeStr, opStr] <- wordsBy '.' c
-  , Just (LowTypeIntS _) <- asLowTypeMaybe typeStr
-  , Just arith <- asBinaryOpMaybe' opStr
-  , isArithOp arith = True
+  | Just (LowTypeIntS _, _) <- asBinaryOpMaybe c = True
 isReducible (_, WeakTermPiElim (_, WeakTermTheta c) [(_, WeakTermIntU _ _), (_, WeakTermIntU _ _)])
-  | [typeStr, opStr] <- wordsBy '.' c
-  , Just (LowTypeIntU _) <- asLowTypeMaybe typeStr
-  , Just arith <- asBinaryOpMaybe' opStr
-  , isArithOp arith = True
--- FIXME: isReducible for Float
--- FIXME: rewrite here using asBinaryOpMaybe
+  | Just (LowTypeIntU _, _) <- asBinaryOpMaybe c = True
 isReducible (_, WeakTermPiElim (_, WeakTermTheta c) [(_, WeakTermFloat16 _), (_, WeakTermFloat16 _)])
-  | [typeStr, opStr] <- wordsBy '.' c
-  , Just (LowTypeFloat FloatSize16) <- asLowTypeMaybe typeStr
-  , Just arith <- asBinaryOpMaybe' opStr
-  , isArithOp arith = True
+  | Just (LowTypeFloat FloatSize16, _) <- asBinaryOpMaybe c = True
 isReducible (_, WeakTermPiElim (_, WeakTermTheta c) [(_, WeakTermFloat32 _), (_, WeakTermFloat32 _)])
-  | [typeStr, opStr] <- wordsBy '.' c
-  , Just (LowTypeFloat FloatSize32) <- asLowTypeMaybe typeStr
-  , Just arith <- asBinaryOpMaybe' opStr
-  , isArithOp arith = True
+  | Just (LowTypeFloat FloatSize32, _) <- asBinaryOpMaybe c = True
 isReducible (_, WeakTermPiElim (_, WeakTermTheta c) [(_, WeakTermFloat64 _), (_, WeakTermFloat64 _)])
-  | [typeStr, opStr] <- wordsBy '.' c
-  , Just (LowTypeFloat FloatSize64) <- asLowTypeMaybe typeStr
-  , Just arith <- asBinaryOpMaybe' opStr
-  , isArithOp arith = True
+  | Just (LowTypeFloat FloatSize64, _) <- asBinaryOpMaybe c = True
 isReducible (_, WeakTermPiElim e es) = isReducible e || any isReducible es
 isReducible (_, WeakTermMu _ _) = False
 isReducible (_, WeakTermZeta _) = False
