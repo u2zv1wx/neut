@@ -252,9 +252,9 @@ withHeader' ((x, t, (z1:z2:zs)):xtzss) e = do
 
 -- withHeaderAffine x t e ~>
 --   bind _ :=
---     bind exp := t^# in
---     let (aff, rel) := exp in
---     aff @ x in
+--     bind exp := t^# in        --
+--     let (aff, rel) := exp in  -- AffineApp
+--     aff @ x in                --
 --   e
 withHeaderAffine :: Identifier -> CodePlus -> CodePlus -> WithEnv CodePlus
 withHeaderAffine x t e = do
@@ -265,12 +265,12 @@ withHeaderAffine x t e = do
 -- withHeaderRelevant x t [x1, ..., x{N}] e ~>
 --   bind exp := t in
 --   let (aff, rel) := exp in
---   let sigTmp1 := rel @ x in
---   let (x1, tmp1) := sigTmp1 in
---   ...
---   let sigTmp{N-1} := rel @ tmp{N-2} in
---   let (x{N-1}, x{N}) := sigTmp{N-1} in
---   e
+--   bind sigTmp1 := rel @ x in                    --
+--   let (x1, tmp1) := sigTmp1 in                  --
+--   ...                                           -- withHeaderRelevant'
+--   bind sigTmp{N-1} := rel @ tmp{N-2} in         --
+--   let (x{N-1}, x{N}) := sigTmp{N-1} in          --
+--   e                                             --
 -- (assuming N >= 2)
 withHeaderRelevant ::
      Identifier
@@ -284,8 +284,9 @@ withHeaderRelevant x t x1 x2 xs e = do
   (expVarName, expVar) <- newDataUpsilon
   (affVarName, _) <- newDataUpsilon
   (relVarName, relVar) <- newDataUpsilon
+  linearChain <- toLinearChain $ x : x1 : x2 : xs
   let ml = fst e
-  rel <- withHeaderRelevant' relVar (ml, DataUpsilon x) x1 x2 xs e
+  rel <- withHeaderRelevant' relVar linearChain e
   return
     ( ml
     , CodeUpElim
@@ -293,54 +294,55 @@ withHeaderRelevant x t x1 x2 xs e = do
         t
         (ml, CodeSigmaElim [affVarName, relVarName] expVar rel))
 
--- withHeaderRelevant' relVar x y1 y2 [y3, y4] e ~>
---   bind sigVar1 := relVar @ x in
---   let (y1, tmp1) := sigVar1 in
---   bind sigVar2 := relVar @ tmp1 in
---   let (y2, tmp2) := sigVar2 in
---   bind sigVar3 := relVar @ tmp2 in
---   let (y3, y4) := sigVar3 in
+type LinearChain = [(Identifier, (Identifier, Identifier))]
+
+--    toLinearChain [x0, x1, x2, ..., x{N-1}] (N >= 3)
+-- ~> [(x0, (x1, tmp1)), (tmp1, (x2, tmp2)), ..., (tmp{N-3}, (x{N-2}, x{N-1}))]
+--
+-- example behavior (length xs = 5):
+--   xs = [x1, x2, x3, x4, x5]
+--   valueSeq = [x2, x3, x4]
+--   tmpSeq = [tmpA, tmpB]
+--   tmpSeq' = [x1, tmpA, tmpB, x5]
+--   pairSeq = [(x2, tmpA), (x3, tmpB), (x4, x5)]
+--   result = [(x1, (x2, tmpA)), (tmpA, (x3, tmpB)), (tmpB, (x4, x5))]
+--
+-- example behavior (length xs = 3):
+--   xs = [x1, x2, x3]
+--   valueSeq = [x2]
+--   tmpSeq = []
+--   tmpSeq' = [x1, x3]
+--   pairSeq = [(x2, x3)]
+--   result = [(x1, (x2, x3))]
+toLinearChain :: [Identifier] -> WithEnv LinearChain
+toLinearChain xs = do
+  let valueSeq = init $ tail xs
+  tmpSeq <- mapM (const $ newNameWith "tmp") $ replicate (length xs - 3) ()
+  let tmpSeq' = [head xs] ++ tmpSeq ++ [last xs]
+  let pairSeq = zip valueSeq (tail tmpSeq')
+  return $ zip (init tmpSeq') pairSeq
+
+-- withHeaderRelevant' relVar [(x1, (x2, tmpA)), (tmpA, (x3, tmpB)), (tmpB, (x3, x4))] ~>
+--   bind sigVar1 := relVar @ x1 in
+--   let (x2, tmpA) := sigVar1 in
+--   bind sigVar2 := relVar @ tmpA in
+--   let (x3, tmpB) := sigVar2 in
+--   bind sigVar3 := relVar @ tmpB in
+--   let (x3, x4) := sigVar3 in
 --   e
-withHeaderRelevant' ::
-     DataPlus
-  -> DataPlus -- copy from
-  -> Identifier -- copy to (1)
-  -> Identifier -- copy to (2)
-  -> [Identifier]
-  -> CodePlus
-  -> WithEnv CodePlus
-withHeaderRelevant' relVar x y1 y2 [] e = do
-  let ml = fst e
+withHeaderRelevant' :: DataPlus -> LinearChain -> CodePlus -> WithEnv CodePlus
+withHeaderRelevant' _ [] cont = return cont
+withHeaderRelevant' relVar ((x, (x1, x2)):chain) cont = do
+  let ml = fst cont
+  cont' <- withHeaderRelevant' relVar chain cont
   (sigVarName, sigVar) <- newDataUpsilon
+  let varX = toDataUpsilon (x, Nothing)
   return $
     ( ml
     , CodeUpElim
         sigVarName
-        (ml, CodePiElimDownElim relVar [x])
-        (ml, CodeSigmaElim [y1, y2] sigVar e))
-withHeaderRelevant' relVar x y1 y2 (y:ys) e = do
-  (tmpVarName, tmpVar) <- newDataUpsilon
-  let ml = fst e
-  (sigVarName, sigVar) <- newDataUpsilon
-  -- e' =
-  --   bind someNewVar := relVar @ tmpVar in
-  --   let (y2, NOT_KNOWN_YET) := someNewVar in
-  --   ...
-  --   e
-  e' <- withHeaderRelevant' relVar tmpVar y2 y ys e
-  -- resulting term:
-  --   bind sigVar := relVar @ x in
-  --   let (y1, tmpVar) := sigVar in
-  --   bind someNewVar := relVar @ tmpVar in     ---
-  --   let (y2, NOT_KNOWN_YET) := someNewVar in  ---  e'
-  --   ...                                       ---
-  --   e                                         ---
-  return $
-    ( ml
-    , CodeUpElim
-        sigVarName
-        (ml, CodePiElimDownElim relVar [x])
-        (ml, CodeSigmaElim [y1, tmpVarName] sigVar e'))
+        (ml, CodePiElimDownElim relVar [varX])
+        (ml, CodeSigmaElim [x1, x2] sigVar cont'))
 
 bindLet :: Binder -> CodePlus -> CodePlus
 bindLet [] cont = cont
