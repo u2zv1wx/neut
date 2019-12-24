@@ -99,7 +99,7 @@ llvmCodeTheta _ (ThetaBinaryOp op lowType v1 v2)
 llvmCodeTheta _ (ThetaSysCall num args) = do
   (xs, vs) <- unzip <$> mapM (const $ newDataLocal "arg") args
   res <- newNameWith "result"
-  num' <- sysCallNumAsInt num --
+  num' <- sysCallNumAsInt num
   llvmDataLet' (zip xs args) $
     LLVMLet res (LLVMOpSysCall $ num' : vs) $ LLVMReturn (LLVMDataLocal res)
 
