@@ -207,13 +207,12 @@ setupHole Nothing pi = newHoleOfType pi
 setupHole (Just t) _ = return t
 
 --    newCtxAppHole ctx SPECIFIED_HOLE [e1, ..., en]
--- ~> SPECIFIED_HOLE @ ctx @ e1 @ ... @ en
+-- ~> SPECIFIED_HOLE @ (ctx[0], ..., ctx[m], e1, ..., en)
 newCtxAppHole ::
      Context -> WeakTermPlus -> [WeakTermPlus] -> WithEnv WeakTermPlus
 newCtxAppHole ctx hole es = do
   xs <- mapM (const $ newNameWith "arg") es
-  (_, appHole) <- newHoleInCtx' (ctx ++ zip xs es) (Just hole)
-  return appHole
+  snd <$> newHoleInCtx' (ctx ++ zip xs es) (Just hole)
 
 inferCase :: Case -> WithEnv (Maybe WeakTermPlus)
 inferCase (CaseValue (EnumValueLabel name)) = do
