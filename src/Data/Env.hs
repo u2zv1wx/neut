@@ -12,7 +12,6 @@ import Data.Basic
 import Data.Code
 import Data.Constraint
 import Data.LLVM
-import Data.Term
 import Data.Tree
 import Data.WeakTerm
 
@@ -235,9 +234,9 @@ getArch = do
 -- distinguish [(x1, t1), ..., (xn, tn)] eは、は、eにおけるxiの出現をすべて新しい名前で置き換え、そうして得られたtermをe'として、
 -- ([(x1, t1, {list-of-new-names-for-x1}), ..., (xm, tm, {list-of-new-names-for-xm})], e')を返す。
 distinguish ::
-     [(Identifier, TermPlus)]
+     [(Identifier, CodePlus)]
   -> CodePlus
-  -> WithEnv ([(Identifier, TermPlus, [Identifier])], CodePlus)
+  -> WithEnv ([(Identifier, CodePlus, [Identifier])], CodePlus)
 distinguish [] e = return ([], e)
 distinguish ((x, t):xts) e = do
   (xtzss, e') <- distinguish xts e

@@ -169,7 +169,10 @@ makeClosure mName fvs m xts e = do
   expName <- newNameWith "exp"
   envExp <- cartesianSigma expName ml $ map Left negTypeList
   (envVarName, envVar) <- newDataUpsilon
-  e' <- linearize (zip freeVarNameList freeVarTypeList ++ xts) e
+  let (xs', ts) = unzip $ zip freeVarNameList freeVarTypeList ++ xts
+  ts' <- mapM polarize ts
+  -- e' <- linearize (zip freeVarNameList freeVarTypeList ++ xts) e
+  e' <- linearize (zip xs' ts') e
   let lamBody = (ml, CodeSigmaElim freeVarNameList envVar e') -- このSigmaElimは「特別」なやつ（これだけ非線形でありうる）
   let fvSigmaIntro =
         ( ml
@@ -210,7 +213,7 @@ callClosure m e es = do
 
 -- linearize xts eは、xtsで指定された変数がeのなかでlinearに使用されるようにする。
 -- xtsは「eのなかでlinearに出現するべき変数」。
-linearize :: [(Identifier, TermPlus)] -> CodePlus -> WithEnv CodePlus
+linearize :: [(Identifier, CodePlus)] -> CodePlus -> WithEnv CodePlus
 linearize xts e@(m, CodeSigmaElim ys d cont) = do
   let xts' = filter (\(x, _) -> x `notElem` ys ++ varCode e) xts -- eで使用されていない変数は「こっち」でfreeするので不要
   -- eの中で使用されていない変数をxtsから除外することでより早い段階でfreeを挿入することができるようになる。
@@ -232,23 +235,21 @@ linearize xts e@(m, CodeEnumElim d les) = do
   withHeader xts (m, CodeEnumElim d $ zip ls es')
 linearize xts e = withHeader xts e -- eのなかにCodePlusが含まれないケース
 
-withHeader :: [(Identifier, TermPlus)] -> CodePlus -> WithEnv CodePlus
+withHeader :: [(Identifier, CodePlus)] -> CodePlus -> WithEnv CodePlus
 withHeader xts e = do
   (xtzss, e') <- distinguish xts e
   withHeader' xtzss e'
 
 withHeader' ::
-     [(Identifier, TermPlus, [Identifier])] -> CodePlus -> WithEnv CodePlus
+     [(Identifier, CodePlus, [Identifier])] -> CodePlus -> WithEnv CodePlus
 withHeader' [] e = return e
 withHeader' ((x, t, []):xtzss) e = do
   e' <- withHeader' xtzss e
-  t' <- polarize t
-  withHeaderAffine x t' e'
+  withHeaderAffine x t e'
 withHeader' ((_, _, [_]):xtzss) e = withHeader' xtzss e -- already linear
 withHeader' ((x, t, (z1:z2:zs)):xtzss) e = do
   e' <- withHeader' xtzss e
-  t' <- polarize t
-  withHeaderRelevant x t' z1 z2 zs e'
+  withHeaderRelevant x t z1 z2 zs e'
 
 -- withHeaderAffine x t e ~>
 --   bind _ :=
@@ -453,22 +454,29 @@ cartesianSigma thetaName ml mxes = do
   rel <- relevantSigma thetaName ml mxes
   return (ml, DataSigmaIntro [aff, rel])
 
--- (Assuming `ei` = `return di` for some `di` such that `xi : di`)
--- affineSigma NAME LOC [x1 : e1, ..., xn : en]   ~>
+-- (Assuming `ti` = `return di` for some `di` such that `xi : di`)
+-- affineSigma NAME LOC [(x1, t1), ..., (xn, tn)]   ~>
 --   update CodeEnv with NAME ~> (thunk LAM), where LAM is:
 --   lam z.
 --     let (x1, ..., xn) := z in
---     bind y1 :=
---       bind f1 = e1 in              ---
---       let (aff-1, rel-1) = f1 in   ---  APP-1
---       aff-1 @ x1 in                ---
---     ...
---     bind yn :=
---       bind fn = en in              ---
---       let (aff-n, rel-n) := fn in  ---  APP-n
---       aff-n @ xn in                ---
---     return ()
+--     <LINEARIZE_HEADER for x1, .., xn> in                     ---
+--     bind y1 :=                                    ---        ---
+--       bind f1 = t1 in              ---            ---        ---
+--       let (aff-1, rel-1) = f1 in   ---  APP-1     ---        ---
+--       aff-1 @ x1 in                ---            ---        ---
+--     ...                                           ---  body  ---  body'
+--     bind yn :=                                    ---        ---
+--       bind fn = tn in              ---            ---        ---
+--       let (aff-n, rel-n) := fn in  ---  APP-n     ---        ---
+--       aff-n @ xn in                ---            ---        ---
+--     return ()                                     ---        ---
+--
 -- (Note that sigma-elim for yi is not necessary since all of them are units.)
+-- xiがtjのなかにlinearに出現するとは限らないので、linearizeをかませる必要がある。
+-- 「だけどもいまはまさにそのxiをfreeしたいんでは？」「いや、copyされたならちゃんとeiのなかで消費されてるはずだから問題ない」
+-- linearizeにおけるaffineは起こらないことがすでにわかっている（だって、すべてのxiは使用されているから）。
+-- ……いやまあ、実際には、tiは型なんだから自由変数を含まないことが保証されていて？
+-- いやいや、sigmaの引数のときはやっぱりxiを自由変数として含みうる。……お、これはまずいんでは？
 affineSigma ::
      Identifier
   -> Maybe Loc
@@ -481,38 +489,34 @@ affineSigma thetaName ml mxes = do
     Just _ -> return theta
     Nothing -> do
       xes <- mapM supplyName mxes
-      (sigVarName, sigVar) <- newDataUpsilon
-      -- appList == [APP-1, ..., APP-n]
-      appList <- forM xes $ \(x, e) -> toAffineApp ml x e
+      (z, varZ) <- newDataUpsilon
+      -- as == [APP-1, ..., APP-n]   (`a` here stands for `app`)
+      as <- forM xes $ \(x, e) -> toAffineApp ml x e
       ys <- mapM (const $ newNameWith "var") xes
-      insCodeEnv
-        thetaName
-        [sigVarName]
-        ( ml
-        , CodeSigmaElim
-            (map fst xes)
-            sigVar
-            (bindLet (zip ys appList) (ml, CodeUpIntro (ml, DataSigmaIntro []))))
+      let body = bindLet (zip ys as) (ml, CodeUpIntro (ml, DataSigmaIntro []))
+      body' <- linearize xes body
+      insCodeEnv thetaName [z] (ml, CodeSigmaElim (map fst xes) varZ body')
       return theta
 
--- (Assuming `ei` = `return di` for some `di` such that `xi : di`)
--- relevantSigma NAME LOC [x1, e1, ..., xn, en]   ~>
+-- (Assuming `ti` = `return di` for some `di` such that `xi : di`)
+-- relevantSigma NAME LOC [(x1, t1), ..., (xn, tn)]   ~>
 --   update CodeEnv with NAME ~> (thunk LAM), where LAM is:
 --   lam z.
 --     let (x1, ..., xn) := z in
---     bind pair-1 :=
---       bind f1 = e1 in              ---
---       let (aff-1, rel-1) = f1 in   ---  APP-1
---       rel-1 @ x1 in                ---
---     ...
---     bind pair-n :=
---       bind fn = en in              ---
---       let (aff-n, rel-n) := fn in  ---  APP-n
---       rel-n @ xn in                ---
---     let (p11, p12) := pair-1 in               ---
---     ...                                       ---  TRANSPOSE-SIGMA
---     let (pn1, pn2) := pair-n in               ---
---     return ((p11, ..., pn1), (p12, ..., pn2)) ---
+--     <LINEARIZE_HEADER for x1, .., xn> in                                      ---
+--     bind pair-1 :=                                                  ---       ---
+--       bind f1 = t1 in              ---                              ---       ---
+--       let (aff-1, rel-1) = f1 in   ---  APP-1                       ---       ---
+--       rel-1 @ x1 in                ---                              ---       ---
+--     ...                                                             ---       ---
+--     bind pair-n :=                                                  --- body  --- body'
+--       bind fn = tn in              ---                              ---       ---
+--       let (aff-n, rel-n) := fn in  ---  APP-n                       ---       ---
+--       rel-n @ xn in                ---                              ---       ---
+--     let (p11, p12) := pair-1 in               ---                   ---       ---
+--     ...                                       ---  TRANSPOSED-PAIR  ---       ---
+--     let (pn1, pn2) := pair-n in               ---                   ---       ---
+--     return ((p11, ..., pn1), (p12, ..., pn2)) ---                   ---       ---
 relevantSigma ::
      Identifier
   -> Maybe Loc
@@ -525,20 +529,16 @@ relevantSigma thetaName ml mxes = do
     Just _ -> return theta
     Nothing -> do
       xes <- mapM supplyName mxes
-      (sigVarName, sigVar) <- newDataUpsilon
+      (z, varZ) <- newDataUpsilon
       -- appList == [APP-1, ..., APP-n]
       appList <- forM xes $ \(x, e) -> toRelevantApp ml x e
+      -- pairVarNameList == [pair-1, ...,  pair-n]
       (pairVarNameList, pairVarList) <-
         unzip <$> mapM (const $ newDataUpsilon) xes
       transposedPair <- transposeSigma pairVarList
-      insCodeEnv
-        thetaName
-        [sigVarName]
-        ( ml
-        , CodeSigmaElim
-            (map fst xes)
-            sigVar
-            (bindLet (zip pairVarNameList appList) transposedPair))
+      let body = bindLet (zip pairVarNameList appList) transposedPair
+      body' <- linearize xes body
+      insCodeEnv thetaName [z] (ml, CodeSigmaElim (map fst xes) varZ body')
       return theta
 
 -- transposeSigma [d1, ..., dn] :=
