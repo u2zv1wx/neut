@@ -1,7 +1,5 @@
 (include "./notation.neut")
 
-(index top unit)
-
 (include "./arith.neut")
 
 (include "./state.neut")
