@@ -100,8 +100,7 @@ llvmCodeTheta _ (ThetaSysCall num args) = do
   (xs, vs) <- unzip <$> mapM (const $ newDataLocal "arg") args
   res <- newNameWith "result"
   num' <- sysCallNumAsInt num --
-  args' <- undefined args -- FIXME: ここでargsを適切に並び替える必要がある
-  llvmDataLet' (zip xs args') $
+  llvmDataLet' (zip xs args) $
     LLVMLet res (LLVMOpSysCall $ num' : vs) $ LLVMReturn (LLVMDataLocal res)
 
 llvmCodeUnaryOp :: UnaryOp -> LowType -> LowType -> DataPlus -> WithEnv LLVM
