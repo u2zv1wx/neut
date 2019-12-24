@@ -106,8 +106,9 @@ polarize (m, TermArray _ _ _) = do
   return (ml, CodeUpIntro arrayClsType)
 polarize (m, TermArrayIntro k les) = do
   let ml = snd $ obtainInfoMeta m
-  let retKindType = (ml, CodeUpIntro $ kindAsType k)
-  -- arrayType = Sigma [_ : A, ..., _ : A]
+  v <- cartesianImmediate ml
+  let retKindType = (ml, CodeUpIntro v)
+  -- arrayType = Sigma [_ : IMMEDIATE, ..., _ : IMMEDIATE]
   name <- newNameWith "array"
   arrayType <-
     cartesianSigma name ml $ map Left $ replicate (length les) retKindType
@@ -138,12 +139,6 @@ polarize (m, TermArrayElim k e1 e2) = do
             [affVarName, relVarName]
             arrTypeVar
             (ml, CodeArrayElim k arrVar idxVar)))
-
-kindAsType :: ArrayKind -> DataPlus
-kindAsType (ArrayKindIntS i) = (Nothing, (DataTheta $ "i" ++ show i))
-kindAsType (ArrayKindIntU i) = (Nothing, (DataTheta $ "u" ++ show i))
-kindAsType (ArrayKindFloat size) =
-  (Nothing, (DataTheta $ "f" ++ show (sizeAsInt size)))
 
 obtainFreeVarList ::
      [Identifier] -> TermPlus -> [(Identifier, Maybe Loc, TermPlus)]
