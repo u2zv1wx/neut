@@ -14,7 +14,7 @@ import Data.Basic
 import Data.Constraint
 import Data.Env
 import Data.WeakTerm
-import Elaborate.Infer (obtainType, readWeakMetaType, univ)
+import Elaborate.Infer (obtainType, univ)
 import Reduce.WeakTerm
 
 analyze :: [PreConstraint] -> WithEnv ()
@@ -113,38 +113,60 @@ simp ((e1, e2):cs)
   , (m2, WeakTermArrayElim k2 (_, WeakTermUpsilon g) eps2) <- e2
   , k1 == k2
   , f == g = simpMetaRet m1 m2 $ simp $ (eps1, eps2) : cs
-simp ((e1@(m1, _), e2@(m2, _)):cs) = do
+simp ((e1, e2):cs) = do
   let ms1 = asStuckedTerm e1
   let ms2 = asStuckedTerm e2
   case (ms1, ms2) of
     (Just (StuckHole h), _) -> do
-      cs' <- simpMetaRet m1 m2 $ simp cs
+      cs' <- simpMetaRet (fst e1) (fst e2) $ simp cs
       return $ Enriched (e1, e2) [h] (ConstraintImmediate h e2) : cs'
     (_, Just (StuckHole _)) -> simp $ (e2, e1) : cs
-    (Just (StuckPiElimStrict h1 exs1), _)
-      | all (isSolvable e2 h1) (map (map snd) exs1) -> do
-        cs' <- simpMetaRet m1 m2 $ simp cs
-        let es1 = map (map fst) exs1
-        return $ Enriched (e1, e2) [h1] (ConstraintPattern h1 es1 e2) : cs'
-    (_, Just (StuckPiElimStrict h2 exs2))
-      | all (isSolvable e1 h2) (map (map snd) exs2) ->
-        simpMetaRet m1 m2 $ simp $ (e2, e1) : cs
+    (Just (StuckPiElimStrict h1 exs1), _) ->
+      simpPatIfPossible ms1 ms2 h1 exs1 $ (e1, e2) : cs
+    (_, Just (StuckPiElimStrict h2 exs2)) ->
+      simpPatIfPossible ms2 ms1 h2 exs2 $ (e2, e1) : cs
+    _ -> simpStuck ms1 ms2 $ (e1, e2) : cs
+
+simpPatIfPossible ::
+     Maybe Stuck
+  -> Maybe Stuck
+  -> Identifier
+  -> [[(WeakTermPlus, Identifier)]]
+  -> [((WeakMeta, WeakTerm), WeakTermPlus)]
+  -> WithEnv [EnrichedConstraint]
+simpPatIfPossible _ _ _ _ [] = return []
+simpPatIfPossible ms1 ms2 h1 exs1 ((e1, e2):cs) = do
+  isPattern <- allM (isSolvable e2 h1) (map (map snd) exs1)
+  if isPattern
+    then do
+      cs' <- simpMetaRet (fst e1) (fst e2) $ simp cs
+      let es1 = map (map fst) exs1
+      return $ Enriched (e1, e2) [h1] (ConstraintPattern h1 es1 e2) : cs'
+    else simpStuck ms1 ms2 $ (e1, e2) : cs
+
+simpStuck ::
+     Maybe Stuck
+  -> Maybe Stuck
+  -> [((WeakMeta, WeakTerm), (WeakMeta, WeakTerm))]
+  -> WithEnv [EnrichedConstraint]
+simpStuck _ _ [] = return []
+simpStuck ms1 ms2 ((e1, e2):cs) =
+  case (ms1, ms2) of
     (Just (StuckPiElimStrict h1 exs1), _) -> do
-      cs' <- simpMetaRet m1 m2 $ simp cs
+      cs' <- simpMetaRet (fst e1) (fst e2) $ simp cs
       let es1 = map (map fst) exs1
       return $ Enriched (e1, e2) [h1] (ConstraintQuasiPattern h1 es1 e2) : cs'
-    (_, Just StuckPiElimStrict {}) -> simp $ (e2, e1) : cs
+    (_, Just StuckPiElimStrict {}) -> simpStuck ms2 ms1 $ (e2, e1) : cs
     (Just (StuckPiElim h1 ies1), Nothing) -> do
-      cs' <- simpMetaRet m1 m2 $ simp cs
+      cs' <- simpMetaRet (fst e1) (fst e2) $ simp cs
       let c = Enriched (e1, e2) [h1] $ ConstraintFlexRigid h1 ies1 e2
       return $ c : cs'
-    (Nothing, Just StuckPiElim {}) -> simp $ (e2, e1) : cs
+    (Nothing, Just StuckPiElim {}) -> simpStuck ms2 ms1 $ (e2, e1) : cs
     (Just (StuckPiElim h1 ies1), Just (StuckPiElim h2 _)) -> do
-      cs' <- simpMetaRet m1 m2 $ simp cs
+      cs' <- simpMetaRet (fst e1) (fst e2) $ simp cs
       let c = Enriched (e1, e2) [h1, h2] $ ConstraintFlexFlex h1 ies1 e2
       return $ c : cs'
-    (Nothing, Nothing) ->
-      throwError $ "cannot simplify:\n" ++ Pr.ppShow (e1, e2)
+    _ -> throwError $ "cannot simplify:\n" ++ Pr.ppShow (e1, e2)
 
 simpMetaRet ::
      WeakMeta
@@ -159,21 +181,13 @@ simpMetaRet m1 m2 comp = do
 simpMeta :: WeakMeta -> WeakMeta -> WithEnv [EnrichedConstraint]
 simpMeta (WeakMetaTerminal _) (WeakMetaTerminal _) = return []
 simpMeta (WeakMetaTerminal _) m2@(WeakMetaNonTerminal _ _) = do
-  simpMeta (WeakMetaNonTerminal (Right univ) Nothing) m2
+  r <- newWeakTermRef $ Just univ
+  simpMeta (WeakMetaNonTerminal r Nothing) m2
 simpMeta m1@WeakMetaNonTerminal {} m2@(WeakMetaTerminal _) = simpMeta m2 m1
-simpMeta m1 m2 = do
-  case (readWeakMetaType m1, readWeakMetaType m2) of
-    (Right t1, Right t2) -> simp [(t1, t2)]
-    (Right t1, Left i2) -> simpMeta' i2 t1
-    (Left i1, Right t2) -> simpMeta' i1 t2
-    _ -> return []
-
-simpMeta' :: Identifier -> WeakTermPlus -> WithEnv [EnrichedConstraint]
-simpMeta' i t = do
-  mt <- lookupSubstEnv i
-  case mt of
-    Just t' -> simp [(t, t')]
-    Nothing -> return []
+simpMeta (WeakMetaNonTerminal ref1 _) (WeakMetaNonTerminal ref2 _) = do
+  t1 <- readWeakTermRef ref1
+  t2 <- readWeakTermRef ref2
+  simp [(t1, t2)]
 
 simpBinder ::
      [IdentifierPlus]
@@ -237,10 +251,10 @@ asStuckedTerm (_, WeakTermPiElim e es) =
 asStuckedTerm (_, WeakTermZeta h) = Just $ StuckHole h
 asStuckedTerm _ = Nothing
 
-isSolvable :: WeakTermPlus -> Identifier -> [Identifier] -> Bool
+isSolvable :: WeakTermPlus -> Identifier -> [Identifier] -> WithEnv Bool
 isSolvable e x xs = do
-  let (fvs, fmvs) = varWeakTermPlus e
-  affineCheck xs fvs && x `notElem` fmvs
+  (fvs, fmvs) <- varWeakTermPlus e
+  return $ affineCheck xs fvs && x `notElem` fmvs
 
 toVar :: Identifier -> WeakTermPlus -> WithEnv WeakTermPlus
 toVar x t = do
@@ -266,3 +280,10 @@ isLinear x xs =
 interpretAsUpsilon :: WeakTermPlus -> Maybe Identifier
 interpretAsUpsilon (_, WeakTermUpsilon x) = Just x
 interpretAsUpsilon _ = Nothing
+
+allM :: Monad m => (a -> m Bool) -> [a] -> m Bool
+allM _ [] = return True
+allM p (x:xs) = do
+  b1 <- p x
+  b2 <- allM p xs
+  return $ b1 && b2

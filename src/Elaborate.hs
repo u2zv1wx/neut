@@ -228,16 +228,10 @@ caseCheckEnumIdentifier' i labelList =
 
 toMeta :: WeakMeta -> WithEnv Meta
 toMeta (WeakMetaTerminal l) = return $ MetaTerminal l
-toMeta (WeakMetaNonTerminal (Right t) l) = do
+toMeta (WeakMetaNonTerminal ref l) = do
+  t <- readWeakTermRef ref
   t' <- elaborate' t
   return $ MetaNonTerminal t' l
-toMeta (WeakMetaNonTerminal (Left i) l) = do
-  mt <- lookupSubstEnv i
-  case mt of
-    Nothing -> throwError "found an unresolved type (compiler bug)"
-    Just t -> do
-      t' <- elaborate' t
-      return $ MetaNonTerminal t' l
 
 obtainTermType :: Meta -> TermPlus
 obtainTermType (MetaTerminal _) = (MetaTerminal Nothing, TermTau)

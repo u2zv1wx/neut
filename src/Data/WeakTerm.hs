@@ -2,7 +2,11 @@
 
 module Data.WeakTerm where
 
+import Control.Monad.Except
+import Data.IORef
+import Data.Maybe (fromMaybe)
 import Numeric.Half
+import System.IO.Unsafe (unsafePerformIO)
 
 import Data.Basic
 
@@ -30,11 +34,6 @@ data WeakTerm
   | WeakTermArrayElim ArrayKind WeakTermPlus WeakTermPlus
   deriving (Show)
 
-data WeakMeta
-  = WeakMetaTerminal (Maybe Loc)
-  | WeakMetaNonTerminal (Either Identifier WeakTermPlus) (Maybe Loc)
-  -- deriving (Show)
-
 instance Show WeakMeta where
   show _ = "_"
 
@@ -46,55 +45,223 @@ type Hole = Identifier
 
 type IdentifierPlus = (Identifier, WeakTermPlus)
 
-varWeakTermPlus :: WeakTermPlus -> ([Identifier], [Hole])
-varWeakTermPlus (_, WeakTermTau) = ([], [])
-varWeakTermPlus (_, WeakTermTheta _) = ([], [])
-varWeakTermPlus (_, WeakTermUpsilon x) = ([x], [])
-varWeakTermPlus (_, WeakTermPi xts t) = varWeakTermPlusBindings xts [t]
-varWeakTermPlus (_, WeakTermPiIntro xts e) = varWeakTermPlusBindings xts [e]
-varWeakTermPlus (_, WeakTermPiElim e es) =
-  pairwiseConcat $ varWeakTermPlus e : map varWeakTermPlus es
-varWeakTermPlus (_, WeakTermMu ut e) = varWeakTermPlusBindings [ut] [e]
-varWeakTermPlus (_, WeakTermZeta h) = ([], [h])
-varWeakTermPlus (_, WeakTermIntS _ _) = ([], [])
-varWeakTermPlus (_, WeakTermIntU _ _) = ([], [])
-varWeakTermPlus (_, WeakTermInt _) = ([], [])
-varWeakTermPlus (_, WeakTermFloat16 _) = ([], [])
-varWeakTermPlus (_, WeakTermFloat32 _) = ([], [])
-varWeakTermPlus (_, WeakTermFloat64 _) = ([], [])
-varWeakTermPlus (_, WeakTermFloat _) = ([], [])
-varWeakTermPlus (_, WeakTermEnum _) = ([], [])
-varWeakTermPlus (_, WeakTermEnumIntro _) = ([], [])
-varWeakTermPlus (_, WeakTermEnumElim e branchList) = do
-  let xhs = varWeakTermPlus e
-  let xhss = map (\(_, body) -> varWeakTermPlus body) branchList
-  pairwiseConcat (xhs : xhss)
-varWeakTermPlus (_, WeakTermArray _ e1 e2) =
-  pairwiseConcat $ [varWeakTermPlus e1, varWeakTermPlus e2]
-varWeakTermPlus (_, WeakTermArrayIntro _ les) = do
-  let xhss = map (\(_, body) -> varWeakTermPlus body) les
-  pairwiseConcat xhss
-varWeakTermPlus (_, WeakTermArrayElim _ e1 e2) =
-  pairwiseConcat $ [varWeakTermPlus e1, varWeakTermPlus e2]
+newtype WeakTermRef =
+  WeakTermRef (IORef (Maybe WeakTermPlus))
+
+data WeakMeta
+  = WeakMetaTerminal (Maybe Loc)
+  | WeakMetaNonTerminal WeakTermRef (Maybe Loc)
+
+instance Show WeakTermRef where
+  show (WeakTermRef x) = show $ unsafePerformIO $ readIORef x
+
+varWeakTermPlus ::
+     (MonadIO m, MonadError String m)
+  => WeakTermPlus
+  -> m ([Identifier], [Hole])
+varWeakTermPlus (m, WeakTermTau) = varWeakMeta m
+varWeakTermPlus (m, WeakTermTheta _) = varWeakMeta m
+varWeakTermPlus (m, WeakTermUpsilon x) = do
+  xhs <- varWeakMeta m
+  return $ pairwiseConcat [([x], []), xhs]
+varWeakTermPlus (m, WeakTermPi xts t) = do
+  xhs <- varWeakTermPlusBindings xts [t]
+  yhs <- varWeakMeta m
+  return $ pairwiseConcat [xhs, yhs]
+varWeakTermPlus (m, WeakTermPiIntro xts e) = do
+  xhs <- varWeakTermPlusBindings xts [e]
+  yhs <- varWeakMeta m
+  return $ pairwiseConcat [xhs, yhs]
+varWeakTermPlus (m, WeakTermPiElim e es) = do
+  xhs <- varWeakTermPlus e
+  yhss <- mapM varWeakTermPlus es
+  zhs <- varWeakMeta m
+  return $ pairwiseConcat $ xhs : zhs : yhss
+varWeakTermPlus (m, WeakTermMu ut e) = do
+  xhs <- varWeakTermPlusBindings [ut] [e]
+  yhs <- varWeakMeta m
+  return $ pairwiseConcat [xhs, yhs]
+varWeakTermPlus (m, WeakTermZeta h) = do
+  xhs <- varWeakMeta m
+  return $ pairwiseConcat [([], [h]), xhs]
+varWeakTermPlus (m, WeakTermIntS _ _) = varWeakMeta m
+varWeakTermPlus (m, WeakTermIntU _ _) = varWeakMeta m
+varWeakTermPlus (m, WeakTermInt _) = varWeakMeta m
+varWeakTermPlus (m, WeakTermFloat16 _) = varWeakMeta m
+varWeakTermPlus (m, WeakTermFloat32 _) = varWeakMeta m
+varWeakTermPlus (m, WeakTermFloat64 _) = varWeakMeta m
+varWeakTermPlus (m, WeakTermFloat _) = varWeakMeta m
+varWeakTermPlus (m, WeakTermEnum _) = varWeakMeta m
+varWeakTermPlus (m, WeakTermEnumIntro _) = varWeakMeta m
+varWeakTermPlus (m, WeakTermEnumElim e les) = do
+  xhs <- varWeakTermPlus e
+  xhss <- mapM (\(_, body) -> varWeakTermPlus body) les
+  yhs <- varWeakMeta m
+  return $ pairwiseConcat $ xhs : yhs : xhss
+varWeakTermPlus (m, WeakTermArray _ e1 e2) = do
+  xhs1 <- varWeakTermPlus e1
+  xhs2 <- varWeakTermPlus e2
+  xhs3 <- varWeakMeta m
+  return $ pairwiseConcat [xhs1, xhs2, xhs3]
+varWeakTermPlus (m, WeakTermArrayIntro _ les) = do
+  xhs <- varWeakMeta m
+  xhss <- mapM (\(_, body) -> varWeakTermPlus body) les
+  return $ pairwiseConcat $ xhs : xhss
+varWeakTermPlus (m, WeakTermArrayElim _ e1 e2) = do
+  xhs1 <- varWeakTermPlus e1
+  xhs2 <- varWeakTermPlus e2
+  xhs3 <- varWeakMeta m
+  return $ pairwiseConcat [xhs1, xhs2, xhs3]
 
 varWeakTermPlusBindings ::
-     [IdentifierPlus] -> [WeakTermPlus] -> ([Identifier], [Identifier])
-varWeakTermPlusBindings [] es = pairwiseConcat $ map varWeakTermPlus es
+     (MonadIO m, MonadError String m)
+  => [IdentifierPlus]
+  -> [WeakTermPlus]
+  -> m ([Identifier], [Identifier])
+varWeakTermPlusBindings [] es = do
+  xhss <- mapM varWeakTermPlus es
+  return $ pairwiseConcat xhss
 varWeakTermPlusBindings ((x, t):xts) es = do
-  let (xs1, hs1) = varWeakTermPlus t
-  let (xs2, hs2) = varWeakTermPlusBindings xts es
-  (xs1 ++ filter (/= x) xs2, hs1 ++ hs2)
+  (xs1, hs1) <- varWeakTermPlus t
+  (xs2, hs2) <- varWeakTermPlusBindings xts es
+  return (xs1 ++ filter (/= x) xs2, hs1 ++ hs2)
 
-varWeakMeta :: WeakMeta -> ([Identifier], [Hole])
-varWeakMeta (WeakMetaTerminal _) = ([], [])
-varWeakMeta (WeakMetaNonTerminal (Right t) _) = varWeakTermPlus t
-varWeakMeta (WeakMetaNonTerminal (Left _) _) = undefined
+varWeakMeta ::
+     (MonadIO m, MonadError String m) => WeakMeta -> m ([Identifier], [Hole])
+varWeakMeta (WeakMetaTerminal _) = return ([], [])
+varWeakMeta (WeakMetaNonTerminal ref _) = do
+  t <- readWeakTermRef ref
+  varWeakTermPlus t
 
 pairwiseConcat :: [([a], [b])] -> ([a], [b])
 pairwiseConcat [] = ([], [])
 pairwiseConcat ((xs, ys):rest) = do
   let (xs', ys') = pairwiseConcat rest
   (xs ++ xs', ys ++ ys')
+
+substWeakTermPlus ::
+     (MonadIO m, MonadError String m)
+  => SubstWeakTerm
+  -> WeakTermPlus
+  -> m WeakTermPlus
+substWeakTermPlus sub (m, WeakTermTau) = do
+  m' <- substWeakMeta sub m
+  return (m', WeakTermTau)
+substWeakTermPlus sub (m, WeakTermTheta t) = do
+  m' <- substWeakMeta sub m
+  return (m', WeakTermTheta t)
+substWeakTermPlus sub (m, WeakTermUpsilon x) = do
+  m' <- substWeakMeta sub m
+  return $ fromMaybe (m', WeakTermUpsilon x) (lookup x sub)
+substWeakTermPlus sub (m, WeakTermPi xts t) = do
+  m' <- substWeakMeta sub m
+  (xts', t') <- substWeakTermPlusBindingsWithBody sub xts t
+  return (m', WeakTermPi xts' t')
+substWeakTermPlus sub (m, WeakTermPiIntro xts body) = do
+  m' <- substWeakMeta sub m
+  (xts', body') <- substWeakTermPlusBindingsWithBody sub xts body
+  return (m', WeakTermPiIntro xts' body')
+substWeakTermPlus sub (m, WeakTermPiElim e es) = do
+  m' <- substWeakMeta sub m
+  e' <- substWeakTermPlus sub e
+  es' <- mapM (substWeakTermPlus sub) es
+  return (m', WeakTermPiElim e' es')
+substWeakTermPlus sub (m, WeakTermMu (x, t) e) = do
+  m' <- substWeakMeta sub m
+  t' <- substWeakTermPlus sub t
+  e' <- substWeakTermPlus (filter (\(k, _) -> k /= x) sub) e
+  return (m', WeakTermMu (x, t') e')
+substWeakTermPlus sub (m, WeakTermZeta s) = do
+  m' <- substWeakMeta sub m
+  return $ fromMaybe (m', WeakTermZeta s) (lookup s sub)
+substWeakTermPlus sub (m, WeakTermIntS size x) = do
+  m' <- substWeakMeta sub m
+  return (m', WeakTermIntS size x)
+substWeakTermPlus sub (m, WeakTermIntU size x) = do
+  m' <- substWeakMeta sub m
+  return (m', WeakTermIntU size x)
+substWeakTermPlus sub (m, WeakTermInt x) = do
+  m' <- substWeakMeta sub m
+  return (m', WeakTermInt x)
+substWeakTermPlus sub (m, WeakTermFloat16 x) = do
+  m' <- substWeakMeta sub m
+  return (m', WeakTermFloat16 x)
+substWeakTermPlus sub (m, WeakTermFloat32 x) = do
+  m' <- substWeakMeta sub m
+  return (m', WeakTermFloat32 x)
+substWeakTermPlus sub (m, WeakTermFloat64 x) = do
+  m' <- substWeakMeta sub m
+  return (m', WeakTermFloat64 x)
+substWeakTermPlus sub (m, WeakTermFloat x) = do
+  m' <- substWeakMeta sub m
+  return (m', WeakTermFloat x)
+substWeakTermPlus sub (m, WeakTermEnum x) = do
+  m' <- substWeakMeta sub m
+  return (m', WeakTermEnum x)
+substWeakTermPlus sub (m, WeakTermEnumIntro l) = do
+  m' <- substWeakMeta sub m
+  return (m', WeakTermEnumIntro l)
+substWeakTermPlus sub (m, WeakTermEnumElim e branchList) = do
+  m' <- substWeakMeta sub m
+  e' <- substWeakTermPlus sub e
+  let (caseList, es) = unzip branchList
+  es' <- mapM (substWeakTermPlus sub) es
+  return (m', WeakTermEnumElim e' (zip caseList es'))
+substWeakTermPlus sub (m, WeakTermArray kind from to) = do
+  m' <- substWeakMeta sub m
+  from' <- substWeakTermPlus sub from
+  to' <- substWeakTermPlus sub to
+  return (m', WeakTermArray kind from' to')
+substWeakTermPlus sub (m, WeakTermArrayIntro kind les) = do
+  m' <- substWeakMeta sub m
+  let (ls, es) = unzip les
+  es' <- mapM (substWeakTermPlus sub) es
+  return (m', WeakTermArrayIntro kind (zip ls es'))
+substWeakTermPlus sub (m, WeakTermArrayElim kind e1 e2) = do
+  m' <- substWeakMeta sub m
+  e1' <- substWeakTermPlus sub e1
+  e2' <- substWeakTermPlus sub e2
+  return (m', WeakTermArrayElim kind e1' e2')
+
+substWeakTermPlusBindingsWithBody ::
+     (MonadIO m, MonadError String m)
+  => SubstWeakTerm
+  -> [IdentifierPlus]
+  -> WeakTermPlus
+  -> m ([IdentifierPlus], WeakTermPlus)
+substWeakTermPlusBindingsWithBody sub [] e = do
+  e' <- substWeakTermPlus sub e
+  return ([], e')
+substWeakTermPlusBindingsWithBody sub ((x, t):xts) e = do
+  let sub' = filter (\(k, _) -> k /= x) sub
+  (xts', e') <- substWeakTermPlusBindingsWithBody sub' xts e
+  t' <- substWeakTermPlus sub t
+  return ((x, t') : xts', e')
+
+substWeakMeta ::
+     (MonadIO m, MonadError String m) => SubstWeakTerm -> WeakMeta -> m WeakMeta
+substWeakMeta _ m@(WeakMetaTerminal _) = return m
+substWeakMeta sub (WeakMetaNonTerminal ref ml) = do
+  t <- readWeakTermRef ref
+  t' <- substWeakTermPlus sub t
+  writeWeakTermRef ref t'
+  return $ WeakMetaNonTerminal ref ml
+
+readWeakTermRef ::
+     (MonadIO m, MonadError String m) => WeakTermRef -> m WeakTermPlus
+readWeakTermRef (WeakTermRef ref) = do
+  mt <- liftIO $ readIORef ref
+  case mt of
+    Nothing -> throwError "readWeakTermRef for Nothing"
+    Just t -> return t
+
+writeWeakTermRef :: (MonadIO m) => WeakTermRef -> WeakTermPlus -> m ()
+writeWeakTermRef (WeakTermRef ref) t = liftIO $ writeIORef ref (Just t)
+
+newWeakTermRef :: (MonadIO m) => Maybe WeakTermPlus -> m WeakTermRef
+newWeakTermRef mt = do
+  ref <- liftIO $ newIORef mt
+  return $ WeakTermRef ref
 
 isReducible :: WeakTermPlus -> Bool
 isReducible (_, WeakTermTau) = False

@@ -19,11 +19,21 @@ import qualified Text.Show.Pretty as Pr
 -- all of them using heuristics.
 synthesize :: ConstraintQueue -> WithEnv ()
 synthesize q = do
+  liftIO $ putStrLn "synth"
   sub <- gets substEnv
-  case Q.getMin q of
+  let c = Q.getMin q
+  case c of
+    Just (Enriched (e1, e2) ms _) -> do
+      mHoleToTerm <- lookupAny ms sub
+      case mHoleToTerm of
+        Just (m, e) -> resolveStuck q e1 e2 m e
+        Nothing -> synthesize' c q
+    _ -> synthesize' c q
+
+synthesize' :: Maybe EnrichedConstraint -> ConstraintQueue -> WithEnv ()
+synthesize' c q =
+  case c of
     Nothing -> return ()
-    Just (Enriched (e1, e2) ms _)
-      | Just (m, e) <- lookupAny ms sub -> resolveStuck q e1 e2 m e
     Just (Enriched _ _ (ConstraintImmediate m e)) -> resolveHole q m e
     Just (Enriched _ _ (ConstraintPattern m iess e)) -> resolvePiElim q m iess e
     Just (Enriched _ _ (ConstraintQuasiPattern m iess e)) ->
@@ -41,8 +51,16 @@ resolveStuck ::
   -> WeakTermPlus
   -> WithEnv ()
 resolveStuck q e1 e2 h e = do
+  liftIO $ putStrLn "resolveStuck"
+  liftIO $ putStrLn "h:"
+  liftIO $ putStrLn $ Pr.ppShow h
+  liftIO $ putStrLn "e:"
+  liftIO $ putStrLn $ Pr.ppShow e
+  liftIO $ putStrLn "subst1"
   e1' <- substWeakTermPlus [(h, e)] e1
+  liftIO $ putStrLn "subst2"
   e2' <- substWeakTermPlus [(h, e)] e2
+  liftIO $ putStrLn "done"
   cs <- simp [(e1', e2')]
   synthesize $ Q.deleteMin q `Q.union` Q.fromList cs
 
@@ -69,6 +87,7 @@ resolvePiElim q m ess e = do
 
 resolveHole :: ConstraintQueue -> Hole -> WeakTermPlus -> WithEnv ()
 resolveHole q h e = do
+  liftIO $ putStrLn "resolveHole"
   senv <- gets substEnv
   senv' <- compose [(h, e)] senv
   modify (\env -> env {substEnv = senv'})
@@ -150,12 +169,19 @@ chain :: ConstraintQueue -> [WithEnv a] -> WithEnv a
 chain _ [] = throwError "cannot synthesize(chain)"
 chain c (e:es) = e `catchError` const (chain c es)
 
-lookupAny :: [Hole] -> [(Identifier, a)] -> Maybe (Hole, a)
-lookupAny [] _ = Nothing
-lookupAny (h:ks) sub =
+lookupAny ::
+     [Hole]
+  -> [(Identifier, WeakTermPlus)]
+  -> WithEnv (Maybe (Hole, WeakTermPlus))
+lookupAny [] _ = return Nothing
+lookupAny (h:ks) sub = do
   case lookup h sub of
-    Just v -> Just (h, v)
-    Nothing -> lookupAny ks sub
+    Just v -> do
+      (_, fmvs) <- varWeakTermPlus v
+      if h `elem` fmvs
+        then lookupAny ks sub
+        else return $ Just (h, v)
+    _ -> lookupAny ks sub
 
 bindFormalArgs :: WeakTermPlus -> [[IdentifierPlus]] -> WithEnv WeakTermPlus
 bindFormalArgs e [] = return e
