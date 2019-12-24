@@ -171,9 +171,8 @@ makeClosure mName fvs m xts e = do
   (envVarName, envVar) <- newDataUpsilon
   let (xs', ts) = unzip $ zip freeVarNameList freeVarTypeList ++ xts
   ts' <- mapM polarize ts
-  -- e' <- linearize (zip freeVarNameList freeVarTypeList ++ xts) e
   e' <- linearize (zip xs' ts') e
-  let lamBody = (ml, CodeSigmaElim freeVarNameList envVar e') -- このSigmaElimは「特別」なやつ（これだけ非線形でありうる）
+  let body = (ml, CodeSigmaElim freeVarNameList envVar e')
   let fvSigmaIntro =
         ( ml
         , DataSigmaIntro $ zipWith (curry toDataUpsilon) freeVarNameList locList)
@@ -182,7 +181,7 @@ makeClosure mName fvs m xts e = do
       Just lamThetaName -> return lamThetaName
       Nothing -> newNameWith "cls"
   penv <- gets codeEnv
-  when (name `elem` map fst penv) $ insCodeEnv name (envVarName : xs) lamBody
+  when (name `elem` map fst penv) $ insCodeEnv name (envVarName : xs) body
   return $
     ( ml
     , CodeUpIntro
@@ -472,11 +471,6 @@ cartesianSigma thetaName ml mxes = do
 --     return ()                                     ---        ---
 --
 -- (Note that sigma-elim for yi is not necessary since all of them are units.)
--- xiがtjのなかにlinearに出現するとは限らないので、linearizeをかませる必要がある。
--- 「だけどもいまはまさにそのxiをfreeしたいんでは？」「いや、copyされたならちゃんとeiのなかで消費されてるはずだから問題ない」
--- linearizeにおけるaffineは起こらないことがすでにわかっている（だって、すべてのxiは使用されているから）。
--- ……いやまあ、実際には、tiは型なんだから自由変数を含まないことが保証されていて？
--- いやいや、sigmaの引数のときはやっぱりxiを自由変数として含みうる。……お、これはまずいんでは？
 affineSigma ::
      Identifier
   -> Maybe Loc
@@ -530,13 +524,13 @@ relevantSigma thetaName ml mxes = do
     Nothing -> do
       xes <- mapM supplyName mxes
       (z, varZ) <- newDataUpsilon
-      -- appList == [APP-1, ..., APP-n]
-      appList <- forM xes $ \(x, e) -> toRelevantApp ml x e
+      -- as == [APP-1, ..., APP-n]
+      as <- forM xes $ \(x, e) -> toRelevantApp ml x e
       -- pairVarNameList == [pair-1, ...,  pair-n]
       (pairVarNameList, pairVarList) <-
         unzip <$> mapM (const $ newDataUpsilon) xes
       transposedPair <- transposeSigma pairVarList
-      let body = bindLet (zip pairVarNameList appList) transposedPair
+      let body = bindLet (zip pairVarNameList as) transposedPair
       body' <- linearize xes body
       insCodeEnv thetaName [z] (ml, CodeSigmaElim (map fst xes) varZ body')
       return theta
