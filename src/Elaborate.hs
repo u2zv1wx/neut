@@ -39,7 +39,10 @@ elaborate e = do
   modify (\env -> env {typeEnv = tenv'})
   -- elaborate `e` using the resulting substitution
   e' <- substWeakTermPlus sub e
-  exhaust e' >>= elaborate'
+  e'' <- elaborate' e'
+  caseCheck e''
+  return e''
+  -- caseCheck e' >>= elaborate'
 
 -- This function translates a well-typed term into an untyped term in a
 -- reduction-preserving way. Here, we translate types into units (nullary product).
@@ -155,13 +158,6 @@ elaboratePlus (x, t) = do
   t' <- elaborate' t
   return (x, t')
 
-exhaust :: WeakTermPlus -> WithEnv WeakTermPlus
-exhaust e = do
-  b <- exhaust' e
-  if b
-    then return e
-    else throwError "non-exhaustive pattern"
-
 -- enum.n{i}   ~> Just i
 -- enum.choice ~> Just 2 (assuming choice = {left, right})
 -- otherwise   ~> Nothing
@@ -178,58 +174,56 @@ elaborateIsEnum x
         return $ Just $ toInteger $ length ls
 elaborateIsEnum _ = return Nothing
 
--- FIXME: exhaust'はmetaも検査するべき
--- FIXME: exhaust'はTermに対して定義されるべき
--- FIXME: exhaustはunitを返すようにするべき
-exhaust' :: WeakTermPlus -> WithEnv Bool
-exhaust' (_, WeakTermTau) = return True
-exhaust' (_, WeakTermTheta _) = return True
-exhaust' (_, WeakTermUpsilon _) = return True
-exhaust' (_, WeakTermPi xts t) = allM exhaust' $ t : map snd xts
-exhaust' (_, WeakTermPiIntro _ e) = exhaust' e
-exhaust' (_, WeakTermPiElim e es) = allM exhaust' $ e : es
-exhaust' (_, WeakTermMu _ e) = exhaust' e
-exhaust' (_, WeakTermZeta _) = return False
-exhaust' (_, WeakTermIntS _ _) = return True
-exhaust' (_, WeakTermIntU _ _) = return True
-exhaust' (_, WeakTermInt _) = return True
-exhaust' (_, WeakTermFloat16 _) = return True
-exhaust' (_, WeakTermFloat32 _) = return True
-exhaust' (_, WeakTermFloat64 _) = return True
-exhaust' (_, WeakTermFloat _) = return True
-exhaust' (_, WeakTermEnum _) = return True
-exhaust' (_, WeakTermEnumIntro _) = return True
-exhaust' (_, WeakTermEnumElim e branchList) = do
-  b <- exhaust' e
+-- `caseCheck e` checks if all the case-lists appear in `e` are exhaustive.
+caseCheck :: TermPlus -> WithEnv ()
+caseCheck (m, TermTau) = caseCheckMeta m
+caseCheck (m, TermTheta _) = caseCheckMeta m
+caseCheck (m, TermUpsilon _) = caseCheckMeta m
+caseCheck (m, TermPi xts t) =
+  caseCheckMeta m >> (mapM_ caseCheck $ t : map snd xts)
+caseCheck (m, TermPiIntro xts e) =
+  caseCheckMeta m >> (mapM_ caseCheck $ e : map snd xts)
+caseCheck (m, TermPiElim e es) = caseCheckMeta m >> (mapM_ caseCheck $ e : es)
+caseCheck (m, TermMu (_, t) e) = caseCheckMeta m >> (mapM_ caseCheck [t, e])
+caseCheck (m, TermIntS _ _) = caseCheckMeta m
+caseCheck (m, TermIntU _ _) = caseCheckMeta m
+caseCheck (m, TermFloat16 _) = caseCheckMeta m
+caseCheck (m, TermFloat32 _) = caseCheckMeta m
+caseCheck (m, TermFloat64 _) = caseCheckMeta m
+caseCheck (m, TermEnum _) = caseCheckMeta m
+caseCheck (m, TermEnumIntro _) = caseCheckMeta m
+caseCheck (m, TermEnumElim e branchList) = do
+  caseCheckMeta m
   let labelList = map fst branchList
-  t <- obtainType <$> (toMeta $ fst e)
-  t' <- reduceTermPlus t
+  t' <- reduceTermPlus $ obtainType $ fst e
   case t' of
-    (_, TermEnum x) -> exhaustEnumIdentifier x labelList b
-    _ -> throwError "type error (exhaust)"
-exhaust' (_, WeakTermArray _ dom cod) = allM exhaust' [dom, cod]
-exhaust' (_, WeakTermArrayIntro _ les) = do
+    (_, TermEnum x) -> caseCheckEnumIdentifier x labelList
+    _ -> throwError "type error (caseCheck)"
+caseCheck (m, TermArray _ dom cod) =
+  caseCheckMeta m >> mapM_ caseCheck [dom, cod]
+caseCheck (m, TermArrayIntro _ les) = do
+  caseCheckMeta m
   let (_, es) = unzip les
-  allM exhaust' es
-exhaust' (_, WeakTermArrayElim _ e1 e2) = allM exhaust' [e1, e2]
+  mapM_ caseCheck es
+caseCheck (m, TermArrayElim _ e1 e2) =
+  caseCheckMeta m >> mapM_ caseCheck [e1, e2]
 
-exhaustEnumIdentifier :: EnumType -> [Case] -> Bool -> WithEnv Bool
-exhaustEnumIdentifier (EnumTypeLabel x) labelList b = do
+caseCheckMeta :: Meta -> WithEnv ()
+caseCheckMeta (MetaTerminal _) = return ()
+caseCheckMeta (MetaNonTerminal t _) = caseCheck t
+
+caseCheckEnumIdentifier :: EnumType -> [Case] -> WithEnv ()
+caseCheckEnumIdentifier (EnumTypeLabel x) labelList = do
   ls <- lookupEnumSet x
-  return $ b && exhaustEnumIdentifier' (length ls) labelList
-exhaustEnumIdentifier (EnumTypeNatNum i) labelList b = do
-  return $ b && exhaustEnumIdentifier' i labelList
+  caseCheckEnumIdentifier' (length ls) labelList
+caseCheckEnumIdentifier (EnumTypeNatNum i) labelList = do
+  caseCheckEnumIdentifier' i labelList
 
-exhaustEnumIdentifier' :: Int -> [Case] -> Bool
-exhaustEnumIdentifier' i labelList =
-  i <= length (nub labelList) || CaseDefault `elem` labelList
-
-allM :: Monad m => (a -> m Bool) -> [a] -> m Bool
-allM _ [] = return True
-allM p (x:xs) = do
-  b1 <- p x
-  b2 <- allM p xs
-  return $ b1 && b2
+caseCheckEnumIdentifier' :: Int -> [Case] -> WithEnv ()
+caseCheckEnumIdentifier' i labelList =
+  if i <= length (nub labelList) || CaseDefault `elem` labelList
+    then return ()
+    else throwError "non-exhaustive pattern"
 
 toMeta :: WeakMeta -> WithEnv Meta
 toMeta (WeakMetaTerminal l) = return $ MetaTerminal l
