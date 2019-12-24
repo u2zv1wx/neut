@@ -21,19 +21,10 @@ synthesize :: ConstraintQueue -> WithEnv ()
 synthesize q = do
   liftIO $ putStrLn "synth"
   sub <- gets substEnv
-  let c = Q.getMin q
-  case c of
-    Just (Enriched (e1, e2) ms _) -> do
-      mHoleToTerm <- lookupAny ms sub
-      case mHoleToTerm of
-        Just (m, e) -> resolveStuck q e1 e2 m e
-        Nothing -> synthesize' c q
-    _ -> synthesize' c q
-
-synthesize' :: Maybe EnrichedConstraint -> ConstraintQueue -> WithEnv ()
-synthesize' c q =
-  case c of
+  case Q.getMin q of
     Nothing -> return ()
+    Just (Enriched (e1, e2) ms _)
+      | Just (m, e) <- lookupAny ms sub -> resolveStuck q e1 e2 m e
     Just (Enriched _ _ (ConstraintImmediate m e)) -> resolveHole q m e
     Just (Enriched _ _ (ConstraintPattern m iess e)) -> resolvePiElim q m iess e
     Just (Enriched _ _ (ConstraintQuasiPattern m iess e)) ->
@@ -169,18 +160,11 @@ chain :: ConstraintQueue -> [WithEnv a] -> WithEnv a
 chain _ [] = throwError "cannot synthesize(chain)"
 chain c (e:es) = e `catchError` const (chain c es)
 
-lookupAny ::
-     [Hole]
-  -> [(Identifier, WeakTermPlus)]
-  -> WithEnv (Maybe (Hole, WeakTermPlus))
-lookupAny [] _ = return Nothing
+lookupAny :: [Hole] -> [(Identifier, a)] -> Maybe (Hole, a)
+lookupAny [] _ = Nothing
 lookupAny (h:ks) sub = do
   case lookup h sub of
-    Just v -> do
-      (_, fmvs) <- varWeakTermPlus v
-      if h `elem` fmvs
-        then lookupAny ks sub
-        else return $ Just (h, v)
+    Just v -> Just (h, v)
     _ -> lookupAny ks sub
 
 bindFormalArgs :: WeakTermPlus -> [[IdentifierPlus]] -> WithEnv WeakTermPlus
