@@ -10,6 +10,8 @@ import System.IO.Unsafe (unsafePerformIO)
 
 import Data.Basic
 
+import qualified Text.Show.Pretty as Pr
+
 data WeakTerm
   = WeakTermTau
   | WeakTermTheta Identifier
@@ -117,7 +119,7 @@ varWeakTermPlusBindings ::
      (MonadIO m, MonadError String m)
   => [IdentifierPlus]
   -> [WeakTermPlus]
-  -> m ([Identifier], [Identifier])
+  -> m ([Identifier], [Hole])
 varWeakTermPlusBindings [] es = do
   xhss <- mapM varWeakTermPlus es
   return $ pairwiseConcat xhss
@@ -243,6 +245,8 @@ substWeakMeta ::
 substWeakMeta _ m@(WeakMetaTerminal _) = return m
 substWeakMeta sub (WeakMetaNonTerminal ref ml) = do
   t <- readWeakTermRef ref
+  -- liftIO $ putStrLn $ "WEAKMETA. e:"
+  -- liftIO $ putStrLn $ Pr.ppShow t
   t' <- substWeakTermPlus sub t
   writeWeakTermRef ref t'
   return $ WeakMetaNonTerminal ref ml
