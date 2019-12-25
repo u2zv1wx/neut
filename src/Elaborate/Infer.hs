@@ -60,10 +60,11 @@ infer ctx (meta, WeakTermPiElim e es) = do
   tPi <- infer ctx e
   -- xts == [(x1, t1), ..., (xn, tn)] with xi : ti and ei : ti
   xts <- inferList ctx es
-  -- cod = ?M @ ctx @ x1 @ ... @ xn
+  -- cod = ?M @ ctx @ (x1, ..., xn)
   cod <- newHoleInCtx (ctx ++ xts)
   let tPi' = (newMetaTerminal, WeakTermPi xts cod)
   insConstraintEnv tPi tPi'
+  -- cod' = ?M @ ctx @ (e1, ..., en)
   cod' <- substWeakTermPlus (zip (map fst xts) es) cod
   returnAfterUpdate meta cod'
 infer ctx (meta, WeakTermMu (x, t) e) = do
