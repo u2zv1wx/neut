@@ -621,7 +621,21 @@ polarizeTheta m "file-descriptor" = polarize (m, TermTheta "i64")
 polarizeTheta m "stdin" = polarize (m, TermIntS 64 0)
 polarizeTheta m "stdout" = polarize (m, TermIntS 64 1)
 polarizeTheta m "stderr" = polarize (m, TermIntS 64 2)
-polarizeTheta _ name = throwError $ "polarize.theta: " ++ name
+polarizeTheta m name = do
+  mx <- asEnumConstant name
+  case mx of
+    Just i -> polarize (m, TermIntS 64 i) -- enum.top ~> 1, enum.choice ~> 2, etc.
+    Nothing -> throwError $ "polarize.theta: " ++ name
+
+-- {enum.top, enum.choice, etc.} ~> {(the number of contents in enum)}
+asEnumConstant :: Identifier -> WithEnv (Maybe Integer)
+asEnumConstant x
+  | ["enum", y] <- wordsBy '.' x = do
+    eenv <- gets enumEnv
+    case lookup y eenv of
+      Nothing -> return Nothing
+      Just ls -> return $ Just $ toInteger $ length ls
+asEnumConstant _ = return Nothing
 
 polarizeUnaryOp :: Identifier -> UnaryOp -> LowType -> Meta -> WithEnv CodePlus
 polarizeUnaryOp name op lowType m = do
