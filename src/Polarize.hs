@@ -34,7 +34,6 @@ polarize (m, TermPi _ _) = do
   let ml = snd $ obtainInfoMeta m
   tau <- cartesianImmediate ml
   (envVarName, envVar) <- newDataUpsilonWith "env"
-  -- (envVarName, envVar) <- newDataUpsilon
   let retTau = (ml, CodeUpIntro tau)
   let retEnvVar = (ml, CodeUpIntro envVar)
   closureType <-
@@ -103,7 +102,7 @@ polarize (m, TermEnumElim e bs) = do
 polarize (m, TermArray _ _ _) = do
   let ml = snd $ obtainInfoMeta m
   tau <- cartesianImmediate ml
-  (arrVarName, arrVar) <- newDataUpsilon
+  (arrVarName, arrVar) <- newDataUpsilonWith "arr"
   let retTau = (ml, CodeUpIntro tau)
   let retArrVar = (ml, CodeUpIntro arrVar)
   arrayClsType <-
@@ -128,11 +127,11 @@ polarize (m, TermArrayElim k e1 e2) = do
   let ml = snd $ obtainInfoMeta m
   e1' <- polarize e1
   e2' <- polarize e2
-  (arrVarName, arrVar) <- newDataUpsilon
-  (idxVarName, idxVar) <- newDataUpsilon
+  (arrVarName, arrVar) <- newDataUpsilonWith "arr"
+  (idxVarName, idxVar) <- newDataUpsilonWith "idx"
   affVarName <- newNameWith "aff"
   relVarName <- newNameWith "rel"
-  (arrTypeVarName, arrTypeVar) <- newDataUpsilon
+  (arrTypeVarName, arrTypeVar) <- newDataUpsilonWith "arr-type"
   return $
     bindLet [(arrVarName, e1'), (idxVarName, e2')] $
     ( ml
@@ -156,7 +155,7 @@ type Binder = [(Identifier, CodePlus)]
 polarize' :: TermPlus -> WithEnv (Binder, DataPlus)
 polarize' e@(m, _) = do
   e' <- polarize e
-  (varName, var) <- newDataUpsilon' $ snd $ obtainInfoMeta m
+  (varName, var) <- newDataUpsilonWith' "var" $ snd $ obtainInfoMeta m
   return ([(varName, e')], var)
 
 makeClosure ::
@@ -197,10 +196,10 @@ callClosure :: Meta -> CodePlus -> [TermPlus] -> WithEnv CodePlus
 callClosure m e es = do
   (xess, xs) <- unzip <$> mapM polarize' es
   let ml = snd $ obtainInfoMeta m
-  (clsVarName, clsVar) <- newDataUpsilon
-  (typeVarName, typeVar) <- newDataUpsilon
-  (envVarName, envVar) <- newDataUpsilon
-  (lamVarName, lamVar) <- newDataUpsilon
+  (clsVarName, clsVar) <- newDataUpsilonWith "cls"
+  (typeVarName, typeVar) <- newDataUpsilonWith "env-type"
+  (envVarName, envVar) <- newDataUpsilonWith "env"
+  (lamVarName, lamVar) <- newDataUpsilonWith "thunk"
   affVarName <- newNameWith "aff"
   relVarName <- newNameWith "rel"
   return $
@@ -389,7 +388,7 @@ relevantImmediate ml = do
   case lookup thetaName cenv of
     Just _ -> return theta
     Nothing -> do
-      (immVarName, immVar) <- newDataUpsilon
+      (immVarName, immVar) <- newDataUpsilonWith "imm"
       insCodeEnv
         thetaName
         [immVarName]
@@ -411,7 +410,7 @@ affineUniv ml = do
   case lookup thetaName cenv of
     Just _ -> return theta
     Nothing -> do
-      (univVarName, univVar) <- newDataUpsilon
+      (univVarName, univVar) <- newDataUpsilonWith "univ"
       affVarName <- newNameWith "var"
       relVarName <- newNameWith "var"
       insCodeEnv
@@ -433,9 +432,9 @@ relevantUniv ml = do
   case lookup thetaName cenv of
     Just _ -> return theta
     Nothing -> do
-      (univVarName, univVar) <- newDataUpsilon
-      (affVarName, affVar) <- newDataUpsilon
-      (relVarName, relVar) <- newDataUpsilon
+      (univVarName, univVar) <- newDataUpsilonWith "univ"
+      (affVarName, affVar) <- newDataUpsilonWith "univ-aff"
+      (relVarName, relVar) <- newDataUpsilonWith "univ-rel"
       insCodeEnv
         thetaName
         [univVarName]
@@ -534,12 +533,12 @@ relevantSigma thetaName ml mxes = do
     Just _ -> return theta
     Nothing -> do
       xes <- mapM supplyName mxes
-      (z, varZ) <- newDataUpsilon
+      (z, varZ) <- newDataUpsilonWith "sig-rel-arg"
       -- as == [APP-1, ..., APP-n]
       as <- forM xes $ \(x, e) -> toRelevantApp ml x e
       -- pairVarNameList == [pair-1, ...,  pair-n]
       (pairVarNameList, pairVarList) <-
-        unzip <$> mapM (const $ newDataUpsilon) xes
+        unzip <$> mapM (const $ newDataUpsilonWith "pair") xes
       transposedPair <- transposeSigma pairVarList
       let body = bindLet (zip pairVarNameList as) transposedPair
       body' <- linearize xes body
@@ -553,8 +552,10 @@ relevantSigma thetaName ml mxes = do
 --   return ((x1, ..., xn), (y1, ..., yn))
 transposeSigma :: [DataPlus] -> WithEnv CodePlus
 transposeSigma ds = do
-  (xVarNameList, xVarList) <- unzip <$> mapM (const $ newDataUpsilon) ds
-  (yVarNameList, yVarList) <- unzip <$> mapM (const $ newDataUpsilon) ds
+  (xVarNameList, xVarList) <-
+    unzip <$> mapM (const $ newDataUpsilonWith "sig-x") ds
+  (yVarNameList, yVarList) <-
+    unzip <$> mapM (const $ newDataUpsilonWith "sig-y") ds
   return $
     bindSigmaElim (zip (zip xVarNameList yVarNameList) ds) $
     ( Nothing
@@ -597,9 +598,9 @@ toAffineApp ml x e = do
 --   rel @ x
 toRelevantApp :: Maybe Loc -> Identifier -> CodePlus -> WithEnv CodePlus
 toRelevantApp ml x e = do
-  (expVarName, expVar) <- newDataUpsilon
-  (affVarName, _) <- newDataUpsilon
-  (relVarName, relVar) <- newDataUpsilon
+  (expVarName, expVar) <- newDataUpsilonWith "rel-app-exp"
+  (affVarName, _) <- newDataUpsilonWith "rel-app-aff"
+  (relVarName, relVar) <- newDataUpsilonWith "rel-app-rel"
   return
     ( ml
     , CodeUpElim
@@ -708,8 +709,8 @@ polarizeEvalIO m = do
   t' <- reduceTermPlus t
   case t' of
     (_, TermPi [arg] _) -> do
-      (resultValue, resultValueVar) <- newDataUpsilon
-      (sig, sigVar) <- newDataUpsilon
+      (resultValue, resultValueVar) <- newDataUpsilonWith "result"
+      (sig, sigVar) <- newDataUpsilonWith "eval-io-sig"
       resultEnv <- newNameWith "env"
       arg' <- polarize $ toTermUpsilon arg
       -- IO Top == Top -> (Bottom, Top)
@@ -764,18 +765,10 @@ polarizeSysCall name sysCall argLen argIdxList m = do
 toVar :: Identifier -> DataPlus
 toVar x = (Nothing, DataUpsilon x)
 
-newDataUpsilon :: WithEnv (Identifier, DataPlus)
-newDataUpsilon = newDataUpsilon' Nothing
-
 newDataUpsilonWith :: Identifier -> WithEnv (Identifier, DataPlus)
 newDataUpsilonWith name = newDataUpsilonWith' name Nothing
 
 newDataUpsilonWith' :: Identifier -> Maybe Loc -> WithEnv (Identifier, DataPlus)
 newDataUpsilonWith' name ml = do
   x <- newNameWith name
-  return (x, (ml, DataUpsilon x))
-
-newDataUpsilon' :: Maybe Loc -> WithEnv (Identifier, DataPlus)
-newDataUpsilon' ml = do
-  x <- newNameWith "arg"
   return (x, (ml, DataUpsilon x))
