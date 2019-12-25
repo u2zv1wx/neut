@@ -2,6 +2,7 @@ module Data.Basic where
 
 import Data.Bits
 import Data.Maybe (fromMaybe)
+import Text.Read
 
 type Identifier = String
 
@@ -21,7 +22,7 @@ readNatEnumType :: Identifier -> (Maybe Integer)
 readNatEnumType str -- n1, n2, ..., n{i}, ..., n{2^64}
   | length str >= 2
   , head str == 'n'
-  , Just i <- read (tail str)
+  , Just i <- readMaybe (tail str)
   , 1 <= i && i <= 2 ^ (64 :: Integer) = Just i
 readNatEnumType _ = Nothing
 
@@ -30,9 +31,9 @@ readNatEnumValue str -- n1-0, n2-0, n2-1, ...
   | length str >= 4
   , head str == 'n'
   , [iStr, jStr] <- wordsBy '-' (tail str)
-  , Just i <- read iStr
+  , Just i <- readMaybe iStr
   , 1 <= i && i <= 2 ^ (64 :: Integer)
-  , Just j <- read jStr
+  , Just j <- readMaybe jStr
   , 0 <= j && j <= i - 1 = Just (i, j)
 readNatEnumValue _ = Nothing
 
@@ -214,11 +215,11 @@ asLowType n = fromMaybe (LowTypeIntS 64) (asLowTypeMaybe n)
 
 asLowTypeMaybe :: Identifier -> Maybe LowType
 asLowTypeMaybe ('i':cs)
-  | Just n <- read cs = Just $ LowTypeIntS n
+  | Just n <- readMaybe cs = Just $ LowTypeIntS n
 asLowTypeMaybe ('u':cs)
-  | Just n <- read cs = Just $ LowTypeIntU n
+  | Just n <- readMaybe cs = Just $ LowTypeIntU n
 asLowTypeMaybe ('f':cs)
-  | Just n <- read cs
+  | Just n <- readMaybe cs
   , Just size <- asFloatSize n = Just $ LowTypeFloat size
 asLowTypeMaybe _ = Nothing
 
