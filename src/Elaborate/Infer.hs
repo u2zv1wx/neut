@@ -49,8 +49,8 @@ infer _ (meta, WeakTermTheta x)
     case mt of
       Just t -> returnAfterUpdate meta t
       Nothing -> do
-        h <- newHoleInCtx [] -- constants do not depend on their context
-        insTypeEnv x h -- これだとthetaは出現のたびに異なる型をもつことになってしまう。
+        h <- newHoleInCtx []
+        insTypeEnv x h
         returnAfterUpdate meta h
 infer _ (meta, WeakTermUpsilon x) = do
   t <- lookupTypeEnv x

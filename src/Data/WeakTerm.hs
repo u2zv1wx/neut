@@ -129,12 +129,8 @@ varWeakTermPlusBindings ((x, t):xts) es = do
 
 varWeakMeta ::
      (MonadIO m, MonadError String m) => WeakMeta -> m ([Identifier], [Hole])
-varWeakMeta _ = return ([], []) -- nop?
+varWeakMeta _ = return ([], [])
 
--- varWeakMeta (WeakMetaTerminal _) = return ([], [])
--- varWeakMeta (WeakMetaNonTerminal ref _) = do
---   t <- readWeakTermRef ref
---   varWeakTermPlus t
 pairwiseConcat :: [([a], [b])] -> ([a], [b])
 pairwiseConcat [] = ([], [])
 pairwiseConcat ((xs, ys):rest) = do
