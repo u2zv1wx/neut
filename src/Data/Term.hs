@@ -31,7 +31,10 @@ data Term
 data Meta
   = MetaTerminal (Maybe Loc)
   | MetaNonTerminal TermPlus (Maybe Loc)
-  deriving (Show)
+  -- deriving (Show)
+
+instance Show Meta where
+  show _ = "_"
 
 type TermPlus = (Meta, Term)
 

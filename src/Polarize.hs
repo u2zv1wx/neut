@@ -17,6 +17,9 @@ import Data.Basic
 import Data.Code
 import Data.Env
 import Data.Term
+import Reduce.Term
+
+import qualified Text.Show.Pretty as Pr
 
 polarize :: TermPlus -> WithEnv CodePlus
 polarize (m, TermTau) = do
@@ -618,12 +621,13 @@ polarizeTheta m "file-descriptor" = polarize (m, TermTheta "i64")
 polarizeTheta m "stdin" = polarize (m, TermIntS 64 0)
 polarizeTheta m "stdout" = polarize (m, TermIntS 64 1)
 polarizeTheta m "stderr" = polarize (m, TermIntS 64 2)
-polarizeTheta _ _ = throwError "polarize.theta"
+polarizeTheta _ name = throwError $ "polarize.theta: " ++ name
 
 polarizeUnaryOp :: Identifier -> UnaryOp -> LowType -> Meta -> WithEnv CodePlus
 polarizeUnaryOp name op lowType m = do
   let (t, ml) = obtainInfoMeta m
-  case t of
+  t' <- reduceTermPlus t
+  case t' of
     (_, TermPi [(x, tx)] _) -> do
       let varX = toDataUpsilon (x, Nothing)
       makeClosure
@@ -638,7 +642,8 @@ polarizeBinaryOp ::
      Identifier -> BinaryOp -> LowType -> Meta -> WithEnv CodePlus
 polarizeBinaryOp name op lowType m = do
   let (t, ml) = obtainInfoMeta m
-  case t of
+  t' <- reduceTermPlus t
+  case t' of
     (_, TermPi [(x, tx), (y, ty)] _) -> do
       let varX = toDataUpsilon (x, Nothing)
       let varY = toDataUpsilon (y, Nothing)
@@ -653,7 +658,8 @@ polarizeBinaryOp name op lowType m = do
 polarizeIsEnum :: Meta -> WithEnv CodePlus
 polarizeIsEnum m = do
   let (t, ml) = obtainInfoMeta m
-  case t of
+  t' <- reduceTermPlus t
+  case t' of
     (_, TermPi [(x, tx)] _) -> do
       v <- cartesianImmediate ml
       let varX = toDataUpsilon (x, Nothing)
@@ -665,7 +671,7 @@ polarizeIsEnum m = do
         m
         [(x, tx)]
         (ml, CodeSigmaElim [aff, rel] varX (ml, CodeUpIntro v))
-    _ -> throwError $ "the type of is-enum is wrong"
+    _ -> throwError $ "the type of is-enum is wrong. t :\n" ++ Pr.ppShow t
 
 --    unsafe.eval-io
 -- ~> lam x.
@@ -676,7 +682,8 @@ polarizeIsEnum m = do
 polarizeEvalIO :: Meta -> WithEnv CodePlus
 polarizeEvalIO m = do
   let (t, ml) = obtainInfoMeta m
-  case t of
+  t' <- reduceTermPlus t
+  case t' of
     (_, TermPi [arg] _) -> do
       (resultValue, resultValueVar) <- newDataUpsilon
       (sig, sigVar) <- newDataUpsilon
@@ -718,7 +725,8 @@ polarizeSysCall ::
   -> WithEnv CodePlus
 polarizeSysCall name sysCall argLen argIdxList m = do
   let (t, ml) = obtainInfoMeta m
-  case t of
+  t' <- reduceTermPlus t
+  case t' of
     (_, TermPi xts _)
       | length xts == argLen -> do
         let ys = map (\i -> toVar $ fst $ xts !! i) argIdxList
