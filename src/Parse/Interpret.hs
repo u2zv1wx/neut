@@ -157,7 +157,7 @@ interpretEnumValueMaybe (_, TreeAtom x) = do
   b <- isDefinedEnum x
   if b
     then return $ Just $ EnumValueLabel x
-    else throwError $ "no such label defined: " ++ x
+    else return Nothing
 interpretEnumValueMaybe _ = return Nothing
 
 interpretEnumValue :: TreePlus -> WithEnv EnumValue
