@@ -33,7 +33,8 @@ polarize (m, TermUpsilon x) = do
 polarize (m, TermPi _ _) = do
   let ml = snd $ obtainInfoMeta m
   tau <- cartesianImmediate ml
-  (envVarName, envVar) <- newDataUpsilon
+  (envVarName, envVar) <- newDataUpsilonWith "env"
+  -- (envVarName, envVar) <- newDataUpsilon
   let retTau = (ml, CodeUpIntro tau)
   let retEnvVar = (ml, CodeUpIntro envVar)
   closureType <-
@@ -41,6 +42,7 @@ polarize (m, TermPi _ _) = do
       "CLS"
       ml
       [Right (envVarName, retTau), Left retEnvVar, Left retTau]
+  liftIO $ putStrLn $ Pr.ppShow closureType
   return (ml, CodeUpIntro closureType)
 polarize (m, TermPiIntro xts e) = do
   let xs = map fst xts
@@ -171,7 +173,8 @@ makeClosure mName fvs m xts e = do
   negTypeList <- mapM polarize freeVarTypeList
   expName <- newNameWith "exp"
   envExp <- cartesianSigma expName ml $ map Left negTypeList
-  (envVarName, envVar) <- newDataUpsilon
+  -- (envVarName, envVar) <- newDataUpsilon
+  (envVarName, envVar) <- newDataUpsilonWith "env"
   let (xs', ts) = unzip $ zip freeVarNameList freeVarTypeList ++ xts
   ts' <- mapM polarize ts
   e' <- linearize (zip xs' ts') e
@@ -248,7 +251,10 @@ withHeader' [] e = return e
 withHeader' ((x, t, []):xtzss) e = do
   e' <- withHeader' xtzss e
   withHeaderAffine x t e'
-withHeader' ((_, _, [_]):xtzss) e = withHeader' xtzss e -- already linear
+withHeader' ((x, _, [z]):xtzss) e = do
+  e' <- withHeader' xtzss e -- already linear.
+  let ml = Nothing
+  return (ml, CodeUpElim z (ml, CodeUpIntro (ml, DataUpsilon x)) e')
 withHeader' ((x, t, (z1:z2:zs)):xtzss) e = do
   e' <- withHeader' xtzss e
   withHeaderRelevant x t z1 z2 zs e'
@@ -284,9 +290,9 @@ withHeaderRelevant ::
   -> CodePlus
   -> WithEnv CodePlus
 withHeaderRelevant x t x1 x2 xs e = do
-  (expVarName, expVar) <- newDataUpsilon
-  (affVarName, _) <- newDataUpsilon
-  (relVarName, relVar) <- newDataUpsilon
+  (expVarName, expVar) <- newDataUpsilonWith "exp"
+  (affVarName, _) <- newDataUpsilonWith "aff"
+  (relVarName, relVar) <- newDataUpsilonWith "rel"
   linearChain <- toLinearChain $ x : x1 : x2 : xs
   let ml = fst e
   rel <- withHeaderRelevant' relVar linearChain e
@@ -338,7 +344,8 @@ withHeaderRelevant' _ [] cont = return cont
 withHeaderRelevant' relVar ((x, (x1, x2)):chain) cont = do
   let ml = fst cont
   cont' <- withHeaderRelevant' relVar chain cont
-  (sigVarName, sigVar) <- newDataUpsilon
+  -- (sigVarName, sigVar) <- newDataUpsilon
+  (sigVarName, sigVar) <- newDataUpsilonWith "sig"
   let varX = toDataUpsilon (x, Nothing)
   return $
     ( ml
@@ -486,12 +493,13 @@ affineSigma thetaName ml mxes = do
     Just _ -> return theta
     Nothing -> do
       xes <- mapM supplyName mxes
-      (z, varZ) <- newDataUpsilon
-      -- as == [APP-1, ..., APP-n]   (`a` here stands for `app`)
+      (z, varZ) <- newDataUpsilonWith "aff-arg"
+      -- As == [APP-1, ..., APP-n]   (`a` here stands for `app`)
       as <- forM xes $ \(x, e) -> toAffineApp ml x e
       ys <- mapM (const $ newNameWith "var") xes
       let body = bindLet (zip ys as) (ml, CodeUpIntro (ml, DataSigmaIntro []))
       body' <- linearize xes body
+      -- liftIO $ putStrLn $ Pr.ppShow body'
       insCodeEnv thetaName [z] (ml, CodeSigmaElim (map fst xes) varZ body')
       return theta
 
@@ -569,15 +577,15 @@ bindSigmaElim (((x, y), d):xyds) cont = do
 --   aff @ x
 toAffineApp :: Maybe Loc -> Identifier -> CodePlus -> WithEnv CodePlus
 toAffineApp ml x e = do
-  (expVarName, expVar) <- newDataUpsilon
-  (affVarName, affVar) <- newDataUpsilon
-  (relVarName, _) <- newDataUpsilon
+  (expVarName, expVar) <- newDataUpsilonWith "exp"
+  (affVarName, affVar) <- newDataUpsilonWith "aff"
+  (relVarName, _) <- newDataUpsilonWith "rel"
   return
     ( ml
     , CodeUpElim
         expVarName
         e
-        ( ml
+        ( Just (111, 222)
         , CodeSigmaElim
             [affVarName, relVarName]
             expVar
@@ -677,6 +685,7 @@ polarizeIsEnum m = do
     (_, TermPi [(x, tx)] _) -> do
       v <- cartesianImmediate ml
       let varX = toDataUpsilon (x, Nothing)
+      liftIO $ putStrLn $ "varX : " ++ show varX
       aff <- newNameWith "aff"
       rel <- newNameWith "rel"
       makeClosure
@@ -757,6 +766,14 @@ toVar x = (Nothing, DataUpsilon x)
 
 newDataUpsilon :: WithEnv (Identifier, DataPlus)
 newDataUpsilon = newDataUpsilon' Nothing
+
+newDataUpsilonWith :: Identifier -> WithEnv (Identifier, DataPlus)
+newDataUpsilonWith name = newDataUpsilonWith' name Nothing
+
+newDataUpsilonWith' :: Identifier -> Maybe Loc -> WithEnv (Identifier, DataPlus)
+newDataUpsilonWith' name ml = do
+  x <- newNameWith name
+  return (x, (ml, DataUpsilon x))
 
 newDataUpsilon' :: Maybe Loc -> WithEnv (Identifier, DataPlus)
 newDataUpsilon' ml = do
