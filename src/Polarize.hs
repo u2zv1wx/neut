@@ -452,8 +452,8 @@ cartesianSigma ::
   -> [Either CodePlus (Identifier, CodePlus)]
   -> WithEnv DataPlus
 cartesianSigma thetaName ml mxes = do
-  aff <- affineSigma thetaName ml mxes
-  rel <- relevantSigma thetaName ml mxes
+  aff <- affineSigma (thetaName ++ "-aff") ml mxes
+  rel <- relevantSigma (thetaName ++ "-rel") ml mxes
   return (ml, DataSigmaIntro [aff, rel])
 
 -- (Assuming `ti` = `return di` for some `di` such that `xi : di`)
