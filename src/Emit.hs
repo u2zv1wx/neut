@@ -69,8 +69,10 @@ emitLLVM funName (LLVMSwitch (d, lowType) defaultBranch branchList) = do
     uncurry (emitBlock funName)
   return $ op ++ concat xs
 emitLLVM funName (LLVMCont op cont) = do
-  h <- newNameWith "hole"
-  emitLLVM funName $ LLVMLet h op cont
+  s <- emitLLVMOp op
+  str <- emitOp s
+  a <- emitLLVM funName cont
+  return $ str ++ a
 emitLLVM funName (LLVMLet x op cont) = do
   s <- emitLLVMOp op
   str <- emitOp $ showLLVMData (LLVMDataLocal x) ++ " = " ++ s
