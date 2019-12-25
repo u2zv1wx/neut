@@ -324,13 +324,7 @@ showLowTypeAsIfNonPtr t = init $ showLowType t
 
 -- for now
 emitGlobal :: WithEnv [String]
-emitGlobal =
-  return
-    [ "@fmt.i32 = constant [3 x i8] c\"%d\00\""
-    , "declare i32 @printf(i8* noalias nocapture, ...)"
-    , "declare i8* @malloc(i64)"
-    , "declare void @free(i8*)"
-    ]
+emitGlobal = return ["declare i8* @malloc(i64)", "declare void @free(i8*)"]
 
 getRegList :: WithEnv [String]
 getRegList = do
