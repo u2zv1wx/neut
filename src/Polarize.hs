@@ -32,16 +32,17 @@ polarize (m, TermUpsilon x) = do
   return (ml, CodeUpIntro (ml, DataUpsilon x))
 polarize (m, TermPi _ _) = do
   let ml = snd $ obtainInfoMeta m
-  tau <- cartesianImmediate ml
+  imm <- cartesianImmediate ml
+  tau <- cartesianUniv ml
   (envVarName, envVar) <- newDataUpsilonWith "env"
   let retTau = (ml, CodeUpIntro tau)
+  let retImm = (ml, CodeUpIntro imm)
   let retEnvVar = (ml, CodeUpIntro envVar)
   closureType <-
     cartesianSigma
-      "CLS"
+      "closure"
       ml
-      [Right (envVarName, retTau), Left retEnvVar, Left retTau]
-  liftIO $ putStrLn $ Pr.ppShow closureType
+      [Right (envVarName, retTau), Left retEnvVar, Left retImm]
   return (ml, CodeUpIntro closureType)
 polarize (m, TermPiIntro xts e) = do
   let xs = map fst xts
@@ -172,7 +173,6 @@ makeClosure mName fvs m xts e = do
   negTypeList <- mapM polarize freeVarTypeList
   expName <- newNameWith "exp"
   envExp <- cartesianSigma expName ml $ map Left negTypeList
-  -- (envVarName, envVar) <- newDataUpsilon
   (envVarName, envVar) <- newDataUpsilonWith "env"
   let (xs', ts) = unzip $ zip freeVarNameList freeVarTypeList ++ xts
   ts' <- mapM polarize ts
@@ -325,7 +325,8 @@ type LinearChain = [(Identifier, (Identifier, Identifier))]
 toLinearChain :: [Identifier] -> WithEnv LinearChain
 toLinearChain xs = do
   let valueSeq = init $ tail xs
-  tmpSeq <- mapM (const $ newNameWith "tmp") $ replicate (length xs - 3) ()
+  tmpSeq <-
+    mapM (const $ newNameWith "linear-chain") $ replicate (length xs - 3) ()
   let tmpSeq' = [head xs] ++ tmpSeq ++ [last xs]
   let pairSeq = zip valueSeq (tail tmpSeq')
   return $ zip (init tmpSeq') pairSeq
@@ -368,7 +369,7 @@ cartesianImmediate ml = do
 affineImmediate :: Maybe Loc -> WithEnv DataPlus
 affineImmediate ml = do
   cenv <- gets codeEnv
-  let thetaName = "EXPONENT.IMMEDIATE.AFFINE"
+  let thetaName = "affine-immediate"
   let theta = (ml, DataTheta thetaName)
   case lookup thetaName cenv of
     Just _ -> return theta
@@ -383,7 +384,7 @@ affineImmediate ml = do
 relevantImmediate :: Maybe Loc -> WithEnv DataPlus
 relevantImmediate ml = do
   cenv <- gets codeEnv
-  let thetaName = "EXPONENT.IMMEDIATE.RELEVANT"
+  let thetaName = "relevant-immediate"
   let theta = (ml, DataTheta thetaName)
   case lookup thetaName cenv of
     Just _ -> return theta
@@ -405,7 +406,7 @@ cartesianUniv ml = do
 affineUniv :: Maybe Loc -> WithEnv DataPlus
 affineUniv ml = do
   cenv <- gets codeEnv
-  let thetaName = "EXPONENT.UNIV.AFFINE"
+  let thetaName = "affine-univ"
   let theta = (ml, DataTheta thetaName)
   case lookup thetaName cenv of
     Just _ -> return theta
@@ -427,7 +428,7 @@ affineUniv ml = do
 relevantUniv :: Maybe Loc -> WithEnv DataPlus
 relevantUniv ml = do
   cenv <- gets codeEnv
-  let thetaName = "EXPONENT.UNIV.RELEVANT"
+  let thetaName = "relevant-univ"
   let theta = (ml, DataTheta thetaName)
   case lookup thetaName cenv of
     Just _ -> return theta
@@ -458,8 +459,8 @@ cartesianSigma ::
   -> [Either CodePlus (Identifier, CodePlus)]
   -> WithEnv DataPlus
 cartesianSigma thetaName ml mxes = do
-  aff <- affineSigma (thetaName ++ "-aff") ml mxes
-  rel <- relevantSigma (thetaName ++ "-rel") ml mxes
+  aff <- affineSigma ("affine-" ++ thetaName) ml mxes
+  rel <- relevantSigma ("relevant-" ++ thetaName) ml mxes
   return (ml, DataSigmaIntro [aff, rel])
 
 -- (Assuming `ti` = `return di` for some `di` such that `xi : di`)
@@ -686,7 +687,6 @@ polarizeIsEnum m = do
     (_, TermPi [(x, tx)] _) -> do
       v <- cartesianImmediate ml
       let varX = toDataUpsilon (x, Nothing)
-      liftIO $ putStrLn $ "varX : " ++ show varX
       aff <- newNameWith "aff"
       rel <- newNameWith "rel"
       makeClosure
