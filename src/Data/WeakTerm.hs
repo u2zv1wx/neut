@@ -241,13 +241,14 @@ substWeakTermPlusBindingsWithBody sub ((x, t):xts) e = do
 
 substWeakMeta ::
      (MonadIO m, MonadError String m) => SubstWeakTerm -> WeakMeta -> m WeakMeta
-substWeakMeta _ m@(WeakMetaTerminal _) = return m
-substWeakMeta sub (WeakMetaNonTerminal ref ml) = do
-  t <- readWeakTermRef ref
-  t' <- substWeakTermPlus sub t
-  writeWeakTermRef ref t'
-  return $ WeakMetaNonTerminal ref ml
+substWeakMeta _ m = return m
 
+-- substWeakMeta _ m@(WeakMetaTerminal _) = return m
+-- substWeakMeta sub (WeakMetaNonTerminal ref ml) = do
+--   t <- readWeakTermRef ref
+--   t' <- substWeakTermPlus sub t
+--   writeWeakTermRef ref t'
+--   return $ WeakMetaNonTerminal ref ml
 readWeakTermRef ::
      (MonadIO m, MonadError String m) => WeakTermRef -> m WeakTermPlus
 readWeakTermRef (WeakTermRef ref) = do
@@ -271,7 +272,8 @@ isReducible (_, WeakTermUpsilon _) = False
 isReducible (_, WeakTermPi _ _) = False
 isReducible (_, WeakTermPiIntro {}) = False
 isReducible (_, WeakTermPiElim (_, WeakTermPiIntro xts _) es)
-  | length xts == length es = True
+  | length xts == length es
+  , all isValue es = True
 isReducible (_, WeakTermPiElim (_, WeakTermMu _ _) _) = True
 isReducible (_, WeakTermPiElim (_, WeakTermTheta c) [(_, WeakTermIntS _ _), (_, WeakTermIntS _ _)])
   | Just (LowTypeIntS _, _) <- asBinaryOpMaybe c = True
@@ -307,6 +309,7 @@ isReducible (_, WeakTermArrayElim _ e1 e2) = isReducible e1 || isReducible e2
 
 isValue :: WeakTermPlus -> Bool
 isValue (_, WeakTermTau) = True
+isValue (_, WeakTermTheta _) = True
 isValue (_, WeakTermUpsilon _) = True
 isValue (_, WeakTermPi {}) = True
 isValue (_, WeakTermPiIntro {}) = True
