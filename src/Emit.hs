@@ -104,7 +104,7 @@ emitLLVMOp (LLVMOpLoad d lowType) = do
     unwords
       [ "load"
       , showLowType lowType ++ ","
-      , showLowTypeAsIfPtr lowType ++ ","
+      , showLowTypeAsIfPtr lowType
       , showLLVMData d
       ]
 emitLLVMOp (LLVMOpStore t d1 d2) = do
