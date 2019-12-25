@@ -673,8 +673,6 @@ polarizeIsEnum :: Meta -> WithEnv CodePlus
 polarizeIsEnum m = do
   let (t, ml) = obtainInfoMeta m
   t' <- reduceTermPlus t
-  liftIO $ putStrLn $ "the type of is-enum:"
-  liftIO $ putStrLn $ Pr.ppShow t'
   case t' of
     (_, TermPi [(x, tx)] _) -> do
       v <- cartesianImmediate ml
