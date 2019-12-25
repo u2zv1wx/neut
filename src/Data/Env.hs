@@ -18,6 +18,8 @@ import qualified Data.Map.Strict as Map
 
 import qualified Data.PQueue.Min as Q
 
+import qualified Text.Show.Pretty as Pr
+
 type ConstraintQueue = Q.MinQueue EnrichedConstraint
 
 data Env =
@@ -305,116 +307,10 @@ distinguishTheta z (ThetaBinaryOp op lowType d1 d2) = do
 distinguishTheta z (ThetaSysCall num ds) = do
   (vss, ds') <- unzip <$> mapM (distinguishData z) ds
   return (concat vss, ThetaSysCall num ds')
--- substWeakTermPlus :: SubstWeakTerm -> WeakTermPlus -> WithEnv WeakTermPlus
--- substWeakTermPlus sub (m, WeakTermTau) = do
---   m' <- substWeakMeta sub m
---   return (m', WeakTermTau)
--- substWeakTermPlus sub (m, WeakTermTheta t) = do
---   m' <- substWeakMeta sub m
---   return (m', WeakTermTheta t)
--- substWeakTermPlus sub (m, WeakTermUpsilon x) = do
---   m' <- substWeakMeta sub m
---   return $ fromMaybe (m', WeakTermUpsilon x) (lookup x sub)
--- substWeakTermPlus sub (m, WeakTermPi xts t) = do
---   m' <- substWeakMeta sub m
---   (xts', t') <- substWeakTermPlusBindingsWithBody sub xts t
---   return (m', WeakTermPi xts' t')
--- substWeakTermPlus sub (m, WeakTermPiIntro xts body) = do
---   m' <- substWeakMeta sub m
---   (xts', body') <- substWeakTermPlusBindingsWithBody sub xts body
---   return (m', WeakTermPiIntro xts' body')
--- substWeakTermPlus sub (m, WeakTermPiElim e es) = do
---   m' <- substWeakMeta sub m
---   e' <- substWeakTermPlus sub e
---   es' <- mapM (substWeakTermPlus sub) es
---   return (m', WeakTermPiElim e' es')
--- substWeakTermPlus sub (m, WeakTermMu (x, t) e) = do
---   m' <- substWeakMeta sub m
---   t' <- substWeakTermPlus sub t
---   e' <- substWeakTermPlus (filter (\(k, _) -> k /= x) sub) e
---   return (m', WeakTermMu (x, t') e')
--- substWeakTermPlus sub (m, WeakTermZeta s) = do
---   m' <- substWeakMeta sub m
---   return $ fromMaybe (m', WeakTermZeta s) (lookup s sub)
--- substWeakTermPlus sub (m, WeakTermIntS size x) = do
---   m' <- substWeakMeta sub m
---   return (m', WeakTermIntS size x)
--- substWeakTermPlus sub (m, WeakTermIntU size x) = do
---   m' <- substWeakMeta sub m
---   return (m', WeakTermIntU size x)
--- substWeakTermPlus sub (m, WeakTermInt x) = do
---   m' <- substWeakMeta sub m
---   return (m', WeakTermInt x)
--- substWeakTermPlus sub (m, WeakTermFloat16 x) = do
---   m' <- substWeakMeta sub m
---   return (m', WeakTermFloat16 x)
--- substWeakTermPlus sub (m, WeakTermFloat32 x) = do
---   m' <- substWeakMeta sub m
---   return (m', WeakTermFloat32 x)
--- substWeakTermPlus sub (m, WeakTermFloat64 x) = do
---   m' <- substWeakMeta sub m
---   return (m', WeakTermFloat64 x)
--- substWeakTermPlus sub (m, WeakTermFloat x) = do
---   m' <- substWeakMeta sub m
---   return (m', WeakTermFloat x)
--- substWeakTermPlus sub (m, WeakTermEnum x) = do
---   m' <- substWeakMeta sub m
---   return (m', WeakTermEnum x)
--- substWeakTermPlus sub (m, WeakTermEnumIntro l) = do
---   m' <- substWeakMeta sub m
---   return (m', WeakTermEnumIntro l)
--- substWeakTermPlus sub (m, WeakTermEnumElim e branchList) = do
---   m' <- substWeakMeta sub m
---   e' <- substWeakTermPlus sub e
---   let (caseList, es) = unzip branchList
---   es' <- mapM (substWeakTermPlus sub) es
---   return (m', WeakTermEnumElim e' (zip caseList es'))
--- substWeakTermPlus sub (m, WeakTermArray kind from to) = do
---   m' <- substWeakMeta sub m
---   from' <- substWeakTermPlus sub from
---   to' <- substWeakTermPlus sub to
---   return (m', WeakTermArray kind from' to')
--- substWeakTermPlus sub (m, WeakTermArrayIntro kind les) = do
---   m' <- substWeakMeta sub m
---   let (ls, es) = unzip les
---   es' <- mapM (substWeakTermPlus sub) es
---   return (m', WeakTermArrayIntro kind (zip ls es'))
--- substWeakTermPlus sub (m, WeakTermArrayElim kind e1 e2) = do
---   m' <- substWeakMeta sub m
---   e1' <- substWeakTermPlus sub e1
---   e2' <- substWeakTermPlus sub e2
---   return (m', WeakTermArrayElim kind e1' e2')
--- substWeakTermPlusBindingsWithBody ::
---      SubstWeakTerm
---   -> [(Identifier, WeakTermPlus)]
---   -> WeakTermPlus
---   -> WithEnv ([(Identifier, WeakTermPlus)], WeakTermPlus)
--- substWeakTermPlusBindingsWithBody sub [] e = do
---   e' <- substWeakTermPlus sub e
---   return ([], e')
--- substWeakTermPlusBindingsWithBody sub ((x, t):xts) e = do
---   let sub' = filter (\(k, _) -> k /= x) sub
---   (xts', e') <- substWeakTermPlusBindingsWithBody sub' xts e
---   t' <- substWeakTermPlus sub t
---   return ((x, t') : xts', e')
--- substWeakMeta :: SubstWeakTerm -> WeakMeta -> WithEnv WeakMeta
--- substWeakMeta _ m@(WeakMetaTerminal _) = return m
--- substWeakMeta sub (WeakMetaNonTerminal (Right t) ml) = do
---   t' <- substWeakTermPlus sub t
---   return $ WeakMetaNonTerminal (Right t') ml
--- substWeakMeta sub (WeakMetaNonTerminal (Left i) ml) = do
---   senv <- gets substEnv
---   case lookup i senv of
---     Nothing -> throwError "substWeakMeta for Nothing"
---     Just t -> do
---       t' <- substWeakTermPlus sub t
---       return $ WeakMetaNonTerminal (Right t') ml
--- compose :: SubstWeakTerm -> SubstWeakTerm -> WithEnv SubstWeakTerm
--- compose s1 s2 = do
---   let domS2 = map fst s2
---   let codS2 = map snd s2
---   liftIO $ putStrLn $ "before subst. len =" ++ show (length codS2)
---   codS2' <- mapM (substWeakTermPlus s1) codS2
---   liftIO $ putStrLn "after subst"
---   let fromS1 = filter (\(ident, _) -> ident `notElem` domS2) s1
---   return $ fromS1 ++ zip domS2 codS2'
+
+-- for debug
+p :: String -> WithEnv ()
+p s = liftIO $ putStrLn s
+
+p' :: (Show a) => a -> WithEnv ()
+p' s = liftIO $ putStrLn $ Pr.ppShow s

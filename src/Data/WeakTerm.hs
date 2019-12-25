@@ -10,8 +10,6 @@ import System.IO.Unsafe (unsafePerformIO)
 
 import Data.Basic
 
-import qualified Text.Show.Pretty as Pr
-
 data WeakTerm
   = WeakTermTau
   | WeakTermTheta Identifier
@@ -53,6 +51,7 @@ newtype WeakTermRef =
 data WeakMeta
   = WeakMetaTerminal (Maybe Loc)
   | WeakMetaNonTerminal WeakTermRef (Maybe Loc)
+  -- deriving (Show)
 
 instance Show WeakTermRef where
   show (WeakTermRef x) = show $ unsafePerformIO $ readIORef x
@@ -245,8 +244,6 @@ substWeakMeta ::
 substWeakMeta _ m@(WeakMetaTerminal _) = return m
 substWeakMeta sub (WeakMetaNonTerminal ref ml) = do
   t <- readWeakTermRef ref
-  -- liftIO $ putStrLn $ "WEAKMETA. e:"
-  -- liftIO $ putStrLn $ Pr.ppShow t
   t' <- substWeakTermPlus sub t
   writeWeakTermRef ref t'
   return $ WeakMetaNonTerminal ref ml

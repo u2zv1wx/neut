@@ -138,22 +138,22 @@ concatDefList [] = do
   let t = (WeakMetaTerminal Nothing, WeakTermEnum $ EnumTypeLabel "top")
   m <- newMetaOfType t
   return (m, WeakTermEnumIntro $ EnumValueLabel "unit")
-concatDefList [DefLet meta xt@(x, t) e] = do
-  mx <- newMetaOfType t
-  let varX = (mx, WeakTermUpsilon x)
-  m <- newMeta
-  m1 <- newMeta
-  m2 <- newMeta
-  -- let x : t := e in
-  -- unsafe.eval-io x
-  return
-    ( meta
-    , WeakTermPiElim
-        ( m
-        , WeakTermPiIntro
-            [xt]
-            (m1, WeakTermPiElim (m2, WeakTermTheta "unsafe.eval-io") [varX]))
-        [e])
+-- concatDefList [DefLet meta xt@(x, t) e] = do
+--   mx <- newMetaOfType t
+--   let varX = (mx, WeakTermUpsilon x)
+--   m <- newMeta
+--   m1 <- newMeta
+--   m2 <- newMeta
+--   -- let x : t := e in
+--   -- unsafe.eval-io x
+--   return
+--     ( meta
+--     , WeakTermPiElim
+--         ( m
+--         , WeakTermPiIntro
+--             [xt]
+--             (m1, WeakTermPiElim (m2, WeakTermTheta "unsafe.eval-io") [varX]))
+--         [e])
 concatDefList (DefLet meta xt e:es) = do
   cont <- concatDefList es
   m <- newMeta

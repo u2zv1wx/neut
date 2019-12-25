@@ -52,15 +52,17 @@ simp (((m1, WeakTermPiIntro xts body1@(bodyMeta, _)), e2@(m2, _)):cs) = do
   simpMetaRet m1 m2 comp
 simp ((e1, e2@(_, WeakTermPiIntro {})):cs) = simp $ (e2, e1) : cs
 simp ((e1, e2):cs)
-  | (m1, WeakTermPiElim (_, WeakTermUpsilon f) es1) <- e1
-  , (m2, WeakTermPiElim (_, WeakTermUpsilon g) es2) <- e2
+  | (m11, WeakTermPiElim (m12, WeakTermUpsilon f) es1) <- e1
+  , (m21, WeakTermPiElim (m22, WeakTermUpsilon g) es2) <- e2
   , f == g
-  , length es1 == length es2 = simpMetaRet m1 m2 $ simp $ zip es1 es2 ++ cs
+  , length es1 == length es2 =
+    simpMetaRet' [(m11, m21), (m12, m22)] $ simp $ zip es1 es2 ++ cs
 simp ((e1, e2):cs)
-  | (m1, WeakTermPiElim (_, WeakTermTheta f) es1) <- e1
-  , (m2, WeakTermPiElim (_, WeakTermTheta g) es2) <- e2
+  | (m11, WeakTermPiElim (m12, WeakTermTheta f) es1) <- e1
+  , (m21, WeakTermPiElim (m22, WeakTermTheta g) es2) <- e2
   , f == g
-  , length es1 == length es2 = simpMetaRet m1 m2 $ simp $ zip es1 es2 ++ cs
+  , length es1 == length es2 =
+    simpMetaRet' [(m11, m21), (m12, m22)] $ simp $ zip es1 es2 ++ cs
 simp (((m1, WeakTermIntS size1 l1), (m2, WeakTermIntS size2 l2)):cs)
   | size1 == size2
   , l1 == l2 = simpMetaRet m1 m2 (simp cs)
@@ -177,6 +179,15 @@ simpMetaRet m1 m2 comp = do
   cs1 <- simpMeta m1 m2
   cs2 <- comp
   return $ cs1 ++ cs2
+
+simpMetaRet' ::
+     [(WeakMeta, WeakMeta)]
+  -> WithEnv [EnrichedConstraint]
+  -> WithEnv [EnrichedConstraint]
+simpMetaRet' mms comp = do
+  cs1 <- mapM (\(m1, m2) -> simpMeta m1 m2) mms
+  cs2 <- comp
+  return $ concat cs1 ++ cs2
 
 simpMeta :: WeakMeta -> WeakMeta -> WithEnv [EnrichedConstraint]
 simpMeta (WeakMetaTerminal _) (WeakMetaTerminal _) = return []

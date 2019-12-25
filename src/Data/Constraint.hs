@@ -50,8 +50,6 @@ compose ::
 compose s1 s2 = do
   let domS2 = map fst s2
   let codS2 = map snd s2
-  liftIO $ putStrLn $ "before subst in compose"
   codS2' <- mapM (substWeakTermPlus s1) codS2
-  liftIO $ putStrLn $ "after subst in compose"
   let fromS1 = filter (\(ident, _) -> ident `notElem` domS2) s1
   return $ fromS1 ++ zip domS2 codS2'

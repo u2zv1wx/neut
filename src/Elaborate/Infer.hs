@@ -15,6 +15,8 @@ import Data.Basic
 import Data.Env
 import Data.WeakTerm
 
+import qualified Text.Show.Pretty as Pr
+
 type Context = [(Identifier, WeakTermPlus)]
 
 -- Given a term and a context, return the type of the term, updating the

@@ -53,8 +53,16 @@
 (notation (definition name (x+) e+)
   (let name (mu name (lambda (x+) e+))))
 
+;; type ascription
+;; (ascribe e t) ~> (let (_ t) e)
+(keyword ascribe)
+
 (constant is-enum)
 
+(notation (ascribe e t)
+  (let (_ t) e))
+
+(ascribe is-enum (pi ((_ type)) type))
 
 ;; just for test
 (enum top unit)

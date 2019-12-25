@@ -16,8 +16,6 @@ import Elaborate.Infer
 import Elaborate.Synthesize
 import Reduce.Term
 
-import qualified Text.Show.Pretty as Pr
-
 -- Given a term `e` and its name `main`, this function
 --   (1) traces `e` using `infer e`, collecting type constraints,
 --   (2) updates typeEnv for `main` by the result of `infer e`,
@@ -28,7 +26,10 @@ import qualified Text.Show.Pretty as Pr
 -- S. Kong, and C. Roux. "Elaboration in Dependent Type Theory", arxiv,
 -- https://arxiv.org/abs/1505.04324, 2015.
 elaborate :: WeakTermPlus -> WithEnv TermPlus
-elaborate e = do
+elaborate e
+  -- liftIO $ putStrLn $ Pr.ppShow e
+ = do
+  p' e
   _ <- infer [] e
   -- Kantian type-inference ;)
   gets constraintEnv >>= analyze
@@ -39,6 +40,7 @@ elaborate e = do
   tenv' <- mapM (substWeakTermPlus sub) tenv
   modify (\env -> env {typeEnv = tenv'})
   -- elaborate `e` using the resulting substitution
+  -- liftIO $ putStrLn $ Pr.ppShow e
   e' <- substWeakTermPlus sub e
   e'' <- elaborate' e'
   caseCheck e''

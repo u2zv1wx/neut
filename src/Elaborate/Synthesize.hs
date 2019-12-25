@@ -18,11 +18,11 @@ import qualified Text.Show.Pretty as Pr
 -- Given a queue of constraints (easier ones comes earlier), try to synthesize
 -- all of them using heuristics.
 synthesize :: ConstraintQueue -> WithEnv ()
-synthesize q = do
-  liftIO $ putStrLn "synth"
+synthesize q
+  -- liftIO $ putStrLn "synth"
+ = do
   sub <- gets substEnv
   case Q.getMin q of
-    Nothing -> return ()
     Just (Enriched (e1, e2) ms _)
       | Just (m, e) <- lookupAny ms sub -> resolveStuck q e1 e2 m e
     Just (Enriched _ _ (ConstraintImmediate m e)) -> resolveHole q m e
@@ -33,6 +33,7 @@ synthesize q = do
       resolvePiElim q m iess e
     Just (Enriched _ _ (ConstraintFlexFlex m iess e)) ->
       resolvePiElim q m iess e
+    Nothing -> return ()
 
 resolveStuck ::
      ConstraintQueue
@@ -41,17 +42,18 @@ resolveStuck ::
   -> Hole
   -> WeakTermPlus
   -> WithEnv ()
-resolveStuck q e1 e2 h e = do
-  liftIO $ putStrLn "resolveStuck"
-  liftIO $ putStrLn "h:"
-  liftIO $ putStrLn $ Pr.ppShow h
-  liftIO $ putStrLn "e:"
-  liftIO $ putStrLn $ Pr.ppShow e
-  liftIO $ putStrLn "subst1"
+resolveStuck q e1 e2 h e
+  -- liftIO $ putStrLn "resolveStuck"
+  -- liftIO $ putStrLn "h:"
+  -- liftIO $ putStrLn $ Pr.ppShow h
+  -- liftIO $ putStrLn "e:"
+  -- liftIO $ putStrLn $ Pr.ppShow e
+  -- liftIO $ putStrLn "subst1"
+ = do
   e1' <- substWeakTermPlus [(h, e)] e1
-  liftIO $ putStrLn "subst2"
+  -- liftIO $ putStrLn "subst2"
   e2' <- substWeakTermPlus [(h, e)] e2
-  liftIO $ putStrLn "done"
+  -- liftIO $ putStrLn "done"
   cs <- simp [(e1', e2')]
   synthesize $ Q.deleteMin q `Q.union` Q.fromList cs
 
@@ -77,8 +79,9 @@ resolvePiElim q m ess e = do
   chain q $ map (resolveHole q m) lamList
 
 resolveHole :: ConstraintQueue -> Hole -> WeakTermPlus -> WithEnv ()
-resolveHole q h e = do
-  liftIO $ putStrLn "resolveHole"
+resolveHole q h e
+  -- liftIO $ putStrLn $ "resolveHole: " ++ show h
+ = do
   senv <- gets substEnv
   senv' <- compose [(h, e)] senv
   modify (\env -> env {substEnv = senv'})
