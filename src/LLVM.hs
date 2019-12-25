@@ -13,7 +13,6 @@ import Data.LLVM
 
 toLLVM :: CodePlus -> WithEnv LLVM
 toLLVM mainTerm = do
-  liftIO $ putStrLn $ "toLLVM"
   penv <- gets codeEnv
   forM_ penv $ \(name, (args, e)) -> do
     llvm <- llvmCode e
@@ -36,7 +35,7 @@ llvmCode (_, CodePiElimDownElim v ds) = do
   llvmDataLet' (zip xs ds) $ castThenCall
 llvmCode (_, CodeSigmaElim xs v e) = do
   let structPtrType = toStructPtrType $ length xs
-  let idxList = map LLVMDataInt [0 ..]
+  let idxList = map (\i -> (LLVMDataInt i, i32)) [0 ..]
   loadContent v structPtrType (zip idxList xs) voidPtr e
 llvmCode (_, CodeUpIntro d) = do
   result <- newNameWith "ans"
@@ -51,7 +50,8 @@ llvmCode (_, CodeArrayElim k d1 d2) = do
   let et = arrayKindToLowType k -- elem type
   let bt = LowTypeArrayPtr 0 et -- base pointer type
   (cast, castThen) <- llvmCast d2 $ LowTypeIntS 64 -- enum ~> i64
-  loadThenFreeThenCont <- loadContent d1 bt [(cast, result)] et (retUp result)
+  loadThenFreeThenCont <-
+    loadContent d1 bt [((cast, i64), result)] et (retUp result)
   castThen loadThenFreeThenCont
 
 retUp :: Identifier -> CodePlus
@@ -60,7 +60,7 @@ retUp result = (Nothing, CodeUpIntro (Nothing, DataUpsilon result))
 loadContent ::
      DataPlus -- base pointer
   -> LowType -- the type of base pointer
-  -> [(LLVMData, Identifier)] -- [(the index of an element, the variable to load the element)]
+  -> [((LLVMData, LowType), Identifier)] -- [(the index of an element, the variable to load the element)]
   -> LowType -- the type of elements
   -> CodePlus -- continuation
   -> WithEnv LLVM
@@ -74,7 +74,7 @@ loadContent' ::
      LLVMData -- base pointer
   -> LowType -- the type of base pointer
   -> LowType -- the type of elements
-  -> [(LLVMData, Identifier)] -- [(the index of an element, the variable to keep the loaded content)]
+  -> [((LLVMData, LowType), Identifier)] -- [(the index of an element, the variable to keep the loaded content)]
   -> LLVM -- continuation
   -> WithEnv LLVM
 loadContent' bp bt _ [] cont = do
@@ -85,7 +85,9 @@ loadContent' bp bt et ((i, x):xis) cont = do
   cont' <- loadContent' bp bt et xis cont
   (posName, pos) <- newDataLocal "pos"
   return $
-    LLVMLet posName (LLVMOpGetElementPtr (bp, bt) [LLVMDataInt 0, i]) $
+    LLVMLet
+      posName
+      (LLVMOpGetElementPtr (bp, bt) [(LLVMDataInt 0, LowTypeIntS 32), i]) $
     LLVMLet x (LLVMOpLoad pos et) cont'
 
 llvmCodeTheta :: CodeMeta -> Theta -> WithEnv LLVM
@@ -307,13 +309,13 @@ storeContent reg elemType aggPtrType ds cont = do
           c
           (LLVMOpGetElementPtr
              (LLVMDataNull, LowTypeIntS64Ptr)
-             [LLVMDataInt (toInteger n)]) $
+             [(LLVMDataInt (toInteger n), i64)]) $
         LLVMLet i (LLVMOpPointerToInt cVar LowTypeIntS64Ptr (LowTypeIntS 64)) $
         LLVMLet reg (LLVMOpAlloc iVar) castThenStoreThenCont
 
 storeContent' ::
      LLVMData -- base pointer
-  -> LowType -- the type of base pointer (like [n x u8], {i8*, i8*}, etc.)
+  -> LowType -- the type of base pointer (like [n x u8]*, {i8*, i8*}*, etc.)
   -> LowType -- the type of elements (like u8, i8*, etc.)
   -> [(Integer, DataPlus)] -- [(the index of an element, the element to be stored)]
   -> LLVM -- continuation
@@ -323,11 +325,16 @@ storeContent' bp bt et ((i, d):ids) cont = do
   cont' <- storeContent' bp bt et ids cont
   (locName, loc) <- newDataLocal "loc"
   (cast, castThen) <- llvmCast d et
+  let it = indexTypeOf bt
   castThen $
     LLVMLet
       locName
-      (LLVMOpGetElementPtr (bp, bt) [LLVMDataInt 0, LLVMDataInt i]) $
+      (LLVMOpGetElementPtr (bp, bt) [(LLVMDataInt 0, i32), (LLVMDataInt i, it)]) $
     LLVMCont (LLVMOpStore et cast loc) cont'
+
+indexTypeOf :: LowType -> LowType
+indexTypeOf (LowTypeStructPtr _) = LowTypeIntS 32
+indexTypeOf _ = LowTypeIntS 64
 
 toFunPtrType :: [a] -> LowType
 toFunPtrType xs = do
@@ -361,3 +368,9 @@ lowTypeToAllocSize' i = do
   if r == 0
     then q
     else q + 1
+
+i64 :: LowType
+i64 = LowTypeIntS 64
+
+i32 :: LowType
+i32 = LowTypeIntS 32

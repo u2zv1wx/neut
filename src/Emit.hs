@@ -86,7 +86,8 @@ emitLLVMOp (LLVMOpGetElementPtr (base, n) is) = do
     unwords
       [ "getelementptr"
       , showLowTypeAsIfNonPtr n ++ ","
-      , showLowType n ++ "*"
+      -- , showLowType n ++ "*"
+      , showLowType n
       , showLLVMData base ++ ","
       , showIndex is
       ]
@@ -294,14 +295,14 @@ showBranchList lowType xs =
   "[" ++ showItems (uncurry (showBranch lowType)) xs ++ "]"
 
 showDataListWithType :: LowType -> [LLVMData] -> String
-showDataListWithType _ [] = ""
-showDataListWithType t [d] = showLowType t ++ " " ++ showLLVMData d
-showDataListWithType t (d:ds) =
-  showLowType t ++ " " ++ showLLVMData d ++ ", " ++ showIndex ds
+showDataListWithType t ds = showIndex $ zip ds (repeat t)
 
-showIndex :: [LLVMData] -> String
-showIndex ds = showDataListWithType (LowTypeIntS 64) ds
+showIndex :: [(LLVMData, LowType)] -> String
+showIndex [] = ""
+showIndex [(d, t)] = showLowType t ++ " " ++ showLLVMData d
+showIndex ((d, t):dts) = showIndex [(d, t)] ++ ", " ++ showIndex dts
 
+-- showIndex ds = showDataListWithType (LowTypeIntS 64) ds
 showBranch :: LowType -> Int -> String -> String
 showBranch lowType i label =
   showLowType lowType ++

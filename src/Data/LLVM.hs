@@ -27,7 +27,7 @@ data LLVMOp
   = LLVMOpCall LLVMData [LLVMData]
   | LLVMOpGetElementPtr
       (LLVMData, LowType) -- (base pointer, the type of base pointer)
-      [LLVMData] -- index
+      [(LLVMData, LowType)] -- [(index, the-typee-of-index)]
   | LLVMOpBitcast
       LLVMData
       LowType -- cast from
