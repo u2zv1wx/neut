@@ -272,10 +272,10 @@ distinguishCode z (ml, CodePiElimDownElim d ds) = do
 distinguishCode z (ml, CodeSigmaElim xs d e) = do
   (vs1, d') <- distinguishData z d
   if z `elem` xs
-    then return (vs1, (ml, CodeSigmaElim vs1 d' e))
+    then return (vs1, (ml, CodeSigmaElim xs d' e))
     else do
       (vs2, e') <- distinguishCode z e
-      return (vs1 ++ vs2, (ml, CodeSigmaElim vs1 d' e'))
+      return (vs1 ++ vs2, (ml, CodeSigmaElim xs d' e'))
 distinguishCode z (ml, CodeUpIntro d) = do
   (vs, d') <- distinguishData z d
   return (vs, (ml, CodeUpIntro d'))
