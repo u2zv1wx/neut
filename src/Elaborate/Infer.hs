@@ -181,41 +181,9 @@ newHoleInCtx ctx = do
   higherHole <- newHoleOfType (newMetaTerminal, WeakTermPi ctx univ)
   varSeq <- mapM (uncurry toVar) ctx
   let app = (newMetaTerminal, WeakTermPiElim higherHole varSeq)
-  -- hole <- setupHole mHole (newMetaTerminal, WeakTermPi ctx app)
   hole <- newHoleOfType (newMetaTerminal, WeakTermPi ctx app)
   wrapWithType app (WeakTermPiElim hole varSeq)
-  -- (_, _, appHole) <- newHoleInCtx' ctx Nothing Nothing
-  -- return appHole
 
--- newHoleInCtx' ::
---      Context
---   -> Maybe WeakTermPlus -- if specified, use this term instead of ?M
---   -> Maybe WeakTermPlus
---   -> WithEnv (WeakTermPlus, WeakTermPlus, WeakTermPlus) -- (?Mt, ?M, ?M @ ctx)
--- newHoleInCtx' ctx mHigherHole mHole = do
---   let higherPi = (newMetaTerminal, WeakTermPi ctx univ)
---   higherHole <- setupHole mHigherHole higherPi
---   varSeq <- mapM (uncurry toVar) ctx
---   let app = (newMetaTerminal, WeakTermPiElim higherHole varSeq)
---   hole <- setupHole mHole (newMetaTerminal, WeakTermPi ctx app)
---   app' <- wrapWithType app (WeakTermPiElim hole varSeq)
---   return (higherHole, hole, app')
--- setupHole :: Maybe WeakTermPlus -> WeakTermPlus -> WithEnv WeakTermPlus
--- setupHole Nothing pi = newHoleOfType pi
--- setupHole (Just t) _ = return t
---    newCtxAppHole ctx SPECIFIED_HOLE [e1, ..., en]
--- ~> SPECIFIED_HOLE @ (ctx[0], ..., ctx[m], e1, ..., en)
--- newCtxAppHole ::
---      Context
---   -> WeakTermPlus
---   -> WeakTermPlus
---   -> [WeakTermPlus]
---   -> WithEnv WeakTermPlus
--- newCtxAppHole ctx higherHole hole es = do
---   xs <- mapM (const $ newNameWith "arg") es
---   (_, _, appHole) <-
---     newHoleInCtx' (ctx ++ zip xs es) (Just higherHole) (Just hole)
---   return appHole
 inferCase :: Case -> WithEnv (Maybe WeakTermPlus)
 inferCase (CaseValue (EnumValueLabel name)) = do
   ienv <- gets enumEnv
