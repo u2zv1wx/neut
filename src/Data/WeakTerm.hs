@@ -129,11 +129,12 @@ varWeakTermPlusBindings ((x, t):xts) es = do
 
 varWeakMeta ::
      (MonadIO m, MonadError String m) => WeakMeta -> m ([Identifier], [Hole])
-varWeakMeta (WeakMetaTerminal _) = return ([], [])
-varWeakMeta (WeakMetaNonTerminal ref _) = do
-  t <- readWeakTermRef ref
-  varWeakTermPlus t
+varWeakMeta _ = return ([], []) -- nop?
 
+-- varWeakMeta (WeakMetaTerminal _) = return ([], [])
+-- varWeakMeta (WeakMetaNonTerminal ref _) = do
+--   t <- readWeakTermRef ref
+--   varWeakTermPlus t
 pairwiseConcat :: [([a], [b])] -> ([a], [b])
 pairwiseConcat [] = ([], [])
 pairwiseConcat ((xs, ys):rest) = do
@@ -243,12 +244,6 @@ substWeakMeta ::
      (MonadIO m, MonadError String m) => SubstWeakTerm -> WeakMeta -> m WeakMeta
 substWeakMeta _ m = return m
 
--- substWeakMeta _ m@(WeakMetaTerminal _) = return m
--- substWeakMeta sub (WeakMetaNonTerminal ref ml) = do
---   t <- readWeakTermRef ref
---   t' <- substWeakTermPlus sub t
---   writeWeakTermRef ref t'
---   return $ WeakMetaNonTerminal ref ml
 readWeakTermRef ::
      (MonadIO m, MonadError String m) => WeakTermRef -> m WeakTermPlus
 readWeakTermRef (WeakTermRef ref) = do

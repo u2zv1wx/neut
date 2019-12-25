@@ -45,9 +45,13 @@ infer _ (meta, WeakTermTheta x)
     t <- toIsEnumType $ fromInteger i
     returnAfterUpdate meta t -- enum.n{i} : is-enum n{i}
   | otherwise = do
-    h <- newHoleInCtx [] -- constants do not depend on their context
-    insTypeEnv x h
-    returnAfterUpdate meta h
+    mt <- lookupTypeEnvMaybe x
+    case mt of
+      Just t -> returnAfterUpdate meta t
+      Nothing -> do
+        h <- newHoleInCtx [] -- constants do not depend on their context
+        insTypeEnv x h -- これだとthetaは出現のたびに異なる型をもつことになってしまう。
+        returnAfterUpdate meta h
 infer _ (meta, WeakTermUpsilon x) = do
   t <- lookupTypeEnv x
   returnAfterUpdate meta t

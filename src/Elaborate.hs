@@ -26,10 +26,7 @@ import Reduce.Term
 -- S. Kong, and C. Roux. "Elaboration in Dependent Type Theory", arxiv,
 -- https://arxiv.org/abs/1505.04324, 2015.
 elaborate :: WeakTermPlus -> WithEnv TermPlus
-elaborate e
-  -- liftIO $ putStrLn $ Pr.ppShow e
- = do
-  p' e
+elaborate e = do
   _ <- infer [] e
   -- Kantian type-inference ;)
   gets constraintEnv >>= analyze

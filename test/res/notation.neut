@@ -66,3 +66,5 @@
 
 ;; just for test
 (enum top unit)
+
+(ascribe is-enum (pi ((_ top)) type))

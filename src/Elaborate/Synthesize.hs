@@ -18,9 +18,7 @@ import qualified Text.Show.Pretty as Pr
 -- Given a queue of constraints (easier ones comes earlier), try to synthesize
 -- all of them using heuristics.
 synthesize :: ConstraintQueue -> WithEnv ()
-synthesize q
-  -- liftIO $ putStrLn "synth"
- = do
+synthesize q = do
   sub <- gets substEnv
   case Q.getMin q of
     Just (Enriched (e1, e2) ms _)
@@ -42,18 +40,9 @@ resolveStuck ::
   -> Hole
   -> WeakTermPlus
   -> WithEnv ()
-resolveStuck q e1 e2 h e
-  -- liftIO $ putStrLn "resolveStuck"
-  -- liftIO $ putStrLn "h:"
-  -- liftIO $ putStrLn $ Pr.ppShow h
-  -- liftIO $ putStrLn "e:"
-  -- liftIO $ putStrLn $ Pr.ppShow e
-  -- liftIO $ putStrLn "subst1"
- = do
+resolveStuck q e1 e2 h e = do
   e1' <- substWeakTermPlus [(h, e)] e1
-  -- liftIO $ putStrLn "subst2"
   e2' <- substWeakTermPlus [(h, e)] e2
-  -- liftIO $ putStrLn "done"
   cs <- simp [(e1', e2')]
   synthesize $ Q.deleteMin q `Q.union` Q.fromList cs
 
@@ -79,15 +68,13 @@ resolvePiElim q m ess e = do
   chain q $ map (resolveHole q m) lamList
 
 resolveHole :: ConstraintQueue -> Hole -> WeakTermPlus -> WithEnv ()
-resolveHole q h e
-  -- liftIO $ putStrLn $ "resolveHole: " ++ show h
- = do
+resolveHole q h e = do
   senv <- gets substEnv
   senv' <- compose [(h, e)] senv
   modify (\env -> env {substEnv = senv'})
   let rest = Q.deleteMin q
   let (q1, q2) = Q.partition (\(Enriched _ ms _) -> h `elem` ms) rest
-  synthesize q1
+  synthesize q1 -- substitute all the occurrences of h
   synthesize q2
 
 -- [e, x, y, y, e2, e3, z] ~> [p, x, y, y, q, r, z]  (p, q, r: new variables)
@@ -160,9 +147,15 @@ discardInactive xs indexList =
 
 -- Try the list of alternatives.
 chain :: ConstraintQueue -> [WithEnv a] -> WithEnv a
-chain _ [] = throwError "cannot synthesize(chain)"
-chain c (e:es) = e `catchError` const (chain c es)
+chain _ [] = throwError $ "cannot synthesize(chain)."
+chain _ [e] = e
+chain c (e:es) =
+  catchError e $ \err -> do
+    liftIO $ putStrLn err
+    liftIO $ putStrLn "trying another chain..."
+    chain c es
 
+-- chain c (e:es) = e `catchError` (\err -> chain c es)
 lookupAny :: [Hole] -> [(Identifier, a)] -> Maybe (Hole, a)
 lookupAny [] _ = Nothing
 lookupAny (h:ks) sub = do

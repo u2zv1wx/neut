@@ -122,13 +122,20 @@ simp ((e1, e2):cs) = do
   case (ms1, ms2) of
     (Just (StuckHole h), _) -> do
       cs' <- simpMetaRet (fst e1) (fst e2) $ simp cs
-      return $ Enriched (e1, e2) [h] (ConstraintImmediate h e2) : cs'
+      fmvs <- takeMetaVarList e1 e2
+      return $ Enriched (e1, e2) fmvs (ConstraintImmediate h e2) : cs'
     (_, Just (StuckHole _)) -> simp $ (e2, e1) : cs
     (Just (StuckPiElimStrict h1 exs1), _) ->
       simpPatIfPossible ms1 ms2 h1 exs1 $ (e1, e2) : cs
     (_, Just (StuckPiElimStrict h2 exs2)) ->
       simpPatIfPossible ms2 ms1 h2 exs2 $ (e2, e1) : cs
     _ -> simpStuck ms1 ms2 $ (e1, e2) : cs
+
+takeMetaVarList :: WeakTermPlus -> WeakTermPlus -> WithEnv [Identifier]
+takeMetaVarList e1 e2 = do
+  (_, fmvs1) <- varWeakTermPlus e1
+  (_, fmvs2) <- varWeakTermPlus e2
+  return $ fmvs1 ++ fmvs2
 
 simpPatIfPossible ::
      Maybe Stuck
@@ -144,7 +151,8 @@ simpPatIfPossible ms1 ms2 h1 exs1 ((e1, e2):cs) = do
     then do
       cs' <- simpMetaRet (fst e1) (fst e2) $ simp cs
       let es1 = map (map fst) exs1
-      return $ Enriched (e1, e2) [h1] (ConstraintPattern h1 es1 e2) : cs'
+      fmvs <- takeMetaVarList e1 e2
+      return $ Enriched (e1, e2) fmvs (ConstraintPattern h1 es1 e2) : cs'
     else simpStuck ms1 ms2 $ (e1, e2) : cs
 
 simpStuck ::
@@ -158,18 +166,21 @@ simpStuck ms1 ms2 ((e1, e2):cs) =
     (Just (StuckPiElimStrict h1 exs1), _) -> do
       cs' <- simpMetaRet (fst e1) (fst e2) $ simp cs
       let es1 = map (map fst) exs1
-      return $ Enriched (e1, e2) [h1] (ConstraintQuasiPattern h1 es1 e2) : cs'
+      fmvs <- takeMetaVarList e1 e2
+      return $ Enriched (e1, e2) fmvs (ConstraintQuasiPattern h1 es1 e2) : cs'
     (_, Just StuckPiElimStrict {}) -> simpStuck ms2 ms1 $ (e2, e1) : cs
     (Just (StuckPiElim h1 ies1), Nothing) -> do
       cs' <- simpMetaRet (fst e1) (fst e2) $ simp cs
-      let c = Enriched (e1, e2) [h1] $ ConstraintFlexRigid h1 ies1 e2
+      fmvs <- takeMetaVarList e1 e2
+      let c = Enriched (e1, e2) fmvs $ ConstraintFlexRigid h1 ies1 e2
       return $ c : cs'
     (Nothing, Just StuckPiElim {}) -> simpStuck ms2 ms1 $ (e2, e1) : cs
-    (Just (StuckPiElim h1 ies1), Just (StuckPiElim h2 _)) -> do
+    (Just (StuckPiElim h1 ies1), Just (StuckPiElim _ _)) -> do
       cs' <- simpMetaRet (fst e1) (fst e2) $ simp cs
-      let c = Enriched (e1, e2) [h1, h2] $ ConstraintFlexFlex h1 ies1 e2
+      fmvs <- takeMetaVarList e1 e2
+      let c = Enriched (e1, e2) fmvs $ ConstraintFlexFlex h1 ies1 e2
       return $ c : cs'
-    _ -> throwError $ "cannot simplify:\n" ++ Pr.ppShow (e1, e2)
+    _ -> throwError $ "cannot simplify:\n" ++ Pr.ppShow (e1, e2) -- ここでcsについても処理をおこなうと複数のエラーを検出できる
 
 simpMetaRet ::
      WeakMeta
