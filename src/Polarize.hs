@@ -184,7 +184,7 @@ makeClosure mName fvs m xts e = do
       Just lamThetaName -> return lamThetaName
       Nothing -> newNameWith "cls"
   penv <- gets codeEnv
-  when (name `elem` map fst penv) $ insCodeEnv name (envVarName : xs) body
+  when (name `notElem` map fst penv) $ insCodeEnv name (envVarName : xs) body
   return $
     ( ml
     , CodeUpIntro
