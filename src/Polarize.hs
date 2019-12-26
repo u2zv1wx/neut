@@ -105,16 +105,7 @@ polarize (m, TermEnumElim e bs) = do
   return $ bindLet [((yName, retImmType), e')] (ml, CodeEnumElim y (zip cs es'))
 polarize (m, TermArray _ _ _) = do
   let ml = snd $ obtainInfoMeta m
-  tau <- cartesianImmediate ml
-  (arrVarName, arrVar) <- newDataUpsilonWith "arr"
-  let retTau = (ml, CodeUpIntro tau)
-  let retArrVar = (ml, CodeUpIntro arrVar)
-  arrayClsType <-
-    cartesianSigma
-      "array-closure"
-      ml
-      [Right (arrVarName, retTau), Left retArrVar]
-  return (ml, CodeUpIntro arrayClsType)
+  returnArrayType ml
 polarize (m, TermArrayIntro k les) = do
   let ml = snd $ obtainInfoMeta m
   v <- cartesianImmediate ml
@@ -141,21 +132,24 @@ polarize (m, TermArrayElim k e1 e2) = do
   (idxVarName, idxVar) <- newDataUpsilonWith "idx"
   affVarName <- newNameWith "aff"
   relVarName <- newNameWith "rel"
-  (arrTypeVarName, arrTypeVar) <- newDataUpsilonWith "arr-type"
+  (contentTypeVarName, contentTypeVar) <- newDataUpsilonWith "array-type"
+  (contentVarName, contentVar) <- newDataUpsilonWith "array-content"
   retUnivType <- returnCartesianUniv
   retImmType <- returnCartesianImmediate
-  let retArrType = (ml, CodeUpIntro arrTypeVar)
+  let retContentType = (ml, CodeUpIntro contentTypeVar)
+  retArrayType <- returnArrayType ml
+  -- array : Sigma [content-type : univ, content : content-type]
   return $
-    bindLet [((arrVarName, undefined), e1'), ((idxVarName, undefined), e2')] $
+    bindLet [((arrVarName, retArrayType), e1'), ((idxVarName, retImmType), e2')] $
     ( ml
     , CodeSigmaElim
-        [(arrTypeVarName, retUnivType), (arrVarName, retArrType)]
+        [(contentTypeVarName, retUnivType), (contentVarName, retContentType)]
         arrVar
         ( ml
         , CodeSigmaElim
             [(affVarName, retImmType), (relVarName, retImmType)]
-            arrTypeVar
-            (ml, CodeArrayElim k arrVar idxVar)))
+            contentTypeVar
+            (ml, CodeArrayElim k contentVar idxVar)))
 
 obtainFreeVarList ::
      [Identifier] -> TermPlus -> [(Identifier, Maybe Loc, TermPlus)]
@@ -420,6 +414,22 @@ returnPairType t1 t2 = do
   name <- newNameWith "copy"
   v <- cartesianSigma name Nothing [Left t1, Left t2]
   return (Nothing, CodeUpIntro v)
+
+returnArrayType :: Maybe Loc -> WithEnv CodePlus
+returnArrayType ml = do
+  tau <- cartesianImmediate ml
+  (arrVarName, arrVar) <- newDataUpsilonWith "arr"
+  let retTau = (ml, CodeUpIntro tau)
+  let retArrVar = (ml, CodeUpIntro arrVar)
+  v <-
+    cartesianSigma
+      "array-closure"
+      ml
+      [Right (arrVarName, retTau), Left retArrVar]
+  return (ml, CodeUpIntro v)
+
+returnClosureType :: MaybeLoc -> WithEnv CodePlus
+returnClosureType = undefined
 
 returnCartesianImmediate :: WithEnv CodePlus
 returnCartesianImmediate = do
