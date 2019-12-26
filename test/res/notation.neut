@@ -59,10 +59,72 @@
 
 (constant is-enum)
 
-(notation (ascribe e t)
+(notation (ascription e t)
   (let (_ t) e))
 
-(ascribe is-enum (pi ((_ type)) type))
+(ascription is-enum (pi ((_ type)) type))
+
+;; (notation (arg-list t) (_ t))
+
+;; (notation (arg-list e rest+) ((_ t) (arg-list rest+)))
+
+;; (hom a b c) = a -> (b -> c)
+(keyword hom)
+
+(notation (hom t) t)
+
+(notation (hom t rest+)
+  (pi
+    ((_ t))
+    (hom rest+)))
+
+(keyword sigma)
+
+(notation (sigma (xt+) t)
+  (pi
+    ((c tau)
+     (_ (pi (xt+ (_ t)) c)))
+    c))
+
+;; ここはarrowの定義のおかげでさくっといける。
+;; cって導入してある新しい変数はスコープがちゃんとここで切れてるので問題なし。
+(notation (product t+)
+  (pi
+    ((c tau)
+     (_ (arrow (t+) c)))
+    c))
+
+;; (notation (sigma-introduction e+)
+;;   (lambda ;; ところでformattingはこうするのがよさそうね。
+;;     ((elim-result-type
+;;       tau) ;; いちばんcanonicalな形での表現。縦に冗長だけど、スケールはする。「縦に読む」って感じ。
+;;      (eliminator
+;;       (arrow
+;;         ((x1 A1)  ;; ここにA1についてのコメント。
+;;          ...
+;;          (xn An)) ;; ここにAnについてのコメント。
+;;         elim-result-type)))
+;;     (eliminator e+))) ;; 適用はこれで問題ないはずで。eliminatorの型を不明にしておいても大丈夫なんだろうか？さすがにきつくない？
+;; こうしたいんだけど、piの引数部分をかくことができない。特殊なマクロが必要なのかしら。
+
+;; 型推論を信じていくスタイル。
+(notation (sigma-introduction e+)
+  (lambda
+    ((elim-result-type tau)
+     (eliminator _)) ;; eliminatorの型は推論で決定する
+    (eliminator e+)))
+
+;; sigma-elimはこれでいいのかな？
+(notation (sigma-elimination (xt+) e1 e2)
+  (e1 (lambda (xt+) e2)))
+
+(definition state ((S type) (A type))
+  (hom S (product S A)))
+
+(enum bottom) ;; for io-monad
+
+(definition io
+  (state bottom))
 
 ;; just for test
 (enum top unit)
