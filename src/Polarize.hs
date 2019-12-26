@@ -126,8 +126,10 @@ polarize (m, TermArrayIntro k les) = do
   let (ls, es) = unzip les
   -- (xess, xs) <- unzip3 <$> mapM polarize' es
   (zs, es', xs) <- unzip3 <$> mapM polarize' es
+  -- arrayの中身はすべてimmediate
+  retImmType <- returnCartesianImmediate
   return $
-    bindLet (undefined zs es') $
+    bindLet (zip (zip zs (repeat retImmType)) es') $
     ( ml
     , CodeUpIntro $
       (ml, DataSigmaIntro [arrayType, (ml, DataArrayIntro k (zip ls xs))]))
