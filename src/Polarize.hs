@@ -32,18 +32,7 @@ polarize (m, TermUpsilon x) = do
   return (ml, CodeUpIntro (ml, DataUpsilon x))
 polarize (m, TermPi _ _) = do
   let ml = snd $ obtainInfoMeta m
-  imm <- cartesianImmediate ml
-  tau <- cartesianUniv ml
-  (envVarName, envVar) <- newDataUpsilonWith "env"
-  let retUnivType = (ml, CodeUpIntro tau)
-  let retImmType = (ml, CodeUpIntro imm)
-  let retEnvVar = (ml, CodeUpIntro envVar)
-  closureType <-
-    cartesianSigma
-      "closure"
-      ml
-      [Right (envVarName, retUnivType), Left retEnvVar, Left retImmType]
-  return (ml, CodeUpIntro closureType)
+  returnClosureType ml
 polarize (m, TermPiIntro xts e) = do
   let xs = map fst xts
   let fvs = obtainFreeVarList xs e
@@ -428,8 +417,20 @@ returnArrayType ml = do
       [Right (arrVarName, retTau), Left retArrVar]
   return (ml, CodeUpIntro v)
 
-returnClosureType :: MaybeLoc -> WithEnv CodePlus
-returnClosureType = undefined
+returnClosureType :: Maybe Loc -> WithEnv CodePlus
+returnClosureType ml = do
+  imm <- cartesianImmediate ml
+  tau <- cartesianUniv ml
+  (envVarName, envVar) <- newDataUpsilonWith "env"
+  let retUnivType = (ml, CodeUpIntro tau)
+  let retImmType = (ml, CodeUpIntro imm)
+  let retEnvVar = (ml, CodeUpIntro envVar)
+  closureType <-
+    cartesianSigma
+      "closure"
+      ml
+      [Right (envVarName, retUnivType), Left retEnvVar, Left retImmType]
+  return (ml, CodeUpIntro closureType)
 
 returnCartesianImmediate :: WithEnv CodePlus
 returnCartesianImmediate = do
