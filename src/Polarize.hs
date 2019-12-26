@@ -510,9 +510,9 @@ cartesianSigma ::
   -> Maybe Loc
   -> [Either CodePlus (Identifier, CodePlus)]
   -> WithEnv DataPlus
-cartesianSigma thetaName ml mxes = do
-  aff <- affineSigma ("affine-" ++ thetaName) ml mxes
-  rel <- relevantSigma ("relevant-" ++ thetaName) ml mxes
+cartesianSigma thetaName ml mxts = do
+  aff <- affineSigma ("affine-" ++ thetaName) ml mxts
+  rel <- relevantSigma ("relevant-" ++ thetaName) ml mxts
   return (ml, DataSigmaIntro [aff, rel])
 
 -- (Assuming `ti` = `return di` for some `di` such that `xi : di`)
@@ -538,22 +538,22 @@ affineSigma ::
   -> Maybe Loc
   -> [Either CodePlus (Identifier, CodePlus)]
   -> WithEnv DataPlus
-affineSigma thetaName ml mxes = do
+affineSigma thetaName ml mxts = do
   cenv <- gets codeEnv
   let theta = (ml, DataTheta thetaName)
   case lookup thetaName cenv of
     Just _ -> return theta
     Nothing -> do
-      xes <- mapM supplyName mxes
+      xts <- mapM supplyName mxts
       (z, varZ) <- newDataUpsilonWith "arg"
       -- As == [APP-1, ..., APP-n]   (`a` here stands for `app`)
-      as <- forM xes $ \(x, e) -> toAffineApp ml x e
-      ys <- mapM (const $ newNameWith "unit") xes
+      as <- forM xts $ \(x, e) -> toAffineApp ml x e
+      ys <- mapM (const $ newNameWith "unit") xts
       let body = bindLet (zip ys as) (ml, CodeUpIntro (ml, DataSigmaIntro []))
-      body' <- linearize xes body
+      body' <- linearize xts body
       -- liftIO $ putStrLn $ Pr.ppShow body'
-      -- insCodeEnv thetaName [z] (ml, CodeSigmaElim (map fst xes) varZ body')
-      insCodeEnv thetaName [z] (ml, CodeSigmaElim xes varZ body')
+      -- insCodeEnv thetaName [z] (ml, CodeSigmaElim (map fst xts) varZ body')
+      insCodeEnv thetaName [z] (ml, CodeSigmaElim xts varZ body')
       return theta
 
 -- (Assuming `ti` = `return di` for some `di` such that `xi : di`)
@@ -580,32 +580,39 @@ relevantSigma ::
   -> Maybe Loc
   -> [Either CodePlus (Identifier, CodePlus)]
   -> WithEnv DataPlus
-relevantSigma thetaName ml mxes = do
+relevantSigma thetaName ml mxts = do
   cenv <- gets codeEnv
   let theta = (ml, DataTheta thetaName)
   case lookup thetaName cenv of
     Just _ -> return theta
     Nothing -> do
-      xes <- mapM supplyName mxes
+      xts <- mapM supplyName mxts
       (z, varZ) <- newDataUpsilonWith "arg"
       -- as == [APP-1, ..., APP-n]
-      as <- forM xes $ \(x, e) -> toRelevantApp ml x e
+      as <- forM xts $ \(x, e) -> toRelevantApp ml x e
       -- pairVarNameList == [pair-1, ...,  pair-n]
-      (pairVarNameList, pairVarList) <-
-        unzip <$> mapM (const $ newDataUpsilonWith "pair") xes
-      transposedPair <- transposeSigma pairVarList
+      (pairVarNameList, pairVarTypeList) <- unzip <$> mapM toPairInfo xts
+      -- (pairVarNameList, pairVarList) <-
+      --   unzip <$> mapM (const $ newDataUpsilonWith "pair") xts
+      transposedPair <- transposeSigma pairVarTypeList
       let body = bindLet (zip pairVarNameList as) transposedPair
-      body' <- linearize xes body
-      -- insCodeEnv thetaName [z] (ml, CodeSigmaElim (map fst xes) varZ body')
-      insCodeEnv thetaName [z] (ml, CodeSigmaElim xes varZ body')
+      body' <- linearize xts body
+      -- insCodeEnv thetaName [z] (ml, CodeSigmaElim (map fst xts) varZ body')
+      insCodeEnv thetaName [z] (ml, CodeSigmaElim xts varZ body')
       return theta
+
+toPairInfo ::
+     (Identifier, CodePlus) -> WithEnv (Identifier, (DataPlus, CodePlus))
+toPairInfo (_, t) = do
+  (name, var) <- newDataUpsilonWith "pair"
+  return (name, (var, t))
 
 -- transposeSigma [d1, ..., dn] :=
 --   let (x1, y1) := d1 in
 --   ...
 --   let (xn, yn) := dn in
 --   return ((x1, ..., xn), (y1, ..., yn))
-transposeSigma :: [DataPlus] -> WithEnv CodePlus
+transposeSigma :: [(DataPlus, CodePlus)] -> WithEnv CodePlus
 transposeSigma ds = do
   (xVarNameList, xVarList) <-
     unzip <$> mapM (const $ newDataUpsilonWith "sig-x") ds
@@ -621,12 +628,14 @@ transposeSigma ds = do
             , (Nothing, DataSigmaIntro yVarList)
             ]))
 
-bindSigmaElim :: [((Identifier, Identifier), DataPlus)] -> CodePlus -> CodePlus
+bindSigmaElim ::
+     [((Identifier, Identifier), (DataPlus, CodePlus))] -> CodePlus -> CodePlus
 bindSigmaElim [] cont = cont
-bindSigmaElim (((x, y), d):xyds) cont = do
+bindSigmaElim (((x, y), (d, t)):xyds) cont = do
   let cont' = bindSigmaElim xyds cont
   -- FIXME: transposeSigmaの時点でx, yの型を引数として与えるようにする
-  (fst cont', CodeSigmaElim [(x, undefined), (y, undefined)] d cont')
+  -- (fst cont', CodeSigmaElim [(x, undefined), (y, undefined)] d cont')
+  (fst cont', CodeSigmaElim [(x, t), (y, t)] d cont')
 
 -- toAffineApp ML x e ~>
 --   bind f := e in
