@@ -190,6 +190,7 @@ makeClosure mName fvs m xts e = do
 callClosure :: Meta -> CodePlus -> [TermPlus] -> WithEnv CodePlus
 callClosure m e es = do
   (zs, es', xs) <- unzip3 <$> mapM polarize' es
+  ts' <- mapM (polarize . fst . obtainInfoMeta . fst) es -- list of types of es
   let ml = snd $ obtainInfoMeta m
   (clsVarName, clsVar) <- newDataUpsilonWith "closure"
   (typeVarName, typeVar) <- newDataUpsilonWith "exp"
@@ -199,9 +200,10 @@ callClosure m e es = do
   relVarName <- newNameWith "rel"
   retUnivType <- returnCartesianUniv
   retImmType <- returnCartesianImmediate
+  retClsType <- returnClosureType ml
   return $
     bindLet
-      (((clsVarName, undefined), e) : undefined zs es')
+      (((clsVarName, retClsType), e) : zip (zip zs ts') es')
       ( ml
       , CodeSigmaElim
           [ (typeVarName, retUnivType)
@@ -580,14 +582,18 @@ affineSigma thetaName ml mxts = do
       (z, varZ) <- newDataUpsilonWith "arg"
       -- As == [APP-1, ..., APP-n]   (`a` here stands for `app`)
       as <- forM xts $ \(x, e) -> toAffineApp ml x e
-      ys <- undefined xts
-      -- ys <- mapM (const $ newNameWith "unit") xts
-      let body = bindLet (zip ys as) (ml, CodeUpIntro (ml, DataSigmaIntro []))
+      yts <- mapM (newNameWithType . snd) xts
+      let body = bindLet (zip yts as) (ml, CodeUpIntro (ml, DataSigmaIntro []))
       body' <- linearize xts body
       -- liftIO $ putStrLn $ Pr.ppShow body'
       -- insCodeEnv thetaName [z] (ml, CodeSigmaElim (map fst xts) varZ body')
       insCodeEnv thetaName [z] (ml, CodeSigmaElim xts varZ body')
       return theta
+
+newNameWithType :: CodePlus -> WithEnv (Identifier, CodePlus)
+newNameWithType t = do
+  name <- newNameWith "aff-name"
+  return (name, t)
 
 -- (Assuming `ti` = `return di` for some `di` such that `xi : di`)
 -- relevantSigma NAME LOC [(x1, t1), ..., (xn, tn)]   ~>
@@ -667,8 +673,6 @@ bindSigmaElim ::
 bindSigmaElim [] cont = cont
 bindSigmaElim (((x, y), (d, t)):xyds) cont = do
   let cont' = bindSigmaElim xyds cont
-  -- FIXME: transposeSigmaの時点でx, yの型を引数として与えるようにする
-  -- (fst cont', CodeSigmaElim [(x, undefined), (y, undefined)] d cont')
   (fst cont', CodeSigmaElim [(x, t), (y, t)] d cont')
 
 -- toAffineApp ML x e ~>
