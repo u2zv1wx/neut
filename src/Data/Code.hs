@@ -28,7 +28,7 @@ data Code
       DataPlus
       CodePlus
   | CodeUpIntro DataPlus
-  | CodeUpElim Identifier CodePlus CodePlus
+  | CodeUpElim (Identifier, CodePlus) CodePlus CodePlus
   | CodeEnumElim DataPlus [(Case, CodePlus)]
   | CodeArrayElim ArrayKind DataPlus DataPlus
   deriving (Show)
@@ -132,9 +132,9 @@ varData _ = []
 varCode :: CodePlus -> [Identifier]
 varCode (_, CodeTheta theta) = varTheta theta
 varCode (_, CodePiElimDownElim d ds) = concatMap varData $ d : ds
-varCode (_, CodeSigmaElim xts d e) = varData d ++ varSigmaElim xts e
+varCode (_, CodeSigmaElim xts d e) = varData d ++ varCode' xts e
 varCode (_, CodeUpIntro d) = varData d
-varCode (_, CodeUpElim x e1 e2) = varCode e1 ++ (filter ((/=) x) $ varCode e2)
+varCode (_, CodeUpElim xt e1 e2) = varCode e1 ++ varCode' [xt] e2
 varCode (_, CodeEnumElim d les) = do
   let (_, es) = unzip les
   varData d ++ concatMap varCode es
@@ -145,7 +145,6 @@ varTheta (ThetaUnaryOp _ _ d) = varData d
 varTheta (ThetaBinaryOp _ _ d1 d2) = varData d1 ++ varData d2
 varTheta (ThetaSysCall _ ds) = concatMap varData ds
 
-varSigmaElim :: [(Identifier, CodePlus)] -> CodePlus -> [Identifier]
-varSigmaElim [] e = varCode e
-varSigmaElim ((x, t):xts) e =
-  varCode t ++ (filter ((/=) x) $ varSigmaElim xts e)
+varCode' :: [(Identifier, CodePlus)] -> CodePlus -> [Identifier]
+varCode' [] e = varCode e
+varCode' ((x, t):xts) e = varCode t ++ (filter ((/=) x) $ varCode' xts e)
