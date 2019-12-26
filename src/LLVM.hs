@@ -33,14 +33,15 @@ llvmCode (_, CodePiElimDownElim v ds) = do
   (fun, castThen) <- llvmCast (Just $ takeBaseName v) v $ toFunPtrType ds
   castThenCall <- castThen $ LLVMCall fun vs
   llvmDataLet' (zip xs ds) $ castThenCall
-llvmCode (_, CodeSigmaElim xs v e) = do
+llvmCode (_, CodeSigmaElim xts v e) = do
+  let xs = map fst xts
   let structPtrType = toStructPtrType $ length xs
   let idxList = map (\i -> (LLVMDataInt i, i32)) [0 ..]
   loadContent v structPtrType (zip idxList xs) voidPtr e
 llvmCode (_, CodeUpIntro d) = do
   result <- newNameWith $ takeBaseName d
   llvmDataLet result d $ LLVMReturn $ LLVMDataLocal result
-llvmCode (_, CodeUpElim x e1 e2) = do
+llvmCode (_, CodeUpElim (x, _) e1 e2) = do
   e1' <- llvmCode e1
   e2' <- llvmCode e2
   return $ commConv x e1' e2'
