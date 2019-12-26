@@ -23,7 +23,10 @@ data Data
 data Code
   = CodeTheta Theta
   | CodePiElimDownElim DataPlus [DataPlus] -- ((force v) v1 ... vn)
-  | CodeSigmaElim [Identifier] DataPlus CodePlus
+  | CodeSigmaElim
+      [(Identifier, CodePlus)] -- [(x1, return t1), ..., (xn, return tn)] with xi : ti
+      DataPlus
+      CodePlus
   | CodeUpIntro DataPlus
   | CodeUpElim Identifier CodePlus CodePlus
   | CodeEnumElim DataPlus [(Case, CodePlus)]
@@ -75,10 +78,10 @@ substCodePlus sub (m, CodePiElimDownElim v ds) = do
   let v' = substDataPlus sub v
   let ds' = map (substDataPlus sub) ds
   (m, CodePiElimDownElim v' ds')
-substCodePlus sub (m, CodeSigmaElim xs v e) = do
+substCodePlus sub (m, CodeSigmaElim xts v e) = do
   let v' = substDataPlus sub v
-  let (xs', e') = substDataPlusSigmaElim sub xs e
-  (m, CodeSigmaElim xs' v' e')
+  let (xts', e') = substDataPlusSigmaElim sub xts e
+  (m, CodeSigmaElim xts' v' e')
 substCodePlus sub (m, CodeUpIntro v) = do
   let v' = substDataPlus sub v
   (m, CodeUpIntro v')
@@ -109,39 +112,16 @@ substTheta sub (ThetaSysCall sysCall ds) = do
   let ds' = map (substDataPlus sub) ds
   ThetaSysCall sysCall ds'
 
-substDataPlusPi ::
-     SubstDataPlus -> [(Identifier, CodePlus)] -> [(Identifier, CodePlus)]
-substDataPlusPi _ [] = []
-substDataPlusPi sub ((x, p):xns) = do
-  let xns' = substDataPlusPi (filter (\(y, _) -> y /= x) sub) xns
-  (x, substCodePlus sub p) : xns'
-
-substDataPlusSigma :: SubstDataPlus -> [IdentifierPlus] -> [IdentifierPlus]
-substDataPlusSigma _ [] = []
-substDataPlusSigma sub ((x, p):xps) = do
-  let xps' = substDataPlusSigma (filter (\(y, _) -> y /= x) sub) xps
-  (x, substDataPlus sub p) : xps'
-
-substCodePlusPi ::
-     SubstDataPlus
-  -> [IdentifierPlus]
-  -> CodePlus
-  -> ([IdentifierPlus], CodePlus)
-substCodePlusPi sub [] n = ([], substCodePlus sub n)
-substCodePlusPi sub ((x, p):xps) n = do
-  let (xps', n') = substCodePlusPi (filter (\(y, _) -> y /= x) sub) xps n
-  let p' = substDataPlus sub p
-  ((x, p') : xps', n')
-
 substDataPlusSigmaElim ::
-     SubstDataPlus -> [Identifier] -> CodePlus -> ([Identifier], CodePlus)
-substDataPlusSigmaElim sub [] e = do
-  let e' = substCodePlus sub e
-  ([], e')
-substDataPlusSigmaElim sub (x:xs) e = do
-  let sub' = filter (\(y, _) -> y /= x) sub
-  let (xs', e') = substDataPlusSigmaElim sub' xs e
-  (x : xs', e')
+     SubstDataPlus
+  -> [(Identifier, CodePlus)]
+  -> CodePlus
+  -> ([(Identifier, CodePlus)], CodePlus)
+substDataPlusSigmaElim sub [] e = ([], substCodePlus sub e)
+substDataPlusSigmaElim sub ((x, t):xs) e = do
+  let (xs', e') = substDataPlusSigmaElim (filter (\(y, _) -> y /= x) sub) xs e
+  let t' = substCodePlus sub t
+  ((x, t') : xs', e')
 
 varData :: DataPlus -> [Identifier]
 varData (_, DataUpsilon x) = [x]
@@ -152,8 +132,7 @@ varData _ = []
 varCode :: CodePlus -> [Identifier]
 varCode (_, CodeTheta theta) = varTheta theta
 varCode (_, CodePiElimDownElim d ds) = concatMap varData $ d : ds
-varCode (_, CodeSigmaElim xs d e) =
-  varData d ++ (filter (`notElem` xs) $ varCode e)
+varCode (_, CodeSigmaElim xts d e) = varData d ++ varSigmaElim xts e
 varCode (_, CodeUpIntro d) = varData d
 varCode (_, CodeUpElim x e1 e2) = varCode e1 ++ (filter ((/=) x) $ varCode e2)
 varCode (_, CodeEnumElim d les) = do
@@ -165,3 +144,8 @@ varTheta :: Theta -> [Identifier]
 varTheta (ThetaUnaryOp _ _ d) = varData d
 varTheta (ThetaBinaryOp _ _ d1 d2) = varData d1 ++ varData d2
 varTheta (ThetaSysCall _ ds) = concatMap varData ds
+
+varSigmaElim :: [(Identifier, CodePlus)] -> CodePlus -> [Identifier]
+varSigmaElim [] e = varCode e
+varSigmaElim ((x, t):xts) e =
+  varCode t ++ (filter ((/=) x) $ varSigmaElim xts e)
