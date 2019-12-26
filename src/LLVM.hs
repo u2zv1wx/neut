@@ -67,6 +67,15 @@ takeBaseName (_, DataFloat64 _) = "double"
 takeBaseName (_, DataEnumIntro _) = "i64"
 takeBaseName (_, DataArrayIntro _ _) = "array"
 
+takeBaseName' :: LLVMData -> Identifier
+takeBaseName' (LLVMDataLocal x) = x
+takeBaseName' (LLVMDataGlobal x) = x
+takeBaseName' (LLVMDataInt _) = "int"
+takeBaseName' (LLVMDataFloat16 _) = "half"
+takeBaseName' (LLVMDataFloat32 _) = "float"
+takeBaseName' (LLVMDataFloat64 _) = "double"
+takeBaseName' LLVMDataNull = "null"
+
 retUp :: Identifier -> CodePlus
 retUp result = (Nothing, CodeUpIntro (Nothing, DataUpsilon result))
 
@@ -78,7 +87,8 @@ loadContent ::
   -> CodePlus -- continuation
   -> WithEnv LLVM
 loadContent v bt ixs et cont = do
-  (bp, castThen) <- llvmCast (Just "base-pointer") v bt
+  (bp, castThen) <- llvmCast (Just $ takeBaseName v) v bt
+  -- (bp, castThen) <- llvmCast (Just "base-pointer") v bt
   cont' <- llvmCode cont
   extractThenFreeThenCont <- loadContent' bp bt et ixs cont'
   castThen extractThenFreeThenCont
@@ -90,9 +100,11 @@ loadContent' ::
   -> [((LLVMData, LowType), Identifier)] -- [(the index of an element, the variable to keep the loaded content)]
   -> LLVM -- continuation
   -> WithEnv LLVM
-loadContent' bp bt _ [] cont = do
-  l <- llvmUncast (Just "base-pointer") bp bt
-  tmp <- newNameWith "load-content-base"
+loadContent' bp bt _ [] cont
+  -- l <- llvmUncast (Just "base-pointer") bp bt
+ = do
+  l <- llvmUncast (Just $ takeBaseName' bp) bp bt
+  tmp <- newNameWith' $ Just $ takeBaseName' bp
   return $ commConv tmp l $ LLVMCont (LLVMOpFree (LLVMDataLocal tmp)) cont
 loadContent' bp bt et ((i, x):xis) cont = do
   cont' <- loadContent' bp bt et xis cont
@@ -145,11 +157,11 @@ llvmCast mName v lowType@(LowTypeIntS _) = llvmCastInt mName v lowType
 llvmCast mName v lowType@(LowTypeIntU _) = llvmCastInt mName v lowType
 llvmCast mName v (LowTypeFloat i) = llvmCastFloat mName v i
 llvmCast mName v ptrType = do
+  tmp <- newNameWith' mName
   x <- newNameWith' mName
   return
     ( LLVMDataLocal x
     , \cont -> do
-        tmp <- newNameWith' mName
         llvmDataLet tmp v $
           LLVMLet x (LLVMOpBitcast (LLVMDataLocal tmp) voidPtr ptrType) cont)
 
