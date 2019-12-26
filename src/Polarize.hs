@@ -133,15 +133,18 @@ polarize (m, TermArrayElim k e1 e2) = do
   affVarName <- newNameWith "aff"
   relVarName <- newNameWith "rel"
   (arrTypeVarName, arrTypeVar) <- newDataUpsilonWith "arr-type"
+  retUnivType <- returnCartesianUniv
+  retImmType <- returnCartesianImmediate
+  let retArrType = (ml, CodeUpIntro arrTypeVar)
   return $
     bindLet [(arrVarName, e1'), (idxVarName, e2')] $
     ( ml
     , CodeSigmaElim
-        [(arrTypeVarName, undefined), (arrVarName, undefined)]
+        [(arrTypeVarName, retUnivType), (arrVarName, retArrType)]
         arrVar
         ( ml
         , CodeSigmaElim
-            [(affVarName, undefined), (relVarName, undefined)]
+            [(affVarName, retImmType), (relVarName, retImmType)]
             arrTypeVar
             (ml, CodeArrayElim k arrVar idxVar)))
 
