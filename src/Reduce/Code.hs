@@ -20,11 +20,12 @@ reduceCodePlus (m, CodePiElimDownElim v ds) = do
       | Just (xs, body) <- lookup x cenv ->
         reduceCodePlus $ substCodePlus (zip xs ds) body
     _ -> return (m, CodePiElimDownElim v ds)
-reduceCodePlus (m, CodeSigmaElim xs v e) =
+reduceCodePlus (m, CodeSigmaElim xts v e) = do
+  let xs = map fst xts
   case v of
     (_, DataSigmaIntro es)
       | length es == length xs -> reduceCodePlus $ substCodePlus (zip xs es) e
-    _ -> return (m, CodeSigmaElim xs v e)
+    _ -> return (m, CodeSigmaElim xts v e)
 reduceCodePlus (m, CodeEnumElim v branchList) =
   case v of
     (_, DataEnumIntro l) ->
