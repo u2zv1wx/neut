@@ -322,7 +322,10 @@ withHeaderRelevant x t x1 x2 xs e = do
   (relVarName, relVar) <- newDataUpsilonWith "rel"
   linearChain <- toLinearChain $ x : x1 : x2 : xs
   let ml = fst e
-  rel <- withHeaderRelevant' relVar linearChain e
+  -- xそのものの型はtなのでこれを利用？
+  -- このtのなかに自由変数があるとやばそうじゃない？
+  -- 別にSigmaElimにannotationをあたえていても、それを使うってわけじゃないから問題ないのか。
+  rel <- withHeaderRelevant' t relVar linearChain e
   retImmType <- returnCartesianImmediate
   return
     ( ml
@@ -372,21 +375,21 @@ toLinearChain xs = do
 --   bind sigVar3 := relVar @ tmpB in
 --   let (x3, x4) := sigVar3 in
 --   e
-withHeaderRelevant' :: DataPlus -> LinearChain -> CodePlus -> WithEnv CodePlus
-withHeaderRelevant' _ [] cont = return cont
-withHeaderRelevant' relVar ((x, (x1, x2)):chain) cont = do
+withHeaderRelevant' ::
+     CodePlus -> DataPlus -> LinearChain -> CodePlus -> WithEnv CodePlus
+withHeaderRelevant' _ _ [] cont = return cont
+withHeaderRelevant' t relVar ((x, (x1, x2)):chain) cont = do
   let ml = fst cont
-  cont' <- withHeaderRelevant' relVar chain cont
+  cont' <- withHeaderRelevant' t relVar chain cont
   -- (sigVarName, sigVar) <- newDataUpsilon
   (sigVarName, sigVar) <- newDataUpsilonWith "sig"
   let varX = toDataUpsilon (x, Nothing)
-  let typeX = undefined -- FIXME: xの型をどっかからひいてくる必要がある。relvarじゃなくて「本体」がほしい。
   return $
     ( ml
     , CodeUpElim
         sigVarName
         (ml, CodePiElimDownElim relVar [varX])
-        (ml, CodeSigmaElim [(x1, typeX), (x2, typeX)] sigVar cont'))
+        (ml, CodeSigmaElim [(x1, t), (x2, t)] sigVar cont'))
 
 bindLet :: Binder -> CodePlus -> CodePlus
 bindLet [] cont = cont
