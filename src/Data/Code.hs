@@ -85,10 +85,12 @@ substCodePlus sub (m, CodeSigmaElim xts v e) = do
 substCodePlus sub (m, CodeUpIntro v) = do
   let v' = substDataPlus sub v
   (m, CodeUpIntro v')
-substCodePlus sub (m, CodeUpElim x e1 e2) = do
+substCodePlus sub (m, CodeUpElim (x, t) e1 e2) = do
+  let t' = substCodePlus sub t
   let e1' = substCodePlus sub e1
-  let e2' = substCodePlus sub e2
-  (m, CodeUpElim x e1' e2')
+  let sub' = filter (\(y, _) -> y /= x) sub
+  let e2' = substCodePlus sub' e2
+  (m, CodeUpElim (x, t') e1' e2')
 substCodePlus sub (m, CodeEnumElim v branchList) = do
   let v' = substDataPlus sub v
   let (cs, es) = unzip branchList
