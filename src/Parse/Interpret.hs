@@ -102,6 +102,13 @@ interpret (m, TreeAtom x)
 interpret (m, TreeAtom x)
   | Just (i, j) <- readNatEnumValue x =
     withMeta m $ WeakTermEnumIntro $ EnumValueNatNum i j
+interpret (m, TreeNode [(_, TreeAtom "arrow"), (_, TreeNode ts), t]) = do
+  xs <- mapM (const $ newNameWith "hole") ts
+  ts' <- mapM interpret ts
+  t' <- interpret t
+  withMeta m $ WeakTermPi (zip xs ts') t'
+  -- (xts', t') <- interpretBinder ts t
+  -- withMeta m $ WeakTermPi xts' t'
 interpret (m, TreeAtom x)
   | Just str <- readMaybe x = do
     u8s <- forM (encode str) $ \u -> withMeta m (WeakTermIntU 8 (toInteger u))
