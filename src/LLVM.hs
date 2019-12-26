@@ -338,8 +338,8 @@ storeContent reg elemType aggPtrType ds cont = do
         (LLVMOpAlloc (LLVMDataInt (toInteger i)))
         castThenStoreThenCont
     AllocSizePtrList n -> do
-      (c, cVar) <- newDataLocal "store-ptr-cast"
-      (i, iVar) <- newDataLocal "store-ptr-size"
+      (c, cVar) <- newDataLocal $ "sizeof-" ++ reg
+      (i, iVar) <- newDataLocal $ "sizeof-" ++ reg
       -- Use getelementptr to realize `sizeof`. More info:
       --   http://nondot.org/sabre/LLVMNotes/SizeOf-OffsetOf-VariableSizedStructs.txt
       return $

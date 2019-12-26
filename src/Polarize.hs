@@ -493,7 +493,7 @@ affineSigma thetaName ml mxes = do
     Just _ -> return theta
     Nothing -> do
       xes <- mapM supplyName mxes
-      (z, varZ) <- newDataUpsilonWith "aff-arg"
+      (z, varZ) <- newDataUpsilonWith "arg"
       -- As == [APP-1, ..., APP-n]   (`a` here stands for `app`)
       as <- forM xes $ \(x, e) -> toAffineApp ml x e
       ys <- mapM (const $ newNameWith "var") xes
@@ -534,7 +534,7 @@ relevantSigma thetaName ml mxes = do
     Just _ -> return theta
     Nothing -> do
       xes <- mapM supplyName mxes
-      (z, varZ) <- newDataUpsilonWith "sig-rel-arg"
+      (z, varZ) <- newDataUpsilonWith "arg"
       -- as == [APP-1, ..., APP-n]
       as <- forM xes $ \(x, e) -> toRelevantApp ml x e
       -- pairVarNameList == [pair-1, ...,  pair-n]
@@ -772,3 +772,9 @@ newDataUpsilonWith' :: Identifier -> Maybe Loc -> WithEnv (Identifier, DataPlus)
 newDataUpsilonWith' name ml = do
   x <- newNameWith name
   return (x, (ml, DataUpsilon x))
+
+supplyName :: Either b (Identifier, b) -> WithEnv (Identifier, b)
+supplyName (Right (x, t)) = return (x, t)
+supplyName (Left t) = do
+  x <- newNameWith "unused-sigarg"
+  return (x, t)

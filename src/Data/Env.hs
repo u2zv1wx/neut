@@ -208,12 +208,6 @@ toWeakMeta m = do
   ref <- newWeakTermRef Nothing
   return $ WeakMetaNonTerminal ref (treeMetaLocation m)
 
-supplyName :: Either b (Identifier, b) -> WithEnv (Identifier, b)
-supplyName (Right (x, t)) = return (x, t)
-supplyName (Left t) = do
-  x <- newNameWith "hole"
-  return (x, t)
-
 getTarget :: WithEnv Target
 getTarget = do
   mtarget <- gets target
