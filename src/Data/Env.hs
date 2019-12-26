@@ -255,6 +255,7 @@ distinguishData z (ml, DataSigmaIntro ds) = do
   return (concat vss, (ml, DataSigmaIntro ds'))
 distinguishData _ d = return ([], d)
 
+-- distinguishのときにtype annotationはいじらなくていいんだろうか？大丈夫そう？
 distinguishCode :: Identifier -> CodePlus -> WithEnv ([Identifier], CodePlus)
 distinguishCode z (ml, CodeTheta theta) = do
   (vs, theta') <- distinguishTheta z theta
@@ -273,13 +274,13 @@ distinguishCode z (ml, CodeSigmaElim xts d e) = do
 distinguishCode z (ml, CodeUpIntro d) = do
   (vs, d') <- distinguishData z d
   return (vs, (ml, CodeUpIntro d'))
-distinguishCode z (ml, CodeUpElim x e1 e2) = do
+distinguishCode z (ml, CodeUpElim (x, t) e1 e2) = do
   (vs1, e1') <- distinguishCode z e1
   if x == z
-    then return (vs1, (ml, CodeUpElim x e1' e2))
+    then return (vs1, (ml, CodeUpElim (x, t) e1' e2))
     else do
       (vs2, e2') <- distinguishCode z e2
-      return (vs1 ++ vs2, (ml, CodeUpElim x e1' e2'))
+      return (vs1 ++ vs2, (ml, CodeUpElim (x, t) e1' e2'))
 distinguishCode z (ml, CodeEnumElim d branchList) = do
   (vs, d') <- distinguishData z d
   let (cs, es) = unzip branchList
