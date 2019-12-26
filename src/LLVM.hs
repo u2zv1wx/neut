@@ -30,9 +30,7 @@ llvmCode :: CodePlus -> WithEnv LLVM
 llvmCode (m, CodeTheta theta) = llvmCodeTheta m theta
 llvmCode (_, CodePiElimDownElim v ds) = do
   (xs, vs) <- unzip <$> mapM (\d -> newDataLocal $ takeBaseName d) ds
-  -- (xs, vs) <- unzip <$> mapM (const $ newDataLocal "pi-elim-arg") ds
   (fun, castThen) <- llvmCast (Just $ takeBaseName v) v $ toFunPtrType ds
-  -- (fun, castThen) <- llvmCast (Just "pi-elim-fun") v $ toFunPtrType ds
   castThenCall <- castThen $ LLVMCall fun vs
   llvmDataLet' (zip xs ds) $ castThenCall
 llvmCode (_, CodeSigmaElim xs v e) = do
@@ -41,7 +39,6 @@ llvmCode (_, CodeSigmaElim xs v e) = do
   loadContent v structPtrType (zip idxList xs) voidPtr e
 llvmCode (_, CodeUpIntro d) = do
   result <- newNameWith $ takeBaseName d
-  -- result <- newNameWith "ans"
   llvmDataLet result d $ LLVMReturn $ LLVMDataLocal result
 llvmCode (_, CodeUpElim x e1 e2) = do
   e1' <- llvmCode e1
@@ -90,7 +87,6 @@ loadContent ::
   -> WithEnv LLVM
 loadContent v bt ixs et cont = do
   (bp, castThen) <- llvmCast (Just $ takeBaseName v) v bt
-  -- (bp, castThen) <- llvmCast (Just "base-pointer") v bt
   cont' <- llvmCode cont
   extractThenFreeThenCont <- loadContent' bp bt et ixs cont'
   castThen extractThenFreeThenCont
@@ -102,9 +98,7 @@ loadContent' ::
   -> [((LLVMData, LowType), Identifier)] -- [(the index of an element, the variable to keep the loaded content)]
   -> LLVM -- continuation
   -> WithEnv LLVM
-loadContent' bp bt _ [] cont
-  -- l <- llvmUncast (Just "base-pointer") bp bt
- = do
+loadContent' bp bt _ [] cont = do
   l <- llvmUncast (Just $ takeBaseName' bp) bp bt
   tmp <- newNameWith' $ Just $ takeBaseName' bp
   return $ commConv tmp l $ LLVMCont (LLVMOpFree (LLVMDataLocal tmp)) cont
@@ -363,9 +357,7 @@ storeContent' ::
 storeContent' _ _ _ [] cont = return cont
 storeContent' bp bt et ((i, d):ids) cont = do
   cont' <- storeContent' bp bt et ids cont
-  -- (locName, loc) <- newDataLocal "store-content-location"
   (locName, loc) <- newDataLocal $ takeBaseName d ++ "-ptr"
-  -- (cast, castThen) <- llvmCast (Just "elem-of-store") d et
   (cast, castThen) <- llvmCast (Just $ takeBaseName d) d et
   let it = indexTypeOf bt
   castThen $
