@@ -256,6 +256,8 @@ distinguishData z (ml, DataSigmaIntro ds) = do
 distinguishData _ d = return ([], d)
 
 -- distinguishのときにtype annotationはいじらなくていいんだろうか？大丈夫そう？
+-- 大丈夫そう。だって、annotationのほうは実際のコードには反映されていないから。
+-- ここのannotationはあくまでlinearizeをおこなうときに必要な情報を保持しているだけで、実際のコードとは関係ない。
 distinguishCode :: Identifier -> CodePlus -> WithEnv ([Identifier], CodePlus)
 distinguishCode z (ml, CodeTheta theta) = do
   (vs, theta') <- distinguishTheta z theta

@@ -386,10 +386,11 @@ withHeaderRelevant' t relVar ((x, (x1, x2)):chain) cont = do
   -- (sigVarName, sigVar) <- newDataUpsilon
   (sigVarName, sigVar) <- newDataUpsilonWith "sig"
   let varX = toDataUpsilon (x, Nothing)
+  retPairType <- returnPairType t t
   return $
     ( ml
     , CodeUpElim
-        (sigVarName, undefined)
+        (sigVarName, retPairType)
         (ml, CodePiElimDownElim relVar [varX])
         (ml, CodeSigmaElim [(x1, t), (x2, t)] sigVar cont'))
 
@@ -401,6 +402,17 @@ bindLet ((x, e):xes) cont = do
 
 returnUpsilon :: Identifier -> CodePlus
 returnUpsilon x = (Nothing, CodeUpIntro (Nothing, DataUpsilon x))
+
+-- cartesianSigma ::
+--      Identifier
+--   -> Maybe Loc
+--   -> [Either CodePlus (Identifier, CodePlus)]
+--   -> WithEnv DataPlus
+returnPairType :: CodePlus -> CodePlus -> WithEnv CodePlus
+returnPairType t1 t2 = do
+  name <- newNameWith "copy"
+  v <- cartesianSigma name Nothing [Left t1, Left t2]
+  return (Nothing, CodeUpIntro v)
 
 returnCartesianImmediate :: WithEnv CodePlus
 returnCartesianImmediate = do
@@ -791,7 +803,7 @@ polarizeEvalIO m = do
       -- IO Top == Top -> (Bottom, Top)
       evalArgWithZero <- callClosure m arg' [toTermInt64 0]
       retImmType <- returnCartesianImmediate
-      retImmPairType <- undefined
+      retImmPairType <- returnPairType retImmType retImmType
       makeClosure
         (Just "unsafe.eval-io")
         []
