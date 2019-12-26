@@ -252,13 +252,14 @@ linearize _ (_, CodeSigmaElim _ _ _) = do
   -- -- ys ++ xtsについてlinearizeすると、それはそれで別に、たんに変数のcopyが遅れるだでけあるような。
   -- cont' <- linearize xts' cont
   -- withHeader xts (m, CodeSigmaElim ys d cont')
-linearize xts e@(m, CodeUpElim x e1 e2) = do
-  let as = filter (`notElem` varCode e) $ map fst xts -- `a` here stands for affine (list of variables that are used in the affine way)
-  let xts1' = filter (\(y, _) -> y `notElem` as) xts
-  e1' <- linearize xts1' e1
-  let xts2' = filter (\(y, _) -> y `notElem` x : as) xts
-  e2' <- linearize xts2' e2
-  withHeader xts (m, CodeUpElim x e1' e2')
+linearize _ (_, CodeUpElim _ _ _) = do
+  undefined
+  -- let as = filter (`notElem` varCode e) $ map fst xts -- `a` here stands for affine (list of variables that are used in the affine way)
+  -- let xts1' = filter (\(y, _) -> y `notElem` as) xts
+  -- e1' <- linearize xts1' e1
+  -- let xts2' = filter (\(y, _) -> y `notElem` x : as) xts
+  -- e2' <- linearize xts2' e2
+  -- withHeader xts (m, CodeUpElim x e1' e2')
 linearize xts e@(m, CodeEnumElim d les) = do
   let (ls, es) = unzip les
   let xts' = filter (\(x, _) -> x `notElem` varCode e) xts
@@ -278,10 +279,10 @@ withHeader' [] e = return e
 withHeader' ((x, t, []):xtzss) e = do
   e' <- withHeader' xtzss e
   withHeaderAffine x t e'
-withHeader' ((x, _, [z]):xtzss) e = do
+withHeader' ((x, t, [z]):xtzss) e = do
   e' <- withHeader' xtzss e -- already linear.
   let ml = Nothing
-  return (ml, CodeUpElim z (ml, CodeUpIntro (ml, DataUpsilon x)) e')
+  return (ml, CodeUpElim (z, t) (ml, CodeUpIntro (ml, DataUpsilon x)) e')
 withHeader' ((x, t, (z1:z2:zs)):xtzss) e = do
   e' <- withHeader' xtzss e
   withHeaderRelevant x t z1 z2 zs e'
@@ -296,7 +297,7 @@ withHeaderAffine :: Identifier -> CodePlus -> CodePlus -> WithEnv CodePlus
 withHeaderAffine x t e = do
   hole <- newNameWith "unit"
   discardUnusedVar <- toAffineApp Nothing x t
-  return (Nothing, CodeUpElim hole discardUnusedVar e)
+  return (Nothing, CodeUpElim (hole, t) discardUnusedVar e)
 
 -- withHeaderRelevant x t [x1, ..., x{N}] e ~>
 --   bind exp := t in
@@ -327,10 +328,11 @@ withHeaderRelevant x t x1 x2 xs e = do
   -- 別にSigmaElimにannotationをあたえていても、それを使うってわけじゃないから問題ないのか。
   rel <- withHeaderRelevant' t relVar linearChain e
   retImmType <- returnCartesianImmediate
+  retUnivType <- returnCartesianUniv
   return
     ( ml
     , CodeUpElim
-        expVarName
+        (expVarName, retUnivType)
         t
         ( ml
         , CodeSigmaElim
@@ -387,7 +389,7 @@ withHeaderRelevant' t relVar ((x, (x1, x2)):chain) cont = do
   return $
     ( ml
     , CodeUpElim
-        sigVarName
+        (sigVarName, undefined)
         (ml, CodePiElimDownElim relVar [varX])
         (ml, CodeSigmaElim [(x1, t), (x2, t)] sigVar cont'))
 
@@ -395,7 +397,7 @@ bindLet :: Binder -> CodePlus -> CodePlus
 bindLet [] cont = cont
 bindLet ((x, e):xes) cont = do
   let cont' = bindLet xes cont
-  (fst cont', CodeUpElim x e cont')
+  (fst cont', CodeUpElim (x, undefined) e cont')
 
 returnUpsilon :: Identifier -> CodePlus
 returnUpsilon x = (Nothing, CodeUpIntro (Nothing, DataUpsilon x))
@@ -647,10 +649,11 @@ toAffineApp ml x e = do
   (affVarName, affVar) <- newDataUpsilonWith "aff"
   (relVarName, _) <- newDataUpsilonWith "rel"
   retImmType <- returnCartesianImmediate
+  retUnivType <- returnCartesianUniv
   return
     ( ml
     , CodeUpElim
-        expVarName
+        (expVarName, retUnivType)
         e
         ( Just (111, 222)
         , CodeSigmaElim
@@ -668,10 +671,11 @@ toRelevantApp ml x e = do
   (affVarName, _) <- newDataUpsilonWith "rel-app-aff"
   (relVarName, relVar) <- newDataUpsilonWith "rel-app-rel"
   retImmType <- returnCartesianImmediate
+  retUnivType <- returnCartesianUniv
   return
     ( ml
     , CodeUpElim
-        expVarName
+        (expVarName, retUnivType)
         e
         ( ml
         , CodeSigmaElim
@@ -787,6 +791,7 @@ polarizeEvalIO m = do
       -- IO Top == Top -> (Bottom, Top)
       evalArgWithZero <- callClosure m arg' [toTermInt64 0]
       retImmType <- returnCartesianImmediate
+      retImmPairType <- undefined
       makeClosure
         (Just "unsafe.eval-io")
         []
@@ -794,7 +799,7 @@ polarizeEvalIO m = do
         [arg]
         ( ml
         , CodeUpElim
-            sig
+            (sig, retImmPairType)
             evalArgWithZero
             ( ml
             , CodeSigmaElim
