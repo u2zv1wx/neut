@@ -263,13 +263,13 @@ distinguishCode z (ml, CodePiElimDownElim d ds) = do
   (vs, d') <- distinguishData z d
   (vss, ds') <- unzip <$> mapM (distinguishData z) ds
   return (vs ++ concat vss, (ml, CodePiElimDownElim d' ds'))
-distinguishCode z (ml, CodeSigmaElim xs d e) = do
+distinguishCode z (ml, CodeSigmaElim xts d e) = do
   (vs1, d') <- distinguishData z d
-  if z `elem` xs
-    then return (vs1, (ml, CodeSigmaElim xs d' e))
+  if z `elem` map fst xts
+    then return (vs1, (ml, CodeSigmaElim xts d' e))
     else do
       (vs2, e') <- distinguishCode z e
-      return (vs1 ++ vs2, (ml, CodeSigmaElim xs d' e'))
+      return (vs1 ++ vs2, (ml, CodeSigmaElim xts d' e'))
 distinguishCode z (ml, CodeUpIntro d) = do
   (vs, d') <- distinguishData z d
   return (vs, (ml, CodeUpIntro d'))
