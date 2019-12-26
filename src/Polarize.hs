@@ -219,31 +219,17 @@ callClosure m e es = do
 
 -- e' <- linearize xts eのとき、e'は、eとbeta-equivalentであり、かつ、xtsに含まれる変数の使用がpractically linearであるようなterm.
 linearize :: [(Identifier, CodePlus)] -> CodePlus -> WithEnv CodePlus
-linearize _ (_, CodeSigmaElim _ _ _) = do
-  undefined
-  -- let xts' = filter (\(x, _) -> x `notElem` ys ++ varCode e) xts -- eで使用されていない変数は「こっち」でfreeするので不要
-  -- -- xts'は、sigmaElimで束縛されておらず、かつ、eに自由変数として出現しないもの。
-  -- -- eからみた自由変数はeのほうでfreeするので、contはその変数がすでに処理されたものとみなして処理をつづけることができる。
-  -- -- eの中で使用されていない変数をxtsから除外することでより早い段階でfreeを挿入することができるようになる。
-  -- -- （使わない変数をずっと保持して関数の末尾になってようやくfreeする、なんてのは無駄なのでこれは最適化として機能する）
-  -- -- CodeSigmaElimだけでなくUpElim, EnumElimに対しても同様の最適化をおこなっている。
-  -- -- いや、ysはむしろcontのなかでlinearに使用されているべきなのでは。確かに。
-  -- -- じゃあ正解は、linearize {ys ++ xtsのうちeに自由に出現しないもの} contとかになる？
-  -- -- dのなかにどう変数が出現するかによっても話が変わってくる気がする。ここは結構むずいぞ。
-  -- -- 変数ysが追加されるのは正しいっぽくて、これはlinearizeを呼び出している箇所での微妙な調整を不要にしてくれる。これはいかにも正しそう。
-  -- -- contが{ys ++ xtsのうちeに自由に出現しないもの}についてlinearであったとして、ここで追加でeについてのaffineなヘッダを追加すると、
-  -- -- 一見それっぽいんだけど、dがどう変数を使用しているかっていう問題が出てくる気がする。
-  -- -- 関係しそうな要素は、
-  -- --   ys
-  -- --   xtsのうちcontに自由に出現しないもの
-  -- --   xtsのうちdに自由に出現するもの
-  -- -- というあたり。dに自由に出現する変数についての処理も「こっち」でやることになる、ということか？
-  -- -- contについては、(ys ++ xs) \ {dに自由に出現するもの, contに自由に出現するもの}
-  -- -- とか？前者は「こっち」のrelで処理して、後者は「こっち」のaffで処理？
-  -- -- たんにcontをysについてlinearizeしたうえで全体をxtsについてwithHeaderしたらいいだけじゃね？
-  -- -- ys ++ xtsについてlinearizeすると、それはそれで別に、たんに変数のcopyが遅れるだでけあるような。
-  -- cont' <- linearize xts' cont
-  -- withHeader xts (m, CodeSigmaElim ys d cont')
+linearize xts (m, CodeSigmaElim yts d e) = do
+  let xts' = filter (\(x, _) -> x `elem` varCode e) xts
+  -- xts'は、xtsのうち実際にeで使用されている変数の集合。実際に使用されているのでeのなかでcopyが起こりうる。
+  -- eのなかで使用されていないものを放置するのは、それらはなるべく早くfreeしたほうが空間的に効率的だから。
+  -- copyは遅ければ遅いほど効率的だし、freeは早ければ早いほど効率的。
+  -- なお、sigmaの型はすべてclosedなので、ytsのなかに変な自由変数が現れたりすることはない。
+  -- つまり、yts = [(y1, ret t1), ..., (yn, ret tn)]とおくと、Sigma (y1 : t1, ..., yn : tn)は
+  -- closedなsigmaになっている。
+  e' <- linearize (xts' ++ yts) e
+  -- eのなかで使用されておらず、かつdのなかでも使用されていないものなども、ここで適切にheaderを挿入することで対応する。
+  withHeader xts (m, CodeSigmaElim yts d e')
 linearize _ (_, CodeUpElim _ _ _) = do
   undefined
   -- let as = filter (`notElem` varCode e) $ map fst xts -- `a` here stands for affine (list of variables that are used in the affine way)
