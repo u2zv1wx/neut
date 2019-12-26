@@ -86,11 +86,9 @@ polarize (m, TermEnumIntro l) = do
 polarize (m, TermEnumElim e bs) = do
   let (cs, es) = unzip bs
   es' <- mapM polarize es
-  -- (yts, y) <- polarize' e
   (yName, e', y) <- polarize' e
   let ml = snd $ obtainInfoMeta m
   retImmType <- returnCartesianImmediate
-  -- return $ bindLet yts (ml, CodeEnumElim y (zip cs es'))
   return $ bindLet [((yName, retImmType), e')] (ml, CodeEnumElim y (zip cs es'))
 polarize (m, TermArray _ _ _) = do
   let ml = snd $ obtainInfoMeta m
@@ -104,9 +102,7 @@ polarize (m, TermArrayIntro k les) = do
   arrayType <-
     cartesianSigma name ml $ map Left $ replicate (length les) retKindType
   let (ls, es) = unzip les
-  -- (xess, xs) <- unzip3 <$> mapM polarize' es
   (zs, es', xs) <- unzip3 <$> mapM polarize' es
-  -- arrayの中身はすべてimmediate
   retImmType <- returnCartesianImmediate
   return $
     bindLet (zip (zip zs (repeat retImmType)) es') $
@@ -145,7 +141,6 @@ obtainFreeVarList ::
 obtainFreeVarList xs e = do
   filter (\(x, _, _) -> x `notElem` xs) $ varTermPlus e
 
--- polarize'がつくった変数はlinearに使用するようにすること。
 polarize' :: TermPlus -> WithEnv (Identifier, CodePlus, DataPlus)
 polarize' e@(m, _) = do
   e' <- polarize e
@@ -361,7 +356,6 @@ withHeaderRelevant' _ _ [] cont = return cont
 withHeaderRelevant' t relVar ((x, (x1, x2)):chain) cont = do
   let ml = fst cont
   cont' <- withHeaderRelevant' t relVar chain cont
-  -- (sigVarName, sigVar) <- newDataUpsilon
   (sigVarName, sigVar) <- newDataUpsilonWith "sig"
   let varX = toDataUpsilon (x, Nothing)
   retPairType <- returnPairType t t
@@ -571,8 +565,6 @@ affineSigma thetaName ml mxts = do
       yts <- mapM (newNameWithType . snd) xts
       let body = bindLet (zip yts as) (ml, CodeUpIntro (ml, DataSigmaIntro []))
       body' <- linearize xts body
-      -- liftIO $ putStrLn $ Pr.ppShow body'
-      -- insCodeEnv thetaName [z] (ml, CodeSigmaElim (map fst xts) varZ body')
       insCodeEnv thetaName [z] (ml, CodeSigmaElim xts varZ body')
       return theta
 
@@ -617,12 +609,9 @@ relevantSigma thetaName ml mxts = do
       as <- forM xts $ \(x, e) -> toRelevantApp ml x e
       -- pairVarNameList == [pair-1, ...,  pair-n]
       (pairVarNameList, pairVarTypeList) <- unzip <$> mapM toPairInfo xts
-      -- (pairVarNameList, pairVarList) <-
-      --   unzip <$> mapM (const $ newDataUpsilonWith "pair") xts
       transposedPair <- transposeSigma pairVarTypeList
       let body = bindLet (zip pairVarNameList as) transposedPair
       body' <- linearize xts body
-      -- insCodeEnv thetaName [z] (ml, CodeSigmaElim (map fst xts) varZ body')
       insCodeEnv thetaName [z] (ml, CodeSigmaElim xts varZ body')
       return theta
 
