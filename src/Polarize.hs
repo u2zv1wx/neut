@@ -107,7 +107,10 @@ polarize (m, TermArray _ _ _) = do
   let retTau = (ml, CodeUpIntro tau)
   let retArrVar = (ml, CodeUpIntro arrVar)
   arrayClsType <-
-    cartesianSigma "ARRAYCLS" ml [Right (arrVarName, retTau), Left retArrVar]
+    cartesianSigma
+      "array-closure"
+      ml
+      [Right (arrVarName, retTau), Left retArrVar]
   return (ml, CodeUpIntro arrayClsType)
 polarize (m, TermArrayIntro k les) = do
   let ml = snd $ obtainInfoMeta m
