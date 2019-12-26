@@ -230,17 +230,17 @@ linearize xts (m, CodeSigmaElim yts d e) = do
   e' <- linearize (xts' ++ yts) e
   -- eのなかで使用されておらず、かつdのなかでも使用されていないものなども、ここで適切にheaderを挿入することで対応する。
   withHeader xts (m, CodeSigmaElim yts d e')
-linearize _ (_, CodeUpElim _ _ _) = do
-  undefined
-  -- let as = filter (`notElem` varCode e) $ map fst xts -- `a` here stands for affine (list of variables that are used in the affine way)
-  -- let xts1' = filter (\(y, _) -> y `notElem` as) xts
-  -- e1' <- linearize xts1' e1
-  -- let xts2' = filter (\(y, _) -> y `notElem` x : as) xts
-  -- e2' <- linearize xts2' e2
-  -- withHeader xts (m, CodeUpElim x e1' e2')
-linearize xts e@(m, CodeEnumElim d les) = do
+linearize xts (m, CodeUpElim xt e1 e2) = do
+  let xts2' = filter (\(x, _) -> x `elem` varCode e2) xts
+  e2' <- linearize (xts2' ++ [xt]) e2
+  let xts1' = filter (\(x, _) -> x `elem` varCode e1) xts
+  e1' <- linearize xts1' e1
+  withHeader xts (m, CodeUpElim xt e1' e2')
+linearize xts (m, CodeEnumElim d les) = do
   let (ls, es) = unzip les
-  let xts' = filter (\(x, _) -> x `notElem` varCode e) xts
+  -- xts'は、xtsのうちすくなくともひとつのbranchにおいて使われているような変数の集合。
+  -- どのbranchでも使用されていない変数はbranchの外側で先にfreeしてしまう。
+  let xts' = filter (\(x, _) -> x `elem` concatMap varCode es) xts
   es' <- mapM (linearize xts') es
   withHeader xts (m, CodeEnumElim d $ zip ls es')
 linearize xts e = withHeader xts e -- eのなかにCodePlusが含まれないケース
