@@ -266,7 +266,7 @@ withHeader' ((x, t, (z1:z2:zs)):xtzss) e = do
 --   e
 withHeaderAffine :: Identifier -> CodePlus -> CodePlus -> WithEnv CodePlus
 withHeaderAffine x t e = do
-  hole <- newNameWith "var"
+  hole <- newNameWith "unit"
   discardUnusedVar <- toAffineApp Nothing x t
   return (Nothing, CodeUpElim hole discardUnusedVar e)
 
@@ -374,7 +374,7 @@ affineImmediate ml = do
   case lookup thetaName cenv of
     Just _ -> return theta
     Nothing -> do
-      immVarName <- newNameWith "var"
+      immVarName <- newNameWith "arg"
       insCodeEnv
         thetaName
         [immVarName]
@@ -389,7 +389,7 @@ relevantImmediate ml = do
   case lookup thetaName cenv of
     Just _ -> return theta
     Nothing -> do
-      (immVarName, immVar) <- newDataUpsilonWith "imm"
+      (immVarName, immVar) <- newDataUpsilonWith "arg"
       insCodeEnv
         thetaName
         [immVarName]
@@ -496,7 +496,7 @@ affineSigma thetaName ml mxes = do
       (z, varZ) <- newDataUpsilonWith "arg"
       -- As == [APP-1, ..., APP-n]   (`a` here stands for `app`)
       as <- forM xes $ \(x, e) -> toAffineApp ml x e
-      ys <- mapM (const $ newNameWith "var") xes
+      ys <- mapM (const $ newNameWith "unit") xes
       let body = bindLet (zip ys as) (ml, CodeUpIntro (ml, DataSigmaIntro []))
       body' <- linearize xes body
       -- liftIO $ putStrLn $ Pr.ppShow body'

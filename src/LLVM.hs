@@ -29,8 +29,10 @@ toLLVM mainTerm = do
 llvmCode :: CodePlus -> WithEnv LLVM
 llvmCode (m, CodeTheta theta) = llvmCodeTheta m theta
 llvmCode (_, CodePiElimDownElim v ds) = do
-  (xs, vs) <- unzip <$> mapM (const $ newDataLocal "pi-elim-arg") ds
-  (fun, castThen) <- llvmCast (Just "pi-elim-fun") v $ toFunPtrType ds
+  (xs, vs) <- unzip <$> mapM (\d -> newDataLocal $ takeBaseName d) ds
+  -- (xs, vs) <- unzip <$> mapM (const $ newDataLocal "pi-elim-arg") ds
+  (fun, castThen) <- llvmCast (Just $ takeBaseName v) v $ toFunPtrType ds
+  -- (fun, castThen) <- llvmCast (Just "pi-elim-fun") v $ toFunPtrType ds
   castThenCall <- castThen $ LLVMCall fun vs
   llvmDataLet' (zip xs ds) $ castThenCall
 llvmCode (_, CodeSigmaElim xs v e) = do
@@ -361,8 +363,10 @@ storeContent' ::
 storeContent' _ _ _ [] cont = return cont
 storeContent' bp bt et ((i, d):ids) cont = do
   cont' <- storeContent' bp bt et ids cont
-  (locName, loc) <- newDataLocal "store-content-location"
-  (cast, castThen) <- llvmCast (Just "elem-of-store") d et
+  -- (locName, loc) <- newDataLocal "store-content-location"
+  (locName, loc) <- newDataLocal $ takeBaseName d ++ "-ptr"
+  -- (cast, castThen) <- llvmCast (Just "elem-of-store") d et
+  (cast, castThen) <- llvmCast (Just $ takeBaseName d) d et
   let it = indexTypeOf bt
   castThen $
     LLVMLet
