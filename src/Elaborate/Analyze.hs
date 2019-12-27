@@ -107,8 +107,6 @@ simp ((e1, e2):cs)
   , (m2, PreTermArrayElim k2 (_, PreTermUpsilon g) eps2) <- e2
   , k1 == k2
   , f == g = simpMetaRet [(m1, m2)] $ simp $ (eps1, eps2) : cs
--- これ言えなくない？たとえば、f = g = lam (_ _ _). 3とかだったら、
--- f @ (1, 2, 3) == g @ (4, 5, 6) となるはず。
 simp ((e1, e2):cs)
   | (m11, PreTermPiElim (m12, PreTermUpsilon f) es1) <- e1
   , (m21, PreTermPiElim (m22, PreTermUpsilon g) es2) <- e2
@@ -132,90 +130,104 @@ simp ((e1, e2):cs) = do
   let ms2 = asStuckedTerm e2
   let (_, fmvs1) = varPreTermPlus e1
   let (_, fmvs2) = varPreTermPlus e2
-  let fmvs = fmvs1 ++ fmvs2
-  -- subst h ~> eをつくるときにはeのなかにhが含まれていないことをチェックすること
   case (ms1, ms2) of
-    (Just (StuckHole h1), _)
-      | h1 `notElem` fmvs2 -> do
-        cs' <- simpMetaRet [(fst e1, fst e2)] $ simp cs
-        return $ Enriched (e1, e2) fmvs (ConstraintImmediate h1 e2) : cs'
-    (_, Just (StuckHole h2))
-      | h2 `notElem` fmvs1 -> do simp $ (e2, e1) : cs
-    (Just (StuckPiElimStrict h1 exs1), _) -> do
-      simpPatIfPossible ms1 ms2 h1 exs1 $ (e1, e2) : cs
+    (Just (StuckHole h1), _) -> simpHole h1 fmvs1 fmvs2 e1 e2 cs
+    (_, Just (StuckHole h2)) -> simpHole h2 fmvs2 fmvs1 e2 e1 cs
+    (Just (StuckPiElimStrict h1 exs1), _) ->
+      simpStuckStrict h1 exs1 $ (e1, e2) : cs
     (_, Just (StuckPiElimStrict h2 exs2)) ->
-      simpPatIfPossible ms2 ms1 h2 exs2 $ (e2, e1) : cs
-    _ -> do
-      simpStuck ms1 ms2 $ (e1, e2) : cs
+      simpStuckStrict h2 exs2 $ (e2, e1) : cs
+    (Just (StuckPiElim h1 ies1), Nothing) ->
+      simpFlexRigid fmvs1 fmvs2 h1 ies1 e1 e2 cs
+    (Nothing, Just (StuckPiElim h2 ies2)) ->
+      simpFlexRigid fmvs2 fmvs1 h2 ies2 e2 e1 cs
+    (Just (StuckPiElim h1 ies1), Just (StuckPiElim {})) ->
+      simpFlexFlex fmvs1 fmvs2 h1 ies1 e1 e2 cs
+    _ -> simpOther (fmvs1 ++ fmvs2) e1 e2 cs
 
-simpPatIfPossible ::
-     Maybe Stuck
-  -> Maybe Stuck
-  -> Identifier
+simpHole ::
+     Hole
+  -> [Hole]
+  -> [Hole]
+  -> (PreMeta, PreTerm)
+  -> (PreMeta, PreTerm)
+  -> [PreConstraint]
+  -> WithEnv [EnrichedConstraint]
+simpHole h1 fmvs1 fmvs2 e1 e2 cs
+  | h1 `notElem` fmvs2 = do
+    cs' <- simpMetaRet [(fst e1, fst e2)] $ simp cs
+    let fmvs = fmvs1 ++ fmvs2
+    return $ Enriched (e1, e2) fmvs (ConstraintImmediate h1 e2) : cs'
+  | otherwise = simpOther (fmvs1 ++ fmvs2) e1 e2 cs
+
+simpStuckStrict ::
+     Identifier
   -> [[(PreTermPlus, Identifier)]]
   -> [(PreTermPlus, PreTermPlus)]
   -> WithEnv [EnrichedConstraint]
-simpPatIfPossible _ _ _ _ [] = return []
-simpPatIfPossible ms1 ms2 h1 exs1 ((e1, e2):cs) =
-  if all (isSolvable e2 h1) (map (map snd) exs1)
-    then do
-      cs' <- simpMetaRet [(fst e1, fst e2)] $ simp cs
-      let (_, fmvs1) = varPreTermPlus e1
-      let (_, fmvs2) = varPreTermPlus e2
-      let fmvs = fmvs1 ++ fmvs2
-      let es1 = map (map fst) exs1
-      return $ Enriched (e1, e2) fmvs (ConstraintPattern h1 es1 e2) : cs'
-    else do
-      simpStuck ms1 ms2 $ (e1, e2) : cs
-
-simpStuck ::
-     Maybe Stuck
-  -> Maybe Stuck
-  -> [(PreTermPlus, PreTermPlus)]
-  -> WithEnv [EnrichedConstraint]
-simpStuck _ _ [] = return []
-simpStuck ms1 ms2 ((e1, e2):cs) = do
+simpStuckStrict _ _ [] = return []
+simpStuckStrict h1 exs1 ((e1, e2):cs) = do
   let (_, fmvs1) = varPreTermPlus e1
   let (_, fmvs2) = varPreTermPlus e2
   let fmvs = fmvs1 ++ fmvs2
-  case (ms1, ms2) of
-    (Just (StuckPiElimStrict h1 exs1), _)
-      | h1 `notElem` fmvs2 -> do
-        cs' <- simpMetaRet [(fst e1, fst e2)] $ simp cs
-        let es1 = map (map fst) exs1
-        return $ Enriched (e1, e2) fmvs (ConstraintQuasiPattern h1 es1 e2) : cs'
-    (_, Just (StuckPiElimStrict h2 _))
-      | h2 `notElem` fmvs1 -> do simpStuck ms2 ms1 $ (e2, e1) : cs
-    (Just (StuckPiElim h1 ies1), Nothing)
-      | h1 `notElem` fmvs2 -> do
-        cs' <- simpMetaRet [(fst e1, fst e2)] $ simp cs
-        let c = Enriched (e1, e2) fmvs $ ConstraintFlexRigid h1 ies1 e2
-        return $ c : cs'
-    (Nothing, Just (StuckPiElim h2 _))
-      | h2 `notElem` fmvs1 -> do simpStuck ms2 ms1 $ (e2, e1) : cs
-    (Just (StuckPiElim h1 ies1), Just (StuckPiElim _ _))
-      | h1 `notElem` fmvs2 -> do
-        cs' <- simpMetaRet [(fst e1, fst e2)] $ simp cs
-        let c = Enriched (e1, e2) fmvs $ ConstraintFlexFlex h1 ies1 e2
-        return $ c : cs'
-    (Just (StuckPiElim _ _), Just (StuckPiElim h2 ies2))
-      | h2 `notElem` fmvs1 -> do
-        cs' <- simpMetaRet [(fst e1, fst e2)] $ simp cs
-        let c = Enriched (e1, e2) fmvs $ ConstraintFlexFlex h2 ies2 e2
-        return $ c : cs'
-    _ -> do
-      cs' <- simpMetaRet [(fst e1, fst e2)] $ simp cs
-      let c = Enriched (e1, e2) fmvs $ ConstraintOther
-      return $ c : cs'
+  let es1 = map (map fst) exs1
+  cs' <- simpMetaRet [(fst e1, fst e2)] $ simp cs
+  if all (isSolvable e2 h1) (map (map snd) exs1)
+    then return $ Enriched (e1, e2) fmvs (ConstraintPattern h1 es1 e2) : cs'
+    else return $
+         Enriched (e1, e2) fmvs (ConstraintQuasiPattern h1 es1 e2) : cs'
+
+simpFlexRigid ::
+     [Hole]
+  -> [Hole]
+  -> Hole
+  -> [[PreTermPlus]]
+  -> (PreMeta, PreTerm)
+  -> (PreMeta, PreTerm)
+  -> [PreConstraint]
+  -> WithEnv [EnrichedConstraint]
+simpFlexRigid fmvs1 fmvs2 h1 ies1 e1 e2 cs
+  | h1 `notElem` fmvs2 = do
+    cs' <- simpMetaRet [(fst e1, fst e2)] $ simp cs
+    let c = Enriched (e1, e2) (fmvs1 ++ fmvs2) $ ConstraintFlexRigid h1 ies1 e2
+    return $ c : cs'
+simpFlexRigid fmvs1 fmvs2 _ _ e1 e2 cs = simpOther (fmvs1 ++ fmvs2) e1 e2 cs
+
+simpFlexFlex ::
+     [Hole]
+  -> [Hole]
+  -> Hole
+  -> [[PreTermPlus]]
+  -> (PreMeta, PreTerm)
+  -> (PreMeta, PreTerm)
+  -> [PreConstraint]
+  -> WithEnv [EnrichedConstraint]
+simpFlexFlex fmvs1 fmvs2 h1 ies1 e1 e2 cs
+  | h1 `notElem` fmvs2 = do
+    cs' <- simpMetaRet [(fst e1, fst e2)] $ simp cs
+    let c = Enriched (e1, e2) (fmvs1 ++ fmvs2) $ ConstraintFlexFlex h1 ies1 e2
+    return $ c : cs'
+simpFlexFlex fmvs1 fmvs2 _ _ e1 e2 cs = simpOther (fmvs1 ++ fmvs2) e1 e2 cs
+
+simpOther ::
+     [Hole]
+  -> PreTermPlus
+  -> PreTermPlus
+  -> [PreConstraint]
+  -> WithEnv [EnrichedConstraint]
+simpOther fmvs e1 e2 cs = do
+  cs' <- simpMetaRet [(fst e1, fst e2)] $ simp cs
+  let c = Enriched (e1, e2) fmvs $ ConstraintOther
+  return $ c : cs'
 
 simpMetaRet ::
      [(PreMeta, PreMeta)]
   -> WithEnv [EnrichedConstraint]
   -> WithEnv [EnrichedConstraint]
 simpMetaRet mms comp = do
-  cs1 <- mapM (\(m1, m2) -> simpMeta m1 m2) mms
+  cs1 <- concat <$> mapM (\(m1, m2) -> simpMeta m1 m2) mms
   cs2 <- comp
-  return $ concat cs1 ++ cs2
+  return $ cs1 ++ cs2
 
 simpMeta :: PreMeta -> PreMeta -> WithEnv [EnrichedConstraint]
 simpMeta (PreMetaTerminal _) (PreMetaTerminal _) = return []
@@ -281,13 +293,10 @@ affineCheck' _ [] _ = True
 affineCheck' xs (y:ys) fvs =
   if y `notElem` fvs
     then affineCheck' xs ys fvs
-    else null (isLinear y xs) && affineCheck' xs ys fvs
+    else isLinear y xs && affineCheck' xs ys fvs
 
-isLinear :: Identifier -> [Identifier] -> [Identifier]
-isLinear x xs =
-  if length (filter (== x) xs) == 1
-    then []
-    else [x]
+isLinear :: Identifier -> [Identifier] -> Bool
+isLinear x xs = length (filter (== x) xs) == 1
 
 interpretAsUpsilon :: PreTermPlus -> Maybe Identifier
 interpretAsUpsilon (_, PreTermUpsilon x) = Just x
