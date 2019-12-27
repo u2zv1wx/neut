@@ -11,6 +11,7 @@ import Data.Basic
 import Data.Code
 import Data.Constraint
 import Data.LLVM
+import Data.PreTerm
 import Data.Tree
 import Data.WeakTerm
 
@@ -175,39 +176,33 @@ isDefinedEnumName name = do
   let enumNameList = map fst $ enumEnv env
   return $ name `elem` enumNameList
 
-insConstraintEnv :: WeakTermPlus -> WeakTermPlus -> WithEnv ()
+insConstraintEnv :: PreTermPlus -> PreTermPlus -> WithEnv ()
 insConstraintEnv t1 t2 =
   modify (\e -> e {constraintEnv = (t1, t2) : constraintEnv e})
 
-wrap :: a -> WithEnv (WeakMeta, a)
-wrap a = do
-  meta <- newMeta
-  return (meta, a)
-
-newHoleOfType :: WeakTermPlus -> WithEnv WeakTermPlus
-newHoleOfType t = do
-  h <- newNameWith "hole"
-  m <- newMetaOfType t
-  return (m, WeakTermZeta h)
-
-newMeta :: WithEnv WeakMeta
-newMeta = do
-  ref <- newWeakTermRef Nothing
-  return $ WeakMetaNonTerminal ref Nothing
-
-newMetaTerminal :: WeakMeta
-newMetaTerminal = WeakMetaTerminal Nothing
-
-newMetaOfType :: WeakTermPlus -> WithEnv WeakMeta
-newMetaOfType t = do
-  ref <- newWeakTermRef $ Just t
-  return $ WeakMetaNonTerminal ref Nothing
-
-toWeakMeta :: TreeMeta -> WithEnv WeakMeta
-toWeakMeta m = do
-  ref <- newWeakTermRef Nothing
-  return $ WeakMetaNonTerminal ref (treeMetaLocation m)
-
+-- wrap :: a -> WithEnv (WeakMeta, a)
+-- wrap a = do
+--   meta <- newMeta
+--   return (meta, a)
+-- newHoleOfType :: WeakTermPlus -> WithEnv WeakTermPlus
+-- newHoleOfType t = do
+--   h <- newNameWith "hole"
+--   m <- newMetaOfType t
+--   return (m, WeakTermZeta h)
+-- newMeta :: WithEnv WeakMeta
+-- newMeta = do
+--   ref <- newWeakTermRef Nothing
+--   return $ WeakMetaNonTerminal ref Nothing
+-- newMetaTerminal :: WeakMeta
+-- newMetaTerminal = WeakMetaTerminal Nothing
+-- newMetaOfType :: WeakTermPlus -> WithEnv WeakMeta
+-- newMetaOfType t = do
+--   ref <- newWeakTermRef $ Just t
+--   return $ WeakMetaNonTerminal ref Nothing
+-- toWeakMeta :: TreeMeta -> WithEnv WeakMeta
+-- toWeakMeta m = do
+--   ref <- newWeakTermRef Nothing
+--   return $ WeakMetaNonTerminal ref (treeMetaLocation m)
 getTarget :: WithEnv Target
 getTarget = do
   mtarget <- gets target
