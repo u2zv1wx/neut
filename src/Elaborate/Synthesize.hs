@@ -35,6 +35,7 @@ synthesize q = do
       senv <- gets substEnv
       p' $ map fst senv
       p $ "q.size = " ++ show (Q.size q)
+      -- ここでe1, e2の定義を展開してみるとよいのかもしれない。
       throwError $ "cannot simplify:\n" ++ Pr.ppShow (e1, e2)
     Nothing -> return ()
 
@@ -95,7 +96,10 @@ resolveHole q h e = do
   p "after compose"
   let rest = Q.deleteMin q
   p $ "before substQueue. len = " ++ show (Q.size rest)
-  substQueue h e rest
+  let (q1, q2) = Q.partition (\(Enriched _ ms _) -> h `elem` ms) rest
+  q1' <- substQueue h e q1
+  synthesize $ q1' `Q.union` q2
+  -- substQueue h e rest
   -- rest' <- substQueue h e rest
   -- p $ "after substQueue. len = " ++ show (Q.size rest')
   -- synthesize rest'
@@ -104,24 +108,17 @@ resolveHole q h e = do
   -- synthesize q1'
   -- synthesize q2
 
-substQueue :: Identifier -> PreTermPlus -> ConstraintQueue -> WithEnv ()
-substQueue h e q
-  -- foo <-
-  --   mapM
-  --     (\(Enriched (e1, e2) _ _) -> do
-  --        let e1' = substPreTermPlus [(h, e)] e1
-  --        let e2' = substPreTermPlus [(h, e)] e2
-  --        return (e1', e2'))
-  --     (Q.toList q)
-  -- analyze foo >>= synthesize
- = do
-  mapM_
-    (\(Enriched (e1, e2) _ _) -> do
-       let e1' = substPreTermPlus [(h, e)] e1
-       let e2' = substPreTermPlus [(h, e)] e2
-       analyze [(e1', e2')] >>= synthesize) $
-    Q.toList q
-  -- return $ Q.fromList $ concat foo
+substQueue ::
+     Identifier -> PreTermPlus -> ConstraintQueue -> WithEnv ConstraintQueue
+substQueue h e q = do
+  cs <-
+    mapM
+      (\(Enriched (e1, e2) _ _) -> do
+         let e1' = substPreTermPlus [(h, e)] e1
+         let e2' = substPreTermPlus [(h, e)] e2
+         return (e1', e2'))
+      (Q.toList q)
+  analyze cs
 
 -- [e, x, y, y, e2, e3, z] ~> [p, x, y, y, q, r, z]  (p, q, r: new variables)
 toVarList :: [PreTermPlus] -> WithEnv [(Identifier, PreTermPlus)]

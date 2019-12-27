@@ -130,6 +130,7 @@ substPreTermPlus sub (m, PreTermTheta t) = do
   (m', PreTermTheta t)
 substPreTermPlus sub (m, PreTermUpsilon x) = do
   let m' = substPreMeta sub m
+  -- このときlookupの結果のmetaとm'とが同一であるって情報を保持する必要があるのでは？
   fromMaybe (m', PreTermUpsilon x) (lookup x sub)
 substPreTermPlus sub (m, PreTermPi xts t) = do
   let m' = substPreMeta sub m
@@ -225,15 +226,16 @@ isReducible :: PreTermPlus -> Bool
 isReducible (_, PreTermTau) = False
 isReducible (_, PreTermTheta _) = False
 isReducible (_, PreTermUpsilon _) = False
-isReducible (_, PreTermPi xts cod) =
-  any isReducible (map snd xts) || isReducible cod
+isReducible (_, PreTermPi _ _) = False
+-- isReducible (_, PreTermPi xts cod) =
+--   any isReducible (map snd xts) || isReducible cod
 isReducible (_, PreTermPiIntro {}) = False
 -- isReducible (_, PreTermPiElim (_, PreTermPiIntro xts _) es)
 --   | length xts == length es
 --   , all isValue es = True
 isReducible (_, PreTermPiElim (_, PreTermPiIntro xts _) es)
   | length xts == length es = True -- 言語はpureなのでvalueじゃなくてもreduceを許す
--- isReducible (_, PreTermPiElim (_, PreTermMu _ _) es) = all isValue es -- muのときだけCBV的な挙動を要求する
+isReducible (_, PreTermPiElim (_, PreTermMu _ _) es) = all isValue es -- muのときだけCBV的な挙動を要求する
 isReducible (_, PreTermPiElim (_, PreTermTheta c) [(_, PreTermIntS _ _), (_, PreTermIntS _ _)])
   | Just (LowTypeIntS _, _) <- asBinaryOpMaybe c = True
 isReducible (_, PreTermPiElim (_, PreTermTheta c) [(_, PreTermIntU _ _), (_, PreTermIntU _ _)])
