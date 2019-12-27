@@ -9,9 +9,9 @@ import qualified Data.PQueue.Min as Q
 import Data.Basic
 import Data.Constraint
 import Data.Env
-import Data.WeakTerm
+import Data.PreTerm
 import Elaborate.Analyze
-import Elaborate.Infer (obtainType)
+import Elaborate.Infer (typeOf)
 
 import qualified Text.Show.Pretty as Pr
 
@@ -35,14 +35,14 @@ synthesize q = do
 
 resolveStuck ::
      ConstraintQueue
-  -> WeakTermPlus
-  -> WeakTermPlus
+  -> PreTermPlus
+  -> PreTermPlus
   -> Hole
-  -> WeakTermPlus
+  -> PreTermPlus
   -> WithEnv ()
 resolveStuck q e1 e2 h e = do
-  e1' <- substWeakTermPlus [(h, e)] e1
-  e2' <- substWeakTermPlus [(h, e)] e2
+  let e1' = substPreTermPlus [(h, e)] e1
+  let e2' = substPreTermPlus [(h, e)] e2
   cs <- simp [(e1', e2')]
   synthesize $ Q.deleteMin q `Q.union` Q.fromList cs
 
@@ -58,7 +58,7 @@ resolveStuck q e1 e2 h e = do
 -- this function replaces all the arguments that are not variable by
 -- fresh variables, and try to resolve the new quasi-pattern ?M @ x @ x @ z @ y == e.
 resolvePiElim ::
-     ConstraintQueue -> Hole -> [[WeakTermPlus]] -> WeakTermPlus -> WithEnv ()
+     ConstraintQueue -> Hole -> [[PreTermPlus]] -> PreTermPlus -> WithEnv ()
 resolvePiElim q m ess e = do
   let lengthInfo = map length ess
   let es = concat ess
@@ -67,27 +67,26 @@ resolvePiElim q m ess e = do
   lamList <- mapM (bindFormalArgs e) xsss
   chain q $ map (resolveHole q m) lamList
 
-resolveHole :: ConstraintQueue -> Hole -> WeakTermPlus -> WithEnv ()
+resolveHole :: ConstraintQueue -> Hole -> PreTermPlus -> WithEnv ()
 resolveHole q h e = do
   senv <- gets substEnv
-  senv' <- compose [(h, e)] senv
-  modify (\env -> env {substEnv = senv'})
+  modify (\env -> env {substEnv = compose [(h, e)] senv})
   let rest = Q.deleteMin q
   let (q1, q2) = Q.partition (\(Enriched _ ms _) -> h `elem` ms) rest
   synthesize q1 -- substitute all the occurrences of h
   synthesize q2
 
 -- [e, x, y, y, e2, e3, z] ~> [p, x, y, y, q, r, z]  (p, q, r: new variables)
-toVarList :: [WeakTermPlus] -> WithEnv [IdentifierPlus]
+toVarList :: [PreTermPlus] -> WithEnv [(Identifier, PreTermPlus)]
 toVarList [] = return []
-toVarList ((_, WeakTermUpsilon x):es) = do
+toVarList ((_, PreTermUpsilon x):es) = do
   xts <- toVarList es
   t <- lookupTypeEnv x
   return $ (x, t) : xts
-toVarList ((m, _):es) = do
+toVarList (e:es) = do
   xts <- toVarList es
   x <- newNameWith "hole"
-  t <- obtainType m
+  let t = typeOf e
   insTypeEnv x t
   return $ (x, t) : xts
 
@@ -163,14 +162,13 @@ lookupAny (h:ks) sub = do
     Just v -> Just (h, v)
     _ -> lookupAny ks sub
 
-bindFormalArgs :: WeakTermPlus -> [[IdentifierPlus]] -> WithEnv WeakTermPlus
+bindFormalArgs :: PreTermPlus -> [[IdentifierPlus]] -> WithEnv PreTermPlus
 bindFormalArgs e [] = return e
 bindFormalArgs e (xts:xtss) = do
-  e'@(m, _) <- bindFormalArgs e xtss
-  cod <- obtainType m
-  let tPi = (newMetaTerminal, WeakTermPi xts cod)
-  meta <- newMetaOfType tPi
-  return (meta, WeakTermPiIntro xts e')
+  e' <- bindFormalArgs e xtss
+  let cod = typeOf e'
+  let tPi = (PreMetaTerminal Nothing, PreTermPi xts cod)
+  return (PreMetaNonTerminal tPi Nothing, PreTermPiIntro xts e')
 
 -- takeByCount [1, 3, 2] [a, b, c, d, e, f, g, h] ~> [[a], [b, c, d], [e, f]]
 takeByCount :: [Int] -> [a] -> [[a]]
