@@ -40,38 +40,17 @@ simp (((m1, PreTermPi [] cod1), (m2, PreTermPi [] cod2)):cs) =
 simp (((m1, PreTermPi ((x1, t1):xts1) cod1), (m2, PreTermPi ((x2, t2):xts2) cod2)):cs) = do
   var1 <- toVar x1 t1
   let m = metaTerminal
-  let (_, pi2) = substPreTermPlus [(x2, var1)] (m, PreTermPi xts2 cod2)
-  csCont <- simp [((m, PreTermPi xts1 cod1), (m, pi2))]
-  cs' <- simpMetaRet [(m1, m2)] $ simp $ (t1, t2) : cs
-  return $ cs' ++ csCont
+  let (xts2', cod2') = substPreTermPlusBindingsWithBody [(x2, var1)] xts2 cod2
+  let tPi1 = (m, PreTermPi xts1 cod1)
+  let tPi2 = (m, PreTermPi xts2' cod2')
+  simpMetaRet [(m1, m2)] $ simp $ (t1, t2) : (tPi1, tPi2) : cs
 simp (((m1, PreTermPiIntro xts1 e1), (m2, PreTermPiIntro xts2 e2)):cs) =
-  simp (((m1, PreTermPi xts1 e1), (m2, PreTermPi xts2 e2)) : cs)
--- patternに落とすためpi-introはpi-elimで表現する
+  simp $ ((m1, PreTermPi xts1 e1), (m2, PreTermPi xts2 e2)) : cs
 simp (((m1, PreTermPiIntro xts body1), e2@(m2, _)):cs) = do
   vs <- mapM (uncurry toVar) xts
   let appMeta = (PreMetaNonTerminal (typeOf body1) Nothing)
   simpMetaRet [(m1, m2)] $ simp $ (body1, (appMeta, PreTermPiElim e2 vs)) : cs
 simp ((e1, e2@(_, PreTermPiIntro {})):cs) = simp $ (e2, e1) : cs
--- これ言えなくない？たとえば、f = g = lam (_ _ _). 3とかだったら、
--- f @ (1, 2, 3) == g @ (4, 5, 6) となるはず。
--- simp ((e1, e2):cs)
---   | (m11, PreTermPiElim (m12, PreTermUpsilon f) es1) <- e1
---   , (m21, PreTermPiElim (m22, PreTermUpsilon g) es2) <- e2
---   , f == g
---   , length es1 == length es2 =
---     simpMetaRet [(m11, m21), (m12, m22)] $ simp $ zip es1 es2 ++ cs
--- simp ((e1, e2):cs)
---   | (m11, PreTermPiElim (m12, PreTermTheta f) es1) <- e1
---   , (m21, PreTermPiElim (m22, PreTermTheta g) es2) <- e2
---   , f == g
---   , length es1 == length es2 =
---     simpMetaRet [(m11, m21), (m12, m22)] $ simp $ zip es1 es2 ++ cs
--- simp ((e1, e2):cs)
---   | (m11, PreTermPiElim (m12, PreTermZeta f) es1) <- e1
---   , (m21, PreTermPiElim (m22, PreTermZeta g) es2) <- e2
---   , f == g
---   , length es1 == length es2 =
---     simpMetaRet [(m11, m21), (m12, m22)] $ simp $ zip es1 es2 ++ cs
 simp (((m1, PreTermMu (x1, t1) e1), (m2, PreTermMu (x2, t2) e2)):cs)
   | x1 == x2 = simpMetaRet [(m1, m2)] $ simp $ (t1, t2) : (e1, e2) : cs
 simp (((m1, PreTermZeta x), (m2, PreTermZeta y)):cs)
@@ -128,6 +107,26 @@ simp ((e1, e2):cs)
   , (m2, PreTermArrayElim k2 (_, PreTermUpsilon g) eps2) <- e2
   , k1 == k2
   , f == g = simpMetaRet [(m1, m2)] $ simp $ (eps1, eps2) : cs
+-- これ言えなくない？たとえば、f = g = lam (_ _ _). 3とかだったら、
+-- f @ (1, 2, 3) == g @ (4, 5, 6) となるはず。
+simp ((e1, e2):cs)
+  | (m11, PreTermPiElim (m12, PreTermUpsilon f) es1) <- e1
+  , (m21, PreTermPiElim (m22, PreTermUpsilon g) es2) <- e2
+  , f == g
+  , length es1 == length es2 =
+    simpMetaRet [(m11, m21), (m12, m22)] $ simp $ zip es1 es2 ++ cs
+simp ((e1, e2):cs)
+  | (m11, PreTermPiElim (m12, PreTermTheta f) es1) <- e1
+  , (m21, PreTermPiElim (m22, PreTermTheta g) es2) <- e2
+  , f == g
+  , length es1 == length es2 =
+    simpMetaRet [(m11, m21), (m12, m22)] $ simp $ zip es1 es2 ++ cs
+simp ((e1, e2):cs)
+  | (m11, PreTermPiElim (m12, PreTermZeta f) es1) <- e1
+  , (m21, PreTermPiElim (m22, PreTermZeta g) es2) <- e2
+  , f == g
+  , length es1 == length es2 =
+    simpMetaRet [(m11, m21), (m12, m22)] $ simp $ zip es1 es2 ++ cs
 simp ((e1, e2):cs) = do
   let ms1 = asStuckedTerm e1
   let ms2 = asStuckedTerm e2
@@ -157,9 +156,8 @@ simpPatIfPossible ::
   -> [(PreTermPlus, PreTermPlus)]
   -> WithEnv [EnrichedConstraint]
 simpPatIfPossible _ _ _ _ [] = return []
-simpPatIfPossible ms1 ms2 h1 exs1 ((e1, e2):cs) = do
-  isPattern <- allM (isSolvable e2 h1) (map (map snd) exs1)
-  if isPattern
+simpPatIfPossible ms1 ms2 h1 exs1 ((e1, e2):cs) =
+  if all (isSolvable e2 h1) (map (map snd) exs1)
     then do
       cs' <- simpMetaRet [(fst e1, fst e2)] $ simp cs
       let (_, fmvs1) = varPreTermPlus e1
@@ -267,10 +265,10 @@ asStuckedTerm (_, PreTermPiElim e es) =
 asStuckedTerm (_, PreTermZeta h) = Just $ StuckHole h
 asStuckedTerm _ = Nothing
 
-isSolvable :: PreTermPlus -> Identifier -> [Identifier] -> WithEnv Bool
+isSolvable :: PreTermPlus -> Identifier -> [Identifier] -> Bool
 isSolvable e x xs = do
   let (fvs, fmvs) = varPreTermPlus e
-  return $ affineCheck xs fvs && x `notElem` fmvs
+  affineCheck xs fvs && x `notElem` fmvs
 
 toVar :: Identifier -> PreTermPlus -> WithEnv PreTermPlus
 toVar x t = return (PreMetaNonTerminal t Nothing, PreTermUpsilon x)
@@ -294,10 +292,3 @@ isLinear x xs =
 interpretAsUpsilon :: PreTermPlus -> Maybe Identifier
 interpretAsUpsilon (_, PreTermUpsilon x) = Just x
 interpretAsUpsilon _ = Nothing
-
-allM :: Monad m => (a -> m Bool) -> [a] -> m Bool
-allM _ [] = return True
-allM f (x:xs) = do
-  b1 <- f x
-  b2 <- allM f xs
-  return $ b1 && b2
