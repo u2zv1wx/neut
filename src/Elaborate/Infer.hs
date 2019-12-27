@@ -1,6 +1,5 @@
 module Elaborate.Infer
   ( infer
-  , readWeakMetaType
   , typeOf
   , univ
   ) where
@@ -166,24 +165,6 @@ inferKind (ArrayKindIntU i) = (newMetaTerminal, PreTermTheta $ "u" ++ show i)
 inferKind (ArrayKindFloat size) =
   (newMetaTerminal, PreTermTheta $ "f" ++ show (sizeAsInt size))
 
--- inferPiIntro ::
---      Context -> WeakMeta -> Context -> WeakTermPlus -> WithEnv WeakTermPlus
--- inferPiIntro ctx meta xts e = inferPiIntro' ctx meta xts xts e
--- inferPiIntro' ::
---      Context
---   -> WeakMeta
---   -> [(Identifier, WeakTermPlus)]
---   -> Context
---   -> WeakTermPlus
---   -> WithEnv WeakTermPlus
--- inferPiIntro' ctx meta [] zts e = do
---   cod <- infer ctx e
---   undefined
---   -- returnAfterUpdate meta (newMetaTerminal, WeakTermPi zts cod)
--- inferPiIntro' ctx meta ((x, t):xts) zts e = do
---   t' <- inferType ctx t
---   insTypeEnv x t'
---   inferPiIntro' (ctx ++ [(x, t')]) meta xts zts e
 inferPi ::
      Context
   -> [(Identifier, WeakTermPlus)]
@@ -245,7 +226,6 @@ inferList _ [] = return []
 inferList ctx (e:es) = do
   e' <- infer ctx e
   x <- newNameWith "hole"
-  -- _ <- inferType ctx t
   insTypeEnv x (typeOf e')
   xets <- inferList (ctx ++ [(x, (typeOf e'))]) es
   return $ (x, e', typeOf e') : xets
@@ -265,24 +245,12 @@ toVar x t = do
 retPreTerm :: PreTermPlus -> Maybe Loc -> PreTerm -> WithEnv PreTermPlus
 retPreTerm t ml e = return (PreMetaNonTerminal t ml, e)
 
--- returnAfterUpdate :: WeakMeta -> WeakTermPlus -> WithEnv WeakTermPlus
--- returnAfterUpdate m t = do
---   typeOrRef <- readWeakMetaType m
---   case typeOrRef of
---     Just t' -> insConstraintEnv t t'
---     Left r -> writeWeakTermRef r t
---   return t
 univ :: PreTermPlus
 univ = (PreMetaTerminal Nothing, PreTermTau)
 
--- wrapWithType :: WeakTermPlus -> WeakTerm -> WithEnv WeakTermPlus
--- wrapWithType t e = do
---   m <- newMetaOfType t
---   return (m, e)
-readWeakMetaType :: WeakMeta -> WithEnv (Maybe PreTermPlus)
-readWeakMetaType (WeakMetaTerminal _) = return $ Just univ
-readWeakMetaType (WeakMetaNonTerminal _) = return Nothing
-
+-- readWeakMetaType :: WeakMeta -> WithEnv (Maybe PreTermPlus)
+-- readWeakMetaType (WeakMetaTerminal _) = return $ Just univ
+-- readWeakMetaType (WeakMetaNonTerminal _) = return Nothing
 -- readWeakMetaType (WeakMetaTerminal _) = return $ Right univ
 -- readWeakMetaType (WeakMetaNonTerminal r@(WeakTermRef ref) _) = do
 --   mt <- liftIO $ readIORef ref
@@ -296,20 +264,20 @@ typeOf (PreMetaNonTerminal t _, _) = t
 
 -- is-enum n{i}
 toIsEnumType :: Int -> WithEnv PreTermPlus
-toIsEnumType i = undefined
-  -- piType <- univToUniv
-  -- piMeta <- newMetaOfType piType
-  -- return
-  --   ( newMetaTerminal
-  --   , WeakTermPiElim
-  --       (piMeta, WeakTermTheta "is-enum")
-  --       [(newMetaTerminal, WeakTermEnum $ EnumTypeNatNum i)])
+toIsEnumType i = do
+  piType <- univToUniv
+  let piMeta = PreMetaNonTerminal piType Nothing
+  return
+    ( newMetaTerminal
+    , PreTermPiElim
+        (piMeta, PreTermTheta "is-enum")
+        [(newMetaTerminal, PreTermEnum $ EnumTypeNatNum i)])
 
 -- Univ -> Univ
 univToUniv :: WithEnv PreTermPlus
-univToUniv = undefined
-  -- h <- newNameWith "hole"
-  -- return (newMetaTerminal, WeakTermPi [(h, univ)] univ)
+univToUniv = do
+  h <- newNameWith "hole"
+  return (newMetaTerminal, PreTermPi [(h, univ)] univ)
 
 toLoc :: WeakMeta -> Maybe Loc
 toLoc (WeakMetaTerminal ml) = ml
