@@ -1,7 +1,7 @@
 module Elaborate.Infer
   ( infer
   , readWeakMetaType
-  , obtainType
+  , typeOf
   , univ
   ) where
 
@@ -60,12 +60,12 @@ infer _ (m, WeakTermUpsilon x) = do
 infer ctx (m, WeakTermPi xts t) = do
   (xts', t') <- inferPi ctx xts t
   retPreTerm univ (toLoc m) $ PreTermPi xts' t'
+infer ctx (m, WeakTermPiIntro xts e) = do
+  (xts', e') <- inferPiIntro ctx xts e
+  let piType = (newMetaTerminal, PreTermPi xts' (typeOf e'))
+  retPreTerm piType (toLoc m) $ PreTermPiIntro xts' e'
 infer _ _ = undefined
 
--- infer ctx (meta, WeakTermPi xts t) = do
---   us <- inferPi ctx xts t
---   constrainList $ univ : us
---   returnAfterUpdate meta univ
 -- infer ctx (meta, WeakTermPiIntro xts e) = inferPiIntro ctx meta xts e
 -- infer ctx (meta, WeakTermPiElim e es) = do
 --   tPi <- infer ctx e
@@ -157,7 +157,7 @@ infer _ _ = undefined
 inferType :: Context -> WeakTermPlus -> WithEnv PreTermPlus
 inferType ctx t = do
   t' <- infer ctx t
-  insConstraintEnv (obtainType t') univ
+  insConstraintEnv (typeOf t') univ
   return t'
 
 -- inferKind :: ArrayKind -> WithEnv WeakTermPlus
@@ -173,17 +173,18 @@ inferType ctx t = do
 -- inferPiIntro' ::
 --      Context
 --   -> WeakMeta
---   -> Context
+--   -> [(Identifier, WeakTermPlus)]
 --   -> Context
 --   -> WeakTermPlus
 --   -> WithEnv WeakTermPlus
 -- inferPiIntro' ctx meta [] zts e = do
 --   cod <- infer ctx e
---   returnAfterUpdate meta (newMetaTerminal, WeakTermPi zts cod)
+--   undefined
+--   -- returnAfterUpdate meta (newMetaTerminal, WeakTermPi zts cod)
 -- inferPiIntro' ctx meta ((x, t):xts) zts e = do
---   _ <- inferType ctx t
---   insTypeEnv x t
---   inferPiIntro' (ctx ++ [(x, t)]) meta xts zts e
+--   t' <- inferType ctx t
+--   insTypeEnv x t'
+--   inferPiIntro' (ctx ++ [(x, t')]) meta xts zts e
 inferPi ::
      Context
   -> [(Identifier, WeakTermPlus)]
@@ -196,6 +197,20 @@ inferPi ctx ((x, t):xts) cod = do
   t' <- inferType ctx t
   insTypeEnv x t'
   (xts', cod') <- inferPi (ctx ++ [(x, t')]) xts cod
+  return ((x, t') : xts', cod')
+
+inferPiIntro ::
+     Context
+  -> [(Identifier, WeakTermPlus)]
+  -> WeakTermPlus
+  -> WithEnv ([(Identifier, PreTermPlus)], PreTermPlus)
+inferPiIntro ctx [] cod = do
+  cod' <- infer ctx cod
+  return ([], cod')
+inferPiIntro ctx ((x, t):xts) cod = do
+  t' <- infer ctx t
+  insTypeEnv x t'
+  (xts', cod') <- inferPiIntro (ctx ++ [(x, t')]) xts cod
   return ((x, t') : xts', cod')
 
 newHoleInCtx :: Context -> WithEnv PreTermPlus
@@ -271,9 +286,9 @@ readWeakMetaType (WeakMetaNonTerminal _) = return Nothing
 --   case mt of
 --     Just t -> return $ Right t
 --     Nothing -> return $ Left r
-obtainType :: PreTermPlus -> PreTermPlus
-obtainType (PreMetaTerminal _, _) = univ
-obtainType (PreMetaNonTerminal t _, _) = t
+typeOf :: PreTermPlus -> PreTermPlus
+typeOf (PreMetaTerminal _, _) = univ
+typeOf (PreMetaNonTerminal t _, _) = t
 
 -- is-enum n{i}
 toIsEnumType :: Int -> WithEnv PreTermPlus
