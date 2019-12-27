@@ -13,7 +13,6 @@ import Data.Constraint
 import Data.LLVM
 import Data.PreTerm
 import Data.Tree
-import Data.WeakTerm
 
 import qualified Data.Map.Strict as Map
 
@@ -33,10 +32,10 @@ data Env =
     , constantEnv :: [Identifier]
     , enumEnv :: [(Identifier, [Identifier])] -- [("choice", ["left", "right"]), ...]
     , nameEnv :: [(Identifier, Identifier)] -- [("foo", "foo.13"), ...]
-    , typeEnv :: Map.Map Identifier WeakTermPlus -- var ~> typeof(var)
+    , typeEnv :: Map.Map Identifier PreTermPlus -- var ~> typeof(var)
     , constraintEnv :: [PreConstraint] -- for type inference
     , constraintQueue :: ConstraintQueue -- for (dependent) type inference
-    , substEnv :: SubstWeakTerm -- metavar ~> beta-equivalent weakterm
+    , substEnv :: [(Identifier, PreTermPlus)] -- metavar ~> beta-equivalent weakterm
     , codeEnv :: [(Identifier, ([Identifier], CodePlus))] -- f ~> thunk (lam (x1 ... xn) e)
     , llvmEnv :: [(Identifier, ([Identifier], LLVM))]
     }
@@ -83,14 +82,14 @@ newNameWith s = do
   modify (\e -> e {nameEnv = (s, s') : nameEnv e})
   return s'
 
-lookupTypeEnv :: String -> WithEnv WeakTermPlus
+lookupTypeEnv :: String -> WithEnv PreTermPlus
 lookupTypeEnv s = do
   mt <- lookupTypeEnvMaybe s
   case mt of
     Just t -> return t
     Nothing -> throwError $ s ++ " is not found in the type environment."
 
-lookupTypeEnvMaybe :: String -> WithEnv (Maybe WeakTermPlus)
+lookupTypeEnvMaybe :: String -> WithEnv (Maybe PreTermPlus)
 lookupTypeEnvMaybe s = do
   mt <- gets (Map.lookup s . typeEnv)
   case mt of
@@ -111,12 +110,12 @@ lookupNameEnvMaybe s = do
     Just s' -> return $ Just s'
     Nothing -> return Nothing
 
-lookupSubstEnv :: Identifier -> WithEnv (Maybe WeakTermPlus)
+lookupSubstEnv :: Identifier -> WithEnv (Maybe PreTermPlus)
 lookupSubstEnv i = do
   senv <- gets substEnv
   return $ lookup i senv
 
-insTypeEnv :: Identifier -> WeakTermPlus -> WithEnv ()
+insTypeEnv :: Identifier -> PreTermPlus -> WithEnv ()
 insTypeEnv i t = modify (\e -> e {typeEnv = Map.insert i t (typeEnv e)})
 
 insCodeEnv :: Identifier -> [Identifier] -> CodePlus -> WithEnv ()
@@ -189,20 +188,10 @@ insConstraintEnv t1 t2 =
 --   h <- newNameWith "hole"
 --   m <- newMetaOfType t
 --   return (m, WeakTermZeta h)
--- newMeta :: WithEnv WeakMeta
--- newMeta = do
---   ref <- newWeakTermRef Nothing
---   return $ WeakMetaNonTerminal ref Nothing
--- newMetaTerminal :: WeakMeta
--- newMetaTerminal = WeakMetaTerminal Nothing
 -- newMetaOfType :: WeakTermPlus -> WithEnv WeakMeta
 -- newMetaOfType t = do
 --   ref <- newWeakTermRef $ Just t
 --   return $ WeakMetaNonTerminal ref Nothing
--- toWeakMeta :: TreeMeta -> WithEnv WeakMeta
--- toWeakMeta m = do
---   ref <- newWeakTermRef Nothing
---   return $ WeakMetaNonTerminal ref (treeMetaLocation m)
 getTarget :: WithEnv Target
 getTarget = do
   mtarget <- gets target

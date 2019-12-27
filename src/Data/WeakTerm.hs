@@ -1,6 +1,5 @@
 module Data.WeakTerm where
 
-import Data.Tree
 import Numeric.Half
 
 import Data.Basic
@@ -29,16 +28,20 @@ data WeakTerm
   | WeakTermArrayElim ArrayKind WeakTermPlus WeakTermPlus
   deriving (Show)
 
-type WeakTermPlus = (TreeMeta, WeakTerm)
+type WeakTermPlus = (WeakMeta, WeakTerm)
 
 type SubstWeakTerm = [(Identifier, WeakTermPlus)]
 
 type Hole = Identifier
 
 type IdentifierPlus = (Identifier, WeakTermPlus)
+
 -- newtype WeakTermRef =
 --   WeakTermRef (IORef (Maybe WeakTermPlus))
--- data WeakMeta
+data WeakMeta
+  = WeakMetaTerminal (Maybe Loc)
+  | WeakMetaNonTerminal (Maybe Loc)
+  deriving (Show) -- data WeakMeta
 --   = WeakMetaTerminal (Maybe Loc)
 --   | WeakMetaNonTerminal WeakTermRef (Maybe Loc)
 --   deriving (Show)
