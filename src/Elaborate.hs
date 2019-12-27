@@ -32,9 +32,11 @@ elaborate e = do
   e' <- infer [] e
   -- Kantian type-inference ;)
   p "analyze"
-  gets constraintEnv >>= analyze
+  q <- gets constraintEnv >>= analyze
   p "synth"
-  gets constraintQueue >>= synthesize
+  synthesize q
+  -- gets constraintEnv >>= analyze >>= synthessize
+  -- gets constraintQueue >>= synthesize
   p "ok"
   -- update the type environment by resulting substitution
   sub <- gets substEnv
