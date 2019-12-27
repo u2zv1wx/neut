@@ -137,6 +137,7 @@ interpret t@(m, TreeNode es) =
 isConstant :: Identifier -> WithEnv Bool
 isConstant x
   | Just _ <- asEnumNatNumConstant x = return True
+  | x `elem` primitiveList = return True
   | otherwise = do
     cenv <- gets constantEnv
     return $ x `elem` cenv

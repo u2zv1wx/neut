@@ -57,8 +57,6 @@ parse' ((_, TreeNode ((_, TreeAtom "enum"):(_, TreeAtom name):ts)):as) = do
   isEnumType <- toIsEnumType name
   h <- newNameWith "hole-parse-enum"
   -- add `let (_, is-enum choice) := enum.choice` to defList in order to insert appropriate type constraint
-  p $ "h: " ++ show h
-  p $ "constName: " ++ show constName
   let ascription =
         DefLet newMeta (h, isEnumType) (newMeta, WeakTermTheta constName)
   defList <- parse' as

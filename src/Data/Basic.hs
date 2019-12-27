@@ -171,6 +171,9 @@ asSysCallMaybe :: Identifier -> Maybe (SysCall, ArgLen, UsedArgIndexList)
 asSysCallMaybe "unsafe.write" = Just (SysCallWrite, 4, [1, 2, 3])
 asSysCallMaybe _ = Nothing
 
+primitiveList :: [Identifier]
+primitiveList = ["unsafe.eval-io", "unsafe.write"]
+
 type Target = (OS, Arch)
 
 data OS

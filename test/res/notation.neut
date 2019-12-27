@@ -137,7 +137,15 @@
 (definition io ((a type))
   (state bottom a))
 
+
+;; (ascription is-enum (pi ((_ type)) type))
+
 ;; (notation (definition name (x+) e+)
 ;;   (let name (mu name (lambda (x+) e+))))
 ;; just for test
 (enum top unit)
+
+(ascription unsafe.eval-io
+  (hom (io top) top))
+
+unit

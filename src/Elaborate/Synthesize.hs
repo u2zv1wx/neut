@@ -61,7 +61,6 @@ resolveStuck ::
   -> PreTermPlus
   -> WithEnv ()
 resolveStuck q e1 e2 h e = do
-  p $ "resolveStuck for " ++ h
   let (_, fmvs) = varPreTermPlus e
   let e1' = substPreTermPlus [(h, e)] e1
   let e2' = substPreTermPlus [(h, e)] e2

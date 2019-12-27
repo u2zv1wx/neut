@@ -141,8 +141,8 @@ simp ((e1, e2):cs) = do
       simpFlexRigid fmvs1 fmvs2 h1 ies1 e1 e2 cs
     (Nothing, Just (StuckPiElim h2 ies2)) ->
       simpFlexRigid fmvs2 fmvs1 h2 ies2 e2 e1 cs
-    (Just (StuckPiElim h1 ies1), Just (StuckPiElim {})) ->
-      simpFlexFlex fmvs1 fmvs2 h1 ies1 e1 e2 cs
+    (Just (StuckPiElim h1 ies1), Just (StuckPiElim h2 _)) ->
+      simpFlexFlex fmvs1 fmvs2 h1 h2 ies1 e1 e2 cs
     _ -> simpOther (fmvs1 ++ fmvs2) e1 e2 cs
 
 simpHole ::
@@ -167,15 +167,12 @@ simpStuckStrict ::
   -> WithEnv [EnrichedConstraint]
 simpStuckStrict _ _ [] = return []
 simpStuckStrict h1 exs1 ((e1, e2):cs) = do
-  let (_, fmvs1) = varPreTermPlus e1
-  let (_, fmvs2) = varPreTermPlus e2
-  let fmvs = fmvs1 ++ fmvs2
   let es1 = map (map fst) exs1
   cs' <- simpMetaRet [(fst e1, fst e2)] $ simp cs
   if all (isSolvable e2 h1) (map (map snd) exs1)
-    then return $ Enriched (e1, e2) fmvs (ConstraintPattern h1 es1 e2) : cs'
+    then return $ Enriched (e1, e2) [h1] (ConstraintPattern h1 es1 e2) : cs'
     else return $
-         Enriched (e1, e2) fmvs (ConstraintQuasiPattern h1 es1 e2) : cs'
+         Enriched (e1, e2) [h1] (ConstraintQuasiPattern h1 es1 e2) : cs'
 
 simpFlexRigid ::
      [Hole]
@@ -186,10 +183,10 @@ simpFlexRigid ::
   -> (PreMeta, PreTerm)
   -> [PreConstraint]
   -> WithEnv [EnrichedConstraint]
-simpFlexRigid fmvs1 fmvs2 h1 ies1 e1 e2 cs
+simpFlexRigid _ fmvs2 h1 ies1 e1 e2 cs
   | h1 `notElem` fmvs2 = do
     cs' <- simpMetaRet [(fst e1, fst e2)] $ simp cs
-    let c = Enriched (e1, e2) (fmvs1 ++ fmvs2) $ ConstraintFlexRigid h1 ies1 e2
+    let c = Enriched (e1, e2) [h1] $ ConstraintFlexRigid h1 ies1 e2
     return $ c : cs'
 simpFlexRigid fmvs1 fmvs2 _ _ e1 e2 cs = simpOther (fmvs1 ++ fmvs2) e1 e2 cs
 
@@ -197,17 +194,18 @@ simpFlexFlex ::
      [Hole]
   -> [Hole]
   -> Hole
+  -> Hole
   -> [[PreTermPlus]]
   -> (PreMeta, PreTerm)
   -> (PreMeta, PreTerm)
   -> [PreConstraint]
   -> WithEnv [EnrichedConstraint]
-simpFlexFlex fmvs1 fmvs2 h1 ies1 e1 e2 cs
+simpFlexFlex _ fmvs2 h1 h2 ies1 e1 e2 cs
   | h1 `notElem` fmvs2 = do
     cs' <- simpMetaRet [(fst e1, fst e2)] $ simp cs
-    let c = Enriched (e1, e2) (fmvs1 ++ fmvs2) $ ConstraintFlexFlex h1 ies1 e2
+    let c = Enriched (e1, e2) [h1, h2] $ ConstraintFlexFlex h1 ies1 e2
     return $ c : cs'
-simpFlexFlex fmvs1 fmvs2 _ _ e1 e2 cs = simpOther (fmvs1 ++ fmvs2) e1 e2 cs
+simpFlexFlex fmvs1 fmvs2 _ _ _ e1 e2 cs = simpOther (fmvs1 ++ fmvs2) e1 e2 cs
 
 simpOther ::
      [Hole]

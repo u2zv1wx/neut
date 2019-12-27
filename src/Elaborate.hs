@@ -97,7 +97,10 @@ elaborate' (_, PreTermZeta x) = do
   sub <- gets substEnv
   case lookup x sub of
     Just e -> elaborate' e
-    Nothing -> throwError $ "elaborate' i: remaining hole: " ++ x
+    Nothing -> do
+      t <- lookupTypeEnv "unsafe.eval-io"
+      p' t
+      throwError $ "elaborate' i: remaining hole: " ++ x
 elaborate' (m, PreTermIntS size x) = do
   m' <- toMeta m
   return (m', TermIntS size x)
