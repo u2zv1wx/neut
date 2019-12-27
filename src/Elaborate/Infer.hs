@@ -60,7 +60,7 @@ infer ctx (m, WeakTermPi xts t) = do
   retPreTerm univ (toLoc m) $ PreTermPi xts' t'
 infer ctx (m, WeakTermPiIntro xts e) = do
   (xts', e') <- inferPiIntro ctx xts e
-  let piType = (newMetaTerminal, PreTermPi xts' (typeOf e'))
+  let piType = (metaTerminal, PreTermPi xts' (typeOf e'))
   retPreTerm piType (toLoc m) $ PreTermPiIntro xts' e'
 infer ctx (m, WeakTermPiElim e es) = do
   e' <- infer ctx e
@@ -69,7 +69,7 @@ infer ctx (m, WeakTermPiElim e es) = do
   let xts = zip xs ts
   -- cod = ?M @ ctx @ (x1, ..., xn)
   cod <- newHoleInCtx (ctx ++ xts)
-  let tPi = (newMetaTerminal, PreTermPi xts cod)
+  let tPi = (metaTerminal, PreTermPi xts cod)
   insConstraintEnv tPi (typeOf e')
   -- cod' = ?M @ ctx @ (e1, ..., en)
   let cod' = substPreTermPlus (zip xs es') cod
@@ -89,22 +89,22 @@ infer ctx (m, WeakTermZeta x) = do
       insTypeEnv x h
       retPreTerm h (toLoc m) $ PreTermZeta x
 infer _ (m, WeakTermIntS size i) = do
-  let t = (newMetaTerminal, PreTermTheta $ "i" ++ show size)
+  let t = (metaTerminal, PreTermTheta $ "i" ++ show size)
   retPreTerm t (toLoc m) $ PreTermIntS size i
 infer _ (m, WeakTermIntU size i) = do
-  let t = (newMetaTerminal, PreTermTheta $ "u" ++ show size)
+  let t = (metaTerminal, PreTermTheta $ "u" ++ show size)
   retPreTerm t (toLoc m) $ PreTermIntU size i
 infer _ (m, WeakTermInt i) = do
   h <- newHoleInCtx []
   retPreTerm h (toLoc m) $ PreTermInt i
 infer _ (m, WeakTermFloat16 f) = do
-  let t = (newMetaTerminal, PreTermTheta "f16")
+  let t = (metaTerminal, PreTermTheta "f16")
   retPreTerm t (toLoc m) $ PreTermFloat16 f
 infer _ (m, WeakTermFloat32 f) = do
-  let t = (newMetaTerminal, PreTermTheta "f32")
+  let t = (metaTerminal, PreTermTheta "f32")
   retPreTerm t (toLoc m) $ PreTermFloat32 f
 infer _ (m, WeakTermFloat64 f) = do
-  let t = (newMetaTerminal, PreTermTheta "f64")
+  let t = (metaTerminal, PreTermTheta "f64")
   retPreTerm t (toLoc m) $ PreTermFloat64 f
 infer _ (m, WeakTermFloat f) = do
   h <- newHoleInCtx []
@@ -114,10 +114,10 @@ infer _ (m, WeakTermEnumIntro labelOrNum) = do
   case labelOrNum of
     EnumValueLabel l -> do
       k <- lookupKind l
-      let t = (newMetaTerminal, PreTermEnum $ EnumTypeLabel k)
+      let t = (metaTerminal, PreTermEnum $ EnumTypeLabel k)
       retPreTerm t (toLoc m) $ PreTermEnumIntro labelOrNum
     EnumValueNatNum i _ -> do
-      let t = (newMetaTerminal, PreTermEnum $ EnumTypeNatNum i)
+      let t = (metaTerminal, PreTermEnum $ EnumTypeNatNum i)
       retPreTerm t (toLoc m) $ PreTermEnumIntro labelOrNum
 infer ctx (m, WeakTermEnumElim e les) = do
   e' <- infer ctx e
@@ -143,14 +143,14 @@ infer ctx (m, WeakTermArrayIntro k les) = do
   constrainList $ catMaybes tls
   es' <- mapM (infer ctx) es
   let tDom = determineDomType es'
-  let t = (newMetaTerminal, PreTermArray k tDom tCod)
+  let t = (metaTerminal, PreTermArray k tDom tCod)
   retPreTerm t (toLoc m) $ PreTermArrayIntro k $ zip ls es'
 infer ctx (m, WeakTermArrayElim kind e1 e2) = do
   let tCod = inferKind kind
   e1' <- infer ctx e1
   e2' <- infer ctx e2
   let tArr = typeOf e1'
-  insConstraintEnv tArr (newMetaTerminal, PreTermArray kind (typeOf e2') tCod)
+  insConstraintEnv tArr (metaTerminal, PreTermArray kind (typeOf e2') tCod)
   retPreTerm tCod (toLoc m) $ PreTermArrayElim kind e1' e2'
 
 inferType :: Context -> WeakTermPlus -> WithEnv PreTermPlus
@@ -160,10 +160,10 @@ inferType ctx t = do
   return t'
 
 inferKind :: ArrayKind -> PreTermPlus
-inferKind (ArrayKindIntS i) = (newMetaTerminal, PreTermTheta $ "i" ++ show i)
-inferKind (ArrayKindIntU i) = (newMetaTerminal, PreTermTheta $ "u" ++ show i)
+inferKind (ArrayKindIntS i) = (metaTerminal, PreTermTheta $ "i" ++ show i)
+inferKind (ArrayKindIntU i) = (metaTerminal, PreTermTheta $ "u" ++ show i)
 inferKind (ArrayKindFloat size) =
-  (newMetaTerminal, PreTermTheta $ "f" ++ show (sizeAsInt size))
+  (metaTerminal, PreTermTheta $ "f" ++ show (sizeAsInt size))
 
 inferPi ::
      Context
@@ -195,25 +195,25 @@ inferPiIntro ctx ((x, t):xts) cod = do
 
 newHoleInCtx :: Context -> WithEnv PreTermPlus
 newHoleInCtx ctx = do
-  higherHole <- newHoleOfType (newMetaTerminal, PreTermPi ctx univ)
+  higherHole <- newHoleOfType (metaTerminal, PreTermPi ctx univ)
   varSeq <- mapM (uncurry toVar) ctx
-  let app = (newMetaTerminal, PreTermPiElim higherHole varSeq)
-  hole <- newHoleOfType (newMetaTerminal, PreTermPi ctx app)
+  let app = (metaTerminal, PreTermPiElim higherHole varSeq)
+  hole <- newHoleOfType (metaTerminal, PreTermPi ctx app)
   return (PreMetaNonTerminal app Nothing, PreTermPiElim hole varSeq)
   -- wrapWithType app (WeakTermPiElim hole varSeq)
-  -- higherHole <- newHoleOfType (newMetaTerminal, WeakTermPi ctx univ)
+  -- higherHole <- newHoleOfType (metaTerminal, WeakTermPi ctx univ)
   -- varSeq <- mapM (uncurry toVar) ctx
-  -- let app = (newMetaTerminal, WeakTermPiElim higherHole varSeq)
-  -- hole <- newHoleOfType (newMetaTerminal, WeakTermPi ctx app)
+  -- let app = (metaTerminal, WeakTermPiElim higherHole varSeq)
+  -- hole <- newHoleOfType (metaTerminal, WeakTermPi ctx app)
   -- wrapWithType app (WeakTermPiElim hole varSeq)
 
 inferCase :: Case -> WithEnv (Maybe PreTermPlus)
 inferCase (CaseValue (EnumValueLabel name)) = do
   ienv <- gets enumEnv
   k <- lookupKind' name ienv
-  return $ Just (newMetaTerminal, PreTermEnum $ EnumTypeLabel k)
+  return $ Just (metaTerminal, PreTermEnum $ EnumTypeLabel k)
 inferCase (CaseValue (EnumValueNatNum i _)) =
-  return $ Just (newMetaTerminal, PreTermEnum $ EnumTypeNatNum i)
+  return $ Just (metaTerminal, PreTermEnum $ EnumTypeNatNum i)
 inferCase _ = return Nothing
 
 -- inferList ctx [e1, ..., en]
@@ -258,23 +258,23 @@ toIsEnumType i = do
   piType <- univToUniv
   let piMeta = PreMetaNonTerminal piType Nothing
   return
-    ( newMetaTerminal
+    ( metaTerminal
     , PreTermPiElim
         (piMeta, PreTermTheta "is-enum")
-        [(newMetaTerminal, PreTermEnum $ EnumTypeNatNum i)])
+        [(metaTerminal, PreTermEnum $ EnumTypeNatNum i)])
 
 -- Univ -> Univ
 univToUniv :: WithEnv PreTermPlus
 univToUniv = do
   h <- newNameWith "hole"
-  return (newMetaTerminal, PreTermPi [(h, univ)] univ)
+  return (metaTerminal, PreTermPi [(h, univ)] univ)
 
 toLoc :: WeakMeta -> Maybe Loc
 toLoc (WeakMetaTerminal ml) = ml
 toLoc (WeakMetaNonTerminal ml) = ml
 
-newMetaTerminal :: PreMeta
-newMetaTerminal = PreMetaTerminal Nothing
+metaTerminal :: PreMeta
+metaTerminal = PreMetaTerminal Nothing
 
 newHoleOfType :: PreTermPlus -> WithEnv PreTermPlus
 newHoleOfType t = do
@@ -285,4 +285,4 @@ determineDomType :: [PreTermPlus] -> PreTermPlus
 determineDomType es =
   if null es
     then typeOf (head es)
-    else (newMetaTerminal, PreTermTheta "bottom")
+    else (metaTerminal, PreTermTheta "bottom")
