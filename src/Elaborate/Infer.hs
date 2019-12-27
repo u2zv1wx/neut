@@ -248,16 +248,6 @@ retPreTerm t ml e = return (PreMetaNonTerminal t ml, e)
 univ :: PreTermPlus
 univ = (PreMetaTerminal Nothing, PreTermTau)
 
--- readWeakMetaType :: WeakMeta -> WithEnv (Maybe PreTermPlus)
--- readWeakMetaType (WeakMetaTerminal _) = return $ Just univ
--- readWeakMetaType (WeakMetaNonTerminal _) = return Nothing
--- readWeakMetaType (WeakMetaTerminal _) = return $ Right univ
--- readWeakMetaType (WeakMetaNonTerminal r@(WeakTermRef ref) _) = do
---   mt <- liftIO $ readIORef ref
---   -- ここで仮にjustだったとしても、nonTerminalのなかにnonterminal nothingが入っている可能性がある、ということ？
---   case mt of
---     Just t -> return $ Right t
---     Nothing -> return $ Left r
 typeOf :: PreTermPlus -> PreTermPlus
 typeOf (PreMetaTerminal _, _) = univ
 typeOf (PreMetaNonTerminal t _, _) = t
