@@ -21,14 +21,14 @@ analyze cs = Q.fromList <$> simp cs
 simp :: [PreConstraint] -> WithEnv [EnrichedConstraint]
 simp [] = return []
 simp ((e1, e2):cs)
-  | isReducible e1 = do
+  | isReduciblePreTerm e1 = do
     me1' <- reducePreTermPlus e1 >>= liftIO . timeout 5000000 . return
     case me1' of
       Just e1' -> simp $ (e1', e2) : cs
       Nothing ->
         throwError $ "cannot simplify [TIMEOUT]:\n" ++ Pr.ppShow (e1, e2)
 simp ((e1, e2):cs)
-  | isReducible e2 = simp $ (e2, e1) : cs
+  | isReduciblePreTerm e2 = simp $ (e2, e1) : cs
 simp (((m1, PreTermTau), (m2, PreTermTau)):cs) =
   simpMetaRet [(m1, m2)] (simp cs)
 simp (((m1, PreTermTheta x), (m2, PreTermTheta y)):cs)
@@ -144,7 +144,6 @@ simp ((e1, e2):cs) = do
       simpFlexFlex fmvs1 fmvs2 h1 h2 ies1 e1 e2 cs
     _ -> simpOther (fmvs1 ++ fmvs2) e1 e2 cs
 
--- simpPi (((m1, PreTermPi [] cod1), (m2, PreTermPi [] cod2)):cs) =
 simpPi ::
      PreMeta
   -> [(Identifier, PreTermPlus)]
@@ -180,7 +179,6 @@ simpHole h1 fmvs1 fmvs2 e1 e2 cs
     return $ Enriched (e1, e2) fmvs (ConstraintImmediate h1 e2) : cs'
   | otherwise = simpOther (fmvs1 ++ fmvs2) e1 e2 cs
 
--- ここでh1のfmvsの条件をチェックしていないのがおかしい？
 simpStuckStrict ::
      Identifier
   -> [[(PreTermPlus, Identifier)]]
