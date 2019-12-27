@@ -200,12 +200,6 @@ newHoleInCtx ctx = do
   let app = (metaTerminal, PreTermPiElim higherHole varSeq)
   hole <- newHoleOfType (metaTerminal, PreTermPi ctx app)
   return (PreMetaNonTerminal app Nothing, PreTermPiElim hole varSeq)
-  -- wrapWithType app (WeakTermPiElim hole varSeq)
-  -- higherHole <- newHoleOfType (metaTerminal, WeakTermPi ctx univ)
-  -- varSeq <- mapM (uncurry toVar) ctx
-  -- let app = (metaTerminal, WeakTermPiElim higherHole varSeq)
-  -- hole <- newHoleOfType (metaTerminal, WeakTermPi ctx app)
-  -- wrapWithType app (WeakTermPiElim hole varSeq)
 
 inferCase :: Case -> WithEnv (Maybe PreTermPlus)
 inferCase (CaseValue (EnumValueLabel name)) = do
@@ -225,7 +219,7 @@ inferList ::
 inferList _ [] = return []
 inferList ctx (e:es) = do
   e' <- infer ctx e
-  x <- newNameWith "hole"
+  x <- newNameWith "hole-list"
   insTypeEnv x (typeOf e')
   xets <- inferList (ctx ++ [(x, (typeOf e'))]) es
   return $ (x, e', typeOf e') : xets
@@ -266,7 +260,7 @@ toIsEnumType i = do
 -- Univ -> Univ
 univToUniv :: WithEnv PreTermPlus
 univToUniv = do
-  h <- newNameWith "hole"
+  h <- newNameWith "hole-univ-to-univ"
   return (metaTerminal, PreTermPi [(h, univ)] univ)
 
 toLoc :: WeakMeta -> Maybe Loc
@@ -278,7 +272,7 @@ metaTerminal = PreMetaTerminal Nothing
 
 newHoleOfType :: PreTermPlus -> WithEnv PreTermPlus
 newHoleOfType t = do
-  h <- newNameWith "hole"
+  h <- newNameWith "hole-with-type"
   return (PreMetaNonTerminal t Nothing, PreTermZeta h)
 
 determineDomType :: [PreTermPlus] -> PreTermPlus
