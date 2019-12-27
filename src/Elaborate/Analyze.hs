@@ -4,7 +4,6 @@ module Elaborate.Analyze
   ) where
 
 import Control.Monad.Except
-import Control.Monad.State
 import Data.List
 import qualified Data.PQueue.Min as Q
 import System.Timeout
@@ -17,10 +16,8 @@ import Data.PreTerm
 import Elaborate.Infer (typeOf, univ)
 import Reduce.PreTerm
 
-analyze :: [PreConstraint] -> WithEnv ()
-analyze cs = do
-  cs' <- Q.fromList <$> simp cs
-  modify (\e -> e {constraintQueue = cs' `Q.union` constraintQueue e})
+analyze :: [PreConstraint] -> WithEnv ConstraintQueue
+analyze cs = Q.fromList <$> simp cs
 
 simp :: [PreConstraint] -> WithEnv [EnrichedConstraint]
 simp [] = return []
@@ -34,107 +31,105 @@ simp ((e1, e2):cs)
         throwError $ "cannot simplify [TIMEOUT]:\n" ++ Pr.ppShow (e1, e2)
 simp ((e1, e2):cs)
   | isReducible e2 = simp $ (e2, e1) : cs
-simp (((m1, PreTermTau), (m2, PreTermTau)):cs) = simpMetaRet m1 m2 (simp cs)
+simp (((m1, PreTermTau), (m2, PreTermTau)):cs) =
+  simpMetaRet [(m1, m2)] (simp cs)
 simp (((m1, PreTermTheta x), (m2, PreTermTheta y)):cs)
-  | x == y = simpMetaRet m1 m2 (simp cs)
+  | x == y = simpMetaRet [(m1, m2)] (simp cs)
 simp (((m1, PreTermUpsilon x1), (m2, PreTermUpsilon x2)):cs)
-  | x1 == x2 = simpMetaRet m1 m2 (simp cs)
+  | x1 == x2 = simpMetaRet [(m1, m2)] (simp cs)
 simp (((m1, PreTermPi xts1 cod1), (m2, PreTermPi xts2 cod2)):cs)
   | length xts1 == length xts2 =
-    simpMetaRet m1 m2 $ simpBinder xts1 cod1 xts2 cod2 cs
+    simpMetaRet [(m1, m2)] $ simpBinder xts1 cod1 xts2 cod2 cs
 simp (((m1, PreTermPiIntro xts1 e1), (m2, PreTermPiIntro xts2 e2)):cs)
   | length xts1 == length xts2 =
-    simpMetaRet m1 m2 $ simpBinder xts1 e1 xts2 e2 cs
+    simpMetaRet [(m1, m2)] $ simpBinder xts1 e1 xts2 e2 cs
 simp (((m1, PreTermPiIntro xts body1), e2@(m2, _)):cs) = do
   vs <- mapM (uncurry toVar) xts
   let appMeta = (PreMetaNonTerminal (typeOf body1) Nothing)
   let comp = simp $ (body1, (appMeta, PreTermPiElim e2 vs)) : cs
-  simpMetaRet m1 m2 comp
+  simpMetaRet [(m1, m2)] comp
 simp ((e1, e2@(_, PreTermPiIntro {})):cs) = simp $ (e2, e1) : cs
 simp ((e1, e2):cs)
   | (m11, PreTermPiElim (m12, PreTermUpsilon f) es1) <- e1
   , (m21, PreTermPiElim (m22, PreTermUpsilon g) es2) <- e2
   , f == g
   , length es1 == length es2 =
-    simpMetaRet' [(m11, m21), (m12, m22)] $ simp $ zip es1 es2 ++ cs
+    simpMetaRet [(m11, m21), (m12, m22)] $ simp $ zip es1 es2 ++ cs
 simp ((e1, e2):cs)
   | (m11, PreTermPiElim (m12, PreTermTheta f) es1) <- e1
   , (m21, PreTermPiElim (m22, PreTermTheta g) es2) <- e2
   , f == g
   , length es1 == length es2 =
-    simpMetaRet' [(m11, m21), (m12, m22)] $ simp $ zip es1 es2 ++ cs
+    simpMetaRet [(m11, m21), (m12, m22)] $ simp $ zip es1 es2 ++ cs
 simp (((m1, PreTermIntS size1 l1), (m2, PreTermIntS size2 l2)):cs)
   | size1 == size2
-  , l1 == l2 = simpMetaRet m1 m2 (simp cs)
+  , l1 == l2 = simpMetaRet [(m1, m2)] (simp cs)
 simp (((m1, PreTermIntU size1 l1), (m2, PreTermIntU size2 l2)):cs)
   | size1 == size2
-  , l1 == l2 = simpMetaRet m1 m2 (simp cs)
+  , l1 == l2 = simpMetaRet [(m1, m2)] (simp cs)
 simp (((m1, PreTermInt l1), (m2, PreTermIntS _ l2)):cs)
-  | l1 == l2 = simpMetaRet m1 m2 (simp cs)
+  | l1 == l2 = simpMetaRet [(m1, m2)] (simp cs)
 simp (((m1, PreTermIntS _ l1), (m2, PreTermInt l2)):cs)
-  | l1 == l2 = simpMetaRet m1 m2 (simp cs)
+  | l1 == l2 = simpMetaRet [(m1, m2)] (simp cs)
 simp (((m1, PreTermInt l1), (m2, PreTermIntU _ l2)):cs)
-  | l1 == l2 = simpMetaRet m1 m2 (simp cs)
+  | l1 == l2 = simpMetaRet [(m1, m2)] (simp cs)
 simp (((m1, PreTermIntU _ l1), (m2, PreTermInt l2)):cs)
-  | l1 == l2 = simpMetaRet m1 m2 (simp cs)
+  | l1 == l2 = simpMetaRet [(m1, m2)] (simp cs)
 simp (((m1, PreTermInt l1), (m2, PreTermInt l2)):cs)
-  | l1 == l2 = simpMetaRet m1 m2 (simp cs)
+  | l1 == l2 = simpMetaRet [(m1, m2)] (simp cs)
 simp (((m1, PreTermFloat16 l1), (m2, PreTermFloat16 l2)):cs)
-  | l1 == l2 = simpMetaRet m1 m2 (simp cs)
+  | l1 == l2 = simpMetaRet [(m1, m2)] (simp cs)
 simp (((m1, PreTermFloat32 l1), (m2, PreTermFloat32 l2)):cs)
-  | l1 == l2 = simpMetaRet m1 m2 (simp cs)
+  | l1 == l2 = simpMetaRet [(m1, m2)] (simp cs)
 simp (((m1, PreTermFloat64 l1), (m2, PreTermFloat64 l2)):cs)
-  | l1 == l2 = simpMetaRet m1 m2 (simp cs)
+  | l1 == l2 = simpMetaRet [(m1, m2)] (simp cs)
 simp (((m1, PreTermFloat l1), (m2, PreTermFloat16 l2)):cs)
-  | show l1 == show l2 = simpMetaRet m1 m2 (simp cs)
+  | show l1 == show l2 = simpMetaRet [(m1, m2)] (simp cs)
 simp (((m1, PreTermFloat16 l1), (m2, PreTermFloat l2)):cs)
-  | show l1 == show l2 = simpMetaRet m1 m2 (simp cs)
+  | show l1 == show l2 = simpMetaRet [(m1, m2)] (simp cs)
 simp (((m1, PreTermFloat l1), (m2, PreTermFloat32 l2)):cs)
-  | show l1 == show l2 = simpMetaRet m1 m2 (simp cs)
+  | show l1 == show l2 = simpMetaRet [(m1, m2)] (simp cs)
 simp (((m1, PreTermFloat32 l1), (m2, PreTermFloat l2)):cs)
-  | show l1 == show l2 = simpMetaRet m1 m2 (simp cs)
+  | show l1 == show l2 = simpMetaRet [(m1, m2)] (simp cs)
 simp (((m1, PreTermFloat l1), (m2, PreTermFloat64 l2)):cs)
-  | l1 == l2 = simpMetaRet m1 m2 (simp cs)
+  | l1 == l2 = simpMetaRet [(m1, m2)] (simp cs)
 simp (((m1, PreTermFloat64 l1), (m2, PreTermFloat l2)):cs)
-  | l1 == l2 = simpMetaRet m1 m2 (simp cs)
+  | l1 == l2 = simpMetaRet [(m1, m2)] (simp cs)
 simp (((m1, PreTermFloat l1), (m2, PreTermFloat l2)):cs)
-  | l1 == l2 = simpMetaRet m1 m2 (simp cs)
+  | l1 == l2 = simpMetaRet [(m1, m2)] (simp cs)
 simp (((m1, PreTermEnum l1), (m2, PreTermEnum l2)):cs)
-  | l1 == l2 = simpMetaRet m1 m2 (simp cs)
+  | l1 == l2 = simpMetaRet [(m1, m2)] (simp cs)
 simp (((m1, PreTermEnumIntro l1), (m2, PreTermEnumIntro l2)):cs)
-  | l1 == l2 = simpMetaRet m1 m2 (simp cs)
+  | l1 == l2 = simpMetaRet [(m1, m2)] (simp cs)
 simp (((m1, PreTermArray k1 dom1 cod1), (m2, PreTermArray k2 dom2 cod2)):cs)
-  | k1 == k2 = simpMetaRet m1 m2 $ simp $ (dom1, dom2) : (cod1, cod2) : cs
+  | k1 == k2 = simpMetaRet [(m1, m2)] $ simp $ (dom1, dom2) : (cod1, cod2) : cs
 simp (((m1, PreTermArrayIntro k1 les1), (m2, PreTermArrayIntro k2 les2)):cs)
   | k1 == k2 = do
     csArray <- simpArrayIntro les1 les2
-    csCont <- simpMetaRet m1 m2 $ simp cs
+    csCont <- simpMetaRet [(m1, m2)] $ simp cs
     return $ csArray ++ csCont
 simp ((e1, e2):cs)
   | (m1, PreTermArrayElim k1 (_, PreTermUpsilon f) eps1) <- e1
   , (m2, PreTermArrayElim k2 (_, PreTermUpsilon g) eps2) <- e2
   , k1 == k2
-  , f == g = simpMetaRet m1 m2 $ simp $ (eps1, eps2) : cs
+  , f == g = simpMetaRet [(m1, m2)] $ simp $ (eps1, eps2) : cs
 simp ((e1, e2):cs) = do
   let ms1 = asStuckedTerm e1
   let ms2 = asStuckedTerm e2
+  let (_, fmvs1) = varPreTermPlus e1
+  let (_, fmvs2) = varPreTermPlus e2
   case (ms1, ms2) of
-    (Just (StuckHole h), _) -> do
-      cs' <- simpMetaRet (fst e1) (fst e2) $ simp cs
-      fmvs <- takeMetaVarList e1 e2
-      return $ Enriched (e1, e2) fmvs (ConstraintImmediate h e2) : cs'
-    (_, Just (StuckHole _)) -> simp $ (e2, e1) : cs
+    (Just (StuckHole h), _)
+      | h `notElem` fmvs2 -> do
+        cs' <- simpMetaRet [(fst e1, fst e2)] $ simp cs
+        return $ Enriched (e1, e2) [h] (ConstraintImmediate h e2) : cs'
+    (_, Just (StuckHole h))
+      | h `notElem` fmvs1 -> simp $ (e2, e1) : cs
     (Just (StuckPiElimStrict h1 exs1), _) ->
       simpPatIfPossible ms1 ms2 h1 exs1 $ (e1, e2) : cs
     (_, Just (StuckPiElimStrict h2 exs2)) ->
       simpPatIfPossible ms2 ms1 h2 exs2 $ (e2, e1) : cs
     _ -> simpStuck ms1 ms2 $ (e1, e2) : cs
-
-takeMetaVarList :: PreTermPlus -> PreTermPlus -> WithEnv [Identifier]
-takeMetaVarList e1 e2 = do
-  let (_, fmvs1) = varPreTermPlus e1
-  let (_, fmvs2) = varPreTermPlus e2
-  return $ fmvs1 ++ fmvs2
 
 simpPatIfPossible ::
      Maybe Stuck
@@ -148,10 +143,9 @@ simpPatIfPossible ms1 ms2 h1 exs1 ((e1, e2):cs) = do
   isPattern <- allM (isSolvable e2 h1) (map (map snd) exs1)
   if isPattern
     then do
-      cs' <- simpMetaRet (fst e1) (fst e2) $ simp cs
+      cs' <- simpMetaRet [(fst e1, fst e2)] $ simp cs
       let es1 = map (map fst) exs1
-      fmvs <- takeMetaVarList e1 e2
-      return $ Enriched (e1, e2) fmvs (ConstraintPattern h1 es1 e2) : cs'
+      return $ Enriched (e1, e2) [h1] (ConstraintPattern h1 es1 e2) : cs'
     else simpStuck ms1 ms2 $ (e1, e2) : cs
 
 simpStuck ::
@@ -163,45 +157,26 @@ simpStuck _ _ [] = return []
 simpStuck ms1 ms2 ((e1, e2):cs) =
   case (ms1, ms2) of
     (Just (StuckPiElimStrict h1 exs1), _) -> do
-      cs' <- simpMetaRet (fst e1) (fst e2) $ simp cs
+      cs' <- simpMetaRet [(fst e1, fst e2)] $ simp cs
       let es1 = map (map fst) exs1
-      fmvs <- takeMetaVarList e1 e2
-      return $ Enriched (e1, e2) fmvs (ConstraintQuasiPattern h1 es1 e2) : cs'
+      return $ Enriched (e1, e2) [h1] (ConstraintQuasiPattern h1 es1 e2) : cs'
     (_, Just StuckPiElimStrict {}) -> simpStuck ms2 ms1 $ (e2, e1) : cs
     (Just (StuckPiElim h1 ies1), Nothing) -> do
-      cs' <- simpMetaRet (fst e1) (fst e2) $ simp cs
-      fmvs <- takeMetaVarList e1 e2
-      let c = Enriched (e1, e2) fmvs $ ConstraintFlexRigid h1 ies1 e2
+      cs' <- simpMetaRet [(fst e1, fst e2)] $ simp cs
+      let c = Enriched (e1, e2) [h1] $ ConstraintFlexRigid h1 ies1 e2
       return $ c : cs'
     (Nothing, Just StuckPiElim {}) -> simpStuck ms2 ms1 $ (e2, e1) : cs
-    (Just (StuckPiElim h1 ies1), Just (StuckPiElim _ _)) -> do
-      cs' <- simpMetaRet (fst e1) (fst e2) $ simp cs
-      fmvs <- takeMetaVarList e1 e2
-      let c = Enriched (e1, e2) fmvs $ ConstraintFlexFlex h1 ies1 e2
+    (Just (StuckPiElim h1 ies1), Just (StuckPiElim h2 _)) -> do
+      cs' <- simpMetaRet [(fst e1, fst e2)] $ simp cs
+      let c = Enriched (e1, e2) [h1, h2] $ ConstraintFlexFlex h1 ies1 e2
       return $ c : cs'
     _ -> throwError $ "cannot simplify:\n" ++ Pr.ppShow (e1, e2) -- ここでcsについても処理をおこなうと複数のエラーを検出できる
 
 simpMetaRet ::
-     PreMeta
-  -> PreMeta
-  -> WithEnv [EnrichedConstraint]
-  -> WithEnv [EnrichedConstraint]
-simpMetaRet m1 m2 comp
-  -- p "simpMetaRet"
-  -- p "m1:"
-  -- p' m1
-  -- p "m2:"
-  -- p' m2
- = do
-  cs1 <- simpMeta m1 m2
-  cs2 <- comp
-  return $ cs1 ++ cs2
-
-simpMetaRet' ::
      [(PreMeta, PreMeta)]
   -> WithEnv [EnrichedConstraint]
   -> WithEnv [EnrichedConstraint]
-simpMetaRet' mms comp = do
+simpMetaRet mms comp = do
   cs1 <- mapM (\(m1, m2) -> simpMeta m1 m2) mms
   cs2 <- comp
   return $ concat cs1 ++ cs2
@@ -307,7 +282,7 @@ interpretAsUpsilon _ = Nothing
 
 allM :: Monad m => (a -> m Bool) -> [a] -> m Bool
 allM _ [] = return True
-allM p (x:xs) = do
-  b1 <- p x
-  b2 <- allM p xs
+allM f (x:xs) = do
+  b1 <- f x
+  b2 <- allM f xs
   return $ b1 && b2
