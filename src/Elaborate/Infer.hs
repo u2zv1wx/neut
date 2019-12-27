@@ -111,6 +111,29 @@ infer _ (m, WeakTermFloat64 f) = do
 infer _ (m, WeakTermFloat f) = do
   h <- newHoleInCtx []
   retPreTerm h (toLoc m) $ PreTermFloat f
+infer _ (m, WeakTermEnum name) = retPreTerm univ (toLoc m) $ PreTermEnum name
+infer _ (m, WeakTermEnumIntro labelOrNum) = do
+  case labelOrNum of
+    EnumValueLabel l -> do
+      k <- lookupKind l
+      let t = (newMetaTerminal, PreTermEnum $ EnumTypeLabel k)
+      retPreTerm t (toLoc m) $ PreTermEnumIntro labelOrNum
+    EnumValueNatNum i _ -> do
+      let t = (newMetaTerminal, PreTermEnum $ EnumTypeNatNum i)
+      retPreTerm t (toLoc m) $ PreTermEnumIntro labelOrNum
+infer ctx (m, WeakTermEnumElim e les) = do
+  e' <- infer ctx e
+  if null les
+    then do
+      h <- newHoleInCtx ctx
+      retPreTerm h (toLoc m) $ PreTermEnumElim e' [] -- ex falso quodlibet
+    else do
+      let (ls, es) = unzip les
+      tls <- mapM inferCase ls
+      constrainList $ (typeOf e') : catMaybes tls
+      es' <- mapM (infer ctx) es
+      constrainList $ map typeOf es'
+      retPreTerm (typeOf $ head es') (toLoc m) $ PreTermEnumElim e' $ zip ls es'
 infer _ _ = undefined
 
 -- infer _ (meta, WeakTermEnum _) = returnAfterUpdate meta univ
@@ -224,15 +247,16 @@ newHoleInCtx ctx = do
   -- hole <- newHoleOfType (newMetaTerminal, WeakTermPi ctx app)
   -- wrapWithType app (WeakTermPiElim hole varSeq)
 
--- inferCase :: Case -> WithEnv (Maybe WeakTermPlus)
--- inferCase (CaseValue (EnumValueLabel name)) = do
---   ienv <- gets enumEnv
---   k <- lookupKind' name ienv
---   return $ Just (newMetaTerminal, WeakTermEnum $ EnumTypeLabel k)
--- inferCase (CaseValue (EnumValueNatNum i _)) =
---   return $ Just (newMetaTerminal, WeakTermEnum $ EnumTypeNatNum i)
--- inferCase _ = return Nothing
---    inferList ctx [e1, ..., en]
+inferCase :: Case -> WithEnv (Maybe PreTermPlus)
+inferCase (CaseValue (EnumValueLabel name)) = do
+  ienv <- gets enumEnv
+  k <- lookupKind' name ienv
+  return $ Just (newMetaTerminal, PreTermEnum $ EnumTypeLabel k)
+inferCase (CaseValue (EnumValueNatNum i _)) =
+  return $ Just (newMetaTerminal, PreTermEnum $ EnumTypeNatNum i)
+inferCase _ = return Nothing
+
+-- inferList ctx [e1, ..., en]
 -- ~> [(x1, t1), ..., (xn, tn)] with xi : ti, ei : ti
 inferList ::
      Context
