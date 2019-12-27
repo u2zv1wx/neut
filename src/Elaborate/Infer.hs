@@ -64,6 +64,18 @@ infer ctx (m, WeakTermPiIntro xts e) = do
   (xts', e') <- inferPiIntro ctx xts e
   let piType = (newMetaTerminal, PreTermPi xts' (typeOf e'))
   retPreTerm piType (toLoc m) $ PreTermPiIntro xts' e'
+infer ctx (m, WeakTermPiElim e es) = do
+  e' <- infer ctx e
+  -- -- xts == [(x1, e1, t1), ..., (xn, en, tn)] with xi : ti and ei : ti
+  (xs, es', ts) <- unzip3 <$> inferList ctx es
+  let xts = zip xs ts
+  -- cod = ?M @ ctx @ (x1, ..., xn)
+  cod <- newHoleInCtx (ctx ++ xts)
+  let tPi = (newMetaTerminal, PreTermPi xts cod)
+  insConstraintEnv tPi (typeOf e')
+  -- cod' = ?M @ ctx @ (e1, ..., en)
+  let cod' = substPreTermPlus (zip xs es') cod
+  retPreTerm cod' (toLoc m) $ PreTermPiElim e' es'
 infer _ _ = undefined
 
 -- infer ctx (meta, WeakTermPiIntro xts e) = inferPiIntro ctx meta xts e
@@ -237,15 +249,19 @@ newHoleInCtx ctx = do
 -- inferCase _ = return Nothing
 --    inferList ctx [e1, ..., en]
 -- ~> [(x1, t1), ..., (xn, tn)] with xi : ti, ei : ti
--- inferList :: Context -> [WeakTermPlus] -> WithEnv Context
--- inferList _ [] = return []
--- inferList ctx (e:es) = do
---   t <- infer ctx e
---   x <- newNameWith "hole"
---   _ <- inferType ctx t
---   insTypeEnv x t
---   xts <- inferList (ctx ++ [(x, t)]) es
---   return $ (x, t) : xts
+inferList ::
+     Context
+  -> [WeakTermPlus]
+  -> WithEnv [(Identifier, PreTermPlus, PreTermPlus)]
+inferList _ [] = return []
+inferList ctx (e:es) = do
+  e' <- infer ctx e
+  x <- newNameWith "hole"
+  -- _ <- inferType ctx t
+  insTypeEnv x (typeOf e')
+  xets <- inferList (ctx ++ [(x, (typeOf e'))]) es
+  return $ (x, e', typeOf e') : xets
+
 constrainList :: [PreTermPlus] -> WithEnv ()
 constrainList [] = return ()
 constrainList [_] = return ()
