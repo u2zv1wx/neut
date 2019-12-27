@@ -2,6 +2,7 @@ module Elaborate.Infer
   ( infer
   , typeOf
   , univ
+  , metaTerminal
   ) where
 
 import Control.Monad.Except

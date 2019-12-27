@@ -12,7 +12,7 @@ import Data.Constraint
 import Data.Env
 import Data.PreTerm
 import Elaborate.Analyze
-import Elaborate.Infer (typeOf)
+import Elaborate.Infer (metaTerminal, typeOf)
 
 -- Given a queue of constraints (easier ones comes earlier), try to synthesize
 -- all of them using heuristics.
@@ -31,10 +31,8 @@ synthesize q = do
     Just (Enriched _ _ (ConstraintFlexFlex m iess e)) ->
       resolvePiElim q m iess e
     Just (Enriched (e1, e2) _ ConstraintOther) -> do
-      p "map fst substEnv:"
-      senv <- gets substEnv
-      p' $ map fst senv
       p $ "q.size = " ++ show (Q.size q)
+      -- p' q
       -- ここでe1, e2の定義を展開してみるとよいのかもしれない。
       throwError $ "cannot simplify:\n" ++ Pr.ppShow (e1, e2)
     Nothing -> return ()
@@ -54,8 +52,8 @@ resolveStuck q e1 e2 h e = do
     else return ()
   let e1' = substPreTermPlus [(h, e)] e1
   let e2' = substPreTermPlus [(h, e)] e2
-  cs <- simp [(e1', e2')]
-  synthesize $ Q.deleteMin q `Q.union` Q.fromList cs
+  q' <- analyze [(e1', e2')]
+  synthesize $ Q.deleteMin q `Q.union` q'
 
 -- Synthesize `hole @ arg-1 @ ... @ arg-n = e`, where arg-i is a variable.
 -- Suppose that we received a quasi-pattern ?M @ x @ x @ y @ z == e.
@@ -91,22 +89,11 @@ resolveHole q h e = do
     then p "broken (hole)"
     else return ()
   senv <- gets substEnv
-  p "before compose"
   modify (\env -> env {substEnv = compose [(h, e)] senv})
-  p "after compose"
   let rest = Q.deleteMin q
-  p $ "before substQueue. len = " ++ show (Q.size rest)
   let (q1, q2) = Q.partition (\(Enriched _ ms _) -> h `elem` ms) rest
   q1' <- substQueue h e q1
   synthesize $ q1' `Q.union` q2
-  -- substQueue h e rest
-  -- rest' <- substQueue h e rest
-  -- p $ "after substQueue. len = " ++ show (Q.size rest')
-  -- synthesize rest'
-  -- let (q1, q2) = Q.partition (\(Enriched _ ms _) -> h `elem` ms) rest
-  -- q1' <- substQueue h e q1
-  -- synthesize q1'
-  -- synthesize q2
 
 substQueue ::
      Identifier -> PreTermPlus -> ConstraintQueue -> WithEnv ConstraintQueue
@@ -210,8 +197,7 @@ bindFormalArgs :: PreTermPlus -> [[IdentifierPlus]] -> WithEnv PreTermPlus
 bindFormalArgs e [] = return e
 bindFormalArgs e (xts:xtss) = do
   e' <- bindFormalArgs e xtss
-  let cod = typeOf e'
-  let tPi = (PreMetaTerminal Nothing, PreTermPi xts cod)
+  let tPi = (metaTerminal, PreTermPi xts (typeOf e'))
   return (PreMetaNonTerminal tPi Nothing, PreTermPiIntro xts e')
 
 -- takeByCount [1, 3, 2] [a, b, c, d, e, f, g, h] ~> [[a], [b, c, d], [e, f]]

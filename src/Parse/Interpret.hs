@@ -103,7 +103,7 @@ interpret (m, TreeAtom x)
   | Just (i, j) <- readNatEnumValue x =
     withMeta m $ WeakTermEnumIntro $ EnumValueNatNum i j
 interpret (m, TreeNode [(_, TreeAtom "arrow"), (_, TreeNode ts), t]) = do
-  xs <- mapM (const $ newNameWith "hole") ts
+  xs <- mapM (const $ newNameWith "hole-arrow") ts
   ts' <- mapM interpret ts
   t' <- interpret t
   withMeta m $ WeakTermPi (zip xs ts') t'
@@ -143,7 +143,7 @@ isConstant x
 
 interpretIdentifierPlus :: TreePlus -> WithEnv IdentifierPlus
 interpretIdentifierPlus (_, TreeAtom x) = do
-  h <- newNameWith "hole"
+  h <- newNameWith "hole-plus"
   return (x, (newWeakMetaTerminal, WeakTermZeta h))
 interpretIdentifierPlus (_, TreeNode [(_, TreeAtom x), t]) = do
   x' <- interpretAtom x
@@ -153,7 +153,7 @@ interpretIdentifierPlus ut =
   throwError $ "interpretIdentifierPlus: syntax error:\n" ++ Pr.ppShow ut
 
 interpretAtom :: String -> WithEnv String
-interpretAtom "_" = newNameWith "hole"
+interpretAtom "_" = newNameWith "hole-explicit"
 interpretAtom x = return x
 
 interpretEnumValueMaybe :: TreePlus -> WithEnv (Maybe EnumValue)

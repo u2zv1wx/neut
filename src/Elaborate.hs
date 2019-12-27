@@ -5,9 +5,11 @@ module Elaborate
 import Control.Monad.Except
 import Control.Monad.State
 import Data.List (nub)
+import qualified Data.PQueue.Min as Q
 import Numeric.Half
 
 import Data.Basic
+import Data.Constraint
 import Data.Env
 import Data.PreTerm
 import Data.Term
@@ -33,7 +35,8 @@ elaborate e = do
   -- Kantian type-inference ;)
   p "analyze"
   q <- gets constraintEnv >>= analyze
-  p "synth"
+  -- p "synth. q:"
+  -- p' $ map (\(Enriched pair _ _) -> pair) $ Q.toList q
   synthesize q
   -- gets constraintEnv >>= analyze >>= synthessize
   -- gets constraintQueue >>= synthesize

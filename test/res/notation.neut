@@ -137,5 +137,7 @@
 (definition io ((a type))
   (state bottom a))
 
+;; (notation (definition name (x+) e+)
+;;   (let name (mu name (lambda (x+) e+))))
 ;; just for test
 (enum top unit)

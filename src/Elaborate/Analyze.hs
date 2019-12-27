@@ -12,7 +12,7 @@ import Data.Basic
 import Data.Constraint
 import Data.Env
 import Data.PreTerm
-import Elaborate.Infer (typeOf, univ)
+import Elaborate.Infer (metaTerminal, typeOf, univ)
 import Reduce.PreTerm
 
 analyze :: [PreConstraint] -> WithEnv ConstraintQueue
@@ -22,8 +22,7 @@ simp :: [PreConstraint] -> WithEnv [EnrichedConstraint]
 simp [] = return []
 simp ((e1, e2):cs)
   | isReducible e1 = do
-    me1' <-
-      reducePreTermPlus e1 >>= \e1' -> liftIO $ timeout 5000000 $ return e1'
+    me1' <- reducePreTermPlus e1 >>= liftIO . timeout 5000000 . return
     case me1' of
       Just e1' -> simp $ (e1', e2) : cs
       Nothing ->
@@ -38,52 +37,41 @@ simp (((m1, PreTermUpsilon x1), (m2, PreTermUpsilon x2)):cs)
   | x1 == x2 = simpMetaRet [(m1, m2)] (simp cs)
 simp (((m1, PreTermPi [] cod1), (m2, PreTermPi [] cod2)):cs) =
   simpMetaRet [(m1, m2)] $ simp $ (cod1, cod2) : cs
-simp (((m1, PreTermPi ((x1, t1):xts1) cod1), (m2, PreTermPi ((x2, t2):xts2) cod2)):cs)
-  | length xts1 == length xts2 = do
-    var1 <- toVar x1 t1
-    -- the "m2" here is not used
-    let (_, pi2) = substPreTermPlus [(x2, var1)] (m2, PreTermPi xts2 cod2)
-    csCont <- simp [((m1, PreTermPi xts1 cod1), (m1, pi2))]
-    cs' <- simpMetaRet [(m1, m2)] $ simp $ (t1, t2) : cs
-    return $ cs' ++ csCont
--- simp (((m1, PreTermPi xts1 cod1), (m2, PreTermPi xts2 cod2)):cs)
---   | length xts1 == length xts2 =
---     simpMetaRet [(m1, m2)] $ simpBinder xts1 cod1 xts2 cod2 cs
-simp (((m1, PreTermPiIntro [] cod1), (m2, PreTermPiIntro [] cod2)):cs) =
-  simpMetaRet [(m1, m2)] $ simp $ (cod1, cod2) : cs
-simp (((m1, PreTermPiIntro ((x1, t1):xts1) cod1), (m2, PreTermPiIntro ((x2, t2):xts2) cod2)):cs)
-  | length xts1 == length xts2 = do
-    var1 <- toVar x1 t1
-    let (_, pi2) = substPreTermPlus [(x2, var1)] (m2, PreTermPiIntro xts2 cod2)
-    csCont <- simp [((m1, PreTermPiIntro xts1 cod1), (m1, pi2))]
-    cs' <- simpMetaRet [(m1, m2)] $ simp $ (t1, t2) : cs
-    return $ cs' ++ csCont
--- simp (((m1, PreTermPiIntro xts1 e1), (m2, PreTermPiIntro xts2 e2)):cs)
---   | length xts1 == length xts2 =
---     simpMetaRet [(m1, m2)] $ simpBinder xts1 e1 xts2 e2 cs
+simp (((m1, PreTermPi ((x1, t1):xts1) cod1), (m2, PreTermPi ((x2, t2):xts2) cod2)):cs) = do
+  var1 <- toVar x1 t1
+  let m = metaTerminal
+  let (_, pi2) = substPreTermPlus [(x2, var1)] (m, PreTermPi xts2 cod2)
+  csCont <- simp [((m, PreTermPi xts1 cod1), (m, pi2))]
+  cs' <- simpMetaRet [(m1, m2)] $ simp $ (t1, t2) : cs
+  return $ cs' ++ csCont
+simp (((m1, PreTermPiIntro xts1 e1), (m2, PreTermPiIntro xts2 e2)):cs) =
+  simp (((m1, PreTermPi xts1 e1), (m2, PreTermPi xts2 e2)) : cs)
+-- patternに落とすためpi-introはpi-elimで表現する
 simp (((m1, PreTermPiIntro xts body1), e2@(m2, _)):cs) = do
   vs <- mapM (uncurry toVar) xts
   let appMeta = (PreMetaNonTerminal (typeOf body1) Nothing)
   simpMetaRet [(m1, m2)] $ simp $ (body1, (appMeta, PreTermPiElim e2 vs)) : cs
 simp ((e1, e2@(_, PreTermPiIntro {})):cs) = simp $ (e2, e1) : cs
-simp ((e1, e2):cs)
-  | (m11, PreTermPiElim (m12, PreTermUpsilon f) es1) <- e1
-  , (m21, PreTermPiElim (m22, PreTermUpsilon g) es2) <- e2
-  , f == g
-  , length es1 == length es2 =
-    simpMetaRet [(m11, m21), (m12, m22)] $ simp $ zip es1 es2 ++ cs
-simp ((e1, e2):cs)
-  | (m11, PreTermPiElim (m12, PreTermTheta f) es1) <- e1
-  , (m21, PreTermPiElim (m22, PreTermTheta g) es2) <- e2
-  , f == g
-  , length es1 == length es2 =
-    simpMetaRet [(m11, m21), (m12, m22)] $ simp $ zip es1 es2 ++ cs
-simp ((e1, e2):cs)
-  | (m11, PreTermPiElim (m12, PreTermZeta f) es1) <- e1
-  , (m21, PreTermPiElim (m22, PreTermZeta g) es2) <- e2
-  , f == g
-  , length es1 == length es2 =
-    simpMetaRet [(m11, m21), (m12, m22)] $ simp $ zip es1 es2 ++ cs
+-- これ言えなくない？たとえば、f = g = lam (_ _ _). 3とかだったら、
+-- f @ (1, 2, 3) == g @ (4, 5, 6) となるはず。
+-- simp ((e1, e2):cs)
+--   | (m11, PreTermPiElim (m12, PreTermUpsilon f) es1) <- e1
+--   , (m21, PreTermPiElim (m22, PreTermUpsilon g) es2) <- e2
+--   , f == g
+--   , length es1 == length es2 =
+--     simpMetaRet [(m11, m21), (m12, m22)] $ simp $ zip es1 es2 ++ cs
+-- simp ((e1, e2):cs)
+--   | (m11, PreTermPiElim (m12, PreTermTheta f) es1) <- e1
+--   , (m21, PreTermPiElim (m22, PreTermTheta g) es2) <- e2
+--   , f == g
+--   , length es1 == length es2 =
+--     simpMetaRet [(m11, m21), (m12, m22)] $ simp $ zip es1 es2 ++ cs
+-- simp ((e1, e2):cs)
+--   | (m11, PreTermPiElim (m12, PreTermZeta f) es1) <- e1
+--   , (m21, PreTermPiElim (m22, PreTermZeta g) es2) <- e2
+--   , f == g
+--   , length es1 == length es2 =
+--     simpMetaRet [(m11, m21), (m12, m22)] $ simp $ zip es1 es2 ++ cs
 simp (((m1, PreTermMu (x1, t1) e1), (m2, PreTermMu (x2, t2) e2)):cs)
   | x1 == x2 = simpMetaRet [(m1, m2)] $ simp $ (t1, t2) : (e1, e2) : cs
 simp (((m1, PreTermZeta x), (m2, PreTermZeta y)):cs)
@@ -146,6 +134,7 @@ simp ((e1, e2):cs) = do
   let (_, fmvs1) = varPreTermPlus e1
   let (_, fmvs2) = varPreTermPlus e2
   let fmvs = fmvs1 ++ fmvs2
+  -- subst h ~> eをつくるときにはeのなかにhが含まれていないことをチェックすること
   case (ms1, ms2) of
     (Just (StuckHole h1), _)
       | h1 `notElem` fmvs2 -> do
@@ -165,7 +154,7 @@ simpPatIfPossible ::
   -> Maybe Stuck
   -> Identifier
   -> [[(PreTermPlus, Identifier)]]
-  -> [((PreMeta, PreTerm), PreTermPlus)]
+  -> [(PreTermPlus, PreTermPlus)]
   -> WithEnv [EnrichedConstraint]
 simpPatIfPossible _ _ _ _ [] = return []
 simpPatIfPossible ms1 ms2 h1 exs1 ((e1, e2):cs) = do
@@ -184,7 +173,7 @@ simpPatIfPossible ms1 ms2 h1 exs1 ((e1, e2):cs) = do
 simpStuck ::
      Maybe Stuck
   -> Maybe Stuck
-  -> [((PreMeta, PreTerm), (PreMeta, PreTerm))]
+  -> [(PreTermPlus, PreTermPlus)]
   -> WithEnv [EnrichedConstraint]
 simpStuck _ _ [] = return []
 simpStuck ms1 ms2 ((e1, e2):cs) = do
@@ -239,29 +228,6 @@ simpMeta m1@(PreMetaNonTerminal _ _) (PreMetaTerminal _) =
 simpMeta (PreMetaNonTerminal t1 _) (PreMetaNonTerminal t2 _) = do
   simp [(t1, t2)]
 
--- simpBinder ::
---      [IdentifierPlus]
---   -> PreTermPlus
---   -> [IdentifierPlus]
---   -> PreTermPlus
---   -> [PreConstraint]
---   -> WithEnv [EnrichedConstraint]
--- simpBinder xts1 t1 xts2 t2 cs = do
---   h1 <- newNameWith "holeA"
---   h2 <- newNameWith "holeB"
---   simpBinder' (xts1 ++ [(h1, t1)]) (xts2 ++ [(h2, t2)]) cs
--- simpBinder' ::
---      [IdentifierPlus]
---   -> [IdentifierPlus]
---   -> [PreConstraint]
---   -> WithEnv [EnrichedConstraint]
--- simpBinder' xts1 xts2 cs = do
---   vs1' <- mapM (uncurry toVar) xts1
---   let s = substPreTermPlus (zip (map fst xts2) vs1')
---   p "rename:"
---   p' (zip (map fst xts2) vs1')
---   let xts2' = map (s . snd) xts2
---   simp $ zip (map snd xts1) xts2' ++ cs
 simpArrayIntro ::
      [(EnumValue, PreTermPlus)]
   -> [(EnumValue, PreTermPlus)]

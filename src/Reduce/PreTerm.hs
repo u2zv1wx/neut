@@ -13,6 +13,11 @@ import Data.Env
 import Data.PreTerm
 
 reducePreTermPlus :: PreTermPlus -> WithEnv PreTermPlus
+reducePreTermPlus (m, PreTermPi xts cod) = do
+  let (xs, ts) = unzip xts
+  ts' <- mapM reducePreTermPlus ts
+  cod' <- reducePreTermPlus cod
+  return $ (m, PreTermPi (zip xs ts') cod')
 reducePreTermPlus (m, PreTermPiElim e es) = do
   e' <- reducePreTermPlus e
   es' <- mapM reducePreTermPlus es
@@ -21,8 +26,6 @@ reducePreTermPlus (m, PreTermPiElim e es) = do
     (_, PreTermPiIntro xts body)
       | length xts == length es' -> do
         let xs = map fst xts
-        -- でもpi-introはいろいろなところで使われるから、こうsubstを限定することはできないんでは
-        modify (\env -> env {substEnv = zip xs es' ++ substEnv env}) -- remember beta-equivalence
         let body' = substPreTermPlus (zip xs es') body
         reducePreTermPlus body'
     self@(_, PreTermMu (x, _) body)

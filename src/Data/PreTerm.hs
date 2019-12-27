@@ -226,9 +226,9 @@ isReducible :: PreTermPlus -> Bool
 isReducible (_, PreTermTau) = False
 isReducible (_, PreTermTheta _) = False
 isReducible (_, PreTermUpsilon _) = False
-isReducible (_, PreTermPi _ _) = False
--- isReducible (_, PreTermPi xts cod) =
---   any isReducible (map snd xts) || isReducible cod
+-- isReducible (_, PreTermPi _ _) = False
+isReducible (_, PreTermPi xts cod) =
+  any isReducible (map snd xts) || isReducible cod
 isReducible (_, PreTermPiIntro {}) = False
 -- isReducible (_, PreTermPiElim (_, PreTermPiIntro xts _) es)
 --   | length xts == length es

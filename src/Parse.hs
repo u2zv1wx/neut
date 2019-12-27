@@ -55,8 +55,10 @@ parse' ((_, TreeNode ((_, TreeAtom "enum"):(_, TreeAtom name):ts)):as) = do
   -- type constraint for constName
   -- e.g. t == is-enum @ (choice)
   isEnumType <- toIsEnumType name
-  h <- newNameWith "hole"
+  h <- newNameWith "hole-parse-enum"
   -- add `let (_, is-enum choice) := enum.choice` to defList in order to insert appropriate type constraint
+  p $ "h: " ++ show h
+  p $ "constName: " ++ show constName
   let ascription =
         DefLet newMeta (h, isEnumType) (newMeta, WeakTermTheta constName)
   defList <- parse' as
@@ -102,7 +104,7 @@ parse' (a:as)
     then parse' $ e : as
     else do
       e'@(meta, _) <- interpret e >>= rename
-      name <- newNameWith "hole"
+      name <- newNameWith "hole-parse-last"
       t <- newHole
       defList <- parse' as
       return $ DefLet meta (name, t) e' : defList
@@ -152,5 +154,5 @@ newMeta = WeakMetaNonTerminal Nothing
 
 newHole :: WithEnv WeakTermPlus
 newHole = do
-  h <- newNameWith "hole"
+  h <- newNameWith "hole-parse-zeta"
   return (newMeta, WeakTermZeta h)
