@@ -56,10 +56,9 @@ parse' ((_, TreeNode ((_, TreeAtom "enum"):(_, TreeAtom name):ts)):as) = do
   -- e.g. t == is-enum @ (choice)
   isEnumType <- toIsEnumType name
   h <- newNameWith "hole"
-  m1 <- newMeta
-  m2 <- newMeta
   -- add `let (_, is-enum choice) := enum.choice` to defList in order to insert appropriate type constraint
-  let ascription = DefLet m1 (h, isEnumType) (m2, WeakTermTheta constName)
+  let ascription =
+        DefLet newMeta (h, isEnumType) (newMeta, WeakTermTheta constName)
   defList <- parse' as
   return $ ascription : defList
 parse' ((_, TreeNode [(_, TreeAtom "include"), (_, TreeAtom pathString)]):as) =
@@ -94,8 +93,7 @@ parse' ((_, TreeNode [(_, TreeAtom "let"), xt, e]):as) = do
   t' <- rename t
   x' <- newNameWith x
   defList <- parse' as
-  m <- newMeta
-  return $ DefLet m (x', t') e' : defList
+  return $ DefLet newMeta (x', t') e' : defList
 parse' (a:as)
   -- If the head element is not a special form, we interpret it as an ordinary term.
  = do
@@ -105,8 +103,7 @@ parse' (a:as)
     else do
       e'@(meta, _) <- interpret e >>= rename
       name <- newNameWith "hole"
-      let u = (WeakMetaTerminal Nothing, WeakTermTau)
-      t <- newHoleOfType u
+      t <- newHole
       defList <- parse' as
       return $ DefLet meta (name, t) e' : defList
 
@@ -122,39 +119,38 @@ isSpecialForm _ = False
 
 toIsEnumType :: Identifier -> WithEnv WeakTermPlus
 toIsEnumType name = do
-  m1 <- newMeta
-  m2 <- newMeta
-  m3 <- newMeta
   return
-    ( m1
+    ( newMeta
     , WeakTermPiElim
-        (m2, WeakTermTheta "is-enum")
-        [(m3, WeakTermEnum $ EnumTypeLabel name)])
+        (newMeta, WeakTermTheta "is-enum")
+        [(newMeta, WeakTermEnum $ EnumTypeLabel name)])
 
 -- Represent the list of Defs in the target language, using `let`.
 -- (Note that `let x := e1 in e2` can be represented as `(lam x e2) e1`.)
 concatDefList :: [Def] -> WithEnv WeakTermPlus
 concatDefList [] = do
-  let t = (WeakMetaTerminal Nothing, WeakTermEnum $ EnumTypeLabel "top")
-  m <- newMetaOfType t
-  return (m, WeakTermEnumIntro $ EnumValueLabel "unit")
--- concatDefList [DefLet meta xt@(x, t) e] = do
---   mx <- newMetaOfType t
---   let varX = (mx, WeakTermUpsilon x)
---   m <- newMeta
---   m1 <- newMeta
---   m2 <- newMeta
---   -- let x : t := e in
---   -- unsafe.eval-io x
---   return
---     ( meta
---     , WeakTermPiElim
---         ( m
---         , WeakTermPiIntro
---             [xt]
---             (m1, WeakTermPiElim (m2, WeakTermTheta "unsafe.eval-io") [varX]))
---         [e])
+  return (newMeta, WeakTermEnumIntro $ EnumValueLabel "unit")
+concatDefList [DefLet meta xt@(x, _) e] = do
+  let varX = (newMeta, WeakTermUpsilon x)
+  -- let x : t := e in
+  -- unsafe.eval-io x
+  return
+    ( meta
+    , WeakTermPiElim
+        ( newMeta
+        , WeakTermPiIntro
+            [xt]
+            ( newMeta
+            , WeakTermPiElim (newMeta, WeakTermTheta "unsafe.eval-io") [varX]))
+        [e])
 concatDefList (DefLet meta xt e:es) = do
   cont <- concatDefList es
-  m <- newMeta
-  return (meta, WeakTermPiElim (m, WeakTermPiIntro [xt] cont) [e])
+  return (meta, WeakTermPiElim (newMeta, WeakTermPiIntro [xt] cont) [e])
+
+newMeta :: WeakMeta
+newMeta = WeakMetaNonTerminal Nothing
+
+newHole :: WithEnv WeakTermPlus
+newHole = do
+  h <- newNameWith "hole"
+  return (newMeta, WeakTermZeta h)
