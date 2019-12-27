@@ -81,6 +81,8 @@ resolvePiElim q m ess e = do
   lamList <- mapM (bindFormalArgs e) xsss
   chain q $ map (resolveHole q m) lamList
 
+-- resolveHoleは[(Hole, PreTermPlus)]を受け取るようにしたほうがよさそう。
+-- で、synthesizeのときに複数のhole-substをまとめてこっちに渡す。
 resolveHole :: ConstraintQueue -> Hole -> PreTermPlus -> WithEnv ()
 resolveHole q h e = do
   p $ "resolveHole for " ++ h
@@ -90,23 +92,23 @@ resolveHole q h e = do
     else return ()
   senv <- gets substEnv
   modify (\env -> env {substEnv = compose [(h, e)] senv})
-  let rest = Q.deleteMin q
-  let (q1, q2) = Q.partition (\(Enriched _ ms _) -> h `elem` ms) rest
-  q1' <- substQueue h e q1
-  synthesize $ q1' `Q.union` q2
+  -- let rest = Q.deleteMin q
+  synthesize $ Q.deleteMin q
+  -- let (q1, q2) = Q.partition (\(Enriched _ ms _) -> h `elem` ms) rest
+  -- q1' <- substQueue h e q1
+  -- synthesize $ q1' `Q.union` q2
 
-substQueue ::
-     Identifier -> PreTermPlus -> ConstraintQueue -> WithEnv ConstraintQueue
-substQueue h e q = do
-  cs <-
-    mapM
-      (\(Enriched (e1, e2) _ _) -> do
-         let e1' = substPreTermPlus [(h, e)] e1
-         let e2' = substPreTermPlus [(h, e)] e2
-         return (e1', e2'))
-      (Q.toList q)
-  analyze cs
-
+-- substQueue ::
+--      Identifier -> PreTermPlus -> ConstraintQueue -> WithEnv ConstraintQueue
+-- substQueue h e q = do
+--   cs <-
+--     mapM
+--       (\(Enriched (e1, e2) _ _) -> do
+--          let e1' = substPreTermPlus [(h, e)] e1
+--          let e2' = substPreTermPlus [(h, e)] e2
+--          return (e1', e2'))
+--       (Q.toList q)
+--   analyze cs
 -- [e, x, y, y, e2, e3, z] ~> [p, x, y, y, q, r, z]  (p, q, r: new variables)
 toVarList :: [PreTermPlus] -> WithEnv [(Identifier, PreTermPlus)]
 toVarList [] = return []
