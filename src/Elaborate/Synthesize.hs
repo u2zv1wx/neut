@@ -2,6 +2,7 @@ module Elaborate.Synthesize
   ( synthesize
   ) where
 
+import Control.Exception
 import Control.Monad.Except
 import Control.Monad.State
 import qualified Data.PQueue.Min as Q
@@ -22,7 +23,24 @@ synthesize q = do
   case Q.getMin q of
     Just (Enriched (e1, e2) ms _)
       | Just (m, e) <- lookupAny ms sub -> resolveStuck q e1 e2 m e
-    Just (Enriched _ _ (ConstraintImmediate m e)) -> resolveHole q m e
+    _ -> synthesize' q
+    -- Just (Enriched _ _ (ConstraintImmediate m e)) -> resolveHole q [(m, e)]
+    -- Just (Enriched _ _ (ConstraintPattern m iess e)) -> resolvePiElim q m iess e
+    -- Just (Enriched _ _ (ConstraintQuasiPattern m iess e)) ->
+    --   resolvePiElim q m iess e
+    -- Just (Enriched _ _ (ConstraintFlexRigid m iess e)) ->
+    --   resolvePiElim q m iess e
+    -- Just (Enriched _ _ (ConstraintFlexFlex m iess e)) ->
+    --   resolvePiElim q m iess e
+    -- Just (Enriched (e1, e2) _ ConstraintOther) -> do
+    --   p $ "q.size = " ++ show (Q.size q)
+    --   throwError $ "cannot simplify:\n" ++ Pr.ppShow (e1, e2)
+    -- Nothing -> return ()
+
+synthesize' :: ConstraintQueue -> WithEnv ()
+synthesize' q = do
+  case Q.getMin q of
+    Just (Enriched _ _ (ConstraintImmediate m e)) -> resolveHole q [(m, e)]
     Just (Enriched _ _ (ConstraintPattern m iess e)) -> resolvePiElim q m iess e
     Just (Enriched _ _ (ConstraintQuasiPattern m iess e)) ->
       resolvePiElim q m iess e
@@ -32,8 +50,6 @@ synthesize q = do
       resolvePiElim q m iess e
     Just (Enriched (e1, e2) _ ConstraintOther) -> do
       p $ "q.size = " ++ show (Q.size q)
-      -- p' q
-      -- ここでe1, e2の定義を展開してみるとよいのかもしれない。
       throwError $ "cannot simplify:\n" ++ Pr.ppShow (e1, e2)
     Nothing -> return ()
 
@@ -47,12 +63,9 @@ resolveStuck ::
 resolveStuck q e1 e2 h e = do
   p $ "resolveStuck for " ++ h
   let (_, fmvs) = varPreTermPlus e
-  if h `elem` fmvs
-    then p "broken"
-    else return ()
   let e1' = substPreTermPlus [(h, e)] e1
   let e2' = substPreTermPlus [(h, e)] e2
-  q' <- analyze [(e1', e2')]
+  q' <- assert (h `notElem` fmvs) $ analyze [(e1', e2')]
   synthesize $ Q.deleteMin q `Q.union` q'
 
 -- Synthesize `hole @ arg-1 @ ... @ arg-n = e`, where arg-i is a variable.
@@ -69,29 +82,21 @@ resolveStuck q e1 e2 h e = do
 resolvePiElim ::
      ConstraintQueue -> Hole -> [[PreTermPlus]] -> PreTermPlus -> WithEnv ()
 resolvePiElim q m ess e = do
-  p $ "resolvePiElim for " ++ m
   let (_, fmvs) = varPreTermPlus e
-  if m `elem` fmvs
-    then p "broken (pielim)"
-    else return ()
-  let lengthInfo = map length ess
+  let lengthInfo = assert (m `notElem` fmvs) $ map length ess
   let es = concat ess
   xss <- toVarList es >>= toAltList
   let xsss = map (takeByCount lengthInfo) xss
-  lamList <- mapM (bindFormalArgs e) xsss
-  chain q $ map (resolveHole q m) lamList
+  let lamList = map (bindFormalArgs e) xsss
+  chain q $ map (\lam -> resolveHole q [(m, lam)]) lamList
 
 -- resolveHoleは[(Hole, PreTermPlus)]を受け取るようにしたほうがよさそう。
 -- で、synthesizeのときに複数のhole-substをまとめてこっちに渡す。
-resolveHole :: ConstraintQueue -> Hole -> PreTermPlus -> WithEnv ()
-resolveHole q h e = do
-  p $ "resolveHole for " ++ h
-  let (_, fmvs) = varPreTermPlus e
-  if h `elem` fmvs
-    then p "broken (hole)"
-    else return ()
+resolveHole :: ConstraintQueue -> [(Hole, PreTermPlus)] -> WithEnv ()
+resolveHole q sub = do
   senv <- gets substEnv
-  modify (\env -> env {substEnv = compose [(h, e)] senv})
+  let b = and $ map (\(h, e) -> h `notElem` snd (varPreTermPlus e)) sub
+  assert b $ modify (\env -> env {substEnv = compose sub senv})
   synthesize $ Q.deleteMin q
 
 -- [e, x, y, y, e2, e3, z] ~> [p, x, y, y, q, r, z]  (p, q, r: new variables)
@@ -180,12 +185,12 @@ lookupAny (h:ks) sub = do
     Just v -> Just (h, v)
     _ -> lookupAny ks sub
 
-bindFormalArgs :: PreTermPlus -> [[IdentifierPlus]] -> WithEnv PreTermPlus
-bindFormalArgs e [] = return e
+bindFormalArgs :: PreTermPlus -> [[IdentifierPlus]] -> PreTermPlus
+bindFormalArgs e [] = e
 bindFormalArgs e (xts:xtss) = do
-  e' <- bindFormalArgs e xtss
+  let e' = bindFormalArgs e xtss
   let tPi = (metaTerminal, PreTermPi xts (typeOf e'))
-  return (PreMetaNonTerminal tPi Nothing, PreTermPiIntro xts e')
+  (PreMetaNonTerminal tPi Nothing, PreTermPiIntro xts e')
 
 -- takeByCount [1, 3, 2] [a, b, c, d, e, f, g, h] ~> [[a], [b, c, d], [e, f]]
 takeByCount :: [Int] -> [a] -> [[a]]
