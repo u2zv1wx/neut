@@ -82,14 +82,16 @@ infer ctx (m, WeakTermMu (x, t) e) = do
   e' <- infer (ctx ++ [(x, t')]) e
   insConstraintEnv t' (typeOf e')
   retPreTerm t' (toLoc m) $ PreTermMu (x, t') e'
+infer ctx (m, WeakTermZeta x) = do
+  mt <- lookupTypeEnvMaybe x
+  case mt of
+    Just t -> retPreTerm t (toLoc m) $ PreTermZeta x
+    Nothing -> do
+      h <- newHoleInCtx ctx
+      insTypeEnv x h
+      retPreTerm h (toLoc m) $ PreTermZeta x
 infer _ _ = undefined
 
--- infer ctx (meta, WeakTermMu (x, t) e) = do
---   _ <- inferType ctx t
---   insTypeEnv x t
---   te <- infer (ctx ++ [(x, t)]) e
---   insConstraintEnv te t
---   returnAfterUpdate meta te
 -- infer ctx (meta, WeakTermZeta x) = do
 --   mt <- lookupTypeEnvMaybe x
 --   case mt of
