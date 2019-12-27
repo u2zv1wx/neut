@@ -9,6 +9,7 @@ import Numeric.Half
 
 import Data.Basic
 import Data.Env
+import Data.PreTerm
 import Data.Term
 import Data.WeakTerm
 import Elaborate.Analyze
@@ -27,55 +28,59 @@ import Reduce.Term
 -- https://arxiv.org/abs/1505.04324, 2015.
 elaborate :: WeakTermPlus -> WithEnv TermPlus
 elaborate e = do
-  _ <- infer [] e
+  p "infer"
+  e' <- infer [] e
   -- Kantian type-inference ;)
+  p "analyze"
   gets constraintEnv >>= analyze
+  p "synth"
   gets constraintQueue >>= synthesize
+  p "ok"
   -- update the type environment by resulting substitution
   sub <- gets substEnv
   tenv <- gets typeEnv
-  tenv' <- mapM (substWeakTermPlus sub) tenv
+  tenv' <- mapM (return . substPreTermPlus sub) tenv
   modify (\env -> env {typeEnv = tenv'})
   -- elaborate `e` using the resulting substitution
   -- liftIO $ putStrLn $ Pr.ppShow e
-  e' <- substWeakTermPlus sub e
-  e'' <- elaborate' e'
-  caseCheck e''
-  return e''
+  let e'' = substPreTermPlus sub e'
+  e''' <- elaborate' e''
+  caseCheck e'''
+  return e'''
   -- caseCheck e' >>= elaborate'
 
 -- This function translates a well-typed term into an untyped term in a
 -- reduction-preserving way. Here, we translate types into units (nullary product).
 -- This doesn't cause any problem since types doesn't have any beta-reduction.
-elaborate' :: WeakTermPlus -> WithEnv TermPlus
-elaborate' (m, WeakTermTau) = do
+elaborate' :: PreTermPlus -> WithEnv TermPlus
+elaborate' (m, PreTermTau) = do
   m' <- toMeta m
   return (m', TermTau)
-elaborate' (m, WeakTermTheta x) = do
+elaborate' (m, PreTermTheta x) = do
   m' <- toMeta m
   mi <- elaborateIsEnum x
   case mi of
     Nothing -> return (m', TermTheta x)
     Just i -> return (m', TermIntU 64 i)
-elaborate' (m, WeakTermUpsilon x) = do
+elaborate' (m, PreTermUpsilon x) = do
   m' <- toMeta m
   return (m', TermUpsilon x)
-elaborate' (m, WeakTermPi xts t) = do
+elaborate' (m, PreTermPi xts t) = do
   m' <- toMeta m
   xts' <- mapM elaboratePlus xts
   t' <- elaborate' t
   return (m', TermPi xts' t')
-elaborate' (m, WeakTermPiIntro xts e) = do
+elaborate' (m, PreTermPiIntro xts e) = do
   m' <- toMeta m
   e' <- elaborate' e
   xts' <- mapM elaboratePlus xts
   return (m', TermPiIntro xts' e')
-elaborate' (m, WeakTermPiElim e es) = do
+elaborate' (m, PreTermPiElim e es) = do
   m' <- toMeta m
   e' <- elaborate' e
   es' <- mapM elaborate' es
   return (m', TermPiElim e' es')
-elaborate' (m, WeakTermMu (x, t) e) = do
+elaborate' (m, PreTermMu (x, t) e) = do
   t' <- elaborate' t >>= reduceTermPlus
   case t' of
     (_, TermPi _ _) -> do
@@ -83,18 +88,18 @@ elaborate' (m, WeakTermMu (x, t) e) = do
       e' <- elaborate' e
       return (m', TermMu (x, t') e')
     _ -> throwError "CBV recursion is allowed only for Pi-types"
-elaborate' (_, WeakTermZeta x) = do
+elaborate' (_, PreTermZeta x) = do
   sub <- gets substEnv
   case lookup x sub of
     Just e -> elaborate' e
     Nothing -> throwError $ "elaborate' i: remaining hole: " ++ x
-elaborate' (m, WeakTermIntS size x) = do
+elaborate' (m, PreTermIntS size x) = do
   m' <- toMeta m
   return (m', TermIntS size x)
-elaborate' (m, WeakTermIntU size x) = do
+elaborate' (m, PreTermIntU size x) = do
   m' <- toMeta m
   return (m', TermIntU size x)
-elaborate' (m, WeakTermInt x) = do
+elaborate' (m, PreTermInt x) = do
   m' <- toMeta m
   t <- reduceTermPlus $ obtainTermType m'
   case t of
@@ -103,17 +108,17 @@ elaborate' (m, WeakTermInt x) = do
         Just (LowTypeIntS size) -> return (m', TermIntS size x)
         Just (LowTypeIntU size) -> return (m', TermIntU size x)
         _ -> throwError $ show x ++ " should be int, but is " ++ intType
-    _ -> throwError "elaborate.WeakTermInt"
-elaborate' (m, WeakTermFloat16 x) = do
+    _ -> throwError "elaborate.PreTermInt"
+elaborate' (m, PreTermFloat16 x) = do
   m' <- toMeta m
   return (m', TermFloat16 x)
-elaborate' (m, WeakTermFloat32 x) = do
+elaborate' (m, PreTermFloat32 x) = do
   m' <- toMeta m
   return (m', TermFloat32 x)
-elaborate' (m, WeakTermFloat64 x) = do
+elaborate' (m, PreTermFloat64 x) = do
   m' <- toMeta m
   return (m', TermFloat64 x)
-elaborate' (m, WeakTermFloat x) = do
+elaborate' (m, PreTermFloat x) = do
   m' <- toMeta m
   t <- reduceTermPlus $ obtainTermType m'
   case t of
@@ -125,35 +130,35 @@ elaborate' (m, WeakTermFloat x) = do
         Just (LowTypeFloat FloatSize32) -> return (m', TermFloat32 x32)
         Just (LowTypeFloat FloatSize64) -> return (m', TermFloat64 x)
         _ -> throwError $ show x ++ " should be float, but is " ++ floatType
-    _ -> throwError "elaborate.WeakTermFloat"
-elaborate' (m, WeakTermEnum k) = do
+    _ -> throwError "elaborate.PreTermFloat"
+elaborate' (m, PreTermEnum k) = do
   m' <- toMeta m
   return (m', TermEnum k)
-elaborate' (m, WeakTermEnumIntro x) = do
+elaborate' (m, PreTermEnumIntro x) = do
   m' <- toMeta m
   return (m', TermEnumIntro x)
-elaborate' (m, WeakTermEnumElim e branchList) = do
+elaborate' (m, PreTermEnumElim e branchList) = do
   m' <- toMeta m
   e' <- elaborate' e
   branchList' <- forM branchList elaboratePlus
   return (m', TermEnumElim e' branchList')
-elaborate' (m, WeakTermArray k dom cod) = do
+elaborate' (m, PreTermArray k dom cod) = do
   m' <- toMeta m
-  dom' <- elaborate dom
-  cod' <- elaborate cod
+  dom' <- elaborate' dom
+  cod' <- elaborate' cod
   return (m', TermArray k dom' cod')
-elaborate' (m, WeakTermArrayIntro k les) = do
+elaborate' (m, PreTermArrayIntro k les) = do
   m' <- toMeta m
   let (ls, es) = unzip les
   es' <- mapM elaborate' es
   return (m', TermArrayIntro k (zip ls es'))
-elaborate' (m, WeakTermArrayElim k e1 e2) = do
+elaborate' (m, PreTermArrayElim k e1 e2) = do
   m' <- toMeta m
   e1' <- elaborate' e1
   e2' <- elaborate' e2
   return (m', TermArrayElim k e1' e2')
 
-elaboratePlus :: (a, WeakTermPlus) -> WithEnv (a, TermPlus)
+elaboratePlus :: (a, PreTermPlus) -> WithEnv (a, TermPlus)
 elaboratePlus (x, t) = do
   t' <- elaborate' t
   return (x, t')
@@ -225,10 +230,9 @@ caseCheckEnumIdentifier' i labelList =
     then return ()
     else throwError "non-exhaustive pattern"
 
-toMeta :: WeakMeta -> WithEnv Meta
-toMeta (WeakMetaTerminal l) = return $ MetaTerminal l
-toMeta (WeakMetaNonTerminal ref l) = do
-  t <- readWeakTermRef ref
+toMeta :: PreMeta -> WithEnv Meta
+toMeta (PreMetaTerminal l) = return $ MetaTerminal l
+toMeta (PreMetaNonTerminal t l) = do
   t' <- elaborate' t
   return $ MetaNonTerminal t' l
 
