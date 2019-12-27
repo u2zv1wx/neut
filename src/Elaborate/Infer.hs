@@ -90,38 +90,29 @@ infer ctx (m, WeakTermZeta x) = do
       h <- newHoleInCtx ctx
       insTypeEnv x h
       retPreTerm h (toLoc m) $ PreTermZeta x
+infer _ (m, WeakTermIntS size i) = do
+  let t = (newMetaTerminal, PreTermTheta $ "i" ++ show size)
+  retPreTerm t (toLoc m) $ PreTermIntS size i
+infer _ (m, WeakTermIntU size i) = do
+  let t = (newMetaTerminal, PreTermTheta $ "u" ++ show size)
+  retPreTerm t (toLoc m) $ PreTermIntU size i
+infer _ (m, WeakTermInt i) = do
+  h <- newHoleInCtx []
+  retPreTerm h (toLoc m) $ PreTermInt i
+infer _ (m, WeakTermFloat16 f) = do
+  let t = (newMetaTerminal, PreTermTheta "f16")
+  retPreTerm t (toLoc m) $ PreTermFloat16 f
+infer _ (m, WeakTermFloat32 f) = do
+  let t = (newMetaTerminal, PreTermTheta "f32")
+  retPreTerm t (toLoc m) $ PreTermFloat32 f
+infer _ (m, WeakTermFloat64 f) = do
+  let t = (newMetaTerminal, PreTermTheta "f64")
+  retPreTerm t (toLoc m) $ PreTermFloat64 f
+infer _ (m, WeakTermFloat f) = do
+  h <- newHoleInCtx []
+  retPreTerm h (toLoc m) $ PreTermFloat f
 infer _ _ = undefined
 
--- infer ctx (meta, WeakTermZeta x) = do
---   mt <- lookupTypeEnvMaybe x
---   case mt of
---     Just t
---       -- p "writing type:"
---       -- p' t
---      -> do
---       returnAfterUpdate meta t
---     Nothing -> do
---       h <- newHoleInCtx ctx
---       insTypeEnv x h
---       -- p "writing type:"
---       -- p' h
---       returnAfterUpdate meta h
--- infer _ (meta, WeakTermIntS size _) = do
---   returnAfterUpdate meta (newMetaTerminal, WeakTermTheta $ "i" ++ show size)
--- infer _ (meta, WeakTermIntU size _) = do
---   returnAfterUpdate meta (newMetaTerminal, WeakTermTheta $ "u" ++ show size)
--- infer _ (meta, WeakTermInt _) = do
---   h <- newHoleInCtx []
---   returnAfterUpdate meta h
--- infer _ (meta, WeakTermFloat16 _) =
---   returnAfterUpdate meta (newMetaTerminal, WeakTermTheta "f16")
--- infer _ (meta, WeakTermFloat32 _) =
---   returnAfterUpdate meta (newMetaTerminal, WeakTermTheta "f32")
--- infer _ (meta, WeakTermFloat64 _) =
---   returnAfterUpdate meta (newMetaTerminal, WeakTermTheta "f64")
--- infer _ (meta, WeakTermFloat _) = do
---   h <- newHoleInCtx []
---   returnAfterUpdate meta h -- f64 or "any float"
 -- infer _ (meta, WeakTermEnum _) = returnAfterUpdate meta univ
 -- infer _ (meta, WeakTermEnumIntro labelOrNum) = do
 --   case labelOrNum of
