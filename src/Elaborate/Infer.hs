@@ -54,6 +54,9 @@ infer _ (m, WeakTermTheta x)
         h <- newHoleInCtx []
         insTypeEnv x h
         retPreTerm h (toLoc m) $ PreTermTheta x
+infer _ (m, WeakTermUpsilon x) = do
+  t <- lookupTypeEnv x
+  retPreTerm t (toLoc m) $ PreTermUpsilon x
 infer _ _ = undefined
 
 -- infer _ (meta, WeakTermTheta x)
