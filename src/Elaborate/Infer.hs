@@ -41,9 +41,11 @@ type Context = [(Identifier, PreTermPlus)]
 -- Calculi and Applications, 2011.
 -- infer e ~> {type-annotated e}
 infer :: Context -> WeakTermPlus -> WithEnv PreTermPlus
-infer = undefined
+infer _ (meta, WeakTermTau) =
+  return (PreMetaTerminal (obtainLoc meta), PreTermTau)
+  -- returnAfterUpdate meta univ -- univ : univ;
+infer _ _ = undefined
 
--- infer _ (meta, WeakTermTau) = returnAfterUpdate meta univ -- univ : univ
 -- infer _ (meta, WeakTermTheta x)
 --   | Just i <- asEnumNatNumConstant x = do
 --     t <- toIsEnumType $ fromInteger i
@@ -283,6 +285,10 @@ univToUniv :: WithEnv PreTermPlus
 univToUniv = undefined
   -- h <- newNameWith "hole"
   -- return (newMetaTerminal, WeakTermPi [(h, univ)] univ)
+
+obtainLoc :: WeakMeta -> Maybe Loc
+obtainLoc (WeakMetaTerminal ml) = ml
+obtainLoc (WeakMetaNonTerminal ml) = ml
 
 newMetaTerminal :: PreMeta
 newMetaTerminal = PreMetaTerminal Nothing
