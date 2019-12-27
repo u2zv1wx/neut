@@ -45,59 +45,40 @@ data PreMeta
 instance Show PreMeta where
   show _ = "_"
 
-varPreTermPlus :: PreTermPlus -> [Hole]
-varPreTermPlus (m, PreTermTau) = varPreMeta m
-varPreTermPlus (m, PreTermTheta _) = varPreMeta m
-varPreTermPlus (m, PreTermUpsilon _) = do
-  varPreMeta m
-varPreTermPlus (m, PreTermPi xts t) = do
-  let xhs = varPreTermPlusBindings xts [t]
-  let yhs = varPreMeta m
-  xhs ++ yhs
-varPreTermPlus (m, PreTermPiIntro xts e) = do
-  let xhs = varPreTermPlusBindings xts [e]
-  let yhs = varPreMeta m
-  xhs ++ yhs
-varPreTermPlus (m, PreTermPiElim e es) = do
+varPreTermPlus :: PreTermPlus -> [Identifier]
+varPreTermPlus (_, PreTermTau) = []
+varPreTermPlus (_, PreTermTheta _) = []
+varPreTermPlus (_, PreTermUpsilon x) = [x]
+varPreTermPlus (_, PreTermPi xts t) = do
+  varPreTermPlusBindings xts [t]
+varPreTermPlus (_, PreTermPiIntro xts e) = do
+  varPreTermPlusBindings xts [e]
+varPreTermPlus (_, PreTermPiElim e es) = do
   let xhs = varPreTermPlus e
   let yhs = concatMap varPreTermPlus es
-  let zhs = varPreMeta m
-  xhs ++ yhs ++ zhs
-varPreTermPlus (m, PreTermMu ut e) = do
-  let xhs = varPreTermPlusBindings [ut] [e]
-  let yhs = varPreMeta m
   xhs ++ yhs
-varPreTermPlus (m, PreTermZeta h) = do
-  let xhs = varPreMeta m
-  h : xhs
-varPreTermPlus (m, PreTermIntS _ _) = varPreMeta m
-varPreTermPlus (m, PreTermIntU _ _) = varPreMeta m
-varPreTermPlus (m, PreTermInt _) = varPreMeta m
-varPreTermPlus (m, PreTermFloat16 _) = varPreMeta m
-varPreTermPlus (m, PreTermFloat32 _) = varPreMeta m
-varPreTermPlus (m, PreTermFloat64 _) = varPreMeta m
-varPreTermPlus (m, PreTermFloat _) = varPreMeta m
-varPreTermPlus (m, PreTermEnum _) = varPreMeta m
-varPreTermPlus (m, PreTermEnumIntro _) = varPreMeta m
-varPreTermPlus (m, PreTermEnumElim e les) = do
+varPreTermPlus (_, PreTermMu ut e) = do
+  varPreTermPlusBindings [ut] [e]
+varPreTermPlus (_, PreTermZeta _) = []
+varPreTermPlus (_, PreTermIntS _ _) = []
+varPreTermPlus (_, PreTermIntU _ _) = []
+varPreTermPlus (_, PreTermInt _) = []
+varPreTermPlus (_, PreTermFloat16 _) = []
+varPreTermPlus (_, PreTermFloat32 _) = []
+varPreTermPlus (_, PreTermFloat64 _) = []
+varPreTermPlus (_, PreTermFloat _) = []
+varPreTermPlus (_, PreTermEnum _) = []
+varPreTermPlus (_, PreTermEnumIntro _) = []
+varPreTermPlus (_, PreTermEnumElim e les) = do
   let xhs = varPreTermPlus e
   let yhs = concatMap (\(_, body) -> varPreTermPlus body) les
-  let zhs = varPreMeta m
-  xhs ++ yhs ++ zhs
-varPreTermPlus (m, PreTermArray _ e1 e2) = do
-  let xhs1 = varPreTermPlus e1
-  let xhs2 = varPreTermPlus e2
-  let xhs3 = varPreMeta m
-  xhs1 ++ xhs2 ++ xhs3
-varPreTermPlus (m, PreTermArrayIntro _ les) = do
-  let xhs = varPreMeta m
-  let yhs = concatMap (\(_, body) -> varPreTermPlus body) les
   xhs ++ yhs
-varPreTermPlus (m, PreTermArrayElim _ e1 e2) = do
-  let xhs1 = varPreTermPlus e1
-  let xhs2 = varPreTermPlus e2
-  let xhs3 = varPreMeta m
-  xhs1 ++ xhs2 ++ xhs3
+varPreTermPlus (_, PreTermArray _ e1 e2) = do
+  varPreTermPlus e1 ++ varPreTermPlus e2
+varPreTermPlus (_, PreTermArrayIntro _ les) = do
+  concatMap (\(_, body) -> varPreTermPlus body) les
+varPreTermPlus (_, PreTermArrayElim _ e1 e2) = do
+  varPreTermPlus e1 ++ varPreTermPlus e2
 
 varPreTermPlusBindings :: [IdentifierPlus] -> [PreTermPlus] -> [Hole]
 varPreTermPlusBindings [] es = do
@@ -107,156 +88,103 @@ varPreTermPlusBindings ((x, t):xts) es = do
   let hs2 = varPreTermPlusBindings xts es
   hs1 ++ filter (/= x) hs2
 
-varPreMeta :: PreMeta -> [Hole]
-varPreMeta (PreMetaTerminal _) = []
-varPreMeta (PreMetaNonTerminal t _) = varPreTermPlus t
-
 holePreTermPlus :: PreTermPlus -> [Hole]
-holePreTermPlus (m, PreTermTau) = holePreMeta m
-holePreTermPlus (m, PreTermTheta _) = holePreMeta m
-holePreTermPlus (m, PreTermUpsilon _) = do
-  holePreMeta m
-holePreTermPlus (m, PreTermPi xts t) = do
-  let xhs = holePreTermPlusBindings xts [t]
-  let yhs = holePreMeta m
-  xhs ++ yhs
-holePreTermPlus (m, PreTermPiIntro xts e) = do
-  let xhs = holePreTermPlusBindings xts [e]
-  let yhs = holePreMeta m
-  xhs ++ yhs
-holePreTermPlus (m, PreTermPiElim e es) = do
-  let xhs = holePreTermPlus e
-  let yhs = concatMap holePreTermPlus es
-  let zhs = holePreMeta m
-  xhs ++ yhs ++ zhs
-holePreTermPlus (m, PreTermMu ut e) = do
-  let xhs = holePreTermPlusBindings [ut] [e]
-  let yhs = holePreMeta m
-  xhs ++ yhs
-holePreTermPlus (m, PreTermZeta h) = do
-  let xhs = holePreMeta m
-  h : xhs
-holePreTermPlus (m, PreTermIntS _ _) = holePreMeta m
-holePreTermPlus (m, PreTermIntU _ _) = holePreMeta m
-holePreTermPlus (m, PreTermInt _) = holePreMeta m
-holePreTermPlus (m, PreTermFloat16 _) = holePreMeta m
-holePreTermPlus (m, PreTermFloat32 _) = holePreMeta m
-holePreTermPlus (m, PreTermFloat64 _) = holePreMeta m
-holePreTermPlus (m, PreTermFloat _) = holePreMeta m
-holePreTermPlus (m, PreTermEnum _) = holePreMeta m
-holePreTermPlus (m, PreTermEnumIntro _) = holePreMeta m
-holePreTermPlus (m, PreTermEnumElim e les) = do
+holePreTermPlus (_, PreTermTau) = []
+holePreTermPlus (_, PreTermTheta _) = []
+holePreTermPlus (_, PreTermUpsilon _) = []
+holePreTermPlus (_, PreTermPi xts t) = do
+  holePreTermPlusBindings xts [t]
+holePreTermPlus (_, PreTermPiIntro xts e) = do
+  holePreTermPlusBindings xts [e]
+holePreTermPlus (_, PreTermPiElim e es) = do
+  holePreTermPlus e ++ concatMap holePreTermPlus es
+holePreTermPlus (_, PreTermMu ut e) = do
+  holePreTermPlusBindings [ut] [e]
+holePreTermPlus (_, PreTermZeta h) = [h]
+holePreTermPlus (_, PreTermIntS _ _) = []
+holePreTermPlus (_, PreTermIntU _ _) = []
+holePreTermPlus (_, PreTermInt _) = []
+holePreTermPlus (_, PreTermFloat16 _) = []
+holePreTermPlus (_, PreTermFloat32 _) = []
+holePreTermPlus (_, PreTermFloat64 _) = []
+holePreTermPlus (_, PreTermFloat _) = []
+holePreTermPlus (_, PreTermEnum _) = []
+holePreTermPlus (_, PreTermEnumIntro _) = []
+holePreTermPlus (_, PreTermEnumElim e les) = do
   let xhs = holePreTermPlus e
   let yhs = concatMap (\(_, body) -> holePreTermPlus body) les
-  let zhs = holePreMeta m
-  xhs ++ yhs ++ zhs
-holePreTermPlus (m, PreTermArray _ e1 e2) = do
-  let xhs1 = holePreTermPlus e1
-  let xhs2 = holePreTermPlus e2
-  let xhs3 = holePreMeta m
-  xhs1 ++ xhs2 ++ xhs3
-holePreTermPlus (m, PreTermArrayIntro _ les) = do
-  let xhs = holePreMeta m
-  let yhs = concatMap (\(_, body) -> holePreTermPlus body) les
   xhs ++ yhs
-holePreTermPlus (m, PreTermArrayElim _ e1 e2) = do
-  let xhs1 = holePreTermPlus e1
-  let xhs2 = holePreTermPlus e2
-  let xhs3 = holePreMeta m
-  xhs1 ++ xhs2 ++ xhs3
+holePreTermPlus (_, PreTermArray _ e1 e2) =
+  holePreTermPlus e1 ++ holePreTermPlus e2
+holePreTermPlus (_, PreTermArrayIntro _ les) = do
+  concatMap (\(_, body) -> holePreTermPlus body) les
+holePreTermPlus (_, PreTermArrayElim _ e1 e2) = do
+  holePreTermPlus e1 ++ holePreTermPlus e2
 
 holePreTermPlusBindings :: [IdentifierPlus] -> [PreTermPlus] -> [Hole]
 holePreTermPlusBindings [] es = do
   concatMap holePreTermPlus es
 holePreTermPlusBindings ((_, t):xts) es = do
-  let hs1 = holePreTermPlus t
-  let hs2 = holePreTermPlusBindings xts es
-  hs1 ++ hs2
-
-holePreMeta :: PreMeta -> [Hole]
-holePreMeta (PreMetaTerminal _) = []
-holePreMeta (PreMetaNonTerminal t _) = holePreTermPlus t
+  holePreTermPlus t ++ holePreTermPlusBindings xts es
 
 substPreTermPlus :: SubstPreTerm -> PreTermPlus -> PreTermPlus
-substPreTermPlus sub (m, PreTermTau) = do
-  let m' = substPreMeta sub m
-  (m', PreTermTau)
-substPreTermPlus sub (m, PreTermTheta t) = do
-  let m' = substPreMeta sub m
-  (m', PreTermTheta t)
+substPreTermPlus _ (m, PreTermTau) = do
+  (m, PreTermTau)
+substPreTermPlus _ (m, PreTermTheta t) = do
+  (m, PreTermTheta t)
 substPreTermPlus sub (m, PreTermUpsilon x) = do
-  let m' = substPreMeta sub m
-  -- このときlookupの結果のmetaとm'とが同一であるって情報を保持する必要があるのでは？
-  fromMaybe (m', PreTermUpsilon x) (lookup x sub)
+  fromMaybe (m, PreTermUpsilon x) (lookup x sub)
 substPreTermPlus sub (m, PreTermPi xts t) = do
-  let m' = substPreMeta sub m
   let (xts', t') = substPreTermPlusBindingsWithBody sub xts t
-  (m', PreTermPi xts' t')
+  (m, PreTermPi xts' t')
 substPreTermPlus sub (m, PreTermPiIntro xts body) = do
-  let m' = substPreMeta sub m
   let (xts', body') = substPreTermPlusBindingsWithBody sub xts body
-  (m', PreTermPiIntro xts' body')
+  (m, PreTermPiIntro xts' body')
 substPreTermPlus sub (m, PreTermPiElim e es) = do
-  let m' = substPreMeta sub m
   let e' = substPreTermPlus sub e
   let es' = map (substPreTermPlus sub) es
-  (m', PreTermPiElim e' es')
+  (m, PreTermPiElim e' es')
 substPreTermPlus sub (m, PreTermMu (x, t) e) = do
-  let m' = substPreMeta sub m
   let t' = substPreTermPlus sub t
   let e' = substPreTermPlus (filter (\(k, _) -> k /= x) sub) e
-  (m', PreTermMu (x, t') e')
+  (m, PreTermMu (x, t') e')
 substPreTermPlus sub (m, PreTermZeta s) = do
-  let m' = substPreMeta sub m
-  fromMaybe (m', PreTermZeta s) (lookup s sub)
-substPreTermPlus sub (m, PreTermIntS size x) = do
-  let m' = substPreMeta sub m
-  (m', PreTermIntS size x)
-substPreTermPlus sub (m, PreTermIntU size x) = do
-  let m' = substPreMeta sub m
-  (m', PreTermIntU size x)
-substPreTermPlus sub (m, PreTermInt x) = do
-  let m' = substPreMeta sub m
-  (m', PreTermInt x)
-substPreTermPlus sub (m, PreTermFloat16 x) = do
-  let m' = substPreMeta sub m
-  (m', PreTermFloat16 x)
-substPreTermPlus sub (m, PreTermFloat32 x) = do
-  let m' = substPreMeta sub m
-  (m', PreTermFloat32 x)
-substPreTermPlus sub (m, PreTermFloat64 x) = do
-  let m' = substPreMeta sub m
-  (m', PreTermFloat64 x)
-substPreTermPlus sub (m, PreTermFloat x) = do
-  let m' = substPreMeta sub m
-  (m', PreTermFloat x)
-substPreTermPlus sub (m, PreTermEnum x) = do
-  let m' = substPreMeta sub m
-  (m', PreTermEnum x)
-substPreTermPlus sub (m, PreTermEnumIntro l) = do
-  let m' = substPreMeta sub m
-  (m', PreTermEnumIntro l)
+  fromMaybe (m, PreTermZeta s) (lookup s sub)
+substPreTermPlus _ (m, PreTermIntS size x) = do
+  (m, PreTermIntS size x)
+substPreTermPlus _ (m, PreTermIntU size x) = do
+  (m, PreTermIntU size x)
+substPreTermPlus _ (m, PreTermInt x) = do
+  (m, PreTermInt x)
+substPreTermPlus _ (m, PreTermFloat16 x) = do
+  (m, PreTermFloat16 x)
+substPreTermPlus _ (m, PreTermFloat32 x) = do
+  (m, PreTermFloat32 x)
+substPreTermPlus _ (m, PreTermFloat64 x) = do
+  (m, PreTermFloat64 x)
+substPreTermPlus _ (m, PreTermFloat x) = do
+  (m, PreTermFloat x)
+substPreTermPlus _ (m, PreTermEnum x) = do
+  (m, PreTermEnum x)
+substPreTermPlus _ (m, PreTermEnumIntro l) = do
+  (m, PreTermEnumIntro l)
 substPreTermPlus sub (m, PreTermEnumElim e branchList) = do
-  let m' = substPreMeta sub m
   let e' = substPreTermPlus sub e
   let (caseList, es) = unzip branchList
   let es' = map (substPreTermPlus sub) es
-  (m', PreTermEnumElim e' (zip caseList es'))
+  (m, PreTermEnumElim e' (zip caseList es'))
 substPreTermPlus sub (m, PreTermArray kind from to) = do
-  let m' = substPreMeta sub m
   let from' = substPreTermPlus sub from
   let to' = substPreTermPlus sub to
-  (m', PreTermArray kind from' to')
+  (m, PreTermArray kind from' to')
 substPreTermPlus sub (m, PreTermArrayIntro kind les) = do
-  let m' = substPreMeta sub m
   let (ls, es) = unzip les
   let es' = map (substPreTermPlus sub) es
-  (m', PreTermArrayIntro kind (zip ls es'))
+  (m, PreTermArrayIntro kind (zip ls es'))
 substPreTermPlus sub (m, PreTermArrayElim kind e1 e2) = do
-  let m' = substPreMeta sub m
   let e1' = substPreTermPlus sub e1
   let e2' = substPreTermPlus sub e2
-  (m', PreTermArrayElim kind e1' e2')
+  (m, PreTermArrayElim kind e1' e2')
 
 substPreTermPlusBindingsWithBody ::
      SubstPreTerm
@@ -272,20 +200,13 @@ substPreTermPlusBindingsWithBody sub ((x, t):xts) e = do
   let t' = substPreTermPlus sub t
   ((x, t') : xts', e')
 
-substPreMeta :: SubstPreTerm -> PreMeta -> PreMeta
-substPreMeta _ m@(PreMetaTerminal _) = m
-substPreMeta sub (PreMetaNonTerminal t ml) =
-  PreMetaNonTerminal (substPreTermPlus sub t) ml
-
 isReduciblePreTerm :: PreTermPlus -> Bool
-isReduciblePreTerm (m, PreTermTau) = isReduciblePreMeta m
-isReduciblePreTerm (m, PreTermTheta _) = isReduciblePreMeta m
-isReduciblePreTerm (m, PreTermUpsilon _) = isReduciblePreMeta m
-isReduciblePreTerm (m, PreTermPi xts cod) =
-  isReduciblePreMeta m ||
+isReduciblePreTerm (_, PreTermTau) = False
+isReduciblePreTerm (_, PreTermTheta _) = False
+isReduciblePreTerm (_, PreTermUpsilon _) = False
+isReduciblePreTerm (_, PreTermPi xts cod) =
   any isReduciblePreTerm (map snd xts) || isReduciblePreTerm cod
-isReduciblePreTerm (m, PreTermPiIntro xts e) =
-  isReduciblePreMeta m ||
+isReduciblePreTerm (_, PreTermPiIntro xts e) =
   any isReduciblePreTerm (map snd xts) || isReduciblePreTerm e
 isReduciblePreTerm (_, PreTermPiElim (_, PreTermPiIntro xts _) es)
   | length xts == length es = True
@@ -300,38 +221,33 @@ isReduciblePreTerm (_, PreTermPiElim (_, PreTermTheta c) [(_, PreTermFloat32 _),
   | Just (LowTypeFloat FloatSize32, _) <- asBinaryOpMaybe c = True
 isReduciblePreTerm (_, PreTermPiElim (_, PreTermTheta c) [(_, PreTermFloat64 _), (_, PreTermFloat64 _)])
   | Just (LowTypeFloat FloatSize64, _) <- asBinaryOpMaybe c = True
-isReduciblePreTerm (m, PreTermPiElim e es) =
-  isReduciblePreMeta m || isReduciblePreTerm e || any isReduciblePreTerm es
-isReduciblePreTerm (m, PreTermMu (_, t) e) =
-  isReduciblePreMeta m || isReduciblePreTerm t || isReduciblePreTerm e
-isReduciblePreTerm (m, PreTermZeta _) = isReduciblePreMeta m
-isReduciblePreTerm (m, PreTermIntS _ _) = isReduciblePreMeta m
-isReduciblePreTerm (m, PreTermIntU _ _) = isReduciblePreMeta m
-isReduciblePreTerm (m, PreTermInt _) = isReduciblePreMeta m
-isReduciblePreTerm (m, PreTermFloat16 _) = isReduciblePreMeta m
-isReduciblePreTerm (m, PreTermFloat32 _) = isReduciblePreMeta m
-isReduciblePreTerm (m, PreTermFloat64 _) = isReduciblePreMeta m
-isReduciblePreTerm (m, PreTermFloat _) = isReduciblePreMeta m
-isReduciblePreTerm (m, PreTermEnum _) = isReduciblePreMeta m
-isReduciblePreTerm (m, PreTermEnumIntro _) = isReduciblePreMeta m
+isReduciblePreTerm (_, PreTermPiElim e es) =
+  isReduciblePreTerm e || any isReduciblePreTerm es
+isReduciblePreTerm (_, PreTermMu (_, t) e) =
+  isReduciblePreTerm t || isReduciblePreTerm e
+isReduciblePreTerm (_, PreTermZeta _) = False
+isReduciblePreTerm (_, PreTermIntS _ _) = False
+isReduciblePreTerm (_, PreTermIntU _ _) = False
+isReduciblePreTerm (_, PreTermInt _) = False
+isReduciblePreTerm (_, PreTermFloat16 _) = False
+isReduciblePreTerm (_, PreTermFloat32 _) = False
+isReduciblePreTerm (_, PreTermFloat64 _) = False
+isReduciblePreTerm (_, PreTermFloat _) = False
+isReduciblePreTerm (_, PreTermEnum _) = False
+isReduciblePreTerm (_, PreTermEnumIntro _) = False
 isReduciblePreTerm (_, PreTermEnumElim (_, PreTermEnumIntro l) les) = do
   let (ls, _) = unzip les
   CaseValue l `elem` ls || CaseDefault `elem` ls
-isReduciblePreTerm (m, PreTermEnumElim e les) =
-  isReduciblePreMeta m ||
+isReduciblePreTerm (_, PreTermEnumElim e les) =
   isReduciblePreTerm e || any isReduciblePreTerm (map snd les)
-isReduciblePreTerm (m, PreTermArray _ dom cod) =
-  isReduciblePreMeta m || isReduciblePreTerm dom || isReduciblePreTerm cod
-isReduciblePreTerm (m, PreTermArrayIntro _ les) =
-  isReduciblePreMeta m || any isReduciblePreTerm (map snd les)
+isReduciblePreTerm (_, PreTermArray _ dom cod) =
+  isReduciblePreTerm dom || isReduciblePreTerm cod
+isReduciblePreTerm (_, PreTermArrayIntro _ les) =
+  any isReduciblePreTerm (map snd les)
 isReduciblePreTerm (_, PreTermArrayElim _ (_, PreTermArrayIntro _ les) (_, PreTermEnumIntro l))
   | l `elem` map fst les = True
-isReduciblePreTerm (m, PreTermArrayElim _ e1 e2) =
-  isReduciblePreMeta m || isReduciblePreTerm e1 || isReduciblePreTerm e2
-
-isReduciblePreMeta :: PreMeta -> Bool
-isReduciblePreMeta (PreMetaNonTerminal t _) = isReduciblePreTerm t
-isReduciblePreMeta _ = False
+isReduciblePreTerm (_, PreTermArrayElim _ e1 e2) =
+  isReduciblePreTerm e1 || isReduciblePreTerm e2
 
 isValue :: PreTermPlus -> Bool
 isValue (_, PreTermTau) = True

@@ -16,19 +16,16 @@ reducePreTermPlus (m, PreTermPi xts cod) = do
   let (xs, ts) = unzip xts
   ts' <- mapM reducePreTermPlus ts
   cod' <- reducePreTermPlus cod
-  m' <- reducePreMeta m
-  return $ (m', PreTermPi (zip xs ts') cod')
+  return $ (m, PreTermPi (zip xs ts') cod')
 reducePreTermPlus (m, PreTermPiIntro xts e) = do
   let (xs, ts) = unzip xts
   ts' <- mapM reducePreTermPlus ts
   e' <- reducePreTermPlus e
-  m' <- reducePreMeta m
-  return $ (m', PreTermPiIntro (zip xs ts') e')
+  return $ (m, PreTermPiIntro (zip xs ts') e')
 reducePreTermPlus (m, PreTermPiElim e es) = do
   e' <- reducePreTermPlus e
   es' <- mapM reducePreTermPlus es
   let app = PreTermPiElim e' es'
-  m' <- reducePreMeta m
   case e' of
     (_, PreTermPiIntro xts body)
       | length xts == length es' -> do
@@ -38,21 +35,18 @@ reducePreTermPlus (m, PreTermPiElim e es) = do
     self@(_, PreTermMu (x, _) body)
       | all isValue es' -> do
         let self' = substPreTermPlus [(x, self)] body
-        reducePreTermPlus (m', PreTermPiElim self' es')
-    (_, PreTermTheta constant) ->
-      reducePreTermPlusTheta (m', app) es' m' constant
-    _ -> return (m', app)
+        reducePreTermPlus (m, PreTermPiElim self' es')
+    (_, PreTermTheta constant) -> reducePreTermPlusTheta (m, app) es' m constant
+    _ -> return (m, app)
 reducePreTermPlus (m, PreTermMu (x, t) e) = do
   t' <- reducePreTermPlus t
   e' <- reducePreTermPlus e
-  m' <- reducePreMeta m
-  return $ (m', PreTermMu (x, t') e')
+  return $ (m, PreTermMu (x, t') e')
 reducePreTermPlus (m, PreTermEnumElim e les) = do
   e' <- reducePreTermPlus e
   let (ls, es) = unzip les
   es' <- mapM reducePreTermPlus es
   let les' = zip ls es'
-  m' <- reducePreMeta m
   case e' of
     (_, PreTermEnumIntro l) ->
       case lookup (CaseValue l) les' of
@@ -60,36 +54,25 @@ reducePreTermPlus (m, PreTermEnumElim e les) = do
         Nothing ->
           case lookup CaseDefault les' of
             Just body -> reducePreTermPlus body
-            Nothing -> return (m', PreTermEnumElim e' les')
-    _ -> return (m', PreTermEnumElim e' les')
+            Nothing -> return (m, PreTermEnumElim e' les')
+    _ -> return (m, PreTermEnumElim e' les')
 reducePreTermPlus (m, PreTermArray k dom cod) = do
   dom' <- reducePreTermPlus dom
   cod' <- reducePreTermPlus cod
-  m' <- reducePreMeta m
-  return (m', PreTermArray k dom' cod')
+  return (m, PreTermArray k dom' cod')
 reducePreTermPlus (m, PreTermArrayIntro k les) = do
   let (ls, es) = unzip les
   es' <- mapM reducePreTermPlus es
-  m' <- reducePreMeta m
-  return (m', PreTermArrayIntro k $ zip ls es')
+  return (m, PreTermArrayIntro k $ zip ls es')
 reducePreTermPlus (m, PreTermArrayElim k e1 e2) = do
   e1' <- reducePreTermPlus e1
   e2' <- reducePreTermPlus e2
-  m' <- reducePreMeta m
   case (e1', e2') of
     ((_, PreTermArrayIntro k' les), (_, PreTermEnumIntro l))
       | k == k'
       , Just e <- lookup l les -> reducePreTermPlus e
-    _ -> return (m', PreTermArrayElim k e1' e2')
-reducePreTermPlus (m, e) = do
-  m' <- reducePreMeta m
-  return (m', e)
-
-reducePreMeta :: PreMeta -> WithEnv PreMeta
-reducePreMeta m@(PreMetaTerminal _) = return m
-reducePreMeta (PreMetaNonTerminal t ml) = do
-  t' <- reducePreTermPlus t
-  return $ PreMetaNonTerminal t' ml
+    _ -> return (m, PreTermArrayElim k e1' e2')
+reducePreTermPlus e = return e
 
 reducePreTermPlusTheta ::
      PreTermPlus
