@@ -41,9 +41,19 @@ type Context = [(Identifier, PreTermPlus)]
 -- Calculi and Applications, 2011.
 -- infer e ~> {type-annotated e}
 infer :: Context -> WeakTermPlus -> WithEnv PreTermPlus
-infer _ (meta, WeakTermTau) =
-  return (PreMetaTerminal (obtainLoc meta), PreTermTau)
-  -- returnAfterUpdate meta univ -- univ : univ;
+infer _ (m, WeakTermTau) = return (PreMetaTerminal (toLoc m), PreTermTau)
+infer _ (m, WeakTermTheta x)
+  | Just i <- asEnumNatNumConstant x = do
+    t <- toIsEnumType $ fromInteger i
+    retPreTerm t (toLoc m) $ PreTermTheta x
+  | otherwise = do
+    mt <- lookupTypeEnvMaybe x
+    case mt of
+      Just t -> retPreTerm t (toLoc m) $ PreTermTheta x
+      Nothing -> do
+        h <- newHoleInCtx []
+        insTypeEnv x h
+        retPreTerm h (toLoc m) $ PreTermTheta x
 infer _ _ = undefined
 
 -- infer _ (meta, WeakTermTheta x)
@@ -240,6 +250,9 @@ toVar x t = do
   insTypeEnv x t
   return (PreMetaNonTerminal t Nothing, PreTermUpsilon x)
 
+retPreTerm :: PreTermPlus -> Maybe Loc -> PreTerm -> WithEnv PreTermPlus
+retPreTerm t ml e = return (PreMetaNonTerminal t ml, e)
+
 -- returnAfterUpdate :: WeakMeta -> WeakTermPlus -> WithEnv WeakTermPlus
 -- returnAfterUpdate m t = do
 --   typeOrRef <- readWeakMetaType m
@@ -270,7 +283,7 @@ obtainType (PreMetaTerminal _) = return univ
 obtainType (PreMetaNonTerminal t _) = return t
 
 -- is-enum n{i}
-toIsEnumType :: Int -> WithEnv WeakTermPlus
+toIsEnumType :: Int -> WithEnv PreTermPlus
 toIsEnumType i = undefined
   -- piType <- univToUniv
   -- piMeta <- newMetaOfType piType
@@ -286,9 +299,9 @@ univToUniv = undefined
   -- h <- newNameWith "hole"
   -- return (newMetaTerminal, WeakTermPi [(h, univ)] univ)
 
-obtainLoc :: WeakMeta -> Maybe Loc
-obtainLoc (WeakMetaTerminal ml) = ml
-obtainLoc (WeakMetaNonTerminal ml) = ml
+toLoc :: WeakMeta -> Maybe Loc
+toLoc (WeakMetaTerminal ml) = ml
+toLoc (WeakMetaNonTerminal ml) = ml
 
 newMetaTerminal :: PreMeta
 newMetaTerminal = PreMetaTerminal Nothing
