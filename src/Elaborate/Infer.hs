@@ -76,22 +76,14 @@ infer ctx (m, WeakTermPiElim e es) = do
   -- cod' = ?M @ ctx @ (e1, ..., en)
   let cod' = substPreTermPlus (zip xs es') cod
   retPreTerm cod' (toLoc m) $ PreTermPiElim e' es'
+infer ctx (m, WeakTermMu (x, t) e) = do
+  t' <- inferType ctx t
+  insTypeEnv x t'
+  e' <- infer (ctx ++ [(x, t')]) e
+  insConstraintEnv t' (typeOf e')
+  retPreTerm t' (toLoc m) $ PreTermMu (x, t') e'
 infer _ _ = undefined
 
--- infer ctx (meta, WeakTermPiIntro xts e) = inferPiIntro ctx meta xts e
--- infer ctx (meta, WeakTermPiElim e es) = do
---   tPi <- infer ctx e
---   -- xts == [(x1, t1), ..., (xn, tn)] with xi : ti and ei : ti
---   xts <- inferList ctx es
---   -- p "extendeding context by:"
---   -- p' xts
---   -- cod = ?M @ ctx @ (x1, ..., xn)
---   cod <- newHoleInCtx (ctx ++ xts)
---   let tPi' = (newMetaTerminal, WeakTermPi xts cod)
---   insConstraintEnv tPi tPi'
---   -- cod' = ?M @ ctx @ (e1, ..., en)
---   cod' <- substWeakTermPlus (zip (map fst xts) es) cod
---   returnAfterUpdate meta cod'
 -- infer ctx (meta, WeakTermMu (x, t) e) = do
 --   _ <- inferType ctx t
 --   insTypeEnv x t
@@ -220,7 +212,7 @@ inferPiIntro ctx [] cod = do
   cod' <- infer ctx cod
   return ([], cod')
 inferPiIntro ctx ((x, t):xts) cod = do
-  t' <- infer ctx t
+  t' <- inferType ctx t
   insTypeEnv x t'
   (xts', cod') <- inferPiIntro (ctx ++ [(x, t')]) xts cod
   return ((x, t') : xts', cod')
