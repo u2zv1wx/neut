@@ -24,104 +24,106 @@ simp ((e1, e2):cs)
   | isReduciblePreTerm e1 = simpReduce e1 e2 cs
 simp ((e1, e2):cs)
   | isReduciblePreTerm e2 = simpReduce e2 e1 cs
-simp (((m1, PreTermTau), (m2, PreTermTau)):cs) =
+simp cs = simp' cs
+
+simp' :: [PreConstraint] -> WithEnv [EnrichedConstraint]
+simp' [] = return []
+simp' (((m1, PreTermTau), (m2, PreTermTau)):cs) =
   simpMetaRet [(m1, m2)] (simp cs)
-simp (((m1, PreTermTheta x), (m2, PreTermTheta y)):cs)
+simp' (((m1, PreTermTheta x), (m2, PreTermTheta y)):cs)
   | x == y = simpMetaRet [(m1, m2)] (simp cs)
-simp (((m1, PreTermUpsilon x1), (m2, PreTermUpsilon x2)):cs)
+simp' (((m1, PreTermUpsilon x1), (m2, PreTermUpsilon x2)):cs)
   | x1 == x2 = simpMetaRet [(m1, m2)] (simp cs)
-simp (((m1, PreTermPi xts1 cod1), (m2, PreTermPi xts2 cod2)):cs) = do
+simp' (((m1, PreTermPi xts1 cod1), (m2, PreTermPi xts2 cod2)):cs) = do
   simpPi m1 xts1 cod1 m2 xts2 cod2 cs
-simp (((m1, PreTermPiIntro xts1 e1), (m2, PreTermPiIntro xts2 e2)):cs) =
+simp' (((m1, PreTermPiIntro xts1 e1), (m2, PreTermPiIntro xts2 e2)):cs) =
   simpPi m1 xts1 e1 m2 xts2 e2 cs
-simp (((m1, PreTermPiIntro xts body1), e2@(m2, _)):cs) = do
+simp' (((m1, PreTermPiIntro xts body1), e2@(m2, _)):cs) = do
   vs <- mapM (uncurry toVar) xts
   let appMeta = (PreMetaNonTerminal (typeOf body1) Nothing)
   simpMetaRet [(m1, m2)] $ simp $ (body1, (appMeta, PreTermPiElim e2 vs)) : cs
-simp ((e1, e2@(_, PreTermPiIntro {})):cs) = simp $ (e2, e1) : cs
-simp (((m1, PreTermMu (x1, t1) e1), (m2, PreTermMu (x2, t2) e2)):cs)
+simp' ((e1, e2@(_, PreTermPiIntro {})):cs) = simp $ (e2, e1) : cs
+simp' (((m1, PreTermMu (x1, t1) e1), (m2, PreTermMu (x2, t2) e2)):cs)
   | x1 == x2 = simpMetaRet [(m1, m2)] $ simp $ (t1, t2) : (e1, e2) : cs
-simp (((m1, PreTermZeta x), (m2, PreTermZeta y)):cs)
+simp' (((m1, PreTermZeta x), (m2, PreTermZeta y)):cs)
   | x == y = simpMetaRet [(m1, m2)] (simp cs)
-simp (((m1, PreTermIntS size1 l1), (m2, PreTermIntS size2 l2)):cs)
+simp' (((m1, PreTermIntS size1 l1), (m2, PreTermIntS size2 l2)):cs)
   | size1 == size2
   , l1 == l2 = simpMetaRet [(m1, m2)] (simp cs)
-simp (((m1, PreTermIntU size1 l1), (m2, PreTermIntU size2 l2)):cs)
+simp' (((m1, PreTermIntU size1 l1), (m2, PreTermIntU size2 l2)):cs)
   | size1 == size2
   , l1 == l2 = simpMetaRet [(m1, m2)] (simp cs)
-simp (((m1, PreTermInt l1), (m2, PreTermIntS _ l2)):cs)
+simp' (((m1, PreTermInt l1), (m2, PreTermIntS _ l2)):cs)
   | l1 == l2 = simpMetaRet [(m1, m2)] (simp cs)
-simp (((m1, PreTermIntS _ l1), (m2, PreTermInt l2)):cs)
+simp' (((m1, PreTermIntS _ l1), (m2, PreTermInt l2)):cs)
   | l1 == l2 = simpMetaRet [(m1, m2)] (simp cs)
-simp (((m1, PreTermInt l1), (m2, PreTermIntU _ l2)):cs)
+simp' (((m1, PreTermInt l1), (m2, PreTermIntU _ l2)):cs)
   | l1 == l2 = simpMetaRet [(m1, m2)] (simp cs)
-simp (((m1, PreTermIntU _ l1), (m2, PreTermInt l2)):cs)
+simp' (((m1, PreTermIntU _ l1), (m2, PreTermInt l2)):cs)
   | l1 == l2 = simpMetaRet [(m1, m2)] (simp cs)
-simp (((m1, PreTermInt l1), (m2, PreTermInt l2)):cs)
+simp' (((m1, PreTermInt l1), (m2, PreTermInt l2)):cs)
   | l1 == l2 = simpMetaRet [(m1, m2)] (simp cs)
-simp (((m1, PreTermFloat16 l1), (m2, PreTermFloat16 l2)):cs)
+simp' (((m1, PreTermFloat16 l1), (m2, PreTermFloat16 l2)):cs)
   | l1 == l2 = simpMetaRet [(m1, m2)] (simp cs)
-simp (((m1, PreTermFloat32 l1), (m2, PreTermFloat32 l2)):cs)
+simp' (((m1, PreTermFloat32 l1), (m2, PreTermFloat32 l2)):cs)
   | l1 == l2 = simpMetaRet [(m1, m2)] (simp cs)
-simp (((m1, PreTermFloat64 l1), (m2, PreTermFloat64 l2)):cs)
+simp' (((m1, PreTermFloat64 l1), (m2, PreTermFloat64 l2)):cs)
   | l1 == l2 = simpMetaRet [(m1, m2)] (simp cs)
-simp (((m1, PreTermFloat l1), (m2, PreTermFloat16 l2)):cs)
+simp' (((m1, PreTermFloat l1), (m2, PreTermFloat16 l2)):cs)
   | show l1 == show l2 = simpMetaRet [(m1, m2)] (simp cs)
-simp (((m1, PreTermFloat16 l1), (m2, PreTermFloat l2)):cs)
+simp' (((m1, PreTermFloat16 l1), (m2, PreTermFloat l2)):cs)
   | show l1 == show l2 = simpMetaRet [(m1, m2)] (simp cs)
-simp (((m1, PreTermFloat l1), (m2, PreTermFloat32 l2)):cs)
+simp' (((m1, PreTermFloat l1), (m2, PreTermFloat32 l2)):cs)
   | show l1 == show l2 = simpMetaRet [(m1, m2)] (simp cs)
-simp (((m1, PreTermFloat32 l1), (m2, PreTermFloat l2)):cs)
+simp' (((m1, PreTermFloat32 l1), (m2, PreTermFloat l2)):cs)
   | show l1 == show l2 = simpMetaRet [(m1, m2)] (simp cs)
-simp (((m1, PreTermFloat l1), (m2, PreTermFloat64 l2)):cs)
+simp' (((m1, PreTermFloat l1), (m2, PreTermFloat64 l2)):cs)
   | l1 == l2 = simpMetaRet [(m1, m2)] (simp cs)
-simp (((m1, PreTermFloat64 l1), (m2, PreTermFloat l2)):cs)
+simp' (((m1, PreTermFloat64 l1), (m2, PreTermFloat l2)):cs)
   | l1 == l2 = simpMetaRet [(m1, m2)] (simp cs)
-simp (((m1, PreTermFloat l1), (m2, PreTermFloat l2)):cs)
+simp' (((m1, PreTermFloat l1), (m2, PreTermFloat l2)):cs)
   | l1 == l2 = simpMetaRet [(m1, m2)] (simp cs)
-simp (((m1, PreTermEnum l1), (m2, PreTermEnum l2)):cs)
+simp' (((m1, PreTermEnum l1), (m2, PreTermEnum l2)):cs)
   | l1 == l2 = simpMetaRet [(m1, m2)] (simp cs)
-simp (((m1, PreTermEnumIntro l1), (m2, PreTermEnumIntro l2)):cs)
+simp' (((m1, PreTermEnumIntro l1), (m2, PreTermEnumIntro l2)):cs)
   | l1 == l2 = simpMetaRet [(m1, m2)] (simp cs)
-simp (((m1, PreTermArray k1 dom1 cod1), (m2, PreTermArray k2 dom2 cod2)):cs)
+simp' (((m1, PreTermArray k1 dom1 cod1), (m2, PreTermArray k2 dom2 cod2)):cs)
   | k1 == k2 = simpMetaRet [(m1, m2)] $ simp $ (dom1, dom2) : (cod1, cod2) : cs
-simp (((m1, PreTermArrayIntro k1 les1), (m2, PreTermArrayIntro k2 les2)):cs)
+simp' (((m1, PreTermArrayIntro k1 les1), (m2, PreTermArrayIntro k2 les2)):cs)
   | k1 == k2 = do
     csArray <- simpArrayIntro les1 les2
     csCont <- simpMetaRet [(m1, m2)] $ simp cs
     return $ csArray ++ csCont
-simp ((e1, e2):cs)
+simp' ((e1, e2):cs)
   | (m1, PreTermArrayElim k1 (_, PreTermUpsilon f) eps1) <- e1
   , (m2, PreTermArrayElim k2 (_, PreTermUpsilon g) eps2) <- e2
   , k1 == k2
   , f == g = simpMetaRet [(m1, m2)] $ simp $ (eps1, eps2) : cs
-simp ((e1, e2):cs)
+simp' ((e1, e2):cs)
   | (m11, PreTermPiElim (m12, PreTermUpsilon f) es1) <- e1
   , (m21, PreTermPiElim (m22, PreTermUpsilon g) es2) <- e2
   , f == g
   , length es1 == length es2 =
     simpMetaRet [(m11, m21), (m12, m22)] $ simp $ zip es1 es2 ++ cs
-simp ((e1, e2):cs)
+simp' ((e1, e2):cs)
   | (m11, PreTermPiElim (m12, PreTermTheta f) es1) <- e1
   , (m21, PreTermPiElim (m22, PreTermTheta g) es2) <- e2
   , f == g
   , length es1 == length es2 =
     simpMetaRet [(m11, m21), (m12, m22)] $ simp $ zip es1 es2 ++ cs
-simp ((e1, e2):cs)
+simp' ((e1, e2):cs)
   | (m11, PreTermPiElim (m12, PreTermZeta f) es1) <- e1
   , (m21, PreTermPiElim (m22, PreTermZeta g) es2) <- e2
   , f == g
   , length es1 == length es2 =
     simpMetaRet [(m11, m21), (m12, m22)] $ simp $ zip es1 es2 ++ cs
-simp ((e1, e2):cs) = do
+simp' ((e1, e2):cs) = do
   let ms1 = asStuckedTerm e1
   let ms2 = asStuckedTerm e2
   let fvs1 = varPreTermPlus e1
   let fmvs1 = holePreTermPlus e1
   let fvs2 = varPreTermPlus e2
   let fmvs2 = holePreTermPlus e2
-  -- let (fvs1, fmvs1) = varPreTermPlus e1
-  -- let (fvs2, fmvs2) = varPreTermPlus e2
   case (ms1, ms2) of
     (Just (StuckHole h1), _) -> do
       simpHole h1 fmvs1 fmvs2 e1 e2 cs
@@ -147,7 +149,20 @@ simpReduce ::
 simpReduce e1 e2 cs = do
   me1' <- reducePreTermPlus e1 >>= liftIO . timeout 5000000 . return
   case me1' of
-    Just e1' -> simp $ (e1', e2) : cs
+    Just e1'
+      | isReduciblePreTerm e2 -> simpReduce' e2 e1' cs
+    Just e1' -> simp' $ (e1', e2) : cs
+    Nothing -> throwError $ "cannot simplify [TIMEOUT]:\n" ++ Pr.ppShow (e1, e2)
+
+simpReduce' ::
+     PreTermPlus
+  -> PreTermPlus
+  -> [PreConstraint]
+  -> WithEnv [EnrichedConstraint]
+simpReduce' e1 e2 cs = do
+  me1' <- reducePreTermPlus e1 >>= liftIO . timeout 5000000 . return
+  case me1' of
+    Just e1' -> simp' $ (e1', e2) : cs
     Nothing -> throwError $ "cannot simplify [TIMEOUT]:\n" ++ Pr.ppShow (e1, e2)
 
 simpPi ::
