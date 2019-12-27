@@ -34,7 +34,6 @@ data Env =
     , nameEnv :: [(Identifier, Identifier)] -- [("foo", "foo.13"), ...]
     , typeEnv :: Map.Map Identifier PreTermPlus -- var ~> typeof(var)
     , constraintEnv :: [PreConstraint] -- for type inference
-    , constraintQueue :: ConstraintQueue -- for (dependent) type inference
     , substEnv :: [(Identifier, PreTermPlus)] -- metavar ~> beta-equivalent weakterm
     , codeEnv :: [(Identifier, ([Identifier], CodePlus))] -- f ~> thunk (lam (x1 ... xn) e)
     , llvmEnv :: [(Identifier, ([Identifier], LLVM))]
@@ -54,7 +53,6 @@ initialEnv path =
     , codeEnv = []
     , llvmEnv = []
     , constraintEnv = []
-    , constraintQueue = Q.empty
     , substEnv = []
     , currentDir = path
     }

@@ -40,7 +40,10 @@ type IdentifierPlus = (Identifier, PreTermPlus)
 data PreMeta
   = PreMetaTerminal (Maybe Loc)
   | PreMetaNonTerminal PreTermPlus (Maybe Loc)
-  deriving (Show)
+  -- deriving (Show)
+
+instance Show PreMeta where
+  show _ = "_"
 
 varPreTermPlus :: PreTermPlus -> ([Identifier], [Hole])
 varPreTermPlus (m, PreTermTau) = varPreMeta m
@@ -108,6 +111,7 @@ varPreTermPlusBindings ((x, t):xts) es = do
   (xs1 ++ filter (/= x) xs2, hs1 ++ hs2)
 
 varPreMeta :: PreMeta -> ([Identifier], [Hole])
+-- varPreMeta _ = ([], [])
 varPreMeta (PreMetaTerminal _) = ([], [])
 varPreMeta (PreMetaNonTerminal t _) = varPreTermPlus t
 
@@ -212,6 +216,7 @@ substPreTermPlusBindingsWithBody sub ((x, t):xts) e = do
   ((x, t') : xts', e')
 
 substPreMeta :: SubstPreTerm -> PreMeta -> PreMeta
+-- substPreMeta _ m = m
 substPreMeta _ m@(PreMetaTerminal _) = m
 substPreMeta sub (PreMetaNonTerminal t ml) =
   PreMetaNonTerminal (substPreTermPlus sub t) ml
@@ -220,12 +225,15 @@ isReducible :: PreTermPlus -> Bool
 isReducible (_, PreTermTau) = False
 isReducible (_, PreTermTheta _) = False
 isReducible (_, PreTermUpsilon _) = False
-isReducible (_, PreTermPi _ _) = False
+isReducible (_, PreTermPi xts cod) =
+  any isReducible (map snd xts) || isReducible cod
 isReducible (_, PreTermPiIntro {}) = False
+-- isReducible (_, PreTermPiElim (_, PreTermPiIntro xts _) es)
+--   | length xts == length es
+--   , all isValue es = True
 isReducible (_, PreTermPiElim (_, PreTermPiIntro xts _) es)
-  | length xts == length es
-  , all isValue es = True
-isReducible (_, PreTermPiElim (_, PreTermMu _ _) _) = True
+  | length xts == length es = True -- 言語はpureなのでvalueじゃなくてもreduceを許す
+-- isReducible (_, PreTermPiElim (_, PreTermMu _ _) es) = all isValue es -- muのときだけCBV的な挙動を要求する
 isReducible (_, PreTermPiElim (_, PreTermTheta c) [(_, PreTermIntS _ _), (_, PreTermIntS _ _)])
   | Just (LowTypeIntS _, _) <- asBinaryOpMaybe c = True
 isReducible (_, PreTermPiElim (_, PreTermTheta c) [(_, PreTermIntU _ _), (_, PreTermIntU _ _)])

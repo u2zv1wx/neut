@@ -55,7 +55,7 @@
 
 ;; type ascription
 ;; (ascribe e t) ~> (let (_ t) e)
-(keyword ascribe)
+(keyword ascription)
 
 (constant is-enum)
 
@@ -88,6 +88,8 @@
 
 ;; ここはarrowの定義のおかげでさくっといける。
 ;; cって導入してある新しい変数はスコープがちゃんとここで切れてるので問題なし。
+(keyword product)
+
 (notation (product t+)
   (pi
     ((c tau)
@@ -108,6 +110,8 @@
 ;; こうしたいんだけど、piの引数部分をかくことができない。特殊なマクロが必要なのかしら。
 
 ;; 型推論を信じていくスタイル。
+(keyword sigma-introduction)
+
 (notation (sigma-introduction e+)
   (lambda
     ((elim-result-type tau)
@@ -115,16 +119,23 @@
     (eliminator e+)))
 
 ;; sigma-elimはこれでいいのかな？
+(keyword sigma-elimination)
+
 (notation (sigma-elimination (xt+) e1 e2)
   (e1 (lambda (xt+) e2)))
 
+;; stateはpartial applicationを許す形で定義する必要がある
+;; (notation (definition name (x+) e+)
+;;   (let name (mu name (lambda (x+) e+))))
+;; これだと2引数が同時に必要。
 (definition state ((S type) (A type))
   (hom S (product S A)))
 
 (enum bottom) ;; for io-monad
 
-(definition io
-  (state bottom))
+;; まあ、こっちのほうで引数を供給すればよいだけではある。
+(definition io ((a type))
+  (state bottom a))
 
 ;; just for test
 (enum top unit)

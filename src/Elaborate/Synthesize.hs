@@ -5,6 +5,7 @@ module Elaborate.Synthesize
 import Control.Monad.Except
 import Control.Monad.State
 import qualified Data.PQueue.Min as Q
+import qualified Text.Show.Pretty as Pr
 
 import Data.Basic
 import Data.Constraint
@@ -12,8 +13,6 @@ import Data.Env
 import Data.PreTerm
 import Elaborate.Analyze
 import Elaborate.Infer (typeOf)
-
-import qualified Text.Show.Pretty as Pr
 
 -- Given a queue of constraints (easier ones comes earlier), try to synthesize
 -- all of them using heuristics.
@@ -31,6 +30,12 @@ synthesize q = do
       resolvePiElim q m iess e
     Just (Enriched _ _ (ConstraintFlexFlex m iess e)) ->
       resolvePiElim q m iess e
+    Just (Enriched (e1, e2) _ ConstraintOther) -> do
+      p "map fst substEnv:"
+      senv <- gets substEnv
+      p' $ map fst senv
+      p $ "q.size = " ++ show (Q.size q)
+      throwError $ "cannot simplify:\n" ++ Pr.ppShow (e1, e2)
     Nothing -> return ()
 
 resolveStuck ::
@@ -41,6 +46,11 @@ resolveStuck ::
   -> PreTermPlus
   -> WithEnv ()
 resolveStuck q e1 e2 h e = do
+  p $ "resolveStuck for " ++ h
+  let (_, fmvs) = varPreTermPlus e
+  if h `elem` fmvs
+    then p "broken"
+    else return ()
   let e1' = substPreTermPlus [(h, e)] e1
   let e2' = substPreTermPlus [(h, e)] e2
   cs <- simp [(e1', e2')]
@@ -60,6 +70,11 @@ resolveStuck q e1 e2 h e = do
 resolvePiElim ::
      ConstraintQueue -> Hole -> [[PreTermPlus]] -> PreTermPlus -> WithEnv ()
 resolvePiElim q m ess e = do
+  p $ "resolvePiElim for " ++ m
+  let (_, fmvs) = varPreTermPlus e
+  if m `elem` fmvs
+    then p "broken (pielim)"
+    else return ()
   let lengthInfo = map length ess
   let es = concat ess
   xss <- toVarList es >>= toAltList
@@ -69,12 +84,44 @@ resolvePiElim q m ess e = do
 
 resolveHole :: ConstraintQueue -> Hole -> PreTermPlus -> WithEnv ()
 resolveHole q h e = do
+  p $ "resolveHole for " ++ h
+  let (_, fmvs) = varPreTermPlus e
+  if h `elem` fmvs
+    then p "broken (hole)"
+    else return ()
   senv <- gets substEnv
+  p "before compose"
   modify (\env -> env {substEnv = compose [(h, e)] senv})
+  p "after compose"
   let rest = Q.deleteMin q
-  let (q1, q2) = Q.partition (\(Enriched _ ms _) -> h `elem` ms) rest
-  synthesize q1 -- substitute all the occurrences of h
-  synthesize q2
+  p $ "before substQueue. len = " ++ show (Q.size rest)
+  substQueue h e rest
+  -- rest' <- substQueue h e rest
+  -- p $ "after substQueue. len = " ++ show (Q.size rest')
+  -- synthesize rest'
+  -- let (q1, q2) = Q.partition (\(Enriched _ ms _) -> h `elem` ms) rest
+  -- q1' <- substQueue h e q1
+  -- synthesize q1'
+  -- synthesize q2
+
+substQueue :: Identifier -> PreTermPlus -> ConstraintQueue -> WithEnv ()
+substQueue h e q
+  -- foo <-
+  --   mapM
+  --     (\(Enriched (e1, e2) _ _) -> do
+  --        let e1' = substPreTermPlus [(h, e)] e1
+  --        let e2' = substPreTermPlus [(h, e)] e2
+  --        return (e1', e2'))
+  --     (Q.toList q)
+  -- analyze foo >>= synthesize
+ = do
+  mapM_
+    (\(Enriched (e1, e2) _ _) -> do
+       let e1' = substPreTermPlus [(h, e)] e1
+       let e2' = substPreTermPlus [(h, e)] e2
+       analyze [(e1', e2')] >>= synthesize) $
+    Q.toList q
+  -- return $ Q.fromList $ concat foo
 
 -- [e, x, y, y, e2, e3, z] ~> [p, x, y, y, q, r, z]  (p, q, r: new variables)
 toVarList :: [PreTermPlus] -> WithEnv [(Identifier, PreTermPlus)]
