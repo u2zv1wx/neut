@@ -1,19 +1,15 @@
-{-# LANGUAGE FlexibleContexts #-}
-
 module Data.Constraint where
 
-import Control.Monad.Except
+import Data.PreTerm
 
-import Data.WeakTerm
-
-type PreConstraint = (WeakTermPlus, WeakTermPlus)
+type PreConstraint = (PreTermPlus, PreTermPlus)
 
 data Constraint
-  = ConstraintImmediate Hole WeakTermPlus
-  | ConstraintPattern Hole [[WeakTermPlus]] WeakTermPlus
-  | ConstraintQuasiPattern Hole [[WeakTermPlus]] WeakTermPlus
-  | ConstraintFlexRigid Hole [[WeakTermPlus]] WeakTermPlus
-  | ConstraintFlexFlex Hole [[WeakTermPlus]] WeakTermPlus
+  = ConstraintImmediate Hole PreTermPlus
+  | ConstraintPattern Hole [[PreTermPlus]] PreTermPlus
+  | ConstraintQuasiPattern Hole [[PreTermPlus]] PreTermPlus
+  | ConstraintFlexRigid Hole [[PreTermPlus]] PreTermPlus
+  | ConstraintFlexFlex Hole [[PreTermPlus]] PreTermPlus
   deriving (Show)
 
 constraintToInt :: Constraint -> Int
@@ -42,14 +38,10 @@ instance Eq EnrichedConstraint where
 instance Ord EnrichedConstraint where
   compare (Enriched _ _ c1) (Enriched _ _ c2) = compare c1 c2
 
-compose ::
-     (MonadIO m, MonadError String m)
-  => SubstWeakTerm
-  -> SubstWeakTerm
-  -> m SubstWeakTerm
+compose :: SubstPreTerm -> SubstPreTerm -> SubstPreTerm
 compose s1 s2 = do
   let domS2 = map fst s2
   let codS2 = map snd s2
-  codS2' <- mapM (substWeakTermPlus s1) codS2
+  let codS2' = map (substPreTermPlus s1) codS2
   let s1' = filter (\(ident, _) -> ident `notElem` domS2) s1
-  return $ s1' ++ zip domS2 codS2'
+  s1' ++ zip domS2 codS2'
