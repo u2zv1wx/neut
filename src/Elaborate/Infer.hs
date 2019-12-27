@@ -7,7 +7,6 @@ module Elaborate.Infer
 
 import Control.Monad.Except
 import Control.Monad.State
-import Data.IORef
 import Data.Maybe (catMaybes)
 import Prelude hiding (pi)
 
@@ -134,59 +133,39 @@ infer ctx (m, WeakTermEnumElim e les) = do
       es' <- mapM (infer ctx) es
       constrainList $ map typeOf es'
       retPreTerm (typeOf $ head es') (toLoc m) $ PreTermEnumElim e' $ zip ls es'
-infer _ _ = undefined
+infer ctx (m, WeakTermArray k dom cod) = do
+  dom' <- inferType ctx dom
+  cod' <- inferType ctx cod
+  retPreTerm univ (toLoc m) $ PreTermArray k dom' cod'
+infer ctx (m, WeakTermArrayIntro k les) = do
+  let tCod = inferKind k
+  let (ls, es) = unzip les
+  tls <- mapM (inferCase . CaseValue) ls
+  constrainList $ catMaybes tls
+  es' <- mapM (infer ctx) es
+  let tDom = determineDomType es'
+  let t = (newMetaTerminal, PreTermArray k tDom tCod)
+  retPreTerm t (toLoc m) $ PreTermArrayIntro k $ zip ls es'
+infer ctx (m, WeakTermArrayElim kind e1 e2) = do
+  let tCod = inferKind kind
+  e1' <- infer ctx e1
+  e2' <- infer ctx e2
+  let tArr = typeOf e1'
+  insConstraintEnv tArr (newMetaTerminal, PreTermArray kind (typeOf e2') tCod)
+  retPreTerm tCod (toLoc m) $ PreTermArrayElim kind e1' e2'
 
--- infer _ (meta, WeakTermEnum _) = returnAfterUpdate meta univ
--- infer _ (meta, WeakTermEnumIntro labelOrNum) = do
---   case labelOrNum of
---     EnumValueLabel l -> do
---       k <- lookupKind l
---       returnAfterUpdate meta (newMetaTerminal, WeakTermEnum $ EnumTypeLabel k)
---     EnumValueNatNum i _ ->
---       returnAfterUpdate meta (newMetaTerminal, WeakTermEnum $ EnumTypeNatNum i)
--- infer ctx (meta, WeakTermEnumElim e branchList) = do
---   te <- infer ctx e
---   if null branchList
---     then newHoleInCtx ctx >>= returnAfterUpdate meta -- ex falso quodlibet
---     else do
---       let (ls, es) = unzip branchList
---       tls <- mapM inferCase ls
---       constrainList $ te : catMaybes tls
---       ts <- mapM (infer ctx) es
---       constrainList ts
---       returnAfterUpdate meta $ head ts
--- infer ctx (meta, WeakTermArray _ from to) = do
---   uDom <- inferType ctx from
---   uCod <- inferType ctx to
---   insConstraintEnv uDom uCod
---   returnAfterUpdate meta uDom
--- infer ctx (meta, WeakTermArrayIntro kind les) = do
---   tCod <- inferKind kind
---   let (ls, es) = unzip les
---   tls <- mapM (inferCase . CaseValue) ls
---   constrainList $ catMaybes tls
---   ts <- mapM (infer ctx) es
---   constrainList $ tCod : ts
---   returnAfterUpdate meta tCod
--- infer ctx (meta, WeakTermArrayElim kind e1 e2) = do
---   tCod <- inferKind kind
---   tDom <- infer ctx e2
---   tDomToCod <- infer ctx e1
---   insConstraintEnv tDomToCod (newMetaTerminal, WeakTermArray kind tDom tCod)
---   returnAfterUpdate meta tCod
 inferType :: Context -> WeakTermPlus -> WithEnv PreTermPlus
 inferType ctx t = do
   t' <- infer ctx t
   insConstraintEnv (typeOf t') univ
   return t'
 
--- inferKind :: ArrayKind -> WithEnv WeakTermPlus
--- inferKind (ArrayKindIntS i) =
---   return (newMetaTerminal, WeakTermTheta $ "i" ++ show i)
--- inferKind (ArrayKindIntU i) =
---   return (newMetaTerminal, WeakTermTheta $ "u" ++ show i)
--- inferKind (ArrayKindFloat size) =
---   return (newMetaTerminal, WeakTermTheta $ "f" ++ show (sizeAsInt size))
+inferKind :: ArrayKind -> PreTermPlus
+inferKind (ArrayKindIntS i) = (newMetaTerminal, PreTermTheta $ "i" ++ show i)
+inferKind (ArrayKindIntU i) = (newMetaTerminal, PreTermTheta $ "u" ++ show i)
+inferKind (ArrayKindFloat size) =
+  (newMetaTerminal, PreTermTheta $ "f" ++ show (sizeAsInt size))
+
 -- inferPiIntro ::
 --      Context -> WeakMeta -> Context -> WeakTermPlus -> WithEnv WeakTermPlus
 -- inferPiIntro ctx meta xts e = inferPiIntro' ctx meta xts xts e
@@ -343,3 +322,9 @@ newHoleOfType :: PreTermPlus -> WithEnv PreTermPlus
 newHoleOfType t = do
   h <- newNameWith "hole"
   return (PreMetaNonTerminal t Nothing, PreTermZeta h)
+
+determineDomType :: [PreTermPlus] -> PreTermPlus
+determineDomType es =
+  if null es
+    then typeOf (head es)
+    else (newMetaTerminal, PreTermTheta "bottom")
