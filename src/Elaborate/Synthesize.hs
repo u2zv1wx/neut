@@ -23,23 +23,6 @@ synthesize q = do
   case Q.getMin q of
     Just (Enriched (e1, e2) ms _)
       | Just (m, e) <- lookupAny ms sub -> resolveStuck q e1 e2 m e
-    _ -> synthesize' q
-    -- Just (Enriched _ _ (ConstraintImmediate m e)) -> resolveHole q [(m, e)]
-    -- Just (Enriched _ _ (ConstraintPattern m iess e)) -> resolvePiElim q m iess e
-    -- Just (Enriched _ _ (ConstraintQuasiPattern m iess e)) ->
-    --   resolvePiElim q m iess e
-    -- Just (Enriched _ _ (ConstraintFlexRigid m iess e)) ->
-    --   resolvePiElim q m iess e
-    -- Just (Enriched _ _ (ConstraintFlexFlex m iess e)) ->
-    --   resolvePiElim q m iess e
-    -- Just (Enriched (e1, e2) _ ConstraintOther) -> do
-    --   p $ "q.size = " ++ show (Q.size q)
-    --   throwError $ "cannot simplify:\n" ++ Pr.ppShow (e1, e2)
-    -- Nothing -> return ()
-
-synthesize' :: ConstraintQueue -> WithEnv ()
-synthesize' q = do
-  case Q.getMin q of
     Just (Enriched _ _ (ConstraintImmediate m e)) -> resolveHole q [(m, e)]
     Just (Enriched _ _ (ConstraintPattern m iess e)) -> resolvePiElim q m iess e
     Just (Enriched _ _ (ConstraintQuasiPattern m iess e)) ->
@@ -61,7 +44,7 @@ resolveStuck ::
   -> PreTermPlus
   -> WithEnv ()
 resolveStuck q e1 e2 h e = do
-  let (_, fmvs) = varPreTermPlus e
+  let fmvs = holePreTermPlus e
   let e1' = substPreTermPlus [(h, e)] e1
   let e2' = substPreTermPlus [(h, e)] e2
   q' <- assert (h `notElem` fmvs) $ analyze [(e1', e2')]
@@ -81,7 +64,7 @@ resolveStuck q e1 e2 h e = do
 resolvePiElim ::
      ConstraintQueue -> Hole -> [[PreTermPlus]] -> PreTermPlus -> WithEnv ()
 resolvePiElim q m ess e = do
-  let (_, fmvs) = varPreTermPlus e
+  let fmvs = holePreTermPlus e
   let lengthInfo = assert (m `notElem` fmvs) $ map length ess
   let es = concat ess
   xss <- toVarList es >>= toAltList
@@ -94,7 +77,7 @@ resolvePiElim q m ess e = do
 resolveHole :: ConstraintQueue -> [(Hole, PreTermPlus)] -> WithEnv ()
 resolveHole q sub = do
   senv <- gets substEnv
-  let b = and $ map (\(h, e) -> h `notElem` snd (varPreTermPlus e)) sub
+  let b = and $ map (\(h, e) -> h `notElem` holePreTermPlus e) sub
   assert b $ modify (\env -> env {substEnv = compose sub senv})
   synthesize $ Q.deleteMin q
 

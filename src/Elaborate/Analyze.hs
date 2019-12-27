@@ -35,17 +35,10 @@ simp (((m1, PreTermTheta x), (m2, PreTermTheta y)):cs)
   | x == y = simpMetaRet [(m1, m2)] (simp cs)
 simp (((m1, PreTermUpsilon x1), (m2, PreTermUpsilon x2)):cs)
   | x1 == x2 = simpMetaRet [(m1, m2)] (simp cs)
-simp (((m1, PreTermPi [] cod1), (m2, PreTermPi [] cod2)):cs) =
-  simpMetaRet [(m1, m2)] $ simp $ (cod1, cod2) : cs
-simp (((m1, PreTermPi ((x1, t1):xts1) cod1), (m2, PreTermPi ((x2, t2):xts2) cod2)):cs) = do
-  var1 <- toVar x1 t1
-  let m = metaTerminal
-  let (xts2', cod2') = substPreTermPlusBindingsWithBody [(x2, var1)] xts2 cod2
-  let tPi1 = (m, PreTermPi xts1 cod1)
-  let tPi2 = (m, PreTermPi xts2' cod2')
-  simpMetaRet [(m1, m2)] $ simp $ (t1, t2) : (tPi1, tPi2) : cs
+simp (((m1, PreTermPi xts1 cod1), (m2, PreTermPi xts2 cod2)):cs) = do
+  simpPi m1 xts1 cod1 m2 xts2 cod2 cs
 simp (((m1, PreTermPiIntro xts1 e1), (m2, PreTermPiIntro xts2 e2)):cs) =
-  simp $ ((m1, PreTermPi xts1 e1), (m2, PreTermPi xts2 e2)) : cs
+  simpPi m1 xts1 e1 m2 xts2 e2 cs
 simp (((m1, PreTermPiIntro xts body1), e2@(m2, _)):cs) = do
   vs <- mapM (uncurry toVar) xts
   let appMeta = (PreMetaNonTerminal (typeOf body1) Nothing)
@@ -128,29 +121,56 @@ simp ((e1, e2):cs)
 simp ((e1, e2):cs) = do
   let ms1 = asStuckedTerm e1
   let ms2 = asStuckedTerm e2
-  let (_, fmvs1) = varPreTermPlus e1
-  let (_, fmvs2) = varPreTermPlus e2
+  let fvs1 = varPreTermPlus e1
+  let fmvs1 = holePreTermPlus e1
+  let fvs2 = varPreTermPlus e2
+  let fmvs2 = holePreTermPlus e2
+  -- let (fvs1, fmvs1) = varPreTermPlus e1
+  -- let (fvs2, fmvs2) = varPreTermPlus e2
   case (ms1, ms2) of
-    (Just (StuckHole h1), _) -> simpHole h1 fmvs1 fmvs2 e1 e2 cs
-    (_, Just (StuckHole h2)) -> simpHole h2 fmvs2 fmvs1 e2 e1 cs
-    (Just (StuckPiElimStrict h1 exs1), _) ->
-      simpStuckStrict h1 exs1 $ (e1, e2) : cs
-    (_, Just (StuckPiElimStrict h2 exs2)) ->
-      simpStuckStrict h2 exs2 $ (e2, e1) : cs
-    (Just (StuckPiElim h1 ies1), Nothing) ->
+    (Just (StuckHole h1), _) -> do
+      simpHole h1 fmvs1 fmvs2 e1 e2 cs
+    (_, Just (StuckHole h2)) -> do
+      simpHole h2 fmvs2 fmvs1 e2 e1 cs
+    (Just (StuckPiElimStrict h1 exs1), _) -> do
+      simpStuckStrict h1 exs1 fvs1 fmvs1 fvs2 fmvs2 e1 e2 cs
+    (_, Just (StuckPiElimStrict h2 exs2)) -> do
+      simpStuckStrict h2 exs2 fvs2 fmvs2 fvs1 fmvs1 e2 e1 cs
+    (Just (StuckPiElim h1 ies1), Nothing) -> do
       simpFlexRigid fmvs1 fmvs2 h1 ies1 e1 e2 cs
-    (Nothing, Just (StuckPiElim h2 ies2)) ->
+    (Nothing, Just (StuckPiElim h2 ies2)) -> do
       simpFlexRigid fmvs2 fmvs1 h2 ies2 e2 e1 cs
-    (Just (StuckPiElim h1 ies1), Just (StuckPiElim h2 _)) ->
+    (Just (StuckPiElim h1 ies1), Just (StuckPiElim h2 _)) -> do
       simpFlexFlex fmvs1 fmvs2 h1 h2 ies1 e1 e2 cs
     _ -> simpOther (fmvs1 ++ fmvs2) e1 e2 cs
+
+-- simpPi (((m1, PreTermPi [] cod1), (m2, PreTermPi [] cod2)):cs) =
+simpPi ::
+     PreMeta
+  -> [(Identifier, PreTermPlus)]
+  -> PreTermPlus
+  -> PreMeta
+  -> [(Identifier, PreTermPlus)]
+  -> PreTermPlus
+  -> [(PreTermPlus, PreTermPlus)]
+  -> WithEnv [EnrichedConstraint]
+simpPi m1 [] cod1 m2 [] cod2 cs =
+  simpMetaRet [(m1, m2)] $ simp $ (cod1, cod2) : cs
+simpPi m1 ((x1, t1):xts1) cod1 m2 ((x2, t2):xts2) cod2 cs = do
+  var1 <- toVar x1 t1
+  let m = metaTerminal
+  let (xts2', cod2') = substPreTermPlusBindingsWithBody [(x2, var1)] xts2 cod2
+  cst <- simp [(t1, t2)]
+  cs' <- simpMetaRet [(m1, m2)] $ simpPi m xts1 cod1 m xts2' cod2' cs -- let tPi1 = (m, PreTermPi xts1 cod1)
+  return $ cst ++ cs'
+simpPi _ _ _ _ _ _ _ = throwError "simpPi"
 
 simpHole ::
      Hole
   -> [Hole]
   -> [Hole]
-  -> (PreMeta, PreTerm)
-  -> (PreMeta, PreTerm)
+  -> PreTermPlus
+  -> PreTermPlus
   -> [PreConstraint]
   -> WithEnv [EnrichedConstraint]
 simpHole h1 fmvs1 fmvs2 e1 e2 cs
@@ -160,27 +180,36 @@ simpHole h1 fmvs1 fmvs2 e1 e2 cs
     return $ Enriched (e1, e2) fmvs (ConstraintImmediate h1 e2) : cs'
   | otherwise = simpOther (fmvs1 ++ fmvs2) e1 e2 cs
 
+-- ここでh1のfmvsの条件をチェックしていないのがおかしい？
 simpStuckStrict ::
      Identifier
   -> [[(PreTermPlus, Identifier)]]
+  -> [Identifier]
+  -> [Hole]
+  -> [Identifier]
+  -> [Hole]
+  -> PreTermPlus
+  -> PreTermPlus
   -> [(PreTermPlus, PreTermPlus)]
   -> WithEnv [EnrichedConstraint]
-simpStuckStrict _ _ [] = return []
-simpStuckStrict h1 exs1 ((e1, e2):cs) = do
-  let es1 = map (map fst) exs1
-  cs' <- simpMetaRet [(fst e1, fst e2)] $ simp cs
-  if all (isSolvable e2 h1) (map (map snd) exs1)
-    then return $ Enriched (e1, e2) [h1] (ConstraintPattern h1 es1 e2) : cs'
-    else return $
-         Enriched (e1, e2) [h1] (ConstraintQuasiPattern h1 es1 e2) : cs'
+simpStuckStrict h1 exs1 _ fmvs1 fvs2 fmvs2 e1 e2 cs
+  | h1 `notElem` fmvs2 = do
+    let es1 = map (map fst) exs1
+    cs' <- simpMetaRet [(fst e1, fst e2)] $ simp cs
+    if all (isSolvable fvs2 fmvs2 h1) (map (map snd) exs1)
+      then do
+        return $ Enriched (e1, e2) [h1] (ConstraintPattern h1 es1 e2) : cs'
+      else do
+        return $ Enriched (e1, e2) [h1] (ConstraintQuasiPattern h1 es1 e2) : cs'
+  | otherwise = simpOther (fmvs1 ++ fmvs2) e1 e2 cs
 
 simpFlexRigid ::
      [Hole]
   -> [Hole]
   -> Hole
   -> [[PreTermPlus]]
-  -> (PreMeta, PreTerm)
-  -> (PreMeta, PreTerm)
+  -> PreTermPlus
+  -> PreTermPlus
   -> [PreConstraint]
   -> WithEnv [EnrichedConstraint]
 simpFlexRigid _ fmvs2 h1 ies1 e1 e2 cs
@@ -196,8 +225,8 @@ simpFlexFlex ::
   -> Hole
   -> Hole
   -> [[PreTermPlus]]
-  -> (PreMeta, PreTerm)
-  -> (PreMeta, PreTerm)
+  -> PreTermPlus
+  -> PreTermPlus
   -> [PreConstraint]
   -> WithEnv [EnrichedConstraint]
 simpFlexFlex _ fmvs2 h1 h2 ies1 e1 e2 cs
@@ -275,10 +304,8 @@ asStuckedTerm (_, PreTermPiElim e es) =
 asStuckedTerm (_, PreTermZeta h) = Just $ StuckHole h
 asStuckedTerm _ = Nothing
 
-isSolvable :: PreTermPlus -> Identifier -> [Identifier] -> Bool
-isSolvable e x xs = do
-  let (fvs, fmvs) = varPreTermPlus e
-  affineCheck xs fvs && x `notElem` fmvs
+isSolvable :: [Identifier] -> [Hole] -> Identifier -> [Identifier] -> Bool
+isSolvable fvs fmvs x xs = affineCheck xs fvs && x `notElem` fmvs
 
 toVar :: Identifier -> PreTermPlus -> WithEnv PreTermPlus
 toVar x t = return (PreMetaNonTerminal t Nothing, PreTermUpsilon x)
