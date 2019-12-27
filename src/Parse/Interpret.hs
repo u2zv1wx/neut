@@ -143,9 +143,8 @@ isConstant x
 
 interpretIdentifierPlus :: TreePlus -> WithEnv IdentifierPlus
 interpretIdentifierPlus (_, TreeAtom x) = do
-  u <- wrap WeakTermTau
-  t <- newHoleOfType u
-  return (x, t)
+  h <- newNameWith "hole"
+  return (x, (newWeakMetaTerminal, WeakTermZeta h))
 interpretIdentifierPlus (_, TreeNode [(_, TreeAtom x), t]) = do
   x' <- interpretAtom x
   t' <- interpret t
@@ -208,9 +207,7 @@ asArrayIntro (CaseValue l) = return l
 asArrayIntro CaseDefault = throwError "`default` cannot be used in array-intro"
 
 withMeta :: TreeMeta -> WeakTerm -> WithEnv WeakTermPlus
-withMeta m e = do
-  m' <- toWeakMeta m
-  return (m', e)
+withMeta m e = return (toWeakMetaNonTerminal m, e)
 
 extractIdentifier :: TreePlus -> WithEnv Identifier
 extractIdentifier (_, TreeAtom s) = return s
@@ -247,3 +244,9 @@ encodeChar = map fromIntegral . go . ord
 -- adopted from https://hackage.haskell.org/package/utf8-string-1.0.1.1/docs/src/Codec-Binary-UTF8-String.html
 encode :: String -> [Word8]
 encode = concatMap encodeChar
+
+toWeakMetaNonTerminal :: TreeMeta -> WeakMeta
+toWeakMetaNonTerminal m = WeakMetaNonTerminal (treeMetaLocation m)
+
+newWeakMetaTerminal :: WeakMeta
+newWeakMetaTerminal = WeakMetaTerminal Nothing
