@@ -72,6 +72,7 @@ resolvePiElim q m ess e = do
   xss <- toVarList es >>= toAltList
   let xsss = map (takeByCount lengthInfo) xss
   let lamList = map (bindFormalArgs e) xsss
+  -- p $ "chain-list len: " ++ show (length lamList)
   chain q $ map (\lam -> resolveHole q [(m, lam)]) lamList
 
 -- resolveHoleは[(Hole, PreTermPlus)]を受け取るようにしたほうがよさそう。
@@ -155,6 +156,7 @@ discardInactive xs indexList =
 chain :: ConstraintQueue -> [WithEnv a] -> WithEnv a
 chain _ [] = throwError $ "cannot synthesize(chain)."
 chain _ [e] = e
+-- chain _ (e:es) = e
 chain c (e:es) =
   catchError e $ \_
     -- liftIO $ putStrLn err
