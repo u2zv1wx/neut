@@ -50,7 +50,7 @@ infer ctx (m, WeakTermTheta x)
     case mt of
       Just t -> retPreTerm t (toLoc m) $ PreTermTheta x
       Nothing -> do
-        h <- newHoleInCtx ctx
+        h <- newTypeHoleInCtx ctx
         insTypeEnv x h
         retPreTerm h (toLoc m) $ PreTermTheta x
 infer _ (m, WeakTermUpsilon x) = do
@@ -65,13 +65,14 @@ infer ctx (m, WeakTermPiIntro xts e) = do
   retPreTerm piType (toLoc m) $ PreTermPiIntro xts' e'
 infer ctx (m, WeakTermPiElim e es) = do
   e' <- infer ctx e
+  insConstraintEnv univ $ typeOf $ typeOf e'
   -- -- xts == [(x1, e1, t1), ..., (xn, en, tn)] with xi : ti and ei : ti
   ys <- mapM (const $ newNameWith "arg") es
   -- yts = [y1 : ?M1 @ (ctx[0], ..., ctx[n]),
   --        y2 : ?M2 @ (ctx[0], ..., ctx[n], y1),
   --        ...,
   --        ym : ?Mm @ (ctx[0], ..., ctx[n], y1, ..., y{m-1})]
-  yts <- newHoleListInCtx ctx ys
+  yts <- newTypeHoleListInCtx ctx ys
   es' <- mapM (infer ctx) es
   let ts = map typeOf es'
   -- ts' = [?M1 @ (ctx[0], ..., ctx[n]),
@@ -81,6 +82,7 @@ infer ctx (m, WeakTermPiElim e es) = do
   let ts' = map (substPreTermPlus (zip ys es') . snd) yts
   forM_ (zip ts ts') $ uncurry insConstraintEnv
   cod <- newHoleInCtx (ctx ++ yts)
+  insConstraintEnv univ $ typeOf cod
   let tPi = (metaTerminal, PreTermPi yts cod)
   insConstraintEnv tPi (typeOf e')
   -- cod' = ?M @ (ctx[0], ..., ctx[n], e1, ..., em)
@@ -107,7 +109,7 @@ infer _ (m, WeakTermIntU size i) = do
   let t = (metaTerminal, PreTermTheta $ "u" ++ show size)
   retPreTerm t (toLoc m) $ PreTermIntU size i
 infer ctx (m, WeakTermInt i) = do
-  h <- newHoleInCtx ctx
+  h <- newTypeHoleInCtx ctx
   retPreTerm h (toLoc m) $ PreTermInt i
 infer _ (m, WeakTermFloat16 f) = do
   let t = (metaTerminal, PreTermTheta "f16")
@@ -119,7 +121,7 @@ infer _ (m, WeakTermFloat64 f) = do
   let t = (metaTerminal, PreTermTheta "f64")
   retPreTerm t (toLoc m) $ PreTermFloat64 f
 infer ctx (m, WeakTermFloat f) = do
-  h <- newHoleInCtx ctx
+  h <- newTypeHoleInCtx ctx
   retPreTerm h (toLoc m) $ PreTermFloat f
 infer _ (m, WeakTermEnum name) = retPreTerm univ (toLoc m) $ PreTermEnum name
 infer _ (m, WeakTermEnumIntro labelOrNum) = do
@@ -135,7 +137,7 @@ infer ctx (m, WeakTermEnumElim e les) = do
   e' <- infer ctx e
   if null les
     then do
-      h <- newHoleInCtx ctx
+      h <- newTypeHoleInCtx ctx
       retPreTerm h (toLoc m) $ PreTermEnumElim e' [] -- ex falso quodlibet
     else do
       let (ls, es) = unzip les
@@ -195,20 +197,20 @@ inferPiIntro ::
   -> [(Identifier, WeakTermPlus)]
   -> WeakTermPlus
   -> WithEnv ([(Identifier, PreTermPlus)], PreTermPlus)
-inferPiIntro ctx [] cod = do
-  cod' <- infer ctx cod
-  return ([], cod')
-inferPiIntro ctx ((x, t):xts) cod = do
+inferPiIntro ctx [] e = do
+  e' <- infer ctx e
+  return ([], e')
+inferPiIntro ctx ((x, t):xts) e = do
   t' <- inferType ctx t
   insTypeEnv x t'
-  (xts', cod') <- inferPiIntro (ctx ++ [(x, t')]) xts cod
-  return ((x, t') : xts', cod')
+  (xts', e') <- inferPiIntro (ctx ++ [(x, t')]) xts e
+  return ((x, t') : xts', e')
 
 -- In a context (x1 : A1, ..., xn : An), this function creates metavariables
 --   ?M  : Pi (x1 : A1, ..., xn : An). ?Mt @ (x1, ..., xn)
 --   ?Mt : Pi (x1 : A1, ..., xn : An). Univ
 -- and return ?M @ (x1, ..., xn) : ?Mt @ (x1, ..., xn).
--- Note that we can't just set `?M : Pi (x1 : A1, ..., xn : An). Ui` since
+-- Note that we can't just set `?M : Pi (x1 : A1, ..., xn : An). Univ` since
 -- WeakTermZeta might be used as an ordinary term, that is, a term which is not a type.
 newHoleInCtx :: Context -> WithEnv PreTermPlus
 newHoleInCtx ctx = do
@@ -218,7 +220,16 @@ newHoleInCtx ctx = do
   hole <- newHoleOfType (metaTerminal, PreTermPi ctx app)
   return (PreMetaNonTerminal app Nothing, PreTermPiElim hole varSeq)
 
--- In context ctx == [x1, ..., xn], `newHoleListInCtx ctx [y1, ..., ym]` generates
+-- In a context (x1 : A1, ..., xn : An), this function creates a metavariable
+--   ?M  : Pi (x1 : A1, ..., xn : An). Univ
+-- and return ?M @ (x1, ..., xn) : Univ.
+newTypeHoleInCtx :: Context -> WithEnv PreTermPlus
+newTypeHoleInCtx ctx = do
+  varSeq <- mapM (uncurry toVar) ctx
+  hole <- newHoleOfType (metaTerminal, PreTermPi ctx univ)
+  return (PreMetaNonTerminal univ Nothing, PreTermPiElim hole varSeq)
+
+-- In context ctx == [x1, ..., xn], `newTypeHoleListInCtx ctx [y1, ..., ym]` generates
 -- the following list:
 --
 --   [(y1,   ?M1   @ (x1, ..., xn)),
@@ -227,13 +238,13 @@ newHoleInCtx ctx = do
 --    (y{m}, ?M{m} @ (x1, ..., xn, y1, ..., y{m-1}))]
 --
 -- inserting type information `yi : ?Mi @ (x1, ..., xn, y1, ..., y{i-1})
-newHoleListInCtx ::
+newTypeHoleListInCtx ::
      Context -> [Identifier] -> WithEnv [(Identifier, PreTermPlus)]
-newHoleListInCtx _ [] = return []
-newHoleListInCtx ctx (x:rest) = do
-  t <- newHoleInCtx ctx
+newTypeHoleListInCtx _ [] = return []
+newTypeHoleListInCtx ctx (x:rest) = do
+  t <- newTypeHoleInCtx ctx
   insTypeEnv x t
-  ts <- newHoleListInCtx (ctx ++ [(x, t)]) rest
+  ts <- newTypeHoleListInCtx (ctx ++ [(x, t)]) rest
   return $ (x, t) : ts
 
 inferCase :: Case -> WithEnv (Maybe PreTermPlus)
