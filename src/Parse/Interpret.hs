@@ -78,7 +78,7 @@ interpret (m, TreeNode [(_, TreeAtom str), indexType])
   | Just kind <- withKindPrefix str "array" = do
     indexType' <- interpret indexType
     withMeta m $ WeakTermArray kind indexType'
-interpret (m, TreeNode [(_, TreeAtom str), (_, TreeNode cs)])
+interpret (m, TreeNode ((_, TreeAtom str):cs))
   | Just kind <- withKindPrefix str "array-introduction" = do
     cs' <- mapM interpretClause cs
     let (ls, es) = unzip cs'
