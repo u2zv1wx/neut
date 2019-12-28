@@ -98,12 +98,7 @@ simp' (((m1, PreTermArrayIntro k1 les1), (m2, PreTermArrayIntro k2 les2)):cs)
 simp' ((e1, e2):cs) = do
   let ms1 = asStuckedTerm e1
   let ms2 = asStuckedTerm e2
-  case (ms1, ms2)
-    -- (Just (StuckHole h1), Nothing) -> do
-    --   simpHole h1 e1 e2 cs
-    -- (Nothing, Just (StuckHole h2)) -> do
-    --   simpHole h2 e2 e1 cs
-        of
+  case (ms1, ms2) of
     (Just (StuckPiElimStrict h1 exs1), _) -> do
       simpStuckStrict h1 exs1 e1 e2 cs
     (_, Just (StuckPiElimStrict h2 exs2)) -> do
