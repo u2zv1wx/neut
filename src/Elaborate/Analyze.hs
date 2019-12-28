@@ -238,7 +238,6 @@ data Stuck
   = StuckPiElim Hole [[PreTermPlus]]
   | StuckPiElimStrict Hole [[(PreTermPlus, Identifier)]]
 
--- a stucked term is a term that cannot be evaluated due to unresolved holes.
 asStuckedTerm :: PreTermPlus -> Maybe Stuck
 asStuckedTerm (_, PreTermPiElim (_, PreTermZeta h) es)
   | Just xs <- mapM asUpsilon es = Just $ StuckPiElimStrict h [zip es xs]
