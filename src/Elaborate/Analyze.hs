@@ -40,10 +40,10 @@ simp' (((m1, PreTermPi xts1 cod1), (m2, PreTermPi xts2 cod2)):cs) = do
 simp' (((m1, PreTermPiIntro xts1 e1), (m2, PreTermPiIntro xts2 e2)):cs) =
   simpPi m1 xts1 e1 m2 xts2 e2 cs
 simp' (((m1, PreTermPiIntro xts body1), e2@(m2, _)):cs) = do
-  vs <- mapM (uncurry toVar) xts
+  let vs = map (uncurry toVar) xts
   let appMeta = (PreMetaNonTerminal (typeOf body1) Nothing)
   simpMetaRet [(m1, m2)] $ simp $ (body1, (appMeta, PreTermPiElim e2 vs)) : cs
-simp' ((e1, e2@(_, PreTermPiIntro {})):cs) = simp $ (e2, e1) : cs
+simp' ((e1, e2@(_, PreTermPiIntro {})):cs) = simp' $ (e2, e1) : cs
 simp' (((m1, PreTermMu (x1, t1) e1), (m2, PreTermMu (x2, t2) e2)):cs)
   | x1 == x2 = simpMetaRet [(m1, m2)] $ simp $ (t1, t2) : (e1, e2) : cs
 simp' (((m1, PreTermZeta x), (m2, PreTermZeta y)):cs)
@@ -98,16 +98,15 @@ simp' (((m1, PreTermArrayIntro k1 les1), (m2, PreTermArrayIntro k2 les2)):cs)
 simp' ((e1, e2):cs) = do
   let ms1 = asStuckedTerm e1
   let ms2 = asStuckedTerm e2
-  -- ここのcategorizeはけっこうデリケートかもしれない。
   case (ms1, ms2) of
-    (Just (StuckPiElimStrict h1 exs1), _) -> do
-      simpStuckStrict h1 exs1 e1 e2 cs
-    (_, Just (StuckPiElimStrict h2 exs2)) -> do
-      simpStuckStrict h2 exs2 e2 e1 cs
     (Just (StuckHole h1), Nothing) -> do
       simpHole h1 e1 e2 cs
     (Nothing, Just (StuckHole h2)) -> do
       simpHole h2 e2 e1 cs
+    (Just (StuckPiElimStrict h1 exs1), _) -> do
+      simpStuckStrict h1 exs1 e1 e2 cs
+    (_, Just (StuckPiElimStrict h2 exs2)) -> do
+      simpStuckStrict h2 exs2 e2 e1 cs
     (Just (StuckPiElim h1 ies1), Nothing) -> do
       simpFlexRigid h1 ies1 e1 e2 cs
     (Nothing, Just (StuckPiElim h2 ies2)) -> do
@@ -152,13 +151,13 @@ simpPi ::
 simpPi m1 [] cod1 m2 [] cod2 cs =
   simpMetaRet [(m1, m2)] $ simp $ (cod1, cod2) : cs
 simpPi m1 ((x1, t1):xts1) cod1 m2 ((x2, t2):xts2) cod2 cs = do
-  var1 <- toVar x1 t1
-  let m = metaTerminal
+  let var1 = toVar x1 t1
+  let m = metaTerminal -- m == m is trivially true
   let (xts2', cod2') = substPreTermPlusBindingsWithBody [(x2, var1)] xts2 cod2
   cst <- simp [(t1, t2)]
-  cs' <- simpMetaRet [(m1, m2)] $ simpPi m xts1 cod1 m xts2' cod2' cs -- let tPi1 = (m, PreTermPi xts1 cod1)
+  cs' <- simpMetaRet [(m1, m2)] $ simpPi m xts1 cod1 m xts2' cod2' cs
   return $ cst ++ cs'
-simpPi _ _ _ _ _ _ _ = throwError "simpPi"
+simpPi _ _ _ _ _ _ _ = throwError "cannot simplify (Pi)"
 
 simpHole ::
      Hole
@@ -183,7 +182,7 @@ simpStuckStrict ::
 simpStuckStrict h1 exs1 e1 e2 cs
   | h1 `notElem` holePreTermPlus e2
   , xs <- concat $ map (map snd) exs1
-  , all (\y -> y `elem` xs) (varPreTermPlus e2) = do
+  , all (`elem` xs) (varPreTermPlus e2) = do
     let es1 = map (map fst) exs1
     cs' <- simpMetaRet [(fst e1, fst e2)] $ simp cs
     if isDisjoint xs
@@ -208,7 +207,7 @@ simpFlexRigid ::
 simpFlexRigid h1 ies1 e1 e2 cs
   | h1 `notElem` holePreTermPlus e2
   , xs <- concatMap getVarList ies1
-  , all (\y -> y `elem` xs) (varPreTermPlus e2) = do
+  , all (`elem` xs) (varPreTermPlus e2) = do
     cs' <- simpMetaRet [(fst e1, fst e2)] $ simp cs
     let c = Enriched (e1, e2) [h1] $ ConstraintFlexRigid h1 ies1 e2
     return $ c : cs'
@@ -226,7 +225,7 @@ simpFlexFlex ::
 simpFlexFlex h1 h2 ies1 _ e1 e2 cs
   | h1 `notElem` holePreTermPlus e2
   , xs <- concatMap getVarList ies1
-  , all (\y -> y `elem` xs) (varPreTermPlus e2) = do
+  , all (`elem` xs) (varPreTermPlus e2) = do
     cs' <- simpMetaRet [(fst e1, fst e2)] $ simp cs
     let c = Enriched (e1, e2) [h1, h2] $ ConstraintFlexFlex h1 ies1 e2
     return $ c : cs'
@@ -307,8 +306,8 @@ asStuckedTerm (_, PreTermPiElim e es) =
 asStuckedTerm (_, PreTermZeta h) = Just $ StuckHole h
 asStuckedTerm _ = Nothing
 
-toVar :: Identifier -> PreTermPlus -> WithEnv PreTermPlus
-toVar x t = return (PreMetaNonTerminal t Nothing, PreTermUpsilon x)
+toVar :: Identifier -> PreTermPlus -> PreTermPlus
+toVar x t = (PreMetaNonTerminal t Nothing, PreTermUpsilon x)
 
 asUpsilon :: PreTermPlus -> Maybe Identifier
 asUpsilon (_, PreTermUpsilon x) = Just x
