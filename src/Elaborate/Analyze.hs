@@ -13,7 +13,7 @@ import Data.Basic
 import Data.Constraint
 import Data.Env
 import Data.PreTerm
-import Elaborate.Infer (metaTerminal, typeOf)
+import Elaborate.Infer (typeOf)
 import Reduce.PreTerm
 
 analyze :: [PreConstraint] -> WithEnv ConstraintQueue
@@ -29,71 +29,70 @@ simp cs = simp' cs
 
 simp' :: [PreConstraint] -> WithEnv [EnrichedConstraint]
 simp' [] = return []
-simp' (((m1, PreTermTau), (m2, PreTermTau)):cs) =
-  simpMetaRet [(m1, m2)] (simp cs)
-simp' (((m1, PreTermTheta x), (m2, PreTermTheta y)):cs)
-  | x == y = simpMetaRet [(m1, m2)] (simp cs)
-simp' (((m1, PreTermUpsilon x1), (m2, PreTermUpsilon x2)):cs)
-  | x1 == x2 = simpMetaRet [(m1, m2)] (simp cs)
-simp' (((m1, PreTermPi xts1 cod1), (m2, PreTermPi xts2 cod2)):cs) = do
-  simpPi m1 xts1 cod1 m2 xts2 cod2 cs
-simp' (((m1, PreTermPiIntro xts1 e1), (m2, PreTermPiIntro xts2 e2)):cs) =
-  simpPi m1 xts1 e1 m2 xts2 e2 cs
-simp' (((m1, PreTermPiIntro xts body1), e2@(m2, _)):cs) = do
+simp' (((_, PreTermTau), (_, PreTermTau)):cs) = (simp cs)
+simp' (((_, PreTermTheta x), (_, PreTermTheta y)):cs)
+  | x == y = (simp cs)
+simp' (((_, PreTermUpsilon x1), (_, PreTermUpsilon x2)):cs)
+  | x1 == x2 = (simp cs)
+simp' (((_, PreTermPi xts1 cod1), (_, PreTermPi xts2 cod2)):cs) = do
+  simpPi xts1 cod1 xts2 cod2 cs
+simp' (((_, PreTermPiIntro xts1 e1), (_, PreTermPiIntro xts2 e2)):cs) =
+  simpPi xts1 e1 xts2 e2 cs
+simp' (((_, PreTermPiIntro xts body1), e2@(_, _)):cs) = do
   let vs = map (uncurry toVar) xts
   let appMeta = (PreMetaNonTerminal (typeOf body1) Nothing)
-  simpMetaRet [(m1, m2)] $ simp $ (body1, (appMeta, PreTermPiElim e2 vs)) : cs
+  simp $ (body1, (appMeta, PreTermPiElim e2 vs)) : cs
 simp' ((e1, e2@(_, PreTermPiIntro {})):cs) = simp' $ (e2, e1) : cs
-simp' (((m1, PreTermMu (x1, t1) e1), (m2, PreTermMu (x2, t2) e2)):cs)
-  | x1 == x2 = simpMetaRet [(m1, m2)] $ simp $ (t1, t2) : (e1, e2) : cs
-simp' (((m1, PreTermZeta x), (m2, PreTermZeta y)):cs)
-  | x == y = simpMetaRet [(m1, m2)] (simp cs)
-simp' (((m1, PreTermIntS size1 l1), (m2, PreTermIntS size2 l2)):cs)
+simp' (((_, PreTermMu (x1, t1) e1), (_, PreTermMu (x2, t2) e2)):cs)
+  | x1 == x2 = simp $ (t1, t2) : (e1, e2) : cs
+simp' (((_, PreTermZeta x), (_, PreTermZeta y)):cs)
+  | x == y = (simp cs)
+simp' (((_, PreTermIntS size1 l1), (_, PreTermIntS size2 l2)):cs)
   | size1 == size2
-  , l1 == l2 = simpMetaRet [(m1, m2)] (simp cs)
-simp' (((m1, PreTermIntU size1 l1), (m2, PreTermIntU size2 l2)):cs)
+  , l1 == l2 = (simp cs)
+simp' (((_, PreTermIntU size1 l1), (_, PreTermIntU size2 l2)):cs)
   | size1 == size2
-  , l1 == l2 = simpMetaRet [(m1, m2)] (simp cs)
-simp' (((m1, PreTermInt l1), (m2, PreTermIntS _ l2)):cs)
-  | l1 == l2 = simpMetaRet [(m1, m2)] (simp cs)
-simp' (((m1, PreTermIntS _ l1), (m2, PreTermInt l2)):cs)
-  | l1 == l2 = simpMetaRet [(m1, m2)] (simp cs)
-simp' (((m1, PreTermInt l1), (m2, PreTermIntU _ l2)):cs)
-  | l1 == l2 = simpMetaRet [(m1, m2)] (simp cs)
-simp' (((m1, PreTermIntU _ l1), (m2, PreTermInt l2)):cs)
-  | l1 == l2 = simpMetaRet [(m1, m2)] (simp cs)
-simp' (((m1, PreTermInt l1), (m2, PreTermInt l2)):cs)
-  | l1 == l2 = simpMetaRet [(m1, m2)] (simp cs)
-simp' (((m1, PreTermFloat16 l1), (m2, PreTermFloat16 l2)):cs)
-  | l1 == l2 = simpMetaRet [(m1, m2)] (simp cs)
-simp' (((m1, PreTermFloat32 l1), (m2, PreTermFloat32 l2)):cs)
-  | l1 == l2 = simpMetaRet [(m1, m2)] (simp cs)
-simp' (((m1, PreTermFloat64 l1), (m2, PreTermFloat64 l2)):cs)
-  | l1 == l2 = simpMetaRet [(m1, m2)] (simp cs)
-simp' (((m1, PreTermFloat l1), (m2, PreTermFloat16 l2)):cs)
-  | show l1 == show l2 = simpMetaRet [(m1, m2)] (simp cs)
-simp' (((m1, PreTermFloat16 l1), (m2, PreTermFloat l2)):cs)
-  | show l1 == show l2 = simpMetaRet [(m1, m2)] (simp cs)
-simp' (((m1, PreTermFloat l1), (m2, PreTermFloat32 l2)):cs)
-  | show l1 == show l2 = simpMetaRet [(m1, m2)] (simp cs)
-simp' (((m1, PreTermFloat32 l1), (m2, PreTermFloat l2)):cs)
-  | show l1 == show l2 = simpMetaRet [(m1, m2)] (simp cs)
-simp' (((m1, PreTermFloat l1), (m2, PreTermFloat64 l2)):cs)
-  | l1 == l2 = simpMetaRet [(m1, m2)] (simp cs)
-simp' (((m1, PreTermFloat64 l1), (m2, PreTermFloat l2)):cs)
-  | l1 == l2 = simpMetaRet [(m1, m2)] (simp cs)
-simp' (((m1, PreTermFloat l1), (m2, PreTermFloat l2)):cs)
-  | l1 == l2 = simpMetaRet [(m1, m2)] (simp cs)
-simp' (((m1, PreTermEnum l1), (m2, PreTermEnum l2)):cs)
-  | l1 == l2 = simpMetaRet [(m1, m2)] (simp cs)
-simp' (((m1, PreTermEnumIntro l1), (m2, PreTermEnumIntro l2)):cs)
-  | l1 == l2 = simpMetaRet [(m1, m2)] (simp cs)
-simp' (((m1, PreTermArray k1 indexType1), (m2, PreTermArray k2 indexType2)):cs)
-  | k1 == k2 = simpMetaRet [(m1, m2)] $ simp $ (indexType1, indexType2) : cs
-simp' (((m1, PreTermArrayIntro k1 les1), (m2, PreTermArrayIntro k2 les2)):cs)
+  , l1 == l2 = (simp cs)
+simp' (((_, PreTermInt l1), (_, PreTermIntS _ l2)):cs)
+  | l1 == l2 = (simp cs)
+simp' (((_, PreTermIntS _ l1), (_, PreTermInt l2)):cs)
+  | l1 == l2 = (simp cs)
+simp' (((_, PreTermInt l1), (_, PreTermIntU _ l2)):cs)
+  | l1 == l2 = (simp cs)
+simp' (((_, PreTermIntU _ l1), (_, PreTermInt l2)):cs)
+  | l1 == l2 = (simp cs)
+simp' (((_, PreTermInt l1), (_, PreTermInt l2)):cs)
+  | l1 == l2 = (simp cs)
+simp' (((_, PreTermFloat16 l1), (_, PreTermFloat16 l2)):cs)
+  | l1 == l2 = (simp cs)
+simp' (((_, PreTermFloat32 l1), (_, PreTermFloat32 l2)):cs)
+  | l1 == l2 = (simp cs)
+simp' (((_, PreTermFloat64 l1), (_, PreTermFloat64 l2)):cs)
+  | l1 == l2 = (simp cs)
+simp' (((_, PreTermFloat l1), (_, PreTermFloat16 l2)):cs)
+  | show l1 == show l2 = (simp cs)
+simp' (((_, PreTermFloat16 l1), (_, PreTermFloat l2)):cs)
+  | show l1 == show l2 = (simp cs)
+simp' (((_, PreTermFloat l1), (_, PreTermFloat32 l2)):cs)
+  | show l1 == show l2 = (simp cs)
+simp' (((_, PreTermFloat32 l1), (_, PreTermFloat l2)):cs)
+  | show l1 == show l2 = (simp cs)
+simp' (((_, PreTermFloat l1), (_, PreTermFloat64 l2)):cs)
+  | l1 == l2 = (simp cs)
+simp' (((_, PreTermFloat64 l1), (_, PreTermFloat l2)):cs)
+  | l1 == l2 = (simp cs)
+simp' (((_, PreTermFloat l1), (_, PreTermFloat l2)):cs)
+  | l1 == l2 = (simp cs)
+simp' (((_, PreTermEnum l1), (_, PreTermEnum l2)):cs)
+  | l1 == l2 = (simp cs)
+simp' (((_, PreTermEnumIntro l1), (_, PreTermEnumIntro l2)):cs)
+  | l1 == l2 = (simp cs)
+simp' (((_, PreTermArray k1 indexType1), (_, PreTermArray k2 indexType2)):cs)
+  | k1 == k2 = simp $ (indexType1, indexType2) : cs
+simp' (((_, PreTermArrayIntro k1 les1), (_, PreTermArrayIntro k2 les2)):cs)
   | k1 == k2 = do
     csArray <- simpArrayIntro les1 les2
-    csCont <- simpMetaRet [(m1, m2)] $ simp cs
+    csCont <- simp cs
     return $ csArray ++ csCont
 simp' ((e1, e2):cs) = do
   let ms1 = asStuckedTerm e1
@@ -136,24 +135,33 @@ simpReduce' e1 e2 cs = do
     Nothing -> throwError $ "cannot simplify [TIMEOUT]:\n" ++ Pr.ppShow (e1, e2)
 
 simpPi ::
-     PreMeta
-  -> [(Identifier, PreTermPlus)]
+     [(Identifier, PreTermPlus)]
   -> PreTermPlus
-  -> PreMeta
   -> [(Identifier, PreTermPlus)]
   -> PreTermPlus
   -> [(PreTermPlus, PreTermPlus)]
   -> WithEnv [EnrichedConstraint]
-simpPi m1 [] cod1 m2 [] cod2 cs =
-  simpMetaRet [(m1, m2)] $ simp $ (cod1, cod2) : cs
-simpPi m1 ((x1, t1):xts1) cod1 m2 ((x2, t2):xts2) cod2 cs = do
+simpPi [] cod1 [] cod2 cs = simp $ (cod1, cod2) : cs
+simpPi ((x1, t1):xts1) cod1 ((x2, t2):xts2) cod2 cs = do
   let var1 = toVar x1 t1
-  let m = metaTerminal -- m == m is trivially true
   let (xts2', cod2') = substPreTermPlusBindingsWithBody [(x2, var1)] xts2 cod2
   cst <- simp [(t1, t2)]
-  cs' <- simpMetaRet [(m1, m2)] $ simpPi m xts1 cod1 m xts2' cod2' cs
+  cs' <- simpPi xts1 cod1 xts2' cod2' cs
   return $ cst ++ cs'
-simpPi _ _ _ _ _ _ _ = throwError "cannot simplify (Pi)"
+simpPi _ _ _ _ _ = throwError "cannot simplify (Pi)"
+
+simpArrayIntro ::
+     [(EnumValue, PreTermPlus)]
+  -> [(EnumValue, PreTermPlus)]
+  -> WithEnv [EnrichedConstraint]
+simpArrayIntro les1 les2 = do
+  let les1' = sortBy (\x y -> fst x `compare` fst y) les1
+  let les2' = sortBy (\x y -> fst x `compare` fst y) les2
+  let (ls1, es1) = unzip les1'
+  let (ls2, es2) = unzip les2'
+  if ls1 /= ls2
+    then throwError "simpArrayIntro"
+    else simp $ zip es1 es2
 
 simpStuckStrict ::
      Identifier
@@ -167,18 +175,12 @@ simpStuckStrict h1 exs1 e1 e2 cs
   , xs <- concat $ map (map snd) exs1
   , all (`elem` xs) (varPreTermPlus e2) = do
     let es1 = map (map fst) exs1
-    cs' <- simpMetaRet [(fst e1, fst e2)] $ simp cs
+    cs' <- simp cs
     if isDisjoint xs
       then return $ Enriched (e1, e2) [h1] (ConstraintPattern h1 es1 e2) : cs'
       else return $
            Enriched (e1, e2) [h1] (ConstraintQuasiPattern h1 es1 e2) : cs'
   | otherwise = simpOther e1 e2 cs
-
-isDisjoint :: [Identifier] -> Bool
-isDisjoint xs = xs == nub xs
-
-getVarList :: [PreTermPlus] -> [Identifier]
-getVarList xs = catMaybes $ map asUpsilon xs
 
 simpFlexRigid ::
      Hole
@@ -191,7 +193,7 @@ simpFlexRigid h1 ies1 e1 e2 cs
   | h1 `notElem` holePreTermPlus e2
   , xs <- concatMap getVarList ies1
   , all (`elem` xs) (varPreTermPlus e2) = do
-    cs' <- simpMetaRet [(fst e1, fst e2)] $ simp cs
+    cs' <- simp cs
     let c = Enriched (e1, e2) [h1] $ ConstraintFlexRigid h1 ies1 e2
     return $ c : cs'
 simpFlexRigid _ _ e1 e2 cs = simpOther e1 e2 cs
@@ -209,14 +211,14 @@ simpFlexFlex h1 h2 ies1 _ e1 e2 cs
   | h1 `notElem` holePreTermPlus e2
   , xs <- concatMap getVarList ies1
   , all (`elem` xs) (varPreTermPlus e2) = do
-    cs' <- simpMetaRet [(fst e1, fst e2)] $ simp cs
+    cs' <- simp cs
     let c = Enriched (e1, e2) [h1, h2] $ ConstraintFlexFlex h1 ies1 e2
     return $ c : cs'
 simpFlexFlex h1 h2 _ ies2 e1 e2 cs
   | h2 `notElem` holePreTermPlus e1
   , xs <- concatMap getVarList ies2
   , all (\y -> y `elem` xs) (varPreTermPlus e1) = do
-    cs' <- simpMetaRet [(fst e2, fst e1)] $ simp cs
+    cs' <- simp cs
     let c = Enriched (e2, e1) [h2, h1] $ ConstraintFlexFlex h2 ies2 e1
     return $ c : cs'
 simpFlexFlex _ _ _ _ e1 e2 cs = simpOther e1 e2 cs
@@ -227,42 +229,10 @@ simpOther ::
   -> [PreConstraint]
   -> WithEnv [EnrichedConstraint]
 simpOther e1 e2 cs = do
-  cs' <- simpMetaRet [(fst e1, fst e2)] $ simp cs
+  cs' <- simp cs
   let fmvs = concatMap holePreTermPlus [e1, e2]
   let c = Enriched (e1, e2) fmvs $ ConstraintOther
   return $ c : cs'
-
-simpMetaRet ::
-     [(PreMeta, PreMeta)]
-  -> WithEnv [EnrichedConstraint]
-  -> WithEnv [EnrichedConstraint]
-simpMetaRet mms comp = do
-  cs1 <- concat <$> mapM (\(m1, m2) -> simpMeta m1 m2) mms
-  cs2 <- comp
-  return $ cs1 ++ cs2
-
-simpMeta :: PreMeta -> PreMeta -> WithEnv [EnrichedConstraint]
-simpMeta _ _ = return []
-
--- simpMeta (PreMetaTerminal _) (PreMetaTerminal _) = return []
--- simpMeta (PreMetaTerminal _) m2@(PreMetaNonTerminal _ _) = do
---   simpMeta (PreMetaNonTerminal univ Nothing) m2
--- simpMeta m1@(PreMetaNonTerminal _ _) (PreMetaTerminal _) =
---   simpMeta m1 (PreMetaNonTerminal univ Nothing)
--- simpMeta (PreMetaNonTerminal t1 _) (PreMetaNonTerminal t2 _) = do
---   simp [(t1, t2)]
-simpArrayIntro ::
-     [(EnumValue, PreTermPlus)]
-  -> [(EnumValue, PreTermPlus)]
-  -> WithEnv [EnrichedConstraint]
-simpArrayIntro les1 les2 = do
-  let les1' = sortBy (\x y -> fst x `compare` fst y) les1
-  let les2' = sortBy (\x y -> fst x `compare` fst y) les2
-  let (ls1, es1) = unzip les1'
-  let (ls2, es2) = unzip les2'
-  if ls1 /= ls2
-    then throwError "simpArrayIntro"
-    else simp $ zip es1 es2
 
 data Stuck
   = StuckPiElim Hole [[PreTermPlus]]
@@ -289,6 +259,12 @@ asStuckedTerm (_, PreTermPiElim e es) =
       Just $ StuckPiElim h $ ess ++ [es]
     Nothing -> Nothing
 asStuckedTerm _ = Nothing
+
+isDisjoint :: [Identifier] -> Bool
+isDisjoint xs = xs == nub xs
+
+getVarList :: [PreTermPlus] -> [Identifier]
+getVarList xs = catMaybes $ map asUpsilon xs
 
 toVar :: Identifier -> PreTermPlus -> PreTermPlus
 toVar x t = (PreMetaNonTerminal t Nothing, PreTermUpsilon x)
