@@ -68,11 +68,11 @@ infer ctx (m, WeakTermPiElim e es) = do
   -- -- xts == [(x1, e1, t1), ..., (xn, en, tn)] with xi : ti and ei : ti
   (xs, es', ts) <- unzip3 <$> inferList ctx es
   let xts = zip xs ts
-  -- cod = ?M @ ctx @ (x1, ..., xn)
+  -- cod = ?M @ (ctx[0], ..., ctx[m], x1, ..., xn)
   cod <- newHoleInCtx (ctx ++ xts)
   let tPi = (metaTerminal, PreTermPi xts cod)
   insConstraintEnv tPi (typeOf e')
-  -- cod' = ?M @ ctx @ (e1, ..., en)
+  -- cod' = ?M @ (ctx[0], ..., ctx[m], e1, ..., en)
   let cod' = substPreTermPlus (zip xs es') cod
   retPreTerm cod' (toLoc m) $ PreTermPiElim e' es'
 infer ctx (m, WeakTermMu (x, t) e) = do
@@ -84,11 +84,11 @@ infer ctx (m, WeakTermMu (x, t) e) = do
 infer ctx (m, WeakTermZeta x) = do
   mt <- lookupTypeEnvMaybe x
   case mt of
-    Just t -> retPreTerm t (toLoc m) $ PreTermZeta x
+    Just t -> retPreTerm (typeOf t) (toLoc m) (snd t)
     Nothing -> do
       h <- newHoleInCtx ctx
       insTypeEnv x h
-      retPreTerm h (toLoc m) $ PreTermZeta x
+      retPreTerm (typeOf h) (toLoc m) (snd h)
 infer _ (m, WeakTermIntS size i) = do
   let t = (metaTerminal, PreTermTheta $ "i" ++ show size)
   retPreTerm t (toLoc m) $ PreTermIntS size i
