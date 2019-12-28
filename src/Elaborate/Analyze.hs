@@ -98,26 +98,23 @@ simp' (((m1, PreTermArrayIntro k1 les1), (m2, PreTermArrayIntro k2 les2)):cs)
 simp' ((e1, e2):cs) = do
   let ms1 = asStuckedTerm e1
   let ms2 = asStuckedTerm e2
-  let fvs1 = varPreTermPlus e1
-  let fmvs1 = holePreTermPlus e1
-  let fvs2 = varPreTermPlus e2
-  let fmvs2 = holePreTermPlus e2
+  -- ここのcategorizeはけっこうデリケートかもしれない。
   case (ms1, ms2) of
-    (Just (StuckHole h1), Nothing) -> do
-      simpHole h1 fmvs1 fmvs2 e1 e2 cs
-    (Nothing, Just (StuckHole h2)) -> do
-      simpHole h2 fmvs2 fmvs1 e2 e1 cs
     (Just (StuckPiElimStrict h1 exs1), _) -> do
-      simpStuckStrict h1 exs1 fvs1 fmvs1 fvs2 fmvs2 e1 e2 cs
+      simpStuckStrict h1 exs1 e1 e2 cs
     (_, Just (StuckPiElimStrict h2 exs2)) -> do
-      simpStuckStrict h2 exs2 fvs2 fmvs2 fvs1 fmvs1 e2 e1 cs
+      simpStuckStrict h2 exs2 e2 e1 cs
+    (Just (StuckHole h1), Nothing) -> do
+      simpHole h1 e1 e2 cs
+    (Nothing, Just (StuckHole h2)) -> do
+      simpHole h2 e2 e1 cs
     (Just (StuckPiElim h1 ies1), Nothing) -> do
-      simpFlexRigid fmvs1 fmvs2 h1 ies1 e1 e2 cs
+      simpFlexRigid h1 ies1 e1 e2 cs
     (Nothing, Just (StuckPiElim h2 ies2)) -> do
-      simpFlexRigid fmvs2 fmvs1 h2 ies2 e2 e1 cs
+      simpFlexRigid h2 ies2 e2 e1 cs
     (Just (StuckPiElim h1 ies1), Just (StuckPiElim h2 ies2)) -> do
-      simpFlexFlex fmvs1 fmvs2 h1 h2 ies1 ies2 e1 e2 cs
-    _ -> simpOther (fmvs1 ++ fmvs2) e1 e2 cs
+      simpFlexFlex h1 h2 ies1 ies2 e1 e2 cs
+    _ -> simpOther e1 e2 cs
 
 simpReduce ::
      PreTermPlus
@@ -165,42 +162,35 @@ simpPi _ _ _ _ _ _ _ = throwError "simpPi"
 
 simpHole ::
      Hole
-  -> [Hole]
-  -> [Hole]
   -> PreTermPlus
   -> PreTermPlus
   -> [PreConstraint]
   -> WithEnv [EnrichedConstraint]
-simpHole h1 fmvs1 fmvs2 e1 e2 cs
-  | h1 `notElem` fmvs2
+simpHole h1 e1 e2 cs
+  | h1 `notElem` holePreTermPlus e2
   , null (varPreTermPlus e2) = do
-    p "found hole"
     cs' <- simpMetaRet [(fst e1, fst e2)] $ simp cs
     return $ Enriched (e1, e2) [h1] (ConstraintImmediate h1 e2) : cs'
-  | otherwise = simpOther (fmvs1 ++ fmvs2) e1 e2 cs
+  | otherwise = simpOther e1 e2 cs
 
 simpStuckStrict ::
      Identifier
   -> [[(PreTermPlus, Identifier)]]
-  -> [Identifier]
-  -> [Hole]
-  -> [Identifier]
-  -> [Hole]
   -> PreTermPlus
   -> PreTermPlus
   -> [(PreTermPlus, PreTermPlus)]
   -> WithEnv [EnrichedConstraint]
-simpStuckStrict h1 exs1 _ fmvs1 fvs2 fmvs2 e1 e2 cs
-  | h1 `notElem` fmvs2
+simpStuckStrict h1 exs1 e1 e2 cs
+  | h1 `notElem` holePreTermPlus e2
   , xs <- concat $ map (map snd) exs1
-  , all (\y -> y `elem` xs) fvs2 = do
+  , all (\y -> y `elem` xs) (varPreTermPlus e2) = do
     let es1 = map (map fst) exs1
     cs' <- simpMetaRet [(fst e1, fst e2)] $ simp cs
     if isDisjoint xs
       then return $ Enriched (e1, e2) [h1] (ConstraintPattern h1 es1 e2) : cs'
       else return $
            Enriched (e1, e2) [h1] (ConstraintQuasiPattern h1 es1 e2) : cs'
-  | otherwise = simpOther (fmvs1 ++ fmvs2) e1 e2 cs
+  | otherwise = simpOther e1 e2 cs
 
 isDisjoint :: [Identifier] -> Bool
 isDisjoint xs = xs == nub xs
@@ -209,27 +199,23 @@ getVarList :: [PreTermPlus] -> [Identifier]
 getVarList xs = catMaybes $ map asUpsilon xs
 
 simpFlexRigid ::
-     [Hole]
-  -> [Hole]
-  -> Hole
+     Hole
   -> [[PreTermPlus]]
   -> PreTermPlus
   -> PreTermPlus
   -> [PreConstraint]
   -> WithEnv [EnrichedConstraint]
-simpFlexRigid _ fmvs2 h1 ies1 e1 e2 cs
-  | h1 `notElem` fmvs2
+simpFlexRigid h1 ies1 e1 e2 cs
+  | h1 `notElem` holePreTermPlus e2
   , xs <- concatMap getVarList ies1
   , all (\y -> y `elem` xs) (varPreTermPlus e2) = do
     cs' <- simpMetaRet [(fst e1, fst e2)] $ simp cs
     let c = Enriched (e1, e2) [h1] $ ConstraintFlexRigid h1 ies1 e2
     return $ c : cs'
-simpFlexRigid fmvs1 fmvs2 _ _ e1 e2 cs = simpOther (fmvs1 ++ fmvs2) e1 e2 cs
+simpFlexRigid _ _ e1 e2 cs = simpOther e1 e2 cs
 
 simpFlexFlex ::
-     [Hole]
-  -> [Hole]
-  -> Hole
+     Hole
   -> Hole
   -> [[PreTermPlus]]
   -> [[PreTermPlus]]
@@ -237,30 +223,30 @@ simpFlexFlex ::
   -> PreTermPlus
   -> [PreConstraint]
   -> WithEnv [EnrichedConstraint]
-simpFlexFlex _ fmvs2 h1 h2 ies1 _ e1 e2 cs
-  | h1 `notElem` fmvs2
+simpFlexFlex h1 h2 ies1 _ e1 e2 cs
+  | h1 `notElem` holePreTermPlus e2
   , xs <- concatMap getVarList ies1
   , all (\y -> y `elem` xs) (varPreTermPlus e2) = do
     cs' <- simpMetaRet [(fst e1, fst e2)] $ simp cs
     let c = Enriched (e1, e2) [h1, h2] $ ConstraintFlexFlex h1 ies1 e2
     return $ c : cs'
-simpFlexFlex fmvs1 _ h1 h2 _ ies2 e1 e2 cs
-  | h2 `notElem` fmvs1
+simpFlexFlex h1 h2 _ ies2 e1 e2 cs
+  | h2 `notElem` holePreTermPlus e1
   , xs <- concatMap getVarList ies2
   , all (\y -> y `elem` xs) (varPreTermPlus e1) = do
     cs' <- simpMetaRet [(fst e2, fst e1)] $ simp cs
     let c = Enriched (e2, e1) [h2, h1] $ ConstraintFlexFlex h2 ies2 e1
     return $ c : cs'
-simpFlexFlex fmvs1 fmvs2 _ _ _ _ e1 e2 cs = simpOther (fmvs1 ++ fmvs2) e1 e2 cs
+simpFlexFlex _ _ _ _ e1 e2 cs = simpOther e1 e2 cs
 
 simpOther ::
-     [Hole]
-  -> PreTermPlus
+     PreTermPlus
   -> PreTermPlus
   -> [PreConstraint]
   -> WithEnv [EnrichedConstraint]
-simpOther fmvs e1 e2 cs = do
+simpOther e1 e2 cs = do
   cs' <- simpMetaRet [(fst e1, fst e2)] $ simp cs
+  let fmvs = concatMap holePreTermPlus [e1, e2]
   let c = Enriched (e1, e2) fmvs $ ConstraintOther
   return $ c : cs'
 
