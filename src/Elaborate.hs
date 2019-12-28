@@ -149,11 +149,10 @@ elaborate' (m, PreTermEnumElim e branchList) = do
   e' <- elaborate' e
   branchList' <- forM branchList elaboratePlus
   return (m', TermEnumElim e' branchList')
-elaborate' (m, PreTermArray k dom cod) = do
+elaborate' (m, PreTermArray k indexType) = do
   m' <- toMeta m
-  dom' <- elaborate' dom
-  cod' <- elaborate' cod
-  return (m', TermArray k dom' cod')
+  indexType' <- elaborate' indexType
+  return (m', TermArray k indexType')
 elaborate' (m, PreTermArrayIntro k les) = do
   m' <- toMeta m
   let (ls, es) = unzip les
@@ -211,8 +210,8 @@ caseCheck (m, TermEnumElim e branchList) = do
   case t' of
     (_, TermEnum x) -> caseCheckEnumIdentifier x labelList
     _ -> throwError "type error (caseCheck)"
-caseCheck (m, TermArray _ dom cod) =
-  caseCheckMeta m >> mapM_ caseCheck [dom, cod]
+caseCheck (m, TermArray _ indexType) =
+  caseCheckMeta m >> mapM_ caseCheck [indexType]
 caseCheck (m, TermArrayIntro _ les) = do
   caseCheckMeta m
   let (_, es) = unzip les

@@ -23,7 +23,9 @@ data WeakTerm
   | WeakTermEnum EnumType
   | WeakTermEnumIntro EnumValue
   | WeakTermEnumElim WeakTermPlus [(Case, WeakTermPlus)]
-  | WeakTermArray ArrayKind WeakTermPlus WeakTermPlus
+  | WeakTermArray
+      ArrayKind -- type of elements
+      WeakTermPlus -- type of index
   | WeakTermArrayIntro ArrayKind [(EnumValue, WeakTermPlus)]
   | WeakTermArrayElim ArrayKind WeakTermPlus WeakTermPlus
   deriving (Show)

@@ -56,10 +56,9 @@ reducePreTermPlus (m, PreTermEnumElim e les) = do
             Just body -> reducePreTermPlus body
             Nothing -> return (m, PreTermEnumElim e' les')
     _ -> return (m, PreTermEnumElim e' les')
-reducePreTermPlus (m, PreTermArray k dom cod) = do
-  dom' <- reducePreTermPlus dom
-  cod' <- reducePreTermPlus cod
-  return (m, PreTermArray k dom' cod')
+reducePreTermPlus (m, PreTermArray k indexType) = do
+  indexType' <- reducePreTermPlus indexType
+  return (m, PreTermArray k indexType')
 reducePreTermPlus (m, PreTermArrayIntro k les) = do
   let (ls, es) = unzip les
   es' <- mapM reducePreTermPlus es

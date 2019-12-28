@@ -146,6 +146,30 @@
 (enum top unit)
 
 (ascription unsafe.eval-io
-  (hom (io top) top))
+  (hom
+    (io top)
+    top))
 
-n8-3
+(constant file-descriptor)
+(ascription file-descriptor type)
+
+(constant stdin)
+(ascription stdin file-descriptor)
+
+(constant stdout)
+(ascription stdout file-descriptor)
+
+(constant stderr)
+(ascription stderr file-descriptor)
+
+(constant unsafe.write)
+(ascription unsafe.write
+  (pi
+    ((A type)
+     (out file-descriptor)
+     (str (u8-array A))
+     (len (is-enum A)))
+    top))
+;; unsafe.write : Pi (A : Univ, out : file-descriptor, str : u8-array a, len : is-enum A). top
+
+stdout

@@ -133,26 +133,26 @@ infer ctx (m, WeakTermEnumElim e les) = do
       es' <- mapM (infer ctx) es
       constrainList $ map typeOf es'
       retPreTerm (typeOf $ head es') (toLoc m) $ PreTermEnumElim e' $ zip ls es'
-infer ctx (m, WeakTermArray k dom cod) = do
-  dom' <- inferType ctx dom
-  cod' <- inferType ctx cod
-  retPreTerm univ (toLoc m) $ PreTermArray k dom' cod'
+infer ctx (m, WeakTermArray k indexType) = do
+  indexType' <- inferType ctx indexType
+  retPreTerm univ (toLoc m) $ PreTermArray k indexType'
 infer ctx (m, WeakTermArrayIntro k les) = do
-  let tCod = inferKind k
   let (ls, es) = unzip les
-  tls <- mapM (inferCase . CaseValue) ls
-  constrainList $ catMaybes tls
+  tls <- catMaybes <$> mapM (inferCase . CaseValue) ls
+  constrainList tls
+  let tCod = inferKind k
   es' <- mapM (infer ctx) es
-  let tDom = determineDomType es'
-  let t = (metaTerminal, PreTermArray k tDom tCod)
+  constrainList $ tCod : map typeOf es'
+  let indexType = determineDomType tls
+  let t = (metaTerminal, PreTermArray k indexType)
   retPreTerm t (toLoc m) $ PreTermArrayIntro k $ zip ls es'
-infer ctx (m, WeakTermArrayElim kind e1 e2) = do
-  let tCod = inferKind kind
+infer ctx (m, WeakTermArrayElim k e1 e2) = do
+  let tCod = inferKind k
   e1' <- infer ctx e1
   e2' <- infer ctx e2
   let tArr = typeOf e1'
-  insConstraintEnv tArr (metaTerminal, PreTermArray kind (typeOf e2') tCod)
-  retPreTerm tCod (toLoc m) $ PreTermArrayElim kind e1' e2'
+  insConstraintEnv tArr (metaTerminal, PreTermArray k (typeOf e2'))
+  retPreTerm tCod (toLoc m) $ PreTermArrayElim k e1' e2'
 
 inferType :: Context -> WeakTermPlus -> WithEnv PreTermPlus
 inferType ctx t = do
@@ -277,7 +277,7 @@ newHoleOfType t = do
   return (PreMetaNonTerminal t Nothing, PreTermZeta h)
 
 determineDomType :: [PreTermPlus] -> PreTermPlus
-determineDomType es =
-  if null es
-    then typeOf (head es)
+determineDomType ts =
+  if not (null ts)
+    then typeOf (head ts)
     else (metaTerminal, PreTermTheta "bottom")

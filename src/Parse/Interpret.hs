@@ -73,11 +73,10 @@ interpret (m, TreeNode [(_, TreeAtom "enum-elimination"), e, (_, TreeNode cs)]) 
   e' <- interpret e
   cs' <- mapM interpretClause cs
   withMeta m $ WeakTermEnumElim e' cs'
-interpret (m, TreeNode [(_, TreeAtom str), from, to])
+interpret (m, TreeNode [(_, TreeAtom str), indexType])
   | Just kind <- withKindPrefix str "array" = do
-    from' <- interpret from
-    to' <- interpret to
-    withMeta m $ WeakTermArray kind from' to'
+    indexType' <- interpret indexType
+    withMeta m $ WeakTermArray kind indexType'
 interpret (m, TreeNode [(_, TreeAtom str), (_, TreeNode cs)])
   | Just kind <- withKindPrefix str "array-introduction" = do
     cs' <- mapM interpretClause cs

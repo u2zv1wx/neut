@@ -24,7 +24,7 @@ data PreTerm
   | PreTermEnum EnumType
   | PreTermEnumIntro EnumValue
   | PreTermEnumElim PreTermPlus [(Case, PreTermPlus)]
-  | PreTermArray ArrayKind PreTermPlus PreTermPlus
+  | PreTermArray ArrayKind PreTermPlus
   | PreTermArrayIntro ArrayKind [(EnumValue, PreTermPlus)]
   | PreTermArrayElim ArrayKind PreTermPlus PreTermPlus
   deriving (Show)
@@ -73,8 +73,8 @@ varPreTermPlus (_, PreTermEnumElim e les) = do
   let xhs = varPreTermPlus e
   let yhs = concatMap (\(_, body) -> varPreTermPlus body) les
   xhs ++ yhs
-varPreTermPlus (_, PreTermArray _ e1 e2) = do
-  varPreTermPlus e1 ++ varPreTermPlus e2
+varPreTermPlus (_, PreTermArray _ t) = do
+  varPreTermPlus t
 varPreTermPlus (_, PreTermArrayIntro _ les) = do
   concatMap (\(_, body) -> varPreTermPlus body) les
 varPreTermPlus (_, PreTermArrayElim _ e1 e2) = do
@@ -114,8 +114,7 @@ holePreTermPlus (_, PreTermEnumElim e les) = do
   let xhs = holePreTermPlus e
   let yhs = concatMap (\(_, body) -> holePreTermPlus body) les
   xhs ++ yhs
-holePreTermPlus (_, PreTermArray _ e1 e2) =
-  holePreTermPlus e1 ++ holePreTermPlus e2
+holePreTermPlus (_, PreTermArray _ e) = holePreTermPlus e
 holePreTermPlus (_, PreTermArrayIntro _ les) = do
   concatMap (\(_, body) -> holePreTermPlus body) les
 holePreTermPlus (_, PreTermArrayElim _ e1 e2) = do
@@ -173,10 +172,9 @@ substPreTermPlus sub (m, PreTermEnumElim e branchList) = do
   let (caseList, es) = unzip branchList
   let es' = map (substPreTermPlus sub) es
   (m, PreTermEnumElim e' (zip caseList es'))
-substPreTermPlus sub (m, PreTermArray kind from to) = do
-  let from' = substPreTermPlus sub from
-  let to' = substPreTermPlus sub to
-  (m, PreTermArray kind from' to')
+substPreTermPlus sub (m, PreTermArray kind indexType) = do
+  let indexType' = substPreTermPlus sub indexType
+  (m, PreTermArray kind indexType')
 substPreTermPlus sub (m, PreTermArrayIntro kind les) = do
   let (ls, es) = unzip les
   let es' = map (substPreTermPlus sub) es
@@ -240,8 +238,7 @@ isReduciblePreTerm (_, PreTermEnumElim (_, PreTermEnumIntro l) les) = do
   CaseValue l `elem` ls || CaseDefault `elem` ls
 isReduciblePreTerm (_, PreTermEnumElim e les) =
   isReduciblePreTerm e || any isReduciblePreTerm (map snd les)
-isReduciblePreTerm (_, PreTermArray _ dom cod) =
-  isReduciblePreTerm dom || isReduciblePreTerm cod
+isReduciblePreTerm (_, PreTermArray _ indexType) = isReduciblePreTerm indexType
 isReduciblePreTerm (_, PreTermArrayIntro _ les) =
   any isReduciblePreTerm (map snd les)
 isReduciblePreTerm (_, PreTermArrayElim _ (_, PreTermArrayIntro _ les) (_, PreTermEnumIntro l))
@@ -249,6 +246,7 @@ isReduciblePreTerm (_, PreTermArrayElim _ (_, PreTermArrayIntro _ les) (_, PreTe
 isReduciblePreTerm (_, PreTermArrayElim _ e1 e2) =
   isReduciblePreTerm e1 || isReduciblePreTerm e2
 
+-- valueの定義がおかしい？
 isValue :: PreTermPlus -> Bool
 isValue (_, PreTermTau) = True
 isValue (_, PreTermTheta _) = True

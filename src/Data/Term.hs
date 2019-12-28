@@ -23,7 +23,7 @@ data Term
   | TermEnum EnumType
   | TermEnumIntro EnumValue
   | TermEnumElim TermPlus [(Case, TermPlus)]
-  | TermArray ArrayKind TermPlus TermPlus
+  | TermArray ArrayKind TermPlus
   | TermArrayIntro ArrayKind [(EnumValue, TermPlus)]
   | TermArrayElim ArrayKind TermPlus TermPlus
   deriving (Show)
@@ -84,8 +84,7 @@ getClosedVarChain (_, TermEnumElim e branchList) = do
   let xhs = getClosedVarChain e
   xhss <- forM branchList $ \(_, body) -> do return $ getClosedVarChain body
   concat (xhs : xhss)
-getClosedVarChain (_, TermArray _ dom cod) =
-  getClosedVarChain dom ++ getClosedVarChain cod
+getClosedVarChain (_, TermArray _ indexType) = getClosedVarChain indexType
 getClosedVarChain (_, TermArrayIntro _ les) = do
   let (_, es) = unzip les
   concat $ map getClosedVarChain es
@@ -133,10 +132,9 @@ substTermPlus sub (m, TermEnumElim e branchList) = do
   let (caseList, es) = unzip branchList
   let es' = map (substTermPlus sub) es
   (substMeta sub m, TermEnumElim e' (zip caseList es'))
-substTermPlus sub (m, TermArray k dom cod) = do
-  let dom' = substTermPlus sub dom
-  let cod' = substTermPlus sub cod
-  (substMeta sub m, TermArray k dom' cod')
+substTermPlus sub (m, TermArray k indexType) = do
+  let indexType' = substTermPlus sub indexType
+  (substMeta sub m, TermArray k indexType')
 substTermPlus sub (m, TermArrayIntro k les) = do
   let (ls, es) = unzip les
   let es' = map (substTermPlus sub) es

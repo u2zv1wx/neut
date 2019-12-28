@@ -45,10 +45,9 @@ rename (m, WeakTermEnumElim e caseList) = do
   e' <- rename e
   caseList' <- renameCaseList caseList
   return (m, WeakTermEnumElim e' caseList')
-rename (m, WeakTermArray kind from to) = do
-  from' <- rename from
-  to' <- rename to
-  return (m, WeakTermArray kind from' to')
+rename (m, WeakTermArray kind indexType) = do
+  indexType' <- rename indexType
+  return (m, WeakTermArray kind indexType')
 rename (m, WeakTermArrayIntro kind les) = do
   les' <-
     forM les $ \(l, body) -> do
@@ -82,8 +81,8 @@ renameCaseList caseList =
       return (l, body')
 
 local :: WithEnv a -> WithEnv a
-local p = do
+local comp = do
   env <- get
-  x <- p
+  x <- comp
   modify (\e -> env {count = count e})
   return x

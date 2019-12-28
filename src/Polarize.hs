@@ -90,7 +90,7 @@ polarize (m, TermEnumElim e bs) = do
   let ml = snd $ obtainInfoMeta m
   retImmType <- returnCartesianImmediate
   return $ bindLet [((yName, retImmType), e')] (ml, CodeEnumElim y (zip cs es'))
-polarize (m, TermArray _ _ _) = do
+polarize (m, TermArray _ _) = do
   let ml = snd $ obtainInfoMeta m
   returnArrayType ml
 polarize (m, TermArrayIntro k les) = do

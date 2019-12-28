@@ -87,8 +87,8 @@ simp' (((m1, PreTermEnum l1), (m2, PreTermEnum l2)):cs)
   | l1 == l2 = simpMetaRet [(m1, m2)] (simp cs)
 simp' (((m1, PreTermEnumIntro l1), (m2, PreTermEnumIntro l2)):cs)
   | l1 == l2 = simpMetaRet [(m1, m2)] (simp cs)
-simp' (((m1, PreTermArray k1 dom1 cod1), (m2, PreTermArray k2 dom2 cod2)):cs)
-  | k1 == k2 = simpMetaRet [(m1, m2)] $ simp $ (dom1, dom2) : (cod1, cod2) : cs
+simp' (((m1, PreTermArray k1 indexType1), (m2, PreTermArray k2 indexType2)):cs)
+  | k1 == k2 = simpMetaRet [(m1, m2)] $ simp $ (indexType1, indexType2) : cs
 simp' (((m1, PreTermArrayIntro k1 les1), (m2, PreTermArrayIntro k2 les2)):cs)
   | k1 == k2 = do
     csArray <- simpArrayIntro les1 les2
