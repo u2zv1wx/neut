@@ -24,23 +24,27 @@ synthesize q = do
     Nothing -> return ()
     Just (Enriched (e1, e2) ms _)
       | Just (m, e) <- lookupAny ms sub -> resolveStuck q e1 e2 m e
-    Just (Enriched _ _ (ConstraintImmediate m e)) -> do
-      p $ "resolveHole: " ++ m
+    Just (Enriched _ _ (ConstraintImmediate m e))
+      -- p $ "resolveHole: " ++ m
+     -> do
       resolveHole q [(m, e)]
-    Just (Enriched _ _ (ConstraintPattern m iess e)) -> do
-      p $ "resolve pattern: " ++ m
+    Just (Enriched _ _ (ConstraintPattern m iess e))
+      -- p $ "resolve pattern: " ++ m
+     -> do
       resolvePiElim q m iess e
-    Just (Enriched _ _ (ConstraintQuasiPattern m iess e)) -> do
-      p "resolve quasi pattern. creating chain"
+    Just (Enriched _ _ (ConstraintQuasiPattern m iess e))
+      -- p "resolve quasi pattern. creating chain"
+     -> do
       resolvePiElim q m iess e
-    Just (Enriched _ _ (ConstraintFlexRigid m iess e)) -> do
-      p "resolve flex-rigid. creating chain"
+    Just (Enriched _ _ (ConstraintFlexRigid m iess e))
+      -- p "resolve flex-rigid. creating chain"
+     -> do
       resolvePiElim q m iess e
-    Just (Enriched _ _ (ConstraintFlexFlex m iess e)) -> do
-      p "resolve flex-flex. creating chain"
+    Just (Enriched _ _ (ConstraintFlexFlex m iess e))
+      -- p "resolve flex-flex. creating chain"
+     -> do
       resolvePiElim q m iess e
     Just (Enriched (e1, e2) _ _) -> do
-      p $ "q.size = " ++ show (Q.size q)
       throwError $ "cannot simplify:\n" ++ Pr.ppShow (e1, e2)
 
 resolveStuck ::
@@ -55,7 +59,7 @@ resolveStuck q e1 e2 h e = do
   let e1' = substPreTermPlus [(h, e)] e1
   let e2' = substPreTermPlus [(h, e)] e2
   q' <- assert (h `notElem` fmvs) $ analyze [(e1', e2')]
-  p $ "resolveStuck. current size = " ++ show (Q.size q)
+  --  p $ "resolveStuck. current size = " ++ show (Q.size q)
   synthesize $ Q.deleteMin q `Q.union` q'
 
 -- Synthesize `hole @ arg-1 @ ... @ arg-n = e`, where arg-i is a variable.
@@ -78,12 +82,12 @@ resolvePiElim q m ess e = do
   xss <- toVarList es >>= toAltList
   let xsss = map (takeByCount lengthInfo) xss
   let lamList = map (bindFormalArgs e) xsss
-  let len = length lamList
+  -- let len = length lamList
   -- p $ "creating chain. length = " ++ show (length lamList)
-  when (len > 1) $ do
-    p $ "creating actual chain of length " ++ show len
-    p "ess:"
-    p' ess
+  -- when (len > 1) $ do
+  --   p $ "creating actual chain of length " ++ show len
+  --   p "ess:"
+  --   p' ess
   chain q $ map (\lam -> resolveHole q [(m, lam)]) lamList
 
 -- resolveHoleは[(Hole, PreTermPlus)]を受け取るようにしたほうがよさそう。
@@ -168,10 +172,10 @@ chain :: ConstraintQueue -> [WithEnv a] -> WithEnv a
 chain _ [] = throwError $ "cannot synthesize(chain)."
 chain _ [e] = e
 chain c (e:es) =
-  catchError e $ \err -> do
-    liftIO $ putStrLn err
-    liftIO $ putStrLn "trying another chain..."
-    chain c es
+  catchError e $ \_
+    -- liftIO $ putStrLn err
+    -- liftIO $ putStrLn "trying another chain..."
+   -> do chain c es
 
 -- chain c (e:es) = e `catchError` (\err -> chain c es)
 lookupAny :: [Hole] -> [(Identifier, a)] -> Maybe (Hole, a)
