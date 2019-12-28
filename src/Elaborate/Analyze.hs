@@ -98,10 +98,10 @@ simp' ((e1, e2):cs) = do
   let ms1 = asStuckedTerm e1
   let ms2 = asStuckedTerm e2
   case (ms1, ms2) of
-    (Just (StuckPiElimStrict h1 exs1), _) -> do
-      simpStuckStrict h1 exs1 e1 e2 cs
-    (_, Just (StuckPiElimStrict h2 exs2)) -> do
-      simpStuckStrict h2 exs2 e2 e1 cs
+    (Just (StuckPiElimStrict h1 ies1), _) -> do
+      simpStuckStrict h1 ies1 e1 e2 cs
+    (_, Just (StuckPiElimStrict h2 ies2)) -> do
+      simpStuckStrict h2 ies2 e2 e1 cs
     (Just (StuckPiElim h1 ies1), Nothing) -> do
       simpFlexRigid h1 ies1 e1 e2 cs
     (Nothing, Just (StuckPiElim h2 ies2)) -> do
@@ -165,23 +165,23 @@ simpArrayIntro les1 les2 = do
 
 simpStuckStrict ::
      Identifier
-  -> [[(PreTermPlus, Identifier)]]
+  -> [[PreTermPlus]]
   -> PreTermPlus
   -> PreTermPlus
   -> [(PreTermPlus, PreTermPlus)]
   -> WithEnv [EnrichedConstraint]
-simpStuckStrict h1 exs1 e1 e2 cs
-  | h1 `notElem` holePreTermPlus e2
-  , xs <- concat $ map (map snd) exs1
-  , all (`elem` xs) (varPreTermPlus e2) = do
-    let es1 = map (map fst) exs1
+simpStuckStrict h1 ies1 e1 e2 cs
+  | onesided h1 e2
+  , xs <- concatMap getVarList ies1
+  , subsume e2 xs = do
     cs' <- simp cs
     if isDisjoint xs
-      then return $ Enriched (e1, e2) [h1] (ConstraintPattern h1 es1 e2) : cs'
+      then return $ Enriched (e1, e2) [h1] (ConstraintPattern h1 ies1 e2) : cs'
       else return $
-           Enriched (e1, e2) [h1] (ConstraintQuasiPattern h1 es1 e2) : cs'
+           Enriched (e1, e2) [h1] (ConstraintQuasiPattern h1 ies1 e2) : cs'
   | otherwise = simpOther e1 e2 cs
 
+--  , all (`elem` xs) (varPreTermPlus e2)
 simpFlexRigid ::
      Hole
   -> [[PreTermPlus]]
@@ -190,9 +190,9 @@ simpFlexRigid ::
   -> [PreConstraint]
   -> WithEnv [EnrichedConstraint]
 simpFlexRigid h1 ies1 e1 e2 cs
-  | h1 `notElem` holePreTermPlus e2
+  | onesided h1 e2
   , xs <- concatMap getVarList ies1
-  , all (`elem` xs) (varPreTermPlus e2) = do
+  , subsume e2 xs = do
     cs' <- simp cs
     let c = Enriched (e1, e2) [h1] $ ConstraintFlexRigid h1 ies1 e2
     return $ c : cs'
@@ -208,16 +208,16 @@ simpFlexFlex ::
   -> [PreConstraint]
   -> WithEnv [EnrichedConstraint]
 simpFlexFlex h1 h2 ies1 _ e1 e2 cs
-  | h1 `notElem` holePreTermPlus e2
+  | onesided h1 e2
   , xs <- concatMap getVarList ies1
-  , all (`elem` xs) (varPreTermPlus e2) = do
+  , subsume e2 xs = do
     cs' <- simp cs
     let c = Enriched (e1, e2) [h1, h2] $ ConstraintFlexFlex h1 ies1 e2
     return $ c : cs'
 simpFlexFlex h1 h2 _ ies2 e1 e2 cs
-  | h2 `notElem` holePreTermPlus e1
+  | onesided h2 e1
   , xs <- concatMap getVarList ies2
-  , all (\y -> y `elem` xs) (varPreTermPlus e1) = do
+  , subsume e1 xs = do
     cs' <- simp cs
     let c = Enriched (e2, e1) [h2, h1] $ ConstraintFlexFlex h2 ies2 e1
     return $ c : cs'
@@ -236,28 +236,33 @@ simpOther e1 e2 cs = do
 
 data Stuck
   = StuckPiElim Hole [[PreTermPlus]]
-  | StuckPiElimStrict Hole [[(PreTermPlus, Identifier)]]
+  | StuckPiElimStrict Hole [[PreTermPlus]]
 
 asStuckedTerm :: PreTermPlus -> Maybe Stuck
 asStuckedTerm (_, PreTermPiElim (_, PreTermZeta h) es)
-  | Just xs <- mapM asUpsilon es = Just $ StuckPiElimStrict h [zip es xs]
+  | Just _ <- mapM asUpsilon es = Just $ StuckPiElimStrict h [es]
 asStuckedTerm (_, PreTermPiElim (_, PreTermZeta h) es) =
   Just $ StuckPiElim h [es]
 asStuckedTerm (_, PreTermPiElim e es)
-  | Just xs <- mapM asUpsilon es =
+  | Just _ <- mapM asUpsilon es =
     case asStuckedTerm e of
       Just (StuckPiElim h iess) -> Just $ StuckPiElim h (iess ++ [es])
       Just (StuckPiElimStrict h iexss) ->
-        Just $ StuckPiElimStrict h $ iexss ++ [zip es xs]
+        Just $ StuckPiElimStrict h $ iexss ++ [es]
       Nothing -> Nothing
 asStuckedTerm (_, PreTermPiElim e es) =
   case asStuckedTerm e of
     Just (StuckPiElim h iess) -> Just $ StuckPiElim h $ iess ++ [es]
-    Just (StuckPiElimStrict h exss) -> do
-      let ess = map (map fst) exss
-      Just $ StuckPiElim h $ ess ++ [es]
+    Just (StuckPiElimStrict h iess) -> do
+      Just $ StuckPiElim h $ iess ++ [es]
     Nothing -> Nothing
 asStuckedTerm _ = Nothing
+
+onesided :: Identifier -> PreTermPlus -> Bool
+onesided h e = h `notElem` holePreTermPlus e
+
+subsume :: PreTermPlus -> [Identifier] -> Bool
+subsume e xs = all (`elem` xs) $ varPreTermPlus e
 
 isDisjoint :: [Identifier] -> Bool
 isDisjoint xs = xs == nub xs
