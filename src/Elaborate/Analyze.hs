@@ -29,11 +29,11 @@ simp cs = simp' cs
 
 simp' :: [PreConstraint] -> WithEnv [EnrichedConstraint]
 simp' [] = return []
-simp' (((_, PreTermTau), (_, PreTermTau)):cs) = (simp cs)
+simp' (((_, PreTermTau), (_, PreTermTau)):cs) = simp cs
 simp' (((_, PreTermTheta x), (_, PreTermTheta y)):cs)
-  | x == y = (simp cs)
+  | x == y = simp cs
 simp' (((_, PreTermUpsilon x1), (_, PreTermUpsilon x2)):cs)
-  | x1 == x2 = (simp cs)
+  | x1 == x2 = simp cs
 simp' (((_, PreTermPi xts1 cod1), (_, PreTermPi xts2 cod2)):cs) = do
   simpPi xts1 cod1 xts2 cod2 cs
 simp' (((_, PreTermPiIntro xts1 e1), (_, PreTermPiIntro xts2 e2)):cs) =
@@ -46,47 +46,47 @@ simp' ((e1, e2@(_, PreTermPiIntro {})):cs) = simp' $ (e2, e1) : cs
 simp' (((_, PreTermMu (x1, t1) e1), (_, PreTermMu (x2, t2) e2)):cs)
   | x1 == x2 = simp $ (t1, t2) : (e1, e2) : cs
 simp' (((_, PreTermZeta x), (_, PreTermZeta y)):cs)
-  | x == y = (simp cs)
+  | x == y = simp cs
 simp' (((_, PreTermIntS size1 l1), (_, PreTermIntS size2 l2)):cs)
   | size1 == size2
-  , l1 == l2 = (simp cs)
+  , l1 == l2 = simp cs
 simp' (((_, PreTermIntU size1 l1), (_, PreTermIntU size2 l2)):cs)
   | size1 == size2
-  , l1 == l2 = (simp cs)
+  , l1 == l2 = simp cs
 simp' (((_, PreTermInt l1), (_, PreTermIntS _ l2)):cs)
-  | l1 == l2 = (simp cs)
+  | l1 == l2 = simp cs
 simp' (((_, PreTermIntS _ l1), (_, PreTermInt l2)):cs)
-  | l1 == l2 = (simp cs)
+  | l1 == l2 = simp cs
 simp' (((_, PreTermInt l1), (_, PreTermIntU _ l2)):cs)
-  | l1 == l2 = (simp cs)
+  | l1 == l2 = simp cs
 simp' (((_, PreTermIntU _ l1), (_, PreTermInt l2)):cs)
-  | l1 == l2 = (simp cs)
+  | l1 == l2 = simp cs
 simp' (((_, PreTermInt l1), (_, PreTermInt l2)):cs)
-  | l1 == l2 = (simp cs)
+  | l1 == l2 = simp cs
 simp' (((_, PreTermFloat16 l1), (_, PreTermFloat16 l2)):cs)
-  | l1 == l2 = (simp cs)
+  | l1 == l2 = simp cs
 simp' (((_, PreTermFloat32 l1), (_, PreTermFloat32 l2)):cs)
-  | l1 == l2 = (simp cs)
+  | l1 == l2 = simp cs
 simp' (((_, PreTermFloat64 l1), (_, PreTermFloat64 l2)):cs)
-  | l1 == l2 = (simp cs)
+  | l1 == l2 = simp cs
 simp' (((_, PreTermFloat l1), (_, PreTermFloat16 l2)):cs)
-  | show l1 == show l2 = (simp cs)
+  | show l1 == show l2 = simp cs
 simp' (((_, PreTermFloat16 l1), (_, PreTermFloat l2)):cs)
-  | show l1 == show l2 = (simp cs)
+  | show l1 == show l2 = simp cs
 simp' (((_, PreTermFloat l1), (_, PreTermFloat32 l2)):cs)
-  | show l1 == show l2 = (simp cs)
+  | show l1 == show l2 = simp cs
 simp' (((_, PreTermFloat32 l1), (_, PreTermFloat l2)):cs)
-  | show l1 == show l2 = (simp cs)
+  | show l1 == show l2 = simp cs
 simp' (((_, PreTermFloat l1), (_, PreTermFloat64 l2)):cs)
-  | l1 == l2 = (simp cs)
+  | l1 == l2 = simp cs
 simp' (((_, PreTermFloat64 l1), (_, PreTermFloat l2)):cs)
-  | l1 == l2 = (simp cs)
+  | l1 == l2 = simp cs
 simp' (((_, PreTermFloat l1), (_, PreTermFloat l2)):cs)
-  | l1 == l2 = (simp cs)
+  | l1 == l2 = simp cs
 simp' (((_, PreTermEnum l1), (_, PreTermEnum l2)):cs)
-  | l1 == l2 = (simp cs)
+  | l1 == l2 = simp cs
 simp' (((_, PreTermEnumIntro l1), (_, PreTermEnumIntro l2)):cs)
-  | l1 == l2 = (simp cs)
+  | l1 == l2 = simp cs
 simp' (((_, PreTermArray k1 indexType1), (_, PreTermArray k2 indexType2)):cs)
   | k1 == k2 = simp $ (indexType1, indexType2) : cs
 simp' (((_, PreTermArrayIntro k1 les1), (_, PreTermArrayIntro k2 les2)):cs)
