@@ -8,6 +8,7 @@ import Control.Monad.Except
 import Control.Monad.State
 import Data.Bits ((.&.), shiftR)
 import Data.Char (ord)
+import Data.List (intercalate)
 import Data.Word (Word8)
 import Text.Read (readMaybe)
 import qualified Text.Show.Pretty as Pr
@@ -219,8 +220,8 @@ extractIdentifier t =
 
 withKindPrefix :: String -> String -> Maybe ArrayKind
 withKindPrefix str base
-  | [t, base'] <- wordsBy '-' str -- e.g. u8-array
-  , base == base'
+  | (t:rest) <- wordsBy '-' str -- e.g. u8-array
+  , base == intercalate "-" rest
   , Just t' <- asLowTypeMaybe t
   , Just kind <- asArrayKind t' = Just kind
 withKindPrefix _ _ = Nothing
