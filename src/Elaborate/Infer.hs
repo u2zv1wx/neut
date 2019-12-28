@@ -41,7 +41,7 @@ type Context = [(Identifier, PreTermPlus)]
 -- infer e ~> {type-annotated e}
 infer :: Context -> WeakTermPlus -> WithEnv PreTermPlus
 infer _ (m, WeakTermTau) = return (PreMetaTerminal (toLoc m), PreTermTau)
-infer _ (m, WeakTermTheta x)
+infer ctx (m, WeakTermTheta x)
   | Just i <- asEnumNatNumConstant x = do
     t <- toIsEnumType i
     retPreTerm t (toLoc m) $ PreTermTheta x
@@ -50,7 +50,7 @@ infer _ (m, WeakTermTheta x)
     case mt of
       Just t -> retPreTerm t (toLoc m) $ PreTermTheta x
       Nothing -> do
-        h <- newHoleInCtx []
+        h <- newHoleInCtx ctx
         insTypeEnv x h
         retPreTerm h (toLoc m) $ PreTermTheta x
 infer _ (m, WeakTermUpsilon x) = do
@@ -106,8 +106,8 @@ infer _ (m, WeakTermIntS size i) = do
 infer _ (m, WeakTermIntU size i) = do
   let t = (metaTerminal, PreTermTheta $ "u" ++ show size)
   retPreTerm t (toLoc m) $ PreTermIntU size i
-infer _ (m, WeakTermInt i) = do
-  h <- newHoleInCtx []
+infer ctx (m, WeakTermInt i) = do
+  h <- newHoleInCtx ctx
   retPreTerm h (toLoc m) $ PreTermInt i
 infer _ (m, WeakTermFloat16 f) = do
   let t = (metaTerminal, PreTermTheta "f16")
@@ -118,8 +118,8 @@ infer _ (m, WeakTermFloat32 f) = do
 infer _ (m, WeakTermFloat64 f) = do
   let t = (metaTerminal, PreTermTheta "f64")
   retPreTerm t (toLoc m) $ PreTermFloat64 f
-infer _ (m, WeakTermFloat f) = do
-  h <- newHoleInCtx []
+infer ctx (m, WeakTermFloat f) = do
+  h <- newHoleInCtx ctx
   retPreTerm h (toLoc m) $ PreTermFloat f
 infer _ (m, WeakTermEnum name) = retPreTerm univ (toLoc m) $ PreTermEnum name
 infer _ (m, WeakTermEnumIntro labelOrNum) = do

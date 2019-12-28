@@ -17,6 +17,8 @@ import Elaborate.Infer
 import Elaborate.Synthesize
 import Reduce.Term
 
+import qualified Data.PQueue.Min as Q
+
 -- Given a term `e` and its name `main`, this function
 --   (1) traces `e` using `infer e`, collecting type constraints,
 --   (2) updates typeEnv for `main` by the result of `infer e`,
@@ -32,8 +34,11 @@ elaborate e = do
   e' <- infer [] e
   -- Kantian type-inference ;)
   p "analyze"
+  cs <- gets constraintEnv
+  p $ "size: " ++ show (length cs)
   q <- gets constraintEnv >>= analyze
   p "synthesize"
+  p $ "size: " ++ show (Q.size q)
   -- p "synth. q:"
   -- p' $ map (\(Enriched pair _ _) -> pair) $ Q.toList q
   synthesize q
@@ -45,6 +50,7 @@ elaborate e = do
   tenv <- gets typeEnv
   tenv' <- mapM (return . substPreTermPlus sub) tenv
   modify (\env -> env {typeEnv = tenv'})
+  p "updated typeEn"
   -- elaborate `e` using the resulting substitution
   -- liftIO $ putStrLn $ Pr.ppShow e
   let e'' = substPreTermPlus sub e'
@@ -96,10 +102,7 @@ elaborate' (_, PreTermZeta x) = do
   sub <- gets substEnv
   case lookup x sub of
     Just e -> elaborate' e
-    Nothing -> do
-      t <- lookupTypeEnv "unsafe.eval-io"
-      p' t
-      throwError $ "elaborate' i: remaining hole: " ++ x
+    Nothing -> throwError $ "elaborate' i: remaining hole: " ++ x
 elaborate' (m, PreTermIntS size x) = do
   m' <- toMeta m
   return (m', TermIntS size x)

@@ -126,63 +126,155 @@ holePreTermPlusBindings [] es = do
 holePreTermPlusBindings ((_, t):xts) es = do
   holePreTermPlus t ++ holePreTermPlusBindings xts es
 
+-- substPreTermPlus :: SubstPreTerm -> PreTermPlus -> PreTermPlus
+-- substPreTermPlus _ (m, PreTermTau) = do
+--   (m, PreTermTau)
+-- substPreTermPlus _ (m, PreTermTheta t) = do
+--   (m, PreTermTheta t)
+-- substPreTermPlus sub (m, PreTermUpsilon x) = do
+--   fromMaybe (m, PreTermUpsilon x) (lookup x sub)
+-- substPreTermPlus sub (m, PreTermPi xts t) = do
+--   let (xts', t') = substPreTermPlusBindingsWithBody sub xts t
+--   (m, PreTermPi xts' t')
+-- substPreTermPlus sub (m, PreTermPiIntro xts body) = do
+--   let (xts', body') = substPreTermPlusBindingsWithBody sub xts body
+--   (m, PreTermPiIntro xts' body')
+-- substPreTermPlus sub (m, PreTermPiElim e es) = do
+--   let e' = substPreTermPlus sub e
+--   let es' = map (substPreTermPlus sub) es
+--   (m, PreTermPiElim e' es')
+-- substPreTermPlus sub (m, PreTermMu (x, t) e) = do
+--   let t' = substPreTermPlus sub t
+--   let e' = substPreTermPlus (filter (\(k, _) -> k /= x) sub) e
+--   (m, PreTermMu (x, t') e')
+-- substPreTermPlus sub (m, PreTermZeta s) = do
+--   fromMaybe (m, PreTermZeta s) (lookup s sub)
+-- substPreTermPlus _ (m, PreTermIntS size x) = do
+--   (m, PreTermIntS size x)
+-- substPreTermPlus _ (m, PreTermIntU size x) = do
+--   (m, PreTermIntU size x)
+-- substPreTermPlus _ (m, PreTermInt x) = do
+--   (m, PreTermInt x)
+-- substPreTermPlus _ (m, PreTermFloat16 x) = do
+--   (m, PreTermFloat16 x)
+-- substPreTermPlus _ (m, PreTermFloat32 x) = do
+--   (m, PreTermFloat32 x)
+-- substPreTermPlus _ (m, PreTermFloat64 x) = do
+--   (m, PreTermFloat64 x)
+-- substPreTermPlus _ (m, PreTermFloat x) = do
+--   (m, PreTermFloat x)
+-- substPreTermPlus _ (m, PreTermEnum x) = do
+--   (m, PreTermEnum x)
+-- substPreTermPlus _ (m, PreTermEnumIntro l) = do
+--   (m, PreTermEnumIntro l)
+-- substPreTermPlus sub (m, PreTermEnumElim e branchList) = do
+--   let e' = substPreTermPlus sub e
+--   let (caseList, es) = unzip branchList
+--   let es' = map (substPreTermPlus sub) es
+--   (m, PreTermEnumElim e' (zip caseList es'))
+-- substPreTermPlus sub (m, PreTermArray kind indexType) = do
+--   let indexType' = substPreTermPlus sub indexType
+--   (m, PreTermArray kind indexType')
+-- substPreTermPlus sub (m, PreTermArrayIntro kind les) = do
+--   let (ls, es) = unzip les
+--   let es' = map (substPreTermPlus sub) es
+--   (m, PreTermArrayIntro kind (zip ls es'))
+-- substPreTermPlus sub (m, PreTermArrayElim kind e1 e2) = do
+--   let e1' = substPreTermPlus sub e1
+--   let e2' = substPreTermPlus sub e2
+--   (m, PreTermArrayElim kind e1' e2')
+-- substPreTermPlusBindingsWithBody ::
+--      SubstPreTerm
+--   -> [IdentifierPlus]
+--   -> PreTermPlus
+--   -> ([IdentifierPlus], PreTermPlus)
+-- substPreTermPlusBindingsWithBody sub [] e = do
+--   let e' = substPreTermPlus sub e
+--   ([], e')
+-- substPreTermPlusBindingsWithBody sub ((x, t):xts) e = do
+--   let sub' = filter (\(k, _) -> k /= x) sub
+--   let (xts', e') = substPreTermPlusBindingsWithBody sub' xts e
+--   let t' = substPreTermPlus sub t
+--   ((x, t') : xts', e')
 substPreTermPlus :: SubstPreTerm -> PreTermPlus -> PreTermPlus
-substPreTermPlus _ (m, PreTermTau) = do
-  (m, PreTermTau)
-substPreTermPlus _ (m, PreTermTheta t) = do
-  (m, PreTermTheta t)
+substPreTermPlus sub (m, PreTermTau) = do
+  let m' = substPreMeta sub m
+  (m', PreTermTau)
+substPreTermPlus sub (m, PreTermTheta t) = do
+  let m' = substPreMeta sub m
+  (m', PreTermTheta t)
 substPreTermPlus sub (m, PreTermUpsilon x) = do
-  fromMaybe (m, PreTermUpsilon x) (lookup x sub)
+  let m' = substPreMeta sub m
+  -- このときlookupの結果のmetaとm'とが同一であるって情報を保持する必要があるのでは？
+  fromMaybe (m', PreTermUpsilon x) (lookup x sub)
 substPreTermPlus sub (m, PreTermPi xts t) = do
+  let m' = substPreMeta sub m
   let (xts', t') = substPreTermPlusBindingsWithBody sub xts t
-  (m, PreTermPi xts' t')
+  (m', PreTermPi xts' t')
 substPreTermPlus sub (m, PreTermPiIntro xts body) = do
+  let m' = substPreMeta sub m
   let (xts', body') = substPreTermPlusBindingsWithBody sub xts body
-  (m, PreTermPiIntro xts' body')
+  (m', PreTermPiIntro xts' body')
 substPreTermPlus sub (m, PreTermPiElim e es) = do
+  let m' = substPreMeta sub m
   let e' = substPreTermPlus sub e
   let es' = map (substPreTermPlus sub) es
-  (m, PreTermPiElim e' es')
+  (m', PreTermPiElim e' es')
 substPreTermPlus sub (m, PreTermMu (x, t) e) = do
+  let m' = substPreMeta sub m
   let t' = substPreTermPlus sub t
   let e' = substPreTermPlus (filter (\(k, _) -> k /= x) sub) e
-  (m, PreTermMu (x, t') e')
+  (m', PreTermMu (x, t') e')
 substPreTermPlus sub (m, PreTermZeta s) = do
-  fromMaybe (m, PreTermZeta s) (lookup s sub)
-substPreTermPlus _ (m, PreTermIntS size x) = do
-  (m, PreTermIntS size x)
-substPreTermPlus _ (m, PreTermIntU size x) = do
-  (m, PreTermIntU size x)
-substPreTermPlus _ (m, PreTermInt x) = do
-  (m, PreTermInt x)
-substPreTermPlus _ (m, PreTermFloat16 x) = do
-  (m, PreTermFloat16 x)
-substPreTermPlus _ (m, PreTermFloat32 x) = do
-  (m, PreTermFloat32 x)
-substPreTermPlus _ (m, PreTermFloat64 x) = do
-  (m, PreTermFloat64 x)
-substPreTermPlus _ (m, PreTermFloat x) = do
-  (m, PreTermFloat x)
-substPreTermPlus _ (m, PreTermEnum x) = do
-  (m, PreTermEnum x)
-substPreTermPlus _ (m, PreTermEnumIntro l) = do
-  (m, PreTermEnumIntro l)
+  let m' = substPreMeta sub m
+  fromMaybe (m', PreTermZeta s) (lookup s sub)
+substPreTermPlus sub (m, PreTermIntS size x) = do
+  let m' = substPreMeta sub m
+  (m', PreTermIntS size x)
+substPreTermPlus sub (m, PreTermIntU size x) = do
+  let m' = substPreMeta sub m
+  (m', PreTermIntU size x)
+substPreTermPlus sub (m, PreTermInt x) = do
+  let m' = substPreMeta sub m
+  (m', PreTermInt x)
+substPreTermPlus sub (m, PreTermFloat16 x) = do
+  let m' = substPreMeta sub m
+  (m', PreTermFloat16 x)
+substPreTermPlus sub (m, PreTermFloat32 x) = do
+  let m' = substPreMeta sub m
+  (m', PreTermFloat32 x)
+substPreTermPlus sub (m, PreTermFloat64 x) = do
+  let m' = substPreMeta sub m
+  (m', PreTermFloat64 x)
+substPreTermPlus sub (m, PreTermFloat x) = do
+  let m' = substPreMeta sub m
+  (m', PreTermFloat x)
+substPreTermPlus sub (m, PreTermEnum x) = do
+  let m' = substPreMeta sub m
+  (m', PreTermEnum x)
+substPreTermPlus sub (m, PreTermEnumIntro l) = do
+  let m' = substPreMeta sub m
+  (m', PreTermEnumIntro l)
 substPreTermPlus sub (m, PreTermEnumElim e branchList) = do
+  let m' = substPreMeta sub m
   let e' = substPreTermPlus sub e
   let (caseList, es) = unzip branchList
   let es' = map (substPreTermPlus sub) es
-  (m, PreTermEnumElim e' (zip caseList es'))
+  (m', PreTermEnumElim e' (zip caseList es'))
 substPreTermPlus sub (m, PreTermArray kind indexType) = do
+  let m' = substPreMeta sub m
   let indexType' = substPreTermPlus sub indexType
-  (m, PreTermArray kind indexType')
+  (m', PreTermArray kind indexType')
 substPreTermPlus sub (m, PreTermArrayIntro kind les) = do
+  let m' = substPreMeta sub m
   let (ls, es) = unzip les
   let es' = map (substPreTermPlus sub) es
-  (m, PreTermArrayIntro kind (zip ls es'))
+  (m', PreTermArrayIntro kind (zip ls es'))
 substPreTermPlus sub (m, PreTermArrayElim kind e1 e2) = do
+  let m' = substPreMeta sub m
   let e1' = substPreTermPlus sub e1
   let e2' = substPreTermPlus sub e2
-  (m, PreTermArrayElim kind e1' e2')
+  (m', PreTermArrayElim kind e1' e2')
 
 substPreTermPlusBindingsWithBody ::
      SubstPreTerm
@@ -197,6 +289,11 @@ substPreTermPlusBindingsWithBody sub ((x, t):xts) e = do
   let (xts', e') = substPreTermPlusBindingsWithBody sub' xts e
   let t' = substPreTermPlus sub t
   ((x, t') : xts', e')
+
+substPreMeta :: SubstPreTerm -> PreMeta -> PreMeta
+substPreMeta _ m@(PreMetaTerminal _) = m
+substPreMeta sub (PreMetaNonTerminal t ml) =
+  PreMetaNonTerminal (substPreTermPlus sub t) ml
 
 isReduciblePreTerm :: PreTermPlus -> Bool
 isReduciblePreTerm (_, PreTermTau) = False

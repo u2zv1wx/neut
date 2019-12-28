@@ -21,20 +21,27 @@ synthesize :: ConstraintQueue -> WithEnv ()
 synthesize q = do
   sub <- gets substEnv
   case Q.getMin q of
+    Nothing -> return ()
     Just (Enriched (e1, e2) ms _)
       | Just (m, e) <- lookupAny ms sub -> resolveStuck q e1 e2 m e
-    Just (Enriched _ _ (ConstraintImmediate m e)) -> resolveHole q [(m, e)]
-    Just (Enriched _ _ (ConstraintPattern m iess e)) -> resolvePiElim q m iess e
-    Just (Enriched _ _ (ConstraintQuasiPattern m iess e)) ->
+    Just (Enriched _ _ (ConstraintImmediate m e)) -> do
+      p $ "resolveHole: " ++ m
+      resolveHole q [(m, e)]
+    Just (Enriched _ _ (ConstraintPattern m iess e)) -> do
+      p $ "resolve pattern: " ++ m
       resolvePiElim q m iess e
-    Just (Enriched _ _ (ConstraintFlexRigid m iess e)) ->
+    Just (Enriched _ _ (ConstraintQuasiPattern m iess e)) -> do
+      p "resolve quasi pattern. creating chain"
       resolvePiElim q m iess e
-    Just (Enriched _ _ (ConstraintFlexFlex m iess e)) ->
+    Just (Enriched _ _ (ConstraintFlexRigid m iess e)) -> do
+      p "resolve flex-rigid. creating chain"
       resolvePiElim q m iess e
-    Just (Enriched (e1, e2) _ ConstraintOther) -> do
+    Just (Enriched _ _ (ConstraintFlexFlex m iess e)) -> do
+      p "resolve flex-flex. creating chain"
+      resolvePiElim q m iess e
+    Just (Enriched (e1, e2) _ _) -> do
       p $ "q.size = " ++ show (Q.size q)
       throwError $ "cannot simplify:\n" ++ Pr.ppShow (e1, e2)
-    Nothing -> return ()
 
 resolveStuck ::
      ConstraintQueue
@@ -48,6 +55,7 @@ resolveStuck q e1 e2 h e = do
   let e1' = substPreTermPlus [(h, e)] e1
   let e2' = substPreTermPlus [(h, e)] e2
   q' <- assert (h `notElem` fmvs) $ analyze [(e1', e2')]
+  p $ "resolveStuck. current size = " ++ show (Q.size q)
   synthesize $ Q.deleteMin q `Q.union` q'
 
 -- Synthesize `hole @ arg-1 @ ... @ arg-n = e`, where arg-i is a variable.
@@ -70,6 +78,12 @@ resolvePiElim q m ess e = do
   xss <- toVarList es >>= toAltList
   let xsss = map (takeByCount lengthInfo) xss
   let lamList = map (bindFormalArgs e) xsss
+  let len = length lamList
+  -- p $ "creating chain. length = " ++ show (length lamList)
+  when (len > 1) $ do
+    p $ "creating actual chain of length " ++ show len
+    p "ess:"
+    p' ess
   chain q $ map (\lam -> resolveHole q [(m, lam)]) lamList
 
 -- resolveHoleは[(Hole, PreTermPlus)]を受け取るようにしたほうがよさそう。
@@ -84,9 +98,9 @@ resolveHole q sub = do
 -- [e, x, y, y, e2, e3, z] ~> [p, x, y, y, q, r, z]  (p, q, r: new variables)
 toVarList :: [PreTermPlus] -> WithEnv [(Identifier, PreTermPlus)]
 toVarList [] = return []
-toVarList ((_, PreTermUpsilon x):es) = do
+toVarList (e@(_, PreTermUpsilon x):es) = do
   xts <- toVarList es
-  t <- lookupTypeEnv x
+  let t = typeOf e
   return $ (x, t) : xts
 toVarList (e:es) = do
   xts <- toVarList es

@@ -175,7 +175,9 @@
 (enum choice left right)
 
 (u8-array-introduction
-  ((left 3)
-   (right 2)))
+  (left 3)
+  (right 2))
+
+(io-return top unit)
 
 ;; stdout

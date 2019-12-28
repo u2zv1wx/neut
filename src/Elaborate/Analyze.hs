@@ -4,6 +4,7 @@ module Elaborate.Analyze
 
 import Control.Monad.Except
 import Data.List
+import Data.List (nub)
 import qualified Data.PQueue.Min as Q
 import System.Timeout
 import qualified Text.Show.Pretty as Pr
@@ -94,29 +95,29 @@ simp' (((m1, PreTermArrayIntro k1 les1), (m2, PreTermArrayIntro k2 les2)):cs)
     csArray <- simpArrayIntro les1 les2
     csCont <- simpMetaRet [(m1, m2)] $ simp cs
     return $ csArray ++ csCont
-simp' ((e1, e2):cs)
-  | (m1, PreTermArrayElim k1 (_, PreTermUpsilon f) eps1) <- e1
-  , (m2, PreTermArrayElim k2 (_, PreTermUpsilon g) eps2) <- e2
-  , k1 == k2
-  , f == g = simpMetaRet [(m1, m2)] $ simp $ (eps1, eps2) : cs
-simp' ((e1, e2):cs)
-  | (m11, PreTermPiElim (m12, PreTermUpsilon f) es1) <- e1
-  , (m21, PreTermPiElim (m22, PreTermUpsilon g) es2) <- e2
-  , f == g
-  , length es1 == length es2 =
-    simpMetaRet [(m11, m21), (m12, m22)] $ simp $ zip es1 es2 ++ cs
-simp' ((e1, e2):cs)
-  | (m11, PreTermPiElim (m12, PreTermTheta f) es1) <- e1
-  , (m21, PreTermPiElim (m22, PreTermTheta g) es2) <- e2
-  , f == g
-  , length es1 == length es2 =
-    simpMetaRet [(m11, m21), (m12, m22)] $ simp $ zip es1 es2 ++ cs
-simp' ((e1, e2):cs)
-  | (m11, PreTermPiElim (m12, PreTermZeta f) es1) <- e1
-  , (m21, PreTermPiElim (m22, PreTermZeta g) es2) <- e2
-  , f == g
-  , length es1 == length es2 =
-    simpMetaRet [(m11, m21), (m12, m22)] $ simp $ zip es1 es2 ++ cs
+-- simp' ((e1, e2):cs)
+--   | (m1, PreTermArrayElim k1 (_, PreTermUpsilon f) eps1) <- e1
+--   , (m2, PreTermArrayElim k2 (_, PreTermUpsilon g) eps2) <- e2
+--   , k1 == k2
+--   , f == g = simpMetaRet [(m1, m2)] $ simp $ (eps1, eps2) : cs
+-- simp' ((e1, e2):cs)
+--   | (m11, PreTermPiElim (m12, PreTermUpsilon f) es1) <- e1
+--   , (m21, PreTermPiElim (m22, PreTermUpsilon g) es2) <- e2
+--   , f == g
+--   , length es1 == length es2 =
+--     simpMetaRet [(m11, m21), (m12, m22)] $ simp $ zip es1 es2 ++ cs
+-- simp' ((e1, e2):cs)
+--   | (m11, PreTermPiElim (m12, PreTermTheta f) es1) <- e1
+--   , (m21, PreTermPiElim (m22, PreTermTheta g) es2) <- e2
+--   , f == g
+--   , length es1 == length es2 =
+--     simpMetaRet [(m11, m21), (m12, m22)] $ simp $ zip es1 es2 ++ cs
+-- simp' ((e1, e2):cs)
+--   | (m11, PreTermPiElim (m12, PreTermZeta f) es1) <- e1
+--   , (m21, PreTermPiElim (m22, PreTermZeta g) es2) <- e2
+--   , f == g
+--   , length es1 == length es2 =
+--     simpMetaRet [(m11, m21), (m12, m22)] $ simp $ zip es1 es2 ++ cs
 simp' ((e1, e2):cs) = do
   let ms1 = asStuckedTerm e1
   let ms2 = asStuckedTerm e2
@@ -196,8 +197,7 @@ simpHole ::
 simpHole h1 fmvs1 fmvs2 e1 e2 cs
   | h1 `notElem` fmvs2 = do
     cs' <- simpMetaRet [(fst e1, fst e2)] $ simp cs
-    let fmvs = fmvs1 ++ fmvs2
-    return $ Enriched (e1, e2) fmvs (ConstraintImmediate h1 e2) : cs'
+    return $ Enriched (e1, e2) [h1] (ConstraintImmediate h1 e2) : cs'
   | otherwise = simpOther (fmvs1 ++ fmvs2) e1 e2 cs
 
 simpStuckStrict ::
@@ -215,12 +215,24 @@ simpStuckStrict h1 exs1 _ fmvs1 fvs2 fmvs2 e1 e2 cs
   | h1 `notElem` fmvs2 = do
     let es1 = map (map fst) exs1
     cs' <- simpMetaRet [(fst e1, fst e2)] $ simp cs
-    if all (isSolvable fvs2 fmvs2 h1) (map (map snd) exs1)
+    -- patternであるための条件がふつうに間違っている。
+    -- ?M @ (x11, ..., x1n) @ ... @ (xn1, ..., xnm) = eについてチェックすべき条件は、
+    --   - xiがdisjointである
+    --   - eの自由変数がxiによって尽くされている
+    --   - eのなかに?Mは出現しない
+    -- というもの。
+    let xs = concat $ map (map snd) exs1
+    -- let foo = all (\y -> y `elem` xs) fvs2
+    if (all (\y -> y `elem` xs) fvs2) && isDisjoint xs
       then do
         return $ Enriched (e1, e2) [h1] (ConstraintPattern h1 es1 e2) : cs'
       else do
         return $ Enriched (e1, e2) [h1] (ConstraintQuasiPattern h1 es1 e2) : cs'
   | otherwise = simpOther (fmvs1 ++ fmvs2) e1 e2 cs
+
+--    if all (isSolvable fvs2 fmvs2 h1) (map (map snd) exs1)
+isDisjoint :: [Identifier] -> Bool
+isDisjoint xs = xs == nub xs
 
 simpFlexRigid ::
      [Hole]
@@ -323,24 +335,8 @@ asStuckedTerm (_, PreTermPiElim e es) =
 asStuckedTerm (_, PreTermZeta h) = Just $ StuckHole h
 asStuckedTerm _ = Nothing
 
-isSolvable :: [Identifier] -> [Hole] -> Identifier -> [Identifier] -> Bool
-isSolvable fvs fmvs x xs = affineCheck xs fvs && x `notElem` fmvs
-
 toVar :: Identifier -> PreTermPlus -> WithEnv PreTermPlus
 toVar x t = return (PreMetaNonTerminal t Nothing, PreTermUpsilon x)
-
-affineCheck :: [Identifier] -> [Identifier] -> Bool
-affineCheck xs = affineCheck' xs xs
-
-affineCheck' :: [Identifier] -> [Identifier] -> [Identifier] -> Bool
-affineCheck' _ [] _ = True
-affineCheck' xs (y:ys) fvs =
-  if y `notElem` fvs
-    then affineCheck' xs ys fvs
-    else isLinear y xs && affineCheck' xs ys fvs
-
-isLinear :: Identifier -> [Identifier] -> Bool
-isLinear x xs = length (filter (== x) xs) == 1
 
 interpretAsUpsilon :: PreTermPlus -> Maybe Identifier
 interpretAsUpsilon (_, PreTermUpsilon x) = Just x
