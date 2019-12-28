@@ -13,7 +13,7 @@ import Data.Basic
 import Data.Constraint
 import Data.Env
 import Data.PreTerm
-import Elaborate.Infer (metaTerminal, typeOf, univ)
+import Elaborate.Infer (metaTerminal, typeOf)
 import Reduce.PreTerm
 
 analyze :: [PreConstraint] -> WithEnv ConstraintQueue
@@ -98,11 +98,12 @@ simp' (((m1, PreTermArrayIntro k1 les1), (m2, PreTermArrayIntro k2 les2)):cs)
 simp' ((e1, e2):cs) = do
   let ms1 = asStuckedTerm e1
   let ms2 = asStuckedTerm e2
-  case (ms1, ms2) of
-    (Just (StuckHole h1), Nothing) -> do
-      simpHole h1 e1 e2 cs
-    (Nothing, Just (StuckHole h2)) -> do
-      simpHole h2 e2 e1 cs
+  case (ms1, ms2)
+    -- (Just (StuckHole h1), Nothing) -> do
+    --   simpHole h1 e1 e2 cs
+    -- (Nothing, Just (StuckHole h2)) -> do
+    --   simpHole h2 e2 e1 cs
+        of
     (Just (StuckPiElimStrict h1 exs1), _) -> do
       simpStuckStrict h1 exs1 e1 e2 cs
     (_, Just (StuckPiElimStrict h2 exs2)) -> do
@@ -158,19 +159,6 @@ simpPi m1 ((x1, t1):xts1) cod1 m2 ((x2, t2):xts2) cod2 cs = do
   cs' <- simpMetaRet [(m1, m2)] $ simpPi m xts1 cod1 m xts2' cod2' cs
   return $ cst ++ cs'
 simpPi _ _ _ _ _ _ _ = throwError "cannot simplify (Pi)"
-
-simpHole ::
-     Hole
-  -> PreTermPlus
-  -> PreTermPlus
-  -> [PreConstraint]
-  -> WithEnv [EnrichedConstraint]
-simpHole h1 e1 e2 cs
-  | h1 `notElem` holePreTermPlus e2
-  , null (varPreTermPlus e2) = do
-    cs' <- simpMetaRet [(fst e1, fst e2)] $ simp cs
-    return $ Enriched (e1, e2) [h1] (ConstraintImmediate h1 e2) : cs'
-  | otherwise = simpOther e1 e2 cs
 
 simpStuckStrict ::
      Identifier
@@ -259,14 +247,15 @@ simpMetaRet mms comp = do
   return $ cs1 ++ cs2
 
 simpMeta :: PreMeta -> PreMeta -> WithEnv [EnrichedConstraint]
-simpMeta (PreMetaTerminal _) (PreMetaTerminal _) = return []
-simpMeta (PreMetaTerminal _) m2@(PreMetaNonTerminal _ _) = do
-  simpMeta (PreMetaNonTerminal univ Nothing) m2
-simpMeta m1@(PreMetaNonTerminal _ _) (PreMetaTerminal _) =
-  simpMeta m1 (PreMetaNonTerminal univ Nothing)
-simpMeta (PreMetaNonTerminal t1 _) (PreMetaNonTerminal t2 _) = do
-  simp [(t1, t2)]
+simpMeta _ _ = return []
 
+-- simpMeta (PreMetaTerminal _) (PreMetaTerminal _) = return []
+-- simpMeta (PreMetaTerminal _) m2@(PreMetaNonTerminal _ _) = do
+--   simpMeta (PreMetaNonTerminal univ Nothing) m2
+-- simpMeta m1@(PreMetaNonTerminal _ _) (PreMetaTerminal _) =
+--   simpMeta m1 (PreMetaNonTerminal univ Nothing)
+-- simpMeta (PreMetaNonTerminal t1 _) (PreMetaNonTerminal t2 _) = do
+--   simp [(t1, t2)]
 simpArrayIntro ::
      [(EnumValue, PreTermPlus)]
   -> [(EnumValue, PreTermPlus)]
@@ -281,29 +270,29 @@ simpArrayIntro les1 les2 = do
     else simp $ zip es1 es2
 
 data Stuck
-  = StuckHole Hole
-  | StuckPiElim Hole [[PreTermPlus]]
+  = StuckPiElim Hole [[PreTermPlus]]
   | StuckPiElimStrict Hole [[(PreTermPlus, Identifier)]]
 
 -- a stucked term is a term that cannot be evaluated due to unresolved holes.
 asStuckedTerm :: PreTermPlus -> Maybe Stuck
+asStuckedTerm (_, PreTermPiElim (_, PreTermZeta h) es)
+  | Just xs <- mapM asUpsilon es = Just $ StuckPiElimStrict h [zip es xs]
+asStuckedTerm (_, PreTermPiElim (_, PreTermZeta h) es) =
+  Just $ StuckPiElim h [es]
 asStuckedTerm (_, PreTermPiElim e es)
   | Just xs <- mapM asUpsilon es =
     case asStuckedTerm e of
-      Just (StuckHole h) -> Just $ StuckPiElimStrict h [zip es xs]
       Just (StuckPiElim h iess) -> Just $ StuckPiElim h (iess ++ [es])
       Just (StuckPiElimStrict h iexss) ->
         Just $ StuckPiElimStrict h $ iexss ++ [zip es xs]
       Nothing -> Nothing
 asStuckedTerm (_, PreTermPiElim e es) =
   case asStuckedTerm e of
-    Just (StuckHole h) -> Just $ StuckPiElim h [es]
     Just (StuckPiElim h iess) -> Just $ StuckPiElim h $ iess ++ [es]
     Just (StuckPiElimStrict h exss) -> do
       let ess = map (map fst) exss
       Just $ StuckPiElim h $ ess ++ [es]
     Nothing -> Nothing
-asStuckedTerm (_, PreTermZeta h) = Just $ StuckHole h
 asStuckedTerm _ = Nothing
 
 toVar :: Identifier -> PreTermPlus -> PreTermPlus
