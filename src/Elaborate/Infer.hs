@@ -150,8 +150,7 @@ infer ctx (m, WeakTermArrayElim k e1 e2) = do
   let tCod = inferKind k
   e1' <- infer ctx e1
   e2' <- infer ctx e2
-  let tArr = typeOf e1'
-  insConstraintEnv tArr (metaTerminal, PreTermArray k (typeOf e2'))
+  insConstraintEnv (typeOf e1') (metaTerminal, PreTermArray k (typeOf e2'))
   retPreTerm tCod (toLoc m) $ PreTermArrayElim k e1' e2'
 
 inferType :: Context -> WeakTermPlus -> WithEnv PreTermPlus
