@@ -112,7 +112,7 @@ interpret (m, TreeNode [(_, TreeAtom "arrow"), (_, TreeNode ts), t]) = do
 interpret (m, TreeAtom x)
   | Just str <- readMaybe x = do
     u8s <- forM (encode str) $ \u -> withMeta m (WeakTermIntU 8 (toInteger u))
-    let len = length u8s
+    let len = toInteger $ length u8s
     let ns = map (\i -> EnumValueNatNum len i) [0 .. (len - 1)]
     -- parse string as utf-8 encoded u8 array
     withMeta m $ WeakTermArrayIntro (ArrayKindIntU 8) (zip ns u8s)

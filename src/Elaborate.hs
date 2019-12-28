@@ -5,11 +5,9 @@ module Elaborate
 import Control.Monad.Except
 import Control.Monad.State
 import Data.List (nub)
-import qualified Data.PQueue.Min as Q
 import Numeric.Half
 
 import Data.Basic
-import Data.Constraint
 import Data.Env
 import Data.PreTerm
 import Data.Term
@@ -35,6 +33,7 @@ elaborate e = do
   -- Kantian type-inference ;)
   p "analyze"
   q <- gets constraintEnv >>= analyze
+  p "synthesize"
   -- p "synth. q:"
   -- p' $ map (\(Enriched pair _ _) -> pair) $ Q.toList q
   synthesize q
@@ -228,13 +227,14 @@ caseCheckMeta (MetaNonTerminal t _) = caseCheck t
 caseCheckEnumIdentifier :: EnumType -> [Case] -> WithEnv ()
 caseCheckEnumIdentifier (EnumTypeLabel x) labelList = do
   ls <- lookupEnumSet x
-  caseCheckEnumIdentifier' (length ls) labelList
+  caseCheckEnumIdentifier' (toInteger $ length ls) labelList
 caseCheckEnumIdentifier (EnumTypeNatNum i) labelList = do
   caseCheckEnumIdentifier' i labelList
 
-caseCheckEnumIdentifier' :: Int -> [Case] -> WithEnv ()
-caseCheckEnumIdentifier' i labelList =
-  if i <= length (nub labelList) || CaseDefault `elem` labelList
+caseCheckEnumIdentifier' :: Integer -> [Case] -> WithEnv ()
+caseCheckEnumIdentifier' i labelList = do
+  let len = toInteger $ length (nub labelList)
+  if i <= len || CaseDefault `elem` labelList
     then return ()
     else throwError "non-exhaustive pattern"
 

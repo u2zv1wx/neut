@@ -43,7 +43,7 @@ infer :: Context -> WeakTermPlus -> WithEnv PreTermPlus
 infer _ (m, WeakTermTau) = return (PreMetaTerminal (toLoc m), PreTermTau)
 infer _ (m, WeakTermTheta x)
   | Just i <- asEnumNatNumConstant x = do
-    t <- toIsEnumType $ fromInteger i
+    t <- toIsEnumType i
     retPreTerm t (toLoc m) $ PreTermTheta x
   | otherwise = do
     mt <- lookupTypeEnvMaybe x
@@ -248,7 +248,7 @@ typeOf (PreMetaTerminal _, _) = univ
 typeOf (PreMetaNonTerminal t _, _) = t
 
 -- is-enum n{i}
-toIsEnumType :: Int -> WithEnv PreTermPlus
+toIsEnumType :: Integer -> WithEnv PreTermPlus
 toIsEnumType i = do
   piType <- univToUniv
   let piMeta = PreMetaNonTerminal piType Nothing

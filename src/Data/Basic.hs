@@ -15,7 +15,7 @@ data Case
 
 data EnumType
   = EnumTypeLabel Identifier
-  | EnumTypeNatNum Int
+  | EnumTypeNatNum Integer
   deriving (Show, Eq)
 
 readNatEnumType :: Identifier -> (Maybe Integer)
@@ -26,7 +26,7 @@ readNatEnumType str -- n1, n2, ..., n{i}, ..., n{2^64}
   , 1 <= i && i <= 2 ^ (64 :: Integer) = Just i
 readNatEnumType _ = Nothing
 
-readNatEnumValue :: Identifier -> (Maybe (Int, Int))
+readNatEnumValue :: Identifier -> (Maybe (Integer, Integer))
 readNatEnumValue str -- n1-0, n2-0, n2-1, ...
   | length str >= 4
   , head str == 'n'
@@ -46,7 +46,7 @@ asEnumNatNumConstant _ = Nothing
 
 data EnumValue
   = EnumValueLabel Identifier
-  | EnumValueNatNum Int Int
+  | EnumValueNatNum Integer Integer
   deriving (Show, Eq, Ord)
 
 data LowType
