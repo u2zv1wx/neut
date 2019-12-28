@@ -24,25 +24,15 @@ synthesize q = do
     Nothing -> return ()
     Just (Enriched (e1, e2) ms _)
       | Just (m, e) <- lookupAny ms sub -> resolveStuck q e1 e2 m e
-    Just (Enriched _ _ (ConstraintImmediate m e))
-      -- p $ "resolveHole: " ++ m
-     -> do
+    Just (Enriched _ _ (ConstraintImmediate m e)) -> do
       resolveHole q [(m, e)]
-    Just (Enriched _ _ (ConstraintPattern m iess e))
-      -- p $ "resolve pattern: " ++ m
-     -> do
+    Just (Enriched _ _ (ConstraintPattern m iess e)) -> do
       resolvePiElim q m iess e
-    Just (Enriched _ _ (ConstraintQuasiPattern m iess e))
-      -- p "resolve quasi pattern. creating chain"
-     -> do
+    Just (Enriched _ _ (ConstraintQuasiPattern m iess e)) -> do
       resolvePiElim q m iess e
-    Just (Enriched _ _ (ConstraintFlexRigid m iess e))
-      -- p "resolve flex-rigid. creating chain"
-     -> do
+    Just (Enriched _ _ (ConstraintFlexRigid m iess e)) -> do
       resolvePiElim q m iess e
-    Just (Enriched _ _ (ConstraintFlexFlex m iess e))
-      -- p "resolve flex-flex. creating chain"
-     -> do
+    Just (Enriched _ _ (ConstraintFlexFlex m iess e)) -> do
       resolvePiElim q m iess e
     Just (Enriched (e1, e2) _ _) -> do
       throwError $ "cannot simplify:\n" ++ Pr.ppShow (e1, e2)
@@ -82,12 +72,6 @@ resolvePiElim q m ess e = do
   xss <- toVarList es >>= toAltList
   let xsss = map (takeByCount lengthInfo) xss
   let lamList = map (bindFormalArgs e) xsss
-  -- let len = length lamList
-  -- p $ "creating chain. length = " ++ show (length lamList)
-  -- when (len > 1) $ do
-  --   p $ "creating actual chain of length " ++ show len
-  --   p "ess:"
-  --   p' ess
   chain q $ map (\lam -> resolveHole q [(m, lam)]) lamList
 
 -- resolveHoleは[(Hole, PreTermPlus)]を受け取るようにしたほうがよさそう。

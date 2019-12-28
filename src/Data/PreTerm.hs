@@ -126,6 +126,130 @@ holePreTermPlusBindings [] es = do
 holePreTermPlusBindings ((_, t):xts) es = do
   holePreTermPlus t ++ holePreTermPlusBindings xts es
 
+-- varPreTermPlus :: PreTermPlus -> [Hole]
+-- varPreTermPlus (m, PreTermTau) = varPreMeta m
+-- varPreTermPlus (m, PreTermTheta _) = varPreMeta m
+-- varPreTermPlus (m, PreTermUpsilon _) = do
+--   varPreMeta m
+-- varPreTermPlus (m, PreTermPi xts t) = do
+--   let xhs = varPreTermPlusBindings xts [t]
+--   let yhs = varPreMeta m
+--   xhs ++ yhs
+-- varPreTermPlus (m, PreTermPiIntro xts e) = do
+--   let xhs = varPreTermPlusBindings xts [e]
+--   let yhs = varPreMeta m
+--   xhs ++ yhs
+-- varPreTermPlus (m, PreTermPiElim e es) = do
+--   let xhs = varPreTermPlus e
+--   let yhs = concatMap varPreTermPlus es
+--   let zhs = varPreMeta m
+--   xhs ++ yhs ++ zhs
+-- varPreTermPlus (m, PreTermMu ut e) = do
+--   let xhs = varPreTermPlusBindings [ut] [e]
+--   let yhs = varPreMeta m
+--   xhs ++ yhs
+-- varPreTermPlus (m, PreTermZeta h) = do
+--   let xhs = varPreMeta m
+--   h : xhs
+-- varPreTermPlus (m, PreTermIntS _ _) = varPreMeta m
+-- varPreTermPlus (m, PreTermIntU _ _) = varPreMeta m
+-- varPreTermPlus (m, PreTermInt _) = varPreMeta m
+-- varPreTermPlus (m, PreTermFloat16 _) = varPreMeta m
+-- varPreTermPlus (m, PreTermFloat32 _) = varPreMeta m
+-- varPreTermPlus (m, PreTermFloat64 _) = varPreMeta m
+-- varPreTermPlus (m, PreTermFloat _) = varPreMeta m
+-- varPreTermPlus (m, PreTermEnum _) = varPreMeta m
+-- varPreTermPlus (m, PreTermEnumIntro _) = varPreMeta m
+-- varPreTermPlus (m, PreTermEnumElim e les) = do
+--   let xhs = varPreTermPlus e
+--   let yhs = concatMap (\(_, body) -> varPreTermPlus body) les
+--   let zhs = varPreMeta m
+--   xhs ++ yhs ++ zhs
+-- varPreTermPlus (m, PreTermArray _ e1) = do
+--   let xhs1 = varPreTermPlus e1
+--   let xhs2 = varPreMeta m
+--   xhs1 ++ xhs2
+-- varPreTermPlus (m, PreTermArrayIntro _ les) = do
+--   let xhs = varPreMeta m
+--   let yhs = concatMap (\(_, body) -> varPreTermPlus body) les
+--   xhs ++ yhs
+-- varPreTermPlus (m, PreTermArrayElim _ e1 e2) = do
+--   let xhs1 = varPreTermPlus e1
+--   let xhs2 = varPreTermPlus e2
+--   let xhs3 = varPreMeta m
+--   xhs1 ++ xhs2 ++ xhs3
+-- varPreTermPlusBindings :: [IdentifierPlus] -> [PreTermPlus] -> [Hole]
+-- varPreTermPlusBindings [] es = do
+--   concatMap varPreTermPlus es
+-- varPreTermPlusBindings ((x, t):xts) es = do
+--   let hs1 = varPreTermPlus t
+--   let hs2 = varPreTermPlusBindings xts es
+--   hs1 ++ filter (/= x) hs2
+-- varPreMeta :: PreMeta -> [Hole]
+-- varPreMeta (PreMetaTerminal _) = []
+-- varPreMeta (PreMetaNonTerminal t _) = varPreTermPlus t
+-- holePreTermPlus :: PreTermPlus -> [Hole]
+-- holePreTermPlus (m, PreTermTau) = holePreMeta m
+-- holePreTermPlus (m, PreTermTheta _) = holePreMeta m
+-- holePreTermPlus (m, PreTermUpsilon _) = do
+--   holePreMeta m
+-- holePreTermPlus (m, PreTermPi xts t) = do
+--   let xhs = holePreTermPlusBindings xts [t]
+--   let yhs = holePreMeta m
+--   xhs ++ yhs
+-- holePreTermPlus (m, PreTermPiIntro xts e) = do
+--   let xhs = holePreTermPlusBindings xts [e]
+--   let yhs = holePreMeta m
+--   xhs ++ yhs
+-- holePreTermPlus (m, PreTermPiElim e es) = do
+--   let xhs = holePreTermPlus e
+--   let yhs = concatMap holePreTermPlus es
+--   let zhs = holePreMeta m
+--   xhs ++ yhs ++ zhs
+-- holePreTermPlus (m, PreTermMu ut e) = do
+--   let xhs = holePreTermPlusBindings [ut] [e]
+--   let yhs = holePreMeta m
+--   xhs ++ yhs
+-- holePreTermPlus (m, PreTermZeta h) = do
+--   let xhs = holePreMeta m
+--   h : xhs
+-- holePreTermPlus (m, PreTermIntS _ _) = holePreMeta m
+-- holePreTermPlus (m, PreTermIntU _ _) = holePreMeta m
+-- holePreTermPlus (m, PreTermInt _) = holePreMeta m
+-- holePreTermPlus (m, PreTermFloat16 _) = holePreMeta m
+-- holePreTermPlus (m, PreTermFloat32 _) = holePreMeta m
+-- holePreTermPlus (m, PreTermFloat64 _) = holePreMeta m
+-- holePreTermPlus (m, PreTermFloat _) = holePreMeta m
+-- holePreTermPlus (m, PreTermEnum _) = holePreMeta m
+-- holePreTermPlus (m, PreTermEnumIntro _) = holePreMeta m
+-- holePreTermPlus (m, PreTermEnumElim e les) = do
+--   let xhs = holePreTermPlus e
+--   let yhs = concatMap (\(_, body) -> holePreTermPlus body) les
+--   let zhs = holePreMeta m
+--   xhs ++ yhs ++ zhs
+-- holePreTermPlus (m, PreTermArray _ e1) = do
+--   let xhs1 = holePreTermPlus e1
+--   let xhs2 = holePreMeta m
+--   xhs1 ++ xhs2
+-- holePreTermPlus (m, PreTermArrayIntro _ les) = do
+--   let xhs = holePreMeta m
+--   let yhs = concatMap (\(_, body) -> holePreTermPlus body) les
+--   xhs ++ yhs
+-- holePreTermPlus (m, PreTermArrayElim _ e1 e2) = do
+--   let xhs1 = holePreTermPlus e1
+--   let xhs2 = holePreTermPlus e2
+--   let xhs3 = holePreMeta m
+--   xhs1 ++ xhs2 ++ xhs3
+-- holePreTermPlusBindings :: [IdentifierPlus] -> [PreTermPlus] -> [Hole]
+-- holePreTermPlusBindings [] es = do
+--   concatMap holePreTermPlus es
+-- holePreTermPlusBindings ((_, t):xts) es = do
+--   let hs1 = holePreTermPlus t
+--   let hs2 = holePreTermPlusBindings xts es
+--   hs1 ++ hs2
+-- holePreMeta :: PreMeta -> [Hole]
+-- holePreMeta (PreMetaTerminal _) = []
+-- holePreMeta (PreMetaNonTerminal t _) = holePreTermPlus t
 -- substPreTermPlus :: SubstPreTerm -> PreTermPlus -> PreTermPlus
 -- substPreTermPlus _ (m, PreTermTau) = do
 --   (m, PreTermTau)

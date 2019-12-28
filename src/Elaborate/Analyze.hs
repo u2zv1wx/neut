@@ -95,29 +95,6 @@ simp' (((m1, PreTermArrayIntro k1 les1), (m2, PreTermArrayIntro k2 les2)):cs)
     csArray <- simpArrayIntro les1 les2
     csCont <- simpMetaRet [(m1, m2)] $ simp cs
     return $ csArray ++ csCont
--- simp' ((e1, e2):cs)
---   | (m1, PreTermArrayElim k1 (_, PreTermUpsilon f) eps1) <- e1
---   , (m2, PreTermArrayElim k2 (_, PreTermUpsilon g) eps2) <- e2
---   , k1 == k2
---   , f == g = simpMetaRet [(m1, m2)] $ simp $ (eps1, eps2) : cs
--- simp' ((e1, e2):cs)
---   | (m11, PreTermPiElim (m12, PreTermUpsilon f) es1) <- e1
---   , (m21, PreTermPiElim (m22, PreTermUpsilon g) es2) <- e2
---   , f == g
---   , length es1 == length es2 =
---     simpMetaRet [(m11, m21), (m12, m22)] $ simp $ zip es1 es2 ++ cs
--- simp' ((e1, e2):cs)
---   | (m11, PreTermPiElim (m12, PreTermTheta f) es1) <- e1
---   , (m21, PreTermPiElim (m22, PreTermTheta g) es2) <- e2
---   , f == g
---   , length es1 == length es2 =
---     simpMetaRet [(m11, m21), (m12, m22)] $ simp $ zip es1 es2 ++ cs
--- simp' ((e1, e2):cs)
---   | (m11, PreTermPiElim (m12, PreTermZeta f) es1) <- e1
---   , (m21, PreTermPiElim (m22, PreTermZeta g) es2) <- e2
---   , f == g
---   , length es1 == length es2 =
---     simpMetaRet [(m11, m21), (m12, m22)] $ simp $ zip es1 es2 ++ cs
 simp' ((e1, e2):cs) = do
   let ms1 = asStuckedTerm e1
   let ms2 = asStuckedTerm e2
@@ -317,7 +294,7 @@ data Stuck
 -- a stucked term is a term that cannot be evaluated due to unresolved holes.
 asStuckedTerm :: PreTermPlus -> Maybe Stuck
 asStuckedTerm (_, PreTermPiElim e es)
-  | Just xs <- mapM interpretAsUpsilon es =
+  | Just xs <- mapM asUpsilon es =
     case asStuckedTerm e of
       Just (StuckHole h) -> Just $ StuckPiElimStrict h [zip es xs]
       Just (StuckPiElim h iess) -> Just $ StuckPiElim h (iess ++ [es])
@@ -338,6 +315,6 @@ asStuckedTerm _ = Nothing
 toVar :: Identifier -> PreTermPlus -> WithEnv PreTermPlus
 toVar x t = return (PreMetaNonTerminal t Nothing, PreTermUpsilon x)
 
-interpretAsUpsilon :: PreTermPlus -> Maybe Identifier
-interpretAsUpsilon (_, PreTermUpsilon x) = Just x
-interpretAsUpsilon _ = Nothing
+asUpsilon :: PreTermPlus -> Maybe Identifier
+asUpsilon (_, PreTermUpsilon x) = Just x
+asUpsilon _ = Nothing
