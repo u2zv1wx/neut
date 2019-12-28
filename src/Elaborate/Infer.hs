@@ -72,11 +72,14 @@ infer ctx (m, WeakTermPiElim e es) = do
   --        ...,
   --        ym : ?Mm @ (ctx[0], ..., ctx[n], y1, ..., y{m-1})]
   yts <- newHoleListInCtx ctx ys
-  es' <- inferList ctx es
+  es' <- mapM (infer ctx) es
   let ts = map typeOf es'
+  -- ts' = [?M1 @ (ctx[0], ..., ctx[n]),
+  --        ?M2 @ (ctx[0], ..., ctx[n], e1),
+  --        ...,
+  --        ?Mm @ (ctx[0], ..., ctx[n], e1, ..., e{m-1})]
   let ts' = map (substPreTermPlus (zip ys es') . snd) yts
   forM_ (zip ts ts') $ uncurry insConstraintEnv
-  p' $ (zip (map typeOf es') (map snd yts))
   cod <- newHoleInCtx (ctx ++ yts)
   let tPi = (metaTerminal, PreTermPi yts cod)
   insConstraintEnv tPi (typeOf e')
@@ -241,17 +244,6 @@ inferCase (CaseValue (EnumValueLabel name)) = do
 inferCase (CaseValue (EnumValueNatNum i _)) =
   return $ Just (metaTerminal, PreTermEnum $ EnumTypeNatNum i)
 inferCase _ = return Nothing
-
--- inferList ctx [e1, ..., en]
--- ~> [(x1, e1'), ..., (xn, en')] with xi : ti, ei : ti
-inferList :: Context -> [WeakTermPlus] -> WithEnv [PreTermPlus]
-inferList _ [] = return []
-inferList ctx (e:es) = do
-  e' <- infer ctx e
-  x <- newNameWith "hole-list"
-  insTypeEnv x (typeOf e')
-  xes <- inferList (ctx ++ [(x, (typeOf e'))]) es
-  return $ e' : xes
 
 constrainList :: [PreTermPlus] -> WithEnv ()
 constrainList [] = return ()
