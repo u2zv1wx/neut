@@ -279,5 +279,5 @@ newHoleOfType t = do
 determineDomType :: [PreTermPlus] -> PreTermPlus
 determineDomType ts =
   if not (null ts)
-    then typeOf (head ts)
+    then head ts
     else (metaTerminal, PreTermTheta "bottom")

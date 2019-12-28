@@ -172,4 +172,10 @@
     top))
 ;; unsafe.write : Pi (A : Univ, out : file-descriptor, str : u8-array a, len : is-enum A). top
 
-stdout
+(enum choice left right)
+
+(u8-array-introduction
+  ((left 3)
+   (right 2)))
+
+;; stdout
