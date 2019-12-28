@@ -24,16 +24,11 @@ synthesize q = do
     Nothing -> return ()
     Just (Enriched (e1, e2) ms _)
       | Just (m, e) <- lookupAny ms sub -> resolveStuck q e1 e2 m e
-    Just (Enriched _ _ (ConstraintImmediate m e)) -> do
-      resolveHole q [(m, e)]
-    Just (Enriched _ _ (ConstraintPattern m iess e)) -> do
-      resolvePiElim q m iess e
-    Just (Enriched _ _ (ConstraintQuasiPattern m iess e)) -> do
-      resolvePiElim q m iess e
-    Just (Enriched _ _ (ConstraintFlexRigid m iess e)) -> do
-      resolvePiElim q m iess e
-    Just (Enriched _ _ (ConstraintFlexFlex m iess e)) -> do
-      resolvePiElim q m iess e
+    Just (Enriched _ _ (ConstraintPattern m ess e)) -> resolvePiElim q m ess e
+    Just (Enriched _ _ (ConstraintQuasiPattern m ess e)) ->
+      resolvePiElim q m ess e
+    Just (Enriched _ _ (ConstraintFlexRigid m ess e)) -> resolvePiElim q m ess e
+    Just (Enriched _ _ (ConstraintFlexFlex m ess e)) -> resolvePiElim q m ess e
     Just (Enriched (e1, e2) _ _) -> do
       throwError $ "cannot simplify:\n" ++ Pr.ppShow (e1, e2)
 
@@ -49,7 +44,6 @@ resolveStuck q e1 e2 h e = do
   let e1' = substPreTermPlus [(h, e)] e1
   let e2' = substPreTermPlus [(h, e)] e2
   q' <- assert (h `notElem` fmvs) $ analyze [(e1', e2')]
-  --  p $ "resolveStuck. current size = " ++ show (Q.size q)
   synthesize $ Q.deleteMin q `Q.union` q'
 
 -- Synthesize `hole @ arg-1 @ ... @ arg-n = e`, where arg-i is a variable.
@@ -72,7 +66,6 @@ resolvePiElim q m ess e = do
   xss <- toVarList es >>= toAltList
   let xsss = map (takeByCount lengthInfo) xss
   let lamList = map (bindFormalArgs e) xsss
-  -- p $ "chain-list len: " ++ show (length lamList)
   chain q $ map (\lam -> resolveHole q [(m, lam)]) lamList
 
 -- resolveHoleは[(Hole, PreTermPlus)]を受け取るようにしたほうがよさそう。
@@ -156,12 +149,7 @@ discardInactive xs indexList =
 chain :: ConstraintQueue -> [WithEnv a] -> WithEnv a
 chain _ [] = throwError $ "cannot synthesize(chain)."
 chain _ [e] = e
--- chain _ (e:es) = e
-chain c (e:es) =
-  catchError e $ \_
-    -- liftIO $ putStrLn err
-    -- liftIO $ putStrLn "trying another chain..."
-   -> do chain c es
+chain c (e:es) = catchError e $ (const $ chain c es)
 
 -- chain c (e:es) = e `catchError` (\err -> chain c es)
 lookupAny :: [Hole] -> [(Identifier, a)] -> Maybe (Hole, a)

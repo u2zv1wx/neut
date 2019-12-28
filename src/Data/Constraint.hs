@@ -5,8 +5,7 @@ import Data.PreTerm
 type PreConstraint = (PreTermPlus, PreTermPlus)
 
 data Constraint
-  = ConstraintImmediate Hole PreTermPlus
-  | ConstraintPattern Hole [[PreTermPlus]] PreTermPlus
+  = ConstraintPattern Hole [[PreTermPlus]] PreTermPlus
   | ConstraintQuasiPattern Hole [[PreTermPlus]] PreTermPlus
   | ConstraintFlexRigid Hole [[PreTermPlus]] PreTermPlus
   | ConstraintFlexFlex Hole [[PreTermPlus]] PreTermPlus
@@ -14,7 +13,6 @@ data Constraint
   deriving (Show)
 
 constraintToInt :: Constraint -> Int
-constraintToInt ConstraintImmediate {} = 0
 constraintToInt ConstraintPattern {} = 1
 constraintToInt ConstraintQuasiPattern {} = 2
 constraintToInt ConstraintFlexRigid {} = 3

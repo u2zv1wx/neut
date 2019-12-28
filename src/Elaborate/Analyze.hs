@@ -181,7 +181,6 @@ simpStuckStrict h1 ies1 e1 e2 cs
            Enriched (e1, e2) [h1] (ConstraintQuasiPattern h1 ies1 e2) : cs'
   | otherwise = simpOther e1 e2 cs
 
---  , all (`elem` xs) (varPreTermPlus e2)
 simpFlexRigid ::
      Hole
   -> [[PreTermPlus]]
