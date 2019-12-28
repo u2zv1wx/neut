@@ -66,14 +66,22 @@ infer ctx (m, WeakTermPiIntro xts e) = do
 infer ctx (m, WeakTermPiElim e es) = do
   e' <- infer ctx e
   -- -- xts == [(x1, e1, t1), ..., (xn, en, tn)] with xi : ti and ei : ti
-  (xs, es', ts) <- unzip3 <$> inferList ctx es
-  let xts = zip xs ts
-  -- cod = ?M @ (ctx[0], ..., ctx[m], x1, ..., xn)
-  cod <- newHoleInCtx (ctx ++ xts)
-  let tPi = (metaTerminal, PreTermPi xts cod)
+  ys <- mapM (const $ newNameWith "arg") es
+  -- yts = [y1 : ?M1 @ (ctx[0], ..., ctx[n]),
+  --        y2 : ?M2 @ (ctx[0], ..., ctx[n], y1),
+  --        ...,
+  --        ym : ?Mm @ (ctx[0], ..., ctx[n], y1, ..., y{m-1})]
+  yts <- newHoleListInCtx ctx ys
+  es' <- inferList ctx es
+  let ts = map typeOf es'
+  let ts' = map (substPreTermPlus (zip ys es') . snd) yts
+  forM_ (zip ts ts') $ uncurry insConstraintEnv
+  p' $ (zip (map typeOf es') (map snd yts))
+  cod <- newHoleInCtx (ctx ++ yts)
+  let tPi = (metaTerminal, PreTermPi yts cod)
   insConstraintEnv tPi (typeOf e')
-  -- cod' = ?M @ (ctx[0], ..., ctx[m], e1, ..., en)
-  let cod' = substPreTermPlus (zip xs es') cod
+  -- cod' = ?M @ (ctx[0], ..., ctx[n], e1, ..., em)
+  let cod' = substPreTermPlus (zip ys es') cod
   retPreTerm cod' (toLoc m) $ PreTermPiElim e' es'
 infer ctx (m, WeakTermMu (x, t) e) = do
   t' <- inferType ctx t
@@ -87,7 +95,7 @@ infer ctx (m, WeakTermZeta x) = do
     Just t -> retPreTerm (typeOf t) (toLoc m) (snd t)
     Nothing -> do
       h <- newHoleInCtx ctx
-      insTypeEnv x h
+      insTypeEnv x h -- abusing type env
       retPreTerm (typeOf h) (toLoc m) (snd h)
 infer _ (m, WeakTermIntS size i) = do
   let t = (metaTerminal, PreTermTheta $ "i" ++ show size)
@@ -193,6 +201,12 @@ inferPiIntro ctx ((x, t):xts) cod = do
   (xts', cod') <- inferPiIntro (ctx ++ [(x, t')]) xts cod
   return ((x, t') : xts', cod')
 
+-- In a context (x1 : A1, ..., xn : An), this function creates metavariables
+--   ?M  : Pi (x1 : A1, ..., xn : An). ?Mt @ (x1, ..., xn)
+--   ?Mt : Pi (x1 : A1, ..., xn : An). Univ
+-- and return ?M @ (x1, ..., xn) : ?Mt @ (x1, ..., xn).
+-- Note that we can't just set `?M : Pi (x1 : A1, ..., xn : An). Ui` since
+-- WeakTermZeta might be used as an ordinary term, that is, a term which is not a type.
 newHoleInCtx :: Context -> WithEnv PreTermPlus
 newHoleInCtx ctx = do
   higherHole <- newHoleOfType (metaTerminal, PreTermPi ctx univ)
@@ -200,6 +214,24 @@ newHoleInCtx ctx = do
   let app = (metaTerminal, PreTermPiElim higherHole varSeq)
   hole <- newHoleOfType (metaTerminal, PreTermPi ctx app)
   return (PreMetaNonTerminal app Nothing, PreTermPiElim hole varSeq)
+
+-- In context ctx == [x1, ..., xn], `newHoleListInCtx ctx [y1, ..., ym]` generates
+-- the following list:
+--
+--   [(y1,   ?M1   @ (x1, ..., xn)),
+--    (y2,   ?M2   @ (x1, ..., xn, y1),
+--    ...,
+--    (y{m}, ?M{m} @ (x1, ..., xn, y1, ..., y{m-1}))]
+--
+-- inserting type information `yi : ?Mi @ (x1, ..., xn, y1, ..., y{i-1})
+newHoleListInCtx ::
+     Context -> [Identifier] -> WithEnv [(Identifier, PreTermPlus)]
+newHoleListInCtx _ [] = return []
+newHoleListInCtx ctx (x:rest) = do
+  t <- newHoleInCtx ctx
+  insTypeEnv x t
+  ts <- newHoleListInCtx (ctx ++ [(x, t)]) rest
+  return $ (x, t) : ts
 
 inferCase :: Case -> WithEnv (Maybe PreTermPlus)
 inferCase (CaseValue (EnumValueLabel name)) = do
@@ -211,18 +243,15 @@ inferCase (CaseValue (EnumValueNatNum i _)) =
 inferCase _ = return Nothing
 
 -- inferList ctx [e1, ..., en]
--- ~> [(x1, t1), ..., (xn, tn)] with xi : ti, ei : ti
-inferList ::
-     Context
-  -> [WeakTermPlus]
-  -> WithEnv [(Identifier, PreTermPlus, PreTermPlus)]
+-- ~> [(x1, e1'), ..., (xn, en')] with xi : ti, ei : ti
+inferList :: Context -> [WeakTermPlus] -> WithEnv [PreTermPlus]
 inferList _ [] = return []
 inferList ctx (e:es) = do
   e' <- infer ctx e
   x <- newNameWith "hole-list"
   insTypeEnv x (typeOf e')
-  xets <- inferList (ctx ++ [(x, (typeOf e'))]) es
-  return $ (x, e', typeOf e') : xets
+  xes <- inferList (ctx ++ [(x, (typeOf e'))]) es
+  return $ e' : xes
 
 constrainList :: [PreTermPlus] -> WithEnv ()
 constrainList [] = return ()
