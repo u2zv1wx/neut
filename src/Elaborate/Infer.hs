@@ -65,7 +65,6 @@ infer ctx (m, WeakTermPiIntro xts e) = do
   retPreTerm piType (toLoc m) $ PreTermPiIntro xts' e'
 infer ctx (m, WeakTermPiElim e es) = do
   e' <- infer ctx e
-  insConstraintEnv univ $ typeOf $ typeOf e'
   -- -- xts == [(x1, e1, t1), ..., (xn, en, tn)] with xi : ti and ei : ti
   ys <- mapM (const $ newNameWith "arg") es
   -- yts = [y1 : ?M1 @ (ctx[0], ..., ctx[n]),
@@ -81,7 +80,7 @@ infer ctx (m, WeakTermPiElim e es) = do
   --        ?Mm @ (ctx[0], ..., ctx[n], e1, ..., e{m-1})]
   let ts' = map (substPreTermPlus (zip ys es') . snd) yts
   forM_ (zip ts ts') $ uncurry insConstraintEnv
-  cod <- newHoleInCtx (ctx ++ yts)
+  cod <- newTypeHoleInCtx (ctx ++ yts)
   insConstraintEnv univ $ typeOf cod
   let tPi = (metaTerminal, PreTermPi yts cod)
   insConstraintEnv tPi (typeOf e')
@@ -89,19 +88,25 @@ infer ctx (m, WeakTermPiElim e es) = do
   let cod' = substPreTermPlus (zip ys es') cod
   retPreTerm cod' (toLoc m) $ PreTermPiElim e' es'
 infer ctx (m, WeakTermMu (x, t) e) = do
+  p $ "found mu. x = " ++ show x
   t' <- inferType ctx t
   insTypeEnv x t'
   e' <- infer (ctx ++ [(x, t')]) e
   insConstraintEnv t' (typeOf e')
   retPreTerm t' (toLoc m) $ PreTermMu (x, t') e'
-infer ctx (m, WeakTermZeta x) = do
-  mt <- lookupTypeEnvMaybe x
-  case mt of
-    Just t -> retPreTerm (typeOf t) (toLoc m) (snd t)
-    Nothing -> do
-      h <- newHoleInCtx ctx
-      insTypeEnv x h -- abusing type env
-      retPreTerm (typeOf h) (toLoc m) (snd h)
+infer ctx (_, WeakTermZeta x) = do
+  p $ "infer hole: " ++ x
+  h <- newHoleInCtx ctx
+  return h
+  -- insTypeEnv x h
+  -- retPreTerm (typeOf h) (toLoc m) (snd h)
+  -- mt <- lookupTypeEnvMaybe x
+  -- case mt of
+  --   Just t -> retPreTerm t (toLoc m) $ PreTermZeta x
+  --   Nothing -> do
+  --     h <- newTypeHoleInCtx ctx
+  --     insTypeEnv x h
+  --     retPreTerm h (toLoc m) $ PreTermZeta x
 infer _ (m, WeakTermIntS size i) = do
   let t = (metaTerminal, PreTermTheta $ "i" ++ show size)
   retPreTerm t (toLoc m) $ PreTermIntS size i

@@ -135,7 +135,6 @@ substPreTermPlus sub (m, PreTermTheta t) = do
   (m', PreTermTheta t)
 substPreTermPlus sub (m, PreTermUpsilon x) = do
   let m' = substPreMeta sub m
-  -- このときlookupの結果のmetaとm'とが同一であるって情報を保持する必要があるのでは？
   fromMaybe (m', PreTermUpsilon x) (lookup x sub)
 substPreTermPlus sub (m, PreTermPi xts t) = do
   let m' = substPreMeta sub m

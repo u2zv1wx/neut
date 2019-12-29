@@ -38,6 +38,8 @@ instance Eq EnrichedConstraint where
 instance Ord EnrichedConstraint where
   compare (Enriched _ _ c1) (Enriched _ _ c2) = compare c1 c2
 
+-- s1が新たに追加されるsubstで、s2が既存のsubst
+-- s1 = m ~> eとして、eのなかにs2でsubstされるべきholeが含まれているとする。
 compose :: SubstPreTerm -> SubstPreTerm -> SubstPreTerm
 compose s1 s2 = do
   let domS2 = map fst s2

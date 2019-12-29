@@ -34,11 +34,15 @@ elaborate e = do
   e' <- infer [] e
   -- Kantian type-inference ;)
   p "analyze"
-  cs <- gets constraintEnv
-  p $ "size: " ++ show (length cs)
+  -- cs <- gets constraintEnv
+  -- p $ "size: " ++ show (length cs)
+  -- p "cs:"
+  -- p' cs
   q <- gets constraintEnv >>= analyze
   p "synthesize"
-  p $ "size: " ++ show (Q.size q)
+  -- p $ "size: " ++ show (Q.size q)
+  -- p "q:"
+  -- p' q
   -- p "synth. q:"
   -- p' $ map (\(Enriched pair _ _) -> pair) $ Q.toList q
   synthesize q

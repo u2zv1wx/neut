@@ -13,7 +13,6 @@ import Data.Basic
 import Data.Constraint
 import Data.Env
 import Data.PreTerm
-import Elaborate.Infer (typeOf)
 import Reduce.PreTerm
 
 analyze :: [PreConstraint] -> WithEnv ConstraintQueue
@@ -36,12 +35,11 @@ simp' (((_, PreTermUpsilon x1), (_, PreTermUpsilon x2)):cs)
   | x1 == x2 = simp cs
 simp' (((_, PreTermPi xts1 cod1), (_, PreTermPi xts2 cod2)):cs) = do
   simpPi xts1 cod1 xts2 cod2 cs
-simp' (((_, PreTermPiIntro xts1 e1), (_, PreTermPiIntro xts2 e2)):cs) =
+simp' (((_, PreTermPiIntro xts1 e1), (_, PreTermPiIntro xts2 e2)):cs) = do
   simpPi xts1 e1 xts2 e2 cs
-simp' (((_, PreTermPiIntro xts body1), e2@(_, _)):cs) = do
+simp' (((_, PreTermPiIntro xts body1@(m1, _)), e2@(_, _)):cs) = do
   let vs = map (uncurry toVar) xts
-  let appMeta = (PreMetaNonTerminal (typeOf body1) Nothing)
-  simp $ (body1, (appMeta, PreTermPiElim e2 vs)) : cs
+  simp $ (body1, (m1, PreTermPiElim e2 vs)) : cs
 simp' ((e1, e2@(_, PreTermPiIntro {})):cs) = simp' $ (e2, e1) : cs
 simp' (((_, PreTermMu (x1, t1) e1), (_, PreTermMu (x2, t2) e2)):cs)
   | x1 == x2 = simp $ (t1, t2) : (e1, e2) : cs

@@ -5,6 +5,10 @@ module Elaborate.Synthesize
 import Control.Exception
 import Control.Monad.Except
 import Control.Monad.State
+
+import Data.List
+
+-- import qualified Data.Map.Strict as Map
 import qualified Data.PQueue.Min as Q
 import qualified Text.Show.Pretty as Pr
 
@@ -14,6 +18,7 @@ import Data.Env
 import Data.PreTerm
 import Elaborate.Analyze
 import Elaborate.Infer (metaTerminal, typeOf)
+import Reduce.PreTerm
 
 -- Given a queue of constraints (easier ones comes earlier), try to synthesize
 -- all of them using heuristics.
@@ -30,6 +35,10 @@ synthesize q = do
     Just (Enriched _ _ (ConstraintFlexRigid m ess e)) -> resolvePiElim q m ess e
     Just (Enriched _ _ (ConstraintFlexFlex m ess e)) -> resolvePiElim q m ess e
     Just (Enriched (e1, e2) _ _) -> do
+      senv <- gets substEnv
+      let (ls, es) = unzip senv
+      es' <- mapM reducePreTermPlus es
+      p' $ zip ls es'
       throwError $ "cannot simplify:\n" ++ Pr.ppShow (e1, e2)
 
 resolveStuck ::
@@ -40,6 +49,7 @@ resolveStuck ::
   -> PreTermPlus
   -> WithEnv ()
 resolveStuck q e1 e2 h e = do
+  p $ "resolveStuck for " ++ h
   let fmvs = holePreTermPlus e
   let e1' = substPreTermPlus [(h, e)] e1
   let e2' = substPreTermPlus [(h, e)] e2
@@ -66,28 +76,50 @@ resolvePiElim q m ess e = do
   xss <- toVarList es >>= toAltList
   let xsss = map (takeByCount lengthInfo) xss
   let lamList = map (bindFormalArgs e) xsss
-  chain q $ map (\lam -> resolveHole q [(m, lam)]) lamList
+  chain q $ map (\lam -> resolveHole q m lam) lamList
 
 -- resolveHoleは[(Hole, PreTermPlus)]を受け取るようにしたほうがよさそう。
 -- で、synthesizeのときに複数のhole-substをまとめてこっちに渡す。
-resolveHole :: ConstraintQueue -> [(Hole, PreTermPlus)] -> WithEnv ()
-resolveHole q sub = do
+resolveHole :: ConstraintQueue -> Hole -> PreTermPlus -> WithEnv ()
+resolveHole q m e = do
+  p $ "resolveHole for: " ++ m
   senv <- gets substEnv
-  let b = and $ map (\(h, e) -> h `notElem` holePreTermPlus e) sub
-  assert b $ modify (\env -> env {substEnv = compose sub senv})
-  synthesize $ Q.deleteMin q
+  let e' = substPreTermPlus senv e
+  modify (\env -> env {substEnv = compose [(m, e')] senv})
+  -- やっぱここでpartitionしないとだめ？
+  -- でないと、stuckしたflex-rigidがあるときに、resolveStuckが呼ばれない……？
+  -- というのは、queueにはあくまでconstraintの順番で要素が並んでいるから。それゆえ、
+  -- stuckしたflex-rigidがあるとこれはいつまでたっても解消されず、けっきょく
+  -- 解消されないまま既存のquasi-patternとかで雑に解こうとしてしまうことになる。
+  -- そしてそのせいでつかえる制約を落としてしまうことになって、推論できるものもできなくなる。
+  -- こういうことか？
+  let (q1, q2) = Q.partition (\(Enriched _ ms _) -> m `elem` ms) $ Q.deleteMin q
+  let cs = map (\(Enriched c _ _) -> c) $ Q.toList q1
+  let cs' = map (uncurry (foo m e)) cs
+  q1' <- analyze cs'
+  synthesize $ q1' `Q.union` q2
+  -- synthesize $ Q.deleteMin q
+
+foo m e e1 e2 = do
+  let e1' = substPreTermPlus [(m, e)] e1
+  let e2' = substPreTermPlus [(m, e)] e2
+  (e1', e2')
 
 -- [e, x, y, y, e2, e3, z] ~> [p, x, y, y, q, r, z]  (p, q, r: new variables)
 toVarList :: [PreTermPlus] -> WithEnv [(Identifier, PreTermPlus)]
 toVarList [] = return []
-toVarList (e@(_, PreTermUpsilon x):es) = do
+toVarList ((_, PreTermUpsilon x):es) = do
   xts <- toVarList es
-  let t = typeOf e
+  let t = (metaTerminal, PreTermUpsilon "fake")
   return $ (x, t) : xts
-toVarList (e:es) = do
+  -- let t = typeOf e
+  -- return $ (x, t) : xts
+toVarList (_:es) = do
   xts <- toVarList es
   x <- newNameWith "hole"
-  let t = typeOf e
+  -- let t = typeOf e
+  -- let t = undefined
+  let t = (metaTerminal, PreTermUpsilon "fake")
   insTypeEnv x t
   return $ (x, t) : xts
 
@@ -148,9 +180,10 @@ discardInactive xs indexList =
 -- Try the list of alternatives.
 chain :: ConstraintQueue -> [WithEnv a] -> WithEnv a
 chain _ [] = throwError $ "cannot synthesize(chain)."
-chain _ [e] = e
-chain c (e:es) = catchError e $ (const $ chain c es)
+chain _ (e:_) = e
 
+-- chain _ [e] = e
+-- chain c (e:es) = catchError e $ (const $ chain c es)
 -- chain c (e:es) = e `catchError` (\err -> chain c es)
 lookupAny :: [Hole] -> [(Identifier, a)] -> Maybe (Hole, a)
 lookupAny [] _ = Nothing

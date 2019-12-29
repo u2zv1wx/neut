@@ -43,8 +43,8 @@
 
 ;; lambda: pi-introduction with implicit begin block
 (keyword lambda)
-(notation (lambda (xts+) e)
-  (pi-i (xts+) (begin e)))
+(notation (lambda (xts+) e+)
+  (pi-i (xts+) (begin e+)))
 
 ;; define recursive term at top level without using `mu` explicitly
 (notation (definition name e)
