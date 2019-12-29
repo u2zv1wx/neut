@@ -220,11 +220,11 @@ substPreTermPlusBindingsWithBody sub ((x, t):xts) e = do
   ((x, t') : xts', e')
 
 substPreMeta :: SubstPreTerm -> PreMeta -> PreMeta
-substPreMeta _ m = m
+-- substPreMeta _ m = m
+substPreMeta _ m@(PreMetaTerminal _) = m
+substPreMeta sub (PreMetaNonTerminal t ml) =
+  PreMetaNonTerminal (substPreTermPlus sub t) ml
 
--- substPreMeta _ m@(PreMetaTerminal _) = m
--- substPreMeta sub (PreMetaNonTerminal t ml) =
---   PreMetaNonTerminal (substPreTermPlus sub t) ml
 isReduciblePreTerm :: PreTermPlus -> Bool
 isReduciblePreTerm (_, PreTermTau) = False
 isReduciblePreTerm (_, PreTermTheta _) = False

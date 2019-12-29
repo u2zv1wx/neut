@@ -716,6 +716,8 @@ polarizeTheta m name = do
   mx <- asEnumConstant name
   case mx of
     Just i -> polarize (m, TermIntS 64 i) -- enum.top ~> 1, enum.choice ~> 2, etc.
+    -- muで導入されたthetaに由来するものもここにくる。
+    -- たぶんたんにreturn (DataTheta f)とすればよい。
     Nothing -> throwError $ "polarize.theta: " ++ name
 
 -- {enum.top, enum.choice, etc.} ~> {(the number of contents in enum)}

@@ -29,16 +29,24 @@ synthesize q = do
     Nothing -> return ()
     Just (Enriched (e1, e2) ms _)
       | Just (m, e) <- lookupAny ms sub -> resolveStuck q e1 e2 m e
-    Just (Enriched _ _ (ConstraintPattern m ess e)) -> resolvePiElim q m ess e
-    Just (Enriched _ _ (ConstraintQuasiPattern m ess e)) ->
+    Just (Enriched _ _ (ConstraintPattern m ess e)) -> do
       resolvePiElim q m ess e
-    Just (Enriched _ _ (ConstraintFlexRigid m ess e)) -> resolvePiElim q m ess e
-    Just (Enriched _ _ (ConstraintFlexFlex m ess e)) -> resolvePiElim q m ess e
-    Just (Enriched (e1, e2) _ _) -> do
-      senv <- gets substEnv
-      let (ls, es) = unzip senv
-      es' <- mapM reducePreTermPlus es
-      p' $ zip ls es'
+    -- Just (Enriched _ _ (ConstraintQuasiPattern m ess e)) -> do
+    --   p "resolve-quasi-pattern"
+    --   resolvePiElim q m ess e
+    -- Just (Enriched _ _ (ConstraintFlexRigid m ess e)) -> do
+    --   p "resolve-flex-rigid"
+    --   resolvePiElim q m ess e
+    -- Just (Enriched _ _ (ConstraintFlexFlex m ess e)) -> do
+    --   p "resolve-flex-flex"
+    --   resolvePiElim q m ess e
+    Just (Enriched (e1, e2) _ _)
+      -- senv <- gets substEnv
+      -- let (ls, es) = unzip senv
+      -- es' <- mapM reducePreTermPlus es
+      -- p' $ zip ls es'
+     -> do
+      p' q
       throwError $ "cannot simplify:\n" ++ Pr.ppShow (e1, e2)
 
 resolveStuck ::
@@ -49,7 +57,6 @@ resolveStuck ::
   -> PreTermPlus
   -> WithEnv ()
 resolveStuck q e1 e2 h e = do
-  p $ "resolveStuck for " ++ h
   let fmvs = holePreTermPlus e
   let e1' = substPreTermPlus [(h, e)] e1
   let e2' = substPreTermPlus [(h, e)] e2
@@ -82,17 +89,9 @@ resolvePiElim q m ess e = do
 -- で、synthesizeのときに複数のhole-substをまとめてこっちに渡す。
 resolveHole :: ConstraintQueue -> Hole -> PreTermPlus -> WithEnv ()
 resolveHole q m e = do
-  p $ "resolveHole for: " ++ m
   senv <- gets substEnv
-  let e' = substPreTermPlus senv e
+  e' <- reducePreTermPlus $ substPreTermPlus senv e
   modify (\env -> env {substEnv = compose [(m, e')] senv})
-  -- やっぱここでpartitionしないとだめ？
-  -- でないと、stuckしたflex-rigidがあるときに、resolveStuckが呼ばれない……？
-  -- というのは、queueにはあくまでconstraintの順番で要素が並んでいるから。それゆえ、
-  -- stuckしたflex-rigidがあるとこれはいつまでたっても解消されず、けっきょく
-  -- 解消されないまま既存のquasi-patternとかで雑に解こうとしてしまうことになる。
-  -- そしてそのせいでつかえる制約を落としてしまうことになって、推論できるものもできなくなる。
-  -- こういうことか？
   let (q1, q2) = Q.partition (\(Enriched _ ms _) -> m `elem` ms) $ Q.deleteMin q
   let cs = map (\(Enriched c _ _) -> c) $ Q.toList q1
   let cs' = map (uncurry (foo m e)) cs
@@ -100,6 +99,7 @@ resolveHole q m e = do
   synthesize $ q1' `Q.union` q2
   -- synthesize $ Q.deleteMin q
 
+foo :: Identifier -> PreTermPlus -> PreTermPlus -> PreTermPlus -> PreConstraint
 foo m e e1 e2 = do
   let e1' = substPreTermPlus [(m, e)] e1
   let e2' = substPreTermPlus [(m, e)] e2
@@ -108,18 +108,14 @@ foo m e e1 e2 = do
 -- [e, x, y, y, e2, e3, z] ~> [p, x, y, y, q, r, z]  (p, q, r: new variables)
 toVarList :: [PreTermPlus] -> WithEnv [(Identifier, PreTermPlus)]
 toVarList [] = return []
-toVarList ((_, PreTermUpsilon x):es) = do
+toVarList (e@(_, PreTermUpsilon x):es) = do
   xts <- toVarList es
-  let t = (metaTerminal, PreTermUpsilon "fake")
+  let t = typeOf e
   return $ (x, t) : xts
-  -- let t = typeOf e
-  -- return $ (x, t) : xts
-toVarList (_:es) = do
+toVarList (e:es) = do
   xts <- toVarList es
   x <- newNameWith "hole"
-  -- let t = typeOf e
-  -- let t = undefined
-  let t = (metaTerminal, PreTermUpsilon "fake")
+  let t = typeOf e
   insTypeEnv x t
   return $ (x, t) : xts
 

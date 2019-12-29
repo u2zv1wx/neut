@@ -118,7 +118,6 @@ interpret (m, TreeAtom x)
     withMeta m $ WeakTermArrayIntro (ArrayKindIntU 8) (zip ns u8s)
 interpret (m, TreeAtom "_") = do
   h <- newNameWith "hole-aux"
-  p $ "found hole: " ++ show h
   withMeta m $ WeakTermZeta h
 interpret t@(m, TreeAtom x) = do
   ml <- interpretEnumValueMaybe t

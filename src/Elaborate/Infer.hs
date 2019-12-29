@@ -14,6 +14,7 @@ import Data.Basic
 import Data.Env
 import Data.PreTerm
 import Data.WeakTerm
+import Reduce.PreTerm
 
 type Context = [(Identifier, PreTermPlus)]
 
@@ -65,14 +66,24 @@ infer ctx (m, WeakTermPiIntro xts e) = do
   retPreTerm piType (toLoc m) $ PreTermPiIntro xts' e'
 infer ctx (m, WeakTermPiElim e es) = do
   e' <- infer ctx e
-  -- -- xts == [(x1, e1, t1), ..., (xn, en, tn)] with xi : ti and ei : ti
+  es' <- mapM (infer ctx) es
+  -- t' <- reducePreTermPlus $ typeOf e'
+  -- この場合分けをしても別に解けるものが増えるわけではないらしい
+  -- case t' of
+  --   (_, PreTermPi xts cod) -> do
+  --     let (xs, ts) = unzip xts
+  --     p "shortcut"
+  --     let ts' = map (substPreTermPlus (zip xs es')) ts
+  --     forM_ (zip ts' (map typeOf es')) $ uncurry insConstraintEnv
+  --     let cod' = substPreTermPlus (zip xs es') cod
+  --     retPreTerm cod' (toLoc m) $ PreTermPiElim e' es'
+  --   _ -> do
   ys <- mapM (const $ newNameWith "arg") es
   -- yts = [y1 : ?M1 @ (ctx[0], ..., ctx[n]),
   --        y2 : ?M2 @ (ctx[0], ..., ctx[n], y1),
   --        ...,
   --        ym : ?Mm @ (ctx[0], ..., ctx[n], y1, ..., y{m-1})]
   yts <- newTypeHoleListInCtx ctx ys
-  es' <- mapM (infer ctx) es
   let ts = map typeOf es'
   -- ts' = [?M1 @ (ctx[0], ..., ctx[n]),
   --        ?M2 @ (ctx[0], ..., ctx[n], e1),
@@ -84,18 +95,16 @@ infer ctx (m, WeakTermPiElim e es) = do
   insConstraintEnv univ $ typeOf cod
   let tPi = (metaTerminal, PreTermPi yts cod)
   insConstraintEnv tPi (typeOf e')
-  -- cod' = ?M @ (ctx[0], ..., ctx[n], e1, ..., em)
+   -- cod' = ?M @ (ctx[0], ..., ctx[n], e1, ..., em)
   let cod' = substPreTermPlus (zip ys es') cod
   retPreTerm cod' (toLoc m) $ PreTermPiElim e' es'
 infer ctx (m, WeakTermMu (x, t) e) = do
-  p $ "found mu. x = " ++ show x
   t' <- inferType ctx t
   insTypeEnv x t'
   e' <- infer (ctx ++ [(x, t')]) e
   insConstraintEnv t' (typeOf e')
   retPreTerm t' (toLoc m) $ PreTermMu (x, t') e'
-infer ctx (_, WeakTermZeta x) = do
-  p $ "infer hole: " ++ x
+infer ctx (_, WeakTermZeta _) = do
   h <- newHoleInCtx ctx
   return h
   -- insTypeEnv x h

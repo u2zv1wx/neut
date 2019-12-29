@@ -33,14 +33,15 @@ elaborate e = do
   p "infer"
   e' <- infer [] e
   -- Kantian type-inference ;)
+  -- p' e
   p "analyze"
-  -- cs <- gets constraintEnv
-  -- p $ "size: " ++ show (length cs)
+  cs <- gets constraintEnv
+  p $ "size: " ++ show (length cs)
   -- p "cs:"
   -- p' cs
   q <- gets constraintEnv >>= analyze
   p "synthesize"
-  -- p $ "size: " ++ show (Q.size q)
+  p $ "size: " ++ show (Q.size q)
   -- p "q:"
   -- p' q
   -- p "synth. q:"
@@ -60,6 +61,7 @@ elaborate e = do
   let e'' = substPreTermPlus sub e'
   e''' <- elaborate' e''
   caseCheck e'''
+  p' e'''
   return e'''
   -- caseCheck e' >>= elaborate'
 
