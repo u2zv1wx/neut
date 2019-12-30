@@ -32,7 +32,12 @@ data EnrichedConstraint =
     PreConstraint
     [Hole] -- list of metavariables that cause stuck
     Constraint
-  deriving (Show)
+  -- deriving (Show)
+
+instance Show EnrichedConstraint where
+  show (Enriched p _ ConstraintAnalyzable) = show p
+  show (Enriched p _ ConstraintOther) = show p
+  show (Enriched _ _ c) = show c
 
 instance Eq EnrichedConstraint where
   (Enriched _ _ c1) == (Enriched _ _ c2) = c1 == c2

@@ -49,10 +49,6 @@ synthesize q = do
       -- p' $ lookup "hole-with-type-118" sub
       throwError $ "cannot simplify:\n" ++ Pr.ppShow (e1, e2)
 
--- recovery :: PreConstraint -> ConstraintQueue -> WithEnv ()
--- recovery (e1, e2) q = do
---   case Q.getMin q of
---     Nothing -> throwError $ "cannot simplify:\n" ++ Pr.ppShow (e1, e2)
 resolveStuck ::
      ConstraintQueue
   -> PreTermPlus
@@ -101,22 +97,10 @@ resolveHole q m e = do
   let (q1, q2) = Q.partition (\(Enriched _ ms _) -> m `elem` ms) $ Q.deleteMin q
   let q1' = Q.mapU asAnalyzable q1
   synthesize $ q1' `Q.union` q2
-  -- synthesize $ Q.deleteMin q
-  -- let (q1, q2) = Q.partition (\(Enriched _ ms _) -> m `elem` ms) $ Q.deleteMin q
-  -- let cs = map (\(Enriched c _ _) -> c) $ Q.toList q1
-  -- let cs' = map (uncurry (foo m e)) cs
-  -- q1' <- analyze cs'
-  -- synthesize $ q1' `Q.union` q2
-  -- synthesize $ Q.deleteMin q
 
 asAnalyzable :: EnrichedConstraint -> EnrichedConstraint
 asAnalyzable (Enriched cs ms _) = Enriched cs ms ConstraintAnalyzable
 
--- foo :: Identifier -> PreTermPlus -> PreTermPlus -> PreTermPlus -> PreConstraint
--- foo m e e1 e2 = do
---   let e1' = substPreTermPlus [(m, e)] e1
---   let e2' = substPreTermPlus [(m, e)] e2
---   (e1', e2')
 -- [e, x, y, y, e2, e3, z] ~> [p, x, y, y, q, r, z]  (p, q, r: new variables)
 toVarList :: [PreTermPlus] -> WithEnv [(Identifier, PreTermPlus)]
 toVarList [] = return []

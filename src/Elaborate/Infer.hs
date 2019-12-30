@@ -67,37 +67,37 @@ infer ctx (m, WeakTermPiIntro xts e) = do
 infer ctx (m, WeakTermPiElim e es) = do
   e' <- infer ctx e
   es' <- mapM (infer ctx) es
-  -- t' <- reducePreTermPlus $ typeOf e'
+  t' <- reducePreTermPlus $ typeOf e'
   -- この場合分けをしても別に解けるものが増えるわけではないらしい
-  -- case t' of
-  --   (_, PreTermPi xts cod) -> do
-  --     let (xs, ts) = unzip xts
-  --     p "shortcut"
-  --     let ts' = map (substPreTermPlus (zip xs es')) ts
-  --     forM_ (zip ts' (map typeOf es')) $ uncurry insConstraintEnv
-  --     let cod' = substPreTermPlus (zip xs es') cod
-  --     retPreTerm cod' (toLoc m) $ PreTermPiElim e' es'
-  --   _ -> do
-  ys <- mapM (const $ newNameWith "arg") es
-  -- yts = [y1 : ?M1 @ (ctx[0], ..., ctx[n]),
-  --        y2 : ?M2 @ (ctx[0], ..., ctx[n], y1),
-  --        ...,
-  --        ym : ?Mm @ (ctx[0], ..., ctx[n], y1, ..., y{m-1})]
-  yts <- newTypeHoleListInCtx ctx ys
-  let ts = map typeOf es'
-  -- ts' = [?M1 @ (ctx[0], ..., ctx[n]),
-  --        ?M2 @ (ctx[0], ..., ctx[n], e1),
-  --        ...,
-  --        ?Mm @ (ctx[0], ..., ctx[n], e1, ..., e{m-1})]
-  let ts' = map (substPreTermPlus (zip ys es') . snd) yts
-  forM_ (zip ts ts') $ uncurry insConstraintEnv
-  cod <- newTypeHoleInCtx (ctx ++ yts)
-  insConstraintEnv univ $ typeOf cod
-  let tPi = (metaTerminal, PreTermPi yts cod)
-  insConstraintEnv tPi (typeOf e')
-   -- cod' = ?M @ (ctx[0], ..., ctx[n], e1, ..., em)
-  let cod' = substPreTermPlus (zip ys es') cod
-  retPreTerm cod' (toLoc m) $ PreTermPiElim e' es'
+  case t' of
+    (_, PreTermPi xts cod) -> do
+      let (xs, ts) = unzip xts
+      p "shortcut"
+      let ts' = map (substPreTermPlus (zip xs es')) ts
+      forM_ (zip ts' (map typeOf es')) $ uncurry insConstraintEnv
+      let cod' = substPreTermPlus (zip xs es') cod
+      retPreTerm cod' (toLoc m) $ PreTermPiElim e' es'
+    _ -> do
+      ys <- mapM (const $ newNameWith "arg") es
+      -- yts = [y1 : ?M1 @ (ctx[0], ..., ctx[n]),
+      --        y2 : ?M2 @ (ctx[0], ..., ctx[n], y1),
+      --        ...,
+      --        ym : ?Mm @ (ctx[0], ..., ctx[n], y1, ..., y{m-1})]
+      yts <- newTypeHoleListInCtx ctx ys
+      let ts = map typeOf es'
+      -- ts' = [?M1 @ (ctx[0], ..., ctx[n]),
+      --        ?M2 @ (ctx[0], ..., ctx[n], e1),
+      --        ...,
+      --        ?Mm @ (ctx[0], ..., ctx[n], e1, ..., e{m-1})]
+      let ts' = map (substPreTermPlus (zip ys es') . snd) yts
+      forM_ (zip ts ts') $ uncurry insConstraintEnv
+      cod <- newTypeHoleInCtx (ctx ++ yts)
+      insConstraintEnv univ $ typeOf cod
+      let tPi = (metaTerminal, PreTermPi yts cod)
+      insConstraintEnv tPi (typeOf e')
+       -- cod' = ?M @ (ctx[0], ..., ctx[n], e1, ..., em)
+      let cod' = substPreTermPlus (zip ys es') cod
+      retPreTerm cod' (toLoc m) $ PreTermPiElim e' es'
 infer ctx (m, WeakTermMu (x, t) e) = do
   t' <- inferType ctx t
   insTypeEnv x t'

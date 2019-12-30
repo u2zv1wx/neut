@@ -32,7 +32,7 @@ elaborate :: WeakTermPlus -> WithEnv TermPlus
 elaborate e = do
   p "infer"
   e' <- infer [] e
-  -- p' e'
+  p' e'
   -- Kantian type-inference ;)
   -- p' e
   p "analyze"

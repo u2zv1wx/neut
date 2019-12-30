@@ -98,10 +98,9 @@ simp' ((e1, e2):cs) = do
   let ms2 = asStuckedTerm e2
   let hs = map stuckReasonOf $ catMaybes [ms1, ms2]
   sub <- gets substEnv
+  -- let fmvs = (concatMap holePreTermPlus [e1, e2])
   if any (`elem` map fst sub) hs
     then do
-      p "found analyzable. hs:"
-      p' hs
       cs' <- simp' cs
       let c = Enriched (e1, e2) hs $ ConstraintAnalyzable
       return $ c : cs'
@@ -133,6 +132,10 @@ simp' ((e1, e2):cs) = do
         --   | onesided h2 e1
         --   , xs <- concatMap getVarList ies2
         --   , subsume e1 xs -> simpFlexFlex h1 h2 ies1 ies2 e1 e2 cs
+        -- (Just (StuckPiElimStrict h1 _), _) -> simpOther e1 e2 fmvs cs
+        -- (_, Just (StuckPiElimStrict h2 _)) -> simpOther e1 e2 fmvs cs
+        -- (Just (StuckPiElim h1 _), Nothing) -> simpOther e1 e2 fmvs cs
+        -- (Nothing, Just (StuckPiElim h2 _)) -> simpOther e1 e2 fmvs cs
         (Just (StuckPiElimStrict h1 _), _) -> simpOther e1 e2 [h1] cs
         (_, Just (StuckPiElimStrict h2 _)) -> simpOther e1 e2 [h2] cs
         (Just (StuckPiElim h1 _), Nothing) -> simpOther e1 e2 [h1] cs
@@ -278,6 +281,7 @@ onesided :: Identifier -> PreTermPlus -> Bool
 onesided h e = h `notElem` holePreTermPlus e
 
 subsume :: PreTermPlus -> [Identifier] -> Bool
+-- subsume _ _ = True
 subsume e xs = all (`elem` xs) $ varPreTermPlus e
 
 isDisjoint :: [Identifier] -> Bool
