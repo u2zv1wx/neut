@@ -10,6 +10,7 @@ data Constraint
   -- | ConstraintQuasiPattern Hole [[PreTermPlus]] PreTermPlus
   -- | ConstraintFlexRigid Hole [[PreTermPlus]] PreTermPlus
   -- | ConstraintFlexFlex Hole [[PreTermPlus]] PreTermPlus
+  | ConstraintDelta
   | ConstraintOther
   deriving (Show)
 
@@ -19,6 +20,7 @@ constraintToInt ConstraintPattern {} = 1
 -- constraintToInt ConstraintQuasiPattern {} = 2
 -- constraintToInt ConstraintFlexRigid {} = 3
 -- constraintToInt ConstraintFlexFlex {} = 4
+constraintToInt ConstraintDelta = 4
 constraintToInt ConstraintOther = 5
 
 instance Eq Constraint where
@@ -32,13 +34,12 @@ data EnrichedConstraint =
     PreConstraint
     [Hole] -- list of metavariables that cause stuck
     Constraint
-  -- deriving (Show)
+  deriving (Show)
 
-instance Show EnrichedConstraint where
-  show (Enriched p _ ConstraintAnalyzable) = show p
-  show (Enriched p _ ConstraintOther) = show p
-  show (Enriched _ _ c) = show c
-
+-- instance Show EnrichedConstraint where
+--   show (Enriched p _ ConstraintAnalyzable) = show p
+--   show (Enriched p _ ConstraintOther) = show p
+--   show (Enriched p _ _) = show p
 instance Eq EnrichedConstraint where
   (Enriched _ _ c1) == (Enriched _ _ c2) = c1 == c2
 

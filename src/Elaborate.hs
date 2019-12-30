@@ -32,7 +32,7 @@ elaborate :: WeakTermPlus -> WithEnv TermPlus
 elaborate e = do
   p "infer"
   e' <- infer [] e
-  p' e'
+  -- p' e'
   -- Kantian type-inference ;)
   -- p' e
   p "analyze"
@@ -62,6 +62,7 @@ elaborate e = do
   -- liftIO $ putStrLn $ Pr.ppShow e
   let e'' = substPreTermPlus sub e'
   e''' <- elaborate' e''
+  p "elaborated"
   caseCheck e'''
   p' e'''
   return e'''

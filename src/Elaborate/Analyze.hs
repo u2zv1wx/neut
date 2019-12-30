@@ -96,7 +96,15 @@ simp' (((_, PreTermArrayIntro k1 les1), (_, PreTermArrayIntro k2 les2)):cs)
 simp' ((e1, e2):cs) = do
   let ms1 = asStuckedTerm e1
   let ms2 = asStuckedTerm e2
-  let hs = map stuckReasonOf $ catMaybes [ms1, ms2]
+  -- let h1 = ms1 >>= stuckReasonOf
+  -- let h2 = ms2 >>= stuckReasonOf
+  let hs = catMaybes [ms1 >>= stuckReasonOf, ms2 >>= stuckReasonOf]
+  -- let hs' = map stuckReasonOf' $ catMaybes [ms1, ms2]
+  -- let hs' = hs
+  let ds = catMaybes [ms1 >>= stuckReasonOf', ms2 >>= stuckReasonOf']
+  -- let ds = catmap stuckReasonOf' $ catMaybes [ms1, ms2]
+  -- let hs = catMaybes $ mapM (stuckReasonOf) [ms1, ms2]
+  -- let hs = map stuckReasonOf $ catMaybes [ms1, ms2]
   sub <- gets substEnv
   -- let fmvs = (concatMap holePreTermPlus [e1, e2])
   if any (`elem` map fst sub) hs
@@ -104,18 +112,25 @@ simp' ((e1, e2):cs) = do
       cs' <- simp' cs
       let c = Enriched (e1, e2) hs $ ConstraintAnalyzable
       return $ c : cs'
-    else do
-      case (ms1, ms2) of
-        (Just (StuckPiElimStrict h1 ies1), _)
-          | onesided h1 e2
-          , xs <- concatMap getVarList ies1
-          , subsume e2 xs
-          , isDisjoint xs -> simpStuckStrict h1 ies1 e1 e2 cs
-        (_, Just (StuckPiElimStrict h2 ies2))
-          | onesided h2 e1
-          , xs <- concatMap getVarList ies2
-          , subsume e1 xs
-          , isDisjoint xs -> simpStuckStrict h2 ies2 e2 e1 cs
+    else if any (`elem` map fst sub) ds
+           then do
+             p "found delta. ds:"
+             p' ds
+             cs' <- simp' cs
+             let c = Enriched (e1, e2) ds $ ConstraintDelta
+             return $ c : cs'
+           else do
+             case (ms1, ms2) of
+               (Just (StuckPiElimStrict h1 ies1), _)
+                 | onesided h1 e2
+                 , xs <- concatMap getVarList ies1
+                 , subsume e2 xs
+                 , isDisjoint xs -> simpStuckStrict h1 ies1 e1 e2 cs
+               (_, Just (StuckPiElimStrict h2 ies2))
+                 | onesided h2 e1
+                 , xs <- concatMap getVarList ies2
+                 , subsume e1 xs
+                 , isDisjoint xs -> simpStuckStrict h2 ies2 e2 e1 cs
         -- (Just (StuckPiElim h1 ies1), Nothing)
         --   | onesided h1 e2
         --   , xs <- concatMap getVarList ies1
@@ -132,18 +147,19 @@ simp' ((e1, e2):cs) = do
         --   | onesided h2 e1
         --   , xs <- concatMap getVarList ies2
         --   , subsume e1 xs -> simpFlexFlex h1 h2 ies1 ies2 e1 e2 cs
-        -- (Just (StuckPiElimStrict h1 _), _) -> simpOther e1 e2 fmvs cs
-        -- (_, Just (StuckPiElimStrict h2 _)) -> simpOther e1 e2 fmvs cs
-        -- (Just (StuckPiElim h1 _), Nothing) -> simpOther e1 e2 fmvs cs
-        -- (Nothing, Just (StuckPiElim h2 _)) -> simpOther e1 e2 fmvs cs
-        (Just (StuckPiElimStrict h1 _), _) -> simpOther e1 e2 [h1] cs
-        (_, Just (StuckPiElimStrict h2 _)) -> simpOther e1 e2 [h2] cs
-        (Just (StuckPiElim h1 _), Nothing) -> simpOther e1 e2 [h1] cs
-        (Nothing, Just (StuckPiElim h2 _)) -> simpOther e1 e2 [h2] cs
-        (Just (StuckPiElim h1 _), Just (StuckPiElim h2 _)) ->
-          simpOther e1 e2 [h1, h2] cs
-        (Nothing, Nothing) ->
-          simpOther e1 e2 (concatMap holePreTermPlus [e1, e2]) cs
+               _ -> simpOther e1 e2 (hs ++ ds) cs
+        -- (Just (StuckPiElimStrict h1 _), _) -> simpOther e1 e2 hs cs
+        -- (_, Just (StuckPiElimStrict h2 _)) -> simpOther e1 e2 hs cs
+        -- (Just (StuckPiElim h1 _), Nothing) -> simpOther e1 e2 hs cs
+        -- (Nothing, Just (StuckPiElim h2 _)) -> simpOther e1 e2 hs cs
+        -- (Just (StuckPiElimStrict h1 _), _) -> simpOther e1 e2 [h1] cs -- このへんhsでよくね？
+        -- (_, Just (StuckPiElimStrict h2 _)) -> simpOther e1 e2 [h2] cs
+        -- (Just (StuckPiElim h1 _), Nothing) -> simpOther e1 e2 [h1] cs
+        -- (Nothing, Just (StuckPiElim h2 _)) -> simpOther e1 e2 [h2] cs
+        -- (Just (StuckPiElim h1 _), Just (StuckPiElim h2 _)) ->
+        --   simpOther e1 e2 [h1, h2] cs
+        -- (Nothing, Nothing) ->
+        --   simpOther e1 e2 (concatMap holePreTermPlus [e1, e2]) cs
 
 simpReduce ::
      PreTermPlus
@@ -252,30 +268,41 @@ simpOther e1 e2 fmvs cs = do
 data Stuck
   = StuckPiElim Hole [[PreTermPlus]]
   | StuckPiElimStrict Hole [[PreTermPlus]]
+  | DeltaPiElim Identifier [[PreTermPlus]]
 
 asStuckedTerm :: PreTermPlus -> Maybe Stuck
 asStuckedTerm (_, PreTermPiElim (_, PreTermZeta h) es)
   | Just _ <- mapM asUpsilon es = Just $ StuckPiElimStrict h [es]
 asStuckedTerm (_, PreTermPiElim (_, PreTermZeta h) es) =
   Just $ StuckPiElim h [es]
+asStuckedTerm (_, PreTermPiElim (_, PreTermUpsilon x) es) =
+  Just $ DeltaPiElim x [es]
 asStuckedTerm (_, PreTermPiElim e es)
   | Just _ <- mapM asUpsilon es =
     case asStuckedTerm e of
       Just (StuckPiElim h iess) -> Just $ StuckPiElim h (iess ++ [es])
       Just (StuckPiElimStrict h iexss) ->
         Just $ StuckPiElimStrict h $ iexss ++ [es]
+      Just (DeltaPiElim x ess) -> Just $ DeltaPiElim x $ ess ++ [es]
       Nothing -> Nothing
 asStuckedTerm (_, PreTermPiElim e es) =
   case asStuckedTerm e of
     Just (StuckPiElim h iess) -> Just $ StuckPiElim h $ iess ++ [es]
     Just (StuckPiElimStrict h iess) -> do
       Just $ StuckPiElim h $ iess ++ [es]
+    Just (DeltaPiElim x ess) -> Just $ DeltaPiElim x $ ess ++ [es]
     Nothing -> Nothing
 asStuckedTerm _ = Nothing
 
-stuckReasonOf :: Stuck -> Hole
-stuckReasonOf (StuckPiElim h _) = h
-stuckReasonOf (StuckPiElimStrict h _) = h
+stuckReasonOf :: Stuck -> Maybe Hole
+stuckReasonOf (StuckPiElim h _) = Just h
+stuckReasonOf (StuckPiElimStrict h _) = Just h
+stuckReasonOf (DeltaPiElim _ _) = Nothing
+
+stuckReasonOf' :: Stuck -> Maybe Hole
+stuckReasonOf' (StuckPiElim _ _) = Nothing
+stuckReasonOf' (StuckPiElimStrict _ _) = Nothing
+stuckReasonOf' (DeltaPiElim x _) = Just x
 
 onesided :: Identifier -> PreTermPlus -> Bool
 onesided h e = h `notElem` holePreTermPlus e

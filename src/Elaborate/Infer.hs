@@ -64,40 +64,34 @@ infer ctx (m, WeakTermPiIntro xts e) = do
   (xts', e') <- inferPiIntro ctx xts e
   let piType = (metaTerminal, PreTermPi xts' (typeOf e'))
   retPreTerm piType (toLoc m) $ PreTermPiIntro xts' e'
+infer ctx (m, WeakTermPiElim e@(_, WeakTermPiIntro xts _) es)
+  | length xts == length es
+    -- Consider the following code:
+    --   (definition itself ((S tau)) S)
+    --   (definition id ((A tau) (x A)) x)
+    --   (ascription id
+    --     (pi
+    --       ((A tau)
+    --        (x A))
+    --       (itself A)))
+    -- In the example code above, the type of `id` is inferred to be
+    --   Pi (A : Tau, x : A). A,
+    -- whereas the type ascription provided by the last term is
+    --   Pi (A : Tau, x : A). itself @ (A).
+    -- Without the information provided by `defList`, one of the resulting constraint
+    -- `A == itself @ (A)` cannot be resolved since we don't know how to unfold the
+    -- definition of `itself`. This case-split of PiElim is exactly for this purpose.
+   = do
+    e' <- infer ctx e
+    es' <- mapM (infer ctx) es
+    senv <- gets substEnv
+    let defList = zip (map fst xts) es'
+    modify (\env -> env {substEnv = defList ++ senv})
+    inferPiElim ctx m e' es'
 infer ctx (m, WeakTermPiElim e es) = do
   e' <- infer ctx e
   es' <- mapM (infer ctx) es
-  t' <- reducePreTermPlus $ typeOf e'
-  -- この場合分けをしても別に解けるものが増えるわけではないらしい
-  case t' of
-    (_, PreTermPi xts cod) -> do
-      let (xs, ts) = unzip xts
-      p "shortcut"
-      let ts' = map (substPreTermPlus (zip xs es')) ts
-      forM_ (zip ts' (map typeOf es')) $ uncurry insConstraintEnv
-      let cod' = substPreTermPlus (zip xs es') cod
-      retPreTerm cod' (toLoc m) $ PreTermPiElim e' es'
-    _ -> do
-      ys <- mapM (const $ newNameWith "arg") es
-      -- yts = [y1 : ?M1 @ (ctx[0], ..., ctx[n]),
-      --        y2 : ?M2 @ (ctx[0], ..., ctx[n], y1),
-      --        ...,
-      --        ym : ?Mm @ (ctx[0], ..., ctx[n], y1, ..., y{m-1})]
-      yts <- newTypeHoleListInCtx ctx ys
-      let ts = map typeOf es'
-      -- ts' = [?M1 @ (ctx[0], ..., ctx[n]),
-      --        ?M2 @ (ctx[0], ..., ctx[n], e1),
-      --        ...,
-      --        ?Mm @ (ctx[0], ..., ctx[n], e1, ..., e{m-1})]
-      let ts' = map (substPreTermPlus (zip ys es') . snd) yts
-      forM_ (zip ts ts') $ uncurry insConstraintEnv
-      cod <- newTypeHoleInCtx (ctx ++ yts)
-      insConstraintEnv univ $ typeOf cod
-      let tPi = (metaTerminal, PreTermPi yts cod)
-      insConstraintEnv tPi (typeOf e')
-       -- cod' = ?M @ (ctx[0], ..., ctx[n], e1, ..., em)
-      let cod' = substPreTermPlus (zip ys es') cod
-      retPreTerm cod' (toLoc m) $ PreTermPiElim e' es'
+  inferPiElim ctx m e' es'
 infer ctx (m, WeakTermMu (x, t) e) = do
   t' <- inferType ctx t
   insTypeEnv x t'
@@ -219,6 +213,41 @@ inferPiIntro ctx ((x, t):xts) e = do
   insTypeEnv x t'
   (xts', e') <- inferPiIntro (ctx ++ [(x, t')]) xts e
   return ((x, t') : xts', e')
+
+inferPiElim ::
+     Context -> WeakMeta -> PreTermPlus -> [PreTermPlus] -> WithEnv PreTermPlus
+inferPiElim ctx m e es = do
+  t' <- reducePreTermPlus $ typeOf e
+  -- -- この場合分けをしても別に解けるものが増えるわけではないらしい
+  -- case t' of
+  --   (_, PreTermPi xts cod) -> do
+  --     let (xs, ts) = unzip xts
+  --     p "shortcut"
+  --     let ts' = map (substPreTermPlus (zip xs es)) ts
+  --     forM_ (zip ts' (map typeOf es)) $ uncurry insConstraintEnv
+  --     let cod' = substPreTermPlus (zip xs es) cod
+  --     retPreTerm cod' (toLoc m) $ PreTermPiElim e es
+  --   _ -> do
+  ys <- mapM (const $ newNameWith "arg") es
+  -- yts = [y1 : ?M1 @ (ctx[0], ..., ctx[n]),
+  --        y2 : ?M2 @ (ctx[0], ..., ctx[n], y1),
+  --        ...,
+  --        ym : ?Mm @ (ctx[0], ..., ctx[n], y1, ..., y{m-1})]
+  yts <- newTypeHoleListInCtx ctx ys
+  let ts = map typeOf es
+  -- ts' = [?M1 @ (ctx[0], ..., ctx[n]),
+  --        ?M2 @ (ctx[0], ..., ctx[n], e1),
+  --        ...,
+  --        ?Mm @ (ctx[0], ..., ctx[n], e1, ..., e{m-1})]
+  let ts' = map (substPreTermPlus (zip ys es) . snd) yts
+  forM_ (zip ts ts') $ uncurry insConstraintEnv
+  cod <- newTypeHoleInCtx (ctx ++ yts)
+  insConstraintEnv univ $ typeOf cod
+  let tPi = (metaTerminal, PreTermPi yts cod)
+  insConstraintEnv tPi (typeOf e)
+   -- cod' = ?M @ (ctx[0], ..., ctx[n], e1, ..., em)
+  let cod' = substPreTermPlus (zip ys es) cod
+  retPreTerm cod' (toLoc m) $ PreTermPiElim e es
 
 -- In a context (x1 : A1, ..., xn : An), this function creates metavariables
 --   ?M  : Pi (x1 : A1, ..., xn : An). ?Mt @ (x1, ..., xn)
