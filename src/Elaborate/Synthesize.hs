@@ -40,18 +40,13 @@ synthesize q = do
     -- Just (Enriched _ _ (ConstraintFlexFlex m ess e)) -> do
     --   p "resolve-flex-flex"
     --   resolvePiElim q m ess e
-    Just (Enriched (e1, e2) ms ConstraintOther) -> do
-      let c = Enriched (e1, e2) ms ConstraintSuspended
-      p "suspending"
-      -- このときには、Qの別の要素がsynthできるかを探すべき。
-      -- でないと、Qの最初の要素がlookupできないってだけで全体が失敗することになってしまう。
-      -- なので、suspendedとしてキューの末尾に要素を移動する。
-      -- suspendedがresolveでpatternに落ちる可能性があるってことを考えると、quasiとかで解くのは控えたほうがむしろよいのかも？
-      -- quasiで解いてpatternが壊れたら元も子もないし。
-      synthesize $ Q.insert c $ Q.deleteMin q
-    Just (Enriched (e1, e2) _ _) -> do
+    Just (Enriched (e1, e2) ms _) -> do
       p' $ sort $ map fst sub
       p' q
+      p "ms:"
+      p' ms
+      -- p "hole-with-type-118"
+      -- p' $ lookup "hole-with-type-118" sub
       throwError $ "cannot simplify:\n" ++ Pr.ppShow (e1, e2)
 
 -- recovery :: PreConstraint -> ConstraintQueue -> WithEnv ()
@@ -66,6 +61,7 @@ resolveStuck ::
   -> PreTermPlus
   -> WithEnv ()
 resolveStuck q e1 e2 h e = do
+  p $ "resolveStuck for " ++ h
   let fmvs = holePreTermPlus e
   let e1' = substPreTermPlus [(h, e)] e1
   let e2' = substPreTermPlus [(h, e)] e2
@@ -103,18 +99,24 @@ resolveHole q m e = do
   e' <- reducePreTermPlus $ substPreTermPlus senv e
   modify (\env -> env {substEnv = compose [(m, e')] senv})
   let (q1, q2) = Q.partition (\(Enriched _ ms _) -> m `elem` ms) $ Q.deleteMin q
-  let cs = map (\(Enriched c _ _) -> c) $ Q.toList q1
-  let cs' = map (uncurry (foo m e)) cs
-  q1' <- analyze cs'
+  let q1' = Q.mapU asAnalyzable q1
   synthesize $ q1' `Q.union` q2
   -- synthesize $ Q.deleteMin q
+  -- let (q1, q2) = Q.partition (\(Enriched _ ms _) -> m `elem` ms) $ Q.deleteMin q
+  -- let cs = map (\(Enriched c _ _) -> c) $ Q.toList q1
+  -- let cs' = map (uncurry (foo m e)) cs
+  -- q1' <- analyze cs'
+  -- synthesize $ q1' `Q.union` q2
+  -- synthesize $ Q.deleteMin q
 
-foo :: Identifier -> PreTermPlus -> PreTermPlus -> PreTermPlus -> PreConstraint
-foo m e e1 e2 = do
-  let e1' = substPreTermPlus [(m, e)] e1
-  let e2' = substPreTermPlus [(m, e)] e2
-  (e1', e2')
+asAnalyzable :: EnrichedConstraint -> EnrichedConstraint
+asAnalyzable (Enriched cs ms _) = Enriched cs ms ConstraintAnalyzable
 
+-- foo :: Identifier -> PreTermPlus -> PreTermPlus -> PreTermPlus -> PreConstraint
+-- foo m e e1 e2 = do
+--   let e1' = substPreTermPlus [(m, e)] e1
+--   let e2' = substPreTermPlus [(m, e)] e2
+--   (e1', e2')
 -- [e, x, y, y, e2, e3, z] ~> [p, x, y, y, q, r, z]  (p, q, r: new variables)
 toVarList :: [PreTermPlus] -> WithEnv [(Identifier, PreTermPlus)]
 toVarList [] = return []

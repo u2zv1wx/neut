@@ -3,6 +3,7 @@ module Elaborate.Analyze
   ) where
 
 import Control.Monad.Except
+import Control.Monad.State
 import Data.List
 import Data.Maybe
 import qualified Data.PQueue.Min as Q
@@ -95,41 +96,51 @@ simp' (((_, PreTermArrayIntro k1 les1), (_, PreTermArrayIntro k2 les2)):cs)
 simp' ((e1, e2):cs) = do
   let ms1 = asStuckedTerm e1
   let ms2 = asStuckedTerm e2
-  case (ms1, ms2) of
-    (Just (StuckPiElimStrict h1 ies1), _)
-      | onesided h1 e2
-      , xs <- concatMap getVarList ies1
-      , subsume e2 xs
-      , isDisjoint xs -> simpStuckStrict h1 ies1 e1 e2 cs
-    (_, Just (StuckPiElimStrict h2 ies2))
-      | onesided h2 e1
-      , xs <- concatMap getVarList ies2
-      , subsume e1 xs
-      , isDisjoint xs -> simpStuckStrict h2 ies2 e2 e1 cs
-    -- (Just (StuckPiElim h1 ies1), Nothing)
-    --   | onesided h1 e2
-    --   , xs <- concatMap getVarList ies1
-    --   , subsume e2 xs -> simpFlexRigid h1 ies1 e1 e2 cs
-    -- (Nothing, Just (StuckPiElim h2 ies2))
-    --   | onesided h2 e1
-    --   , xs <- concatMap getVarList ies2
-    --   , subsume e1 xs -> simpFlexRigid h2 ies2 e2 e1 cs
-    -- (Just (StuckPiElim h1 ies1), Just (StuckPiElim h2 ies2))
-    --   | onesided h1 e2
-    --   , xs <- concatMap getVarList ies1
-    --   , subsume e2 xs -> simpFlexFlex h1 h2 ies1 ies2 e1 e2 cs
-    -- (Just (StuckPiElim h1 ies1), Just (StuckPiElim h2 ies2))
-    --   | onesided h2 e1
-    --   , xs <- concatMap getVarList ies2
-    --   , subsume e1 xs -> simpFlexFlex h1 h2 ies1 ies2 e1 e2 cs
-    (Just (StuckPiElimStrict h1 _), _) -> simpOther e1 e2 [h1] cs
-    (_, Just (StuckPiElimStrict h2 _)) -> simpOther e1 e2 [h2] cs
-    (Just (StuckPiElim h1 _), Nothing) -> simpOther e1 e2 [h1] cs
-    (Nothing, Just (StuckPiElim h2 _)) -> simpOther e1 e2 [h2] cs
-    (Just (StuckPiElim h1 _), Just (StuckPiElim h2 _)) ->
-      simpOther e1 e2 [h1, h2] cs
-    (Nothing, Nothing) ->
-      simpOther e1 e2 (concatMap holePreTermPlus [e1, e2]) cs
+  let hs = map stuckReasonOf $ catMaybes [ms1, ms2]
+  sub <- gets substEnv
+  if any (`elem` map fst sub) hs
+    then do
+      p "found analyzable. hs:"
+      p' hs
+      cs' <- simp' cs
+      let c = Enriched (e1, e2) hs $ ConstraintAnalyzable
+      return $ c : cs'
+    else do
+      case (ms1, ms2) of
+        (Just (StuckPiElimStrict h1 ies1), _)
+          | onesided h1 e2
+          , xs <- concatMap getVarList ies1
+          , subsume e2 xs
+          , isDisjoint xs -> simpStuckStrict h1 ies1 e1 e2 cs
+        (_, Just (StuckPiElimStrict h2 ies2))
+          | onesided h2 e1
+          , xs <- concatMap getVarList ies2
+          , subsume e1 xs
+          , isDisjoint xs -> simpStuckStrict h2 ies2 e2 e1 cs
+        -- (Just (StuckPiElim h1 ies1), Nothing)
+        --   | onesided h1 e2
+        --   , xs <- concatMap getVarList ies1
+        --   , subsume e2 xs -> simpFlexRigid h1 ies1 e1 e2 cs
+        -- (Nothing, Just (StuckPiElim h2 ies2))
+        --   | onesided h2 e1
+        --   , xs <- concatMap getVarList ies2
+        --   , subsume e1 xs -> simpFlexRigid h2 ies2 e2 e1 cs
+        -- (Just (StuckPiElim h1 ies1), Just (StuckPiElim h2 ies2))
+        --   | onesided h1 e2
+        --   , xs <- concatMap getVarList ies1
+        --   , subsume e2 xs -> simpFlexFlex h1 h2 ies1 ies2 e1 e2 cs
+        -- (Just (StuckPiElim h1 ies1), Just (StuckPiElim h2 ies2))
+        --   | onesided h2 e1
+        --   , xs <- concatMap getVarList ies2
+        --   , subsume e1 xs -> simpFlexFlex h1 h2 ies1 ies2 e1 e2 cs
+        (Just (StuckPiElimStrict h1 _), _) -> simpOther e1 e2 [h1] cs
+        (_, Just (StuckPiElimStrict h2 _)) -> simpOther e1 e2 [h2] cs
+        (Just (StuckPiElim h1 _), Nothing) -> simpOther e1 e2 [h1] cs
+        (Nothing, Just (StuckPiElim h2 _)) -> simpOther e1 e2 [h2] cs
+        (Just (StuckPiElim h1 _), Just (StuckPiElim h2 _)) ->
+          simpOther e1 e2 [h1, h2] cs
+        (Nothing, Nothing) ->
+          simpOther e1 e2 (concatMap holePreTermPlus [e1, e2]) cs
 
 simpReduce ::
      PreTermPlus
@@ -258,6 +269,10 @@ asStuckedTerm (_, PreTermPiElim e es) =
       Just $ StuckPiElim h $ iess ++ [es]
     Nothing -> Nothing
 asStuckedTerm _ = Nothing
+
+stuckReasonOf :: Stuck -> Hole
+stuckReasonOf (StuckPiElim h _) = h
+stuckReasonOf (StuckPiElimStrict h _) = h
 
 onesided :: Identifier -> PreTermPlus -> Bool
 onesided h e = h `notElem` holePreTermPlus e
