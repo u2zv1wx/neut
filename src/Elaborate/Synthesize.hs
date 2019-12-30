@@ -42,6 +42,7 @@ synthesize q = do
     --   resolvePiElim q m ess e
     Just (Enriched (e1, e2) ms ConstraintOther) -> do
       let c = Enriched (e1, e2) ms ConstraintSuspended
+      p "suspending"
       -- このときには、Qの別の要素がsynthできるかを探すべき。
       -- でないと、Qの最初の要素がlookupできないってだけで全体が失敗することになってしまう。
       -- なので、suspendedとしてキューの末尾に要素を移動する。
@@ -49,7 +50,7 @@ synthesize q = do
       -- quasiで解いてpatternが壊れたら元も子もないし。
       synthesize $ Q.insert c $ Q.deleteMin q
     Just (Enriched (e1, e2) _ _) -> do
-      p' $ map fst sub
+      p' $ sort $ map fst sub
       p' q
       throwError $ "cannot simplify:\n" ++ Pr.ppShow (e1, e2)
 

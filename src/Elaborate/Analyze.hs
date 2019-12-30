@@ -99,27 +99,29 @@ simp' ((e1, e2):cs) = do
     (Just (StuckPiElimStrict h1 ies1), _)
       | onesided h1 e2
       , xs <- concatMap getVarList ies1
-      , subsume e2 xs -> simpStuckStrict h1 ies1 e1 e2 cs
+      , subsume e2 xs
+      , isDisjoint xs -> simpStuckStrict h1 ies1 e1 e2 cs
     (_, Just (StuckPiElimStrict h2 ies2))
       | onesided h2 e1
       , xs <- concatMap getVarList ies2
-      , subsume e1 xs -> simpStuckStrict h2 ies2 e2 e1 cs
-    (Just (StuckPiElim h1 ies1), Nothing)
-      | onesided h1 e2
-      , xs <- concatMap getVarList ies1
-      , subsume e2 xs -> simpFlexRigid h1 ies1 e1 e2 cs
-    (Nothing, Just (StuckPiElim h2 ies2))
-      | onesided h2 e1
-      , xs <- concatMap getVarList ies2
-      , subsume e1 xs -> simpFlexRigid h2 ies2 e2 e1 cs
-    (Just (StuckPiElim h1 ies1), Just (StuckPiElim h2 ies2))
-      | onesided h1 e2
-      , xs <- concatMap getVarList ies1
-      , subsume e2 xs -> simpFlexFlex h1 h2 ies1 ies2 e1 e2 cs
-    (Just (StuckPiElim h1 ies1), Just (StuckPiElim h2 ies2))
-      | onesided h2 e1
-      , xs <- concatMap getVarList ies2
-      , subsume e1 xs -> simpFlexFlex h1 h2 ies1 ies2 e1 e2 cs
+      , subsume e1 xs
+      , isDisjoint xs -> simpStuckStrict h2 ies2 e2 e1 cs
+    -- (Just (StuckPiElim h1 ies1), Nothing)
+    --   | onesided h1 e2
+    --   , xs <- concatMap getVarList ies1
+    --   , subsume e2 xs -> simpFlexRigid h1 ies1 e1 e2 cs
+    -- (Nothing, Just (StuckPiElim h2 ies2))
+    --   | onesided h2 e1
+    --   , xs <- concatMap getVarList ies2
+    --   , subsume e1 xs -> simpFlexRigid h2 ies2 e2 e1 cs
+    -- (Just (StuckPiElim h1 ies1), Just (StuckPiElim h2 ies2))
+    --   | onesided h1 e2
+    --   , xs <- concatMap getVarList ies1
+    --   , subsume e2 xs -> simpFlexFlex h1 h2 ies1 ies2 e1 e2 cs
+    -- (Just (StuckPiElim h1 ies1), Just (StuckPiElim h2 ies2))
+    --   | onesided h2 e1
+    --   , xs <- concatMap getVarList ies2
+    --   , subsume e1 xs -> simpFlexFlex h1 h2 ies1 ies2 e1 e2 cs
     (Just (StuckPiElimStrict h1 _), _) -> simpOther e1 e2 [h1] cs
     (_, Just (StuckPiElimStrict h2 _)) -> simpOther e1 e2 [h2] cs
     (Just (StuckPiElim h1 _), Nothing) -> simpOther e1 e2 [h1] cs
@@ -190,39 +192,38 @@ simpStuckStrict ::
   -> [(PreTermPlus, PreTermPlus)]
   -> WithEnv [EnrichedConstraint]
 simpStuckStrict h1 ies1 e1 e2 cs = do
-  let xs = concatMap getVarList ies1
   cs' <- simp cs
-  if isDisjoint xs
-    then return $ Enriched (e1, e2) [h1] (ConstraintPattern h1 ies1 e2) : cs'
-    else return $
-         Enriched (e1, e2) [h1] (ConstraintQuasiPattern h1 ies1 e2) : cs'
+  -- if isDisjoint xs
+  --   then return $ Enriched (e1, e2) [h1] (ConstraintPattern h1 ies1 e2) : cs'
+  --   else simpOther e1 e2 [h1] cs
+  return $ Enriched (e1, e2) [h1] (ConstraintPattern h1 ies1 e2) : cs'
+    -- else return $
+    --      Enriched (e1, e2) [h1] (ConstraintQuasiPattern h1 ies1 e2) : cs'
 
-simpFlexRigid ::
-     Hole
-  -> [[PreTermPlus]]
-  -> PreTermPlus
-  -> PreTermPlus
-  -> [PreConstraint]
-  -> WithEnv [EnrichedConstraint]
-simpFlexRigid h1 ies1 e1 e2 cs = do
-  cs' <- simp cs
-  let c = Enriched (e1, e2) [h1] $ ConstraintFlexRigid h1 ies1 e2
-  return $ c : cs'
-
-simpFlexFlex ::
-     Hole
-  -> Hole
-  -> [[PreTermPlus]]
-  -> [[PreTermPlus]]
-  -> PreTermPlus
-  -> PreTermPlus
-  -> [PreConstraint]
-  -> WithEnv [EnrichedConstraint]
-simpFlexFlex h1 h2 ies1 _ e1 e2 cs = do
-  cs' <- simp cs
-  let c = Enriched (e1, e2) [h1, h2] $ ConstraintFlexFlex h1 ies1 e2
-  return $ c : cs'
-
+-- simpFlexRigid ::
+--      Hole
+--   -> [[PreTermPlus]]
+--   -> PreTermPlus
+--   -> PreTermPlus
+--   -> [PreConstraint]
+--   -> WithEnv [EnrichedConstraint]
+-- simpFlexRigid h1 ies1 e1 e2 cs = do
+--   cs' <- simp cs
+--   let c = Enriched (e1, e2) [h1] $ ConstraintFlexRigid h1 ies1 e2
+--   return $ c : cs'
+-- simpFlexFlex ::
+--      Hole
+--   -> Hole
+--   -> [[PreTermPlus]]
+--   -> [[PreTermPlus]]
+--   -> PreTermPlus
+--   -> PreTermPlus
+--   -> [PreConstraint]
+--   -> WithEnv [EnrichedConstraint]
+-- simpFlexFlex h1 h2 ies1 _ e1 e2 cs = do
+--   cs' <- simp cs
+--   let c = Enriched (e1, e2) [h1, h2] $ ConstraintFlexFlex h1 ies1 e2
+--   return $ c : cs'
 simpOther ::
      PreTermPlus
   -> PreTermPlus

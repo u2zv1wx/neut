@@ -6,18 +6,18 @@ type PreConstraint = (PreTermPlus, PreTermPlus)
 
 data Constraint
   = ConstraintPattern Hole [[PreTermPlus]] PreTermPlus
-  | ConstraintQuasiPattern Hole [[PreTermPlus]] PreTermPlus
-  | ConstraintFlexRigid Hole [[PreTermPlus]] PreTermPlus
-  | ConstraintFlexFlex Hole [[PreTermPlus]] PreTermPlus
+  -- | ConstraintQuasiPattern Hole [[PreTermPlus]] PreTermPlus
+  -- | ConstraintFlexRigid Hole [[PreTermPlus]] PreTermPlus
+  -- | ConstraintFlexFlex Hole [[PreTermPlus]] PreTermPlus
   | ConstraintOther
   | ConstraintSuspended
   deriving (Show)
 
 constraintToInt :: Constraint -> Int
 constraintToInt ConstraintPattern {} = 1
-constraintToInt ConstraintQuasiPattern {} = 2
-constraintToInt ConstraintFlexRigid {} = 3
-constraintToInt ConstraintFlexFlex {} = 4
+-- constraintToInt ConstraintQuasiPattern {} = 2
+-- constraintToInt ConstraintFlexRigid {} = 3
+-- constraintToInt ConstraintFlexFlex {} = 4
 constraintToInt ConstraintOther = 5
 constraintToInt ConstraintSuspended = 6
 
