@@ -10,6 +10,7 @@ data Constraint
   | ConstraintFlexRigid Hole [[PreTermPlus]] PreTermPlus
   | ConstraintFlexFlex Hole [[PreTermPlus]] PreTermPlus
   | ConstraintOther
+  | ConstraintSuspended
   deriving (Show)
 
 constraintToInt :: Constraint -> Int
@@ -17,7 +18,8 @@ constraintToInt ConstraintPattern {} = 1
 constraintToInt ConstraintQuasiPattern {} = 2
 constraintToInt ConstraintFlexRigid {} = 3
 constraintToInt ConstraintFlexFlex {} = 4
-constraintToInt ConstraintOther {} = 5
+constraintToInt ConstraintOther = 5
+constraintToInt ConstraintSuspended = 6
 
 instance Eq Constraint where
   c1 == c2 = constraintToInt c1 == constraintToInt c2

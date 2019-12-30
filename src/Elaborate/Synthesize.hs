@@ -40,15 +40,23 @@ synthesize q = do
     -- Just (Enriched _ _ (ConstraintFlexFlex m ess e)) -> do
     --   p "resolve-flex-flex"
     --   resolvePiElim q m ess e
-    Just (Enriched (e1, e2) _ _)
-      -- senv <- gets substEnv
-      -- let (ls, es) = unzip senv
-      -- es' <- mapM reducePreTermPlus es
-      -- p' $ zip ls es'
-     -> do
+    Just (Enriched (e1, e2) ms ConstraintOther) -> do
+      let c = Enriched (e1, e2) ms ConstraintSuspended
+      -- このときには、Qの別の要素がsynthできるかを探すべき。
+      -- でないと、Qの最初の要素がlookupできないってだけで全体が失敗することになってしまう。
+      -- なので、suspendedとしてキューの末尾に要素を移動する。
+      -- suspendedがresolveでpatternに落ちる可能性があるってことを考えると、quasiとかで解くのは控えたほうがむしろよいのかも？
+      -- quasiで解いてpatternが壊れたら元も子もないし。
+      synthesize $ Q.insert c $ Q.deleteMin q
+    Just (Enriched (e1, e2) _ _) -> do
+      p' $ map fst sub
       p' q
       throwError $ "cannot simplify:\n" ++ Pr.ppShow (e1, e2)
 
+-- recovery :: PreConstraint -> ConstraintQueue -> WithEnv ()
+-- recovery (e1, e2) q = do
+--   case Q.getMin q of
+--     Nothing -> throwError $ "cannot simplify:\n" ++ Pr.ppShow (e1, e2)
 resolveStuck ::
      ConstraintQueue
   -> PreTermPlus
@@ -89,6 +97,7 @@ resolvePiElim q m ess e = do
 -- で、synthesizeのときに複数のhole-substをまとめてこっちに渡す。
 resolveHole :: ConstraintQueue -> Hole -> PreTermPlus -> WithEnv ()
 resolveHole q m e = do
+  p $ "resolveHole for: " ++ m
   senv <- gets substEnv
   e' <- reducePreTermPlus $ substPreTermPlus senv e
   modify (\env -> env {substEnv = compose [(m, e')] senv})

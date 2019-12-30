@@ -262,7 +262,6 @@ onesided :: Identifier -> PreTermPlus -> Bool
 onesided h e = h `notElem` holePreTermPlus e
 
 subsume :: PreTermPlus -> [Identifier] -> Bool
--- subsume _ _ = True
 subsume e xs = all (`elem` xs) $ varPreTermPlus e
 
 isDisjoint :: [Identifier] -> Bool
