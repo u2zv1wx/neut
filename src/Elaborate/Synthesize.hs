@@ -6,9 +6,6 @@ import Control.Exception
 import Control.Monad.Except
 import Control.Monad.State
 
-import Data.List
-
--- import qualified Data.Map.Strict as Map
 import qualified Data.PQueue.Min as Q
 import qualified Text.Show.Pretty as Pr
 
@@ -37,12 +34,7 @@ synthesize q = do
       resolvePiElim q m ess e
     Just (Enriched _ _ (ConstraintFlexRigid m ess e)) -> do
       resolvePiElim q m ess e
-    Just (Enriched (e1, e2) ms _)
-      -- p' $ sort $ map fst sub
-      -- p' q
-      -- p "ms:"
-      -- p' ms
-     -> do
+    Just (Enriched (e1, e2) _ _) -> do
       throwError $ "cannot simplify:\n" ++ Pr.ppShow (e1, e2)
 
 resolveStuck ::

@@ -118,8 +118,6 @@
 
 (keyword sigma-introduction)
 
-
-
 (keyword to-hole-list)
 
 (notation (to-hole-list e)
@@ -232,14 +230,6 @@
 
 (constant unsafe.write)
 
-(keyword tata)
-
-(notation (tata any) type)
-
-(keyword ta)
-
-(notation ta type)
-
 (ascription unsafe.write
   (pi
     ((A type)
@@ -276,11 +266,16 @@
 ;; これがちゃんと型つくのかなりうれしいな。
 (write choice stdout admit enum.choice)
 
+(io-return top unit)
+
 ;; (ascription write
 ;;   (arrow (top top top top) bottom))
 
 ;; (write choice stdout (admit (u8-array choice)) unit)
 
+;; (u8-array-introduction
+;;   (left 3)
+;;   (right 2))
 
 ;; unit
 ;; (io-return top unit)
