@@ -15,7 +15,7 @@ type Pattern = TreePlus
 
 -- CBV-like macro expansion
 macroExpand :: TreePlus -> WithEnv TreePlus
-macroExpand = recurM macroExpand1
+macroExpand t = splice <$> recurM macroExpand1 t
 
 recurM :: (Monad m) => (TreePlus -> m TreePlus) -> TreePlus -> m TreePlus
 recurM f (meta, TreeAtom s) = f (meta, TreeAtom s)
@@ -168,3 +168,18 @@ isSaneNotation (_, TreeNode ts) = do
   case last ts of
     (_, TreeAtom _) -> True
     ts' -> b && isSaneNotation ts'
+
+splice :: TreePlus -> TreePlus
+splice t@(_, TreeAtom _) = t
+splice (m, TreeNode ts) = do
+  let ts' = map splice ts
+  (m, TreeNode $ expandSplice $ map findSplice ts')
+
+findSplice :: TreePlus -> Either TreePlus [TreePlus]
+findSplice (_, TreeNode ((_, TreeAtom "splice"):ts)) = Right ts
+findSplice t = Left t
+
+expandSplice :: [Either TreePlus [TreePlus]] -> [TreePlus]
+expandSplice [] = []
+expandSplice (Left t:rest) = t : expandSplice rest
+expandSplice (Right ts:rest) = ts ++ expandSplice rest

@@ -2,29 +2,38 @@
 
 ;; synonyms
 (keyword type)
+
 (notation type tau)
 
 (keyword universe)
+
 (notation universe tau)
 
 (keyword forall)
+
 (notation forall pi)
 
 (keyword apply)
+
 (notation apply pi-elimination)
 
 (keyword fix)
+
 (notation fix mu)
 
 ;; sequential execution
 (keyword pi-i)
+
 (notation pi-i pi-introduction)
 
 (keyword pi-e)
+
 (notation pi-e pi-elimination)
 
 (keyword let)
+
 (keyword begin)
+
 (keyword definition)
 
 (notation (begin e) e)
@@ -43,6 +52,7 @@
 
 ;; lambda: pi-introduction with implicit begin block
 (keyword lambda)
+
 (notation (lambda (xts+) e)
   (pi-i (xts+) (begin e)))
 
@@ -63,6 +73,19 @@
   (let (_ t) e))
 
 (ascription is-enum (pi ((_ type)) type))
+
+(keyword to-type-list)
+
+(notation (to-type-list t)
+  t)
+
+(notation (to-type-list t t+)
+  (t (splice (to-type-list t+))))
+
+(keyword arrow)
+
+(notation (arrow (t+) cod)
+  (pi (to-type-list t+) cod))
 
 ;; (hom a b c) = a -> (b -> c)
 (keyword hom)
@@ -94,30 +117,46 @@
 
 (keyword sigma-introduction)
 
+
+
+(keyword to-hole-list)
+
+(notation (to-hole-list e)
+  (_ _))
+
+(notation (to-hole-list e e+)
+  ((_ _) (splice (to-hole-list e+))))
+
 ;; ;; これだとeliminatorのcodが最初に解決されたもので確定してしまうからだめ？
 (notation (sigma-introduction e+)
   (lambda
     ((elim-result-type tau)
-     (eliminator _))
+     (eliminator (pi (to-hole-list e+) elim-result-type)))
     (eliminator e+)))
+;; (notation (sigma-introduction e+)
+;;   (lambda
+;;     ((elim-result-type tau)
+;;      (eliminator (pi (???) elim-result-type)))
+;;     (eliminator e+)))
 
-;; (keyword sigma-introduction-2)
+(keyword sigma-introduction-2)
 
 ;; これだとpiの引数が最初に解決したもので確定してしまうからだめ？
 ;; でも、notationが展開されるたびにholeが別物としてとられたら。
 ;; いや、現在のコードではsigma-introは結局1回しか使用されていない。
 ;; 型推論、正しかったっぽい。
-;; (notation (sigma-introduction-2 e1 e2)
-;;   (lambda
-;;     ((elim-result-type tau)
-;;      (eliminator (pi ((_ _) (_ _)) elim-result-type)))
-;;     (eliminator e1 e2)))
+;; こっちのかたちで推論するとうまくいくが、上のsigma-introductionのように(eliminator _)とするとうまくいかない。
+;; これはやっぱり記法を用意するべきなのかな？
+(notation (sigma-introduction-2 e1 e2)
+  (lambda
+    ((elim-result-type tau)
+     (eliminator (pi ((_ _) (_ _)) elim-result-type)))
+    (eliminator e1 e2)))
 
 (keyword sigma-elimination)
 
 (notation (sigma-elimination (xt+) e1 e2)
   (e1 (lambda (xt+) e2)))
-
 
 (definition state ((S type) (A type))
   (hom S (product S A)))
@@ -138,15 +177,19 @@
 ;; ここでsigma-intro-2は、reduceの結果をAで固定してしまう？
 ;; これによって、eliminatorの型が特定のものに固定してしまう。
 ;; この時点でeliminatorがかなり具体的なものになってしまう、ということ。
+(definition state-return ((S type) (A type) (x A))
+  (lambda ((env S))
+    (sigma-introduction env x)))
+
 ;; (definition state-return ((S type) (A type) (x A))
 ;;   (lambda ((env S))
 ;;     (sigma-introduction-2 env x)))
 
-(definition state-return ((S type) (A type) (x A))
-  (lambda ((env S))
-    (lambda ((result-type tau)
-             (elim (arrow (S A) result-type)))
-      (elim env x))))
+;; (definition state-return ((S type) (A type) (x A))
+;;   (lambda ((env S))
+;;     (lambda ((result-type tau)
+;;              (elim (arrow (S A) result-type)))
+;;       (elim env x))))
 
 ;; (ascription state-return
 ;;   (pi
@@ -196,16 +239,23 @@
      (x A))
     (state bottom A)))
 
-;; (ascription unsafe.eval-io
-;;   (hom
-;;     (io top)
-;;     top))
+(constant unsafe.eval-io)
+
+(ascription unsafe.eval-io
+  (hom
+    (io top)
+    top))
 
 (constant file-descriptor)
+
 (ascription file-descriptor type)
+
 (constant stdout)
+
 (ascription stdout file-descriptor)
+
 (constant unsafe.write)
+
 (ascription unsafe.write
   (pi
     ((A type)
@@ -213,10 +263,30 @@
      (str (u8-array A))
      (len (is-enum A)))
     top))
-;; unsafe.write : Pi (A : Univ, out : file-descriptor, str : u8-array a, len : is-enum A). top
 
-;; (enum choice left right)
+(enum choice left right)
 
-unit
+(constant admit-explicit)
+
+(ascription admit-explicit
+  (pi ((A type)) A))
+
+(keyword admit)
+
+(notation admit (admit-explicit _))
+
+;; writeが無事定義できた〜。
+(definition write ((A type) (out file-descriptor) (str (u8-array A)) (len (is-enum A)))
+  (io-return top (unsafe.write A out str len)))
+;; implicitは、explicit.writeみたいなのを展開型として用意した上で、notationの定義を入れれば終了。
+
+;; (write choice stdout (admit (u8-array choice)) enum.choice)
+;; これがちゃんと型つくのかなりうれしいな。
+(write choice stdout admit enum.choice)
+
+;; (write choice stdout (admit (u8-array choice)) unit)
+
+;; unit
 ;; (io-return top unit)
+;; unsafe.write
 ;; stdout

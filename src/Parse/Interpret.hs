@@ -27,7 +27,10 @@ interpret (m, TreeNode [(_, TreeAtom "theta"), (_, TreeAtom x)]) =
   withMeta m $ WeakTermTheta x
 interpret (m, TreeNode [(_, TreeAtom "upsilon"), (_, TreeAtom x)]) =
   withMeta m $ WeakTermUpsilon x
-interpret (m, TreeNode [(_, TreeAtom "pi"), (_, TreeNode xts), t]) = do
+interpret foo@(m, TreeNode [(_, TreeAtom "pi"), (_, TreeNode xts), t]) = do
+  p "pi"
+  p "foo"
+  p' foo
   (xts', t') <- interpretBinder xts t
   withMeta m $ WeakTermPi xts' t'
 interpret (m, TreeNode [(_, TreeAtom "pi-introduction"), (_, TreeNode xts), e]) = do
@@ -102,13 +105,6 @@ interpret (m, TreeAtom x)
 interpret (m, TreeAtom x)
   | Just (i, j) <- readNatEnumValue x =
     withMeta m $ WeakTermEnumIntro $ EnumValueNatNum i j
-interpret (m, TreeNode [(_, TreeAtom "arrow"), (_, TreeNode ts), t]) = do
-  xs <- mapM (const $ newNameWith "hole-arrow") ts
-  ts' <- mapM interpret ts
-  t' <- interpret t
-  withMeta m $ WeakTermPi (zip xs ts') t'
-  -- (xts', t') <- interpretBinder ts t
-  -- withMeta m $ WeakTermPi xts' t'
 interpret (m, TreeAtom x)
   | Just str <- readMaybe x = do
     u8s <- forM (encode str) $ \u -> withMeta m (WeakTermIntU 8 (toInteger u))

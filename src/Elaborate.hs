@@ -55,10 +55,10 @@ elaborate e = do
   p "ok"
   -- update the type environment by resulting substitution
   sub <- gets substEnv
-  let (xs, es) = unzip sub
-  es' <- mapM reducePreTermPlus es
-  let sub' = zip xs es'
-  p' sub'
+  -- let (xs, es) = unzip sub
+  -- es' <- mapM reducePreTermPlus es
+  -- let sub' = zip xs es'
+  -- p' sub'
   tenv <- gets typeEnv
   tenv' <- mapM (return . substPreTermPlus sub) tenv
   modify (\env -> env {typeEnv = tenv'})
