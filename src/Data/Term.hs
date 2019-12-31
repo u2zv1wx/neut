@@ -144,9 +144,6 @@ substTermPlusBindingsWithBody sub ((x, t):xts) e = do
   let (xts', e') = substTermPlusBindingsWithBody sub' xts e
   ((x, substTermPlus sub t) : xts', e')
 
--- substMeta :: SubstTerm -> Meta -> Meta
--- substMeta _ (MetaTerminal ml) = MetaTerminal ml
--- substMeta sub (MetaNonTerminal t ml) = MetaNonTerminal (substTermPlus sub t) ml
 isValue :: TermPlus -> Bool
 isValue (_, TermTau) = True
 isValue (_, TermUpsilon _) = True
