@@ -22,7 +22,9 @@ data Meta =
   Meta
     { metaLocation :: Maybe Loc
     }
-  deriving (Show)
+
+instance Show Meta where
+  show _ = "_"
 
 emptyMeta :: Meta
 emptyMeta = Meta {metaLocation = Nothing}

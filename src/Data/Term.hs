@@ -28,12 +28,6 @@ data Term
   | TermArrayElim ArrayKind TermPlus TermPlus
   deriving (Show)
 
--- data Meta
---   = MetaTerminal (Meta)
---   | MetaNonTerminal TermPlus (Meta)
---   -- deriving (Show)
--- instance Show Meta where
---   show _ = "_"
 type TermPlus = (Meta, Term)
 
 type SubstTerm = [(Identifier, TermPlus)]
