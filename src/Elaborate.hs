@@ -125,7 +125,6 @@ elaborate' (m, PreTermIntU size x) = do
   return (m', TermIntU size x)
 elaborate' (m, PreTermInt x) = do
   m' <- toMeta m
-  -- t <- reduceTermPlus $ obtainTermType m'
   t <- reducePreTermPlus $ typeOf' m
   case t of
     (_, PreTermTheta intType) ->
@@ -146,7 +145,6 @@ elaborate' (m, PreTermFloat64 x) = do
 elaborate' (m, PreTermFloat x) = do
   m' <- toMeta m
   t <- reducePreTermPlus $ typeOf' m
-  -- t <- reduceTermPlus $ obtainTermType m'
   case t of
     (_, PreTermTheta floatType) -> do
       let x16 = realToFrac x :: Half
@@ -173,10 +171,6 @@ elaborate' (m, PreTermEnumElim e les) = do
       caseCheckEnumIdentifier x $ map fst les
       return (m', TermEnumElim e' les')
     _ -> throwError "type error (enum elim)"
-  -- case t' of
-  --   (_, TermEnum x) -> caseCheckEnumIdentifier x ls
-  --   _ -> throwError "type error (caseCheck)"
-  -- return (m', TermEnumElim e' les')
 elaborate' (m, PreTermArray k indexType) = do
   m' <- toMeta m
   indexType' <- elaborate' indexType
@@ -213,36 +207,6 @@ elaborateIsEnum x
         return $ Just $ toInteger $ length ls
 elaborateIsEnum _ = return Nothing
 
--- `caseCheck e` checks if all the case-lists appear in `e` are exhaustive.
--- caseCheck :: TermPlus -> WithEnv ()
--- caseCheck (m, TermTau) = return ()
--- caseCheck (m, TermTheta _) = return ()
--- caseCheck (m, TermUpsilon _) = return ()
--- caseCheck (m, TermPi xts t) = mapM_ caseCheck $ t : map snd xts
--- caseCheck (m, TermPiIntro xts e) = mapM_ caseCheck $ e : map snd xts
--- caseCheck (m, TermPiElim e es) = mapM_ caseCheck $ e : es
--- caseCheck (m, TermMu (_, t) e) = mapM_ caseCheck [t, e]
--- caseCheck (m, TermIntS _ _) = return ()
--- caseCheck (m, TermIntU _ _) = return ()
--- caseCheck (m, TermFloat16 _) = return ()
--- caseCheck (m, TermFloat32 _) = return ()
--- caseCheck (m, TermFloat64 _) = return ()
--- caseCheck (m, TermEnum _) = return ()
--- caseCheck (m, TermEnumIntro _) = return ()
--- caseCheck (m, TermEnumElim e les) = do
---   let ls = map fst les
---   t' <- reduceTermPlus $ obtainTermType $ fst e
---   case t' of
---     (_, TermEnum x) -> caseCheckEnumIdentifier x ls
---     _ -> throwError "type error (caseCheck)"
--- caseCheck (m, TermArray _ indexType) = mapM_ caseCheck [indexType]
--- caseCheck (m, TermArrayIntro _ les) = do
---   let (_, es) = unzip les
---   mapM_ caseCheck es
--- caseCheck (m, TermArrayElim _ e1 e2) = mapM_ caseCheck [e1, e2]
--- caseCheckMeta :: Meta -> WithEnv ()
--- caseCheckMeta (MetaTerminal _) = return ()
--- caseCheckMeta (MetaNonTerminal t _) = caseCheck t
 caseCheckEnumIdentifier :: EnumType -> [Case] -> WithEnv ()
 caseCheckEnumIdentifier (EnumTypeLabel x) labelList = do
   ls <- lookupEnumSet x
@@ -260,8 +224,3 @@ caseCheckEnumIdentifier' i labelList = do
 toMeta :: PreMeta -> WithEnv Meta
 toMeta (PreMetaTerminal l) = return $ Meta {metaLocation = l}
 toMeta (PreMetaNonTerminal _ l) = return $ Meta {metaLocation = l}
-  -- t' <- elaborate' t
-  -- return $ MetaNonTerminal t' l
--- obtainTermType :: Meta -> TermPlus
--- obtainTermType (MetaTerminal _) = (MetaTerminal Nothing, TermTau)
--- obtainTermType (MetaNonTerminal t _) = t
