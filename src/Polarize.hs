@@ -32,14 +32,15 @@ polarize (m, TermPi _ _) = do
   returnClosureType m
 polarize (m, TermPiIntro xts e) = do
   let xs = map fst xts
-  let fvs = obtainFreeVarList xs e
+  fvs <- obtainFreeVarList xs e
   e' <- polarize e
   makeClosure Nothing fvs m xts e'
 polarize (m, TermPiElim e es) = do
   e' <- polarize e
   callClosure m e' es
 polarize (m, TermMu (f, _) e) = do
-  let (nameList, _, typeList) = unzip3 $ obtainFreeVarList [f] e
+  tmp <- obtainFreeVarList [f] e
+  let (nameList, _, typeList) = unzip3 tmp
   let fvs = zip nameList typeList
   let fvs' = map (toTermUpsilon . fst) fvs
   let lamBody = substTermPlus [(f, (m, TermPiElim (m, TermTheta f) fvs'))] e
@@ -110,9 +111,11 @@ polarize (m, TermArrayElim k e1 e2) = do
             contentTypeVar
             (m, CodeArrayElim k contentVar idxVar)))
 
-obtainFreeVarList :: [Identifier] -> TermPlus -> [(Identifier, Meta, TermPlus)]
+obtainFreeVarList ::
+     [Identifier] -> TermPlus -> WithEnv [(Identifier, Meta, TermPlus)]
 obtainFreeVarList xs e = do
-  filter (\(x, _, _) -> x `notElem` xs) $ varTermPlus e
+  tmp <- varTermPlus e
+  return $ filter (\(x, _, _) -> x `notElem` xs) $ tmp
 
 polarize' :: TermPlus -> WithEnv (Identifier, CodePlus, DataPlus)
 polarize' e@(m, _) = do
@@ -817,3 +820,53 @@ supplyName (Right (x, t)) = return (x, t)
 supplyName (Left t) = do
   x <- newNameWith "unused-sigarg"
   return (x, t)
+
+varTermPlus :: TermPlus -> WithEnv [(Identifier, Meta, TermPlus)]
+varTermPlus e = do
+  tmp <- getClosedVarChain e
+  return $ nubBy (\(x, _, _) (y, _, _) -> x == y) tmp
+
+getClosedVarChain :: TermPlus -> WithEnv [(Identifier, Meta, TermPlus)]
+getClosedVarChain (_, TermTau) = return []
+getClosedVarChain (_, TermTheta _) = return []
+getClosedVarChain (m, TermUpsilon x) = do
+  t <- lookupTypeEnv x
+  xs <- getClosedVarChain t
+  return $ xs ++ [(x, m, t)]
+getClosedVarChain (_, TermPi xts t) = getClosedVarChainBindings xts [t]
+getClosedVarChain (_, TermPiIntro xts e) = getClosedVarChainBindings xts [e]
+getClosedVarChain (_, TermPiElim e es) = do
+  xs1 <- getClosedVarChain e
+  xs2 <- concat <$> mapM getClosedVarChain es
+  return $ xs1 ++ xs2
+getClosedVarChain (_, TermMu ut e) = getClosedVarChainBindings [ut] [e]
+getClosedVarChain (_, TermIntS _ _) = return []
+getClosedVarChain (_, TermIntU _ _) = return []
+getClosedVarChain (_, TermFloat16 _) = return []
+getClosedVarChain (_, TermFloat32 _) = return []
+getClosedVarChain (_, TermFloat64 _) = return []
+getClosedVarChain (_, TermEnum _) = return []
+getClosedVarChain (_, TermEnumIntro _) = return []
+getClosedVarChain (_, TermEnumElim e les) = do
+  xs1 <- getClosedVarChain e
+  let es = map snd les
+  xs2 <- concat <$> mapM getClosedVarChain es
+  return $ xs1 ++ xs2
+getClosedVarChain (_, TermArray _ indexType) = getClosedVarChain indexType
+getClosedVarChain (_, TermArrayIntro _ les) = do
+  let es = map snd les
+  concat <$> mapM getClosedVarChain es
+getClosedVarChain (_, TermArrayElim _ e1 e2) = do
+  xs1 <- getClosedVarChain e1
+  xs2 <- getClosedVarChain e2
+  return $ xs1 ++ xs2
+
+getClosedVarChainBindings ::
+     [(Identifier, TermPlus)]
+  -> [TermPlus]
+  -> WithEnv [(Identifier, Meta, TermPlus)]
+getClosedVarChainBindings [] es = concat <$> mapM getClosedVarChain es
+getClosedVarChainBindings ((x, t):xts) es = do
+  xs1 <- getClosedVarChain t
+  xs2 <- getClosedVarChainBindings xts es
+  return $ xs1 ++ filter (\(y, _, _) -> y /= x) xs2

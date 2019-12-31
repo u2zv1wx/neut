@@ -1,7 +1,5 @@
 module Data.Term where
 
-import Control.Monad (forM)
-import Data.List (nubBy)
 import Data.Maybe (fromMaybe)
 import Numeric.Half
 
@@ -42,47 +40,6 @@ toTermUpsilon x = do
 
 toTermInt64 :: Integer -> TermPlus
 toTermInt64 i = (emptyMeta, TermIntS 64 i)
-
-varTermPlus :: TermPlus -> [(Identifier, Meta, TermPlus)]
-varTermPlus e = nubBy (\(x, _, _) (y, _, _) -> x == y) $ getClosedVarChain e
-
-getClosedVarChain :: TermPlus -> [(Identifier, Meta, TermPlus)]
-getClosedVarChain (_, TermTau) = []
-getClosedVarChain (_, TermTheta _) = []
-getClosedVarChain (_, TermUpsilon _) = undefined
-  -- case m of
-  --   MetaTerminal ml -> [(x, ml, (m, TermTau))]
-  --   MetaNonTerminal t ml -> getClosedVarChain t ++ [(x, ml, t)]
-getClosedVarChain (_, TermPi xts t) = getClosedVarChainBindings xts [t]
-getClosedVarChain (_, TermPiIntro xts e) = getClosedVarChainBindings xts [e]
-getClosedVarChain (_, TermPiElim e es) =
-  getClosedVarChain e ++ concatMap getClosedVarChain es
-getClosedVarChain (_, TermMu ut e) = getClosedVarChainBindings [ut] [e]
-getClosedVarChain (_, TermIntS _ _) = []
-getClosedVarChain (_, TermIntU _ _) = []
-getClosedVarChain (_, TermFloat16 _) = []
-getClosedVarChain (_, TermFloat32 _) = []
-getClosedVarChain (_, TermFloat64 _) = []
-getClosedVarChain (_, TermEnum _) = []
-getClosedVarChain (_, TermEnumIntro _) = []
-getClosedVarChain (_, TermEnumElim e branchList) = do
-  let xhs = getClosedVarChain e
-  xhss <- forM branchList $ \(_, body) -> do return $ getClosedVarChain body
-  concat (xhs : xhss)
-getClosedVarChain (_, TermArray _ indexType) = getClosedVarChain indexType
-getClosedVarChain (_, TermArrayIntro _ les) = do
-  let (_, es) = unzip les
-  concat $ map getClosedVarChain es
-getClosedVarChain (_, TermArrayElim _ e1 e2) = do
-  getClosedVarChain e1 ++ getClosedVarChain e2
-
-getClosedVarChainBindings ::
-     [(Identifier, TermPlus)] -> [TermPlus] -> [(Identifier, Meta, TermPlus)]
-getClosedVarChainBindings [] es = concatMap getClosedVarChain es
-getClosedVarChainBindings ((x, t):xts) es = do
-  let xs1 = getClosedVarChain t
-  let xs2 = getClosedVarChainBindings xts es
-  xs1 ++ filter (\(y, _, _) -> y /= x) xs2
 
 substTermPlus :: SubstTerm -> TermPlus -> TermPlus
 substTermPlus _ (m, TermTau) = (m, TermTau)
