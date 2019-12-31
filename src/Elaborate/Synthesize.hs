@@ -31,22 +31,19 @@ synthesize q = do
       | Just (m, e) <- lookupAny ms sub -> resolveStuck q e1 e2 m e
     Just (Enriched _ _ (ConstraintPattern m ess e)) -> do
       resolvePiElim q m ess e
-    -- Just (Enriched _ _ (ConstraintQuasiPattern m ess e)) -> do
-    --   p "resolve-quasi-pattern"
-    --   resolvePiElim q m ess e
-    -- Just (Enriched _ _ (ConstraintFlexRigid m ess e)) -> do
-    --   p "resolve-flex-rigid"
-    --   resolvePiElim q m ess e
-    -- Just (Enriched _ _ (ConstraintFlexFlex m ess e)) -> do
-    --   p "resolve-flex-flex"
-    --   resolvePiElim q m ess e
+    Just (Enriched _ _ (ConstraintDelta x ess e)) -> do
+      resolveDelta q x ess e
+    Just (Enriched _ _ (ConstraintQuasiPattern m ess e)) -> do
+      resolvePiElim q m ess e
+    Just (Enriched _ _ (ConstraintFlexRigid m ess e)) -> do
+      resolvePiElim q m ess e
+    Just (Enriched _ _ (ConstraintFlexFlex m ess e)) -> do
+      resolvePiElim q m ess e
     Just (Enriched (e1, e2) ms _) -> do
       p' $ sort $ map fst sub
       p' q
       p "ms:"
       p' ms
-      -- p "hole-with-type-118"
-      -- p' $ lookup "hole-with-type-118" sub
       throwError $ "cannot simplify:\n" ++ Pr.ppShow (e1, e2)
 
 resolveStuck ::
@@ -57,11 +54,20 @@ resolveStuck ::
   -> PreTermPlus
   -> WithEnv ()
 resolveStuck q e1 e2 h e = do
-  p $ "resolveStuck for " ++ h
   let fmvs = holePreTermPlus e
   let e1' = substPreTermPlus [(h, e)] e1
   let e2' = substPreTermPlus [(h, e)] e2
   q' <- assert (h `notElem` fmvs) $ analyze [(e1', e2')]
+  synthesize $ Q.deleteMin q `Q.union` q'
+
+resolveDelta ::
+     ConstraintQueue
+  -> PreTermPlus
+  -> [(PreMeta, [PreTermPlus])]
+  -> PreTermPlus
+  -> WithEnv ()
+resolveDelta q body mess1 e2 = do
+  q' <- analyze [(toPiElim body mess1, e2)]
   synthesize $ Q.deleteMin q `Q.union` q'
 
 -- Synthesize `hole @ arg-1 @ ... @ arg-n = e`, where arg-i is a variable.
@@ -90,7 +96,6 @@ resolvePiElim q m ess e = do
 -- で、synthesizeのときに複数のhole-substをまとめてこっちに渡す。
 resolveHole :: ConstraintQueue -> Hole -> PreTermPlus -> WithEnv ()
 resolveHole q m e = do
-  p $ "resolveHole for: " ++ m
   senv <- gets substEnv
   e' <- reducePreTermPlus $ substPreTermPlus senv e
   modify (\env -> env {substEnv = compose [(m, e')] senv})
@@ -176,7 +181,6 @@ chain _ (e:_) = e
 
 -- chain _ [e] = e
 -- chain c (e:es) = catchError e $ (const $ chain c es)
--- chain c (e:es) = e `catchError` (\err -> chain c es)
 lookupAny :: [Hole] -> [(Identifier, a)] -> Maybe (Hole, a)
 lookupAny [] _ = Nothing
 lookupAny (h:ks) sub = do
@@ -190,6 +194,10 @@ bindFormalArgs e (xts:xtss) = do
   let e' = bindFormalArgs e xtss
   let tPi = (metaTerminal, PreTermPi xts (typeOf e'))
   (PreMetaNonTerminal tPi Nothing, PreTermPiIntro xts e')
+
+toPiElim :: PreTermPlus -> [(PreMeta, [PreTermPlus])] -> PreTermPlus
+toPiElim e [] = e
+toPiElim e ((m, es):ess) = toPiElim (m, PreTermPiElim e es) ess
 
 -- takeByCount [1, 3, 2] [a, b, c, d, e, f, g, h] ~> [[a], [b, c, d], [e, f]]
 takeByCount :: [Int] -> [a] -> [[a]]

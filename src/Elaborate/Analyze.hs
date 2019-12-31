@@ -96,70 +96,56 @@ simp' (((_, PreTermArrayIntro k1 les1), (_, PreTermArrayIntro k2 les2)):cs)
 simp' ((e1, e2):cs) = do
   let ms1 = asStuckedTerm e1
   let ms2 = asStuckedTerm e2
-  -- let h1 = ms1 >>= stuckReasonOf
-  -- let h2 = ms2 >>= stuckReasonOf
   let hs = catMaybes [ms1 >>= stuckReasonOf, ms2 >>= stuckReasonOf]
-  -- let hs' = map stuckReasonOf' $ catMaybes [ms1, ms2]
-  -- let hs' = hs
-  let ds = catMaybes [ms1 >>= stuckReasonOf', ms2 >>= stuckReasonOf']
-  -- let ds = catmap stuckReasonOf' $ catMaybes [ms1, ms2]
-  -- let hs = catMaybes $ mapM (stuckReasonOf) [ms1, ms2]
-  -- let hs = map stuckReasonOf $ catMaybes [ms1, ms2]
   sub <- gets substEnv
-  -- let fmvs = (concatMap holePreTermPlus [e1, e2])
   if any (`elem` map fst sub) hs
     then do
       cs' <- simp' cs
       let c = Enriched (e1, e2) hs $ ConstraintAnalyzable
       return $ c : cs'
-    else if any (`elem` map fst sub) ds
-           then do
-             p "found delta. ds:"
-             p' ds
-             cs' <- simp' cs
-             let c = Enriched (e1, e2) ds $ ConstraintDelta
-             return $ c : cs'
-           else do
-             case (ms1, ms2) of
-               (Just (StuckPiElimStrict h1 ies1), _)
-                 | onesided h1 e2
-                 , xs <- concatMap getVarList ies1
-                 , subsume e2 xs
-                 , isDisjoint xs -> simpStuckStrict h1 ies1 e1 e2 cs
-               (_, Just (StuckPiElimStrict h2 ies2))
-                 | onesided h2 e1
-                 , xs <- concatMap getVarList ies2
-                 , subsume e1 xs
-                 , isDisjoint xs -> simpStuckStrict h2 ies2 e2 e1 cs
-        -- (Just (StuckPiElim h1 ies1), Nothing)
-        --   | onesided h1 e2
-        --   , xs <- concatMap getVarList ies1
-        --   , subsume e2 xs -> simpFlexRigid h1 ies1 e1 e2 cs
-        -- (Nothing, Just (StuckPiElim h2 ies2))
-        --   | onesided h2 e1
-        --   , xs <- concatMap getVarList ies2
-        --   , subsume e1 xs -> simpFlexRigid h2 ies2 e2 e1 cs
-        -- (Just (StuckPiElim h1 ies1), Just (StuckPiElim h2 ies2))
-        --   | onesided h1 e2
-        --   , xs <- concatMap getVarList ies1
-        --   , subsume e2 xs -> simpFlexFlex h1 h2 ies1 ies2 e1 e2 cs
-        -- (Just (StuckPiElim h1 ies1), Just (StuckPiElim h2 ies2))
-        --   | onesided h2 e1
-        --   , xs <- concatMap getVarList ies2
-        --   , subsume e1 xs -> simpFlexFlex h1 h2 ies1 ies2 e1 e2 cs
-               _ -> simpOther e1 e2 (hs ++ ds) cs
-        -- (Just (StuckPiElimStrict h1 _), _) -> simpOther e1 e2 hs cs
-        -- (_, Just (StuckPiElimStrict h2 _)) -> simpOther e1 e2 hs cs
-        -- (Just (StuckPiElim h1 _), Nothing) -> simpOther e1 e2 hs cs
-        -- (Nothing, Just (StuckPiElim h2 _)) -> simpOther e1 e2 hs cs
-        -- (Just (StuckPiElimStrict h1 _), _) -> simpOther e1 e2 [h1] cs -- このへんhsでよくね？
-        -- (_, Just (StuckPiElimStrict h2 _)) -> simpOther e1 e2 [h2] cs
-        -- (Just (StuckPiElim h1 _), Nothing) -> simpOther e1 e2 [h1] cs
-        -- (Nothing, Just (StuckPiElim h2 _)) -> simpOther e1 e2 [h2] cs
-        -- (Just (StuckPiElim h1 _), Just (StuckPiElim h2 _)) ->
-        --   simpOther e1 e2 [h1, h2] cs
-        -- (Nothing, Nothing) ->
-        --   simpOther e1 e2 (concatMap holePreTermPlus [e1, e2]) cs
+    else do
+      case (ms1, ms2) of
+        (Just (StuckPiElimStrict h1 ies1), _)
+          | onesided h1 e2
+          , xs <- concatMap getVarList ies1
+          , subsume e2 xs
+          , isDisjoint xs -> simpPattern h1 ies1 e1 e2 cs
+        (_, Just (StuckPiElimStrict h2 ies2))
+          | onesided h2 e1
+          , xs <- concatMap getVarList ies2
+          , subsume e1 xs
+          , isDisjoint xs -> simpPattern h2 ies2 e2 e1 cs
+        (Just (DeltaPiElim h1 mess1), _)
+          | Just body <- lookup h1 sub -> simpDelta body mess1 e1 e2 cs
+        (_, Just (DeltaPiElim h2 mess2))
+          | Just body <- lookup h2 sub -> simpDelta body mess2 e2 e1 cs
+        (Just (StuckPiElimStrict h1 ies1), _)
+          | onesided h1 e2
+          , xs <- concatMap getVarList ies1
+          , subsume e2 xs -> simpQuasiPattern h1 ies1 e1 e2 cs
+        (_, Just (StuckPiElimStrict h2 ies2))
+          | onesided h2 e1
+          , xs <- concatMap getVarList ies2
+          , subsume e1 xs -> simpQuasiPattern h2 ies2 e2 e1 cs
+        (Just (StuckPiElim h1 ies1), Nothing)
+          | onesided h1 e2
+          , xs <- concatMap getVarList ies1
+          , subsume e2 xs -> simpFlexRigid h1 ies1 e1 e2 cs
+        (Nothing, Just (StuckPiElim h2 ies2))
+          | onesided h2 e1
+          , xs <- concatMap getVarList ies2
+          , subsume e1 xs -> simpFlexRigid h2 ies2 e2 e1 cs
+        (Just (StuckPiElim h1 ies1), Just (StuckPiElim h2 ies2))
+          | onesided h1 e2
+          , xs <- concatMap getVarList ies1
+          , subsume e2 xs -> simpFlexFlex h1 h2 ies1 ies2 e1 e2 cs
+        (Just (StuckPiElim h1 ies1), Just (StuckPiElim h2 ies2))
+          | onesided h2 e1
+          , xs <- concatMap getVarList ies2
+          , subsume e1 xs -> simpFlexFlex h1 h2 ies1 ies2 e1 e2 cs
+        _ -> do
+          let fmvs = (concatMap holePreTermPlus [e1, e2])
+          simpOther e1 e2 fmvs cs
 
 simpReduce ::
      PreTermPlus
@@ -214,46 +200,77 @@ simpArrayIntro les1 les2 = do
     then throwError "simpArrayIntro"
     else simp $ zip es1 es2
 
-simpStuckStrict ::
+simpPattern ::
      Identifier
   -> [[PreTermPlus]]
   -> PreTermPlus
   -> PreTermPlus
   -> [(PreTermPlus, PreTermPlus)]
   -> WithEnv [EnrichedConstraint]
-simpStuckStrict h1 ies1 e1 e2 cs = do
+simpPattern h1 ies1 e1 e2 cs = do
   cs' <- simp cs
-  -- if isDisjoint xs
-  --   then return $ Enriched (e1, e2) [h1] (ConstraintPattern h1 ies1 e2) : cs'
-  --   else simpOther e1 e2 [h1] cs
   return $ Enriched (e1, e2) [h1] (ConstraintPattern h1 ies1 e2) : cs'
-    -- else return $
-    --      Enriched (e1, e2) [h1] (ConstraintQuasiPattern h1 ies1 e2) : cs'
 
--- simpFlexRigid ::
---      Hole
---   -> [[PreTermPlus]]
---   -> PreTermPlus
---   -> PreTermPlus
---   -> [PreConstraint]
---   -> WithEnv [EnrichedConstraint]
--- simpFlexRigid h1 ies1 e1 e2 cs = do
---   cs' <- simp cs
---   let c = Enriched (e1, e2) [h1] $ ConstraintFlexRigid h1 ies1 e2
---   return $ c : cs'
+simpDelta ::
+     PreTermPlus
+  -> [(PreMeta, [PreTermPlus])]
+  -> PreTermPlus
+  -> PreTermPlus
+  -> [(PreTermPlus, PreTermPlus)]
+  -> WithEnv [EnrichedConstraint]
+simpDelta body mes1 e1 e2 cs = do
+  cs' <- simp cs
+  return $ Enriched (e1, e2) [] (ConstraintDelta body mes1 e2) : cs'
+
+simpQuasiPattern ::
+     Identifier
+  -> [[PreTermPlus]]
+  -> PreTermPlus
+  -> PreTermPlus
+  -> [(PreTermPlus, PreTermPlus)]
+  -> WithEnv [EnrichedConstraint]
+simpQuasiPattern h1 ies1 e1 e2 cs = do
+  cs' <- simp cs
+  let fmvs = (concatMap holePreTermPlus [e1, e2])
+  return $ Enriched (e1, e2) fmvs (ConstraintQuasiPattern h1 ies1 e2) : cs'
+
+simpFlexRigid ::
+     Hole
+  -> [[PreTermPlus]]
+  -> PreTermPlus
+  -> PreTermPlus
+  -> [PreConstraint]
+  -> WithEnv [EnrichedConstraint]
+simpFlexRigid h1 ies1 e1 e2 cs = do
+  cs' <- simp cs
+  let fmvs = (concatMap holePreTermPlus [e1, e2])
+  return $ Enriched (e1, e2) fmvs (ConstraintFlexRigid h1 ies1 e2) : cs'
+
 -- simpFlexFlex ::
 --      Hole
---   -> Hole
---   -> [[PreTermPlus]]
 --   -> [[PreTermPlus]]
 --   -> PreTermPlus
 --   -> PreTermPlus
 --   -> [PreConstraint]
 --   -> WithEnv [EnrichedConstraint]
--- simpFlexFlex h1 h2 ies1 _ e1 e2 cs = do
+-- simpFlexFlex h1 ies1 e1 e2 cs = do
 --   cs' <- simp cs
---   let c = Enriched (e1, e2) [h1, h2] $ ConstraintFlexFlex h1 ies1 e2
---   return $ c : cs'
+--   -- let c = Enriched (e1, e2) [h1] $ ConstraintFlexFlex h1 ies1 e2
+--   return $ Enriched (e1, e2) [h1] (ConstraintFlexFlex h1 ies1 e2) : cs'
+simpFlexFlex ::
+     Hole
+  -> Hole
+  -> [[PreTermPlus]]
+  -> [[PreTermPlus]]
+  -> PreTermPlus
+  -> PreTermPlus
+  -> [PreConstraint]
+  -> WithEnv [EnrichedConstraint]
+simpFlexFlex h1 h2 ies1 _ e1 e2 cs = do
+  cs' <- simp cs
+  let c = Enriched (e1, e2) [h1, h2] $ ConstraintFlexFlex h1 ies1 e2
+  return $ c : cs'
+
 simpOther ::
      PreTermPlus
   -> PreTermPlus
@@ -268,29 +285,29 @@ simpOther e1 e2 fmvs cs = do
 data Stuck
   = StuckPiElim Hole [[PreTermPlus]]
   | StuckPiElimStrict Hole [[PreTermPlus]]
-  | DeltaPiElim Identifier [[PreTermPlus]]
+  | DeltaPiElim Identifier [(PreMeta, [PreTermPlus])] -- ここでmetaを保持。
 
 asStuckedTerm :: PreTermPlus -> Maybe Stuck
 asStuckedTerm (_, PreTermPiElim (_, PreTermZeta h) es)
   | Just _ <- mapM asUpsilon es = Just $ StuckPiElimStrict h [es]
 asStuckedTerm (_, PreTermPiElim (_, PreTermZeta h) es) =
   Just $ StuckPiElim h [es]
-asStuckedTerm (_, PreTermPiElim (_, PreTermUpsilon x) es) =
-  Just $ DeltaPiElim x [es]
-asStuckedTerm (_, PreTermPiElim e es)
+asStuckedTerm (m, PreTermPiElim (_, PreTermUpsilon x) es) =
+  Just $ DeltaPiElim x [(m, es)]
+asStuckedTerm (m, PreTermPiElim e es)
   | Just _ <- mapM asUpsilon es =
     case asStuckedTerm e of
       Just (StuckPiElim h iess) -> Just $ StuckPiElim h (iess ++ [es])
       Just (StuckPiElimStrict h iexss) ->
         Just $ StuckPiElimStrict h $ iexss ++ [es]
-      Just (DeltaPiElim x ess) -> Just $ DeltaPiElim x $ ess ++ [es]
+      Just (DeltaPiElim x ess) -> Just $ DeltaPiElim x $ ess ++ [(m, es)]
       Nothing -> Nothing
-asStuckedTerm (_, PreTermPiElim e es) =
+asStuckedTerm (m, PreTermPiElim e es) =
   case asStuckedTerm e of
     Just (StuckPiElim h iess) -> Just $ StuckPiElim h $ iess ++ [es]
     Just (StuckPiElimStrict h iess) -> do
       Just $ StuckPiElim h $ iess ++ [es]
-    Just (DeltaPiElim x ess) -> Just $ DeltaPiElim x $ ess ++ [es]
+    Just (DeltaPiElim x ess) -> Just $ DeltaPiElim x $ ess ++ [(m, es)]
     Nothing -> Nothing
 asStuckedTerm _ = Nothing
 
@@ -299,16 +316,10 @@ stuckReasonOf (StuckPiElim h _) = Just h
 stuckReasonOf (StuckPiElimStrict h _) = Just h
 stuckReasonOf (DeltaPiElim _ _) = Nothing
 
-stuckReasonOf' :: Stuck -> Maybe Hole
-stuckReasonOf' (StuckPiElim _ _) = Nothing
-stuckReasonOf' (StuckPiElimStrict _ _) = Nothing
-stuckReasonOf' (DeltaPiElim x _) = Just x
-
 onesided :: Identifier -> PreTermPlus -> Bool
 onesided h e = h `notElem` holePreTermPlus e
 
 subsume :: PreTermPlus -> [Identifier] -> Bool
--- subsume _ _ = True
 subsume e xs = all (`elem` xs) $ varPreTermPlus e
 
 isDisjoint :: [Identifier] -> Bool
