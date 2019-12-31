@@ -125,7 +125,7 @@ polarize' e@(m, _) = do
 
 makeClosure ::
      Maybe Identifier -- the name of newly created closure
-  -> [(Identifier, Meta, TermPlus)] -- list of free variables in `lam (x1, ..., xn). e`
+  -> [(Identifier, Meta, TermPlus)] -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
   -> Meta -- meta of lambda
   -> [(Identifier, TermPlus)] -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
   -> CodePlus -- the `e` in `lam (x1, ..., xn). e`
@@ -135,7 +135,8 @@ makeClosure mName fvs m xts e = do
   let (freeVarNameList, locList, freeVarTypeList) = unzip3 fvs
   negTypeList <- mapM polarize freeVarTypeList
   expName <- newNameWith "exp"
-  envExp <- cartesianSigma expName m $ map Left negTypeList
+  envExp <-
+    cartesianSigma expName m $ map Right $ zip freeVarNameList negTypeList
   (envVarName, envVar) <- newDataUpsilonWith "env"
   let (xs', ts) = unzip $ zip freeVarNameList freeVarTypeList ++ xts
   ts' <- mapM polarize ts
