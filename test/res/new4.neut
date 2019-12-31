@@ -1,0 +1,26 @@
+;; define basic notations
+
+;; synonyms
+(keyword type)
+(notation type tau)
+
+(keyword let)
+(keyword begin)
+(keyword definition)
+
+(keyword lambda)
+(notation lambda pi-introduction)
+
+;; type ascription
+;; (ascribe e t) ~> (let (_ t) e)
+(keyword ascription)
+
+(notation (ascription e t)
+  (let (_ t) e))
+
+(constant is-enum)
+(ascription is-enum (pi ((_ type)) type))
+
+(enum top unit)
+
+unit

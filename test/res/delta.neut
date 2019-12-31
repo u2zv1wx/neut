@@ -1,0 +1,58 @@
+;; 変数名のalphaぶんだけずれて推論に失敗する問題の原因を探るためのファイル。
+;; define basic notations
+
+;; synonyms
+(keyword type)
+(notation type tau)
+
+(keyword apply)
+(notation apply pi-elimination)
+
+(keyword fix)
+(notation fix mu)
+
+;; sequential execution
+(keyword pi-i)
+(notation pi-i pi-introduction)
+
+(keyword pi-e)
+(notation pi-e pi-elimination)
+
+(keyword let)
+(keyword begin)
+(keyword definition)
+
+(notation (begin e) e)
+
+(notation (begin e rest+)
+  (pi-e (pi-i ((_ _)) (begin rest+)) (begin e)))
+
+(notation (begin (let x e+) rest+)
+  (pi-e (pi-i ((x _)) (begin rest+)) (begin e+)))
+
+(notation (begin (definition x e) rest+)
+  (pi-e (pi-i ((x _)) (begin rest+)) (mu x e)))
+
+(notation (begin (definition name (x+) e+) rest+)
+  (pi-e (pi-i ((name _)) (begin rest+)) (mu name (pi-i (x+) (begin e+)))))
+
+;; lambda: pi-introduction with implicit begin block
+(keyword lambda)
+(notation (lambda (xts+) e)
+  (pi-i (xts+) (begin e)))
+
+(notation (definition name (x+) e+)
+  (let name (mu name (lambda (x+) e+))))
+
+(enum top unit)
+
+;; (let id
+;;   (lambda ((A type) (x A))
+;;     x))
+
+(definition id ((A type) (x A))
+  x)
+
+(id top unit)
+;; (io-return top unit)
+;; stdout

@@ -1,0 +1,40 @@
+;; define basic notations
+
+;; synonyms
+(keyword fix)
+(notation fix mu)
+
+;; sequential execution
+(keyword pi-i)
+(notation pi-i pi-introduction)
+
+(keyword pi-e)
+(notation pi-e pi-elimination)
+
+(keyword let)
+(keyword begin)
+(keyword definition)
+
+(notation (begin e) e)
+
+(notation (begin e rest+)
+  (pi-e (pi-i ((_ _)) (begin rest+)) (begin e)))
+
+(notation (begin (let x e+) rest+)
+  (pi-e (pi-i ((x _)) (begin rest+)) (begin e+)))
+
+;; lambda: pi-introduction with implicit begin block
+(keyword lambda)
+(notation (lambda (xts+) e+)
+  (pi-i (xts+) (begin e+)))
+
+;; (enum bottom) ;; for io-monad
+
+(enum top unit)
+
+(lambda ((env top))
+  (lambda
+    ((eliminator (pi ((_ top) (_ top)) _)))
+    (eliminator env unit)))
+
+;; unit

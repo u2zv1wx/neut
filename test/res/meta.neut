@@ -1,0 +1,120 @@
+;; define basic notations
+
+;; synonyms
+(keyword type)
+(notation type tau)
+
+(keyword universe)
+(notation universe tau)
+
+(keyword forall)
+(notation forall pi)
+
+(keyword apply)
+(notation apply pi-elimination)
+
+(keyword fix)
+(notation fix mu)
+
+;; sequential execution
+(keyword pi-i)
+(notation pi-i pi-introduction)
+
+(keyword pi-e)
+(notation pi-e pi-elimination)
+
+(keyword let)
+(keyword begin)
+(keyword definition)
+
+(notation (begin e) e)
+
+(notation (begin e rest+)
+  (pi-e (pi-i ((_ _)) (begin rest+)) (begin e)))
+
+(notation (begin (let x e+) rest+)
+  (pi-e (pi-i ((x _)) (begin rest+)) (begin e+)))
+
+(notation (begin (definition x e) rest+)
+  (pi-e (pi-i ((x _)) (begin rest+)) (mu x e)))
+
+(notation (begin (definition name (x+) e+) rest+)
+  (pi-e (pi-i ((name _)) (begin rest+)) (mu name (pi-i (x+) (begin e+)))))
+
+;; lambda: pi-introduction with implicit begin block
+(keyword lambda)
+(notation (lambda (xts+) e)
+  (pi-i (xts+) (begin e)))
+
+;; define recursive term at top level without using `mu` explicitly
+(notation (definition name e)
+  (let name (mu name e))) ;; こっちの `let` はspecial formのほうのlet.
+
+(notation (definition name (x+) e+)
+  (let name (mu name (lambda (x+) e+))))
+
+;; type ascription
+;; (ascribe e t) ~> (let (_ t) e)
+(keyword ascription)
+
+(constant is-enum)
+
+(notation (ascription e t)
+  (let (_ t) e))
+
+(ascription is-enum (pi ((_ type)) type))
+
+;; (hom a b c) = a -> (b -> c)
+(keyword hom)
+
+(notation (hom t) t)
+
+(notation (hom t rest+)
+  (pi
+    ((_ t))
+    (hom rest+)))
+
+(keyword sigma)
+
+(notation (sigma (xt+) t)
+  (pi
+    ((c tau)
+     (_ (pi (xt+ (_ t)) c)))
+    c))
+
+;; ここはarrowの定義のおかげでさくっといける。
+;; cって導入してある新しい変数はスコープがちゃんとここで切れてるので問題なし。
+(keyword product)
+
+(notation (product t+)
+  (pi
+    ((c tau)
+     (_ (arrow (t+) c)))
+    c))
+
+;; 型推論を信じていくスタイル。
+(keyword sigma-introduction)
+
+(notation (sigma-introduction e+)
+  (lambda
+    ((elim-result-type tau)
+     (eliminator _)) ;; eliminatorの型は推論で決定する
+    (eliminator e+)))
+
+(definition state ((S type) (A type))
+  (hom S (product S A)))
+
+(definition state-return ((S type) (A type) (x A))
+  (lambda ((env S))
+    (sigma-introduction env x)))
+
+(enum bottom) ;; for io-monad
+
+(enum top unit)
+
+;; (lambda ((env bottom))
+;;   (sigma-introduction-2 env unit))
+(state-return bottom top unit)
+
+;; (io-return top unit)
+;; stdout
