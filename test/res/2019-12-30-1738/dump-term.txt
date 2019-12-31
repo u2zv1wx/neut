@@ -1,0 +1,122 @@
+( _
+, PreTermPiElim
+    ( _
+    , PreTermPiIntro
+        [ ( "hole-explicit-0-3"
+          , ( _
+            , PreTermPi
+                [ ( "hole-explicit-1-2" , ( _ , PreTermTau ) ) ] ( _ , PreTermTau )
+            )
+          )
+        ]
+        ( _
+        , PreTermPiElim
+            ( _
+            , PreTermPiIntro
+                [ ( "hole-parse-enum-4"
+                  , ( _
+                    , PreTermPiElim
+                        ( _ , PreTermTheta "is-enum" )
+                        [ ( _ , PreTermEnum (EnumTypeLabel "top") ) ]
+                    )
+                  )
+                ]
+                ( _
+                , PreTermPiElim
+                    ( _
+                    , PreTermPiIntro
+                        [ ( "itself-9"
+                          , ( _
+                            , PreTermPiElim
+                                ( _ , PreTermZeta "hole-with-type-25" )
+                                [ ( _ , PreTermUpsilon "hole-explicit-0-3" )
+                                , ( _ , PreTermUpsilon "hole-parse-enum-4" )
+                                ]
+                            )
+                          )
+                        ]
+                        ( _
+                        , PreTermPiElim
+                            ( _
+                            , PreTermPiIntro
+                                [ ( "id-15"
+                                  , ( _
+                                    , PreTermPiElim
+                                        ( _ , PreTermZeta "hole-with-type-27" )
+                                        [ ( _ , PreTermUpsilon "hole-explicit-0-3" )
+                                        , ( _ , PreTermUpsilon "hole-parse-enum-4" )
+                                        , ( _ , PreTermUpsilon "itself-9" )
+                                        ]
+                                    )
+                                  )
+                                ]
+                                ( _
+                                , PreTermPiElim
+                                    ( _
+                                    , PreTermPiIntro
+                                        [ ( "hole-explicit-16-19"
+                                          , ( _
+                                            , PreTermPi
+                                                [ ( "A-17" , ( _ , PreTermTau ) )
+                                                , ( "x-18" , ( _ , PreTermUpsilon "A-17" ) )
+                                                ]
+                                                ( _
+                                                , PreTermPiElim
+                                                    ( _ , PreTermUpsilon "itself-9" )
+                                                    [ ( _ , PreTermUpsilon "A-17" ) ]
+                                                )
+                                            )
+                                          )
+                                        ]
+                                        ( _ , PreTermEnumIntro (EnumValueLabel "unit") )
+                                    )
+                                    [ ( _ , PreTermUpsilon "id-15" ) ]
+                                )
+                            )
+                            [ ( _
+                              , PreTermMu
+                                  ( "id-11"
+                                  , ( _
+                                    , PreTermPiElim
+                                        ( _ , PreTermZeta "hole-with-type-32" )
+                                        [ ( _ , PreTermUpsilon "hole-explicit-0-3" )
+                                        , ( _ , PreTermUpsilon "hole-parse-enum-4" )
+                                        , ( _ , PreTermUpsilon "itself-9" )
+                                        ]
+                                    )
+                                  )
+                                  ( _
+                                  , PreTermPiIntro
+                                      [ ( "A-12" , ( _ , PreTermTau ) )
+                                      , ( "x-13" , ( _ , PreTermUpsilon "A-12" ) )
+                                      ]
+                                      ( _ , PreTermUpsilon "x-13" )
+                                  )
+                              )
+                            ]
+                        )
+                    )
+                    [ ( _
+                      , PreTermMu
+                          ( "itself-6"
+                          , ( _
+                            , PreTermPiElim
+                                ( _ , PreTermZeta "hole-with-type-34" )
+                                [ ( _ , PreTermUpsilon "hole-explicit-0-3" )
+                                , ( _ , PreTermUpsilon "hole-parse-enum-4" )
+                                ]
+                            )
+                          )
+                          ( _
+                          , PreTermPiIntro
+                              [ ( "S-7" , ( _ , PreTermTau ) ) ] ( _ , PreTermUpsilon "S-7" )
+                          )
+                      )
+                    ]
+                )
+            )
+            [ ( _ , PreTermTheta "enum.top" ) ]
+        )
+    )
+    [ ( _ , PreTermTheta "is-enum" ) ]
+)

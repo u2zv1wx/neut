@@ -1,0 +1,9 @@
+(include "../header.neut")
+
+(constant is-enum)
+
+(ascription is-enum (pi ((_ type)) type))
+
+(enum top unit)
+
+unit

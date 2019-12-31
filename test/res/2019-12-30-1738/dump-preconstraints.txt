@@ -1,0 +1,253 @@
+[ ( ( _
+    , PreTermPi
+        [ ( "hole-explicit-1-2" , ( _ , PreTermTau ) ) ] ( _ , PreTermTau )
+    )
+  , ( _
+    , PreTermPiElim
+        ( _ , PreTermZeta "hole-with-type-20" )
+        [ ( _ , PreTermUpsilon "hole-explicit-0-3" ) ]
+    )
+  )
+, ( ( _
+    , PreTermPiElim
+        ( _ , PreTermTheta "is-enum" )
+        [ ( _ , PreTermEnum (EnumTypeLabel "top") ) ]
+    )
+  , ( _
+    , PreTermPiElim
+        ( _ , PreTermZeta "hole-with-type-35" )
+        [ ( _ , PreTermUpsilon "hole-explicit-0-3" ) ]
+    )
+  )
+, ( ( _
+    , PreTermPiElim
+        ( _ , PreTermZeta "hole-with-type-25" )
+        [ ( _ , PreTermUpsilon "hole-explicit-0-3" )
+        , ( _ , PreTermUpsilon "hole-parse-enum-4" )
+        ]
+    )
+  , ( _
+    , PreTermPiElim
+        ( _ , PreTermZeta "hole-with-type-34" )
+        [ ( _ , PreTermUpsilon "hole-explicit-0-3" )
+        , ( _ , PreTermUpsilon "hole-parse-enum-4" )
+        ]
+    )
+  )
+, ( ( _
+    , PreTermPiElim
+        ( _ , PreTermZeta "hole-with-type-34" )
+        [ ( _ , PreTermUpsilon "hole-explicit-0-3" )
+        , ( _ , PreTermUpsilon "hole-parse-enum-4" )
+        ]
+    )
+  , ( _
+    , PreTermPi [ ( "S-7" , ( _ , PreTermTau ) ) ] ( _ , PreTermTau )
+    )
+  )
+, ( ( _ , PreTermTau ) , ( _ , PreTermTau ) )
+, ( ( _
+    , PreTermPiElim
+        ( _ , PreTermZeta "hole-with-type-33" )
+        [ ( _ , PreTermUpsilon "hole-explicit-0-3" )
+        , ( _ , PreTermUpsilon "hole-parse-enum-4" )
+        ]
+    )
+  , ( _ , PreTermTau )
+  )
+, ( ( _
+    , PreTermPiElim
+        ( _ , PreTermZeta "hole-with-type-27" )
+        [ ( _ , PreTermUpsilon "hole-explicit-0-3" )
+        , ( _ , PreTermUpsilon "hole-parse-enum-4" )
+        , ( _ , PreTermUpsilon "itself-9" )
+        ]
+    )
+  , ( _
+    , PreTermPiElim
+        ( _ , PreTermZeta "hole-with-type-32" )
+        [ ( _ , PreTermUpsilon "hole-explicit-0-3" )
+        , ( _ , PreTermUpsilon "hole-parse-enum-4" )
+        , ( _ , PreTermUpsilon "itself-9" )
+        ]
+    )
+  )
+, ( ( _
+    , PreTermPiElim
+        ( _ , PreTermZeta "hole-with-type-32" )
+        [ ( _ , PreTermUpsilon "hole-explicit-0-3" )
+        , ( _ , PreTermUpsilon "hole-parse-enum-4" )
+        , ( _ , PreTermUpsilon "itself-9" )
+        ]
+    )
+  , ( _
+    , PreTermPi
+        [ ( "A-12" , ( _ , PreTermTau ) )
+        , ( "x-13" , ( _ , PreTermUpsilon "A-12" ) )
+        ]
+        ( _ , PreTermUpsilon "A-12" )
+    )
+  )
+, ( ( _ , PreTermTau ) , ( _ , PreTermTau ) )
+, ( ( _ , PreTermTau ) , ( _ , PreTermTau ) )
+, ( ( _
+    , PreTermPiElim
+        ( _ , PreTermZeta "hole-with-type-31" )
+        [ ( _ , PreTermUpsilon "hole-explicit-0-3" )
+        , ( _ , PreTermUpsilon "hole-parse-enum-4" )
+        , ( _ , PreTermUpsilon "itself-9" )
+        ]
+    )
+  , ( _ , PreTermTau )
+  )
+, ( ( _
+    , PreTermPi
+        [ ( "A-17" , ( _ , PreTermTau ) )
+        , ( "x-18" , ( _ , PreTermUpsilon "A-17" ) )
+        ]
+        ( _
+        , PreTermPiElim
+            ( _ , PreTermUpsilon "itself-9" ) [ ( _ , PreTermUpsilon "A-17" ) ]
+        )
+    )
+  , ( _
+    , PreTermPiElim
+        ( _ , PreTermZeta "hole-with-type-27" )
+        [ ( _ , PreTermUpsilon "hole-explicit-0-3" )
+        , ( _ , PreTermUpsilon "hole-parse-enum-4" )
+        , ( _ , PreTermUpsilon "itself-9" )
+        ]
+    )
+  )
+, ( ( _ , PreTermTau ) , ( _ , PreTermTau ) )
+, ( ( _
+    , PreTermPiElim
+        ( _ , PreTermZeta "hole-with-type-30" )
+        [ ( _ , PreTermUpsilon "hole-explicit-0-3" )
+        , ( _ , PreTermUpsilon "hole-parse-enum-4" )
+        , ( _ , PreTermUpsilon "itself-9" )
+        , ( _ , PreTermUpsilon "id-15" )
+        , ( _ , PreTermUpsilon "A-17" )
+        , ( _ , PreTermUpsilon "x-18" )
+        , ( _ , PreTermUpsilon "A-17" )
+        ]
+    )
+  , ( _ , PreTermTau )
+  )
+, ( ( _
+    , PreTermPi
+        [ ( "arg-28"
+          , ( _
+            , PreTermPiElim
+                ( _ , PreTermZeta "hole-with-type-29" )
+                [ ( _ , PreTermUpsilon "hole-explicit-0-3" )
+                , ( _ , PreTermUpsilon "hole-parse-enum-4" )
+                , ( _ , PreTermUpsilon "itself-9" )
+                , ( _ , PreTermUpsilon "id-15" )
+                , ( _ , PreTermUpsilon "A-17" )
+                , ( _ , PreTermUpsilon "x-18" )
+                ]
+            )
+          )
+        ]
+        ( _
+        , PreTermPiElim
+            ( _ , PreTermZeta "hole-with-type-30" )
+            [ ( _ , PreTermUpsilon "hole-explicit-0-3" )
+            , ( _ , PreTermUpsilon "hole-parse-enum-4" )
+            , ( _ , PreTermUpsilon "itself-9" )
+            , ( _ , PreTermUpsilon "id-15" )
+            , ( _ , PreTermUpsilon "A-17" )
+            , ( _ , PreTermUpsilon "x-18" )
+            , ( _ , PreTermUpsilon "arg-28" )
+            ]
+        )
+    )
+  , ( _
+    , PreTermPiElim
+        ( _ , PreTermZeta "hole-with-type-25" )
+        [ ( _ , PreTermUpsilon "hole-explicit-0-3" )
+        , ( _ , PreTermUpsilon "hole-parse-enum-4" )
+        ]
+    )
+  )
+, ( ( _ , PreTermTau ) , ( _ , PreTermTau ) )
+, ( ( _ , PreTermTau )
+  , ( _
+    , PreTermPiElim
+        ( _ , PreTermZeta "hole-with-type-29" )
+        [ ( _ , PreTermUpsilon "hole-explicit-0-3" )
+        , ( _ , PreTermUpsilon "hole-parse-enum-4" )
+        , ( _ , PreTermUpsilon "itself-9" )
+        , ( _ , PreTermUpsilon "id-15" )
+        , ( _ , PreTermUpsilon "A-17" )
+        , ( _ , PreTermUpsilon "x-18" )
+        ]
+    )
+  )
+, ( ( _ , PreTermTau ) , ( _ , PreTermTau ) )
+, ( ( _ , PreTermTau ) , ( _ , PreTermTau ) )
+, ( ( _
+    , PreTermPiElim
+        ( _ , PreTermZeta "hole-with-type-26" )
+        [ ( _ , PreTermUpsilon "hole-explicit-0-3" )
+        , ( _ , PreTermUpsilon "hole-parse-enum-4" )
+        , ( _ , PreTermUpsilon "itself-9" )
+        ]
+    )
+  , ( _ , PreTermTau )
+  )
+, ( ( _
+    , PreTermPiElim
+        ( _ , PreTermZeta "hole-with-type-24" )
+        [ ( _ , PreTermUpsilon "hole-explicit-0-3" )
+        , ( _ , PreTermUpsilon "hole-parse-enum-4" )
+        ]
+    )
+  , ( _ , PreTermTau )
+  )
+, ( ( _
+    , PreTermPiElim
+        ( _ , PreTermZeta "hole-with-type-23" )
+        [ ( _ , PreTermUpsilon "hole-explicit-0-3" )
+        , ( _ , PreTermEnum (EnumTypeLabel "top") )
+        ]
+    )
+  , ( _ , PreTermTau )
+  )
+, ( ( _
+    , PreTermPi
+        [ ( "arg-21"
+          , ( _
+            , PreTermPiElim
+                ( _ , PreTermZeta "hole-with-type-22" )
+                [ ( _ , PreTermUpsilon "hole-explicit-0-3" ) ]
+            )
+          )
+        ]
+        ( _
+        , PreTermPiElim
+            ( _ , PreTermZeta "hole-with-type-23" )
+            [ ( _ , PreTermUpsilon "hole-explicit-0-3" )
+            , ( _ , PreTermUpsilon "arg-21" )
+            ]
+        )
+    )
+  , ( _
+    , PreTermPiElim
+        ( _ , PreTermZeta "hole-with-type-20" )
+        [ ( _ , PreTermUpsilon "hole-explicit-0-3" ) ]
+    )
+  )
+, ( ( _ , PreTermTau ) , ( _ , PreTermTau ) )
+, ( ( _ , PreTermTau )
+  , ( _
+    , PreTermPiElim
+        ( _ , PreTermZeta "hole-with-type-22" )
+        [ ( _ , PreTermUpsilon "hole-explicit-0-3" ) ]
+    )
+  )
+, ( ( _ , PreTermTau ) , ( _ , PreTermTau ) )
+, ( ( _ , PreTermTau ) , ( _ , PreTermTau ) )
+, ( ( _ , PreTermTau ) , ( _ , PreTermTau ) )
+]

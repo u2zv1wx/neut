@@ -1,0 +1,26 @@
+(include "../header.neut")
+
+(constant is-enum)
+
+(ascription is-enum (hom tau tau))
+
+(enum top unit)
+
+(definition itself ((S tau))
+  S)
+
+(definition id ((A tau) (x A))
+  x)
+
+(ascription id
+  (pi
+    ((A tau)
+     (x A))
+    (itself A)))
+
+;; ↓ こっちだとwell-typedになる
+;; (ascription id
+;;   (pi
+;;     ((A tau)
+;;      (x A))
+;;     ((lambda ((x tau)) x) A)))

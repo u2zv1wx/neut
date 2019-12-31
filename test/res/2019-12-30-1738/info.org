@@ -1,0 +1,104 @@
+* 2019-12-30-1738
+** 概要
+beta-equivなtermでありながら、変数が定数であるかのように出現して、その結果として推論ができない。
+
+** 結論
+推論の方式がそのままであるかぎり、出力としてはこれで正しい。実際、Leanでも同一の挙動が見られる。(lam x. e1) @ e2という形のtermを見つけた時点でx := e2っていう情報をsubstEnvあたりに保持しておいて、analyzeのときに利用する、みたいにして解決することがたぶん可能。メタ変数についてのstuckだけじゃなく変数についてのstuckもとる、という感じ。で、変数についてのstuckが解けるときはconstraintAnalyzeあたりをつかって解く、みたいな。もちろんメタ変数側でpatternになっているならanalyzableにする必要はないけど。
+
+** 雑記
+簡単な例がとれて、たとえば、
+#+BEGIN_SRC neut
+(definition itself ((S tau))
+  S)
+
+(definition id ((A tau) (x A))
+  x)
+
+(ascription id
+  (pi
+    ((A tau)
+     (x A))
+    (itself A)))
+#+END_SRC
+とかでも、「itself A == A」が制約として出てきて、んでtyはどうなればよいかが不明だから解けない、みたいになる。もちろんこんなのはtyについてbeta-reductionをすれば型が合っていることなんて簡単に確認できるわけだけど。なんでこれが解けないんだろう？
+制約のサイズは28なんだけど。読むー？
+dumpしてまとめた。
+preconstraintsを手で書き直していこう。
+  Pi (H1 : Tau). Tau = ?M20 @ (H0)
+  is-enum @ (top) = ?M35 @ (H0)
+  ?M25 @ (H0, H4) = ?M34 @ (H0, H4)
+  ?M34 @ (H0, H4) = Pi (S7 : Tau). Tau
+  ?M33 @ (H0, H4) = Tau
+  ?M27 @ (H0, H4, itself) = ?M32 @ (H0, H4, itself)
+  ?M32 @ (H0, H4, itself) = Pi (A12 : Tau, x13 : A12). A12
+  ?M31 @ (H0, H4, itself) = Tau
+  Pi (A17 : Tau, x18 : A17). itself @ (A17) = ?M27 @ (H0, H4, itself) --(*)
+  ?M30 @ (H0, H4, itself, id, A17, x18, A17) = Tau
+  Pi (A28 : ?M29 @ (H0, H4, itself, id, A17, x18)). ?M30 @ (H0, H4, itself, id, A17, x18, A28) = ?M25 @ (H0, H4)
+  Tau = ?M29 @ (H0, H4, itself, id, A17, x18)
+  ?M26 @ (H0, H4, itself) = Tau
+  ?M24 @ (H0, H4) = Tau
+  ?M23 @ (H0, top) = Tau
+  Pi (A21 : ?M22 @ (H0)). ?M23 @ (H0, A21) = ?M20 @ (H0)
+  Tau = ?M22 @ (H0)
+以上。tau = tauは省略。
+これを手で解いてみる。
+  ?M20 = lam (H0). Pi (H1 : Tau). Tau
+  ?M35 = lam (H0). is-enum @ (top)
+  ?M34 = lam (H0, H4). Pi (S7 : Tau). Tau
+  ?M25 = lam (H0, H4). Pi (S7 : Tau). Tau
+  ?M33 = lam (H0, H4). Tau
+  ?M32 = lam (H0, H4, itself). Pi (A12 : Tau, x13 : A12). A12
+  ?M27 = lam (H0, H4, itself). Pi (A12 : Tau, x13 : A12). A12
+  ?M31 = lam (H0, H4, itself). Tau
+ここまでの解法と(*)から、
+  Pi (A17 : Tau, x18 : A17). itself @ (A17) = Pi (A12 : Tau, x13 : A12). A12
+となり、これらとPiについてのsimpから、
+  itself @ (A17) = A17
+が従う。……そうだね〜。この制約には、subsumeの条件をきちんとみたすものだけを処理して到達している。
+もし(*)を先に解いて
+  ?M27 = lam (H0, H4, itself). Pi (A17 : Tau, x18 : A17). itself @ (A17)
+としていたらどうか？このときは、?M27と?M32のところの制約から、
+  Pi (A17 : Tau, x18 : A17). itself @ (A17) = Pi (A12 : Tau, x13 : A12). A12
+となって、けっきょく
+  itself @ (A17) = A17
+が制約として立ち上がってくることになる。……これ、どうにもならなくね？そりゃそうでしょ、としか言いようがない。
+leanではどうなってるんだろう？ふつうに解けた。なんで……？
+意図したとおりにプログラムが動作している。意図した通りに動いたうえで、制約の解消に失敗している。
+じゃあ、自由変数もまたメタ変数のようにみなして、
+  itself = lam (A17). A17
+と「解いて」、そのうえでsusbtをおこなっていく、とかになるのか？制約の中における変数ってなんやねん、という問題。でも、これをしてしまうと、たとえば
+ ?M26 @ (H0, H4, itself) = Tau
+みたいなものが
+ ?M26 @ (H0, H4, lam (A17). A17) = Tau
+のようになってしまって、解けなくなると思うんですが。
+変数について考えるか〜。
+itself @ (A17) = A17とitself = lam (A17). A17とが等価であるってのは、まあ、それはそう。でもそんなことしていいの…？
+自由変数をメタ変数におきかえる、みたいな操作？いやー。
+実際、itselfは複数の関数に適用されればそのつど具体的な形を変えるわけだし。
+(lam x. e1) @ e2って形でe1のなかに入るときにx := e2っていう情報を保持しておいて、制約を作るときにその定義の情報も引き回すようにする？
+実際それくらいしかないような気がするんですが……？
+……試したら、Leanでもそうなってた。まーじか。Leanはletを特別扱いしていた。だからLeanではふつうに解けてるようにみえてただけ。letじゃなくてlambdaで実現しようとしたら、まったく同じようになった。つまり、
+  type mismatch at application
+    (λ (id : Π (A : Type), A → itself A), (λ (asc : Π (A : Type), A → itself A), 0) id) (λ (A : Type) (x : A), x)
+  term
+    λ (A : Type) (x : A), x
+  has type
+    Π (A : Type), A → A
+  but is expected to have type
+    Π (A : Type), A → itself A
+となった。
+つまりは、嫌でもnewtypeみたいになるってわけだ。
+だとしたら、えーと？型はじゃあnotation的に扱う必要があるのか？
+(lam x. e1) @ e2を特別扱いすることはできない？lamって直接書いてるんならもうそこでしか使われないって確定してるからいいんじゃない？
+- lamへの直接の適用をinferの時点で見つけたらdefEnvみたいなものを更新しておく
+- analyzeにおいてstuckで変数についてのstuckも探すようにして、もしその変数に対応する定義が見つかればresolveStuck的に定義を展開する
+みたいな。……いちおう解決策は見つかった気がするけど。
+notationでもいけるわけだけど。どっちがいいだろう？
+まあlamのほうじゃないですか。想像した通りの動きをするわけで。
+けど実装が「自然」じゃなくなる感じもある。まあinferとは別にdefEnvを集める処理を考えることはできて、そっちと合わせれば妥当か。
+まあ、inferの前に一発reduceを噛ませてしまう、という手はあるけど。
+「一発」ってのがポイントで。つまり、もともとの入力の時点で
+  (lambda (x1 : A1, ..., xn : An). e) @ (e1, ..., en)
+となっているところだけをreduceする。
+……でも、こうすると、eiがAiっていう型をもつっていう情報が保持できないように思う。

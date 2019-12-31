@@ -1,0 +1,297 @@
+Last login: Mon Dec 30 11:17:13 on ttys004
+u2zv1wx@w1zv7j ~/Documents/Develop/neut (git)-[pre] % stack exec -- neut build test/res/201912301117/code.neut
+infer
+( _
+, PreTermPiElim
+    ( _
+    , PreTermPiIntro
+        [ ( "hole-explicit-0-3"
+          , ( _
+            , PreTermPi
+                [ ( "hole-explicit-1-2" , ( _ , PreTermTau ) ) ] ( _ , PreTermTau )
+            )
+          )
+        ]
+        ( _
+        , PreTermPiElim
+            ( _
+            , PreTermPiIntro
+                [ ( "hole-parse-enum-4"
+                  , ( _
+                    , PreTermPiElim
+                        ( _ , PreTermTheta "is-enum" )
+                        [ ( _ , PreTermEnum (EnumTypeLabel "top") ) ]
+                    )
+                  )
+                ]
+                ( _
+                , PreTermPiElim
+                    ( _
+                    , PreTermPiIntro
+                        [ ( "hole-parse-last-5"
+                          , ( _
+                            , PreTermPiElim
+                                ( _ , PreTermZeta "hole-with-type-12" )
+                                [ ( _ , PreTermUpsilon "hole-explicit-0-3" )
+                                , ( _ , PreTermUpsilon "hole-parse-enum-4" )
+                                ]
+                            )
+                          )
+                        ]
+                        ( _ , PreTermEnumIntro (EnumValueLabel "unit") )
+                    )
+                    [ ( _ , PreTermEnumIntro (EnumValueLabel "unit") ) ]
+                )
+            )
+            [ ( _ , PreTermTheta "enum.top" ) ]
+        )
+    )
+    [ ( _ , PreTermTheta "is-enum" ) ]
+)
+analyze
+size: 17
+cs:
+[ ( ( _
+    , PreTermPi
+        [ ( "arg-20"
+          , ( _ , PreTermPiElim ( _ , PreTermZeta "hole-with-type-21" ) [] )
+          )
+        ]
+        ( _
+        , PreTermPiElim
+            ( _ , PreTermZeta "hole-with-type-22" )
+            [ ( _ , PreTermUpsilon "arg-20" ) ]
+        )
+    )
+  , ( _
+    , PreTermPi
+        [ ( "hole-explicit-0-3"
+          , ( _
+            , PreTermPi
+                [ ( "hole-explicit-1-2" , ( _ , PreTermTau ) ) ] ( _ , PreTermTau )
+            )
+          )
+        ]
+        ( _
+        , PreTermPiElim
+            ( _ , PreTermZeta "hole-with-type-19" )
+            [ ( _ , PreTermUpsilon "hole-explicit-0-3" )
+            , ( _ , PreTermTheta "enum.top" )
+            ]
+        )
+    )
+  )
+, ( ( _ , PreTermTau ) , ( _ , PreTermTau ) )
+, ( ( _
+    , PreTermPiElim
+        ( _ , PreTermZeta "hole-with-type-7" )
+        [ ( _ , PreTermUpsilon "hole-explicit-0-3" ) ]
+    )
+  , ( _ , PreTermPiElim ( _ , PreTermZeta "hole-with-type-21" ) [] )
+  )
+, ( ( _
+    , PreTermPi
+        [ ( "arg-17"
+          , ( _
+            , PreTermPiElim
+                ( _ , PreTermZeta "hole-with-type-18" )
+                [ ( _ , PreTermUpsilon "hole-explicit-0-3" ) ]
+            )
+          )
+        ]
+        ( _
+        , PreTermPiElim
+            ( _ , PreTermZeta "hole-with-type-19" )
+            [ ( _ , PreTermUpsilon "hole-explicit-0-3" )
+            , ( _ , PreTermUpsilon "arg-17" )
+            ]
+        )
+    )
+  , ( _
+    , PreTermPi
+        [ ( "hole-parse-enum-4"
+          , ( _
+            , PreTermPiElim
+                ( _ , PreTermTheta "is-enum" )
+                [ ( _ , PreTermEnum (EnumTypeLabel "top") ) ]
+            )
+          )
+        ]
+        ( _
+        , PreTermPiElim
+            ( _ , PreTermZeta "hole-with-type-15" )
+            [ ( _ , PreTermUpsilon "hole-explicit-0-3" )
+            , ( _ , PreTermUpsilon "hole-parse-enum-4" )
+            , ( _ , PreTermEnumIntro (EnumValueLabel "unit") )
+            ]
+        )
+    )
+  )
+, ( ( _ , PreTermTau ) , ( _ , PreTermTau ) )
+, ( ( _
+    , PreTermPiElim
+        ( _ , PreTermZeta "hole-with-type-16" )
+        [ ( _ , PreTermUpsilon "hole-explicit-0-3" ) ]
+    )
+  , ( _
+    , PreTermPiElim
+        ( _ , PreTermZeta "hole-with-type-18" )
+        [ ( _ , PreTermUpsilon "hole-explicit-0-3" ) ]
+    )
+  )
+, ( ( _
+    , PreTermPi
+        [ ( "arg-13"
+          , ( _
+            , PreTermPiElim
+                ( _ , PreTermZeta "hole-with-type-14" )
+                [ ( _ , PreTermUpsilon "hole-explicit-0-3" )
+                , ( _ , PreTermUpsilon "hole-parse-enum-4" )
+                ]
+            )
+          )
+        ]
+        ( _
+        , PreTermPiElim
+            ( _ , PreTermZeta "hole-with-type-15" )
+            [ ( _ , PreTermUpsilon "hole-explicit-0-3" )
+            , ( _ , PreTermUpsilon "hole-parse-enum-4" )
+            , ( _ , PreTermUpsilon "arg-13" )
+            ]
+        )
+    )
+  , ( _
+    , PreTermPi
+        [ ( "hole-parse-last-5"
+          , ( _
+            , PreTermPiElim
+                ( _ , PreTermZeta "hole-with-type-12" )
+                [ ( _ , PreTermUpsilon "hole-explicit-0-3" )
+                , ( _ , PreTermUpsilon "hole-parse-enum-4" )
+                ]
+            )
+          )
+        ]
+        ( _ , PreTermEnum (EnumTypeLabel "top") )
+    )
+  )
+, ( ( _ , PreTermTau ) , ( _ , PreTermTau ) )
+, ( ( _ , PreTermEnum (EnumTypeLabel "top") )
+  , ( _
+    , PreTermPiElim
+        ( _ , PreTermZeta "hole-with-type-14" )
+        [ ( _ , PreTermUpsilon "hole-explicit-0-3" )
+        , ( _ , PreTermUpsilon "hole-parse-enum-4" )
+        ]
+    )
+  )
+, ( ( _
+    , PreTermPiElim
+        ( _ , PreTermZeta "hole-with-type-11" )
+        [ ( _ , PreTermUpsilon "hole-explicit-0-3" )
+        , ( _ , PreTermUpsilon "hole-parse-enum-4" )
+        ]
+    )
+  , ( _ , PreTermTau )
+  )
+, ( ( _
+    , PreTermPiElim
+        ( _ , PreTermZeta "hole-with-type-10" )
+        [ ( _ , PreTermUpsilon "hole-explicit-0-3" )
+        , ( _ , PreTermEnum (EnumTypeLabel "top") )
+        ]
+    )
+  , ( _ , PreTermTau )
+  )
+, ( ( _
+    , PreTermPi
+        [ ( "arg-8"
+          , ( _
+            , PreTermPiElim
+                ( _ , PreTermZeta "hole-with-type-9" )
+                [ ( _ , PreTermUpsilon "hole-explicit-0-3" ) ]
+            )
+          )
+        ]
+        ( _
+        , PreTermPiElim
+            ( _ , PreTermZeta "hole-with-type-10" )
+            [ ( _ , PreTermUpsilon "hole-explicit-0-3" )
+            , ( _ , PreTermUpsilon "arg-8" )
+            ]
+        )
+    )
+  , ( _
+    , PreTermPiElim
+        ( _ , PreTermZeta "hole-with-type-7" )
+        [ ( _ , PreTermUpsilon "hole-explicit-0-3" ) ]
+    )
+  )
+, ( ( _ , PreTermTau ) , ( _ , PreTermTau ) )
+, ( ( _ , PreTermTau )
+  , ( _
+    , PreTermPiElim
+        ( _ , PreTermZeta "hole-with-type-9" )
+        [ ( _ , PreTermUpsilon "hole-explicit-0-3" ) ]
+    )
+  )
+, ( ( _ , PreTermTau ) , ( _ , PreTermTau ) )
+, ( ( _ , PreTermTau ) , ( _ , PreTermTau ) )
+, ( ( _ , PreTermTau ) , ( _ , PreTermTau ) )
+]
+synthesize
+size: 13
+fromAscList
+  [ Enriched
+      ( ( _
+        , PreTermPiElim
+            ( _ , PreTermZeta "hole-with-type-10" )
+            [ ( _ , PreTermUpsilon "hole-explicit-0-3" )
+            , ( _ , PreTermEnum (EnumTypeLabel "top") )
+            ]
+        )
+      , ( _ , PreTermTau )
+      )
+      [ "hole-with-type-10" ]
+      (ConstraintFlexRigid
+         "hole-with-type-10"
+         [ [ ( _ , PreTermUpsilon "hole-explicit-0-3" )
+           , ( _ , PreTermEnum (EnumTypeLabel "top") )
+           ]
+         ]
+         ( _ , PreTermTau ))
+  , Enriched
+      ( ( _
+        , PreTermPi
+            [ ( "arg-8"
+              , ( _
+                , PreTermPiElim
+                    ( _ , PreTermZeta "hole-with-type-9" )
+                    [ ( _ , PreTermUpsilon "hole-explicit-0-3" ) ]
+                )
+              )
+            ]
+            ( _
+            , PreTermPiElim
+                ( _ , PreTermZeta "hole-with-type-10" )
+                [ ( _ , PreTermUpsilon "hole-explicit-0-3" )
+                , ( _ , PreTermUpsilon "arg-8" )
+                ]
+            )
+        )
+      , ( _ , PreTermPiElim ( _ , PreTermZeta "hole-with-type-21" ) [] )
+      )
+      [ "hole-with-type-21" ]
+      ConstraintOther
+  ]
+cannot simplify:
+( ( _
+  , PreTermPiElim
+      ( _ , PreTermZeta "hole-with-type-10" )
+      [ ( _ , PreTermUpsilon "hole-explicit-0-3" )
+      , ( _ , PreTermEnum (EnumTypeLabel "top") )
+      ]
+  )
+, ( _ , PreTermTau )
+)
+u2zv1wx@w1zv7j ~/Documents/Develop/neut (git)-[pre] %

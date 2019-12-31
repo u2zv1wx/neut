@@ -1,0 +1,17 @@
+fromAscList
+  [ ( ( _
+      , PreTermPiElim
+          ( _ , PreTermUpsilon "itself-9" ) [ ( _ , PreTermUpsilon "A-17" ) ]
+      )
+    , ( _ , PreTermUpsilon "A-17" )
+    )
+  ]
+ms:
+[]
+cannot simplify:
+( ( _
+  , PreTermPiElim
+      ( _ , PreTermUpsilon "itself-9" ) [ ( _ , PreTermUpsilon "A-17" ) ]
+  )
+, ( _ , PreTermUpsilon "A-17" )
+)

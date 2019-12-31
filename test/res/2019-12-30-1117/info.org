@@ -1,0 +1,109 @@
+* 2019-12-30-1117
+** バグの概要
+unitを返すだけのほとんど自明なコードでありながら推論に失敗する。
+
+** 結論
+synthesizeで、最初の要素がConstraintOtherであるとき、その要素についてのresolveStuckに失敗した時点で全体のsynthesizeに失敗すると判定しているのが誤り。特定のConstraintOtherよりも後ろにあるConstraintOtherについてはresolveStuckが成功するというのは普通に考えうることであり、そこを落としてしまっていては、そりゃあ、解けるものも解けない。
+
+** 雑記
+ほぼ自明なコードでありながら、
+cannot simplify:
+( ( _
+  , PreTermPiElim
+      ( _ , PreTermZeta "hole-with-type-10" )
+      [ ( _ , PreTermUpsilon "hole-explicit-0-3" )
+      , ( _ , PreTermEnum (EnumTypeLabel "top") )
+      ]
+  )
+, ( _ , PreTermTau )
+)
+として推論に失敗する例。パース結果は
+  (lam (H0 : univ -> univ).
+    (lam (H4 : is-enum top).
+      (lam (H5 : ?M12 @ (H0, H4)).
+        unit)
+      @ unit)
+    @ enum.top)
+  @ is-enum
+となっていて、これは少なくとも、読んだ限りではすべての型が確定するように思われる。
+生成された制約を手で読みやすく書き直してみる：
+  Pi (ARG20 : ?M21 @ ()). ?M22 @ ARG20 = Pi (H0 : Pi (_ : Tau). Tau). ?M19 @ (H0, enum.top)
+  Tau = Tau
+  ?M7 @ (H0) = ?M21 @ ()
+  Pi (ARG17 : ?M18 @ (H0)). ?M19 @ (H0, ARG17) = Pi (H4 : is-enum top). ?M15 @ (H0, H4, unit)
+  Tau = Tau
+  ?M16 @ (H0) = ?M18 @ (H0)
+  Pi (ARG13 : ?M14 @ (H0, H4)). ?M15 @ (H0, H4, ARG13) = Pi (H5 : ?M12 @ (H0, H4)). top
+  Tau = Tau
+  top = ?M14 @ (H0, H4)
+  ?M11 @ (H0, H4) = Tau
+  ?M10 @ (H0, top) = Tau
+  Pi (ARG8 : ?M9 @ (H0)). ?M10 @ (H0, ARG8) = ?M7 @ (H0)
+  Tau = Tau
+  Tau = ?M9 @ (H0)
+  Tau = Tau
+  Tau = Tau
+  Tau = Tau
+で、最終的には、?M10と?M21が決定できずに推論に失敗している。
+じゃあ?M10は推論できないかというと？まず最初のPiについての条件から、
+  ?M21 @ () = Pi (_ : Tau). Tau
+がわかって、ここから
+  ?M21 = lam (). Pi (_ : Tau). Tau
+が確定する。さらにこれより
+  ?M7 @ (H0) = Pi (_ : Tau). Tau
+となって、
+  ?M7 = lam (H0). Pi (_ : Tau). Tau
+が確定する。これから
+  Pi (ARG8 : ?M9 @ (H0)). ?M10 @ (H0, ARG8) =  Pi (_ : Tau). Tau
+がしたがって、で、
+  ?M9 @ (H0) = Tau
+  ?M10 @ (H0, ARG8) = Tau
+がしたがって、ここから
+  ?M10 = lam (H0, ARG8). Tau
+がしたがうはず。つまりはこれも普通に解けるはず。だから、inferの部分は合っていて、analyze以降がおかしい。
+analyzeの結果をみてみる。
+queue.txtに出力した。手で整形すると？
+  pattern:
+    ?M21 @ () = Pi (_ : Tau). Tau
+    ?M22 @ ARG20 = ?M19 @ (ARG20, enum.top)
+    ?M7 @ (H0) = ?M21 @ ()
+    ?M18 @ (H0) = is-enum top
+    ?M19 @ (H0, ARG17) = ?M15 @ (H0, ARG17, unit)
+    ?M16 @ (H0) = ?M18 @ (H0)
+    ?M14 @ (H0, H4) = ?M12 @ (H0, H4)
+    ?M15 @ (H0, H4, ARG13) = top
+    ?M14 @ (H0, H4) = top
+    ?M11 @ (H0, H4) = tau
+    {(H0, top)のappは後回し}
+    ?M7 @ (H0) = Pi (ARG8 : ?M9 @ (H0)). ?M10 @ (H0, ARG8)
+    ?M9 @ (H0) = tau
+  flex-rigid:
+    ?M10 @ (H0, top) = Tau
+こうなる。合っているとしか思えないが。
+analyzeも合っているように見える。
+resolve-holeの様子をみてみると、
+  resolveHole for: hole-with-type-21
+  resolveHole for: hole-with-type-22
+  resolveHole for: hole-with-type-16
+  resolveHole for: hole-with-type-15
+  resolveHole for: hole-with-type-7
+  resolveHole for: hole-with-type-18
+  resolveHole for: hole-with-type-14
+  resolveHole for: hole-with-type-12
+  resolveHole for: hole-with-type-9
+  resolveHole for: hole-with-type-11
+  resolveHole for: hole-with-type-19
+となっている。つまりは、?M21は解決されているはずなのに最終的に解けていないものとして残っている。は？
+やっぱり、fmvsはすべてのやつを取得するようにすべきなのでは…？
+というか、あれ？substEnvにhole-with-type-21が存在するはずなのにotherに残ってるってどういうことよ。
+あー、わかった。otherのうち最初のものがlookupに失敗したらその時点で全体が失敗するってことになってるんだ。これ。
+解けずに残ってる
+  Pi (ARG8 : ?M9 @ (H0)). ?M10 @ (H0, ARG8) = ?M21 @ ()
+だけど、これも、?M21のsubstを適用すれば
+  Pi (ARG8 : ?M9 @ (H0)). ?M10 @ (H0, ARG8) = Pi (_ : Tau). Tau
+になって、ここから
+  ?M9 @ (H0) = Tau
+  ?M10 @ (H0, ARG8) = Tau
+が入って、で、?M9のほうについてはresolveStuckで解けて、そんで?M10のほうは
+  ?M10 = lam (H0, ARG8). Tau
+となって解けるはず。これが解けなかった原因。
