@@ -26,11 +26,11 @@ reduceCodePlus (m, CodeSigmaElim xts v e) = do
     (_, DataSigmaIntro es)
       | length es == length xs -> reduceCodePlus $ substCodePlus (zip xs es) e
     _ -> return (m, CodeSigmaElim xts v e)
-reduceCodePlus (m, CodeUpElim (x, t) e1 e2) = do
+reduceCodePlus (m, CodeUpElim x e1 e2) = do
   e1' <- reduceCodePlus e1
   case e1' of
     (_, CodeUpIntro d) -> reduceCodePlus $ substCodePlus [(x, d)] e2
-    _ -> return (m, CodeUpElim (x, t) e1' e2)
+    _ -> return (m, CodeUpElim x e1' e2)
 reduceCodePlus (m, CodeEnumElim v branchList) =
   case v of
     (_, DataEnumIntro l) ->

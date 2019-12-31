@@ -88,8 +88,7 @@ polarize (m, TermEnumElim e bs) = do
   es' <- mapM polarize es
   (yName, e', y) <- polarize' e
   let ml = snd $ obtainInfoMeta m
-  retImmType <- returnCartesianImmediate
-  return $ bindLet [((yName, retImmType), e')] (ml, CodeEnumElim y (zip cs es'))
+  return $ bindLet [(yName, e')] (ml, CodeEnumElim y (zip cs es'))
 polarize (m, TermArray _ _) = do
   let ml = snd $ obtainInfoMeta m
   returnArrayType ml
@@ -103,9 +102,8 @@ polarize (m, TermArrayIntro k les) = do
     cartesianSigma name ml $ map Left $ replicate (length les) retKindType
   let (ls, es) = unzip les
   (zs, es', xs) <- unzip3 <$> mapM polarize' es
-  retImmType <- returnCartesianImmediate
   return $
-    bindLet (zip (zip zs (repeat retImmType)) es') $
+    bindLet (zip zs es') $
     ( ml
     , CodeUpIntro $
       (ml, DataSigmaIntro [arrayType, (ml, DataArrayIntro k (zip ls xs))]))
@@ -122,10 +120,9 @@ polarize (m, TermArrayElim k e1 e2) = do
   retUnivType <- returnCartesianUniv
   retImmType <- returnCartesianImmediate
   let retContentType = (ml, CodeUpIntro contentTypeVar)
-  retArrayType <- returnArrayType ml
   -- array : Sigma [content-type : univ, content : content-type]
   return $
-    bindLet [((arrVarName, retArrayType), e1'), ((idxVarName, retImmType), e2')] $
+    bindLet [(arrVarName, e1'), (idxVarName, e2')] $
     ( ml
     , CodeSigmaElim
         [(contentTypeVarName, retUnivType), (contentVarName, retContentType)]
@@ -185,7 +182,6 @@ makeClosure mName fvs m xts e = do
 callClosure :: Meta -> CodePlus -> [TermPlus] -> WithEnv CodePlus
 callClosure m e es = do
   (zs, es', xs) <- unzip3 <$> mapM polarize' es
-  ts' <- mapM (polarize . fst . obtainInfoMeta . fst) es -- list of types of es
   let ml = snd $ obtainInfoMeta m
   (clsVarName, clsVar) <- newDataUpsilonWith "closure"
   (typeVarName, typeVar) <- newDataUpsilonWith "exp"
@@ -195,10 +191,9 @@ callClosure m e es = do
   relVarName <- newNameWith "rel"
   retUnivType <- returnCartesianUniv
   retImmType <- returnCartesianImmediate
-  retClsType <- returnClosureType ml
   return $
     bindLet
-      (((clsVarName, retClsType), e) : zip (zip zs ts') es')
+      ((clsVarName, e) : zip zs es')
       ( ml
       , CodeSigmaElim
           [ (typeVarName, retUnivType)
@@ -225,12 +220,14 @@ linearize xts (m, CodeSigmaElim yts d e) = do
   e' <- linearize (xts' ++ yts) e
   -- eのなかで使用されておらず、かつdのなかでも使用されていないものなども、ここで適切にheaderを挿入することで対応する。
   withHeader xts (m, CodeSigmaElim yts d e')
-linearize xts (m, CodeUpElim xt e1 e2) = do
+linearize xts (m, CodeUpElim z e1 e2) = do
   let xts2' = filter (\(x, _) -> x `elem` varCode e2) xts
-  e2' <- linearize (xts2' ++ [xt]) e2
+  -- zはe2のなかでlinearに使用されることが既知なので放置でよい。
+  -- つまり、zについてのlinearizeの必要がないのでxts2' ++ [z]でなくxts2'を引数として与えれば十分。
+  e2' <- linearize xts2' e2
   let xts1' = filter (\(x, _) -> x `elem` varCode e1) xts
   e1' <- linearize xts1' e1
-  withHeader xts (m, CodeUpElim xt e1' e2')
+  withHeader xts (m, CodeUpElim z e1' e2')
 linearize xts (m, CodeEnumElim d les) = do
   let (ls, es) = unzip les
   -- xts'は、xtsのうちすくなくともひとつのbranchにおいて使われているような変数の集合。
@@ -252,10 +249,10 @@ withHeader' [] e = return e
 withHeader' ((x, t, []):xtzss) e = do
   e' <- withHeader' xtzss e
   withHeaderAffine x t e'
-withHeader' ((x, t, [z]):xtzss) e = do
+withHeader' ((x, _, [z]):xtzss) e = do
   e' <- withHeader' xtzss e -- already linear.
   let ml = Nothing
-  return (ml, CodeUpElim (z, t) (ml, CodeUpIntro (ml, DataUpsilon x)) e')
+  return (ml, CodeUpElim z (ml, CodeUpIntro (ml, DataUpsilon x)) e')
 withHeader' ((x, t, (z1:z2:zs)):xtzss) e = do
   e' <- withHeader' xtzss e
   withHeaderRelevant x t z1 z2 zs e'
@@ -270,7 +267,7 @@ withHeaderAffine :: Identifier -> CodePlus -> CodePlus -> WithEnv CodePlus
 withHeaderAffine x t e = do
   hole <- newNameWith "unit"
   discardUnusedVar <- toAffineApp Nothing x t
-  return (Nothing, CodeUpElim (hole, t) discardUnusedVar e)
+  return (Nothing, CodeUpElim hole discardUnusedVar e)
 
 -- withHeaderRelevant x t [x1, ..., x{N}] e ~>
 --   bind exp := t in
@@ -301,11 +298,10 @@ withHeaderRelevant x t x1 x2 xs e = do
   -- 別にSigmaElimにannotationをあたえていても、それを使うってわけじゃないから問題ないのか。
   rel <- withHeaderRelevant' t relVar linearChain e
   retImmType <- returnCartesianImmediate
-  retUnivType <- returnCartesianUniv
   return
     ( ml
     , CodeUpElim
-        (expVarName, retUnivType)
+        expVarName
         t
         ( ml
         , CodeSigmaElim
@@ -358,33 +354,21 @@ withHeaderRelevant' t relVar ((x, (x1, x2)):chain) cont = do
   cont' <- withHeaderRelevant' t relVar chain cont
   (sigVarName, sigVar) <- newDataUpsilonWith "sig"
   let varX = toDataUpsilon (x, Nothing)
-  retPairType <- returnPairType t t
   return $
     ( ml
     , CodeUpElim
-        (sigVarName, retPairType)
+        sigVarName
         (ml, CodePiElimDownElim relVar [varX])
         (ml, CodeSigmaElim [(x1, t), (x2, t)] sigVar cont'))
 
-bindLet :: [((Identifier, CodePlus), CodePlus)] -> CodePlus -> CodePlus
+bindLet :: [(Identifier, CodePlus)] -> CodePlus -> CodePlus
 bindLet [] cont = cont
-bindLet (((x, t), e):xes) cont = do
+bindLet ((x, e):xes) cont = do
   let cont' = bindLet xes cont
-  (fst cont', CodeUpElim (x, t) e cont')
+  (fst cont', CodeUpElim x e cont')
 
 returnUpsilon :: Identifier -> CodePlus
 returnUpsilon x = (Nothing, CodeUpIntro (Nothing, DataUpsilon x))
-
--- cartesianSigma ::
---      Identifier
---   -> Maybe Loc
---   -> [Either CodePlus (Identifier, CodePlus)]
---   -> WithEnv DataPlus
-returnPairType :: CodePlus -> CodePlus -> WithEnv CodePlus
-returnPairType t1 t2 = do
-  name <- newNameWith "copy"
-  v <- cartesianSigma name Nothing [Left t1, Left t2]
-  return (Nothing, CodeUpIntro v)
 
 returnArrayType :: Maybe Loc -> WithEnv CodePlus
 returnArrayType ml = do
@@ -562,16 +546,13 @@ affineSigma thetaName ml mxts = do
       (z, varZ) <- newDataUpsilonWith "arg"
       -- As == [APP-1, ..., APP-n]   (`a` here stands for `app`)
       as <- forM xts $ \(x, e) -> toAffineApp ml x e
-      yts <- mapM (newNameWithType . snd) xts
-      let body = bindLet (zip yts as) (ml, CodeUpIntro (ml, DataSigmaIntro []))
+      ys <- mapM (const $ newNameWith "arg") xts
+      -- yts <- mapM (newNameWithType . snd) xts
+      -- let body = bindLet (zip yts as) (ml, CodeUpIntro (ml, DataSigmaIntro []))
+      let body = bindLet (zip ys as) (ml, CodeUpIntro (ml, DataSigmaIntro []))
       body' <- linearize xts body
       insCodeEnv thetaName [z] (ml, CodeSigmaElim xts varZ body')
       return theta
-
-newNameWithType :: CodePlus -> WithEnv (Identifier, CodePlus)
-newNameWithType t = do
-  name <- newNameWith "aff-name"
-  return (name, t)
 
 -- (Assuming `ti` = `return di` for some `di` such that `xi : di`)
 -- relevantSigma NAME LOC [(x1, t1), ..., (xn, tn)]   ~>
@@ -616,11 +597,10 @@ relevantSigma thetaName ml mxts = do
       return theta
 
 toPairInfo ::
-     (Identifier, CodePlus)
-  -> WithEnv ((Identifier, CodePlus), (DataPlus, CodePlus))
+     (Identifier, CodePlus) -> WithEnv (Identifier, (DataPlus, CodePlus))
 toPairInfo (_, t) = do
   (name, var) <- newDataUpsilonWith "pair"
-  return ((name, t), (var, t))
+  return (name, (var, t))
 
 -- transposeSigma [d1, ..., dn] :=
 --   let (x1, y1) := d1 in
@@ -660,11 +640,10 @@ toAffineApp ml x e = do
   (affVarName, affVar) <- newDataUpsilonWith "aff"
   (relVarName, _) <- newDataUpsilonWith "rel"
   retImmType <- returnCartesianImmediate
-  retUnivType <- returnCartesianUniv
   return
     ( ml
     , CodeUpElim
-        (expVarName, retUnivType)
+        expVarName
         e
         ( Just (111, 222)
         , CodeSigmaElim
@@ -682,11 +661,10 @@ toRelevantApp ml x e = do
   (affVarName, _) <- newDataUpsilonWith "rel-app-aff"
   (relVarName, relVar) <- newDataUpsilonWith "rel-app-rel"
   retImmType <- returnCartesianImmediate
-  retUnivType <- returnCartesianUniv
   return
     ( ml
     , CodeUpElim
-        (expVarName, retUnivType)
+        expVarName
         e
         ( ml
         , CodeSigmaElim
@@ -804,7 +782,6 @@ polarizeEvalIO m = do
       -- IO Top == Top -> (Bottom, Top)
       evalArgWithZero <- callClosure m arg' [toTermInt64 0]
       retImmType <- returnCartesianImmediate
-      retImmPairType <- returnPairType retImmType retImmType
       makeClosure
         (Just "unsafe.eval-io")
         []
@@ -812,7 +789,7 @@ polarizeEvalIO m = do
         [arg]
         ( ml
         , CodeUpElim
-            (sig, retImmPairType)
+            sig
             evalArgWithZero
             ( ml
             , CodeSigmaElim

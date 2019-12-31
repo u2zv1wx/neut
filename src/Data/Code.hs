@@ -28,7 +28,7 @@ data Code
       DataPlus
       CodePlus
   | CodeUpIntro DataPlus
-  | CodeUpElim (Identifier, CodePlus) CodePlus CodePlus
+  | CodeUpElim Identifier CodePlus CodePlus
   | CodeEnumElim DataPlus [(Case, CodePlus)]
   | CodeArrayElim ArrayKind DataPlus DataPlus
   deriving (Show)
@@ -85,12 +85,11 @@ substCodePlus sub (m, CodeSigmaElim xts v e) = do
 substCodePlus sub (m, CodeUpIntro v) = do
   let v' = substDataPlus sub v
   (m, CodeUpIntro v')
-substCodePlus sub (m, CodeUpElim (x, t) e1 e2) = do
-  let t' = substCodePlus sub t
+substCodePlus sub (m, CodeUpElim x e1 e2) = do
   let e1' = substCodePlus sub e1
   let sub' = filter (\(y, _) -> y /= x) sub
   let e2' = substCodePlus sub' e2
-  (m, CodeUpElim (x, t') e1' e2')
+  (m, CodeUpElim x e1' e2')
 substCodePlus sub (m, CodeEnumElim v branchList) = do
   let v' = substDataPlus sub v
   let (cs, es) = unzip branchList
@@ -136,7 +135,7 @@ varCode (_, CodeTheta theta) = varTheta theta
 varCode (_, CodePiElimDownElim d ds) = concatMap varData $ d : ds
 varCode (_, CodeSigmaElim xts d e) = varData d ++ varCode' xts e
 varCode (_, CodeUpIntro d) = varData d
-varCode (_, CodeUpElim xt e1 e2) = varCode e1 ++ varCode' [xt] e2
+varCode (_, CodeUpElim x e1 e2) = varCode e1 ++ filter (/= x) (varCode e2)
 varCode (_, CodeEnumElim d les) = do
   let (_, es) = unzip les
   varData d ++ concatMap varCode es

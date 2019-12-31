@@ -258,6 +258,7 @@
 (notation admit (admit-explicit _))
 
 ;; writeが無事定義できた〜。
+;; (size-of A)とかってしたほうがis-enumよりもいいかも？まあそのへんは適当に。
 (definition write ((A type) (out file-descriptor) (str (u8-array A)) (len (is-enum A)))
   (io-return top (unsafe.write A out str len)))
 ;; implicitは、explicit.writeみたいなのを展開型として用意した上で、notationの定義を入れれば終了。
