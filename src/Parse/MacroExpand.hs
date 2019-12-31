@@ -9,6 +9,8 @@ import Data.Env
 import Data.Maybe (fromMaybe)
 import Data.Tree
 
+-- fst: ordinary bindings
+-- snd: "+"-bindings created by, for example, `(notation (hom e rest+) ...)`.
 type MacroSubst = ([(String, TreePlus)], [(String, [TreePlus])])
 
 type Pattern = TreePlus
@@ -169,6 +171,7 @@ isSaneNotation (_, TreeNode ts) = do
     (_, TreeAtom _) -> True
     ts' -> b && isSaneNotation ts'
 
+-- (a b (splice (c (splice (p q)) e)) f) ~> (a b c p q d e)
 splice :: TreePlus -> TreePlus
 splice t@(_, TreeAtom _) = t
 splice (m, TreeNode ts) = do
@@ -176,7 +179,8 @@ splice (m, TreeNode ts) = do
   (m, TreeNode $ expandSplice $ map findSplice ts')
 
 findSplice :: TreePlus -> Either TreePlus [TreePlus]
-findSplice (_, TreeNode ((_, TreeAtom "splice"):ts)) = Right ts
+findSplice (_, TreeNode [(_, TreeAtom "splice"), (_, TreeNode ts)]) = do
+  Right ts
 findSplice t = Left t
 
 expandSplice :: [Either TreePlus [TreePlus]] -> [TreePlus]

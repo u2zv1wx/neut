@@ -78,10 +78,10 @@
 
 ;; 意味としては(t)へと変換するべきであるような気がする。でないとsplicingにならないような？
 (notation (to-type-list t)
-  t)
+  ((_ t)))
 
 (notation (to-type-list t t+)
-  (t (splice (to-type-list t+))))
+  ((_ t) (splice (to-type-list t+))))
 
 (keyword arrow)
 
@@ -123,7 +123,7 @@
 (keyword to-hole-list)
 
 (notation (to-hole-list e)
-  (_ _))
+  ((_ _)))
 
 (notation (to-hole-list e e+)
   ((_ _) (splice (to-hole-list e+))))
@@ -232,6 +232,14 @@
 
 (constant unsafe.write)
 
+(keyword tata)
+
+(notation (tata any) type)
+
+(keyword ta)
+
+(notation ta type)
+
 (ascription unsafe.write
   (pi
     ((A type)
@@ -239,6 +247,14 @@
      (str (u8-array A))
      (len (is-enum A)))
     top))
+;; (ascription unsafe.write
+;;   (pi
+;;     ((A (tata 10))
+;;      (out file-descriptor)
+;;      (str (u8-array A))
+;;      (len (is-enum A)))
+;;     top))
+
 
 (enum choice left right)
 
@@ -260,7 +276,11 @@
 ;; これがちゃんと型つくのかなりうれしいな。
 (write choice stdout admit enum.choice)
 
+;; (ascription write
+;;   (arrow (top top top top) bottom))
+
 ;; (write choice stdout (admit (u8-array choice)) unit)
+
 
 ;; unit
 ;; (io-return top unit)
