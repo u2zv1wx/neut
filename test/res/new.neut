@@ -76,6 +76,7 @@
 
 (keyword to-type-list)
 
+;; 意味としては(t)へと変換するべきであるような気がする。でないとsplicingにならないような？
 (notation (to-type-list t)
   t)
 
@@ -139,20 +140,6 @@
 ;;      (eliminator (pi (???) elim-result-type)))
 ;;     (eliminator e+)))
 
-(keyword sigma-introduction-2)
-
-;; これだとpiの引数が最初に解決したもので確定してしまうからだめ？
-;; でも、notationが展開されるたびにholeが別物としてとられたら。
-;; いや、現在のコードではsigma-introは結局1回しか使用されていない。
-;; 型推論、正しかったっぽい。
-;; こっちのかたちで推論するとうまくいくが、上のsigma-introductionのように(eliminator _)とするとうまくいかない。
-;; これはやっぱり記法を用意するべきなのかな？
-(notation (sigma-introduction-2 e1 e2)
-  (lambda
-    ((elim-result-type tau)
-     (eliminator (pi ((_ _) (_ _)) elim-result-type)))
-    (eliminator e1 e2)))
-
 (keyword sigma-elimination)
 
 (notation (sigma-elimination (xt+) e1 e2)
@@ -160,19 +147,12 @@
 
 (definition state ((S type) (A type))
   (hom S (product S A)))
-;; たぶんこのstateも、
-;;   (keyword state)
-;;   (notation (state S A)
-;;     (hom S (product S A)))
-;; として実現する必要がある。ようするに、型はnotationによって定義する必要がある。
-;; 完全展開型のほうで常に書くようにすればwell-typeになるわけで。
-;; 逆に言えば、newtype相当の処理はdefinitionによって実現されることになる？
 
-(ascription state
-  (pi
-    ((S type)
-     (A type))
-    type))
+;; (ascription state
+;;   (pi
+;;     ((S type)
+;;      (A type))
+;;     type))
 
 ;; ここでsigma-intro-2は、reduceの結果をAで固定してしまう？
 ;; これによって、eliminatorの型が特定のものに固定してしまう。
@@ -202,10 +182,6 @@
 
 (definition io ((a type))
   (state bottom a))
-;; たぶんioは
-;;  (notation (io a)
-;;    (state bottom a))
-;; のようにして実現する必要がある。
 
 ;; (ascription io
 ;;   (hom type type))

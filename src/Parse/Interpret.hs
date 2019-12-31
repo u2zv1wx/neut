@@ -27,10 +27,7 @@ interpret (m, TreeNode [(_, TreeAtom "theta"), (_, TreeAtom x)]) =
   withMeta m $ WeakTermTheta x
 interpret (m, TreeNode [(_, TreeAtom "upsilon"), (_, TreeAtom x)]) =
   withMeta m $ WeakTermUpsilon x
-interpret foo@(m, TreeNode [(_, TreeAtom "pi"), (_, TreeNode xts), t]) = do
-  p "pi"
-  p "foo"
-  p' foo
+interpret (m, TreeNode [(_, TreeAtom "pi"), (_, TreeNode xts), t]) = do
   (xts', t') <- interpretBinder xts t
   withMeta m $ WeakTermPi xts' t'
 interpret (m, TreeNode [(_, TreeAtom "pi-introduction"), (_, TreeNode xts), e]) = do
