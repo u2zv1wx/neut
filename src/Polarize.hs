@@ -521,8 +521,6 @@ affineSigma thetaName m mxts = do
       -- As == [APP-1, ..., APP-n]   (`a` here stands for `app`)
       as <- forM xts $ \(x, e) -> toAffineApp m x e
       ys <- mapM (const $ newNameWith "arg") xts
-      -- yts <- mapM (newNameWithType . snd) xts
-      -- let body = bindLet (zip yts as) (m, CodeUpIntro (m, DataSigmaIntro []))
       let body = bindLet (zip ys as) (m, CodeUpIntro (m, DataSigmaIntro []))
       body' <- linearize xts body
       insCodeEnv thetaName [z] (m, CodeSigmaElim xts varZ body')
@@ -683,10 +681,8 @@ asEnumConstant x
 asEnumConstant _ = return Nothing
 
 polarizeUnaryOp :: Identifier -> UnaryOp -> LowType -> Meta -> WithEnv CodePlus
-polarizeUnaryOp name op lowType m
-  -- let (t, ml) = obtainInfoMeta m
- = do
-  let t = undefined
+polarizeUnaryOp name op lowType m = do
+  t <- lookupTypeEnv name
   t' <- reduceTermPlus t
   case t' of
     (_, TermPi [(x, tx)] _) -> do
@@ -697,14 +693,12 @@ polarizeUnaryOp name op lowType m
         m
         [(x, tx)]
         (m, CodeTheta (ThetaUnaryOp op lowType varX))
-    _ -> throwError $ "the arity of " ++ name ++ " is wrongi"
+    _ -> throwError $ "the arity of " ++ name ++ " is wrong"
 
 polarizeBinaryOp ::
      Identifier -> BinaryOp -> LowType -> Meta -> WithEnv CodePlus
-polarizeBinaryOp name op lowType m
-  -- let (t, ml) = obtainInfoMeta m
- = do
-  let t = undefined
+polarizeBinaryOp name op lowType m = do
+  t <- lookupTypeEnv name
   t' <- reduceTermPlus t
   case t' of
     (_, TermPi [(x, tx), (y, ty)] _) -> do
@@ -716,12 +710,11 @@ polarizeBinaryOp name op lowType m
         m
         [(x, tx), (y, ty)]
         (m, CodeTheta (ThetaBinaryOp op lowType varX varY))
-    _ -> throwError $ "the arity of " ++ name ++ " is wrongi"
+    _ -> throwError $ "the arity of " ++ name ++ " is wrong"
 
 polarizeIsEnum :: Meta -> WithEnv CodePlus
 polarizeIsEnum m = do
-  let t = undefined :: TermPlus
-  -- let (t, ml) = obtainInfoMeta m
+  t <- lookupTypeEnv "is-enum"
   t' <- reduceTermPlus t
   case t' of
     (_, TermPi [(x, tx)] _) -> do
@@ -750,8 +743,7 @@ polarizeIsEnum m = do
 --    (as closure)
 polarizeEvalIO :: Meta -> WithEnv CodePlus
 polarizeEvalIO m = do
-  let t = undefined
-  -- let (t, ml) = obtainInfoMeta m
+  t <- lookupTypeEnv "unsafe.eval-io"
   t' <- reduceTermPlus t
   case t' of
     (_, TermPi [arg] _) -> do
@@ -795,8 +787,7 @@ polarizeSysCall ::
   -> Meta -- the meta of the theta
   -> WithEnv CodePlus
 polarizeSysCall name sysCall argLen argIdxList m = do
-  let t = undefined
-  -- let (t, ml) = obtainInfoMeta m
+  t <- lookupTypeEnv name
   t' <- reduceTermPlus t
   case t' of
     (_, TermPi xts _)

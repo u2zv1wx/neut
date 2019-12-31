@@ -97,6 +97,13 @@ lookupWeakTypeEnvMaybe s = do
     Nothing -> return Nothing
     Just t -> return $ Just t
 
+lookupTypeEnv :: String -> WithEnv TermPlus
+lookupTypeEnv s = do
+  mt <- gets (Map.lookup s . typeEnv)
+  case mt of
+    Just t -> return t
+    Nothing -> throwError $ s ++ " is not found in the type environment."
+
 lookupNameEnv :: String -> WithEnv String
 lookupNameEnv s = do
   ms <- lookupNameEnvMaybe s
