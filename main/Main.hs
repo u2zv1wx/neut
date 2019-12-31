@@ -119,4 +119,13 @@ expandDirPath path = do
   return $ current </> path
 
 process :: String -> WithEnv [String]
-process = parse >=> elaborate >=> polarize >=> toLLVM >=> emit
+process input = do
+  e <- (parse >=> elaborate) input
+  p "elaborated"
+  e' <- polarize e
+  p "polarized"
+  e'' <- toLLVM e'
+  p "llvm-done"
+  emit e''
+   -- process input = do
+   -- parse >=> elaborate >=> polarize >=> toLLVM >=> emit

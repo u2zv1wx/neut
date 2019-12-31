@@ -222,7 +222,7 @@
 
 (constant file-descriptor)
 
-(ascription file-descriptor type)
+(ascription file-descriptor tau)
 
 (constant stdout)
 
@@ -237,21 +237,13 @@
      (str (u8-array A))
      (len (is-enum A)))
     top))
-;; (ascription unsafe.write
-;;   (pi
-;;     ((A (tata 10))
-;;      (out file-descriptor)
-;;      (str (u8-array A))
-;;      (len (is-enum A)))
-;;     top))
-
 
 (enum choice left right)
 
-(constant admit-explicit)
+;; (constant admit-explicit)
 
-(ascription admit-explicit
-  (pi ((A type)) A))
+;; (ascription admit-explicit
+;;   (pi ((A type)) A))
 
 (keyword admit)
 
@@ -265,7 +257,7 @@
 
 ;; (write choice stdout (admit (u8-array choice)) enum.choice)
 ;; これがちゃんと型つくのかなりうれしいな。
-(write choice stdout admit enum.choice)
+;; (write choice stdout admit enum.choice)
 
 (io-return top unit)
 

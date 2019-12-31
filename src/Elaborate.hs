@@ -55,9 +55,6 @@ elaborate e = do
   p "updated typeEnv"
   -- elaborate `e` using the resulting substitution
   e'' <- elaborate' e'
-  p "elaborated"
-  _ <- error "done"
-  p' e''
   return e''
 
 -- This function translates a well-typed term into an untyped term in a
