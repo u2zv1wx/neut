@@ -42,9 +42,6 @@ type Hole = Identifier
 
 type IdentifierPlus = (Identifier, TermPlus)
 
--- obtainInfoMeta :: Meta -> (TermPlus, Meta)
--- obtainInfoMeta (MetaTerminal ml) = ((MetaTerminal ml, TermTau), ml)
--- obtainInfoMeta (MetaNonTerminal t ml) = (t, ml)
 toTermUpsilon :: Identifier -> TermPlus
 toTermUpsilon x = do
   (emptyMeta, TermUpsilon x)
