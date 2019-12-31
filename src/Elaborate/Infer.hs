@@ -46,15 +46,15 @@ infer ctx (m, WeakTermTheta x)
     t <- toIsEnumType i
     retPreTerm t (toLoc m) $ PreTermTheta x
   | otherwise = do
-    mt <- lookupTypeEnvMaybe x
+    mt <- lookupWeakTypeEnvMaybe x
     case mt of
       Just t -> retPreTerm t (toLoc m) $ PreTermTheta x
       Nothing -> do
         h <- newTypeHoleInCtx ctx
-        insTypeEnv x h
+        insWeakTypeEnv x h
         retPreTerm h (toLoc m) $ PreTermTheta x
 infer _ (m, WeakTermUpsilon x) = do
-  t <- lookupTypeEnv x
+  t <- lookupWeakTypeEnv x
   retPreTerm t (toLoc m) $ PreTermUpsilon x
 infer ctx (m, WeakTermPi xts t) = do
   (xts', t') <- inferPi ctx xts t
@@ -93,21 +93,21 @@ infer ctx (m, WeakTermPiElim e es) = do
   inferPiElim ctx m e' es'
 infer ctx (m, WeakTermMu (x, t) e) = do
   t' <- inferType ctx t
-  insTypeEnv x t'
+  insWeakTypeEnv x t'
   e' <- infer (ctx ++ [(x, t')]) e
   insConstraintEnv t' (typeOf e')
   retPreTerm t' (toLoc m) $ PreTermMu (x, t') e'
 infer ctx (_, WeakTermZeta _) = do
   h <- newHoleInCtx ctx
   return h
-  -- insTypeEnv x h
+  -- insWeakTypeEnv x h
   -- retPreTerm (typeOf h) (toLoc m) (snd h)
-  -- mt <- lookupTypeEnvMaybe x
+  -- mt <- lookupWeakTypeEnvMaybe x
   -- case mt of
   --   Just t -> retPreTerm t (toLoc m) $ PreTermZeta x
   --   Nothing -> do
   --     h <- newTypeHoleInCtx ctx
-  --     insTypeEnv x h
+  --     insWeakTypeEnv x h
   --     retPreTerm h (toLoc m) $ PreTermZeta x
 infer _ (m, WeakTermIntS size i) = do
   let t = (metaTerminal, PreTermTheta $ "i" ++ show size)
@@ -195,7 +195,7 @@ inferPi ctx [] cod = do
   return ([], cod')
 inferPi ctx ((x, t):xts) cod = do
   t' <- inferType ctx t
-  insTypeEnv x t'
+  insWeakTypeEnv x t'
   (xts', cod') <- inferPi (ctx ++ [(x, t')]) xts cod
   return ((x, t') : xts', cod')
 
@@ -209,7 +209,7 @@ inferPiIntro ctx [] e = do
   return ([], e')
 inferPiIntro ctx ((x, t):xts) e = do
   t' <- inferType ctx t
-  insTypeEnv x t'
+  insWeakTypeEnv x t'
   (xts', e') <- inferPiIntro (ctx ++ [(x, t')]) xts e
   return ((x, t') : xts', e')
 
@@ -286,7 +286,7 @@ newTypeHoleListInCtx ::
 newTypeHoleListInCtx _ [] = return []
 newTypeHoleListInCtx ctx (x:rest) = do
   t <- newTypeHoleInCtx ctx
-  insTypeEnv x t
+  insWeakTypeEnv x t
   ts <- newTypeHoleListInCtx (ctx ++ [(x, t)]) rest
   return $ (x, t) : ts
 
@@ -308,7 +308,7 @@ constrainList (t1:t2:ts) = do
 
 toVar :: Identifier -> PreTermPlus -> WithEnv PreTermPlus
 toVar x t = do
-  insTypeEnv x t
+  insWeakTypeEnv x t
   return (PreMetaNonTerminal t Nothing, PreTermUpsilon x)
 
 retPreTerm :: PreTermPlus -> Maybe Loc -> PreTerm -> WithEnv PreTermPlus

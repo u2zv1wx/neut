@@ -108,7 +108,7 @@ toVarList (e:es) = do
   xts <- toVarList es
   x <- newNameWith "hole"
   let t = typeOf e
-  insTypeEnv x t
+  insWeakTypeEnv x t
   return $ (x, t) : xts
 
 -- [x, x, y, z, z] ~>
@@ -162,7 +162,7 @@ discardInactive xs indexList =
         | i == j -> return (x, t)
       _ -> do
         y <- newNameWith "hole"
-        insTypeEnv y t
+        insWeakTypeEnv y t
         return (y, t)
 
 -- Try the list of alternatives.

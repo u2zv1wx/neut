@@ -12,6 +12,7 @@ import Data.Code
 import Data.Constraint
 import Data.LLVM
 import Data.PreTerm
+import Data.Term
 import Data.Tree
 
 import qualified Data.Map.Strict as Map
@@ -32,7 +33,8 @@ data Env =
     , constantEnv :: [Identifier]
     , enumEnv :: [(Identifier, [Identifier])] -- [("choice", ["left", "right"]), ...]
     , nameEnv :: [(Identifier, Identifier)] -- [("foo", "foo.13"), ...]
-    , typeEnv :: Map.Map Identifier PreTermPlus -- var ~> typeof(var)
+    , weakTypeEnv :: Map.Map Identifier PreTermPlus -- var ~> typeof(var)
+    , typeEnv :: Map.Map Identifier TermPlus
     , constraintEnv :: [PreConstraint] -- for type inference
     , substEnv :: [(Identifier, PreTermPlus)] -- metavar ~> beta-equivalent weakterm
     , codeEnv :: [(Identifier, ([Identifier], CodePlus))] -- f ~> thunk (lam (x1 ... xn) e)
@@ -49,6 +51,7 @@ initialEnv path =
     , constantEnv = []
     , enumEnv = []
     , nameEnv = []
+    , weakTypeEnv = Map.empty
     , typeEnv = Map.empty
     , codeEnv = []
     , llvmEnv = []
@@ -80,16 +83,16 @@ newNameWith s = do
   modify (\e -> e {nameEnv = (s, s') : nameEnv e})
   return s'
 
-lookupTypeEnv :: String -> WithEnv PreTermPlus
-lookupTypeEnv s = do
-  mt <- lookupTypeEnvMaybe s
+lookupWeakTypeEnv :: String -> WithEnv PreTermPlus
+lookupWeakTypeEnv s = do
+  mt <- lookupWeakTypeEnvMaybe s
   case mt of
     Just t -> return t
     Nothing -> throwError $ s ++ " is not found in the type environment."
 
-lookupTypeEnvMaybe :: String -> WithEnv (Maybe PreTermPlus)
-lookupTypeEnvMaybe s = do
-  mt <- gets (Map.lookup s . typeEnv)
+lookupWeakTypeEnvMaybe :: String -> WithEnv (Maybe PreTermPlus)
+lookupWeakTypeEnvMaybe s = do
+  mt <- gets (Map.lookup s . weakTypeEnv)
   case mt of
     Nothing -> return Nothing
     Just t -> return $ Just t
@@ -113,8 +116,9 @@ lookupSubstEnv i = do
   senv <- gets substEnv
   return $ lookup i senv
 
-insTypeEnv :: Identifier -> PreTermPlus -> WithEnv ()
-insTypeEnv i t = modify (\e -> e {typeEnv = Map.insert i t (typeEnv e)})
+insWeakTypeEnv :: Identifier -> PreTermPlus -> WithEnv ()
+insWeakTypeEnv i t =
+  modify (\e -> e {weakTypeEnv = Map.insert i t (weakTypeEnv e)})
 
 insCodeEnv :: Identifier -> [Identifier] -> CodePlus -> WithEnv ()
 insCodeEnv name args e =

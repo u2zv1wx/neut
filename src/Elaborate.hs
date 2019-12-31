@@ -22,7 +22,7 @@ import qualified Data.PQueue.Min as Q
 
 -- Given a term `e` and its name `main`, this function
 --   (1) traces `e` using `infer e`, collecting type constraints,
---   (2) updates typeEnv for `main` by the result of `infer e`,
+--   (2) updates weakTypeEnv for `main` by the result of `infer e`,
 --   (3) analyze the constraints, solving easy ones,
 --   (4) synthesize these analyzed constraints, solving as many solutions as possible,
 --   (5) elaborate the given term using the result of synthesis.
@@ -33,17 +33,12 @@ elaborate :: WeakTermPlus -> WithEnv TermPlus
 elaborate e = do
   p "infer"
   e' <- infer [] e
-  -- p' e'
   -- Kantian type-inference ;)
-  -- p' e
   p "analyze"
   cs <- gets constraintEnv
   p $ "size: " ++ show (length cs)
-  -- p "cs:"
-  -- p' cs
   q <- gets constraintEnv >>= analyze
-  -- p' q
-  -- p "synthesize"
+  p "synthesize"
   p $ "size: " ++ show (Q.size q)
   -- p "q:"
   -- p' q
@@ -54,24 +49,16 @@ elaborate e = do
   -- gets constraintQueue >>= synthesize
   p "ok"
   -- update the type environment by resulting substitution
-  sub <- gets substEnv
-  -- let (xs, es) = unzip sub
-  -- es' <- mapM reducePreTermPlus es
-  -- let sub' = zip xs es'
-  -- p' sub'
-  tenv <- gets typeEnv
-  tenv' <- mapM (return . substPreTermPlus sub) tenv
+  tenv <- gets weakTypeEnv
+  tenv' <- mapM elaborate' tenv
   modify (\env -> env {typeEnv = tenv'})
-  p "updated typeEn"
+  p "updated typeEnv"
   -- elaborate `e` using the resulting substitution
-  -- liftIO $ putStrLn $ Pr.ppShow e
-  let e'' = substPreTermPlus sub e'
-  e''' <- elaborate' e''
+  e'' <- elaborate' e'
   p "elaborated"
-  error "done"
-  p' e'''
-  return e'''
-  -- caseCheck e' >>= elaborate'
+  _ <- error "done"
+  p' e''
+  return e''
 
 -- This function translates a well-typed term into an untyped term in a
 -- reduction-preserving way. Here, we translate types into units (nullary product).
