@@ -10,7 +10,6 @@ data Constraint
   | ConstraintDelta PreTermPlus [(PreMeta, [PreTermPlus])] PreTermPlus
   | ConstraintQuasiPattern Hole [[PreTermPlus]] PreTermPlus
   | ConstraintFlexRigid Hole [[PreTermPlus]] PreTermPlus
-  | ConstraintFlexFlex Hole [[PreTermPlus]] PreTermPlus
   | ConstraintOther
   deriving (Show)
 
@@ -20,8 +19,7 @@ constraintToInt ConstraintPattern {} = 1
 constraintToInt ConstraintDelta {} = 2
 constraintToInt ConstraintQuasiPattern {} = 3
 constraintToInt ConstraintFlexRigid {} = 4
-constraintToInt ConstraintFlexFlex {} = 5
-constraintToInt ConstraintOther = 6
+constraintToInt ConstraintOther = 5
 
 instance Eq Constraint where
   c1 == c2 = constraintToInt c1 == constraintToInt c2
@@ -36,10 +34,6 @@ data EnrichedConstraint =
     Constraint
   deriving (Show)
 
--- instance Show EnrichedConstraint where
---   show (Enriched p _ ConstraintAnalyzable) = show p
---   show (Enriched p _ ConstraintOther) = show p
---   show (Enriched p _ _) = show p
 instance Eq EnrichedConstraint where
   (Enriched _ _ c1) == (Enriched _ _ c2) = c1 == c2
 

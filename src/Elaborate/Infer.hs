@@ -216,8 +216,8 @@ inferPiIntro ctx ((x, t):xts) e = do
 
 inferPiElim ::
      Context -> WeakMeta -> PreTermPlus -> [PreTermPlus] -> WithEnv PreTermPlus
-inferPiElim ctx m e es = do
-  t' <- reducePreTermPlus $ typeOf e
+inferPiElim ctx m e es
+  -- t' <- reducePreTermPlus $ typeOf e
   -- -- この場合分けをしても別に解けるものが増えるわけではないらしい
   -- case t' of
   --   (_, PreTermPi xts cod) -> do
@@ -228,6 +228,7 @@ inferPiElim ctx m e es = do
   --     let cod' = substPreTermPlus (zip xs es) cod
   --     retPreTerm cod' (toLoc m) $ PreTermPiElim e es
   --   _ -> do
+ = do
   ys <- mapM (const $ newNameWith "arg") es
   -- yts = [y1 : ?M1 @ (ctx[0], ..., ctx[n]),
   --        y2 : ?M2 @ (ctx[0], ..., ctx[n], y1),
