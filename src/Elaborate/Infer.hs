@@ -14,7 +14,6 @@ import Data.Basic
 import Data.Env
 import Data.PreTerm
 import Data.WeakTerm
-import Reduce.PreTerm
 
 type Context = [(Identifier, PreTermPlus)]
 
@@ -314,13 +313,6 @@ toVar x t = do
 
 retPreTerm :: PreTermPlus -> Maybe Loc -> PreTerm -> WithEnv PreTermPlus
 retPreTerm t ml e = return (PreMetaNonTerminal t ml, e)
-
-univ :: PreTermPlus
-univ = (PreMetaTerminal Nothing, PreTermTau)
-
-typeOf :: PreTermPlus -> PreTermPlus
-typeOf (PreMetaTerminal _, _) = univ
-typeOf (PreMetaNonTerminal t _, _) = t
 
 -- is-enum n{i}
 toIsEnumType :: Integer -> WithEnv PreTermPlus

@@ -41,14 +41,13 @@ data Theta
 
 type IdentifierPlus = (Identifier, DataPlus)
 
-type CodeMeta = Maybe Loc
+-- type CodeMeta = Maybe Loc
+type DataPlus = (Meta, Data)
 
-type DataPlus = (CodeMeta, Data)
+type CodePlus = (Meta, Code)
 
-type CodePlus = (CodeMeta, Code)
-
-toDataUpsilon :: (Identifier, Maybe Loc) -> DataPlus
-toDataUpsilon (x, ml) = (ml, DataUpsilon x)
+toDataUpsilon :: (Identifier, Meta) -> DataPlus
+toDataUpsilon (x, m) = (m, DataUpsilon x)
 
 type SubstDataPlus = [IdentifierPlus]
 

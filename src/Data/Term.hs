@@ -28,14 +28,12 @@ data Term
   | TermArrayElim ArrayKind TermPlus TermPlus
   deriving (Show)
 
-data Meta
-  = MetaTerminal (Maybe Loc)
-  | MetaNonTerminal TermPlus (Maybe Loc)
-  -- deriving (Show)
-
-instance Show Meta where
-  show _ = "_"
-
+-- data Meta
+--   = MetaTerminal (Meta)
+--   | MetaNonTerminal TermPlus (Meta)
+--   -- deriving (Show)
+-- instance Show Meta where
+--   show _ = "_"
 type TermPlus = (Meta, Term)
 
 type SubstTerm = [(Identifier, TermPlus)]
@@ -44,30 +42,26 @@ type Hole = Identifier
 
 type IdentifierPlus = (Identifier, TermPlus)
 
-obtainInfoMeta :: Meta -> (TermPlus, Maybe Loc)
-obtainInfoMeta (MetaTerminal ml) = ((MetaTerminal ml, TermTau), ml)
-obtainInfoMeta (MetaNonTerminal t ml) = (t, ml)
-
-toTermUpsilon :: (Identifier, TermPlus) -> TermPlus
-toTermUpsilon (x, t) = do
-  let (_, ml) = obtainInfoMeta $ fst t
-  (MetaNonTerminal t ml, TermUpsilon x)
+-- obtainInfoMeta :: Meta -> (TermPlus, Meta)
+-- obtainInfoMeta (MetaTerminal ml) = ((MetaTerminal ml, TermTau), ml)
+-- obtainInfoMeta (MetaNonTerminal t ml) = (t, ml)
+toTermUpsilon :: Identifier -> TermPlus
+toTermUpsilon x = do
+  (emptyMeta, TermUpsilon x)
 
 toTermInt64 :: Integer -> TermPlus
-toTermInt64 i =
-  ( MetaNonTerminal (MetaTerminal Nothing, TermTheta "i64") Nothing
-  , TermIntS 64 i)
+toTermInt64 i = (emptyMeta, TermIntS 64 i)
 
-varTermPlus :: TermPlus -> [(Identifier, Maybe Loc, TermPlus)]
+varTermPlus :: TermPlus -> [(Identifier, Meta, TermPlus)]
 varTermPlus e = nubBy (\(x, _, _) (y, _, _) -> x == y) $ getClosedVarChain e
 
-getClosedVarChain :: TermPlus -> [(Identifier, Maybe Loc, TermPlus)]
+getClosedVarChain :: TermPlus -> [(Identifier, Meta, TermPlus)]
 getClosedVarChain (_, TermTau) = []
 getClosedVarChain (_, TermTheta _) = []
-getClosedVarChain (m, TermUpsilon x) =
-  case m of
-    MetaTerminal ml -> [(x, ml, (m, TermTau))]
-    MetaNonTerminal t ml -> getClosedVarChain t ++ [(x, ml, t)]
+getClosedVarChain (_, TermUpsilon _) = undefined
+  -- case m of
+  --   MetaTerminal ml -> [(x, ml, (m, TermTau))]
+  --   MetaNonTerminal t ml -> getClosedVarChain t ++ [(x, ml, t)]
 getClosedVarChain (_, TermPi xts t) = getClosedVarChainBindings xts [t]
 getClosedVarChain (_, TermPiIntro xts e) = getClosedVarChainBindings xts [e]
 getClosedVarChain (_, TermPiElim e es) =
@@ -92,9 +86,7 @@ getClosedVarChain (_, TermArrayElim _ e1 e2) = do
   getClosedVarChain e1 ++ getClosedVarChain e2
 
 getClosedVarChainBindings ::
-     [(Identifier, TermPlus)]
-  -> [TermPlus]
-  -> [(Identifier, Maybe Loc, TermPlus)]
+     [(Identifier, TermPlus)] -> [TermPlus] -> [(Identifier, Meta, TermPlus)]
 getClosedVarChainBindings [] es = concatMap getClosedVarChain es
 getClosedVarChainBindings ((x, t):xts) es = do
   let xs1 = getClosedVarChain t
@@ -102,47 +94,47 @@ getClosedVarChainBindings ((x, t):xts) es = do
   xs1 ++ filter (\(y, _, _) -> y /= x) xs2
 
 substTermPlus :: SubstTerm -> TermPlus -> TermPlus
-substTermPlus sub (m, TermTau) = (substMeta sub m, TermTau)
-substTermPlus sub (m, TermTheta t) = (substMeta sub m, TermTheta t)
+substTermPlus _ (m, TermTau) = (m, TermTau)
+substTermPlus _ (m, TermTheta t) = (m, TermTheta t)
 substTermPlus sub (m, TermUpsilon x) =
-  fromMaybe (substMeta sub m, TermUpsilon x) (lookup x sub)
+  fromMaybe (m, TermUpsilon x) (lookup x sub)
 substTermPlus sub (m, TermPi xts t) = do
   let (xts', t') = substTermPlusBindingsWithBody sub xts t
-  (substMeta sub m, TermPi xts' t')
+  (m, TermPi xts' t')
 substTermPlus sub (m, TermPiIntro xts body) = do
   let (xts', body') = substTermPlusBindingsWithBody sub xts body
-  (substMeta sub m, TermPiIntro xts' body')
+  (m, TermPiIntro xts' body')
 substTermPlus sub (m, TermPiElim e es) = do
   let e' = substTermPlus sub e
   let es' = map (substTermPlus sub) es
-  (substMeta sub m, TermPiElim e' es')
+  (m, TermPiElim e' es')
 substTermPlus sub (m, TermMu (x, t) e) = do
   let t' = substTermPlus sub t
   let e' = substTermPlus (filter (\(k, _) -> k /= x) sub) e
-  (substMeta sub m, TermMu (x, t') e')
-substTermPlus sub (m, TermIntS size x) = (substMeta sub m, TermIntS size x)
-substTermPlus sub (m, TermIntU size x) = (substMeta sub m, TermIntU size x)
-substTermPlus sub (m, TermFloat16 x) = (substMeta sub m, TermFloat16 x)
-substTermPlus sub (m, TermFloat32 x) = (substMeta sub m, TermFloat32 x)
-substTermPlus sub (m, TermFloat64 x) = (substMeta sub m, TermFloat64 x)
-substTermPlus sub (m, TermEnum x) = (substMeta sub m, TermEnum x)
-substTermPlus sub (m, TermEnumIntro l) = (substMeta sub m, TermEnumIntro l)
+  (m, TermMu (x, t') e')
+substTermPlus _ (m, TermIntS size x) = (m, TermIntS size x)
+substTermPlus _ (m, TermIntU size x) = (m, TermIntU size x)
+substTermPlus _ (m, TermFloat16 x) = (m, TermFloat16 x)
+substTermPlus _ (m, TermFloat32 x) = (m, TermFloat32 x)
+substTermPlus _ (m, TermFloat64 x) = (m, TermFloat64 x)
+substTermPlus _ (m, TermEnum x) = (m, TermEnum x)
+substTermPlus _ (m, TermEnumIntro l) = (m, TermEnumIntro l)
 substTermPlus sub (m, TermEnumElim e branchList) = do
   let e' = substTermPlus sub e
   let (caseList, es) = unzip branchList
   let es' = map (substTermPlus sub) es
-  (substMeta sub m, TermEnumElim e' (zip caseList es'))
+  (m, TermEnumElim e' (zip caseList es'))
 substTermPlus sub (m, TermArray k indexType) = do
   let indexType' = substTermPlus sub indexType
-  (substMeta sub m, TermArray k indexType')
+  (m, TermArray k indexType')
 substTermPlus sub (m, TermArrayIntro k les) = do
   let (ls, es) = unzip les
   let es' = map (substTermPlus sub) es
-  (substMeta sub m, TermArrayIntro k (zip ls es'))
+  (m, TermArrayIntro k (zip ls es'))
 substTermPlus sub (m, TermArrayElim k e1 e2) = do
   let e1' = substTermPlus sub e1
   let e2' = substTermPlus sub e2
-  (substMeta sub m, TermArrayElim k e1' e2')
+  (m, TermArrayElim k e1' e2')
 
 substTermPlusBindingsWithBody ::
      SubstTerm -> [IdentifierPlus] -> TermPlus -> ([IdentifierPlus], TermPlus)
@@ -152,10 +144,9 @@ substTermPlusBindingsWithBody sub ((x, t):xts) e = do
   let (xts', e') = substTermPlusBindingsWithBody sub' xts e
   ((x, substTermPlus sub t) : xts', e')
 
-substMeta :: SubstTerm -> Meta -> Meta
-substMeta _ (MetaTerminal ml) = MetaTerminal ml
-substMeta sub (MetaNonTerminal t ml) = MetaNonTerminal (substTermPlus sub t) ml
-
+-- substMeta :: SubstTerm -> Meta -> Meta
+-- substMeta _ (MetaTerminal ml) = MetaTerminal ml
+-- substMeta sub (MetaNonTerminal t ml) = MetaNonTerminal (substTermPlus sub t) ml
 isValue :: TermPlus -> Bool
 isValue (_, TermTau) = True
 isValue (_, TermUpsilon _) = True

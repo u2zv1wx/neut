@@ -78,7 +78,7 @@ takeBaseName' (LLVMDataFloat64 _) = "double"
 takeBaseName' LLVMDataNull = "null"
 
 retUp :: Identifier -> CodePlus
-retUp result = (Nothing, CodeUpIntro (Nothing, DataUpsilon result))
+retUp result = (emptyMeta, CodeUpIntro (emptyMeta, DataUpsilon result))
 
 loadContent ::
      DataPlus -- base pointer
@@ -113,7 +113,7 @@ loadContent' bp bt et ((i, x):xis) cont = do
       (LLVMOpGetElementPtr (bp, bt) [(LLVMDataInt 0, LowTypeIntS 32), i]) $
     LLVMLet x (LLVMOpLoad pos et) cont'
 
-llvmCodeTheta :: CodeMeta -> Theta -> WithEnv LLVM
+llvmCodeTheta :: Meta -> Theta -> WithEnv LLVM
 llvmCodeTheta _ (ThetaUnaryOp op lowType v)
   | UnaryOpNeg <- op = llvmCodeUnaryOp op lowType lowType v
   | Just codType <- getCodType op = llvmCodeUnaryOp op lowType codType v
@@ -324,7 +324,8 @@ llvmCodeEnumElim v branchList = do
 storeContent ::
      Identifier -> LowType -> LowType -> [DataPlus] -> LLVM -> WithEnv LLVM
 storeContent reg elemType aggPtrType ds cont = do
-  (cast, castThen) <- llvmCast (Just reg) (Nothing, DataUpsilon reg) aggPtrType
+  (cast, castThen) <-
+    llvmCast (Just reg) (emptyMeta, DataUpsilon reg) aggPtrType
   storeThenCont <- storeContent' cast aggPtrType elemType (zip [0 ..] ds) cont
   castThenStoreThenCont <- castThen $ storeThenCont
   -- FIXME: getelementptrでsizeofを実現する方式を使えばallocsizeを計算する必要はそもそもないはず？

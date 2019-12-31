@@ -23,16 +23,13 @@ import qualified Text.Show.Pretty as Pr
 
 polarize :: TermPlus -> WithEnv CodePlus
 polarize (m, TermTau) = do
-  let ml = snd $ obtainInfoMeta m
-  v <- cartesianUniv ml
-  return (ml, CodeUpIntro v)
+  v <- cartesianUniv m
+  return (m, CodeUpIntro v)
 polarize (m, TermTheta x) = polarizeTheta m x
 polarize (m, TermUpsilon x) = do
-  let ml = snd $ obtainInfoMeta m
-  return (ml, CodeUpIntro (ml, DataUpsilon x))
+  return (m, CodeUpIntro (m, DataUpsilon x))
 polarize (m, TermPi _ _) = do
-  let ml = snd $ obtainInfoMeta m
-  returnClosureType ml
+  returnClosureType m
 polarize (m, TermPiIntro xts e) = do
   let xs = map fst xts
   let fvs = obtainFreeVarList xs e
@@ -41,74 +38,54 @@ polarize (m, TermPiIntro xts e) = do
 polarize (m, TermPiElim e es) = do
   e' <- polarize e
   callClosure m e' es
-polarize (m, TermMu (f, t) e) = do
-  let ml = snd $ obtainInfoMeta m
+polarize (m, TermMu (f, _) e) = do
   let (nameList, _, typeList) = unzip3 $ obtainFreeVarList [f] e
   let fvs = zip nameList typeList
-  let fvs' = map toTermUpsilon fvs
-  let clsMuType = (MetaTerminal ml, TermPi fvs t)
-  let lamBody =
-        substTermPlus
-          [ ( f
-            , ( MetaNonTerminal t ml
-              , TermPiElim (MetaNonTerminal clsMuType ml, TermTheta f) fvs'))
-          ]
-          e
-  let clsMeta = MetaNonTerminal clsMuType ml
+  let fvs' = map (toTermUpsilon . fst) fvs
+  let lamBody = substTermPlus [(f, (m, TermPiElim (m, TermTheta f) fvs'))] e
   lamBody' <- polarize lamBody
   -- ここはクロージャではなく直接呼び出すように最適化が可能
   -- (その場合は上のsubstTermPlusの中のTermPiElimを「直接の」callへと書き換える必要がある)
   -- いや、clsにすぐcallClosureしてるから、インライン展開で結局直接の呼び出しになるのでは？
-  cls <- makeClosure (Just f) [] clsMeta fvs lamBody'
+  cls <- makeClosure (Just f) [] m fvs lamBody'
   callClosure m cls fvs'
 polarize (m, TermIntS size l) = do
-  let ml = snd $ obtainInfoMeta m
-  return (ml, CodeUpIntro (ml, DataIntS size l))
+  return (m, CodeUpIntro (m, DataIntS size l))
 polarize (m, TermIntU size l) = do
-  let ml = snd $ obtainInfoMeta m
-  return (ml, CodeUpIntro (ml, DataIntU size l))
+  return (m, CodeUpIntro (m, DataIntU size l))
 polarize (m, TermFloat16 l) = do
-  let ml = snd $ obtainInfoMeta m
-  return (ml, CodeUpIntro (ml, DataFloat16 l))
+  return (m, CodeUpIntro (m, DataFloat16 l))
 polarize (m, TermFloat32 l) = do
-  let ml = snd $ obtainInfoMeta m
-  return (ml, CodeUpIntro (ml, DataFloat32 l))
+  return (m, CodeUpIntro (m, DataFloat32 l))
 polarize (m, TermFloat64 l) = do
-  let ml = snd $ obtainInfoMeta m
-  return (ml, CodeUpIntro (ml, DataFloat64 l))
+  return (m, CodeUpIntro (m, DataFloat64 l))
 polarize (m, TermEnum _) = do
-  let ml = snd $ obtainInfoMeta m
-  v <- cartesianImmediate ml
-  return (ml, CodeUpIntro v)
+  v <- cartesianImmediate m
+  return (m, CodeUpIntro v)
 polarize (m, TermEnumIntro l) = do
-  let ml = snd $ obtainInfoMeta m
-  return (ml, CodeUpIntro (ml, DataEnumIntro l))
+  return (m, CodeUpIntro (m, DataEnumIntro l))
 polarize (m, TermEnumElim e bs) = do
   let (cs, es) = unzip bs
   es' <- mapM polarize es
   (yName, e', y) <- polarize' e
-  let ml = snd $ obtainInfoMeta m
-  return $ bindLet [(yName, e')] (ml, CodeEnumElim y (zip cs es'))
+  return $ bindLet [(yName, e')] (m, CodeEnumElim y (zip cs es'))
 polarize (m, TermArray _ _) = do
-  let ml = snd $ obtainInfoMeta m
-  returnArrayType ml
+  returnArrayType m
 polarize (m, TermArrayIntro k les) = do
-  let ml = snd $ obtainInfoMeta m
-  v <- cartesianImmediate ml
-  let retKindType = (ml, CodeUpIntro v)
+  v <- cartesianImmediate m
+  let retKindType = (m, CodeUpIntro v)
   -- arrayType = Sigma [_ : IMMEDIATE, ..., _ : IMMEDIATE]
   name <- newNameWith "array"
   arrayType <-
-    cartesianSigma name ml $ map Left $ replicate (length les) retKindType
+    cartesianSigma name m $ map Left $ replicate (length les) retKindType
   let (ls, es) = unzip les
   (zs, es', xs) <- unzip3 <$> mapM polarize' es
   return $
     bindLet (zip zs es') $
-    ( ml
+    ( m
     , CodeUpIntro $
-      (ml, DataSigmaIntro [arrayType, (ml, DataArrayIntro k (zip ls xs))]))
+      (m, DataSigmaIntro [arrayType, (m, DataArrayIntro k (zip ls xs))]))
 polarize (m, TermArrayElim k e1 e2) = do
-  let ml = snd $ obtainInfoMeta m
   e1' <- polarize e1
   e2' <- polarize e2
   (arrVarName, arrVar) <- newDataUpsilonWith "arr"
@@ -119,54 +96,52 @@ polarize (m, TermArrayElim k e1 e2) = do
   (contentVarName, contentVar) <- newDataUpsilonWith "array-content"
   retUnivType <- returnCartesianUniv
   retImmType <- returnCartesianImmediate
-  let retContentType = (ml, CodeUpIntro contentTypeVar)
+  let retContentType = (m, CodeUpIntro contentTypeVar)
   -- array : Sigma [content-type : univ, content : content-type]
   return $
     bindLet [(arrVarName, e1'), (idxVarName, e2')] $
-    ( ml
+    ( m
     , CodeSigmaElim
         [(contentTypeVarName, retUnivType), (contentVarName, retContentType)]
         arrVar
-        ( ml
+        ( m
         , CodeSigmaElim
             [(affVarName, retImmType), (relVarName, retImmType)]
             contentTypeVar
-            (ml, CodeArrayElim k contentVar idxVar)))
+            (m, CodeArrayElim k contentVar idxVar)))
 
-obtainFreeVarList ::
-     [Identifier] -> TermPlus -> [(Identifier, Maybe Loc, TermPlus)]
+obtainFreeVarList :: [Identifier] -> TermPlus -> [(Identifier, Meta, TermPlus)]
 obtainFreeVarList xs e = do
   filter (\(x, _, _) -> x `notElem` xs) $ varTermPlus e
 
 polarize' :: TermPlus -> WithEnv (Identifier, CodePlus, DataPlus)
 polarize' e@(m, _) = do
   e' <- polarize e
-  (varName, var) <- newDataUpsilonWith' "var" $ snd $ obtainInfoMeta m
+  (varName, var) <- newDataUpsilonWith' "var" m
   return (varName, e', var)
 
 makeClosure ::
      Maybe Identifier -- the name of newly created closure
-  -> [(Identifier, Maybe Loc, TermPlus)] -- list of free variables in `lam (x1, ..., xn). e`
+  -> [(Identifier, Meta, TermPlus)] -- list of free variables in `lam (x1, ..., xn). e`
   -> Meta -- meta of lambda
   -> [(Identifier, TermPlus)] -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
   -> CodePlus -- the `e` in `lam (x1, ..., xn). e`
   -> WithEnv CodePlus
 makeClosure mName fvs m xts e = do
   let (xs, _) = unzip xts
-  let ml = snd $ obtainInfoMeta m
   let (freeVarNameList, locList, freeVarTypeList) = unzip3 fvs
   negTypeList <- mapM polarize freeVarTypeList
   expName <- newNameWith "exp"
-  envExp <- cartesianSigma expName ml $ map Left negTypeList
+  envExp <- cartesianSigma expName m $ map Left negTypeList
   (envVarName, envVar) <- newDataUpsilonWith "env"
   let (xs', ts) = unzip $ zip freeVarNameList freeVarTypeList ++ xts
   ts' <- mapM polarize ts
   e' <- linearize (zip xs' ts') e
   let fvInfo = zip freeVarNameList negTypeList
   -- let body = (ml, CodeSigmaElim freeVarNameList envVar e')
-  let body = (ml, CodeSigmaElim fvInfo envVar e')
+  let body = (m, CodeSigmaElim fvInfo envVar e')
   let fvSigmaIntro =
-        ( ml
+        ( m
         , DataSigmaIntro $ zipWith (curry toDataUpsilon) freeVarNameList locList)
   name <-
     case mName of
@@ -175,14 +150,13 @@ makeClosure mName fvs m xts e = do
   cenv <- gets codeEnv
   when (name `notElem` map fst cenv) $ insCodeEnv name (envVarName : xs) body
   return $
-    ( ml
+    ( m
     , CodeUpIntro
-        (ml, DataSigmaIntro [envExp, fvSigmaIntro, (ml, DataTheta name)]))
+        (m, DataSigmaIntro [envExp, fvSigmaIntro, (m, DataTheta name)]))
 
 callClosure :: Meta -> CodePlus -> [TermPlus] -> WithEnv CodePlus
 callClosure m e es = do
   (zs, es', xs) <- unzip3 <$> mapM polarize' es
-  let ml = snd $ obtainInfoMeta m
   (clsVarName, clsVar) <- newDataUpsilonWith "closure"
   (typeVarName, typeVar) <- newDataUpsilonWith "exp"
   (envVarName, envVar) <- newDataUpsilonWith "env"
@@ -194,18 +168,18 @@ callClosure m e es = do
   return $
     bindLet
       ((clsVarName, e) : zip zs es')
-      ( ml
+      ( m
       , CodeSigmaElim
           [ (typeVarName, retUnivType)
           , (envVarName, returnUpsilon typeVarName)
           , (lamVarName, retImmType)
           ]
           clsVar
-          ( ml
+          ( m
           , CodeSigmaElim
               [(affVarName, retImmType), (relVarName, retImmType)]
               typeVar
-              (ml, CodePiElimDownElim lamVar (envVar : xs))))
+              (m, CodePiElimDownElim lamVar (envVar : xs))))
 
 -- e' <- linearize xts eのとき、e'は、eとbeta-equivalentであり、かつ、xtsに含まれる変数の使用がpractically linearであるようなterm.
 linearize :: [(Identifier, CodePlus)] -> CodePlus -> WithEnv CodePlus
@@ -251,8 +225,8 @@ withHeader' ((x, t, []):xtzss) e = do
   withHeaderAffine x t e'
 withHeader' ((x, _, [z]):xtzss) e = do
   e' <- withHeader' xtzss e -- already linear.
-  let ml = Nothing
-  return (ml, CodeUpElim z (ml, CodeUpIntro (ml, DataUpsilon x)) e')
+  let m = emptyMeta
+  return (m, CodeUpElim z (m, CodeUpIntro (m, DataUpsilon x)) e')
 withHeader' ((x, t, (z1:z2:zs)):xtzss) e = do
   e' <- withHeader' xtzss e
   withHeaderRelevant x t z1 z2 zs e'
@@ -266,8 +240,8 @@ withHeader' ((x, t, (z1:z2:zs)):xtzss) e = do
 withHeaderAffine :: Identifier -> CodePlus -> CodePlus -> WithEnv CodePlus
 withHeaderAffine x t e = do
   hole <- newNameWith "unit"
-  discardUnusedVar <- toAffineApp Nothing x t
-  return (Nothing, CodeUpElim hole discardUnusedVar e)
+  discardUnusedVar <- toAffineApp emptyMeta x t
+  return (emptyMeta, CodeUpElim hole discardUnusedVar e)
 
 -- withHeaderRelevant x t [x1, ..., x{N}] e ~>
 --   bind exp := t in
@@ -350,16 +324,16 @@ withHeaderRelevant' ::
      CodePlus -> DataPlus -> LinearChain -> CodePlus -> WithEnv CodePlus
 withHeaderRelevant' _ _ [] cont = return cont
 withHeaderRelevant' t relVar ((x, (x1, x2)):chain) cont = do
-  let ml = fst cont
+  let m = fst cont
   cont' <- withHeaderRelevant' t relVar chain cont
   (sigVarName, sigVar) <- newDataUpsilonWith "sig"
-  let varX = toDataUpsilon (x, Nothing)
+  let varX = toDataUpsilon (x, emptyMeta)
   return $
-    ( ml
+    ( m
     , CodeUpElim
         sigVarName
-        (ml, CodePiElimDownElim relVar [varX])
-        (ml, CodeSigmaElim [(x1, t), (x2, t)] sigVar cont'))
+        (m, CodePiElimDownElim relVar [varX])
+        (m, CodeSigmaElim [(x1, t), (x2, t)] sigVar cont'))
 
 bindLet :: [(Identifier, CodePlus)] -> CodePlus -> CodePlus
 bindLet [] cont = cont
@@ -368,9 +342,9 @@ bindLet ((x, e):xes) cont = do
   (fst cont', CodeUpElim x e cont')
 
 returnUpsilon :: Identifier -> CodePlus
-returnUpsilon x = (Nothing, CodeUpIntro (Nothing, DataUpsilon x))
+returnUpsilon x = (emptyMeta, CodeUpIntro (emptyMeta, DataUpsilon x))
 
-returnArrayType :: Maybe Loc -> WithEnv CodePlus
+returnArrayType :: Meta -> WithEnv CodePlus
 returnArrayType ml = do
   tau <- cartesianImmediate ml
   (arrVarName, arrVar) <- newDataUpsilonWith "arr"
@@ -383,37 +357,37 @@ returnArrayType ml = do
       [Right (arrVarName, retTau), Left retArrVar]
   return (ml, CodeUpIntro v)
 
-returnClosureType :: Maybe Loc -> WithEnv CodePlus
-returnClosureType ml = do
-  imm <- cartesianImmediate ml
-  tau <- cartesianUniv ml
+returnClosureType :: Meta -> WithEnv CodePlus
+returnClosureType m = do
+  imm <- cartesianImmediate m
+  tau <- cartesianUniv m
   (envVarName, envVar) <- newDataUpsilonWith "env"
-  let retUnivType = (ml, CodeUpIntro tau)
-  let retImmType = (ml, CodeUpIntro imm)
-  let retEnvVar = (ml, CodeUpIntro envVar)
+  let retUnivType = (m, CodeUpIntro tau)
+  let retImmType = (m, CodeUpIntro imm)
+  let retEnvVar = (m, CodeUpIntro envVar)
   closureType <-
     cartesianSigma
       "closure"
-      ml
+      m
       [Right (envVarName, retUnivType), Left retEnvVar, Left retImmType]
-  return (ml, CodeUpIntro closureType)
+  return (m, CodeUpIntro closureType)
 
 returnCartesianImmediate :: WithEnv CodePlus
 returnCartesianImmediate = do
-  v <- cartesianImmediate Nothing
-  return (Nothing, CodeUpIntro v)
+  v <- cartesianImmediate emptyMeta
+  return (emptyMeta, CodeUpIntro v)
 
-cartesianImmediate :: Maybe Loc -> WithEnv DataPlus
-cartesianImmediate ml = do
-  aff <- affineImmediate ml
-  rel <- relevantImmediate ml
-  return (ml, DataSigmaIntro [aff, rel])
+cartesianImmediate :: Meta -> WithEnv DataPlus
+cartesianImmediate m = do
+  aff <- affineImmediate m
+  rel <- relevantImmediate m
+  return (m, DataSigmaIntro [aff, rel])
 
-affineImmediate :: Maybe Loc -> WithEnv DataPlus
-affineImmediate ml = do
+affineImmediate :: Meta -> WithEnv DataPlus
+affineImmediate m = do
   cenv <- gets codeEnv
   let thetaName = "affine-immediate"
-  let theta = (ml, DataTheta thetaName)
+  let theta = (m, DataTheta thetaName)
   case lookup thetaName cenv of
     Just _ -> return theta
     Nothing -> do
@@ -421,14 +395,14 @@ affineImmediate ml = do
       insCodeEnv
         thetaName
         [immVarName]
-        (Nothing, CodeUpIntro (Nothing, DataSigmaIntro []))
+        (emptyMeta, CodeUpIntro (emptyMeta, DataSigmaIntro []))
       return theta
 
-relevantImmediate :: Maybe Loc -> WithEnv DataPlus
-relevantImmediate ml = do
+relevantImmediate :: Meta -> WithEnv DataPlus
+relevantImmediate m = do
   cenv <- gets codeEnv
   let thetaName = "relevant-immediate"
-  let theta = (ml, DataTheta thetaName)
+  let theta = (m, DataTheta thetaName)
   case lookup thetaName cenv of
     Just _ -> return theta
     Nothing -> do
@@ -436,26 +410,26 @@ relevantImmediate ml = do
       insCodeEnv
         thetaName
         [immVarName]
-        (Nothing, CodeUpIntro (Nothing, DataSigmaIntro [immVar, immVar]))
+        (emptyMeta, CodeUpIntro (emptyMeta, DataSigmaIntro [immVar, immVar]))
       return theta
 
 returnCartesianUniv :: WithEnv CodePlus
 returnCartesianUniv = do
-  v <- cartesianUniv Nothing
-  return (Nothing, CodeUpIntro v)
+  v <- cartesianUniv emptyMeta
+  return (emptyMeta, CodeUpIntro v)
 
-cartesianUniv :: Maybe Loc -> WithEnv DataPlus
-cartesianUniv ml = do
-  aff <- affineUniv ml
-  rel <- relevantUniv ml
-  return (ml, DataSigmaIntro [aff, rel])
+cartesianUniv :: Meta -> WithEnv DataPlus
+cartesianUniv m = do
+  aff <- affineUniv m
+  rel <- relevantUniv m
+  return (m, DataSigmaIntro [aff, rel])
 
 -- \x -> let (_, _) := x in unit
-affineUniv :: Maybe Loc -> WithEnv DataPlus
-affineUniv ml = do
+affineUniv :: Meta -> WithEnv DataPlus
+affineUniv m = do
   cenv <- gets codeEnv
   let thetaName = "affine-univ"
-  let theta = (ml, DataTheta thetaName)
+  let theta = (m, DataTheta thetaName)
   case lookup thetaName cenv of
     Just _ -> return theta
     Nothing -> do
@@ -467,18 +441,18 @@ affineUniv ml = do
         thetaName
         [univVarName]
         -- let (a, b) := x in return ()
-        ( Nothing
+        ( emptyMeta
         , CodeSigmaElim
             [(affVarName, retImmType), (relVarName, retImmType)]
             univVar
-            (Nothing, CodeUpIntro (Nothing, DataSigmaIntro [])))
+            (emptyMeta, CodeUpIntro (emptyMeta, DataSigmaIntro [])))
       return theta
 
-relevantUniv :: Maybe Loc -> WithEnv DataPlus
-relevantUniv ml = do
+relevantUniv :: Meta -> WithEnv DataPlus
+relevantUniv m = do
   cenv <- gets codeEnv
   let thetaName = "relevant-univ"
-  let theta = (ml, DataTheta thetaName)
+  let theta = (m, DataTheta thetaName)
   case lookup thetaName cenv of
     Just _ -> return theta
     Nothing -> do
@@ -490,28 +464,28 @@ relevantUniv ml = do
         thetaName
         [univVarName]
         -- let (a, b) := x in return ((a, b), (a, b))
-        ( Nothing
+        ( emptyMeta
         , CodeSigmaElim
             [(affVarName, retImmType), (relVarName, retImmType)]
             univVar
-            ( Nothing
+            ( emptyMeta
             , CodeUpIntro
-                ( Nothing
+                ( emptyMeta
                 , DataSigmaIntro
-                    [ (Nothing, DataSigmaIntro [affVar, relVar])
-                    , (Nothing, DataSigmaIntro [affVar, relVar])
+                    [ (emptyMeta, DataSigmaIntro [affVar, relVar])
+                    , (emptyMeta, DataSigmaIntro [affVar, relVar])
                     ])))
       return theta
 
 cartesianSigma ::
      Identifier
-  -> Maybe Loc
+  -> Meta
   -> [Either CodePlus (Identifier, CodePlus)]
   -> WithEnv DataPlus
-cartesianSigma thetaName ml mxts = do
-  aff <- affineSigma ("affine-" ++ thetaName) ml mxts
-  rel <- relevantSigma ("relevant-" ++ thetaName) ml mxts
-  return (ml, DataSigmaIntro [aff, rel])
+cartesianSigma thetaName m mxts = do
+  aff <- affineSigma ("affine-" ++ thetaName) m mxts
+  rel <- relevantSigma ("relevant-" ++ thetaName) m mxts
+  return (m, DataSigmaIntro [aff, rel])
 
 -- (Assuming `ti` = `return di` for some `di` such that `xi : di`)
 -- affineSigma NAME LOC [(x1, t1), ..., (xn, tn)]   ~>
@@ -533,25 +507,25 @@ cartesianSigma thetaName ml mxts = do
 -- (Note that sigma-elim for yi is not necessary since all of them are units.)
 affineSigma ::
      Identifier
-  -> Maybe Loc
+  -> Meta
   -> [Either CodePlus (Identifier, CodePlus)]
   -> WithEnv DataPlus
-affineSigma thetaName ml mxts = do
+affineSigma thetaName m mxts = do
   cenv <- gets codeEnv
-  let theta = (ml, DataTheta thetaName)
+  let theta = (m, DataTheta thetaName)
   case lookup thetaName cenv of
     Just _ -> return theta
     Nothing -> do
       xts <- mapM supplyName mxts
       (z, varZ) <- newDataUpsilonWith "arg"
       -- As == [APP-1, ..., APP-n]   (`a` here stands for `app`)
-      as <- forM xts $ \(x, e) -> toAffineApp ml x e
+      as <- forM xts $ \(x, e) -> toAffineApp m x e
       ys <- mapM (const $ newNameWith "arg") xts
       -- yts <- mapM (newNameWithType . snd) xts
-      -- let body = bindLet (zip yts as) (ml, CodeUpIntro (ml, DataSigmaIntro []))
-      let body = bindLet (zip ys as) (ml, CodeUpIntro (ml, DataSigmaIntro []))
+      -- let body = bindLet (zip yts as) (m, CodeUpIntro (m, DataSigmaIntro []))
+      let body = bindLet (zip ys as) (m, CodeUpIntro (m, DataSigmaIntro []))
       body' <- linearize xts body
-      insCodeEnv thetaName [z] (ml, CodeSigmaElim xts varZ body')
+      insCodeEnv thetaName [z] (m, CodeSigmaElim xts varZ body')
       return theta
 
 -- (Assuming `ti` = `return di` for some `di` such that `xi : di`)
@@ -575,25 +549,25 @@ affineSigma thetaName ml mxts = do
 --     return ((p11, ..., pn1), (p12, ..., pn2)) ---                   ---       ---
 relevantSigma ::
      Identifier
-  -> Maybe Loc
+  -> Meta
   -> [Either CodePlus (Identifier, CodePlus)]
   -> WithEnv DataPlus
-relevantSigma thetaName ml mxts = do
+relevantSigma thetaName m mxts = do
   cenv <- gets codeEnv
-  let theta = (ml, DataTheta thetaName)
+  let theta = (m, DataTheta thetaName)
   case lookup thetaName cenv of
     Just _ -> return theta
     Nothing -> do
       xts <- mapM supplyName mxts
       (z, varZ) <- newDataUpsilonWith "arg"
       -- as == [APP-1, ..., APP-n]
-      as <- forM xts $ \(x, e) -> toRelevantApp ml x e
+      as <- forM xts $ \(x, e) -> toRelevantApp m x e
       -- pairVarNameList == [pair-1, ...,  pair-n]
       (pairVarNameList, pairVarTypeList) <- unzip <$> mapM toPairInfo xts
       transposedPair <- transposeSigma pairVarTypeList
       let body = bindLet (zip pairVarNameList as) transposedPair
       body' <- linearize xts body
-      insCodeEnv thetaName [z] (ml, CodeSigmaElim xts varZ body')
+      insCodeEnv thetaName [z] (m, CodeSigmaElim xts varZ body')
       return theta
 
 toPairInfo ::
@@ -615,12 +589,12 @@ transposeSigma ds = do
     unzip <$> mapM (const $ newDataUpsilonWith "sig-y") ds
   return $
     bindSigmaElim (zip (zip xVarNameList yVarNameList) ds) $
-    ( Nothing
+    ( emptyMeta
     , CodeUpIntro
-        ( Nothing
+        ( emptyMeta
         , DataSigmaIntro
-            [ (Nothing, DataSigmaIntro xVarList)
-            , (Nothing, DataSigmaIntro yVarList)
+            [ (emptyMeta, DataSigmaIntro xVarList)
+            , (emptyMeta, DataSigmaIntro yVarList)
             ]))
 
 bindSigmaElim ::
@@ -634,43 +608,43 @@ bindSigmaElim (((x, y), (d, t)):xyds) cont = do
 --   bind f := e in
 --   let (aff, rel) := f in
 --   aff @ x
-toAffineApp :: Maybe Loc -> Identifier -> CodePlus -> WithEnv CodePlus
-toAffineApp ml x e = do
+toAffineApp :: Meta -> Identifier -> CodePlus -> WithEnv CodePlus
+toAffineApp m x e = do
   (expVarName, expVar) <- newDataUpsilonWith "exp"
   (affVarName, affVar) <- newDataUpsilonWith "aff"
   (relVarName, _) <- newDataUpsilonWith "rel"
   retImmType <- returnCartesianImmediate
   return
-    ( ml
+    ( m
     , CodeUpElim
         expVarName
         e
-        ( Just (111, 222)
+        ( emptyMeta
         , CodeSigmaElim
             [(affVarName, retImmType), (relVarName, retImmType)]
             expVar
-            (ml, CodePiElimDownElim affVar [toDataUpsilon (x, fst e)])))
+            (m, CodePiElimDownElim affVar [toDataUpsilon (x, fst e)])))
 
 -- toRelevantApp ML x e ~>
 --   bind f := e in
 --   let (aff, rel) := f in
 --   rel @ x
-toRelevantApp :: Maybe Loc -> Identifier -> CodePlus -> WithEnv CodePlus
-toRelevantApp ml x e = do
+toRelevantApp :: Meta -> Identifier -> CodePlus -> WithEnv CodePlus
+toRelevantApp m x e = do
   (expVarName, expVar) <- newDataUpsilonWith "rel-app-exp"
   (affVarName, _) <- newDataUpsilonWith "rel-app-aff"
   (relVarName, relVar) <- newDataUpsilonWith "rel-app-rel"
   retImmType <- returnCartesianImmediate
   return
-    ( ml
+    ( m
     , CodeUpElim
         expVarName
         e
-        ( ml
+        ( m
         , CodeSigmaElim
             [(affVarName, retImmType), (relVarName, retImmType)]
             expVar
-            (ml, CodePiElimDownElim relVar [toDataUpsilon (x, fst e)])))
+            (m, CodePiElimDownElim relVar [toDataUpsilon (x, fst e)])))
 
 polarizeTheta :: Meta -> Identifier -> WithEnv CodePlus
 polarizeTheta m name
@@ -709,45 +683,50 @@ asEnumConstant x
 asEnumConstant _ = return Nothing
 
 polarizeUnaryOp :: Identifier -> UnaryOp -> LowType -> Meta -> WithEnv CodePlus
-polarizeUnaryOp name op lowType m = do
-  let (t, ml) = obtainInfoMeta m
+polarizeUnaryOp name op lowType m
+  -- let (t, ml) = obtainInfoMeta m
+ = do
+  let t = undefined
   t' <- reduceTermPlus t
   case t' of
     (_, TermPi [(x, tx)] _) -> do
-      let varX = toDataUpsilon (x, Nothing)
+      let varX = toDataUpsilon (x, emptyMeta)
       makeClosure
         (Just name)
         []
         m
         [(x, tx)]
-        (ml, CodeTheta (ThetaUnaryOp op lowType varX))
+        (m, CodeTheta (ThetaUnaryOp op lowType varX))
     _ -> throwError $ "the arity of " ++ name ++ " is wrongi"
 
 polarizeBinaryOp ::
      Identifier -> BinaryOp -> LowType -> Meta -> WithEnv CodePlus
-polarizeBinaryOp name op lowType m = do
-  let (t, ml) = obtainInfoMeta m
+polarizeBinaryOp name op lowType m
+  -- let (t, ml) = obtainInfoMeta m
+ = do
+  let t = undefined
   t' <- reduceTermPlus t
   case t' of
     (_, TermPi [(x, tx), (y, ty)] _) -> do
-      let varX = toDataUpsilon (x, Nothing)
-      let varY = toDataUpsilon (y, Nothing)
+      let varX = toDataUpsilon (x, emptyMeta)
+      let varY = toDataUpsilon (y, emptyMeta)
       makeClosure
         (Just name)
         []
         m
         [(x, tx), (y, ty)]
-        (ml, CodeTheta (ThetaBinaryOp op lowType varX varY))
+        (m, CodeTheta (ThetaBinaryOp op lowType varX varY))
     _ -> throwError $ "the arity of " ++ name ++ " is wrongi"
 
 polarizeIsEnum :: Meta -> WithEnv CodePlus
 polarizeIsEnum m = do
-  let (t, ml) = obtainInfoMeta m
+  let t = undefined :: TermPlus
+  -- let (t, ml) = obtainInfoMeta m
   t' <- reduceTermPlus t
   case t' of
     (_, TermPi [(x, tx)] _) -> do
-      v <- cartesianImmediate ml
-      let varX = toDataUpsilon (x, Nothing)
+      v <- cartesianImmediate m
+      let varX = toDataUpsilon (x, emptyMeta)
       aff <- newNameWith "aff"
       rel <- newNameWith "rel"
       retImmType <- returnCartesianImmediate
@@ -756,11 +735,11 @@ polarizeIsEnum m = do
         []
         m
         [(x, tx)]
-        ( ml
+        ( m
         , CodeSigmaElim
             [(aff, retImmType), (rel, retImmType)]
             varX
-            (ml, CodeUpIntro v))
+            (m, CodeUpIntro v))
     _ -> throwError $ "the type of is-enum is wrong. t :\n" ++ Pr.ppShow t
 
 --    unsafe.eval-io
@@ -771,14 +750,15 @@ polarizeIsEnum m = do
 --    (as closure)
 polarizeEvalIO :: Meta -> WithEnv CodePlus
 polarizeEvalIO m = do
-  let (t, ml) = obtainInfoMeta m
+  let t = undefined
+  -- let (t, ml) = obtainInfoMeta m
   t' <- reduceTermPlus t
   case t' of
     (_, TermPi [arg] _) -> do
       (resultValue, resultValueVar) <- newDataUpsilonWith "result"
       (sig, sigVar) <- newDataUpsilonWith "eval-io-sig"
       resultEnv <- newNameWith "env"
-      arg' <- polarize $ toTermUpsilon arg
+      arg' <- polarize $ toTermUpsilon $ fst arg
       -- IO Top == Top -> (Bottom, Top)
       evalArgWithZero <- callClosure m arg' [toTermInt64 0]
       retImmType <- returnCartesianImmediate
@@ -787,17 +767,17 @@ polarizeEvalIO m = do
         []
         m
         [arg]
-        ( ml
+        ( m
         , CodeUpElim
             sig
             evalArgWithZero
-            ( ml
+            ( m
             , CodeSigmaElim
                 -- Since `resultEnv` is evaluated into 0,
                 -- we can set resultEnv : retImmType (despite the fact that its actual type is bottom).
                 [(resultEnv, retImmType), (resultValue, retImmType)] -- (Bottom, Top)
                 sigVar
-                (ml, CodeUpIntro resultValueVar)))
+                (m, CodeUpIntro resultValueVar)))
     _ -> throwError "the type of unsafe.eval-io is wrong"
 
 -- インデックス部分についての説明。たとえばsystem callとしてのwriteは、対象言語では
@@ -815,7 +795,8 @@ polarizeSysCall ::
   -> Meta -- the meta of the theta
   -> WithEnv CodePlus
 polarizeSysCall name sysCall argLen argIdxList m = do
-  let (t, ml) = obtainInfoMeta m
+  let t = undefined
+  -- let (t, ml) = obtainInfoMeta m
   t' <- reduceTermPlus t
   case t' of
     (_, TermPi xts _)
@@ -826,19 +807,19 @@ polarizeSysCall name sysCall argLen argIdxList m = do
           []
           m
           xts
-          (ml, CodeTheta (ThetaSysCall sysCall ys))
+          (m, CodeTheta (ThetaSysCall sysCall ys))
     _ -> throwError $ "the type of " ++ name ++ " is wrong"
 
 toVar :: Identifier -> DataPlus
-toVar x = (Nothing, DataUpsilon x)
+toVar x = (emptyMeta, DataUpsilon x)
 
 newDataUpsilonWith :: Identifier -> WithEnv (Identifier, DataPlus)
-newDataUpsilonWith name = newDataUpsilonWith' name Nothing
+newDataUpsilonWith name = newDataUpsilonWith' name emptyMeta
 
-newDataUpsilonWith' :: Identifier -> Maybe Loc -> WithEnv (Identifier, DataPlus)
-newDataUpsilonWith' name ml = do
+newDataUpsilonWith' :: Identifier -> Meta -> WithEnv (Identifier, DataPlus)
+newDataUpsilonWith' name m = do
   x <- newNameWith name
-  return (x, (ml, DataUpsilon x))
+  return (x, (m, DataUpsilon x))
 
 supplyName :: Either b (Identifier, b) -> WithEnv (Identifier, b)
 supplyName (Right (x, t)) = return (x, t)

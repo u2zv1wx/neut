@@ -292,3 +292,13 @@ isValue (_, PreTermEnumIntro _) = True
 isValue (_, PreTermArray {}) = True
 isValue (_, PreTermArrayIntro _ les) = all isValue $ map snd les
 isValue _ = False
+
+typeOf :: PreTermPlus -> PreTermPlus
+typeOf (m, _) = typeOf' m
+
+typeOf' :: PreMeta -> PreTermPlus
+typeOf' (PreMetaTerminal _) = univ
+typeOf' (PreMetaNonTerminal t _) = t
+
+univ :: PreTermPlus
+univ = (PreMetaTerminal Nothing, PreTermTau)

@@ -18,6 +18,15 @@ data EnumType
   | EnumTypeNatNum Integer
   deriving (Show, Eq)
 
+data Meta =
+  Meta
+    { metaLocation :: Maybe Loc
+    }
+  deriving (Show)
+
+emptyMeta :: Meta
+emptyMeta = Meta {metaLocation = Nothing}
+
 readNatEnumType :: Identifier -> (Maybe Integer)
 readNatEnumType str -- n1, n2, ..., n{i}, ..., n{2^64}
   | length str >= 2
