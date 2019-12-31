@@ -34,10 +34,10 @@ simp' (((_, PreTermTheta x), (_, PreTermTheta y)):cs)
   | x == y = simp cs
 simp' (((_, PreTermUpsilon x1), (_, PreTermUpsilon x2)):cs)
   | x1 == x2 = simp cs
-simp' (((_, PreTermPi xts1 cod1), (_, PreTermPi xts2 cod2)):cs) = do
-  simpPi xts1 cod1 xts2 cod2 cs
-simp' (((_, PreTermPiIntro xts1 e1), (_, PreTermPiIntro xts2 e2)):cs) = do
-  simpPi xts1 e1 xts2 e2 cs
+simp' (((_, PreTermPi xts1 cod1), (_, PreTermPi xts2 cod2)):cs)
+  | length xts1 == length xts2 = do simpPi xts1 cod1 xts2 cod2 cs
+simp' (((_, PreTermPiIntro xts1 e1), (_, PreTermPiIntro xts2 e2)):cs)
+  | length xts1 == length xts2 = do simpPi xts1 e1 xts2 e2 cs
 simp' (((_, PreTermPiIntro xts body1@(m1, _)), e2@(_, _)):cs) = do
   let vs = map (uncurry toVar) xts
   simp $ (body1, (m1, PreTermPiElim e2 vs)) : cs
@@ -93,6 +93,11 @@ simp' (((_, PreTermArrayIntro k1 les1), (_, PreTermArrayIntro k2 les2)):cs)
     csArray <- simpArrayIntro les1 les2
     csCont <- simp cs
     return $ csArray ++ csCont
+simp' ((e1, e2):cs)
+  | (_, PreTermPiElim (_, PreTermTheta f) es1) <- e1
+  , (_, PreTermPiElim (_, PreTermTheta g) es2) <- e2
+  , f == g
+  , length es1 == length es2 = simp $ zip es1 es2 ++ cs
 simp' ((e1, e2):cs) = do
   let ms1 = asStuckedTerm e1
   let ms2 = asStuckedTerm e2
