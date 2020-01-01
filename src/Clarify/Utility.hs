@@ -1,9 +1,6 @@
 module Clarify.Utility where
 
-import Control.Monad.Except
 import Control.Monad.State
-import Data.List
-import Prelude hiding (pi)
 
 import Data.Basic
 import Data.Code

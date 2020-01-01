@@ -2,10 +2,6 @@ module Clarify.Linearize
   ( linearize
   ) where
 
-import Control.Monad.Except
-import Data.List
-import Prelude hiding (pi)
-
 import Clarify.Utility
 import Data.Basic
 import Data.Code

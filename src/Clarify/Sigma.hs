@@ -6,8 +6,6 @@ module Clarify.Sigma
 
 import Control.Monad.Except
 import Control.Monad.State
-import Data.List
-import Prelude hiding (pi)
 
 import Clarify.Linearize
 import Clarify.Utility
