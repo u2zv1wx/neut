@@ -14,7 +14,8 @@ import Data.List
 import Prelude hiding (pi)
 
 import Clarify.Closure
-import Clarify.Linearize
+import Clarify.Sigma
+import Clarify.Utility
 import Data.Basic
 import Data.Code
 import Data.Env

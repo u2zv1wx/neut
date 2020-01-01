@@ -10,13 +10,13 @@ import Data.List
 import Prelude hiding (pi)
 
 import Clarify.Linearize
+import Clarify.Sigma
+import Clarify.Utility
 import Data.Basic
 import Data.Code
 import Data.Env
 import Data.Term
 
--- import Reduce.Term
--- import qualified Text.Show.Pretty as Pr
 makeClosure ::
      Maybe Identifier -- the name of newly created closure
   -> [(Identifier, Meta, CodePlus)] -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
@@ -26,18 +26,12 @@ makeClosure ::
   -> WithEnv CodePlus
 makeClosure mName fvs m xts e = do
   let (freeVarNameList, locList, negTypeList) = unzip3 fvs
-  -- negTypeList <- mapM clarify freeVarTypeList
   expName <- newNameWith "exp"
   envExp <-
     cartesianSigma expName m $ map Right $ zip freeVarNameList negTypeList
   (envVarName, envVar) <- newDataUpsilonWith "env"
-  -- let (_, ts) = unzip xts
-  -- let (xs', ts) = unzip $ zip freeVarNameList freeVarTypeList ++ xts
-  -- let (xs, ts) = unzip xts
-  -- ts' <- mapM clarify ts
   let fvInfo = zip freeVarNameList negTypeList
   -- envVarがlinearなのは既知
-  -- こっちの仕方でlinearizeしてしまうと、
   -- body <- linearize (zip xs ts') $ (m, CodeSigmaElim fvInfo envVar e)
   body <- linearize xts $ (m, CodeSigmaElim fvInfo envVar e)
   let fvSigmaIntro =
@@ -47,14 +41,6 @@ makeClosure mName fvs m xts e = do
     case mName of
       Just lamThetaName -> return lamThetaName
       Nothing -> newNameWith "thunk"
-  -- p name
-  -- p "fvs:"
-  -- p' freeVarNameList
-  -- p "args:"
-  -- p' (envVarName : xs)
-  -- p "target:"
-  -- p' xs
-  -- p' body
   cenv <- gets codeEnv
   when (name `notElem` map fst cenv) $
     insCodeEnv name (envVarName : map fst xts) body
