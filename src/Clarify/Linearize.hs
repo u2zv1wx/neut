@@ -41,9 +41,7 @@ withHeader ((x, t):xts) e = do
   (ys, e'') <- distinguishCode x e'
   case ys of
     [] -> withHeaderAffine x t e''
-    [z] -> do
-      let m = emptyMeta
-      return (m, CodeUpElim z (m, CodeUpIntro (m, DataUpsilon x)) e')
+    [z] -> withHeaderLinear z x e''
     (z1:z2:zs) -> withHeaderRelevant x t z1 z2 zs e''
 
 -- withHeaderAffine x t e ~>
@@ -57,6 +55,14 @@ withHeaderAffine x t e = do
   hole <- newNameWith "unit"
   discardUnusedVar <- toAffineApp emptyMeta x t
   return (emptyMeta, CodeUpElim hole discardUnusedVar e)
+
+-- withHeaderLinear z x e ~>
+--   bind z := return x in
+--   e
+withHeaderLinear :: Identifier -> Identifier -> CodePlus -> WithEnv CodePlus
+withHeaderLinear z x e = do
+  let m = emptyMeta
+  return (m, CodeUpElim z (m, CodeUpIntro (m, DataUpsilon x)) e)
 
 -- withHeaderRelevant x t [x1, ..., x{N}] e ~>
 --   bind exp := t in
