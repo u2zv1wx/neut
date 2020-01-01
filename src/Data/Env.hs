@@ -265,6 +265,7 @@ distinguishCode z (ml, CodeSigmaElim xts d e) = do
     then return (vs1, (ml, CodeSigmaElim xts d' e))
     else do
       (vs2, e') <- distinguishCode z e
+      -- このときはxtsの要素のそれぞれについてeをdistinguishする必要があるはず？
       return (vs1 ++ vs2, (ml, CodeSigmaElim xts d' e'))
 distinguishCode z (ml, CodeUpIntro d) = do
   (vs, d') <- distinguishData z d
@@ -304,3 +305,11 @@ p s = liftIO $ putStrLn s
 
 p' :: (Show a) => a -> WithEnv ()
 p' s = liftIO $ putStrLn $ Pr.ppShow s
+
+newDataUpsilonWith :: Identifier -> WithEnv (Identifier, DataPlus)
+newDataUpsilonWith name = newDataUpsilonWith' name emptyMeta
+
+newDataUpsilonWith' :: Identifier -> Meta -> WithEnv (Identifier, DataPlus)
+newDataUpsilonWith' name m = do
+  x <- newNameWith name
+  return (x, (m, DataUpsilon x))

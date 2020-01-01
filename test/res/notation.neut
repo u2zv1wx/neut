@@ -2,29 +2,38 @@
 
 ;; synonyms
 (keyword type)
+
 (notation type tau)
 
 (keyword universe)
+
 (notation universe tau)
 
 (keyword forall)
+
 (notation forall pi)
 
 (keyword apply)
+
 (notation apply pi-elimination)
 
 (keyword fix)
+
 (notation fix mu)
 
 ;; sequential execution
 (keyword pi-i)
+
 (notation pi-i pi-introduction)
 
 (keyword pi-e)
+
 (notation pi-e pi-elimination)
 
 (keyword let)
+
 (keyword begin)
+
 (keyword definition)
 
 (notation (begin e) e)
@@ -43,8 +52,9 @@
 
 ;; lambda: pi-introduction with implicit begin block
 (keyword lambda)
-(notation (lambda (xts+) e+)
-  (pi-i (xts+) (begin e+)))
+
+(notation (lambda (xts+) e)
+  (pi-i (xts+) (begin e)))
 
 ;; define recursive term at top level without using `mu` explicitly
 (notation (definition name e)
@@ -64,9 +74,19 @@
 
 (ascription is-enum (pi ((_ type)) type))
 
-;; (notation (arg-list t) (_ t))
+(keyword to-type-list)
 
-;; (notation (arg-list e rest+) ((_ t) (arg-list rest+)))
+;; 意味としては(t)へと変換するべきであるような気がする。でないとsplicingにならないような？
+(notation (to-type-list t)
+  ((_ t)))
+
+(notation (to-type-list t t+)
+  ((_ t) (splice (to-type-list t+))))
+
+(keyword arrow)
+
+(notation (arrow (t+) cod)
+  (pi (to-type-list t+) cod))
 
 ;; (hom a b c) = a -> (b -> c)
 (keyword hom)
@@ -96,88 +116,27 @@
      (_ (arrow (t+) c)))
     c))
 
-;; (notation (sigma-introduction e+)
-;;   (lambda ;; ところでformattingはこうするのがよさそうね。
-;;     ((elim-result-type
-;;       tau) ;; いちばんcanonicalな形での表現。縦に冗長だけど、スケールはする。「縦に読む」って感じ。
-;;      (eliminator
-;;       (arrow
-;;         ((x1 A1)  ;; ここにA1についてのコメント。
-;;          ...
-;;          (xn An)) ;; ここにAnについてのコメント。
-;;         elim-result-type)))
-;;     (eliminator e+))) ;; 適用はこれで問題ないはずで。eliminatorの型を不明にしておいても大丈夫なんだろうか？さすがにきつくない？
-;; こうしたいんだけど、piの引数部分をかくことができない。特殊なマクロが必要なのかしら。
-
-;; 型推論を信じていくスタイル。
 (keyword sigma-introduction)
+
+(keyword to-hole-list)
+
+(notation (to-hole-list e)
+  ((_ _)))
+
+(notation (to-hole-list e e+)
+  ((_ _) (splice (to-hole-list e+))))
 
 (notation (sigma-introduction e+)
   (lambda
     ((elim-result-type tau)
-     (eliminator _)) ;; eliminatorの型は推論で決定する
+     (eliminator (pi (to-hole-list e+) elim-result-type)))
     (eliminator e+)))
 
-;; sigma-elimはこれでいいのかな？
 (keyword sigma-elimination)
 
 (notation (sigma-elimination (xt+) e1 e2)
   (e1 (lambda (xt+) e2)))
 
-;; stateはpartial applicationを許す形で定義する必要がある
-;; (notation (definition name (x+) e+)
-;;   (let name (mu name (lambda (x+) e+))))
-;; これだと2引数が同時に必要。
-(definition state ((S type) (A type))
-  (hom S (product S A)))
+(keyword admit)
 
-(enum bottom) ;; for io-monad
-
-;; まあ、こっちのほうで引数を供給すればよいだけではある。
-(definition io ((a type))
-  (state bottom a))
-
-
-;; (ascription is-enum (pi ((_ type)) type))
-
-;; (notation (definition name (x+) e+)
-;;   (let name (mu name (lambda (x+) e+))))
-;; just for test
-(enum top unit)
-
-(ascription unsafe.eval-io
-  (hom
-    (io top)
-    top))
-
-(constant file-descriptor)
-(ascription file-descriptor type)
-
-(constant stdin)
-(ascription stdin file-descriptor)
-
-(constant stdout)
-(ascription stdout file-descriptor)
-
-(constant stderr)
-(ascription stderr file-descriptor)
-
-(constant unsafe.write)
-(ascription unsafe.write
-  (pi
-    ((A type)
-     (out file-descriptor)
-     (str (u8-array A))
-     (len (is-enum A)))
-    top))
-;; unsafe.write : Pi (A : Univ, out : file-descriptor, str : u8-array a, len : is-enum A). top
-
-(enum choice left right)
-
-(u8-array-introduction
-  (left 3)
-  (right 2))
-
-(io-return top unit)
-
-;; stdout
+(notation admit (admit-explicit _))

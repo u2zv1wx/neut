@@ -14,6 +14,7 @@ import Data.LLVM
 toLLVM :: CodePlus -> WithEnv LLVM
 toLLVM mainTerm = do
   penv <- gets codeEnv
+  -- p' penv
   forM_ penv $ \(name, (args, e)) -> do
     llvm <- llvmCode e
     insLLVMEnv name args llvm
@@ -244,7 +245,7 @@ llvmDataLet x (_, DataTheta y) cont = do
       llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType args) cont
 llvmDataLet x (_, DataUpsilon y) cont =
   llvmUncastLet x (LLVMDataLocal y) voidPtr cont
-llvmDataLet reg (_, DataSigmaIntro ds) cont = do
+llvmDataLet reg (_, DataSigmaIntro ds) cont =
   storeContent reg voidPtr (toStructPtrType $ length ds) ds cont
 llvmDataLet x (_, DataIntS j i) cont =
   llvmUncastLet x (LLVMDataInt i) (LowTypeIntS j) cont

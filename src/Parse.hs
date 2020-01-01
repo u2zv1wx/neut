@@ -130,19 +130,19 @@ toIsEnumType name = do
 concatDefList :: [Def] -> WithEnv WeakTermPlus
 concatDefList [] = do
   return (newMeta, WeakTermEnumIntro $ EnumValueLabel "unit")
-concatDefList [DefLet meta xt@(x, _) e] = do
-  let varX = (newMeta, WeakTermUpsilon x)
-  -- let x : t := e in
-  -- unsafe.eval-io x
-  return
-    ( meta
-    , WeakTermPiElim
-        ( newMeta
-        , WeakTermPiIntro
-            [xt]
-            ( newMeta
-            , WeakTermPiElim (newMeta, WeakTermTheta "unsafe.eval-io") [varX]))
-        [e])
+-- concatDefList [DefLet meta xt@(x, _) e] = do
+--   let varX = (newMeta, WeakTermUpsilon x)
+--   -- let x : t := e in
+--   -- unsafe.eval-io x
+--   return
+--     ( meta
+--     , WeakTermPiElim
+--         ( newMeta
+--         , WeakTermPiIntro
+--             [xt]
+--             ( newMeta
+--             , WeakTermPiElim (newMeta, WeakTermTheta "unsafe.eval-io") [varX]))
+--         [e])
 concatDefList (DefLet meta xt e:es) = do
   cont <- concatDefList es
   return (meta, WeakTermPiElim (newMeta, WeakTermPiIntro [xt] cont) [e])

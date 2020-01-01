@@ -1,32 +1,14 @@
-;; (include "./string.neut")
-
-(index world)
-
 (definition io
   (state world))
 
-;; (index handle)
+(definition io ((a type))
+  (state bottom a))
 
-;; (primitive stdin (box handle))
-;; (primitive stdout (box handle))
-;; (primitive stderr (box handle))
+(definition io-return ((B type) (x B))
+  (state-return bottom B x))
 
-;; (let size i32)
-
-;; (let length i32)
-
-;; (index mode
-;;   mode.write
-;;   mode.read
-;;   mode.append
-;;   mode.read-write)
-
-;; (primitive open (arrow string mode (io handle)))
-
-;; (primitive close (arrow handle (io top)))
-
-;; (primitive write (arrow string handle size length (io handle)))
-
-;; (primitive read (arrow handle size length (io (tensor handle string))))
-
-(primitive core.i32.print (arrow i32 (io top)))
+(ascription io-return
+  (pi
+    ((A type)
+     (x A))
+    (io A)))

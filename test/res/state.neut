@@ -1,2 +1,6 @@
 (definition state ((S type) (A type))
-  (arrow S (product S A)))
+  (hom S (product S A)))
+
+(definition state-return ((S type) (A type) (x A))
+  (lambda ((env S))
+    (sigma-introduction env x)))
