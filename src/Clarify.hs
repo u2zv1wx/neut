@@ -35,9 +35,9 @@ clarify (m, TermPi _ _) = do
   returnClosureType m
 clarify lam@(m, TermPiIntro xts e) = do
   fvs <- varTermPlus lam
-  let (freeVarNameList, locList, freeVarTypeList) = unzip3 fvs
+  let (freeVarNameList, freeVarTypeList) = unzip fvs
   negTypeList <- mapM clarify freeVarTypeList
-  let fvs' = zip3 freeVarNameList locList negTypeList
+  let fvs' = zip freeVarNameList negTypeList
   e' <- clarify e
   makeClosure' Nothing fvs' m xts e'
 clarify (m, TermPiElim e es) = do
@@ -45,7 +45,7 @@ clarify (m, TermPiElim e es) = do
   callClosure' m e' es
 clarify (m, TermMu (f, _) e) = do
   tmp <- obtainFreeVarList [f] e -- fの型は使用しないので無視でオーケー
-  let (nameList, _, typeList) = unzip3 tmp
+  let (nameList, typeList) = unzip tmp
   let fvs = zip nameList typeList
   let fvs' = map (toTermUpsilon . fst) fvs
   let lamBody = substTermPlus [(f, (m, TermPiElim (m, TermTheta f) fvs'))] e
@@ -279,7 +279,7 @@ toVar x = (emptyMeta, DataUpsilon x)
 
 makeClosure' ::
      Maybe Identifier -- the name of newly created closure
-  -> [(Identifier, Meta, CodePlus)] -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
+  -> [(Identifier, CodePlus)] -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
   -> Meta -- meta of lambda
   -> [(Identifier, TermPlus)] -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
   -> CodePlus -- the `e` in `lam (x1, ..., xn). e`
@@ -295,7 +295,7 @@ callClosure' m e es = do
   callClosure m e tmp
 
 obtainFreeVarList ::
-     [Identifier] -> TermPlus -> WithEnv [(Identifier, Meta, TermPlus)]
+     [Identifier] -> TermPlus -> WithEnv [(Identifier, TermPlus)]
 obtainFreeVarList xs e = do
   tmp <- varTermPlus e
-  return $ filter (\(x, _, _) -> x `notElem` xs) $ tmp
+  return $ filter (\(x, _) -> x `notElem` xs) $ tmp

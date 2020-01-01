@@ -16,16 +16,17 @@ import Data.Basic
 import Data.Code
 import Data.Env
 import Data.Term
+import Reduce.Code
 
 makeClosure ::
      Maybe Identifier -- the name of newly created closure
-  -> [(Identifier, Meta, CodePlus)] -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
+  -> [(Identifier, CodePlus)] -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
   -> Meta -- meta of lambda
   -> [(Identifier, CodePlus)] -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
   -> CodePlus -- the `e` in `lam (x1, ..., xn). e`
   -> WithEnv CodePlus
 makeClosure mName fvs m xts e = do
-  let (freeVarNameList, locList, negTypeList) = unzip3 fvs
+  let (freeVarNameList, negTypeList) = unzip fvs
   expName <- newNameWith "exp"
   envExp <-
     cartesianSigma expName m $ map Right $ zip freeVarNameList negTypeList
@@ -33,14 +34,28 @@ makeClosure mName fvs m xts e = do
   let fvInfo = zip freeVarNameList negTypeList
   -- envVarがlinearなのは既知
   -- body <- linearize (zip xs ts') $ (m, CodeSigmaElim fvInfo envVar e)
-  body <- linearize xts $ (m, CodeSigmaElim fvInfo envVar e)
-  let fvSigmaIntro =
-        ( m
-        , DataSigmaIntro $ zipWith (curry toDataUpsilon) freeVarNameList locList)
+  -- xtsのtのうちにはfvに依存したものが含まれうるのでこれではダメ
+  e' <- linearize (fvs ++ xts) e
+  -- body <- linearize xts $ (m, CodeSigmaElim fvInfo envVar e)
+  let body = (m, CodeSigmaElim fvInfo envVar e')
+  let fvSigmaIntro = (m, DataSigmaIntro $ map toDataUpsilon' freeVarNameList)
   name <-
     case mName of
       Just lamThetaName -> return lamThetaName
       Nothing -> newNameWith "thunk"
+  -- when (name == "thunk-374") $ do
+  -- p' name
+  -- p "args:"
+  -- let (ys, ss) = unzip xts
+  -- ss' <- mapM reduceCodePlus ss
+  -- -- p' xts
+  -- p' $ zip ys ss'
+  -- p "fvs:"
+  -- p' freeVarNameList
+  -- p "body-orig:"
+  -- p' (m, CodeSigmaElim fvInfo envVar e)
+  -- p "body:"
+  -- p' body
   cenv <- gets codeEnv
   when (name `notElem` map fst cenv) $
     insCodeEnv name (envVarName : map fst xts) body
@@ -79,18 +94,18 @@ callClosure m e zexes = do
               typeVar
               (m, CodePiElimDownElim lamVar (envVar : xs))))
 
-varTermPlus :: TermPlus -> WithEnv [(Identifier, Meta, TermPlus)]
+varTermPlus :: TermPlus -> WithEnv [(Identifier, TermPlus)]
 varTermPlus e = do
   tmp <- getClosedVarChain e
-  return $ nubBy (\(x, _, _) (y, _, _) -> x == y) tmp
+  return $ nubBy (\(x, _) (y, _) -> x == y) tmp
 
-getClosedVarChain :: TermPlus -> WithEnv [(Identifier, Meta, TermPlus)]
+getClosedVarChain :: TermPlus -> WithEnv [(Identifier, TermPlus)]
 getClosedVarChain (_, TermTau) = return []
 getClosedVarChain (_, TermTheta _) = return []
-getClosedVarChain (m, TermUpsilon x) = do
+getClosedVarChain (_, TermUpsilon x) = do
   t <- lookupTypeEnv x
   xs <- getClosedVarChain t
-  return $ xs ++ [(x, m, t)]
+  return $ xs ++ [(x, t)]
 getClosedVarChain (_, TermPi xts t) = getClosedVarChainBindings xts [t]
 getClosedVarChain (_, TermPiIntro xts e) = getClosedVarChainBindings xts [e]
 getClosedVarChain (_, TermPiElim e es) = do
@@ -120,11 +135,9 @@ getClosedVarChain (_, TermArrayElim _ e1 e2) = do
   return $ xs1 ++ xs2
 
 getClosedVarChainBindings ::
-     [(Identifier, TermPlus)]
-  -> [TermPlus]
-  -> WithEnv [(Identifier, Meta, TermPlus)]
+     [(Identifier, TermPlus)] -> [TermPlus] -> WithEnv [(Identifier, TermPlus)]
 getClosedVarChainBindings [] es = concat <$> mapM getClosedVarChain es
 getClosedVarChainBindings ((x, t):xts) es = do
   xs1 <- getClosedVarChain t
   xs2 <- getClosedVarChainBindings xts es
-  return $ xs1 ++ filter (\(y, _, _) -> y /= x) xs2
+  return $ xs1 ++ filter (\(y, _) -> y /= x) xs2

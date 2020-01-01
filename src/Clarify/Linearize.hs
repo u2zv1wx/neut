@@ -24,8 +24,6 @@ linearize xts (m, CodeSigmaElim yts d e) = do
   -- closedなsigmaになっている。
   -- yiを自由変数としてふくんだtiがeのなかでどんだけ使われようが、それらはlinearize (...) eによってlinearizeされるから
   -- yiの自由変数としての使用を心配する必要はない。
-  p "linearize-sigma-cont-with:"
-  p' $ map fst $ xts' ++ yts
   e' <- linearize (xts' ++ yts) e
   -- eのなかで使用されておらず、かつdのなかでも使用されていないものなども、ここで適切にheaderを挿入することで対応する。
   withHeader xts (m, CodeSigmaElim yts d e')
@@ -48,11 +46,11 @@ linearize xts e = withHeader xts e -- eのなかにCodePlusが含まれないケ
 
 -- eのなかでxtsがpractically linearになるよう適切にheaderを挿入する。
 withHeader :: [(Identifier, CodePlus)] -> CodePlus -> WithEnv CodePlus
-withHeader xts e = do
-  p "distinguishing: "
-  p' $ map fst xts
-  (xtzss, e') <- distinguish xts e
-  withHeader' xtzss e'
+withHeader [] e = return e
+withHeader ((x, t):xts) e = do
+  e' <- withHeader xts e
+  (xt', e'') <- distinguish [(x, t)] e'
+  withHeader' xt' e''
 
 withHeader' ::
      [(Identifier, CodePlus, [Identifier])] -> CodePlus -> WithEnv CodePlus
@@ -104,9 +102,6 @@ withHeaderRelevant x t x1 x2 xs e = do
   (relVarName, relVar) <- newDataUpsilonWith "rel"
   linearChain <- toLinearChain $ x : x1 : x2 : xs
   let ml = fst e
-  -- xそのものの型はtなのでこれを利用？
-  -- このtのなかに自由変数があるとやばそうじゃない？
-  -- 別にSigmaElimにannotationをあたえていても、それを使うってわけじゃないから問題ないのか。
   rel <- withHeaderRelevant' t relVar linearChain e
   retImmType <- returnCartesianImmediate
   return

@@ -57,14 +57,11 @@ affineSigma thetaName m mxts = do
       xts <- mapM supplyName mxts
       (z, varZ) <- newDataUpsilonWith "arg"
       -- As == [APP-1, ..., APP-n]   (`a` here stands for `app`)
-      as <- forM xts $ \(x, e) -> toAffineApp m x e
+      as <- forM xts $ \(x, t) -> toAffineApp m x t
       ys <- mapM (const $ newNameWith "arg") xts
       let body = bindLet (zip ys as) (m, CodeUpIntro (m, DataSigmaIntro []))
       body' <- linearize xts body
       insCodeEnv thetaName [z] (m, CodeSigmaElim xts varZ body')
-      -- when (thetaName == "affine-closure") $ do
-      --   p "affine-closure"
-      --   p' (m, CodeSigmaElim xts varZ body')
       return theta
 
 -- (Assuming `ti` = `return di` for some `di` such that `xi : di`)
@@ -100,7 +97,7 @@ relevantSigma thetaName m mxts = do
       xts <- mapM supplyName mxts
       (z, varZ) <- newDataUpsilonWith "arg"
       -- as == [APP-1, ..., APP-n]
-      as <- forM xts $ \(x, e) -> toRelevantApp m x e
+      as <- forM xts $ \(x, t) -> toRelevantApp m x t
       -- pairVarNameList == [pair-1, ...,  pair-n]
       (pairVarNameList, pairVarTypeList) <- unzip <$> mapM toPairInfo xts
       transposedPair <- transposeSigma pairVarTypeList

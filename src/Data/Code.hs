@@ -49,6 +49,9 @@ type CodePlus = (Meta, Code)
 toDataUpsilon :: (Identifier, Meta) -> DataPlus
 toDataUpsilon (x, m) = (m, DataUpsilon x)
 
+toDataUpsilon' :: Identifier -> DataPlus
+toDataUpsilon' x = (emptyMeta, DataUpsilon x)
+
 type SubstDataPlus = [IdentifierPlus]
 
 substDataPlus :: SubstDataPlus -> DataPlus -> DataPlus
