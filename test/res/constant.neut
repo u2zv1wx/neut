@@ -1,0 +1,26 @@
+;; should be loaded after `notation`
+
+(constant unsafe.eval-io)
+
+(ascription unsafe.eval-io
+  (hom
+    (io top)
+    top))
+
+(constant file-descriptor)
+
+(ascription file-descriptor tau)
+
+(constant stdout)
+
+(ascription stdout file-descriptor)
+
+(constant unsafe.write)
+
+(ascription unsafe.write
+  (pi
+    ((A type)
+     (out file-descriptor)
+     (str (u8-array A))
+     (len (is-enum A)))
+    top))
