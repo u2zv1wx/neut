@@ -1,0 +1,431 @@
+thunk-375
+fvs:
+[ "hole-explicit-0-3" , "hole-parse-enum-4" ]
+[ "env-300" , "hole-parse-last-5" ]
+( _
+, CodeUpElim
+    "unit-371"
+    ( _
+    , CodeUpElim
+        "exp-372"
+        ( _
+        , CodeUpElim
+            "closure-357"
+            ( _
+            , CodeUpIntro
+                ( _
+                , DataSigmaIntro
+                    [ ( _
+                      , DataSigmaIntro
+                          [ ( _ , DataTheta "affine-exp-301" )
+                          , ( _ , DataTheta "relevant-exp-301" )
+                          ]
+                      )
+                    , ( _ , DataSigmaIntro [] )
+                    , ( _ , DataTheta "thunk-354" )
+                    ]
+                )
+            )
+            ( _
+            , CodeUpElim
+                "var-355"
+                ( _ , CodeUpIntro ( _ , DataUpsilon "hole-explicit-0-3" ) )
+                ( _
+                , CodeUpElim
+                    "var-356"
+                    ( _ , CodeUpIntro ( _ , DataUpsilon "hole-parse-enum-4" ) )
+                    ( _
+                    , CodeSigmaElim
+                        [ ( "exp-358"
+                          , ( _
+                            , CodeUpIntro
+                                ( _
+                                , DataSigmaIntro
+                                    [ ( _ , DataTheta "affine-univ" )
+                                    , ( _ , DataTheta "relevant-univ" )
+                                    ]
+                                )
+                            )
+                          )
+                        , ( "env-359" , ( _ , CodeUpIntro ( _ , DataUpsilon "exp-358" ) ) )
+                        , ( "thunk-360"
+                          , ( _
+                            , CodeUpIntro
+                                ( _
+                                , DataSigmaIntro
+                                    [ ( _ , DataTheta "affine-immediate" )
+                                    , ( _ , DataTheta "relevant-immediate" )
+                                    ]
+                                )
+                            )
+                          )
+                        ]
+                        ( _ , DataUpsilon "closure-357" )
+                        ( _
+                        , CodeSigmaElim
+                            [ ( "aff-361"
+                              , ( _
+                                , CodeUpIntro
+                                    ( _
+                                    , DataSigmaIntro
+                                        [ ( _ , DataTheta "affine-immediate" )
+                                        , ( _ , DataTheta "relevant-immediate" )
+                                        ]
+                                    )
+                                )
+                              )
+                            , ( "rel-362"
+                              , ( _
+                                , CodeUpIntro
+                                    ( _
+                                    , DataSigmaIntro
+                                        [ ( _ , DataTheta "affine-immediate" )
+                                        , ( _ , DataTheta "relevant-immediate" )
+                                        ]
+                                    )
+                                )
+                              )
+                            ]
+                            ( _ , DataUpsilon "exp-358" )
+                            ( _
+                            , CodePiElimDownElim
+                                ( _ , DataUpsilon "thunk-360" )
+                                [ ( _ , DataUpsilon "env-359" )
+                                , ( _ , DataUpsilon "var-355" )
+                                , ( _ , DataUpsilon "var-356" )
+                                ]
+                            )
+                        )
+                    )
+                )
+            )
+        )
+        ( _
+        , CodeSigmaElim
+            [ ( "aff-373"
+              , ( _
+                , CodeUpIntro
+                    ( _
+                    , DataSigmaIntro
+                        [ ( _ , DataTheta "affine-immediate" )
+                        , ( _ , DataTheta "relevant-immediate" )
+                        ]
+                    )
+                )
+              )
+            , ( "rel-374"
+              , ( _
+                , CodeUpIntro
+                    ( _
+                    , DataSigmaIntro
+                        [ ( _ , DataTheta "affine-immediate" )
+                        , ( _ , DataTheta "relevant-immediate" )
+                        ]
+                    )
+                )
+              )
+            ]
+            ( _ , DataUpsilon "exp-372" )
+            ( _
+            , CodePiElimDownElim
+                ( _ , DataUpsilon "aff-373" )
+                [ ( _ , DataUpsilon "hole-parse-last-5" ) ]
+            )
+        )
+    )
+    ;; ここでhole-parse-last-5という不要な変数をあらかじめfree
+    ( _
+    , CodeSigmaElim
+        [ ( "hole-explicit-0-3"
+          , ( _
+            , CodeUpIntro
+                ( _
+                , DataSigmaIntro
+                    [ ( _ , DataTheta "affine-closure" )
+                    , ( _ , DataTheta "relevant-closure" )
+                    ]
+                )
+            )
+          )
+        , ( "hole-parse-enum-4"
+          , ( _
+            , CodeUpElim
+                "closure-201"
+                ( _
+                , CodeUpIntro
+                    ( _
+                    , DataSigmaIntro
+                        [ ( _
+                          , DataSigmaIntro
+                              [ ( _ , DataTheta "affine-exp-169" )
+                              , ( _ , DataTheta "relevant-exp-169" )
+                              ]
+                          )
+                        , ( _ , DataSigmaIntro [] )
+                        , ( _ , DataTheta "is-enum" )
+                        ]
+                    )
+                )
+                ( _
+                , CodeUpElim
+                    "var-200"
+                    ( _
+                    , CodeUpIntro
+                        ( _
+                        , DataSigmaIntro
+                            [ ( _ , DataTheta "affine-immediate" )
+                            , ( _ , DataTheta "relevant-immediate" )
+                            ]
+                        )
+                    )
+                    ( _
+                    , CodeSigmaElim
+                        [ ( "exp-202"
+                          , ( _
+                            , CodeUpIntro
+                                ( _
+                                , DataSigmaIntro
+                                    [ ( _ , DataTheta "affine-univ" )
+                                    , ( _ , DataTheta "relevant-univ" )
+                                    ]
+                                )
+                            )
+                          )
+                        , ( "env-203" , ( _ , CodeUpIntro ( _ , DataUpsilon "exp-202" ) ) )
+                        , ( "thunk-204"
+                          , ( _
+                            , CodeUpIntro
+                                ( _
+                                , DataSigmaIntro
+                                    [ ( _ , DataTheta "affine-immediate" )
+                                    , ( _ , DataTheta "relevant-immediate" )
+                                    ]
+                                )
+                            )
+                          )
+                        ]
+                        ( _ , DataUpsilon "closure-201" )
+                        ( _
+                        , CodeSigmaElim
+                            [ ( "aff-205"
+                              , ( _
+                                , CodeUpIntro
+                                    ( _
+                                    , DataSigmaIntro
+                                        [ ( _ , DataTheta "affine-immediate" )
+                                        , ( _ , DataTheta "relevant-immediate" )
+                                        ]
+                                    )
+                                )
+                              )
+                            , ( "rel-206"
+                              , ( _
+                                , CodeUpIntro
+                                    ( _
+                                    , DataSigmaIntro
+                                        [ ( _ , DataTheta "affine-immediate" )
+                                        , ( _ , DataTheta "relevant-immediate" )
+                                        ]
+                                    )
+                                )
+                              )
+                            ]
+                            ( _ , DataUpsilon "exp-202" )
+                            ( _
+                            , CodePiElimDownElim
+                                ( _ , DataUpsilon "thunk-204" )
+                                [ ( _ , DataUpsilon "env-203" ) , ( _ , DataUpsilon "var-200" ) ]
+                            )
+                        )
+                    )
+                )
+            )
+          )
+        ]
+        ( _ , DataUpsilon "env-300" )
+        ( _
+        , CodeUpElim
+            "unit-367"
+            ( _
+            , CodeUpElim
+                "exp-368"
+                ( _
+                , CodeUpIntro
+                    ( _
+                    , DataSigmaIntro
+                        [ ( _ , DataTheta "affine-closure" )
+                        , ( _ , DataTheta "relevant-closure" )
+                        ]
+                    )
+                )
+                ( _
+                , CodeSigmaElim
+                    [ ( "aff-369"
+                      , ( _
+                        , CodeUpIntro
+                            ( _
+                            , DataSigmaIntro
+                                [ ( _ , DataTheta "affine-immediate" )
+                                , ( _ , DataTheta "relevant-immediate" )
+                                ]
+                            )
+                        )
+                      )
+                    , ( "rel-370"
+                      , ( _
+                        , CodeUpIntro
+                            ( _
+                            , DataSigmaIntro
+                                [ ( _ , DataTheta "affine-immediate" )
+                                , ( _ , DataTheta "relevant-immediate" )
+                                ]
+                            )
+                        )
+                      )
+                    ]
+                    ( _ , DataUpsilon "exp-368" )
+                    ( _
+                    , CodePiElimDownElim
+                        ( _ , DataUpsilon "aff-369" )
+                        [ ( _ , DataUpsilon "hole-explicit-0-3" ) ]
+                    )
+                )
+            )
+            ( _
+            , CodeUpElim
+                "unit-363"
+                ( _
+                , CodeUpElim
+                    "exp-364"
+                    ( _
+                    , CodeUpElim
+                        "closure-201"
+                        ( _
+                        , CodeUpIntro
+                            ( _
+                            , DataSigmaIntro
+                                [ ( _
+                                  , DataSigmaIntro
+                                      [ ( _ , DataTheta "affine-exp-169" )
+                                      , ( _ , DataTheta "relevant-exp-169" )
+                                      ]
+                                  )
+                                , ( _ , DataSigmaIntro [] )
+                                , ( _ , DataTheta "is-enum" )
+                                ]
+                            )
+                        )
+                        ( _
+                        , CodeUpElim
+                            "var-200"
+                            ( _
+                            , CodeUpIntro
+                                ( _
+                                , DataSigmaIntro
+                                    [ ( _ , DataTheta "affine-immediate" )
+                                    , ( _ , DataTheta "relevant-immediate" )
+                                    ]
+                                )
+                            )
+                            ( _
+                            , CodeSigmaElim
+                                [ ( "exp-202"
+                                  , ( _
+                                    , CodeUpIntro
+                                        ( _
+                                        , DataSigmaIntro
+                                            [ ( _ , DataTheta "affine-univ" )
+                                            , ( _ , DataTheta "relevant-univ" )
+                                            ]
+                                        )
+                                    )
+                                  )
+                                , ( "env-203" , ( _ , CodeUpIntro ( _ , DataUpsilon "exp-202" ) ) )
+                                , ( "thunk-204"
+                                  , ( _
+                                    , CodeUpIntro
+                                        ( _
+                                        , DataSigmaIntro
+                                            [ ( _ , DataTheta "affine-immediate" )
+                                            , ( _ , DataTheta "relevant-immediate" )
+                                            ]
+                                        )
+                                    )
+                                  )
+                                ]
+                                ( _ , DataUpsilon "closure-201" )
+                                ( _
+                                , CodeSigmaElim
+                                    [ ( "aff-205"
+                                      , ( _
+                                        , CodeUpIntro
+                                            ( _
+                                            , DataSigmaIntro
+                                                [ ( _ , DataTheta "affine-immediate" )
+                                                , ( _ , DataTheta "relevant-immediate" )
+                                                ]
+                                            )
+                                        )
+                                      )
+                                    , ( "rel-206"
+                                      , ( _
+                                        , CodeUpIntro
+                                            ( _
+                                            , DataSigmaIntro
+                                                [ ( _ , DataTheta "affine-immediate" )
+                                                , ( _ , DataTheta "relevant-immediate" )
+                                                ]
+                                            )
+                                        )
+                                      )
+                                    ]
+                                    ( _ , DataUpsilon "exp-202" )
+                                    ( _
+                                    , CodePiElimDownElim
+                                        ( _ , DataUpsilon "thunk-204" )
+                                        [ ( _ , DataUpsilon "env-203" )
+                                        , ( _ , DataUpsilon "var-200" )
+                                        ]
+                                    )
+                                )
+                            )
+                        )
+                    )
+                    ( _
+                    , CodeSigmaElim
+                        [ ( "aff-365"
+                          , ( _
+                            , CodeUpIntro
+                                ( _
+                                , DataSigmaIntro
+                                    [ ( _ , DataTheta "affine-immediate" )
+                                    , ( _ , DataTheta "relevant-immediate" )
+                                    ]
+                                )
+                            )
+                          )
+                        , ( "rel-366"
+                          , ( _
+                            , CodeUpIntro
+                                ( _
+                                , DataSigmaIntro
+                                    [ ( _ , DataTheta "affine-immediate" )
+                                    , ( _ , DataTheta "relevant-immediate" )
+                                    ]
+                                )
+                            )
+                          )
+                        ]
+                        ( _ , DataUpsilon "exp-364" )
+                        ( _
+                        , CodePiElimDownElim
+                            ( _ , DataUpsilon "aff-365" )
+                            [ ( _ , DataUpsilon "hole-parse-enum-4" ) ]
+                        )
+                    )
+                )
+                ( _ , CodeUpIntro ( _ , DataEnumIntro (EnumValueLabel "unit") ) )
+            )
+        )
+    )
+)

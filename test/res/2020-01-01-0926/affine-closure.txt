@@ -1,0 +1,53 @@
+-- affine-closureだから、clsを捨てていく処理。env31でhole32を捨てるのが目標。
+-- ここの処理は正しいように見える。
+let (env31 : univ, HOLE32 : env31, HOLE33 : IMM) := ARG34 in
+bind EXP81 := return (aff-univ, rel-univ) in
+let (aff82 : IMM, rel83 : IMM) := EXP81 in
+bind SIG84 := rel83 @ (env31) in
+let (env31-79 : univ, env31-80 : univ) := SIG84 in
+bind HOLE32-78 := return HOLE32 in -- linear
+bind HOLE33-77 := return HOLE33 in -- linear
+bind ARG44 := -- これはclsの第1成分をfreeするための処理。コピーしたうえでfreeしている
+  bind env31-76 := env31-79 in
+  bind EXP35 := return (aff-univ, rel-univ) in
+  bind env31-75 := return (env31-76) in
+  let (aff-36, rel-37) := EXP35 in
+  bind ENV31-70 := return (env31-75) in
+  bind aff36-69 := return aff-36 in
+  bind unit71 :=
+    bind exp72 := return (aff-imm, rel-imm) in
+    let (aff73, rel74) := exp72 in
+    aff73 @ (rel-37) in
+  aff-36-69 @ (env31-70) in
+bind env31-68 := return env31-80 in
+bind HOLE32-67 := return HOLE32-78 in
+bind HOLE33-66 := return HOLE33-77 in
+bind ARG45 := -- 第2成分をfreeするための処理。ここで第1成分を利用している
+  bind env31-65 := env31-68 in
+  bind HOLE32-64 := return HOLE32-67 in
+  bind exp-38 :=
+    bind env31-63 = return env31-65 in
+    env31-63 in
+  bind HOLE32-62 := return HOLE32-64 in
+  let (aff-39, rel-40) := exp-38 in -- ここで第1成分の要素を取り出している
+  bind HOLE32-57 := return HOLE32-62 in
+  bind aff39-56 := return aff39 in
+  bind unit-58 :=
+    bind exp-59 := return (aff-imm, rel-imm) in
+    let (aff-60, rel-61) := exp-59 in
+    aff-60 @ (rel-40) in
+  aff-39-56 @ (HOLE32-57) in ;; ここでhole-32が捨てられている。正しい。
+bind HOLE33-55 := return HOLE33-66 in
+bind ARG46 := -- 第3成分のfree. ここはimmでfreeできるはずだから簡単。
+  bind HOLE33-54 := return HOLE33-55 in
+  bind EXP41 := return (aff-imm, rel-imm) in
+  bind HOLE33-53 := return HOLE33-54 in
+  let (aff-42, rel-42) := EXP41 in
+  bind HOLE33-48 := return HOLE33-53 in
+  bind aff-42-47 := return aff-42 in
+  bind unit-49 :=
+    bind exp-50 := return (aff-imm, rel-imm) in
+    let (aff-51, rel-52) := exp-50 in
+    aff-51 @ (rel-43) in
+  aff-42-47 @ (HOLE33-48) in -- ちゃんとaffされている。
+return ()

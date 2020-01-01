@@ -1,0 +1,46 @@
+* 2020-01-01-0756
+** 概要
+自明なコードについて、LLVMのコードのほうに自由変数が出現する。
+
+** 結論
+makeClosureのときに型からも自由変数を拾いましょう、というだけの話。
+
+** 雑記
+unitを返すだけのコードを書いても再現。thunkのなかで、本来であればおそらく自由変数としてenvからとりだされるはずのものがとれずに残っている。
+codeEnvのほうを出力してみよう。
+dumpしてみたけど、codeの時点で自由変数をもってしまっているようにみえる。
+thunk-235にはfreeVarがないと主張されている。は？
+lamの引数は必ずしもclosed chainじゃないよね、という話か？
+thunk-235の引数リストは
+[ ( "hole-parse-last-5"
+  , ( _
+    , TermPiElim
+        ( _
+        , TermPiIntro
+            [ ( "hole-explicit-0-3"
+              , ( _
+                , TermPi
+                    [ ( "hole-explicit-1-2" , ( _ , TermTau ) ) ] ( _ , TermTau )
+                )
+              )
+            , ( "hole-parse-enum-4"
+              , ( _
+                , TermPiElim
+                    ( _ , TermTheta "is-enum" )
+                    [ ( _ , TermEnum (EnumTypeLabel "top") ) ]
+                )
+              )
+            ]
+            ( _ , TermEnum (EnumTypeLabel "top") )
+        )
+        [ ( _ , TermUpsilon "hole-explicit-0-3" )
+        , ( _ , TermUpsilon "hole-parse-enum-4" )
+        ]
+    )
+  )
+]
+となっている。おもいっきりexplicit-0-3あるじゃん。……いや、ちがって？
+これは、「適用されれば消える自由変数」だ。
+わかった。pi-introの自由変数をとるときに、
+  fvs <- obtainFreeVarList xs e
+のようにbodyだけとるんじゃなくて、lam全体からとる必要がある。でないと型の中にある自由変数が放置されてしまう。

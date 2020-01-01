@@ -1,0 +1,681 @@
+affine-closure
+( _
+, CodeSigmaElim
+    [ ( "env-31"
+      , ( _
+        , CodeUpIntro
+            ( _
+            , DataSigmaIntro
+                [ ( _ , DataTheta "affine-univ" )
+                , ( _ , DataTheta "relevant-univ" )
+                ]
+            )
+        )
+      )
+    , ( "unused-sigarg-32"
+      , ( _ , CodeUpIntro ( _ , DataUpsilon "env-31" ) )
+      )
+    , ( "unused-sigarg-33"
+      , ( _
+        , CodeUpIntro
+            ( _
+            , DataSigmaIntro
+                [ ( _ , DataTheta "affine-immediate" )
+                , ( _ , DataTheta "relevant-immediate" )
+                ]
+            )
+        )
+      )
+    ]
+    ( _ , DataUpsilon "arg-34" )
+    ( _
+    , CodeUpElim
+        "exp-81"
+        ( _
+        , CodeUpIntro
+            ( _
+            , DataSigmaIntro
+                [ ( _ , DataTheta "affine-univ" )
+                , ( _ , DataTheta "relevant-univ" )
+                ]
+            )
+        )
+        ( _
+        , CodeSigmaElim
+            [ ( "aff-82"
+              , ( _
+                , CodeUpIntro
+                    ( _
+                    , DataSigmaIntro
+                        [ ( _ , DataTheta "affine-immediate" )
+                        , ( _ , DataTheta "relevant-immediate" )
+                        ]
+                    )
+                )
+              )
+            , ( "rel-83"
+              , ( _
+                , CodeUpIntro
+                    ( _
+                    , DataSigmaIntro
+                        [ ( _ , DataTheta "affine-immediate" )
+                        , ( _ , DataTheta "relevant-immediate" )
+                        ]
+                    )
+                )
+              )
+            ]
+            ( _ , DataUpsilon "exp-81" )
+            ( _
+            , CodeUpElim
+                "sig-84"
+                ( _
+                , CodePiElimDownElim
+                    ( _ , DataUpsilon "rel-83" ) [ ( _ , DataUpsilon "env-31" ) ]
+                )
+                ( _
+                , CodeSigmaElim
+                    [ ( "env-31-79"
+                      , ( _
+                        , CodeUpIntro
+                            ( _
+                            , DataSigmaIntro
+                                [ ( _ , DataTheta "affine-univ" )
+                                , ( _ , DataTheta "relevant-univ" )
+                                ]
+                            )
+                        )
+                      )
+                    , ( "env-31-80"
+                      , ( _
+                        , CodeUpIntro
+                            ( _
+                            , DataSigmaIntro
+                                [ ( _ , DataTheta "affine-univ" )
+                                , ( _ , DataTheta "relevant-univ" )
+                                ]
+                            )
+                        )
+                      )
+                    ]
+                    ( _ , DataUpsilon "sig-84" )
+                    ( _
+                    , CodeUpElim
+                        "unused-sigarg-32-78"
+                        ( _ , CodeUpIntro ( _ , DataUpsilon "unused-sigarg-32" ) )
+                        ( _
+                        , CodeUpElim
+                            "unused-sigarg-33-77"
+                            ( _ , CodeUpIntro ( _ , DataUpsilon "unused-sigarg-33" ) )
+                            ( _
+                            , CodeUpElim
+                                "arg-44"
+                                ( _
+                                , CodeUpElim
+                                    "env-31-76"
+                                    ( _ , CodeUpIntro ( _ , DataUpsilon "env-31-79" ) )
+                                    ( _
+                                    , CodeUpElim
+                                        "exp-35"
+                                        ( _
+                                        , CodeUpIntro
+                                            ( _
+                                            , DataSigmaIntro
+                                                [ ( _ , DataTheta "affine-univ" )
+                                                , ( _ , DataTheta "relevant-univ" )
+                                                ]
+                                            )
+                                        )
+                                        ( _
+                                        , CodeUpElim
+                                            "env-31-75"
+                                            ( _ , CodeUpIntro ( _ , DataUpsilon "env-31-76" ) )
+                                            ( _
+                                            , CodeSigmaElim
+                                                [ ( "aff-36"
+                                                  , ( _
+                                                    , CodeUpIntro
+                                                        ( _
+                                                        , DataSigmaIntro
+                                                            [ ( _ , DataTheta "affine-immediate" )
+                                                            , ( _ , DataTheta "relevant-immediate" )
+                                                            ]
+                                                        )
+                                                    )
+                                                  )
+                                                , ( "rel-37"
+                                                  , ( _
+                                                    , CodeUpIntro
+                                                        ( _
+                                                        , DataSigmaIntro
+                                                            [ ( _ , DataTheta "affine-immediate" )
+                                                            , ( _ , DataTheta "relevant-immediate" )
+                                                            ]
+                                                        )
+                                                    )
+                                                  )
+                                                ]
+                                                ( _ , DataUpsilon "exp-35" )
+                                                ( _
+                                                , CodeUpElim
+                                                    "env-31-70"
+                                                    ( _
+                                                    , CodeUpIntro ( _ , DataUpsilon "env-31-75" )
+                                                    )
+                                                    ( _
+                                                    , CodeUpElim
+                                                        "aff-36-69"
+                                                        ( _
+                                                        , CodeUpIntro ( _ , DataUpsilon "aff-36" )
+                                                        )
+                                                        ( _
+                                                        , CodeUpElim
+                                                            "unit-71"
+                                                            ( _
+                                                            , CodeUpElim
+                                                                "exp-72"
+                                                                ( _
+                                                                , CodeUpIntro
+                                                                    ( _
+                                                                    , DataSigmaIntro
+                                                                        [ ( _
+                                                                          , DataTheta
+                                                                              "affine-immediate"
+                                                                          )
+                                                                        , ( _
+                                                                          , DataTheta
+                                                                              "relevant-immediate"
+                                                                          )
+                                                                        ]
+                                                                    )
+                                                                )
+                                                                ( _
+                                                                , CodeSigmaElim
+                                                                    [ ( "aff-73"
+                                                                      , ( _
+                                                                        , CodeUpIntro
+                                                                            ( _
+                                                                            , DataSigmaIntro
+                                                                                [ ( _
+                                                                                  , DataTheta
+                                                                                      "affine-immediate"
+                                                                                  )
+                                                                                , ( _
+                                                                                  , DataTheta
+                                                                                      "relevant-immediate"
+                                                                                  )
+                                                                                ]
+                                                                            )
+                                                                        )
+                                                                      )
+                                                                    , ( "rel-74"
+                                                                      , ( _
+                                                                        , CodeUpIntro
+                                                                            ( _
+                                                                            , DataSigmaIntro
+                                                                                [ ( _
+                                                                                  , DataTheta
+                                                                                      "affine-immediate"
+                                                                                  )
+                                                                                , ( _
+                                                                                  , DataTheta
+                                                                                      "relevant-immediate"
+                                                                                  )
+                                                                                ]
+                                                                            )
+                                                                        )
+                                                                      )
+                                                                    ]
+                                                                    ( _ , DataUpsilon "exp-72" )
+                                                                    ( _
+                                                                    , CodePiElimDownElim
+                                                                        ( _ , DataUpsilon "aff-73" )
+                                                                        [ ( _
+                                                                          , DataUpsilon "rel-37"
+                                                                          )
+                                                                        ]
+                                                                    )
+                                                                )
+                                                            )
+                                                            ( _
+                                                            , CodePiElimDownElim
+                                                                ( _ , DataUpsilon "aff-36-69" )
+                                                                [ ( _ , DataUpsilon "env-31-70" ) ]
+                                                            )
+                                                        )
+                                                    )
+                                                )
+                                            )
+                                        )
+                                    )
+                                )
+                                ( _
+                                , CodeUpElim
+                                    "env-31-68"
+                                    ( _ , CodeUpIntro ( _ , DataUpsilon "env-31-80" ) )
+                                    ( _
+                                    , CodeUpElim
+                                        "unused-sigarg-32-67"
+                                        ( _
+                                        , CodeUpIntro ( _ , DataUpsilon "unused-sigarg-32-78" )
+                                        )
+                                        ( _
+                                        , CodeUpElim
+                                            "unused-sigarg-33-66"
+                                            ( _
+                                            , CodeUpIntro ( _ , DataUpsilon "unused-sigarg-33-77" )
+                                            )
+                                            ( _
+                                            , CodeUpElim
+                                                "arg-45"
+                                                ( _
+                                                , CodeUpElim
+                                                    "env-31-65"
+                                                    ( _
+                                                    , CodeUpIntro ( _ , DataUpsilon "env-31-68" )
+                                                    )
+                                                    ( _
+                                                    , CodeUpElim
+                                                        "unused-sigarg-32-64"
+                                                        ( _
+                                                        , CodeUpIntro
+                                                            ( _
+                                                            , DataUpsilon "unused-sigarg-32-67"
+                                                            )
+                                                        )
+                                                        ( _
+                                                        , CodeUpElim
+                                                            "exp-38"
+                                                            ( _
+                                                            , CodeUpElim
+                                                                "env-31-63"
+                                                                ( _
+                                                                , CodeUpIntro
+                                                                    ( _ , DataUpsilon "env-31-65" )
+                                                                )
+                                                                ( _
+                                                                , CodeUpIntro
+                                                                    ( _ , DataUpsilon "env-31-63" )
+                                                                )
+                                                            )
+                                                            ( _
+                                                            , CodeUpElim
+                                                                "unused-sigarg-32-62"
+                                                                ( _
+                                                                , CodeUpIntro
+                                                                    ( _
+                                                                    , DataUpsilon
+                                                                        "unused-sigarg-32-64"
+                                                                    )
+                                                                )
+                                                                ( _
+                                                                , CodeSigmaElim
+                                                                    [ ( "aff-39"
+                                                                      , ( _
+                                                                        , CodeUpIntro
+                                                                            ( _
+                                                                            , DataSigmaIntro
+                                                                                [ ( _
+                                                                                  , DataTheta
+                                                                                      "affine-immediate"
+                                                                                  )
+                                                                                , ( _
+                                                                                  , DataTheta
+                                                                                      "relevant-immediate"
+                                                                                  )
+                                                                                ]
+                                                                            )
+                                                                        )
+                                                                      )
+                                                                    , ( "rel-40"
+                                                                      , ( _
+                                                                        , CodeUpIntro
+                                                                            ( _
+                                                                            , DataSigmaIntro
+                                                                                [ ( _
+                                                                                  , DataTheta
+                                                                                      "affine-immediate"
+                                                                                  )
+                                                                                , ( _
+                                                                                  , DataTheta
+                                                                                      "relevant-immediate"
+                                                                                  )
+                                                                                ]
+                                                                            )
+                                                                        )
+                                                                      )
+                                                                    ]
+                                                                    ( _ , DataUpsilon "exp-38" )
+                                                                    ( _
+                                                                    , CodeUpElim
+                                                                        "unused-sigarg-32-57"
+                                                                        ( _
+                                                                        , CodeUpIntro
+                                                                            ( _
+                                                                            , DataUpsilon
+                                                                                "unused-sigarg-32-62"
+                                                                            )
+                                                                        )
+                                                                        ( _
+                                                                        , CodeUpElim
+                                                                            "aff-39-56"
+                                                                            ( _
+                                                                            , CodeUpIntro
+                                                                                ( _
+                                                                                , DataUpsilon
+                                                                                    "aff-39"
+                                                                                )
+                                                                            )
+                                                                            ( _
+                                                                            , CodeUpElim
+                                                                                "unit-58"
+                                                                                ( _
+                                                                                , CodeUpElim
+                                                                                    "exp-59"
+                                                                                    ( _
+                                                                                    , CodeUpIntro
+                                                                                        ( _
+                                                                                        , DataSigmaIntro
+                                                                                            [ ( _
+                                                                                              , DataTheta
+                                                                                                  "affine-immediate"
+                                                                                              )
+                                                                                            , ( _
+                                                                                              , DataTheta
+                                                                                                  "relevant-immediate"
+                                                                                              )
+                                                                                            ]
+                                                                                        )
+                                                                                    )
+                                                                                    ( _
+                                                                                    , CodeSigmaElim
+                                                                                        [ ( "aff-60"
+                                                                                          , ( _
+                                                                                            , CodeUpIntro
+                                                                                                ( _
+                                                                                                , DataSigmaIntro
+                                                                                                    [ ( _
+                                                                                                      , DataTheta
+                                                                                                          "affine-immediate"
+                                                                                                      )
+                                                                                                    , ( _
+                                                                                                      , DataTheta
+                                                                                                          "relevant-immediate"
+                                                                                                      )
+                                                                                                    ]
+                                                                                                )
+                                                                                            )
+                                                                                          )
+                                                                                        , ( "rel-61"
+                                                                                          , ( _
+                                                                                            , CodeUpIntro
+                                                                                                ( _
+                                                                                                , DataSigmaIntro
+                                                                                                    [ ( _
+                                                                                                      , DataTheta
+                                                                                                          "affine-immediate"
+                                                                                                      )
+                                                                                                    , ( _
+                                                                                                      , DataTheta
+                                                                                                          "relevant-immediate"
+                                                                                                      )
+                                                                                                    ]
+                                                                                                )
+                                                                                            )
+                                                                                          )
+                                                                                        ]
+                                                                                        ( _
+                                                                                        , DataUpsilon
+                                                                                            "exp-59"
+                                                                                        )
+                                                                                        ( _
+                                                                                        , CodePiElimDownElim
+                                                                                            ( _
+                                                                                            , DataUpsilon
+                                                                                                "aff-60"
+                                                                                            )
+                                                                                            [ ( _
+                                                                                              , DataUpsilon
+                                                                                                  "rel-40"
+                                                                                              )
+                                                                                            ]
+                                                                                        )
+                                                                                    )
+                                                                                )
+                                                                                ( _
+                                                                                , CodePiElimDownElim
+                                                                                    ( _
+                                                                                    , DataUpsilon
+                                                                                        "aff-39-56"
+                                                                                    )
+                                                                                    [ ( _
+                                                                                      , DataUpsilon
+                                                                                          "unused-sigarg-32-57"
+                                                                                      )
+                                                                                    ]
+                                                                                )
+                                                                            )
+                                                                        )
+                                                                    )
+                                                                )
+                                                            )
+                                                        )
+                                                    )
+                                                )
+                                                ( _
+                                                , CodeUpElim
+                                                    "unused-sigarg-33-55"
+                                                    ( _
+                                                    , CodeUpIntro
+                                                        ( _ , DataUpsilon "unused-sigarg-33-66" )
+                                                    )
+                                                    ( _
+                                                    , CodeUpElim
+                                                        "arg-46"
+                                                        ( _
+                                                        , CodeUpElim
+                                                            "unused-sigarg-33-54"
+                                                            ( _
+                                                            , CodeUpIntro
+                                                                ( _
+                                                                , DataUpsilon "unused-sigarg-33-55"
+                                                                )
+                                                            )
+                                                            ( _
+                                                            , CodeUpElim
+                                                                "exp-41"
+                                                                ( _
+                                                                , CodeUpIntro
+                                                                    ( _
+                                                                    , DataSigmaIntro
+                                                                        [ ( _
+                                                                          , DataTheta
+                                                                              "affine-immediate"
+                                                                          )
+                                                                        , ( _
+                                                                          , DataTheta
+                                                                              "relevant-immediate"
+                                                                          )
+                                                                        ]
+                                                                    )
+                                                                )
+                                                                ( _
+                                                                , CodeUpElim
+                                                                    "unused-sigarg-33-53"
+                                                                    ( _
+                                                                    , CodeUpIntro
+                                                                        ( _
+                                                                        , DataUpsilon
+                                                                            "unused-sigarg-33-54"
+                                                                        )
+                                                                    )
+                                                                    ( _
+                                                                    , CodeSigmaElim
+                                                                        [ ( "aff-42"
+                                                                          , ( _
+                                                                            , CodeUpIntro
+                                                                                ( _
+                                                                                , DataSigmaIntro
+                                                                                    [ ( _
+                                                                                      , DataTheta
+                                                                                          "affine-immediate"
+                                                                                      )
+                                                                                    , ( _
+                                                                                      , DataTheta
+                                                                                          "relevant-immediate"
+                                                                                      )
+                                                                                    ]
+                                                                                )
+                                                                            )
+                                                                          )
+                                                                        , ( "rel-43"
+                                                                          , ( _
+                                                                            , CodeUpIntro
+                                                                                ( _
+                                                                                , DataSigmaIntro
+                                                                                    [ ( _
+                                                                                      , DataTheta
+                                                                                          "affine-immediate"
+                                                                                      )
+                                                                                    , ( _
+                                                                                      , DataTheta
+                                                                                          "relevant-immediate"
+                                                                                      )
+                                                                                    ]
+                                                                                )
+                                                                            )
+                                                                          )
+                                                                        ]
+                                                                        ( _ , DataUpsilon "exp-41" )
+                                                                        ( _
+                                                                        , CodeUpElim
+                                                                            "unused-sigarg-33-48"
+                                                                            ( _
+                                                                            , CodeUpIntro
+                                                                                ( _
+                                                                                , DataUpsilon
+                                                                                    "unused-sigarg-33-53"
+                                                                                )
+                                                                            )
+                                                                            ( _
+                                                                            , CodeUpElim
+                                                                                "aff-42-47"
+                                                                                ( _
+                                                                                , CodeUpIntro
+                                                                                    ( _
+                                                                                    , DataUpsilon
+                                                                                        "aff-42"
+                                                                                    )
+                                                                                )
+                                                                                ( _
+                                                                                , CodeUpElim
+                                                                                    "unit-49"
+                                                                                    ( _
+                                                                                    , CodeUpElim
+                                                                                        "exp-50"
+                                                                                        ( _
+                                                                                        , CodeUpIntro
+                                                                                            ( _
+                                                                                            , DataSigmaIntro
+                                                                                                [ ( _
+                                                                                                  , DataTheta
+                                                                                                      "affine-immediate"
+                                                                                                  )
+                                                                                                , ( _
+                                                                                                  , DataTheta
+                                                                                                      "relevant-immediate"
+                                                                                                  )
+                                                                                                ]
+                                                                                            )
+                                                                                        )
+                                                                                        ( _
+                                                                                        , CodeSigmaElim
+                                                                                            [ ( "aff-51"
+                                                                                              , ( _
+                                                                                                , CodeUpIntro
+                                                                                                    ( _
+                                                                                                    , DataSigmaIntro
+                                                                                                        [ ( _
+                                                                                                          , DataTheta
+                                                                                                              "affine-immediate"
+                                                                                                          )
+                                                                                                        , ( _
+                                                                                                          , DataTheta
+                                                                                                              "relevant-immediate"
+                                                                                                          )
+                                                                                                        ]
+                                                                                                    )
+                                                                                                )
+                                                                                              )
+                                                                                            , ( "rel-52"
+                                                                                              , ( _
+                                                                                                , CodeUpIntro
+                                                                                                    ( _
+                                                                                                    , DataSigmaIntro
+                                                                                                        [ ( _
+                                                                                                          , DataTheta
+                                                                                                              "affine-immediate"
+                                                                                                          )
+                                                                                                        , ( _
+                                                                                                          , DataTheta
+                                                                                                              "relevant-immediate"
+                                                                                                          )
+                                                                                                        ]
+                                                                                                    )
+                                                                                                )
+                                                                                              )
+                                                                                            ]
+                                                                                            ( _
+                                                                                            , DataUpsilon
+                                                                                                "exp-50"
+                                                                                            )
+                                                                                            ( _
+                                                                                            , CodePiElimDownElim
+                                                                                                ( _
+                                                                                                , DataUpsilon
+                                                                                                    "aff-51"
+                                                                                                )
+                                                                                                [ ( _
+                                                                                                  , DataUpsilon
+                                                                                                      "rel-43"
+                                                                                                  )
+                                                                                                ]
+                                                                                            )
+                                                                                        )
+                                                                                    )
+                                                                                    ( _
+                                                                                    , CodePiElimDownElim
+                                                                                        ( _
+                                                                                        , DataUpsilon
+                                                                                            "aff-42-47"
+                                                                                        )
+                                                                                        [ ( _
+                                                                                          , DataUpsilon
+                                                                                              "unused-sigarg-33-48"
+                                                                                          )
+                                                                                        ]
+                                                                                    )
+                                                                                )
+                                                                            )
+                                                                        )
+                                                                    )
+                                                                )
+                                                            )
+                                                        )
+                                                        ( _
+                                                        , CodeUpIntro ( _ , DataSigmaIntro [] )
+                                                        )
+                                                    )
+                                                )
+                                            )
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )
+    )
+)

@@ -1,0 +1,113 @@
+* 2019-01-01-0926
+** 概要
+unitを返すだけのコードでfree after freeが起こる。場所としてはaffine-closureの中で起こっているらしい。
+
+** 結論
+まだ不明。
+
+** 雑記
+affine-closureをdumpしておく。これを手で整形していく。
+affine-closureじたいは正しいように見える。
+btは
+#+BEGIN_SRC
+* thread #1, queue = 'com.apple.main-thread', stop reason = breakpoint 1.1
+  * frame #0: 0x00007fff68e512cb libsystem_malloc.dylib`malloc_error_break
+    frame #1: 0x00007fff68e475db libsystem_malloc.dylib`malloc_vreport + 440
+    frame #2: 0x00007fff68e4a40e libsystem_malloc.dylib`malloc_report + 151
+    frame #3: 0x0000000100000c61 out`relevant-univ + 17
+    frame #4: 0x0000000100000cf5 out`affine-closure + 85
+    frame #5: 0x0000000100001753 out`thunk-392 + 67
+    frame #6: 0x0000000100001978 out`thunk-413 + 344
+    frame #7: 0x0000000100000bf7 out`main + 183
+    frame #8: 0x00007fff68c837fd libdyld.dylib`start + 1
+#+END_SRC
+という感じ。
+exp-379が2回使われてる。
+thunk-392のdumpでわかる。
+……いや、ひとつは型のsigmaelimの型のなかでの出現だからいいのか？問題ないように思う。実際、LLVM.hsのなかでは型の部分は捨ててるわけだし。
+どこで死んでるのかだけ特定しないと。
+どうも、
+  CodePiElimDownElim
+    ( _ , DataUpsilon "aff-390" )
+    [ ( _ , DataUpsilon "hole-explicit-0-3" ) ]
+ここで死んでいるらしい。ここで、aff-390はaffine-closureである。
+explicit-0-3にはis-enumのクロージャが入ったはず。そのとおり。
+( _
+, PreTermPiElim
+    ( _
+    , PreTermPiIntro
+        [ ( "hole-explicit-0-3"
+          , ( _
+            , PreTermPi
+                [ ( "hole-explicit-1-2" , ( _ , PreTermTau ) ) ] ( _ , PreTermTau )
+            )
+          )
+        ]
+        ( _
+        , PreTermPiElim
+            ( _
+            , PreTermPiIntro
+                [ ( "hole-parse-enum-4"
+                  , ( _
+                    , PreTermPiElim
+                        ( _ , PreTermTheta "is-enum" )
+                        [ ( _ , PreTermEnum (EnumTypeLabel "top") ) ]
+                    )
+                  )
+                ]
+                ( _
+                , PreTermPiElim
+                    ( _
+                    , PreTermPiIntro
+                        [ ( "hole-parse-last-5"
+                          , ( _
+                            , PreTermPiElim
+                                ( _ , PreTermZeta "hole-with-type-12" )
+                                [ ( _ , PreTermUpsilon "hole-explicit-0-3" )
+                                , ( _ , PreTermUpsilon "hole-parse-enum-4" )
+                                ]
+                            )
+                          )
+                        ]
+                        ( _ , PreTermEnumIntro (EnumValueLabel "unit") )
+                    )
+                    [ ( _ , PreTermEnumIntro (EnumValueLabel "unit") ) ]
+                )
+            )
+            [ ( _ , PreTermTheta "enum.top" ) ]
+        )
+    )
+    [ ( _ , PreTermTheta "is-enum" ) ]
+)
+となっているわけで。
+これが死ぬってことは、けっきょく、is-enumに対してのaffine-closureが失敗しているということ。
+でも、is-enumはmakeClosureで、
+( _
+, CodeUpIntro
+    ( _
+    , DataSigmaIntro
+        [ ( _
+          , DataSigmaIntro
+              [ ( _ , DataTheta "affine-exp-544" )
+              , ( _ , DataTheta "relevant-exp-544" )
+              ]
+          )
+        , ( _ , DataSigmaIntro [] )
+        , ( _ , DataTheta "is-enum" )
+        ]
+    )
+)
+のように普通にちゃんとしたクロージャになっていると思うんだけど。
+あら。thunk-413の中でhole-explict-0-3を普通に2回使ってしまっている。なんで？
+linearize xts (m, CodeSigmaElim yts d e) = do
+  let xts' = filter (\(x, _) -> x `elem` varCode e) xts
+  e' <- linearize (xts' ++ yts) e
+  withHeader xts (m, CodeSigmaElim yts d e')
+ここがバグってるのか？SigmaElimからはじまるコードがあるとしてさ。
+怪しいな。ここか。copyされるべきものであるはずのhole-explicit-0-3がスルーされてしまっている。
+修正できたっぽい。xtsとして余計にsigmaElimの引数ytsを入れてしまっていると、
+  let xts' = filter (\(x, _) -> x `elem` varCode e) xts
+によって、ytsのものがxtsから除外されて、えーと？
+まずもって、varCode eのなかにはytsで定義されたものが含まれることになる。
+たぶんあれだ。distinguishが束縛の関係で無視されてる、みたいな話だ。
+原因はわかった。distinguish/withHeader/linearizeまわりとsigmaElimの束縛周りの話だ。
