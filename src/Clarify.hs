@@ -1,11 +1,11 @@
--- This module "polarizes" a neutral term into a negative term. Operationally,
+-- This module "clarifies" a neutral term into a negative term. Operationally,
 -- this corresponds to determination of the order of evaluation. In proof-theoretic
 -- term, we translate a ordinary dependent calculus to a dependent variant of
 -- Call-By-Push-Value. A detailed explanation of Call-By-Push-Value can be found
 -- in P. Levy, "Call-by-Push-Value: A Subsuming Paradigm". Ph. D. thesis,
 -- Queen Mary College, 2001.
-module Polarize
-  ( polarize
+module Clarify
+  ( clarify
   ) where
 
 import Control.Monad.Except
@@ -21,58 +21,61 @@ import Reduce.Term
 
 import qualified Text.Show.Pretty as Pr
 
-polarize :: TermPlus -> WithEnv CodePlus
-polarize (m, TermTau) = do
+clarify :: TermPlus -> WithEnv CodePlus
+clarify (m, TermTau) = do
   v <- cartesianUniv m
   return (m, CodeUpIntro v)
-polarize (m, TermTheta x) = polarizeTheta m x
-polarize (m, TermUpsilon x) = do
+clarify (m, TermTheta x) = clarifyTheta m x
+clarify (m, TermUpsilon x) = do
   return (m, CodeUpIntro (m, DataUpsilon x))
-polarize (m, TermPi _ _) = do
+clarify (m, TermPi _ _) = do
   returnClosureType m
-polarize (m, TermPiIntro xts e) = do
-  let xs = map fst xts
-  fvs <- obtainFreeVarList xs e
-  e' <- polarize e
+clarify lam@(m, TermPiIntro xts e)
+  -- let xs = map fst xts
+  -- fvs <- obtainFreeVarList xs e
+ = do
+  fvs <- varTermPlus lam
+  -- fvs <- obtainFreeVarList [] lam
+  e' <- clarify e
   makeClosure Nothing fvs m xts e'
-polarize (m, TermPiElim e es) = do
-  e' <- polarize e
+clarify (m, TermPiElim e es) = do
+  e' <- clarify e
   callClosure m e' es
-polarize (m, TermMu (f, _) e) = do
-  tmp <- obtainFreeVarList [f] e
+clarify (m, TermMu (f, _) e) = do
+  tmp <- obtainFreeVarList [f] e -- fの型は使用しないので無視でオーケー
   let (nameList, _, typeList) = unzip3 tmp
   let fvs = zip nameList typeList
   let fvs' = map (toTermUpsilon . fst) fvs
   let lamBody = substTermPlus [(f, (m, TermPiElim (m, TermTheta f) fvs'))] e
-  lamBody' <- polarize lamBody
+  lamBody' <- clarify lamBody
   -- ここはクロージャではなく直接呼び出すように最適化が可能
   -- (その場合は上のsubstTermPlusの中のTermPiElimを「直接の」callへと書き換える必要がある)
   -- いや、clsにすぐcallClosureしてるから、インライン展開で結局直接の呼び出しになるのでは？
   cls <- makeClosure (Just f) [] m fvs lamBody'
   callClosure m cls fvs'
-polarize (m, TermIntS size l) = do
+clarify (m, TermIntS size l) = do
   return (m, CodeUpIntro (m, DataIntS size l))
-polarize (m, TermIntU size l) = do
+clarify (m, TermIntU size l) = do
   return (m, CodeUpIntro (m, DataIntU size l))
-polarize (m, TermFloat16 l) = do
+clarify (m, TermFloat16 l) = do
   return (m, CodeUpIntro (m, DataFloat16 l))
-polarize (m, TermFloat32 l) = do
+clarify (m, TermFloat32 l) = do
   return (m, CodeUpIntro (m, DataFloat32 l))
-polarize (m, TermFloat64 l) = do
+clarify (m, TermFloat64 l) = do
   return (m, CodeUpIntro (m, DataFloat64 l))
-polarize (m, TermEnum _) = do
+clarify (m, TermEnum _) = do
   v <- cartesianImmediate m
   return (m, CodeUpIntro v)
-polarize (m, TermEnumIntro l) = do
+clarify (m, TermEnumIntro l) = do
   return (m, CodeUpIntro (m, DataEnumIntro l))
-polarize (m, TermEnumElim e bs) = do
+clarify (m, TermEnumElim e bs) = do
   let (cs, es) = unzip bs
-  es' <- mapM polarize es
-  (yName, e', y) <- polarize' e
+  es' <- mapM clarify es
+  (yName, e', y) <- clarify' e
   return $ bindLet [(yName, e')] (m, CodeEnumElim y (zip cs es'))
-polarize (m, TermArray _ _) = do
+clarify (m, TermArray _ _) = do
   returnArrayType m
-polarize (m, TermArrayIntro k les) = do
+clarify (m, TermArrayIntro k les) = do
   v <- cartesianImmediate m
   let retKindType = (m, CodeUpIntro v)
   -- arrayType = Sigma [_ : IMMEDIATE, ..., _ : IMMEDIATE]
@@ -80,15 +83,15 @@ polarize (m, TermArrayIntro k les) = do
   arrayType <-
     cartesianSigma name m $ map Left $ replicate (length les) retKindType
   let (ls, es) = unzip les
-  (zs, es', xs) <- unzip3 <$> mapM polarize' es
+  (zs, es', xs) <- unzip3 <$> mapM clarify' es
   return $
     bindLet (zip zs es') $
     ( m
     , CodeUpIntro $
       (m, DataSigmaIntro [arrayType, (m, DataArrayIntro k (zip ls xs))]))
-polarize (m, TermArrayElim k e1 e2) = do
-  e1' <- polarize e1
-  e2' <- polarize e2
+clarify (m, TermArrayElim k e1 e2) = do
+  e1' <- clarify e1
+  e2' <- clarify e2
   (arrVarName, arrVar) <- newDataUpsilonWith "arr"
   (idxVarName, idxVar) <- newDataUpsilonWith "idx"
   affVarName <- newNameWith "aff"
@@ -117,9 +120,9 @@ obtainFreeVarList xs e = do
   tmp <- varTermPlus e
   return $ filter (\(x, _, _) -> x `notElem` xs) $ tmp
 
-polarize' :: TermPlus -> WithEnv (Identifier, CodePlus, DataPlus)
-polarize' e@(m, _) = do
-  e' <- polarize e
+clarify' :: TermPlus -> WithEnv (Identifier, CodePlus, DataPlus)
+clarify' e@(m, _) = do
+  e' <- clarify e
   (varName, var) <- newDataUpsilonWith' "var" m
   return (varName, e', var)
 
@@ -131,19 +134,20 @@ makeClosure ::
   -> CodePlus -- the `e` in `lam (x1, ..., xn). e`
   -> WithEnv CodePlus
 makeClosure mName fvs m xts e = do
-  let (xs, _) = unzip xts
   let (freeVarNameList, locList, freeVarTypeList) = unzip3 fvs
-  negTypeList <- mapM polarize freeVarTypeList
+  negTypeList <- mapM clarify freeVarTypeList
   expName <- newNameWith "exp"
   envExp <-
     cartesianSigma expName m $ map Right $ zip freeVarNameList negTypeList
   (envVarName, envVar) <- newDataUpsilonWith "env"
-  let (xs', ts) = unzip $ zip freeVarNameList freeVarTypeList ++ xts
-  ts' <- mapM polarize ts
-  e' <- linearize (zip xs' ts') e
+  -- let (_, ts) = unzip xts
+  -- let (xs', ts) = unzip $ zip freeVarNameList freeVarTypeList ++ xts
+  let (xs, ts) = unzip xts
+  ts' <- mapM clarify ts
   let fvInfo = zip freeVarNameList negTypeList
-  -- let body = (ml, CodeSigmaElim freeVarNameList envVar e')
-  let body = (m, CodeSigmaElim fvInfo envVar e')
+  -- envVarがlinearなのは既知
+  -- こっちの仕方でlinearizeしてしまうと、
+  body <- linearize (zip xs ts') $ (m, CodeSigmaElim fvInfo envVar e)
   let fvSigmaIntro =
         ( m
         , DataSigmaIntro $ zipWith (curry toDataUpsilon) freeVarNameList locList)
@@ -151,6 +155,14 @@ makeClosure mName fvs m xts e = do
     case mName of
       Just lamThetaName -> return lamThetaName
       Nothing -> newNameWith "thunk"
+  p name
+  p "fvs:"
+  p' freeVarNameList
+  p "args:"
+  p' (envVarName : xs)
+  p "target:"
+  p' xs
+  p' body
   cenv <- gets codeEnv
   when (name `notElem` map fst cenv) $ insCodeEnv name (envVarName : xs) body
   return $
@@ -158,9 +170,10 @@ makeClosure mName fvs m xts e = do
     , CodeUpIntro
         (m, DataSigmaIntro [envExp, fvSigmaIntro, (m, DataTheta name)]))
 
+--  when (name == "thunk-413") $ do
 callClosure :: Meta -> CodePlus -> [TermPlus] -> WithEnv CodePlus
 callClosure m e es = do
-  (zs, es', xs) <- unzip3 <$> mapM polarize' es
+  (zs, es', xs) <- unzip3 <$> mapM clarify' es
   (clsVarName, clsVar) <- newDataUpsilonWith "closure"
   (typeVarName, typeVar) <- newDataUpsilonWith "exp"
   (envVarName, envVar) <- newDataUpsilonWith "env"
@@ -186,6 +199,7 @@ callClosure m e es = do
               (m, CodePiElimDownElim lamVar (envVar : xs))))
 
 -- e' <- linearize xts eのとき、e'は、eとbeta-equivalentであり、かつ、xtsに含まれる変数の使用がpractically linearであるようなterm.
+-- linearizeの第1引数はeのなかでlinearに使用されるべき自由変数のリスト。
 linearize :: [(Identifier, CodePlus)] -> CodePlus -> WithEnv CodePlus
 linearize xts (m, CodeSigmaElim yts d e) = do
   let xts' = filter (\(x, _) -> x `elem` varCode e) xts
@@ -195,6 +209,10 @@ linearize xts (m, CodeSigmaElim yts d e) = do
   -- なお、sigmaの型はすべてclosedなので、ytsのなかに変な自由変数が現れたりすることはない。
   -- つまり、yts = [(y1, ret t1), ..., (yn, ret tn)]とおくと、Sigma (y1 : t1, ..., yn : tn)は
   -- closedなsigmaになっている。
+  -- yiを自由変数としてふくんだtiがeのなかでどんだけ使われようが、それらはlinearize (...) eによってlinearizeされるから
+  -- yiの自由変数としての使用を心配する必要はない。
+  p "linearize-sigma-cont-with:"
+  p' $ map fst $ xts' ++ yts
   e' <- linearize (xts' ++ yts) e
   -- eのなかで使用されておらず、かつdのなかでも使用されていないものなども、ここで適切にheaderを挿入することで対応する。
   withHeader xts (m, CodeSigmaElim yts d e')
@@ -218,6 +236,8 @@ linearize xts e = withHeader xts e -- eのなかにCodePlusが含まれないケ
 -- eのなかでxtsがpractically linearになるよう適切にheaderを挿入する。
 withHeader :: [(Identifier, CodePlus)] -> CodePlus -> WithEnv CodePlus
 withHeader xts e = do
+  p "distinguishing: "
+  p' $ map fst xts
   (xtzss, e') <- distinguish xts e
   withHeader' xtzss e'
 
@@ -528,6 +548,9 @@ affineSigma thetaName m mxts = do
       let body = bindLet (zip ys as) (m, CodeUpIntro (m, DataSigmaIntro []))
       body' <- linearize xts body
       insCodeEnv thetaName [z] (m, CodeSigmaElim xts varZ body')
+      -- when (thetaName == "affine-closure") $ do
+      --   p "affine-closure"
+      --   p' (m, CodeSigmaElim xts varZ body')
       return theta
 
 -- (Assuming `ti` = `return di` for some `di` such that `xi : di`)
@@ -648,31 +671,30 @@ toRelevantApp m x e = do
             expVar
             (m, CodePiElimDownElim relVar [toDataUpsilon (x, fst e)])))
 
-polarizeTheta :: Meta -> Identifier -> WithEnv CodePlus
-polarizeTheta m name
-  | Just (lowType, op) <- asUnaryOpMaybe name =
-    polarizeUnaryOp name op lowType m
-polarizeTheta m name
+clarifyTheta :: Meta -> Identifier -> WithEnv CodePlus
+clarifyTheta m name
+  | Just (lowType, op) <- asUnaryOpMaybe name = clarifyUnaryOp name op lowType m
+clarifyTheta m name
   | Just (lowType, op) <- asBinaryOpMaybe name =
-    polarizeBinaryOp name op lowType m
-polarizeTheta m name
+    clarifyBinaryOp name op lowType m
+clarifyTheta m name
   | Just (sysCall, len, idxList) <- asSysCallMaybe name =
-    polarizeSysCall name sysCall len idxList m
-polarizeTheta m name
-  | Just _ <- asLowTypeMaybe name = polarize (m, TermEnum $ EnumTypeLabel "top")
-polarizeTheta m "is-enum" = polarizeIsEnum m
-polarizeTheta m "unsafe.eval-io" = polarizeEvalIO m
-polarizeTheta m "file-descriptor" = polarize (m, TermTheta "i64")
-polarizeTheta m "stdin" = polarize (m, TermIntS 64 0)
-polarizeTheta m "stdout" = polarize (m, TermIntS 64 1)
-polarizeTheta m "stderr" = polarize (m, TermIntS 64 2)
-polarizeTheta m name = do
+    clarifySysCall name sysCall len idxList m
+clarifyTheta m name
+  | Just _ <- asLowTypeMaybe name = clarify (m, TermEnum $ EnumTypeLabel "top")
+clarifyTheta m "is-enum" = clarifyIsEnum m
+clarifyTheta m "unsafe.eval-io" = clarifyEvalIO m
+clarifyTheta m "file-descriptor" = clarify (m, TermTheta "i64")
+clarifyTheta m "stdin" = clarify (m, TermIntS 64 0)
+clarifyTheta m "stdout" = clarify (m, TermIntS 64 1)
+clarifyTheta m "stderr" = clarify (m, TermIntS 64 2)
+clarifyTheta m name = do
   mx <- asEnumConstant name
   case mx of
-    Just i -> polarize (m, TermIntS 64 i) -- enum.top ~> 1, enum.choice ~> 2, etc.
+    Just i -> clarify (m, TermIntS 64 i) -- enum.top ~> 1, enum.choice ~> 2, etc.
     -- muで導入されたthetaに由来するものもここにくる。
     -- たぶんたんにreturn (DataTheta f)とすればよい。
-    Nothing -> throwError $ "polarize.theta: " ++ name
+    Nothing -> throwError $ "clarify.theta: " ++ name
 
 -- {enum.top, enum.choice, etc.} ~> {(the number of contents in enum)}
 asEnumConstant :: Identifier -> WithEnv (Maybe Integer)
@@ -684,8 +706,8 @@ asEnumConstant x
       Just ls -> return $ Just $ toInteger $ length ls
 asEnumConstant _ = return Nothing
 
-polarizeUnaryOp :: Identifier -> UnaryOp -> LowType -> Meta -> WithEnv CodePlus
-polarizeUnaryOp name op lowType m = do
+clarifyUnaryOp :: Identifier -> UnaryOp -> LowType -> Meta -> WithEnv CodePlus
+clarifyUnaryOp name op lowType m = do
   t <- lookupTypeEnv name
   t' <- reduceTermPlus t
   case t' of
@@ -699,9 +721,8 @@ polarizeUnaryOp name op lowType m = do
         (m, CodeTheta (ThetaUnaryOp op lowType varX))
     _ -> throwError $ "the arity of " ++ name ++ " is wrong"
 
-polarizeBinaryOp ::
-     Identifier -> BinaryOp -> LowType -> Meta -> WithEnv CodePlus
-polarizeBinaryOp name op lowType m = do
+clarifyBinaryOp :: Identifier -> BinaryOp -> LowType -> Meta -> WithEnv CodePlus
+clarifyBinaryOp name op lowType m = do
   t <- lookupTypeEnv name
   t' <- reduceTermPlus t
   case t' of
@@ -716,8 +737,8 @@ polarizeBinaryOp name op lowType m = do
         (m, CodeTheta (ThetaBinaryOp op lowType varX varY))
     _ -> throwError $ "the arity of " ++ name ++ " is wrong"
 
-polarizeIsEnum :: Meta -> WithEnv CodePlus
-polarizeIsEnum m = do
+clarifyIsEnum :: Meta -> WithEnv CodePlus
+clarifyIsEnum m = do
   t <- lookupTypeEnv "is-enum"
   t' <- reduceTermPlus t
   case t' of
@@ -727,16 +748,30 @@ polarizeIsEnum m = do
       aff <- newNameWith "aff"
       rel <- newNameWith "rel"
       retImmType <- returnCartesianImmediate
-      makeClosure
-        (Just "is-enum")
-        []
-        m
-        [(x, tx)]
-        ( m
-        , CodeSigmaElim
-            [(aff, retImmType), (rel, retImmType)]
-            varX
-            (m, CodeUpIntro v))
+      e <-
+        makeClosure
+          (Just "is-enum")
+          []
+          m
+          [(x, tx)]
+          ( m
+          , CodeSigmaElim
+              [(aff, retImmType), (rel, retImmType)]
+              varX
+              (m, CodeUpIntro v))
+      -- p "is-enum:"
+      -- p' e
+      return e
+      -- makeClosure
+      --   (Just "is-enum")
+      --   []
+      --   m
+      --   [(x, tx)]
+      --   ( m
+      --   , CodeSigmaElim
+      --       [(aff, retImmType), (rel, retImmType)]
+      --       varX
+      --       (m, CodeUpIntro v))
     _ -> throwError $ "the type of is-enum is wrong. t :\n" ++ Pr.ppShow t
 
 --    unsafe.eval-io
@@ -745,8 +780,8 @@ polarizeIsEnum m = do
 --      let (resultEnv, value) := sig in
 --      return value
 --    (as closure)
-polarizeEvalIO :: Meta -> WithEnv CodePlus
-polarizeEvalIO m = do
+clarifyEvalIO :: Meta -> WithEnv CodePlus
+clarifyEvalIO m = do
   t <- lookupTypeEnv "unsafe.eval-io"
   t' <- reduceTermPlus t
   case t' of
@@ -754,7 +789,7 @@ polarizeEvalIO m = do
       (resultValue, resultValueVar) <- newDataUpsilonWith "result"
       (sig, sigVar) <- newDataUpsilonWith "eval-io-sig"
       resultEnv <- newNameWith "env"
-      arg' <- polarize $ toTermUpsilon $ fst arg
+      arg' <- clarify $ toTermUpsilon $ fst arg
       -- IO Top == Top -> (Bottom, Top)
       evalArgWithZero <- callClosure m arg' [toTermInt64 0]
       retImmType <- returnCartesianImmediate
@@ -780,17 +815,17 @@ polarizeEvalIO m = do
 --   unsafe.write : Pi (A : Univ, out : file-descriptor, str : u8-array a, len : is-enum A). top
 -- などと宣言されることになる。他方で実際のsystem callの引数は
 --   write(FILE_DESCRIPTOR, STRING_BUFFER, LENGTH)
--- という感じなので、unsafe.writeの引数Aの部分が不要である。この不要な部分と必要な部分を指定するためにpolarizeSyscallは
+-- という感じなので、unsafe.writeの引数Aの部分が不要である。この不要な部分と必要な部分を指定するためにclarifySyscallは
 -- 引数としてインデックスの情報をとっている。unsafe.writeの例で言えば、長さについての情報は4であり、"used arguments" を
 -- 指定する配列は、zero-indexであることに注意して [1, 2, 3] となる。
-polarizeSysCall ::
+clarifySysCall ::
      Identifier -- the name of theta
   -> SysCall -- the kind of system call
   -> Int -- the length of the arguments of the theta
   -> [Int] -- used (or, non-discarded) arguments in its actual implementation (index starts from zero)
   -> Meta -- the meta of the theta
   -> WithEnv CodePlus
-polarizeSysCall name sysCall argLen argIdxList m = do
+clarifySysCall name sysCall argLen argIdxList m = do
   t <- lookupTypeEnv name
   t' <- reduceTermPlus t
   case t' of
@@ -807,14 +842,6 @@ polarizeSysCall name sysCall argLen argIdxList m = do
 
 toVar :: Identifier -> DataPlus
 toVar x = (emptyMeta, DataUpsilon x)
-
-newDataUpsilonWith :: Identifier -> WithEnv (Identifier, DataPlus)
-newDataUpsilonWith name = newDataUpsilonWith' name emptyMeta
-
-newDataUpsilonWith' :: Identifier -> Meta -> WithEnv (Identifier, DataPlus)
-newDataUpsilonWith' name m = do
-  x <- newNameWith name
-  return (x, (m, DataUpsilon x))
 
 supplyName :: Either b (Identifier, b) -> WithEnv (Identifier, b)
 supplyName (Right (x, t)) = return (x, t)

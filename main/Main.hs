@@ -8,12 +8,12 @@ import System.FilePath
 import System.Process
 import Text.Read (readMaybe)
 
+import Clarify
 import Data.Env
 import Elaborate
 import Emit
 import LLVM
 import Parse
-import Polarize
 
 type ImportOptScreenName = String
 
@@ -122,8 +122,8 @@ process :: String -> WithEnv [String]
 process input = do
   e <- (parse >=> elaborate) input
   p "elaborated"
-  e' <- polarize e
-  p "polarized"
+  e' <- clarify e
+  p "clarified"
   e'' <- toLLVM e'
   p "llvm-done"
   emit e''
