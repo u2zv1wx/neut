@@ -16,7 +16,6 @@ import Data.Basic
 import Data.Code
 import Data.Env
 import Data.Term
-import Reduce.Code
 
 makeClosure ::
      Maybe Identifier -- the name of newly created closure
@@ -32,9 +31,6 @@ makeClosure mName fvs m xts e = do
     cartesianSigma expName m $ map Right $ zip freeVarNameList negTypeList
   (envVarName, envVar) <- newDataUpsilonWith "env"
   let fvInfo = zip freeVarNameList negTypeList
-  -- envVarがlinearなのは既知
-  -- body <- linearize (zip xs ts') $ (m, CodeSigmaElim fvInfo envVar e)
-  -- xtsのtのうちにはfvに依存したものが含まれうるのでこれではダメ
   e' <- linearize (fvs ++ xts) e
   -- body <- linearize xts $ (m, CodeSigmaElim fvInfo envVar e)
   let body = (m, CodeSigmaElim fvInfo envVar e')
@@ -64,12 +60,10 @@ makeClosure mName fvs m xts e = do
     , CodeUpIntro
         (m, DataSigmaIntro [envExp, fvSigmaIntro, (m, DataTheta name)]))
 
---  when (name == "thunk-413") $ do
 callClosure ::
      Meta -> CodePlus -> [(Identifier, CodePlus, DataPlus)] -> WithEnv CodePlus
 callClosure m e zexes = do
   let (zs, es', xs) = unzip3 zexes
-  -- (zs, es', xs) <- unzip3 <$> mapM clarify' es
   (clsVarName, clsVar) <- newDataUpsilonWith "closure"
   (typeVarName, typeVar) <- newDataUpsilonWith "exp"
   (envVarName, envVar) <- newDataUpsilonWith "env"

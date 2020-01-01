@@ -12,26 +12,15 @@ import Data.Code
 import Data.Env
 
 -- e' <- linearize xts eのとき、e'は、eとbeta-equivalentであり、かつ、xtsに含まれる変数の使用がpractically linearであるようなterm.
--- linearizeの第1引数はeのなかでlinearに使用されるべき自由変数のリスト。
+-- linearizeの第1引数はeのなかでlinearに使用されるべき自由変数のリスト。closed chainでなければならないことに注意。
 linearize :: [(Identifier, CodePlus)] -> CodePlus -> WithEnv CodePlus
 linearize xts (m, CodeSigmaElim yts d e) = do
   let xts' = filter (\(x, _) -> x `elem` varCode e) xts
-  -- xts'は、xtsのうち実際にeで使用されている変数の集合。実際に使用されているのでeのなかでcopyが起こりうる。
-  -- eのなかで使用されていないものを放置するのは、それらはなるべく早くfreeしたほうが空間的に効率的だから。
-  -- copyは遅ければ遅いほど効率的だし、freeは早ければ早いほど効率的。
-  -- なお、sigmaの型はすべてclosedなので、ytsのなかに変な自由変数が現れたりすることはない。
-  -- つまり、yts = [(y1, ret t1), ..., (yn, ret tn)]とおくと、Sigma (y1 : t1, ..., yn : tn)は
-  -- closedなsigmaになっている。
-  -- yiを自由変数としてふくんだtiがeのなかでどんだけ使われようが、それらはlinearize (...) eによってlinearizeされるから
-  -- yiの自由変数としての使用を心配する必要はない。
   e' <- linearize (xts' ++ yts) e
-  -- eのなかで使用されておらず、かつdのなかでも使用されていないものなども、ここで適切にheaderを挿入することで対応する。
   withHeader xts (m, CodeSigmaElim yts d e')
 linearize xts (m, CodeUpElim z e1 e2) = do
   let xts2' = filter (\(x, _) -> x `elem` varCode e2) xts
-  -- zはe2のなかでlinearに使用されることが既知なので放置でよい。
-  -- つまり、zについてのlinearizeの必要がないのでxts2' ++ [z]でなくxts2'を引数として与えれば十分。
-  e2' <- linearize xts2' e2
+  e2' <- linearize xts2' e2 -- `z` is already linear
   let xts1' = filter (\(x, _) -> x `elem` varCode e1) xts
   e1' <- linearize xts1' e1
   withHeader xts (m, CodeUpElim z e1' e2')
@@ -49,22 +38,13 @@ withHeader :: [(Identifier, CodePlus)] -> CodePlus -> WithEnv CodePlus
 withHeader [] e = return e
 withHeader ((x, t):xts) e = do
   e' <- withHeader xts e
-  (xt', e'') <- distinguish [(x, t)] e'
-  withHeader' xt' e''
-
-withHeader' ::
-     [(Identifier, CodePlus, [Identifier])] -> CodePlus -> WithEnv CodePlus
-withHeader' [] e = return e
-withHeader' ((x, t, []):xtzss) e = do
-  e' <- withHeader' xtzss e
-  withHeaderAffine x t e'
-withHeader' ((x, _, [z]):xtzss) e = do
-  e' <- withHeader' xtzss e -- already linear.
-  let m = emptyMeta
-  return (m, CodeUpElim z (m, CodeUpIntro (m, DataUpsilon x)) e')
-withHeader' ((x, t, (z1:z2:zs)):xtzss) e = do
-  e' <- withHeader' xtzss e
-  withHeaderRelevant x t z1 z2 zs e'
+  (ys, e'') <- distinguishCode x e'
+  case ys of
+    [] -> withHeaderAffine x t e''
+    [z] -> do
+      let m = emptyMeta
+      return (m, CodeUpElim z (m, CodeUpIntro (m, DataUpsilon x)) e')
+    (z1:z2:zs) -> withHeaderRelevant x t z1 z2 zs e''
 
 -- withHeaderAffine x t e ~>
 --   bind _ :=
@@ -166,18 +146,6 @@ withHeaderRelevant' t relVar ((x, (x1, x2)):chain) cont = do
         sigVarName
         (m, CodePiElimDownElim relVar [varX])
         (m, CodeSigmaElim [(x1, t), (x2, t)] sigVar cont'))
-
--- distinguish [(x1, t1), ..., (xn, tn)] eは、は、eにおけるxiの出現をすべて新しい名前で置き換え、そうして得られたtermをe'として、
--- ([(x1, t1, {list-of-new-names-for-x1}), ..., (xm, tm, {list-of-new-names-for-xm})], e')を返す。
-distinguish ::
-     [(Identifier, CodePlus)]
-  -> CodePlus
-  -> WithEnv ([(Identifier, CodePlus, [Identifier])], CodePlus)
-distinguish [] e = return ([], e)
-distinguish ((x, t):xts) e = do
-  (xtzss, e') <- distinguish xts e
-  (xs, e'') <- distinguishCode x e'
-  return ((x, t, xs) : xtzss, e'')
 
 distinguishData :: Identifier -> DataPlus -> WithEnv ([Identifier], DataPlus)
 distinguishData z d@(ml, DataUpsilon x) =
