@@ -161,3 +161,80 @@ relevantUniv m = do
                     , (emptyMeta, DataSigmaIntro [affVar, relVar])
                     ])))
       return theta
+
+renameData :: DataPlus -> WithEnv DataPlus
+renameData (m, DataTheta x) = return (m, DataTheta x)
+renameData (m, DataUpsilon x) = do
+  x' <- lookupNameEnv x
+  return (m, DataUpsilon x')
+renameData (m, DataSigmaIntro ds) = do
+  ds' <- mapM renameData ds
+  return (m, DataSigmaIntro ds')
+renameData (m, DataIntS size x) = return (m, DataIntS size x)
+renameData (m, DataIntU size x) = return (m, DataIntU size x)
+renameData (m, DataFloat16 x) = return (m, DataFloat16 x)
+renameData (m, DataFloat32 x) = return (m, DataFloat32 x)
+renameData (m, DataFloat64 x) = return (m, DataFloat64 x)
+renameData (m, DataEnumIntro x) = return (m, DataEnumIntro x)
+renameData (m, DataArrayIntro kind les) = do
+  les' <-
+    forM les $ \(l, body) -> do
+      body' <- renameData body
+      return (l, body')
+  return (m, DataArrayIntro kind les')
+
+renameCode :: CodePlus -> WithEnv CodePlus
+renameCode (m, CodeTheta x) = return (m, CodeTheta x)
+renameCode (m, CodePiElimDownElim v vs) = do
+  v' <- renameData v
+  vs' <- mapM renameData vs
+  return (m, CodePiElimDownElim v' vs')
+renameCode (m, CodeSigmaElim xts d e) = do
+  d' <- renameData d
+  (xts', e') <- renameBinderWithBody xts e
+  return (m, CodeSigmaElim xts' d' e')
+renameCode (m, CodeUpIntro d) = do
+  d' <- renameData d
+  return (m, CodeUpIntro d')
+renameCode (m, CodeUpElim x e1 e2) = do
+  e1' <- renameCode e1
+  local $ do
+    x' <- newNameWith x
+    e2' <- renameCode e2
+    return (m, CodeUpElim x' e1' e2')
+renameCode (m, CodeEnumElim d les) = do
+  d' <- renameData d
+  les' <- renameCaseList les
+  return (m, CodeEnumElim d' les')
+renameCode (m, CodeArrayElim k d1 d2) = do
+  d1' <- renameData d1
+  d2' <- renameData d2
+  return (m, CodeArrayElim k d1' d2')
+
+renameBinderWithBody ::
+     [(Identifier, CodePlus)]
+  -> CodePlus
+  -> WithEnv ([(Identifier, CodePlus)], CodePlus)
+renameBinderWithBody [] e = do
+  e' <- renameCode e
+  return ([], e')
+renameBinderWithBody ((x, t):xts) e = do
+  t' <- renameCode t
+  local $ do
+    x' <- newNameWith x
+    (xts', e') <- renameBinderWithBody xts e
+    return ((x', t') : xts', e')
+
+renameCaseList :: [(Case, CodePlus)] -> WithEnv [(Case, CodePlus)]
+renameCaseList les =
+  forM les $ \(l, body) ->
+    local $ do
+      body' <- renameCode body
+      return (l, body')
+
+local :: WithEnv a -> WithEnv a
+local comp = do
+  env <- get
+  x <- comp
+  modify (\e -> env {count = count e})
+  return x
