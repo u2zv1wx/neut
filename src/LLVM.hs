@@ -4,7 +4,7 @@ module LLVM
 
 import Control.Monad.Except
 import Control.Monad.State
-import Data.List (sortBy)
+import Data.List (elemIndex, sortBy)
 
 import Data.Basic
 import Data.Code
@@ -419,3 +419,21 @@ i32 = LowTypeIntS 32
 newNameWith' :: Maybe Identifier -> WithEnv Identifier
 newNameWith' Nothing = newNameWith "var"
 newNameWith' (Just name) = newNameWith name
+
+insLLVMEnv :: Identifier -> [Identifier] -> LLVM -> WithEnv ()
+insLLVMEnv funName args e =
+  modify (\env -> env {llvmEnv = (funName, (args, e)) : llvmEnv env})
+
+getEnumNum :: Identifier -> WithEnv Int
+getEnumNum label = do
+  ienv <- gets enumEnv
+  case (getEnumNum' label $ map snd ienv) of
+    Nothing -> throwError $ "no such enum is defined: " ++ show label
+    Just i -> return i
+
+getEnumNum' :: Identifier -> [[Identifier]] -> Maybe Int
+getEnumNum' _ [] = Nothing
+getEnumNum' l (xs:xss) =
+  case elemIndex l xs of
+    Nothing -> getEnumNum' l xss
+    Just i -> Just i

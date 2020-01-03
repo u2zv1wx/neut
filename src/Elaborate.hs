@@ -209,3 +209,10 @@ caseCheckEnumIdentifier' i labelList = do
 toMeta :: PreMeta -> WithEnv Meta
 toMeta (PreMetaTerminal l) = return $ Meta {metaLocation = l}
 toMeta (PreMetaNonTerminal _ l) = return $ Meta {metaLocation = l}
+
+lookupEnumSet :: Identifier -> WithEnv [Identifier]
+lookupEnumSet name = do
+  eenv <- gets enumEnv
+  case lookup name eenv of
+    Nothing -> throwError $ "no such enum defined: " ++ show name
+    Just ls -> return ls

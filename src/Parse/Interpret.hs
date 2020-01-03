@@ -247,3 +247,9 @@ toWeakMetaNonTerminal m = WeakMetaNonTerminal (treeMetaLocation m)
 
 newWeakMetaTerminal :: WeakMeta
 newWeakMetaTerminal = WeakMetaTerminal Nothing
+
+isDefinedEnumName :: Identifier -> WithEnv Bool
+isDefinedEnumName name = do
+  env <- get
+  let enumNameList = map fst $ enumEnv env
+  return $ name `elem` enumNameList

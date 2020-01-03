@@ -14,7 +14,7 @@ import Data.Constraint
 import Data.Env
 import Data.PreTerm
 import Elaborate.Analyze
-import Elaborate.Infer (metaTerminal, typeOf)
+import Elaborate.Infer (insWeakTypeEnv, metaTerminal, typeOf)
 import Reduce.PreTerm
 
 -- Given a queue of constraints (easier ones comes earlier), try to synthesize

@@ -3,12 +3,13 @@ module Elaborate.Infer
   , typeOf
   , univ
   , metaTerminal
+  , insWeakTypeEnv
   ) where
 
 import Control.Monad.Except
 import Control.Monad.State
+import qualified Data.Map.Strict as Map
 import Data.Maybe (catMaybes)
-import Prelude hiding (pi)
 
 import Data.Basic
 import Data.Env
@@ -348,3 +349,37 @@ determineDomType ts =
   if not (null ts)
     then head ts
     else (metaTerminal, PreTermTheta "bottom")
+
+insConstraintEnv :: PreTermPlus -> PreTermPlus -> WithEnv ()
+insConstraintEnv t1 t2 =
+  modify (\e -> e {constraintEnv = (t1, t2) : constraintEnv e})
+
+insWeakTypeEnv :: Identifier -> PreTermPlus -> WithEnv ()
+insWeakTypeEnv i t =
+  modify (\e -> e {weakTypeEnv = Map.insert i t (weakTypeEnv e)})
+
+lookupWeakTypeEnv :: String -> WithEnv PreTermPlus
+lookupWeakTypeEnv s = do
+  mt <- lookupWeakTypeEnvMaybe s
+  case mt of
+    Just t -> return t
+    Nothing -> throwError $ s ++ " is not found in the type environment."
+
+lookupWeakTypeEnvMaybe :: String -> WithEnv (Maybe PreTermPlus)
+lookupWeakTypeEnvMaybe s = do
+  mt <- gets (Map.lookup s . weakTypeEnv)
+  case mt of
+    Nothing -> return Nothing
+    Just t -> return $ Just t
+
+lookupKind :: Identifier -> WithEnv Identifier
+lookupKind name = do
+  env <- get
+  lookupKind' name $ enumEnv env
+
+lookupKind' :: Identifier -> [(Identifier, [Identifier])] -> WithEnv Identifier
+lookupKind' i [] = throwError $ "no such enum-intro is defined: " ++ i
+lookupKind' i ((j, ls):xs) =
+  if i `elem` ls
+    then return j
+    else lookupKind' i xs

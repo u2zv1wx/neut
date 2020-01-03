@@ -154,3 +154,7 @@ newHole :: WithEnv WeakTermPlus
 newHole = do
   h <- newNameWith "hole-parse-zeta"
   return (newMeta, WeakTermZeta h)
+
+insEnumEnv :: Identifier -> [Identifier] -> WithEnv ()
+insEnumEnv name enumList =
+  modify (\e -> e {enumEnv = (name, enumList) : enumEnv e})

@@ -4,7 +4,6 @@ module Data.Env where
 
 import Control.Monad.Except
 import Control.Monad.State
-import Data.List (elemIndex)
 import System.Info
 
 import Data.Basic
@@ -83,20 +82,6 @@ newNameWith s = do
   modify (\e -> e {nameEnv = (s, s') : nameEnv e})
   return s'
 
-lookupWeakTypeEnv :: String -> WithEnv PreTermPlus
-lookupWeakTypeEnv s = do
-  mt <- lookupWeakTypeEnvMaybe s
-  case mt of
-    Just t -> return t
-    Nothing -> throwError $ s ++ " is not found in the type environment."
-
-lookupWeakTypeEnvMaybe :: String -> WithEnv (Maybe PreTermPlus)
-lookupWeakTypeEnvMaybe s = do
-  mt <- gets (Map.lookup s . weakTypeEnv)
-  case mt of
-    Nothing -> return Nothing
-    Just t -> return $ Just t
-
 lookupTypeEnv :: String -> WithEnv TermPlus
 lookupTypeEnv s = do
   mt <- gets (Map.lookup s . typeEnv)
@@ -118,71 +103,11 @@ lookupNameEnvMaybe s = do
     Just s' -> return $ Just s'
     Nothing -> return Nothing
 
-lookupSubstEnv :: Identifier -> WithEnv (Maybe PreTermPlus)
-lookupSubstEnv i = do
-  senv <- gets substEnv
-  return $ lookup i senv
-
-insWeakTypeEnv :: Identifier -> PreTermPlus -> WithEnv ()
-insWeakTypeEnv i t =
-  modify (\e -> e {weakTypeEnv = Map.insert i t (weakTypeEnv e)})
-
-insLLVMEnv :: Identifier -> [Identifier] -> LLVM -> WithEnv ()
-insLLVMEnv funName args e =
-  modify (\env -> env {llvmEnv = (funName, (args, e)) : llvmEnv env})
-
-insEnumEnv :: Identifier -> [Identifier] -> WithEnv ()
-insEnumEnv name enumList =
-  modify (\e -> e {enumEnv = (name, enumList) : enumEnv e})
-
-lookupKind :: Identifier -> WithEnv Identifier
-lookupKind name = do
-  env <- get
-  lookupKind' name $ enumEnv env
-
-lookupKind' :: Identifier -> [(Identifier, [Identifier])] -> WithEnv Identifier
-lookupKind' i [] = throwError $ "no such enum-intro is defined: " ++ i
-lookupKind' i ((j, ls):xs) =
-  if i `elem` ls
-    then return j
-    else lookupKind' i xs
-
-lookupEnumSet :: Identifier -> WithEnv [Identifier]
-lookupEnumSet name = do
-  eenv <- gets enumEnv
-  case lookup name eenv of
-    Nothing -> throwError $ "no such enum defined: " ++ show name
-    Just ls -> return ls
-
-getEnumNum :: Identifier -> WithEnv Int
-getEnumNum label = do
-  ienv <- gets enumEnv
-  case (getEnumNum' label $ map snd ienv) of
-    Nothing -> throwError $ "no such enum is defined: " ++ show label
-    Just i -> return i
-
-getEnumNum' :: Identifier -> [[Identifier]] -> Maybe Int
-getEnumNum' _ [] = Nothing
-getEnumNum' l (xs:xss) =
-  case elemIndex l xs of
-    Nothing -> getEnumNum' l xss
-    Just i -> Just i
-
 isDefinedEnum :: Identifier -> WithEnv Bool
 isDefinedEnum name = do
   env <- get
   let labelList = join $ map snd $ enumEnv env
   return $ name `elem` labelList
-
-isDefinedEnumName :: Identifier -> WithEnv Bool
-isDefinedEnumName name = do
-  env <- get
-  let enumNameList = map fst $ enumEnv env
-  return $ name `elem` enumNameList
-
-insConstraintEnv :: PreTermPlus -> PreTermPlus -> WithEnv ()
-insConstraintEnv t1 t2 =
-  modify (\e -> e {constraintEnv = (t1, t2) : constraintEnv e})
 
 getTarget :: WithEnv Target
 getTarget = do

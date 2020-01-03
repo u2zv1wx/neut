@@ -10,8 +10,6 @@ module Clarify
 
 import Control.Monad.Except
 import Control.Monad.State
-import Data.List
-import Prelude hiding (pi)
 
 import Clarify.Closure
 import Clarify.Sigma
