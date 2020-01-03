@@ -82,15 +82,20 @@ infer ctx (m, WeakTermPiElim e@(_, WeakTermPiIntro xts _) es)
     -- `A == itself @ (A)` cannot be resolved since we don't know how to unfold the
     -- definition of `itself`. This case-split of PiElim is exactly for this purpose.
    = do
-    e' <- infer ctx e
     es' <- mapM (infer ctx) es
+    e' <- infer ctx e
     senv <- gets substEnv
     let defList = zip (map fst xts) es'
     modify (\env -> env {substEnv = defList ++ senv})
     inferPiElim ctx m e' es'
 infer ctx (m, WeakTermPiElim e es) = do
-  e' <- infer ctx e
   es' <- mapM (infer ctx) es
+  -- `es` must be inferred first since inference on `e` might extend the context,
+  -- leading (for example) the type of a constant set to be something like ?M @ (ctx, x).
+  -- This might cause a problem since if we have the same constant in `es`, the type of
+  -- the constant is inferred to be ?M @ (ctx, x), despite the fact that the `x` is not in
+  -- the context of the constant.
+  e' <- infer ctx e
   inferPiElim ctx m e' es'
 infer ctx (m, WeakTermMu (x, t) e) = do
   t' <- inferType ctx t
@@ -101,15 +106,6 @@ infer ctx (m, WeakTermMu (x, t) e) = do
 infer ctx (_, WeakTermZeta _) = do
   h <- newHoleInCtx ctx
   return h
-  -- insWeakTypeEnv x h
-  -- retPreTerm (typeOf h) (toLoc m) (snd h)
-  -- mt <- lookupWeakTypeEnvMaybe x
-  -- case mt of
-  --   Just t -> retPreTerm t (toLoc m) $ PreTermZeta x
-  --   Nothing -> do
-  --     h <- newTypeHoleInCtx ctx
-  --     insWeakTypeEnv x h
-  --     retPreTerm h (toLoc m) $ PreTermZeta x
 infer _ (m, WeakTermIntS size i) = do
   let t = (metaTerminal, PreTermTheta $ "i" ++ show size)
   retPreTerm t (toLoc m) $ PreTermIntS size i
@@ -216,19 +212,7 @@ inferPiIntro ctx ((x, t):xts) e = do
 
 inferPiElim ::
      Context -> WeakMeta -> PreTermPlus -> [PreTermPlus] -> WithEnv PreTermPlus
-inferPiElim ctx m e es
-  -- t' <- reducePreTermPlus $ typeOf e
-  -- -- この場合分けをしても別に解けるものが増えるわけではないらしい
-  -- case t' of
-  --   (_, PreTermPi xts cod) -> do
-  --     let (xs, ts) = unzip xts
-  --     p "shortcut"
-  --     let ts' = map (substPreTermPlus (zip xs es)) ts
-  --     forM_ (zip ts' (map typeOf es)) $ uncurry insConstraintEnv
-  --     let cod' = substPreTermPlus (zip xs es) cod
-  --     retPreTerm cod' (toLoc m) $ PreTermPiElim e es
-  --   _ -> do
- = do
+inferPiElim ctx m e es = do
   ys <- mapM (const $ newNameWith "arg") es
   -- yts = [y1 : ?M1 @ (ctx[0], ..., ctx[n]),
   --        y2 : ?M2 @ (ctx[0], ..., ctx[n], y1),
