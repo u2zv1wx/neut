@@ -35,12 +35,6 @@ withHeader [] e = return e
 withHeader ((x, t):xts) e = do
   e' <- withHeader xts e
   (ys, e'') <- distinguishCode x e'
-  -- 素朴には、ここでt' <- renameCode tのようにしてtのなかの束縛変数をrenameしてしまうという
-  -- 手が考えられる（LLVM IRがshadowingを許してくれないがためのアレ）。
-  -- 計算コストがかかるってのが難点。
-  -- ……いや、Clarifyが終わったあとで一回だけrenameを通せば済む話か。ここは放置にしといて。
-  -- Clarify.clarifyをclarify'にして、んでclarifyのほうではclarify'をおこなった上でrenameCodeをしたものを
-  -- 返す、みたいにすればいいんじゃないかしら。parseでもelaborateでもllvmでもこのパターン使ってるし、いいんじゃない？
   case ys of
     [] -> withHeaderAffine x t e''
     [z] -> withHeaderLinear z x e''
@@ -184,7 +178,6 @@ distinguishCode z (ml, CodeSigmaElim xts d e) = do
     then return (vs1, (ml, CodeSigmaElim xts d' e))
     else do
       (vs2, e') <- distinguishCode z e
-      -- このときはxtsの要素のそれぞれについてeをdistinguishする必要があるはず？
       return (vs1 ++ vs2, (ml, CodeSigmaElim xts d' e'))
 distinguishCode z (ml, CodeUpIntro d) = do
   (vs, d') <- distinguishData z d
