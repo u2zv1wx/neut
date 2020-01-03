@@ -126,7 +126,7 @@ llvmCodeTheta _ (ThetaSysCall num args) = do
   res <- newNameWith "result"
   num' <- sysCallNumAsInt num
   llvmDataLet' (zip xs args) $
-    LLVMLet res (LLVMOpSysCall $ num' : vs) $ LLVMReturn (LLVMDataLocal res)
+    LLVMLet res (LLVMOpSysCall num' vs) $ LLVMReturn (LLVMDataLocal res)
 
 llvmCodeUnaryOp :: UnaryOp -> LowType -> LowType -> DataPlus -> WithEnv LLVM
 llvmCodeUnaryOp op domType codType d = do
@@ -276,16 +276,16 @@ enumValueToInteger labelOrNat =
     EnumValueLabel l -> toInteger <$> getEnumNum l
     EnumValueNatNum _ j -> return $ toInteger j
 
-sysCallNumAsInt :: SysCall -> WithEnv LLVMData
+sysCallNumAsInt :: SysCall -> WithEnv Integer
 sysCallNumAsInt num = do
   targetOS <- getOS
   case targetOS of
     OSLinux ->
       case num of
-        SysCallWrite -> return $ LLVMDataInt 1
+        SysCallWrite -> return 1
     OSDarwin ->
       case num of
-        SysCallWrite -> return $ LLVMDataInt 0x2000004
+        SysCallWrite -> return 0x2000004
 
 llvmDataLet' :: [(Identifier, DataPlus)] -> LLVM -> WithEnv LLVM
 llvmDataLet' [] cont = return cont

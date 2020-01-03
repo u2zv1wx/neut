@@ -40,7 +40,9 @@ data LLVMOp
   | LLVMOpFree LLVMData
   | LLVMOpUnaryOp (UnaryOp, LowType) LLVMData
   | LLVMOpBinaryOp (BinaryOp, LowType) LLVMData LLVMData
-  | LLVMOpSysCall [LLVMData]
+  | LLVMOpSysCall
+      Integer -- syscall number
+      [LLVMData] -- arguments
   deriving (Show)
 
 data AllocSize

@@ -120,8 +120,8 @@ emitLLVMOp (LLVMOpAlloc d) = do
   return $ unwords ["call", "i8*", "@malloc(i64 " ++ showLLVMData d ++ ")"]
 emitLLVMOp (LLVMOpFree d) = do
   return $ unwords ["call", "void", "@free(i8* " ++ showLLVMData d ++ ")"]
-emitLLVMOp (LLVMOpSysCall ds) = do
-  emitSysCallOp ds
+emitLLVMOp (LLVMOpSysCall num ds) = do
+  emitSysCallOp num ds
 emitLLVMOp (LLVMOpUnaryOp (UnaryOpNeg, t@(LowTypeFloat _)) d) = do
   emitUnaryOp t "fneg" d
 emitLLVMOp (LLVMOpUnaryOp ((UnaryOpTrunc t2@(LowTypeIntS i2)), t1@(LowTypeIntS i1)) d)
@@ -255,23 +255,16 @@ emitLLVMConvOp cast d dom cod = do
     unwords [cast, showLowType dom, showLLVMData d, "to", showLowType cod]
 
 -- call i64 asm sideeffect "syscall", "=r,{rax},{rdi},{rsi},{rdx}" (i64 %raxArg, i64 %rdiArg, i64 %rsiArg, i64 %rdxArg)
-emitSysCallOp :: [LLVMData] -> WithEnv String
-emitSysCallOp ds = do
+emitSysCallOp :: Integer -> [LLVMData] -> WithEnv String
+emitSysCallOp num ds = do
   regList <- getRegList
   currentArch <- getArch
   case currentArch of
     Arch64 -> do
-      let regStr = "\"=r," ++ showRegList (take (length ds) regList) ++ "\""
-      let argStr = "(" ++ showDataListWithType voidPtr ds ++ ")"
-      return $
-        unwords
-          [ "call i8* asm sideeffect \"syscall\","
-          , regStr -- fixme: syscall numberのところはi8*じゃなくてi64にしないとだめ
-          , argStr
-          -- , "\" ("
-          -- , showDataListWithType voidPtr ds
-          -- , ")"
-          ]
+      let args = (LLVMDataInt num, LowTypeIntS 64) : zip ds (repeat voidPtr)
+      let argStr = "(" ++ showIndex args ++ ")"
+      let regStr = "\"=r," ++ showRegList (take (length args) regList) ++ "\""
+      return $ unwords ["call i8* asm sideeffect \"syscall\",", regStr, argStr]
 
 emitOp :: String -> WithEnv [String]
 emitOp s = return ["  " ++ s]
@@ -299,9 +292,8 @@ showBranchList :: LowType -> [(Int, String)] -> String
 showBranchList lowType xs =
   "[" ++ showItems (uncurry (showBranch lowType)) xs ++ "]"
 
-showDataListWithType :: LowType -> [LLVMData] -> String
-showDataListWithType t ds = showIndex $ zip ds (repeat t)
-
+-- showDataListWithType :: LowType -> [LLVMData] -> String
+-- showDataListWithType t ds = showIndex $ zip ds (repeat t)
 showIndex :: [(LLVMData, LowType)] -> String
 showIndex [] = ""
 showIndex [(d, t)] = showLowType t ++ " " ++ showLLVMData d
