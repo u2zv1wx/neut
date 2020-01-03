@@ -1,9 +1,6 @@
--- This module "clarifies" a neutral term into a negative term. Operationally,
--- this corresponds to determination of the order of evaluation. In proof-theoretic
--- term, we translate a ordinary dependent calculus to a dependent variant of
--- Call-By-Push-Value. A detailed explanation of Call-By-Push-Value can be found
--- in P. Levy, "Call-by-Push-Value: A Subsuming Paradigm". Ph. D. thesis,
--- Queen Mary College, 2001.
+--
+-- clarification == polarization + closure conversion + linearization
+--
 module Clarify
   ( clarify
   ) where
@@ -39,12 +36,12 @@ clarify lam@(m, TermPiIntro xts e) = do
 clarify (m, TermPiElim e es) = do
   e' <- clarify e
   callClosure' m e' es
-clarify (m, TermMu (f, _) e) = do
-  fvs <- obtainFreeVarList [f] e -- fの型は使用しないので無視でオーケー
+clarify mu@(m, TermMu (f, _) e) = do
+  fvs <- varTermPlus mu
   let fvs' = map (toTermUpsilon . fst) fvs
-  let lamBody = substTermPlus [(f, (m, TermPiElim (m, TermTheta f) fvs'))] e
-  lamBody' <- clarify lamBody
-  cls <- makeClosure' (Just f) [] m fvs lamBody'
+  let e' = substTermPlus [(f, (m, TermPiElim (m, TermTheta f) fvs'))] e
+  e'' <- clarify e'
+  cls <- makeClosure' (Just f) [] m fvs e''
   callClosure' m cls fvs'
 clarify (m, TermIntS size l) = do
   return (m, CodeUpIntro (m, DataIntS size l))
@@ -137,16 +134,6 @@ clarifyTheta m name = do
     -- muで導入されたthetaに由来するものもここにくる。
     -- たぶんたんにreturn (DataTheta f)とすればよい。
     Nothing -> throwError $ "clarify.theta: " ++ name
-
--- {enum.top, enum.choice, etc.} ~> {(the number of contents in enum)}
-asEnumConstant :: Identifier -> WithEnv (Maybe Integer)
-asEnumConstant x
-  | ["enum", y] <- wordsBy '.' x = do
-    eenv <- gets enumEnv
-    case lookup y eenv of
-      Nothing -> return Nothing
-      Just ls -> return $ Just $ toInteger $ length ls
-asEnumConstant _ = return Nothing
 
 clarifyUnaryOp :: Identifier -> UnaryOp -> LowType -> Meta -> WithEnv CodePlus
 clarifyUnaryOp name op lowType m = do
@@ -282,6 +269,16 @@ complementaryChainOf xts = do
 toVar :: Identifier -> DataPlus
 toVar x = (emptyMeta, DataUpsilon x)
 
+-- {enum.top, enum.choice, etc.} ~> {(the number of contents in enum)}
+asEnumConstant :: Identifier -> WithEnv (Maybe Integer)
+asEnumConstant x
+  | ["enum", y] <- wordsBy '.' x = do
+    eenv <- gets enumEnv
+    case lookup y eenv of
+      Nothing -> return Nothing
+      Just ls -> return $ Just $ toInteger $ length ls
+asEnumConstant _ = return Nothing
+
 makeClosure' ::
      Maybe Identifier -- the name of newly created closure
   -> [(Identifier, TermPlus)] -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
@@ -301,9 +298,3 @@ callClosure' :: Meta -> CodePlus -> [TermPlus] -> WithEnv CodePlus
 callClosure' m e es = do
   tmp <- mapM clarifyPlus es
   callClosure m e tmp
-
-obtainFreeVarList ::
-     [Identifier] -> TermPlus -> WithEnv [(Identifier, TermPlus)]
-obtainFreeVarList xs e = do
-  tmp <- varTermPlus e
-  return $ filter (\(x, _) -> x `notElem` xs) $ tmp
