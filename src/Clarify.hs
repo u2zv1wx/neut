@@ -70,7 +70,7 @@ clarify (m, TermEnumIntro l) = do
 clarify (m, TermEnumElim e bs) = do
   let (cs, es) = unzip bs
   es' <- mapM clarify es
-  (yName, e', y) <- clarify' e
+  (yName, e', y) <- clarifyPlus e
   return $ bindLet [(yName, e')] (m, CodeEnumElim y (zip cs es'))
 clarify (m, TermArray _ _) = do
   returnArrayType m
@@ -82,7 +82,7 @@ clarify (m, TermArrayIntro k les) = do
   arrayType <-
     cartesianSigma name m $ map Left $ replicate (length les) retKindType
   let (ls, es) = unzip les
-  (zs, es', xs) <- unzip3 <$> mapM clarify' es
+  (zs, es', xs) <- unzip3 <$> mapM clarifyPlus es
   return $
     bindLet (zip zs es') $
     ( m
@@ -113,8 +113,8 @@ clarify (m, TermArrayElim k e1 e2) = do
             contentTypeVar
             (m, CodeArrayElim k contentVar idxVar)))
 
-clarify' :: TermPlus -> WithEnv (Identifier, CodePlus, DataPlus)
-clarify' e@(m, _) = do
+clarifyPlus :: TermPlus -> WithEnv (Identifier, CodePlus, DataPlus)
+clarifyPlus e@(m, _) = do
   e' <- clarify e
   (varName, var) <- newDataUpsilonWith' "var" m
   return (varName, e', var)
@@ -266,11 +266,29 @@ clarifySysCall name sysCall argLen argIdxList m = do
     (_, TermPi xts _)
       | length xts == argLen -> do
         let ys = map (\i -> toVar $ fst $ xts !! i) argIdxList
+        -- p "syscall"
+        -- p "name:"
+        -- p' name
+        -- p "args (default):"
+        -- p' xts
+        -- p "choice:"
+        -- p' argIdxList
+        -- p "chosen args:"
+        -- p' ys
+        -- pi-introのときと同じように、fvsをとったうえでmakeClosureにあたえる必要がある
+        -- （つまりxtsはclosed chainとは限らないので適切なcompletionが必要。でないとtを使用したときに自由変数が絡んでしまうことになる）
+        -- clarify lam@(m, TermPiIntro xts e) = do
+        -- fvs <- varTermPlus lam
+        -- let (freeVarNameList, freeVarTypeList) = unzip fvs
+        -- negTypeList <- mapM clarify freeVarTypeList
+        -- let fvs' = zip freeVarNameList negTypeList
+        -- e' <- clarify e
+        -- makeClosure' Nothing fvs' m xts e'
         makeClosure'
           (Just name)
           []
           m
-          xts
+          xts -- ここはおかしいな？いや、引数じたいはふつうにxtsでとっていいのか。……xtsをclosed chainにする必要があるんでは。
           (m, CodeTheta (ThetaSysCall sysCall ys))
     _ -> throwError $ "the type of " ++ name ++ " is wrong"
 
@@ -291,7 +309,7 @@ makeClosure' mName fvs m xts e = do
 
 callClosure' :: Meta -> CodePlus -> [TermPlus] -> WithEnv CodePlus
 callClosure' m e es = do
-  tmp <- mapM clarify' es
+  tmp <- mapM clarifyPlus es
   callClosure m e tmp
 
 obtainFreeVarList ::

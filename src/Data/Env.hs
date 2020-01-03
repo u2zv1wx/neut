@@ -127,10 +127,6 @@ insWeakTypeEnv :: Identifier -> PreTermPlus -> WithEnv ()
 insWeakTypeEnv i t =
   modify (\e -> e {weakTypeEnv = Map.insert i t (weakTypeEnv e)})
 
-insCodeEnv :: Identifier -> [Identifier] -> CodePlus -> WithEnv ()
-insCodeEnv name args e =
-  modify (\env -> env {codeEnv = (name, (args, e)) : codeEnv env})
-
 insLLVMEnv :: Identifier -> [Identifier] -> LLVM -> WithEnv ()
 insLLVMEnv funName args e =
   modify (\env -> env {llvmEnv = (funName, (args, e)) : llvmEnv env})

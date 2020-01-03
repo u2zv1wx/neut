@@ -14,18 +14,16 @@ import Data.LLVM
 toLLVM :: CodePlus -> WithEnv LLVM
 toLLVM mainTerm = do
   penv <- gets codeEnv
-  -- p' penv
   forM_ penv $ \(name, (args, e)) -> do
     llvm <- llvmCode e
     insLLVMEnv name args llvm
   l <- llvmCode mainTerm
-  (result, resultVar) <- newDataLocal "result"
-  (cast, castVar) <- newDataLocal "cast-result"
-  let intType = LowTypeIntS 64
-  return $
-    commConv result l $
-    LLVMLet cast (LLVMOpPointerToInt resultVar voidPtr intType) $
-    LLVMReturn castVar
+  -- the result of "main" must be i64, not i8*
+  (result, resultVar) <- newDataUpsilonWith "result"
+  (cast, castThen) <- llvmCast (Just "cast") resultVar (LowTypeIntS 64)
+  castResult <- castThen (LLVMReturn cast)
+  -- let result: i8* := (main-term) in {cast result to i64}
+  return $ commConv result l $ castResult
 
 llvmCode :: CodePlus -> WithEnv LLVM
 llvmCode (m, CodeTheta theta) = llvmCodeTheta m theta

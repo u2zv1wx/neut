@@ -238,3 +238,11 @@ local comp = do
   x <- comp
   modify (\e -> env {count = count e})
   return x
+
+insCodeEnv :: Identifier -> [Identifier] -> CodePlus -> WithEnv ()
+insCodeEnv name args e = do
+  args' <- mapM newNameWith args
+  e' <- renameCode e
+  -- Since LLVM doesn't allow variable shadowing, we must explicitly
+  -- rename variables here.
+  modify (\env -> env {codeEnv = (name, (args', e')) : codeEnv env})

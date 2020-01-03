@@ -260,15 +260,18 @@ emitSysCallOp ds = do
   regList <- getRegList
   currentArch <- getArch
   case currentArch of
-    Arch64 ->
+    Arch64 -> do
+      let regStr = "\"=r," ++ showRegList (take (length ds) regList) ++ "\""
+      let argStr = "(" ++ showDataListWithType voidPtr ds ++ ")"
       return $
-      unwords
-        [ "call i8* asm sideeffect \"syscall\" \"=r,"
-        , showRegList $ take (length ds) regList
-        , "\" ("
-        , showDataListWithType voidPtr ds
-        , ")"
-        ]
+        unwords
+          [ "call i8* asm sideeffect \"syscall\","
+          , regStr -- fixme: syscall numberのところはi8*じゃなくてi64にしないとだめ
+          , argStr
+          -- , "\" ("
+          -- , showDataListWithType voidPtr ds
+          -- , ")"
+          ]
 
 emitOp :: String -> WithEnv [String]
 emitOp s = return ["  " ++ s]
