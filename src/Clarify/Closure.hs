@@ -39,19 +39,12 @@ makeClosure mName fvs m xts e = do
     case mName of
       Just lamThetaName -> return lamThetaName
       Nothing -> newNameWith "thunk"
-  -- when (name == "thunk-374") $ do
-  -- p' name
-  -- p "args:"
-  -- let (ys, ss) = unzip xts
-  -- ss' <- mapM reduceCodePlus ss
-  -- -- p' xts
-  -- p' $ zip ys ss'
-  -- p "fvs:"
-  -- p' freeVarNameList
-  -- p "body-orig:"
-  -- p' (m, CodeSigmaElim fvInfo envVar e)
-  -- p "body:"
-  -- p' body
+  -- when (name == "unsafe.write") $ do
+  --   p "unsafe.write"
+  --   p "args:"
+  --   p' $ envVarName : map fst xts
+  --   p "body:"
+  --   p' body
   cenv <- gets codeEnv
   when (name `notElem` map fst cenv) $
     insCodeEnv name (envVarName : map fst xts) body

@@ -184,7 +184,9 @@ renameData (m, DataArrayIntro kind les) = do
   return (m, DataArrayIntro kind les')
 
 renameCode :: CodePlus -> WithEnv CodePlus
-renameCode (m, CodeTheta x) = return (m, CodeTheta x)
+renameCode (m, CodeTheta theta) = do
+  theta' <- renameTheta theta
+  return (m, CodeTheta theta')
 renameCode (m, CodePiElimDownElim v vs) = do
   v' <- renameData v
   vs' <- mapM renameData vs
@@ -231,6 +233,18 @@ renameCaseList les =
     local $ do
       body' <- renameCode body
       return (l, body')
+
+renameTheta :: Theta -> WithEnv Theta
+renameTheta (ThetaUnaryOp op t d) = do
+  d' <- renameData d
+  return $ ThetaUnaryOp op t d'
+renameTheta (ThetaBinaryOp op t d1 d2) = do
+  d1' <- renameData d1
+  d2' <- renameData d2
+  return $ ThetaBinaryOp op t d1' d2'
+renameTheta (ThetaSysCall c ds) = do
+  ds' <- mapM renameData ds
+  return $ ThetaSysCall c ds'
 
 local :: WithEnv a -> WithEnv a
 local comp = do

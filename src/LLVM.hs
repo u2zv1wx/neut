@@ -15,6 +15,12 @@ toLLVM :: CodePlus -> WithEnv LLVM
 toLLVM mainTerm = do
   penv <- gets codeEnv
   forM_ penv $ \(name, (args, e)) -> do
+    when (name == "unsafe.write") $ do
+      p "unsafe.write"
+      p "args:"
+      p' $ args
+      p "body:"
+      p' e
     llvm <- llvmCode e
     insLLVMEnv name args llvm
   l <- llvmCode mainTerm
