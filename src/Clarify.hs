@@ -10,6 +10,7 @@ module Clarify
 
 import Control.Monad.Except
 import Control.Monad.State
+import Data.List (nubBy)
 
 import Clarify.Closure
 import Clarify.Sigma
@@ -33,18 +34,13 @@ clarify (m, TermPi _ _) = do
   returnClosureType m
 clarify lam@(m, TermPiIntro xts e) = do
   fvs <- varTermPlus lam
-  let (freeVarNameList, freeVarTypeList) = unzip fvs
-  negTypeList <- mapM clarify freeVarTypeList
-  let fvs' = zip freeVarNameList negTypeList
   e' <- clarify e
-  makeClosure' Nothing fvs' m xts e'
+  makeClosure' Nothing fvs m xts e'
 clarify (m, TermPiElim e es) = do
   e' <- clarify e
   callClosure' m e' es
 clarify (m, TermMu (f, _) e) = do
-  tmp <- obtainFreeVarList [f] e -- fの型は使用しないので無視でオーケー
-  let (nameList, typeList) = unzip tmp
-  let fvs = zip nameList typeList
+  fvs <- obtainFreeVarList [f] e -- fの型は使用しないので無視でオーケー
   let fvs' = map (toTermUpsilon . fst) fvs
   let lamBody = substTermPlus [(f, (m, TermPiElim (m, TermTheta f) fvs'))] e
   lamBody' <- clarify lamBody
@@ -157,11 +153,12 @@ clarifyUnaryOp name op lowType m = do
   t <- lookupTypeEnv name
   t' <- reduceTermPlus t
   case t' of
-    (_, TermPi [(x, tx)] _) -> do
+    (_, TermPi xts@[(x, tx)] _) -> do
       let varX = toDataUpsilon (x, emptyMeta)
+      zts <- complementaryChainOf xts
       makeClosure'
         (Just name)
-        []
+        zts
         m
         [(x, tx)]
         (m, CodeTheta (ThetaUnaryOp op lowType varX))
@@ -172,12 +169,13 @@ clarifyBinaryOp name op lowType m = do
   t <- lookupTypeEnv name
   t' <- reduceTermPlus t
   case t' of
-    (_, TermPi [(x, tx), (y, ty)] _) -> do
+    (_, TermPi xts@[(x, tx), (y, ty)] _) -> do
       let varX = toDataUpsilon (x, emptyMeta)
       let varY = toDataUpsilon (y, emptyMeta)
+      zts <- complementaryChainOf xts
       makeClosure'
         (Just name)
-        []
+        zts
         m
         [(x, tx), (y, ty)]
         (m, CodeTheta (ThetaBinaryOp op lowType varX varY))
@@ -188,15 +186,16 @@ clarifyIsEnum m = do
   t <- lookupTypeEnv "is-enum"
   t' <- reduceTermPlus t
   case t' of
-    (_, TermPi [(x, tx)] _) -> do
+    (_, TermPi xts@[(x, tx)] _) -> do
       v <- cartesianImmediate m
       let varX = toDataUpsilon (x, emptyMeta)
       aff <- newNameWith "aff"
       rel <- newNameWith "rel"
       retImmType <- returnCartesianImmediate
+      zts <- complementaryChainOf xts
       makeClosure'
         (Just "is-enum")
-        []
+        zts
         m
         [(x, tx)]
         ( m
@@ -217,7 +216,7 @@ clarifyEvalIO m = do
   t <- lookupTypeEnv "unsafe.eval-io"
   t' <- reduceTermPlus t
   case t' of
-    (_, TermPi [arg] _) -> do
+    (_, TermPi xts@[arg] _) -> do
       (resultValue, resultValueVar) <- newDataUpsilonWith "result"
       (sig, sigVar) <- newDataUpsilonWith "eval-io-sig"
       resultEnv <- newNameWith "env"
@@ -225,9 +224,10 @@ clarifyEvalIO m = do
       -- IO Top == Top -> (Bottom, Top)
       evalArgWithZero <- callClosure' m arg' [toTermInt64 0]
       retImmType <- returnCartesianImmediate
+      zts <- complementaryChainOf xts
       makeClosure'
         (Just "unsafe.eval-io")
-        []
+        zts
         m
         [arg]
         ( m
@@ -264,46 +264,38 @@ clarifySysCall name sysCall argLen argIdxList m = do
     (_, TermPi xts _)
       | length xts == argLen -> do
         let ys = map (\i -> toVar $ fst $ xts !! i) argIdxList
-        -- p "syscall"
-        -- p "name:"
-        -- p' name
-        -- p "args (default):"
-        -- p' xts
-        -- p "choice:"
-        -- p' argIdxList
-        -- p "chosen args:"
-        -- p' ys
-        -- pi-introのときと同じように、fvsをとったうえでmakeClosureにあたえる必要がある
-        -- （つまりxtsはclosed chainとは限らないので適切なcompletionが必要。でないとtを使用したときに自由変数が絡んでしまうことになる）
-        -- clarify lam@(m, TermPiIntro xts e) = do
-        -- fvs <- varTermPlus lam
-        -- let (freeVarNameList, freeVarTypeList) = unzip fvs
-        -- negTypeList <- mapM clarify freeVarTypeList
-        -- let fvs' = zip freeVarNameList negTypeList
-        -- e' <- clarify e
-        -- makeClosure' Nothing fvs' m xts e'
+        zts <- complementaryChainOf xts
         makeClosure'
           (Just name)
-          []
+          zts
           m
-          xts -- ここはおかしいな？いや、引数じたいはふつうにxtsでとっていいのか。……xtsをclosed chainにする必要があるんでは。
+          xts
           (m, CodeTheta (ThetaSysCall sysCall ys))
     _ -> throwError $ "the type of " ++ name ++ " is wrong"
+
+complementaryChainOf ::
+     [(Identifier, TermPlus)] -> WithEnv [(Identifier, TermPlus)]
+complementaryChainOf xts = do
+  zts <- getClosedChainBindings xts []
+  return $ nubBy (\(x, _) (y, _) -> x == y) zts
 
 toVar :: Identifier -> DataPlus
 toVar x = (emptyMeta, DataUpsilon x)
 
 makeClosure' ::
      Maybe Identifier -- the name of newly created closure
-  -> [(Identifier, CodePlus)] -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
+  -> [(Identifier, TermPlus)] -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
   -> Meta -- meta of lambda
   -> [(Identifier, TermPlus)] -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
   -> CodePlus -- the `e` in `lam (x1, ..., xn). e`
   -> WithEnv CodePlus
 makeClosure' mName fvs m xts e = do
+  let (ys, ws) = unzip fvs
+  ws' <- mapM clarify ws
+  let fvs' = zip ys ws'
   let (xs, ts) = unzip xts
   ts' <- mapM clarify ts
-  makeClosure mName fvs m (zip xs ts') e
+  makeClosure mName fvs' m (zip xs ts') e
 
 callClosure' :: Meta -> CodePlus -> [TermPlus] -> WithEnv CodePlus
 callClosure' m e es = do

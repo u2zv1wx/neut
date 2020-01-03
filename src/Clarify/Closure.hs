@@ -2,6 +2,7 @@ module Clarify.Closure
   ( makeClosure
   , callClosure
   , varTermPlus
+  , getClosedChainBindings
   ) where
 
 import Control.Monad.Except
@@ -89,48 +90,48 @@ callClosure m e zexes = do
 
 varTermPlus :: TermPlus -> WithEnv [(Identifier, TermPlus)]
 varTermPlus e = do
-  tmp <- getClosedVarChain e
+  tmp <- getClosedChain e
   return $ nubBy (\(x, _) (y, _) -> x == y) tmp
 
-getClosedVarChain :: TermPlus -> WithEnv [(Identifier, TermPlus)]
-getClosedVarChain (_, TermTau) = return []
-getClosedVarChain (_, TermTheta _) = return []
-getClosedVarChain (_, TermUpsilon x) = do
+getClosedChain :: TermPlus -> WithEnv [(Identifier, TermPlus)]
+getClosedChain (_, TermTau) = return []
+getClosedChain (_, TermTheta _) = return []
+getClosedChain (_, TermUpsilon x) = do
   t <- lookupTypeEnv x
-  xs <- getClosedVarChain t
+  xs <- getClosedChain t
   return $ xs ++ [(x, t)]
-getClosedVarChain (_, TermPi xts t) = getClosedVarChainBindings xts [t]
-getClosedVarChain (_, TermPiIntro xts e) = getClosedVarChainBindings xts [e]
-getClosedVarChain (_, TermPiElim e es) = do
-  xs1 <- getClosedVarChain e
-  xs2 <- concat <$> mapM getClosedVarChain es
+getClosedChain (_, TermPi xts t) = getClosedChainBindings xts [t]
+getClosedChain (_, TermPiIntro xts e) = getClosedChainBindings xts [e]
+getClosedChain (_, TermPiElim e es) = do
+  xs1 <- getClosedChain e
+  xs2 <- concat <$> mapM getClosedChain es
   return $ xs1 ++ xs2
-getClosedVarChain (_, TermMu ut e) = getClosedVarChainBindings [ut] [e]
-getClosedVarChain (_, TermIntS _ _) = return []
-getClosedVarChain (_, TermIntU _ _) = return []
-getClosedVarChain (_, TermFloat16 _) = return []
-getClosedVarChain (_, TermFloat32 _) = return []
-getClosedVarChain (_, TermFloat64 _) = return []
-getClosedVarChain (_, TermEnum _) = return []
-getClosedVarChain (_, TermEnumIntro _) = return []
-getClosedVarChain (_, TermEnumElim e les) = do
-  xs1 <- getClosedVarChain e
+getClosedChain (_, TermMu ut e) = getClosedChainBindings [ut] [e]
+getClosedChain (_, TermIntS _ _) = return []
+getClosedChain (_, TermIntU _ _) = return []
+getClosedChain (_, TermFloat16 _) = return []
+getClosedChain (_, TermFloat32 _) = return []
+getClosedChain (_, TermFloat64 _) = return []
+getClosedChain (_, TermEnum _) = return []
+getClosedChain (_, TermEnumIntro _) = return []
+getClosedChain (_, TermEnumElim e les) = do
+  xs1 <- getClosedChain e
   let es = map snd les
-  xs2 <- concat <$> mapM getClosedVarChain es
+  xs2 <- concat <$> mapM getClosedChain es
   return $ xs1 ++ xs2
-getClosedVarChain (_, TermArray _ indexType) = getClosedVarChain indexType
-getClosedVarChain (_, TermArrayIntro _ les) = do
+getClosedChain (_, TermArray _ indexType) = getClosedChain indexType
+getClosedChain (_, TermArrayIntro _ les) = do
   let es = map snd les
-  concat <$> mapM getClosedVarChain es
-getClosedVarChain (_, TermArrayElim _ e1 e2) = do
-  xs1 <- getClosedVarChain e1
-  xs2 <- getClosedVarChain e2
+  concat <$> mapM getClosedChain es
+getClosedChain (_, TermArrayElim _ e1 e2) = do
+  xs1 <- getClosedChain e1
+  xs2 <- getClosedChain e2
   return $ xs1 ++ xs2
 
-getClosedVarChainBindings ::
+getClosedChainBindings ::
      [(Identifier, TermPlus)] -> [TermPlus] -> WithEnv [(Identifier, TermPlus)]
-getClosedVarChainBindings [] es = concat <$> mapM getClosedVarChain es
-getClosedVarChainBindings ((x, t):xts) es = do
-  xs1 <- getClosedVarChain t
-  xs2 <- getClosedVarChainBindings xts es
+getClosedChainBindings [] es = concat <$> mapM getClosedChain es
+getClosedChainBindings ((x, t):xts) es = do
+  xs1 <- getClosedChain t
+  xs2 <- getClosedChainBindings xts es
   return $ xs1 ++ filter (\(y, _) -> y /= x) xs2
