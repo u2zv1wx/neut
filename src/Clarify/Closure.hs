@@ -17,6 +17,8 @@ import Data.Code
 import Data.Env
 import Data.Term
 
+import qualified Data.Map.Strict as Map
+
 makeClosure ::
      Maybe Identifier -- the name of newly created closure
   -> [(Identifier, CodePlus)] -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
@@ -24,34 +26,19 @@ makeClosure ::
   -> [(Identifier, CodePlus)] -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
   -> CodePlus -- the `e` in `lam (x1, ..., xn). e`
   -> WithEnv CodePlus
-makeClosure mName fvs m xts e = do
-  let (freeVarNameList, negTypeList) = unzip fvs
+makeClosure mName xts2 m xts1 e = do
   expName <- newNameWith "exp"
-  envExp <-
-    cartesianSigma expName m $ map Right $ zip freeVarNameList negTypeList
+  envExp <- cartesianSigma expName m $ map Right xts2
   (envVarName, envVar) <- newDataUpsilonWith "env"
-  let fvInfo = zip freeVarNameList negTypeList
-  e' <- linearize (fvs ++ xts) e
-  -- body <- linearize xts $ (m, CodeSigmaElim fvInfo envVar e)
-  let body = (m, CodeSigmaElim fvInfo envVar e')
-  let fvSigmaIntro = (m, DataSigmaIntro $ map toDataUpsilon' freeVarNameList)
-  name <-
-    case mName of
-      Just lamThetaName -> return lamThetaName
-      Nothing -> newNameWith "thunk"
-  -- when (name == "unsafe.write") $ do
-  --   p "unsafe.write"
-  --   p "args:"
-  --   p' $ envVarName : map fst xts
-  --   p "body:"
-  --   p' body
+  e' <- linearize (xts2 ++ xts1) e
   cenv <- gets codeEnv
-  when (name `notElem` map fst cenv) $
-    insCodeEnv name (envVarName : map fst xts) body
-  return $
-    ( m
-    , CodeUpIntro
-        (m, DataSigmaIntro [envExp, fvSigmaIntro, (m, DataTheta name)]))
+  name <- nameFromMaybe mName
+  let args = envVarName : map fst xts1
+  let body = (m, CodeSigmaElim xts2 envVar e')
+  when (name `notElem` map fst cenv) $ insCodeEnv name args body
+  let fvEnv = (m, DataSigmaIntro $ map (toDataUpsilon' . fst) xts2)
+  let cls = (m, DataSigmaIntro [envExp, fvEnv, (m, DataTheta name)])
+  return (m, CodeUpIntro cls)
 
 callClosure ::
      Meta -> CodePlus -> [(Identifier, CodePlus, DataPlus)] -> WithEnv CodePlus
@@ -81,6 +68,12 @@ callClosure m e zexes = do
               typeVar
               (m, CodePiElimDownElim lamVar (envVar : xs))))
 
+nameFromMaybe :: Maybe Identifier -> WithEnv Identifier
+nameFromMaybe mName =
+  case mName of
+    Just lamThetaName -> return lamThetaName
+    Nothing -> newNameWith "thunk"
+
 varTermPlus :: TermPlus -> WithEnv [(Identifier, TermPlus)]
 varTermPlus e = do
   tmp <- getClosedChain e
@@ -88,11 +81,24 @@ varTermPlus e = do
 
 getClosedChain :: TermPlus -> WithEnv [(Identifier, TermPlus)]
 getClosedChain (_, TermTau) = return []
-getClosedChain (_, TermTheta _) = return []
+getClosedChain (_, TermTheta z) = do
+  cenv <- gets chainEnv
+  t <- lookupTypeEnv z
+  case Map.lookup z cenv of
+    Just xts -> return xts
+    Nothing -> do
+      xts <- getClosedChain t
+      modify (\env -> env {chainEnv = Map.insert z xts cenv})
+      return xts
 getClosedChain (_, TermUpsilon x) = do
+  cenv <- gets chainEnv
   t <- lookupTypeEnv x
-  xs <- getClosedChain t
-  return $ xs ++ [(x, t)]
+  case Map.lookup x cenv of
+    Just xts -> return $ xts ++ [(x, t)]
+    Nothing -> do
+      xts <- getClosedChain t
+      modify (\env -> env {chainEnv = Map.insert x xts cenv})
+      return $ xts ++ [(x, t)]
 getClosedChain (_, TermPi xts t) = getClosedChainBindings xts [t]
 getClosedChain (_, TermPiIntro xts e) = getClosedChainBindings xts [e]
 getClosedChain (_, TermPiElim e es) = do
