@@ -184,19 +184,6 @@ insConstraintEnv :: PreTermPlus -> PreTermPlus -> WithEnv ()
 insConstraintEnv t1 t2 =
   modify (\e -> e {constraintEnv = (t1, t2) : constraintEnv e})
 
--- wrap :: a -> WithEnv (WeakMeta, a)
--- wrap a = do
---   meta <- newMeta
---   return (meta, a)
--- newHoleOfType :: WeakTermPlus -> WithEnv WeakTermPlus
--- newHoleOfType t = do
---   h <- newNameWith "hole"
---   m <- newMetaOfType t
---   return (m, WeakTermZeta h)
--- newMetaOfType :: WeakTermPlus -> WithEnv WeakMeta
--- newMetaOfType t = do
---   ref <- newWeakTermRef $ Just t
---   return $ WeakMetaNonTerminal ref Nothing
 getTarget :: WithEnv Target
 getTarget = do
   mtarget <- gets target
