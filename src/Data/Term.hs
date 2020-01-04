@@ -7,12 +7,12 @@ import Data.Basic
 
 data Term
   = TermTau
-  | TermTheta Identifier
   | TermUpsilon Identifier
   | TermPi [IdentifierPlus] TermPlus
   | TermPiIntro [IdentifierPlus] TermPlus
   | TermPiElim TermPlus [TermPlus]
   | TermMu (Identifier, TermPlus) TermPlus
+  | TermTheta [IdentifierPlus] TermPlus
   | TermIntS IntSize Integer
   | TermIntU IntSize Integer
   | TermFloat16 Half
@@ -43,7 +43,6 @@ toTermInt64 i = (emptyMeta, TermIntS 64 i)
 
 substTermPlus :: SubstTerm -> TermPlus -> TermPlus
 substTermPlus _ (m, TermTau) = (m, TermTau)
-substTermPlus _ (m, TermTheta t) = (m, TermTheta t)
 substTermPlus sub (m, TermUpsilon x) =
   fromMaybe (m, TermUpsilon x) (lookup x sub)
 substTermPlus sub (m, TermPi xts t) = do
@@ -60,6 +59,9 @@ substTermPlus sub (m, TermMu (x, t) e) = do
   let t' = substTermPlus sub t
   let e' = substTermPlus (filter (\(k, _) -> k /= x) sub) e
   (m, TermMu (x, t') e')
+substTermPlus sub (m, TermTheta xts e) = do
+  let (xts', e') = substTermPlusBindingsWithBody sub xts e
+  (m, TermTheta xts' e')
 substTermPlus _ (m, TermIntS size x) = (m, TermIntS size x)
 substTermPlus _ (m, TermIntU size x) = (m, TermIntU size x)
 substTermPlus _ (m, TermFloat16 x) = (m, TermFloat16 x)
@@ -94,7 +96,6 @@ substTermPlusBindingsWithBody sub ((x, t):xts) e = do
 
 isValue :: TermPlus -> Bool
 isValue (_, TermTau) = True
-isValue (_, TermTheta _) = True
 isValue (_, TermUpsilon _) = True
 isValue (_, TermPi {}) = True
 isValue (_, TermPiIntro {}) = True
