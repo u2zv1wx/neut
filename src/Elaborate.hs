@@ -52,15 +52,12 @@ elaborate' :: PreTermPlus -> WithEnv TermPlus
 elaborate' (m, PreTermTau) = do
   m' <- toMeta m
   return (m', TermTau)
-elaborate' (m, PreTermTheta x) = do
+elaborate' (m, PreTermUpsilon x) = do
   m' <- toMeta m
   mi <- elaborateIsEnum x
   case mi of
-    Nothing -> return (m', TermTheta x)
+    Nothing -> return (m', TermUpsilon x)
     Just i -> return (m', TermIntU 64 i)
-elaborate' (m, PreTermUpsilon x) = do
-  m' <- toMeta m
-  return (m', TermUpsilon x)
 elaborate' (m, PreTermPi xts t) = do
   m' <- toMeta m
   xts' <- mapM elaboratePlus xts
@@ -84,6 +81,11 @@ elaborate' (m, PreTermMu (x, t) e) = do
       e' <- elaborate' e
       return (m', TermMu (x, t') e')
     _ -> throwError "CBV recursion is allowed only for Pi-types"
+elaborate' (m, PreTermTheta xts e) = do
+  m' <- toMeta m
+  e' <- elaborate' e
+  xts' <- mapM elaboratePlus xts
+  return (m', TermTheta xts' e')
 elaborate' (_, PreTermZeta x) = do
   sub <- gets substEnv
   case lookup x sub of
@@ -98,8 +100,10 @@ elaborate' (m, PreTermIntU size x) = do
 elaborate' (m, PreTermInt x) = do
   m' <- toMeta m
   t <- reducePreTermPlus $ typeOf' m
-  case t of
-    (_, PreTermTheta intType) ->
+  case t
+    -- (_, PreTermTheta intType) ->
+        of
+    (_, PreTermUpsilon intType) ->
       case asLowTypeMaybe intType of
         Just (LowTypeIntS size) -> return (m', TermIntS size x)
         Just (LowTypeIntU size) -> return (m', TermIntU size x)
@@ -117,8 +121,10 @@ elaborate' (m, PreTermFloat64 x) = do
 elaborate' (m, PreTermFloat x) = do
   m' <- toMeta m
   t <- reducePreTermPlus $ typeOf' m
-  case t of
-    (_, PreTermTheta floatType) -> do
+  case t
+    -- (_, PreTermTheta floatType) -> do
+        of
+    (_, PreTermUpsilon floatType) -> do
       let x16 = realToFrac x :: Half
       let x32 = realToFrac x :: Float
       case asLowTypeMaybe floatType of
