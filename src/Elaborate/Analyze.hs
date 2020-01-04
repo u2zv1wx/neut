@@ -30,8 +30,8 @@ simp cs = simp' cs
 simp' :: [PreConstraint] -> WithEnv [EnrichedConstraint]
 simp' [] = return []
 simp' (((_, PreTermTau), (_, PreTermTau)):cs) = simp cs
-simp' (((_, PreTermTheta x), (_, PreTermTheta y)):cs)
-  | x == y = simp cs
+-- simp' (((_, PreTermTheta x), (_, PreTermTheta y)):cs)
+--   | x == y = simp cs
 simp' (((_, PreTermUpsilon x1), (_, PreTermUpsilon x2)):cs)
   | x1 == x2 = simp cs
 simp' (((_, PreTermPi xts1 cod1), (_, PreTermPi xts2 cod2)):cs)
@@ -46,6 +46,8 @@ simp' (((_, PreTermMu (x1, t1) e1), (_, PreTermMu (x2, t2) e2)):cs)
   | x1 == x2 = simp $ (t1, t2) : (e1, e2) : cs
 simp' (((_, PreTermZeta x), (_, PreTermZeta y)):cs)
   | x == y = simp cs
+simp' (((_, PreTermTheta xts1 e1), (_, PreTermTheta xts2 e2)):cs)
+  | length xts1 == length xts2 = do simpPi xts1 e1 xts2 e2 cs
 simp' (((_, PreTermIntS size1 l1), (_, PreTermIntS size2 l2)):cs)
   | size1 == size2
   , l1 == l2 = simp cs
@@ -93,11 +95,11 @@ simp' (((_, PreTermArrayIntro k1 les1), (_, PreTermArrayIntro k2 les2)):cs)
     csArray <- simpArrayIntro les1 les2
     csCont <- simp cs
     return $ csArray ++ csCont
-simp' ((e1, e2):cs)
-  | (_, PreTermPiElim (_, PreTermTheta f) es1) <- e1
-  , (_, PreTermPiElim (_, PreTermTheta g) es2) <- e2
-  , f == g
-  , length es1 == length es2 = simp $ zip es1 es2 ++ cs
+-- simp' ((e1, e2):cs)
+--   | (_, PreTermPiElim (_, PreTermTheta f) es1) <- e1
+--   , (_, PreTermPiElim (_, PreTermTheta g) es2) <- e2
+--   , f == g
+--   , length es1 == length es2 = simp $ zip es1 es2 ++ cs
 simp' ((e1, e2):cs) = do
   let ms1 = asStuckedTerm e1
   let ms2 = asStuckedTerm e2
