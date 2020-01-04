@@ -11,10 +11,11 @@ import Data.WeakTerm
 -- Alpha-convert all the variables so that different variables have different names.
 rename :: WeakTermPlus -> WithEnv WeakTermPlus
 rename (m, WeakTermTau) = return (m, WeakTermTau)
-rename (m, WeakTermTheta x) = return (m, WeakTermTheta x)
-rename (m, WeakTermUpsilon x) = do
-  x' <- lookupNameEnv x
-  return (m, WeakTermUpsilon x')
+rename (m, WeakTermUpsilon x)
+  | Just _ <- asEnumNatNumConstant x = return (m, WeakTermUpsilon x) -- enum.n8 or something like that
+  | otherwise = do
+    x' <- lookupNameEnv x
+    return (m, WeakTermUpsilon x')
 rename (m, WeakTermPi xts t) = do
   (xts', t') <- renameBinderWithBody xts t
   return (m, WeakTermPi xts' t')
@@ -31,6 +32,9 @@ rename (m, WeakTermMu (x, t) e) =
     x' <- newNameWith x
     e' <- rename e
     return (m, WeakTermMu (x', t') e')
+rename (m, WeakTermTheta xts t) = do
+  (xts', t') <- renameTheta xts t
+  return (m, WeakTermTheta xts' t')
 rename (m, WeakTermZeta h) = return (m, WeakTermZeta h)
 rename (m, WeakTermIntS size x) = return (m, WeakTermIntS size x)
 rename (m, WeakTermIntU size x) = return (m, WeakTermIntU size x)
@@ -72,6 +76,20 @@ renameBinderWithBody ((x, t):xts) e = do
     x' <- newNameWith x
     (xts', e') <- renameBinderWithBody xts e
     return ((x', t') : xts', e')
+
+renameTheta ::
+     [IdentifierPlus]
+  -> WeakTermPlus
+  -> WithEnv ([IdentifierPlus], WeakTermPlus)
+renameTheta [] e = do
+  e' <- rename e
+  return ([], e')
+renameTheta ((x, t):xts) e = do
+  t' <- rename t
+  local $ do
+    modify (\env -> env {nameEnv = (x, x) : nameEnv env}) -- constants shouldn't be alpha-converted
+    (xts', e') <- renameTheta xts e
+    return ((x, t') : xts', e')
 
 renameCaseList :: [(Case, WeakTermPlus)] -> WithEnv [(Case, WeakTermPlus)]
 renameCaseList caseList =
