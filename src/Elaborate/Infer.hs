@@ -42,21 +42,15 @@ type Context = [(Identifier, PreTermPlus)]
 -- infer e ~> {type-annotated e}
 infer :: Context -> WeakTermPlus -> WithEnv PreTermPlus
 infer _ (m, WeakTermTau) = return (PreMetaTerminal (toLoc m), PreTermTau)
-infer ctx (m, WeakTermTheta x)
+infer _ (m, WeakTermUpsilon x)
+  -- enum.n8とかの型はto-enum n8になる。
+  -- fixme: i64とかu8とかの型をinferできるようにする
   | Just i <- asEnumNatNumConstant x = do
-    t <- toIsEnumType i
-    retPreTerm t (toLoc m) $ PreTermTheta x
+    t' <- toIsEnumType i
+    retPreTerm t' (toLoc m) $ PreTermUpsilon x
   | otherwise = do
-    mt <- lookupWeakTypeEnvMaybe x
-    case mt of
-      Just t -> retPreTerm t (toLoc m) $ PreTermTheta x
-      Nothing -> do
-        h <- newTypeHoleInCtx ctx
-        insWeakTypeEnv x h
-        retPreTerm h (toLoc m) $ PreTermTheta x
-infer _ (m, WeakTermUpsilon x) = do
-  t <- lookupWeakTypeEnv x
-  retPreTerm t (toLoc m) $ PreTermUpsilon x
+    t <- lookupWeakTypeEnv x
+    retPreTerm t (toLoc m) $ PreTermUpsilon x
 infer ctx (m, WeakTermPi xts t) = do
   (xts', t') <- inferPi ctx xts t
   retPreTerm univ (toLoc m) $ PreTermPi xts' t'
@@ -100,32 +94,34 @@ infer ctx (m, WeakTermPiElim e es) = do
 infer ctx (m, WeakTermMu (x, t) e) = do
   t' <- inferType ctx t
   insWeakTypeEnv x t'
-  -- e' <- infer (ctx ++ [(x, t')]) e
   -- Note that we cannot extend context with x. The type of e cannot be dependent on `x`.
   -- Otherwise the type of `mu x. e` might have `x` as free variable, which is unsound.
   e' <- infer ctx e
   insConstraintEnv t' (typeOf e')
   retPreTerm t' (toLoc m) $ PreTermMu (x, t') e'
+infer ctx (m, WeakTermTheta xts e) = do
+  (xts', e') <- inferTheta ctx xts e
+  retPreTerm (typeOf e') (toLoc m) $ PreTermTheta xts' e'
 infer ctx (_, WeakTermZeta _) = do
   h <- newHoleInCtx ctx
   return h
 infer _ (m, WeakTermIntS size i) = do
-  let t = (metaTerminal, PreTermTheta $ "i" ++ show size)
+  let t = (metaTerminal, PreTermUpsilon $ "i" ++ show size)
   retPreTerm t (toLoc m) $ PreTermIntS size i
 infer _ (m, WeakTermIntU size i) = do
-  let t = (metaTerminal, PreTermTheta $ "u" ++ show size)
+  let t = (metaTerminal, PreTermUpsilon $ "u" ++ show size)
   retPreTerm t (toLoc m) $ PreTermIntU size i
 infer ctx (m, WeakTermInt i) = do
   h <- newTypeHoleInCtx ctx
   retPreTerm h (toLoc m) $ PreTermInt i
 infer _ (m, WeakTermFloat16 f) = do
-  let t = (metaTerminal, PreTermTheta "f16")
+  let t = (metaTerminal, PreTermUpsilon "f16")
   retPreTerm t (toLoc m) $ PreTermFloat16 f
 infer _ (m, WeakTermFloat32 f) = do
-  let t = (metaTerminal, PreTermTheta "f32")
+  let t = (metaTerminal, PreTermUpsilon "f32")
   retPreTerm t (toLoc m) $ PreTermFloat32 f
 infer _ (m, WeakTermFloat64 f) = do
-  let t = (metaTerminal, PreTermTheta "f64")
+  let t = (metaTerminal, PreTermUpsilon "f64")
   retPreTerm t (toLoc m) $ PreTermFloat64 f
 infer ctx (m, WeakTermFloat f) = do
   h <- newTypeHoleInCtx ctx
@@ -180,10 +176,10 @@ inferType ctx t = do
   return t'
 
 inferKind :: ArrayKind -> PreTermPlus
-inferKind (ArrayKindIntS i) = (metaTerminal, PreTermTheta $ "i" ++ show i)
-inferKind (ArrayKindIntU i) = (metaTerminal, PreTermTheta $ "u" ++ show i)
+inferKind (ArrayKindIntS i) = (metaTerminal, PreTermUpsilon $ "i" ++ show i)
+inferKind (ArrayKindIntU i) = (metaTerminal, PreTermUpsilon $ "u" ++ show i)
 inferKind (ArrayKindFloat size) =
-  (metaTerminal, PreTermTheta $ "f" ++ show (sizeAsInt size))
+  (metaTerminal, PreTermUpsilon $ "f" ++ show (sizeAsInt size))
 
 inferPi ::
      Context
@@ -195,8 +191,6 @@ inferPi ctx [] cod = do
   return ([], cod')
 inferPi ctx ((x, t):xts) cod = do
   t' <- inferType ctx t
-  -- p $ "ctx for " ++ x ++ ":"
-  -- p' $ map fst ctx
   insWeakTypeEnv x t'
   (xts', cod') <- inferPi (ctx ++ [(x, t')]) xts cod
   return ((x, t') : xts', cod')
@@ -211,8 +205,6 @@ inferPiIntro ctx [] e = do
   return ([], e')
 inferPiIntro ctx ((x, t):xts) e = do
   t' <- inferType ctx t
-  -- p $ "ctx for " ++ x ++ ":"
-  -- p' $ map fst ctx
   insWeakTypeEnv x t'
   (xts', e') <- inferPiIntro (ctx ++ [(x, t')]) xts e
   return ((x, t') : xts', e')
@@ -240,6 +232,21 @@ inferPiElim ctx m e es = do
    -- cod' = ?M @ (ctx[0], ..., ctx[n], e1, ..., em)
   let cod' = substPreTermPlus (zip ys es) cod
   retPreTerm cod' (toLoc m) $ PreTermPiElim e es
+
+inferTheta ::
+     Context
+  -> [(Identifier, WeakTermPlus)]
+  -> WeakTermPlus
+  -> WithEnv ([(Identifier, PreTermPlus)], PreTermPlus)
+inferTheta ctx [] e = do
+  e' <- infer ctx e
+  return ([], e')
+inferTheta ctx ((x, t):xts) e
+  | otherwise = do
+    t' <- inferType ctx t
+    insWeakTypeEnv x t'
+    (xts', e') <- inferTheta (ctx ++ [(x, t')]) xts e
+    return ((x, t') : xts', e')
 
 -- In a context (x1 : A1, ..., xn : An), this function creates metavariables
 --   ?M  : Pi (x1 : A1, ..., xn : An). ?Mt @ (x1, ..., xn)
@@ -314,7 +321,7 @@ toIsEnumType i = do
   return
     ( metaTerminal
     , PreTermPiElim
-        (piMeta, PreTermTheta "is-enum")
+        (piMeta, PreTermUpsilon "is-enum")
         [(metaTerminal, PreTermEnum $ EnumTypeNatNum i)])
 
 -- Univ -> Univ
@@ -339,7 +346,7 @@ determineDomType :: [PreTermPlus] -> PreTermPlus
 determineDomType ts =
   if not (null ts)
     then head ts
-    else (metaTerminal, PreTermTheta "bottom")
+    else (metaTerminal, PreTermUpsilon "bottom")
 
 insConstraintEnv :: PreTermPlus -> PreTermPlus -> WithEnv ()
 insConstraintEnv t1 t2 =
