@@ -23,16 +23,13 @@ interpret :: TreePlus -> WithEnv WeakTermPlus
 -- foundational interpretations
 --
 interpret (m, TreeAtom "tau") = withMeta m WeakTermTau
-interpret (m, TreeNode [(_, TreeAtom "theta"), (_, TreeAtom x)]) =
-  withMeta m $ WeakTermTheta x
 interpret (m, TreeNode [(_, TreeAtom "upsilon"), (_, TreeAtom x)]) =
   withMeta m $ WeakTermUpsilon x
 interpret (m, TreeNode [(_, TreeAtom "pi"), (_, TreeNode xts), t]) = do
   (xts', t') <- interpretBinder xts t
   withMeta m $ WeakTermPi xts' t'
 interpret (m, TreeNode [(_, TreeAtom "pi-introduction"), (_, TreeNode xts), e]) = do
-  xts' <- mapM interpretIdentifierPlus xts
-  e' <- interpret e
+  (xts', e') <- interpretBinder xts e
   withMeta m $ WeakTermPiIntro xts' e'
 interpret (m, TreeNode ((_, TreeAtom "pi-elimination"):e:es)) = do
   e' <- interpret e
@@ -42,6 +39,12 @@ interpret (m, TreeNode [(_, TreeAtom "mu"), xt, e]) = do
   xt' <- interpretIdentifierPlus xt
   e' <- interpret e
   withMeta m $ WeakTermMu xt' e'
+interpret (m, TreeNode [(_, TreeAtom "theta"), (_, TreeNode xts), e]) = do
+  (xts', e') <- interpretBinder xts e
+  -- xts' <- mapM interpretIdentifierPlus xts
+  -- e' <- interpret e
+  withMeta m $ WeakTermTheta xts' e'
+  -- withMeta m $ WeakTermTheta x
 interpret (m, TreeNode [(_, TreeAtom "zeta"), (_, TreeAtom x)]) = do
   x' <- interpretAtom x
   withMeta m $ WeakTermZeta x'
@@ -120,24 +123,24 @@ interpret t@(m, TreeAtom x) = do
       isEnum <- isDefinedEnumName x
       if isEnum
         then withMeta m $ WeakTermEnum $ EnumTypeLabel x
-        else do
-          b <- isConstant x
-          if b
-            then withMeta m $ WeakTermTheta x
-            else withMeta m $ WeakTermUpsilon x
+        else withMeta m $ WeakTermUpsilon x
+          -- b <- isConstant x
+          -- if b
+          --   then withMeta m $ WeakTermTheta x
+          --   else withMeta m $ WeakTermUpsilon x
 interpret t@(m, TreeNode es) =
   if null es
     then throwError $ "interpret: syntax error:\n" ++ Pr.ppShow t
     else interpret (m, TreeNode ((m, TreeAtom "pi-elimination") : es))
 
-isConstant :: Identifier -> WithEnv Bool
-isConstant x
-  | Just _ <- asEnumNatNumConstant x = return True
-  | x `elem` primitiveList = return True
-  | otherwise = do
-    cenv <- gets constantEnv
-    return $ x `elem` cenv
-
+-- enum.n4とかを定数として処理する話は？freevarとしてenum.n4とかが出てきたときに適当に処理しろって感じか？
+-- isConstant :: Identifier -> WithEnv Bool
+-- isConstant x
+--   | Just _ <- asEnumNatNumConstant x = return True
+--   | x `elem` primitiveList = return True
+--   | otherwise = do
+--     cenv <- gets constantEnv
+--     return $ x `elem` cenv
 interpretIdentifierPlus :: TreePlus -> WithEnv IdentifierPlus
 interpretIdentifierPlus (_, TreeAtom x) = do
   h <- newNameWith "hole-plus"

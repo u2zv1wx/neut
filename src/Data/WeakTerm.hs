@@ -6,12 +6,12 @@ import Data.Basic
 
 data WeakTerm
   = WeakTermTau
-  | WeakTermTheta Identifier
   | WeakTermUpsilon Identifier
   | WeakTermPi [IdentifierPlus] WeakTermPlus
   | WeakTermPiIntro [IdentifierPlus] WeakTermPlus
   | WeakTermPiElim WeakTermPlus [WeakTermPlus]
   | WeakTermMu IdentifierPlus WeakTermPlus
+  | WeakTermTheta [IdentifierPlus] WeakTermPlus
   | WeakTermZeta Identifier
   | WeakTermIntS IntSize Integer
   | WeakTermIntU IntSize Integer
