@@ -102,16 +102,16 @@ varTermPlus ctx e = do
 
 getClosedChain :: Context -> TermPlus -> WithEnv [(Identifier, TermPlus)]
 getClosedChain _ (_, TermTau) = return []
-getClosedChain ctx (_, TermTheta z) = do
-  cenv <- gets chainEnv
-  -- t <- lookupTypeEnv z
-  t <- lookupContext z ctx
-  case Map.lookup z cenv of
-    Just xts -> return xts
-    Nothing -> do
-      xts <- getClosedChain ctx t
-      modify (\env -> env {chainEnv = Map.insert z xts cenv})
-      return xts
+-- getClosedChain ctx (_, TermTheta z) = do
+--   cenv <- gets chainEnv
+--   -- t <- lookupTypeEnv z
+--   t <- lookupContext z ctx
+--   case Map.lookup z cenv of
+--     Just xts -> return xts
+--     Nothing -> do
+--       xts <- getClosedChain ctx t
+--       modify (\env -> env {chainEnv = Map.insert z xts cenv})
+--       return xts
 getClosedChain ctx (_, TermUpsilon x) = do
   cenv <- gets chainEnv
   t <- lookupContext x ctx
@@ -129,6 +129,7 @@ getClosedChain ctx (_, TermPiElim e es) = do
   xs2 <- concat <$> mapM (getClosedChain ctx) es
   return $ xs1 ++ xs2
 getClosedChain ctx (_, TermMu ut e) = getClosedChainBindings ctx [ut] [e]
+getClosedChain ctx (_, TermTheta xts e) = getClosedChainBindings ctx xts [e]
 getClosedChain _ (_, TermIntS _ _) = return []
 getClosedChain _ (_, TermIntU _ _) = return []
 getClosedChain _ (_, TermFloat16 _) = return []

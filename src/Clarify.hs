@@ -27,7 +27,7 @@ clarify' :: Context -> TermPlus -> WithEnv CodePlus
 clarify' _ (m, TermTau) = do
   v <- cartesianUniv m
   return (m, CodeUpIntro v)
-clarify' ctx (m, TermTheta x) = clarifyTheta ctx m x
+-- clarify' ctx (m, TermTheta x) = clarifyTheta ctx m x
 clarify' _ (m, TermUpsilon x) = do
   return (m, CodeUpIntro (m, DataUpsilon x))
 clarify' _ (m, TermPi _ _) = do
@@ -36,26 +36,17 @@ clarify' ctx lam@(m, TermPiIntro xts e) = do
   fvs <- varTermPlus ctx lam
   e' <- clarify' (reverse xts ++ ctx) e
   makeClosure' ctx Nothing fvs m xts e'
--- clarify' ctx (m, TermPiElim e@(mLam, TermPiIntro [(x, t)] e1) es@[(_, TermTheta z)]) = do
---   fvs <- varTermPlus ctx e
---   -- thetaをcontextに登録する必要があるのでletを特別扱いする
---   -- thetaのたぐいはこのletの形式で型情報を与えていないとここで死ぬ。
---   -- ……でも、普通にインライン展開で直接型を保持してる可能性もあるんでは。ある。
---   -- インライン展開されるとこのthetaは生で登場することになるわけでして。だからこれではうまくいかない。
---   -- えーと？じゃあどうすればいい？
---   e1' <- clarify' ((z, t) : (x, t) : ctx) e1
---   e' <- makeClosure' ctx Nothing fvs mLam [(x, t)] e1'
---   callClosure' ctx m e' es
 clarify' ctx (m, TermPiElim e es) = do
   e' <- clarify' ctx e
   callClosure' ctx m e' es
 clarify' ctx mu@(m, TermMu (f, t) e) = do
   fvs <- varTermPlus ctx mu
   let fvs' = map (toTermUpsilon . fst) fvs
-  let e' = substTermPlus [(f, (m, TermPiElim (m, TermTheta f) fvs'))] e
-  e'' <- clarify' ((f, t) : ctx) e'
-  cls <- makeClosure' ctx (Just f) [] m fvs e''
-  callClosure' ctx m cls fvs'
+  undefined
+  -- let e' = substTermPlus [(f, (m, TermPiElim (m, TermTheta f) fvs'))] e
+  -- e'' <- clarify' ((f, t) : ctx) e'
+  -- cls <- makeClosure' ctx (Just f) [] m fvs e''
+  -- callClosure' ctx m cls fvs'
 clarify' _ (m, TermIntS size l) = do
   return (m, CodeUpIntro (m, DataIntS size l))
 clarify' _ (m, TermIntU size l) = do
@@ -138,7 +129,8 @@ clarifyTheta ctx m name
     clarify' ctx (m, TermEnum $ EnumTypeLabel "top")
 clarifyTheta ctx m "is-enum" = clarifyIsEnum ctx m
 clarifyTheta ctx m "unsafe.eval-io" = clarifyEvalIO ctx m
-clarifyTheta ctx m "file-descriptor" = clarify' ctx (m, TermTheta "i64")
+clarifyTheta ctx m "file-descriptor" = clarify' ctx (m, TermUpsilon "i64")
+-- clarifyTheta ctx m "file-descriptor" = clarify' ctx (m, TermTheta "i64")
 clarifyTheta ctx m "stdin" = clarify' ctx (m, TermIntS 64 0)
 clarifyTheta ctx m "stdout" = clarify' ctx (m, TermIntS 64 1)
 clarifyTheta ctx m "stderr" = clarify' ctx (m, TermIntS 64 2)

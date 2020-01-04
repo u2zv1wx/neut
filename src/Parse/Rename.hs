@@ -12,7 +12,8 @@ import Data.WeakTerm
 rename :: WeakTermPlus -> WithEnv WeakTermPlus
 rename (m, WeakTermTau) = return (m, WeakTermTau)
 rename (m, WeakTermUpsilon x)
-  | Just _ <- asEnumNatNumConstant x = return (m, WeakTermUpsilon x) -- enum.n8 or something like that
+  -- | Just _ <- asEnumNatNumConstant x = return (m, WeakTermUpsilon x) -- enum.n8 or something like that
+  | isConstant x = return (m, WeakTermUpsilon x) -- enum.n8, i64, f16, etc.
   | otherwise = do
     x' <- lookupNameEnv x
     return (m, WeakTermUpsilon x')

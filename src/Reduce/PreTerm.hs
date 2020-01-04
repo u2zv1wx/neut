@@ -36,12 +36,19 @@ reducePreTermPlus (m, PreTermPiElim e es) = do
       | all isValue es' -> do
         let self' = substPreTermPlus [(x, self)] body
         reducePreTermPlus (m, PreTermPiElim self' es')
-    (_, PreTermTheta constant) -> reducePreTermPlusTheta (m, app) es' m constant
+    (_, PreTermUpsilon constant) ->
+      reducePreTermPlusTheta (m, app) es' m constant
+    -- (_, PreTermTheta constant) -> reducePreTermPlusTheta (m, app) es' m constant
     _ -> return (m, app)
 reducePreTermPlus (m, PreTermMu (x, t) e) = do
   t' <- reducePreTermPlus t
   e' <- reducePreTermPlus e
   return $ (m, PreTermMu (x, t') e')
+reducePreTermPlus (m, PreTermTheta xts e) = do
+  let (xs, ts) = unzip xts
+  ts' <- mapM reducePreTermPlus ts
+  e' <- reducePreTermPlus e
+  return $ (m, PreTermTheta (zip xs ts') e')
 reducePreTermPlus (m, PreTermEnumElim e les) = do
   e' <- reducePreTermPlus e
   let (ls, es) = unzip les

@@ -41,10 +41,7 @@ interpret (m, TreeNode [(_, TreeAtom "mu"), xt, e]) = do
   withMeta m $ WeakTermMu xt' e'
 interpret (m, TreeNode [(_, TreeAtom "theta"), (_, TreeNode xts), e]) = do
   (xts', e') <- interpretBinder xts e
-  -- xts' <- mapM interpretIdentifierPlus xts
-  -- e' <- interpret e
   withMeta m $ WeakTermTheta xts' e'
-  -- withMeta m $ WeakTermTheta x
 interpret (m, TreeNode [(_, TreeAtom "zeta"), (_, TreeAtom x)]) = do
   x' <- interpretAtom x
   withMeta m $ WeakTermZeta x'

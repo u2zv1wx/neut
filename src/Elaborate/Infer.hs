@@ -43,11 +43,12 @@ type Context = [(Identifier, PreTermPlus)]
 infer :: Context -> WeakTermPlus -> WithEnv PreTermPlus
 infer _ (m, WeakTermTau) = return (PreMetaTerminal (toLoc m), PreTermTau)
 infer _ (m, WeakTermUpsilon x)
-  -- enum.n8とかの型はto-enum n8になる。
-  -- fixme: i64とかu8とかの型をinferできるようにする
+  -- enum.n8, enum.n64, etc.
   | Just i <- asEnumNatNumConstant x = do
     t' <- toIsEnumType i
     retPreTerm t' (toLoc m) $ PreTermUpsilon x
+  -- i64, f16, u8, etc.
+  | Just _ <- asLowTypeMaybe x = retPreTerm univ (toLoc m) $ PreTermUpsilon x
   | otherwise = do
     t <- lookupWeakTypeEnv x
     retPreTerm t (toLoc m) $ PreTermUpsilon x

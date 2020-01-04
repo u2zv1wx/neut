@@ -55,6 +55,12 @@ asEnumNatNumConstant x
   , Just i <- readNatEnumType y = Just i -- enum.n{i} is a constant
 asEnumNatNumConstant _ = Nothing
 
+isConstant :: Identifier -> Bool
+isConstant x
+  | Just _ <- asEnumNatNumConstant x = True
+  | Just _ <- asLowTypeMaybe x = True
+  | otherwise = False
+
 data EnumValue
   = EnumValueLabel Identifier
   | EnumValueNatNum Integer Integer
