@@ -1,10 +1,14 @@
 module Clarify.Utility where
 
+import Control.Monad.Except
 import Control.Monad.State
 
 import Data.Basic
 import Data.Code
 import Data.Env
+import Data.Term
+
+type Context = [(Identifier, TermPlus)]
 
 -- toAffineApp ML x e ~>
 --   bind f := e in
@@ -260,3 +264,9 @@ insCodeEnv name args e = do
   -- Since LLVM doesn't allow variable shadowing, we must explicitly
   -- rename variables here.
   modify (\env -> env {codeEnv = (name, (args', e')) : codeEnv env})
+
+lookupContext :: Identifier -> Context -> WithEnv TermPlus
+lookupContext z ctx = do
+  case lookup z ctx of
+    Nothing -> throwError "lookupContext"
+    Just t -> return t

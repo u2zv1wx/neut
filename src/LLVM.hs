@@ -6,6 +6,7 @@ import Control.Monad.Except
 import Control.Monad.State
 import Data.List (elemIndex, sortBy)
 
+import Clarify.Utility
 import Data.Basic
 import Data.Code
 import Data.Env
@@ -14,15 +15,18 @@ import Data.LLVM
 toLLVM :: CodePlus -> WithEnv LLVM
 toLLVM mainTerm = do
   penv <- gets codeEnv
-  forM_ penv $ \(name, (args, e)) -> do
-    when (name == "unsafe.write") $ do
-      p "unsafe.write"
-      p "args:"
-      p' $ args
-      p "body:"
-      p' e
+  forM_ penv $ \(name, (args, e))
+    -- when (name == "unsafe.write") $ do
+    --   p "unsafe.write"
+    --   p "args:"
+    --   p' $ args
+    --   p "body:"
+    --   p' e
+   -> do
     llvm <- llvmCode e
     insLLVMEnv name args llvm
+  p' mainTerm
+  error "stop"
   l <- llvmCode mainTerm
   -- the result of "main" must be i64, not i8*
   (result, resultVar) <- newDataUpsilonWith "result"

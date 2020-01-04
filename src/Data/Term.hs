@@ -94,9 +94,17 @@ substTermPlusBindingsWithBody sub ((x, t):xts) e = do
 
 isValue :: TermPlus -> Bool
 isValue (_, TermTau) = True
+isValue (_, TermTheta _) = True
 isValue (_, TermUpsilon _) = True
 isValue (_, TermPi {}) = True
 isValue (_, TermPiIntro {}) = True
+isValue (_, TermIntS _ _) = True
+isValue (_, TermIntU _ _) = True
+isValue (_, TermFloat16 _) = True
+isValue (_, TermFloat32 _) = True
+isValue (_, TermFloat64 _) = True
 isValue (_, TermEnum _) = True
 isValue (_, TermEnumIntro _) = True
+isValue (_, TermArray {}) = True
+isValue (_, TermArrayIntro _ les) = all isValue $ map snd les
 isValue _ = False

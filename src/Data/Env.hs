@@ -36,6 +36,7 @@ data Env =
     , typeEnv :: Map.Map Identifier TermPlus
     , constraintEnv :: [PreConstraint] -- for type inference
     , substEnv :: [(Identifier, PreTermPlus)] -- metavar ~> beta-equivalent weakterm
+    , chainEnv :: Map.Map Identifier [(Identifier, TermPlus)] -- var/const ~> the closed var chain of its type
     , codeEnv :: [(Identifier, ([Identifier], CodePlus))] -- f ~> thunk (lam (x1 ... xn) e)
     , llvmEnv :: [(Identifier, ([Identifier], LLVM))]
     }
@@ -52,6 +53,7 @@ initialEnv path =
     , nameEnv = []
     , weakTypeEnv = Map.empty
     , typeEnv = Map.empty
+    , chainEnv = Map.empty
     , codeEnv = []
     , llvmEnv = []
     , constraintEnv = []

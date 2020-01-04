@@ -21,26 +21,35 @@ reduceCodePlus (m, CodePiElimDownElim v ds) = do
         reduceCodePlus $ substCodePlus (zip xs ds) body
     _ -> return (m, CodePiElimDownElim v ds)
 reduceCodePlus (m, CodeSigmaElim xts v e) = do
-  let xs = map fst xts
+  let (xs, ts) = unzip xts
+  -- let xs = map fst xts
   case v of
     (_, DataSigmaIntro es)
       | length es == length xs -> reduceCodePlus $ substCodePlus (zip xs es) e
-    _ -> return (m, CodeSigmaElim xts v e)
+    _ -> do
+      e' <- reduceCodePlus e
+      ts' <- mapM reduceCodePlus ts
+      return (m, CodeSigmaElim (zip xs ts') v e')
 reduceCodePlus (m, CodeUpElim x e1 e2) = do
   e1' <- reduceCodePlus e1
   case e1' of
     (_, CodeUpIntro d) -> reduceCodePlus $ substCodePlus [(x, d)] e2
-    _ -> return (m, CodeUpElim x e1' e2)
-reduceCodePlus (m, CodeEnumElim v branchList) =
+    _ -> do
+      e2' <- reduceCodePlus e2
+      return (m, CodeUpElim x e1' e2')
+reduceCodePlus (m, CodeEnumElim v les) = do
+  let (ls, es) = unzip les
+  es' <- mapM reduceCodePlus es
   case v of
     (_, DataEnumIntro l) ->
-      case lookup (CaseValue l) branchList of
+      case lookup (CaseValue l) les of
         Just body -> reduceCodePlus body
         Nothing ->
-          case lookup CaseDefault branchList of
+          case lookup CaseDefault les of
             Just body -> reduceCodePlus body
-            Nothing -> return (m, CodeEnumElim v branchList)
-    _ -> return (m, CodeEnumElim v branchList)
+            Nothing -> return (m, CodeEnumElim v $ zip ls es')
+    _ -> do
+      return (m, CodeEnumElim v $ zip ls es')
 reduceCodePlus (m, CodeArrayElim k d1 d2) = do
   case (d1, d2) of
     ((_, DataArrayIntro k' les), (_, DataEnumIntro l))

@@ -12,11 +12,26 @@ import Data.Env
 import Data.Term
 
 reduceTermPlus :: TermPlus -> WithEnv TermPlus
+reduceTermPlus (m, TermPi xts cod) = do
+  let (xs, ts) = unzip xts
+  ts' <- mapM reduceTermPlus ts
+  cod' <- reduceTermPlus cod
+  return $ (m, TermPi (zip xs ts') cod')
+reduceTermPlus (m, TermPiIntro xts e) = do
+  let (xs, ts) = unzip xts
+  ts' <- mapM reduceTermPlus ts
+  e' <- reduceTermPlus e
+  return $ (m, TermPiIntro (zip xs ts') e')
 reduceTermPlus (m, TermPiElim e es) = do
   e' <- reduceTermPlus e
   es' <- mapM reduceTermPlus es
   let app = TermPiElim e' es'
-  case e' of
+  case e'
+    -- (_, TermPiIntro xts body)
+    --   | length xts == length es' -> do
+    --     let xs = map fst xts
+    --     reduceTermPlus $ substTermPlus (zip xs es') body
+        of
     (_, TermPiIntro xts body)
       | length xts == length es'
       , all isValue es' -> do
@@ -28,17 +43,31 @@ reduceTermPlus (m, TermPiElim e es) = do
         reduceTermPlus (m, TermPiElim self' es')
     (_, TermTheta constant) -> reduceTermPlusTheta (m, app) es' m constant
     _ -> return (m, app)
-reduceTermPlus (m, TermEnumElim e branchList) = do
+reduceTermPlus (m, TermMu (x, t) e) = do
+  t' <- reduceTermPlus t
   e' <- reduceTermPlus e
+  return $ (m, TermMu (x, t') e')
+reduceTermPlus (m, TermEnumElim e les) = do
+  e' <- reduceTermPlus e
+  let (ls, es) = unzip les
+  es' <- mapM reduceTermPlus es
+  let les' = zip ls es'
   case e' of
     (_, TermEnumIntro l) ->
-      case lookup (CaseValue l) branchList of
+      case lookup (CaseValue l) les of
         Just body -> reduceTermPlus body
         Nothing ->
-          case lookup CaseDefault branchList of
+          case lookup CaseDefault les of
             Just body -> reduceTermPlus body
-            Nothing -> return (m, TermEnumElim e' branchList)
-    _ -> return (m, TermEnumElim e' branchList)
+            Nothing -> return (m, TermEnumElim e' les')
+    _ -> return (m, TermEnumElim e' les')
+reduceTermPlus (m, TermArray k indexType) = do
+  indexType' <- reduceTermPlus indexType
+  return (m, TermArray k indexType')
+reduceTermPlus (m, TermArrayIntro k les) = do
+  let (ls, es) = unzip les
+  es' <- mapM reduceTermPlus es
+  return (m, TermArrayIntro k $ zip ls es')
 reduceTermPlus (m, TermArrayElim k e1 e2) = do
   e1' <- reduceTermPlus e1
   e2' <- reduceTermPlus e2

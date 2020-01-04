@@ -251,8 +251,8 @@
 
 ;; writeが無事定義できた〜。
 ;; (size-of A)とかってしたほうがis-enumよりもいいかも？まあそのへんは適当に。
-(definition write ((A type) (out file-descriptor) (str (u8-array A)) (len (is-enum A)))
-  (io-return top (unsafe.write A out str len)))
+(definition write ((B type) (out file-descriptor) (str (u8-array B)) (len (is-enum B)))
+  (io-return top (unsafe.write B out str len)))
 ;; implicitは、explicit.writeみたいなのを展開型として用意した上で、notationの定義を入れれば終了。
 
 ;; (write choice stdout (admit (u8-array choice)) enum.choice)

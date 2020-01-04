@@ -100,7 +100,10 @@ infer ctx (m, WeakTermPiElim e es) = do
 infer ctx (m, WeakTermMu (x, t) e) = do
   t' <- inferType ctx t
   insWeakTypeEnv x t'
-  e' <- infer (ctx ++ [(x, t')]) e
+  -- e' <- infer (ctx ++ [(x, t')]) e
+  -- Note that we cannot extend context with x. The type of e cannot be dependent on `x`.
+  -- Otherwise the type of `mu x. e` might have `x` as free variable, which is unsound.
+  e' <- infer ctx e
   insConstraintEnv t' (typeOf e')
   retPreTerm t' (toLoc m) $ PreTermMu (x, t') e'
 infer ctx (_, WeakTermZeta _) = do
@@ -192,6 +195,8 @@ inferPi ctx [] cod = do
   return ([], cod')
 inferPi ctx ((x, t):xts) cod = do
   t' <- inferType ctx t
+  -- p $ "ctx for " ++ x ++ ":"
+  -- p' $ map fst ctx
   insWeakTypeEnv x t'
   (xts', cod') <- inferPi (ctx ++ [(x, t')]) xts cod
   return ((x, t') : xts', cod')
@@ -206,6 +211,8 @@ inferPiIntro ctx [] e = do
   return ([], e')
 inferPiIntro ctx ((x, t):xts) e = do
   t' <- inferType ctx t
+  -- p $ "ctx for " ++ x ++ ":"
+  -- p' $ map fst ctx
   insWeakTypeEnv x t'
   (xts', e') <- inferPiIntro (ctx ++ [(x, t')]) xts e
   return ((x, t') : xts', e')

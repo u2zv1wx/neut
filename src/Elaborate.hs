@@ -18,6 +18,7 @@ import Elaborate.Synthesize
 import Reduce.PreTerm
 import Reduce.Term
 
+import qualified Data.Map.Strict as Map
 import qualified Data.PQueue.Min as Q
 
 -- Given a term `e` and its name `main`, this function
@@ -34,29 +35,15 @@ elaborate e = do
   p "infer"
   e' <- infer [] e
   -- Kantian type-inference ;)
-  p "analyze"
-  -- p' e'
-  cs <- gets constraintEnv
-  p $ "size: " ++ show (length cs)
-  q <- gets constraintEnv >>= analyze
-  p "synthesize"
-  p $ "size: " ++ show (Q.size q)
-  -- p "q:"
-  -- p' q
-  -- p "synth. q:"
-  -- p' $ map (\(Enriched pair _ _) -> pair) $ Q.toList q
-  synthesize q
-  -- gets constraintEnv >>= analyze >>= synthessize
-  -- gets constraintQueue >>= synthesize
-  p "ok"
+  gets constraintEnv >>= analyze >>= synthesize
   -- update the type environment by resulting substitution
   tenv <- gets weakTypeEnv
+  -- tenv' <- mapM (elaborate' >=> reduceTermPlus) tenv
   tenv' <- mapM elaborate' tenv
   modify (\env -> env {typeEnv = tenv'})
   p "updated typeEnv"
   -- elaborate `e` using the resulting substitution
-  e'' <- elaborate' e'
-  return e''
+  elaborate' e'
 
 -- This function translates a well-typed term into an untyped term in a
 -- reduction-preserving way. Here, we translate types into units (nullary product).
@@ -90,7 +77,7 @@ elaborate' (m, PreTermPiElim e es) = do
   es' <- mapM elaborate' es
   return (m', TermPiElim e' es')
 elaborate' (m, PreTermMu (x, t) e) = do
-  t' <- elaborate' t >>= reduceTermPlus
+  t' <- elaborate' t >>= reduceTermPlus -- これで型のlookupがunsoundになってるっぽい
   case t' of
     (_, TermPi _ _) -> do
       m' <- toMeta m

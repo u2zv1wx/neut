@@ -35,6 +35,27 @@ makeClosure mName xts2 m xts1 e = do
   name <- nameFromMaybe mName
   let args = envVarName : map fst xts1
   let body = (m, CodeSigmaElim xts2 envVar e')
+  -- when
+  --   (name `elem`
+  --    [ "thunk-74450"
+  --    , "thunk-73997"
+  --    , "thunk-71507"
+  --    , "thunk-70675"
+  --    , "thunk-68875"
+  --    , "thunk-66147"
+  --    , "thunk-63567"
+  --    , "thunk-59793"
+  --    , "thunk-55814"
+  --    , "thunk-49906"
+  --    , "thunk-45765"
+  --    ]) $ do
+  --   p name
+  --   p "args:"
+  --   p' args
+  --   p "fvs:"
+  --   p' xts2
+  --   p "body-orig:"
+  --   p' e
   when (name `notElem` map fst cenv) $ insCodeEnv name args body
   let fvEnv = (m, DataSigmaIntro $ map (toDataUpsilon' . fst) xts2)
   let cls = (m, DataSigmaIntro [envExp, fvEnv, (m, DataTheta name)])
@@ -74,63 +95,68 @@ nameFromMaybe mName =
     Just lamThetaName -> return lamThetaName
     Nothing -> newNameWith "thunk"
 
-varTermPlus :: TermPlus -> WithEnv [(Identifier, TermPlus)]
-varTermPlus e = do
-  tmp <- getClosedChain e
+varTermPlus :: Context -> TermPlus -> WithEnv [(Identifier, TermPlus)]
+varTermPlus ctx e = do
+  tmp <- getClosedChain ctx e
   return $ nubBy (\(x, _) (y, _) -> x == y) tmp
 
-getClosedChain :: TermPlus -> WithEnv [(Identifier, TermPlus)]
-getClosedChain (_, TermTau) = return []
-getClosedChain (_, TermTheta z) = do
+getClosedChain :: Context -> TermPlus -> WithEnv [(Identifier, TermPlus)]
+getClosedChain _ (_, TermTau) = return []
+getClosedChain ctx (_, TermTheta z) = do
   cenv <- gets chainEnv
-  t <- lookupTypeEnv z
+  -- t <- lookupTypeEnv z
+  t <- lookupContext z ctx
   case Map.lookup z cenv of
     Just xts -> return xts
     Nothing -> do
-      xts <- getClosedChain t
+      xts <- getClosedChain ctx t
       modify (\env -> env {chainEnv = Map.insert z xts cenv})
       return xts
-getClosedChain (_, TermUpsilon x) = do
+getClosedChain ctx (_, TermUpsilon x) = do
   cenv <- gets chainEnv
-  t <- lookupTypeEnv x
+  t <- lookupContext x ctx
+  -- t <- lookupTypeEnv x
   case Map.lookup x cenv of
     Just xts -> return $ xts ++ [(x, t)]
     Nothing -> do
-      xts <- getClosedChain t
+      xts <- getClosedChain ctx t
       modify (\env -> env {chainEnv = Map.insert x xts cenv})
       return $ xts ++ [(x, t)]
-getClosedChain (_, TermPi xts t) = getClosedChainBindings xts [t]
-getClosedChain (_, TermPiIntro xts e) = getClosedChainBindings xts [e]
-getClosedChain (_, TermPiElim e es) = do
-  xs1 <- getClosedChain e
-  xs2 <- concat <$> mapM getClosedChain es
+getClosedChain ctx (_, TermPi xts t) = getClosedChainBindings ctx xts [t]
+getClosedChain ctx (_, TermPiIntro xts e) = getClosedChainBindings ctx xts [e]
+getClosedChain ctx (_, TermPiElim e es) = do
+  xs1 <- getClosedChain ctx e
+  xs2 <- concat <$> mapM (getClosedChain ctx) es
   return $ xs1 ++ xs2
-getClosedChain (_, TermMu ut e) = getClosedChainBindings [ut] [e]
-getClosedChain (_, TermIntS _ _) = return []
-getClosedChain (_, TermIntU _ _) = return []
-getClosedChain (_, TermFloat16 _) = return []
-getClosedChain (_, TermFloat32 _) = return []
-getClosedChain (_, TermFloat64 _) = return []
-getClosedChain (_, TermEnum _) = return []
-getClosedChain (_, TermEnumIntro _) = return []
-getClosedChain (_, TermEnumElim e les) = do
-  xs1 <- getClosedChain e
+getClosedChain ctx (_, TermMu ut e) = getClosedChainBindings ctx [ut] [e]
+getClosedChain _ (_, TermIntS _ _) = return []
+getClosedChain _ (_, TermIntU _ _) = return []
+getClosedChain _ (_, TermFloat16 _) = return []
+getClosedChain _ (_, TermFloat32 _) = return []
+getClosedChain _ (_, TermFloat64 _) = return []
+getClosedChain _ (_, TermEnum _) = return []
+getClosedChain _ (_, TermEnumIntro _) = return []
+getClosedChain ctx (_, TermEnumElim e les) = do
+  xs1 <- getClosedChain ctx e
   let es = map snd les
-  xs2 <- concat <$> mapM getClosedChain es
+  xs2 <- concat <$> mapM (getClosedChain ctx) es
   return $ xs1 ++ xs2
-getClosedChain (_, TermArray _ indexType) = getClosedChain indexType
-getClosedChain (_, TermArrayIntro _ les) = do
+getClosedChain ctx (_, TermArray _ indexType) = getClosedChain ctx indexType
+getClosedChain ctx (_, TermArrayIntro _ les) = do
   let es = map snd les
-  concat <$> mapM getClosedChain es
-getClosedChain (_, TermArrayElim _ e1 e2) = do
-  xs1 <- getClosedChain e1
-  xs2 <- getClosedChain e2
+  concat <$> mapM (getClosedChain ctx) es
+getClosedChain ctx (_, TermArrayElim _ e1 e2) = do
+  xs1 <- getClosedChain ctx e1
+  xs2 <- getClosedChain ctx e2
   return $ xs1 ++ xs2
 
 getClosedChainBindings ::
-     [(Identifier, TermPlus)] -> [TermPlus] -> WithEnv [(Identifier, TermPlus)]
-getClosedChainBindings [] es = concat <$> mapM getClosedChain es
-getClosedChainBindings ((x, t):xts) es = do
-  xs1 <- getClosedChain t
-  xs2 <- getClosedChainBindings xts es
+     Context
+  -> [(Identifier, TermPlus)]
+  -> [TermPlus]
+  -> WithEnv [(Identifier, TermPlus)]
+getClosedChainBindings ctx [] es = concat <$> mapM (getClosedChain ctx) es
+getClosedChainBindings ctx ((x, t):xts) es = do
+  xs1 <- getClosedChain ctx t
+  xs2 <- getClosedChainBindings ((x, t) : ctx) xts es
   return $ xs1 ++ filter (\(y, _) -> y /= x) xs2
