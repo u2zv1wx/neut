@@ -17,11 +17,12 @@ import Parse.MacroExpand
 import Parse.Read
 import Parse.Rename
 
-data Def =
-  DefLet
-    WeakMeta -- meta
-    IdentifierPlus -- the `(x : t)` in `let (x : t) = e`
-    WeakTermPlus -- the `e` in `let x = e`
+data Def
+  = DefLet
+      WeakMeta -- meta
+      IdentifierPlus -- the `(x : t)` in `let (x : t) = e`
+      WeakTermPlus -- the `e` in `let x = e`
+  | DefTheta IdentifierPlus
 
 parse :: String -> WithEnv WeakTermPlus
 parse s = strToTree s >>= parse' >>= concatDefList
@@ -55,10 +56,10 @@ parse' ((_, TreeNode ((_, TreeAtom "enum"):(_, TreeAtom name):ts)):as) = do
   -- type constraint for constName
   -- e.g. t == is-enum @ (choice)
   isEnumType <- toIsEnumType name
-  h <- newNameWith "hole-parse-enum"
-  -- add `let (_, is-enum choice) := enum.choice` to defList in order to insert appropriate type constraint
-  let ascription =
-        DefLet newMeta (h, isEnumType) (newMeta, WeakTermTheta constName)
+  -- add `(constant enum.choice (is-enum choice))` to defList in order to insert appropriate type constraint
+  let ascription = DefTheta (constName, isEnumType)
+  -- register the name of the constant
+  modify (\env -> env {nameEnv = (constName, constName) : nameEnv env})
   defList <- parse' as
   return $ ascription : defList
 parse' ((_, TreeNode [(_, TreeAtom "include"), (_, TreeAtom pathString)]):as) =
@@ -82,11 +83,15 @@ parse' ((_, TreeNode ((_, TreeAtom "statement"):as1)):as2) = do
   defList1 <- parse' as1
   defList2 <- parse' as2
   return $ defList1 ++ defList2
-parse' ((_, TreeNode [(_, TreeAtom "constant"), (_, TreeAtom name)]):as)
-  -- Declare external constants.
+parse' ((_, TreeNode [(_, TreeAtom "constant"), (_, TreeAtom name), t]):as)
+  -- (constant x t) : Declare external constants.
  = do
-  modify (\e -> e {constantEnv = name : constantEnv e})
-  parse' as
+  t' <- macroExpand t >>= interpret >>= rename
+  let theta = DefTheta (name, t')
+  -- register the name of the constant
+  modify (\env -> env {nameEnv = (name, name) : nameEnv env})
+  defList <- parse' as
+  return $ theta : defList
 parse' ((_, TreeNode [(_, TreeAtom "let"), xt, e]):as) = do
   e' <- macroExpand e >>= interpret >>= rename
   (x, t) <- macroExpand xt >>= interpretIdentifierPlus
@@ -122,7 +127,7 @@ toIsEnumType name = do
   return
     ( newMeta
     , WeakTermPiElim
-        (newMeta, WeakTermTheta "is-enum")
+        (newMeta, WeakTermUpsilon "is-enum")
         [(newMeta, WeakTermEnum $ EnumTypeLabel name)])
 
 -- Represent the list of Defs in the target language, using `let`.
@@ -143,6 +148,9 @@ concatDefList [] = do
 --             ( newMeta
 --             , WeakTermPiElim (newMeta, WeakTermTheta "unsafe.eval-io") [varX]))
 --         [e])
+concatDefList (DefTheta xt:es) = do
+  cont <- concatDefList es
+  return (newMeta, WeakTermTheta [xt] cont)
 concatDefList (DefLet meta xt e:es) = do
   cont <- concatDefList es
   return (meta, WeakTermPiElim (newMeta, WeakTermPiIntro [xt] cont) [e])
