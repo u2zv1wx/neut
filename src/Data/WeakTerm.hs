@@ -11,7 +11,7 @@ data WeakTerm
   | WeakTermPiIntro [IdentifierPlus] WeakTermPlus
   | WeakTermPiElim WeakTermPlus [WeakTermPlus]
   | WeakTermMu IdentifierPlus WeakTermPlus
-  | WeakTermTheta [IdentifierPlus] WeakTermPlus
+  | WeakTermTheta IdentifierPlus WeakTermPlus
   | WeakTermZeta Identifier
   | WeakTermIntS IntSize Integer
   | WeakTermIntU IntSize Integer
