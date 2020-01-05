@@ -18,9 +18,6 @@ import Elaborate.Synthesize
 import Reduce.PreTerm
 import Reduce.Term
 
-import qualified Data.Map.Strict as Map
-import qualified Data.PQueue.Min as Q
-
 -- Given a term `e` and its name `main`, this function
 --   (1) traces `e` using `infer e`, collecting type constraints,
 --   (2) updates weakTypeEnv for `main` by the result of `infer e`,
@@ -81,11 +78,11 @@ elaborate' (m, PreTermMu (x, t) e) = do
       e' <- elaborate' e
       return (m', TermMu (x, t') e')
     _ -> throwError "CBV recursion is allowed only for Pi-types"
-elaborate' (m, PreTermTheta xts e) = do
+elaborate' (m, PreTermTheta (x, t) e) = do
   m' <- toMeta m
+  t' <- elaborate' t
   e' <- elaborate' e
-  xts' <- mapM elaboratePlus xts
-  return (m', TermTheta xts' e')
+  return (m', TermTheta (x, t') e')
 elaborate' (_, PreTermZeta x) = do
   sub <- gets substEnv
   case lookup x sub of
