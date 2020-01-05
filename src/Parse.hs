@@ -88,7 +88,7 @@ parse' ((_, TreeNode [(_, TreeAtom "constant"), (_, TreeAtom name), t]):as)
  = do
   t' <- macroExpand t >>= interpret >>= rename
   let theta = DefTheta (name, t')
-  -- register the name of the constant
+  -- register the name of the constant (to be used in `rename` in `parse' as`)
   modify (\env -> env {nameEnv = (name, name) : nameEnv env})
   defList <- parse' as
   return $ theta : defList
@@ -150,7 +150,7 @@ concatDefList [] = do
 --         [e])
 concatDefList (DefTheta xt:es) = do
   cont <- concatDefList es
-  return (newMeta, WeakTermTheta [xt] cont)
+  return (newMeta, WeakTermTheta xt cont)
 concatDefList (DefLet meta xt e:es) = do
   cont <- concatDefList es
   return (meta, WeakTermPiElim (newMeta, WeakTermPiIntro [xt] cont) [e])
