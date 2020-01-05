@@ -67,12 +67,12 @@
 ;; (ascribe e t) ~> (let (_ t) e)
 (keyword ascription)
 
-(constant is-enum)
+;; (constant is-enum)
 
 (notation (ascription e t)
   (let (_ t) e))
 
-(ascription is-enum (pi ((_ type)) type))
+(constant is-enum (pi ((_ type)) type))
 
 (keyword to-type-list)
 
@@ -213,24 +213,24 @@
      (x A))
     (state bottom A)))
 
-(constant unsafe.eval-io)
+;; (constant unsafe.eval-io)
 
-(ascription unsafe.eval-io
+(constant unsafe.eval-io
   (hom
     (io top)
     top))
 
-(constant file-descriptor)
+;; (constant file-descriptor)
 
-(ascription file-descriptor tau)
+(constant file-descriptor tau)
 
-(constant stdout)
+;; (constant stdout)
 
-(ascription stdout file-descriptor)
+(constant stdout file-descriptor)
 
-(constant unsafe.write)
+;; (constant unsafe.write)
 
-(ascription unsafe.write
+(constant unsafe.write
   (pi
     ((A type)
      (out file-descriptor)
