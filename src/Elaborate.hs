@@ -68,7 +68,7 @@ elaborate' (m, PreTermPiElim e es) = do
   es' <- mapM elaborate' es
   return (m', TermPiElim e' es')
 elaborate' (m, PreTermMu (x, t) e) = do
-  t' <- elaborate' t >>= reduceTermPlus -- これで型のlookupがunsoundになってるっぽい
+  t' <- elaborate' t >>= reduceTermPlus
   case t' of
     (_, TermPi _ _) -> do
       m' <- toMeta m
