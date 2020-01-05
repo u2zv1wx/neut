@@ -86,17 +86,14 @@ varTermPlus' (_, TermUpsilon x)
   | Just _ <- asEnumNatNumConstant x = return []
   -- i64, f32, u1234 : univ
   | Just _ <- asLowTypeMaybe x = return []
-  | otherwise
-    -- xが定数かそうでないかで処理を分岐させる必要がある
-   = do
-    chenv <- gets chainEnv
+  -- constant or ordinary variable
+  | otherwise = do
     t <- lookupTypeEnv x
-    case Map.lookup x chenv of
-      Just xts -> return $ xts ++ [(x, t)]
-      Nothing -> do
-        xts <- varTermPlus' t
-        modify (\env -> env {chainEnv = Map.insert x xts chenv})
-        return $ xts ++ [(x, t)]
+    xts <- chainWithName x t
+    cenv <- gets constantEnv
+    if x `elem` cenv
+      then return xts
+      else return $ xts ++ [(x, t)]
 varTermPlus' (_, TermPi xts t) = varTermPlus'' xts [t]
 varTermPlus' (_, TermPiIntro xts e) = varTermPlus'' xts [e]
 varTermPlus' (_, TermPiElim e es) = do
@@ -133,3 +130,16 @@ varTermPlus'' ((x, t):xts) es = do
   xs1 <- varTermPlus' t
   xs2 <- varTermPlus'' xts es
   return $ xs1 ++ filter (\(y, _) -> y /= x) xs2
+
+-- assuming the type of `x` is `t`, obtain the closed chain of the type of `x`.
+-- if the chain is computed for the first time, this function caches the computed result.
+-- if not, use the cached result.
+chainWithName :: Identifier -> TermPlus -> WithEnv [(Identifier, TermPlus)]
+chainWithName x t = do
+  cenv <- gets chainEnv
+  case Map.lookup x cenv of
+    Just xts -> return xts -- use cached result
+    Nothing -> do
+      xts <- varTermPlus' t
+      modify (\env -> env {chainEnv = Map.insert x xts cenv})
+      return xts
