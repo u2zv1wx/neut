@@ -185,11 +185,11 @@ type ArgLen = Int
 type UsedArgIndexList = [Int]
 
 asSysCallMaybe :: Identifier -> Maybe (SysCall, ArgLen, UsedArgIndexList)
-asSysCallMaybe "unsafe.write" = Just (SysCallWrite, 4, [1, 2, 3])
+asSysCallMaybe "write" = Just (SysCallWrite, 4, [1, 2, 3])
 asSysCallMaybe _ = Nothing
 
 primitiveList :: [Identifier]
-primitiveList = ["unsafe.write"]
+primitiveList = ["write"]
 
 type Target = (OS, Arch)
 

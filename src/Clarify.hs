@@ -201,11 +201,11 @@ clarifyIsEnum m = do
     _ -> throwError $ "the type of is-enum is wrong. t :\n" ++ Pr.ppShow t
 
 -- インデックス部分についての説明。たとえばsystem callとしてのwriteは、対象言語では
---   unsafe.write : Pi (A : Univ, out : file-descriptor, str : u8-array a, len : is-enum A). top
+--   write : Pi (A : Univ, out : file-descriptor, str : u8-array a, len : is-enum A). top
 -- などと宣言されることになる。他方で実際のsystem callの引数は
 --   write(FILE_DESCRIPTOR, STRING_BUFFER, LENGTH)
--- という感じなので、unsafe.writeの引数Aの部分が不要である。この不要な部分と必要な部分を指定するためにclarifySyscallは
--- 引数としてインデックスの情報をとっている。unsafe.writeの例で言えば、長さについての情報は4であり、"used arguments" を
+-- という感じなので、writeの引数Aの部分が不要である。この不要な部分と必要な部分を指定するためにclarifySyscallは
+-- 引数としてインデックスの情報をとっている。writeの例で言えば、長さについての情報は4であり、"used arguments" を
 -- 指定する配列は、zero-indexであることに注意して [1, 2, 3] となる。
 clarifySysCall ::
      Identifier -- the name of theta
