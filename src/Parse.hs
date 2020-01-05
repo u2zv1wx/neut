@@ -118,7 +118,8 @@ isSpecialForm (_, TreeNode [(_, TreeAtom "notation"), _, _]) = True
 isSpecialForm (_, TreeNode [(_, TreeAtom "keyword"), (_, TreeAtom _)]) = True
 isSpecialForm (_, TreeNode ((_, TreeAtom "enum"):(_, TreeAtom _):_)) = True
 isSpecialForm (_, TreeNode [(_, TreeAtom "include"), (_, TreeAtom _)]) = True
-isSpecialForm (_, TreeNode [(_, TreeAtom "constant"), (_, TreeAtom _)]) = True
+isSpecialForm (_, TreeNode [(_, TreeAtom "constant"), (_, TreeAtom _), _]) =
+  True
 isSpecialForm (_, TreeNode ((_, TreeAtom "statement"):_)) = True
 isSpecialForm (_, TreeNode [(_, TreeAtom "let"), _, _]) = True
 isSpecialForm _ = False
