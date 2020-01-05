@@ -129,7 +129,6 @@ clarifyConst m name
 clarifyConst m name
   | Just _ <- asLowTypeMaybe name = clarify (m, TermEnum $ EnumTypeLabel "top")
 clarifyConst m "is-enum" = clarifyIsEnum m
-clarifyConst m "unsafe.eval-io" = clarifyEvalIO m
 clarifyConst m "file-descriptor" = clarify (m, TermUpsilon "i64")
 clarifyConst m "stdin" = clarify (m, TermIntS 64 0)
 clarifyConst m "stdout" = clarify (m, TermIntS 64 1)
@@ -200,50 +199,6 @@ clarifyIsEnum m = do
             varX
             (m, CodeUpIntro v))
     _ -> throwError $ "the type of is-enum is wrong. t :\n" ++ Pr.ppShow t
-
---    unsafe.eval-io
--- ~> lam x.
---      bind sig := call-closure(x, [0]) in
---      let (resultEnv, value) := sig in
---      return value
---    (as closure)
--- io aがbottom -> (bottom, a)であるってのはそうなんだけど、そもそもこのcodのproductは
--- piによって表現された特殊なものなので、普通にsigmaElimで分解することはできない。
--- unsafe.zero : Pi (A : Tau). Tauみたいなものを対象言語のほうに用意しておいて、これをつかって
--- unsafe.eval-io = lam x. (snd (x @ (unsafe.zero bottom))) のように対象言語のほうで
--- 定義するべきなのでは。
-clarifyEvalIO :: Meta -> WithEnv CodePlus
-clarifyEvalIO m = do
-  t <- lookupTypeEnv "unsafe.eval-io"
-  t' <- reduceTermPlus t
-  case t' of
-    (_, TermPi xts@[arg] _) -> do
-      (resultValue, resultValueVar) <- newDataUpsilonWith "result"
-      (sig, sigVar) <- newDataUpsilonWith "eval-io-sig"
-      resultEnv <- newNameWith "env"
-      arg' <- clarify $ toTermUpsilon $ fst arg
-      -- IO Top == Top -> (Bottom, Top)
-      evalArgWithZero <- callClosure' m arg' [toTermInt64 0]
-      retImmType <- returnCartesianImmediate
-      zts <- complementaryChainOf xts
-      makeClosure'
-        (Just "unsafe.eval-io")
-        zts
-        m
-        [arg]
-        ( m
-        , CodeUpElim
-            sig
-            evalArgWithZero
-            ( m
-            , CodeSigmaElim
-                -- Since `resultEnv` is evaluated into 0,
-                -- we can set resultEnv : retImmType (despite the fact that its actual type is bottom).
-                [(resultEnv, retImmType), (resultValue, retImmType)] -- (Bottom, Top)
-                -- 実際にはこのsigVarはペアではなくて関数（を表現するクロージャ）になっている
-                sigVar
-                (m, CodeUpIntro resultValueVar)))
-    _ -> throwError "the type of unsafe.eval-io is wrong"
 
 -- インデックス部分についての説明。たとえばsystem callとしてのwriteは、対象言語では
 --   unsafe.write : Pi (A : Univ, out : file-descriptor, str : u8-array a, len : is-enum A). top

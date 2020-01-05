@@ -173,9 +173,6 @@
 
 (enum bottom) ;; for io-monad
 
-;; wink at modal realism
-(enum world actual-world)
-
 (definition io ((a type))
   (state world a))
 
@@ -213,10 +210,10 @@
 
 ;; (constant unsafe.eval-io)
 
-(constant unsafe.eval-io
-  (hom
-    (io top)
-    top))
+;; (constant unsafe.eval-io
+;;   (hom
+;;     (io top)
+;;     top))
 
 ;; (constant file-descriptor)
 
