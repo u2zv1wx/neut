@@ -40,8 +40,8 @@ simp' (((_, PreTermPiIntro xts body1@(m1, _)), e2@(_, _)):cs) = do
   let vs = map (uncurry toVar) xts
   simp $ (body1, (m1, PreTermPiElim e2 vs)) : cs
 simp' ((e1, e2@(_, PreTermPiIntro {})):cs) = simp' $ (e2, e1) : cs
-simp' (((_, PreTermMu xt1 e1), (_, PreTermMu xt2 e2)):cs) =
-  simpBinder [xt1] e1 [xt2] e2 cs
+simp' (((_, PreTermMu xt1 e1), (_, PreTermMu xt2 e2)):cs)
+  | fst xt1 == fst xt2 = simpBinder [xt1] e1 [xt2] e2 cs
 simp' (((_, PreTermZeta x), (_, PreTermZeta y)):cs)
   | x == y = simp cs
 simp' (((_, PreTermConst x1), (_, PreTermConst x2)):cs)

@@ -30,7 +30,7 @@ rename (m, WeakTermMu (x, t) e) = do
     x' <- newNameWith x
     e' <- rename e
     return (m, WeakTermMu (x', t') e')
-rename (m, WeakTermConst x) = return (m, WeakTermConst x) -- enum.n8, i64, f16, etc. shouldn't be renamed (i.e. can occur freely)
+rename (m, WeakTermConst x) = return (m, WeakTermConst x)
 rename (m, WeakTermConstDecl (x, t) e) = do
   t' <- rename t
   e' <- rename e
