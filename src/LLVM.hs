@@ -123,7 +123,7 @@ llvmCodeTheta _ (ThetaBinaryOp op lowType v1 v2)
   | isArithOp op = llvmCodeBinaryOp op lowType lowType v1 v2
   | isCompareOp op = llvmCodeBinaryOp op lowType (LowTypeIntS 1) v1 v2
   | otherwise = throwError "llvmCodeTheta.ThetaBinaryOp"
-llvmCodeTheta _ (ThetaSysCall num args) = do
+llvmCodeTheta _ e@(ThetaSysCall num args) = do
   (xs, vs) <- unzip <$> mapM (const $ newDataLocal "sys-call-arg") args
   res <- newNameWith "result"
   num' <- sysCallNumAsInt num

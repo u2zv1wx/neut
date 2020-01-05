@@ -113,3 +113,6 @@ isValue (_, TermEnumIntro _) = True
 isValue (_, TermArray {}) = True
 isValue (_, TermArrayIntro _ les) = all isValue $ map snd les
 isValue _ = False
+
+univTerm :: TermPlus
+univTerm = (emptyMeta, TermTau)

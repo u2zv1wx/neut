@@ -129,7 +129,7 @@ clarifyConst m name
 clarifyConst m name
   | Just _ <- asLowTypeMaybe name = clarify (m, TermEnum $ EnumTypeLabel "top")
 clarifyConst m "is-enum" = clarifyIsEnum m
-clarifyConst m "file-descriptor" = clarify (m, TermUpsilon "i64")
+clarifyConst m "file-descriptor" = clarify (m, TermConst "i64")
 clarifyConst m "stdin" = clarify (m, TermIntS 64 0)
 clarifyConst m "stdout" = clarify (m, TermIntS 64 1)
 clarifyConst m "stderr" = clarify (m, TermIntS 64 2)
@@ -222,12 +222,27 @@ clarifySysCall name sysCall argLen argIdxList m = do
       | length xts == argLen -> do
         let ys = map (\i -> toVar $ fst $ xts !! i) argIdxList
         zts <- complementaryChainOf xts
-        makeClosure'
-          (Just name)
-          zts
-          m
-          xts
-          (m, CodeTheta (ThetaSysCall sysCall ys))
+        case sysCall of
+          SysCallWrite
+            -- 引数のうち配列はクロージャとして表現されているので中身を取り出す必要がある
+           -> do
+            (contentTypeVarName, contentTypeVar) <-
+              newDataUpsilonWith "array-type"
+            (contentVarName, contentVar) <- newDataUpsilonWith "array-content"
+            retUnivType <- returnCartesianUniv
+            -- retImmType <- returnCartesianImmediate
+            let retContentType = (m, CodeUpIntro contentTypeVar)
+            let ys' = [ys !! 0, contentVar, ys !! 2]
+            let body =
+                  ( m
+                  -- decompose the array closure
+                  , CodeSigmaElim
+                      [ (contentTypeVarName, retUnivType)
+                      , (contentVarName, retContentType)
+                      ]
+                      (ys !! 1)
+                      (m, CodeTheta (ThetaSysCall sysCall ys')))
+            makeClosure' (Just name) zts m xts body
     _ -> throwError $ "the type of " ++ name ++ " is wrong"
 
 complementaryChainOf ::

@@ -53,12 +53,18 @@
 ;; lambda: pi-introduction with implicit begin block
 (keyword lambda)
 
+(notation (lambda () e)
+  (pi-introduction () (begin e)))
+
 (notation (lambda (xts+) e)
   (pi-i (xts+) (begin e)))
 
 ;; define recursive term at top level without using `mu` explicitly
 (notation (definition name e)
   (let name (mu name e))) ;; こっちの `let` はspecial formのほうのlet.
+
+(notation (definition name () e+)
+  (let name (mu name (lambda () e+))))
 
 (notation (definition name (x+) e+)
   (let name (mu name (lambda (x+) e+))))
@@ -174,7 +180,7 @@
 (enum bottom) ;; for io-monad
 
 (definition io ((a type))
-  (state world a))
+  (state bottom a))
 
 ;; (ascription io
 ;;   (hom type type))
@@ -206,7 +212,7 @@
   (pi
     ((A type)
      (x A))
-    (state world A)))
+    (state bottom A)))
 
 ;; (constant unsafe.eval-io)
 
@@ -235,7 +241,10 @@
 
 (enum choice left right)
 
-;; (constant admit-explicit)
+(enum three three-0 three-1 three-2)
+
+(constant admit-explicit
+  (pi ((A type)) A))
 
 ;; (ascription admit-explicit
 ;;   (pi ((A type)) A))
@@ -253,8 +262,35 @@
 ;; (write choice stdout (admit (u8-array choice)) enum.choice)
 ;; これがちゃんと型つくのかなりうれしいな。
 ;; (write choice stdout admit enum.choice)
+;; (lambda () admit)
 
-(io-return top unit)
+;; 「あ」を出力
+(definition str ()
+  (u8-array-introduction
+    (n3-0 227)
+    (n3-1 129)
+    (n3-2 130)))
+
+(definition test ()
+  "あいしてる")
+
+;; 長さがn15になるのがポイントで、ここでunicodeの複雜性が出てくる
+(unsafe.write n15 stdout (test) enum.n15)
+
+;; (unsafe.write n3 stdout (str) enum.n3)
+
+;; (unsafe.write n3 stdout (str) enum.n3)
+
+;; (unsafe.write n3 stdout (str) enum.n3)
+
+unit
+
+;; (unsafe.write choice stdout (str) enum.choice)
+
+;; (unsafe.write choice stdout (str) enum.choice)
+
+
+;; (io-return top unit)
 
 ;; unit
 
