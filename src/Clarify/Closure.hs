@@ -2,7 +2,7 @@ module Clarify.Closure
   ( makeClosure
   , callClosure
   , varTermPlus
-  , getClosedChainBindings
+  , varTermPlus''
   ) where
 
 import Control.Monad.Except
@@ -95,69 +95,62 @@ nameFromMaybe mName =
     Just lamThetaName -> return lamThetaName
     Nothing -> newNameWith "thunk"
 
-varTermPlus :: Context -> TermPlus -> WithEnv [(Identifier, TermPlus)]
-varTermPlus ctx e = do
-  tmp <- getClosedChain ctx e
+varTermPlus :: TermPlus -> WithEnv [(Identifier, TermPlus)]
+varTermPlus e = do
+  tmp <- varTermPlus' e
   return $ nubBy (\(x, _) (y, _) -> x == y) tmp
 
-getClosedChain :: Context -> TermPlus -> WithEnv [(Identifier, TermPlus)]
-getClosedChain _ (_, TermTau) = return []
--- getClosedChain ctx (_, TermTheta z) = do
---   cenv <- gets chainEnv
---   -- t <- lookupTypeEnv z
---   t <- lookupContext z ctx
---   case Map.lookup z cenv of
---     Just xts -> return xts
---     Nothing -> do
---       xts <- getClosedChain ctx t
---       modify (\env -> env {chainEnv = Map.insert z xts cenv})
---       return xts
-getClosedChain ctx (_, TermUpsilon x) = do
-  cenv <- gets chainEnv
-  t <- lookupContext x ctx
-  -- t <- lookupTypeEnv x
-  case Map.lookup x cenv of
-    Just xts -> return $ xts ++ [(x, t)]
-    Nothing -> do
-      xts <- getClosedChain ctx t
-      modify (\env -> env {chainEnv = Map.insert x xts cenv})
-      return $ xts ++ [(x, t)]
-getClosedChain ctx (_, TermPi xts t) = getClosedChainBindings ctx xts [t]
-getClosedChain ctx (_, TermPiIntro xts e) = getClosedChainBindings ctx xts [e]
-getClosedChain ctx (_, TermPiElim e es) = do
-  xs1 <- getClosedChain ctx e
-  xs2 <- concat <$> mapM (getClosedChain ctx) es
+varTermPlus' :: TermPlus -> WithEnv [(Identifier, TermPlus)]
+varTermPlus' (_, TermTau) = return []
+varTermPlus' (_, TermUpsilon x)
+  -- enum.n{i} : is-enum n{i}. since `is-enum` is a constant, the type of enum.n{i} doesn't have any variables.
+  | Just _ <- asEnumNatNumConstant x = return []
+  -- i64, f32, u1234 : univ
+  | Just _ <- asLowTypeMaybe x = return []
+  | otherwise
+    -- xが定数かそうでないかで処理を分岐させる必要がある
+   = do
+    chenv <- gets chainEnv
+    t <- lookupTypeEnv x
+    case Map.lookup x chenv of
+      Just xts -> return $ xts ++ [(x, t)]
+      Nothing -> do
+        xts <- varTermPlus' t
+        modify (\env -> env {chainEnv = Map.insert x xts chenv})
+        return $ xts ++ [(x, t)]
+varTermPlus' (_, TermPi xts t) = varTermPlus'' xts [t]
+varTermPlus' (_, TermPiIntro xts e) = varTermPlus'' xts [e]
+varTermPlus' (_, TermPiElim e es) = do
+  xs1 <- varTermPlus' e
+  xs2 <- concat <$> mapM (varTermPlus') es
   return $ xs1 ++ xs2
-getClosedChain ctx (_, TermMu ut e) = getClosedChainBindings ctx [ut] [e]
-getClosedChain ctx (_, TermTheta xts e) = getClosedChainBindings ctx xts [e]
-getClosedChain _ (_, TermIntS _ _) = return []
-getClosedChain _ (_, TermIntU _ _) = return []
-getClosedChain _ (_, TermFloat16 _) = return []
-getClosedChain _ (_, TermFloat32 _) = return []
-getClosedChain _ (_, TermFloat64 _) = return []
-getClosedChain _ (_, TermEnum _) = return []
-getClosedChain _ (_, TermEnumIntro _) = return []
-getClosedChain ctx (_, TermEnumElim e les) = do
-  xs1 <- getClosedChain ctx e
+varTermPlus' (_, TermMu xt e) = varTermPlus'' [xt] [e]
+varTermPlus' (_, TermTheta xt e) = varTermPlus'' [xt] [e]
+varTermPlus' (_, TermIntS _ _) = return []
+varTermPlus' (_, TermIntU _ _) = return []
+varTermPlus' (_, TermFloat16 _) = return []
+varTermPlus' (_, TermFloat32 _) = return []
+varTermPlus' (_, TermFloat64 _) = return []
+varTermPlus' (_, TermEnum _) = return []
+varTermPlus' (_, TermEnumIntro _) = return []
+varTermPlus' (_, TermEnumElim e les) = do
+  xs1 <- varTermPlus' e
   let es = map snd les
-  xs2 <- concat <$> mapM (getClosedChain ctx) es
+  xs2 <- concat <$> mapM (varTermPlus') es
   return $ xs1 ++ xs2
-getClosedChain ctx (_, TermArray _ indexType) = getClosedChain ctx indexType
-getClosedChain ctx (_, TermArrayIntro _ les) = do
+varTermPlus' (_, TermArray _ indexType) = varTermPlus' indexType
+varTermPlus' (_, TermArrayIntro _ les) = do
   let es = map snd les
-  concat <$> mapM (getClosedChain ctx) es
-getClosedChain ctx (_, TermArrayElim _ e1 e2) = do
-  xs1 <- getClosedChain ctx e1
-  xs2 <- getClosedChain ctx e2
+  concat <$> mapM (varTermPlus') es
+varTermPlus' (_, TermArrayElim _ e1 e2) = do
+  xs1 <- varTermPlus' e1
+  xs2 <- varTermPlus' e2
   return $ xs1 ++ xs2
 
-getClosedChainBindings ::
-     Context
-  -> [(Identifier, TermPlus)]
-  -> [TermPlus]
-  -> WithEnv [(Identifier, TermPlus)]
-getClosedChainBindings ctx [] es = concat <$> mapM (getClosedChain ctx) es
-getClosedChainBindings ctx ((x, t):xts) es = do
-  xs1 <- getClosedChain ctx t
-  xs2 <- getClosedChainBindings ((x, t) : ctx) xts es
+varTermPlus'' ::
+     [(Identifier, TermPlus)] -> [TermPlus] -> WithEnv [(Identifier, TermPlus)]
+varTermPlus'' [] es = concat <$> mapM (varTermPlus') es
+varTermPlus'' ((x, t):xts) es = do
+  xs1 <- varTermPlus' t
+  xs2 <- varTermPlus'' xts es
   return $ xs1 ++ filter (\(y, _) -> y /= x) xs2
