@@ -12,7 +12,7 @@ data PreTerm
   | PreTermPiIntro [IdentifierPlus] PreTermPlus
   | PreTermPiElim PreTermPlus [PreTermPlus]
   | PreTermMu IdentifierPlus PreTermPlus
-  | PreTermTheta [IdentifierPlus] PreTermPlus
+  | PreTermTheta IdentifierPlus PreTermPlus
   | PreTermZeta Identifier
   | PreTermIntS IntSize Integer
   | PreTermIntU IntSize Integer
@@ -47,7 +47,10 @@ instance Show PreMeta where
 
 varPreTermPlus :: PreTermPlus -> [Identifier]
 varPreTermPlus (_, PreTermTau) = []
-varPreTermPlus (_, PreTermUpsilon x) = [x]
+varPreTermPlus (_, PreTermUpsilon x)
+  | isConstant x = []
+  | otherwise = [x]
+-- varPreTermPlus (_, PreTermUpsilon x) = [x]
 varPreTermPlus (_, PreTermPi xts t) = do
   varPreTermPlusBindings xts [t]
 varPreTermPlus (_, PreTermPiIntro xts e) = do
@@ -58,7 +61,7 @@ varPreTermPlus (_, PreTermPiElim e es) = do
   xhs ++ yhs
 varPreTermPlus (_, PreTermMu ut e) = do
   varPreTermPlusBindings [ut] [e]
-varPreTermPlus (_, PreTermTheta xts e) = varPreTermPlusBindings xts [e]
+varPreTermPlus (_, PreTermTheta xt e) = varPreTermPlusBindings [xt] [e]
 varPreTermPlus (_, PreTermZeta _) = []
 varPreTermPlus (_, PreTermIntS _ _) = []
 varPreTermPlus (_, PreTermIntU _ _) = []
@@ -91,15 +94,12 @@ varPreTermPlusBindings ((x, t):xts) es = do
 holePreTermPlus :: PreTermPlus -> [Hole]
 holePreTermPlus (_, PreTermTau) = []
 holePreTermPlus (_, PreTermUpsilon _) = []
-holePreTermPlus (_, PreTermPi xts t) = do
-  holePreTermPlusBindings xts [t]
-holePreTermPlus (_, PreTermPiIntro xts e) = do
-  holePreTermPlusBindings xts [e]
-holePreTermPlus (_, PreTermPiElim e es) = do
+holePreTermPlus (_, PreTermPi xts t) = holePreTermPlusBindings xts [t]
+holePreTermPlus (_, PreTermPiIntro xts e) = holePreTermPlusBindings xts [e]
+holePreTermPlus (_, PreTermPiElim e es) =
   holePreTermPlus e ++ concatMap holePreTermPlus es
-holePreTermPlus (_, PreTermMu ut e) = do
-  holePreTermPlusBindings [ut] [e]
-holePreTermPlus (_, PreTermTheta xts e) = holePreTermPlusBindings xts [e]
+holePreTermPlus (_, PreTermMu ut e) = holePreTermPlusBindings [ut] [e]
+holePreTermPlus (_, PreTermTheta xt e) = holePreTermPlusBindings [xt] [e]
 holePreTermPlus (_, PreTermZeta h) = [h]
 holePreTermPlus (_, PreTermIntS _ _) = []
 holePreTermPlus (_, PreTermIntU _ _) = []
@@ -151,12 +151,12 @@ substPreTermPlus sub (m, PreTermMu (x, t) e) = do
   let t' = substPreTermPlus sub t
   let e' = substPreTermPlus (filter (\(k, _) -> k /= x) sub) e
   (m', PreTermMu (x, t') e')
-substPreTermPlus sub (m, PreTermTheta xts body) = do
+substPreTermPlus sub (m, PreTermTheta (x, t) e) = do
   let m' = substPreMeta sub m
-  let (xts', body') = substPreTermPlusBindingsWithBody sub xts body
-  (m', PreTermTheta xts' body')
-  -- let m' = substPreMeta sub m
-  -- (m', PreTermTheta t)
+  let t' = substPreTermPlus sub t
+  let e' = substPreTermPlus (filter (\(k, _) -> k /= x) sub) e
+  -- let (xts', body') = substPreTermPlusBindingsWithBody sub xts body
+  (m', PreTermTheta (x, t') e')
 substPreTermPlus sub (m, PreTermZeta s) = do
   let m' = substPreMeta sub m
   fromMaybe (m', PreTermZeta s) (lookup s sub)
@@ -223,7 +223,6 @@ substPreTermPlusBindingsWithBody sub ((x, t):xts) e = do
   ((x, t') : xts', e')
 
 substPreMeta :: SubstPreTerm -> PreMeta -> PreMeta
--- substPreMeta _ m = m
 substPreMeta _ m@(PreMetaTerminal _) = m
 substPreMeta sub (PreMetaNonTerminal t ml) =
   PreMetaNonTerminal (substPreTermPlus sub t) ml
@@ -252,8 +251,8 @@ isReduciblePreTerm (_, PreTermPiElim e es) =
   isReduciblePreTerm e || any isReduciblePreTerm es
 isReduciblePreTerm (_, PreTermMu (_, t) e) =
   isReduciblePreTerm t || isReduciblePreTerm e
-isReduciblePreTerm (_, PreTermTheta xts e) =
-  any isReduciblePreTerm (map snd xts) || isReduciblePreTerm e
+isReduciblePreTerm (_, PreTermTheta (_, t) e) =
+  isReduciblePreTerm t || isReduciblePreTerm e
 isReduciblePreTerm (_, PreTermZeta _) = False
 isReduciblePreTerm (_, PreTermIntS _ _) = False
 isReduciblePreTerm (_, PreTermIntU _ _) = False
@@ -277,7 +276,6 @@ isReduciblePreTerm (_, PreTermArrayElim _ (_, PreTermArrayIntro _ les) (_, PreTe
 isReduciblePreTerm (_, PreTermArrayElim _ e1 e2) =
   isReduciblePreTerm e1 || isReduciblePreTerm e2
 
--- valueの定義がおかしい？
 isValue :: PreTermPlus -> Bool
 isValue (_, PreTermTau) = True
 isValue (_, PreTermUpsilon _) = True
