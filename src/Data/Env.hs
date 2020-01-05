@@ -86,6 +86,12 @@ newNameWith s = do
 
 lookupTypeEnv :: String -> WithEnv TermPlus
 lookupTypeEnv s
+  | Just i <- asEnumNatNumConstant s = do
+    return
+      ( emptyMeta
+      , TermPiElim
+          (emptyMeta, TermConst "is-enum")
+          [(emptyMeta, TermEnum $ EnumTypeNatNum i)])
   | Just _ <- asLowTypeMaybe s = return univTerm
   | otherwise = do
     mt <- gets (Map.lookup s . typeEnv)
