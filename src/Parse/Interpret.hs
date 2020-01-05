@@ -39,19 +39,18 @@ interpret (m, TreeNode [(_, TreeAtom "mu"), xt, e]) = do
   xt' <- interpretIdentifierPlus xt
   e' <- interpret e
   withMeta m $ WeakTermMu xt' e'
-interpret (m, TreeNode [(_, TreeAtom "theta"), (_, TreeNode xts), e]) = do
-  (xts', e') <- interpretBinder xts e
-  withMeta m $ WeakTermTheta xts' e'
+interpret (m, TreeNode [(_, TreeAtom "theta"), xt, e]) = do
+  xt' <- interpretIdentifierPlus xt
+  e' <- interpret e
+  withMeta m $ WeakTermTheta xt' e'
 interpret (m, TreeNode [(_, TreeAtom "zeta"), (_, TreeAtom x)]) = do
   x' <- interpretAtom x
   withMeta m $ WeakTermZeta x'
 interpret (m, TreeNode [(_, TreeAtom t), (_, TreeAtom x)])
   | Just (LowTypeIntS i) <- asLowTypeMaybe t
-  , i > 0
   , Just x' <- readMaybe x = withMeta m $ WeakTermIntS i x'
 interpret (m, TreeNode [(_, TreeAtom t), (_, TreeAtom x)])
   | Just (LowTypeIntU i) <- asLowTypeMaybe t
-  , i > 0
   , Just x' <- readMaybe x = withMeta m $ WeakTermIntU i x'
 interpret (m, TreeNode [(_, TreeAtom "f16"), (_, TreeAtom x)])
   | Just x' <- readMaybe x = do withMeta m $ WeakTermFloat16 x'
@@ -121,23 +120,11 @@ interpret t@(m, TreeAtom x) = do
       if isEnum
         then withMeta m $ WeakTermEnum $ EnumTypeLabel x
         else withMeta m $ WeakTermUpsilon x
-          -- b <- isConstant x
-          -- if b
-          --   then withMeta m $ WeakTermTheta x
-          --   else withMeta m $ WeakTermUpsilon x
 interpret t@(m, TreeNode es) =
   if null es
     then throwError $ "interpret: syntax error:\n" ++ Pr.ppShow t
     else interpret (m, TreeNode ((m, TreeAtom "pi-elimination") : es))
 
--- enum.n4とかを定数として処理する話は？freevarとしてenum.n4とかが出てきたときに適当に処理しろって感じか？
--- isConstant :: Identifier -> WithEnv Bool
--- isConstant x
---   | Just _ <- asEnumNatNumConstant x = return True
---   | x `elem` primitiveList = return True
---   | otherwise = do
---     cenv <- gets constantEnv
---     return $ x `elem` cenv
 interpretIdentifierPlus :: TreePlus -> WithEnv IdentifierPlus
 interpretIdentifierPlus (_, TreeAtom x) = do
   h <- newNameWith "hole-plus"
