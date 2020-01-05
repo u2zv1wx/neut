@@ -31,15 +31,9 @@ elaborate :: WeakTermPlus -> WithEnv TermPlus
 elaborate e = do
   p "infer"
   e' <- infer [] e
-  -- Kantian type-inference ;)
+  p "analyze/synthesize"
   gets constraintEnv >>= analyze >>= synthesize
-  -- update the type environment by resulting substitution
-  tenv <- gets weakTypeEnv
-  -- tenv' <- mapM (elaborate' >=> reduceTermPlus) tenv
-  tenv' <- mapM elaborate' tenv
-  modify (\env -> env {typeEnv = tenv'})
-  p "updated typeEnv"
-  -- elaborate `e` using the resulting substitution
+  p "elaborate"
   elaborate' e'
 
 -- This function translates a well-typed term into an untyped term in a

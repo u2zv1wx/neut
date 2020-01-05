@@ -122,6 +122,7 @@ varTermPlus'' ::
 varTermPlus'' [] es = concat <$> mapM (varTermPlus') es
 varTermPlus'' ((x, t):xts) es = do
   xs1 <- varTermPlus' t
+  insTypeEnv x t
   xs2 <- varTermPlus'' xts es
   return $ xs1 ++ filter (\(y, _) -> y /= x) xs2
 

@@ -25,10 +25,10 @@ data Def
   | DefConstDecl IdentifierPlus
 
 parse :: String -> WithEnv WeakTermPlus
-parse s = strToTree s >>= parse' >>= concatDefList
+parse s = strToTree s >>= parse' >>= concatDefList >>= rename
 
+-- parse s = strToTree s >>= parse' >>= concatDefList
 -- Parse the head element of the input list.
--- FIXME: 細かくrenameせずにparseの最後にまとめてrenameすればよくね？
 parse' :: [TreePlus] -> WithEnv [Def]
 parse' [] = return []
 parse' ((_, TreeNode [(_, TreeAtom "notation"), from, to]):as) =
@@ -84,23 +84,16 @@ parse' ((_, TreeNode ((_, TreeAtom "statement"):as1)):as2) = do
   defList1 <- parse' as1
   defList2 <- parse' as2
   return $ defList1 ++ defList2
-parse' ((_, TreeNode [(_, TreeAtom "constant"), (_, TreeAtom name), t]):as)
-  -- (constant x t) : Declare external constants.
- = do
-  t' <- macroExpand t >>= interpret >>= rename
-  let theta = DefConstDecl (name, t')
+parse' ((_, TreeNode [(_, TreeAtom "constant"), (_, TreeAtom name), t]):as) = do
+  t' <- macroExpand t >>= interpret
   modify (\e -> e {constantEnv = name : constantEnv e})
-  -- register the name of the constant (to be used in `rename` in `parse' as`)
-  modify (\env -> env {nameEnv = (name, name) : nameEnv env})
   defList <- parse' as
-  return $ theta : defList
+  return $ DefConstDecl (name, t') : defList
 parse' ((_, TreeNode [(_, TreeAtom "let"), xt, e]):as) = do
-  e' <- macroExpand e >>= interpret >>= rename
+  e' <- macroExpand e >>= interpret
   (x, t) <- macroExpand xt >>= interpretIdentifierPlus
-  t' <- rename t
-  x' <- newNameWith x
   defList <- parse' as
-  return $ DefLet newMeta (x', t') e' : defList
+  return $ DefLet newMeta (x, t) e' : defList
 parse' (a:as)
   -- If the head element is not a special form, we interpret it as an ordinary term.
  = do
@@ -108,7 +101,7 @@ parse' (a:as)
   if isSpecialForm e
     then parse' $ e : as
     else do
-      e'@(meta, _) <- interpret e >>= rename
+      e'@(meta, _) <- interpret e
       name <- newNameWith "hole-parse-last"
       t <- newHole
       defList <- parse' as
@@ -138,19 +131,19 @@ toIsEnumType name = do
 concatDefList :: [Def] -> WithEnv WeakTermPlus
 concatDefList [] = do
   return (newMeta, WeakTermEnumIntro $ EnumValueLabel "unit")
--- concatDefList [DefLet meta xt@(x, _) e] = do
---   let varX = (newMeta, WeakTermUpsilon x)
---   -- let x : t := e in
---   -- unsafe.eval-io x
---   return
---     ( meta
---     , WeakTermPiElim
---         ( newMeta
---         , WeakTermPiIntro
---             [xt]
---             ( newMeta
---             , WeakTermPiElim (newMeta, WeakTermConstDecl "unsafe.eval-io") [varX]))
---         [e])
+concatDefList [DefLet meta xt@(x, _) e] = do
+  let varX = (newMeta, WeakTermUpsilon x)
+  -- let x : t := e in
+  -- unsafe.eval-io x
+  return
+    ( meta
+    , WeakTermPiElim
+        ( newMeta
+        , WeakTermPiIntro
+            [xt]
+            ( newMeta
+            , WeakTermPiElim (newMeta, WeakTermConst "unsafe.eval-io") [varX]))
+        [e])
 concatDefList (DefConstDecl xt:es) = do
   cont <- concatDefList es
   return (newMeta, WeakTermConstDecl xt cont)

@@ -18,7 +18,6 @@ import Data.Env
 import Data.Term
 import Reduce.Term
 
-import qualified Data.Map.Strict as Map
 import qualified Text.Show.Pretty as Pr
 
 clarify :: TermPlus -> WithEnv CodePlus
@@ -30,8 +29,8 @@ clarify (m, TermPi {}) = do
   returnClosureType m
 clarify lam@(m, TermPiIntro xts e) = do
   forM_ xts $ uncurry insTypeEnv
-  fvs <- varTermPlus lam
   e' <- clarify e
+  fvs <- varTermPlus lam
   makeClosure' Nothing fvs m xts e'
 clarify (m, TermPiElim e es) = do
   e' <- clarify e
@@ -48,6 +47,7 @@ clarify mu@(m, TermMu (f, t) e) = do
   callClosure' m cls fvs'
 clarify (m, TermConst x) = clarifyConst m x
 clarify (_, TermConstDecl (x, t) e) = do
+  _ <- clarify t
   insTypeEnv x t
   clarify e
 clarify (m, TermIntS size l) = do
@@ -207,10 +207,21 @@ clarifyIsEnum m = do
 --      let (resultEnv, value) := sig in
 --      return value
 --    (as closure)
+-- io aがbottom -> (bottom, a)であるってのはそうなんだけど、そもそもこのcodのproductは
+-- piによって表現された特殊なものなので、普通にsigmaElimで分解することはできない。
+-- unsafe.zero : Pi (A : Tau). Tauみたいなものを対象言語のほうに用意しておいて、これをつかって
+-- unsafe.eval-io = lam x. (snd (x @ (unsafe.zero bottom))) のように対象言語のほうで
+-- 定義するべきなのでは。
 clarifyEvalIO :: Meta -> WithEnv CodePlus
-clarifyEvalIO m = do
+clarifyEvalIO m
+  -- p "found eval-io"
+ = do
   t <- lookupTypeEnv "unsafe.eval-io"
+  -- p "type:"
+  -- p' t
+  -- p "type (reduced):"
   t' <- reduceTermPlus t
+  p' t'
   case t' of
     (_, TermPi xts@[arg] _) -> do
       (resultValue, resultValueVar) <- newDataUpsilonWith "result"
@@ -313,6 +324,3 @@ callClosure' :: Meta -> CodePlus -> [TermPlus] -> WithEnv CodePlus
 callClosure' m e es = do
   tmp <- mapM (clarifyPlus) es
   callClosure m e tmp
-
-insTypeEnv :: Identifier -> TermPlus -> WithEnv ()
-insTypeEnv i t = modify (\e -> e {typeEnv = Map.insert i t (typeEnv e)})

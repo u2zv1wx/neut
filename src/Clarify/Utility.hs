@@ -8,6 +8,8 @@ import Data.Code
 import Data.Env
 import Data.Term
 
+import qualified Data.Map.Strict as Map
+
 type Context = [(Identifier, TermPlus)]
 
 -- toAffineApp ML x e ~>
@@ -270,3 +272,6 @@ lookupContext z ctx = do
   case lookup z ctx of
     Nothing -> throwError "lookupContext"
     Just t -> return t
+
+insTypeEnv :: Identifier -> TermPlus -> WithEnv ()
+insTypeEnv i t = modify (\e -> e {typeEnv = Map.insert i t (typeEnv e)})

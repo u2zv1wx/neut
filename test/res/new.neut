@@ -132,11 +132,6 @@
     ((elim-result-type tau)
      (eliminator (pi (to-hole-list e+) elim-result-type)))
     (eliminator e+)))
-;; (notation (sigma-introduction e+)
-;;   (lambda
-;;     ((elim-result-type tau)
-;;      (eliminator (pi (???) elim-result-type)))
-;;     (eliminator e+)))
 
 (keyword sigma-elimination)
 
@@ -260,6 +255,8 @@
 ;; (write choice stdout admit enum.choice)
 
 (io-return top unit)
+
+;; unit
 
 ;; (ascription write
 ;;   (arrow (top top top top) bottom))
