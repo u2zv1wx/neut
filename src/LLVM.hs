@@ -14,17 +14,10 @@ import Data.LLVM
 toLLVM :: CodePlus -> WithEnv LLVM
 toLLVM mainTerm = do
   penv <- gets codeEnv
-  forM_ penv $ \(name, (args, e))
-    -- when (name == "unsafe.write") $ do
-    --   p "unsafe.write"
-    --   p "args:"
-    --   p' $ args
-    --   p "body:"
-    --   p' e
-   -> do
+  forM_ penv $ \(name, (args, e)) -> do
     llvm <- llvmCode e
     insLLVMEnv name args llvm
-  p' mainTerm
+  -- p' mainTerm
   -- error "stop"
   l <- llvmCode mainTerm
   -- the result of "main" must be i64, not i8*

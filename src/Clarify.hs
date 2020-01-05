@@ -25,16 +25,7 @@ clarify :: TermPlus -> WithEnv CodePlus
 clarify (m, TermTau) = do
   v <- cartesianUniv m
   return (m, CodeUpIntro v)
-clarify (m, TermUpsilon x)
-  -- enum.n{i} ~> i  (i.e. the size of n{i})
-  | Just i <- asEnumNatNumConstant x = clarify (m, TermIntS 64 i)
-  -- i64, f32, u1234, etc ~> cartesianImmediate
-  | Just _ <- asLowTypeMaybe x = clarify (m, TermEnum $ EnumTypeLabel "top")
-  | otherwise = do
-    cenv <- gets constantEnv
-    if x `elem` cenv
-      then return (m, CodeUpIntro (m, DataTheta x)) -- global
-      else return (m, CodeUpIntro (m, DataUpsilon x)) -- local
+clarify (m, TermUpsilon x) = return (m, CodeUpIntro (m, DataUpsilon x))
 clarify (m, TermPi {}) = do
   returnClosureType m
 clarify lam@(m, TermPiIntro xts e) = do
@@ -51,18 +42,14 @@ clarify mu@(m, TermMu (f, t) e) = do
   let fvs' = map (toTermUpsilon . fst) fvs
   -- set f as a global variable
   modify (\env -> env {constantEnv = f : constantEnv env})
-  let e' = substTermPlus [(f, (m, TermPiElim (m, TermUpsilon f) fvs'))] e
+  let e' = substTermPlus [(f, (m, TermPiElim (m, TermConst f) fvs'))] e
   e'' <- clarify e'
   cls <- makeClosure' (Just f) [] m fvs e''
   callClosure' m cls fvs'
-clarify theta@(m, TermTheta (x, t) e) = do
+clarify (m, TermConst x) = clarifyConst m x
+clarify (_, TermConstDecl (x, t) e) = do
   insTypeEnv x t
-  fvs <- varTermPlus theta
-  e' <- clarify e
-  cls <- makeClosure' Nothing fvs m [(x, t)] e'
-  arg <- clarifyTheta m x
-  (varName, var) <- newDataUpsilonWith' "var" m
-  callClosure m cls [(varName, arg, var)]
+  clarify e
 clarify (m, TermIntS size l) = do
   return (m, CodeUpIntro (m, DataIntS size l))
 clarify (m, TermIntU size l) = do
@@ -130,28 +117,32 @@ clarifyPlus e@(m, _) = do
   (varName, var) <- newDataUpsilonWith' "var" m
   return (varName, e', var)
 
-clarifyTheta :: Meta -> Identifier -> WithEnv CodePlus
-clarifyTheta m name
+clarifyConst :: Meta -> Identifier -> WithEnv CodePlus
+clarifyConst m name
   | Just (lowType, op) <- asUnaryOpMaybe name = clarifyUnaryOp name op lowType m
-clarifyTheta m name
+clarifyConst m name
   | Just (lowType, op) <- asBinaryOpMaybe name =
     clarifyBinaryOp name op lowType m
-clarifyTheta m name
+clarifyConst m name
   | Just (sysCall, len, idxList) <- asSysCallMaybe name =
     clarifySysCall name sysCall len idxList m
-clarifyTheta m name
+clarifyConst m name
   | Just _ <- asLowTypeMaybe name = clarify (m, TermEnum $ EnumTypeLabel "top")
-clarifyTheta m "is-enum" = clarifyIsEnum m
-clarifyTheta m "unsafe.eval-io" = clarifyEvalIO m
-clarifyTheta m "file-descriptor" = clarify (m, TermUpsilon "i64")
-clarifyTheta m "stdin" = clarify (m, TermIntS 64 0)
-clarifyTheta m "stdout" = clarify (m, TermIntS 64 1)
-clarifyTheta m "stderr" = clarify (m, TermIntS 64 2)
-clarifyTheta m name = do
+clarifyConst m "is-enum" = clarifyIsEnum m
+clarifyConst m "unsafe.eval-io" = clarifyEvalIO m
+clarifyConst m "file-descriptor" = clarify (m, TermUpsilon "i64")
+clarifyConst m "stdin" = clarify (m, TermIntS 64 0)
+clarifyConst m "stdout" = clarify (m, TermIntS 64 1)
+clarifyConst m "stderr" = clarify (m, TermIntS 64 2)
+clarifyConst m name = do
   mx <- asEnumConstant name
   case mx of
     Just i -> clarify (m, TermIntS 64 i) -- enum.top ~> 1, enum.choice ~> 2, etc.
-    Nothing -> throwError $ "clarify.theta: " ++ name
+    Nothing -> do
+      cenv <- gets constantEnv
+      if name `elem` cenv
+        then return (m, CodeUpIntro (m, DataTheta name))
+        else throwError $ "clarify.theta: " ++ name
 
 clarifyUnaryOp :: Identifier -> UnaryOp -> LowType -> Meta -> WithEnv CodePlus
 clarifyUnaryOp name op lowType m = do
@@ -296,6 +287,7 @@ asEnumConstant x
     case lookup y eenv of
       Nothing -> return Nothing
       Just ls -> return $ Just $ toInteger $ length ls
+  | Just i <- asEnumNatNumConstant x = return $ Just i
 asEnumConstant _ = return Nothing
 
 clarifyBinder :: [(Identifier, TermPlus)] -> WithEnv [(Identifier, CodePlus)]

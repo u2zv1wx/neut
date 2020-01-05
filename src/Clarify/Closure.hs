@@ -81,16 +81,10 @@ varTermPlus e = do
 
 varTermPlus' :: TermPlus -> WithEnv [(Identifier, TermPlus)]
 varTermPlus' (_, TermTau) = return []
-varTermPlus' (_, TermUpsilon x)
-  -- enum.n{i} : is-enum n{i}. since `is-enum` is a constant, the type of enum.n{i} doesn't have any variables.
-  | Just _ <- asEnumNatNumConstant x = return []
-  -- i64, f32, u1234 : univ
-  | Just _ <- asLowTypeMaybe x = return []
-  -- constant or ordinary variable
-  | otherwise = do
-    t <- lookupTypeEnv x
-    xts <- chainWithName x t
-    return $ xts ++ [(x, t)]
+varTermPlus' (_, TermUpsilon x) = do
+  t <- lookupTypeEnv x
+  xts <- chainWithName x t
+  return $ xts ++ [(x, t)]
 varTermPlus' (_, TermPi xts t) = varTermPlus'' xts [t]
 varTermPlus' (_, TermPiIntro xts e) = varTermPlus'' xts [e]
 varTermPlus' (_, TermPiElim e es) = do
@@ -98,7 +92,10 @@ varTermPlus' (_, TermPiElim e es) = do
   xs2 <- concat <$> mapM (varTermPlus') es
   return $ xs1 ++ xs2
 varTermPlus' (_, TermMu xt e) = varTermPlus'' [xt] [e]
-varTermPlus' (_, TermTheta xt e) = varTermPlus'' [xt] [e]
+varTermPlus' (_, TermConst x) = do
+  t <- lookupTypeEnv x
+  chainWithName x t
+varTermPlus' (_, TermConstDecl xt e) = varTermPlus'' [xt] [e]
 varTermPlus' (_, TermIntS _ _) = return []
 varTermPlus' (_, TermIntU _ _) = return []
 varTermPlus' (_, TermFloat16 _) = return []
