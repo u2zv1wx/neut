@@ -85,11 +85,13 @@ newNameWith s = do
   return s'
 
 lookupTypeEnv :: String -> WithEnv TermPlus
-lookupTypeEnv s = do
-  mt <- gets (Map.lookup s . typeEnv)
-  case mt of
-    Just t -> return t
-    Nothing -> throwError $ s ++ " is not found in the type environment."
+lookupTypeEnv s
+  | Just _ <- asLowTypeMaybe s = return univTerm
+  | otherwise = do
+    mt <- gets (Map.lookup s . typeEnv)
+    case mt of
+      Just t -> return t
+      Nothing -> throwError $ s ++ " is not found in the type environment."
 
 lookupNameEnv :: String -> WithEnv String
 lookupNameEnv s = do
