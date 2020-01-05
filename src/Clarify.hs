@@ -27,9 +27,17 @@ clarify' :: Context -> TermPlus -> WithEnv CodePlus
 clarify' _ (m, TermTau) = do
   v <- cartesianUniv m
   return (m, CodeUpIntro v)
--- clarify' ctx (m, TermTheta x) = clarifyTheta ctx m x
-clarify' _ (m, TermUpsilon x) = do
-  return (m, CodeUpIntro (m, DataUpsilon x))
+clarify' ctx (m, TermUpsilon x)
+  -- enum.n{i} ~> i  (i.e. the size of n{i})
+  | Just i <- asEnumNatNumConstant x = clarify' ctx (m, TermIntS 64 i)
+  -- i64, f32, u1234, etc ~> cartesianImmediate
+  | Just _ <- asLowTypeMaybe x =
+    clarify' ctx (m, TermEnum $ EnumTypeLabel "top")
+  | otherwise = do
+    cenv <- gets constantEnv
+    if x `elem` cenv
+      then return (m, CodeUpIntro (m, DataTheta x)) -- global
+      else return (m, CodeUpIntro (m, DataUpsilon x)) -- local
 clarify' _ (m, TermPi _ _) = do
   returnClosureType m
 clarify' ctx lam@(m, TermPiIntro xts e) = do
@@ -42,11 +50,13 @@ clarify' ctx (m, TermPiElim e es) = do
 clarify' ctx mu@(m, TermMu (f, t) e) = do
   fvs <- varTermPlus ctx mu
   let fvs' = map (toTermUpsilon . fst) fvs
-  undefined
+  -- set f as a global variable
+  modify (\env -> env {constantEnv = f : constantEnv env})
   -- let e' = substTermPlus [(f, (m, TermPiElim (m, TermTheta f) fvs'))] e
-  -- e'' <- clarify' ((f, t) : ctx) e'
-  -- cls <- makeClosure' ctx (Just f) [] m fvs e''
-  -- callClosure' ctx m cls fvs'
+  let e' = substTermPlus [(f, (m, TermPiElim (m, TermUpsilon f) fvs'))] e
+  e'' <- clarify' ((f, t) : ctx) e'
+  cls <- makeClosure' ctx (Just f) [] m fvs e''
+  callClosure' ctx m cls fvs'
 clarify' _ (m, TermIntS size l) = do
   return (m, CodeUpIntro (m, DataIntS size l))
 clarify' _ (m, TermIntU size l) = do
@@ -130,7 +140,6 @@ clarifyTheta ctx m name
 clarifyTheta ctx m "is-enum" = clarifyIsEnum ctx m
 clarifyTheta ctx m "unsafe.eval-io" = clarifyEvalIO ctx m
 clarifyTheta ctx m "file-descriptor" = clarify' ctx (m, TermUpsilon "i64")
--- clarifyTheta ctx m "file-descriptor" = clarify' ctx (m, TermTheta "i64")
 clarifyTheta ctx m "stdin" = clarify' ctx (m, TermIntS 64 0)
 clarifyTheta ctx m "stdout" = clarify' ctx (m, TermIntS 64 1)
 clarifyTheta ctx m "stderr" = clarify' ctx (m, TermIntS 64 2)
@@ -285,6 +294,7 @@ toVar :: Identifier -> DataPlus
 toVar x = (emptyMeta, DataUpsilon x)
 
 -- {enum.top, enum.choice, etc.} ~> {(the number of contents in enum)}
+-- enum.n{i}とかも処理できないとだめ。
 asEnumConstant :: Identifier -> WithEnv (Maybe Integer)
 asEnumConstant x
   | ["enum", y] <- wordsBy '.' x = do
