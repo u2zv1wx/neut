@@ -28,7 +28,8 @@ reducePreTermPlus (m, PreTermPiElim e es) = do
   let app = PreTermPiElim e' es'
   case e' of
     (_, PreTermPiIntro xts body)
-      | length xts == length es' -> do
+      | length xts == length es' -- fixme: arguments must be pure (also add partial evaluation)
+       -> do
         let xs = map fst xts
         let body' = substPreTermPlus (zip xs es') body
         reducePreTermPlus body'
