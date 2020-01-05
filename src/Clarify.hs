@@ -18,68 +18,69 @@ import Data.Env
 import Data.Term
 import Reduce.Term
 
+import qualified Data.Map.Strict as Map
 import qualified Text.Show.Pretty as Pr
 
+-- clarify :: TermPlus -> WithEnv CodePlus
+-- clarify = clarify []
 clarify :: TermPlus -> WithEnv CodePlus
-clarify = clarify' []
-
-clarify' :: Context -> TermPlus -> WithEnv CodePlus
-clarify' _ (m, TermTau) = do
+clarify (m, TermTau) = do
   v <- cartesianUniv m
   return (m, CodeUpIntro v)
-clarify' ctx (m, TermUpsilon x)
+clarify (m, TermUpsilon x)
   -- enum.n{i} ~> i  (i.e. the size of n{i})
-  | Just i <- asEnumNatNumConstant x = clarify' ctx (m, TermIntS 64 i)
+  | Just i <- asEnumNatNumConstant x = clarify (m, TermIntS 64 i)
   -- i64, f32, u1234, etc ~> cartesianImmediate
-  | Just _ <- asLowTypeMaybe x =
-    clarify' ctx (m, TermEnum $ EnumTypeLabel "top")
+  | Just _ <- asLowTypeMaybe x = clarify (m, TermEnum $ EnumTypeLabel "top")
   | otherwise = do
     cenv <- gets constantEnv
     if x `elem` cenv
       then return (m, CodeUpIntro (m, DataTheta x)) -- global
       else return (m, CodeUpIntro (m, DataUpsilon x)) -- local
-clarify' _ (m, TermPi _ _) = do
+clarify (m, TermPi {}) = do
   returnClosureType m
-clarify' ctx lam@(m, TermPiIntro xts e) = do
-  fvs <- varTermPlus ctx lam
-  e' <- clarify' (reverse xts ++ ctx) e
-  makeClosure' ctx Nothing fvs m xts e'
-clarify' ctx (m, TermPiElim e es) = do
-  e' <- clarify' ctx e
-  callClosure' ctx m e' es
-clarify' ctx mu@(m, TermMu (f, t) e) = do
-  fvs <- varTermPlus ctx mu
+clarify lam@(m, TermPiIntro xts e) = do
+  fvs <- varTermPlus lam
+  forM_ xts $ uncurry insTypeEnv
+  e' <- clarify e
+  makeClosure' Nothing fvs m xts e'
+clarify (m, TermPiElim e es) = do
+  e' <- clarify e
+  callClosure' m e' es
+clarify mu@(m, TermMu (f, t) e) = do
+  fvs <- varTermPlus mu
   let fvs' = map (toTermUpsilon . fst) fvs
   -- set f as a global variable
+  insTypeEnv f t
   modify (\env -> env {constantEnv = f : constantEnv env})
   -- let e' = substTermPlus [(f, (m, TermPiElim (m, TermTheta f) fvs'))] e
   let e' = substTermPlus [(f, (m, TermPiElim (m, TermUpsilon f) fvs'))] e
-  e'' <- clarify' ((f, t) : ctx) e'
-  cls <- makeClosure' ctx (Just f) [] m fvs e''
-  callClosure' ctx m cls fvs'
-clarify' _ (m, TermIntS size l) = do
+  e'' <- clarify e'
+  cls <- makeClosure' (Just f) [] m fvs e''
+  callClosure' m cls fvs'
+clarify (m, TermIntS size l) = do
   return (m, CodeUpIntro (m, DataIntS size l))
-clarify' _ (m, TermIntU size l) = do
+clarify (m, TermIntU size l) = do
   return (m, CodeUpIntro (m, DataIntU size l))
-clarify' _ (m, TermFloat16 l) = do
+clarify (m, TermFloat16 l) = do
   return (m, CodeUpIntro (m, DataFloat16 l))
-clarify' _ (m, TermFloat32 l) = do
+clarify (m, TermFloat32 l) = do
   return (m, CodeUpIntro (m, DataFloat32 l))
-clarify' _ (m, TermFloat64 l) = do
+clarify (m, TermFloat64 l) = do
   return (m, CodeUpIntro (m, DataFloat64 l))
-clarify' _ (m, TermEnum _) = do
+clarify (m, TermEnum _) = do
   v <- cartesianImmediate m
   return (m, CodeUpIntro v)
-clarify' _ (m, TermEnumIntro l) = do
+clarify (m, TermEnumIntro l) = do
   return (m, CodeUpIntro (m, DataEnumIntro l))
-clarify' ctx (m, TermEnumElim e bs) = do
+clarify (m, TermEnumElim e bs) = do
   let (cs, es) = unzip bs
-  es' <- mapM (clarify' ctx) es
-  (yName, e', y) <- clarifyPlus ctx e
+  es' <- mapM (clarify) es
+  (yName, e', y) <- clarifyPlus e
   return $ bindLet [(yName, e')] (m, CodeEnumElim y (zip cs es'))
-clarify' _ (m, TermArray _ _) = do
+clarify (m, TermArray {}) = do
   returnArrayType m
-clarify' ctx (m, TermArrayIntro k les) = do
+clarify (m, TermArrayIntro k les) = do
   v <- cartesianImmediate m
   let retKindType = (m, CodeUpIntro v)
   -- arrayType = Sigma [_ : IMMEDIATE, ..., _ : IMMEDIATE]
@@ -87,15 +88,15 @@ clarify' ctx (m, TermArrayIntro k les) = do
   arrayType <-
     cartesianSigma name m $ map Left $ replicate (length les) retKindType
   let (ls, es) = unzip les
-  (zs, es', xs) <- unzip3 <$> mapM (clarifyPlus ctx) es
+  (zs, es', xs) <- unzip3 <$> mapM (clarifyPlus) es
   return $
     bindLet (zip zs es') $
     ( m
     , CodeUpIntro $
       (m, DataSigmaIntro [arrayType, (m, DataArrayIntro k (zip ls xs))]))
-clarify' ctx (m, TermArrayElim k e1 e2) = do
-  e1' <- clarify' ctx e1
-  e2' <- clarify' ctx e2
+clarify (m, TermArrayElim k e1 e2) = do
+  e1' <- clarify e1
+  e2' <- clarify e2
   (arrVarName, arrVar) <- newDataUpsilonWith "arr"
   (idxVarName, idxVar) <- newDataUpsilonWith "idx"
   affVarName <- newNameWith "aff"
@@ -118,50 +119,46 @@ clarify' ctx (m, TermArrayElim k e1 e2) = do
             contentTypeVar
             (m, CodeArrayElim k contentVar idxVar)))
 
-clarifyPlus :: Context -> TermPlus -> WithEnv (Identifier, CodePlus, DataPlus)
-clarifyPlus ctx e@(m, _) = do
-  e' <- clarify' ctx e
+clarifyPlus :: TermPlus -> WithEnv (Identifier, CodePlus, DataPlus)
+clarifyPlus e@(m, _) = do
+  e' <- clarify e
   (varName, var) <- newDataUpsilonWith' "var" m
   return (varName, e', var)
 
-clarifyTheta :: Context -> Meta -> Identifier -> WithEnv CodePlus
-clarifyTheta ctx m name
-  | Just (lowType, op) <- asUnaryOpMaybe name =
-    clarifyUnaryOp ctx name op lowType m
-clarifyTheta ctx m name
+clarifyTheta :: Meta -> Identifier -> WithEnv CodePlus
+clarifyTheta m name
+  | Just (lowType, op) <- asUnaryOpMaybe name = clarifyUnaryOp name op lowType m
+clarifyTheta m name
   | Just (lowType, op) <- asBinaryOpMaybe name =
-    clarifyBinaryOp ctx name op lowType m
-clarifyTheta ctx m name
+    clarifyBinaryOp name op lowType m
+clarifyTheta m name
   | Just (sysCall, len, idxList) <- asSysCallMaybe name =
-    clarifySysCall ctx name sysCall len idxList m
-clarifyTheta ctx m name
-  | Just _ <- asLowTypeMaybe name =
-    clarify' ctx (m, TermEnum $ EnumTypeLabel "top")
-clarifyTheta ctx m "is-enum" = clarifyIsEnum ctx m
-clarifyTheta ctx m "unsafe.eval-io" = clarifyEvalIO ctx m
-clarifyTheta ctx m "file-descriptor" = clarify' ctx (m, TermUpsilon "i64")
-clarifyTheta ctx m "stdin" = clarify' ctx (m, TermIntS 64 0)
-clarifyTheta ctx m "stdout" = clarify' ctx (m, TermIntS 64 1)
-clarifyTheta ctx m "stderr" = clarify' ctx (m, TermIntS 64 2)
-clarifyTheta ctx m name = do
+    clarifySysCall name sysCall len idxList m
+clarifyTheta m name
+  | Just _ <- asLowTypeMaybe name = clarify (m, TermEnum $ EnumTypeLabel "top")
+clarifyTheta m "is-enum" = clarifyIsEnum m
+clarifyTheta m "unsafe.eval-io" = clarifyEvalIO m
+clarifyTheta m "file-descriptor" = clarify (m, TermUpsilon "i64")
+clarifyTheta m "stdin" = clarify (m, TermIntS 64 0)
+clarifyTheta m "stdout" = clarify (m, TermIntS 64 1)
+clarifyTheta m "stderr" = clarify (m, TermIntS 64 2)
+clarifyTheta m name = do
   mx <- asEnumConstant name
   case mx of
-    Just i -> clarify' ctx (m, TermIntS 64 i) -- enum.top ~> 1, enum.choice ~> 2, etc.
+    Just i -> clarify (m, TermIntS 64 i) -- enum.top ~> 1, enum.choice ~> 2, etc.
     -- muで導入されたthetaに由来するものもここにくる。
     -- たぶんたんにreturn (DataTheta f)とすればよい。
     Nothing -> throwError $ "clarify.theta: " ++ name
 
-clarifyUnaryOp ::
-     Context -> Identifier -> UnaryOp -> LowType -> Meta -> WithEnv CodePlus
-clarifyUnaryOp ctx name op lowType m = do
-  t <- lookupContext name ctx
+clarifyUnaryOp :: Identifier -> UnaryOp -> LowType -> Meta -> WithEnv CodePlus
+clarifyUnaryOp name op lowType m = do
+  t <- lookupTypeEnv name
   t' <- reduceTermPlus t
   case t' of
     (_, TermPi xts@[(x, tx)] _) -> do
       let varX = toDataUpsilon (x, emptyMeta)
-      zts <- complementaryChainOf ctx xts
+      zts <- complementaryChainOf xts
       makeClosure'
-        ctx
         (Just name)
         zts
         m
@@ -169,18 +166,16 @@ clarifyUnaryOp ctx name op lowType m = do
         (m, CodeTheta (ThetaUnaryOp op lowType varX))
     _ -> throwError $ "the arity of " ++ name ++ " is wrong"
 
-clarifyBinaryOp ::
-     Context -> Identifier -> BinaryOp -> LowType -> Meta -> WithEnv CodePlus
-clarifyBinaryOp ctx name op lowType m = do
-  t <- lookupContext name ctx
+clarifyBinaryOp :: Identifier -> BinaryOp -> LowType -> Meta -> WithEnv CodePlus
+clarifyBinaryOp name op lowType m = do
+  t <- lookupTypeEnv name
   t' <- reduceTermPlus t
   case t' of
     (_, TermPi xts@[(x, tx), (y, ty)] _) -> do
       let varX = toDataUpsilon (x, emptyMeta)
       let varY = toDataUpsilon (y, emptyMeta)
-      zts <- complementaryChainOf ctx xts
+      zts <- complementaryChainOf xts
       makeClosure'
-        ctx
         (Just name)
         zts
         m
@@ -188,9 +183,9 @@ clarifyBinaryOp ctx name op lowType m = do
         (m, CodeTheta (ThetaBinaryOp op lowType varX varY))
     _ -> throwError $ "the arity of " ++ name ++ " is wrong"
 
-clarifyIsEnum :: Context -> Meta -> WithEnv CodePlus
-clarifyIsEnum ctx m = do
-  t <- lookupContext "is-enum" ctx
+clarifyIsEnum :: Meta -> WithEnv CodePlus
+clarifyIsEnum m = do
+  t <- lookupTypeEnv "is-enum"
   t' <- reduceTermPlus t
   case t' of
     (_, TermPi xts@[(x, tx)] _) -> do
@@ -199,9 +194,8 @@ clarifyIsEnum ctx m = do
       aff <- newNameWith "aff"
       rel <- newNameWith "rel"
       retImmType <- returnCartesianImmediate
-      zts <- complementaryChainOf ctx xts
+      zts <- complementaryChainOf xts
       makeClosure'
-        ctx
         (Just "is-enum")
         zts
         m
@@ -219,22 +213,21 @@ clarifyIsEnum ctx m = do
 --      let (resultEnv, value) := sig in
 --      return value
 --    (as closure)
-clarifyEvalIO :: Context -> Meta -> WithEnv CodePlus
-clarifyEvalIO ctx m = do
-  t <- lookupContext "unsafe.eval-io" ctx
+clarifyEvalIO :: Meta -> WithEnv CodePlus
+clarifyEvalIO m = do
+  t <- lookupTypeEnv "unsafe.eval-io"
   t' <- reduceTermPlus t
   case t' of
     (_, TermPi xts@[arg] _) -> do
       (resultValue, resultValueVar) <- newDataUpsilonWith "result"
       (sig, sigVar) <- newDataUpsilonWith "eval-io-sig"
       resultEnv <- newNameWith "env"
-      arg' <- clarify' ctx $ toTermUpsilon $ fst arg
+      arg' <- clarify $ toTermUpsilon $ fst arg
       -- IO Top == Top -> (Bottom, Top)
-      evalArgWithZero <- callClosure' ctx m arg' [toTermInt64 0]
+      evalArgWithZero <- callClosure' m arg' [toTermInt64 0]
       retImmType <- returnCartesianImmediate
-      zts <- complementaryChainOf ctx xts
+      zts <- complementaryChainOf xts
       makeClosure'
-        ctx
         (Just "unsafe.eval-io")
         zts
         m
@@ -260,23 +253,21 @@ clarifyEvalIO ctx m = do
 -- 引数としてインデックスの情報をとっている。unsafe.writeの例で言えば、長さについての情報は4であり、"used arguments" を
 -- 指定する配列は、zero-indexであることに注意して [1, 2, 3] となる。
 clarifySysCall ::
-     Context
-  -> Identifier -- the name of theta
+     Identifier -- the name of theta
   -> SysCall -- the kind of system call
   -> Int -- the length of the arguments of the theta
   -> [Int] -- used (or, non-discarded) arguments in its actual implementation (index starts from zero)
   -> Meta -- the meta of the theta
   -> WithEnv CodePlus
-clarifySysCall ctx name sysCall argLen argIdxList m = do
-  t <- lookupContext name ctx
+clarifySysCall name sysCall argLen argIdxList m = do
+  t <- lookupTypeEnv name
   t' <- reduceTermPlus t
   case t' of
     (_, TermPi xts _)
       | length xts == argLen -> do
         let ys = map (\i -> toVar $ fst $ xts !! i) argIdxList
-        zts <- complementaryChainOf ctx xts
+        zts <- complementaryChainOf xts
         makeClosure'
-          ctx
           (Just name)
           zts
           m
@@ -285,9 +276,9 @@ clarifySysCall ctx name sysCall argLen argIdxList m = do
     _ -> throwError $ "the type of " ++ name ++ " is wrong"
 
 complementaryChainOf ::
-     Context -> [(Identifier, TermPlus)] -> WithEnv [(Identifier, TermPlus)]
-complementaryChainOf ctx xts = do
-  zts <- getClosedChainBindings ctx xts []
+     [(Identifier, TermPlus)] -> WithEnv [(Identifier, TermPlus)]
+complementaryChainOf xts = do
+  zts <- varTermPlus'' xts []
   return $ nubBy (\(x, _) (y, _) -> x == y) zts
 
 toVar :: Identifier -> DataPlus
@@ -304,28 +295,29 @@ asEnumConstant x
       Just ls -> return $ Just $ toInteger $ length ls
 asEnumConstant _ = return Nothing
 
-clarifyBinder ::
-     Context -> [(Identifier, TermPlus)] -> WithEnv [(Identifier, CodePlus)]
-clarifyBinder _ [] = return []
-clarifyBinder ctx ((x, t):xts) = do
-  t' <- clarify' ctx t
-  bar <- clarifyBinder ((x, t) : ctx) xts
+clarifyBinder :: [(Identifier, TermPlus)] -> WithEnv [(Identifier, CodePlus)]
+clarifyBinder [] = return []
+clarifyBinder ((x, t):xts) = do
+  t' <- clarify t
+  bar <- clarifyBinder xts
   return $ (x, t') : bar
 
 makeClosure' ::
-     Context
-  -> Maybe Identifier -- the name of newly created closure
+     Maybe Identifier -- the name of newly created closure
   -> [(Identifier, TermPlus)] -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
   -> Meta -- meta of lambda
   -> [(Identifier, TermPlus)] -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
   -> CodePlus -- the `e` in `lam (x1, ..., xn). e`
   -> WithEnv CodePlus
-makeClosure' ctx mName fvs m xts e = do
-  fvs' <- clarifyBinder ctx fvs
-  xts' <- clarifyBinder ctx xts
+makeClosure' mName fvs m xts e = do
+  fvs' <- clarifyBinder fvs
+  xts' <- clarifyBinder xts
   makeClosure mName fvs' m xts' e
 
-callClosure' :: Context -> Meta -> CodePlus -> [TermPlus] -> WithEnv CodePlus
-callClosure' ctx m e es = do
-  tmp <- mapM (clarifyPlus ctx) es
+callClosure' :: Meta -> CodePlus -> [TermPlus] -> WithEnv CodePlus
+callClosure' m e es = do
+  tmp <- mapM (clarifyPlus) es
   callClosure m e tmp
+
+insTypeEnv :: Identifier -> TermPlus -> WithEnv ()
+insTypeEnv i t = modify (\e -> e {typeEnv = Map.insert i t (typeEnv e)})
