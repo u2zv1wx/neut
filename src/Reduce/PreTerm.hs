@@ -36,8 +36,7 @@ reducePreTermPlus (m, PreTermPiElim e es) = do
       | all isValue es' -> do
         let self' = substPreTermPlus [(x, self)] body
         reducePreTermPlus (m, PreTermPiElim self' es')
-    (_, PreTermUpsilon constant) ->
-      reducePreTermPlusTheta (m, app) es' m constant
+    (_, PreTermConst constant) -> reducePreTermPlusTheta (m, app) es' m constant
     -- (_, PreTermTheta constant) -> reducePreTermPlusTheta (m, app) es' m constant
     _ -> return (m, app)
 reducePreTermPlus (m, PreTermMu (x, t) e) = do

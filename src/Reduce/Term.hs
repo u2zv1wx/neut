@@ -41,8 +41,8 @@ reduceTermPlus (m, TermPiElim e es) = do
       | all isValue es' -> do
         let self' = substTermPlus [(x, self)] body
         reduceTermPlus (m, TermPiElim self' es')
+    (_, TermConst constant) -> reduceTermPlusTheta (m, app) es' m constant
     -- (_, TermTheta constant) -> reduceTermPlusTheta (m, app) es' m constant
-    (_, TermUpsilon constant) -> reduceTermPlusTheta (m, app) es' m constant
     _ -> return (m, app)
 reduceTermPlus (m, TermMu (x, t) e) = do
   t' <- reduceTermPlus t
