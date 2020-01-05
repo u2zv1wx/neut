@@ -100,9 +100,12 @@ infer ctx (m, WeakTermMu (x, t) e) = do
   e' <- infer ctx e
   insConstraintEnv t' (typeOf e')
   retPreTerm t' (toLoc m) $ PreTermMu (x, t') e'
-infer ctx (m, WeakTermTheta xts e) = do
-  (xts', e') <- inferTheta ctx xts e
-  retPreTerm (typeOf e') (toLoc m) $ PreTermTheta xts' e'
+infer ctx (m, WeakTermTheta (x, t) e) = do
+  t' <- inferType ctx t
+  insWeakTypeEnv x t'
+  -- the type of `e` doesn't depend on `x`
+  e' <- infer ctx e
+  retPreTerm (typeOf e') (toLoc m) $ PreTermTheta (x, t') e'
 infer ctx (_, WeakTermZeta _) = do
   h <- newHoleInCtx ctx
   return h
@@ -233,21 +236,6 @@ inferPiElim ctx m e es = do
    -- cod' = ?M @ (ctx[0], ..., ctx[n], e1, ..., em)
   let cod' = substPreTermPlus (zip ys es) cod
   retPreTerm cod' (toLoc m) $ PreTermPiElim e es
-
-inferTheta ::
-     Context
-  -> [(Identifier, WeakTermPlus)]
-  -> WeakTermPlus
-  -> WithEnv ([(Identifier, PreTermPlus)], PreTermPlus)
-inferTheta ctx [] e = do
-  e' <- infer ctx e
-  return ([], e')
-inferTheta ctx ((x, t):xts) e
-  | otherwise = do
-    t' <- inferType ctx t
-    insWeakTypeEnv x t'
-    (xts', e') <- inferTheta (ctx ++ [(x, t')]) xts e
-    return ((x, t') : xts', e')
 
 -- In a context (x1 : A1, ..., xn : An), this function creates metavariables
 --   ?M  : Pi (x1 : A1, ..., xn : An). ?Mt @ (x1, ..., xn)
