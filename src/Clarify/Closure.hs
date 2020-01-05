@@ -35,27 +35,6 @@ makeClosure mName xts2 m xts1 e = do
   name <- nameFromMaybe mName
   let args = envVarName : map fst xts1
   let body = (m, CodeSigmaElim xts2 envVar e')
-  -- when
-  --   (name `elem`
-  --    [ "thunk-74450"
-  --    , "thunk-73997"
-  --    , "thunk-71507"
-  --    , "thunk-70675"
-  --    , "thunk-68875"
-  --    , "thunk-66147"
-  --    , "thunk-63567"
-  --    , "thunk-59793"
-  --    , "thunk-55814"
-  --    , "thunk-49906"
-  --    , "thunk-45765"
-  --    ]) $ do
-  --   p name
-  --   p "args:"
-  --   p' args
-  --   p "fvs:"
-  --   p' xts2
-  --   p "body-orig:"
-  --   p' e
   when (name `notElem` map fst cenv) $ insCodeEnv name args body
   let fvEnv = (m, DataSigmaIntro $ map (toDataUpsilon' . fst) xts2)
   let cls = (m, DataSigmaIntro [envExp, fvEnv, (m, DataTheta name)])
