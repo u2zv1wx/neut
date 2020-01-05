@@ -33,7 +33,6 @@ elaborate e = do
   e' <- infer [] e
   p "analyze/synthesize"
   gets constraintEnv >>= analyze >>= synthesize
-  p "elaborate"
   elaborate' e'
 
 -- This function translates a well-typed term into an untyped term in a

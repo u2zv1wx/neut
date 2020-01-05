@@ -213,15 +213,9 @@ clarifyIsEnum m = do
 -- unsafe.eval-io = lam x. (snd (x @ (unsafe.zero bottom))) のように対象言語のほうで
 -- 定義するべきなのでは。
 clarifyEvalIO :: Meta -> WithEnv CodePlus
-clarifyEvalIO m
-  -- p "found eval-io"
- = do
+clarifyEvalIO m = do
   t <- lookupTypeEnv "unsafe.eval-io"
-  -- p "type:"
-  -- p' t
-  -- p "type (reduced):"
   t' <- reduceTermPlus t
-  p' t'
   case t' of
     (_, TermPi xts@[arg] _) -> do
       (resultValue, resultValueVar) <- newDataUpsilonWith "result"
@@ -246,6 +240,7 @@ clarifyEvalIO m
                 -- Since `resultEnv` is evaluated into 0,
                 -- we can set resultEnv : retImmType (despite the fact that its actual type is bottom).
                 [(resultEnv, retImmType), (resultValue, retImmType)] -- (Bottom, Top)
+                -- 実際にはこのsigVarはペアではなくて関数（を表現するクロージャ）になっている
                 sigVar
                 (m, CodeUpIntro resultValueVar)))
     _ -> throwError "the type of unsafe.eval-io is wrong"

@@ -173,8 +173,11 @@
 
 (enum bottom) ;; for io-monad
 
+;; wink at modal realism
+(enum world actual-world)
+
 (definition io ((a type))
-  (state bottom a))
+  (state world a))
 
 ;; (ascription io
 ;;   (hom type type))
@@ -206,7 +209,7 @@
   (pi
     ((A type)
      (x A))
-    (state bottom A)))
+    (state world A)))
 
 ;; (constant unsafe.eval-io)
 

@@ -27,7 +27,6 @@ data Def
 parse :: String -> WithEnv WeakTermPlus
 parse s = strToTree s >>= parse' >>= concatDefList >>= rename
 
--- parse s = strToTree s >>= parse' >>= concatDefList
 -- Parse the head element of the input list.
 parse' :: [TreePlus] -> WithEnv [Def]
 parse' [] = return []
