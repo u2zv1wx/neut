@@ -12,8 +12,9 @@ data PreTerm
   | PreTermPiIntro [IdentifierPlus] PreTermPlus
   | PreTermPiElim PreTermPlus [PreTermPlus]
   | PreTermMu IdentifierPlus PreTermPlus
-  | PreTermTheta IdentifierPlus PreTermPlus
   | PreTermZeta Identifier
+  | PreTermConst Identifier
+  | PreTermConstDecl IdentifierPlus PreTermPlus
   | PreTermIntS IntSize Integer
   | PreTermIntU IntSize Integer
   | PreTermInt Integer
@@ -47,10 +48,7 @@ instance Show PreMeta where
 
 varPreTermPlus :: PreTermPlus -> [Identifier]
 varPreTermPlus (_, PreTermTau) = []
-varPreTermPlus (_, PreTermUpsilon x)
-  | isConstant x = []
-  | otherwise = [x]
--- varPreTermPlus (_, PreTermUpsilon x) = [x]
+varPreTermPlus (_, PreTermUpsilon x) = [x]
 varPreTermPlus (_, PreTermPi xts t) = do
   varPreTermPlusBindings xts [t]
 varPreTermPlus (_, PreTermPiIntro xts e) = do
@@ -61,7 +59,8 @@ varPreTermPlus (_, PreTermPiElim e es) = do
   xhs ++ yhs
 varPreTermPlus (_, PreTermMu ut e) = do
   varPreTermPlusBindings [ut] [e]
-varPreTermPlus (_, PreTermTheta xt e) = varPreTermPlusBindings [xt] [e]
+varPreTermPlus (_, PreTermConst _) = []
+varPreTermPlus (_, PreTermConstDecl xt e) = varPreTermPlusBindings [xt] [e]
 varPreTermPlus (_, PreTermZeta _) = []
 varPreTermPlus (_, PreTermIntS _ _) = []
 varPreTermPlus (_, PreTermIntU _ _) = []
@@ -99,8 +98,9 @@ holePreTermPlus (_, PreTermPiIntro xts e) = holePreTermPlusBindings xts [e]
 holePreTermPlus (_, PreTermPiElim e es) =
   holePreTermPlus e ++ concatMap holePreTermPlus es
 holePreTermPlus (_, PreTermMu ut e) = holePreTermPlusBindings [ut] [e]
-holePreTermPlus (_, PreTermTheta xt e) = holePreTermPlusBindings [xt] [e]
 holePreTermPlus (_, PreTermZeta h) = [h]
+holePreTermPlus (_, PreTermConst _) = []
+holePreTermPlus (_, PreTermConstDecl xt e) = holePreTermPlusBindings [xt] [e]
 holePreTermPlus (_, PreTermIntS _ _) = []
 holePreTermPlus (_, PreTermIntU _ _) = []
 holePreTermPlus (_, PreTermInt _) = []
@@ -151,12 +151,14 @@ substPreTermPlus sub (m, PreTermMu (x, t) e) = do
   let t' = substPreTermPlus sub t
   let e' = substPreTermPlus (filter (\(k, _) -> k /= x) sub) e
   (m', PreTermMu (x, t') e')
-substPreTermPlus sub (m, PreTermTheta (x, t) e) = do
+substPreTermPlus sub (m, PreTermConst x) = do
+  let m' = substPreMeta sub m
+  (m', PreTermConst x)
+substPreTermPlus sub (m, PreTermConstDecl (x, t) e) = do
   let m' = substPreMeta sub m
   let t' = substPreTermPlus sub t
   let e' = substPreTermPlus (filter (\(k, _) -> k /= x) sub) e
-  -- let (xts', body') = substPreTermPlusBindingsWithBody sub xts body
-  (m', PreTermTheta (x, t') e')
+  (m', PreTermConstDecl (x, t') e')
 substPreTermPlus sub (m, PreTermZeta s) = do
   let m' = substPreMeta sub m
   fromMaybe (m', PreTermZeta s) (lookup s sub)
@@ -251,7 +253,8 @@ isReduciblePreTerm (_, PreTermPiElim e es) =
   isReduciblePreTerm e || any isReduciblePreTerm es
 isReduciblePreTerm (_, PreTermMu (_, t) e) =
   isReduciblePreTerm t || isReduciblePreTerm e
-isReduciblePreTerm (_, PreTermTheta (_, t) e) =
+isReduciblePreTerm (_, PreTermConst _) = False
+isReduciblePreTerm (_, PreTermConstDecl (_, t) e) =
   isReduciblePreTerm t || isReduciblePreTerm e
 isReduciblePreTerm (_, PreTermZeta _) = False
 isReduciblePreTerm (_, PreTermIntS _ _) = False
@@ -281,7 +284,7 @@ isValue (_, PreTermTau) = True
 isValue (_, PreTermUpsilon _) = True
 isValue (_, PreTermPi {}) = True
 isValue (_, PreTermPiIntro {}) = True
--- isValue (_, PreTermTheta _) = True
+isValue (_, PreTermConst _) = True
 isValue (_, PreTermIntS _ _) = True
 isValue (_, PreTermIntU _ _) = True
 isValue (_, PreTermInt _) = True

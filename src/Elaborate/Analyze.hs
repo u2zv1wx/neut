@@ -44,7 +44,9 @@ simp' (((_, PreTermMu xt1 e1), (_, PreTermMu xt2 e2)):cs) =
   simpBinder [xt1] e1 [xt2] e2 cs
 simp' (((_, PreTermZeta x), (_, PreTermZeta y)):cs)
   | x == y = simp cs
-simp' (((_, PreTermTheta xt1 e1), (_, PreTermTheta xt2 e2)):cs) = do
+simp' (((_, PreTermConst x1), (_, PreTermConst x2)):cs)
+  | x1 == x2 = simp cs
+simp' (((_, PreTermConstDecl xt1 e1), (_, PreTermConstDecl xt2 e2)):cs) = do
   simpBinder [xt1] e1 [xt2] e2 cs
 simp' (((_, PreTermIntS size1 l1), (_, PreTermIntS size2 l2)):cs)
   | size1 == size2

@@ -51,10 +51,7 @@ elaborate' (m, PreTermTau) = do
   return (m', TermTau)
 elaborate' (m, PreTermUpsilon x) = do
   m' <- toMeta m
-  mi <- elaborateIsEnum x
-  case mi of
-    Nothing -> return (m', TermUpsilon x)
-    Just i -> return (m', TermIntU 64 i)
+  return (m', TermUpsilon x)
 elaborate' (m, PreTermPi xts t) = do
   m' <- toMeta m
   xts' <- mapM elaboratePlus xts
@@ -78,16 +75,22 @@ elaborate' (m, PreTermMu (x, t) e) = do
       e' <- elaborate' e
       return (m', TermMu (x, t') e')
     _ -> throwError "CBV recursion is allowed only for Pi-types"
-elaborate' (m, PreTermTheta (x, t) e) = do
-  m' <- toMeta m
-  t' <- elaborate' t
-  e' <- elaborate' e
-  return (m', TermTheta (x, t') e')
 elaborate' (_, PreTermZeta x) = do
   sub <- gets substEnv
   case lookup x sub of
     Just e -> elaborate' e
     Nothing -> throwError $ "elaborate' i: remaining hole: " ++ x
+elaborate' (m, PreTermConst x) = do
+  m' <- toMeta m
+  mi <- elaborateIsEnum x
+  case mi of
+    Nothing -> return (m', TermConst x)
+    Just i -> return (m', TermIntU 64 i)
+elaborate' (m, PreTermConstDecl (x, t) e) = do
+  m' <- toMeta m
+  t' <- elaborate' t
+  e' <- elaborate' e
+  return (m', TermConstDecl (x, t') e')
 elaborate' (m, PreTermIntS size x) = do
   m' <- toMeta m
   return (m', TermIntS size x)
@@ -97,10 +100,8 @@ elaborate' (m, PreTermIntU size x) = do
 elaborate' (m, PreTermInt x) = do
   m' <- toMeta m
   t <- reducePreTermPlus $ typeOf' m
-  case t
-    -- (_, PreTermTheta intType) ->
-        of
-    (_, PreTermUpsilon intType) ->
+  case t of
+    (_, PreTermConst intType) ->
       case asLowTypeMaybe intType of
         Just (LowTypeIntS size) -> return (m', TermIntS size x)
         Just (LowTypeIntU size) -> return (m', TermIntU size x)
@@ -118,10 +119,8 @@ elaborate' (m, PreTermFloat64 x) = do
 elaborate' (m, PreTermFloat x) = do
   m' <- toMeta m
   t <- reducePreTermPlus $ typeOf' m
-  case t
-    -- (_, PreTermTheta floatType) -> do
-        of
-    (_, PreTermUpsilon floatType) -> do
+  case t of
+    (_, PreTermConst floatType) -> do
       let x16 = realToFrac x :: Half
       let x32 = realToFrac x :: Float
       case asLowTypeMaybe floatType of

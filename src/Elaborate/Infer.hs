@@ -42,16 +42,9 @@ type Context = [(Identifier, PreTermPlus)]
 -- infer e ~> {type-annotated e}
 infer :: Context -> WeakTermPlus -> WithEnv PreTermPlus
 infer _ (m, WeakTermTau) = return (PreMetaTerminal (toLoc m), PreTermTau)
-infer _ (m, WeakTermUpsilon x)
-  -- enum.n8, enum.n64, etc.
-  | Just i <- asEnumNatNumConstant x = do
-    t' <- toIsEnumType i
-    retPreTerm t' (toLoc m) $ PreTermUpsilon x
-  -- i64, f16, u8, etc.
-  | Just _ <- asLowTypeMaybe x = retPreTerm univ (toLoc m) $ PreTermUpsilon x
-  | otherwise = do
-    t <- lookupWeakTypeEnv x
-    retPreTerm t (toLoc m) $ PreTermUpsilon x
+infer _ (m, WeakTermUpsilon x) = do
+  t <- lookupWeakTypeEnv x
+  retPreTerm t (toLoc m) $ PreTermUpsilon x
 infer ctx (m, WeakTermPi xts t) = do
   (xts', t') <- inferPi ctx xts t
   retPreTerm univ (toLoc m) $ PreTermPi xts' t'
@@ -100,32 +93,42 @@ infer ctx (m, WeakTermMu (x, t) e) = do
   e' <- infer ctx e
   insConstraintEnv t' (typeOf e')
   retPreTerm t' (toLoc m) $ PreTermMu (x, t') e'
-infer ctx (m, WeakTermTheta (x, t) e) = do
+infer ctx (_, WeakTermZeta _) = do
+  h <- newHoleInCtx ctx
+  return h
+infer _ (m, WeakTermConst x)
+  -- enum.n8, enum.n64, etc.
+  | Just i <- asEnumNatNumConstant x = do
+    t' <- toIsEnumType i
+    retPreTerm t' (toLoc m) $ PreTermConst x
+  -- i64, f16, u8, etc.
+  | Just _ <- asLowTypeMaybe x = retPreTerm univ (toLoc m) $ PreTermConst x
+  | otherwise = do
+    t <- lookupWeakTypeEnv x
+    retPreTerm t (toLoc m) $ PreTermConst x
+infer ctx (m, WeakTermConstDecl (x, t) e) = do
   t' <- inferType ctx t
   insWeakTypeEnv x t'
   -- the type of `e` doesn't depend on `x`
   e' <- infer ctx e
-  retPreTerm (typeOf e') (toLoc m) $ PreTermTheta (x, t') e'
-infer ctx (_, WeakTermZeta _) = do
-  h <- newHoleInCtx ctx
-  return h
+  retPreTerm (typeOf e') (toLoc m) $ PreTermConstDecl (x, t') e'
 infer _ (m, WeakTermIntS size i) = do
-  let t = (metaTerminal, PreTermUpsilon $ "i" ++ show size)
+  let t = (metaTerminal, PreTermConst $ "i" ++ show size)
   retPreTerm t (toLoc m) $ PreTermIntS size i
 infer _ (m, WeakTermIntU size i) = do
-  let t = (metaTerminal, PreTermUpsilon $ "u" ++ show size)
+  let t = (metaTerminal, PreTermConst $ "u" ++ show size)
   retPreTerm t (toLoc m) $ PreTermIntU size i
 infer ctx (m, WeakTermInt i) = do
   h <- newTypeHoleInCtx ctx
   retPreTerm h (toLoc m) $ PreTermInt i
 infer _ (m, WeakTermFloat16 f) = do
-  let t = (metaTerminal, PreTermUpsilon "f16")
+  let t = (metaTerminal, PreTermConst "f16")
   retPreTerm t (toLoc m) $ PreTermFloat16 f
 infer _ (m, WeakTermFloat32 f) = do
-  let t = (metaTerminal, PreTermUpsilon "f32")
+  let t = (metaTerminal, PreTermConst "f32")
   retPreTerm t (toLoc m) $ PreTermFloat32 f
 infer _ (m, WeakTermFloat64 f) = do
-  let t = (metaTerminal, PreTermUpsilon "f64")
+  let t = (metaTerminal, PreTermConst "f64")
   retPreTerm t (toLoc m) $ PreTermFloat64 f
 infer ctx (m, WeakTermFloat f) = do
   h <- newTypeHoleInCtx ctx
@@ -180,10 +183,10 @@ inferType ctx t = do
   return t'
 
 inferKind :: ArrayKind -> PreTermPlus
-inferKind (ArrayKindIntS i) = (metaTerminal, PreTermUpsilon $ "i" ++ show i)
-inferKind (ArrayKindIntU i) = (metaTerminal, PreTermUpsilon $ "u" ++ show i)
+inferKind (ArrayKindIntS i) = (metaTerminal, PreTermConst $ "i" ++ show i)
+inferKind (ArrayKindIntU i) = (metaTerminal, PreTermConst $ "u" ++ show i)
 inferKind (ArrayKindFloat size) =
-  (metaTerminal, PreTermUpsilon $ "f" ++ show (sizeAsInt size))
+  (metaTerminal, PreTermConst $ "f" ++ show (sizeAsInt size))
 
 inferPi ::
      Context
@@ -310,7 +313,7 @@ toIsEnumType i = do
   return
     ( metaTerminal
     , PreTermPiElim
-        (piMeta, PreTermUpsilon "is-enum")
+        (piMeta, PreTermConst "is-enum")
         [(metaTerminal, PreTermEnum $ EnumTypeNatNum i)])
 
 -- Univ -> Univ
@@ -335,7 +338,7 @@ determineDomType :: [PreTermPlus] -> PreTermPlus
 determineDomType ts =
   if not (null ts)
     then head ts
-    else (metaTerminal, PreTermUpsilon "bottom")
+    else (metaTerminal, PreTermConst "bottom")
 
 insConstraintEnv :: PreTermPlus -> PreTermPlus -> WithEnv ()
 insConstraintEnv t1 t2 =

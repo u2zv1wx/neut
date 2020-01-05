@@ -39,13 +39,15 @@ interpret (m, TreeNode [(_, TreeAtom "mu"), xt, e]) = do
   xt' <- interpretIdentifierPlus xt
   e' <- interpret e
   withMeta m $ WeakTermMu xt' e'
-interpret (m, TreeNode [(_, TreeAtom "theta"), xt, e]) = do
-  xt' <- interpretIdentifierPlus xt
-  e' <- interpret e
-  withMeta m $ WeakTermTheta xt' e'
 interpret (m, TreeNode [(_, TreeAtom "zeta"), (_, TreeAtom x)]) = do
   x' <- interpretAtom x
   withMeta m $ WeakTermZeta x'
+interpret (m, TreeNode [(_, TreeAtom "constant"), (_, TreeAtom x)]) =
+  withMeta m $ WeakTermConst x
+interpret (m, TreeNode [(_, TreeAtom "constant-declaration"), xt, e]) = do
+  xt' <- interpretIdentifierPlus xt
+  e' <- interpret e
+  withMeta m $ WeakTermConstDecl xt' e'
 interpret (m, TreeNode [(_, TreeAtom t), (_, TreeAtom x)])
   | Just (LowTypeIntS i) <- asLowTypeMaybe t
   , Just x' <- readMaybe x = withMeta m $ WeakTermIntS i x'
@@ -119,7 +121,11 @@ interpret t@(m, TreeAtom x) = do
       isEnum <- isDefinedEnumName x
       if isEnum
         then withMeta m $ WeakTermEnum $ EnumTypeLabel x
-        else withMeta m $ WeakTermUpsilon x
+        else do
+          cenv <- gets constantEnv
+          if isConstant x || x `elem` cenv
+            then withMeta m $ WeakTermConst x
+            else withMeta m $ WeakTermUpsilon x
 interpret t@(m, TreeNode es) =
   if null es
     then throwError $ "interpret: syntax error:\n" ++ Pr.ppShow t

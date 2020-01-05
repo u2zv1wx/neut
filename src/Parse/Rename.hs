@@ -11,11 +11,9 @@ import Data.WeakTerm
 -- Alpha-convert all the variables so that different variables have different names.
 rename :: WeakTermPlus -> WithEnv WeakTermPlus
 rename (m, WeakTermTau) = return (m, WeakTermTau)
-rename (m, WeakTermUpsilon x)
-  | isConstant x = return (m, WeakTermUpsilon x) -- enum.n8, i64, f16, etc. shouldn't be renamed (i.e. can occur freely)
-  | otherwise = do
-    x' <- lookupNameEnv x
-    return (m, WeakTermUpsilon x')
+rename (m, WeakTermUpsilon x) = do
+  x' <- lookupNameEnv x
+  return (m, WeakTermUpsilon x')
 rename (m, WeakTermPi xts t) = do
   (xts', t') <- renameBinderWithBody xts t
   return (m, WeakTermPi xts' t')
@@ -26,18 +24,17 @@ rename (m, WeakTermPiElim e es) = do
   e' <- rename e
   es' <- mapM rename es
   return (m, WeakTermPiElim e' es')
-rename (m, WeakTermMu (x, t) e) =
+rename (m, WeakTermMu (x, t) e) = do
+  t' <- rename t
   local $ do
-    t' <- rename t
     x' <- newNameWith x
     e' <- rename e
     return (m, WeakTermMu (x', t') e')
-rename (m, WeakTermTheta (x, t) e) = do
-  local $ do
-    t' <- rename t
-    modify (\env -> env {nameEnv = (x, x) : nameEnv env}) -- constants shouldn't be alpha-converted
-    e' <- rename e
-    return (m, WeakTermMu (x, t') e')
+rename (m, WeakTermConst x) = return (m, WeakTermConst x) -- enum.n8, i64, f16, etc. shouldn't be renamed (i.e. can occur freely)
+rename (m, WeakTermConstDecl (x, t) e) = do
+  t' <- rename t
+  e' <- rename e
+  return (m, WeakTermConstDecl (x, t') e')
 rename (m, WeakTermZeta h) = return (m, WeakTermZeta h)
 rename (m, WeakTermIntS size x) = return (m, WeakTermIntS size x)
 rename (m, WeakTermIntU size x) = return (m, WeakTermIntU size x)

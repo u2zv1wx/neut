@@ -12,7 +12,8 @@ data Term
   | TermPiIntro [IdentifierPlus] TermPlus
   | TermPiElim TermPlus [TermPlus]
   | TermMu IdentifierPlus TermPlus
-  | TermTheta IdentifierPlus TermPlus
+  | TermConst Identifier
+  | TermConstDecl IdentifierPlus TermPlus
   | TermIntS IntSize Integer
   | TermIntU IntSize Integer
   | TermFloat16 Half
@@ -59,10 +60,12 @@ substTermPlus sub (m, TermMu (x, t) e) = do
   let t' = substTermPlus sub t
   let e' = substTermPlus (filter (\(k, _) -> k /= x) sub) e
   (m, TermMu (x, t') e')
-substTermPlus sub (m, TermTheta (x, t) e) = do
+substTermPlus _ (m, TermConst x) = do
+  (m, TermConst x)
+substTermPlus sub (m, TermConstDecl (x, t) e) = do
   let t' = substTermPlus sub t
   let e' = substTermPlus (filter (\(k, _) -> k /= x) sub) e
-  (m, TermTheta (x, t') e')
+  (m, TermConstDecl (x, t') e')
 substTermPlus _ (m, TermIntS size x) = (m, TermIntS size x)
 substTermPlus _ (m, TermIntU size x) = (m, TermIntU size x)
 substTermPlus _ (m, TermFloat16 x) = (m, TermFloat16 x)

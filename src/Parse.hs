@@ -22,12 +22,13 @@ data Def
       WeakMeta -- meta
       IdentifierPlus -- the `(x : t)` in `let (x : t) = e`
       WeakTermPlus -- the `e` in `let x = e`
-  | DefTheta IdentifierPlus
+  | DefConstDecl IdentifierPlus
 
 parse :: String -> WithEnv WeakTermPlus
 parse s = strToTree s >>= parse' >>= concatDefList
 
 -- Parse the head element of the input list.
+-- FIXME: 細かくrenameせずにparseの最後にまとめてrenameすればよくね？
 parse' :: [TreePlus] -> WithEnv [Def]
 parse' [] = return []
 parse' ((_, TreeNode [(_, TreeAtom "notation"), from, to]):as) =
@@ -52,13 +53,12 @@ parse' ((_, TreeNode ((_, TreeAtom "enum"):(_, TreeAtom name):ts)):as) = do
   -- In the example of `print`, this integer in turn represents the length of the array `str`,
   -- which is indispensable for the system call `write`.
   let constName = "enum." ++ name
-  -- 次の処理は不要のはず（constantEnvはrecursionのときにのみかかわってくる）：
-  -- modify (\e -> e {constantEnv = constName : constantEnv e})
+  modify (\e -> e {constantEnv = constName : constantEnv e})
   -- type constraint for constName
   -- e.g. t == is-enum @ (choice)
   isEnumType <- toIsEnumType name
   -- add `(constant enum.choice (is-enum choice))` to defList in order to insert appropriate type constraint
-  let ascription = DefTheta (constName, isEnumType)
+  let ascription = DefConstDecl (constName, isEnumType)
   -- register the name of the constant
   modify (\env -> env {nameEnv = (constName, constName) : nameEnv env})
   defList <- parse' as
@@ -88,7 +88,7 @@ parse' ((_, TreeNode [(_, TreeAtom "constant"), (_, TreeAtom name), t]):as)
   -- (constant x t) : Declare external constants.
  = do
   t' <- macroExpand t >>= interpret >>= rename
-  let theta = DefTheta (name, t')
+  let theta = DefConstDecl (name, t')
   -- register the name of the constant (to be used in `rename` in `parse' as`)
   modify (\env -> env {nameEnv = (name, name) : nameEnv env})
   defList <- parse' as
@@ -129,7 +129,7 @@ toIsEnumType name = do
   return
     ( newMeta
     , WeakTermPiElim
-        (newMeta, WeakTermUpsilon "is-enum")
+        (newMeta, WeakTermConst "is-enum")
         [(newMeta, WeakTermEnum $ EnumTypeLabel name)])
 
 -- Represent the list of Defs in the target language, using `let`.
@@ -148,11 +148,11 @@ concatDefList [] = do
 --         , WeakTermPiIntro
 --             [xt]
 --             ( newMeta
---             , WeakTermPiElim (newMeta, WeakTermTheta "unsafe.eval-io") [varX]))
+--             , WeakTermPiElim (newMeta, WeakTermConstDecl "unsafe.eval-io") [varX]))
 --         [e])
-concatDefList (DefTheta xt:es) = do
+concatDefList (DefConstDecl xt:es) = do
   cont <- concatDefList es
-  return (newMeta, WeakTermTheta xt cont)
+  return (newMeta, WeakTermConstDecl xt cont)
 concatDefList (DefLet meta xt e:es) = do
   cont <- concatDefList es
   return (meta, WeakTermPiElim (newMeta, WeakTermPiIntro [xt] cont) [e])
