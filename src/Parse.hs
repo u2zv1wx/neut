@@ -89,6 +89,7 @@ parse' ((_, TreeNode [(_, TreeAtom "constant"), (_, TreeAtom name), t]):as)
  = do
   t' <- macroExpand t >>= interpret >>= rename
   let theta = DefConstDecl (name, t')
+  modify (\e -> e {constantEnv = name : constantEnv e})
   -- register the name of the constant (to be used in `rename` in `parse' as`)
   modify (\env -> env {nameEnv = (name, name) : nameEnv env})
   defList <- parse' as
