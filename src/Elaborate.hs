@@ -92,14 +92,14 @@ elaborate' (m, PreTermIntU size x) = do
   return (m', TermIntU size x)
 elaborate' (m, PreTermInt x) = do
   m' <- toMeta m
-  t <- reducePreTermPlus $ typeOf' m
+  t <- elaborate' (typeOf' m) >>= reduceTermPlus
   case t of
-    (_, PreTermConst intType) ->
+    (_, TermConst intType) ->
       case asLowTypeMaybe intType of
         Just (LowTypeIntS size) -> return (m', TermIntS size x)
         Just (LowTypeIntU size) -> return (m', TermIntU size x)
         _ -> throwError $ show x ++ " should be int, but is " ++ intType
-    _ -> throwError "elaborate.PreTermInt"
+    _ -> throwError $ "elaborate.PreTermInt."
 elaborate' (m, PreTermFloat16 x) = do
   m' <- toMeta m
   return (m', TermFloat16 x)
@@ -111,9 +111,9 @@ elaborate' (m, PreTermFloat64 x) = do
   return (m', TermFloat64 x)
 elaborate' (m, PreTermFloat x) = do
   m' <- toMeta m
-  t <- reducePreTermPlus $ typeOf' m
+  t <- elaborate' (typeOf' m) >>= reduceTermPlus
   case t of
-    (_, PreTermConst floatType) -> do
+    (_, TermConst floatType) -> do
       let x16 = realToFrac x :: Half
       let x32 = realToFrac x :: Float
       case asLowTypeMaybe floatType of
