@@ -30,24 +30,22 @@ simp cs = simp' cs
 simp' :: [PreConstraint] -> WithEnv [EnrichedConstraint]
 simp' [] = return []
 simp' (((_, PreTermTau), (_, PreTermTau)):cs) = simp cs
--- simp' (((_, PreTermTheta x), (_, PreTermTheta y)):cs)
---   | x == y = simp cs
 simp' (((_, PreTermUpsilon x1), (_, PreTermUpsilon x2)):cs)
   | x1 == x2 = simp cs
 simp' (((_, PreTermPi xts1 cod1), (_, PreTermPi xts2 cod2)):cs)
-  | length xts1 == length xts2 = do simpPi xts1 cod1 xts2 cod2 cs
+  | length xts1 == length xts2 = do simpBinder xts1 cod1 xts2 cod2 cs
 simp' (((_, PreTermPiIntro xts1 e1), (_, PreTermPiIntro xts2 e2)):cs)
-  | length xts1 == length xts2 = do simpPi xts1 e1 xts2 e2 cs
+  | length xts1 == length xts2 = do simpBinder xts1 e1 xts2 e2 cs
 simp' (((_, PreTermPiIntro xts body1@(m1, _)), e2@(_, _)):cs) = do
   let vs = map (uncurry toVar) xts
   simp $ (body1, (m1, PreTermPiElim e2 vs)) : cs
 simp' ((e1, e2@(_, PreTermPiIntro {})):cs) = simp' $ (e2, e1) : cs
-simp' (((_, PreTermMu (x1, t1) e1), (_, PreTermMu (x2, t2) e2)):cs)
-  | x1 == x2 = simp $ (t1, t2) : (e1, e2) : cs
+simp' (((_, PreTermMu xt1 e1), (_, PreTermMu xt2 e2)):cs) =
+  simpBinder [xt1] e1 [xt2] e2 cs
 simp' (((_, PreTermZeta x), (_, PreTermZeta y)):cs)
   | x == y = simp cs
-simp' (((_, PreTermTheta xts1 e1), (_, PreTermTheta xts2 e2)):cs)
-  | length xts1 == length xts2 = do simpPi xts1 e1 xts2 e2 cs
+simp' (((_, PreTermTheta xt1 e1), (_, PreTermTheta xt2 e2)):cs) = do
+  simpBinder [xt1] e1 [xt2] e2 cs
 simp' (((_, PreTermIntS size1 l1), (_, PreTermIntS size2 l2)):cs)
   | size1 == size2
   , l1 == l2 = simp cs
@@ -95,22 +93,19 @@ simp' (((_, PreTermArrayIntro k1 les1), (_, PreTermArrayIntro k2 les2)):cs)
     csArray <- simpArrayIntro les1 les2
     csCont <- simp cs
     return $ csArray ++ csCont
--- simp' ((e1, e2):cs)
---   | (_, PreTermPiElim (_, PreTermTheta f) es1) <- e1
---   , (_, PreTermPiElim (_, PreTermTheta g) es2) <- e2
---   , f == g
---   , length es1 == length es2 = simp $ zip es1 es2 ++ cs
 simp' ((e1, e2):cs) = do
   let ms1 = asStuckedTerm e1
   let ms2 = asStuckedTerm e2
   let hs = catMaybes [ms1 >>= stuckReasonOf, ms2 >>= stuckReasonOf]
   sub <- gets substEnv
-  if any (`elem` map fst sub) hs
-    then do
+  let isAnalyzable = any (`elem` map fst sub) hs
+  case (isAnalyzable, takeFreeAppArgs e1 e2 sub) of
+    (True, _) -> do
       cs' <- simp' cs
       let c = Enriched (e1, e2) hs $ ConstraintAnalyzable
       return $ c : cs'
-    else do
+    (_, Just (es1, es2)) -> simp $ zip es1 es2 ++ cs
+    _ -> do
       case (ms1, ms2) of
         (Just (StuckPiElimStrict h1 ies1), _)
           | onesided h1 e2
@@ -146,6 +141,19 @@ simp' ((e1, e2):cs) = do
           let fmvs = (concatMap holePreTermPlus [e1, e2])
           simpOther e1 e2 fmvs cs
 
+takeFreeAppArgs ::
+     PreTermPlus
+  -> PreTermPlus
+  -> [(Identifier, PreTermPlus)]
+  -> Maybe ([PreTermPlus], [PreTermPlus])
+takeFreeAppArgs e1 e2 sub
+  | (_, PreTermPiElim (_, PreTermUpsilon f) es1) <- e1
+  , (_, PreTermPiElim (_, PreTermUpsilon g) es2) <- e2
+  , f == g
+  , f `notElem` map fst sub
+  , length es1 == length es2 = Just (es1, es2)
+takeFreeAppArgs _ _ _ = Nothing
+
 simpReduce ::
      PreTermPlus
   -> PreTermPlus
@@ -170,21 +178,21 @@ simpReduce' e1 e2 cs = do
     Just e1' -> simp' $ (e1', e2) : cs
     Nothing -> throwError $ "cannot simplify [TIMEOUT]:\n" ++ Pr.ppShow (e1, e2)
 
-simpPi ::
+simpBinder ::
      [(Identifier, PreTermPlus)]
   -> PreTermPlus
   -> [(Identifier, PreTermPlus)]
   -> PreTermPlus
   -> [(PreTermPlus, PreTermPlus)]
   -> WithEnv [EnrichedConstraint]
-simpPi [] cod1 [] cod2 cs = simp $ (cod1, cod2) : cs
-simpPi ((x1, t1):xts1) cod1 ((x2, t2):xts2) cod2 cs = do
+simpBinder [] cod1 [] cod2 cs = simp $ (cod1, cod2) : cs
+simpBinder ((x1, t1):xts1) cod1 ((x2, t2):xts2) cod2 cs = do
   let var1 = toVar x1 t1
   let (xts2', cod2') = substPreTermPlusBindingsWithBody [(x2, var1)] xts2 cod2
   cst <- simp [(t1, t2)]
-  cs' <- simpPi xts1 cod1 xts2' cod2' cs
+  cs' <- simpBinder xts1 cod1 xts2' cod2' cs
   return $ cst ++ cs'
-simpPi _ _ _ _ _ = throwError "cannot simplify (Pi)"
+simpBinder _ _ _ _ _ = throwError "cannot simplify (simpBinder)"
 
 simpArrayIntro ::
      [(EnumValue, PreTermPlus)]
