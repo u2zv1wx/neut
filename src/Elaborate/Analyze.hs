@@ -149,8 +149,8 @@ takeFreeAppArgs ::
   -> [(Identifier, PreTermPlus)]
   -> Maybe ([PreTermPlus], [PreTermPlus])
 takeFreeAppArgs e1 e2 sub
-  | (_, PreTermPiElim (_, PreTermUpsilon f) es1) <- e1
-  , (_, PreTermPiElim (_, PreTermUpsilon g) es2) <- e2
+  | (_, PreTermPiElim (_, PreTermConst f) es1) <- e1
+  , (_, PreTermPiElim (_, PreTermConst g) es2) <- e2
   , f == g
   , f `notElem` map fst sub
   , length es1 == length es2 = Just (es1, es2)
