@@ -132,7 +132,6 @@
 (notation (to-hole-list e e+)
   ((_ _) (splice (to-hole-list e+))))
 
-;; ;; これだとeliminatorのcodが最初に解決されたもので確定してしまうからだめ？
 (notation (sigma-introduction e+)
   (lambda
     ((elim-result-type tau)
@@ -147,37 +146,24 @@
 (definition state ((S type) (A type))
   (hom S (product S A)))
 
-;; (ascription state
-;;   (pi
-;;     ((S type)
-;;      (A type))
-;;     type))
+(ascription state
+  (pi
+    ((S type)
+     (A type))
+    type))
 
-;; ここでsigma-intro-2は、reduceの結果をAで固定してしまう？
-;; これによって、eliminatorの型が特定のものに固定してしまう。
-;; この時点でeliminatorがかなり具体的なものになってしまう、ということ。
 (definition state-return ((S type) (A type) (x A))
   (lambda ((env S))
     (sigma-introduction env x)))
 
-;; (definition state-return ((S type) (A type) (x A))
-;;   (lambda ((env S))
-;;     (sigma-introduction-2 env x)))
+(ascription state-return
+  (pi
+    ((S type)
+     (A type)
+     (x A))
+    (hom S (product S A))))
 
-;; (definition state-return ((S type) (A type) (x A))
-;;   (lambda ((env S))
-;;     (lambda ((result-type tau)
-;;              (elim (arrow (S A) result-type)))
-;;       (elim env x))))
-
-;; (ascription state-return
-;;   (pi
-;;     ((S type)
-;;      (A type)
-;;      (x A))
-;;     (hom S (product S A))))
-
-(enum bottom) ;; for io-monad
+(enum bottom)
 
 (definition io ((a type))
   (state bottom a))
@@ -189,22 +175,11 @@
 (definition io-return ((B type) (x B))
   (state-return bottom B x))
 
-;; ところで、こうしたうえでio.returnを
-;;   (notation (io.return e) (io-return _ e))
-;; のように定義すると、型推論でなんかいい感じになりそう。
-;; とにかく型推論を上手く実装しないと。
-
 (ascription io-return
   (pi
     ((A type)
      (x A))
     (io A)))
-
-;; (ascription io-return
-;;   (pi
-;;     ((A type)
-;;      (x A))
-;;     (state bottom A)))
 
 (enum top unit)
 
@@ -214,22 +189,9 @@
      (x A))
     (state bottom A)))
 
-;; (constant unsafe.eval-io)
-
-;; (constant unsafe.eval-io
-;;   (hom
-;;     (io top)
-;;     top))
-
-;; (constant file-descriptor)
-
 (constant file-descriptor tau)
 
-;; (constant stdout)
-
 (constant stdout file-descriptor)
-
-;; (constant unsafe.write)
 
 (constant write
   (pi
@@ -246,64 +208,26 @@
 (constant admit-explicit
   (pi ((A type)) A))
 
-;; (ascription admit-explicit
-;;   (pi ((A type)) A))
-
 (keyword admit)
 
 (notation admit (admit-explicit _))
 
-;; writeが無事定義できた〜。
-;; (size-of A)とかってしたほうがis-enumよりもいいかも？まあそのへんは適当に。
 (definition write ((B type) (out file-descriptor) (str (u8-array B)) (len (is-enum B)))
   (io-return top (write B out str len)))
-;; implicitは、explicit.writeみたいなのを展開型として用意した上で、notationの定義を入れれば終了。
 
-;; (write choice stdout (admit (u8-array choice)) enum.choice)
-;; これがちゃんと型つくのかなりうれしいな。
-;; (write choice stdout admit enum.choice)
-;; (lambda () admit)
-
-;; 「あ」を出力
+;; 「あ」のutf8-encoding
 (definition str ()
   (u8-array-introduction
     (n3-0 227)
     (n3-1 129)
     (n3-2 130)))
 
+;; 文字列をunicode encodingされたu8 arrayへと変換して保持
 (definition test ()
   "あいしてる")
 
 ;; 長さがn15になるのがポイントで、ここでunicodeの複雜性が出てくる
+;; n15の部分をsigmaで包めばどうにかなりそうな雰囲気はある。
 (write n15 stdout (test) enum.n15)
 
-;; (unsafe.write n3 stdout (str) enum.n3)
-
-;; (unsafe.write n3 stdout (str) enum.n3)
-
-;; (unsafe.write n3 stdout (str) enum.n3)
-
-unit
-
-;; (unsafe.write choice stdout (str) enum.choice)
-
-;; (unsafe.write choice stdout (str) enum.choice)
-
-
-;; (io-return top unit)
-
-;; unit
-
-;; (ascription write
-;;   (arrow (top top top top) bottom))
-
-;; (write choice stdout (admit (u8-array choice)) unit)
-
-;; (u8-array-introduction
-;;   (left 3)
-;;   (right 2))
-
-;; unit
-;; (io-return top unit)
-;; unsafe.write
-;; stdout
+;; new.neut ends here
