@@ -11,8 +11,8 @@ data Term
   | TermPi [IdentifierPlus] TermPlus
   | TermPiIntro [IdentifierPlus] TermPlus
   | TermPiElim TermPlus [TermPlus]
-  | TermMu (Identifier, TermPlus) TermPlus
-  | TermTheta [IdentifierPlus] TermPlus
+  | TermMu IdentifierPlus TermPlus
+  | TermTheta IdentifierPlus TermPlus
   | TermIntS IntSize Integer
   | TermIntU IntSize Integer
   | TermFloat16 Half
@@ -59,9 +59,10 @@ substTermPlus sub (m, TermMu (x, t) e) = do
   let t' = substTermPlus sub t
   let e' = substTermPlus (filter (\(k, _) -> k /= x) sub) e
   (m, TermMu (x, t') e')
-substTermPlus sub (m, TermTheta xts e) = do
-  let (xts', e') = substTermPlusBindingsWithBody sub xts e
-  (m, TermTheta xts' e')
+substTermPlus sub (m, TermTheta (x, t) e) = do
+  let t' = substTermPlus sub t
+  let e' = substTermPlus (filter (\(k, _) -> k /= x) sub) e
+  (m, TermTheta (x, t') e')
 substTermPlus _ (m, TermIntS size x) = (m, TermIntS size x)
 substTermPlus _ (m, TermIntU size x) = (m, TermIntU size x)
 substTermPlus _ (m, TermFloat16 x) = (m, TermFloat16 x)
