@@ -77,7 +77,7 @@ data LowType
   | LowTypeIntS64Ptr
   deriving (Eq, Show)
 
-type IntSize = Int
+type IntSize = Integer
 
 showLowType :: LowType -> String
 showLowType (LowTypeIntS i) = "i" ++ show i
@@ -119,8 +119,8 @@ sizeAsInt FloatSize32 = 32
 sizeAsInt FloatSize64 = 64
 
 data ArrayKind
-  = ArrayKindIntS Int
-  | ArrayKindIntU Int
+  = ArrayKindIntS Integer
+  | ArrayKindIntU Integer
   | ArrayKindFloat FloatSize
   deriving (Show, Eq)
 
@@ -235,9 +235,11 @@ asLowType n = fromMaybe (LowTypeIntS 64) (asLowTypeMaybe n)
 
 asLowTypeMaybe :: Identifier -> Maybe LowType
 asLowTypeMaybe ('i':cs)
-  | Just n <- readMaybe cs = Just $ LowTypeIntS n
+  | Just n <- readMaybe cs
+  , 0 < n && n < (2 ^ (23 :: Integer)) - 1 = Just $ LowTypeIntS n
 asLowTypeMaybe ('u':cs)
-  | Just n <- readMaybe cs = Just $ LowTypeIntU n
+  | Just n <- readMaybe cs
+  , 0 < n && n < (2 ^ (23 :: Integer)) - 1 = Just $ LowTypeIntU n
 asLowTypeMaybe ('f':cs)
   | Just n <- readMaybe cs
   , Just size <- asFloatSize n = Just $ LowTypeFloat size
