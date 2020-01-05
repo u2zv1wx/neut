@@ -85,6 +85,8 @@ macroMatch (_, TreeAtom _) (_, _)
   -- The input is an atom, and the pattern is a S-expression, which is not an atom.
   -- An atom can't be matched with a tree, so this case immediately fails.
  = return Nothing
+macroMatch (_, TreeNode []) (_, TreeNode []) = return $ Just ([], [])
+macroMatch _ (_, TreeNode []) = return Nothing
 macroMatch (_, TreeNode ts1) (_, TreeNode ts2)
   -- The input is list of S-expressions, and also the pattern is.
   -- We fistly check that the last element of `ts2` is an atom with a name that
@@ -96,7 +98,7 @@ macroMatch (_, TreeNode ts1) (_, TreeNode ts2)
   -- Note that the [3, foo, 5] is not the same as (3 foo 5). the `[3, foo, 5]` is the
   -- list in the meta-language (namely, Haskell), whereas the `(3 foo 5)` is the list
   -- in the object-language (namely, WeakTerm).
- =
+ = do
   case last ts2 of
     (_, TreeAtom sym)
       | last sym == '+'
@@ -140,6 +142,7 @@ macroMatch (_, TreeNode ts1) (_, TreeNode ts2)
 applyMacroSubst :: MacroSubst -> Pattern -> TreePlus
 applyMacroSubst (s1, _) (i, TreeAtom s) =
   fromMaybe (i, TreeAtom s) (lookup s s1)
+applyMacroSubst _ (i, TreeNode []) = (i, TreeNode [])
 applyMacroSubst sub@(_, s2) (i, TreeNode ts)
   -- When we need to replace the last variable of a list, we check if the variable
   -- is a '+'-suffixed one. If it is, we lookup the list of trees from the
@@ -165,6 +168,7 @@ applyMacroSubst sub@(_, s2) (i, TreeNode ts)
 -- The '+'-suffixed name can be occurred only at the end of a list
 isSaneNotation :: Pattern -> Bool
 isSaneNotation (_, TreeAtom s) = last s /= '+'
+isSaneNotation (_, TreeNode []) = True
 isSaneNotation (_, TreeNode ts) = do
   let b = all isSaneNotation $ init ts
   case last ts of
