@@ -1,5 +1,5 @@
 --
--- clarification == polarization + closure conversion + linearization
+-- clarification == polarization + closure conversion + linearization (+ rename, for LLVM IR)
 --
 module Clarify
   ( clarify
@@ -21,8 +21,6 @@ import Reduce.Term
 import qualified Data.Map.Strict as Map
 import qualified Text.Show.Pretty as Pr
 
--- clarify :: TermPlus -> WithEnv CodePlus
--- clarify = clarify []
 clarify :: TermPlus -> WithEnv CodePlus
 clarify (m, TermTau) = do
   v <- cartesianUniv m
@@ -40,24 +38,31 @@ clarify (m, TermUpsilon x)
 clarify (m, TermPi {}) = do
   returnClosureType m
 clarify lam@(m, TermPiIntro xts e) = do
-  fvs <- varTermPlus lam
   forM_ xts $ uncurry insTypeEnv
+  fvs <- varTermPlus lam
   e' <- clarify e
   makeClosure' Nothing fvs m xts e'
 clarify (m, TermPiElim e es) = do
   e' <- clarify e
   callClosure' m e' es
 clarify mu@(m, TermMu (f, t) e) = do
+  insTypeEnv f t
   fvs <- varTermPlus mu
   let fvs' = map (toTermUpsilon . fst) fvs
   -- set f as a global variable
-  insTypeEnv f t
   modify (\env -> env {constantEnv = f : constantEnv env})
-  -- let e' = substTermPlus [(f, (m, TermPiElim (m, TermTheta f) fvs'))] e
   let e' = substTermPlus [(f, (m, TermPiElim (m, TermUpsilon f) fvs'))] e
   e'' <- clarify e'
   cls <- makeClosure' (Just f) [] m fvs e''
   callClosure' m cls fvs'
+clarify theta@(m, TermTheta (x, t) e) = do
+  insTypeEnv x t
+  fvs <- varTermPlus theta
+  e' <- clarify e
+  cls <- makeClosure' Nothing fvs m [(x, t)] e'
+  arg <- clarifyTheta m x
+  (varName, var) <- newDataUpsilonWith' "var" m
+  callClosure m cls [(varName, arg, var)]
 clarify (m, TermIntS size l) = do
   return (m, CodeUpIntro (m, DataIntS size l))
 clarify (m, TermIntU size l) = do
@@ -75,7 +80,7 @@ clarify (m, TermEnumIntro l) = do
   return (m, CodeUpIntro (m, DataEnumIntro l))
 clarify (m, TermEnumElim e bs) = do
   let (cs, es) = unzip bs
-  es' <- mapM (clarify) es
+  es' <- mapM clarify es
   (yName, e', y) <- clarifyPlus e
   return $ bindLet [(yName, e')] (m, CodeEnumElim y (zip cs es'))
 clarify (m, TermArray {}) = do
@@ -146,8 +151,6 @@ clarifyTheta m name = do
   mx <- asEnumConstant name
   case mx of
     Just i -> clarify (m, TermIntS 64 i) -- enum.top ~> 1, enum.choice ~> 2, etc.
-    -- muで導入されたthetaに由来するものもここにくる。
-    -- たぶんたんにreturn (DataTheta f)とすればよい。
     Nothing -> throwError $ "clarify.theta: " ++ name
 
 clarifyUnaryOp :: Identifier -> UnaryOp -> LowType -> Meta -> WithEnv CodePlus

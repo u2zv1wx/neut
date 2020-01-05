@@ -6,7 +6,6 @@ import Control.Monad.Except
 import Control.Monad.State
 import Data.List (elemIndex, sortBy)
 
-import Clarify.Utility
 import Data.Basic
 import Data.Code
 import Data.Env
@@ -26,7 +25,7 @@ toLLVM mainTerm = do
     llvm <- llvmCode e
     insLLVMEnv name args llvm
   p' mainTerm
-  error "stop"
+  -- error "stop"
   l <- llvmCode mainTerm
   -- the result of "main" must be i64, not i8*
   (result, resultVar) <- newDataUpsilonWith "result"
@@ -271,7 +270,7 @@ llvmDataLet x (m, DataEnumIntro labelOrNat) cont = do
 llvmDataLet x (_, DataArrayIntro k lds) cont = do
   ds <- reorder lds
   let elemType = arrayKindToLowType k
-  let arrayType = LowTypeArrayPtr (length ds) elemType
+  let arrayType = LowTypeArrayPtr (toInteger $ length ds) elemType
   storeContent x elemType arrayType ds cont
 
 reorder :: [(EnumValue, a)] -> WithEnv [a]
@@ -406,14 +405,15 @@ lowTypeToAllocSize (LowTypeFloat size) =
   AllocSizeExact $ lowTypeToAllocSize' $ sizeAsInt size
 lowTypeToAllocSize LowTypeVoidPtr = AllocSizePtrList 1
 lowTypeToAllocSize (LowTypeFunctionPtr _ _) = AllocSizePtrList 1
-lowTypeToAllocSize (LowTypeStructPtr ts) = AllocSizePtrList $ length ts
+lowTypeToAllocSize (LowTypeStructPtr ts) =
+  AllocSizePtrList $ toInteger $ length ts
 lowTypeToAllocSize (LowTypeArrayPtr i t) =
   case lowTypeToAllocSize t of
     AllocSizeExact s -> AllocSizeExact $ s * i
     AllocSizePtrList s -> AllocSizePtrList $ s * i -- shouldn't occur
 lowTypeToAllocSize LowTypeIntS64Ptr = AllocSizePtrList 1
 
-lowTypeToAllocSize' :: Int -> Int
+lowTypeToAllocSize' :: Integer -> Integer
 lowTypeToAllocSize' i = do
   let (q, r) = quotRem i 8
   if r == 0

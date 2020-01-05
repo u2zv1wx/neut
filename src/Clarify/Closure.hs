@@ -90,10 +90,7 @@ varTermPlus' (_, TermUpsilon x)
   | otherwise = do
     t <- lookupTypeEnv x
     xts <- chainWithName x t
-    cenv <- gets constantEnv
-    if x `elem` cenv
-      then return xts
-      else return $ xts ++ [(x, t)]
+    return $ xts ++ [(x, t)]
 varTermPlus' (_, TermPi xts t) = varTermPlus'' xts [t]
 varTermPlus' (_, TermPiIntro xts e) = varTermPlus'' xts [e]
 varTermPlus' (_, TermPiElim e es) = do

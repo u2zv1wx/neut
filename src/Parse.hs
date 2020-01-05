@@ -52,7 +52,8 @@ parse' ((_, TreeNode ((_, TreeAtom "enum"):(_, TreeAtom name):ts)):as) = do
   -- In the example of `print`, this integer in turn represents the length of the array `str`,
   -- which is indispensable for the system call `write`.
   let constName = "enum." ++ name
-  modify (\e -> e {constantEnv = constName : constantEnv e})
+  -- 次の処理は不要のはず（constantEnvはrecursionのときにのみかかわってくる）：
+  -- modify (\e -> e {constantEnv = constName : constantEnv e})
   -- type constraint for constName
   -- e.g. t == is-enum @ (choice)
   isEnumType <- toIsEnumType name

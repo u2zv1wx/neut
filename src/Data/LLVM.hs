@@ -46,8 +46,8 @@ data LLVMOp
   deriving (Show)
 
 data AllocSize
-  = AllocSizeExact Int
-  | AllocSizePtrList Int
+  = AllocSizeExact Integer
+  | AllocSizePtrList Integer
   deriving (Show)
 
 -- commutative conversion

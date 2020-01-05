@@ -73,7 +73,7 @@ data LowType
   | LowTypeVoidPtr
   | LowTypeFunctionPtr [LowType] LowType
   | LowTypeStructPtr [LowType]
-  | LowTypeArrayPtr Int LowType -- [n x LOWTYPE]*
+  | LowTypeArrayPtr Integer LowType -- [n x LOWTYPE]*
   | LowTypeIntS64Ptr
   deriving (Eq, Show)
 
@@ -113,7 +113,7 @@ data FloatSize
   | FloatSize64
   deriving (Eq, Show)
 
-sizeAsInt :: FloatSize -> Int
+sizeAsInt :: FloatSize -> Integer
 sizeAsInt FloatSize16 = 16
 sizeAsInt FloatSize32 = 32
 sizeAsInt FloatSize64 = 64
