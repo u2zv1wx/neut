@@ -44,11 +44,10 @@ reducePreTermPlus (m, PreTermMu (x, t) e) = do
   t' <- reducePreTermPlus t
   e' <- reducePreTermPlus e
   return $ (m, PreTermMu (x, t') e')
-reducePreTermPlus (m, PreTermTheta xts e) = do
-  let (xs, ts) = unzip xts
-  ts' <- mapM reducePreTermPlus ts
+reducePreTermPlus (m, PreTermTheta (x, t) e) = do
+  t' <- reducePreTermPlus t
   e' <- reducePreTermPlus e
-  return $ (m, PreTermTheta (zip xs ts') e')
+  return (m, PreTermTheta (x, t') e')
 reducePreTermPlus (m, PreTermEnumElim e les) = do
   e' <- reducePreTermPlus e
   let (ls, es) = unzip les
