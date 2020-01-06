@@ -1,0 +1,7 @@
+;; keywordとしてlambdaを指定していなかったらよくわからないことになるという話。
+
+;; (keyword lambda)
+(notation (lambda () e)
+  (pi-introduction () e))
+
+(foo () 3)
