@@ -101,17 +101,10 @@ lookupTypeEnv s
 
 lookupNameEnv :: String -> WithEnv String
 lookupNameEnv s = do
-  ms <- lookupNameEnvMaybe s
-  case ms of
-    Just s' -> return s'
-    Nothing -> throwError $ "undefined variable: " ++ show s
-
-lookupNameEnvMaybe :: String -> WithEnv (Maybe String)
-lookupNameEnvMaybe s = do
   env <- get
   case lookup s (nameEnv env) of
-    Just s' -> return $ Just s'
-    Nothing -> return Nothing
+    Just s' -> return s'
+    Nothing -> throwError $ "undefined variable: " ++ show s
 
 isDefinedEnum :: Identifier -> WithEnv Bool
 isDefinedEnum name = do

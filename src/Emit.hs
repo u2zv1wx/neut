@@ -343,3 +343,12 @@ showLowType (LowTypeArrayPtr i t) = do
   let s = showLowType t
   "[" ++ show i ++ " x " ++ s ++ "]*"
 showLowType LowTypeIntS64Ptr = "i64*"
+
+showLLVMData :: LLVMData -> String
+showLLVMData (LLVMDataLocal x) = "%" ++ x
+showLLVMData (LLVMDataGlobal x) = "@" ++ x
+showLLVMData (LLVMDataInt i) = show i
+showLLVMData (LLVMDataFloat16 x) = show x
+showLLVMData (LLVMDataFloat32 x) = show x
+showLLVMData (LLVMDataFloat64 x) = show x
+showLLVMData LLVMDataNull = "null"
