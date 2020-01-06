@@ -41,7 +41,6 @@ data Theta
 
 type IdentifierPlus = (Identifier, DataPlus)
 
--- type CodeMeta = Maybe Loc
 type DataPlus = (Meta, Data)
 
 type CodePlus = (Meta, Code)
