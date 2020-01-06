@@ -322,9 +322,6 @@ univToUniv = do
   h <- newNameWith "hole-univ-to-univ"
   return (metaTerminal, WeakTermPi [(h, univ)] univ)
 
--- toLoc :: WeakMeta -> Maybe Loc
--- toLoc (WeakMetaTerminal ml) = ml
--- toLoc (WeakMetaNonTerminal ml) = ml
 metaTerminal :: PreMeta
 metaTerminal = PreMetaTerminal emptyMeta
 
