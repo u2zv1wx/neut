@@ -134,7 +134,7 @@ interpret t@(m, TreeNode es) =
 interpretIdentifierPlus :: TreePlus -> WithEnv IdentifierPlus
 interpretIdentifierPlus (_, TreeAtom x) = do
   h <- newNameWith "hole-plus"
-  return (x, (newWeakMetaTerminal, QuasiTermZeta h))
+  return (x, (emptyMeta, QuasiTermZeta h))
 interpretIdentifierPlus (_, TreeNode [(_, TreeAtom x), t]) = do
   x' <- interpretAtom x
   t' <- interpret t
@@ -196,8 +196,8 @@ asArrayIntro :: Case -> WithEnv EnumValue
 asArrayIntro (CaseValue l) = return l
 asArrayIntro CaseDefault = throwError "`default` cannot be used in array-intro"
 
-withMeta :: TreeMeta -> QuasiTerm -> WithEnv QuasiTermPlus
-withMeta m e = return (toWeakMetaNonTerminal m, e)
+withMeta :: Meta -> QuasiTerm -> WithEnv QuasiTermPlus
+withMeta m e = return (m, e)
 
 extractIdentifier :: TreePlus -> WithEnv Identifier
 extractIdentifier (_, TreeAtom s) = return s
@@ -234,12 +234,6 @@ encodeChar = map fromIntegral . go . ord
 -- adopted from https://hackage.haskell.org/package/utf8-string-1.0.1.1/docs/src/Codec-Binary-UTF8-String.html
 encode :: String -> [Word8]
 encode = concatMap encodeChar
-
-toWeakMetaNonTerminal :: TreeMeta -> WeakMeta
-toWeakMetaNonTerminal m = WeakMetaNonTerminal (treeMetaLocation m)
-
-newWeakMetaTerminal :: WeakMeta
-newWeakMetaTerminal = WeakMetaTerminal Nothing
 
 isDefinedEnumName :: Identifier -> WithEnv Bool
 isDefinedEnumName name = do

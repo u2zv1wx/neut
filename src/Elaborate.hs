@@ -189,8 +189,8 @@ caseCheckEnumIdentifier' i labelList = do
     else throwError "non-exhaustive pattern"
 
 toMeta :: PreMeta -> WithEnv Meta
-toMeta (PreMetaTerminal l) = return $ Meta {metaLocation = l}
-toMeta (PreMetaNonTerminal _ l) = return $ Meta {metaLocation = l}
+toMeta (PreMetaTerminal m) = return m
+toMeta (PreMetaNonTerminal _ m) = return m
 
 lookupEnumSet :: Identifier -> WithEnv [Identifier]
 lookupEnumSet name = do

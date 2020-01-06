@@ -184,7 +184,7 @@ bindFormalArgs e [] = e
 bindFormalArgs e (xts:xtss) = do
   let e' = bindFormalArgs e xtss
   let tPi = (metaTerminal, WeakTermPi xts (typeOf e'))
-  (PreMetaNonTerminal tPi Nothing, WeakTermPiIntro xts e')
+  (PreMetaNonTerminal tPi emptyMeta, WeakTermPiIntro xts e')
 
 toPiElim :: WeakTermPlus -> [(PreMeta, [WeakTermPlus])] -> WeakTermPlus
 toPiElim e [] = e

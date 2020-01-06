@@ -41,17 +41,17 @@ type Context = [(Identifier, WeakTermPlus)]
 -- Calculi and Applications, 2011.
 -- infer e ~> {type-annotated e}
 infer :: Context -> QuasiTermPlus -> WithEnv WeakTermPlus
-infer _ (m, QuasiTermTau) = return (PreMetaTerminal (toLoc m), WeakTermTau)
+infer _ (m, QuasiTermTau) = return (PreMetaTerminal m, WeakTermTau)
 infer _ (m, QuasiTermUpsilon x) = do
   t <- lookupWeakTypeEnv x
-  retWeakTerm t (toLoc m) $ WeakTermUpsilon x
+  retWeakTerm t m $ WeakTermUpsilon x
 infer ctx (m, QuasiTermPi xts t) = do
   (xts', t') <- inferPi ctx xts t
-  retWeakTerm univ (toLoc m) $ WeakTermPi xts' t'
+  retWeakTerm univ m $ WeakTermPi xts' t'
 infer ctx (m, QuasiTermPiIntro xts e) = do
   (xts', e') <- inferPiIntro ctx xts e
   let piType = (metaTerminal, WeakTermPi xts' (typeOf e'))
-  retWeakTerm piType (toLoc m) $ WeakTermPiIntro xts' e'
+  retWeakTerm piType m $ WeakTermPiIntro xts' e'
 infer ctx (m, QuasiTermPiElim e@(_, QuasiTermPiIntro xts _) es)
   | length xts == length es
     -- Consider the following code:
@@ -92,7 +92,7 @@ infer ctx (m, QuasiTermMu (x, t) e) = do
   -- Otherwise the type of `mu x. e` might have `x` as free variable, which is unsound.
   e' <- infer ctx e
   insConstraintEnv t' (typeOf e')
-  retWeakTerm t' (toLoc m) $ WeakTermMu (x, t') e'
+  retWeakTerm t' m $ WeakTermMu (x, t') e'
 infer ctx (_, QuasiTermZeta _) = do
   h <- newHoleInCtx ctx
   return h
@@ -100,66 +100,65 @@ infer _ (m, QuasiTermConst x)
   -- enum.n8, enum.n64, etc.
   | Just i <- asEnumNatNumConstant x = do
     t' <- toIsEnumType i
-    retWeakTerm t' (toLoc m) $ WeakTermConst x
+    retWeakTerm t' m $ WeakTermConst x
   -- i64, f16, u8, etc.
-  | Just _ <- asLowTypeMaybe x = retWeakTerm univ (toLoc m) $ WeakTermConst x
+  | Just _ <- asLowTypeMaybe x = retWeakTerm univ m $ WeakTermConst x
   | otherwise = do
     t <- lookupWeakTypeEnv x
-    retWeakTerm t (toLoc m) $ WeakTermConst x
+    retWeakTerm t m $ WeakTermConst x
 infer ctx (m, QuasiTermConstDecl (x, t) e) = do
   t' <- inferType ctx t
   insWeakTypeEnv x t'
   -- the type of `e` doesn't depend on `x`
   e' <- infer ctx e
-  retWeakTerm (typeOf e') (toLoc m) $ WeakTermConstDecl (x, t') e'
+  retWeakTerm (typeOf e') m $ WeakTermConstDecl (x, t') e'
 infer _ (m, QuasiTermIntS size i) = do
   let t = (metaTerminal, WeakTermConst $ "i" ++ show size)
-  retWeakTerm t (toLoc m) $ WeakTermIntS size i
+  retWeakTerm t m $ WeakTermIntS size i
 infer _ (m, QuasiTermIntU size i) = do
   let t = (metaTerminal, WeakTermConst $ "u" ++ show size)
-  retWeakTerm t (toLoc m) $ WeakTermIntU size i
+  retWeakTerm t m $ WeakTermIntU size i
 infer ctx (m, QuasiTermInt i) = do
   h <- newTypeHoleInCtx ctx
-  retWeakTerm h (toLoc m) $ WeakTermInt i
+  retWeakTerm h m $ WeakTermInt i
 infer _ (m, QuasiTermFloat16 f) = do
   let t = (metaTerminal, WeakTermConst "f16")
-  retWeakTerm t (toLoc m) $ WeakTermFloat16 f
+  retWeakTerm t m $ WeakTermFloat16 f
 infer _ (m, QuasiTermFloat32 f) = do
   let t = (metaTerminal, WeakTermConst "f32")
-  retWeakTerm t (toLoc m) $ WeakTermFloat32 f
+  retWeakTerm t m $ WeakTermFloat32 f
 infer _ (m, QuasiTermFloat64 f) = do
   let t = (metaTerminal, WeakTermConst "f64")
-  retWeakTerm t (toLoc m) $ WeakTermFloat64 f
+  retWeakTerm t m $ WeakTermFloat64 f
 infer ctx (m, QuasiTermFloat f) = do
   h <- newTypeHoleInCtx ctx
-  retWeakTerm h (toLoc m) $ WeakTermFloat f
-infer _ (m, QuasiTermEnum name) = retWeakTerm univ (toLoc m) $ WeakTermEnum name
+  retWeakTerm h m $ WeakTermFloat f
+infer _ (m, QuasiTermEnum name) = retWeakTerm univ m $ WeakTermEnum name
 infer _ (m, QuasiTermEnumIntro labelOrNum) = do
   case labelOrNum of
     EnumValueLabel l -> do
       k <- lookupKind l
       let t = (metaTerminal, WeakTermEnum $ EnumTypeLabel k)
-      retWeakTerm t (toLoc m) $ WeakTermEnumIntro labelOrNum
+      retWeakTerm t m $ WeakTermEnumIntro labelOrNum
     EnumValueNatNum i _ -> do
       let t = (metaTerminal, WeakTermEnum $ EnumTypeNatNum i)
-      retWeakTerm t (toLoc m) $ WeakTermEnumIntro labelOrNum
+      retWeakTerm t m $ WeakTermEnumIntro labelOrNum
 infer ctx (m, QuasiTermEnumElim e les) = do
   e' <- infer ctx e
   if null les
     then do
       h <- newTypeHoleInCtx ctx
-      retWeakTerm h (toLoc m) $ WeakTermEnumElim e' [] -- ex falso quodlibet
+      retWeakTerm h m $ WeakTermEnumElim e' [] -- ex falso quodlibet
     else do
       let (ls, es) = unzip les
       tls <- mapM inferCase ls
       constrainList $ (typeOf e') : catMaybes tls
       es' <- mapM (infer ctx) es
       constrainList $ map typeOf es'
-      retWeakTerm (typeOf $ head es') (toLoc m) $
-        WeakTermEnumElim e' $ zip ls es'
+      retWeakTerm (typeOf $ head es') m $ WeakTermEnumElim e' $ zip ls es'
 infer ctx (m, QuasiTermArray k indexType) = do
   indexType' <- inferType ctx indexType
-  retWeakTerm univ (toLoc m) $ WeakTermArray k indexType'
+  retWeakTerm univ m $ WeakTermArray k indexType'
 infer ctx (m, QuasiTermArrayIntro k les) = do
   let (ls, es) = unzip les
   tls <- catMaybes <$> mapM (inferCase . CaseValue) ls
@@ -169,13 +168,13 @@ infer ctx (m, QuasiTermArrayIntro k les) = do
   constrainList $ tCod : map typeOf es'
   let indexType = determineDomType tls
   let t = (metaTerminal, WeakTermArray k indexType)
-  retWeakTerm t (toLoc m) $ WeakTermArrayIntro k $ zip ls es'
+  retWeakTerm t m $ WeakTermArrayIntro k $ zip ls es'
 infer ctx (m, QuasiTermArrayElim k e1 e2) = do
   let tCod = inferKind k
   e1' <- infer ctx e1
   e2' <- infer ctx e2
   insConstraintEnv (typeOf e1') (metaTerminal, WeakTermArray k (typeOf e2'))
-  retWeakTerm tCod (toLoc m) $ WeakTermArrayElim k e1' e2'
+  retWeakTerm tCod m $ WeakTermArrayElim k e1' e2'
 
 inferType :: Context -> QuasiTermPlus -> WithEnv WeakTermPlus
 inferType ctx t = do
@@ -218,11 +217,7 @@ inferPiIntro ctx ((x, t):xts) e = do
   return ((x, t') : xts', e')
 
 inferPiElim ::
-     Context
-  -> WeakMeta
-  -> WeakTermPlus
-  -> [WeakTermPlus]
-  -> WithEnv WeakTermPlus
+     Context -> Meta -> WeakTermPlus -> [WeakTermPlus] -> WithEnv WeakTermPlus
 inferPiElim ctx m e es = do
   ys <- mapM (const $ newNameWith "arg") es
   -- yts = [y1 : ?M1 @ (ctx[0], ..., ctx[n]),
@@ -243,7 +238,7 @@ inferPiElim ctx m e es = do
   insConstraintEnv tPi (typeOf e)
    -- cod' = ?M @ (ctx[0], ..., ctx[n], e1, ..., em)
   let cod' = substWeakTermPlus (zip ys es) cod
-  retWeakTerm cod' (toLoc m) $ WeakTermPiElim e es
+  retWeakTerm cod' m $ WeakTermPiElim e es
 
 -- In a context (x1 : A1, ..., xn : An), this function creates metavariables
 --   ?M  : Pi (x1 : A1, ..., xn : An). ?Mt @ (x1, ..., xn)
@@ -257,7 +252,7 @@ newHoleInCtx ctx = do
   varSeq <- mapM (uncurry toVar) ctx
   let app = (metaTerminal, WeakTermPiElim higherHole varSeq)
   hole <- newHoleOfType (metaTerminal, WeakTermPi ctx app)
-  return (PreMetaNonTerminal app Nothing, WeakTermPiElim hole varSeq)
+  return (PreMetaNonTerminal app emptyMeta, WeakTermPiElim hole varSeq)
 
 -- In a context (x1 : A1, ..., xn : An), this function creates a metavariable
 --   ?M  : Pi (x1 : A1, ..., xn : An). Univ
@@ -266,7 +261,7 @@ newTypeHoleInCtx :: Context -> WithEnv WeakTermPlus
 newTypeHoleInCtx ctx = do
   varSeq <- mapM (uncurry toVar) ctx
   hole <- newHoleOfType (metaTerminal, WeakTermPi ctx univ)
-  return (PreMetaNonTerminal univ Nothing, WeakTermPiElim hole varSeq)
+  return (PreMetaNonTerminal univ emptyMeta, WeakTermPiElim hole varSeq)
 
 -- In context ctx == [x1, ..., xn], `newTypeHoleListInCtx ctx [y1, ..., ym]` generates
 -- the following list:
@@ -305,16 +300,16 @@ constrainList (t1:t2:ts) = do
 toVar :: Identifier -> WeakTermPlus -> WithEnv WeakTermPlus
 toVar x t = do
   insWeakTypeEnv x t
-  return (PreMetaNonTerminal t Nothing, WeakTermUpsilon x)
+  return (PreMetaNonTerminal t emptyMeta, WeakTermUpsilon x)
 
-retWeakTerm :: WeakTermPlus -> Maybe Loc -> WeakTerm -> WithEnv WeakTermPlus
+retWeakTerm :: WeakTermPlus -> Meta -> WeakTerm -> WithEnv WeakTermPlus
 retWeakTerm t ml e = return (PreMetaNonTerminal t ml, e)
 
 -- is-enum n{i}
 toIsEnumType :: Integer -> WithEnv WeakTermPlus
 toIsEnumType i = do
   piType <- univToUniv
-  let piMeta = PreMetaNonTerminal piType Nothing
+  let piMeta = PreMetaNonTerminal piType emptyMeta
   return
     ( metaTerminal
     , WeakTermPiElim
@@ -327,17 +322,16 @@ univToUniv = do
   h <- newNameWith "hole-univ-to-univ"
   return (metaTerminal, WeakTermPi [(h, univ)] univ)
 
-toLoc :: WeakMeta -> Maybe Loc
-toLoc (WeakMetaTerminal ml) = ml
-toLoc (WeakMetaNonTerminal ml) = ml
-
+-- toLoc :: WeakMeta -> Maybe Loc
+-- toLoc (WeakMetaTerminal ml) = ml
+-- toLoc (WeakMetaNonTerminal ml) = ml
 metaTerminal :: PreMeta
-metaTerminal = PreMetaTerminal Nothing
+metaTerminal = PreMetaTerminal emptyMeta
 
 newHoleOfType :: WeakTermPlus -> WithEnv WeakTermPlus
 newHoleOfType t = do
   h <- newNameWith "hole-with-type"
-  return (PreMetaNonTerminal t Nothing, WeakTermZeta h)
+  return (PreMetaNonTerminal t emptyMeta, WeakTermZeta h)
 
 determineDomType :: [WeakTermPlus] -> WeakTermPlus
 determineDomType ts =

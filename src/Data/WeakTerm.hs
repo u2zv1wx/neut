@@ -39,8 +39,8 @@ type Hole = Identifier
 type IdentifierPlus = (Identifier, WeakTermPlus)
 
 data PreMeta
-  = PreMetaTerminal (Maybe Loc)
-  | PreMetaNonTerminal WeakTermPlus (Maybe Loc)
+  = PreMetaTerminal Meta
+  | PreMetaNonTerminal WeakTermPlus Meta
   -- deriving (Show)
 
 instance Show PreMeta where
@@ -307,4 +307,4 @@ typeOf' (PreMetaTerminal _) = univ
 typeOf' (PreMetaNonTerminal t _) = t
 
 univ :: WeakTermPlus
-univ = (PreMetaTerminal Nothing, WeakTermTau)
+univ = (PreMetaTerminal emptyMeta, WeakTermTau)

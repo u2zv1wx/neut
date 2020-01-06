@@ -313,7 +313,7 @@ getVarList :: [WeakTermPlus] -> [Identifier]
 getVarList xs = catMaybes $ map asUpsilon xs
 
 toVar :: Identifier -> WeakTermPlus -> WeakTermPlus
-toVar x t = (PreMetaNonTerminal t Nothing, WeakTermUpsilon x)
+toVar x t = (PreMetaNonTerminal t emptyMeta, WeakTermUpsilon x)
 
 asUpsilon :: WeakTermPlus -> Maybe Identifier
 asUpsilon (_, WeakTermUpsilon x) = Just x

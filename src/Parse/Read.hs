@@ -6,6 +6,7 @@ import Control.Monad.Except
 import Control.Monad.State
 import Text.Parsec
 
+import Data.Basic
 import Data.Env
 import Data.Tree
 
@@ -31,14 +32,14 @@ parseAtom :: Parser TreePlus
 parseAtom = do
   s <- symbol
   _ <- skip
-  return (emptyTreeMeta, TreeAtom s)
+  return (emptyMeta, TreeAtom s)
 
 parseNode :: Parser TreePlus
 parseNode = do
   _ <- char '(' >> skip
   itemList <- many parseStr
   _ <- skip >> char ')' >> skip
-  return (emptyTreeMeta, TreeNode itemList)
+  return (emptyMeta, TreeNode itemList)
 
 skip :: Parser ()
 skip = spaces >> (comment <|> spaces)

@@ -7,16 +7,7 @@ data Tree
   | TreeNode [TreePlus]
   deriving (Show)
 
-type TreePlus = (TreeMeta, Tree)
-
-newtype TreeMeta =
-  TreeMeta
-    { treeMetaLocation :: Maybe Loc
-    }
-  deriving (Show)
-
-emptyTreeMeta :: TreeMeta
-emptyTreeMeta = TreeMeta {treeMetaLocation = Nothing}
+type TreePlus = (Meta, Tree)
 
 atomListOf :: TreePlus -> [Identifier]
 atomListOf (_, TreeAtom x) = [x]

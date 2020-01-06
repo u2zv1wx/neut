@@ -19,7 +19,7 @@ import Parse.Rename
 
 data Def
   = DefLet
-      WeakMeta -- meta
+      Meta
       IdentifierPlus -- the `(x : t)` in `let (x : t) = e`
       QuasiTermPlus -- the `e` in `let x = e`
   | DefConstDecl IdentifierPlus
@@ -89,7 +89,7 @@ parse' ((_, TreeNode [(_, TreeAtom "let"), xt, e]):as) = do
   e' <- macroExpand e >>= interpret
   (x, t) <- macroExpand xt >>= interpretIdentifierPlus
   defList <- parse' as
-  return $ DefLet newMeta (x, t) e' : defList
+  return $ DefLet emptyMeta (x, t) e' : defList
 parse' (a:as)
   -- If the head element is not a special form, we interpret it as an ordinary term.
  = do
@@ -117,30 +117,27 @@ isSpecialForm _ = False
 toIsEnumType :: Identifier -> WithEnv QuasiTermPlus
 toIsEnumType name = do
   return
-    ( newMeta
+    ( emptyMeta
     , QuasiTermPiElim
-        (newMeta, QuasiTermConst "is-enum")
-        [(newMeta, QuasiTermEnum $ EnumTypeLabel name)])
+        (emptyMeta, QuasiTermConst "is-enum")
+        [(emptyMeta, QuasiTermEnum $ EnumTypeLabel name)])
 
 -- Represent the list of Defs in the target language, using `let`.
 -- (Note that `let x := e1 in e2` can be represented as `(lam x e2) e1`.)
 concatDefList :: [Def] -> WithEnv QuasiTermPlus
 concatDefList [] = do
-  return (newMeta, QuasiTermEnumIntro $ EnumValueLabel "unit")
+  return (emptyMeta, QuasiTermEnumIntro $ EnumValueLabel "unit")
 concatDefList (DefConstDecl xt:es) = do
   cont <- concatDefList es
-  return (newMeta, QuasiTermConstDecl xt cont)
+  return (emptyMeta, QuasiTermConstDecl xt cont)
 concatDefList (DefLet meta xt e:es) = do
   cont <- concatDefList es
-  return (meta, QuasiTermPiElim (newMeta, QuasiTermPiIntro [xt] cont) [e])
-
-newMeta :: WeakMeta
-newMeta = WeakMetaNonTerminal Nothing
+  return (meta, QuasiTermPiElim (emptyMeta, QuasiTermPiIntro [xt] cont) [e])
 
 newHole :: WithEnv QuasiTermPlus
 newHole = do
   h <- newNameWith "hole-parse-zeta"
-  return (newMeta, QuasiTermZeta h)
+  return (emptyMeta, QuasiTermZeta h)
 
 insEnumEnv :: Identifier -> [Identifier] -> WithEnv ()
 insEnumEnv name enumList =

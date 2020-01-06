@@ -31,15 +31,10 @@ data QuasiTerm
   | QuasiTermArrayElim ArrayKind QuasiTermPlus QuasiTermPlus
   deriving (Show)
 
-type QuasiTermPlus = (WeakMeta, QuasiTerm)
+type QuasiTermPlus = (Meta, QuasiTerm)
 
 type SubstQuasiTerm = [(Identifier, QuasiTermPlus)]
 
 type Hole = Identifier
 
 type IdentifierPlus = (Identifier, QuasiTermPlus)
-
-data WeakMeta
-  = WeakMetaTerminal (Maybe Loc)
-  | WeakMetaNonTerminal (Maybe Loc)
-  deriving (Show) -- data WeakMeta
