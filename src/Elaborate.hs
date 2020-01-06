@@ -10,8 +10,8 @@ import Numeric.Half
 import Data.Basic
 import Data.Env
 import Data.PreTerm
+import Data.QuasiTerm
 import Data.Term
-import Data.WeakTerm
 import Elaborate.Analyze
 import Elaborate.Infer
 import Elaborate.Synthesize
@@ -27,7 +27,7 @@ import Reduce.Term
 -- The inference algorithm in this module is based on L. de Moura, J. Avigad,
 -- S. Kong, and C. Roux. "Elaboration in Dependent Type Theory", arxiv,
 -- https://arxiv.org/abs/1505.04324, 2015.
-elaborate :: WeakTermPlus -> WithEnv TermPlus
+elaborate :: QuasiTermPlus -> WithEnv TermPlus
 elaborate e = do
   p "infer"
   e' <- infer [] e

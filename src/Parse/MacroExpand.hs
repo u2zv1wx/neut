@@ -104,7 +104,7 @@ macroMatch (_, TreeNode ts1) (_, TreeNode ts2)
   -- This behavior is indispensable when we realize practical macros.
   -- Note that the [3, foo, 5] is not the same as (3 foo 5). the `[3, foo, 5]` is the
   -- list in the meta-language (namely, Haskell), whereas the `(3 foo 5)` is the list
-  -- in the object-language (namely, WeakTerm).
+  -- in the object-language (namely, QuasiTerm).
  = do
   case last ts2 of
     (_, TreeAtom sym)

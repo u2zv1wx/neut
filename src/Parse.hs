@@ -10,8 +10,8 @@ import Text.Read (readMaybe)
 
 import Data.Basic
 import Data.Env
+import Data.QuasiTerm
 import Data.Tree
-import Data.WeakTerm
 import Parse.Interpret
 import Parse.MacroExpand
 import Parse.Read
@@ -21,10 +21,10 @@ data Def
   = DefLet
       WeakMeta -- meta
       IdentifierPlus -- the `(x : t)` in `let (x : t) = e`
-      WeakTermPlus -- the `e` in `let x = e`
+      QuasiTermPlus -- the `e` in `let x = e`
   | DefConstDecl IdentifierPlus
 
-parse :: String -> WithEnv WeakTermPlus
+parse :: String -> WithEnv QuasiTermPlus
 parse s = strToTree s >>= parse' >>= concatDefList >>= rename
 
 -- Parse the head element of the input list.
@@ -114,33 +114,33 @@ isSpecialForm (_, TreeNode ((_, TreeAtom "statement"):_)) = True
 isSpecialForm (_, TreeNode [(_, TreeAtom "let"), _, _]) = True
 isSpecialForm _ = False
 
-toIsEnumType :: Identifier -> WithEnv WeakTermPlus
+toIsEnumType :: Identifier -> WithEnv QuasiTermPlus
 toIsEnumType name = do
   return
     ( newMeta
-    , WeakTermPiElim
-        (newMeta, WeakTermConst "is-enum")
-        [(newMeta, WeakTermEnum $ EnumTypeLabel name)])
+    , QuasiTermPiElim
+        (newMeta, QuasiTermConst "is-enum")
+        [(newMeta, QuasiTermEnum $ EnumTypeLabel name)])
 
 -- Represent the list of Defs in the target language, using `let`.
 -- (Note that `let x := e1 in e2` can be represented as `(lam x e2) e1`.)
-concatDefList :: [Def] -> WithEnv WeakTermPlus
+concatDefList :: [Def] -> WithEnv QuasiTermPlus
 concatDefList [] = do
-  return (newMeta, WeakTermEnumIntro $ EnumValueLabel "unit")
+  return (newMeta, QuasiTermEnumIntro $ EnumValueLabel "unit")
 concatDefList (DefConstDecl xt:es) = do
   cont <- concatDefList es
-  return (newMeta, WeakTermConstDecl xt cont)
+  return (newMeta, QuasiTermConstDecl xt cont)
 concatDefList (DefLet meta xt e:es) = do
   cont <- concatDefList es
-  return (meta, WeakTermPiElim (newMeta, WeakTermPiIntro [xt] cont) [e])
+  return (meta, QuasiTermPiElim (newMeta, QuasiTermPiIntro [xt] cont) [e])
 
 newMeta :: WeakMeta
 newMeta = WeakMetaNonTerminal Nothing
 
-newHole :: WithEnv WeakTermPlus
+newHole :: WithEnv QuasiTermPlus
 newHole = do
   h <- newNameWith "hole-parse-zeta"
-  return (newMeta, WeakTermZeta h)
+  return (newMeta, QuasiTermZeta h)
 
 insEnumEnv :: Identifier -> [Identifier] -> WithEnv ()
 insEnumEnv name enumList =

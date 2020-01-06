@@ -6,67 +6,67 @@ import Control.Monad.State
 
 import Data.Basic
 import Data.Env
-import Data.WeakTerm
+import Data.QuasiTerm
 
 -- Alpha-convert all the variables so that different variables have different names.
-rename :: WeakTermPlus -> WithEnv WeakTermPlus
-rename (m, WeakTermTau) = return (m, WeakTermTau)
-rename (m, WeakTermUpsilon x) = do
+rename :: QuasiTermPlus -> WithEnv QuasiTermPlus
+rename (m, QuasiTermTau) = return (m, QuasiTermTau)
+rename (m, QuasiTermUpsilon x) = do
   x' <- lookupNameEnv x
-  return (m, WeakTermUpsilon x')
-rename (m, WeakTermPi xts t) = do
+  return (m, QuasiTermUpsilon x')
+rename (m, QuasiTermPi xts t) = do
   (xts', t') <- renameBinderWithBody xts t
-  return (m, WeakTermPi xts' t')
-rename (m, WeakTermPiIntro xts e) = do
+  return (m, QuasiTermPi xts' t')
+rename (m, QuasiTermPiIntro xts e) = do
   (xts', e') <- renameBinderWithBody xts e
-  return (m, WeakTermPiIntro xts' e')
-rename (m, WeakTermPiElim e es) = do
+  return (m, QuasiTermPiIntro xts' e')
+rename (m, QuasiTermPiElim e es) = do
   e' <- rename e
   es' <- mapM rename es
-  return (m, WeakTermPiElim e' es')
-rename (m, WeakTermMu (x, t) e) = do
+  return (m, QuasiTermPiElim e' es')
+rename (m, QuasiTermMu (x, t) e) = do
   t' <- rename t
   local $ do
     x' <- newNameWith x
     e' <- rename e
-    return (m, WeakTermMu (x', t') e')
-rename (m, WeakTermConst x) = return (m, WeakTermConst x)
-rename (m, WeakTermConstDecl (x, t) e) = do
+    return (m, QuasiTermMu (x', t') e')
+rename (m, QuasiTermConst x) = return (m, QuasiTermConst x)
+rename (m, QuasiTermConstDecl (x, t) e) = do
   t' <- rename t
   e' <- rename e
-  return (m, WeakTermConstDecl (x, t') e')
-rename (m, WeakTermZeta h) = return (m, WeakTermZeta h)
-rename (m, WeakTermIntS size x) = return (m, WeakTermIntS size x)
-rename (m, WeakTermIntU size x) = return (m, WeakTermIntU size x)
-rename (m, WeakTermInt x) = return (m, WeakTermInt x)
-rename (m, WeakTermFloat16 x) = return (m, WeakTermFloat16 x)
-rename (m, WeakTermFloat32 x) = return (m, WeakTermFloat32 x)
-rename (m, WeakTermFloat64 x) = return (m, WeakTermFloat64 x)
-rename (m, WeakTermFloat x) = return (m, WeakTermFloat x)
-rename (m, WeakTermEnum s) = return (m, WeakTermEnum s)
-rename (m, WeakTermEnumIntro x) = return (m, WeakTermEnumIntro x)
-rename (m, WeakTermEnumElim e caseList) = do
+  return (m, QuasiTermConstDecl (x, t') e')
+rename (m, QuasiTermZeta h) = return (m, QuasiTermZeta h)
+rename (m, QuasiTermIntS size x) = return (m, QuasiTermIntS size x)
+rename (m, QuasiTermIntU size x) = return (m, QuasiTermIntU size x)
+rename (m, QuasiTermInt x) = return (m, QuasiTermInt x)
+rename (m, QuasiTermFloat16 x) = return (m, QuasiTermFloat16 x)
+rename (m, QuasiTermFloat32 x) = return (m, QuasiTermFloat32 x)
+rename (m, QuasiTermFloat64 x) = return (m, QuasiTermFloat64 x)
+rename (m, QuasiTermFloat x) = return (m, QuasiTermFloat x)
+rename (m, QuasiTermEnum s) = return (m, QuasiTermEnum s)
+rename (m, QuasiTermEnumIntro x) = return (m, QuasiTermEnumIntro x)
+rename (m, QuasiTermEnumElim e caseList) = do
   e' <- rename e
   caseList' <- renameCaseList caseList
-  return (m, WeakTermEnumElim e' caseList')
-rename (m, WeakTermArray kind indexType) = do
+  return (m, QuasiTermEnumElim e' caseList')
+rename (m, QuasiTermArray kind indexType) = do
   indexType' <- rename indexType
-  return (m, WeakTermArray kind indexType')
-rename (m, WeakTermArrayIntro kind les) = do
+  return (m, QuasiTermArray kind indexType')
+rename (m, QuasiTermArrayIntro kind les) = do
   les' <-
     forM les $ \(l, body) -> do
       body' <- rename body
       return (l, body')
-  return (m, WeakTermArrayIntro kind les')
-rename (m, WeakTermArrayElim kind e1 e2) = do
+  return (m, QuasiTermArrayIntro kind les')
+rename (m, QuasiTermArrayElim kind e1 e2) = do
   e1' <- rename e1
   e2' <- rename e2
-  return (m, WeakTermArrayElim kind e1' e2')
+  return (m, QuasiTermArrayElim kind e1' e2')
 
 renameBinderWithBody ::
      [IdentifierPlus]
-  -> WeakTermPlus
-  -> WithEnv ([IdentifierPlus], WeakTermPlus)
+  -> QuasiTermPlus
+  -> WithEnv ([IdentifierPlus], QuasiTermPlus)
 renameBinderWithBody [] e = do
   e' <- rename e
   return ([], e')
@@ -77,7 +77,7 @@ renameBinderWithBody ((x, t):xts) e = do
     (xts', e') <- renameBinderWithBody xts e
     return ((x', t') : xts', e')
 
-renameCaseList :: [(Case, WeakTermPlus)] -> WithEnv [(Case, WeakTermPlus)]
+renameCaseList :: [(Case, QuasiTermPlus)] -> WithEnv [(Case, QuasiTermPlus)]
 renameCaseList caseList =
   forM caseList $ \(l, body) ->
     local $ do
