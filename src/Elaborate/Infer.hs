@@ -93,8 +93,8 @@ infer ctx (m, QuasiTermMu (x, t) e) = do
   e' <- infer ctx e
   insConstraintEnv t' (typeOf e')
   retWeakTerm t' m $ WeakTermMu (x, t') e'
-infer ctx (_, QuasiTermZeta _) = do
-  h <- newHoleInCtx ctx
+infer ctx (m, QuasiTermZeta _) = do
+  h <- newHoleInCtx ctx m
   return h
 infer _ (m, QuasiTermConst x)
   -- enum.n8, enum.n64, etc.
@@ -246,13 +246,13 @@ inferPiElim ctx m e es = do
 -- and return ?M @ (x1, ..., xn) : ?Mt @ (x1, ..., xn).
 -- Note that we can't just set `?M : Pi (x1 : A1, ..., xn : An). Univ` since
 -- QuasiTermZeta might be used as an ordinary term, that is, a term which is not a type.
-newHoleInCtx :: Context -> WithEnv WeakTermPlus
-newHoleInCtx ctx = do
-  higherHole <- newHoleOfType (metaTerminal, WeakTermPi ctx univ)
+newHoleInCtx :: Context -> Meta -> WithEnv WeakTermPlus
+newHoleInCtx ctx m = do
+  higherHole <- newHoleOfType (metaTermWith m, WeakTermPi ctx univ)
   varSeq <- mapM (uncurry toVar) ctx
-  let app = (metaTerminal, WeakTermPiElim higherHole varSeq)
-  hole <- newHoleOfType (metaTerminal, WeakTermPi ctx app)
-  return (PreMetaNonTerminal app emptyMeta, WeakTermPiElim hole varSeq)
+  let app = (metaTermWith m, WeakTermPiElim higherHole varSeq)
+  hole <- newHoleOfType (metaTermWith m, WeakTermPi ctx app)
+  return (PreMetaNonTerminal app m, WeakTermPiElim hole varSeq)
 
 -- In a context (x1 : A1, ..., xn : An), this function creates a metavariable
 --   ?M  : Pi (x1 : A1, ..., xn : An). Univ
@@ -327,6 +327,9 @@ univToUniv = do
 -- toLoc (WeakMetaNonTerminal ml) = ml
 metaTerminal :: PreMeta
 metaTerminal = PreMetaTerminal emptyMeta
+
+metaTermWith :: Meta -> PreMeta
+metaTermWith m = PreMetaTerminal m
 
 newHoleOfType :: WeakTermPlus -> WithEnv WeakTermPlus
 newHoleOfType t = do
