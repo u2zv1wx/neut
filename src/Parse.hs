@@ -30,13 +30,10 @@ parse s = strToTree s >>= parse' >>= concatDefList >>= rename
 -- Parse the head element of the input list.
 parse' :: [TreePlus] -> WithEnv [Def]
 parse' [] = return []
-parse' ((_, TreeNode [(_, TreeAtom "notation"), from, to]):as) =
-  if not $ isSaneNotation from
-    then throwError
-           "The '+'-suffixed name can be occurred only at the end of a list"
-    else do
-      modify (\e -> e {notationEnv = (from, to) : notationEnv e})
-      parse' as
+parse' ((_, TreeNode [(_, TreeAtom "notation"), from, to]):as) = do
+  checkNotation from
+  modify (\e -> e {notationEnv = (from, to) : notationEnv e})
+  parse' as
 parse' ((_, TreeNode [(_, TreeAtom "keyword"), (_, TreeAtom s)]):as) = do
   modify (\e -> e {keywordEnv = s : keywordEnv e})
   parse' as

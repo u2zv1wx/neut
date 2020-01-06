@@ -53,6 +53,8 @@
 ;; lambda: pi-introduction with implicit begin block
 (keyword lambda)
 
+;; このときはlambdaは変数としての束縛を与える。
+;; だから、(lambda () 3)とかがあったら、
 (notation (lambda () e)
   (pi-introduction () (begin e)))
 
@@ -82,7 +84,6 @@
 
 (keyword to-type-list)
 
-;; 意味としては(t)へと変換するべきであるような気がする。でないとsplicingにならないような？
 (notation (to-type-list t)
   ((_ t)))
 
@@ -112,8 +113,6 @@
      (_ (pi (xt+ (_ t)) c)))
     c))
 
-;; ここはarrowの定義のおかげでさくっといける。
-;; cって導入してある新しい変数はスコープがちゃんとここで切れてるので問題なし。
 (keyword product)
 
 (notation (product t+)
@@ -211,9 +210,6 @@
 (keyword admit)
 
 (notation admit (admit-explicit _))
-
-(definition write ((B type) (out file-descriptor) (str (u8-array B)) (len (is-enum B)))
-  (io-return top (write B out str len)))
 
 ;; 「あ」のutf8-encoding
 (definition str ()

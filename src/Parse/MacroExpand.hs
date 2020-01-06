@@ -1,9 +1,11 @@
 module Parse.MacroExpand
   ( macroExpand
-  , isSaneNotation
+  , checkNotation
   ) where
 
+import Control.Monad.Except
 import Control.Monad.State
+import Data.List (intersect)
 
 import Data.Env
 import Data.Maybe (fromMaybe)
@@ -38,8 +40,7 @@ macroExpand1 t@(i, _) = do
   mMatch <- try (macroMatch t) nenv
   case mMatch of
     Just (subst, (_, template)) -> do
-      let t' = applyMacroSubst subst (i, template)
-      macroExpand t'
+      macroExpand $ applyMacroSubst subst (i, template)
     Nothing -> return t
 
 -- returns the first "Just"
@@ -69,8 +70,14 @@ macroMatch (i, TreeAtom s1) (_, TreeAtom s2)
   case (s1 `elem` kenv, s2 `elem` kenv) of
     (True, True)
       | s1 == s2 -> return $ Just ([], [])
-    (False, False) -> return $ Just ([(s2, (i, TreeAtom s1))], [])
-    _ -> return Nothing
+    (False, False) -> do
+      return $ Just ([(s2, (i, TreeAtom s1))], [])
+    (True, False)
+      | s1 == s2 -> do return Nothing
+    (False, True)
+      | s1 == s2 -> do return Nothing
+    _ -> do
+      return Nothing
 macroMatch t (_, TreeAtom s)
   -- The input is a S-expression, and the pattern is (supposed to be) a variable.
   -- We firstly check that the `s` is in fact a variable, that is, not a reserved
@@ -166,14 +173,30 @@ applyMacroSubst sub@(_, s2) (i, TreeNode ts)
       (i, TreeNode ts')
 
 -- The '+'-suffixed name can be occurred only at the end of a list
-isSaneNotation :: Pattern -> Bool
-isSaneNotation (_, TreeAtom s) = last s /= '+'
-isSaneNotation (_, TreeNode []) = True
-isSaneNotation (_, TreeNode ts) = do
-  let b = all isSaneNotation $ init ts
+checkNotation :: Pattern -> WithEnv ()
+checkNotation t = do
+  checkKeywordCondition t
+  checkPlusCondition t
+
+checkKeywordCondition :: Pattern -> WithEnv ()
+checkKeywordCondition t = do
+  kenv <- gets keywordEnv
+  if not $ null $ kenv `intersect` atomListOf t
+    then return ()
+    else throwError "A notation must include at least one keyword"
+
+checkPlusCondition :: Pattern -> WithEnv ()
+checkPlusCondition (_, TreeAtom s) =
+  if last s /= '+'
+    then return ()
+    else throwError
+           "The '+'-suffixed name can be occurred only at the end of a list"
+checkPlusCondition (_, TreeNode []) = return ()
+checkPlusCondition (_, TreeNode ts) = do
+  mapM_ checkPlusCondition $ init ts
   case last ts of
-    (_, TreeAtom _) -> True
-    ts' -> b && isSaneNotation ts'
+    (_, TreeAtom _) -> return ()
+    ts' -> checkPlusCondition ts'
 
 -- (a b (splice (c (splice (p q)) e)) f) ~> (a b c p q d e)
 splice :: TreePlus -> TreePlus

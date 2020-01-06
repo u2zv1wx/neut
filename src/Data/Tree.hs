@@ -17,3 +17,7 @@ newtype TreeMeta =
 
 emptyTreeMeta :: TreeMeta
 emptyTreeMeta = TreeMeta {treeMetaLocation = Nothing}
+
+atomListOf :: TreePlus -> [Identifier]
+atomListOf (_, TreeAtom x) = [x]
+atomListOf (_, TreeNode ts) = concatMap atomListOf ts
