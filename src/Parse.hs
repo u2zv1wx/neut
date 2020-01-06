@@ -65,7 +65,9 @@ parse' ((_, TreeNode [(_, TreeAtom "include"), (_, TreeAtom pathString)]):as) =
     Nothing -> throwError "the argument of `include` must be a string"
     Just path -> do
       dirPath <- gets currentDir
-      let nextPath = dirPath </> path
+      let nextPath = normalise $ dirPath </> path
+      p' "path:"
+      p' nextPath
       b <- liftIO $ doesFileExist nextPath
       if not b
         then throwError $ "no such file: " ++ normalise nextPath
@@ -91,9 +93,7 @@ parse' ((_, TreeNode [(_, TreeAtom "let"), xt, e]):as) = do
   (x, t) <- macroExpand xt >>= interpretIdentifierPlus
   defList <- parse' as
   return $ DefLet emptyMeta (x, t) e' : defList
-parse' (a:as)
-  -- If the head element is not a special form, we interpret it as an ordinary term.
- = do
+parse' (a:as) = do
   e <- macroExpand a
   if isSpecialForm e
     then parse' $ e : as

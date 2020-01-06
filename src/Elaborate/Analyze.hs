@@ -21,11 +21,12 @@ analyze cs = Q.fromList <$> simp cs
 
 simp :: [PreConstraint] -> WithEnv [EnrichedConstraint]
 simp [] = return []
-simp ((e1, e2):cs)
-  | isReducibleWeakTerm e1 = simpReduce e1 e2 cs
-simp ((e1, e2):cs)
-  | isReducibleWeakTerm e2 = simpReduce e2 e1 cs
-simp cs = simp' cs
+simp ((e1, e2):cs) = do
+  me1' <- reduceWeakTermPlus e1 >>= liftIO . timeout 5000000 . return
+  me2' <- reduceWeakTermPlus e2 >>= liftIO . timeout 5000000 . return
+  case (me1', me2') of
+    (Just e1', Just e2') -> simp' $ (e1', e2') : cs
+    _ -> throwError $ "cannot simplify [TIMEOUT]:\n" ++ Pr.ppShow (e1, e2)
 
 simp' :: [PreConstraint] -> WithEnv [EnrichedConstraint]
 simp' [] = return []
@@ -155,30 +156,6 @@ takeFreeAppArgs e1 e2 sub
   , f `notElem` map fst sub
   , length es1 == length es2 = Just (es1, es2)
 takeFreeAppArgs _ _ _ = Nothing
-
-simpReduce ::
-     WeakTermPlus
-  -> WeakTermPlus
-  -> [PreConstraint]
-  -> WithEnv [EnrichedConstraint]
-simpReduce e1 e2 cs = do
-  me1' <- reduceWeakTermPlus e1 >>= liftIO . timeout 5000000 . return
-  case me1' of
-    Just e1'
-      | isReducibleWeakTerm e2 -> simpReduce' e2 e1' cs
-    Just e1' -> simp' $ (e1', e2) : cs
-    Nothing -> throwError $ "cannot simplify [TIMEOUT]:\n" ++ Pr.ppShow (e1, e2)
-
-simpReduce' ::
-     WeakTermPlus
-  -> WeakTermPlus
-  -> [PreConstraint]
-  -> WithEnv [EnrichedConstraint]
-simpReduce' e1 e2 cs = do
-  me1' <- reduceWeakTermPlus e1 >>= liftIO . timeout 5000000 . return
-  case me1' of
-    Just e1' -> simp' $ (e1', e2) : cs
-    Nothing -> throwError $ "cannot simplify [TIMEOUT]:\n" ++ Pr.ppShow (e1, e2)
 
 simpBinder ::
      [(Identifier, WeakTermPlus)]

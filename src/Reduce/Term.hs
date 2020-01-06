@@ -26,23 +26,18 @@ reduceTermPlus (m, TermPiElim e es) = do
   e' <- reduceTermPlus e
   es' <- mapM reduceTermPlus es
   let app = TermPiElim e' es'
-  case e'
-    -- (_, TermPiIntro xts body)
-    --   | length xts == length es' -> do
-    --     let xs = map fst xts
-    --     reduceTermPlus $ substTermPlus (zip xs es') body
-        of
+  case e' of
     (_, TermPiIntro xts body)
       | length xts == length es'
-      , all isValue es' -> do
+      , all isValue es' -- fixme: reduceできるだけreduceするようにする (partial evaluation)
+       -> do
         let xs = map fst xts
         reduceTermPlus $ substTermPlus (zip xs es') body
-    self@(_, TermMu (x, _) body)
+    self@(_, TermMu (x, _) body) -- fixme: muは放置のほうがよくね？
       | all isValue es' -> do
         let self' = substTermPlus [(x, self)] body
         reduceTermPlus (m, TermPiElim self' es')
     (_, TermConst constant) -> reduceTermPlusTheta (m, app) es' m constant
-    -- (_, TermTheta constant) -> reduceTermPlusTheta (m, app) es' m constant
     _ -> return (m, app)
 reduceTermPlus (m, TermMu (x, t) e) = do
   t' <- reduceTermPlus t

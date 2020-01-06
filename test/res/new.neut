@@ -1,146 +1,148 @@
-;; define basic notations
+;; ;; define basic notations
 
-;; synonyms
-(keyword type)
+;; ;; synonyms
+;; (keyword type)
 
-(notation type tau)
+;; (notation type tau)
 
-(keyword universe)
+;; (keyword universe)
 
-(notation universe tau)
+;; (notation universe tau)
 
-(keyword forall)
+;; (keyword forall)
 
-(notation forall pi)
+;; (notation forall pi)
 
-(keyword apply)
+;; (keyword apply)
 
-(notation apply pi-elimination)
+;; (notation apply pi-elimination)
 
-(keyword fix)
+;; (keyword fix)
 
-(notation fix mu)
+;; (notation fix mu)
 
-;; sequential execution
-(keyword pi-i)
+;; ;; sequential execution
+;; (keyword pi-i)
 
-(notation pi-i pi-introduction)
+;; (notation pi-i pi-introduction)
 
-(keyword pi-e)
+;; (keyword pi-e)
 
-(notation pi-e pi-elimination)
+;; (notation pi-e pi-elimination)
 
-(keyword let)
+;; (keyword let)
 
-(keyword begin)
+;; (keyword begin)
 
-(keyword definition)
+;; (keyword definition)
 
-(notation (begin e) e)
+;; (notation (begin e) e)
 
-(notation (begin e rest+)
-  (pi-e (pi-i ((_ _)) (begin rest+)) (begin e)))
+;; (notation (begin e rest+)
+;;   (pi-e (pi-i ((_ _)) (begin rest+)) (begin e)))
 
-(notation (begin (let x e+) rest+)
-  (pi-e (pi-i ((x _)) (begin rest+)) (begin e+)))
+;; (notation (begin (let x e+) rest+)
+;;   (pi-e (pi-i ((x _)) (begin rest+)) (begin e+)))
 
-(notation (begin (definition x e) rest+)
-  (pi-e (pi-i ((x _)) (begin rest+)) (mu x e)))
+;; (notation (begin (definition x e) rest+)
+;;   (pi-e (pi-i ((x _)) (begin rest+)) (mu x e)))
 
-(notation (begin (definition name (x+) e+) rest+)
-  (pi-e (pi-i ((name _)) (begin rest+)) (mu name (pi-i (x+) (begin e+)))))
+;; (notation (begin (definition name (x+) e+) rest+)
+;;   (pi-e (pi-i ((name _)) (begin rest+)) (mu name (pi-i (x+) (begin e+)))))
 
-;; lambda: pi-introduction with implicit begin block
-(keyword lambda)
+;; ;; lambda: pi-introduction with implicit begin block
+;; (keyword lambda)
 
-;; このときはlambdaは変数としての束縛を与える。
-;; だから、(lambda () 3)とかがあったら、
-(notation (lambda () e)
-  (pi-introduction () (begin e)))
+;; ;; このときはlambdaは変数としての束縛を与える。
+;; ;; だから、(lambda () 3)とかがあったら、
+;; (notation (lambda () e)
+;;   (pi-introduction () (begin e)))
 
-(notation (lambda (xts+) e)
-  (pi-i (xts+) (begin e)))
+;; (notation (lambda (xts+) e)
+;;   (pi-i (xts+) (begin e)))
 
-;; define recursive term at top level without using `mu` explicitly
-(notation (definition name e)
-  (let name (mu name e))) ;; こっちの `let` はspecial formのほうのlet.
+;; ;; define recursive term at top level without using `mu` explicitly
+;; (notation (definition name e)
+;;   (let name (mu name e))) ;; こっちの `let` はspecial formのほうのlet.
 
-(notation (definition name () e+)
-  (let name (mu name (lambda () e+))))
+;; (notation (definition name () e+)
+;;   (let name (mu name (lambda () e+))))
 
-(notation (definition name (x+) e+)
-  (let name (mu name (lambda (x+) e+))))
+;; (notation (definition name (x+) e+)
+;;   (let name (mu name (lambda (x+) e+))))
 
-;; type ascription
-;; (ascribe e t) ~> (let (_ t) e)
-(keyword ascription)
+;; ;; type ascription
+;; ;; (ascribe e t) ~> (let (_ t) e)
+;; (keyword ascription)
 
-;; (constant is-enum)
+;; ;; (constant is-enum)
 
-(notation (ascription e t)
-  (let (_ t) e))
+;; (notation (ascription e t)
+;;   (let (_ t) e))
 
-(constant is-enum (pi ((_ type)) type))
+;; (constant is-enum (pi ((_ type)) type))
 
-(keyword to-type-list)
+;; (keyword to-type-list)
 
-(notation (to-type-list t)
-  ((_ t)))
+;; (notation (to-type-list t)
+;;   ((_ t)))
 
-(notation (to-type-list t t+)
-  ((_ t) (splice (to-type-list t+))))
+;; (notation (to-type-list t t+)
+;;   ((_ t) (splice (to-type-list t+))))
 
-(keyword arrow)
+;; (keyword arrow)
 
-(notation (arrow (t+) cod)
-  (pi (to-type-list t+) cod))
+;; (notation (arrow (t+) cod)
+;;   (pi (to-type-list t+) cod))
 
-;; (hom a b c) = a -> (b -> c)
-(keyword hom)
+;; ;; (hom a b c) = a -> (b -> c)
+;; (keyword hom)
 
-(notation (hom t) t)
+;; (notation (hom t) t)
 
-(notation (hom t rest+)
-  (pi
-    ((_ t))
-    (hom rest+)))
+;; (notation (hom t rest+)
+;;   (pi
+;;     ((_ t))
+;;     (hom rest+)))
 
-(keyword sigma)
+;; (keyword sigma)
 
-(notation (sigma (xt+) t)
-  (pi
-    ((c tau)
-     (_ (pi (xt+ (_ t)) c)))
-    c))
+;; (notation (sigma (xt+) t)
+;;   (pi
+;;     ((c tau)
+;;      (_ (pi (xt+ (_ t)) c)))
+;;     c))
 
-(keyword product)
+;; (keyword product)
 
-(notation (product t+)
-  (pi
-    ((c tau)
-     (_ (arrow (t+) c)))
-    c))
+;; (notation (product t+)
+;;   (pi
+;;     ((c tau)
+;;      (_ (arrow (t+) c)))
+;;     c))
 
-(keyword sigma-introduction)
+;; (keyword sigma-introduction)
 
-(keyword to-hole-list)
+;; (keyword to-hole-list)
 
-(notation (to-hole-list e)
-  ((_ _)))
+;; (notation (to-hole-list e)
+;;   ((_ _)))
 
-(notation (to-hole-list e e+)
-  ((_ _) (splice (to-hole-list e+))))
+;; (notation (to-hole-list e e+)
+;;   ((_ _) (splice (to-hole-list e+))))
 
-(notation (sigma-introduction e+)
-  (lambda
-    ((elim-result-type tau)
-     (eliminator (pi (to-hole-list e+) elim-result-type)))
-    (eliminator e+)))
+;; (notation (sigma-introduction e+)
+;;   (lambda
+;;     ((elim-result-type tau)
+;;      (eliminator (pi (to-hole-list e+) elim-result-type)))
+;;     (eliminator e+)))
 
-(keyword sigma-elimination)
+;; (keyword sigma-elimination)
 
-(notation (sigma-elimination (xt+) e1 e2)
-  (e1 (lambda (xt+) e2)))
+;; (notation (sigma-elimination (xt+) e1 e2)
+;;   (e1 (lambda (xt+) e2)))
+
+(include "../res/notation.neut")
 
 (definition state ((S type) (A type))
   (hom S (product S A)))
@@ -224,6 +226,10 @@
 
 ;; 長さがn15になるのがポイントで、ここでunicodeの複雜性が出てくる
 ;; n15の部分をsigmaで包めばどうにかなりそうな雰囲気はある。
+(write n15 stdout (test) enum.n15)
+
+(write n15 stdout (test) enum.n15)
+
 (write n15 stdout (test) enum.n15)
 
 ;; new.neut ends here

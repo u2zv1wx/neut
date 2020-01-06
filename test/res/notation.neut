@@ -53,12 +53,20 @@
 ;; lambda: pi-introduction with implicit begin block
 (keyword lambda)
 
+;; このときはlambdaは変数としての束縛を与える。
+;; だから、(lambda () 3)とかがあったら、
+(notation (lambda () e)
+  (pi-introduction () (begin e)))
+
 (notation (lambda (xts+) e)
   (pi-i (xts+) (begin e)))
 
 ;; define recursive term at top level without using `mu` explicitly
 (notation (definition name e)
   (let name (mu name e))) ;; こっちの `let` はspecial formのほうのlet.
+
+(notation (definition name () e+)
+  (let name (mu name (lambda () e+))))
 
 (notation (definition name (x+) e+)
   (let name (mu name (lambda (x+) e+))))
@@ -67,16 +75,15 @@
 ;; (ascribe e t) ~> (let (_ t) e)
 (keyword ascription)
 
-(constant is-enum)
+;; (constant is-enum)
 
 (notation (ascription e t)
   (let (_ t) e))
 
-(ascription is-enum (pi ((_ type)) type))
+(constant is-enum (pi ((_ type)) type))
 
 (keyword to-type-list)
 
-;; 意味としては(t)へと変換するべきであるような気がする。でないとsplicingにならないような？
 (notation (to-type-list t)
   ((_ t)))
 
@@ -88,7 +95,6 @@
 (notation (arrow (t+) cod)
   (pi (to-type-list t+) cod))
 
-;; (hom a b c) = a -> (b -> c)
 (keyword hom)
 
 (notation (hom t) t)
@@ -106,8 +112,6 @@
      (_ (pi (xt+ (_ t)) c)))
     c))
 
-;; ここはarrowの定義のおかげでさくっといける。
-;; cって導入してある新しい変数はスコープがちゃんとここで切れてるので問題なし。
 (keyword product)
 
 (notation (product t+)
@@ -136,7 +140,3 @@
 
 (notation (sigma-elimination (xt+) e1 e2)
   (e1 (lambda (xt+) e2)))
-
-(keyword admit)
-
-(notation admit (admit-explicit _))

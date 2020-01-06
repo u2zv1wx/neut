@@ -228,56 +228,6 @@ substPreMeta _ m@(PreMetaTerminal _) = m
 substPreMeta sub (PreMetaNonTerminal t ml) =
   PreMetaNonTerminal (substWeakTermPlus sub t) ml
 
-isReducibleWeakTerm :: WeakTermPlus -> Bool
-isReducibleWeakTerm (_, WeakTermTau) = False
-isReducibleWeakTerm (_, WeakTermUpsilon _) = False
-isReducibleWeakTerm (_, WeakTermPi xts cod) =
-  any isReducibleWeakTerm (map snd xts) || isReducibleWeakTerm cod
-isReducibleWeakTerm (_, WeakTermPiIntro xts e) =
-  any isReducibleWeakTerm (map snd xts) || isReducibleWeakTerm e
-isReducibleWeakTerm (_, WeakTermPiElim (_, WeakTermPiIntro xts _) es)
-  | length xts == length es = True
-isReducibleWeakTerm (_, WeakTermPiElim (_, WeakTermUpsilon c) [(_, WeakTermIntS _ _), (_, WeakTermIntS _ _)])
-  | Just (LowTypeIntS _, _) <- asBinaryOpMaybe c = True
-isReducibleWeakTerm (_, WeakTermPiElim (_, WeakTermUpsilon c) [(_, WeakTermIntU _ _), (_, WeakTermIntU _ _)])
-  | Just (LowTypeIntU _, _) <- asBinaryOpMaybe c = True
-isReducibleWeakTerm (_, WeakTermPiElim (_, WeakTermUpsilon c) [(_, WeakTermFloat16 _), (_, WeakTermFloat16 _)])
-  | Just (LowTypeFloat FloatSize16, _) <- asBinaryOpMaybe c = True
-isReducibleWeakTerm (_, WeakTermPiElim (_, WeakTermUpsilon c) [(_, WeakTermFloat32 _), (_, WeakTermFloat32 _)])
-  | Just (LowTypeFloat FloatSize32, _) <- asBinaryOpMaybe c = True
-isReducibleWeakTerm (_, WeakTermPiElim (_, WeakTermUpsilon c) [(_, WeakTermFloat64 _), (_, WeakTermFloat64 _)])
-  | Just (LowTypeFloat FloatSize64, _) <- asBinaryOpMaybe c = True
-isReducibleWeakTerm (_, WeakTermPiElim e es) =
-  isReducibleWeakTerm e || any isReducibleWeakTerm es
-isReducibleWeakTerm (_, WeakTermMu (_, t) e) =
-  isReducibleWeakTerm t || isReducibleWeakTerm e
-isReducibleWeakTerm (_, WeakTermConst _) = False
-isReducibleWeakTerm (_, WeakTermConstDecl (_, t) e) =
-  isReducibleWeakTerm t || isReducibleWeakTerm e
-isReducibleWeakTerm (_, WeakTermZeta _) = False
-isReducibleWeakTerm (_, WeakTermIntS _ _) = False
-isReducibleWeakTerm (_, WeakTermIntU _ _) = False
-isReducibleWeakTerm (_, WeakTermInt _) = False
-isReducibleWeakTerm (_, WeakTermFloat16 _) = False
-isReducibleWeakTerm (_, WeakTermFloat32 _) = False
-isReducibleWeakTerm (_, WeakTermFloat64 _) = False
-isReducibleWeakTerm (_, WeakTermFloat _) = False
-isReducibleWeakTerm (_, WeakTermEnum _) = False
-isReducibleWeakTerm (_, WeakTermEnumIntro _) = False
-isReducibleWeakTerm (_, WeakTermEnumElim (_, WeakTermEnumIntro l) les) = do
-  let (ls, _) = unzip les
-  CaseValue l `elem` ls || CaseDefault `elem` ls
-isReducibleWeakTerm (_, WeakTermEnumElim e les) =
-  isReducibleWeakTerm e || any isReducibleWeakTerm (map snd les)
-isReducibleWeakTerm (_, WeakTermArray _ indexType) =
-  isReducibleWeakTerm indexType
-isReducibleWeakTerm (_, WeakTermArrayIntro _ les) =
-  any isReducibleWeakTerm (map snd les)
-isReducibleWeakTerm (_, WeakTermArrayElim _ (_, WeakTermArrayIntro _ les) (_, WeakTermEnumIntro l))
-  | l `elem` map fst les = True
-isReducibleWeakTerm (_, WeakTermArrayElim _ e1 e2) =
-  isReducibleWeakTerm e1 || isReducibleWeakTerm e2
-
 typeOf :: WeakTermPlus -> WeakTermPlus
 typeOf (m, _) = typeOf' m
 
