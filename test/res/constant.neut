@@ -1,23 +1,14 @@
-;; should be loaded after `notation`
+;; should be loaded after `notation`, `top`.
 
-(constant unsafe.eval-io)
+(constant file-descriptor type)
 
-(ascription unsafe.eval-io
-  (hom
-    (io top)
-    top))
+(constant stdin file-descriptor)
 
-(constant file-descriptor)
+(constant stdout file-descriptor)
 
-(ascription file-descriptor tau)
+(constant stderr file-descriptor)
 
-(constant stdout)
-
-(ascription stdout file-descriptor)
-
-(constant unsafe.write)
-
-(ascription unsafe.write
+(constant write
   (pi
     ((A type)
      (out file-descriptor)

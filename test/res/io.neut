@@ -1,9 +1,26 @@
-(definition io
-  (state world))
+;; (definition io
+;;   (state world))
+
+;; (definition io ((a type))
+;;   (state bottom a))
+
+;; (definition io-return ((B type) (x B))
+;;   (state-return bottom B x))
+
+;; (ascription io-return
+;;   (pi
+;;     ((A type)
+;;      (x A))
+;;     (io A)))
+
 
 (definition io ((a type))
   (state bottom a))
 
+;; (ascription io
+;;   (hom type type))
+
+;; IO Bみたいなやつ。
 (definition io-return ((B type) (x B))
   (state-return bottom B x))
 
@@ -12,3 +29,9 @@
     ((A type)
      (x A))
     (io A)))
+
+(ascription io-return
+  (pi
+    ((A type)
+     (x A))
+    (state bottom A)))

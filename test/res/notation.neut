@@ -53,13 +53,11 @@
 ;; lambda: pi-introduction with implicit begin block
 (keyword lambda)
 
-;; このときはlambdaは変数としての束縛を与える。
-;; だから、(lambda () 3)とかがあったら、
-(notation (lambda () e)
-  (pi-introduction () (begin e)))
+(notation (lambda () e+)
+  (pi-introduction () (begin e+)))
 
-(notation (lambda (xts+) e)
-  (pi-i (xts+) (begin e)))
+(notation (lambda (xts+) e+)
+  (pi-introduction (xts+) (begin e+)))
 
 ;; define recursive term at top level without using `mu` explicitly
 (notation (definition name e)
@@ -75,12 +73,8 @@
 ;; (ascribe e t) ~> (let (_ t) e)
 (keyword ascription)
 
-;; (constant is-enum)
-
 (notation (ascription e t)
   (let (_ t) e))
-
-(constant is-enum (pi ((_ type)) type))
 
 (keyword to-type-list)
 

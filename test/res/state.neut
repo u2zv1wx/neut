@@ -1,6 +1,26 @@
+;; (definition state ((S type) (A type))
+;;   (hom S (product S A)))
+
+;; (definition state-return ((S type) (A type) (x A))
+;;   (lambda ((env S))
+;;     (sigma-introduction env x)))
+
 (definition state ((S type) (A type))
   (hom S (product S A)))
+
+(ascription state
+  (pi
+    ((S type)
+     (A type))
+    type))
 
 (definition state-return ((S type) (A type) (x A))
   (lambda ((env S))
     (sigma-introduction env x)))
+
+(ascription state-return
+  (pi
+    ((S type)
+     (A type)
+     (x A))
+    (hom S (product S A))))

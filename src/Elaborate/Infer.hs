@@ -108,6 +108,8 @@ infer _ (m, QuasiTermConst x)
     retWeakTerm t m $ WeakTermConst x
 infer ctx (m, QuasiTermConstDecl (x, t) e) = do
   t' <- inferType ctx t
+  p "insWeakTypeEnv:"
+  p' x
   insWeakTypeEnv x t'
   -- the type of `e` doesn't depend on `x`
   e' <- infer ctx e
