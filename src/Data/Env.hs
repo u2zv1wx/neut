@@ -10,9 +10,9 @@ import Data.Basic
 import Data.Code
 import Data.Constraint
 import Data.LLVM
-import Data.PreTerm
 import Data.Term
 import Data.Tree
+import Data.WeakTerm
 
 import qualified Data.Map.Strict as Map
 
@@ -32,10 +32,10 @@ data Env =
     , constantEnv :: [Identifier]
     , enumEnv :: [(Identifier, [Identifier])] -- [("choice", ["left", "right"]), ...]
     , nameEnv :: [(Identifier, Identifier)] -- [("foo", "foo.13"), ...]
-    , weakTypeEnv :: Map.Map Identifier PreTermPlus -- var ~> typeof(var)
+    , weakTypeEnv :: Map.Map Identifier WeakTermPlus -- var ~> typeof(var)
     , typeEnv :: Map.Map Identifier TermPlus
     , constraintEnv :: [PreConstraint] -- for type inference
-    , substEnv :: [(Identifier, PreTermPlus)] -- metavar ~> beta-equivalent weakterm
+    , substEnv :: [(Identifier, WeakTermPlus)] -- metavar ~> beta-equivalent weakterm
     , chainEnv :: Map.Map Identifier [(Identifier, TermPlus)] -- var/const ~> the closed var chain of its type
     , codeEnv :: [(Identifier, ([Identifier], CodePlus))] -- f ~> thunk (lam (x1 ... xn) e)
     , llvmEnv :: [(Identifier, ([Identifier], LLVM))]

@@ -1,15 +1,15 @@
 module Data.Constraint where
 
-import Data.PreTerm
+import Data.WeakTerm
 
-type PreConstraint = (PreTermPlus, PreTermPlus)
+type PreConstraint = (WeakTermPlus, WeakTermPlus)
 
 data Constraint
   = ConstraintAnalyzable
-  | ConstraintPattern Hole [[PreTermPlus]] PreTermPlus
-  | ConstraintDelta PreTermPlus [(PreMeta, [PreTermPlus])] PreTermPlus
-  | ConstraintQuasiPattern Hole [[PreTermPlus]] PreTermPlus
-  | ConstraintFlexRigid Hole [[PreTermPlus]] PreTermPlus
+  | ConstraintPattern Hole [[WeakTermPlus]] WeakTermPlus
+  | ConstraintDelta WeakTermPlus [(PreMeta, [WeakTermPlus])] WeakTermPlus
+  | ConstraintQuasiPattern Hole [[WeakTermPlus]] WeakTermPlus
+  | ConstraintFlexRigid Hole [[WeakTermPlus]] WeakTermPlus
   | ConstraintOther
   deriving (Show)
 
@@ -42,10 +42,10 @@ instance Ord EnrichedConstraint where
 
 -- s1が新たに追加されるsubstで、s2が既存のsubst
 -- s1 = m ~> eとして、eのなかにs2でsubstされるべきholeが含まれているとする。
-compose :: SubstPreTerm -> SubstPreTerm -> SubstPreTerm
+compose :: SubstWeakTerm -> SubstWeakTerm -> SubstWeakTerm
 compose s1 s2 = do
   let domS2 = map fst s2
   let codS2 = map snd s2
-  let codS2' = map (substPreTermPlus s1) codS2
+  let codS2' = map (substWeakTermPlus s1) codS2
   let s1' = filter (\(ident, _) -> ident `notElem` domS2) s1
   s1' ++ zip domS2 codS2'

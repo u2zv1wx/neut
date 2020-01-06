@@ -12,10 +12,10 @@ import qualified Text.Show.Pretty as Pr
 import Data.Basic
 import Data.Constraint
 import Data.Env
-import Data.PreTerm
+import Data.WeakTerm
 import Elaborate.Analyze
 import Elaborate.Infer (insWeakTypeEnv, metaTerminal, typeOf)
-import Reduce.PreTerm
+import Reduce.WeakTerm
 
 -- Given a queue of constraints (easier ones comes earlier), try to synthesize
 -- all of them using heuristics.
@@ -39,23 +39,23 @@ synthesize q = do
 
 resolveStuck ::
      ConstraintQueue
-  -> PreTermPlus
-  -> PreTermPlus
+  -> WeakTermPlus
+  -> WeakTermPlus
   -> Hole
-  -> PreTermPlus
+  -> WeakTermPlus
   -> WithEnv ()
 resolveStuck q e1 e2 h e = do
-  let fmvs = holePreTermPlus e
-  let e1' = substPreTermPlus [(h, e)] e1
-  let e2' = substPreTermPlus [(h, e)] e2
+  let fmvs = holeWeakTermPlus e
+  let e1' = substWeakTermPlus [(h, e)] e1
+  let e2' = substWeakTermPlus [(h, e)] e2
   q' <- assert (h `notElem` fmvs) $ analyze [(e1', e2')]
   synthesize $ Q.deleteMin q `Q.union` q'
 
 resolveDelta ::
      ConstraintQueue
-  -> PreTermPlus
-  -> [(PreMeta, [PreTermPlus])]
-  -> PreTermPlus
+  -> WeakTermPlus
+  -> [(PreMeta, [WeakTermPlus])]
+  -> WeakTermPlus
   -> WithEnv ()
 resolveDelta q body mess1 e2 = do
   q' <- analyze [(toPiElim body mess1, e2)]
@@ -73,9 +73,9 @@ resolveDelta q body mess1 e2 = do
 -- this function replaces all the arguments that are not variable by
 -- fresh variables, and try to resolve the new quasi-pattern ?M @ x @ x @ z @ y == e.
 resolvePiElim ::
-     ConstraintQueue -> Hole -> [[PreTermPlus]] -> PreTermPlus -> WithEnv ()
+     ConstraintQueue -> Hole -> [[WeakTermPlus]] -> WeakTermPlus -> WithEnv ()
 resolvePiElim q m ess e = do
-  let fmvs = holePreTermPlus e
+  let fmvs = holeWeakTermPlus e
   let lengthInfo = assert (m `notElem` fmvs) $ map length ess
   let es = concat ess
   xss <- toVarList es >>= toAltList
@@ -83,12 +83,12 @@ resolvePiElim q m ess e = do
   let lamList = map (bindFormalArgs e) xsss
   chain q $ map (\lam -> resolveHole q m lam) lamList
 
--- resolveHoleは[(Hole, PreTermPlus)]を受け取るようにしたほうがよさそう。
+-- resolveHoleは[(Hole, WeakTermPlus)]を受け取るようにしたほうがよさそう。
 -- で、synthesizeのときに複数のhole-substをまとめてこっちに渡す。
-resolveHole :: ConstraintQueue -> Hole -> PreTermPlus -> WithEnv ()
+resolveHole :: ConstraintQueue -> Hole -> WeakTermPlus -> WithEnv ()
 resolveHole q m e = do
   senv <- gets substEnv
-  e' <- reducePreTermPlus $ substPreTermPlus senv e
+  e' <- reduceWeakTermPlus $ substWeakTermPlus senv e
   modify (\env -> env {substEnv = compose [(m, e')] senv})
   let (q1, q2) = Q.partition (\(Enriched _ ms _) -> m `elem` ms) $ Q.deleteMin q
   let q1' = Q.mapU asAnalyzable q1
@@ -98,9 +98,9 @@ asAnalyzable :: EnrichedConstraint -> EnrichedConstraint
 asAnalyzable (Enriched cs ms _) = Enriched cs ms ConstraintAnalyzable
 
 -- [e, x, y, y, e2, e3, z] ~> [p, x, y, y, q, r, z]  (p, q, r: new variables)
-toVarList :: [PreTermPlus] -> WithEnv [(Identifier, PreTermPlus)]
+toVarList :: [WeakTermPlus] -> WithEnv [(Identifier, WeakTermPlus)]
 toVarList [] = return []
-toVarList (e@(_, PreTermUpsilon x):es) = do
+toVarList (e@(_, WeakTermUpsilon x):es) = do
   xts <- toVarList es
   let t = typeOf e
   return $ (x, t) : xts
@@ -179,16 +179,16 @@ lookupAny (h:ks) sub = do
     Just v -> Just (h, v)
     _ -> lookupAny ks sub
 
-bindFormalArgs :: PreTermPlus -> [[IdentifierPlus]] -> PreTermPlus
+bindFormalArgs :: WeakTermPlus -> [[IdentifierPlus]] -> WeakTermPlus
 bindFormalArgs e [] = e
 bindFormalArgs e (xts:xtss) = do
   let e' = bindFormalArgs e xtss
-  let tPi = (metaTerminal, PreTermPi xts (typeOf e'))
-  (PreMetaNonTerminal tPi Nothing, PreTermPiIntro xts e')
+  let tPi = (metaTerminal, WeakTermPi xts (typeOf e'))
+  (PreMetaNonTerminal tPi Nothing, WeakTermPiIntro xts e')
 
-toPiElim :: PreTermPlus -> [(PreMeta, [PreTermPlus])] -> PreTermPlus
+toPiElim :: WeakTermPlus -> [(PreMeta, [WeakTermPlus])] -> WeakTermPlus
 toPiElim e [] = e
-toPiElim e ((m, es):ess) = toPiElim (m, PreTermPiElim e es) ess
+toPiElim e ((m, es):ess) = toPiElim (m, WeakTermPiElim e es) ess
 
 -- takeByCount [1, 3, 2] [a, b, c, d, e, f, g, h] ~> [[a], [b, c, d], [e, f]]
 takeByCount :: [Int] -> [a] -> [[a]]
