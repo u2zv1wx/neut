@@ -39,9 +39,6 @@ toTermUpsilon :: Identifier -> TermPlus
 toTermUpsilon x = do
   (emptyMeta, TermUpsilon x)
 
-toTermInt64 :: Integer -> TermPlus
-toTermInt64 i = (emptyMeta, TermIntS 64 i)
-
 substTermPlus :: SubstTerm -> TermPlus -> TermPlus
 substTermPlus _ (m, TermTau) = (m, TermTau)
 substTermPlus sub (m, TermUpsilon x) =

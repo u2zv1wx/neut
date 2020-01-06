@@ -66,8 +66,6 @@ parse' ((_, TreeNode [(_, TreeAtom "include"), (_, TreeAtom pathString)]):as) =
     Just path -> do
       dirPath <- gets currentDir
       let nextPath = normalise $ dirPath </> path
-      p' "path:"
-      p' nextPath
       b <- liftIO $ doesFileExist nextPath
       if not b
         then throwError $ "no such file: " ++ normalise nextPath
