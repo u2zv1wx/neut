@@ -24,8 +24,9 @@ data Def
       QuasiTermPlus -- the `e` in `let x = e`
   | DefConstDecl IdentifierPlus
 
-parse :: String -> WithEnv QuasiTermPlus
-parse s = strToTree s >>= parse' >>= concatDefList >>= rename
+parse :: String -> String -> WithEnv QuasiTermPlus
+parse s inputPath =
+  strToTree s inputPath >>= parse' >>= concatDefList >>= rename
 
 -- Parse the head element of the input list.
 parse' :: [TreePlus] -> WithEnv [Def]
@@ -72,7 +73,7 @@ parse' ((_, TreeNode [(_, TreeAtom "include"), (_, TreeAtom pathString)]):as) =
           content <- liftIO $ readFile nextPath
           let nextDirPath = dirPath </> takeDirectory path
           modify (\e -> e {currentDir = nextDirPath})
-          includedDefList <- strToTree content >>= parse'
+          includedDefList <- strToTree content path >>= parse'
           modify (\e -> e {currentDir = dirPath})
           defList <- parse' as
           return $ includedDefList ++ defList

@@ -20,14 +20,15 @@ data EnumType
 
 data Meta =
   Meta
-    { metaLocation :: Maybe Loc
+    { metaFileName :: Maybe String
+    , metaLocation :: Maybe Loc
     }
+  deriving (Show)
 
-instance Show Meta where
-  show _ = "_"
-
+-- instance Show Meta where
+--   show _ = "_"
 emptyMeta :: Meta
-emptyMeta = Meta {metaLocation = Nothing}
+emptyMeta = Meta {metaLocation = Nothing, metaFileName = Nothing}
 
 readNatEnumType :: Identifier -> (Maybe Integer)
 readNatEnumType str -- n1, n2, ..., n{i}, ..., n{2^64}

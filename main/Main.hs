@@ -83,7 +83,7 @@ run :: Command -> IO ()
 run (Build inputPath moutputPath outputKind) = do
   content <- readFile inputPath
   dirPath <- expandDirPath $ takeDirectory inputPath
-  resultOrErr <- evalWithEnv (process content) (initialEnv dirPath)
+  resultOrErr <- evalWithEnv (process content inputPath) (initialEnv dirPath)
   let basename = takeBaseName inputPath
   outputPath <- constructOutputPath basename moutputPath outputKind
   case resultOrErr of
@@ -118,9 +118,9 @@ expandDirPath path = do
   current <- getCurrentDirectory
   return $ current </> path
 
-process :: String -> WithEnv [String]
-process input = do
-  e <- (parse >=> elaborate) input
+process :: String -> String -> WithEnv [String]
+process input inputPath = do
+  e <- parse input inputPath >>= elaborate
   p "elaborated"
   e' <- clarify e
   p "clarified"
