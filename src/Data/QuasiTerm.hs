@@ -24,9 +24,7 @@ data QuasiTerm
   | QuasiTermEnum EnumType
   | QuasiTermEnumIntro EnumValue
   | QuasiTermEnumElim QuasiTermPlus [(Case, QuasiTermPlus)]
-  | QuasiTermArray
-      ArrayKind -- type of elements
-      QuasiTermPlus -- type of index
+  | QuasiTermArray ArrayKind QuasiTermPlus
   | QuasiTermArrayIntro ArrayKind [(EnumValue, QuasiTermPlus)]
   | QuasiTermArrayElim ArrayKind QuasiTermPlus QuasiTermPlus
   deriving (Show)

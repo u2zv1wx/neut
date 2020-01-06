@@ -23,10 +23,11 @@ data Meta =
     { metaFileName :: Maybe String
     , metaLocation :: Maybe Loc
     }
-  deriving (Show)
+  -- deriving (Show)
 
--- instance Show Meta where
---   show _ = "_"
+instance Show Meta where
+  show _ = "_"
+
 emptyMeta :: Meta
 emptyMeta = Meta {metaLocation = Nothing, metaFileName = Nothing}
 

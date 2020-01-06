@@ -12,11 +12,6 @@ import Data.Env
 import Data.WeakTerm
 
 reduceWeakTermPlus :: WeakTermPlus -> WithEnv WeakTermPlus
-reduceWeakTermPlus (m, WeakTermPi xts cod) = do
-  let (xs, ts) = unzip xts
-  ts' <- mapM reduceWeakTermPlus ts
-  cod' <- reduceWeakTermPlus cod
-  return $ (m, WeakTermPi (zip xs ts') cod')
 reduceWeakTermPlus (m, WeakTermPiIntro xts e) = do
   let (xs, ts) = unzip xts
   ts' <- mapM reduceWeakTermPlus ts
@@ -28,18 +23,15 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
   let app = WeakTermPiElim e' es'
   case e' of
     (_, WeakTermPiIntro xts body)
-      | length xts == length es' -- fixme: arguments must be pure (also add partial evaluation)
-       -> do
+      | length xts == length es' -> do
         let xs = map fst xts
         let body' = substWeakTermPlus (zip xs es') body
         reduceWeakTermPlus body'
-    self@(_, WeakTermMu (x, _) body)
-      | all isValue es' -> do
-        let self' = substWeakTermPlus [(x, self)] body
-        reduceWeakTermPlus (m, WeakTermPiElim self' es')
+    self@(_, WeakTermMu (x, _) body) -> do
+      let self' = substWeakTermPlus [(x, self)] body
+      reduceWeakTermPlus (m, WeakTermPiElim self' es')
     (_, WeakTermConst constant) ->
       reduceWeakTermPlusTheta (m, app) es' m constant
-    -- (_, WeakTermTheta constant) -> reduceWeakTermPlusTheta (m, app) es' m constant
     _ -> return (m, app)
 reduceWeakTermPlus (m, WeakTermMu (x, t) e) = do
   t' <- reduceWeakTermPlus t
@@ -63,9 +55,6 @@ reduceWeakTermPlus (m, WeakTermEnumElim e les) = do
             Just body -> reduceWeakTermPlus body
             Nothing -> return (m, WeakTermEnumElim e' les')
     _ -> return (m, WeakTermEnumElim e' les')
-reduceWeakTermPlus (m, WeakTermArray k indexType) = do
-  indexType' <- reduceWeakTermPlus indexType
-  return (m, WeakTermArray k indexType')
 reduceWeakTermPlus (m, WeakTermArrayIntro k les) = do
   let (ls, es) = unzip les
   es' <- mapM reduceWeakTermPlus es

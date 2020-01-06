@@ -41,6 +41,7 @@ parseNode = do
   itemList <- many parseStr
   _ <- skip >> char ')' >> skip
   m <- currentMeta
+  -- 別にマクロ展開はここでは絡んでないんだから、original formはtreeとして保持していいのでは？
   return (m, TreeNode itemList)
 
 skip :: Parser ()

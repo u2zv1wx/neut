@@ -41,7 +41,6 @@ type IdentifierPlus = (Identifier, WeakTermPlus)
 data PreMeta
   = PreMetaTerminal Meta
   | PreMetaNonTerminal WeakTermPlus Meta
-  -- deriving (Show)
 
 instance Show PreMeta where
   show _ = "_"
@@ -238,7 +237,6 @@ isReducibleWeakTerm (_, WeakTermPiIntro xts e) =
   any isReducibleWeakTerm (map snd xts) || isReducibleWeakTerm e
 isReducibleWeakTerm (_, WeakTermPiElim (_, WeakTermPiIntro xts _) es)
   | length xts == length es = True
-isReducibleWeakTerm (_, WeakTermPiElim (_, WeakTermMu _ _) es) = all isValue es -- muのときだけCBV的な挙動を要求する
 isReducibleWeakTerm (_, WeakTermPiElim (_, WeakTermUpsilon c) [(_, WeakTermIntS _ _), (_, WeakTermIntS _ _)])
   | Just (LowTypeIntS _, _) <- asBinaryOpMaybe c = True
 isReducibleWeakTerm (_, WeakTermPiElim (_, WeakTermUpsilon c) [(_, WeakTermIntU _ _), (_, WeakTermIntU _ _)])
@@ -279,25 +277,6 @@ isReducibleWeakTerm (_, WeakTermArrayElim _ (_, WeakTermArrayIntro _ les) (_, We
   | l `elem` map fst les = True
 isReducibleWeakTerm (_, WeakTermArrayElim _ e1 e2) =
   isReducibleWeakTerm e1 || isReducibleWeakTerm e2
-
-isValue :: WeakTermPlus -> Bool
-isValue (_, WeakTermTau) = True
-isValue (_, WeakTermUpsilon _) = True
-isValue (_, WeakTermPi {}) = True
-isValue (_, WeakTermPiIntro {}) = True
-isValue (_, WeakTermConst _) = True
-isValue (_, WeakTermIntS _ _) = True
-isValue (_, WeakTermIntU _ _) = True
-isValue (_, WeakTermInt _) = True
-isValue (_, WeakTermFloat16 _) = True
-isValue (_, WeakTermFloat32 _) = True
-isValue (_, WeakTermFloat64 _) = True
-isValue (_, WeakTermFloat _) = True
-isValue (_, WeakTermEnum _) = True
-isValue (_, WeakTermEnumIntro _) = True
-isValue (_, WeakTermArray {}) = True
-isValue (_, WeakTermArrayIntro _ les) = all isValue $ map snd les
-isValue _ = False
 
 typeOf :: WeakTermPlus -> WeakTermPlus
 typeOf (m, _) = typeOf' m

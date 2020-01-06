@@ -16,7 +16,6 @@ import Elaborate.Analyze
 import Elaborate.Infer
 import Elaborate.Synthesize
 import Reduce.Term
-import Reduce.WeakTerm
 
 -- Given a term `e` and its name `main`, this function
 --   (1) traces `e` using `infer e`, collecting type constraints,
@@ -132,9 +131,9 @@ elaborate' (m, WeakTermEnumElim e les) = do
   m' <- toMeta m
   e' <- elaborate' e
   les' <- forM les elaboratePlus
-  t <- reduceWeakTermPlus $ typeOf e
+  t <- elaborate' (typeOf e) >>= reduceTermPlus
   case t of
-    (_, WeakTermEnum x) -> do
+    (_, TermEnum x) -> do
       caseCheckEnumIdentifier x $ map fst les
       return (m', TermEnumElim e' les')
     _ -> throwError "type error (enum elim)"
