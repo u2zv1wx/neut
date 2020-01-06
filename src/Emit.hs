@@ -327,3 +327,19 @@ getRegList = do
   case targetOS of
     OSLinux -> return ["rax", "rdi", "rsi", "rdx", "rcx", "r8", "r9"]
     OSDarwin -> return ["rax", "rdi", "rsi", "rdx", "r10", "r8", "r9"]
+
+showLowType :: LowType -> String
+showLowType (LowTypeIntS i) = "i" ++ show i
+-- LLVM doesn't distinguish unsigned integers from signed ones
+showLowType (LowTypeIntU i) = "i" ++ show i
+showLowType (LowTypeFloat FloatSize16) = "half"
+showLowType (LowTypeFloat FloatSize32) = "float"
+showLowType (LowTypeFloat FloatSize64) = "double"
+showLowType LowTypeVoidPtr = "i8*"
+showLowType (LowTypeStructPtr ts) = "{" ++ showItems showLowType ts ++ "}*"
+showLowType (LowTypeFunctionPtr ts t) =
+  showLowType t ++ " (" ++ showItems showLowType ts ++ ")*"
+showLowType (LowTypeArrayPtr i t) = do
+  let s = showLowType t
+  "[" ++ show i ++ " x " ++ s ++ "]*"
+showLowType LowTypeIntS64Ptr = "i64*"

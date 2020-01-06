@@ -123,7 +123,7 @@ llvmCodeTheta _ (ThetaBinaryOp op lowType v1 v2)
   | isArithOp op = llvmCodeBinaryOp op lowType lowType v1 v2
   | isCompareOp op = llvmCodeBinaryOp op lowType (LowTypeIntS 1) v1 v2
   | otherwise = throwError "llvmCodeTheta.ThetaBinaryOp"
-llvmCodeTheta _ e@(ThetaSysCall num args) = do
+llvmCodeTheta _ (ThetaSysCall num args) = do
   (xs, vs) <- unzip <$> mapM (const $ newDataLocal "sys-call-arg") args
   res <- newNameWith "result"
   num' <- sysCallNumAsInt num
@@ -440,3 +440,34 @@ getEnumNum' l (xs:xss) =
   case elemIndex l xs of
     Nothing -> getEnumNum' l xss
     Just i -> Just i
+
+getCodType :: UnaryOp -> Maybe LowType
+getCodType (UnaryOpTrunc lowType) = Just lowType
+getCodType (UnaryOpZext lowType) = Just lowType
+getCodType (UnaryOpSext lowType) = Just lowType
+getCodType (UnaryOpFpExt lowType) = Just lowType
+getCodType (UnaryOpTo lowType) = Just lowType
+getCodType _ = Nothing
+
+isArithOp :: BinaryOp -> Bool
+isArithOp BinaryOpAdd = True
+isArithOp BinaryOpSub = True
+isArithOp BinaryOpMul = True
+isArithOp BinaryOpDiv = True
+isArithOp BinaryOpRem = True
+isArithOp BinaryOpShl = True
+isArithOp BinaryOpLshr = True
+isArithOp BinaryOpAshr = True
+isArithOp BinaryOpAnd = True
+isArithOp BinaryOpOr = True
+isArithOp BinaryOpXor = True
+isArithOp _ = False
+
+isCompareOp :: BinaryOp -> Bool
+isCompareOp BinaryOpEQ = True
+isCompareOp BinaryOpNE = True
+isCompareOp BinaryOpGT = True
+isCompareOp BinaryOpGE = True
+isCompareOp BinaryOpLT = True
+isCompareOp BinaryOpLE = True
+isCompareOp _ = False

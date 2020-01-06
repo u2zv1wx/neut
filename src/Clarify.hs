@@ -289,3 +289,7 @@ callClosure' :: Meta -> CodePlus -> [TermPlus] -> WithEnv CodePlus
 callClosure' m e es = do
   tmp <- mapM (clarifyPlus) es
   callClosure m e tmp
+
+asSysCallMaybe :: Identifier -> Maybe (SysCall, ArgLen, UsedArgIndexList)
+asSysCallMaybe "write" = Just (SysCallWrite, 4, [1, 2, 3])
+asSysCallMaybe _ = Nothing

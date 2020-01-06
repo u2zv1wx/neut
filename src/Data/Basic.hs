@@ -80,22 +80,6 @@ data LowType
 
 type IntSize = Integer
 
-showLowType :: LowType -> String
-showLowType (LowTypeIntS i) = "i" ++ show i
--- LLVM doesn't distinguish unsigned integers from signed ones
-showLowType (LowTypeIntU i) = "i" ++ show i
-showLowType (LowTypeFloat FloatSize16) = "half"
-showLowType (LowTypeFloat FloatSize32) = "float"
-showLowType (LowTypeFloat FloatSize64) = "double"
-showLowType LowTypeVoidPtr = "i8*"
-showLowType (LowTypeStructPtr ts) = "{" ++ showItems showLowType ts ++ "}*"
-showLowType (LowTypeFunctionPtr ts t) =
-  showLowType t ++ " (" ++ showItems showLowType ts ++ ")*"
-showLowType (LowTypeArrayPtr i t) = do
-  let s = showLowType t
-  "[" ++ show i ++ " x " ++ s ++ "]*"
-showLowType LowTypeIntS64Ptr = "i64*"
-
 asIntS :: Integral a => a -> a -> a
 asIntS size n = do
   let upperBound = 2 ^ (size - 1)
@@ -137,7 +121,6 @@ arrayKindToLowType (ArrayKindIntU i) = LowTypeIntU i
 arrayKindToLowType (ArrayKindFloat size) = LowTypeFloat size
 
 voidPtr :: LowType
--- voidPtr = LowTypePointer $ LowTypeIntS 8
 voidPtr = LowTypeVoidPtr
 
 data UnaryOp
@@ -148,14 +131,6 @@ data UnaryOp
   | UnaryOpFpExt LowType -- fpext
   | UnaryOpTo LowType -- fp-to-ui, fp-to-si, ui-to-fp, si-to-fp (f32.to.i32, i32.to.f64, etc.)
   deriving (Eq, Show)
-
-getCodType :: UnaryOp -> Maybe LowType
-getCodType (UnaryOpTrunc lowType) = Just lowType
-getCodType (UnaryOpZext lowType) = Just lowType
-getCodType (UnaryOpSext lowType) = Just lowType
-getCodType (UnaryOpFpExt lowType) = Just lowType
-getCodType (UnaryOpTo lowType) = Just lowType
-getCodType _ = Nothing
 
 data BinaryOp
   = BinaryOpAdd
@@ -185,13 +160,6 @@ type ArgLen = Int
 
 type UsedArgIndexList = [Int]
 
-asSysCallMaybe :: Identifier -> Maybe (SysCall, ArgLen, UsedArgIndexList)
-asSysCallMaybe "write" = Just (SysCallWrite, 4, [1, 2, 3])
-asSysCallMaybe _ = Nothing
-
-primitiveList :: [Identifier]
-primitiveList = ["write"]
-
 type Target = (OS, Arch)
 
 data OS
@@ -202,29 +170,6 @@ data OS
 data Arch =
   Arch64
   deriving (Eq, Show)
-
-isArithOp :: BinaryOp -> Bool
-isArithOp BinaryOpAdd = True
-isArithOp BinaryOpSub = True
-isArithOp BinaryOpMul = True
-isArithOp BinaryOpDiv = True
-isArithOp BinaryOpRem = True
-isArithOp BinaryOpShl = True
-isArithOp BinaryOpLshr = True
-isArithOp BinaryOpAshr = True
-isArithOp BinaryOpAnd = True
-isArithOp BinaryOpOr = True
-isArithOp BinaryOpXor = True
-isArithOp _ = False
-
-isCompareOp :: BinaryOp -> Bool
-isCompareOp BinaryOpEQ = True
-isCompareOp BinaryOpNE = True
-isCompareOp BinaryOpGT = True
-isCompareOp BinaryOpGE = True
-isCompareOp BinaryOpLT = True
-isCompareOp BinaryOpLE = True
-isCompareOp _ = False
 
 showItems :: (a -> String) -> [a] -> String
 showItems _ [] = ""
