@@ -134,7 +134,7 @@ simp' ((e1, e2):cs) = do
           | x1 == x2
           , mess1 == mess2 -> simp $ (body1, body2) : cs
         _ -> do
-          let fmvs = (concatMap holeWeakTermPlus [e1, e2])
+          let fmvs = concatMap holeWeakTermPlus [e1, e2]
           simpOther e1 e2 fmvs cs
 
 takeFreeAppArgs ::
