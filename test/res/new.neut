@@ -39,11 +39,7 @@
 ;;     ((c tau)
 ;;      (_ (pi (xt+ (_ t)) c)))
 ;;     c))
-;; (definition string
-;;   (sigma ((A type) (prf (is-enum A)))
-;;     (u8-array A)))
-
-(let (string tau)
+(definition string
   (sigma ((A type) (prf (is-enum A)))
     (u8-array A)))
 

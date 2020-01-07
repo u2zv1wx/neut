@@ -60,8 +60,11 @@
   (pi-introduction (xts+) (begin e+)))
 
 ;; define recursive term at top level without using `mu` explicitly
+;; (notation (definition name e)
+;;   (let name (mu name e))) ;; こっちの `let` はspecial formのほうのlet.
+;; 引数がないときはmuを入れない
 (notation (definition name e)
-  (let name (mu name e))) ;; こっちの `let` はspecial formのほうのlet.
+  (let name e)) ;; こっちの `let` はspecial formのほうのlet.
 
 (notation (definition name () e+)
   (let name (mu name (lambda () e+))))

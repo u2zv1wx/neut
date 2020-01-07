@@ -51,6 +51,9 @@ macroMatch t1@(_, TreeNode _) (_, TreeAtom s2) = do
     True -> return Nothing
     False -> return $ Just [(s2, t1)]
 macroMatch (_, TreeAtom _) (_, TreeNode _) = return Nothing
+macroMatch (_, TreeNode []) (_, TreeNode []) = return $ Just []
+macroMatch (_, TreeNode _) (_, TreeNode []) = return Nothing
+macroMatch (_, TreeNode []) (_, TreeNode _) = return Nothing
 macroMatch (_, TreeNode ts1) (_, TreeNode ts2)
   | (_, TreeAtom sym) <- last ts2
   , last sym == '+'

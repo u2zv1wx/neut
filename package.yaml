@@ -52,3 +52,4 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - neut
+    - QuickCheck
