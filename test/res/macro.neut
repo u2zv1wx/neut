@@ -1,7 +1,11 @@
 ;; keywordとしてlambdaを指定していなかったらよくわからないことになるという話。
 
-;; (keyword lambda)
-(notation (lambda () e)
-  (pi-introduction () e))
+(include "notation.neut")
 
-(foo () 3)
+(sigma ((foo a) (bar b)) qux)
+
+;; (keyword lambda)
+;; (notation (lambda () e)
+;;   (pi-introduction () e))
+
+;; (foo () 3)

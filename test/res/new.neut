@@ -34,6 +34,20 @@
 (definition test ()
   "あいしてる")
 
+;; (notation (sigma (xt+) t)
+;;   (pi
+;;     ((c tau)
+;;      (_ (pi (xt+ (_ t)) c)))
+;;     c))
+;; (definition string
+;;   (sigma ((A type) (prf (is-enum A)))
+;;     (u8-array A)))
+
+(let (string tau)
+  (sigma ((A type) (prf (is-enum A)))
+    (u8-array A))
+)
+
 ;; 長さがn15になるのがポイントで、ここでunicodeの複雜性が出てくる
 ;; n15の部分をsigmaで包めばどうにかなりそうな雰囲気はある。
 (write n15 stdout (test) enum.n15)

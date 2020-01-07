@@ -25,8 +25,11 @@ data Def
   | DefConstDecl IdentifierPlus
 
 parse :: String -> String -> WithEnv QuasiTermPlus
-parse s inputPath =
-  strToTree s inputPath >>= parse' >>= concatDefList >>= rename
+parse s inputPath = do
+  tmp <- strToTree s inputPath >>= parse' >>= concatDefList
+  -- p' tmp
+  rename tmp
+  -- strToTree s inputPath >>= parse' >>= concatDefList >>= rename
 
 -- Parse the head element of the input list.
 parse' :: [TreePlus] -> WithEnv [Def]

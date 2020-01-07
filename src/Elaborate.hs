@@ -66,7 +66,12 @@ elaborate' (m, WeakTermMu (x, t) e) = do
       m' <- toMeta m
       e' <- elaborate' e
       return (m', TermMu (x, t') e')
-    _ -> throwError "CBV recursion is allowed only for Pi-types"
+    _ -> do
+      p "x:"
+      p' x
+      p "t':"
+      p' t'
+      throwError "CBV recursion is allowed only for Pi-types"
 elaborate' (_, WeakTermZeta x) = do
   sub <- gets substEnv
   case lookup x sub of
