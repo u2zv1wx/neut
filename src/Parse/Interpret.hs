@@ -18,114 +18,117 @@ import Data.Env
 import Data.QuasiTerm
 import Data.Tree
 
+-- {} interpret {}
+-- input: any tree
+-- output: quasi-term if possible, otherwise throw exception
 interpret :: TreePlus -> WithEnv QuasiTermPlus
 --
 -- foundational interpretations
 --
-interpret (m, TreeAtom "tau") = withMeta m QuasiTermTau
+interpret (m, TreeAtom "tau") = return (m, QuasiTermTau)
 interpret (m, TreeNode [(_, TreeAtom "upsilon"), (_, TreeAtom x)]) =
-  withMeta m $ QuasiTermUpsilon x
+  return (m, QuasiTermUpsilon x)
 interpret (m, TreeNode [(_, TreeAtom "pi"), (_, TreeNode xts), t]) = do
   (xts', t') <- interpretBinder xts t
-  withMeta m $ QuasiTermPi xts' t'
+  return (m, QuasiTermPi xts' t')
 interpret (m, TreeNode [(_, TreeAtom "pi-introduction"), (_, TreeNode xts), e]) = do
   (xts', e') <- interpretBinder xts e
-  withMeta m $ QuasiTermPiIntro xts' e'
+  return (m, QuasiTermPiIntro xts' e')
 interpret (m, TreeNode ((_, TreeAtom "pi-elimination"):e:es)) = do
   e' <- interpret e
   es' <- mapM interpret es
-  withMeta m $ QuasiTermPiElim e' es'
+  return (m, QuasiTermPiElim e' es')
 interpret (m, TreeNode [(_, TreeAtom "mu"), xt, e]) = do
   xt' <- interpretIdentifierPlus xt
   e' <- interpret e
-  withMeta m $ QuasiTermMu xt' e'
+  return (m, QuasiTermMu xt' e')
 interpret (m, TreeNode [(_, TreeAtom "zeta"), (_, TreeAtom x)]) = do
   x' <- interpretAtom x
-  withMeta m $ QuasiTermZeta x'
+  return (m, QuasiTermZeta x')
 interpret (m, TreeNode [(_, TreeAtom "constant"), (_, TreeAtom x)]) =
-  withMeta m $ QuasiTermConst x
+  return (m, QuasiTermConst x)
 interpret (m, TreeNode [(_, TreeAtom "constant-declaration"), xt, e]) = do
   xt' <- interpretIdentifierPlus xt
   e' <- interpret e
-  withMeta m $ QuasiTermConstDecl xt' e'
+  return (m, QuasiTermConstDecl xt' e')
 interpret (m, TreeNode [(_, TreeAtom t), (_, TreeAtom x)])
   | Just (LowTypeIntS i) <- asLowTypeMaybe t
-  , Just x' <- readMaybe x = withMeta m $ QuasiTermIntS i x'
+  , Just x' <- readMaybe x = return (m, QuasiTermIntS i x')
 interpret (m, TreeNode [(_, TreeAtom t), (_, TreeAtom x)])
   | Just (LowTypeIntU i) <- asLowTypeMaybe t
-  , Just x' <- readMaybe x = withMeta m $ QuasiTermIntU i x'
+  , Just x' <- readMaybe x = return (m, QuasiTermIntU i x')
 interpret (m, TreeNode [(_, TreeAtom "f16"), (_, TreeAtom x)])
-  | Just x' <- readMaybe x = do withMeta m $ QuasiTermFloat16 x'
+  | Just x' <- readMaybe x = return (m, QuasiTermFloat16 x')
 interpret (m, TreeNode [(_, TreeAtom "f32"), (_, TreeAtom x)])
-  | Just x' <- readMaybe x = do withMeta m $ QuasiTermFloat32 x'
+  | Just x' <- readMaybe x = return (m, QuasiTermFloat32 x')
 interpret (m, TreeNode [(_, TreeAtom "f64"), (_, TreeAtom x)])
-  | Just x' <- readMaybe x = do withMeta m $ QuasiTermFloat64 x'
+  | Just x' <- readMaybe x = return (m, QuasiTermFloat64 x')
 interpret (m, TreeNode [(_, TreeAtom "enum"), (_, TreeAtom x)])
   | Just i <- readNatEnumType x =
-    withMeta m $ QuasiTermEnum $ EnumTypeNatNum $ fromInteger i
+    return (m, QuasiTermEnum $ EnumTypeNatNum $ fromInteger i)
 interpret (m, TreeNode [(_, TreeAtom "enum"), (_, TreeAtom x)]) = do
   isEnum <- isDefinedEnumName x
   if not isEnum
     then throwError $ "No such enum-type defined: " ++ x
-    else withMeta m $ QuasiTermEnum $ EnumTypeLabel x
+    else return (m, QuasiTermEnum $ EnumTypeLabel x)
 interpret (m, TreeNode [(_, TreeAtom "enum-introduction"), l]) = do
   l' <- interpretEnumValue l
-  withMeta m $ QuasiTermEnumIntro l'
+  return (m, QuasiTermEnumIntro l')
 interpret (m, TreeNode ((_, TreeAtom "enum-elimination"):e:cs)) = do
   e' <- interpret e
   cs' <- mapM interpretClause cs
-  withMeta m $ QuasiTermEnumElim e' cs'
+  return (m, QuasiTermEnumElim e' cs')
 interpret (m, TreeNode [(_, TreeAtom str), indexType])
   | Just kind <- withKindPrefix str "array" = do
     indexType' <- interpret indexType
-    withMeta m $ QuasiTermArray kind indexType'
+    return (m, QuasiTermArray kind indexType')
 interpret (m, TreeNode ((_, TreeAtom str):cs))
   | Just kind <- withKindPrefix str "array-introduction" = do
     cs' <- mapM interpretClause cs
     let (ls, es) = unzip cs'
     ls' <- mapM asArrayIntro ls
-    withMeta m $ QuasiTermArrayIntro kind (zip ls' es)
+    return (m, QuasiTermArrayIntro kind (zip ls' es))
 interpret (m, TreeNode [(_, TreeAtom str), e1, e2])
   | Just kind <- withKindPrefix str "array-elimination" = do
     e1' <- interpret e1
     e2' <- interpret e2
-    withMeta m $ QuasiTermArrayElim kind e1' e2'
+    return (m, QuasiTermArrayElim kind e1' e2')
 --
 -- auxiliary interpretations
 --
 interpret (m, TreeAtom x)
-  | Just x' <- readMaybe x = withMeta m $ QuasiTermInt x'
+  | Just x' <- readMaybe x = return (m, QuasiTermInt x')
 interpret (m, TreeAtom x)
-  | Just x' <- readMaybe x = withMeta m $ QuasiTermFloat x'
+  | Just x' <- readMaybe x = return (m, QuasiTermFloat x')
 interpret (m, TreeAtom x)
   | Just i <- readNatEnumType x =
-    withMeta m $ QuasiTermEnum $ EnumTypeNatNum $ fromInteger i
+    return (m, QuasiTermEnum $ EnumTypeNatNum $ fromInteger i)
 interpret (m, TreeAtom x)
   | Just (i, j) <- readNatEnumValue x =
-    withMeta m $ QuasiTermEnumIntro $ EnumValueNatNum i j
+    return (m, QuasiTermEnumIntro $ EnumValueNatNum i j)
 interpret (m, TreeAtom x)
   | Just str <- readMaybe x = do
-    u8s <- forM (encode str) $ \u -> withMeta m (QuasiTermIntU 8 (toInteger u))
+    u8s <- forM (encode str) $ \u -> return (m, QuasiTermIntU 8 (toInteger u))
     let len = toInteger $ length u8s
     let ns = map (\i -> EnumValueNatNum len i) [0 .. (len - 1)]
     -- parse string as utf-8 encoded u8 array
-    withMeta m $ QuasiTermArrayIntro (ArrayKindIntU 8) (zip ns u8s)
+    return (m, QuasiTermArrayIntro (ArrayKindIntU 8) (zip ns u8s))
 interpret (m, TreeAtom "_") = do
   h <- newNameWith "hole-aux"
-  withMeta m $ QuasiTermZeta h
+  return (m, QuasiTermZeta h)
 interpret t@(m, TreeAtom x) = do
   ml <- interpretEnumValueMaybe t
   case ml of
-    Just l -> withMeta m $ QuasiTermEnumIntro l
+    Just l -> return (m, QuasiTermEnumIntro l)
     _ -> do
       isEnum <- isDefinedEnumName x
       if isEnum
-        then withMeta m $ QuasiTermEnum $ EnumTypeLabel x
+        then return (m, QuasiTermEnum $ EnumTypeLabel x)
         else do
           cenv <- gets constantEnv
           if isConstant x || x `elem` cenv
-            then withMeta m $ QuasiTermConst x
-            else withMeta m $ QuasiTermUpsilon x
+            then return (m, QuasiTermConst x)
+            else return (m, QuasiTermUpsilon x)
 interpret t@(m, TreeNode es) =
   if null es
     then throwError $ "interpret: syntax error:\n" ++ Pr.ppShow t
@@ -195,9 +198,6 @@ interpretClause e =
 asArrayIntro :: Case -> WithEnv EnumValue
 asArrayIntro (CaseValue l) = return l
 asArrayIntro CaseDefault = throwError "`default` cannot be used in array-intro"
-
-withMeta :: Meta -> QuasiTerm -> WithEnv QuasiTermPlus
-withMeta m e = return (m, e)
 
 extractIdentifier :: TreePlus -> WithEnv Identifier
 extractIdentifier (_, TreeAtom s) = return s
