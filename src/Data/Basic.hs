@@ -23,7 +23,10 @@ data Meta =
     { metaFileName :: Maybe String
     , metaLocation :: Maybe Loc
     }
-  -- deriving (Show)
+
+-- required to derive the eqality on WeakTerm
+instance Eq Meta where
+  _ == _ = True
 
 instance Show Meta where
   show _ = "_"
@@ -61,6 +64,8 @@ isConstant :: Identifier -> Bool
 isConstant x
   | Just _ <- asEnumNatNumConstant x = True
   | Just _ <- asLowTypeMaybe x = True
+  | Just _ <- asUnaryOpMaybe x = True
+  | Just _ <- asBinaryOpMaybe x = True
   | otherwise = False
 
 data EnumValue

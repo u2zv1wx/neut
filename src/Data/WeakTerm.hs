@@ -28,7 +28,7 @@ data WeakTerm
   | WeakTermArray ArrayKind WeakTermPlus
   | WeakTermArrayIntro ArrayKind [(EnumValue, WeakTermPlus)]
   | WeakTermArrayElim ArrayKind WeakTermPlus WeakTermPlus
-  deriving (Show)
+  deriving (Show, Eq)
 
 type WeakTermPlus = (PreMeta, WeakTerm)
 
@@ -41,6 +41,7 @@ type IdentifierPlus = (Identifier, WeakTermPlus)
 data PreMeta
   = PreMetaTerminal Meta
   | PreMetaNonTerminal WeakTermPlus Meta
+  deriving (Eq)
 
 instance Show PreMeta where
   show _ = "_"
