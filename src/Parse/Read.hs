@@ -17,7 +17,7 @@ strToTree input fileName = do
   t <- runParserT (skip >> parseSExpList) () fileName input
   case t of
     Left err -> throwError (show err)
-    Right p -> return p
+    Right ts -> return ts
 
 parseSExpList :: Parser [TreePlus]
 parseSExpList = sepEndBy parseStr skip
