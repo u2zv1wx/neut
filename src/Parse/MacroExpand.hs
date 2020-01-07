@@ -33,11 +33,11 @@ macroExpand1 t@(i, _) = do
       macroExpand $ applyMacroSubst subst (i, template)
     Nothing -> return t
 
-type Pattern = TreePlus
+type Notation = TreePlus
 
 macroMatch ::
      TreePlus -- input tree
-  -> Pattern -- registered notation
+  -> Notation -- registered notation
   -> WithEnv (Maybe MacroSubst) -- {symbols in a pattern} -> {trees}
 macroMatch t1@(_, TreeAtom s1) (_, TreeAtom s2) = do
   kenv <- gets keywordEnv
@@ -67,7 +67,7 @@ macroMatch (_, TreeNode ts1) (_, TreeNode ts2)
     return $ mzs >>= \zs -> Just $ join zs
   | otherwise = return Nothing
 
-applyMacroSubst :: MacroSubst -> Pattern -> TreePlus
+applyMacroSubst :: MacroSubst -> Notation -> TreePlus
 applyMacroSubst sub (i, TreeAtom s) = fromMaybe (i, TreeAtom s) (lookup s sub)
 applyMacroSubst sub (i, TreeNode ts) =
   (i, TreeNode $ map (applyMacroSubst sub) ts)
@@ -77,19 +77,19 @@ toSpliceTree ts =
   ( emptyMeta
   , TreeNode [(emptyMeta, TreeAtom "splice"), (emptyMeta, TreeNode ts)])
 
-checkNotation :: Pattern -> WithEnv ()
+checkNotation :: Notation -> WithEnv ()
 checkNotation t = do
   checkKeywordCondition t
   checkPlusCondition t
 
-checkKeywordCondition :: Pattern -> WithEnv ()
+checkKeywordCondition :: Notation -> WithEnv ()
 checkKeywordCondition t = do
   kenv <- gets keywordEnv
   if not $ null $ kenv `intersect` atomListOf t
     then return ()
     else throwError "A notation must include at least one keyword"
 
-checkPlusCondition :: Pattern -> WithEnv ()
+checkPlusCondition :: Notation -> WithEnv ()
 checkPlusCondition (_, TreeAtom s) =
   if last s /= '+'
     then return ()
