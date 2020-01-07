@@ -26,10 +26,7 @@ data Def
 
 parse :: String -> String -> WithEnv QuasiTermPlus
 parse s inputPath = do
-  tmp <- strToTree s inputPath >>= parse' >>= concatDefList
-  -- p' tmp
-  rename tmp
-  -- strToTree s inputPath >>= parse' >>= concatDefList >>= rename
+  strToTree s inputPath >>= parse' >>= concatDefList >>= rename
 
 -- Parse the head element of the input list.
 parse' :: [TreePlus] -> WithEnv [Def]
