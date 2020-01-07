@@ -17,6 +17,10 @@
 
 (notation apply pi-elimination)
 
+(keyword case)
+
+(notation case enum-elimination)
+
 (keyword fix)
 
 (notation fix mu)

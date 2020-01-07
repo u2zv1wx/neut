@@ -25,14 +25,20 @@ synthesize q = do
   case Q.getMin q of
     Nothing -> return ()
     Just (Enriched (e1, e2) ms _ _)
-      | Just (m, (_, e)) <- lookupAny ms sub -> do resolveStuck q e1 e2 m e
+      | Just (m, (_, e)) <- lookupAny ms sub -> do
+        p "resolve-stuck"
+        resolveStuck q e1 e2 m e
     Just (Enriched _ _ fmvs (ConstraintPattern m ess e)) -> do
+      p "pat"
       resolvePiElim q m fmvs ess e
     Just (Enriched _ _ _ (ConstraintDelta x ess e)) -> do
+      p "delta"
       resolveDelta q x ess e
     Just (Enriched _ _ fmvs (ConstraintQuasiPattern m ess e)) -> do
+      p "quasi"
       resolvePiElim q m fmvs ess e
     Just (Enriched _ _ fmvs (ConstraintFlexRigid m ess e)) -> do
+      p "flex"
       resolvePiElim q m fmvs ess e
     Just (Enriched (e1, e2) _ _ _) -> do
       p $ "rest:" ++ show (Q.size q)
@@ -174,10 +180,14 @@ discardInactive xs indexList =
 -- Try the list of alternatives.
 chain :: ConstraintQueue -> [WithEnv a] -> WithEnv a
 chain _ [] = throwError $ "cannot synthesize(chain)."
-chain _ (e:_) = e
+-- chain _ (e:_) = e
+chain _ [e] = e
+chain c (e:es) =
+  catchError e $
+  (const $ do
+     p "==trying another=="
+     chain c es)
 
--- chain _ [e] = e
--- chain c (e:es) = catchError e $ (const $ chain c es)
 lookupAny :: [Hole] -> [(Identifier, a)] -> Maybe (Hole, a)
 lookupAny [] _ = Nothing
 lookupAny (h:ks) sub = do

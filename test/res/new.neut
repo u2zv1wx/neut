@@ -51,36 +51,55 @@
 
 (write n15 stdout (test) enum.n15)
 
+(definition coproduct ((A tau) (B tau))
+  (sigma ((x choice))
+    (case x
+      (left A)
+      (right B))))
+
+(ascription coproduct
+  (arrow (tau tau) tau))
+
 (enum nat-enum zero-inner succ-inner)
 
 ;; nat = mu x. 1 + x = mu x. Sigma (p : choice). case p of left -> 1 | right -> x
 (definition nat-inner ()
-  (sigma ((x nat-enum))
-    (enum-elimination x
-      (zero-inner top)
-      (succ-inner (nat-inner)))))
+  (coproduct top (nat-inner)))
+
+;; 0 = (left unit)
+;; 1 = (right (left unit))
+;; 2 = (right (right (left unit)))
+;; 3 = (right (right (right (left unit))))
+;;  ...
+;; という感じ。
+
+;; (definition nat-inner ()
+;;   (sigma ((x nat-enum))
+;;     (enum-elimination x
+;;       (zero-inner top)
+;;       (succ-inner (nat-inner)))))
 
 (let (nat tau) (nat-inner))
 
-(definition nat-helper ((x nat-enum))
+(definition nat-helper ((x choice))
   (enum-elimination x
-    (zero-inner top)
-    (succ-inner nat)))
+    (left top)
+    (right nat)))
 
 (let (foo (nat-inner))
-  (sigma-introduction zero-inner unit))
-
-(keyword succ)
-
-(notation (succ x)
-  (sigma-introduction succ-inner x))
+  (sigma-introduction left unit))
 
 (keyword zero)
 
 (notation (zero)
-  (sigma-introduction zero-inner unit))
+  (sigma-introduction left unit))
 
 (ascription (zero) nat)
+
+(keyword succ)
+
+(notation (succ x)
+  (sigma-introduction right x))
 
 ;; こうするとあたかもsuccがコンストラクタであるかのようにつかえる。
 (let (bar (nat-inner))
@@ -107,18 +126,18 @@
 ;;     (enum-elimination selector
 ;;       (zero-inner top)
 ;;       (succ-inner bottom))))
-(definition my-succ ((x nat))
+(definition top-or-bottom ((x nat))
   (sigma-elimination
-    ((cons nat-enum)
+    ((cons choice)
      (value (nat-helper cons)))
     x
     (enum-elimination cons
-      (zero-inner top)
-      (succ-inner bottom))))
+      (left top)
+      (right bottom))))
 ;; こうか。第1成分を取り出してその値がどうなっているかをみて、それに応じた処理を書く。
 
 ;; zero-innerのときtopに、そうでないときbottomになる関数。
-(ascription my-succ (hom nat tau))
+(ascription top-or-bottom (hom nat tau))
 
 ;; (definition my-dec ((x nat))
 ;;   (sigma-elimination
@@ -131,13 +150,12 @@
 
 (definition my-dec ((num nat))
   (sigma-elimination
-    ((selector nat-enum)
+    ((selector choice)
      (value (nat-helper selector)))
     num
     (enum-elimination selector
-      (zero-inner (zero))
-      (succ-inner (zero)))))
-;; これ、実際、valueをこうやってとりだしてしまうと、valueのところがtopでもありうるからだめ、ってことか？
+      (left (zero))
+      (right (succ (succ (succ (zero))))))))
 
 (ascription my-dec (hom nat nat))
 
