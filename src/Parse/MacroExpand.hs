@@ -29,8 +29,7 @@ macroExpand1 t@(i, _) = do
   nenv <- gets notationEnv
   mMatch <- try (macroMatch t) nenv
   case mMatch of
-    Just (subst, (_, template)) ->
-      macroExpand $ applyMacroSubst subst (i, template)
+    Just (sub, (_, skel)) -> macroExpand $ applySubst sub (i, skel)
     Nothing -> return t
 
 type Notation = TreePlus
@@ -65,10 +64,9 @@ macroMatch (_, TreeNode ts1) (_, TreeNode ts2)
     return $ mzs >>= \zs -> Just $ join zs
   | otherwise = return Nothing
 
-applyMacroSubst :: MacroSubst -> Notation -> TreePlus
-applyMacroSubst sub (i, TreeAtom s) = fromMaybe (i, TreeAtom s) (lookup s sub)
-applyMacroSubst sub (i, TreeNode ts) =
-  (i, TreeNode $ map (applyMacroSubst sub) ts)
+applySubst :: MacroSubst -> Notation -> TreePlus
+applySubst sub (i, TreeAtom s) = fromMaybe (i, TreeAtom s) (lookup s sub)
+applySubst sub (i, TreeNode ts) = (i, TreeNode $ map (applySubst sub) ts)
 
 toSpliceTree :: [TreePlus] -> TreePlus
 toSpliceTree ts =
