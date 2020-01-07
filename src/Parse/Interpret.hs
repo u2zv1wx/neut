@@ -71,7 +71,7 @@ interpret (m, TreeNode [(_, TreeAtom "enum"), (_, TreeAtom x)]) = do
 interpret (m, TreeNode [(_, TreeAtom "enum-introduction"), l]) = do
   l' <- interpretEnumValue l
   withMeta m $ QuasiTermEnumIntro l'
-interpret (m, TreeNode [(_, TreeAtom "enum-elimination"), e, (_, TreeNode cs)]) = do
+interpret (m, TreeNode ((_, TreeAtom "enum-elimination"):e:cs)) = do
   e' <- interpret e
   cs' <- mapM interpretClause cs
   withMeta m $ QuasiTermEnumElim e' cs'
