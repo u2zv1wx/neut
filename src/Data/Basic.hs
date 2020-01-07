@@ -11,7 +11,7 @@ type Loc = (Int, Int)
 data Case
   = CaseValue EnumValue
   | CaseDefault
-  deriving (Show, Eq)
+  deriving (Show, Eq, Ord)
 
 data EnumType
   = EnumTypeLabel Identifier

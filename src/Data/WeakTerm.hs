@@ -41,10 +41,12 @@ type IdentifierPlus = (Identifier, WeakTermPlus)
 data PreMeta
   = PreMetaTerminal Meta
   | PreMetaNonTerminal WeakTermPlus Meta
-  deriving (Eq)
 
 instance Show PreMeta where
   show _ = "_"
+
+instance Eq PreMeta where
+  _ == _ = True
 
 varWeakTermPlus :: WeakTermPlus -> [Identifier]
 varWeakTermPlus (_, WeakTermTau) = []

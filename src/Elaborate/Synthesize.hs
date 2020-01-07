@@ -34,7 +34,10 @@ synthesize q = do
       resolvePiElim q m ess e
     Just (Enriched _ _ (ConstraintFlexRigid m ess e)) -> do
       resolvePiElim q m ess e
-    Just (Enriched (e1, e2) _ _) -> do
+    Just (Enriched (e1, e2) _ _)
+      -- p "rest:"
+      -- p' q
+     -> do
       throwError $ "cannot simplify:\n" ++ Pr.ppShow (e1, e2)
 
 resolveStuck ::
@@ -185,10 +188,6 @@ bindFormalArgs e (xts:xtss) = do
   let e' = bindFormalArgs e xtss
   let tPi = (metaTerminal, WeakTermPi xts (typeOf e'))
   (PreMetaNonTerminal tPi emptyMeta, WeakTermPiIntro xts e')
-
-toPiElim :: WeakTermPlus -> [(PreMeta, [WeakTermPlus])] -> WeakTermPlus
-toPiElim e [] = e
-toPiElim e ((m, es):ess) = toPiElim (m, WeakTermPiElim e es) ess
 
 -- takeByCount [1, 3, 2] [a, b, c, d, e, f, g, h] ~> [[a], [b, c, d], [e, f]]
 takeByCount :: [Int] -> [a] -> [[a]]

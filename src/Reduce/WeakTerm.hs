@@ -27,9 +27,14 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
         let xs = map fst xts
         let body' = substWeakTermPlus (zip xs es') body
         reduceWeakTermPlus body'
-    self@(_, WeakTermMu (x, _) body) -> do
-      let self' = substWeakTermPlus [(x, self)] body
-      reduceWeakTermPlus (m, WeakTermPiElim self' es')
+    self@(_, WeakTermMu (x, _) body)
+      -- reduce pseudo-recursive terms
+      | x `notElem` varWeakTermPlus body -> do
+        let self' = substWeakTermPlus [(x, self)] body -- nop
+        reduceWeakTermPlus (m, WeakTermPiElim self' es')
+    -- self@(_, WeakTermMu (x, _) body) -> do
+    --   let self' = substWeakTermPlus [(x, self)] body
+    --   reduceWeakTermPlus (m, WeakTermPiElim self' es')
     (_, WeakTermConst constant) ->
       reduceWeakTermPlusTheta (m, app) es' m constant
     _ -> return (m, app)
