@@ -15,3 +15,6 @@
      (str (u8-array A))
      (len (is-enum A)))
     top))
+
+(constant i64.add
+  (arrow (i64 i64) i64))

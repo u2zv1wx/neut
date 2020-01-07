@@ -135,5 +135,8 @@
 
 (keyword sigma-elimination)
 
+;; sigma-eliminationでは型情報も引数としてとるのね。
+;; (notation (sigma-elimination (xt+) e1 e2)
+;;   (e1 (lambda (xt+) e2)))
 (notation (sigma-elimination (xt+) e1 e2)
-  (e1 (lambda (xt+) e2)))
+  (e1 _ (lambda (xt+) e2)))

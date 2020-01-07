@@ -16,6 +16,7 @@ import Elaborate.Analyze
 import Elaborate.Infer
 import Elaborate.Synthesize
 import Reduce.Term
+import Reduce.WeakTerm
 
 -- Given a term `e` and its name `main`, this function
 --   (1) traces `e` using `infer e`, collecting type constraints,
@@ -32,6 +33,8 @@ elaborate e = do
   e' <- infer [] e
   p "analyze/synthesize"
   gets constraintEnv >>= analyze >>= synthesize
+  error "stop"
+  p "elaboration"
   elaborate' e'
 
 -- This function translates a well-typed term into an untyped term in a
@@ -75,7 +78,9 @@ elaborate' (m, WeakTermMu (x, t) e) = do
 elaborate' (_, WeakTermZeta x) = do
   sub <- gets substEnv
   case lookup x sub of
-    Just e -> elaborate' e
+    Just e -> do
+      e' <- reduceWeakTermPlus e
+      elaborate' e'
     Nothing -> throwError $ "elaborate' i: remaining hole: " ++ x
 elaborate' (m, WeakTermConst x) = do
   m' <- toMeta m

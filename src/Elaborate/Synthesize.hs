@@ -24,17 +24,23 @@ synthesize q = do
   sub <- gets substEnv
   case Q.getMin q of
     Nothing -> return ()
-    Just (Enriched (e1, e2) ms _)
-      | Just (m, e) <- lookupAny ms sub -> resolveStuck q e1 e2 m e
-    Just (Enriched _ _ (ConstraintPattern m ess e)) -> do
+    Just (Enriched (e1, e2) ms _ _)
+      | Just (m, e) <- lookupAny ms sub -> do
+        p "stuck"
+        resolveStuck q e1 e2 m e
+    Just (Enriched _ _ _ (ConstraintPattern m ess e)) -> do
+      p "pat"
       resolvePiElim q m ess e
-    Just (Enriched _ _ (ConstraintDelta x ess e)) -> do
+    Just (Enriched _ _ _ (ConstraintDelta x ess e)) -> do
+      p "delta"
       resolveDelta q x ess e
-    Just (Enriched _ _ (ConstraintQuasiPattern m ess e)) -> do
+    Just (Enriched _ _ _ (ConstraintQuasiPattern m ess e)) -> do
+      p "quasi"
       resolvePiElim q m ess e
-    Just (Enriched _ _ (ConstraintFlexRigid m ess e)) -> do
+    Just (Enriched _ _ _ (ConstraintFlexRigid m ess e)) -> do
+      p "flex"
       resolvePiElim q m ess e
-    Just (Enriched (e1, e2) _ _) -> do
+    Just (Enriched (e1, e2) _ _ _) -> do
       throwError $ "cannot simplify:\n" ++ Pr.ppShow (e1, e2)
 
 resolveStuck ::
@@ -83,19 +89,18 @@ resolvePiElim q m ess e = do
   let lamList = map (bindFormalArgs e) xsss
   chain q $ map (\lam -> resolveHole q m lam) lamList
 
--- resolveHoleは[(Hole, WeakTermPlus)]を受け取るようにしたほうがよさそう。
--- で、synthesizeのときに複数のhole-substをまとめてこっちに渡す。
 resolveHole :: ConstraintQueue -> Hole -> WeakTermPlus -> WithEnv ()
 resolveHole q m e = do
   senv <- gets substEnv
   e' <- reduceWeakTermPlus $ substWeakTermPlus senv e
   modify (\env -> env {substEnv = compose [(m, e')] senv})
-  let (q1, q2) = Q.partition (\(Enriched _ ms _) -> m `elem` ms) $ Q.deleteMin q
+  let (q1, q2) =
+        Q.partition (\(Enriched _ ms _ _) -> m `elem` ms) $ Q.deleteMin q
   let q1' = Q.mapU asAnalyzable q1
   synthesize $ q1' `Q.union` q2
 
 asAnalyzable :: EnrichedConstraint -> EnrichedConstraint
-asAnalyzable (Enriched cs ms _) = Enriched cs ms ConstraintAnalyzable
+asAnalyzable (Enriched cs ms fmvs _) = Enriched cs ms fmvs ConstraintAnalyzable
 
 -- [e, x, y, y, e2, e3, z] ~> [p, x, y, y, q, r, z]  (p, q, r: new variables)
 toVarList :: [WeakTermPlus] -> WithEnv [(Identifier, WeakTermPlus)]

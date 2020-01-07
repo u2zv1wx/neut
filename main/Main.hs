@@ -1,6 +1,5 @@
 module Main where
 
-import Control.Monad.State
 import Data.List (intercalate)
 import Options.Applicative
 import System.Directory

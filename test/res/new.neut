@@ -51,4 +51,51 @@
 
 (write n15 stdout (test) enum.n15)
 
+(enum nat-enum zero succ-inner)
+
+;; nat = mu x. 1 + x = mu x. Sigma (p : choice). case p of left -> 1 | right -> x
+(definition nat-inner ()
+  (sigma ((x nat-enum))
+    (enum-elimination x
+      (zero top)
+      (succ-inner (nat-inner)))))
+
+(let (nat tau) (nat-inner))
+
+(let (foo (nat-inner))
+  (sigma-introduction zero unit))
+
+(keyword succ)
+
+(notation (succ x)
+  (sigma-introduction succ-inner x))
+
+;; こうするとあたかもsuccがコンストラクタであるかのようにつかえる。
+(let (bar (nat-inner))
+  (succ foo))
+
+;; ちゃんと推論できとる。えらい。
+(let (buz nat)
+  (succ bar))
+
+(ascription bar nat)
+
+(ascription buz nat)
+
+;; natの上の関数とかってかけるかな？
+;; この引数xについてのパターンマッチをしたい。
+(definition my-succ ((x nat))
+  (sigma-elimination ((selector nat-enum) (value _)) x
+    (enum-elimination selector
+      (zero top)
+      (succ-inner bottom))))
+;; こうか。第1成分を取り出してその値がどうなっているかをみて、それに応じた処理を書く。
+
+;; zeroのときtopに、そうでないときbottomになる関数。
+(ascription my-succ (hom nat tau))
+
+(definition x 10)
+
+(i64.add (i64.add 3 x) x)
+
 ;; new.neut ends here

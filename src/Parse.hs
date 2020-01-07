@@ -88,6 +88,7 @@ parse' ((_, TreeNode [(_, TreeAtom "constant"), (_, TreeAtom name), t]):as) = do
   return $ DefConstDecl (name, t') : defList
 parse' ((_, TreeNode [(_, TreeAtom "let"), xt, e]):as) = do
   e' <- macroExpand e >>= interpret
+  -- このときもsubstEnvを更新する必要がある？letだから不要か。
   (x, t) <- macroExpand xt >>= interpretIdentifierPlus
   defList <- parse' as
   return $ DefLet emptyMeta (x, t) e' : defList
@@ -126,6 +127,9 @@ toIsEnumType name = do
 concatDefList :: [Def] -> WithEnv QuasiTermPlus
 concatDefList [] = do
   return (emptyMeta, QuasiTermEnumIntro $ EnumValueLabel "unit")
+concatDefList [DefLet _ _ e] -- for test
+ = do
+  return e
 concatDefList (DefConstDecl xt:es) = do
   cont <- concatDefList es
   return (emptyMeta, QuasiTermConstDecl xt cont)
