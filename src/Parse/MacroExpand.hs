@@ -46,14 +46,12 @@ macroMatch t1@(_, TreeAtom s1) (_, TreeAtom s2) = do
       | s1 == s2 -> return $ Just []
       | otherwise -> return Nothing
     False -> return $ Just [(s2, t1)]
-macroMatch t1 (_, TreeAtom s2) = do
+macroMatch t1@(_, TreeNode _) (_, TreeAtom s2) = do
   kenv <- gets keywordEnv
   case s2 `elem` kenv of
     True -> return Nothing
     False -> return $ Just [(s2, t1)]
 macroMatch (_, TreeAtom _) (_, TreeNode _) = return Nothing
-macroMatch (_, TreeNode []) (_, TreeNode []) = return $ Just []
-macroMatch _ (_, TreeNode []) = return Nothing
 macroMatch (_, TreeNode ts1) (_, TreeNode ts2)
   | (_, TreeAtom sym) <- last ts2
   , last sym == '+'
