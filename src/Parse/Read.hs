@@ -12,6 +12,8 @@ import Data.Tree
 
 type Parser a = ParsecT String () (StateT Env (ExceptT String IO)) a
 
+-- {} strToTree {}
+-- (as long as the input is translated into a tree, this function is considered valid)
 strToTree :: String -> String -> WithEnv [TreePlus]
 strToTree input fileName = do
   t <- runParserT (skip >> parseSExpList) () fileName input
@@ -21,9 +23,6 @@ strToTree input fileName = do
 
 parseSExpList :: Parser [TreePlus]
 parseSExpList = sepEndBy parseStr skip
-
-symbol :: Parser String
-symbol = many1 (noneOf "()[] \n;")
 
 parseStr :: Parser TreePlus
 parseStr = parseNode <|> parseAtom
@@ -41,11 +40,13 @@ parseNode = do
   itemList <- many parseStr
   _ <- skip >> char ')' >> skip
   m <- currentMeta
-  -- 別にマクロ展開はここでは絡んでないんだから、original formはtreeとして保持していいのでは？
   return (m, TreeNode itemList)
 
 skip :: Parser ()
 skip = spaces >> (comment <|> spaces)
+
+symbol :: Parser String
+symbol = many1 (noneOf "()[] \n;")
 
 comment :: Parser ()
 comment = do
