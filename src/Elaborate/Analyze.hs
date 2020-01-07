@@ -246,14 +246,13 @@ data Stuck
   | DeltaPiElim Identifier [(PreMeta, [WeakTermPlus])] -- ここでmetaを保持。
 
 asStuckedTerm :: WeakTermPlus -> Maybe Stuck
+asStuckedTerm (_, WeakTermUpsilon x) = Just $ DeltaPiElim x []
 asStuckedTerm (_, WeakTermPiElim (_, WeakTermZeta h) es)
   | Just _ <- mapM asUpsilon es = Just $ StuckPiElimStrict h [es]
 asStuckedTerm (_, WeakTermPiElim (_, WeakTermZeta h) es) =
   Just $ StuckPiElim h [es]
 asStuckedTerm (m, WeakTermPiElim self@(_, WeakTermMu (x, _) body) es) =
   Just $ StuckPiElimMu (x, body, self) [(m, es)]
-asStuckedTerm (m, WeakTermPiElim (_, WeakTermUpsilon x) es) =
-  Just $ DeltaPiElim x [(m, es)]
 asStuckedTerm (m, WeakTermPiElim e es)
   | Just _ <- mapM asUpsilon es =
     case asStuckedTerm e of
