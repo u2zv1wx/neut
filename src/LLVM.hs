@@ -6,6 +6,7 @@ import Control.Monad.Except
 import Control.Monad.State
 import Data.List (elemIndex, sortBy)
 
+import Clarify.Utility
 import Data.Basic
 import Data.Code
 import Data.Env
@@ -16,13 +17,12 @@ toLLVM :: CodePlus -> WithEnv LLVM
 toLLVM mainTerm = do
   penv <- gets codeEnv
   forM_ penv $ \(name, (args, e)) -> do
-    llvm <- reduceCodePlus e >>= llvmCode
-    -- llvm <- llvmCode e
+    llvm <- llvmCode e
     insLLVMEnv name args llvm
   -- p' mainTerm
   -- error "stop"
-  l <- reduceCodePlus mainTerm >>= llvmCode
-  -- l <- llvmCode mainTerm
+  -- l <- reduceCodePlus mainTerm >>= renameCode >>= llvmCode
+  l <- llvmCode mainTerm
   -- the result of "main" must be i64, not i8*
   (result, resultVar) <- newDataUpsilonWith "result"
   (cast, castThen) <- llvmCast (Just "cast") resultVar (LowTypeIntS 64)

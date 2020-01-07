@@ -7,6 +7,7 @@ import Data.Basic
 import Data.Code
 import Data.Env
 import Data.Term
+import Reduce.Code
 
 import qualified Data.Map.Strict as Map
 
@@ -262,10 +263,11 @@ local comp = do
 insCodeEnv :: Identifier -> [Identifier] -> CodePlus -> WithEnv ()
 insCodeEnv name args e = do
   args' <- mapM newNameWith args
-  e' <- renameCode e
+  e' <- reduceCodePlus e
+  e'' <- renameCode e'
   -- Since LLVM doesn't allow variable shadowing, we must explicitly
   -- rename variables here.
-  modify (\env -> env {codeEnv = (name, (args', e')) : codeEnv env})
+  modify (\env -> env {codeEnv = (name, (args', e'')) : codeEnv env})
 
 lookupContext :: Identifier -> Context -> WithEnv TermPlus
 lookupContext z ctx = do

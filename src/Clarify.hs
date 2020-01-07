@@ -31,6 +31,7 @@ clarify lam@(m, TermPiIntro xts e) = do
   forM_ xts $ uncurry insTypeEnv
   e' <- clarify e
   fvs <- chainTermPlus lam
+  -- p "make one-time closure"
   makeClosure' Nothing fvs m xts e'
 clarify (m, TermPiElim e es) = do
   e' <- clarify e
@@ -151,6 +152,7 @@ clarifyUnaryOp name op lowType m = do
     (_, TermPi xts@[(x, tx)] _) -> do
       let varX = toDataUpsilon (x, emptyMeta)
       zts <- complementaryChainOf xts
+      -- p "one-time closure (unary)"
       makeClosure'
         (Just name)
         zts
@@ -168,6 +170,7 @@ clarifyBinaryOp name op lowType m = do
       let varX = toDataUpsilon (x, emptyMeta)
       let varY = toDataUpsilon (y, emptyMeta)
       zts <- complementaryChainOf xts
+      -- p "one-time closure (binary)"
       makeClosure'
         (Just name)
         zts
@@ -188,6 +191,7 @@ clarifyIsEnum m = do
       rel <- newNameWith "rel"
       retImmType <- returnCartesianImmediate
       zts <- complementaryChainOf xts
+      -- p "one-time closure (is-enum)"
       makeClosure'
         (Just "is-enum")
         zts
@@ -230,6 +234,7 @@ clarifySysCall name sysCall argLen argIdxList m = do
               newDataUpsilonWith "array-type"
             (contentVarName, contentVar) <- newDataUpsilonWith "array-content"
             retUnivType <- returnCartesianUniv
+            -- p "one-time closure (write)"
             -- retImmType <- returnCartesianImmediate
             let retContentType = (m, CodeUpIntro contentTypeVar)
             let ys' = [ys !! 0, contentVar, ys !! 2]

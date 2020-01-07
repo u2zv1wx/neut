@@ -39,6 +39,7 @@ elaborate e = do
   reduceSubstEnv
   p "elaborate"
   e'' <- elaborate' e'
+  p "done"
   reduceTermPlus e''
 
 -- This function translates a well-typed term into an untyped term in a
@@ -82,9 +83,12 @@ elaborate' (_, WeakTermZeta x) = do
       sub <- gets substEnv
       case lookup x sub of
         Nothing -> throwError $ "elaborate' i: remaining hole: " ++ x
-        Just (_, e) -> do
+        Just (_, e)
+          -- p $ "not found: " ++ x
+         -> do
           e' <- elaborate' e
           -- このelaborate' eを計算する途中でxが確定したらthrowして計算を打ち切ってその結果を使うとかすればよさそう？
+          -- いや、それは変では。x ~> eのとき、eのなかにはxは出現しないんだから。
           modify (\env -> env {zetaEnv = Map.insert x e' zenv})
           return e'
 elaborate' (m, WeakTermConst x) = do

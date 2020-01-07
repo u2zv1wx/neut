@@ -51,30 +51,42 @@
 
 (write n15 stdout (test) enum.n15)
 
-(enum nat-enum zero succ-inner)
+(enum nat-enum zero-inner succ-inner)
 
 ;; nat = mu x. 1 + x = mu x. Sigma (p : choice). case p of left -> 1 | right -> x
 (definition nat-inner ()
   (sigma ((x nat-enum))
     (enum-elimination x
-      (zero top)
+      (zero-inner top)
       (succ-inner (nat-inner)))))
 
 (let (nat tau) (nat-inner))
 
+(definition nat-helper ((x nat-enum))
+  (enum-elimination x
+    (zero-inner top)
+    (succ-inner nat)))
+
 (let (foo (nat-inner))
-  (sigma-introduction zero unit))
+  (sigma-introduction zero-inner unit))
 
 (keyword succ)
 
 (notation (succ x)
   (sigma-introduction succ-inner x))
 
+(keyword zero)
+
+(notation (zero)
+  (sigma-introduction zero-inner unit))
+
+(ascription (zero) nat)
+
 ;; こうするとあたかもsuccがコンストラクタであるかのようにつかえる。
 (let (bar (nat-inner))
   (succ foo))
 
-;; ちゃんと推論できとる。えらい。
+;; ちゃんと推論できてる。えらい。
 (let (buz nat)
   (succ bar))
 
@@ -84,15 +96,55 @@
 
 ;; natの上の関数とかってかけるかな？
 ;; この引数xについてのパターンマッチをしたい。
+;; (definition my-succ ((x nat))
+;;   (sigma-elimination
+;;     ((selector nat-enum)
+;;      (value
+;;       (enum-elimination selector
+;;         (zero-inner top)
+;;         (succ-inner nat))))
+;;     x
+;;     (enum-elimination selector
+;;       (zero-inner top)
+;;       (succ-inner bottom))))
 (definition my-succ ((x nat))
-  (sigma-elimination ((selector _) (value _)) x
-    (enum-elimination selector
-      (zero top)
+  (sigma-elimination
+    ((cons nat-enum)
+     (value (nat-helper cons)))
+    x
+    (enum-elimination cons
+      (zero-inner top)
       (succ-inner bottom))))
 ;; こうか。第1成分を取り出してその値がどうなっているかをみて、それに応じた処理を書く。
 
-;; zeroのときtopに、そうでないときbottomになる関数。
+;; zero-innerのときtopに、そうでないときbottomになる関数。
 (ascription my-succ (hom nat tau))
+
+;; (definition my-dec ((x nat))
+;;   (sigma-elimination
+;;     ((selector nat-enum)
+;;      (value (nat-helper selector)))
+;;     x
+;;     (enum-elimination selector
+;;       (zero-inner (zero))
+;;       (succ-inner (zero)))))
+
+(definition my-dec ((num nat))
+  (sigma-elimination
+    ((selector nat-enum)
+     (value (nat-helper selector)))
+    num
+    (enum-elimination selector
+      (zero-inner (zero))
+      (succ-inner (zero)))))
+;; これ、実際、valueをこうやってとりだしてしまうと、valueのところがtopでもありうるからだめ、ってことか？
+
+(ascription my-dec (hom nat nat))
+
+;; (ascription my-dec
+;;   (pi
+;;     ((x nat))
+;;     nat))
 
 (definition x 10)
 

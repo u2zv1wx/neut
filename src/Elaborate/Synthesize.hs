@@ -35,6 +35,7 @@ synthesize q = do
     Just (Enriched _ _ fmvs (ConstraintFlexRigid m ess e)) -> do
       resolvePiElim q m fmvs ess e
     Just (Enriched (e1, e2) _ _ _) -> do
+      p $ "rest:" ++ show (Q.size q)
       throwError $ "cannot simplify:\n" ++ Pr.ppShow (e1, e2)
 
 resolveStuck ::

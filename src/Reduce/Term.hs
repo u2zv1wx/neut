@@ -33,23 +33,18 @@ reduceTermPlus (m, TermPiElim e es) = do
        -> do
         let xs = map fst xts
         reduceTermPlus $ substTermPlus (zip xs es') body
-    (_, TermMu (x, _) body)
-      -- reduce pseudo-recursive terms
-      | x `notElem` varTermPlus body -> do
-        reduceTermPlus (m, TermPiElim body es')
-    -- self@(_, TermMu (x, _) body) -- fixme: muは放置のほうがよくね？
-    --   | all isValue es' -> do
-    --     let self' = substTermPlus [(x, self)] body
-    --     reduceTermPlus (m, TermPiElim self' es')
+    -- (_, TermMu (x, _) body)
+    --   -- reduce pseudo-recursive terms
+    --   | x `notElem` varTermPlus body -> do
+    --     reduceTermPlus (m, TermPiElim body es')
     (_, TermConst constant) -> reduceTermPlusTheta (m, app) es' m constant
     _ -> return (m, app)
 reduceTermPlus (m, TermMu (x, t) e)
-  | x `notElem` varTermPlus e = reduceTermPlus e
+  | x `notElem` varTermPlus e = do reduceTermPlus e
   | otherwise = do
     t' <- reduceTermPlus t
     e' <- reduceTermPlus e
     return $ (m, TermMu (x, t') e')
--- reduceTermPlus (m, TermMu (x, t) e) = do
 reduceTermPlus (m, TermConstDecl (x, t) e) = do
   t' <- reduceTermPlus t
   e' <- reduceTermPlus e
@@ -57,8 +52,6 @@ reduceTermPlus (m, TermConstDecl (x, t) e) = do
 reduceTermPlus (m, TermEnumElim e les) = do
   e' <- reduceTermPlus e
   let (ls, es) = unzip les
-  es' <- mapM reduceTermPlus es
-  let les' = zip ls es'
   case e' of
     (_, TermEnumIntro l) ->
       case lookup (CaseValue l) les of
@@ -66,8 +59,14 @@ reduceTermPlus (m, TermEnumElim e les) = do
         Nothing ->
           case lookup CaseDefault les of
             Just body -> reduceTermPlus body
-            Nothing -> return (m, TermEnumElim e' les')
-    _ -> return (m, TermEnumElim e' les')
+            Nothing -> do
+              es' <- mapM reduceTermPlus es
+              let les' = zip ls es'
+              return (m, TermEnumElim e' les')
+    _ -> do
+      es' <- mapM reduceTermPlus es
+      let les' = zip ls es'
+      return (m, TermEnumElim e' les')
 reduceTermPlus (m, TermArray k indexType) = do
   indexType' <- reduceTermPlus indexType
   return (m, TermArray k indexType')
