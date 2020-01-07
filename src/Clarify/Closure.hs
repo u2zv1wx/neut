@@ -1,8 +1,8 @@
 module Clarify.Closure
   ( makeClosure
   , callClosure
-  , varTermPlus
-  , varTermPlus''
+  , chainTermPlus
+  , chainTermPlus''
   ) where
 
 import Control.Monad.Except
@@ -74,56 +74,56 @@ nameFromMaybe mName =
     Just lamThetaName -> return lamThetaName
     Nothing -> newNameWith "thunk"
 
-varTermPlus :: TermPlus -> WithEnv [(Identifier, TermPlus)]
-varTermPlus e = do
-  tmp <- varTermPlus' e
+chainTermPlus :: TermPlus -> WithEnv [(Identifier, TermPlus)]
+chainTermPlus e = do
+  tmp <- chainTermPlus' e
   return $ nubBy (\(x, _) (y, _) -> x == y) tmp
 
-varTermPlus' :: TermPlus -> WithEnv [(Identifier, TermPlus)]
-varTermPlus' (_, TermTau) = return []
-varTermPlus' (_, TermUpsilon x) = do
+chainTermPlus' :: TermPlus -> WithEnv [(Identifier, TermPlus)]
+chainTermPlus' (_, TermTau) = return []
+chainTermPlus' (_, TermUpsilon x) = do
   t <- lookupTypeEnv x
   xts <- chainWithName x t
   return $ xts ++ [(x, t)]
-varTermPlus' (_, TermPi xts t) = varTermPlus'' xts [t]
-varTermPlus' (_, TermPiIntro xts e) = varTermPlus'' xts [e]
-varTermPlus' (_, TermPiElim e es) = do
-  xs1 <- varTermPlus' e
-  xs2 <- concat <$> mapM (varTermPlus') es
+chainTermPlus' (_, TermPi xts t) = chainTermPlus'' xts [t]
+chainTermPlus' (_, TermPiIntro xts e) = chainTermPlus'' xts [e]
+chainTermPlus' (_, TermPiElim e es) = do
+  xs1 <- chainTermPlus' e
+  xs2 <- concat <$> mapM (chainTermPlus') es
   return $ xs1 ++ xs2
-varTermPlus' (_, TermMu xt e) = varTermPlus'' [xt] [e]
-varTermPlus' (_, TermConst x) = do
+chainTermPlus' (_, TermMu xt e) = chainTermPlus'' [xt] [e]
+chainTermPlus' (_, TermConst x) = do
   t <- lookupTypeEnv x
   chainWithName x t
-varTermPlus' (_, TermConstDecl xt e) = varTermPlus'' [xt] [e]
-varTermPlus' (_, TermIntS _ _) = return []
-varTermPlus' (_, TermIntU _ _) = return []
-varTermPlus' (_, TermFloat16 _) = return []
-varTermPlus' (_, TermFloat32 _) = return []
-varTermPlus' (_, TermFloat64 _) = return []
-varTermPlus' (_, TermEnum _) = return []
-varTermPlus' (_, TermEnumIntro _) = return []
-varTermPlus' (_, TermEnumElim e les) = do
-  xs1 <- varTermPlus' e
+chainTermPlus' (_, TermConstDecl xt e) = chainTermPlus'' [xt] [e]
+chainTermPlus' (_, TermIntS _ _) = return []
+chainTermPlus' (_, TermIntU _ _) = return []
+chainTermPlus' (_, TermFloat16 _) = return []
+chainTermPlus' (_, TermFloat32 _) = return []
+chainTermPlus' (_, TermFloat64 _) = return []
+chainTermPlus' (_, TermEnum _) = return []
+chainTermPlus' (_, TermEnumIntro _) = return []
+chainTermPlus' (_, TermEnumElim e les) = do
+  xs1 <- chainTermPlus' e
   let es = map snd les
-  xs2 <- concat <$> mapM (varTermPlus') es
+  xs2 <- concat <$> mapM (chainTermPlus') es
   return $ xs1 ++ xs2
-varTermPlus' (_, TermArray _ indexType) = varTermPlus' indexType
-varTermPlus' (_, TermArrayIntro _ les) = do
+chainTermPlus' (_, TermArray _ indexType) = chainTermPlus' indexType
+chainTermPlus' (_, TermArrayIntro _ les) = do
   let es = map snd les
-  concat <$> mapM (varTermPlus') es
-varTermPlus' (_, TermArrayElim _ e1 e2) = do
-  xs1 <- varTermPlus' e1
-  xs2 <- varTermPlus' e2
+  concat <$> mapM (chainTermPlus') es
+chainTermPlus' (_, TermArrayElim _ e1 e2) = do
+  xs1 <- chainTermPlus' e1
+  xs2 <- chainTermPlus' e2
   return $ xs1 ++ xs2
 
-varTermPlus'' ::
+chainTermPlus'' ::
      [(Identifier, TermPlus)] -> [TermPlus] -> WithEnv [(Identifier, TermPlus)]
-varTermPlus'' [] es = concat <$> mapM (varTermPlus') es
-varTermPlus'' ((x, t):xts) es = do
-  xs1 <- varTermPlus' t
+chainTermPlus'' [] es = concat <$> mapM (chainTermPlus') es
+chainTermPlus'' ((x, t):xts) es = do
+  xs1 <- chainTermPlus' t
   insTypeEnv x t
-  xs2 <- varTermPlus'' xts es
+  xs2 <- chainTermPlus'' xts es
   return $ xs1 ++ filter (\(y, _) -> y /= x) xs2
 
 -- assuming the type of `x` is `t`, obtain the closed chain of the type of `x`.
@@ -135,6 +135,6 @@ chainWithName x t = do
   case Map.lookup x cenv of
     Just xts -> return xts -- use cached result
     Nothing -> do
-      xts <- varTermPlus' t
+      xts <- chainTermPlus' t
       modify (\env -> env {chainEnv = Map.insert x xts cenv})
       return xts

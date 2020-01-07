@@ -10,16 +10,19 @@ import Data.Basic
 import Data.Code
 import Data.Env
 import Data.LLVM
+import Reduce.Code
 
 toLLVM :: CodePlus -> WithEnv LLVM
 toLLVM mainTerm = do
   penv <- gets codeEnv
   forM_ penv $ \(name, (args, e)) -> do
-    llvm <- llvmCode e
+    llvm <- reduceCodePlus e >>= llvmCode
+    -- llvm <- llvmCode e
     insLLVMEnv name args llvm
   -- p' mainTerm
   -- error "stop"
-  l <- llvmCode mainTerm
+  l <- reduceCodePlus mainTerm >>= llvmCode
+  -- l <- llvmCode mainTerm
   -- the result of "main" must be i64, not i8*
   (result, resultVar) <- newDataUpsilonWith "result"
   (cast, castThen) <- llvmCast (Just "cast") resultVar (LowTypeIntS 64)

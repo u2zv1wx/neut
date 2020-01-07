@@ -18,6 +18,8 @@ import Elaborate.Synthesize
 import Reduce.Term
 import Reduce.WeakTerm
 
+import qualified Data.Map.Strict as Map
+
 -- Given a term `e` and its name `main`, this function
 --   (1) traces `e` using `infer e`, collecting type constraints,
 --   (2) updates weakTypeEnv for `main` by the result of `infer e`,
@@ -33,9 +35,11 @@ elaborate e = do
   e' <- infer [] e
   p "analyze/synthesize"
   gets constraintEnv >>= analyze >>= synthesize
-  error "stop"
-  p "elaboration"
-  elaborate' e'
+  p "reduceSubstEnv"
+  reduceSubstEnv
+  p "elaborate"
+  e'' <- elaborate' e'
+  reduceTermPlus e''
 
 -- This function translates a well-typed term into an untyped term in a
 -- reduction-preserving way. Here, we translate types into units (nullary product).
@@ -69,19 +73,20 @@ elaborate' (m, WeakTermMu (x, t) e) = do
       m' <- toMeta m
       e' <- elaborate' e
       return (m', TermMu (x, t') e')
-    _ -> do
-      p "x:"
-      p' x
-      p "t':"
-      p' t'
-      throwError "CBV recursion is allowed only for Pi-types"
+    _ -> throwError "CBV recursion is allowed only for Pi-types"
 elaborate' (_, WeakTermZeta x) = do
-  sub <- gets substEnv
-  case lookup x sub of
-    Just (_, e) -> do
-      e' <- reduceWeakTermPlus e
-      elaborate' e'
-    Nothing -> throwError $ "elaborate' i: remaining hole: " ++ x
+  zenv <- gets zetaEnv
+  case Map.lookup x zenv of
+    Just e -> return e
+    Nothing -> do
+      sub <- gets substEnv
+      case lookup x sub of
+        Nothing -> throwError $ "elaborate' i: remaining hole: " ++ x
+        Just (_, e) -> do
+          e' <- elaborate' e
+          -- このelaborate' eを計算する途中でxが確定したらthrowして計算を打ち切ってその結果を使うとかすればよさそう？
+          modify (\env -> env {zetaEnv = Map.insert x e' zenv})
+          return e'
 elaborate' (m, WeakTermConst x) = do
   m' <- toMeta m
   mi <- elaborateIsEnum x
@@ -207,3 +212,14 @@ lookupEnumSet name = do
   case lookup name eenv of
     Nothing -> throwError $ "no such enum defined: " ++ show name
     Just ls -> return ls
+
+reduceSubstEnv :: WithEnv ()
+reduceSubstEnv = do
+  senv <- gets substEnv
+  senv' <- mapM reduceSubstEnv' senv
+  modify (\env -> env {substEnv = senv'})
+
+reduceSubstEnv' :: (a, (b, WeakTermPlus)) -> WithEnv (a, (b, WeakTermPlus))
+reduceSubstEnv' (x, (y, e)) = do
+  e' <- reduceWeakTermPlus e
+  return (x, (y, e'))

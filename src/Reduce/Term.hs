@@ -33,16 +33,27 @@ reduceTermPlus (m, TermPiElim e es) = do
        -> do
         let xs = map fst xts
         reduceTermPlus $ substTermPlus (zip xs es') body
-    self@(_, TermMu (x, _) body) -- fixme: muは放置のほうがよくね？
-      | all isValue es' -> do
-        let self' = substTermPlus [(x, self)] body
-        reduceTermPlus (m, TermPiElim self' es')
+    (_, TermMu (x, _) body)
+      -- reduce pseudo-recursive terms
+      | x `notElem` varTermPlus body -> do
+        reduceTermPlus (m, TermPiElim body es')
+    -- self@(_, TermMu (x, _) body) -- fixme: muは放置のほうがよくね？
+    --   | all isValue es' -> do
+    --     let self' = substTermPlus [(x, self)] body
+    --     reduceTermPlus (m, TermPiElim self' es')
     (_, TermConst constant) -> reduceTermPlusTheta (m, app) es' m constant
     _ -> return (m, app)
-reduceTermPlus (m, TermMu (x, t) e) = do
+reduceTermPlus (m, TermMu (x, t) e)
+  | x `notElem` varTermPlus e = reduceTermPlus e
+  | otherwise = do
+    t' <- reduceTermPlus t
+    e' <- reduceTermPlus e
+    return $ (m, TermMu (x, t') e')
+-- reduceTermPlus (m, TermMu (x, t) e) = do
+reduceTermPlus (m, TermConstDecl (x, t) e) = do
   t' <- reduceTermPlus t
   e' <- reduceTermPlus e
-  return $ (m, TermMu (x, t') e')
+  return (m, TermConstDecl (x, t') e')
 reduceTermPlus (m, TermEnumElim e les) = do
   e' <- reduceTermPlus e
   let (ls, es) = unzip les

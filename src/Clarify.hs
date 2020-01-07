@@ -30,14 +30,14 @@ clarify (m, TermPi {}) = do
 clarify lam@(m, TermPiIntro xts e) = do
   forM_ xts $ uncurry insTypeEnv
   e' <- clarify e
-  fvs <- varTermPlus lam
+  fvs <- chainTermPlus lam
   makeClosure' Nothing fvs m xts e'
 clarify (m, TermPiElim e es) = do
   e' <- clarify e
   callClosure' m e' es
 clarify mu@(m, TermMu (f, t) e) = do
   insTypeEnv f t
-  fvs <- varTermPlus mu
+  fvs <- chainTermPlus mu
   let fvs' = map (toTermUpsilon . fst) fvs
   -- set f as a global variable
   modify (\env -> env {constantEnv = f : constantEnv env})
@@ -248,7 +248,7 @@ clarifySysCall name sysCall argLen argIdxList m = do
 complementaryChainOf ::
      [(Identifier, TermPlus)] -> WithEnv [(Identifier, TermPlus)]
 complementaryChainOf xts = do
-  zts <- varTermPlus'' xts []
+  zts <- chainTermPlus'' xts []
   return $ nubBy (\(x, _) (y, _) -> x == y) zts
 
 toVar :: Identifier -> DataPlus

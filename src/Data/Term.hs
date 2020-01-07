@@ -39,6 +39,46 @@ toTermUpsilon :: Identifier -> TermPlus
 toTermUpsilon x = do
   (emptyMeta, TermUpsilon x)
 
+varTermPlus :: TermPlus -> [Identifier]
+varTermPlus (_, TermTau) = []
+varTermPlus (_, TermUpsilon x) = [x]
+varTermPlus (_, TermPi xts t) = varTermPlus' xts [t]
+varTermPlus (_, TermPiIntro xts e) = varTermPlus' xts [e]
+varTermPlus (_, TermPiElim e es) = do
+  xs1 <- varTermPlus e
+  xs2 <- concat <$> mapM (varTermPlus) es
+  return $ xs1 ++ xs2
+varTermPlus (_, TermMu xt e) = varTermPlus' [xt] [e]
+varTermPlus (_, TermConst _) = []
+varTermPlus (_, TermConstDecl xt e) = varTermPlus' [xt] [e]
+varTermPlus (_, TermIntS _ _) = []
+varTermPlus (_, TermIntU _ _) = []
+varTermPlus (_, TermFloat16 _) = []
+varTermPlus (_, TermFloat32 _) = []
+varTermPlus (_, TermFloat64 _) = []
+varTermPlus (_, TermEnum _) = []
+varTermPlus (_, TermEnumIntro _) = []
+varTermPlus (_, TermEnumElim e les) = do
+  xs1 <- varTermPlus e
+  let es = map snd les
+  xs2 <- concat <$> mapM (varTermPlus) es
+  return $ xs1 ++ xs2
+varTermPlus (_, TermArray _ indexType) = varTermPlus indexType
+varTermPlus (_, TermArrayIntro _ les) = do
+  let es = map snd les
+  concat <$> mapM (varTermPlus) es
+varTermPlus (_, TermArrayElim _ e1 e2) = do
+  xs1 <- varTermPlus e1
+  xs2 <- varTermPlus e2
+  return $ xs1 ++ xs2
+
+varTermPlus' :: [(Identifier, TermPlus)] -> [TermPlus] -> [Identifier]
+varTermPlus' [] es = concat <$> mapM (varTermPlus) es
+varTermPlus' ((x, t):xts) es = do
+  let xs1 = varTermPlus t
+  let xs2 = varTermPlus' xts es
+  xs1 ++ filter (\y -> y /= x) xs2
+
 substTermPlus :: SubstTerm -> TermPlus -> TermPlus
 substTermPlus _ (m, TermTau) = (m, TermTau)
 substTermPlus sub (m, TermUpsilon x) =
