@@ -85,7 +85,7 @@
 ;; natの上の関数とかってかけるかな？
 ;; この引数xについてのパターンマッチをしたい。
 (definition my-succ ((x nat))
-  (sigma-elimination ((selector nat-enum) (value _)) x
+  (sigma-elimination ((selector _) (value _)) x
     (enum-elimination selector
       (zero top)
       (succ-inner bottom))))

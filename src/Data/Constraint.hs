@@ -41,12 +41,25 @@ instance Eq EnrichedConstraint where
 instance Ord EnrichedConstraint where
   compare (Enriched _ _ _ c1) (Enriched _ _ _ c2) = compare c1 c2
 
+type SubstWeakTerm' = [(String, ([Hole], WeakTermPlus))]
+
 -- s1が新たに追加されるsubstで、s2が既存のsubst
 -- s1 = m ~> eとして、eのなかにs2でsubstされるべきholeが含まれているとする。
-compose :: SubstWeakTerm -> SubstWeakTerm -> SubstWeakTerm
+compose :: SubstWeakTerm' -> SubstWeakTerm' -> SubstWeakTerm'
 compose s1 s2 = do
   let domS2 = map fst s2
   let codS2 = map snd s2
-  let codS2' = map (substWeakTermPlus s1) codS2
+  let codS2' = map (substIfNecessary s1) codS2
+  -- let codS2' = map (substWeakTermPlus s1) codS2
   let s1' = filter (\(ident, _) -> ident `notElem` domS2) s1
   s1' ++ zip domS2 codS2'
+
+substIfNecessary ::
+     SubstWeakTerm' -> ([Hole], WeakTermPlus) -> ([Hole], WeakTermPlus)
+substIfNecessary sub (hs, e)
+  | xs <- map fst sub
+  , any (\h -> h `elem` hs) xs = do
+    let sub' = map (\(x, (_, body)) -> (x, body)) sub
+    let e' = substWeakTermPlus sub' e
+    (filter (`notElem` xs) hs, e')
+substIfNecessary _ hse = hse

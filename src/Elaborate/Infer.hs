@@ -73,7 +73,8 @@ infer ctx (m, QuasiTermPiElim e@(_, QuasiTermPiIntro xts _) es)
     es' <- mapM (infer ctx) es
     e' <- infer ctx e
     senv <- gets substEnv
-    let defList = zip (map fst xts) es'
+    let hss = map holeWeakTermPlus es'
+    let defList = zip (map fst xts) (zip hss es')
     modify (\env -> env {substEnv = defList ++ senv})
     inferPiElim ctx m e' es'
 infer ctx (m, QuasiTermPiElim e es) = do

@@ -106,9 +106,9 @@ simp' ((e1, e2):cs) = do
           , subsume e1 xs
           , isDisjoint xs -> simpPattern h2 ies2 e2 e1 fmvs1 cs
         (Just (DeltaPiElim h1 mess1), _)
-          | Just body <- lookup h1 sub -> simpDelta body mess1 e1 e2 cs
+          | Just (_, body) <- lookup h1 sub -> simpDelta body mess1 e1 e2 cs
         (_, Just (DeltaPiElim h2 mess2))
-          | Just body <- lookup h2 sub -> simpDelta body mess2 e2 e1 cs
+          | Just (_, body) <- lookup h2 sub -> simpDelta body mess2 e2 e1 cs
         (Just (StuckPiElimStrict h1 ies1), _)
           | onesided h1 fmvs2
           , xs <- concatMap getVarList ies1
@@ -141,7 +141,7 @@ simp' ((e1, e2):cs) = do
 takeFreeAppArgs ::
      WeakTermPlus
   -> WeakTermPlus
-  -> [(Identifier, WeakTermPlus)]
+  -> [(Identifier, a)]
   -> Maybe ([WeakTermPlus], [WeakTermPlus])
 takeFreeAppArgs e1 e2 sub
   | (_, WeakTermPiElim (_, WeakTermConst f) es1) <- e1
@@ -191,9 +191,7 @@ simpPattern ::
   -> WithEnv [EnrichedConstraint]
 simpPattern h1 ies1 e1 e2 fmvs cs = do
   cs' <- simp cs
-  -- let fmvs = holeWeakTermPlus e2
   return $ Enriched (e1, e2) [h1] fmvs (ConstraintPattern h1 ies1 e2) : cs'
-  -- return $ Enriched (e1, e2) fmvs (ConstraintPattern h1 ies1 e2) : cs'
 
 simpDelta ::
      WeakTermPlus
@@ -206,10 +204,6 @@ simpDelta body mes1 e1 e2 cs = do
   cs' <- simp cs
   return $ Enriched (e1, e2) [] [] (ConstraintDelta body mes1 e2) : cs'
 
--- 変数条件のせいでpatternになれなかったものと、変数重複のせいで
--- patternになれなかったものとを別々にあつかったほうがよさそう？
--- 現在のこのquasiは変数重複に由来するもの。
--- だったら、h1だけをとったほうがたぶん賢い。
 simpQuasiPattern ::
      Identifier
   -> [[WeakTermPlus]]
@@ -220,7 +214,6 @@ simpQuasiPattern ::
   -> WithEnv [EnrichedConstraint]
 simpQuasiPattern h1 ies1 e1 e2 fmvs cs = do
   cs' <- simp cs
-  -- return $ Enriched (e1, e2) fmvs (ConstraintQuasiPattern h1 ies1 e2) : cs'
   return $ Enriched (e1, e2) [h1] fmvs (ConstraintQuasiPattern h1 ies1 e2) : cs'
 
 simpFlexRigid ::
@@ -233,9 +226,7 @@ simpFlexRigid ::
   -> WithEnv [EnrichedConstraint]
 simpFlexRigid h1 ies1 e1 e2 fmvs cs = do
   cs' <- simp cs
-  -- let fmvs = holeWeakTermPlus e2
   return $ Enriched (e1, e2) [h1] fmvs (ConstraintFlexRigid h1 ies1 e2) : cs'
-  -- return $ Enriched (e1, e2) fmvs (ConstraintFlexRigid h1 ies1 e2) : cs'
 
 simpOther ::
      WeakTermPlus
@@ -292,8 +283,6 @@ stuckReasonOf (DeltaPiElim _ _) = Nothing
 onesided :: Identifier -> [Identifier] -> Bool
 onesided h fmvs = h `notElem` fmvs
 
--- onesided :: Identifier -> WeakTermPlus -> Bool
--- onesided h e = h `notElem` holeWeakTermPlus e
 subsume :: WeakTermPlus -> [Identifier] -> Bool
 subsume e xs = all (`elem` xs) $ varWeakTermPlus e
 

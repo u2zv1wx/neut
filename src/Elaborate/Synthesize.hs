@@ -25,21 +25,15 @@ synthesize q = do
   case Q.getMin q of
     Nothing -> return ()
     Just (Enriched (e1, e2) ms _ _)
-      | Just (m, e) <- lookupAny ms sub -> do
-        p "stuck"
-        resolveStuck q e1 e2 m e
-    Just (Enriched _ _ _ (ConstraintPattern m ess e)) -> do
-      p "pat"
-      resolvePiElim q m ess e
+      | Just (m, (_, e)) <- lookupAny ms sub -> do resolveStuck q e1 e2 m e
+    Just (Enriched _ _ fmvs (ConstraintPattern m ess e)) -> do
+      resolvePiElim q m fmvs ess e
     Just (Enriched _ _ _ (ConstraintDelta x ess e)) -> do
-      p "delta"
       resolveDelta q x ess e
-    Just (Enriched _ _ _ (ConstraintQuasiPattern m ess e)) -> do
-      p "quasi"
-      resolvePiElim q m ess e
-    Just (Enriched _ _ _ (ConstraintFlexRigid m ess e)) -> do
-      p "flex"
-      resolvePiElim q m ess e
+    Just (Enriched _ _ fmvs (ConstraintQuasiPattern m ess e)) -> do
+      resolvePiElim q m fmvs ess e
+    Just (Enriched _ _ fmvs (ConstraintFlexRigid m ess e)) -> do
+      resolvePiElim q m fmvs ess e
     Just (Enriched (e1, e2) _ _ _) -> do
       throwError $ "cannot simplify:\n" ++ Pr.ppShow (e1, e2)
 
@@ -79,21 +73,27 @@ resolveDelta q body mess1 e2 = do
 -- this function replaces all the arguments that are not variable by
 -- fresh variables, and try to resolve the new quasi-pattern ?M @ x @ x @ z @ y == e.
 resolvePiElim ::
-     ConstraintQueue -> Hole -> [[WeakTermPlus]] -> WeakTermPlus -> WithEnv ()
-resolvePiElim q m ess e = do
+     ConstraintQueue
+  -> Hole
+  -> [Hole]
+  -> [[WeakTermPlus]]
+  -> WeakTermPlus
+  -> WithEnv ()
+resolvePiElim q m ms ess e = do
   let fmvs = holeWeakTermPlus e
   let lengthInfo = assert (m `notElem` fmvs) $ map length ess
   let es = concat ess
   xss <- toVarList es >>= toAltList
   let xsss = map (takeByCount lengthInfo) xss
   let lamList = map (bindFormalArgs e) xsss
-  chain q $ map (\lam -> resolveHole q m lam) lamList
+  chain q $ map (\lam -> resolveHole q m ms lam) lamList
 
-resolveHole :: ConstraintQueue -> Hole -> WeakTermPlus -> WithEnv ()
-resolveHole q m e = do
+resolveHole :: ConstraintQueue -> Hole -> [Hole] -> WeakTermPlus -> WithEnv ()
+resolveHole q m fmvs e = do
   senv <- gets substEnv
-  e' <- reduceWeakTermPlus $ substWeakTermPlus senv e
-  modify (\env -> env {substEnv = compose [(m, e')] senv})
+  let (fmvs', e') = substIfNecessary senv (fmvs, e)
+  e'' <- reduceWeakTermPlus e'
+  modify (\env -> env {substEnv = compose [(m, (fmvs', e''))] senv})
   let (q1, q2) =
         Q.partition (\(Enriched _ ms _ _) -> m `elem` ms) $ Q.deleteMin q
   let q1' = Q.mapU asAnalyzable q1

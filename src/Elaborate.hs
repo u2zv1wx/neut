@@ -78,7 +78,7 @@ elaborate' (m, WeakTermMu (x, t) e) = do
 elaborate' (_, WeakTermZeta x) = do
   sub <- gets substEnv
   case lookup x sub of
-    Just e -> do
+    Just (_, e) -> do
       e' <- reduceWeakTermPlus e
       elaborate' e'
     Nothing -> throwError $ "elaborate' i: remaining hole: " ++ x
