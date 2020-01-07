@@ -155,6 +155,15 @@
     num
     (enum-elimination selector
       (left (zero))
+      ;; 型システムはrightの中身がnatであることを知らないわけだ。だから
+      ;; valueを返そうとしても「それtopかもしれないよ！」とエラーを返すことになる。
+      ;; これってどう解決すればいいんだ？enum-elimの中ではselectorがrightであるってことの証明が
+      ;; 手に入る、みたいな話だろうか？それっぽい？
+      ;; enum-elimが変数で分岐してるときを特別扱いする感じ？
+      ;; 分岐の中ではselector == rightっていう等式が成立しているわけですが。このselectorの部分は通常は一般の式だからな〜。
+      ;; foo @ (bar, buz)とかで分岐されてたら詰むわけじゃん？fooが具体的な関数ならともかく、fooの部分まで引数にとってたりすると、これはもう
+      ;; どうにもならないわけじゃん？
+      ;; とりあえず等式だけ保持しておいて、で、推論が無理っぽくなったら等式をみてみる、みたいな？
       (right (succ (succ (succ (zero))))))))
 
 (ascription my-dec (hom nat nat))
