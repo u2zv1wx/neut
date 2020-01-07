@@ -31,8 +31,6 @@ data QuasiTerm
 
 type QuasiTermPlus = (Meta, QuasiTerm)
 
-type SubstQuasiTerm = [(Identifier, QuasiTermPlus)]
-
 type Hole = Identifier
 
 type IdentifierPlus = (Identifier, QuasiTermPlus)
