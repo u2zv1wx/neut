@@ -19,24 +19,37 @@ type MacroSubst = [(String, TreePlus)]
 macroExpand :: TreePlus -> WithEnv TreePlus
 macroExpand t = do
   result <- recurM (macroExpand1 . splice) t
-  assertPostPM "macroExpand" result $ noSpliceOrKeyword result
+  let info = toInfo "macroExpand.post" result
+  assertPM info result $ noSpliceOrKeyword result
+
+macroExpand' :: TreePlus -> WithEnv TreePlus
+macroExpand' t = recurM (macroExpand1 . splice) t
 
 noSpliceOrKeyword :: TreePlus -> WithEnv Bool
 noSpliceOrKeyword t = do
   let noSplice = hasNoRemSplice t
-  noKeyword <- hasNoRemKeyword t
+  noKeyword <- hasNoMatch t
   return $ noSplice && noKeyword
 
 hasNoRemSplice :: TreePlus -> Bool
-hasNoRemSplice t = do
-  let xs = atomListOf t
-  "splice" `notElem` xs
+hasNoRemSplice (_, TreeAtom _) = True
+hasNoRemSplice (_, TreeNode ts) = do
+  let b1 = all hasNoRemSplice ts
+  let b2 = all (isLeft . findSplice) ts
+  b1 && b2
 
-hasNoRemKeyword :: TreePlus -> WithEnv Bool
-hasNoRemKeyword t = do
-  let xs = atomListOf t
-  kenv <- gets keywordEnv
-  return $ all (`notElem` xs) kenv
+isLeft :: Either a b -> Bool
+isLeft (Left _) = True
+isLeft _ = False
+
+-- noRemKeywordというか、noMatchが正解。
+hasNoMatch :: TreePlus -> WithEnv Bool
+hasNoMatch t = do
+  nenv <- gets notationEnv
+  mMatch <- try (macroMatch t) nenv
+  case mMatch of
+    Just _ -> return False
+    Nothing -> return True
 
 -- {} recurM {}
 recurM :: (Monad m) => (TreePlus -> m TreePlus) -> TreePlus -> m TreePlus
@@ -45,19 +58,15 @@ recurM f (m, TreeNode ts) = do
   ts' <- mapM (recurM f) ts
   f (m, TreeNode ts')
 
--- {(noSplice)} macroExpand1 {(noSplice, noKeyword)}
+-- substの結果がkeywordを含んでいることは普通にありうる。
+-- {(noSplice)} macroExpand1 {(noSplice, noMatch)}
 macroExpand1 :: TreePlus -> WithEnv TreePlus
 macroExpand1 t@(i, _) = do
-  assertPreUP "macroExpand1" $ hasNoRemSplice t
+  assertUP (toInfo "macroExpand1.pre" t) $ hasNoRemSplice t
   nenv <- gets notationEnv
   mMatch <- try (macroMatch t) nenv
   case mMatch of
-    Just (sub, (_, skel)) -> do
-      let result = applySubst sub (i, skel)
-      assertPostMM
-        "macroExpand1"
-        (macroExpand result)
-        (noSpliceOrKeyword result)
+    Just (sub, (_, skel)) -> macroExpand' $ applySubst sub (i, skel)
     Nothing -> return t
 
 type Notation = TreePlus
@@ -138,7 +147,8 @@ checkPlusCondition (_, TreeNode ts) = do
 splice :: TreePlus -> TreePlus
 splice t = do
   let result = splice' t
-  assertP "splice" result $ hasNoRemSplice result
+  let info = toInfo "splice" t
+  assertP info result $ hasNoRemSplice result
 
 -- (a b (splice (c (splice (p q)) e)) f) ~> (a b c p q d e)
 splice' :: TreePlus -> TreePlus
