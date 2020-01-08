@@ -36,6 +36,7 @@ parse' ((_, TreeNode [(_, TreeAtom "notation"), from, to]):as) = do
   modify (\e -> e {notationEnv = (from, to) : notationEnv e})
   parse' as
 parse' ((_, TreeNode [(_, TreeAtom "keyword"), (_, TreeAtom s)]):as) = do
+  checkKeywordSanity s
   modify (\e -> e {keywordEnv = s : keywordEnv e})
   parse' as
 parse' ((_, TreeNode ((_, TreeAtom "enum"):(_, TreeAtom name):ts)):as) = do
@@ -141,6 +142,12 @@ newHole :: WithEnv QuasiTermPlus
 newHole = do
   h <- newNameWith "hole-parse-zeta"
   return (emptyMeta, QuasiTermZeta h)
+
+checkKeywordSanity :: Identifier -> WithEnv ()
+checkKeywordSanity "" = throwError "empty string for a keyword"
+checkKeywordSanity x
+  | last x == '+' = throwError "A +-suffixed name cannot be a keyword"
+checkKeywordSanity _ = return ()
 
 insEnumEnv :: Identifier -> [Identifier] -> WithEnv ()
 insEnumEnv name enumList =
