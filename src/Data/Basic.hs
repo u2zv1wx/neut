@@ -1,7 +1,9 @@
 module Data.Basic where
 
+import Control.Exception (assert)
 import Data.Bits
 import Data.Maybe (fromMaybe)
+import Debug.Trace
 import Text.Read
 
 type Identifier = String
@@ -262,3 +264,54 @@ ushiftR n k = fromIntegral (fromIntegral n `shiftR` k :: Word)
 
 ushiftR' :: (Integral a) => a -> Int -> a
 ushiftR' n k = fromIntegral (fromIntegral n `shiftR` k :: Word)
+
+-- `P` is for "Pure"
+assertP :: String -> a -> Bool -> a
+assertP msg x b = assert (trace msg b) x
+
+assertP' :: String -> Bool -> ()
+assertP' msg b = assert (trace msg b) ()
+
+-- assert-pure-monadic
+assertPM :: (Monad m) => String -> a -> m Bool -> m a
+assertPM msg x m = do
+  b <- m
+  return $ assert (trace msg b) x
+
+-- assert-unit-monadic
+assertUM :: (Monad m) => String -> m Bool -> m ()
+assertUM msg mb = do
+  b <- mb
+  return $ assert (trace msg b) ()
+
+-- assert-unit-pure
+assertUP :: (Monad m) => String -> Bool -> m ()
+assertUP msg b = return $ assert (trace msg b) ()
+
+-- assert-monadic-monadic
+assertMM :: (Monad m) => String -> m a -> m Bool -> m a
+assertMM msg mx mb = do
+  b <- mb
+  x <- mx
+  return $ assert (trace msg b) x
+
+-- assert-monadic-pure
+assertMP :: (Monad m) => String -> m a -> Bool -> m a
+assertMP msg mx b = do
+  x <- mx
+  return $ assert (trace msg b) x
+
+assertPreUP :: (Monad m) => String -> Bool -> m ()
+assertPreUP msg b = assertUP (msg ++ ".pre") b
+
+assertPreUM :: (Monad m) => String -> m Bool -> m ()
+assertPreUM msg mb = assertUM (msg ++ ".pre") mb
+
+assertPostMM :: (Monad m) => String -> m a -> m Bool -> m a
+assertPostMM msg mx mb = assertMM (msg ++ ".post") mx mb
+
+assertPostMP :: (Monad m) => String -> m a -> Bool -> m a
+assertPostMP msg mx b = assertMP (msg ++ ".post") mx b
+
+assertPostPM :: (Monad m) => String -> a -> m Bool -> m a
+assertPostPM msg x mb = assertPM (msg ++ ".post") x mb
