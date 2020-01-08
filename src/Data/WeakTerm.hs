@@ -50,40 +50,41 @@ instance Eq PreMeta where
   _ == _ = True
 
 varWeakTermPlus :: WeakTermPlus -> [Identifier]
-varWeakTermPlus (_, WeakTermTau) = []
-varWeakTermPlus (_, WeakTermUpsilon x) = [x]
-varWeakTermPlus (_, WeakTermPi xts t) = do
-  varWeakTermPlusBindings xts [t]
-varWeakTermPlus (_, WeakTermPiIntro xts e) = do
-  varWeakTermPlusBindings xts [e]
-varWeakTermPlus (_, WeakTermPiElim e es) = do
+varWeakTermPlus (m, WeakTermTau) = varPreMeta m
+varWeakTermPlus (m, WeakTermUpsilon x) = x : varPreMeta m
+varWeakTermPlus (m, WeakTermPi xts t) = do
+  varPreMeta m ++ varWeakTermPlusBindings xts [t]
+varWeakTermPlus (m, WeakTermPiIntro xts e) = do
+  varPreMeta m ++ varWeakTermPlusBindings xts [e]
+varWeakTermPlus (m, WeakTermPiElim e es) = do
   let xhs = varWeakTermPlus e
   let yhs = concatMap varWeakTermPlus es
-  xhs ++ yhs
-varWeakTermPlus (_, WeakTermMu ut e) = do
-  varWeakTermPlusBindings [ut] [e]
-varWeakTermPlus (_, WeakTermConst _) = []
-varWeakTermPlus (_, WeakTermConstDecl xt e) = varWeakTermPlusBindings [xt] [e]
-varWeakTermPlus (_, WeakTermZeta _) = []
-varWeakTermPlus (_, WeakTermIntS _ _) = []
-varWeakTermPlus (_, WeakTermIntU _ _) = []
-varWeakTermPlus (_, WeakTermInt _) = []
-varWeakTermPlus (_, WeakTermFloat16 _) = []
-varWeakTermPlus (_, WeakTermFloat32 _) = []
-varWeakTermPlus (_, WeakTermFloat64 _) = []
-varWeakTermPlus (_, WeakTermFloat _) = []
-varWeakTermPlus (_, WeakTermEnum _) = []
-varWeakTermPlus (_, WeakTermEnumIntro _) = []
-varWeakTermPlus (_, WeakTermEnumElim e les) = do
+  varPreMeta m ++ xhs ++ yhs
+varWeakTermPlus (m, WeakTermMu ut e) = do
+  varPreMeta m ++ varWeakTermPlusBindings [ut] [e]
+varWeakTermPlus (m, WeakTermConst _) = varPreMeta m
+varWeakTermPlus (m, WeakTermConstDecl xt e) =
+  varPreMeta m ++ varWeakTermPlusBindings [xt] [e]
+varWeakTermPlus (m, WeakTermZeta _) = varPreMeta m
+varWeakTermPlus (m, WeakTermIntS _ _) = varPreMeta m
+varWeakTermPlus (m, WeakTermIntU _ _) = varPreMeta m
+varWeakTermPlus (m, WeakTermInt _) = varPreMeta m
+varWeakTermPlus (m, WeakTermFloat16 _) = varPreMeta m
+varWeakTermPlus (m, WeakTermFloat32 _) = varPreMeta m
+varWeakTermPlus (m, WeakTermFloat64 _) = varPreMeta m
+varWeakTermPlus (m, WeakTermFloat _) = varPreMeta m
+varWeakTermPlus (m, WeakTermEnum _) = varPreMeta m
+varWeakTermPlus (m, WeakTermEnumIntro _) = varPreMeta m
+varWeakTermPlus (m, WeakTermEnumElim e les) = do
   let xhs = varWeakTermPlus e
-  let yhs = concatMap (\(_, body) -> varWeakTermPlus body) les
-  xhs ++ yhs
-varWeakTermPlus (_, WeakTermArray _ t) = do
-  varWeakTermPlus t
-varWeakTermPlus (_, WeakTermArrayIntro _ les) = do
-  concatMap (\(_, body) -> varWeakTermPlus body) les
-varWeakTermPlus (_, WeakTermArrayElim _ e1 e2) = do
-  varWeakTermPlus e1 ++ varWeakTermPlus e2
+  let yhs = concatMap (varWeakTermPlus . snd) les
+  varPreMeta m ++ xhs ++ yhs
+varWeakTermPlus (m, WeakTermArray _ t) = do
+  varPreMeta m ++ varWeakTermPlus t
+varWeakTermPlus (m, WeakTermArrayIntro _ les) = do
+  varPreMeta m ++ concatMap (\(_, body) -> varWeakTermPlus body) les
+varWeakTermPlus (m, WeakTermArrayElim _ e1 e2) = do
+  varPreMeta m ++ varWeakTermPlus e1 ++ varWeakTermPlus e2
 
 varWeakTermPlusBindings :: [IdentifierPlus] -> [WeakTermPlus] -> [Hole]
 varWeakTermPlusBindings [] es = do
@@ -93,41 +94,53 @@ varWeakTermPlusBindings ((x, t):xts) es = do
   let hs2 = varWeakTermPlusBindings xts es
   hs1 ++ filter (/= x) hs2
 
+varPreMeta :: PreMeta -> [Hole]
+varPreMeta (PreMetaTerminal _) = []
+varPreMeta (PreMetaNonTerminal t _) = varWeakTermPlus t
+
 holeWeakTermPlus :: WeakTermPlus -> [Hole]
-holeWeakTermPlus (_, WeakTermTau) = []
-holeWeakTermPlus (_, WeakTermUpsilon _) = []
-holeWeakTermPlus (_, WeakTermPi xts t) = holeWeakTermPlusBindings xts [t]
-holeWeakTermPlus (_, WeakTermPiIntro xts e) = holeWeakTermPlusBindings xts [e]
-holeWeakTermPlus (_, WeakTermPiElim e es) =
-  holeWeakTermPlus e ++ concatMap holeWeakTermPlus es
-holeWeakTermPlus (_, WeakTermMu ut e) = holeWeakTermPlusBindings [ut] [e]
-holeWeakTermPlus (_, WeakTermZeta h) = [h]
-holeWeakTermPlus (_, WeakTermConst _) = []
-holeWeakTermPlus (_, WeakTermConstDecl xt e) = holeWeakTermPlusBindings [xt] [e]
-holeWeakTermPlus (_, WeakTermIntS _ _) = []
-holeWeakTermPlus (_, WeakTermIntU _ _) = []
-holeWeakTermPlus (_, WeakTermInt _) = []
-holeWeakTermPlus (_, WeakTermFloat16 _) = []
-holeWeakTermPlus (_, WeakTermFloat32 _) = []
-holeWeakTermPlus (_, WeakTermFloat64 _) = []
-holeWeakTermPlus (_, WeakTermFloat _) = []
-holeWeakTermPlus (_, WeakTermEnum _) = []
-holeWeakTermPlus (_, WeakTermEnumIntro _) = []
-holeWeakTermPlus (_, WeakTermEnumElim e les) = do
+holeWeakTermPlus (m, WeakTermTau) = holePreMeta m
+holeWeakTermPlus (m, WeakTermUpsilon _) = holePreMeta m
+holeWeakTermPlus (m, WeakTermPi xts t) =
+  holePreMeta m ++ holeWeakTermPlusBindings xts [t]
+holeWeakTermPlus (m, WeakTermPiIntro xts e) =
+  holePreMeta m ++ holeWeakTermPlusBindings xts [e]
+holeWeakTermPlus (m, WeakTermPiElim e es) =
+  holePreMeta m ++ holeWeakTermPlus e ++ concatMap holeWeakTermPlus es
+holeWeakTermPlus (m, WeakTermMu ut e) =
+  holePreMeta m ++ holeWeakTermPlusBindings [ut] [e]
+holeWeakTermPlus (m, WeakTermZeta h) = h : holePreMeta m
+holeWeakTermPlus (m, WeakTermConst _) = holePreMeta m
+holeWeakTermPlus (m, WeakTermConstDecl xt e) =
+  holePreMeta m ++ holeWeakTermPlusBindings [xt] [e]
+holeWeakTermPlus (m, WeakTermIntS _ _) = holePreMeta m
+holeWeakTermPlus (m, WeakTermIntU _ _) = holePreMeta m
+holeWeakTermPlus (m, WeakTermInt _) = holePreMeta m
+holeWeakTermPlus (m, WeakTermFloat16 _) = holePreMeta m
+holeWeakTermPlus (m, WeakTermFloat32 _) = holePreMeta m
+holeWeakTermPlus (m, WeakTermFloat64 _) = holePreMeta m
+holeWeakTermPlus (m, WeakTermFloat _) = holePreMeta m
+holeWeakTermPlus (m, WeakTermEnum _) = holePreMeta m
+holeWeakTermPlus (m, WeakTermEnumIntro _) = holePreMeta m
+holeWeakTermPlus (m, WeakTermEnumElim e les) = do
   let xhs = holeWeakTermPlus e
   let yhs = concatMap (\(_, body) -> holeWeakTermPlus body) les
-  xhs ++ yhs
-holeWeakTermPlus (_, WeakTermArray _ e) = holeWeakTermPlus e
-holeWeakTermPlus (_, WeakTermArrayIntro _ les) = do
-  concatMap (\(_, body) -> holeWeakTermPlus body) les
-holeWeakTermPlus (_, WeakTermArrayElim _ e1 e2) = do
-  holeWeakTermPlus e1 ++ holeWeakTermPlus e2
+  holePreMeta m ++ xhs ++ yhs
+holeWeakTermPlus (m, WeakTermArray _ e) = holePreMeta m ++ holeWeakTermPlus e
+holeWeakTermPlus (m, WeakTermArrayIntro _ les) = do
+  holePreMeta m ++ concatMap (\(_, body) -> holeWeakTermPlus body) les
+holeWeakTermPlus (m, WeakTermArrayElim _ e1 e2) = do
+  holePreMeta m ++ holeWeakTermPlus e1 ++ holeWeakTermPlus e2
 
 holeWeakTermPlusBindings :: [IdentifierPlus] -> [WeakTermPlus] -> [Hole]
 holeWeakTermPlusBindings [] es = do
   concatMap holeWeakTermPlus es
 holeWeakTermPlusBindings ((_, t):xts) es = do
   holeWeakTermPlus t ++ holeWeakTermPlusBindings xts es
+
+holePreMeta :: PreMeta -> [Hole]
+holePreMeta (PreMetaTerminal _) = []
+holePreMeta (PreMetaNonTerminal t _) = holeWeakTermPlus t
 
 substWeakTermPlus :: SubstWeakTerm -> WeakTermPlus -> WeakTermPlus
 substWeakTermPlus sub (m, WeakTermTau) = do
