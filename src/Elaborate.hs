@@ -33,14 +33,18 @@ elaborate :: QuasiTermPlus -> WithEnv TermPlus
 elaborate e = do
   p "infer"
   e' <- infer [] e
+  let vs = varWeakTermPlus e'
+  let info1 = toInfo "inferred term is not closed. freevars:" vs
+  assertUP info1 $ null vs
   p "analyze/synthesize"
   gets constraintEnv >>= analyze >>= synthesize
   p "reduceSubstEnv"
   reduceSubstEnv
   p "elaborate"
   e'' <- elaborate' e'
-  p "done"
-  reduceTermPlus e''
+  let ws = varTermPlus e''
+  let info2 = toInfo "elaborated term is not closed. freevars:" ws
+  assertMP info2 (reduceTermPlus e'') $ null ws
 
 -- This function translates a well-typed term into an untyped term in a
 -- reduction-preserving way. Here, we translate types into units (nullary product).
