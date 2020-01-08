@@ -95,9 +95,10 @@ varWeakTermPlusBindings ((x, t):xts) es = do
   hs1 ++ filter (/= x) hs2
 
 varPreMeta :: PreMeta -> [Hole]
-varPreMeta (PreMetaTerminal _) = []
-varPreMeta (PreMetaNonTerminal t _) = varWeakTermPlus t
+varPreMeta _ = []
 
+-- varPreMeta (PreMetaTerminal _) = []
+-- varPreMeta (PreMetaNonTerminal t _) = varWeakTermPlus t
 holeWeakTermPlus :: WeakTermPlus -> [Hole]
 holeWeakTermPlus (m, WeakTermTau) = holePreMeta m
 holeWeakTermPlus (m, WeakTermUpsilon _) = holePreMeta m
@@ -139,9 +140,10 @@ holeWeakTermPlusBindings ((_, t):xts) es = do
   holeWeakTermPlus t ++ holeWeakTermPlusBindings xts es
 
 holePreMeta :: PreMeta -> [Hole]
-holePreMeta (PreMetaTerminal _) = []
-holePreMeta (PreMetaNonTerminal t _) = holeWeakTermPlus t
+holePreMeta _ = []
 
+-- holePreMeta (PreMetaTerminal _) = []
+-- holePreMeta (PreMetaNonTerminal t _) = holeWeakTermPlus t
 substWeakTermPlus :: SubstWeakTerm -> WeakTermPlus -> WeakTermPlus
 substWeakTermPlus sub (m, WeakTermTau) = do
   let m' = substPreMeta sub m

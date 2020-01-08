@@ -2,7 +2,6 @@ module Elaborate.Synthesize
   ( synthesize
   ) where
 
-import Control.Exception
 import Control.Monad.Except
 import Control.Monad.State
 
@@ -55,7 +54,8 @@ resolveStuck q e1 e2 h e = do
   let fmvs = holeWeakTermPlus e
   let e1' = substWeakTermPlus [(h, e)] e1
   let e2' = substWeakTermPlus [(h, e)] e2
-  q' <- assert (h `notElem` fmvs) $ analyze [(e1', e2')]
+  q' <- analyze [(e1', e2')] >>= assert "resolveStuck" (h `notElem` fmvs)
+  -- q' <- assert "resolveStuck" (h `notElem` fmvs) $ analyze [(e1', e2')]
   synthesize $ Q.deleteMin q `Q.union` q'
 
 resolveDelta ::
@@ -86,14 +86,13 @@ resolvePiElim ::
   -> [[WeakTermPlus]]
   -> WeakTermPlus
   -> WithEnv ()
-resolvePiElim q m ms ess e = do
-  let fmvs = holeWeakTermPlus e
-  let lengthInfo = assert (m `notElem` fmvs) $ map length ess
+resolvePiElim q m fmvs ess e = do
+  lengthInfo <- assert "piElim" (m `notElem` fmvs) $ map length ess
   let es = concat ess
   xss <- toVarList es >>= toAltList
   let xsss = map (takeByCount lengthInfo) xss
   let lamList = map (bindFormalArgs e) xsss
-  chain q $ map (\lam -> resolveHole q m ms lam) lamList
+  chain q $ map (\lam -> resolveHole q m fmvs lam) lamList
 
 resolveHole :: ConstraintQueue -> Hole -> [Hole] -> WeakTermPlus -> WithEnv ()
 resolveHole q m fmvs e = do

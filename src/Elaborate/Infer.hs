@@ -39,7 +39,8 @@ type Context = [(Identifier, WeakTermPlus)]
 -- Interested readers are referred to A. Abel and B. Pientka. "Higher-Order
 -- Dynamic Pattern Unification for Dependent Types and Records". Typed Lambda
 -- Calculi and Applications, 2011.
--- infer e ~> {type-annotated e}
+-- {termはrename済みでclosed} infer {termはrename済みでclosedで、かつすべてのsubtermが型でannotateされている}
+-- type-annotationを与えるのがメインの挙動だけど、それ自体は型情報に記録されている。
 infer :: Context -> QuasiTermPlus -> WithEnv WeakTermPlus
 infer _ (m, QuasiTermTau) = return (PreMetaTerminal m, WeakTermTau)
 infer _ (m, QuasiTermUpsilon x) = do

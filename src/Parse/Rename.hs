@@ -12,7 +12,8 @@ import Data.QuasiTerm
 rename :: QuasiTermPlus -> WithEnv QuasiTermPlus
 rename e = do
   result <- rename' e
-  return $ assertPostP "rename" result $ checkSanity [] result
+  let info = toInfo "rename.post" result
+  return $ assertP info result $ checkSanity [] result
 
 -- Alpha-convert all the variables so that different variables have different names.
 rename' :: QuasiTermPlus -> WithEnv QuasiTermPlus

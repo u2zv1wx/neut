@@ -144,6 +144,12 @@ p s = liftIO $ putStrLn s
 p' :: (Show a) => a -> WithEnv ()
 p' s = liftIO $ putStrLn $ Pr.ppShow s
 
+toStr :: (Show a) => a -> String
+toStr s = Pr.ppShow s
+
+toInfo :: (Show a) => String -> a -> String
+toInfo s x = "assertion failure:\n" ++ s ++ "\n" ++ toStr x
+
 newDataUpsilonWith :: Identifier -> WithEnv (Identifier, DataPlus)
 newDataUpsilonWith name = newDataUpsilonWith' name emptyMeta
 
