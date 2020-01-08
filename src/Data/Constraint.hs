@@ -1,5 +1,7 @@
 module Data.Constraint where
 
+import Data.List
+
 import Data.WeakTerm
 
 type PreConstraint = (WeakTermPlus, WeakTermPlus)
@@ -58,8 +60,10 @@ substIfNecessary ::
      SubstWeakTerm' -> ([Hole], WeakTermPlus) -> ([Hole], WeakTermPlus)
 substIfNecessary sub (hs, e)
   | xs <- map fst sub
-  , any (\h -> h `elem` hs) xs = do
-    let sub' = map (\(x, (_, body)) -> (x, body)) sub
-    let e' = substWeakTermPlus sub' e
-    (filter (`notElem` xs) hs, e')
+  , sub' <- filter (\(x, _) -> x `elem` hs) sub
+  , not (null sub') = do
+    let hs' = concatMap (\(_, (foo, _)) -> foo) sub'
+    let sub2 = map (\(x, (_, body)) -> (x, body)) sub
+    let e' = substWeakTermPlus sub2 e
+    (nub $ hs' ++ filter (`notElem` xs) hs, e')
 substIfNecessary _ hse = hse
