@@ -77,30 +77,12 @@ elaborate' (m, WeakTermMu (x, t) e) = do
       e' <- elaborate' e
       return (m', TermMu (x, t') e')
     _ -> throwError "CBV recursion is allowed only for Pi-types"
-elaborate' (_, WeakTermZeta x)
-  -- zenv <- gets zetaEnv
-  -- -- dbgsym <- newNameWith "DEBUG"
-  -- case Map.lookup x zenv of
-  --   Just e
-  --     -- p $ "found: " ++ x
-  --    -> do
-  --     return e
-  --   Nothing -> do
- = do
+elaborate' (_, WeakTermZeta x) = do
   sub <- gets substEnv
   case lookup x sub of
     Nothing -> throwError $ "elaborate' i: remaining hole: " ++ x
-    Just (_, e)
-          -- p $ "not found: " ++ x
-          -- p $ "zenv length = " ++ show (Map.size zenv)
-          -- p $ "===start===: " ++ dbgsym
-     -> do
+    Just (_, e) -> do
       e' <- elaborate' e
-          -- p $ "===end===: " ++ dbgsym
-          -- このelaborate' eを計算する途中でxが確定したらthrowして計算を打ち切ってその結果を使うとかすればよさそう？
-          -- いや、それは変では。x ~> eのとき、eのなかにはxは出現しないんだから。
-          -- eの処理でふたたびzeta xが出てきたらそれは自明に無限ループとなるはず。
-          -- modify (\env -> env {zetaEnv = Map.insert x e' zenv})
       return e'
 elaborate' (m, WeakTermConst x) = do
   m' <- toMeta m
