@@ -14,7 +14,7 @@ import Data.Tree
 
 type MacroSubst = [(String, TreePlus)]
 
--- {} macroExpand {(noSplice, noKeyword)}
+-- {} macroExpand {noSplice, noKeyword}
 -- CBV-like macro expansion
 macroExpand :: TreePlus -> WithEnv TreePlus
 macroExpand t = do
@@ -84,18 +84,19 @@ macroMatch (_, TreeNode []) (_, TreeNode []) = return $ Just []
 macroMatch (_, TreeNode _) (_, TreeNode []) = return Nothing
 macroMatch (_, TreeNode []) (_, TreeNode _) = return Nothing
 macroMatch (_, TreeNode ts1) (_, TreeNode ts2)
-  | (_, TreeAtom sym) <- last ts2
-  , last sym == '+'
+  | (_, TreeAtom s2) <- last ts2
+  , last s2 == '+' -- this ensures that s2 is not a keyword
   , length ts1 >= length ts2 = do
     let (xs, rest) = splitAt (length ts2 - 1) ts1
     let ys = take (length ts2 - 1) ts2
     mzs <- sequence <$> zipWithM macroMatch xs ys
-    return $ mzs >>= \zs -> Just $ (sym, toSpliceTree rest) : join zs
+    return $ mzs >>= \zs -> Just $ (s2, toSpliceTree rest) : join zs
   | length ts1 == length ts2 = do
     mzs <- sequence <$> zipWithM macroMatch ts1 ts2
     return $ mzs >>= \zs -> Just $ join zs
   | otherwise = return Nothing
 
+-- {} applySubst {}
 applySubst :: MacroSubst -> Notation -> TreePlus
 applySubst sub (i, TreeAtom s) = fromMaybe (i, TreeAtom s) (lookup s sub)
 applySubst sub (i, TreeNode ts) = (i, TreeNode $ map (applySubst sub) ts)
@@ -130,23 +131,32 @@ checkPlusCondition (_, TreeNode ts) = do
     (_, TreeAtom _) -> return ()
     ts' -> checkPlusCondition ts'
 
--- (a b (splice (c (splice (p q)) e)) f) ~> (a b c p q d e)
+-- {} splice {noSplice}
 splice :: TreePlus -> TreePlus
-splice t@(_, TreeAtom _) = t
-splice (m, TreeNode ts) = do
-  let ts' = map splice ts
+splice t = do
+  let result = splice' t
+  assertP "splice" result $ hasNoRemSplice result
+
+-- (a b (splice (c (splice (p q)) e)) f) ~> (a b c p q d e)
+splice' :: TreePlus -> TreePlus
+splice' t@(_, TreeAtom _) = t
+splice' (m, TreeNode ts) = do
+  let ts' = map splice' ts
   (m, TreeNode $ expandSplice $ map findSplice ts')
 
+-- {} findSplice {}
 findSplice :: TreePlus -> Either TreePlus [TreePlus]
 findSplice (_, TreeNode [(_, TreeAtom "splice"), (_, TreeNode ts)]) = do
   Right ts
 findSplice t = Left t
 
+-- {} expandSplice {}
 expandSplice :: [Either TreePlus [TreePlus]] -> [TreePlus]
 expandSplice [] = []
 expandSplice (Left t:rest) = t : expandSplice rest
 expandSplice (Right ts:rest) = ts ++ expandSplice rest
 
+-- {} try {}
 -- returns the first "Just"
 try :: (Monad m) => (a -> m (Maybe b)) -> [(a, c)] -> m (Maybe (b, c))
 try _ [] = return Nothing
