@@ -24,23 +24,15 @@ synthesize q = do
   case Q.getMin q of
     Nothing -> return ()
     Just (Enriched (e1, e2) ms _ _)
-      | Just (m, (_, e)) <- lookupAny ms sub -> do
-        p "resolve-stuck"
-        resolveStuck q e1 e2 m e
-    Just (Enriched _ _ fmvs (ConstraintPattern m ess e)) -> do
-      p "pat"
+      | Just (m, (_, e)) <- lookupAny ms sub -> resolveStuck q e1 e2 m e
+    Just (Enriched _ _ fmvs (ConstraintPattern m ess e)) ->
       resolvePiElim q m fmvs ess e
-    Just (Enriched _ _ _ (ConstraintDelta x ess e)) -> do
-      p "delta"
-      resolveDelta q x ess e
-    Just (Enriched _ _ fmvs (ConstraintQuasiPattern m ess e)) -> do
-      p "quasi"
+    Just (Enriched _ _ _ (ConstraintDelta x ess e)) -> resolveDelta q x ess e
+    Just (Enriched _ _ fmvs (ConstraintQuasiPattern m ess e)) ->
       resolvePiElim q m fmvs ess e
-    Just (Enriched _ _ fmvs (ConstraintFlexRigid m ess e)) -> do
-      p "flex"
+    Just (Enriched _ _ fmvs (ConstraintFlexRigid m ess e)) ->
       resolvePiElim q m fmvs ess e
-    Just (Enriched (e1, e2) _ _ _) -> do
-      p $ "rest:" ++ show (Q.size q)
+    Just (Enriched (e1, e2) _ _ _) ->
       throwError $ "cannot simplify:\n" ++ Pr.ppShow (e1, e2)
 
 resolveStuck ::
@@ -55,7 +47,6 @@ resolveStuck q e1 e2 h e = do
   let e1' = substWeakTermPlus [(h, e)] e1
   let e2' = substWeakTermPlus [(h, e)] e2
   q' <- analyze [(e1', e2')] >>= assert "resolveStuck" (h `notElem` fmvs)
-  -- q' <- assert "resolveStuck" (h `notElem` fmvs) $ analyze [(e1', e2')]
   synthesize $ Q.deleteMin q `Q.union` q'
 
 resolveDelta ::
@@ -97,9 +88,9 @@ resolvePiElim q m fmvs ess e = do
 resolveHole :: ConstraintQueue -> Hole -> [Hole] -> WeakTermPlus -> WithEnv ()
 resolveHole q m fmvs e = do
   senv <- gets substEnv
-  let (fmvs', e') = substIfNecessary senv (fmvs, e)
-  e'' <- reduceWeakTermPlus e'
-  modify (\env -> env {substEnv = compose [(m, (fmvs', e''))] senv})
+  e' <- reduceWeakTermPlus $ snd $ substIfNecessary senv (fmvs, e)
+  let fmvs' = holeWeakTermPlus e'
+  modify (\env -> env {substEnv = compose [(m, (fmvs', e'))] senv})
   let (q1, q2) =
         Q.partition (\(Enriched _ ms _ _) -> m `elem` ms) $ Q.deleteMin q
   let q1' = Q.mapU asAnalyzable q1
@@ -111,14 +102,14 @@ asAnalyzable (Enriched cs ms fmvs _) = Enriched cs ms fmvs ConstraintAnalyzable
 -- [e, x, y, y, e2, e3, z] ~> [p, x, y, y, q, r, z]  (p, q, r: new variables)
 toVarList :: [WeakTermPlus] -> WithEnv [(Identifier, WeakTermPlus)]
 toVarList [] = return []
-toVarList (e@(_, WeakTermUpsilon x):es) = do
+toVarList ((_, WeakTermUpsilon x):es) = do
   xts <- toVarList es
-  let t = typeOf e
+  let t = (metaTerminal, WeakTermUpsilon "DONT_CARE")
   return $ (x, t) : xts
-toVarList (e:es) = do
+toVarList (_:es) = do
   xts <- toVarList es
   x <- newNameWith "hole"
-  let t = typeOf e
+  let t = (metaTerminal, WeakTermUpsilon "DONT_CARE")
   insWeakTypeEnv x t
   return $ (x, t) : xts
 
@@ -179,13 +170,8 @@ discardInactive xs indexList =
 -- Try the list of alternatives.
 chain :: ConstraintQueue -> [WithEnv a] -> WithEnv a
 chain _ [] = throwError $ "cannot synthesize(chain)."
--- chain _ (e:_) = e
 chain _ [e] = e
-chain c (e:es) =
-  catchError e $
-  (const $ do
-     p "==trying another=="
-     chain c es)
+chain c (e:es) = catchError e $ (const $ chain c es)
 
 lookupAny :: [Hole] -> [(Identifier, a)] -> Maybe (Hole, a)
 lookupAny [] _ = Nothing
