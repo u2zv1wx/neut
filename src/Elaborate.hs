@@ -38,11 +38,9 @@ elaborate e = do
   gets constraintEnv >>= analyze >>= synthesize
   reduceSubstEnv
   p "elaborate"
-  e'' <- elaborate' e'
-  e''' <- reduceTermPlus e''
-  let ws = varTermPlus e'''
-  let info2 = toInfo "elaborated term is not closed:" e'''
-  assertMP info2 (return e''') $ null ws
+  e'' <- elaborate' e' >>= reduceTermPlus
+  let info2 = toInfo "elaborated term is not closed:" e''
+  assertMP info2 (return e'') $ null (varTermPlus e'')
 
 -- This function translates a well-typed term into an untyped term in a
 -- reduction-preserving way. Here, we translate types into units (nullary product).
