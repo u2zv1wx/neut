@@ -24,10 +24,13 @@ data Def
       QuasiTermPlus -- the `e` in `let x = e`
   | DefConstDecl IdentifierPlus
 
+-- {} parse {the output term is correctly renamed}
+-- (The postcondition is guaranteed by the assertion of `rename`.)
 parse :: String -> String -> WithEnv QuasiTermPlus
 parse s inputPath = do
   strToTree s inputPath >>= parse' >>= concatDefList >>= rename
 
+-- {} parse' {}
 -- Parse the head element of the input list.
 parse' :: [TreePlus] -> WithEnv [Def]
 parse' [] = return []
@@ -42,8 +45,8 @@ parse' ((_, TreeNode [(_, TreeAtom "keyword"), (_, TreeAtom s)]):as) = do
 parse' ((_, TreeNode ((_, TreeAtom "enum"):(_, TreeAtom name):ts)):as) = do
   indexList <- mapM extractIdentifier ts
   insEnumEnv name indexList
-  -- `constName` is a proof term that `name` is indeed an enum.
-  -- e.g.) enum.choice : is-enum choice
+  -- `constName` is a proof term that `name` is indeed an enum:
+  --   enum.choice : is-enum choice
   -- example usage:
   --   print: Pi (A : Univ, prf : is-enum A, str : u8-array A). IO top
   -- This proof term is translated into the number of the contents of the corresponding enum type.
@@ -87,12 +90,11 @@ parse' ((_, TreeNode [(_, TreeAtom "constant"), (_, TreeAtom name), t]):as) = do
   modify (\e -> e {constantEnv = name : constantEnv e})
   defList <- parse' as
   return $ DefConstDecl (name, t') : defList
-parse' ((_, TreeNode [(_, TreeAtom "let"), xt, e]):as) = do
+parse' ((m, TreeNode [(_, TreeAtom "let"), xt, e]):as) = do
   e' <- macroExpand e >>= interpret
-  -- このときもsubstEnvを更新する必要がある？letだから不要か。
   (x, t) <- macroExpand xt >>= interpretIdentifierPlus
   defList <- parse' as
-  return $ DefLet emptyMeta (x, t) e' : defList
+  return $ DefLet m (x, t) e' : defList
 parse' (a:as) = do
   e <- macroExpand a
   if isSpecialForm e
@@ -104,6 +106,7 @@ parse' (a:as) = do
       defList <- parse' as
       return $ DefLet meta (name, t) e' : defList
 
+-- {} isSpecialForm {}
 isSpecialForm :: TreePlus -> Bool
 isSpecialForm (_, TreeNode [(_, TreeAtom "notation"), _, _]) = True
 isSpecialForm (_, TreeNode [(_, TreeAtom "keyword"), (_, TreeAtom _)]) = True
@@ -115,6 +118,7 @@ isSpecialForm (_, TreeNode ((_, TreeAtom "statement"):_)) = True
 isSpecialForm (_, TreeNode [(_, TreeAtom "let"), _, _]) = True
 isSpecialForm _ = False
 
+-- {} toIsEnumType {}
 toIsEnumType :: Identifier -> WithEnv QuasiTermPlus
 toIsEnumType name = do
   return
@@ -123,32 +127,36 @@ toIsEnumType name = do
         (emptyMeta, QuasiTermConst "is-enum")
         [(emptyMeta, QuasiTermEnum $ EnumTypeLabel name)])
 
+-- {} concatDefList {}
 -- Represent the list of Defs in the target language, using `let`.
 -- (Note that `let x := e1 in e2` can be represented as `(lam x e2) e1`.)
 concatDefList :: [Def] -> WithEnv QuasiTermPlus
 concatDefList [] = do
   return (emptyMeta, QuasiTermEnumIntro $ EnumValueLabel "unit")
-concatDefList [DefLet _ _ e] -- for test
- = do
+-- for test
+concatDefList [DefLet _ _ e] = do
   return e
 concatDefList (DefConstDecl xt:es) = do
   cont <- concatDefList es
   return (emptyMeta, QuasiTermConstDecl xt cont)
-concatDefList (DefLet meta xt e:es) = do
+concatDefList (DefLet m xt e:es) = do
   cont <- concatDefList es
-  return (meta, QuasiTermPiElim (emptyMeta, QuasiTermPiIntro [xt] cont) [e])
+  return (m, QuasiTermPiElim (emptyMeta, QuasiTermPiIntro [xt] cont) [e])
 
+-- {} newHole {}
 newHole :: WithEnv QuasiTermPlus
 newHole = do
   h <- newNameWith "hole-parse-zeta"
   return (emptyMeta, QuasiTermZeta h)
 
+-- {} checkKeywordSanity {}
 checkKeywordSanity :: Identifier -> WithEnv ()
 checkKeywordSanity "" = throwError "empty string for a keyword"
 checkKeywordSanity x
   | last x == '+' = throwError "A +-suffixed name cannot be a keyword"
 checkKeywordSanity _ = return ()
 
+-- {} insEnumEnv {}
 insEnumEnv :: Identifier -> [Identifier] -> WithEnv ()
 insEnumEnv name enumList =
   modify (\e -> e {enumEnv = (name, enumList) : enumEnv e})
