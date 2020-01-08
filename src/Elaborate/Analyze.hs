@@ -96,35 +96,35 @@ simp' ((e1, e2):cs) = do
     _ -> do
       case (ms1, ms2) of
         (Just (StuckPiElimStrict h1 ies1), _)
-          | onesided h1 fmvs2
-          , xs <- concatMap getVarList ies1
-          , subsume e2 xs
-          , isDisjoint xs -> simpPattern h1 ies1 e1 e2 fmvs2 cs
+          | occurCheck h1 fmvs2
+          , xs1 <- concatMap getVarList ies1
+          , subsume e2 xs1
+          , isDisjoint xs1 -> simpPattern h1 ies1 e1 e2 fmvs2 cs
         (_, Just (StuckPiElimStrict h2 ies2))
-          | onesided h2 fmvs1
-          , xs <- concatMap getVarList ies2
-          , subsume e1 xs
-          , isDisjoint xs -> simpPattern h2 ies2 e2 e1 fmvs1 cs
+          | occurCheck h2 fmvs1
+          , xs2 <- concatMap getVarList ies2
+          , subsume e1 xs2
+          , isDisjoint xs2 -> simpPattern h2 ies2 e2 e1 fmvs1 cs
         (Just (DeltaPiElim h1 mess1), _)
           | Just (_, body) <- lookup h1 sub -> simpDelta body mess1 e1 e2 cs
         (_, Just (DeltaPiElim h2 mess2))
           | Just (_, body) <- lookup h2 sub -> simpDelta body mess2 e2 e1 cs
         (Just (StuckPiElimStrict h1 ies1), _)
-          | onesided h1 fmvs2
-          , xs <- concatMap getVarList ies1
-          , subsume e2 xs -> simpQuasiPattern h1 ies1 e1 e2 fmvs2 cs
+          | occurCheck h1 fmvs2
+          , xs1 <- concatMap getVarList ies1
+          , subsume e2 xs1 -> simpQuasiPattern h1 ies1 e1 e2 fmvs2 cs
         (_, Just (StuckPiElimStrict h2 ies2))
-          | onesided h2 fmvs1
-          , xs <- concatMap getVarList ies2
-          , subsume e1 xs -> simpQuasiPattern h2 ies2 e2 e1 fmvs1 cs
+          | occurCheck h2 fmvs1
+          , xs2 <- concatMap getVarList ies2
+          , subsume e1 xs2 -> simpQuasiPattern h2 ies2 e2 e1 fmvs1 cs
         (Just (StuckPiElim h1 ies1), Nothing)
-          | onesided h1 fmvs2
-          , xs <- concatMap getVarList ies1
-          , subsume e2 xs -> simpFlexRigid h1 ies1 e1 e2 fmvs2 cs
+          | occurCheck h1 fmvs2
+          , xs1 <- concatMap getVarList ies1
+          , subsume e2 xs1 -> simpFlexRigid h1 ies1 e1 e2 fmvs2 cs
         (Nothing, Just (StuckPiElim h2 ies2))
-          | onesided h2 fmvs1
-          , xs <- concatMap getVarList ies2
-          , subsume e1 xs -> simpFlexRigid h2 ies2 e2 e1 fmvs1 cs
+          | occurCheck h2 fmvs1
+          , xs2 <- concatMap getVarList ies2
+          , subsume e1 xs2 -> simpFlexRigid h2 ies2 e2 e1 fmvs1 cs
         (Just (StuckPiElimMu (x1, body1, _) mess1), Just (StuckPiElimMu (x2, body2, _) mess2))
           | x1 == x2
           , mess1 == mess2 -> simp $ (body1, body2) : cs
@@ -280,8 +280,8 @@ stuckReasonOf (StuckPiElimStrict h _) = Just h
 stuckReasonOf (StuckPiElimMu {}) = Nothing
 stuckReasonOf (DeltaPiElim _ _) = Nothing
 
-onesided :: Identifier -> [Identifier] -> Bool
-onesided h fmvs = h `notElem` fmvs
+occurCheck :: Identifier -> [Identifier] -> Bool
+occurCheck h fmvs = h `notElem` fmvs
 
 subsume :: WeakTermPlus -> [Identifier] -> Bool
 subsume e xs = all (`elem` xs) $ varWeakTermPlus e
