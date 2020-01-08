@@ -4,10 +4,11 @@ module Parse.Interpret
   , extractIdentifier
   ) where
 
+import Control.Exception (assert)
 import Control.Monad.Except
 import Control.Monad.State
-import Data.Bits ((.&.), shiftR)
-import Data.Char (ord)
+import Data.Bits ((.&.), (.|.), shiftL, shiftR)
+import Data.Char (chr, ord)
 import Data.List (intercalate)
 import Data.Word (Word8)
 import Text.Read (readMaybe)
@@ -19,8 +20,6 @@ import Data.QuasiTerm
 import Data.Tree
 
 -- {} interpret {}
--- input: any tree
--- output: quasi-term if possible, otherwise throw exception
 interpret :: TreePlus -> WithEnv QuasiTermPlus
 --
 -- foundational interpretations
@@ -134,6 +133,7 @@ interpret t@(m, TreeNode es) =
     then throwError $ "interpret: syntax error:\n" ++ Pr.ppShow t
     else interpret (m, TreeNode ((m, TreeAtom "pi-elimination") : es))
 
+-- {} interpretIdentifierPlus {}
 interpretIdentifierPlus :: TreePlus -> WithEnv IdentifierPlus
 interpretIdentifierPlus (_, TreeAtom x) = do
   h <- newNameWith "hole-plus"
@@ -145,10 +145,12 @@ interpretIdentifierPlus (_, TreeNode [(_, TreeAtom x), t]) = do
 interpretIdentifierPlus ut =
   throwError $ "interpretIdentifierPlus: syntax error:\n" ++ Pr.ppShow ut
 
+-- {} interpretAtom {}
 interpretAtom :: String -> WithEnv String
 interpretAtom "_" = newNameWith "hole-explicit"
 interpretAtom x = return x
 
+-- {} interpretEnumValueMaybe {}
 interpretEnumValueMaybe :: TreePlus -> WithEnv (Maybe EnumValue)
 interpretEnumValueMaybe (_, TreeAtom x)
   | Just (i, j) <- readNatEnumValue x = return $ Just $ EnumValueNatNum i j
@@ -159,6 +161,7 @@ interpretEnumValueMaybe (_, TreeAtom x) = do
     else return Nothing
 interpretEnumValueMaybe _ = return Nothing
 
+-- {} interpretEnumValue {}
 interpretEnumValue :: TreePlus -> WithEnv EnumValue
 interpretEnumValue l = do
   ml' <- interpretEnumValueMaybe l
@@ -166,6 +169,9 @@ interpretEnumValue l = do
     Just l' -> return l'
     Nothing -> throwError $ "interpretEnumValue: syntax error:\n" ++ Pr.ppShow l
 
+-- {} interpretBinder {}
+-- `xts` はatomまたは(atom, tree)であることが想定されているけれど、どうせ、interpretIdentifierPlusは
+-- 任意のtreeを読んで読めなかったらたんに失敗するだけだから問題なし。それゆえ事前条件がemptyになる。
 interpretBinder ::
      [TreePlus] -> TreePlus -> WithEnv ([IdentifierPlus], QuasiTermPlus)
 interpretBinder xts t = do
@@ -173,6 +179,7 @@ interpretBinder xts t = do
   t' <- interpret t
   return (xts', t')
 
+-- {} interpretCase {}
 interpretCase :: TreePlus -> WithEnv Case
 --
 -- foundational
@@ -183,10 +190,9 @@ interpretCase (_, TreeAtom "default") = return CaseDefault
 --
 -- auxiliary
 --
-interpretCase c = do
-  l <- interpretEnumValue c
-  return $ CaseValue l
+interpretCase c = CaseValue <$> interpretEnumValue c
 
+-- {} interpretClause {}
 interpretClause :: TreePlus -> WithEnv (Case, QuasiTermPlus)
 interpretClause (_, TreeNode [c, e]) = do
   c' <- interpretCase c
@@ -195,16 +201,25 @@ interpretClause (_, TreeNode [c, e]) = do
 interpretClause e =
   throwError $ "interpretClause: syntax error:\n " ++ Pr.ppShow e
 
+-- {} asArrayIntro {}
 asArrayIntro :: Case -> WithEnv EnumValue
 asArrayIntro (CaseValue l) = return l
 asArrayIntro CaseDefault = throwError "`default` cannot be used in array-intro"
 
+-- {} extractIdentifier {}
 extractIdentifier :: TreePlus -> WithEnv Identifier
 extractIdentifier (_, TreeAtom s) = return s
 extractIdentifier t =
   throwError $ "interpretAtom: syntax error:\n" ++ Pr.ppShow t
 
-withKindPrefix :: String -> String -> Maybe ArrayKind
+-- {} withKindPrefix {}
+-- 「-」でsplitして、第1要素がarraykindとして妥当で、かつ第2要素以降をconcatしたものがbaseと一致していたら、
+-- arraykindを返す。たとえば"u8-array"と"array"が入力ならu8を、"f64-array-introduction"と"array-introduction"が
+-- 入力ならf64を返す。
+withKindPrefix ::
+     String -- "u8-array", "u16-hoo", "f64-hogehoge"
+  -> String -- "array", "hoo", "hogehoge"
+  -> Maybe ArrayKind
 withKindPrefix str base
   | (t:rest) <- wordsBy '-' str -- e.g. u8-array
   , base == intercalate "-" rest
@@ -212,9 +227,19 @@ withKindPrefix str base
   , Just kind <- asArrayKind t' = Just kind
 withKindPrefix _ _ = Nothing
 
+-- {} isDefinedEnumName {}
+isDefinedEnumName :: Identifier -> WithEnv Bool
+isDefinedEnumName name = do
+  env <- get
+  let enumNameList = map fst $ enumEnv env
+  return $ name `elem` enumNameList
+
+-- {} encodeChar {(the output is valid as utf8 string)}
 -- adopted from https://hackage.haskell.org/package/utf8-string-1.0.1.1/docs/src/Codec-Binary-UTF8-String.html
 encodeChar :: Char -> [Word8]
-encodeChar = map fromIntegral . go . ord
+encodeChar c = do
+  let result = (map fromIntegral . go . ord) c
+  assert (decode result == [c]) result
   where
     go oc
       | oc <= 0x7f = [oc]
@@ -231,12 +256,53 @@ encodeChar = map fromIntegral . go . ord
         , 0x80 + oc .&. 0x3f
         ]
 
+-- {} encode {(the output is valid as utf-8 encoded string)}
 -- adopted from https://hackage.haskell.org/package/utf8-string-1.0.1.1/docs/src/Codec-Binary-UTF8-String.html
 encode :: String -> [Word8]
-encode = concatMap encodeChar
+encode input = do
+  let result = concatMap encodeChar input
+  assert (decode result == input) result
 
-isDefinedEnumName :: Identifier -> WithEnv Bool
-isDefinedEnumName name = do
-  env <- get
-  let enumNameList = map fst $ enumEnv env
-  return $ name `elem` enumNameList
+-- {} replacement_character {}
+-- adopted from https://hackage.haskell.org/package/utf8-string-1.0.1.1/docs/src/Codec-Binary-UTF8-String.html
+replacement_character :: Char
+replacement_character = '\xfffd'
+
+-- {} decode {}
+-- adopted from https://hackage.haskell.org/package/utf8-string-1.0.1.1/docs/src/Codec-Binary-UTF8-String.html
+-- this function is used only for assertion.
+decode :: [Word8] -> String
+decode [] = ""
+decode (c:cs)
+  | c < 0x80 = chr (fromEnum c) : decode cs
+  | c < 0xc0 = replacement_character : decode cs
+  | c < 0xe0 = multi1
+  | c < 0xf0 = multi_byte 2 0xf 0x800
+  | c < 0xf8 = multi_byte 3 0x7 0x10000
+  | c < 0xfc = multi_byte 4 0x3 0x200000
+  | c < 0xfe = multi_byte 5 0x1 0x4000000
+  | otherwise = replacement_character : decode cs
+  where
+    multi1 =
+      case cs of
+        c1:ds
+          | c1 .&. 0xc0 == 0x80 ->
+            let d =
+                  ((fromEnum c .&. 0x1f) `shiftL` 6) .|. fromEnum (c1 .&. 0x3f)
+             in if d >= 0x000080
+                  then toEnum d : decode ds
+                  else replacement_character : decode ds
+        _ -> replacement_character : decode cs
+    multi_byte :: Int -> Word8 -> Int -> [Char]
+    multi_byte i mask overlong = aux i cs (fromEnum (c .&. mask))
+      where
+        aux 0 rs acc
+          | overlong <= acc &&
+              acc <= 0x10ffff &&
+              (acc < 0xd800 || 0xdfff < acc) && (acc < 0xfffe || 0xffff < acc) =
+            chr acc : decode rs
+          | otherwise = replacement_character : decode rs
+        aux n (r:rs) acc
+          | r .&. 0xc0 == 0x80 =
+            aux (n - 1) rs $ shiftL acc 6 .|. fromEnum (r .&. 0x3f)
+        aux _ rs _ = replacement_character : decode rs
