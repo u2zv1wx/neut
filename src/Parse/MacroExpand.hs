@@ -14,26 +14,55 @@ import Data.Tree
 
 type MacroSubst = [(String, TreePlus)]
 
+-- {} macroExpand {(noSplice, noKeyword)}
 -- CBV-like macro expansion
 macroExpand :: TreePlus -> WithEnv TreePlus
-macroExpand t = recurM (macroExpand1 . splice) t
+macroExpand t = do
+  result <- recurM (macroExpand1 . splice) t
+  assertPostPM "macroExpand" result $ noSpliceOrKeyword result
 
+noSpliceOrKeyword :: TreePlus -> WithEnv Bool
+noSpliceOrKeyword t = do
+  let noSplice = hasNoRemSplice t
+  noKeyword <- hasNoRemKeyword t
+  return $ noSplice && noKeyword
+
+hasNoRemSplice :: TreePlus -> Bool
+hasNoRemSplice t = do
+  let xs = atomListOf t
+  "splice" `notElem` xs
+
+hasNoRemKeyword :: TreePlus -> WithEnv Bool
+hasNoRemKeyword t = do
+  let xs = atomListOf t
+  kenv <- gets keywordEnv
+  return $ all (`notElem` xs) kenv
+
+-- {} recurM {}
 recurM :: (Monad m) => (TreePlus -> m TreePlus) -> TreePlus -> m TreePlus
 recurM f (m, TreeAtom s) = f (m, TreeAtom s)
 recurM f (m, TreeNode ts) = do
   ts' <- mapM (recurM f) ts
   f (m, TreeNode ts')
 
+-- {(noSplice)} macroExpand1 {(noSplice, noKeyword)}
 macroExpand1 :: TreePlus -> WithEnv TreePlus
 macroExpand1 t@(i, _) = do
+  assertPreUP "macroExpand1" $ hasNoRemSplice t
   nenv <- gets notationEnv
   mMatch <- try (macroMatch t) nenv
   case mMatch of
-    Just (sub, (_, skel)) -> macroExpand $ applySubst sub (i, skel)
+    Just (sub, (_, skel)) -> do
+      let result = applySubst sub (i, skel)
+      assertPostMM
+        "macroExpand1"
+        (macroExpand result)
+        (noSpliceOrKeyword result)
     Nothing -> return t
 
 type Notation = TreePlus
 
+-- {} macroMatch {}
 macroMatch ::
      TreePlus -- input tree
   -> Notation -- registered notation
