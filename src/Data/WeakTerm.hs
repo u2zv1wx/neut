@@ -32,7 +32,6 @@ data WeakTerm
 
 type WeakTermPlus = (PreMeta, WeakTerm)
 
--- こっちの型は普通にしておくべきでは。
 type SubstWeakTerm = [(Identifier, WeakTermPlus)]
 
 type Hole = Identifier

@@ -18,8 +18,6 @@ import Elaborate.Synthesize
 import Reduce.Term
 import Reduce.WeakTerm
 
-import qualified Data.Map.Strict as Map
-
 -- Given a term `e` and its name `main`, this function
 --   (1) traces `e` using `infer e`, collecting type constraints,
 --   (2) updates weakTypeEnv for `main` by the result of `infer e`,
@@ -38,13 +36,13 @@ elaborate e = do
   assertUP info1 $ null vs
   p "analyze/synthesize"
   gets constraintEnv >>= analyze >>= synthesize
-  p "reduceSubstEnv"
   reduceSubstEnv
   p "elaborate"
   e'' <- elaborate' e'
-  let ws = varTermPlus e''
-  let info2 = toInfo "elaborated term is not closed. freevars:" ws
-  assertMP info2 (reduceTermPlus e'') $ null ws
+  e''' <- reduceTermPlus e''
+  let ws = varTermPlus e'''
+  let info2 = toInfo "elaborated term is not closed:" e'''
+  assertMP info2 (return e''') $ null ws
 
 -- This function translates a well-typed term into an untyped term in a
 -- reduction-preserving way. Here, we translate types into units (nullary product).
@@ -79,22 +77,31 @@ elaborate' (m, WeakTermMu (x, t) e) = do
       e' <- elaborate' e
       return (m', TermMu (x, t') e')
     _ -> throwError "CBV recursion is allowed only for Pi-types"
-elaborate' (_, WeakTermZeta x) = do
-  zenv <- gets zetaEnv
-  case Map.lookup x zenv of
-    Just e -> return e
-    Nothing -> do
-      sub <- gets substEnv
-      case lookup x sub of
-        Nothing -> throwError $ "elaborate' i: remaining hole: " ++ x
-        Just (_, e)
+elaborate' (_, WeakTermZeta x)
+  -- zenv <- gets zetaEnv
+  -- -- dbgsym <- newNameWith "DEBUG"
+  -- case Map.lookup x zenv of
+  --   Just e
+  --     -- p $ "found: " ++ x
+  --    -> do
+  --     return e
+  --   Nothing -> do
+ = do
+  sub <- gets substEnv
+  case lookup x sub of
+    Nothing -> throwError $ "elaborate' i: remaining hole: " ++ x
+    Just (_, e)
           -- p $ "not found: " ++ x
-         -> do
-          e' <- elaborate' e
+          -- p $ "zenv length = " ++ show (Map.size zenv)
+          -- p $ "===start===: " ++ dbgsym
+     -> do
+      e' <- elaborate' e
+          -- p $ "===end===: " ++ dbgsym
           -- このelaborate' eを計算する途中でxが確定したらthrowして計算を打ち切ってその結果を使うとかすればよさそう？
           -- いや、それは変では。x ~> eのとき、eのなかにはxは出現しないんだから。
-          modify (\env -> env {zetaEnv = Map.insert x e' zenv})
-          return e'
+          -- eの処理でふたたびzeta xが出てきたらそれは自明に無限ループとなるはず。
+          -- modify (\env -> env {zetaEnv = Map.insert x e' zenv})
+      return e'
 elaborate' (m, WeakTermConst x) = do
   m' <- toMeta m
   mi <- elaborateIsEnum x
