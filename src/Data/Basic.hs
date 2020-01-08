@@ -307,6 +307,9 @@ assertPreUP msg b = assertUP (msg ++ ".pre") b
 assertPreUM :: (Monad m) => String -> m Bool -> m ()
 assertPreUM msg mb = assertUM (msg ++ ".pre") mb
 
+assertPostP :: String -> a -> Bool -> a
+assertPostP msg x b = assert (trace (msg ++ ".post") b) x
+
 assertPostMM :: (Monad m) => String -> m a -> m Bool -> m a
 assertPostMM msg mx mb = assertMM (msg ++ ".post") mx mb
 

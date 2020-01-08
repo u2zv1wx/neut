@@ -106,11 +106,13 @@ toSpliceTree ts =
   ( emptyMeta
   , TreeNode [(emptyMeta, TreeAtom "splice"), (emptyMeta, TreeNode ts)])
 
+-- {} checkNotation {}
 checkNotation :: Notation -> WithEnv ()
 checkNotation t = do
   checkKeywordCondition t
   checkPlusCondition t
 
+-- {} checkKeywordCondition {}
 checkKeywordCondition :: Notation -> WithEnv ()
 checkKeywordCondition t = do
   kenv <- gets keywordEnv
@@ -118,6 +120,7 @@ checkKeywordCondition t = do
     then return ()
     else throwError "A notation must include at least one keyword"
 
+-- {} checkPlusCondition {}
 checkPlusCondition :: Notation -> WithEnv ()
 checkPlusCondition (_, TreeAtom s) =
   if last s /= '+'
