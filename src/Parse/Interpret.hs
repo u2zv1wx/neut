@@ -4,7 +4,6 @@ module Parse.Interpret
   , extractIdentifier
   ) where
 
-import Control.Exception (assert)
 import Control.Monad.Except
 import Control.Monad.State
 import Data.Bits ((.&.), (.|.), shiftL, shiftR)
@@ -239,7 +238,7 @@ isDefinedEnumName name = do
 encodeChar :: Char -> [Word8]
 encodeChar c = do
   let result = (map fromIntegral . go . ord) c
-  assert (decode result == [c]) result
+  assertP "encodeChar" result (decode result == [c])
   where
     go oc
       | oc <= 0x7f = [oc]
@@ -261,7 +260,7 @@ encodeChar c = do
 encode :: String -> [Word8]
 encode input = do
   let result = concatMap encodeChar input
-  assert (decode result == input) result
+  assertP "encode" result (decode result == input)
 
 -- {} replacement_character {}
 -- adopted from https://hackage.haskell.org/package/utf8-string-1.0.1.1/docs/src/Codec-Binary-UTF8-String.html
