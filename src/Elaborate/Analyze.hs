@@ -81,11 +81,6 @@ simp' (((_, WeakTermArrayIntro k1 les1), (_, WeakTermArrayIntro k2 les2)):cs)
     csArray <- simpCase les1 les2
     csCont <- simp cs
     return $ csArray ++ csCont
-simp' ((e1, e2):cs)
-  | (_, WeakTermPiElim (_, WeakTermConst f) es1) <- e1 -- ここもn-aryのconstのappをとれるようにすべき？
-  , (_, WeakTermPiElim (_, WeakTermConst g) es2) <- e2
-  , f == g
-  , length es1 == length es2 = simp $ zip es1 es2 ++ cs
 simp' ((e1, e2):cs) = do
   let ms1 = asStuckedTerm e1
   let ms2 = asStuckedTerm e2
@@ -97,6 +92,12 @@ simp' ((e1, e2):cs) = do
       let hs1 = holeWeakTermPlus e1
       let hs2 = holeWeakTermPlus e2
       case (ms1, ms2) of
+        (Just (ConstPiElim f1 ess1), Just (ConstPiElim f2 ess2))
+          | f1 == f2
+          , length ess1 == length ess2
+          , es1 <- concat ess1
+          , es2 <- concat ess2
+          , length es1 == length es2 -> simp $ zip es1 es2 ++ cs
         (Just (StuckPiElimMu (x1, body1, _) mess1), Just (StuckPiElimMu (x2, body2, _) mess2))
           | x1 == x2
           , mess1 == mess2 -> simp $ (body1, body2) : cs
@@ -243,6 +244,7 @@ data Stuck
       (Identifier, WeakTermPlus, WeakTermPlus)
       [(PreMeta, [WeakTermPlus])]
   | DeltaPiElim Identifier [(PreMeta, [WeakTermPlus])] -- ここでmetaを保持。
+  | ConstPiElim Identifier [[WeakTermPlus]]
 
 -- {} asStuckedTerm {}
 asStuckedTerm :: WeakTermPlus -> Maybe Stuck
@@ -253,6 +255,8 @@ asStuckedTerm (_, WeakTermPiElim (_, WeakTermZeta h) es) =
   Just $ StuckPiElim h [es]
 asStuckedTerm (m, WeakTermPiElim self@(_, WeakTermMu (x, _) body) es) =
   Just $ StuckPiElimMu (x, body, self) [(m, es)]
+asStuckedTerm (_, WeakTermPiElim (_, WeakTermConst x) es) =
+  Just $ ConstPiElim x [es]
 asStuckedTerm (m, WeakTermPiElim e es)
   | Just _ <- mapM asUpsilon es =
     case asStuckedTerm e of
@@ -261,6 +265,7 @@ asStuckedTerm (m, WeakTermPiElim e es)
         Just $ StuckPiElimStrict h $ iexss ++ [es]
       Just (StuckPiElimMu mu ess) -> Just $ StuckPiElimMu mu $ ess ++ [(m, es)]
       Just (DeltaPiElim x ess) -> Just $ DeltaPiElim x $ ess ++ [(m, es)]
+      Just (ConstPiElim x ess) -> Just $ ConstPiElim x $ ess ++ [es]
       Nothing -> Nothing
 asStuckedTerm (m, WeakTermPiElim e es) =
   case asStuckedTerm e of
@@ -269,6 +274,7 @@ asStuckedTerm (m, WeakTermPiElim e es) =
       Just $ StuckPiElim h $ iess ++ [es]
     Just (StuckPiElimMu mu ess) -> Just $ StuckPiElimMu mu $ ess ++ [(m, es)]
     Just (DeltaPiElim x ess) -> Just $ DeltaPiElim x $ ess ++ [(m, es)]
+    Just (ConstPiElim x ess) -> Just $ ConstPiElim x $ ess ++ [es]
     Nothing -> Nothing
 asStuckedTerm _ = Nothing
 
@@ -278,6 +284,7 @@ stuckReasonOf (StuckPiElim h _) = Just h
 stuckReasonOf (StuckPiElimStrict h _) = Just h
 stuckReasonOf (StuckPiElimMu {}) = Nothing
 stuckReasonOf (DeltaPiElim _ _) = Nothing
+stuckReasonOf (ConstPiElim _ _) = Nothing
 
 -- {} occurCheck {}
 occurCheck :: Identifier -> [Identifier] -> Bool
