@@ -1,7 +1,5 @@
 module Data.Constraint where
 
-import Data.List
-
 import Data.WeakTerm
 
 type PreConstraint = (WeakTermPlus, WeakTermPlus)
@@ -50,7 +48,6 @@ compose s1 s2 = do
   let domS2 = map fst s2
   let codS2 = map snd s2
   let codS2' = map (substIfNecessary s1) codS2
-  -- let codS2' = map (substWeakTermPlus s1) codS2
   let s1' = filter (\(ident, _) -> ident `notElem` domS2) s1
   s1' ++ zip domS2 codS2'
 
@@ -63,5 +60,5 @@ substIfNecessary sub (hs, e)
     let hs' = concatMap (\(_, (foo, _)) -> foo) sub'
     let sub2 = map (\(x, (_, body)) -> (x, body)) sub
     let e' = substWeakTermPlus sub2 e
-    (nub $ hs' ++ filter (`notElem` xs) hs, e')
+    (hs' ++ filter (`notElem` xs) hs, e')
 substIfNecessary _ hse = hse

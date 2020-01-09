@@ -30,14 +30,14 @@ import Reduce.WeakTerm
 elaborate :: QuasiTermPlus -> WithEnv TermPlus
 elaborate e = do
   p "infer"
-  e' <- infer [] e
-  let vs = varWeakTermPlus e'
-  let info1 = toInfo "inferred term is not closed. freevars:" vs
-  assertUP info1 $ null vs
+  e' <- infer e
   p "analyze/synthesize"
   gets constraintEnv >>= analyze >>= synthesize
+  p "done"
   reduceSubstEnv
   p "elaborate"
+  -- this reduceTermPlus is necessary since e' contains "DONT_CARE" in its
+  -- type of arguments of abstractions of meta-variables.
   e'' <- elaborate' e' >>= reduceTermPlus
   let info2 = toInfo "elaborated term is not closed:" e''
   assertMP info2 (return e'') $ null (varTermPlus e'')
@@ -211,10 +211,14 @@ lookupEnumSet name = do
 reduceSubstEnv :: WithEnv ()
 reduceSubstEnv = do
   senv <- gets substEnv
+  -- p' senv
   senv' <- mapM reduceSubstEnv' senv
   modify (\env -> env {substEnv = senv'})
 
-reduceSubstEnv' :: (a, (b, WeakTermPlus)) -> WithEnv (a, (b, WeakTermPlus))
-reduceSubstEnv' (x, (y, e)) = do
+reduceSubstEnv' ::
+     (Identifier, (b, WeakTermPlus)) -> WithEnv (Identifier, (b, WeakTermPlus))
+reduceSubstEnv' (x, (y, e))
+  -- p $ "reducing: " ++ x
+ = do
   e' <- reduceWeakTermPlus e
   return (x, (y, e'))

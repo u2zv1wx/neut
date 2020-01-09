@@ -1,6 +1,7 @@
 module Elaborate.Analyze
   ( analyze
   , toPiElim
+  , linearCheck
   ) where
 
 import Control.Monad.Except

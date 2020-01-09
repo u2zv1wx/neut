@@ -18,6 +18,7 @@ import Reduce.WeakTerm
 
 -- Given a queue of constraints (easier ones comes earlier), try to synthesize
 -- all of them using heuristics.
+-- {} synthesize {}
 synthesize :: ConstraintQueue -> WithEnv ()
 synthesize q = do
   sub <- gets substEnv
@@ -34,6 +35,8 @@ synthesize q = do
     Just (Enriched (e1, e2) _ _ _) ->
       throwError $ "cannot simplify:\n" ++ Pr.ppShow (e1, e2)
 
+-- e1だけがstuckしているとき、e2だけがstuckしているとき、両方がstuckしているときをそれぞれ
+-- 独立したケースとして扱えるようにしたほうがよい（そうすればsubstを減らせる）
 resolveStuck ::
      ConstraintQueue
   -> WeakTermPlus
@@ -42,10 +45,9 @@ resolveStuck ::
   -> WeakTermPlus
   -> WithEnv ()
 resolveStuck q e1 e2 h e = do
-  let fmvs = holeWeakTermPlus e
   let e1' = substWeakTermPlus [(h, e)] e1
   let e2' = substWeakTermPlus [(h, e)] e2
-  q' <- analyze [(e1', e2')] >>= assert "resolveStuck" (h `notElem` fmvs)
+  q' <- analyze [(e1', e2')]
   synthesize $ Q.deleteMin q `Q.union` q'
 
 -- Synthesize `hole @ arg-1 @ ... @ arg-n = e`, where arg-i is a variable.
@@ -59,6 +61,7 @@ resolveStuck q e1 e2 h e = do
 -- If the given pattern is a flex-rigid pattern like ?M @ x @ x @ e1 @ y == e,
 -- this function replaces all the arguments that are not variable by
 -- fresh variables, and try to resolve the new quasi-pattern ?M @ x @ x @ z @ y == e.
+-- {} resolvePiElim {}
 resolvePiElim ::
      ConstraintQueue
   -> Hole
@@ -67,13 +70,14 @@ resolvePiElim ::
   -> WeakTermPlus
   -> WithEnv ()
 resolvePiElim q m fmvs ess e = do
-  lengthInfo <- assert "piElim" (m `notElem` fmvs) $ map length ess
+  let lengthInfo = map length ess
   let es = concat ess
   xss <- toVarList es >>= toAltList
   let xsss = map (takeByCount lengthInfo) xss
   let lamList = map (bindFormalArgs e) xsss
-  chain q $ map (\lam -> resolveHole q m fmvs lam) lamList
+  chain q $ map (resolveHole q m fmvs) lamList
 
+-- {} resolveHole {}
 resolveHole :: ConstraintQueue -> Hole -> [Hole] -> WeakTermPlus -> WithEnv ()
 resolveHole q m fmvs e = do
   senv <- gets substEnv
@@ -85,10 +89,32 @@ resolveHole q m fmvs e = do
   let q1' = Q.mapU asAnalyzable q1
   synthesize $ q1' `Q.union` q2
 
+-- {} asAnalyzable {}
 asAnalyzable :: EnrichedConstraint -> EnrichedConstraint
 asAnalyzable (Enriched cs ms fmvs _) = Enriched cs ms fmvs ConstraintAnalyzable
 
+-- Try the list of alternatives.
+chain :: ConstraintQueue -> [WithEnv a] -> WithEnv a
+chain _ [] = throwError $ "cannot synthesize(chain)."
+chain _ [e] = e
+chain c (e:es) = catchError e $ (const $ chain c es)
+
+bindFormalArgs :: WeakTermPlus -> [[IdentifierPlus]] -> WeakTermPlus
+bindFormalArgs e [] = e
+bindFormalArgs e (xts:xtss) = do
+  let e' = bindFormalArgs e xtss
+  let tPi = (metaTerminal, WeakTermPi xts (typeOf e'))
+  (PreMetaNonTerminal tPi emptyMeta, WeakTermPiIntro xts e')
+
+lookupAny :: [Hole] -> [(Identifier, a)] -> Maybe (Hole, a)
+lookupAny [] _ = Nothing
+lookupAny (h:ks) sub = do
+  case lookup h sub of
+    Just v -> Just (h, v)
+    _ -> lookupAny ks sub
+
 -- [e, x, y, y, e2, e3, z] ~> [p, x, y, y, q, r, z]  (p, q, r: new variables)
+-- {} toVarList {}
 toVarList :: [WeakTermPlus] -> WithEnv [(Identifier, WeakTermPlus)]
 toVarList [] = return []
 toVarList ((_, WeakTermUpsilon x):es) = do
@@ -109,9 +135,15 @@ toVarList (_:es) = do
 --   , [p, x, y, q, z]
 --   ]
 -- (p, q : fresh variables)
+-- {} toAltList {それぞれのlistはlinear list}
 toAltList :: [IdentifierPlus] -> WithEnv [[IdentifierPlus]]
-toAltList xts =
-  mapM (discardInactive xts) $ chooseActive $ toIndexInfo (map fst xts)
+toAltList xts = do
+  result <-
+    mapM (discardInactive xts) $ chooseActive $ toIndexInfo (map fst xts)
+  forM_ (map (map fst) result) $ \xs -> do
+    let info = toInfo "toAltList: linearity is not satisfied:" xs
+    assertUP info $ linearCheck xs
+  return result
 
 -- [x, x, y, z, z] ~> [(x, [0, 1]), (y, [2]), (z, [3, 4])]
 toIndexInfo :: Eq a => [a] -> [(a, [Int])]
@@ -155,26 +187,6 @@ discardInactive xs indexList =
         y <- newNameWith "hole"
         insWeakTypeEnv y t
         return (y, t)
-
--- Try the list of alternatives.
-chain :: ConstraintQueue -> [WithEnv a] -> WithEnv a
-chain _ [] = throwError $ "cannot synthesize(chain)."
-chain _ [e] = e
-chain c (e:es) = catchError e $ (const $ chain c es)
-
-lookupAny :: [Hole] -> [(Identifier, a)] -> Maybe (Hole, a)
-lookupAny [] _ = Nothing
-lookupAny (h:ks) sub = do
-  case lookup h sub of
-    Just v -> Just (h, v)
-    _ -> lookupAny ks sub
-
-bindFormalArgs :: WeakTermPlus -> [[IdentifierPlus]] -> WeakTermPlus
-bindFormalArgs e [] = e
-bindFormalArgs e (xts:xtss) = do
-  let e' = bindFormalArgs e xtss
-  let tPi = (metaTerminal, WeakTermPi xts (typeOf e'))
-  (PreMetaNonTerminal tPi emptyMeta, WeakTermPiIntro xts e')
 
 -- takeByCount [1, 3, 2] [a, b, c, d, e, f, g, h] ~> [[a], [b, c, d], [e, f]]
 takeByCount :: [Int] -> [a] -> [[a]]
