@@ -30,6 +30,9 @@ makeClosure mName xts2 m xts1 e = do
   expName <- newNameWith "exp"
   envExp <- cartesianSigma expName m $ map Right xts2
   (envVarName, envVar) <- newDataUpsilonWith "env"
+  let xts = xts2 ++ xts1
+  let info1 = toInfo "makeClosure: arg of linearize is not closed chain:" xts
+  assertUP info1 $ isClosedChain xts
   e' <- linearize (xts2 ++ xts1) e
   cenv <- gets codeEnv
   name <- nameFromMaybe mName

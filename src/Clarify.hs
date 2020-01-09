@@ -42,9 +42,29 @@ clarify mu@(m, TermMu (f, t) e) = do
   let fvs' = map (toTermUpsilon . fst) fvs
   -- set f as a global variable
   modify (\env -> env {constantEnv = f : constantEnv env})
-  let e' = substTermPlus [(f, (m, TermPiElim (m, TermConst f) fvs'))] e
-  e'' <- clarify e'
-  cls <- makeClosure' (Just f) [] m fvs e''
+  -- let e' = substTermPlus [(f, (m, TermPiElim (m, TermConst f) fvs'))] e
+  -- これ、fをconstとしてるけど、これだとクロージャに名前がついてることになってしまっていておかしい？
+  -- 現在はfっていうconstantとクロージャがbeta-equivalentになっている。
+  -- というか、呼び出しが普通におかしいな、これ。昔マジでこれでfact動いてたの？嘘でしょ？
+  -- どうすれば実装できるかというと、まずf ~> lam ((), x1, ..., xn). e{f := (GLOBAL f) @ (x1, ..., xn)}を対応付ける。
+  -- で、return ((A1, ..., An), (x1, ..., xn), f)を返す（クロージャのように扱えるようにする）。
+  -- というかTermCallClosure Identifier [TermPlus]みたいなのがあればいいだけか。
+  -- TermPiElimConstとかで。
+  -- (mu f ((x1 A1) ... (xn An)) e)とかを基本のmuの形にしてもいいのかもしれないが。こっちなら引数を常に直接適用できるので。
+  -- というか今はどういう挙動になってるんだ？sigmaElimでfのtypeVarのところに関数本体が入って、envVarとlamVarは意味不明な領域を参照して。
+  -- このtypeVarに対してsigmaElimをすることでaffとrelが意味不明な領域を参照して、
+  -- さらにsigmaelimによってこの関数本体がfreeされて、で、「そんなもんfreeできねえぜ」となってエラー。
+  -- これだな。原因見つけたっぽい。バグもいいとこですわ。
+  -- ちなみにこれを発見できるようなassertionってあった？厳しいんじゃない？
+  -- free after freeのときだけじゃなく、sigmaじゃないものをelimしてしまったときにも「freeできねえぜ」の
+  -- エラーが出てくるってのがポイントだなー。
+  e' <- clarify $ substTermPlus [(f, (m, TermPiElim (m, TermConst f) fvs'))] e
+  -- cls = (envType, env, f) となっている。
+  -- f @ (fvs')をclarifyすると、これはけっきょく、
+  -- callClosure @f (fvs)となるはずで、だからまずこの@fに対して
+  -- sigmaElimで分解が試みられることになる。そんなのぶっこわれるにきまってるじゃん？
+  cls <- makeClosure' (Just f) [] m fvs e'
+  -- ここでfvsがコピーされてる？そんなことはない。
   callClosure' m cls fvs'
 clarify (m, TermConst x) = clarifyConst m x
 clarify (_, TermConstDecl (x, t) e) = do

@@ -7,35 +7,49 @@ import Data.Basic
 import Data.Code
 import Data.Env
 
--- e' <- linearize xts eのとき、e'は、eとbeta-equivalentであり、かつ、xtsに含まれる変数の使用がpractically linearであるようなterm.
 -- linearizeの第1引数はeのなかでlinearに使用されるべき自由変数のリスト。closed chainでなければならないことに注意。
+-- [x1, ..., xn] = map fst xtsとする。
+-- {xtsはclosed chain} linearize {resultにおいて、x1, ..., xnはすべてlinearに出現する}
+-- 「出現するならばlinearである」ってしたほうがいいのか？
 linearize :: [(Identifier, CodePlus)] -> CodePlus -> WithEnv CodePlus
-linearize xts (m, CodeSigmaElim yts d e) = do
+linearize xts e = do
+  result <- linearize' xts e
+  let v = (map fst xts, result)
+  let info2 = toInfo "the result of linearize is not linear:" v
+  assertUM info2 $ result `isLinearOn` map fst xts
+  return result
+
+-- e' <- linearize xts eのとき、e'は、eとbeta-equivalentであり、かつ、xtsに含まれる変数の使用がlinearであるようなterm.
+linearize' :: [(Identifier, CodePlus)] -> CodePlus -> WithEnv CodePlus
+linearize' xts (m, CodeSigmaElim yts d e) = do
   let xts' = filter (\(x, _) -> x `elem` varCode e) xts
-  e' <- linearize (xts' ++ yts) e
-  withHeader xts (m, CodeSigmaElim yts d e')
-linearize xts (m, CodeUpElim z e1 e2) = do
+  e' <- linearize (xts' ++ yts) e -- e'はxts' ++ ytsについてlinear
+  withHeader xts (m, CodeSigmaElim yts d e') -- SigmaElimはxtsについてlinear
+linearize' xts (m, CodeUpElim z e1 e2) = do
   let xts2' = filter (\(x, _) -> x `elem` varCode e2) xts
   e2' <- linearize xts2' e2 -- `z` is already linear
   let xts1' = filter (\(x, _) -> x `elem` varCode e1) xts
   e1' <- linearize xts1' e1
   withHeader xts (m, CodeUpElim z e1' e2')
-linearize xts (m, CodeEnumElim d les) = do
+linearize' xts (m, CodeEnumElim d les) = do
   let (ls, es) = unzip les
   -- xts'は、xtsのうちすくなくともひとつのbranchにおいて使われているような変数の集合。
   -- どのbranchでも使用されていない変数はbranchの外側で先にfreeしてしまう。
   let xts' = filter (\(x, _) -> x `elem` concatMap varCode es) xts
   es' <- mapM (linearize xts') es
   withHeader xts (m, CodeEnumElim d $ zip ls es')
-linearize xts e = withHeader xts e -- eのなかにCodePlusが含まれないケース
+linearize' xts e = withHeader xts e -- eのなかにCodePlusが含まれないケース
 
 -- eのなかでxtsがpractically linearになるよう適切にheaderを挿入する。
+-- withHeaderの引数ってclosed chainである必要ある？別にないのか？依存の向きだけあってればいい？
+-- 型のなかに出現する変数の名前は基本そのままで。えーと？
+-- {xtsはclosed chain} withHeader xts e {eの中でmap fst xs = [x1, ..., xn]はすべてlinearに出現する}
 withHeader :: [(Identifier, CodePlus)] -> CodePlus -> WithEnv CodePlus
 withHeader [] e = return e
 withHeader ((x, t):xts) e = do
   e' <- withHeader xts e
-  (ys, e'') <- distinguishCode x e'
-  case ys of
+  (xs, e'') <- distinguishCode x e'
+  case xs of
     [] -> withHeaderAffine x t e''
     [z] -> withHeaderLinear z x e''
     (z1:z2:zs) -> withHeaderRelevant x t z1 z2 zs e''
@@ -46,6 +60,7 @@ withHeader ((x, t):xts) e = do
 --     let (aff, rel) := exp in  -- AffineApp
 --     aff @ x in                --
 --   e
+-- 変数xに型t由来のaffineを適用して破棄する。
 withHeaderAffine :: Identifier -> CodePlus -> CodePlus -> WithEnv CodePlus
 withHeaderAffine x t e = do
   hole <- newNameWith "unit"
@@ -55,6 +70,7 @@ withHeaderAffine x t e = do
 -- withHeaderLinear z x e ~>
 --   bind z := return x in
 --   e
+-- renameするだけ。
 withHeaderLinear :: Identifier -> Identifier -> CodePlus -> WithEnv CodePlus
 withHeaderLinear z x e = do
   let m = emptyMeta
@@ -149,6 +165,7 @@ withHeaderRelevant' t relVar ((x, (x1, x2)):chain) cont = do
         (m, CodePiElimDownElim relVar [varX])
         (m, CodeSigmaElim [(x1, t), (x2, t)] sigVar cont'))
 
+-- {} distinguishData z d {結果のtermにzは出現せず、かつ、renameされた結果がリストに格納されている}
 distinguishData :: Identifier -> DataPlus -> WithEnv ([Identifier], DataPlus)
 distinguishData z d@(ml, DataUpsilon x) =
   if x /= z
@@ -161,6 +178,7 @@ distinguishData z (ml, DataSigmaIntro ds) = do
   return (concat vss, (ml, DataSigmaIntro ds'))
 distinguishData _ d = return ([], d)
 
+-- {} distinguishCode z d {結果のtermにzは出現せず、かつ、renameされた結果がリストに格納されている}
 distinguishCode :: Identifier -> CodePlus -> WithEnv ([Identifier], CodePlus)
 distinguishCode z (ml, CodeTheta theta) = do
   (vs, theta') <- distinguishTheta z theta
@@ -171,6 +189,7 @@ distinguishCode z (ml, CodePiElimDownElim d ds) = do
   return (vs ++ concat vss, (ml, CodePiElimDownElim d' ds'))
 distinguishCode z (ml, CodeSigmaElim xts d e) = do
   (vs1, d') <- distinguishData z d
+  -- type annotationの中の変数をどうするか、という問題がある。
   if z `elem` map fst xts
     then return (vs1, (ml, CodeSigmaElim xts d' e))
     else do
@@ -196,6 +215,7 @@ distinguishCode z (ml, CodeArrayElim k d1 d2) = do
   (vs2, d2') <- distinguishData z d2
   return (vs1 ++ vs2, (ml, CodeArrayElim k d1' d2'))
 
+-- {} distinguishTheta z theta {結果のtermにzは出現せず、かつ、renameされた結果がリストに格納されている}
 distinguishTheta :: Identifier -> Theta -> WithEnv ([Identifier], Theta)
 distinguishTheta z (ThetaUnaryOp op lowType d) = do
   (vs, d') <- distinguishData z d
@@ -207,3 +227,11 @@ distinguishTheta z (ThetaBinaryOp op lowType d1 d2) = do
 distinguishTheta z (ThetaSysCall num ds) = do
   (vss, ds') <- unzip <$> mapM (distinguishData z) ds
   return (concat vss, ThetaSysCall num ds')
+
+isLinearOn :: CodePlus -> [Identifier] -> WithEnv Bool
+isLinearOn _ [] = return True
+isLinearOn e (x:xs) = do
+  (zs, _) <- distinguishCode x e
+  case zs of
+    [_] -> e `isLinearOn` xs
+    _ -> return False

@@ -7,21 +7,22 @@ import Data.Basic
 import Data.Code
 import Data.Env
 import Data.Term
-import Reduce.Code
 
 import qualified Data.Map.Strict as Map
 
 type Context = [(Identifier, TermPlus)]
 
--- toAffineApp ML x e ~>
---   bind f := e in
---   let (aff, rel) := f in
+-- toAffineApp meta x t ~>
+--   bind exp := t in
+--   let (aff, rel) := exp in
 --   aff @ x
+--
+-- {} toAffineApp {}
 toAffineApp :: Meta -> Identifier -> CodePlus -> WithEnv CodePlus
 toAffineApp m x t = do
-  (expVarName, expVar) <- newDataUpsilonWith "exp"
-  (affVarName, affVar) <- newDataUpsilonWith "aff"
-  (relVarName, _) <- newDataUpsilonWith "rel"
+  (expVarName, expVar) <- newDataUpsilonWith "aff-app-exp"
+  (affVarName, affVar) <- newDataUpsilonWith "aff-app-aff"
+  (relVarName, _) <- newDataUpsilonWith "aff-app-rel"
   retImmType <- returnCartesianImmediate
   return
     ( m
@@ -34,10 +35,12 @@ toAffineApp m x t = do
             expVar
             (m, CodePiElimDownElim affVar [toDataUpsilon (x, m)])))
 
--- toRelevantApp ML x e ~>
---   bind f := e in
---   let (aff, rel) := f in
+-- toRelevantApp meta x t ~>
+--   bind exp := t in
+--   let (aff, rel) := exp in
 --   rel @ x
+--
+-- {} toRelevantApp {}
 toRelevantApp :: Meta -> Identifier -> CodePlus -> WithEnv CodePlus
 toRelevantApp m x t = do
   (expVarName, expVar) <- newDataUpsilonWith "rel-app-exp"
@@ -55,20 +58,21 @@ toRelevantApp m x t = do
             expVar
             (m, CodePiElimDownElim relVar [toDataUpsilon (x, m)])))
 
+-- {each x in xes is used linearly in cont} bindLet {each x in xes is used linearly in cont}
 bindLet :: [(Identifier, CodePlus)] -> CodePlus -> CodePlus
 bindLet [] cont = cont
-bindLet ((x, e):xes) cont = do
-  let cont' = bindLet xes cont
-  (fst cont', CodeUpElim x e cont')
+bindLet ((x, e):xes) cont = (fst e, CodeUpElim x e $ bindLet xes cont)
 
 returnUpsilon :: Identifier -> CodePlus
 returnUpsilon x = (emptyMeta, CodeUpIntro (emptyMeta, DataUpsilon x))
 
+-- {} returnCartesianImmediate {v is the aff-rel pair off imm}
 returnCartesianImmediate :: WithEnv CodePlus
 returnCartesianImmediate = do
   v <- cartesianImmediate emptyMeta
   return (emptyMeta, CodeUpIntro v)
 
+-- {} returnCartesianUniv {v is the aff-rel pair of univ}
 returnCartesianUniv :: WithEnv CodePlus
 returnCartesianUniv = do
   v <- cartesianUniv emptyMeta
@@ -263,11 +267,11 @@ local comp = do
 insCodeEnv :: Identifier -> [Identifier] -> CodePlus -> WithEnv ()
 insCodeEnv name args e = do
   args' <- mapM newNameWith args
-  e' <- reduceCodePlus e
-  e'' <- renameCode e'
+  -- e' <- reduceCodePlus e
+  e' <- renameCode e
   -- Since LLVM doesn't allow variable shadowing, we must explicitly
   -- rename variables here.
-  modify (\env -> env {codeEnv = (name, (args', e'')) : codeEnv env})
+  modify (\env -> env {codeEnv = (name, (args', e')) : codeEnv env})
 
 lookupContext :: Identifier -> Context -> WithEnv TermPlus
 lookupContext z ctx = do
@@ -277,3 +281,11 @@ lookupContext z ctx = do
 
 insTypeEnv :: Identifier -> TermPlus -> WithEnv ()
 insTypeEnv i t = modify (\e -> e {typeEnv = Map.insert i t (typeEnv e)})
+
+isClosedChain :: [(Identifier, CodePlus)] -> Bool
+isClosedChain xts = null (isClosedChain' xts)
+
+isClosedChain' :: [(Identifier, CodePlus)] -> [Identifier]
+isClosedChain' [] = []
+isClosedChain' ((x, t):xts) =
+  varCode t ++ (filter ((/=) x) $ isClosedChain' xts)
