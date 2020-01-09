@@ -82,7 +82,7 @@ simp' (((_, WeakTermArrayIntro k1 les1), (_, WeakTermArrayIntro k2 les2)):cs)
     csCont <- simp cs
     return $ csArray ++ csCont
 simp' ((e1, e2):cs)
-  | (_, WeakTermPiElim (_, WeakTermConst f) es1) <- e1
+  | (_, WeakTermPiElim (_, WeakTermConst f) es1) <- e1 -- ここもn-aryのconstのappをとれるようにすべき？
   , (_, WeakTermPiElim (_, WeakTermConst g) es2) <- e2
   , f == g
   , length es1 == length es2 = simp $ zip es1 es2 ++ cs
@@ -97,6 +97,17 @@ simp' ((e1, e2):cs) = do
       let hs1 = holeWeakTermPlus e1
       let hs2 = holeWeakTermPlus e2
       case (ms1, ms2) of
+        (Just (StuckPiElimMu (x1, body1, _) mess1), Just (StuckPiElimMu (x2, body2, _) mess2))
+          | x1 == x2
+          , mess1 == mess2 -> simp $ (body1, body2) : cs
+        (Just (StuckPiElimMu (x1, body1, self1) mess1), _) -> do
+          let self' = substWeakTermPlus [(x1, self1)] body1
+          let e1' = toPiElim self' mess1
+          simp $ (e1', e2) : cs
+        (_, Just (StuckPiElimMu (x2, body2, self2) mess2)) -> do
+          let self' = substWeakTermPlus [(x2, self2)] body2
+          let e2' = toPiElim self' mess2
+          simp $ (e1, e2') : cs
         (Just (StuckPiElimStrict h1 ies1), _)
           | xs1 <- concatMap getVarList ies1
           , occurCheck h1 hs2
@@ -129,17 +140,6 @@ simp' ((e1, e2):cs) = do
           | xs2 <- concatMap getVarList ies2
           , occurCheck h2 hs1
           , includeCheck xs2 e1 -> simpFlexRigid h2 ies2 e2 e1 hs1 cs
-        (Just (StuckPiElimMu (x1, body1, _) mess1), Just (StuckPiElimMu (x2, body2, _) mess2))
-          | x1 == x2
-          , mess1 == mess2 -> simp $ (body1, body2) : cs
-        (Just (StuckPiElimMu (x1, body, self) mess1), _) -> do
-          let self' = substWeakTermPlus [(x1, self)] body
-          let e1' = toPiElim self' mess1
-          simp $ (e1', e2) : cs
-        (_, Just (StuckPiElimMu (x2, body, self) mess2)) -> do
-          let self' = substWeakTermPlus [(x2, self)] body
-          let e2' = toPiElim self' mess2
-          simp $ (e1, e2') : cs
         _ -> simpOther e1 e2 (hs1 ++ hs2) cs
 
 -- {} simpBinder {}
@@ -174,6 +174,7 @@ simpCase les1 les2 = do
     then throwError "cannot simplify (simpCase)"
     else simp $ zip es1 es2
 
+-- {} simpAnalyzable {}
 simpAnalyzable ::
      WeakTermPlus
   -> WeakTermPlus
@@ -210,6 +211,7 @@ simpQuasiPattern h1 ies1 e1 e2 fmvs cs = do
   cs' <- simp cs
   return $ Enriched (e1, e2) [h1] fmvs (ConstraintQuasiPattern h1 ies1 e2) : cs'
 
+-- {} simpFlexRigid {}
 simpFlexRigid ::
      Hole
   -> [[WeakTermPlus]]
@@ -222,6 +224,7 @@ simpFlexRigid h1 ies1 e1 e2 fmvs cs = do
   cs' <- simp cs
   return $ Enriched (e1, e2) [h1] fmvs (ConstraintFlexRigid h1 ies1 e2) : cs'
 
+-- {} simpOther {}
 simpOther ::
      WeakTermPlus
   -> WeakTermPlus
@@ -241,6 +244,7 @@ data Stuck
       [(PreMeta, [WeakTermPlus])]
   | DeltaPiElim Identifier [(PreMeta, [WeakTermPlus])] -- ここでmetaを保持。
 
+-- {} asStuckedTerm {}
 asStuckedTerm :: WeakTermPlus -> Maybe Stuck
 asStuckedTerm (_, WeakTermUpsilon x) = Just $ DeltaPiElim x []
 asStuckedTerm (_, WeakTermPiElim (_, WeakTermZeta h) es)
@@ -268,31 +272,39 @@ asStuckedTerm (m, WeakTermPiElim e es) =
     Nothing -> Nothing
 asStuckedTerm _ = Nothing
 
+-- {} stuckReasonOf {}
 stuckReasonOf :: Stuck -> Maybe Hole
 stuckReasonOf (StuckPiElim h _) = Just h
 stuckReasonOf (StuckPiElimStrict h _) = Just h
 stuckReasonOf (StuckPiElimMu {}) = Nothing
 stuckReasonOf (DeltaPiElim _ _) = Nothing
 
+-- {} occurCheck {}
 occurCheck :: Identifier -> [Identifier] -> Bool
 occurCheck h fmvs = h `notElem` fmvs
 
+-- {} includeCheck {}
 includeCheck :: [Identifier] -> WeakTermPlus -> Bool
 includeCheck xs e = all (`elem` xs) $ varWeakTermPlus e
 
+-- {} linearCheck {}
 linearCheck :: [Identifier] -> Bool
 linearCheck xs = xs == nub xs
 
+-- {} getVarList {}
 getVarList :: [WeakTermPlus] -> [Identifier]
 getVarList xs = catMaybes $ map asUpsilon xs
 
+-- {} toVar {}
 toVar :: Identifier -> WeakTermPlus -> WeakTermPlus
 toVar x t = (PreMetaNonTerminal t emptyMeta, WeakTermUpsilon x)
 
+-- {} asUpsilon {}
 asUpsilon :: WeakTermPlus -> Maybe Identifier
 asUpsilon (_, WeakTermUpsilon x) = Just x
 asUpsilon _ = Nothing
 
+-- {} toPiElim {}
 toPiElim :: WeakTermPlus -> [(PreMeta, [WeakTermPlus])] -> WeakTermPlus
 toPiElim e [] = e
 toPiElim e ((m, es):ess) = toPiElim (m, WeakTermPiElim e es) ess
