@@ -25,12 +25,11 @@ synthesize q = do
     Nothing -> return ()
     Just (Enriched (e1, e2) ms _ _)
       | Just (m, (_, e)) <- lookupAny ms sub -> resolveStuck q e1 e2 m e
-    Just (Enriched _ _ fmvs (ConstraintPattern m ess e)) ->
+    Just (Enriched _ _ fmvs (ConstraintPattern m ess e)) -> do
       resolvePiElim q m fmvs ess e
-    Just (Enriched _ _ _ (ConstraintDelta x ess e)) -> resolveDelta q x ess e
-    Just (Enriched _ _ fmvs (ConstraintQuasiPattern m ess e)) ->
+    Just (Enriched _ _ fmvs (ConstraintQuasiPattern m ess e)) -> do
       resolvePiElim q m fmvs ess e
-    Just (Enriched _ _ fmvs (ConstraintFlexRigid m ess e)) ->
+    Just (Enriched _ _ fmvs (ConstraintFlexRigid m ess e)) -> do
       resolvePiElim q m fmvs ess e
     Just (Enriched (e1, e2) _ _ _) ->
       throwError $ "cannot simplify:\n" ++ Pr.ppShow (e1, e2)
@@ -47,16 +46,6 @@ resolveStuck q e1 e2 h e = do
   let e1' = substWeakTermPlus [(h, e)] e1
   let e2' = substWeakTermPlus [(h, e)] e2
   q' <- analyze [(e1', e2')] >>= assert "resolveStuck" (h `notElem` fmvs)
-  synthesize $ Q.deleteMin q `Q.union` q'
-
-resolveDelta ::
-     ConstraintQueue
-  -> WeakTermPlus
-  -> [(PreMeta, [WeakTermPlus])]
-  -> WeakTermPlus
-  -> WithEnv ()
-resolveDelta q body mess1 e2 = do
-  q' <- analyze [(toPiElim body mess1, e2)]
   synthesize $ Q.deleteMin q `Q.union` q'
 
 -- Synthesize `hole @ arg-1 @ ... @ arg-n = e`, where arg-i is a variable.

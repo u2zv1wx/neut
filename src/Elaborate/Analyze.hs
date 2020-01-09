@@ -17,9 +17,11 @@ import Data.Env
 import Data.WeakTerm
 import Reduce.WeakTerm
 
+-- {} analyze {}
 analyze :: [PreConstraint] -> WithEnv ConstraintQueue
 analyze cs = Q.fromList <$> simp cs
 
+-- {} simp {}
 simp :: [PreConstraint] -> WithEnv [EnrichedConstraint]
 simp [] = return []
 simp ((e1, e2):cs) = do
@@ -29,6 +31,7 @@ simp ((e1, e2):cs) = do
     (Just e1', Just e2') -> simp' $ (e1', e2') : cs
     _ -> throwError $ "cannot simplify [TIMEOUT]:\n" ++ Pr.ppShow (e1, e2)
 
+-- {} simp' {}
 simp' :: [PreConstraint] -> WithEnv [EnrichedConstraint]
 simp' [] = return []
 simp' (((_, e1), (_, e2)):cs)
@@ -78,53 +81,57 @@ simp' (((_, WeakTermArrayIntro k1 les1), (_, WeakTermArrayIntro k2 les2)):cs)
     csArray <- simpCase les1 les2
     csCont <- simp cs
     return $ csArray ++ csCont
+simp' ((e1, e2):cs)
+  | (_, WeakTermPiElim (_, WeakTermConst f) es1) <- e1
+  , (_, WeakTermPiElim (_, WeakTermConst g) es2) <- e2
+  , f == g
+  , length es1 == length es2 = simp $ zip es1 es2 ++ cs
 simp' ((e1, e2):cs) = do
   let ms1 = asStuckedTerm e1
   let ms2 = asStuckedTerm e2
-  let hs = catMaybes [ms1 >>= stuckReasonOf, ms2 >>= stuckReasonOf]
+  let stuckReasonList = catMaybes [ms1 >>= stuckReasonOf, ms2 >>= stuckReasonOf]
   sub <- gets substEnv
-  let fmvs1 = holeWeakTermPlus e1
-  let fmvs2 = holeWeakTermPlus e2
-  let fmvs = fmvs1 ++ fmvs2
-  let isAnalyzable = any (`elem` map fst sub) hs
-  case (isAnalyzable, takeFreeAppArgs e1 e2 sub) of
-    (True, _) -> do
+  if any (`elem` map fst sub) stuckReasonList
+    then do
       cs' <- simp' cs
-      let c = Enriched (e1, e2) hs [] $ ConstraintAnalyzable
+      let c = Enriched (e1, e2) stuckReasonList [] $ ConstraintAnalyzable
       return $ c : cs'
-    (_, Just (es1, es2)) -> simp $ zip es1 es2 ++ cs
-    _ -> do
+    else do
+      let hs1 = holeWeakTermPlus e1
+      let hs2 = holeWeakTermPlus e2
       case (ms1, ms2) of
         (Just (StuckPiElimStrict h1 ies1), _)
-          | occurCheck h1 fmvs2
-          , xs1 <- concatMap getVarList ies1
-          , subsume e2 xs1
-          , isDisjoint xs1 -> simpPattern h1 ies1 e1 e2 fmvs2 cs
+          | xs1 <- concatMap getVarList ies1
+          , occurCheck h1 hs2
+          , includeCheck xs1 e2
+          , linearCheck xs1 -> simpPattern h1 ies1 e1 e2 hs2 cs
         (_, Just (StuckPiElimStrict h2 ies2))
-          | occurCheck h2 fmvs1
-          , xs2 <- concatMap getVarList ies2
-          , subsume e1 xs2
-          , isDisjoint xs2 -> simpPattern h2 ies2 e2 e1 fmvs1 cs
+          | xs2 <- concatMap getVarList ies2
+          , occurCheck h2 hs1
+          , includeCheck xs2 e1
+          , linearCheck xs2 -> simpPattern h2 ies2 e2 e1 hs1 cs
         (Just (DeltaPiElim h1 mess1), _)
-          | Just (_, body) <- lookup h1 sub -> simpDelta body mess1 e1 e2 cs
+          | Just (_, body) <- lookup h1 sub ->
+            simp $ (toPiElim body mess1, e2) : cs
         (_, Just (DeltaPiElim h2 mess2))
-          | Just (_, body) <- lookup h2 sub -> simpDelta body mess2 e2 e1 cs
+          | Just (_, body) <- lookup h2 sub ->
+            simp $ (toPiElim body mess2, e1) : cs
         (Just (StuckPiElimStrict h1 ies1), _)
-          | occurCheck h1 fmvs2
-          , xs1 <- concatMap getVarList ies1
-          , subsume e2 xs1 -> simpQuasiPattern h1 ies1 e1 e2 fmvs2 cs
+          | xs1 <- concatMap getVarList ies1
+          , occurCheck h1 hs2
+          , includeCheck xs1 e2 -> simpQuasiPattern h1 ies1 e1 e2 hs2 cs
         (_, Just (StuckPiElimStrict h2 ies2))
-          | occurCheck h2 fmvs1
-          , xs2 <- concatMap getVarList ies2
-          , subsume e1 xs2 -> simpQuasiPattern h2 ies2 e2 e1 fmvs1 cs
+          | xs2 <- concatMap getVarList ies2
+          , occurCheck h2 hs1
+          , includeCheck xs2 e1 -> simpQuasiPattern h2 ies2 e2 e1 hs1 cs
         (Just (StuckPiElim h1 ies1), Nothing)
-          | occurCheck h1 fmvs2
-          , xs1 <- concatMap getVarList ies1
-          , subsume e2 xs1 -> simpFlexRigid h1 ies1 e1 e2 fmvs2 cs
+          | xs1 <- concatMap getVarList ies1
+          , occurCheck h1 hs2
+          , includeCheck xs1 e2 -> simpFlexRigid h1 ies1 e1 e2 hs2 cs
         (Nothing, Just (StuckPiElim h2 ies2))
-          | occurCheck h2 fmvs1
-          , xs2 <- concatMap getVarList ies2
-          , subsume e1 xs2 -> simpFlexRigid h2 ies2 e2 e1 fmvs1 cs
+          | xs2 <- concatMap getVarList ies2
+          , occurCheck h2 hs1
+          , includeCheck xs2 e1 -> simpFlexRigid h2 ies2 e2 e1 hs1 cs
         (Just (StuckPiElimMu (x1, body1, _) mess1), Just (StuckPiElimMu (x2, body2, _) mess2))
           | x1 == x2
           , mess1 == mess2 -> simp $ (body1, body2) : cs
@@ -136,20 +143,7 @@ simp' ((e1, e2):cs) = do
           let self' = substWeakTermPlus [(x2, self)] body
           let e2' = toPiElim self' mess2
           simp $ (e1, e2') : cs
-        _ -> simpOther e1 e2 fmvs cs
-
-takeFreeAppArgs ::
-     WeakTermPlus
-  -> WeakTermPlus
-  -> [(Identifier, a)]
-  -> Maybe ([WeakTermPlus], [WeakTermPlus])
-takeFreeAppArgs e1 e2 sub
-  | (_, WeakTermPiElim (_, WeakTermConst f) es1) <- e1
-  , (_, WeakTermPiElim (_, WeakTermConst g) es2) <- e2
-  , f == g
-  , f `notElem` map fst sub
-  , length es1 == length es2 = Just (es1, es2)
-takeFreeAppArgs _ _ _ = Nothing
+        _ -> simpOther e1 e2 (hs1 ++ hs2) cs
 
 simpBinder ::
      [(Identifier, WeakTermPlus)]
@@ -178,7 +172,7 @@ simpCase les1 les2 = do
   let (ls1, es1) = unzip les1'
   let (ls2, es2) = unzip les2'
   if ls1 /= ls2
-    then throwError "simpCase"
+    then throwError "cannot simplify (simpCase)"
     else simp $ zip es1 es2
 
 simpPattern ::
@@ -192,17 +186,6 @@ simpPattern ::
 simpPattern h1 ies1 e1 e2 fmvs cs = do
   cs' <- simp cs
   return $ Enriched (e1, e2) [h1] fmvs (ConstraintPattern h1 ies1 e2) : cs'
-
-simpDelta ::
-     WeakTermPlus
-  -> [(PreMeta, [WeakTermPlus])]
-  -> WeakTermPlus
-  -> WeakTermPlus
-  -> [(WeakTermPlus, WeakTermPlus)]
-  -> WithEnv [EnrichedConstraint]
-simpDelta body mes1 e1 e2 cs = do
-  cs' <- simp cs
-  return $ Enriched (e1, e2) [] [] (ConstraintDelta body mes1 e2) : cs'
 
 simpQuasiPattern ::
      Identifier
@@ -283,11 +266,11 @@ stuckReasonOf (DeltaPiElim _ _) = Nothing
 occurCheck :: Identifier -> [Identifier] -> Bool
 occurCheck h fmvs = h `notElem` fmvs
 
-subsume :: WeakTermPlus -> [Identifier] -> Bool
-subsume e xs = all (`elem` xs) $ varWeakTermPlus e
+includeCheck :: [Identifier] -> WeakTermPlus -> Bool
+includeCheck xs e = all (`elem` xs) $ varWeakTermPlus e
 
-isDisjoint :: [Identifier] -> Bool
-isDisjoint xs = xs == nub xs
+linearCheck :: [Identifier] -> Bool
+linearCheck xs = xs == nub xs
 
 getVarList :: [WeakTermPlus] -> [Identifier]
 getVarList xs = catMaybes $ map asUpsilon xs
