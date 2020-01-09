@@ -32,6 +32,7 @@ elaborate e = do
   p "infer"
   e' <- infer e
   p "analyze/synthesize"
+  -- Kantian type-inference ;)
   gets constraintEnv >>= analyze >>= synthesize
   p "done"
   reduceSubstEnv
