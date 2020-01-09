@@ -92,10 +92,7 @@ simp' ((e1, e2):cs) = do
   let stuckReasonList = catMaybes [ms1 >>= stuckReasonOf, ms2 >>= stuckReasonOf]
   sub <- gets substEnv
   if any (`elem` map fst sub) stuckReasonList
-    then do
-      cs' <- simp' cs
-      let c = Enriched (e1, e2) stuckReasonList [] $ ConstraintAnalyzable
-      return $ c : cs'
+    then simpAnalyzable e1 e2 stuckReasonList cs
     else do
       let hs1 = holeWeakTermPlus e1
       let hs2 = holeWeakTermPlus e2
@@ -145,6 +142,7 @@ simp' ((e1, e2):cs) = do
           simp $ (e1, e2') : cs
         _ -> simpOther e1 e2 (hs1 ++ hs2) cs
 
+-- {} simpBinder {}
 simpBinder ::
      [(Identifier, WeakTermPlus)]
   -> WeakTermPlus
@@ -161,6 +159,7 @@ simpBinder ((x1, t1):xts1) cod1 ((x2, t2):xts2) cod2 cs = do
   return $ cst ++ cs'
 simpBinder _ _ _ _ _ = throwError "cannot simplify (simpBinder)"
 
+-- {} simpCase {}
 simpCase ::
      (Ord a)
   => [(a, WeakTermPlus)]
@@ -175,25 +174,37 @@ simpCase les1 les2 = do
     then throwError "cannot simplify (simpCase)"
     else simp $ zip es1 es2
 
+simpAnalyzable ::
+     WeakTermPlus
+  -> WeakTermPlus
+  -> [Identifier]
+  -> [PreConstraint]
+  -> WithEnv [EnrichedConstraint]
+simpAnalyzable e1 e2 hs cs = do
+  cs' <- simp' cs
+  return $ (Enriched (e1, e2) hs [] $ ConstraintAnalyzable) : cs'
+
+-- {} simpPattern {}
 simpPattern ::
      Identifier
   -> [[WeakTermPlus]]
   -> WeakTermPlus
   -> WeakTermPlus
   -> [Identifier]
-  -> [(WeakTermPlus, WeakTermPlus)]
+  -> [PreConstraint]
   -> WithEnv [EnrichedConstraint]
 simpPattern h1 ies1 e1 e2 fmvs cs = do
   cs' <- simp cs
   return $ Enriched (e1, e2) [h1] fmvs (ConstraintPattern h1 ies1 e2) : cs'
 
+-- {} simpQuasiPattern {}
 simpQuasiPattern ::
      Identifier
   -> [[WeakTermPlus]]
   -> WeakTermPlus
   -> WeakTermPlus
   -> [Identifier]
-  -> [(WeakTermPlus, WeakTermPlus)]
+  -> [PreConstraint]
   -> WithEnv [EnrichedConstraint]
 simpQuasiPattern h1 ies1 e1 e2 fmvs cs = do
   cs' <- simp cs
