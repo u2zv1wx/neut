@@ -37,6 +37,7 @@ synthesize q = do
 
 -- e1だけがstuckしているとき、e2だけがstuckしているとき、両方がstuckしているときをそれぞれ
 -- 独立したケースとして扱えるようにしたほうがよい（そうすればsubstを減らせる）
+-- つまり、e1とe2のstuck reasonをそれぞれ別々に保持したほうがよい。
 resolveStuck ::
      ConstraintQueue
   -> WeakTermPlus
