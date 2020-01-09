@@ -242,10 +242,11 @@ substWeakTermPlusBindingsWithBody sub ((x, t):xts) e = do
   ((x, t') : xts', e')
 
 substPreMeta :: SubstWeakTerm -> PreMeta -> PreMeta
-substPreMeta _ m@(PreMetaTerminal _) = m
-substPreMeta sub (PreMetaNonTerminal t ml) =
-  PreMetaNonTerminal (substWeakTermPlus sub t) ml
+substPreMeta _ m = m
 
+-- substPreMeta _ m@(PreMetaTerminal _) = m
+-- substPreMeta sub (PreMetaNonTerminal t ml) =
+--   PreMetaNonTerminal (substWeakTermPlus sub t) ml
 typeOf :: WeakTermPlus -> WeakTermPlus
 typeOf (m, _) = typeOf' m
 
