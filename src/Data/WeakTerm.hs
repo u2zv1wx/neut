@@ -11,7 +11,7 @@ data WeakTerm
   | WeakTermPi [IdentifierPlus] WeakTermPlus
   | WeakTermPiIntro [IdentifierPlus] WeakTermPlus
   | WeakTermPiElim WeakTermPlus [WeakTermPlus]
-  | WeakTermMu IdentifierPlus WeakTermPlus
+  | WeakTermIter IdentifierPlus [IdentifierPlus] WeakTermPlus -- CBN recursion ~ CBV iteration
   | WeakTermZeta Identifier
   | WeakTermConst Identifier
   | WeakTermConstDecl IdentifierPlus WeakTermPlus
@@ -59,8 +59,8 @@ varWeakTermPlus (m, WeakTermPiElim e es) = do
   let xhs = varWeakTermPlus e
   let yhs = concatMap varWeakTermPlus es
   varPreMeta m ++ xhs ++ yhs
-varWeakTermPlus (m, WeakTermMu ut e) = do
-  varPreMeta m ++ varWeakTermPlusBindings [ut] [e]
+varWeakTermPlus (m, WeakTermIter xt xts e) = do
+  varPreMeta m ++ varWeakTermPlusBindings (xt : xts) [e]
 varWeakTermPlus (m, WeakTermConst _) = varPreMeta m
 varWeakTermPlus (m, WeakTermConstDecl xt e) =
   varPreMeta m ++ varWeakTermPlusBindings [xt] [e]
@@ -107,8 +107,8 @@ holeWeakTermPlus (m, WeakTermPiIntro xts e) =
   holePreMeta m ++ holeWeakTermPlusBindings xts [e]
 holeWeakTermPlus (m, WeakTermPiElim e es) =
   holePreMeta m ++ holeWeakTermPlus e ++ concatMap holeWeakTermPlus es
-holeWeakTermPlus (m, WeakTermMu ut e) =
-  holePreMeta m ++ holeWeakTermPlusBindings [ut] [e]
+holeWeakTermPlus (m, WeakTermIter xt xts e) =
+  holePreMeta m ++ holeWeakTermPlusBindings (xt : xts) [e]
 holeWeakTermPlus (m, WeakTermZeta h) = h : holePreMeta m
 holeWeakTermPlus (m, WeakTermConst _) = holePreMeta m
 holeWeakTermPlus (m, WeakTermConstDecl xt e) =
@@ -163,11 +163,12 @@ substWeakTermPlus sub (m, WeakTermPiElim e es) = do
   let e' = substWeakTermPlus sub e
   let es' = map (substWeakTermPlus sub) es
   (m', WeakTermPiElim e' es')
-substWeakTermPlus sub (m, WeakTermMu (x, t) e) = do
+substWeakTermPlus sub (m, WeakTermIter (x, t) xts e) = do
   let m' = substPreMeta sub m
   let t' = substWeakTermPlus sub t
-  let e' = substWeakTermPlus (filter (\(k, _) -> k /= x) sub) e
-  (m', WeakTermMu (x, t') e')
+  let sub' = filter (\(k, _) -> k /= x) sub
+  let (xts', e') = substWeakTermPlusBindingsWithBody sub' xts e
+  (m', WeakTermIter (x, t') xts' e')
 substWeakTermPlus sub (m, WeakTermConst x) = do
   let m' = substPreMeta sub m
   (m', WeakTermConst x)
