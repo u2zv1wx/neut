@@ -11,7 +11,7 @@ data Term
   | TermPi [IdentifierPlus] TermPlus
   | TermPiIntro [IdentifierPlus] TermPlus
   | TermPiElim TermPlus [TermPlus]
-  | TermMu IdentifierPlus TermPlus
+  | TermIter IdentifierPlus [IdentifierPlus] TermPlus
   | TermConst Identifier
   | TermConstDecl IdentifierPlus TermPlus
   | TermIntS IntSize Integer
@@ -48,7 +48,8 @@ varTermPlus (_, TermPiElim e es) = do
   let xs1 = varTermPlus e
   let xs2 = concatMap varTermPlus es
   xs1 ++ xs2
-varTermPlus (_, TermMu xt e) = varTermPlus' [xt] [e]
+varTermPlus (_, TermIter (x, t) xts e) =
+  varTermPlus t ++ filter (/= x) (varTermPlus' xts [e])
 varTermPlus (_, TermConst _) = []
 varTermPlus (_, TermConstDecl xt e) = varTermPlus' [xt] [e]
 varTermPlus (_, TermIntS _ _) = []
@@ -93,10 +94,11 @@ substTermPlus sub (m, TermPiElim e es) = do
   let e' = substTermPlus sub e
   let es' = map (substTermPlus sub) es
   (m, TermPiElim e' es')
-substTermPlus sub (m, TermMu (x, t) e) = do
+substTermPlus sub (m, TermIter (x, t) xts e) = do
   let t' = substTermPlus sub t
-  let e' = substTermPlus (filter (\(k, _) -> k /= x) sub) e
-  (m, TermMu (x, t') e')
+  let sub' = filter (\(k, _) -> k /= x) sub
+  let (xts', e') = substTermPlusBindingsWithBody sub' xts e
+  (m, TermIter (x, t') xts' e')
 substTermPlus _ (m, TermConst x) = do
   (m, TermConst x)
 substTermPlus sub (m, TermConstDecl (x, t) e) = do
@@ -140,6 +142,7 @@ isValue (_, TermTau) = True
 isValue (_, TermUpsilon _) = True
 isValue (_, TermPi {}) = True
 isValue (_, TermPiIntro {}) = True
+isValue (_, TermIter {}) = True
 isValue (_, TermIntS _ _) = True
 isValue (_, TermIntU _ _) = True
 isValue (_, TermFloat16 _) = True
