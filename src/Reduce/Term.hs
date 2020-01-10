@@ -39,12 +39,12 @@ reduceTermPlus (m, TermPiElim e es) = do
     --     reduceTermPlus (m, TermPiElim body es')
     (_, TermConst constant) -> reduceTermPlusTheta (m, app) es' m constant
     _ -> return (m, app)
-reduceTermPlus (m, TermMu (x, t) e)
-  | x `notElem` varTermPlus e = do reduceTermPlus e
-  | otherwise = do
-    t' <- reduceTermPlus t
-    e' <- reduceTermPlus e
-    return $ (m, TermMu (x, t') e')
+reduceTermPlus (m, TermIter (x, t) xts e) = do
+  t' <- reduceTermPlus t
+  let (xs, ts) = unzip xts
+  ts' <- mapM reduceTermPlus ts
+  e' <- reduceTermPlus e
+  return $ (m, TermIter (x, t') (zip xs ts') e')
 reduceTermPlus (m, TermConstDecl (x, t) e) = do
   t' <- reduceTermPlus t
   e' <- reduceTermPlus e
