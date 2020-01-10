@@ -22,21 +22,18 @@ rename' (m, QuasiTermUpsilon x) = do
   x' <- lookupNameEnv x
   return (m, QuasiTermUpsilon x')
 rename' (m, QuasiTermPi xts t) = do
-  (xts', t') <- renameBinderWithBody xts t
+  (xts', t') <- renameBinder xts t
   return (m, QuasiTermPi xts' t')
 rename' (m, QuasiTermPiIntro xts e) = do
-  (xts', e') <- renameBinderWithBody xts e
+  (xts', e') <- renameBinder xts e
   return (m, QuasiTermPiIntro xts' e')
 rename' (m, QuasiTermPiElim e es) = do
   e' <- rename' e
   es' <- mapM rename' es
   return (m, QuasiTermPiElim e' es')
-rename' (m, QuasiTermIter (x, t) xts e) = do
-  t' <- rename' t
-  local $ do
-    x' <- newNameWith x
-    (xts', e') <- renameBinderWithBody xts e
-    return (m, QuasiTermIter (x', t') xts' e')
+rename' (m, QuasiTermIter xt xts e) = do
+  (xt', xts', e') <- renameIter xt xts e
+  return (m, QuasiTermIter xt' xts' e')
 rename' (m, QuasiTermConst x) = return (m, QuasiTermConst x)
 rename' (m, QuasiTermConstDecl (x, t) e) = do
   t' <- rename' t
@@ -70,19 +67,37 @@ rename' (m, QuasiTermArrayElim kind e1 e2) = do
   e2' <- rename' e2
   return (m, QuasiTermArrayElim kind e1' e2')
 
-renameBinderWithBody ::
+renameBinder ::
      [IdentifierPlus]
   -> QuasiTermPlus
   -> WithEnv ([IdentifierPlus], QuasiTermPlus)
-renameBinderWithBody [] e = do
+renameBinder [] e = do
   e' <- rename' e
   return ([], e')
-renameBinderWithBody ((x, t):xts) e = do
+renameBinder ((x, t):xts) e = do
   t' <- rename' t
   local $ do
     x' <- newNameWith x
-    (xts', e') <- renameBinderWithBody xts e
+    (xts', e') <- renameBinder xts e
     return ((x', t') : xts', e')
+
+renameIter ::
+     IdentifierPlus
+  -> [IdentifierPlus]
+  -> QuasiTermPlus
+  -> WithEnv (IdentifierPlus, [IdentifierPlus], QuasiTermPlus)
+renameIter (x, t) [] e = do
+  t' <- rename' t
+  local $ do
+    x' <- newNameWith x
+    e' <- rename' e
+    return ((x', t'), [], e')
+renameIter xt ((x, t):xts) e = do
+  t' <- rename' t
+  local $ do
+    x' <- newNameWith x
+    (xt', xts', e') <- renameIter xt xts e
+    return (xt', (x', t') : xts', e')
 
 renameCaseList :: [(Case, QuasiTermPlus)] -> WithEnv [(Case, QuasiTermPlus)]
 renameCaseList caseList =
