@@ -68,14 +68,12 @@ elaborate' (m, WeakTermPiElim e es) = do
   e' <- elaborate' e
   es' <- mapM elaborate' es
   return (m', TermPiElim e' es')
-elaborate' (m, WeakTermMu (x, t) e) = do
-  t' <- elaborate' t >>= reduceTermPlus
-  case t' of
-    (_, TermPi _ _) -> do
-      m' <- toMeta m
-      e' <- elaborate' e
-      return (m', TermMu (x, t') e')
-    _ -> throwError "CBV recursion is allowed only for Pi-types"
+elaborate' (m, WeakTermIter (x, t) xts e) = do
+  m' <- toMeta m
+  t' <- elaborate' t
+  xts' <- mapM elaboratePlus xts
+  e' <- elaborate' e
+  return (m', TermIter (x, t') xts' e')
 elaborate' (_, WeakTermZeta x) = do
   sub <- gets substEnv
   case lookup x sub of
