@@ -93,14 +93,19 @@ infer' ctx (m, QuasiTermPiElim e es) = do
   -- the context of the constant.
   e' <- infer' ctx e
   inferPiElim ctx m e' es'
-infer' ctx (m, QuasiTermMu (x, t) e) = do
+infer' ctx (m, QuasiTermIter (x, t) xts e) = do
   t' <- inferType ctx t
   insWeakTypeEnv x t'
   -- Note that we cannot extend context with x. The type of e cannot be dependent on `x`.
   -- Otherwise the type of `mu x. e` might have `x` as free variable, which is unsound.
-  e' <- infer' ctx e
-  insConstraintEnv t' (typeOf e')
-  retWeakTerm t' m $ WeakTermMu (x, t') e'
+  (xts', e') <- inferPiIntro ctx xts e
+  let piType = (metaTerminal, WeakTermPi xts' (typeOf e'))
+  -- retWeakTerm piType m $ WeakTermPiIntro xts' e'
+  -- e' <- infer' ctx e
+  insConstraintEnv t' piType
+  -- insConstraintEnv t' (typeOf e')
+  retWeakTerm piType m $ WeakTermIter (x, t') xts' e'
+  -- retWeakTerm t' m $ WeakTermIter (x, t') e'
 infer' ctx (m, QuasiTermZeta _) = do
   h <- newHoleInCtx ctx m
   return h
