@@ -16,6 +16,7 @@ import Data.Basic
 import Data.Code
 import Data.Env
 import Data.Term
+import Reduce.Code
 import Reduce.Term
 
 import qualified Text.Show.Pretty as Pr
@@ -31,41 +32,15 @@ clarify lam@(m, TermPiIntro xts e) = do
   forM_ xts $ uncurry insTypeEnv
   e' <- clarify e
   fvs <- chainTermPlus lam
-  -- p "make one-time closure"
-  makeClosure' Nothing fvs m xts e'
+  retClosure Nothing fvs m xts e'
 clarify (m, TermPiElim e es) = do
   e' <- clarify e
   callClosure' m e' es
-clarify mu@(m, TermMu (f, t) e) = do
-  insTypeEnv f t
-  fvs <- chainTermPlus mu
-  let fvs' = map (toTermUpsilon . fst) fvs
-  -- set f as a global variable
-  modify (\env -> env {constantEnv = f : constantEnv env})
-  -- let e' = substTermPlus [(f, (m, TermPiElim (m, TermConst f) fvs'))] e
-  -- これ、fをconstとしてるけど、これだとクロージャに名前がついてることになってしまっていておかしい？
-  -- 現在はfっていうconstantとクロージャがbeta-equivalentになっている。
-  -- というか、呼び出しが普通におかしいな、これ。昔マジでこれでfact動いてたの？嘘でしょ？
-  -- どうすれば実装できるかというと、まずf ~> lam ((), x1, ..., xn). e{f := (GLOBAL f) @ (x1, ..., xn)}を対応付ける。
-  -- で、return ((A1, ..., An), (x1, ..., xn), f)を返す（クロージャのように扱えるようにする）。
-  -- というかTermCallClosure Identifier [TermPlus]みたいなのがあればいいだけか。
-  -- TermPiElimConstとかで。
-  -- (mu f ((x1 A1) ... (xn An)) e)とかを基本のmuの形にしてもいいのかもしれないが。こっちなら引数を常に直接適用できるので。
-  -- というか今はどういう挙動になってるんだ？sigmaElimでfのtypeVarのところに関数本体が入って、envVarとlamVarは意味不明な領域を参照して。
-  -- このtypeVarに対してsigmaElimをすることでaffとrelが意味不明な領域を参照して、
-  -- さらにsigmaelimによってこの関数本体がfreeされて、で、「そんなもんfreeできねえぜ」となってエラー。
-  -- これだな。原因見つけたっぽい。バグもいいとこですわ。
-  -- ちなみにこれを発見できるようなassertionってあった？厳しいんじゃない？
-  -- free after freeのときだけじゃなく、sigmaじゃないものをelimしてしまったときにも「freeできねえぜ」の
-  -- エラーが出てくるってのがポイントだなー。
-  e' <- clarify $ substTermPlus [(f, (m, TermPiElim (m, TermConst f) fvs'))] e
-  -- cls = (envType, env, f) となっている。
-  -- f @ (fvs')をclarifyすると、これはけっきょく、
-  -- callClosure @f (fvs)となるはずで、だからまずこの@fに対して
-  -- sigmaElimで分解が試みられることになる。そんなのぶっこわれるにきまってるじゃん？
-  cls <- makeClosure' (Just f) [] m fvs e'
-  -- ここでfvsがコピーされてる？そんなことはない。
-  callClosure' m cls fvs'
+clarify iter@(m, TermIter (x, t) xts e) = do
+  forM_ ((x, t) : xts) $ uncurry insTypeEnv
+  e' <- clarify e
+  fvs <- chainTermPlus iter
+  retClosure' x fvs m xts e'
 clarify (m, TermConst x) = clarifyConst m x
 clarify (_, TermConstDecl (x, t) e) = do
   _ <- clarify t
@@ -173,7 +148,7 @@ clarifyUnaryOp name op lowType m = do
       let varX = toDataUpsilon (x, emptyMeta)
       zts <- complementaryChainOf xts
       -- p "one-time closure (unary)"
-      makeClosure'
+      retClosure
         (Just name)
         zts
         m
@@ -191,7 +166,7 @@ clarifyBinaryOp name op lowType m = do
       let varY = toDataUpsilon (y, emptyMeta)
       zts <- complementaryChainOf xts
       -- p "one-time closure (binary)"
-      makeClosure'
+      retClosure
         (Just name)
         zts
         m
@@ -212,7 +187,7 @@ clarifyIsEnum m = do
       retImmType <- returnCartesianImmediate
       zts <- complementaryChainOf xts
       -- p "one-time closure (is-enum)"
-      makeClosure'
+      retClosure
         (Just "is-enum")
         zts
         m
@@ -267,7 +242,7 @@ clarifySysCall name sysCall argLen argIdxList m = do
                       ]
                       (ys !! 1)
                       (m, CodeTheta (ThetaSysCall sysCall ys')))
-            makeClosure' (Just name) zts m xts body
+            retClosure (Just name) zts m xts body
     _ -> throwError $ "the type of " ++ name ++ " is wrong"
 
 complementaryChainOf ::
@@ -298,13 +273,37 @@ clarifyBinder ((x, t):xts) = do
   bar <- clarifyBinder xts
   return $ (x, t') : bar
 
-makeClosure' ::
+retClosure ::
      Maybe Identifier -- the name of newly created closure
   -> [(Identifier, TermPlus)] -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
   -> Meta -- meta of lambda
   -> [(Identifier, TermPlus)] -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
   -> CodePlus -- the `e` in `lam (x1, ..., xn). e`
   -> WithEnv CodePlus
+retClosure mName fvs m xts e = do
+  cls <- makeClosure' mName fvs m xts e
+  return (m, CodeUpIntro cls)
+
+retClosure' ::
+     Identifier -- the name of newly created closure
+  -> [(Identifier, TermPlus)] -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
+  -> Meta -- meta of lambda
+  -> [(Identifier, TermPlus)] -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
+  -> CodePlus -- the `e` in `lam (x1, ..., xn). e`
+  -> WithEnv CodePlus
+retClosure' x fvs m xts e = do
+  modify (\env -> env {nameEnv = (x, x) : nameEnv env})
+  cls <- makeClosure' (Just x) fvs m xts e
+  knot x cls
+  return (m, CodeUpIntro cls)
+
+makeClosure' ::
+     Maybe Identifier -- the name of newly created closure
+  -> [(Identifier, TermPlus)] -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
+  -> Meta -- meta of lambda
+  -> [(Identifier, TermPlus)] -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
+  -> CodePlus -- the `e` in `lam (x1, ..., xn). e`
+  -> WithEnv DataPlus
 makeClosure' mName fvs m xts e = do
   fvs' <- clarifyBinder fvs
   xts' <- clarifyBinder xts
@@ -314,6 +313,39 @@ callClosure' :: Meta -> CodePlus -> [TermPlus] -> WithEnv CodePlus
 callClosure' m e es = do
   tmp <- mapM (clarifyPlus) es
   callClosure m e tmp
+
+knot :: Identifier -> DataPlus -> WithEnv ()
+knot z cls = do
+  cenv <- gets codeEnv
+  case pop z cenv of
+    Nothing -> throwError "knot (compiler error)"
+    Just ((args, body), cenv') -> do
+      let body' = substCodePlus [(z, cls)] body
+      let cenv'' = (z, (args, body')) : cenv'
+      body'' <- reduceCodePlus body'
+      p "z:"
+      p' z
+      p "args:"
+      p' args
+      p "subst:"
+      p' (z, cls)
+      -- p "body(before):"
+      -- p' body
+      -- p "body(after):"
+      -- p' body'
+      p "body(reduced):"
+      p' body''
+      -- modify (\env -> env {codeEnv = cenv''})
+      modify (\env -> env {codeEnv = cenv''})
+
+-- lookup and remove the matching element from the given assoc list
+pop :: (Eq a) => a -> [(a, b)] -> Maybe (b, [(a, b)])
+pop _ [] = Nothing
+pop x ((y, v):ys)
+  | x == y = return (v, ys)
+  | otherwise = do
+    (w, zs) <- pop x ys
+    return (w, (y, v) : zs)
 
 asSysCallMaybe :: Identifier -> Maybe (SysCall, ArgLen, UsedArgIndexList)
 asSysCallMaybe "write" = Just (SysCallWrite, 4, [1, 2, 3])

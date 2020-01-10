@@ -21,10 +21,6 @@
 
 (notation case enum-elimination)
 
-(keyword fix)
-
-(notation fix mu)
-
 ;; sequential execution
 (keyword pi-i)
 
@@ -48,11 +44,11 @@
 (notation (begin (let x e+) rest+)
   (pi-e (pi-i ((x _)) (begin rest+)) (begin e+)))
 
-(notation (begin (definition x e) rest+)
-  (pi-e (pi-i ((x _)) (begin rest+)) (mu x e)))
+;; (notation (begin (definition x e) rest+)
+;;   (pi-e (pi-i ((x _)) (begin rest+)) (mu x e)))
 
-(notation (begin (definition name (x+) e+) rest+)
-  (pi-e (pi-i ((name _)) (begin rest+)) (mu name (pi-i (x+) (begin e+)))))
+;; (notation (begin (definition name (x+) e+) rest+)
+;;   (pi-e (pi-i ((name _)) (begin rest+)) (mu name (pi-i (x+) (begin e+)))))
 
 ;; lambda: pi-introduction with implicit begin block
 (keyword lambda)
@@ -73,8 +69,11 @@
 (notation (definition name () e+)
   (let name (mu name (lambda () e+))))
 
+(notation (definition name () e+)
+  (let name (iterate name () e+)))
+
 (notation (definition name (x+) e+)
-  (let name (mu name (lambda (x+) e+))))
+  (let name (iterate name (x+) e+)))
 
 ;; type ascription
 ;; (ascribe e t) ~> (let (_ t) e)

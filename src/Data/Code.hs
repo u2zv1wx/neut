@@ -51,7 +51,7 @@ toDataUpsilon (x, m) = (m, DataUpsilon x)
 toDataUpsilon' :: Identifier -> DataPlus
 toDataUpsilon' x = (emptyMeta, DataUpsilon x)
 
-type SubstDataPlus = [IdentifierPlus]
+type SubstDataPlus = [(Identifier, DataPlus)]
 
 substDataPlus :: SubstDataPlus -> DataPlus -> DataPlus
 substDataPlus _ (m, DataTheta x) = (m, DataTheta x)
@@ -121,8 +121,9 @@ substDataPlusSigmaElim ::
   -> ([(Identifier, CodePlus)], CodePlus)
 substDataPlusSigmaElim sub [] e = ([], substCodePlus sub e)
 substDataPlusSigmaElim sub ((x, t):xs) e = do
-  let (xs', e') = substDataPlusSigmaElim (filter (\(y, _) -> y /= x) sub) xs e
   let t' = substCodePlus sub t
+  let sub' = filter (\(y, _) -> y /= x) sub
+  let (xs', e') = substDataPlusSigmaElim sub' xs e
   ((x, t') : xs', e')
 
 varData :: DataPlus -> [Identifier]

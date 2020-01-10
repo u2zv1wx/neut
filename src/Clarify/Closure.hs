@@ -25,7 +25,7 @@ makeClosure ::
   -> Meta -- meta of lambda
   -> [(Identifier, CodePlus)] -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
   -> CodePlus -- the `e` in `lam (x1, ..., xn). e`
-  -> WithEnv CodePlus
+  -> WithEnv DataPlus
 makeClosure mName xts2 m xts1 e = do
   expName <- newNameWith "exp"
   envExp <- cartesianSigma expName m $ map Right xts2
@@ -33,6 +33,8 @@ makeClosure mName xts2 m xts1 e = do
   let xts = xts2 ++ xts1
   let info1 = toInfo "makeClosure: arg of linearize is not closed chain:" xts
   assertUP info1 $ isClosedChain xts
+  -- これxts1がclosedとは限らないんでは？
+  -- いや、closedchainを構成するときにけっきょくxts2に入ってくるから問題ないのか。
   e' <- linearize (xts2 ++ xts1) e
   cenv <- gets codeEnv
   name <- nameFromMaybe mName
@@ -40,8 +42,9 @@ makeClosure mName xts2 m xts1 e = do
   let body = (m, CodeSigmaElim xts2 envVar e')
   when (name `notElem` map fst cenv) $ insCodeEnv name args body
   let fvEnv = (m, DataSigmaIntro $ map (toDataUpsilon' . fst) xts2)
-  let cls = (m, DataSigmaIntro [envExp, fvEnv, (m, DataTheta name)])
-  return (m, CodeUpIntro cls)
+  return (m, DataSigmaIntro [envExp, fvEnv, (m, DataTheta name)])
+  -- let cls = (m, DataSigmaIntro [envExp, fvEnv, (m, DataTheta name)])
+  -- return (m, CodeUpIntro cls)
 
 callClosure ::
      Meta -> CodePlus -> [(Identifier, CodePlus, DataPlus)] -> WithEnv CodePlus
@@ -94,7 +97,10 @@ chainTermPlus' (_, TermPiElim e es) = do
   xs1 <- chainTermPlus' e
   xs2 <- concat <$> mapM (chainTermPlus') es
   return $ xs1 ++ xs2
-chainTermPlus' (_, TermMu xt e) = chainTermPlus'' [xt] [e]
+chainTermPlus' (_, TermIter (x, t) xts e) = do
+  xs1 <- chainTermPlus' t
+  xs2 <- chainTermPlus'' xts [e]
+  return $ xs1 ++ filter (\(y, _) -> y /= x) xs2
 chainTermPlus' (_, TermConst x) = do
   t <- lookupTypeEnv x
   chainWithName x t
