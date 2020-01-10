@@ -4,9 +4,12 @@ import Data.WeakTerm
 
 type PreConstraint = (WeakTermPlus, WeakTermPlus)
 
+type IterInfo = (String, [IdentifierPlus], WeakTermPlus, WeakTermPlus)
+
 data Constraint
   = ConstraintAnalyzable
   | ConstraintPattern Hole [[WeakTermPlus]] WeakTermPlus
+  | ConstraintDelta IterInfo [[WeakTermPlus]] [[WeakTermPlus]]
   | ConstraintQuasiPattern Hole [[WeakTermPlus]] WeakTermPlus
   | ConstraintFlexRigid Hole [[WeakTermPlus]] WeakTermPlus
   | ConstraintOther
@@ -15,9 +18,10 @@ data Constraint
 constraintToInt :: Constraint -> Int
 constraintToInt ConstraintAnalyzable = 0
 constraintToInt ConstraintPattern {} = 1
-constraintToInt ConstraintQuasiPattern {} = 2
-constraintToInt ConstraintFlexRigid {} = 3
-constraintToInt ConstraintOther = 4
+constraintToInt ConstraintDelta {} = 2
+constraintToInt ConstraintQuasiPattern {} = 3
+constraintToInt ConstraintFlexRigid {} = 4
+constraintToInt ConstraintOther = 5
 
 instance Eq Constraint where
   c1 == c2 = constraintToInt c1 == constraintToInt c2
