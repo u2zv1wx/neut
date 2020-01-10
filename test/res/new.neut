@@ -84,6 +84,7 @@
       (right (nat-inner)))))
 ;; こっちなら、sigmaの中身が消えることによって無限ループは生じないはず。……実際、うまくいった。
 ;; (coproduct top (nat-inner)))
+;; sigmaの中でのrecursive callは問題なし、ということでね。
 
 (write n3 stdout (test) enum.n3)
 ;; 0 = (left unit)
