@@ -86,17 +86,25 @@ renameIter ::
   -> [IdentifierPlus]
   -> QuasiTermPlus
   -> WithEnv (IdentifierPlus, [IdentifierPlus], QuasiTermPlus)
-renameIter (x, t) [] e = do
+renameIter (x, t) xts e = do
   t' <- rename' t
+  renameIter' (x, t') xts e
+
+renameIter' ::
+     IdentifierPlus
+  -> [IdentifierPlus]
+  -> QuasiTermPlus
+  -> WithEnv (IdentifierPlus, [IdentifierPlus], QuasiTermPlus)
+renameIter' (x, t') [] e = do
   local $ do
     x' <- newNameWith x
     e' <- rename' e
     return ((x', t'), [], e')
-renameIter xt ((x, t):xts) e = do
+renameIter' xt ((x, t):xts) e = do
   t' <- rename' t
   local $ do
     x' <- newNameWith x
-    (xt', xts', e') <- renameIter xt xts e
+    (xt', xts', e') <- renameIter' xt xts e
     return (xt', (x', t') : xts', e')
 
 renameCaseList :: [(Case, QuasiTermPlus)] -> WithEnv [(Case, QuasiTermPlus)]
