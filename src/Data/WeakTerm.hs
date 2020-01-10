@@ -59,8 +59,9 @@ varWeakTermPlus (m, WeakTermPiElim e es) = do
   let xhs = varWeakTermPlus e
   let yhs = concatMap varWeakTermPlus es
   varPreMeta m ++ xhs ++ yhs
-varWeakTermPlus (m, WeakTermIter xt xts e) = do
-  varPreMeta m ++ varWeakTermPlusBindings (xt : xts) [e]
+varWeakTermPlus (m, WeakTermIter (x, t) xts e) = do
+  varPreMeta m ++
+    varWeakTermPlus t ++ filter (/= x) (varWeakTermPlusBindings xts [e])
 varWeakTermPlus (m, WeakTermConst _) = varPreMeta m
 varWeakTermPlus (m, WeakTermConstDecl xt e) =
   varPreMeta m ++ varWeakTermPlusBindings [xt] [e]
@@ -107,8 +108,8 @@ holeWeakTermPlus (m, WeakTermPiIntro xts e) =
   holePreMeta m ++ holeWeakTermPlusBindings xts [e]
 holeWeakTermPlus (m, WeakTermPiElim e es) =
   holePreMeta m ++ holeWeakTermPlus e ++ concatMap holeWeakTermPlus es
-holeWeakTermPlus (m, WeakTermIter xt xts e) =
-  holePreMeta m ++ holeWeakTermPlusBindings (xt : xts) [e]
+holeWeakTermPlus (m, WeakTermIter (_, t) xts e) =
+  holePreMeta m ++ holeWeakTermPlus t ++ holeWeakTermPlusBindings xts [e]
 holeWeakTermPlus (m, WeakTermZeta h) = h : holePreMeta m
 holeWeakTermPlus (m, WeakTermConst _) = holePreMeta m
 holeWeakTermPlus (m, WeakTermConstDecl xt e) =

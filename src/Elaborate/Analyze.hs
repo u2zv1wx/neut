@@ -2,6 +2,7 @@ module Elaborate.Analyze
   ( analyze
   , toPiElim
   , linearCheck
+  , unfoldIter
   ) where
 
 import Control.Monad.Except
@@ -101,11 +102,13 @@ simp' ((e1, e2):cs) = do
           , es2 <- concat ess2
           , length es1 == length es2 -> simp $ zip es1 es2 ++ cs
         (Just (StuckPiElimIter iter1@(x1, _, _, _) mess1), Just (StuckPiElimIter (x2, _, _, _) mess2))
-          | x1 == x2 -> do
+          | x1 == x2
+          , length mess1 == length mess2
+          , ess1 <- map snd mess1
+          , ess2 <- map snd mess2
+          , length (concat ess1) == length (concat ess2) -> do
             cs' <- simp cs
-            let ess1 = map snd mess1
-            let ess2 = map snd mess2
-            let c = Enriched (e1, e2) [] [] $ ConstraintDelta iter1 ess1 ess2
+            let c = Enriched (e1, e2) [] [] $ ConstraintDelta iter1 mess1 mess2
             return $ c : cs'
         (Just (StuckPiElimIter iter1 mess1), Just (StuckPiElimIter iter2 mess2)) -> do
           let e1' = toPiElim (unfoldIter iter1) mess1

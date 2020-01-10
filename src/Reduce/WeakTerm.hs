@@ -30,24 +30,23 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
     (_, WeakTermPiIntro xts body)
       | length xts == length es' -> do
         let xs = map fst xts
-        let body' = substWeakTermPlus (zip xs es') body
-        reduceWeakTermPlus body'
-    (_, WeakTermMu (x, _) body)
-      -- reduce pseudo-recursive terms
-      | x `notElem` varWeakTermPlus body -> do
-        reduceWeakTermPlus (m, WeakTermPiElim body es')
-        -- let self' = substWeakTermPlus [(x, self)] body -- nop
-        -- reduceWeakTermPlus (m, WeakTermPiElim self' es')
-    -- self@(_, WeakTermMu (x, _) body) -> do
-    --   let self' = substWeakTermPlus [(x, self)] body
-    --   reduceWeakTermPlus (m, WeakTermPiElim self' es')
+        reduceWeakTermPlus $ substWeakTermPlus (zip xs es') body
+    (_, WeakTermIter (x, _) xts body)
+      | x `notElem` varWeakTermPlus body
+      , length xts == length es' -> do
+        let xs = map fst xts
+        reduceWeakTermPlus $ substWeakTermPlus (zip xs es') body
     (_, WeakTermConst constant) ->
       reduceWeakTermPlusTheta (m, app) es' m constant
     _ -> return (m, app)
-reduceWeakTermPlus (m, WeakTermMu (x, t) e) = do
+-- reduceWeakTermPlus (m, WeakTermIter (x, t) xts e)
+--   | x `notElem` varWeakTermPlus e = do undefined
+reduceWeakTermPlus (m, WeakTermIter (x, t) xts e) = do
   t' <- reduceWeakTermPlus t
   e' <- reduceWeakTermPlus e
-  return $ (m, WeakTermMu (x, t') e')
+  let (xs, ts) = unzip xts
+  ts' <- mapM reduceWeakTermPlus ts
+  return $ (m, WeakTermIter (x, t') (zip xs ts') e')
 reduceWeakTermPlus (m, WeakTermConstDecl (x, t) e) = do
   t' <- reduceWeakTermPlus t
   e' <- reduceWeakTermPlus e

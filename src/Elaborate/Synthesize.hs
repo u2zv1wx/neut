@@ -28,6 +28,8 @@ synthesize q = do
       | Just (m, (_, e)) <- lookupAny ms sub -> resolveStuck q e1 e2 m e
     Just (Enriched _ _ fmvs (ConstraintPattern m ess e)) -> do
       resolvePiElim q m fmvs ess e
+    Just (Enriched _ _ _ (ConstraintDelta iter mess1 mess2)) -> do
+      resolveDelta q iter mess1 mess2
     Just (Enriched _ _ fmvs (ConstraintQuasiPattern m ess e)) -> do
       resolvePiElim q m fmvs ess e
     Just (Enriched _ _ fmvs (ConstraintFlexRigid m ess e)) -> do
@@ -51,7 +53,26 @@ resolveStuck q e1 e2 h e = do
   q' <- analyze [(e1', e2')]
   synthesize $ Q.deleteMin q `Q.union` q'
 
--- Synthesize `hole @ arg-1 @ ... @ arg-n = e`, where arg-i is a variable.
+resolveDelta ::
+     ConstraintQueue
+  -> IterInfo
+  -> [(PreMeta, [WeakTermPlus])]
+  -> [(PreMeta, [WeakTermPlus])]
+  -> WithEnv ()
+resolveDelta q iter mess1 mess2 = do
+  let planA = do
+        let ess1 = map snd mess1
+        let ess2 = map snd mess2
+        q' <- analyze $ zip (concat ess1) (concat ess2)
+        synthesize $ Q.deleteMin q `Q.union` q'
+  let planB = do
+        let e1 = toPiElim (unfoldIter iter) mess1
+        let e2 = toPiElim (unfoldIter iter) mess2
+        q' <- analyze $ [(e1, e2)]
+        synthesize $ Q.deleteMin q `Q.union` q'
+  chain [planA, planB]
+
+-- synthesize `hole @ arg-1 @ ... @ arg-n = e`, where arg-i is a variable.
 -- Suppose that we received a quasi-pattern ?M @ x @ x @ y @ z == e.
 -- What this function do is to try two alternatives in this case:
 --   (1) ?M == lam x. lam _. lam y. lam z. e
@@ -76,7 +97,7 @@ resolvePiElim q m fmvs ess e = do
   xss <- toVarList es >>= toAltList
   let xsss = map (takeByCount lengthInfo) xss
   let lamList = map (bindFormalArgs e) xsss
-  chain q $ map (resolveHole q m fmvs) lamList
+  chain $ map (resolveHole q m fmvs) lamList
 
 -- {} resolveHole {}
 resolveHole :: ConstraintQueue -> Hole -> [Hole] -> WeakTermPlus -> WithEnv ()
@@ -95,10 +116,10 @@ asAnalyzable :: EnrichedConstraint -> EnrichedConstraint
 asAnalyzable (Enriched cs ms fmvs _) = Enriched cs ms fmvs ConstraintAnalyzable
 
 -- Try the list of alternatives.
-chain :: ConstraintQueue -> [WithEnv a] -> WithEnv a
-chain _ [] = throwError $ "cannot synthesize(chain)."
-chain _ [e] = e
-chain c (e:es) = catchError e $ (const $ chain c es)
+chain :: [WithEnv a] -> WithEnv a
+chain [] = throwError $ "cannot synthesize(chain)."
+chain [e] = e
+chain (e:es) = catchError e $ (const $ chain es)
 
 bindFormalArgs :: WeakTermPlus -> [[IdentifierPlus]] -> WeakTermPlus
 bindFormalArgs e [] = e
