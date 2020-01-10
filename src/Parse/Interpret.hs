@@ -36,10 +36,10 @@ interpret (m, TreeNode ((_, TreeAtom "pi-elimination"):e:es)) = do
   e' <- interpret e
   es' <- mapM interpret es
   return (m, QuasiTermPiElim e' es')
-interpret (m, TreeNode [(_, TreeAtom "mu"), xt, e]) = do
+interpret (m, TreeNode [(_, TreeAtom "iterate"), xt, (_, TreeNode xts), e]) = do
   xt' <- interpretIdentifierPlus xt
-  e' <- interpret e
-  return (m, QuasiTermMu xt' e')
+  (xts', e') <- interpretBinder xts e
+  return (m, QuasiTermIter xt' xts' e')
 interpret (m, TreeNode [(_, TreeAtom "zeta"), (_, TreeAtom x)]) = do
   x' <- interpretAtom x
   return (m, QuasiTermZeta x')
