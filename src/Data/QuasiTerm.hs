@@ -10,7 +10,8 @@ data QuasiTerm
   | QuasiTermPi [IdentifierPlus] QuasiTermPlus
   | QuasiTermPiIntro [IdentifierPlus] QuasiTermPlus
   | QuasiTermPiElim QuasiTermPlus [QuasiTermPlus]
-  | QuasiTermMu IdentifierPlus QuasiTermPlus
+  -- CBN recursion ~ CBV iteration
+  | QuasiTermIter IdentifierPlus [IdentifierPlus] QuasiTermPlus
   | QuasiTermZeta Identifier
   | QuasiTermConst Identifier
   | QuasiTermConstDecl IdentifierPlus QuasiTermPlus
