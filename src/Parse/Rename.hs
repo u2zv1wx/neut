@@ -31,12 +31,12 @@ rename' (m, QuasiTermPiElim e es) = do
   e' <- rename' e
   es' <- mapM rename' es
   return (m, QuasiTermPiElim e' es')
-rename' (m, QuasiTermMu (x, t) e) = do
+rename' (m, QuasiTermIter (x, t) xts e) = do
   t' <- rename' t
   local $ do
     x' <- newNameWith x
-    e' <- rename' e
-    return (m, QuasiTermMu (x', t') e')
+    (xts', e') <- renameBinderWithBody xts e
+    return (m, QuasiTermIter (x', t') xts' e')
 rename' (m, QuasiTermConst x) = return (m, QuasiTermConst x)
 rename' (m, QuasiTermConstDecl (x, t) e) = do
   t' <- rename' t
@@ -107,8 +107,8 @@ checkSanity ctx (_, QuasiTermPiIntro xts e) = do
   checkSanity' ctx xts e
 checkSanity ctx (_, QuasiTermPiElim e es) = do
   checkSanity ctx e && all (checkSanity ctx) es
-checkSanity ctx (_, QuasiTermMu (x, t) e) = do
-  checkSanity' ctx [(x, t)] e
+checkSanity ctx (_, QuasiTermIter xt xts e) = do
+  checkSanity' ctx (xt : xts) e
 checkSanity _ (_, QuasiTermConst _) = True
 checkSanity ctx (_, QuasiTermConstDecl (_, t) e) = do
   checkSanity ctx t && checkSanity ctx e
