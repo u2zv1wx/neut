@@ -45,8 +45,9 @@ simp' (((_, WeakTermPiIntro xts body1@(m1, _)), e2@(_, _)):cs) = do
   let vs = map (uncurry toVar) xts
   simp $ (body1, (m1, WeakTermPiElim e2 vs)) : cs
 simp' ((e1, e2@(_, WeakTermPiIntro {})):cs) = simp' $ (e2, e1) : cs
-simp' (((_, WeakTermMu xt1 e1), (_, WeakTermMu xt2 e2)):cs)
-  | fst xt1 == fst xt2 = simpBinder [xt1] e1 [xt2] e2 cs
+simp' (((_, WeakTermIter xt1 xts1 e1), (_, WeakTermIter xt2 xts2 e2)):cs)
+  | fst xt1 == fst xt2
+  , length xts1 == length xts2 = simpBinder (xt1 : xts1) e1 (xt2 : xts2) e2 cs
 simp' (((_, WeakTermConstDecl xt1 e1), (_, WeakTermConstDecl xt2 e2)):cs) = do
   simpBinder [xt1] e1 [xt2] e2 cs
 simp' (((_, WeakTermInt l1), (_, WeakTermIntS _ l2)):cs)
@@ -99,17 +100,21 @@ simp' ((e1, e2):cs) = do
           , es1 <- concat ess1
           , es2 <- concat ess2
           , length es1 == length es2 -> simp $ zip es1 es2 ++ cs
-        (Just (StuckPiElimMu (x1, body1, _) mess1), Just (StuckPiElimMu (x2, body2, _) mess2))
-          | x1 == x2
-          , mess1 == mess2 -> simp $ (body1, body2) : cs
-        (Just (StuckPiElimMu (x1, body1, self1) mess1), _) -> do
-          let self' = substWeakTermPlus [(x1, self1)] body1
-          let e1' = toPiElim self' mess1
-          simp $ (e1', e2) : cs
-        (_, Just (StuckPiElimMu (x2, body2, self2) mess2)) -> do
-          let self' = substWeakTermPlus [(x2, self2)] body2
-          let e2' = toPiElim self' mess2
-          simp $ (e1, e2') : cs
+        (Just (StuckPiElimIter iter1@(x1, _, _, _) mess1), Just (StuckPiElimIter (x2, _, _, _) mess2))
+          | x1 == x2 -> do
+            cs' <- simp cs
+            let ess1 = map snd mess1
+            let ess2 = map snd mess2
+            let c = Enriched (e1, e2) [] [] $ ConstraintDelta iter1 ess1 ess2
+            return $ c : cs'
+        (Just (StuckPiElimIter iter1 mess1), Just (StuckPiElimIter iter2 mess2)) -> do
+          let e1' = toPiElim (unfoldIter iter1) mess1
+          let e2' = toPiElim (unfoldIter iter2) mess2
+          simp $ (e1', e2') : cs
+        (Just (StuckPiElimIter iter1 mess1), _) -> do
+          simp $ (toPiElim (unfoldIter iter1) mess1, e2) : cs
+        (_, Just (StuckPiElimIter iter2 mess2)) -> do
+          simp $ (e1, toPiElim (unfoldIter iter2) mess2) : cs
         (Just (StuckPiElimZetaStrict h1 ies1), _)
           | xs1 <- concatMap getVarList ies1
           , occurCheck h1 hs2
@@ -241,9 +246,7 @@ simpOther e1 e2 fmvs cs = do
 data Stuck
   = StuckPiElimZeta Hole [[WeakTermPlus]]
   | StuckPiElimZetaStrict Hole [[WeakTermPlus]]
-  | StuckPiElimMu
-      (Identifier, WeakTermPlus, WeakTermPlus)
-      [(PreMeta, [WeakTermPlus])]
+  | StuckPiElimIter IterInfo [(PreMeta, [WeakTermPlus])]
   | StuckPiElimUpsilon Identifier [(PreMeta, [WeakTermPlus])] -- ここでmetaを保持。
   | StuckPiElimConst Identifier [[WeakTermPlus]]
 
@@ -254,8 +257,8 @@ asStuckedTerm (_, WeakTermPiElim (_, WeakTermZeta h) es)
   | Just _ <- mapM asUpsilon es = Just $ StuckPiElimZetaStrict h [es]
 asStuckedTerm (_, WeakTermPiElim (_, WeakTermZeta h) es) =
   Just $ StuckPiElimZeta h [es]
-asStuckedTerm (m, WeakTermPiElim self@(_, WeakTermMu (x, _) body) es) =
-  Just $ StuckPiElimMu (x, body, self) [(m, es)]
+asStuckedTerm (m, WeakTermPiElim self@(_, WeakTermIter (x, _) xts body) es) =
+  Just $ StuckPiElimIter (x, xts, body, self) [(m, es)]
 asStuckedTerm (_, WeakTermPiElim (_, WeakTermConst x) es) =
   Just $ StuckPiElimConst x [es]
 asStuckedTerm (m, WeakTermPiElim e es)
@@ -264,7 +267,8 @@ asStuckedTerm (m, WeakTermPiElim e es)
       Just (StuckPiElimZeta h iess) -> Just $ StuckPiElimZeta h (iess ++ [es])
       Just (StuckPiElimZetaStrict h iexss) ->
         Just $ StuckPiElimZetaStrict h $ iexss ++ [es]
-      Just (StuckPiElimMu mu ess) -> Just $ StuckPiElimMu mu $ ess ++ [(m, es)]
+      Just (StuckPiElimIter mu ess) ->
+        Just $ StuckPiElimIter mu $ ess ++ [(m, es)]
       Just (StuckPiElimUpsilon x ess) ->
         Just $ StuckPiElimUpsilon x $ ess ++ [(m, es)]
       Just (StuckPiElimConst x ess) -> Just $ StuckPiElimConst x $ ess ++ [es]
@@ -274,7 +278,8 @@ asStuckedTerm (m, WeakTermPiElim e es) =
     Just (StuckPiElimZeta h iess) -> Just $ StuckPiElimZeta h $ iess ++ [es]
     Just (StuckPiElimZetaStrict h iess) -> do
       Just $ StuckPiElimZeta h $ iess ++ [es]
-    Just (StuckPiElimMu mu ess) -> Just $ StuckPiElimMu mu $ ess ++ [(m, es)]
+    Just (StuckPiElimIter mu ess) ->
+      Just $ StuckPiElimIter mu $ ess ++ [(m, es)]
     Just (StuckPiElimUpsilon x ess) ->
       Just $ StuckPiElimUpsilon x $ ess ++ [(m, es)]
     Just (StuckPiElimConst x ess) -> Just $ StuckPiElimConst x $ ess ++ [es]
@@ -285,7 +290,7 @@ asStuckedTerm _ = Nothing
 stuckReasonOf :: Stuck -> Maybe Hole
 stuckReasonOf (StuckPiElimZeta h _) = Just h
 stuckReasonOf (StuckPiElimZetaStrict h _) = Just h
-stuckReasonOf (StuckPiElimMu {}) = Nothing
+stuckReasonOf (StuckPiElimIter {}) = Nothing
 stuckReasonOf (StuckPiElimUpsilon _ _) = Nothing
 stuckReasonOf (StuckPiElimConst _ _) = Nothing
 
@@ -318,3 +323,8 @@ asUpsilon _ = Nothing
 toPiElim :: WeakTermPlus -> [(PreMeta, [WeakTermPlus])] -> WeakTermPlus
 toPiElim e [] = e
 toPiElim e ((m, es):ess) = toPiElim (m, WeakTermPiElim e es) ess
+
+unfoldIter :: IterInfo -> WeakTermPlus
+unfoldIter (x, xts, body, self) = do
+  let body' = substWeakTermPlus [(x, self)] body
+  (fst self, WeakTermPiIntro xts body')
