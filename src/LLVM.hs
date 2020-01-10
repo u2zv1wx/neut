@@ -16,12 +16,20 @@ import Reduce.Code
 toLLVM :: CodePlus -> WithEnv LLVM
 toLLVM mainTerm = do
   penv <- gets codeEnv
-  forM_ penv $ \(name, (args, e)) -> do
+  forM_ penv $ \(name, (args, e))
+    -- e' <- reduceCodePlus e
+    -- p' (name, (args, e'))
+    -- e' <- reduceCodePlus e
+    -- p' (name, (args, e'))
+   -> do
     llvm <- llvmCode e
     insLLVMEnv name args llvm
   -- p' mainTerm
   -- error "stop"
   -- l <- reduceCodePlus mainTerm >>= renameCode >>= llvmCode
+  -- p "main"
+  -- mainTerm' <- reduceCodePlus mainTerm
+  -- p' ("main", mainTerm')
   l <- llvmCode mainTerm
   -- the result of "main" must be i64, not i8*
   (result, resultVar) <- newDataUpsilonWith "result"

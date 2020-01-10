@@ -222,15 +222,11 @@ clarifySysCall name sysCall argLen argIdxList m = do
         let ys = map (\i -> toVar $ fst $ xts !! i) argIdxList
         zts <- complementaryChainOf xts
         case sysCall of
-          SysCallWrite
-            -- 引数のうち配列はクロージャとして表現されているので中身を取り出す必要がある
-           -> do
+          SysCallWrite -> do
             (contentTypeVarName, contentTypeVar) <-
               newDataUpsilonWith "array-type"
             (contentVarName, contentVar) <- newDataUpsilonWith "array-content"
             retUnivType <- returnCartesianUniv
-            -- p "one-time closure (write)"
-            -- retImmType <- returnCartesianImmediate
             let retContentType = (m, CodeUpIntro contentTypeVar)
             let ys' = [ys !! 0, contentVar, ys !! 2]
             let body =
@@ -318,24 +314,10 @@ knot :: Identifier -> DataPlus -> WithEnv ()
 knot z cls = do
   cenv <- gets codeEnv
   case pop z cenv of
-    Nothing -> throwError "knot (compiler error)"
+    Nothing -> throwError "knot"
     Just ((args, body), cenv') -> do
       let body' = substCodePlus [(z, cls)] body
       let cenv'' = (z, (args, body')) : cenv'
-      body'' <- reduceCodePlus body'
-      p "z:"
-      p' z
-      p "args:"
-      p' args
-      p "subst:"
-      p' (z, cls)
-      -- p "body(before):"
-      -- p' body
-      -- p "body(after):"
-      -- p' body'
-      p "body(reduced):"
-      p' body''
-      -- modify (\env -> env {codeEnv = cenv''})
       modify (\env -> env {codeEnv = cenv''})
 
 -- lookup and remove the matching element from the given assoc list

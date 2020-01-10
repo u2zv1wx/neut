@@ -13,13 +13,18 @@ import Data.Code
 import Data.Env
 
 reduceCodePlus :: CodePlus -> WithEnv CodePlus
--- reduceCodePlus (m, CodePiElimDownElim v ds) = do
---   cenv <- gets codeEnv
---   case v of
---     (_, DataTheta x)
---       | Just (xs, body) <- lookup x cenv ->
---         reduceCodePlus $ substCodePlus (zip xs ds) body
---     _ -> return (m, CodePiElimDownElim v ds)
+reduceCodePlus (m, CodePiElimDownElim v ds) = do
+  cenv <- gets codeEnv
+  case v of
+    (_, DataTheta x)
+      | Just (xs, body) <- lookup x cenv
+      , x `notElem` varCode body
+      , length xs == length ds ->
+        reduceCodePlus $ substCodePlus (zip xs ds) body
+    (_, DataTheta x)
+      | Just (xs, body) <- lookup x cenv
+      , x `notElem` varCode body -> error "length unmatch"
+    _ -> return (m, CodePiElimDownElim v ds)
 reduceCodePlus (m, CodeSigmaElim xts v e) = do
   let (xs, ts) = unzip xts
   -- let xs = map fst xts

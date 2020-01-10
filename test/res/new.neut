@@ -32,7 +32,7 @@
 
 ;; 文字列をunicode encodingされたu8 arrayへと変換して保持
 (definition test ()
-  "あいしてる")
+  "あ")
 
 ;; (notation (sigma (xt+) t)
 ;;   (pi
@@ -45,7 +45,7 @@
 
 ;; 長さがn15になるのがポイントで、ここでunicodeの複雜性が出てくる
 ;; n15の部分をsigmaで包めばどうにかなりそうな雰囲気はある。
-(write n15 stdout (test) enum.n15)
+(write n3 stdout (test) enum.n3)
 
 ;; (write n15 stdout (test) enum.n15)
 
@@ -63,9 +63,29 @@
 (enum nat-enum zero-inner succ-inner)
 
 ;; nat = mu x. 1 + x = mu x. Sigma (p : choice). case p of left -> 1 | right -> x
-(definition nat-inner ()
-  (coproduct top (nat-inner)))
+;; これさー、CBVで考えると普通に無限ループなんだよね？
+;; (definition nat-inner ()
+;;   (coproduct top (nat-inner)))
+;; 無限ループですね。coproductの部分をインライン展開しても、まだiterの適用だから無限ループ。
+;; そのiterをpi-introに展開しても、まだnat-innerがpureかどうかはわからないから……いや、そこをreduceしろ、って話なのでは？
+;; 型がpureであることをつかって。
+;; coproductの適用部分は、しかし、CBVだと無限ループになっている。
+;; coproductが引数として() -> tauを受け取れるようになっていれば、ここは抑えられる。
+;;   (definition nat-inner ()
+;;     (coproduct (thunk top) nat-inner))
+;; みたいにするわけ。このときはcoproductのreduceができて、んでcoproductはsigmaになっていて、それのおかげで
+;; nat-innerがclosureとして普通に処理できるようになる。
 
+;; 無限ループしないように修正していく
+(definition nat-inner ()
+  (sigma ((x choice))
+    (case x
+      (left top)
+      (right (nat-inner)))))
+;; こっちなら、sigmaの中身が消えることによって無限ループは生じないはず。……実際、うまくいった。
+;; (coproduct top (nat-inner)))
+
+(write n3 stdout (test) enum.n3)
 ;; 0 = (left unit)
 ;; 1 = (right (left unit))
 ;; 2 = (right (right (left unit)))
@@ -81,10 +101,14 @@
 
 (let (nat tau) (nat-inner))
 
+(write n3 stdout (test) enum.n3)
+
 (definition nat-helper ((x choice))
   (enum-elimination x
     (left top)
     (right nat)))
+
+;; (write n15 stdout (test) enum.n15)
 
 (let (foo (nat-inner))
   (sigma-introduction left unit))
@@ -104,6 +128,9 @@
 ;; こうするとあたかもsuccがコンストラクタであるかのようにつかえる。
 (let (bar (nat-inner))
   (succ foo))
+
+;; ここより前でセグフォ
+;; (write n15 stdout (test) enum.n15)
 
 ;; ちゃんと推論できてる。えらい。
 (let (buz nat)
