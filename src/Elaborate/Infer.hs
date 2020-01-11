@@ -215,24 +215,32 @@ inferPiElim ::
   -> WithEnv (WeakTermPlus, WeakTermPlus)
 inferPiElim ctx m (e, t) ets = do
   let (es, ts) = unzip ets
-  ys <- mapM (const $ newNameWith "arg") es
-  -- yts = [(y1, ?M1 @ (ctx[0], ..., ctx[n])),
-  --        (y2, ?M2 @ (ctx[0], ..., ctx[n], y1)),
-  --        ...,
-  --        (ym, ?Mm @ (ctx[0], ..., ctx[n], y1, ..., y{m-1}))]
-  yts <- newTypeHoleListInCtx ctx ys
-  -- ts' = [?M1 @ (ctx[0], ..., ctx[n]),
-  --        ?M2 @ (ctx[0], ..., ctx[n], e1),
-  --        ...,
-  --        ?Mm @ (ctx[0], ..., ctx[n], e1, ..., e{m-1})]
-  let ts' = map (substWeakTermPlus (zip ys es) . snd) yts
-  forM_ (zip ts ts') $ uncurry insConstraintEnv
-  cod <- newTypeHoleInCtx (ctx ++ yts)
-  let tPi = (emptyMeta, WeakTermPi yts cod)
-  insConstraintEnv tPi t
-  -- insConstraintEnv tPi (typeOf e)
-  let cod' = substWeakTermPlus (zip ys es) cod
-  retWeakTerm cod' m $ WeakTermPiElim e es
+  case t of
+    (_, WeakTermPi xts cod) -- performance optimization (not necessary for correctness)
+      | length xts == length ets -> do
+        let xs = map fst xts
+        let ts' = map (substWeakTermPlus (zip xs es) . snd) xts
+        forM_ (zip ts ts') $ uncurry insConstraintEnv
+        let cod' = substWeakTermPlus (zip xs es) cod
+        retWeakTerm cod' m $ WeakTermPiElim e es
+    _ -> do
+      ys <- mapM (const $ newNameWith "arg") es
+      -- yts = [(y1, ?M1 @ (ctx[0], ..., ctx[n])),
+      --        (y2, ?M2 @ (ctx[0], ..., ctx[n], y1)),
+      --        ...,
+      --        (ym, ?Mm @ (ctx[0], ..., ctx[n], y1, ..., y{m-1}))]
+      yts <- newTypeHoleListInCtx ctx ys
+      -- ts' = [?M1 @ (ctx[0], ..., ctx[n]),
+      --        ?M2 @ (ctx[0], ..., ctx[n], e1),
+      --        ...,
+      --        ?Mm @ (ctx[0], ..., ctx[n], e1, ..., e{m-1})]
+      let ts' = map (substWeakTermPlus (zip ys es) . snd) yts
+      forM_ (zip ts ts') $ uncurry insConstraintEnv
+      cod <- newTypeHoleInCtx (ctx ++ yts)
+      let tPi = (emptyMeta, WeakTermPi yts cod)
+      insConstraintEnv tPi t
+      let cod' = substWeakTermPlus (zip ys es) cod
+      retWeakTerm cod' m $ WeakTermPiElim e es
 
 -- In a context (x1 : A1, ..., xn : An), this function creates metavariables
 --   ?M  : Pi (x1 : A1, ..., xn : An). ?Mt @ (x1, ..., xn)
