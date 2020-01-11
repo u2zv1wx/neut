@@ -24,26 +24,14 @@ synthesize q = do
   case Q.getMin q of
     Nothing -> return ()
     Just (Enriched (e1, e2) ms _ _)
-      | Just (m, (_, e)) <- lookupAny ms sub
-        -- p $ "resolve-stuck: " ++ m
-       -> do resolveStuck q e1 e2 m e
-    Just (Enriched _ _ fmvs (ConstraintPattern m ess e))
-      -- p $ "pat: " ++ m
-     -> do
+      | Just (m, (_, e)) <- lookupAny ms sub -> do resolveStuck q e1 e2 m e
+    Just (Enriched _ _ fmvs (ConstraintPattern m ess e)) -> do
       resolvePiElim q m fmvs ess e
-    Just (Enriched _ _ _ (ConstraintDelta iter mess1 mess2))
-      -- p "delta"
-     -> do
+    Just (Enriched _ _ _ (ConstraintDelta iter mess1 mess2)) -> do
       resolveDelta q iter mess1 mess2
-    Just (Enriched _ _ fmvs (ConstraintQuasiPattern m ess e))
-      -- p $ "quasi: " ++ m
-      -- p $ "rest: " ++ show (Q.size q)
-      -- p' qua
-     -> do
+    Just (Enriched _ _ fmvs (ConstraintQuasiPattern m ess e)) -> do
       resolvePiElim q m fmvs ess e
-    Just (Enriched _ _ fmvs (ConstraintFlexRigid m ess e))
-      -- p "flex"
-     -> do
+    Just (Enriched _ _ fmvs (ConstraintFlexRigid m ess e)) -> do
       resolvePiElim q m fmvs ess e
     Just (Enriched (e1, e2) _ _ _) -> do
       p $ "rest: " ++ show (Q.size q)
