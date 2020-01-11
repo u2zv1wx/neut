@@ -1,5 +1,6 @@
 module Data.Constraint where
 
+import Data.Basic
 import Data.WeakTerm
 
 type PreConstraint = (WeakTermPlus, WeakTermPlus)
@@ -9,10 +10,7 @@ type IterInfo = (String, [IdentifierPlus], WeakTermPlus, WeakTermPlus)
 data Constraint
   = ConstraintAnalyzable
   | ConstraintPattern Hole [[WeakTermPlus]] WeakTermPlus
-  | ConstraintDelta
-      IterInfo
-      [(PreMeta, [WeakTermPlus])]
-      [(PreMeta, [WeakTermPlus])]
+  | ConstraintDelta IterInfo [(Meta, [WeakTermPlus])] [(Meta, [WeakTermPlus])]
   | ConstraintQuasiPattern Hole [[WeakTermPlus]] WeakTermPlus
   | ConstraintFlexRigid Hole [[WeakTermPlus]] WeakTermPlus
   | ConstraintOther

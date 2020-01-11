@@ -47,11 +47,12 @@ reduceWeakTermPlus (m, WeakTermConstDecl (x, t) e) = do
   t' <- reduceWeakTermPlus t
   e' <- reduceWeakTermPlus e
   return (m, WeakTermConstDecl (x, t') e')
-reduceWeakTermPlus (m, WeakTermEnumElim e les) = do
+reduceWeakTermPlus (m, WeakTermEnumElim (e, t) les) = do
   e' <- reduceWeakTermPlus e
   let (ls, es) = unzip les
   es' <- mapM reduceWeakTermPlus es
   let les' = zip ls es'
+  t' <- reduceWeakTermPlus t
   case e' of
     (_, WeakTermEnumIntro l) ->
       case lookup (CaseValue l) les' of
@@ -59,8 +60,8 @@ reduceWeakTermPlus (m, WeakTermEnumElim e les) = do
         Nothing ->
           case lookup CaseDefault les' of
             Just body -> reduceWeakTermPlus body
-            Nothing -> return (m, WeakTermEnumElim e' les')
-    _ -> return (m, WeakTermEnumElim e' les')
+            Nothing -> return (m, WeakTermEnumElim (e', t') les')
+    _ -> return (m, WeakTermEnumElim (e', t') les')
 reduceWeakTermPlus (m, WeakTermArray k indexType) = do
   indexType' <- reduceWeakTermPlus indexType
   return (m, WeakTermArray k indexType')
@@ -81,7 +82,7 @@ reduceWeakTermPlus e = return e
 reduceWeakTermPlusTheta ::
      WeakTermPlus
   -> [WeakTermPlus]
-  -> PreMeta
+  -> Meta
   -> Identifier
   -> WithEnv WeakTermPlus
 reduceWeakTermPlusTheta orig es m constant
@@ -94,7 +95,7 @@ reduceWeakTermPlusTheta orig es m constant
 reduceWeakTermPlusUnary ::
      WeakTermPlus
   -> WeakTermPlus
-  -> PreMeta
+  -> Meta
   -> LowType
   -> UnaryOp
   -> WithEnv WeakTermPlus
@@ -200,7 +201,7 @@ reduceWeakTermPlusBinary ::
      WeakTermPlus
   -> WeakTermPlus
   -> WeakTermPlus
-  -> PreMeta
+  -> Meta
   -> LowType
   -> BinaryOp
   -> WithEnv WeakTermPlus
@@ -242,7 +243,7 @@ getUnaryArgInfo (LowTypeIntS s) (_, WeakTermIntS s1 x)
 getUnaryArgInfo (LowTypeIntU s) (_, WeakTermIntU s1 x)
   | s == s1 = return $ UnaryArgInfoIntU s x
 -- Int with size specified by lowType
-getUnaryArgInfo (LowTypeIntS s) (_, WeakTermInt x) =
+getUnaryArgInfo (LowTypeIntS s) (_, WeakTermInt _ x) =
   return $ UnaryArgInfoIntS s x
 -- Float16
 getUnaryArgInfo (LowTypeFloat FloatSize16) (_, WeakTermFloat16 x) =
@@ -254,11 +255,11 @@ getUnaryArgInfo (LowTypeFloat FloatSize32) (_, WeakTermFloat32 x) =
 getUnaryArgInfo (LowTypeFloat FloatSize64) (_, WeakTermFloat64 x) =
   return $ UnaryArgInfoFloat64 x
 -- Float with size specified by lowType
-getUnaryArgInfo (LowTypeFloat FloatSize16) (_, WeakTermFloat x) =
+getUnaryArgInfo (LowTypeFloat FloatSize16) (_, WeakTermFloat _ x) =
   return $ UnaryArgInfoFloat16 (realToFrac x)
-getUnaryArgInfo (LowTypeFloat FloatSize32) (_, WeakTermFloat x) =
+getUnaryArgInfo (LowTypeFloat FloatSize32) (_, WeakTermFloat _ x) =
   return $ UnaryArgInfoFloat32 (realToFrac x)
-getUnaryArgInfo (LowTypeFloat FloatSize64) (_, WeakTermFloat x) =
+getUnaryArgInfo (LowTypeFloat FloatSize64) (_, WeakTermFloat _ x) =
   return $ UnaryArgInfoFloat64 (realToFrac x)
 -- otherwise (invalid argument)
 getUnaryArgInfo _ _ = Nothing
@@ -276,49 +277,49 @@ getBinaryArgInfo ::
 -- IntS
 getBinaryArgInfo (LowTypeIntS s) (_, WeakTermIntS s1 x) (_, WeakTermIntS s2 y)
   | s == s1 && s == s2 = return $ BinaryArgInfoIntS s x y
-getBinaryArgInfo (LowTypeIntS s) (_, WeakTermInt x) (_, WeakTermIntS s2 y)
+getBinaryArgInfo (LowTypeIntS s) (_, WeakTermInt _ x) (_, WeakTermIntS s2 y)
   | s == s2 = return $ BinaryArgInfoIntS s x y
-getBinaryArgInfo (LowTypeIntS s) (_, WeakTermIntS s1 x) (_, WeakTermInt y)
+getBinaryArgInfo (LowTypeIntS s) (_, WeakTermIntS s1 x) (_, WeakTermInt _ y)
   | s == s1 = return $ BinaryArgInfoIntS s x y
 -- IntU
 getBinaryArgInfo (LowTypeIntU s) (_, WeakTermIntU s1 x) (_, WeakTermIntU s2 y)
   | s == s1 && s == s2 = return $ BinaryArgInfoIntU s x y
-getBinaryArgInfo (LowTypeIntU s) (_, WeakTermInt x) (_, WeakTermIntU s2 y)
+getBinaryArgInfo (LowTypeIntU s) (_, WeakTermInt _ x) (_, WeakTermIntU s2 y)
   | s == s2 = return $ BinaryArgInfoIntU s x y
-getBinaryArgInfo (LowTypeIntU s) (_, WeakTermIntU s1 x) (_, WeakTermInt y)
+getBinaryArgInfo (LowTypeIntU s) (_, WeakTermIntU s1 x) (_, WeakTermInt _ y)
   | s == s1 = return $ BinaryArgInfoIntU s x y
 -- Int with size specified by lowType
-getBinaryArgInfo (LowTypeIntS s) (_, WeakTermInt x) (_, WeakTermInt y) =
+getBinaryArgInfo (LowTypeIntS s) (_, WeakTermInt _ x) (_, WeakTermInt _ y) =
   return $ BinaryArgInfoIntS s x y
-getBinaryArgInfo (LowTypeIntU s) (_, WeakTermInt x) (_, WeakTermInt y) =
+getBinaryArgInfo (LowTypeIntU s) (_, WeakTermInt _ x) (_, WeakTermInt _ y) =
   return $ BinaryArgInfoIntU s x y
 -- Float16
 getBinaryArgInfo (LowTypeFloat FloatSize16) (_, WeakTermFloat16 x) (_, WeakTermFloat16 y) =
   return $ BinaryArgInfoFloat16 x y
-getBinaryArgInfo (LowTypeFloat FloatSize16) (_, WeakTermFloat x) (_, WeakTermFloat16 y) =
+getBinaryArgInfo (LowTypeFloat FloatSize16) (_, WeakTermFloat _ x) (_, WeakTermFloat16 y) =
   return $ BinaryArgInfoFloat16 (realToFrac x) y
-getBinaryArgInfo (LowTypeFloat FloatSize16) (_, WeakTermFloat16 x) (_, WeakTermFloat y) =
+getBinaryArgInfo (LowTypeFloat FloatSize16) (_, WeakTermFloat16 x) (_, WeakTermFloat _ y) =
   return $ BinaryArgInfoFloat16 x (realToFrac y)
 -- Float32
 getBinaryArgInfo (LowTypeFloat FloatSize32) (_, WeakTermFloat32 x) (_, WeakTermFloat32 y) =
   return $ BinaryArgInfoFloat32 x y
-getBinaryArgInfo (LowTypeFloat FloatSize32) (_, WeakTermFloat x) (_, WeakTermFloat32 y) =
+getBinaryArgInfo (LowTypeFloat FloatSize32) (_, WeakTermFloat _ x) (_, WeakTermFloat32 y) =
   return $ BinaryArgInfoFloat32 (realToFrac x) y
-getBinaryArgInfo (LowTypeFloat FloatSize32) (_, WeakTermFloat32 x) (_, WeakTermFloat y) =
+getBinaryArgInfo (LowTypeFloat FloatSize32) (_, WeakTermFloat32 x) (_, WeakTermFloat _ y) =
   return $ BinaryArgInfoFloat32 x (realToFrac y)
 -- Float64
 getBinaryArgInfo (LowTypeFloat FloatSize64) (_, WeakTermFloat64 x) (_, WeakTermFloat64 y) =
   return $ BinaryArgInfoFloat64 x y
-getBinaryArgInfo (LowTypeFloat FloatSize64) (_, WeakTermFloat x) (_, WeakTermFloat64 y) =
+getBinaryArgInfo (LowTypeFloat FloatSize64) (_, WeakTermFloat _ x) (_, WeakTermFloat64 y) =
   return $ BinaryArgInfoFloat64 (realToFrac x) y
-getBinaryArgInfo (LowTypeFloat FloatSize64) (_, WeakTermFloat64 x) (_, WeakTermFloat y) =
+getBinaryArgInfo (LowTypeFloat FloatSize64) (_, WeakTermFloat64 x) (_, WeakTermFloat _ y) =
   return $ BinaryArgInfoFloat64 x (realToFrac y)
 -- Float with size specified by lowType
-getBinaryArgInfo (LowTypeFloat FloatSize16) (_, WeakTermFloat x) (_, WeakTermFloat y) =
+getBinaryArgInfo (LowTypeFloat FloatSize16) (_, WeakTermFloat _ x) (_, WeakTermFloat _ y) =
   return $ BinaryArgInfoFloat16 (realToFrac x) (realToFrac y)
-getBinaryArgInfo (LowTypeFloat FloatSize32) (_, WeakTermFloat x) (_, WeakTermFloat y) =
+getBinaryArgInfo (LowTypeFloat FloatSize32) (_, WeakTermFloat _ x) (_, WeakTermFloat _ y) =
   return $ BinaryArgInfoFloat32 (realToFrac x) (realToFrac y)
-getBinaryArgInfo (LowTypeFloat FloatSize64) (_, WeakTermFloat x) (_, WeakTermFloat y) =
+getBinaryArgInfo (LowTypeFloat FloatSize64) (_, WeakTermFloat _ x) (_, WeakTermFloat _ y) =
   return $ BinaryArgInfoFloat64 x y
 -- otherwise (invalid arguments)
 getBinaryArgInfo _ _ _ = Nothing

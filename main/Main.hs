@@ -119,6 +119,7 @@ expandDirPath path = do
 
 process :: String -> String -> WithEnv [String]
 process input inputPath = do
+  p "parse"
   e <- parse input inputPath >>= elaborate
   p "elaborated"
   e' <- clarify e

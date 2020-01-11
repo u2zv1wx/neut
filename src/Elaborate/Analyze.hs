@@ -26,9 +26,12 @@ analyze cs = Q.fromList <$> simp cs
 -- {} simp {}
 simp :: [PreConstraint] -> WithEnv [EnrichedConstraint]
 simp [] = return []
-simp ((e1, e2):cs) = do
+simp ((e1, e2):cs)
+  -- p "reduce"
+ = do
   me1' <- reduceWeakTermPlus e1 >>= liftIO . timeout 5000000 . return
   me2' <- reduceWeakTermPlus e2 >>= liftIO . timeout 5000000 . return
+  -- p "ok"
   case (me1', me2') of
     (Just e1', Just e2') -> simp' $ (e1', e2') : cs
     _ -> throwError $ "cannot simplify [TIMEOUT]:\n" ++ Pr.ppShow (e1, e2)
@@ -43,7 +46,7 @@ simp' (((_, WeakTermPi xts1 cod1), (_, WeakTermPi xts2 cod2)):cs)
 simp' (((_, WeakTermPiIntro xts1 e1), (_, WeakTermPiIntro xts2 e2)):cs)
   | length xts1 == length xts2 = simpBinder xts1 e1 xts2 e2 cs
 simp' (((_, WeakTermPiIntro xts body1@(m1, _)), e2@(_, _)):cs) = do
-  let vs = map (uncurry toVar) xts
+  let vs = map (toVar . fst) xts
   simp $ (body1, (m1, WeakTermPiElim e2 vs)) : cs
 simp' ((e1, e2@(_, WeakTermPiIntro {})):cs) = simp' $ (e2, e1) : cs
 simp' (((_, WeakTermIter xt1 xts1 e1), (_, WeakTermIter xt2 xts2 e2)):cs)
@@ -51,31 +54,35 @@ simp' (((_, WeakTermIter xt1 xts1 e1), (_, WeakTermIter xt2 xts2 e2)):cs)
   , length xts1 == length xts2 = simpBinder (xt1 : xts1) e1 (xt2 : xts2) e2 cs
 simp' (((_, WeakTermConstDecl xt1 e1), (_, WeakTermConstDecl xt2 e2)):cs) = do
   simpBinder [xt1] e1 [xt2] e2 cs
-simp' (((_, WeakTermInt l1), (_, WeakTermIntS _ l2)):cs)
-  | l1 == l2 = simp cs
-simp' (((_, WeakTermIntS _ l1), (_, WeakTermInt l2)):cs)
-  | l1 == l2 = simp cs
-simp' (((_, WeakTermInt l1), (_, WeakTermIntU _ l2)):cs)
-  | l1 == l2 = simp cs
-simp' (((_, WeakTermIntU _ l1), (_, WeakTermInt l2)):cs)
-  | l1 == l2 = simp cs
-simp' (((_, WeakTermFloat l1), (_, WeakTermFloat16 l2)):cs)
-  | show l1 == show l2 = simp cs
-simp' (((_, WeakTermFloat16 l1), (_, WeakTermFloat l2)):cs)
-  | show l1 == show l2 = simp cs
-simp' (((_, WeakTermFloat l1), (_, WeakTermFloat32 l2)):cs)
-  | show l1 == show l2 = simp cs
-simp' (((_, WeakTermFloat32 l1), (_, WeakTermFloat l2)):cs)
-  | show l1 == show l2 = simp cs
-simp' (((_, WeakTermFloat l1), (_, WeakTermFloat64 l2)):cs)
-  | l1 == l2 = simp cs
-simp' (((_, WeakTermFloat64 l1), (_, WeakTermFloat l2)):cs)
-  | l1 == l2 = simp cs
-simp' (((_, WeakTermEnumElim e1 les1), (_, WeakTermEnumElim e2 les2)):cs)
+simp' (((_, WeakTermInt t1 l1), (_, WeakTermIntS s2 l2)):cs)
+  | l1 == l2 = simp $ (t1, toIntS s2) : cs
+simp' (((_, WeakTermIntS s1 l1), (_, WeakTermInt t2 l2)):cs)
+  | l1 == l2 = simp $ (toIntS s1, t2) : cs
+simp' (((_, WeakTermInt t1 l1), (_, WeakTermIntU s2 l2)):cs)
+  | l1 == l2 = simp $ (t1, toIntU s2) : cs
+simp' (((_, WeakTermIntU s1 l1), (_, WeakTermInt t2 l2)):cs)
+  | l1 == l2 = simp $ (toIntU s1, t2) : cs
+simp' (((_, WeakTermInt t1 l1), (_, WeakTermInt t2 l2)):cs)
+  | l1 == l2 = simp $ (t1, t2) : cs
+simp' (((_, WeakTermFloat t1 l1), (_, WeakTermFloat16 l2)):cs)
+  | show l1 == show l2 = simp $ (t1, f16) : cs
+simp' (((_, WeakTermFloat16 l1), (_, WeakTermFloat t2 l2)):cs)
+  | show l1 == show l2 = simp $ (f16, t2) : cs
+simp' (((_, WeakTermFloat t1 l1), (_, WeakTermFloat32 l2)):cs)
+  | show l1 == show l2 = simp $ (t1, f32) : cs
+simp' (((_, WeakTermFloat32 l1), (_, WeakTermFloat t2 l2)):cs)
+  | show l1 == show l2 = simp $ (f32, t2) : cs
+simp' (((_, WeakTermFloat t1 l1), (_, WeakTermFloat64 l2)):cs)
+  | l1 == l2 = simp $ (t1, f64) : cs
+simp' (((_, WeakTermFloat64 l1), (_, WeakTermFloat t2 l2)):cs)
+  | l1 == l2 = simp $ (f64, t2) : cs
+simp' (((_, WeakTermFloat t1 l1), (_, WeakTermFloat t2 l2)):cs)
+  | l1 == l2 = simp $ (t1, t2) : cs
+simp' (((_, WeakTermEnumElim (e1, t1) les1), (_, WeakTermEnumElim (e2, t2) les2)):cs)
   -- using term equality
   | e1 == e2 = do
     csEnum <- simpCase les1 les2
-    csCont <- simp cs
+    csCont <- simp $ (t1, t2) : cs
     return $ csEnum ++ csCont
 simp' (((_, WeakTermArray k1 indexType1), (_, WeakTermArray k2 indexType2)):cs)
   | k1 == k2 = simp $ (indexType1, indexType2) : cs
@@ -162,7 +169,7 @@ simpBinder ::
   -> WithEnv [EnrichedConstraint]
 simpBinder [] cod1 [] cod2 cs = simp $ (cod1, cod2) : cs
 simpBinder ((x1, t1):xts1) cod1 ((x2, t2):xts2) cod2 cs = do
-  let var1 = toVar x1 t1
+  let var1 = toVar x1
   let (xts2', cod2') = substWeakTermPlusBindingsWithBody [(x2, var1)] xts2 cod2
   cst <- simp [(t1, t2)]
   cs' <- simpBinder xts1 cod1 xts2' cod2' cs
@@ -249,8 +256,8 @@ simpOther e1 e2 fmvs cs = do
 data Stuck
   = StuckPiElimZeta Hole [[WeakTermPlus]]
   | StuckPiElimZetaStrict Hole [[WeakTermPlus]]
-  | StuckPiElimIter IterInfo [(PreMeta, [WeakTermPlus])]
-  | StuckPiElimUpsilon Identifier [(PreMeta, [WeakTermPlus])] -- ここでmetaを保持。
+  | StuckPiElimIter IterInfo [(Meta, [WeakTermPlus])]
+  | StuckPiElimUpsilon Identifier [(Meta, [WeakTermPlus])] -- ここでmetaを保持。
   | StuckPiElimConst Identifier [[WeakTermPlus]]
 
 -- {} asStuckedTerm {}
@@ -313,17 +320,13 @@ linearCheck xs = xs == nub xs
 getVarList :: [WeakTermPlus] -> [Identifier]
 getVarList xs = catMaybes $ map asUpsilon xs
 
--- {} toVar {}
-toVar :: Identifier -> WeakTermPlus -> WeakTermPlus
-toVar x t = (PreMetaNonTerminal t emptyMeta, WeakTermUpsilon x)
-
 -- {} asUpsilon {}
 asUpsilon :: WeakTermPlus -> Maybe Identifier
 asUpsilon (_, WeakTermUpsilon x) = Just x
 asUpsilon _ = Nothing
 
 -- {} toPiElim {}
-toPiElim :: WeakTermPlus -> [(PreMeta, [WeakTermPlus])] -> WeakTermPlus
+toPiElim :: WeakTermPlus -> [(Meta, [WeakTermPlus])] -> WeakTermPlus
 toPiElim e [] = e
 toPiElim e ((m, es):ess) = toPiElim (m, WeakTermPiElim e es) ess
 

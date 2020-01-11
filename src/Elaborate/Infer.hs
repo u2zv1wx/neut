@@ -1,293 +1,3 @@
--- module Elaborate.Infer
---   ( infer
---   , univ
---   ) where
--- import Control.Monad.Except
--- import Control.Monad.State
--- import qualified Data.Map.Strict as Map
--- import Data.Maybe (catMaybes)
--- import Data.Basic
--- import Data.Env
--- import Data.WeakTerm
--- import Elaborate.Supply
--- type Context = [(Identifier, WeakTermPlus)]
--- -- Given a term and a context, return the type of the term, updating the
--- -- constraint environment. This is more or less the same process in ordinary
--- -- Hindley-Milner type inference algorithm. The difference is that, when we
--- -- create a type variable, the type variable may depend on terms.
--- -- For example, consider generating constraints from an application `e1 @ e2`.
--- -- In ordinary predicate logic, we generate a type variable `?M` and add a
--- -- constraint `<type-of-e1> == <type-of-e2> -> ?M`. In dependent situation, however,
--- -- we cannot take this approach, since the `?M` may depend on other terms defined
--- -- beforehand. If `?M` depends on other terms, we cannot define substitution for terms
--- -- that contain metavariables because we don't know whether a substitution {x := e}
--- -- affects the content of a metavariable.
--- -- To handle this situation, we define metavariables to be *closed*. To represent
--- -- dependence, we apply all the names defined beforehand to the metavariables.
--- -- In other words, when we generate a metavariable, we use `?M @ (x1, ..., xn)` as a
--- -- representation of the hole, where x1, ..., xn are the defined names, or the context.
--- -- With this design, we can handle dependence in a simple way. This design decision
--- -- is due to "Elaboration in Dependent Type Theory". There also exists an approach
--- -- that deals with this situation which uses so-called contextual modality.
--- -- Interested readers are referred to A. Abel and B. Pientka. "Higher-Order
--- -- Dynamic Pattern Unification for Dependent Types and Records". Typed Lambda
--- -- Calculi and Applications, 2011.
--- -- {termはrename済みでclosed} infer' {termはrename済みでclosedで、かつすべてのsubtermが型でannotateされている}
--- infer :: WeakTermPlus -> WithEnv WeakTermPlus
--- infer e = do
---   let e' = (supply e)
---   -- p' e'
---   t <- infer' [] e'
---   let vs = varWeakTermPlus t
---   let info = toInfo "inferred type is not closed. freevars:" vs
---   return $ assertP info t $ null vs
--- infer' :: Context -> WeakTermPlus -> WithEnv WeakTermPlus
--- infer' _ (m, WeakTermTau) = return (m, WeakTermTau)
--- infer' _ (_, WeakTermUpsilon x) = lookupWeakTypeEnv x
--- infer' ctx (_, WeakTermPi xts t) = do
---   inferPi ctx xts t
---   return univ
--- infer' ctx (m, WeakTermPiIntro xts e) = do
---   tCod <- inferPiIntro ctx xts e
---   return (m, WeakTermPi xts tCod)
--- infer' ctx (m, WeakTermPiElim e@(_, WeakTermPiIntro xts _) es) -- let xts := es in cont
---   | length xts == length es = do
---     senv <- gets substEnv
---     let hss = map holeWeakTermPlus es
---     let defList = zip (map fst xts) (zip hss es)
---     modify (\env -> env {substEnv = defList ++ senv})
---     inferPiElim ctx m e es
--- infer' ctx (m, WeakTermPiElim e es) = do
---   inferPiElim ctx m e es
--- infer' ctx (_, WeakTermIter (x, t) xts e) = do
---   inferType ctx t
---   insWeakTypeEnv x t
---   -- Note that we cannot extend context with x. The type of e cannot be dependent on `x`.
---   -- Otherwise the type of `mu x. e` might have `x` as free variable, which is unsound.
---   tCod <- inferPiIntro ctx xts e
---   let piType = (emptyMeta, WeakTermPi xts tCod)
---   insConstraintEnv t piType
---   return piType
--- infer' ctx (_, WeakTermZeta x) = do
---   t <- newTypeHoleInCtx ctx
---   insWeakTypeEnv x t -- for later use (maybe)
---   return t
--- infer' _ (_, WeakTermConst x)
---   | Just i <- asEnumNatNumConstant x = toIsEnumType i
---   | Just _ <- asLowTypeMaybe x = return univ
---   | otherwise = lookupWeakTypeEnv x
--- infer' ctx (_, WeakTermConstDecl (x, t) e) = do
---   inferType ctx t
---   insWeakTypeEnv x t
---   infer' ctx e
--- infer' _ (m, WeakTermIntS size _) = return (m, WeakTermConst $ "i" ++ show size)
--- infer' _ (m, WeakTermIntU size _) = return (m, WeakTermConst $ "u" ++ show size)
--- infer' ctx (_, WeakTermInt t _) = do
---   inferType ctx t
---   return t
--- infer' _ (m, WeakTermFloat16 _) = return (m, WeakTermConst "f16")
--- infer' _ (m, WeakTermFloat32 _) = return (m, WeakTermConst "f32")
--- infer' _ (m, WeakTermFloat64 _) = return (m, WeakTermConst "f64")
--- infer' ctx (_, WeakTermFloat t _) = do
---   inferType ctx t
---   return t
--- infer' _ (_, WeakTermEnum _) = return univ
--- infer' _ (_, WeakTermEnumIntro labelOrNum) = do
---   case labelOrNum of
---     EnumValueNatNum i _ -> return (emptyMeta, WeakTermEnum $ EnumTypeNatNum i)
---     EnumValueLabel l -> do
---       k <- lookupKind l
---       return (emptyMeta, WeakTermEnum $ EnumTypeLabel k)
--- infer' ctx (_, WeakTermEnumElim (e, t) les) = do
---   inferType ctx t
---   t' <- infer' ctx e
---   insConstraintEnv t t'
---   if null les
---     then newTypeHoleInCtx ctx -- ex falso quodlibet
---     else do
---       let (ls, es) = unzip les
---       tls <- mapM inferCase ls
---       constrainList $ t : catMaybes tls
---       ts' <- mapM (infer' ctx) es
---       constrainList ts'
---       return $ head ts'
--- infer' ctx (_, WeakTermArray _ indexType) = do
---   inferType ctx indexType
---   return univ
--- infer' ctx (_, WeakTermArrayIntro k les) = do
---   let (ls, es) = unzip les
---   tls <- catMaybes <$> mapM (inferCase . CaseValue) ls
---   constrainList tls
---   let tCod = inferKind k
---   ts' <- mapM (infer' ctx) es
---   constrainList $ tCod : ts'
---   let indexType = determineDomType tls
---   return (emptyMeta, WeakTermArray k indexType)
--- infer' ctx (_, WeakTermArrayElim k e1 e2) = do
---   let tCod = inferKind k
---   t1' <- infer' ctx e1
---   t2' <- infer' ctx e2
---   insConstraintEnv t1' (emptyMeta, WeakTermArray k t2')
---   return tCod
--- -- {} inferType {}
--- inferType :: Context -> WeakTermPlus -> WithEnv ()
--- inferType ctx t = do
---   u <- infer' ctx t
---   insConstraintEnv u univ
--- -- {} inferKind {}
--- inferKind :: ArrayKind -> WeakTermPlus
--- inferKind (ArrayKindIntS i) = (emptyMeta, WeakTermConst $ "i" ++ show i)
--- inferKind (ArrayKindIntU i) = (emptyMeta, WeakTermConst $ "u" ++ show i)
--- inferKind (ArrayKindFloat size) =
---   (emptyMeta, WeakTermConst $ "f" ++ show (sizeAsInt size))
--- -- {} inferPi {}
--- inferPi :: Context -> [(Identifier, WeakTermPlus)] -> WeakTermPlus -> WithEnv ()
--- inferPi ctx [] cod = inferType ctx cod
--- inferPi ctx ((x, t):xts) cod = do
---   inferType ctx t
---   insWeakTypeEnv x t
---   inferPi (ctx ++ [(x, t)]) xts cod
--- -- {} inferPiIntro {}
--- inferPiIntro ::
---      Context
---   -> [(Identifier, WeakTermPlus)]
---   -> WeakTermPlus
---   -> WithEnv WeakTermPlus
--- inferPiIntro ctx [] e = infer' ctx e
--- inferPiIntro ctx ((x, t):xts) e = do
---   inferType ctx t
---   insWeakTypeEnv x t
---   inferPiIntro (ctx ++ [(x, t)]) xts e
--- -- {} inferPiElim {}
--- inferPiElim ::
---      Context -> Meta -> WeakTermPlus -> [WeakTermPlus] -> WithEnv WeakTermPlus
--- inferPiElim ctx m e es = do
---   ts <- mapM (infer' ctx) es
---   -- `es` must be inferred first since inference on `e` might extend the context,
---   -- leading (for example) the type of a constant set to be something like ?M @ (ctx, x).
---   -- This might cause a problem since if we have the same constant in `es`, the type of
---   -- the constant is inferred to be ?M @ (ctx, x), despite the fact that the `x` is not in
---   -- the context of the constant.
---   t <- infer' ctx e
---   ys <- mapM (const $ newNameWith "arg") es
---   -- yts = [y1 : ?M1 @ (ctx[0], ..., ctx[n]),
---   --        y2 : ?M2 @ (ctx[0], ..., ctx[n], y1),
---   --        ...,
---   --        ym : ?Mm @ (ctx[0], ..., ctx[n], y1, ..., y{m-1})]
---   yts <- newTypeHoleListInCtx ctx ys
---   -- ts' = [?M1 @ (ctx[0], ..., ctx[n]),
---   --        ?M2 @ (ctx[0], ..., ctx[n], e1),
---   --        ...,
---   --        ?Mm @ (ctx[0], ..., ctx[n], e1, ..., e{m-1})]
---   let ts' = map (substWeakTermPlus (zip ys es) . snd) yts
---   forM_ (zip ts ts') $ uncurry insConstraintEnv
---   cod <- newTypeHoleInCtx (ctx ++ yts)
---   let tPi = (m, WeakTermPi yts cod)
---   insConstraintEnv tPi t
---   -- cod' = ?M @ (ctx[0], ..., ctx[n], e1, ..., em)
---   return $ substWeakTermPlus (zip ys es) cod
--- -- In a context (x1 : A1, ..., xn : An), this function creates metavariables
--- --   ?M  : Pi (x1 : A1, ..., xn : An). ?Mt @ (x1, ..., xn)
--- --   ?Mt : Pi (x1 : A1, ..., xn : An). Univ
--- -- and return ?M @ (x1, ..., xn) : ?Mt @ (x1, ..., xn).
--- -- Note that we can't just set `?M : Pi (x1 : A1, ..., xn : An). Univ` since
--- -- WeakTermZeta might be used as an ordinary term, that is, a term which is not a type.
--- -- {} newHoleInCtx {}
--- -- newHoleInCtx :: Context -> Meta -> WithEnv WeakTermPlus
--- -- newHoleInCtx ctx m = do
--- --   higherHole <- newHoleOfType (m, WeakTermPi ctx univ)
--- --   varSeq <- mapM (uncurry toVar) ctx
--- --   let higherApp = (m, WeakTermPiElim higherHole varSeq)
--- --   hole <- newHoleOfType (m, WeakTermPi ctx higherApp)
--- --   -- return (PreMetaNonTerminal app m, WeakTermPiElim hole varSeq)
--- --   return (m, WeakTermPiElim hole varSeq)
--- --   -- return (m, WeakTermPiElim hole varSeq)
--- -- In a context (x1 : A1, ..., xn : An), this function creates a metavariable
--- --   ?M  : Pi (x1 : A1, ..., xn : An). Univ
--- -- and return ?M @ (x1, ..., xn) : Univ.
--- newTypeHoleInCtx :: Context -> WithEnv WeakTermPlus
--- newTypeHoleInCtx ctx = do
---   let varSeq = map (toVar . fst) ctx
---   -- 実際にはholeの型とかどうでもいいのか、これ？制約に絡んでこない。
---   -- hole <- newHoleOfType (emptyMeta, WeakTermPi ctx univ)
---   hole <- newHole
---   return (emptyMeta, WeakTermPiElim hole varSeq)
--- -- In context ctx == [x1, ..., xn], `newTypeHoleListInCtx ctx [y1, ..., ym]` generates
--- -- the following list:
--- --
--- --   [(y1,   ?M1   @ (x1, ..., xn)),
--- --    (y2,   ?M2   @ (x1, ..., xn, y1),
--- --    ...,
--- --    (y{m}, ?M{m} @ (x1, ..., xn, y1, ..., y{m-1}))]
--- --
--- -- inserting type information `yi : ?Mi @ (x1, ..., xn, y1, ..., y{i-1})
--- newTypeHoleListInCtx ::
---      Context -> [Identifier] -> WithEnv [(Identifier, WeakTermPlus)]
--- newTypeHoleListInCtx _ [] = return []
--- newTypeHoleListInCtx ctx (y:ys) = do
---   t <- newTypeHoleInCtx ctx
---   insWeakTypeEnv y t
---   ts <- newTypeHoleListInCtx (ctx ++ [(y, t)]) ys
---   return $ (y, t) : ts
--- inferCase :: Case -> WithEnv (Maybe WeakTermPlus)
--- inferCase (CaseValue (EnumValueLabel name)) = do
---   ienv <- gets enumEnv
---   k <- lookupKind' name ienv
---   return $ Just (emptyMeta, WeakTermEnum $ EnumTypeLabel k)
--- inferCase (CaseValue (EnumValueNatNum i _)) =
---   return $ Just (emptyMeta, WeakTermEnum $ EnumTypeNatNum i)
--- inferCase _ = return Nothing
--- constrainList :: [WeakTermPlus] -> WithEnv ()
--- constrainList [] = return ()
--- constrainList [_] = return ()
--- constrainList (t1:t2:ts) = do
---   insConstraintEnv t1 t2
---   constrainList $ t2 : ts
--- -- is-enum n{i}
--- toIsEnumType :: Integer -> WithEnv WeakTermPlus
--- toIsEnumType i = do
---   return
---     ( emptyMeta
---     , WeakTermPiElim
---         (emptyMeta, WeakTermConst "is-enum")
---         [(emptyMeta, WeakTermEnum $ EnumTypeNatNum i)])
--- newHole :: WithEnv WeakTermPlus
--- newHole = do
---   h <- newNameWith "hole"
---   return (emptyMeta, WeakTermZeta h)
--- determineDomType :: [WeakTermPlus] -> WeakTermPlus
--- determineDomType ts =
---   if not (null ts)
---     then head ts
---     else (emptyMeta, WeakTermConst "bottom")
--- insConstraintEnv :: WeakTermPlus -> WeakTermPlus -> WithEnv ()
--- insConstraintEnv t1 t2 =
---   modify (\e -> e {constraintEnv = (t1, t2) : constraintEnv e})
--- insWeakTypeEnv :: Identifier -> WeakTermPlus -> WithEnv ()
--- insWeakTypeEnv i t =
---   modify (\e -> e {weakTypeEnv = Map.insert i t (weakTypeEnv e)})
--- lookupWeakTypeEnv :: String -> WithEnv WeakTermPlus
--- lookupWeakTypeEnv s = do
---   mt <- lookupWeakTypeEnvMaybe s
---   case mt of
---     Just t -> return t
---     Nothing -> throwError $ s ++ " is not found in the type environment."
--- lookupWeakTypeEnvMaybe :: String -> WithEnv (Maybe WeakTermPlus)
--- lookupWeakTypeEnvMaybe s = do
---   mt <- gets (Map.lookup s . weakTypeEnv)
---   case mt of
---     Nothing -> return Nothing
---     Just t -> return $ Just t
--- lookupKind :: Identifier -> WithEnv Identifier
--- lookupKind name = do
---   env <- get
---   lookupKind' name $ enumEnv env
--- lookupKind' :: Identifier -> [(Identifier, [Identifier])] -> WithEnv Identifier
--- lookupKind' i [] = throwError $ "no such enum-intro is defined: " ++ i
--- lookupKind' i ((j, ls):xs) =
---   if i `elem` ls
---     then return j
---     else lookupKind' i xs
 module Elaborate.Infer
   ( infer
   , univ
@@ -346,40 +56,16 @@ infer' ctx (m, WeakTermPiIntro xts e) = do
   let piType = (emptyMeta, WeakTermPi xts' tCod)
   retWeakTerm piType m $ WeakTermPiIntro xts' e'
 infer' ctx (m, WeakTermPiElim e@(_, WeakTermPiIntro xts _) es)
-  | length xts == length es
-    -- Consider the following code:
-    --   (definition itself ((S tau)) S)
-    --   (definition id ((A tau) (x A)) x)
-    --   (ascription id
-    --     (pi
-    --       ((A tau)
-    --        (x A))
-    --       (itself A)))
-    -- In the example code above, the type of `id` is inferred to be
-    --   Pi (A : Tau, x : A). A,
-    -- whereas the type ascription provided by the last term is
-    --   Pi (A : Tau, x : A). itself @ (A).
-    -- Without the information provided by `defList`, one of the resulting constraint
-    -- `A == itself @ (A)` cannot be resolved since we don't know how to unfold the
-    -- definition of `itself`. This case-split of PiElim is exactly for this purpose.
-   = do
+  | length xts == length es = do
     ets <- mapM (infer' ctx) es
-    let es' = map fst ets
-    -- (es', ts) <- unzip <$> mapM (infer' ctx) es
     et <- infer' ctx e
-    senv <- gets substEnv
+    let es' = map fst ets
     let hss = map holeWeakTermPlus es'
     let defList = zip (map fst xts) (zip hss es')
-    modify (\env -> env {substEnv = defList ++ senv})
+    modify (\env -> env {substEnv = defList ++ substEnv env})
     inferPiElim ctx m et ets
 infer' ctx (m, WeakTermPiElim e es) = do
   ets <- mapM (infer' ctx) es
-  -- (es', ts) <- unzip <$> mapM (infer' ctx) es
-  -- `es` must be inferred first since inference on `e` might extend the context,
-  -- leading (for example) the type of a constant set to be something like ?M @ (ctx, x).
-  -- This might cause a problem since if we have the same constant in `es`, the type of
-  -- the constant is inferred to be ?M @ (ctx, x), despite the fact that the `x` is not in
-  -- the context of the constant.
   et <- infer' ctx e
   inferPiElim ctx m et ets
 infer' ctx (m, WeakTermIter (x, t) xts e) = do
@@ -389,12 +75,8 @@ infer' ctx (m, WeakTermIter (x, t) xts e) = do
   -- Otherwise the type of `mu x. e` might have `x` as free variable, which is unsound.
   (xts', (e', tCod)) <- inferPiIntro ctx xts e
   let piType = (emptyMeta, WeakTermPi xts' tCod)
-  -- retWeakTerm piType m $ WeakTermPiIntro xts' e'
-  -- e' <- infer' ctx e
   insConstraintEnv t' piType
-  -- insConstraintEnv t' (typeOf e')
   retWeakTerm piType m $ WeakTermIter (x, t') xts' e'
-  -- retWeakTerm t' m $ WeakTermIter (x, t') e'
 infer' ctx (m, WeakTermZeta _) = do
   (app, higherApp) <- newHoleInCtx ctx m
   return (app, higherApp)
@@ -422,7 +104,6 @@ infer' _ (m, WeakTermIntU size i) = do
   retWeakTerm t m $ WeakTermIntU size i
 infer' ctx (m, WeakTermInt t i) = do
   t' <- inferType ctx t
-  -- h <- newTypeHoleInCtx ctx
   retWeakTerm t' m $ WeakTermInt t' i
 infer' _ (m, WeakTermFloat16 f) = do
   let t = (emptyMeta, WeakTermConst "f16")
@@ -435,7 +116,6 @@ infer' _ (m, WeakTermFloat64 f) = do
   retWeakTerm t m $ WeakTermFloat64 f
 infer' ctx (m, WeakTermFloat t f) = do
   t' <- inferType ctx t
-  -- h <- newTypeHoleInCtx ctx
   retWeakTerm t' m $ WeakTermFloat t' f
 infer' _ (m, WeakTermEnum name) = retWeakTerm univ m $ WeakTermEnum name
 infer' _ (m, WeakTermEnumIntro labelOrNum) = do
@@ -535,15 +215,12 @@ inferPiElim ::
   -> WithEnv (WeakTermPlus, WeakTermPlus)
 inferPiElim ctx m (e, t) ets = do
   let (es, ts) = unzip ets
-  -- (es', ts) <- unzip <$> mapM (infer' ctx) es
-  -- (e', t) <- infer' ctx e
   ys <- mapM (const $ newNameWith "arg") es
-  -- yts = [y1 : ?M1 @ (ctx[0], ..., ctx[n]),
-  --        y2 : ?M2 @ (ctx[0], ..., ctx[n], y1),
+  -- yts = [(y1, ?M1 @ (ctx[0], ..., ctx[n])),
+  --        (y2, ?M2 @ (ctx[0], ..., ctx[n], y1)),
   --        ...,
-  --        ym : ?Mm @ (ctx[0], ..., ctx[n], y1, ..., y{m-1})]
+  --        (ym, ?Mm @ (ctx[0], ..., ctx[n], y1, ..., y{m-1}))]
   yts <- newTypeHoleListInCtx ctx ys
-  -- let ts = map typeOf es
   -- ts' = [?M1 @ (ctx[0], ..., ctx[n]),
   --        ?M2 @ (ctx[0], ..., ctx[n], e1),
   --        ...,
@@ -554,7 +231,6 @@ inferPiElim ctx m (e, t) ets = do
   let tPi = (emptyMeta, WeakTermPi yts cod)
   insConstraintEnv tPi t
   -- insConstraintEnv tPi (typeOf e)
-  -- cod' = ?M @ (ctx[0], ..., ctx[n], e1, ..., em)
   let cod' = substWeakTermPlus (zip ys es) cod
   retWeakTerm cod' m $ WeakTermPiElim e es
 
@@ -572,7 +248,7 @@ newHoleInCtx ctx m = do
   let higherApp = (m, WeakTermPiElim higherHole varSeq)
   hole <- newHoleOfType (m, WeakTermPi ctx higherApp)
   let app = (m, WeakTermPiElim hole varSeq)
-  return (app, higherHole)
+  return (app, higherApp)
 
 -- In a context (x1 : A1, ..., xn : An), this function creates a metavariable
 --   ?M  : Pi (x1 : A1, ..., xn : An). Univ
@@ -631,7 +307,7 @@ toIsEnumType i = do
         [(emptyMeta, WeakTermEnum $ EnumTypeNatNum i)])
 
 newHoleOfType :: WeakTermPlus -> WithEnv WeakTermPlus
-newHoleOfType t = do
+newHoleOfType _ = do
   h <- newNameWith "hole-with-type"
   return (emptyMeta, WeakTermZeta h)
 

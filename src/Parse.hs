@@ -10,8 +10,8 @@ import Text.Read (readMaybe)
 
 import Data.Basic
 import Data.Env
-import Data.QuasiTerm
 import Data.Tree
+import Data.WeakTerm
 import Parse.Interpret
 import Parse.MacroExpand
 import Parse.Read
@@ -21,12 +21,12 @@ data Def
   = DefLet
       Meta
       IdentifierPlus -- the `(x : t)` in `let (x : t) = e`
-      QuasiTermPlus -- the `e` in `let x = e`
+      WeakTermPlus -- the `e` in `let x = e`
   | DefConstDecl IdentifierPlus
 
 -- {} parse {the output term is correctly renamed}
 -- (The postcondition is guaranteed by the assertion of `rename`.)
-parse :: String -> String -> WithEnv QuasiTermPlus
+parse :: String -> String -> WithEnv WeakTermPlus
 parse s inputPath = do
   strToTree s inputPath >>= parse' >>= concatDefList >>= rename
 
@@ -119,35 +119,35 @@ isSpecialForm (_, TreeNode [(_, TreeAtom "let"), _, _]) = True
 isSpecialForm _ = False
 
 -- {} toIsEnumType {}
-toIsEnumType :: Identifier -> WithEnv QuasiTermPlus
+toIsEnumType :: Identifier -> WithEnv WeakTermPlus
 toIsEnumType name = do
   return
     ( emptyMeta
-    , QuasiTermPiElim
-        (emptyMeta, QuasiTermConst "is-enum")
-        [(emptyMeta, QuasiTermEnum $ EnumTypeLabel name)])
+    , WeakTermPiElim
+        (emptyMeta, WeakTermConst "is-enum")
+        [(emptyMeta, WeakTermEnum $ EnumTypeLabel name)])
 
 -- {} concatDefList {}
 -- Represent the list of Defs in the target language, using `let`.
 -- (Note that `let x := e1 in e2` can be represented as `(lam x e2) e1`.)
-concatDefList :: [Def] -> WithEnv QuasiTermPlus
+concatDefList :: [Def] -> WithEnv WeakTermPlus
 concatDefList [] = do
-  return (emptyMeta, QuasiTermEnumIntro $ EnumValueLabel "unit")
+  return (emptyMeta, WeakTermEnumIntro $ EnumValueLabel "unit")
 -- for test
 concatDefList [DefLet _ _ e] = do
   return e
 concatDefList (DefConstDecl xt:es) = do
   cont <- concatDefList es
-  return (emptyMeta, QuasiTermConstDecl xt cont)
+  return (emptyMeta, WeakTermConstDecl xt cont)
 concatDefList (DefLet m xt e:es) = do
   cont <- concatDefList es
-  return (m, QuasiTermPiElim (emptyMeta, QuasiTermPiIntro [xt] cont) [e])
+  return (m, WeakTermPiElim (emptyMeta, WeakTermPiIntro [xt] cont) [e])
 
 -- {} newHole {}
-newHole :: WithEnv QuasiTermPlus
+newHole :: WithEnv WeakTermPlus
 newHole = do
   h <- newNameWith "hole-parse-zeta"
-  return (emptyMeta, QuasiTermZeta h)
+  return (emptyMeta, WeakTermZeta h)
 
 -- {} checkKeywordSanity {}
 checkKeywordSanity :: Identifier -> WithEnv ()

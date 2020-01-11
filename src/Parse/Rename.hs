@@ -6,71 +6,76 @@ import Control.Monad.State
 
 import Data.Basic
 import Data.Env
-import Data.QuasiTerm
+import Data.WeakTerm
 
 -- {} rename' {(every bound variable has fresh name)}
-rename :: QuasiTermPlus -> WithEnv QuasiTermPlus
+rename :: WeakTermPlus -> WithEnv WeakTermPlus
 rename e = do
   result <- rename' e
   let info = toInfo "rename.post" result
   return $ assertP info result $ checkSanity [] result
 
 -- Alpha-convert all the variables so that different variables have different names.
-rename' :: QuasiTermPlus -> WithEnv QuasiTermPlus
-rename' (m, QuasiTermTau) = return (m, QuasiTermTau)
-rename' (m, QuasiTermUpsilon x) = do
+rename' :: WeakTermPlus -> WithEnv WeakTermPlus
+rename' (m, WeakTermTau) = return (m, WeakTermTau)
+rename' (m, WeakTermUpsilon x) = do
   x' <- lookupNameEnv x
-  return (m, QuasiTermUpsilon x')
-rename' (m, QuasiTermPi xts t) = do
+  return (m, WeakTermUpsilon x')
+rename' (m, WeakTermPi xts t) = do
   (xts', t') <- renameBinder xts t
-  return (m, QuasiTermPi xts' t')
-rename' (m, QuasiTermPiIntro xts e) = do
+  return (m, WeakTermPi xts' t')
+rename' (m, WeakTermPiIntro xts e) = do
   (xts', e') <- renameBinder xts e
-  return (m, QuasiTermPiIntro xts' e')
-rename' (m, QuasiTermPiElim e es) = do
+  return (m, WeakTermPiIntro xts' e')
+rename' (m, WeakTermPiElim e es) = do
   e' <- rename' e
   es' <- mapM rename' es
-  return (m, QuasiTermPiElim e' es')
-rename' (m, QuasiTermIter xt xts e) = do
+  return (m, WeakTermPiElim e' es')
+rename' (m, WeakTermIter xt xts e) = do
   (xt', xts', e') <- renameIter xt xts e
-  return (m, QuasiTermIter xt' xts' e')
-rename' (m, QuasiTermConst x) = return (m, QuasiTermConst x)
-rename' (m, QuasiTermConstDecl (x, t) e) = do
+  return (m, WeakTermIter xt' xts' e')
+rename' (m, WeakTermConst x) = return (m, WeakTermConst x)
+rename' (m, WeakTermConstDecl (x, t) e) = do
   t' <- rename' t
   e' <- rename' e
-  return (m, QuasiTermConstDecl (x, t') e')
-rename' (m, QuasiTermZeta h) = return (m, QuasiTermZeta h)
-rename' (m, QuasiTermIntS size x) = return (m, QuasiTermIntS size x)
-rename' (m, QuasiTermIntU size x) = return (m, QuasiTermIntU size x)
-rename' (m, QuasiTermInt x) = return (m, QuasiTermInt x)
-rename' (m, QuasiTermFloat16 x) = return (m, QuasiTermFloat16 x)
-rename' (m, QuasiTermFloat32 x) = return (m, QuasiTermFloat32 x)
-rename' (m, QuasiTermFloat64 x) = return (m, QuasiTermFloat64 x)
-rename' (m, QuasiTermFloat x) = return (m, QuasiTermFloat x)
-rename' (m, QuasiTermEnum s) = return (m, QuasiTermEnum s)
-rename' (m, QuasiTermEnumIntro x) = return (m, QuasiTermEnumIntro x)
-rename' (m, QuasiTermEnumElim e caseList) = do
+  return (m, WeakTermConstDecl (x, t') e')
+rename' (m, WeakTermZeta h) = return (m, WeakTermZeta h)
+rename' (m, WeakTermIntS size x) = return (m, WeakTermIntS size x)
+rename' (m, WeakTermIntU size x) = return (m, WeakTermIntU size x)
+rename' (m, WeakTermInt t x) = do
+  t' <- rename t
+  return (m, WeakTermInt t' x)
+rename' (m, WeakTermFloat16 x) = return (m, WeakTermFloat16 x)
+rename' (m, WeakTermFloat32 x) = return (m, WeakTermFloat32 x)
+rename' (m, WeakTermFloat64 x) = return (m, WeakTermFloat64 x)
+rename' (m, WeakTermFloat t x) = do
+  t' <- rename' t
+  return (m, WeakTermFloat t' x)
+rename' (m, WeakTermEnum s) = return (m, WeakTermEnum s)
+rename' (m, WeakTermEnumIntro x) = return (m, WeakTermEnumIntro x)
+rename' (m, WeakTermEnumElim (e, t) caseList) = do
   e' <- rename' e
+  t' <- rename' t
   caseList' <- renameCaseList caseList
-  return (m, QuasiTermEnumElim e' caseList')
-rename' (m, QuasiTermArray kind indexType) = do
+  return (m, WeakTermEnumElim (e', t') caseList')
+rename' (m, WeakTermArray kind indexType) = do
   indexType' <- rename' indexType
-  return (m, QuasiTermArray kind indexType')
-rename' (m, QuasiTermArrayIntro kind les) = do
+  return (m, WeakTermArray kind indexType')
+rename' (m, WeakTermArrayIntro kind les) = do
   les' <-
     forM les $ \(l, body) -> do
       body' <- rename' body
       return (l, body')
-  return (m, QuasiTermArrayIntro kind les')
-rename' (m, QuasiTermArrayElim kind e1 e2) = do
+  return (m, WeakTermArrayIntro kind les')
+rename' (m, WeakTermArrayElim kind e1 e2) = do
   e1' <- rename' e1
   e2' <- rename' e2
-  return (m, QuasiTermArrayElim kind e1' e2')
+  return (m, WeakTermArrayElim kind e1' e2')
 
 renameBinder ::
      [IdentifierPlus]
-  -> QuasiTermPlus
-  -> WithEnv ([IdentifierPlus], QuasiTermPlus)
+  -> WeakTermPlus
+  -> WithEnv ([IdentifierPlus], WeakTermPlus)
 renameBinder [] e = do
   e' <- rename' e
   return ([], e')
@@ -84,8 +89,8 @@ renameBinder ((x, t):xts) e = do
 renameIter ::
      IdentifierPlus
   -> [IdentifierPlus]
-  -> QuasiTermPlus
-  -> WithEnv (IdentifierPlus, [IdentifierPlus], QuasiTermPlus)
+  -> WeakTermPlus
+  -> WithEnv (IdentifierPlus, [IdentifierPlus], WeakTermPlus)
 renameIter (x, t) xts e = do
   t' <- rename' t
   renameIter' (x, t') xts e
@@ -93,8 +98,8 @@ renameIter (x, t) xts e = do
 renameIter' ::
      IdentifierPlus
   -> [IdentifierPlus]
-  -> QuasiTermPlus
-  -> WithEnv (IdentifierPlus, [IdentifierPlus], QuasiTermPlus)
+  -> WeakTermPlus
+  -> WithEnv (IdentifierPlus, [IdentifierPlus], WeakTermPlus)
 renameIter' (x, t') [] e = do
   local $ do
     x' <- newNameWith x
@@ -107,7 +112,7 @@ renameIter' xt ((x, t):xts) e = do
     (xt', xts', e') <- renameIter' xt xts e
     return (xt', (x', t') : xts', e')
 
-renameCaseList :: [(Case, QuasiTermPlus)] -> WithEnv [(Case, QuasiTermPlus)]
+renameCaseList :: [(Case, WeakTermPlus)] -> WithEnv [(Case, WeakTermPlus)]
 renameCaseList caseList =
   forM caseList $ \(l, body) ->
     local $ do
@@ -121,40 +126,40 @@ local comp = do
   modify (\e -> env {count = count e})
   return x
 
-checkSanity :: [Identifier] -> QuasiTermPlus -> Bool
-checkSanity _ (_, QuasiTermTau) = True
-checkSanity _ (_, QuasiTermUpsilon _) = True
-checkSanity ctx (_, QuasiTermPi xts t) = do
+checkSanity :: [Identifier] -> WeakTermPlus -> Bool
+checkSanity _ (_, WeakTermTau) = True
+checkSanity _ (_, WeakTermUpsilon _) = True
+checkSanity ctx (_, WeakTermPi xts t) = do
   checkSanity' ctx xts t
-checkSanity ctx (_, QuasiTermPiIntro xts e) = do
+checkSanity ctx (_, WeakTermPiIntro xts e) = do
   checkSanity' ctx xts e
-checkSanity ctx (_, QuasiTermPiElim e es) = do
+checkSanity ctx (_, WeakTermPiElim e es) = do
   checkSanity ctx e && all (checkSanity ctx) es
-checkSanity ctx (_, QuasiTermIter xt xts e) = do
+checkSanity ctx (_, WeakTermIter xt xts e) = do
   checkSanity' ctx (xt : xts) e
-checkSanity _ (_, QuasiTermConst _) = True
-checkSanity ctx (_, QuasiTermConstDecl (_, t) e) = do
+checkSanity _ (_, WeakTermConst _) = True
+checkSanity ctx (_, WeakTermConstDecl (_, t) e) = do
   checkSanity ctx t && checkSanity ctx e
-checkSanity _ (_, QuasiTermZeta _) = True
-checkSanity _ (_, QuasiTermIntS {}) = True
-checkSanity _ (_, QuasiTermIntU {}) = True
-checkSanity _ (_, QuasiTermInt _) = True
-checkSanity _ (_, QuasiTermFloat16 _) = True
-checkSanity _ (_, QuasiTermFloat32 _) = True
-checkSanity _ (_, QuasiTermFloat64 _) = True
-checkSanity _ (_, QuasiTermFloat _) = True
-checkSanity _ (_, QuasiTermEnum _) = True
-checkSanity _ (_, QuasiTermEnumIntro _) = True
-checkSanity ctx (_, QuasiTermEnumElim e les) = do
-  checkSanity ctx e && all (checkSanity ctx . snd) les
-checkSanity ctx (_, QuasiTermArray _ indexType) = do
+checkSanity _ (_, WeakTermZeta _) = True
+checkSanity _ (_, WeakTermIntS {}) = True
+checkSanity _ (_, WeakTermIntU {}) = True
+checkSanity ctx (_, WeakTermInt t _) = checkSanity ctx t
+checkSanity _ (_, WeakTermFloat16 _) = True
+checkSanity _ (_, WeakTermFloat32 _) = True
+checkSanity _ (_, WeakTermFloat64 _) = True
+checkSanity ctx (_, WeakTermFloat t _) = checkSanity ctx t
+checkSanity _ (_, WeakTermEnum _) = True
+checkSanity _ (_, WeakTermEnumIntro _) = True
+checkSanity ctx (_, WeakTermEnumElim (e, t) les) =
+  all (checkSanity ctx) $ e : t : map snd les
+checkSanity ctx (_, WeakTermArray _ indexType) = do
   checkSanity ctx indexType
-checkSanity ctx (_, QuasiTermArrayIntro _ les) = do
+checkSanity ctx (_, WeakTermArrayIntro _ les) = do
   all (checkSanity ctx . snd) les
-checkSanity ctx (_, QuasiTermArrayElim _ e1 e2) = do
+checkSanity ctx (_, WeakTermArrayElim _ e1 e2) = do
   checkSanity ctx e1 && checkSanity ctx e2
 
-checkSanity' :: [Identifier] -> [IdentifierPlus] -> QuasiTermPlus -> Bool
+checkSanity' :: [Identifier] -> [IdentifierPlus] -> WeakTermPlus -> Bool
 checkSanity' ctx [] e = do
   checkSanity ctx e
 checkSanity' ctx ((x, _):_) _

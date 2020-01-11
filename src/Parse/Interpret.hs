@@ -15,118 +15,121 @@ import qualified Text.Show.Pretty as Pr
 
 import Data.Basic
 import Data.Env
-import Data.QuasiTerm
 import Data.Tree
+import Data.WeakTerm
 
 -- {} interpret {}
-interpret :: TreePlus -> WithEnv QuasiTermPlus
+interpret :: TreePlus -> WithEnv WeakTermPlus
 --
 -- foundational interpretations
 --
-interpret (m, TreeAtom "tau") = return (m, QuasiTermTau)
+interpret (m, TreeAtom "tau") = return (m, WeakTermTau)
 interpret (m, TreeNode [(_, TreeAtom "upsilon"), (_, TreeAtom x)]) =
-  return (m, QuasiTermUpsilon x)
+  return (m, WeakTermUpsilon x)
 interpret (m, TreeNode [(_, TreeAtom "pi"), (_, TreeNode xts), t]) = do
   (xts', t') <- interpretBinder xts t
-  return (m, QuasiTermPi xts' t')
+  return (m, WeakTermPi xts' t')
 interpret (m, TreeNode [(_, TreeAtom "pi-introduction"), (_, TreeNode xts), e]) = do
   (xts', e') <- interpretBinder xts e
-  return (m, QuasiTermPiIntro xts' e')
+  return (m, WeakTermPiIntro xts' e')
 interpret (m, TreeNode ((_, TreeAtom "pi-elimination"):e:es)) = do
   e' <- interpret e
   es' <- mapM interpret es
-  return (m, QuasiTermPiElim e' es')
+  return (m, WeakTermPiElim e' es')
 interpret (m, TreeNode [(_, TreeAtom "iterate"), xt, (_, TreeNode xts), e]) = do
   xt' <- interpretIdentifierPlus xt
   (xts', e') <- interpretBinder xts e
-  return (m, QuasiTermIter xt' xts' e')
+  return (m, WeakTermIter xt' xts' e')
 interpret (m, TreeNode [(_, TreeAtom "zeta"), (_, TreeAtom x)]) = do
   x' <- interpretAtom x
-  return (m, QuasiTermZeta x')
+  return (m, WeakTermZeta x')
 interpret (m, TreeNode [(_, TreeAtom "constant"), (_, TreeAtom x)]) =
-  return (m, QuasiTermConst x)
+  return (m, WeakTermConst x)
 interpret (m, TreeNode [(_, TreeAtom "constant-declaration"), xt, e]) = do
   xt' <- interpretIdentifierPlus xt
   e' <- interpret e
-  return (m, QuasiTermConstDecl xt' e')
+  return (m, WeakTermConstDecl xt' e')
 interpret (m, TreeNode [(_, TreeAtom t), (_, TreeAtom x)])
   | Just (LowTypeIntS i) <- asLowTypeMaybe t
-  , Just x' <- readMaybe x = return (m, QuasiTermIntS i x')
+  , Just x' <- readMaybe x = return (m, WeakTermIntS i x')
 interpret (m, TreeNode [(_, TreeAtom t), (_, TreeAtom x)])
   | Just (LowTypeIntU i) <- asLowTypeMaybe t
-  , Just x' <- readMaybe x = return (m, QuasiTermIntU i x')
+  , Just x' <- readMaybe x = return (m, WeakTermIntU i x')
 interpret (m, TreeNode [(_, TreeAtom "f16"), (_, TreeAtom x)])
-  | Just x' <- readMaybe x = return (m, QuasiTermFloat16 x')
+  | Just x' <- readMaybe x = return (m, WeakTermFloat16 x')
 interpret (m, TreeNode [(_, TreeAtom "f32"), (_, TreeAtom x)])
-  | Just x' <- readMaybe x = return (m, QuasiTermFloat32 x')
+  | Just x' <- readMaybe x = return (m, WeakTermFloat32 x')
 interpret (m, TreeNode [(_, TreeAtom "f64"), (_, TreeAtom x)])
-  | Just x' <- readMaybe x = return (m, QuasiTermFloat64 x')
+  | Just x' <- readMaybe x = return (m, WeakTermFloat64 x')
 interpret (m, TreeNode [(_, TreeAtom "enum"), (_, TreeAtom x)])
   | Just i <- readNatEnumType x =
-    return (m, QuasiTermEnum $ EnumTypeNatNum $ fromInteger i)
+    return (m, WeakTermEnum $ EnumTypeNatNum $ fromInteger i)
 interpret (m, TreeNode [(_, TreeAtom "enum"), (_, TreeAtom x)]) = do
   isEnum <- isDefinedEnumName x
   if not isEnum
     then throwError $ "No such enum-type defined: " ++ x
-    else return (m, QuasiTermEnum $ EnumTypeLabel x)
+    else return (m, WeakTermEnum $ EnumTypeLabel x)
 interpret (m, TreeNode [(_, TreeAtom "enum-introduction"), l]) = do
   l' <- interpretEnumValue l
-  return (m, QuasiTermEnumIntro l')
+  return (m, WeakTermEnumIntro l')
 interpret (m, TreeNode ((_, TreeAtom "enum-elimination"):e:cs)) = do
   e' <- interpret e
   cs' <- mapM interpretClause cs
-  return (m, QuasiTermEnumElim e' cs')
+  h <- newHole m
+  return (m, WeakTermEnumElim (e', h) cs')
 interpret (m, TreeNode [(_, TreeAtom str), indexType])
   | Just kind <- withKindPrefix str "array" = do
     indexType' <- interpret indexType
-    return (m, QuasiTermArray kind indexType')
+    return (m, WeakTermArray kind indexType')
 interpret (m, TreeNode ((_, TreeAtom str):cs))
   | Just kind <- withKindPrefix str "array-introduction" = do
     cs' <- mapM interpretClause cs
     let (ls, es) = unzip cs'
     ls' <- mapM asArrayIntro ls
-    return (m, QuasiTermArrayIntro kind (zip ls' es))
+    return (m, WeakTermArrayIntro kind (zip ls' es))
 interpret (m, TreeNode [(_, TreeAtom str), e1, e2])
   | Just kind <- withKindPrefix str "array-elimination" = do
     e1' <- interpret e1
     e2' <- interpret e2
-    return (m, QuasiTermArrayElim kind e1' e2')
+    return (m, WeakTermArrayElim kind e1' e2')
 --
 -- auxiliary interpretations
 --
 interpret (m, TreeAtom x)
-  | Just x' <- readMaybe x = return (m, QuasiTermInt x')
+  | Just x' <- readMaybe x = do
+    h <- newHole m
+    return (m, WeakTermInt h x')
 interpret (m, TreeAtom x)
-  | Just x' <- readMaybe x = return (m, QuasiTermFloat x')
+  | Just x' <- readMaybe x = do
+    h <- newHole m
+    return (m, WeakTermFloat h x')
 interpret (m, TreeAtom x)
   | Just i <- readNatEnumType x =
-    return (m, QuasiTermEnum $ EnumTypeNatNum $ fromInteger i)
+    return (m, WeakTermEnum $ EnumTypeNatNum $ fromInteger i)
 interpret (m, TreeAtom x)
   | Just (i, j) <- readNatEnumValue x =
-    return (m, QuasiTermEnumIntro $ EnumValueNatNum i j)
+    return (m, WeakTermEnumIntro $ EnumValueNatNum i j)
 interpret (m, TreeAtom x)
   | Just str <- readMaybe x = do
-    u8s <- forM (encode str) $ \u -> return (m, QuasiTermIntU 8 (toInteger u))
+    u8s <- forM (encode str) $ \u -> return (m, WeakTermIntU 8 (toInteger u))
     let len = toInteger $ length u8s
     let ns = map (\i -> EnumValueNatNum len i) [0 .. (len - 1)]
     -- parse string as utf-8 encoded u8 array
-    return (m, QuasiTermArrayIntro (ArrayKindIntU 8) (zip ns u8s))
-interpret (m, TreeAtom "_") = do
-  h <- newNameWith "hole-aux"
-  return (m, QuasiTermZeta h)
+    return (m, WeakTermArrayIntro (ArrayKindIntU 8) (zip ns u8s))
+interpret (m, TreeAtom "_") = newHole m
 interpret t@(m, TreeAtom x) = do
   ml <- interpretEnumValueMaybe t
   case ml of
-    Just l -> return (m, QuasiTermEnumIntro l)
+    Just l -> return (m, WeakTermEnumIntro l)
     _ -> do
       isEnum <- isDefinedEnumName x
       if isEnum
-        then return (m, QuasiTermEnum $ EnumTypeLabel x)
+        then return (m, WeakTermEnum $ EnumTypeLabel x)
         else do
           cenv <- gets constantEnv
           if isConstant x || x `elem` cenv
-            then return (m, QuasiTermConst x)
-            else return (m, QuasiTermUpsilon x)
+            then return (m, WeakTermConst x)
+            else return (m, WeakTermUpsilon x)
 interpret t@(m, TreeNode es) =
   if null es
     then throwError $ "interpret: syntax error:\n" ++ Pr.ppShow t
@@ -134,9 +137,9 @@ interpret t@(m, TreeNode es) =
 
 -- {} interpretIdentifierPlus {}
 interpretIdentifierPlus :: TreePlus -> WithEnv IdentifierPlus
-interpretIdentifierPlus (_, TreeAtom x) = do
-  h <- newNameWith "hole-plus"
-  return (x, (emptyMeta, QuasiTermZeta h))
+interpretIdentifierPlus (m, TreeAtom x) = do
+  h <- newHole m
+  return (x, h)
 interpretIdentifierPlus (_, TreeNode [(_, TreeAtom x), t]) = do
   x' <- interpretAtom x
   t' <- interpret t
@@ -172,7 +175,7 @@ interpretEnumValue l = do
 -- `xts` はatomまたは(atom, tree)であることが想定されているけれど、どうせ、interpretIdentifierPlusは
 -- 任意のtreeを読んで読めなかったらたんに失敗するだけだから問題なし。それゆえ事前条件がemptyになる。
 interpretBinder ::
-     [TreePlus] -> TreePlus -> WithEnv ([IdentifierPlus], QuasiTermPlus)
+     [TreePlus] -> TreePlus -> WithEnv ([IdentifierPlus], WeakTermPlus)
 interpretBinder xts t = do
   xts' <- mapM interpretIdentifierPlus xts
   t' <- interpret t
@@ -192,7 +195,7 @@ interpretCase (_, TreeAtom "default") = return CaseDefault
 interpretCase c = CaseValue <$> interpretEnumValue c
 
 -- {} interpretClause {}
-interpretClause :: TreePlus -> WithEnv (Case, QuasiTermPlus)
+interpretClause :: TreePlus -> WithEnv (Case, WeakTermPlus)
 interpretClause (_, TreeNode [c, e]) = do
   c' <- interpretCase c
   e' <- interpret e
@@ -232,6 +235,11 @@ isDefinedEnumName name = do
   env <- get
   let enumNameList = map fst $ enumEnv env
   return $ name `elem` enumNameList
+
+newHole :: Meta -> WithEnv WeakTermPlus
+newHole m = do
+  h <- newNameWith "hole-aux"
+  return (m, WeakTermZeta h)
 
 -- {} encodeChar {(the output is valid as utf8 string)}
 -- adopted from https://hackage.haskell.org/package/utf8-string-1.0.1.1/docs/src/Codec-Binary-UTF8-String.html

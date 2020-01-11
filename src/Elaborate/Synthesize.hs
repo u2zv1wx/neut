@@ -13,7 +13,6 @@ import Data.Constraint
 import Data.Env
 import Data.WeakTerm
 import Elaborate.Analyze
-import Elaborate.Infer (insWeakTypeEnv, metaTerminal, typeOf)
 import Reduce.WeakTerm
 
 -- Given a queue of constraints (easier ones comes earlier), try to synthesize
@@ -25,16 +24,29 @@ synthesize q = do
   case Q.getMin q of
     Nothing -> return ()
     Just (Enriched (e1, e2) ms _ _)
-      | Just (m, (_, e)) <- lookupAny ms sub -> resolveStuck q e1 e2 m e
-    Just (Enriched _ _ fmvs (ConstraintPattern m ess e)) -> do
+      | Just (m, (_, e)) <- lookupAny ms sub
+        -- p $ "resolve-stuck: " ++ m
+       -> do resolveStuck q e1 e2 m e
+    Just (Enriched _ _ fmvs (ConstraintPattern m ess e))
+      -- p $ "pat: " ++ m
+     -> do
       resolvePiElim q m fmvs ess e
-    Just (Enriched _ _ _ (ConstraintDelta iter mess1 mess2)) -> do
+    Just (Enriched _ _ _ (ConstraintDelta iter mess1 mess2))
+      -- p "delta"
+     -> do
       resolveDelta q iter mess1 mess2
-    Just (Enriched _ _ fmvs (ConstraintQuasiPattern m ess e)) -> do
+    Just (Enriched _ _ fmvs (ConstraintQuasiPattern m ess e))
+      -- p $ "quasi: " ++ m
+      -- p $ "rest: " ++ show (Q.size q)
+      -- p' qua
+     -> do
       resolvePiElim q m fmvs ess e
-    Just (Enriched _ _ fmvs (ConstraintFlexRigid m ess e)) -> do
+    Just (Enriched _ _ fmvs (ConstraintFlexRigid m ess e))
+      -- p "flex"
+     -> do
       resolvePiElim q m fmvs ess e
-    Just (Enriched (e1, e2) _ _ _) ->
+    Just (Enriched (e1, e2) _ _ _) -> do
+      p $ "rest: " ++ show (Q.size q)
       throwError $ "cannot simplify:\n" ++ Pr.ppShow (e1, e2)
 
 -- e1だけがstuckしているとき、e2だけがstuckしているとき、両方がstuckしているときをそれぞれ
@@ -56,8 +68,8 @@ resolveStuck q e1 e2 h e = do
 resolveDelta ::
      ConstraintQueue
   -> IterInfo
-  -> [(PreMeta, [WeakTermPlus])]
-  -> [(PreMeta, [WeakTermPlus])]
+  -> [(Meta, [WeakTermPlus])]
+  -> [(Meta, [WeakTermPlus])]
   -> WithEnv ()
 resolveDelta q iter mess1 mess2 = do
   let planA = do
@@ -94,9 +106,23 @@ resolvePiElim ::
 resolvePiElim q m fmvs ess e = do
   let lengthInfo = map length ess
   let es = concat ess
+  when (m == "hole-2718") $ do
+    p $ "resolvePiElim for " ++ m
+    p "before toVarList"
+    p "es:"
+    p' es
+    foo <- toVarList es
+    p "foo:"
+    p' foo
+    bar <- toAltList foo
+    p "bar:"
+    p' bar
   xss <- toVarList es >>= toAltList
+  -- p "after toVarList"
   let xsss = map (takeByCount lengthInfo) xss
+  -- p "created xsss"
   let lamList = map (bindFormalArgs e) xsss
+  -- p "start chain"
   chain $ map (resolveHole q m fmvs) lamList
 
 -- {} resolveHole {}
@@ -119,14 +145,13 @@ asAnalyzable (Enriched cs ms fmvs _) = Enriched cs ms fmvs ConstraintAnalyzable
 chain :: [WithEnv a] -> WithEnv a
 chain [] = throwError $ "cannot synthesize(chain)."
 chain [e] = e
-chain (e:es) = catchError e $ (const $ chain es)
+chain (e:es) = catchError e $ (const $ do chain es)
 
 bindFormalArgs :: WeakTermPlus -> [[IdentifierPlus]] -> WeakTermPlus
 bindFormalArgs e [] = e
 bindFormalArgs e (xts:xtss) = do
   let e' = bindFormalArgs e xtss
-  let tPi = (metaTerminal, WeakTermPi xts (typeOf e'))
-  (PreMetaNonTerminal tPi emptyMeta, WeakTermPiIntro xts e')
+  (emptyMeta, WeakTermPiIntro xts e')
 
 lookupAny :: [Hole] -> [(Identifier, a)] -> Maybe (Hole, a)
 lookupAny [] _ = Nothing
@@ -141,13 +166,12 @@ toVarList :: [WeakTermPlus] -> WithEnv [(Identifier, WeakTermPlus)]
 toVarList [] = return []
 toVarList ((_, WeakTermUpsilon x):es) = do
   xts <- toVarList es
-  let t = (metaTerminal, WeakTermUpsilon "DONT_CARE")
+  let t = (emptyMeta, WeakTermUpsilon "DONT_CARE")
   return $ (x, t) : xts
 toVarList (_:es) = do
   xts <- toVarList es
   x <- newNameWith "hole"
-  let t = (metaTerminal, WeakTermUpsilon "DONT_CARE")
-  insWeakTypeEnv x t
+  let t = (emptyMeta, WeakTermUpsilon "DONT_CARE")
   return $ (x, t) : xts
 
 -- [x, x, y, z, z] ~>
@@ -207,7 +231,6 @@ discardInactive xs indexList =
         | i == j -> return (x, t)
       _ -> do
         y <- newNameWith "hole"
-        insWeakTypeEnv y t
         return (y, t)
 
 -- takeByCount [1, 3, 2] [a, b, c, d, e, f, g, h] ~> [[a], [b, c, d], [e, f]]

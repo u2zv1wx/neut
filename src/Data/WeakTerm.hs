@@ -17,14 +17,14 @@ data WeakTerm
   | WeakTermConstDecl IdentifierPlus WeakTermPlus
   | WeakTermIntS IntSize Integer
   | WeakTermIntU IntSize Integer
-  | WeakTermInt Integer
+  | WeakTermInt WeakTermPlus Integer
   | WeakTermFloat16 Half
   | WeakTermFloat32 Float
   | WeakTermFloat64 Double
-  | WeakTermFloat Double
+  | WeakTermFloat WeakTermPlus Double
   | WeakTermEnum EnumType
   | WeakTermEnumIntro EnumValue
-  | WeakTermEnumElim WeakTermPlus [(Case, WeakTermPlus)]
+  | WeakTermEnumElim (WeakTermPlus, WeakTermPlus) [(Case, WeakTermPlus)]
   | WeakTermArray ArrayKind WeakTermPlus
   | WeakTermArrayIntro ArrayKind [(EnumValue, WeakTermPlus)]
   | WeakTermArrayElim ArrayKind WeakTermPlus WeakTermPlus
@@ -37,6 +37,24 @@ type SubstWeakTerm = [(Identifier, WeakTermPlus)]
 type Hole = Identifier
 
 type IdentifierPlus = (Identifier, WeakTermPlus)
+
+toVar :: Identifier -> WeakTermPlus
+toVar x = (emptyMeta, WeakTermUpsilon x)
+
+toIntS :: IntSize -> WeakTermPlus
+toIntS size = (emptyMeta, WeakTermConst $ "i" ++ show size)
+
+toIntU :: IntSize -> WeakTermPlus
+toIntU size = (emptyMeta, WeakTermConst $ "u" ++ show size)
+
+f16 :: WeakTermPlus
+f16 = (emptyMeta, WeakTermConst "f16")
+
+f32 :: WeakTermPlus
+f32 = (emptyMeta, WeakTermConst "f32")
+
+f64 :: WeakTermPlus
+f64 = (emptyMeta, WeakTermConst "f64")
 
 varWeakTermPlus :: WeakTermPlus -> [Identifier]
 varWeakTermPlus (_, WeakTermTau) = []
@@ -56,17 +74,18 @@ varWeakTermPlus (_, WeakTermConstDecl xt e) = varWeakTermPlusBindings [xt] [e]
 varWeakTermPlus (_, WeakTermZeta _) = []
 varWeakTermPlus (_, WeakTermIntS _ _) = []
 varWeakTermPlus (_, WeakTermIntU _ _) = []
-varWeakTermPlus (_, WeakTermInt _) = []
+varWeakTermPlus (_, WeakTermInt t _) = varWeakTermPlus t
 varWeakTermPlus (_, WeakTermFloat16 _) = []
 varWeakTermPlus (_, WeakTermFloat32 _) = []
 varWeakTermPlus (_, WeakTermFloat64 _) = []
-varWeakTermPlus (_, WeakTermFloat _) = []
+varWeakTermPlus (_, WeakTermFloat t _) = varWeakTermPlus t
 varWeakTermPlus (_, WeakTermEnum _) = []
 varWeakTermPlus (_, WeakTermEnumIntro _) = []
-varWeakTermPlus (_, WeakTermEnumElim e les) = do
-  let xhs = varWeakTermPlus e
-  let yhs = concatMap (varWeakTermPlus . snd) les
-  xhs ++ yhs
+varWeakTermPlus (_, WeakTermEnumElim (e, t) les) = do
+  let xhs = varWeakTermPlus t
+  let yhs = varWeakTermPlus e
+  let zhs = concatMap (varWeakTermPlus . snd) les
+  xhs ++ yhs ++ zhs
 varWeakTermPlus (_, WeakTermArray _ t) = do
   varWeakTermPlus t
 varWeakTermPlus (_, WeakTermArrayIntro _ les) = do
@@ -96,17 +115,18 @@ holeWeakTermPlus (_, WeakTermConst _) = []
 holeWeakTermPlus (_, WeakTermConstDecl xt e) = holeWeakTermPlusBindings [xt] [e]
 holeWeakTermPlus (_, WeakTermIntS _ _) = []
 holeWeakTermPlus (_, WeakTermIntU _ _) = []
-holeWeakTermPlus (_, WeakTermInt _) = []
+holeWeakTermPlus (_, WeakTermInt t _) = holeWeakTermPlus t
 holeWeakTermPlus (_, WeakTermFloat16 _) = []
 holeWeakTermPlus (_, WeakTermFloat32 _) = []
 holeWeakTermPlus (_, WeakTermFloat64 _) = []
-holeWeakTermPlus (_, WeakTermFloat _) = []
+holeWeakTermPlus (_, WeakTermFloat t _) = holeWeakTermPlus t
 holeWeakTermPlus (_, WeakTermEnum _) = []
 holeWeakTermPlus (_, WeakTermEnumIntro _) = []
-holeWeakTermPlus (_, WeakTermEnumElim e les) = do
+holeWeakTermPlus (_, WeakTermEnumElim (e, t) les) = do
   let xhs = holeWeakTermPlus e
-  let yhs = concatMap (\(_, body) -> holeWeakTermPlus body) les
-  xhs ++ yhs
+  let yhs = holeWeakTermPlus t
+  let zhs = concatMap (\(_, body) -> holeWeakTermPlus body) les
+  xhs ++ yhs ++ zhs
 holeWeakTermPlus (_, WeakTermArray _ e) = holeWeakTermPlus e
 holeWeakTermPlus (_, WeakTermArrayIntro _ les) = do
   concatMap (\(_, body) -> holeWeakTermPlus body) les
@@ -151,25 +171,28 @@ substWeakTermPlus _ (m, WeakTermIntS size x) = do
   (m, WeakTermIntS size x)
 substWeakTermPlus _ (m, WeakTermIntU size x) = do
   (m, WeakTermIntU size x)
-substWeakTermPlus _ (m, WeakTermInt x) = do
-  (m, WeakTermInt x)
+substWeakTermPlus sub (m, WeakTermInt t x) = do
+  let t' = substWeakTermPlus sub t
+  (m, WeakTermInt t' x)
 substWeakTermPlus _ (m, WeakTermFloat16 x) = do
   (m, WeakTermFloat16 x)
 substWeakTermPlus _ (m, WeakTermFloat32 x) = do
   (m, WeakTermFloat32 x)
 substWeakTermPlus _ (m, WeakTermFloat64 x) = do
   (m, WeakTermFloat64 x)
-substWeakTermPlus _ (m, WeakTermFloat x) = do
-  (m, WeakTermFloat x)
+substWeakTermPlus sub (m, WeakTermFloat t x) = do
+  let t' = substWeakTermPlus sub t
+  (m, WeakTermFloat t' x)
 substWeakTermPlus _ (m, WeakTermEnum x) = do
   (m, WeakTermEnum x)
 substWeakTermPlus _ (m, WeakTermEnumIntro l) = do
   (m, WeakTermEnumIntro l)
-substWeakTermPlus sub (m, WeakTermEnumElim e branchList) = do
+substWeakTermPlus sub (m, WeakTermEnumElim (e, t) branchList) = do
+  let t' = substWeakTermPlus sub t
   let e' = substWeakTermPlus sub e
   let (caseList, es) = unzip branchList
   let es' = map (substWeakTermPlus sub) es
-  (m, WeakTermEnumElim e' (zip caseList es'))
+  (m, WeakTermEnumElim (e', t') (zip caseList es'))
 substWeakTermPlus sub (m, WeakTermArray kind indexType) = do
   let indexType' = substWeakTermPlus sub indexType
   (m, WeakTermArray kind indexType')
