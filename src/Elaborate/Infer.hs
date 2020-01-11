@@ -251,10 +251,10 @@ inferPiElim ctx m (e, t) ets = do
 -- {} newHoleInCtx {}
 newHoleInCtx :: Context -> Meta -> WithEnv (WeakTermPlus, WeakTermPlus)
 newHoleInCtx ctx m = do
-  higherHole <- newHoleOfType (m, WeakTermPi ctx univ)
+  higherHole <- newHole
   let varSeq = map (toVar . fst) ctx
   let higherApp = (m, WeakTermPiElim higherHole varSeq)
-  hole <- newHoleOfType (m, WeakTermPi ctx higherApp)
+  hole <- newHole
   let app = (m, WeakTermPiElim hole varSeq)
   return (app, higherApp)
 
@@ -264,7 +264,7 @@ newHoleInCtx ctx m = do
 newTypeHoleInCtx :: Context -> WithEnv WeakTermPlus
 newTypeHoleInCtx ctx = do
   let varSeq = map (toVar . fst) ctx
-  hole <- newHoleOfType (emptyMeta, WeakTermPi ctx univ)
+  hole <- newHole
   return (emptyMeta, WeakTermPiElim hole varSeq)
 
 -- In context ctx == [x1, ..., xn], `newTypeHoleListInCtx ctx [y1, ..., ym]` generates
@@ -314,9 +314,9 @@ toIsEnumType i = do
         (emptyMeta, WeakTermConst "is-enum")
         [(emptyMeta, WeakTermEnum $ EnumTypeNatNum i)])
 
-newHoleOfType :: WeakTermPlus -> WithEnv WeakTermPlus
-newHoleOfType _ = do
-  h <- newNameWith "hole-with-type"
+newHole :: WithEnv WeakTermPlus
+newHole = do
+  h <- newNameWith "hole"
   return (emptyMeta, WeakTermZeta h)
 
 determineDomType :: [WeakTermPlus] -> WeakTermPlus
