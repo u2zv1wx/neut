@@ -65,10 +65,15 @@ macroExpand1 :: TreePlus -> WithEnv TreePlus
 macroExpand1 t@(i, _) = do
   assertUP (toInfo "macroExpand1.pre" t) $ hasNoRemSplice t
   nenv <- gets notationEnv
-  mMatch <- try (macroMatch t) nenv
-  case mMatch of
-    Just (sub, (_, skel)) -> macroExpand' $ applySubst sub (i, skel)
-    Nothing -> return t
+  kenv <- gets keywordEnv
+  -- the computation of atomListOf could be memoized
+  if atomListOf t `S.disjoint` kenv
+    then return t -- t is already resolved
+    else do
+      mMatch <- try (macroMatch t) nenv
+      case mMatch of
+        Just (sub, (_, skel)) -> macroExpand' $ applySubst sub (i, skel)
+        Nothing -> return t
 
 type Notation = TreePlus
 
