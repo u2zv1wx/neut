@@ -28,12 +28,9 @@ analyze cs = Q.fromList <$> simp cs
 -- {} simp {}
 simp :: [PreConstraint] -> WithEnv [EnrichedConstraint]
 simp [] = return []
-simp ((e1, e2):cs)
-  -- p "reduce"
- = do
+simp ((e1, e2):cs) = do
   me1' <- reduceWeakTermPlus e1 >>= liftIO . timeout 5000000 . return
   me2' <- reduceWeakTermPlus e2 >>= liftIO . timeout 5000000 . return
-  -- p "ok"
   case (me1', me2') of
     (Just e1', Just e2') -> simp' $ (e1', e2') : cs
     _ -> throwError $ "cannot simplify [TIMEOUT]:\n" ++ Pr.ppShow (e1, e2)
