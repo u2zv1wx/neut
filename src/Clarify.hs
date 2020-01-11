@@ -330,12 +330,6 @@ pop x mp = do
   v <- Map.lookup x mp
   return (v, Map.delete x mp)
 
--- pop _ [] = Nothing
--- pop x ((y, v):ys)
---   | x == y = return (v, ys)
---   | otherwise = do
---     (w, zs) <- pop x ys
---     return (w, (y, v) : zs)
 asSysCallMaybe :: Identifier -> Maybe (SysCall, ArgLen, UsedArgIndexList)
 asSysCallMaybe "write" = Just (SysCallWrite, 4, [1, 2, 3])
 asSysCallMaybe _ = Nothing
