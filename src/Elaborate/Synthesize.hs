@@ -95,17 +95,6 @@ resolvePiElim ::
 resolvePiElim q m fmvs ess e = do
   let lengthInfo = map length ess
   let es = concat ess
-  when (m == "hole-2718") $ do
-    p $ "resolvePiElim for " ++ m
-    p "before toVarList"
-    p "es:"
-    p' es
-    foo <- toVarList es
-    p "foo:"
-    p' foo
-    bar <- toAltList foo
-    p "bar:"
-    p' bar
   xss <- toVarList es >>= toAltList
   -- p "after toVarList"
   let xsss = map (takeByCount lengthInfo) xss
