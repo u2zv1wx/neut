@@ -9,12 +9,16 @@ import Data.Basic
 import Data.Env
 import Data.LLVM
 
+import qualified Data.HashMap.Strict as Map
+
 emit :: LLVM -> WithEnv [String]
 emit mainTerm = do
   lenv <- gets llvmEnv
   g <- emitGlobal
   zs <- emitDefinition "main" [] mainTerm
-  xs <- forM lenv $ \(name, (args, body)) -> emitDefinition name args body
+  xs <-
+    forM (Map.toList lenv) $ \(name, (args, body)) ->
+      emitDefinition name args body
   return $ g ++ zs ++ concat xs
 
 emitDefinition :: Identifier -> [Identifier] -> LLVM -> WithEnv [String]

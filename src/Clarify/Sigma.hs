@@ -7,6 +7,8 @@ module Clarify.Sigma
 import Control.Monad.Except
 import Control.Monad.State
 
+import qualified Data.HashMap.Strict as Map
+
 import Clarify.Linearize
 import Clarify.Utility
 import Data.Basic
@@ -49,7 +51,7 @@ affineSigma ::
 affineSigma thetaName m mxts = do
   cenv <- gets codeEnv
   let theta = (m, DataTheta thetaName)
-  case lookup thetaName cenv of
+  case Map.lookup thetaName cenv of
     Just _ -> return theta
     Nothing -> do
       xts <- mapM supplyName mxts
@@ -91,7 +93,7 @@ relevantSigma ::
 relevantSigma thetaName m mxts = do
   cenv <- gets codeEnv
   let theta = (m, DataTheta thetaName)
-  case lookup thetaName cenv of
+  case Map.lookup thetaName cenv of
     Just _ -> return theta
     Nothing -> do
       xts <- mapM supplyName mxts

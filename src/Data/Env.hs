@@ -14,10 +14,9 @@ import Data.Term
 import Data.Tree
 import Data.WeakTerm
 
-import qualified Data.Map.Strict as Map
-
+import qualified Data.HashMap.Strict as Map
 import qualified Data.PQueue.Min as Q
-
+import qualified Data.Set as S
 import qualified Text.Show.Pretty as Pr
 
 type ConstraintQueue = Q.MinQueue EnrichedConstraint
@@ -27,19 +26,20 @@ data Env =
     { count :: Int -- to generate fresh symbols
     , target :: Maybe Target
     , currentDir :: FilePath
-    , keywordEnv :: [Identifier] -- list of reserved keywords
+    , keywordEnv :: S.Set Identifier -- list of reserved keywords
     , notationEnv :: [(TreePlus, TreePlus)] -- macro transformers
-    , constantEnv :: [Identifier]
-    , enumEnv :: [(Identifier, [Identifier])] -- [("choice", ["left", "right"]), ...]
-    , nameEnv :: [(Identifier, Identifier)] -- [("foo", "foo.13"), ...]
-    , weakTypeEnv :: Map.Map Identifier WeakTermPlus -- var ~> typeof(var)
-    , typeEnv :: Map.Map Identifier TermPlus
+    , constantEnv :: S.Set Identifier
+    , enumEnv :: Map.HashMap Identifier [Identifier] -- [("choice", ["left", "right"]), ...]
+    , revEnumEnv :: Map.HashMap Identifier Identifier -- [("left", "choice"), ("right", "choice"), ...]
+    , nameEnv :: Map.HashMap Identifier Identifier -- [("foo", "foo.13"), ...]
+    , weakTypeEnv :: Map.HashMap Identifier WeakTermPlus -- var ~> typeof(var)
+    , typeEnv :: Map.HashMap Identifier TermPlus
     , constraintEnv :: [PreConstraint] -- for type inference
-    , substEnv :: [(Identifier, ([Identifier], WeakTermPlus))] -- metavar ~> [(metavar in the term, beta-equivalent weakterm)]
-    , zetaEnv :: Map.Map Identifier TermPlus -- memoization for elaborate'
-    , chainEnv :: Map.Map Identifier [(Identifier, TermPlus)] -- var/const ~> the closed var chain of its type
-    , codeEnv :: [(Identifier, ([Identifier], CodePlus))] -- f ~> thunk (lam (x1 ... xn) e)
-    , llvmEnv :: [(Identifier, ([Identifier], LLVM))]
+    , substEnv :: Map.HashMap Identifier ([Identifier], WeakTermPlus) -- metavar ~> [(metavar in the term, beta-equivalent weakterm)]
+    , zetaEnv :: Map.HashMap Identifier TermPlus -- memoization for elaborate'
+    , chainEnv :: Map.HashMap Identifier [(Identifier, TermPlus)] -- var/const ~> the closed var chain of its type
+    , codeEnv :: Map.HashMap Identifier ([Identifier], CodePlus) -- f ~> thunk (lam (x1 ... xn) e)
+    , llvmEnv :: Map.HashMap Identifier ([Identifier], LLVM)
     }
 
 initialEnv :: FilePath -> Env
@@ -48,18 +48,19 @@ initialEnv path =
     { count = 0
     , target = Nothing
     , notationEnv = []
-    , keywordEnv = []
-    , constantEnv = []
-    , enumEnv = []
-    , nameEnv = []
+    , keywordEnv = S.empty
+    , constantEnv = S.empty
+    , enumEnv = Map.empty
+    , revEnumEnv = Map.empty
+    , nameEnv = Map.empty
     , weakTypeEnv = Map.empty
     , typeEnv = Map.empty
     , zetaEnv = Map.empty
     , chainEnv = Map.empty
-    , codeEnv = []
-    , llvmEnv = []
+    , codeEnv = Map.empty
+    , llvmEnv = Map.empty
     , constraintEnv = []
-    , substEnv = []
+    , substEnv = Map.empty
     , currentDir = path
     }
 
@@ -83,7 +84,7 @@ newNameWith :: Identifier -> WithEnv Identifier
 newNameWith s = do
   i <- newName
   let s' = s ++ i
-  modify (\e -> e {nameEnv = (s, s') : nameEnv e})
+  modify (\e -> e {nameEnv = Map.insert s s' (nameEnv e)})
   return s'
 
 lookupTypeEnv :: String -> WithEnv TermPlus
@@ -104,14 +105,14 @@ lookupTypeEnv s
 lookupNameEnv :: String -> WithEnv String
 lookupNameEnv s = do
   env <- get
-  case lookup s (nameEnv env) of
+  case Map.lookup s (nameEnv env) of
     Just s' -> return s'
     Nothing -> throwError $ "undefined variable: " ++ show s
 
 isDefinedEnum :: Identifier -> WithEnv Bool
 isDefinedEnum name = do
   env <- get
-  let labelList = join $ map snd $ enumEnv env
+  let labelList = join $ Map.elems $ enumEnv env
   return $ name `elem` labelList
 
 getTarget :: WithEnv Target

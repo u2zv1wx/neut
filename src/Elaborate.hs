@@ -7,6 +7,8 @@ import Control.Monad.State
 import Data.List (nub)
 import Numeric.Half
 
+import qualified Data.HashMap.Strict as Map
+
 import Data.Basic
 import Data.Env
 import Data.Term
@@ -69,7 +71,7 @@ elaborate' (m, WeakTermIter (x, t) xts e) = do
   return (m, TermIter (x, t') xts' e')
 elaborate' (_, WeakTermZeta x) = do
   sub <- gets substEnv
-  case lookup x sub of
+  case Map.lookup x sub of
     Nothing -> throwError $ "elaborate' i: remaining hole: " ++ x
     Just (_, e) -> do
       e' <- elaborate' e
@@ -177,7 +179,7 @@ caseCheckEnumIdentifier' i labelList = do
 lookupEnumSet :: Identifier -> WithEnv [Identifier]
 lookupEnumSet name = do
   eenv <- gets enumEnv
-  case lookup name eenv of
+  case Map.lookup name eenv of
     Nothing -> throwError $ "no such enum defined: " ++ show name
     Just ls -> return ls
 
@@ -187,8 +189,7 @@ reduceSubstEnv = do
   senv' <- mapM reduceSubstEnv' senv
   modify (\env -> env {substEnv = senv'})
 
-reduceSubstEnv' ::
-     (Identifier, (b, WeakTermPlus)) -> WithEnv (Identifier, (b, WeakTermPlus))
-reduceSubstEnv' (x, (y, e)) = do
+reduceSubstEnv' :: (b, WeakTermPlus) -> WithEnv (b, WeakTermPlus)
+reduceSubstEnv' (y, e) = do
   e' <- reduceWeakTermPlus e
-  return (x, (y, e'))
+  return (y, e')

@@ -7,6 +7,8 @@ import Data.Bits
 import Data.Fixed (mod')
 import Unsafe.Coerce -- for int -> word, word -> int
 
+import qualified Data.HashMap.Strict as Map
+
 import Data.Basic
 import Data.Code
 
@@ -17,13 +19,13 @@ reduceCodePlus (m, CodePiElimDownElim v ds) = do
   cenv <- gets codeEnv
   case v of
     (_, DataTheta x)
-      | Just (xs, body) <- lookup x cenv
+      | Just (xs, body) <- Map.lookup x cenv
       , x `notElem` varCode body
       , length xs == length ds ->
         reduceCodePlus $ substCodePlus (zip xs ds) body
     (_, DataTheta x)
-      | Just (xs, body) <- lookup x cenv
-      , x `notElem` varCode body -> error "length unmatch"
+      | Just (_, body) <- Map.lookup x cenv
+      , x `notElem` varCode body -> error "unmatched length"
     _ -> return (m, CodePiElimDownElim v ds)
 reduceCodePlus (m, CodeSigmaElim xts v e) = do
   let (xs, ts) = unzip xts

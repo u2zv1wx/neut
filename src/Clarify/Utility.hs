@@ -8,7 +8,7 @@ import Data.Code
 import Data.Env
 import Data.Term
 
-import qualified Data.Map.Strict as Map
+import qualified Data.HashMap.Strict as Map
 
 type Context = [(Identifier, TermPlus)]
 
@@ -89,7 +89,7 @@ affineImmediate m = do
   cenv <- gets codeEnv
   let thetaName = "affine-immediate"
   let theta = (m, DataTheta thetaName)
-  case lookup thetaName cenv of
+  case Map.lookup thetaName cenv of
     Just _ -> return theta
     Nothing -> do
       immVarName <- newNameWith "arg"
@@ -104,7 +104,7 @@ relevantImmediate m = do
   cenv <- gets codeEnv
   let thetaName = "relevant-immediate"
   let theta = (m, DataTheta thetaName)
-  case lookup thetaName cenv of
+  case Map.lookup thetaName cenv of
     Just _ -> return theta
     Nothing -> do
       (immVarName, immVar) <- newDataUpsilonWith "arg"
@@ -126,7 +126,7 @@ affineUniv m = do
   cenv <- gets codeEnv
   let thetaName = "affine-univ"
   let theta = (m, DataTheta thetaName)
-  case lookup thetaName cenv of
+  case Map.lookup thetaName cenv of
     Just _ -> return theta
     Nothing -> do
       (univVarName, univVar) <- newDataUpsilonWith "univ"
@@ -149,7 +149,7 @@ relevantUniv m = do
   cenv <- gets codeEnv
   let thetaName = "relevant-univ"
   let theta = (m, DataTheta thetaName)
-  case lookup thetaName cenv of
+  case Map.lookup thetaName cenv of
     Just _ -> return theta
     Nothing -> do
       (univVarName, univVar) <- newDataUpsilonWith "univ"
@@ -271,7 +271,7 @@ insCodeEnv name args e = do
   e' <- renameCode e
   -- Since LLVM doesn't allow variable shadowing, we must explicitly
   -- rename variables here.
-  modify (\env -> env {codeEnv = (name, (args', e')) : codeEnv env})
+  modify (\env -> env {codeEnv = Map.insert name (args', e') (codeEnv env)})
 
 lookupContext :: Identifier -> Context -> WithEnv TermPlus
 lookupContext z ctx = do

@@ -8,6 +8,9 @@ import System.Directory
 import System.FilePath
 import Text.Read (readMaybe)
 
+import qualified Data.HashMap.Strict as Map
+import qualified Data.Set as S
+
 import Data.Basic
 import Data.Env
 import Data.Tree
@@ -40,7 +43,7 @@ parse' ((_, TreeNode [(_, TreeAtom "notation"), from, to]):as) = do
   parse' as
 parse' ((_, TreeNode [(_, TreeAtom "keyword"), (_, TreeAtom s)]):as) = do
   checkKeywordSanity s
-  modify (\e -> e {keywordEnv = s : keywordEnv e})
+  modify (\e -> e {keywordEnv = S.insert s (keywordEnv e)})
   parse' as
 parse' ((_, TreeNode ((_, TreeAtom "enum"):(_, TreeAtom name):ts)):as) = do
   indexList <- mapM extractIdentifier ts
@@ -54,14 +57,14 @@ parse' ((_, TreeNode ((_, TreeAtom "enum"):(_, TreeAtom name):ts)):as) = do
   -- In the example of `print`, this integer in turn represents the length of the array `str`,
   -- which is indispensable for the system call `write`.
   let constName = "enum." ++ name
-  modify (\e -> e {constantEnv = constName : constantEnv e})
+  modify (\e -> e {constantEnv = S.insert constName (constantEnv e)})
   -- type constraint for constName
   -- e.g. t == is-enum @ (choice)
   isEnumType <- toIsEnumType name
   -- add `(constant enum.choice (is-enum choice))` to defList in order to insert appropriate type constraint
   let ascription = DefConstDecl (constName, isEnumType)
   -- register the name of the constant
-  modify (\env -> env {nameEnv = (constName, constName) : nameEnv env})
+  modify (\env -> env {nameEnv = Map.insert constName constName (nameEnv env)})
   defList <- parse' as
   return $ ascription : defList
 parse' ((_, TreeNode [(_, TreeAtom "include"), (_, TreeAtom pathString)]):as) =
@@ -87,7 +90,7 @@ parse' ((_, TreeNode ((_, TreeAtom "statement"):as1)):as2) = do
   return $ defList1 ++ defList2
 parse' ((_, TreeNode [(_, TreeAtom "constant"), (_, TreeAtom name), t]):as) = do
   t' <- macroExpand t >>= interpret
-  modify (\e -> e {constantEnv = name : constantEnv e})
+  modify (\e -> e {constantEnv = S.insert name (constantEnv e)})
   defList <- parse' as
   return $ DefConstDecl (name, t') : defList
 parse' ((m, TreeNode [(_, TreeAtom "let"), xt, e]):as) = do
@@ -158,5 +161,11 @@ checkKeywordSanity _ = return ()
 
 -- {} insEnumEnv {}
 insEnumEnv :: Identifier -> [Identifier] -> WithEnv ()
-insEnumEnv name enumList =
-  modify (\e -> e {enumEnv = (name, enumList) : enumEnv e})
+insEnumEnv name enumList = do
+  let rev = Map.fromList $ zip enumList (repeat name)
+  modify
+    (\e ->
+       e
+         { enumEnv = Map.insert name enumList (enumEnv e)
+         , revEnumEnv = rev `Map.union` (revEnumEnv e)
+         })

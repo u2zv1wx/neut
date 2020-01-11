@@ -9,6 +9,8 @@ import Control.Monad.Except
 import Control.Monad.State
 import Data.List (nubBy)
 
+import qualified Data.HashMap.Strict as Map
+
 import Clarify.Closure
 import Clarify.Sigma
 import Clarify.Utility
@@ -16,7 +18,6 @@ import Data.Basic
 import Data.Code
 import Data.Env
 import Data.Term
-import Reduce.Code
 import Reduce.Term
 
 import qualified Text.Show.Pretty as Pr
@@ -256,7 +257,7 @@ asEnumConstant :: Identifier -> WithEnv (Maybe Integer)
 asEnumConstant x
   | ["enum", y] <- wordsBy '.' x = do
     eenv <- gets enumEnv
-    case lookup y eenv of
+    case Map.lookup y eenv of
       Nothing -> return Nothing
       Just ls -> return $ Just $ toInteger $ length ls
   | Just i <- asEnumNatNumConstant x = return $ Just i
@@ -288,7 +289,7 @@ retClosure' ::
   -> CodePlus -- the `e` in `lam (x1, ..., xn). e`
   -> WithEnv CodePlus
 retClosure' x fvs m xts e = do
-  modify (\env -> env {nameEnv = (x, x) : nameEnv env})
+  modify (\env -> env {nameEnv = Map.insert x x (nameEnv env)})
   cls <- makeClosure' (Just x) fvs m xts e
   knot x cls
   return (m, CodeUpIntro cls)
@@ -317,18 +318,24 @@ knot z cls = do
     Nothing -> throwError "knot"
     Just ((args, body), cenv') -> do
       let body' = substCodePlus [(z, cls)] body
-      let cenv'' = (z, (args, body')) : cenv'
+      let cenv'' = Map.insert z (args, body') cenv'
       modify (\env -> env {codeEnv = cenv''})
 
 -- lookup and remove the matching element from the given assoc list
-pop :: (Eq a) => a -> [(a, b)] -> Maybe (b, [(a, b)])
-pop _ [] = Nothing
-pop x ((y, v):ys)
-  | x == y = return (v, ys)
-  | otherwise = do
-    (w, zs) <- pop x ys
-    return (w, (y, v) : zs)
+pop ::
+     Identifier
+  -> Map.HashMap Identifier b
+  -> Maybe (b, Map.HashMap Identifier b)
+pop x mp = do
+  v <- Map.lookup x mp
+  return (v, Map.delete x mp)
 
+-- pop _ [] = Nothing
+-- pop x ((y, v):ys)
+--   | x == y = return (v, ys)
+--   | otherwise = do
+--     (w, zs) <- pop x ys
+--     return (w, (y, v) : zs)
 asSysCallMaybe :: Identifier -> Maybe (SysCall, ArgLen, UsedArgIndexList)
 asSysCallMaybe "write" = Just (SysCallWrite, 4, [1, 2, 3])
 asSysCallMaybe _ = Nothing

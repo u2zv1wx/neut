@@ -11,10 +11,12 @@ import Data.Code
 import Data.Env
 import Data.LLVM
 
+import qualified Data.HashMap.Strict as Map
+
 toLLVM :: CodePlus -> WithEnv LLVM
 toLLVM mainTerm = do
   penv <- gets codeEnv
-  forM_ penv $ \(name, (args, e)) -> do
+  forM_ (Map.toList penv) $ \(name, (args, e)) -> do
     llvm <- llvmCode e
     insLLVMEnv name args llvm
   l <- llvmCode mainTerm
@@ -236,8 +238,8 @@ llvmUncastLet x d lowType cont = do
 -- continuation `cont`.
 llvmDataLet :: Identifier -> DataPlus -> LLVM -> WithEnv LLVM
 llvmDataLet x (_, DataTheta y) cont = do
-  penv <- gets codeEnv
-  case lookup y penv of
+  cenv <- gets codeEnv
+  case Map.lookup y cenv of
     Nothing -> throwError $ "no such global label defined: " ++ y -- FIXME
     Just (args, _) ->
       llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType args) cont
@@ -423,12 +425,12 @@ newNameWith' (Just name) = newNameWith name
 
 insLLVMEnv :: Identifier -> [Identifier] -> LLVM -> WithEnv ()
 insLLVMEnv funName args e =
-  modify (\env -> env {llvmEnv = (funName, (args, e)) : llvmEnv env})
+  modify (\env -> env {llvmEnv = Map.insert funName (args, e) (llvmEnv env)})
 
 getEnumNum :: Identifier -> WithEnv Int
 getEnumNum label = do
   ienv <- gets enumEnv
-  case (getEnumNum' label $ map snd ienv) of
+  case (getEnumNum' label $ Map.elems ienv) of
     Nothing -> throwError $ "no such enum is defined: " ++ show label
     Just i -> return i
 

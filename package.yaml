@@ -24,6 +24,7 @@ dependencies:
 - optparse-applicative
 - process
 - containers
+- unordered-containers
 - half
 
 library:

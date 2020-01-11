@@ -5,6 +5,7 @@ module Elaborate.Synthesize
 import Control.Monad.Except
 import Control.Monad.State
 
+import qualified Data.HashMap.Strict as Map
 import qualified Data.PQueue.Min as Q
 import qualified Text.Show.Pretty as Pr
 
@@ -119,7 +120,9 @@ resolveHole q m fmvs e = do
   senv <- gets substEnv
   e' <- reduceWeakTermPlus $ snd $ substIfNecessary senv (fmvs, e)
   let fmvs' = holeWeakTermPlus e'
-  modify (\env -> env {substEnv = compose [(m, (fmvs', e'))] senv})
+  let s1 = Map.singleton m (fmvs', e')
+  modify (\env -> env {substEnv = compose s1 senv})
+  -- modify (\env -> env {substEnv = compose [(m, (fmvs', e'))] senv})
   let (q1, q2) =
         Q.partition (\(Enriched _ ms _ _) -> m `elem` ms) $ Q.deleteMin q
   let q1' = Q.mapU asAnalyzable q1
@@ -141,10 +144,10 @@ bindFormalArgs e (xts:xtss) = do
   let e' = bindFormalArgs e xtss
   (emptyMeta, WeakTermPiIntro xts e')
 
-lookupAny :: [Hole] -> [(Identifier, a)] -> Maybe (Hole, a)
+lookupAny :: [Hole] -> Map.HashMap Identifier a -> Maybe (Hole, a)
 lookupAny [] _ = Nothing
 lookupAny (h:ks) sub = do
-  case lookup h sub of
+  case Map.lookup h sub of
     Just v -> Just (h, v)
     _ -> lookupAny ks sub
 

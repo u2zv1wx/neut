@@ -5,7 +5,8 @@ module Parse.MacroExpand
 
 import Control.Monad.Except
 import Control.Monad.State
-import Data.List (intersect)
+
+import qualified Data.Set as S
 
 import Data.Basic
 import Data.Env
@@ -125,7 +126,7 @@ checkNotation t = do
 checkKeywordCondition :: Notation -> WithEnv ()
 checkKeywordCondition t = do
   kenv <- gets keywordEnv
-  if not $ null $ kenv `intersect` atomListOf t
+  if not $ null $ kenv `S.intersection` atomListOf t
     then return ()
     else throwError "A notation must include at least one keyword"
 

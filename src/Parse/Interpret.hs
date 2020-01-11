@@ -8,6 +8,7 @@ import Control.Monad.Except
 import Control.Monad.State
 import Data.Bits ((.&.), (.|.), shiftL, shiftR)
 import Data.Char (chr, ord)
+import qualified Data.HashMap.Strict as Map
 import Data.List (intercalate)
 import Data.Word (Word8)
 import Text.Read (readMaybe)
@@ -233,7 +234,8 @@ withKindPrefix _ _ = Nothing
 isDefinedEnumName :: Identifier -> WithEnv Bool
 isDefinedEnumName name = do
   env <- get
-  let enumNameList = map fst $ enumEnv env
+  -- let enumNameList = Map.elems $ enumEnv env
+  let enumNameList = Map.keys $ enumEnv env
   return $ name `elem` enumNameList
 
 newHole :: Meta -> WithEnv WeakTermPlus

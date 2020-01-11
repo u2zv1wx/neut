@@ -8,9 +8,10 @@ import Control.Monad.Except
 import Control.Monad.State
 import Data.Basic
 import Data.Env
-import qualified Data.Map.Strict as Map
 import Data.Maybe (catMaybes)
 import Data.WeakTerm
+
+import qualified Data.HashMap.Strict as Map
 
 type Context = [(Identifier, WeakTermPlus)]
 
@@ -61,8 +62,9 @@ infer' ctx (m, WeakTermPiElim e@(_, WeakTermPiIntro xts _) es)
     et <- infer' ctx e
     let es' = map fst ets
     let hss = map holeWeakTermPlus es'
-    let defList = zip (map fst xts) (zip hss es')
-    modify (\env -> env {substEnv = defList ++ substEnv env})
+    -- let defList = zip (map fst xts) (zip hss es')
+    let defList = Map.fromList $ zip (map fst xts) (zip hss es')
+    modify (\env -> env {substEnv = defList `Map.union` substEnv env})
     inferPiElim ctx m et ets
 infer' ctx (m, WeakTermPiElim e es) = do
   ets <- mapM (infer' ctx) es
@@ -287,8 +289,7 @@ newTypeHoleListInCtx ctx (x:rest) = do
 
 inferCase :: Case -> WithEnv (Maybe WeakTermPlus)
 inferCase (CaseValue (EnumValueLabel name)) = do
-  ienv <- gets enumEnv
-  k <- lookupKind' name ienv
+  k <- lookupKind name
   return $ Just (emptyMeta, WeakTermEnum $ EnumTypeLabel k)
 inferCase (CaseValue (EnumValueNatNum i _)) =
   return $ Just (emptyMeta, WeakTermEnum $ EnumTypeNatNum i)
@@ -349,13 +350,16 @@ lookupWeakTypeEnvMaybe s = do
 
 lookupKind :: Identifier -> WithEnv Identifier
 lookupKind name = do
-  env <- get
-  lookupKind' name $ enumEnv env
-
-lookupKind' :: Identifier -> [(Identifier, [Identifier])] -> WithEnv Identifier
-lookupKind' i [] = throwError $ "no such enum-intro is defined: " ++ i
-lookupKind' i ((j, ls):xs) =
-  if i `elem` ls
-    then return j
-    else lookupKind' i xs
-         --
+  renv <- gets revEnumEnv
+  case Map.lookup name renv of
+    Nothing -> throwError $ "no such enum-intro is defined: " ++ name
+    Just j -> return j
+  -- lookupKind' name $ enumEnv env
+-- lookupKind' ::
+--      Identifier -> Map.HashMap Identifier [Identifier] -> WithEnv Identifier
+-- lookupKind' i [] = throwError $ "no such enum-intro is defined: " ++ i
+-- lookupKind' i ((j, ls):xs) =
+--   if i `elem` ls
+--     then return j
+--     else lookupKind' i xs
+--          --

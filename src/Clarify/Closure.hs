@@ -17,7 +17,7 @@ import Data.Code
 import Data.Env
 import Data.Term
 
-import qualified Data.Map.Strict as Map
+import qualified Data.HashMap.Strict as Map
 
 makeClosure ::
      Maybe Identifier -- the name of newly created closure
@@ -40,7 +40,7 @@ makeClosure mName xts2 m xts1 e = do
   name <- nameFromMaybe mName
   let args = envVarName : map fst xts1
   let body = (m, CodeSigmaElim xts2 envVar e')
-  when (name `notElem` map fst cenv) $ insCodeEnv name args body
+  when (name `notElem` Map.keys cenv) $ insCodeEnv name args body
   let fvEnv = (m, DataSigmaIntro $ map (toDataUpsilon' . fst) xts2)
   return (m, DataSigmaIntro [envExp, fvEnv, (m, DataTheta name)])
   -- let cls = (m, DataSigmaIntro [envExp, fvEnv, (m, DataTheta name)])

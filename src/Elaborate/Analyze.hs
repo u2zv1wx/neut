@@ -9,8 +9,10 @@ import Control.Monad.Except
 import Control.Monad.State
 import Data.List
 import Data.Maybe
-import qualified Data.PQueue.Min as Q
 import System.Timeout
+
+import qualified Data.HashMap.Strict as Map
+import qualified Data.PQueue.Min as Q
 import qualified Text.Show.Pretty as Pr
 
 import Data.Basic
@@ -96,7 +98,7 @@ simp' ((e1, e2):cs) = do
   let ms2 = asStuckedTerm e2
   let stuckReasonList = catMaybes [ms1 >>= stuckReasonOf, ms2 >>= stuckReasonOf]
   sub <- gets substEnv
-  if any (`elem` map fst sub) stuckReasonList
+  if any (`elem` Map.keys sub) stuckReasonList
     then simpAnalyzable e1 e2 stuckReasonList cs
     else do
       let hs1 = holeWeakTermPlus e1
@@ -136,10 +138,10 @@ simp' ((e1, e2):cs) = do
           , includeCheck xs2 e1
           , linearCheck xs2 -> simpPattern h2 ies2 e2 e1 hs1 cs
         (Just (StuckPiElimUpsilon h1 mess1), _)
-          | Just (_, body) <- lookup h1 sub ->
+          | Just (_, body) <- Map.lookup h1 sub ->
             simp $ (toPiElim body mess1, e2) : cs
         (_, Just (StuckPiElimUpsilon h2 mess2))
-          | Just (_, body) <- lookup h2 sub ->
+          | Just (_, body) <- Map.lookup h2 sub ->
             simp $ (toPiElim body mess2, e1) : cs
         (Just (StuckPiElimZetaStrict h1 ies1), _)
           | xs1 <- concatMap getVarList ies1
