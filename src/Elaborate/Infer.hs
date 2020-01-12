@@ -245,7 +245,6 @@ inferPiElim ctx m (e, t) ets = do
       insConstraintEnv tPi t
       let cod' = substWeakTermPlus (zip ys es) cod
       retWeakTerm cod' m $ WeakTermPiElim e es
-     -- undefined h x $ zip ls ts
 
 inferEnumElim ::
      Context
@@ -391,12 +390,3 @@ lookupKind name = do
   case Map.lookup name renv of
     Nothing -> throwError $ "no such enum-intro is defined: " ++ name
     Just j -> return j
-  -- lookupKind' name $ enumEnv env
--- lookupKind' ::
---      Identifier -> Map.HashMap Identifier [Identifier] -> WithEnv Identifier
--- lookupKind' i [] = throwError $ "no such enum-intro is defined: " ++ i
--- lookupKind' i ((j, ls):xs) =
---   if i `elem` ls
---     then return j
---     else lookupKind' i xs
---          --
