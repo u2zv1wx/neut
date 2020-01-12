@@ -62,24 +62,10 @@
 
 (enum nat-enum zero-inner succ-inner)
 
-;; nat = mu x. 1 + x = mu x. Sigma (p : choice). case p of left -> 1 | right -> x
-;; これさー、CBVで考えると普通に無限ループなんだよね？
-;; (definition nat-inner ()
-;;   (coproduct top (nat-inner)))
-;; 無限ループですね。coproductの部分をインライン展開しても、まだiterの適用だから無限ループ。
-;; そのiterをpi-introに展開しても、まだnat-innerがpureかどうかはわからないから……いや、そこをreduceしろ、って話なのでは？
-;; 型がpureであることをつかって。
-;; coproductの適用部分は、しかし、CBVだと無限ループになっている。
-;; coproductが引数として() -> tauを受け取れるようになっていれば、ここは抑えられる。
-;;   (definition nat-inner ()
-;;     (coproduct (thunk top) nat-inner))
-;; みたいにするわけ。このときはcoproductのreduceができて、んでcoproductはsigmaになっていて、それのおかげで
-;; nat-innerがclosureとして普通に処理できるようになる。
-
 ;; 無限ループしないように修正していく
 (definition nat-inner ()
-  (sigma ((x choice))
-    (case x
+  (sigma ((p choice))
+    (case p
       (left top)
       (right (nat-inner)))))
 ;; こっちなら、sigmaの中身が消えることによって無限ループは生じないはず。……実際、うまくいった。
@@ -93,12 +79,6 @@
 ;; 3 = (right (right (right (left unit))))
 ;;  ...
 ;; という感じ。
-
-;; (definition nat-inner ()
-;;   (sigma ((x nat-enum))
-;;     (enum-elimination x
-;;       (zero-inner top)
-;;       (succ-inner (nat-inner)))))
 
 (let (nat tau) (nat-inner))
 
@@ -129,9 +109,6 @@
 ;; こうするとあたかもsuccがコンストラクタであるかのようにつかえる。
 (let (bar (nat-inner))
   (succ foo))
-
-;; ここより前でセグフォ
-;; (write n15 stdout (test) enum.n15)
 
 ;; ちゃんと推論できてる。えらい。
 (let (buz nat)
@@ -181,28 +158,27 @@
     ((selector choice)
      (value (nat-helper selector)))
     num
-    (enum-elimination selector
+    (case selector
       (left (zero))
-      ;; 型システムはrightの中身がnatであることを知らないわけだ。だから
-      ;; valueを返そうとしても「それtopかもしれないよ！」とエラーを返すことになる。
-      ;; これってどう解決すればいいんだ？enum-elimの中ではselectorがrightであるってことの証明が
-      ;; 手に入る、みたいな話だろうか？それっぽい？
-      ;; enum-elimが変数で分岐してるときを特別扱いする感じ？
-      ;; 分岐の中ではselector == rightっていう等式が成立しているわけですが。このselectorの部分は通常は一般の式だからな〜。
-      ;; foo @ (bar, buz)とかで分岐されてたら詰むわけじゃん？fooが具体的な関数ならともかく、fooの部分まで引数にとってたりすると、これはもう
-      ;; どうにもならないわけじゃん？
-      ;; とりあえず等式だけ保持しておいて、で、推論が無理っぽくなったら等式をみてみる、みたいな？
       (right (succ (succ (succ (zero))))))))
 
 (ascription my-dec (hom nat nat))
 
-;; (ascription my-dec
-;;   (pi
-;;     ((x nat))
-;;     nat))
+(definition my-item ((num nat))
+  (sigma-elimination
+    ((selector choice)
+     (value (nat-helper selector)))
+    num
+    (case selector
+      (left (zero))
+      (right value))))
+
+(ascription my-item
+  (hom nat nat))
+
 
 (definition x 10)
 
-(i64.add (i64.add 3 x) x)
+(i64.add (i64.add 4 x) x)
 
 ;; new.neut ends here

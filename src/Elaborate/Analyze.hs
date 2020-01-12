@@ -79,7 +79,14 @@ simp' (((_, WeakTermFloat t1 l1), (_, WeakTermFloat t2 l2)):cs)
   | l1 == l2 = simp $ (t1, t2) : cs
 simp' (((_, WeakTermEnumElim (e1, t1) les1), (_, WeakTermEnumElim (e2, t2) les2)):cs)
   -- using term equality
-  | e1 == e2 = do
+  | e1 == e2
+    -- p "enum-elim with:"
+    -- p' e1
+    -- p "les1:"
+    -- p' les1
+    -- p "les2:"
+    -- p' les2
+   = do
     csEnum <- simpCase les1 les2
     csCont <- simp $ (t1, t2) : cs
     return $ csEnum ++ csCont
@@ -140,6 +147,12 @@ simp' ((e1, e2):cs) = do
         (_, Just (StuckPiElimUpsilon h2 mess2))
           | Just (_, body) <- Map.lookup h2 sub ->
             simp $ (toPiElim body mess2, e1) : cs
+        (Just (StuckEnumElim x1), _)
+          | Just (_, body) <- Map.lookup x1 sub ->
+            simp $ (substWeakTermPlus [(x1, body)] e1, e2) : cs
+        (_, Just (StuckEnumElim x2))
+          | Just (_, body) <- Map.lookup x2 sub ->
+            simp $ (e1, substWeakTermPlus [(x2, body)] e2) : cs
         (Just (StuckPiElimZetaStrict h1 ies1), _)
           | xs1 <- concatMap getVarList ies1
           , occurCheck h1 hs2
@@ -258,6 +271,7 @@ data Stuck
   | StuckPiElimIter IterInfo [(Meta, [WeakTermPlus])]
   | StuckPiElimUpsilon Identifier [(Meta, [WeakTermPlus])] -- ここでmetaを保持。
   | StuckPiElimConst Identifier [[WeakTermPlus]]
+  | StuckEnumElim Identifier
 
 -- {} asStuckedTerm {}
 asStuckedTerm :: WeakTermPlus -> Maybe Stuck
@@ -281,6 +295,7 @@ asStuckedTerm (m, WeakTermPiElim e es)
       Just (StuckPiElimUpsilon x ess) ->
         Just $ StuckPiElimUpsilon x $ ess ++ [(m, es)]
       Just (StuckPiElimConst x ess) -> Just $ StuckPiElimConst x $ ess ++ [es]
+      Just (StuckEnumElim x) -> Just $ StuckEnumElim x
       Nothing -> Nothing
 asStuckedTerm (m, WeakTermPiElim e es) =
   case asStuckedTerm e of
@@ -292,7 +307,10 @@ asStuckedTerm (m, WeakTermPiElim e es) =
     Just (StuckPiElimUpsilon x ess) ->
       Just $ StuckPiElimUpsilon x $ ess ++ [(m, es)]
     Just (StuckPiElimConst x ess) -> Just $ StuckPiElimConst x $ ess ++ [es]
+    Just (StuckEnumElim x) -> Just $ StuckEnumElim x
     Nothing -> Nothing
+asStuckedTerm (_, WeakTermEnumElim ((_, WeakTermUpsilon x), _) _) =
+  Just $ StuckEnumElim x
 asStuckedTerm _ = Nothing
 
 -- {} stuckReasonOf {}
@@ -302,6 +320,7 @@ stuckReasonOf (StuckPiElimZetaStrict h _) = Just h
 stuckReasonOf (StuckPiElimIter {}) = Nothing
 stuckReasonOf (StuckPiElimUpsilon _ _) = Nothing
 stuckReasonOf (StuckPiElimConst _ _) = Nothing
+stuckReasonOf (StuckEnumElim _) = Nothing
 
 -- {} occurCheck {}
 occurCheck :: Identifier -> [Identifier] -> Bool

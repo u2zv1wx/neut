@@ -42,6 +42,8 @@ infer e = do
   (e', _) <- infer' [] e
   let vs = varWeakTermPlus e'
   let info = toInfo "inferred term is not closed. freevars:" vs
+  -- senv <- gets substEnv
+  -- p' senv
   return $ assertP info e' $ null vs
 
 infer' :: Context -> WeakTermPlus -> WithEnv (WeakTermPlus, WeakTermPlus)
@@ -251,6 +253,26 @@ inferEnumElim ::
   -> (Case, WeakTermPlus)
   -> WithEnv (WeakTermPlus, WeakTermPlus)
 inferEnumElim ctx _ (CaseDefault, e) = infer' ctx e
+inferEnumElim ctx ((_, WeakTermUpsilon x), enumType) (CaseValue v, e) = do
+  x' <- newNameWith x
+  -- infer `let xi := v in e{x := xi}`, with replacing all the occurrences of
+  -- `x` in the type of `e{x := xi}` with `xi`.
+  -- ctx must be extended since we're emulating the inference of `e{x := xi}` in `let xi := v in e{x := xi}`.
+  let ctx' = ctx ++ [(x', enumType)]
+  -- emulate the inference of the `let` part of `let xi := v in e{x := xi}`
+  let val = ([], (emptyMeta, WeakTermEnumIntro v))
+  modify (\env -> env {substEnv = Map.insert x' val (substEnv env)})
+  -- the `e{x := xi}` part
+  let var = (emptyMeta, WeakTermUpsilon x')
+  (e', t) <- infer' ctx' $ substWeakTermPlus [(x, var)] e
+  let t' = substWeakTermPlus [(x, var)] t
+  -- return `let xi := v in e{x := xi}`
+  let e'' =
+        ( emptyMeta
+        , WeakTermPiElim
+            (emptyMeta, WeakTermPiIntro [(x', enumType)] e')
+            [(emptyMeta, WeakTermEnumIntro v)])
+  return (e'', t')
 inferEnumElim ctx (enumTerm, enumType) (CaseValue v, e) = do
   x <- newNameWith "hole-enum"
   h <- newTypeHoleInCtx $ ctx ++ [(x, enumType)]

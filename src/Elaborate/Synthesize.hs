@@ -34,8 +34,15 @@ synthesize q = do
       resolvePiElim q m fmvs ess e
     Just (Enriched _ _ fmvs (ConstraintFlexRigid m ess e)) -> do
       resolvePiElim q m fmvs ess e
-    Just (Enriched (e1, e2) _ _ _) -> do
+    Just (Enriched (e1, e2) _ _ _)
+      -- throwError $ "cannot simplify:\n" ++ Pr.ppShow q
+      -- p $ "cannot simplify:\n" ++ Pr.ppShow (e1, e2)
+      -- throwError $ "don't know how to synthesize constraint(s)"
+     -> do
       p $ "rest: " ++ show (Q.size q)
+      senv <- gets substEnv
+      p "selector-186-458:"
+      p' $ Map.lookup "selector-186-458" senv
       throwError $ "cannot simplify:\n" ++ Pr.ppShow (e1, e2)
 
 -- e1だけがstuckしているとき、e2だけがstuckしているとき、両方がstuckしているときをそれぞれ
@@ -96,11 +103,8 @@ resolvePiElim q m fmvs ess e = do
   let lengthInfo = map length ess
   let es = concat ess
   xss <- toVarList es >>= toAltList
-  -- p "after toVarList"
   let xsss = map (takeByCount lengthInfo) xss
-  -- p "created xsss"
   let lamList = map (bindFormalArgs e) xsss
-  -- p "start chain"
   chain $ map (resolveHole q m fmvs) lamList
 
 -- {} resolveHole {}
@@ -111,7 +115,6 @@ resolveHole q m fmvs e = do
   let fmvs' = holeWeakTermPlus e'
   let s1 = Map.singleton m (fmvs', e')
   modify (\env -> env {substEnv = compose s1 senv})
-  -- modify (\env -> env {substEnv = compose [(m, (fmvs', e'))] senv})
   let (q1, q2) =
         Q.partition (\(Enriched _ ms _ _) -> m `elem` ms) $ Q.deleteMin q
   let q1' = Q.mapU asAnalyzable q1
