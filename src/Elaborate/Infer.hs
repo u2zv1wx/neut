@@ -141,7 +141,7 @@ infer' ctx (m, WeakTermEnumElim (e, t) les) = do
       let (ls, _) = unzip les
       tls <- mapM inferCase ls
       constrainList $ t' : catMaybes tls
-      (es', ts) <- unzip <$> mapM (bar ctx (e', t')) les
+      (es', ts) <- unzip <$> mapM (inferEnumElim ctx (e', t')) les
       constrainList $ ts
       retWeakTerm (head ts) m $ WeakTermEnumElim (e', t') $ zip ls es'
 infer' ctx (m, WeakTermArray k indexType) = do
@@ -245,33 +245,20 @@ inferPiElim ctx m (e, t) ets = do
       retWeakTerm cod' m $ WeakTermPiElim e es
      -- undefined h x $ zip ls ts
 
-bar ::
+inferEnumElim ::
      Context
   -> (WeakTermPlus, WeakTermPlus)
   -> (Case, WeakTermPlus)
   -> WithEnv (WeakTermPlus, WeakTermPlus)
-bar ctx _ (CaseDefault, e) = do
-  (e', t) <- infer' ctx e
-  -- insConstraintEnv t h'
-  return (e', t)
-bar ctx (enumTerm, enumType) (CaseValue v, e) = do
+inferEnumElim ctx _ (CaseDefault, e) = infer' ctx e
+inferEnumElim ctx (enumTerm, enumType) (CaseValue v, e) = do
   x <- newNameWith "hole-enum"
   h <- newTypeHoleInCtx $ ctx ++ [(x, enumType)]
   (e', t) <- infer' ctx e
   insConstraintEnv t $ substWeakTermPlus [(x, enumTerm)] h
-  -- p "insert:"
-  -- p' (t, h')
-  -- p "return:"
   let sub = [(x, (emptyMeta, WeakTermEnumIntro v))]
-  -- p' $ substWeakTermPlus sub h
   return (e', substWeakTermPlus sub h)
 
--- substIfUpsilon :: WeakTermPlus -> (Case, WeakTermPlus) -> WeakTermPlus
--- substIfUpsilon _ (CaseDefault, t) = t
--- substIfUpsilon (_, WeakTermUpsilon x) (CaseValue v, t) = do
---   let sub = [(x, (emptyMeta, WeakTermEnumIntro v))]
---   substWeakTermPlus sub t
--- substIfUpsilon _ (_, t) = t
 -- In a context (x1 : A1, ..., xn : An), this function creates metavariables
 --   ?M  : Pi (x1 : A1, ..., xn : An). ?Mt @ (x1, ..., xn)
 --   ?Mt : Pi (x1 : A1, ..., xn : An). Univ
