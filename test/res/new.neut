@@ -176,7 +176,6 @@
 (ascription my-item
   (hom nat nat))
 
-
 (definition x 10)
 
 (i64.add (i64.add 4 x) x)
