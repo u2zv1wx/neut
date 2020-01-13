@@ -100,6 +100,7 @@ resolvePiElim ::
 resolvePiElim q m fmvs ess e = do
   let lengthInfo = map length ess
   let es = concat ess
+  -- patternのときはこの処理無駄だし省略する？
   xss <- toVarList es >>= toAltList
   let xsss = map (takeByCount lengthInfo) xss
   let lamList = map (bindFormalArgs e) xsss
