@@ -4,12 +4,14 @@ module Parse
 
 import Control.Monad.Except
 import Control.Monad.State
+import Data.List
 import Path
 import Path.IO
 import Text.Read (readMaybe)
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.Set as S
+import qualified Text.Show.Pretty as Pr
 
 import Data.Basic
 import Data.Env
@@ -71,16 +73,18 @@ parse' ((_, TreeNode [(_, TreeAtom "include"), (_, TreeAtom pathString)]):as) =
   case readMaybe pathString :: Maybe String of
     Nothing -> throwError "the argument of `include` must be a string"
     Just path -> do
-      filePath <- gets currentFilePath
-      nextPath <- resolveFile (parent filePath) path
-      b <- doesFileExist nextPath
+      oldFilePath <- gets currentFilePath
+      newFilePath <- resolveFile (parent oldFilePath) path
+      b <- doesFileExist newFilePath
       if not b
-        then throwError $ "no such file: " ++ toFilePath nextPath
+        then throwError $ "no such file: " ++ toFilePath newFilePath
         else do
-          content <- liftIO $ readFile $ toFilePath nextPath
-          modify (\e -> e {currentFilePath = nextPath})
+          insertPathInfo oldFilePath newFilePath
+          ensureDAG
+          content <- liftIO $ readFile $ toFilePath newFilePath
+          modify (\e -> e {currentFilePath = newFilePath})
           includedDefList <- strToTree content path >>= parse'
-          modify (\e -> e {currentFilePath = filePath})
+          modify (\e -> e {currentFilePath = oldFilePath})
           defList <- parse' as
           return $ includedDefList ++ defList
 parse' ((_, TreeNode ((_, TreeAtom "statement"):as1)):as2) = do
@@ -168,3 +172,34 @@ insEnumEnv name enumList = do
          { enumEnv = Map.insert name enumList (enumEnv e)
          , revEnumEnv = rev `Map.union` (revEnumEnv e)
          })
+
+insertPathInfo :: Path Abs File -> Path Abs File -> WithEnv ()
+insertPathInfo oldFilePath newFilePath = do
+  g <- gets includeGraph
+  let g' = Map.insertWith (++) oldFilePath [newFilePath] g
+  modify (\env -> env {includeGraph = g'})
+
+ensureDAG :: WithEnv ()
+ensureDAG = do
+  g <- gets includeGraph
+  m <- gets mainFilePath
+  case ensureDAG' m [] g of
+    Right _ -> return ()
+    Left cyclicPath -> do
+      throwError $ "found cyclic inclusion:\n" ++ Pr.ppShow cyclicPath
+
+ensureDAG' ::
+     Path Abs File
+  -> [Path Abs File]
+  -> IncludeGraph
+  -> Either [Path Abs File] () -- cyclic path (if any)
+ensureDAG' a visited g =
+  case Map.lookup a g of
+    Nothing -> Right ()
+    Just as
+      | xs <- as `intersect` visited
+      , not (null xs) -> do
+        let z = head xs
+        -- result = z -> path{0} -> ... -> path{n} -> z
+        Left $ dropWhile (/= z) visited ++ [a, z]
+    Just as -> mapM_ (\x -> ensureDAG' x (visited ++ [a]) g) as

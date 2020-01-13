@@ -22,11 +22,15 @@ import qualified Text.Show.Pretty as Pr
 
 type ConstraintQueue = Q.MinQueue EnrichedConstraint
 
+type IncludeGraph = Map.HashMap (Path Abs File) [Path Abs File]
+
 data Env =
   Env
     { count :: Int -- to generate fresh symbols
     , target :: Maybe Target
+    , mainFilePath :: Path Abs File
     , currentFilePath :: Path Abs File
+    , includeGraph :: IncludeGraph -- to detect cyclic `include`
     , keywordEnv :: S.Set Identifier -- list of reserved keywords
     , notationEnv :: [(TreePlus, TreePlus)] -- macro transformers
     , constantEnv :: S.Set Identifier
@@ -47,6 +51,7 @@ initialEnv path =
   Env
     { count = 0
     , target = Nothing
+    , includeGraph = Map.empty
     , notationEnv = []
     , keywordEnv = S.empty
     , constantEnv = S.empty
@@ -60,6 +65,7 @@ initialEnv path =
     , llvmEnv = Map.empty
     , constraintEnv = []
     , substEnv = Map.empty
+    , mainFilePath = path
     , currentFilePath = path
     }
 

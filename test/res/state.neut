@@ -24,3 +24,7 @@
      (A type)
      (x A))
     (hom S (product S A))))
+
+;; cyclic inclusion
+;; (include "new.neut")
+(include "sample.neut")
