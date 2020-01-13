@@ -27,7 +27,7 @@ synthesize q = do
     Just (Enriched (e1, e2) ms _ _)
       | Just (m, (_, e)) <- lookupAny ms sub -> do resolveStuck q e1 e2 m e
     Just (Enriched _ _ fmvs (ConstraintPattern m ess e)) -> do
-      resolvePiElim q m fmvs ess e
+      resolvePattern q m fmvs ess e
     Just (Enriched _ _ _ (ConstraintDelta iter mess1 mess2)) -> do
       resolveDelta q iter mess1 mess2
     Just (Enriched _ _ fmvs (ConstraintQuasiPattern m ess e)) -> do
@@ -100,11 +100,22 @@ resolvePiElim ::
 resolvePiElim q m fmvs ess e = do
   let lengthInfo = map length ess
   let es = concat ess
-  -- patternのときはこの処理無駄だし省略する？
   xss <- toVarList es >>= toAltList
   let xsss = map (takeByCount lengthInfo) xss
   let lamList = map (bindFormalArgs e) xsss
   chain $ map (resolveHole q m fmvs) lamList
+
+-- optimization for pattern (not necessary for correctness; its output is the same as that of resolvePiElim)
+resolvePattern ::
+     ConstraintQueue
+  -> Hole
+  -> [Hole]
+  -> [[WeakTermPlus]]
+  -> WeakTermPlus
+  -> WithEnv ()
+resolvePattern q m fmvs ess e = do
+  xss <- mapM toVarList ess
+  resolveHole q m fmvs $ bindFormalArgs e xss
 
 -- {} resolveHole {}
 resolveHole :: ConstraintQueue -> Hole -> [Hole] -> WeakTermPlus -> WithEnv ()
