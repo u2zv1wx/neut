@@ -267,8 +267,8 @@ clarifyBinder :: [(Identifier, TermPlus)] -> WithEnv [(Identifier, CodePlus)]
 clarifyBinder [] = return []
 clarifyBinder ((x, t):xts) = do
   t' <- clarify t
-  bar <- clarifyBinder xts
-  return $ (x, t') : bar
+  xts' <- clarifyBinder xts
+  return $ (x, t') : xts'
 
 retClosure ::
      Maybe Identifier -- the name of newly created closure
