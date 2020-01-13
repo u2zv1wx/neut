@@ -120,17 +120,15 @@ interpret (m, TreeAtom x)
 interpret (m, TreeAtom "_") = newHole m
 interpret t@(m, TreeAtom x) = do
   ml <- interpretEnumValueMaybe t
-  case ml of
-    Just l -> return (m, WeakTermEnumIntro l)
-    _ -> do
-      isEnum <- isDefinedEnumName x
-      if isEnum
-        then return (m, WeakTermEnum $ EnumTypeLabel x)
-        else do
-          cenv <- gets constantEnv
-          if isConstant x || x `elem` cenv
-            then return (m, WeakTermConst x)
-            else return (m, WeakTermUpsilon x)
+  isEnum <- isDefinedEnumName x
+  case (ml, isEnum) of
+    (Just l, _) -> return (m, WeakTermEnumIntro l)
+    (_, True) -> return (m, WeakTermEnum $ EnumTypeLabel x)
+    -- Note that constants are interpreted as variables at this stage.
+    -- Those are reinterpreted into constants in Rename.
+    -- This is to handle terms like `lam (i64 : bool). e` (i.e. bound variable
+    -- with the same name of a constant) in saner way.
+    (_, False) -> return (m, WeakTermUpsilon x)
 interpret t@(m, TreeNode es) =
   if null es
     then throwError $ "interpret: syntax error:\n" ++ Pr.ppShow t

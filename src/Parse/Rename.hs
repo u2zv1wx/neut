@@ -2,7 +2,10 @@ module Parse.Rename
   ( rename
   ) where
 
+import Control.Monad.Except
 import Control.Monad.State
+
+import qualified Data.HashMap.Strict as Map
 
 import Data.Basic
 import Data.Env
@@ -19,8 +22,14 @@ rename e = do
 rename' :: WeakTermPlus -> WithEnv WeakTermPlus
 rename' (m, WeakTermTau) = return (m, WeakTermTau)
 rename' (m, WeakTermUpsilon x) = do
-  x' <- lookupNameEnv x
-  return (m, WeakTermUpsilon x')
+  nenv <- gets nameEnv
+  case Map.lookup x nenv of
+    Just x'
+      | x == x' -> return (m, WeakTermConst x')
+    Just x' -> return (m, WeakTermUpsilon x')
+    Nothing
+      | isConstant x -> return (m, WeakTermConst x)
+    Nothing -> throwError $ "undefined variable: " ++ show x
 rename' (m, WeakTermPi xts t) = do
   (xts', t') <- renameBinder xts t
   return (m, WeakTermPi xts' t')
@@ -37,6 +46,7 @@ rename' (m, WeakTermIter xt xts e) = do
 rename' (m, WeakTermConst x) = return (m, WeakTermConst x)
 rename' (m, WeakTermConstDecl (x, t) e) = do
   t' <- rename' t
+  modify (\env -> env {nameEnv = Map.insert x x (nameEnv env)})
   e' <- rename' e
   return (m, WeakTermConstDecl (x, t') e')
 rename' (m, WeakTermZeta h) = return (m, WeakTermZeta h)
