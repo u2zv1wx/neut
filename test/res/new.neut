@@ -18,7 +18,7 @@
 (include "io.neut")
 
 ;; もちろん、もう一回includeすれば書き換えの問題は解消される。
-(include "top.neut")
+;; (include "top.neut")
 
 (enum choice left right)
 
