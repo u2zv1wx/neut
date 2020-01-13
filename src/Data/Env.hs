@@ -26,7 +26,7 @@ data Env =
   Env
     { count :: Int -- to generate fresh symbols
     , target :: Maybe Target
-    , currentDir :: Path Abs Dir
+    , currentFilePath :: Path Abs File
     , keywordEnv :: S.Set Identifier -- list of reserved keywords
     , notationEnv :: [(TreePlus, TreePlus)] -- macro transformers
     , constantEnv :: S.Set Identifier
@@ -42,7 +42,7 @@ data Env =
     , llvmEnv :: Map.HashMap Identifier ([Identifier], LLVM)
     }
 
-initialEnv :: Path Abs Dir -> Env
+initialEnv :: Path Abs File -> Env
 initialEnv path =
   Env
     { count = 0
@@ -60,7 +60,7 @@ initialEnv path =
     , llvmEnv = Map.empty
     , constraintEnv = []
     , substEnv = Map.empty
-    , currentDir = path
+    , currentFilePath = path
     }
 
 type WithEnv a = StateT Env (ExceptT String IO) a

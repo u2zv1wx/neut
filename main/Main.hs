@@ -82,8 +82,7 @@ main = execParser optParser >>= run
 run :: Command -> IO ()
 run (Build inputPathStr mOutputPathStr outputKind) = do
   inputPath <- resolveFile' inputPathStr
-  let dirPath = parent inputPath
-  resultOrErr <- evalWithEnv (process inputPath) (initialEnv dirPath)
+  resultOrErr <- evalWithEnv (process inputPath) (initialEnv inputPath)
   let basename = filename inputPath
   mOutputPath <- mapM resolveFile' mOutputPathStr
   outputPath <- constructOutputPath basename mOutputPath outputKind

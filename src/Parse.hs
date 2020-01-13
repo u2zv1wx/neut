@@ -71,17 +71,16 @@ parse' ((_, TreeNode [(_, TreeAtom "include"), (_, TreeAtom pathString)]):as) =
   case readMaybe pathString :: Maybe String of
     Nothing -> throwError "the argument of `include` must be a string"
     Just path -> do
-      dirPath <- gets currentDir
-      nextPath <- resolveFile dirPath path
+      filePath <- gets currentFilePath
+      nextPath <- resolveFile (parent filePath) path
       b <- doesFileExist nextPath
       if not b
         then throwError $ "no such file: " ++ toFilePath nextPath
         else do
           content <- liftIO $ readFile $ toFilePath nextPath
-          let nextDirPath = parent nextPath
-          modify (\e -> e {currentDir = nextDirPath})
+          modify (\e -> e {currentFilePath = nextPath})
           includedDefList <- strToTree content path >>= parse'
-          modify (\e -> e {currentDir = dirPath})
+          modify (\e -> e {currentFilePath = filePath})
           defList <- parse' as
           return $ includedDefList ++ defList
 parse' ((_, TreeNode ((_, TreeAtom "statement"):as1)):as2) = do
