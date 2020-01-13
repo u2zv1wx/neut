@@ -1,9 +1,10 @@
 module Main where
 
+import Control.Monad.State
 import Data.List (intercalate)
 import Options.Applicative
-import System.Directory
-import System.FilePath
+import Path
+import Path.IO
 import System.Process
 import Text.Read (readMaybe)
 
@@ -79,48 +80,48 @@ main :: IO ()
 main = execParser optParser >>= run
 
 run :: Command -> IO ()
-run (Build inputPath moutputPath outputKind) = do
-  content <- readFile inputPath
-  dirPath <- expandDirPath $ takeDirectory inputPath
-  resultOrErr <- evalWithEnv (process content inputPath) (initialEnv dirPath)
-  let basename = takeBaseName inputPath
-  outputPath <- constructOutputPath basename moutputPath outputKind
+run (Build inputPathStr mOutputPathStr outputKind) = do
+  inputPath <- resolveFile' inputPathStr
+  let dirPath = parent inputPath
+  resultOrErr <- evalWithEnv (process inputPath) (initialEnv dirPath)
+  let basename = filename inputPath
+  mOutputPath <- mapM resolveFile' mOutputPathStr
+  outputPath <- constructOutputPath basename mOutputPath outputKind
   case resultOrErr of
     Left err -> putStrLn err
     Right result -> writeResult result outputPath outputKind
 
-constructOutputPath :: String -> Maybe FilePath -> OutputKind -> IO FilePath
+constructOutputPath ::
+     Path Rel File -> Maybe (Path Abs File) -> OutputKind -> IO (Path Abs File)
 constructOutputPath basename Nothing OutputKindLLVM = do
-  dir <- getCurrentDirectory
-  return $ dir </> (basename ++ ".ll")
+  dir <- getCurrentDir
+  (dir </> basename) <.> "ll"
 constructOutputPath basename Nothing OutputKindObject = do
-  dir <- getCurrentDirectory
+  dir <- getCurrentDir
   return $ dir </> basename
 constructOutputPath _ (Just path) _ = return path
 
-writeResult :: [String] -> FilePath -> OutputKind -> IO ()
+writeResult :: [String] -> Path Abs File -> OutputKind -> IO ()
 writeResult result outputPath OutputKindLLVM = do
   let content = intercalate "\n" result
-  writeFile outputPath content
+  writeFile (toFilePath outputPath) content
 writeResult result outputPath OutputKindObject = do
   let content = intercalate "\n" result
-  let tmpOutputPath = outputPath ++ ".ll"
-  let tmpAsmOutputPath = outputPath ++ ".s"
-  writeFile tmpOutputPath content
-  callProcess "llc" [tmpOutputPath, "-o=" ++ tmpAsmOutputPath]
-  callProcess "clang" [tmpAsmOutputPath, "-o" ++ outputPath]
+  tmpOutputPath <- liftIO $ outputPath <.> "ll"
+  tmpAsmOutputPath <- liftIO $ outputPath <.> "s"
+  let tmpOutputPathStr = toFilePath tmpOutputPath
+  let tmpAsmOutputPathStr = toFilePath tmpAsmOutputPath
+  writeFile tmpOutputPathStr content
+  callProcess "llc" [tmpOutputPathStr, "-o=" ++ tmpAsmOutputPathStr]
+  callProcess "clang" [tmpAsmOutputPathStr, "-o" ++ toFilePath outputPath]
   removeFile tmpOutputPath
   removeFile tmpAsmOutputPath
 
-expandDirPath :: FilePath -> IO FilePath
-expandDirPath path = do
-  current <- getCurrentDirectory
-  return $ current </> path
-
-process :: String -> String -> WithEnv [String]
-process input inputPath = do
+process :: Path Abs File -> WithEnv [String]
+process inputPath = do
+  content <- liftIO $ readFile $ toFilePath inputPath
   p "parse"
-  e <- parse input inputPath >>= elaborate
+  e <- parse content (toFilePath inputPath) >>= elaborate
   p "elaborated"
   e' <- clarify e
   p "clarified"

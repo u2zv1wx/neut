@@ -26,6 +26,8 @@ dependencies:
 - containers
 - unordered-containers
 - half
+- path
+- path-io
 
 library:
   source-dirs: src

@@ -4,6 +4,7 @@ module Data.Env where
 
 import Control.Monad.Except
 import Control.Monad.State
+import Path
 import System.Info
 
 import Data.Basic
@@ -25,7 +26,7 @@ data Env =
   Env
     { count :: Int -- to generate fresh symbols
     , target :: Maybe Target
-    , currentDir :: FilePath
+    , currentDir :: Path Abs Dir
     , keywordEnv :: S.Set Identifier -- list of reserved keywords
     , notationEnv :: [(TreePlus, TreePlus)] -- macro transformers
     , constantEnv :: S.Set Identifier
@@ -41,7 +42,7 @@ data Env =
     , llvmEnv :: Map.HashMap Identifier ([Identifier], LLVM)
     }
 
-initialEnv :: FilePath -> Env
+initialEnv :: Path Abs Dir -> Env
 initialEnv path =
   Env
     { count = 0

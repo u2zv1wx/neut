@@ -39,7 +39,7 @@
 ;;     ((c tau)
 ;;      (_ (pi (xt+ (_ t)) c)))
 ;;     c))
-(definition string
+(definition utf8-code
   (sigma ((A type) (prf (is-enum A)))
     (u8-array A)))
 
@@ -173,6 +173,7 @@
 
 (ascription my-dec (hom nat nat))
 
+;; これがパターンマッチの基本をあたえている
 (definition my-item ((num nat))
   (sigma-elimination
     ((selector choice)

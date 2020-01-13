@@ -4,8 +4,8 @@ module Parse
 
 import Control.Monad.Except
 import Control.Monad.State
-import System.Directory
-import System.FilePath
+import Path
+import Path.IO
 import Text.Read (readMaybe)
 
 import qualified Data.HashMap.Strict as Map
@@ -72,13 +72,13 @@ parse' ((_, TreeNode [(_, TreeAtom "include"), (_, TreeAtom pathString)]):as) =
     Nothing -> throwError "the argument of `include` must be a string"
     Just path -> do
       dirPath <- gets currentDir
-      let nextPath = normalise $ dirPath </> path
-      b <- liftIO $ doesFileExist nextPath
+      nextPath <- resolveFile dirPath path
+      b <- doesFileExist nextPath
       if not b
-        then throwError $ "no such file: " ++ normalise nextPath
+        then throwError $ "no such file: " ++ toFilePath nextPath
         else do
-          content <- liftIO $ readFile nextPath
-          let nextDirPath = dirPath </> takeDirectory path
+          content <- liftIO $ readFile $ toFilePath nextPath
+          let nextDirPath = parent nextPath
           modify (\e -> e {currentDir = nextDirPath})
           includedDefList <- strToTree content path >>= parse'
           modify (\e -> e {currentDir = dirPath})
