@@ -90,8 +90,16 @@ newName = do
 newNameWith :: Identifier -> WithEnv Identifier
 newNameWith s = do
   i <- newName
-  -- let s' = llvmString s ++ i -- for debug build (slow)
-  let s' = "name" ++ i
+  let s' = s ++ i -- for debug build (slow)
+  -- let s' = "name" ++ i
+  modify (\e -> e {nameEnv = Map.insert s s' (nameEnv e)})
+  return s'
+
+newLLVMNameWith :: Identifier -> WithEnv Identifier
+newLLVMNameWith s = do
+  i <- newName
+  let s' = llvmString s ++ i -- for debug build (slow)
+  -- let s' = "name" ++ i
   modify (\e -> e {nameEnv = Map.insert s s' (nameEnv e)})
   return s'
 
@@ -99,14 +107,20 @@ llvmString :: String -> String
 llvmString [] = error "llvmString called for the empty string"
 llvmString (c:cs) = llvmHeadChar c : map llvmTailChar cs
 
+foo :: String
+foo = "-$._" ++ ['a' .. 'z'] ++ ['A' .. 'Z']
+
+bar :: String
+bar = "-$._" ++ ['a' .. 'z'] ++ ['A' .. 'Z'] ++ ['0' .. '9']
+
 llvmHeadChar :: Char -> Char
 llvmHeadChar c
-  | c `elem` "-$._" ++ ['a' .. 'z'] ++ ['A' .. 'Z'] = c
+  | c `elem` foo = c
 llvmHeadChar _ = '-'
 
 llvmTailChar :: Char -> Char
 llvmTailChar c
-  | c `elem` "-$._" ++ ['a' .. 'z'] ++ ['A' .. 'Z'] ++ ['0' .. '9'] = c
+  | c `elem` bar = c
 llvmTailChar _ = '-'
 
 lookupTypeEnv :: String -> WithEnv TermPlus

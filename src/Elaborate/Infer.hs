@@ -224,7 +224,6 @@ inferPiElim ctx m (e, t) ets = do
   case t of
     (_, WeakTermPi xts cod) -- performance optimization (not necessary for correctness)
       | length xts == length ets -> do
-        p $ "shortcut: " ++ show (map fst xts)
         let xs = map fst xts
         let ts' = map (substWeakTermPlus (zip xs es) . snd) xts
         forM_ (zip ts ts') $ uncurry insConstraintEnv

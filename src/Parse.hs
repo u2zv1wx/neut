@@ -84,8 +84,6 @@ parse' ((_, TreeNode [(_, TreeAtom "include"), (_, TreeAtom pathString)]):as) =
           denv <- gets defEnv
           case Map.lookup newFilePath denv of
             Just mxs -> do
-              p "mxs:"
-              p' mxs
               let header = map (toDefLetHeader newFilePath) mxs
               defList <- parse' as
               return $ header ++ defList

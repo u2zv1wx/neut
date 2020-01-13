@@ -92,7 +92,7 @@ renameBinder [] e = do
 renameBinder ((x, t):xts) e = do
   t' <- rename' t
   local $ do
-    x' <- newNameWith x
+    x' <- newLLVMNameWith x
     (xts', e') <- renameBinder xts e
     return ((x', t') : xts', e')
 
@@ -112,13 +112,13 @@ renameIter' ::
   -> WithEnv (IdentifierPlus, [IdentifierPlus], WeakTermPlus)
 renameIter' (x, t') [] e = do
   local $ do
-    x' <- newNameWith x
+    x' <- newLLVMNameWith x
     e' <- rename' e
     return ((x', t'), [], e')
 renameIter' xt ((x, t):xts) e = do
   t' <- rename' t
   local $ do
-    x' <- newNameWith x
+    x' <- newLLVMNameWith x
     (xt', xts', e') <- renameIter' xt xts e
     return (xt', (x', t') : xts', e')
 
