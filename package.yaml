@@ -28,6 +28,8 @@ dependencies:
 - half
 - path
 - path-io
+- bytestring
+- binary
 
 library:
   source-dirs: src

@@ -186,11 +186,6 @@ data Arch =
   Arch64
   deriving (Eq, Show)
 
-showItems :: (a -> String) -> [a] -> String
-showItems _ [] = ""
-showItems f [a] = f a
-showItems f (a:as) = f a ++ ", " ++ showItems f as
-
 asLowType :: Identifier -> LowType
 asLowType n = fromMaybe (LowTypeIntS 64) (asLowTypeMaybe n)
 

@@ -29,23 +29,25 @@ import Reduce.WeakTerm
 -- S. Kong, and C. Roux. "Elaboration in Dependent Type Theory", arxiv,
 -- https://arxiv.org/abs/1505.04324, 2015.
 elaborate :: WeakTermPlus -> WithEnv TermPlus
-elaborate e = do
-  p "infer"
+elaborate e
+  -- p "infer"
+ = do
   e' <- infer e
-  p "analyze/synthesize"
+  -- p "analyze/synthesize"
   -- Kantian type-inference ;)
-  cs <- gets constraintEnv
-  p $ "size: " ++ show (length cs)
+  -- cs <- gets constraintEnv
+  -- p $ "size: " ++ show (length cs)
   gets constraintEnv >>= analyze >>= synthesize
-  p "done"
+  -- p "done"
   reduceSubstEnv
-  p "elaborate"
+  -- p "elaborate"
   -- this reduceTermPlus is necessary since e' contains "DONT_CARE" in its
   -- type of arguments of abstractions of meta-variables.
   e'' <- elaborate' e' >>= reduceTermPlus
   -- error "stop"
-  let info2 = toInfo "elaborated term is not closed:" e''
-  assertMP info2 (return e'') $ null (varTermPlus e'')
+  return e''
+  -- let info2 = toInfo "elaborated term is not closed:" e''
+  -- assertMP info2 (return e'') $ null (varTermPlus e'')
 
 -- This function translates a well-typed term into an untyped term in a
 -- reduction-preserving way. Here, we translate types into units (nullary product).
