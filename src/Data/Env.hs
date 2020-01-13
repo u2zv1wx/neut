@@ -90,9 +90,23 @@ newName = do
 newNameWith :: Identifier -> WithEnv Identifier
 newNameWith s = do
   i <- newName
-  let s' = s ++ i
+  let s' = llvmString s ++ i
   modify (\e -> e {nameEnv = Map.insert s s' (nameEnv e)})
   return s'
+
+llvmString :: String -> String
+llvmString [] = error "llvmString called for the empty string"
+llvmString (c:cs) = llvmHeadChar c : map llvmTailChar cs
+
+llvmHeadChar :: Char -> Char
+llvmHeadChar c
+  | c `elem` "-$._" ++ ['a' .. 'z'] ++ ['A' .. 'Z'] = c
+llvmHeadChar _ = '-'
+
+llvmTailChar :: Char -> Char
+llvmTailChar c
+  | c `elem` "-$._" ++ ['a' .. 'z'] ++ ['A' .. 'Z'] ++ ['0' .. '9'] = c
+llvmTailChar _ = '-'
 
 lookupTypeEnv :: String -> WithEnv TermPlus
 lookupTypeEnv s
