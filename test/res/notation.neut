@@ -21,15 +21,6 @@
 
 (notation case enum-elimination)
 
-;; sequential execution
-(keyword pi-i)
-
-(notation pi-i pi-introduction)
-
-;; (keyword pi-e)
-
-;; (notation pi-e pi-elimination)
-
 (keyword hole)
 
 (notation hole (zeta _))
@@ -69,9 +60,6 @@
 ;; 引数がないときはmuを入れない
 (notation (definition name e)
   (let name e)) ;; こっちの `let` はspecial formのほうのlet.
-
-;; (notation (definition name () e+)
-;;   (let name (mu name (lambda () e+))))
 
 (notation (definition name () e+)
   (let name (iterate name () e+)))
@@ -142,8 +130,5 @@
 
 (keyword sigma-elimination)
 
-;; sigma-eliminationでは型情報も引数としてとるのね。
-;; (notation (sigma-elimination (xt+) e1 e2)
-;;   (e1 (lambda (xt+) e2)))
 (notation (sigma-elimination (xt+) e1 e2)
   (e1 hole (lambda (xt+) e2)))

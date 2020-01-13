@@ -45,6 +45,15 @@
 
 ;; 長さがn15になるのがポイントで、ここでunicodeの複雜性が出てくる
 ;; n15の部分をsigmaで包めばどうにかなりそうな雰囲気はある。
+;; string := sigma (A : Univ, prf : is-enum A, str : u8-array A)とかってしておく感じ。
+;; で、出力するときはsigma-elimで中身をとりだしてそれぞれをwriteの引数に与える。
+;; こうすれば、長さが不明の文字列を扱うことができる。まあ、いけそう。
+;; ところで、
+;;   (sigma
+;;     (A type)
+;;     (prf (is-enum A))
+;;     (content (u8-array A)))
+;; みたいに書けるとうれしいだろうか？案外うれしいかも。
 (write n3 stdout (test) enum.n3)
 
 ;; (write n15 stdout (test) enum.n15)
