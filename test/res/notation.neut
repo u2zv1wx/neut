@@ -70,8 +70,8 @@
 (notation (definition name e)
   (let name e)) ;; こっちの `let` はspecial formのほうのlet.
 
-(notation (definition name () e+)
-  (let name (mu name (lambda () e+))))
+;; (notation (definition name () e+)
+;;   (let name (mu name (lambda () e+))))
 
 (notation (definition name () e+)
   (let name (iterate name () e+)))

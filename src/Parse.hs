@@ -39,7 +39,7 @@ parse' :: [TreePlus] -> WithEnv [Def]
 parse' [] = return []
 parse' ((_, TreeNode [(_, TreeAtom "notation"), from, to]):as) = do
   checkNotation from
-  modify (\e -> e {notationEnv = (from, to) : notationEnv e})
+  modify (\e -> e {notationEnv = notationEnv e ++ [(from, to)]})
   parse' as
 parse' ((_, TreeNode [(_, TreeAtom "keyword"), (_, TreeAtom s)]):as) = do
   checkKeywordSanity s
