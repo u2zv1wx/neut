@@ -1,6 +1,6 @@
 module Parse.MacroExpand
   ( macroExpand
-  , checkNotation
+  , checkNotationSanity
   ) where
 
 import Control.Monad.Except
@@ -122,8 +122,8 @@ toSpliceTree ts =
   , TreeNode [(emptyMeta, TreeAtom "splice"), (emptyMeta, TreeNode ts)])
 
 -- {} checkNotation {}
-checkNotation :: Notation -> WithEnv ()
-checkNotation t = do
+checkNotationSanity :: Notation -> WithEnv ()
+checkNotationSanity t = do
   checkKeywordCondition t
   checkPlusCondition t
 
