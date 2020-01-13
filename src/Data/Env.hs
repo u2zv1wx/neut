@@ -90,7 +90,8 @@ newName = do
 newNameWith :: Identifier -> WithEnv Identifier
 newNameWith s = do
   i <- newName
-  let s' = llvmString s ++ i
+  -- let s' = llvmString s ++ i -- for debug build (slow)
+  let s' = "name" ++ i
   modify (\e -> e {nameEnv = Map.insert s s' (nameEnv e)})
   return s'
 

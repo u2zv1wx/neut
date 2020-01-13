@@ -20,18 +20,11 @@
 ;; (ascription io
 ;;   (hom type type))
 
-;; IO Bみたいなやつ。
 (definition io-return ((B type) (x B))
   (state-return bottom B x))
 
-(ascription io-return
-  (pi
-    ((A type)
-     (x A))
-    (io A)))
-
-(ascription io-return
-  (pi
-    ((A type)
-     (x A))
-    (state bottom A)))
+;; (ascription io-return
+;;   (pi
+;;     ((A type)
+;;      (x A))
+;;     (io A)))

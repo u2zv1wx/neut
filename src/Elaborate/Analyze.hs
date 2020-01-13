@@ -313,7 +313,13 @@ includeCheck xs e = all (`elem` xs) $ varWeakTermPlus e
 
 -- {} linearCheck {}
 linearCheck :: [Identifier] -> Bool
-linearCheck xs = xs == nub xs
+linearCheck xs = linearCheck' [] xs
+
+linearCheck' :: [Identifier] -> [Identifier] -> Bool
+linearCheck' _ [] = True
+linearCheck' found (x:_)
+  | x `elem` found = False
+linearCheck' found (x:xs) = linearCheck' (x : found) xs
 
 -- {} getVarList {}
 getVarList :: [WeakTermPlus] -> [Identifier]

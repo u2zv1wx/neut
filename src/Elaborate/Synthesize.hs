@@ -31,10 +31,8 @@ synthesize q = do
     Just (Enriched _ _ _ (ConstraintDelta iter mess1 mess2)) -> do
       resolveDelta q iter mess1 mess2
     Just (Enriched _ _ fmvs (ConstraintQuasiPattern m ess e)) -> do
-      p "quasi"
       resolvePiElim q m fmvs ess e
     Just (Enriched _ _ fmvs (ConstraintFlexRigid m ess e)) -> do
-      p "flex"
       resolvePiElim q m fmvs ess e
     Just (Enriched (e1, e2) _ _ _)
       -- throwError $ "cannot simplify:\n" ++ Pr.ppShow q
@@ -169,9 +167,9 @@ toAltList :: [IdentifierPlus] -> WithEnv [[IdentifierPlus]]
 toAltList xts = do
   result <-
     mapM (discardInactive xts) $ chooseActive $ toIndexInfo (map fst xts)
-  forM_ (map (map fst) result) $ \xs -> do
-    let info = toInfo "toAltList: linearity is not satisfied:" xs
-    assertUP info $ linearCheck xs
+  -- forM_ (map (map fst) result) $ \xs -> do
+  --   let info = toInfo "toAltList: linearity is not satisfied:" xs
+  --   assertUP info $ linearCheck xs
   return result
 
 -- [x, x, y, z, z] ~> [(x, [0, 1]), (y, [2]), (z, [3, 4])]

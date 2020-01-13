@@ -82,7 +82,7 @@ infer' ctx (m, WeakTermIter (x, t) xts e) = do
   insConstraintEnv t' piType
   retWeakTerm piType m $ WeakTermIter (x, t') xts' e'
 infer' ctx (m, WeakTermZeta _)
-  -- zetaから変換先をlookupできるようにしておいたほうがたぶん正しい？
+  -- zetaから変換先をlookupできるようにしておいたほうが正しい？
  = do
   (app, higherApp) <- newHoleInCtx ctx m
   return (app, higherApp)
@@ -224,6 +224,7 @@ inferPiElim ctx m (e, t) ets = do
   case t of
     (_, WeakTermPi xts cod) -- performance optimization (not necessary for correctness)
       | length xts == length ets -> do
+        p $ "shortcut: " ++ show (map fst xts)
         let xs = map fst xts
         let ts' = map (substWeakTermPlus (zip xs es) . snd) xts
         forM_ (zip ts ts') $ uncurry insConstraintEnv

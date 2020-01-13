@@ -34,6 +34,8 @@ elaborate e = do
   e' <- infer e
   p "analyze/synthesize"
   -- Kantian type-inference ;)
+  cs <- gets constraintEnv
+  p $ "size: " ++ show (length cs)
   gets constraintEnv >>= analyze >>= synthesize
   p "done"
   reduceSubstEnv

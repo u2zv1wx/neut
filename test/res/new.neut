@@ -11,6 +11,7 @@
 ;; このstateの中でtop-unitが書き換えられてしまう。
 ;; これは挙動として妥当だろうか？
 ;; まあ、state.neutがtop-unitをexportしてるって考えれば妥当か。
+;; 特定のモジュールがexportしてるものはリストアップされてるはずで。
 ;; exportしない、みたいなのも指定できるとうれしいかな。
 (include "state.neut")
 
@@ -26,9 +27,9 @@
 (constant admit-explicit
   (pi ((A type)) A))
 
-(definition foo top-unit)
+;; (definition foo top-unit)
 
-(ascription foo top)
+;; (ascription foo top)
 
 (keyword admit)
 
@@ -151,18 +152,18 @@
 ;;     (enum-elimination selector
 ;;       (zero-inner top)
 ;;       (succ-inner bottom))))
-(definition top-or-bottom ((x nat))
-  (sigma-elimination
-    ((cons choice)
-     (value (nat-helper cons)))
-    x
-    (enum-elimination cons
-      (left top)
-      (right bottom))))
+;; (definition top-or-bottom ((x nat))
+;;   (sigma-elimination
+;;     ((cons choice)
+;;      (value (nat-helper cons)))
+;;     x
+;;     (enum-elimination cons
+;;       (left top)
+;;       (right bottom))))
 ;; こうか。第1成分を取り出してその値がどうなっているかをみて、それに応じた処理を書く。
 
 ;; zero-innerのときtopに、そうでないときbottomになる関数。
-(ascription top-or-bottom (hom nat tau))
+;; (ascription top-or-bottom (hom nat tau))
 
 ;; (definition my-dec ((x nat))
 ;;   (sigma-elimination
@@ -193,14 +194,6 @@
     (case selector
       (left (zero))
       (right value))))
-
-;; こういう感じ？でもwarningではないよな。
-;; (notation infer
-;;   (zeta _))
-
-;; こうだろうか。
-;; (let (x (zeta _)) ...)
-;; (let (x (zeta _)) ..)
 
 (ascription my-item
   (hom nat nat))
