@@ -29,17 +29,17 @@ parseStr = parseNode <|> parseAtom
 
 parseAtom :: Parser TreePlus
 parseAtom = do
+  m <- currentMeta
   s <- symbol
   _ <- skip
-  m <- currentMeta
   return (m, TreeAtom s)
 
 parseNode :: Parser TreePlus
 parseNode = do
+  m <- currentMeta
   _ <- char '(' >> skip
   itemList <- many parseStr
   _ <- skip >> char ')' >> skip
-  m <- currentMeta
   return (m, TreeNode itemList)
 
 skip :: Parser ()

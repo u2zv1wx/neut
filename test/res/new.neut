@@ -73,8 +73,8 @@
 
 ;; redefinition of enum-value is also disallowed
 ;; (enum yay top)
-(enum yay unit)
 ;; (enum unit yay)
+(enum yay unit)
 
 ;; (write n15 stdout (test) enum.n15)
 
