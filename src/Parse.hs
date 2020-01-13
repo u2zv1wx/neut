@@ -104,9 +104,13 @@ parse' ((_, TreeNode ((_, TreeAtom "statement"):as1)):as2) = do
   return $ defList1 ++ defList2
 parse' ((_, TreeNode [(_, TreeAtom "constant"), (_, TreeAtom name), t]):as) = do
   t' <- macroExpand t >>= interpret
-  modify (\e -> e {constantEnv = S.insert name (constantEnv e)})
-  defList <- parse' as
-  return $ DefConstDecl (name, t') : defList
+  cenv <- gets constantEnv
+  if name `S.member` cenv
+    then throwError $ "the constant " ++ name ++ " is already defined"
+    else do
+      modify (\e -> e {constantEnv = S.insert name (constantEnv e)})
+      defList <- parse' as
+      return $ DefConstDecl (name, t') : defList
 parse' ((m, TreeNode [(_, TreeAtom "let"), xt, e]):as) = do
   e' <- macroExpand e >>= interpret
   (x, t) <- macroExpand xt >>= interpretIdentifierPlus
