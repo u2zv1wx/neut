@@ -81,12 +81,23 @@ parse' ((_, TreeNode [(_, TreeAtom "include"), (_, TreeAtom pathString)]):as) =
         else do
           insertPathInfo oldFilePath newFilePath
           ensureDAG
-          content <- liftIO $ readFile $ toFilePath newFilePath
-          modify (\e -> e {currentFilePath = newFilePath})
-          includedDefList <- strToTree content path >>= parse'
-          modify (\e -> e {currentFilePath = oldFilePath})
-          defList <- parse' as
-          return $ includedDefList ++ defList
+          denv <- gets defEnv
+          case Map.lookup newFilePath denv of
+            Just mxs -> do
+              let header = map (toDefLetHeader newFilePath) mxs
+              defList <- parse' as
+              return $ header ++ defList
+            Nothing -> do
+              content <- liftIO $ readFile $ toFilePath newFilePath
+              modify (\e -> e {currentFilePath = newFilePath})
+              includedDefList <- strToTree content path >>= parse'
+              let mxs = toIdentList includedDefList
+              modify (\e -> e {currentFilePath = oldFilePath})
+              modify (\env -> env {defEnv = Map.insert newFilePath mxs denv})
+              defList <- parse' as
+              let footer = map (toDefLetFooter newFilePath) mxs
+              let header = map (toDefLetHeader newFilePath) mxs
+              return $ includedDefList ++ footer ++ header ++ defList
 parse' ((_, TreeNode ((_, TreeAtom "statement"):as1)):as2) = do
   defList1 <- parse' as1
   defList2 <- parse' as2
@@ -203,3 +214,18 @@ ensureDAG' a visited g =
         -- result = z -> path{0} -> ... -> path{n} -> z
         Left $ dropWhile (/= z) visited ++ [a, z]
     Just as -> mapM_ (\x -> ensureDAG' x (visited ++ [a]) g) as
+
+toIdentList :: [Def] -> [(Meta, Identifier, WeakTermPlus)]
+toIdentList [] = []
+toIdentList ((DefLet m (x, t) _):ds) = (m, x, t) : toIdentList ds
+toIdentList ((DefConstDecl (x, t)):ds) = (emptyMeta, x, t) : toIdentList ds
+
+toDefLetFooter :: Path Abs File -> (Meta, Identifier, WeakTermPlus) -> Def
+toDefLetFooter path (m, x, t) = do
+  let x' = "(" ++ toFilePath path ++ ":" ++ x ++ ")" -- user cannot write this var since it contains parenthesis
+  DefLet m (x', t) (m, WeakTermUpsilon x)
+
+toDefLetHeader :: Path Abs File -> (Meta, Identifier, WeakTermPlus) -> Def
+toDefLetHeader path (m, x, t) = do
+  let x' = "(" ++ toFilePath path ++ ":" ++ x ++ ")"
+  DefLet m (x, t) (m, WeakTermUpsilon x')

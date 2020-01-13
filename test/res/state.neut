@@ -27,4 +27,12 @@
 
 ;; cyclic inclusion
 ;; (include "new.neut")
-(include "sample.neut")
+;; (include "sample.neut")
+
+(include "top.neut")
+
+;; このtop-unitをexportしないっていうことが表現できるとうれしい。
+(definition top-unit is-enum)
+
+;; こんなかんじで。
+;; (private top-unit)

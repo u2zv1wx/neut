@@ -34,6 +34,7 @@ data Env =
     , keywordEnv :: S.Set Identifier -- list of reserved keywords
     , notationEnv :: [(TreePlus, TreePlus)] -- macro transformers
     , constantEnv :: S.Set Identifier
+    , defEnv :: Map.HashMap (Path Abs File) [(Meta, Identifier, WeakTermPlus)] -- path ~> identifiers defined in the file at toplevel
     , enumEnv :: Map.HashMap Identifier [Identifier] -- [("choice", ["left", "right"]), ...]
     , revEnumEnv :: Map.HashMap Identifier Identifier -- [("left", "choice"), ("right", "choice"), ...]
     , nameEnv :: Map.HashMap Identifier Identifier -- [("foo", "foo.13"), ...]
@@ -56,6 +57,7 @@ initialEnv path =
     , keywordEnv = S.empty
     , constantEnv = S.empty
     , enumEnv = Map.empty
+    , defEnv = Map.empty
     , revEnumEnv = Map.empty
     , nameEnv = Map.empty
     , weakTypeEnv = Map.empty

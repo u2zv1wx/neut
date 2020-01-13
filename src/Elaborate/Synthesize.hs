@@ -31,18 +31,18 @@ synthesize q = do
     Just (Enriched _ _ _ (ConstraintDelta iter mess1 mess2)) -> do
       resolveDelta q iter mess1 mess2
     Just (Enriched _ _ fmvs (ConstraintQuasiPattern m ess e)) -> do
+      p "quasi"
       resolvePiElim q m fmvs ess e
     Just (Enriched _ _ fmvs (ConstraintFlexRigid m ess e)) -> do
+      p "flex"
       resolvePiElim q m fmvs ess e
     Just (Enriched (e1, e2) _ _ _)
       -- throwError $ "cannot simplify:\n" ++ Pr.ppShow q
       -- p $ "cannot simplify:\n" ++ Pr.ppShow (e1, e2)
       -- throwError $ "don't know how to synthesize constraint(s)"
+      -- senv <- gets substEnv
      -> do
       p $ "rest: " ++ show (Q.size q)
-      senv <- gets substEnv
-      p "selector-186-458:"
-      p' $ Map.lookup "selector-186-458" senv
       throwError $ "cannot simplify:\n" ++ Pr.ppShow (e1, e2)
 
 -- e1だけがstuckしているとき、e2だけがstuckしているとき、両方がstuckしているときをそれぞれ

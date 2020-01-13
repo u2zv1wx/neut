@@ -8,9 +8,16 @@
 
 (include "constant.neut")
 
+;; このstateの中でtop-unitが書き換えられてしまう。
+;; これは挙動として妥当だろうか？
+;; まあ、state.neutがtop-unitをexportしてるって考えれば妥当か。
+;; exportしない、みたいなのも指定できるとうれしいかな。
 (include "state.neut")
 
 (include "io.neut")
+
+;; もちろん、もう一回includeすれば書き換えの問題は解消される。
+(include "top.neut")
 
 (enum choice left right)
 
@@ -18,6 +25,10 @@
 
 (constant admit-explicit
   (pi ((A type)) A))
+
+(definition foo top-unit)
+
+(ascription foo top)
 
 (keyword admit)
 
