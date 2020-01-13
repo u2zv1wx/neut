@@ -81,7 +81,9 @@ infer' ctx (m, WeakTermIter (x, t) xts e) = do
   let piType = (emptyMeta, WeakTermPi xts' tCod)
   insConstraintEnv t' piType
   retWeakTerm piType m $ WeakTermIter (x, t') xts' e'
-infer' ctx (m, WeakTermZeta _) = do
+infer' ctx (m, WeakTermZeta _)
+  -- zetaから変換先をlookupできるようにしておいたほうがたぶん正しい？
+ = do
   (app, higherApp) <- newHoleInCtx ctx m
   return (app, higherApp)
 infer' _ (m, WeakTermConst x)

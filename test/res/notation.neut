@@ -26,9 +26,13 @@
 
 (notation pi-i pi-introduction)
 
-(keyword pi-e)
+;; (keyword pi-e)
 
-(notation pi-e pi-elimination)
+;; (notation pi-e pi-elimination)
+
+(keyword hole)
+
+(notation hole (zeta _))
 
 (keyword let)
 
@@ -39,10 +43,10 @@
 (notation (begin e) e)
 
 (notation (begin e rest+)
-  (pi-e (pi-i ((_ _)) (begin rest+)) (begin e)))
+  ((pi-introduction ((_ hole)) (begin rest+)) (begin e)))
 
 (notation (begin (let x e+) rest+)
-  (pi-e (pi-i ((x _)) (begin rest+)) (begin e+)))
+  ((pi-introduction ((x hole)) (begin rest+)) (begin e+)))
 
 ;; (notation (begin (definition x e) rest+)
 ;;   (pi-e (pi-i ((x _)) (begin rest+)) (mu x e)))
@@ -125,10 +129,10 @@
 (keyword to-hole-list)
 
 (notation (to-hole-list e)
-  ((_ _)))
+  ((_ hole)))
 
 (notation (to-hole-list e e+)
-  ((_ _) (splice (to-hole-list e+))))
+  ((_ hole) (splice (to-hole-list e+))))
 
 (notation (sigma-introduction e+)
   (lambda
@@ -142,4 +146,4 @@
 ;; (notation (sigma-elimination (xt+) e1 e2)
 ;;   (e1 (lambda (xt+) e2)))
 (notation (sigma-elimination (xt+) e1 e2)
-  (e1 _ (lambda (xt+) e2)))
+  (e1 hole (lambda (xt+) e2)))

@@ -117,7 +117,6 @@ interpret (m, TreeAtom x)
     let ns = map (\i -> EnumValueNatNum len i) [0 .. (len - 1)]
     -- parse string as utf-8 encoded u8 array
     return (m, WeakTermArrayIntro (ArrayKindIntU 8) (zip ns u8s))
-interpret (m, TreeAtom "_") = newHole m
 interpret t@(m, TreeAtom x) = do
   ml <- interpretEnumValueMaybe t
   isEnum <- isDefinedEnumName x

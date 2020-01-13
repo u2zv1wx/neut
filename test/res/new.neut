@@ -21,7 +21,7 @@
 
 (keyword admit)
 
-(notation admit (admit-explicit _))
+(notation admit (admit-explicit hole))
 
 ;; 「あ」のutf8-encoding
 (definition str ()
@@ -172,6 +172,14 @@
     (case selector
       (left (zero))
       (right value))))
+
+;; こういう感じ？でもwarningではないよな。
+;; (notation infer
+;;   (zeta _))
+
+;; こうだろうか。
+;; (let (x (zeta _)) ...)
+;; (let (x (zeta _)) ..)
 
 (ascription my-item
   (hom nat nat))
