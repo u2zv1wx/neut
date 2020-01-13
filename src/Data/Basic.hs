@@ -32,6 +32,14 @@ instance Eq Meta where
 instance Show Meta where
   show _ = "_"
 
+showMeta :: Meta -> String
+showMeta m =
+  case (metaFileName m, metaLocation m) of
+    (Just name, Just (x, y)) -> name ++ ":" ++ show y ++ ":" ++ show x
+    (Just name, Nothing) -> name
+    (Nothing, Just (x, y)) -> "<unknown-file>:" ++ show y ++ ":" ++ show x
+    (Nothing, Nothing) -> "_"
+
 emptyMeta :: Meta
 emptyMeta = Meta {metaLocation = Nothing, metaFileName = Nothing}
 
