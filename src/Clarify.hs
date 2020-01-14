@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 --
 -- clarification == polarization + closure conversion + linearization (+ rename, for LLVM IR)
 --
@@ -10,6 +12,7 @@ import Control.Monad.State
 import Data.List (nubBy)
 
 import qualified Data.HashMap.Strict as Map
+import qualified Data.Text as T
 
 import Clarify.Closure
 import Clarify.Sigma
@@ -138,7 +141,7 @@ clarifyConst m name = do
       cenv <- gets constantEnv
       if name `elem` cenv
         then return (m, CodeUpIntro (m, DataTheta name))
-        else throwError $ "clarify.theta: " ++ name
+        else throwError $ "clarify.theta: " <> name
 
 clarifyUnaryOp :: Identifier -> UnaryOp -> LowType -> Meta -> WithEnv CodePlus
 clarifyUnaryOp name op lowType m = do
@@ -155,7 +158,7 @@ clarifyUnaryOp name op lowType m = do
         m
         [(x, tx)]
         (m, CodeTheta (ThetaUnaryOp op lowType varX))
-    _ -> throwError $ "the arity of " ++ name ++ " is wrong"
+    _ -> throwError $ "the arity of " <> name <> " is wrong"
 
 clarifyBinaryOp :: Identifier -> BinaryOp -> LowType -> Meta -> WithEnv CodePlus
 clarifyBinaryOp name op lowType m = do
@@ -173,7 +176,7 @@ clarifyBinaryOp name op lowType m = do
         m
         [(x, tx), (y, ty)]
         (m, CodeTheta (ThetaBinaryOp op lowType varX varY))
-    _ -> throwError $ "the arity of " ++ name ++ " is wrong"
+    _ -> throwError $ "the arity of " <> name <> " is wrong"
 
 clarifyIsEnum :: Meta -> WithEnv CodePlus
 clarifyIsEnum m = do
@@ -198,7 +201,8 @@ clarifyIsEnum m = do
             [(aff, retImmType), (rel, retImmType)]
             varX
             (m, CodeUpIntro v))
-    _ -> throwError $ "the type of is-enum is wrong. t :\n" ++ Pr.ppShow t
+    _ ->
+      throwError $ "the type of is-enum is wrong. t :\n" <> T.pack (Pr.ppShow t)
 
 -- インデックス部分についての説明。たとえばsystem callとしてのwriteは、対象言語では
 --   write : Pi (A : Univ, out : file-descriptor, str : u8-array a, len : is-enum A). top
@@ -240,7 +244,7 @@ clarifySysCall name sysCall argLen argIdxList m = do
                       (ys !! 1)
                       (m, CodeTheta (ThetaSysCall sysCall ys')))
             retClosure (Just name) zts m xts body
-    _ -> throwError $ "the type of " ++ name ++ " is wrong"
+    _ -> throwError $ "the type of " <> name <> " is wrong"
 
 complementaryChainOf ::
      [(Identifier, TermPlus)] -> WithEnv [(Identifier, TermPlus)]

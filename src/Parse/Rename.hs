@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Parse.Rename
   ( rename
   ) where
@@ -29,7 +31,7 @@ rename' (m, WeakTermUpsilon x) = do
     Just x' -> return (m, WeakTermUpsilon x')
     Nothing
       | isConstant x -> return (m, WeakTermConst x)
-    Nothing -> throwError $ "undefined variable: " ++ show x
+    Nothing -> throwError $ "undefined variable: " <> x
 rename' (m, WeakTermPi xts t) = do
   (xts', t') <- renameBinder xts t
   return (m, WeakTermPi xts' t')

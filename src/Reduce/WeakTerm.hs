@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Reduce.WeakTerm
   ( reduceWeakTermPlus
   ) where

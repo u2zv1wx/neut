@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Reduce.Term
   ( reduceTermPlus
   ) where

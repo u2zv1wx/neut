@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Elaborate.Infer
   ( infer
   , univ
@@ -12,6 +14,7 @@ import Data.Maybe (catMaybes)
 import Data.WeakTerm
 
 import qualified Data.HashMap.Strict as Map
+import qualified Data.Text as T
 
 type Context = [(Identifier, WeakTermPlus)]
 
@@ -103,10 +106,10 @@ infer' ctx (m, WeakTermConstDecl (x, t) e) = do
   (e', t'') <- infer' ctx e
   retWeakTerm t'' m $ WeakTermConstDecl (x, t') e'
 infer' _ (m, WeakTermIntS size i) = do
-  let t = (emptyMeta, WeakTermConst $ "i" ++ show size)
+  let t = (emptyMeta, WeakTermConst $ "i" <> T.pack (show size))
   retWeakTerm t m $ WeakTermIntS size i
 infer' _ (m, WeakTermIntU size i) = do
-  let t = (emptyMeta, WeakTermConst $ "u" ++ show size)
+  let t = (emptyMeta, WeakTermConst $ "u" <> T.pack (show size))
   retWeakTerm t m $ WeakTermIntU size i
 infer' ctx (m, WeakTermInt t i) = do
   t' <- inferType ctx t
@@ -177,10 +180,12 @@ inferType ctx t = do
 
 -- {} inferKind {}
 inferKind :: ArrayKind -> WeakTermPlus
-inferKind (ArrayKindIntS i) = (emptyMeta, WeakTermConst $ "i" ++ show i)
-inferKind (ArrayKindIntU i) = (emptyMeta, WeakTermConst $ "u" ++ show i)
+inferKind (ArrayKindIntS i) =
+  (emptyMeta, WeakTermConst $ "i" <> T.pack (show i))
+inferKind (ArrayKindIntU i) =
+  (emptyMeta, WeakTermConst $ "u" <> T.pack (show i))
 inferKind (ArrayKindFloat size) =
-  (emptyMeta, WeakTermConst $ "f" ++ show (sizeAsInt size))
+  (emptyMeta, WeakTermConst $ "f" <> T.pack (show (sizeAsInt size)))
 
 -- {} inferPi {}
 inferPi ::
@@ -372,14 +377,14 @@ insWeakTypeEnv :: Identifier -> WeakTermPlus -> WithEnv ()
 insWeakTypeEnv i t =
   modify (\e -> e {weakTypeEnv = Map.insert i t (weakTypeEnv e)})
 
-lookupWeakTypeEnv :: String -> WithEnv WeakTermPlus
+lookupWeakTypeEnv :: Identifier -> WithEnv WeakTermPlus
 lookupWeakTypeEnv s = do
   mt <- lookupWeakTypeEnvMaybe s
   case mt of
     Just t -> return t
-    Nothing -> throwError $ s ++ " is not found in the type environment."
+    Nothing -> throwError $ s <> " is not found in the type environment."
 
-lookupWeakTypeEnvMaybe :: String -> WithEnv (Maybe WeakTermPlus)
+lookupWeakTypeEnvMaybe :: Identifier -> WithEnv (Maybe WeakTermPlus)
 lookupWeakTypeEnvMaybe s = do
   mt <- gets (Map.lookup s . weakTypeEnv)
   case mt of
@@ -390,5 +395,5 @@ lookupKind :: Identifier -> WithEnv Identifier
 lookupKind name = do
   renv <- gets revEnumEnv
   case Map.lookup name renv of
-    Nothing -> throwError $ "no such enum-intro is defined: " ++ name
+    Nothing -> throwError $ "no such enum-intro is defined: " <> name
     Just j -> return j

@@ -1,11 +1,15 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Data.Basic where
+
+import qualified Data.Text as T
 
 -- import Control.Exception (assert)
 import Data.Bits
 import Data.Maybe (fromMaybe)
 import Text.Read
 
-type Identifier = String
+type Identifier = T.Text
 
 type Loc = (Int, Int)
 
@@ -45,26 +49,26 @@ emptyMeta = Meta {metaLocation = Nothing, metaFileName = Nothing}
 
 readNatEnumType :: Identifier -> (Maybe Integer)
 readNatEnumType str -- n1, n2, ..., n{i}, ..., n{2^64}
-  | length str >= 2
-  , head str == 'n'
-  , Just i <- readMaybe (tail str)
+  | T.length str >= 2
+  , T.head str == 'n'
+  , Just i <- readMaybe $ T.unpack $ T.tail str
   , 1 <= i && i <= 2 ^ (64 :: Integer) = Just i
 readNatEnumType _ = Nothing
 
 readNatEnumValue :: Identifier -> (Maybe (Integer, Integer))
 readNatEnumValue str -- n1-0, n2-0, n2-1, ...
-  | length str >= 4
-  , head str == 'n'
-  , [iStr, jStr] <- wordsBy '-' (tail str)
-  , Just i <- readMaybe iStr
+  | T.length str >= 4
+  , T.head str == 'n'
+  , [iStr, jStr] <- wordsBy '-' (T.tail str)
+  , Just i <- readMaybe $ T.unpack iStr
   , 1 <= i && i <= 2 ^ (64 :: Integer)
-  , Just j <- readMaybe jStr
+  , Just j <- readMaybe $ T.unpack jStr
   , 0 <= j && j <= i - 1 = Just (i, j)
 readNatEnumValue _ = Nothing
 
 asEnumNatNumConstant :: Identifier -> Maybe Integer
 asEnumNatNumConstant x
-  | length x >= 7 -- length "enum.n4" == 7
+  | T.length x >= 7 -- length "enum.n4" == 7
   , ["enum", y] <- wordsBy '.' x
   , Just i <- readNatEnumType y = Just i -- enum.n{i} is a constant
 asEnumNatNumConstant _ = Nothing
@@ -190,14 +194,18 @@ asLowType :: Identifier -> LowType
 asLowType n = fromMaybe (LowTypeIntS 64) (asLowTypeMaybe n)
 
 asLowTypeMaybe :: Identifier -> Maybe LowType
-asLowTypeMaybe ('i':cs)
-  | Just n <- readMaybe cs
+asLowTypeMaybe "" = Nothing
+asLowTypeMaybe s
+  | 'i' <- T.head s
+  , Just n <- readMaybe $ T.unpack $ T.tail s
   , 0 < n && n < (2 ^ (23 :: Integer)) - 1 = Just $ LowTypeIntS n
-asLowTypeMaybe ('u':cs)
-  | Just n <- readMaybe cs
+asLowTypeMaybe s
+  | 'u' <- T.head s
+  , Just n <- readMaybe $ T.unpack $ T.tail s
   , 0 < n && n < (2 ^ (23 :: Integer)) - 1 = Just $ LowTypeIntU n
-asLowTypeMaybe ('f':cs)
-  | Just n <- readMaybe cs
+asLowTypeMaybe s
+  | 'f' <- T.head s
+  , Just n <- readMaybe $ T.unpack $ T.tail s
   , Just size <- asFloatSize n = Just $ LowTypeFloat size
 asLowTypeMaybe _ = Nothing
 
@@ -253,12 +261,12 @@ asBinaryOpMaybe' "or" = Just BinaryOpOr
 asBinaryOpMaybe' "xor" = Just BinaryOpXor
 asBinaryOpMaybe' _ = Nothing
 
-wordsBy :: Char -> String -> [String]
+wordsBy :: Char -> T.Text -> [T.Text]
 wordsBy c s =
-  case dropWhile (== c) s of
+  case T.dropWhile (== c) s of
     "" -> []
     s' -> do
-      let (w, s'') = break (== c) s'
+      let (w, s'') = T.break (== c) s'
       w : wordsBy c s''
 
 ushiftR :: Int -> Int -> Int

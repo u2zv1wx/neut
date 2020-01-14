@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Parse.MacroExpand
   ( macroExpand
   , checkNotationSanity
@@ -7,13 +9,14 @@ import Control.Monad.Except
 import Control.Monad.State
 
 import qualified Data.Set as S
+import qualified Data.Text as T
 
 import Data.Basic
 import Data.Env
 import Data.Maybe (fromMaybe)
 import Data.Tree
 
-type MacroSubst = [(String, TreePlus)]
+type MacroSubst = [(Identifier, TreePlus)]
 
 -- {} macroExpand {noSplice, noKeyword}
 -- CBV-like macro expansion
@@ -100,7 +103,7 @@ macroMatch (_, TreeNode _) (_, TreeNode []) = return Nothing
 macroMatch (_, TreeNode []) (_, TreeNode _) = return Nothing
 macroMatch (_, TreeNode ts1) (_, TreeNode ts2)
   | (_, TreeAtom s2) <- last ts2
-  , last s2 == '+' -- this ensures that s2 is not a keyword
+  , T.last s2 == '+' -- this ensures that s2 is not a keyword
   , length ts1 >= length ts2 = do
     let (xs, rest) = splitAt (length ts2 - 1) ts1
     let ys = take (length ts2 - 1) ts2
@@ -138,7 +141,7 @@ checkKeywordCondition t = do
 -- {} checkPlusCondition {}
 checkPlusCondition :: Notation -> WithEnv ()
 checkPlusCondition (_, TreeAtom s) =
-  if last s /= '+'
+  if T.last s /= '+'
     then return ()
     else throwError
            "The '+'-suffixed name can be occurred only at the end of a list"

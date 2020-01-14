@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Data.Env where
 
@@ -18,6 +19,7 @@ import Data.WeakTerm
 import qualified Data.HashMap.Strict as Map
 import qualified Data.PQueue.Min as Q
 import qualified Data.Set as S
+import qualified Data.Text as T
 import qualified Text.Show.Pretty as Pr
 
 type ConstraintQueue = Q.MinQueue EnrichedConstraint
@@ -73,13 +75,13 @@ initialEnv path =
     , currentFilePath = path
     }
 
-type WithEnv a = StateT Env (ExceptT String IO) a
+type WithEnv a = StateT Env (ExceptT Identifier IO) a
 
 evalWithEnv :: (Show a) => WithEnv a -> Env -> IO (Either String a)
 evalWithEnv c env = do
   resultOrErr <- runExceptT (runStateT c env)
   case resultOrErr of
-    Left err -> return $ Left err
+    Left err -> return $ Left $ T.unpack err
     Right (result, _) -> return $ Right result
 
 newName :: WithEnv Identifier
@@ -87,45 +89,51 @@ newName = do
   env <- get
   let i = count env
   modify (\e -> e {count = i + 1})
-  return $ "-" ++ show i
+  return $ "-" <> T.pack (show i)
 
 newNameWith :: Identifier -> WithEnv Identifier
 newNameWith s = do
   i <- newName
-  let s' = s ++ i -- for debug build (slow)
-  -- let s' = "name" ++ i
+  let s' = s <> i
   modify (\e -> e {nameEnv = Map.insert s s' (nameEnv e)})
   return s'
 
 newLLVMNameWith :: Identifier -> WithEnv Identifier
 newLLVMNameWith s = do
   i <- newName
-  let s' = llvmString s ++ i -- for debug build (slow)
-  -- let s' = "name" ++ i
+  let s' = llvmString s <> i -- for debug build (slow)
   modify (\e -> e {nameEnv = Map.insert s s' (nameEnv e)})
   return s'
 
-llvmString :: String -> String
-llvmString [] = error "llvmString called for the empty string"
-llvmString (c:cs) = llvmHeadChar c : map llvmTailChar cs
+llvmString :: Identifier -> Identifier
+llvmString "" = error "llvmString called for the empty string"
+llvmString s = T.cons (llvmHeadChar $ T.head s) (T.map llvmTailChar $ T.tail s)
 
-foo :: String
-foo = "-$._" ++ ['a' .. 'z'] ++ ['A' .. 'Z']
-
-bar :: String
-bar = "-$._" ++ ['a' .. 'z'] ++ ['A' .. 'Z'] ++ ['0' .. '9']
+llvmHeadCharSet :: S.Set Char
+llvmHeadCharSet =
+  S.fromList $
+  "-$._" <> "abcdefghijklmnopqrstuvwxyz" <> "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 llvmHeadChar :: Char -> Char
-llvmHeadChar c
-  | c `elem` foo = c
-llvmHeadChar _ = '-'
+llvmHeadChar x =
+  if x `S.member` llvmHeadCharSet
+    then x
+    else '-'
 
+llvmTailCharSet :: S.Set Char
+llvmTailCharSet =
+  S.fromList $
+  "-$._" <>
+  "abcdefghijklmnopqrstuvwxyz" <> "ABCDEFGHIJKLMNOPQRSTUVWXYZ" <> "0123456789"
+
+-- foo = S.fromList $ "-$._" <> "abcdefghijklmnopqrstuvwxyz" <> "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 llvmTailChar :: Char -> Char
-llvmTailChar c
-  | c `elem` bar = c
-llvmTailChar _ = '-'
+llvmTailChar x =
+  if x `S.member` llvmTailCharSet
+    then x
+    else '-'
 
-lookupTypeEnv :: String -> WithEnv TermPlus
+lookupTypeEnv :: Identifier -> WithEnv TermPlus
 lookupTypeEnv s
   | Just i <- asEnumNatNumConstant s = do
     return
@@ -138,14 +146,14 @@ lookupTypeEnv s
     mt <- gets (Map.lookup s . typeEnv)
     case mt of
       Just t -> return t
-      Nothing -> throwError $ s ++ " is not found in the type environment."
+      Nothing -> throwError $ s <> " is not found in the type environment."
 
-lookupNameEnv :: String -> WithEnv String
+lookupNameEnv :: Identifier -> WithEnv Identifier
 lookupNameEnv s = do
   env <- get
   case Map.lookup s (nameEnv env) of
     Just s' -> return s'
-    Nothing -> throwError $ "undefined variable: " ++ show s
+    Nothing -> throwError $ "undefined variable: " <> s
 
 isDefinedEnum :: Identifier -> WithEnv Bool
 isDefinedEnum name = do
@@ -168,13 +176,13 @@ getOS = do
   case os of
     "linux" -> return OSLinux
     "darwin" -> return OSDarwin
-    s -> throwError $ "unsupported target os: " ++ show s
+    s -> throwError $ "unsupported target os: " <> T.pack (show s)
 
 getArch :: WithEnv Arch
 getArch = do
   case arch of
     "x86_64" -> return Arch64
-    s -> throwError $ "unsupported target arch: " ++ show s
+    s -> throwError $ "unsupported target arch: " <> T.pack (show s)
 
 -- for debug
 p :: String -> WithEnv ()

@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Parse
   ( parse
   ) where
@@ -5,12 +7,15 @@ module Parse
 import Control.Monad.Except
 import Control.Monad.State
 import Data.List
+import Data.Monoid ((<>))
 import Path
 import Path.IO
 import Text.Read (readMaybe)
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.Set as S
+import qualified Data.Text as T
+import qualified Data.Text.IO as TIO
 import qualified Text.Show.Pretty as Pr
 
 import Data.Basic
@@ -31,7 +36,7 @@ data Def
 
 -- {} parse {the output term is correctly renamed}
 -- (The postcondition is guaranteed by the assertion of `rename`.)
-parse :: String -> String -> WithEnv WeakTermPlus
+parse :: T.Text -> String -> WithEnv WeakTermPlus
 parse s inputPath = do
   strToTree s inputPath >>= parse' >>= concatDefList >>= rename
 
@@ -58,7 +63,7 @@ parse' ((m, TreeNode ((_, TreeAtom "enum"):(_, TreeAtom name):ts)):as) = do
   -- Thus, `enum.choice` is, for example, translated into 2, assuming that choice = {left, right}.
   -- In the example of `print`, this integer in turn represents the length of the array `str`,
   -- which is indispensable for the system call `write`.
-  let constName = "enum." ++ name
+  let constName = "enum." <> name
   modify (\e -> e {constantEnv = S.insert constName (constantEnv e)})
   -- type constraint for constName
   -- e.g. t == is-enum @ (choice)
@@ -70,14 +75,14 @@ parse' ((m, TreeNode ((_, TreeAtom "enum"):(_, TreeAtom name):ts)):as) = do
   defList <- parse' as
   return $ ascription : defList
 parse' ((_, TreeNode [(_, TreeAtom "include"), (_, TreeAtom pathString)]):as) =
-  case readMaybe pathString :: Maybe String of
+  case readMaybe (T.unpack pathString) :: Maybe String of
     Nothing -> throwError "the argument of `include` must be a string"
     Just path -> do
       oldFilePath <- gets currentFilePath
       newFilePath <- resolveFile (parent oldFilePath) path
       b <- doesFileExist newFilePath
       if not b
-        then throwError $ "no such file: " ++ toFilePath newFilePath
+        then throwError $ "no such file: " <> T.pack (toFilePath newFilePath)
         else do
           insertPathInfo oldFilePath newFilePath
           ensureDAG
@@ -88,7 +93,7 @@ parse' ((_, TreeNode [(_, TreeAtom "include"), (_, TreeAtom pathString)]):as) =
               defList <- parse' as
               return $ header ++ defList
             Nothing -> do
-              content <- liftIO $ readFile $ toFilePath newFilePath
+              content <- liftIO $ TIO.readFile $ toFilePath newFilePath
               modify (\e -> e {currentFilePath = newFilePath})
               includedDefList <- strToTree content path >>= parse'
               let mxs = toIdentList includedDefList
@@ -106,7 +111,7 @@ parse' ((_, TreeNode [(_, TreeAtom "constant"), (_, TreeAtom name), t]):as) = do
   t' <- macroExpand t >>= interpret
   cenv <- gets constantEnv
   if name `S.member` cenv
-    then throwError $ "the constant " ++ name ++ " is already defined"
+    then throwError $ "the constant " <> name <> " is already defined"
     else do
       modify (\e -> e {constantEnv = S.insert name (constantEnv e)})
       defList <- parse' as
@@ -174,7 +179,7 @@ newHole = do
 checkKeywordSanity :: Identifier -> WithEnv ()
 checkKeywordSanity "" = throwError "empty string for a keyword"
 checkKeywordSanity x
-  | last x == '+' = throwError "A +-suffixed name cannot be a keyword"
+  | T.last x == '+' = throwError "A +-suffixed name cannot be a keyword"
 checkKeywordSanity _ = return ()
 
 -- {} insEnumEnv {}
@@ -185,7 +190,8 @@ insEnumEnv m name enumList = do
   case find (`elem` xs) $ name : enumList of
     Just x ->
       throwError $
-      showMeta m ++ ": " ++ "the constant `" ++ x ++ "` is already defined"
+      T.pack (showMeta m) <>
+      ": " <> "the constant `" <> x <> "` is already defined"
     _ -> do
       let rev = Map.fromList $ zip enumList (repeat name)
       modify
@@ -208,7 +214,7 @@ ensureDAG = do
   case ensureDAG' m [] g of
     Right _ -> return ()
     Left cyclicPath -> do
-      throwError $ "found cyclic inclusion:\n" ++ Pr.ppShow cyclicPath
+      throwError $ "found cyclic inclusion:\n" <> T.pack (Pr.ppShow cyclicPath)
 
 ensureDAG' ::
      Path Abs File
@@ -233,10 +239,10 @@ toIdentList ((DefConstDecl (x, t)):ds) = (emptyMeta, x, t) : toIdentList ds
 
 toDefLetFooter :: Path Abs File -> (Meta, Identifier, WeakTermPlus) -> Def
 toDefLetFooter path (m, x, t) = do
-  let x' = "(" ++ toFilePath path ++ ":" ++ x ++ ")" -- user cannot write this var since it contains parenthesis
+  let x' = "(" <> T.pack (toFilePath path) <> ":" <> x <> ")" -- user cannot write this var since it contains parenthesis
   DefLet m (x', t) (m, WeakTermUpsilon x)
 
 toDefLetHeader :: Path Abs File -> (Meta, Identifier, WeakTermPlus) -> Def
 toDefLetHeader path (m, x, t) = do
-  let x' = "(" ++ toFilePath path ++ ":" ++ x ++ ")"
+  let x' = "(" <> T.pack (toFilePath path) <> ":" <> x <> ")" -- user cannot write this var since it contains parenthesis
   DefLet m (x, t) (m, WeakTermUpsilon x')

@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Elaborate.Analyze
   ( analyze
   , simp
@@ -18,6 +20,7 @@ import System.Timeout
 import qualified Data.HashMap.Strict as Map
 import qualified Data.PQueue.Min as Q
 import qualified Data.Set as S
+import qualified Data.Text as T
 import qualified Text.Show.Pretty as Pr
 
 import Data.Basic
@@ -40,7 +43,8 @@ simp ((e1, e2):cs) = do
   me2' <- return (reduceWeakTermPlus e2) >>= liftIO . timeout 5000000 . return
   case (me1', me2') of
     (Just e1', Just e2') -> simp' $ (e1', e2') : cs
-    _ -> throwError $ "cannot simplify [TIMEOUT]:\n" ++ Pr.ppShow (e1, e2)
+    _ ->
+      throwError $ "cannot simplify [TIMEOUT]:\n" <> T.pack (Pr.ppShow (e1, e2))
 
 -- {} simp' {}
 simp' :: [PreConstraint] -> WithEnv ()

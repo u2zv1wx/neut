@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Clarify.Utility where
 
 import Control.Monad.Except

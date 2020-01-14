@@ -1,6 +1,11 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Data.WeakTerm where
 
+import qualified Data.Text as T
+
 import Data.Maybe (fromMaybe)
+import Data.Monoid ((<>))
 import Numeric.Half
 
 import Data.Basic
@@ -42,10 +47,10 @@ toVar :: Identifier -> WeakTermPlus
 toVar x = (emptyMeta, WeakTermUpsilon x)
 
 toIntS :: IntSize -> WeakTermPlus
-toIntS size = (emptyMeta, WeakTermConst $ "i" ++ show size)
+toIntS size = (emptyMeta, WeakTermConst $ "i" <> T.pack (show size))
 
 toIntU :: IntSize -> WeakTermPlus
-toIntU size = (emptyMeta, WeakTermConst $ "u" ++ show size)
+toIntU size = (emptyMeta, WeakTermConst $ "u" <> T.pack (show size))
 
 f16 :: WeakTermPlus
 f16 = (emptyMeta, WeakTermConst "f16")

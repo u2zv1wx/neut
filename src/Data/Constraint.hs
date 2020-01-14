@@ -8,7 +8,7 @@ import Reduce.WeakTerm
 
 type PreConstraint = (WeakTermPlus, WeakTermPlus)
 
-type IterInfo = (String, [IdentifierPlus], WeakTermPlus, WeakTermPlus)
+type IterInfo = (Identifier, [IdentifierPlus], WeakTermPlus, WeakTermPlus)
 
 data Constraint
   = ConstraintAnalyzable
@@ -45,7 +45,7 @@ instance Eq EnrichedConstraint where
 instance Ord EnrichedConstraint where
   compare (Enriched _ _ _ c1) (Enriched _ _ _ c2) = compare c1 c2
 
-type SubstWeakTerm' = Map.HashMap String ([Hole], WeakTermPlus)
+type SubstWeakTerm' = Map.HashMap Identifier ([Hole], WeakTermPlus)
 
 -- s1が新たに追加されるsubstで、s2が既存のsubst
 -- s1 = m ~> eとして、eのなかにs2でsubstされるべきholeが含まれているとする。

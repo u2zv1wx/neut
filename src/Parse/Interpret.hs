@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Parse.Interpret
   ( interpret
   , interpretIdentifierPlus
@@ -8,10 +10,11 @@ import Control.Monad.Except
 import Control.Monad.State
 import Data.Bits ((.&.), (.|.), shiftL, shiftR)
 import Data.Char (chr, ord)
-import qualified Data.HashMap.Strict as Map
-import Data.List (intercalate)
 import Data.Word (Word8)
 import Text.Read (readMaybe)
+
+import qualified Data.HashMap.Strict as Map
+import qualified Data.Text as T
 import qualified Text.Show.Pretty as Pr
 
 import Data.Basic
@@ -52,23 +55,23 @@ interpret (m, TreeNode [(_, TreeAtom "constant-declaration"), xt, e]) = do
   return (m, WeakTermConstDecl xt' e')
 interpret (m, TreeNode [(_, TreeAtom t), (_, TreeAtom x)])
   | Just (LowTypeIntS i) <- asLowTypeMaybe t
-  , Just x' <- readMaybe x = return (m, WeakTermIntS i x')
+  , Just x' <- readMaybe $ T.unpack x = return (m, WeakTermIntS i x')
 interpret (m, TreeNode [(_, TreeAtom t), (_, TreeAtom x)])
   | Just (LowTypeIntU i) <- asLowTypeMaybe t
-  , Just x' <- readMaybe x = return (m, WeakTermIntU i x')
+  , Just x' <- readMaybe $ T.unpack x = return (m, WeakTermIntU i x')
 interpret (m, TreeNode [(_, TreeAtom "f16"), (_, TreeAtom x)])
-  | Just x' <- readMaybe x = return (m, WeakTermFloat16 x')
+  | Just x' <- readMaybe $ T.unpack x = return (m, WeakTermFloat16 x')
 interpret (m, TreeNode [(_, TreeAtom "f32"), (_, TreeAtom x)])
-  | Just x' <- readMaybe x = return (m, WeakTermFloat32 x')
+  | Just x' <- readMaybe $ T.unpack x = return (m, WeakTermFloat32 x')
 interpret (m, TreeNode [(_, TreeAtom "f64"), (_, TreeAtom x)])
-  | Just x' <- readMaybe x = return (m, WeakTermFloat64 x')
+  | Just x' <- readMaybe $ T.unpack x = return (m, WeakTermFloat64 x')
 interpret (m, TreeNode [(_, TreeAtom "enum"), (_, TreeAtom x)])
   | Just i <- readNatEnumType x =
     return (m, WeakTermEnum $ EnumTypeNatNum $ fromInteger i)
 interpret (m, TreeNode [(_, TreeAtom "enum"), (_, TreeAtom x)]) = do
   isEnum <- isDefinedEnumName x
   if not isEnum
-    then throwError $ "No such enum-type defined: " ++ x
+    then throwError $ "No such enum-type defined: " <> x
     else return (m, WeakTermEnum $ EnumTypeLabel x)
 interpret (m, TreeNode [(_, TreeAtom "enum-introduction"), l]) = do
   l' <- interpretEnumValue l
@@ -97,11 +100,11 @@ interpret (m, TreeNode [(_, TreeAtom str), e1, e2])
 -- auxiliary interpretations
 --
 interpret (m, TreeAtom x)
-  | Just x' <- readMaybe x = do
+  | Just x' <- readMaybe $ T.unpack x = do
     h <- newHole m
     return (m, WeakTermInt h x')
 interpret (m, TreeAtom x)
-  | Just x' <- readMaybe x = do
+  | Just x' <- readMaybe $ T.unpack x = do
     h <- newHole m
     return (m, WeakTermFloat h x')
 interpret (m, TreeAtom x)
@@ -111,7 +114,7 @@ interpret (m, TreeAtom x)
   | Just (i, j) <- readNatEnumValue x =
     return (m, WeakTermEnumIntro $ EnumValueNatNum i j)
 interpret (m, TreeAtom x)
-  | Just str <- readMaybe x = do
+  | Just str <- readMaybe $ T.unpack x = do
     u8s <- forM (encode str) $ \u -> return (m, WeakTermIntU 8 (toInteger u))
     let len = toInteger $ length u8s
     let ns = map (\i -> EnumValueNatNum len i) [0 .. (len - 1)]
@@ -130,7 +133,7 @@ interpret t@(m, TreeAtom x) = do
     (_, False) -> return (m, WeakTermUpsilon x)
 interpret t@(m, TreeNode es) =
   if null es
-    then throwError $ "interpret: syntax error:\n" ++ Pr.ppShow t
+    then throwError $ "interpret: syntax error:\n" <> T.pack (Pr.ppShow t)
     else interpret (m, TreeNode ((m, TreeAtom "pi-elimination") : es))
 
 -- {} interpretIdentifierPlus {}
@@ -143,10 +146,11 @@ interpretIdentifierPlus (_, TreeNode [(_, TreeAtom x), t]) = do
   t' <- interpret t
   return (x', t')
 interpretIdentifierPlus ut =
-  throwError $ "interpretIdentifierPlus: syntax error:\n" ++ Pr.ppShow ut
+  throwError $
+  "interpretIdentifierPlus: syntax error:\n" <> T.pack (Pr.ppShow ut)
 
 -- {} interpretAtom {}
-interpretAtom :: String -> WithEnv String
+interpretAtom :: Identifier -> WithEnv Identifier
 interpretAtom "_" = newNameWith "hole-explicit"
 interpretAtom x = return x
 
@@ -167,7 +171,8 @@ interpretEnumValue l = do
   ml' <- interpretEnumValueMaybe l
   case ml' of
     Just l' -> return l'
-    Nothing -> throwError $ "interpretEnumValue: syntax error:\n" ++ Pr.ppShow l
+    Nothing ->
+      throwError $ "interpretEnumValue: syntax error:\n" <> T.pack (Pr.ppShow l)
 
 -- {} interpretBinder {}
 -- `xts` はatomまたは(atom, tree)であることが想定されているけれど、どうせ、interpretIdentifierPlusは
@@ -199,7 +204,7 @@ interpretClause (_, TreeNode [c, e]) = do
   e' <- interpret e
   return (c', e')
 interpretClause e =
-  throwError $ "interpretClause: syntax error:\n " ++ Pr.ppShow e
+  throwError $ "interpretClause: syntax error:\n " <> T.pack (Pr.ppShow e)
 
 -- {} asArrayIntro {}
 asArrayIntro :: Case -> WithEnv EnumValue
@@ -210,19 +215,19 @@ asArrayIntro CaseDefault = throwError "`default` cannot be used in array-intro"
 extractIdentifier :: TreePlus -> WithEnv Identifier
 extractIdentifier (_, TreeAtom s) = return s
 extractIdentifier t =
-  throwError $ "interpretAtom: syntax error:\n" ++ Pr.ppShow t
+  throwError $ "interpretAtom: syntax error:\n" <> T.pack (Pr.ppShow t)
 
 -- {} withKindPrefix {}
 -- 「-」でsplitして、第1要素がarraykindとして妥当で、かつ第2要素以降をconcatしたものがbaseと一致していたら、
 -- arraykindを返す。たとえば"u8-array"と"array"が入力ならu8を、"f64-array-introduction"と"array-introduction"が
 -- 入力ならf64を返す。
 withKindPrefix ::
-     String -- "u8-array", "u16-hoo", "f64-hogehoge"
-  -> String -- "array", "hoo", "hogehoge"
+     Identifier -- "u8-array", "u16-hoo", "f64-hogehoge"
+  -> Identifier -- "array", "hoo", "hogehoge"
   -> Maybe ArrayKind
 withKindPrefix str base
   | (t:rest) <- wordsBy '-' str -- e.g. u8-array
-  , base == intercalate "-" rest
+  , base == T.intercalate "-" rest
   , Just t' <- asLowTypeMaybe t
   , Just kind <- asArrayKind t' = Just kind
 withKindPrefix _ _ = Nothing

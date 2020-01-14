@@ -9,6 +9,8 @@ import Text.Read (readMaybe)
 
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.Text as T
+import qualified Data.Text.IO as TIO
 
 import Clarify
 import Data.Env
@@ -102,29 +104,30 @@ constructOutputPath basename Nothing OutputKindObject = do
   return $ dir </> basename
 constructOutputPath _ (Just path) _ = return path
 
-writeResult :: [B.ByteString] -> Path Abs File -> OutputKind -> IO ()
+writeResult :: [T.Text] -> Path Abs File -> OutputKind -> IO ()
 writeResult result outputPath OutputKindLLVM
   -- let content = intercalate "\n" result
  = do
-  let content = BC.unlines result
-  BC.writeFile (toFilePath outputPath) content
+  let content = T.unlines result
+  TIO.writeFile (toFilePath outputPath) content
 writeResult result outputPath OutputKindObject
   -- let content = intercalate "\n" result
  = do
-  let content = BC.unlines result
+  let content = T.unlines result
   tmpOutputPath <- liftIO $ outputPath <.> "ll"
   tmpAsmOutputPath <- liftIO $ outputPath <.> "s"
   let tmpOutputPathStr = toFilePath tmpOutputPath
   let tmpAsmOutputPathStr = toFilePath tmpAsmOutputPath
-  BC.writeFile tmpOutputPathStr content
+  TIO.writeFile tmpOutputPathStr content
   callProcess "llc" [tmpOutputPathStr, "-o=" ++ tmpAsmOutputPathStr]
   callProcess "clang" [tmpAsmOutputPathStr, "-o" ++ toFilePath outputPath]
   removeFile tmpOutputPath
   removeFile tmpAsmOutputPath
 
-process :: Path Abs File -> WithEnv [B.ByteString]
+process :: Path Abs File -> WithEnv [T.Text]
+-- process :: Path Abs File -> WithEnv [B.ByteString]
 process inputPath = do
-  content <- liftIO $ readFile $ toFilePath inputPath
+  content <- liftIO $ TIO.readFile $ toFilePath inputPath
   -- p "parse"
   e <- parse content (toFilePath inputPath) >>= elaborate
   -- p "elaborated"
@@ -132,6 +135,5 @@ process inputPath = do
   -- p "clarified"
   e'' <- toLLVM e'
   -- p "llvm-done"
-  emit e''
-   -- process input = do
+  emit e'' -- process input = do
    -- parse >=> elaborate >=> polarize >=> toLLVM >=> emit

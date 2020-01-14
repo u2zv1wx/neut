@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module LLVM
   ( toLLVM
   ) where
@@ -6,12 +8,13 @@ import Control.Monad.Except
 import Control.Monad.State
 import Data.List (elemIndex, sortBy)
 
+import qualified Data.HashMap.Strict as Map
+import qualified Data.Text as T
+
 import Data.Basic
 import Data.Code
 import Data.Env
 import Data.LLVM
-
-import qualified Data.HashMap.Strict as Map
 
 toLLVM :: CodePlus -> WithEnv LLVM
 toLLVM mainTerm = do
@@ -60,14 +63,14 @@ takeBaseName :: DataPlus -> Identifier
 takeBaseName (_, DataTheta x) = x
 takeBaseName (_, DataUpsilon x) = x
 takeBaseName (_, DataSigmaIntro []) = "unit"
-takeBaseName (_, DataSigmaIntro ds) = "struct" ++ show (length ds)
-takeBaseName (_, DataIntS size _) = "i" ++ show size
-takeBaseName (_, DataIntU size _) = "u" ++ show size
+takeBaseName (_, DataSigmaIntro ds) = "struct" <> T.pack (show (length ds))
+takeBaseName (_, DataIntS size _) = "i" <> T.pack (show size)
+takeBaseName (_, DataIntU size _) = "u" <> T.pack (show size)
 takeBaseName (_, DataFloat16 _) = "half"
 takeBaseName (_, DataFloat32 _) = "float"
 takeBaseName (_, DataFloat64 _) = "double"
 takeBaseName (_, DataEnumIntro _) = "i64"
-takeBaseName (_, DataArrayIntro _ ds) = "array" ++ show (length ds)
+takeBaseName (_, DataArrayIntro _ ds) = "array" <> T.pack (show (length ds))
 
 takeBaseName' :: LLVMData -> Identifier
 takeBaseName' (LLVMDataLocal x) = x
@@ -240,7 +243,7 @@ llvmDataLet :: Identifier -> DataPlus -> LLVM -> WithEnv LLVM
 llvmDataLet x (_, DataTheta y) cont = do
   cenv <- gets codeEnv
   case Map.lookup y cenv of
-    Nothing -> throwError $ "no such global label defined: " ++ y -- FIXME
+    Nothing -> throwError $ "no such global label defined: " <> y
     Just (args, _) ->
       llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType args) cont
 llvmDataLet x (_, DataUpsilon y) cont =
@@ -338,8 +341,8 @@ storeContent reg elemType aggPtrType ds cont = do
         (LLVMOpAlloc (LLVMDataInt (toInteger i)))
         castThenStoreThenCont
     AllocSizePtrList n -> do
-      (c, cVar) <- newDataLocal $ "sizeof-" ++ reg
-      (i, iVar) <- newDataLocal $ "sizeof-" ++ reg
+      (c, cVar) <- newDataLocal $ "sizeof-" <> reg
+      (i, iVar) <- newDataLocal $ "sizeof-" <> reg
       -- Use getelementptr to realize `sizeof`. More info:
       --   http://nondot.org/sabre/LLVMNotes/SizeOf-OffsetOf-VariableSizedStructs.txt
       return $
@@ -361,7 +364,7 @@ storeContent' ::
 storeContent' _ _ _ [] cont = return cont
 storeContent' bp bt et ((i, d):ids) cont = do
   cont' <- storeContent' bp bt et ids cont
-  (locName, loc) <- newDataLocal $ takeBaseName d ++ "-location"
+  (locName, loc) <- newDataLocal $ takeBaseName d <> "-location"
   (cast, castThen) <- llvmCast (Just $ takeBaseName d) d et
   let it = indexTypeOf bt
   castThen $
@@ -431,7 +434,7 @@ getEnumNum :: Identifier -> WithEnv Int
 getEnumNum label = do
   ienv <- gets enumEnv
   case (getEnumNum' label $ Map.elems ienv) of
-    Nothing -> throwError $ "no such enum is defined: " ++ show label
+    Nothing -> throwError $ "no such enum is defined: " <> label
     Just i -> return i
 
 getEnumNum' :: Identifier -> [[Identifier]] -> Maybe Int

@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Clarify.Sigma
   ( cartesianSigma
   , returnArrayType
@@ -21,8 +23,8 @@ cartesianSigma ::
   -> [Either CodePlus (Identifier, CodePlus)]
   -> WithEnv DataPlus
 cartesianSigma thetaName m mxts = do
-  aff <- affineSigma ("affine-" ++ thetaName) m mxts
-  rel <- relevantSigma ("relevant-" ++ thetaName) m mxts
+  aff <- affineSigma ("affine-" <> thetaName) m mxts
+  rel <- relevantSigma ("relevant-" <> thetaName) m mxts
   return (m, DataSigmaIntro [aff, rel])
 
 -- (Assuming `ti` = `return di` for some `di` such that `xi : di`)

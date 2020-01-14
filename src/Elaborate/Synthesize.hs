@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Elaborate.Synthesize
   ( synthesize
   ) where
@@ -7,6 +9,7 @@ import Control.Monad.State
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.PQueue.Min as Q
+import qualified Data.Text as T
 import qualified Text.Show.Pretty as Pr
 
 import Data.Basic
@@ -40,7 +43,7 @@ synthesize = do
       -- senv <- gets substEnv
      -> do
       p $ "rest: " ++ show (Q.size q)
-      throwError $ "cannot simplify:\n" ++ Pr.ppShow (e1, e2)
+      throwError $ "cannot simplify:\n" <> T.pack (Pr.ppShow (e1, e2))
 
 -- e1だけがstuckしているとき、e2だけがstuckしているとき、両方がstuckしているときをそれぞれ
 -- 独立したケースとして扱えるようにしたほうがよい（そうすればsubstを減らせる）

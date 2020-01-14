@@ -30,6 +30,7 @@ dependencies:
 - path-io
 - bytestring
 - binary
+- text
 
 library:
   source-dirs: src

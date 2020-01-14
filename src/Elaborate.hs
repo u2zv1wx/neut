@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Elaborate
   ( elaborate
   ) where
@@ -8,6 +10,7 @@ import Data.List (nub)
 import Numeric.Half
 
 import qualified Data.HashMap.Strict as Map
+import qualified Data.Text as T
 
 import Data.Basic
 import Data.Env
@@ -17,8 +20,8 @@ import Elaborate.Analyze
 import Elaborate.Infer
 import Elaborate.Synthesize
 import Reduce.Term
-import Reduce.WeakTerm
 
+-- import Reduce.WeakTerm
 -- Given a term `e` and its name `main`, this function
 --   (1) traces `e` using `infer e`, collecting type constraints,
 --   (2) updates weakTypeEnv for `main` by the result of `infer e`,
@@ -44,7 +47,6 @@ elaborate e
   -- this reduceTermPlus is necessary since e' contains "DONT_CARE" in its
   -- type of arguments of abstractions of meta-variables.
   e'' <- elaborate' e' >>= reduceTermPlus
-  -- error "stop"
   return e''
   -- let info2 = toInfo "elaborated term is not closed:" e''
   -- assertMP info2 (return e'') $ null (varTermPlus e'')
@@ -77,7 +79,7 @@ elaborate' (m, WeakTermIter (x, t) xts e) = do
 elaborate' (_, WeakTermZeta x) = do
   sub <- gets substEnv
   case Map.lookup x sub of
-    Nothing -> throwError $ "elaborate' i: remaining hole: " ++ x
+    Nothing -> throwError $ "elaborate' i: remaining hole: " <> x
     Just (_, e) -> do
       e' <- elaborate' e
       return e'
@@ -101,7 +103,8 @@ elaborate' (m, WeakTermInt t x) = do
       case asLowTypeMaybe intType of
         Just (LowTypeIntS size) -> return (m, TermIntS size x)
         Just (LowTypeIntU size) -> return (m, TermIntU size x)
-        _ -> throwError $ show x ++ " should be int, but is " ++ intType
+        _ ->
+          throwError $ T.pack (show x) <> " should be int, but is " <> intType
     _ -> throwError $ "elaborate.WeakTermInt."
 elaborate' (m, WeakTermFloat16 x) = do
   return (m, TermFloat16 x)
@@ -119,7 +122,9 @@ elaborate' (m, WeakTermFloat t x) = do
         Just (LowTypeFloat FloatSize16) -> return (m, TermFloat16 x16)
         Just (LowTypeFloat FloatSize32) -> return (m, TermFloat32 x32)
         Just (LowTypeFloat FloatSize64) -> return (m, TermFloat64 x)
-        _ -> throwError $ show x ++ " should be float, but is " ++ floatType
+        _ ->
+          throwError $
+          T.pack (show x) <> " should be float, but is " <> floatType
     _ -> throwError "elaborate.WeakTermFloat"
 elaborate' (m, WeakTermEnum k) = do
   return (m, TermEnum k)
@@ -185,16 +190,14 @@ lookupEnumSet :: Identifier -> WithEnv [Identifier]
 lookupEnumSet name = do
   eenv <- gets enumEnv
   case Map.lookup name eenv of
-    Nothing -> throwError $ "no such enum defined: " ++ show name
+    Nothing -> throwError $ "no such enum defined: " <> name
     Just ls -> return ls
-
-reduceSubstEnv :: WithEnv ()
-reduceSubstEnv = do
-  senv <- gets substEnv
-  let senv' = Map.map reduceSubstEnv' senv
-  modify (\env -> env {substEnv = senv'})
-
-reduceSubstEnv' :: (b, WeakTermPlus) -> (b, WeakTermPlus)
-reduceSubstEnv' (y, e) = do
-  let e' = reduceWeakTermPlus e
-  (y, e')
+-- reduceSubstEnv :: WithEnv ()
+-- reduceSubstEnv = do
+--   senv <- gets substEnv
+--   let senv' = Map.map reduceSubstEnv' senv
+--   modify (\env -> env {substEnv = senv'})
+-- reduceSubstEnv' :: (b, WeakTermPlus) -> (b, WeakTermPlus)
+-- reduceSubstEnv' (y, e) = do
+--   let e' = reduceWeakTermPlus e
+--   (y, e')

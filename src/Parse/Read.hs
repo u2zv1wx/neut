@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Parse.Read
   ( strToTree
   ) where
@@ -6,19 +8,22 @@ import Control.Monad.Except
 import Control.Monad.State
 import Text.Parsec
 
+-- import Text.Parsec.Text
+import qualified Data.Text as T
+
 import Data.Basic
 import Data.Env
 import Data.Tree
 
-type Parser a = ParsecT String () (StateT Env (ExceptT String IO)) a
+type Parser a = ParsecT T.Text () (StateT Env (ExceptT T.Text IO)) a
 
 -- {} strToTree {}
 -- (as long as the input is translated into a tree, this function is considered valid)
-strToTree :: String -> String -> WithEnv [TreePlus]
+strToTree :: T.Text -> String -> WithEnv [TreePlus]
 strToTree input fileName = do
   t <- runParserT (skip >> parseSExpList) () fileName input
   case t of
-    Left err -> throwError (show err)
+    Left err -> throwError $ T.pack (show err)
     Right ts -> return ts
 
 parseSExpList :: Parser [TreePlus]
@@ -45,8 +50,10 @@ parseNode = do
 skip :: Parser ()
 skip = spaces >> (comment <|> spaces)
 
-symbol :: Parser String
-symbol = many1 (noneOf "()[] \n;")
+symbol :: Parser Identifier
+symbol = do
+  s <- many1 (noneOf "()[] \n;")
+  return $ T.pack s
 
 comment :: Parser ()
 comment = do
