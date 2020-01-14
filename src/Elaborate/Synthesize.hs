@@ -121,7 +121,7 @@ resolvePattern q m fmvs ess e = do
 resolveHole :: ConstraintQueue -> Hole -> [Hole] -> WeakTermPlus -> WithEnv ()
 resolveHole q m fmvs e = do
   senv <- gets substEnv
-  e' <- reduceWeakTermPlus $ snd $ substIfNecessary senv (fmvs, e)
+  let e' = reduceWeakTermPlus $ snd $ substIfNecessary senv (fmvs, e)
   let fmvs' = holeWeakTermPlus e'
   let s1 = Map.singleton m (fmvs', e')
   modify (\env -> env {substEnv = compose s1 senv})

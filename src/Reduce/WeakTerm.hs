@@ -8,23 +8,24 @@ import Numeric.Half
 import Unsafe.Coerce -- for int -> word, word -> int
 
 import Data.Basic
-import Data.Env
+
+-- import Data.Env
 import Data.WeakTerm
 
-reduceWeakTermPlus :: WeakTermPlus -> WithEnv WeakTermPlus
+reduceWeakTermPlus :: WeakTermPlus -> WeakTermPlus
 reduceWeakTermPlus (m, WeakTermPi xts cod) = do
   let (xs, ts) = unzip xts
-  ts' <- mapM reduceWeakTermPlus ts
-  cod' <- reduceWeakTermPlus cod
-  return (m, WeakTermPi (zip xs ts') cod')
+  let ts' = map reduceWeakTermPlus ts
+  let cod' = reduceWeakTermPlus cod
+  (m, WeakTermPi (zip xs ts') cod')
 reduceWeakTermPlus (m, WeakTermPiIntro xts e) = do
   let (xs, ts) = unzip xts
-  ts' <- mapM reduceWeakTermPlus ts
-  e' <- reduceWeakTermPlus e
-  return $ (m, WeakTermPiIntro (zip xs ts') e')
+  let ts' = map reduceWeakTermPlus ts
+  let e' = reduceWeakTermPlus e
+  (m, WeakTermPiIntro (zip xs ts') e')
 reduceWeakTermPlus (m, WeakTermPiElim e es) = do
-  e' <- reduceWeakTermPlus e
-  es' <- mapM reduceWeakTermPlus es
+  let e' = reduceWeakTermPlus e
+  let es' = map reduceWeakTermPlus es
   let app = WeakTermPiElim e' es'
   case e' of
     (_, WeakTermPiIntro xts body)
@@ -33,26 +34,26 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
         reduceWeakTermPlus $ substWeakTermPlus (zip xs es') body
     (_, WeakTermConst constant) ->
       reduceWeakTermPlusTheta (m, app) es' m constant
-    _ -> return (m, app)
+    _ -> (m, app)
 reduceWeakTermPlus (m, WeakTermIter (x, t) xts e)
   | x `notElem` varWeakTermPlus e = do
     reduceWeakTermPlus (m, WeakTermPiIntro xts e)
   | otherwise = do
-    t' <- reduceWeakTermPlus t
-    e' <- reduceWeakTermPlus e
+    let t' = reduceWeakTermPlus t
+    let e' = reduceWeakTermPlus e
     let (xs, ts) = unzip xts
-    ts' <- mapM reduceWeakTermPlus ts
-    return $ (m, WeakTermIter (x, t') (zip xs ts') e')
+    let ts' = map reduceWeakTermPlus ts
+    (m, WeakTermIter (x, t') (zip xs ts') e')
 reduceWeakTermPlus (m, WeakTermConstDecl (x, t) e) = do
-  t' <- reduceWeakTermPlus t
-  e' <- reduceWeakTermPlus e
-  return (m, WeakTermConstDecl (x, t') e')
+  let t' = reduceWeakTermPlus t
+  let e' = reduceWeakTermPlus e
+  (m, WeakTermConstDecl (x, t') e')
 reduceWeakTermPlus (m, WeakTermEnumElim (e, t) les) = do
-  e' <- reduceWeakTermPlus e
+  let e' = reduceWeakTermPlus e
   let (ls, es) = unzip les
-  es' <- mapM reduceWeakTermPlus es
+  let es' = map reduceWeakTermPlus es
   let les' = zip ls es'
-  t' <- reduceWeakTermPlus t
+  let t' = reduceWeakTermPlus t
   case e' of
     (_, WeakTermEnumIntro l) ->
       case lookup (CaseValue l) les' of
@@ -60,51 +61,42 @@ reduceWeakTermPlus (m, WeakTermEnumElim (e, t) les) = do
         Nothing ->
           case lookup CaseDefault les' of
             Just body -> reduceWeakTermPlus body
-            Nothing -> return (m, WeakTermEnumElim (e', t') les')
-    _ -> return (m, WeakTermEnumElim (e', t') les')
+            Nothing -> (m, WeakTermEnumElim (e', t') les')
+    _ -> (m, WeakTermEnumElim (e', t') les')
 reduceWeakTermPlus (m, WeakTermArray k indexType) = do
-  indexType' <- reduceWeakTermPlus indexType
-  return (m, WeakTermArray k indexType')
+  let indexType' = reduceWeakTermPlus indexType
+  (m, WeakTermArray k indexType')
 reduceWeakTermPlus (m, WeakTermArrayIntro k les) = do
   let (ls, es) = unzip les
-  es' <- mapM reduceWeakTermPlus es
-  return (m, WeakTermArrayIntro k $ zip ls es')
+  let es' = map reduceWeakTermPlus es
+  (m, WeakTermArrayIntro k $ zip ls es')
 reduceWeakTermPlus (m, WeakTermArrayElim k e1 e2) = do
-  e1' <- reduceWeakTermPlus e1
-  e2' <- reduceWeakTermPlus e2
+  let e1' = reduceWeakTermPlus e1
+  let e2' = reduceWeakTermPlus e2
   case (e1', e2') of
     ((_, WeakTermArrayIntro k' les), (_, WeakTermEnumIntro l))
       | k == k'
       , Just e <- lookup l les -> reduceWeakTermPlus e
-    _ -> return (m, WeakTermArrayElim k e1' e2')
-reduceWeakTermPlus e = return e
+    _ -> (m, WeakTermArrayElim k e1' e2')
+reduceWeakTermPlus e = e
 
 reduceWeakTermPlusTheta ::
-     WeakTermPlus
-  -> [WeakTermPlus]
-  -> Meta
-  -> Identifier
-  -> WithEnv WeakTermPlus
+     WeakTermPlus -> [WeakTermPlus] -> Meta -> Identifier -> WeakTermPlus
 reduceWeakTermPlusTheta orig es m constant
   | Just (lowType, op) <- asUnaryOpMaybe constant
   , [arg] <- es = reduceWeakTermPlusUnary orig arg m lowType op
   | Just (lowType, op) <- asBinaryOpMaybe constant
   , [arg1, arg2] <- es = reduceWeakTermPlusBinary orig arg1 arg2 m lowType op
-  | otherwise = return orig
+  | otherwise = orig
 
 reduceWeakTermPlusUnary ::
-     WeakTermPlus
-  -> WeakTermPlus
-  -> Meta
-  -> LowType
-  -> UnaryOp
-  -> WithEnv WeakTermPlus
+     WeakTermPlus -> WeakTermPlus -> Meta -> LowType -> UnaryOp -> WeakTermPlus
 reduceWeakTermPlusUnary orig arg m lowType op = do
   case getUnaryArgInfo lowType arg of
     Just (UnaryArgInfoIntS s1 x) ->
       case op of
         UnaryOpTrunc (LowTypeIntS s2)
-          | s1 > s2 -> return (m, WeakTermIntS s2 (x .&. (2 ^ s2 - 1))) -- e.g. trunc 257 to i8 ~> 257 .&. 255 ~> 1
+          | s1 > s2 -> (m, WeakTermIntS s2 (x .&. (2 ^ s2 - 1))) -- e.g. trunc 257 to i8 ~> 257 .&. 255 ~> 1
         UnaryOpZext (LowTypeIntS s2)
           | s1 < s2 -> do
             let s1' = toInteger s1
@@ -114,22 +106,22 @@ reduceWeakTermPlusUnary orig arg m lowType op = do
             -- ~> (zero extend) ~>  246 in u16 {bitseq = 0000 0000 1111 0110}
             -- ~> (asIntS 16)   ~>  246 in i16 {bitseq = 0000 0000 1111 0110}
             -- (the newly-inserted sign bit is always 0)
-            return (m, WeakTermIntS s2 (asIntS s2' (asIntU s1' x)))
+            (m, WeakTermIntS s2 (asIntS s2' (asIntU s1' x)))
         UnaryOpSext (LowTypeIntS s2)
-          | s1 < s2 -> return (m, WeakTermIntS s2 x) -- sext over int doesn't alter interpreted value
+          | s1 < s2 -> (m, WeakTermIntS s2 x) -- sext over int doesn't alter interpreted value
         UnaryOpTo (LowTypeFloat FloatSize16) ->
-          return (m, WeakTermFloat16 (fromIntegral x))
+          (m, WeakTermFloat16 (fromIntegral x))
         UnaryOpTo (LowTypeFloat FloatSize32) ->
-          return (m, WeakTermFloat32 (fromIntegral x))
+          (m, WeakTermFloat32 (fromIntegral x))
         UnaryOpTo (LowTypeFloat FloatSize64) ->
-          return (m, WeakTermFloat64 (fromIntegral x))
-        _ -> return orig
+          (m, WeakTermFloat64 (fromIntegral x))
+        _ -> orig
     Just (UnaryArgInfoIntU s1 x) ->
       case op of
         UnaryOpTrunc (LowTypeIntU s2)
-          | s1 > s2 -> return (m, WeakTermIntU s2 (x .&. (2 ^ s2 - 1))) -- e.g. trunc 257 to i8 ~> 257 .&. 255 ~> 1
+          | s1 > s2 -> (m, WeakTermIntU s2 (x .&. (2 ^ s2 - 1))) -- e.g. trunc 257 to i8 ~> 257 .&. 255 ~> 1
         UnaryOpZext (LowTypeIntU s2)
-          | s1 < s2 -> return (m, WeakTermIntU s2 x) -- zext over uint doesn't alter interpreted value
+          | s1 < s2 -> (m, WeakTermIntU s2 x) -- zext over uint doesn't alter interpreted value
         UnaryOpSext (LowTypeIntU s2)
           | s1 < s2 -> do
             let s1' = toInteger s1
@@ -145,57 +137,57 @@ reduceWeakTermPlusUnary orig arg m lowType op = do
             -- ~> (asIntS 8)    ~>  118 in  i8 {bitseq =           0111 0110}
             -- ~> (sign extend) ~>  118 in i16 {bitseq = 0000 0000 1111 0110}
             -- ~> (asIntU 16)   ~>  118 in u16 {bitseq = 0000 0000 1111 0110}
-            return (m, WeakTermIntU s2 (asIntU s2' (asIntS s1' x)))
+            (m, WeakTermIntU s2 (asIntU s2' (asIntS s1' x)))
         UnaryOpTo (LowTypeFloat FloatSize16) ->
-          return (m, WeakTermFloat16 (fromIntegral x))
+          (m, WeakTermFloat16 (fromIntegral x))
         UnaryOpTo (LowTypeFloat FloatSize32) ->
-          return (m, WeakTermFloat32 (fromIntegral x))
+          (m, WeakTermFloat32 (fromIntegral x))
         UnaryOpTo (LowTypeFloat FloatSize64) ->
-          return (m, WeakTermFloat64 (fromIntegral x))
-        _ -> return orig
+          (m, WeakTermFloat64 (fromIntegral x))
+        _ -> orig
     Just (UnaryArgInfoFloat16 x) ->
       case op of
-        UnaryOpNeg -> return (m, WeakTermFloat16 (-x))
+        UnaryOpNeg -> (m, WeakTermFloat16 (-x))
         UnaryOpFpExt (LowTypeFloat FloatSize32) ->
-          return (m, WeakTermFloat32 (realToFrac x))
+          (m, WeakTermFloat32 (realToFrac x))
         UnaryOpFpExt (LowTypeFloat FloatSize64) ->
-          return (m, WeakTermFloat64 (realToFrac x))
+          (m, WeakTermFloat64 (realToFrac x))
         UnaryOpTo (LowTypeIntS s) -> do
           let s' = toInteger s
-          return (m, WeakTermIntS s (asIntS s' (round x)))
+          (m, WeakTermIntS s (asIntS s' (round x)))
         UnaryOpTo (LowTypeIntU s) -> do
           let s' = toInteger s
-          return (m, WeakTermIntU s (asIntU s' (round x)))
-        _ -> return orig
+          (m, WeakTermIntU s (asIntU s' (round x)))
+        _ -> orig
     Just (UnaryArgInfoFloat32 x) ->
       case op of
-        UnaryOpNeg -> return (m, WeakTermFloat32 (-x))
+        UnaryOpNeg -> (m, WeakTermFloat32 (-x))
         UnaryOpTrunc (LowTypeFloat FloatSize16) ->
-          return (m, WeakTermFloat16 (realToFrac x))
+          (m, WeakTermFloat16 (realToFrac x))
         UnaryOpFpExt (LowTypeFloat FloatSize64) ->
-          return (m, WeakTermFloat64 (realToFrac x))
+          (m, WeakTermFloat64 (realToFrac x))
         UnaryOpTo (LowTypeIntS s) -> do
           let s' = toInteger s
-          return (m, WeakTermIntS s (asIntS s' (round x)))
+          (m, WeakTermIntS s (asIntS s' (round x)))
         UnaryOpTo (LowTypeIntU s) -> do
           let s' = toInteger s
-          return (m, WeakTermIntU s (asIntU s' (round x)))
-        _ -> return orig
+          (m, WeakTermIntU s (asIntU s' (round x)))
+        _ -> orig
     Just (UnaryArgInfoFloat64 x) ->
       case op of
-        UnaryOpNeg -> return (m, WeakTermFloat64 (-x))
+        UnaryOpNeg -> (m, WeakTermFloat64 (-x))
         UnaryOpTrunc (LowTypeFloat FloatSize16) ->
-          return (m, WeakTermFloat16 (realToFrac x))
+          (m, WeakTermFloat16 (realToFrac x))
         UnaryOpTrunc (LowTypeFloat FloatSize32) ->
-          return (m, WeakTermFloat32 (realToFrac x))
+          (m, WeakTermFloat32 (realToFrac x))
         UnaryOpTo (LowTypeIntS s) -> do
           let s' = toInteger s
-          return (m, WeakTermIntS s (asIntS s' (round x)))
+          (m, WeakTermIntS s (asIntS s' (round x)))
         UnaryOpTo (LowTypeIntU s) -> do
           let s' = toInteger s
-          return (m, WeakTermIntU s (asIntU s' (round x)))
-        _ -> return orig
-    Nothing -> return orig
+          (m, WeakTermIntU s (asIntU s' (round x)))
+        _ -> orig
+    Nothing -> orig
 
 reduceWeakTermPlusBinary ::
      WeakTermPlus
@@ -204,7 +196,7 @@ reduceWeakTermPlusBinary ::
   -> Meta
   -> LowType
   -> BinaryOp
-  -> WithEnv WeakTermPlus
+  -> WeakTermPlus
 reduceWeakTermPlusBinary orig arg1 arg2 m lowType op = do
   case getBinaryArgInfo lowType arg1 arg2 of
     Just (BinaryArgInfoIntS size x y) -> do
@@ -219,13 +211,13 @@ reduceWeakTermPlusBinary orig arg1 arg2 m lowType op = do
       asWeakTermPlus m (computeFloat x y op (snd orig)) WeakTermFloat32
     Just (BinaryArgInfoFloat64 x y) ->
       asWeakTermPlus m (computeFloat x y op (snd orig)) WeakTermFloat64
-    Nothing -> return orig
+    Nothing -> orig
 
-asWeakTermPlus :: Monad m => a -> Either b t -> (t -> b) -> m (a, b)
+asWeakTermPlus :: a -> Either b t -> (t -> b) -> (a, b)
 asWeakTermPlus m boolOrCalcResult f =
   case boolOrCalcResult of
-    Left b -> return (m, b)
-    Right i -> return (m, f i)
+    Left b -> (m, b)
+    Right i -> (m, f i)
 
 data UnaryArgInfo
   = UnaryArgInfoIntS IntSize Integer

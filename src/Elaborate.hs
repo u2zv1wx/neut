@@ -191,10 +191,10 @@ lookupEnumSet name = do
 reduceSubstEnv :: WithEnv ()
 reduceSubstEnv = do
   senv <- gets substEnv
-  senv' <- mapM reduceSubstEnv' senv
+  let senv' = Map.map reduceSubstEnv' senv
   modify (\env -> env {substEnv = senv'})
 
-reduceSubstEnv' :: (b, WeakTermPlus) -> WithEnv (b, WeakTermPlus)
+reduceSubstEnv' :: (b, WeakTermPlus) -> (b, WeakTermPlus)
 reduceSubstEnv' (y, e) = do
-  e' <- reduceWeakTermPlus e
-  return (y, e')
+  let e' = reduceWeakTermPlus e
+  (y, e')
