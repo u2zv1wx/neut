@@ -27,8 +27,6 @@ synthesize = do
     Nothing -> return ()
     Just (Enriched (e1, e2) ms _ _)
       | Just (m, (_, e)) <- lookupAny ms sub -> do resolveStuck e1 e2 m e
-    Just (Enriched _ _ fmvs (ConstraintPattern m ess e)) -> do
-      resolvePattern m fmvs ess e
     Just (Enriched _ _ _ (ConstraintDelta iter mess1 mess2)) -> do
       resolveDelta iter mess1 mess2
     Just (Enriched _ _ fmvs (ConstraintQuasiPattern m ess e)) -> do
@@ -98,14 +96,6 @@ resolvePiElim m fmvs ess e = do
   deleteMin
   chain $ map (resolveHole m fmvs) lamList
 
--- optimization for pattern (not necessary for correctness; its output is the same as that of resolvePiElim)
-resolvePattern ::
-     Hole -> [Hole] -> [[WeakTermPlus]] -> WeakTermPlus -> WithEnv ()
-resolvePattern m fmvs ess e = do
-  xss <- mapM toVarList ess
-  deleteMin
-  resolveHole m fmvs $ bindFormalArgs e xss
-
 -- {} resolveHole {}
 resolveHole :: Hole -> [Hole] -> WeakTermPlus -> WithEnv ()
 resolveHole m fmvs e = do
@@ -130,12 +120,6 @@ chain [] = throwError $ "cannot synthesize(chain)."
 chain [e] = e
 chain (e:es) = catchError e $ (const $ do chain es)
 
-bindFormalArgs :: WeakTermPlus -> [[IdentifierPlus]] -> WeakTermPlus
-bindFormalArgs e [] = e
-bindFormalArgs e (xts:xtss) = do
-  let e' = bindFormalArgs e xtss
-  (emptyMeta, WeakTermPiIntro xts e')
-
 lookupAny :: [Hole] -> Map.HashMap Identifier a -> Maybe (Hole, a)
 lookupAny [] _ = Nothing
 lookupAny (h:ks) sub = do
@@ -146,20 +130,6 @@ lookupAny (h:ks) sub = do
 deleteMin :: WithEnv ()
 deleteMin = do
   modify (\env -> env {constraintQueue = Q.deleteMin (constraintQueue env)})
-
--- [e, x, y, y, e2, e3, z] ~> [p, x, y, y, q, r, z]  (p, q, r: new variables)
--- {} toVarList {}
-toVarList :: [WeakTermPlus] -> WithEnv [(Identifier, WeakTermPlus)]
-toVarList [] = return []
-toVarList ((_, WeakTermUpsilon x):es) = do
-  xts <- toVarList es
-  let t = (emptyMeta, WeakTermUpsilon "DONT_CARE")
-  return $ (x, t) : xts
-toVarList (_:es) = do
-  xts <- toVarList es
-  x <- newNameWith "hole"
-  let t = (emptyMeta, WeakTermUpsilon "DONT_CARE")
-  return $ (x, t) : xts
 
 -- [x, x, y, z, z] ~>
 --   [ [x, p, y, z, q]

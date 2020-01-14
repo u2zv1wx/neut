@@ -4,6 +4,8 @@ module Elaborate.Analyze
   , toPiElim
   , linearCheck
   , unfoldIter
+  , toVarList
+  , bindFormalArgs
   ) where
 
 import Control.Monad.Except
@@ -206,9 +208,15 @@ simpPattern ::
   -> [Identifier]
   -> [PreConstraint]
   -> WithEnv ()
-simpPattern h1 ies1 e1 e2 fmvs cs = do
-  insConstraintQueue $
-    Enriched (e1, e2) [h1] fmvs (ConstraintPattern h1 ies1 e2)
+simpPattern h1 ies1 _ e2 fmvs cs = do
+  xss <- mapM toVarList ies1
+  let lam = bindFormalArgs e2 xss
+  senv <- gets substEnv
+  let lam' = reduceWeakTermPlus $ snd $ substIfNecessary senv (fmvs, lam)
+  let fmvs' = holeWeakTermPlus lam'
+  let s1 = Map.singleton h1 (fmvs', lam')
+  modify (\env -> env {substEnv = compose s1 senv})
+  visit h1
   simp cs
 
 -- {} simpQuasiPattern {}
@@ -337,3 +345,31 @@ unfoldIter (x, xts, body, self) = do
 insConstraintQueue :: EnrichedConstraint -> WithEnv ()
 insConstraintQueue c = do
   modify (\env -> env {constraintQueue = Q.insert c (constraintQueue env)})
+
+visit :: Identifier -> WithEnv ()
+visit m = do
+  q <- gets constraintQueue
+  let (q1, q2) = Q.partition (\(Enriched _ ms _ _) -> m `elem` ms) q
+  modify (\env -> env {constraintQueue = q2})
+  simp $ map (\(Enriched c _ _ _) -> c) $ Q.toList q1
+  -- undefined
+
+-- [e, x, y, y, e2, e3, z] ~> [p, x, y, y, q, r, z]  (p, q, r: new variables)
+-- {} toVarList {}
+toVarList :: [WeakTermPlus] -> WithEnv [(Identifier, WeakTermPlus)]
+toVarList [] = return []
+toVarList ((_, WeakTermUpsilon x):es) = do
+  xts <- toVarList es
+  let t = (emptyMeta, WeakTermUpsilon "DONT_CARE")
+  return $ (x, t) : xts
+toVarList (_:es) = do
+  xts <- toVarList es
+  x <- newNameWith "hole"
+  let t = (emptyMeta, WeakTermUpsilon "DONT_CARE")
+  return $ (x, t) : xts
+
+bindFormalArgs :: WeakTermPlus -> [[IdentifierPlus]] -> WeakTermPlus
+bindFormalArgs e [] = e
+bindFormalArgs e (xts:xtss) = do
+  let e' = bindFormalArgs e xtss
+  (emptyMeta, WeakTermPiIntro xts e')
