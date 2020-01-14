@@ -19,21 +19,22 @@ import Reduce.WeakTerm
 -- Given a queue of constraints (easier ones comes earlier), try to synthesize
 -- all of them using heuristics.
 -- {} synthesize {}
-synthesize :: ConstraintQueue -> WithEnv ()
-synthesize q = do
+synthesize :: WithEnv ()
+synthesize = do
+  q <- gets constraintQueue
   sub <- gets substEnv
   case Q.getMin q of
     Nothing -> return ()
     Just (Enriched (e1, e2) ms _ _)
-      | Just (m, (_, e)) <- lookupAny ms sub -> do resolveStuck q e1 e2 m e
+      | Just (m, (_, e)) <- lookupAny ms sub -> do resolveStuck e1 e2 m e
     Just (Enriched _ _ fmvs (ConstraintPattern m ess e)) -> do
-      resolvePattern q m fmvs ess e
+      resolvePattern m fmvs ess e
     Just (Enriched _ _ _ (ConstraintDelta iter mess1 mess2)) -> do
-      resolveDelta q iter mess1 mess2
+      resolveDelta iter mess1 mess2
     Just (Enriched _ _ fmvs (ConstraintQuasiPattern m ess e)) -> do
-      resolvePiElim q m fmvs ess e
+      resolvePiElim m fmvs ess e
     Just (Enriched _ _ fmvs (ConstraintFlexRigid m ess e)) -> do
-      resolvePiElim q m fmvs ess e
+      resolvePiElim m fmvs ess e
     Just (Enriched (e1, e2) _ _ _)
       -- throwError $ "cannot simplify:\n" ++ Pr.ppShow q
       -- p $ "cannot simplify:\n" ++ Pr.ppShow (e1, e2)
@@ -47,35 +48,31 @@ synthesize q = do
 -- 独立したケースとして扱えるようにしたほうがよい（そうすればsubstを減らせる）
 -- つまり、e1とe2のstuck reasonをそれぞれ別々に保持したほうがよい。
 resolveStuck ::
-     ConstraintQueue
-  -> WeakTermPlus
-  -> WeakTermPlus
-  -> Hole
-  -> WeakTermPlus
-  -> WithEnv ()
-resolveStuck q e1 e2 h e = do
+     WeakTermPlus -> WeakTermPlus -> Hole -> WeakTermPlus -> WithEnv ()
+resolveStuck e1 e2 h e = do
   let e1' = substWeakTermPlus [(h, e)] e1
   let e2' = substWeakTermPlus [(h, e)] e2
-  q' <- analyze [(e1', e2')]
-  synthesize $ Q.deleteMin q `Q.union` q'
+  deleteMin
+  simp [(e1', e2')]
+  synthesize
 
 resolveDelta ::
-     ConstraintQueue
-  -> IterInfo
+     IterInfo
   -> [(Meta, [WeakTermPlus])]
   -> [(Meta, [WeakTermPlus])]
   -> WithEnv ()
-resolveDelta q iter mess1 mess2 = do
+resolveDelta iter mess1 mess2 = do
   let planA = do
         let ess1 = map snd mess1
         let ess2 = map snd mess2
-        q' <- analyze $ zip (concat ess1) (concat ess2)
-        synthesize $ Q.deleteMin q `Q.union` q'
+        simp $ zip (concat ess1) (concat ess2)
+        synthesize
   let planB = do
         let e1 = toPiElim (unfoldIter iter) mess1
         let e2 = toPiElim (unfoldIter iter) mess2
-        q' <- analyze $ [(e1, e2)]
-        synthesize $ Q.deleteMin q `Q.union` q'
+        simp $ [(e1, e2)]
+        synthesize
+  deleteMin
   chain [planA, planB]
 
 -- synthesize `hole @ arg-1 @ ... @ arg-n = e`, where arg-i is a variable.
@@ -91,44 +88,37 @@ resolveDelta q iter mess1 mess2 = do
 -- fresh variables, and try to resolve the new quasi-pattern ?M @ x @ x @ z @ y == e.
 -- {} resolvePiElim {}
 resolvePiElim ::
-     ConstraintQueue
-  -> Hole
-  -> [Hole]
-  -> [[WeakTermPlus]]
-  -> WeakTermPlus
-  -> WithEnv ()
-resolvePiElim q m fmvs ess e = do
+     Hole -> [Hole] -> [[WeakTermPlus]] -> WeakTermPlus -> WithEnv ()
+resolvePiElim m fmvs ess e = do
   let lengthInfo = map length ess
   let es = concat ess
   xss <- toVarList es >>= toAltList
   let xsss = map (takeByCount lengthInfo) xss
   let lamList = map (bindFormalArgs e) xsss
-  chain $ map (resolveHole q m fmvs) lamList
+  deleteMin
+  chain $ map (resolveHole m fmvs) lamList
 
 -- optimization for pattern (not necessary for correctness; its output is the same as that of resolvePiElim)
 resolvePattern ::
-     ConstraintQueue
-  -> Hole
-  -> [Hole]
-  -> [[WeakTermPlus]]
-  -> WeakTermPlus
-  -> WithEnv ()
-resolvePattern q m fmvs ess e = do
+     Hole -> [Hole] -> [[WeakTermPlus]] -> WeakTermPlus -> WithEnv ()
+resolvePattern m fmvs ess e = do
   xss <- mapM toVarList ess
-  resolveHole q m fmvs $ bindFormalArgs e xss
+  deleteMin
+  resolveHole m fmvs $ bindFormalArgs e xss
 
 -- {} resolveHole {}
-resolveHole :: ConstraintQueue -> Hole -> [Hole] -> WeakTermPlus -> WithEnv ()
-resolveHole q m fmvs e = do
+resolveHole :: Hole -> [Hole] -> WeakTermPlus -> WithEnv ()
+resolveHole m fmvs e = do
   senv <- gets substEnv
   let e' = reduceWeakTermPlus $ snd $ substIfNecessary senv (fmvs, e)
   let fmvs' = holeWeakTermPlus e'
   let s1 = Map.singleton m (fmvs', e')
   modify (\env -> env {substEnv = compose s1 senv})
-  let (q1, q2) =
-        Q.partition (\(Enriched _ ms _ _) -> m `elem` ms) $ Q.deleteMin q
+  q <- gets constraintQueue
+  let (q1, q2) = Q.partition (\(Enriched _ ms _ _) -> m `elem` ms) q
   let q1' = Q.mapU asAnalyzable q1
-  synthesize $ q1' `Q.union` q2
+  modify (\env -> env {constraintQueue = q1' `Q.union` q2})
+  synthesize
 
 -- {} asAnalyzable {}
 asAnalyzable :: EnrichedConstraint -> EnrichedConstraint
@@ -152,6 +142,10 @@ lookupAny (h:ks) sub = do
   case Map.lookup h sub of
     Just v -> Just (h, v)
     _ -> lookupAny ks sub
+
+deleteMin :: WithEnv ()
+deleteMin = do
+  modify (\env -> env {constraintQueue = Q.deleteMin (constraintQueue env)})
 
 -- [e, x, y, y, e2, e3, z] ~> [p, x, y, y, q, r, z]  (p, q, r: new variables)
 -- {} toVarList {}

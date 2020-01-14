@@ -1,5 +1,6 @@
 module Elaborate.Analyze
   ( analyze
+  , simp
   , toPiElim
   , linearCheck
   , unfoldIter
@@ -22,12 +23,14 @@ import Data.WeakTerm
 import Reduce.WeakTerm
 
 -- {} analyze {}
-analyze :: [PreConstraint] -> WithEnv ConstraintQueue
-analyze cs = Q.fromList <$> simp cs
+analyze :: WithEnv ()
+analyze = do
+  cs <- gets constraintEnv
+  simp cs
 
 -- {} simp {}
-simp :: [PreConstraint] -> WithEnv [EnrichedConstraint]
-simp [] = return []
+simp :: [PreConstraint] -> WithEnv ()
+simp [] = return ()
 simp ((e1, e2):cs) = do
   me1' <- return (reduceWeakTermPlus e1) >>= liftIO . timeout 5000000 . return
   me2' <- return (reduceWeakTermPlus e2) >>= liftIO . timeout 5000000 . return
@@ -36,8 +39,8 @@ simp ((e1, e2):cs) = do
     _ -> throwError $ "cannot simplify [TIMEOUT]:\n" ++ Pr.ppShow (e1, e2)
 
 -- {} simp' {}
-simp' :: [PreConstraint] -> WithEnv [EnrichedConstraint]
-simp' [] = return []
+simp' :: [PreConstraint] -> WithEnv ()
+simp' [] = return ()
 simp' (((_, e1), (_, e2)):cs)
   | e1 == e2 = simp cs
 simp' (((_, WeakTermPi xts1 cod1), (_, WeakTermPi xts2 cod2)):cs)
@@ -80,16 +83,14 @@ simp' (((_, WeakTermFloat t1 l1), (_, WeakTermFloat t2 l2)):cs)
 simp' (((_, WeakTermEnumElim (e1, t1) les1), (_, WeakTermEnumElim (e2, t2) les2)):cs)
   -- using term equality
   | e1 == e2 = do
-    csEnum <- simpCase les1 les2
-    csCont <- simp $ (t1, t2) : cs
-    return $ csEnum ++ csCont
+    simpCase les1 les2
+    simp $ (t1, t2) : cs
 simp' (((_, WeakTermArray k1 indexType1), (_, WeakTermArray k2 indexType2)):cs)
   | k1 == k2 = simp $ (indexType1, indexType2) : cs
 simp' (((_, WeakTermArrayIntro k1 les1), (_, WeakTermArrayIntro k2 les2)):cs)
   | k1 == k2 = do
-    csArray <- simpCase les1 les2
-    csCont <- simp cs
-    return $ csArray ++ csCont
+    simpCase les1 les2
+    simp cs
 simp' ((e1, e2):cs) = do
   let ms1 = asStuckedTerm e1
   let ms2 = asStuckedTerm e2
@@ -113,9 +114,9 @@ simp' ((e1, e2):cs) = do
           , ess1 <- map snd mess1
           , ess2 <- map snd mess2
           , length (concat ess1) == length (concat ess2) -> do
-            cs' <- simp cs
             let c = Enriched (e1, e2) [] [] $ ConstraintDelta iter1 mess1 mess2
-            return $ c : cs'
+            insConstraintQueue c
+            simp cs
         (Just (StuckPiElimIter iter1 mess1), Just (StuckPiElimIter iter2 mess2)) -> do
           let e1' = toPiElim (unfoldIter iter1) mess1
           let e2' = toPiElim (unfoldIter iter2) mess2
@@ -165,22 +166,17 @@ simpBinder ::
   -> [(Identifier, WeakTermPlus)]
   -> WeakTermPlus
   -> [(WeakTermPlus, WeakTermPlus)]
-  -> WithEnv [EnrichedConstraint]
+  -> WithEnv ()
 simpBinder [] cod1 [] cod2 cs = simp $ (cod1, cod2) : cs
 simpBinder ((x1, t1):xts1) cod1 ((x2, t2):xts2) cod2 cs = do
   let var1 = toVar x1
   let (xts2', cod2') = substWeakTermPlusBindingsWithBody [(x2, var1)] xts2 cod2
-  cst <- simp [(t1, t2)]
-  cs' <- simpBinder xts1 cod1 xts2' cod2' cs
-  return $ cst ++ cs'
+  simp [(t1, t2)]
+  simpBinder xts1 cod1 xts2' cod2' cs
 simpBinder _ _ _ _ _ = throwError "cannot simplify (simpBinder)"
 
 -- {} simpCase {}
-simpCase ::
-     (Ord a)
-  => [(a, WeakTermPlus)]
-  -> [(a, WeakTermPlus)]
-  -> WithEnv [EnrichedConstraint]
+simpCase :: (Ord a) => [(a, WeakTermPlus)] -> [(a, WeakTermPlus)] -> WithEnv ()
 simpCase les1 les2 = do
   let les1' = sortBy (\x y -> fst x `compare` fst y) les1
   let les2' = sortBy (\x y -> fst x `compare` fst y) les2
@@ -196,10 +192,10 @@ simpAnalyzable ::
   -> WeakTermPlus
   -> [Identifier]
   -> [PreConstraint]
-  -> WithEnv [EnrichedConstraint]
+  -> WithEnv ()
 simpAnalyzable e1 e2 hs cs = do
-  cs' <- simp' cs
-  return $ (Enriched (e1, e2) hs [] $ ConstraintAnalyzable) : cs'
+  insConstraintQueue $ Enriched (e1, e2) hs [] $ ConstraintAnalyzable
+  simp cs
 
 -- {} simpPattern {}
 simpPattern ::
@@ -209,10 +205,11 @@ simpPattern ::
   -> WeakTermPlus
   -> [Identifier]
   -> [PreConstraint]
-  -> WithEnv [EnrichedConstraint]
+  -> WithEnv ()
 simpPattern h1 ies1 e1 e2 fmvs cs = do
-  cs' <- simp cs
-  return $ Enriched (e1, e2) [h1] fmvs (ConstraintPattern h1 ies1 e2) : cs'
+  insConstraintQueue $
+    Enriched (e1, e2) [h1] fmvs (ConstraintPattern h1 ies1 e2)
+  simp cs
 
 -- {} simpQuasiPattern {}
 simpQuasiPattern ::
@@ -222,10 +219,11 @@ simpQuasiPattern ::
   -> WeakTermPlus
   -> [Identifier]
   -> [PreConstraint]
-  -> WithEnv [EnrichedConstraint]
+  -> WithEnv ()
 simpQuasiPattern h1 ies1 e1 e2 fmvs cs = do
-  cs' <- simp cs
-  return $ Enriched (e1, e2) [h1] fmvs (ConstraintQuasiPattern h1 ies1 e2) : cs'
+  insConstraintQueue $
+    Enriched (e1, e2) [h1] fmvs (ConstraintQuasiPattern h1 ies1 e2)
+  simp cs
 
 -- {} simpFlexRigid {}
 simpFlexRigid ::
@@ -235,22 +233,18 @@ simpFlexRigid ::
   -> WeakTermPlus
   -> [Identifier]
   -> [PreConstraint]
-  -> WithEnv [EnrichedConstraint]
+  -> WithEnv ()
 simpFlexRigid h1 ies1 e1 e2 fmvs cs = do
-  cs' <- simp cs
-  return $ Enriched (e1, e2) [h1] fmvs (ConstraintFlexRigid h1 ies1 e2) : cs'
+  insConstraintQueue $
+    Enriched (e1, e2) [h1] fmvs (ConstraintFlexRigid h1 ies1 e2)
+  simp cs
 
 -- {} simpOther {}
 simpOther ::
-     WeakTermPlus
-  -> WeakTermPlus
-  -> [Hole]
-  -> [PreConstraint]
-  -> WithEnv [EnrichedConstraint]
+     WeakTermPlus -> WeakTermPlus -> [Hole] -> [PreConstraint] -> WithEnv ()
 simpOther e1 e2 fmvs cs = do
-  cs' <- simp cs
-  let c = Enriched (e1, e2) fmvs [] $ ConstraintOther
-  return $ c : cs'
+  insConstraintQueue $ Enriched (e1, e2) fmvs [] $ ConstraintOther
+  simp cs
 
 data Stuck
   = StuckPiElimZeta Hole [[WeakTermPlus]]
@@ -339,3 +333,7 @@ unfoldIter :: IterInfo -> WeakTermPlus
 unfoldIter (x, xts, body, self) = do
   let body' = substWeakTermPlus [(x, self)] body
   (fst self, WeakTermPiIntro xts body')
+
+insConstraintQueue :: EnrichedConstraint -> WithEnv ()
+insConstraintQueue c = do
+  modify (\env -> env {constraintQueue = Q.insert c (constraintQueue env)})

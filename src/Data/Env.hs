@@ -41,6 +41,7 @@ data Env =
     , weakTypeEnv :: Map.HashMap Identifier WeakTermPlus -- var ~> typeof(var)
     , typeEnv :: Map.HashMap Identifier TermPlus
     , constraintEnv :: [PreConstraint] -- for type inference
+    , constraintQueue :: ConstraintQueue
     , substEnv :: Map.HashMap Identifier ([Identifier], WeakTermPlus) -- metavar ~> [(metavar in the term, beta-equivalent weakterm)]
     , chainEnv :: Map.HashMap Identifier [(Identifier, TermPlus)] -- var/const ~> the closed var chain of its type
     , codeEnv :: Map.HashMap Identifier ([Identifier], CodePlus) -- f ~> thunk (lam (x1 ... xn) e)
@@ -66,6 +67,7 @@ initialEnv path =
     , codeEnv = Map.empty
     , llvmEnv = Map.empty
     , constraintEnv = []
+    , constraintQueue = Q.empty
     , substEnv = Map.empty
     , mainFilePath = path
     , currentFilePath = path
