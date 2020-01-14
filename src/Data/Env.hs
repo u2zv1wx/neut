@@ -101,7 +101,7 @@ newNameWith s = do
 newLLVMNameWith :: Identifier -> WithEnv Identifier
 newLLVMNameWith s = do
   i <- newName
-  let s' = llvmString s <> i -- for debug build (slow)
+  let s' = llvmString s <> i
   modify (\e -> e {nameEnv = Map.insert s s' (nameEnv e)})
   return s'
 

@@ -112,14 +112,12 @@ writeResult result outputPath OutputKindLLVM = do
 writeResult result outputPath OutputKindObject = do
   let content = BC.unlines result
   tmpOutputPath <- liftIO $ outputPath <.> "ll"
-  tmpAsmOutputPath <- liftIO $ outputPath <.> "s"
   let tmpOutputPathStr = toFilePath tmpOutputPath
-  let tmpAsmOutputPathStr = toFilePath tmpAsmOutputPath
   B.writeFile tmpOutputPathStr content
-  callProcess "llc" [tmpOutputPathStr, "-o=" ++ tmpAsmOutputPathStr]
-  callProcess "clang" [tmpAsmOutputPathStr, "-o" ++ toFilePath outputPath]
+  callProcess
+    "clang"
+    [tmpOutputPathStr, "-Wno-override-module", "-o" ++ toFilePath outputPath]
   removeFile tmpOutputPath
-  removeFile tmpAsmOutputPath
 
 -- process :: Path Abs File -> WithEnv [T.Text]
 process :: Path Abs File -> WithEnv [B.ByteString]
