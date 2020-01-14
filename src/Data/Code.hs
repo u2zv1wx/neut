@@ -6,7 +6,7 @@ import Numeric.Half
 import Data.Basic
 
 -- The definition of `Data` doesn't contain those type-level definitions like `DataTau`
--- since they are translated to "exponents" immediately after polarization (and thus in Polarize.hs).
+-- since they are translated to "exponents" immediately after polarization (and thus in Clarify.hs).
 data Data
   = DataTheta Identifier
   | DataUpsilon Identifier
@@ -18,6 +18,7 @@ data Data
   | DataFloat64 Double
   | DataEnumIntro EnumValue
   | DataArrayIntro ArrayKind [(EnumValue, DataPlus)]
+  | DataMemory DataPlus -- DataMemory n = n byte dynamically-allocated uninitialized memory
   deriving (Show)
 
 data Code
@@ -70,6 +71,9 @@ substDataPlus sub (m, DataArrayIntro k lds) = do
   let (ls, ds) = unzip lds
   let ds' = map (substDataPlus sub) ds
   (m, DataArrayIntro k $ zip ls ds')
+substDataPlus sub (m, DataMemory n) = do
+  let n' = substDataPlus sub n
+  (m, DataMemory n')
 
 substCodePlus :: SubstDataPlus -> CodePlus -> CodePlus
 substCodePlus sub (m, CodeTheta theta) = do
@@ -130,6 +134,7 @@ varData :: DataPlus -> [Identifier]
 varData (_, DataUpsilon x) = [x]
 varData (_, DataSigmaIntro ds) = concatMap varData ds
 varData (_, DataArrayIntro _ lds) = concatMap (varData . snd) lds
+varData (_, DataMemory d) = varData d
 varData _ = []
 
 varCode :: CodePlus -> [Identifier]

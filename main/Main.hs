@@ -88,7 +88,7 @@ run :: Command -> IO ()
 run (Build inputPathStr mOutputPathStr outputKind) = do
   inputPath <- resolveFile' inputPathStr
   resultOrErr <- evalWithEnv (process inputPath) (initialEnv inputPath)
-  let basename = filename inputPath
+  basename <- setFileExtension "" $ filename inputPath
   mOutputPath <- mapM resolveFile' mOutputPathStr
   outputPath <- constructOutputPath basename mOutputPath outputKind
   case resultOrErr of

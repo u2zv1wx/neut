@@ -171,8 +171,9 @@ data BinaryOp
   | BinaryOpXor
   deriving (Eq, Show)
 
-data SysCall =
-  SysCallWrite
+data SysCall
+  = SysCallWrite
+  | SysCallRead
   deriving (Eq, Show)
 
 type ArgLen = Int

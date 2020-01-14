@@ -195,6 +195,9 @@ renameData (m, DataArrayIntro kind les) = do
       body' <- renameData body
       return (l, body')
   return (m, DataArrayIntro kind les')
+renameData (m, DataMemory d) = do
+  d' <- renameData d
+  return (m, DataMemory d')
 
 renameCode :: CodePlus -> WithEnv CodePlus
 renameCode (m, CodeTheta theta) = do

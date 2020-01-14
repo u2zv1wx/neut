@@ -222,7 +222,7 @@ clarifySysCall name sysCall argLen argIdxList m = do
   t <- lookupTypeEnv name
   t' <- reduceTermPlus t
   case t' of
-    (_, TermPi xts _)
+    (_, TermPi xts cod)
       | length xts == argLen -> do
         let ys = map (\i -> toVar $ fst $ xts !! i) argIdxList
         zts <- complementaryChainOf xts
@@ -244,6 +244,64 @@ clarifySysCall name sysCall argLen argIdxList m = do
                       (ys !! 1)
                       (m, CodeTheta (ThetaSysCall sysCall ys')))
             retClosure (Just name) zts m xts body
+          -- read [A, in, len]
+          -- ys == [in, len]
+          SysCallRead
+            | (_, TermPi [c, (funName, funType@(_, TermPi [(_, bufType), (_, sizeType)] _))] _) <-
+               cod -> do
+              bufName <- newNameWith "buf"
+              (buf1Name, buf1) <- newDataUpsilonWith bufName
+              buf2Name <- newNameWith bufName
+              retImmType <- returnCartesianImmediate
+              -- copy as if buf is an immediate (to realize variable assignment)
+              relApp <- toRelevantApp m bufName retImmType
+              sizeName <- newNameWith "size"
+              -- (pair buf2 size) == lam (C : univ). lam (f : (Buf, i64) -> C). f @ (buf2, size)
+              let pair =
+                    ( m
+                    , TermPiIntro
+                        [c, (funName, funType)]
+                        ( m
+                        , TermPiElim
+                            (m, TermUpsilon funName)
+                            [ (m, TermUpsilon buf2Name)
+                            , (m, TermUpsilon sizeName)
+                            ]))
+              -- buf2NameとかをinsTypeEnvする必要がある。
+              insTypeEnv buf2Name bufType
+              insTypeEnv sizeName sizeType
+              pair' <- clarify pair
+              -- buf2がコピーされる可能性はあるから、そこの型はちゃんととっておく必要がある。
+              retArrayType <- returnArrayType m
+              (sigName, sig) <- newDataUpsilonWith "sig"
+              let body =
+                    ( m
+                    , CodeUpElim
+                        bufName
+                        (m, CodeUpIntro (m, DataMemory $ ys !! 1)) -- len
+                        ( m
+                        , CodeUpElim
+                            sigName
+                            -- bufをimmであるかのようにしてcopy
+                            relApp
+                            ( m
+                            , CodeSigmaElim
+                                [ (buf1Name, retArrayType)
+                                , (buf2Name, retArrayType)
+                                ]
+                                sig
+                                ( m
+                                , CodeUpElim
+                                    sizeName
+                                    ( m
+                                    , CodeTheta
+                                        (ThetaSysCall
+                                           sysCall
+                                           [ys !! 0, buf1, ys !! 1] -- buf1はここでしか使用されない
+                                         ))
+                                    pair'))))
+              retClosure (Just name) zts m xts body
+          _ -> throwError $ "the type of " <> name <> " is wrong"
     _ -> throwError $ "the type of " <> name <> " is wrong"
 
 complementaryChainOf ::
@@ -336,4 +394,5 @@ pop x mp = do
 
 asSysCallMaybe :: Identifier -> Maybe (SysCall, ArgLen, UsedArgIndexList)
 asSysCallMaybe "write" = Just (SysCallWrite, 4, [1, 2, 3])
+asSysCallMaybe "read" = Just (SysCallRead, 3, [1, 2])
 asSysCallMaybe _ = Nothing

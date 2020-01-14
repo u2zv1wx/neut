@@ -71,6 +71,7 @@ takeBaseName (_, DataFloat32 _) = "float"
 takeBaseName (_, DataFloat64 _) = "double"
 takeBaseName (_, DataEnumIntro _) = "i64"
 takeBaseName (_, DataArrayIntro _ ds) = "array" <> T.pack (show (length ds))
+takeBaseName (_, DataMemory _) = "memory"
 
 takeBaseName' :: LLVMData -> Identifier
 takeBaseName' (LLVMDataLocal x) = x
@@ -268,6 +269,11 @@ llvmDataLet x (_, DataArrayIntro k lds) cont = do
   let elemType = arrayKindToLowType k
   let arrayType = LowTypeArrayPtr (toInteger $ length ds) elemType
   storeContent x elemType arrayType ds cont
+llvmDataLet x (_, DataMemory size) cont = do
+  (size', castThen) <- llvmCast (Just $ takeBaseName size) size $ LowTypeIntS 64
+  castThen $ LLVMLet x (LLVMOpAlloc size') cont
+  -- llvmDataLet i d $ LLVMLet x (LLVMOpAlloc iVar) cont
+  -- (fun, castThen) <- llvmCast (Just $ takeBaseName v) v $ toFunPtrType ds
 
 reorder :: [(EnumValue, a)] -> WithEnv [a]
 reorder lds = do
@@ -287,9 +293,11 @@ sysCallNumAsInt num = do
   case targetOS of
     OSLinux ->
       case num of
+        SysCallRead -> return 0
         SysCallWrite -> return 1
     OSDarwin ->
       case num of
+        SysCallRead -> return 0x2000003
         SysCallWrite -> return 0x2000004
 
 llvmDataLet' :: [(Identifier, DataPlus)] -> LLVM -> WithEnv LLVM

@@ -215,8 +215,31 @@
 (ascription my-item
   (hom nat nat))
 
+;; (constant read
+;;   (pi
+;;     ((A type)
+;;      (in file-descriptor)
+;;      (len (is-enum A)))
+;;     (product (u8-array A) i64)))
+
+(definition a
+  (read n20 stdin enum.n20))
+
+(let foo
+  (sigma-elimination
+    ((p (u8-array n20))
+     (q i64))
+    a
+    p))
+
+(write n20 stdout foo enum.n20)
+
+;; (write n20 stdout foo enum.n20)
+
+(write n3 stdout (test) enum.n3)
+
 (definition x 10)
 
-(i64.add (i64.add 4 x) x)
+(i64.add (i64.add 3 x) x)
 
 ;; new.neut ends here
