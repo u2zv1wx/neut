@@ -6,6 +6,7 @@ module Elaborate.Analyze
   , unfoldIter
   , toVarList
   , bindFormalArgs
+  , lookupAny
   ) where
 
 import Control.Monad.Except
@@ -98,9 +99,12 @@ simp' ((e1, e2):cs) = do
   let ms2 = asStuckedTerm e2
   let stuckReasonList = catMaybes [ms1 >>= stuckReasonOf, ms2 >>= stuckReasonOf]
   sub <- gets substEnv
-  if any (`elem` Map.keys sub) stuckReasonList
-    then simpAnalyzable e1 e2 stuckReasonList cs
-    else do
+  case lookupAny stuckReasonList sub of
+    Just (h, (_, e)) -> do
+      let e1' = substWeakTermPlus [(h, e)] e1
+      let e2' = substWeakTermPlus [(h, e)] e2
+      simp $ (e1', e2') : cs
+    Nothing -> do
       let hs1 = holeWeakTermPlus e1
       let hs2 = holeWeakTermPlus e2
       case (ms1, ms2) of
@@ -187,17 +191,6 @@ simpCase les1 les2 = do
   if ls1 /= ls2
     then throwError "cannot simplify (simpCase)"
     else simp $ zip es1 es2
-
--- {} simpAnalyzable {}
-simpAnalyzable ::
-     WeakTermPlus
-  -> WeakTermPlus
-  -> [Identifier]
-  -> [PreConstraint]
-  -> WithEnv ()
-simpAnalyzable e1 e2 hs cs = do
-  insConstraintQueue $ Enriched (e1, e2) hs [] $ ConstraintAnalyzable
-  simp cs
 
 -- {} simpPattern {}
 simpPattern ::
@@ -352,7 +345,6 @@ visit m = do
   let (q1, q2) = Q.partition (\(Enriched _ ms _ _) -> m `elem` ms) q
   modify (\env -> env {constraintQueue = q2})
   simp $ map (\(Enriched c _ _ _) -> c) $ Q.toList q1
-  -- undefined
 
 -- [e, x, y, y, e2, e3, z] ~> [p, x, y, y, q, r, z]  (p, q, r: new variables)
 -- {} toVarList {}
@@ -373,3 +365,10 @@ bindFormalArgs e [] = e
 bindFormalArgs e (xts:xtss) = do
   let e' = bindFormalArgs e xtss
   (emptyMeta, WeakTermPiIntro xts e')
+
+lookupAny :: [Hole] -> Map.HashMap Identifier a -> Maybe (Hole, a)
+lookupAny [] _ = Nothing
+lookupAny (h:ks) sub = do
+  case Map.lookup h sub of
+    Just v -> Just (h, v)
+    _ -> lookupAny ks sub

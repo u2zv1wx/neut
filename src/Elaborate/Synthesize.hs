@@ -120,13 +120,6 @@ chain [] = throwError $ "cannot synthesize(chain)."
 chain [e] = e
 chain (e:es) = catchError e $ (const $ do chain es)
 
-lookupAny :: [Hole] -> Map.HashMap Identifier a -> Maybe (Hole, a)
-lookupAny [] _ = Nothing
-lookupAny (h:ks) sub = do
-  case Map.lookup h sub of
-    Just v -> Just (h, v)
-    _ -> lookupAny ks sub
-
 deleteMin :: WithEnv ()
 deleteMin = do
   modify (\env -> env {constraintQueue = Q.deleteMin (constraintQueue env)})
