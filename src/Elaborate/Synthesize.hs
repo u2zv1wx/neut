@@ -103,8 +103,7 @@ resolvePiElim m fmvs ess e = do
 resolveHole :: Hole -> [Hole] -> WeakTermPlus -> WithEnv ()
 resolveHole m fmvs e = do
   senv <- gets substEnv
-  let e' = reduceWeakTermPlus $ snd $ substIfNecessary senv (fmvs, e)
-  let fmvs' = holeWeakTermPlus e'
+  let (fmvs', e') = substIfNecessary senv (fmvs, e)
   let s1 = Map.singleton m (fmvs', e')
   modify (\env -> env {substEnv = compose s1 senv})
   q <- gets constraintQueue

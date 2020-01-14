@@ -20,6 +20,7 @@ import Elaborate.Analyze
 import Elaborate.Infer
 import Elaborate.Synthesize
 import Reduce.Term
+import Reduce.WeakTerm
 
 -- import Reduce.WeakTerm
 -- Given a term `e` and its name `main`, this function
@@ -192,12 +193,14 @@ lookupEnumSet name = do
   case Map.lookup name eenv of
     Nothing -> throwError $ "no such enum defined: " <> name
     Just ls -> return ls
--- reduceSubstEnv :: WithEnv ()
--- reduceSubstEnv = do
---   senv <- gets substEnv
---   let senv' = Map.map reduceSubstEnv' senv
---   modify (\env -> env {substEnv = senv'})
--- reduceSubstEnv' :: (b, WeakTermPlus) -> (b, WeakTermPlus)
--- reduceSubstEnv' (y, e) = do
---   let e' = reduceWeakTermPlus e
---   (y, e')
+
+reduceSubstEnv :: WithEnv ()
+reduceSubstEnv = do
+  senv <- gets substEnv
+  let senv' = Map.map reduceSubstEnv' senv
+  modify (\env -> env {substEnv = senv'})
+
+reduceSubstEnv' :: (b, WeakTermPlus) -> (b, WeakTermPlus)
+reduceSubstEnv' (y, e) = do
+  let e' = reduceWeakTermPlus e
+  (y, e')

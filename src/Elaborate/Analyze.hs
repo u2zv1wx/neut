@@ -210,8 +210,7 @@ simpPattern h1 ies1 _ e2 fmvs cs = do
   xss <- mapM toVarList ies1
   let lam = bindFormalArgs e2 xss
   senv <- gets substEnv
-  let lam' = reduceWeakTermPlus $ snd $ substIfNecessary senv (fmvs, lam)
-  let fmvs' = holeWeakTermPlus lam'
+  let (fmvs', lam') = substIfNecessary senv (fmvs, lam)
   let s1 = Map.singleton h1 (fmvs', lam')
   modify (\env -> env {substEnv = compose s1 senv})
   visit h1

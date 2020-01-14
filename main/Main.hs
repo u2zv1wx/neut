@@ -7,8 +7,6 @@ import Path.IO
 import System.Process
 import Text.Read (readMaybe)
 
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Char8 as BC
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 
@@ -128,12 +126,12 @@ process :: Path Abs File -> WithEnv [T.Text]
 -- process :: Path Abs File -> WithEnv [B.ByteString]
 process inputPath = do
   content <- liftIO $ TIO.readFile $ toFilePath inputPath
-  -- p "parse"
+  p "parse"
   e <- parse content (toFilePath inputPath) >>= elaborate
-  -- p "elaborated"
+  p "elaborated"
   e' <- clarify e
-  -- p "clarified"
+  p "clarified"
   e'' <- toLLVM e'
-  -- p "llvm-done"
+  p "llvm-done"
   emit e'' -- process input = do
    -- parse >=> elaborate >=> polarize >=> toLLVM >=> emit
