@@ -7,7 +7,8 @@ import Path.IO
 import System.Process
 import Text.Read (readMaybe)
 
-import qualified Data.Text as T
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
 import qualified Data.Text.IO as TIO
 
 import Clarify
@@ -79,7 +80,9 @@ optParser :: ParserInfo Command
 optParser = info (helper <*> parseOpt) fullDesc
 
 main :: IO ()
-main = execParser optParser >>= run
+main = do
+  putStrLn "start"
+  execParser optParser >>= run
 
 run :: Command -> IO ()
 run (Build inputPathStr mOutputPathStr outputKind) = do
@@ -102,28 +105,24 @@ constructOutputPath basename Nothing OutputKindObject = do
   return $ dir </> basename
 constructOutputPath _ (Just path) _ = return path
 
-writeResult :: [T.Text] -> Path Abs File -> OutputKind -> IO ()
-writeResult result outputPath OutputKindLLVM
-  -- let content = intercalate "\n" result
- = do
-  let content = T.unlines result
-  TIO.writeFile (toFilePath outputPath) content
-writeResult result outputPath OutputKindObject
-  -- let content = intercalate "\n" result
- = do
-  let content = T.unlines result
+writeResult :: [B.ByteString] -> Path Abs File -> OutputKind -> IO ()
+writeResult result outputPath OutputKindLLVM = do
+  let content = BC.unlines result
+  B.writeFile (toFilePath outputPath) content
+writeResult result outputPath OutputKindObject = do
+  let content = BC.unlines result
   tmpOutputPath <- liftIO $ outputPath <.> "ll"
   tmpAsmOutputPath <- liftIO $ outputPath <.> "s"
   let tmpOutputPathStr = toFilePath tmpOutputPath
   let tmpAsmOutputPathStr = toFilePath tmpAsmOutputPath
-  TIO.writeFile tmpOutputPathStr content
+  B.writeFile tmpOutputPathStr content
   callProcess "llc" [tmpOutputPathStr, "-o=" ++ tmpAsmOutputPathStr]
   callProcess "clang" [tmpAsmOutputPathStr, "-o" ++ toFilePath outputPath]
   removeFile tmpOutputPath
   removeFile tmpAsmOutputPath
 
-process :: Path Abs File -> WithEnv [T.Text]
--- process :: Path Abs File -> WithEnv [B.ByteString]
+-- process :: Path Abs File -> WithEnv [T.Text]
+process :: Path Abs File -> WithEnv [B.ByteString]
 process inputPath = do
   content <- liftIO $ TIO.readFile $ toFilePath inputPath
   p "parse"
