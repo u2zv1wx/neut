@@ -35,13 +35,11 @@ elaborate e
   e' <- infer e
   -- p "analyze/synthesize"
   -- Kantian type-inference ;)
-  cs <- gets constraintEnv
-  p $ "size: " ++ show (length cs)
   -- gets constraintEnv >>= analyze >>= synthesize
   analyze
   synthesize
   -- p "done"
-  reduceSubstEnv
+  -- reduceSubstEnv
   -- p "elaborate"
   -- this reduceTermPlus is necessary since e' contains "DONT_CARE" in its
   -- type of arguments of abstractions of meta-variables.

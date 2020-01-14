@@ -20,8 +20,8 @@
 ;; (ascription io
 ;;   (hom type type))
 
-(definition io-return ((B type) (x B))
-  (state-return bottom B x))
+;; (definition io-return ((B type) (x B))
+;;   (state-return bottom B x))
 
 ;; (ascription io-return
 ;;   (pi

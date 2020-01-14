@@ -1,8 +1,10 @@
 module Data.Constraint where
 
-import Data.Basic
 import qualified Data.HashMap.Strict as Map
+
+import Data.Basic
 import Data.WeakTerm
+import Reduce.WeakTerm
 
 type PreConstraint = (WeakTermPlus, WeakTermPlus)
 
@@ -57,11 +59,13 @@ compose s1 s2 = do
 substIfNecessary ::
      SubstWeakTerm' -> ([Hole], WeakTermPlus) -> ([Hole], WeakTermPlus)
 substIfNecessary sub (hs, e)
-  | xs <- Map.keys sub
-  , sub' <- Map.filterWithKey (\x _ -> x `elem` hs) sub
-  , not (null sub') = do
-    let hs' = concatMap fst $ Map.elems sub'
+  | sub' <- Map.filterWithKey (\x _ -> x `elem` hs) sub
+  , not (null sub')
+    -- let hs' = concatMap fst $ Map.elems sub'
+   = do
     let sub2 = map (\(x, (_, body)) -> (x, body)) $ Map.toList sub
-    let e' = substWeakTermPlus sub2 e
-    (hs' ++ filter (`notElem` xs) hs, e')
+    -- let e' = substWeakTermPlus sub2 e
+    -- (hs' ++ filter (`notElem` xs) hs, e')
+    let e' = reduceWeakTermPlus $ substWeakTermPlus sub2 e
+    (holeWeakTermPlus e', e')
 substIfNecessary _ hse = hse

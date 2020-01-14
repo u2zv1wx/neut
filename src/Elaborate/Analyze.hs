@@ -17,6 +17,7 @@ import System.Timeout
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.PQueue.Min as Q
+import qualified Data.Set as S
 import qualified Text.Show.Pretty as Pr
 
 import Data.Basic
@@ -308,13 +309,13 @@ includeCheck xs e = all (`elem` xs) $ varWeakTermPlus e
 
 -- {} linearCheck {}
 linearCheck :: [Identifier] -> Bool
-linearCheck xs = linearCheck' [] xs
+linearCheck xs = linearCheck' S.empty xs
 
-linearCheck' :: [Identifier] -> [Identifier] -> Bool
+linearCheck' :: (S.Set Identifier) -> [Identifier] -> Bool
 linearCheck' _ [] = True
 linearCheck' found (x:_)
-  | x `elem` found = False
-linearCheck' found (x:xs) = linearCheck' (x : found) xs
+  | x `S.member` found = False
+linearCheck' found (x:xs) = linearCheck' (S.insert x found) xs
 
 -- {} getVarList {}
 getVarList :: [WeakTermPlus] -> [Identifier]
