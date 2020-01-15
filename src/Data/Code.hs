@@ -18,7 +18,7 @@ data Data
   | DataFloat64 Double
   | DataEnumIntro EnumValue
   | DataArrayIntro ArrayKind [(EnumValue, DataPlus)]
-  | DataMemory DataPlus -- DataMemory n = n byte dynamically-allocated uninitialized memory
+  | DataAlloc DataPlus -- DataAlloc n = n byte dynamically-allocated uninitialized memory
   deriving (Show)
 
 data Code
@@ -32,6 +32,8 @@ data Code
   | CodeUpElim Identifier CodePlus CodePlus
   | CodeEnumElim DataPlus [(Case, CodePlus)]
   | CodeArrayElim ArrayKind DataPlus DataPlus
+  | CodeFree DataPlus
+  | CodeMemCpy DataPlus DataPlus DataPlus -- (dest, src, size-in-byte)
   deriving (Show)
 
 data Theta
@@ -71,9 +73,9 @@ substDataPlus sub (m, DataArrayIntro k lds) = do
   let (ls, ds) = unzip lds
   let ds' = map (substDataPlus sub) ds
   (m, DataArrayIntro k $ zip ls ds')
-substDataPlus sub (m, DataMemory n) = do
+substDataPlus sub (m, DataAlloc n) = do
   let n' = substDataPlus sub n
-  (m, DataMemory n')
+  (m, DataAlloc n')
 
 substCodePlus :: SubstDataPlus -> CodePlus -> CodePlus
 substCodePlus sub (m, CodeTheta theta) = do
@@ -105,6 +107,14 @@ substCodePlus sub (m, CodeArrayElim k d1 d2) = do
   let d1' = substDataPlus sub d1
   let d2' = substDataPlus sub d2
   (m, CodeArrayElim k d1' d2')
+substCodePlus sub (m, CodeFree d) = do
+  let d' = substDataPlus sub d
+  (m, CodeFree d')
+substCodePlus sub (m, CodeMemCpy dest src size) = do
+  let dest' = substDataPlus sub dest
+  let src' = substDataPlus sub src
+  let size' = substDataPlus sub size
+  (m, CodeMemCpy dest' src' size')
 
 substTheta :: SubstDataPlus -> Theta -> Theta
 substTheta sub (ThetaUnaryOp a t v) = do
@@ -134,7 +144,7 @@ varData :: DataPlus -> [Identifier]
 varData (_, DataUpsilon x) = [x]
 varData (_, DataSigmaIntro ds) = concatMap varData ds
 varData (_, DataArrayIntro _ lds) = concatMap (varData . snd) lds
-varData (_, DataMemory d) = varData d
+varData (_, DataAlloc d) = varData d
 varData _ = []
 
 varCode :: CodePlus -> [Identifier]
@@ -147,6 +157,8 @@ varCode (_, CodeEnumElim d les) = do
   let (_, es) = unzip les
   varData d ++ concatMap varCode es
 varCode (_, CodeArrayElim _ d1 d2) = varData d1 ++ varData d2
+varCode (_, CodeFree d) = varData d
+varCode (_, CodeMemCpy dest src size) = concatMap varData [dest, src, size]
 
 varTheta :: Theta -> [Identifier]
 varTheta (ThetaUnaryOp _ _ d) = varData d
