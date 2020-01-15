@@ -40,6 +40,10 @@ linearize' xts (m, CodeEnumElim d les) = do
   let xts' = filter (\(x, _) -> x `elem` concatMap varCode es) xts
   es' <- mapM (linearize xts') es
   withHeader xts (m, CodeEnumElim d $ zip ls es')
+linearize' xts (m, CodeArrayElimPositive k ys d e) = do
+  let xts' = filter (\(x, _) -> x `elem` varCode e) xts
+  e' <- linearize xts' e
+  withHeader xts (m, CodeArrayElimPositive k ys d e') -- arrayの中身 (ys) はimmediateなのでlinearizeの必要なし
 linearize' xts e = withHeader xts e -- eのなかにCodePlusが含まれないケース
 
 -- eのなかでxtsがpractically linearになるよう適切にheaderを挿入する。
