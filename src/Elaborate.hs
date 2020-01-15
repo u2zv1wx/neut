@@ -43,7 +43,7 @@ elaborate e
   analyze
   synthesize
   -- p "done"
-  -- reduceSubstEnv
+  reduceSubstEnv
   -- p "elaborate"
   -- this reduceTermPlus is necessary since e' contains "DONT_CARE" in its
   -- type of arguments of abstractions of meta-variables.
