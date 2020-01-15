@@ -102,9 +102,10 @@ simp' (((_, WeakTermArrayIntro k1 les1), (_, WeakTermArrayIntro k2 les2)):cs)
 simp' ((e1, e2):cs) = do
   let ms1 = asStuckedTerm e1
   let ms2 = asStuckedTerm e2
-  let stuckReasonList = catMaybes [ms1 >>= stuckReasonOf, ms2 >>= stuckReasonOf]
+  -- list of stuck reasons (fmvs: free meta-variables)
+  let fmvs = catMaybes [ms1 >>= stuckReasonOf, ms2 >>= stuckReasonOf]
   sub <- gets substEnv
-  case lookupAny stuckReasonList sub of
+  case lookupAny fmvs sub of
     Just (h, e) -> do
       let e1' = substWeakTermPlus [(h, e)] e1
       let e2' = substWeakTermPlus [(h, e)] e2
@@ -155,20 +156,20 @@ simp' ((e1, e2):cs) = do
         (Just (StuckPiElimZetaStrict h1 ies1), _)
           | xs1 <- concatMap getVarList ies1
           , occurCheck h1 hs2
-          , includeCheck xs1 e2 -> simpQuasiPattern h1 ies1 e1 e2 cs
+          , includeCheck xs1 e2 -> simpQuasiPattern h1 ies1 e1 e2 fmvs cs
         (_, Just (StuckPiElimZetaStrict h2 ies2))
           | xs2 <- concatMap getVarList ies2
           , occurCheck h2 hs1
-          , includeCheck xs2 e1 -> simpQuasiPattern h2 ies2 e2 e1 cs
+          , includeCheck xs2 e1 -> simpQuasiPattern h2 ies2 e2 e1 fmvs cs
         (Just (StuckPiElimZeta h1 ies1), Nothing)
           | xs1 <- concatMap getVarList ies1
           , occurCheck h1 hs2
-          , includeCheck xs1 e2 -> simpFlexRigid h1 ies1 e1 e2 cs
+          , includeCheck xs1 e2 -> simpFlexRigid h1 ies1 e1 e2 fmvs cs
         (Nothing, Just (StuckPiElimZeta h2 ies2))
           | xs2 <- concatMap getVarList ies2
           , occurCheck h2 hs1
-          , includeCheck xs2 e1 -> simpFlexRigid h2 ies2 e2 e1 cs
-        _ -> simpOther e1 e2 (hs1 ++ hs2) cs
+          , includeCheck xs2 e1 -> simpFlexRigid h2 ies2 e2 e1 fmvs cs
+        _ -> simpOther e1 e2 fmvs cs
 
 -- {} simpBinder {}
 simpBinder ::
@@ -218,11 +219,12 @@ simpQuasiPattern ::
   -> [[WeakTermPlus]]
   -> WeakTermPlus
   -> WeakTermPlus
+  -> [Identifier]
   -> [PreConstraint]
   -> WithEnv ()
-simpQuasiPattern h1 ies1 e1 e2 cs = do
+simpQuasiPattern h1 ies1 e1 e2 fmvs cs = do
   insConstraintQueue $
-    Enriched (e1, e2) [h1] (ConstraintQuasiPattern h1 ies1 e2)
+    Enriched (e1, e2) fmvs (ConstraintQuasiPattern h1 ies1 e2)
   simp cs
 
 -- {} simpFlexRigid {}
@@ -231,10 +233,11 @@ simpFlexRigid ::
   -> [[WeakTermPlus]]
   -> WeakTermPlus
   -> WeakTermPlus
+  -> [Identifier]
   -> [PreConstraint]
   -> WithEnv ()
-simpFlexRigid h1 ies1 e1 e2 cs = do
-  insConstraintQueue $ Enriched (e1, e2) [h1] (ConstraintFlexRigid h1 ies1 e2)
+simpFlexRigid h1 ies1 e1 e2 fmvs cs = do
+  insConstraintQueue $ Enriched (e1, e2) fmvs (ConstraintFlexRigid h1 ies1 e2)
   simp cs
 
 -- {} simpOther {}
