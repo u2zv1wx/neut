@@ -16,9 +16,9 @@ import Data.Env
 linearize :: [(Identifier, CodePlus)] -> CodePlus -> WithEnv CodePlus
 linearize xts e = do
   result <- linearize' xts e
-  let v = (map fst xts, result)
-  let info2 = toInfo "the result of linearize is not linear:" v
-  assertUM info2 $ result `isLinearOn` map fst xts
+  -- let v = (map fst xts, result)
+  -- let info2 = toInfo "the result of linearize is not linear:" v
+  -- assertUM info2 $ result `isLinearOn` map fst xts
   return result
 
 -- e' <- linearize xts eのとき、e'は、eとbeta-equivalentであり、かつ、xtsに含まれる変数の使用がlinearであるようなterm.
@@ -216,6 +216,13 @@ distinguishCode z (ml, CodeArrayElim k d1 d2) = do
   (vs1, d1') <- distinguishData z d1
   (vs2, d2') <- distinguishData z d2
   return (vs1 ++ vs2, (ml, CodeArrayElim k d1' d2'))
+distinguishCode z (ml, CodeArrayElimPositive k xs d e) = do
+  (vs1, d') <- distinguishData z d
+  if z `elem` xs
+    then return (vs1, (ml, CodeArrayElimPositive k xs d' e))
+    else do
+      (vs2, e') <- distinguishCode z e
+      return (vs1 ++ vs2, (ml, CodeArrayElimPositive k xs d' e'))
 
 -- {} distinguishTheta z theta {結果のtermにzは出現せず、かつ、renameされた結果がリストに格納されている}
 distinguishTheta :: Identifier -> Theta -> WithEnv ([Identifier], Theta)
