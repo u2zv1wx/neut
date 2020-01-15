@@ -28,7 +28,7 @@ reduceCodePlus (m, CodePiElimDownElim v ds) = do
     --   , x `notElem` varCode body -> error "unmatched length"
         of
     _ -> return (m, CodePiElimDownElim v ds)
-reduceCodePlus (m, CodeSigmaElim xts v e) = do
+reduceCodePlus (m, CodeSigmaElim Nothing xts v e) = do
   let (xs, ts) = unzip xts
   -- let xs = map fst xts
   case v of
@@ -37,7 +37,7 @@ reduceCodePlus (m, CodeSigmaElim xts v e) = do
     _ -> do
       e' <- reduceCodePlus e
       ts' <- mapM reduceCodePlus ts
-      return (m, CodeSigmaElim (zip xs ts') v e')
+      return (m, CodeSigmaElim Nothing (zip xs ts') v e')
 reduceCodePlus (m, CodeUpElim x e1 e2) = do
   e1' <- reduceCodePlus e1
   case e1' of
@@ -64,7 +64,8 @@ reduceCodePlus (m, CodeArrayElim k d1 d2) = do
       | k == k'
       , Just d <- lookup l les -> return (m, CodeUpIntro d)
     _ -> return (m, CodeArrayElim k d1 d2)
-reduceCodePlus (m, CodeArrayElimPositive k xs v e) = do
+reduceCodePlus (m, CodeSigmaElim (Just k) xts v e) = do
+  let (xs, ts) = unzip xts
   case v of
     (_, DataArrayIntro k' lds)
       | length lds == length xs
@@ -73,7 +74,8 @@ reduceCodePlus (m, CodeArrayElimPositive k xs v e) = do
         reduceCodePlus $ substCodePlus (zip xs ds) e
     _ -> do
       e' <- reduceCodePlus e
-      return (m, CodeArrayElimPositive k xs v e')
+      ts' <- mapM reduceCodePlus ts
+      return (m, CodeSigmaElim (Just k) (zip xs ts') v e')
 reduceCodePlus (m, CodeTheta theta) =
   case theta of
     ThetaUnaryOp op (LowTypeIntS s) (m1, DataIntS s1 x)

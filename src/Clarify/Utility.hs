@@ -33,6 +33,7 @@ toAffineApp m x t = do
         t
         ( emptyMeta
         , CodeSigmaElim
+            Nothing
             [(affVarName, retImmType), (relVarName, retImmType)]
             expVar
             (m, CodePiElimDownElim affVar [toDataUpsilon (x, m)])))
@@ -56,6 +57,7 @@ toRelevantApp m x t = do
         t
         ( m
         , CodeSigmaElim
+            Nothing
             [(affVarName, retImmType), (relVarName, retImmType)]
             expVar
             (m, CodePiElimDownElim relVar [toDataUpsilon (x, m)])))
@@ -141,6 +143,7 @@ affineUniv m = do
         -- let (a, b) := x in return ()
         ( emptyMeta
         , CodeSigmaElim
+            Nothing
             [(affVarName, retImmType), (relVarName, retImmType)]
             univVar
             (emptyMeta, CodeUpIntro (emptyMeta, DataSigmaIntro [])))
@@ -164,6 +167,7 @@ relevantUniv m = do
         -- let (a, b) := x in return ((a, b), (a, b))
         ( emptyMeta
         , CodeSigmaElim
+            Nothing
             [(affVarName, retImmType), (relVarName, retImmType)]
             univVar
             ( emptyMeta
@@ -175,65 +179,62 @@ relevantUniv m = do
                     ])))
       return theta
 
-cartesianInnerArray :: Meta -> ArrayKind -> DataPlus -> WithEnv DataPlus
-cartesianInnerArray m k size = do
-  aff <- affineInnerArray m
-  rel <- relevantInnerArray m k size
-  return (m, DataSigmaIntro [aff, rel])
-
-affineInnerArray :: Meta -> WithEnv DataPlus
-affineInnerArray _ = undefined
-  -- cenv <- gets codeEnv
-  -- let thetaName = "affine-inner-array"
-  -- let theta = (m, DataTheta thetaName)
-  -- case Map.lookup thetaName cenv of
-  --   Just _ -> return theta
-  --   Nothing -> do
-  --     (arrVarName, arrVar) <- newDataUpsilonWith "inner-array"
-  --     -- arrayはふつうにfreeできる
-  --     insCodeEnv thetaName [arrVarName] (emptyMeta, CodeFree arrVar)
-  --     return theta
-
-relevantInnerArray :: Meta -> ArrayKind -> DataPlus -> WithEnv DataPlus
-relevantInnerArray _ _ _ = do
-  undefined
-  -- cenv <- gets codeEnv
-  -- let thetaName = "relevant-inner-array"
-  -- let theta = (m, DataTheta thetaName)
-  -- case Map.lookup thetaName cenv of
-  --   Just _ -> return theta
-  --   Nothing -> do
-  --     (arrVarName, arrVar) <- newDataUpsilonWith "inner-array"
-  --     -- elemSize : u8 ~> 1, u9 ~> 2, u16 ~> 2, u17 ~> 3, etc.
-  --     let elemSize = (emptyMeta, DataIntU 64 $ arrayKindToSize k)
-  --     -- retAllocSize = return (size * num)
-  --     let retAllocSize = thetaMul elemSize num
-  --     (sizeVarName, sizeVar) <- newDataUpsilonWith "size"
-  --     (destVarName, destVar) <- newDataUpsilonWith "dest"
-  --     holeVarName <- newNameWith "hole"
-  --     let m' = emptyMeta
-  --     insCodeEnv
-  --       thetaName
-  --       [arrVarName]
-  --       ( m'
-  --       -- calculate the allocation size
-  --       , CodeUpElim
-  --           sizeVarName
-  --           retAllocSize
-  --           ( m'
-  --           -- allocate region
-  --           , CodeUpElim
-  --               destVarName
-  --               (m', CodeUpIntro (m', DataAlloc sizeVar))
-  --               ( m'
-  --               -- copy data
-  --               , CodeUpElim
-  --                   holeVarName
-  --                   (m', CodeMemCpy destVar arrVar sizeVar)
-  --                   -- return result
-  --                   (m', CodeUpIntro (m', DataSigmaIntro [destVar, arrVar])))))
-  --     return theta
-
+-- cartesianInnerArray :: Meta -> ArrayKind -> DataPlus -> WithEnv DataPlus
+-- cartesianInnerArray m k size = do
+--   aff <- affineInnerArray m
+--   rel <- relevantInnerArray m k size
+--   return (m, DataSigmaIntro [aff, rel])
+-- affineInnerArray :: Meta -> WithEnv DataPlus
+-- affineInnerArray _ = undefined
+--   -- cenv <- gets codeEnv
+--   -- let thetaName = "affine-inner-array"
+--   -- let theta = (m, DataTheta thetaName)
+--   -- case Map.lookup thetaName cenv of
+--   --   Just _ -> return theta
+--   --   Nothing -> do
+--   --     (arrVarName, arrVar) <- newDataUpsilonWith "inner-array"
+--   --     -- arrayはふつうにfreeできる
+--   --     insCodeEnv thetaName [arrVarName] (emptyMeta, CodeFree arrVar)
+--   --     return theta
+-- relevantInnerArray :: Meta -> ArrayKind -> DataPlus -> WithEnv DataPlus
+-- relevantInnerArray _ _ _ = do
+--   undefined
+--   -- cenv <- gets codeEnv
+--   -- let thetaName = "relevant-inner-array"
+--   -- let theta = (m, DataTheta thetaName)
+--   -- case Map.lookup thetaName cenv of
+--   --   Just _ -> return theta
+--   --   Nothing -> do
+--   --     (arrVarName, arrVar) <- newDataUpsilonWith "inner-array"
+--   --     -- elemSize : u8 ~> 1, u9 ~> 2, u16 ~> 2, u17 ~> 3, etc.
+--   --     let elemSize = (emptyMeta, DataIntU 64 $ arrayKindToSize k)
+--   --     -- retAllocSize = return (size * num)
+--   --     let retAllocSize = thetaMul elemSize num
+--   --     (sizeVarName, sizeVar) <- newDataUpsilonWith "size"
+--   --     (destVarName, destVar) <- newDataUpsilonWith "dest"
+--   --     holeVarName <- newNameWith "hole"
+--   --     let m' = emptyMeta
+--   --     insCodeEnv
+--   --       thetaName
+--   --       [arrVarName]
+--   --       ( m'
+--   --       -- calculate the allocation size
+--   --       , CodeUpElim
+--   --           sizeVarName
+--   --           retAllocSize
+--   --           ( m'
+--   --           -- allocate region
+--   --           , CodeUpElim
+--   --               destVarName
+--   --               (m', CodeUpIntro (m', DataAlloc sizeVar))
+--   --               ( m'
+--   --               -- copy data
+--   --               , CodeUpElim
+--   --                   holeVarName
+--   --                   (m', CodeMemCpy destVar arrVar sizeVar)
+--   --                   -- return result
+--   --                   (m', CodeUpIntro (m', DataSigmaIntro [destVar, arrVar])))))
+--   --     return theta
 thetaMul :: DataPlus -> DataPlus -> CodePlus
 thetaMul d1 d2 =
   (emptyMeta, CodeTheta $ ThetaBinaryOp BinaryOpMul (LowTypeIntU 64) d1 d2)
@@ -267,10 +268,10 @@ renameCode (m, CodePiElimDownElim v vs) = do
   v' <- renameData v
   vs' <- mapM renameData vs
   return (m, CodePiElimDownElim v' vs')
-renameCode (m, CodeSigmaElim xts d e) = do
+renameCode (m, CodeSigmaElim mk xts d e) = do
   d' <- renameData d
   (xts', e') <- renameBinderWithBody xts e
-  return (m, CodeSigmaElim xts' d' e')
+  return (m, CodeSigmaElim mk xts' d' e')
 renameCode (m, CodeUpIntro d) = do
   d' <- renameData d
   return (m, CodeUpIntro d')
@@ -288,12 +289,6 @@ renameCode (m, CodeArrayElim k d1 d2) = do
   d1' <- renameData d1
   d2' <- renameData d2
   return (m, CodeArrayElim k d1' d2')
-renameCode (m, CodeArrayElimPositive k xs d e) = do
-  d' <- renameData d
-  local $ do
-    xs' <- mapM newNameWith xs
-    e' <- renameCode e
-    return (m, CodeArrayElimPositive k xs' d' e')
 
 renameBinderWithBody ::
      [(Identifier, CodePlus)]

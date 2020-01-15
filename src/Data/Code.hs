@@ -24,6 +24,7 @@ data Code
   = CodeTheta Theta
   | CodePiElimDownElim DataPlus [DataPlus] -- ((force v) v1 ... vn)
   | CodeSigmaElim
+      (Maybe ArrayKind)
       [(Identifier, CodePlus)] -- [(x1, return t1), ..., (xn, return tn)] with xi : ti
       DataPlus
       CodePlus
@@ -31,7 +32,6 @@ data Code
   | CodeUpElim Identifier CodePlus CodePlus
   | CodeEnumElim DataPlus [(Case, CodePlus)]
   | CodeArrayElim ArrayKind DataPlus DataPlus
-  | CodeArrayElimPositive ArrayKind [Identifier] DataPlus CodePlus
   deriving (Show)
 
 data Theta
@@ -80,10 +80,10 @@ substCodePlus sub (m, CodePiElimDownElim v ds) = do
   let v' = substDataPlus sub v
   let ds' = map (substDataPlus sub) ds
   (m, CodePiElimDownElim v' ds')
-substCodePlus sub (m, CodeSigmaElim xts v e) = do
+substCodePlus sub (m, CodeSigmaElim mk xts v e) = do
   let v' = substDataPlus sub v
   let (xts', e') = substDataPlusSigmaElim sub xts e
-  (m, CodeSigmaElim xts' v' e')
+  (m, CodeSigmaElim mk xts' v' e')
 substCodePlus sub (m, CodeUpIntro v) = do
   let v' = substDataPlus sub v
   (m, CodeUpIntro v')
@@ -102,11 +102,6 @@ substCodePlus sub (m, CodeArrayElim k d1 d2) = do
   let d1' = substDataPlus sub d1
   let d2' = substDataPlus sub d2
   (m, CodeArrayElim k d1' d2')
-substCodePlus sub (m, CodeArrayElimPositive k xs d e) = do
-  let d' = substDataPlus sub d
-  let sub' = filter (\(y, _) -> y `notElem` xs) sub
-  let e' = substCodePlus sub' e
-  (m, CodeArrayElimPositive k xs d' e')
 
 substTheta :: SubstDataPlus -> Theta -> Theta
 substTheta sub (ThetaUnaryOp a t v) = do
@@ -141,15 +136,13 @@ varData _ = []
 varCode :: CodePlus -> [Identifier]
 varCode (_, CodeTheta theta) = varTheta theta
 varCode (_, CodePiElimDownElim d ds) = concatMap varData $ d : ds
-varCode (_, CodeSigmaElim xts d e) = varData d ++ varCode' xts e
+varCode (_, CodeSigmaElim _ xts d e) = varData d ++ varCode' xts e
 varCode (_, CodeUpIntro d) = varData d
 varCode (_, CodeUpElim x e1 e2) = varCode e1 ++ filter (/= x) (varCode e2)
 varCode (_, CodeEnumElim d les) = do
   let (_, es) = unzip les
   varData d ++ concatMap varCode es
 varCode (_, CodeArrayElim _ d1 d2) = varData d1 ++ varData d2
-varCode (_, CodeArrayElimPositive _ xs d e) =
-  varData d ++ filter (`notElem` xs) (varCode e)
 
 varTheta :: Theta -> [Identifier]
 varTheta (ThetaUnaryOp _ _ d) = varData d

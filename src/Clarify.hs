@@ -75,10 +75,11 @@ clarify (m, TermArray {}) = do
 clarify (m, TermArrayIntro k les) = do
   v <- cartesianImmediate m
   let retKindType = (m, CodeUpIntro v)
-  -- arrayType = Sigma [_ : IMMEDIATE, ..., _ : IMMEDIATE]
+  -- arrayType = Sigma{k} [_ : IMMEDIATE, ..., _ : IMMEDIATE]
   name <- newNameWith "array"
   arrayType <-
-    cartesianSigma name m $ map Left $ replicate (length les) retKindType
+    cartesianSigma name m (Just k) $
+    map Left $ replicate (length les) retKindType
   let (ls, es) = unzip les
   (zs, es', xs) <- unzip3 <$> mapM (clarifyPlus) es
   return $
@@ -103,10 +104,12 @@ clarify (m, TermArrayElim k e1 e2) = do
     bindLet [(arrVarName, e1'), (idxVarName, e2')] $
     ( m
     , CodeSigmaElim
+        Nothing
         [(contentTypeVarName, retUnivType), (contentVarName, retContentType)]
         arrVar
         ( m
         , CodeSigmaElim
+            Nothing
             [(affVarName, retImmType), (relVarName, retImmType)]
             contentTypeVar
             (m, CodeArrayElim k contentVar idxVar)))
@@ -136,7 +139,7 @@ clarifyConst m "stderr" = clarify (m, TermIntS 64 2)
 clarifyConst m name = do
   mx <- asEnumConstant name
   case mx of
-    Just i -> clarify (m, TermIntS 64 i) -- enum.top ~> 1, enum.choice ~> 2, etc.
+    Just i -> clarify (m, TermIntU 64 i) -- enum.top ~> 1, enum.choice ~> 2, etc.
     Nothing -> do
       cenv <- gets constantEnv
       if name `elem` cenv
@@ -198,6 +201,7 @@ clarifyIsEnum m = do
         [(x, tx)]
         ( m
         , CodeSigmaElim
+            Nothing
             [(aff, retImmType), (rel, retImmType)]
             varX
             (m, CodeUpIntro v))
@@ -238,6 +242,7 @@ clarifySysCall name sysCall argLen argIdxList m = do
                   ( m
                   -- decompose the array closure
                   , CodeSigmaElim
+                      Nothing
                       [ (contentTypeVarName, retUnivType)
                       , (contentVarName, retContentType)
                       ]
@@ -247,60 +252,57 @@ clarifySysCall name sysCall argLen argIdxList m = do
           -- read [A, in, len]
           -- ys == [in, len]
           SysCallRead
-            | (_, TermPi [c, (funName, funType@(_, TermPi [(_, bufType), (_, sizeType)] _))] _) <-
-               cod -> do
-              bufName <- newNameWith "buf"
-              (buf1Name, buf1) <- newDataUpsilonWith bufName
-              buf2Name <- newNameWith bufName
-              retImmType <- returnCartesianImmediate
-              -- copy as if buf is an immediate (to realize variable assignment)
-              relApp <- toRelevantApp m bufName retImmType
-              sizeName <- newNameWith "size"
-              -- (pair buf2 size) == lam (C : univ). lam (f : (Buf, i64) -> C). f @ (buf2, size)
-              let pair =
-                    ( m
-                    , TermPiIntro
-                        [c, (funName, funType)]
-                        ( m
-                        , TermPiElim
-                            (m, TermUpsilon funName)
-                            [ (m, TermUpsilon buf2Name)
-                            , (m, TermUpsilon sizeName)
-                            ]))
-              -- buf2NameとかをinsTypeEnvする必要がある。
-              insTypeEnv buf2Name bufType
-              insTypeEnv sizeName sizeType
-              pair' <- clarify pair
-              -- buf2がコピーされる可能性はあるから、そこの型はちゃんととっておく必要がある。
-              retArrayType <- returnArrayType m
-              (sigName, sig) <- newDataUpsilonWith "sig"
-              let body =
-                    ( m
-                    , CodeUpElim
-                        bufName
-                        (m, CodeUpIntro (m, DataMemory $ ys !! 1)) -- len
-                        ( m
-                        , CodeUpElim
-                            sigName
-                            -- bufをimmであるかのようにしてcopy
-                            relApp
-                            ( m
-                            , CodeSigmaElim
-                                [ (buf1Name, retArrayType)
-                                , (buf2Name, retArrayType)
-                                ]
-                                sig
-                                ( m
-                                , CodeUpElim
-                                    sizeName
-                                    ( m
-                                    , CodeTheta
-                                        (ThetaSysCall
-                                           sysCall
-                                           [ys !! 0, buf1, ys !! 1] -- buf1はここでしか使用されない
-                                         ))
-                                    pair'))))
-              retClosure (Just name) zts m xts body
+            | (_, TermPi [c, (funName, funType@(_, TermPi [(_, arrType@(_, TermArray k _)), (_, sizeType)] _))] _) <-
+               cod -> do undefined
+              -- (bufName, buf) <- newDataUpsilonWith "buf"
+              -- arrName <- newNameWith "array"
+              -- sizeName <- newNameWith "size"
+              -- let pair =
+              --       ( m
+              --       , TermPiIntro
+              --           [c, (funName, funType)]
+              --           ( m
+              --           , TermPiElim
+              --               (m, TermUpsilon funName)
+              --               [ (m, TermUpsilon arrName)
+              --               , (m, TermUpsilon sizeName)
+              --               ]))
+              -- insTypeEnv arrName arrType
+              -- insTypeEnv sizeName sizeType
+              -- pair' <- clarify pair
+              -- -- あれか？配列の表現のズレの話か？そんな気がしてきた。
+              -- -- bufNameは
+              -- -- arrayは(m, DataSigmaIntro [arrayType, (m, DataArrayIntro k (zip ls xs))])みたいに表現されるわけで、
+              -- -- bufNameはこの(m, DataArrayIntro k (zip ls xs))の部分に相当している。
+              -- -- ということは、型を作りたいわけだけど。u8-array Aってのは既にもっていて。でもこれは「termとしての」型であって。
+              -- -- arrayのためのcartesianを用意しましょう、ってことかなー。
+              -- -- let arrInnerType = (m, DataArray k (ys !! 1))
+              -- arrInnerType <- cartesianInnerArray m k $ ys !! 1
+              -- -- let arrValue = (m, DataSigmaIntro [arrInnerType, buf])
+              -- let body =
+              --       ( m
+              --       -- upelimで束縛された変数はlinearizeから除外されることを利用してbufを複数回使う
+              --       , CodeUpElim
+              --           bufName
+              --           (m, CodeUpIntro (m, DataAlloc $ ys !! 1)) -- len
+              --           -- ここでbufNameをTerm的なarrayに変換する必要がある。
+              --           -- pairのほうにはそっちを渡す。
+              --           ( m
+              --           , CodeUpElim
+              --               arrName
+              --               ( m
+              --               , CodeUpIntro
+              --                   (m, DataSigmaIntro [arrInnerType, buf]))
+              --               ( m
+              --               , CodeUpElim
+              --                   sizeName
+              --                   ( m
+              --                   , CodeTheta
+              --                       (ThetaSysCall
+              --                          sysCall
+              --                          [ys !! 0, buf, ys !! 1]))
+              --                   pair')))
+              -- retClosure (Just name) zts m xts body
           _ -> throwError $ "the type of " <> name <> " is wrong"
     _ -> throwError $ "the type of " <> name <> " is wrong"
 

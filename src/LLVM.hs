@@ -36,11 +36,17 @@ llvmCode (_, CodePiElimDownElim v ds) = do
   (fun, castThen) <- llvmCast (Just $ takeBaseName v) v $ toFunPtrType ds
   castThenCall <- castThen $ LLVMCall fun vs
   llvmDataLet' (zip xs ds) $ castThenCall
-llvmCode (_, CodeSigmaElim xts v e) = do
+llvmCode (_, CodeSigmaElim Nothing xts v e) = do
   let xs = map fst xts
   let structPtrType = toStructPtrType $ length xs
   let idxList = map (\i -> (LLVMDataInt i, i32)) [0 ..]
   loadContent v structPtrType (zip idxList xs) voidPtr e
+llvmCode (_, CodeSigmaElim (Just k) xts v e) = do
+  let xs = map fst xts
+  let et = arrayKindToLowType k -- elem type
+  let bt = LowTypeArrayPtr (toInteger $ length xs) et -- base pointer type  ([(length xs) x ARRAY_ELEM_TYPE])
+  let idxList = map (\i -> (LLVMDataInt i, i32)) [0 ..]
+  loadContent v bt (zip idxList xs) voidPtr e
 llvmCode (_, CodeUpIntro d) = do
   result <- newNameWith $ takeBaseName d
   llvmDataLet result d $ LLVMReturn $ LLVMDataLocal result
@@ -57,11 +63,6 @@ llvmCode (_, CodeArrayElim k d1 d2) = do
   loadThenFreeThenCont <-
     loadContent d1 bt [((cast, i64), result)] et (retUp result)
   castThen loadThenFreeThenCont
-llvmCode (_, CodeArrayElimPositive k xs v e) = do
-  let et = arrayKindToLowType k -- elem type
-  let bt = LowTypeArrayPtr (toInteger $ length xs) et -- base pointer type  ([(length xs) x ARRAY_ELEM_TYPE])
-  let idxList = map (\i -> (LLVMDataInt i, i32)) [0 ..]
-  loadContent v bt (zip idxList xs) voidPtr e
 
 takeBaseName :: DataPlus -> Identifier
 takeBaseName (_, DataTheta x) = x

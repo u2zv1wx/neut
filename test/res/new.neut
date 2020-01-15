@@ -222,17 +222,17 @@
 ;;      (len (is-enum A)))
 ;;     (product (u8-array A) i64)))
 
-(definition a
-  (read n20 stdin enum.n20))
+;; (definition a
+;;   (read n20 stdin enum.n20))
 
-(let foo
-  (sigma-elimination
-    ((p (u8-array n20))
-     (q i64))
-    a
-    p))
+;; (let foo
+;;   (sigma-elimination
+;;     ((p (u8-array n20))
+;;      (q i64))
+;;     a
+;;     p))
 
-(write n20 stdout foo enum.n20)
+;; (write n20 stdout foo enum.n20)
 
 ;; (write n20 stdout foo enum.n20)
 

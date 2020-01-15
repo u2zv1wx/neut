@@ -23,10 +23,14 @@ linearize xts e = do
 
 -- e' <- linearize xts eのとき、e'は、eとbeta-equivalentであり、かつ、xtsに含まれる変数の使用がlinearであるようなterm.
 linearize' :: [(Identifier, CodePlus)] -> CodePlus -> WithEnv CodePlus
-linearize' xts (m, CodeSigmaElim yts d e) = do
+linearize' xts (m, CodeSigmaElim Nothing yts d e) = do
   let xts' = filter (\(x, _) -> x `elem` varCode e) xts
   e' <- linearize (xts' ++ yts) e -- e'はxts' ++ ytsについてlinear
-  withHeader xts (m, CodeSigmaElim yts d e') -- SigmaElimはxtsについてlinear
+  withHeader xts (m, CodeSigmaElim Nothing yts d e') -- SigmaElimはxtsについてlinear
+linearize' xts (m, CodeSigmaElim (Just k) ys d e) = do
+  let xts' = filter (\(x, _) -> x `elem` varCode e) xts
+  e' <- linearize xts' e
+  withHeader xts (m, CodeSigmaElim (Just k) ys d e') -- arrayの中身 (ys) はimmediateなのでlinearizeの必要なし
 linearize' xts (m, CodeUpElim z e1 e2) = do
   let xts2' = filter (\(x, _) -> x `elem` varCode e2) xts
   e2' <- linearize xts2' e2 -- `z` is already linear
@@ -40,10 +44,6 @@ linearize' xts (m, CodeEnumElim d les) = do
   let xts' = filter (\(x, _) -> x `elem` concatMap varCode es) xts
   es' <- mapM (linearize xts') es
   withHeader xts (m, CodeEnumElim d $ zip ls es')
-linearize' xts (m, CodeArrayElimPositive k ys d e) = do
-  let xts' = filter (\(x, _) -> x `elem` varCode e) xts
-  e' <- linearize xts' e
-  withHeader xts (m, CodeArrayElimPositive k ys d e') -- arrayの中身 (ys) はimmediateなのでlinearizeの必要なし
 linearize' xts e = withHeader xts e -- eのなかにCodePlusが含まれないケース
 
 -- eのなかでxtsがpractically linearになるよう適切にheaderを挿入する。
@@ -115,6 +115,7 @@ withHeaderRelevant x t x1 x2 xs e = do
         t
         ( ml
         , CodeSigmaElim
+            Nothing
             [(affVarName, retImmType), (relVarName, retImmType)]
             expVar
             rel))
@@ -169,7 +170,7 @@ withHeaderRelevant' t relVar ((x, (x1, x2)):chain) cont = do
     , CodeUpElim
         sigVarName
         (m, CodePiElimDownElim relVar [varX])
-        (m, CodeSigmaElim [(x1, t), (x2, t)] sigVar cont'))
+        (m, CodeSigmaElim Nothing [(x1, t), (x2, t)] sigVar cont'))
 
 -- {} distinguishData z d {結果のtermにzは出現せず、かつ、renameされた結果がリストに格納されている}
 distinguishData :: Identifier -> DataPlus -> WithEnv ([Identifier], DataPlus)
@@ -193,14 +194,14 @@ distinguishCode z (ml, CodePiElimDownElim d ds) = do
   (vs, d') <- distinguishData z d
   (vss, ds') <- unzip <$> mapM (distinguishData z) ds
   return (vs ++ concat vss, (ml, CodePiElimDownElim d' ds'))
-distinguishCode z (ml, CodeSigmaElim xts d e) = do
+distinguishCode z (ml, CodeSigmaElim mk xts d e) = do
   (vs1, d') <- distinguishData z d
   -- type annotationの中の変数をどうするか、という問題がある。
   if z `elem` map fst xts
-    then return (vs1, (ml, CodeSigmaElim xts d' e))
+    then return (vs1, (ml, CodeSigmaElim mk xts d' e))
     else do
       (vs2, e') <- distinguishCode z e
-      return (vs1 ++ vs2, (ml, CodeSigmaElim xts d' e'))
+      return (vs1 ++ vs2, (ml, CodeSigmaElim mk xts d' e'))
 distinguishCode z (ml, CodeUpIntro d) = do
   (vs, d') <- distinguishData z d
   return (vs, (ml, CodeUpIntro d'))
@@ -220,14 +221,14 @@ distinguishCode z (ml, CodeArrayElim k d1 d2) = do
   (vs1, d1') <- distinguishData z d1
   (vs2, d2') <- distinguishData z d2
   return (vs1 ++ vs2, (ml, CodeArrayElim k d1' d2'))
-distinguishCode z (ml, CodeArrayElimPositive k xs d e) = do
-  (vs1, d') <- distinguishData z d
-  if z `elem` xs
-    then return (vs1, (ml, CodeArrayElimPositive k xs d' e))
-    else do
-      (vs2, e') <- distinguishCode z e
-      return (vs1 ++ vs2, (ml, CodeArrayElimPositive k xs d' e'))
 
+-- distinguishCode z (ml, CodeArrayElimPositive k xs d e) = do
+--   (vs1, d') <- distinguishData z d
+--   if z `elem` xs
+--     then return (vs1, (ml, CodeArrayElimPositive k xs d' e))
+--     else do
+--       (vs2, e') <- distinguishCode z e
+--       return (vs1 ++ vs2, (ml, CodeArrayElimPositive k xs d' e'))
 -- {} distinguishTheta z theta {結果のtermにzは出現せず、かつ、renameされた結果がリストに格納されている}
 distinguishTheta :: Identifier -> Theta -> WithEnv ([Identifier], Theta)
 distinguishTheta z (ThetaUnaryOp op lowType d) = do

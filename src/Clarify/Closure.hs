@@ -18,6 +18,7 @@ import Data.Basic
 import Data.Code
 import Data.Env
 import Data.Term
+import Reduce.Code
 
 import qualified Data.HashMap.Strict as Map
 
@@ -30,7 +31,7 @@ makeClosure ::
   -> WithEnv DataPlus
 makeClosure mName xts2 m xts1 e = do
   expName <- newNameWith "exp"
-  envExp <- cartesianSigma expName m $ map Right xts2
+  envExp <- cartesianSigma expName m Nothing $ map Right xts2
   (envVarName, envVar) <- newDataUpsilonWith "env"
   let xts = xts2 ++ xts1
   let info1 = toInfo "makeClosure: arg of linearize is not closed chain:" xts
@@ -41,7 +42,7 @@ makeClosure mName xts2 m xts1 e = do
   cenv <- gets codeEnv
   name <- nameFromMaybe mName
   let args = envVarName : map fst xts1
-  let body = (m, CodeSigmaElim xts2 envVar e')
+  let body = (m, CodeSigmaElim Nothing xts2 envVar e')
   when (name `notElem` Map.keys cenv) $ insCodeEnv name args body
   let fvEnv = (m, DataSigmaIntro $ map (toDataUpsilon' . fst) xts2)
   return (m, DataSigmaIntro [envExp, fvEnv, (m, DataTheta name)])
@@ -65,6 +66,7 @@ callClosure m e zexes = do
       ((clsVarName, e) : zip zs es')
       ( m
       , CodeSigmaElim
+          Nothing
           [ (typeVarName, retUnivType)
           , (envVarName, returnUpsilon typeVarName)
           , (lamVarName, retImmType)
@@ -72,6 +74,7 @@ callClosure m e zexes = do
           clsVar
           ( m
           , CodeSigmaElim
+              Nothing
               [(affVarName, retImmType), (relVarName, retImmType)]
               typeVar
               (m, CodePiElimDownElim lamVar (envVar : xs))))
