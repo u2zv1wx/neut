@@ -17,15 +17,16 @@ import Data.Env
 reduceCodePlus :: CodePlus -> WithEnv CodePlus
 reduceCodePlus (m, CodePiElimDownElim v ds) = do
   cenv <- gets codeEnv
-  case v of
-    (_, DataTheta x)
-      | Just (xs, body) <- Map.lookup x cenv
-      , x `notElem` varCode body
-      , length xs == length ds ->
-        reduceCodePlus $ substCodePlus (zip xs ds) body
-    (_, DataTheta x)
-      | Just (_, body) <- Map.lookup x cenv
-      , x `notElem` varCode body -> error "unmatched length"
+  case v
+    -- (_, DataTheta x)
+    --   | Just (xs, body) <- Map.lookup x cenv
+    --   , x `notElem` varCode body
+    --   , length xs == length ds ->
+    --     reduceCodePlus $ substCodePlus (zip xs ds) body
+    -- (_, DataTheta x)
+    --   | Just (_, body) <- Map.lookup x cenv
+    --   , x `notElem` varCode body -> error "unmatched length"
+        of
     _ -> return (m, CodePiElimDownElim v ds)
 reduceCodePlus (m, CodeSigmaElim xts v e) = do
   let (xs, ts) = unzip xts
@@ -63,6 +64,16 @@ reduceCodePlus (m, CodeArrayElim k d1 d2) = do
       | k == k'
       , Just d <- lookup l les -> return (m, CodeUpIntro d)
     _ -> return (m, CodeArrayElim k d1 d2)
+reduceCodePlus (m, CodeArrayElimPositive k xs v e) = do
+  case v of
+    (_, DataArrayIntro k' lds)
+      | length lds == length xs
+      , k == k' -> do
+        ds <- reorder lds
+        reduceCodePlus $ substCodePlus (zip xs ds) e
+    _ -> do
+      e' <- reduceCodePlus e
+      return (m, CodeArrayElimPositive k xs v e')
 reduceCodePlus (m, CodeTheta theta) =
   case theta of
     ThetaUnaryOp op (LowTypeIntS s) (m1, DataIntS s1 x)
