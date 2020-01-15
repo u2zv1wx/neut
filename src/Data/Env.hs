@@ -5,6 +5,7 @@ module Data.Env where
 
 import Control.Monad.Except
 import Control.Monad.State
+import Data.List (elemIndex, sortBy)
 import Path
 import System.Info
 
@@ -205,3 +206,29 @@ newDataUpsilonWith' :: Identifier -> Meta -> WithEnv (Identifier, DataPlus)
 newDataUpsilonWith' name m = do
   x <- newNameWith name
   return (x, (m, DataUpsilon x))
+
+reorder :: [(EnumValue, a)] -> WithEnv [a]
+reorder lds = do
+  let (ls, ds) = unzip lds
+  is <- mapM enumValueToInteger ls
+  return $ map snd $ sortBy (\(i, _) (j, _) -> i `compare` j) $ zip is ds
+
+enumValueToInteger :: EnumValue -> WithEnv Integer
+enumValueToInteger labelOrNat =
+  case labelOrNat of
+    EnumValueLabel l -> toInteger <$> getEnumNum l
+    EnumValueNatNum _ j -> return $ toInteger j
+
+getEnumNum :: Identifier -> WithEnv Int
+getEnumNum label = do
+  ienv <- gets enumEnv
+  case (getEnumNum' label $ Map.elems ienv) of
+    Nothing -> throwError $ "no such enum is defined: " <> label
+    Just i -> return i
+
+getEnumNum' :: Identifier -> [[Identifier]] -> Maybe Int
+getEnumNum' _ [] = Nothing
+getEnumNum' l (xs:xss) =
+  case elemIndex l xs of
+    Nothing -> getEnumNum' l xss
+    Just i -> Just i

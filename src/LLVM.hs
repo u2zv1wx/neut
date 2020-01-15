@@ -6,7 +6,6 @@ module LLVM
 
 import Control.Monad.Except
 import Control.Monad.State
-import Data.List (elemIndex, sortBy)
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.Text as T
@@ -58,6 +57,11 @@ llvmCode (_, CodeArrayElim k d1 d2) = do
   loadThenFreeThenCont <-
     loadContent d1 bt [((cast, i64), result)] et (retUp result)
   castThen loadThenFreeThenCont
+llvmCode (_, CodeArrayElimPositive k xs v e) = do
+  let et = arrayKindToLowType k -- elem type
+  let bt = LowTypeArrayPtr (toInteger $ length xs) et -- base pointer type  ([(length xs) x ARRAY_ELEM_TYPE])
+  let idxList = map (\i -> (LLVMDataInt i, i32)) [0 ..]
+  loadContent v bt (zip idxList xs) voidPtr e
 
 takeBaseName :: DataPlus -> Identifier
 takeBaseName (_, DataTheta x) = x
@@ -71,7 +75,6 @@ takeBaseName (_, DataFloat32 _) = "float"
 takeBaseName (_, DataFloat64 _) = "double"
 takeBaseName (_, DataEnumIntro _) = "i64"
 takeBaseName (_, DataArrayIntro _ ds) = "array" <> T.pack (show (length ds))
-takeBaseName (_, DataMemory _) = "memory"
 
 takeBaseName' :: LLVMData -> Identifier
 takeBaseName' (LLVMDataLocal x) = x
@@ -269,24 +272,10 @@ llvmDataLet x (_, DataArrayIntro k lds) cont = do
   let elemType = arrayKindToLowType k
   let arrayType = LowTypeArrayPtr (toInteger $ length ds) elemType
   storeContent x elemType arrayType ds cont
-llvmDataLet x (_, DataMemory size) cont = do
-  (size', castThen) <- llvmCast (Just $ takeBaseName size) size $ LowTypeIntS 64
-  castThen $ LLVMLet x (LLVMOpAlloc size') cont
-  -- llvmDataLet i d $ LLVMLet x (LLVMOpAlloc iVar) cont
-  -- (fun, castThen) <- llvmCast (Just $ takeBaseName v) v $ toFunPtrType ds
 
-reorder :: [(EnumValue, a)] -> WithEnv [a]
-reorder lds = do
-  let (ls, ds) = unzip lds
-  is <- mapM enumValueToInteger ls
-  return $ map snd $ sortBy (\(i, _) (j, _) -> i `compare` j) $ zip is ds
-
-enumValueToInteger :: EnumValue -> WithEnv Integer
-enumValueToInteger labelOrNat =
-  case labelOrNat of
-    EnumValueLabel l -> toInteger <$> getEnumNum l
-    EnumValueNatNum _ j -> return $ toInteger j
-
+-- llvmDataLet x (_, DataAlloc size) cont = do
+--   (size', castThen) <- llvmCast (Just $ takeBaseName size) size $ LowTypeIntS 64
+--   castThen $ LLVMLet x (LLVMOpAlloc size') cont
 sysCallNumAsInt :: SysCall -> WithEnv Integer
 sysCallNumAsInt num = do
   targetOS <- getOS
@@ -417,13 +406,6 @@ lowTypeToAllocSize (LowTypeArrayPtr i t) =
     AllocSizePtrList s -> AllocSizePtrList $ s * i -- shouldn't occur
 lowTypeToAllocSize LowTypeIntS64Ptr = AllocSizePtrList 1
 
-lowTypeToAllocSize' :: Integer -> Integer
-lowTypeToAllocSize' i = do
-  let (q, r) = quotRem i 8
-  if r == 0
-    then q
-    else q + 1
-
 i64 :: LowType
 i64 = LowTypeIntS 64
 
@@ -437,20 +419,6 @@ newNameWith' (Just name) = newNameWith name
 insLLVMEnv :: Identifier -> [Identifier] -> LLVM -> WithEnv ()
 insLLVMEnv funName args e =
   modify (\env -> env {llvmEnv = Map.insert funName (args, e) (llvmEnv env)})
-
-getEnumNum :: Identifier -> WithEnv Int
-getEnumNum label = do
-  ienv <- gets enumEnv
-  case (getEnumNum' label $ Map.elems ienv) of
-    Nothing -> throwError $ "no such enum is defined: " <> label
-    Just i -> return i
-
-getEnumNum' :: Identifier -> [[Identifier]] -> Maybe Int
-getEnumNum' _ [] = Nothing
-getEnumNum' l (xs:xss) =
-  case elemIndex l xs of
-    Nothing -> getEnumNum' l xss
-    Just i -> Just i
 
 getCodType :: UnaryOp -> Maybe LowType
 getCodType (UnaryOpTrunc lowType) = Just lowType

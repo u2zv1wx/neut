@@ -97,6 +97,13 @@ data LowType
   | LowTypeIntS64Ptr
   deriving (Eq, Show)
 
+lowTypeToAllocSize' :: Integer -> Integer
+lowTypeToAllocSize' i = do
+  let (q, r) = quotRem i 8
+  if r == 0
+    then q
+    else q + 1
+
 type IntSize = Integer
 
 asIntS :: Integral a => a -> a -> a
@@ -133,6 +140,11 @@ asArrayKind (LowTypeIntS i) = Just $ ArrayKindIntS i
 asArrayKind (LowTypeIntU i) = Just $ ArrayKindIntU i
 asArrayKind (LowTypeFloat size) = Just $ ArrayKindFloat size
 asArrayKind _ = Nothing
+
+arrayKindToSize :: ArrayKind -> Integer
+arrayKindToSize (ArrayKindIntS i) = lowTypeToAllocSize' i
+arrayKindToSize (ArrayKindIntU i) = lowTypeToAllocSize' i
+arrayKindToSize (ArrayKindFloat size) = lowTypeToAllocSize' $ sizeAsInt size
 
 arrayKindToLowType :: ArrayKind -> LowType
 arrayKindToLowType (ArrayKindIntS i) = LowTypeIntS i
