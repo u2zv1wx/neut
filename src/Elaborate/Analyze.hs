@@ -119,6 +119,7 @@ simp' ((e1, e2):cs) = do
           , length ess1 == length ess2
           , es1 <- concat ess1
           , es2 <- concat ess2
+          -- es1 = [[a, b], [c]], es2 =  [[d], [e, f]]とかを許してしまっているので修正すること
           , length es1 == length es2 -> simp $ zip es1 es2 ++ cs
         (Just (StuckPiElimIter iter1@(x1, _, _, _) mess1), Just (StuckPiElimIter (x2, _, _, _) mess2))
           | x1 == x2
