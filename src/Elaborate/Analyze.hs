@@ -209,10 +209,7 @@ simpPattern ::
 simpPattern h1 ies1 _ e2 fmvs cs = do
   xss <- mapM toVarList ies1
   let lam = bindFormalArgs e2 xss
-  senv <- gets substEnv
-  let (fmvs', lam') = substIfNecessary senv (fmvs, lam)
-  let s1 = Map.singleton h1 (fmvs', lam')
-  modify (\env -> env {substEnv = compose s1 senv})
+  modify (\env -> env {substEnv = Map.insert h1 (fmvs, lam) (substEnv env)})
   visit h1
   simp cs
 

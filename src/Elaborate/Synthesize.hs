@@ -48,6 +48,7 @@ synthesize = do
 -- e1だけがstuckしているとき、e2だけがstuckしているとき、両方がstuckしているときをそれぞれ
 -- 独立したケースとして扱えるようにしたほうがよい（そうすればsubstを減らせる）
 -- つまり、e1とe2のstuck reasonをそれぞれ別々に保持したほうがよい。
+-- synthのときにlookupAnyできるかでseparateするとか？
 resolveStuck ::
      WeakTermPlus -> WeakTermPlus -> Hole -> WeakTermPlus -> WithEnv ()
 resolveStuck e1 e2 h e = do
@@ -102,10 +103,7 @@ resolvePiElim m fmvs ess e = do
 -- {} resolveHole {}
 resolveHole :: Hole -> [Hole] -> WeakTermPlus -> WithEnv ()
 resolveHole m fmvs e = do
-  senv <- gets substEnv
-  let (fmvs', e') = substIfNecessary senv (fmvs, e)
-  let s1 = Map.singleton m (fmvs', e')
-  modify (\env -> env {substEnv = compose s1 senv})
+  modify (\env -> env {substEnv = Map.insert m (fmvs, e) (substEnv env)})
   q <- gets constraintQueue
   let (q1, q2) = Q.partition (\(Enriched _ ms _ _) -> m `elem` ms) q
   let q1' = Q.mapU asAnalyzable q1

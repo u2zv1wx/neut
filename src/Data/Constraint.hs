@@ -46,26 +46,3 @@ instance Ord EnrichedConstraint where
   compare (Enriched _ _ _ c1) (Enriched _ _ _ c2) = compare c1 c2
 
 type SubstWeakTerm' = Map.HashMap Identifier ([Hole], WeakTermPlus)
-
--- s1が新たに追加されるsubstで、s2が既存のsubst
--- s1 = m ~> eとして、eのなかにs2でsubstされるべきholeが含まれているとする。
-compose :: SubstWeakTerm' -> SubstWeakTerm' -> SubstWeakTerm'
-compose s1 s2 = do
-  let domS2 = Map.keys s2
-  let s2' = Map.map (substIfNecessary s1) s2
-  let s1' = Map.filterWithKey (\ident _ -> ident `notElem` domS2) s1
-  s1' `Map.union` s2'
-
-substIfNecessary ::
-     SubstWeakTerm' -> ([Hole], WeakTermPlus) -> ([Hole], WeakTermPlus)
-substIfNecessary sub (hs, e)
-  | sub' <- Map.filterWithKey (\x _ -> x `elem` hs) sub
-  , not (null sub')
-    -- let hs' = concatMap fst $ Map.elems sub'
-   = do
-    let sub2 = map (\(x, (_, body)) -> (x, body)) $ Map.toList sub
-    -- let e' = substWeakTermPlus sub2 e
-    -- (hs' ++ filter (`notElem` xs) hs, e')
-    let e' = reduceWeakTermPlus $ substWeakTermPlus sub2 e
-    (holeWeakTermPlus e', e')
-substIfNecessary _ hse = hse
