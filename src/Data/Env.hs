@@ -44,7 +44,7 @@ data Env =
     , typeEnv :: Map.HashMap Identifier TermPlus
     , constraintEnv :: [PreConstraint] -- for type inference
     , constraintQueue :: ConstraintQueue
-    , substEnv :: Map.HashMap Identifier ([Identifier], WeakTermPlus) -- metavar ~> [(metavar in the term, beta-equivalent weakterm)]
+    , substEnv :: Map.HashMap Identifier WeakTermPlus -- metavar ~> beta-equivalent weakterm
     , chainEnv :: Map.HashMap Identifier [(Identifier, TermPlus)] -- var/const ~> the closed var chain of its type
     , codeEnv :: Map.HashMap Identifier ([Identifier], CodePlus) -- f ~> thunk (lam (x1 ... xn) e)
     , llvmEnv :: Map.HashMap Identifier ([Identifier], LLVM)

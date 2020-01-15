@@ -81,7 +81,7 @@ elaborate' (_, WeakTermZeta x) = do
   sub <- gets substEnv
   case Map.lookup x sub of
     Nothing -> throwError $ "elaborate' i: remaining hole: " <> x
-    Just (_, e) -> do
+    Just e -> do
       e' <- elaborate' e
       return e'
 elaborate' (m, WeakTermConst x) = do
@@ -197,10 +197,5 @@ lookupEnumSet name = do
 reduceSubstEnv :: WithEnv ()
 reduceSubstEnv = do
   senv <- gets substEnv
-  let senv' = Map.map reduceSubstEnv' senv
+  let senv' = Map.map reduceWeakTermPlus senv
   modify (\env -> env {substEnv = senv'})
-
-reduceSubstEnv' :: (b, WeakTermPlus) -> (b, WeakTermPlus)
-reduceSubstEnv' (y, e) = do
-  let e' = reduceWeakTermPlus e
-  (y, e')

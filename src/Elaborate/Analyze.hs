@@ -105,7 +105,7 @@ simp' ((e1, e2):cs) = do
   let stuckReasonList = catMaybes [ms1 >>= stuckReasonOf, ms2 >>= stuckReasonOf]
   sub <- gets substEnv
   case lookupAny stuckReasonList sub of
-    Just (h, (_, e)) -> do
+    Just (h, e) -> do
       let e1' = substWeakTermPlus [(h, e)] e1
       let e2' = substWeakTermPlus [(h, e)] e2
       simp $ (e1', e2') : cs
@@ -125,7 +125,7 @@ simp' ((e1, e2):cs) = do
           , ess1 <- map snd mess1
           , ess2 <- map snd mess2
           , length (concat ess1) == length (concat ess2) -> do
-            let c = Enriched (e1, e2) [] [] $ ConstraintDelta iter1 mess1 mess2
+            let c = Enriched (e1, e2) [] $ ConstraintDelta iter1 mess1 mess2
             insConstraintQueue c
             simp cs
         (Just (StuckPiElimIter iter1 mess1), Just (StuckPiElimIter iter2 mess2)) -> do
@@ -140,34 +140,34 @@ simp' ((e1, e2):cs) = do
           | xs1 <- concatMap getVarList ies1
           , occurCheck h1 hs2
           , includeCheck xs1 e2
-          , linearCheck xs1 -> simpPattern h1 ies1 e1 e2 hs2 cs
+          , linearCheck xs1 -> simpPattern h1 ies1 e1 e2 cs
         (_, Just (StuckPiElimZetaStrict h2 ies2))
           | xs2 <- concatMap getVarList ies2
           , occurCheck h2 hs1
           , includeCheck xs2 e1
-          , linearCheck xs2 -> simpPattern h2 ies2 e2 e1 hs1 cs
+          , linearCheck xs2 -> simpPattern h2 ies2 e2 e1 cs
         (Just (StuckUpsilon x1), _)
-          | Just (_, body) <- Map.lookup x1 sub ->
+          | Just body <- Map.lookup x1 sub ->
             simp $ (substWeakTermPlus [(x1, body)] e1, e2) : cs
         (_, Just (StuckUpsilon x2))
-          | Just (_, body) <- Map.lookup x2 sub ->
+          | Just body <- Map.lookup x2 sub ->
             simp $ (e1, substWeakTermPlus [(x2, body)] e2) : cs
         (Just (StuckPiElimZetaStrict h1 ies1), _)
           | xs1 <- concatMap getVarList ies1
           , occurCheck h1 hs2
-          , includeCheck xs1 e2 -> simpQuasiPattern h1 ies1 e1 e2 hs2 cs
+          , includeCheck xs1 e2 -> simpQuasiPattern h1 ies1 e1 e2 cs
         (_, Just (StuckPiElimZetaStrict h2 ies2))
           | xs2 <- concatMap getVarList ies2
           , occurCheck h2 hs1
-          , includeCheck xs2 e1 -> simpQuasiPattern h2 ies2 e2 e1 hs1 cs
+          , includeCheck xs2 e1 -> simpQuasiPattern h2 ies2 e2 e1 cs
         (Just (StuckPiElimZeta h1 ies1), Nothing)
           | xs1 <- concatMap getVarList ies1
           , occurCheck h1 hs2
-          , includeCheck xs1 e2 -> simpFlexRigid h1 ies1 e1 e2 hs2 cs
+          , includeCheck xs1 e2 -> simpFlexRigid h1 ies1 e1 e2 cs
         (Nothing, Just (StuckPiElimZeta h2 ies2))
           | xs2 <- concatMap getVarList ies2
           , occurCheck h2 hs1
-          , includeCheck xs2 e1 -> simpFlexRigid h2 ies2 e2 e1 hs1 cs
+          , includeCheck xs2 e1 -> simpFlexRigid h2 ies2 e2 e1 cs
         _ -> simpOther e1 e2 (hs1 ++ hs2) cs
 
 -- {} simpBinder {}
@@ -203,13 +203,12 @@ simpPattern ::
   -> [[WeakTermPlus]]
   -> WeakTermPlus
   -> WeakTermPlus
-  -> [Identifier]
   -> [PreConstraint]
   -> WithEnv ()
-simpPattern h1 ies1 _ e2 fmvs cs = do
+simpPattern h1 ies1 _ e2 cs = do
   xss <- mapM toVarList ies1
   let lam = bindFormalArgs e2 xss
-  modify (\env -> env {substEnv = Map.insert h1 (fmvs, lam) (substEnv env)})
+  modify (\env -> env {substEnv = Map.insert h1 lam (substEnv env)})
   visit h1
   simp cs
 
@@ -219,12 +218,11 @@ simpQuasiPattern ::
   -> [[WeakTermPlus]]
   -> WeakTermPlus
   -> WeakTermPlus
-  -> [Identifier]
   -> [PreConstraint]
   -> WithEnv ()
-simpQuasiPattern h1 ies1 e1 e2 fmvs cs = do
+simpQuasiPattern h1 ies1 e1 e2 cs = do
   insConstraintQueue $
-    Enriched (e1, e2) [h1] fmvs (ConstraintQuasiPattern h1 ies1 e2)
+    Enriched (e1, e2) [h1] (ConstraintQuasiPattern h1 ies1 e2)
   simp cs
 
 -- {} simpFlexRigid {}
@@ -233,19 +231,17 @@ simpFlexRigid ::
   -> [[WeakTermPlus]]
   -> WeakTermPlus
   -> WeakTermPlus
-  -> [Identifier]
   -> [PreConstraint]
   -> WithEnv ()
-simpFlexRigid h1 ies1 e1 e2 fmvs cs = do
-  insConstraintQueue $
-    Enriched (e1, e2) [h1] fmvs (ConstraintFlexRigid h1 ies1 e2)
+simpFlexRigid h1 ies1 e1 e2 cs = do
+  insConstraintQueue $ Enriched (e1, e2) [h1] (ConstraintFlexRigid h1 ies1 e2)
   simp cs
 
 -- {} simpOther {}
 simpOther ::
      WeakTermPlus -> WeakTermPlus -> [Hole] -> [PreConstraint] -> WithEnv ()
 simpOther e1 e2 fmvs cs = do
-  insConstraintQueue $ Enriched (e1, e2) fmvs [] $ ConstraintOther
+  insConstraintQueue $ Enriched (e1, e2) fmvs $ ConstraintOther
   simp cs
 
 data Stuck
@@ -343,9 +339,9 @@ insConstraintQueue c = do
 visit :: Identifier -> WithEnv ()
 visit m = do
   q <- gets constraintQueue
-  let (q1, q2) = Q.partition (\(Enriched _ ms _ _) -> m `elem` ms) q
+  let (q1, q2) = Q.partition (\(Enriched _ ms _) -> m `elem` ms) q
   modify (\env -> env {constraintQueue = q2})
-  simp $ map (\(Enriched c _ _ _) -> c) $ Q.toList q1
+  simp $ map (\(Enriched c _ _) -> c) $ Q.toList q1
 
 -- [e, x, y, y, e2, e3, z] ~> [p, x, y, y, q, r, z]  (p, q, r: new variables)
 -- {} toVarList {}

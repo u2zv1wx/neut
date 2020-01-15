@@ -66,9 +66,9 @@ infer' ctx (m, WeakTermPiElim e@(_, WeakTermPiIntro xts _) es)
     ets <- mapM (infer' ctx) es
     et <- infer' ctx e
     let es' = map fst ets
-    let hss = map holeWeakTermPlus es'
+    -- let hss = map holeWeakTermPlus es'
     -- let defList = zip (map fst xts) (zip hss es')
-    let defList = Map.fromList $ zip (map fst xts) (zip hss es')
+    let defList = Map.fromList $ zip (map fst xts) es'
     modify (\env -> env {substEnv = defList `Map.union` substEnv env})
     inferPiElim ctx m et ets
 infer' ctx (m, WeakTermPiElim e es) = do
@@ -266,7 +266,7 @@ inferEnumElim ctx ((_, WeakTermUpsilon x), enumType) (CaseValue v, e) = do
   -- ctx must be extended since we're emulating the inference of `e{x := xi}` in `let xi := v in e{x := xi}`.
   let ctx' = ctx ++ [(x', enumType)]
   -- emulate the inference of the `let` part of `let xi := v in e{x := xi}`
-  let val = ([], (emptyMeta, WeakTermEnumIntro v))
+  let val = (emptyMeta, WeakTermEnumIntro v)
   modify (\env -> env {substEnv = Map.insert x' val (substEnv env)})
   -- the `e{x := xi}` part
   let var = (emptyMeta, WeakTermUpsilon x')

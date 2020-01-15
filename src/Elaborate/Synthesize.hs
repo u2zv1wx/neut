@@ -17,7 +17,6 @@ import Data.Constraint
 import Data.Env
 import Data.WeakTerm
 import Elaborate.Analyze
-import Reduce.WeakTerm
 
 -- Given a queue of constraints (easier ones comes earlier), try to synthesize
 -- all of them using heuristics.
@@ -28,15 +27,15 @@ synthesize = do
   sub <- gets substEnv
   case Q.getMin q of
     Nothing -> return ()
-    Just (Enriched (e1, e2) ms _ _)
-      | Just (m, (_, e)) <- lookupAny ms sub -> do resolveStuck e1 e2 m e
-    Just (Enriched _ _ _ (ConstraintDelta iter mess1 mess2)) -> do
+    Just (Enriched (e1, e2) ms _)
+      | Just (m, e) <- lookupAny ms sub -> do resolveStuck e1 e2 m e
+    Just (Enriched _ _ (ConstraintDelta iter mess1 mess2)) -> do
       resolveDelta iter mess1 mess2
-    Just (Enriched _ _ fmvs (ConstraintQuasiPattern m ess e)) -> do
-      resolvePiElim m fmvs ess e
-    Just (Enriched _ _ fmvs (ConstraintFlexRigid m ess e)) -> do
-      resolvePiElim m fmvs ess e
-    Just (Enriched (e1, e2) _ _ _)
+    Just (Enriched _ _ (ConstraintQuasiPattern m ess e)) -> do
+      resolvePiElim m ess e
+    Just (Enriched _ _ (ConstraintFlexRigid m ess e)) -> do
+      resolvePiElim m ess e
+    Just (Enriched (e1, e2) _ _)
       -- throwError $ "cannot simplify:\n" ++ Pr.ppShow q
       -- p $ "cannot simplify:\n" ++ Pr.ppShow (e1, e2)
       -- throwError $ "don't know how to synthesize constraint(s)"
@@ -89,30 +88,29 @@ resolveDelta iter mess1 mess2 = do
 -- this function replaces all the arguments that are not variable by
 -- fresh variables, and try to resolve the new quasi-pattern ?M @ x @ x @ z @ y == e.
 -- {} resolvePiElim {}
-resolvePiElim ::
-     Hole -> [Hole] -> [[WeakTermPlus]] -> WeakTermPlus -> WithEnv ()
-resolvePiElim m fmvs ess e = do
+resolvePiElim :: Hole -> [[WeakTermPlus]] -> WeakTermPlus -> WithEnv ()
+resolvePiElim m ess e = do
   let lengthInfo = map length ess
   let es = concat ess
   xss <- toVarList es >>= toAltList
   let xsss = map (takeByCount lengthInfo) xss
   let lamList = map (bindFormalArgs e) xsss
   deleteMin
-  chain $ map (resolveHole m fmvs) lamList
+  chain $ map (resolveHole m) lamList
 
 -- {} resolveHole {}
-resolveHole :: Hole -> [Hole] -> WeakTermPlus -> WithEnv ()
-resolveHole m fmvs e = do
-  modify (\env -> env {substEnv = Map.insert m (fmvs, e) (substEnv env)})
+resolveHole :: Hole -> WeakTermPlus -> WithEnv ()
+resolveHole m e = do
+  modify (\env -> env {substEnv = Map.insert m e (substEnv env)})
   q <- gets constraintQueue
-  let (q1, q2) = Q.partition (\(Enriched _ ms _ _) -> m `elem` ms) q
+  let (q1, q2) = Q.partition (\(Enriched _ ms _) -> m `elem` ms) q
   let q1' = Q.mapU asAnalyzable q1
   modify (\env -> env {constraintQueue = q1' `Q.union` q2})
   synthesize
 
 -- {} asAnalyzable {}
 asAnalyzable :: EnrichedConstraint -> EnrichedConstraint
-asAnalyzable (Enriched cs ms fmvs _) = Enriched cs ms fmvs ConstraintAnalyzable
+asAnalyzable (Enriched cs ms _) = Enriched cs ms ConstraintAnalyzable
 
 -- Try the list of alternatives.
 chain :: [WithEnv a] -> WithEnv a
