@@ -266,7 +266,6 @@
 
 (write n15 stdout buf enum.n15)
 
-;; aのコピーが間違ってる
 (definition a
   (read n15 stdin buf enum.n15))
 
