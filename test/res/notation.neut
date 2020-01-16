@@ -130,5 +130,5 @@
 
 (keyword sigma-elimination)
 
-(notation (sigma-elimination (xt+) e1 e2)
-  (e1 hole (lambda (xt+) e2)))
+(notation (sigma-elimination (xt+) e1 e2+)
+  (e1 hole (lambda (xt+) e2+)))

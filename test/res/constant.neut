@@ -23,7 +23,6 @@
      (buf (u8-array A))
      (len (is-enum A)))
     (product (u8-array A) i64)))
-
 ;; ここ (sigma (result (u8-array A)) (wrote-size i64)) とかってしたほうがわかりやすくてよさそう？
 
 (constant i64.add

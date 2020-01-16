@@ -276,6 +276,7 @@ clarifySysCall name sysCall argLen m = do
               let retBufType = (m, CodeUpIntro bufType)
               let fileDescriptor = vs !! 1
               let bufSize = vs !! 3
+              (bufTmpName, bufTmp) <- newDataUpsilonWith "buf"
               let body =
                     ( m
                     , CodeSigmaElim
@@ -283,20 +284,25 @@ clarifySysCall name sysCall argLen m = do
                         [(bufTypeName, retUnivType), (bufInnerName, retBufType)]
                         (vs !! 2) -- buf
                         ( m
+                        -- bufInnerのコピーを避けるための変数
                         , CodeUpElim
-                            wroteSizeName
-                            ( m
-                            , CodeTheta
-                                (ThetaSysCall
-                                   sysCall -- read
-                                   [fileDescriptor, bufInner, bufSize]))
+                            bufTmpName
+                            (m, CodeUpIntro bufInner)
                             ( m
                             , CodeUpElim
-                                arrName -- arr = (arrType, arrInner)
+                                wroteSizeName
                                 ( m
-                                , CodeUpIntro
-                                    (m, DataSigmaIntro [bufType, bufInner]))
-                                pair')))
+                                , CodeTheta
+                                    (ThetaSysCall
+                                       sysCall -- read
+                                       [fileDescriptor, bufTmp, bufSize]))
+                                ( m
+                                , CodeUpElim
+                                    arrName -- arr = (arrType, arrInner)
+                                    ( m
+                                    , CodeUpIntro
+                                        (m, DataSigmaIntro [bufType, bufTmp]))
+                                    pair'))))
               retClosure (Just name) zts m xts body
           _ -> throwError $ "the type of " <> name <> " is wrong"
     _ -> throwError $ "the type of " <> name <> " is wrong"

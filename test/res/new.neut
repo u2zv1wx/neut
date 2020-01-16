@@ -66,7 +66,9 @@
 ;;     (prf (is-enum A))
 ;;     (content (u8-array A)))
 ;; みたいに書けるとうれしいだろうか？案外うれしいかも。
-(write n3 stdout (test) enum.n3)
+
+;; out-1
+;; (write n3 stdout (test) enum.n3)
 
 ;; redefinition of enum-type is disallowed
 ;; (enum top red blue yellow)
@@ -110,7 +112,8 @@
 ;; (coproduct top (nat-inner)))
 ;; sigmaの中でのrecursive callは問題なし、ということでね。
 
-(write n3 stdout (test) enum.n3)
+;; out-2
+;; (write n3 stdout (test) enum.n3)
 ;; 0 = (left unit)
 ;; 1 = (right (left unit))
 ;; 2 = (right (right (left unit)))
@@ -120,7 +123,8 @@
 
 (let (nat tau) (nat-inner))
 
-(write n3 stdout (test) enum.n3)
+;; out-3
+;; (write n3 stdout (test) enum.n3)
 
 (definition nat-helper ((x choice))
   (enum-elimination x
@@ -224,36 +228,59 @@
 
 (let bar (str))
 
-(write n3 stdout bar enum.n3)
+;; (write n3 stdout bar enum.n3)
+
+(definition buf
+  (u8-array-introduction
+    (n12-0 10)
+    (n12-1 20)
+    (n12-2 30)
+    (n12-3 40)
+    (n12-4 50)
+    (n12-5 60)
+    (n12-6 70)
+    (n12-7 80)
+    (n12-8 90)
+    (n12-9 100)
+    (n12-10 110)
+    (n12-11 120)))
+
+;; (write n12 stdout buf enum.n12)
 
 (definition a
-  (read n3 stdin bar enum.n3))
+  (read n12 stdin buf enum.n12))
 
 (let foo
   (sigma-elimination
-    ((p (u8-array n3))
+    ((read-content (u8-array n12))
+     (read-size i64))
+    a
+    read-content))
+
+;; (let bar foo)
+
+(let size
+  (sigma-elimination
+    ((p (u8-array n12))
      (q i64))
     a
-    p))
-
-;; (let size
-;;   (sigma-elimination
-;;     ((p (u8-array n3))
-;;      (q i64))
-;;     a
-;;     q))
+    q))
 ;; aのコピーが通ってない？
 
-(write n3 stdout foo enum.n3)
+;; (write 10 stdout foo 3)とかって書けたほうがラクかな〜？
+;; (write n3 stdout foo enum.n3)
+
+(write n12 stdout foo enum.n12)
 
 ;; (write n20 stdout foo enum.n20)
 
-(write n3 stdout (test) enum.n3)
+;; (write n3 stdout (test) enum.n3)
 
 (definition x 10)
 
 (i64.add (i64.add 3 x) x)
 
-;; size
+;; このsizeをみるかぎり、なんかreadじたいはできてるっぽい。byte数がちゃんと得られてる。
+size
 
 ;; new.neut ends here
