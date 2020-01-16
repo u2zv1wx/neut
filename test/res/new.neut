@@ -245,8 +245,9 @@
     (n12-10 110)
     (n12-11 120)))
 
-;; (write n12 stdout buf enum.n12)
+(write n12 stdout buf enum.n12)
 
+;; aのコピーが間違ってる
 (definition a
   (read n12 stdin buf enum.n12))
 
@@ -257,20 +258,34 @@
     a
     read-content))
 
+;; こう書けたほうがうれしい？
+;; (sigma-elimination a
+;;   ((read-content (u8-array n12))
+;;    (read-size i64))
+;;   (foo)
+;;   (let p some-computation)
+;;   (let q (pohe p f1 f2 f3))
+;;   (bar)
+;;   (buz)
+;;   (qux)
+;;   read-content)
+
 ;; (let bar foo)
 
-(let size
-  (sigma-elimination
-    ((p (u8-array n12))
-     (q i64))
-    a
-    q))
+(write n12 stdout foo enum.n12)
+
+;; (let size
+;;   (sigma-elimination
+;;     ((p (u8-array n12))
+;;      (q i64))
+;;     a
+;;     q))
 ;; aのコピーが通ってない？
 
 ;; (write 10 stdout foo 3)とかって書けたほうがラクかな〜？
 ;; (write n3 stdout foo enum.n3)
 
-(write n12 stdout foo enum.n12)
+;; (write n12 stdout foo enum.n12)
 
 ;; (write n20 stdout foo enum.n20)
 
@@ -281,6 +296,6 @@
 (i64.add (i64.add 3 x) x)
 
 ;; このsizeをみるかぎり、なんかreadじたいはできてるっぽい。byte数がちゃんと得られてる。
-size
+;; size
 
 ;; new.neut ends here

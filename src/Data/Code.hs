@@ -17,7 +17,7 @@ data Data
   | DataFloat32 Float
   | DataFloat64 Double
   | DataEnumIntro EnumValue
-  | DataArrayIntro ArrayKind [(EnumValue, DataPlus)]
+  | DataArrayIntro ArrayKind [DataPlus]
   deriving (Show)
 
 data Code
@@ -67,10 +67,11 @@ substDataPlus _ (m, DataFloat16 l) = (m, DataFloat16 l)
 substDataPlus _ (m, DataFloat32 l) = (m, DataFloat32 l)
 substDataPlus _ (m, DataFloat64 l) = (m, DataFloat64 l)
 substDataPlus _ (m, DataEnumIntro l) = (m, DataEnumIntro l)
-substDataPlus sub (m, DataArrayIntro k lds) = do
-  let (ls, ds) = unzip lds
+substDataPlus sub (m, DataArrayIntro k ds)
+  -- let (ls, ds) = unzip lds
+ = do
   let ds' = map (substDataPlus sub) ds
-  (m, DataArrayIntro k $ zip ls ds')
+  (m, DataArrayIntro k ds')
 
 substCodePlus :: SubstDataPlus -> CodePlus -> CodePlus
 substCodePlus sub (m, CodeTheta theta) = do
@@ -130,7 +131,7 @@ substDataPlusSigmaElim sub ((x, t):xs) e = do
 varData :: DataPlus -> [Identifier]
 varData (_, DataUpsilon x) = [x]
 varData (_, DataSigmaIntro ds) = concatMap varData ds
-varData (_, DataArrayIntro _ lds) = concatMap (varData . snd) lds
+varData (_, DataArrayIntro _ ds) = concatMap varData ds
 varData _ = []
 
 varCode :: CodePlus -> [Identifier]

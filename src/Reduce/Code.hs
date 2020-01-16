@@ -60,18 +60,22 @@ reduceCodePlus (m, CodeEnumElim v les) = do
       return (m, CodeEnumElim v $ zip ls es')
 reduceCodePlus (m, CodeArrayElim k d1 d2) = do
   case (d1, d2) of
-    ((_, DataArrayIntro k' les), (_, DataEnumIntro l))
+    ((_, DataArrayIntro k' ds), (_, DataEnumIntro l))
       | k == k'
-      , Just d <- lookup l les -> return (m, CodeUpIntro d)
+      -- , Just d <- lookup l ds
+       -> do
+        i <- enumValueToInteger l
+          -- return (m, CodeUpIntro d)
+        return (m, CodeUpIntro $ ds !! fromInteger i)
     _ -> return (m, CodeArrayElim k d1 d2)
 reduceCodePlus (m, CodeSigmaElim (Just k) xts v e) = do
   let (xs, ts) = unzip xts
   case v of
-    (_, DataArrayIntro k' lds)
-      | length lds == length xs
-      , k == k' -> do
-        ds <- reorder lds
-        reduceCodePlus $ substCodePlus (zip xs ds) e
+    (_, DataArrayIntro k' ds)
+      | length ds == length xs
+      , k == k'
+        -- ds <- reorder lds
+       -> do reduceCodePlus $ substCodePlus (zip xs ds) e
     _ -> do
       e' <- reduceCodePlus e
       ts' <- mapM reduceCodePlus ts

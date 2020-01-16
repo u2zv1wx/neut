@@ -61,7 +61,7 @@ llvmCode (_, CodeArrayElim k d1 d2) = do
   result <- newNameWith "array-elim-ans"
   resultTmp <- newNameWith "array-elim-ans-tmp"
   let et = arrayKindToLowType k -- elem type
-  let bt = LowTypeArrayPtr 0 et -- base pointer type
+  let bt = LowTypeArrayPtr 0 et -- base pointer type (e.g. [0 x u8]*)
   (cast, castThen) <- llvmCast (Just "array-idx") d2 $ LowTypeIntS 64 -- enum ~> i64
   loadThenFreeThenCont <-
     loadContent d1 bt [((cast, i64), (resultTmp, result))] et (retUp result)
@@ -281,8 +281,7 @@ llvmDataLet x (_, DataFloat64 f) cont =
 llvmDataLet x (m, DataEnumIntro labelOrNat) cont = do
   i <- enumValueToInteger labelOrNat
   llvmDataLet x (m, DataIntS 64 i) cont
-llvmDataLet x (_, DataArrayIntro k lds) cont = do
-  ds <- reorder lds
+llvmDataLet x (_, DataArrayIntro k ds) cont = do
   let elemType = arrayKindToLowType k
   let arrayType = LowTypeArrayPtr (toInteger $ length ds) elemType
   storeContent x elemType arrayType ds cont

@@ -79,13 +79,12 @@ clarify (m, TermArrayIntro k les) = do
   arrayType <-
     cartesianSigma name m (Just k) $
     map Left $ replicate (length les) retImmType
-  let (ls, es) = unzip les
+  es <- reorder les
+  -- let (ls, es) = unzip les
   (zs, es', xs) <- unzip3 <$> mapM (clarifyPlus) es
   return $
     bindLet (zip zs es') $
-    ( m
-    , CodeUpIntro $
-      (m, DataSigmaIntro [arrayType, (m, DataArrayIntro k (zip ls xs))]))
+    (m, CodeUpIntro $ (m, DataSigmaIntro [arrayType, (m, DataArrayIntro k xs)]))
 clarify (m, TermArrayElim k e1 e2) = do
   e1' <- clarify e1
   e2' <- clarify e2
@@ -138,7 +137,8 @@ clarifyConst m "stderr" = clarify (m, TermIntS 64 2)
 clarifyConst m name = do
   mx <- asEnumConstant name
   case mx of
-    Just i -> clarify (m, TermIntU 64 i) -- enum.top ~> 1, enum.choice ~> 2, etc.
+    Just i ->
+      clarify (m, TermIntU 64 i) -- enum.top ~> 1, enum.choice ~> 2, etc.
     Nothing -> do
       cenv <- gets constantEnv
       if name `elem` cenv
@@ -257,6 +257,10 @@ clarifySysCall name sysCall argLen m = do
           SysCallRead
             | (_, TermPi [c, (funName, funType@(_, TermPi [(arrName, arrType), (wroteSizeName, sizeType)] _))] _) <-
                cod -> do
+              p "arrType:"
+              p' arrType
+              p "xts:"
+              p' xts
               insTypeEnv arrName arrType
               insTypeEnv wroteSizeName sizeType
               let pair =
@@ -318,6 +322,7 @@ toVar x = (emptyMeta, DataUpsilon x)
 
 -- {enum.top, enum.choice, etc.} ~> {(the number of contents in enum)}
 -- enum.n{i}とかも処理できないとだめ。
+-- これ、enumNatNumのやつを後ろにしてたってことは、enum.n8とかがNothingになってたってこと？
 asEnumConstant :: Identifier -> WithEnv (Maybe Integer)
 asEnumConstant x
   | ["enum", y] <- wordsBy '.' x = do
