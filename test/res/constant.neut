@@ -16,12 +16,15 @@
      (len (is-enum A)))
     top))
 
-;; (constant read
-;;   (pi
-;;     ((A type)
-;;      (in file-descriptor)
-;;      (len (is-enum A)))
-;;     (product (u8-array A) i64)))
+(constant read
+  (pi
+    ((A type)
+     (in file-descriptor)
+     (buf (u8-array A))
+     (len (is-enum A)))
+    (product (u8-array A) i64)))
+
+;; ここ (sigma (result (u8-array A)) (wrote-size i64)) とかってしたほうがわかりやすくてよさそう？
 
 (constant i64.add
   (arrow (i64 i64) i64))

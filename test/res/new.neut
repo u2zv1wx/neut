@@ -222,17 +222,29 @@
 ;;      (len (is-enum A)))
 ;;     (product (u8-array A) i64)))
 
-;; (definition a
-;;   (read n20 stdin enum.n20))
+(let bar (str))
 
-;; (let foo
+(write n3 stdout bar enum.n3)
+
+(definition a
+  (read n3 stdin bar enum.n3))
+
+(let foo
+  (sigma-elimination
+    ((p (u8-array n3))
+     (q i64))
+    a
+    p))
+
+;; (let size
 ;;   (sigma-elimination
-;;     ((p (u8-array n20))
+;;     ((p (u8-array n3))
 ;;      (q i64))
 ;;     a
-;;     p))
+;;     q))
+;; aのコピーが通ってない？
 
-;; (write n20 stdout foo enum.n20)
+(write n3 stdout foo enum.n3)
 
 ;; (write n20 stdout foo enum.n20)
 
@@ -241,5 +253,7 @@
 (definition x 10)
 
 (i64.add (i64.add 3 x) x)
+
+;; size
 
 ;; new.neut ends here

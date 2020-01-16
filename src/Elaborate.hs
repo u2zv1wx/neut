@@ -48,6 +48,7 @@ elaborate e
   -- this reduceTermPlus is necessary since e' contains "DONT_CARE" in its
   -- type of arguments of abstractions of meta-variables.
   e'' <- elaborate' e' >>= reduceTermPlus
+  -- p' e''
   return e''
   -- let info2 = toInfo "elaborated term is not closed:" e''
   -- assertMP info2 (return e'') $ null (varTermPlus e'')
@@ -68,6 +69,16 @@ elaborate' (m, WeakTermPiIntro xts e) = do
   e' <- elaborate' e
   xts' <- mapM elaboratePlus xts
   return (m, TermPiIntro xts' e')
+elaborate' (_, WeakTermPiElim (_, WeakTermZeta x) es) = do
+  sub <- gets substEnv
+  case Map.lookup x sub of
+    Nothing -> throwError $ "elaborate' i: remaining hole: " <> x
+    Just (_, WeakTermPiIntro xts e)
+      | length xts == length es -> do
+        let xs = map fst xts
+        e' <- elaborate' $ substWeakTermPlus (zip xs es) e
+        return e'
+    Just _ -> throwError "insane zeta"
 elaborate' (m, WeakTermPiElim e es) = do
   e' <- elaborate' e
   es' <- mapM elaborate' es
