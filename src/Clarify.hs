@@ -236,6 +236,11 @@ clarifySysCall name sysCall argLen m = do
             let exitStatus = vs !! 0
             let body = (m, CodeTheta (ThetaSysCall sysCall [exitStatus]))
             retClosure (Just name) zts m xts body
+          SysCallOpen -> clarifySysCallOpen m name xts zts vs cod sysCall
+          SysCallClose -> do
+            let fileDescriptor = vs !! 0
+            let body = (m, CodeTheta (ThetaSysCall sysCall [fileDescriptor]))
+            retClosure (Just name) zts m xts body
     _ -> throwError $ "the type of " <> name <> " is wrong"
 
 -- clarification for read/write is the same procedure
@@ -286,6 +291,57 @@ clarifySysCallRW m name xts zts vs cod sysCall
                           ( m
                           , CodeUpIntro
                               (m, DataSigmaIntro Nothing [strType, strTmp]))
+                          pair'))))
+    retClosure (Just name) zts m xts body
+  | otherwise = throwError $ "the type of " <> name <> " is wrong"
+
+clarifySysCallOpen ::
+     Meta
+  -> Identifier
+  -> [(Identifier, TermPlus)]
+  -> [(Identifier, TermPlus)]
+  -> [DataPlus]
+  -> (a, Term)
+  -> SysCall
+  -> WithEnv CodePlus
+clarifySysCallOpen m name xts zts vs cod sysCall
+  | (_, TermPi [c, (funName, funType@(_, TermPi [(arrName, arrType), (fdName, fdType)] _))] _) <-
+     cod = do
+    insTypeEnv arrName arrType
+    insTypeEnv fdName fdType
+    pair' <- retPair m c funName funType arrName fdName
+    (strTypeName, strType) <- newDataUpsilonWith "str-type"
+    (strInnerName, strInner) <- newDataUpsilonWith "str-inner"
+    retUnivType <- returnCartesianUniv
+    let retStrType = (m, CodeUpIntro strType)
+    let filePath = vs !! 1
+    let flags = vs !! 2
+    let mode = vs !! 3
+    (fliePathTmpName, fliePathTmp) <- newDataUpsilonWith "str"
+    let body =
+          ( m
+          , CodeSigmaElim
+              Nothing
+              [(strTypeName, retUnivType), (strInnerName, retStrType)]
+              filePath
+              ( m
+              , CodeUpElim
+                  fliePathTmpName
+                  (m, CodeUpIntro strInner)
+                  ( m
+                  , CodeUpElim
+                      fdName
+                      ( m
+                      , CodeTheta
+                          (ThetaSysCall
+                             sysCall -- open
+                             [fliePathTmp, flags, mode]))
+                      ( m
+                      , CodeUpElim
+                          arrName -- arr = (arrType, arrInner)
+                          ( m
+                          , CodeUpIntro
+                              (m, DataSigmaIntro Nothing [strType, fliePathTmp]))
                           pair'))))
     retClosure (Just name) zts m xts body
   | otherwise = throwError $ "the type of " <> name <> " is wrong"
@@ -402,4 +458,6 @@ asSysCallMaybe :: Identifier -> Maybe (SysCall, ArgLen)
 asSysCallMaybe "write" = Just (SysCallWrite, 4)
 asSysCallMaybe "read" = Just (SysCallRead, 4)
 asSysCallMaybe "exit" = Just (SysCallExit, 1)
+asSysCallMaybe "open" = Just (SysCallOpen, 4)
+asSysCallMaybe "close" = Just (SysCallClose, 1)
 asSysCallMaybe _ = Nothing

@@ -245,6 +245,7 @@
 ;;     (n12-10 110)
 ;;     (n12-11 120)))
 
+;; malloc(15)に相当する操作だと言えるかも。initは余計だけどね。
 (definition buf
   (u8-array-introduction
     (n15-0 0)
@@ -264,17 +265,17 @@
     (n15-14 0)))
 
 
-(write n15 stdout buf enum.n15)
+;; (write n15 stdout buf enum.n15)
 
-(definition a
-  (read n15 stdin buf enum.n15))
+;; (definition a
+;;   (read n15 stdin buf enum.n15))
 
-(let foo
-  (sigma-elimination
-    ((read-content (u8-array n15))
-     (read-size i64))
-    a
-    read-content))
+;; (let foo
+;;   (sigma-elimination
+;;     ((read-content (u8-array n15))
+;;      (read-size i64))
+;;     a
+;;     read-content))
 
 ;; こう書けたほうがうれしい？
 ;; (sigma-elimination a
@@ -292,14 +293,14 @@
 
 ;; writeは(product (u8-array A) i64)を返している。
 ;; これはどこでも使用されていないのでfreeされる、という感じ。
-(write n15 stdout foo enum.n15)
+;; (write n15 stdout foo enum.n15)
 
-(let size
-  (sigma-elimination
-    ((p (u8-array n15))
-     (q i64))
-    a
-    q))
+;; (let size
+;;   (sigma-elimination
+;;     ((p (u8-array n15))
+;;      (q i64))
+;;     a
+;;     q))
 ;; aのコピーが通ってない？
 ;; 修正できたっぽい？できた。
 
@@ -312,11 +313,47 @@
 
 ;; (write n3 stdout (test) enum.n3)
 
-(definition x 10)
+;; (constant open
+;;   (pi
+;;     ((A type)
+;;      (path (u8-array A))
+;;      (flags i64)
+;;      (mode i64))
+;;     (product (u8-array A) file-descriptor)))
 
-(i64.add (i64.add 3 x) x)
+;; 0 = rdonly
+(let file-and-str
+  (open n32 "/Users/u2zv1wx/Downloads/sample.txt" 0 0))
 
-;; このsizeをみるかぎり、なんかreadじたいはできてるっぽい。byte数がちゃんと得られてる。
-size
+(let file
+  (sigma-elimination
+    ((p (u8-array n32))
+     (q file-descriptor))
+    file-and-str
+    q))
+
+(let item-and-len
+  (read n15 file buf enum.n15))
+
+(let item
+  (sigma-elimination
+    ((read-content (u8-array n15))
+     (read-size i64))
+    item-and-len
+    read-content))
+
+(write n15 stdout item enum.n15)
+
+(close file)
+
+;; (definition x 10)
+
+;; (i64.add (i64.add 3 x) x)
+
+;; ;; このsizeをみるかぎり、なんかreadじたいはできてるっぽい。byte数がちゃんと得られてる。
+;; size
+
+;; 3が返ってるってことは、0 = stdin, 1 = stdout, 2 = stderrだから、ちゃんとファイルが開けてるはず。
+file
 
 ;; new.neut ends here

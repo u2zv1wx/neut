@@ -8,10 +8,25 @@
 
 (constant stderr file-descriptor)
 
-;; ここ (sigma (result (u8-array A)) (wrote-size i64)) とかってしたほうがわかりやすくてよさそう？
+;; file-descriptor as int, みたいな操作を許すための定数が必要っぽい。まあそれはそのうち。
+
 (constant i64.add
   (arrow (i64 i64) i64))
 
+;; (definition u8-vector
+;;   (sigma
+;;     ((A type)
+;;      (prf (is-enum A)))
+;;     (u8-array A)))
+
+;; (definition u8-vector
+;;   (sigma
+;;     (A type)
+;;     (content-length (is-enum A))
+;;     (content (u8-array A))))
+
+;; これ、buf : utf8-codeとかにしたほうがいいのかも？
+;; writeのlenの部分はi64にしてよさげ。
 (constant read
   (pi
     ((A type)
@@ -19,6 +34,15 @@
      (buf (u8-array A))
      (len (is-enum A)))
     (product (u8-array A) i64)))
+
+;; こういうノリ？
+;; (constant read
+;;   (pi
+;;     ((in file-descriptor)
+;;      (buf u8-vector)
+;;      (len i64))
+;;     (product u8-vector i64)))
+
 
 (constant write
   (pi
@@ -29,5 +53,20 @@
     (product (u8-array A) i64)))
 
 (constant exit
-  (pi ((status i64))
+  (pi
+    ((status i64))
     top))
+
+(constant open
+  (pi
+    ((A type)
+     (path (u8-array A))
+     (flags i64)
+     (mode i64))
+    (product (u8-array A) file-descriptor)))
+
+;; closeは簡単。
+(constant close
+  (pi
+    ((_ file-descriptor))
+    i64))
