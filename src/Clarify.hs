@@ -258,10 +258,6 @@ clarifySysCall name sysCall argLen m = do
           SysCallRead
             | (_, TermPi [c, (funName, funType@(_, TermPi [(arrName, arrType), (wroteSizeName, sizeType)] _))] _) <-
                cod -> do
-              p "arrType:"
-              p' arrType
-              p "xts:"
-              p' xts
               insTypeEnv arrName arrType
               insTypeEnv wroteSizeName sizeType
               let pair =
