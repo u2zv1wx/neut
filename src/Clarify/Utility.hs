@@ -86,7 +86,7 @@ cartesianImmediate :: Meta -> WithEnv DataPlus
 cartesianImmediate m = do
   aff <- affineImmediate m
   rel <- relevantImmediate m
-  return (m, DataSigmaIntro [aff, rel])
+  return (m, DataSigmaIntro Nothing [aff, rel])
 
 affineImmediate :: Meta -> WithEnv DataPlus
 affineImmediate m = do
@@ -100,7 +100,7 @@ affineImmediate m = do
       insCodeEnv
         thetaName
         [immVarName]
-        (emptyMeta, CodeUpIntro (emptyMeta, DataSigmaIntro []))
+        (emptyMeta, CodeUpIntro (emptyMeta, DataSigmaIntro Nothing []))
       return theta
 
 relevantImmediate :: Meta -> WithEnv DataPlus
@@ -115,14 +115,15 @@ relevantImmediate m = do
       insCodeEnv
         thetaName
         [immVarName]
-        (emptyMeta, CodeUpIntro (emptyMeta, DataSigmaIntro [immVar, immVar]))
+        ( emptyMeta
+        , CodeUpIntro (emptyMeta, DataSigmaIntro Nothing [immVar, immVar]))
       return theta
 
 cartesianUniv :: Meta -> WithEnv DataPlus
 cartesianUniv m = do
   aff <- affineUniv m
   rel <- relevantUniv m
-  return (m, DataSigmaIntro [aff, rel])
+  return (m, DataSigmaIntro Nothing [aff, rel])
 
 -- \x -> let (_, _) := x in unit
 affineUniv :: Meta -> WithEnv DataPlus
@@ -146,7 +147,7 @@ affineUniv m = do
             Nothing
             [(affVarName, retImmType), (relVarName, retImmType)]
             univVar
-            (emptyMeta, CodeUpIntro (emptyMeta, DataSigmaIntro [])))
+            (emptyMeta, CodeUpIntro (emptyMeta, DataSigmaIntro Nothing [])))
       return theta
 
 relevantUniv :: Meta -> WithEnv DataPlus
@@ -174,8 +175,9 @@ relevantUniv m = do
             , CodeUpIntro
                 ( emptyMeta
                 , DataSigmaIntro
-                    [ (emptyMeta, DataSigmaIntro [affVar, relVar])
-                    , (emptyMeta, DataSigmaIntro [affVar, relVar])
+                    Nothing
+                    [ (emptyMeta, DataSigmaIntro Nothing [affVar, relVar])
+                    , (emptyMeta, DataSigmaIntro Nothing [affVar, relVar])
                     ])))
       return theta
 
@@ -184,22 +186,22 @@ renameData (m, DataTheta x) = return (m, DataTheta x)
 renameData (m, DataUpsilon x) = do
   x' <- lookupNameEnv x
   return (m, DataUpsilon x')
-renameData (m, DataSigmaIntro ds) = do
+renameData (m, DataSigmaIntro mk ds) = do
   ds' <- mapM renameData ds
-  return (m, DataSigmaIntro ds')
+  return (m, DataSigmaIntro mk ds')
 renameData (m, DataIntS size x) = return (m, DataIntS size x)
 renameData (m, DataIntU size x) = return (m, DataIntU size x)
 renameData (m, DataFloat16 x) = return (m, DataFloat16 x)
 renameData (m, DataFloat32 x) = return (m, DataFloat32 x)
 renameData (m, DataFloat64 x) = return (m, DataFloat64 x)
 renameData (m, DataEnumIntro x) = return (m, DataEnumIntro x)
-renameData (m, DataArrayIntro kind ds) = do
-  ds' <- mapM renameData ds
-    -- forM ds $ \(l, body) -> do
-    --   body' <- renameData body
-    --   return (l, body')
-  return (m, DataArrayIntro kind ds')
 
+-- renameData (m, DataArrayIntro kind ds) = do
+--   ds' <- mapM renameData ds
+--     -- forM ds $ \(l, body) -> do
+--     --   body' <- renameData body
+--     --   return (l, body')
+--   return (m, DataArrayIntro kind ds')
 renameCode :: CodePlus -> WithEnv CodePlus
 renameCode (m, CodeTheta theta) = do
   theta' <- renameTheta theta

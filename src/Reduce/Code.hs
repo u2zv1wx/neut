@@ -32,7 +32,7 @@ reduceCodePlus (m, CodeSigmaElim Nothing xts v e) = do
   let (xs, ts) = unzip xts
   -- let xs = map fst xts
   case v of
-    (_, DataSigmaIntro es)
+    (_, DataSigmaIntro Nothing es)
       | length es == length xs -> reduceCodePlus $ substCodePlus (zip xs es) e
     _ -> do
       e' <- reduceCodePlus e
@@ -60,7 +60,7 @@ reduceCodePlus (m, CodeEnumElim v les) = do
       return (m, CodeEnumElim v $ zip ls es')
 reduceCodePlus (m, CodeArrayElim k d1 d2) = do
   case (d1, d2) of
-    ((_, DataArrayIntro k' ds), (_, DataEnumIntro l))
+    ((_, DataSigmaIntro (Just k') ds), (_, DataEnumIntro l))
       | k == k'
       -- , Just d <- lookup l ds
        -> do
@@ -71,7 +71,7 @@ reduceCodePlus (m, CodeArrayElim k d1 d2) = do
 reduceCodePlus (m, CodeSigmaElim (Just k) xts v e) = do
   let (xs, ts) = unzip xts
   case v of
-    (_, DataArrayIntro k' ds)
+    (_, DataSigmaIntro (Just k') ds)
       | length ds == length xs
       , k == k'
         -- ds <- reorder lds

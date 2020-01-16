@@ -78,16 +78,19 @@ uncastList et ((y, x):yxs) e = do
 takeBaseName :: DataPlus -> Identifier
 takeBaseName (_, DataTheta x) = x
 takeBaseName (_, DataUpsilon x) = x
-takeBaseName (_, DataSigmaIntro []) = "unit"
-takeBaseName (_, DataSigmaIntro ds) = "struct" <> T.pack (show (length ds))
+takeBaseName (_, DataSigmaIntro Nothing []) = "unit"
+takeBaseName (_, DataSigmaIntro Nothing ds) =
+  "struct" <> T.pack (show (length ds))
+takeBaseName (_, DataSigmaIntro (Just _) ds) =
+  "array" <> T.pack (show (length ds))
 takeBaseName (_, DataIntS size _) = "i" <> T.pack (show size)
 takeBaseName (_, DataIntU size _) = "u" <> T.pack (show size)
 takeBaseName (_, DataFloat16 _) = "half"
 takeBaseName (_, DataFloat32 _) = "float"
 takeBaseName (_, DataFloat64 _) = "double"
 takeBaseName (_, DataEnumIntro _) = "i64"
-takeBaseName (_, DataArrayIntro _ ds) = "array" <> T.pack (show (length ds))
 
+-- takeBaseName (_, DataArrayIntro _ ds) = "array" <> T.pack (show (length ds))
 takeBaseName' :: LLVMData -> Identifier
 takeBaseName' (LLVMDataLocal x) = x
 takeBaseName' (LLVMDataGlobal x) = x
@@ -266,8 +269,12 @@ llvmDataLet x (_, DataTheta y) cont = do
       llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType args) cont
 llvmDataLet x (_, DataUpsilon y) cont =
   llvmUncastLet x (LLVMDataLocal y) voidPtr cont
-llvmDataLet reg (_, DataSigmaIntro ds) cont =
+llvmDataLet reg (_, DataSigmaIntro Nothing ds) cont =
   storeContent reg voidPtr (toStructPtrType $ length ds) ds cont
+llvmDataLet x (_, DataSigmaIntro (Just k) ds) cont = do
+  let elemType = arrayKindToLowType k
+  let arrayType = LowTypeArrayPtr (toInteger $ length ds) elemType
+  storeContent x elemType arrayType ds cont
 llvmDataLet x (_, DataIntS j i) cont =
   llvmUncastLet x (LLVMDataInt i) (LowTypeIntS j) cont
 llvmDataLet x (_, DataIntU j i) cont =
@@ -281,10 +288,6 @@ llvmDataLet x (_, DataFloat64 f) cont =
 llvmDataLet x (m, DataEnumIntro labelOrNat) cont = do
   i <- enumValueToInteger labelOrNat
   llvmDataLet x (m, DataIntS 64 i) cont
-llvmDataLet x (_, DataArrayIntro k ds) cont = do
-  let elemType = arrayKindToLowType k
-  let arrayType = LowTypeArrayPtr (toInteger $ length ds) elemType
-  storeContent x elemType arrayType ds cont
 
 -- llvmDataLet x (_, DataAlloc size) cont = do
 --   (size', castThen) <- llvmCast (Just $ takeBaseName size) size $ LowTypeIntS 64

@@ -180,9 +180,9 @@ distinguishData z d@(ml, DataUpsilon x) =
     else do
       x' <- newNameWith z
       return ([x'], (ml, DataUpsilon x'))
-distinguishData z (ml, DataSigmaIntro ds) = do
+distinguishData z (ml, DataSigmaIntro mk ds) = do
   (vss, ds') <- unzip <$> mapM (distinguishData z) ds
-  return (concat vss, (ml, DataSigmaIntro ds'))
+  return (concat vss, (ml, DataSigmaIntro mk ds'))
 distinguishData _ d = return ([], d)
 
 -- {} distinguishCode z d {結果のtermにzは出現せず、かつ、renameされた結果がリストに格納されている}

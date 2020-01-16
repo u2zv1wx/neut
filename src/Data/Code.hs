@@ -10,14 +10,13 @@ import Data.Basic
 data Data
   = DataTheta Identifier
   | DataUpsilon Identifier
-  | DataSigmaIntro [DataPlus]
+  | DataSigmaIntro (Maybe ArrayKind) [DataPlus]
   | DataIntS IntSize Integer
   | DataIntU IntSize Integer
   | DataFloat16 Half
   | DataFloat32 Float
   | DataFloat64 Double
   | DataEnumIntro EnumValue
-  | DataArrayIntro ArrayKind [DataPlus]
   deriving (Show)
 
 data Code
@@ -58,21 +57,21 @@ substDataPlus :: SubstDataPlus -> DataPlus -> DataPlus
 substDataPlus _ (m, DataTheta x) = (m, DataTheta x)
 substDataPlus sub (m, DataUpsilon s) =
   fromMaybe (m, DataUpsilon s) (lookup s sub)
-substDataPlus sub (m, DataSigmaIntro vs) = do
+substDataPlus sub (m, DataSigmaIntro mk vs) = do
   let vs' = map (substDataPlus sub) vs
-  (m, DataSigmaIntro vs')
+  (m, DataSigmaIntro mk vs')
 substDataPlus _ (m, DataIntS size l) = (m, DataIntS size l)
 substDataPlus _ (m, DataIntU size l) = (m, DataIntU size l)
 substDataPlus _ (m, DataFloat16 l) = (m, DataFloat16 l)
 substDataPlus _ (m, DataFloat32 l) = (m, DataFloat32 l)
 substDataPlus _ (m, DataFloat64 l) = (m, DataFloat64 l)
 substDataPlus _ (m, DataEnumIntro l) = (m, DataEnumIntro l)
-substDataPlus sub (m, DataArrayIntro k ds)
-  -- let (ls, ds) = unzip lds
- = do
-  let ds' = map (substDataPlus sub) ds
-  (m, DataArrayIntro k ds')
 
+-- substDataPlus sub (m, DataArrayIntro k ds)
+--   -- let (ls, ds) = unzip lds
+--  = do
+--   let ds' = map (substDataPlus sub) ds
+--   (m, DataArrayIntro k ds')
 substCodePlus :: SubstDataPlus -> CodePlus -> CodePlus
 substCodePlus sub (m, CodeTheta theta) = do
   let theta' = substTheta sub theta
@@ -130,8 +129,8 @@ substDataPlusSigmaElim sub ((x, t):xs) e = do
 
 varData :: DataPlus -> [Identifier]
 varData (_, DataUpsilon x) = [x]
-varData (_, DataSigmaIntro ds) = concatMap varData ds
-varData (_, DataArrayIntro _ ds) = concatMap varData ds
+varData (_, DataSigmaIntro _ ds) = concatMap varData ds
+-- varData (_, DataArrayIntro _ ds) = concatMap varData ds
 varData _ = []
 
 varCode :: CodePlus -> [Identifier]

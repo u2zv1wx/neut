@@ -124,7 +124,7 @@
 (let (nat tau) (nat-inner))
 
 ;; out-3
-;; (write n3 stdout (test) enum.n3)
+(write n3 stdout (test) enum.n3)
 
 (definition nat-helper ((x choice))
   (enum-elimination x

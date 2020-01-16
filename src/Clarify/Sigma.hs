@@ -26,7 +26,7 @@ cartesianSigma ::
 cartesianSigma thetaName m mk mxts = do
   aff <- affineSigma ("affine-" <> thetaName) m mk mxts
   rel <- relevantSigma ("relevant-" <> thetaName) m mk mxts
-  return (m, DataSigmaIntro [aff, rel])
+  return (m, DataSigmaIntro Nothing [aff, rel])
 
 -- (Assuming `ti` = `return di` for some `di` such that `xi : di`)
 -- affineSigma NAME LOC [(x1, t1), ..., (xn, tn)]   ~>
@@ -63,7 +63,8 @@ affineSigma thetaName m mk mxts = do
       -- As == [APP-1, ..., APP-n]   (`a` here stands for `app`)
       as <- forM xts $ \(x, t) -> toAffineApp m x t
       ys <- mapM (const $ newNameWith "arg") xts
-      let body = bindLet (zip ys as) (m, CodeUpIntro (m, DataSigmaIntro []))
+      let body =
+            bindLet (zip ys as) (m, CodeUpIntro (m, DataSigmaIntro Nothing []))
       let info = toInfo "affineSigma: arg of linearize is not closed:" xts
       assertUP info $ isClosedChain xts
       body' <- linearize xts body
@@ -138,8 +139,9 @@ transposeSigma ds = do
     , CodeUpIntro
         ( emptyMeta
         , DataSigmaIntro
-            [ (emptyMeta, DataSigmaIntro xVarList)
-            , (emptyMeta, DataSigmaIntro yVarList)
+            Nothing
+            [ (emptyMeta, DataSigmaIntro Nothing xVarList)
+            , (emptyMeta, DataSigmaIntro Nothing yVarList)
             ]))
 
 bindSigmaElim ::

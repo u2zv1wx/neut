@@ -84,7 +84,9 @@ clarify (m, TermArrayIntro k les) = do
   (zs, es', xs) <- unzip3 <$> mapM (clarifyPlus) es
   return $
     bindLet (zip zs es') $
-    (m, CodeUpIntro $ (m, DataSigmaIntro [arrayType, (m, DataArrayIntro k xs)]))
+    ( m
+    , CodeUpIntro $
+      (m, DataSigmaIntro Nothing [arrayType, (m, DataSigmaIntro (Just k) xs)]))
 clarify (m, TermArrayElim k e1 e2) = do
   e1' <- clarify e1
   e2' <- clarify e2
@@ -305,7 +307,10 @@ clarifySysCall name sysCall argLen m = do
                                     arrName -- arr = (arrType, arrInner)
                                     ( m
                                     , CodeUpIntro
-                                        (m, DataSigmaIntro [bufType, bufTmp]))
+                                        ( m
+                                        , DataSigmaIntro
+                                            Nothing
+                                            [bufType, bufTmp]))
                                     pair'))))
               retClosure (Just name) zts m xts body
           _ -> throwError $ "the type of " <> name <> " is wrong"
