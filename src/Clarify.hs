@@ -230,32 +230,7 @@ clarifySysCall name sysCall argLen m = do
         let vs = map (toVar . fst) xts
         zts <- complementaryChainOf xts
         case sysCall of
-          SysCallWrite -> do
-            (contentTypeVarName, contentTypeVar) <-
-              newDataUpsilonWith "array-type"
-            (contentVarName, contentVar) <- newDataUpsilonWith "array-content"
-            retUnivType <- returnCartesianUniv
-            let retContentType = (m, CodeUpIntro contentTypeVar)
-            let fileDescriptor = vs !! 1
-            let writeSize = vs !! 3
-            let body =
-                  ( m
-                  -- decompose the array closure
-                  , CodeSigmaElim
-                      Nothing
-                      [ (contentTypeVarName, retUnivType)
-                      , (contentVarName, retContentType)
-                      ]
-                      (vs !! 2)
-                      ( m
-                      , CodeTheta
-                          (ThetaSysCall
-                             sysCall -- write
-                             [fileDescriptor, contentVar, writeSize])))
-            retClosure (Just name) zts m xts body
-          -- read [A, in, len]
-          -- ys == [in, len]
-          SysCallRead
+          SysCallWrite
             | (_, TermPi [c, (funName, funType@(_, TermPi [(arrName, arrType), (wroteSizeName, sizeType)] _))] _) <-
                cod -> do
               insTypeEnv arrName arrType
@@ -269,6 +244,61 @@ clarifySysCall name sysCall argLen m = do
                             (m, TermUpsilon funName)
                             [ (m, TermUpsilon arrName)
                             , (m, TermUpsilon wroteSizeName)
+                            ]))
+              pair' <- clarify pair
+              (strTypeName, strType) <- newDataUpsilonWith "str-type"
+              (strInnerName, strInner) <- newDataUpsilonWith "str-inner"
+              retUnivType <- returnCartesianUniv
+              let retStrType = (m, CodeUpIntro strType)
+              let fileDescriptor = vs !! 1
+              let strSize = vs !! 3
+              (strTmpName, strTmp) <- newDataUpsilonWith "str"
+              let body =
+                    ( m
+                    , CodeSigmaElim
+                        Nothing
+                        [(strTypeName, retUnivType), (strInnerName, retStrType)]
+                        (vs !! 2) -- str
+                        ( m
+                        -- strInnerのコピーを避けるための変数
+                        , CodeUpElim
+                            strTmpName
+                            (m, CodeUpIntro strInner)
+                            ( m
+                            , CodeUpElim
+                                wroteSizeName
+                                ( m
+                                , CodeTheta
+                                    (ThetaSysCall
+                                       sysCall -- write
+                                       [fileDescriptor, strTmp, strSize]))
+                                ( m
+                                , CodeUpElim
+                                    arrName -- arr = (arrType, arrInner)
+                                    ( m
+                                    , CodeUpIntro
+                                        ( m
+                                        , DataSigmaIntro
+                                            Nothing
+                                            [strType, strTmp]))
+                                    pair'))))
+              retClosure (Just name) zts m xts body
+          -- read [A, in, len]
+          -- ys == [in, len]
+          SysCallRead
+            | (_, TermPi [c, (funName, funType@(_, TermPi [(arrName, arrType), (readSizeName, sizeType)] _))] _) <-
+               cod -> do
+              insTypeEnv arrName arrType
+              insTypeEnv readSizeName sizeType
+              let pair =
+                    ( m
+                    , TermPiIntro
+                        [c, (funName, funType)]
+                        ( m
+                        , TermPiElim
+                            (m, TermUpsilon funName)
+                            [ (m, TermUpsilon arrName)
+                            , (m, TermUpsilon readSizeName)
                             ]))
               pair' <- clarify pair
               (bufTypeName, bufType) <- newDataUpsilonWith "buf-type"
@@ -291,7 +321,7 @@ clarifySysCall name sysCall argLen m = do
                             (m, CodeUpIntro bufInner)
                             ( m
                             , CodeUpElim
-                                wroteSizeName
+                                readSizeName
                                 ( m
                                 , CodeTheta
                                     (ThetaSysCall

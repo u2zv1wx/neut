@@ -288,6 +288,8 @@
 
 ;; (let bar foo)
 
+;; writeは(product (u8-array A) i64)を返している。
+;; これはどこでも使用されていないのでfreeされる、という感じ。
 (write n12 stdout foo enum.n12)
 
 (let size

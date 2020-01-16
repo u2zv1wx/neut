@@ -8,13 +8,24 @@
 
 (constant stderr file-descriptor)
 
+;; u8-array Aも返すようにしないと、この配列をfreeする処理が抜け落ちてしまう。
+;; writeはべつに配列を消費するわけではないので。
+;; (constant write
+;;   (pi
+;;     ((A type)
+;;      (out file-descriptor)
+;;      (str (u8-array A))
+;;      (len (is-enum A)))
+;;     i64))
+
+;; こうですね。こうして見てみると、readとインターフェイスが一致していることがわかる。
 (constant write
   (pi
     ((A type)
      (out file-descriptor)
      (str (u8-array A))
      (len (is-enum A)))
-    top))
+    (product (u8-array A) i64)))
 
 (constant read
   (pi
