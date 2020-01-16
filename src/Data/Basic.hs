@@ -186,6 +186,7 @@ data BinaryOp
 data SysCall
   = SysCallWrite
   | SysCallRead
+  | SysCallExit
   deriving (Eq, Show)
 
 type ArgLen = Int

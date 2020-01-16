@@ -28,4 +28,6 @@
      (len (is-enum A)))
     (product (u8-array A) i64)))
 
-(constant exit)
+(constant exit
+  (pi ((status i64))
+    top))

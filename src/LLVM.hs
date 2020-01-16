@@ -297,10 +297,12 @@ sysCallNumAsInt num = do
       case num of
         SysCallRead -> return 0
         SysCallWrite -> return 1
+        SysCallExit -> return 60
     OSDarwin ->
       case num of
         SysCallRead -> return 0x2000003
         SysCallWrite -> return 0x2000004
+        SysCallExit -> return 0x2000001
 
 llvmDataLet' :: [(Identifier, DataPlus)] -> LLVM -> WithEnv LLVM
 llvmDataLet' [] cont = return cont

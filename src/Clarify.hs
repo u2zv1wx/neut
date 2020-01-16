@@ -232,6 +232,10 @@ clarifySysCall name sysCall argLen m = do
         case sysCall of
           SysCallWrite -> clarifySysCallRW m name xts zts vs cod sysCall
           SysCallRead -> clarifySysCallRW m name xts zts vs cod sysCall
+          SysCallExit -> do
+            let exitStatus = vs !! 0
+            let body = (m, CodeTheta (ThetaSysCall sysCall [exitStatus]))
+            retClosure (Just name) zts m xts body
     _ -> throwError $ "the type of " <> name <> " is wrong"
 
 -- clarification for read/write is the same procedure
@@ -386,4 +390,5 @@ pop x mp = do
 asSysCallMaybe :: Identifier -> Maybe (SysCall, ArgLen)
 asSysCallMaybe "write" = Just (SysCallWrite, 4)
 asSysCallMaybe "read" = Just (SysCallRead, 4)
+asSysCallMaybe "exit" = Just (SysCallExit, 1)
 asSysCallMaybe _ = Nothing
