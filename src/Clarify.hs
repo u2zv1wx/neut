@@ -253,15 +253,7 @@ clarifySysCallRW m name xts zts vs cod sysCall
      cod = do
     insTypeEnv arrName arrType
     insTypeEnv sizeName sizeType
-    let pair =
-          ( m
-          , TermPiIntro
-              [c, (funName, funType)]
-              ( m
-              , TermPiElim
-                  (m, TermUpsilon funName)
-                  [(m, TermUpsilon arrName), (m, TermUpsilon sizeName)]))
-    pair' <- clarify pair
+    pair' <- retPair m c funName funType arrName sizeName
     (strTypeName, strType) <- newDataUpsilonWith "str-type"
     (strInnerName, strInner) <- newDataUpsilonWith "str-inner"
     retUnivType <- returnCartesianUniv
@@ -276,7 +268,7 @@ clarifySysCallRW m name xts zts vs cod sysCall
               [(strTypeName, retUnivType), (strInnerName, retStrType)]
               (vs !! 2) -- str
               ( m
-                        -- strInnerのコピーを避けるための変数
+              -- strInnerのコピーを避けるための変数
               , CodeUpElim
                   strTmpName
                   (m, CodeUpIntro strInner)
@@ -297,6 +289,25 @@ clarifySysCallRW m name xts zts vs cod sysCall
                           pair'))))
     retClosure (Just name) zts m xts body
   | otherwise = throwError $ "the type of " <> name <> " is wrong"
+
+retPair ::
+     Meta
+  -> (Identifier, TermPlus)
+  -> Identifier
+  -> TermPlus
+  -> Identifier
+  -> Identifier
+  -> WithEnv CodePlus
+retPair m c funName funType leftName rightName = do
+  let pair =
+        ( m
+        , TermPiIntro
+            [c, (funName, funType)]
+            ( m
+            , TermPiElim
+                (m, TermUpsilon funName)
+                [(m, TermUpsilon leftName), (m, TermUpsilon rightName)]))
+  clarify pair
 
 complementaryChainOf ::
      [(Identifier, TermPlus)] -> WithEnv [(Identifier, TermPlus)]
