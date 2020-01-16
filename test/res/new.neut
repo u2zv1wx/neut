@@ -124,7 +124,7 @@
 (let (nat tau) (nat-inner))
 
 ;; out-3
-(write n3 stdout (test) enum.n3)
+;; (write n3 stdout (test) enum.n3)
 
 (definition nat-helper ((x choice))
   (enum-elimination x
@@ -230,20 +230,36 @@
 
 ;; (write n3 stdout bar enum.n3)
 
+;; (definition buf
+;;   (u8-array-introduction
+;;     (n12-0 10)
+;;     (n12-1 20)
+;;     (n12-2 30)
+;;     (n12-3 40)
+;;     (n12-4 50)
+;;     (n12-5 60)
+;;     (n12-6 70)
+;;     (n12-7 80)
+;;     (n12-8 90)
+;;     (n12-9 100)
+;;     (n12-10 110)
+;;     (n12-11 120)))
+
 (definition buf
   (u8-array-introduction
-    (n12-0 10)
-    (n12-1 20)
-    (n12-2 30)
-    (n12-3 40)
-    (n12-4 50)
-    (n12-5 60)
-    (n12-6 70)
-    (n12-7 80)
-    (n12-8 90)
-    (n12-9 100)
-    (n12-10 110)
-    (n12-11 120)))
+    (n12-0 0)
+    (n12-1 0)
+    (n12-2 0)
+    (n12-3 0)
+    (n12-4 0)
+    (n12-5 0)
+    (n12-6 0)
+    (n12-7 0)
+    (n12-8 0)
+    (n12-9 0)
+    (n12-10 0)
+    (n12-11 0)))
+
 
 (write n12 stdout buf enum.n12)
 
@@ -274,13 +290,14 @@
 
 (write n12 stdout foo enum.n12)
 
-;; (let size
-;;   (sigma-elimination
-;;     ((p (u8-array n12))
-;;      (q i64))
-;;     a
-;;     q))
+(let size
+  (sigma-elimination
+    ((p (u8-array n12))
+     (q i64))
+    a
+    q))
 ;; aのコピーが通ってない？
+;; 修正できたっぽい？できた。
 
 ;; (write 10 stdout foo 3)とかって書けたほうがラクかな〜？
 ;; (write n3 stdout foo enum.n3)
@@ -296,6 +313,6 @@
 (i64.add (i64.add 3 x) x)
 
 ;; このsizeをみるかぎり、なんかreadじたいはできてるっぽい。byte数がちゃんと得られてる。
-;; size
+size
 
 ;; new.neut ends here

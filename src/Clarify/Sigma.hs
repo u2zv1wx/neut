@@ -108,7 +108,7 @@ relevantSigma thetaName m mk mxts = do
       as <- forM xts $ \(x, t) -> toRelevantApp m x t
       -- pairVarNameList == [pair-1, ...,  pair-n]
       (pairVarNameList, pairVarTypeList) <- unzip <$> mapM toPairInfo xts
-      transposedPair <- transposeSigma pairVarTypeList
+      transposedPair <- transposeSigma mk pairVarTypeList
       let body = bindLet (zip pairVarNameList as) transposedPair
       let info = toInfo "relevantSigma: arg of linearize is not closed:" xts
       assertUP info $ isClosedChain xts
@@ -127,8 +127,8 @@ toPairInfo (_, t) = do
 --   ...
 --   let (xn, yn) := dn in
 --   return ((x1, ..., xn), (y1, ..., yn))
-transposeSigma :: [(DataPlus, CodePlus)] -> WithEnv CodePlus
-transposeSigma ds = do
+transposeSigma :: Maybe ArrayKind -> [(DataPlus, CodePlus)] -> WithEnv CodePlus
+transposeSigma mk ds = do
   (xVarNameList, xVarList) <-
     unzip <$> mapM (const $ newDataUpsilonWith "sig-x") ds
   (yVarNameList, yVarList) <-
@@ -140,8 +140,8 @@ transposeSigma ds = do
         ( emptyMeta
         , DataSigmaIntro
             Nothing
-            [ (emptyMeta, DataSigmaIntro Nothing xVarList)
-            , (emptyMeta, DataSigmaIntro Nothing yVarList)
+            [ (emptyMeta, DataSigmaIntro mk xVarList)
+            , (emptyMeta, DataSigmaIntro mk yVarList)
             ]))
 
 bindSigmaElim ::
