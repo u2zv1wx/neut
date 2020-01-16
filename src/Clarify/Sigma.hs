@@ -157,9 +157,8 @@ supplyName (Left t) = do
 
 returnArrayType :: Meta -> WithEnv CodePlus
 returnArrayType ml = do
-  tau <- cartesianImmediate ml
   (arrVarName, arrVar) <- newDataUpsilonWith "arr"
-  let retTau = (ml, CodeUpIntro tau)
+  retTau <- returnCartesianUniv
   let retArrVar = (ml, CodeUpIntro arrVar)
   v <-
     cartesianSigma
@@ -171,11 +170,9 @@ returnArrayType ml = do
 
 returnClosureType :: Meta -> WithEnv CodePlus
 returnClosureType m = do
-  imm <- cartesianImmediate m
-  tau <- cartesianUniv m
   (envVarName, envVar) <- newDataUpsilonWith "env"
-  let retUnivType = (m, CodeUpIntro tau)
-  let retImmType = (m, CodeUpIntro imm)
+  retUnivType <- returnCartesianUniv
+  retImmType <- returnCartesianImmediate
   let retEnvVar = (m, CodeUpIntro envVar)
   closureType <-
     cartesianSigma
