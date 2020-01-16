@@ -40,13 +40,15 @@ llvmCode (_, CodeSigmaElim Nothing xts v e) = do
   let xs = map fst xts
   let structPtrType = toStructPtrType $ length xs
   let idxList = map (\i -> (LLVMDataInt i, i32)) [0 ..]
-  loadContent v structPtrType (zip idxList xs) voidPtr e
+  ys <- mapM newNameWith xs
+  loadContent v structPtrType (zip idxList (zip ys xs)) voidPtr e
 llvmCode (_, CodeSigmaElim (Just k) xts v e) = do
   let xs = map fst xts
   let et = arrayKindToLowType k -- elem type
   let bt = LowTypeArrayPtr (toInteger $ length xs) et -- base pointer type  ([(length xs) x ARRAY_ELEM_TYPE])
   let idxList = map (\i -> (LLVMDataInt i, i32)) [0 ..]
-  loadContent v bt (zip idxList xs) voidPtr e
+  ys <- mapM newNameWith xs
+  loadContent v bt (zip idxList (zip ys xs)) et e
 llvmCode (_, CodeUpIntro d) = do
   result <- newNameWith $ takeBaseName d
   llvmDataLet result d $ LLVMReturn $ LLVMDataLocal result
@@ -57,13 +59,22 @@ llvmCode (_, CodeUpElim x e1 e2) = do
 llvmCode (_, CodeEnumElim v branchList) = llvmCodeEnumElim v branchList
 llvmCode (_, CodeArrayElim k d1 d2) = do
   result <- newNameWith "array-elim-ans"
+  resultTmp <- newNameWith "array-elim-ans-tmp"
   let et = arrayKindToLowType k -- elem type
   let bt = LowTypeArrayPtr 0 et -- base pointer type
   (cast, castThen) <- llvmCast (Just "array-idx") d2 $ LowTypeIntS 64 -- enum ~> i64
   loadThenFreeThenCont <-
-    loadContent d1 bt [((cast, i64), result)] et (retUp result)
+    loadContent d1 bt [((cast, i64), (resultTmp, result))] et (retUp result)
   castThen loadThenFreeThenCont
 
+uncastList :: LowType -> [(Identifier, Identifier)] -> CodePlus -> WithEnv LLVM
+uncastList _ [] e = llvmCode e
+uncastList et ((y, x):yxs) e = do
+  e' <- uncastList et yxs e
+  llvmUncastLet x (LLVMDataLocal y) et e'
+
+-- llvmUncastLet :: Identifier -> LLVMData -> LowType -> LLVM -> WithEnv LLVM
+-- llvmUncast :: Maybe Identifier -> LLVMData -> LowType -> WithEnv LLVM
 takeBaseName :: DataPlus -> Identifier
 takeBaseName (_, DataTheta x) = x
 takeBaseName (_, DataUpsilon x) = x
@@ -92,15 +103,17 @@ retUp result = (emptyMeta, CodeUpIntro (emptyMeta, DataUpsilon result))
 loadContent ::
      DataPlus -- base pointer
   -> LowType -- the type of base pointer
-  -> [((LLVMData, LowType), Identifier)] -- [(the index of an element, the variable to load the element)]
+  -> [((LLVMData, LowType), (Identifier, Identifier))] -- [(the index of an element, the variable to load the element)]
   -> LowType -- the type of elements
   -> CodePlus -- continuation
   -> WithEnv LLVM
-loadContent v bt ixs et cont = do
+loadContent v bt iyxs et cont = do
+  let ixs = map (\(i, (y, _)) -> (i, y)) iyxs
   (bp, castThen) <- llvmCast (Just $ takeBaseName v) v bt
-  cont' <- llvmCode cont
-  extractThenFreeThenCont <- loadContent' bp bt et ixs cont'
-  castThen extractThenFreeThenCont
+  let yxs = map (\(_, yx) -> yx) iyxs
+  uncastThenCont <- uncastList et yxs cont
+  extractThenFreeThenUncastThenCont <- loadContent' bp bt et ixs uncastThenCont
+  castThen extractThenFreeThenUncastThenCont
 
 loadContent' ::
      LLVMData -- base pointer

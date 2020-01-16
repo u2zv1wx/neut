@@ -127,8 +127,8 @@ clarifyConst m name
   | Just (lowType, op) <- asBinaryOpMaybe name =
     clarifyBinaryOp name op lowType m
 clarifyConst m name
-  | Just (sysCall, len, idxList) <- asSysCallMaybe name =
-    clarifySysCall name sysCall len idxList m
+  | Just (sysCall, len) <- asSysCallMaybe name =
+    clarifySysCall name sysCall len m
 clarifyConst m name
   | Just _ <- asLowTypeMaybe name = clarify (m, TermEnum $ EnumTypeLabel "top")
 clarifyConst m "is-enum" = clarifyIsEnum m
@@ -219,16 +219,15 @@ clarifySysCall ::
      Identifier -- the name of theta
   -> SysCall -- the kind of system call
   -> Int -- the length of the arguments of the theta
-  -> [Int] -- used (or, non-discarded) arguments in its actual implementation (index starts from zero)
   -> Meta -- the meta of the theta
   -> WithEnv CodePlus
-clarifySysCall name sysCall argLen argIdxList m = do
+clarifySysCall name sysCall argLen m = do
   t <- lookupTypeEnv name
   t' <- reduceTermPlus t
   case t' of
     (_, TermPi xts cod)
       | length xts == argLen -> do
-        let ys = map (\i -> toVar $ fst $ xts !! i) argIdxList
+        let vs = map (toVar . fst) xts
         zts <- complementaryChainOf xts
         case sysCall of
           SysCallWrite -> do
@@ -237,7 +236,6 @@ clarifySysCall name sysCall argLen argIdxList m = do
             (contentVarName, contentVar) <- newDataUpsilonWith "array-content"
             retUnivType <- returnCartesianUniv
             let retContentType = (m, CodeUpIntro contentTypeVar)
-            let ys' = [ys !! 0, contentVar, ys !! 2]
             let body =
                   ( m
                   -- decompose the array closure
@@ -246,63 +244,55 @@ clarifySysCall name sysCall argLen argIdxList m = do
                       [ (contentTypeVarName, retUnivType)
                       , (contentVarName, retContentType)
                       ]
-                      (ys !! 1)
-                      (m, CodeTheta (ThetaSysCall sysCall ys')))
+                      (vs !! 2)
+                      ( m
+                      , CodeTheta
+                          (ThetaSysCall sysCall [vs !! 1, contentVar, vs !! 3])))
             retClosure (Just name) zts m xts body
           -- read [A, in, len]
           -- ys == [in, len]
           SysCallRead
-            | (_, TermPi [c, (funName, funType@(_, TermPi [(_, arrType@(_, TermArray k _)), (_, sizeType)] _))] _) <-
-               cod -> do undefined
-              -- (bufName, buf) <- newDataUpsilonWith "buf"
-              -- arrName <- newNameWith "array"
-              -- sizeName <- newNameWith "size"
-              -- let pair =
-              --       ( m
-              --       , TermPiIntro
-              --           [c, (funName, funType)]
-              --           ( m
-              --           , TermPiElim
-              --               (m, TermUpsilon funName)
-              --               [ (m, TermUpsilon arrName)
-              --               , (m, TermUpsilon sizeName)
-              --               ]))
-              -- insTypeEnv arrName arrType
-              -- insTypeEnv sizeName sizeType
-              -- pair' <- clarify pair
-              -- -- あれか？配列の表現のズレの話か？そんな気がしてきた。
-              -- -- bufNameは
-              -- -- arrayは(m, DataSigmaIntro [arrayType, (m, DataArrayIntro k (zip ls xs))])みたいに表現されるわけで、
-              -- -- bufNameはこの(m, DataArrayIntro k (zip ls xs))の部分に相当している。
-              -- -- ということは、型を作りたいわけだけど。u8-array Aってのは既にもっていて。でもこれは「termとしての」型であって。
-              -- -- arrayのためのcartesianを用意しましょう、ってことかなー。
-              -- -- let arrInnerType = (m, DataArray k (ys !! 1))
-              -- arrInnerType <- cartesianInnerArray m k $ ys !! 1
-              -- -- let arrValue = (m, DataSigmaIntro [arrInnerType, buf])
-              -- let body =
-              --       ( m
-              --       -- upelimで束縛された変数はlinearizeから除外されることを利用してbufを複数回使う
-              --       , CodeUpElim
-              --           bufName
-              --           (m, CodeUpIntro (m, DataAlloc $ ys !! 1)) -- len
-              --           -- ここでbufNameをTerm的なarrayに変換する必要がある。
-              --           -- pairのほうにはそっちを渡す。
-              --           ( m
-              --           , CodeUpElim
-              --               arrName
-              --               ( m
-              --               , CodeUpIntro
-              --                   (m, DataSigmaIntro [arrInnerType, buf]))
-              --               ( m
-              --               , CodeUpElim
-              --                   sizeName
-              --                   ( m
-              --                   , CodeTheta
-              --                       (ThetaSysCall
-              --                          sysCall
-              --                          [ys !! 0, buf, ys !! 1]))
-              --                   pair')))
-              -- retClosure (Just name) zts m xts body
+            | (_, TermPi [c, (funName, funType@(_, TermPi [(arrName, arrType), (sizeName, sizeType)] _))] _) <-
+               cod -> do
+              insTypeEnv arrName arrType
+              insTypeEnv sizeName sizeType
+              let pair =
+                    ( m
+                    , TermPiIntro
+                        [c, (funName, funType)]
+                        ( m
+                        , TermPiElim
+                            (m, TermUpsilon funName)
+                            [ (m, TermUpsilon arrName)
+                            , (m, TermUpsilon sizeName)
+                            ]))
+              pair' <- clarify pair
+              (bufTypeName, bufType) <- newDataUpsilonWith "buf-type"
+              (bufInnerName, bufInner) <- newDataUpsilonWith "buf-inner"
+              retUnivType <- returnCartesianUniv
+              let retBufType = (m, CodeUpIntro bufType)
+              let body =
+                    ( m
+                    , CodeSigmaElim
+                        Nothing
+                        [(bufTypeName, retUnivType), (bufInnerName, retBufType)]
+                        (vs !! 2) -- buf
+                        ( m
+                        , CodeUpElim
+                            sizeName
+                            ( m
+                            , CodeTheta
+                                (ThetaSysCall
+                                   sysCall
+                                   [vs !! 1, bufInner, vs !! 3]))
+                            ( m
+                            , CodeUpElim
+                                arrName -- arr = (arrType, arrInner)
+                                ( m
+                                , CodeUpIntro
+                                    (m, DataSigmaIntro [bufType, bufInner]))
+                                pair')))
+              retClosure (Just name) zts m xts body
           _ -> throwError $ "the type of " <> name <> " is wrong"
     _ -> throwError $ "the type of " <> name <> " is wrong"
 
@@ -394,7 +384,7 @@ pop x mp = do
   v <- Map.lookup x mp
   return (v, Map.delete x mp)
 
-asSysCallMaybe :: Identifier -> Maybe (SysCall, ArgLen, UsedArgIndexList)
-asSysCallMaybe "write" = Just (SysCallWrite, 4, [1, 2, 3])
-asSysCallMaybe "read" = Just (SysCallRead, 3, [1, 2])
+asSysCallMaybe :: Identifier -> Maybe (SysCall, ArgLen)
+asSysCallMaybe "write" = Just (SysCallWrite, 4)
+asSysCallMaybe "read" = Just (SysCallRead, 4)
 asSysCallMaybe _ = Nothing

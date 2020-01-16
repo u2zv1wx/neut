@@ -95,8 +95,8 @@ newName = do
 newNameWith :: Identifier -> WithEnv Identifier
 newNameWith s = do
   i <- newName
-  -- let s' = s <> i -- slow
-  let s' = i
+  let s' = s <> i -- slow
+  -- let s' = i
   modify (\e -> e {nameEnv = Map.insert s s' (nameEnv e)})
   return s'
 
