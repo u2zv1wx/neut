@@ -342,6 +342,10 @@
     item-and-len
     read-content))
 
+;; マジでファイルを読み書きできるようになってしまった。えらすぎる。
+;; writeのバイト数のところはi64で指定するようにしたほうがいいかもしれない。
+;; itemの型がわかってるんだから、(write _ stdout item enum.n15)とかでもいけるね。
+;; printをこれで定義できるわけだ。
 (write n15 stdout item enum.n15)
 
 (close file)
@@ -353,7 +357,17 @@
 ;; ;; このsizeをみるかぎり、なんかreadじたいはできてるっぽい。byte数がちゃんと得られてる。
 ;; size
 
+;; ここでもmallocの処理がある。
+;; forkしたあとでmallocしたらなんでダメなの？
+(let pid (fork))
+
+;; letはクロージャになるから、たしかに、mallocの処理はここで入る。
+;; (fork)
+
+;; (fork)
+
 ;; 3が返ってるってことは、0 = stdin, 1 = stdout, 2 = stderrだから、ちゃんとファイルが開けてるはず。
-file
+;; file
+pid
 
 ;; new.neut ends here

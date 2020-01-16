@@ -270,7 +270,6 @@ emitLLVMConvOp cast d dom cod = do
   return $
     BC.unwords [cast, showLowType dom, showLLVMData d, "to", showLowType cod]
 
--- call i64 asm sideeffect "syscall", "=r,{rax},{rdi},{rsi},{rdx}" (i64 %raxArg, i64 %rdiArg, i64 %rsiArg, i64 %rdxArg)
 emitSysCallOp :: Integer -> [LLVMData] -> WithEnv B.ByteString
 emitSysCallOp num ds = do
   regList <- getRegList
@@ -279,7 +278,7 @@ emitSysCallOp num ds = do
     Arch64 -> do
       let args = (LLVMDataInt num, LowTypeIntS 64) : zip ds (repeat voidPtr)
       let argStr = "(" <> showIndex args <> ")"
-      let regStr = "\"=r," <> showRegList (take (length args) regList) <> "\""
+      let regStr = "\"=r" <> showRegList (take (length args) regList) <> "\""
       return $
         BC.unwords ["call i8* asm sideeffect \"syscall\",", regStr, argStr]
 
@@ -302,8 +301,7 @@ constructLabelList ((_, _):rest) = do
 
 showRegList :: [B.ByteString] -> B.ByteString
 showRegList [] = ""
-showRegList [s] = "{" <> s <> "}"
-showRegList (s:ss) = "{" <> s <> "}," <> showRegList ss
+showRegList (s:ss) = ",{" <> s <> "}" <> showRegList ss
 
 showBranchList :: LowType -> [(Int, T.Text)] -> B.ByteString
 showBranchList lowType xs =

@@ -189,6 +189,7 @@ data SysCall
   | SysCallExit
   | SysCallOpen
   | SysCallClose
+  | SysCallFork
   deriving (Eq, Show)
 
 type ArgLen = Int

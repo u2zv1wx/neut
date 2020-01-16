@@ -300,6 +300,7 @@ sysCallNumAsInt num = do
         SysCallExit -> return 60
         SysCallOpen -> return 2
         SysCallClose -> return 3
+        SysCallFork -> return 57
     OSDarwin ->
       case num of
         SysCallRead -> return 0x2000003
@@ -307,6 +308,7 @@ sysCallNumAsInt num = do
         SysCallExit -> return 0x2000001
         SysCallOpen -> return 0x2000005
         SysCallClose -> return 0x2000006
+        SysCallFork -> return 0x2000002
 
 llvmDataLet' :: [(Identifier, DataPlus)] -> LLVM -> WithEnv LLVM
 llvmDataLet' [] cont = return cont

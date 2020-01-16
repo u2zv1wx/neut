@@ -70,3 +70,8 @@
   (pi
     ((_ file-descriptor))
     i64))
+
+(constant fork
+  (pi
+    ()
+    i64))

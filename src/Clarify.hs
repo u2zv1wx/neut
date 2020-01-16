@@ -241,6 +241,9 @@ clarifySysCall name sysCall argLen m = do
             let fileDescriptor = vs !! 0
             let body = (m, CodeTheta (ThetaSysCall sysCall [fileDescriptor]))
             retClosure (Just name) zts m xts body
+          SysCallFork -> do
+            let body = (m, CodeTheta (ThetaSysCall sysCall []))
+            retClosure (Just name) zts m xts body
     _ -> throwError $ "the type of " <> name <> " is wrong"
 
 -- clarification for read/write is the same procedure
@@ -460,4 +463,5 @@ asSysCallMaybe "read" = Just (SysCallRead, 4)
 asSysCallMaybe "exit" = Just (SysCallExit, 1)
 asSysCallMaybe "open" = Just (SysCallOpen, 4)
 asSysCallMaybe "close" = Just (SysCallClose, 1)
+asSysCallMaybe "fork" = Just (SysCallFork, 0)
 asSysCallMaybe _ = Nothing
