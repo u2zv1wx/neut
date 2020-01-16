@@ -196,12 +196,6 @@ renameData (m, DataFloat32 x) = return (m, DataFloat32 x)
 renameData (m, DataFloat64 x) = return (m, DataFloat64 x)
 renameData (m, DataEnumIntro x) = return (m, DataEnumIntro x)
 
--- renameData (m, DataArrayIntro kind ds) = do
---   ds' <- mapM renameData ds
---     -- forM ds $ \(l, body) -> do
---     --   body' <- renameData body
---     --   return (l, body')
---   return (m, DataArrayIntro kind ds')
 renameCode :: CodePlus -> WithEnv CodePlus
 renameCode (m, CodeTheta theta) = do
   theta' <- renameTheta theta

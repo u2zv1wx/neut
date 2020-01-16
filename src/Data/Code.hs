@@ -67,11 +67,6 @@ substDataPlus _ (m, DataFloat32 l) = (m, DataFloat32 l)
 substDataPlus _ (m, DataFloat64 l) = (m, DataFloat64 l)
 substDataPlus _ (m, DataEnumIntro l) = (m, DataEnumIntro l)
 
--- substDataPlus sub (m, DataArrayIntro k ds)
---   -- let (ls, ds) = unzip lds
---  = do
---   let ds' = map (substDataPlus sub) ds
---   (m, DataArrayIntro k ds')
 substCodePlus :: SubstDataPlus -> CodePlus -> CodePlus
 substCodePlus sub (m, CodeTheta theta) = do
   let theta' = substTheta sub theta
@@ -130,7 +125,6 @@ substDataPlusSigmaElim sub ((x, t):xs) e = do
 varData :: DataPlus -> [Identifier]
 varData (_, DataUpsilon x) = [x]
 varData (_, DataSigmaIntro _ ds) = concatMap varData ds
--- varData (_, DataArrayIntro _ ds) = concatMap varData ds
 varData _ = []
 
 varCode :: CodePlus -> [Identifier]

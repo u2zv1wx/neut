@@ -80,7 +80,6 @@ clarify (m, TermArrayIntro k les) = do
     cartesianSigma name m (Just k) $
     map Left $ replicate (length les) retImmType
   es <- reorder les
-  -- let (ls, es) = unzip les
   (zs, es', xs) <- unzip3 <$> mapM (clarifyPlus) es
   return $
     bindLet (zip zs es') $

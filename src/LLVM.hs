@@ -289,9 +289,6 @@ llvmDataLet x (m, DataEnumIntro labelOrNat) cont = do
   i <- enumValueToInteger labelOrNat
   llvmDataLet x (m, DataIntS 64 i) cont
 
--- llvmDataLet x (_, DataAlloc size) cont = do
---   (size', castThen) <- llvmCast (Just $ takeBaseName size) size $ LowTypeIntS 64
---   castThen $ LLVMLet x (LLVMOpAlloc size') cont
 sysCallNumAsInt :: SysCall -> WithEnv Integer
 sysCallNumAsInt num = do
   targetOS <- getOS
