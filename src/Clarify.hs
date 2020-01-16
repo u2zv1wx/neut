@@ -230,116 +230,69 @@ clarifySysCall name sysCall argLen m = do
         let vs = map (toVar . fst) xts
         zts <- complementaryChainOf xts
         case sysCall of
-          SysCallWrite
-            | (_, TermPi [c, (funName, funType@(_, TermPi [(arrName, arrType), (wroteSizeName, sizeType)] _))] _) <-
-               cod -> do
-              insTypeEnv arrName arrType
-              insTypeEnv wroteSizeName sizeType
-              let pair =
-                    ( m
-                    , TermPiIntro
-                        [c, (funName, funType)]
-                        ( m
-                        , TermPiElim
-                            (m, TermUpsilon funName)
-                            [ (m, TermUpsilon arrName)
-                            , (m, TermUpsilon wroteSizeName)
-                            ]))
-              pair' <- clarify pair
-              (strTypeName, strType) <- newDataUpsilonWith "str-type"
-              (strInnerName, strInner) <- newDataUpsilonWith "str-inner"
-              retUnivType <- returnCartesianUniv
-              let retStrType = (m, CodeUpIntro strType)
-              let fileDescriptor = vs !! 1
-              let strSize = vs !! 3
-              (strTmpName, strTmp) <- newDataUpsilonWith "str"
-              let body =
-                    ( m
-                    , CodeSigmaElim
-                        Nothing
-                        [(strTypeName, retUnivType), (strInnerName, retStrType)]
-                        (vs !! 2) -- str
-                        ( m
-                        -- strInnerのコピーを避けるための変数
-                        , CodeUpElim
-                            strTmpName
-                            (m, CodeUpIntro strInner)
-                            ( m
-                            , CodeUpElim
-                                wroteSizeName
-                                ( m
-                                , CodeTheta
-                                    (ThetaSysCall
-                                       sysCall -- write
-                                       [fileDescriptor, strTmp, strSize]))
-                                ( m
-                                , CodeUpElim
-                                    arrName -- arr = (arrType, arrInner)
-                                    ( m
-                                    , CodeUpIntro
-                                        ( m
-                                        , DataSigmaIntro
-                                            Nothing
-                                            [strType, strTmp]))
-                                    pair'))))
-              retClosure (Just name) zts m xts body
-          -- read [A, in, len]
-          -- ys == [in, len]
-          SysCallRead
-            | (_, TermPi [c, (funName, funType@(_, TermPi [(arrName, arrType), (readSizeName, sizeType)] _))] _) <-
-               cod -> do
-              insTypeEnv arrName arrType
-              insTypeEnv readSizeName sizeType
-              let pair =
-                    ( m
-                    , TermPiIntro
-                        [c, (funName, funType)]
-                        ( m
-                        , TermPiElim
-                            (m, TermUpsilon funName)
-                            [ (m, TermUpsilon arrName)
-                            , (m, TermUpsilon readSizeName)
-                            ]))
-              pair' <- clarify pair
-              (bufTypeName, bufType) <- newDataUpsilonWith "buf-type"
-              (bufInnerName, bufInner) <- newDataUpsilonWith "buf-inner"
-              retUnivType <- returnCartesianUniv
-              let retBufType = (m, CodeUpIntro bufType)
-              let fileDescriptor = vs !! 1
-              let bufSize = vs !! 3
-              (bufTmpName, bufTmp) <- newDataUpsilonWith "buf"
-              let body =
-                    ( m
-                    , CodeSigmaElim
-                        Nothing
-                        [(bufTypeName, retUnivType), (bufInnerName, retBufType)]
-                        (vs !! 2) -- buf
-                        ( m
-                        -- bufInnerのコピーを避けるための変数
-                        , CodeUpElim
-                            bufTmpName
-                            (m, CodeUpIntro bufInner)
-                            ( m
-                            , CodeUpElim
-                                readSizeName
-                                ( m
-                                , CodeTheta
-                                    (ThetaSysCall
-                                       sysCall -- read
-                                       [fileDescriptor, bufTmp, bufSize]))
-                                ( m
-                                , CodeUpElim
-                                    arrName -- arr = (arrType, arrInner)
-                                    ( m
-                                    , CodeUpIntro
-                                        ( m
-                                        , DataSigmaIntro
-                                            Nothing
-                                            [bufType, bufTmp]))
-                                    pair'))))
-              retClosure (Just name) zts m xts body
-          _ -> throwError $ "the type of " <> name <> " is wrong"
+          SysCallWrite -> clarifySysCallRW m name xts zts vs cod sysCall
+          SysCallRead -> clarifySysCallRW m name xts zts vs cod sysCall
     _ -> throwError $ "the type of " <> name <> " is wrong"
+
+-- clarification for read/write is the same procedure
+clarifySysCallRW ::
+     Meta
+  -> Identifier
+  -> [(Identifier, TermPlus)]
+  -> [(Identifier, TermPlus)]
+  -> [DataPlus]
+  -> (a, Term)
+  -> SysCall
+  -> WithEnv CodePlus
+clarifySysCallRW m name xts zts vs cod sysCall
+  | (_, TermPi [c, (funName, funType@(_, TermPi [(arrName, arrType), (sizeName, sizeType)] _))] _) <-
+     cod = do
+    insTypeEnv arrName arrType
+    insTypeEnv sizeName sizeType
+    let pair =
+          ( m
+          , TermPiIntro
+              [c, (funName, funType)]
+              ( m
+              , TermPiElim
+                  (m, TermUpsilon funName)
+                  [(m, TermUpsilon arrName), (m, TermUpsilon sizeName)]))
+    pair' <- clarify pair
+    (strTypeName, strType) <- newDataUpsilonWith "str-type"
+    (strInnerName, strInner) <- newDataUpsilonWith "str-inner"
+    retUnivType <- returnCartesianUniv
+    let retStrType = (m, CodeUpIntro strType)
+    let fileDescriptor = vs !! 1
+    let strSize = vs !! 3
+    (strTmpName, strTmp) <- newDataUpsilonWith "str"
+    let body =
+          ( m
+          , CodeSigmaElim
+              Nothing
+              [(strTypeName, retUnivType), (strInnerName, retStrType)]
+              (vs !! 2) -- str
+              ( m
+                        -- strInnerのコピーを避けるための変数
+              , CodeUpElim
+                  strTmpName
+                  (m, CodeUpIntro strInner)
+                  ( m
+                  , CodeUpElim
+                      sizeName
+                      ( m
+                      , CodeTheta
+                          (ThetaSysCall
+                             sysCall -- write
+                             [fileDescriptor, strTmp, strSize]))
+                      ( m
+                      , CodeUpElim
+                          arrName -- arr = (arrType, arrInner)
+                          ( m
+                          , CodeUpIntro
+                              (m, DataSigmaIntro Nothing [strType, strTmp]))
+                          pair'))))
+    retClosure (Just name) zts m xts body
+  | otherwise = throwError $ "the type of " <> name <> " is wrong"
 
 complementaryChainOf ::
      [(Identifier, TermPlus)] -> WithEnv [(Identifier, TermPlus)]

@@ -247,36 +247,39 @@
 
 (definition buf
   (u8-array-introduction
-    (n12-0 0)
-    (n12-1 0)
-    (n12-2 0)
-    (n12-3 0)
-    (n12-4 0)
-    (n12-5 0)
-    (n12-6 0)
-    (n12-7 0)
-    (n12-8 0)
-    (n12-9 0)
-    (n12-10 0)
-    (n12-11 0)))
+    (n15-0 0)
+    (n15-1 0)
+    (n15-2 0)
+    (n15-3 0)
+    (n15-4 0)
+    (n15-5 0)
+    (n15-6 0)
+    (n15-7 0)
+    (n15-8 0)
+    (n15-9 0)
+    (n15-10 0)
+    (n15-11 0)
+    (n15-12 0)
+    (n15-13 0)
+    (n15-14 0)))
 
 
-(write n12 stdout buf enum.n12)
+(write n15 stdout buf enum.n15)
 
 ;; aのコピーが間違ってる
 (definition a
-  (read n12 stdin buf enum.n12))
+  (read n15 stdin buf enum.n15))
 
 (let foo
   (sigma-elimination
-    ((read-content (u8-array n12))
+    ((read-content (u8-array n15))
      (read-size i64))
     a
     read-content))
 
 ;; こう書けたほうがうれしい？
 ;; (sigma-elimination a
-;;   ((read-content (u8-array n12))
+;;   ((read-content (u8-array n15))
 ;;    (read-size i64))
 ;;   (foo)
 ;;   (let p some-computation)
@@ -290,11 +293,11 @@
 
 ;; writeは(product (u8-array A) i64)を返している。
 ;; これはどこでも使用されていないのでfreeされる、という感じ。
-(write n12 stdout foo enum.n12)
+(write n15 stdout foo enum.n15)
 
 (let size
   (sigma-elimination
-    ((p (u8-array n12))
+    ((p (u8-array n15))
      (q i64))
     a
     q))
