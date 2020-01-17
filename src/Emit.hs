@@ -337,7 +337,19 @@ showLowTypeAsIfNonPtr t = BC.init $ showLowType t
 
 -- for now
 emitGlobal :: WithEnv [B.ByteString]
-emitGlobal = return ["declare i8* @malloc(i64)", "declare void @free(i8*)"]
+emitGlobal = do
+  os <- getOS
+  case os of
+    OSDarwin ->
+      return
+        [ "declare i8* @malloc(i64)"
+        , "declare void @free(i8*)"
+        -- The "direct" call of fork(2) via syscall seems to be broken in Darwin. It causes
+        -- malloc after fork to be broken with message `mach_vm_map(size=1048576) failed (error code=268435459)`.
+        -- Thus we need to declare the type of the interface function as follows and use it.
+        , "declare i8* @fork()"
+        ]
+    _ -> return ["declare i8* @malloc(i64)", "declare void @free(i8*)"]
 
 getRegList :: WithEnv [B.ByteString]
 getRegList = do

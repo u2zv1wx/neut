@@ -242,8 +242,18 @@ clarifySysCall name sysCall argLen m = do
             let body = (m, CodeTheta (ThetaSysCall sysCall [fileDescriptor]))
             retClosure (Just name) zts m xts body
           SysCallFork -> do
-            let body = (m, CodeTheta (ThetaSysCall sysCall []))
-            retClosure (Just name) zts m xts body
+            os <- getOS
+            case os of
+              OSDarwin -> do
+                let theta = (m, DataTheta "fork")
+                let body = (m, CodePiElimDownElim theta [])
+                name' <- newNameWith "fork"
+                -- retClosure (Just name) zts m xts body
+                retClosure (Just name') zts m xts body
+              _ -> do
+                let body = (m, CodeTheta (ThetaSysCall sysCall []))
+                -- forkはmacOSでは定数関数としてとる必要があるのか？
+                retClosure (Just name) zts m xts body
     _ -> throwError $ "the type of " <> name <> " is wrong"
 
 -- clarification for read/write is the same procedure

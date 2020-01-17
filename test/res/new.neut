@@ -363,21 +363,21 @@
 ;; forkしたあとでmallocしたらなんでダメなの？
 ;; forkはリソースを完全にコピーするんだよね？
 ;; (i64.add 3 3)
-;; (let pid (fork))
+(let pid (fork))
 
-((lambda (pid) pid) (fork))
+;; ((lambda (pid) pid) (fork))
 
 ;; (exit 20)
 
 ;; letはクロージャになるから、たしかに、mallocの処理はここで入る。
-;; (fork)
+(fork)
 
-;; (fork)
+(fork)
 
 ;; 3が返ってるってことは、0 = stdin, 1 = stdout, 2 = stderrだから、ちゃんとファイルが開けてるはず。
 ;; file
 
 ;; pidはあくまでparent processのものが返ってくる？
-;; pid
+pid
 
 ;; new.neut ends here
