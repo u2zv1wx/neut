@@ -216,6 +216,18 @@
       (left (zero))
       (right value))))
 
+;; こういうmatchのコードはもうふつうにsigma-elimに書き換えることができる。
+;; まさに上のように書き換えればいいだけなので。
+;; (definition foo ((num nat))
+;;   (match num
+;;     ((nat.zero _) (zero))
+;;     ((nat.succ n) n)))
+;; value部分についてのmatchがあったら、という話はあるけど。「atomだったらそこで止めて、nodeだったらcaseで展開」みたいな。
+
+;; こういうのがあっても便利かも：
+;;   (enum-with-prefix nat zero succ)
+;;   ~> nat = {nat.zero, nat.succ}
+
 (ascription my-item
   (hom nat nat))
 
