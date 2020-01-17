@@ -248,11 +248,9 @@ clarifySysCall name sysCall argLen m = do
                 let theta = (m, DataTheta "fork")
                 let body = (m, CodePiElimDownElim theta [])
                 name' <- newNameWith "fork"
-                -- retClosure (Just name) zts m xts body
                 retClosure (Just name') zts m xts body
               _ -> do
                 let body = (m, CodeTheta (ThetaSysCall sysCall []))
-                -- forkはmacOSでは定数関数としてとる必要があるのか？
                 retClosure (Just name) zts m xts body
     _ -> throwError $ "the type of " <> name <> " is wrong"
 
