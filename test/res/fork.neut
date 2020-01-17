@@ -1,0 +1,63 @@
+(include "notation.neut")
+
+;; (include "enum.neut")
+
+;; (include "top.neut")
+
+;; (include "bottom.neut")
+
+;; (include "constant.neut")
+
+(constant fork
+  (pi
+    ()
+    i64))
+
+
+(constant i64.add
+  (pi ((op1 i64) (op2 i64)) i64))
+
+;; このstateの中でtop-unitが書き換えられてしまう。
+;; これは挙動として妥当だろうか？
+;; まあ、state.neutがtop-unitをexportしてるって考えれば妥当か。
+;; 特定のモジュールがexportしてるものはリストアップされてるはずで。
+;; exportしない、みたいなのも指定できるとうれしいかな。
+;; (include "state.neut")
+
+;; (include "io.neut")
+
+;; ((lambda (pid) pid) (fork))
+
+(let pid (fork))
+
+;; (fork)
+
+;; ここのmallocがなければ安全？
+;; 100回実行しても安全。1000回実行しても大丈夫だった。
+;; じゃあ、pidをとったらさっさと場合分けしろってこと？謎。
+;; Cで同じことをやると？
+;;   int pid = fork();
+;;   char *array = malloc(20);
+;;   strcpy(array, "Hello");
+;;   printf("content: %s\n", array);
+;;   free(array);
+;;   return pid;
+;; Cで上のような処理を書いてもとくに問題ないらしい。なんで……？やってること一緒じゃない？
+;; (let y (i64.add pid 1))
+
+pid
+
+;; (exit 20)
+
+;; letはクロージャになるから、たしかに、mallocの処理はここで入る。
+;; (fork)
+
+;; (fork)
+
+;; 3が返ってるってことは、0 = stdin, 1 = stdout, 2 = stderrだから、ちゃんとファイルが開けてるはず。
+;; file
+
+;; pidはあくまでparent processのものが返ってくる？
+;; pid
+
+;; fork.neut ends here

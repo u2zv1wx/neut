@@ -95,8 +95,8 @@ newName = do
 newNameWith :: Identifier -> WithEnv Identifier
 newNameWith s = do
   i <- newName
-  -- let s' = s <> i -- slow
-  let s' = i
+  let s' = s <> i -- slow
+  -- let s' = i
   modify (\e -> e {nameEnv = Map.insert s s' (nameEnv e)})
   return s'
 
@@ -232,3 +232,16 @@ getEnumNum' l (xs:xss) =
   case elemIndex l xs of
     Nothing -> getEnumNum' l xss
     Just i -> Just i
+
+-- {enum.top, enum.choice, etc.} ~> {(the number of contents in enum)}
+-- enum.n{i}とかも処理できないとだめ。
+-- これ、enumNatNumのやつを後ろにしてたってことは、enum.n8とかがNothingになってたってこと？
+asEnumConstant :: Identifier -> WithEnv (Maybe Integer)
+asEnumConstant x
+  | ["enum", y] <- wordsBy '.' x = do
+    eenv <- gets enumEnv
+    case Map.lookup y eenv of
+      Nothing -> return Nothing
+      Just ls -> return $ Just $ toInteger $ length ls
+  | Just i <- asEnumNatNumConstant x = return $ Just i
+asEnumConstant _ = return Nothing

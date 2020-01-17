@@ -28,11 +28,11 @@ reduceTermPlus (m, TermPiElim e es) = do
   e' <- reduceTermPlus e
   es' <- mapM reduceTermPlus es
   let app = TermPiElim e' es'
+  valueCond <- and <$> mapM isValue es
   case e' of
-    (_, TermPiIntro xts body)
+    (_, TermPiIntro xts body) -- fixme: reduceできるだけreduceするようにする (partial evaluation)
       | length xts == length es'
-      , all isValue es' -- fixme: reduceできるだけreduceするようにする (partial evaluation)
-       -> do
+      , valueCond -> do
         let xs = map fst xts
         reduceTermPlus $ substTermPlus (zip xs es') body
     -- (_, TermMu (x, _) body)
@@ -309,3 +309,37 @@ computeFloat _ _ _ e = Left e
 asEnum :: Bool -> Term
 asEnum True = TermEnumIntro $ EnumValueLabel "true"
 asEnum False = TermEnumIntro $ EnumValueLabel "false"
+
+isValue :: TermPlus -> WithEnv Bool
+isValue (_, TermTau) = return True
+isValue (_, TermUpsilon _) = return True
+isValue (_, TermPi {}) = return True
+isValue (_, TermPiIntro {}) = return True
+isValue (_, TermIter {}) = return True
+isValue (_, TermConst x) = isValueConst x
+isValue (_, TermIntS _ _) = return True
+isValue (_, TermIntU _ _) = return True
+isValue (_, TermFloat16 _) = return True
+isValue (_, TermFloat32 _) = return True
+isValue (_, TermFloat64 _) = return True
+isValue (_, TermEnum _) = return True
+isValue (_, TermEnumIntro _) = return True
+isValue (_, TermArray {}) = return True
+isValue (_, TermArrayIntro _ les) = do
+  bs <- mapM (isValue . snd) les
+  return $ and bs
+isValue _ = return False
+
+isValueConst :: Identifier -> WithEnv Bool
+isValueConst x
+  | "is-enum" <- x = return True
+  | Just _ <- asLowTypeMaybe x = return True
+  | Just _ <- asUnaryOpMaybe x = return True
+  | Just _ <- asBinaryOpMaybe x = return True
+  | otherwise = do
+    m <- asEnumConstant x
+    case m of
+      Nothing -> return False
+      Just _ -> return True
+      -- return False
+-- isValueConst _ = return False

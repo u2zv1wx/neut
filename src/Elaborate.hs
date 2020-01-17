@@ -48,7 +48,7 @@ elaborate e
   -- this reduceTermPlus is necessary since e' contains "DONT_CARE" in its
   -- type of arguments of abstractions of meta-variables.
   e'' <- elaborate' e' >>= reduceTermPlus
-  -- p' e''
+  p' e''
   return e''
   -- let info2 = toInfo "elaborated term is not closed:" e''
   -- assertMP info2 (return e'') $ null (varTermPlus e'')

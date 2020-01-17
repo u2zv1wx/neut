@@ -377,19 +377,6 @@ complementaryChainOf xts = do
 toVar :: Identifier -> DataPlus
 toVar x = (emptyMeta, DataUpsilon x)
 
--- {enum.top, enum.choice, etc.} ~> {(the number of contents in enum)}
--- enum.n{i}とかも処理できないとだめ。
--- これ、enumNatNumのやつを後ろにしてたってことは、enum.n8とかがNothingになってたってこと？
-asEnumConstant :: Identifier -> WithEnv (Maybe Integer)
-asEnumConstant x
-  | ["enum", y] <- wordsBy '.' x = do
-    eenv <- gets enumEnv
-    case Map.lookup y eenv of
-      Nothing -> return Nothing
-      Just ls -> return $ Just $ toInteger $ length ls
-  | Just i <- asEnumNatNumConstant x = return $ Just i
-asEnumConstant _ = return Nothing
-
 clarifyBinder :: [(Identifier, TermPlus)] -> WithEnv [(Identifier, CodePlus)]
 clarifyBinder [] = return []
 clarifyBinder ((x, t):xts) = do
