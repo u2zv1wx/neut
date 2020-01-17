@@ -71,6 +71,7 @@
     ((_ file-descriptor))
     i64))
 
+;; darwinではこのforkは定数関数に落ちる。linuxではsyscallになる。
 (constant fork
   (pi
     ()
