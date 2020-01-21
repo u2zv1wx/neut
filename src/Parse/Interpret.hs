@@ -94,6 +94,17 @@ interpret (m, TreeNode [(_, TreeAtom "array-elimination"), (_, TreeAtom kind), (
   e1' <- interpret e1
   (xts', e2') <- interpretBinder xts e2
   return (m, WeakTermArrayElim kind' xts' e1' e2')
+interpret (m, TreeNode ((_, TreeAtom "struct"):ks)) = do
+  ks' <- mapM asStructKind ks
+  return (m, WeakTermStruct ks')
+interpret (m, TreeNode ((_, TreeAtom "struct-introduction"):ets)) = do
+  ets' <- mapM interpretStructIntro ets
+  return (m, WeakTermStructIntro ets')
+interpret (m, TreeNode [(_, TreeAtom "struct-elimination"), (_, TreeNode xts), e1, e2]) = do
+  e1' <- interpret e1
+  xts' <- mapM interpretStructElim xts
+  e2' <- interpret e2
+  return (m, WeakTermStructElim xts' e1' e2')
 --
 -- auxiliary interpretations
 --
@@ -202,6 +213,21 @@ interpretClause (_, TreeNode [c, e]) = do
 interpretClause e =
   throwError $ "interpretClause: syntax error:\n " <> T.pack (Pr.ppShow e)
 
+interpretStructIntro :: TreePlus -> WithEnv (WeakTermPlus, ArrayKind)
+interpretStructIntro (_, TreeNode [e, k]) = do
+  e' <- interpret e
+  k' <- asStructKind k
+  return (e', k')
+interpretStructIntro e =
+  throwError $ "interpretStructIntro: syntax error:\n " <> T.pack (Pr.ppShow e)
+
+interpretStructElim :: TreePlus -> WithEnv (Identifier, ArrayKind)
+interpretStructElim (_, TreeNode [(_, TreeAtom x), k]) = do
+  k' <- asStructKind k
+  return (x, k')
+interpretStructElim e =
+  throwError $ "interpretStructElim: syntax error:\n " <> T.pack (Pr.ppShow e)
+
 -- {} extractIdentifier {}
 extractIdentifier :: TreePlus -> WithEnv Identifier
 extractIdentifier (_, TreeAtom s) = return s
@@ -229,6 +255,11 @@ asArrayKind x =
       case asArrayKindMaybe t of
         Nothing -> throwError "asArrayKind: syntax error"
         Just a -> return a
+
+asStructKind :: TreePlus -> WithEnv ArrayKind
+asStructKind (_, TreeAtom x) = asArrayKind x
+asStructKind t =
+  throwError $ "asStructKind: syntax error:\n" <> T.pack (Pr.ppShow t)
 
 -- {} encodechar {(the output is valid as utf8 string)}
 -- adopted from https://hackage.haskell.org/package/utf8-string-1.0.1.1/docs/src/Codec-Binary-UTF8-String.html
