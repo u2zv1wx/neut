@@ -81,6 +81,15 @@ rename' (m, WeakTermArrayElim kind xts e1 e2) = do
   e1' <- rename' e1
   (xts', e2') <- renameBinder xts e2
   return (m, WeakTermArrayElim kind xts' e1' e2')
+rename' (m, WeakTermStruct ts) = return (m, WeakTermStruct ts)
+rename' (m, WeakTermStructIntro ets) = do
+  let (es, ts) = unzip ets
+  es' <- mapM rename' es
+  return (m, WeakTermStructIntro $ zip es' ts)
+rename' (m, WeakTermStructElim xts e1 e2) = do
+  e1' <- rename' e1
+  (xts', e2') <- renameStruct xts e2
+  return (m, WeakTermStructElim xts' e1' e2')
 
 renameBinder ::
      [IdentifierPlus]
@@ -129,6 +138,19 @@ renameCaseList caseList =
       body' <- rename' body
       return (l, body')
 
+renameStruct ::
+     [(Identifier, ArrayKind)]
+  -> WeakTermPlus
+  -> WithEnv ([(Identifier, ArrayKind)], WeakTermPlus)
+renameStruct [] e = do
+  e' <- rename' e
+  return ([], e')
+renameStruct ((x, t):xts) e = do
+  local $ do
+    x' <- newLLVMNameWith x
+    (xts', e') <- renameStruct xts e
+    return ((x', t) : xts', e')
+
 local :: WithEnv a -> WithEnv a
 local comp = do
   env <- get
@@ -168,6 +190,11 @@ checkSanity ctx (_, WeakTermArrayIntro _ es) = do
   all (checkSanity ctx) es
 checkSanity ctx (_, WeakTermArrayElim _ xts e1 e2) = do
   checkSanity ctx e1 && checkSanity' ctx xts e2
+checkSanity _ (_, WeakTermStruct {}) = True
+checkSanity ctx (_, WeakTermStructIntro ets) =
+  all (checkSanity ctx) $ map fst ets
+checkSanity ctx (_, WeakTermStructElim xts e1 e2) = do
+  checkSanity ctx e1 && checkSanity'' ctx xts e2
 
 checkSanity' :: [Identifier] -> [IdentifierPlus] -> WeakTermPlus -> Bool
 checkSanity' ctx [] e = do
@@ -176,3 +203,12 @@ checkSanity' ctx ((x, _):_) _
   | x `elem` ctx = False
 checkSanity' ctx ((x, t):xts) e = do
   checkSanity ctx t && checkSanity' (x : ctx) xts e
+
+checkSanity'' ::
+     [Identifier] -> [(Identifier, ArrayKind)] -> WeakTermPlus -> Bool
+checkSanity'' ctx [] e = do
+  checkSanity ctx e
+checkSanity'' ctx ((x, _):_) _
+  | x `elem` ctx = False
+checkSanity'' ctx ((x, _):xts) e = do
+  checkSanity'' (x : ctx) xts e
