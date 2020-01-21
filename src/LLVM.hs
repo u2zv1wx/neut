@@ -38,6 +38,7 @@ llvmCode (_, CodePiElimDownElim v ds) = do
   llvmDataLet' (zip xs ds) $ castThenCall
 llvmCode (_, CodeSigmaElim Nothing xts v e) = do
   let xs = map fst xts
+  -- ここは[n x i8*]*みたいにしたほうがたぶんよい。
   let structPtrType = toStructPtrType $ length xs
   let idxList = map (\i -> (LLVMDataInt i, i32)) [0 ..]
   ys <- mapM newNameWith xs
@@ -58,23 +59,12 @@ llvmCode (_, CodeUpElim x e1 e2) = do
   return $ commConv x e1' e2'
 llvmCode (_, CodeEnumElim v branchList) = llvmCodeEnumElim v branchList
 
--- llvmCode (_, CodeArrayElim k d1 d2) = do
---   result <- newNameWith "array-elim-ans"
---   resultTmp <- newNameWith "array-elim-ans-tmp"
---   let et = arrayKindToLowType k -- elem type
---   let bt = LowTypeArrayPtr 0 et -- base pointer type (e.g. [0 x u8]*)
---   (cast, castThen) <- llvmCast (Just "array-idx") d2 $ LowTypeIntS 64 -- enum ~> i64
---   loadThenFreeThenCont <-
---     loadContent d1 bt [((cast, i64), (resultTmp, result))] et (retUp result)
---   castThen loadThenFreeThenCont
 uncastList :: LowType -> [(Identifier, Identifier)] -> CodePlus -> WithEnv LLVM
 uncastList _ [] e = llvmCode e
 uncastList et ((y, x):yxs) e = do
   e' <- uncastList et yxs e
   llvmUncastLet x (LLVMDataLocal y) et e'
 
--- llvmUncastLet :: Identifier -> LLVMData -> LowType -> LLVM -> WithEnv LLVM
--- llvmUncast :: Maybe Identifier -> LLVMData -> LowType -> WithEnv LLVM
 takeBaseName :: DataPlus -> Identifier
 takeBaseName (_, DataTheta x) = x
 takeBaseName (_, DataUpsilon x) = x
@@ -99,9 +89,6 @@ takeBaseName' (LLVMDataFloat16 _) = "half"
 takeBaseName' (LLVMDataFloat32 _) = "float"
 takeBaseName' (LLVMDataFloat64 _) = "double"
 takeBaseName' LLVMDataNull = "null"
-
-retUp :: Identifier -> CodePlus
-retUp result = (emptyMeta, CodeUpIntro (emptyMeta, DataUpsilon result))
 
 loadContent ::
      DataPlus -- base pointer

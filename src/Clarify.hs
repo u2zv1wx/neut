@@ -72,47 +72,27 @@ clarify (m, TermEnumElim e bs) = do
   return $ bindLet [(yName, e')] (m, CodeEnumElim y (zip cs es'))
 clarify (m, TermArray {}) = do
   returnArrayType m
-clarify (m, TermArrayIntro k les) = do
+clarify (m, TermArrayIntro k es) = do
   retImmType <- returnCartesianImmediate
   -- arrayType = Sigma{k} [_ : IMMEDIATE, ..., _ : IMMEDIATE]
   name <- newNameWith "array"
-  arrayType <-
-    cartesianSigma name m (Just k) $
-    map Left $ replicate (length les) retImmType
-  es <- reorder les
-  (zs, es', xs) <- unzip3 <$> mapM (clarifyPlus) es
+  let ts = map Left $ replicate (length es) retImmType
+  arrayType <- cartesianSigma name m (Just k) ts
+  (zs, es', xs) <- unzip3 <$> mapM clarifyPlus es
   return $
     bindLet (zip zs es') $
     ( m
     , CodeUpIntro $
       (m, DataSigmaIntro Nothing [arrayType, (m, DataSigmaIntro (Just k) xs)]))
-clarify (_, TermArrayElim {}) = do
-  undefined
-  -- e1' <- clarify e1
-  -- e2' <- clarify e2
-  -- (arrVarName, arrVar) <- newDataUpsilonWith "arr"
-  -- (idxVarName, idxVar) <- newDataUpsilonWith "idx"
-  -- affVarName <- newNameWith "aff"
-  -- relVarName <- newNameWith "rel"
-  -- (contentTypeVarName, contentTypeVar) <- newDataUpsilonWith "array-type"
-  -- (contentVarName, contentVar) <- newDataUpsilonWith "array-content"
-  -- retUnivType <- returnCartesianUniv
-  -- retImmType <- returnCartesianImmediate
-  -- let retContentType = (m, CodeUpIntro contentTypeVar)
-  -- -- array : Sigma [content-type : univ, content : content-type]
-  -- return $
-  --   bindLet [(arrVarName, e1'), (idxVarName, e2')] $
-  --   ( m
-  --   , CodeSigmaElim
-  --       Nothing
-  --       [(contentTypeVarName, retUnivType), (contentVarName, retContentType)]
-  --       arrVar
-  --       ( m
-  --       , CodeSigmaElim
-  --           Nothing
-  --           [(affVarName, retImmType), (relVarName, retImmType)]
-  --           contentTypeVar
-  --           (m, CodeArrayElim k contentVar idxVar)))
+clarify (m, TermArrayElim k xts e1 e2) = do
+  e1' <- clarify e1
+  let (xs, ts) = unzip xts
+  ts' <- mapM clarify ts
+  let xts' = zip xs ts'
+  e2' <- clarify e2
+  (arrVarName, arrVar) <- newDataUpsilonWith "arr"
+  return $
+    bindLet [(arrVarName, e1')] $ (m, CodeSigmaElim (Just k) xts' arrVar e2')
 
 clarifyPlus :: TermPlus -> WithEnv (Identifier, CodePlus, DataPlus)
 clarifyPlus e@(m, _) = do

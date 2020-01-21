@@ -135,11 +135,11 @@ data ArrayKind
   | ArrayKindFloat FloatSize
   deriving (Show, Eq)
 
-asArrayKind :: LowType -> Maybe ArrayKind
-asArrayKind (LowTypeIntS i) = Just $ ArrayKindIntS i
-asArrayKind (LowTypeIntU i) = Just $ ArrayKindIntU i
-asArrayKind (LowTypeFloat size) = Just $ ArrayKindFloat size
-asArrayKind _ = Nothing
+asArrayKindMaybe :: LowType -> Maybe ArrayKind
+asArrayKindMaybe (LowTypeIntS i) = Just $ ArrayKindIntS i
+asArrayKindMaybe (LowTypeIntU i) = Just $ ArrayKindIntU i
+asArrayKindMaybe (LowTypeFloat size) = Just $ ArrayKindFloat size
+asArrayKindMaybe _ = Nothing
 
 arrayKindToSize :: ArrayKind -> Integer
 arrayKindToSize (ArrayKindIntS i) = lowTypeToAllocSize' i

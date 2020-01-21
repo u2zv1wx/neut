@@ -71,21 +71,35 @@ reduceTermPlus (m, TermEnumElim e les) = do
       es' <- mapM reduceTermPlus es
       let les' = zip ls es'
       return (m, TermEnumElim e' les')
-reduceTermPlus (m, TermArray k indexType) = do
-  indexType' <- reduceTermPlus indexType
-  return (m, TermArray k indexType')
-reduceTermPlus (m, TermArrayIntro k les) = do
-  let (ls, es) = unzip les
+reduceTermPlus (m, TermArray dom k) = do
+  dom' <- reduceTermPlus dom
+  return (m, TermArray dom' k)
+reduceTermPlus (m, TermArrayIntro k es)
+  -- let (ls, es) = unzip les
+ = do
   es' <- mapM reduceTermPlus es
-  return (m, TermArrayIntro k $ zip ls es')
-reduceTermPlus (m, TermArrayElim k e1 e2) = do
+  return (m, TermArrayIntro k es')
+reduceTermPlus (m, TermArrayElim k xts e1 e2) = do
   e1' <- reduceTermPlus e1
-  e2' <- reduceTermPlus e2
-  case (e1', e2') of
-    ((_, TermArrayIntro k' les), (_, TermEnumIntro l))
-      | k == k'
-      , Just e <- lookup l les -> reduceTermPlus e
-    _ -> return (m, TermArrayElim k e1' e2')
+  case e1 of
+    (_, TermArrayIntro k' es)
+      | length es == length xts
+      , k == k' -> reduceTermPlus $ substTermPlus (zip (map fst xts) es) e2
+    _ -> return (m, TermArrayElim k xts e1' e2)
+  -- case v of
+  --   (_, DataSigmaIntro mk' ds)
+  --     | length ds == length xs
+  --     , mk == mk' -> do reduceCodePlus $ substCodePlus (zip xs ds) e
+  --   _ -> do
+  --     e' <- reduceCodePlus e
+  --     ts' <- mapM reduceCodePlus ts
+  --     return (m, CodeSigmaElim mk (zip xs ts') v e')
+  -- e2' <- reduceTermPlus e2
+  -- case (e1', e2') of
+  --   ((_, TermArrayIntro k' les), (_, TermEnumIntro l))
+  --     | k == k'
+  --     , Just e <- lookup l les -> reduceTermPlus e
+    -- _ -> return (m, TermArrayElim k e1' e2')
 reduceTermPlus t = return t
 
 reduceTermPlusTheta ::
@@ -325,8 +339,8 @@ isValue (_, TermFloat64 _) = return True
 isValue (_, TermEnum _) = return True
 isValue (_, TermEnumIntro _) = return True
 isValue (_, TermArray {}) = return True
-isValue (_, TermArrayIntro _ les) = do
-  bs <- mapM (isValue . snd) les
+isValue (_, TermArrayIntro _ es) = do
+  bs <- mapM isValue es
   return $ and bs
 isValue _ = return False
 

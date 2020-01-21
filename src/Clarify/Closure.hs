@@ -18,7 +18,6 @@ import Data.Basic
 import Data.Code
 import Data.Env
 import Data.Term
-import Reduce.Code
 
 import qualified Data.HashMap.Strict as Map
 
@@ -122,13 +121,15 @@ chainTermPlus' (_, TermEnumElim e les) = do
   let es = map snd les
   xs2 <- concat <$> mapM (chainTermPlus') es
   return $ xs1 ++ xs2
-chainTermPlus' (_, TermArray _ indexType) = chainTermPlus' indexType
-chainTermPlus' (_, TermArrayIntro _ les) = do
-  let es = map snd les
+chainTermPlus' (_, TermArray dom _) = chainTermPlus' dom
+chainTermPlus' (_, TermArrayIntro _ es)
+  -- let es = map snd les
+ = do
   concat <$> mapM (chainTermPlus') es
-chainTermPlus' (_, TermArrayElim _ e1 e2) = do
+-- chainTermPlus' (_, TermArrayElim _ e1 e2) = do
+chainTermPlus' (_, TermArrayElim _ xts e1 e2) = do
   xs1 <- chainTermPlus' e1
-  xs2 <- chainTermPlus' e2
+  xs2 <- chainTermPlus'' xts [e2]
   return $ xs1 ++ xs2
 
 chainTermPlus'' ::

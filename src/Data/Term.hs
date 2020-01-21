@@ -22,9 +22,13 @@ data Term
   | TermEnum EnumType
   | TermEnumIntro EnumValue
   | TermEnumElim TermPlus [(Case, TermPlus)]
-  | TermArray ArrayKind TermPlus
-  | TermArrayIntro ArrayKind [(EnumValue, TermPlus)]
-  | TermArrayElim ArrayKind TermPlus TermPlus
+  | TermArray TermPlus ArrayKind -- array n3 u8 ~= n3 -> u8
+  | TermArrayIntro ArrayKind [TermPlus]
+  | TermArrayElim
+      ArrayKind
+      [(Identifier, TermPlus)] -- [(x1, return t1), ..., (xn, return tn)] with xi : ti
+      TermPlus
+      TermPlus
   deriving (Show)
 
 type TermPlus = (Meta, Term)
@@ -64,14 +68,10 @@ varTermPlus (_, TermEnumElim e les) = do
   let es = map snd les
   let xs2 = concatMap varTermPlus es
   xs1 ++ xs2
-varTermPlus (_, TermArray _ indexType) = varTermPlus indexType
-varTermPlus (_, TermArrayIntro _ les) = do
-  let es = map snd les
+varTermPlus (_, TermArray dom _) = varTermPlus dom
+varTermPlus (_, TermArrayIntro _ es) = do
   concatMap varTermPlus es
-varTermPlus (_, TermArrayElim _ e1 e2) = do
-  let xs1 = varTermPlus e1
-  let xs2 = varTermPlus e2
-  xs1 ++ xs2
+varTermPlus (_, TermArrayElim _ xts d e) = varTermPlus d ++ varTermPlus' xts [e]
 
 varTermPlus' :: [(Identifier, TermPlus)] -> [TermPlus] -> [Identifier]
 varTermPlus' [] es = concatMap varTermPlus es
@@ -117,17 +117,16 @@ substTermPlus sub (m, TermEnumElim e branchList) = do
   let (caseList, es) = unzip branchList
   let es' = map (substTermPlus sub) es
   (m, TermEnumElim e' (zip caseList es'))
-substTermPlus sub (m, TermArray k indexType) = do
-  let indexType' = substTermPlus sub indexType
-  (m, TermArray k indexType')
-substTermPlus sub (m, TermArrayIntro k les) = do
-  let (ls, es) = unzip les
+substTermPlus sub (m, TermArray dom k) = do
+  let dom' = substTermPlus sub dom
+  (m, TermArray dom' k)
+substTermPlus sub (m, TermArrayIntro k es) = do
   let es' = map (substTermPlus sub) es
-  (m, TermArrayIntro k (zip ls es'))
-substTermPlus sub (m, TermArrayElim k e1 e2) = do
-  let e1' = substTermPlus sub e1
-  let e2' = substTermPlus sub e2
-  (m, TermArrayElim k e1' e2')
+  (m, TermArrayIntro k es')
+substTermPlus sub (m, TermArrayElim mk xts v e) = do
+  let v' = substTermPlus sub v
+  let (xts', e') = substTermPlusBindingsWithBody sub xts e
+  (m, TermArrayElim mk xts' v' e')
 
 substTermPlusBindingsWithBody ::
      SubstTerm -> [IdentifierPlus] -> TermPlus -> ([IdentifierPlus], TermPlus)

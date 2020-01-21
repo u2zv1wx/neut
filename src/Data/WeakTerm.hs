@@ -30,9 +30,16 @@ data WeakTerm
   | WeakTermEnum EnumType
   | WeakTermEnumIntro EnumValue
   | WeakTermEnumElim (WeakTermPlus, WeakTermPlus) [(Case, WeakTermPlus)]
-  | WeakTermArray ArrayKind WeakTermPlus
-  | WeakTermArrayIntro ArrayKind [(EnumValue, WeakTermPlus)]
-  | WeakTermArrayElim ArrayKind WeakTermPlus WeakTermPlus
+  -- | WeakTermArray ArrayKind WeakTermPlus
+  -- | WeakTermArrayIntro ArrayKind [(EnumValue, WeakTermPlus)]
+  -- | WeakTermArrayElim ArrayKind WeakTermPlus WeakTermPlus
+  | WeakTermArray WeakTermPlus ArrayKind -- array n3 u8 ~= n3 -> u8
+  | WeakTermArrayIntro ArrayKind [WeakTermPlus]
+  | WeakTermArrayElim
+      ArrayKind
+      [(Identifier, WeakTermPlus)] -- [(x1, return t1), ..., (xn, return tn)] with xi : ti
+      WeakTermPlus
+      WeakTermPlus
   deriving (Show, Eq)
 
 type WeakTermPlus = (Meta, WeakTerm)
@@ -91,12 +98,17 @@ varWeakTermPlus (_, WeakTermEnumElim (e, t) les) = do
   let yhs = varWeakTermPlus e
   let zhs = concatMap (varWeakTermPlus . snd) les
   xhs ++ yhs ++ zhs
-varWeakTermPlus (_, WeakTermArray _ t) = do
-  varWeakTermPlus t
-varWeakTermPlus (_, WeakTermArrayIntro _ les) = do
-  concatMap (\(_, body) -> varWeakTermPlus body) les
-varWeakTermPlus (_, WeakTermArrayElim _ e1 e2) = do
-  varWeakTermPlus e1 ++ varWeakTermPlus e2
+-- varWeakTermPlus (_, WeakTermArray _ t) = do
+--   varWeakTermPlus t
+-- varWeakTermPlus (_, WeakTermArrayIntro _ les) = do
+--   concatMap (\(_, body) -> varWeakTermPlus body) les
+varWeakTermPlus (_, WeakTermArray dom _) = varWeakTermPlus dom
+varWeakTermPlus (_, WeakTermArrayIntro _ es) = do
+  concatMap varWeakTermPlus es
+-- varWeakTermPlus (_, WeakTermArrayElim _ e1 e2) = do
+--   varWeakTermPlus e1 ++ varWeakTermPlus e2
+varWeakTermPlus (_, WeakTermArrayElim _ xts d e) =
+  varWeakTermPlus d ++ varWeakTermPlusBindings xts [e]
 
 varWeakTermPlusBindings :: [IdentifierPlus] -> [WeakTermPlus] -> [Hole]
 varWeakTermPlusBindings [] es = do
@@ -132,12 +144,17 @@ holeWeakTermPlus (_, WeakTermEnumElim (e, t) les) = do
   let yhs = holeWeakTermPlus t
   let zhs = concatMap (\(_, body) -> holeWeakTermPlus body) les
   xhs ++ yhs ++ zhs
-holeWeakTermPlus (_, WeakTermArray _ e) = holeWeakTermPlus e
-holeWeakTermPlus (_, WeakTermArrayIntro _ les) = do
-  concatMap (\(_, body) -> holeWeakTermPlus body) les
-holeWeakTermPlus (_, WeakTermArrayElim _ e1 e2) = do
-  holeWeakTermPlus e1 ++ holeWeakTermPlus e2
+holeWeakTermPlus (_, WeakTermArray dom _) = holeWeakTermPlus dom
+holeWeakTermPlus (_, WeakTermArrayIntro _ es) = do
+  concatMap holeWeakTermPlus es
+holeWeakTermPlus (_, WeakTermArrayElim _ xts d e) =
+  holeWeakTermPlus d ++ holeWeakTermPlusBindings xts [e]
 
+-- holeWeakTermPlus (_, WeakTermArray _ e) = holeWeakTermPlus e
+-- holeWeakTermPlus (_, WeakTermArrayIntro _ les) = do
+--   concatMap (\(_, body) -> holeWeakTermPlus body) les
+-- holeWeakTermPlus (_, WeakTermArrayElim _ e1 e2) = do
+--   holeWeakTermPlus e1 ++ holeWeakTermPlus e2
 holeWeakTermPlusBindings :: [IdentifierPlus] -> [WeakTermPlus] -> [Hole]
 holeWeakTermPlusBindings [] es = do
   concatMap holeWeakTermPlus es
@@ -198,18 +215,28 @@ substWeakTermPlus sub (m, WeakTermEnumElim (e, t) branchList) = do
   let (caseList, es) = unzip branchList
   let es' = map (substWeakTermPlus sub) es
   (m, WeakTermEnumElim (e', t') (zip caseList es'))
-substWeakTermPlus sub (m, WeakTermArray kind indexType) = do
-  let indexType' = substWeakTermPlus sub indexType
-  (m, WeakTermArray kind indexType')
-substWeakTermPlus sub (m, WeakTermArrayIntro kind les) = do
-  let (ls, es) = unzip les
+substWeakTermPlus sub (m, WeakTermArray dom k) = do
+  let dom' = substWeakTermPlus sub dom
+  (m, WeakTermArray dom' k)
+substWeakTermPlus sub (m, WeakTermArrayIntro k es) = do
   let es' = map (substWeakTermPlus sub) es
-  (m, WeakTermArrayIntro kind (zip ls es'))
-substWeakTermPlus sub (m, WeakTermArrayElim kind e1 e2) = do
-  let e1' = substWeakTermPlus sub e1
-  let e2' = substWeakTermPlus sub e2
-  (m, WeakTermArrayElim kind e1' e2')
+  (m, WeakTermArrayIntro k es')
+substWeakTermPlus sub (m, WeakTermArrayElim mk xts v e) = do
+  let v' = substWeakTermPlus sub v
+  let (xts', e') = substWeakTermPlusBindingsWithBody sub xts e
+  (m, WeakTermArrayElim mk xts' v' e')
 
+-- substWeakTermPlus sub (m, WeakTermArray kind indexType) = do
+--   let indexType' = substWeakTermPlus sub indexType
+--   (m, WeakTermArray kind indexType')
+-- substWeakTermPlus sub (m, WeakTermArrayIntro kind les) = do
+--   let (ls, es) = unzip les
+--   let es' = map (substWeakTermPlus sub) es
+--   (m, WeakTermArrayIntro kind (zip ls es'))
+-- substWeakTermPlus sub (m, WeakTermArrayElim kind e1 e2) = do
+--   let e1' = substWeakTermPlus sub e1
+--   let e2' = substWeakTermPlus sub e2
+--   (m, WeakTermArrayElim kind e1' e2')
 substWeakTermPlusBindingsWithBody ::
      SubstWeakTerm
   -> [IdentifierPlus]

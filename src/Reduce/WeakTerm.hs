@@ -65,21 +65,20 @@ reduceWeakTermPlus (m, WeakTermEnumElim (e, t) les) = do
             Just body -> reduceWeakTermPlus body
             Nothing -> (m, WeakTermEnumElim (e', t') les')
     _ -> (m, WeakTermEnumElim (e', t') les')
-reduceWeakTermPlus (m, WeakTermArray k indexType) = do
-  let indexType' = reduceWeakTermPlus indexType
-  (m, WeakTermArray k indexType')
-reduceWeakTermPlus (m, WeakTermArrayIntro k les) = do
-  let (ls, es) = unzip les
+reduceWeakTermPlus (m, WeakTermArray dom k) = do
+  let dom' = reduceWeakTermPlus dom
+  (m, WeakTermArray dom' k)
+reduceWeakTermPlus (m, WeakTermArrayIntro k es) = do
   let es' = map reduceWeakTermPlus es
-  (m, WeakTermArrayIntro k $ zip ls es')
-reduceWeakTermPlus (m, WeakTermArrayElim k e1 e2) = do
+  (m, WeakTermArrayIntro k es')
+reduceWeakTermPlus (m, WeakTermArrayElim k xts e1 e2) = do
   let e1' = reduceWeakTermPlus e1
-  let e2' = reduceWeakTermPlus e2
-  case (e1', e2') of
-    ((_, WeakTermArrayIntro k' les), (_, WeakTermEnumIntro l))
-      | k == k'
-      , Just e <- lookup l les -> reduceWeakTermPlus e
-    _ -> (m, WeakTermArrayElim k e1' e2')
+  case e1' of
+    (_, WeakTermArrayIntro k' es)
+      | length es == length xts
+      , k == k' ->
+        reduceWeakTermPlus $ substWeakTermPlus (zip (map fst xts) es) e2
+    _ -> (m, WeakTermArrayElim k xts e1' e2)
 reduceWeakTermPlus e = e
 
 reduceWeakTermPlusTheta ::
