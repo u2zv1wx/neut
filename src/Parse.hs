@@ -38,7 +38,10 @@ data Def
 -- (The postcondition is guaranteed by the assertion of `rename`.)
 parse :: T.Text -> String -> WithEnv WeakTermPlus
 parse s inputPath = do
-  strToTree s inputPath >>= parse' >>= concatDefList >>= rename
+  e <- strToTree s inputPath >>= parse' >>= concatDefList
+  -- p' e
+  rename e
+  -- strToTree s inputPath >>= parse' >>= concatDefList >>= rename
 
 -- {} parse' {}
 -- Parse the head element of the input list.

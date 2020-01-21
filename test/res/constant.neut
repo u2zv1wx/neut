@@ -31,9 +31,9 @@
   (pi
     ((A type)
      (in file-descriptor)
-     (buf (u8-array A))
+     (buf (array A u8))
      (len (is-enum A)))
-    (product (u8-array A) i64)))
+    (product (array A u8) i64)))
 
 ;; こういうノリ？
 ;; (constant read
@@ -48,9 +48,9 @@
   (pi
     ((A type)
      (out file-descriptor)
-     (str (u8-array A))
+     (str (array A u8))
      (len (is-enum A)))
-    (product (u8-array A) i64)))
+    (product (array A u8) i64)))
 
 (constant exit
   (pi
@@ -60,10 +60,10 @@
 (constant open
   (pi
     ((A type)
-     (path (u8-array A))
+     (path (array A u8))
      (flags i64)
      (mode i64))
-    (product (u8-array A) file-descriptor)))
+    (product (array A u8) file-descriptor)))
 
 ;; closeは簡単。
 (constant close

@@ -8,6 +8,7 @@ import Control.Monad.Except
 import Control.Monad.State
 
 import qualified Data.HashMap.Strict as Map
+import qualified Data.Text as T
 
 import Data.Basic
 import Data.Env
@@ -31,7 +32,7 @@ rename' (m, WeakTermUpsilon x) = do
     Just x' -> return (m, WeakTermUpsilon x')
     Nothing
       | isConstant x -> return (m, WeakTermConst x)
-    Nothing -> throwError $ "undefined variable: " <> x
+    Nothing -> throwError $ T.pack (showMeta m) <> ": undefined variable: " <> x
 rename' (m, WeakTermPi xts t) = do
   (xts', t') <- renameBinder xts t
   return (m, WeakTermPi xts' t')
