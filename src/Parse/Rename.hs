@@ -70,19 +70,16 @@ rename' (m, WeakTermEnumElim (e, t) caseList) = do
   t' <- rename' t
   caseList' <- renameCaseList caseList
   return (m, WeakTermEnumElim (e', t') caseList')
-rename' (m, WeakTermArray kind indexType) = do
-  indexType' <- rename' indexType
-  return (m, WeakTermArray kind indexType')
-rename' (m, WeakTermArrayIntro kind les) = do
-  les' <-
-    forM les $ \(l, body) -> do
-      body' <- rename' body
-      return (l, body')
-  return (m, WeakTermArrayIntro kind les')
-rename' (m, WeakTermArrayElim kind e1 e2) = do
+rename' (m, WeakTermArray dom kind) = do
+  dom' <- rename' dom
+  return (m, WeakTermArray dom' kind)
+rename' (m, WeakTermArrayIntro kind es) = do
+  es' <- mapM rename' es
+  return (m, WeakTermArrayIntro kind es')
+rename' (m, WeakTermArrayElim kind xts e1 e2) = do
   e1' <- rename' e1
-  e2' <- rename' e2
-  return (m, WeakTermArrayElim kind e1' e2')
+  (xts', e2') <- renameBinder xts e2
+  return (m, WeakTermArrayElim kind xts' e1' e2')
 
 renameBinder ::
      [IdentifierPlus]
@@ -164,12 +161,12 @@ checkSanity _ (_, WeakTermEnum _) = True
 checkSanity _ (_, WeakTermEnumIntro _) = True
 checkSanity ctx (_, WeakTermEnumElim (e, t) les) =
   all (checkSanity ctx) $ e : t : map snd les
-checkSanity ctx (_, WeakTermArray _ indexType) = do
-  checkSanity ctx indexType
-checkSanity ctx (_, WeakTermArrayIntro _ les) = do
-  all (checkSanity ctx . snd) les
-checkSanity ctx (_, WeakTermArrayElim _ e1 e2) = do
-  checkSanity ctx e1 && checkSanity ctx e2
+checkSanity ctx (_, WeakTermArray dom _) = do
+  checkSanity ctx dom
+checkSanity ctx (_, WeakTermArrayIntro _ es) = do
+  all (checkSanity ctx) es
+checkSanity ctx (_, WeakTermArrayElim _ xts e1 e2) = do
+  checkSanity ctx e1 && checkSanity' ctx xts e2
 
 checkSanity' :: [Identifier] -> [IdentifierPlus] -> WeakTermPlus -> Bool
 checkSanity' ctx [] e = do
