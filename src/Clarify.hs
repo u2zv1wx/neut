@@ -86,6 +86,7 @@ clarify (m, TermArrayIntro k es) = do
       (m, DataSigmaIntro arrVoidPtr [arrayType, (m, DataSigmaIntro k xs)]))
 clarify (m, TermArrayElim k xts e1 e2) = do
   e1' <- clarify e1
+  forM_ xts $ uncurry insTypeEnv
   let (xs, ts) = unzip xts
   (arrVarName, arrVar) <- newDataUpsilonWith "arr"
   (arrTypeVarName, arrTypeVar) <- newDataUpsilonWith "arr-type"
@@ -121,6 +122,9 @@ clarify (m, TermStructIntro eks) = do
     bindLet (zip xs es') $ (m, CodeUpIntro (m, DataStructIntro (zip vs ks)))
 clarify (m, TermStructElim xks e1 e2) = do
   e1' <- clarify e1
+  let (xs, ks) = unzip xks
+  let ts = map inferKind ks
+  forM_ (zip xs ts) $ uncurry insTypeEnv
   e2' <- clarify e2
   (structVarName, structVar) <- newDataUpsilonWith "struct"
   return $ bindLet [(structVarName, e1')] (m, CodeStructElim xks structVar e2')
@@ -473,3 +477,10 @@ asSysCallMaybe "open" = Just (SysCallOpen, 4)
 asSysCallMaybe "close" = Just (SysCallClose, 1)
 asSysCallMaybe "fork" = Just (SysCallFork, 0)
 asSysCallMaybe _ = Nothing
+
+inferKind :: ArrayKind -> TermPlus
+inferKind (ArrayKindIntS i) = (emptyMeta, TermConst $ "i" <> T.pack (show i))
+inferKind (ArrayKindIntU i) = (emptyMeta, TermConst $ "u" <> T.pack (show i))
+inferKind (ArrayKindFloat size) =
+  (emptyMeta, TermConst $ "f" <> T.pack (show (sizeAsInt size)))
+inferKind _ = error "inferKind for void-pointer"
