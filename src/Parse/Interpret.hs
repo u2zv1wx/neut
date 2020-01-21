@@ -81,10 +81,10 @@ interpret (m, TreeNode ((_, TreeAtom "enum-elimination"):e:cs)) = do
   cs' <- mapM interpretClause cs
   h <- newHole m
   return (m, WeakTermEnumElim (e', h) cs')
-interpret (m, TreeNode [(_, TreeAtom str), dom])
-  | Just kind <- withKindPrefix str "array" = do
-    dom' <- interpret dom
-    return (m, WeakTermArray dom' kind)
+interpret (m, TreeNode [(_, TreeAtom "array"), dom, (_, TreeAtom kind)]) = do
+  dom' <- interpret dom
+  kind' <- asArrayKind kind
+  return (m, WeakTermArray dom' kind')
 interpret (m, TreeNode ((_, TreeAtom "array-introduction"):(_, TreeAtom kind):es)) = do
   kind' <- asArrayKind kind
   es' <- mapM interpret es
@@ -114,8 +114,6 @@ interpret (m, TreeAtom x)
 interpret (m, TreeAtom x)
   | Just str <- readMaybe $ T.unpack x = do
     u8s <- forM (encode str) $ \u -> return (m, WeakTermIntU 8 (toInteger u))
-    -- let len = toInteger $ length u8s
-    -- let ns = map (\i -> EnumValueNatNum len i) [0 .. (len - 1)]
     -- parse string as utf-8 encoded u8 array
     return (m, WeakTermArrayIntro (ArrayKindIntU 8) u8s)
 interpret t@(m, TreeAtom x) = do
@@ -204,30 +202,11 @@ interpretClause (_, TreeNode [c, e]) = do
 interpretClause e =
   throwError $ "interpretClause: syntax error:\n " <> T.pack (Pr.ppShow e)
 
--- {} asArrayIntro {}
--- asArrayIntro :: Case -> WithEnv EnumValue
--- asArrayIntro (CaseValue l) = return l
--- asArrayIntro CaseDefault = throwError "`default` cannot be used in array-intro"
 -- {} extractIdentifier {}
 extractIdentifier :: TreePlus -> WithEnv Identifier
 extractIdentifier (_, TreeAtom s) = return s
 extractIdentifier t =
   throwError $ "interpretAtom: syntax error:\n" <> T.pack (Pr.ppShow t)
-
--- {} withKindPrefix {}
--- 「-」でsplitして、第1要素がarraykindとして妥当で、かつ第2要素以降をconcatしたものがbaseと一致していたら、
--- arraykindを返す。たとえば"u8-array"と"array"が入力ならu8を、"f64-array-introduction"と"array-introduction"が
--- 入力ならf64を返す。
-withKindPrefix ::
-     Identifier -- "u8-array", "u16-hoo", "f64-hogehoge"
-  -> Identifier -- "array", "hoo", "hogehoge"
-  -> Maybe ArrayKind
-withKindPrefix str base
-  | (t:rest) <- wordsBy '-' str -- e.g. u8-array
-  , base == T.intercalate "-" rest
-  , Just t' <- asLowTypeMaybe t
-  , Just kind <- asArrayKindMaybe t' = Just kind
-withKindPrefix _ _ = Nothing
 
 -- {} isDefinedEnumName {}
 isDefinedEnumName :: Identifier -> WithEnv Bool
