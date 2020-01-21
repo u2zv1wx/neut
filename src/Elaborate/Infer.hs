@@ -113,6 +113,7 @@ infer' _ (m, WeakTermIntU size i) = do
   retWeakTerm t m $ WeakTermIntU size i
 infer' ctx (m, WeakTermInt t i) = do
   t' <- inferType ctx t
+  -- holeはemptyにしたほうが妥当かも？
   retWeakTerm t' m $ WeakTermInt t' i
 infer' _ (m, WeakTermFloat16 f) = do
   let t = (emptyMeta, WeakTermConst "f16")
