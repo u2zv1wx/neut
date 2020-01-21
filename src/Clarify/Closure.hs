@@ -122,15 +122,19 @@ chainTermPlus' (_, TermEnumElim e les) = do
   xs2 <- concat <$> mapM (chainTermPlus') es
   return $ xs1 ++ xs2
 chainTermPlus' (_, TermArray dom _) = chainTermPlus' dom
-chainTermPlus' (_, TermArrayIntro _ es)
-  -- let es = map snd les
- = do
+chainTermPlus' (_, TermArrayIntro _ es) = do
   concat <$> mapM (chainTermPlus') es
--- chainTermPlus' (_, TermArrayElim _ e1 e2) = do
 chainTermPlus' (_, TermArrayElim _ xts e1 e2) = do
   xs1 <- chainTermPlus' e1
   xs2 <- chainTermPlus'' xts [e2]
   return $ xs1 ++ xs2
+chainTermPlus' (_, TermStruct _) = return []
+chainTermPlus' (_, TermStructIntro eks) =
+  concat <$> mapM (chainTermPlus' . fst) eks
+chainTermPlus' (_, TermStructElim xks e1 e2) = do
+  xs1 <- chainTermPlus' e1
+  xs2 <- chainTermPlus' e2
+  return $ xs1 ++ filter (\(y, _) -> y `notElem` map fst xks) xs2
 
 chainTermPlus'' ::
      [(Identifier, TermPlus)] -> [TermPlus] -> WithEnv [(Identifier, TermPlus)]

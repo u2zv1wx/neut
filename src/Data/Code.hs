@@ -67,6 +67,10 @@ substDataPlus _ (m, DataFloat16 l) = (m, DataFloat16 l)
 substDataPlus _ (m, DataFloat32 l) = (m, DataFloat32 l)
 substDataPlus _ (m, DataFloat64 l) = (m, DataFloat64 l)
 substDataPlus _ (m, DataEnumIntro l) = (m, DataEnumIntro l)
+substDataPlus sub (m, DataStructIntro dks) = do
+  let (ds, ks) = unzip dks
+  let ds' = map (substDataPlus sub) ds
+  (m, DataStructIntro $ zip ds' ks)
 
 substCodePlus :: SubstDataPlus -> CodePlus -> CodePlus
 substCodePlus sub (m, CodeTheta theta) = do
@@ -94,6 +98,11 @@ substCodePlus sub (m, CodeEnumElim v branchList) = do
   let es' = map (substCodePlus sub) es
   let branchList' = zip cs es'
   (m, CodeEnumElim v' branchList')
+substCodePlus sub (m, CodeStructElim xks v e) = do
+  let v' = substDataPlus sub v
+  let sub' = filter (\(k, _) -> k `notElem` map fst xks) sub
+  let e' = substCodePlus sub' e
+  (m, CodeStructElim xks v' e')
 
 substTheta :: SubstDataPlus -> Theta -> Theta
 substTheta sub (ThetaUnaryOp a t v) = do
@@ -122,6 +131,7 @@ substDataPlusSigmaElim sub ((x, t):xs) e = do
 varData :: DataPlus -> [Identifier]
 varData (_, DataUpsilon x) = [x]
 varData (_, DataSigmaIntro _ ds) = concatMap varData ds
+varData (_, DataStructIntro dks) = concatMap (varData . fst) dks
 varData _ = []
 
 varCode :: CodePlus -> [Identifier]
@@ -133,6 +143,8 @@ varCode (_, CodeUpElim x e1 e2) = varCode e1 ++ filter (/= x) (varCode e2)
 varCode (_, CodeEnumElim d les) = do
   let (_, es) = unzip les
   varData d ++ concatMap varCode es
+varCode (_, CodeStructElim xks d e) =
+  varData d ++ filter (`notElem` map fst xks) (varCode e)
 
 varTheta :: Theta -> [Identifier]
 varTheta (ThetaUnaryOp _ _ d) = varData d
