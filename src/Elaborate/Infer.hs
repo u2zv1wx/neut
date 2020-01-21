@@ -58,7 +58,7 @@ infer' ctx (m, WeakTermPi xts t) = do
   (xts', t') <- inferPi ctx xts t
   retWeakTerm univ m $ WeakTermPi xts' t'
 infer' ctx (m, WeakTermPiIntro xts e) = do
-  (xts', (e', tCod)) <- inferPiIntro ctx xts e
+  (xts', (e', tCod)) <- inferBinder ctx xts e
   let piType = (emptyMeta, WeakTermPi xts' tCod)
   retWeakTerm piType m $ WeakTermPiIntro xts' e'
 infer' ctx (m, WeakTermPiElim e@(_, WeakTermPiIntro xts _) es)
@@ -80,7 +80,7 @@ infer' ctx (m, WeakTermIter (x, t) xts e) = do
   insWeakTypeEnv x t'
   -- Note that we cannot extend context with x. The type of e cannot be dependent on `x`.
   -- Otherwise the type of `mu x. e` might have `x` as free variable, which is unsound.
-  (xts', (e', tCod)) <- inferPiIntro ctx xts e
+  (xts', (e', tCod)) <- inferBinder ctx xts e
   let piType = (emptyMeta, WeakTermPi xts' tCod)
   insConstraintEnv t' piType
   retWeakTerm piType m $ WeakTermIter (x, t') xts' e'
@@ -152,25 +152,25 @@ infer' ctx (m, WeakTermEnumElim (e, t) les) = do
       (es', ts) <- unzip <$> mapM (inferEnumElim ctx (e', t')) les
       constrainList $ ts
       retWeakTerm (head ts) m $ WeakTermEnumElim (e', t') $ zip ls es'
-infer' ctx (m, WeakTermArray k indexType) = do
-  indexType' <- inferType ctx indexType
-  retWeakTerm univ m $ WeakTermArray k indexType'
-infer' ctx (m, WeakTermArrayIntro k les) = do
-  let (ls, es) = unzip les
-  tls <- catMaybes <$> mapM (inferCase . CaseValue) ls
-  constrainList tls
+infer' ctx (m, WeakTermArray dom k) = do
+  dom' <- inferType ctx dom
+  retWeakTerm univ m $ WeakTermArray dom' k
+infer' ctx (m, WeakTermArrayIntro k es) = do
   let tCod = inferKind k
   (es', ts) <- unzip <$> mapM (infer' ctx) es
   constrainList $ tCod : ts
-  let indexType = determineDomType tls
-  let t = (emptyMeta, WeakTermArray k indexType)
-  retWeakTerm t m $ WeakTermArrayIntro k $ zip ls es'
-infer' ctx (m, WeakTermArrayElim k e1 e2) = do
-  let tCod = inferKind k
+  let len = toInteger $ length es
+  let dom = (emptyMeta, WeakTermEnum (EnumTypeNatNum len))
+  let t = (emptyMeta, WeakTermArray dom k)
+  retWeakTerm t m $ WeakTermArrayIntro k es'
+infer' ctx (m, WeakTermArrayElim k xts e1 e2) = do
   (e1', t1) <- infer' ctx e1
-  (e2', t2) <- infer' ctx e2
-  insConstraintEnv t1 (emptyMeta, WeakTermArray k t2)
-  retWeakTerm tCod m $ WeakTermArrayElim k e1' e2'
+  (xts', (e2', t2)) <- inferBinder ctx xts e2
+  let len = toInteger $ length xts
+  let dom = (emptyMeta, WeakTermEnum (EnumTypeNatNum len))
+  insConstraintEnv t1 (emptyMeta, WeakTermArray dom k)
+  constrainList $ inferKind k : map snd xts'
+  retWeakTerm t2 m $ WeakTermArrayElim k xts' e1' e2'
 
 -- {} inferType {}
 inferType :: Context -> WeakTermPlus -> WithEnv WeakTermPlus
@@ -203,19 +203,19 @@ inferPi ctx ((x, t):xts) cod = do
   (xts', cod') <- inferPi (ctx ++ [(x, t')]) xts cod
   return ((x, t') : xts', cod')
 
--- {} inferPiIntro {}
-inferPiIntro ::
+-- {} inferBinder {}
+inferBinder ::
      Context
   -> [(Identifier, WeakTermPlus)]
   -> WeakTermPlus
   -> WithEnv ([(Identifier, WeakTermPlus)], (WeakTermPlus, WeakTermPlus))
-inferPiIntro ctx [] e = do
+inferBinder ctx [] e = do
   et' <- infer' ctx e
   return ([], et')
-inferPiIntro ctx ((x, t):xts) e = do
+inferBinder ctx ((x, t):xts) e = do
   t' <- inferType ctx t
   insWeakTypeEnv x t'
-  (xts', et') <- inferPiIntro (ctx ++ [(x, t')]) xts e
+  (xts', et') <- inferBinder (ctx ++ [(x, t')]) xts e
   return ((x, t') : xts', et')
 
 -- {} inferPiElim {}
@@ -364,12 +364,11 @@ newHole = do
   h <- newNameWith "hole"
   return (emptyMeta, WeakTermZeta h)
 
-determineDomType :: [WeakTermPlus] -> WeakTermPlus
-determineDomType ts =
-  if not (null ts)
-    then head ts
-    else (emptyMeta, WeakTermConst "bottom")
-
+-- determineDomType :: [WeakTermPlus] -> WeakTermPlus
+-- determineDomType ts =
+--   if not (null ts)
+--     then head ts
+--     else (emptyMeta, WeakTermConst "bottom")
 insConstraintEnv :: WeakTermPlus -> WeakTermPlus -> WithEnv ()
 insConstraintEnv t1 t2 =
   modify (\e -> e {constraintEnv = (t1, t2) : constraintEnv e})
