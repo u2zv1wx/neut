@@ -299,13 +299,13 @@ inferEnumElim ctx ((_, WeakTermUpsilon x), enumType) (CaseValue v, e) = do
             (emptyMeta, WeakTermPiIntro [(x', enumType)] e')
             [(emptyMeta, WeakTermEnumIntro v)])
   return (e'', t')
-inferEnumElim ctx (enumTerm, enumType) (CaseValue v, e) = do
-  x <- newNameWith "hole-enum"
-  h <- newTypeHoleInCtx $ ctx ++ [(x, enumType)]
-  (e', t) <- infer' ctx e
-  insConstraintEnv t $ substWeakTermPlus [(x, enumTerm)] h
-  let sub = [(x, (emptyMeta, WeakTermEnumIntro v))]
-  return (e', substWeakTermPlus sub h)
+inferEnumElim ctx _ (_, e) = infer' ctx e
+  -- x <- newNameWith "hole-enum"
+  -- h <- newTypeHoleInCtx $ ctx ++ [(x, enumType)]
+  -- (e', t) <- infer' ctx e
+  -- insConstraintEnv t $ substWeakTermPlus [(x, enumTerm)] h
+  -- let sub = [(x, (emptyMeta, WeakTermEnumIntro v))]
+  -- return (e', substWeakTermPlus sub h)
 
 -- In a context (x1 : A1, ..., xn : An), this function creates metavariables
 --   ?M  : Pi (x1 : A1, ..., xn : An). ?Mt @ (x1, ..., xn)
