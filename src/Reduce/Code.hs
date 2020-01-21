@@ -58,13 +58,13 @@ reduceCodePlus (m, CodeEnumElim v les) = do
             Nothing -> return (m, CodeEnumElim v $ zip ls es')
     _ -> do
       return (m, CodeEnumElim v $ zip ls es')
--- reduceCodePlus (m, CodeArrayElim k d1 d2) = do
---   case (d1, d2) of
---     ((_, DataSigmaIntro (Just k') ds), (_, DataEnumIntro l))
---       | k == k' -> do
---         i <- enumValueToInteger l
---         return (m, CodeUpIntro $ ds !! fromInteger i)
---     _ -> return (m, CodeArrayElim k d1 d2)
+reduceCodePlus (m, CodeStructElim xks d e) = do
+  case d of
+    (_, DataStructIntro eks)
+      | (xs, ks1) <- unzip xks
+      , (es, ks2) <- unzip eks
+      , ks1 == ks2 -> reduceCodePlus $ substCodePlus (zip xs es) e
+    _ -> return (m, CodeStructElim xks d e)
 reduceCodePlus (m, CodeTheta theta) =
   case theta of
     ThetaUnaryOp op (LowTypeIntS s) (m1, DataIntS s1 x)

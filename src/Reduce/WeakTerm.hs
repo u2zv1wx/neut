@@ -79,6 +79,18 @@ reduceWeakTermPlus (m, WeakTermArrayElim k xts e1 e2) = do
       , k == k' ->
         reduceWeakTermPlus $ substWeakTermPlus (zip (map fst xts) es) e2
     _ -> (m, WeakTermArrayElim k xts e1' e2)
+reduceWeakTermPlus (m, WeakTermStructIntro eks) = do
+  let (es, ks) = unzip eks
+  let es' = map reduceWeakTermPlus es
+  (m, WeakTermStructIntro $ zip es' ks)
+reduceWeakTermPlus (m, WeakTermStructElim xks e1 e2) = do
+  let e1' = reduceWeakTermPlus e1
+  case e1' of
+    (_, WeakTermStructIntro eks)
+      | (xs, ks1) <- unzip xks
+      , (es, ks2) <- unzip eks
+      , ks1 == ks2 -> reduceWeakTermPlus $ substWeakTermPlus (zip xs es) e2
+    _ -> (m, WeakTermStructElim xks e1' e2)
 reduceWeakTermPlus e = e
 
 reduceWeakTermPlusTheta ::

@@ -100,6 +100,18 @@ reduceTermPlus (m, TermArrayElim k xts e1 e2) = do
   --     | k == k'
   --     , Just e <- lookup l les -> reduceTermPlus e
     -- _ -> return (m, TermArrayElim k e1' e2')
+reduceTermPlus (m, TermStructIntro eks) = do
+  let (es, ks) = unzip eks
+  es' <- mapM reduceTermPlus es
+  return (m, TermStructIntro $ zip es' ks)
+reduceTermPlus (m, TermStructElim xks e1 e2) = do
+  e1' <- reduceTermPlus e1
+  case e1' of
+    (_, TermStructIntro eks)
+      | (xs, ks1) <- unzip xks
+      , (es, ks2) <- unzip eks
+      , ks1 == ks2 -> reduceTermPlus $ substTermPlus (zip xs es) e2
+    _ -> return (m, TermStructElim xks e1' e2)
 reduceTermPlus t = return t
 
 reduceTermPlusTheta ::
