@@ -81,21 +81,19 @@ interpret (m, TreeNode ((_, TreeAtom "enum-elimination"):e:cs)) = do
   cs' <- mapM interpretClause cs
   h <- newHole m
   return (m, WeakTermEnumElim (e', h) cs')
-interpret (m, TreeNode [(_, TreeAtom str), indexType])
+interpret (m, TreeNode [(_, TreeAtom str), dom])
   | Just kind <- withKindPrefix str "array" = do
-    indexType' <- interpret indexType
-    return (m, WeakTermArray kind indexType')
-interpret (m, TreeNode ((_, TreeAtom str):cs))
-  | Just kind <- withKindPrefix str "array-introduction" = do
-    cs' <- mapM interpretClause cs
-    let (ls, es) = unzip cs'
-    ls' <- mapM asArrayIntro ls
-    return (m, WeakTermArrayIntro kind (zip ls' es))
-interpret (m, TreeNode [(_, TreeAtom str), e1, e2])
-  | Just kind <- withKindPrefix str "array-elimination" = do
-    e1' <- interpret e1
-    e2' <- interpret e2
-    return (m, WeakTermArrayElim kind e1' e2')
+    dom' <- interpret dom
+    return (m, WeakTermArray dom' kind)
+interpret (m, TreeNode ((_, TreeAtom "array-introduction"):(_, TreeAtom kind):es)) = do
+  kind' <- asArrayKind kind
+  es' <- mapM interpret es
+  return (m, WeakTermArrayIntro kind' es')
+interpret (m, TreeNode [(_, TreeAtom "array-elimination"), (_, TreeAtom kind), (_, TreeNode xts), e1, e2]) = do
+  kind' <- asArrayKind kind
+  e1' <- interpret e1
+  (xts', e2') <- interpretBinder xts e2
+  return (m, WeakTermArrayElim kind' xts' e1' e2')
 --
 -- auxiliary interpretations
 --
@@ -116,10 +114,10 @@ interpret (m, TreeAtom x)
 interpret (m, TreeAtom x)
   | Just str <- readMaybe $ T.unpack x = do
     u8s <- forM (encode str) $ \u -> return (m, WeakTermIntU 8 (toInteger u))
-    let len = toInteger $ length u8s
-    let ns = map (\i -> EnumValueNatNum len i) [0 .. (len - 1)]
+    -- let len = toInteger $ length u8s
+    -- let ns = map (\i -> EnumValueNatNum len i) [0 .. (len - 1)]
     -- parse string as utf-8 encoded u8 array
-    return (m, WeakTermArrayIntro (ArrayKindIntU 8) (zip ns u8s))
+    return (m, WeakTermArrayIntro (ArrayKindIntU 8) u8s)
 interpret t@(m, TreeAtom x) = do
   ml <- interpretEnumValueMaybe t
   isEnum <- isDefinedEnumName x
@@ -207,10 +205,9 @@ interpretClause e =
   throwError $ "interpretClause: syntax error:\n " <> T.pack (Pr.ppShow e)
 
 -- {} asArrayIntro {}
-asArrayIntro :: Case -> WithEnv EnumValue
-asArrayIntro (CaseValue l) = return l
-asArrayIntro CaseDefault = throwError "`default` cannot be used in array-intro"
-
+-- asArrayIntro :: Case -> WithEnv EnumValue
+-- asArrayIntro (CaseValue l) = return l
+-- asArrayIntro CaseDefault = throwError "`default` cannot be used in array-intro"
 -- {} extractIdentifier {}
 extractIdentifier :: TreePlus -> WithEnv Identifier
 extractIdentifier (_, TreeAtom s) = return s
@@ -229,7 +226,7 @@ withKindPrefix str base
   | (t:rest) <- wordsBy '-' str -- e.g. u8-array
   , base == T.intercalate "-" rest
   , Just t' <- asLowTypeMaybe t
-  , Just kind <- asArrayKind t' = Just kind
+  , Just kind <- asArrayKindMaybe t' = Just kind
 withKindPrefix _ _ = Nothing
 
 -- {} isDefinedEnumName {}
@@ -245,7 +242,16 @@ newHole m = do
   h <- newNameWith "hole-aux"
   return (m, WeakTermZeta h)
 
--- {} encodeChar {(the output is valid as utf8 string)}
+asArrayKind :: Identifier -> WithEnv ArrayKind
+asArrayKind x =
+  case asLowTypeMaybe x of
+    Nothing -> throwError "asArrayKind: syntax error"
+    Just t -> do
+      case asArrayKindMaybe t of
+        Nothing -> throwError "asArrayKind: syntax error"
+        Just a -> return a
+
+-- {} encodechar {(the output is valid as utf8 string)}
 -- adopted from https://hackage.haskell.org/package/utf8-string-1.0.1.1/docs/src/Codec-Binary-UTF8-String.html
 encodeChar :: Char -> [Word8]
 encodeChar c = do
