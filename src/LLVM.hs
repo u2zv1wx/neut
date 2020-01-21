@@ -42,7 +42,8 @@ llvmCode (_, CodeSigmaElim k xts v e) = do
   let bt = LowTypeArrayPtr (toInteger $ length xs) et -- base pointer type  ([(length xs) x ARRAY_ELEM_TYPE])
   let idxList = map (\i -> (LLVMDataInt i, i32)) [0 ..]
   ys <- mapM newNameWith xs
-  loadContent v bt (zip idxList (zip ys xs)) et e
+  let xts' = zip xs (repeat et)
+  loadContent v bt (zip idxList (zip ys xts')) e
 llvmCode (_, CodeUpIntro d) = do
   result <- newNameWith $ takeBaseName d
   llvmDataLet result d $ LLVMReturn $ LLVMDataLocal result
@@ -51,19 +52,24 @@ llvmCode (_, CodeUpElim x e1 e2) = do
   e2' <- llvmCode e2
   return $ commConv x e1' e2'
 llvmCode (_, CodeEnumElim v branchList) = llvmCodeEnumElim v branchList
+llvmCode (_, CodeStructElim xks v e) = do
+  let (xs, ks) = unzip xks
+  let ts = map arrayKindToLowType ks
+  let xts = zip xs ts
+  let bt = LowTypeStructPtr ts
+  let idxList = map (\i -> (LLVMDataInt i, i32)) [0 ..]
+  ys <- mapM newNameWith xs
+  loadContent v bt (zip idxList (zip ys xts)) e
 
-uncastList :: LowType -> [(Identifier, Identifier)] -> CodePlus -> WithEnv LLVM
-uncastList _ [] e = llvmCode e
-uncastList et ((y, x):yxs) e = do
-  e' <- uncastList et yxs e
+uncastList :: [(Identifier, (Identifier, LowType))] -> CodePlus -> WithEnv LLVM
+uncastList [] e = llvmCode e
+uncastList ((y, (x, et)):yxs) e = do
+  e' <- uncastList yxs e
   llvmUncastLet x (LLVMDataLocal y) et e'
 
 takeBaseName :: DataPlus -> Identifier
 takeBaseName (_, DataTheta x) = x
 takeBaseName (_, DataUpsilon x) = x
--- takeBaseName (_, DataSigmaIntro Nothing []) = "unit"
--- takeBaseName (_, DataSigmaIntro Nothing ds) =
---   "struct" <> T.pack (show (length ds))
 takeBaseName (_, DataSigmaIntro _ ds) = "array" <> T.pack (show (length ds))
 takeBaseName (_, DataIntS size _) = "i" <> T.pack (show size)
 takeBaseName (_, DataIntU size _) = "u" <> T.pack (show size)
@@ -71,8 +77,8 @@ takeBaseName (_, DataFloat16 _) = "half"
 takeBaseName (_, DataFloat32 _) = "float"
 takeBaseName (_, DataFloat64 _) = "double"
 takeBaseName (_, DataEnumIntro _) = "i64"
+takeBaseName (_, DataStructIntro dks) = "struct" <> T.pack (show (length dks))
 
--- takeBaseName (_, DataArrayIntro _ ds) = "array" <> T.pack (show (length ds))
 takeBaseName' :: LLVMData -> Identifier
 takeBaseName' (LLVMDataLocal x) = x
 takeBaseName' (LLVMDataGlobal x) = x
@@ -85,31 +91,29 @@ takeBaseName' LLVMDataNull = "null"
 loadContent ::
      DataPlus -- base pointer
   -> LowType -- the type of base pointer
-  -> [((LLVMData, LowType), (Identifier, Identifier))] -- [(the index of an element, the variable to load the element)]
-  -> LowType -- the type of elements
+  -> [((LLVMData, LowType), (Identifier, (Identifier, LowType)))] -- [(the index of an element, the variable to load the element)]
   -> CodePlus -- continuation
   -> WithEnv LLVM
-loadContent v bt iyxs et cont = do
-  let ixs = map (\(i, (y, _)) -> (i, y)) iyxs
+loadContent v bt iyxs cont = do
+  let ixs = map (\(i, (y, (_, k))) -> (i, (y, k))) iyxs
   (bp, castThen) <- llvmCast (Just $ takeBaseName v) v bt
   let yxs = map (\(_, yx) -> yx) iyxs
-  uncastThenCont <- uncastList et yxs cont
-  extractThenFreeThenUncastThenCont <- loadContent' bp bt et ixs uncastThenCont
+  uncastThenCont <- uncastList yxs cont
+  extractThenFreeThenUncastThenCont <- loadContent' bp bt ixs uncastThenCont
   castThen extractThenFreeThenUncastThenCont
 
 loadContent' ::
      LLVMData -- base pointer
   -> LowType -- the type of base pointer
-  -> LowType -- the type of elements
-  -> [((LLVMData, LowType), Identifier)] -- [(the index of an element, the variable to keep the loaded content)]
+  -> [((LLVMData, LowType), (Identifier, LowType))] -- [(the index of an element, the variable to keep the loaded content)]
   -> LLVM -- continuation
   -> WithEnv LLVM
-loadContent' bp bt _ [] cont = do
+loadContent' bp bt [] cont = do
   l <- llvmUncast (Just $ takeBaseName' bp) bp bt
   tmp <- newNameWith' $ Just $ takeBaseName' bp
   return $ commConv tmp l $ LLVMCont (LLVMOpFree (LLVMDataLocal tmp)) cont
-loadContent' bp bt et ((i, x):xis) cont = do
-  cont' <- loadContent' bp bt et xis cont
+loadContent' bp bt ((i, (x, et)):xis) cont = do
+  cont' <- loadContent' bp bt xis cont
   (posName, pos) <- newDataLocal' (Just x)
   return $
     LLVMLet
@@ -254,7 +258,8 @@ llvmDataLet x (_, DataUpsilon y) cont =
 llvmDataLet x (_, DataSigmaIntro k ds) cont = do
   let elemType = arrayKindToLowType k
   let arrayType = LowTypeArrayPtr (toInteger $ length ds) elemType
-  storeContent x elemType arrayType ds cont
+  let dts = zip ds (repeat elemType)
+  storeContent x arrayType dts cont
 llvmDataLet x (_, DataIntS j i) cont =
   llvmUncastLet x (LLVMDataInt i) (LowTypeIntS j) cont
 llvmDataLet x (_, DataIntU j i) cont =
@@ -268,6 +273,11 @@ llvmDataLet x (_, DataFloat64 f) cont =
 llvmDataLet x (m, DataEnumIntro labelOrNat) cont = do
   i <- enumValueToInteger labelOrNat
   llvmDataLet x (m, DataIntS 64 i) cont
+llvmDataLet x (_, DataStructIntro dks) cont = do
+  let (ds, ks) = unzip dks
+  let ts = map arrayKindToLowType ks
+  let structType = LowTypeStructPtr ts
+  storeContent x structType (zip ds ts) cont
 
 sysCallNumAsInt :: SysCall -> WithEnv Integer
 sysCallNumAsInt num = do
@@ -326,11 +336,11 @@ llvmCodeEnumElim v branchList = do
       castThen $ LLVMSwitch (cast, t) defaultCase caseList
 
 storeContent ::
-     Identifier -> LowType -> LowType -> [DataPlus] -> LLVM -> WithEnv LLVM
-storeContent reg elemType aggPtrType ds cont = do
+     Identifier -> LowType -> [(DataPlus, LowType)] -> LLVM -> WithEnv LLVM
+storeContent reg aggPtrType dts cont = do
   (cast, castThen) <-
     llvmCast (Just reg) (emptyMeta, DataUpsilon reg) aggPtrType
-  storeThenCont <- storeContent' cast aggPtrType elemType (zip [0 ..] ds) cont
+  storeThenCont <- storeContent' cast aggPtrType (zip [0 ..] dts) cont
   castThenStoreThenCont <- castThen $ storeThenCont
   -- FIXME: getelementptrでsizeofを実現する方式を使えばallocsizeを計算する必要はそもそもないはず？
   case lowTypeToAllocSize aggPtrType of
@@ -357,13 +367,12 @@ storeContent reg elemType aggPtrType ds cont = do
 storeContent' ::
      LLVMData -- base pointer
   -> LowType -- the type of base pointer (like [n x u8]*, {i8*, i8*}*, etc.)
-  -> LowType -- the type of elements (like u8, i8*, etc.)
-  -> [(Integer, DataPlus)] -- [(the index of an element, the element to be stored)]
+  -> [(Integer, (DataPlus, LowType))] -- [(the index of an element, the element to be stored)]
   -> LLVM -- continuation
   -> WithEnv LLVM
-storeContent' _ _ _ [] cont = return cont
-storeContent' bp bt et ((i, d):ids) cont = do
-  cont' <- storeContent' bp bt et ids cont
+storeContent' _ _ [] cont = return cont
+storeContent' bp bt ((i, (d, et)):ids) cont = do
+  cont' <- storeContent' bp bt ids cont
   (locName, loc) <- newDataLocal $ takeBaseName d <> "-location"
   (cast, castThen) <- llvmCast (Just $ takeBaseName d) d et
   let it = indexTypeOf bt
