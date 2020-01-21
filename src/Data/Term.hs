@@ -29,6 +29,9 @@ data Term
       [(Identifier, TermPlus)] -- [(x1, return t1), ..., (xn, return tn)] with xi : ti
       TermPlus
       TermPlus
+  | TermStruct [ArrayKind] -- e.g. (struct u8 u8 f16 f32 u64)
+  | TermStructIntro [(TermPlus, ArrayKind)]
+  | TermStructElim [(Identifier, ArrayKind)] TermPlus TermPlus
   deriving (Show)
 
 type TermPlus = (Meta, Term)
@@ -72,6 +75,11 @@ varTermPlus (_, TermArray dom _) = varTermPlus dom
 varTermPlus (_, TermArrayIntro _ es) = do
   concatMap varTermPlus es
 varTermPlus (_, TermArrayElim _ xts d e) = varTermPlus d ++ varTermPlus' xts [e]
+varTermPlus (_, TermStruct {}) = []
+varTermPlus (_, TermStructIntro ets) = concatMap (varTermPlus . fst) ets
+varTermPlus (_, TermStructElim xts d e) = do
+  let xs = map fst xts
+  varTermPlus d ++ filter (`notElem` xs) (varTermPlus e)
 
 varTermPlus' :: [(Identifier, TermPlus)] -> [TermPlus] -> [Identifier]
 varTermPlus' [] es = concatMap varTermPlus es
@@ -127,6 +135,17 @@ substTermPlus sub (m, TermArrayElim mk xts v e) = do
   let v' = substTermPlus sub v
   let (xts', e') = substTermPlusBindingsWithBody sub xts e
   (m, TermArrayElim mk xts' v' e')
+substTermPlus _ (m, TermStruct ts) = do
+  (m, TermStruct ts)
+substTermPlus sub (m, TermStructIntro ets) = do
+  let (es, ts) = unzip ets
+  let es' = map (substTermPlus sub) es
+  (m, TermStructIntro $ zip es' ts)
+substTermPlus sub (m, TermStructElim xts v e) = do
+  let v' = substTermPlus sub v
+  let sub' = filter (\(k, _) -> k `notElem` map fst xts) sub
+  let e' = substTermPlus sub' e
+  (m, TermStructElim xts v' e')
 
 substTermPlusBindingsWithBody ::
      SubstTerm -> [IdentifierPlus] -> TermPlus -> ([IdentifierPlus], TermPlus)
