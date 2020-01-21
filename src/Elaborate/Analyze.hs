@@ -98,6 +98,10 @@ simp' (((_, WeakTermArray dom1 k1), (_, WeakTermArray dom2 k2)):cs)
 simp' (((_, WeakTermArrayIntro k1 es1), (_, WeakTermArrayIntro k2 es2)):cs)
   | k1 == k2
   , length es1 == length es2 = simp $ zip es1 es2 ++ cs
+simp' (((_, WeakTermStructIntro eks1), (_, WeakTermStructIntro eks2)):cs)
+  | (es1, ks1) <- unzip eks1
+  , (es2, ks2) <- unzip eks2
+  , ks1 == ks2 = simp $ zip es1 es2 ++ cs
 simp' ((e1, e2):cs) = do
   let ms1 = asStuckedTerm e1
   let ms2 = asStuckedTerm e2
