@@ -171,6 +171,24 @@ infer' ctx (m, WeakTermArrayElim k xts e1 e2) = do
   insConstraintEnv t1 (emptyMeta, WeakTermArray dom k)
   constrainList $ inferKind k : map snd xts'
   retWeakTerm t2 m $ WeakTermArrayElim k xts' e1' e2'
+infer' _ (m, WeakTermStruct ts) = retWeakTerm univ m $ WeakTermStruct ts
+infer' ctx (m, WeakTermStructIntro eks) = do
+  let (es, ks) = unzip eks
+  let ts = map inferKind ks
+  let structType = (emptyMeta, WeakTermStruct ks)
+  (es', ts') <- unzip <$> mapM (infer' ctx) es
+  forM_ (zip ts ts') $ uncurry insConstraintEnv
+  retWeakTerm structType m $ WeakTermStructIntro $ zip es' ks
+infer' ctx (m, WeakTermStructElim xks e1 e2) = do
+  (e1', t1) <- infer' ctx e1
+  let (xs, ks) = unzip xks
+  let ts = map inferKind ks
+  let structType = (emptyMeta, WeakTermStruct ks)
+  insConstraintEnv t1 structType
+  let xts = zip xs ts
+  forM_ xts $ uncurry insWeakTypeEnv
+  (e2', t2) <- infer' (ctx ++ xts) e2
+  retWeakTerm t2 m $ WeakTermStructElim xks e1' e2'
 
 -- {} inferType {}
 inferType :: Context -> WeakTermPlus -> WithEnv WeakTermPlus
@@ -187,6 +205,7 @@ inferKind (ArrayKindIntU i) =
   (emptyMeta, WeakTermConst $ "u" <> T.pack (show i))
 inferKind (ArrayKindFloat size) =
   (emptyMeta, WeakTermConst $ "f" <> T.pack (show (sizeAsInt size)))
+inferKind _ = error "inferKind for void-pointer"
 
 -- {} inferPi {}
 inferPi ::
