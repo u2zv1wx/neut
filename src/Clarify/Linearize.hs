@@ -31,6 +31,10 @@ linearize' xts (m, CodeSigmaElim k ys d e) = do
   let xts' = filter (\(x, _) -> x `elem` varCode e) xts
   e' <- linearize xts' e
   withHeader xts (m, CodeSigmaElim k ys d e') -- arrayの中身 (ys) はimmediateなのでlinearizeの必要なし
+linearize' xts (m, CodeStructElim yks d e) = do
+  let xts' = filter (\(x, _) -> x `elem` varCode e) xts
+  e' <- linearize xts' e
+  withHeader xts (m, CodeStructElim yks d e') -- arrayの中身 (ys) はimmediateなのでlinearizeの必要なし
 linearize' xts (m, CodeUpElim z e1 e2) = do
   let xts2' = filter (\(x, _) -> x `elem` varCode e2) xts
   e2' <- linearize xts2' e2 -- `z` is already linear
@@ -183,6 +187,10 @@ distinguishData z d@(ml, DataUpsilon x) =
 distinguishData z (ml, DataSigmaIntro mk ds) = do
   (vss, ds') <- unzip <$> mapM (distinguishData z) ds
   return (concat vss, (ml, DataSigmaIntro mk ds'))
+distinguishData z (m, DataStructIntro dks) = do
+  let (ds, ks) = unzip dks
+  (vss, ds') <- unzip <$> mapM (distinguishData z) ds
+  return (concat vss, (m, DataStructIntro $ zip ds' ks))
 distinguishData _ d = return ([], d)
 
 -- {} distinguishCode z d {結果のtermにzは出現せず、かつ、renameされた結果がリストに格納されている}
@@ -217,6 +225,13 @@ distinguishCode z (ml, CodeEnumElim d branchList) = do
   let (cs, es) = unzip branchList
   (vss, es') <- unzip <$> mapM (distinguishCode z) es
   return (vs ++ concat vss, (ml, CodeEnumElim d' (zip cs es')))
+distinguishCode z (ml, CodeStructElim xts d e) = do
+  (vs1, d') <- distinguishData z d
+  if z `elem` map fst xts
+    then return (vs1, (ml, CodeStructElim xts d' e))
+    else do
+      (vs2, e') <- distinguishCode z e
+      return (vs1 ++ vs2, (ml, CodeStructElim xts d' e'))
 
 -- distinguishCode z (ml, CodeArrayElim k d1 d2) = do
 --   (vs1, d1') <- distinguishData z d1

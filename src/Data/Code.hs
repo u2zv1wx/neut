@@ -17,6 +17,7 @@ data Data
   | DataFloat32 Float
   | DataFloat64 Double
   | DataEnumIntro EnumValue
+  | DataStructIntro [(DataPlus, ArrayKind)]
   deriving (Show)
 
 data Code
@@ -30,6 +31,7 @@ data Code
   | CodeUpIntro DataPlus
   | CodeUpElim Identifier CodePlus CodePlus
   | CodeEnumElim DataPlus [(Case, CodePlus)]
+  | CodeStructElim [(Identifier, ArrayKind)] DataPlus CodePlus
   deriving (Show)
 
 data Theta

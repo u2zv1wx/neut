@@ -111,6 +111,19 @@ clarify (m, TermArrayElim k xts e1 e2) = do
             [(affVarName, retImmType), (relVarName, retImmType)]
             arrTypeVar
             (m, CodeSigmaElim k xts' arrInnerVar e2')))
+clarify (m, TermStruct ks) = do
+  t <- cartesianStruct m ks
+  return (m, CodeUpIntro t)
+clarify (m, TermStructIntro eks) = do
+  let (es, ks) = unzip eks
+  (xs, es', vs) <- unzip3 <$> mapM clarifyPlus es
+  return $
+    bindLet (zip xs es') $ (m, CodeUpIntro (m, DataStructIntro (zip vs ks)))
+clarify (m, TermStructElim xks e1 e2) = do
+  e1' <- clarify e1
+  e2' <- clarify e2
+  (structVarName, structVar) <- newDataUpsilonWith "struct"
+  return $ bindLet [(structVarName, e1')] (m, CodeStructElim xks structVar e2')
 
 clarifyPlus :: TermPlus -> WithEnv (Identifier, CodePlus, DataPlus)
 clarifyPlus e@(m, _) = do

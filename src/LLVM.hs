@@ -150,6 +150,7 @@ llvmCodeBinaryOp op domType codType v1 v2 = do
   (cast1then >=> cast2then) $
     LLVMLet result (LLVMOpBinaryOp (op, domType) x1 x2) uncast
 
+-- alloca + storeで実現すべき？
 llvmCast ::
      Maybe Identifier
   -> DataPlus
