@@ -87,11 +87,30 @@ clarify (m, TermArrayIntro k es) = do
 clarify (m, TermArrayElim k xts e1 e2) = do
   e1' <- clarify e1
   let (xs, ts) = unzip xts
+  (arrVarName, arrVar) <- newDataUpsilonWith "arr"
+  (arrTypeVarName, arrTypeVar) <- newDataUpsilonWith "arr-type"
+  let retArrTypeVar = (m, CodeUpIntro arrTypeVar)
+  (arrInnerVarName, arrInnerVar) <- newDataUpsilonWith "arr-inner"
+  affVarName <- newNameWith "aff"
+  relVarName <- newNameWith "rel"
+  retUnivType <- returnCartesianUniv
+  retImmType <- returnCartesianImmediate
   ts' <- mapM clarify ts
   let xts' = zip xs ts'
   e2' <- clarify e2
-  (arrVarName, arrVar) <- newDataUpsilonWith "arr"
-  return $ bindLet [(arrVarName, e1')] $ (m, CodeSigmaElim k xts' arrVar e2')
+  return $
+    bindLet [(arrVarName, e1')] $
+    ( m
+    , CodeSigmaElim
+        arrVoidPtr
+        [(arrTypeVarName, retUnivType), (arrInnerVarName, retArrTypeVar)]
+        arrVar
+        ( m
+        , CodeSigmaElim
+            arrVoidPtr
+            [(affVarName, retImmType), (relVarName, retImmType)]
+            arrTypeVar
+            (m, CodeSigmaElim k xts' arrInnerVar e2')))
 
 clarifyPlus :: TermPlus -> WithEnv (Identifier, CodePlus, DataPlus)
 clarifyPlus e@(m, _) = do
