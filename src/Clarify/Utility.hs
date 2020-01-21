@@ -34,7 +34,7 @@ toAffineApp m x t = do
         t
         ( emptyMeta
         , CodeSigmaElim
-            Nothing
+            arrVoidPtr
             [(affVarName, retImmType), (relVarName, retImmType)]
             expVar
             (m, CodePiElimDownElim affVar [toDataUpsilon (x, m)])))
@@ -58,7 +58,7 @@ toRelevantApp m x t = do
         t
         ( m
         , CodeSigmaElim
-            Nothing
+            arrVoidPtr
             [(affVarName, retImmType), (relVarName, retImmType)]
             expVar
             (m, CodePiElimDownElim relVar [toDataUpsilon (x, m)])))
@@ -87,7 +87,7 @@ cartesianImmediate :: Meta -> WithEnv DataPlus
 cartesianImmediate m = do
   aff <- affineImmediate m
   rel <- relevantImmediate m
-  return (m, DataSigmaIntro Nothing [aff, rel])
+  return (m, DataSigmaIntro arrVoidPtr [aff, rel])
 
 affineImmediate :: Meta -> WithEnv DataPlus
 affineImmediate m = do
@@ -101,7 +101,7 @@ affineImmediate m = do
       insCodeEnv
         thetaName
         [immVarName]
-        (emptyMeta, CodeUpIntro (emptyMeta, DataSigmaIntro Nothing []))
+        (emptyMeta, CodeUpIntro (emptyMeta, DataSigmaIntro arrVoidPtr []))
       return theta
 
 relevantImmediate :: Meta -> WithEnv DataPlus
@@ -117,14 +117,14 @@ relevantImmediate m = do
         thetaName
         [immVarName]
         ( emptyMeta
-        , CodeUpIntro (emptyMeta, DataSigmaIntro Nothing [immVar, immVar]))
+        , CodeUpIntro (emptyMeta, DataSigmaIntro arrVoidPtr [immVar, immVar]))
       return theta
 
 cartesianUniv :: Meta -> WithEnv DataPlus
 cartesianUniv m = do
   aff <- affineUniv m
   rel <- relevantUniv m
-  return (m, DataSigmaIntro Nothing [aff, rel])
+  return (m, DataSigmaIntro arrVoidPtr [aff, rel])
 
 -- \x -> let (_, _) := x in unit
 affineUniv :: Meta -> WithEnv DataPlus
@@ -145,10 +145,10 @@ affineUniv m = do
         -- let (a, b) := x in return ()
         ( emptyMeta
         , CodeSigmaElim
-            Nothing
+            arrVoidPtr
             [(affVarName, retImmType), (relVarName, retImmType)]
             univVar
-            (emptyMeta, CodeUpIntro (emptyMeta, DataSigmaIntro Nothing [])))
+            (emptyMeta, CodeUpIntro (emptyMeta, DataSigmaIntro arrVoidPtr [])))
       return theta
 
 relevantUniv :: Meta -> WithEnv DataPlus
@@ -169,16 +169,16 @@ relevantUniv m = do
         -- let (a, b) := x in return ((a, b), (a, b))
         ( emptyMeta
         , CodeSigmaElim
-            Nothing
+            arrVoidPtr
             [(affVarName, retImmType), (relVarName, retImmType)]
             univVar
             ( emptyMeta
             , CodeUpIntro
                 ( emptyMeta
                 , DataSigmaIntro
-                    Nothing
-                    [ (emptyMeta, DataSigmaIntro Nothing [affVar, relVar])
-                    , (emptyMeta, DataSigmaIntro Nothing [affVar, relVar])
+                    arrVoidPtr
+                    [ (emptyMeta, DataSigmaIntro arrVoidPtr [affVar, relVar])
+                    , (emptyMeta, DataSigmaIntro arrVoidPtr [affVar, relVar])
                     ])))
       return theta
 

@@ -133,6 +133,7 @@ data ArrayKind
   = ArrayKindIntS Integer
   | ArrayKindIntU Integer
   | ArrayKindFloat FloatSize
+  | ArrayKindVoidPtr
   deriving (Show, Eq)
 
 asArrayKindMaybe :: LowType -> Maybe ArrayKind
@@ -141,18 +142,17 @@ asArrayKindMaybe (LowTypeIntU i) = Just $ ArrayKindIntU i
 asArrayKindMaybe (LowTypeFloat size) = Just $ ArrayKindFloat size
 asArrayKindMaybe _ = Nothing
 
-arrayKindToSize :: ArrayKind -> Integer
-arrayKindToSize (ArrayKindIntS i) = lowTypeToAllocSize' i
-arrayKindToSize (ArrayKindIntU i) = lowTypeToAllocSize' i
-arrayKindToSize (ArrayKindFloat size) = lowTypeToAllocSize' $ sizeAsInt size
-
 arrayKindToLowType :: ArrayKind -> LowType
 arrayKindToLowType (ArrayKindIntS i) = LowTypeIntS i
 arrayKindToLowType (ArrayKindIntU i) = LowTypeIntU i
 arrayKindToLowType (ArrayKindFloat size) = LowTypeFloat size
+arrayKindToLowType ArrayKindVoidPtr = LowTypeVoidPtr
 
 voidPtr :: LowType
 voidPtr = LowTypeVoidPtr
+
+arrVoidPtr :: ArrayKind
+arrVoidPtr = ArrayKindVoidPtr
 
 data UnaryOp
   = UnaryOpNeg -- fneg

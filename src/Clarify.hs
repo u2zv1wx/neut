@@ -77,13 +77,13 @@ clarify (m, TermArrayIntro k es) = do
   -- arrayType = Sigma{k} [_ : IMMEDIATE, ..., _ : IMMEDIATE]
   name <- newNameWith "array"
   let ts = map Left $ replicate (length es) retImmType
-  arrayType <- cartesianSigma name m (Just k) ts
+  arrayType <- cartesianSigma name m k ts
   (zs, es', xs) <- unzip3 <$> mapM clarifyPlus es
   return $
     bindLet (zip zs es') $
     ( m
     , CodeUpIntro $
-      (m, DataSigmaIntro Nothing [arrayType, (m, DataSigmaIntro (Just k) xs)]))
+      (m, DataSigmaIntro arrVoidPtr [arrayType, (m, DataSigmaIntro k xs)]))
 clarify (m, TermArrayElim k xts e1 e2) = do
   e1' <- clarify e1
   let (xs, ts) = unzip xts
@@ -91,8 +91,7 @@ clarify (m, TermArrayElim k xts e1 e2) = do
   let xts' = zip xs ts'
   e2' <- clarify e2
   (arrVarName, arrVar) <- newDataUpsilonWith "arr"
-  return $
-    bindLet [(arrVarName, e1')] $ (m, CodeSigmaElim (Just k) xts' arrVar e2')
+  return $ bindLet [(arrVarName, e1')] $ (m, CodeSigmaElim k xts' arrVar e2')
 
 clarifyPlus :: TermPlus -> WithEnv (Identifier, CodePlus, DataPlus)
 clarifyPlus e@(m, _) = do
@@ -182,7 +181,7 @@ clarifyIsEnum m = do
         [(x, tx)]
         ( m
         , CodeSigmaElim
-            Nothing
+            arrVoidPtr
             [(aff, retImmType), (rel, retImmType)]
             varX
             (m, CodeUpIntro v))
@@ -261,7 +260,7 @@ clarifySysCallRW m name xts zts vs cod sysCall
     let body =
           ( m
           , CodeSigmaElim
-              Nothing
+              arrVoidPtr
               [(strTypeName, retUnivType), (strInnerName, retStrType)]
               (vs !! 2) -- str
               ( m
@@ -282,7 +281,7 @@ clarifySysCallRW m name xts zts vs cod sysCall
                           arrName -- arr = (arrType, arrInner)
                           ( m
                           , CodeUpIntro
-                              (m, DataSigmaIntro Nothing [strType, strTmp]))
+                              (m, DataSigmaIntro arrVoidPtr [strType, strTmp]))
                           pair'))))
     retClosure (Just name) zts m xts body
   | otherwise = throwError $ "the type of " <> name <> " is wrong"
@@ -313,7 +312,7 @@ clarifySysCallOpen m name xts zts vs cod sysCall
     let body =
           ( m
           , CodeSigmaElim
-              Nothing
+              arrVoidPtr
               [(strTypeName, retUnivType), (strInnerName, retStrType)]
               filePath
               ( m
@@ -333,7 +332,8 @@ clarifySysCallOpen m name xts zts vs cod sysCall
                           arrName -- arr = (arrType, arrInner)
                           ( m
                           , CodeUpIntro
-                              (m, DataSigmaIntro Nothing [strType, fliePathTmp]))
+                              ( m
+                              , DataSigmaIntro arrVoidPtr [strType, fliePathTmp]))
                           pair'))))
     retClosure (Just name) zts m xts body
   | otherwise = throwError $ "the type of " <> name <> " is wrong"

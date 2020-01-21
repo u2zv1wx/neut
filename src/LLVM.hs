@@ -36,14 +36,7 @@ llvmCode (_, CodePiElimDownElim v ds) = do
   (fun, castThen) <- llvmCast (Just $ takeBaseName v) v $ toFunPtrType ds
   castThenCall <- castThen $ LLVMCall fun vs
   llvmDataLet' (zip xs ds) $ castThenCall
-llvmCode (_, CodeSigmaElim Nothing xts v e) = do
-  let xs = map fst xts
-  -- ここは[n x i8*]*みたいにしたほうがたぶんよい。
-  let structPtrType = toStructPtrType $ length xs
-  let idxList = map (\i -> (LLVMDataInt i, i32)) [0 ..]
-  ys <- mapM newNameWith xs
-  loadContent v structPtrType (zip idxList (zip ys xs)) voidPtr e
-llvmCode (_, CodeSigmaElim (Just k) xts v e) = do
+llvmCode (_, CodeSigmaElim k xts v e) = do
   let xs = map fst xts
   let et = arrayKindToLowType k -- elem type
   let bt = LowTypeArrayPtr (toInteger $ length xs) et -- base pointer type  ([(length xs) x ARRAY_ELEM_TYPE])
@@ -68,11 +61,10 @@ uncastList et ((y, x):yxs) e = do
 takeBaseName :: DataPlus -> Identifier
 takeBaseName (_, DataTheta x) = x
 takeBaseName (_, DataUpsilon x) = x
-takeBaseName (_, DataSigmaIntro Nothing []) = "unit"
-takeBaseName (_, DataSigmaIntro Nothing ds) =
-  "struct" <> T.pack (show (length ds))
-takeBaseName (_, DataSigmaIntro (Just _) ds) =
-  "array" <> T.pack (show (length ds))
+-- takeBaseName (_, DataSigmaIntro Nothing []) = "unit"
+-- takeBaseName (_, DataSigmaIntro Nothing ds) =
+--   "struct" <> T.pack (show (length ds))
+takeBaseName (_, DataSigmaIntro _ ds) = "array" <> T.pack (show (length ds))
 takeBaseName (_, DataIntS size _) = "i" <> T.pack (show size)
 takeBaseName (_, DataIntU size _) = "u" <> T.pack (show size)
 takeBaseName (_, DataFloat16 _) = "half"
@@ -258,9 +250,7 @@ llvmDataLet x (_, DataTheta y) cont = do
       llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType args) cont
 llvmDataLet x (_, DataUpsilon y) cont =
   llvmUncastLet x (LLVMDataLocal y) voidPtr cont
-llvmDataLet reg (_, DataSigmaIntro Nothing ds) cont =
-  storeContent reg voidPtr (toStructPtrType $ length ds) ds cont
-llvmDataLet x (_, DataSigmaIntro (Just k) ds) cont = do
+llvmDataLet x (_, DataSigmaIntro k ds) cont = do
   let elemType = arrayKindToLowType k
   let arrayType = LowTypeArrayPtr (toInteger $ length ds) elemType
   storeContent x elemType arrayType ds cont
@@ -389,9 +379,6 @@ indexTypeOf _ = LowTypeIntS 64
 toFunPtrType :: [a] -> LowType
 toFunPtrType xs = do
   LowTypeFunctionPtr (map (const voidPtr) xs) voidPtr
-
-toStructPtrType :: Int -> LowType
-toStructPtrType i = LowTypeStructPtr $ map (const voidPtr) [1 .. i]
 
 newDataLocal :: Identifier -> WithEnv (Identifier, LLVMData)
 newDataLocal name = do

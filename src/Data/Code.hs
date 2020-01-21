@@ -10,7 +10,7 @@ import Data.Basic
 data Data
   = DataTheta Identifier
   | DataUpsilon Identifier
-  | DataSigmaIntro (Maybe ArrayKind) [DataPlus]
+  | DataSigmaIntro ArrayKind [DataPlus]
   | DataIntS IntSize Integer
   | DataIntU IntSize Integer
   | DataFloat16 Half
@@ -23,7 +23,7 @@ data Code
   = CodeTheta Theta
   | CodePiElimDownElim DataPlus [DataPlus] -- ((force v) v1 ... vn)
   | CodeSigmaElim
-      (Maybe ArrayKind)
+      ArrayKind
       [(Identifier, CodePlus)] -- [(x1, return t1), ..., (xn, return tn)] with xi : ti
       DataPlus
       CodePlus

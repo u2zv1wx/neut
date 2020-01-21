@@ -20,13 +20,13 @@ import Data.Env
 cartesianSigma ::
      Identifier
   -> Meta
-  -> Maybe ArrayKind
+  -> ArrayKind
   -> [Either CodePlus (Identifier, CodePlus)]
   -> WithEnv DataPlus
-cartesianSigma thetaName m mk mxts = do
-  aff <- affineSigma ("affine-" <> thetaName) m mk mxts
-  rel <- relevantSigma ("relevant-" <> thetaName) m mk mxts
-  return (m, DataSigmaIntro Nothing [aff, rel])
+cartesianSigma thetaName m k mxts = do
+  aff <- affineSigma ("affine-" <> thetaName) m k mxts
+  rel <- relevantSigma ("relevant-" <> thetaName) m k mxts
+  return (m, DataSigmaIntro arrVoidPtr [aff, rel])
 
 -- (Assuming `ti` = `return di` for some `di` such that `xi : di`)
 -- affineSigma NAME LOC [(x1, t1), ..., (xn, tn)]   ~>
@@ -49,10 +49,10 @@ cartesianSigma thetaName m mk mxts = do
 affineSigma ::
      Identifier
   -> Meta
-  -> Maybe ArrayKind
+  -> ArrayKind
   -> [Either CodePlus (Identifier, CodePlus)]
   -> WithEnv DataPlus
-affineSigma thetaName m mk mxts = do
+affineSigma thetaName m k mxts = do
   cenv <- gets codeEnv
   let theta = (m, DataTheta thetaName)
   case Map.lookup thetaName cenv of
@@ -64,11 +64,13 @@ affineSigma thetaName m mk mxts = do
       as <- forM xts $ \(x, t) -> toAffineApp m x t
       ys <- mapM (const $ newNameWith "arg") xts
       let body =
-            bindLet (zip ys as) (m, CodeUpIntro (m, DataSigmaIntro Nothing []))
+            bindLet
+              (zip ys as)
+              (m, CodeUpIntro (m, DataSigmaIntro arrVoidPtr []))
       let info = toInfo "affineSigma: arg of linearize is not closed:" xts
       assertUP info $ isClosedChain xts
       body' <- linearize xts body
-      insCodeEnv thetaName [z] (m, CodeSigmaElim mk xts varZ body')
+      insCodeEnv thetaName [z] (m, CodeSigmaElim k xts varZ body')
       return theta
 
 -- (Assuming `ti` = `return di` for some `di` such that `xi : di`)
@@ -93,10 +95,10 @@ affineSigma thetaName m mk mxts = do
 relevantSigma ::
      Identifier
   -> Meta
-  -> Maybe ArrayKind
+  -> ArrayKind
   -> [Either CodePlus (Identifier, CodePlus)]
   -> WithEnv DataPlus
-relevantSigma thetaName m mk mxts = do
+relevantSigma thetaName m k mxts = do
   cenv <- gets codeEnv
   let theta = (m, DataTheta thetaName)
   case Map.lookup thetaName cenv of
@@ -108,12 +110,12 @@ relevantSigma thetaName m mk mxts = do
       as <- forM xts $ \(x, t) -> toRelevantApp m x t
       -- pairVarNameList == [pair-1, ...,  pair-n]
       (pairVarNameList, pairVarTypeList) <- unzip <$> mapM toPairInfo xts
-      transposedPair <- transposeSigma mk pairVarTypeList
+      transposedPair <- transposeSigma k pairVarTypeList
       let body = bindLet (zip pairVarNameList as) transposedPair
       let info = toInfo "relevantSigma: arg of linearize is not closed:" xts
       assertUP info $ isClosedChain xts
       body' <- linearize xts body
-      insCodeEnv thetaName [z] (m, CodeSigmaElim mk xts varZ body')
+      insCodeEnv thetaName [z] (m, CodeSigmaElim k xts varZ body')
       return theta
 
 toPairInfo ::
@@ -127,8 +129,8 @@ toPairInfo (_, t) = do
 --   ...
 --   let (xn, yn) := dn in
 --   return ((x1, ..., xn), (y1, ..., yn))
-transposeSigma :: Maybe ArrayKind -> [(DataPlus, CodePlus)] -> WithEnv CodePlus
-transposeSigma mk ds = do
+transposeSigma :: ArrayKind -> [(DataPlus, CodePlus)] -> WithEnv CodePlus
+transposeSigma k ds = do
   (xVarNameList, xVarList) <-
     unzip <$> mapM (const $ newDataUpsilonWith "sig-x") ds
   (yVarNameList, yVarList) <-
@@ -139,9 +141,9 @@ transposeSigma mk ds = do
     , CodeUpIntro
         ( emptyMeta
         , DataSigmaIntro
-            Nothing
-            [ (emptyMeta, DataSigmaIntro mk xVarList)
-            , (emptyMeta, DataSigmaIntro mk yVarList)
+            arrVoidPtr
+            [ (emptyMeta, DataSigmaIntro k xVarList)
+            , (emptyMeta, DataSigmaIntro k yVarList)
             ]))
 
 bindSigmaElim ::
@@ -149,7 +151,7 @@ bindSigmaElim ::
 bindSigmaElim [] cont = cont
 bindSigmaElim (((x, y), (d, t)):xyds) cont = do
   let cont' = bindSigmaElim xyds cont
-  (fst cont', CodeSigmaElim Nothing [(x, t), (y, t)] d cont')
+  (fst cont', CodeSigmaElim arrVoidPtr [(x, t), (y, t)] d cont')
 
 supplyName :: Either b (Identifier, b) -> WithEnv (Identifier, b)
 supplyName (Right (x, t)) = return (x, t)
@@ -166,7 +168,7 @@ returnArrayType ml = do
     cartesianSigma
       "array-closure"
       ml
-      Nothing
+      arrVoidPtr
       [Right (arrVarName, retTau), Left retArrVar]
   return (ml, CodeUpIntro v)
 
@@ -180,6 +182,6 @@ returnClosureType m = do
     cartesianSigma
       "closure"
       m
-      Nothing
+      arrVoidPtr
       [Right (envVarName, retUnivType), Left retEnvVar, Left retImmType]
   return (m, CodeUpIntro closureType)

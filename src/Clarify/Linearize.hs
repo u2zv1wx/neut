@@ -23,14 +23,14 @@ linearize xts e = do
 
 -- e' <- linearize xts eのとき、e'は、eとbeta-equivalentであり、かつ、xtsに含まれる変数の使用がlinearであるようなterm.
 linearize' :: [(Identifier, CodePlus)] -> CodePlus -> WithEnv CodePlus
-linearize' xts (m, CodeSigmaElim Nothing yts d e) = do
+linearize' xts (m, CodeSigmaElim ArrayKindVoidPtr yts d e) = do
   let xts' = filter (\(x, _) -> x `elem` varCode e) xts
   e' <- linearize (xts' ++ yts) e -- e'はxts' ++ ytsについてlinear
-  withHeader xts (m, CodeSigmaElim Nothing yts d e') -- SigmaElimはxtsについてlinear
-linearize' xts (m, CodeSigmaElim (Just k) ys d e) = do
+  withHeader xts (m, CodeSigmaElim ArrayKindVoidPtr yts d e') -- SigmaElimはxtsについてlinear
+linearize' xts (m, CodeSigmaElim k ys d e) = do
   let xts' = filter (\(x, _) -> x `elem` varCode e) xts
   e' <- linearize xts' e
-  withHeader xts (m, CodeSigmaElim (Just k) ys d e') -- arrayの中身 (ys) はimmediateなのでlinearizeの必要なし
+  withHeader xts (m, CodeSigmaElim k ys d e') -- arrayの中身 (ys) はimmediateなのでlinearizeの必要なし
 linearize' xts (m, CodeUpElim z e1 e2) = do
   let xts2' = filter (\(x, _) -> x `elem` varCode e2) xts
   e2' <- linearize xts2' e2 -- `z` is already linear
@@ -115,7 +115,7 @@ withHeaderRelevant x t x1 x2 xs e = do
         t
         ( ml
         , CodeSigmaElim
-            Nothing
+            arrVoidPtr
             [(affVarName, retImmType), (relVarName, retImmType)]
             expVar
             rel))
@@ -170,7 +170,7 @@ withHeaderRelevant' t relVar ((x, (x1, x2)):chain) cont = do
     , CodeUpElim
         sigVarName
         (m, CodePiElimDownElim relVar [varX])
-        (m, CodeSigmaElim Nothing [(x1, t), (x2, t)] sigVar cont'))
+        (m, CodeSigmaElim arrVoidPtr [(x1, t), (x2, t)] sigVar cont'))
 
 -- {} distinguishData z d {結果のtermにzは出現せず、かつ、renameされた結果がリストに格納されている}
 distinguishData :: Identifier -> DataPlus -> WithEnv ([Identifier], DataPlus)

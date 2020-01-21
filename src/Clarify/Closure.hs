@@ -30,7 +30,7 @@ makeClosure ::
   -> WithEnv DataPlus
 makeClosure mName xts2 m xts1 e = do
   expName <- newNameWith "exp"
-  envExp <- cartesianSigma expName m Nothing $ map Right xts2
+  envExp <- cartesianSigma expName m arrVoidPtr $ map Right xts2
   (envVarName, envVar) <- newDataUpsilonWith "env"
   let xts = xts2 ++ xts1
   let info1 = toInfo "makeClosure: arg of linearize is not closed chain:" xts
@@ -41,10 +41,10 @@ makeClosure mName xts2 m xts1 e = do
   cenv <- gets codeEnv
   name <- nameFromMaybe mName
   let args = envVarName : map fst xts1
-  let body = (m, CodeSigmaElim Nothing xts2 envVar e')
+  let body = (m, CodeSigmaElim arrVoidPtr xts2 envVar e')
   when (name `notElem` Map.keys cenv) $ insCodeEnv name args body
-  let fvEnv = (m, DataSigmaIntro Nothing $ map (toDataUpsilon' . fst) xts2)
-  return (m, DataSigmaIntro Nothing [envExp, fvEnv, (m, DataTheta name)])
+  let fvEnv = (m, DataSigmaIntro arrVoidPtr $ map (toDataUpsilon' . fst) xts2)
+  return (m, DataSigmaIntro arrVoidPtr [envExp, fvEnv, (m, DataTheta name)])
   -- let cls = (m, DataSigmaIntro [envExp, fvEnv, (m, DataTheta name)])
   -- return (m, CodeUpIntro cls)
 
@@ -65,7 +65,7 @@ callClosure m e zexes = do
       ((clsVarName, e) : zip zs es')
       ( m
       , CodeSigmaElim
-          Nothing
+          arrVoidPtr
           [ (typeVarName, retUnivType)
           , (envVarName, returnUpsilon typeVarName)
           , (lamVarName, retImmType)
@@ -73,7 +73,7 @@ callClosure m e zexes = do
           clsVar
           ( m
           , CodeSigmaElim
-              Nothing
+              arrVoidPtr
               [(affVarName, retImmType), (relVarName, retImmType)]
               typeVar
               (m, CodePiElimDownElim lamVar (envVar : xs))))
