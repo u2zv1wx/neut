@@ -22,7 +22,6 @@ import Elaborate.Synthesize
 import Reduce.Term
 import Reduce.WeakTerm
 
--- import Reduce.WeakTerm
 -- Given a term `e` and its name `main`, this function
 --   (1) traces `e` using `infer e`, collecting type constraints,
 --   (2) updates weakTypeEnv for `main` by the result of `infer e`,
@@ -151,17 +150,17 @@ elaborate' (m, WeakTermEnumElim (e, t) les) = do
       caseCheckEnumIdentifier x $ map fst les
       return (m, TermEnumElim e' les')
     _ -> throwError "type error (enum elim)"
-elaborate' (m, WeakTermArray k indexType) = do
-  indexType' <- elaborate' indexType
-  return (m, TermArray k indexType')
-elaborate' (m, WeakTermArrayIntro k les) = do
-  let (ls, es) = unzip les
+elaborate' (m, WeakTermArray dom k) = do
+  dom' <- elaborate' dom
+  return (m, TermArray dom' k)
+elaborate' (m, WeakTermArrayIntro k es) = do
   es' <- mapM elaborate' es
-  return (m, TermArrayIntro k (zip ls es'))
-elaborate' (m, WeakTermArrayElim k e1 e2) = do
+  return (m, TermArrayIntro k es')
+elaborate' (m, WeakTermArrayElim k xts e1 e2) = do
   e1' <- elaborate' e1
+  xts' <- mapM elaboratePlus xts
   e2' <- elaborate' e2
-  return (m, TermArrayElim k e1' e2')
+  return (m, TermArrayElim k xts' e1' e2')
 
 elaboratePlus :: (a, WeakTermPlus) -> WithEnv (a, TermPlus)
 elaboratePlus (x, t) = do
