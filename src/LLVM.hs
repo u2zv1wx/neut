@@ -57,16 +57,16 @@ llvmCode (_, CodeUpElim x e1 e2) = do
   e2' <- llvmCode e2
   return $ commConv x e1' e2'
 llvmCode (_, CodeEnumElim v branchList) = llvmCodeEnumElim v branchList
-llvmCode (_, CodeArrayElim k d1 d2) = do
-  result <- newNameWith "array-elim-ans"
-  resultTmp <- newNameWith "array-elim-ans-tmp"
-  let et = arrayKindToLowType k -- elem type
-  let bt = LowTypeArrayPtr 0 et -- base pointer type (e.g. [0 x u8]*)
-  (cast, castThen) <- llvmCast (Just "array-idx") d2 $ LowTypeIntS 64 -- enum ~> i64
-  loadThenFreeThenCont <-
-    loadContent d1 bt [((cast, i64), (resultTmp, result))] et (retUp result)
-  castThen loadThenFreeThenCont
 
+-- llvmCode (_, CodeArrayElim k d1 d2) = do
+--   result <- newNameWith "array-elim-ans"
+--   resultTmp <- newNameWith "array-elim-ans-tmp"
+--   let et = arrayKindToLowType k -- elem type
+--   let bt = LowTypeArrayPtr 0 et -- base pointer type (e.g. [0 x u8]*)
+--   (cast, castThen) <- llvmCast (Just "array-idx") d2 $ LowTypeIntS 64 -- enum ~> i64
+--   loadThenFreeThenCont <-
+--     loadContent d1 bt [((cast, i64), (resultTmp, result))] et (retUp result)
+--   castThen loadThenFreeThenCont
 uncastList :: LowType -> [(Identifier, Identifier)] -> CodePlus -> WithEnv LLVM
 uncastList _ [] e = llvmCode e
 uncastList et ((y, x):yxs) e = do

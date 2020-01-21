@@ -222,11 +222,11 @@ renameCode (m, CodeEnumElim d les) = do
   d' <- renameData d
   les' <- renameCaseList les
   return (m, CodeEnumElim d' les')
-renameCode (m, CodeArrayElim k d1 d2) = do
-  d1' <- renameData d1
-  d2' <- renameData d2
-  return (m, CodeArrayElim k d1' d2')
 
+-- renameCode (m, CodeArrayElim k d1 d2) = do
+--   d1' <- renameData d1
+--   d2' <- renameData d2
+--   return (m, CodeArrayElim k d1' d2')
 renameBinderWithBody ::
      [(Identifier, CodePlus)]
   -> CodePlus

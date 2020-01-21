@@ -30,7 +30,7 @@ data Code
   | CodeUpIntro DataPlus
   | CodeUpElim Identifier CodePlus CodePlus
   | CodeEnumElim DataPlus [(Case, CodePlus)]
-  | CodeArrayElim ArrayKind DataPlus DataPlus
+  -- | CodeArrayElim ArrayKind DataPlus DataPlus
   deriving (Show)
 
 data Theta
@@ -93,11 +93,11 @@ substCodePlus sub (m, CodeEnumElim v branchList) = do
   let es' = map (substCodePlus sub) es
   let branchList' = zip cs es'
   (m, CodeEnumElim v' branchList')
-substCodePlus sub (m, CodeArrayElim k d1 d2) = do
-  let d1' = substDataPlus sub d1
-  let d2' = substDataPlus sub d2
-  (m, CodeArrayElim k d1' d2')
 
+-- substCodePlus sub (m, CodeArrayElim k d1 d2) = do
+--   let d1' = substDataPlus sub d1
+--   let d2' = substDataPlus sub d2
+--   (m, CodeArrayElim k d1' d2')
 substTheta :: SubstDataPlus -> Theta -> Theta
 substTheta sub (ThetaUnaryOp a t v) = do
   let v' = substDataPlus sub v
@@ -136,8 +136,8 @@ varCode (_, CodeUpElim x e1 e2) = varCode e1 ++ filter (/= x) (varCode e2)
 varCode (_, CodeEnumElim d les) = do
   let (_, es) = unzip les
   varData d ++ concatMap varCode es
-varCode (_, CodeArrayElim _ d1 d2) = varData d1 ++ varData d2
 
+-- varCode (_, CodeArrayElim _ d1 d2) = varData d1 ++ varData d2
 varTheta :: Theta -> [Identifier]
 varTheta (ThetaUnaryOp _ _ d) = varData d
 varTheta (ThetaBinaryOp _ _ d1 d2) = varData d1 ++ varData d2

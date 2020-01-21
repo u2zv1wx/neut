@@ -86,32 +86,33 @@ clarify (m, TermArrayIntro k les) = do
     ( m
     , CodeUpIntro $
       (m, DataSigmaIntro Nothing [arrayType, (m, DataSigmaIntro (Just k) xs)]))
-clarify (m, TermArrayElim k e1 e2) = do
-  e1' <- clarify e1
-  e2' <- clarify e2
-  (arrVarName, arrVar) <- newDataUpsilonWith "arr"
-  (idxVarName, idxVar) <- newDataUpsilonWith "idx"
-  affVarName <- newNameWith "aff"
-  relVarName <- newNameWith "rel"
-  (contentTypeVarName, contentTypeVar) <- newDataUpsilonWith "array-type"
-  (contentVarName, contentVar) <- newDataUpsilonWith "array-content"
-  retUnivType <- returnCartesianUniv
-  retImmType <- returnCartesianImmediate
-  let retContentType = (m, CodeUpIntro contentTypeVar)
-  -- array : Sigma [content-type : univ, content : content-type]
-  return $
-    bindLet [(arrVarName, e1'), (idxVarName, e2')] $
-    ( m
-    , CodeSigmaElim
-        Nothing
-        [(contentTypeVarName, retUnivType), (contentVarName, retContentType)]
-        arrVar
-        ( m
-        , CodeSigmaElim
-            Nothing
-            [(affVarName, retImmType), (relVarName, retImmType)]
-            contentTypeVar
-            (m, CodeArrayElim k contentVar idxVar)))
+clarify (_, TermArrayElim {}) = do
+  undefined
+  -- e1' <- clarify e1
+  -- e2' <- clarify e2
+  -- (arrVarName, arrVar) <- newDataUpsilonWith "arr"
+  -- (idxVarName, idxVar) <- newDataUpsilonWith "idx"
+  -- affVarName <- newNameWith "aff"
+  -- relVarName <- newNameWith "rel"
+  -- (contentTypeVarName, contentTypeVar) <- newDataUpsilonWith "array-type"
+  -- (contentVarName, contentVar) <- newDataUpsilonWith "array-content"
+  -- retUnivType <- returnCartesianUniv
+  -- retImmType <- returnCartesianImmediate
+  -- let retContentType = (m, CodeUpIntro contentTypeVar)
+  -- -- array : Sigma [content-type : univ, content : content-type]
+  -- return $
+  --   bindLet [(arrVarName, e1'), (idxVarName, e2')] $
+  --   ( m
+  --   , CodeSigmaElim
+  --       Nothing
+  --       [(contentTypeVarName, retUnivType), (contentVarName, retContentType)]
+  --       arrVar
+  --       ( m
+  --       , CodeSigmaElim
+  --           Nothing
+  --           [(affVarName, retImmType), (relVarName, retImmType)]
+  --           contentTypeVar
+  --           (m, CodeArrayElim k contentVar idxVar)))
 
 clarifyPlus :: TermPlus -> WithEnv (Identifier, CodePlus, DataPlus)
 clarifyPlus e@(m, _) = do

@@ -217,11 +217,11 @@ distinguishCode z (ml, CodeEnumElim d branchList) = do
   let (cs, es) = unzip branchList
   (vss, es') <- unzip <$> mapM (distinguishCode z) es
   return (vs ++ concat vss, (ml, CodeEnumElim d' (zip cs es')))
-distinguishCode z (ml, CodeArrayElim k d1 d2) = do
-  (vs1, d1') <- distinguishData z d1
-  (vs2, d2') <- distinguishData z d2
-  return (vs1 ++ vs2, (ml, CodeArrayElim k d1' d2'))
 
+-- distinguishCode z (ml, CodeArrayElim k d1 d2) = do
+--   (vs1, d1') <- distinguishData z d1
+--   (vs2, d2') <- distinguishData z d2
+--   return (vs1 ++ vs2, (ml, CodeArrayElim k d1' d2'))
 -- distinguishCode z (ml, CodeArrayElimPositive k xs d e) = do
 --   (vs1, d') <- distinguishData z d
 --   if z `elem` xs
