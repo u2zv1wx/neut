@@ -161,6 +161,15 @@ elaborate' (m, WeakTermArrayElim k xts e1 e2) = do
   xts' <- mapM elaboratePlus xts
   e2' <- elaborate' e2
   return (m, TermArrayElim k xts' e1' e2')
+elaborate' (m, WeakTermStruct ts) = return (m, TermStruct ts)
+elaborate' (m, WeakTermStructIntro eks) = do
+  let (es, ks) = unzip eks
+  es' <- mapM elaborate' es
+  return (m, TermStructIntro $ zip es' ks)
+elaborate' (m, WeakTermStructElim xts e1 e2) = do
+  e1' <- elaborate' e1
+  e2' <- elaborate' e2
+  return (m, TermStructElim xts e1' e2')
 
 elaboratePlus :: (a, WeakTermPlus) -> WithEnv (a, TermPlus)
 elaboratePlus (x, t) = do
