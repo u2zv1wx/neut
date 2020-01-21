@@ -93,12 +93,11 @@ simp' (((_, WeakTermEnumElim (e1, t1) les1), (_, WeakTermEnumElim (e2, t2) les2)
   | e1 == e2 = do
     simpCase les1 les2
     simp $ (t1, t2) : cs
-simp' (((_, WeakTermArray k1 indexType1), (_, WeakTermArray k2 indexType2)):cs)
-  | k1 == k2 = simp $ (indexType1, indexType2) : cs
-simp' (((_, WeakTermArrayIntro k1 les1), (_, WeakTermArrayIntro k2 les2)):cs)
-  | k1 == k2 = do
-    simpCase les1 les2
-    simp cs
+simp' (((_, WeakTermArray dom1 k1), (_, WeakTermArray dom2 k2)):cs)
+  | k1 == k2 = simp $ (dom1, dom2) : cs
+simp' (((_, WeakTermArrayIntro k1 es1), (_, WeakTermArrayIntro k2 es2)):cs)
+  | k1 == k2
+  , length es1 == length es2 = simp $ zip es1 es2 ++ cs
 simp' ((e1, e2):cs) = do
   let ms1 = asStuckedTerm e1
   let ms2 = asStuckedTerm e2
