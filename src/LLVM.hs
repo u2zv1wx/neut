@@ -249,7 +249,9 @@ llvmDataLet x (_, DataTheta y) cont = do
   cenv <- gets codeEnv
   case Map.lookup y cenv of
     Nothing
-      | y == "fork" -> llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType []) cont
+      | y == "fork" -> do
+        p "found fork"
+        llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType []) cont
     Nothing -> throwError $ "no such global label defined: " <> y
     Just (args, _) ->
       llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType args) cont

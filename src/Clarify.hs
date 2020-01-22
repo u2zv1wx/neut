@@ -224,174 +224,37 @@ clarifyIsEnum m = do
     _ ->
       throwError $ "the type of is-enum is wrong. t :\n" <> T.pack (Pr.ppShow t)
 
--- インデックス部分についての説明。たとえばsystem callとしてのwriteは、対象言語では
---   write : Pi (A : Univ, out : file-descriptor, str : u8-array a, len : is-enum A). top
--- などと宣言されることになる。他方で実際のsystem callの引数は
---   write(FILE_DESCRIPTOR, STRING_BUFFER, LENGTH)
--- という感じなので、writeの引数Aの部分が不要である。この不要な部分と必要な部分を指定するためにclarifySyscallは
--- 引数としてインデックスの情報をとっている。writeの例で言えば、長さについての情報は4であり、"used arguments" を
--- 指定する配列は、zero-indexであることに注意して [1, 2, 3] となる。
 clarifySysCall ::
      Identifier -- the name of theta
   -> SysCall -- the kind of system call
-  -> Int -- the length of the arguments of the theta
+  -> [Arg] -- the length of the arguments of the theta
   -> Meta -- the meta of the theta
   -> WithEnv CodePlus
-clarifySysCall name sysCall argLen m = do
-  t <- lookupTypeEnv name
-  t' <- reduceTermPlus t
-  case t' of
+clarifySysCall name sysCall args m = do
+  sysCallType <- lookupTypeEnv name
+  sysCallType' <- reduceTermPlus sysCallType
+  case sysCallType' of
     (_, TermPi xts cod)
-      | length xts == argLen -> do
-        let vs = map (toVar . fst) xts
+      | length xts == length args -> do
         zts <- complementaryChainOf xts
-        case sysCall of
-          SysCallWrite -> clarifySysCallRW m name xts zts vs cod sysCall
-          SysCallRead -> clarifySysCallRW m name xts zts vs cod sysCall
-          SysCallExit -> do
-            let exitStatus = vs !! 0
-            let body = (m, CodeTheta (ThetaSysCall sysCall [exitStatus]))
-            retClosure (Just name) zts m xts body
-          SysCallOpen -> clarifySysCallOpen m name xts zts vs cod sysCall
-          SysCallClose -> do
-            let fileDescriptor = vs !! 0
-            let body = (m, CodeTheta (ThetaSysCall sysCall [fileDescriptor]))
-            retClosure (Just name) zts m xts body
-          SysCallFork -> do
-            os <- getOS
-            case os of
-              OSDarwin -> do
-                let theta = (m, DataTheta "fork")
-                let body = (m, CodePiElimDownElim theta [])
-                name' <- newNameWith "fork"
-                retClosure (Just name') zts m xts body
-              _ -> do
-                let body = (m, CodeTheta (ThetaSysCall sysCall []))
-                retClosure (Just name) zts m xts body
+        let xtas = zip xts args
+        (xss, dss, headerList) <-
+          unzip3 <$> mapM (\((x, t), a) -> toHeaderInfo m x t a) xtas
+        let ds = concat dss
+        let xs = concat xss
+        callThenReturn <- toSysCallTail m cod sysCall ds xs
+        let body = iterativeApp headerList callThenReturn
+        os <- getOS
+        case (sysCall, os) of
+          (SysCallFork, OSDarwin) -> do
+            name' <- newNameWith "fork"
+            retClosure (Just name') zts m xts body
+          _ -> retClosure (Just name) zts m xts body
     _ -> throwError $ "the type of " <> name <> " is wrong"
 
--- clarification for read/write is the same procedure
-clarifySysCallRW ::
-     Meta
-  -> Identifier
-  -> [(Identifier, TermPlus)]
-  -> [(Identifier, TermPlus)]
-  -> [DataPlus]
-  -> (a, Term)
-  -> SysCall
-  -> WithEnv CodePlus
-clarifySysCallRW m name xts zts vs cod sysCall
-  | (_, TermPi [c, (funName, funType@(_, TermPi [(arrName, arrType), (sizeName, sizeType)] _))] _) <-
-     cod = do
-    insTypeEnv arrName arrType
-    insTypeEnv sizeName sizeType
-    pair' <- retPair m c funName funType arrName sizeName
-    (strTypeName, strType) <- newDataUpsilonWith "str-type"
-    (strInnerName, strInner) <- newDataUpsilonWith "str-inner"
-    retUnivType <- returnCartesianUniv
-    let retStrType = (m, CodeUpIntro strType)
-    let fileDescriptor = vs !! 1
-    let strSize = vs !! 3
-    (strTmpName, strTmp) <- newDataUpsilonWith "str"
-    let body =
-          ( m
-          , CodeSigmaElim
-              arrVoidPtr
-              [(strTypeName, retUnivType), (strInnerName, retStrType)]
-              (vs !! 2) -- str
-              ( m
-              -- strInnerのコピーを避けるための変数
-              , CodeUpElim
-                  strTmpName
-                  (m, CodeUpIntro strInner)
-                  ( m
-                  , CodeUpElim
-                      sizeName
-                      ( m
-                      , CodeTheta
-                          (ThetaSysCall
-                             sysCall -- write
-                             [fileDescriptor, strTmp, strSize]))
-                      ( m
-                      , CodeUpElim
-                          arrName -- arr = (arrType, arrInner)
-                          ( m
-                          , CodeUpIntro
-                              (m, DataSigmaIntro arrVoidPtr [strType, strTmp]))
-                          pair'))))
-    retClosure (Just name) zts m xts body
-  | otherwise = throwError $ "the type of " <> name <> " is wrong"
-
-clarifySysCallOpen ::
-     Meta
-  -> Identifier
-  -> [(Identifier, TermPlus)]
-  -> [(Identifier, TermPlus)]
-  -> [DataPlus]
-  -> (a, Term)
-  -> SysCall
-  -> WithEnv CodePlus
-clarifySysCallOpen m name xts zts vs cod sysCall
-  | (_, TermPi [c, (funName, funType@(_, TermPi [(arrName, arrType), (fdName, fdType)] _))] _) <-
-     cod = do
-    insTypeEnv arrName arrType
-    insTypeEnv fdName fdType
-    pair' <- retPair m c funName funType arrName fdName
-    (strTypeName, strType) <- newDataUpsilonWith "str-type"
-    (strInnerName, strInner) <- newDataUpsilonWith "str-inner"
-    retUnivType <- returnCartesianUniv
-    let retStrType = (m, CodeUpIntro strType)
-    let filePath = vs !! 1
-    let flags = vs !! 2
-    let mode = vs !! 3
-    (fliePathTmpName, fliePathTmp) <- newDataUpsilonWith "str"
-    let body =
-          ( m
-          , CodeSigmaElim
-              arrVoidPtr
-              [(strTypeName, retUnivType), (strInnerName, retStrType)]
-              filePath
-              ( m
-              , CodeUpElim
-                  fliePathTmpName
-                  (m, CodeUpIntro strInner)
-                  ( m
-                  , CodeUpElim
-                      fdName
-                      ( m
-                      , CodeTheta
-                          (ThetaSysCall
-                             sysCall -- open
-                             [fliePathTmp, flags, mode]))
-                      ( m
-                      , CodeUpElim
-                          arrName -- arr = (arrType, arrInner)
-                          ( m
-                          , CodeUpIntro
-                              ( m
-                              , DataSigmaIntro arrVoidPtr [strType, fliePathTmp]))
-                          pair'))))
-    retClosure (Just name) zts m xts body
-  | otherwise = throwError $ "the type of " <> name <> " is wrong"
-
-retPair ::
-     Meta
-  -> (Identifier, TermPlus)
-  -> Identifier
-  -> TermPlus
-  -> Identifier
-  -> Identifier
-  -> WithEnv CodePlus
-retPair m c funName funType leftName rightName = do
-  let pair =
-        ( m
-        , TermPiIntro
-            [c, (funName, funType)]
-            ( m
-            , TermPiElim
-                (m, TermUpsilon funName)
-                [(m, TermUpsilon leftName), (m, TermUpsilon rightName)]))
-  clarify pair
+iterativeApp :: [a -> a] -> a -> a
+iterativeApp [] x = x
+iterativeApp (f:fs) x = f (iterativeApp fs x)
 
 complementaryChainOf ::
      [(Identifier, TermPlus)] -> WithEnv [(Identifier, TermPlus)]
@@ -469,14 +332,114 @@ pop x mp = do
   v <- Map.lookup x mp
   return (v, Map.delete x mp)
 
-asSysCallMaybe :: Identifier -> Maybe (SysCall, ArgLen)
-asSysCallMaybe "write" = Just (SysCallWrite, 4)
-asSysCallMaybe "read" = Just (SysCallRead, 4)
-asSysCallMaybe "exit" = Just (SysCallExit, 1)
-asSysCallMaybe "open" = Just (SysCallOpen, 4)
-asSysCallMaybe "close" = Just (SysCallClose, 1)
-asSysCallMaybe "fork" = Just (SysCallFork, 0)
+asSysCallMaybe :: Identifier -> Maybe (SysCall, [Arg])
+asSysCallMaybe "write" =
+  Just (SysCallWrite, [ArgUnused, ArgImmediate, ArgArray, ArgImmediate])
+asSysCallMaybe "read" =
+  Just (SysCallRead, [ArgUnused, ArgImmediate, ArgArray, ArgImmediate])
+asSysCallMaybe "exit" = Just (SysCallExit, [ArgImmediate])
+asSysCallMaybe "open" =
+  Just (SysCallOpen, [ArgUnused, ArgArray, ArgImmediate, ArgImmediate])
+asSysCallMaybe "close" = Just (SysCallClose, [ArgImmediate])
+asSysCallMaybe "fork" = Just (SysCallFork, [])
 asSysCallMaybe _ = Nothing
+
+data Arg
+  = ArgImmediate
+  | ArgArray
+  | ArgStruct
+  | ArgUnused
+  deriving (Show)
+
+toHeaderInfo ::
+     Meta
+  -> Identifier -- argument
+  -> TermPlus -- the type of argument
+  -> Arg -- the way of use of argument (specifically)
+  -> WithEnv ([Identifier], [DataPlus], CodePlus -> CodePlus) -- ([borrow], arg-to-syscall, ADD_HEADER_TO_CONTINUATION)
+toHeaderInfo _ x _ ArgImmediate = return ([], [toVar x], id)
+toHeaderInfo _ _ _ ArgUnused = return ([], [], id)
+toHeaderInfo m x t ArgStruct = do
+  (structVarName, structVar) <- newDataUpsilonWith "struct"
+  insTypeEnv structVarName t
+  return
+    ( [structVarName]
+    , [structVar]
+    , \cont -> (m, CodeUpElim structVarName (m, CodeUpIntro (toVar x)) cont))
+toHeaderInfo m x t ArgArray = do
+  arrayVarName <- newNameWith "array"
+  insTypeEnv arrayVarName t
+  (arrayTypeName, arrayType) <- newDataUpsilonWith "array-type"
+  (arrayInnerName, arrayInner) <- newDataUpsilonWith "array-inner"
+  (arrayInnerTmpName, arrayInnerTmp) <- newDataUpsilonWith "array-tmp"
+  retUnivType <- returnCartesianUniv
+  return
+    ( [arrayVarName]
+    , [arrayInnerTmp]
+    , \cont ->
+        ( m
+        , CodeSigmaElim
+            arrVoidPtr
+            [ (arrayTypeName, retUnivType)
+            , (arrayInnerName, (m, CodeUpIntro arrayType))
+            ]
+            (toVar x)
+            ( m
+            , CodeUpElim
+                arrayInnerTmpName
+                (m, CodeUpIntro arrayInner)
+                ( m
+                , CodeUpElim
+                    arrayVarName
+                    ( m
+                    , CodeUpIntro
+                        ( m
+                        , DataSigmaIntro arrVoidPtr [arrayType, arrayInnerTmp]))
+                    cont))))
+
+toSysCallTail ::
+     Meta
+  -> TermPlus -- cod type
+  -> SysCall -- read, write, open, etc
+  -> [DataPlus] -- args of syscall
+  -> [Identifier] -- borrowed variables
+  -> WithEnv CodePlus
+toSysCallTail m cod syscall args xs = do
+  resultVarName <- newNameWith "result"
+  result <- retWithBorrowedVars m cod xs resultVarName
+  os <- getOS
+  case (syscall, os) of
+    (SysCallFork, OSDarwin) -> do
+      return
+        ( m
+        , CodeUpElim
+            resultVarName
+            (m, CodePiElimDownElim (m, DataTheta "fork") args)
+            result)
+    _ ->
+      return
+        ( m
+        , CodeUpElim
+            resultVarName
+            (m, CodeTheta (ThetaSysCall syscall args))
+            result)
+
+retWithBorrowedVars ::
+     Meta -> TermPlus -> [Identifier] -> Identifier -> WithEnv CodePlus
+retWithBorrowedVars m _ [] resultVarName =
+  return (m, CodeUpIntro (m, DataUpsilon resultVarName))
+retWithBorrowedVars m cod xs resultVarName
+  | (_, TermPi [c, (funName, funType@(_, TermPi xts _))] _) <- cod
+  , length xts >= 1 = do
+    let resultType = snd $ last xts
+    let vs = map (\x -> (m, TermUpsilon x)) $ xs ++ [resultVarName]
+    insTypeEnv resultVarName resultType
+    clarify
+      ( m
+      , TermPiIntro
+          [c, (funName, funType)]
+          (m, TermPiElim (m, TermUpsilon funName) vs))
+  | otherwise = throwError "retWithBorrowedVars"
 
 inferKind :: ArrayKind -> TermPlus
 inferKind (ArrayKindIntS i) = (emptyMeta, TermConst $ "i" <> T.pack (show i))

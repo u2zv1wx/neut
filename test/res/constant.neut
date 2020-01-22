@@ -11,7 +11,7 @@
 ;; file-descriptor as int, みたいな操作を許すための定数が必要っぽい。まあそれはそのうち。
 
 (constant i64.add
-  (arrow (i64 i64) i64))
+  (pi ((_ i64) (_ i64)) i64))
 
 ;; (definition u8-vector
 ;;   (sigma
