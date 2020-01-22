@@ -349,6 +349,10 @@ asSysCallMaybe "wait4" =
   Just (SysCallWait4, [ArgImmediate, ArgArray, ArgImmediate, ArgStruct])
 asSysCallMaybe "bind" =
   Just (SysCallBind, [ArgImmediate, ArgStruct, ArgImmediate])
+asSysCallMaybe "accept" =
+  Just (SysCallAccept, [ArgImmediate, ArgStruct, ArgArray])
+asSysCallMaybe "connect" =
+  Just (SysCallConnect, [ArgImmediate, ArgStruct, ArgImmediate])
 asSysCallMaybe _ = Nothing
 
 data Arg

@@ -141,6 +141,20 @@
      (sock-len i64))
     (product sockaddr i64)))
 
+(constant accept
+  (pi
+    ((sock i64)
+     (address sockaddr)
+     (address-len (array n1 i64)))
+    (product sockaddr (array n1 i64) i64)))
+
+(constant connect
+  (pi
+    ((sock i64)
+     (address sockaddr)
+     (address-len i64))
+    (product sockaddr i64)))
+
 (constant socket
   (pi
     ((domain i64)
