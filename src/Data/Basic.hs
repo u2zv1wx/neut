@@ -193,6 +193,7 @@ data SysCall
   | SysCallSocket
   | SysCallListen
   | SysCallWait4
+  | SysCallBind
   deriving (Eq, Show)
 
 type ArgLen = Int

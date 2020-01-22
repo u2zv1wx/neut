@@ -109,6 +109,38 @@
      (usage rusage))
     (product (array n1 i64) rusage i64)))
 
+(definition sockaddr
+  (struct
+    u8    ;; total length
+    u8    ;; address family
+    u16   ;; empty (4 byte so far)
+    u32   ;; empty (8 byte so far)
+    u64)) ;; empty (16 byte so far)
+
+(definition sockaddr-in
+  (struct
+    u8    ;; total length
+    u8    ;; address family
+    u16   ;; ipv4 port
+    u32   ;; ipv4 addr
+    u64)) ;; empty
+
+(definition sockaddr-in6
+  (struct
+    u8    ;; length of this struct
+    u8    ;; AF_INET6
+    u16   ;; Transport layer port
+    u32   ;; IP6 flow information
+    u32   ;; IP6 address
+    u32)) ;; scope zone index
+
+(constant bind
+  (pi
+    ((sock i64)
+     (address sockaddr)
+     (sock-len i64))
+    (product sockaddr i64)))
+
 (constant socket
   (pi
     ((domain i64)

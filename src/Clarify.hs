@@ -347,6 +347,8 @@ asSysCallMaybe "socket" =
 asSysCallMaybe "listen" = Just (SysCallListen, [ArgImmediate, ArgImmediate])
 asSysCallMaybe "wait4" =
   Just (SysCallWait4, [ArgImmediate, ArgArray, ArgImmediate, ArgStruct])
+asSysCallMaybe "bind" =
+  Just (SysCallBind, [ArgImmediate, ArgStruct, ArgImmediate])
 asSysCallMaybe _ = Nothing
 
 data Arg
