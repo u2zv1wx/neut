@@ -77,6 +77,38 @@
     ()
     i64))
 
+;; (definition time-t i64)
+;; structの中でtime-tって使いたいし、やっぱ一般化してelaborateの時点で具体化するほうがいいか？
+
+(definition rusage
+  (struct
+    i64   ;; ru_utime           user CPU time used
+    i64   ;; (microsec)
+    i64   ;; ru_stime           system CPU time used
+    i64   ;; (microsec)
+    i64   ;; ru_maxrss;         maximum resident set size
+    i64   ;; ru_ixrss;          integral shared memory size
+    i64   ;; ru_idrss;          integral unshared data size
+    i64   ;; ru_isrss;          integral unshared stack size
+    i64   ;; ru_minflt;         page reclaims (soft page faults)
+    i64   ;; ru_majflt;         page faults (hard page faults)
+    i64   ;; ru_nswap;          swaps
+    i64   ;; ru_inblock;        block input operations
+    i64   ;; ru_oublock;        block output operations
+    i64   ;; ru_msgsnd;         IPC messages sent
+    i64   ;; ru_msgrcv;         IPC messages received
+    i64   ;; ru_nsignals;       signals received
+    i64   ;; ru_nvcsw;          voluntary context switches
+    i64)) ;; ru_nivcsw;         involuntary context switches
+
+(constant wait4
+  (pi
+    ((pid i64)
+     (stat-loc (array n1 i64))
+     (options i64)
+     (usage rusage))
+    (product (array n1 i64) rusage i64)))
+
 (constant socket
   (pi
     ((domain i64)

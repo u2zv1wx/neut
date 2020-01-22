@@ -345,6 +345,8 @@ asSysCallMaybe "fork" = Just (SysCallFork, [])
 asSysCallMaybe "socket" =
   Just (SysCallSocket, [ArgImmediate, ArgImmediate, ArgImmediate])
 asSysCallMaybe "listen" = Just (SysCallListen, [ArgImmediate, ArgImmediate])
+asSysCallMaybe "wait4" =
+  Just (SysCallWait4, [ArgImmediate, ArgArray, ArgImmediate, ArgStruct])
 asSysCallMaybe _ = Nothing
 
 data Arg

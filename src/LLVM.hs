@@ -291,6 +291,7 @@ sysCallNumAsInt num = do
         SysCallOpen -> return 2
         SysCallClose -> return 3
         SysCallFork -> return 57
+        SysCallWait4 -> return 61
         SysCallSocket -> return 41
         SysCallListen -> return 50
     OSDarwin ->
@@ -303,6 +304,7 @@ sysCallNumAsInt num = do
         SysCallFork ->
           throwError
             "syscall 0x2000002 (fork) cannot be used directly in Darwin"
+        SysCallWait4 -> return 0x2000007
         SysCallSocket -> return 0x2000097
         SysCallListen -> return 0x2000106
 
