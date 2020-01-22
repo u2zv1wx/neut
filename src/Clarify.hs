@@ -342,6 +342,8 @@ asSysCallMaybe "open" =
   Just (SysCallOpen, [ArgUnused, ArgArray, ArgImmediate, ArgImmediate])
 asSysCallMaybe "close" = Just (SysCallClose, [ArgImmediate])
 asSysCallMaybe "fork" = Just (SysCallFork, [])
+asSysCallMaybe "socket" =
+  Just (SysCallSocket, [ArgImmediate, ArgImmediate, ArgImmediate])
 asSysCallMaybe _ = Nothing
 
 data Arg

@@ -76,3 +76,10 @@
   (pi
     ()
     i64))
+
+(constant socket
+  (pi
+    ((domain i64)
+     (socket-type i64)
+     (protocol i64))
+    i64))

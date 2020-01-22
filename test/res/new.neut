@@ -341,33 +341,33 @@
 ;;     (product (u8-array A) file-descriptor)))
 
 ;; 0 = rdonly
-(let file-and-str
-  (open n32 "/Users/u2zv1wx/Downloads/sample.txt" 0 0))
+;; (let file-and-str
+;;   (open n32 "/Users/u2zv1wx/Downloads/sample.txt" 0 0))
 
-(let file
-  (sigma-elimination
-    ((p (array n32 u8))
-     (q file-descriptor))
-    file-and-str
-    q))
+;; (let file
+;;   (sigma-elimination
+;;     ((p (array n32 u8))
+;;      (q file-descriptor))
+;;     file-and-str
+;;     q))
 
-(let item-and-len
-  (read n15 file buf enum.n15))
+;; (let item-and-len
+;;   (read n15 file buf enum.n15))
 
-(let item
-  (sigma-elimination
-    ((read-content (array n15 u8))
-     (read-size i64))
-    item-and-len
-    read-content))
+;; (let item
+;;   (sigma-elimination
+;;     ((read-content (array n15 u8))
+;;      (read-size i64))
+;;     item-and-len
+;;     read-content))
 
 ;; マジでファイルを読み書きできるようになってしまった。えらすぎる。
 ;; writeのバイト数のところはi64で指定するようにしたほうがいいかもしれない。
 ;; itemの型がわかってるんだから、(write _ stdout item enum.n15)とかでもいけるね。
 ;; printをこれで定義できるわけだ。
-(write n15 stdout item enum.n15)
+;; (write n15 stdout item enum.n15)
 
-(close file)
+;; (close file)
 
 ;; (definition x 10)
 
@@ -407,7 +407,7 @@
     some-struct
     t))
 
-(exit 100)
+;; (exit 100)
 
 ;; pidはあくまでparent processのものが返ってくる？
 pid

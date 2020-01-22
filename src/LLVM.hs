@@ -249,9 +249,7 @@ llvmDataLet x (_, DataTheta y) cont = do
   cenv <- gets codeEnv
   case Map.lookup y cenv of
     Nothing
-      | y == "fork" -> do
-        p "found fork"
-        llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType []) cont
+      | y == "fork" -> llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType []) cont
     Nothing -> throwError $ "no such global label defined: " <> y
     Just (args, _) ->
       llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType args) cont
@@ -293,6 +291,7 @@ sysCallNumAsInt num = do
         SysCallOpen -> return 2
         SysCallClose -> return 3
         SysCallFork -> return 57
+        SysCallSocket -> return 41
     OSDarwin ->
       case num of
         SysCallRead -> return 0x2000003
@@ -303,6 +302,7 @@ sysCallNumAsInt num = do
         SysCallFork ->
           throwError
             "syscall 0x2000002 (fork) cannot be used directly in Darwin"
+        SysCallSocket -> return 0x2000097
 
 llvmDataLet' :: [(Identifier, DataPlus)] -> LLVM -> WithEnv LLVM
 llvmDataLet' [] cont = return cont
