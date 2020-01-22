@@ -292,6 +292,7 @@ sysCallNumAsInt num = do
         SysCallClose -> return 3
         SysCallFork -> return 57
         SysCallSocket -> return 41
+        SysCallListen -> return 50
     OSDarwin ->
       case num of
         SysCallRead -> return 0x2000003
@@ -303,6 +304,7 @@ sysCallNumAsInt num = do
           throwError
             "syscall 0x2000002 (fork) cannot be used directly in Darwin"
         SysCallSocket -> return 0x2000097
+        SysCallListen -> return 0x2000106
 
 llvmDataLet' :: [(Identifier, DataPlus)] -> LLVM -> WithEnv LLVM
 llvmDataLet' [] cont = return cont

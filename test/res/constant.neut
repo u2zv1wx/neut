@@ -83,3 +83,9 @@
      (socket-type i64)
      (protocol i64))
     i64))
+
+(constant listen
+  (pi
+    ((sock i64)
+     (backlog i64))
+    i64))
