@@ -385,11 +385,6 @@ newHole = do
   h <- newNameWith "hole"
   return (emptyMeta, WeakTermZeta h)
 
--- determineDomType :: [WeakTermPlus] -> WeakTermPlus
--- determineDomType ts =
---   if not (null ts)
---     then head ts
---     else (emptyMeta, WeakTermConst "bottom")
 insConstraintEnv :: WeakTermPlus -> WeakTermPlus -> WithEnv ()
 insConstraintEnv t1 t2 =
   modify (\e -> e {constraintEnv = (t1, t2) : constraintEnv e})
