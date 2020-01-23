@@ -110,12 +110,8 @@ elaborate' (m, WeakTermIntU size x) = do
 elaborate' (m, WeakTermInt t x) = do
   t' <- elaborate' t >>= reduceTermPlus
   case t' of
-    (_, TermConst intType) ->
-      case asLowTypeMaybe intType of
-        Just (LowTypeIntS size) -> return (m, TermIntS size x)
-        Just (LowTypeIntU size) -> return (m, TermIntU size x)
-        _ ->
-          throwError $ T.pack (show x) <> " should be int, but is " <> intType
+    (_, TermEnum (EnumTypeIntS size)) -> return (m, TermIntS size x)
+    (_, TermEnum (EnumTypeIntU size)) -> return (m, TermIntU size x)
     _ -> throwError $ "elaborate.WeakTermInt."
 elaborate' (m, WeakTermFloat16 x) = do
   return (m, TermFloat16 x)
@@ -193,16 +189,24 @@ elaborateIsEnum x
 elaborateIsEnum _ = return Nothing
 
 caseCheckEnumIdentifier :: EnumType -> [Case] -> WithEnv ()
-caseCheckEnumIdentifier (EnumTypeLabel x) labelList = do
-  ls <- lookupEnumSet x
-  caseCheckEnumIdentifier' (toInteger $ length ls) labelList
-caseCheckEnumIdentifier (EnumTypeNatNum i) labelList = do
-  caseCheckEnumIdentifier' i labelList
+caseCheckEnumIdentifier (EnumTypeLabel x) ls = do
+  es <- lookupEnumSet x
+  caseCheckEnumIdentifier' (toInteger $ length es) ls
+caseCheckEnumIdentifier (EnumTypeNatNum i) ls = do
+  caseCheckEnumIdentifier' i ls
+caseCheckEnumIdentifier (EnumTypeIntS _) ls =
+  throwIfFalse $ CaseDefault `elem` ls
+caseCheckEnumIdentifier (EnumTypeIntU _) ls =
+  throwIfFalse $ CaseDefault `elem` ls
 
 caseCheckEnumIdentifier' :: Integer -> [Case] -> WithEnv ()
 caseCheckEnumIdentifier' i labelList = do
   let len = toInteger $ length (nub labelList)
-  if i <= len || CaseDefault `elem` labelList
+  throwIfFalse $ i <= len || CaseDefault `elem` labelList
+
+throwIfFalse :: Bool -> WithEnv ()
+throwIfFalse b =
+  if b
     then return ()
     else throwError "non-exhaustive pattern"
 

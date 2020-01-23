@@ -20,7 +20,9 @@ data Case
 
 data EnumType
   = EnumTypeLabel Identifier
-  | EnumTypeNatNum Integer
+  | EnumTypeIntS Integer -- i{k}
+  | EnumTypeIntU Integer -- u{k}
+  | EnumTypeNatNum Integer -- n{k}
   deriving (Show, Eq)
 
 data Meta =
@@ -47,13 +49,22 @@ showMeta m =
 emptyMeta :: Meta
 emptyMeta = Meta {metaLocation = Nothing, metaFileName = Nothing}
 
-readNatEnumType :: Identifier -> (Maybe Integer)
-readNatEnumType str -- n1, n2, ..., n{i}, ..., n{2^64}
+readEnumType :: Char -> Identifier -> Integer -> (Maybe Integer)
+readEnumType c str k -- n1, n2, ..., n{i}, ..., n{2^64}
   | T.length str >= 2
-  , T.head str == 'n'
+  , T.head str == c
   , Just i <- readMaybe $ T.unpack $ T.tail str
-  , 1 <= i && i <= 2 ^ (64 :: Integer) = Just i
-readNatEnumType _ = Nothing
+  , 1 <= i && i <= 2 ^ k = Just i
+readEnumType _ _ _ = Nothing
+
+readEnumTypeNat :: Identifier -> (Maybe Integer)
+readEnumTypeNat str = readEnumType 'n' str 64
+
+readEnumTypeIntS :: Identifier -> (Maybe Integer)
+readEnumTypeIntS str = readEnumType 'i' str 23
+
+readEnumTypeIntU :: Identifier -> (Maybe Integer)
+readEnumTypeIntU str = readEnumType 'u' str 23
 
 readNatEnumValue :: Identifier -> (Maybe (Integer, Integer))
 readNatEnumValue str -- n1-0, n2-0, n2-1, ...
@@ -70,13 +81,13 @@ asEnumNatNumConstant :: Identifier -> Maybe Integer
 asEnumNatNumConstant x
   | T.length x >= 7 -- length "enum.n4" == 7
   , ["enum", y] <- wordsBy '.' x
-  , Just i <- readNatEnumType y = Just i -- enum.n{i} is a constant
+  , Just i <- readEnumTypeNat y = Just i -- enum.n{i} is a constant
 asEnumNatNumConstant _ = Nothing
 
 isConstant :: Identifier -> Bool
 isConstant x
   | Just _ <- asEnumNatNumConstant x = True
-  | Just _ <- asLowTypeMaybe x = True
+  | Just (LowTypeFloat _) <- asLowTypeMaybe x = True
   | Just _ <- asUnaryOpMaybe x = True
   | Just _ <- asBinaryOpMaybe x = True
   | otherwise = False

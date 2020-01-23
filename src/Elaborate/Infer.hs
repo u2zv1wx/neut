@@ -106,10 +106,10 @@ infer' ctx (m, WeakTermConstDecl (x, t) e) = do
   (e', t'') <- infer' ctx e
   retWeakTerm t'' m $ WeakTermConstDecl (x, t') e'
 infer' _ (m, WeakTermIntS size i) = do
-  let t = (emptyMeta, WeakTermConst $ "i" <> T.pack (show size))
+  let t = (emptyMeta, WeakTermEnum (EnumTypeIntS size))
   retWeakTerm t m $ WeakTermIntS size i
 infer' _ (m, WeakTermIntU size i) = do
-  let t = (emptyMeta, WeakTermConst $ "u" <> T.pack (show size))
+  let t = (emptyMeta, WeakTermEnum (EnumTypeIntU size))
   retWeakTerm t m $ WeakTermIntU size i
 infer' ctx (m, WeakTermInt t i) = do
   t' <- inferType ctx t
@@ -199,10 +199,8 @@ inferType ctx t = do
 
 -- {} inferKind {}
 inferKind :: ArrayKind -> WeakTermPlus
-inferKind (ArrayKindIntS i) =
-  (emptyMeta, WeakTermConst $ "i" <> T.pack (show i))
-inferKind (ArrayKindIntU i) =
-  (emptyMeta, WeakTermConst $ "u" <> T.pack (show i))
+inferKind (ArrayKindIntS i) = (emptyMeta, WeakTermEnum (EnumTypeIntS i))
+inferKind (ArrayKindIntU i) = (emptyMeta, WeakTermEnum (EnumTypeIntU i))
 inferKind (ArrayKindFloat size) =
   (emptyMeta, WeakTermConst $ "f" <> T.pack (show (sizeAsInt size)))
 inferKind _ = error "inferKind for void-pointer"

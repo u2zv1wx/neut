@@ -66,8 +66,9 @@ interpret (m, TreeNode [(_, TreeAtom "f32"), (_, TreeAtom x)])
 interpret (m, TreeNode [(_, TreeAtom "f64"), (_, TreeAtom x)])
   | Just x' <- readMaybe $ T.unpack x = return (m, WeakTermFloat64 x')
 interpret (m, TreeNode [(_, TreeAtom "enum"), (_, TreeAtom x)])
-  | Just i <- readNatEnumType x =
-    return (m, WeakTermEnum $ EnumTypeNatNum $ fromInteger i)
+  | Just i <- readEnumTypeIntS x = return (m, WeakTermEnum $ EnumTypeIntS i)
+  | Just i <- readEnumTypeIntU x = return (m, WeakTermEnum $ EnumTypeIntU i)
+  | Just i <- readEnumTypeNat x = return (m, WeakTermEnum $ EnumTypeNatNum i)
 interpret (m, TreeNode [(_, TreeAtom "enum"), (_, TreeAtom x)]) = do
   isEnum <- isDefinedEnumName x
   if not isEnum
@@ -117,8 +118,9 @@ interpret (m, TreeAtom x)
     h <- newHole m
     return (m, WeakTermFloat h x')
 interpret (m, TreeAtom x)
-  | Just i <- readNatEnumType x =
-    return (m, WeakTermEnum $ EnumTypeNatNum $ fromInteger i)
+  | Just i <- readEnumTypeIntS x = return (m, WeakTermEnum $ EnumTypeIntS i)
+  | Just i <- readEnumTypeIntU x = return (m, WeakTermEnum $ EnumTypeIntU i)
+  | Just i <- readEnumTypeNat x = return (m, WeakTermEnum $ EnumTypeNatNum i)
 interpret (m, TreeAtom x)
   | Just (i, j) <- readNatEnumValue x =
     return (m, WeakTermEnumIntro $ EnumValueNatNum i j)
