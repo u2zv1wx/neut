@@ -144,13 +144,21 @@ simp' ((e1, e2):cs) = do
         (Just (StuckPiElimZetaStrict h1 ies1), _)
           | xs1 <- concatMap getVarList ies1
           , occurCheck h1 hs2
-          , [] <- includeCheck xs1 e2
-          , linearCheck xs1 -> simpPattern h1 ies1 e1 e2 cs
+          , linearCheck xs1
+          , zs <- includeCheck xs1 e2
+          , Just es <- lookupAll zs sub ->
+            case es of
+              [] -> simpPattern h1 ies1 e1 e2 cs
+              _ -> simp $ (e1, substWeakTermPlus (zip zs es) e2) : cs
         (_, Just (StuckPiElimZetaStrict h2 ies2))
           | xs2 <- concatMap getVarList ies2
           , occurCheck h2 hs1
-          , [] <- includeCheck xs2 e1
-          , linearCheck xs2 -> simpPattern h2 ies2 e2 e1 cs
+          , linearCheck xs2
+          , zs <- includeCheck xs2 e1
+          , Just es <- lookupAll zs sub ->
+            case es of
+              [] -> simpPattern h2 ies2 e2 e1 cs
+              _ -> simp $ (substWeakTermPlus (zip zs es) e1, e2) : cs
         (Just (StuckUpsilon x1), _)
           | Just body <- Map.lookup x1 sub ->
             simp $ (substWeakTermPlus [(x1, body)] e1, e2) : cs
@@ -160,11 +168,19 @@ simp' ((e1, e2):cs) = do
         (Just (StuckPiElimZetaStrict h1 ies1), _)
           | xs1 <- concatMap getVarList ies1
           , occurCheck h1 hs2
-          , [] <- includeCheck xs1 e2 -> simpQuasiPattern h1 ies1 e1 e2 fmvs cs
+          , zs <- includeCheck xs1 e2
+          , Just es <- lookupAll zs sub ->
+            case es of
+              [] -> simpQuasiPattern h1 ies1 e1 e2 fmvs cs
+              _ -> simp $ (e1, substWeakTermPlus (zip zs es) e2) : cs
         (_, Just (StuckPiElimZetaStrict h2 ies2))
           | xs2 <- concatMap getVarList ies2
           , occurCheck h2 hs1
-          , [] <- includeCheck xs2 e1 -> simpQuasiPattern h2 ies2 e2 e1 fmvs cs
+          , zs <- includeCheck xs2 e1
+          , Just es <- lookupAll zs sub ->
+            case es of
+              [] -> simpQuasiPattern h2 ies2 e2 e1 fmvs cs
+              _ -> simp $ (substWeakTermPlus (zip zs es) e1, e2) : cs
         (Just (StuckPiElimZeta h1 ies1), Nothing)
           | xs1 <- concatMap getVarList ies1
           , occurCheck h1 hs2
@@ -173,26 +189,6 @@ simp' ((e1, e2):cs) = do
           | xs2 <- concatMap getVarList ies2
           , occurCheck h2 hs1
           , [] <- includeCheck xs2 e1 -> simpFlexRigid h2 ies2 e2 e1 fmvs cs
-        (Just (StuckPiElimZetaStrict _ ies1), _)
-          | xs1 <- concatMap getVarList ies1
-          , zs <- includeCheck xs1 e2
-          , Just es <- lookupAll zs sub ->
-            simp $ (e1, substWeakTermPlus (zip zs es) e2) : cs
-        (_, Just (StuckPiElimZetaStrict _ ies2))
-          | xs2 <- concatMap getVarList ies2
-          , zs <- includeCheck xs2 e1
-          , Just es <- lookupAll zs sub ->
-            simp $ (substWeakTermPlus (zip zs es) e1, e2) : cs
-        (Just (StuckPiElimZeta _ ies1), Nothing)
-          | xs1 <- concatMap getVarList ies1
-          , zs <- includeCheck xs1 e2
-          , Just es <- lookupAll zs sub ->
-            simp $ (e1, substWeakTermPlus (zip zs es) e2) : cs
-        (Nothing, Just (StuckPiElimZeta _ ies2))
-          | xs2 <- concatMap getVarList ies2
-          , zs <- includeCheck xs2 e1
-          , Just es <- lookupAll zs sub ->
-            simp $ (substWeakTermPlus (zip zs es) e1, e2) : cs
         _ -> simpOther e1 e2 fmvs cs
 
 -- {} simpBinder {}
