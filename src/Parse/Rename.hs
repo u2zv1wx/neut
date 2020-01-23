@@ -53,8 +53,8 @@ rename' (m, WeakTermConstDecl (x, t) e) = do
   e' <- rename' e
   return (m, WeakTermConstDecl (x, t') e')
 rename' (m, WeakTermZeta h) = return (m, WeakTermZeta h)
-rename' (m, WeakTermIntS size x) = return (m, WeakTermIntS size x)
-rename' (m, WeakTermIntU size x) = return (m, WeakTermIntU size x)
+-- rename' (m, WeakTermIntS size x) = return (m, WeakTermIntS size x)
+-- rename' (m, WeakTermIntU size x) = return (m, WeakTermIntU size x)
 rename' (m, WeakTermInt t x) = do
   t' <- rename t
   return (m, WeakTermInt t' x)
@@ -173,8 +173,6 @@ checkSanity _ (_, WeakTermConst _) = True
 checkSanity ctx (_, WeakTermConstDecl (_, t) e) = do
   checkSanity ctx t && checkSanity ctx e
 checkSanity _ (_, WeakTermZeta _) = True
-checkSanity _ (_, WeakTermIntS {}) = True
-checkSanity _ (_, WeakTermIntU {}) = True
 checkSanity ctx (_, WeakTermInt t _) = checkSanity ctx t
 checkSanity _ (_, WeakTermFloat16 _) = True
 checkSanity _ (_, WeakTermFloat32 _) = True

@@ -22,7 +22,7 @@ data EnumType
   = EnumTypeLabel Identifier
   | EnumTypeIntS Integer -- i{k}
   | EnumTypeIntU Integer -- u{k}
-  | EnumTypeNatNum Integer -- n{k}
+  | EnumTypeNat Integer -- n{k}
   deriving (Show, Eq)
 
 data Meta =
@@ -66,36 +66,50 @@ readEnumTypeIntS str = readEnumType 'i' str 23
 readEnumTypeIntU :: Identifier -> (Maybe Integer)
 readEnumTypeIntU str = readEnumType 'u' str 23
 
-readNatEnumValue :: Identifier -> (Maybe (Integer, Integer))
-readNatEnumValue str -- n1-0, n2-0, n2-1, ...
+data EnumValue
+  = EnumValueIntS IntSize Integer
+  | EnumValueIntU IntSize Integer
+  | EnumValueNat Integer Integer
+  | EnumValueLabel Identifier
+  deriving (Show, Eq, Ord)
+
+readEnumValueIntS :: Identifier -> Identifier -> Maybe EnumValue
+readEnumValueIntS t x
+  | Just (LowTypeIntS i) <- asLowTypeMaybe t
+  , Just x' <- readMaybe $ T.unpack x = Just $ EnumValueIntS i x'
+  | otherwise = Nothing
+
+readEnumValueIntU :: Identifier -> Identifier -> Maybe EnumValue
+readEnumValueIntU t x
+  | Just (LowTypeIntU i) <- asLowTypeMaybe t
+  , Just x' <- readMaybe $ T.unpack x = Just $ EnumValueIntU i x'
+  | otherwise = Nothing
+
+readEnumValueNat :: Identifier -> Maybe EnumValue
+readEnumValueNat str -- n1-0, n2-0, n2-1, ...
   | T.length str >= 4
   , T.head str == 'n'
   , [iStr, jStr] <- wordsBy '-' (T.tail str)
   , Just i <- readMaybe $ T.unpack iStr
   , 1 <= i && i <= 2 ^ (64 :: Integer)
   , Just j <- readMaybe $ T.unpack jStr
-  , 0 <= j && j <= i - 1 = Just (i, j)
-readNatEnumValue _ = Nothing
+  , 0 <= j && j <= i - 1 = Just $ EnumValueNat i j
+  | otherwise = Nothing
 
-asEnumNatNumConstant :: Identifier -> Maybe Integer
-asEnumNatNumConstant x
+asEnumNatConstant :: Identifier -> Maybe Integer
+asEnumNatConstant x
   | T.length x >= 7 -- length "enum.n4" == 7
   , ["enum", y] <- wordsBy '.' x
   , Just i <- readEnumTypeNat y = Just i -- enum.n{i} is a constant
-asEnumNatNumConstant _ = Nothing
+asEnumNatConstant _ = Nothing
 
 isConstant :: Identifier -> Bool
 isConstant x
-  | Just _ <- asEnumNatNumConstant x = True
+  | Just _ <- asEnumNatConstant x = True
   | Just (LowTypeFloat _) <- asLowTypeMaybe x = True
   | Just _ <- asUnaryOpMaybe x = True
   | Just _ <- asBinaryOpMaybe x = True
   | otherwise = False
-
-data EnumValue
-  = EnumValueLabel Identifier
-  | EnumValueNatNum Integer Integer
-  deriving (Show, Eq, Ord)
 
 data LowType
   = LowTypeIntS IntSize

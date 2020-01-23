@@ -15,6 +15,12 @@
 (constant i64.add
   (pi ((_ i64) (_ i64)) i64))
 
+(constant i64.sub
+  (pi ((_ i64) (_ i64)) i64))
+
+(constant i64.mul
+  (pi ((_ i64) (_ i64)) i64))
+
 (constant array-access-u8
   (pi
     ((A type)

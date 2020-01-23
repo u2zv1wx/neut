@@ -118,94 +118,98 @@ reduceTermPlusTheta ::
      TermPlus -> [TermPlus] -> Meta -> Identifier -> WithEnv TermPlus
 reduceTermPlusTheta orig es m constant
   | Just (lowType, op) <- asUnaryOpMaybe constant
-  , [arg] <- es = reduceTermPlusUnary orig arg m lowType op
+  , [arg] <- es = return $ reduceTermPlusUnary orig arg m lowType op
   | Just (lowType, op) <- asBinaryOpMaybe constant
   , [arg1, arg2] <- es = reduceTermPlusBinary orig arg1 arg2 m lowType op
   | otherwise = return orig
 
 reduceTermPlusUnary ::
-     TermPlus -> TermPlus -> Meta -> LowType -> UnaryOp -> WithEnv TermPlus
+     TermPlus -> TermPlus -> Meta -> LowType -> UnaryOp -> TermPlus
 reduceTermPlusUnary orig arg m lowType op = do
   case getUnaryArgInfo lowType arg of
     Just (UnaryArgInfoIntS s1 x) ->
       case op of
         UnaryOpTrunc (LowTypeIntS s2)
-          | s1 > s2 -> return (m, TermIntS s2 (x .&. (2 ^ s2 - 1))) -- e.g. trunc 257 to i8 ~> 257 .&. 255 ~> 1
+          | s1 > s2 ->
+            (m, TermEnumIntro (EnumValueIntS s2 (x .&. (2 ^ s2 - 1)))) -- e.g. trunc 257 to i8 ~> 257 .&. 255 ~> 1
         UnaryOpZext (LowTypeIntS s2)
           | s1 < s2 -> do
             let s1' = toInteger s1
             let s2' = toInteger s2
-            return (m, TermIntS s2 (asIntS s2' (asIntU s1' x)))
+            let a = (EnumValueIntS s2 (asIntS s2' (asIntU s1' x)))
+            (m, TermEnumIntro a)
         UnaryOpSext (LowTypeIntS s2)
-          | s1 < s2 -> return (m, TermIntS s2 x) -- sext over int doesn't alter interpreted value
+          | s1 < s2 -> (m, TermEnumIntro (EnumValueIntS s2 x)) -- sext over int doesn't alter interpreted value
         UnaryOpTo (LowTypeFloat FloatSize16) ->
-          return (m, TermFloat16 (fromIntegral x))
+          (m, TermFloat16 (fromIntegral x))
         UnaryOpTo (LowTypeFloat FloatSize32) ->
-          return (m, TermFloat32 (fromIntegral x))
+          (m, TermFloat32 (fromIntegral x))
         UnaryOpTo (LowTypeFloat FloatSize64) ->
-          return (m, TermFloat64 (fromIntegral x))
-        _ -> return orig
+          (m, TermFloat64 (fromIntegral x))
+        _ -> orig
     Just (UnaryArgInfoIntU s1 x) ->
       case op of
         UnaryOpTrunc (LowTypeIntU s2)
-          | s1 > s2 -> return (m, TermIntU s2 (x .&. (2 ^ s2 - 1))) -- e.g. trunc 257 to i8 ~> 257 .&. 255 ~> 1
+          | s1 > s2 ->
+            (m, TermEnumIntro (EnumValueIntU s2 (x .&. (2 ^ s2 - 1)))) -- e.g. trunc 257 to i8 ~> 257 .&. 255 ~> 1
         UnaryOpZext (LowTypeIntU s2)
-          | s1 < s2 -> return (m, TermIntU s2 x) -- zext over uint doesn't alter interpreted value
+          | s1 < s2 -> (m, TermEnumIntro (EnumValueIntU s2 x)) -- zext over uint doesn't alter interpreted value
         UnaryOpSext (LowTypeIntU s2)
           | s1 < s2 -> do
             let s1' = toInteger s1
             let s2' = toInteger s2
-            return (m, TermIntU s2 (asIntU s2' (asIntS s1' x)))
+            let a = (EnumValueIntU s2 (asIntU s2' (asIntS s1' x)))
+            (m, TermEnumIntro a)
         UnaryOpTo (LowTypeFloat FloatSize16) ->
-          return (m, TermFloat16 (fromIntegral x))
+          (m, TermFloat16 (fromIntegral x))
         UnaryOpTo (LowTypeFloat FloatSize32) ->
-          return (m, TermFloat32 (fromIntegral x))
+          (m, TermFloat32 (fromIntegral x))
         UnaryOpTo (LowTypeFloat FloatSize64) ->
-          return (m, TermFloat64 (fromIntegral x))
-        _ -> return orig
+          (m, TermFloat64 (fromIntegral x))
+        _ -> orig
     Just (UnaryArgInfoFloat16 x) ->
       case op of
-        UnaryOpNeg -> return (m, TermFloat16 (-x))
+        UnaryOpNeg -> (m, TermFloat16 (-x))
         UnaryOpFpExt (LowTypeFloat FloatSize32) ->
-          return (m, TermFloat32 (realToFrac x))
+          (m, TermFloat32 (realToFrac x))
         UnaryOpFpExt (LowTypeFloat FloatSize64) ->
-          return (m, TermFloat64 (realToFrac x))
+          (m, TermFloat64 (realToFrac x))
         UnaryOpTo (LowTypeIntS s) -> do
           let s' = toInteger s
-          return (m, TermIntS s (asIntS s' (round x)))
+          (m, TermEnumIntro (EnumValueIntS s (asIntS s' (round x))))
         UnaryOpTo (LowTypeIntU s) -> do
           let s' = toInteger s
-          return (m, TermIntU s (asIntU s' (round x)))
-        _ -> return orig
+          (m, TermEnumIntro (EnumValueIntU s (asIntU s' (round x))))
+        _ -> orig
     Just (UnaryArgInfoFloat32 x) ->
       case op of
-        UnaryOpNeg -> return (m, TermFloat32 (-x))
+        UnaryOpNeg -> (m, TermFloat32 (-x))
         UnaryOpTrunc (LowTypeFloat FloatSize16) ->
-          return (m, TermFloat16 (realToFrac x))
+          (m, TermFloat16 (realToFrac x))
         UnaryOpFpExt (LowTypeFloat FloatSize64) ->
-          return (m, TermFloat64 (realToFrac x))
+          (m, TermFloat64 (realToFrac x))
         UnaryOpTo (LowTypeIntS s) -> do
           let s' = toInteger s
-          return (m, TermIntS s (asIntS s' (round x)))
+          (m, TermEnumIntro (EnumValueIntS s (asIntS s' (round x))))
         UnaryOpTo (LowTypeIntU s) -> do
           let s' = toInteger s
-          return (m, TermIntU s (asIntU s' (round x)))
-        _ -> return orig
+          (m, TermEnumIntro (EnumValueIntU s (asIntU s' (round x))))
+        _ -> orig
     Just (UnaryArgInfoFloat64 x) ->
       case op of
-        UnaryOpNeg -> return (m, TermFloat64 (-x))
+        UnaryOpNeg -> (m, TermFloat64 (-x))
         UnaryOpTrunc (LowTypeFloat FloatSize16) ->
-          return (m, TermFloat16 (realToFrac x))
+          (m, TermFloat16 (realToFrac x))
         UnaryOpTrunc (LowTypeFloat FloatSize32) ->
-          return (m, TermFloat32 (realToFrac x))
+          (m, TermFloat32 (realToFrac x))
         UnaryOpTo (LowTypeIntS s) -> do
           let s' = toInteger s
-          return (m, TermIntS s (asIntS s' (round x)))
+          (m, TermEnumIntro (EnumValueIntS s (asIntS s' (round x))))
         UnaryOpTo (LowTypeIntU s) -> do
           let s' = toInteger s
-          return (m, TermIntU s (asIntU s' (round x)))
-        _ -> return orig
-    Nothing -> return orig
+          (m, TermEnumIntro (EnumValueIntU s (asIntU s' (round x))))
+        _ -> orig
+    Nothing -> orig
 
 reduceTermPlusBinary ::
      TermPlus
@@ -219,10 +223,16 @@ reduceTermPlusBinary orig arg1 arg2 m lowType op = do
   case getBinaryArgInfo lowType arg1 arg2 of
     Just (BinaryArgInfoIntS size x y) -> do
       let s = toInteger size
-      asTermPlus m (computeInt asIntS s x y op) (TermIntS size)
+      asTermPlus
+        m
+        (computeInt asIntS s x y op)
+        (\z -> TermEnumIntro (EnumValueIntS size z))
     Just (BinaryArgInfoIntU size x y) -> do
       let s = toInteger size
-      asTermPlus m (computeInt asIntU s x y op) (TermIntU size)
+      asTermPlus
+        m
+        (computeInt asIntU s x y op)
+        (\z -> TermEnumIntro (EnumValueIntU size z))
     Just (BinaryArgInfoFloat16 x y) ->
       asTermPlus m (computeFloat x y op (snd orig)) TermFloat16
     Just (BinaryArgInfoFloat32 x y) ->
@@ -245,12 +255,30 @@ data UnaryArgInfo
   | UnaryArgInfoFloat64 Double
   deriving (Show, Eq)
 
+-- getUnaryArgInfo :: LowType -> TermPlus -> Maybe UnaryArgInfo
+-- -- IntS
+-- getUnaryArgInfo (LowTypeIntS s) (_, TermIntS s1 x)
+--   | s == s1 = return $ UnaryArgInfoIntS s x
+-- -- IntU
+-- getUnaryArgInfo (LowTypeIntU s) (_, TermIntU s1 x)
+--   | s == s1 = return $ UnaryArgInfoIntU s x
+-- -- Float16
+-- getUnaryArgInfo (LowTypeFloat FloatSize16) (_, TermFloat16 x) =
+--   return $ UnaryArgInfoFloat16 x
+-- -- Float32
+-- getUnaryArgInfo (LowTypeFloat FloatSize32) (_, TermFloat32 x) =
+--   return $ UnaryArgInfoFloat32 x
+-- -- Float64
+-- getUnaryArgInfo (LowTypeFloat FloatSize64) (_, TermFloat64 x) =
+--   return $ UnaryArgInfoFloat64 x
+-- -- otherwise (invalid argument)
+-- getUnaryArgInfo _ _ = Nothing
 getUnaryArgInfo :: LowType -> TermPlus -> Maybe UnaryArgInfo
 -- IntS
-getUnaryArgInfo (LowTypeIntS s) (_, TermIntS s1 x)
+getUnaryArgInfo (LowTypeIntS s) (_, TermEnumIntro (EnumValueIntS s1 x))
   | s == s1 = return $ UnaryArgInfoIntS s x
 -- IntU
-getUnaryArgInfo (LowTypeIntU s) (_, TermIntU s1 x)
+getUnaryArgInfo (LowTypeIntU s) (_, TermEnumIntro (EnumValueIntU s1 x))
   | s == s1 = return $ UnaryArgInfoIntU s x
 -- Float16
 getUnaryArgInfo (LowTypeFloat FloatSize16) (_, TermFloat16 x) =
@@ -272,12 +300,30 @@ data BinaryArgInfo
   | BinaryArgInfoFloat64 Double Double
   deriving (Show, Eq)
 
+-- getBinaryArgInfo :: LowType -> TermPlus -> TermPlus -> Maybe BinaryArgInfo
+-- -- IntS
+-- getBinaryArgInfo (LowTypeIntS s) (_, TermIntS s1 x) (_, TermIntS s2 y)
+--   | s == s1 && s == s2 = return $ BinaryArgInfoIntS s x y
+-- -- IntU
+-- getBinaryArgInfo (LowTypeIntU s) (_, TermIntU s1 x) (_, TermIntU s2 y)
+--   | s == s1 && s == s2 = return $ BinaryArgInfoIntU s x y
+-- -- Float16
+-- getBinaryArgInfo (LowTypeFloat FloatSize16) (_, TermFloat16 x) (_, TermFloat16 y) =
+--   return $ BinaryArgInfoFloat16 x y
+-- -- Float32
+-- getBinaryArgInfo (LowTypeFloat FloatSize32) (_, TermFloat32 x) (_, TermFloat32 y) =
+--   return $ BinaryArgInfoFloat32 x y
+-- -- Float64
+-- getBinaryArgInfo (LowTypeFloat FloatSize64) (_, TermFloat64 x) (_, TermFloat64 y) =
+--   return $ BinaryArgInfoFloat64 x y
+-- -- otherwise (invalid arguments)
+-- getBinaryArgInfo _ _ _ = Nothing
 getBinaryArgInfo :: LowType -> TermPlus -> TermPlus -> Maybe BinaryArgInfo
 -- IntS
-getBinaryArgInfo (LowTypeIntS s) (_, TermIntS s1 x) (_, TermIntS s2 y)
+getBinaryArgInfo (LowTypeIntS s) (_, TermEnumIntro (EnumValueIntS s1 x)) (_, TermEnumIntro (EnumValueIntS s2 y))
   | s == s1 && s == s2 = return $ BinaryArgInfoIntS s x y
 -- IntU
-getBinaryArgInfo (LowTypeIntU s) (_, TermIntU s1 x) (_, TermIntU s2 y)
+getBinaryArgInfo (LowTypeIntU s) (_, TermEnumIntro (EnumValueIntU s1 x)) (_, TermEnumIntro (EnumValueIntU s2 y))
   | s == s1 && s == s2 = return $ BinaryArgInfoIntU s x y
 -- Float16
 getBinaryArgInfo (LowTypeFloat FloatSize16) (_, TermFloat16 x) (_, TermFloat16 y) =
@@ -343,8 +389,8 @@ isValue (_, TermPi {}) = return True
 isValue (_, TermPiIntro {}) = return True
 isValue (_, TermIter {}) = return True
 isValue (_, TermConst x) = isValueConst x
-isValue (_, TermIntS _ _) = return True
-isValue (_, TermIntU _ _) = return True
+-- isValue (_, TermIntS _ _) = return True
+-- isValue (_, TermIntU _ _) = return True
 isValue (_, TermFloat16 _) = return True
 isValue (_, TermFloat32 _) = return True
 isValue (_, TermFloat64 _) = return True

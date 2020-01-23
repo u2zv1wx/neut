@@ -2,10 +2,7 @@
 
 module Data.WeakTerm where
 
-import qualified Data.Text as T
-
 import Data.Maybe (fromMaybe)
-import Data.Monoid ((<>))
 import Numeric.Half
 
 import Data.Basic
@@ -20,8 +17,6 @@ data WeakTerm
   | WeakTermZeta Identifier
   | WeakTermConst Identifier
   | WeakTermConstDecl IdentifierPlus WeakTermPlus
-  | WeakTermIntS IntSize Integer
-  | WeakTermIntU IntSize Integer
   | WeakTermInt WeakTermPlus Integer
   | WeakTermFloat16 Half
   | WeakTermFloat32 Float
@@ -54,10 +49,16 @@ toVar :: Identifier -> WeakTermPlus
 toVar x = (emptyMeta, WeakTermUpsilon x)
 
 toIntS :: IntSize -> WeakTermPlus
-toIntS size = (emptyMeta, WeakTermConst $ "i" <> T.pack (show size))
+toIntS size = (emptyMeta, WeakTermEnum $ EnumTypeIntS size)
 
 toIntU :: IntSize -> WeakTermPlus
-toIntU size = (emptyMeta, WeakTermConst $ "u" <> T.pack (show size))
+toIntU size = (emptyMeta, WeakTermEnum $ EnumTypeIntU size)
+
+toValueIntS :: IntSize -> Integer -> WeakTerm
+toValueIntS size i = WeakTermEnumIntro $ EnumValueIntS size i
+
+toValueIntU :: IntSize -> Integer -> WeakTerm
+toValueIntU size i = WeakTermEnumIntro $ EnumValueIntU size i
 
 f16 :: WeakTermPlus
 f16 = (emptyMeta, WeakTermConst "f16")
@@ -84,8 +85,6 @@ varWeakTermPlus (_, WeakTermIter (x, t) xts e) = do
 varWeakTermPlus (_, WeakTermConst _) = []
 varWeakTermPlus (_, WeakTermConstDecl xt e) = varWeakTermPlusBindings [xt] [e]
 varWeakTermPlus (_, WeakTermZeta _) = []
-varWeakTermPlus (_, WeakTermIntS _ _) = []
-varWeakTermPlus (_, WeakTermIntU _ _) = []
 varWeakTermPlus (_, WeakTermInt t _) = varWeakTermPlus t
 varWeakTermPlus (_, WeakTermFloat16 _) = []
 varWeakTermPlus (_, WeakTermFloat32 _) = []
@@ -130,8 +129,6 @@ holeWeakTermPlus (_, WeakTermIter (_, t) xts e) =
 holeWeakTermPlus (_, WeakTermZeta h) = h : []
 holeWeakTermPlus (_, WeakTermConst _) = []
 holeWeakTermPlus (_, WeakTermConstDecl xt e) = holeWeakTermPlusBindings [xt] [e]
-holeWeakTermPlus (_, WeakTermIntS _ _) = []
-holeWeakTermPlus (_, WeakTermIntU _ _) = []
 holeWeakTermPlus (_, WeakTermInt t _) = holeWeakTermPlus t
 holeWeakTermPlus (_, WeakTermFloat16 _) = []
 holeWeakTermPlus (_, WeakTermFloat32 _) = []
@@ -189,10 +186,6 @@ substWeakTermPlus sub (m, WeakTermConstDecl (x, t) e) = do
   (m, WeakTermConstDecl (x, t') e')
 substWeakTermPlus sub (m, WeakTermZeta s) = do
   fromMaybe (m, WeakTermZeta s) (lookup s sub)
-substWeakTermPlus _ (m, WeakTermIntS size x) = do
-  (m, WeakTermIntS size x)
-substWeakTermPlus _ (m, WeakTermIntU size x) = do
-  (m, WeakTermIntU size x)
 substWeakTermPlus sub (m, WeakTermInt t x) = do
   let t' = substWeakTermPlus sub t
   (m, WeakTermInt t' x)

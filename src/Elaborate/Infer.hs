@@ -91,7 +91,7 @@ infer' ctx (m, WeakTermZeta _)
   return (app, higherApp)
 infer' _ (m, WeakTermConst x)
   -- enum.n8, enum.n64, etc.
-  | Just i <- asEnumNatNumConstant x = do
+  | Just i <- asEnumNatConstant x = do
     t' <- toIsEnumType i
     retWeakTerm t' m $ WeakTermConst x
   -- i64, f16, u8, etc.
@@ -105,15 +105,8 @@ infer' ctx (m, WeakTermConstDecl (x, t) e) = do
   -- the type of `e` doesn't depend on `x`
   (e', t'') <- infer' ctx e
   retWeakTerm t'' m $ WeakTermConstDecl (x, t') e'
-infer' _ (m, WeakTermIntS size i) = do
-  let t = (emptyMeta, WeakTermEnum (EnumTypeIntS size))
-  retWeakTerm t m $ WeakTermIntS size i
-infer' _ (m, WeakTermIntU size i) = do
-  let t = (emptyMeta, WeakTermEnum (EnumTypeIntU size))
-  retWeakTerm t m $ WeakTermIntU size i
-infer' ctx (m, WeakTermInt t i) = do
-  t' <- inferType ctx t
-  -- holeはemptyにしたほうが妥当かも？
+infer' _ (m, WeakTermInt t i) = do
+  t' <- inferType [] t -- ctx == [] since t' should be i64, i8, etc. (i.e. t must be closed)
   retWeakTerm t' m $ WeakTermInt t' i
 infer' _ (m, WeakTermFloat16 f) = do
   let t = (emptyMeta, WeakTermConst "f16")
@@ -124,19 +117,25 @@ infer' _ (m, WeakTermFloat32 f) = do
 infer' _ (m, WeakTermFloat64 f) = do
   let t = (emptyMeta, WeakTermConst "f64")
   retWeakTerm t m $ WeakTermFloat64 f
-infer' ctx (m, WeakTermFloat t f) = do
-  t' <- inferType ctx t
+infer' _ (m, WeakTermFloat t f) = do
+  t' <- inferType [] t -- t must be closed
   retWeakTerm t' m $ WeakTermFloat t' f
 infer' _ (m, WeakTermEnum name) = retWeakTerm univ m $ WeakTermEnum name
-infer' _ (m, WeakTermEnumIntro labelOrNum) = do
-  case labelOrNum of
+infer' _ (m, WeakTermEnumIntro v) = do
+  case v of
+    EnumValueIntS size _ -> do
+      let t = (emptyMeta, WeakTermEnum (EnumTypeIntS size))
+      retWeakTerm t m $ WeakTermEnumIntro v
+    EnumValueIntU size _ -> do
+      let t = (emptyMeta, WeakTermEnum (EnumTypeIntU size))
+      retWeakTerm t m $ WeakTermEnumIntro v
+    EnumValueNat i _ -> do
+      let t = (emptyMeta, WeakTermEnum $ EnumTypeNat i)
+      retWeakTerm t m $ WeakTermEnumIntro v
     EnumValueLabel l -> do
       k <- lookupKind l
       let t = (emptyMeta, WeakTermEnum $ EnumTypeLabel k)
-      retWeakTerm t m $ WeakTermEnumIntro labelOrNum
-    EnumValueNatNum i _ -> do
-      let t = (emptyMeta, WeakTermEnum $ EnumTypeNatNum i)
-      retWeakTerm t m $ WeakTermEnumIntro labelOrNum
+      retWeakTerm t m $ WeakTermEnumIntro v
 infer' ctx (m, WeakTermEnumElim (e, t) les) = do
   t'' <- inferType ctx t
   (e', t') <- infer' ctx e
@@ -160,14 +159,14 @@ infer' ctx (m, WeakTermArrayIntro k es) = do
   (es', ts) <- unzip <$> mapM (infer' ctx) es
   constrainList $ tCod : ts
   let len = toInteger $ length es
-  let dom = (emptyMeta, WeakTermEnum (EnumTypeNatNum len))
+  let dom = (emptyMeta, WeakTermEnum (EnumTypeNat len))
   let t = (emptyMeta, WeakTermArray dom k)
   retWeakTerm t m $ WeakTermArrayIntro k es'
 infer' ctx (m, WeakTermArrayElim k xts e1 e2) = do
   (e1', t1) <- infer' ctx e1
   (xts', (e2', t2)) <- inferBinder ctx xts e2
   let len = toInteger $ length xts
-  let dom = (emptyMeta, WeakTermEnum (EnumTypeNatNum len))
+  let dom = (emptyMeta, WeakTermEnum (EnumTypeNat len))
   insConstraintEnv t1 (emptyMeta, WeakTermArray dom k)
   constrainList $ inferKind k : map snd xts'
   retWeakTerm t2 m $ WeakTermArrayElim k xts' e1' e2'
@@ -298,12 +297,6 @@ inferEnumElim ctx ((_, WeakTermUpsilon x), enumType) (CaseValue v, e) = do
             [(emptyMeta, WeakTermEnumIntro v)])
   return (e'', t')
 inferEnumElim ctx _ (_, e) = infer' ctx e
-  -- x <- newNameWith "hole-enum"
-  -- h <- newTypeHoleInCtx $ ctx ++ [(x, enumType)]
-  -- (e', t) <- infer' ctx e
-  -- insConstraintEnv t $ substWeakTermPlus [(x, enumTerm)] h
-  -- let sub = [(x, (emptyMeta, WeakTermEnumIntro v))]
-  -- return (e', substWeakTermPlus sub h)
 
 -- In a context (x1 : A1, ..., xn : An), this function creates metavariables
 --   ?M  : Pi (x1 : A1, ..., xn : An). ?Mt @ (x1, ..., xn)
@@ -352,10 +345,15 @@ inferCase :: Case -> WithEnv (Maybe WeakTermPlus)
 inferCase (CaseValue (EnumValueLabel name)) = do
   k <- lookupKind name
   return $ Just (emptyMeta, WeakTermEnum $ EnumTypeLabel k)
-inferCase (CaseValue (EnumValueNatNum i _)) =
-  return $ Just (emptyMeta, WeakTermEnum $ EnumTypeNatNum i)
-inferCase _ = return Nothing
+inferCase (CaseValue (EnumValueNat i _)) =
+  return $ Just (emptyMeta, WeakTermEnum $ EnumTypeNat i)
+inferCase (CaseValue (EnumValueIntS size _)) =
+  return $ Just (emptyMeta, WeakTermEnum (EnumTypeIntS size))
+inferCase (CaseValue (EnumValueIntU size _)) =
+  return $ Just (emptyMeta, WeakTermEnum (EnumTypeIntU size))
+inferCase CaseDefault = return Nothing
 
+-- inferCase _ = return Nothing
 constrainList :: [WeakTermPlus] -> WithEnv ()
 constrainList [] = return ()
 constrainList [_] = return ()
@@ -374,7 +372,7 @@ toIsEnumType i = do
     ( emptyMeta
     , WeakTermPiElim
         (emptyMeta, WeakTermConst "is-enum")
-        [(emptyMeta, WeakTermEnum $ EnumTypeNatNum i)])
+        [(emptyMeta, WeakTermEnum $ EnumTypeNat i)])
 
 newHole :: WithEnv WeakTermPlus
 newHole = do

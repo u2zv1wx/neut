@@ -50,10 +50,10 @@ clarify (_, TermConstDecl (x, t) e) = do
   _ <- clarify t
   insTypeEnv x t
   clarify e
-clarify (m, TermIntS size l) = do
-  return (m, CodeUpIntro (m, DataIntS size l))
-clarify (m, TermIntU size l) = do
-  return (m, CodeUpIntro (m, DataIntU size l))
+-- clarify (m, TermIntS size l) = do
+--   return (m, CodeUpIntro (m, DataIntS size l))
+-- clarify (m, TermIntU size l) = do
+--   return (m, CodeUpIntro (m, DataIntU size l))
 clarify (m, TermFloat16 l) = do
   return (m, CodeUpIntro (m, DataFloat16 l))
 clarify (m, TermFloat32 l) = do
@@ -150,14 +150,14 @@ clarifyConst m name
   | Just lowType <- asArrayAccessMaybe name = clarifyArrayAccess m name lowType
 clarifyConst m "is-enum" = clarifyIsEnum m
 clarifyConst m "file-descriptor" = clarify (m, TermConst "i64")
-clarifyConst m "stdin" = clarify (m, TermIntS 64 0)
-clarifyConst m "stdout" = clarify (m, TermIntS 64 1)
-clarifyConst m "stderr" = clarify (m, TermIntS 64 2)
+clarifyConst m "stdin" = clarify (m, TermEnumIntro (EnumValueIntS 64 0))
+clarifyConst m "stdout" = clarify (m, TermEnumIntro (EnumValueIntS 64 1))
+clarifyConst m "stderr" = clarify (m, TermEnumIntro (EnumValueIntS 64 2))
 clarifyConst m name = do
   mx <- asEnumConstant name
   case mx of
     Just i ->
-      clarify (m, TermIntU 64 i) -- enum.top ~> 1, enum.choice ~> 2, etc.
+      clarify (m, TermEnumIntro (EnumValueIntU 64 i)) -- enum.top ~> 1, enum.choice ~> 2, etc.
     Nothing -> do
       cenv <- gets constantEnv
       if name `elem` cenv
@@ -506,8 +506,8 @@ retWithBorrowedVars m cod xs resultVarName
   | otherwise = throwError "retWithBorrowedVars"
 
 inferKind :: ArrayKind -> TermPlus
-inferKind (ArrayKindIntS i) = (emptyMeta, TermConst $ "i" <> T.pack (show i))
-inferKind (ArrayKindIntU i) = (emptyMeta, TermConst $ "u" <> T.pack (show i))
+inferKind (ArrayKindIntS i) = (emptyMeta, TermEnum (EnumTypeIntS i))
+inferKind (ArrayKindIntU i) = (emptyMeta, TermEnum (EnumTypeIntU i))
 inferKind (ArrayKindFloat size) =
   (emptyMeta, TermConst $ "f" <> T.pack (show (sizeAsInt size)))
 inferKind _ = error "inferKind for void-pointer"

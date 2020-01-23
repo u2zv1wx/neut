@@ -31,13 +31,16 @@
 
 (keyword definition)
 
-(notation (begin e) e)
+(notation (begin (let (x t) e+) rest+)
+  ((pi-introduction ((x t)) (begin rest+)) (begin e+)))
+
+(notation (begin (let x e+) rest+)
+  ((pi-introduction ((x hole)) (begin rest+)) (begin e+)))
 
 (notation (begin e rest+)
   ((pi-introduction ((_ hole)) (begin rest+)) (begin e)))
 
-(notation (begin (let x e+) rest+)
-  ((pi-introduction ((x hole)) (begin rest+)) (begin e+)))
+(notation (begin e) e)
 
 ;; (notation (begin (definition x e) rest+)
 ;;   (pi-e (pi-i ((x _)) (begin rest+)) (mu x e)))

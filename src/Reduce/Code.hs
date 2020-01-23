@@ -67,18 +67,18 @@ reduceCodePlus (m, CodeStructElim xks d e) = do
     _ -> return (m, CodeStructElim xks d e)
 reduceCodePlus (m, CodeTheta theta) =
   case theta of
-    ThetaUnaryOp op (LowTypeIntS s) (m1, DataIntS s1 x)
+    ThetaUnaryOp op (LowTypeIntS s) (m1, DataEnumIntro (EnumValueIntS s1 x))
       | s == s1 ->
         case op of
           UnaryOpTrunc (LowTypeIntS s2)
-            | s1 > s2 -> upIntroData m (m1, DataIntS s2 (x .&. (2 ^ s2 - 1)))
+            | s1 > s2 -> upIntroData m (m1, toIntS s2 (x .&. (2 ^ s2 - 1)))
           UnaryOpZext (LowTypeIntS s2)
             | s1 < s2 -> do
               let s1' = toInteger s1
               let s2' = toInteger s2
-              upIntroData m (m1, DataIntS s2 (asIntS s2' (asIntU s1' x)))
+              upIntroData m (m1, toIntS s2 (asIntS s2' (asIntU s1' x)))
           UnaryOpSext (LowTypeIntS s2)
-            | s1 < s2 -> upIntroData m (m1, DataIntS s2 x)
+            | s1 < s2 -> upIntroData m (m1, DataEnumIntro (EnumValueIntS s2 x))
           UnaryOpTo (LowTypeFloat FloatSize16) ->
             upIntroData m (m1, DataFloat16 (fromIntegral x))
           UnaryOpTo (LowTypeFloat FloatSize32) ->
@@ -86,18 +86,18 @@ reduceCodePlus (m, CodeTheta theta) =
           UnaryOpTo (LowTypeFloat FloatSize64) ->
             upIntroData m (m1, DataFloat64 (fromIntegral x))
           _ -> return (m, CodeTheta theta)
-    ThetaUnaryOp op (LowTypeIntU s) (m1, DataIntU s1 x)
+    ThetaUnaryOp op (LowTypeIntU s) (m1, DataEnumIntro (EnumValueIntU s1 x))
       | s == s1 ->
         case op of
           UnaryOpTrunc (LowTypeIntU s2)
-            | s1 > s2 -> upIntroData m (m1, DataIntU s2 (x .&. (2 ^ s2 - 1)))
+            | s1 > s2 -> upIntroData m (m1, toIntU s2 (x .&. (2 ^ s2 - 1)))
           UnaryOpZext (LowTypeIntU s2)
-            | s1 < s2 -> upIntroData m (m1, DataIntU s2 x)
+            | s1 < s2 -> upIntroData m (m1, toIntU s2 x)
           UnaryOpSext (LowTypeIntU s2)
             | s1 < s2 -> do
               let s1' = toInteger s1
               let s2' = toInteger s2
-              upIntroData m (m1, DataIntU s2 (asIntU s2' (asIntS s1' x)))
+              upIntroData m (m1, toIntU s2 (asIntU s2' (asIntS s1' x)))
           UnaryOpTo (LowTypeFloat FloatSize16) ->
             upIntroData m (m1, DataFloat16 (fromIntegral x))
           UnaryOpTo (LowTypeFloat FloatSize32) ->
@@ -114,10 +114,10 @@ reduceCodePlus (m, CodeTheta theta) =
           upIntroData m (m1, DataFloat64 (realToFrac x))
         UnaryOpTo (LowTypeIntS s) -> do
           let s' = toInteger s
-          upIntroData m (m1, DataIntS s (asIntS s' (round x)))
+          upIntroData m (m1, toIntS s (asIntS s' (round x)))
         UnaryOpTo (LowTypeIntU s) -> do
           let s' = toInteger s
-          upIntroData m (m1, DataIntU s (asIntU s' (round x)))
+          upIntroData m (m1, toIntU s (asIntU s' (round x)))
         _ -> return (m, CodeTheta theta)
     ThetaUnaryOp op (LowTypeFloat FloatSize32) (m1, DataFloat32 x) ->
       case op of
@@ -128,10 +128,10 @@ reduceCodePlus (m, CodeTheta theta) =
           upIntroData m (m1, DataFloat64 (realToFrac x))
         UnaryOpTo (LowTypeIntS s) -> do
           let s' = toInteger s
-          upIntroData m (m1, DataIntS s (asIntS s' (round x)))
+          upIntroData m (m1, toIntS s (asIntS s' (round x)))
         UnaryOpTo (LowTypeIntU s) -> do
           let s' = toInteger s
-          upIntroData m (m1, DataIntU s (asIntU s' (round x)))
+          upIntroData m (m1, toIntU s (asIntU s' (round x)))
         _ -> return (m, CodeTheta theta)
     ThetaUnaryOp op (LowTypeFloat FloatSize64) (m1, DataFloat64 x) ->
       case op of
@@ -142,21 +142,21 @@ reduceCodePlus (m, CodeTheta theta) =
           upIntroData m (m1, DataFloat32 (realToFrac x))
         UnaryOpTo (LowTypeIntS s) -> do
           let s' = toInteger s
-          upIntroData m (m1, DataIntS s (asIntS s' (round x)))
+          upIntroData m (m1, toIntS s (asIntS s' (round x)))
         UnaryOpTo (LowTypeIntU s) -> do
           let s' = toInteger s
-          upIntroData m (m1, DataIntU s (asIntU s' (round x)))
+          upIntroData m (m1, toIntU s (asIntU s' (round x)))
         _ -> return (m, CodeTheta theta)
-    ThetaBinaryOp op (LowTypeIntS s) (m1, DataIntS s1 x) (_, DataIntS s2 y)
+    ThetaBinaryOp op (LowTypeIntS s) (m1, DataEnumIntro (EnumValueIntS s1 x)) (_, DataEnumIntro (EnumValueIntS s2 y))
       | s == s1 && s == s2 -> do
         case computeInt asIntS (toInteger s) x y op of
           Left d -> upIntroData m (m1, d)
-          Right z -> upIntroData m (m1, DataIntS s z)
-    ThetaBinaryOp op (LowTypeIntU s) (m1, DataIntU s1 x) (_, DataIntU s2 y)
+          Right z -> upIntroData m (m1, toIntS s z)
+    ThetaBinaryOp op (LowTypeIntU s) (m1, DataEnumIntro (EnumValueIntU s1 x)) (_, DataEnumIntro (EnumValueIntU s2 y))
       | s == s1 && s == s2 -> do
         case computeInt asIntU (toInteger s) x y op of
           Left d -> upIntroData m (m1, d)
-          Right z -> upIntroData m (m1, DataIntS s z)
+          Right z -> upIntroData m (m1, toIntS s z)
     ThetaBinaryOp op (LowTypeFloat _) (m1, DataFloat16 x) (_, DataFloat16 y) -> do
       case computeFloat x y op of
         Just (Left d) -> upIntroData m (m1, d)
@@ -217,8 +217,8 @@ computeFloat x y BinaryOpLE = Just $ Left $ asData $ x <= y
 computeFloat _ _ _ = Nothing
 
 asData :: Bool -> Data
-asData True = DataIntS 64 1
-asData False = DataIntS 64 0
+asData True = toIntS 64 1
+asData False = toIntS 64 0
 
 upIntroData :: Monad m => a -> DataPlus -> m (a, Code)
 upIntroData m d = return (m, CodeUpIntro d)

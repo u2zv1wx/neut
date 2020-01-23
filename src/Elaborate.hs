@@ -98,20 +98,18 @@ elaborate' (m, WeakTermConst x) = do
   mi <- elaborateIsEnum x
   case mi of
     Nothing -> return (m, TermConst x)
-    Just i -> return (m, TermIntU 64 i)
+    Just i -> return (m, TermEnumIntro (EnumValueIntU 64 i))
 elaborate' (m, WeakTermConstDecl (x, t) e) = do
   t' <- elaborate' t
   e' <- elaborate' e
   return (m, TermConstDecl (x, t') e')
-elaborate' (m, WeakTermIntS size x) = do
-  return (m, TermIntS size x)
-elaborate' (m, WeakTermIntU size x) = do
-  return (m, TermIntU size x)
 elaborate' (m, WeakTermInt t x) = do
   t' <- elaborate' t >>= reduceTermPlus
   case t' of
-    (_, TermEnum (EnumTypeIntS size)) -> return (m, TermIntS size x)
-    (_, TermEnum (EnumTypeIntU size)) -> return (m, TermIntU size x)
+    (_, TermEnum (EnumTypeIntS size)) ->
+      return (m, TermEnumIntro (EnumValueIntS size x))
+    (_, TermEnum (EnumTypeIntU size)) ->
+      return (m, TermEnumIntro (EnumValueIntU size x))
     _ -> throwError $ "elaborate.WeakTermInt."
 elaborate' (m, WeakTermFloat16 x) = do
   return (m, TermFloat16 x)
@@ -177,7 +175,7 @@ elaboratePlus (x, t) = do
 -- otherwise   ~> Nothing
 elaborateIsEnum :: Identifier -> WithEnv (Maybe Integer)
 elaborateIsEnum x
-  | Just i <- asEnumNatNumConstant x = return $ Just i
+  | Just i <- asEnumNatConstant x = return $ Just i
 elaborateIsEnum x
   | ["enum", enumStr] <- wordsBy '.' x = do
     b <- isDefinedEnum enumStr
@@ -192,7 +190,7 @@ caseCheckEnumIdentifier :: EnumType -> [Case] -> WithEnv ()
 caseCheckEnumIdentifier (EnumTypeLabel x) ls = do
   es <- lookupEnumSet x
   caseCheckEnumIdentifier' (toInteger $ length es) ls
-caseCheckEnumIdentifier (EnumTypeNatNum i) ls = do
+caseCheckEnumIdentifier (EnumTypeNat i) ls = do
   caseCheckEnumIdentifier' i ls
 caseCheckEnumIdentifier (EnumTypeIntS _) ls =
   throwIfFalse $ CaseDefault `elem` ls

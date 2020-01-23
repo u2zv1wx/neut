@@ -109,19 +109,24 @@ reduceWeakTermPlusUnary orig arg m lowType op = do
     Just (UnaryArgInfoIntS s1 x) ->
       case op of
         UnaryOpTrunc (LowTypeIntS s2)
-          | s1 > s2 -> (m, WeakTermIntS s2 (x .&. (2 ^ s2 - 1))) -- e.g. trunc 257 to i8 ~> 257 .&. 255 ~> 1
+          | s1 > s2 ->
+            (m, WeakTermEnumIntro (EnumValueIntS s2 (x .&. (2 ^ s2 - 1)))) -- e.g. trunc 257 to i8 ~> 257 .&. 255 ~> 1
         UnaryOpZext (LowTypeIntS s2)
-          | s1 < s2 -> do
-            let s1' = toInteger s1
-            let s2' = toInteger s2
+          | s1 < s2
             --                      -10 in  i8 {bitseq =           1111 0110}
             -- ~> (asIntU 8)    ~>  246 in  u8 {bitseq =           1111 0110}
             -- ~> (zero extend) ~>  246 in u16 {bitseq = 0000 0000 1111 0110}
             -- ~> (asIntS 16)   ~>  246 in i16 {bitseq = 0000 0000 1111 0110}
-            -- (the newly-inserted sign bit is always 0)
-            (m, WeakTermIntS s2 (asIntS s2' (asIntU s1' x)))
+            -- (the newly-inserted sign bit is always 0)            let s1' = toInteger s1
+           -> do
+            let s1' = toInteger s1
+            let s2' = toInteger s2
+            let a = (EnumValueIntS s2 (asIntS s2' (asIntU s1' x)))
+            (m, WeakTermEnumIntro a)
+            -- ( m
+            -- , WeakTermEnumIntro (EnumValueIntS s2 (asIntS s2' (asIntU s1' x))))
         UnaryOpSext (LowTypeIntS s2)
-          | s1 < s2 -> (m, WeakTermIntS s2 x) -- sext over int doesn't alter interpreted value
+          | s1 < s2 -> (m, WeakTermEnumIntro (EnumValueIntS s2 x)) -- sext over int doesn't alter interpreted value
         UnaryOpTo (LowTypeFloat FloatSize16) ->
           (m, WeakTermFloat16 (fromIntegral x))
         UnaryOpTo (LowTypeFloat FloatSize32) ->
@@ -132,13 +137,12 @@ reduceWeakTermPlusUnary orig arg m lowType op = do
     Just (UnaryArgInfoIntU s1 x) ->
       case op of
         UnaryOpTrunc (LowTypeIntU s2)
-          | s1 > s2 -> (m, WeakTermIntU s2 (x .&. (2 ^ s2 - 1))) -- e.g. trunc 257 to i8 ~> 257 .&. 255 ~> 1
+          | s1 > s2 ->
+            (m, WeakTermEnumIntro (EnumValueIntU s2 (x .&. (2 ^ s2 - 1)))) -- e.g. trunc 257 to i8 ~> 257 .&. 255 ~> 1
         UnaryOpZext (LowTypeIntU s2)
-          | s1 < s2 -> (m, WeakTermIntU s2 x) -- zext over uint doesn't alter interpreted value
+          | s1 < s2 -> (m, WeakTermEnumIntro (EnumValueIntU s2 x)) -- zext over uint doesn't alter interpreted value
         UnaryOpSext (LowTypeIntU s2)
-          | s1 < s2 -> do
-            let s1' = toInteger s1
-            let s2' = toInteger s2
+          | s1 < s2
             -- when the highest bit is 1:
             --                        246 in  u8 {bitseq =           1111 0110}
             -- ~> (asIntS 8)    ~>    -10 in  i8 {bitseq =           1111 0110}
@@ -150,7 +154,13 @@ reduceWeakTermPlusUnary orig arg m lowType op = do
             -- ~> (asIntS 8)    ~>  118 in  i8 {bitseq =           0111 0110}
             -- ~> (sign extend) ~>  118 in i16 {bitseq = 0000 0000 1111 0110}
             -- ~> (asIntU 16)   ~>  118 in u16 {bitseq = 0000 0000 1111 0110}
-            (m, WeakTermIntU s2 (asIntU s2' (asIntS s1' x)))
+           -> do
+            let s1' = toInteger s1
+            let s2' = toInteger s2
+            let a = (EnumValueIntU s2 (asIntU s2' (asIntS s1' x)))
+            (m, WeakTermEnumIntro a)
+            -- ( m
+            -- , WeakTermEnumIntro (EnumValueIntU s2 (asIntU s2' (asIntS s1' x))))
         UnaryOpTo (LowTypeFloat FloatSize16) ->
           (m, WeakTermFloat16 (fromIntegral x))
         UnaryOpTo (LowTypeFloat FloatSize32) ->
@@ -167,10 +177,10 @@ reduceWeakTermPlusUnary orig arg m lowType op = do
           (m, WeakTermFloat64 (realToFrac x))
         UnaryOpTo (LowTypeIntS s) -> do
           let s' = toInteger s
-          (m, WeakTermIntS s (asIntS s' (round x)))
+          (m, WeakTermEnumIntro (EnumValueIntS s (asIntS s' (round x))))
         UnaryOpTo (LowTypeIntU s) -> do
           let s' = toInteger s
-          (m, WeakTermIntU s (asIntU s' (round x)))
+          (m, WeakTermEnumIntro (EnumValueIntU s (asIntU s' (round x))))
         _ -> orig
     Just (UnaryArgInfoFloat32 x) ->
       case op of
@@ -181,10 +191,10 @@ reduceWeakTermPlusUnary orig arg m lowType op = do
           (m, WeakTermFloat64 (realToFrac x))
         UnaryOpTo (LowTypeIntS s) -> do
           let s' = toInteger s
-          (m, WeakTermIntS s (asIntS s' (round x)))
+          (m, WeakTermEnumIntro (EnumValueIntS s (asIntS s' (round x))))
         UnaryOpTo (LowTypeIntU s) -> do
           let s' = toInteger s
-          (m, WeakTermIntU s (asIntU s' (round x)))
+          (m, WeakTermEnumIntro (EnumValueIntU s (asIntU s' (round x))))
         _ -> orig
     Just (UnaryArgInfoFloat64 x) ->
       case op of
@@ -195,10 +205,10 @@ reduceWeakTermPlusUnary orig arg m lowType op = do
           (m, WeakTermFloat32 (realToFrac x))
         UnaryOpTo (LowTypeIntS s) -> do
           let s' = toInteger s
-          (m, WeakTermIntS s (asIntS s' (round x)))
+          (m, WeakTermEnumIntro (EnumValueIntS s (asIntS s' (round x))))
         UnaryOpTo (LowTypeIntU s) -> do
           let s' = toInteger s
-          (m, WeakTermIntU s (asIntU s' (round x)))
+          (m, WeakTermEnumIntro (EnumValueIntU s (asIntU s' (round x))))
         _ -> orig
     Nothing -> orig
 
@@ -214,10 +224,16 @@ reduceWeakTermPlusBinary orig arg1 arg2 m lowType op = do
   case getBinaryArgInfo lowType arg1 arg2 of
     Just (BinaryArgInfoIntS size x y) -> do
       let s = toInteger size
-      asWeakTermPlus m (computeInt asIntS s x y op) (WeakTermIntS size)
+      asWeakTermPlus
+        m
+        (computeInt asIntS s x y op)
+        (\z -> WeakTermEnumIntro (EnumValueIntS size z))
     Just (BinaryArgInfoIntU size x y) -> do
       let s = toInteger size
-      asWeakTermPlus m (computeInt asIntU s x y op) (WeakTermIntU size)
+      asWeakTermPlus
+        m
+        (computeInt asIntU s x y op)
+        (\z -> WeakTermEnumIntro (EnumValueIntU size z))
     Just (BinaryArgInfoFloat16 x y) ->
       asWeakTermPlus m (computeFloat x y op (snd orig)) WeakTermFloat16
     Just (BinaryArgInfoFloat32 x y) ->
@@ -242,10 +258,10 @@ data UnaryArgInfo
 
 getUnaryArgInfo :: LowType -> WeakTermPlus -> Maybe UnaryArgInfo
 -- IntS
-getUnaryArgInfo (LowTypeIntS s) (_, WeakTermIntS s1 x)
+getUnaryArgInfo (LowTypeIntS s) (_, WeakTermEnumIntro (EnumValueIntS s1 x))
   | s == s1 = return $ UnaryArgInfoIntS s x
 -- IntU
-getUnaryArgInfo (LowTypeIntU s) (_, WeakTermIntU s1 x)
+getUnaryArgInfo (LowTypeIntU s) (_, WeakTermEnumIntro (EnumValueIntU s1 x))
   | s == s1 = return $ UnaryArgInfoIntU s x
 -- Int with size specified by lowType
 getUnaryArgInfo (LowTypeIntS s) (_, WeakTermInt _ x) =
@@ -280,18 +296,18 @@ data BinaryArgInfo
 getBinaryArgInfo ::
      LowType -> WeakTermPlus -> WeakTermPlus -> Maybe BinaryArgInfo
 -- IntS
-getBinaryArgInfo (LowTypeIntS s) (_, WeakTermIntS s1 x) (_, WeakTermIntS s2 y)
+getBinaryArgInfo (LowTypeIntS s) (_, WeakTermEnumIntro (EnumValueIntS s1 x)) (_, WeakTermEnumIntro (EnumValueIntS s2 y))
   | s == s1 && s == s2 = return $ BinaryArgInfoIntS s x y
-getBinaryArgInfo (LowTypeIntS s) (_, WeakTermInt _ x) (_, WeakTermIntS s2 y)
+getBinaryArgInfo (LowTypeIntS s) (_, WeakTermInt _ x) (_, WeakTermEnumIntro (EnumValueIntS s2 y))
   | s == s2 = return $ BinaryArgInfoIntS s x y
-getBinaryArgInfo (LowTypeIntS s) (_, WeakTermIntS s1 x) (_, WeakTermInt _ y)
+getBinaryArgInfo (LowTypeIntS s) (_, WeakTermEnumIntro (EnumValueIntS s1 x)) (_, WeakTermInt _ y)
   | s == s1 = return $ BinaryArgInfoIntS s x y
 -- IntU
-getBinaryArgInfo (LowTypeIntU s) (_, WeakTermIntU s1 x) (_, WeakTermIntU s2 y)
+getBinaryArgInfo (LowTypeIntU s) (_, WeakTermEnumIntro (EnumValueIntU s1 x)) (_, WeakTermEnumIntro (EnumValueIntU s2 y))
   | s == s1 && s == s2 = return $ BinaryArgInfoIntU s x y
-getBinaryArgInfo (LowTypeIntU s) (_, WeakTermInt _ x) (_, WeakTermIntU s2 y)
+getBinaryArgInfo (LowTypeIntU s) (_, WeakTermInt _ x) (_, WeakTermEnumIntro (EnumValueIntU s2 y))
   | s == s2 = return $ BinaryArgInfoIntU s x y
-getBinaryArgInfo (LowTypeIntU s) (_, WeakTermIntU s1 x) (_, WeakTermInt _ y)
+getBinaryArgInfo (LowTypeIntU s) (_, WeakTermEnumIntro (EnumValueIntU s1 x)) (_, WeakTermInt _ y)
   | s == s1 = return $ BinaryArgInfoIntU s x y
 -- Int with size specified by lowType
 getBinaryArgInfo (LowTypeIntS s) (_, WeakTermInt _ x) (_, WeakTermInt _ y) =

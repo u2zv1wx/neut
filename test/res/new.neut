@@ -212,6 +212,8 @@
 (ascription my-dec (hom nat nat))
 
 ;; これがパターンマッチの基本をあたえている
+;; こっちで与えるべきヒントって何？
+;; valueの型がnatであるって書いても、それはselector = rightの情報がないから解けないよね？
 (definition my-item ((num nat))
   (sigma-elimination
     ((selector choice)
@@ -443,6 +445,29 @@
 
 (i64.add pid pohe)
 
+;; 変数がenum-elimされてるから依存ありのほうで推論が起こる
+;; enum-elimを依存なしにすると普通に推論できる
+
+(definition fact ((n i64))
+  (enum-elimination n
+    ((i64 1) 1)
+    (default (i64.mul n (fact (i64.sub n 1))))))
+
+;; こっちなら推論できる。これはつまり、なんというか、情報を与えればenum-elimをいじらなくても推論可能ってこと？
+;; でもさ、defaultのほうの結果がi64で確定してるんだから、1のほうがi64であることも本来はわかるはずじゃない？
+;; (definition fact ((n i64))
+;;   (enum-elimination n
+;;     ((i64 1)
+;;       (begin
+;;         (let (x i64) 1)
+;;         x))
+;;     (default (i64.mul n (fact (i64.sub n 1))))))
+
+;; (ascription fact
+;;   (pi
+;;     ((n i64))
+;;     i64))
+
 ;; (write hole stdout result 15)
 
 ;; 3になるはずなんですけど。実行のたびに異なる結果が返ってくる。
@@ -451,6 +476,8 @@
 ;; 修正できた。いいね。
 ;; result
 
-;; n15-4
+n15-4
+
+(fact 5)
 
 ;; new.neut ends here

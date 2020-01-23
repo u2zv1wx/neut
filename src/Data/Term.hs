@@ -14,8 +14,8 @@ data Term
   | TermIter IdentifierPlus [IdentifierPlus] TermPlus
   | TermConst Identifier
   | TermConstDecl IdentifierPlus TermPlus
-  | TermIntS IntSize Integer
-  | TermIntU IntSize Integer
+  -- | TermIntS IntSize Integer
+  -- | TermIntU IntSize Integer
   | TermFloat16 Half
   | TermFloat32 Float
   | TermFloat64 Double
@@ -59,8 +59,8 @@ varTermPlus (_, TermIter (x, t) xts e) =
   varTermPlus t ++ filter (/= x) (varTermPlus' xts [e])
 varTermPlus (_, TermConst _) = []
 varTermPlus (_, TermConstDecl xt e) = varTermPlus' [xt] [e]
-varTermPlus (_, TermIntS _ _) = []
-varTermPlus (_, TermIntU _ _) = []
+-- varTermPlus (_, TermIntS _ _) = []
+-- varTermPlus (_, TermIntU _ _) = []
 varTermPlus (_, TermFloat16 _) = []
 varTermPlus (_, TermFloat32 _) = []
 varTermPlus (_, TermFloat64 _) = []
@@ -113,8 +113,8 @@ substTermPlus sub (m, TermConstDecl (x, t) e) = do
   let t' = substTermPlus sub t
   let e' = substTermPlus (filter (\(k, _) -> k /= x) sub) e
   (m, TermConstDecl (x, t') e')
-substTermPlus _ (m, TermIntS size x) = (m, TermIntS size x)
-substTermPlus _ (m, TermIntU size x) = (m, TermIntU size x)
+-- substTermPlus _ (m, TermIntS size x) = (m, TermIntS size x)
+-- substTermPlus _ (m, TermIntU size x) = (m, TermIntU size x)
 substTermPlus _ (m, TermFloat16 x) = (m, TermFloat16 x)
 substTermPlus _ (m, TermFloat32 x) = (m, TermFloat32 x)
 substTermPlus _ (m, TermFloat64 x) = (m, TermFloat64 x)

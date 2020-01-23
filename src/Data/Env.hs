@@ -137,12 +137,12 @@ llvmTailChar x =
 
 lookupTypeEnv :: Identifier -> WithEnv TermPlus
 lookupTypeEnv s
-  | Just i <- asEnumNatNumConstant s = do
+  | Just i <- asEnumNatConstant s = do
     return
       ( emptyMeta
       , TermPiElim
           (emptyMeta, TermConst "is-enum")
-          [(emptyMeta, TermEnum $ EnumTypeNatNum i)])
+          [(emptyMeta, TermEnum $ EnumTypeNat i)])
   | Just _ <- asLowTypeMaybe s = return univTerm
   | otherwise = do
     mt <- gets (Map.lookup s . typeEnv)
@@ -207,17 +207,18 @@ newDataUpsilonWith' name m = do
   x <- newNameWith name
   return (x, (m, DataUpsilon x))
 
-reorder :: [(EnumValue, a)] -> WithEnv [a]
-reorder lds = do
-  let (ls, ds) = unzip lds
-  is <- mapM enumValueToInteger ls
-  return $ map snd $ sortBy (\(i, _) (j, _) -> i `compare` j) $ zip is ds
-
+-- reorder :: [(EnumValue, a)] -> WithEnv [a]
+-- reorder lds = do
+--   let (ls, ds) = unzip lds
+--   is <- mapM enumValueToInteger ls
+--   return $ map snd $ sortBy (\(i, _) (j, _) -> i `compare` j) $ zip is ds
 enumValueToInteger :: EnumValue -> WithEnv Integer
 enumValueToInteger labelOrNat =
   case labelOrNat of
     EnumValueLabel l -> toInteger <$> getEnumNum l
-    EnumValueNatNum _ j -> return $ toInteger j
+    EnumValueIntS _ i -> return i
+    EnumValueIntU _ i -> return i
+    EnumValueNat _ j -> return j
 
 getEnumNum :: Identifier -> WithEnv Int
 getEnumNum label = do
@@ -243,5 +244,5 @@ asEnumConstant x
     case Map.lookup y eenv of
       Nothing -> return Nothing
       Just ls -> return $ Just $ toInteger $ length ls
-  | Just i <- asEnumNatNumConstant x = return $ Just i
+  | Just i <- asEnumNatConstant x = return $ Just i
 asEnumConstant _ = return Nothing

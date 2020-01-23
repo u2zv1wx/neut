@@ -35,13 +35,14 @@ synthesize = do
       resolvePiElim m ess e
     Just (Enriched _ _ (ConstraintFlexRigid m ess e)) -> do
       resolvePiElim m ess e
-    Just (Enriched (e1, e2) _ _)
+    Just (Enriched (e1, e2) _ c)
       -- throwError $ "cannot simplify:\n" ++ Pr.ppShow q
       -- p $ "cannot simplify:\n" ++ Pr.ppShow (e1, e2)
       -- throwError $ "don't know how to synthesize constraint(s)"
       -- senv <- gets substEnv
      -> do
       p $ "rest: " ++ show (Q.size q)
+      p' c
       throwError $ "cannot simplify:\n" <> T.pack (Pr.ppShow (e1, e2))
 
 -- e1だけがstuckしているとき、e2だけがstuckしているとき、両方がstuckしているときをそれぞれ

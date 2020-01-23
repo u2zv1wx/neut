@@ -11,8 +11,8 @@ data Data
   = DataTheta Identifier
   | DataUpsilon Identifier
   | DataSigmaIntro ArrayKind [DataPlus]
-  | DataIntS IntSize Integer
-  | DataIntU IntSize Integer
+  -- | DataIntS IntSize Integer
+  -- | DataIntU IntSize Integer
   | DataFloat16 Half
   | DataFloat32 Float
   | DataFloat64 Double
@@ -53,6 +53,12 @@ toDataUpsilon (x, m) = (m, DataUpsilon x)
 toDataUpsilon' :: Identifier -> DataPlus
 toDataUpsilon' x = (emptyMeta, DataUpsilon x)
 
+toIntS :: IntSize -> Integer -> Data
+toIntS size i = DataEnumIntro (EnumValueIntS size i)
+
+toIntU :: IntSize -> Integer -> Data
+toIntU size i = DataEnumIntro (EnumValueIntU size i)
+
 type SubstDataPlus = [(Identifier, DataPlus)]
 
 substDataPlus :: SubstDataPlus -> DataPlus -> DataPlus
@@ -62,8 +68,8 @@ substDataPlus sub (m, DataUpsilon s) =
 substDataPlus sub (m, DataSigmaIntro mk vs) = do
   let vs' = map (substDataPlus sub) vs
   (m, DataSigmaIntro mk vs')
-substDataPlus _ (m, DataIntS size l) = (m, DataIntS size l)
-substDataPlus _ (m, DataIntU size l) = (m, DataIntU size l)
+-- substDataPlus _ (m, DataIntS size l) = (m, DataIntS size l)
+-- substDataPlus _ (m, DataIntU size l) = (m, DataIntU size l)
 substDataPlus _ (m, DataFloat16 l) = (m, DataFloat16 l)
 substDataPlus _ (m, DataFloat32 l) = (m, DataFloat32 l)
 substDataPlus _ (m, DataFloat64 l) = (m, DataFloat64 l)

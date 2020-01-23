@@ -109,8 +109,8 @@ chainTermPlus' (_, TermConst x) = do
   t <- lookupTypeEnv x
   chainWithName x t
 chainTermPlus' (_, TermConstDecl xt e) = chainTermPlus'' [xt] [e]
-chainTermPlus' (_, TermIntS _ _) = return []
-chainTermPlus' (_, TermIntU _ _) = return []
+-- chainTermPlus' (_, TermIntS _ _) = return []
+-- chainTermPlus' (_, TermIntU _ _) = return []
 chainTermPlus' (_, TermFloat16 _) = return []
 chainTermPlus' (_, TermFloat32 _) = return []
 chainTermPlus' (_, TermFloat64 _) = return []

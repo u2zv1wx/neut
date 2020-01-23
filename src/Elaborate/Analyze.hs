@@ -64,13 +64,13 @@ simp' (((_, WeakTermIter xt1 xts1 e1), (_, WeakTermIter xt2 xts2 e2)):cs)
   , length xts1 == length xts2 = simpBinder (xt1 : xts1) e1 (xt2 : xts2) e2 cs
 simp' (((_, WeakTermConstDecl xt1 e1), (_, WeakTermConstDecl xt2 e2)):cs) = do
   simpBinder [xt1] e1 [xt2] e2 cs
-simp' (((_, WeakTermInt t1 l1), (_, WeakTermIntS s2 l2)):cs)
+simp' (((_, WeakTermInt t1 l1), (_, WeakTermEnumIntro (EnumValueIntS s2 l2))):cs)
   | l1 == l2 = simp $ (t1, toIntS s2) : cs
-simp' (((_, WeakTermIntS s1 l1), (_, WeakTermInt t2 l2)):cs)
+simp' (((_, WeakTermEnumIntro (EnumValueIntS s1 l1)), (_, WeakTermInt t2 l2)):cs)
   | l1 == l2 = simp $ (toIntS s1, t2) : cs
-simp' (((_, WeakTermInt t1 l1), (_, WeakTermIntU s2 l2)):cs)
+simp' (((_, WeakTermInt t1 l1), (_, WeakTermEnumIntro (EnumValueIntU s2 l2))):cs)
   | l1 == l2 = simp $ (t1, toIntU s2) : cs
-simp' (((_, WeakTermIntU s1 l1), (_, WeakTermInt t2 l2)):cs)
+simp' (((_, WeakTermEnumIntro (EnumValueIntU s1 l1)), (_, WeakTermInt t2 l2)):cs)
   | l1 == l2 = simp $ (toIntU s1, t2) : cs
 simp' (((_, WeakTermInt t1 l1), (_, WeakTermInt t2 l2)):cs)
   | l1 == l2 = simp $ (t1, t2) : cs

@@ -71,11 +71,13 @@ takeBaseName :: DataPlus -> Identifier
 takeBaseName (_, DataTheta x) = x
 takeBaseName (_, DataUpsilon x) = x
 takeBaseName (_, DataSigmaIntro _ ds) = "array" <> T.pack (show (length ds))
-takeBaseName (_, DataIntS size _) = "i" <> T.pack (show size)
-takeBaseName (_, DataIntU size _) = "u" <> T.pack (show size)
 takeBaseName (_, DataFloat16 _) = "half"
 takeBaseName (_, DataFloat32 _) = "float"
 takeBaseName (_, DataFloat64 _) = "double"
+takeBaseName (_, DataEnumIntro (EnumValueIntS size _)) =
+  "i" <> T.pack (show size)
+takeBaseName (_, DataEnumIntro (EnumValueIntU size _)) =
+  "u" <> T.pack (show size)
 takeBaseName (_, DataEnumIntro _) = "i64"
 takeBaseName (_, DataStructIntro dks) = "struct" <> T.pack (show (length dks))
 
@@ -274,19 +276,22 @@ llvmDataLet x (_, DataSigmaIntro k ds) cont = do
   let arrayType = LowTypeArrayPtr (toInteger $ length ds) elemType
   let dts = zip ds (repeat elemType)
   storeContent x arrayType dts cont
-llvmDataLet x (_, DataIntS j i) cont =
-  llvmUncastLet x (LLVMDataInt i) (LowTypeIntS j) cont
-llvmDataLet x (_, DataIntU j i) cont =
-  llvmUncastLet x (LLVMDataInt i) (LowTypeIntU j) cont
 llvmDataLet x (_, DataFloat16 f) cont =
   llvmUncastLet x (LLVMDataFloat16 f) (LowTypeFloat FloatSize16) cont
 llvmDataLet x (_, DataFloat32 f) cont =
   llvmUncastLet x (LLVMDataFloat32 f) (LowTypeFloat FloatSize32) cont
 llvmDataLet x (_, DataFloat64 f) cont =
   llvmUncastLet x (LLVMDataFloat64 f) (LowTypeFloat FloatSize64) cont
-llvmDataLet x (m, DataEnumIntro labelOrNat) cont = do
-  i <- enumValueToInteger labelOrNat
-  llvmDataLet x (m, DataIntS 64 i) cont
+llvmDataLet x (_, DataEnumIntro labelOrNat) cont = do
+  case labelOrNat of
+    EnumValueIntS size i ->
+      llvmUncastLet x (LLVMDataInt i) (LowTypeIntS size) cont
+    EnumValueIntU size i ->
+      llvmUncastLet x (LLVMDataInt i) (LowTypeIntU size) cont
+    EnumValueNat _ i -> llvmUncastLet x (LLVMDataInt i) (LowTypeIntS 64) cont
+    EnumValueLabel l -> do
+      i <- toInteger <$> getEnumNum l
+      llvmUncastLet x (LLVMDataInt i) (LowTypeIntS 64) cont
 llvmDataLet x (_, DataStructIntro dks) cont = do
   let (ds, ks) = unzip dks
   let ts = map arrayKindToLowType ks

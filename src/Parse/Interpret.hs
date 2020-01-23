@@ -53,12 +53,6 @@ interpret (m, TreeNode [(_, TreeAtom "constant-declaration"), xt, e]) = do
   xt' <- interpretIdentifierPlus xt
   e' <- interpret e
   return (m, WeakTermConstDecl xt' e')
-interpret (m, TreeNode [(_, TreeAtom t), (_, TreeAtom x)])
-  | Just (LowTypeIntS i) <- asLowTypeMaybe t
-  , Just x' <- readMaybe $ T.unpack x = return (m, WeakTermIntS i x')
-interpret (m, TreeNode [(_, TreeAtom t), (_, TreeAtom x)])
-  | Just (LowTypeIntU i) <- asLowTypeMaybe t
-  , Just x' <- readMaybe $ T.unpack x = return (m, WeakTermIntU i x')
 interpret (m, TreeNode [(_, TreeAtom "f16"), (_, TreeAtom x)])
   | Just x' <- readMaybe $ T.unpack x = return (m, WeakTermFloat16 x')
 interpret (m, TreeNode [(_, TreeAtom "f32"), (_, TreeAtom x)])
@@ -68,7 +62,7 @@ interpret (m, TreeNode [(_, TreeAtom "f64"), (_, TreeAtom x)])
 interpret (m, TreeNode [(_, TreeAtom "enum"), (_, TreeAtom x)])
   | Just i <- readEnumTypeIntS x = return (m, WeakTermEnum $ EnumTypeIntS i)
   | Just i <- readEnumTypeIntU x = return (m, WeakTermEnum $ EnumTypeIntU i)
-  | Just i <- readEnumTypeNat x = return (m, WeakTermEnum $ EnumTypeNatNum i)
+  | Just i <- readEnumTypeNat x = return (m, WeakTermEnum $ EnumTypeNat i)
 interpret (m, TreeNode [(_, TreeAtom "enum"), (_, TreeAtom x)]) = do
   isEnum <- isDefinedEnumName x
   if not isEnum
@@ -120,13 +114,12 @@ interpret (m, TreeAtom x)
 interpret (m, TreeAtom x)
   | Just i <- readEnumTypeIntS x = return (m, WeakTermEnum $ EnumTypeIntS i)
   | Just i <- readEnumTypeIntU x = return (m, WeakTermEnum $ EnumTypeIntU i)
-  | Just i <- readEnumTypeNat x = return (m, WeakTermEnum $ EnumTypeNatNum i)
+  | Just i <- readEnumTypeNat x = return (m, WeakTermEnum $ EnumTypeNat i)
 interpret (m, TreeAtom x)
-  | Just (i, j) <- readNatEnumValue x =
-    return (m, WeakTermEnumIntro $ EnumValueNatNum i j)
+  | Just v <- readEnumValueNat x = return (m, WeakTermEnumIntro v)
 interpret (m, TreeAtom x)
   | Just str <- readMaybe $ T.unpack x = do
-    u8s <- forM (encode str) $ \u -> return (m, WeakTermIntU 8 (toInteger u))
+    u8s <- forM (encode str) $ \u -> return (m, toValueIntU 8 (toInteger u))
     -- parse string as utf-8 encoded u8 array
     return (m, WeakTermArrayIntro (ArrayKindIntU 8) u8s)
 interpret t@(m, TreeAtom x) = do
@@ -166,7 +159,11 @@ interpretAtom x = return x
 -- {} interpretEnumValueMaybe {}
 interpretEnumValueMaybe :: TreePlus -> WithEnv (Maybe EnumValue)
 interpretEnumValueMaybe (_, TreeAtom x)
-  | Just (i, j) <- readNatEnumValue x = return $ Just $ EnumValueNatNum i j
+  | Just v <- readEnumValueNat x = return $ Just v
+interpretEnumValueMaybe (_, TreeNode [(_, TreeAtom t), (_, TreeAtom x)])
+  | Just v <- readEnumValueIntS t x = return $ Just v
+interpretEnumValueMaybe (_, TreeNode [(_, TreeAtom t), (_, TreeAtom x)])
+  | Just v <- readEnumValueIntU t x = return $ Just v
 interpretEnumValueMaybe (_, TreeAtom x) = do
   b <- isDefinedEnum x
   if b
