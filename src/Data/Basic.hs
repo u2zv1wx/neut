@@ -292,6 +292,14 @@ wordsBy c s =
       let (w, s'') = T.break (== c) s'
       w : wordsBy c s''
 
+-- sepAtLast '-' "array-access-u8" ~> ["array-access", "u8"]
+sepAtLast :: Char -> T.Text -> [T.Text]
+sepAtLast c s =
+  case wordsBy c s of
+    [] -> []
+    [s'] -> [s']
+    ss -> [T.intercalate (T.singleton c) (init ss), last ss]
+
 ushiftR :: Int -> Int -> Int
 ushiftR n k = fromIntegral (fromIntegral n `shiftR` k :: Word)
 

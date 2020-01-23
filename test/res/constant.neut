@@ -10,8 +10,17 @@
 
 ;; file-descriptor as int, みたいな操作を許すための定数が必要っぽい。まあそれはそのうち。
 
+;; add-i64とかにしたほうがよい。
+;; このへんの定数はそのうち「まとめて」処理できるようにする。無限個あるのでconstantとして書くのは無理。
 (constant i64.add
   (pi ((_ i64) (_ i64)) i64))
+
+(constant array-access-u8
+  (pi
+    ((A type)
+     (arr (array A u8))
+     (n A))
+    (product (array A u8) u8)))
 
 ;; これ、buf : utf8-codeとかにしたほうがいいのかも？
 ;; writeのlenの部分はi64にしてよさげ。
@@ -20,7 +29,7 @@
     ((A type)
      (in file-descriptor)
      (buf (array A u8))
-     (len (is-enum A)))
+     (len i64))
     (product (array A u8) i64)))
 
 (constant write
@@ -28,7 +37,7 @@
     ((A type)
      (out file-descriptor)
      (str (array A u8))
-     (len (is-enum A)))
+     (len i64))
     (product (array A u8) i64)))
 
 (constant exit

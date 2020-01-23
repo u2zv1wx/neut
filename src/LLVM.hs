@@ -130,6 +130,20 @@ llvmCodeTheta _ (ThetaBinaryOp op lowType v1 v2)
   | isArithOp op = llvmCodeBinaryOp op lowType lowType v1 v2
   | isCompareOp op = llvmCodeBinaryOp op lowType (LowTypeIntS 1) v1 v2
   | otherwise = throwError "llvmCodeTheta.ThetaBinaryOp"
+llvmCodeTheta _ (ThetaArrayAccess lowType arr idx) = do
+  let arrayType = LowTypeArrayPtr 0 lowType
+  (arrVar, castArrThen) <- llvmCast (Just $ takeBaseName arr) arr arrayType
+  (idxVar, castIdxThen) <- llvmCast (Just $ takeBaseName idx) idx i64
+  (resPtrName, resPtr) <- newDataLocal "result-ptr"
+  resName <- newNameWith "result"
+  uncast <- llvmUncast (Just resName) (LLVMDataLocal resName) lowType
+  (castArrThen >=> castIdxThen) $
+    LLVMLet
+      resPtrName
+      (LLVMOpGetElementPtr
+         (arrVar, arrayType)
+         [(LLVMDataInt 0, i32), (idxVar, i64)])
+      (LLVMLet resName (LLVMOpLoad resPtr lowType) uncast)
 llvmCodeTheta _ (ThetaSysCall num args) = do
   (xs, vs) <- unzip <$> mapM (const $ newDataLocal "sys-call-arg") args
   res <- newNameWith "result"

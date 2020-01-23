@@ -328,6 +328,10 @@ renameTheta (ThetaBinaryOp op t d1 d2) = do
   d1' <- renameData d1
   d2' <- renameData d2
   return $ ThetaBinaryOp op t d1' d2'
+renameTheta (ThetaArrayAccess t d1 d2) = do
+  d1' <- renameData d1
+  d2' <- renameData d2
+  return $ ThetaArrayAccess t d1' d2'
 renameTheta (ThetaSysCall c ds) = do
   ds' <- mapM renameData ds
   return $ ThetaSysCall c ds'

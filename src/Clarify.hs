@@ -146,6 +146,8 @@ clarifyConst m name
     clarifySysCall name sysCall len m
 clarifyConst m name
   | Just _ <- asLowTypeMaybe name = clarify (m, TermEnum $ EnumTypeLabel "top")
+clarifyConst m name
+  | Just lowType <- asArrayAccessMaybe name = clarifyArrayAccess m name lowType
 clarifyConst m "is-enum" = clarifyIsEnum m
 clarifyConst m "file-descriptor" = clarify (m, TermConst "i64")
 clarifyConst m "stdin" = clarify (m, TermIntS 64 0)
@@ -188,7 +190,6 @@ clarifyBinaryOp name op lowType m = do
       let varX = toDataUpsilon (x, emptyMeta)
       let varY = toDataUpsilon (y, emptyMeta)
       zts <- complementaryChainOf xts
-      -- p "one-time closure (binary)"
       retClosure
         (Just name)
         zts
@@ -224,6 +225,24 @@ clarifyIsEnum m = do
     _ ->
       throwError $ "the type of is-enum is wrong. t :\n" <> T.pack (Pr.ppShow t)
 
+clarifyArrayAccess :: Meta -> Identifier -> LowType -> WithEnv CodePlus
+clarifyArrayAccess m name lowType = do
+  arrayAccessType <- lookupTypeEnv name
+  arrayAccessType' <- reduceTermPlus arrayAccessType
+  case arrayAccessType' of
+    (_, TermPi xts cod)
+      | length xts == 3 -> do
+        (xs, ds, headerList) <-
+          computeHeader m xts [ArgUnused, ArgArray, ArgImmediate]
+        case ds of
+          [arr, index] -> do
+            zts <- complementaryChainOf xts
+            callThenReturn <- toArrayAccessTail m lowType cod arr index xs
+            let body = iterativeApp headerList callThenReturn
+            retClosure (Just name) zts m xts body
+          _ -> throwError $ "the type of array-access is wrong"
+    _ -> throwError $ "the type of array-access is wrong"
+
 clarifySysCall ::
      Identifier -- the name of theta
   -> SysCall -- the kind of system call
@@ -237,11 +256,7 @@ clarifySysCall name sysCall args m = do
     (_, TermPi xts cod)
       | length xts == length args -> do
         zts <- complementaryChainOf xts
-        let xtas = zip xts args
-        (xss, dss, headerList) <-
-          unzip3 <$> mapM (\((x, t), a) -> toHeaderInfo m x t a) xtas
-        let ds = concat dss
-        let xs = concat xss
+        (xs, ds, headerList) <- computeHeader m xts args
         callThenReturn <- toSysCallTail m cod sysCall ds xs
         let body = iterativeApp headerList callThenReturn
         os <- getOS
@@ -332,6 +347,14 @@ pop x mp = do
   v <- Map.lookup x mp
   return (v, Map.delete x mp)
 
+-- array-access-u8 ~> Just u8
+-- array-access-i12341234 ~> Just i12341234
+asArrayAccessMaybe :: Identifier -> Maybe LowType
+asArrayAccessMaybe name
+  | ["array-access", typeStr] <- sepAtLast '-' name
+  , Just lowType <- asLowTypeMaybe typeStr = Just lowType
+asArrayAccessMaybe _ = Nothing
+
 asSysCallMaybe :: Identifier -> Maybe (SysCall, [Arg])
 asSysCallMaybe "write" =
   Just (SysCallWrite, [ArgUnused, ArgImmediate, ArgArray, ArgImmediate])
@@ -406,7 +429,19 @@ toHeaderInfo m x t ArgArray = do
                     , CodeUpIntro
                         ( m
                         , DataSigmaIntro arrVoidPtr [arrayType, arrayInnerTmp]))
-                    cont))))
+                    cont -- contの中でarrayInnerTmpを使用することで配列を利用
+                 ))))
+
+computeHeader ::
+     Meta
+  -> [(Identifier, TermPlus)]
+  -> [Arg]
+  -> WithEnv ([Identifier], [DataPlus], [CodePlus -> CodePlus])
+computeHeader m xts argInfoList = do
+  let xtas = zip xts argInfoList
+  (xss, dss, headerList) <-
+    unzip3 <$> mapM (\((x, t), a) -> toHeaderInfo m x t a) xtas
+  return (concat xss, concat dss, headerList)
 
 toSysCallTail ::
      Meta
@@ -434,6 +469,24 @@ toSysCallTail m cod syscall args xs = do
             resultVarName
             (m, CodeTheta (ThetaSysCall syscall args))
             result)
+
+toArrayAccessTail ::
+     Meta
+  -> LowType
+  -> TermPlus -- cod type
+  -> DataPlus -- array (inner)
+  -> DataPlus -- index
+  -> [Identifier] -- borrowed variables
+  -> WithEnv CodePlus
+toArrayAccessTail m lowType cod arr index xs = do
+  resultVarName <- newNameWith "result"
+  result <- retWithBorrowedVars m cod xs resultVarName
+  return
+    ( m
+    , CodeUpElim
+        resultVarName
+        (m, CodeTheta (ThetaArrayAccess lowType arr index))
+        result)
 
 retWithBorrowedVars ::
      Meta -> TermPlus -> [Identifier] -> Identifier -> WithEnv CodePlus
