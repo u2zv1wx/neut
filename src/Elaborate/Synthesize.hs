@@ -32,8 +32,10 @@ synthesize = do
     Just (Enriched _ _ (ConstraintDelta iter mess1 mess2)) -> do
       resolveDelta iter mess1 mess2
     Just (Enriched _ _ (ConstraintQuasiPattern m ess e)) -> do
+      p "quasi"
       resolvePiElim m ess e
     Just (Enriched _ _ (ConstraintFlexRigid m ess e)) -> do
+      p "flex"
       resolvePiElim m ess e
     Just (Enriched (e1, e2) _ c)
       -- throwError $ "cannot simplify:\n" ++ Pr.ppShow q
@@ -44,6 +46,7 @@ synthesize = do
       p $ "rest: " ++ show (Q.size q)
       p' c
       throwError $ "cannot simplify:\n" <> T.pack (Pr.ppShow (e1, e2))
+      -- throwError $ "cannot simplify:\n" <> T.pack (Pr.ppShow q)
 
 -- e1だけがstuckしているとき、e2だけがstuckしているとき、両方がstuckしているときをそれぞれ
 -- 独立したケースとして扱えるようにしたほうがよい（そうすればsubstを減らせる）

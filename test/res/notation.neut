@@ -77,6 +77,12 @@
 (notation (ascription e t)
   (let (_ t) e))
 
+(keyword with-type)
+
+(notation (with-type t e)
+  ((lambda ((x t)) x) e))
+  ;; ~> (lambda (_ t) cont) @ e
+
 (keyword to-type-list)
 
 (notation (to-type-list t)

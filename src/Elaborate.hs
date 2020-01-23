@@ -35,8 +35,9 @@ elaborate :: WeakTermPlus -> WithEnv TermPlus
 elaborate e
   -- p "infer"
  = do
+  p "infer"
   e' <- infer e
-  -- p "analyze/synthesize"
+  p "analyze/synthesize"
   -- Kantian type-inference ;)
   -- gets constraintEnv >>= analyze >>= synthesize
   analyze

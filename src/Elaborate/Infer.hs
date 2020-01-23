@@ -61,14 +61,20 @@ infer' ctx (m, WeakTermPiIntro xts e) = do
   (xts', (e', tCod)) <- inferBinder ctx xts e
   let piType = (emptyMeta, WeakTermPi xts' tCod)
   retWeakTerm piType m $ WeakTermPiIntro xts' e'
-infer' ctx (m, WeakTermPiElim e@(_, WeakTermPiIntro xts _) es)
+infer' ctx (m, WeakTermPiElim (_, WeakTermPiIntro xts e) es) -- "let"
   | length xts == length es = do
     ets <- mapM (infer' ctx) es
-    et <- infer' ctx e
+    let (xs, ts) = unzip xts
+    -- don't extend context
+    ts' <- mapM (inferType ctx) ts
+    let xts' = zip xs ts'
+    forM_ xts' $ uncurry insWeakTypeEnv
+    -- ctxをextendしなくてもdefListにそれ相当の情報がある
+    (e', tCod) <- infer' ctx e -- don't extend context
+    let piType = (emptyMeta, WeakTermPi xts' tCod)
+    et <- retWeakTerm piType m $ WeakTermPiIntro xts' e'
     let es' = map fst ets
-    -- let hss = map holeWeakTermPlus es'
-    -- let defList = zip (map fst xts) (zip hss es')
-    let defList = Map.fromList $ zip (map fst xts) es'
+    let defList = Map.fromList $ zip xs es'
     modify (\env -> env {substEnv = defList `Map.union` substEnv env})
     inferPiElim ctx m et ets
 infer' ctx (m, WeakTermPiElim e es) = do

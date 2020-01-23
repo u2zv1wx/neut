@@ -71,6 +71,41 @@
 ;; (write n3 stdout (test) enum.n3)
 (write hole stdout (test) 3)
 
+(let str-with-len
+  (sigma-introduction n3 (test)))
+
+(definition string
+  (sigma ((A type)) (array A u8)))
+
+(ascription str-with-len string)
+  ;; (sigma
+  ;;   ((A type))
+  ;;   (array A u8)))
+
+;; これで長さ不明の文字列を出力することができる
+;; (sigma-elimination
+;;   ((n type) (content (array n u8)))
+;;   str-with-len
+;;   (write n stdout content 3)
+;;   unit)
+
+;; dependent sigma elimができるってのは、この結果のwriteを「返せる」っていうこと。それはまあ、ヤバそう。
+;; strをそのまま返す、みたいなことをしてもよいのかも？
+;; それにはwrite-stringを定数として定義する必要があるけどね。
+(definition write-string ((str string))
+  (sigma-elimination
+    ((n type) (content (array n u8)))
+    str
+    (write n stdout content 3)
+    unit))
+
+(ascription write-string
+  (hom string top))
+
+(write-string str-with-len)
+
+(write-string str-with-len)
+
 ;; 過剰にwriteするとどうなる？たんに0が入るだけっぽい？
 ;; 負の数だと？そもそも何も書かれない。
 ;; (write n3 stdout (test) -3)
@@ -113,8 +148,9 @@
     (case p
       (left top)
       (right (nat-inner)))))
+
 ;; こっちなら、sigmaの中身が消えることによって無限ループは生じないはず。……実際、うまくいった。
-;; (coproduct top (nat-inner)))
+;; (coproduct top (nat-inner))
 ;; sigmaの中でのrecursive callは問題なし、ということでね。
 
 ;; out-2
@@ -141,17 +177,26 @@
 (let (foo (nat-inner))
   (sigma-introduction left unit))
 
-(keyword zero)
-
-(notation (zero)
+(definition zero
   (sigma-introduction left unit))
+;; (keyword zero)
 
-(ascription (zero) nat)
+;; (notation (zero)
+;;   (sigma-introduction left unit))
 
-(keyword succ)
+(ascription zero nat)
 
-(notation (succ x)
+;; (keyword succ)
+
+;; (notation (succ x)
+;;   (sigma-introduction right x))
+
+;; 関数として定義したほうがよくね。
+(definition succ ((x nat))
   (sigma-introduction right x))
+
+(ascription succ
+  (hom nat nat))
 
 ;; こうするとあたかもsuccがコンストラクタであるかのようにつかえる。
 (let (bar (nat-inner))
@@ -200,28 +245,63 @@
 ;;       (zero-inner (zero))
 ;;       (succ-inner (zero)))))
 
+;; (definition my-dec ((num nat))
+;;   (sigma-elimination
+;;     ((selector choice)
+;;      (value (nat-helper selector)))
+;;     num
+;;     (case selector
+;;       (left (zero))
+;;       (right (succ (succ (succ (zero))))))))
+
+;; 普通に関数として書いたら推論できたわ。なんでわざわざnotationでやってたんだ。
+;; 関数として書いたほうが推論できるものが増えてうれしい、ってことがわかる。
 (definition my-dec ((num nat))
   (sigma-elimination
     ((selector choice)
      (value (nat-helper selector)))
     num
     (case selector
-      (left (zero))
-      (right (succ (succ (succ (zero))))))))
+      (left zero)
+      (right (succ (succ (succ zero)))))))
+
+;; (definition my-dec ((num nat))
+;;   (sigma-elimination
+;;     ((selector choice)
+;;      (value (nat-helper selector)))
+;;     num
+;;     (case selector
+;;       (left (zero))
+;;       (right (with-type nat (succ (succ (succ (zero)))))))))
+
+;; (succ (succ (succ (zero))))とかの型がnatじゃないなにかに推論されてるっぽいが？
+
+;; (definition my-dec ((num nat))
+;;   (sigma-elimination
+;;     ((selector choice)
+;;      (value (nat-helper selector)))
+;;     num
+;;     (case selector
+;;       (left (with-type nat (zero)))
+;;       (right (with-type nat (succ (succ (succ (zero)))))))))
 
 (ascription my-dec (hom nat nat))
 
 ;; これがパターンマッチの基本をあたえている
 ;; こっちで与えるべきヒントって何？
 ;; valueの型がnatであるって書いても、それはselector = rightの情報がないから解けないよね？
+;; というかこっちが推論できてなんでmy-decが推論できないんだ？
 (definition my-item ((num nat))
   (sigma-elimination
     ((selector choice)
      (value (nat-helper selector)))
     num
     (case selector
-      (left (zero))
+      (left zero)
       (right value))))
+
+(ascription my-item
+  (hom nat nat))
 
 ;; こういうmatchのコードはもうふつうにsigma-elimに書き換えることができる。
 ;; まさに上のように書き換えればいいだけなので。
@@ -235,8 +315,6 @@
 ;;   (enum-with-prefix nat zero succ)
 ;;   ~> nat = {nat.zero, nat.succ}
 
-(ascription my-item
-  (hom nat nat))
 
 ;; (constant read
 ;;   (pi
