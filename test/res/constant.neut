@@ -13,18 +13,6 @@
 (constant i64.add
   (pi ((_ i64) (_ i64)) i64))
 
-;; (definition u8-vector
-;;   (sigma
-;;     ((A type)
-;;      (prf (is-enum A)))
-;;     (u8-array A)))
-
-;; (definition u8-vector
-;;   (sigma
-;;     (A type)
-;;     (content-length (is-enum A))
-;;     (content (u8-array A))))
-
 ;; これ、buf : utf8-codeとかにしたほうがいいのかも？
 ;; writeのlenの部分はi64にしてよさげ。
 (constant read
@@ -34,15 +22,6 @@
      (buf (array A u8))
      (len (is-enum A)))
     (product (array A u8) i64)))
-
-;; こういうノリ？
-;; (constant read
-;;   (pi
-;;     ((in file-descriptor)
-;;      (buf u8-vector)
-;;      (len i64))
-;;     (product u8-vector i64)))
-
 
 (constant write
   (pi
