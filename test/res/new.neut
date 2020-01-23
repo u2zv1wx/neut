@@ -556,6 +556,13 @@
 
 n15-4
 
+;; (definition foo ((x hole)) x)
+
+;; (ascription foo (hom nat hole))
+
 (fact 5)
+
+
+;; hole
 
 ;; new.neut ends here

@@ -69,10 +69,13 @@ elaborate' (m, WeakTermPiIntro xts e) = do
   e' <- elaborate' e
   xts' <- mapM elaboratePlus xts
   return (m, TermPiIntro xts' e')
-elaborate' (_, WeakTermPiElim (_, WeakTermZeta x) es) = do
+elaborate' (m, WeakTermPiElim (_, WeakTermZeta x) es) = do
   sub <- gets substEnv
   case Map.lookup x sub of
-    Nothing -> throwError $ "elaborate' i: remaining hole: " <> x
+    Nothing ->
+      throwError $
+      T.pack (showMeta m) <>
+      ":error: couldn't instantiate the hole since no constraints are given on it"
     Just (_, WeakTermPiIntro xts e)
       | length xts == length es -> do
         let xs = map fst xts
