@@ -99,21 +99,11 @@ elaborate' (m, WeakTermSigmaIntro t es) = do
   es' <- mapM elaborate' es
   case t' of
     (_, TermPi [zu, kp@(k, (_, TermPi xts _))] _) -- i.e. Sigma xts
-      | length xts == length es'
-        -- let (xs, ts) = unzip xts
-        -- strict product:
-        --   sigma-intro e1 ... en
-        -- ~>
-        --   let x1 := e1 in
-        --   ...
-        --   len xn := en in
-        --   lam (z : tau, k : Pi (x1 : t1, ..., xn : tn). z).
-        --     k @ (x1, ..., xn)
-        -- let xvs = map toTermUpsilon xs
-        -- let end = (m, TermPiIntro [zu, kp] (m, TermPiElim kv xvs))
-        -- bindをとりあえず今は省略
-       -> do
-        return (m, TermPiIntro [zu, kp] (m, TermPiElim (toTermUpsilon k) es'))
+      | length xts == length es' -> do
+        let xvs = map (toTermUpsilon . fst) xts
+        let kv = toTermUpsilon k
+        let bindArgsThen = \e -> (m, TermPiElim (m, TermPiIntro xts e) es')
+        return $ bindArgsThen (m, TermPiIntro [zu, kp] (m, TermPiElim kv xvs))
     _ -> throwError "the type of sigma-intro is wrong"
 elaborate' (m, WeakTermSigmaElim t xts e1 e2) = do
   t' <- elaborate' t
