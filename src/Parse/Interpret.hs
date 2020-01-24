@@ -40,6 +40,19 @@ interpret (m, TreeNode ((_, TreeAtom "pi-elimination"):e:es)) = do
   e' <- interpret e
   es' <- mapM interpret es
   return (m, WeakTermPiElim e' es')
+interpret (m, TreeNode ((_, TreeAtom "sigma"):xts)) = do
+  xts' <- mapM interpretIdentifierPlus xts
+  return (m, WeakTermSigma xts')
+interpret (m, TreeNode ((_, TreeAtom "sigma-introduction"):es)) = do
+  h <- newHole m
+  es' <- mapM interpret es
+  return (m, WeakTermSigmaIntro h es')
+interpret (m, TreeNode [(_, TreeAtom "sigma-elimination"), (_, TreeNode xts), e1, e2]) = do
+  h <- newHole m
+  xts' <- mapM interpretIdentifierPlus xts
+  e1' <- interpret e1
+  e2' <- interpret e2
+  return (m, WeakTermSigmaElim h xts' e1' e2')
 interpret (m, TreeNode [(_, TreeAtom "iterate"), xt, (_, TreeNode xts), e]) = do
   xt' <- interpretIdentifierPlus xt
   (xts', e') <- interpretBinder xts e
