@@ -81,6 +81,36 @@ infer' ctx (m, WeakTermPiElim e es) = do
   ets <- mapM (infer' ctx) es
   et <- infer' ctx e
   inferPiElim ctx m et ets
+infer' ctx (m, WeakTermSigma xts) = do
+  xts' <- inferSigma ctx xts
+  retWeakTerm univ m $ WeakTermSigma xts'
+infer' ctx (m, WeakTermSigmaIntro t es) = do
+  t' <- inferType ctx t
+  (es', ts) <- unzip <$> mapM (infer' ctx) es
+  ys <- mapM (const $ newNameWith "arg") es'
+  -- yts = [(y1, ?M1 @ (ctx[0], ..., ctx[n])),
+  --        (y2, ?M2 @ (ctx[0], ..., ctx[n], y1)),
+  --        ...,
+  --        (ym, ?Mm @ (ctx[0], ..., ctx[n], y1, ..., y{m-1}))]
+  yts <- newTypeHoleListInCtx ctx ys
+  let sigmaType = (emptyMeta, WeakTermSigma yts)
+  -- ts' = [?M1 @ (ctx[0], ..., ctx[n]),
+  --        ?M2 @ (ctx[0], ..., ctx[n], e1),
+  --        ...,
+  --        ?Mm @ (ctx[0], ..., ctx[n], e1, ..., e{m-1})]
+  let ts' = map (substWeakTermPlus (zip ys es) . snd) yts
+  forM_ ((t', sigmaType) : zip ts ts') $ uncurry insConstraintEnv
+  retWeakTerm sigmaType m $ WeakTermSigmaIntro t' es'
+  -- undefined
+infer' ctx (m, WeakTermSigmaElim t xts e1 e2) = do
+  t' <- inferType ctx t
+  (e1', t1) <- infer' ctx e1
+  xts' <- inferSigma ctx xts
+  let sigmaType = (emptyMeta, WeakTermSigma xts')
+  insConstraintEnv t1 sigmaType
+  (e2', t2) <- infer' ctx e2
+  insConstraintEnv t2 t'
+  retWeakTerm t2 m $ WeakTermSigmaElim t' xts' e1' e2'
 infer' ctx (m, WeakTermIter (x, t) xts e) = do
   t' <- inferType ctx t
   insWeakTypeEnv x t'
@@ -224,6 +254,17 @@ inferPi ctx ((x, t):xts) cod = do
   insWeakTypeEnv x t'
   (xts', cod') <- inferPi (ctx ++ [(x, t')]) xts cod
   return ((x, t') : xts', cod')
+
+inferSigma ::
+     Context
+  -> [(Identifier, WeakTermPlus)]
+  -> WithEnv [(Identifier, WeakTermPlus)]
+inferSigma _ [] = return []
+inferSigma ctx ((x, t):xts) = do
+  t' <- inferType ctx t
+  insWeakTypeEnv x t'
+  xts' <- inferSigma (ctx ++ [(x, t')]) xts
+  return $ (x, t') : xts'
 
 -- {} inferBinder {}
 inferBinder ::
