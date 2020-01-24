@@ -39,6 +39,8 @@ synthesize = do
       resolvePiElim m ess e
     Just (Enriched (e1, e2) _ _) -> do
       p $ "rest: " ++ show (Q.size q)
+      let foo = Map.lookup "n-529" sub
+      p' foo
       throwError $ "cannot simplify:\n" <> T.pack (Pr.ppShow (e1, e2))
 
 -- e1だけがstuckしているとき、e2だけがstuckしているとき、両方がstuckしているときをそれぞれ

@@ -108,7 +108,7 @@ infer' ctx (m, WeakTermSigmaElim t xts e1 e2) = do
   xts' <- inferSigma ctx xts
   let sigmaType = (emptyMeta, WeakTermSigma xts')
   insConstraintEnv t1 sigmaType
-  (e2', t2) <- infer' ctx e2
+  (e2', t2) <- infer' (ctx ++ xts') e2
   insConstraintEnv t2 t'
   retWeakTerm t2 m $ WeakTermSigmaElim t' xts' e1' e2'
 infer' ctx (m, WeakTermIter (x, t) xts e) = do

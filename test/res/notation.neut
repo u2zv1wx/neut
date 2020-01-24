@@ -13,10 +13,6 @@
 
 (notation forall pi)
 
-(keyword apply)
-
-(notation apply pi-elimination)
-
 (keyword case)
 
 (notation case enum-elimination)
@@ -51,11 +47,11 @@
 ;; lambda: pi-introduction with implicit begin block
 (keyword lambda)
 
-(notation (lambda () e+)
-  (pi-introduction () (begin e+)))
-
 (notation (lambda (xts+) e+)
   (pi-introduction (xts+) (begin e+)))
+
+(notation (lambda () e+)
+  (pi-introduction () (begin e+)))
 
 ;; define recursive term at top level without using `mu` explicitly
 ;; (notation (definition name e)
@@ -91,11 +87,12 @@
 (notation (to-type-list t t+)
   ((_ t) (splice (to-type-list t+))))
 
-(keyword arrow)
+;; (keyword arrow)
 
-(notation (arrow (t+) cod)
-  (pi (to-type-list t+) cod))
+;; (notation (arrow (t+) cod)
+;;   (pi (to-type-list t+) cod))
 
+;; homはdefinitionでも定義できる。
 (keyword hom)
 
 (notation (hom t) t)
@@ -105,23 +102,29 @@
     ((_ t))
     (hom rest+)))
 
-(keyword sigma)
+;; (keyword sigma)
 
-(notation (sigma (xt+) t)
-  (pi
-    ((c tau)
-     (_ (pi (xt+ (_ t)) c)))
-    c))
+;; (notation (sigma (xt+) t)
+;;   (pi
+;;     ((c tau)
+;;      (_ (pi (xt+ (_ t)) c)))
+;;     c))
 
 (keyword product)
 
-(notation (product t+)
-  (pi
-    ((c tau)
-     (_ (arrow (t+) c)))
-    c))
+;; (notation (product t+)
+;;   (pi
+;;     ((c tau)
+;;      (_ (arrow (t+) c)))
+;;     c))
 
-(keyword sigma-introduction)
+(notation (product t+)
+  (sigma (splice (to-type-list t+))))
+
+;; (product A1 ... An)
+;; ~> (sigma (_ A1) ... (_ An))
+
+;; (keyword sigma-introduction)
 
 (keyword to-hole-list)
 
@@ -131,13 +134,13 @@
 (notation (to-hole-list e e+)
   ((_ hole) (splice (to-hole-list e+))))
 
-(notation (sigma-introduction e+)
-  (lambda
-    ((elim-result-type tau)
-     (eliminator (pi (to-hole-list e+) elim-result-type)))
-    (eliminator e+)))
+;; (notation (sigma-introduction e+)
+;;   (lambda
+;;     ((elim-result-type tau)
+;;      (eliminator (pi (to-hole-list e+) elim-result-type)))
+;;     (eliminator e+)))
 
-(keyword sigma-elimination)
+;; (keyword sigma-elimination)
 
-(notation (sigma-elimination (xt+) e1 e2+)
-  (e1 hole (lambda (xt+) e2+)))
+;; (notation (sigma-elimination (xt+) e1 e2+)
+;;   (e1 hole (lambda (xt+) e2+)))

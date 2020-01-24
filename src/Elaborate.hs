@@ -86,6 +86,42 @@ elaborate' (m, WeakTermPiElim e es) = do
   e' <- elaborate' e
   es' <- mapM elaborate' es
   return (m, TermPiElim e' es')
+elaborate' (m, WeakTermSigma xts) = do
+  xts' <- mapM elaboratePlus xts
+  z <- newNameWith "sigma"
+  let zv = toTermUpsilon z
+  k <- newNameWith "sig"
+  -- Sigma [x1 : A1, ..., xn : An] = Pi (z : Type, _ : Pi [x1 : A1, ..., xn : An]. z). z
+  let piType = (emptyMeta, TermPi xts' zv)
+  return (m, TermPi [(z, univTerm), (k, piType)] zv)
+elaborate' (m, WeakTermSigmaIntro t es) = do
+  t' <- elaborate' t >>= reduceTermPlus
+  es' <- mapM elaborate' es
+  case t' of
+    (_, TermPi [zu, kp@(k, (_, TermPi xts _))] _) -- i.e. Sigma xts
+      | length xts == length es'
+        -- let (xs, ts) = unzip xts
+        -- strict product:
+        --   sigma-intro e1 ... en
+        -- ~>
+        --   let x1 := e1 in
+        --   ...
+        --   len xn := en in
+        --   lam (z : tau, k : Pi (x1 : t1, ..., xn : tn). z).
+        --     k @ (x1, ..., xn)
+        -- let xvs = map toTermUpsilon xs
+        -- let end = (m, TermPiIntro [zu, kp] (m, TermPiElim kv xvs))
+        -- bindをとりあえず今は省略
+       -> do
+        return (m, TermPiIntro [zu, kp] (m, TermPiElim (toTermUpsilon k) es'))
+    _ -> throwError "the type of sigma-intro is wrong"
+elaborate' (m, WeakTermSigmaElim t xts e1 e2) = do
+  t' <- elaborate' t
+  xts' <- mapM elaboratePlus xts
+  e1' <- elaborate' e1
+  e2' <- elaborate' e2
+  -- sigma-elim t xts e1 e2 = e1 @ (t, lam xts. e2)
+  return (m, TermPiElim e1' [t', (emptyMeta, TermPiIntro xts' e2')])
 elaborate' (m, WeakTermIter (x, t) xts e) = do
   t' <- elaborate' t
   xts' <- mapM elaboratePlus xts

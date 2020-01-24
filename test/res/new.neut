@@ -24,16 +24,16 @@
 
 (enum three three-0 three-1 three-2)
 
-(constant admit-explicit
-  (pi ((A type)) A))
+;; (constant admit-explicit
+;;   (pi ((A type)) A))
 
 ;; (definition foo top-unit)
 
 ;; (ascription foo top)
 
-(keyword admit)
+;; (keyword admit)
 
-(notation admit (admit-explicit hole))
+;; (notation admit (admit-explicit hole))
 
 ;; 「あ」のutf8-encoding
 (definition str ()
@@ -51,9 +51,15 @@
 ;;     ((c tau)
 ;;      (_ (pi (xt+ (_ t)) c)))
 ;;     c))
+;; (definition utf8-code
+;;   (sigma ((A type) (prf (is-enum A)))
+;;     (array A u8)))
+
 (definition utf8-code
-  (sigma ((A type) (prf (is-enum A)))
-    (array A u8)))
+  (sigma
+    (A type)
+    (prf (is-enum A))
+    (_ (array A u8))))
 
 ;; 長さがn15になるのがポイントで、ここでunicodeの複雜性が出てくる
 ;; n15の部分をsigmaで包めばどうにかなりそうな雰囲気はある。
@@ -75,7 +81,11 @@
   (sigma-introduction n3 (test)))
 
 (definition string
-  (sigma ((A type)) (array A u8)))
+  (sigma
+    (A type)
+    (_ (array A u8))))
+;; (definition string
+;;   (sigma ((A type)) (array A u8)))
 
 (ascription str-with-len string)
   ;; (sigma
@@ -96,8 +106,9 @@
   (sigma-elimination
     ((n type) (content (array n u8)))
     str
-    (write n stdout content 3)
-    unit))
+    (begin
+      (write n stdout content 3)
+      unit)))
 
 (ascription write-string
   (hom string top))
@@ -132,22 +143,39 @@
 ;; (write n15 stdout (test) enum.n15)
 
 (definition coproduct ((A tau) (B tau))
-  (sigma ((x choice))
-    (case x
-      (left A)
-      (right B))))
+  (sigma
+    (x choice)
+    (_ (case x
+         (left A)
+         (right B)))))
+
+;; (definition coproduct ((A tau) (B tau))
+;;   (sigma ((x choice))
+;;     (case x
+;;       (left A)
+;;       (right B))))
+
+;; (ascription coproduct
+;;   (arrow (tau tau) tau))
 
 (ascription coproduct
-  (arrow (tau tau) tau))
+  (pi ((_ tau) (_ tau)) tau))
 
 (enum nat-enum zero-inner succ-inner)
 
 ;; 無限ループしないように修正していく
 (definition nat-inner ()
-  (sigma ((p choice))
-    (case p
-      (left top)
-      (right (nat-inner)))))
+  (sigma
+    (p choice)
+    (_ (case p
+         (left top)
+         (right (nat-inner))))))
+
+;; (definition nat-inner ()
+;;   (sigma ((p choice))
+;;     (case p
+;;       (left top)
+;;       (right (nat-inner)))))
 
 ;; こっちなら、sigmaの中身が消えることによって無限ループは生じないはず。……実際、うまくいった。
 ;; (coproduct top (nat-inner))
