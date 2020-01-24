@@ -51,6 +51,8 @@
 ;;     ((c tau)
 ;;      (_ (pi (xt+ (_ t)) c)))
 ;;     c))
+
+;; このときはたしかに、is-enumによってutf8-codeは長さの情報を保持することができている。
 (definition utf8-code
   (sigma
     ((A type)
@@ -91,6 +93,9 @@
   (sigma
     ((A type))
     (array A u8)))
+;; こっちでは、(n3, [p, q, r])みたいな感じで。
+;; 型としては長さの情報があるけど、termとしては長さの情報がない、という状況。
+;; 別にwriteだってできてるんだしこれでよくね、という感じが……？
 
 (ascription str-with-len string)
   ;; (sigma
@@ -610,7 +615,13 @@ n15-4
 
 ;; (ascription foo (hom nat hole))
 
+;; (定義 ご 5)
+
+;; (fact ご)
+
 (fact 5)
+
+;; (fact nat)
 
 ;; (fact (begin (lambda ((A tau) (y A)) y)))
 ;; (fact (top 100))

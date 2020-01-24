@@ -194,7 +194,12 @@ holeWeakTermPlusBindings ((_, t):xts) es = do
 substWeakTermPlus :: SubstWeakTerm -> WeakTermPlus -> WeakTermPlus
 substWeakTermPlus _ (m, WeakTermTau) = do
   (m, WeakTermTau)
-substWeakTermPlus sub (m, WeakTermUpsilon x) = do
+substWeakTermPlus sub (m, WeakTermUpsilon x)
+  -- metaを保持するべき？
+  -- case lookup x sub of
+  --   Just (_, e) -> (m, e)
+  --   Nothing -> (m, WeakTermUpsilon x)
+ = do
   fromMaybe (m, WeakTermUpsilon x) (lookup x sub)
 substWeakTermPlus sub (m, WeakTermPi xts t) = do
   let (xts', t') = substWeakTermPlusBindingsWithBody sub xts t
@@ -229,7 +234,11 @@ substWeakTermPlus sub (m, WeakTermConstDecl (x, t) e) = do
   let t' = substWeakTermPlus sub t
   let e' = substWeakTermPlus (filter (\(k, _) -> k /= x) sub) e
   (m, WeakTermConstDecl (x, t') e')
-substWeakTermPlus sub (m, WeakTermZeta s) = do
+substWeakTermPlus sub (m, WeakTermZeta s)
+  -- case lookup s sub of
+  --   Just (_, e) -> (m, e)
+  --   Nothing -> (m, WeakTermZeta s)
+ = do
   fromMaybe (m, WeakTermZeta s) (lookup s sub)
 substWeakTermPlus sub (m, WeakTermInt t x) = do
   let t' = substWeakTermPlus sub t

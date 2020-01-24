@@ -52,8 +52,10 @@ infer e = do
 infer' :: Context -> WeakTermPlus -> WithEnv (WeakTermPlus, WeakTermPlus)
 infer' _ tau@(_, WeakTermTau) = return (tau, tau)
 infer' _ (m, WeakTermUpsilon x) = do
-  t <- lookupWeakTypeEnv x
-  retWeakTerm t m $ WeakTermUpsilon x
+  (_, t) <- lookupWeakTypeEnv x
+  retWeakTerm (m, t) m $ WeakTermUpsilon x
+  -- t <- lookupWeakTypeEnv x
+  -- retWeakTerm t m $ WeakTermUpsilon x
 infer' ctx (m, WeakTermPi xts t) = do
   (xts', t') <- inferPi ctx xts t
   retWeakTerm (univAt m) m $ WeakTermPi xts' t'
@@ -99,7 +101,7 @@ infer' ctx (m, WeakTermSigmaIntro t es) = do
   --        ...,
   --        ?Mm @ (ctx[0], ..., ctx[n], e1, ..., e{m-1})]
   let ts' = map (substWeakTermPlus (zip ys es) . snd) yts
-  forM_ ((t', sigmaType) : zip ts ts') $ uncurry insConstraintEnv
+  forM_ ((sigmaType, t') : zip ts ts') $ uncurry insConstraintEnv
   retWeakTerm sigmaType m $ WeakTermSigmaIntro t' es'
 infer' ctx (m, WeakTermSigmaElim t xts e1 e2) = do
   t' <- inferType ctx t
@@ -117,7 +119,7 @@ infer' ctx (m, WeakTermIter (x, t) xts e) = do
   -- Otherwise the type of `mu x. e` might have `x` as free variable, which is unsound.
   (xts', (e', tCod)) <- inferBinder ctx xts e
   let piType = (m, WeakTermPi xts' tCod)
-  insConstraintEnv t' piType
+  insConstraintEnv piType t'
   retWeakTerm piType m $ WeakTermIter (x, t') xts' e'
 infer' ctx (m, WeakTermZeta _)
   -- zetaから変換先をlookupできるようにしておいたほうが正しい？
@@ -174,15 +176,16 @@ infer' _ (m, WeakTermEnumIntro v) = do
 infer' ctx (m, WeakTermEnumElim (e, t) les) = do
   t'' <- inferType ctx t
   (e', t') <- infer' ctx e
-  insConstraintEnv t'' t'
+  insConstraintEnv t' t''
   if null les
     then do
       h <- newTypeHoleInCtx ctx m
       retWeakTerm h m $ WeakTermEnumElim (e', t') [] -- ex falso quodlibet
     else do
       let (ls, _) = unzip les
-      tls <- mapM inferCase ls
-      constrainList $ t' : catMaybes tls
+      tls <- catMaybes <$> mapM inferCase ls
+      forM_ (zip (repeat t') tls) $ uncurry insConstraintEnv
+      -- constrainList $ t' : catMaybes tls
       (es', ts) <- unzip <$> mapM (inferEnumElim ctx (e', t')) les
       constrainList $ ts
       retWeakTerm (head ts) m $ WeakTermEnumElim (e', t') $ zip ls es'
@@ -192,7 +195,8 @@ infer' ctx (m, WeakTermArray dom k) = do
 infer' ctx (m, WeakTermArrayIntro k es) = do
   let tCod = inferKind k
   (es', ts) <- unzip <$> mapM (infer' ctx) es
-  constrainList $ tCod : ts
+  forM_ (zip ts (repeat tCod)) $ uncurry insConstraintEnv
+  -- constrainList $ tCod : ts
   let len = toInteger $ length es
   -- このdomの場所って何、という話がある。mでいいのか？
   -- esの最初のやつとか？(array-intro u8 e1 e2 e3)とかだったら、e1の最初の位置。
@@ -210,7 +214,8 @@ infer' ctx (m, WeakTermArrayElim k xts e1 e2) = do
   -- このdomも位置がわからない。わからないというか、定義されない。
   let dom = (emptyMeta, WeakTermEnum (EnumTypeNat len))
   insConstraintEnv t1 (fst e1', WeakTermArray dom k)
-  constrainList $ inferKind k : map snd xts'
+  forM_ (zip (map snd xts') (repeat (inferKind k))) $ uncurry insConstraintEnv
+  -- constrainList $ inferKind k : map snd xts'
   retWeakTerm t2 m $ WeakTermArrayElim k xts' e1' e2'
 infer' _ (m, WeakTermStruct ts) = retWeakTerm (univAt m) m $ WeakTermStruct ts
 infer' ctx (m, WeakTermStructIntro eks) = do
@@ -218,7 +223,7 @@ infer' ctx (m, WeakTermStructIntro eks) = do
   let ts = map inferKind ks
   let structType = (m, WeakTermStruct ks)
   (es', ts') <- unzip <$> mapM (infer' ctx) es
-  forM_ (zip ts ts') $ uncurry insConstraintEnv
+  forM_ (zip ts' ts) $ uncurry insConstraintEnv
   retWeakTerm structType m $ WeakTermStructIntro $ zip es' ks
 infer' ctx (m, WeakTermStructElim xks e1 e2) = do
   (e1', t1) <- infer' ctx e1
@@ -319,7 +324,7 @@ inferPiElim ctx m (e, t) ets = do
       forM_ (zip ts ts') $ uncurry insConstraintEnv
       cod <- newTypeHoleInCtx (ctx ++ yts) m
       let tPi = (fst e, WeakTermPi yts cod)
-      insConstraintEnv tPi t
+      insConstraintEnv t tPi
       let cod' = substWeakTermPlus (zip ys es) cod
       retWeakTerm cod' m $ WeakTermPiElim e es
 

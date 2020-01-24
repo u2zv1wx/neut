@@ -195,8 +195,9 @@ showErrorThenQuit q = do
 
 showError :: EnrichedConstraint -> WithEnv ()
 showError (Enriched (e1, e2) _ _) = do
-  case (getLocInfo e1, getLocInfo e2) of
-    (Just m1, Just m2) -> showError'' m1 m2 e1 e2
+  case (getLocInfo e1, getLocInfo e2)
+    -- (Just m1, Just m2) -> showError'' m1 m2 e1 e2
+        of
     (Just m, _) -> showError' m e1 e2
     (_, Just m) -> showError' m e2 e1
     _ -> showError' emptyMeta e1 e2
