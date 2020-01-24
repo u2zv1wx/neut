@@ -6,10 +6,12 @@ module Elaborate.Synthesize
 
 import Control.Monad.Except
 import Control.Monad.State
+import System.Console.ANSI
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.PQueue.Min as Q
 import qualified Data.Text as T
+import qualified Data.Text.IO as TIO
 import qualified Text.Show.Pretty as Pr
 
 import Data.Basic
@@ -37,9 +39,10 @@ synthesize = do
     Just (Enriched _ _ (ConstraintFlexRigid m ess e)) -> do
       p "flex"
       resolvePiElim m ess e
-    Just (Enriched (e1, e2) _ _) -> do
-      p $ "rest: " ++ show (Q.size q)
-      throwError $ "cannot simplify:\n" <> T.pack (Pr.ppShow (e1, e2))
+    Just (Enriched _ _ _) -> do
+      showErrorThenQuit q
+      -- p $ "rest: " ++ show (Q.size q)
+      -- throwError $ "cannot simplify:\n" <> T.pack (Pr.ppShow (e1, e2))
 
 -- e1だけがstuckしているとき、e2だけがstuckしているとき、両方がstuckしているときをそれぞれ
 -- 独立したケースとして扱えるようにしたほうがよい（そうすればsubstを減らせる）
@@ -185,3 +188,61 @@ takeByCount (i:is) xs = do
   let ys = take i xs
   let yss = takeByCount is (drop i xs)
   ys : yss
+
+showErrorThenQuit :: ConstraintQueue -> WithEnv ()
+showErrorThenQuit q = do
+  let cs = Q.toList q
+  mapM_ showError cs
+  throwError "aborting"
+
+showError :: EnrichedConstraint -> WithEnv ()
+showError (Enriched (e1, e2) _ _) = do
+  case (getLocInfo e1, getLocInfo e2) of
+    (Just m1, Just m2) -> showError'' m1 m2 e1 e2
+    (Just m, _) -> showError' m e1 e2
+    (_, Just m) -> showError' m e2 e1
+    _ -> showError' emptyMeta e1 e2
+
+showError' :: Meta -> WeakTermPlus -> WeakTermPlus -> WithEnv ()
+showError' m e1 e2 = do
+  liftIO $ setSGR [SetConsoleIntensity BoldIntensity]
+  liftIO $ TIO.putStr $ T.pack (showMeta m)
+  liftIO $ setSGR [Reset]
+  liftIO $ TIO.putStrLn ":"
+  liftIO $
+    setSGR [SetConsoleIntensity BoldIntensity, SetColor Foreground Vivid Red]
+  liftIO $ TIO.putStr "error"
+  liftIO $ setSGR [Reset]
+  liftIO $
+    TIO.putStrLn
+      ": couldn't verify the definitional equality of the following two terms:"
+  liftIO $ putStrLn $ "- " ++ show (e1)
+  liftIO $ putStrLn $ "- " ++ show (e2)
+  liftIO $ putStrLn ""
+
+showError'' :: Meta -> Meta -> WeakTermPlus -> WeakTermPlus -> WithEnv ()
+showError'' m1 m2 e1 e2 = do
+  liftIO $ setSGR [SetConsoleIntensity BoldIntensity]
+  liftIO $ TIO.putStr $ T.pack (showMeta m1)
+  liftIO $ setSGR [Reset]
+  liftIO $ TIO.putStrLn ":"
+  liftIO $ setSGR [SetConsoleIntensity BoldIntensity]
+  liftIO $ TIO.putStr $ T.pack (showMeta m2)
+  liftIO $ setSGR [Reset]
+  liftIO $ TIO.putStrLn ":"
+  liftIO $
+    setSGR [SetConsoleIntensity BoldIntensity, SetColor Foreground Vivid Red]
+  liftIO $ TIO.putStr "error"
+  liftIO $ setSGR [Reset]
+  liftIO $
+    TIO.putStrLn
+      ": couldn't verify the definitional equality of the following two terms:"
+  liftIO $ putStrLn $ "- " ++ show (e1)
+  liftIO $ putStrLn $ "- " ++ show (e2)
+  liftIO $ putStrLn ""
+
+getLocInfo :: WeakTermPlus -> Maybe Meta
+getLocInfo (m, _) =
+  case (metaFileName m, metaLocation m) of
+    (Just _, Just _) -> return m
+    _ -> Nothing

@@ -568,7 +568,7 @@
 
 (definition fact ((n i64))
   (enum-elimination n
-    ((i64 1) 1)
+    ((i64 1) top)
     (default (i64.mul n (fact (i64.sub n 1))))))
 
 ;; こっちなら推論できる。これはつまり、なんというか、情報を与えればenum-elimをいじらなくても推論可能ってこと？
@@ -601,6 +601,8 @@ n15-4
 ;; (ascription foo (hom nat hole))
 
 (fact 5)
+
+(fact (lambda ((A tau) (y A)) y))
 
 
 ;; hole

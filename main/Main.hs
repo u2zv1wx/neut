@@ -80,9 +80,7 @@ optParser :: ParserInfo Command
 optParser = info (helper <*> parseOpt) fullDesc
 
 main :: IO ()
-main = do
-  putStrLn "start"
-  execParser optParser >>= run
+main = execParser optParser >>= run
 
 run :: Command -> IO ()
 run (Build inputPathStr mOutputPathStr outputKind) = do
@@ -123,7 +121,6 @@ writeResult result outputPath OutputKindObject = do
 process :: Path Abs File -> WithEnv [B.ByteString]
 process inputPath = do
   content <- liftIO $ TIO.readFile $ toFilePath inputPath
-  p "parse"
   e <- parse content (toFilePath inputPath) >>= elaborate
   p "elaborated"
   e' <- clarify e

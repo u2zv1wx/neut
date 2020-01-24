@@ -300,3 +300,6 @@ substWeakTermPlusBindingsWithBody sub ((x, t):xts) e = do
 
 univ :: WeakTermPlus
 univ = (emptyMeta, WeakTermTau)
+
+univAt :: Meta -> WeakTermPlus
+univAt m = (m, WeakTermTau)
