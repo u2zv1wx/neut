@@ -50,10 +50,6 @@ clarify (_, TermConstDecl (x, t) e) = do
   _ <- clarify t
   insTypeEnv x t
   clarify e
--- clarify (m, TermIntS size l) = do
---   return (m, CodeUpIntro (m, DataIntS size l))
--- clarify (m, TermIntU size l) = do
---   return (m, CodeUpIntro (m, DataIntU size l))
 clarify (m, TermFloat16 l) = do
   return (m, CodeUpIntro (m, DataFloat16 l))
 clarify (m, TermFloat32 l) = do
