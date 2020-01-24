@@ -5,7 +5,7 @@ module Data.Env where
 
 import Control.Monad.Except
 import Control.Monad.State
-import Data.List (elemIndex, sortBy)
+import Data.List (elemIndex)
 import Path
 import System.Info
 
@@ -95,8 +95,8 @@ newName = do
 newNameWith :: Identifier -> WithEnv Identifier
 newNameWith s = do
   i <- newName
-  let s' = s <> i -- slow
-  -- let s' = i
+  -- let s' = s <> i -- slow
+  let s' = i
   modify (\e -> e {nameEnv = Map.insert s s' (nameEnv e)})
   return s'
 
@@ -207,11 +207,6 @@ newDataUpsilonWith' name m = do
   x <- newNameWith name
   return (x, (m, DataUpsilon x))
 
--- reorder :: [(EnumValue, a)] -> WithEnv [a]
--- reorder lds = do
---   let (ls, ds) = unzip lds
---   is <- mapM enumValueToInteger ls
---   return $ map snd $ sortBy (\(i, _) (j, _) -> i `compare` j) $ zip is ds
 enumValueToInteger :: EnumValue -> WithEnv Integer
 enumValueToInteger labelOrNat =
   case labelOrNat of

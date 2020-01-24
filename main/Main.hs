@@ -1,9 +1,13 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Main where
 
 import Control.Monad.State
 import Options.Applicative
 import Path
 import Path.IO
+import System.Console.ANSI
+import System.Exit
 import System.Process
 import Text.Read (readMaybe)
 
@@ -90,8 +94,18 @@ run (Build inputPathStr mOutputPathStr outputKind) = do
   mOutputPath <- mapM resolveFile' mOutputPathStr
   outputPath <- constructOutputPath basename mOutputPath outputKind
   case resultOrErr of
-    Left err -> putStrLn err
+    Left err -> do
+      printError err
+      exitWith (ExitFailure 1)
     Right result -> writeResult result outputPath outputKind
+
+printError :: String -> IO ()
+printError err = do
+  liftIO $
+    setSGR [SetConsoleIntensity BoldIntensity, SetColor Foreground Vivid Red]
+  liftIO $ putStr "error"
+  liftIO $ setSGR [Reset]
+  liftIO $ putStrLn $ ": " <> err
 
 constructOutputPath ::
      Path Rel File -> Maybe (Path Abs File) -> OutputKind -> IO (Path Abs File)
@@ -122,10 +136,10 @@ process :: Path Abs File -> WithEnv [B.ByteString]
 process inputPath = do
   content <- liftIO $ TIO.readFile $ toFilePath inputPath
   e <- parse content (toFilePath inputPath) >>= elaborate
-  p "elaborated"
+  -- p "elaborated"
   e' <- clarify e
-  p "clarified"
+  -- p "clarified"
   e'' <- toLLVM e'
-  p "llvm-done"
+  -- p "llvm-done"
   emit e'' -- process input = do
    -- parse >=> elaborate >=> polarize >=> toLLVM >=> emit

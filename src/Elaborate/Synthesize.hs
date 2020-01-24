@@ -34,10 +34,8 @@ synthesize = do
     Just (Enriched _ _ (ConstraintDelta iter mess1 mess2)) -> do
       resolveDelta iter mess1 mess2
     Just (Enriched _ _ (ConstraintQuasiPattern m ess e)) -> do
-      p "quasi"
       resolvePiElim m ess e
     Just (Enriched _ _ (ConstraintFlexRigid m ess e)) -> do
-      p "flex"
       resolvePiElim m ess e
     Just (Enriched _ _ _) -> do
       showErrorThenQuit q
@@ -193,7 +191,7 @@ showErrorThenQuit :: ConstraintQueue -> WithEnv ()
 showErrorThenQuit q = do
   let cs = Q.toList q
   mapM_ showError cs
-  throwError "aborting"
+  throwError "aborting due to failure of constraint synthesis"
 
 showError :: EnrichedConstraint -> WithEnv ()
 showError (Enriched (e1, e2) _ _) = do

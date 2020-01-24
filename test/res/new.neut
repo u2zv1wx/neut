@@ -467,8 +467,14 @@
 ;;     (product (u8-array A) file-descriptor)))
 
 ;; 0 = rdonly
+;; これを使うとコンパイルが異様に遅くなる。なんでだろう？
 ;; (let file-and-str
 ;;   (open n32 "/Users/u2zv1wx/Downloads/sample.txt" 0 0))
+
+    ;; (product (array A u8) file-descriptor)))
+
+;; (ascription file-and-str
+;;   (product (array n32 u8) file-descriptor))
 
 ;; (let file
 ;;   (sigma-elimination
@@ -477,6 +483,8 @@
 ;;     file-and-str
 ;;     q))
 
+;; (let item-and-len
+;;   (read n15 file buf 15))
 ;; (let item-and-len
 ;;   (read n15 file buf enum.n15))
 
@@ -492,6 +500,7 @@
 ;; itemの型がわかってるんだから、(write _ stdout item enum.n15)とかでもいけるね。
 ;; printをこれで定義できるわけだ。
 ;; (write n15 stdout item enum.n15)
+;; (write n15 stdout item 15)
 
 ;; (close file)
 
@@ -568,8 +577,9 @@
 
 (definition fact ((n i64))
   (enum-elimination n
-    ((i64 1) top)
+    ((i64 1) 1)
     (default (i64.mul n (fact (i64.sub n 1))))))
+
 
 ;; こっちなら推論できる。これはつまり、なんというか、情報を与えればenum-elimをいじらなくても推論可能ってこと？
 ;; でもさ、defaultのほうの結果がi64で確定してるんだから、1のほうがi64であることも本来はわかるはずじゃない？
@@ -602,7 +612,9 @@ n15-4
 
 (fact 5)
 
-(fact (lambda ((A tau) (y A)) y))
+;; (fact (begin (lambda ((A tau) (y A)) y)))
+;; (fact (top 100))
+;; (fact (5 top))
 
 
 ;; hole

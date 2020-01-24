@@ -8,6 +8,7 @@ import Control.Monad.Except
 import Control.Monad.State
 import Data.List (nub)
 import Numeric.Half
+import System.Console.ANSI
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.Text as T
@@ -47,6 +48,7 @@ elaborate e
   -- type of arguments of abstractions of meta-variables.
   e'' <- elaborate' e' >>= reduceTermPlus
   -- p' e''
+  -- error "finished elaboration"
   return e''
   -- let info2 = toInfo "elaborated term is not closed:" e''
   -- assertMP info2 (return e'') $ null (varTermPlus e'')
@@ -138,7 +140,15 @@ elaborate' (m, WeakTermInt t x) = do
       return (m, TermEnumIntro (EnumValueIntS size x))
     (_, TermEnum (EnumTypeIntU size)) ->
       return (m, TermEnumIntro (EnumValueIntU size x))
-    _ -> throwError $ "elaborate.WeakTermInt."
+    _ -> do
+      liftIO $ setSGR [SetConsoleIntensity BoldIntensity]
+      liftIO $ putStrLn $ showMeta m ++ ":"
+      liftIO $ setSGR [Reset]
+      -- p $ showMeta m
+      throwError $
+        T.pack $
+        "the type of `" ++
+        show x ++ "` should be an integer type, but is:\n" ++ show t'
 elaborate' (m, WeakTermFloat16 x) = do
   return (m, TermFloat16 x)
 elaborate' (m, WeakTermFloat32 x) = do
