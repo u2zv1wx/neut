@@ -66,5 +66,6 @@ currentMeta = do
   pos <- getPosition
   let x = sourceColumn pos
   let y = sourceLine pos
-  let name = sourceName pos
+  name <- gets currentFilePath
+  -- let name = sourceName pos
   return $ Meta {metaFileName = Just name, metaLocation = Just (x, y)}

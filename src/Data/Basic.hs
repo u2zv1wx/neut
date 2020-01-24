@@ -2,6 +2,8 @@
 
 module Data.Basic where
 
+import Path
+
 import qualified Data.Text as T
 
 -- import Control.Exception (assert)
@@ -27,7 +29,7 @@ data EnumType
 
 data Meta =
   Meta
-    { metaFileName :: Maybe String
+    { metaFileName :: Maybe (Path Abs File)
     , metaLocation :: Maybe Loc
     }
 
@@ -41,8 +43,9 @@ instance Show Meta where
 showMeta :: Meta -> String
 showMeta m =
   case (metaFileName m, metaLocation m) of
-    (Just name, Just (x, y)) -> name ++ ":" ++ show y ++ ":" ++ show x
-    (Just name, Nothing) -> name
+    (Just name, Just (x, y)) ->
+      toFilePath name ++ ":" ++ show y ++ ":" ++ show x
+    (Just name, Nothing) -> toFilePath name
     (Nothing, Just (x, y)) -> "<unknown-file>:" ++ show y ++ ":" ++ show x
     (Nothing, Nothing) -> "_"
 
