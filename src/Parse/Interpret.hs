@@ -40,9 +40,14 @@ interpret (m, TreeNode ((_, TreeAtom "pi-elimination"):e:es)) = do
   e' <- interpret e
   es' <- mapM interpret es
   return (m, WeakTermPiElim e' es')
-interpret (m, TreeNode ((_, TreeAtom "sigma"):xts)) = do
+-- interpret (m, TreeNode ((_, TreeAtom "sigma"):xts)) = do
+--   xts' <- mapM interpretIdentifierPlus xts
+--   return (m, WeakTermSigma xts')
+interpret (m, TreeNode [(_, TreeAtom "sigma"), (_, TreeNode xts), t]) = do
   xts' <- mapM interpretIdentifierPlus xts
-  return (m, WeakTermSigma xts')
+  t' <- interpret t
+  placeholder <- newNameWith "cod"
+  return (m, WeakTermSigma $ xts' ++ [(placeholder, t')])
 interpret (m, TreeNode ((_, TreeAtom "sigma-introduction"):es)) = do
   h <- newHole m
   es' <- mapM interpret es
@@ -116,6 +121,10 @@ interpret (m, TreeNode [(_, TreeAtom "struct-elimination"), (_, TreeNode xts), e
 --
 -- auxiliary interpretations
 --
+interpret (m, TreeNode ((_, TreeAtom "product"):ts)) = do
+  ts' <- mapM interpret ts
+  xs <- mapM (const $ newNameWith "sig") ts'
+  return (m, WeakTermSigma (zip xs ts'))
 interpret (m, TreeAtom x)
   | Just x' <- readMaybe $ T.unpack x = do
     h <- newHole m

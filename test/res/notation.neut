@@ -110,7 +110,7 @@
 ;;      (_ (pi (xt+ (_ t)) c)))
 ;;     c))
 
-(keyword product)
+;; (keyword product)
 
 ;; (notation (product t+)
 ;;   (pi
@@ -118,8 +118,8 @@
 ;;      (_ (arrow (t+) c)))
 ;;     c))
 
-(notation (product t+)
-  (sigma (splice (to-type-list t+))))
+;; (notation (product t+)
+;;   (sigma (splice (to-type-list t+))))
 
 ;; (product A1 ... An)
 ;; ~> (sigma (_ A1) ... (_ An))
