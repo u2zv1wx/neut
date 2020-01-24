@@ -43,6 +43,18 @@ rename' (m, WeakTermPiElim e es) = do
   e' <- rename' e
   es' <- mapM rename' es
   return (m, WeakTermPiElim e' es')
+rename' (m, WeakTermSigma xts) = do
+  xts' <- renameSigma xts
+  return (m, WeakTermSigma xts')
+rename' (m, WeakTermSigmaIntro t es) = do
+  t' <- rename' t
+  es' <- mapM rename' es
+  return (m, WeakTermSigmaIntro t' es')
+rename' (m, WeakTermSigmaElim t xts e1 e2) = do
+  t' <- rename' t
+  e1' <- rename' e1
+  (xts', e2') <- renameBinder xts e2
+  return (m, WeakTermSigmaElim t' xts' e1' e2')
 rename' (m, WeakTermIter xt xts e) = do
   (xt', xts', e') <- renameIter xt xts e
   return (m, WeakTermIter xt' xts' e')
@@ -53,8 +65,6 @@ rename' (m, WeakTermConstDecl (x, t) e) = do
   e' <- rename' e
   return (m, WeakTermConstDecl (x, t') e')
 rename' (m, WeakTermZeta h) = return (m, WeakTermZeta h)
--- rename' (m, WeakTermIntS size x) = return (m, WeakTermIntS size x)
--- rename' (m, WeakTermIntU size x) = return (m, WeakTermIntU size x)
 rename' (m, WeakTermInt t x) = do
   t' <- rename t
   return (m, WeakTermInt t' x)
@@ -104,6 +114,15 @@ renameBinder ((x, t):xts) e = do
     x' <- newLLVMNameWith x
     (xts', e') <- renameBinder xts e
     return ((x', t') : xts', e')
+
+renameSigma :: [IdentifierPlus] -> WithEnv [IdentifierPlus]
+renameSigma [] = return []
+renameSigma ((x, t):xts) = do
+  t' <- rename' t
+  local $ do
+    x' <- newLLVMNameWith x
+    xts' <- renameSigma xts
+    return $ (x', t') : xts'
 
 renameIter ::
      IdentifierPlus
@@ -167,6 +186,10 @@ checkSanity ctx (_, WeakTermPiIntro xts e) = do
   checkSanity' ctx xts e
 checkSanity ctx (_, WeakTermPiElim e es) = do
   checkSanity ctx e && all (checkSanity ctx) es
+checkSanity ctx (_, WeakTermSigma xts) = checkSanitySigma ctx xts
+checkSanity ctx (_, WeakTermSigmaIntro t es) = all (checkSanity ctx) $ t : es
+checkSanity ctx (_, WeakTermSigmaElim t xts e1 e2) = do
+  all (checkSanity ctx) [t, e1] && checkSanity' ctx xts e2
 checkSanity ctx (_, WeakTermIter xt xts e) = do
   checkSanity' ctx (xt : xts) e
 checkSanity _ (_, WeakTermConst _) = True
@@ -201,6 +224,13 @@ checkSanity' ctx ((x, _):_) _
   | x `elem` ctx = False
 checkSanity' ctx ((x, t):xts) e = do
   checkSanity ctx t && checkSanity' (x : ctx) xts e
+
+checkSanitySigma :: [Identifier] -> [IdentifierPlus] -> Bool
+checkSanitySigma _ [] = True
+checkSanitySigma ctx ((x, _):_)
+  | x `elem` ctx = False
+checkSanitySigma ctx ((x, t):xts) = do
+  checkSanity ctx t && checkSanitySigma (x : ctx) xts
 
 checkSanity'' ::
      [Identifier] -> [(Identifier, ArrayKind)] -> WeakTermPlus -> Bool
