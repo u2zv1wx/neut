@@ -52,18 +52,23 @@ simp' [] = return ()
 simp' (((_, e1), (_, e2)):cs)
   | e1 == e2 = simp cs
 simp' (((_, WeakTermPi xts1 cod1), (_, WeakTermPi xts2 cod2)):cs)
-  | length xts1 == length xts2 = simpBinder xts1 cod1 xts2 cod2 cs
+  | length xts1 == length xts2 = simpBinder xts1 xts2 (Just (cod1, cod2)) cs
 simp' (((_, WeakTermPiIntro xts1 e1), (_, WeakTermPiIntro xts2 e2)):cs)
-  | length xts1 == length xts2 = simpBinder xts1 e1 xts2 e2 cs
+  | length xts1 == length xts2 = simpBinder xts1 xts2 (Just (e1, e2)) cs
 simp' (((_, WeakTermPiIntro xts body1@(m1, _)), e2@(_, _)):cs) = do
   let vs = map (toVar . fst) xts
   simp $ (body1, (m1, WeakTermPiElim e2 vs)) : cs
 simp' ((e1, e2@(_, WeakTermPiIntro {})):cs) = simp' $ (e2, e1) : cs
+simp' (((_, WeakTermSigma xts1), (_, WeakTermSigma xts2)):cs)
+  | length xts1 == length xts2 = simpBinder xts1 xts2 Nothing cs
+simp' (((_, WeakTermSigmaIntro t1 es1), (_, WeakTermSigmaIntro t2 es2)):cs)
+  | length es1 == length es2 = simp $ (t1, t2) : zip es1 es2 ++ cs
 simp' (((_, WeakTermIter xt1 xts1 e1), (_, WeakTermIter xt2 xts2 e2)):cs)
   | fst xt1 == fst xt2
-  , length xts1 == length xts2 = simpBinder (xt1 : xts1) e1 (xt2 : xts2) e2 cs
+  , length xts1 == length xts2 =
+    simpBinder (xt1 : xts1) (xt2 : xts2) (Just (e1, e2)) cs
 simp' (((_, WeakTermConstDecl xt1 e1), (_, WeakTermConstDecl xt2 e2)):cs) = do
-  simpBinder [xt1] e1 [xt2] e2 cs
+  simpBinder [xt1] [xt2] (Just (e1, e2)) cs
 simp' (((_, WeakTermInt t1 l1), (_, WeakTermEnumIntro (EnumValueIntS s2 l2))):cs)
   | l1 == l2 = simp $ (t1, toIntS s2) : cs
 simp' (((_, WeakTermEnumIntro (EnumValueIntS s1 l1)), (_, WeakTermInt t2 l2)):cs)
@@ -194,18 +199,23 @@ simp' ((e1, e2):cs) = do
 -- {} simpBinder {}
 simpBinder ::
      [(Identifier, WeakTermPlus)]
-  -> WeakTermPlus
   -> [(Identifier, WeakTermPlus)]
-  -> WeakTermPlus
+  -> Maybe (WeakTermPlus, WeakTermPlus)
   -> [(WeakTermPlus, WeakTermPlus)]
   -> WithEnv ()
-simpBinder [] cod1 [] cod2 cs = simp $ (cod1, cod2) : cs
-simpBinder ((x1, t1):xts1) cod1 ((x2, t2):xts2) cod2 cs = do
+simpBinder [] [] Nothing cs = simp cs
+simpBinder [] [] (Just (cod1, cod2)) cs = simp $ (cod1, cod2) : cs
+simpBinder ((x1, t1):xts1) ((x2, t2):xts2) Nothing cs = do
+  let var1 = toVar x1
+  let xts2' = substWeakTermPlusBindings [(x2, var1)] xts2
+  simp [(t1, t2)]
+  simpBinder xts1 xts2' Nothing cs
+simpBinder ((x1, t1):xts1) ((x2, t2):xts2) (Just (cod1, cod2)) cs = do
   let var1 = toVar x1
   let (xts2', cod2') = substWeakTermPlusBindingsWithBody [(x2, var1)] xts2 cod2
   simp [(t1, t2)]
-  simpBinder xts1 cod1 xts2' cod2' cs
-simpBinder _ _ _ _ _ = throwError "cannot simplify (simpBinder)"
+  simpBinder xts1 xts2' (Just (cod1, cod2')) cs
+simpBinder _ _ _ _ = throwError "cannot simplify (simpBinder)"
 
 -- {} simpCase {}
 simpCase :: (Ord a) => [(a, WeakTermPlus)] -> [(a, WeakTermPlus)] -> WithEnv ()
