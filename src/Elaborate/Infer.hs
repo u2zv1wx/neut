@@ -101,7 +101,6 @@ infer' ctx (m, WeakTermSigmaIntro t es) = do
   let ts' = map (substWeakTermPlus (zip ys es) . snd) yts
   forM_ ((t', sigmaType) : zip ts ts') $ uncurry insConstraintEnv
   retWeakTerm sigmaType m $ WeakTermSigmaIntro t' es'
-  -- undefined
 infer' ctx (m, WeakTermSigmaElim t xts e1 e2) = do
   t' <- inferType ctx t
   (e1', t1) <- infer' ctx e1
