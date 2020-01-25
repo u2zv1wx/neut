@@ -2,10 +2,13 @@
 
 module Parse.Rename
   ( rename
+  , invRename
+  , prepareInvRename
   ) where
 
 import Control.Monad.Except
 import Control.Monad.State
+import Data.Tuple (swap)
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.Text as T
@@ -14,18 +17,19 @@ import Data.Basic
 import Data.Env
 import Data.WeakTerm
 
--- {} rename' {(every bound variable has fresh name)}
+-- {} rename' nenv {(every bound variable has fresh name)}
 rename :: WeakTermPlus -> WithEnv WeakTermPlus
 rename e = do
-  result <- rename' e
+  result <- rename' Map.empty e
   let info = toInfo "rename.post" result
   return $ assertP info result $ checkSanity [] result
 
+type NameEnv = Map.HashMap Identifier Identifier
+
 -- Alpha-convert all the variables so that different variables have different names.
-rename' :: WeakTermPlus -> WithEnv WeakTermPlus
-rename' (m, WeakTermTau) = return (m, WeakTermTau)
-rename' (m, WeakTermUpsilon x) = do
-  nenv <- gets nameEnv
+rename' :: NameEnv -> WeakTermPlus -> WithEnv WeakTermPlus
+rename' _ (m, WeakTermTau) = return (m, WeakTermTau)
+rename' nenv (m, WeakTermUpsilon x) = do
   case Map.lookup x nenv of
     Just x'
       | x == x' -> return (m, WeakTermConst x')
@@ -34,149 +38,140 @@ rename' (m, WeakTermUpsilon x) = do
       | isConstant x -> return (m, WeakTermConst x)
     Nothing ->
       throwError' $ T.pack (showMeta m) <> ": undefined variable: " <> x
-rename' (m, WeakTermPi xts t) = do
-  (xts', t') <- renameBinder xts t
+rename' nenv (m, WeakTermPi xts t) = do
+  (xts', t') <- renameBinder nenv xts t
   return (m, WeakTermPi xts' t')
-rename' (m, WeakTermPiIntro xts e) = do
-  (xts', e') <- renameBinder xts e
+rename' nenv (m, WeakTermPiIntro xts e) = do
+  (xts', e') <- renameBinder nenv xts e
   return (m, WeakTermPiIntro xts' e')
-rename' (m, WeakTermPiElim e es) = do
-  e' <- rename' e
-  es' <- mapM rename' es
+rename' nenv (m, WeakTermPiElim e es) = do
+  es' <- mapM (rename' nenv) es
+  e' <- rename' nenv e
   return (m, WeakTermPiElim e' es')
-rename' (m, WeakTermSigma xts) = do
-  xts' <- renameSigma xts
+rename' nenv (m, WeakTermSigma xts) = do
+  xts' <- renameSigma nenv xts
   return (m, WeakTermSigma xts')
-rename' (m, WeakTermSigmaIntro t es) = do
-  t' <- rename' t
-  es' <- mapM rename' es
+rename' nenv (m, WeakTermSigmaIntro t es) = do
+  t' <- rename' nenv t
+  es' <- mapM (rename' nenv) es
   return (m, WeakTermSigmaIntro t' es')
-rename' (m, WeakTermSigmaElim t xts e1 e2) = do
-  t' <- rename' t
-  e1' <- rename' e1
-  (xts', e2') <- renameBinder xts e2
+rename' nenv (m, WeakTermSigmaElim t xts e1 e2) = do
+  t' <- rename' nenv t
+  e1' <- rename' nenv e1
+  (xts', e2') <- renameBinder nenv xts e2
   return (m, WeakTermSigmaElim t' xts' e1' e2')
-rename' (m, WeakTermIter xt xts e) = do
-  (xt', xts', e') <- renameIter xt xts e
+rename' nenv (m, WeakTermIter xt xts e) = do
+  (xt', xts', e') <- renameIter nenv xt xts e
   return (m, WeakTermIter xt' xts' e')
-rename' (m, WeakTermConst x) = return (m, WeakTermConst x)
-rename' (m, WeakTermConstDecl (x, t) e) = do
-  t' <- rename' t
-  modify (\env -> env {nameEnv = Map.insert x x (nameEnv env)})
-  e' <- rename' e
+rename' _ (m, WeakTermConst x) = return (m, WeakTermConst x)
+rename' nenv (m, WeakTermConstDecl (x, t) e) = do
+  t' <- rename' nenv t
+  e' <- rename' (Map.insert x x nenv) e
   return (m, WeakTermConstDecl (x, t') e')
-rename' (m, WeakTermZeta h) = return (m, WeakTermZeta h)
-rename' (m, WeakTermInt t x) = do
+rename' _ (m, WeakTermZeta h) = return (m, WeakTermZeta h)
+rename' _ (m, WeakTermInt t x) = do
   t' <- rename t
   return (m, WeakTermInt t' x)
-rename' (m, WeakTermFloat16 x) = return (m, WeakTermFloat16 x)
-rename' (m, WeakTermFloat32 x) = return (m, WeakTermFloat32 x)
-rename' (m, WeakTermFloat64 x) = return (m, WeakTermFloat64 x)
-rename' (m, WeakTermFloat t x) = do
-  t' <- rename' t
+rename' _ (m, WeakTermFloat16 x) = return (m, WeakTermFloat16 x)
+rename' _ (m, WeakTermFloat32 x) = return (m, WeakTermFloat32 x)
+rename' _ (m, WeakTermFloat64 x) = return (m, WeakTermFloat64 x)
+rename' nenv (m, WeakTermFloat t x) = do
+  t' <- rename' nenv t
   return (m, WeakTermFloat t' x)
-rename' (m, WeakTermEnum s) = return (m, WeakTermEnum s)
-rename' (m, WeakTermEnumIntro x) = return (m, WeakTermEnumIntro x)
-rename' (m, WeakTermEnumElim (e, t) caseList) = do
-  e' <- rename' e
-  t' <- rename' t
-  caseList' <- renameCaseList caseList
+rename' _ (m, WeakTermEnum s) = return (m, WeakTermEnum s)
+rename' _ (m, WeakTermEnumIntro x) = return (m, WeakTermEnumIntro x)
+rename' nenv (m, WeakTermEnumElim (e, t) caseList) = do
+  e' <- rename' nenv e
+  t' <- rename' nenv t
+  caseList' <- renameCaseList nenv caseList
   return (m, WeakTermEnumElim (e', t') caseList')
-rename' (m, WeakTermArray dom kind) = do
-  dom' <- rename' dom
+rename' nenv (m, WeakTermArray dom kind) = do
+  dom' <- rename' nenv dom
   return (m, WeakTermArray dom' kind)
-rename' (m, WeakTermArrayIntro kind es) = do
-  es' <- mapM rename' es
+rename' nenv (m, WeakTermArrayIntro kind es) = do
+  es' <- mapM (rename' nenv) es
   return (m, WeakTermArrayIntro kind es')
-rename' (m, WeakTermArrayElim kind xts e1 e2) = do
-  e1' <- rename' e1
-  (xts', e2') <- renameBinder xts e2
+rename' nenv (m, WeakTermArrayElim kind xts e1 e2) = do
+  e1' <- rename' nenv e1
+  (xts', e2') <- renameBinder nenv xts e2
   return (m, WeakTermArrayElim kind xts' e1' e2')
-rename' (m, WeakTermStruct ts) = return (m, WeakTermStruct ts)
-rename' (m, WeakTermStructIntro ets) = do
+rename' _ (m, WeakTermStruct ts) = return (m, WeakTermStruct ts)
+rename' nenv (m, WeakTermStructIntro ets) = do
   let (es, ts) = unzip ets
-  es' <- mapM rename' es
+  es' <- mapM (rename' nenv) es
   return (m, WeakTermStructIntro $ zip es' ts)
-rename' (m, WeakTermStructElim xts e1 e2) = do
-  e1' <- rename' e1
-  (xts', e2') <- renameStruct xts e2
+rename' nenv (m, WeakTermStructElim xts e1 e2) = do
+  e1' <- rename' nenv e1
+  (xts', e2') <- renameStruct nenv xts e2
   return (m, WeakTermStructElim xts' e1' e2')
 
 renameBinder ::
-     [IdentifierPlus]
+     NameEnv
+  -> [IdentifierPlus]
   -> WeakTermPlus
   -> WithEnv ([IdentifierPlus], WeakTermPlus)
-renameBinder [] e = do
-  e' <- rename' e
+renameBinder nenv [] e = do
+  e' <- rename' nenv e
   return ([], e')
-renameBinder ((x, t):xts) e = do
-  t' <- rename' t
-  local $ do
-    x' <- newLLVMNameWith x
-    (xts', e') <- renameBinder xts e
-    return ((x', t') : xts', e')
+renameBinder nenv ((x, t):xts) e = do
+  t' <- rename' nenv t
+  x' <- newLLVMNameWith x
+  (xts', e') <- renameBinder (Map.insert x x' nenv) xts e
+  return ((x', t') : xts', e')
 
-renameSigma :: [IdentifierPlus] -> WithEnv [IdentifierPlus]
-renameSigma [] = return []
-renameSigma ((x, t):xts) = do
-  t' <- rename' t
-  local $ do
-    x' <- newLLVMNameWith x
-    xts' <- renameSigma xts
-    return $ (x', t') : xts'
+renameSigma :: NameEnv -> [IdentifierPlus] -> WithEnv [IdentifierPlus]
+renameSigma _ [] = return []
+renameSigma nenv ((x, t):xts) = do
+  t' <- rename' nenv t
+  x' <- newLLVMNameWith x
+  xts' <- renameSigma (Map.insert x x' nenv) xts
+  return $ (x', t') : xts'
 
 renameIter ::
-     IdentifierPlus
+     NameEnv
+  -> IdentifierPlus
   -> [IdentifierPlus]
   -> WeakTermPlus
   -> WithEnv (IdentifierPlus, [IdentifierPlus], WeakTermPlus)
-renameIter (x, t) xts e = do
-  t' <- rename' t
-  renameIter' (x, t') xts e
+renameIter nenv (x, t) xts e = do
+  t' <- rename' nenv t
+  renameIter' nenv (x, t') xts e
 
 renameIter' ::
-     IdentifierPlus
+     NameEnv
+  -> IdentifierPlus
   -> [IdentifierPlus]
   -> WeakTermPlus
   -> WithEnv (IdentifierPlus, [IdentifierPlus], WeakTermPlus)
-renameIter' (x, t') [] e = do
-  local $ do
-    x' <- newLLVMNameWith x
-    e' <- rename' e
-    return ((x', t'), [], e')
-renameIter' xt ((x, t):xts) e = do
-  t' <- rename' t
-  local $ do
-    x' <- newLLVMNameWith x
-    (xt', xts', e') <- renameIter' xt xts e
-    return (xt', (x', t') : xts', e')
+renameIter' nenv (x, t') [] e = do
+  x' <- newLLVMNameWith x
+  e' <- rename' (Map.insert x x' nenv) e
+  return ((x', t'), [], e')
+renameIter' nenv xt ((x, t):xts) e = do
+  t' <- rename' nenv t
+  x' <- newLLVMNameWith x
+  (xt', xts', e') <- renameIter' (Map.insert x x' nenv) xt xts e
+  return (xt', (x', t') : xts', e')
 
-renameCaseList :: [(Case, WeakTermPlus)] -> WithEnv [(Case, WeakTermPlus)]
-renameCaseList caseList =
-  forM caseList $ \(l, body) ->
-    local $ do
-      body' <- rename' body
-      return (l, body')
+renameCaseList ::
+     NameEnv -> [(Case, WeakTermPlus)] -> WithEnv [(Case, WeakTermPlus)]
+renameCaseList nenv caseList =
+  forM caseList $ \(l, body) -> do
+    body' <- rename' nenv body
+    return (l, body')
 
 renameStruct ::
-     [(Identifier, ArrayKind)]
+     NameEnv
+  -> [(Identifier, ArrayKind)]
   -> WeakTermPlus
   -> WithEnv ([(Identifier, ArrayKind)], WeakTermPlus)
-renameStruct [] e = do
-  e' <- rename' e
+renameStruct nenv [] e = do
+  e' <- rename' nenv e
   return ([], e')
-renameStruct ((x, t):xts) e = do
-  local $ do
-    x' <- newLLVMNameWith x
-    (xts', e') <- renameStruct xts e
-    return ((x', t) : xts', e')
-
-local :: WithEnv a -> WithEnv a
-local comp = do
-  env <- get
-  x <- comp
-  modify (\e -> env {count = count e})
-  return x
+renameStruct nenv ((x, t):xts) e = do
+  x' <- newLLVMNameWith x
+  (xts', e') <- renameStruct (Map.insert x x' nenv) xts e
+  return ((x', t) : xts', e')
 
 checkSanity :: [Identifier] -> WeakTermPlus -> Bool
 checkSanity _ (_, WeakTermTau) = True
@@ -241,3 +236,153 @@ checkSanity'' ctx ((x, _):_) _
   | x `elem` ctx = False
 checkSanity'' ctx ((x, _):xts) e = do
   checkSanity'' (x : ctx) xts e
+
+-- {} invRename {(every bound variable has fresh name)}
+prepareInvRename :: WithEnv ()
+prepareInvRename = do
+  nenv <- Map.toList <$> gets nameEnv
+  modify (\env -> env {nameEnv = Map.fromList $ map swap nenv})
+
+invRenameIdentifier :: Identifier -> WithEnv Identifier
+invRenameIdentifier x = do
+  nenv <- gets nameEnv
+  case Map.lookup x nenv of
+    Just x' -> return x'
+    Nothing -> return x
+
+-- Alpha-convert all the variables so that different variables have different names.
+invRename :: WeakTermPlus -> WithEnv WeakTermPlus
+invRename (m, WeakTermTau) = return (m, WeakTermTau)
+invRename (m, WeakTermUpsilon x) = do
+  x' <- invRenameIdentifier x
+  return (m, WeakTermUpsilon x')
+invRename (m, WeakTermPi xts t) = do
+  (xts', t') <- invRenameBinder xts t
+  return (m, WeakTermPi xts' t')
+invRename (m, WeakTermPiIntro xts e) = do
+  (xts', e') <- invRenameBinder xts e
+  return (m, WeakTermPiIntro xts' e')
+invRename (m, WeakTermPiElim e es) = do
+  e' <- invRename e
+  es' <- mapM invRename es
+  return (m, WeakTermPiElim e' es')
+invRename (m, WeakTermSigma xts) = do
+  xts' <- invRenameSigma xts
+  return (m, WeakTermSigma xts')
+invRename (m, WeakTermSigmaIntro t es) = do
+  t' <- invRename t
+  es' <- mapM invRename es
+  return (m, WeakTermSigmaIntro t' es')
+invRename (m, WeakTermSigmaElim t xts e1 e2) = do
+  t' <- invRename t
+  e1' <- invRename e1
+  (xts', e2') <- invRenameBinder xts e2
+  return (m, WeakTermSigmaElim t' xts' e1' e2')
+invRename (m, WeakTermIter xt xts e) = do
+  (xt', xts', e') <- invRenameIter xt xts e
+  return (m, WeakTermIter xt' xts' e')
+invRename (m, WeakTermConst x) = return (m, WeakTermConst x)
+invRename (m, WeakTermConstDecl (x, t) e) = do
+  t' <- invRename t
+  -- modify (\env -> env {nameEnv = Map.insert x x (nameEnv env)})
+  e' <- invRename e
+  return (m, WeakTermConstDecl (x, t') e')
+invRename (m, WeakTermZeta h) = return (m, WeakTermZeta h)
+invRename (m, WeakTermInt t x) = do
+  t' <- invRename t
+  return (m, WeakTermInt t' x)
+invRename (m, WeakTermFloat16 x) = return (m, WeakTermFloat16 x)
+invRename (m, WeakTermFloat32 x) = return (m, WeakTermFloat32 x)
+invRename (m, WeakTermFloat64 x) = return (m, WeakTermFloat64 x)
+invRename (m, WeakTermFloat t x) = do
+  t' <- invRename t
+  return (m, WeakTermFloat t' x)
+invRename (m, WeakTermEnum s) = return (m, WeakTermEnum s)
+invRename (m, WeakTermEnumIntro x) = return (m, WeakTermEnumIntro x)
+invRename (m, WeakTermEnumElim (e, t) caseList) = do
+  e' <- invRename e
+  t' <- invRename t
+  caseList' <- invRenameCaseList caseList
+  return (m, WeakTermEnumElim (e', t') caseList')
+invRename (m, WeakTermArray dom kind) = do
+  dom' <- invRename dom
+  return (m, WeakTermArray dom' kind)
+invRename (m, WeakTermArrayIntro kind es) = do
+  es' <- mapM invRename es
+  return (m, WeakTermArrayIntro kind es')
+invRename (m, WeakTermArrayElim kind xts e1 e2) = do
+  e1' <- invRename e1
+  (xts', e2') <- invRenameBinder xts e2
+  return (m, WeakTermArrayElim kind xts' e1' e2')
+invRename (m, WeakTermStruct ts) = return (m, WeakTermStruct ts)
+invRename (m, WeakTermStructIntro ets) = do
+  let (es, ts) = unzip ets
+  es' <- mapM invRename es
+  return (m, WeakTermStructIntro $ zip es' ts)
+invRename (m, WeakTermStructElim xts e1 e2) = do
+  e1' <- invRename e1
+  (xts', e2') <- invRenameStruct xts e2
+  return (m, WeakTermStructElim xts' e1' e2')
+
+invRenameBinder ::
+     [IdentifierPlus]
+  -> WeakTermPlus
+  -> WithEnv ([IdentifierPlus], WeakTermPlus)
+invRenameBinder [] e = do
+  e' <- invRename e
+  return ([], e')
+invRenameBinder ((x, t):xts) e = do
+  t' <- invRename t
+  x' <- invRenameIdentifier x
+  (xts', e') <- invRenameBinder xts e
+  return ((x', t') : xts', e')
+
+invRenameSigma :: [IdentifierPlus] -> WithEnv [IdentifierPlus]
+invRenameSigma [] = return []
+invRenameSigma ((x, t):xts) = do
+  t' <- invRename t
+  x' <- invRenameIdentifier x
+  xts' <- invRenameSigma xts
+  return $ (x', t') : xts'
+
+invRenameIter ::
+     IdentifierPlus
+  -> [IdentifierPlus]
+  -> WeakTermPlus
+  -> WithEnv (IdentifierPlus, [IdentifierPlus], WeakTermPlus)
+invRenameIter (x, t) xts e = do
+  t' <- invRename t
+  invRenameIter' (x, t') xts e
+
+invRenameIter' ::
+     IdentifierPlus
+  -> [IdentifierPlus]
+  -> WeakTermPlus
+  -> WithEnv (IdentifierPlus, [IdentifierPlus], WeakTermPlus)
+invRenameIter' (x, t') [] e = do
+  x' <- invRenameIdentifier x
+  e' <- invRename e
+  return ((x', t'), [], e')
+invRenameIter' xt ((x, t):xts) e = do
+  t' <- invRename t
+  x' <- invRenameIdentifier x
+  (xt', xts', e') <- invRenameIter' xt xts e
+  return (xt', (x', t') : xts', e')
+
+invRenameCaseList :: [(Case, WeakTermPlus)] -> WithEnv [(Case, WeakTermPlus)]
+invRenameCaseList caseList =
+  forM caseList $ \(l, body) -> do
+    body' <- invRename body
+    return (l, body')
+
+invRenameStruct ::
+     [(Identifier, ArrayKind)]
+  -> WeakTermPlus
+  -> WithEnv ([(Identifier, ArrayKind)], WeakTermPlus)
+invRenameStruct [] e = do
+  e' <- invRename e
+  return ([], e')
+invRenameStruct ((x, t):xts) e = do
+  x' <- invRenameIdentifier x
+  (xts', e') <- invRenameStruct xts e
+  return ((x', t) : xts', e')
