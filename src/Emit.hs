@@ -252,7 +252,7 @@ emitLLVMOp (LLVMOpBinaryOp (BinaryOpXor, t@(LowTypeIntS _)) d1 d2) =
   emitBinaryOp t "xor" d1 d2
 emitLLVMOp (LLVMOpBinaryOp (BinaryOpXor, t@(LowTypeIntU _)) d1 d2) =
   emitBinaryOp t "xor" d1 d2
-emitLLVMOp _ = throwError "emitLLVMOp"
+emitLLVMOp _ = throwError' "emitLLVMOp"
 
 emitUnaryOp :: LowType -> B.ByteString -> LLVMData -> WithEnv B.ByteString
 emitUnaryOp t inst d = do

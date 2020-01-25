@@ -73,7 +73,7 @@ elaborate' (m, WeakTermPiElim (_, WeakTermZeta x) es) = do
   sub <- gets substEnv
   case Map.lookup x sub of
     Nothing ->
-      throwError $
+      throwError' $
       T.pack (showMeta m) <>
       ":error: couldn't instantiate the hole since no constraints are given on it"
     Just (_, WeakTermPiIntro xts e)
@@ -81,7 +81,7 @@ elaborate' (m, WeakTermPiElim (_, WeakTermZeta x) es) = do
         let xs = map fst xts
         e' <- elaborate' $ substWeakTermPlus (zip xs es) e
         return e'
-    Just _ -> throwError "insane zeta"
+    Just _ -> throwError' "insane zeta"
 elaborate' (m, WeakTermPiElim e es) = do
   e' <- elaborate' e
   es' <- mapM elaborate' es
@@ -104,7 +104,7 @@ elaborate' (m, WeakTermSigmaIntro t es) = do
         let kv = toTermUpsilon k
         let bindArgsThen = \e -> (m, TermPiElim (m, TermPiIntro xts e) es')
         return $ bindArgsThen (m, TermPiIntro [zu, kp] (m, TermPiElim kv xvs))
-    _ -> throwError "the type of sigma-intro is wrong"
+    _ -> throwError' "the type of sigma-intro is wrong"
 elaborate' (m, WeakTermSigmaElim t xts e1 e2) = do
   t' <- elaborate' t
   xts' <- mapM elaboratePlus xts
@@ -120,7 +120,7 @@ elaborate' (m, WeakTermIter (x, t) xts e) = do
 elaborate' (_, WeakTermZeta x) = do
   sub <- gets substEnv
   case Map.lookup x sub of
-    Nothing -> throwError $ "elaborate' i: remaining hole: " <> x
+    Nothing -> throwError' $ "elaborate' i: remaining hole: " <> x
     Just e -> do
       e' <- elaborate' e
       return e'
@@ -145,7 +145,7 @@ elaborate' (m, WeakTermInt t x) = do
       liftIO $ putStrLn $ showMeta m ++ ":"
       liftIO $ setSGR [Reset]
       -- p $ showMeta m
-      throwError $
+      throwError' $
         T.pack $
         "the type of `" ++
         show x ++ "` should be an integer type, but is:\n" ++ show t'
@@ -166,9 +166,9 @@ elaborate' (m, WeakTermFloat t x) = do
         Just (LowTypeFloat FloatSize32) -> return (m, TermFloat32 x32)
         Just (LowTypeFloat FloatSize64) -> return (m, TermFloat64 x)
         _ ->
-          throwError $
+          throwError' $
           T.pack (show x) <> " should be float, but is " <> floatType
-    _ -> throwError "elaborate.WeakTermFloat"
+    _ -> throwError' "elaborate.WeakTermFloat"
 elaborate' (m, WeakTermEnum k) = do
   return (m, TermEnum k)
 elaborate' (m, WeakTermEnumIntro x) = do
@@ -181,7 +181,7 @@ elaborate' (m, WeakTermEnumElim (e, t) les) = do
     (_, TermEnum x) -> do
       caseCheckEnumIdentifier x $ map fst les
       return (m, TermEnumElim e' les')
-    _ -> throwError "type error (enum elim)"
+    _ -> throwError' "type error (enum elim)"
 elaborate' (m, WeakTermArray dom k) = do
   dom' <- elaborate' dom
   return (m, TermArray dom' k)
@@ -244,13 +244,13 @@ throwIfFalse :: Bool -> WithEnv ()
 throwIfFalse b =
   if b
     then return ()
-    else throwError "non-exhaustive pattern"
+    else throwError' "non-exhaustive pattern"
 
 lookupEnumSet :: Identifier -> WithEnv [Identifier]
 lookupEnumSet name = do
   eenv <- gets enumEnv
   case Map.lookup name eenv of
-    Nothing -> throwError $ "no such enum defined: " <> name
+    Nothing -> throwError' $ "no such enum defined: " <> name
     Just ls -> return ls
 
 reduceSubstEnv :: WithEnv ()

@@ -355,7 +355,7 @@ insCodeEnv name args e = do
 lookupContext :: Identifier -> Context -> WithEnv TermPlus
 lookupContext z ctx = do
   case lookup z ctx of
-    Nothing -> throwError "lookupContext"
+    Nothing -> throwError' "lookupContext"
     Just t -> return t
 
 insTypeEnv :: Identifier -> TermPlus -> WithEnv ()

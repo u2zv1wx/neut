@@ -127,11 +127,11 @@ llvmCodeTheta :: Meta -> Theta -> WithEnv LLVM
 llvmCodeTheta _ (ThetaUnaryOp op lowType v)
   | UnaryOpNeg <- op = llvmCodeUnaryOp op lowType lowType v
   | Just codType <- getCodType op = llvmCodeUnaryOp op lowType codType v
-  | otherwise = throwError "llvmCodeTheta.ThetaUnaryOp"
+  | otherwise = throwError' "llvmCodeTheta.ThetaUnaryOp"
 llvmCodeTheta _ (ThetaBinaryOp op lowType v1 v2)
   | isArithOp op = llvmCodeBinaryOp op lowType lowType v1 v2
   | isCompareOp op = llvmCodeBinaryOp op lowType (LowTypeIntS 1) v1 v2
-  | otherwise = throwError "llvmCodeTheta.ThetaBinaryOp"
+  | otherwise = throwError' "llvmCodeTheta.ThetaBinaryOp"
 llvmCodeTheta _ (ThetaArrayAccess lowType arr idx) = do
   let arrayType = LowTypeArrayPtr 0 lowType
   (arrVar, castArrThen) <- llvmCast (Just $ takeBaseName arr) arr arrayType
@@ -266,7 +266,7 @@ llvmDataLet x (_, DataTheta y) cont = do
   case Map.lookup y cenv of
     Nothing
       | y == "fork" -> llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType []) cont
-    Nothing -> throwError $ "no such global label defined: " <> y
+    Nothing -> throwError' $ "no such global label defined: " <> y
     Just (args, _) ->
       llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType args) cont
 llvmDataLet x (_, DataUpsilon y) cont =
@@ -324,7 +324,7 @@ sysCallNumAsInt num = do
         SysCallOpen -> return 0x2000005
         SysCallClose -> return 0x2000006
         SysCallFork ->
-          throwError
+          throwError'
             "syscall 0x2000002 (fork) cannot be used directly in Darwin"
         SysCallWait4 -> return 0x2000007
         SysCallSocket -> return 0x2000097

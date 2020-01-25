@@ -451,7 +451,7 @@ lookupWeakTypeEnv s = do
   mt <- lookupWeakTypeEnvMaybe s
   case mt of
     Just t -> return t
-    Nothing -> throwError $ s <> " is not found in the type environment."
+    Nothing -> throwError' $ s <> " is not found in the type environment."
 
 lookupWeakTypeEnvMaybe :: Identifier -> WithEnv (Maybe WeakTermPlus)
 lookupWeakTypeEnvMaybe s = do
@@ -464,5 +464,5 @@ lookupKind :: Identifier -> WithEnv Identifier
 lookupKind name = do
   renv <- gets revEnumEnv
   case Map.lookup name renv of
-    Nothing -> throwError $ "no such enum-intro is defined: " <> name
+    Nothing -> throwError' $ "no such enum-intro is defined: " <> name
     Just j -> return j

@@ -32,7 +32,8 @@ rename' (m, WeakTermUpsilon x) = do
     Just x' -> return (m, WeakTermUpsilon x')
     Nothing
       | isConstant x -> return (m, WeakTermConst x)
-    Nothing -> throwError $ T.pack (showMeta m) <> ": undefined variable: " <> x
+    Nothing ->
+      throwError' $ T.pack (showMeta m) <> ": undefined variable: " <> x
 rename' (m, WeakTermPi xts t) = do
   (xts', t') <- renameBinder xts t
   return (m, WeakTermPi xts' t')

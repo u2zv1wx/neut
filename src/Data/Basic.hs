@@ -49,6 +49,9 @@ showMeta m =
     (Nothing, Just (x, y)) -> "<unknown-file>:" ++ show y ++ ":" ++ show x
     (Nothing, Nothing) -> "_"
 
+showPosInfo :: Path Abs File -> Loc -> String
+showPosInfo path (x, y) = toFilePath path ++ ":" ++ show y ++ ":" ++ show x
+
 emptyMeta :: Meta
 emptyMeta = Meta {metaLocation = Nothing, metaFileName = Nothing}
 

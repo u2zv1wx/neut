@@ -158,7 +158,7 @@ clarifyConst m name = do
       cenv <- gets constantEnv
       if name `elem` cenv
         then return (m, CodeUpIntro (m, DataTheta name))
-        else throwError $ "clarify.theta: " <> name
+        else throwError' $ "clarify.theta: " <> name
 
 clarifyUnaryOp :: Identifier -> UnaryOp -> LowType -> Meta -> WithEnv CodePlus
 clarifyUnaryOp name op lowType m = do
@@ -175,7 +175,7 @@ clarifyUnaryOp name op lowType m = do
         m
         [(x, tx)]
         (m, CodeTheta (ThetaUnaryOp op lowType varX))
-    _ -> throwError $ "the arity of " <> name <> " is wrong"
+    _ -> throwError' $ "the arity of " <> name <> " is wrong"
 
 clarifyBinaryOp :: Identifier -> BinaryOp -> LowType -> Meta -> WithEnv CodePlus
 clarifyBinaryOp name op lowType m = do
@@ -192,7 +192,7 @@ clarifyBinaryOp name op lowType m = do
         m
         [(x, tx), (y, ty)]
         (m, CodeTheta (ThetaBinaryOp op lowType varX varY))
-    _ -> throwError $ "the arity of " <> name <> " is wrong"
+    _ -> throwError' $ "the arity of " <> name <> " is wrong"
 
 clarifyIsEnum :: Meta -> WithEnv CodePlus
 clarifyIsEnum m = do
@@ -219,7 +219,8 @@ clarifyIsEnum m = do
             varX
             (m, CodeUpIntro v))
     _ ->
-      throwError $ "the type of is-enum is wrong. t :\n" <> T.pack (Pr.ppShow t)
+      throwError' $
+      "the type of is-enum is wrong. t :\n" <> T.pack (Pr.ppShow t)
 
 clarifyArrayAccess :: Meta -> Identifier -> LowType -> WithEnv CodePlus
 clarifyArrayAccess m name lowType = do
@@ -236,8 +237,8 @@ clarifyArrayAccess m name lowType = do
             callThenReturn <- toArrayAccessTail m lowType cod arr index xs
             let body = iterativeApp headerList callThenReturn
             retClosure (Just name) zts m xts body
-          _ -> throwError $ "the type of array-access is wrong"
-    _ -> throwError $ "the type of array-access is wrong"
+          _ -> throwError' $ "the type of array-access is wrong"
+    _ -> throwError' $ "the type of array-access is wrong"
 
 clarifySysCall ::
      Identifier -- the name of theta
@@ -261,7 +262,7 @@ clarifySysCall name sysCall args m = do
             name' <- newNameWith "fork"
             retClosure (Just name') zts m xts body
           _ -> retClosure (Just name) zts m xts body
-    _ -> throwError $ "the type of " <> name <> " is wrong"
+    _ -> throwError' $ "the type of " <> name <> " is wrong"
 
 iterativeApp :: [a -> a] -> a -> a
 iterativeApp [] x = x
@@ -328,7 +329,7 @@ knot :: Identifier -> DataPlus -> WithEnv ()
 knot z cls = do
   cenv <- gets codeEnv
   case pop z cenv of
-    Nothing -> throwError "knot"
+    Nothing -> throwError' "knot"
     Just ((args, body), cenv') -> do
       let body' = substCodePlus [(z, cls)] body
       let cenv'' = Map.insert z (args, body') cenv'
@@ -499,7 +500,7 @@ retWithBorrowedVars m cod xs resultVarName
       , TermPiIntro
           [c, (funName, funType)]
           (m, TermPiElim (m, TermUpsilon funName) vs))
-  | otherwise = throwError "retWithBorrowedVars"
+  | otherwise = throwError' "retWithBorrowedVars"
 
 inferKind :: ArrayKind -> TermPlus
 inferKind (ArrayKindIntS i) = (emptyMeta, TermEnum (EnumTypeIntS i))

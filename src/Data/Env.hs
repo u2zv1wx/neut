@@ -21,6 +21,7 @@ import qualified Data.HashMap.Strict as Map
 import qualified Data.PQueue.Min as Q
 import qualified Data.Set as S
 import qualified Data.Text as T
+import qualified Data.Text.IO as TIO
 import qualified Text.Show.Pretty as Pr
 
 type ConstraintQueue = Q.MinQueue EnrichedConstraint
@@ -76,15 +77,29 @@ initialEnv path =
     , currentFilePath = path
     }
 
-type WithEnv a = StateT Env (ExceptT Identifier IO) a
+-- type WithEnv a = StateT Env (ExceptT Identifier IO) a
+type WithEnv a = StateT Env (ExceptT [IO ()] IO) a
 
-evalWithEnv :: (Show a) => WithEnv a -> Env -> IO (Either String a)
+evalWithEnv :: (Show a) => WithEnv a -> Env -> IO (Either [IO ()] a)
 evalWithEnv c env = do
   resultOrErr <- runExceptT (runStateT c env)
   case resultOrErr of
-    Left err -> return $ Left $ T.unpack err
+    Left err -> return $ Left err
     Right (result, _) -> return $ Right result
 
+throwError' :: Identifier -> WithEnv a
+throwError' x = throwError [TIO.putStrLn x]
+
+addErrorAction :: IO () -> WithEnv a -> WithEnv a
+addErrorAction action computation = do
+  catchError computation $ \err -> throwError $ action : err
+
+-- evalWithEnv :: (Show a) => WithEnv a -> Env -> IO (Either String a)
+-- evalWithEnv c env = do
+--   resultOrErr <- runExceptT (runStateT c env)
+--   case resultOrErr of
+--     Left err -> return $ Left $ T.unpack err
+--     Right (result, _) -> return $ Right result
 newName :: WithEnv Identifier
 newName = do
   env <- get
@@ -148,14 +163,16 @@ lookupTypeEnv s
     mt <- gets (Map.lookup s . typeEnv)
     case mt of
       Just t -> return t
-      Nothing -> throwError $ s <> " is not found in the type environment."
+      Nothing ->
+        throwError
+          [TIO.putStrLn $ s <> " is not found in the type environment."]
 
 lookupNameEnv :: Identifier -> WithEnv Identifier
 lookupNameEnv s = do
   env <- get
   case Map.lookup s (nameEnv env) of
     Just s' -> return s'
-    Nothing -> throwError $ "undefined variable: " <> s
+    Nothing -> throwError [TIO.putStrLn $ "undefined variable: " <> s]
 
 isDefinedEnum :: Identifier -> WithEnv Bool
 isDefinedEnum name = do
@@ -178,13 +195,14 @@ getOS = do
   case os of
     "linux" -> return OSLinux
     "darwin" -> return OSDarwin
-    s -> throwError $ "unsupported target os: " <> T.pack (show s)
+    s -> throwError [putStrLn $ "unsupported target os: " <> show s]
 
 getArch :: WithEnv Arch
 getArch = do
   case arch of
     "x86_64" -> return Arch64
-    s -> throwError $ "unsupported target arch: " <> T.pack (show s)
+    s ->
+      throwError [TIO.putStrLn $ "unsupported target arch: " <> T.pack (show s)]
 
 -- for debug
 p :: String -> WithEnv ()
@@ -219,7 +237,7 @@ getEnumNum :: Identifier -> WithEnv Int
 getEnumNum label = do
   ienv <- gets enumEnv
   case (getEnumNum' label $ Map.elems ienv) of
-    Nothing -> throwError $ "no such enum is defined: " <> label
+    Nothing -> throwError [TIO.putStrLn $ "no such enum is defined: " <> label]
     Just i -> return i
 
 getEnumNum' :: Identifier -> [[Identifier]] -> Maybe Int

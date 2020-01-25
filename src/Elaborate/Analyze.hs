@@ -44,7 +44,8 @@ simp ((e1, e2):cs) = do
   case (me1', me2') of
     (Just e1', Just e2') -> simp' $ (e1', e2') : cs
     _ ->
-      throwError $ "cannot simplify [TIMEOUT]:\n" <> T.pack (Pr.ppShow (e1, e2))
+      throwError' $
+      "cannot simplify [TIMEOUT]:\n" <> T.pack (Pr.ppShow (e1, e2))
 
 -- {} simp' {}
 simp' :: [PreConstraint] -> WithEnv ()
@@ -215,7 +216,7 @@ simpBinder ((x1, t1):xts1) ((x2, t2):xts2) (Just (cod1, cod2)) cs = do
   let (xts2', cod2') = substWeakTermPlusBindingsWithBody [(x2, var1)] xts2 cod2
   simp [(t1, t2)]
   simpBinder xts1 xts2' (Just (cod1, cod2')) cs
-simpBinder _ _ _ _ = throwError "cannot simplify (simpBinder)"
+simpBinder _ _ _ _ = throwError' "cannot simplify (simpBinder)"
 
 -- {} simpCase {}
 simpCase :: (Ord a) => [(a, WeakTermPlus)] -> [(a, WeakTermPlus)] -> WithEnv ()
@@ -225,7 +226,7 @@ simpCase les1 les2 = do
   let (ls1, es1) = unzip les1'
   let (ls2, es2) = unzip les2'
   if ls1 /= ls2
-    then throwError "cannot simplify (simpCase)"
+    then throwError' "cannot simplify (simpCase)"
     else simp $ zip es1 es2
 
 -- {} simpPattern {}

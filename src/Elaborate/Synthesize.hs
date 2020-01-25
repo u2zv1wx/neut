@@ -6,6 +6,7 @@ module Elaborate.Synthesize
 
 import Control.Monad.Except
 import Control.Monad.State
+import Path
 import System.Console.ANSI
 
 import qualified Data.HashMap.Strict as Map
@@ -40,7 +41,7 @@ synthesize = do
     Just (Enriched _ _ _) -> do
       showErrorThenQuit q
       -- p $ "rest: " ++ show (Q.size q)
-      -- throwError $ "cannot simplify:\n" <> T.pack (Pr.ppShow (e1, e2))
+      -- throwError' $ "cannot simplify:\n" <> T.pack (Pr.ppShow (e1, e2))
 
 -- e1だけがstuckしているとき、e2だけがstuckしているとき、両方がstuckしているときをそれぞれ
 -- 独立したケースとして扱えるようにしたほうがよい（そうすればsubstを減らせる）
@@ -112,7 +113,7 @@ asAnalyzable (Enriched cs ms _) = Enriched cs ms ConstraintAnalyzable
 
 -- Try the list of alternatives.
 chain :: [WithEnv a] -> WithEnv a
-chain [] = throwError $ "cannot synthesize(chain)."
+chain [] = throwError' $ "cannot synthesize(chain)."
 chain [e] = e
 chain (e:es) = catchError e $ (const $ do chain es)
 
@@ -189,58 +190,46 @@ takeByCount (i:is) xs = do
 
 showErrorThenQuit :: ConstraintQueue -> WithEnv ()
 showErrorThenQuit q = do
-  let cs = Q.toList q
-  mapM_ showError cs
-  throwError "aborting due to failure of constraint synthesis"
+  as <- showErrors [] $ Q.toList q
+  throwError as
 
-showError :: EnrichedConstraint -> WithEnv ()
-showError (Enriched (e1, e2) _ _) = do
-  case (getLocInfo e1, getLocInfo e2)
-    -- (Just m1, Just m2) -> showError'' m1 m2 e1 e2
-        of
-    (Just m, _) -> showError' m e1 e2
-    (_, Just m) -> showError' m e2 e1
-    _ -> showError' emptyMeta e1 e2
+type PosInfo = (Path Abs File, Loc)
 
-showError' :: Meta -> WeakTermPlus -> WeakTermPlus -> WithEnv ()
-showError' m e1 e2 = do
-  liftIO $ setSGR [SetConsoleIntensity BoldIntensity]
-  liftIO $ TIO.putStr $ T.pack (showMeta m)
-  liftIO $ TIO.putStrLn ":"
-  liftIO $ setSGR [Reset]
-  liftIO $
-    setSGR [SetConsoleIntensity BoldIntensity, SetColor Foreground Vivid Red]
-  liftIO $ TIO.putStr "error: "
-  liftIO $ setSGR [Reset]
-  liftIO $
-    TIO.putStrLn
-      "couldn't verify the definitional equality of the following two terms:"
-  liftIO $ TIO.putStrLn $ "- " <> toText e1
-  liftIO $ TIO.putStrLn $ "- " <> toText e2
-  liftIO $ putStrLn ""
+showErrors :: [PosInfo] -> [EnrichedConstraint] -> WithEnv [IO ()]
+showErrors _ [] = return []
+showErrors ps ((Enriched (e1, e2) _ _):cs) = do
+  case getLocInfo e1 of
+    Just pos
+      | pos `notElem` ps -> do
+        let a = showErrorHeader pos >> showError' e1 e2
+        as <- showErrors (pos : ps) cs
+        return $ a : as
+    Just _ -> showErrors ps cs
+    _ -> do
+      let a = showError' e1 e2
+      as <- showErrors ps cs
+      return $ a : as
 
--- showError'' :: Meta -> Meta -> WeakTermPlus -> WeakTermPlus -> WithEnv ()
--- showError'' m1 m2 e1 e2 = do
---   liftIO $ setSGR [SetConsoleIntensity BoldIntensity]
---   liftIO $ TIO.putStr $ T.pack (showMeta m1)
---   liftIO $ setSGR [Reset]
---   liftIO $ TIO.putStrLn ":"
---   liftIO $ setSGR [SetConsoleIntensity BoldIntensity]
---   liftIO $ TIO.putStr $ T.pack (showMeta m2)
---   liftIO $ setSGR [Reset]
---   liftIO $ TIO.putStrLn ":"
---   liftIO $
---     setSGR [SetConsoleIntensity BoldIntensity, SetColor Foreground Vivid Red]
---   liftIO $ TIO.putStr "error"
---   liftIO $ setSGR [Reset]
---   liftIO $
---     TIO.putStrLn
---       ": couldn't verify the definitional equality of the following two terms:"
---   liftIO $ putStrLn $ "- " ++ show (e1)
---   liftIO $ putStrLn $ "- " ++ show (e2)
---   liftIO $ putStrLn ""
-getLocInfo :: WeakTermPlus -> Maybe Meta
+showErrorHeader :: PosInfo -> IO ()
+showErrorHeader (path, loc) = do
+  setSGR [SetConsoleIntensity BoldIntensity]
+  TIO.putStr $ T.pack (showPosInfo path loc)
+  TIO.putStrLn ":"
+  setSGR [Reset]
+
+showError' :: WeakTermPlus -> WeakTermPlus -> IO ()
+showError' e1 e2 = do
+  setSGR [SetConsoleIntensity BoldIntensity, SetColor Foreground Vivid Red]
+  TIO.putStr "error: "
+  setSGR [Reset]
+  TIO.putStrLn
+    "couldn't verify the definitional equality of the following two terms:"
+  TIO.putStrLn $ "- " <> toText e1
+  TIO.putStrLn $ "- " <> toText e2
+  putStrLn ""
+
+getLocInfo :: WeakTermPlus -> Maybe PosInfo
 getLocInfo (m, _) =
   case (metaFileName m, metaLocation m) of
-    (Just _, Just _) -> return m
+    (Just path, Just loc) -> return (path, loc)
     _ -> Nothing

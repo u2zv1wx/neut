@@ -136,14 +136,14 @@ checkKeywordCondition t = do
   kenv <- gets keywordEnv
   if not $ null $ kenv `S.intersection` atomListOf t
     then return ()
-    else throwError "A notation must include at least one keyword"
+    else throwError' "A notation must include at least one keyword"
 
 -- {} checkPlusCondition {}
 checkPlusCondition :: Notation -> WithEnv ()
 checkPlusCondition (_, TreeAtom s) =
   if T.last s /= '+'
     then return ()
-    else throwError
+    else throwError'
            "The '+'-suffixed name can be occurred only at the end of a list"
 checkPlusCondition (_, TreeNode []) = return ()
 checkPlusCondition (_, TreeNode ts) = do

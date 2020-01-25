@@ -15,15 +15,16 @@ import Data.Basic
 import Data.Env
 import Data.Tree
 
-type Parser a = ParsecT T.Text () (StateT Env (ExceptT T.Text IO)) a
+type Parser a = ParsecT T.Text () (StateT Env (ExceptT [IO ()] IO)) a
 
+-- type Parser a = ParsecT T.Text () (StateT Env (ExceptT T.Text IO)) a
 -- {} strToTree {}
 -- (as long as the input is translated into a tree, this function is considered valid)
 strToTree :: T.Text -> String -> WithEnv [TreePlus]
 strToTree input fileName = do
   t <- runParserT (skip >> parseSExpList) () fileName input
   case t of
-    Left err -> throwError $ T.pack (show err)
+    Left err -> throwError' $ T.pack (show err)
     Right ts -> return ts
 
 parseSExpList :: Parser [TreePlus]

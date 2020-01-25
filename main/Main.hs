@@ -95,7 +95,8 @@ run (Build inputPathStr mOutputPathStr outputKind) = do
   outputPath <- constructOutputPath basename mOutputPath outputKind
   case resultOrErr of
     Left err -> do
-      printError err
+      seqIO err
+      -- printError err
       exitWith (ExitFailure 1)
     Right result -> writeResult result outputPath outputKind
 
@@ -143,3 +144,7 @@ process inputPath = do
   -- p "llvm-done"
   emit e'' -- process input = do
    -- parse >=> elaborate >=> polarize >=> toLLVM >=> emit
+
+seqIO :: [IO ()] -> IO ()
+seqIO [] = return ()
+seqIO (a:as) = a >> seqIO as

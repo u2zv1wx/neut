@@ -79,13 +79,13 @@ parse' ((m, TreeNode ((_, TreeAtom "enum"):(_, TreeAtom name):ts)):as) = do
   return $ ascription : defList
 parse' ((_, TreeNode [(_, TreeAtom "include"), (_, TreeAtom pathString)]):as) =
   case readMaybe (T.unpack pathString) :: Maybe String of
-    Nothing -> throwError "the argument of `include` must be a string"
+    Nothing -> throwError' "the argument of `include` must be a string"
     Just path -> do
       oldFilePath <- gets currentFilePath
       newFilePath <- resolveFile (parent oldFilePath) path
       b <- doesFileExist newFilePath
       if not b
-        then throwError $ "no such file: " <> T.pack (toFilePath newFilePath)
+        then throwError' $ "no such file: " <> T.pack (toFilePath newFilePath)
         else do
           insertPathInfo oldFilePath newFilePath
           ensureDAG
@@ -114,7 +114,7 @@ parse' ((_, TreeNode [(_, TreeAtom "constant"), (_, TreeAtom name), t]):as) = do
   t' <- macroExpand t >>= interpret
   cenv <- gets constantEnv
   if name `S.member` cenv
-    then throwError $ "the constant " <> name <> " is already defined"
+    then throwError' $ "the constant " <> name <> " is already defined"
     else do
       modify (\e -> e {constantEnv = S.insert name (constantEnv e)})
       defList <- parse' as
@@ -180,9 +180,9 @@ newHole = do
 
 -- {} checkKeywordSanity {}
 checkKeywordSanity :: Identifier -> WithEnv ()
-checkKeywordSanity "" = throwError "empty string for a keyword"
+checkKeywordSanity "" = throwError' "empty string for a keyword"
 checkKeywordSanity x
-  | T.last x == '+' = throwError "A +-suffixed name cannot be a keyword"
+  | T.last x == '+' = throwError' "A +-suffixed name cannot be a keyword"
 checkKeywordSanity _ = return ()
 
 -- {} insEnumEnv {}
@@ -192,7 +192,7 @@ insEnumEnv m name enumList = do
   let xs = Map.keys eenv ++ concat (Map.elems eenv)
   case find (`elem` xs) $ name : enumList of
     Just x ->
-      throwError $
+      throwError' $
       T.pack (showMeta m) <>
       ": " <> "the constant `" <> x <> "` is already defined"
     _ -> do
@@ -217,7 +217,7 @@ ensureDAG = do
   case ensureDAG' m [] g of
     Right _ -> return ()
     Left cyclicPath -> do
-      throwError $ "found cyclic inclusion:\n" <> T.pack (Pr.ppShow cyclicPath)
+      throwError' $ "found cyclic inclusion:\n" <> T.pack (Pr.ppShow cyclicPath)
 
 ensureDAG' ::
      Path Abs File
