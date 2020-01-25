@@ -147,4 +147,5 @@ process inputPath = do
 
 seqIO :: [IO ()] -> IO ()
 seqIO [] = return ()
-seqIO (a:as) = a >> seqIO as
+seqIO [a] = a
+seqIO (a:as) = a >> putStrLn "" >> seqIO as

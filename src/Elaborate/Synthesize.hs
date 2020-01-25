@@ -216,7 +216,7 @@ showErrors ps ((Enriched (e1, e2) _ _):cs) = do
     _ -> do
       let a = showError' e1 e2
       as <- showErrors ps cs
-      return $ (undefined, a) : as
+      return $ (undefined, a) : as -- fixme (location info not available)
 
 showErrorHeader :: PosInfo -> IO ()
 showErrorHeader (path, loc) = do
@@ -234,7 +234,6 @@ showError' e1 e2 = do
     "couldn't verify the definitional equality of the following two terms:"
   TIO.putStrLn $ "- " <> toText e1
   TIO.putStrLn $ "- " <> toText e2
-  putStrLn ""
 
 getLocInfo :: WeakTermPlus -> Maybe PosInfo
 getLocInfo (m, _) =
