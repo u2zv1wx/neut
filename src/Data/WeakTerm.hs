@@ -333,8 +333,7 @@ toText (_, WeakTermIter (x, _) xts e) = do
 toText (_, WeakTermConst x) = x
 toText (_, WeakTermConstDecl xt e) = do
   showCons ["constant-declaration", showArg xt, toText e]
-toText (_, WeakTermZeta x) = "?M" <> x
-  -- showCons ["zeta", x]
+toText (_, WeakTermZeta x) = x
 toText (_, WeakTermInt _ a) = T.pack $ show a
 toText (_, WeakTermFloat16 a) = T.pack $ show a
 toText (_, WeakTermFloat32 a) = T.pack $ show a

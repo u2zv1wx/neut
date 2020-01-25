@@ -628,7 +628,7 @@ n15-4
 ;; (fact nat)
 
 ;; type error:
-;; (fact (begin (lambda ((A tau) (y A)) y)))
+(fact (begin (lambda ((A tau) (y A)) y)))
 
 (fact (top 100))
 ;; (fact (5 top))

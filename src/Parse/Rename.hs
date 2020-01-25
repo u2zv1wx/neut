@@ -241,20 +241,39 @@ checkSanity'' ctx ((x, _):xts) e = do
 prepareInvRename :: WithEnv ()
 prepareInvRename = do
   nenv <- Map.toList <$> gets nameEnv
-  modify (\env -> env {nameEnv = Map.fromList $ map swap nenv})
+  modify (\env -> env {nameEnv = Map.fromList $ map swap nenv, count = 0})
 
-invRenameIdentifier :: Identifier -> WithEnv Identifier
-invRenameIdentifier x = do
+data IdentKind
+  = IdentKindUpsilon
+  | IdentKindZeta
+
+invRenameIdentifier :: IdentKind -> Identifier -> WithEnv Identifier
+invRenameIdentifier IdentKindUpsilon x = do
   nenv <- gets nameEnv
   case Map.lookup x nenv of
     Just x' -> return x'
-    Nothing -> return x
+    Nothing -> do
+      i <- gets count
+      modify (\env -> env {count = i + 1})
+      let s = T.pack $ "x" ++ show i
+      modify (\env -> env {nameEnv = Map.insert x s (nameEnv env)})
+      return s
+invRenameIdentifier IdentKindZeta x = do
+  nenv <- gets nameEnv
+  case Map.lookup x nenv of
+    Just x' -> return x'
+    Nothing -> do
+      i <- gets count
+      modify (\env -> env {count = i + 1})
+      let s = T.pack $ "?M" ++ show i
+      modify (\env -> env {nameEnv = Map.insert x s (nameEnv env)})
+      return s
 
 -- Alpha-convert all the variables so that different variables have different names.
 invRename :: WeakTermPlus -> WithEnv WeakTermPlus
 invRename (m, WeakTermTau) = return (m, WeakTermTau)
 invRename (m, WeakTermUpsilon x) = do
-  x' <- invRenameIdentifier x
+  x' <- invRenameIdentifier IdentKindUpsilon x
   return (m, WeakTermUpsilon x')
 invRename (m, WeakTermPi xts t) = do
   (xts', t') <- invRenameBinder xts t
@@ -287,7 +306,9 @@ invRename (m, WeakTermConstDecl (x, t) e) = do
   -- modify (\env -> env {nameEnv = Map.insert x x (nameEnv env)})
   e' <- invRename e
   return (m, WeakTermConstDecl (x, t') e')
-invRename (m, WeakTermZeta h) = return (m, WeakTermZeta h)
+invRename (m, WeakTermZeta h) = do
+  h' <- invRenameIdentifier IdentKindZeta h
+  return (m, WeakTermZeta h')
 invRename (m, WeakTermInt t x) = do
   t' <- invRename t
   return (m, WeakTermInt t' x)
@@ -333,7 +354,7 @@ invRenameBinder [] e = do
   return ([], e')
 invRenameBinder ((x, t):xts) e = do
   t' <- invRename t
-  x' <- invRenameIdentifier x
+  x' <- invRenameIdentifier IdentKindUpsilon x
   (xts', e') <- invRenameBinder xts e
   return ((x', t') : xts', e')
 
@@ -341,7 +362,7 @@ invRenameSigma :: [IdentifierPlus] -> WithEnv [IdentifierPlus]
 invRenameSigma [] = return []
 invRenameSigma ((x, t):xts) = do
   t' <- invRename t
-  x' <- invRenameIdentifier x
+  x' <- invRenameIdentifier IdentKindUpsilon x
   xts' <- invRenameSigma xts
   return $ (x', t') : xts'
 
@@ -360,12 +381,12 @@ invRenameIter' ::
   -> WeakTermPlus
   -> WithEnv (IdentifierPlus, [IdentifierPlus], WeakTermPlus)
 invRenameIter' (x, t') [] e = do
-  x' <- invRenameIdentifier x
+  x' <- invRenameIdentifier IdentKindUpsilon x
   e' <- invRename e
   return ((x', t'), [], e')
 invRenameIter' xt ((x, t):xts) e = do
   t' <- invRename t
-  x' <- invRenameIdentifier x
+  x' <- invRenameIdentifier IdentKindUpsilon x
   (xt', xts', e') <- invRenameIter' xt xts e
   return (xt', (x', t') : xts', e')
 
@@ -383,6 +404,6 @@ invRenameStruct [] e = do
   e' <- invRename e
   return ([], e')
 invRenameStruct ((x, t):xts) e = do
-  x' <- invRenameIdentifier x
+  x' <- invRenameIdentifier IdentKindUpsilon x
   (xts', e') <- invRenameStruct xts e
   return ((x', t) : xts', e')
