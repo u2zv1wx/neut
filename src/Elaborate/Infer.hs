@@ -205,6 +205,9 @@ infer' ctx (m, WeakTermArrayIntro k es) = do
   -- 実際にtermを書くときには(array-intro _ u8 e1 e2 e3)とかって書けばよくて。
   -- まーでもそれをnotationで隠したりすると結局metaが意味不明に。
   let dom = (emptyMeta, WeakTermEnum (EnumTypeNat len))
+  -- たぶんこのarrayの型が「左」にきて、んでarrayについての分解からこのdomのemptyMetaが左にきて、んで
+  -- 位置情報が不明になる、って仕組みだと思う。はい。
+  -- WeakTermArray dom1 k1 = WeakTermArray dom2 k2みたいな状況ね。
   let t = (m, WeakTermArray dom k)
   retWeakTerm t m $ WeakTermArrayIntro k es'
 infer' ctx (m, WeakTermArrayElim k xts e1 e2) = do

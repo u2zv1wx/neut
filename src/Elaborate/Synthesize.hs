@@ -6,6 +6,7 @@ module Elaborate.Synthesize
 
 import Control.Monad.Except
 import Control.Monad.State
+import Data.List (sortBy)
 import Path
 import System.Console.ANSI
 
@@ -190,25 +191,32 @@ takeByCount (i:is) xs = do
 
 showErrorThenQuit :: ConstraintQueue -> WithEnv ()
 showErrorThenQuit q = do
-  as <- showErrors [] $ Q.toList q
-  throwError as
+  pas <- showErrors [] $ Q.toList q
+  let pas' = sortBy (\pa1 pa2 -> fst pa2 `compare` fst pa1) pas
+  throwError $ map snd pas'
 
 type PosInfo = (Path Abs File, Loc)
 
-showErrors :: [PosInfo] -> [EnrichedConstraint] -> WithEnv [IO ()]
+showErrors :: [PosInfo] -> [EnrichedConstraint] -> WithEnv [(PosInfo, IO ())]
 showErrors _ [] = return []
 showErrors ps ((Enriched (e1, e2) _ _):cs) = do
-  case getLocInfo e1 of
-    Just pos
+  case (getLocInfo e1, getLocInfo e2) of
+    (Just pos, _)
       | pos `notElem` ps -> do
         let a = showErrorHeader pos >> showError' e1 e2
         as <- showErrors (pos : ps) cs
-        return $ a : as
-    Just _ -> showErrors ps cs
+        return $ (pos, a) : as
+    (Just _, _) -> showErrors ps cs
+    (_, Just pos)
+      | pos `notElem` ps -> do
+        let a = showErrorHeader pos >> showError' e2 e1
+        as <- showErrors (pos : ps) cs
+        return $ (pos, a) : as
+    (_, Just _) -> showErrors ps cs
     _ -> do
       let a = showError' e1 e2
       as <- showErrors ps cs
-      return $ a : as
+      return $ (undefined, a) : as
 
 showErrorHeader :: PosInfo -> IO ()
 showErrorHeader (path, loc) = do

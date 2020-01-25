@@ -80,10 +80,10 @@
 
 ;; out-1
 ;; (write n3 stdout (test) enum.n3)
-(write hole stdout (test) 3)
+(write hole stdout (test) top)
 
 (let str-with-len
-  (sigma-introduction n3 (test)))
+  (sigma-introduction top (test)))
 
 
 ;; (definition string
