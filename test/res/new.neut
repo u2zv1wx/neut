@@ -545,6 +545,7 @@
 ;; 3が返ってるってことは、0 = stdin, 1 = stdout, 2 = stderrだから、ちゃんとファイルが開けてるはず。
 ;; file
 
+
 (definition pohe
   (struct-elimination
     ((p u8) (q u8) (r u16) (s u32) (t i64))

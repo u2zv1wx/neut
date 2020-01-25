@@ -30,6 +30,8 @@ type BuildOptOutputPath = String
 
 type CheckOptInputPath = String
 
+type CheckOptPeriod = String
+
 data OutputKind
   = OutputKindObject
   | OutputKindLLVM
@@ -42,7 +44,7 @@ instance Read OutputKind where
 
 data Command
   = Build BuildOptInputPath (Maybe BuildOptOutputPath) OutputKind
-  | Check CheckOptInputPath
+  | Check CheckOptInputPath (Maybe CheckOptPeriod)
 
 parseBuildOpt :: Parser Command
 parseBuildOpt = do
@@ -71,7 +73,15 @@ parseCheckOpt :: Parser Command
 parseCheckOpt = do
   let inputPathOpt =
         argument str $ mconcat [metavar "INPUT", help "The path of input file"]
-  Check <$> inputPathOpt
+  let footerOpt =
+        optional $
+        strOption $
+        mconcat
+          [ long "period"
+          , help "String printed after each entry"
+          , metavar "STRING"
+          ]
+  Check <$> inputPathOpt <*> footerOpt
 
 kindReader :: ReadM OutputKind
 kindReader = do
@@ -108,14 +118,15 @@ run (Build inputPathStr mOutputPathStr outputKind) = do
       seqIO err
       exitWith (ExitFailure 1)
     Right result -> writeResult result outputPath outputKind
-run (Check inputPathStr) = do
+run (Check inputPathStr mPeriod) = do
   inputPath <- resolveFile' inputPathStr
   resultOrErr <- evalWithEnv (check inputPath) (initialEnv inputPath)
   case resultOrErr of
-    Left err -> do
-      seqIO err
-      exitWith (ExitFailure 1)
     Right _ -> return ()
+    Left err ->
+      case mPeriod of
+        Just period -> seqIO' period err
+        Nothing -> seqIO err
 
 printError :: String -> IO ()
 printError err = do
@@ -164,3 +175,7 @@ check inputPath = do
 seqIO :: [IO ()] -> IO ()
 seqIO [] = return ()
 seqIO (a:as) = a >> seqIO as
+
+seqIO' :: String -> [IO ()] -> IO ()
+seqIO' _ [] = return ()
+seqIO' period (a:as) = a >> putStrLn period >> seqIO' period as
