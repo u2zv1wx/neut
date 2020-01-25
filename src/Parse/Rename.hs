@@ -255,7 +255,7 @@ invRenameIdentifier IdentKindUpsilon x = do
     Nothing -> do
       i <- gets count
       modify (\env -> env {count = i + 1})
-      let s = T.pack $ "x" ++ show i
+      let s = T.pack $ "var" ++ show i
       modify (\env -> env {nameEnv = Map.insert x s (nameEnv env)})
       return s
 invRenameIdentifier IdentKindZeta x = do

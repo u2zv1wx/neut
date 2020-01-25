@@ -28,6 +28,8 @@ type BuildOptInputPath = String
 
 type BuildOptOutputPath = String
 
+type CheckOptInputPath = String
+
 data OutputKind
   = OutputKindObject
   | OutputKindLLVM
@@ -38,8 +40,9 @@ instance Read OutputKind where
   readsPrec _ "llvm" = [(OutputKindLLVM, [])]
   readsPrec _ _ = []
 
-data Command =
-  Build BuildOptInputPath (Maybe BuildOptOutputPath) OutputKind
+data Command
+  = Build BuildOptInputPath (Maybe BuildOptOutputPath) OutputKind
+  | Check CheckOptInputPath
 
 parseBuildOpt :: Parser Command
 parseBuildOpt = do
@@ -64,6 +67,12 @@ parseBuildOpt = do
           ]
   Build <$> inputPathOpt <*> outputPathOpt <*> outputKindOpt
 
+parseCheckOpt :: Parser Command
+parseCheckOpt = do
+  let inputPathOpt =
+        argument str $ mconcat [metavar "INPUT", help "The path of input file"]
+  Check <$> inputPathOpt
+
 kindReader :: ReadM OutputKind
 kindReader = do
   s <- str
@@ -74,11 +83,12 @@ kindReader = do
 parseOpt :: Parser Command
 parseOpt =
   subparser $
-  command
-    "build"
-    (info
-       (helper <*> parseBuildOpt)
-       (progDesc "Usage: neut build FILENAME [OPTIONS]"))
+  (command
+     "build"
+     (info (helper <*> parseBuildOpt) (progDesc "build given file")) <>
+   command
+     "check"
+     (info (helper <*> parseCheckOpt) (progDesc "check specified file")))
 
 optParser :: ParserInfo Command
 optParser = info (helper <*> parseOpt) fullDesc
@@ -89,16 +99,23 @@ main = execParser optParser >>= run
 run :: Command -> IO ()
 run (Build inputPathStr mOutputPathStr outputKind) = do
   inputPath <- resolveFile' inputPathStr
-  resultOrErr <- evalWithEnv (process inputPath) (initialEnv inputPath)
+  resultOrErr <- evalWithEnv (build inputPath) (initialEnv inputPath)
   basename <- setFileExtension "" $ filename inputPath
   mOutputPath <- mapM resolveFile' mOutputPathStr
   outputPath <- constructOutputPath basename mOutputPath outputKind
   case resultOrErr of
     Left err -> do
       seqIO err
-      -- printError err
       exitWith (ExitFailure 1)
     Right result -> writeResult result outputPath outputKind
+run (Check inputPathStr) = do
+  inputPath <- resolveFile' inputPathStr
+  resultOrErr <- evalWithEnv (check inputPath) (initialEnv inputPath)
+  case resultOrErr of
+    Left err -> do
+      seqIO err
+      exitWith (ExitFailure 1)
+    Right _ -> return ()
 
 printError :: String -> IO ()
 printError err = do
@@ -132,23 +149,18 @@ writeResult result outputPath OutputKindObject = do
     [tmpOutputPathStr, "-Wno-override-module", "-o" ++ toFilePath outputPath]
   removeFile tmpOutputPath
 
--- process :: Path Abs File -> WithEnv [T.Text]
-process :: Path Abs File -> WithEnv [B.ByteString]
-process inputPath = do
+build :: Path Abs File -> WithEnv [B.ByteString]
+build inputPath = do
   content <- liftIO $ TIO.readFile $ toFilePath inputPath
-  e <- parse content (toFilePath inputPath) >>= elaborate
-  -- p "elaborated"
-  e' <- clarify e
-  -- p "clarified"
-  e'' <- toLLVM e'
-  -- p "llvm-done"
-  emit e'' -- process input = do
-   -- parse >=> elaborate >=> polarize >=> toLLVM >=> emit
+  let path = toFilePath inputPath
+  parse content path >>= elaborate >>= clarify >>= toLLVM >>= emit
 
--- seqIO :: [IO ()] -> IO ()
--- seqIO [] = return ()
--- seqIO [a] = a
--- seqIO (a:as) = a >> putStrLn "" >> seqIO as
+check :: Path Abs File -> WithEnv ()
+check inputPath = do
+  content <- liftIO $ TIO.readFile $ toFilePath inputPath
+  _ <- parse content (toFilePath inputPath) >>= elaborate
+  return ()
+
 seqIO :: [IO ()] -> IO ()
 seqIO [] = return ()
 seqIO (a:as) = a >> seqIO as
