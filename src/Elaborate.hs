@@ -146,9 +146,9 @@ elaborate' (m, WeakTermInt t x) = do
       liftIO $ setSGR [Reset]
       -- p $ showMeta m
       throwError' $
-        T.pack $
-        "the type of `" ++
-        show x ++ "` should be an integer type, but is:\n" ++ show t'
+        "the type of `" <>
+        T.pack (show x) <>
+        "` should be an integer type, but is:\n" <> T.pack (show t')
 elaborate' (m, WeakTermFloat16 x) = do
   return (m, TermFloat16 x)
 elaborate' (m, WeakTermFloat32 x) = do

@@ -145,7 +145,10 @@ process inputPath = do
   emit e'' -- process input = do
    -- parse >=> elaborate >=> polarize >=> toLLVM >=> emit
 
+-- seqIO :: [IO ()] -> IO ()
+-- seqIO [] = return ()
+-- seqIO [a] = a
+-- seqIO (a:as) = a >> putStrLn "" >> seqIO as
 seqIO :: [IO ()] -> IO ()
 seqIO [] = return ()
-seqIO [a] = a
-seqIO (a:as) = a >> putStrLn "" >> seqIO as
+seqIO (a:as) = a >> seqIO as

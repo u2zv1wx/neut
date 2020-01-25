@@ -91,10 +91,12 @@
 ;;     (index type)
 ;;     (content (array index u8))))
 
+;; test : Pi (). stringとの一致が問題になってる？
 (definition string
   (sigma
     ((A type))
     (array A u8)))
+
 ;; こっちでは、(n3, [p, q, r])みたいな感じで。
 ;; 型としては長さの情報があるけど、termとしては長さの情報がない、という状況。
 ;; 別にwriteだってできてるんだしこれでよくね、という感じが……？
@@ -626,8 +628,9 @@ n15-4
 ;; (fact nat)
 
 ;; type error:
-(fact (begin (lambda ((A tau) (y A)) y)))
-;; (fact (top 100))
+;; (fact (begin (lambda ((A tau) (y A)) y)))
+
+(fact (top 100))
 ;; (fact (5 top))
 
 

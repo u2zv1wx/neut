@@ -333,7 +333,8 @@ toText (_, WeakTermIter (x, _) xts e) = do
 toText (_, WeakTermConst x) = x
 toText (_, WeakTermConstDecl xt e) = do
   showCons ["constant-declaration", showArg xt, toText e]
-toText (_, WeakTermZeta _) = undefined
+toText (_, WeakTermZeta x) = "?M" <> x
+  -- showCons ["zeta", x]
 toText (_, WeakTermInt _ a) = T.pack $ show a
 toText (_, WeakTermFloat16 a) = T.pack $ show a
 toText (_, WeakTermFloat32 a) = T.pack $ show a
@@ -353,7 +354,7 @@ toText (_, WeakTermArrayIntro _ es) = showArray $ map toText es
 toText (_, WeakTermArrayElim _ xts e1 e2) = do
   let argStr = inParen $ showItems $ map showArg xts
   showCons ["array-elimination", argStr, toText e1, toText e2]
-toText (_, WeakTermStruct {}) = undefined
+toText (_, WeakTermStruct ks) = showCons $ "struct" : map showArrayKind ks
 toText (_, WeakTermStructIntro ets) = do
   showStruct $ map (toText . fst) ets
 toText (_, WeakTermStructElim xts e1 e2) = do
@@ -387,6 +388,12 @@ showEnumValue (EnumValueLabel l) = l
 showEnumValue (EnumValueIntS _ a) = T.pack $ show a
 showEnumValue (EnumValueIntU _ a) = T.pack $ show a
 showEnumValue (EnumValueNat size a) = T.pack $ "n" ++ show size ++ "-" ++ show a
+
+showArrayKind :: ArrayKind -> T.Text
+showArrayKind (ArrayKindIntS size) = T.pack $ "i" ++ show size
+showArrayKind (ArrayKindIntU size) = T.pack $ "u" ++ show size
+showArrayKind (ArrayKindFloat size) = T.pack $ "f" ++ show (sizeAsInt size)
+showArrayKind ArrayKindVoidPtr = "void*" -- shouldn't be used
 
 showItems :: [T.Text] -> T.Text
 showItems = T.intercalate " "

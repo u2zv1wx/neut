@@ -21,6 +21,7 @@ import Data.Constraint
 import Data.Env
 import Data.WeakTerm
 import Elaborate.Analyze
+import Parse.Rename
 
 -- Given a queue of constraints (easier ones comes earlier), try to synthesize
 -- all of them using heuristics.
@@ -191,6 +192,10 @@ takeByCount (i:is) xs = do
 
 showErrorThenQuit :: ConstraintQueue -> WithEnv ()
 showErrorThenQuit q = do
+  prepareInvRename
+  -- nenv <- gets nameEnv
+  -- p "nenv:"
+  -- p' nenvs
   pas <- showErrors [] $ Q.toList q
   let pas' = sortBy (\pa1 pa2 -> fst pa2 `compare` fst pa1) pas
   throwError $ map snd pas'
@@ -200,21 +205,23 @@ type PosInfo = (Path Abs File, Loc)
 showErrors :: [PosInfo] -> [EnrichedConstraint] -> WithEnv [(PosInfo, IO ())]
 showErrors _ [] = return []
 showErrors ps ((Enriched (e1, e2) _ _):cs) = do
-  case (getLocInfo e1, getLocInfo e2) of
+  e1' <- invRename e1
+  e2' <- invRename e2
+  case (getLocInfo e1', getLocInfo e2') of
     (Just pos, _)
       | pos `notElem` ps -> do
-        let a = showErrorHeader pos >> showError' e1 e2
+        let a = showErrorHeader pos >> showError' e1' e2'
         as <- showErrors (pos : ps) cs
         return $ (pos, a) : as
     (Just _, _) -> showErrors ps cs
     (_, Just pos)
       | pos `notElem` ps -> do
-        let a = showErrorHeader pos >> showError' e2 e1
+        let a = showErrorHeader pos >> showError' e2' e1'
         as <- showErrors (pos : ps) cs
         return $ (pos, a) : as
     (_, Just _) -> showErrors ps cs
     _ -> do
-      let a = showError' e1 e2
+      let a = showError' e1' e2'
       as <- showErrors ps cs
       return $ (undefined, a) : as -- fixme (location info not available)
 

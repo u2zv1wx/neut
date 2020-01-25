@@ -454,7 +454,7 @@ lookupWeakTypeEnv s = do
   mt <- lookupWeakTypeEnvMaybe s
   case mt of
     Just t -> return t
-    Nothing -> throwError' $ s <> " is not found in the type environment."
+    Nothing -> throwError' $ s <> " is not found in the weak type environment."
 
 lookupWeakTypeEnvMaybe :: Identifier -> WithEnv (Maybe WeakTermPlus)
 lookupWeakTypeEnvMaybe s = do
