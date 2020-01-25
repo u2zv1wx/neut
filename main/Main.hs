@@ -6,7 +6,6 @@ import Control.Monad.State
 import Options.Applicative
 import Path
 import Path.IO
-import System.Console.ANSI
 import System.Exit
 import System.Process
 import Text.Read (readMaybe)
@@ -30,7 +29,7 @@ type BuildOptOutputPath = String
 
 type CheckOptInputPath = String
 
-type CheckOptPeriod = String
+type CheckOptEndOfEntry = String
 
 data OutputKind
   = OutputKindObject
@@ -44,7 +43,7 @@ instance Read OutputKind where
 
 data Command
   = Build BuildOptInputPath (Maybe BuildOptOutputPath) OutputKind
-  | Check CheckOptInputPath (Maybe CheckOptPeriod)
+  | Check CheckOptInputPath (Maybe CheckOptEndOfEntry)
 
 parseBuildOpt :: Parser Command
 parseBuildOpt = do
@@ -77,7 +76,7 @@ parseCheckOpt = do
         optional $
         strOption $
         mconcat
-          [ long "period"
+          [ long "end-of-entry"
           , help "String printed after each entry"
           , metavar "STRING"
           ]
@@ -114,28 +113,25 @@ run (Build inputPathStr mOutputPathStr outputKind) = do
   mOutputPath <- mapM resolveFile' mOutputPathStr
   outputPath <- constructOutputPath basename mOutputPath outputKind
   case resultOrErr of
-    Left err -> do
-      seqIO err
-      exitWith (ExitFailure 1)
+    Left err -> seqIO err >> exitWith (ExitFailure 1)
     Right result -> writeResult result outputPath outputKind
-run (Check inputPathStr mPeriod) = do
+run (Check inputPathStr mEndOfEntry) = do
   inputPath <- resolveFile' inputPathStr
   resultOrErr <- evalWithEnv (check inputPath) (initialEnv inputPath)
   case resultOrErr of
     Right _ -> return ()
     Left err ->
-      case mPeriod of
-        Just period -> seqIO' period err
-        Nothing -> seqIO err
+      case mEndOfEntry of
+        Just eoe -> seqIO' eoe err >> exitWith (ExitFailure 1)
+        Nothing -> seqIO err >> exitWith (ExitFailure 1)
 
-printError :: String -> IO ()
-printError err = do
-  liftIO $
-    setSGR [SetConsoleIntensity BoldIntensity, SetColor Foreground Vivid Red]
-  liftIO $ putStr "error: "
-  liftIO $ setSGR [Reset]
-  liftIO $ putStrLn $ err
-
+-- printError :: String -> IO ()
+-- printError err = do
+--   liftIO $
+--     setSGR [SetConsoleIntensity BoldIntensity, SetColor Foreground Vivid Red]
+--   liftIO $ putStr "error: "
+--   liftIO $ setSGR [Reset]
+--   liftIO $ putStrLn $ err
 constructOutputPath ::
      Path Rel File -> Maybe (Path Abs File) -> OutputKind -> IO (Path Abs File)
 constructOutputPath basename Nothing OutputKindLLVM = do
@@ -178,4 +174,4 @@ seqIO (a:as) = a >> seqIO as
 
 seqIO' :: String -> [IO ()] -> IO ()
 seqIO' _ [] = return ()
-seqIO' period (a:as) = a >> putStrLn period >> seqIO' period as
+seqIO' eoe (a:as) = a >> putStrLn eoe >> seqIO' eoe as

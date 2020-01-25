@@ -226,17 +226,19 @@ showErrors ps ((Enriched (e1, e2) _ _):cs) = do
       return $ (undefined, a) : as -- fixme (location info not available)
 
 showErrorHeader :: PosInfo -> IO ()
-showErrorHeader (path, loc) = do
-  setSGR [SetConsoleIntensity BoldIntensity]
+showErrorHeader (path, loc)
+  -- setSGR [SetConsoleIntensity BoldIntensity]
+ = do
   TIO.putStr $ T.pack (showPosInfo path loc)
   TIO.putStrLn ":"
-  setSGR [Reset]
+  -- setSGR [Reset]
 
 showError' :: WeakTermPlus -> WeakTermPlus -> IO ()
-showError' e1 e2 = do
-  setSGR [SetConsoleIntensity BoldIntensity, SetColor Foreground Vivid Red]
+showError' e1 e2
+  -- setSGR [SetConsoleIntensity BoldIntensity, SetColor Foreground Vivid Red]
+ = do
   TIO.putStr "error: "
-  setSGR [Reset]
+  -- setSGR [Reset]
   TIO.putStrLn
     "couldn't verify the definitional equality of the following two terms:"
   TIO.putStrLn $ "- " <> toText e1
