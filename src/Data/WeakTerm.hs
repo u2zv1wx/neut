@@ -5,6 +5,8 @@ module Data.WeakTerm where
 import Data.Maybe (fromMaybe)
 import Numeric.Half
 
+import qualified Data.Text as T
+
 import Data.Basic
 
 data WeakTerm
@@ -303,3 +305,100 @@ univ = (emptyMeta, WeakTermTau)
 
 univAt :: Meta -> WeakTermPlus
 univAt m = (m, WeakTermTau)
+
+toText :: WeakTermPlus -> Identifier
+toText (_, WeakTermTau) = "tau"
+toText (_, WeakTermUpsilon x) = x
+toText (_, WeakTermPi xts t) = do
+  let argStr = inParen $ showItems $ map showArg xts
+  showCons ["Π", argStr, toText t]
+toText (_, WeakTermPiIntro xts e) = do
+  let argStr = inParen $ showItems $ map showArg xts
+  showCons ["λ", argStr, toText e]
+toText (_, WeakTermPiElim e es) = do
+  showCons $ map toText $ e : es
+toText (_, WeakTermSigma xts)
+  | Just (yts, (_, t)) <- splitLast xts = do
+    let argStr = inParen $ showItems $ map showArg yts
+    showCons ["Σ", argStr, toText t]
+  | otherwise = "(product)" -- <> : (product)
+toText (_, WeakTermSigmaIntro _ es) = do
+  showTuple $ map toText es
+toText (_, WeakTermSigmaElim _ xts e1 e2) = do
+  let argStr = inParen $ showItems $ map showArg xts
+  showCons ["sigma-elimination", argStr, toText e1, toText e2]
+toText (_, WeakTermIter (x, _) xts e) = do
+  let argStr = inParen $ showItems $ map showArg xts
+  showCons ["μ", x, argStr, toText e]
+toText (_, WeakTermConst x) = x
+toText (_, WeakTermConstDecl xt e) = do
+  showCons ["constant-declaration", showArg xt, toText e]
+toText (_, WeakTermZeta _) = undefined
+toText (_, WeakTermInt _ a) = T.pack $ show a
+toText (_, WeakTermFloat16 a) = T.pack $ show a
+toText (_, WeakTermFloat32 a) = T.pack $ show a
+toText (_, WeakTermFloat64 a) = T.pack $ show a
+toText (_, WeakTermFloat _ a) = T.pack $ show a
+toText (_, WeakTermEnum enumType) =
+  case enumType of
+    EnumTypeLabel l -> l
+    EnumTypeIntS size -> "i" <> T.pack (show size)
+    EnumTypeIntU size -> "u" <> T.pack (show size)
+    EnumTypeNat size -> "n" <> T.pack (show size)
+toText (_, WeakTermEnumIntro v) = showEnumValue v
+toText (_, WeakTermEnumElim (e, _) les) =
+  showCons ["case", toText e, showItems (map showClause les)]
+toText (_, WeakTermArray dom _) = toText dom
+toText (_, WeakTermArrayIntro _ es) = showArray $ map toText es
+toText (_, WeakTermArrayElim _ xts e1 e2) = do
+  let argStr = inParen $ showItems $ map showArg xts
+  showCons ["array-elimination", argStr, toText e1, toText e2]
+toText (_, WeakTermStruct {}) = undefined
+toText (_, WeakTermStructIntro ets) = do
+  showStruct $ map (toText . fst) ets
+toText (_, WeakTermStructElim xts e1 e2) = do
+  let argStr = inParen $ showItems $ map fst xts
+  showCons ["struct-elimination", argStr, toText e1, toText e2]
+
+inParen :: T.Text -> T.Text
+inParen s = "(" <> s <> ")"
+
+inAngle :: T.Text -> T.Text
+inAngle s = "<" <> s <> ">"
+
+inBrace :: T.Text -> T.Text
+inBrace s = "{" <> s <> "}"
+
+inBracket :: T.Text -> T.Text
+inBracket s = "[" <> s <> "]"
+
+showArg :: (Identifier, WeakTermPlus) -> T.Text
+showArg (x, t) = inParen $ x <> " " <> toText t
+
+showClause :: (Case, WeakTermPlus) -> T.Text
+showClause (c, e) = inParen $ showCase c <> " " <> toText e
+
+showCase :: Case -> T.Text
+showCase (CaseValue v) = showEnumValue v
+showCase CaseDefault = "default"
+
+showEnumValue :: EnumValue -> T.Text
+showEnumValue (EnumValueLabel l) = l
+showEnumValue (EnumValueIntS _ a) = T.pack $ show a
+showEnumValue (EnumValueIntU _ a) = T.pack $ show a
+showEnumValue (EnumValueNat size a) = T.pack $ "n" ++ show size ++ "-" ++ show a
+
+showItems :: [T.Text] -> T.Text
+showItems = T.intercalate " "
+
+showCons :: [T.Text] -> T.Text
+showCons = inParen . T.intercalate " "
+
+showTuple :: [T.Text] -> T.Text
+showTuple = inAngle . T.intercalate " "
+
+showArray :: [T.Text] -> T.Text
+showArray = inBracket . T.intercalate " "
+
+showStruct :: [T.Text] -> T.Text
+showStruct = inBrace . T.intercalate " "

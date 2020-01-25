@@ -103,9 +103,9 @@ printError :: String -> IO ()
 printError err = do
   liftIO $
     setSGR [SetConsoleIntensity BoldIntensity, SetColor Foreground Vivid Red]
-  liftIO $ putStr "error"
+  liftIO $ putStr "error: "
   liftIO $ setSGR [Reset]
-  liftIO $ putStrLn $ ": " <> err
+  liftIO $ putStrLn $ err
 
 constructOutputPath ::
      Path Rel File -> Maybe (Path Abs File) -> OutputKind -> IO (Path Abs File)

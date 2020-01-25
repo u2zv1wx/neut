@@ -386,3 +386,10 @@ assertPostMP msg mx b = assertMP (msg ++ ".post") mx b
 
 assertPostPM :: (Monad m) => String -> a -> m Bool -> m a
 assertPostPM msg x mb = assertPM (msg ++ ".post") x mb
+
+splitLast :: [a] -> Maybe ([a], a)
+splitLast [] = Nothing
+splitLast [x] = return ([], x)
+splitLast (x:xs) = do
+  (xs', z) <- splitLast xs
+  return (x : xs', z)

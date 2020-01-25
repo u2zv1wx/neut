@@ -12,8 +12,8 @@ import qualified Data.HashMap.Strict as Map
 import qualified Data.PQueue.Min as Q
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
-import qualified Text.Show.Pretty as Pr
 
+-- import qualified Text.Show.Pretty as Pr
 import Data.Basic
 import Data.Constraint
 import Data.Env
@@ -206,40 +206,39 @@ showError' :: Meta -> WeakTermPlus -> WeakTermPlus -> WithEnv ()
 showError' m e1 e2 = do
   liftIO $ setSGR [SetConsoleIntensity BoldIntensity]
   liftIO $ TIO.putStr $ T.pack (showMeta m)
-  liftIO $ setSGR [Reset]
   liftIO $ TIO.putStrLn ":"
+  liftIO $ setSGR [Reset]
   liftIO $
     setSGR [SetConsoleIntensity BoldIntensity, SetColor Foreground Vivid Red]
-  liftIO $ TIO.putStr "error"
+  liftIO $ TIO.putStr "error: "
   liftIO $ setSGR [Reset]
   liftIO $
     TIO.putStrLn
-      ": couldn't verify the definitional equality of the following two terms:"
-  liftIO $ putStrLn $ "- " ++ show (e1)
-  liftIO $ putStrLn $ "- " ++ show (e2)
+      "couldn't verify the definitional equality of the following two terms:"
+  liftIO $ TIO.putStrLn $ "- " <> toText e1
+  liftIO $ TIO.putStrLn $ "- " <> toText e2
   liftIO $ putStrLn ""
 
-showError'' :: Meta -> Meta -> WeakTermPlus -> WeakTermPlus -> WithEnv ()
-showError'' m1 m2 e1 e2 = do
-  liftIO $ setSGR [SetConsoleIntensity BoldIntensity]
-  liftIO $ TIO.putStr $ T.pack (showMeta m1)
-  liftIO $ setSGR [Reset]
-  liftIO $ TIO.putStrLn ":"
-  liftIO $ setSGR [SetConsoleIntensity BoldIntensity]
-  liftIO $ TIO.putStr $ T.pack (showMeta m2)
-  liftIO $ setSGR [Reset]
-  liftIO $ TIO.putStrLn ":"
-  liftIO $
-    setSGR [SetConsoleIntensity BoldIntensity, SetColor Foreground Vivid Red]
-  liftIO $ TIO.putStr "error"
-  liftIO $ setSGR [Reset]
-  liftIO $
-    TIO.putStrLn
-      ": couldn't verify the definitional equality of the following two terms:"
-  liftIO $ putStrLn $ "- " ++ show (e1)
-  liftIO $ putStrLn $ "- " ++ show (e2)
-  liftIO $ putStrLn ""
-
+-- showError'' :: Meta -> Meta -> WeakTermPlus -> WeakTermPlus -> WithEnv ()
+-- showError'' m1 m2 e1 e2 = do
+--   liftIO $ setSGR [SetConsoleIntensity BoldIntensity]
+--   liftIO $ TIO.putStr $ T.pack (showMeta m1)
+--   liftIO $ setSGR [Reset]
+--   liftIO $ TIO.putStrLn ":"
+--   liftIO $ setSGR [SetConsoleIntensity BoldIntensity]
+--   liftIO $ TIO.putStr $ T.pack (showMeta m2)
+--   liftIO $ setSGR [Reset]
+--   liftIO $ TIO.putStrLn ":"
+--   liftIO $
+--     setSGR [SetConsoleIntensity BoldIntensity, SetColor Foreground Vivid Red]
+--   liftIO $ TIO.putStr "error"
+--   liftIO $ setSGR [Reset]
+--   liftIO $
+--     TIO.putStrLn
+--       ": couldn't verify the definitional equality of the following two terms:"
+--   liftIO $ putStrLn $ "- " ++ show (e1)
+--   liftIO $ putStrLn $ "- " ++ show (e2)
+--   liftIO $ putStrLn ""
 getLocInfo :: WeakTermPlus -> Maybe Meta
 getLocInfo (m, _) =
   case (metaFileName m, metaLocation m) of

@@ -42,6 +42,7 @@
     129
     130))
 
+
 ;; 文字列をunicode encodingされたu8 arrayへと変換して保持
 (definition test ()
   "あ")
@@ -84,6 +85,7 @@
 (let str-with-len
   (sigma-introduction n3 (test)))
 
+
 ;; (definition string
 ;;   (sigma
 ;;     (index type)
@@ -100,7 +102,7 @@
 (ascription str-with-len string)
   ;; (sigma
   ;;   ((A type))
-  ;;   (array A u8)))
+  ;;   (array A u8))
 
 ;; これで長さ不明の文字列を出力することができる
 ;; (sigma-elimination
@@ -476,7 +478,7 @@
 ;; (let file-and-str
 ;;   (open n32 "/Users/u2zv1wx/Downloads/sample.txt" 0 0))
 
-    ;; (product (array A u8) file-descriptor)))
+    ;; (product (array A u8) file-descriptor)
 
 ;; (ascription file-and-str
 ;;   (product (array n32 u8) file-descriptor))
@@ -623,7 +625,8 @@ n15-4
 
 ;; (fact nat)
 
-;; (fact (begin (lambda ((A tau) (y A)) y)))
+;; type error:
+(fact (begin (lambda ((A tau) (y A)) y)))
 ;; (fact (top 100))
 ;; (fact (5 top))
 
