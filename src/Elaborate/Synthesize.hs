@@ -207,42 +207,45 @@ showErrors _ [] = return []
 showErrors ps ((Enriched (e1, e2) _ _):cs) = do
   e1' <- invRename e1
   e2' <- invRename e2
+  b <- gets shouldColorize
   case (getLocInfo e1', getLocInfo e2') of
     (Just pos, _)
       | pos `notElem` ps -> do
-        let a = showErrorHeader pos >> showError' e1' e2'
+        let a = showErrorHeader b pos >> showError' b e1' e2'
         as <- showErrors (pos : ps) cs
         return $ (pos, a) : as
     (Just _, _) -> showErrors ps cs
     (_, Just pos)
       | pos `notElem` ps -> do
-        let a = showErrorHeader pos >> showError' e2' e1'
+        let a = showErrorHeader b pos >> showError' b e2' e1'
         as <- showErrors (pos : ps) cs
         return $ (pos, a) : as
     (_, Just _) -> showErrors ps cs
     _ -> do
-      let a = showError' e1' e2'
+      let a = showError' b e1' e2'
       as <- showErrors ps cs
       return $ (undefined, a) : as -- fixme (location info not available)
 
-showErrorHeader :: PosInfo -> IO ()
-showErrorHeader (path, loc)
-  -- setSGR [SetConsoleIntensity BoldIntensity]
- = do
+showErrorHeader :: Bool -> PosInfo -> IO ()
+showErrorHeader b (path, loc) = do
+  setSGR' b [SetConsoleIntensity BoldIntensity]
   TIO.putStr $ T.pack (showPosInfo path loc)
   TIO.putStrLn ":"
-  -- setSGR [Reset]
+  setSGR' b [Reset]
 
-showError' :: WeakTermPlus -> WeakTermPlus -> IO ()
-showError' e1 e2
-  -- setSGR [SetConsoleIntensity BoldIntensity, SetColor Foreground Vivid Red]
- = do
+showError' :: Bool -> WeakTermPlus -> WeakTermPlus -> IO ()
+showError' b e1 e2 = do
+  setSGR' b [SetConsoleIntensity BoldIntensity, SetColor Foreground Vivid Red]
   TIO.putStr "error: "
-  -- setSGR [Reset]
+  setSGR' b [Reset]
   TIO.putStrLn
     "couldn't verify the definitional equality of the following two terms:"
   TIO.putStrLn $ "- " <> toText e1
   TIO.putStrLn $ "- " <> toText e2
+
+setSGR' :: Bool -> [SGR] -> IO ()
+setSGR' False _ = return ()
+setSGR' True arg = setSGR arg
 
 getLocInfo :: WeakTermPlus -> Maybe PosInfo
 getLocInfo (m, _) =

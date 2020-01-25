@@ -50,10 +50,11 @@ data Env =
     , chainEnv :: Map.HashMap Identifier [(Identifier, TermPlus)] -- var/const ~> the closed var chain of its type
     , codeEnv :: Map.HashMap Identifier ([Identifier], CodePlus) -- f ~> thunk (lam (x1 ... xn) e)
     , llvmEnv :: Map.HashMap Identifier ([Identifier], LLVM)
+    , shouldColorize :: Bool
     }
 
-initialEnv :: Path Abs File -> Env
-initialEnv path =
+initialEnv :: Path Abs File -> Bool -> Env
+initialEnv path colorizeFlag =
   Env
     { count = 0
     , target = Nothing
@@ -75,6 +76,7 @@ initialEnv path =
     , substEnv = Map.empty
     , mainFilePath = path
     , currentFilePath = path
+    , shouldColorize = colorizeFlag
     }
 
 -- type WithEnv a = StateT Env (ExceptT Identifier IO) a

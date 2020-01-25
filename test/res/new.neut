@@ -631,10 +631,10 @@ n15-4
 ;; (fact zero)
 
 ;; type error:
-;; (fact (begin (lambda ((A type) (y A)) y)))
+(fact (begin (lambda ((A type) (y A)) y)))
 ;; エラーをflycheckで表示できるようになったぜ。イエーイ。
 
-;; (fact (top 100))
+(fact (top 100))
 
 ;; (fact (5 top))
 ;; hole

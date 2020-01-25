@@ -31,6 +31,8 @@ type CheckOptInputPath = String
 
 type CheckOptEndOfEntry = String
 
+type CheckOptColorize = Bool
+
 data OutputKind
   = OutputKindObject
   | OutputKindLLVM
@@ -43,7 +45,7 @@ instance Read OutputKind where
 
 data Command
   = Build BuildOptInputPath (Maybe BuildOptOutputPath) OutputKind
-  | Check CheckOptInputPath (Maybe CheckOptEndOfEntry)
+  | Check CheckOptInputPath CheckOptColorize (Maybe CheckOptEndOfEntry)
 
 parseBuildOpt :: Parser Command
 parseBuildOpt = do
@@ -72,6 +74,12 @@ parseCheckOpt :: Parser Command
 parseCheckOpt = do
   let inputPathOpt =
         argument str $ mconcat [metavar "INPUT", help "The path of input file"]
+  let colorizeOpt =
+        flag True False $
+        mconcat
+          [ long "no-color"
+          , help "Set this to disable colorization of the output"
+          ]
   let footerOpt =
         optional $
         strOption $
@@ -80,7 +88,7 @@ parseCheckOpt = do
           , help "String printed after each entry"
           , metavar "STRING"
           ]
-  Check <$> inputPathOpt <*> footerOpt
+  Check <$> inputPathOpt <*> colorizeOpt <*> footerOpt
 
 kindReader :: ReadM OutputKind
 kindReader = do
@@ -108,16 +116,17 @@ main = execParser optParser >>= run
 run :: Command -> IO ()
 run (Build inputPathStr mOutputPathStr outputKind) = do
   inputPath <- resolveFile' inputPathStr
-  resultOrErr <- evalWithEnv (build inputPath) (initialEnv inputPath)
+  resultOrErr <- evalWithEnv (build inputPath) (initialEnv inputPath True)
   basename <- setFileExtension "" $ filename inputPath
   mOutputPath <- mapM resolveFile' mOutputPathStr
   outputPath <- constructOutputPath basename mOutputPath outputKind
   case resultOrErr of
     Left err -> seqIO err >> exitWith (ExitFailure 1)
     Right result -> writeResult result outputPath outputKind
-run (Check inputPathStr mEndOfEntry) = do
+run (Check inputPathStr colorizeFlag mEndOfEntry) = do
   inputPath <- resolveFile' inputPathStr
-  resultOrErr <- evalWithEnv (check inputPath) (initialEnv inputPath)
+  resultOrErr <-
+    evalWithEnv (check inputPath) (initialEnv inputPath colorizeFlag)
   case resultOrErr of
     Right _ -> return ()
     Left err ->
@@ -125,13 +134,6 @@ run (Check inputPathStr mEndOfEntry) = do
         Just eoe -> seqIO' eoe err >> exitWith (ExitFailure 1)
         Nothing -> seqIO err >> exitWith (ExitFailure 1)
 
--- printError :: String -> IO ()
--- printError err = do
---   liftIO $
---     setSGR [SetConsoleIntensity BoldIntensity, SetColor Foreground Vivid Red]
---   liftIO $ putStr "error: "
---   liftIO $ setSGR [Reset]
---   liftIO $ putStrLn $ err
 constructOutputPath ::
      Path Rel File -> Maybe (Path Abs File) -> OutputKind -> IO (Path Abs File)
 constructOutputPath basename Nothing OutputKindLLVM = do
