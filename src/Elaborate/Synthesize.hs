@@ -16,13 +16,13 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import qualified Text.Show.Pretty as Pr
 
--- import qualified Text.Show.Pretty as Pr
 import Data.Basic
 import Data.Constraint
 import Data.Env
 import Data.WeakTerm
 import Elaborate.Analyze
 import Parse.Rename
+import Reduce.WeakTerm
 
 -- Given a queue of constraints (easier ones comes earlier), try to synthesize
 -- all of them using heuristics.
@@ -193,53 +193,53 @@ takeByCount (i:is) xs = do
 
 showErrorThenQuit :: ConstraintQueue -> WithEnv ()
 showErrorThenQuit q = do
+  let pcs = sortBy (\x y -> fst x `compare` fst y) $ setupPosInfo $ Q.toList q
   prepareInvRename
-  pas <- showErrors [] $ Q.toList q
-  let pas' = sortBy (\pa1 pa2 -> fst pa2 `compare` fst pa1) pas
-  throwError $ map snd pas'
+  showErrors [] pcs >>= throwError
 
-type PosInfo = (Path Abs File, Loc)
+type PosInfo = (Path Abs File, Maybe Loc)
 
 isFollowedBy :: PosInfo -> PosInfo -> Bool
 isFollowedBy (_, loc1) (_, loc2) = loc1 < loc2
 
-showErrors :: [PosInfo] -> [EnrichedConstraint] -> WithEnv [(PosInfo, IO ())]
-showErrors _ [] = return []
-showErrors ps ((Enriched (e1, e2) _ _):cs) = do
-  e1' <- invRename e1
-  e2' <- invRename e2
-  b <- gets shouldColorize
-  case (getLocInfo e1', getLocInfo e2') of
+setupPosInfo :: [EnrichedConstraint] -> [(PosInfo, PreConstraint)]
+setupPosInfo [] = []
+setupPosInfo ((Enriched c@(e1, e2) _ _):cs) = do
+  case (getLocInfo e1, getLocInfo e2) of
     (Just pos1, Just pos2) -> do
       if pos1 `isFollowedBy` pos2
-        then showErrors' pos2 ps e2' e1' cs
-        else showErrors' pos1 ps e1' e2' cs
-    (Just pos1, Nothing) -> showErrors' pos1 ps e1' e2' cs
-    (Nothing, Just pos2) -> showErrors' pos2 ps e2' e1' cs
-    (Nothing, Nothing) -> do
-      let a = showError' b e1' e2'
-      as <- showErrors ps cs
-      return $ (undefined, a) : as -- fixme (location info not available)
+        then (pos2, c) : setupPosInfo cs
+        else (pos1, c) : setupPosInfo cs
+    (Just pos1, Nothing) -> (pos1, c) : setupPosInfo cs
+    (Nothing, Just pos2) -> (pos2, c) : setupPosInfo cs
+    _ -> setupPosInfo cs -- fixme (loc info not available)
+
+showErrors :: [PosInfo] -> [(PosInfo, PreConstraint)] -> WithEnv [IO ()]
+showErrors _ [] = return []
+showErrors ps ((pos, (e1, e2)):pcs) = do
+  e1' <- invRename $ reduceWeakTermPlus e1
+  e2' <- invRename $ reduceWeakTermPlus e2
+  showErrors' pos ps e1' e2' pcs
 
 showErrors' ::
      PosInfo
   -> [PosInfo]
   -> WeakTermPlus
   -> WeakTermPlus
-  -> [EnrichedConstraint]
-  -> WithEnv [(PosInfo, IO ())]
-showErrors' pos ps e1 e2 cs
+  -> [(PosInfo, PreConstraint)]
+  -> WithEnv [IO ()]
+showErrors' pos ps e1 e2 pcs
   | pos `notElem` ps = do
     b <- gets shouldColorize
     let a = showErrorHeader b pos >> showError' b e1 e2
-    as <- showErrors (pos : ps) cs
-    return $ (pos, a) : as
-  | otherwise = showErrors ps cs
+    as <- showErrors (pos : ps) pcs
+    return $ a : as
+  | otherwise = showErrors ps pcs
 
 showErrorHeader :: Bool -> PosInfo -> IO ()
 showErrorHeader b (path, loc) = do
   setSGR' b [SetConsoleIntensity BoldIntensity]
-  TIO.putStr $ T.pack (showPosInfo path loc)
+  TIO.putStr $ T.pack (showPosInfo path $ maximum loc)
   TIO.putStrLn ":"
   setSGR' b [Reset]
 
@@ -259,6 +259,7 @@ setSGR' True arg = setSGR arg
 
 getLocInfo :: WeakTermPlus -> Maybe PosInfo
 getLocInfo (m, _) =
-  case (metaFileName m, metaLocation m) of
-    (Just path, Just loc) -> return (path, loc)
+  case (metaFileName m, metaConstraintLocation m) of
+    (_, Nothing) -> Nothing
+    (Just path, l) -> return (path, l)
     _ -> Nothing

@@ -213,6 +213,8 @@
 
 (let (nat tau) (nat-inner))
 
+;; (definition nat)
+
 ;; out-3
 ;; (write n3 stdout (test) enum.n3)
 
@@ -629,6 +631,7 @@ n15-4
 ;; (fact top)
 
 ;; ほんとはここにエラーが表示されるべきなのに別な場所に流れる
+;; ~> 修正した。ちゃんと適切な場所にエラーが表示されるようになった。
 (fact zero)
 
 (definition pohe
@@ -642,6 +645,31 @@ n15-4
 ;; 型のなかに出現するnatの定義を展開せずにそのままnatとして表示できていてうれしい、って話。
 (fact (begin (lambda ((y nat)) y)))
 ;; エラーをflycheckで表示できるようになったぜ。イエーイ。
+
+(definition nat-direct ()
+  (sigma
+    ((p choice))
+    (case p
+      (left top)
+      (right (nat-direct)))))
+
+(definition g ((y nat)) y)
+
+;; ここのエラーでnatの型を開かずに済ませたいところ。
+;; でないと型エラーが読めたものではなくなる。
+;; nat = topが解けないと知るためにはどうすればよいか？
+(g top)
+
+;; (Σ ((p choice))
+;;   (case p
+;;     (left top)
+;;     (right
+;;      ((μ nat-direct ()
+;;         (Σ ((p choice))
+;;           (case p
+;;             (left top)
+;;             (right (nat-direct)))))))))
+
 
 ;; メタ変数とかを適切にrenameしたうえでエラーとして表示する、ってことのチェック。
 (fact (top 100))

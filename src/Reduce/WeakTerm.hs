@@ -37,6 +37,27 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
     (_, WeakTermConst constant) ->
       reduceWeakTermPlusTheta (m, app) es' m constant
     _ -> (m, app)
+reduceWeakTermPlus (m, WeakTermSigma xts) = do
+  let (xs, ts) = unzip xts
+  let ts' = map reduceWeakTermPlus ts
+  (m, WeakTermSigma $ zip xs ts')
+reduceWeakTermPlus (m, WeakTermSigmaIntro t es) = do
+  let t' = reduceWeakTermPlus t
+  let es' = map reduceWeakTermPlus es
+  (m, WeakTermSigmaIntro t' es')
+reduceWeakTermPlus (m, WeakTermSigmaElim t xts e1 e2) = do
+  let e1' = reduceWeakTermPlus e1
+  case e1' of
+    (_, WeakTermSigmaIntro _ es)
+      | xs <- map fst xts
+      , length xs == length es ->
+        reduceWeakTermPlus $ substWeakTermPlus (zip xs es) e2
+    _ -> do
+      let t' = reduceWeakTermPlus t
+      let e2' = reduceWeakTermPlus e2
+      let (xs, ts) = unzip xts
+      let ts' = map reduceWeakTermPlus ts
+      (m, WeakTermSigmaElim t' (zip xs ts') e1' e2')
 reduceWeakTermPlus (m, WeakTermIter (x, t) xts e)
   | x `notElem` varWeakTermPlus e = do
     reduceWeakTermPlus (m, WeakTermPiIntro xts e)

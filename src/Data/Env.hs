@@ -46,6 +46,7 @@ data Env =
     , enumEnv :: Map.HashMap Identifier [Identifier] -- [("choice", ["left", "right"]), ...]
     , revEnumEnv :: Map.HashMap Identifier Identifier -- [("left", "choice"), ("right", "choice"), ...]
     , nameEnv :: Map.HashMap Identifier Identifier -- [("foo", "foo.13"), ...]
+    , revNameEnv :: Map.HashMap Identifier Identifier -- [("foo.13", "foo"), ...]
     , weakTypeEnv :: Map.HashMap Identifier WeakTermPlus -- var ~> typeof(var)
     , typeEnv :: Map.HashMap Identifier TermPlus
     , constraintEnv :: [PreConstraint] -- for type inference
@@ -70,6 +71,7 @@ initialEnv path colorizeFlag =
     , fileEnv = Map.empty
     , revEnumEnv = Map.empty
     , nameEnv = Map.empty
+    , revNameEnv = Map.empty
     , weakTypeEnv = Map.empty
     , typeEnv = Map.empty
     , chainEnv = Map.empty
@@ -108,8 +110,8 @@ addErrorAction action computation = do
 --     Right (result, _) -> return $ Right result
 newCount :: WithEnv Integer
 newCount = do
-  env <- get
-  let i = count env
+  i <- gets count
+  -- let i = count env
   modify (\e -> e {count = i + 1})
   return i
 
@@ -124,13 +126,15 @@ newNameWith s = do
   let s' = s <> i -- slow
   -- let s' = i
   modify (\e -> e {nameEnv = Map.insert s s' (nameEnv e)})
+  -- modify (\e -> e {revNameEnv = Map.insert s' s (revNameEnv e)})
   return s'
 
 newLLVMNameWith :: Identifier -> WithEnv Identifier
 newLLVMNameWith s = do
   i <- newName
   let s' = llvmString s <> i
-  modify (\e -> e {nameEnv = Map.insert s s' (nameEnv e)})
+  modify (\e -> e {nameEnv = Map.insert s' s (nameEnv e)})
+  modify (\e -> e {revNameEnv = Map.insert s' s (revNameEnv e)})
   return s'
 
 llvmString :: Identifier -> Identifier

@@ -222,6 +222,7 @@ ensureDAG = do
     Left cyclicPath -> do
       throwError' $ "found cyclic inclusion:\n" <> T.pack (Pr.ppShow cyclicPath)
 
+-- ここでRightのときにDFSの結果を返すようにすればファイルが何番目に読み込まれたものであるのかを知ることができる。
 ensureDAG' ::
      Path Abs File
   -> [Path Abs File]

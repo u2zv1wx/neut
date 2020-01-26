@@ -51,11 +51,12 @@ infer e = do
 
 infer' :: Context -> WeakTermPlus -> WithEnv (WeakTermPlus, WeakTermPlus)
 infer' _ tau@(_, WeakTermTau) = return (tau, tau)
-infer' _ (m, WeakTermUpsilon x) = do
-  (_, t) <- lookupWeakTypeEnv x
-  retWeakTerm (m, t) m $ WeakTermUpsilon x
-  -- t <- lookupWeakTypeEnv x
-  -- retWeakTerm t m $ WeakTermUpsilon x
+infer' _ (m, WeakTermUpsilon x)
+  -- (_, t) <- lookupWeakTypeEnv x
+  -- retWeakTerm (m, t) m $ WeakTermUpsilon x
+ = do
+  t <- lookupWeakTypeEnv x
+  retWeakTerm t m $ WeakTermUpsilon x
 infer' ctx (m, WeakTermPi xts t) = do
   (xts', t') <- inferPi ctx xts t
   retWeakTerm (univAt m) m $ WeakTermPi xts' t'
@@ -309,7 +310,15 @@ inferPiElim ctx m (e, t) ets = do
       | length xts == length ets -> do
         let xs = map fst xts
         let ts' = map (substWeakTermPlus (zip xs es) . snd) xts
+        -- p "pi-elim-opt"
+        -- p "constraints:"
+        -- p' $ zip ts ts'
+        -- let ms1 = map (showMeta . fst) ts
+        -- let ms2 = map (showMeta . fst) ts'
+        -- p "meta-info:"
+        -- p' $ zip ms1 ms2
         forM_ (zip ts ts') $ uncurry insConstraintEnv
+        -- p "done"
         let cod' = substWeakTermPlus (zip xs es) cod
         retWeakTerm cod' m $ WeakTermPiElim e es
     _ -> do

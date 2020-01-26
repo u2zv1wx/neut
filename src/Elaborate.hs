@@ -12,6 +12,7 @@ import System.Console.ANSI
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.Text as T
+import qualified Data.Text.IO as TIO
 
 import Data.Basic
 import Data.Env
@@ -20,6 +21,7 @@ import Data.WeakTerm
 import Elaborate.Analyze
 import Elaborate.Infer
 import Elaborate.Synthesize
+import Parse.Rename
 import Reduce.Term
 import Reduce.WeakTerm
 
@@ -40,18 +42,21 @@ elaborate e
   -- Kantian type-inference ;)
   -- gets constraintEnv >>= analyze >>= synthesize
   -- cs <- gets constraintEnv
-  -- prepareInvRename
+  -- -- prepareInvRename
   -- forM_ cs $ \(x, y)
   --   -- x' <- invRename x
   --   -- y' <- invRename y
   --  -> do
   --   when (x /= y) $ do
   --     liftIO $ putStr "- "
+  --     liftIO $ putStrLn $ showMeta $ fst x
+  --     liftIO $ putStr "- "
+  --     liftIO $ putStrLn $ showMeta $ fst y
+  --     liftIO $ putStr "- "
   --     liftIO $ TIO.putStrLn $ toText x
   --     liftIO $ putStr "- "
   --     liftIO $ TIO.putStrLn $ toText y
   --     liftIO $ putStrLn "------"
-  -- p' $ map (\(x, y) -> (toText x, toText y)) cs
   analyze
   synthesize
   -- p "done"

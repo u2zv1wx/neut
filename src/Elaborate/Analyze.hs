@@ -21,6 +21,7 @@ import qualified Data.HashMap.Strict as Map
 import qualified Data.PQueue.Min as Q
 import qualified Data.Set as S
 import qualified Data.Text as T
+import qualified Data.Text.IO as TIO
 import qualified Text.Show.Pretty as Pr
 
 import Data.Basic
@@ -154,7 +155,17 @@ simp' ((e1, e2):cs) = do
           , zs <- includeCheck xs1 e2
           , Just es <- lookupAll zs sub ->
             case es of
-              [] -> simpPattern h1 ies1 e1 e2 cs
+              []
+                -- liftIO $ putStrLn "------"
+                -- -- liftIO $ putStr "- "
+                -- -- liftIO $ putStrLn $ showMeta $ fst e1
+                -- -- liftIO $ putStr "- "
+                -- -- liftIO $ putStrLn $ showMeta $ fst e2
+                -- liftIO $ TIO.putStrLn $ toText e1 <> " = " <> toText e2
+               -> do
+                let m = mergeMeta e1 e2
+                simpPattern h1 ies1 e1 (m, snd e2) cs
+                -- simpPattern h1 ies1 e1 e2 cs
               _ -> simp $ (e1, substWeakTermPlus (zip zs es) e2) : cs
         (_, Just (StuckPiElimZetaStrict h2 ies2))
           | xs2 <- concatMap getVarList ies2
@@ -163,7 +174,17 @@ simp' ((e1, e2):cs) = do
           , zs <- includeCheck xs2 e1
           , Just es <- lookupAll zs sub ->
             case es of
-              [] -> simpPattern h2 ies2 e2 e1 cs
+              []
+                -- liftIO $ putStrLn "------"
+                -- -- liftIO $ putStr "- "
+                -- -- liftIO $ putStrLn $ showMeta $ fst e2
+                -- -- liftIO $ putStr "- "
+                -- -- liftIO $ putStrLn $ showMeta $ fst e1
+                -- liftIO $ TIO.putStrLn $ toText e2 <> " = " <> toText e1
+               -> do
+                let m = mergeMeta e2 e1
+                simpPattern h2 ies2 e2 (m, snd e1) cs
+                -- simpPattern h2 ies2 e2 e1 cs
               _ -> simp $ (substWeakTermPlus (zip zs es) e1, e2) : cs
         (Just (StuckUpsilon x1), _)
           | Just body <- Map.lookup x1 sub ->
@@ -190,11 +211,17 @@ simp' ((e1, e2):cs) = do
         (Just (StuckPiElimZeta h1 ies1), Nothing)
           | xs1 <- concatMap getVarList ies1
           , occurCheck h1 hs2
-          , [] <- includeCheck xs1 e2 -> simpFlexRigid h1 ies1 e1 e2 fmvs cs
+          , [] <- includeCheck xs1 e2
+            -- let m = mergeMeta e1 e2
+            -- simpFlexRigid h1 ies1 e1 (m, snd e2) fmvs cs
+           -> do simpFlexRigid h1 ies1 e1 e2 fmvs cs
         (Nothing, Just (StuckPiElimZeta h2 ies2))
           | xs2 <- concatMap getVarList ies2
           , occurCheck h2 hs1
-          , [] <- includeCheck xs2 e1 -> simpFlexRigid h2 ies2 e2 e1 fmvs cs
+          , [] <- includeCheck xs2 e1
+            -- let m = mergeMeta e2 e1
+            -- simpFlexRigid h2 ies2 e2 (m, snd e1) fmvs cs
+           -> do simpFlexRigid h2 ies2 e2 e1 fmvs cs
         _ -> simpOther e1 e2 fmvs cs
 
 -- {} simpBinder {}
@@ -240,6 +267,12 @@ simpPattern ::
 simpPattern h1 ies1 _ e2 cs = do
   xss <- mapM toVarList ies1
   let lam = bindFormalArgs e2 xss
+  -- p "lam:"
+  -- liftIO $ TIO.putStrLn $ "lam: " <> toText lam
+  -- liftIO $ TIO.putStrLn $ "~> " <> h1 <> " = " <> toText lam
+  -- p' $ metaLocation $ fst e2
+  -- e2のmetaを「大きい方」に書き換える必要があるのか？
+  -- p $ "location after lam-reduce is: " ++ showMeta (fst e2)
   modify (\env -> env {substEnv = Map.insert h1 lam (substEnv env)})
   visit h1
   simp cs
@@ -384,12 +417,12 @@ toVarList :: [WeakTermPlus] -> WithEnv [(Identifier, WeakTermPlus)]
 toVarList [] = return []
 toVarList ((_, WeakTermUpsilon x):es) = do
   xts <- toVarList es
-  let t = (emptyMeta, WeakTermUpsilon "DONT_CARE")
+  let t = (emptyMeta, WeakTermUpsilon "_")
   return $ (x, t) : xts
 toVarList (_:es) = do
   xts <- toVarList es
   x <- newNameWith "hole"
-  let t = (emptyMeta, WeakTermUpsilon "DONT_CARE")
+  let t = (emptyMeta, WeakTermUpsilon "_")
   return $ (x, t) : xts
 
 bindFormalArgs :: WeakTermPlus -> [[IdentifierPlus]] -> WeakTermPlus
@@ -411,3 +444,10 @@ lookupAll (x:xs) sub = do
   v <- Map.lookup x sub
   vs <- lookupAll xs sub
   return $ v : vs
+
+mergeMeta :: WeakTermPlus -> WeakTermPlus -> Meta
+mergeMeta (m1, _) (m2, _)
+  -- m2 {metaLocation = metaLocation m1 ++ metaLocation m2}
+  | metaConstraintLocation m1 > metaConstraintLocation m2 =
+    m2 {metaConstraintLocation = metaConstraintLocation m1}
+  | otherwise = m2

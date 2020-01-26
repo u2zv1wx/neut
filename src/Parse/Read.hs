@@ -22,6 +22,7 @@ type Parser a = ParsecT T.Text () (StateT Env (ExceptT [IO ()] IO)) a
 -- (as long as the input is translated into a tree, this function is considered valid)
 strToTree :: T.Text -> String -> WithEnv [TreePlus]
 strToTree input fileName = do
+  modify (\e -> e {count = 1 + count e})
   t <- runParserT (skip >> parseSExpList) () fileName input
   case t of
     Left err -> throwError' $ T.pack (show err)
@@ -68,6 +69,16 @@ currentMeta = do
   let l = toInteger $ sourceLine pos
   let c = toInteger $ sourceColumn pos
   name <- gets currentFilePath
-  -- let name = sourceName pos
-  i <- gets count
-  return $ Meta {metaFileName = Just name, metaLocation = Just (i, l, c)}
+  i <- gets count -- fixme: phaseごとにiがちゃんと増加するように修正すること
+  -- いちおうこれでもいいけどさ。パフォーマンス的にどうなんだろう？対して問題ないかな。
+  -- いや、これでも、特定のファイルを読んだあとで別なファイルを読んだら、その別なファイルのほうがつねに値が大きくなってしまう。
+  -- やっぱファイル読み込みの順番を保持する必要がある。
+  -- というかincludeGraphを使えばいいんでは。DFSしたらリストになるし。それでいいね。はい。
+  -- modify (\env -> env {count = 1 + count env})
+  -- i <- newCount
+  return $
+    Meta
+      { metaFileName = Just name
+      , metaLocation = Just (i, l, c)
+      , metaConstraintLocation = Just (i, l, c)
+      }
