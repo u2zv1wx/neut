@@ -217,8 +217,8 @@ setupPosInfo ((Enriched c@(e1, e2) _ _):cs) = do
 showErrors :: [PosInfo] -> [(PosInfo, PreConstraint)] -> WithEnv [IO ()]
 showErrors _ [] = return []
 showErrors ps ((pos, (e1, e2)):pcs) = do
-  e1' <- invRename $ reduceWeakTermPlus e1
-  e2' <- invRename $ reduceWeakTermPlus e2
+  e1' <- invRename e1
+  e2' <- invRename e2
   showErrors' pos ps e1' e2' pcs
 
 showErrors' ::
