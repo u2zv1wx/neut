@@ -36,9 +36,12 @@ data Def
 
 -- {} parse {the output term is correctly renamed}
 -- (The postcondition is guaranteed by the assertion of `rename`.)
-parse :: T.Text -> String -> WithEnv WeakTermPlus
-parse s inputPath = do
-  e <- strToTree s inputPath >>= parse' >>= concatDefList
+parse :: T.Text -> Path Abs File -> WithEnv WeakTermPlus
+parse s inputPath
+  -- i <- newCount
+  -- modify (\env -> env {fileEnv = Map.insert inputPath (i, []) (fileEnv env)})
+ = do
+  e <- strToTree s (toFilePath inputPath) >>= parse' >>= concatDefList
   -- p' e
   rename e
   -- strToTree s inputPath >>= parse' >>= concatDefList >>= rename
@@ -89,7 +92,7 @@ parse' ((_, TreeNode [(_, TreeAtom "include"), (_, TreeAtom pathString)]):as) =
         else do
           insertPathInfo oldFilePath newFilePath
           ensureDAG
-          denv <- gets defEnv
+          denv <- gets fileEnv
           case Map.lookup newFilePath denv of
             Just mxs -> do
               let header = map (toDefLetHeader newFilePath) mxs
@@ -101,7 +104,7 @@ parse' ((_, TreeNode [(_, TreeAtom "include"), (_, TreeAtom pathString)]):as) =
               includedDefList <- strToTree content path >>= parse'
               let mxs = toIdentList includedDefList
               modify (\e -> e {currentFilePath = oldFilePath})
-              modify (\env -> env {defEnv = Map.insert newFilePath mxs denv})
+              modify (\env -> env {fileEnv = Map.insert newFilePath mxs denv})
               defList <- parse' as
               let footer = map (toDefLetFooter newFilePath) mxs
               let header = map (toDefLetHeader newFilePath) mxs

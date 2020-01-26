@@ -628,12 +628,22 @@ n15-4
 
 ;; (fact top)
 
-;; (fact zero)
+;; ほんとはここにエラーが表示されるべきなのに別な場所に流れる
+(fact zero)
+
+(definition pohe
+  (sigma-introduction left unit))
+
+(fact pohe)
 
 ;; type error:
 (fact (begin (lambda ((A type) (y A)) y)))
+
+;; 型のなかに出現するnatの定義を展開せずにそのままnatとして表示できていてうれしい、って話。
+(fact (begin (lambda ((y nat)) y)))
 ;; エラーをflycheckで表示できるようになったぜ。イエーイ。
 
+;; メタ変数とかを適切にrenameしたうえでエラーとして表示する、ってことのチェック。
 (fact (top 100))
 
 ;; (fact (5 top))

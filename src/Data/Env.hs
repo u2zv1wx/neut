@@ -28,9 +28,13 @@ type ConstraintQueue = Q.MinQueue EnrichedConstraint
 
 type IncludeGraph = Map.HashMap (Path Abs File) [Path Abs File]
 
+type FileInfo = [(Meta, Identifier, WeakTermPlus)]
+
+type FileEnv = Map.HashMap (Path Abs File) FileInfo
+
 data Env =
   Env
-    { count :: Int -- to generate fresh symbols
+    { count :: Integer -- to generate fresh symbols
     , target :: Maybe Target
     , mainFilePath :: Path Abs File
     , currentFilePath :: Path Abs File
@@ -38,7 +42,7 @@ data Env =
     , keywordEnv :: S.Set Identifier -- list of reserved keywords
     , notationEnv :: [(TreePlus, TreePlus)] -- macro transformers
     , constantEnv :: S.Set Identifier
-    , defEnv :: Map.HashMap (Path Abs File) [(Meta, Identifier, WeakTermPlus)] -- path ~> identifiers defined in the file at toplevel
+    , fileEnv :: FileEnv -- path ~> identifiers defined in the file at toplevel
     , enumEnv :: Map.HashMap Identifier [Identifier] -- [("choice", ["left", "right"]), ...]
     , revEnumEnv :: Map.HashMap Identifier Identifier -- [("left", "choice"), ("right", "choice"), ...]
     , nameEnv :: Map.HashMap Identifier Identifier -- [("foo", "foo.13"), ...]
@@ -63,7 +67,7 @@ initialEnv path colorizeFlag =
     , keywordEnv = S.empty
     , constantEnv = S.empty
     , enumEnv = Map.empty
-    , defEnv = Map.empty
+    , fileEnv = Map.empty
     , revEnumEnv = Map.empty
     , nameEnv = Map.empty
     , weakTypeEnv = Map.empty
@@ -102,18 +106,23 @@ addErrorAction action computation = do
 --   case resultOrErr of
 --     Left err -> return $ Left $ T.unpack err
 --     Right (result, _) -> return $ Right result
-newName :: WithEnv Identifier
-newName = do
+newCount :: WithEnv Integer
+newCount = do
   env <- get
   let i = count env
   modify (\e -> e {count = i + 1})
+  return i
+
+newName :: WithEnv Identifier
+newName = do
+  i <- newCount
   return $ "-" <> T.pack (show i)
 
 newNameWith :: Identifier -> WithEnv Identifier
 newNameWith s = do
   i <- newName
-  -- let s' = s <> i -- slow
-  let s' = i
+  let s' = s <> i -- slow
+  -- let s' = i
   modify (\e -> e {nameEnv = Map.insert s s' (nameEnv e)})
   return s'
 

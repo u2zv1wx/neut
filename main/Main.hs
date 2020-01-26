@@ -161,13 +161,12 @@ writeResult result outputPath OutputKindObject = do
 build :: Path Abs File -> WithEnv [B.ByteString]
 build inputPath = do
   content <- liftIO $ TIO.readFile $ toFilePath inputPath
-  let path = toFilePath inputPath
-  parse content path >>= elaborate >>= clarify >>= toLLVM >>= emit
+  parse content inputPath >>= elaborate >>= clarify >>= toLLVM >>= emit
 
 check :: Path Abs File -> WithEnv ()
 check inputPath = do
   content <- liftIO $ TIO.readFile $ toFilePath inputPath
-  _ <- parse content (toFilePath inputPath) >>= elaborate
+  _ <- parse content inputPath >>= elaborate
   return ()
 
 seqIO :: [IO ()] -> IO ()

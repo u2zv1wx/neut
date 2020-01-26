@@ -14,6 +14,7 @@ import qualified Data.HashMap.Strict as Map
 import qualified Data.PQueue.Min as Q
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
+import qualified Text.Show.Pretty as Pr
 
 -- import qualified Text.Show.Pretty as Pr
 import Data.Basic
@@ -193,14 +194,14 @@ takeByCount (i:is) xs = do
 showErrorThenQuit :: ConstraintQueue -> WithEnv ()
 showErrorThenQuit q = do
   prepareInvRename
-  -- nenv <- gets nameEnv
-  -- p "nenv:"
-  -- p' nenvs
   pas <- showErrors [] $ Q.toList q
   let pas' = sortBy (\pa1 pa2 -> fst pa2 `compare` fst pa1) pas
   throwError $ map snd pas'
 
 type PosInfo = (Path Abs File, Loc)
+
+isFollowedBy :: PosInfo -> PosInfo -> Bool
+isFollowedBy (_, loc1) (_, loc2) = loc1 < loc2
 
 showErrors :: [PosInfo] -> [EnrichedConstraint] -> WithEnv [(PosInfo, IO ())]
 showErrors _ [] = return []
@@ -209,22 +210,31 @@ showErrors ps ((Enriched (e1, e2) _ _):cs) = do
   e2' <- invRename e2
   b <- gets shouldColorize
   case (getLocInfo e1', getLocInfo e2') of
-    (Just pos, _)
-      | pos `notElem` ps -> do
-        let a = showErrorHeader b pos >> showError' b e1' e2'
-        as <- showErrors (pos : ps) cs
-        return $ (pos, a) : as
-    (Just _, _) -> showErrors ps cs
-    (_, Just pos)
-      | pos `notElem` ps -> do
-        let a = showErrorHeader b pos >> showError' b e2' e1'
-        as <- showErrors (pos : ps) cs
-        return $ (pos, a) : as
-    (_, Just _) -> showErrors ps cs
-    _ -> do
+    (Just pos1, Just pos2) -> do
+      if pos1 `isFollowedBy` pos2
+        then showErrors' pos2 ps e2' e1' cs
+        else showErrors' pos1 ps e1' e2' cs
+    (Just pos1, Nothing) -> showErrors' pos1 ps e1' e2' cs
+    (Nothing, Just pos2) -> showErrors' pos2 ps e2' e1' cs
+    (Nothing, Nothing) -> do
       let a = showError' b e1' e2'
       as <- showErrors ps cs
       return $ (undefined, a) : as -- fixme (location info not available)
+
+showErrors' ::
+     PosInfo
+  -> [PosInfo]
+  -> WeakTermPlus
+  -> WeakTermPlus
+  -> [EnrichedConstraint]
+  -> WithEnv [(PosInfo, IO ())]
+showErrors' pos ps e1 e2 cs
+  | pos `notElem` ps = do
+    b <- gets shouldColorize
+    let a = showErrorHeader b pos >> showError' b e1 e2
+    as <- showErrors (pos : ps) cs
+    return $ (pos, a) : as
+  | otherwise = showErrors ps cs
 
 showErrorHeader :: Bool -> PosInfo -> IO ()
 showErrorHeader b (path, loc) = do

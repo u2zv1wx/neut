@@ -6,7 +6,7 @@ module Parse.Read
 
 import Control.Monad.Except
 import Control.Monad.State
-import Text.Parsec
+import Text.Parsec hiding (count)
 
 -- import Text.Parsec.Text
 import qualified Data.Text as T
@@ -65,8 +65,9 @@ comment = do
 currentMeta :: Parser Meta
 currentMeta = do
   pos <- getPosition
-  let x = sourceColumn pos
-  let y = sourceLine pos
+  let l = toInteger $ sourceLine pos
+  let c = toInteger $ sourceColumn pos
   name <- gets currentFilePath
   -- let name = sourceName pos
-  return $ Meta {metaFileName = Just name, metaLocation = Just (x, y)}
+  i <- gets count
+  return $ Meta {metaFileName = Just name, metaLocation = Just (i, l, c)}

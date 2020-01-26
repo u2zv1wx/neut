@@ -175,7 +175,8 @@ interpretIdentifierPlus ut =
 
 -- {} interpretAtom {}
 interpretAtom :: Identifier -> WithEnv Identifier
-interpretAtom "_" = newNameWith "hole-explicit"
+interpretAtom "_" = newNameWith "H"
+-- interpretAtom "_" = newNameWith "hole-explicit"
 interpretAtom x = return x
 
 -- {} interpretEnumValueMaybe {}

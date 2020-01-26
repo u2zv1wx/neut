@@ -39,6 +39,19 @@ elaborate e
   e' <- infer e
   -- Kantian type-inference ;)
   -- gets constraintEnv >>= analyze >>= synthesize
+  -- cs <- gets constraintEnv
+  -- prepareInvRename
+  -- forM_ cs $ \(x, y)
+  --   -- x' <- invRename x
+  --   -- y' <- invRename y
+  --  -> do
+  --   when (x /= y) $ do
+  --     liftIO $ putStr "- "
+  --     liftIO $ TIO.putStrLn $ toText x
+  --     liftIO $ putStr "- "
+  --     liftIO $ TIO.putStrLn $ toText y
+  --     liftIO $ putStrLn "------"
+  -- p' $ map (\(x, y) -> (toText x, toText y)) cs
   analyze
   synthesize
   -- p "done"

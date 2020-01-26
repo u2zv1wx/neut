@@ -13,7 +13,13 @@ import Text.Read
 
 type Identifier = T.Text
 
-type Loc = (Int, Int)
+type Phase = Integer
+
+type Line = Integer
+
+type Column = Integer
+
+type Loc = (Phase, Line, Column)
 
 data Case
   = CaseValue EnumValue
@@ -43,14 +49,14 @@ instance Show Meta where
 showMeta :: Meta -> String
 showMeta m =
   case (metaFileName m, metaLocation m) of
-    (Just name, Just (x, y)) ->
-      toFilePath name ++ ":" ++ show y ++ ":" ++ show x
+    (Just name, Just (_, l, c)) ->
+      toFilePath name ++ ":" ++ show l ++ ":" ++ show c
     (Just name, Nothing) -> toFilePath name
-    (Nothing, Just (x, y)) -> "<unknown-file>:" ++ show y ++ ":" ++ show x
+    (Nothing, Just (_, l, c)) -> "<unknown-file>:" ++ show l ++ ":" ++ show c
     (Nothing, Nothing) -> "_"
 
 showPosInfo :: Path Abs File -> Loc -> String
-showPosInfo path (x, y) = toFilePath path ++ ":" ++ show y ++ ":" ++ show x
+showPosInfo path (_, l, c) = toFilePath path ++ ":" ++ show l ++ ":" ++ show c
 
 emptyMeta :: Meta
 emptyMeta = Meta {metaLocation = Nothing, metaFileName = Nothing}
