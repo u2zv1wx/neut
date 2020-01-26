@@ -100,10 +100,12 @@ parse' ((_, TreeNode [(_, TreeAtom "include"), (_, TreeAtom pathString)]):as) =
               return $ header ++ defList
             Nothing -> do
               content <- liftIO $ TIO.readFile $ toFilePath newFilePath
-              modify (\e -> e {currentFilePath = newFilePath})
+              modify (\env -> env {currentFilePath = newFilePath})
+              modify (\env -> env {phase = 1 + phase env})
               includedDefList <- strToTree content path >>= parse'
               let mxs = toIdentList includedDefList
-              modify (\e -> e {currentFilePath = oldFilePath})
+              modify (\env -> env {currentFilePath = oldFilePath})
+              modify (\env -> env {phase = 1 + phase env})
               modify (\env -> env {fileEnv = Map.insert newFilePath mxs denv})
               defList <- parse' as
               let footer = map (toDefLetFooter newFilePath) mxs
@@ -222,7 +224,6 @@ ensureDAG = do
     Left cyclicPath -> do
       throwError' $ "found cyclic inclusion:\n" <> T.pack (Pr.ppShow cyclicPath)
 
--- ここでRightのときにDFSの結果を返すようにすればファイルが何番目に読み込まれたものであるのかを知ることができる。
 ensureDAG' ::
      Path Abs File
   -> [Path Abs File]

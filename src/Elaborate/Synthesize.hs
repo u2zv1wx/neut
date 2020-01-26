@@ -14,7 +14,6 @@ import qualified Data.HashMap.Strict as Map
 import qualified Data.PQueue.Min as Q
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
-import qualified Text.Show.Pretty as Pr
 
 import Data.Basic
 import Data.Constraint
@@ -22,7 +21,6 @@ import Data.Env
 import Data.WeakTerm
 import Elaborate.Analyze
 import Parse.Rename
-import Reduce.WeakTerm
 
 -- Given a queue of constraints (easier ones comes earlier), try to synthesize
 -- all of them using heuristics.

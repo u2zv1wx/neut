@@ -69,16 +69,9 @@ currentMeta = do
   let l = toInteger $ sourceLine pos
   let c = toInteger $ sourceColumn pos
   name <- gets currentFilePath
-  i <- gets count -- fixme: phaseごとにiがちゃんと増加するように修正すること
-  -- いちおうこれでもいいけどさ。パフォーマンス的にどうなんだろう？対して問題ないかな。
-  -- いや、これでも、特定のファイルを読んだあとで別なファイルを読んだら、その別なファイルのほうがつねに値が大きくなってしまう。
-  -- やっぱファイル読み込みの順番を保持する必要がある。
-  -- というかincludeGraphを使えばいいんでは。DFSしたらリストになるし。それでいいね。はい。
-  -- modify (\env -> env {count = 1 + count env})
-  -- i <- newCount
   return $
     Meta
       { metaFileName = Just name
-      , metaLocation = Just (i, l, c)
-      , metaConstraintLocation = Just (i, l, c)
+      , metaLocation = Just (0, l, c)
+      , metaConstraintLocation = Just (0, l, c)
       }

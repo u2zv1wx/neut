@@ -35,6 +35,7 @@ type FileEnv = Map.HashMap (Path Abs File) FileInfo
 data Env =
   Env
     { count :: Integer -- to generate fresh symbols
+    , phase :: Integer
     , target :: Maybe Target
     , mainFilePath :: Path Abs File
     , currentFilePath :: Path Abs File
@@ -62,6 +63,7 @@ initialEnv :: Path Abs File -> Bool -> Env
 initialEnv path colorizeFlag =
   Env
     { count = 0
+    , phase = 0
     , target = Nothing
     , includeGraph = Map.empty
     , notationEnv = []
