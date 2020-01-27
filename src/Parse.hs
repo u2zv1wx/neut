@@ -27,13 +27,12 @@ import Parse.MacroExpand
 import Parse.Read
 import Parse.Rename
 
-data Def
-  = DefLet
-      Meta
-      IdentifierPlus -- the `(x : t)` in `let (x : t) = e`
-      WeakTermPlus -- the `e` in `let x = e`
-  | DefConstDecl IdentifierPlus
-
+-- data Stmt
+--   = StmtLet
+--       Meta
+--       IdentifierPlus -- the `(x : t)` in `let (x : t) = e`
+--       WeakTermPlus -- the `e` in `let x = e`
+--   | StmtConstDecl IdentifierPlus
 -- {} parse {the output term is correctly renamed}
 -- (The postcondition is guaranteed by the assertion of `rename`.)
 parse :: T.Text -> Path Abs File -> WithEnv WeakTermPlus
@@ -41,14 +40,17 @@ parse s inputPath
   -- i <- newCount
   -- modify (\env -> env {fileEnv = Map.insert inputPath (i, []) (fileEnv env)})
  = do
-  e <- strToTree s (toFilePath inputPath) >>= parse' >>= concatDefList
-  -- p' e
-  rename e
-  -- strToTree s inputPath >>= parse' >>= concatDefList >>= rename
+  stmtList <- strToTree s (toFilePath inputPath) >>= parse'
+  stmtList' <- renameStmtList stmtList
+  concatStmtList stmtList'
+  -- e <- strToTree s (toFilePath inputPath) >>= parse' >>= concatStmtList
+  -- -- p' e
+  -- rename e
+  -- strToTree s inputPath >>= parse' >>= concatStmtList >>= rename
 
 -- {} parse' {}
 -- Parse the head element of the input list.
-parse' :: [TreePlus] -> WithEnv [Def]
+parse' :: [TreePlus] -> WithEnv [Stmt]
 parse' [] = return []
 parse' ((_, TreeNode [(_, TreeAtom "notation"), from, to]):as) = do
   checkNotationSanity from
@@ -75,7 +77,7 @@ parse' ((m, TreeNode ((_, TreeAtom "enum"):(_, TreeAtom name):ts)):as) = do
   -- e.g. t == is-enum @ (choice)
   isEnumType <- toIsEnumType name
   -- add `(constant enum.choice (is-enum choice))` to defList in order to insert appropriate type constraint
-  let ascription = DefConstDecl (constName, isEnumType)
+  let ascription = StmtConstDecl (constName, isEnumType)
   -- register the name of the constant
   modify (\env -> env {nameEnv = Map.insert constName constName (nameEnv env)})
   defList <- parse' as
@@ -95,22 +97,22 @@ parse' ((_, TreeNode [(_, TreeAtom "include"), (_, TreeAtom pathString)]):as) =
           denv <- gets fileEnv
           case Map.lookup newFilePath denv of
             Just mxs -> do
-              let header = map (toDefLetHeader newFilePath) mxs
+              let header = map (toStmtLetHeader newFilePath) mxs
               defList <- parse' as
               return $ header ++ defList
             Nothing -> do
               content <- liftIO $ TIO.readFile $ toFilePath newFilePath
               modify (\env -> env {currentFilePath = newFilePath})
               modify (\env -> env {phase = 1 + phase env})
-              includedDefList <- strToTree content path >>= parse'
-              let mxs = toIdentList includedDefList
+              includedStmtList <- strToTree content path >>= parse'
+              let mxs = toIdentList includedStmtList
               modify (\env -> env {currentFilePath = oldFilePath})
               modify (\env -> env {phase = 1 + phase env})
               modify (\env -> env {fileEnv = Map.insert newFilePath mxs denv})
               defList <- parse' as
-              let footer = map (toDefLetFooter newFilePath) mxs
-              let header = map (toDefLetHeader newFilePath) mxs
-              return $ includedDefList ++ footer ++ header ++ defList
+              let footer = map (toStmtLetFooter newFilePath) mxs
+              let header = map (toStmtLetHeader newFilePath) mxs
+              return $ includedStmtList ++ footer ++ header ++ defList
 parse' ((_, TreeNode ((_, TreeAtom "statement"):as1)):as2) = do
   defList1 <- parse' as1
   defList2 <- parse' as2
@@ -123,12 +125,20 @@ parse' ((_, TreeNode [(_, TreeAtom "constant"), (_, TreeAtom name), t]):as) = do
     else do
       modify (\e -> e {constantEnv = S.insert name (constantEnv e)})
       defList <- parse' as
-      return $ DefConstDecl (name, t') : defList
+      return $ StmtConstDecl (name, t') : defList
+parse' ((m, TreeNode [(mDef, TreeAtom "definition"), name@(_, TreeAtom _), body]):as) =
+  parse' $ (m, TreeNode [(mDef, TreeAtom "let"), name, body]) : as
+parse' ((m, TreeNode (def@(_, TreeAtom "definition"):name@(mFun, TreeAtom _):xts@(_, TreeNode _):body:rest)):as) =
+  parse' $ (m, TreeNode [def, (mFun, TreeNode (name : xts : body : rest))]) : as
+parse' ((_, TreeNode ((_, TreeAtom "definition"):xds)):as) = do
+  stmt <- parseDef xds
+  stmtList <- parse' as
+  return $ stmt : stmtList
 parse' ((m, TreeNode [(_, TreeAtom "let"), xt, e]):as) = do
   e' <- macroExpand e >>= interpret
   (x, t) <- macroExpand xt >>= interpretIdentifierPlus
   defList <- parse' as
-  return $ DefLet m (x, t) e' : defList
+  return $ StmtLet m (x, t) e' : defList
 parse' (a:as) = do
   e <- macroExpand a
   if isSpecialForm e
@@ -138,7 +148,26 @@ parse' (a:as) = do
       name <- newNameWith "hole-parse-last"
       t <- newHole
       defList <- parse' as
-      return $ DefLet meta (name, t) e' : defList
+      return $ StmtLet meta (name, t) e' : defList
+
+parseDef :: [TreePlus] -> WithEnv Stmt
+parseDef xds = do
+  xds' <- mapM (insImplicitBegin >=> macroExpand) xds
+  xs <- mapM extractFunName xds'
+  xds'' <- mapM interpretIter xds'
+  return $ StmtDef $ zip xs xds''
+
+insImplicitBegin :: TreePlus -> WithEnv TreePlus
+insImplicitBegin (m, TreeNode (xt:xts:body:rest)) = do
+  let m' = fst body
+  let beginBlock = (m', TreeNode ((m', TreeAtom "begin") : body : rest))
+  return (m, TreeNode [xt, xts, beginBlock])
+insImplicitBegin _ = throwError' "insImplicitBegin"
+
+extractFunName :: TreePlus -> WithEnv Identifier
+extractFunName (_, TreeNode ((_, TreeAtom x):_)) = return x
+extractFunName (_, TreeNode ((_, TreeNode [(_, TreeAtom x), _]):_)) = return x
+extractFunName _ = throwError' "extractFunName"
 
 -- {} isSpecialForm {}
 isSpecialForm :: TreePlus -> Bool
@@ -150,6 +179,7 @@ isSpecialForm (_, TreeNode [(_, TreeAtom "constant"), (_, TreeAtom _), _]) =
   True
 isSpecialForm (_, TreeNode ((_, TreeAtom "statement"):_)) = True
 isSpecialForm (_, TreeNode [(_, TreeAtom "let"), _, _]) = True
+isSpecialForm (_, TreeNode [(_, TreeAtom "definition"), _, _]) = True
 isSpecialForm _ = False
 
 -- {} toIsEnumType {}
@@ -161,21 +191,59 @@ toIsEnumType name = do
         (emptyMeta, WeakTermConst "is-enum")
         [(emptyMeta, WeakTermEnum $ EnumTypeLabel name)])
 
--- {} concatDefList {}
--- Represent the list of Defs in the target language, using `let`.
+-- {} concatStmtList {}
+-- Represent the list of Stmts in the target language, using `let`.
 -- (Note that `let x := e1 in e2` can be represented as `(lam x e2) e1`.)
-concatDefList :: [Def] -> WithEnv WeakTermPlus
-concatDefList [] = do
+-- これはrenameのあとで呼ばれる
+concatStmtList :: [Stmt] -> WithEnv WeakTermPlus
+concatStmtList [] = do
   return (emptyMeta, WeakTermEnumIntro $ EnumValueLabel "unit")
 -- for test
-concatDefList [DefLet _ _ e] = do
+concatStmtList [StmtLet _ _ e] = do
   return e
-concatDefList (DefConstDecl xt:es) = do
-  cont <- concatDefList es
+concatStmtList (StmtConstDecl xt:es) = do
+  cont <- concatStmtList es
   return (emptyMeta, WeakTermConstDecl xt cont)
-concatDefList (DefLet m xt e:es) = do
-  cont <- concatDefList es
+concatStmtList (StmtLet m xt e:es) = do
+  cont <- concatStmtList es
   return (m, WeakTermPiElim (emptyMeta, WeakTermPiIntro [xt] cont) [e])
+concatStmtList (StmtDef xds:ss) = do
+  let ds = map snd xds
+  let baseSub = map defToSub ds
+  let nTimes = length baseSub
+  let sub = selfCompose nTimes baseSub
+  let varList = map (\(m, (x, _), _, _) -> (m, WeakTermUpsilon x)) ds
+  let iterList = map (substWeakTermPlus sub) varList
+  -- StmtLetに帰着
+  let letList = toLetList $ zip xds iterList
+  -- when (length xds >= 2) $ do
+  --   p "baseSub:"
+  --   p' baseSub
+  --   p "letList:"
+  --   p' letList
+  concatStmtList $ letList ++ ss
+
+toLetList :: [(IdentDef, WeakTermPlus)] -> [Stmt]
+toLetList [] = []
+toLetList (((x, (m, (_, t), _, _)), iter):rest) =
+  StmtLet m (x, t) iter : toLetList rest
+
+defToSub :: Def -> (Identifier, WeakTermPlus)
+defToSub (m, (x, t), xts, e) = (x, (m, WeakTermIter (x, t) xts e))
+
+selfCompose :: Int -> SubstWeakTerm -> SubstWeakTerm
+selfCompose 0 sub = sub
+selfCompose n sub = do
+  let sub' = selfCompose (n - 1) sub
+  compose sub sub'
+
+compose :: SubstWeakTerm -> SubstWeakTerm -> SubstWeakTerm
+compose s1 s2 = do
+  let domS2 = map fst s2
+  let codS2 = map snd s2
+  let codS2' = map (substWeakTermPlus s1) codS2
+  let s1' = filter (\(ident, _) -> ident `notElem` domS2) s1
+  s1' ++ zip domS2 codS2'
 
 -- {} newHole {}
 newHole :: WithEnv WeakTermPlus
@@ -240,17 +308,21 @@ ensureDAG' a visited g =
         Left $ dropWhile (/= z) visited ++ [a, z]
     Just as -> mapM_ (\x -> ensureDAG' x (visited ++ [a]) g) as
 
-toIdentList :: [Def] -> [(Meta, Identifier, WeakTermPlus)]
+-- これが呼ばれるのはまだrenameされる前
+toIdentList :: [Stmt] -> [(Meta, Identifier, WeakTermPlus)]
 toIdentList [] = []
-toIdentList ((DefLet m (x, t) _):ds) = (m, x, t) : toIdentList ds
-toIdentList ((DefConstDecl (x, t)):ds) = (emptyMeta, x, t) : toIdentList ds
+toIdentList ((StmtLet m (x, t) _):ds) = (m, x, t) : toIdentList ds
+toIdentList ((StmtDef xds):ds) = do
+  let mxts = map (\(_, (m, (x, t), _, _)) -> (m, x, t)) xds
+  mxts ++ toIdentList ds
+toIdentList ((StmtConstDecl (x, t)):ds) = (emptyMeta, x, t) : toIdentList ds
 
-toDefLetFooter :: Path Abs File -> (Meta, Identifier, WeakTermPlus) -> Def
-toDefLetFooter path (m, x, t) = do
+toStmtLetFooter :: Path Abs File -> (Meta, Identifier, WeakTermPlus) -> Stmt
+toStmtLetFooter path (m, x, t) = do
   let x' = "(" <> T.pack (toFilePath path) <> ":" <> x <> ")" -- user cannot write this var since it contains parenthesis
-  DefLet m (x', t) (m, WeakTermUpsilon x)
+  StmtLet m (x', t) (m, WeakTermUpsilon x)
 
-toDefLetHeader :: Path Abs File -> (Meta, Identifier, WeakTermPlus) -> Def
-toDefLetHeader path (m, x, t) = do
+toStmtLetHeader :: Path Abs File -> (Meta, Identifier, WeakTermPlus) -> Stmt
+toStmtLetHeader path (m, x, t) = do
   let x' = "(" <> T.pack (toFilePath path) <> ":" <> x <> ")" -- user cannot write this var since it contains parenthesis
-  DefLet m (x, t) (m, WeakTermUpsilon x')
+  StmtLet m (x, t) (m, WeakTermUpsilon x')

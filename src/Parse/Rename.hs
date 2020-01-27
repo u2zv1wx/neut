@@ -54,10 +54,15 @@ renameStmtList' nenv ((StmtConstDecl (x, t)):ss) = do
   return $ StmtConstDecl (x, t') : ss'
 
 renameDef :: NameEnv -> Def -> WithEnv Def
-renameDef nenv (m, xt, xts, e) = do
-  (xt', xts', e') <- renameIter nenv xt xts e
+renameDef nenv (m, (x, t), xts, e) = do
+  t' <- rename' nenv t
+  (xts', e') <- renameBinder nenv xts e
+  case Map.lookup x nenv of
+    Nothing -> throwError' "renameDef"
+    Just x' -> return (m, (x', t'), xts', e')
+  -- (xt', xts', e') <- renameIter nenv xt xts e
   -- (xts', e') <- renameBinder nenv xts e
-  return (m, xt', xts', e')
+  -- return (m, xt', xts', e')
 
 type NameEnv = Map.HashMap Identifier Identifier
 

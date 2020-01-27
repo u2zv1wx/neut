@@ -79,6 +79,7 @@ data Stmt
   | StmtDef [(Identifier, Def)]
   -- (constant x t)
   | StmtConstDecl IdentifierPlus
+  deriving (Show)
 
 toVar :: Identifier -> WeakTermPlus
 toVar x = (emptyMeta, WeakTermUpsilon x)

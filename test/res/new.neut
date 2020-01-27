@@ -632,18 +632,18 @@ n15-4
 
 ;; ほんとはここにエラーが表示されるべきなのに別な場所に流れる
 ;; ~> 修正した。ちゃんと適切な場所にエラーが表示されるようになった。
-(fact zero)
+;; (fact zero)
 
 (definition pohe
   (sigma-introduction left unit))
 
-(fact pohe)
+;; (fact pohe)
 
 ;; type error:
-(fact (begin (lambda ((A type) (y A)) y)))
+;; (fact (begin (lambda ((A type) (y A)) y)))
 
 ;; 型のなかに出現するnatの定義を展開せずにそのままnatとして表示できていてうれしい、って話。
-(fact (begin (lambda ((y nat)) y)))
+;; (fact (begin (lambda ((y nat)) y)))
 ;; エラーをflycheckで表示できるようになったぜ。イエーイ。
 
 (definition nat-direct ()
@@ -655,10 +655,25 @@ n15-4
 
 (definition g ((y nat)) y)
 
+
+;; 相互再帰を実装
+(definition
+  (p ((a i64)) (q a))
+  (q ((y i64)) (p y))
+  (r ((z i64)) (p z)))
+
+(ascription p (hom i64 i64))
+
+(ascription q (hom i64 i64))
+
+;; (ascription q (hom i64 i64))
+
+(i64.add 100 10)
+
 ;; ここのエラーでnatの型を開かずに済ませたいところ。
 ;; でないと型エラーが読めたものではなくなる。
 ;; nat = topが解けないと知るためにはどうすればよいか？
-(g (lambda ((x nat)) x))
+;; (g (lambda ((x nat)) x))
 
 ;; (Σ ((p choice))
 ;;   (case p
@@ -672,8 +687,57 @@ n15-4
 
 
 ;; メタ変数とかを適切にrenameしたうえでエラーとして表示する、ってことのチェック。
-(fact (top 100))
+;; (fact (top 100))
 
+;; こんな感じで相互再帰を書くことになる。
+;; (mutual-definition
+;;   (even ((x1 tau) (foo nat)) admit)
+;;   (odd ((A tau) (y2 A)) admit))
+
+;; こう書けたほうがうれしい？そうでもないか？
+;; 素直な感じはする。
+;; いつものdefinitionをこっちの特殊ケースとしてとるとよさそう。
+;; (definition
+;;   (even ((x1 tau) (foo nat))
+;;     admit)
+;;   (odd ((A tau) (y2 A))
+;;     admit))
+
+;; こっちのほうが素直かなー。
+;; (mutual-definition
+;;   (even ((x1 tau) (foo nat))
+;;     (let x foo)
+;;     (let y bar)
+;;     (return admit))
+;;   (odd ((A tau) (y2 A))
+;;     admit))
+
+;; キーワードをたくさん使うコース。微妙。
+;; (mutual
+;;   (definition even ((x1 tau) (foo nat))
+;;     (let x foo)
+;;     (let y bar)
+;;     (return admit))
+;;   (definition odd ((A tau) (y2 A))
+;;     admit))
+
+;; これはなんか欠けてる感じがするよな。
+;; (mutual
+;;   (even ((x1 tau) (foo nat))
+;;     (let x foo)
+;;     (let y bar)
+;;     (return admit))
+;;   (odd ((A tau) (y2 A))
+;;     admit))
+
+;; 敢えての倒置
+;; (definition-mutual
+;;   (even ((x1 tau) (foo nat))
+;;     (let x foo)
+;;     (let y bar)
+;;     (return admit))
+;;   (odd ((A tau) (y2 A))
+;;     admit))
 ;; (fact (5 top))
 ;; hole
 

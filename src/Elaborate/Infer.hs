@@ -122,11 +122,17 @@ infer' ctx (m, WeakTermIter (x, t) xts e) = do
   let piType = (m, WeakTermPi xts' tCod)
   insConstraintEnv piType t'
   retWeakTerm piType m $ WeakTermIter (x, t') xts' e'
-infer' ctx (m, WeakTermZeta _)
-  -- zetaから変換先をlookupできるようにしておいたほうが正しい？
- = do
+infer' ctx (m, WeakTermZeta x) = do
   (app, higherApp) <- newHoleInCtx ctx m
-  return (app, higherApp)
+  zenv <- gets zetaEnv
+  case Map.lookup x zenv of
+    Just (app', higherApp') -> do
+      insConstraintEnv app app'
+      insConstraintEnv higherApp higherApp'
+      return (app, higherApp)
+    Nothing -> do
+      modify (\env -> env {zetaEnv = Map.insert x (app, higherApp) zenv})
+      return (app, higherApp)
 infer' _ (m, WeakTermConst x)
   -- enum.n8, enum.n64, etc.
   | Just i <- asEnumNatConstant x = do

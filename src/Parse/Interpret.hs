@@ -3,6 +3,7 @@
 module Parse.Interpret
   ( interpret
   , interpretIdentifierPlus
+  , interpretIter
   , extractIdentifier
   ) where
 
@@ -67,11 +68,14 @@ interpret (m, TreeNode [(_, TreeAtom "sigma-elimination"), (_, TreeNode xts), e1
   m' <- adjustPhase m
   h <- newHole m'
   return (m', WeakTermSigmaElim h xts' e1' e2')
-interpret (m, TreeNode [(_, TreeAtom "iterate"), xt, (_, TreeNode xts), e]) = do
-  xt' <- interpretIdentifierPlus xt
-  (xts', e') <- interpretBinder xts e
-  m' <- adjustPhase m
+interpret (m, TreeNode [(_, TreeAtom "iterate"), xt, xts@(_, TreeNode _), e]) = do
+  (m', xt', xts', e') <- interpretIter (m, TreeNode [xt, xts, e])
+  -- xt' <- interpretIdentifierPlus xt
+  -- (xts', e') <- interpretBinder xts e
+  -- m' <- adjustPhase m
   return (m', WeakTermIter xt' xts' e')
+-- interpret t@(_, TreeNode [(_, TreeAtom "iterate"), _, (_, TreeNode _), _]) = do
+--   (m', xt', xts', e') <- interpretIter t
 interpret (m, TreeNode [(_, TreeAtom "zeta"), (_, TreeAtom x)]) = do
   x' <- interpretAtom x
   m' <- adjustPhase m
@@ -221,6 +225,15 @@ interpretIdentifierPlus (_, TreeNode [(_, TreeAtom x), t]) = do
 interpretIdentifierPlus ut =
   throwError' $
   "interpretIdentifierPlus: syntax error:\n" <> T.pack (Pr.ppShow ut)
+
+interpretIter :: TreePlus -> WithEnv Def
+-- interpretIter (m, TreeNode [(_, TreeAtom "iterate"), xt, (_, TreeNode xts), e]) = do
+interpretIter (m, TreeNode [xt, (_, TreeNode xts), e]) = do
+  xt' <- interpretIdentifierPlus xt
+  (xts', e') <- interpretBinder xts e
+  m' <- adjustPhase m
+  return (m', xt', xts', e')
+interpretIter _ = throwError' "interpretIter"
 
 -- {} interpretAtom {}
 interpretAtom :: Identifier -> WithEnv Identifier

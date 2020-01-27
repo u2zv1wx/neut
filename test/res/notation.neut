@@ -25,7 +25,7 @@
 
 (keyword begin)
 
-(keyword definition)
+;; (keyword definition)
 
 (notation (begin (let (x t) e+) rest+)
   ((pi-introduction ((x t)) (begin rest+)) (begin e+)))
@@ -57,14 +57,16 @@
 ;; (notation (definition name e)
 ;;   (let name (mu name e))) ;; こっちの `let` はspecial formのほうのlet.
 ;; 引数がないときはmuを入れない
-(notation (definition name e)
-  (let name e)) ;; こっちの `let` はspecial formのほうのlet.
+;; (keyword definition)
 
-(notation (definition name () e+)
-  (let name (iterate name () e+)))
+;; (notation (definition name e)
+;;   (let name e)) ;; こっちの `let` はspecial formのほうのlet.
 
-(notation (definition name (x+) e+)
-  (let name (iterate name (x+) e+)))
+;; (notation (definition name () e+)
+;;   (let name (iterate name () e+)))
+
+;; (notation (definition name (x+) e+)
+;;   (let name (iterate name (x+) e+)))
 
 ;; type ascription
 ;; (ascribe e t) ~> (let (_ t) e)

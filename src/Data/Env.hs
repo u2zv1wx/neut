@@ -53,6 +53,7 @@ data Env =
     , constraintEnv :: [PreConstraint] -- for type inference
     , constraintQueue :: ConstraintQueue
     , substEnv :: Map.HashMap Identifier WeakTermPlus -- metavar ~> beta-equivalent weakterm
+    , zetaEnv :: Map.HashMap Identifier (WeakTermPlus, WeakTermPlus)
     , chainEnv :: Map.HashMap Identifier [(Identifier, TermPlus)] -- var/const ~> the closed var chain of its type
     , codeEnv :: Map.HashMap Identifier ([Identifier], CodePlus) -- f ~> thunk (lam (x1 ... xn) e)
     , llvmEnv :: Map.HashMap Identifier ([Identifier], LLVM)
@@ -82,6 +83,7 @@ initialEnv path colorizeFlag =
     , constraintEnv = []
     , constraintQueue = Q.empty
     , substEnv = Map.empty
+    , zetaEnv = Map.empty
     , mainFilePath = path
     , currentFilePath = path
     , shouldColorize = colorizeFlag
