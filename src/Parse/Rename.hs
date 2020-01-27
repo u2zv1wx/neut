@@ -2,14 +2,15 @@
 
 module Parse.Rename
   ( rename
+  , renameStmtList
   , invRename
   , prepareInvRename
   ) where
 
 import Control.Monad.Except
 import Control.Monad.State
-import Data.Tuple (swap)
 
+-- import Data.Tuple (swap)
 import qualified Data.HashMap.Strict as Map
 import qualified Data.Text as T
 
@@ -23,6 +24,40 @@ rename e = do
   result <- rename' Map.empty e
   let info = toInfo "rename.post" result
   return $ assertP info result $ checkSanity [] result
+
+renameStmtList :: [Stmt] -> WithEnv [Stmt]
+renameStmtList = renameStmtList' Map.empty
+
+renameStmtList' :: NameEnv -> [Stmt] -> WithEnv [Stmt]
+renameStmtList' _ [] = return []
+renameStmtList' nenv ((StmtLet m (x, t) e):ss) = do
+  t' <- rename' nenv t
+  x' <- newLLVMNameWith x
+  e' <- rename' nenv e
+  ss' <- renameStmtList' (Map.insert x x' nenv) ss
+  return $ StmtLet m (x', t') e' : ss'
+renameStmtList' nenv ((StmtDef xds):ss) = do
+  let (xs, ds) = unzip xds
+  -- rename for deflist
+  let ys = map (\(_, (y, _), _, _) -> y) ds
+  ys' <- mapM newLLVMNameWith ys
+  let nenvForDef = Map.fromList (zip ys ys') `Map.union` nenv
+  ds' <- mapM (renameDef nenvForDef) ds
+  -- rename for continuation
+  xs' <- mapM newLLVMNameWith xs
+  let nenvForCont = Map.fromList (zip xs xs') `Map.union` nenv
+  ss' <- renameStmtList' nenvForCont ss
+  return $ StmtDef (zip xs' ds') : ss'
+renameStmtList' nenv ((StmtConstDecl (x, t)):ss) = do
+  t' <- rename' nenv t
+  ss' <- renameStmtList' (Map.insert x x nenv) ss
+  return $ StmtConstDecl (x, t') : ss'
+
+renameDef :: NameEnv -> Def -> WithEnv Def
+renameDef nenv (m, xt, xts, e) = do
+  (xt', xts', e') <- renameIter nenv xt xts e
+  -- (xts', e') <- renameBinder nenv xts e
+  return (m, xt', xts', e')
 
 type NameEnv = Map.HashMap Identifier Identifier
 

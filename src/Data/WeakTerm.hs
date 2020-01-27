@@ -64,6 +64,22 @@ type Hole = Identifier
 
 type IdentifierPlus = (Identifier, WeakTermPlus)
 
+type Def = (Meta, IdentifierPlus, [IdentifierPlus], WeakTermPlus)
+
+type IdentDef = (Identifier, Def)
+
+data Stmt
+  -- (let (x t) e)
+  = StmtLet Meta IdentifierPlus WeakTermPlus
+  -- mutually recursive definition (n >= 0)
+  -- (definition
+  --   ((f1 A1) (ARGS-1) e1)
+  --   ...
+  --   ((fn An) (ARGS-n) en))
+  | StmtDef [(Identifier, Def)]
+  -- (constant x t)
+  | StmtConstDecl IdentifierPlus
+
 toVar :: Identifier -> WeakTermPlus
 toVar x = (emptyMeta, WeakTermUpsilon x)
 
