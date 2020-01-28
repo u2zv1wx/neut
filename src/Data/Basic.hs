@@ -79,6 +79,12 @@ supMeta m1 m2
     m1 {metaConstraintLocation = metaConstraintLocation m2}
   | otherwise = m1
 
+getInfo :: Meta -> Maybe (Path Abs File, Loc)
+getInfo m =
+  case (metaFileName m, metaLocation m) of
+    (Just name, Just loc) -> return (name, loc)
+    _ -> Nothing
+
 showPosInfo :: Path Abs File -> Loc -> String
 showPosInfo path (_, l, c) = toFilePath path ++ ":" ++ show l ++ ":" ++ show c
 

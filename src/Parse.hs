@@ -2,7 +2,7 @@
 
 module Parse
   ( parse
-  , parseForCompletion
+  , complete
   ) where
 
 import Control.Monad.Except
@@ -38,6 +38,26 @@ parse inputPath = do
   stmtList' <- renameStmtList stmtList
   concatStmtList stmtList'
 
+complete :: Path Abs File -> Line -> Column -> WithEnv [String]
+complete inputPath l c = do
+  info <- parseForCompletion inputPath l c
+  return $ showCompInfo info
+
+showCompInfo :: CompInfo -> [String]
+showCompInfo [] = []
+showCompInfo ((x, m):xms) = do
+  case getInfo m of
+    Nothing -> showCompInfo xms
+    Just (path, (ph, l, c)) -> do
+      let pathStr = "\"" <> toFilePath path <> "\""
+      let x' = T.unpack x
+      let str =
+            "(" ++
+            x' ++
+            " " ++
+            pathStr ++ " " ++ show ph ++ " " ++ show l ++ " " ++ show c ++ ")"
+      str : showCompInfo xms
+
 parseForCompletion :: Path Abs File -> Line -> Column -> WithEnv CompInfo
 parseForCompletion inputPath l c = do
   content <- liftIO $ TIO.readFile $ toFilePath inputPath
@@ -62,11 +82,11 @@ modifyFileForCompletion ::
      CursorName -> T.Text -> Line -> Column -> Maybe (Prefix, T.Text)
 modifyFileForCompletion s content l c = do
   let xs = T.lines content
-  let targetLine = xs !! fromInteger (l - 1)
+  let (ys, targetLine:zs) = splitAt (fromInteger $ l - 1) xs
   let (s1, s2) = T.splitAt (fromInteger $ c - 1) targetLine
   -- ほんとはここのs1/s2を読んでprefixを取得したりなんなりする
   let targetLine' = s1 <> s <> s2
-  return (T.empty, targetLine')
+  return (T.empty, T.unlines $ ys ++ [targetLine'] ++ zs)
 
 -- {} parse' {}
 -- Parse the head element of the input list.

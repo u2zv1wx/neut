@@ -32,6 +32,10 @@ type CheckOptEndOfEntry = String
 
 type CheckOptColorize = Bool
 
+type Line = Integer
+
+type Column = Integer
+
 data OutputKind
   = OutputKindObject
   | OutputKindLLVM
@@ -45,6 +49,7 @@ instance Read OutputKind where
 data Command
   = Build BuildOptInputPath (Maybe BuildOptOutputPath) OutputKind
   | Check CheckOptInputPath CheckOptColorize (Maybe CheckOptEndOfEntry)
+  | Complete FilePath Line Column
 
 parseBuildOpt :: Parser Command
 parseBuildOpt = do
@@ -89,6 +94,15 @@ parseCheckOpt = do
           ]
   Check <$> inputPathOpt <*> colorizeOpt <*> footerOpt
 
+parseCompleteOpt :: Parser Command
+parseCompleteOpt = do
+  let inputPathOpt =
+        argument str $ mconcat [metavar "INPUT", help "The path of input file"]
+  let lineOpt = argument auto $ mconcat [help "Line number", metavar "LINE"]
+  let columnOpt =
+        argument auto $ mconcat [help "Column number", metavar "COLUMN"]
+  Complete <$> inputPathOpt <*> lineOpt <*> columnOpt
+
 kindReader :: ReadM OutputKind
 kindReader = do
   s <- str
@@ -104,7 +118,10 @@ parseOpt =
      (info (helper <*> parseBuildOpt) (progDesc "build given file")) <>
    command
      "check"
-     (info (helper <*> parseCheckOpt) (progDesc "check specified file")))
+     (info (helper <*> parseCheckOpt) (progDesc "check specified file")) <>
+   command
+     "complete"
+     (info (helper <*> parseCompleteOpt) (progDesc "show completion info")))
 
 optParser :: ParserInfo Command
 optParser = info (helper <*> parseOpt) fullDesc
@@ -132,6 +149,13 @@ run (Check inputPathStr colorizeFlag mEndOfEntry) = do
       case mEndOfEntry of
         Just eoe -> seqIO' eoe err >> exitWith (ExitFailure 1)
         Nothing -> seqIO err >> exitWith (ExitFailure 1)
+run (Complete inputPathStr l c) = do
+  inputPath <- resolveFile' inputPathStr
+  resultOrErr <-
+    evalWithEnv (complete inputPath l c) (initialEnv inputPath True)
+  case resultOrErr of
+    Left err -> seqIO err >> exitWith (ExitFailure 1)
+    Right result -> mapM_ putStrLn result
 
 constructOutputPath ::
      Path Rel File -> Maybe (Path Abs File) -> OutputKind -> IO (Path Abs File)
