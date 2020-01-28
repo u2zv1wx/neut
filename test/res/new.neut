@@ -659,7 +659,7 @@ n15-4
 
 (definition nat-direct ()
   (sigma
-    ((p choice))
+   ((p choice))
     (case p
       (left top)
       (right (nat-direct)))))

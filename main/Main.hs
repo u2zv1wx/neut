@@ -153,7 +153,9 @@ run (Complete inputPathStr l c) = do
   inputPath <- resolveFile' inputPathStr
   resultOrErr <-
     evalWithEnv (complete inputPath l c) (initialEnv inputPath True)
-  case resultOrErr of
+  case resultOrErr
+    -- Left _ -> return () -- don't show any errors, just quit silently
+        of
     Left err -> seqIO err >> exitWith (ExitFailure 1)
     Right result -> mapM_ putStrLn result
 

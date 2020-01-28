@@ -95,7 +95,9 @@ modifyFileForCompletion s content l c = do
   (ch, s2') <- headTailMaybeText s2
   case ch of
     '(' -> Nothing
-    ')' -> Nothing
+    ')' -> do
+      let targetLine' = s1 <> " " <> s <> s2
+      return (T.empty, T.unlines $ ys ++ [targetLine'] ++ zs)
     ' ' -> do
       let targetLine' = s1 <> " " <> s <> s2
       return (T.empty, T.unlines $ ys ++ [targetLine'] ++ zs)
@@ -108,7 +110,9 @@ modifyFileForCompletion s content l c = do
       let s1' = T.reverse revStr
       let s2'' = T.dropWhile (\c -> c `notElem` ['(', ' ', ')']) s2'
       let targetLine' = s1' <> s <> s2''
-      return (prefix, T.unlines $ ys ++ [targetLine'] ++ zs)
+      return $
+        trace ("result: " ++ T.unpack targetLine') $
+        (prefix, T.unlines $ ys ++ [targetLine'] ++ zs)
 
 headTailMaybe :: [a] -> Maybe (a, [a])
 headTailMaybe [] = Nothing
