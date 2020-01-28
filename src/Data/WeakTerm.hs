@@ -213,12 +213,11 @@ holeWeakTermPlusBindings ((_, t):xts) es = do
 substWeakTermPlus :: SubstWeakTerm -> WeakTermPlus -> WeakTermPlus
 substWeakTermPlus _ (m, WeakTermTau) = do
   (m, WeakTermTau)
-substWeakTermPlus sub (m, WeakTermUpsilon x)
-  -- case lookup x sub of
-  --   Just (_, e) -> (m, e)
-  --   Nothing -> (m, WeakTermUpsilon x)
- = do
-  fromMaybe (m, WeakTermUpsilon x) (lookup x sub)
+substWeakTermPlus sub e1@(_, WeakTermUpsilon x) = do
+  case lookup x sub of
+    Nothing -> e1
+    Just e2@(_, e) -> (supMeta (metaOf e1) (metaOf e2), e)
+  -- fromMaybe (m, WeakTermUpsilon x) (lookup x sub)
 substWeakTermPlus sub (m, WeakTermPi xts t) = do
   let (xts', t') = substWeakTermPlusBindingsWithBody sub xts t
   (m, WeakTermPi xts' t')
@@ -252,12 +251,15 @@ substWeakTermPlus sub (m, WeakTermConstDecl (x, t) e) = do
   let t' = substWeakTermPlus sub t
   let e' = substWeakTermPlus (filter (\(k, _) -> k /= x) sub) e
   (m, WeakTermConstDecl (x, t') e')
-substWeakTermPlus sub (m, WeakTermZeta x)
+substWeakTermPlus sub e1@(_, WeakTermZeta x)
   -- case lookup x sub of
   --   Just (_, e) -> (m, e)
   --   Nothing -> (m, WeakTermZeta x)
  = do
-  fromMaybe (m, WeakTermZeta x) (lookup x sub)
+  case lookup x sub of
+    Nothing -> e1
+    Just e2@(_, e) -> (supMeta (metaOf e1) (metaOf e2), e)
+  -- fromMaybe (m, WeakTermZeta x) (lookup x sub)
 substWeakTermPlus sub (m, WeakTermInt t x) = do
   let t' = substWeakTermPlus sub t
   (m, WeakTermInt t' x)
@@ -433,3 +435,6 @@ showArray = inBracket . T.intercalate " "
 
 showStruct :: [T.Text] -> T.Text
 showStruct = inBrace . T.intercalate " "
+
+metaOf :: WeakTermPlus -> Meta
+metaOf e = fst e

@@ -7,7 +7,7 @@ import Data.WeakTerm
 
 type PreConstraint = (WeakTermPlus, WeakTermPlus)
 
-type IterInfo = (Identifier, [IdentifierPlus], WeakTermPlus, WeakTermPlus)
+type IterInfo = (Meta, Identifier, [IdentifierPlus], WeakTermPlus, WeakTermPlus)
 
 data Constraint
   = ConstraintAnalyzable

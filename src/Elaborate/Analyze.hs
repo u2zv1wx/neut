@@ -21,7 +21,6 @@ import qualified Data.HashMap.Strict as Map
 import qualified Data.PQueue.Min as Q
 import qualified Data.Set as S
 import qualified Data.Text as T
-import qualified Data.Text.IO as TIO
 import qualified Text.Show.Pretty as Pr
 
 import Data.Basic
@@ -117,8 +116,9 @@ simp' ((e1, e2):cs) = do
   sub <- gets substEnv
   case lookupAny fmvs sub of
     Just (h, e) -> do
-      let e1' = substWeakTermPlus [(h, e)] e1
-      let e2' = substWeakTermPlus [(h, e)] e2
+      let m = supMeta (metaOf e1) (metaOf e2)
+      let e1' = substWeakTermPlus [(h, e)] (m, snd e1)
+      let e2' = substWeakTermPlus [(h, e)] (m, snd e2)
       simp $ (e1', e2') : cs
     Nothing -> do
       let hs1 = holeWeakTermPlus e1
@@ -131,7 +131,7 @@ simp' ((e1, e2):cs) = do
           , es2 <- concat ess2
           -- es1 = [[a, b], [c]], es2 =  [[d], [e, f]]とかを許してしまっているので修正すること
           , length es1 == length es2 -> simp $ zip es1 es2 ++ cs
-        (Just (StuckPiElimIter iter1@(x1, _, _, _) mess1), Just (StuckPiElimIter (x2, _, _, _) mess2))
+        (Just (StuckPiElimIter iter1@(_, x1, _, _, _) mess1), Just (StuckPiElimIter (_, x2, _, _, _) mess2))
           | x1 == x2
           , length mess1 == length mess2
           , ess1 <- map snd mess1
@@ -153,75 +153,77 @@ simp' ((e1, e2):cs) = do
           , occurCheck h1 hs2
           , linearCheck xs1
           , zs <- includeCheck xs1 e2
-          , Just es <- lookupAll zs sub ->
+          , Just es <- lookupAll zs sub -> do
+            let m = supMeta (metaOf e1) (metaOf e2)
+            let e1' = (m, snd e1)
+            let e2' = (m, snd e2)
             case es of
-              []
-                -- liftIO $ putStrLn "------"
-                -- -- liftIO $ putStr "- "
-                -- -- liftIO $ putStrLn $ showMeta $ fst e1
-                -- -- liftIO $ putStr "- "
-                -- -- liftIO $ putStrLn $ showMeta $ fst e2
-                -- liftIO $ TIO.putStrLn $ toText e1 <> " = " <> toText e2
-               -> do
-                let m = mergeMeta e1 e2
-                simpPattern h1 ies1 e1 (m, snd e2) cs
-                -- simpPattern h1 ies1 e1 e2 cs
-              _ -> simp $ (e1, substWeakTermPlus (zip zs es) e2) : cs
+              [] -> simpPattern h1 ies1 e1' e2' cs
+              _ -> simp $ (e1', substWeakTermPlus (zip zs es) e2') : cs
         (_, Just (StuckPiElimZetaStrict h2 ies2))
           | xs2 <- concatMap getVarList ies2
           , occurCheck h2 hs1
           , linearCheck xs2
           , zs <- includeCheck xs2 e1
-          , Just es <- lookupAll zs sub ->
+          , Just es <- lookupAll zs sub -> do
+            let m = supMeta (metaOf e1) (metaOf e2)
+            let e1' = (m, snd e1)
+            let e2' = (m, snd e2)
             case es of
-              []
-                -- liftIO $ putStrLn "------"
-                -- -- liftIO $ putStr "- "
-                -- -- liftIO $ putStrLn $ showMeta $ fst e2
-                -- -- liftIO $ putStr "- "
-                -- -- liftIO $ putStrLn $ showMeta $ fst e1
-                -- liftIO $ TIO.putStrLn $ toText e2 <> " = " <> toText e1
-               -> do
-                let m = mergeMeta e2 e1
-                simpPattern h2 ies2 e2 (m, snd e1) cs
-                -- simpPattern h2 ies2 e2 e1 cs
-              _ -> simp $ (substWeakTermPlus (zip zs es) e1, e2) : cs
+              [] -> simpPattern h2 ies2 e2' e1' cs
+              _ -> simp $ (substWeakTermPlus (zip zs es) e1', e2') : cs
         (Just (StuckUpsilon x1), _)
-          | Just body <- Map.lookup x1 sub ->
-            simp $ (substWeakTermPlus [(x1, body)] e1, e2) : cs
+          | Just body <- Map.lookup x1 sub -> do
+            let m = supMeta (supMeta (metaOf e1) (metaOf e2)) (metaOf body) -- x1 == e1 == body
+            let e1' = (m, snd e1)
+            let e2' = (m, snd e2)
+            let body' = (m, snd body)
+            simp $ (substWeakTermPlus [(x1, body')] e1', e2') : cs
         (_, Just (StuckUpsilon x2))
-          | Just body <- Map.lookup x2 sub ->
-            simp $ (e1, substWeakTermPlus [(x2, body)] e2) : cs
+          | Just body <- Map.lookup x2 sub -> do
+            let m = supMeta (supMeta (metaOf e1) (metaOf e2)) (metaOf body) -- x2 == e2 == body
+            let e1' = (m, snd e1)
+            let e2' = (m, snd e2)
+            let body' = (m, snd body)
+            simp $ (e1', substWeakTermPlus [(x2, body')] e2') : cs
         (Just (StuckPiElimZetaStrict h1 ies1), _)
           | xs1 <- concatMap getVarList ies1
           , occurCheck h1 hs2
           , zs <- includeCheck xs1 e2
-          , Just es <- lookupAll zs sub ->
+          , Just es <- lookupAll zs sub -> do
+            let m = supMeta (metaOf e1) (metaOf e2)
+            let e1' = (m, snd e1)
+            let e2' = (m, snd e2)
             case es of
-              [] -> simpQuasiPattern h1 ies1 e1 e2 fmvs cs
-              _ -> simp $ (e1, substWeakTermPlus (zip zs es) e2) : cs
+              [] -> simpQuasiPattern h1 ies1 e1' e2' fmvs cs
+              _ -> simp $ (e1', substWeakTermPlus (zip zs es) e2') : cs
         (_, Just (StuckPiElimZetaStrict h2 ies2))
           | xs2 <- concatMap getVarList ies2
           , occurCheck h2 hs1
           , zs <- includeCheck xs2 e1
-          , Just es <- lookupAll zs sub ->
+          , Just es <- lookupAll zs sub -> do
+            let m = supMeta (metaOf e1) (metaOf e2)
+            let e1' = (m, snd e1)
+            let e2' = (m, snd e2)
             case es of
-              [] -> simpQuasiPattern h2 ies2 e2 e1 fmvs cs
-              _ -> simp $ (substWeakTermPlus (zip zs es) e1, e2) : cs
+              [] -> simpQuasiPattern h2 ies2 e2' e1' fmvs cs
+              _ -> simp $ (substWeakTermPlus (zip zs es) e1', e2') : cs
         (Just (StuckPiElimZeta h1 ies1), Nothing)
           | xs1 <- concatMap getVarList ies1
           , occurCheck h1 hs2
-          , [] <- includeCheck xs1 e2
-            -- let m = mergeMeta e1 e2
-            -- simpFlexRigid h1 ies1 e1 (m, snd e2) fmvs cs
-           -> do simpFlexRigid h1 ies1 e1 e2 fmvs cs
+          , [] <- includeCheck xs1 e2 -> do
+            let m = supMeta (metaOf e1) (metaOf e2)
+            let e1' = (m, snd e1)
+            let e2' = (m, snd e2)
+            simpFlexRigid h1 ies1 e1' e2' fmvs cs
         (Nothing, Just (StuckPiElimZeta h2 ies2))
           | xs2 <- concatMap getVarList ies2
           , occurCheck h2 hs1
-          , [] <- includeCheck xs2 e1
-            -- let m = mergeMeta e2 e1
-            -- simpFlexRigid h2 ies2 e2 (m, snd e1) fmvs cs
-           -> do simpFlexRigid h2 ies2 e2 e1 fmvs cs
+          , [] <- includeCheck xs2 e1 -> do
+            let m = supMeta (metaOf e1) (metaOf e2)
+            let e1' = (m, snd e1)
+            let e2' = (m, snd e2)
+            simpFlexRigid h2 ies2 e2' e1' fmvs cs
         _ -> simpOther e1 e2 fmvs cs
 
 -- {} simpBinder {}
@@ -267,12 +269,6 @@ simpPattern ::
 simpPattern h1 ies1 _ e2 cs = do
   xss <- mapM toVarList ies1
   let lam = bindFormalArgs e2 xss
-  -- p "lam:"
-  -- liftIO $ TIO.putStrLn $ "lam: " <> toText lam
-  -- liftIO $ TIO.putStrLn $ "~> " <> h1 <> " = " <> toText lam
-  -- p' $ metaLocation $ fst e2
-  -- e2のmetaを「大きい方」に書き換える必要があるのか？
-  -- p $ "location after lam-reduce is: " ++ showMeta (fst e2)
   modify (\env -> env {substEnv = Map.insert h1 lam (substEnv env)})
   visit h1
   simp cs
@@ -325,8 +321,8 @@ asStuckedTerm (_, WeakTermPiElim (_, WeakTermZeta h) es)
   | Just _ <- mapM asUpsilon es = Just $ StuckPiElimZetaStrict h [es]
 asStuckedTerm (_, WeakTermPiElim (_, WeakTermZeta h) es) =
   Just $ StuckPiElimZeta h [es]
-asStuckedTerm (m, WeakTermPiElim self@(_, WeakTermIter (x, _) xts body) es) =
-  Just $ StuckPiElimIter (x, xts, body, self) [(m, es)]
+asStuckedTerm (m, WeakTermPiElim self@(mi, WeakTermIter (x, _) xts body) es) =
+  Just $ StuckPiElimIter (mi, x, xts, body, self) [(m, es)]
 asStuckedTerm (_, WeakTermPiElim (_, WeakTermConst x) es) =
   Just $ StuckPiElimConst x [es]
 asStuckedTerm (m, WeakTermPiElim e es)
@@ -396,8 +392,10 @@ toPiElim e [] = e
 toPiElim e ((m, es):ess) = toPiElim (m, WeakTermPiElim e es) ess
 
 unfoldIter :: IterInfo -> WeakTermPlus
-unfoldIter (x, xts, body, self) = do
-  let body' = substWeakTermPlus [(x, self)] body
+unfoldIter (mi, x, xts, body, self) = do
+  let m = supMeta mi (metaOf body)
+  -- let body' = substWeakTermPlus [(x, self)] body
+  let body' = substWeakTermPlus [(x, self)] (m, snd body)
   (fst self, WeakTermPiIntro xts body')
 
 insConstraintQueue :: EnrichedConstraint -> WithEnv ()
@@ -444,10 +442,3 @@ lookupAll (x:xs) sub = do
   v <- Map.lookup x sub
   vs <- lookupAll xs sub
   return $ v : vs
-
-mergeMeta :: WeakTermPlus -> WeakTermPlus -> Meta
-mergeMeta (m1, _) (m2, _)
-  -- m2 {metaLocation = metaLocation m1 ++ metaLocation m2}
-  | metaConstraintLocation m1 > metaConstraintLocation m2 =
-    m2 {metaConstraintLocation = metaConstraintLocation m1}
-  | otherwise = m2

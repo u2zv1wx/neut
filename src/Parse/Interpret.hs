@@ -335,7 +335,8 @@ adjustPhase m = do
 
 adjustPhase' :: Integer -> Maybe Loc -> Maybe Loc
 adjustPhase' _ Nothing = Nothing
-adjustPhase' i (Just (j, l, c)) = Just (i + j, l, c)
+-- adjustPhase' i (Just (j, l, c)) = Just (i + j, l, c)
+adjustPhase' i (Just (_, l, c)) = Just (i, l, c)
 
 newHole :: Meta -> WithEnv WeakTermPlus
 newHole m = do

@@ -49,7 +49,7 @@ instance Show Meta where
 
 showMeta :: Meta -> String
 showMeta m =
-  case (metaFileName m, metaLocation m) of
+  case (metaFileName m, metaConstraintLocation m) of
     (Just name, Nothing) -> toFilePath name
     -- (Just name, Just (_, l,))
     --   | (_, l, c) <- minimum xs ->
@@ -60,6 +60,24 @@ showMeta m =
     (Nothing, Just (_, l, c)) -> "<unknown-file>:" ++ show l ++ ":" ++ show c
     -- (Nothing, xs)
     --   | (_, l, c) <- minimum xs -> "<unknown-file>:" ++ show l ++ ":" ++ show c
+
+showMeta' :: Meta -> String
+showMeta' m =
+  case (metaFileName m, metaConstraintLocation m) of
+    (Just name, Nothing) -> toFilePath name
+    (Just name, Just (ph, l, c)) ->
+      toFilePath name ++ ":" ++ show ph ++ ":" ++ show l ++ ":" ++ show c
+    (Nothing, Nothing) -> "_"
+    (Nothing, Just (ph, l, c)) ->
+      "<unknown-file>:" ++ show ph ++ ":" ++ show l ++ ":" ++ show c
+    -- (Nothing, xs)
+    --   | (_, l, c) <- minimum xs -> "<unknown-file>:" ++ show l ++ ":" ++ show c
+
+supMeta :: Meta -> Meta -> Meta
+supMeta m1 m2
+  | metaConstraintLocation m1 < metaConstraintLocation m2 =
+    m1 {metaConstraintLocation = metaConstraintLocation m2}
+  | otherwise = m1
 
 showPosInfo :: Path Abs File -> Loc -> String
 showPosInfo path (_, l, c) = toFilePath path ++ ":" ++ show l ++ ":" ++ show c

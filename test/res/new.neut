@@ -587,11 +587,18 @@
 ;; 変数がenum-elimされてるから依存ありのほうで推論が起こる
 ;; enum-elimを依存なしにすると普通に推論できる
 
+;; ここが推論できないのは、enum-elimで依存がありうるってことになってるから。
+;; (definition fact ((n i64))
+;;   (enum-elimination n
+;;     ((i64 1) 1)
+;;     (default (i64.mul n (fact (i64.sub n 1))))))
+
 (definition fact ((n i64))
   (enum-elimination n
     ((i64 1) 1)
-    (default (i64.mul n (fact (i64.sub n 1))))))
+    (default (i64.mul n (with-type i64 (fact (i64.sub n 1)))))))
 
+(ascription fact (hom i64 i64))
 
 ;; こっちなら推論できる。これはつまり、なんというか、情報を与えればenum-elimをいじらなくても推論可能ってこと？
 ;; でもさ、defaultのほうの結果がi64で確定してるんだから、1のほうがi64であることも本来はわかるはずじゃない？
@@ -628,7 +635,7 @@ n15-4
 
 (fact 5)
 
-;; (fact top)
+(fact top)
 
 ;; ほんとはここにエラーが表示されるべきなのに別な場所に流れる
 ;; ~> 修正した。ちゃんと適切な場所にエラーが表示されるようになった。
@@ -637,13 +644,15 @@ n15-4
 (definition pohe
   (sigma-introduction left unit))
 
-;; (fact pohe)
+;; (ascription pohe (sigma ((x choice)) top))
+
+(fact pohe)
 
 ;; type error:
-;; (fact (begin (lambda ((A type) (y A)) y)))
+(fact (begin (lambda ((A type) (y A)) y)))
 
 ;; 型のなかに出現するnatの定義を展開せずにそのままnatとして表示できていてうれしい、って話。
-;; (fact (begin (lambda ((y nat)) y)))
+(fact (begin (lambda ((y nat)) y)))
 ;; エラーをflycheckで表示できるようになったぜ。イエーイ。
 
 (definition nat-direct ()
@@ -656,17 +665,58 @@ n15-4
 (definition g ((y nat)) y)
 
 
-;; 相互再帰を実装
+;; 相互再帰を実装した。いいね。
+;; definitionの一般化としてとれてるところが偉い。
 (definition
-  (p ((a i64)) (q a))
-  (q ((y i64)) (p y))
-  (r ((z i64)) (p z)))
+  ((p (hom i64 i64)) ((a i64)) (q a)) ;; こんなかんじでascriptionを与えると推論がすぐ終わる。
+  (q ((y i64)) (with-type i64 (p y)))
+  (r ((z i64)) (p z))
+  (s ((z i64)) (p z))
+  (t ((z i64)) (p z))
+  (u ((z i64)) (p z))
+  (v ((z i64)) (p z))
+  (w ((z i64)) (p z))
+  (x ((z i64)) (p z))
+  (y ((z i64)) (p z))
+  (z ((z i64)) (p z))
+  (a ((z i64)) (y z)))
 
+;; 0要素のdefinitionも合法
+(definition)
+
+;; implicit beginもちゃんと処理できてる。
+(definition foo ((x i64))
+  (let y x)
+  (let z y)
+  z)
+
+(definition foo ((x i64))
+  (let y x)
+  y)
+
+(let foo
+  (lambda ((x i64)) ((lambda ((y hole)) y) x)))
+
+;; これはxのほうにunderlineがきてほしいような。
+;; natの定義が展開されるときに後ろに情報がながれてるって話か。
+;; (definition foo ((x i64)) x)
+
+
+(ascription foo (hom i64 nat))
+
+
+;; homでascriptionを与えたときに依存がないって情報を反映できるとうれしい？
+;; holeでcontextをextendするのは依存がないって情報を与えるのと同じことか。
 (ascription p (hom i64 i64))
 
 (ascription q (hom i64 i64))
 
-;; (ascription q (hom i64 i64))
+;; (ascription q (hom i64 (lambda ((x i64)) x)))
+
+;; 次のように書くと推論にけっこう時間がかかる。flexをめっちゃ試したりしてるのかな？
+;; そのとおりだった。
+;; まあ、型エラーの推論のときはtimeoutをとってもいいな。
+;; (ascription a (hom i64 tau))
 
 (i64.add 100 10)
 

@@ -32,6 +32,8 @@ type FileInfo = [(Meta, Identifier, WeakTermPlus)]
 
 type FileEnv = Map.HashMap (Path Abs File) FileInfo
 
+type Justification = Loc
+
 data Env =
   Env
     { count :: Integer -- to generate fresh symbols

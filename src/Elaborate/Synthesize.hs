@@ -197,19 +197,17 @@ showErrorThenQuit q = do
 
 type PosInfo = (Path Abs File, Maybe Loc)
 
-isFollowedBy :: PosInfo -> PosInfo -> Bool
-isFollowedBy (_, loc1) (_, loc2) = loc1 < loc2
-
 setupPosInfo :: [EnrichedConstraint] -> [(PosInfo, PreConstraint)]
 setupPosInfo [] = []
-setupPosInfo ((Enriched c@(e1, e2) _ _):cs) = do
+setupPosInfo ((Enriched (e1, e2) _ _):cs) = do
   case (getLocInfo e1, getLocInfo e2) of
     (Just pos1, Just pos2) -> do
-      if pos1 `isFollowedBy` pos2
-        then (pos2, c) : setupPosInfo cs
-        else (pos1, c) : setupPosInfo cs
-    (Just pos1, Nothing) -> (pos1, c) : setupPosInfo cs
-    (Nothing, Just pos2) -> (pos2, c) : setupPosInfo cs
+      case snd pos1 `compare` snd pos2 of
+        LT -> (pos2, (e2, e1)) : setupPosInfo cs -- pos1 < pos2
+        EQ -> (pos1, (e1, e2)) : setupPosInfo cs -- pos1 = pos2 (どっちで表示してもオーケー)
+        GT -> (pos1, (e1, e2)) : setupPosInfo cs -- pos1 > pos2
+    (Just pos1, Nothing) -> (pos1, (e1, e2)) : setupPosInfo cs
+    (Nothing, Just pos2) -> (pos2, (e2, e1)) : setupPosInfo cs
     _ -> setupPosInfo cs -- fixme (loc info not available)
 
 showErrors :: [PosInfo] -> [(PosInfo, PreConstraint)] -> WithEnv [IO ()]
