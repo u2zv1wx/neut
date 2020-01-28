@@ -57,15 +57,15 @@ simp' (((_, WeakTermPi xts1 cod1), (_, WeakTermPi xts2 cod2)):cs)
 simp' (((_, WeakTermPiIntro xts1 e1), (_, WeakTermPiIntro xts2 e2)):cs)
   | length xts1 == length xts2 = simpBinder xts1 xts2 (Just (e1, e2)) cs
 simp' (((_, WeakTermPiIntro xts body1@(m1, _)), e2@(_, _)):cs) = do
-  let vs = map (toVar . fst) xts
+  let vs = map (\(_, x, _) -> toVar x) xts
   simp $ (body1, (m1, WeakTermPiElim e2 vs)) : cs
 simp' ((e1, e2@(_, WeakTermPiIntro {})):cs) = simp' $ (e2, e1) : cs
 simp' (((_, WeakTermSigma xts1), (_, WeakTermSigma xts2)):cs)
   | length xts1 == length xts2 = simpBinder xts1 xts2 Nothing cs
 simp' (((_, WeakTermSigmaIntro t1 es1), (_, WeakTermSigmaIntro t2 es2)):cs)
   | length es1 == length es2 = simp $ (t1, t2) : zip es1 es2 ++ cs
-simp' (((_, WeakTermIter xt1 xts1 e1), (_, WeakTermIter xt2 xts2 e2)):cs)
-  | fst xt1 == fst xt2
+simp' (((_, WeakTermIter xt1@(_, x1, _) xts1 e1), (_, WeakTermIter xt2@(_, x2, _) xts2 e2)):cs)
+  | x1 == x2
   , length xts1 == length xts2 =
     simpBinder (xt1 : xts1) (xt2 : xts2) (Just (e1, e2)) cs
 simp' (((_, WeakTermConstDecl xt1 e1), (_, WeakTermConstDecl xt2 e2)):cs) = do
@@ -228,19 +228,19 @@ simp' ((e1, e2):cs) = do
 
 -- {} simpBinder {}
 simpBinder ::
-     [(Identifier, WeakTermPlus)]
-  -> [(Identifier, WeakTermPlus)]
+     [IdentifierPlus]
+  -> [IdentifierPlus]
   -> Maybe (WeakTermPlus, WeakTermPlus)
   -> [(WeakTermPlus, WeakTermPlus)]
   -> WithEnv ()
 simpBinder [] [] Nothing cs = simp cs
 simpBinder [] [] (Just (cod1, cod2)) cs = simp $ (cod1, cod2) : cs
-simpBinder ((x1, t1):xts1) ((x2, t2):xts2) Nothing cs = do
+simpBinder ((_, x1, t1):xts1) ((_, x2, t2):xts2) Nothing cs = do
   let var1 = toVar x1
   let xts2' = substWeakTermPlusBindings [(x2, var1)] xts2
   simp [(t1, t2)]
   simpBinder xts1 xts2' Nothing cs
-simpBinder ((x1, t1):xts1) ((x2, t2):xts2) (Just (cod1, cod2)) cs = do
+simpBinder ((_, x1, t1):xts1) ((_, x2, t2):xts2) (Just (cod1, cod2)) cs = do
   let var1 = toVar x1
   let (xts2', cod2') = substWeakTermPlusBindingsWithBody [(x2, var1)] xts2 cod2
   simp [(t1, t2)]
@@ -321,7 +321,7 @@ asStuckedTerm (_, WeakTermPiElim (_, WeakTermZeta h) es)
   | Just _ <- mapM asUpsilon es = Just $ StuckPiElimZetaStrict h [es]
 asStuckedTerm (_, WeakTermPiElim (_, WeakTermZeta h) es) =
   Just $ StuckPiElimZeta h [es]
-asStuckedTerm (m, WeakTermPiElim self@(mi, WeakTermIter (x, _) xts body) es) =
+asStuckedTerm (m, WeakTermPiElim self@(mi, WeakTermIter (_, x, _) xts body) es) =
   Just $ StuckPiElimIter (mi, x, xts, body, self) [(m, es)]
 asStuckedTerm (_, WeakTermPiElim (_, WeakTermConst x) es) =
   Just $ StuckPiElimConst x [es]
@@ -411,17 +411,17 @@ visit m = do
 
 -- [e, x, y, y, e2, e3, z] ~> [p, x, y, y, q, r, z]  (p, q, r: new variables)
 -- {} toVarList {}
-toVarList :: [WeakTermPlus] -> WithEnv [(Identifier, WeakTermPlus)]
+toVarList :: [WeakTermPlus] -> WithEnv [IdentifierPlus]
 toVarList [] = return []
-toVarList ((_, WeakTermUpsilon x):es) = do
+toVarList ((m, WeakTermUpsilon x):es) = do
   xts <- toVarList es
   let t = (emptyMeta, WeakTermUpsilon "_")
-  return $ (x, t) : xts
-toVarList (_:es) = do
+  return $ (m, x, t) : xts
+toVarList ((m, _):es) = do
   xts <- toVarList es
   x <- newNameWith "hole"
   let t = (emptyMeta, WeakTermUpsilon "_")
-  return $ (x, t) : xts
+  return $ (m, x, t) : xts
 
 bindFormalArgs :: WeakTermPlus -> [[IdentifierPlus]] -> WeakTermPlus
 bindFormalArgs e [] = e

@@ -16,15 +16,15 @@ import Data.WeakTerm
 
 reduceWeakTermPlus :: WeakTermPlus -> WeakTermPlus
 reduceWeakTermPlus (m, WeakTermPi xts cod) = do
-  let (xs, ts) = unzip xts
+  let (ms, xs, ts) = unzip3 xts
   let ts' = map reduceWeakTermPlus ts
   let cod' = reduceWeakTermPlus cod
-  (m, WeakTermPi (zip xs ts') cod')
+  (m, WeakTermPi (zip3 ms xs ts') cod')
 reduceWeakTermPlus (m, WeakTermPiIntro xts e) = do
-  let (xs, ts) = unzip xts
+  let (ms, xs, ts) = unzip3 xts
   let ts' = map reduceWeakTermPlus ts
   let e' = reduceWeakTermPlus e
-  (m, WeakTermPiIntro (zip xs ts') e')
+  (m, WeakTermPiIntro (zip3 ms xs ts') e')
 reduceWeakTermPlus (m, WeakTermPiElim e es) = do
   let e' = reduceWeakTermPlus e
   let es' = map reduceWeakTermPlus es
@@ -32,15 +32,15 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
   case e' of
     (_, WeakTermPiIntro xts body)
       | length xts == length es' -> do
-        let xs = map fst xts
+        let xs = map (\(_, x, _) -> x) xts
         reduceWeakTermPlus $ substWeakTermPlus (zip xs es') body
     (_, WeakTermConst constant) ->
       reduceWeakTermPlusTheta (m, app) es' m constant
     _ -> (m, app)
 reduceWeakTermPlus (m, WeakTermSigma xts) = do
-  let (xs, ts) = unzip xts
+  let (ms, xs, ts) = unzip3 xts
   let ts' = map reduceWeakTermPlus ts
-  (m, WeakTermSigma $ zip xs ts')
+  (m, WeakTermSigma $ zip3 ms xs ts')
 reduceWeakTermPlus (m, WeakTermSigmaIntro t es) = do
   let t' = reduceWeakTermPlus t
   let es' = map reduceWeakTermPlus es
@@ -49,28 +49,28 @@ reduceWeakTermPlus (m, WeakTermSigmaElim t xts e1 e2) = do
   let e1' = reduceWeakTermPlus e1
   case e1' of
     (_, WeakTermSigmaIntro _ es)
-      | xs <- map fst xts
+      | xs <- map (\(_, x, _) -> x) xts
       , length xs == length es ->
         reduceWeakTermPlus $ substWeakTermPlus (zip xs es) e2
     _ -> do
       let t' = reduceWeakTermPlus t
       let e2' = reduceWeakTermPlus e2
-      let (xs, ts) = unzip xts
+      let (ms, xs, ts) = unzip3 xts
       let ts' = map reduceWeakTermPlus ts
-      (m, WeakTermSigmaElim t' (zip xs ts') e1' e2')
-reduceWeakTermPlus (m, WeakTermIter (x, t) xts e)
+      (m, WeakTermSigmaElim t' (zip3 ms xs ts') e1' e2')
+reduceWeakTermPlus (m, WeakTermIter (mx, x, t) xts e)
   | x `notElem` varWeakTermPlus e = do
     reduceWeakTermPlus (m, WeakTermPiIntro xts e)
   | otherwise = do
     let t' = reduceWeakTermPlus t
     let e' = reduceWeakTermPlus e
-    let (xs, ts) = unzip xts
+    let (ms, xs, ts) = unzip3 xts
     let ts' = map reduceWeakTermPlus ts
-    (m, WeakTermIter (x, t') (zip xs ts') e')
-reduceWeakTermPlus (m, WeakTermConstDecl (x, t) e) = do
+    (m, WeakTermIter (mx, x, t') (zip3 ms xs ts') e')
+reduceWeakTermPlus (m, WeakTermConstDecl (mx, x, t) e) = do
   let t' = reduceWeakTermPlus t
   let e' = reduceWeakTermPlus e
-  (m, WeakTermConstDecl (x, t') e')
+  (m, WeakTermConstDecl (mx, x, t') e')
 reduceWeakTermPlus (m, WeakTermEnumElim (e, t) les) = do
   let e' = reduceWeakTermPlus e
   let (ls, es) = unzip les
@@ -97,8 +97,9 @@ reduceWeakTermPlus (m, WeakTermArrayElim k xts e1 e2) = do
   case e1' of
     (_, WeakTermArrayIntro k' es)
       | length es == length xts
-      , k == k' ->
-        reduceWeakTermPlus $ substWeakTermPlus (zip (map fst xts) es) e2
+      , k == k' -> do
+        let (_, xs, _) = unzip3 xts
+        reduceWeakTermPlus $ substWeakTermPlus (zip xs es) e2
     _ -> (m, WeakTermArrayElim k xts e1' e2)
 reduceWeakTermPlus (m, WeakTermStructIntro eks) = do
   let (es, ks) = unzip eks
@@ -108,7 +109,7 @@ reduceWeakTermPlus (m, WeakTermStructElim xks e1 e2) = do
   let e1' = reduceWeakTermPlus e1
   case e1' of
     (_, WeakTermStructIntro eks)
-      | (xs, ks1) <- unzip xks
+      | (_, xs, ks1) <- unzip3 xks
       , (es, ks2) <- unzip eks
       , ks1 == ks2 -> reduceWeakTermPlus $ substWeakTermPlus (zip xs es) e2
     _ -> (m, WeakTermStructElim xks e1' e2)
