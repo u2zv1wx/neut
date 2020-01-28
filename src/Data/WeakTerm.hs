@@ -2,7 +2,6 @@
 
 module Data.WeakTerm where
 
-import Data.Maybe (fromMaybe)
 import Numeric.Half
 
 import qualified Data.Text as T
@@ -48,7 +47,7 @@ data WeakTerm
   | WeakTermArrayIntro ArrayKind [WeakTermPlus]
   | WeakTermArrayElim
       ArrayKind
-      [(Identifier, WeakTermPlus)] -- [(x1, return t1), ..., (xn, return tn)] with xi : ti
+      [IdentifierPlus] -- [(x1, return t1), ..., (xn, return tn)] with xi : ti
       WeakTermPlus
       WeakTermPlus
   | WeakTermStruct [ArrayKind] -- e.g. (struct u8 u8 f16 f32 u64)
@@ -62,7 +61,7 @@ type SubstWeakTerm = [(Identifier, WeakTermPlus)]
 
 type Hole = Identifier
 
-type IdentifierPlus = (Identifier, WeakTermPlus)
+type IdentifierPlus = (Meta, Identifier, WeakTermPlus)
 
 type Def = (Meta, IdentifierPlus, [IdentifierPlus], WeakTermPlus)
 
@@ -78,7 +77,7 @@ data Stmt
   --   ((fn An) (ARGS-n) en))
   | StmtDef [(Identifier, Def)]
   -- (constant x t)
-  | StmtConstDecl IdentifierPlus
+  | StmtConstDecl Meta IdentifierPlus
   deriving (Show)
 
 toVar :: Identifier -> WeakTermPlus
@@ -124,7 +123,7 @@ varWeakTermPlus (_, WeakTermSigmaElim t xts e1 e2) = do
   let ys = varWeakTermPlus e1
   let zs = varWeakTermPlusBindings xts [e2]
   xs ++ ys ++ zs
-varWeakTermPlus (_, WeakTermIter (x, t) xts e) = do
+varWeakTermPlus (_, WeakTermIter (_, x, t) xts e) = do
   varWeakTermPlus t ++ filter (/= x) (varWeakTermPlusBindings xts [e])
 varWeakTermPlus (_, WeakTermConst _) = []
 varWeakTermPlus (_, WeakTermConstDecl xt e) = varWeakTermPlusBindings [xt] [e]
@@ -156,7 +155,7 @@ varWeakTermPlus (_, WeakTermStructElim xts d e) = do
 varWeakTermPlusBindings :: [IdentifierPlus] -> [WeakTermPlus] -> [Hole]
 varWeakTermPlusBindings [] es = do
   concatMap varWeakTermPlus es
-varWeakTermPlusBindings ((x, t):xts) es = do
+varWeakTermPlusBindings ((_, x, t):xts) es = do
   let hs1 = varWeakTermPlus t
   let hs2 = varWeakTermPlusBindings xts es
   hs1 ++ filter (/= x) hs2
@@ -176,7 +175,7 @@ holeWeakTermPlus (_, WeakTermSigmaElim t xts e1 e2) = do
   let ys = holeWeakTermPlus e1
   let zs = holeWeakTermPlusBindings xts [e2]
   xs ++ ys ++ zs
-holeWeakTermPlus (_, WeakTermIter (_, t) xts e) =
+holeWeakTermPlus (_, WeakTermIter (_, _, t) xts e) =
   holeWeakTermPlus t ++ holeWeakTermPlusBindings xts [e]
 holeWeakTermPlus (_, WeakTermZeta h) = h : []
 holeWeakTermPlus (_, WeakTermConst _) = []
@@ -207,7 +206,7 @@ holeWeakTermPlus (_, WeakTermStructElim _ d e) = do
 holeWeakTermPlusBindings :: [IdentifierPlus] -> [WeakTermPlus] -> [Hole]
 holeWeakTermPlusBindings [] es = do
   concatMap holeWeakTermPlus es
-holeWeakTermPlusBindings ((_, t):xts) es = do
+holeWeakTermPlusBindings ((_, _, t):xts) es = do
   holeWeakTermPlus t ++ holeWeakTermPlusBindings xts es
 
 substWeakTermPlus :: SubstWeakTerm -> WeakTermPlus -> WeakTermPlus
@@ -240,17 +239,17 @@ substWeakTermPlus sub (m, WeakTermSigmaElim t xts e1 e2) = do
   let e1' = substWeakTermPlus sub e1
   let (xts', e2') = substWeakTermPlusBindingsWithBody sub xts e2
   (m, WeakTermSigmaElim t' xts' e1' e2')
-substWeakTermPlus sub (m, WeakTermIter (x, t) xts e) = do
+substWeakTermPlus sub (m, WeakTermIter (mx, x, t) xts e) = do
   let t' = substWeakTermPlus sub t
   let sub' = filter (\(k, _) -> k /= x) sub
   let (xts', e') = substWeakTermPlusBindingsWithBody sub' xts e
-  (m, WeakTermIter (x, t') xts' e')
+  (m, WeakTermIter (mx, x, t') xts' e')
 substWeakTermPlus _ (m, WeakTermConst x) = do
   (m, WeakTermConst x)
-substWeakTermPlus sub (m, WeakTermConstDecl (x, t) e) = do
+substWeakTermPlus sub (m, WeakTermConstDecl (mx, x, t) e) = do
   let t' = substWeakTermPlus sub t
   let e' = substWeakTermPlus (filter (\(k, _) -> k /= x) sub) e
-  (m, WeakTermConstDecl (x, t') e')
+  (m, WeakTermConstDecl (mx, x, t') e')
 substWeakTermPlus sub e1@(_, WeakTermZeta x)
   -- case lookup x sub of
   --   Just (_, e) -> (m, e)
@@ -307,11 +306,11 @@ substWeakTermPlus sub (m, WeakTermStructElim xts v e) = do
 substWeakTermPlusBindings ::
      SubstWeakTerm -> [IdentifierPlus] -> [IdentifierPlus]
 substWeakTermPlusBindings _ [] = []
-substWeakTermPlusBindings sub ((x, t):xts) = do
+substWeakTermPlusBindings sub ((m, x, t):xts) = do
   let sub' = filter (\(k, _) -> k /= x) sub
   let xts' = substWeakTermPlusBindings sub' xts
   let t' = substWeakTermPlus sub t
-  (x, t') : xts'
+  (m, x, t') : xts'
 
 substWeakTermPlusBindingsWithBody ::
      SubstWeakTerm
@@ -321,11 +320,11 @@ substWeakTermPlusBindingsWithBody ::
 substWeakTermPlusBindingsWithBody sub [] e = do
   let e' = substWeakTermPlus sub e
   ([], e')
-substWeakTermPlusBindingsWithBody sub ((x, t):xts) e = do
+substWeakTermPlusBindingsWithBody sub ((m, x, t):xts) e = do
   let sub' = filter (\(k, _) -> k /= x) sub
   let (xts', e') = substWeakTermPlusBindingsWithBody sub' xts e
   let t' = substWeakTermPlus sub t
-  ((x, t') : xts', e')
+  ((m, x, t') : xts', e')
 
 univ :: WeakTermPlus
 univ = (emptyMeta, WeakTermTau)
@@ -345,7 +344,7 @@ toText (_, WeakTermPiIntro xts e) = do
 toText (_, WeakTermPiElim e es) = do
   showCons $ map toText $ e : es
 toText (_, WeakTermSigma xts)
-  | Just (yts, (_, t)) <- splitLast xts = do
+  | Just (yts, (_, _, t)) <- splitLast xts = do
     let argStr = inParen $ showItems $ map showArg yts
     showCons ["Σ", argStr, toText t]
   | otherwise = "(product)" -- <> : (product)
@@ -354,7 +353,7 @@ toText (_, WeakTermSigmaIntro _ es) = do
 toText (_, WeakTermSigmaElim _ xts e1 e2) = do
   let argStr = inParen $ showItems $ map showArg xts
   showCons ["sigma-elimination", argStr, toText e1, toText e2]
-toText (_, WeakTermIter (x, _) xts e) = do
+toText (_, WeakTermIter (_, x, _) xts e) = do
   let argStr = inParen $ showItems $ map showArg xts
   showCons ["μ", x, argStr, toText e]
 toText (_, WeakTermConst x) = x
@@ -399,8 +398,8 @@ inBrace s = "{" <> s <> "}"
 inBracket :: T.Text -> T.Text
 inBracket s = "[" <> s <> "]"
 
-showArg :: (Identifier, WeakTermPlus) -> T.Text
-showArg (x, t) = inParen $ x <> " " <> toText t
+showArg :: (Meta, Identifier, WeakTermPlus) -> T.Text
+showArg (_, x, t) = inParen $ x <> " " <> toText t
 
 showClause :: (Case, WeakTermPlus) -> T.Text
 showClause (c, e) = inParen $ showCase c <> " " <> toText e
