@@ -13,8 +13,6 @@ import Path
 import Path.IO
 import Text.Read (readMaybe)
 
-import Debug.Trace
-
 import qualified Data.HashMap.Strict as Map
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -50,14 +48,11 @@ showCompInfo [] = []
 showCompInfo ((x, m):xms) = do
   case getInfo m of
     Nothing -> showCompInfo xms
-    Just (path, (ph, l, c)) -> do
+    Just (path, (_, l, c)) -> do
       let pathStr = "\"" <> toFilePath path <> "\""
       let x' = T.unpack x
       let str =
-            "(" ++
-            x' ++
-            " " ++
-            pathStr ++ " " ++ show ph ++ " " ++ show l ++ " " ++ show c ++ ")"
+            "(" ++ x' ++ " " ++ pathStr ++ " " ++ show l ++ " " ++ show c ++ ")"
       str : showCompInfo xms
 
 parseForCompletion :: Path Abs File -> Line -> Column -> WithEnv CompInfo
@@ -104,15 +99,13 @@ modifyFileForCompletion s content l c = do
     _ -> do
       let baseStr = s1 <> T.singleton ch
       let revBaseStr = T.reverse baseStr
-      let revPrefix = T.takeWhile (\c -> c `notElem` ['(', ' ', ')']) revBaseStr
+      let revPrefix = T.takeWhile (`notElem` ['(', ' ', ')']) revBaseStr
       let prefix = T.reverse revPrefix
-      let revStr = T.dropWhile (\c -> c `notElem` ['(', ' ', ')']) revBaseStr
+      let revStr = T.dropWhile (`notElem` ['(', ' ', ')']) revBaseStr
       let s1' = T.reverse revStr
-      let s2'' = T.dropWhile (\c -> c `notElem` ['(', ' ', ')']) s2'
+      let s2'' = T.dropWhile (`notElem` ['(', ' ', ')']) s2'
       let targetLine' = s1' <> s <> s2''
-      return $
-        trace ("result: " ++ T.unpack targetLine') $
-        (prefix, T.unlines $ ys ++ [targetLine'] ++ zs)
+      return (prefix, T.unlines $ ys ++ [targetLine'] ++ zs)
 
 headTailMaybe :: [a] -> Maybe (a, [a])
 headTailMaybe [] = Nothing
