@@ -52,7 +52,7 @@ data WeakTerm
       WeakTermPlus
   | WeakTermStruct [ArrayKind] -- e.g. (struct u8 u8 f16 f32 u64)
   | WeakTermStructIntro [(WeakTermPlus, ArrayKind)]
-  | WeakTermStructElim [(Identifier, ArrayKind)] WeakTermPlus WeakTermPlus
+  | WeakTermStructElim [(Meta, Identifier, ArrayKind)] WeakTermPlus WeakTermPlus
   deriving (Show, Eq)
 
 type WeakTermPlus = (Meta, WeakTerm)
@@ -149,7 +149,7 @@ varWeakTermPlus (_, WeakTermStruct {}) = []
 varWeakTermPlus (_, WeakTermStructIntro ets) =
   concatMap (varWeakTermPlus . fst) ets
 varWeakTermPlus (_, WeakTermStructElim xts d e) = do
-  let xs = map fst xts
+  let xs = map (\(_, x, _) -> x) xts
   varWeakTermPlus d ++ filter (`notElem` xs) (varWeakTermPlus e)
 
 varWeakTermPlusBindings :: [IdentifierPlus] -> [WeakTermPlus] -> [Hole]
@@ -299,7 +299,8 @@ substWeakTermPlus sub (m, WeakTermStructIntro ets) = do
   (m, WeakTermStructIntro $ zip es' ts)
 substWeakTermPlus sub (m, WeakTermStructElim xts v e) = do
   let v' = substWeakTermPlus sub v
-  let sub' = filter (\(k, _) -> k `notElem` map fst xts) sub
+  let xs = map (\(_, x, _) -> x) xts
+  let sub' = filter (\(k, _) -> k `notElem` xs) sub
   let e' = substWeakTermPlus sub' e
   (m, WeakTermStructElim xts v' e')
 
@@ -383,7 +384,7 @@ toText (_, WeakTermStruct ks) = showCons $ "struct" : map showArrayKind ks
 toText (_, WeakTermStructIntro ets) = do
   showStruct $ map (toText . fst) ets
 toText (_, WeakTermStructElim xts e1 e2) = do
-  let argStr = inParen $ showItems $ map fst xts
+  let argStr = inParen $ showItems $ map (\(_, x, _) -> x) xts
   showCons ["struct-elimination", argStr, toText e1, toText e2]
 
 inParen :: T.Text -> T.Text

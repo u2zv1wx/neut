@@ -308,10 +308,10 @@ interpretStructIntro (_, TreeNode [e, k]) = do
 interpretStructIntro e =
   throwError' $ "interpretStructIntro: syntax error:\n " <> T.pack (Pr.ppShow e)
 
-interpretStructElim :: TreePlus -> WithEnv (Identifier, ArrayKind)
-interpretStructElim (_, TreeNode [(_, TreeAtom x), k]) = do
+interpretStructElim :: TreePlus -> WithEnv (Meta, Identifier, ArrayKind)
+interpretStructElim (_, TreeNode [(m, TreeAtom x), k]) = do
   k' <- asStructKind k
-  return (x, k')
+  return (m, x, k')
 interpretStructElim e =
   throwError' $ "interpretStructElim: syntax error:\n " <> T.pack (Pr.ppShow e)
 

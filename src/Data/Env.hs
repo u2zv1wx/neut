@@ -60,6 +60,7 @@ data Env =
     , codeEnv :: Map.HashMap Identifier ([Identifier], CodePlus) -- f ~> thunk (lam (x1 ... xn) e)
     , llvmEnv :: Map.HashMap Identifier ([Identifier], LLVM)
     , shouldColorize :: Bool
+    , cursorName :: Maybe Identifier -- to generate completion candidates
     }
 
 initialEnv :: Path Abs File -> Bool -> Env
@@ -89,6 +90,7 @@ initialEnv path colorizeFlag =
     , mainFilePath = path
     , currentFilePath = path
     , shouldColorize = colorizeFlag
+    , cursorName = Nothing
     }
 
 -- type WithEnv a = StateT Env (ExceptT Identifier IO) a

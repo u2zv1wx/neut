@@ -202,16 +202,16 @@ renameCaseList nenv caseList =
 
 renameStruct ::
      NameEnv
-  -> [(Identifier, ArrayKind)]
+  -> [(Meta, Identifier, ArrayKind)]
   -> WeakTermPlus
-  -> WithEnv ([(Identifier, ArrayKind)], WeakTermPlus)
+  -> WithEnv ([(Meta, Identifier, ArrayKind)], WeakTermPlus)
 renameStruct nenv [] e = do
   e' <- rename' nenv e
   return ([], e')
-renameStruct nenv ((x, t):xts) e = do
+renameStruct nenv ((mx, x, t):xts) e = do
   x' <- newLLVMNameWith x
   (xts', e') <- renameStruct (Map.insert x x' nenv) xts e
-  return ((x', t) : xts', e')
+  return ((mx, x', t) : xts', e')
 
 checkSanity :: [Identifier] -> WeakTermPlus -> Bool
 checkSanity _ (_, WeakTermTau) = True
@@ -269,12 +269,12 @@ checkSanitySigma ctx ((_, x, t):xts) = do
   checkSanity ctx t && checkSanitySigma (x : ctx) xts
 
 checkSanity'' ::
-     [Identifier] -> [(Identifier, ArrayKind)] -> WeakTermPlus -> Bool
+     [Identifier] -> [(Meta, Identifier, ArrayKind)] -> WeakTermPlus -> Bool
 checkSanity'' ctx [] e = do
   checkSanity ctx e
-checkSanity'' ctx ((x, _):_) _
+checkSanity'' ctx ((_, x, _):_) _
   | x `elem` ctx = False
-checkSanity'' ctx ((x, _):xts) e = do
+checkSanity'' ctx ((_, x, _):xts) e = do
   checkSanity'' (x : ctx) xts e
 
 -- {} invRename {(every bound variable has fresh name)}
@@ -416,13 +416,13 @@ invRenameCaseList caseList = do
   return $ zip ls es'
 
 invRenameStruct ::
-     [(Identifier, ArrayKind)]
+     [(Meta, Identifier, ArrayKind)]
   -> WeakTermPlus
-  -> WithEnv ([(Identifier, ArrayKind)], WeakTermPlus)
+  -> WithEnv ([(Meta, Identifier, ArrayKind)], WeakTermPlus)
 invRenameStruct [] e = do
   e' <- invRename e
   return ([], e')
-invRenameStruct ((x, t):xts) e = do
+invRenameStruct ((mx, x, t):xts) e = do
   x' <- invRenameIdentifier IdentKindUpsilon x
   (xts', e') <- invRenameStruct xts e
-  return ((x', t) : xts', e')
+  return ((mx, x', t) : xts', e')
