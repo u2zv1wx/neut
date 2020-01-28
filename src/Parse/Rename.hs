@@ -30,16 +30,16 @@ renameStmtList = renameStmtList' Map.empty
 
 renameStmtList' :: NameEnv -> [Stmt] -> WithEnv [Stmt]
 renameStmtList' _ [] = return []
-renameStmtList' nenv ((StmtLet m (x, t) e):ss) = do
+renameStmtList' nenv ((StmtLet m (mx, x, t) e):ss) = do
   t' <- rename' nenv t
   x' <- newLLVMNameWith x
   e' <- rename' nenv e
   ss' <- renameStmtList' (Map.insert x x' nenv) ss
-  return $ StmtLet m (x', t') e' : ss'
+  return $ StmtLet m (mx, x', t') e' : ss'
 renameStmtList' nenv ((StmtDef xds):ss) = do
   let (xs, ds) = unzip xds
   -- rename for deflist
-  let ys = map (\(_, (y, _), _, _) -> y) ds
+  let ys = map (\(_, (_, y, _), _, _) -> y) ds
   ys' <- mapM newLLVMNameWith ys
   let nenvForDef = Map.fromList (zip ys ys') `Map.union` nenv
   ds' <- mapM (renameDef nenvForDef) ds
@@ -48,18 +48,18 @@ renameStmtList' nenv ((StmtDef xds):ss) = do
   let nenvForCont = Map.fromList (zip xs xs') `Map.union` nenv
   ss' <- renameStmtList' nenvForCont ss
   return $ StmtDef (zip xs' ds') : ss'
-renameStmtList' nenv ((StmtConstDecl (x, t)):ss) = do
+renameStmtList' nenv ((StmtConstDecl m (mx, x, t)):ss) = do
   t' <- rename' nenv t
   ss' <- renameStmtList' (Map.insert x x nenv) ss
-  return $ StmtConstDecl (x, t') : ss'
+  return $ StmtConstDecl m (mx, x, t') : ss'
 
 renameDef :: NameEnv -> Def -> WithEnv Def
-renameDef nenv (m, (x, t), xts, e) = do
+renameDef nenv (m, (mx, x, t), xts, e) = do
   t' <- rename' nenv t
   (xts', e') <- renameBinder nenv xts e
   case Map.lookup x nenv of
     Nothing -> throwError' "renameDef"
-    Just x' -> return (m, (x', t'), xts', e')
+    Just x' -> return (m, (mx, x', t'), xts', e')
   -- (xt', xts', e') <- renameIter nenv xt xts e
   -- (xts', e') <- renameBinder nenv xts e
   -- return (m, xt', xts', e')
@@ -104,10 +104,10 @@ rename' nenv (m, WeakTermIter xt xts e) = do
   (xt', xts', e') <- renameIter nenv xt xts e
   return (m, WeakTermIter xt' xts' e')
 rename' _ (m, WeakTermConst x) = return (m, WeakTermConst x)
-rename' nenv (m, WeakTermConstDecl (x, t) e) = do
+rename' nenv (m, WeakTermConstDecl (mx, x, t) e) = do
   t' <- rename' nenv t
   e' <- rename' (Map.insert x x nenv) e
-  return (m, WeakTermConstDecl (x, t') e')
+  return (m, WeakTermConstDecl (mx, x, t') e')
 rename' _ (m, WeakTermZeta h) = return (m, WeakTermZeta h)
 rename' _ (m, WeakTermInt t x) = do
   t' <- rename t
@@ -153,19 +153,19 @@ renameBinder ::
 renameBinder nenv [] e = do
   e' <- rename' nenv e
   return ([], e')
-renameBinder nenv ((x, t):xts) e = do
+renameBinder nenv ((mx, x, t):xts) e = do
   t' <- rename' nenv t
   x' <- newLLVMNameWith x
   (xts', e') <- renameBinder (Map.insert x x' nenv) xts e
-  return ((x', t') : xts', e')
+  return ((mx, x', t') : xts', e')
 
 renameSigma :: NameEnv -> [IdentifierPlus] -> WithEnv [IdentifierPlus]
 renameSigma _ [] = return []
-renameSigma nenv ((x, t):xts) = do
+renameSigma nenv ((mx, x, t):xts) = do
   t' <- rename' nenv t
   x' <- newLLVMNameWith x
   xts' <- renameSigma (Map.insert x x' nenv) xts
-  return $ (x', t') : xts'
+  return $ (mx, x', t') : xts'
 
 renameIter ::
      NameEnv
@@ -173,9 +173,9 @@ renameIter ::
   -> [IdentifierPlus]
   -> WeakTermPlus
   -> WithEnv (IdentifierPlus, [IdentifierPlus], WeakTermPlus)
-renameIter nenv (x, t) xts e = do
+renameIter nenv (mx, x, t) xts e = do
   t' <- rename' nenv t
-  renameIter' nenv (x, t') xts e
+  renameIter' nenv (mx, x, t') xts e
 
 renameIter' ::
      NameEnv
@@ -183,15 +183,15 @@ renameIter' ::
   -> [IdentifierPlus]
   -> WeakTermPlus
   -> WithEnv (IdentifierPlus, [IdentifierPlus], WeakTermPlus)
-renameIter' nenv (x, t') [] e = do
+renameIter' nenv (mx, x, t') [] e = do
   x' <- newLLVMNameWith x
   e' <- rename' (Map.insert x x' nenv) e
-  return ((x', t'), [], e')
-renameIter' nenv xt ((x, t):xts) e = do
+  return ((mx, x', t'), [], e')
+renameIter' nenv xt ((mx, x, t):xts) e = do
   t' <- rename' nenv t
   x' <- newLLVMNameWith x
   (xt', xts', e') <- renameIter' (Map.insert x x' nenv) xt xts e
-  return (xt', (x', t') : xts', e')
+  return (xt', (mx, x', t') : xts', e')
 
 renameCaseList ::
      NameEnv -> [(Case, WeakTermPlus)] -> WithEnv [(Case, WeakTermPlus)]
@@ -229,7 +229,7 @@ checkSanity ctx (_, WeakTermSigmaElim t xts e1 e2) = do
 checkSanity ctx (_, WeakTermIter xt xts e) = do
   checkSanity' ctx (xt : xts) e
 checkSanity _ (_, WeakTermConst _) = True
-checkSanity ctx (_, WeakTermConstDecl (_, t) e) = do
+checkSanity ctx (_, WeakTermConstDecl (_, _, t) e) = do
   checkSanity ctx t && checkSanity ctx e
 checkSanity _ (_, WeakTermZeta _) = True
 checkSanity ctx (_, WeakTermInt t _) = checkSanity ctx t
@@ -256,16 +256,16 @@ checkSanity ctx (_, WeakTermStructElim xts e1 e2) = do
 checkSanity' :: [Identifier] -> [IdentifierPlus] -> WeakTermPlus -> Bool
 checkSanity' ctx [] e = do
   checkSanity ctx e
-checkSanity' ctx ((x, _):_) _
+checkSanity' ctx ((_, x, _):_) _
   | x `elem` ctx = False
-checkSanity' ctx ((x, t):xts) e = do
+checkSanity' ctx ((_, x, t):xts) e = do
   checkSanity ctx t && checkSanity' (x : ctx) xts e
 
 checkSanitySigma :: [Identifier] -> [IdentifierPlus] -> Bool
 checkSanitySigma _ [] = True
-checkSanitySigma ctx ((x, _):_)
+checkSanitySigma ctx ((_, x, _):_)
   | x `elem` ctx = False
-checkSanitySigma ctx ((x, t):xts) = do
+checkSanitySigma ctx ((_, x, t):xts) = do
   checkSanity ctx t && checkSanitySigma (x : ctx) xts
 
 checkSanity'' ::
@@ -331,10 +331,10 @@ invRename (m, WeakTermPiElim e es) = do
 invRename (m, WeakTermSigma xts) =
   case splitLast xts of
     Nothing -> return (m, WeakTermSigma xts)
-    Just (yts, (y, t)) -> do
+    Just (yts, (my, y, t)) -> do
       yts' <- invRenameSigma yts
       t' <- invRename t
-      return (m, WeakTermSigma $ yts' ++ [(y, t')])
+      return (m, WeakTermSigma $ yts' ++ [(my, y, t')])
 invRename (m, WeakTermSigmaIntro t es) = do
   es' <- mapM invRename es
   -- don't rename t since it is not printed
@@ -343,15 +343,15 @@ invRename (m, WeakTermSigmaElim t xts e1 e2) = do
   e1' <- invRename e1
   (xts', e2') <- invRenameBinder xts e2
   return (m, WeakTermSigmaElim t xts' e1' e2')
-invRename (m, WeakTermIter (x, t) xts e) = do
+invRename (m, WeakTermIter (mx, x, t) xts e) = do
   x' <- invRenameIdentifier IdentKindUpsilon x
   (xts', e') <- invRenameBinder xts e
-  return (m, WeakTermIter (x', t) xts' e')
+  return (m, WeakTermIter (mx, x', t) xts' e')
 invRename (m, WeakTermConst x) = return (m, WeakTermConst x)
-invRename (m, WeakTermConstDecl (x, t) e) = do
+invRename (m, WeakTermConstDecl (mx, x, t) e) = do
   t' <- invRename t
   e' <- invRename e
-  return (m, WeakTermConstDecl (x, t') e')
+  return (m, WeakTermConstDecl (mx, x, t') e')
 invRename (m, WeakTermZeta h) = do
   h' <- invRenameIdentifier IdentKindZeta h
   return (m, WeakTermZeta h')
@@ -395,19 +395,19 @@ invRenameBinder ::
 invRenameBinder [] e = do
   e' <- invRename e
   return ([], e')
-invRenameBinder ((x, t):xts) e = do
+invRenameBinder ((mx, x, t):xts) e = do
   t' <- invRename t
   x' <- invRenameIdentifier IdentKindUpsilon x
   (xts', e') <- invRenameBinder xts e
-  return ((x', t') : xts', e')
+  return ((mx, x', t') : xts', e')
 
 invRenameSigma :: [IdentifierPlus] -> WithEnv [IdentifierPlus]
 invRenameSigma [] = return []
-invRenameSigma ((x, t):xts) = do
+invRenameSigma ((mx, x, t):xts) = do
   t' <- invRename t
   x' <- invRenameIdentifier IdentKindUpsilon x
   xts' <- invRenameSigma xts
-  return $ (x', t') : xts'
+  return $ (mx, x', t') : xts'
 
 invRenameCaseList :: [(Case, WeakTermPlus)] -> WithEnv [(Case, WeakTermPlus)]
 invRenameCaseList caseList = do
