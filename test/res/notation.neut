@@ -25,18 +25,16 @@
 
 (keyword begin)
 
-;; (keyword definition)
-
-(notation (begin (let (x t) e+) rest+)
-  ((pi-introduction ((x t)) (begin rest+)) (begin e+)))
-
-(notation (begin (let x e+) rest+)
-  ((pi-introduction ((x hole)) (begin rest+)) (begin e+)))
+(notation (begin e) e)
 
 (notation (begin e rest+)
   ((pi-introduction ((_ hole)) (begin rest+)) (begin e)))
 
-(notation (begin e) e)
+(notation (begin (let x e+) rest+)
+  ((pi-introduction ((x hole)) (begin rest+)) (begin e+)))
+
+(notation (begin (let (x t) e+) rest+)
+  ((pi-introduction ((x t)) (begin rest+)) (begin e+)))
 
 ;; (notation (begin (definition x e) rest+)
 ;;   (pi-e (pi-i ((x _)) (begin rest+)) (mu x e)))
@@ -47,11 +45,12 @@
 ;; lambda: pi-introduction with implicit begin block
 (keyword lambda)
 
+(notation (lambda () e+)
+  (pi-introduction () (begin e+)))
+
 (notation (lambda (xts+) e+)
   (pi-introduction (xts+) (begin e+)))
 
-(notation (lambda () e+)
-  (pi-introduction () (begin e+)))
 
 ;; define recursive term at top level without using `mu` explicitly
 ;; (notation (definition name e)
