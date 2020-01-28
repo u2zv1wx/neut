@@ -132,8 +132,8 @@ deleteMin = do
 -- {} toAltList {それぞれのlistはlinear list}
 toAltList :: [IdentifierPlus] -> WithEnv [[IdentifierPlus]]
 toAltList xts = do
-  result <-
-    mapM (discardInactive xts) $ chooseActive $ toIndexInfo (map fst xts)
+  let xs = map (\(_, x, _) -> x) xts
+  result <- mapM (discardInactive xts) $ chooseActive $ toIndexInfo xs
   -- forM_ (map (map fst) result) $ \xs -> do
   --   let info = toInfo "toAltList: linearity is not satisfied:" xs
   --   assertUP info $ linearCheck xs
@@ -173,13 +173,13 @@ pickup (xs:xss) = do
 discardInactive ::
      [IdentifierPlus] -> [(Identifier, Int)] -> WithEnv [IdentifierPlus]
 discardInactive xs indexList =
-  forM (zip xs [0 ..]) $ \((x, t), i) ->
+  forM (zip xs [0 ..]) $ \((mx, x, t), i) ->
     case lookup x indexList of
       Just j
-        | i == j -> return (x, t)
+        | i == j -> return (mx, x, t)
       _ -> do
         y <- newNameWith "hole"
-        return (y, t)
+        return (mx, y, t)
 
 -- takeByCount [1, 3, 2] [a, b, c, d, e, f, g, h] ~> [[a], [b, c, d], [e, f]]
 takeByCount :: [Int] -> [a] -> [[a]]
