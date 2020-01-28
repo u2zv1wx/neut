@@ -23,12 +23,16 @@ import qualified Data.HashMap.Strict as Map
 
 makeClosure ::
      Maybe Identifier -- the name of newly created closure
-  -> [(Identifier, CodePlus)] -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
+  -> [(Meta, Identifier, CodePlus)] -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
   -> Meta -- meta of lambda
-  -> [(Identifier, CodePlus)] -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
+  -> [(Meta, Identifier, CodePlus)] -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
   -> CodePlus -- the `e` in `lam (x1, ..., xn). e`
   -> WithEnv DataPlus
-makeClosure mName xts2 m xts1 e = do
+makeClosure mName mxts2 m mxts1 e = do
+  let (_, xs2, ts2) = unzip3 mxts2
+  let xts2 = zip xs2 ts2
+  let (_, xs1, ts1) = unzip3 mxts1
+  let xts1 = zip xs1 ts1
   expName <- newNameWith "exp"
   envExp <- cartesianSigma expName m arrVoidPtr $ map Right xts2
   (envVarName, envVar) <- newDataUpsilonWith "env"

@@ -56,7 +56,7 @@ data Env =
     , constraintQueue :: ConstraintQueue
     , substEnv :: Map.HashMap Identifier WeakTermPlus -- metavar ~> beta-equivalent weakterm
     , zetaEnv :: Map.HashMap Identifier (WeakTermPlus, WeakTermPlus)
-    , chainEnv :: Map.HashMap Identifier [(Identifier, TermPlus)] -- var/const ~> the closed var chain of its type
+    , chainEnv :: Map.HashMap Identifier [(Meta, Identifier, TermPlus)] -- var/const ~> the closed var chain of its type
     , codeEnv :: Map.HashMap Identifier ([Identifier], CodePlus) -- f ~> thunk (lam (x1 ... xn) e)
     , llvmEnv :: Map.HashMap Identifier ([Identifier], LLVM)
     , shouldColorize :: Bool
