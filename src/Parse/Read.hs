@@ -17,7 +17,6 @@ import Data.Tree
 
 type Parser a = ParsecT T.Text () (StateT Env (ExceptT [IO ()] IO)) a
 
--- type Parser a = ParsecT T.Text () (StateT Env (ExceptT T.Text IO)) a
 -- {} strToTree {}
 -- (as long as the input is translated into a tree, this function is considered valid)
 strToTree :: T.Text -> String -> WithEnv [TreePlus]
