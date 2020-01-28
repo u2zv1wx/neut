@@ -21,7 +21,6 @@ import Data.WeakTerm
 import Elaborate.Analyze
 import Elaborate.Infer
 import Elaborate.Synthesize
-import Parse.Rename
 import Reduce.Term
 import Reduce.WeakTerm
 
@@ -96,7 +95,7 @@ elaborate' (m, WeakTermPiElim (_, WeakTermZeta x) es) = do
       ":error: couldn't instantiate the hole since no constraints are given on it"
     Just (_, WeakTermPiIntro xts e)
       | length xts == length es -> do
-        let xs = map fst xts
+        let xs = map (\(_, y, _) -> y) xts
         e' <- elaborate' $ substWeakTermPlus (zip xs es) e
         return e'
     Just _ -> throwError' "insane zeta"
@@ -111,14 +110,14 @@ elaborate' (m, WeakTermSigma xts) = do
   k <- newNameWith "sig"
   -- Sigma [x1 : A1, ..., xn : An] = Pi (z : Type, _ : Pi [x1 : A1, ..., xn : An]. z). z
   let piType = (emptyMeta, TermPi xts' zv)
-  return (m, TermPi [(z, univTerm), (k, piType)] zv)
+  return (m, TermPi [(emptyMeta, z, univTerm), (emptyMeta, k, piType)] zv)
 elaborate' (m, WeakTermSigmaIntro t es) = do
   t' <- elaborate' t >>= reduceTermPlus
   es' <- mapM elaborate' es
   case t' of
-    (_, TermPi [zu, kp@(k, (_, TermPi xts _))] _) -- i.e. Sigma xts
+    (_, TermPi [zu, kp@(_, k, (_, TermPi xts _))] _) -- i.e. Sigma xts
       | length xts == length es' -> do
-        let xvs = map (toTermUpsilon . fst) xts
+        let xvs = map (\(_, x, _) -> toTermUpsilon x) xts
         let kv = toTermUpsilon k
         let bindArgsThen = \e -> (m, TermPiElim (m, TermPiIntro xts e) es')
         return $ bindArgsThen (m, TermPiIntro [zu, kp] (m, TermPiElim kv xvs))
@@ -130,11 +129,11 @@ elaborate' (m, WeakTermSigmaElim t xts e1 e2) = do
   e2' <- elaborate' e2
   -- sigma-elim t xts e1 e2 = e1 @ (t, lam xts. e2)
   return (m, TermPiElim e1' [t', (emptyMeta, TermPiIntro xts' e2')])
-elaborate' (m, WeakTermIter (x, t) xts e) = do
+elaborate' (m, WeakTermIter (mx, x, t) xts e) = do
   t' <- elaborate' t
   xts' <- mapM elaboratePlus xts
   e' <- elaborate' e
-  return (m, TermIter (x, t') xts' e')
+  return (m, TermIter (mx, x, t') xts' e')
 elaborate' (_, WeakTermZeta x) = do
   sub <- gets substEnv
   case Map.lookup x sub of
@@ -147,10 +146,10 @@ elaborate' (m, WeakTermConst x) = do
   case mi of
     Nothing -> return (m, TermConst x)
     Just i -> return (m, TermEnumIntro (EnumValueIntU 64 i))
-elaborate' (m, WeakTermConstDecl (x, t) e) = do
+elaborate' (m, WeakTermConstDecl (mx, x, t) e) = do
   t' <- elaborate' t
   e' <- elaborate' e
-  return (m, TermConstDecl (x, t') e')
+  return (m, TermConstDecl (mx, x, t') e')
 elaborate' (m, WeakTermInt t x) = do
   t' <- elaborate' t >>= reduceTermPlus
   case t' of
@@ -193,12 +192,14 @@ elaborate' (m, WeakTermEnumIntro x) = do
   return (m, TermEnumIntro x)
 elaborate' (m, WeakTermEnumElim (e, t) les) = do
   e' <- elaborate' e
-  les' <- forM les elaboratePlus
+  let (ls, es) = unzip les
+  es' <- mapM elaborate' es
+  -- les' <- forM les elaboratePlus
   t' <- elaborate' t >>= reduceTermPlus
   case t' of
     (_, TermEnum x) -> do
-      caseCheckEnumIdentifier x $ map fst les
-      return (m, TermEnumElim e' les')
+      caseCheckEnumIdentifier x ls
+      return (m, TermEnumElim e' (zip ls es'))
     _ -> throwError' "type error (enum elim)"
 elaborate' (m, WeakTermArray dom k) = do
   dom' <- elaborate' dom
@@ -221,10 +222,10 @@ elaborate' (m, WeakTermStructElim xts e1 e2) = do
   e2' <- elaborate' e2
   return (m, TermStructElim xts e1' e2')
 
-elaboratePlus :: (a, WeakTermPlus) -> WithEnv (a, TermPlus)
-elaboratePlus (x, t) = do
+elaboratePlus :: (Meta, a, WeakTermPlus) -> WithEnv (Meta, a, TermPlus)
+elaboratePlus (m, x, t) = do
   t' <- elaborate' t
-  return (x, t')
+  return (m, x, t')
 
 -- enum.n{i}   ~> Just i
 -- enum.choice ~> Just 2 (assuming choice = {left, right})

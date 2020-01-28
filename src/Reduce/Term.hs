@@ -15,15 +15,15 @@ import Data.Term
 
 reduceTermPlus :: TermPlus -> WithEnv TermPlus
 reduceTermPlus (m, TermPi xts cod) = do
-  let (xs, ts) = unzip xts
+  let (ms, xs, ts) = unzip3 xts
   ts' <- mapM reduceTermPlus ts
   cod' <- reduceTermPlus cod
-  return $ (m, TermPi (zip xs ts') cod')
+  return $ (m, TermPi (zip3 ms xs ts') cod')
 reduceTermPlus (m, TermPiIntro xts e) = do
-  let (xs, ts) = unzip xts
+  let (ms, xs, ts) = unzip3 xts
   ts' <- mapM reduceTermPlus ts
   e' <- reduceTermPlus e
-  return $ (m, TermPiIntro (zip xs ts') e')
+  return $ (m, TermPiIntro (zip3 ms xs ts') e')
 reduceTermPlus (m, TermPiElim e es) = do
   e' <- reduceTermPlus e
   es' <- mapM reduceTermPlus es
@@ -33,7 +33,7 @@ reduceTermPlus (m, TermPiElim e es) = do
     (_, TermPiIntro xts body) -- fixme: reduceできるだけreduceするようにする (partial evaluation)
       | length xts == length es'
       , valueCond -> do
-        let xs = map fst xts
+        let xs = map (\(_, x, _) -> x) xts
         reduceTermPlus $ substTermPlus (zip xs es') body
     -- (_, TermMu (x, _) body)
     --   -- reduce pseudo-recursive terms
@@ -41,18 +41,18 @@ reduceTermPlus (m, TermPiElim e es) = do
     --     reduceTermPlus (m, TermPiElim body es')
     (_, TermConst constant) -> reduceTermPlusTheta (m, app) es' m constant
     _ -> return (m, app)
-reduceTermPlus (m, TermIter (x, t) xts e)
+reduceTermPlus (m, TermIter (mx, x, t) xts e)
   | x `notElem` varTermPlus e = reduceTermPlus (m, TermPiIntro xts e)
   | otherwise = do
     t' <- reduceTermPlus t
-    let (xs, ts) = unzip xts
+    let (ms, xs, ts) = unzip3 xts
     ts' <- mapM reduceTermPlus ts
     e' <- reduceTermPlus e
-    return $ (m, TermIter (x, t') (zip xs ts') e')
-reduceTermPlus (m, TermConstDecl (x, t) e) = do
+    return $ (m, TermIter (mx, x, t') (zip3 ms xs ts') e')
+reduceTermPlus (m, TermConstDecl (mx, x, t) e) = do
   t' <- reduceTermPlus t
   e' <- reduceTermPlus e
-  return (m, TermConstDecl (x, t') e')
+  return (m, TermConstDecl (mx, x, t') e')
 reduceTermPlus (m, TermEnumElim e les) = do
   e' <- reduceTermPlus e
   let (ls, es) = unzip les
@@ -84,7 +84,9 @@ reduceTermPlus (m, TermArrayElim k xts e1 e2) = do
   case e1 of
     (_, TermArrayIntro k' es)
       | length es == length xts
-      , k == k' -> reduceTermPlus $ substTermPlus (zip (map fst xts) es) e2
+      , k == k' -> do
+        let xs = map (\(_, x, _) -> x) xts
+        reduceTermPlus $ substTermPlus (zip xs es) e2
     _ -> return (m, TermArrayElim k xts e1' e2)
   -- case v of
   --   (_, DataSigmaIntro mk' ds)
@@ -108,7 +110,7 @@ reduceTermPlus (m, TermStructElim xks e1 e2) = do
   e1' <- reduceTermPlus e1
   case e1' of
     (_, TermStructIntro eks)
-      | (xs, ks1) <- unzip xks
+      | (_, xs, ks1) <- unzip3 xks
       , (es, ks2) <- unzip eks
       , ks1 == ks2 -> reduceTermPlus $ substTermPlus (zip xs es) e2
     _ -> return (m, TermStructElim xks e1' e2)
