@@ -27,26 +27,14 @@ import Parse.MacroExpand
 import Parse.Read
 import Parse.Rename
 
--- data Stmt
---   = StmtLet
---       Meta
---       IdentifierPlus -- the `(x : t)` in `let (x : t) = e`
---       WeakTermPlus -- the `e` in `let x = e`
---   | StmtConstDecl IdentifierPlus
 -- {} parse {the output term is correctly renamed}
 -- (The postcondition is guaranteed by the assertion of `rename`.)
-parse :: T.Text -> Path Abs File -> WithEnv WeakTermPlus
-parse s inputPath
-  -- i <- newCount
-  -- modify (\env -> env {fileEnv = Map.insert inputPath (i, []) (fileEnv env)})
- = do
-  stmtList <- strToTree s (toFilePath inputPath) >>= parse'
+parse :: Path Abs File -> WithEnv WeakTermPlus
+parse inputPath = do
+  content <- liftIO $ TIO.readFile $ toFilePath inputPath
+  stmtList <- strToTree content (toFilePath inputPath) >>= parse'
   stmtList' <- renameStmtList stmtList
   concatStmtList stmtList'
-  -- e <- strToTree s (toFilePath inputPath) >>= parse' >>= concatStmtList
-  -- -- p' e
-  -- rename e
-  -- strToTree s inputPath >>= parse' >>= concatStmtList >>= rename
 
 -- {} parse' {}
 -- Parse the head element of the input list.

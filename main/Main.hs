@@ -12,7 +12,6 @@ import Text.Read (readMaybe)
 
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
-import qualified Data.Text.IO as TIO
 
 import Clarify
 import Data.Env
@@ -160,13 +159,11 @@ writeResult result outputPath OutputKindObject = do
 
 build :: Path Abs File -> WithEnv [B.ByteString]
 build inputPath = do
-  content <- liftIO $ TIO.readFile $ toFilePath inputPath
-  parse content inputPath >>= elaborate >>= clarify >>= toLLVM >>= emit
+  parse inputPath >>= elaborate >>= clarify >>= toLLVM >>= emit
 
 check :: Path Abs File -> WithEnv ()
 check inputPath = do
-  content <- liftIO $ TIO.readFile $ toFilePath inputPath
-  _ <- parse content inputPath >>= elaborate
+  _ <- parse inputPath >>= elaborate
   return ()
 
 seqIO :: [IO ()] -> IO ()
