@@ -55,7 +55,7 @@ interpret (m, TreeNode [(_, TreeAtom "sigma"), (_, TreeNode xts), t]) = do
   t' <- interpret t
   placeholder <- newNameWith "cod"
   m' <- adjustPhase m
-  return (m', WeakTermSigma $ xts' ++ [(placeholder, t')])
+  return (m', WeakTermSigma $ xts' ++ [(fst t', placeholder, t')])
 interpret (m, TreeNode ((_, TreeAtom "sigma-introduction"):es)) = do
   m' <- adjustPhase m
   h <- newHole m'
@@ -161,9 +161,10 @@ interpret (m, TreeNode [(_, TreeAtom "struct-elimination"), (_, TreeNode xts), e
 --
 interpret (m, TreeNode ((_, TreeAtom "product"):ts)) = do
   ts' <- mapM interpret ts
+  let ms = map fst ts'
   xs <- mapM (const $ newNameWith "sig") ts'
   m' <- adjustPhase m
-  return (m', WeakTermSigma (zip xs ts'))
+  return (m', WeakTermSigma (zip3 ms xs ts'))
 interpret (m, TreeAtom x)
   | Just x' <- readMaybe $ T.unpack x = do
     m' <- adjustPhase m
@@ -217,11 +218,12 @@ interpretIdentifierPlus :: TreePlus -> WithEnv IdentifierPlus
 interpretIdentifierPlus (m, TreeAtom x) = do
   m' <- adjustPhase m
   h <- newHole m'
-  return (x, h)
-interpretIdentifierPlus (_, TreeNode [(_, TreeAtom x), t]) = do
+  return (m, x, h)
+interpretIdentifierPlus (_, TreeNode [(m, TreeAtom x), t]) = do
   x' <- interpretAtom x
   t' <- interpret t
-  return (x', t')
+  -- ここでxの位置情報が捨てられてしまっている。
+  return (m, x', t')
 interpretIdentifierPlus ut =
   throwError' $
   "interpretIdentifierPlus: syntax error:\n" <> T.pack (Pr.ppShow ut)
