@@ -376,6 +376,7 @@
 
 (let bar (str))
 
+
 ;; (write n3 stdout bar enum.n3)
 
 ;; (definition buf

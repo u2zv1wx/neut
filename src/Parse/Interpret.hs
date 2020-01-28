@@ -5,6 +5,7 @@ module Parse.Interpret
   , interpretIdentifierPlus
   , interpretIter
   , extractIdentifier
+  , adjustPhase
   ) where
 
 import Control.Monad.Except
@@ -76,10 +77,12 @@ interpret (m, TreeNode [(_, TreeAtom "iterate"), xt, xts@(_, TreeNode _), e]) = 
   return (m', WeakTermIter xt' xts' e')
 -- interpret t@(_, TreeNode [(_, TreeAtom "iterate"), _, (_, TreeNode _), _]) = do
 --   (m', xt', xts', e') <- interpretIter t
-interpret (m, TreeNode [(_, TreeAtom "zeta"), (_, TreeAtom x)]) = do
-  x' <- interpretAtom x
+-- interpret (m, TreeNode [(_, TreeAtom "zeta"), (_, TreeAtom x)]) = do
+interpret (m, TreeNode [(_, TreeAtom "zeta"), x]) = do
+  (_, x') <- interpretAtom x
   m' <- adjustPhase m
-  return (m', WeakTermZeta x')
+  let m'' = m' {metaIsAppropriateAsCompletionCandidate = False}
+  return (m'', WeakTermZeta x')
 interpret (m, TreeNode [(_, TreeAtom "constant"), (_, TreeAtom x)]) = do
   m' <- adjustPhase m
   return (m', WeakTermConst x)
@@ -216,14 +219,15 @@ interpret t@(m, TreeNode es) = do
 -- {} interpretIdentifierPlus {}
 interpretIdentifierPlus :: TreePlus -> WithEnv IdentifierPlus
 interpretIdentifierPlus (m, TreeAtom x) = do
-  m' <- adjustPhase m
+  (m', x') <- interpretAtom (m, TreeAtom x)
   h <- newHole m'
-  return (m, x, h)
-interpretIdentifierPlus (_, TreeNode [(m, TreeAtom x), t]) = do
-  x' <- interpretAtom x
+  return (m', x', h)
+interpretIdentifierPlus (_, TreeNode [x, t])
+  -- m' <- adjustPhase m
+ = do
+  (m', x') <- interpretAtom x
   t' <- interpret t
-  -- ここでxの位置情報が捨てられてしまっている。
-  return (m, x', t')
+  return (m', x', t')
 interpretIdentifierPlus ut =
   throwError' $
   "interpretIdentifierPlus: syntax error:\n" <> T.pack (Pr.ppShow ut)
@@ -238,11 +242,21 @@ interpretIter (m, TreeNode [xt, (_, TreeNode xts), e]) = do
 interpretIter _ = throwError' "interpretIter"
 
 -- {} interpretAtom {}
-interpretAtom :: Identifier -> WithEnv Identifier
-interpretAtom "_" = newNameWith "H"
--- interpretAtom "_" = newNameWith "hole-explicit"
-interpretAtom x = return x
+interpretAtom :: TreePlus -> WithEnv (Meta, Identifier)
+interpretAtom (m, TreeAtom "_") = do
+  m' <- adjustPhase m
+  let m'' = m' {metaIsAppropriateAsCompletionCandidate = False}
+  h <- newNameWith "H"
+  return (m'', h)
+interpretAtom (m, TreeAtom x) = do
+  m' <- adjustPhase m
+  return (m', x)
+interpretAtom t =
+  throwError' $ "interpretAtom: syntax error:\n" <> T.pack (Pr.ppShow t)
 
+-- interpretAtom "_" = newNameWith "H"
+-- -- interpretAtom "_" = newNameWith "hole-explicit"
+-- interpretAtom x = return x
 -- {} interpretEnumValueMaybe {}
 interpretEnumValueMaybe :: TreePlus -> WithEnv (Maybe EnumValue)
 interpretEnumValueMaybe (_, TreeAtom x)
@@ -319,7 +333,7 @@ interpretStructElim e =
 extractIdentifier :: TreePlus -> WithEnv Identifier
 extractIdentifier (_, TreeAtom s) = return s
 extractIdentifier t =
-  throwError' $ "interpretAtom: syntax error:\n" <> T.pack (Pr.ppShow t)
+  throwError' $ "extractIdentifier: syntax error:\n" <> T.pack (Pr.ppShow t)
 
 -- {} isDefinedEnumName {}
 isDefinedEnumName :: Identifier -> WithEnv Bool

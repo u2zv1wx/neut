@@ -62,7 +62,6 @@ parseForCompletion :: Path Abs File -> Line -> Column -> WithEnv CompInfo
 parseForCompletion inputPath l c = do
   content <- liftIO $ TIO.readFile $ toFilePath inputPath
   s <- newNameWith "cursor"
-  modify (\env -> env {cursorName = Just s})
   case modifyFileForCompletion s content l c of
     Nothing -> return []
     Just (prefix, content') -> do
@@ -70,9 +69,15 @@ parseForCompletion inputPath l c = do
       case compInfo s stmtList of
         Right () -> return []
         Left info -> do
-          let filteredInfo = filter (\(x, _) -> prefix `T.isPrefixOf` x) info
+          let info' = filter (filterCompInfo prefix) info
+          -- let filteredInfo = filter (\(x, _) -> prefix `T.isPrefixOf` x) info
           let compareLoc m1 m2 = metaLocation m2 `compare` metaLocation m1
-          return $ sortBy (\(_, m1) (_, m2) -> compareLoc m1 m2) filteredInfo
+          return $ nub $ sortBy (\(_, m1) (_, m2) -> compareLoc m1 m2) info'
+
+filterCompInfo :: Prefix -> (Identifier, Meta) -> Bool
+filterCompInfo prefix (x, m)
+  | True <- metaIsAppropriateAsCompletionCandidate m = prefix `T.isPrefixOf` x
+  | otherwise = False
 
 type Prefix = T.Text
 
@@ -102,7 +107,8 @@ parse' ((_, TreeNode [(_, TreeAtom "keyword"), (_, TreeAtom s)]):as) = do
   parse' as
 parse' ((m, TreeNode ((_, TreeAtom "enum"):(_, TreeAtom name):ts)):as) = do
   indexList <- mapM extractIdentifier ts
-  insEnumEnv m name indexList
+  m' <- adjustPhase m
+  insEnumEnv m' name indexList
   -- `constName` is a proof term that `name` is indeed an enum:
   --   enum.choice : is-enum choice
   -- example usage:
@@ -117,7 +123,7 @@ parse' ((m, TreeNode ((_, TreeAtom "enum"):(_, TreeAtom name):ts)):as) = do
   -- e.g. t == is-enum @ (choice)
   isEnumType <- toIsEnumType name
   -- add `(constant enum.choice (is-enum choice))` to defList in order to insert appropriate type constraint
-  let ascription = StmtConstDecl m (m, constName, isEnumType)
+  let ascription = StmtConstDecl m' (m', constName, isEnumType)
   -- register the name of the constant
   modify (\env -> env {nameEnv = Map.insert constName constName (nameEnv env)})
   defList <- parse' as
@@ -165,7 +171,9 @@ parse' ((m, TreeNode [(_, TreeAtom "constant"), (mn, TreeAtom name), t]):as) = d
     else do
       modify (\e -> e {constantEnv = S.insert name (constantEnv e)})
       defList <- parse' as
-      return $ StmtConstDecl m (mn, name, t') : defList
+      m' <- adjustPhase m
+      mn' <- adjustPhase mn
+      return $ StmtConstDecl m' (mn', name, t') : defList
 parse' ((m, TreeNode [(mDef, TreeAtom "definition"), name@(_, TreeAtom _), body]):as) =
   parse' $ (m, TreeNode [(mDef, TreeAtom "let"), name, body]) : as
 parse' ((m, TreeNode (def@(_, TreeAtom "definition"):name@(mFun, TreeAtom _):xts@(_, TreeNode _):body:rest)):as) =
@@ -175,10 +183,11 @@ parse' ((_, TreeNode ((_, TreeAtom "definition"):xds)):as) = do
   stmtList <- parse' as
   return $ stmt : stmtList
 parse' ((m, TreeNode [(_, TreeAtom "let"), xt, e]):as) = do
+  m' <- adjustPhase m
   e' <- macroExpand e >>= interpret
   (mx, x, t) <- macroExpand xt >>= interpretIdentifierPlus
   defList <- parse' as
-  return $ StmtLet m (mx, x, t) e' : defList
+  return $ StmtLet m' (mx, x, t) e' : defList
 parse' (a:as) = do
   e <- macroExpand a
   if isSpecialForm e
@@ -188,14 +197,15 @@ parse' (a:as) = do
       name <- newNameWith "hole-parse-last"
       t <- newHole
       defList <- parse' as
-      return $ StmtLet meta (meta, name, t) e' : defList
+      let meta' = meta {metaIsAppropriateAsCompletionCandidate = False}
+      return $ StmtLet meta' (meta', name, t) e' : defList
 
 parseDef :: [TreePlus] -> WithEnv Stmt
 parseDef xds = do
   xds' <- mapM (insImplicitBegin >=> macroExpand) xds
-  xs <- mapM extractFunName xds'
+  mxs <- mapM extractFunName xds'
   xds'' <- mapM interpretIter xds'
-  return $ StmtDef $ zip xs xds''
+  return $ StmtDef $ zip mxs xds''
 
 insImplicitBegin :: TreePlus -> WithEnv TreePlus
 insImplicitBegin (m, TreeNode (xt:xts:body:rest)) = do
@@ -352,13 +362,14 @@ toIdentList ((StmtDef xds):ds) = do
   mxts ++ toIdentList ds
 toIdentList ((StmtConstDecl _ (mx, x, t)):ds) = (mx, x, t) : toIdentList ds
 
--- このへんの位置情報はまだちょっと変。
 toStmtLetFooter :: Path Abs File -> (Meta, Identifier, WeakTermPlus) -> Stmt
 toStmtLetFooter path (m, x, t) = do
   let x' = "(" <> T.pack (toFilePath path) <> ":" <> x <> ")" -- user cannot write this var since it contains parenthesis
-  StmtLet m (m, x', t) (m, WeakTermUpsilon x)
+  let m' = m {metaIsAppropriateAsCompletionCandidate = False}
+  StmtLet m' (m', x', t) (m, WeakTermUpsilon x)
 
 toStmtLetHeader :: Path Abs File -> (Meta, Identifier, WeakTermPlus) -> Stmt
 toStmtLetHeader path (m, x, t) = do
   let x' = "(" <> T.pack (toFilePath path) <> ":" <> x <> ")" -- user cannot write this var since it contains parenthesis
-  StmtLet m (m, x, t) (m, WeakTermUpsilon x')
+  let m' = m {metaIsAppropriateAsCompletionCandidate = False}
+  StmtLet m' (m, x, t) (m', WeakTermUpsilon x')

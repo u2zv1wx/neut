@@ -73,4 +73,6 @@ currentMeta = do
       { metaFileName = Just name
       , metaLocation = Just (0, l, c)
       , metaConstraintLocation = Just (0, l, c)
+      , metaIsPublic = True
+      , metaIsAppropriateAsCompletionCandidate = True
       }

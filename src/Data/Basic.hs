@@ -38,6 +38,8 @@ data Meta =
     { metaFileName :: Maybe (Path Abs File)
     , metaLocation :: Maybe Loc
     , metaConstraintLocation :: Maybe Loc
+    , metaIsPublic :: Bool
+    , metaIsAppropriateAsCompletionCandidate :: Bool
     }
 
 -- required to derive the eqality on WeakTerm
@@ -94,6 +96,8 @@ emptyMeta =
     { metaLocation = Nothing
     , metaConstraintLocation = Nothing
     , metaFileName = Nothing
+    , metaIsPublic = True
+    , metaIsAppropriateAsCompletionCandidate = True
     }
 
 readEnumType :: Char -> Identifier -> Integer -> (Maybe Integer)
