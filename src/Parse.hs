@@ -13,6 +13,8 @@ import Path
 import Path.IO
 import Text.Read (readMaybe)
 
+import Debug.Trace
+
 import qualified Data.HashMap.Strict as Map
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -87,11 +89,42 @@ modifyFileForCompletion ::
      CursorName -> T.Text -> Line -> Column -> Maybe (Prefix, T.Text)
 modifyFileForCompletion s content l c = do
   let xs = T.lines content
-  let (ys, targetLine:zs) = splitAt (fromInteger $ l - 1) xs
-  let (s1, s2) = T.splitAt (fromInteger $ c - 1) targetLine
-  -- ほんとはここのs1/s2を読んでprefixを取得したりなんなりする
-  let targetLine' = s1 <> s <> s2
-  return (T.empty, T.unlines $ ys ++ [targetLine'] ++ zs)
+  let (ys, ws) = splitAt (fromInteger $ l - 1) xs
+  (targetLine, zs) <- headTailMaybe ws
+  (s1, s2) <- splitAtMaybe (c - 1) targetLine
+  (ch, s2') <- headTailMaybeText s2
+  case ch of
+    '(' -> Nothing
+    ')' -> Nothing
+    ' ' -> do
+      let targetLine' = s1 <> " " <> s <> s2
+      return (T.empty, T.unlines $ ys ++ [targetLine'] ++ zs)
+    _ -> do
+      let baseStr = s1 <> T.singleton ch
+      let revBaseStr = T.reverse baseStr
+      let revPrefix = T.takeWhile (\c -> c `notElem` ['(', ' ', ')']) revBaseStr
+      let prefix = T.reverse revPrefix
+      let revStr = T.dropWhile (\c -> c `notElem` ['(', ' ', ')']) revBaseStr
+      let s1' = T.reverse revStr
+      let s2'' = T.dropWhile (\c -> c `notElem` ['(', ' ', ')']) s2'
+      let targetLine' = s1' <> s <> s2''
+      return (prefix, T.unlines $ ys ++ [targetLine'] ++ zs)
+
+headTailMaybe :: [a] -> Maybe (a, [a])
+headTailMaybe [] = Nothing
+headTailMaybe (x:xs) = return (x, xs)
+
+headTailMaybeText :: T.Text -> Maybe (Char, T.Text)
+headTailMaybeText s
+  | s == T.empty = Nothing
+  | otherwise = return (T.head s, T.tail s)
+
+splitAtMaybe :: Integer -> T.Text -> Maybe (T.Text, T.Text)
+splitAtMaybe i xs = do
+  let i' = fromInteger i
+  if 0 <= i' && i' < T.length xs
+    then return $ T.splitAt i' xs
+    else Nothing
 
 -- {} parse' {}
 -- Parse the head element of the input list.
