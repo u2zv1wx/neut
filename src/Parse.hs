@@ -52,7 +52,8 @@ showCompInfo ((x, m):xms) = do
       let pathStr = "\"" <> toFilePath path <> "\""
       let x' = T.unpack x
       let str =
-            "(" ++ x' ++ " " ++ pathStr ++ " " ++ show l ++ " " ++ show c ++ ")"
+            "(\"" ++
+            x' ++ "\" (" ++ pathStr ++ " " ++ show l ++ " " ++ show c ++ "))"
       str : showCompInfo xms
 
 parseForCompletion :: Path Abs File -> Line -> Column -> WithEnv CompInfo
@@ -67,7 +68,6 @@ parseForCompletion inputPath l c = do
         Right () -> return []
         Left info -> do
           let info' = filter (filterCompInfo prefix) info
-          -- let filteredInfo = filter (\(x, _) -> prefix `T.isPrefixOf` x) info
           let compareLoc m1 m2 = metaLocation m2 `compare` metaLocation m1
           return $ nub $ sortBy (\(_, m1) (_, m2) -> compareLoc m1 m2) info'
 
@@ -212,6 +212,18 @@ parse' ((_, TreeNode ((_, TreeAtom "definition"):xds)):as) = do
   stmt <- parseDef xds
   stmtList <- parse' as
   return $ stmt : stmtList
+parse' ((m, TreeNode (ind@(_, TreeAtom "inductive"):name@(mFun, TreeAtom _):xts@(_, TreeNode _):rest)):as) =
+  parse' $ (m, TreeNode [ind, (mFun, TreeNode (name : xts : rest))]) : as
+parse' ((_, TreeNode ((_, TreeAtom "inductive"):ts)):as) = do
+  algDeclList <- mapM parseData ts
+  let es = map (toTypeDef algDeclList) algDeclList
+  let xts = map foo algDeclList
+  let ls = zipWith (\e i@(_, _, (m, _)) -> StmtLet m i e) es xts
+  let cs = concatMap (toConstructorList algDeclList) algDeclList
+  stmtList <- parse' as
+  return $ ls ++ cs ++ stmtList
+parse' ((m, TreeNode (coind@(_, TreeAtom "coinductive"):name@(mFun, TreeAtom _):xts@(_, TreeNode _):rest)):as) =
+  parse' $ (m, TreeNode [coind, (mFun, TreeNode (name : xts : rest))]) : as
 parse' ((m, TreeNode [(_, TreeAtom "let"), xt, e]):as) = do
   m' <- adjustPhase m
   e' <- macroExpand e >>= interpret
@@ -237,6 +249,60 @@ parseDef xds = do
   xds'' <- mapM interpretIter xds'
   return $ StmtDef $ zip mxs xds''
 
+type Decl = (Meta, (Meta, Identifier), [IdentifierPlus], WeakTermPlus)
+
+type AlgType = (Meta, (Meta, Identifier), [IdentifierPlus], [Decl])
+
+toConstructorList :: [AlgType] -> AlgType -> [Stmt]
+toConstructorList algDeclList algDecl@(_, _, _, decls) =
+  map (toConstructor algDeclList algDecl) decls
+
+toConstructor :: [AlgType] -> AlgType -> Decl -> Stmt
+toConstructor algDeclList (_, _, xts, decls) (m, (mName, name), yts, cod) = do
+  let zts = map foo algDeclList
+  let wts = map declToPi decls
+  let vs = map toVar' yts
+  let body = (m, WeakTermPiElim (mName, WeakTermUpsilon name) vs)
+  let e =
+        (m, WeakTermPiIntro (xts ++ yts) (m, WeakTermPiIntro (zts ++ wts) body))
+  let t = (m, WeakTermPi (xts ++ yts) cod)
+  StmtLet m (mName, name, t) e
+
+declToPi :: Decl -> IdentifierPlus
+declToPi (m, (mName, name), xts, t) = (mName, name, (m, WeakTermPi xts t))
+
+foo :: AlgType -> IdentifierPlus
+foo (m, (mName, name), xts, _) = (mName, name, (m, WeakTermPi xts univ))
+
+toVar' :: IdentifierPlus -> WeakTermPlus
+toVar' (m, x, _) = (m, WeakTermUpsilon x)
+
+toTypeDef :: [AlgType] -> AlgType -> WeakTermPlus
+toTypeDef algDeclList (m, (mName, name), xts, decls) = do
+  let zts = map foo algDeclList
+  let wts = map declToPi decls
+  let vs = map toVar' xts
+  let cod = (m, WeakTermPiElim (mName, WeakTermUpsilon name) vs)
+  (m, WeakTermPiIntro xts (m, WeakTermPi (zts ++ wts) cod))
+
+parseData :: TreePlus -> WithEnv AlgType
+parseData (m, TreeNode ((mName, TreeAtom name):(_, TreeNode xts):decls)) = do
+  m' <- adjustPhase m
+  mName' <- adjustPhase mName
+  xts' <- mapM interpretIdentifierPlus xts
+  decls' <- mapM parseDecl decls
+  return (m', (mName', name), xts', decls')
+parseData _ = throwError' "parseData: syntax error"
+
+parseDecl :: TreePlus -> WithEnv Decl
+parseDecl (m, TreeNode [(mName, TreeAtom name), (_, TreeNode xts), t]) = do
+  m' <- adjustPhase m
+  mName' <- adjustPhase mName
+  t' <- interpret t
+  xts' <- mapM interpretIdentifierPlus xts
+  return (m', (mName', name), xts', t')
+parseDecl _ = throwError' "parseDecl: syntax error"
+
 insImplicitBegin :: TreePlus -> WithEnv TreePlus
 insImplicitBegin (m, TreeNode (xt:xts:body:rest)) = do
   let m' = fst body
@@ -259,7 +325,9 @@ isSpecialForm (_, TreeNode [(_, TreeAtom "constant"), (_, TreeAtom _), _]) =
   True
 isSpecialForm (_, TreeNode ((_, TreeAtom "statement"):_)) = True
 isSpecialForm (_, TreeNode [(_, TreeAtom "let"), _, _]) = True
-isSpecialForm (_, TreeNode [(_, TreeAtom "definition"), _, _]) = True
+isSpecialForm (_, TreeNode ((_, TreeAtom "definition"):_)) = True
+isSpecialForm (_, TreeNode ((_, TreeAtom "inductive"):_)) = True
+isSpecialForm (_, TreeNode ((_, TreeAtom "coinductive"):_)) = True
 isSpecialForm _ = False
 
 -- {} toIsEnumType {}
