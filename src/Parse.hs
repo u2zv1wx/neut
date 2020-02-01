@@ -357,8 +357,12 @@ toCoinductiveElim ats bts xts (m, (mb, b), yts, cod)
             ( m
             , WeakTermSigmaElim
                 cod -- sigmaElimの型の部分はelimの結果の型。変数（yts）を同一名の変数（yts）でsubstするので依存の処理の心配もなし。
-                (ats ++ bts ++ [head yts]) -- 同一の変数名を使うのがポイント
-                (toVar' $ head yts)
+                -- 同一の変数名を使うのがポイント。head yts : a @ (e1, ..., en)なので、
+                -- (1)のほうのhead ytsの型に出現するaは(1)の行のatsによって束縛されたものとなり、
+                -- (2)のほうのhead ytsの方に出現するaは外側のtoCoinductiveの結果によって定義されたものとなる。
+                -- 別に異なる名前を両者に与えてもよいが、同一の名前を使ったほうが実装がラクなのでこちらをとることにする。
+                (ats ++ bts ++ [head yts]) -- (1)
+                (toVar' $ head yts) -- (2)
                 (m, WeakTermPiElim (mb, WeakTermUpsilon b) (map toVar' yts))))
   | otherwise =
     throwError'
