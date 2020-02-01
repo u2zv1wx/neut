@@ -215,11 +215,11 @@ parse' ((_, TreeNode ((_, TreeAtom "definition"):xds)):as) = do
 parse' ((m, TreeNode (ind@(_, TreeAtom "inductive"):name@(mFun, TreeAtom _):xts@(_, TreeNode _):rest)):as) =
   parse' $ (m, TreeNode [ind, (mFun, TreeNode (name : xts : rest))]) : as
 parse' ((_, TreeNode ((_, TreeAtom "inductive"):ts)):as) = do
-  parseData ts as toInductive toInductiveIntroList
+  parseConnective ts as toInductive toInductiveIntroList
 parse' ((m, TreeNode (coind@(_, TreeAtom "coinductive"):name@(mFun, TreeAtom _):xts@(_, TreeNode _):rest)):as) =
   parse' $ (m, TreeNode [coind, (mFun, TreeNode (name : xts : rest))]) : as
 parse' ((_, TreeNode ((_, TreeAtom "coinductive"):ts)):as) = do
-  parseData ts as toCoinductive toCoinductiveElimList
+  parseConnective ts as toCoinductive toCoinductiveElimList
 parse' ((m, TreeNode [(_, TreeAtom "let"), xt, e]):as) = do
   m' <- adjustPhase m
   e' <- macroExpand e >>= interpret
@@ -238,20 +238,6 @@ parse' (a:as) = do
       let meta' = meta {metaIsAppropriateAsCompletionCandidate = False}
       return $ StmtLet meta' (meta', name, t) e' : defList
 
-parseData ::
-     [TreePlus]
-  -> [TreePlus]
-  -> ([IdentifierPlus] -> AlgType -> WithEnv Stmt)
-  -> ([IdentifierPlus] -> AlgType -> WithEnv [Stmt])
-  -> WithEnv [Stmt]
-parseData ts as f g = do
-  algDeclList <- mapM parseAlgType ts
-  let ats = map foo algDeclList
-  ss <- mapM (f ats) algDeclList
-  cs <- concat <$> mapM (g ats) algDeclList
-  stmtList <- parse' as
-  return $ ss ++ cs ++ stmtList
-
 parseDef :: [TreePlus] -> WithEnv Stmt
 parseDef xds = do
   xds' <- mapM (insImplicitBegin >=> macroExpand) xds
@@ -259,35 +245,64 @@ parseDef xds = do
   xds'' <- mapM interpretIter xds'
   return $ StmtDef $ zip mxs xds''
 
-type Decl = (Meta, (Meta, Identifier), [IdentifierPlus], WeakTermPlus)
+type Rule -- inference rule
+   = ( Meta
+     , (Meta, Identifier) -- the name of rule (e.g. `cons`)
+     , [IdentifierPlus] -- the antecedents of the inference rule (e.g. [(x, A), (xs, list A)])
+     , WeakTermPlus -- the consequent of the inference rule
+      )
 
-type AlgType = (Meta, (Meta, Identifier), [IdentifierPlus], [Decl])
+type Connective -- logical connective
+   = ( Meta
+     , (Meta, Identifier) -- the name of the logical connective (e.g. `list`)
+     , [IdentifierPlus] -- the arguments of the logical connective (e.g. `A` in `list A`)
+     , [Rule] -- the list of inference rules that determines the logical connective.
+              -- when the connective is defined inductively (or positively, or "verificationistically", or
+              -- from the "meaning-by-definition" perspective), this list of rules is interpreted as a list of introduction rules.
+              -- when defined coinductively (or negatively, or "pragmatistically", or from the "meaning-as-use" perspective),
+              -- this list is interpreted as a list of elimination rules.
+      )
 
-parseAlgType :: TreePlus -> WithEnv AlgType
-parseAlgType (m, TreeNode ((mName, TreeAtom name):(_, TreeNode xts):decls)) = do
+parseConnective ::
+     [TreePlus]
+  -> [TreePlus]
+  -> ([IdentifierPlus] -> Connective -> WithEnv Stmt)
+  -> ([IdentifierPlus] -> Connective -> WithEnv [Stmt])
+  -> WithEnv [Stmt]
+parseConnective ts as f g = do
+  connectiveList <- mapM parseConnective' ts
+  let ats = map connectiveToIdentPlus connectiveList
+  ss <- mapM (f ats) connectiveList
+  cs <- concat <$> mapM (g ats) connectiveList
+  stmtList <- parse' as
+  return $ ss ++ cs ++ stmtList
+
+parseConnective' :: TreePlus -> WithEnv Connective
+parseConnective' (m, TreeNode ((mName, TreeAtom name):(_, TreeNode xts):rules)) = do
   m' <- adjustPhase m
   mName' <- adjustPhase mName
   xts' <- mapM interpretIdentifierPlus xts
-  decls' <- mapM parseDecl decls
-  return (m', (mName', name), xts', decls')
-parseAlgType _ = throwError' "parseAlgType: syntax error"
+  rules' <- mapM parseRule rules
+  return (m', (mName', name), xts', rules')
+parseConnective' _ = throwError' "parseConnective: syntax error"
 
-parseDecl :: TreePlus -> WithEnv Decl
-parseDecl (m, TreeNode [(mName, TreeAtom name), (_, TreeNode xts), t]) = do
+parseRule :: TreePlus -> WithEnv Rule
+parseRule (m, TreeNode [(mName, TreeAtom name), (_, TreeNode xts), t]) = do
   m' <- adjustPhase m
   mName' <- adjustPhase mName
   t' <- interpret t
   xts' <- mapM interpretIdentifierPlus xts
   return (m', (mName', name), xts', t')
-parseDecl _ = throwError' "parseDecl: syntax error"
+parseRule _ = throwError' "parseRule: syntax error"
 
-toInductive :: [IdentifierPlus] -> AlgType -> WithEnv Stmt
-toInductive ats algDecl@(m, (ma, a), xts, decls) = do
-  let bts = map declToPi decls
+-- represent the inductive logical connective using Pi
+toInductive :: [IdentifierPlus] -> Connective -> WithEnv Stmt
+toInductive ats connective@(m, (ma, a), xts, rules) = do
+  let bts = map ruleToIdentPlus rules
   return $
     StmtLet
       m
-      (foo algDecl)
+      (connectiveToIdentPlus connective)
       ( m
       , WeakTermPiIntro
           xts
@@ -296,16 +311,17 @@ toInductive ats algDecl@(m, (ma, a), xts, decls) = do
               (ats ++ bts)
               (m, WeakTermPiElim (ma, WeakTermUpsilon a) (map toVar' xts))))
 
-toInductiveIntroList :: [IdentifierPlus] -> AlgType -> WithEnv [Stmt]
-toInductiveIntroList ats (_, _, xts, decls) = do
-  let bts = map declToPi decls
-  mapM (toInductiveIntro ats bts xts) decls
+toInductiveIntroList :: [IdentifierPlus] -> Connective -> WithEnv [Stmt]
+toInductiveIntroList ats (_, _, xts, rules) = do
+  let bts = map ruleToIdentPlus rules
+  mapM (toInductiveIntro ats bts xts) rules
 
+-- represent the introduction rule within CoC
 toInductiveIntro ::
      [IdentifierPlus]
   -> [IdentifierPlus]
   -> [IdentifierPlus]
-  -> Decl
+  -> Rule
   -> WithEnv Stmt
 toInductiveIntro ats bts xts (m, (mb, b), yts, cod) = do
   return $
@@ -320,9 +336,10 @@ toInductiveIntro ats bts xts (m, (mb, b), yts, cod) = do
               (ats ++ bts)
               (m, WeakTermPiElim (mb, WeakTermUpsilon b) (map toVar' yts))))
 
-toCoinductive :: [IdentifierPlus] -> AlgType -> WithEnv Stmt
-toCoinductive ats algDecl@(m, (ma, a), xts, decls) = do
-  let bts = map declToPi decls
+-- represent the coinductive logical connective using Sigma
+toCoinductive :: [IdentifierPlus] -> Connective -> WithEnv Stmt
+toCoinductive ats connective@(m, (ma, a), xts, rules) = do
+  let bts = map ruleToIdentPlus rules
   let cod = (m, WeakTermPiElim (ma, WeakTermUpsilon a) (map toVar' xts))
   -- sigmaを[IdentifierPlus]で表現しているからここの処理が必要。
   -- もしSigma (x1 : A1, ..., xn : An). Bで表現していれば、ここはtoInductiveと完全に
@@ -331,19 +348,20 @@ toCoinductive ats algDecl@(m, (ma, a), xts, decls) = do
   return $
     StmtLet
       m
-      (foo algDecl)
+      (connectiveToIdentPlus connective)
       (m, WeakTermPiIntro xts (m, WeakTermSigma (ats ++ bts ++ [(m, h, cod)])))
 
-toCoinductiveElimList :: [IdentifierPlus] -> AlgType -> WithEnv [Stmt]
-toCoinductiveElimList ats (_, _, xts, decls) = do
-  let bts = map declToPi decls
-  mapM (toCoinductiveElim ats bts xts) decls
+toCoinductiveElimList :: [IdentifierPlus] -> Connective -> WithEnv [Stmt]
+toCoinductiveElimList ats (_, _, xts, rules) = do
+  let bts = map ruleToIdentPlus rules
+  mapM (toCoinductiveElim ats bts xts) rules
 
+-- represent the elimination rule within CoC
 toCoinductiveElim ::
      [IdentifierPlus]
   -> [IdentifierPlus]
   -> [IdentifierPlus]
-  -> Decl
+  -> Rule
   -> WithEnv Stmt
 toCoinductiveElim ats bts xts (m, (mb, b), yts, cod)
   | length yts > 0 = do
@@ -368,11 +386,11 @@ toCoinductiveElim ats bts xts (m, (mb, b), yts, cod)
     throwError'
       "toCoinductiveElim: the antecedant of an elimination rule cannot be empty"
 
-declToPi :: Decl -> IdentifierPlus
-declToPi (m, (mb, b), xts, t) = (mb, b, (m, WeakTermPi xts t))
+ruleToIdentPlus :: Rule -> IdentifierPlus
+ruleToIdentPlus (m, (mb, b), xts, t) = (mb, b, (m, WeakTermPi xts t))
 
-foo :: AlgType -> IdentifierPlus
-foo (m, (ma, a), xts, _) = (ma, a, (m, WeakTermPi xts univ))
+connectiveToIdentPlus :: Connective -> IdentifierPlus
+connectiveToIdentPlus (m, (ma, a), xts, _) = (ma, a, (m, WeakTermPi xts univ))
 
 toVar' :: IdentifierPlus -> WeakTermPlus
 toVar' (m, x, _) = (m, WeakTermUpsilon x)
