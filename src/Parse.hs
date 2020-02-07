@@ -311,26 +311,17 @@ toInductiveIntro ::
   -> [IdentifierPlus]
   -> Rule
   -> WithEnv Stmt
-toInductiveIntro = undefined
+toInductiveIntro ats bts xts (mb, b, m, yts, cod) = do
+  return $
+    StmtLetInductive
+      m
+      (mb, b, (m, WeakTermPi (xts ++ yts) cod))
+      (xts ++ yts)
+      (ats ++ bts)
+      (mb, WeakTermUpsilon b)
+      yts
+      []
 
--- toInductiveIntro ats bts xts (mb, b, m, yts, cod) = do
---   return $
---     StmtLet
---       m
---       (mb, b, (m, WeakTermPi (xts ++ yts) cod)) -- e.g. cons : Pi (A : tau, w : A, ws : list A). list A,
---                                                 -- where b = cons, xts = [A : tau], yts = [w : A, ws : list A], cod = list A
---       ( m
---       , WeakTermPiIntro
---           (xts ++ yts)
---           -- list A = (lam (A : Tau). Pi (list : (...), nil : (...), cons : (...)). list A) @ A
---           --        = Pi (list : (...), nil : (...), cons : (...)). list A
---           ( m
---           , WeakTermPiIntro
---               (ats ++ bts) -- ats = [list : (...)],
---                            -- bts = [nil : Pi (yts). list A, cons : (...)]
---               (m, WeakTermPiElim (mb, WeakTermUpsilon b) (map toVar' yts)) -- nil @ yts : list A
---                                                                            -- (note that the `nil` here doesn't have xts as arguments)
---            ))
 -- -- represent the coinductive logical connective within CoC
 toCoinductive ::
      [IdentifierPlus] -> [IdentifierPlus] -> Connective -> WithEnv Stmt
@@ -356,39 +347,20 @@ toCoinductiveElim ::
   -> [IdentifierPlus]
   -> Rule
   -> WithEnv Stmt
-toCoinductiveElim = undefined
+toCoinductiveElim ats bts xts (mb, b, m, yts, cod)
+  | [yt] <- yts = do
+    return $
+      StmtLetCoinductive
+        m
+        (mb, b, (m, WeakTermPi (xts ++ [yt]) cod))
+        (xts ++ [yt])
+        cod
+        (ats ++ bts ++ [yt])
+        (toVar' yt)
+        (m, WeakTermPiElim (mb, WeakTermUpsilon b) [toVar' yt])
+        []
+  | otherwise = throwError' "toCoinductiveElim"
 
--- toCoinductiveElim ats bts xts (m, (mb, b), yts, cod)
---   | length yts > 0 = do
---     return $
---       StmtLet
---         m
---         (mb, b, (m, WeakTermPi (xts ++ yts) cod)) -- tail : Pi (A : tau, s : stream A). stream A
---         ( m
---         , WeakTermPiIntro
---             (xts ++ yts)
---             -- stream A = (lam (A : Tau). Sigma (stream : (...), head : (...), tail : (...)). stream A) @ A
---             --          = Sigma (list : (...), head : (...), tail : (...)). stream A
---             -- ats = [list : (...)]
---             -- bts = [head : (...), tail : Pi (y1 : stream A). stream A]
---             -- (head yts : stream A)
---             -- ~> ats ++ bts ++ [head yts] = [list : (...), head : (...), tail : Pi (y1 : stream A). stream A, y1 : stream A]
---             ( m
---             , WeakTermSigmaElim
---                 cod -- sigmaElimの型の部分はelimの結果の型。変数（yts）を同一名の変数（yts）でsubstするので依存の処理の心配もなし。
---                 -- 同一の変数名を使うのがポイント。head yts : a @ (e1, ..., en)なので、
---                 -- (1)のほうのhead ytsの型に出現するaは(1)の行のatsによって束縛されたものとなり、
---                 -- (2)のほうのhead ytsの方に出現するaは外側のtoCoinductiveの結果によって定義されたものとなる。
---                 -- 別に異なる名前を両者に与えてもよいが、同一の名前を使ったほうが実装がラクなのでこちらをとることにする。
---                 (ats ++ bts ++ [head yts]) -- (1)
---                 (toVar' $ head yts) -- (2)
---                 (m, WeakTermPiElim (mb, WeakTermUpsilon b) (map toVar' yts))))
---   | otherwise =
---     throwError'
---       "toCoinductiveElim: the antecedant of an elimination rule cannot be empty"
--- identPlusAsRule :: IdentifierPlus -> WithEnv Rule
--- identPlusAsRule (m, x, (mPi, WeakTermPi xts cod)) = return (m, x, mPi, xts, cod)
--- identPlusAsRule _ = throwError' "a rule must be specified by pi type"
 ruleAsIdentPlus :: Rule -> IdentifierPlus
 ruleAsIdentPlus (mb, b, m, xts, t) = (mb, b, (m, WeakTermPi xts t))
 
@@ -398,12 +370,6 @@ formationRuleOf = undefined
 toInternalRuleList :: Connective -> [IdentifierPlus]
 toInternalRuleList (_, _, _, rules) = map ruleAsIdentPlus rules
 
--- formationRuleOf (formationRule, _) = formationRule
--- createInternalizer :: WeakTermPlus -> WithEnv (WeakTermPlus -> WeakTermPlus)
--- createInternalizer = undefined
--- createExternalizer :: WeakTermPlus -> WithEnv (WeakTermPlus -> WeakTermPlus)
--- createExternalizer = undefined
--- connectiveToIdentPlus (m, (ma, a), xts, _) = (ma, a, (m, WeakTermPi xts univ))
 toVar' :: IdentifierPlus -> WeakTermPlus
 toVar' (m, x, _) = (m, WeakTermUpsilon x)
 
@@ -469,9 +435,56 @@ concatStmtList (StmtDef xds:ss) = do
   -- StmtLetに帰着
   let letList = toLetList $ zip xds iterList
   concatStmtList $ letList ++ ss
+concatStmtList (StmtLetInductive {}:_) = undefined
+concatStmtList (StmtLetCoinductive {}:_) = undefined
 
--- concatStmtList (StmtInductive {}:_) = undefined
+-- toInductiveIntro ats bts xts (mb, b, m, yts, cod) = do
+--   return $
+--     StmtLet
+--       m
+--       (mb, b, (m, WeakTermPi (xts ++ yts) cod)) -- e.g. cons : Pi (A : tau, w : A, ws : list A). list A,
+--                                                 -- where b = cons, xts = [A : tau], yts = [w : A, ws : list A], cod = list A
+--       ( m
+--       , WeakTermPiIntro
+--           (xts ++ yts)
+--           -- list A = (lam (A : Tau). Pi (list : (...), nil : (...), cons : (...)). list A) @ A
+--           --        = Pi (list : (...), nil : (...), cons : (...)). list A
+--           ( m
+--           , WeakTermPiIntro
+--               (ats ++ bts) -- ats = [list : (...)],
+--                            -- bts = [nil : Pi (yts). list A, cons : (...)]
+--               (m, WeakTermPiElim (mb, WeakTermUpsilon b) (map toVar' yts)) -- nil @ yts : list A
+--                                                                            -- (note that the `nil` here doesn't have xts as arguments)
+--            ))
 -- concatStmtList (StmtCoinductive {}:_) = undefined
+-- toCoinductiveElim ats bts xts (m, (mb, b), yts, cod)
+--   | length yts > 0 = do
+--     return $
+--       StmtLet
+--         m
+--         (mb, b, (m, WeakTermPi (xts ++ yts) cod)) -- tail : Pi (A : tau, s : stream A). stream A
+--         ( m
+--         , WeakTermPiIntro
+--             (xts ++ yts)
+--             -- stream A = (lam (A : Tau). Sigma (stream : (...), head : (...), tail : (...)). stream A) @ A
+--             --          = Sigma (list : (...), head : (...), tail : (...)). stream A
+--             -- ats = [list : (...)]
+--             -- bts = [head : (...), tail : Pi (y1 : stream A). stream A]
+--             -- (head yts : stream A)
+--             -- ~> ats ++ bts ++ [head yts] = [list : (...), head : (...), tail : Pi (y1 : stream A). stream A, y1 : stream A]
+--             ( m
+--             , WeakTermSigmaElim
+--                 cod -- sigmaElimの型の部分はelimの結果の型。変数（yts）を同一名の変数（yts）でsubstするので依存の処理の心配もなし。
+--                 -- 同一の変数名を使うのがポイント。head yts : a @ (e1, ..., en)なので、
+--                 -- (1)のほうのhead ytsの型に出現するaは(1)の行のatsによって束縛されたものとなり、
+--                 -- (2)のほうのhead ytsの方に出現するaは外側のtoCoinductiveの結果によって定義されたものとなる。
+--                 -- 別に異なる名前を両者に与えてもよいが、同一の名前を使ったほうが実装がラクなのでこちらをとることにする。
+--                 (ats ++ bts ++ [head yts]) -- (1)
+--                 (toVar' $ head yts) -- (2)
+--                 (m, WeakTermPiElim (mb, WeakTermUpsilon b) (map toVar' yts))))
+--   | otherwise =
+--     throwError'
+--       "toCoinductiveElim: the antecedant of an elimination rule cannot be empty"
 toLetList :: [(IdentDef, WeakTermPlus)] -> [Stmt]
 toLetList [] = []
 toLetList (((x, (m, (mx, _, t), _, _)), iter):rest) =
@@ -565,8 +578,9 @@ toIdentList ((StmtDef xds):ds) = do
   let mxts = map (\(_, (_, (mx, x, t), _, _)) -> (mx, x, t)) xds
   mxts ++ toIdentList ds
 toIdentList ((StmtConstDecl _ (mx, x, t)):ds) = (mx, x, t) : toIdentList ds
+toIdentList ((StmtLetInductive {}):_) = undefined
+toIdentList ((StmtLetCoinductive {}):_) = undefined
 
--- toIdentList ((StmtInductive {}):_) = undefined
 -- toIdentList ((StmtCoinductive {}):_) = undefined
 toStmtLetFooter :: Path Abs File -> (Meta, Identifier, WeakTermPlus) -> Stmt
 toStmtLetFooter path (m, x, t) = do

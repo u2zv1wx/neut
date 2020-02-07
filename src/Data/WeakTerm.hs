@@ -96,30 +96,31 @@ data Stmt
   -- declaration of a constant
   --   (constant x t)
   | StmtConstDecl Meta IdentifierPlus
-  -- -- definition of a logical connective `a` by its introduction rules + logical harmony
-  -- --   (inductive
-  -- --     (a ((x A) ... (x A))
-  -- --       (b ((y B) ... (y B)) (a e ... e))
-  -- --       ...
-  -- --       (b ((y B) ... (y B)) (a e ... e)))
-  -- --     ...
-  -- --     (a ((x A) ... (x A))
-  -- --       (b ((y B) ... (y B)) (a e ... e))
-  -- --       ...
-  -- --       (b ((y B) ... (y B)) (a e ... e))))
-  -- | StmtInductive [Connective]
-  -- -- definition of a logical connective `a` by its elimination rules + logical harmony
-  -- --   (coinductive
-  -- --     (a ((x A) ... (x A))
-  -- --       (b ((y (a e ... e))) B)
-  -- --       ...
-  -- --       (b ((y (a e ... e))) B))
-  -- --     ...
-  -- --     (a ((x A) ... (x A))
-  -- --       (b ((y (a e ... e))) B)
-  -- --       ...
-  -- --       (b ((y (a e ... e))) B)))
-  -- | StmtCoinductive [Connective]
+  -- let (b : B) :=
+  --   lam (xts ++ yts).
+  --     lam (ats ++ bts).
+  --       b-inner @ [y, ..., y]
+  | StmtLetInductive
+      Meta -- location of b
+      IdentifierPlus -- b : B
+      [IdentifierPlus] -- xts ++ yts
+      [IdentifierPlus] -- ats ++ bts
+      WeakTermPlus -- b-inner
+      [IdentifierPlus] -- [(y, t), ..., (y, t)]  (must be internalized later)
+      [(Identifier, Identifier)] -- the `a` in `ats` ~> the `a` defined beforehand
+  -- let (b : B) :=
+  --   lam (xts ++ [(z, t)]).
+  --     let (ats ++ bts ++ [(c, t)]) := z in
+  --     b-inner @ [c]
+  | StmtLetCoinductive
+      Meta
+      IdentifierPlus
+      [IdentifierPlus] -- xts ++ [(z, t)]
+      WeakTermPlus -- the type of b-inner @ [c]                  --
+      [IdentifierPlus] -- ats ++ bts ++ [(c, t)]                 -- sigma-elim
+      WeakTermPlus -- z                                          --
+      WeakTermPlus -- b-inner @ [c] (must be externalized later) --
+      [(Identifier, Identifier)] -- the `a` defined beforehand ~> the `a` in `ats`
   deriving (Show)
 
 toVar :: Identifier -> WeakTermPlus
