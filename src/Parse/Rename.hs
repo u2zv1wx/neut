@@ -52,9 +52,42 @@ renameStmtList' nenv ((StmtConstDecl m (mx, x, t)):ss) = do
   t' <- rename' nenv t
   ss' <- renameStmtList' (Map.insert x x nenv) ss
   return $ StmtConstDecl m (mx, x, t') : ss'
+renameStmtList' nenv ((StmtLetInductive m (mb, b, t) xtsyts ats bts bInner args _):ss) = do
+  t' <- rename' nenv t
+  (xtsyts', nenv') <- renameArgs nenv xtsyts
+  (ats', nenv'') <- renameArgs nenv' ats
+  (bts', nenv''') <- renameArgs nenv'' bts
+  bInner' <- rename' nenv bInner
+  args' <- mapM (renameIdentPlus nenv''') args
+  b' <- newLLVMNameWith b
+  ss' <- renameStmtList' (Map.insert b b' nenv) ss
+  let as = map (\(_, y, _) -> y) ats
+  asOuter <- mapM (lookupStrict nenv) as -- outer
+  asInner <- mapM (lookupStrict nenv''') as -- inner
+  -- infoでytsの型の中のouterをinnerに置き換えていく
+  -- (ytsの型を置き換えるのでdomのasOuterはxtsytsと同じnenvでrenameされている)
+  let info = zip asOuter asInner
+  return $
+    StmtLetInductive m (mb, b', t') xtsyts' ats' bts' bInner' args' info : ss'
+renameStmtList' nenv ((StmtLetCoinductive m (mb, b, t) xtsyt cod ats btsyt e1 e2 _):ss) = do
+  t' <- rename' nenv t
+  (xtsyt', nenv') <- renameArgs nenv xtsyt
+  e1' <- rename' nenv' e1
+  (ats', nenv'') <- renameArgs nenv' ats
+  (btsyt', nenv''') <- renameArgs nenv'' btsyt
+  cod' <- rename' nenv''' cod
+  e2' <- rename' nenv''' e2
+  b' <- newLLVMNameWith b
+  ss' <- renameStmtList' (Map.insert b b' nenv) ss
+  let as = map (\(_, y, _) -> y) ats
+  asOuter <- mapM (lookupStrict nenv) as
+  asInner <- mapM (lookupStrict nenv''') as
+  -- infoでcod'の中のinnerをouterに置き換えていく
+  -- (cod'を置き換えるのでdomのasOuterはcod'と同じnenvでrenameされている)
+  let info = zip asInner asOuter
+  return $
+    StmtLetCoinductive m (mb, b', t') xtsyt' cod' ats' btsyt' e1' e2' info : ss'
 
--- renameStmtList' nenv ((StmtInductive cs):ss) = do
---   undefined
 -- renameStmtList' _ ((StmtCoinductive _):_) = undefined
 -- renameConnective :: NameEnv -> Connective -> WithEnv Connective
 -- renameConnective = undefined
@@ -174,6 +207,20 @@ renameSigma nenv ((mx, x, t):xts) = do
   xts' <- renameSigma (Map.insert x x' nenv) xts
   return $ (mx, x', t') : xts'
 
+renameArgs :: NameEnv -> [IdentifierPlus] -> WithEnv ([IdentifierPlus], NameEnv)
+renameArgs nenv [] = return ([], nenv)
+renameArgs nenv ((mx, x, t):xts) = do
+  t' <- rename' nenv t
+  x' <- newLLVMNameWith x
+  (xts', nenv') <- renameArgs (Map.insert x x' nenv) xts
+  return ((mx, x', t') : xts', nenv')
+
+renameIdentPlus :: NameEnv -> IdentifierPlus -> WithEnv IdentifierPlus
+renameIdentPlus nenv (m, x, t) = do
+  t' <- rename' nenv t
+  x' <- newLLVMNameWith x
+  return (m, x', t')
+
 renameIter ::
      NameEnv
   -> IdentifierPlus
@@ -219,6 +266,12 @@ renameStruct nenv ((mx, x, t):xts) e = do
   x' <- newLLVMNameWith x
   (xts', e') <- renameStruct (Map.insert x x' nenv) xts e
   return ((mx, x', t) : xts', e')
+
+lookupStrict :: NameEnv -> Identifier -> WithEnv Identifier
+lookupStrict nenv x =
+  case Map.lookup x nenv of
+    Just x' -> return x'
+    Nothing -> throwError' $ "[lookupStrict] undefined variable:  " <> x
 
 checkSanity :: [Identifier] -> WeakTermPlus -> Bool
 checkSanity _ (_, WeakTermTau) = True
