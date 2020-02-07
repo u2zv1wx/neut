@@ -100,27 +100,31 @@ data Stmt
   --   lam (xts ++ yts).
   --     lam (ats ++ bts).
   --       b-inner @ [y, ..., y]
-  | StmtLetInductive
+  | StmtLetInductiveIntro
       Meta -- location of b
       IdentifierPlus -- b : B
       [IdentifierPlus] -- xts ++ yts
-      [IdentifierPlus] -- ats ++ bts
+      [IdentifierPlus] -- ats
+      [IdentifierPlus] -- bts
       WeakTermPlus -- b-inner
       [IdentifierPlus] -- [(y, t), ..., (y, t)]  (must be internalized later)
       [(Identifier, Identifier)] -- the `a` in `ats` ~> the `a` defined beforehand
+      [Identifier] -- as (to be used to update the environment with constructor info)
   -- let (b : B) :=
   --   lam (xts ++ [(z, t)]).
   --     let (ats ++ bts ++ [(c, t)]) := z in
   --     b-inner @ [c]
-  | StmtLetCoinductive
+  | StmtLetCoinductiveElim
       Meta
       IdentifierPlus
       [IdentifierPlus] -- xts ++ [(z, t)]
       WeakTermPlus -- the type of b-inner @ [c]                  --
-      [IdentifierPlus] -- ats ++ bts ++ [(c, t)]                 -- sigma-elim
+      [IdentifierPlus] -- ats                                    --
+      [IdentifierPlus] -- bts ++ [(c, t)]                        -- sigma-elim
       WeakTermPlus -- z                                          --
       WeakTermPlus -- b-inner @ [c] (must be externalized later) --
       [(Identifier, Identifier)] -- the `a` defined beforehand ~> the `a` in `ats`
+      [Identifier] -- as (to be used to update the environment with constructor info)
   deriving (Show)
 
 toVar :: Identifier -> WeakTermPlus

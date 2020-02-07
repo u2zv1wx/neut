@@ -376,7 +376,6 @@
 
 (let bar (str))
 
-
 ;; (write n3 stdout bar enum.n3)
 
 ;; (definition buf
@@ -419,7 +418,6 @@
     0
     0
     0)))
-
 
 (write hole stdout buf 3)
 ;; (write n15 stdout buf enum.n15)
@@ -636,7 +634,10 @@ n15-4
 
 (fact 5)
 
-   (fact top   )
+   ;; (fact  top  )
+
+
+
 
 ;; ほんとはここにエラーが表示されるべきなのに別な場所に流れる
 ;; ~> 修正した。ちゃんと適切な場所にエラーが表示されるようになった。
@@ -647,14 +648,13 @@ n15-4
 
 ;; (ascription pohe (sigma ((x choice)) top))
 
-(fact pohe)
-
+;; (fact pohe  )
 
 ;; type error:
-(fact (begin (lambda ((A type) (y A)) y)))
+;; (fact (begin (lambda ((A type) (y A)) y)))
 
 ;; 型のなかに出現するnatの定義を展開せずにそのままnatとして表示できていてうれしい、って話。
-(fact (begin (lambda ((y nat)) y)))
+;; (fact (begin (lambda ((y nat)) y)))
 ;; エラーをflycheckで表示できるようになったぜ。イエーイ。
 
 (definition nat-direct ()
@@ -687,10 +687,13 @@ n15-4
 (definition)
 
 ;; implicit beginもちゃんと処理できてる。
-(definition foo ((x i64))
+(definition loo ((x i64))
   (let y x)
-  (let z y)
-  z)
+  (let long-long-name y)
+  (let longer-name long-long-name)
+  (let longest-longest-name longer-name)
+  (let longest-name i64.add i64.sub)
+  longest-name)
 
 (definition foo ((x i64))
   (let y x)
@@ -704,8 +707,7 @@ n15-4
 ;; (definition foo ((x i64)) x)
 
 
-(ascription foo (hom i64 nat))
-
+;; (ascription foo (hom i64 nat))
 
 ;; homでascriptionを与えたときに依存がないって情報を反映できるとうれしい？
 ;; holeでcontextをextendするのは依存がないって情報を与えるのと同じことか。
@@ -719,6 +721,11 @@ n15-4
 ;; そのとおりだった。
 ;; まあ、型エラーの推論のときはtimeoutをとってもいいな。
 ;; (ascription a (hom i64 tau))
+
+
+(inductive my-nat ()
+  (my-zero () (my-nat))
+  (my-succ ((n (my-nat))) (my-nat)))
 
 (i64.add 100 10)
 
@@ -740,6 +747,7 @@ n15-4
 
 ;; メタ変数とかを適切にrenameしたうえでエラーとして表示する、ってことのチェック。
 ;; (fact (top 100))
+
 
 ;; こんな感じで相互再帰を書くことになる。
 ;; (mutual-definition

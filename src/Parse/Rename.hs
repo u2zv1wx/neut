@@ -52,7 +52,7 @@ renameStmtList' nenv ((StmtConstDecl m (mx, x, t)):ss) = do
   t' <- rename' nenv t
   ss' <- renameStmtList' (Map.insert x x nenv) ss
   return $ StmtConstDecl m (mx, x, t') : ss'
-renameStmtList' nenv ((StmtLetInductive m (mb, b, t) xtsyts ats bts bInner args _):ss) = do
+renameStmtList' nenv ((StmtLetInductiveIntro m (mb, b, t) xtsyts ats bts bInner args _ as):ss) = do
   t' <- rename' nenv t
   (xtsyts', nenv') <- renameArgs nenv xtsyts
   (ats', nenv'') <- renameArgs nenv' ats
@@ -61,15 +61,25 @@ renameStmtList' nenv ((StmtLetInductive m (mb, b, t) xtsyts ats bts bInner args 
   args' <- mapM (renameIdentPlus nenv''') args
   b' <- newLLVMNameWith b
   ss' <- renameStmtList' (Map.insert b b' nenv) ss
-  let as = map (\(_, y, _) -> y) ats
+  -- let as = map (\(_, y, _) -> y) ats
   asOuter <- mapM (lookupStrict nenv) as -- outer
   asInner <- mapM (lookupStrict nenv''') as -- inner
   -- infoでytsの型の中のouterをinnerに置き換えていく
   -- (ytsの型を置き換えるのでdomのasOuterはxtsytsと同じnenvでrenameされている)
   let info = zip asOuter asInner
   return $
-    StmtLetInductive m (mb, b', t') xtsyts' ats' bts' bInner' args' info : ss'
-renameStmtList' nenv ((StmtLetCoinductive m (mb, b, t) xtsyt cod ats btsyt e1 e2 _):ss) = do
+    StmtLetInductiveIntro
+      m
+      (mb, b', t')
+      xtsyts'
+      ats'
+      bts'
+      bInner'
+      args'
+      info
+      asOuter :
+    ss'
+renameStmtList' nenv ((StmtLetCoinductiveElim m (mb, b, t) xtsyt cod ats btsyt e1 e2 _ as):ss) = do
   t' <- rename' nenv t
   (xtsyt', nenv') <- renameArgs nenv xtsyt
   e1' <- rename' nenv' e1
@@ -79,14 +89,25 @@ renameStmtList' nenv ((StmtLetCoinductive m (mb, b, t) xtsyt cod ats btsyt e1 e2
   e2' <- rename' nenv''' e2
   b' <- newLLVMNameWith b
   ss' <- renameStmtList' (Map.insert b b' nenv) ss
-  let as = map (\(_, y, _) -> y) ats
+  -- let as = map (\(_, y, _) -> y) ats
   asOuter <- mapM (lookupStrict nenv) as
   asInner <- mapM (lookupStrict nenv''') as
   -- infoでcod'の中のinnerをouterに置き換えていく
   -- (cod'を置き換えるのでdomのasOuterはcod'と同じnenvでrenameされている)
   let info = zip asInner asOuter
   return $
-    StmtLetCoinductive m (mb, b', t') xtsyt' cod' ats' btsyt' e1' e2' info : ss'
+    StmtLetCoinductiveElim
+      m
+      (mb, b', t')
+      xtsyt'
+      cod'
+      ats'
+      btsyt'
+      e1'
+      e2'
+      info
+      asOuter :
+    ss'
 
 -- renameStmtList' _ ((StmtCoinductive _):_) = undefined
 -- renameConnective :: NameEnv -> Connective -> WithEnv Connective

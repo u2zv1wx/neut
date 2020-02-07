@@ -313,14 +313,16 @@ toInductiveIntro ::
   -> WithEnv Stmt
 toInductiveIntro ats bts xts (mb, b, m, yts, cod) = do
   return $
-    StmtLetInductive
+    StmtLetInductiveIntro
       m
       (mb, b, (m, WeakTermPi (xts ++ yts) cod))
       (xts ++ yts)
-      (ats ++ bts)
+      ats
+      bts
       (mb, WeakTermUpsilon b)
       yts
       []
+      (map (\(_, a, _) -> a) ats)
 
 -- -- represent the coinductive logical connective within CoC
 toCoinductive ::
@@ -350,15 +352,17 @@ toCoinductiveElim ::
 toCoinductiveElim ats bts xts (mb, b, m, yts, cod)
   | [yt] <- yts = do
     return $
-      StmtLetCoinductive
+      StmtLetCoinductiveElim
         m
         (mb, b, (m, WeakTermPi (xts ++ [yt]) cod))
         (xts ++ [yt])
         cod
-        (ats ++ bts ++ [yt])
+        ats
+        (bts ++ [yt])
         (toVar' yt)
         (m, WeakTermPiElim (mb, WeakTermUpsilon b) [toVar' yt])
         []
+        (map (\(_, a, _) -> a) ats)
   | otherwise = throwError' "toCoinductiveElim"
 
 ruleAsIdentPlus :: Rule -> IdentifierPlus
@@ -372,6 +376,9 @@ toInternalRuleList (_, _, _, rules) = map ruleAsIdentPlus rules
 
 toVar' :: IdentifierPlus -> WeakTermPlus
 toVar' (m, x, _) = (m, WeakTermUpsilon x)
+
+toVar'' :: IdentifierPlus -> (WeakTermPlus, WeakTermPlus)
+toVar'' (m, x, t) = ((m, WeakTermUpsilon x), t)
 
 insImplicitBegin :: TreePlus -> WithEnv TreePlus
 insImplicitBegin (m, TreeNode (xt:xts:body:rest)) = do
@@ -435,8 +442,60 @@ concatStmtList (StmtDef xds:ss) = do
   -- StmtLetに帰着
   let letList = toLetList $ zip xds iterList
   concatStmtList $ letList ++ ss
-concatStmtList (StmtLetInductive {}:_) = undefined
-concatStmtList (StmtLetCoinductive {}:_) = undefined
+concatStmtList (StmtLetInductiveIntro m bt xtsyts ats bts bInner args info as:ss) = do
+  args' <- mapM (\(e, te) -> alternateBy info te e) $ map toVar'' args -- internalize
+  let s =
+        StmtLet
+          m
+          bt
+          ( m
+          , WeakTermPiIntro
+              xtsyts
+              ( m
+              , WeakTermPiIntro
+                  (ats ++ bts) -- ats = [list : (...)], bts = [nil : Pi (yts). list A, cons : (...)]
+                  (m, WeakTermPiElim bInner args')))
+  insInductive as bt -- register the constructor (if necessary)
+  concatStmtList $ s : ss
+concatStmtList (StmtLetCoinductiveElim m bt xtsyt cod ats btsyt e1 e2 info as:ss) = do
+  e2' <- alternateBy info cod e2 -- externalize
+  let s =
+        StmtLet
+          m
+          bt
+          ( m
+          , WeakTermPiIntro
+              xtsyt
+              (m, WeakTermSigmaElim cod (ats ++ btsyt) e1 e2'))
+  insCoinductive as bt -- register the destructor (if necessary)
+  concatStmtList $ s : ss
+
+insInductive :: [Identifier] -> IdentifierPlus -> WithEnv ()
+insInductive [a] bt = do
+  ienv <- gets inductiveEnv
+  modify
+    (\env -> env {inductiveEnv = Map.insertWith optConcat a (Just [bt]) ienv})
+insInductive as _ = do
+  forM_ as $ \a -> do
+    modify
+      (\env -> env {inductiveEnv = Map.insert a Nothing (inductiveEnv env)})
+
+insCoinductive :: [Identifier] -> IdentifierPlus -> WithEnv ()
+insCoinductive [a] bt = do
+  cenv <- gets coinductiveEnv
+  modify
+    (\env -> env {coinductiveEnv = Map.insertWith optConcat a (Just [bt]) cenv})
+insCoinductive as _ = do
+  forM_ as $ \a -> do
+    modify
+      (\env -> env {coinductiveEnv = Map.insert a Nothing (coinductiveEnv env)})
+
+optConcat :: Maybe [a] -> Maybe [a] -> Maybe [a]
+optConcat mNew mOld = do
+  mNew' <- mNew
+  mOld' <- mOld
+  -- insert mNew at the end of the list (to respect the structure of ind/coind represented as pi/sigma)
+  return $ mOld' ++ mNew'
 
 -- toInductiveIntro ats bts xts (mb, b, m, yts, cod) = do
 --   return $
@@ -485,6 +544,13 @@ concatStmtList (StmtLetCoinductive {}:_) = undefined
 --   | otherwise =
 --     throwError'
 --       "toCoinductiveElim: the antecedant of an elimination rule cannot be empty"
+alternateBy ::
+     [(Identifier, Identifier)] -- substitution {x1 := x1', ..., xn := xn'}
+  -> WeakTermPlus -- a type `A`
+  -> WeakTermPlus -- a term `e` of type `A`
+  -> WithEnv WeakTermPlus -- a term of type `A{x1 := x1', ..., xn := xn'}`, based on e
+alternateBy = undefined
+
 toLetList :: [(IdentDef, WeakTermPlus)] -> [Stmt]
 toLetList [] = []
 toLetList (((x, (m, (mx, _, t), _, _)), iter):rest) =
@@ -578,8 +644,8 @@ toIdentList ((StmtDef xds):ds) = do
   let mxts = map (\(_, (_, (mx, x, t), _, _)) -> (mx, x, t)) xds
   mxts ++ toIdentList ds
 toIdentList ((StmtConstDecl _ (mx, x, t)):ds) = (mx, x, t) : toIdentList ds
-toIdentList ((StmtLetInductive {}):_) = undefined
-toIdentList ((StmtLetCoinductive {}):_) = undefined
+toIdentList ((StmtLetInductiveIntro {}):_) = undefined
+toIdentList ((StmtLetCoinductiveElim {}):_) = undefined
 
 -- toIdentList ((StmtCoinductive {}):_) = undefined
 toStmtLetFooter :: Path Abs File -> (Meta, Identifier, WeakTermPlus) -> Stmt

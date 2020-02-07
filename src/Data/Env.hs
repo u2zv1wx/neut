@@ -34,6 +34,8 @@ type FileEnv = Map.HashMap (Path Abs File) FileInfo
 
 type Justification = Loc
 
+type RuleEnv = Map.HashMap Identifier (Maybe [Data.WeakTerm.IdentifierPlus])
+
 data Env =
   Env
     { count :: Integer -- to generate fresh symbols
@@ -50,6 +52,8 @@ data Env =
     , revEnumEnv :: Map.HashMap Identifier Identifier -- [("left", "choice"), ("right", "choice"), ...]
     , nameEnv :: Map.HashMap Identifier Identifier -- [("foo", "foo.13"), ...]
     , revNameEnv :: Map.HashMap Identifier Identifier -- [("foo.13", "foo"), ...]
+    , inductiveEnv :: RuleEnv -- "list" ~> (cons, Pi (A : tau). A -> list A -> list A)
+    , coinductiveEnv :: RuleEnv -- "tail" ~> (head, Pi (A : tau). stream A -> A)
     , weakTypeEnv :: Map.HashMap Identifier WeakTermPlus -- var ~> typeof(var)
     , typeEnv :: Map.HashMap Identifier TermPlus
     , constraintEnv :: [PreConstraint] -- for type inference
@@ -77,6 +81,8 @@ initialEnv path colorizeFlag =
     , revEnumEnv = Map.empty
     , nameEnv = Map.empty
     , revNameEnv = Map.empty
+    , inductiveEnv = Map.empty
+    , coinductiveEnv = Map.empty
     , weakTypeEnv = Map.empty
     , typeEnv = Map.empty
     , chainEnv = Map.empty
