@@ -1,3 +1,4 @@
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Data.WeakTerm where
@@ -67,17 +68,58 @@ type Def = (Meta, IdentifierPlus, [IdentifierPlus], WeakTermPlus)
 
 type IdentDef = (Identifier, Def)
 
+type Rule -- inference rule
+   = ( Meta -- location of the name
+     , Identifier -- the name of the rule
+     , Meta -- location of the rule
+     , [IdentifierPlus] -- the antecedents of the inference rule (e.g. [(x, A), (xs, list A)])
+     , WeakTermPlus -- the consequent of the inference rule
+      )
+
+type Connective
+   = ( Meta -- location of the connective
+     , Identifier -- the name of the connective (e.g. nat, list)
+     , [IdentifierPlus] -- parameter of the connective (e.g. the `A` in `list A`)
+     , [Rule] -- list of introduction rule when inductive / list of elimination rule when coinductive
+      )
+
 data Stmt
-  -- (let (x t) e)
+  -- translated intro lam + app as in the usual way
+  --   (let (x t) e)
   = StmtLet Meta IdentifierPlus WeakTermPlus
   -- mutually recursive definition (n >= 0)
-  -- (definition
-  --   ((f1 A1) (ARGS-1) e1)
-  --   ...
-  --   ((fn An) (ARGS-n) en))
+  --   (definition
+  --     ((f1 A1) (ARGS-1) e1)
+  --     ...
+  --     ((fn An) (ARGS-n) en))
   | StmtDef [(Identifier, Def)]
-  -- (constant x t)
+  -- declaration of a constant
+  --   (constant x t)
   | StmtConstDecl Meta IdentifierPlus
+  -- definition of a logical connective `a` by its introduction rules + logical harmony
+  --   (inductive
+  --     (a ((x A) ... (x A))
+  --       (b ((y B) ... (y B)) (a e ... e))
+  --       ...
+  --       (b ((y B) ... (y B)) (a e ... e)))
+  --     ...
+  --     (a ((x A) ... (x A))
+  --       (b ((y B) ... (y B)) (a e ... e))
+  --       ...
+  --       (b ((y B) ... (y B)) (a e ... e))))
+  | StmtInductive [Connective]
+  -- definition of a logical connective `a` by its elimination rules + logical harmony
+  --   (coinductive
+  --     (a ((x A) ... (x A))
+  --       (b ((y (a e ... e))) B)
+  --       ...
+  --       (b ((y (a e ... e))) B))
+  --     ...
+  --     (a ((x A) ... (x A))
+  --       (b ((y (a e ... e))) B)
+  --       ...
+  --       (b ((y (a e ... e))) B)))
+  | StmtCoinductive [Connective]
   deriving (Show)
 
 toVar :: Identifier -> WeakTermPlus
