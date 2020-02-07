@@ -96,30 +96,30 @@ data Stmt
   -- declaration of a constant
   --   (constant x t)
   | StmtConstDecl Meta IdentifierPlus
-  -- definition of a logical connective `a` by its introduction rules + logical harmony
-  --   (inductive
-  --     (a ((x A) ... (x A))
-  --       (b ((y B) ... (y B)) (a e ... e))
-  --       ...
-  --       (b ((y B) ... (y B)) (a e ... e)))
-  --     ...
-  --     (a ((x A) ... (x A))
-  --       (b ((y B) ... (y B)) (a e ... e))
-  --       ...
-  --       (b ((y B) ... (y B)) (a e ... e))))
-  | StmtInductive [Connective]
-  -- definition of a logical connective `a` by its elimination rules + logical harmony
-  --   (coinductive
-  --     (a ((x A) ... (x A))
-  --       (b ((y (a e ... e))) B)
-  --       ...
-  --       (b ((y (a e ... e))) B))
-  --     ...
-  --     (a ((x A) ... (x A))
-  --       (b ((y (a e ... e))) B)
-  --       ...
-  --       (b ((y (a e ... e))) B)))
-  | StmtCoinductive [Connective]
+  -- -- definition of a logical connective `a` by its introduction rules + logical harmony
+  -- --   (inductive
+  -- --     (a ((x A) ... (x A))
+  -- --       (b ((y B) ... (y B)) (a e ... e))
+  -- --       ...
+  -- --       (b ((y B) ... (y B)) (a e ... e)))
+  -- --     ...
+  -- --     (a ((x A) ... (x A))
+  -- --       (b ((y B) ... (y B)) (a e ... e))
+  -- --       ...
+  -- --       (b ((y B) ... (y B)) (a e ... e))))
+  -- | StmtInductive [Connective]
+  -- -- definition of a logical connective `a` by its elimination rules + logical harmony
+  -- --   (coinductive
+  -- --     (a ((x A) ... (x A))
+  -- --       (b ((y (a e ... e))) B)
+  -- --       ...
+  -- --       (b ((y (a e ... e))) B))
+  -- --     ...
+  -- --     (a ((x A) ... (x A))
+  -- --       (b ((y (a e ... e))) B)
+  -- --       ...
+  -- --       (b ((y (a e ... e))) B)))
+  -- | StmtCoinductive [Connective]
   deriving (Show)
 
 toVar :: Identifier -> WeakTermPlus

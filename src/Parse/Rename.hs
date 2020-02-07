@@ -53,6 +53,13 @@ renameStmtList' nenv ((StmtConstDecl m (mx, x, t)):ss) = do
   ss' <- renameStmtList' (Map.insert x x nenv) ss
   return $ StmtConstDecl m (mx, x, t') : ss'
 
+-- renameStmtList' nenv ((StmtInductive cs):ss) = do
+--   undefined
+-- renameStmtList' _ ((StmtCoinductive _):_) = undefined
+-- renameConnective :: NameEnv -> Connective -> WithEnv Connective
+-- renameConnective = undefined
+-- renameRule :: NameEnv -> Rule -> WithEnv Rule
+-- renameRule = undefined
 renameDef :: NameEnv -> Def -> WithEnv Def
 renameDef nenv (m, (mx, x, t), xts, e) = do
   t' <- rename' nenv t
