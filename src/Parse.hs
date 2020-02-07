@@ -637,15 +637,16 @@ ensureDAG' a visited g =
     Just as -> mapM_ (\x -> ensureDAG' x (visited ++ [a]) g) as
 
 -- これが呼ばれるのはまだrenameされる前
-toIdentList :: [Stmt] -> [(Meta, Identifier, WeakTermPlus)]
+toIdentList :: [Stmt] -> [IdentifierPlus]
 toIdentList [] = []
-toIdentList ((StmtLet _ (mx, x, t) _):ds) = (mx, x, t) : toIdentList ds
+toIdentList ((StmtLet _ mxt _):ds) = mxt : toIdentList ds
 toIdentList ((StmtDef xds):ds) = do
-  let mxts = map (\(_, (_, (mx, x, t), _, _)) -> (mx, x, t)) xds
+  let mxts = map (\(_, (_, mxt, _, _)) -> mxt) xds
   mxts ++ toIdentList ds
-toIdentList ((StmtConstDecl _ (mx, x, t)):ds) = (mx, x, t) : toIdentList ds
-toIdentList ((StmtLetInductiveIntro {}):_) = undefined
-toIdentList ((StmtLetCoinductiveElim {}):_) = undefined
+toIdentList ((StmtConstDecl _ mxt):ds) = mxt : toIdentList ds
+toIdentList ((StmtLetInductiveIntro _ b _ _ _ _ _ _ _):ss) = b : toIdentList ss
+toIdentList ((StmtLetCoinductiveElim _ b _ _ _ _ _ _ _ _):ss) =
+  b : toIdentList ss
 
 -- toIdentList ((StmtCoinductive {}):_) = undefined
 toStmtLetFooter :: Path Abs File -> (Meta, Identifier, WeakTermPlus) -> Stmt
