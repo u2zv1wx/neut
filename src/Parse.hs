@@ -212,14 +212,23 @@ parse' ((_, TreeNode ((_, TreeAtom "definition"):xds)):as) = do
   stmt <- parseDef xds
   stmtList <- parse' as
   return $ stmt : stmtList
-parse' ((m, TreeNode (ind@(_, TreeAtom "inductive"):name@(mFun, TreeAtom _):xts@(_, TreeNode _):rest)):as) =
+parse' ((m, TreeNode (ind@(_, TreeAtom "inductive"):name@(mFun, TreeAtom _):xts@(_, TreeNode _):rest)):as) = do
   parse' $ (m, TreeNode [ind, (mFun, TreeNode (name : xts : rest))]) : as
 parse' ((_, TreeNode ((_, TreeAtom "inductive"):ts)):as) = do
-  parseConnective ts as toInductive toInductiveIntroList
+  connectiveList <- mapM parseConnective ts
+  stmtList <- parse' as
+  -- ここでinductiveのsanity checkをやるとよい？
+  return $ StmtInductive connectiveList : stmtList
+  -- parseConnective ts as toInductive toInductiveIntroList
+-- parse' ((_, TreeNode ((_, TreeAtom "coinductive"):ts)):as) = do
+--   parseConnective ts as toCoinductive toCoinductiveElimList
 parse' ((m, TreeNode (coind@(_, TreeAtom "coinductive"):name@(mFun, TreeAtom _):xts@(_, TreeNode _):rest)):as) =
   parse' $ (m, TreeNode [coind, (mFun, TreeNode (name : xts : rest))]) : as
 parse' ((_, TreeNode ((_, TreeAtom "coinductive"):ts)):as) = do
-  parseConnective ts as toCoinductive toCoinductiveElimList
+  connectiveList <- mapM parseConnective ts
+  stmtList <- parse' as
+  -- ここでcoinductiveのsanity checkをやるとよい？
+  return $ StmtCoinductive connectiveList : stmtList
 parse' ((m, TreeNode [(_, TreeAtom "let"), xt, e]):as) = do
   m' <- adjustPhase m
   e' <- macroExpand e >>= interpret
@@ -245,173 +254,183 @@ parseDef xds = do
   xds'' <- mapM interpretIter xds'
   return $ StmtDef $ zip mxs xds''
 
-type Rule -- inference rule
-   = ( Meta
-     , (Meta, Identifier) -- the name of rule (e.g. `cons`)
-     , [IdentifierPlus] -- the antecedents of the inference rule (e.g. [(x, A), (xs, list A)])
-     , WeakTermPlus -- the consequent of the inference rule
-      )
-
-type Connective -- logical connective
-   = ( Meta
-     , (Meta, Identifier) -- the name of the logical connective (e.g. `list`)
-     , [IdentifierPlus] -- the arguments of the logical connective (e.g. `A` in `list A`)
-     , [Rule] -- the list of inference rules that determines the logical connective.
-              -- when the connective is defined inductively (or positively, or "verificationistically", or
-              -- from the "meaning-by-definition" perspective), this list of rules is interpreted as a list of introduction rules.
-              -- when defined coinductively (or negatively, or "pragmatistically", or from the "meaning-as-use" perspective),
-              -- this list is interpreted as a list of elimination rules.
-      )
-
+-- type Rule -- inference rule
+--    = ( Meta -- location of the name
+--      , Identifier -- the name of the rule
+--      , Meta -- location of the rule
+--      , [IdentifierPlus] -- the antecedents of the inference rule (e.g. [(x, A), (xs, list A)])
+--      , WeakTermPlus -- the consequent of the inference rule
+--       )
+-- type FormationRule = Rule
+-- type Connective
+--    = ( FormationRule
+--      , [Rule] -- list of introduction rule when inductive / list of elimination rule when coinductive
+--       )
+-- type Connective -- logical connective
+--    = ( Meta
+--      , (Meta, Identifier) -- the name of the logical connective (e.g. `list`)
+--      , [IdentifierPlus] -- the arguments of the logical connective (e.g. `A` in `list A`)
+--      , [Rule] -- the list of inference rules that determines the logical connective.
+--               -- when the connective is defined inductively (or positively, or "verificationistically", or
+--               -- from the "meaning-by-definition" perspective), this list of rules is interpreted as a list of introduction rules.
+--               -- when defined coinductively (or negatively, or "pragmatistically", or from the "meaning-as-use" perspective),
+--               -- this list is interpreted as a list of elimination rules.
+--       )
 -- variable naming convention on parsing connectives:
---   a : the name of a connective, like `nat`, `list`, `stream`, etc.
---   b : the name of an inference rule, like `zero`, `cons`, `head`, etc.
---   x : the name of an argument of a connective, like `A` in `list A` or `stream A`.
---   y : the name of an argument of an inference rule, like `w` or `ws` in `cons : Pi (w : A, ws : list A). list A`.
-parseConnective ::
-     [TreePlus]
-  -> [TreePlus]
-  -> ([IdentifierPlus] -> Connective -> WithEnv Stmt)
-  -> ([IdentifierPlus] -> Connective -> WithEnv [Stmt])
-  -> WithEnv [Stmt]
-parseConnective ts as f g = do
-  connectiveList <- mapM parseConnective' ts
-  let ats = map connectiveToIdentPlus connectiveList
-  connectiveList' <- mapM (f ats) connectiveList
-  ruleList <- concat <$> mapM (g ats) connectiveList
-  stmtList <- parse' as
-  return $ connectiveList' ++ ruleList ++ stmtList
-
-parseConnective' :: TreePlus -> WithEnv Connective
-parseConnective' (m, TreeNode ((mName, TreeAtom name):(_, TreeNode xts):rules)) = do
+--   a : the name of a formation rule, like `nat`, `list`, `stream`, etc.
+--   b : the name of an introduction/elimination rule, like `zero`, `cons`, `head`, etc.
+--   x : the name of an argument of a formation rule, like `A` in `list A` or `stream A`.
+--   y : the name of an argument of an introduction/elimination rule, like `w` or `ws` in `cons : Pi (w : A, ws : list A). list A`.
+-- parseConnective ::
+--      [TreePlus]
+--   -> [TreePlus]
+--   -> ([IdentifierPlus] -> Connective -> WithEnv Stmt)
+--   -> ([IdentifierPlus] -> Connective -> WithEnv [Stmt])
+--   -> WithEnv [Stmt]
+-- parseConnective ts as f g = do
+--   connectiveList <- mapM parseConnective' ts
+--   let ats = map (ruleAsPi . formationRuleOf) connectiveList
+--   connectiveList' <- mapM (f ats) connectiveList
+--   ruleList <- concat <$> mapM (g ats) connectiveList
+--   stmtList <- parse' as
+--   return $ connectiveList' ++ ruleList ++ stmtList
+-- parse:
+--   (inductive ((nat TYPE_OF_NAT) ((zero TYPE_OF_ZERO) (succ TYPE_OF_SUCC))))
+--              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+parseConnective :: TreePlus -> WithEnv Connective
+-- parseConnective' (_, TreeNode [formationRule, (_, TreeNode rules)]) = do
+--   formationRule' <- parseRule formationRule
+--   rules' <- mapM parseRule rules
+--   return (formationRule', rules')
+parseConnective (m, TreeNode ((_, TreeAtom name):(_, TreeNode xts):rules)) = do
   m' <- adjustPhase m
-  mName' <- adjustPhase mName
   xts' <- mapM interpretIdentifierPlus xts
   rules' <- mapM parseRule rules
-  return (m', (mName', name), xts', rules')
-parseConnective' _ = throwError' "parseConnective: syntax error"
+  return (m', name, xts', rules')
+parseConnective _ = throwError' "parseConnective: syntax error"
 
 parseRule :: TreePlus -> WithEnv Rule
-parseRule (m, TreeNode [(mName, TreeAtom name), (_, TreeNode xts), t]) = do
-  m' <- adjustPhase m
-  mName' <- adjustPhase mName
-  t' <- interpret t
-  xts' <- mapM interpretIdentifierPlus xts
-  return (m', (mName', name), xts', t')
-parseRule _ = throwError' "parseRule: syntax error"
+parseRule t = interpretIdentifierPlus t >>= piAsRule
 
+-- parseRule (m, TreeNode [(mName, TreeAtom name), (_, TreeNode xts), t]) = do
+--   m' <- adjustPhase m
+--   mName' <- adjustPhase mName
+--   t' <- interpret t
+--   xts' <- mapM interpretIdentifierPlus xts
+--   return (m', (mName', name), xts', t')
 -- represent the inductive logical connective within CoC
-toInductive :: [IdentifierPlus] -> Connective -> WithEnv Stmt
-toInductive ats connective@(m, (ma, a), xts, rules) = do
-  let bts = map ruleToIdentPlus rules
-  return $
-    StmtLet
-      m
-      (connectiveToIdentPlus connective)
-      ( m
-      , WeakTermPiIntro
-          xts
-          ( m
-          , WeakTermPi
-              (ats ++ bts)
-              (m, WeakTermPiElim (ma, WeakTermUpsilon a) (map toVar' xts))))
-
-toInductiveIntroList :: [IdentifierPlus] -> Connective -> WithEnv [Stmt]
-toInductiveIntroList ats (_, _, xts, rules) = do
-  let bts = map ruleToIdentPlus rules
-  mapM (toInductiveIntro ats bts xts) rules
-
+-- toInductive ats connective@(m, (ma, a), xts, rules) = do
+-- toInductive :: [IdentifierPlus] -> Connective -> WithEnv Stmt
+-- toInductive ats (formationRule@(ma, a, m, xts, _), rules) = do
+--   let bts = map ruleAsPi rules
+--   return $
+--     StmtLet
+--       m
+--       (ruleAsPi formationRule)
+--       ( m
+--       , WeakTermPiIntro
+--           xts
+--           ( m
+--           , WeakTermPi
+--               (ats ++ bts)
+--               (m, WeakTermPiElim (ma, WeakTermUpsilon a) (map toVar' xts))))
+-- toInductiveIntroList :: [IdentifierPlus] -> Connective -> WithEnv [Stmt]
+-- toInductiveIntroList ats ((_, _, _, xts, _), rules) = do
+--   let bts = map ruleAsPi rules
+--   mapM (toInductiveIntro ats bts xts) rules
 -- represent the introduction rule within CoC
-toInductiveIntro ::
-     [IdentifierPlus]
-  -> [IdentifierPlus]
-  -> [IdentifierPlus]
-  -> Rule
-  -> WithEnv Stmt
-toInductiveIntro ats bts xts (m, (mb, b), yts, cod) = do
-  return $
-    StmtLet
-      m
-      (mb, b, (m, WeakTermPi (xts ++ yts) cod)) -- e.g. cons : Pi (A : tau, w : A, ws : list A). list A,
-                                                -- where b = cons, xts = [A : tau], yts = [w : A, ws : list A], cod = list A
-      ( m
-      , WeakTermPiIntro
-          (xts ++ yts)
-          -- list A = (lam (A : Tau). Pi (list : (...), nil : (...), cons : (...)). list A) @ A
-          --        = Pi (list : (...), nil : (...), cons : (...)). list A
-          ( m
-          , WeakTermPiIntro
-              (ats ++ bts) -- ats = [list : (...)],
-                           -- bts = [nil : Pi (yts). list A, cons : (...)]
-              (m, WeakTermPiElim (mb, WeakTermUpsilon b) (map toVar' yts)) -- nil @ yts : list A
-                                                                           -- (note that the `nil` here doesn't have xts as arguments)
-           ))
+-- toInductiveIntro ::
+--      [IdentifierPlus]
+--   -> [IdentifierPlus]
+--   -> [IdentifierPlus]
+--   -> Rule
+--   -> WithEnv Stmt
+-- toInductiveIntro ats bts xts (mb, b, m, yts, cod) = do
+--   return $
+--     StmtLet
+--       m
+--       (mb, b, (m, WeakTermPi (xts ++ yts) cod)) -- e.g. cons : Pi (A : tau, w : A, ws : list A). list A,
+--                                                 -- where b = cons, xts = [A : tau], yts = [w : A, ws : list A], cod = list A
+--       ( m
+--       , WeakTermPiIntro
+--           (xts ++ yts)
+--           -- list A = (lam (A : Tau). Pi (list : (...), nil : (...), cons : (...)). list A) @ A
+--           --        = Pi (list : (...), nil : (...), cons : (...)). list A
+--           ( m
+--           , WeakTermPiIntro
+--               (ats ++ bts) -- ats = [list : (...)],
+--                            -- bts = [nil : Pi (yts). list A, cons : (...)]
+--               (m, WeakTermPiElim (mb, WeakTermUpsilon b) (map toVar' yts)) -- nil @ yts : list A
+--                                                                            -- (note that the `nil` here doesn't have xts as arguments)
+--            ))
+-- -- represent the coinductive logical connective within CoC
+-- toCoinductive :: [IdentifierPlus] -> Connective -> WithEnv Stmt
+-- toCoinductive ats connective@(m, (ma, a), xts, rules) = do
+--   let bts = map ruleAsPi rules
+--   let cod = (m, WeakTermPiElim (ma, WeakTermUpsilon a) (map toVar' xts))
+--   -- sigmaを[IdentifierPlus]で表現しているからここの処理が必要。
+--   -- もしSigma (x1 : A1, ..., xn : An). Bで表現していれば、ここはtoInductiveと完全に
+--   -- 対称的な処理になる。
+--   h <- newNameWith "cod"
+--   return $
+--     StmtLet
+--       m
+--       (connectiveToIdentPlus connective)
+--       (m, WeakTermPiIntro xts (m, WeakTermSigma (ats ++ bts ++ [(m, h, cod)])))
+-- toCoinductiveElimList :: [IdentifierPlus] -> Connective -> WithEnv [Stmt]
+-- toCoinductiveElimList ats (_, _, xts, rules) = do
+--   let bts = map ruleAsPi rules
+--   mapM (toCoinductiveElim ats bts xts) rules
+-- -- represent the elimination rule within CoC
+-- toCoinductiveElim ::
+--      [IdentifierPlus]
+--   -> [IdentifierPlus]
+--   -> [IdentifierPlus]
+--   -> Rule
+--   -> WithEnv Stmt
+-- toCoinductiveElim ats bts xts (m, (mb, b), yts, cod)
+--   | length yts > 0 = do
+--     return $
+--       StmtLet
+--         m
+--         (mb, b, (m, WeakTermPi (xts ++ yts) cod)) -- tail : Pi (A : tau, s : stream A). stream A
+--         ( m
+--         , WeakTermPiIntro
+--             (xts ++ yts)
+--             -- stream A = (lam (A : Tau). Sigma (stream : (...), head : (...), tail : (...)). stream A) @ A
+--             --          = Sigma (list : (...), head : (...), tail : (...)). stream A
+--             -- ats = [list : (...)]
+--             -- bts = [head : (...), tail : Pi (y1 : stream A). stream A]
+--             -- (head yts : stream A)
+--             -- ~> ats ++ bts ++ [head yts] = [list : (...), head : (...), tail : Pi (y1 : stream A). stream A, y1 : stream A]
+--             ( m
+--             , WeakTermSigmaElim
+--                 cod -- sigmaElimの型の部分はelimの結果の型。変数（yts）を同一名の変数（yts）でsubstするので依存の処理の心配もなし。
+--                 -- 同一の変数名を使うのがポイント。head yts : a @ (e1, ..., en)なので、
+--                 -- (1)のほうのhead ytsの型に出現するaは(1)の行のatsによって束縛されたものとなり、
+--                 -- (2)のほうのhead ytsの方に出現するaは外側のtoCoinductiveの結果によって定義されたものとなる。
+--                 -- 別に異なる名前を両者に与えてもよいが、同一の名前を使ったほうが実装がラクなのでこちらをとることにする。
+--                 (ats ++ bts ++ [head yts]) -- (1)
+--                 (toVar' $ head yts) -- (2)
+--                 (m, WeakTermPiElim (mb, WeakTermUpsilon b) (map toVar' yts))))
+--   | otherwise =
+--     throwError'
+--       "toCoinductiveElim: the antecedant of an elimination rule cannot be empty"
+piAsRule :: IdentifierPlus -> WithEnv Rule
+piAsRule (m, x, (mPi, WeakTermPi xts cod)) = return (m, x, mPi, xts, cod)
+piAsRule _ = throwError' "a rule must be specified by pi type"
 
--- represent the coinductive logical connective within CoC
-toCoinductive :: [IdentifierPlus] -> Connective -> WithEnv Stmt
-toCoinductive ats connective@(m, (ma, a), xts, rules) = do
-  let bts = map ruleToIdentPlus rules
-  let cod = (m, WeakTermPiElim (ma, WeakTermUpsilon a) (map toVar' xts))
-  -- sigmaを[IdentifierPlus]で表現しているからここの処理が必要。
-  -- もしSigma (x1 : A1, ..., xn : An). Bで表現していれば、ここはtoInductiveと完全に
-  -- 対称的な処理になる。
-  h <- newNameWith "cod"
-  return $
-    StmtLet
-      m
-      (connectiveToIdentPlus connective)
-      (m, WeakTermPiIntro xts (m, WeakTermSigma (ats ++ bts ++ [(m, h, cod)])))
-
-toCoinductiveElimList :: [IdentifierPlus] -> Connective -> WithEnv [Stmt]
-toCoinductiveElimList ats (_, _, xts, rules) = do
-  let bts = map ruleToIdentPlus rules
-  mapM (toCoinductiveElim ats bts xts) rules
-
--- represent the elimination rule within CoC
-toCoinductiveElim ::
-     [IdentifierPlus]
-  -> [IdentifierPlus]
-  -> [IdentifierPlus]
-  -> Rule
-  -> WithEnv Stmt
-toCoinductiveElim ats bts xts (m, (mb, b), yts, cod)
-  | length yts > 0 = do
-    return $
-      StmtLet
-        m
-        (mb, b, (m, WeakTermPi (xts ++ yts) cod)) -- tail : Pi (A : tau, s : stream A). stream A
-        ( m
-        , WeakTermPiIntro
-            (xts ++ yts)
-            -- stream A = (lam (A : Tau). Sigma (stream : (...), head : (...), tail : (...)). stream A) @ A
-            --          = Sigma (list : (...), head : (...), tail : (...)). stream A
-            -- ats = [list : (...)]
-            -- bts = [head : (...), tail : Pi (y1 : stream A). stream A]
-            -- (head yts : stream A)
-            -- ~> ats ++ bts ++ [head yts] = [list : (...), head : (...), tail : Pi (y1 : stream A). stream A, y1 : stream A]
-            ( m
-            , WeakTermSigmaElim
-                cod -- sigmaElimの型の部分はelimの結果の型。変数（yts）を同一名の変数（yts）でsubstするので依存の処理の心配もなし。
-                -- 同一の変数名を使うのがポイント。head yts : a @ (e1, ..., en)なので、
-                -- (1)のほうのhead ytsの型に出現するaは(1)の行のatsによって束縛されたものとなり、
-                -- (2)のほうのhead ytsの方に出現するaは外側のtoCoinductiveの結果によって定義されたものとなる。
-                -- 別に異なる名前を両者に与えてもよいが、同一の名前を使ったほうが実装がラクなのでこちらをとることにする。
-                (ats ++ bts ++ [head yts]) -- (1)
-                (toVar' $ head yts) -- (2)
-                (m, WeakTermPiElim (mb, WeakTermUpsilon b) (map toVar' yts))))
-  | otherwise =
-    throwError'
-      "toCoinductiveElim: the antecedant of an elimination rule cannot be empty"
-
-ruleToIdentPlus :: Rule -> IdentifierPlus
-ruleToIdentPlus (m, (mb, b), xts, t) = (mb, b, (m, WeakTermPi xts t))
-
-connectiveToIdentPlus :: Connective -> IdentifierPlus
-connectiveToIdentPlus (m, (ma, a), xts, _) = (ma, a, (m, WeakTermPi xts univ))
-
-toVar' :: IdentifierPlus -> WeakTermPlus
-toVar' (m, x, _) = (m, WeakTermUpsilon x)
-
+-- ruleAsPi :: Rule -> IdentifierPlus
+-- ruleAsPi (mb, b, m, xts, t) = (mb, b, (m, WeakTermPi xts t))
+-- formationRuleOf :: Connective -> Rule
+-- formationRuleOf (formationRule, _) = formationRule
+-- createInternalizer :: WeakTermPlus -> WithEnv (WeakTermPlus -> WeakTermPlus)
+-- createInternalizer = undefined
+-- createExternalizer :: WeakTermPlus -> WithEnv (WeakTermPlus -> WeakTermPlus)
+-- createExternalizer = undefined
+-- connectiveToIdentPlus (m, (ma, a), xts, _) = (ma, a, (m, WeakTermPi xts univ))
+-- toVar' :: IdentifierPlus -> WeakTermPlus
+-- toVar' (m, x, _) = (m, WeakTermUpsilon x)
 insImplicitBegin :: TreePlus -> WithEnv TreePlus
 insImplicitBegin (m, TreeNode (xt:xts:body:rest)) = do
   let m' = fst body
@@ -474,6 +493,8 @@ concatStmtList (StmtDef xds:ss) = do
   -- StmtLetに帰着
   let letList = toLetList $ zip xds iterList
   concatStmtList $ letList ++ ss
+concatStmtList (StmtInductive {}:_) = undefined
+concatStmtList (StmtCoinductive {}:_) = undefined
 
 toLetList :: [(IdentDef, WeakTermPlus)] -> [Stmt]
 toLetList [] = []
@@ -568,6 +589,8 @@ toIdentList ((StmtDef xds):ds) = do
   let mxts = map (\(_, (_, (mx, x, t), _, _)) -> (mx, x, t)) xds
   mxts ++ toIdentList ds
 toIdentList ((StmtConstDecl _ (mx, x, t)):ds) = (mx, x, t) : toIdentList ds
+toIdentList ((StmtInductive {}):_) = undefined
+toIdentList ((StmtCoinductive {}):_) = undefined
 
 toStmtLetFooter :: Path Abs File -> (Meta, Identifier, WeakTermPlus) -> Stmt
 toStmtLetFooter path (m, x, t) = do
