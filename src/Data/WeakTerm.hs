@@ -96,6 +96,8 @@ data Stmt
   -- declaration of a constant
   --   (constant x t)
   | StmtConstDecl Meta IdentifierPlus
+  | StmtLetInductive Int Meta IdentifierPlus WeakTermPlus
+  | StmtLetCoinductive Int Meta IdentifierPlus WeakTermPlus
   -- let (b : B) :=
   --   lam (xts ++ yts).
   --     lam (ats ++ bts).
@@ -120,7 +122,8 @@ data Stmt
       [IdentifierPlus] -- xts ++ [(z, t)]
       WeakTermPlus -- the type of b-inner @ [c]                  --
       [IdentifierPlus] -- ats                                    --
-      [IdentifierPlus] -- bts ++ [(c, t)]                        -- sigma-elim
+      [IdentifierPlus] -- bts                                    -- sigma-elim
+      IdentifierPlus -- (c, t)                                   --
       WeakTermPlus -- z                                          --
       WeakTermPlus -- b-inner @ [c] (must be externalized later) --
       [(Identifier, Identifier)] -- the `a` defined beforehand ~> the `a` in `ats`

@@ -52,6 +52,7 @@ data Env =
     , revEnumEnv :: Map.HashMap Identifier Identifier -- [("left", "choice"), ("right", "choice"), ...]
     , nameEnv :: Map.HashMap Identifier Identifier -- [("foo", "foo.13"), ...]
     , revNameEnv :: Map.HashMap Identifier Identifier -- [("foo.13", "foo"), ...]
+    , formationEnv :: Map.HashMap Identifier (Maybe WeakTermPlus)
     , inductiveEnv :: RuleEnv -- "list" ~> (cons, Pi (A : tau). A -> list A -> list A)
     , coinductiveEnv :: RuleEnv -- "tail" ~> (head, Pi (A : tau). stream A -> A)
     , weakTypeEnv :: Map.HashMap Identifier WeakTermPlus -- var ~> typeof(var)
@@ -81,6 +82,7 @@ initialEnv path colorizeFlag =
     , revEnumEnv = Map.empty
     , nameEnv = Map.empty
     , revNameEnv = Map.empty
+    , formationEnv = Map.empty
     , inductiveEnv = Map.empty
     , coinductiveEnv = Map.empty
     , weakTypeEnv = Map.empty

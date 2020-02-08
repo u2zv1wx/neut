@@ -79,19 +79,21 @@ renameStmtList' nenv ((StmtLetInductiveIntro m (mb, b, t) xtsyts ats bts bInner 
       info
       asOuter :
     ss'
-renameStmtList' nenv ((StmtLetCoinductiveElim m (mb, b, t) xtsyt cod ats btsyt e1 e2 _ as):ss) = do
+renameStmtList' nenv ((StmtLetCoinductiveElim m (mb, b, t) xtsyt cod ats bts yt e1 e2 _ as):ss) = do
   t' <- rename' nenv t
   (xtsyt', nenv') <- renameArgs nenv xtsyt
   e1' <- rename' nenv' e1
   (ats', nenv'') <- renameArgs nenv' ats
-  (btsyt', nenv''') <- renameArgs nenv'' btsyt
-  cod' <- rename' nenv''' cod
-  e2' <- rename' nenv''' e2
+  (bts', nenv''') <- renameArgs nenv'' bts
+  (yt', nenv'''') <- renameIdentPlus' nenv''' yt
+  -- (btsyt', nenv''') <- renameArgs nenv'' btsyt
+  cod' <- rename' nenv'''' cod
+  e2' <- rename' nenv'''' e2
   b' <- newLLVMNameWith b
   ss' <- renameStmtList' (Map.insert b b' nenv) ss
   -- let as = map (\(_, y, _) -> y) ats
   asOuter <- mapM (lookupStrict nenv) as
-  asInner <- mapM (lookupStrict nenv''') as
+  asInner <- mapM (lookupStrict nenv'''') as
   -- infoでcod'の中のinnerをouterに置き換えていく
   -- (cod'を置き換えるのでdomのasOuterはcod'と同じnenvでrenameされている)
   let info = zip asInner asOuter
@@ -102,7 +104,8 @@ renameStmtList' nenv ((StmtLetCoinductiveElim m (mb, b, t) xtsyt cod ats btsyt e
       xtsyt'
       cod'
       ats'
-      btsyt'
+      bts'
+      yt'
       e1'
       e2'
       info
@@ -241,6 +244,13 @@ renameIdentPlus nenv (m, x, t) = do
   t' <- rename' nenv t
   x' <- newLLVMNameWith x
   return (m, x', t')
+
+renameIdentPlus' ::
+     NameEnv -> IdentifierPlus -> WithEnv (IdentifierPlus, NameEnv)
+renameIdentPlus' nenv (m, x, t) = do
+  t' <- rename' nenv t
+  x' <- newLLVMNameWith x
+  return ((m, x', t'), Map.insert x x' nenv)
 
 renameIter ::
      NameEnv
