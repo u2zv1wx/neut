@@ -445,7 +445,6 @@ substRuleType sub (m, WeakTermStructElim xts v e) = do
   let xs = map (\(_, x, _) -> x) xts
   if fst (fst sub) `elem` xs
     then return (m, WeakTermStructElim xts v' e)
-      -- let sub' = filter (\(k, _) -> fst k `notElem` xs) sub
     else do
       e' <- substRuleType sub e
       return (m, WeakTermStructElim xts v' e')
@@ -457,7 +456,6 @@ substRuleTypeBindings sub ((m, x, t):xts) = do
   t' <- substRuleType sub t
   if fst (fst sub) == x
     then return $ (m, x, t') : xts
-      -- let sub' = filter (\(k, _) -> fst k /= x) sub
     else do
       xts' <- substRuleTypeBindings sub xts
       return $ (m, x, t') : xts'
@@ -474,7 +472,6 @@ substRuleTypeBindingsWithBody sub ((m, x, t):xts) e = do
   t' <- substRuleType sub t
   if fst (fst sub) == x
     then return ((m, x, t') : xts, e)
-      -- let sub' = filter (\(k, _) -> fst k /= x) sub
     else do
       (xts', e') <- substRuleTypeBindingsWithBody sub xts e
       return ((m, x, t') : xts', e')
