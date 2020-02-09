@@ -229,15 +229,17 @@ zeta mode isub csub atsbts t e = do
   ienv <- gets inductiveEnv
   cenv <- gets coinductiveEnv
   case t of
+    _
+      | isResolved (isub ++ csub) t -> return e
     (_, WeakTermPi xts cod) -> do
       let (ms, xs, ts) = unzip3 xts
+      let ts' = map (substWeakTermPlus (isub ++ csub)) ts
       let vs = map toVar' xts
       -- backward conversion to create (A', ..., A') -> (A, ..., A)
       vs' <- zipWithM (zeta (flipMode mode) isub csub atsbts) ts vs
       let app = (fst e, WeakTermPiElim e vs')
       -- forward conversion to create B -> B'
       app' <- zeta mode isub csub atsbts cod app
-      let ts' = map (substWeakTermPlus undefined) ts
       let xts' = zip3 ms xs ts'
       -- return (A' ..., A') -> (A, ..., A) -> B -> B'
       return $ (fst e, WeakTermPiIntro xts' app')
@@ -245,9 +247,9 @@ zeta mode isub csub atsbts t e = do
       -- ordinary internalization
       | ModeInternalize <- mode -- modeはforwardかbackwardかを保持しておいて、んでinductive/coinductiveのベースのときだけチェック、とかで。
       , Just _ <- lookup a isub -> do
-        _ <- undefined isub (concatMap varWeakTermPlus es) -- sanity check
-        return (fst e, WeakTermPiElim e (map toVar' atsbts))
-      -- nested inductive type
+        if all (isResolved isub) es
+          then return (fst e, WeakTermPiElim e (map toVar' atsbts))
+          else throwError' "self-nested inductive type is not allowed"
       | Just (Just bts) <- Map.lookup a ienv -> do
         (xts, btsInner) <- lookupInductive a
         let es' = map (substWeakTermPlus isub) es
@@ -269,10 +271,12 @@ zeta mode isub csub atsbts t e = do
       -- ordinary externalization
       | ModeExternalize <- mode
       , Just _ <- lookup a csub -> do
-        _ <- undefined isub (concatMap varWeakTermPlus es) -- sanity check
-        let es' = map (substWeakTermPlus csub) es
-        let t' = (m, WeakTermPiElim va es')
-        return (fst e, WeakTermSigmaIntro t' (map toVar' atsbts ++ [e]))
+        if all (isResolved csub) es
+          then do
+            let es' = map (substWeakTermPlus csub) es
+            let t' = (m, WeakTermPiElim va es')
+            return (fst e, WeakTermSigmaIntro t' (map toVar' atsbts ++ [e]))
+          else throwError' "self-nested coinductive type is not allowed"
       -- nested coinductive type
       | Just (Just bts) <- Map.lookup a cenv -> do
         (xts, btsInner) <- lookupCoinductive a
@@ -304,9 +308,15 @@ zeta mode isub csub atsbts t e = do
         a <> "` cannot be used to construct a nested coinductive type"
     (_, WeakTermSigma _) -> undefined
     _ ->
-      if undefined isub (varWeakTermPlus t)
+      if isResolved isub t
         then return e
         else undefined
+
+isResolved :: SubstWeakTerm -> WeakTermPlus -> Bool
+isResolved sub e = do
+  let xs = map fst sub
+  let ys = varWeakTermPlus e
+  all (\x -> x `notElem` ys) xs
 
 lookupInductive :: Identifier -> WithEnv ([IdentifierPlus], [IdentifierPlus])
 lookupInductive a = do
