@@ -27,6 +27,7 @@ compInfoStmtList c info ((StmtConstDecl _ (mx, x, t)):ss) = do
   compInfoWeakTermPlus c info t
   let info' = (x, mx) : info
   compInfoStmtList c info' ss
+compInfoStmtList c info (_:ss) = compInfoStmtList c info ss
 
 compInfoDef ::
      CursorName -> CompInfo -> Def -> Either CompInfo (Identifier, Meta)
