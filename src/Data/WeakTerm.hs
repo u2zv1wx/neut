@@ -488,3 +488,8 @@ showStruct = inBrace . T.intercalate " "
 
 metaOf :: WeakTermPlus -> Meta
 metaOf e = fst e
+
+-- {} asUpsilon {}
+asUpsilon :: WeakTermPlus -> Maybe Identifier
+asUpsilon (_, WeakTermUpsilon x) = Just x
+asUpsilon _ = Nothing

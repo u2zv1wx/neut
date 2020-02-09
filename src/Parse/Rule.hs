@@ -324,10 +324,16 @@ toInternalizedArg ::
   -> IdentifierPlus
   -> WithEnv WeakTermPlus
 toInternalizedArg mode isub csub xts atsbts es' b (mbInner, _, (_, WeakTermPi yts _)) = do
-  yts' <- mapM (modifyArgs isub xts (undefined, (undefined, es'))) yts
+  let (ms, ys, ts) = unzip3 yts
+  let xs = map toVar' xts
+  ts' <- mapM (modifyType isub ((undefined, xs), (undefined, es'))) ts
+  let yts' = zip3 ms ys ts'
   args <- mapM (internalize' mode isub csub atsbts) yts'
   return (mbInner, WeakTermPiElim (toVar' b) (es' ++ args))
 toInternalizedArg _ _ _ _ _ _ _ _ = throwError' "toInternalizedArg"
+
+-- a @ [e1, ..., en]
+type RuleType = (Identifier, [WeakTermPlus])
 
 -- 型アノテーションつきの変数(meta, y, t)をうけとって、tのなかの
 --   - 変数をisubに沿ってsubstし、かつ、
@@ -337,10 +343,138 @@ toInternalizedArg _ _ _ _ _ _ _ _ = throwError' "toInternalizedArg"
 -- a @ (e1, ..., en)をa' @ (e1', ..., en')にしたいときは、a'' = lam (...). a' @ (e1', ..., en')としてreduceすればよいわけで。
 -- というか、reduceではなくて、zetaのタイミングで((lam (...). e) e1 ... en)があったらsubstして、みたいにすればいいだけでは。
 -- そうすればけっきょくふつうのsubstをすればよいということになるはず。……generalizedだと型が合わないからだめ、みたいなエラーを出力できなくて困るか。
-modifyArgs ::
+modifyType ::
      SubstWeakTerm
+  -> (RuleType, RuleType) -- ((a, [x1, ..., xn]), (a', [e1', ..., en']))
+  -> WeakTermPlus -- subst対象の型
+  -> WithEnv WeakTermPlus -- subst結果
+modifyType sub rsub t = do
+  t' <- substRuleType rsub t
+  return $ substWeakTermPlus sub t'
+
+substRuleType :: (RuleType, RuleType) -> WeakTermPlus -> WithEnv WeakTermPlus
+substRuleType _ (m, WeakTermTau) = return (m, WeakTermTau)
+substRuleType sub (m, WeakTermUpsilon x) =
+  if fst (fst sub) == x
+    then throwError' "invalid use of inductive/coinductive type"
+    else return (m, WeakTermUpsilon x)
+substRuleType sub (m, WeakTermPi xts t) = do
+  (xts', t') <- substRuleTypeBindingsWithBody sub xts t
+  return (m, WeakTermPi xts' t')
+substRuleType sub (m, WeakTermPiIntro xts body) = do
+  (xts', body') <- substRuleTypeBindingsWithBody sub xts body
+  return (m, WeakTermPiIntro xts' body')
+substRuleType sub@((a1, es1), (a2, es2)) (m, WeakTermPiElim e es)
+  | (mx, WeakTermUpsilon x) <- e
+  , a1 == x =
+    case (mapM asUpsilon es1, mapM asUpsilon es) of
+      (Just xs', Just ys')
+        | xs' == ys' -> return (m, WeakTermPiElim (mx, WeakTermUpsilon a2) es2)
+      (_, _) ->
+        throwError'
+          "generalized inductive/coinductive type cannot be used to construct a nested inductive/coinductive type"
+  | otherwise = do
+    e' <- substRuleType sub e
+    es' <- mapM (substRuleType sub) es
+    return (m, WeakTermPiElim e' es')
+substRuleType sub (m, WeakTermSigma xts) = do
+  xts' <- substRuleTypeBindings sub xts
+  return (m, WeakTermSigma xts')
+substRuleType sub (m, WeakTermSigmaIntro t es) = do
+  t' <- substRuleType sub t
+  es' <- mapM (substRuleType sub) es
+  return (m, WeakTermSigmaIntro t' es')
+substRuleType sub (m, WeakTermSigmaElim t xts e1 e2) = do
+  t' <- substRuleType sub t
+  e1' <- substRuleType sub e1
+  (xts', e2') <- substRuleTypeBindingsWithBody sub xts e2
+  return (m, WeakTermSigmaElim t' xts' e1' e2')
+substRuleType sub (m, WeakTermIter (mx, x, t) xts e) = do
+  t' <- substRuleType sub t
+  if fst (fst sub) == x
+    then return (m, WeakTermIter (mx, x, t') xts e)
+    else do
+      (xts', e') <- substRuleTypeBindingsWithBody sub xts e
+      return (m, WeakTermIter (mx, x, t') xts' e')
+substRuleType _ (m, WeakTermConst x) = return (m, WeakTermConst x)
+substRuleType sub (m, WeakTermConstDecl (mx, x, t) e) = do
+  t' <- substRuleType sub t
+  if fst (fst sub) == x
+    then return (m, WeakTermConstDecl (mx, x, t') e)
+    else do
+      e' <- substRuleType sub e
+      return (m, WeakTermConstDecl (mx, x, t') e')
+substRuleType _ (m, WeakTermZeta x) = return (m, WeakTermZeta x)
+substRuleType sub (m, WeakTermInt t x) = do
+  t' <- substRuleType sub t
+  return (m, WeakTermInt t' x)
+substRuleType _ (m, WeakTermFloat16 x) = do
+  return (m, WeakTermFloat16 x)
+substRuleType _ (m, WeakTermFloat32 x) = do
+  return (m, WeakTermFloat32 x)
+substRuleType _ (m, WeakTermFloat64 x) = do
+  return (m, WeakTermFloat64 x)
+substRuleType sub (m, WeakTermFloat t x) = do
+  t' <- substRuleType sub t
+  return (m, WeakTermFloat t' x)
+substRuleType _ (m, WeakTermEnum x) = return (m, WeakTermEnum x)
+substRuleType _ (m, WeakTermEnumIntro l) = return (m, WeakTermEnumIntro l)
+substRuleType sub (m, WeakTermEnumElim (e, t) branchList) = do
+  t' <- substRuleType sub t
+  e' <- substRuleType sub e
+  let (caseList, es) = unzip branchList
+  es' <- mapM (substRuleType sub) es
+  return (m, WeakTermEnumElim (e', t') (zip caseList es'))
+substRuleType sub (m, WeakTermArray dom k) = do
+  dom' <- substRuleType sub dom
+  return (m, WeakTermArray dom' k)
+substRuleType sub (m, WeakTermArrayIntro k es) = do
+  es' <- mapM (substRuleType sub) es
+  return (m, WeakTermArrayIntro k es')
+substRuleType sub (m, WeakTermArrayElim mk xts v e) = do
+  v' <- substRuleType sub v
+  (xts', e') <- substRuleTypeBindingsWithBody sub xts e
+  return (m, WeakTermArrayElim mk xts' v' e')
+substRuleType _ (m, WeakTermStruct ts) = return (m, WeakTermStruct ts)
+substRuleType sub (m, WeakTermStructIntro ets) = do
+  let (es, ts) = unzip ets
+  es' <- mapM (substRuleType sub) es
+  return (m, WeakTermStructIntro $ zip es' ts)
+substRuleType sub (m, WeakTermStructElim xts v e) = do
+  v' <- substRuleType sub v
+  let xs = map (\(_, x, _) -> x) xts
+  if fst (fst sub) `elem` xs
+    then return (m, WeakTermStructElim xts v' e)
+      -- let sub' = filter (\(k, _) -> fst k `notElem` xs) sub
+    else do
+      e' <- substRuleType sub e
+      return (m, WeakTermStructElim xts v' e')
+
+substRuleTypeBindings ::
+     (RuleType, RuleType) -> [IdentifierPlus] -> WithEnv [IdentifierPlus]
+substRuleTypeBindings _ [] = return []
+substRuleTypeBindings sub ((m, x, t):xts) = do
+  t' <- substRuleType sub t
+  if fst (fst sub) == x
+    then return $ (m, x, t') : xts
+      -- let sub' = filter (\(k, _) -> fst k /= x) sub
+    else do
+      xts' <- substRuleTypeBindings sub xts
+      return $ (m, x, t') : xts'
+
+substRuleTypeBindingsWithBody ::
+     (RuleType, RuleType)
   -> [IdentifierPlus]
-  -> (Identifier, (Identifier, [WeakTermPlus]))
-  -> IdentifierPlus
-  -> WithEnv IdentifierPlus
-modifyArgs _ _ _ _ = undefined
+  -> WeakTermPlus
+  -> WithEnv ([IdentifierPlus], WeakTermPlus)
+substRuleTypeBindingsWithBody sub [] e = do
+  e' <- substRuleType sub e
+  return ([], e')
+substRuleTypeBindingsWithBody sub ((m, x, t):xts) e = do
+  t' <- substRuleType sub t
+  if fst (fst sub) == x
+    then return ((m, x, t') : xts, e)
+      -- let sub' = filter (\(k, _) -> fst k /= x) sub
+    else do
+      (xts', e') <- substRuleTypeBindingsWithBody sub xts e
+      return ((m, x, t') : xts', e')

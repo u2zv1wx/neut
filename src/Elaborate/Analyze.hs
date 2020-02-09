@@ -381,11 +381,6 @@ linearCheck' found (x:xs) = linearCheck' (S.insert x found) xs
 getVarList :: [WeakTermPlus] -> [Identifier]
 getVarList xs = catMaybes $ map asUpsilon xs
 
--- {} asUpsilon {}
-asUpsilon :: WeakTermPlus -> Maybe Identifier
-asUpsilon (_, WeakTermUpsilon x) = Just x
-asUpsilon _ = Nothing
-
 -- {} toPiElim {}
 toPiElim :: WeakTermPlus -> [(Meta, [WeakTermPlus])] -> WeakTermPlus
 toPiElim e [] = e
