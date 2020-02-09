@@ -205,16 +205,6 @@ internalize ::
 internalize isub atsbts (m, y, t) =
   zeta ModeInternalize isub [] atsbts t (m, WeakTermUpsilon y)
 
-internalize' ::
-     Mode
-  -> SubstWeakTerm
-  -> SubstWeakTerm
-  -> [IdentifierPlus]
-  -> IdentifierPlus
-  -> WithEnv WeakTermPlus
-internalize' mode isub csub atsbts (m, y, t) =
-  zeta mode isub csub atsbts t (m, WeakTermUpsilon y)
-
 externalize ::
      SubstWeakTerm
   -> [IdentifierPlus]
@@ -260,15 +250,18 @@ zeta mode isub csub atsbts t e = do
       -- nested inductive type
       | ModeInternalize <- mode
       , Just (Just bts) <- Map.lookup a ienv -> do
-        let es' = map (substWeakTermPlus undefined) es
+        let es' = map (substWeakTermPlus isub) es
         (xts, btsInner) <- lookupInductive a
-        let a' = (ma, WeakTermPiIntro xts (ma, WeakTermPiElim va es'))
         args <-
           zipWithM
-            (toInternalizedArg mode isub csub xts atsbts es')
+            (toInternalizedArg mode isub csub a xts atsbts es')
             bts
             btsInner
-        return (fst e, WeakTermPiElim e (a' : args))
+        return
+          ( fst e
+          , WeakTermPiElim
+              e
+              ((ma, WeakTermPiIntro xts (ma, WeakTermPiElim va es')) : args))
       -- invalid nested inductive type
       | ModeInternalize <- mode
       , Just Nothing <- Map.lookup a ienv ->
@@ -317,20 +310,22 @@ toInternalizedArg ::
      Mode
   -> SubstWeakTerm
   -> SubstWeakTerm
+  -> Identifier
   -> [IdentifierPlus]
   -> [IdentifierPlus]
   -> [WeakTermPlus]
   -> IdentifierPlus
   -> IdentifierPlus
   -> WithEnv WeakTermPlus
-toInternalizedArg mode isub csub xts atsbts es' b (mbInner, _, (_, WeakTermPi yts _)) = do
+toInternalizedArg mode isub csub a xts atsbts es' b (mbInner, _, (_, WeakTermPi yts _)) = do
   let (ms, ys, ts) = unzip3 yts
   let xs = map toVar' xts
-  ts' <- mapM (modifyType isub ((undefined, xs), (undefined, es'))) ts
+  ts' <- mapM (modifyType isub ((a, xs), (a, es'))) ts
   let yts' = zip3 ms ys ts'
-  args <- mapM (internalize' mode isub csub atsbts) yts'
+  let f (m, y, t) = zeta mode isub csub atsbts t (m, WeakTermUpsilon y)
+  args <- mapM f yts'
   return (mbInner, WeakTermPiElim (toVar' b) (es' ++ args))
-toInternalizedArg _ _ _ _ _ _ _ _ = throwError' "toInternalizedArg"
+toInternalizedArg _ _ _ _ _ _ _ _ _ = throwError' "toInternalizedArg"
 
 -- a @ [e1, ..., en]
 type RuleType = (Identifier, [WeakTermPlus])
@@ -349,7 +344,7 @@ modifyType ::
   -> WeakTermPlus -- subst対象の型
   -> WithEnv WeakTermPlus -- subst結果
 modifyType sub rsub t = do
-  t' <- substRuleType rsub t
+  t' <- substRuleType rsub t -- これでaの中には処理済みのものしか出現しない
   return $ substWeakTermPlus sub t'
 
 substRuleType :: (RuleType, RuleType) -> WeakTermPlus -> WithEnv WeakTermPlus
