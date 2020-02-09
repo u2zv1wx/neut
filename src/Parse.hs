@@ -192,12 +192,21 @@ parse' ((_, TreeNode ((_, TreeAtom "definition"):xds)):as) = do
   return $ stmt : stmtList
 parse' ((m, TreeNode (ind@(_, TreeAtom "inductive"):name@(mFun, TreeAtom _):xts@(_, TreeNode _):rest)):as) = do
   parse' $ (m, TreeNode [ind, (mFun, TreeNode (name : xts : rest))]) : as
-parse' ((_, TreeNode ((_, TreeAtom "inductive"):ts)):as) = do
-  parseConnective ts as toInductive toInductiveIntroList
+parse' ((_, TreeNode ((_, TreeAtom "inductive"):ts)):as)
+  -- stmtList1 <- parseConnective ts toInductive toInductiveIntroList
+ = do
+  stmtList1 <- parseInductive ts
+  stmtList2 <- parse' as
+  return $ stmtList1 ++ stmtList2
 parse' ((m, TreeNode (coind@(_, TreeAtom "coinductive"):name@(mFun, TreeAtom _):xts@(_, TreeNode _):rest)):as) =
   parse' $ (m, TreeNode [coind, (mFun, TreeNode (name : xts : rest))]) : as
-parse' ((_, TreeNode ((_, TreeAtom "coinductive"):ts)):as) = do
-  parseConnective ts as toCoinductive toCoinductiveElimList
+parse' ((_, TreeNode ((_, TreeAtom "coinductive"):ts)):as)
+  -- stmtList1 <- parseConnective ts toInductive toInductiveIntroList
+ = do
+  stmtList1 <- parseCoinductive ts
+  stmtList2 <- parse' as
+  return $ stmtList1 ++ stmtList2
+  -- parseConnective ts as toCoinductive toCoinductiveElimList
 parse' ((m, TreeNode [(_, TreeAtom "let"), xt, e]):as) = do
   m' <- adjustPhase m
   e' <- macroExpand e >>= interpret
@@ -222,26 +231,6 @@ parseDef xds = do
   mxs <- mapM extractFunName xds'
   xds'' <- mapM interpretIter xds'
   return $ StmtDef $ zip mxs xds''
-
--- variable naming convention on parsing connectives:
---   a : the name of a formation rule, like `nat`, `list`, `stream`, etc.
---   b : the name of an introduction/elimination rule, like `zero`, `cons`, `head`, etc.
---   x : the name of an argument of a formation rule, like `A` in `list A` or `stream A`.
---   y : the name of an argument of an introduction/elimination rule, like `w` or `ws` in `cons : Pi (w : A, ws : list A). list A`.
-parseConnective ::
-     [TreePlus]
-  -> [TreePlus]
-  -> ([IdentifierPlus] -> [IdentifierPlus] -> Connective -> WithEnv Stmt)
-  -> ([IdentifierPlus] -> Connective -> WithEnv [Stmt])
-  -> WithEnv [Stmt]
-parseConnective ts as f g = do
-  connectiveList <- mapM parseConnective' ts
-  let ats = map (ruleAsIdentPlus . formationRuleOf) connectiveList
-  let bts = concatMap toInternalRuleList connectiveList
-  connectiveList' <- mapM (f ats bts) connectiveList
-  ruleList <- concat <$> mapM (g ats) connectiveList
-  stmtList <- parse' as
-  return $ connectiveList' ++ ruleList ++ stmtList
 
 insImplicitBegin :: TreePlus -> WithEnv TreePlus
 insImplicitBegin (m, TreeNode (xt:xts:body:rest)) = do
@@ -313,9 +302,7 @@ concatStmtList (StmtLetCoinductive n m xt e:es) = do
   cont <- concatStmtList es
   return (m, WeakTermPiElim (emptyMeta, WeakTermPiIntro [xt] cont) [e])
 concatStmtList (StmtLetInductiveIntro m bt xtsyts ats bts bInner args info as:ss) = do
-  args' <-
-    mapM (\(e, te) -> psi ModeInternalize info [] (ats ++ bts) te e) $
-    map toVar'' args -- internalize
+  args' <- mapM (internalize info (ats ++ bts)) args
   let s =
         StmtLet
           m
@@ -330,7 +317,7 @@ concatStmtList (StmtLetInductiveIntro m bt xtsyts ats bts bInner args info as:ss
   insInductive as bt -- register the constructor (if necessary)
   concatStmtList $ s : ss
 concatStmtList (StmtLetCoinductiveElim m bt xtsyt cod ats bts yt e1 e2 info as:ss) = do
-  e2' <- psi ModeExternalize [] info (ats ++ bts) cod e2 -- externalize
+  e2' <- externalize info (ats ++ bts) cod e2
   let s =
         StmtLet
           m

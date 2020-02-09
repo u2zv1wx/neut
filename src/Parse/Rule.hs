@@ -1,6 +1,15 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Parse.Rule where
+module Parse.Rule
+  ( parseInductive
+  , parseCoinductive
+  , insForm
+  , insInductive
+  , insCoinductive
+  , psi
+  , internalize
+  , externalize
+  ) where
 
 import Control.Monad.Except
 import Control.Monad.State
@@ -14,6 +23,30 @@ import Data.Env
 import Data.Tree
 import Data.WeakTerm
 import Parse.Interpret
+
+parseInductive :: [TreePlus] -> WithEnv [Stmt]
+parseInductive ts = parseConnective ts toInductive toInductiveIntroList
+
+parseCoinductive :: [TreePlus] -> WithEnv [Stmt]
+parseCoinductive ts = parseConnective ts toCoinductive toCoinductiveElimList
+
+-- variable naming convention on parsing connectives:
+--   a : the name of a formation rule, like `nat`, `list`, `stream`, etc.
+--   b : the name of an introduction/elimination rule, like `zero`, `cons`, `head`, etc.
+--   x : the name of an argument of a formation rule, like `A` in `list A` or `stream A`.
+--   y : the name of an argument of an introduction/elimination rule, like `w` or `ws` in `cons : Pi (w : A, ws : list A). list A`.
+parseConnective ::
+     [TreePlus]
+  -> ([IdentifierPlus] -> [IdentifierPlus] -> Connective -> WithEnv Stmt)
+  -> ([IdentifierPlus] -> Connective -> WithEnv [Stmt])
+  -> WithEnv [Stmt]
+parseConnective ts f g = do
+  connectiveList <- mapM parseConnective' ts
+  let ats = map (ruleAsIdentPlus . formationRuleOf) connectiveList
+  let bts = concatMap toInternalRuleList connectiveList
+  connectiveList' <- mapM (f ats bts) connectiveList
+  ruleList <- concat <$> mapM (g ats) connectiveList
+  return $ connectiveList' ++ ruleList
 
 parseConnective' :: TreePlus -> WithEnv Connective
 parseConnective' (m, TreeNode ((_, TreeAtom name):(_, TreeNode xts):rules)) = do
@@ -129,9 +162,8 @@ toInternalRuleList (_, _, _, rules) = map ruleAsIdentPlus rules
 toVar' :: IdentifierPlus -> WeakTermPlus
 toVar' (m, x, _) = (m, WeakTermUpsilon x)
 
-toVar'' :: IdentifierPlus -> (WeakTermPlus, WeakTermPlus)
-toVar'' (m, x, t) = ((m, WeakTermUpsilon x), t)
-
+-- toVar'' :: IdentifierPlus -> (WeakTermPlus, WeakTermPlus)
+-- toVar'' (m, x, t) = ((m, WeakTermUpsilon x), t)
 insForm :: Int -> IdentifierPlus -> WeakTermPlus -> WithEnv ()
 insForm 1 (_, a, _) e =
   modify (\env -> env {formationEnv = Map.insert a (Just e) (formationEnv env)})
@@ -220,6 +252,7 @@ flipMode :: Mode -> Mode
 flipMode ModeInternalize = ModeExternalize
 flipMode ModeExternalize = ModeInternalize
 
+-- internalize info atsbts t e = psi ModeInternalize info [] atsbts t e
 psi ::
      Mode
   -> [(Identifier, Identifier)] -- out ~> in (substitution {x1 := x1', ..., xn := xn'})
@@ -313,7 +346,7 @@ toInternalizedArg ::
   -> WithEnv WeakTermPlus
 toInternalizedArg mode isub csub xts atsbts es' b (mbInner, _, (_, WeakTermPi yts _)) = do
   yts' <- mapM (modifyArgs isub xts (undefined, (undefined, es'))) yts
-  args <- mapM (internalize mode isub csub atsbts) yts'
+  args <- mapM (internalize' mode isub csub atsbts) yts'
   return (mbInner, WeakTermPiElim (toVar' b) (es' ++ args))
 toInternalizedArg _ _ _ _ _ _ _ _ = throwError' "toInternalizedArg"
 
@@ -335,11 +368,29 @@ modifyArgs isub xts (a, (a', es')) (m, y, t) = do
   undefined
 
 internalize ::
+     [(Identifier, Identifier)]
+  -> [IdentifierPlus]
+  -> IdentifierPlus
+  -> WithEnv WeakTermPlus
+internalize isub atsbts (m, y, t) =
+  psi ModeInternalize isub [] atsbts t (m, WeakTermUpsilon y)
+  -- psi ModeInternalize info [] atsbts t e
+
+internalize' ::
      Mode
   -> [(Identifier, Identifier)]
   -> [(Identifier, Identifier)]
   -> [IdentifierPlus]
   -> IdentifierPlus
   -> WithEnv WeakTermPlus
-internalize mode isub csub atsbts (m, y, t) =
+internalize' mode isub csub atsbts (m, y, t) =
   psi mode isub csub atsbts t (m, WeakTermUpsilon y)
+  -- psi ModeInternalize info [] atsbts t e
+
+externalize ::
+     [(Identifier, Identifier)]
+  -> [IdentifierPlus]
+  -> WeakTermPlus
+  -> WeakTermPlus
+  -> WithEnv WeakTermPlus
+externalize csub atsbts t e = psi ModeExternalize [] csub atsbts t e
