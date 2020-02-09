@@ -1,8 +1,4 @@
-module Parse.Utility
-  ( compInfo
-  , CursorName
-  , CompInfo
-  ) where
+module Parse.Utility where
 
 import qualified Data.Text as T
 
@@ -125,3 +121,26 @@ compInfoSigma s info ((mx, x, t):xts) = do
   compInfoWeakTermPlus s info t
   let info' = (x, mx) : info
   compInfoSigma s info' xts
+
+filterCompInfo :: Prefix -> (Identifier, Meta) -> Bool
+filterCompInfo prefix (x, m)
+  | True <- metaIsAppropriateAsCompletionCandidate m = prefix `T.isPrefixOf` x
+  | otherwise = False
+
+type Prefix = T.Text
+
+headTailMaybe :: [a] -> Maybe (a, [a])
+headTailMaybe [] = Nothing
+headTailMaybe (x:xs) = return (x, xs)
+
+headTailMaybeText :: T.Text -> Maybe (Char, T.Text)
+headTailMaybeText s
+  | s == T.empty = Nothing
+  | otherwise = return (T.head s, T.tail s)
+
+splitAtMaybe :: Integer -> T.Text -> Maybe (T.Text, T.Text)
+splitAtMaybe i xs = do
+  let i' = fromInteger i
+  if 0 <= i' && i' < T.length xs
+    then return $ T.splitAt i' xs
+    else Nothing

@@ -72,13 +72,6 @@ parseForCompletion inputPath l c = do
           let compareLoc m1 m2 = metaLocation m2 `compare` metaLocation m1
           return $ nub $ sortBy (\(_, m1) (_, m2) -> compareLoc m1 m2) info'
 
-filterCompInfo :: Prefix -> (Identifier, Meta) -> Bool
-filterCompInfo prefix (x, m)
-  | True <- metaIsAppropriateAsCompletionCandidate m = prefix `T.isPrefixOf` x
-  | otherwise = False
-
-type Prefix = T.Text
-
 -- 必要ならここでprefixの情報も与える
 -- parenとかのときは何も返さないからNothingにする
 modifyFileForCompletion ::
@@ -107,22 +100,6 @@ modifyFileForCompletion s content l c = do
       let s2'' = T.dropWhile (`notElem` ['(', ' ', ')']) s2'
       let targetLine' = s1' <> s <> s2''
       return (prefix, T.unlines $ ys ++ [targetLine'] ++ zs)
-
-headTailMaybe :: [a] -> Maybe (a, [a])
-headTailMaybe [] = Nothing
-headTailMaybe (x:xs) = return (x, xs)
-
-headTailMaybeText :: T.Text -> Maybe (Char, T.Text)
-headTailMaybeText s
-  | s == T.empty = Nothing
-  | otherwise = return (T.head s, T.tail s)
-
-splitAtMaybe :: Integer -> T.Text -> Maybe (T.Text, T.Text)
-splitAtMaybe i xs = do
-  let i' = fromInteger i
-  if 0 <= i' && i' < T.length xs
-    then return $ T.splitAt i' xs
-    else Nothing
 
 -- {} parse' {}
 -- Parse the head element of the input list.
@@ -321,8 +298,7 @@ concatStmtList (StmtLet m xt e:es) = do
 concatStmtList (StmtDef xds:ss) = do
   let ds = map snd xds
   let baseSub = map defToSub ds
-  let nTimes = length baseSub
-  let sub = selfCompose nTimes baseSub
+  let sub = selfCompose (length baseSub) baseSub
   let varList = map (\(_, (m, x, _), _, _) -> (m, WeakTermUpsilon x)) ds
   let iterList = map (substWeakTermPlus sub) varList
   -- StmtLetに帰着
@@ -376,9 +352,7 @@ defToSub (m, (mx, x, t), xts, e) = (x, (m, WeakTermIter (mx, x, t) xts e))
 
 selfCompose :: Int -> SubstWeakTerm -> SubstWeakTerm
 selfCompose 0 sub = sub
-selfCompose n sub = do
-  let sub' = selfCompose (n - 1) sub
-  compose sub sub'
+selfCompose n sub = compose sub $ selfCompose (n - 1) sub
 
 compose :: SubstWeakTerm -> SubstWeakTerm -> SubstWeakTerm
 compose s1 s2 = do
@@ -465,7 +439,6 @@ toIdentList ((StmtLetInductiveIntro _ b _ _ _ _ _ _ _):ss) = b : toIdentList ss
 toIdentList ((StmtLetCoinductiveElim _ b _ _ _ _ _ _ _ _ _):ss) =
   b : toIdentList ss
 
--- toIdentList ((StmtCoinductive {}):_) = undefined
 toStmtLetFooter :: Path Abs File -> (Meta, Identifier, WeakTermPlus) -> Stmt
 toStmtLetFooter path (m, x, t) = do
   let x' = "(" <> T.pack (toFilePath path) <> ":" <> x <> ")" -- user cannot write this var since it contains parenthesis
@@ -477,5 +450,3 @@ toStmtLetHeader path (m, x, t) = do
   let x' = "(" <> T.pack (toFilePath path) <> ":" <> x <> ")" -- user cannot write this var since it contains parenthesis
   let m' = m {metaIsAppropriateAsCompletionCandidate = False}
   StmtLet m' (m, x, t) (m', WeakTermUpsilon x')
--- reverseLookup :: Eq a => a -> [(a, a)] -> Maybe a
--- reverseLookup
