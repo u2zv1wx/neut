@@ -288,6 +288,22 @@ zetaInductive mode isub atsbts es e
     return (fst e, WeakTermPiElim e (map toVar' atsbts))
   | otherwise = throwError' "self-nested inductive type is not allowed"
 
+zetaCoinductive ::
+     Mode
+  -> SubstWeakTerm
+  -> [IdentifierPlus]
+  -> [WeakTermPlus]
+  -> WeakTermPlus
+  -> WeakTermPlus
+  -> WithEnv WeakTermPlus
+zetaCoinductive mode csub atsbts es e va
+  | ModeInternalize <- mode = undefined
+  | all (isResolved csub) es = do
+    let es' = map (substWeakTermPlus csub) es
+    let t' = (fst va, WeakTermPiElim va es')
+    return (fst e, WeakTermSigmaIntro t' (map toVar' atsbts ++ [e]))
+  | otherwise = throwError' "self-nested coinductive type is not allowed"
+
 zetaInductiveNested ::
      Mode
   -> SubstWeakTerm
@@ -310,28 +326,6 @@ zetaInductiveNested mode isub csub atsbts e va a es bts = do
     , WeakTermPiElim
         e
         ((m, WeakTermPiIntro xts (m, WeakTermPiElim va es')) : args))
-
-zetaInductiveNestedMutual :: Identifier -> WithEnv WeakTermPlus
-zetaInductiveNestedMutual a =
-  throwError' $
-  "mutual inductive type `" <>
-  a <> "` cannot be used to construct a nested inductive type"
-
-zetaCoinductive ::
-     Mode
-  -> SubstWeakTerm
-  -> [IdentifierPlus]
-  -> [WeakTermPlus]
-  -> WeakTermPlus
-  -> WeakTermPlus
-  -> WithEnv WeakTermPlus
-zetaCoinductive mode csub atsbts es e va
-  | ModeInternalize <- mode = undefined
-  | all (isResolved csub) es = do
-    let es' = map (substWeakTermPlus csub) es
-    let t' = (fst va, WeakTermPiElim va es')
-    return (fst e, WeakTermSigmaIntro t' (map toVar' atsbts ++ [e]))
-  | otherwise = throwError' "self-nested coinductive type is not allowed"
 
 zetaCoinductiveNested ::
      Mode
@@ -365,6 +359,12 @@ zetaCoinductiveNested mode isub csub atsbts e va a es bts = do
             [(ma, a', (ma, WeakTermPi xts (ma, WeakTermTau)))]
             (ma, WeakTermSigmaIntro t' (va' : args ++ [e])))
         [lam])
+
+zetaInductiveNestedMutual :: Identifier -> WithEnv WeakTermPlus
+zetaInductiveNestedMutual a =
+  throwError' $
+  "mutual inductive type `" <>
+  a <> "` cannot be used to construct a nested inductive type"
 
 zetaCoinductiveNestedMutual :: Identifier -> WithEnv WeakTermPlus
 zetaCoinductiveNestedMutual a =
