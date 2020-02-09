@@ -290,9 +290,7 @@ concatStmtList (StmtDef xds:ss) = do
   let sub = selfCompose (length baseSub) baseSub
   let varList = map (\(_, (m, x, _), _, _) -> (m, WeakTermUpsilon x)) ds
   let iterList = map (substWeakTermPlus sub) varList
-  -- StmtLetに帰着
-  let letList = toLetList $ zip xds iterList
-  concatStmtList $ letList ++ ss
+  concatStmtList $ (toLetList $ zip xds iterList) ++ ss
 concatStmtList (StmtLetInductive n m xt e:es) = do
   insForm n xt e
   cont <- concatStmtList es
@@ -301,8 +299,8 @@ concatStmtList (StmtLetCoinductive n m xt e:es) = do
   insForm n xt e
   cont <- concatStmtList es
   return (m, WeakTermPiElim (emptyMeta, WeakTermPiIntro [xt] cont) [e])
-concatStmtList (StmtLetInductiveIntro m bt xtsyts ats bts bInner args info as:ss) = do
-  args' <- mapM (internalize info (ats ++ bts)) args
+concatStmtList (StmtLetInductiveIntro m bt xtsyts ats bts bInner args isub as:ss) = do
+  args' <- mapM (internalize isub (ats ++ bts)) args
   let s =
         StmtLet
           m
@@ -316,8 +314,8 @@ concatStmtList (StmtLetInductiveIntro m bt xtsyts ats bts bInner args info as:ss
                   (m, WeakTermPiElim bInner args')))
   insInductive as bt -- register the constructor (if necessary)
   concatStmtList $ s : ss
-concatStmtList (StmtLetCoinductiveElim m bt xtsyt cod ats bts yt e1 e2 info as:ss) = do
-  e2' <- externalize info (ats ++ bts) cod e2
+concatStmtList (StmtLetCoinductiveElim m bt xtsyt cod ats bts yt e1 e2 csub as:ss) = do
+  e2' <- externalize csub (ats ++ bts) cod e2
   let s =
         StmtLet
           m

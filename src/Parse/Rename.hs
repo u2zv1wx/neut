@@ -52,7 +52,7 @@ renameStmtList' nenv ((StmtConstDecl m (mx, x, t)):ss) = do
   t' <- rename' nenv t
   ss' <- renameStmtList' (Map.insert x x nenv) ss
   return $ StmtConstDecl m (mx, x, t') : ss'
-renameStmtList' nenv ((StmtLetInductiveIntro m (mb, b, t) xtsyts ats bts bInner args _ as):ss) = do
+renameStmtList' nenv ((StmtLetInductiveIntro m (mb, b, t) xtsyts ats bts bInner args _ _):ss) = do
   t' <- rename' nenv t
   (xtsyts', nenv') <- renameArgs nenv xtsyts
   (ats', nenv'') <- renameArgs nenv' ats
@@ -62,11 +62,11 @@ renameStmtList' nenv ((StmtLetInductiveIntro m (mb, b, t) xtsyts ats bts bInner 
   b' <- newLLVMNameWith b
   ss' <- renameStmtList' (Map.insert b b' nenv) ss
   -- let as = map (\(_, y, _) -> y) ats
-  asOuter <- mapM (lookupStrict nenv) as -- outer
-  asInner <- mapM (lookupStrict nenv''') as -- inner
+  asOuter <- mapM (lookupStrict nenv) ats -- outer
+  asInnerPlus <- mapM (lookupStrict' nenv''') ats -- inner
   -- infoでytsの型の中のouterをinnerに置き換えていく
   -- (ytsの型を置き換えるのでdomのasOuterはxtsytsと同じnenvでrenameされている)
-  let info = zip asOuter asInner
+  let info = zip asOuter asInnerPlus
   return $
     StmtLetInductiveIntro
       m
@@ -79,7 +79,7 @@ renameStmtList' nenv ((StmtLetInductiveIntro m (mb, b, t) xtsyts ats bts bInner 
       info
       asOuter :
     ss'
-renameStmtList' nenv ((StmtLetCoinductiveElim m (mb, b, t) xtsyt cod ats bts yt e1 e2 _ as):ss) = do
+renameStmtList' nenv ((StmtLetCoinductiveElim m (mb, b, t) xtsyt cod ats bts yt e1 e2 _ _):ss) = do
   t' <- rename' nenv t
   (xtsyt', nenv') <- renameArgs nenv xtsyt
   e1' <- rename' nenv' e1
@@ -92,11 +92,12 @@ renameStmtList' nenv ((StmtLetCoinductiveElim m (mb, b, t) xtsyt cod ats bts yt 
   b' <- newLLVMNameWith b
   ss' <- renameStmtList' (Map.insert b b' nenv) ss
   -- let as = map (\(_, y, _) -> y) ats
-  asOuter <- mapM (lookupStrict nenv) as
-  asInner <- mapM (lookupStrict nenv'''') as
+  asOuterPlus <- mapM (lookupStrict' nenv) ats
+  asOuter <- mapM (lookupStrict nenv) ats
+  asInner <- mapM (lookupStrict nenv'''') ats
   -- infoでcod'の中のinnerをouterに置き換えていく
   -- (cod'を置き換えるのでdomのasOuterはcod'と同じnenvでrenameされている)
-  let info = zip asInner asOuter
+  let info = zip asInner asOuterPlus
   return $
     StmtLetCoinductiveElim
       m
@@ -112,11 +113,6 @@ renameStmtList' nenv ((StmtLetCoinductiveElim m (mb, b, t) xtsyt cod ats bts yt 
       asOuter :
     ss'
 
--- renameStmtList' _ ((StmtCoinductive _):_) = undefined
--- renameConnective :: NameEnv -> Connective -> WithEnv Connective
--- renameConnective = undefined
--- renameRule :: NameEnv -> Rule -> WithEnv Rule
--- renameRule = undefined
 renameDef :: NameEnv -> Def -> WithEnv Def
 renameDef nenv (m, (mx, x, t), xts, e) = do
   t' <- rename' nenv t
@@ -124,9 +120,6 @@ renameDef nenv (m, (mx, x, t), xts, e) = do
   case Map.lookup x nenv of
     Nothing -> throwError' "renameDef"
     Just x' -> return (m, (mx, x', t'), xts', e')
-  -- (xt', xts', e') <- renameIter nenv xt xts e
-  -- (xts', e') <- renameBinder nenv xts e
-  -- return (m, xt', xts', e')
 
 type NameEnv = Map.HashMap Identifier Identifier
 
@@ -298,10 +291,16 @@ renameStruct nenv ((mx, x, t):xts) e = do
   (xts', e') <- renameStruct (Map.insert x x' nenv) xts e
   return ((mx, x', t) : xts', e')
 
-lookupStrict :: NameEnv -> Identifier -> WithEnv Identifier
-lookupStrict nenv x =
+lookupStrict :: NameEnv -> IdentifierPlus -> WithEnv Identifier
+lookupStrict nenv (_, x, _) =
   case Map.lookup x nenv of
     Just x' -> return x'
+    Nothing -> throwError' $ "[lookupStrict] undefined variable:  " <> x
+
+lookupStrict' :: NameEnv -> IdentifierPlus -> WithEnv WeakTermPlus
+lookupStrict' nenv (m, x, _) =
+  case Map.lookup x nenv of
+    Just x' -> return (m, WeakTermUpsilon x)
     Nothing -> throwError' $ "[lookupStrict] undefined variable:  " <> x
 
 checkSanity :: [Identifier] -> WeakTermPlus -> Bool

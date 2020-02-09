@@ -6,7 +6,6 @@ module Parse.Rule
   , insForm
   , insInductive
   , insCoinductive
-  , psi
   , internalize
   , externalize
   ) where
@@ -14,7 +13,6 @@ module Parse.Rule
 import Control.Monad.Except
 import Control.Monad.State
 import Data.Monoid ((<>))
-import Data.Tuple (swap)
 
 import qualified Data.HashMap.Strict as Map
 
@@ -197,121 +195,102 @@ optConcat mNew mOld = do
   -- insert mNew at the end of the list (to respect the structure of ind/coind represented as pi/sigma)
   return $ mOld' ++ mNew'
 
--- toInductiveIntro ats bts xts (mb, b, m, yts, cod) = do
---   return $
---     StmtLet
---       m
---       (mb, b, (m, WeakTermPi (xts ++ yts) cod)) -- e.g. cons : Pi (A : tau, w : A, ws : list A). list A,
---                                                 -- where b = cons, xts = [A : tau], yts = [w : A, ws : list A], cod = list A
---       ( m
---       , WeakTermPiIntro
---           (xts ++ yts)
---           -- list A = (lam (A : Tau). Pi (list : (...), nil : (...), cons : (...)). list A) @ A
---           --        = Pi (list : (...), nil : (...), cons : (...)). list A
---           ( m
---           , WeakTermPiIntro
---               (ats ++ bts) -- ats = [list : (...)],
---                            -- bts = [nil : Pi (yts). list A, cons : (...)]
---               (m, WeakTermPiElim (mb, WeakTermUpsilon b) (map toVar' yts)) -- nil @ yts : list A
---                                                                            -- (note that the `nil` here doesn't have xts as arguments)
---            ))
--- concatStmtList (StmtCoinductive {}:_) = undefined
--- toCoinductiveElim ats bts xts (m, (mb, b), yts, cod)
---   | length yts > 0 = do
---     return $
---       StmtLet
---         m
---         (mb, b, (m, WeakTermPi (xts ++ yts) cod)) -- tail : Pi (A : tau, s : stream A). stream A
---         ( m
---         , WeakTermPiIntro
---             (xts ++ yts)
---             -- stream A = (lam (A : Tau). Sigma (stream : (...), head : (...), tail : (...)). stream A) @ A
---             --          = Sigma (list : (...), head : (...), tail : (...)). stream A
---             -- ats = [list : (...)]
---             -- bts = [head : (...), tail : Pi (y1 : stream A). stream A]
---             -- (head yts : stream A)
---             -- ~> ats ++ bts ++ [head yts] = [list : (...), head : (...), tail : Pi (y1 : stream A). stream A, y1 : stream A]
---             ( m
---             , WeakTermSigmaElim
---                 cod -- sigmaElimの型の部分はelimの結果の型。変数（yts）を同一名の変数（yts）でsubstするので依存の処理の心配もなし。
---                 -- 同一の変数名を使うのがポイント。head yts : a @ (e1, ..., en)なので、
---                 -- (1)のほうのhead ytsの型に出現するaは(1)の行のatsによって束縛されたものとなり、
---                 -- (2)のほうのhead ytsの方に出現するaは外側のtoCoinductiveの結果によって定義されたものとなる。
---                 -- 別に異なる名前を両者に与えてもよいが、同一の名前を使ったほうが実装がラクなのでこちらをとることにする。
---                 (ats ++ bts ++ [head yts]) -- (1)
---                 (toVar' $ head yts) -- (2)
---                 (m, WeakTermPiElim (mb, WeakTermUpsilon b) (map toVar' yts))))
---   | otherwise =
---     throwError'
---       "toCoinductiveElim: the antecedant of an elimination rule cannot be empty"
+-- ここでモジュールを切るべき？
 data Mode
   = ModeInternalize
   | ModeExternalize
+
+internalize ::
+     SubstWeakTerm -> [IdentifierPlus] -> IdentifierPlus -> WithEnv WeakTermPlus
+internalize isub atsbts (m, y, t) =
+  zeta ModeInternalize isub [] atsbts t (m, WeakTermUpsilon y)
+
+internalize' ::
+     Mode
+  -> SubstWeakTerm
+  -> SubstWeakTerm
+  -> [IdentifierPlus]
+  -> IdentifierPlus
+  -> WithEnv WeakTermPlus
+internalize' mode isub csub atsbts (m, y, t) =
+  zeta mode isub csub atsbts t (m, WeakTermUpsilon y)
+
+externalize ::
+     SubstWeakTerm
+  -> [IdentifierPlus]
+  -> WeakTermPlus
+  -> WeakTermPlus
+  -> WithEnv WeakTermPlus
+externalize csub atsbts t e = zeta ModeExternalize [] csub atsbts t e
 
 flipMode :: Mode -> Mode
 flipMode ModeInternalize = ModeExternalize
 flipMode ModeExternalize = ModeInternalize
 
--- internalize info atsbts t e = psi ModeInternalize info [] atsbts t e
-psi ::
+zeta ::
      Mode
-  -> [(Identifier, Identifier)] -- out ~> in (substitution {x1 := x1', ..., xn := xn'})
-  -> [(Identifier, Identifier)] -- in ~> out
+  -> SubstWeakTerm -- out ~> in (substitution {x1 := x1', ..., xn := xn'})
+  -> SubstWeakTerm -- in ~> out
   -> [IdentifierPlus] -- ats ++ bts
   -> WeakTermPlus -- a type `A`
   -> WeakTermPlus -- a term `e` of type `A`
   -> WithEnv WeakTermPlus -- a term of type `A{x1 := x1', ..., xn := xn'}`
-psi m isub csub atsbts t e = do
+zeta mode isub csub atsbts t e = do
   ienv <- gets inductiveEnv
   cenv <- gets coinductiveEnv
   case t of
     (_, WeakTermPi xts cod) -> do
       let (ms, xs, ts) = unzip3 xts
       let vs = map toVar' xts
-      let isub' = map swap isub
-      let csub' = map swap csub
       -- backward conversion to create (A', ..., A') -> (A, ..., A)
-      vs' <- zipWithM (psi (flipMode m) isub' csub' atsbts) ts vs
+      vs' <- zipWithM (zeta (flipMode mode) isub csub atsbts) ts vs
       let app = (fst e, WeakTermPiElim e vs')
       -- forward conversion to create B -> B'
-      app' <- psi m isub csub atsbts cod app
+      app' <- zeta mode isub csub atsbts cod app
       let ts' = map (substWeakTermPlus undefined) ts
       let xts' = zip3 ms xs ts'
       -- return (A' ..., A') -> (A, ..., A) -> B -> B'
       return $ (fst e, WeakTermPiIntro xts' app')
     (_, WeakTermPiElim va@(ma, WeakTermUpsilon a) es)
       -- ordinary internalization
-      | Just _ <- lookup a isub -> do
+      | ModeInternalize <- mode
+      , Just _ <- lookup a isub -> do
         _ <- undefined isub (concatMap varWeakTermPlus es) -- sanity check
         return (fst e, WeakTermPiElim e (map toVar' atsbts))
       -- nested inductive type
-      | Just (Just bts) <- Map.lookup a ienv -> do
+      | ModeInternalize <- mode
+      , Just (Just bts) <- Map.lookup a ienv -> do
         let es' = map (substWeakTermPlus undefined) es
         (xts, btsInner) <- lookupInductive a
-        a' <- newNameWith "psi"
         let a' = (ma, WeakTermPiIntro xts (ma, WeakTermPiElim va es'))
         args <-
-          zipWithM (toInternalizedArg m isub csub xts atsbts es') bts btsInner
+          zipWithM
+            (toInternalizedArg mode isub csub xts atsbts es')
+            bts
+            btsInner
         return (fst e, WeakTermPiElim e (a' : args))
       -- invalid nested inductive type
-      | Just Nothing <- Map.lookup a ienv ->
+      | ModeInternalize <- mode
+      , Just Nothing <- Map.lookup a ienv ->
         throwError' $
         "mutual inductive type `" <>
         a <> "` cannot be used to construct a nested inductive type"
       -- ordinary externalization
-      | Just _ <- lookup a csub -> do
+      | ModeExternalize <- mode
+      , Just _ <- lookup a csub -> do
         _ <- undefined isub (concatMap varWeakTermPlus es) -- sanity check
-        x <- newNameWith "psi"
+        x <- newNameWith "zeta"
         let sigmaType = (fst e, WeakTermSigma (atsbts ++ [(fst t, x, t)]))
         return (fst e, WeakTermSigmaIntro sigmaType (map toVar' atsbts ++ [e]))
       -- nested coinductive type
-      | Just (Just _) <- Map.lookup a cenv -> undefined
+      | ModeExternalize <- mode
+      , Just (Just _) <- Map.lookup a cenv -> undefined
       -- invalid nested coinductive type
-      | Just Nothing <- Map.lookup a cenv ->
+      | ModeExternalize <- mode
+      , Just Nothing <- Map.lookup a cenv ->
         throwError' $
         "mutual coinductive type `" <>
         a <> "` cannot be used to construct a nested coinductive type"
-    (_, WeakTermPiElim (_, WeakTermPiIntro {}) _) -> undefined
     (_, WeakTermSigma _) -> undefined
     _ ->
       if undefined isub (varWeakTermPlus t)
@@ -336,8 +315,8 @@ lookupInductive a = do
 
 toInternalizedArg ::
      Mode
-  -> [(Identifier, Identifier)]
-  -> [(Identifier, Identifier)]
+  -> SubstWeakTerm
+  -> SubstWeakTerm
   -> [IdentifierPlus]
   -> [IdentifierPlus]
   -> [WeakTermPlus]
@@ -356,41 +335,12 @@ toInternalizedArg _ _ _ _ _ _ _ _ = throwError' "toInternalizedArg"
 -- したものをt'として、(meta, y, t')を返す。
 -- ……たんに、isubとlamとでsubstしたあとでreduceすればいいだけじゃないかしら。
 -- a @ (e1, ..., en)をa' @ (e1', ..., en')にしたいときは、a'' = lam (...). a' @ (e1', ..., en')としてreduceすればよいわけで。
--- というか、reduceではなくて、psiのタイミングで((lam (...). e) e1 ... en)があったらsubstして、みたいにすればいいだけでは。
+-- というか、reduceではなくて、zetaのタイミングで((lam (...). e) e1 ... en)があったらsubstして、みたいにすればいいだけでは。
 -- そうすればけっきょくふつうのsubstをすればよいということになるはず。……generalizedだと型が合わないからだめ、みたいなエラーを出力できなくて困るか。
 modifyArgs ::
-     [(Identifier, Identifier)]
+     SubstWeakTerm
   -> [IdentifierPlus]
   -> (Identifier, (Identifier, [WeakTermPlus]))
   -> IdentifierPlus
   -> WithEnv IdentifierPlus
-modifyArgs isub xts (a, (a', es')) (m, y, t) = do
-  undefined
-
-internalize ::
-     [(Identifier, Identifier)]
-  -> [IdentifierPlus]
-  -> IdentifierPlus
-  -> WithEnv WeakTermPlus
-internalize isub atsbts (m, y, t) =
-  psi ModeInternalize isub [] atsbts t (m, WeakTermUpsilon y)
-  -- psi ModeInternalize info [] atsbts t e
-
-internalize' ::
-     Mode
-  -> [(Identifier, Identifier)]
-  -> [(Identifier, Identifier)]
-  -> [IdentifierPlus]
-  -> IdentifierPlus
-  -> WithEnv WeakTermPlus
-internalize' mode isub csub atsbts (m, y, t) =
-  psi mode isub csub atsbts t (m, WeakTermUpsilon y)
-  -- psi ModeInternalize info [] atsbts t e
-
-externalize ::
-     [(Identifier, Identifier)]
-  -> [IdentifierPlus]
-  -> WeakTermPlus
-  -> WeakTermPlus
-  -> WithEnv WeakTermPlus
-externalize csub atsbts t e = psi ModeExternalize [] csub atsbts t e
+modifyArgs _ _ _ _ = undefined

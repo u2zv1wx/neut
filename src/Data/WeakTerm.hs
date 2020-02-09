@@ -110,7 +110,7 @@ data Stmt
       [IdentifierPlus] -- bts
       WeakTermPlus -- b-inner
       [IdentifierPlus] -- [(y, t), ..., (y, t)]  (must be internalized later)
-      [(Identifier, Identifier)] -- the `a` in `ats` ~> the `a` defined beforehand
+      SubstWeakTerm -- the `a` in `ats` ~> the `a` defined beforehand
       [Identifier] -- as (to be used to update the environment with constructor info)
   -- let (b : B) :=
   --   lam (xts ++ [(z, t)]).
@@ -126,7 +126,7 @@ data Stmt
       IdentifierPlus -- (c, t)                                   --
       WeakTermPlus -- z                                          --
       WeakTermPlus -- b-inner @ [c] (must be externalized later) --
-      [(Identifier, Identifier)] -- the `a` defined beforehand ~> the `a` in `ats`
+      SubstWeakTerm -- the `a` defined beforehand ~> the `a` in `ats`
       [Identifier] -- as (to be used to update the environment with constructor info)
   deriving (Show)
 
