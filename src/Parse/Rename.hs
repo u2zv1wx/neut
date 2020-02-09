@@ -52,42 +52,39 @@ renameStmtList' nenv ((StmtConstDecl m (mx, x, t)):ss) = do
   t' <- rename' nenv t
   ss' <- renameStmtList' (Map.insert x x nenv) ss
   return $ StmtConstDecl m (mx, x, t') : ss'
-renameStmtList' nenv ((StmtLetInductive n m (mx, x, t) e):ss) = do
+renameStmtList' nenv ((StmtLetInductive n m (mx, a, t) e):ss) = do
   t' <- rename' nenv t
-  x' <- newLLVMNameWith x
+  a' <- newLLVMNameWith a
   e' <- rename' nenv e
-  ss' <- renameStmtList' (Map.insert x x' nenv) ss
-  return $ StmtLetInductive n m (mx, x', t') e' : ss'
-renameStmtList' nenv ((StmtLetCoinductive n m (mx, x, t) e):ss) = do
+  ss' <- renameStmtList' (Map.insert a a' nenv) ss
+  return $ StmtLetInductive n m (mx, a', t') e' : ss'
+renameStmtList' nenv ((StmtLetCoinductive n m (mx, a, t) e):ss) = do
   t' <- rename' nenv t
-  x' <- newLLVMNameWith x
+  a' <- newLLVMNameWith a
   e' <- rename' nenv e
-  ss' <- renameStmtList' (Map.insert x x' nenv) ss
-  return $ StmtLetCoinductive n m (mx, x', t') e' : ss'
-renameStmtList' nenv ((StmtLetInductiveIntro m (mb, b, t) xtsyts ats bts bInner args _ _):ss) = do
+  ss' <- renameStmtList' (Map.insert a a' nenv) ss
+  return $ StmtLetCoinductive n m (mx, a', t') e' : ss'
+renameStmtList' nenv ((StmtLetInductiveIntro m (mb, b, t) xts yts ats bts bInner _ _):ss) = do
   t' <- rename' nenv t
-  (xtsyts', nenv') <- renameArgs nenv xtsyts
-  (ats', nenv'') <- renameArgs nenv' ats
-  (bts', nenv''') <- renameArgs nenv'' bts
-  bInner' <- rename' nenv bInner
-  args' <- mapM (renameIdentPlus nenv''') args
+  (xts', nenv') <- renameArgs nenv xts
+  (yts', nenv'') <- renameArgs nenv' yts
+  (ats', nenv''') <- renameArgs nenv'' ats
+  (bts', nenv'''') <- renameArgs nenv''' bts
+  bInner' <- rename' nenv'''' bInner
   b' <- newLLVMNameWith b
   ss' <- renameStmtList' (Map.insert b b' nenv) ss
-  -- let as = map (\(_, y, _) -> y) ats
-  asOuter <- mapM (lookupStrict nenv) ats -- outer
-  asInnerPlus <- mapM (lookupStrict' nenv''') ats -- inner
-  -- infoでytsの型の中のouterをinnerに置き換えていく
-  -- (ytsの型を置き換えるのでdomのasOuterはxtsytsと同じnenvでrenameされている)
+  asOuter <- mapM (lookupStrict nenv) ats
+  asInnerPlus <- mapM (lookupStrict' nenv'''') ats
   let info = zip asOuter asInnerPlus
   return $
     StmtLetInductiveIntro
       m
       (mb, b', t')
-      xtsyts'
+      xts'
+      yts'
       ats'
       bts'
       bInner'
-      args'
       info
       asOuter :
     ss'
@@ -244,12 +241,11 @@ renameArgs nenv ((mx, x, t):xts) = do
   (xts', nenv') <- renameArgs (Map.insert x x' nenv) xts
   return ((mx, x', t') : xts', nenv')
 
-renameIdentPlus :: NameEnv -> IdentifierPlus -> WithEnv IdentifierPlus
-renameIdentPlus nenv (m, x, t) = do
-  t' <- rename' nenv t
-  x' <- newLLVMNameWith x
-  return (m, x', t')
-
+-- renameIdentPlus :: NameEnv -> IdentifierPlus -> WithEnv IdentifierPlus
+-- renameIdentPlus nenv (m, x, t) = do
+--   t' <- rename' nenv t
+--   x' <- newLLVMNameWith x
+--   return (m, x', t')
 renameIdentPlus' ::
      NameEnv -> IdentifierPlus -> WithEnv (IdentifierPlus, NameEnv)
 renameIdentPlus' nenv (m, x, t) = do
@@ -257,6 +253,14 @@ renameIdentPlus' nenv (m, x, t) = do
   x' <- newLLVMNameWith x
   return ((m, x', t'), Map.insert x x' nenv)
 
+-- renameIdentPlus :: NameEnv -> IdentifierPlus -> WithEnv IdentifierPlus
+-- renameIdentPlus nenv (m, x, t) = do
+--   t' <- rename' nenv t
+--   case Map.lookup x nenv of
+--     Just x' -> return (m, x', t')
+--     Nothing ->
+--       throwError' $
+--       T.pack (showMeta m) <> ": (renameIdentPlus'') undefined variable: " <> x
 renameIter ::
      NameEnv
   -> IdentifierPlus

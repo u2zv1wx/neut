@@ -34,9 +34,7 @@ import Reduce.WeakTerm
 -- S. Kong, and C. Roux. "Elaboration in Dependent Type Theory", arxiv,
 -- https://arxiv.org/abs/1505.04324, 2015.
 elaborate :: WeakTermPlus -> WithEnv TermPlus
-elaborate e
-  -- p "infer"
- = do
+elaborate e = do
   e' <- infer e
   -- Kantian type-inference ;)
   -- gets constraintEnv >>= analyze >>= synthesize
