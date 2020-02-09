@@ -161,8 +161,6 @@ toInternalRuleList (_, _, _, rules) = map ruleAsIdentPlus rules
 toVar' :: IdentifierPlus -> WeakTermPlus
 toVar' (m, x, _) = (m, WeakTermUpsilon x)
 
--- toVar'' :: IdentifierPlus -> (WeakTermPlus, WeakTermPlus)
--- toVar'' (m, x, t) = ((m, WeakTermUpsilon x), t)
 insForm :: Int -> IdentifierPlus -> WeakTermPlus -> WithEnv ()
 insForm 1 (_, a, _) e =
   modify (\env -> env {formationEnv = Map.insert a (Just e) (formationEnv env)})
@@ -219,7 +217,7 @@ flipMode ModeInternalize = ModeExternalize
 flipMode ModeExternalize = ModeInternalize
 
 zeta ::
-     Mode
+     Mode -- 現在の変換がinvertedかそうでないかをtrackするための変数（となるようにあとで修正すること）
   -> SubstWeakTerm -- out ~> in (substitution {x1 := x1', ..., xn := xn'})
   -> SubstWeakTerm -- in ~> out
   -> [IdentifierPlus] -- ats ++ bts
@@ -235,10 +233,12 @@ zeta mode isub csub atsbts t e
       (_, WeakTermPi xts cod) -> do
         let (ms, xs, ts) = unzip3 xts
         let ts' = map (substWeakTermPlus (isub ++ csub)) ts
-        let vs = map toVar' xts
-        -- backward conversion to create (A', ..., A') -> (A, ..., A)
-        vs' <- zipWithM (zeta (flipMode mode) isub csub atsbts) ts vs
-        let app = (fst e, WeakTermPiElim e vs')
+        let vs' = zipWith (\m x -> (m, WeakTermUpsilon x)) ms xs
+        -- invert conversion to create (A', ..., A') -> (A, ..., A)
+        -- （偶数回invertすると通常の変換が使える（これがいわゆる "positivity" の理由））
+        vs <- zipWithM (zeta (flipMode mode) isub csub atsbts) ts' vs'
+        -- 逆変換によって、x1' : t1', ..., xn' : tn'がx1 : t1, ..., xn : tnとなっており、それゆえ引数として渡せる
+        let app = (fst e, WeakTermPiElim e vs)
         -- forward conversion to create B -> B'
         app' <- zeta mode isub csub atsbts cod app
         let xts' = zip3 ms xs ts'
