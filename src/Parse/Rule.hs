@@ -152,7 +152,7 @@ ruleAsIdentPlus :: Rule -> IdentifierPlus
 ruleAsIdentPlus (mb, b, m, xts, t) = (mb, b, (m, WeakTermPi xts t))
 
 formationRuleOf :: Connective -> Rule
-formationRuleOf = undefined
+formationRuleOf (m, a, xts, _) = (m, a, m, xts, (m, WeakTermTau))
 
 toInternalRuleList :: Connective -> [IdentifierPlus]
 toInternalRuleList (_, _, _, rules) = map ruleAsIdentPlus rules
@@ -241,20 +241,19 @@ zeta mode isub csub atsbts t e = do
       let xts' = zip3 ms xs ts'
       -- return (A' ..., A') -> (A, ..., A) -> B -> B'
       return $ (fst e, WeakTermPiIntro xts' app')
-    (_, WeakTermPiElim va@(ma, WeakTermUpsilon a) es)
+    (m, WeakTermPiElim va@(ma, WeakTermUpsilon a) es)
       -- ordinary internalization
-      | ModeInternalize <- mode
+      | ModeInternalize <- mode -- modeはforwardかbackwardかを保持しておいて、んでinductive/coinductiveのベースのときだけチェック、とかで。
       , Just _ <- lookup a isub -> do
         _ <- undefined isub (concatMap varWeakTermPlus es) -- sanity check
         return (fst e, WeakTermPiElim e (map toVar' atsbts))
       -- nested inductive type
-      | ModeInternalize <- mode
-      , Just (Just bts) <- Map.lookup a ienv -> do
-        let es' = map (substWeakTermPlus isub) es
+      | Just (Just bts) <- Map.lookup a ienv -> do
         (xts, btsInner) <- lookupInductive a
+        let es' = map (substWeakTermPlus isub) es
         args <-
           zipWithM
-            (toInternalizedArg mode isub csub a xts atsbts es')
+            (toInternalizedArg mode isub csub a xts atsbts es es')
             bts
             btsInner
         return
@@ -263,8 +262,7 @@ zeta mode isub csub atsbts t e = do
               e
               ((ma, WeakTermPiIntro xts (ma, WeakTermPiElim va es')) : args))
       -- invalid nested inductive type
-      | ModeInternalize <- mode
-      , Just Nothing <- Map.lookup a ienv ->
+      | Just Nothing <- Map.lookup a ienv ->
         throwError' $
         "mutual inductive type `" <>
         a <> "` cannot be used to construct a nested inductive type"
@@ -272,15 +270,35 @@ zeta mode isub csub atsbts t e = do
       | ModeExternalize <- mode
       , Just _ <- lookup a csub -> do
         _ <- undefined isub (concatMap varWeakTermPlus es) -- sanity check
-        x <- newNameWith "zeta"
-        let sigmaType = (fst e, WeakTermSigma (atsbts ++ [(fst t, x, t)]))
-        return (fst e, WeakTermSigmaIntro sigmaType (map toVar' atsbts ++ [e]))
+        let es' = map (substWeakTermPlus csub) es
+        let t' = (m, WeakTermPiElim va es')
+        return (fst e, WeakTermSigmaIntro t' (map toVar' atsbts ++ [e]))
       -- nested coinductive type
-      | ModeExternalize <- mode
-      , Just (Just _) <- Map.lookup a cenv -> undefined
+      | Just (Just bts) <- Map.lookup a cenv -> do
+        (xts, btsInner) <- lookupCoinductive a
+        let es' = map (substWeakTermPlus csub) es
+        a' <- newNameWith "zeta"
+        let va' = (ma, WeakTermUpsilon a')
+        let lam = (ma, WeakTermPiIntro xts (ma, WeakTermPiElim va es'))
+        -- let a' := (lam) in (a', ...)
+        args <-
+          zipWithM
+            (toExternalizedArg mode isub csub a a' xts atsbts es es')
+            bts
+            btsInner
+        let t' = (m, WeakTermPiElim va es')
+        return
+          ( fst e
+          -- let a' := lam
+          , WeakTermPiElim
+              ( ma
+              , WeakTermPiIntro
+                  [(ma, a', (ma, WeakTermPi xts (ma, WeakTermTau)))]
+                  -- (a', (args), z)
+                  (ma, WeakTermSigmaIntro t' (va' : args ++ [e])))
+              [lam])
       -- invalid nested coinductive type
-      | ModeExternalize <- mode
-      , Just Nothing <- Map.lookup a cenv ->
+      | Just Nothing <- Map.lookup a cenv ->
         throwError' $
         "mutual coinductive type `" <>
         a <> "` cannot be used to construct a nested coinductive type"
@@ -306,6 +324,22 @@ lookupInductive a = do
     Nothing ->
       throwError' $ "[compiler bug] no such inductive type defined: " <> a
 
+lookupCoinductive :: Identifier -> WithEnv ([IdentifierPlus], [IdentifierPlus])
+lookupCoinductive a = do
+  fenv <- gets formationEnv
+  case Map.lookup a fenv of
+    Just (Just (_, WeakTermPiIntro xts (_, WeakTermSigma atsbtscod))) -> do
+      let bts = init $ tail atsbtscod -- this is valid since a is not mutual
+      return (xts, bts)
+    Just (Just _) ->
+      throwError' $
+      "[compiler bug] malformed inductive type (Parse.lookupInductive)"
+    Just Nothing ->
+      throwError' $
+      "the inductive type `" <> a <> "` must be a non-mutual inductive type"
+    Nothing ->
+      throwError' $ "[compiler bug] no such inductive type defined: " <> a
+
 toInternalizedArg ::
      Mode
   -> SubstWeakTerm
@@ -314,18 +348,49 @@ toInternalizedArg ::
   -> [IdentifierPlus]
   -> [IdentifierPlus]
   -> [WeakTermPlus]
+  -> [WeakTermPlus]
   -> IdentifierPlus
   -> IdentifierPlus
   -> WithEnv WeakTermPlus
-toInternalizedArg mode isub csub a xts atsbts es' b (mbInner, _, (_, WeakTermPi yts _)) = do
+toInternalizedArg mode isub csub a xts atsbts es es' b (mbInner, _, (_, WeakTermPi yts _)) = do
   let (ms, ys, ts) = unzip3 yts
-  let xs = map toVar' xts
-  ts' <- mapM (modifyType isub ((a, xs), (a, es'))) ts
-  let yts' = zip3 ms ys ts'
+  let vxs = map toVar' xts
+  ts' <- mapM (modifyType isub ((a, vxs), (a, es'))) ts
+  let xs = map (\(_, x, _) -> x) xts
+  -- aの中身はe', aの外はe
+  let ts'' = map (substWeakTermPlus (zip xs es)) ts'
+  let yts' = zip3 ms ys ts''
   let f (m, y, t) = zeta mode isub csub atsbts t (m, WeakTermUpsilon y)
   args <- mapM f yts'
   return (mbInner, WeakTermPiElim (toVar' b) (es' ++ args))
-toInternalizedArg _ _ _ _ _ _ _ _ _ = throwError' "toInternalizedArg"
+toInternalizedArg _ _ _ _ _ _ _ _ _ _ = throwError' "toInternalizedArg"
+
+toExternalizedArg ::
+     Mode
+  -> SubstWeakTerm
+  -> SubstWeakTerm
+  -> Identifier
+  -> Identifier
+  -> [IdentifierPlus]
+  -> [IdentifierPlus]
+  -> [WeakTermPlus]
+  -> [WeakTermPlus]
+  -> IdentifierPlus
+  -> IdentifierPlus
+  -> WithEnv WeakTermPlus
+toExternalizedArg mode isub csub a a' xts atsbts es es' b (mbInner, _, (_, WeakTermPi yts cod)) = do
+  let (ms, ys, ts) = unzip3 yts
+  let vxs = map toVar' xts
+  ts' <- mapM (modifyType isub ((a, vxs), (a', es'))) ts
+  let yts' = zip3 ms ys ts'
+  let app = (mbInner, WeakTermPiElim (toVar' b) (es' ++ (map toVar' yts)))
+  cod' <- modifyType csub ((a, vxs), (a', es')) cod
+  let xs = map (\(_, x, _) -> x) xts
+  -- a'の中身はe', a'の外はe
+  let cod'' = substWeakTermPlus (zip xs es) cod'
+  app' <- zeta mode isub csub atsbts cod'' app
+  return (mbInner, WeakTermPiIntro yts' app')
+toExternalizedArg _ _ _ _ _ _ _ _ _ _ _ = throwError' "toExternalizedArg"
 
 -- a @ [e1, ..., en]
 type RuleType = (Identifier, [WeakTermPlus])
