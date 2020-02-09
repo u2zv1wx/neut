@@ -323,7 +323,7 @@ lookupInductive a = do
   fenv <- gets formationEnv
   case Map.lookup a fenv of
     Just (Just (_, WeakTermPiIntro xts (_, WeakTermPi atsbts (_, WeakTermPiElim (_, WeakTermUpsilon _) _)))) -> do
-      let bts = tail atsbts -- this is valid since a is not mutual
+      let bts = tail atsbts -- valid since a is not mutual
       return (xts, bts)
     Just (Just _) ->
       throwError' $
@@ -339,16 +339,16 @@ lookupCoinductive a = do
   fenv <- gets formationEnv
   case Map.lookup a fenv of
     Just (Just (_, WeakTermPiIntro xts (_, WeakTermSigma atsbtscod))) -> do
-      let bts = init $ tail atsbtscod -- this is valid since a is not mutual
+      let bts = init $ tail atsbtscod -- valid since a is not mutual
       return (xts, bts)
     Just (Just _) ->
       throwError' $
-      "[compiler bug] malformed inductive type (Parse.lookupInductive)"
+      "[compiler bug] malformed coinductive type (Parse.lookupCoinductive)"
     Just Nothing ->
       throwError' $
-      "the inductive type `" <> a <> "` must be a non-mutual inductive type"
+      "the coinductive type `" <> a <> "` must be a non-mutual coinductive type"
     Nothing ->
-      throwError' $ "[compiler bug] no such inductive type defined: " <> a
+      throwError' $ "[compiler bug] no such coinductive type defined: " <> a
 
 toInternalizedArg ::
      Mode
@@ -420,7 +420,7 @@ modifyType ::
   -> WithEnv WeakTermPlus -- subst結果
 modifyType sub rsub t = do
   t' <- substRuleType rsub t -- これでaの中には処理済みのものしか出現しない
-  return $ substWeakTermPlus sub t'
+  return $ substWeakTermPlus sub t' -- aの外側を処理
 
 substRuleType :: (RuleType, RuleType) -> WeakTermPlus -> WithEnv WeakTermPlus
 substRuleType _ (m, WeakTermTau) = return (m, WeakTermTau)

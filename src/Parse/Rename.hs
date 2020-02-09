@@ -52,6 +52,18 @@ renameStmtList' nenv ((StmtConstDecl m (mx, x, t)):ss) = do
   t' <- rename' nenv t
   ss' <- renameStmtList' (Map.insert x x nenv) ss
   return $ StmtConstDecl m (mx, x, t') : ss'
+renameStmtList' nenv ((StmtLetInductive n m (mx, x, t) e):ss) = do
+  t' <- rename' nenv t
+  x' <- newLLVMNameWith x
+  e' <- rename' nenv e
+  ss' <- renameStmtList' (Map.insert x x' nenv) ss
+  return $ StmtLetInductive n m (mx, x', t') e' : ss'
+renameStmtList' nenv ((StmtLetCoinductive n m (mx, x, t) e):ss) = do
+  t' <- rename' nenv t
+  x' <- newLLVMNameWith x
+  e' <- rename' nenv e
+  ss' <- renameStmtList' (Map.insert x x' nenv) ss
+  return $ StmtLetCoinductive n m (mx, x', t') e' : ss'
 renameStmtList' nenv ((StmtLetInductiveIntro m (mb, b, t) xtsyts ats bts bInner args _ _):ss) = do
   t' <- rename' nenv t
   (xtsyts', nenv') <- renameArgs nenv xtsyts
@@ -300,7 +312,7 @@ lookupStrict nenv (_, x, _) =
 lookupStrict' :: NameEnv -> IdentifierPlus -> WithEnv WeakTermPlus
 lookupStrict' nenv (m, x, _) =
   case Map.lookup x nenv of
-    Just x' -> return (m, WeakTermUpsilon x)
+    Just x' -> return (m, WeakTermUpsilon x')
     Nothing -> throwError' $ "[lookupStrict] undefined variable:  " <> x
 
 checkSanity :: [Identifier] -> WeakTermPlus -> Bool
