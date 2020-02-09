@@ -282,10 +282,11 @@ zetaInductive ::
   -> [WeakTermPlus]
   -> WeakTermPlus
   -> WithEnv WeakTermPlus
-zetaInductive _ isub atsbts es e = do
-  if all (isResolved isub) es
-    then return (fst e, WeakTermPiElim e (map toVar' atsbts))
-    else throwError' "self-nested inductive type is not allowed"
+zetaInductive mode isub atsbts es e
+  | ModeExternalize <- mode = undefined
+  | all (isResolved isub) es =
+    return (fst e, WeakTermPiElim e (map toVar' atsbts))
+  | otherwise = throwError' "self-nested inductive type is not allowed"
 
 zetaInductiveNested ::
      Mode
@@ -324,13 +325,13 @@ zetaCoinductive ::
   -> WeakTermPlus
   -> WeakTermPlus
   -> WithEnv WeakTermPlus
-zetaCoinductive _ csub atsbts es e va = do
-  if all (isResolved csub) es
-    then do
-      let es' = map (substWeakTermPlus csub) es
-      let t' = (fst va, WeakTermPiElim va es')
-      return (fst e, WeakTermSigmaIntro t' (map toVar' atsbts ++ [e]))
-    else throwError' "self-nested coinductive type is not allowed"
+zetaCoinductive mode csub atsbts es e va
+  | ModeInternalize <- mode = undefined
+  | all (isResolved csub) es = do
+    let es' = map (substWeakTermPlus csub) es
+    let t' = (fst va, WeakTermPiElim va es')
+    return (fst e, WeakTermSigmaIntro t' (map toVar' atsbts ++ [e]))
+  | otherwise = throwError' "self-nested coinductive type is not allowed"
 
 zetaCoinductiveNested ::
      Mode
