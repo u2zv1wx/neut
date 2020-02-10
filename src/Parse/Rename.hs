@@ -96,7 +96,13 @@ renameStmtList' nenv ((StmtLetCoinductiveElim m (mb, b, t) xtsyt cod ats bts yt 
   (bts', nenv''') <- renameArgs nenv'' bts
   (yt', nenv'''') <- renameIdentPlus' nenv''' yt
   -- (btsyt', nenv''') <- renameArgs nenv'' btsyt
-  cod' <- rename' nenv'''' cod
+  p "cod:"
+  p' cod
+  -- codは外側でも意味をもつべきだからnenv'で変換
+  cod' <- rename' nenv' cod
+  -- cod' <- rename' nenv'''' cod
+  p "cod':"
+  p' cod'
   e2' <- rename' nenv'''' e2
   b' <- newLLVMNameWith b
   ss' <- renameStmtList' (Map.insert b b' nenv) ss

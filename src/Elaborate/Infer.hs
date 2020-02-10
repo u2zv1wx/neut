@@ -102,7 +102,9 @@ infer' ctx (m, WeakTermSigmaIntro t es) = do
   --        ?Mm @ (ctx[0], ..., ctx[n], e1, ..., e{m-1})]
   let ts' = map (\(_, _, ty) -> substWeakTermPlus (zip ys es) ty) yts
   forM_ ((sigmaType, t') : zip ts ts') $ uncurry insConstraintEnv
-  retWeakTerm sigmaType m $ WeakTermSigmaIntro t' es'
+  -- retWeakTerm sigmaType m $ WeakTermSigmaIntro t' es'
+  -- 中身をsigmaTypeにすることでelaborateのときに確実に中身を取り出せるようにする
+  retWeakTerm sigmaType m $ WeakTermSigmaIntro sigmaType es'
 infer' ctx (m, WeakTermSigmaElim t xts e1 e2) = do
   t' <- inferType ctx t
   (e1', t1) <- infer' ctx e1

@@ -299,10 +299,11 @@ concatStmtList ((StmtLetInductive n m xt e):es) = do
   insForm n xt e
   cont <- concatStmtList es
   return (m, WeakTermPiElim (emptyMeta, WeakTermPiIntro [xt] cont) [e])
-concatStmtList (StmtLetCoinductive n m xt e:es) = do
-  insForm n xt e
+concatStmtList (StmtLetCoinductive n m at e:es) = do
+  p $ "let-coinductive. a = " <> show ((\(_, a, _) -> a) at)
+  insForm n at e
   cont <- concatStmtList es
-  return (m, WeakTermPiElim (emptyMeta, WeakTermPiIntro [xt] cont) [e])
+  return (m, WeakTermPiElim (emptyMeta, WeakTermPiIntro [at] cont) [e])
 concatStmtList (StmtLetInductiveIntro m bt xts yts ats bts bInner isub as:ss) = do
   yts' <- mapM (internalize isub (ats ++ bts)) yts
   let s =
@@ -332,6 +333,13 @@ concatStmtList (StmtLetInductiveIntro m bt xts yts ats bts bInner isub as:ss) = 
   concatStmtList $ s : ss
 concatStmtList (StmtLetCoinductiveElim m bt xtsyt cod ats bts yt e1 e2 csub as:ss) = do
   e2' <- externalize csub (ats ++ bts) cod e2
+  p $ "let-coinductive-intro. b = " <> show ((\(_, b, _) -> b) bt)
+  p "content:"
+  pp
+    ( m
+    , WeakTermPiIntro
+        xtsyt
+        (m, WeakTermSigmaElim cod (ats ++ bts ++ [yt]) e1 e2'))
   let s =
         StmtLet
           m
