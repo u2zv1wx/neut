@@ -270,7 +270,6 @@ zetaPi ::
   -> WeakTermPlus
   -> WithEnv WeakTermPlus
 zetaPi mode isub csub atsbts xts cod e = do
-  p "===========zetaPi========="
   let (ms, xs, ts) = unzip3 xts
   xs' <- mapM newNameWith xs
   let vs' = zipWith (\m x -> (m, WeakTermUpsilon x)) ms xs'
@@ -280,7 +279,7 @@ zetaPi mode isub csub atsbts xts cod e = do
   vs <- zipWithM (zeta (flipMode mode) isub' csub' atsbts) ts vs'
   -- forward conversion to create B -> B'
   app' <- zeta mode isub csub atsbts cod (fst e, WeakTermPiElim e vs)
-  -- return (A' ..., A') -> (A, ..., A) -> B -> B'
+  -- return the composition: (A' ..., A') -> (A, ..., A) -> B -> B'
   let ts' = map (substWeakTermPlus (isub ++ csub)) ts
   return $ (fst e, WeakTermPiIntro (zip3 ms xs' ts') app')
 
