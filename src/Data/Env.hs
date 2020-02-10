@@ -288,3 +288,6 @@ asEnumConstant x
       Just ls -> return $ Just $ toInteger $ length ls
   | Just i <- asEnumNatConstant x = return $ Just i
 asEnumConstant _ = return Nothing
+
+pp :: WeakTermPlus -> WithEnv ()
+pp e = liftIO $ TIO.putStrLn $ toText e

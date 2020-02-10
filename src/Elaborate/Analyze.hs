@@ -172,20 +172,41 @@ simp' ((e1, e2):cs) = do
             case es of
               [] -> simpPattern h2 ies2 e2' e1' cs
               _ -> simp $ (substWeakTermPlus (zip zs es) e1', e2') : cs
-        (Just (StuckUpsilon x1), _)
+        (Just (StuckPiElimUpsilon x1 _), _)
           | Just body <- Map.lookup x1 sub -> do
             let m = supMeta (supMeta (metaOf e1) (metaOf e2)) (metaOf body) -- x1 == e1 == body
             let e1' = (m, snd e1)
             let e2' = (m, snd e2)
             let body' = (m, snd body)
             simp $ (substWeakTermPlus [(x1, body')] e1', e2') : cs
-        (_, Just (StuckUpsilon x2))
+        (_, Just (StuckPiElimUpsilon x2 _))
           | Just body <- Map.lookup x2 sub -> do
             let m = supMeta (supMeta (metaOf e1) (metaOf e2)) (metaOf body) -- x2 == e2 == body
             let e1' = (m, snd e1)
             let e2' = (m, snd e2)
             let body' = (m, snd body)
             simp $ (e1', substWeakTermPlus [(x2, body')] e2') : cs
+        (Just (StuckPiElimUpsilon x1 ess1), Just (StuckPiElimUpsilon x2 ess2))
+          | x1 == x2
+          , length ess1 == length ess2
+          , es1 <- concat ess1
+          , es2 <- concat ess2
+          -- es1 = [[a, b], [c]], es2 =  [[d], [e, f]]とかを許してしまっているので修正すること
+          , length es1 == length es2 -> simp $ zip es1 es2 ++ cs
+        -- (Just (StuckUpsilon x1), _)
+        --   | Just body <- Map.lookup x1 sub -> do
+        --     let m = supMeta (supMeta (metaOf e1) (metaOf e2)) (metaOf body) -- x1 == e1 == body
+        --     let e1' = (m, snd e1)
+        --     let e2' = (m, snd e2)
+        --     let body' = (m, snd body)
+        --     simp $ (substWeakTermPlus [(x1, body')] e1', e2') : cs
+        -- (_, Just (StuckUpsilon x2))
+        --   | Just body <- Map.lookup x2 sub -> do
+        --     let m = supMeta (supMeta (metaOf e1) (metaOf e2)) (metaOf body) -- x2 == e2 == body
+        --     let e1' = (m, snd e1)
+        --     let e2' = (m, snd e2)
+        --     let body' = (m, snd body)
+        --     simp $ (e1', substWeakTermPlus [(x2, body')] e2') : cs
         (Just (StuckPiElimZetaStrict h1 ies1), _)
           | xs1 <- concatMap getVarList ies1
           , occurCheck h1 hs2
@@ -312,11 +333,13 @@ data Stuck
   | StuckPiElimZetaStrict Hole [[WeakTermPlus]]
   | StuckPiElimIter IterInfo [(Meta, [WeakTermPlus])]
   | StuckPiElimConst Identifier [[WeakTermPlus]]
-  | StuckUpsilon Identifier
+  | StuckPiElimUpsilon Identifier [[WeakTermPlus]]
+  -- | StuckUpsilon Identifier
 
 -- {} asStuckedTerm {}
 asStuckedTerm :: WeakTermPlus -> Maybe Stuck
-asStuckedTerm (_, WeakTermUpsilon x) = Just $ StuckUpsilon x
+-- asStuckedTerm (_, WeakTermUpsilon x) = Just $ StuckUpsilon x
+asStuckedTerm (_, WeakTermUpsilon x) = Just $ StuckPiElimUpsilon x []
 asStuckedTerm (_, WeakTermPiElim (_, WeakTermZeta h) es)
   | Just _ <- mapM asUpsilon es = Just $ StuckPiElimZetaStrict h [es]
 asStuckedTerm (_, WeakTermPiElim (_, WeakTermZeta h) es) =
@@ -325,6 +348,8 @@ asStuckedTerm (m, WeakTermPiElim self@(mi, WeakTermIter (_, x, _) xts body) es) 
   Just $ StuckPiElimIter (mi, x, xts, body, self) [(m, es)]
 asStuckedTerm (_, WeakTermPiElim (_, WeakTermConst x) es) =
   Just $ StuckPiElimConst x [es]
+-- asStuckedTerm (_, WeakTermPiElim (_, WeakTermUpsilon x) es) =
+--   Just $ StuckPiElimUpsilon x [es]
 asStuckedTerm (m, WeakTermPiElim e es)
   | Just _ <- mapM asUpsilon es =
     case asStuckedTerm e of
@@ -334,7 +359,9 @@ asStuckedTerm (m, WeakTermPiElim e es)
       Just (StuckPiElimIter mu ess) ->
         Just $ StuckPiElimIter mu $ ess ++ [(m, es)]
       Just (StuckPiElimConst x ess) -> Just $ StuckPiElimConst x $ ess ++ [es]
-      Just (StuckUpsilon x) -> Just $ StuckUpsilon x
+      Just (StuckPiElimUpsilon x ess) ->
+        Just $ StuckPiElimUpsilon x $ ess ++ [es]
+      -- Just (StuckUpsilon x) -> Just $ StuckUpsilon x
       Nothing -> Nothing
 asStuckedTerm (m, WeakTermPiElim e es) =
   case asStuckedTerm e of
@@ -344,10 +371,11 @@ asStuckedTerm (m, WeakTermPiElim e es) =
     Just (StuckPiElimIter mu ess) ->
       Just $ StuckPiElimIter mu $ ess ++ [(m, es)]
     Just (StuckPiElimConst x ess) -> Just $ StuckPiElimConst x $ ess ++ [es]
-    Just (StuckUpsilon x) -> Just $ StuckUpsilon x
+    Just (StuckPiElimUpsilon x ess) -> Just $ StuckPiElimUpsilon x $ ess ++ [es]
+    -- Just (StuckUpsilon x) -> Just $ StuckUpsilon x
     Nothing -> Nothing
 asStuckedTerm (_, WeakTermEnumElim ((_, WeakTermUpsilon x), _) _) =
-  Just $ StuckUpsilon x
+  Just $ StuckPiElimUpsilon x []
 asStuckedTerm _ = Nothing
 
 -- {} stuckReasonOf {}
@@ -356,8 +384,9 @@ stuckReasonOf (StuckPiElimZeta h _) = Just h
 stuckReasonOf (StuckPiElimZetaStrict h _) = Just h
 stuckReasonOf (StuckPiElimIter {}) = Nothing
 stuckReasonOf (StuckPiElimConst _ _) = Nothing
-stuckReasonOf (StuckUpsilon _) = Nothing
+stuckReasonOf (StuckPiElimUpsilon _ _) = Nothing
 
+-- stuckReasonOf (StuckUpsilon _) = Nothing
 -- {} occurCheck {}
 occurCheck :: Identifier -> [Identifier] -> Bool
 occurCheck h fmvs = h `notElem` fmvs

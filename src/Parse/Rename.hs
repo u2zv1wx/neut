@@ -144,6 +144,13 @@ rename' nenv (m, WeakTermUpsilon x) = do
       | isConstant x -> return (m, WeakTermConst x)
     Nothing ->
       throwError' $ T.pack (showMeta m) <> ": undefined variable: " <> x
+    -- Nothing -> do
+    --   p "not found:"
+    --   p' x
+    --   throwError' $
+    --   -- T.pack (showMeta m) <> ": undefined variable: " <> x throwError' $
+    --     T.pack (showMeta m) <>
+    --     ": undefined variable: " <> x <> "\nnenv:\n" <> T.pack (show nenv)
 rename' nenv (m, WeakTermPi xts t) = do
   (xts', t') <- renameBinder nenv xts t
   return (m, WeakTermPi xts' t')

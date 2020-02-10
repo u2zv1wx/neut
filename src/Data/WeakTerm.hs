@@ -6,6 +6,7 @@ module Data.WeakTerm where
 import Numeric.Half
 
 import qualified Data.Text as T
+import qualified Data.Text.IO as TIO
 
 import Data.Basic
 

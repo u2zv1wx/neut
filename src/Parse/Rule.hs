@@ -231,9 +231,10 @@ zeta ::
   -> WeakTermPlus -- a type `A`
   -> WeakTermPlus -- a term `e` of type `A`
   -> WithEnv WeakTermPlus -- a term of type `A{x1 := x1', ..., xn := xn'}`
-zeta mode isub csub atsbts t e = do
-  p "zeta. t:"
-  p' t
+zeta mode isub csub atsbts t e
+  -- p "zeta. t:"
+  -- p' t
+ = do
   ienv <- gets inductiveEnv
   cenv <- gets coinductiveEnv
   case t of
@@ -250,9 +251,10 @@ zeta mode isub csub atsbts t e = do
         zetaCoinductiveNested mode isub csub atsbts e va a es bts
       | Just Nothing <- Map.lookup a ienv -> zetaInductiveNestedMutual a
       | Just Nothing <- Map.lookup a cenv -> zetaCoinductiveNestedMutual a
-    _ -> do
-      p "other. t:"
-      p' t
+    _
+      -- p "other. t:"
+      -- p' t
+     -> do
       if isResolved (isub ++ csub) t
         then return e
         else throwError' $
@@ -290,10 +292,10 @@ zetaInductive ::
 zetaInductive mode isub atsbts es e
   | ModeExternalize <- mode =
     throwError' "found a contravariant occurence of an inductive type"
-  | all (isResolved isub) es = do
-    p "zetaInductive. es:"
-    p' es
-    return (fst e, WeakTermPiElim e (map toVar' atsbts))
+  | all (isResolved isub) es
+    -- p "zetaInductive. es:"
+    -- p' es
+   = do return (fst e, WeakTermPiElim e (map toVar' atsbts))
   | otherwise = throwError' "self-nested inductive type is not allowed"
 
 zetaCoinductive ::

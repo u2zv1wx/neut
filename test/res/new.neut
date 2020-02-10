@@ -722,10 +722,33 @@ n15-4
 ;; まあ、型エラーの推論のときはtimeoutをとってもいいな。
 ;; (ascription a (hom i64 tau))
 
+;; 一番簡単なinductive typeの処理
+(inductive nat ()
+  (nat.zero () (nat))
+  (nat.succ ((n (nat))) (nat)))
 
-(inductive my-nat ()
-  (my-zero () (my-nat))
-  (my-succ ((n (my-nat))) (my-nat)))
+;; 引数ありのinductive typeの処理
+;; (inductive my-list ((A tau))
+;;   (my-nil () (my-list A))
+;;   (my-cons ((_ A) (_ (my-list A))) (my-list A)))
+
+;; 量化された引数の部分はpiで包まないといけない（でないと全体で共有されてしまうので固定になる）
+;; つまり、inductiveの引数は「そこを固定して」ってことなんだな。
+(inductive vec ((A tau) (n (nat)))
+  (vec.nil () (vec A (nat.zero)))
+  (vec.cons ((m (nat)) (_ A) (_ (vec A m))) (vec A (nat.succ m))))
+
+;; こっちはwell-typed
+;; (inductive my-vec ((A tau) (n (nat)))
+;;   (vec-zero () (my-vec A (zero))))
+
+;; (inductive my-vec ((A tau) (n (nat)))
+;;   (vec-cons ((_ A) (_ (my-vec A n))) (my-vec A (succ n))))
+
+;; (i64.add 100 (vec.cons i64 (nat.zero) (nat.zero) 10 (vec.nil i64 (nat.zero))))
+
+;; こんな感じでvecも使える。
+(let a (vec.nil i64 (nat.zero)))
 
 (i64.add 100 10)
 
