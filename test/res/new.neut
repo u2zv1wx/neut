@@ -728,9 +728,9 @@ n15-4
   (nat.succ ((n (nat))) (nat)))
 
 ;; 引数ありのinductive typeの処理
-;; (inductive my-list ((A tau))
-;;   (my-nil () (my-list A))
-;;   (my-cons ((_ A) (_ (my-list A))) (my-list A)))
+(inductive list ((A tau))
+  (list.nil () (list A))
+  (list.cons ((_ A) (_ (list A))) (list A)))
 
 ;; 量化された引数の部分はpiで包まないといけない（でないと全体で共有されてしまうので固定になる）
 ;; つまり、inductiveの引数は「そこを固定して」ってことなんだな。
@@ -749,6 +749,20 @@ n15-4
 
 ;; こんな感じでvecも使える。
 (let a (vec.nil i64 (nat.zero)))
+
+;; (inductive item ((A tau))
+;;   (item.intro () (item A))
+;;   (item.cont ((_ (item A)) (_ (list (item A)))) (item A))
+;;   (item.cont1 ((_ (item A)) (_ (list (list (item A))))) (item A))
+;;   (item.cont2 ((_ A) (_ (item A))) (item A)))
+
+(inductive item ((A tau))
+  (item.intro () (item A))
+  (item.cont ((_ (item A)) (_ (list (item A)))) (item A))
+  (item.cont2 ((_ A) (_ (item A))) (item A))
+  (item.cont1 ((_ (item A)) (_ (list (list (item A)))) (_ (list (item A))) (_ A)) (item A)))
+
+;; (i64.add 100 item.cont)
 
 (i64.add 100 10)
 
