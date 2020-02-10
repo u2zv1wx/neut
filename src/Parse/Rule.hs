@@ -199,6 +199,7 @@ optConcat mNew mOld = do
 data Mode
   = ModeInternalize
   | ModeExternalize
+  deriving (Show)
 
 internalize ::
      SubstWeakTerm -> [IdentifierPlus] -> IdentifierPlus -> WithEnv WeakTermPlus
@@ -234,12 +235,16 @@ zeta ::
 zeta mode isub csub atsbts t e = do
   ienv <- gets inductiveEnv
   cenv <- gets coinductiveEnv
+  isub' <- invSubst isub
+  csub' <- invSubst csub
   case t of
     (_, WeakTermPi xts cod) -> zetaPi mode isub csub atsbts xts cod e
       -- (_, WeakTermSigma _) -> undefined
     (_, WeakTermPiElim va@(_, WeakTermUpsilon a) es)
-      | Just _ <- lookup a isub -> zetaInductive mode isub atsbts es e
-      | Just _ <- lookup a csub -> zetaCoinductive mode csub atsbts es e va
+      | Just _ <- lookup a (isub ++ isub') ->
+        zetaInductive mode isub atsbts es e
+      | Just _ <- lookup a (csub ++ csub') ->
+        zetaCoinductive mode csub atsbts es e va
       | Just (Just bts) <- Map.lookup a ienv
       , not (all (isResolved (isub ++ csub)) es) ->
         zetaInductiveNested mode isub csub atsbts e va a es bts
@@ -265,16 +270,19 @@ zetaPi ::
   -> WeakTermPlus
   -> WithEnv WeakTermPlus
 zetaPi mode isub csub atsbts xts cod e = do
-  p "zetaPi"
+  p "===========zetaPi========="
   let (ms, xs, ts) = unzip3 xts
-  let ts' = map (substWeakTermPlus (isub ++ csub)) ts
-  let vs' = zipWith (\m x -> (m, WeakTermUpsilon x)) ms xs
+  xs' <- mapM newNameWith xs
+  let vs' = zipWith (\m x -> (m, WeakTermUpsilon x)) ms xs'
   -- backward conversion to create (A', ..., A') -> (A, ..., A)
-  vs <- zipWithM (zeta (flipMode mode) isub csub atsbts) ts' vs'
+  isub' <- invSubst isub
+  csub' <- invSubst csub
+  vs <- zipWithM (zeta (flipMode mode) isub' csub' atsbts) ts vs'
   -- forward conversion to create B -> B'
   app' <- zeta mode isub csub atsbts cod (fst e, WeakTermPiElim e vs)
   -- return (A' ..., A') -> (A, ..., A) -> B -> B'
-  return $ (fst e, WeakTermPiIntro (zip3 ms xs ts') app')
+  let ts' = map (substWeakTermPlus (isub ++ csub)) ts
+  return $ (fst e, WeakTermPiIntro (zip3 ms xs' ts') app')
 
 zetaInductive ::
      Mode
@@ -460,7 +468,6 @@ toInternalizedArg mode isub csub aInner aOuter xts atsbts es es' b (mbInner, _, 
     , WeakTermPiIntro
         ytsInner'
         (mbInner, WeakTermPiElim (toVar' b) (es' ++ args)))
-  -- return (mbInner, WeakTermPiElim (toVar' b) (es' ++ args))
 toInternalizedArg _ _ _ _ _ _ _ _ _ _ _ = throwError' "toInternalizedArg"
 
 toExternalizedArg ::
@@ -624,3 +631,10 @@ substRuleTypeBindingsWithBody sub ((m, x, t):xts) e = do
     else do
       (xts', e') <- substRuleTypeBindingsWithBody sub xts e
       return ((m, x, t') : xts', e')
+
+invSubst :: SubstWeakTerm -> WithEnv SubstWeakTerm
+invSubst [] = return []
+invSubst ((x, (m, WeakTermUpsilon x')):sub) = do
+  sub' <- invSubst sub
+  return $ (x', (m, WeakTermUpsilon x)) : sub'
+invSubst _ = throwError' "invSubst"

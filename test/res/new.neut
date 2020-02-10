@@ -732,6 +732,10 @@ n15-4
   (list.nil () (list A))
   (list.cons ((_ A) (_ (list A))) (list A)))
 
+(inductive mylist ((A tau) (B tau))
+  (mylist.nil () (mylist A B))
+  (mylist.cons ((_ A) (_ (mylist A B))) (mylist A B)))
+
 ;; 量化された引数の部分はpiで包まないといけない（でないと全体で共有されてしまうので固定になる）
 ;; つまり、inductiveの引数は「そこを固定して」ってことなんだな。
 (inductive vec ((A tau) (n (nat)))
@@ -759,8 +763,9 @@ n15-4
 (inductive item ((A tau))
   (item.intro () (item A))
   (item.cont ((_ (item A)) (_ (list (item A)))) (item A))
-  (item.cont2 ((_ A) (_ (item A))) (item A))
-  (item.cont1 ((_ (item A)) (_ (list (list (item A)))) (_ (list (item A))) (_ A)) (item A)))
+  (item.cont2 ((_ A) (_ (pi ((_ (pi ((_ (item A))) i64))) (item A)))) (item A))
+  ;; (item.cont3 ((_ A) (_ (pi ((_ (item A))) (item A)))) (item A))
+  (item.cont1 ((_ (item A)) (_ (list (list (item A)))) (_ (list (mylist (item A) i64))) (_ A) (_ (nat)) (_ i64)) (item A)))
 
 ;; (i64.add 100 item.cont)
 
