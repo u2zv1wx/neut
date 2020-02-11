@@ -294,8 +294,8 @@ zeta mode isub csub atsbts t e = do
   csub' <- invSubst csub
   case t of
     (_, WeakTermPi xts cod) -> zetaPi mode isub csub atsbts xts cod e
-      -- (_, WeakTermSigma _) -> undefined
-    (_, WeakTermPiElim va@(_, WeakTermUpsilon a) es)
+    (_, WeakTermSigma xts) -> zetaSigma mode isub csub atsbts xts e
+    (_, WeakTermPiElim va@(_, WeakTermUpsilon a) es) -- esの長さをチェックするべきでは？
       | Just _ <- lookup a (isub ++ isub') ->
         zetaInductive mode isub atsbts es e
       | Just _ <- lookup a (csub ++ csub') ->
@@ -336,7 +336,30 @@ zetaPi mode isub csub atsbts xts cod e = do
   app' <- zeta mode isub csub atsbts cod (fst e, WeakTermPiElim e vs)
   -- return the composition: (A' ..., A') -> (A, ..., A) -> B -> B'
   let ts' = map (substWeakTermPlus (isub ++ csub)) ts
-  return $ (fst e, WeakTermPiIntro (zip3 ms xs' ts') app')
+  return (fst e, WeakTermPiIntro (zip3 ms xs' ts') app')
+
+zetaSigma ::
+     Mode
+  -> SubstWeakTerm
+  -> SubstWeakTerm
+  -> [IdentifierPlus]
+  -> [IdentifierPlus]
+  -> WeakTermPlus
+  -> WithEnv WeakTermPlus
+zetaSigma mode isub csub atsbts xts e = do
+  let (ms, xs, ts) = unzip3 xts
+  xs' <- mapM newNameWith xs
+  let vs = zipWith (\m x -> (m, WeakTermUpsilon x)) ms xs'
+  vs' <- zipWithM (zeta mode isub csub atsbts) ts vs
+  let ts' = map (substWeakTermPlus (isub ++ csub)) ts
+  let sigType = (fst e, WeakTermSigma (zip3 ms xs ts'))
+  return
+    ( fst e
+    , WeakTermSigmaElim
+        sigType
+        (zip3 ms xs' ts)
+        e
+        (fst e, WeakTermSigmaIntro sigType vs'))
 
 zetaInductive ::
      Mode

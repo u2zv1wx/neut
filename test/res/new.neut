@@ -773,6 +773,7 @@ n15-4
           ((_ (pi ((_ (item A))) i64)))
            (item A))))
     (item A))
+  (item.dom-sig ((_ (sigma ((_ (item A))) (item A)))) (item A))
   ;; (item.cont3 ((_ A) (_ (pi ((_ (item A))) (item A)))) (item A))
   (item.cont1 ((_ (item A))
                (_ (list (list (item A))))
@@ -784,7 +785,7 @@ n15-4
 
 (coinductive stream ((A tau))
   (stream.head ((_ (stream A))) A)
-  (stream.tail ((_ i64)) (stream A)))
+  (stream.tail ((_ (stream A))) (stream A)))
 
 ;; (coinductive stream ((A tau))
 ;;   (stream.head ((_ (stream A))) A)
@@ -801,7 +802,7 @@ n15-4
   (list-stream.tail ((_ (list-stream A))) (list (list-stream A))))
 
 ;; induction principleを自動生成できるようにした。これでnatの内部実装を気にせずにnatを利用できるようになる。
-(i64.add 100 nat.induction)
+;; (i64.add 100 nat.induction)
 
 
 ;; coinduction principleも自動生成できるようにした。偉すぎる。
