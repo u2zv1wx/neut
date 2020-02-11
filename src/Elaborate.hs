@@ -34,6 +34,7 @@ import Reduce.WeakTerm
 -- https://arxiv.org/abs/1505.04324, 2015.
 elaborate :: WeakTermPlus -> WithEnv TermPlus
 elaborate e = do
+  p "elaborate"
   e' <- infer e
   -- Kantian type-inference ;)
   analyze
