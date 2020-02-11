@@ -103,32 +103,39 @@ toInductive ats bts connective@(m, a, xts, _) = do
     ]
 
 toInductiveIntroList :: [IdentifierPlus] -> Connective -> WithEnv [Stmt]
-toInductiveIntroList ats (_, _, xts, rules) = do
+toInductiveIntroList ats (_, a, xts, rules) = do
   let bts = map ruleAsIdentPlus rules
-  mapM (toInductiveIntro ats bts xts) rules
+  mapM (toInductiveIntro ats bts xts a) rules
 
 -- represent the introduction rule within CoC
 toInductiveIntro ::
      [IdentifierPlus]
   -> [IdentifierPlus]
   -> [IdentifierPlus]
+  -> Identifier
   -> Rule
   -> WithEnv Stmt
-toInductiveIntro ats bts xts (mb, b, m, yts, cod) = do
-  return $
-    StmtLetInductiveIntro
-      m
-      (mb, b, (m, WeakTermPi (xts ++ yts) cod))
-      xts
-      yts
-      ats
-      bts
-      (mb, WeakTermUpsilon b)
-      -- yts
-      []
-      (map (\(_, a, _) -> a) ats)
+toInductiveIntro ats bts xts a (mb, b, m, yts, cod)
+  | (_, WeakTermPiElim (_, WeakTermUpsilon a') es) <- cod
+  , a == a'
+  , length xts == length es = do
+    return $
+      StmtLetInductiveIntro
+        m
+        (mb, b, (m, WeakTermPi (xts ++ yts) cod))
+        xts
+        yts
+        ats
+        bts
+        (mb, WeakTermUpsilon b)
+        []
+        (map (\(_, x, _) -> x) ats)
+  | otherwise =
+    throwError' $
+    "the succedent of an introduction rule of `" <>
+    a <>
+    "` must be of the form `(" <> showItems (a : map (const "_") xts) <> ")`"
 
--- -- represent the coinductive logical connective within CoC
 toCoinductive ::
      [IdentifierPlus] -> [IdentifierPlus] -> Connective -> WithEnv [Stmt]
 toCoinductive ats bts c@(m, a, xts, _) = do
@@ -162,19 +169,23 @@ toCoinductive ats bts c@(m, a, xts, _) = do
     ]
 
 toCoinductiveElimList :: [IdentifierPlus] -> Connective -> WithEnv [Stmt]
-toCoinductiveElimList ats (_, _, xts, rules) = do
+toCoinductiveElimList ats (_, a, xts, rules) = do
   let bts = map ruleAsIdentPlus rules
-  mapM (toCoinductiveElim ats bts xts) rules
+  mapM (toCoinductiveElim ats bts xts a) rules
 
 -- represent the elimination rule within CoC
 toCoinductiveElim ::
      [IdentifierPlus]
   -> [IdentifierPlus]
   -> [IdentifierPlus]
+  -> Identifier
   -> Rule
   -> WithEnv Stmt
-toCoinductiveElim ats bts xts (mb, b, m, yts, cod)
-  | [yt] <- yts = do
+toCoinductiveElim ats bts xts a (mb, b, m, yts, cod)
+  | [yt@(_, _, dom)] <- yts
+  , (_, WeakTermPiElim (_, WeakTermUpsilon a') es) <- dom
+  , a == a'
+  , length xts == length es = do
     return $
       StmtLetCoinductiveElim
         m
@@ -187,8 +198,12 @@ toCoinductiveElim ats bts xts (mb, b, m, yts, cod)
         (toVar' yt)
         (m, WeakTermPiElim (mb, WeakTermUpsilon b) [toVar' yt])
         []
-        (map (\(_, a, _) -> a) ats)
-  | otherwise = throwError' "toCoinductiveElim"
+        (map (\(_, x, _) -> x) ats)
+  | otherwise =
+    throwError' $
+    "the antecedent of an elimination rule of `" <>
+    a <>
+    "` must be of the form `(" <> showItems (a : map (const "_") xts) <> ")`"
 
 ruleAsIdentPlus :: Rule -> IdentifierPlus
 ruleAsIdentPlus (mb, b, m, xts, t) = (mb, b, (m, WeakTermPi xts t))

@@ -693,7 +693,7 @@ n15-4
   (let longer-name long-long-name)
   (let longest-longest-name longer-name)
   (let longest-name i64.add i64.sub)
-  longest-name)
+  longest-longest-name)
 
 (definition foo ((x i64))
   (let y x)
@@ -726,6 +726,10 @@ n15-4
 (inductive nat ()
   (nat.zero () (nat))
   (nat.succ ((n (nat))) (nat)))
+
+;; (inductive nat ()
+;;   (nat.zero () (nat))
+;;   (nat.succ ((n (nat))) (nat)))
 
 ;; 引数ありのinductive typeの処理
 (inductive list ((A tau))
@@ -780,7 +784,11 @@ n15-4
 
 (coinductive stream ((A tau))
   (stream.head ((_ (stream A))) A)
-  (stream.tail ((_ (stream A))) (stream A)))
+  (stream.tail ((_ i64)) (stream A)))
+
+;; (coinductive stream ((A tau))
+;;   (stream.head ((_ (stream A))) A)
+;;   (stream.tail ((_ (stream A))) (stream A)))
 
 ;; これも通った
 (coinductive nested-stream ((A tau))
