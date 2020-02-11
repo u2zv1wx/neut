@@ -116,7 +116,8 @@ toCoinductive ats bts c@(m, a, xts, _) = do
   let f = formationRuleOf c
   h <- newNameWith "cod"
   return $
-    StmtLet
+    StmtLetCoinductive
+      (length ats)
       m
       (ruleAsIdentPlus f) -- a : Pi xts. Univ
       (m, WeakTermPiIntro xts (m, WeakTermSigma (ats ++ bts ++ [(m, h, cod)])))
@@ -292,7 +293,8 @@ zetaInductive ::
   -> WithEnv WeakTermPlus
 zetaInductive mode isub atsbts es e
   | ModeExternalize <- mode =
-    throwError' "found a contravariant occurence of an inductive type"
+    throwError'
+      "found a contravariant occurence of <name> in the antecedent of an introduction rule"
   | all (isResolved isub) es = do
     return (fst e, WeakTermPiElim e (map toVar' atsbts))
   | otherwise = throwError' "found a self-nested inductive type"
@@ -307,11 +309,17 @@ zetaCoinductive ::
   -> WithEnv WeakTermPlus
 zetaCoinductive mode csub atsbts es e va
   | ModeInternalize <- mode =
-    throwError' "found a contravariant occurrence of a coinductive type"
+    throwError'
+      "found a contravariant occurrence of <name> in the succedent of an elimination rule"
   | all (isResolved csub) es = do
-    let es' = map (substWeakTermPlus csub) es
-    let t' = (fst va, WeakTermPiElim va es')
-    return (fst e, WeakTermSigmaIntro t' (map toVar' atsbts ++ [e]))
+    return
+      ( fst e
+      , WeakTermSigmaIntro
+          ( fst e
+          -- resulting type: aOuter @ (e1, ..., en)
+          -- (note that ei is already resolved)
+          , WeakTermPiElim (substWeakTermPlus csub va) es)
+          (map toVar' atsbts ++ [e]))
   | otherwise = throwError' "found a self-nested coinductive type"
 
 -- atsbtsは、internalizeで使用するためのもの
@@ -355,27 +363,28 @@ zetaCoinductiveNested ::
   -> [WeakTermPlus]
   -> [IdentifierPlus]
   -> WithEnv WeakTermPlus
-zetaCoinductiveNested mode isub csub atsbts e va a es bts = do
-  (xts, btsInner) <- lookupCoinductive a
+zetaCoinductiveNested mode isub csub atsbts e va aOuter es bts = do
+  (xts, (_, aInner, aType), btsInner) <- lookupCoinductive aOuter
   let es' = map (substWeakTermPlus (isub ++ csub)) es
-  a' <- newNameWith "zeta"
+  a' <- newNameWith "coinductive"
   args <-
     zipWithM
-      (toExternalizedArg mode isub csub a a' xts atsbts es es')
+      (toExternalizedArg mode isub csub aInner a' xts atsbts es es')
       bts
       btsInner
   let m = fst e
+  let va' = substWeakTermPlus csub va
   return
     ( m
     , WeakTermPiElim
         ( m
         , WeakTermPiIntro
-            [(m, a', (m, WeakTermPi xts (m, WeakTermTau)))]
+            [(m, a', aType)]
             ( m
             , WeakTermSigmaIntro
-                (fst e, WeakTermPiElim va es')
+                (m, WeakTermPiElim va' es')
                 ((m, WeakTermUpsilon a') : args ++ [e])))
-        [(m, WeakTermPiIntro xts (m, WeakTermPiElim va es'))])
+        [(m, WeakTermPiIntro xts (m, WeakTermPiElim va es))])
 
 zetaInductiveNestedMutual :: Identifier -> WithEnv WeakTermPlus
 zetaInductiveNestedMutual a =
@@ -407,13 +416,15 @@ lookupInductive a = do
     Nothing ->
       throwError' $ "[compiler bug] no such inductive type defined: " <> a
 
-lookupCoinductive :: Identifier -> WithEnv ([IdentifierPlus], [IdentifierPlus])
+lookupCoinductive ::
+     Identifier -> WithEnv ([IdentifierPlus], IdentifierPlus, [IdentifierPlus])
 lookupCoinductive a = do
   fenv <- gets formationEnv
   case Map.lookup a fenv of
     Just (Just (_, WeakTermPiIntro xts (_, WeakTermSigma atsbtscod))) -> do
-      let bts = init $ tail atsbtscod -- valid since a is not mutual
-      return (xts, bts)
+      let at = head atsbtscod
+      let bts = tail $ init atsbtscod -- valid since a is not mutual
+      return (xts, at, bts)
     Just (Just _) ->
       throwError' $
       "[compiler bug] malformed coinductive type (Parse.lookupCoinductive)"
@@ -471,42 +482,59 @@ toInternalizedArg _ _ _ _ _ _ _ _ _ _ _ = throwError' "toInternalizedArg"
 
 toExternalizedArg ::
      Mode
-  -> SubstWeakTerm
-  -> SubstWeakTerm
-  -> Identifier
-  -> Identifier
-  -> [IdentifierPlus]
-  -> [IdentifierPlus]
-  -> [WeakTermPlus]
-  -> [WeakTermPlus]
-  -> IdentifierPlus
-  -> IdentifierPlus
+  -> SubstWeakTerm -- inductiveのためのaのsubst (outer -> inner)
+  -> SubstWeakTerm -- coinductiveのためのaのsubst (inner -> outer)
+  -> Identifier -- innerでのaの名前。
+  -> Identifier -- a' := lam (x1 : A1, ..., xn : An). aInner @ (e1, ..., en)
+  -> [IdentifierPlus] -- streamの引数
+  -> [IdentifierPlus] -- base caseでのexternalizeのための情報
+  -> [WeakTermPlus] -- stream @ (A)の引数部分
+  -> [WeakTermPlus] -- eiをisub ++ csubでsubstしたもの
+  -> IdentifierPlus -- outerでのdestructor
+  -> IdentifierPlus -- innerでのdestructor
   -> WithEnv WeakTermPlus
-toExternalizedArg mode isub csub a a' xts atsbts es es' b (mbInner, _, (_, WeakTermPi yts cod)) = do
+toExternalizedArg mode isub csub aInner a' xts atsbts es es' b (mbInner, _, (_, WeakTermPi yts cod)) = do
   let (ms, ys, ts) = unzip3 yts
   let vxs = map toVar' xts
-  ts' <- mapM (modifyType isub ((a, vxs), (a', es'))) ts
+  -- 引数の型を変更する。coinductiveなので実際にはlength ts == 1であるが気にせずリストのまま処理する。
+  -- これによって、aInner @ (x1, ..., xn)だった型はa' @ (e1', ..., en')へと変換される。
+  -- 現在はa @ (e1, ..., en)を考えているので本来の型はaInner @ (e1, ..., en)である。
+  -- a'は外側でa' := lam (x1 : A1, ..., xn : An). aInner @ (e1, ..., en)と定義されているので、結局
+  -- a' @ (e1', ..., en') = aInner @ (x1, ..., xn)であるから、型としては実際には変化していない。
+  -- このsubstはzetaの再帰を停止させるための処理である。
+  -- こうsubstすることでa' @ (e1', ..., en')の部分を処理済みとして扱うことができる。
+  ts' <- mapM (substRuleType ((aInner, vxs), (a', es'))) ts
   let xs = map (\(_, x, _) -> x) xts
-  let yts' = zip3 ms ys ts'
-  let app = (mbInner, WeakTermPiElim (toVar' b) (es' ++ (map toVar' yts)))
-  cod' <- modifyType csub ((a, vxs), (a', es')) cod
-  -- a'の中身はe', a'の外はe
+  -- 型の「変更」は実際にはbeta-equivalentなのでysに別名を与える必要はない
+  -- coinductiveなのでaの外側にxiが出現することはなく、したがってxsによるsubstの必要もない
+  ys' <- mapM newNameWith ys
+  let yts' = zip3 ms ys' ts'
+  -- 関数本体部分の型を構成していく。
+  -- 適用結果の型はcod{xi := ei}である。
+  -- なのだけど、ただちに{xi := ei}のsubstを行わず、先にcodの型の中のaInner @ (x1, ..., xn)の出現をa' @ (e1', ..., en')に書き換えておく。
+  cod' <- substRuleType ((aInner, vxs), (a', es')) cod
+  -- cod' <- modifyType csub ((aInner, vxs), (a', es')) cod
+  -- そのうえでxiをsubstすることで、a'の中身はe', a'の外はe、という状況がとれる。
   let cod'' = substWeakTermPlus (zip xs es) cod'
+  -- cod''をこう表現することよってzetaがwell-founded relationに沿って停止する。
+  -- あとは適用のtermを構成して、
+  -- let app = (mbInner, WeakTermPiElim (toVar' b) (es ++ (map toVar' yts)))
+  let app = (mbInner, WeakTermPiElim (toVar' b) (es ++ (map toVar' yts')))
+  -- それを再帰的に処理すればよい。
   app' <- zeta mode isub csub atsbts cod'' app
   return (mbInner, WeakTermPiIntro yts' app')
 toExternalizedArg _ _ _ _ _ _ _ _ _ _ _ = throwError' "toExternalizedArg"
 
 type RuleType = (Identifier, [WeakTermPlus])
 
-modifyType ::
-     SubstWeakTerm
-  -> (RuleType, RuleType) -- ((a, [x1, ..., xn]), (a', [e1', ..., en']))
-  -> WeakTermPlus -- subst対象の型
-  -> WithEnv WeakTermPlus -- subst結果
-modifyType sub rsub t = do
-  t' <- substRuleType rsub t -- これでaの中には処理済みのものしか出現しない
-  return $ substWeakTermPlus sub t' -- aの外側を処理
-
+-- modifyType ::
+--      SubstWeakTerm
+--   -> (RuleType, RuleType) -- ((a, [x1, ..., xn]), (a', [e1', ..., en']))
+--   -> WeakTermPlus -- subst対象の型
+--   -> WithEnv WeakTermPlus -- subst結果
+-- modifyType sub rsub t = do
+--   t' <- substRuleType rsub t -- これでaの中には処理済みのものしか出現しない
+--   return $ substWeakTermPlus sub t' -- aの外側を処理
 substRuleType :: (RuleType, RuleType) -> WeakTermPlus -> WithEnv WeakTermPlus
 substRuleType _ (m, WeakTermTau) = return (m, WeakTermTau)
 substRuleType sub (m, WeakTermUpsilon x) =

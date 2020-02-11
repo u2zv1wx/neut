@@ -402,7 +402,8 @@ toText (_, WeakTermSigma xts)
     showCons ["Σ", argStr, toText t]
   | otherwise = "(product)" -- <> : (product)
 toText (_, WeakTermSigmaIntro _ es) = do
-  showTuple $ map toText es
+  showCons ("sigma-introduction" : map toText es)
+  -- showTuple $ map toText es
 toText (_, WeakTermSigmaElim _ xts e1 e2) = do
   let argStr = inParen $ showItems $ map showArg xts
   showCons ["sigma-elimination", argStr, toText e1, toText e2]

@@ -12,7 +12,6 @@ import System.Console.ANSI
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.Text as T
-import qualified Data.Text.IO as TIO
 
 import Data.Basic
 import Data.Env
@@ -35,36 +34,14 @@ import Reduce.WeakTerm
 -- https://arxiv.org/abs/1505.04324, 2015.
 elaborate :: WeakTermPlus -> WithEnv TermPlus
 elaborate e = do
-  p "elaborate"
   e' <- infer e
   -- Kantian type-inference ;)
-  -- gets constraintEnv >>= analyze >>= synthesize
-  -- cs <- gets constraintEnv
-  -- -- prepareInvRename
-  -- forM_ cs $ \(x, y)
-  --   -- x' <- invRename x
-  --   -- y' <- invRename y
-  --  -> do
-  --   when (x /= y) $ do
-  --     liftIO $ putStr "- "
-  --     liftIO $ putStrLn $ showMeta $ fst x
-  --     liftIO $ putStr "- "
-  --     liftIO $ putStrLn $ showMeta $ fst y
-  --     liftIO $ putStr "- "
-  --     liftIO $ TIO.putStrLn $ toText x
-  --     liftIO $ putStr "- "
-  --     liftIO $ TIO.putStrLn $ toText y
-  --     liftIO $ putStrLn "------"
   analyze
   synthesize
-  -- p "done"
   reduceSubstEnv
-  -- p "elaborate"
   -- this reduceTermPlus is necessary since e' contains "DONT_CARE" in its
   -- type of arguments of abstractions of meta-variables.
   e'' <- elaborate' e' >>= reduceTermPlus
-  -- p' e''
-  -- error "finished elaboration"
   return e''
   -- let info2 = toInfo "elaborated term is not closed:" e''
   -- assertMP info2 (return e'') $ null (varTermPlus e'')

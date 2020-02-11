@@ -782,6 +782,16 @@ n15-4
   (stream.head ((_ (stream A))) A)
   (stream.tail ((_ (stream A))) (stream A)))
 
+;; これも通った
+(coinductive nested-stream ((A tau))
+  (nested-stream.head ((_ (nested-stream A))) A)
+  (nested-stream.tail ((_ (nested-stream A))) (stream (stream (nested-stream A)))))
+
+;; これも通る。えらすぎる。
+(coinductive list-stream ((A tau))
+  (list-stream.head ((_ (list-stream A))) A)
+  (list-stream.tail ((_ (list-stream A))) (list (list-stream A))))
+
 ;; (i64.add 100 item.cont)
 
 (i64.add 100 10)

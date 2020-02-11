@@ -88,7 +88,7 @@ renameStmtList' nenv ((StmtLetInductiveIntro m (mb, b, t) xts yts ats bts bInner
       info
       asOuter :
     ss'
-renameStmtList' nenv ((StmtLetCoinductiveElim m (mb, b, t) xtsyt cod ats bts yt e1 e2 _ _):ss) = do
+renameStmtList' nenv ((StmtLetCoinductiveElim m (mb, b, t) xtsyt codInner ats bts yt e1 e2 _ _):ss) = do
   t' <- rename' nenv t
   (xtsyt', nenv') <- renameArgs nenv xtsyt
   e1' <- rename' nenv' e1
@@ -96,13 +96,8 @@ renameStmtList' nenv ((StmtLetCoinductiveElim m (mb, b, t) xtsyt cod ats bts yt 
   (bts', nenv''') <- renameArgs nenv'' bts
   (yt', nenv'''') <- renameIdentPlus' nenv''' yt
   -- (btsyt', nenv''') <- renameArgs nenv'' btsyt
-  p "cod:"
-  p' cod
-  -- codは外側でも意味をもつべきだからnenv'で変換
-  cod' <- rename' nenv' cod
-  -- cod' <- rename' nenv'''' cod
-  p "cod':"
-  p' cod'
+  -- codはexternalizeによって初めて意味をもつべきで、ここで保つべきはe2 : cod
+  codInner' <- rename' nenv'''' codInner
   e2' <- rename' nenv'''' e2
   b' <- newLLVMNameWith b
   ss' <- renameStmtList' (Map.insert b b' nenv) ss
@@ -118,7 +113,7 @@ renameStmtList' nenv ((StmtLetCoinductiveElim m (mb, b, t) xtsyt cod ats bts yt 
       m
       (mb, b', t')
       xtsyt'
-      cod'
+      codInner'
       ats'
       bts'
       yt'
