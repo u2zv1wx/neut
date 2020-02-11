@@ -291,12 +291,7 @@ concatStmtList (StmtDef xds:ss) = do
   let varList = map (\(_, (m, x, _), _, _) -> (m, WeakTermUpsilon x)) ds
   let iterList = map (substWeakTermPlus sub) varList
   concatStmtList $ (toLetList $ zip xds iterList) ++ ss
-concatStmtList ((StmtLetInductive n m xt e):es)
-  -- p $ "let-inductive. a = " <> show ((\(_, a, _) -> a) xt)
-  -- p' xt
-  -- p "body:"
-  -- pp e
- = do
+concatStmtList ((StmtLetInductive n m xt e):es) = do
   insForm n xt e
   cont <- concatStmtList es
   return (m, WeakTermPiElim (emptyMeta, WeakTermPiIntro [xt] cont) [e])
@@ -317,18 +312,6 @@ concatStmtList (StmtLetInductiveIntro m bt xts yts ats bts bInner isub as:ss) = 
               , WeakTermPiIntro
                   (ats ++ bts) -- ats = [list : (...)], bts = [nil : Pi (yts). list A, cons : (...)]
                   (m, WeakTermPiElim bInner yts')))
-  -- p $ "let-inductive-intro. b = " <> show ((\(_, b, _) -> b) bt)
-  -- p "t:"
-  -- pp $ (\(_, _, t) -> t) bt
-  -- p "content:"
-  -- pp
-  --   ( m
-  --   , WeakTermPiIntro
-  --       (xts ++ yts)
-  --       ( m
-  --       , WeakTermPiIntro
-  --           (ats ++ bts) -- ats = [list : (...)], bts = [nil : Pi (yts). list A, cons : (...)]
-  --           (m, WeakTermPiElim bInner yts')))
   insInductive as bt -- register the constructor (if necessary)
   concatStmtList $ s : ss
 concatStmtList (StmtLetCoinductiveElim m bt xtsyt codInner ats bts yt e1 e2 csub asOuter:ss) = do

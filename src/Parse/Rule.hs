@@ -36,14 +36,14 @@ parseCoinductive ts = parseConnective ts toCoinductive toCoinductiveElimList
 --   y : the name of an argument of an introduction/elimination rule, like `w` or `ws` in `cons : Pi (w : A, ws : list A). list A`.
 parseConnective ::
      [TreePlus]
-  -> ([IdentifierPlus] -> [IdentifierPlus] -> Connective -> WithEnv Stmt)
+  -> ([IdentifierPlus] -> [IdentifierPlus] -> Connective -> WithEnv [Stmt])
   -> ([IdentifierPlus] -> Connective -> WithEnv [Stmt])
   -> WithEnv [Stmt]
 parseConnective ts f g = do
   connectiveList <- mapM parseConnective' ts
   let ats = map (ruleAsIdentPlus . formationRuleOf) connectiveList
   let bts = concatMap toInternalRuleList connectiveList
-  connectiveList' <- mapM (f ats bts) connectiveList
+  connectiveList' <- concat <$> mapM (f ats bts) connectiveList
   ruleList <- concat <$> mapM (g ats) connectiveList
   return $ connectiveList' ++ ruleList
 
@@ -66,22 +66,29 @@ parseRule _ = throwError' "parseRule: syntax error"
 
 -- represent the inductive logical connective within CoC
 toInductive ::
-     [IdentifierPlus] -> [IdentifierPlus] -> Connective -> WithEnv Stmt
+     [IdentifierPlus] -> [IdentifierPlus] -> Connective -> WithEnv [Stmt]
 toInductive ats bts connective@(m, a, xts, _) = do
   let formationRule = formationRuleOf connective
+  let cod = (m, WeakTermPiElim (m, WeakTermUpsilon a) (map toVar' xts))
+  z <- newNameWith "z"
+  let zt = (m, z, cod)
+  let indType = (m, WeakTermPi (xts ++ [zt] ++ ats ++ bts) cod)
   return $
-    StmtLetInductive
-      (length ats)
-      m
-      (ruleAsIdentPlus formationRule)
-      ( m
-      , WeakTermPiIntro
-          xts
-          ( m
-          , WeakTermPi
-              (ats ++ bts)
-              (m, WeakTermPiElim (m, WeakTermUpsilon a) (map toVar' xts))))
+    [ StmtLetInductive
+        (length ats)
+        m
+        (ruleAsIdentPlus formationRule)
+        (m, WeakTermPiIntro xts (m, WeakTermPi (ats ++ bts) cod))
+    , StmtLet
+        m
+        (m, a <> "." <> "induction", indType) -- induction principle
+        ( m
+        , WeakTermPiIntro
+            (xts ++ [zt] ++ ats ++ bts)
+            (m, WeakTermPiElim (toVar' zt) (map toVar' (ats ++ bts))))
+    ]
 
+--                (m, WeakTermPiElim (m, WeakTermUpsilon a) (map toVar' xts))
 toInductiveIntroList :: [IdentifierPlus] -> Connective -> WithEnv [Stmt]
 toInductiveIntroList ats (_, _, xts, rules) = do
   let bts = map ruleAsIdentPlus rules
@@ -110,17 +117,19 @@ toInductiveIntro ats bts xts (mb, b, m, yts, cod) = do
 
 -- -- represent the coinductive logical connective within CoC
 toCoinductive ::
-     [IdentifierPlus] -> [IdentifierPlus] -> Connective -> WithEnv Stmt
+     [IdentifierPlus] -> [IdentifierPlus] -> Connective -> WithEnv [Stmt]
 toCoinductive ats bts c@(m, a, xts, _) = do
   let cod = (m, WeakTermPiElim (m, WeakTermUpsilon a) (map toVar' xts))
   let f = formationRuleOf c
   h <- newNameWith "cod"
-  return $
-    StmtLetCoinductive
-      (length ats)
-      m
-      (ruleAsIdentPlus f) -- a : Pi xts. Univ
-      (m, WeakTermPiIntro xts (m, WeakTermSigma (ats ++ bts ++ [(m, h, cod)])))
+  return
+    [ StmtLetCoinductive
+        (length ats)
+        m
+        (ruleAsIdentPlus f) -- a : Pi xts. Univ
+        ( m
+        , WeakTermPiIntro xts (m, WeakTermSigma (ats ++ bts ++ [(m, h, cod)])))
+    ]
 
 toCoinductiveElimList :: [IdentifierPlus] -> Connective -> WithEnv [Stmt]
 toCoinductiveElimList ats (_, _, xts, rules) = do

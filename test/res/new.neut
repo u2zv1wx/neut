@@ -792,7 +792,7 @@ n15-4
   (list-stream.head ((_ (list-stream A))) A)
   (list-stream.tail ((_ (list-stream A))) (list (list-stream A))))
 
-;; (i64.add 100 item.cont)
+;; (i64.add 100 nat.induction)
 
 (i64.add 100 10)
 
