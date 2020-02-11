@@ -198,14 +198,14 @@ optConcat mNew mOld = do
 
 -- ここでモジュールを切るべき？
 data Mode
-  = ModeInternalize
-  | ModeExternalize
+  = ModeForward
+  | ModeBackward
   deriving (Show)
 
 internalize ::
      SubstWeakTerm -> [IdentifierPlus] -> IdentifierPlus -> WithEnv WeakTermPlus
 internalize isub atsbts (m, y, t) =
-  zeta ModeInternalize isub [] atsbts t (m, WeakTermUpsilon y)
+  zeta ModeForward isub [] atsbts t (m, WeakTermUpsilon y)
 
 externalize ::
      SubstWeakTerm
@@ -213,11 +213,11 @@ externalize ::
   -> WeakTermPlus
   -> WeakTermPlus
   -> WithEnv WeakTermPlus
-externalize csub atsbts t e = zeta ModeExternalize [] csub atsbts t e
+externalize csub atsbts t e = zeta ModeForward [] csub atsbts t e
 
 flipMode :: Mode -> Mode
-flipMode ModeInternalize = ModeExternalize
-flipMode ModeExternalize = ModeInternalize
+flipMode ModeForward = ModeBackward
+flipMode ModeBackward = ModeForward
 
 isResolved :: SubstWeakTerm -> WeakTermPlus -> Bool
 isResolved sub e = do
@@ -226,7 +226,7 @@ isResolved sub e = do
   all (\x -> x `notElem` ys) xs
 
 zeta ::
-     Mode -- 現在の変換がinvertedかそうでないかをtrackするための変数（となるようにあとで修正すること）
+     Mode -- 現在の変換がinvertedかそうでないかをtrackするための変数
   -> SubstWeakTerm -- out ~> in (substitution {x1 := x1', ..., xn := xn'})
   -> SubstWeakTerm -- in ~> out
   -> [IdentifierPlus] -- ats ++ bts
@@ -292,7 +292,7 @@ zetaInductive ::
   -> WeakTermPlus
   -> WithEnv WeakTermPlus
 zetaInductive mode isub atsbts es e
-  | ModeExternalize <- mode =
+  | ModeBackward <- mode =
     throwError'
       "found a contravariant occurence of <name> in the antecedent of an introduction rule"
   | all (isResolved isub) es = do
@@ -308,7 +308,7 @@ zetaCoinductive ::
   -> WeakTermPlus
   -> WithEnv WeakTermPlus
 zetaCoinductive mode csub atsbts es e va
-  | ModeInternalize <- mode =
+  | ModeBackward <- mode =
     throwError'
       "found a contravariant occurrence of <name> in the succedent of an elimination rule"
   | all (isResolved csub) es = do
