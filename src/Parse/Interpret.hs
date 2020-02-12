@@ -334,7 +334,10 @@ interpretStructElim e =
 interpretEnumItem :: [TreePlus] -> WithEnv [(Identifier, Int)]
 interpretEnumItem ts = do
   xis <- interpretEnumItem' $ reverse ts
-  return $ reverse xis
+  if linearCheck (map snd xis)
+    then return $ reverse xis
+    else throwError'
+           "found a collision of discriminant with previous definition"
 
 interpretEnumItem' :: [TreePlus] -> WithEnv [(Identifier, Int)]
 interpretEnumItem' [] = return []

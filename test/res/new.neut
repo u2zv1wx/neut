@@ -307,14 +307,15 @@
 
 ;; 普通に関数として書いたら推論できたわ。なんでわざわざnotationでやってたんだ。
 ;; 関数として書いたほうが推論できるものが増えてうれしい、ってことがわかる。
-(definition my-dec ((num nat))
-  (sigma-elimination
-    ((selector choice)
-     (value (nat-helper selector)))
-    num
-    (case selector
-      (left zero)
-      (right (succ (succ (succ zero)))))))
+;; このへんのsigmaによるあれはもう不要で、というのは、inductive/coinductiveが定義できたから。
+;; (definition my-dec ((num nat))
+;;   (sigma-elimination
+;;     ((selector choice)
+;;      (value (nat-helper selector)))
+;;     num
+;;     (case selector
+;;       (left zero)
+;;       (right (succ (succ (succ zero)))))))
 
 ;; (definition my-dec ((num nat))
 ;;   (sigma-elimination
@@ -336,23 +337,23 @@
 ;;       (left (with-type nat (zero)))
 ;;       (right (with-type nat (succ (succ (succ (zero)))))))))
 
-(ascription my-dec (hom nat nat))
+;; (ascription my-dec (hom nat nat))
 
 ;; これがパターンマッチの基本をあたえている
 ;; こっちで与えるべきヒントって何？
 ;; valueの型がnatであるって書いても、それはselector = rightの情報がないから解けないよね？
 ;; というかこっちが推論できてなんでmy-decが推論できないんだ？
-(definition my-item ((num nat))
-  (sigma-elimination
-    ((selector choice)
-     (value (nat-helper selector)))
-    num
-    (case selector
-      (left zero)
-      (right value))))
+;; (definition my-item ((num nat))
+;;   (sigma-elimination
+;;     ((selector choice)
+;;      (value (nat-helper selector)))
+;;     num
+;;     (case selector
+;;       (left zero)
+;;       (right value))))
 
-(ascription my-item
-  (hom nat nat))
+;; (ascription my-item
+;;   (hom nat nat))
 
 ;; こういうmatchのコードはもうふつうにsigma-elimに書き換えることができる。
 ;; まさに上のように書き換えればいいだけなので。
@@ -816,7 +817,7 @@ n15-4
   bar
   (buz 10)
   qux
-  (pohe 1)
+  (pohe 100)
   popo)
 
 ;; bar

@@ -11,6 +11,8 @@ import Data.Bits
 import Data.Maybe (fromMaybe)
 import Text.Read
 
+import qualified Data.Set as S
+
 type Identifier = T.Text
 
 type Phase = Integer
@@ -359,6 +361,16 @@ asBinaryOpMaybe' "and" = Just BinaryOpAnd
 asBinaryOpMaybe' "or" = Just BinaryOpOr
 asBinaryOpMaybe' "xor" = Just BinaryOpXor
 asBinaryOpMaybe' _ = Nothing
+
+-- {} linearCheck {}
+linearCheck :: (Eq a, Ord a) => [a] -> Bool
+linearCheck xs = linearCheck' S.empty xs
+
+linearCheck' :: (Eq a, Ord a) => (S.Set a) -> [a] -> Bool
+linearCheck' _ [] = True
+linearCheck' found (x:_)
+  | x `S.member` found = False
+linearCheck' found (x:xs) = linearCheck' (S.insert x found) xs
 
 wordsBy :: Char -> T.Text -> [T.Text]
 wordsBy c s =

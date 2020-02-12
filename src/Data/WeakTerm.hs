@@ -6,7 +6,6 @@ module Data.WeakTerm where
 import Numeric.Half
 
 import qualified Data.Text as T
-import qualified Data.Text.IO as TIO
 
 import Data.Basic
 
@@ -58,6 +57,15 @@ data WeakTerm
   deriving (Show, Eq)
 
 type WeakTermPlus = (Meta, WeakTerm)
+
+data WeakCase
+  = WeakCaseIntS IntSize Integer
+  | WeakCaseIntU IntSize Integer
+  | WeakCaseInt WeakTermPlus Integer
+  | WeakCaseNat Integer Integer
+  | WeakCaseLabel Identifier
+  | WeakEnumDefault
+  deriving (Show, Eq)
 
 type SubstWeakTerm = [(Identifier, WeakTermPlus)]
 

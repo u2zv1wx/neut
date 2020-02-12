@@ -190,11 +190,10 @@ infer' ctx (m, WeakTermEnumElim (e, t) les) = do
       h <- newTypeHoleInCtx ctx m
       retWeakTerm h m $ WeakTermEnumElim (e', t') [] -- ex falso quodlibet
     else do
-      let (ls, _) = unzip les
+      let (ls, es) = unzip les
       tls <- catMaybes <$> mapM inferCase ls
       forM_ (zip (repeat t') tls) $ uncurry insConstraintEnv
-      -- constrainList $ t' : catMaybes tls
-      (es', ts) <- unzip <$> mapM (inferEnumElim ctx (e', t')) les
+      (es', ts) <- unzip <$> mapM (infer' ctx) es
       constrainList $ ts
       retWeakTerm (head ts) m $ WeakTermEnumElim (e', t') $ zip ls es'
 infer' ctx (m, WeakTermArray dom k) = do
@@ -338,34 +337,6 @@ inferPiElim ctx m (e, t) ets = do
       insConstraintEnv t tPi
       let cod' = substWeakTermPlus (zip ys es) cod
       retWeakTerm cod' m $ WeakTermPiElim e es
-
-inferEnumElim ::
-     Context
-  -> (WeakTermPlus, WeakTermPlus)
-  -> (Case, WeakTermPlus)
-  -> WithEnv (WeakTermPlus, WeakTermPlus)
-inferEnumElim ctx _ (CaseDefault, e) = infer' ctx e
-inferEnumElim ctx ((m, WeakTermUpsilon x), enumType) (CaseValue v, e) = do
-  x' <- newNameWith x
-  -- infer `let xi := v in e{x := xi}`, with replacing all the occurrences of
-  -- `x` in the type of `e{x := xi}` with `xi`.
-  -- ctx must be extended since we're emulating the inference of `e{x := xi}` in `let xi := v in e{x := xi}`.
-  let ctx' = ctx ++ [(m, x', enumType)]
-  -- emulate the inference of the `let` part of `let xi := v in e{x := xi}`
-  let val = (m, WeakTermEnumIntro v)
-  modify (\env -> env {substEnv = Map.insert x' val (substEnv env)})
-  -- the `e{x := xi}` part
-  let var = (m, WeakTermUpsilon x')
-  (e', t) <- infer' ctx' $ substWeakTermPlus [(x, var)] e
-  let t' = substWeakTermPlus [(x, var)] t
-  -- return `let xi := v in e{x := xi}`
-  let e'' =
-        ( emptyMeta
-        , WeakTermPiElim
-            (emptyMeta, WeakTermPiIntro [(m, x', enumType)] e')
-            [(emptyMeta, WeakTermEnumIntro v)])
-  return (e'', t')
-inferEnumElim ctx _ (_, e) = infer' ctx e
 
 -- In a context (x1 : A1, ..., xn : An), this function creates metavariables
 --   ?M  : Pi (x1 : A1, ..., xn : An). ?Mt @ (x1, ..., xn)

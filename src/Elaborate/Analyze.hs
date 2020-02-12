@@ -13,13 +13,11 @@ module Elaborate.Analyze
 
 import Control.Monad.Except
 import Control.Monad.State
-import Data.List
 import Data.Maybe
 import System.Timeout
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.PQueue.Min as Q
-import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Text.Show.Pretty as Pr
 
@@ -94,11 +92,6 @@ simp' (((_, WeakTermFloat64 l1), (_, WeakTermFloat t2 l2)):cs)
   | l1 == l2 = simp $ (f64, t2) : cs
 simp' (((_, WeakTermFloat t1 l1), (_, WeakTermFloat t2 l2)):cs)
   | l1 == l2 = simp $ (t1, t2) : cs
-simp' (((_, WeakTermEnumElim (e1, t1) les1), (_, WeakTermEnumElim (e2, t2) les2)):cs)
-  -- using term equality
-  | e1 == e2 = do
-    simpCase les1 les2
-    simp $ (t1, t2) : cs
 simp' (((_, WeakTermArray dom1 k1), (_, WeakTermArray dom2 k2)):cs)
   | k1 == k2 = simp $ (dom1, dom2) : cs
 simp' (((_, WeakTermArrayIntro k1 es1), (_, WeakTermArrayIntro k2 es2)):cs)
@@ -269,16 +262,15 @@ simpBinder ((_, x1, t1):xts1) ((_, x2, t2):xts2) (Just (cod1, cod2)) cs = do
 simpBinder _ _ _ _ = throwError' "cannot simplify (simpBinder)"
 
 -- {} simpCase {}
-simpCase :: (Ord a) => [(a, WeakTermPlus)] -> [(a, WeakTermPlus)] -> WithEnv ()
-simpCase les1 les2 = do
-  let les1' = sortBy (\x y -> fst x `compare` fst y) les1
-  let les2' = sortBy (\x y -> fst x `compare` fst y) les2
-  let (ls1, es1) = unzip les1'
-  let (ls2, es2) = unzip les2'
-  if ls1 /= ls2
-    then throwError' "cannot simplify (simpCase)"
-    else simp $ zip es1 es2
-
+-- simpCase :: (Ord a) => [(a, WeakTermPlus)] -> [(a, WeakTermPlus)] -> WithEnv ()
+-- simpCase les1 les2 = do
+--   let les1' = sortBy (\x y -> fst x `compare` fst y) les1
+--   let les2' = sortBy (\x y -> fst x `compare` fst y) les2
+--   let (ls1, es1) = unzip les1'
+--   let (ls2, es2) = unzip les2'
+--   if ls1 /= ls2
+--     then throwError' "cannot simplify (simpCase)"
+--     else simp $ zip es1 es2
 -- {} simpPattern {}
 simpPattern ::
      Identifier
@@ -348,8 +340,6 @@ asStuckedTerm (m, WeakTermPiElim self@(mi, WeakTermIter (_, x, _) xts body) es) 
   Just $ StuckPiElimIter (mi, x, xts, body, self) [(m, es)]
 asStuckedTerm (_, WeakTermPiElim (_, WeakTermConst x) es) =
   Just $ StuckPiElimConst x [es]
--- asStuckedTerm (_, WeakTermPiElim (_, WeakTermUpsilon x) es) =
---   Just $ StuckPiElimUpsilon x [es]
 asStuckedTerm (m, WeakTermPiElim e es)
   | Just _ <- mapM asUpsilon es =
     case asStuckedTerm e of
@@ -372,10 +362,7 @@ asStuckedTerm (m, WeakTermPiElim e es) =
       Just $ StuckPiElimIter mu $ ess ++ [(m, es)]
     Just (StuckPiElimConst x ess) -> Just $ StuckPiElimConst x $ ess ++ [es]
     Just (StuckPiElimUpsilon x ess) -> Just $ StuckPiElimUpsilon x $ ess ++ [es]
-    -- Just (StuckUpsilon x) -> Just $ StuckUpsilon x
     Nothing -> Nothing
-asStuckedTerm (_, WeakTermEnumElim ((_, WeakTermUpsilon x), _) _) =
-  Just $ StuckPiElimUpsilon x []
 asStuckedTerm _ = Nothing
 
 -- {} stuckReasonOf {}
@@ -395,16 +382,6 @@ occurCheck h fmvs = h `notElem` fmvs
 includeCheck :: [Identifier] -> WeakTermPlus -> [Identifier]
 -- includeCheck xs e = all (`elem` xs) $ varWeakTermPlus e
 includeCheck xs e = filter (`notElem` xs) $ varWeakTermPlus e
-
--- {} linearCheck {}
-linearCheck :: [Identifier] -> Bool
-linearCheck xs = linearCheck' S.empty xs
-
-linearCheck' :: (S.Set Identifier) -> [Identifier] -> Bool
-linearCheck' _ [] = True
-linearCheck' found (x:_)
-  | x `S.member` found = False
-linearCheck' found (x:xs) = linearCheck' (S.insert x found) xs
 
 -- {} getVarList {}
 getVarList :: [WeakTermPlus] -> [Identifier]
