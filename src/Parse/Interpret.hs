@@ -4,7 +4,7 @@ module Parse.Interpret
   ( interpret
   , interpretIdentifierPlus
   , interpretIter
-  , extractIdentifier
+  , interpretEnumItem
   , adjustPhase
   ) where
 
@@ -12,6 +12,7 @@ import Control.Monad.Except
 import Control.Monad.State
 import Data.Bits ((.&.), (.|.), shiftL, shiftR)
 import Data.Char (chr, ord)
+import Data.Maybe (fromMaybe)
 import Data.Word (Word8)
 import Text.Read (readMaybe)
 
@@ -329,11 +330,29 @@ interpretStructElim (_, TreeNode [(m, TreeAtom x), k]) = do
 interpretStructElim e =
   throwError' $ "interpretStructElim: syntax error:\n " <> T.pack (Pr.ppShow e)
 
--- {} extractIdentifier {}
-extractIdentifier :: TreePlus -> WithEnv Identifier
-extractIdentifier (_, TreeAtom s) = return s
-extractIdentifier t =
-  throwError' $ "extractIdentifier: syntax error:\n" <> T.pack (Pr.ppShow t)
+-- {} interpretEnumItem {}
+interpretEnumItem :: [TreePlus] -> WithEnv [(Identifier, Int)]
+interpretEnumItem ts = do
+  xis <- interpretEnumItem' $ reverse ts
+  return $ reverse xis
+
+interpretEnumItem' :: [TreePlus] -> WithEnv [(Identifier, Int)]
+interpretEnumItem' [] = return []
+interpretEnumItem' (t:ts) = do
+  ts' <- interpretEnumItem' ts
+  (s, mj) <- interpretEnumItem'' t
+  return $ (s, fromMaybe (headDiscriminantOf ts') mj) : ts'
+
+interpretEnumItem'' :: TreePlus -> WithEnv (Identifier, Maybe Int)
+interpretEnumItem'' (_, TreeAtom s) = return (s, Nothing)
+interpretEnumItem'' (_, TreeNode [(_, TreeAtom s), (_, TreeAtom i)])
+  | Just i' <- readMaybe $ T.unpack i = return (s, Just i')
+interpretEnumItem'' t =
+  throwError' $ "interpretEnumItem: syntax error:\n" <> T.pack (Pr.ppShow t)
+
+headDiscriminantOf :: [(Identifier, Int)] -> Int
+headDiscriminantOf [] = 0
+headDiscriminantOf ((_, i):_) = i
 
 -- {} isDefinedEnumName {}
 isDefinedEnumName :: Identifier -> WithEnv Bool
