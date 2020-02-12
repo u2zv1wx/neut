@@ -246,7 +246,7 @@ lookupEnumSet name = do
   eenv <- gets enumEnv
   case Map.lookup name eenv of
     Nothing -> throwError' $ "no such enum defined: " <> name
-    Just ls -> return ls
+    Just xis -> return $ map fst xis
 
 reduceSubstEnv :: WithEnv ()
 reduceSubstEnv = do

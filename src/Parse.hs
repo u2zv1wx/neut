@@ -114,9 +114,9 @@ parse' ((_, TreeNode [(_, TreeAtom "keyword"), (_, TreeAtom s)]):as) = do
   modify (\e -> e {keywordEnv = S.insert s (keywordEnv e)})
   parse' as
 parse' ((m, TreeNode ((_, TreeAtom "enum"):(_, TreeAtom name):ts)):as) = do
-  indexList <- mapM extractIdentifier ts
+  xis <- interpretEnumItem ts
   m' <- adjustPhase m
-  insEnumEnv m' name indexList
+  insEnumEnv m' name xis
   -- `constName` is a proof term that `name` is indeed an enum:
   --   enum.choice : is-enum choice
   -- example usage:
@@ -369,21 +369,22 @@ checkKeywordSanity x
 checkKeywordSanity _ = return ()
 
 -- {} insEnumEnv {}
-insEnumEnv :: Meta -> Identifier -> [Identifier] -> WithEnv ()
-insEnumEnv m name enumList = do
+insEnumEnv :: Meta -> Identifier -> [(Identifier, Int)] -> WithEnv ()
+insEnumEnv m name xis = do
   eenv <- gets enumEnv
-  let xs = Map.keys eenv ++ concat (Map.elems eenv)
-  case find (`elem` xs) $ name : enumList of
+  let definedEnums = Map.keys eenv ++ map fst (concat (Map.elems eenv))
+  case find (`elem` definedEnums) $ name : map fst xis of
     Just x ->
       throwError' $
       T.pack (showMeta m) <>
       ": " <> "the constant `" <> x <> "` is already defined"
     _ -> do
-      let rev = Map.fromList $ zip enumList (repeat name)
+      let (xs, is) = unzip xis
+      let rev = Map.fromList $ zip xs (zip (repeat name) is)
       modify
         (\e ->
            e
-             { enumEnv = Map.insert name enumList (enumEnv e)
+             { enumEnv = Map.insert name xis (enumEnv e)
              , revEnumEnv = rev `Map.union` (revEnumEnv e)
              })
 

@@ -476,4 +476,4 @@ lookupKind name = do
   renv <- gets revEnumEnv
   case Map.lookup name renv of
     Nothing -> throwError' $ "no such enum-intro is defined: " <> name
-    Just j -> return j
+    Just (j, _) -> return j

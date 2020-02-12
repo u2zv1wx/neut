@@ -5,7 +5,6 @@ module Data.Env where
 
 import Control.Monad.Except
 import Control.Monad.State
-import Data.List (elemIndex)
 import Path
 import System.Info
 
@@ -48,8 +47,8 @@ data Env =
     , notationEnv :: [(TreePlus, TreePlus)] -- macro transformers
     , constantEnv :: S.Set Identifier
     , fileEnv :: FileEnv -- path ~> identifiers defined in the file at toplevel
-    , enumEnv :: Map.HashMap Identifier [Identifier] -- [("choice", ["left", "right"]), ...]
-    , revEnumEnv :: Map.HashMap Identifier Identifier -- [("left", "choice"), ("right", "choice"), ...]
+    , enumEnv :: Map.HashMap Identifier [(Identifier, Int)] -- [("choice", [("left", 0), ("right", 1)]), ...]
+    , revEnumEnv :: Map.HashMap Identifier (Identifier, Int) -- [("left", ("choice", 0)), ("right", ("choice", 1)), ...]
     , nameEnv :: Map.HashMap Identifier Identifier -- [("foo", "foo.13"), ...]
     , revNameEnv :: Map.HashMap Identifier Identifier -- [("foo.13", "foo"), ...]
     , formationEnv :: Map.HashMap Identifier (Maybe WeakTermPlus)
@@ -207,7 +206,7 @@ isDefinedEnum :: Identifier -> WithEnv Bool
 isDefinedEnum name = do
   env <- get
   let labelList = join $ Map.elems $ enumEnv env
-  return $ name `elem` labelList
+  return $ name `elem` map fst labelList
 
 getTarget :: WithEnv Target
 getTarget = do
@@ -263,19 +262,23 @@ enumValueToInteger labelOrNat =
     EnumValueNat _ j -> return j
 
 getEnumNum :: Identifier -> WithEnv Int
-getEnumNum label = do
-  ienv <- gets enumEnv
-  case (getEnumNum' label $ Map.elems ienv) of
+getEnumNum label
+  -- ienv <- gets enumEnv
+ = do
+  renv <- gets revEnumEnv
+  case Map.lookup label renv of
     Nothing -> throwError [TIO.putStrLn $ "no such enum is defined: " <> label]
-    Just i -> return i
+    Just (_, i) -> return i
+  -- case (getEnumNum' label $ Map.elems ienv) of
+  --   Nothing -> throwError [TIO.putStrLn $ "no such enum is defined: " <> label]
+  --   Just i -> return i
 
-getEnumNum' :: Identifier -> [[Identifier]] -> Maybe Int
-getEnumNum' _ [] = Nothing
-getEnumNum' l (xs:xss) =
-  case elemIndex l xs of
-    Nothing -> getEnumNum' l xss
-    Just i -> Just i
-
+-- getEnumNum' :: Identifier -> [[Identifier]] -> Maybe Int
+-- getEnumNum' _ [] = Nothing
+-- getEnumNum' l (xs:xss) =
+--   case elemIndex l xs of
+--     Nothing -> getEnumNum' l xss
+--     Just i -> Just i
 -- {enum.top, enum.choice, etc.} ~> {(the number of contents in enum)}
 -- enum.n{i}とかも処理できないとだめ。
 -- これ、enumNatNumのやつを後ろにしてたってことは、enum.n8とかがNothingになってたってこと？

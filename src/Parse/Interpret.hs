@@ -338,10 +338,13 @@ interpretEnumItem ts = do
 
 interpretEnumItem' :: [TreePlus] -> WithEnv [(Identifier, Int)]
 interpretEnumItem' [] = return []
+interpretEnumItem' [t] = do
+  (s, mj) <- interpretEnumItem'' t
+  return [(s, fromMaybe 0 mj)]
 interpretEnumItem' (t:ts) = do
   ts' <- interpretEnumItem' ts
   (s, mj) <- interpretEnumItem'' t
-  return $ (s, fromMaybe (headDiscriminantOf ts') mj) : ts'
+  return $ (s, fromMaybe (1 + headDiscriminantOf ts') mj) : ts'
 
 interpretEnumItem'' :: TreePlus -> WithEnv (Identifier, Maybe Int)
 interpretEnumItem'' (_, TreeAtom s) = return (s, Nothing)
