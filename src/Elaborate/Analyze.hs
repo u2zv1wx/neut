@@ -186,20 +186,6 @@ simp' ((e1, e2):cs) = do
           , es2 <- concat ess2
           -- es1 = [[a, b], [c]], es2 =  [[d], [e, f]]とかを許してしまっているので修正すること
           , length es1 == length es2 -> simp $ zip es1 es2 ++ cs
-        -- (Just (StuckUpsilon x1), _)
-        --   | Just body <- Map.lookup x1 sub -> do
-        --     let m = supMeta (supMeta (metaOf e1) (metaOf e2)) (metaOf body) -- x1 == e1 == body
-        --     let e1' = (m, snd e1)
-        --     let e2' = (m, snd e2)
-        --     let body' = (m, snd body)
-        --     simp $ (substWeakTermPlus [(x1, body')] e1', e2') : cs
-        -- (_, Just (StuckUpsilon x2))
-        --   | Just body <- Map.lookup x2 sub -> do
-        --     let m = supMeta (supMeta (metaOf e1) (metaOf e2)) (metaOf body) -- x2 == e2 == body
-        --     let e1' = (m, snd e1)
-        --     let e2' = (m, snd e2)
-        --     let body' = (m, snd body)
-        --     simp $ (e1', substWeakTermPlus [(x2, body')] e2') : cs
         (Just (StuckPiElimZetaStrict h1 ies1), _)
           | xs1 <- concatMap getVarList ies1
           , occurCheck h1 hs2
@@ -261,16 +247,6 @@ simpBinder ((_, x1, t1):xts1) ((_, x2, t2):xts2) (Just (cod1, cod2)) cs = do
   simpBinder xts1 xts2' (Just (cod1, cod2')) cs
 simpBinder _ _ _ _ = throwError' "cannot simplify (simpBinder)"
 
--- {} simpCase {}
--- simpCase :: (Ord a) => [(a, WeakTermPlus)] -> [(a, WeakTermPlus)] -> WithEnv ()
--- simpCase les1 les2 = do
---   let les1' = sortBy (\x y -> fst x `compare` fst y) les1
---   let les2' = sortBy (\x y -> fst x `compare` fst y) les2
---   let (ls1, es1) = unzip les1'
---   let (ls2, es2) = unzip les2'
---   if ls1 /= ls2
---     then throwError' "cannot simplify (simpCase)"
---     else simp $ zip es1 es2
 -- {} simpPattern {}
 simpPattern ::
      Identifier
@@ -321,25 +297,19 @@ simpOther e1 e2 fmvs cs = do
   simp cs
 
 data Stuck
-  = StuckPiElimZeta Hole [[WeakTermPlus]]
-  | StuckPiElimZetaStrict Hole [[WeakTermPlus]]
-  | StuckPiElimIter IterInfo [(Meta, [WeakTermPlus])]
+  = StuckPiElimUpsilon Identifier [[WeakTermPlus]]
+  | StuckPiElimZeta Identifier [[WeakTermPlus]]
+  | StuckPiElimZetaStrict Identifier [[WeakTermPlus]]
   | StuckPiElimConst Identifier [[WeakTermPlus]]
-  | StuckPiElimUpsilon Identifier [[WeakTermPlus]]
-  -- | StuckUpsilon Identifier
+  | StuckPiElimIter IterInfo [(Meta, [WeakTermPlus])]
 
 -- {} asStuckedTerm {}
 asStuckedTerm :: WeakTermPlus -> Maybe Stuck
--- asStuckedTerm (_, WeakTermUpsilon x) = Just $ StuckUpsilon x
 asStuckedTerm (_, WeakTermUpsilon x) = Just $ StuckPiElimUpsilon x []
-asStuckedTerm (_, WeakTermPiElim (_, WeakTermZeta h) es)
-  | Just _ <- mapM asUpsilon es = Just $ StuckPiElimZetaStrict h [es]
-asStuckedTerm (_, WeakTermPiElim (_, WeakTermZeta h) es) =
-  Just $ StuckPiElimZeta h [es]
-asStuckedTerm (m, WeakTermPiElim self@(mi, WeakTermIter (_, x, _) xts body) es) =
-  Just $ StuckPiElimIter (mi, x, xts, body, self) [(m, es)]
-asStuckedTerm (_, WeakTermPiElim (_, WeakTermConst x) es) =
-  Just $ StuckPiElimConst x [es]
+asStuckedTerm (_, WeakTermZeta h) = Just $ StuckPiElimZetaStrict h []
+asStuckedTerm (_, WeakTermConst x) = Just $ StuckPiElimConst x []
+asStuckedTerm self@(mi, WeakTermIter (_, x, _) xts body) =
+  Just $ StuckPiElimIter (mi, x, xts, body, self) []
 asStuckedTerm (m, WeakTermPiElim e es)
   | Just _ <- mapM asUpsilon es =
     case asStuckedTerm e of
@@ -351,7 +321,6 @@ asStuckedTerm (m, WeakTermPiElim e es)
       Just (StuckPiElimConst x ess) -> Just $ StuckPiElimConst x $ ess ++ [es]
       Just (StuckPiElimUpsilon x ess) ->
         Just $ StuckPiElimUpsilon x $ ess ++ [es]
-      -- Just (StuckUpsilon x) -> Just $ StuckUpsilon x
       Nothing -> Nothing
 asStuckedTerm (m, WeakTermPiElim e es) =
   case asStuckedTerm e of
