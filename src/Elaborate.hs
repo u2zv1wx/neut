@@ -207,12 +207,12 @@ elaborateWeakCase (WeakCaseInt t x) = do
       return $ CaseValue (EnumValueIntS size x)
     (_, TermEnum (EnumTypeIntU size)) ->
       return $ CaseValue (EnumValueIntU size x)
-    _
-      -- liftIO $ setSGR [SetConsoleIntensity BoldIntensity]
-      -- liftIO $ putStrLn $ showMeta m ++ ":"
-      -- liftIO $ setSGR [Reset]
-      -- p $ showMeta m
-     -> do
+    _ -> do
+      let m = fst t
+      liftIO $ setSGR [SetConsoleIntensity BoldIntensity]
+      liftIO $ putStrLn $ showMeta m ++ ":"
+      liftIO $ setSGR [Reset]
+      p $ showMeta m
       throwError' $
         "the type of `" <>
         T.pack (show x) <>
