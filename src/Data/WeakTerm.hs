@@ -43,7 +43,7 @@ data WeakTerm
   | WeakTermFloat WeakTermPlus Double
   | WeakTermEnum EnumType
   | WeakTermEnumIntro EnumValue
-  | WeakTermEnumElim (WeakTermPlus, WeakTermPlus) [(Case, WeakTermPlus)]
+  | WeakTermEnumElim (WeakTermPlus, WeakTermPlus) [(WeakCase, WeakTermPlus)]
   | WeakTermArray WeakTermPlus ArrayKind -- array n3 u8 ~= n3 -> u8
   | WeakTermArrayIntro ArrayKind [WeakTermPlus]
   | WeakTermArrayElim
@@ -64,7 +64,7 @@ data WeakCase
   | WeakCaseInt WeakTermPlus Integer
   | WeakCaseNat Integer Integer
   | WeakCaseLabel Identifier
-  | WeakEnumDefault
+  | WeakCaseDefault
   deriving (Show, Eq)
 
 type SubstWeakTerm = [(Identifier, WeakTermPlus)]
@@ -463,12 +463,16 @@ inBracket s = "[" <> s <> "]"
 showArg :: (Meta, Identifier, WeakTermPlus) -> T.Text
 showArg (_, x, t) = inParen $ x <> " " <> toText t
 
-showClause :: (Case, WeakTermPlus) -> T.Text
-showClause (c, e) = inParen $ showCase c <> " " <> toText e
+showClause :: (WeakCase, WeakTermPlus) -> T.Text
+showClause (c, e) = inParen $ showWeakCase c <> " " <> toText e
 
-showCase :: Case -> T.Text
-showCase (CaseValue v) = showEnumValue v
-showCase CaseDefault = "default"
+showWeakCase :: WeakCase -> T.Text
+showWeakCase (WeakCaseLabel l) = l
+showWeakCase (WeakCaseIntS _ a) = T.pack $ show a
+showWeakCase (WeakCaseIntU _ a) = T.pack $ show a
+showWeakCase (WeakCaseInt _ a) = T.pack $ show a
+showWeakCase (WeakCaseNat size a) = T.pack $ "n" ++ show size ++ "-" ++ show a
+showWeakCase WeakCaseDefault = "default"
 
 showEnumValue :: EnumValue -> T.Text
 showEnumValue (EnumValueLabel l) = l
