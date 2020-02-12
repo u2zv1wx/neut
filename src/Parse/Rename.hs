@@ -296,11 +296,18 @@ renameIter' nenv xt ((mx, x, t):xts) e = do
   return (xt', (mx, x', t') : xts', e')
 
 renameCaseList ::
-     NameEnv -> [(Case, WeakTermPlus)] -> WithEnv [(Case, WeakTermPlus)]
+     NameEnv -> [(WeakCase, WeakTermPlus)] -> WithEnv [(WeakCase, WeakTermPlus)]
 renameCaseList nenv caseList =
   forM caseList $ \(l, body) -> do
+    l' <- renameWeakCase nenv l
     body' <- rename' nenv body
-    return (l, body')
+    return (l', body')
+
+renameWeakCase :: NameEnv -> WeakCase -> WithEnv WeakCase
+renameWeakCase nenv (WeakCaseInt t a) = do
+  t' <- rename' nenv t
+  return (WeakCaseInt t' a)
+renameWeakCase _ l = return l
 
 renameStruct ::
      NameEnv
@@ -523,11 +530,19 @@ invRenameSigma ((mx, x, t):xts) = do
   xts' <- invRenameSigma xts
   return $ (mx, x', t') : xts'
 
-invRenameCaseList :: [(Case, WeakTermPlus)] -> WithEnv [(Case, WeakTermPlus)]
+invRenameCaseList ::
+     [(WeakCase, WeakTermPlus)] -> WithEnv [(WeakCase, WeakTermPlus)]
 invRenameCaseList caseList = do
   let (ls, es) = unzip caseList
+  ls' <- mapM invRenameWeakCase ls
   es' <- mapM invRename es
-  return $ zip ls es'
+  return $ zip ls' es'
+
+invRenameWeakCase :: WeakCase -> WithEnv WeakCase
+invRenameWeakCase (WeakCaseInt t a) = do
+  t' <- invRename t
+  return $ WeakCaseInt t' a
+invRenameWeakCase l = return l
 
 invRenameStruct ::
      [(Meta, Identifier, ArrayKind)]
