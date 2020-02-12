@@ -41,6 +41,7 @@ elaborate e = do
   reduceSubstEnv
   -- this reduceTermPlus is necessary since e' contains "DONT_CARE" in its
   -- type of arguments of abstractions of meta-variables.
+  -- ここでunivのレベルをチェック。そのあとでelaborate.
   e'' <- elaborate' e' >>= reduceTermPlus
   return e''
   -- let info2 = toInfo "elaborated term is not closed:" e''
@@ -50,7 +51,7 @@ elaborate e = do
 -- reduction-preserving way. Here, we translate types into units (nullary product).
 -- This doesn't cause any problem since types doesn't have any beta-reduction.
 elaborate' :: WeakTermPlus -> WithEnv TermPlus
-elaborate' (m, WeakTermTau) = do
+elaborate' (m, WeakTermTau _) = do
   return (m, TermTau)
 elaborate' (m, WeakTermUpsilon x) = do
   return (m, TermUpsilon x)

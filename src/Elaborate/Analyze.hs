@@ -50,6 +50,7 @@ simp' :: [PreConstraint] -> WithEnv ()
 simp' [] = return ()
 simp' (((_, e1), (_, e2)):cs)
   | e1 == e2 = simp cs
+simp' (((_, WeakTermTau _), (_, WeakTermTau _)):cs) = simp cs -- fixme: insert EQ constraint
 simp' (((_, WeakTermPi xts1 cod1), (_, WeakTermPi xts2 cod2)):cs)
   | length xts1 == length xts2 = simpBinder xts1 xts2 (Just (cod1, cod2)) cs
 simp' (((_, WeakTermPiIntro xts1 e1), (_, WeakTermPiIntro xts2 e2)):cs)
