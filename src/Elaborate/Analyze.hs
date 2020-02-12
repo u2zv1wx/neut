@@ -300,8 +300,8 @@ data Stuck
   = StuckPiElimUpsilon Identifier [[WeakTermPlus]]
   | StuckPiElimZeta Identifier [[WeakTermPlus]]
   | StuckPiElimZetaStrict Identifier [[WeakTermPlus]]
-  | StuckPiElimConst Identifier [[WeakTermPlus]]
   | StuckPiElimIter IterInfo [(Meta, [WeakTermPlus])]
+  | StuckPiElimConst Identifier [[WeakTermPlus]]
 
 -- {} asStuckedTerm {}
 asStuckedTerm :: WeakTermPlus -> Maybe Stuck
@@ -336,11 +336,11 @@ asStuckedTerm _ = Nothing
 
 -- {} stuckReasonOf {}
 stuckReasonOf :: Stuck -> Maybe Hole
+stuckReasonOf (StuckPiElimUpsilon _ _) = Nothing
 stuckReasonOf (StuckPiElimZeta h _) = Just h
 stuckReasonOf (StuckPiElimZetaStrict h _) = Just h
 stuckReasonOf (StuckPiElimIter {}) = Nothing
 stuckReasonOf (StuckPiElimConst _ _) = Nothing
-stuckReasonOf (StuckPiElimUpsilon _ _) = Nothing
 
 -- stuckReasonOf (StuckUpsilon _) = Nothing
 -- {} occurCheck {}
