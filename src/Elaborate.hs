@@ -169,13 +169,14 @@ elaborate' (m, WeakTermEnumIntro x) = do
 elaborate' (m, WeakTermEnumElim (e, t) les) = do
   e' <- elaborate' e
   let (ls, es) = unzip les
+  ls' <- mapM elaborateWeakCase ls
   es' <- mapM elaborate' es
   -- les' <- forM les elaboratePlus
   t' <- elaborate' t >>= reduceTermPlus
   case t' of
     (_, TermEnum x) -> do
-      caseCheckEnumIdentifier x ls
-      return (m, TermEnumElim e' (zip ls es'))
+      caseCheckEnumIdentifier x ls'
+      return (m, TermEnumElim e' (zip ls' es'))
     _ -> throwError' "type error (enum elim)"
 elaborate' (m, WeakTermArray dom k) = do
   dom' <- elaborate' dom
@@ -197,6 +198,30 @@ elaborate' (m, WeakTermStructElim xts e1 e2) = do
   e1' <- elaborate' e1
   e2' <- elaborate' e2
   return (m, TermStructElim xts e1' e2')
+
+elaborateWeakCase :: WeakCase -> WithEnv Case
+elaborateWeakCase (WeakCaseInt t x) = do
+  t' <- elaborate' t >>= reduceTermPlus
+  case t' of
+    (_, TermEnum (EnumTypeIntS size)) ->
+      return $ CaseValue (EnumValueIntS size x)
+    (_, TermEnum (EnumTypeIntU size)) ->
+      return $ CaseValue (EnumValueIntU size x)
+    _
+      -- liftIO $ setSGR [SetConsoleIntensity BoldIntensity]
+      -- liftIO $ putStrLn $ showMeta m ++ ":"
+      -- liftIO $ setSGR [Reset]
+      -- p $ showMeta m
+     -> do
+      throwError' $
+        "the type of `" <>
+        T.pack (show x) <>
+        "` should be an integer type, but is:\n" <> T.pack (show t')
+elaborateWeakCase (WeakCaseLabel l) = return $ CaseValue $ EnumValueLabel l
+elaborateWeakCase (WeakCaseIntS t a) = return $ CaseValue $ EnumValueIntS t a
+elaborateWeakCase (WeakCaseIntU t a) = return $ CaseValue $ EnumValueIntU t a
+elaborateWeakCase (WeakCaseNat t a) = return $ CaseValue $ EnumValueNat t a
+elaborateWeakCase WeakCaseDefault = return $ CaseDefault
 
 elaboratePlus :: (Meta, a, WeakTermPlus) -> WithEnv (Meta, a, TermPlus)
 elaboratePlus (m, x, t) = do

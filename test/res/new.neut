@@ -593,10 +593,21 @@
 ;;     ((i64 1) 1)
 ;;     (default (i64.mul n (fact (i64.sub n 1))))))
 
+;; (definition fact ((n i64))
+;;   (enum-elimination n
+;;     ((i64 1) 1)
+;;     (default (i64.mul n (with-type i64 (fact (i64.sub n 1)))))))
+
+;; allow weakcase
+;; (definition fact ((n i64))
+;;   (enum-elimination n
+;;     (1 1) ;; weak case (i64 1)
+;;     (default (i64.mul n (with-type i64 (fact (i64.sub n 1)))))))
+
 (definition fact ((n i64))
   (enum-elimination n
-    ((i64 1) 1)
-    (default (i64.mul n (with-type i64 (fact (i64.sub n 1)))))))
+    (1 1) ;; weak case (don't have to write `(i64 1)`)
+    (default (i64.mul n (fact (i64.sub n 1))))))
 
 (ascription fact (hom i64 i64))
 

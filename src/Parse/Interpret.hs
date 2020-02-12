@@ -311,12 +311,6 @@ interpretWeakCase c
     return $ WeakCaseInt h i'
   | otherwise = weaken <$> interpretEnumValue c
 
-weaken :: EnumValue -> WeakCase
-weaken (EnumValueLabel l) = WeakCaseLabel l
-weaken (EnumValueIntS t a) = WeakCaseIntS t a
-weaken (EnumValueIntU t a) = WeakCaseIntU t a
-weaken (EnumValueNat size a) = WeakCaseNat size a
-
 -- {} interpretClause {}
 interpretClause :: TreePlus -> WithEnv (WeakCase, WeakTermPlus)
 interpretClause (_, TreeNode [c, e]) = do

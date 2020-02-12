@@ -79,10 +79,10 @@ reduceWeakTermPlus (m, WeakTermEnumElim (e, t) les) = do
   let t' = reduceWeakTermPlus t
   case e' of
     (_, WeakTermEnumIntro l) ->
-      case lookup (CaseValue l) les' of
+      case lookup (weaken l) les' of
         Just body -> reduceWeakTermPlus body
         Nothing ->
-          case lookup CaseDefault les' of
+          case lookup WeakCaseDefault les' of
             Just body -> reduceWeakTermPlus body
             Nothing -> (m, WeakTermEnumElim (e', t') les')
     _ -> (m, WeakTermEnumElim (e', t') les')

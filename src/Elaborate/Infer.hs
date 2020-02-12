@@ -10,7 +10,6 @@ import Control.Monad.Except
 import Control.Monad.State
 import Data.Basic
 import Data.Env
-import Data.Maybe (catMaybes)
 import Data.WeakTerm
 
 import qualified Data.HashMap.Strict as Map
@@ -191,11 +190,13 @@ infer' ctx (m, WeakTermEnumElim (e, t) les) = do
       retWeakTerm h m $ WeakTermEnumElim (e', t') [] -- ex falso quodlibet
     else do
       let (ls, es) = unzip les
-      tls <- catMaybes <$> mapM inferCase ls
+      -- tls <- catMaybes <$> mapM (inferWeakCase ctx) ls
+      (ls', tls) <- unzip <$> mapM (inferWeakCase ctx) ls
+      -- forM_ (zip (repeat t') tls) $ uncurry insConstraintEnv
       forM_ (zip (repeat t') tls) $ uncurry insConstraintEnv
       (es', ts) <- unzip <$> mapM (infer' ctx) es
       constrainList $ ts
-      retWeakTerm (head ts) m $ WeakTermEnumElim (e', t') $ zip ls es'
+      retWeakTerm (head ts) m $ WeakTermEnumElim (e', t') $ zip ls' es'
 infer' ctx (m, WeakTermArray dom k) = do
   dom' <- inferType ctx dom
   retWeakTerm (univAt m) m $ WeakTermArray dom' k
@@ -382,19 +383,23 @@ newTypeHoleListInCtx ctx ((x, m):rest) = do
   return $ (m, x, t) : ts
 
 -- caseにもmetaの情報がほしいか。それはたしかに？
-inferCase :: Case -> WithEnv (Maybe WeakTermPlus)
-inferCase (CaseValue (EnumValueLabel name)) = do
+inferWeakCase :: Context -> WeakCase -> WithEnv (WeakCase, WeakTermPlus)
+inferWeakCase _ l@(WeakCaseLabel name) = do
   k <- lookupKind name
-  return $ Just (emptyMeta, WeakTermEnum $ EnumTypeLabel k)
-inferCase (CaseValue (EnumValueNat i _)) =
-  return $ Just (emptyMeta, WeakTermEnum $ EnumTypeNat i)
-inferCase (CaseValue (EnumValueIntS size _)) =
-  return $ Just (emptyMeta, WeakTermEnum (EnumTypeIntS size))
-inferCase (CaseValue (EnumValueIntU size _)) =
-  return $ Just (emptyMeta, WeakTermEnum (EnumTypeIntU size))
-inferCase CaseDefault = return Nothing
+  return (l, (emptyMeta, WeakTermEnum $ EnumTypeLabel k))
+inferWeakCase _ l@(WeakCaseNat i _) =
+  return (l, (emptyMeta, WeakTermEnum $ EnumTypeNat i))
+inferWeakCase _ l@(WeakCaseIntS size _) =
+  return (l, (emptyMeta, WeakTermEnum (EnumTypeIntS size)))
+inferWeakCase _ l@(WeakCaseIntU size _) =
+  return (l, (emptyMeta, WeakTermEnum (EnumTypeIntU size)))
+inferWeakCase ctx (WeakCaseInt t a) = do
+  t' <- inferType ctx t
+  return (WeakCaseInt t' a, t')
+inferWeakCase ctx WeakCaseDefault = do
+  h <- newTypeHoleInCtx ctx emptyMeta
+  return (WeakCaseDefault, h)
 
--- inferCase _ = return Nothing
 constrainList :: [WeakTermPlus] -> WithEnv ()
 constrainList [] = return ()
 constrainList [_] = return ()
