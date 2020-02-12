@@ -2,7 +2,6 @@
 
 module Elaborate.Infer
   ( infer
-  , univ
   , insWeakTypeEnv
   ) where
 
@@ -453,3 +452,6 @@ lookupKind name = do
   case Map.lookup name renv of
     Nothing -> throwError' $ "no such enum-intro is defined: " <> name
     Just (j, _) -> return j
+
+univAt :: Meta -> WeakTermPlus
+univAt m = (m, WeakTermTau)

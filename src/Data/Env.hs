@@ -128,6 +128,9 @@ newCount = do
   modify (\e -> e {count = i + 1})
   return i
 
+newUnivLevel :: WithEnv UnivLevel
+newUnivLevel = newCount
+
 newName :: WithEnv Identifier
 newName = do
   i <- newCount

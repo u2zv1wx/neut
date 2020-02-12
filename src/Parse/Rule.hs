@@ -41,7 +41,8 @@ parseConnective ::
   -> WithEnv [Stmt]
 parseConnective ts f g = do
   connectiveList <- mapM parseConnective' ts
-  let ats = map (ruleAsIdentPlus . formationRuleOf) connectiveList
+  fs <- mapM formationRuleOf connectiveList
+  let ats = map ruleAsIdentPlus fs
   let bts = concatMap toInternalRuleList connectiveList
   connectiveList' <- concat <$> mapM (f ats bts) connectiveList
   ruleList <- concat <$> mapM (g ats) connectiveList
@@ -77,7 +78,7 @@ renameFormArgs ((m, a, t):ats) = do
 toInductive ::
      [IdentifierPlus] -> [IdentifierPlus] -> Connective -> WithEnv [Stmt]
 toInductive ats bts connective@(m, a, xts, _) = do
-  let formationRule = formationRuleOf connective
+  formationRule <- formationRuleOf connective
   atsbts' <- renameFormArgs $ ats ++ bts
   a' <- lookupNameEnv a
   let cod = (m, WeakTermPiElim (m, WeakTermUpsilon a) (map toVar' xts))
@@ -139,7 +140,7 @@ toInductiveIntro ats bts xts a (mb, b, m, yts, cod)
 toCoinductive ::
      [IdentifierPlus] -> [IdentifierPlus] -> Connective -> WithEnv [Stmt]
 toCoinductive ats bts c@(m, a, xts, _) = do
-  let f = formationRuleOf c
+  f <- formationRuleOf c
   atsbts' <- renameFormArgs $ ats ++ bts
   a' <- lookupNameEnv a
   let cod = (m, WeakTermPiElim (m, WeakTermUpsilon a) (map toVar' xts))
@@ -208,8 +209,10 @@ toCoinductiveElim ats bts xts a (mb, b, m, yts, cod)
 ruleAsIdentPlus :: Rule -> IdentifierPlus
 ruleAsIdentPlus (mb, b, m, xts, t) = (mb, b, (m, WeakTermPi xts t))
 
-formationRuleOf :: Connective -> Rule
-formationRuleOf (m, a, xts, _) = (m, a, m, xts, (m, WeakTermTau))
+formationRuleOf :: Connective -> WithEnv Rule
+formationRuleOf (m, a, xts, _) = do
+  l <- newUnivLevel
+  return (m, a, m, xts, (m, WeakTermTau l))
 
 toInternalRuleList :: Connective -> [IdentifierPlus]
 toInternalRuleList (_, _, _, rules) = map ruleAsIdentPlus rules
@@ -309,7 +312,7 @@ zeta mode isub csub atsbts t e = do
       | Just Nothing <- Map.lookup a ienv -> zetaInductiveNestedMutual a
       | Just Nothing <- Map.lookup a cenv -> zetaCoinductiveNestedMutual a
     _ -> do
-      if isResolved (isub ++ csub) t
+      if isResolved (isub ++ csub) t -- flipが絡むのでは？
         then return e
         else throwError' $
              "malformed inductive/coinductive type definition: " <>
@@ -604,16 +607,8 @@ toExternalizedArg _ _ _ _ _ _ _ _ _ _ _ = throwError' "toExternalizedArg"
 
 type RuleType = (Identifier, [WeakTermPlus])
 
--- modifyType ::
---      SubstWeakTerm
---   -> (RuleType, RuleType) -- ((a, [x1, ..., xn]), (a', [e1', ..., en']))
---   -> WeakTermPlus -- subst対象の型
---   -> WithEnv WeakTermPlus -- subst結果
--- modifyType sub rsub t = do
---   t' <- substRuleType rsub t -- これでaの中には処理済みのものしか出現しない
---   return $ substWeakTermPlus sub t' -- aの外側を処理
 substRuleType :: (RuleType, RuleType) -> WeakTermPlus -> WithEnv WeakTermPlus
-substRuleType _ (m, WeakTermTau) = return (m, WeakTermTau)
+substRuleType _ (m, WeakTermTau l) = return (m, WeakTermTau l)
 substRuleType sub (m, WeakTermUpsilon x) =
   if fst (fst sub) == x
     then throwError' "invalid use of inductive/coinductive type"

@@ -9,8 +9,12 @@ import qualified Data.Text as T
 
 import Data.Basic
 
+-- note that UnivLevel is just the name of the level of a universe (i.e. the integer
+-- itself is not the level of the universe)
+type UnivLevel = Integer
+
 data WeakTerm
-  = WeakTermTau
+  = WeakTermTau UnivLevel
   | WeakTermUpsilon Identifier
   | WeakTermPi [IdentifierPlus] WeakTermPlus
   | WeakTermPiIntro [IdentifierPlus] WeakTermPlus
@@ -165,7 +169,7 @@ f64 :: WeakTermPlus
 f64 = (emptyMeta, WeakTermConst "f64")
 
 varWeakTermPlus :: WeakTermPlus -> [Identifier]
-varWeakTermPlus (_, WeakTermTau) = []
+varWeakTermPlus (_, WeakTermTau _) = []
 varWeakTermPlus (_, WeakTermUpsilon x) = x : []
 varWeakTermPlus (_, WeakTermPi xts t) = do
   varWeakTermPlusBindings xts [t]
@@ -221,7 +225,7 @@ varWeakTermPlusBindings ((_, x, t):xts) es = do
   hs1 ++ filter (/= x) hs2
 
 holeWeakTermPlus :: WeakTermPlus -> [Hole]
-holeWeakTermPlus (_, WeakTermTau) = []
+holeWeakTermPlus (_, WeakTermTau _) = []
 holeWeakTermPlus (_, WeakTermUpsilon _) = []
 holeWeakTermPlus (_, WeakTermPi xts t) = holeWeakTermPlusBindings xts [t]
 holeWeakTermPlus (_, WeakTermPiIntro xts e) = holeWeakTermPlusBindings xts [e]
@@ -270,8 +274,8 @@ holeWeakTermPlusBindings ((_, _, t):xts) es = do
   holeWeakTermPlus t ++ holeWeakTermPlusBindings xts es
 
 substWeakTermPlus :: SubstWeakTerm -> WeakTermPlus -> WeakTermPlus
-substWeakTermPlus _ (m, WeakTermTau) = do
-  (m, WeakTermTau)
+substWeakTermPlus _ (m, WeakTermTau l) = do
+  (m, WeakTermTau l)
 substWeakTermPlus sub e1@(_, WeakTermUpsilon x) = do
   case lookup x sub of
     Nothing -> e1
@@ -387,14 +391,10 @@ substWeakTermPlusBindingsWithBody sub ((m, x, t):xts) e = do
   let t' = substWeakTermPlus sub t
   ((m, x, t') : xts', e')
 
-univ :: WeakTermPlus
-univ = (emptyMeta, WeakTermTau)
-
-univAt :: Meta -> WeakTermPlus
-univAt m = (m, WeakTermTau)
-
+-- univ :: WeakTermPlus
+-- univ = (emptyMeta, WeakTermTau)
 toText :: WeakTermPlus -> Identifier
-toText (_, WeakTermTau) = "tau"
+toText (_, WeakTermTau _) = "tau"
 toText (_, WeakTermUpsilon x) = x
 toText (_, WeakTermPi xts t) = do
   let argStr = inParen $ showItems $ map showArg xts

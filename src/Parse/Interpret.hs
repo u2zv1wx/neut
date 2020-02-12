@@ -32,7 +32,8 @@ interpret :: TreePlus -> WithEnv WeakTermPlus
 --
 interpret (m, TreeAtom "tau") = do
   m' <- adjustPhase m
-  return (m', WeakTermTau)
+  l <- newUnivLevel
+  return (m', WeakTermTau l)
 interpret (m, TreeNode [(_, TreeAtom "upsilon"), (_, TreeAtom x)]) = do
   m' <- adjustPhase m
   return (m', WeakTermUpsilon x)

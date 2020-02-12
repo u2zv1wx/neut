@@ -768,7 +768,11 @@ n15-4
 ;; (i64.add 100 (vec.cons i64 (nat.zero) (nat.zero) 10 (vec.nil i64 (nat.zero))))
 
 ;; こんな感じでvecも使える。
-(let a (vec.nil i64 (nat.zero)))
+;; あれ？ここは型エラーになるべきでは？
+;; いや、vecのこの引数のほうは「どうでもいいやつ」だから関係ない。いわばパラメータの部分なので。
+;; このときはaの型はちゃんとvec i64 (nat.zero)になってる。
+(let a (vec.nil i64 (nat.succ (nat.zero))))
+
 
 ;; (inductive item ((A tau))
 ;;   (item.intro () (item A))

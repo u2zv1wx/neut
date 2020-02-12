@@ -135,7 +135,7 @@ type NameEnv = Map.HashMap Identifier Identifier
 
 -- Alpha-convert all the variables so that different variables have different names.
 rename' :: NameEnv -> WeakTermPlus -> WithEnv WeakTermPlus
-rename' _ (m, WeakTermTau) = return (m, WeakTermTau)
+rename' _ (m, WeakTermTau l) = return (m, WeakTermTau l)
 rename' nenv (m, WeakTermUpsilon x) = do
   case Map.lookup x nenv of
     Just x'
@@ -335,7 +335,7 @@ lookupStrict' nenv (m, x, _) =
     Nothing -> throwError' $ "[lookupStrict] undefined variable:  " <> x
 
 checkSanity :: [Identifier] -> WeakTermPlus -> Bool
-checkSanity _ (_, WeakTermTau) = True
+checkSanity _ (_, WeakTermTau _) = True
 checkSanity _ (_, WeakTermUpsilon _) = True
 checkSanity ctx (_, WeakTermPi xts t) = do
   checkSanity' ctx xts t
@@ -435,7 +435,7 @@ traceIdentifier rnenv x = do
 
 -- Alpha-convert all the variables so that different variables have different names.
 invRename :: WeakTermPlus -> WithEnv WeakTermPlus
-invRename (m, WeakTermTau) = return (m, WeakTermTau)
+invRename (m, WeakTermTau l) = return (m, WeakTermTau l)
 invRename (m, WeakTermUpsilon x) = do
   x' <- invRenameIdentifier IdentKindUpsilon x
   return (m, WeakTermUpsilon x')

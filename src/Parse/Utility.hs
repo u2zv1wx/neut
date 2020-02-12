@@ -39,7 +39,7 @@ compInfoDef c info (_, (mx, x, t), xts, e) = do
 
 compInfoWeakTermPlus ::
      CursorName -> CompInfo -> WeakTermPlus -> Either CompInfo ()
-compInfoWeakTermPlus _ _ (_, WeakTermTau) = return ()
+compInfoWeakTermPlus _ _ (_, WeakTermTau _) = return ()
 compInfoWeakTermPlus c info (_, WeakTermUpsilon x)
   | c == x = Left info
   | otherwise = return ()
