@@ -14,11 +14,11 @@ import Data.Basic
 import Data.WeakTerm
 
 reduceWeakTermPlus :: WeakTermPlus -> WeakTermPlus
-reduceWeakTermPlus (m, WeakTermPi xts cod) = do
+reduceWeakTermPlus (m, WeakTermPi mls xts cod) = do
   let (ms, xs, ts) = unzip3 xts
   let ts' = map reduceWeakTermPlus ts
   let cod' = reduceWeakTermPlus cod
-  (m, WeakTermPi (zip3 ms xs ts') cod')
+  (m, WeakTermPi mls (zip3 ms xs ts') cod')
 reduceWeakTermPlus (m, WeakTermPiIntro xts e) = do
   let (ms, xs, ts) = unzip3 xts
   let ts' = map reduceWeakTermPlus ts

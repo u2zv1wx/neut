@@ -105,7 +105,7 @@ elaborate' (m, WeakTermTau _) = do
   return (m, TermTau)
 elaborate' (m, WeakTermUpsilon x) = do
   return (m, TermUpsilon x)
-elaborate' (m, WeakTermPi xts t) = do
+elaborate' (m, WeakTermPi _ xts t) = do
   xts' <- mapM elaboratePlus xts
   t' <- elaborate' t
   return (m, TermPi xts' t')

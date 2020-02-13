@@ -53,8 +53,11 @@ simp' (((m1, WeakTermTau l1), (m2, WeakTermTau l2)):cs) = do
   let ml2 = UnivLevelPlus (m2, l2)
   modify (\env -> env {levelEnv = substLevelConstraint ml1 ml2 lenv})
   simp cs
-simp' (((_, WeakTermPi xts1 cod1), (_, WeakTermPi xts2 cod2)):cs)
-  | length xts1 == length xts2 = simpBinder xts1 xts2 (Just (cod1, cod2)) cs
+simp' (((_, WeakTermPi mls1 xts1 cod1), (_, WeakTermPi mls2 xts2 cod2)):cs)
+  | length xts1 == length xts2 = do
+    let us1 = map asUniv mls1
+    let us2 = map asUniv mls2
+    simpBinder xts1 xts2 (Just (cod1, cod2)) $ zip us1 us2 ++ cs
 simp' (((_, WeakTermPiIntro xts1 e1), (_, WeakTermPiIntro xts2 e2)):cs)
   | length xts1 == length xts2 = simpBinder xts1 xts2 (Just (e1, e2)) cs
 simp' (((_, WeakTermPiIntro xts body1@(m1, _)), e2@(_, _)):cs) = do

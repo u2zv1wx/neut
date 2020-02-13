@@ -526,3 +526,6 @@ metaOf e = fst e
 asUpsilon :: WeakTermPlus -> Maybe Identifier
 asUpsilon (_, WeakTermUpsilon x) = Just x
 asUpsilon _ = Nothing
+
+asUniv :: UnivLevelPlus -> WeakTermPlus
+asUniv (UnivLevelPlus (m, l)) = (m, WeakTermTau l)

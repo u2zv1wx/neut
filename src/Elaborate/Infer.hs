@@ -7,7 +7,6 @@ module Elaborate.Infer
 import Control.Monad.Except
 import Control.Monad.State
 import Data.Basic
-import Data.Constraint
 import Data.Env
 import Data.WeakTerm
 
@@ -58,17 +57,19 @@ infer' _ (m, WeakTermTau l0) = do
 infer' _ (m, WeakTermUpsilon x) = do
   ((_, t), UnivLevelPlus (_, l)) <- lookupWeakTypeEnv x
   return ((m, WeakTermUpsilon x), (m, t), UnivLevelPlus (m, l))
-infer' ctx (m, WeakTermPi xts t) = do
-  (xtls', (t', ml)) <- inferPi ctx xts t
-  let (xts', mls) = unzip xtls'
-  ml0 <- newLevelOver m $ ml : mls
+infer' ctx (m, WeakTermPi mls xts t) = do
+  (xtls', (t', mlPiCod)) <- inferPi ctx xts t
+  let (xts', mlPiArgs) = unzip xtls'
+  ml0 <- newLevelOver m $ mlPiCod : mlPiArgs
   ml1 <- newLevelOver m [ml0]
-  return ((m, WeakTermPi xts' t'), (asUniv ml0), ml1)
+  forM_ (zip mls (mlPiArgs ++ [mlPiCod])) $ uncurry insLevelEQ
+  return ((m, WeakTermPi mls xts' t'), (asUniv ml0), ml1)
 infer' ctx (m, WeakTermPiIntro xts e) = do
   (xtls', (e', t', mlPiCod)) <- inferBinder ctx xts e
   let (xts', mlPiArgs) = unzip xtls'
   mlPi <- newLevelOver m $ mlPiCod : mlPiArgs
-  return ((m, WeakTermPiIntro xts' e'), (m, WeakTermPi xts' t'), mlPi)
+  let mls = mlPiArgs ++ [mlPiCod]
+  return ((m, WeakTermPiIntro xts' e'), (m, WeakTermPi mls xts' t'), mlPi)
 infer' ctx (m, WeakTermPiElim (mPi, WeakTermPiIntro xts e) es) -- "let"
   | length xts == length es = do
     etls <- mapM (infer' ctx) es
@@ -80,7 +81,10 @@ infer' ctx (m, WeakTermPiElim (mPi, WeakTermPiIntro xts e) es) -- "let"
     let (ts', mls) = unzip tls'
     mlPi <- newLevelOver m $ ml : mls
     let xts' = zip3 ms xs ts'
-    let etl = ((m, WeakTermPiIntro xts' e'), (mPi, WeakTermPi xts' tCod), mlPi)
+    let etl =
+          ( (m, WeakTermPiIntro xts' e')
+          , (mPi, WeakTermPi (mls ++ [ml]) xts' tCod)
+          , mlPi)
     let (es', _, _) = unzip3 etls
     let defList = Map.fromList $ zip xs es'
     modify (\env -> env {substEnv = defList `Map.union` substEnv env})
@@ -135,7 +139,7 @@ infer' ctx (m, WeakTermIter (mx, x, t) xts e) = do
   (xtls', (e', tCod, mlPiCod)) <- inferBinder ctx xts e
   let (xts', mlPiArgs) = unzip xtls'
   mlPi <- newLevelOver m $ mlPiCod : mlPiArgs
-  let piType = (m, WeakTermPi xts' tCod)
+  let piType = (m, WeakTermPi (mlPiArgs ++ [mlPiCod]) xts' tCod)
   insConstraintEnv piType t'
   insLevelEQ mlPi ml'
   return ((m, WeakTermIter (mx, x, t') xts' e'), piType, mlPi)
@@ -335,15 +339,18 @@ inferPiElim ::
 inferPiElim ctx m (e, t, mlPi) etls = do
   let (es, ts, mlPiDomList) = unzip3 etls
   case t of
-    (_, WeakTermPi xts cod) -- performance optimization (not necessary for correctness)
+    (_, WeakTermPi mls xts cod) -- performance optimization (not necessary for correctness)
       | length xts == length etls -> do
+        let mlPiDomList' = init mls
+        let mlPiCod' = last mls
         let xs = map (\(_, x, _) -> x) xts
         let ts'' = map (\(_, _, tx) -> substWeakTermPlus (zip xs es) tx) xts
         forM_ (zip ts'' ts) $ uncurry insConstraintEnv
+        forM_ (zip mlPiDomList mlPiDomList') $ uncurry insLevelEQ
+        forM_ mlPiDomList $ \mlPiDom -> insLevelLT mlPiDom mlPi
+        insLevelLT mlPiCod' mlPi
         let cod' = substWeakTermPlus (zip xs es) cod
-        ml <- newLevelOver m [] -- for test
-        -- return ((m, WeakTermPiElim e es), cod', undefined)
-        return ((m, WeakTermPiElim e es), cod', ml)
+        return ((m, WeakTermPiElim e es), cod', mlPiCod')
     _ -> do
       ys <- mapM (const $ newNameWith "arg") es
       -- yts = [(y1, ?M1 @ (ctx[0], ..., ctx[n])),
@@ -363,7 +370,7 @@ inferPiElim ctx m (e, t, mlPi) etls = do
       forM_ (zip mlPiDomList mls') $ uncurry insLevelEQ
       forM_ mlPiDomList $ \mlPiDom -> insLevelLT mlPiDom mlPi
       insLevelLT mlPiCod mlPi
-      insConstraintEnv t (fst e, WeakTermPi yts cod)
+      insConstraintEnv t (fst e, WeakTermPi (mlPiDomList ++ [mlPiCod]) yts cod)
       return ((m, WeakTermPiElim e es), cod', mlPiCod)
 
 -- In a context (x1 : A1, ..., xn : An), this function creates metavariables
@@ -488,9 +495,6 @@ newLevelOver m mls = do
   let ml = UnivLevelPlus (m, l)
   forM_ mls $ \ml' -> insLevelLT ml' ml
   return ml
-
-asUniv :: UnivLevelPlus -> WeakTermPlus
-asUniv (UnivLevelPlus (m, l)) = (m, WeakTermTau l)
 
 insLevelLT :: UnivLevelPlus -> UnivLevelPlus -> WithEnv ()
 insLevelLT ml1 ml2 = modify (\env -> env {levelEnv = (ml1, ml2) : levelEnv env})
