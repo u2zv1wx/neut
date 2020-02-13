@@ -50,7 +50,7 @@ elaborate e = do
   analyze
   synthesize
   p "synthesized"
-  -- error "exit"
+  error "exit"
   -- we shouldn't resort to `type(l) : type(l)`
   -- p "lenv-after"
   -- lenv <- gets levelEnv

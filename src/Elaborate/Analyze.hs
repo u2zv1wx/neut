@@ -50,12 +50,10 @@ simp' :: [PreConstraint] -> WithEnv ()
 simp' [] = return ()
 simp' (((_, e1), (_, e2)):cs)
   | e1 == e2 = simp cs
-simp' (((m1, WeakTermTau l1), (m2, WeakTermTau l2)):cs)
-  -- p $ "subst: [" ++ show l1 ++ "] ~> [" ++ show l2 ++ "]"
- = do
+simp' (((m1, WeakTermTau l1), (m2, WeakTermTau l2)):cs) = do
   lenv <- gets levelEnv
-  let ml1 = UnivLevelPlus m1 l1
-  let ml2 = UnivLevelPlus m2 l2
+  let ml1 = UnivLevelPlus (m1, l1)
+  let ml2 = UnivLevelPlus (m2, l2)
   modify (\env -> env {levelEnv = substLevelConstraint ml1 ml2 lenv})
   simp cs
 simp' (((_, WeakTermPi xts1 cod1), (_, WeakTermPi xts2 cod2)):cs)

@@ -51,13 +51,13 @@ infer' ::
   -> WeakTermPlus
   -> WithEnv (WeakTermPlus, WeakTermPlus, UnivLevelPlus)
 infer' _ (m, WeakTermTau l0) = do
-  let ml0 = UnivLevelPlus m l0
+  let ml0 = UnivLevelPlus (m, l0)
   ml1 <- newLevelOver m [ml0]
   ml2 <- newLevelOver m [ml1]
   return (asUniv ml0, asUniv ml1, ml2)
 infer' _ (m, WeakTermUpsilon x) = do
-  ((_, t), (UnivLevelPlus _ l)) <- lookupWeakTypeEnv x
-  return ((m, WeakTermUpsilon x), (m, t), (UnivLevelPlus m l))
+  ((_, t), (UnivLevelPlus (_, l))) <- lookupWeakTypeEnv x
+  return ((m, WeakTermUpsilon x), (m, t), (UnivLevelPlus (m, l)))
 infer' ctx (m, WeakTermPi xts t) = do
   (xtls', (t', ml)) <- inferPi ctx xts t
   let (xts', mls) = unzip xtls'
@@ -182,8 +182,8 @@ infer' _ (m, WeakTermConst x)
     return ((m, WeakTermConst x), (asUniv ml0), ml1)
     -- retWeakTerm u m l $ WeakTermConst x
   | otherwise = do
-    (t, (UnivLevelPlus _ l)) <- lookupWeakTypeEnv x
-    return ((m, WeakTermConst x), t, UnivLevelPlus m l)
+    (t, UnivLevelPlus (_, l)) <- lookupWeakTypeEnv x
+    return ((m, WeakTermConst x), t, UnivLevelPlus (m, l))
     -- retWeakTerm t m l $ WeakTermConst x
 infer' ctx (m, WeakTermConstDecl (mx, x, t) e) = do
   tl'@(t', _) <- inferType ctx t
@@ -193,8 +193,8 @@ infer' ctx (m, WeakTermConstDecl (mx, x, t) e) = do
   return ((m, WeakTermConstDecl (mx, x, t') e'), t'', ml)
   -- retWeakTerm t'' m l $ WeakTermConstDecl (mx, x, t') e'
 infer' _ (m, WeakTermInt t i) = do
-  (t', UnivLevelPlus _ l) <- inferType [] t -- ctx == [] since t' should be i64, i8, etc. (i.e. t must be closed)
-  return ((m, WeakTermInt t' i), t', UnivLevelPlus m l)
+  (t', UnivLevelPlus (_, l)) <- inferType [] t -- ctx == [] since t' should be i64, i8, etc. (i.e. t must be closed)
+  return ((m, WeakTermInt t' i), t', UnivLevelPlus (m, l))
   -- retWeakTerm t' m l $ WeakTermInt t' i
 infer' _ (m, WeakTermFloat16 f)
   -- let t = (m, WeakTermConst "f16")
@@ -216,9 +216,9 @@ infer' _ (m, WeakTermFloat64 f) = do
   -- l <- newUnivLevel
   -- retWeakTerm t m l $ WeakTermFloat64 f
 infer' _ (m, WeakTermFloat t f) = do
-  (t', UnivLevelPlus _ l) <- inferType [] t -- t must be closed
+  (t', UnivLevelPlus (_, l)) <- inferType [] t -- t must be closed
   -- (t', UnivLevelPlus _ l) <- inferType [] t -- ctx == [] since t' should be i64, i8, etc. (i.e. t must be closed)
-  return ((m, WeakTermFloat t' f), t', UnivLevelPlus m l)
+  return ((m, WeakTermFloat t' f), t', UnivLevelPlus (m, l))
   -- retWeakTerm t' m l $ WeakTermFloat t' f
 infer' _ (m, WeakTermEnum name)
   -- u <- newUnivAt m
@@ -333,7 +333,7 @@ infer' ctx (m, WeakTermStructElim xks e1 e2) = do
   let ts = map inferKind ks
   -- fixme: add level constraint
   ls <- mapM (const newUnivLevel) ts
-  let mls = zipWith UnivLevelPlus (repeat m) ls
+  let mls = map UnivLevelPlus $ zip (repeat m) ls
   forM_ mls $ \mlStructArg -> insLevelLT mlStructArg mlStruct
   let structType = (fst e1', WeakTermStruct ks)
   insConstraintEnv t1 structType
@@ -461,7 +461,7 @@ newHoleInCtx ctx m = do
   hole <- newHole
   let app = (m, WeakTermPiElim hole varSeq)
   l <- newUnivLevel
-  return (app, higherApp, UnivLevelPlus m l)
+  return (app, higherApp, UnivLevelPlus (m, l))
 
 -- In a context (x1 : A1, ..., xn : An), this function creates a metavariable
 --   ?M  : Pi (x1 : A1, ..., xn : An). Univ{i}
@@ -471,7 +471,7 @@ newTypeHoleInCtx ctx m = do
   let varSeq = map (\((_, x, _), _) -> toVar x) ctx
   hole <- newHole
   l <- newUnivLevel
-  return ((m, WeakTermPiElim hole varSeq), UnivLevelPlus m l)
+  return ((m, WeakTermPiElim hole varSeq), UnivLevelPlus (m, l))
 
 -- In context ctx == [x1, ..., xn], `newTypeHoleListInCtx ctx [y1, ..., ym]` generates
 -- the following list:
@@ -582,12 +582,12 @@ lookupKind name = do
 newLevelOver :: Meta -> [UnivLevelPlus] -> WithEnv UnivLevelPlus
 newLevelOver m mls = do
   lu <- newUnivLevel
-  let mlu = UnivLevelPlus m lu
+  let mlu = UnivLevelPlus (m, lu)
   forM_ mls $ \ml' -> insLevelLT ml' mlu
   return mlu
 
 asUniv :: UnivLevelPlus -> WeakTermPlus
-asUniv (UnivLevelPlus m l) = (m, WeakTermTau l)
+asUniv (UnivLevelPlus (m, l)) = (m, WeakTermTau l)
 
 insLevelLT :: UnivLevelPlus -> UnivLevelPlus -> WithEnv ()
 insLevelLT ml1 ml2 = modify (\env -> env {levelEnv = (ml1, ml2) : levelEnv env})
