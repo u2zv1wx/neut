@@ -11,7 +11,6 @@ import Unsafe.Coerce -- for int -> word, word -> int
 
 import Data.Basic
 
--- import Data.Env
 import Data.WeakTerm
 
 reduceWeakTermPlus :: WeakTermPlus -> WeakTermPlus

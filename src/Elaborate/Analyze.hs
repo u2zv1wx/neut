@@ -27,13 +27,11 @@ import Data.Env
 import Data.WeakTerm
 import Reduce.WeakTerm
 
--- {} analyze {}
 analyze :: WithEnv ()
 analyze = do
   cs <- gets constraintEnv
   simp cs
 
--- {} simp {}
 simp :: [PreConstraint] -> WithEnv ()
 simp [] = return ()
 simp ((e1, e2):cs) = do
@@ -45,7 +43,6 @@ simp ((e1, e2):cs) = do
       throwError' $
       "cannot simplify [TIMEOUT]:\n" <> T.pack (Pr.ppShow (e1, e2))
 
--- {} simp' {}
 simp' :: [PreConstraint] -> WithEnv ()
 simp' [] = return ()
 simp' (((_, e1), (_, e2)):cs)
