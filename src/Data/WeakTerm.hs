@@ -274,8 +274,8 @@ holeWeakTermPlusBindings ((_, _, t):xts) es = do
   holeWeakTermPlus t ++ holeWeakTermPlusBindings xts es
 
 substWeakTermPlus :: SubstWeakTerm -> WeakTermPlus -> WeakTermPlus
-substWeakTermPlus _ (m, WeakTermTau l) = do
-  (m, WeakTermTau l)
+substWeakTermPlus _ tau@(_, WeakTermTau _) = tau
+  -- (m, WeakTermTau l)
 substWeakTermPlus sub e1@(_, WeakTermUpsilon x) = do
   case lookup x sub of
     Nothing -> e1

@@ -51,9 +51,10 @@ data UnivLevelPlus =
 levelOf :: UnivLevelPlus -> UnivLevel
 levelOf (UnivLevelPlus _ l) = l
 
-instance Show UnivLevelPlus where
-  show (UnivLevelPlus _ l) = "[" ++ show l ++ "]"
-  -- show (UnivLevelPlus m l) = "[" ++ show l ++ "]:" ++ showMeta m
+instance Show UnivLevelPlus
+  -- show (UnivLevelPlus _ l) = "[" ++ show l ++ "]"
+                                                     where
+  show (UnivLevelPlus m l) = "[" ++ show l ++ "]:" ++ showMeta m
 
 instance Eq UnivLevelPlus where
   (UnivLevelPlus _ l1) == (UnivLevelPlus _ l2) = l1 == l2

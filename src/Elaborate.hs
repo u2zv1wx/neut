@@ -40,19 +40,21 @@ elaborate e = do
   e' <- infer e
   -- p "e:"
   -- p' e
-  cs <- gets constraintEnv
+  -- cs <- gets constraintEnv
   -- p "cs-before"
   -- p' cs
-  p "lenv-before"
-  lenv <- gets levelEnv
-  p' lenv
+  -- p "lenv-before"
+  -- lenv <- gets levelEnv
+  -- p' lenv
   -- Kantian type-inference ;)
   analyze
   synthesize
+  p "synthesized"
+  -- error "exit"
   -- we shouldn't resort to `type(l) : type(l)`
-  p "lenv-after"
-  lenv <- gets levelEnv
-  p' lenv
+  -- p "lenv-after"
+  -- lenv <- gets levelEnv
+  -- p' lenv
   gets levelEnv >>= ensureDAG
   -- for faster elaboration
   reduceSubstEnv
@@ -67,7 +69,7 @@ ensureDAG g = do
   case xs of
     [] -> return ()
     _ -> do
-      throwError' $ "found cyclic univ level:\n" <> T.pack (Pr.ppShow xs)
+      throwError' $ "found cyclic univ level:\n" <> T.pack (show xs)
 
 ensureDAG' ::
      S.Set UnivLevelPlus
