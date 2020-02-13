@@ -41,43 +41,52 @@ type Context = [(IdentifierPlus, UnivLevelPlus)]
 -- {termはrename済みでclosed} infer' {termはrename済みでclosedで、かつすべてのsubtermが型でannotateされている}
 infer :: WeakTermPlus -> WithEnv WeakTermPlus
 infer e = do
-  (e', _) <- infer' [] e
+  (e', _, _) <- infer' [] e
   let vs = varWeakTermPlus e'
   let info = toInfo "inferred term is not closed. freevars:" vs
   -- senv <- gets substEnv
   -- p' senv
   return $ assertP info e' $ null vs
 
-infer' :: Context -> WeakTermPlus -> WithEnv (WeakTermPlus, WeakTermPlus)
-infer' _ (m, WeakTermTau l) = do
-  l' <- newUnivLevel
-  lenv <- gets levelEnv
-  let ml1 = UnivLevelPlus m l
-  let ml2 = UnivLevelPlus m l'
-  modify (\env -> env {levelEnv = (ml1, ml2) : lenv})
-  return ((m, WeakTermTau l), (m, WeakTermTau l'))
+infer' ::
+     Context
+  -> WeakTermPlus
+  -> WithEnv (WeakTermPlus, WeakTermPlus, UnivLevelPlus)
+infer' _ (m, WeakTermTau l0) = do
+  l1 <- newUnivLevel
+  l2 <- newUnivLevel
+  let ml0 = UnivLevelPlus m l0
+  let ml1 = UnivLevelPlus m l1
+  let ml2 = UnivLevelPlus m l2
+  modify (\env -> env {levelEnv = (ml0, ml1) : (ml1, ml2) : (levelEnv env)})
+  return ((m, WeakTermTau l0), (m, WeakTermTau l1), ml2)
 infer' _ (m, WeakTermUpsilon x) = do
-  ((_, t), _) <- lookupWeakTypeEnv x
-  retWeakTerm (m, t) m $ WeakTermUpsilon x
+  ((_, t), (UnivLevelPlus _ l)) <- lookupWeakTypeEnv x
+  retWeakTerm (m, t) m l $ WeakTermUpsilon x
 infer' ctx (m, WeakTermPi xts t) = do
-  (xts', t', ls, lCod) <- inferPi ctx xts t
-  l <- newUnivLevel
-  p $ "newLevel: " <> show l
-  let ml = UnivLevelPlus m l
+  (xtls', tlCod@(t', lCod)) <- inferPi ctx xts t
+  l0 <- newUnivLevel
+  let ml0 = UnivLevelPlus m l0
+  let (xts', ls) = unzip xtls'
   forM_ (ls ++ [lCod]) $ \ml' ->
-    modify (\env -> env {levelEnv = (ml', ml) : levelEnv env})
-  let univ = (m, WeakTermTau l)
-  retWeakTerm univ m $ WeakTermPi xts' t'
+    modify (\env -> env {levelEnv = (ml', ml0) : levelEnv env})
+  let univ0 = (m, WeakTermTau l0)
+  l1 <- newUnivLevel
+  let ml1 = UnivLevelPlus m l1
+  modify (\env -> env {levelEnv = (ml0, ml1) : levelEnv env})
+  retWeakTerm univ0 m l1 $ WeakTermPi xts' t'
 infer' ctx (m, WeakTermPiIntro xts e) = do
-  (xts', (e', tCod), ls) <- inferBinder ctx xts e
-  -- constrainList us
-  p "pi-intro. ls:"
-  p' ls
+  (xtls', (e', tCod, l)) <- inferBinder ctx xts e
+  let (xts', ls) = unzip xtls'
+  lu <- newUnivLevel
+  let mlu = UnivLevelPlus m lu
+  forM_ (ls ++ [l]) $ \ml' ->
+    modify (\env -> env {levelEnv = (ml', mlu) : levelEnv env})
   let piType = (m, WeakTermPi xts' tCod)
-  retWeakTerm piType m $ WeakTermPiIntro xts' e'
+  retWeakTerm piType m lu $ WeakTermPiIntro xts' e'
 infer' ctx (m, WeakTermPiElim (mPi, WeakTermPiIntro xts e) es) -- "let"
   | length xts == length es = do
-    ets <- mapM (infer' ctx) es
+    etls <- mapM (infer' ctx) es
     let (ms, xs, ts) = unzip3 xts
     -- don't extend context
     tls' <- mapM (inferType ctx) ts
@@ -91,24 +100,24 @@ infer' ctx (m, WeakTermPiElim (mPi, WeakTermPiIntro xts e) es) -- "let"
     (e', tCod) <- infer' ctx e -- don't extend context
     let piType = (mPi, WeakTermPi xts' tCod)
     et <- retWeakTerm piType mPi $ WeakTermPiIntro xts' e'
-    let es' = map fst ets
+    let (es', _, _) = unzip3 etls
     let defList = Map.fromList $ zip xs es'
     modify (\env -> env {substEnv = defList `Map.union` substEnv env})
-    inferPiElim ctx m et ets
+    inferPiElim ctx m et etls
 infer' ctx (m, WeakTermPiElim e es) = do
-  ets <- mapM (infer' ctx) es
-  et <- infer' ctx e
-  inferPiElim ctx m et ets
+  etls <- mapM (infer' ctx) es
+  etl <- infer' ctx e
+  inferPiElim ctx m etl etls
 infer' ctx (m, WeakTermSigma xts) = do
   (xts', ls) <- unzip <$> inferSigma ctx xts
   l <- newUnivLevel
   let ml = UnivLevelPlus m l
   forM_ ls $ \ml' -> modify (\env -> env {levelEnv = (ml', ml) : levelEnv env})
   let univ = (m, WeakTermTau l)
-  retWeakTerm univ m $ WeakTermSigma xts'
+  retWeakTerm univ m undefined $ WeakTermSigma xts'
 infer' ctx (m, WeakTermSigmaIntro t es) = do
   (t', _) <- inferType ctx t
-  (es', ts) <- unzip <$> mapM (infer' ctx) es
+  (es', ts, ls) <- unzip3 <$> mapM (infer' ctx) es
   ys <- mapM (const $ newNameWith "arg") es'
   -- yts = [(y1, ?M1 @ (ctx[0], ..., ctx[n])),
   --        (y2, ?M2 @ (ctx[0], ..., ctx[n], y1)),
@@ -125,19 +134,19 @@ infer' ctx (m, WeakTermSigmaIntro t es) = do
   forM_ ((sigmaType, t') : zip ts ts') $ uncurry insConstraintEnv
   -- retWeakTerm sigmaType m $ WeakTermSigmaIntro t' es'
   -- 中身をsigmaTypeにすることでelaborateのときに確実に中身を取り出せるようにする
-  retWeakTerm sigmaType m $ WeakTermSigmaIntro sigmaType es'
+  retWeakTerm sigmaType m undefined $ WeakTermSigmaIntro sigmaType es'
 infer' ctx (m, WeakTermSigmaElim t xts e1 e2) = do
   (t', _) <- inferType ctx t
-  (e1', t1) <- infer' ctx e1
+  (e1', t1, l1) <- infer' ctx e1
   xtls <- inferSigma ctx xts
   let (xts', _) = unzip xtls
   -- (xts', _) <- unzip <$> inferSigma ctx xts
   -- constrainList us
   let sigmaType = (fst e1', WeakTermSigma xts')
   insConstraintEnv t1 sigmaType
-  (e2', t2) <- infer' (ctx ++ xtls) e2
+  (e2', t2, l2) <- infer' (ctx ++ xtls) e2
   insConstraintEnv t2 t'
-  retWeakTerm t2 m $ WeakTermSigmaElim t' xts' e1' e2'
+  retWeakTerm t2 m undefined $ WeakTermSigmaElim t' xts' e1' e2'
 infer' ctx (m, WeakTermIter (mx, x, t) xts e) = do
   tl'@(t', _) <- inferType ctx t
   insWeakTypeEnv x tl'
@@ -293,14 +302,13 @@ infer' ctx (m, WeakTermStructElim xks e1 e2) = do
 -- {} inferType {}
 inferType :: Context -> WeakTermPlus -> WithEnv (WeakTermPlus, UnivLevelPlus)
 inferType ctx t = do
-  (t', u) <- infer' ctx t
-  l <- newUnivLevel
-  let univ = (fst t', WeakTermTau l)
+  (t', u, l) <- infer' ctx t
+  lu <- newUnivLevel
+  let univ = (fst t', WeakTermTau lu)
   -- univ <- newUnivAt (fst t')
   insConstraintEnv u univ
-  return (t', (UnivLevelPlus (fst t') l))
+  return (t', (UnivLevelPlus (fst t') lu))
 
--- {} inferKind {}
 inferKind :: ArrayKind -> WeakTermPlus
 inferKind (ArrayKindIntS i) = (emptyMeta, WeakTermEnum (EnumTypeIntS i))
 inferKind (ArrayKindIntU i) = (emptyMeta, WeakTermEnum (EnumTypeIntU i))
@@ -308,20 +316,19 @@ inferKind (ArrayKindFloat size) =
   (emptyMeta, WeakTermConst $ "f" <> T.pack (show (sizeAsInt size)))
 inferKind _ = error "inferKind for void-pointer"
 
--- {} inferPi {}
 inferPi ::
      Context
   -> [IdentifierPlus]
   -> WeakTermPlus
-  -> WithEnv ([IdentifierPlus], WeakTermPlus, [UnivLevelPlus], UnivLevelPlus)
+  -> WithEnv ([(IdentifierPlus, UnivLevelPlus)], (WeakTermPlus, UnivLevelPlus))
 inferPi ctx [] cod = do
   (cod', lCod) <- inferType ctx cod
-  return ([], cod', [], lCod)
+  return ([], (cod', lCod))
 inferPi ctx ((mx, x, t):xts) cod = do
   tl'@(t', l) <- inferType ctx t
   insWeakTypeEnv x tl'
-  (xts', cod', ls, lCod) <- inferPi (ctx ++ [((mx, x, t'), l)]) xts cod
-  return ((mx, x, t') : xts', cod', l : ls, lCod)
+  (xtls', tlCod) <- inferPi (ctx ++ [((mx, x, t'), l)]) xts cod
+  return (((mx, x, t'), l) : xtls', tlCod)
 
 inferSigma ::
      Context -> [IdentifierPlus] -> WithEnv [(IdentifierPlus, UnivLevelPlus)]
@@ -337,15 +344,16 @@ inferBinder ::
      Context
   -> [IdentifierPlus]
   -> WeakTermPlus
-  -> WithEnv ([IdentifierPlus], (WeakTermPlus, WeakTermPlus), [UnivLevelPlus])
+  -> WithEnv ( [(IdentifierPlus, UnivLevelPlus)]
+             , (WeakTermPlus, WeakTermPlus, UnivLevelPlus))
 inferBinder ctx [] e = do
-  et' <- infer' ctx e
-  return ([], et', [])
+  etl' <- infer' ctx e
+  return ([], etl')
 inferBinder ctx ((mx, x, t):xts) e = do
   tl'@(t', l) <- inferType ctx t
   insWeakTypeEnv x tl'
-  (xts', et', ls) <- inferBinder (ctx ++ [((mx, x, t'), l)]) xts e
-  return ((mx, x, t') : xts', et', l : ls)
+  (xtls', etl') <- inferBinder (ctx ++ [((mx, x, t'), l)]) xts e
+  return (((mx, x, t'), l) : xtls', etl')
 
 -- {} inferPiElim {}
 inferPiElim ::
@@ -463,8 +471,12 @@ constrainList (t1:t2:ts) = do
   constrainList $ t2 : ts
 
 retWeakTerm ::
-     WeakTermPlus -> Meta -> WeakTerm -> WithEnv (WeakTermPlus, WeakTermPlus)
-retWeakTerm t m e = return ((m, e), t)
+     WeakTermPlus
+  -> Meta
+  -> UnivLevel
+  -> WeakTerm
+  -> WithEnv (WeakTermPlus, WeakTermPlus, UnivLevelPlus)
+retWeakTerm t m l e = return (((m, e), t), UnivLevelPlus m l)
 
 -- is-enum n{i}
 toIsEnumType :: Integer -> Meta -> WithEnv WeakTermPlus
