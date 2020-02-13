@@ -54,7 +54,7 @@ data Env =
     , formationEnv :: Map.HashMap Identifier (Maybe WeakTermPlus)
     , inductiveEnv :: RuleEnv -- "list" ~> (cons, Pi (A : tau). A -> list A -> list A)
     , coinductiveEnv :: RuleEnv -- "tail" ~> (head, Pi (A : tau). stream A -> A)
-    , weakTypeEnv :: Map.HashMap Identifier WeakTermPlus -- var ~> typeof(var)
+    , weakTypeEnv :: Map.HashMap Identifier (WeakTermPlus, UnivLevelPlus) -- var ~> (typeof(var), level-of-type)
     , typeEnv :: Map.HashMap Identifier TermPlus
     , constraintEnv :: [PreConstraint] -- for type inference
     , constraintQueue :: ConstraintQueue

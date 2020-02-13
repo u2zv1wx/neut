@@ -57,7 +57,7 @@ infer' _ (m, WeakTermTau l) = do
   modify (\env -> env {levelEnv = (ml1, ml2) : lenv})
   return ((m, WeakTermTau l), (m, WeakTermTau l'))
 infer' _ (m, WeakTermUpsilon x) = do
-  (_, t) <- lookupWeakTypeEnv x
+  ((_, t), _) <- lookupWeakTypeEnv x
   retWeakTerm (m, t) m $ WeakTermUpsilon x
 infer' ctx (m, WeakTermPi xts t) = do
   (xts', t', ls, lCod) <- inferPi ctx xts t
@@ -80,10 +80,12 @@ infer' ctx (m, WeakTermPiElim (mPi, WeakTermPiIntro xts e) es) -- "let"
     ets <- mapM (infer' ctx) es
     let (ms, xs, ts) = unzip3 xts
     -- don't extend context
-    (ts', ls) <- unzip <$> mapM (inferType ctx) ts
+    tls' <- mapM (inferType ctx) ts
+    let (ts', ls) = unzip tls'
+    -- (ts', ls) <- unzip <$> mapM (inferType ctx) ts
     -- constrainList us
     let xts' = zip3 ms xs ts'
-    forM_ (zip xs ts') $ uncurry insWeakTypeEnv
+    forM_ (zip xs tls') $ uncurry insWeakTypeEnv
     -- forM_ xts' $ uncurry insWeakTypeEnv
     -- ctxをextendしなくてもdefListにそれ相当の情報がある
     (e', tCod) <- infer' ctx e -- don't extend context
@@ -137,8 +139,8 @@ infer' ctx (m, WeakTermSigmaElim t xts e1 e2) = do
   insConstraintEnv t2 t'
   retWeakTerm t2 m $ WeakTermSigmaElim t' xts' e1' e2'
 infer' ctx (m, WeakTermIter (mx, x, t) xts e) = do
-  (t', _) <- inferType ctx t
-  insWeakTypeEnv x t'
+  tl'@(t', _) <- inferType ctx t
+  insWeakTypeEnv x tl'
   -- Note that we cannot extend context with x. The type of e cannot be dependent on `x`.
   -- Otherwise the type of `mu x. e` might have `x` as free variable, which is unsound.
   (xts', (e', tCod), _) <- inferBinder ctx xts e
@@ -167,11 +169,11 @@ infer' _ (m, WeakTermConst x)
     u <- newUnivAt m
     retWeakTerm u m $ WeakTermConst x
   | otherwise = do
-    t <- lookupWeakTypeEnv x
+    (t, _) <- lookupWeakTypeEnv x
     retWeakTerm t m $ WeakTermConst x
 infer' ctx (m, WeakTermConstDecl (mx, x, t) e) = do
-  (t', _) <- inferType ctx t
-  insWeakTypeEnv x t'
+  tl'@(t', _) <- inferType ctx t
+  insWeakTypeEnv x tl'
   -- the type of `e` doesn't depend on `x`
   (e', t'') <- infer' ctx e
   retWeakTerm t'' m $ WeakTermConstDecl (mx, x, t') e'
@@ -282,7 +284,8 @@ infer' ctx (m, WeakTermStructElim xks e1 e2) = do
   let structType = (fst e1', WeakTermStruct ks)
   insConstraintEnv t1 structType
   let xts = zip3 ms xs ts
-  forM_ (zip xs ts) $ uncurry insWeakTypeEnv
+  -- forM_ (zip xs ts) $ uncurry insWeakTypeEnv
+  forM_ (zip xs (zip ts mls)) $ uncurry insWeakTypeEnv
   (e2', t2) <- infer' (ctx ++ zip xts mls) e2
   -- (e2', t2) <- infer' (ctx ++ xts) e2
   retWeakTerm t2 m $ WeakTermStructElim xks e1' e2'
@@ -315,8 +318,8 @@ inferPi ctx [] cod = do
   (cod', lCod) <- inferType ctx cod
   return ([], cod', [], lCod)
 inferPi ctx ((mx, x, t):xts) cod = do
-  (t', l) <- inferType ctx t
-  insWeakTypeEnv x t'
+  tl'@(t', l) <- inferType ctx t
+  insWeakTypeEnv x tl'
   (xts', cod', ls, lCod) <- inferPi (ctx ++ [((mx, x, t'), l)]) xts cod
   return ((mx, x, t') : xts', cod', l : ls, lCod)
 
@@ -324,8 +327,8 @@ inferSigma ::
      Context -> [IdentifierPlus] -> WithEnv [(IdentifierPlus, UnivLevelPlus)]
 inferSigma _ [] = return []
 inferSigma ctx ((mx, x, t):xts) = do
-  (t', l) <- inferType ctx t
-  insWeakTypeEnv x t'
+  tl'@(t', l) <- inferType ctx t
+  insWeakTypeEnv x tl'
   xts' <- inferSigma (ctx ++ [((mx, x, t'), l)]) xts
   return $ ((mx, x, t'), l) : xts'
 
@@ -339,8 +342,8 @@ inferBinder ctx [] e = do
   et' <- infer' ctx e
   return ([], et', [])
 inferBinder ctx ((mx, x, t):xts) e = do
-  (t', l) <- inferType ctx t
-  insWeakTypeEnv x t'
+  tl'@(t', l) <- inferType ctx t
+  insWeakTypeEnv x tl'
   (xts', et', ls) <- inferBinder (ctx ++ [((mx, x, t'), l)]) xts e
   return ((mx, x, t') : xts', et', l : ls)
 
@@ -429,8 +432,8 @@ newTypeHoleListInCtx ::
   -> WithEnv [(IdentifierPlus, UnivLevelPlus)]
 newTypeHoleListInCtx _ [] = return []
 newTypeHoleListInCtx ctx ((x, m):rest) = do
-  (t, l) <- newTypeHoleInCtx ctx m
-  insWeakTypeEnv x t
+  tl@(t, l) <- newTypeHoleInCtx ctx m
+  insWeakTypeEnv x tl
   ts <- newTypeHoleListInCtx (ctx ++ [((m, x, t), l)]) rest
   return $ ((m, x, t), l) : ts
 
@@ -481,18 +484,19 @@ insConstraintEnv :: WeakTermPlus -> WeakTermPlus -> WithEnv ()
 insConstraintEnv t1 t2 =
   modify (\e -> e {constraintEnv = (t1, t2) : constraintEnv e})
 
-insWeakTypeEnv :: Identifier -> WeakTermPlus -> WithEnv ()
-insWeakTypeEnv i t =
-  modify (\e -> e {weakTypeEnv = Map.insert i t (weakTypeEnv e)})
+insWeakTypeEnv :: Identifier -> (WeakTermPlus, UnivLevelPlus) -> WithEnv ()
+insWeakTypeEnv i tl =
+  modify (\e -> e {weakTypeEnv = Map.insert i tl (weakTypeEnv e)})
 
-lookupWeakTypeEnv :: Identifier -> WithEnv WeakTermPlus
+lookupWeakTypeEnv :: Identifier -> WithEnv (WeakTermPlus, UnivLevelPlus)
 lookupWeakTypeEnv s = do
   mt <- lookupWeakTypeEnvMaybe s
   case mt of
     Just t -> return t
     Nothing -> throwError' $ s <> " is not found in the weak type environment."
 
-lookupWeakTypeEnvMaybe :: Identifier -> WithEnv (Maybe WeakTermPlus)
+lookupWeakTypeEnvMaybe ::
+     Identifier -> WithEnv (Maybe (WeakTermPlus, UnivLevelPlus))
 lookupWeakTypeEnvMaybe s = do
   mt <- gets (Map.lookup s . weakTypeEnv)
   case mt of
