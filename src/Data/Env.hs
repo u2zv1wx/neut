@@ -60,7 +60,9 @@ data Env =
     , constraintQueue :: ConstraintQueue
     , levelEnv :: [LevelConstraint]
     , substEnv :: Map.HashMap Identifier WeakTermPlus -- metavar ~> beta-equivalent weakterm
-    , zetaEnv :: Map.HashMap Identifier (WeakTermPlus, WeakTermPlus)
+    , zetaEnv :: Map.HashMap Identifier ( WeakTermPlus
+                                        , WeakTermPlus
+                                        , UnivLevelPlus)
     , chainEnv :: Map.HashMap Identifier [(Meta, Identifier, TermPlus)] -- var/const ~> the closed var chain of its type
     , codeEnv :: Map.HashMap Identifier ([Identifier], CodePlus) -- f ~> thunk (lam (x1 ... xn) e)
     , llvmEnv :: Map.HashMap Identifier ([Identifier], LLVM)
