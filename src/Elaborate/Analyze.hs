@@ -25,6 +25,7 @@ import Data.Basic
 import Data.Constraint
 import Data.Env
 import Data.WeakTerm
+import Elaborate.Infer
 import Reduce.WeakTerm
 
 analyze :: WithEnv ()
@@ -47,11 +48,13 @@ simp' :: [PreConstraint] -> WithEnv ()
 simp' [] = return ()
 simp' (((_, e1), (_, e2)):cs)
   | e1 == e2 = simp cs
-simp' (((m1, WeakTermTau l1), (m2, WeakTermTau l2)):cs) = do
-  lenv <- gets levelEnv
-  let ml1 = UnivLevelPlus (m1, l1)
-  let ml2 = UnivLevelPlus (m2, l2)
-  modify (\env -> env {levelEnv = substLevelConstraint ml1 ml2 lenv})
+simp' (((m1, WeakTermTau l1), (m2, WeakTermTau l2)):cs)
+  -- lenv <- gets levelEnv
+ = do
+  insLevelEQ (UnivLevelPlus (m1, l1)) (UnivLevelPlus (m2, l2))
+  -- let ml1 = UnivLevelPlus (m1, l1)
+  -- let ml2 = UnivLevelPlus (m2, l2)
+  -- modify (\env -> env {levelEnv = substLevelConstraint ml1 ml2 lenv})
   simp cs
 simp' (((_, WeakTermPi mls1 xts1 cod1), (_, WeakTermPi mls2 xts2 cod2)):cs)
   | length xts1 == length xts2 = do

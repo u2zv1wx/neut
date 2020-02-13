@@ -6,12 +6,12 @@ module Elaborate
 
 import Control.Monad.Except
 import Control.Monad.State
-import Data.List (intersect, nub)
+import Data.List (nub)
+import Data.Maybe (fromMaybe)
 import Numeric.Half
 import System.Console.ANSI
 
 import qualified Data.HashMap.Strict as Map
-import qualified Data.Set as S
 import qualified Data.Text as T
 
 import Data.Basic
@@ -37,23 +37,18 @@ import Reduce.WeakTerm
 elaborate :: WeakTermPlus -> WithEnv TermPlus
 elaborate e = do
   e' <- infer e
-  -- p "e:"
-  -- p' e
-  -- cs <- gets constraintEnv
-  -- p "cs-before"
-  -- p' cs
   -- p "lenv-before"
   -- lenv <- gets levelEnv
   -- p' lenv
   -- Kantian type-inference ;)
   analyze
   synthesize
-  error "exit"
-  -- we shouldn't resort to `type(l) : type(l)`
   -- p "lenv-after"
   -- lenv <- gets levelEnv
   -- p' lenv
+  -- we shouldn't resort to `type(l) : type(l)`
   gets levelEnv >>= ensureDAG
+  _ <- error "exit"
   -- for faster elaboration
   reduceSubstEnv
   -- elaborate the given term
@@ -63,39 +58,60 @@ elaborate e = do
 
 ensureDAG :: [LevelConstraint] -> WithEnv ()
 ensureDAG g = do
-  xs <- ensureDAG' S.empty g g
-  case xs of
-    [] -> return ()
-    _ -> do
-      throwError' $ "found cyclic univ level:\n" <> T.pack (show xs)
+  let nodeList = nub $ concatMap (\(n1, (_, n2)) -> [n1, n2]) g
+  let g' = toGraph g
+  ensureDAG' g' Map.empty nodeList
 
-ensureDAG' ::
-     S.Set UnivLevelPlus
-  -> [LevelConstraint]
-  -> [LevelConstraint]
-  -> WithEnv [[UnivLevelPlus]]
-ensureDAG' _ _ [] = return []
-ensureDAG' visited g ((v1, v2):edgeList)
-  | v1 `S.member` visited = ensureDAG' visited g edgeList
-  | v2 `S.member` visited = ensureDAG' visited g edgeList
-  | otherwise = do
-    case dfs v1 [] g of
-      Right path -> ensureDAG' (S.union (S.fromList path) visited) g edgeList
-      Left closedPath -> do
-        xs <- ensureDAG' visited g edgeList
-        return $ closedPath : xs
+ensureDAG' :: LevelGraph -> NodeInfo -> [UnivLevelPlus] -> WithEnv ()
+ensureDAG' _ _ [] = return ()
+ensureDAG' g nodeInfo (v:vs) = do
+  p $ "remaining: " <> show (length vs)
+  let l = levelOf v
+  case Map.lookup l nodeInfo of
+    Just NodeStateFinish -> ensureDAG' g nodeInfo vs
+    Just NodeStateActive -> error "invalid argument"
+    Nothing ->
+      case dfs g v [(0, v)] nodeInfo of
+        Right _ -> ensureDAG' g (Map.insert l NodeStateFinish nodeInfo) vs
+        Left closedPath ->
+          throwError' $ "found cyclic univ level:\n" <> T.pack (show closedPath)
 
-dfs :: (Eq a) => a -> [a] -> [(a, a)] -> Either [a] [a]
-dfs a visited g =
-  case map snd $ filter (\(from, _) -> from == a) g of
-    [] -> return visited
-    as -> do
-      let xs = as `intersect` visited
-      if null xs
-        then concat <$> mapM (\x -> dfs x (visited ++ [a]) g) as
-        else do
-          let z = head xs
-          Left $ dropWhile (/= z) visited ++ [a, z]
+type LevelGraph = Map.HashMap UnivLevel [(Integer, UnivLevelPlus)]
+
+toGraph :: [LevelConstraint] -> LevelGraph
+toGraph [] = Map.empty
+toGraph ((UnivLevelPlus (_, l), v):kvs) = do
+  Map.insertWith (\v1 v2 -> v1 ++ v2) l [v] $ toGraph kvs
+
+type UnivPath = [(Integer, UnivLevelPlus)]
+
+type NodeInfo = Map.HashMap UnivLevel NodeState
+
+data NodeState
+  = NodeStateActive
+  | NodeStateFinish
+
+levelOf :: UnivLevelPlus -> UnivLevel
+levelOf (UnivLevelPlus (_, l)) = l
+
+dfs :: LevelGraph -> UnivLevelPlus -> UnivPath -> NodeInfo -> Either UnivPath ()
+dfs g (UnivLevelPlus (_, l)) path visitInfo = do
+  let mvs = fromMaybe [] $ Map.lookup l g
+  sequence_ $
+    (flip map) mvs $ \(w', v') -> do
+      let path' = path ++ [(w', v')]
+      let l' = levelOf v'
+      case Map.lookup l' visitInfo of
+        Just NodeStateActive -> do
+          let closedPath = dropWhile (\(_, ml'') -> levelOf ml'' /= l') path'
+          if weightOf closedPath > 0
+            then Left closedPath
+            else return ()
+        Just NodeStateFinish -> return ()
+        Nothing -> dfs g v' path' $ Map.insert l NodeStateActive visitInfo
+
+weightOf :: UnivPath -> Integer
+weightOf path = sum $ map fst $ tail path
 
 -- This function translates a well-typed term into an untyped term in a
 -- reduction-preserving way. Here, we translate types into units (nullary product).

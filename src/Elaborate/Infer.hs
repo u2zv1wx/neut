@@ -2,6 +2,7 @@
 
 module Elaborate.Infer
   ( infer
+  , insLevelEQ
   ) where
 
 import Control.Monad.Except
@@ -51,8 +52,8 @@ infer' ::
   -> WithEnv (WeakTermPlus, WeakTermPlus, UnivLevelPlus)
 infer' _ (m, WeakTermTau l0) = do
   let ml0 = UnivLevelPlus (m, l0)
-  ml1 <- newLevelOver m [ml0]
-  ml2 <- newLevelOver m [ml1]
+  ml1 <- newLevelLT m [ml0]
+  ml2 <- newLevelLT m [ml1]
   return (asUniv ml0, asUniv ml1, ml2)
 infer' _ (m, WeakTermUpsilon x) = do
   ((_, t), UnivLevelPlus (_, l)) <- lookupWeakTypeEnv x
@@ -60,14 +61,14 @@ infer' _ (m, WeakTermUpsilon x) = do
 infer' ctx (m, WeakTermPi mls xts t) = do
   (xtls', (t', mlPiCod)) <- inferPi ctx xts t
   let (xts', mlPiArgs) = unzip xtls'
-  ml0 <- newLevelOver m $ mlPiCod : mlPiArgs
-  ml1 <- newLevelOver m [ml0]
+  ml0 <- newLevelLE m $ mlPiCod : mlPiArgs
+  ml1 <- newLevelLT m [ml0]
   forM_ (zip mls (mlPiArgs ++ [mlPiCod])) $ uncurry insLevelEQ
   return ((m, WeakTermPi mls xts' t'), (asUniv ml0), ml1)
 infer' ctx (m, WeakTermPiIntro xts e) = do
   (xtls', (e', t', mlPiCod)) <- inferBinder ctx xts e
   let (xts', mlPiArgs) = unzip xtls'
-  mlPi <- newLevelOver m $ mlPiCod : mlPiArgs
+  mlPi <- newLevelLE m $ mlPiCod : mlPiArgs
   let mls = mlPiArgs ++ [mlPiCod]
   return ((m, WeakTermPiIntro xts' e'), (m, WeakTermPi mls xts' t'), mlPi)
 infer' ctx (m, WeakTermPiElim (mPi, WeakTermPiIntro xts e) es) -- "let"
@@ -79,7 +80,7 @@ infer' ctx (m, WeakTermPiElim (mPi, WeakTermPiIntro xts e) es) -- "let"
     -- ctxをextendしなくてもdefListにそれ相当の情報がある
     (e', tCod, ml) <- infer' ctx e -- don't extend the context
     let (ts', mls) = unzip tls'
-    mlPi <- newLevelOver m $ ml : mls
+    mlPi <- newLevelLE m $ ml : mls
     let xts' = zip3 ms xs ts'
     let etl =
           ( (m, WeakTermPiIntro xts' e')
@@ -95,8 +96,8 @@ infer' ctx (m, WeakTermPiElim e es) = do
   inferPiElim ctx m etl etls
 infer' ctx (m, WeakTermSigma xts) = do
   (xts', mls) <- unzip <$> inferSigma ctx xts
-  ml0 <- newLevelOver m $ mls
-  ml1 <- newLevelOver m [ml0]
+  ml0 <- newLevelLE m $ mls
+  ml1 <- newLevelLT m [ml0]
   return ((m, WeakTermSigma xts'), (asUniv ml0), ml1)
 infer' ctx (m, WeakTermSigmaIntro t es) = do
   (t', mlSigma) <- inferType ctx t
@@ -108,7 +109,7 @@ infer' ctx (m, WeakTermSigmaIntro t es) = do
   --        (ym, ?Mm @ (ctx[0], ..., ctx[n], y1, ..., y{m-1}))]
   ytls <- newTypeHoleListInCtx ctx $ zip ys (map fst es')
   let (yts, mls') = unzip ytls
-  forM_ mlSigmaArgList $ \mlSigmaArg -> insLevelLT mlSigmaArg mlSigma
+  forM_ mlSigmaArgList $ \mlSigmaArg -> insLevelLE mlSigmaArg mlSigma
   -- ts' = [?M1 @ (ctx[0], ..., ctx[n]),
   --        ?M2 @ (ctx[0], ..., ctx[n], e1),
   --        ...,
@@ -127,7 +128,7 @@ infer' ctx (m, WeakTermSigmaElim t xts e1 e2) = do
   (e2', t2, ml2) <- infer' (ctx ++ xtls) e2
   -- insert constraints
   insConstraintEnv t1 (fst e1', WeakTermSigma xts')
-  forM_ mlSigArgList $ \mlSigArg -> insLevelLT mlSigArg mlSigma
+  forM_ mlSigArgList $ \mlSigArg -> insLevelLE mlSigArg mlSigma
   insConstraintEnv t2 t'
   insLevelEQ mlResult ml2
   return ((m, WeakTermSigmaElim t' xts' e1' e2'), t2, ml2)
@@ -138,7 +139,7 @@ infer' ctx (m, WeakTermIter (mx, x, t) xts e) = do
   -- Otherwise the type of `mu x. e` might have `x` as free variable, which is unsound.
   (xtls', (e', tCod, mlPiCod)) <- inferBinder ctx xts e
   let (xts', mlPiArgs) = unzip xtls'
-  mlPi <- newLevelOver m $ mlPiCod : mlPiArgs
+  mlPi <- newLevelLE m $ mlPiCod : mlPiArgs
   let piType = (m, WeakTermPi (mlPiArgs ++ [mlPiCod]) xts' tCod)
   insConstraintEnv piType t'
   insLevelEQ mlPi ml'
@@ -159,12 +160,12 @@ infer' _ (m, WeakTermConst x)
   -- enum.n8, enum.n64, etc.
   | Just i <- asEnumNatConstant x = do
     t <- toIsEnumType i m
-    ml <- newLevelOver m []
+    ml <- newLevelLE m []
     return ((m, WeakTermConst x), t, ml)
   -- i64, f16, u8, etc.
   | Just _ <- asLowTypeMaybe x = do
-    ml0 <- newLevelOver m []
-    ml1 <- newLevelOver m [ml0]
+    ml0 <- newLevelLE m []
+    ml1 <- newLevelLT m [ml0]
     return ((m, WeakTermConst x), (asUniv ml0), ml1)
   | otherwise = do
     (t, UnivLevelPlus (_, l)) <- lookupWeakTypeEnv x
@@ -179,23 +180,23 @@ infer' _ (m, WeakTermInt t i) = do
   (t', UnivLevelPlus (_, l)) <- inferType [] t -- ctx == [] since t' should be i64, i8, etc. (i.e. t must be closed)
   return ((m, WeakTermInt t' i), t', UnivLevelPlus (m, l))
 infer' _ (m, WeakTermFloat16 f) = do
-  ml <- newLevelOver m []
+  ml <- newLevelLE m []
   return ((m, WeakTermFloat16 f), (m, WeakTermConst "f16"), ml)
 infer' _ (m, WeakTermFloat32 f) = do
-  ml <- newLevelOver m []
+  ml <- newLevelLE m []
   return ((m, WeakTermFloat32 f), (m, WeakTermConst "f32"), ml)
 infer' _ (m, WeakTermFloat64 f) = do
-  ml <- newLevelOver m []
+  ml <- newLevelLE m []
   return ((m, WeakTermFloat64 f), (m, WeakTermConst "f64"), ml)
 infer' _ (m, WeakTermFloat t f) = do
   (t', UnivLevelPlus (_, l)) <- inferType [] t -- t must be closed
   return ((m, WeakTermFloat t' f), t', UnivLevelPlus (m, l))
 infer' _ (m, WeakTermEnum name) = do
-  ml0 <- newLevelOver m []
-  ml1 <- newLevelOver m [ml0]
+  ml0 <- newLevelLE m []
+  ml1 <- newLevelLT m [ml0]
   return ((m, WeakTermEnum name), asUniv ml0, ml1)
 infer' _ (m, WeakTermEnumIntro v) = do
-  ml <- newLevelOver m []
+  ml <- newLevelLE m []
   case v of
     EnumValueIntS size _ -> do
       let t = (m, WeakTermEnum (EnumTypeIntS size))
@@ -229,8 +230,8 @@ infer' ctx (m, WeakTermEnumElim (e, t) ces) = do
       return ((m, WeakTermEnumElim (e', t') $ zip cs' es'), head ts, head mls)
 infer' ctx (m, WeakTermArray dom k) = do
   (dom', mlDom) <- inferType ctx dom
-  ml0 <- newLevelOver m [mlDom]
-  ml1 <- newLevelOver m [ml0]
+  ml0 <- newLevelLE m [mlDom]
+  ml1 <- newLevelLT m [ml0]
   return ((m, WeakTermArray dom' k), asUniv ml0, ml1)
 infer' ctx (m, WeakTermArrayIntro k es) = do
   let tCod = inferKind k
@@ -240,21 +241,21 @@ infer' ctx (m, WeakTermArrayIntro k es) = do
   let len = toInteger $ length es
   let dom = (emptyMeta, WeakTermEnum (EnumTypeNat len))
   let t = (m, WeakTermArray dom k)
-  ml <- newLevelOver m mls
+  ml <- newLevelLE m mls
   return ((m, WeakTermArrayIntro k es'), t, ml)
 infer' ctx (m, WeakTermArrayElim k xts e1 e2) = do
   (e1', t1, mlArr) <- infer' ctx e1
   (xtls', (e2', t2, ml2)) <- inferBinder ctx xts e2
   let (xts', mls) = unzip xtls'
-  forM_ mls $ \mlArrArg -> insLevelLT mlArrArg mlArr
+  forM_ mls $ \mlArrArg -> insLevelLE mlArrArg mlArr
   let dom = (emptyMeta, WeakTermEnum (EnumTypeNat (toInteger $ length xts)))
   insConstraintEnv t1 (fst e1', WeakTermArray dom k)
   let ts = map (\(_, _, t) -> t) xts'
   forM_ (zip ts (repeat (inferKind k))) $ uncurry insConstraintEnv
   return ((m, WeakTermArrayElim k xts' e1' e2'), t2, ml2)
 infer' _ (m, WeakTermStruct ts) = do
-  ml0 <- newLevelOver m []
-  ml1 <- newLevelOver m [ml0]
+  ml0 <- newLevelLE m []
+  ml1 <- newLevelLT m [ml0]
   return ((m, WeakTermStruct ts), asUniv ml0, ml1)
 infer' ctx (m, WeakTermStructIntro eks) = do
   let (es, ks) = unzip eks
@@ -262,7 +263,7 @@ infer' ctx (m, WeakTermStructIntro eks) = do
   let structType = (m, WeakTermStruct ks)
   (es', ts', mls) <- unzip3 <$> mapM (infer' ctx) es
   forM_ (zip ts' ts) $ uncurry insConstraintEnv
-  ml <- newLevelOver m mls
+  ml <- newLevelLE m mls
   return ((m, WeakTermStructIntro $ zip es' ks), structType, ml)
 infer' ctx (m, WeakTermStructElim xks e1 e2) = do
   (e1', t1, mlStruct) <- infer' ctx e1
@@ -270,7 +271,7 @@ infer' ctx (m, WeakTermStructElim xks e1 e2) = do
   let ts = map inferKind ks
   ls <- mapM (const newUnivLevel) ts
   let mls = map UnivLevelPlus $ zip (repeat m) ls
-  forM_ mls $ \mlStructArg -> insLevelLT mlStructArg mlStruct
+  forM_ mls $ \mlStructArg -> insLevelLE mlStructArg mlStruct
   let structType = (fst e1', WeakTermStruct ks)
   insConstraintEnv t1 structType
   forM_ (zip xs (zip ts mls)) $ uncurry insWeakTypeEnv
@@ -279,10 +280,9 @@ infer' ctx (m, WeakTermStructElim xks e1 e2) = do
 
 inferType :: Context -> WeakTermPlus -> WithEnv (WeakTermPlus, UnivLevelPlus)
 inferType ctx t = do
-  (t', u, l) <- infer' ctx t
-  ml <- newLevelOver (fst t') []
+  (t', u, _) <- infer' ctx t
+  ml <- newLevelLE (fst t') []
   insConstraintEnv u (asUniv ml)
-  insLevelLT ml l
   return (t', ml)
 
 inferKind :: ArrayKind -> WeakTermPlus
@@ -347,8 +347,8 @@ inferPiElim ctx m (e, t, mlPi) etls = do
         let ts'' = map (\(_, _, tx) -> substWeakTermPlus (zip xs es) tx) xts
         forM_ (zip ts'' ts) $ uncurry insConstraintEnv
         forM_ (zip mlPiDomList mlPiDomList') $ uncurry insLevelEQ
-        forM_ mlPiDomList $ \mlPiDom -> insLevelLT mlPiDom mlPi
-        insLevelLT mlPiCod' mlPi
+        forM_ mlPiDomList $ \mlPiDom -> insLevelLE mlPiDom mlPi
+        insLevelLE mlPiCod' mlPi
         let cod' = substWeakTermPlus (zip xs es) cod
         return ((m, WeakTermPiElim e es), cod', mlPiCod')
     _ -> do
@@ -368,8 +368,8 @@ inferPiElim ctx m (e, t, mlPi) etls = do
       let cod' = substWeakTermPlus (zip ys es) cod
       forM_ (zip ts ts'') $ uncurry insConstraintEnv
       forM_ (zip mlPiDomList mls') $ uncurry insLevelEQ
-      forM_ mlPiDomList $ \mlPiDom -> insLevelLT mlPiDom mlPi
-      insLevelLT mlPiCod mlPi
+      forM_ mlPiDomList $ \mlPiDom -> insLevelLE mlPiDom mlPi
+      insLevelLE mlPiCod mlPi
       insConstraintEnv t (fst e, WeakTermPi (mlPiDomList ++ [mlPiCod]) yts cod)
       return ((m, WeakTermPiElim e es), cod', mlPiCod)
 
@@ -489,15 +489,29 @@ lookupKind name = do
     Nothing -> throwError' $ "no such enum-intro is defined: " <> name
     Just (j, _) -> return j
 
-newLevelOver :: Meta -> [UnivLevelPlus] -> WithEnv UnivLevelPlus
-newLevelOver m mls = do
+newLevelLE :: Meta -> [UnivLevelPlus] -> WithEnv UnivLevelPlus
+newLevelLE m mls = do
+  l <- newUnivLevel
+  let ml = UnivLevelPlus (m, l)
+  forM_ mls $ \ml' -> insLevelLE ml' ml
+  return ml
+
+newLevelLT :: Meta -> [UnivLevelPlus] -> WithEnv UnivLevelPlus
+newLevelLT m mls = do
   l <- newUnivLevel
   let ml = UnivLevelPlus (m, l)
   forM_ mls $ \ml' -> insLevelLT ml' ml
   return ml
 
+insLevelLE :: UnivLevelPlus -> UnivLevelPlus -> WithEnv ()
+insLevelLE ml1 ml2 =
+  modify (\env -> env {levelEnv = (ml1, (0, ml2)) : levelEnv env})
+
 insLevelLT :: UnivLevelPlus -> UnivLevelPlus -> WithEnv ()
-insLevelLT ml1 ml2 = modify (\env -> env {levelEnv = (ml1, ml2) : levelEnv env})
+insLevelLT ml1 ml2 =
+  modify (\env -> env {levelEnv = (ml1, (1, ml2)) : levelEnv env})
 
 insLevelEQ :: UnivLevelPlus -> UnivLevelPlus -> WithEnv ()
-insLevelEQ ml1 ml2 = insConstraintEnv (asUniv ml1) (asUniv ml2)
+insLevelEQ ml1 ml2 = do
+  insLevelLE ml1 ml2
+  insLevelLE ml2 ml1

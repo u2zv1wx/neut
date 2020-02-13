@@ -45,19 +45,6 @@ instance Ord EnrichedConstraint where
 
 type SubstWeakTerm' = Map.HashMap Identifier ([Hole], WeakTermPlus)
 
-type LevelConstraint = (UnivLevelPlus, UnivLevelPlus)
+type Weight = Integer
 
-substLevelConstraint ::
-     UnivLevelPlus -> UnivLevelPlus -> [LevelConstraint] -> [LevelConstraint]
-substLevelConstraint _ _ [] = []
-substLevelConstraint from to ((mx, my):cs) = do
-  let mx' = substLevelConstraint' from to mx
-  let my' = substLevelConstraint' from to my
-  let cs' = substLevelConstraint from to cs
-  (mx', my') : cs'
-
-substLevelConstraint' ::
-     UnivLevelPlus -> UnivLevelPlus -> UnivLevelPlus -> UnivLevelPlus
-substLevelConstraint' (UnivLevelPlus (_, from)) (UnivLevelPlus (mTo, to)) (UnivLevelPlus (m, x))
-  | from == x = UnivLevelPlus (supMeta m mTo, to)
-  | otherwise = UnivLevelPlus (m, x)
+type LevelConstraint = (UnivLevelPlus, (Integer, UnivLevelPlus))
