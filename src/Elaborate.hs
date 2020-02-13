@@ -6,14 +6,17 @@ module Elaborate
 
 import Control.Monad.Except
 import Control.Monad.State
-import Data.List (nub)
+import Data.List (intersect, nub)
 import Numeric.Half
 import System.Console.ANSI
 
 import qualified Data.HashMap.Strict as Map
+import qualified Data.Set as S
 import qualified Data.Text as T
+import qualified Text.Show.Pretty as Pr
 
 import Data.Basic
+import Data.Constraint
 import Data.Env
 import Data.Term
 import Data.WeakTerm
@@ -35,17 +38,64 @@ import Reduce.WeakTerm
 elaborate :: WeakTermPlus -> WithEnv TermPlus
 elaborate e = do
   e' <- infer e
+  -- p "e:"
+  -- p' e
+  cs <- gets constraintEnv
+  -- p "cs-before"
+  -- p' cs
+  p "lenv-before"
+  lenv <- gets levelEnv
+  p' lenv
   -- Kantian type-inference ;)
   analyze
   synthesize
+  -- we shouldn't resort to `type(l) : type(l)`
+  p "lenv-after"
+  lenv <- gets levelEnv
+  p' lenv
+  gets levelEnv >>= ensureDAG
+  -- for faster elaboration
   reduceSubstEnv
-  -- this reduceTermPlus is necessary since e' contains "DONT_CARE" in its
-  -- type of arguments of abstractions of meta-variables.
-  -- ここでunivのレベルをチェック。そのあとでelaborate.
-  e'' <- elaborate' e' >>= reduceTermPlus
-  return e''
+  -- elaborate the given term
+  elaborate' e' >>= reduceTermPlus
   -- let info2 = toInfo "elaborated term is not closed:" e''
   -- assertMP info2 (return e'') $ null (varTermPlus e'')
+
+ensureDAG :: [LevelConstraint] -> WithEnv ()
+ensureDAG g = do
+  xs <- ensureDAG' S.empty g g
+  case xs of
+    [] -> return ()
+    _ -> do
+      throwError' $ "found cyclic univ level:\n" <> T.pack (Pr.ppShow xs)
+
+ensureDAG' ::
+     S.Set UnivLevelPlus
+  -> [LevelConstraint]
+  -> [LevelConstraint]
+  -> WithEnv [[UnivLevelPlus]]
+ensureDAG' _ _ [] = return []
+ensureDAG' visited g ((v1, v2):edgeList)
+  | v1 `S.member` visited = ensureDAG' visited g edgeList
+  | v2 `S.member` visited = ensureDAG' visited g edgeList
+  | otherwise = do
+    case dfs v1 [] g of
+      Right path -> ensureDAG' (S.union (S.fromList path) visited) g edgeList
+      Left closedPath -> do
+        xs <- ensureDAG' visited g edgeList
+        return $ closedPath : xs
+
+dfs :: (Eq a) => a -> [a] -> [(a, a)] -> Either [a] [a]
+dfs a visited g =
+  case map snd $ filter (\(from, _) -> from == a) g of
+    [] -> return visited
+    as -> do
+      let xs = as `intersect` visited
+      if null xs
+        then concat <$> mapM (\x -> dfs x (visited ++ [a]) g) as
+        else do
+          let z = head xs
+          Left $ dropWhile (/= z) visited ++ [a, z]
 
 -- This function translates a well-typed term into an untyped term in a
 -- reduction-preserving way. Here, we translate types into units (nullary product).

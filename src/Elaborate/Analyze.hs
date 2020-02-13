@@ -50,7 +50,14 @@ simp' :: [PreConstraint] -> WithEnv ()
 simp' [] = return ()
 simp' (((_, e1), (_, e2)):cs)
   | e1 == e2 = simp cs
-simp' (((_, WeakTermTau _), (_, WeakTermTau _)):cs) = simp cs -- fixme: insert EQ constraint
+simp' (((m1, WeakTermTau l1), (m2, WeakTermTau l2)):cs)
+  -- p $ "subst: [" ++ show l1 ++ "] ~> [" ++ show l2 ++ "]"
+ = do
+  lenv <- gets levelEnv
+  let ml1 = UnivLevelPlus m1 l1
+  let ml2 = UnivLevelPlus m2 l2
+  modify (\env -> env {levelEnv = substLevelConstraint ml1 ml2 lenv})
+  simp cs
 simp' (((_, WeakTermPi xts1 cod1), (_, WeakTermPi xts2 cod2)):cs)
   | length xts1 == length xts2 = simpBinder xts1 xts2 (Just (cod1, cod2)) cs
 simp' (((_, WeakTermPiIntro xts1 e1), (_, WeakTermPiIntro xts2 e2)):cs)

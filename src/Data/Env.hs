@@ -58,6 +58,7 @@ data Env =
     , typeEnv :: Map.HashMap Identifier TermPlus
     , constraintEnv :: [PreConstraint] -- for type inference
     , constraintQueue :: ConstraintQueue
+    , levelEnv :: [LevelConstraint]
     , substEnv :: Map.HashMap Identifier WeakTermPlus -- metavar ~> beta-equivalent weakterm
     , zetaEnv :: Map.HashMap Identifier (WeakTermPlus, WeakTermPlus)
     , chainEnv :: Map.HashMap Identifier [(Meta, Identifier, TermPlus)] -- var/const ~> the closed var chain of its type
@@ -91,6 +92,7 @@ initialEnv path colorizeFlag =
     , llvmEnv = Map.empty
     , constraintEnv = []
     , constraintQueue = Q.empty
+    , levelEnv = []
     , substEnv = Map.empty
     , zetaEnv = Map.empty
     , mainFilePath = path

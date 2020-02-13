@@ -44,3 +44,36 @@ instance Ord EnrichedConstraint where
   compare (Enriched _ _ c1) (Enriched _ _ c2) = compare c1 c2
 
 type SubstWeakTerm' = Map.HashMap Identifier ([Hole], WeakTermPlus)
+
+data UnivLevelPlus =
+  UnivLevelPlus Meta UnivLevel
+
+levelOf :: UnivLevelPlus -> UnivLevel
+levelOf (UnivLevelPlus _ l) = l
+
+instance Show UnivLevelPlus where
+  show (UnivLevelPlus _ l) = "[" ++ show l ++ "]"
+  -- show (UnivLevelPlus m l) = "[" ++ show l ++ "]:" ++ showMeta m
+
+instance Eq UnivLevelPlus where
+  (UnivLevelPlus _ l1) == (UnivLevelPlus _ l2) = l1 == l2
+
+instance Ord UnivLevelPlus where
+  compare (UnivLevelPlus _ l1) (UnivLevelPlus _ l2) = compare l1 l2
+
+type LevelConstraint = (UnivLevelPlus, UnivLevelPlus)
+
+substLevelConstraint ::
+     UnivLevelPlus -> UnivLevelPlus -> [LevelConstraint] -> [LevelConstraint]
+substLevelConstraint _ _ [] = []
+substLevelConstraint from to ((mx, my):cs) = do
+  let mx' = substLevelConstraint' from to mx
+  let my' = substLevelConstraint' from to my
+  let cs' = substLevelConstraint from to cs
+  (mx', my') : cs'
+
+substLevelConstraint' ::
+     UnivLevelPlus -> UnivLevelPlus -> UnivLevelPlus -> UnivLevelPlus
+substLevelConstraint' (UnivLevelPlus _ from) (UnivLevelPlus mTo to) (UnivLevelPlus m x)
+  | from == x = UnivLevelPlus (supMeta m mTo) to
+  | otherwise = UnivLevelPlus m x
