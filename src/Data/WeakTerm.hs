@@ -275,7 +275,6 @@ holeWeakTermPlusBindings ((_, _, t):xts) es = do
 
 substWeakTermPlus :: SubstWeakTerm -> WeakTermPlus -> WeakTermPlus
 substWeakTermPlus _ tau@(_, WeakTermTau _) = tau
-  -- (m, WeakTermTau l)
 substWeakTermPlus sub e1@(_, WeakTermUpsilon x) = do
   case lookup x sub of
     Nothing -> e1
@@ -391,8 +390,6 @@ substWeakTermPlusBindingsWithBody sub ((m, x, t):xts) e = do
   let t' = substWeakTermPlus sub t
   ((m, x, t') : xts', e')
 
--- univ :: WeakTermPlus
--- univ = (emptyMeta, WeakTermTau)
 toText :: WeakTermPlus -> Identifier
 toText (_, WeakTermTau _) = "tau"
 toText (_, WeakTermUpsilon x) = x

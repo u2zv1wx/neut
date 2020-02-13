@@ -48,13 +48,9 @@ type SubstWeakTerm' = Map.HashMap Identifier ([Hole], WeakTermPlus)
 newtype UnivLevelPlus =
   UnivLevelPlus (Meta, UnivLevel)
 
-levelOf :: UnivLevelPlus -> UnivLevel
-levelOf (UnivLevelPlus (_, l)) = l
-
-instance Show UnivLevelPlus
-  -- show (UnivLevelPlus _ l) = "[" ++ show l ++ "]"
-                                                     where
+instance Show UnivLevelPlus where
   show (UnivLevelPlus (m, l)) = "[" ++ show l ++ "]:" ++ showMeta m
+  -- show (UnivLevelPlus _ l) = "[" ++ show l ++ "]"
 
 instance Eq UnivLevelPlus where
   (UnivLevelPlus (_, l1)) == (UnivLevelPlus (_, l2)) = l1 == l2

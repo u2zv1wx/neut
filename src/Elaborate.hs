@@ -13,7 +13,6 @@ import System.Console.ANSI
 import qualified Data.HashMap.Strict as Map
 import qualified Data.Set as S
 import qualified Data.Text as T
-import qualified Text.Show.Pretty as Pr
 
 import Data.Basic
 import Data.Constraint
@@ -49,7 +48,6 @@ elaborate e = do
   -- Kantian type-inference ;)
   analyze
   synthesize
-  p "synthesized"
   error "exit"
   -- we shouldn't resort to `type(l) : type(l)`
   -- p "lenv-after"
