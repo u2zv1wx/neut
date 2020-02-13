@@ -301,3 +301,10 @@ asEnumConstant _ = return Nothing
 
 pp :: WeakTermPlus -> WithEnv ()
 pp e = liftIO $ TIO.putStrLn $ toText e
+
+piUnivLevelsfrom ::
+     [Data.WeakTerm.IdentifierPlus] -> WeakTermPlus -> WithEnv [UnivLevelPlus]
+piUnivLevelsfrom xts t = do
+  let ms = map fst $ map (\(_, _, z) -> z) xts ++ [t]
+  ls <- mapM (const newUnivLevel) ms
+  return $ map UnivLevelPlus $ zip ms ls

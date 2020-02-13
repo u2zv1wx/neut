@@ -152,9 +152,9 @@ rename' nenv (m, WeakTermUpsilon x) = do
     --   -- T.pack (showMeta m) <> ": undefined variable: " <> x throwError' $
     --     T.pack (showMeta m) <>
     --     ": undefined variable: " <> x <> "\nnenv:\n" <> T.pack (show nenv)
-rename' nenv (m, WeakTermPi xts t) = do
+rename' nenv (m, WeakTermPi mls xts t) = do
   (xts', t') <- renameBinder nenv xts t
-  return (m, WeakTermPi xts' t')
+  return (m, WeakTermPi mls xts' t')
 rename' nenv (m, WeakTermPiIntro xts e) = do
   (xts', e') <- renameBinder nenv xts e
   return (m, WeakTermPiIntro xts' e')
@@ -337,7 +337,7 @@ lookupStrict' nenv (m, x, _) =
 checkSanity :: [Identifier] -> WeakTermPlus -> Bool
 checkSanity _ (_, WeakTermTau _) = True
 checkSanity _ (_, WeakTermUpsilon _) = True
-checkSanity ctx (_, WeakTermPi xts t) = do
+checkSanity ctx (_, WeakTermPi _ xts t) = do
   checkSanity' ctx xts t
 checkSanity ctx (_, WeakTermPiIntro xts e) = do
   checkSanity' ctx xts e
@@ -439,9 +439,9 @@ invRename (m, WeakTermTau l) = return (m, WeakTermTau l)
 invRename (m, WeakTermUpsilon x) = do
   x' <- invRenameIdentifier IdentKindUpsilon x
   return (m, WeakTermUpsilon x')
-invRename (m, WeakTermPi xts t) = do
+invRename (m, WeakTermPi mls xts t) = do
   (xts', t') <- invRenameBinder xts t
-  return (m, WeakTermPi xts' t')
+  return (m, WeakTermPi mls xts' t')
 invRename (m, WeakTermPiIntro xts e) = do
   (xts', e') <- invRenameBinder xts e
   return (m, WeakTermPiIntro xts' e')

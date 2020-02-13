@@ -39,8 +39,9 @@ interpret (m, TreeNode [(_, TreeAtom "upsilon"), (_, TreeAtom x)]) = do
   return (m', WeakTermUpsilon x)
 interpret (m, TreeNode [(_, TreeAtom "pi"), (_, TreeNode xts), t]) = do
   (xts', t') <- interpretBinder xts t
+  mls <- piUnivLevelsfrom xts' t'
   m' <- adjustPhase m
-  return (m', WeakTermPi xts' t')
+  return (m', WeakTermPi mls xts' t')
 interpret (m, TreeNode [(_, TreeAtom "pi-introduction"), (_, TreeNode xts), e]) = do
   (xts', e') <- interpretBinder xts e
   m' <- adjustPhase m

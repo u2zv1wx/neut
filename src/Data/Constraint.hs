@@ -45,19 +45,6 @@ instance Ord EnrichedConstraint where
 
 type SubstWeakTerm' = Map.HashMap Identifier ([Hole], WeakTermPlus)
 
-newtype UnivLevelPlus =
-  UnivLevelPlus (Meta, UnivLevel)
-
-instance Show UnivLevelPlus where
-  show (UnivLevelPlus (m, l)) = "[" ++ show l ++ "]:" ++ showMeta m
-  -- show (UnivLevelPlus _ l) = "[" ++ show l ++ "]"
-
-instance Eq UnivLevelPlus where
-  (UnivLevelPlus (_, l1)) == (UnivLevelPlus (_, l2)) = l1 == l2
-
-instance Ord UnivLevelPlus where
-  compare (UnivLevelPlus (_, l1)) (UnivLevelPlus (_, l2)) = compare l1 l2
-
 type LevelConstraint = (UnivLevelPlus, UnivLevelPlus)
 
 substLevelConstraint ::

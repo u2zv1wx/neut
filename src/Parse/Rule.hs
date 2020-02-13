@@ -42,8 +42,8 @@ parseConnective ::
 parseConnective ts f g = do
   connectiveList <- mapM parseConnective' ts
   fs <- mapM formationRuleOf connectiveList
-  let ats = map ruleAsIdentPlus fs
-  let bts = concatMap toInternalRuleList connectiveList
+  ats <- mapM ruleAsIdentPlus fs
+  bts <- concat <$> mapM toInternalRuleList connectiveList
   connectiveList' <- concat <$> mapM (f ats bts) connectiveList
   ruleList <- concat <$> mapM (g ats) connectiveList
   return $ connectiveList' ++ ruleList
@@ -78,25 +78,27 @@ renameFormArgs ((m, a, t):ats) = do
 toInductive ::
      [IdentifierPlus] -> [IdentifierPlus] -> Connective -> WithEnv [Stmt]
 toInductive ats bts connective@(m, a, xts, _) = do
-  formationRule <- formationRuleOf connective
+  formationRule <- formationRuleOf connective >>= ruleAsIdentPlus
   atsbts' <- renameFormArgs $ ats ++ bts
   a' <- lookupNameEnv a
   let cod = (m, WeakTermPiElim (m, WeakTermUpsilon a) (map toVar' xts))
   let cod' = (m, WeakTermPiElim (m, WeakTermUpsilon a') (map toVar' xts))
   z <- newLLVMNameWith "_"
   let zt = (m, z, cod)
+  mls1 <- piUnivLevelsfrom (ats ++ bts) cod
+  mls2 <- piUnivLevelsfrom (xts ++ atsbts' ++ [zt]) cod'
   return $
     [ StmtLetInductive
         (length ats)
         m
-        (ruleAsIdentPlus formationRule)
-        (m, WeakTermPiIntro xts (m, WeakTermPi (ats ++ bts) cod))
+        formationRule
+        (m, WeakTermPiIntro xts (m, WeakTermPi mls1 (ats ++ bts) cod))
     -- induction principle
     , StmtLet
         m
         ( m
         , a <> "." <> "induction"
-        , (m, WeakTermPi (xts ++ atsbts' ++ [zt]) cod'))
+        , (m, WeakTermPi mls2 (xts ++ atsbts' ++ [zt]) cod'))
         ( m
         , WeakTermPiIntro
             (xts ++ atsbts' ++ [zt])
@@ -105,7 +107,7 @@ toInductive ats bts connective@(m, a, xts, _) = do
 
 toInductiveIntroList :: [IdentifierPlus] -> Connective -> WithEnv [Stmt]
 toInductiveIntroList ats (_, a, xts, rules) = do
-  let bts = map ruleAsIdentPlus rules
+  bts <- mapM ruleAsIdentPlus rules
   mapM (toInductiveIntro ats bts xts a) rules
 
 -- represent the introduction rule within CoC
@@ -120,10 +122,11 @@ toInductiveIntro ats bts xts a (mb, b, m, yts, cod)
   | (_, WeakTermPiElim (_, WeakTermUpsilon a') es) <- cod
   , a == a'
   , length xts == length es = do
+    mls <- piUnivLevelsfrom (xts ++ yts) cod
     return $
       StmtLetInductiveIntro
         m
-        (mb, b, (m, WeakTermPi (xts ++ yts) cod))
+        (mb, b, (m, WeakTermPi mls (xts ++ yts) cod))
         xts
         yts
         ats
@@ -140,18 +143,19 @@ toInductiveIntro ats bts xts a (mb, b, m, yts, cod)
 toCoinductive ::
      [IdentifierPlus] -> [IdentifierPlus] -> Connective -> WithEnv [Stmt]
 toCoinductive ats bts c@(m, a, xts, _) = do
-  f <- formationRuleOf c
+  f <- formationRuleOf c >>= ruleAsIdentPlus
   atsbts' <- renameFormArgs $ ats ++ bts
   a' <- lookupNameEnv a
   let cod = (m, WeakTermPiElim (m, WeakTermUpsilon a) (map toVar' xts))
   let cod' = (m, WeakTermPiElim (m, WeakTermUpsilon a') (map toVar' xts))
   z <- newLLVMNameWith "_"
   let zt' = (m, z, cod')
+  mls <- piUnivLevelsfrom (xts ++ atsbts' ++ [zt']) cod
   return
     [ StmtLetCoinductive
         (length ats)
         m
-        (ruleAsIdentPlus f) -- a : Pi xts. Univ
+        f -- a : Pi xts. Univ
         ( m
         , WeakTermPiIntro xts (m, WeakTermSigma (ats ++ bts ++ [(m, z, cod)])))
     -- coinduction principle
@@ -159,7 +163,7 @@ toCoinductive ats bts c@(m, a, xts, _) = do
         m
         ( m
         , a <> "." <> "coinduction"
-        , (m, WeakTermPi (xts ++ atsbts' ++ [zt']) cod))
+        , (m, WeakTermPi mls (xts ++ atsbts' ++ [zt']) cod))
         ( m
         , WeakTermPiIntro
             (xts ++ atsbts' ++ [zt'])
@@ -171,7 +175,7 @@ toCoinductive ats bts c@(m, a, xts, _) = do
 
 toCoinductiveElimList :: [IdentifierPlus] -> Connective -> WithEnv [Stmt]
 toCoinductiveElimList ats (_, a, xts, rules) = do
-  let bts = map ruleAsIdentPlus rules
+  bts <- mapM ruleAsIdentPlus rules
   mapM (toCoinductiveElim ats bts xts a) rules
 
 -- represent the elimination rule within CoC
@@ -187,10 +191,11 @@ toCoinductiveElim ats bts xts a (mb, b, m, yts, cod)
   , (_, WeakTermPiElim (_, WeakTermUpsilon a') es) <- dom
   , a == a'
   , length xts == length es = do
+    mls <- piUnivLevelsfrom (xts ++ [yt]) cod
     return $
       StmtLetCoinductiveElim
         m
-        (mb, b, (m, WeakTermPi (xts ++ [yt]) cod))
+        (mb, b, (m, WeakTermPi mls (xts ++ [yt]) cod))
         (xts ++ [yt])
         cod
         ats
@@ -206,16 +211,18 @@ toCoinductiveElim ats bts xts a (mb, b, m, yts, cod)
     a <>
     "` must be of the form `(" <> showItems (a : map (const "_") xts) <> ")`"
 
-ruleAsIdentPlus :: Rule -> IdentifierPlus
-ruleAsIdentPlus (mb, b, m, xts, t) = (mb, b, (m, WeakTermPi xts t))
+ruleAsIdentPlus :: Rule -> WithEnv IdentifierPlus
+ruleAsIdentPlus (mb, b, m, xts, t) = do
+  mls <- piUnivLevelsfrom xts t
+  return (mb, b, (m, WeakTermPi mls xts t))
 
 formationRuleOf :: Connective -> WithEnv Rule
 formationRuleOf (m, a, xts, _) = do
   l <- newUnivLevel
   return (m, a, m, xts, (m, WeakTermTau l))
 
-toInternalRuleList :: Connective -> [IdentifierPlus]
-toInternalRuleList (_, _, _, rules) = map ruleAsIdentPlus rules
+toInternalRuleList :: Connective -> WithEnv [IdentifierPlus]
+toInternalRuleList (_, _, _, rules) = mapM ruleAsIdentPlus rules
 
 toVar' :: IdentifierPlus -> WeakTermPlus
 toVar' (m, x, _) = (m, WeakTermUpsilon x)
@@ -296,7 +303,7 @@ zeta mode isub csub atsbts t e = do
   isub' <- invSubst isub
   csub' <- invSubst csub
   case t of
-    (_, WeakTermPi xts cod) -> zetaPi mode isub csub atsbts xts cod e
+    (_, WeakTermPi _ xts cod) -> zetaPi mode isub csub atsbts xts cod e
     (_, WeakTermSigma xts) -> zetaSigma mode isub csub atsbts xts e
     (_, WeakTermPiElim va@(_, WeakTermUpsilon a) es) -- esの長さをチェックするべきでは？
       | Just _ <- lookup a (isub ++ isub') ->
@@ -483,7 +490,7 @@ lookupInductive ::
 lookupInductive a = do
   fenv <- gets formationEnv
   case Map.lookup a fenv of
-    Just (Just (_, WeakTermPiIntro xts (_, WeakTermPi atsbts (_, WeakTermPiElim (_, WeakTermUpsilon _) _)))) -> do
+    Just (Just (_, WeakTermPiIntro xts (_, WeakTermPi _ atsbts (_, WeakTermPiElim (_, WeakTermUpsilon _) _)))) -> do
       let at = head atsbts
       let bts = tail atsbts -- valid since a is not mutual
       return (xts, at, bts)
@@ -527,7 +534,7 @@ toInternalizedArg ::
   -> IdentifierPlus -- outerでのコンストラクタ。
   -> IdentifierPlus -- innerでのコンストラクタ。xts部分の引数だけouterのコンストラクタと型がずれていることに注意。
   -> WithEnv WeakTermPlus
-toInternalizedArg mode isub csub aInner aOuter xts atsbts es es' b (mbInner, _, (_, WeakTermPi ytsInner _)) = do
+toInternalizedArg mode isub csub aInner aOuter xts atsbts es es' b (mbInner, _, (_, WeakTermPi _ ytsInner _)) = do
   let (ms, ys, ts) = unzip3 ytsInner
   let vxs = map toVar' xts
   -- 引数の型を適切にsubstする。これによって、aInner (x1, ..., xn)の出現がaOuter (e1', ..., en')へと置き換えられて、
@@ -573,7 +580,7 @@ toExternalizedArg ::
   -> IdentifierPlus -- outerでのdestructor
   -> IdentifierPlus -- innerでのdestructor
   -> WithEnv WeakTermPlus
-toExternalizedArg mode isub csub aInner a' xts atsbts es es' b (mbInner, _, (_, WeakTermPi yts cod)) = do
+toExternalizedArg mode isub csub aInner a' xts atsbts es es' b (mbInner, _, (_, WeakTermPi _ yts cod)) = do
   let (ms, ys, ts) = unzip3 yts
   let vxs = map toVar' xts
   -- 引数の型を変更する。coinductiveなので実際にはlength ts == 1であるが気にせずリストのまま処理する。
@@ -613,9 +620,9 @@ substRuleType sub (m, WeakTermUpsilon x) =
   if fst (fst sub) == x
     then throwError' "invalid use of inductive/coinductive type"
     else return (m, WeakTermUpsilon x)
-substRuleType sub (m, WeakTermPi xts t) = do
+substRuleType sub (m, WeakTermPi mls xts t) = do
   (xts', t') <- substRuleTypeBindingsWithBody sub xts t
-  return (m, WeakTermPi xts' t')
+  return (m, WeakTermPi mls xts' t')
 substRuleType sub (m, WeakTermPiIntro xts body) = do
   (xts', body') <- substRuleTypeBindingsWithBody sub xts body
   return (m, WeakTermPiIntro xts' body')

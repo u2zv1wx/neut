@@ -13,10 +13,23 @@ import Data.Basic
 -- itself is not the level of the universe)
 type UnivLevel = Integer
 
+newtype UnivLevelPlus =
+  UnivLevelPlus (Meta, UnivLevel)
+
+instance Show UnivLevelPlus where
+  show (UnivLevelPlus (m, l)) = "[" ++ show l ++ "]:" ++ showMeta m
+  -- show (UnivLevelPlus _ l) = "[" ++ show l ++ "]"
+
+instance Eq UnivLevelPlus where
+  (UnivLevelPlus (_, l1)) == (UnivLevelPlus (_, l2)) = l1 == l2
+
+instance Ord UnivLevelPlus where
+  compare (UnivLevelPlus (_, l1)) (UnivLevelPlus (_, l2)) = compare l1 l2
+
 data WeakTerm
   = WeakTermTau UnivLevel
   | WeakTermUpsilon Identifier
-  | WeakTermPi [IdentifierPlus] WeakTermPlus
+  | WeakTermPi [UnivLevelPlus] [IdentifierPlus] WeakTermPlus
   | WeakTermPiIntro [IdentifierPlus] WeakTermPlus
   | WeakTermPiElim WeakTermPlus [WeakTermPlus]
   -- We define Sigma here since n-ary Sigma cannot be defined in the target language.
@@ -171,7 +184,7 @@ f64 = (emptyMeta, WeakTermConst "f64")
 varWeakTermPlus :: WeakTermPlus -> [Identifier]
 varWeakTermPlus (_, WeakTermTau _) = []
 varWeakTermPlus (_, WeakTermUpsilon x) = x : []
-varWeakTermPlus (_, WeakTermPi xts t) = do
+varWeakTermPlus (_, WeakTermPi _ xts t) = do
   varWeakTermPlusBindings xts [t]
 varWeakTermPlus (_, WeakTermPiIntro xts e) = do
   varWeakTermPlusBindings xts [e]
@@ -227,7 +240,7 @@ varWeakTermPlusBindings ((_, x, t):xts) es = do
 holeWeakTermPlus :: WeakTermPlus -> [Hole]
 holeWeakTermPlus (_, WeakTermTau _) = []
 holeWeakTermPlus (_, WeakTermUpsilon _) = []
-holeWeakTermPlus (_, WeakTermPi xts t) = holeWeakTermPlusBindings xts [t]
+holeWeakTermPlus (_, WeakTermPi _ xts t) = holeWeakTermPlusBindings xts [t]
 holeWeakTermPlus (_, WeakTermPiIntro xts e) = holeWeakTermPlusBindings xts [e]
 holeWeakTermPlus (_, WeakTermPiElim e es) =
   holeWeakTermPlus e ++ concatMap holeWeakTermPlus es
@@ -280,9 +293,9 @@ substWeakTermPlus sub e1@(_, WeakTermUpsilon x) = do
     Nothing -> e1
     Just e2@(_, e) -> (supMeta (metaOf e1) (metaOf e2), e)
   -- fromMaybe (m, WeakTermUpsilon x) (lookup x sub)
-substWeakTermPlus sub (m, WeakTermPi xts t) = do
+substWeakTermPlus sub (m, WeakTermPi mls xts t) = do
   let (xts', t') = substWeakTermPlusBindingsWithBody sub xts t
-  (m, WeakTermPi xts' t')
+  (m, WeakTermPi mls xts' t')
 substWeakTermPlus sub (m, WeakTermPiIntro xts body) = do
   let (xts', body') = substWeakTermPlusBindingsWithBody sub xts body
   (m, WeakTermPiIntro xts' body')
@@ -393,7 +406,7 @@ substWeakTermPlusBindingsWithBody sub ((m, x, t):xts) e = do
 toText :: WeakTermPlus -> Identifier
 toText (_, WeakTermTau _) = "tau"
 toText (_, WeakTermUpsilon x) = x
-toText (_, WeakTermPi xts t) = do
+toText (_, WeakTermPi _ xts t) = do
   let argStr = inParen $ showItems $ map showArg xts
   showCons ["Π", argStr, toText t]
 toText (_, WeakTermPiIntro xts e) = do

@@ -43,7 +43,8 @@ compInfoWeakTermPlus _ _ (_, WeakTermTau _) = return ()
 compInfoWeakTermPlus c info (_, WeakTermUpsilon x)
   | c == x = Left info
   | otherwise = return ()
-compInfoWeakTermPlus c info (_, WeakTermPi xts t) = compInfoBinder c info xts t
+compInfoWeakTermPlus c info (_, WeakTermPi _ xts t) =
+  compInfoBinder c info xts t
 compInfoWeakTermPlus c info (_, WeakTermPiIntro xts e) =
   compInfoBinder c info xts e
 compInfoWeakTermPlus c info (_, WeakTermPiElim e es) = do
