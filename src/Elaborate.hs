@@ -89,9 +89,7 @@ toGraph (((_, l1), v@(_, (_, _))):kvs) =
 
 ensureDAG' :: LevelGraph -> NodeInfo -> [(Meta, UnivLevel)] -> WithEnv ()
 ensureDAG' _ _ [] = return ()
-ensureDAG' g nodeInfo (v:vs)
-  -- p $ "remaining: " <> show (length vs)
- = do
+ensureDAG' g nodeInfo (v:vs) = do
   let l = snd v
   case Map.lookup l nodeInfo of
     Just NodeStateFinish -> ensureDAG' g nodeInfo vs

@@ -32,15 +32,13 @@ synthesize = do
   case Q.getMin q of
     Nothing -> return ()
     Just (Enriched (e1, e2) ms _)
-      | Just (m, e) <- lookupAny ms sub -> do resolveStuck e1 e2 m e
-    Just (Enriched _ _ (ConstraintDelta iter mess1 mess2)) -> do
+      | Just (m, e) <- lookupAny ms sub -> resolveStuck e1 e2 m e
+    Just (Enriched _ _ (ConstraintDelta iter mess1 mess2)) ->
       resolveDelta iter mess1 mess2
-    Just (Enriched _ _ (ConstraintQuasiPattern m ess e)) -> do
+    Just (Enriched _ _ (ConstraintQuasiPattern m ess e)) ->
       resolvePiElim m ess e
-    Just (Enriched _ _ (ConstraintFlexRigid m ess e)) -> do
-      resolvePiElim m ess e
-    Just (Enriched _ _ _) -> do
-      showErrorThenQuit q
+    Just (Enriched _ _ (ConstraintFlexRigid m ess e)) -> resolvePiElim m ess e
+    Just (Enriched _ _ _) -> showErrorThenQuit q
       -- p $ "rest: " ++ show (Q.size q)
       -- throwError' $ "cannot simplify:\n" <> T.pack (Pr.ppShow (e1, e2))
 
