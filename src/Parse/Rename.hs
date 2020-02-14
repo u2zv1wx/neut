@@ -2,7 +2,7 @@
 
 module Parse.Rename
   ( rename
-  , renameStmtList
+  , renameQuasiStmtList
   , invRename
   , prepareInvRename
   ) where
@@ -25,18 +25,18 @@ rename e = do
   let info = toInfo "rename.post" result
   return $ assertP info result $ checkSanity [] result
 
-renameStmtList :: [Stmt] -> WithEnv [Stmt]
-renameStmtList = renameStmtList' Map.empty
+renameQuasiStmtList :: [QuasiStmt] -> WithEnv [QuasiStmt]
+renameQuasiStmtList = renameQuasiStmtList' Map.empty
 
-renameStmtList' :: NameEnv -> [Stmt] -> WithEnv [Stmt]
-renameStmtList' _ [] = return []
-renameStmtList' nenv ((StmtLet m (mx, x, t) e):ss) = do
+renameQuasiStmtList' :: NameEnv -> [QuasiStmt] -> WithEnv [QuasiStmt]
+renameQuasiStmtList' _ [] = return []
+renameQuasiStmtList' nenv ((QuasiStmtLet m (mx, x, t) e):ss) = do
   t' <- rename' nenv t
   x' <- newLLVMNameWith x
   e' <- rename' nenv e
-  ss' <- renameStmtList' (Map.insert x x' nenv) ss
-  return $ StmtLet m (mx, x', t') e' : ss'
-renameStmtList' nenv ((StmtDef xds):ss) = do
+  ss' <- renameQuasiStmtList' (Map.insert x x' nenv) ss
+  return $ QuasiStmtLet m (mx, x', t') e' : ss'
+renameQuasiStmtList' nenv ((QuasiStmtDef xds):ss) = do
   let (xs, ds) = unzip xds
   -- rename for deflist
   let ys = map (\(_, (_, y, _), _, _) -> y) ds
@@ -46,25 +46,25 @@ renameStmtList' nenv ((StmtDef xds):ss) = do
   -- rename for continuation
   xs' <- mapM newLLVMNameWith xs
   let nenvForCont = Map.fromList (zip xs xs') `Map.union` nenv
-  ss' <- renameStmtList' nenvForCont ss
-  return $ StmtDef (zip xs' ds') : ss'
-renameStmtList' nenv ((StmtConstDecl m (mx, x, t)):ss) = do
+  ss' <- renameQuasiStmtList' nenvForCont ss
+  return $ QuasiStmtDef (zip xs' ds') : ss'
+renameQuasiStmtList' nenv ((QuasiStmtConstDecl m (mx, x, t)):ss) = do
   t' <- rename' nenv t
-  ss' <- renameStmtList' (Map.insert x x nenv) ss
-  return $ StmtConstDecl m (mx, x, t') : ss'
-renameStmtList' nenv ((StmtLetInductive n m (mx, a, t) e):ss) = do
-  t' <- rename' nenv t
-  a' <- newLLVMNameWith a
-  e' <- rename' nenv e
-  ss' <- renameStmtList' (Map.insert a a' nenv) ss
-  return $ StmtLetInductive n m (mx, a', t') e' : ss'
-renameStmtList' nenv ((StmtLetCoinductive n m (mx, a, t) e):ss) = do
+  ss' <- renameQuasiStmtList' (Map.insert x x nenv) ss
+  return $ QuasiStmtConstDecl m (mx, x, t') : ss'
+renameQuasiStmtList' nenv ((QuasiStmtLetInductive n m (mx, a, t) e):ss) = do
   t' <- rename' nenv t
   a' <- newLLVMNameWith a
   e' <- rename' nenv e
-  ss' <- renameStmtList' (Map.insert a a' nenv) ss
-  return $ StmtLetCoinductive n m (mx, a', t') e' : ss'
-renameStmtList' nenv ((StmtLetInductiveIntro m (mb, b, t) xts yts ats bts bInner _ _):ss) = do
+  ss' <- renameQuasiStmtList' (Map.insert a a' nenv) ss
+  return $ QuasiStmtLetInductive n m (mx, a', t') e' : ss'
+renameQuasiStmtList' nenv ((QuasiStmtLetCoinductive n m (mx, a, t) e):ss) = do
+  t' <- rename' nenv t
+  a' <- newLLVMNameWith a
+  e' <- rename' nenv e
+  ss' <- renameQuasiStmtList' (Map.insert a a' nenv) ss
+  return $ QuasiStmtLetCoinductive n m (mx, a', t') e' : ss'
+renameQuasiStmtList' nenv ((QuasiStmtLetInductiveIntro m (mb, b, t) xts yts ats bts bInner _ _):ss) = do
   t' <- rename' nenv t
   (xts', nenv') <- renameArgs nenv xts
   (yts', nenv'') <- renameArgs nenv' yts
@@ -72,12 +72,12 @@ renameStmtList' nenv ((StmtLetInductiveIntro m (mb, b, t) xts yts ats bts bInner
   (bts', nenv'''') <- renameArgs nenv''' bts
   bInner' <- rename' nenv'''' bInner
   b' <- newLLVMNameWith b
-  ss' <- renameStmtList' (Map.insert b b' nenv) ss
+  ss' <- renameQuasiStmtList' (Map.insert b b' nenv) ss
   asOuter <- mapM (lookupStrict nenv) ats
   asInnerPlus <- mapM (lookupStrict' nenv'''') ats
   let info = zip asOuter asInnerPlus
   return $
-    StmtLetInductiveIntro
+    QuasiStmtLetInductiveIntro
       m
       (mb, b', t')
       xts'
@@ -88,7 +88,7 @@ renameStmtList' nenv ((StmtLetInductiveIntro m (mb, b, t) xts yts ats bts bInner
       info
       asOuter :
     ss'
-renameStmtList' nenv ((StmtLetCoinductiveElim m (mb, b, t) xtsyt codInner ats bts yt e1 e2 _ _):ss) = do
+renameQuasiStmtList' nenv ((QuasiStmtLetCoinductiveElim m (mb, b, t) xtsyt codInner ats bts yt e1 e2 _ _):ss) = do
   t' <- rename' nenv t
   (xtsyt', nenv') <- renameArgs nenv xtsyt
   e1' <- rename' nenv' e1
@@ -100,7 +100,7 @@ renameStmtList' nenv ((StmtLetCoinductiveElim m (mb, b, t) xtsyt codInner ats bt
   codInner' <- rename' nenv'''' codInner
   e2' <- rename' nenv'''' e2
   b' <- newLLVMNameWith b
-  ss' <- renameStmtList' (Map.insert b b' nenv) ss
+  ss' <- renameQuasiStmtList' (Map.insert b b' nenv) ss
   -- let as = map (\(_, y, _) -> y) ats
   asOuterPlus <- mapM (lookupStrict' nenv) ats
   asOuter <- mapM (lookupStrict nenv) ats
@@ -109,7 +109,7 @@ renameStmtList' nenv ((StmtLetCoinductiveElim m (mb, b, t) xtsyt codInner ats bt
   -- (cod'を置き換えるのでdomのasOuterはcod'と同じnenvでrenameされている)
   let info = zip asInner asOuterPlus
   return $
-    StmtLetCoinductiveElim
+    QuasiStmtLetCoinductiveElim
       m
       (mb, b', t')
       xtsyt'

@@ -23,10 +23,10 @@ import Data.Tree
 import Data.WeakTerm
 import Parse.Interpret
 
-parseInductive :: [TreePlus] -> WithEnv [Stmt]
+parseInductive :: [TreePlus] -> WithEnv [QuasiStmt]
 parseInductive ts = parseConnective ts toInductive toInductiveIntroList
 
-parseCoinductive :: [TreePlus] -> WithEnv [Stmt]
+parseCoinductive :: [TreePlus] -> WithEnv [QuasiStmt]
 parseCoinductive ts = parseConnective ts toCoinductive toCoinductiveElimList
 
 -- variable naming convention on parsing connectives:
@@ -36,9 +36,9 @@ parseCoinductive ts = parseConnective ts toCoinductive toCoinductiveElimList
 --   y : the name of an argument of an introduction/elimination rule, like `w` or `ws` in `cons : Pi (w : A, ws : list A). list A`.
 parseConnective ::
      [TreePlus]
-  -> ([IdentifierPlus] -> [IdentifierPlus] -> Connective -> WithEnv [Stmt])
-  -> ([IdentifierPlus] -> Connective -> WithEnv [Stmt])
-  -> WithEnv [Stmt]
+  -> ([IdentifierPlus] -> [IdentifierPlus] -> Connective -> WithEnv [QuasiStmt])
+  -> ([IdentifierPlus] -> Connective -> WithEnv [QuasiStmt])
+  -> WithEnv [QuasiStmt]
 parseConnective ts f g = do
   connectiveList <- mapM parseConnective' ts
   fs <- mapM formationRuleOf connectiveList
@@ -76,7 +76,7 @@ renameFormArgs ((m, a, t):ats) = do
 
 -- represent the inductive logical connective within CoC
 toInductive ::
-     [IdentifierPlus] -> [IdentifierPlus] -> Connective -> WithEnv [Stmt]
+     [IdentifierPlus] -> [IdentifierPlus] -> Connective -> WithEnv [QuasiStmt]
 toInductive ats bts connective@(m, a, xts, _) = do
   formationRule <- formationRuleOf connective >>= ruleAsIdentPlus
   atsbts' <- renameFormArgs $ ats ++ bts
@@ -88,13 +88,13 @@ toInductive ats bts connective@(m, a, xts, _) = do
   mls1 <- piUnivLevelsfrom (ats ++ bts) cod
   mls2 <- piUnivLevelsfrom (xts ++ atsbts' ++ [zt]) cod'
   return $
-    [ StmtLetInductive
+    [ QuasiStmtLetInductive
         (length ats)
         m
         formationRule
         (m, WeakTermPiIntro xts (m, WeakTermPi mls1 (ats ++ bts) cod))
     -- induction principle
-    , StmtLet
+    , QuasiStmtLet
         m
         ( m
         , a <> "." <> "induction"
@@ -105,7 +105,7 @@ toInductive ats bts connective@(m, a, xts, _) = do
             (m, WeakTermPiElim (toVar' zt) (map toVar' atsbts')))
     ]
 
-toInductiveIntroList :: [IdentifierPlus] -> Connective -> WithEnv [Stmt]
+toInductiveIntroList :: [IdentifierPlus] -> Connective -> WithEnv [QuasiStmt]
 toInductiveIntroList ats (_, a, xts, rules) = do
   bts <- mapM ruleAsIdentPlus rules
   mapM (toInductiveIntro ats bts xts a) rules
@@ -117,14 +117,14 @@ toInductiveIntro ::
   -> [IdentifierPlus]
   -> Identifier
   -> Rule
-  -> WithEnv Stmt
+  -> WithEnv QuasiStmt
 toInductiveIntro ats bts xts a (mb, b, m, yts, cod)
   | (_, WeakTermPiElim (_, WeakTermUpsilon a') es) <- cod
   , a == a'
   , length xts == length es = do
     mls <- piUnivLevelsfrom (xts ++ yts) cod
     return $
-      StmtLetInductiveIntro
+      QuasiStmtLetInductiveIntro
         m
         (mb, b, (m, WeakTermPi mls (xts ++ yts) cod))
         xts
@@ -141,7 +141,7 @@ toInductiveIntro ats bts xts a (mb, b, m, yts, cod)
     "` must be of the form `(" <> showItems (a : map (const "_") xts) <> ")`"
 
 toCoinductive ::
-     [IdentifierPlus] -> [IdentifierPlus] -> Connective -> WithEnv [Stmt]
+     [IdentifierPlus] -> [IdentifierPlus] -> Connective -> WithEnv [QuasiStmt]
 toCoinductive ats bts c@(m, a, xts, _) = do
   f <- formationRuleOf c >>= ruleAsIdentPlus
   atsbts' <- renameFormArgs $ ats ++ bts
@@ -152,14 +152,14 @@ toCoinductive ats bts c@(m, a, xts, _) = do
   let zt' = (m, z, cod')
   mls <- piUnivLevelsfrom (xts ++ atsbts' ++ [zt']) cod
   return
-    [ StmtLetCoinductive
+    [ QuasiStmtLetCoinductive
         (length ats)
         m
         f -- a : Pi xts. Univ
         ( m
         , WeakTermPiIntro xts (m, WeakTermSigma (ats ++ bts ++ [(m, z, cod)])))
     -- coinduction principle
-    , StmtLet
+    , QuasiStmtLet
         m
         ( m
         , a <> "." <> "coinduction"
@@ -173,7 +173,7 @@ toCoinductive ats bts c@(m, a, xts, _) = do
                 (map toVar' (atsbts' ++ [zt']))))
     ]
 
-toCoinductiveElimList :: [IdentifierPlus] -> Connective -> WithEnv [Stmt]
+toCoinductiveElimList :: [IdentifierPlus] -> Connective -> WithEnv [QuasiStmt]
 toCoinductiveElimList ats (_, a, xts, rules) = do
   bts <- mapM ruleAsIdentPlus rules
   mapM (toCoinductiveElim ats bts xts a) rules
@@ -185,7 +185,7 @@ toCoinductiveElim ::
   -> [IdentifierPlus]
   -> Identifier
   -> Rule
-  -> WithEnv Stmt
+  -> WithEnv QuasiStmt
 toCoinductiveElim ats bts xts a (mb, b, m, yts, cod)
   | [yt@(_, _, dom)] <- yts
   , (_, WeakTermPiElim (_, WeakTermUpsilon a') es) <- dom
@@ -193,7 +193,7 @@ toCoinductiveElim ats bts xts a (mb, b, m, yts, cod)
   , length xts == length es = do
     mls <- piUnivLevelsfrom (xts ++ [yt]) cod
     return $
-      StmtLetCoinductiveElim
+      QuasiStmtLetCoinductiveElim
         m
         (mb, b, (m, WeakTermPi mls (xts ++ [yt]) cod))
         (xts ++ [yt])

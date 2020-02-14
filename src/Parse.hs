@@ -36,8 +36,8 @@ parse :: Path Abs File -> WithEnv WeakTermPlus
 parse inputPath = do
   content <- liftIO $ TIO.readFile $ toFilePath inputPath
   stmtList <- strToTree content (toFilePath inputPath) >>= parse'
-  stmtList' <- renameStmtList stmtList
-  concatStmtList stmtList'
+  stmtList' <- renameQuasiStmtList stmtList
+  concatQuasiStmtList stmtList'
 
 complete :: Path Abs File -> Line -> Column -> WithEnv [String]
 complete inputPath l c = do
@@ -103,7 +103,7 @@ modifyFileForCompletion s content l c = do
 
 -- {} parse' {}
 -- Parse the head element of the input list.
-parse' :: [TreePlus] -> WithEnv [Stmt]
+parse' :: [TreePlus] -> WithEnv [QuasiStmt]
 parse' [] = return []
 parse' ((_, TreeNode [(_, TreeAtom "notation"), from, to]):as) = do
   checkNotationSanity from
@@ -131,7 +131,7 @@ parse' ((m, TreeNode ((_, TreeAtom "enum"):(_, TreeAtom name):ts)):as) = do
   -- e.g. t == is-enum @ (choice)
   isEnumType <- toIsEnumType name
   -- add `(constant enum.choice (is-enum choice))` to defList in order to insert appropriate type constraint
-  let ascription = StmtConstDecl m' (m', constName, isEnumType)
+  let ascription = QuasiStmtConstDecl m' (m', constName, isEnumType)
   -- register the name of the constant
   modify (\env -> env {nameEnv = Map.insert constName constName (nameEnv env)})
   defList <- parse' as
@@ -151,22 +151,22 @@ parse' ((_, TreeNode [(_, TreeAtom "include"), (_, TreeAtom pathString)]):as) =
           denv <- gets fileEnv
           case Map.lookup newFilePath denv of
             Just mxs -> do
-              let header = map (toStmtLetHeader newFilePath) mxs
+              let header = map (toQuasiStmtLetHeader newFilePath) mxs
               defList <- parse' as
               return $ header ++ defList
             Nothing -> do
               content <- liftIO $ TIO.readFile $ toFilePath newFilePath
               modify (\env -> env {currentFilePath = newFilePath})
               modify (\env -> env {phase = 1 + phase env})
-              includedStmtList <- strToTree content path >>= parse'
-              let mxs = toIdentList includedStmtList
+              includedQuasiStmtList <- strToTree content path >>= parse'
+              let mxs = toIdentList includedQuasiStmtList
               modify (\env -> env {currentFilePath = oldFilePath})
               modify (\env -> env {phase = 1 + phase env})
               modify (\env -> env {fileEnv = Map.insert newFilePath mxs denv})
               defList <- parse' as
-              let footer = map (toStmtLetFooter newFilePath) mxs
-              let header = map (toStmtLetHeader newFilePath) mxs
-              return $ includedStmtList ++ footer ++ header ++ defList
+              let footer = map (toQuasiStmtLetFooter newFilePath) mxs
+              let header = map (toQuasiStmtLetHeader newFilePath) mxs
+              return $ includedQuasiStmtList ++ footer ++ header ++ defList
 parse' ((_, TreeNode ((_, TreeAtom "statement"):as1)):as2) = do
   defList1 <- parse' as1
   defList2 <- parse' as2
@@ -181,7 +181,7 @@ parse' ((m, TreeNode [(_, TreeAtom "constant"), (mn, TreeAtom name), t]):as) = d
       defList <- parse' as
       m' <- adjustPhase m
       mn' <- adjustPhase mn
-      return $ StmtConstDecl m' (mn', name, t') : defList
+      return $ QuasiStmtConstDecl m' (mn', name, t') : defList
 parse' ((m, TreeNode [(mDef, TreeAtom "definition"), name@(_, TreeAtom _), body]):as) =
   parse' $ (m, TreeNode [(mDef, TreeAtom "let"), name, body]) : as
 parse' ((m, TreeNode (def@(_, TreeAtom "definition"):name@(mFun, TreeAtom _):xts@(_, TreeNode _):body:rest)):as) =
@@ -212,7 +212,7 @@ parse' ((m, TreeNode [(_, TreeAtom "let"), xt, e]):as) = do
   e' <- macroExpand e >>= interpret
   (mx, x, t) <- macroExpand xt >>= interpretIdentifierPlus
   defList <- parse' as
-  return $ StmtLet m' (mx, x, t) e' : defList
+  return $ QuasiStmtLet m' (mx, x, t) e' : defList
 parse' (a:as) = do
   e <- macroExpand a
   if isSpecialForm e
@@ -223,14 +223,14 @@ parse' (a:as) = do
       t <- newHole
       defList <- parse' as
       let meta' = meta {metaIsAppropriateAsCompletionCandidate = False}
-      return $ StmtLet meta' (meta', name, t) e' : defList
+      return $ QuasiStmtLet meta' (meta', name, t) e' : defList
 
-parseDef :: [TreePlus] -> WithEnv Stmt
+parseDef :: [TreePlus] -> WithEnv QuasiStmt
 parseDef xds = do
   xds' <- mapM (insImplicitBegin >=> macroExpand) xds
   mxs <- mapM extractFunName xds'
   xds'' <- mapM interpretIter xds'
-  return $ StmtDef $ zip mxs xds''
+  return $ QuasiStmtDef $ zip mxs xds''
 
 insImplicitBegin :: TreePlus -> WithEnv TreePlus
 insImplicitBegin (m, TreeNode (xt:xts:body:rest)) = do
@@ -268,41 +268,41 @@ toIsEnumType name = do
         (emptyMeta, WeakTermConst "is-enum")
         [(emptyMeta, WeakTermEnum $ EnumTypeLabel name)])
 
--- {} concatStmtList {}
--- Represent the list of Stmts in the target language, using `let`.
+-- {} concatQuasiStmtList {}
+-- Represent the list of QuasiStmts in the target language, using `let`.
 -- (Note that `let x := e1 in e2` can be represented as `(lam x e2) e1`.)
 -- これはrenameのあとで呼ばれる
-concatStmtList :: [Stmt] -> WithEnv WeakTermPlus
-concatStmtList [] = do
+concatQuasiStmtList :: [QuasiStmt] -> WithEnv WeakTermPlus
+concatQuasiStmtList [] = do
   return (emptyMeta, WeakTermEnumIntro $ EnumValueLabel "unit")
 -- for test
-concatStmtList [StmtLet _ _ e] = do
+concatQuasiStmtList [QuasiStmtLet _ _ e] = do
   return e
-concatStmtList (StmtConstDecl m xt:es) = do
-  cont <- concatStmtList es
+concatQuasiStmtList (QuasiStmtConstDecl m xt:es) = do
+  cont <- concatQuasiStmtList es
   return (m, WeakTermConstDecl xt cont)
-concatStmtList (StmtLet m xt e:es) = do
-  cont <- concatStmtList es
+concatQuasiStmtList (QuasiStmtLet m xt e:es) = do
+  cont <- concatQuasiStmtList es
   return (m, WeakTermPiElim (emptyMeta, WeakTermPiIntro [xt] cont) [e])
-concatStmtList (StmtDef xds:ss) = do
+concatQuasiStmtList (QuasiStmtDef xds:ss) = do
   let ds = map snd xds
   let baseSub = map defToSub ds
   let sub = selfCompose (length baseSub) baseSub
   let varList = map (\(_, (m, x, _), _, _) -> (m, WeakTermUpsilon x)) ds
   let iterList = map (substWeakTermPlus sub) varList
-  concatStmtList $ (toLetList $ zip xds iterList) ++ ss
-concatStmtList ((StmtLetInductive n m xt e):es) = do
+  concatQuasiStmtList $ (toLetList $ zip xds iterList) ++ ss
+concatQuasiStmtList ((QuasiStmtLetInductive n m xt e):es) = do
   insForm n xt e
-  cont <- concatStmtList es
+  cont <- concatQuasiStmtList es
   return (m, WeakTermPiElim (emptyMeta, WeakTermPiIntro [xt] cont) [e])
-concatStmtList (StmtLetCoinductive n m at e:es) = do
+concatQuasiStmtList (QuasiStmtLetCoinductive n m at e:es) = do
   insForm n at e
-  cont <- concatStmtList es
+  cont <- concatQuasiStmtList es
   return (m, WeakTermPiElim (emptyMeta, WeakTermPiIntro [at] cont) [e])
-concatStmtList (StmtLetInductiveIntro m bt xts yts ats bts bInner isub as:ss) = do
+concatQuasiStmtList (QuasiStmtLetInductiveIntro m bt xts yts ats bts bInner isub as:ss) = do
   yts' <- mapM (internalize isub (ats ++ bts)) yts
   let s =
-        StmtLet
+        QuasiStmtLet
           m
           bt
           ( m
@@ -313,8 +313,8 @@ concatStmtList (StmtLetInductiveIntro m bt xts yts ats bts bInner isub as:ss) = 
                   (ats ++ bts) -- ats = [list : (...)], bts = [nil : Pi (yts). list A, cons : (...)]
                   (m, WeakTermPiElim bInner yts')))
   insInductive as bt -- register the constructor (if necessary)
-  concatStmtList $ s : ss
-concatStmtList (StmtLetCoinductiveElim m bt xtsyt codInner ats bts yt e1 e2 csub asOuter:ss) = do
+  concatQuasiStmtList $ s : ss
+concatQuasiStmtList (QuasiStmtLetCoinductiveElim m bt xtsyt codInner ats bts yt e1 e2 csub asOuter:ss) = do
   e2' <- externalize csub (ats ++ bts) codInner e2
   let codOuter = substWeakTermPlus csub codInner
   -- p $ "let-coinductive-intro. b = " <> show ((\(_, b, _) -> b) bt)
@@ -325,7 +325,7 @@ concatStmtList (StmtLetCoinductiveElim m bt xtsyt codInner ats bts yt e1 e2 csub
   --       xtsyt
   --       (m, WeakTermSigmaElim codOuter (ats ++ bts ++ [yt]) e1 e2'))
   let s =
-        StmtLet
+        QuasiStmtLet
           m
           bt
           ( m
@@ -333,12 +333,12 @@ concatStmtList (StmtLetCoinductiveElim m bt xtsyt codInner ats bts yt e1 e2 csub
               xtsyt
               (m, WeakTermSigmaElim codOuter (ats ++ bts ++ [yt]) e1 e2'))
   insCoinductive asOuter bt -- register the destructor (if necessary)
-  concatStmtList $ s : ss
+  concatQuasiStmtList $ s : ss
 
-toLetList :: [(IdentDef, WeakTermPlus)] -> [Stmt]
+toLetList :: [(IdentDef, WeakTermPlus)] -> [QuasiStmt]
 toLetList [] = []
 toLetList (((x, (m, (mx, _, t), _, _)), iter):rest) =
-  StmtLet m (mx, x, t) iter : toLetList rest
+  QuasiStmtLet m (mx, x, t) iter : toLetList rest
 
 defToSub :: Def -> (Identifier, WeakTermPlus)
 defToSub (m, (mx, x, t), xts, e) = (x, (m, WeakTermIter (mx, x, t) xts e))
@@ -420,27 +420,30 @@ ensureDAG' a visited g =
     Just as -> mapM_ (\x -> ensureDAG' x (visited ++ [a]) g) as
 
 -- これが呼ばれるのはまだrenameされる前
-toIdentList :: [Stmt] -> [IdentifierPlus]
+toIdentList :: [QuasiStmt] -> [IdentifierPlus]
 toIdentList [] = []
-toIdentList ((StmtLet _ mxt _):ds) = mxt : toIdentList ds
-toIdentList ((StmtDef xds):ds) = do
+toIdentList ((QuasiStmtLet _ mxt _):ds) = mxt : toIdentList ds
+toIdentList ((QuasiStmtDef xds):ds) = do
   let mxts = map (\(_, (_, mxt, _, _)) -> mxt) xds
   mxts ++ toIdentList ds
-toIdentList ((StmtConstDecl _ mxt):ds) = mxt : toIdentList ds
-toIdentList ((StmtLetInductive _ _ mxt _):ds) = mxt : toIdentList ds
-toIdentList ((StmtLetCoinductive _ _ mxt _):ds) = mxt : toIdentList ds
-toIdentList ((StmtLetInductiveIntro _ b _ _ _ _ _ _ _):ss) = b : toIdentList ss
-toIdentList ((StmtLetCoinductiveElim _ b _ _ _ _ _ _ _ _ _):ss) =
+toIdentList ((QuasiStmtConstDecl _ mxt):ds) = mxt : toIdentList ds
+toIdentList ((QuasiStmtLetInductive _ _ mxt _):ds) = mxt : toIdentList ds
+toIdentList ((QuasiStmtLetCoinductive _ _ mxt _):ds) = mxt : toIdentList ds
+toIdentList ((QuasiStmtLetInductiveIntro _ b _ _ _ _ _ _ _):ss) =
+  b : toIdentList ss
+toIdentList ((QuasiStmtLetCoinductiveElim _ b _ _ _ _ _ _ _ _ _):ss) =
   b : toIdentList ss
 
-toStmtLetFooter :: Path Abs File -> (Meta, Identifier, WeakTermPlus) -> Stmt
-toStmtLetFooter path (m, x, t) = do
+toQuasiStmtLetFooter ::
+     Path Abs File -> (Meta, Identifier, WeakTermPlus) -> QuasiStmt
+toQuasiStmtLetFooter path (m, x, t) = do
   let x' = "(" <> T.pack (toFilePath path) <> ":" <> x <> ")" -- user cannot write this var since it contains parenthesis
   let m' = m {metaIsAppropriateAsCompletionCandidate = False}
-  StmtLet m' (m', x', t) (m, WeakTermUpsilon x)
+  QuasiStmtLet m' (m', x', t) (m, WeakTermUpsilon x)
 
-toStmtLetHeader :: Path Abs File -> (Meta, Identifier, WeakTermPlus) -> Stmt
-toStmtLetHeader path (m, x, t) = do
+toQuasiStmtLetHeader ::
+     Path Abs File -> (Meta, Identifier, WeakTermPlus) -> QuasiStmt
+toQuasiStmtLetHeader path (m, x, t) = do
   let x' = "(" <> T.pack (toFilePath path) <> ":" <> x <> ")" -- user cannot write this var since it contains parenthesis
   let m' = m {metaIsAppropriateAsCompletionCandidate = False}
-  StmtLet m' (m, x, t) (m', WeakTermUpsilon x')
+  QuasiStmtLet m' (m, x, t) (m', WeakTermUpsilon x')

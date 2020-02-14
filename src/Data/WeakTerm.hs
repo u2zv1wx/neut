@@ -108,26 +108,26 @@ type Connective
      , [Rule] -- list of introduction rule when inductive / list of elimination rule when coinductive
       )
 
-data Stmt
+data QuasiStmt
   -- translated intro lam + app as in the usual way
   --   (let (x t) e)
-  = StmtLet Meta IdentifierPlus WeakTermPlus
+  = QuasiStmtLet Meta IdentifierPlus WeakTermPlus
   -- mutually recursive definition (n >= 0)
   --   (definition
   --     ((f1 A1) (ARGS-1) e1)
   --     ...
   --     ((fn An) (ARGS-n) en))
-  | StmtDef [(Identifier, Def)]
+  | QuasiStmtDef [(Identifier, Def)]
   -- declaration of a constant
   --   (constant x t)
-  | StmtConstDecl Meta IdentifierPlus
-  | StmtLetInductive Int Meta IdentifierPlus WeakTermPlus
-  | StmtLetCoinductive Int Meta IdentifierPlus WeakTermPlus
+  | QuasiStmtConstDecl Meta IdentifierPlus
+  | QuasiStmtLetInductive Int Meta IdentifierPlus WeakTermPlus
+  | QuasiStmtLetCoinductive Int Meta IdentifierPlus WeakTermPlus
   -- let (b : B) :=
   --   lam (xts ++ yts).
   --     lam (ats ++ bts).
   --       b-inner @ [y, ..., y]
-  | StmtLetInductiveIntro
+  | QuasiStmtLetInductiveIntro
       Meta -- location of b
       IdentifierPlus -- b : B
       [IdentifierPlus] -- xts
@@ -142,7 +142,7 @@ data Stmt
   --   lam (xts ++ [(z, t)]).
   --     let (ats ++ bts ++ [(c, t)]) := z in
   --     b-inner @ [c]
-  | StmtLetCoinductiveElim
+  | QuasiStmtLetCoinductiveElim
       Meta
       IdentifierPlus
       [IdentifierPlus] -- xts ++ [(z, t)]

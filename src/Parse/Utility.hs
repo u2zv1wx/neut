@@ -9,25 +9,26 @@ type CompInfo = [(Identifier, Meta)]
 
 type CursorName = T.Text
 
-compInfo :: CursorName -> [Stmt] -> Either CompInfo ()
-compInfo c ss = compInfoStmtList c [] ss
+compInfo :: CursorName -> [QuasiStmt] -> Either CompInfo ()
+compInfo c ss = compInfoQuasiStmtList c [] ss
 
-compInfoStmtList :: CursorName -> CompInfo -> [Stmt] -> Either CompInfo ()
-compInfoStmtList _ _ [] = return ()
-compInfoStmtList c info ((StmtLet _ (mx, x, t) e):ss) = do
+compInfoQuasiStmtList ::
+     CursorName -> CompInfo -> [QuasiStmt] -> Either CompInfo ()
+compInfoQuasiStmtList _ _ [] = return ()
+compInfoQuasiStmtList c info ((QuasiStmtLet _ (mx, x, t) e):ss) = do
   compInfoWeakTermPlus c info t
   let info' = (x, mx) : info
   compInfoWeakTermPlus c info' e
-  compInfoStmtList c info' ss
-compInfoStmtList c info ((StmtDef xds):ss) = do
+  compInfoQuasiStmtList c info' ss
+compInfoQuasiStmtList c info ((QuasiStmtDef xds):ss) = do
   xms <- mapM (compInfoDef c info . snd) xds
   let info' = xms ++ info
-  compInfoStmtList c info' ss
-compInfoStmtList c info ((StmtConstDecl _ (mx, x, t)):ss) = do
+  compInfoQuasiStmtList c info' ss
+compInfoQuasiStmtList c info ((QuasiStmtConstDecl _ (mx, x, t)):ss) = do
   compInfoWeakTermPlus c info t
   let info' = (x, mx) : info
-  compInfoStmtList c info' ss
-compInfoStmtList c info (_:ss) = compInfoStmtList c info ss
+  compInfoQuasiStmtList c info' ss
+compInfoQuasiStmtList c info (_:ss) = compInfoQuasiStmtList c info ss
 
 compInfoDef ::
      CursorName -> CompInfo -> Def -> Either CompInfo (Identifier, Meta)
