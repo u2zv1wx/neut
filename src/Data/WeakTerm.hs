@@ -156,6 +156,13 @@ data QuasiStmt
       [Identifier] -- as (to be used to update the environment with constructor info)
   deriving (Show)
 
+data WeakStmt
+  = WeakStmtReturn
+  | WeakStmtReturnTerm WeakTermPlus
+  | WeakStmtLet Meta IdentifierPlus WeakTermPlus
+  | WeakStmtConstDecl Meta IdentifierPlus
+  deriving (Show)
+
 toVar :: Identifier -> WeakTermPlus
 toVar x = (emptyMeta, WeakTermUpsilon x)
 
