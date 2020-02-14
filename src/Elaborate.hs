@@ -25,6 +25,8 @@ import Elaborate.Synthesize
 import Reduce.Term
 import Reduce.WeakTerm
 
+import qualified Data.UnionFind as UF
+
 -- Given a term `e` and its name `main`, this function
 --   (1) traces `e` using `infer e`, collecting type constraints,
 --   (2) updates weakTypeEnv for `main` by the result of `infer e`,
@@ -37,15 +39,9 @@ import Reduce.WeakTerm
 elaborate :: WeakTermPlus -> WithEnv TermPlus
 elaborate e = do
   e' <- infer e
-  -- p "lenv-before"
-  -- lenv <- gets levelEnv
-  -- p' lenv
   -- Kantian type-inference ;)
   analyze
   synthesize
-  -- p "lenv-after"
-  -- lenv <- gets levelEnv
-  -- p' lenv
   -- we shouldn't resort to `type(l) : type(l)`
   gets levelEnv >>= ensureDAG
   _ <- error "exit"
@@ -56,17 +52,47 @@ elaborate e = do
   -- let info2 = toInfo "elaborated term is not closed:" e''
   -- assertMP info2 (return e'') $ null (varTermPlus e'')
 
+type LevelEdge = ((Meta, UnivLevel), (Integer, (Meta, UnivLevel)))
+
+quotient ::
+     [(UnivLevel, UnivLevel)] -> [LevelConstraint] -> UF.UnionFind [LevelEdge]
+quotient [] g = mapM quotient' g
+quotient ((l1, l2):lls) g = do
+  UF.union l1 l2
+  quotient lls g
+
+quotient' :: LevelConstraint -> UF.UnionFind LevelEdge
+quotient' (UnivLevelPlus (m1, l1), (w, UnivLevelPlus (m2, l2))) = do
+  l1' <- UF.find l1
+  l2' <- UF.find l2
+  return ((m1, l1'), (w, (m2, l2')))
+
 ensureDAG :: [LevelConstraint] -> WithEnv ()
 ensureDAG g = do
-  let nodeList = nub $ concatMap (\(n1, (_, n2)) -> [n1, n2]) g
-  let g' = toGraph g
-  ensureDAG' g' Map.empty nodeList
+  eenv <- gets equalityEnv
+  let g' = UF.run $ quotient eenv g
+  let nodeList = nub $ concatMap (\(n1, (_, n2)) -> [n1, n2]) g'
+  let g'' = toGraph g'
+  ensureDAG' g'' Map.empty nodeList
 
-ensureDAG' :: LevelGraph -> NodeInfo -> [UnivLevelPlus] -> WithEnv ()
+type LevelGraph = Map.HashMap UnivLevel [(Integer, (Meta, UnivLevel))]
+
+toGraph :: [LevelEdge] -> LevelGraph
+toGraph [] = Map.empty
+toGraph (((_, l1), v@(_, (_, _))):kvs) =
+  Map.insertWith (\v1 v2 -> v1 ++ v2) l1 [v] $ toGraph kvs
+  -- | l1 == l2 =
+  --   if w == 0
+  --     then toGraph kvs
+  --     else undefined -- found cycle
+  -- | otherwise = Map.insertWith (\v1 v2 -> v1 ++ v2) l1 [v] $ toGraph kvs
+
+ensureDAG' :: LevelGraph -> NodeInfo -> [(Meta, UnivLevel)] -> WithEnv ()
 ensureDAG' _ _ [] = return ()
-ensureDAG' g nodeInfo (v:vs) = do
-  p $ "remaining: " <> show (length vs)
-  let l = levelOf v
+ensureDAG' g nodeInfo (v:vs)
+  -- p $ "remaining: " <> show (length vs)
+ = do
+  let l = snd v
   case Map.lookup l nodeInfo of
     Just NodeStateFinish -> ensureDAG' g nodeInfo vs
     Just NodeStateActive -> error "invalid argument"
@@ -74,16 +100,13 @@ ensureDAG' g nodeInfo (v:vs) = do
       case dfs g v [(0, v)] nodeInfo of
         Right _ -> ensureDAG' g (Map.insert l NodeStateFinish nodeInfo) vs
         Left closedPath ->
-          throwError' $ "found cyclic univ level:\n" <> T.pack (show closedPath)
+          throwError' $
+          "found cyclic univ level:\n" <>
+          T.pack (show $ map (\(x, y) -> (x, UnivLevelPlus y)) closedPath)
 
-type LevelGraph = Map.HashMap UnivLevel [(Integer, UnivLevelPlus)]
-
-toGraph :: [LevelConstraint] -> LevelGraph
-toGraph [] = Map.empty
-toGraph ((UnivLevelPlus (_, l), v):kvs) = do
-  Map.insertWith (\v1 v2 -> v1 ++ v2) l [v] $ toGraph kvs
-
-type UnivPath = [(Integer, UnivLevelPlus)]
+-- toGraph ((UnivLevelPlus (_, l), v):kvs) = do
+--   Map.insertWith (\v1 v2 -> v1 ++ v2) l [v] $ toGraph kvs
+type UnivPath = [(Integer, (Meta, UnivLevel))]
 
 type NodeInfo = Map.HashMap UnivLevel NodeState
 
@@ -91,19 +114,21 @@ data NodeState
   = NodeStateActive
   | NodeStateFinish
 
-levelOf :: UnivLevelPlus -> UnivLevel
-levelOf (UnivLevelPlus (_, l)) = l
-
-dfs :: LevelGraph -> UnivLevelPlus -> UnivPath -> NodeInfo -> Either UnivPath ()
-dfs g (UnivLevelPlus (_, l)) path visitInfo = do
+dfs ::
+     LevelGraph
+  -> (Meta, UnivLevel)
+  -> UnivPath
+  -> NodeInfo
+  -> Either UnivPath ()
+dfs g (_, l) path visitInfo = do
   let mvs = fromMaybe [] $ Map.lookup l g
   sequence_ $
     (flip map) mvs $ \(w', v') -> do
       let path' = path ++ [(w', v')]
-      let l' = levelOf v'
+      let l' = snd v'
       case Map.lookup l' visitInfo of
         Just NodeStateActive -> do
-          let closedPath = dropWhile (\(_, ml'') -> levelOf ml'' /= l') path'
+          let closedPath = dropWhile (\(_, ml'') -> snd ml'' /= l') path'
           if weightOf closedPath > 0
             then Left closedPath
             else return ()

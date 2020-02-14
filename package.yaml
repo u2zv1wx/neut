@@ -32,6 +32,7 @@ dependencies:
 - binary
 - text
 - ansi-terminal
+- array
 
 library:
   source-dirs: src

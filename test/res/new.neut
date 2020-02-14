@@ -799,6 +799,7 @@ n15-4
                (_ i64))
               (item A)))
 
+
 (coinductive stream ((A tau))
   (stream.head ((_ (stream A))) A)
   (stream.tail ((_ (stream A))) (stream A)))

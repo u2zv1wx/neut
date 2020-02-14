@@ -17,6 +17,7 @@ import Data.Tree
 import Data.WeakTerm
 
 import qualified Data.HashMap.Strict as Map
+import qualified Data.IntMap.Strict as IntMap
 import qualified Data.PQueue.Min as Q
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -55,6 +56,7 @@ data Env =
     , inductiveEnv :: RuleEnv -- "list" ~> (cons, Pi (A : tau). A -> list A -> list A)
     , coinductiveEnv :: RuleEnv -- "tail" ~> (head, Pi (A : tau). stream A -> A)
     , weakTypeEnv :: Map.HashMap Identifier (WeakTermPlus, UnivLevelPlus) -- var ~> (typeof(var), level-of-type)
+    , equalityEnv :: [(UnivLevel, UnivLevel)]
     , typeEnv :: Map.HashMap Identifier TermPlus
     , constraintEnv :: [PreConstraint] -- for type inference
     , constraintQueue :: ConstraintQueue
@@ -87,6 +89,7 @@ initialEnv path colorizeFlag =
     , formationEnv = Map.empty
     , inductiveEnv = Map.empty
     , coinductiveEnv = Map.empty
+    , equalityEnv = []
     , weakTypeEnv = Map.empty
     , typeEnv = Map.empty
     , chainEnv = Map.empty
@@ -133,7 +136,7 @@ newCount = do
   return i
 
 newUnivLevel :: WithEnv UnivLevel
-newUnivLevel = newCount
+newUnivLevel = fromInteger <$> newCount
 
 newName :: WithEnv Identifier
 newName = do
@@ -280,12 +283,6 @@ getEnumNum label
   --   Nothing -> throwError [TIO.putStrLn $ "no such enum is defined: " <> label]
   --   Just i -> return i
 
--- getEnumNum' :: Identifier -> [[Identifier]] -> Maybe Int
--- getEnumNum' _ [] = Nothing
--- getEnumNum' l (xs:xss) =
---   case elemIndex l xs of
---     Nothing -> getEnumNum' l xss
---     Just i -> Just i
 -- {enum.top, enum.choice, etc.} ~> {(the number of contents in enum)}
 -- enum.n{i}とかも処理できないとだめ。
 -- これ、enumNatNumのやつを後ろにしてたってことは、enum.n8とかがNothingになってたってこと？
@@ -308,3 +305,24 @@ piUnivLevelsfrom xts t = do
   let ms = map fst $ map (\(_, _, z) -> z) xts ++ [t]
   ls <- mapM (const newUnivLevel) ms
   return $ map UnivLevelPlus $ zip ms ls
+-- newUnivAccessor :: UnivLevel -> WithEnv UnivAccessor
+-- newUnivAccessor a = do
+--   i <- newUnivLevel
+--   eenv <- gets equalityEnv
+--   modify (\env -> env {equalityEnv = IntMap.insert i a eenv})
+--   return $ UnivAccessor i
+-- newUnivAccessor' :: WithEnv UnivAccessor
+-- newUnivAccessor' = do
+--   l <- fromInteger <$> newCount
+--   newUnivAccessor l
+-- readUnivAccessor :: UnivAccessor -> WithEnv UnivLevel
+-- readUnivAccessor (UnivAccessor i) = do
+--   eenv <- gets equalityEnv
+--   case IntMap.lookup i eenv of
+--     Nothing -> throwError' "readUnivAccessor"
+--     Just b' -> return b'
+-- writeUnivAccessor :: UnivAccessor -> UnivAccessor -> WithEnv ()
+-- writeUnivAccessor (UnivAccessor i1) u2 = do
+--   v2 <- readUnivAccessor u2
+--   eenv <- gets equalityEnv
+--   modify (\env -> env {equalityEnv = IntMap.insert i1 v2 eenv})

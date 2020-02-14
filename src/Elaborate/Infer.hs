@@ -7,12 +7,13 @@ module Elaborate.Infer
 
 import Control.Monad.Except
 import Control.Monad.State
-import Data.Basic
-import Data.Env
-import Data.WeakTerm
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.Text as T
+
+import Data.Basic
+import Data.Env
+import Data.WeakTerm
 
 type Context = [(IdentifierPlus, UnivLevelPlus)]
 
@@ -280,9 +281,10 @@ infer' ctx (m, WeakTermStructElim xks e1 e2) = do
 
 inferType :: Context -> WeakTermPlus -> WithEnv (WeakTermPlus, UnivLevelPlus)
 inferType ctx t = do
-  (t', u, _) <- infer' ctx t
+  (t', u, l) <- infer' ctx t
   ml <- newLevelLE (fst t') []
   insConstraintEnv u (asUniv ml)
+  insLevelLT ml l
   return (t', ml)
 
 inferKind :: ArrayKind -> WeakTermPlus
@@ -512,6 +514,5 @@ insLevelLT ml1 ml2 =
   modify (\env -> env {levelEnv = (ml1, (1, ml2)) : levelEnv env})
 
 insLevelEQ :: UnivLevelPlus -> UnivLevelPlus -> WithEnv ()
-insLevelEQ ml1 ml2 = do
-  insLevelLE ml1 ml2
-  insLevelLE ml2 ml1
+insLevelEQ (UnivLevelPlus (_, l1)) (UnivLevelPlus (_, l2)) = do
+  modify (\env -> env {equalityEnv = (l1, l2) : equalityEnv env})

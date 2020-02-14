@@ -11,21 +11,20 @@ import Data.Basic
 
 -- note that UnivLevel is just the name of the level of a universe (i.e. the integer
 -- itself is not the level of the universe)
-type UnivLevel = Integer
+type UnivLevel = Int
 
 newtype UnivLevelPlus =
   UnivLevelPlus (Meta, UnivLevel)
 
 instance Show UnivLevelPlus where
   show (UnivLevelPlus (m, l)) = "[" ++ show l ++ "]:" ++ showMeta m
-  -- show (UnivLevelPlus _ l) = "[" ++ show l ++ "]"
+  -- show (UnivLevelPlus (_, l)) = "[" ++ show l ++ "]"
 
 instance Eq UnivLevelPlus where
   (UnivLevelPlus (_, l1)) == (UnivLevelPlus (_, l2)) = l1 == l2
 
-instance Ord UnivLevelPlus where
-  compare (UnivLevelPlus (_, l1)) (UnivLevelPlus (_, l2)) = compare l1 l2
-
+-- instance Ord UnivLevelPlus where
+--   compare (UnivLevelPlus (_, l1)) (UnivLevelPlus (_, l2)) = compare l1 l2
 data WeakTerm
   = WeakTermTau UnivLevel
   | WeakTermUpsilon Identifier
@@ -529,3 +528,7 @@ asUpsilon _ = Nothing
 
 asUniv :: UnivLevelPlus -> WeakTermPlus
 asUniv (UnivLevelPlus (m, l)) = (m, WeakTermTau l)
+
+levelOf :: UnivLevelPlus -> UnivLevel
+-- levelOf = undefined
+levelOf (UnivLevelPlus (_, l)) = l
