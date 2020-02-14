@@ -30,9 +30,8 @@ import Parse.Rename
 import Parse.Rule
 import Parse.Utility
 
--- {} parse {the output term is correctly renamed}
--- (The postcondition is guaranteed by the assertion of `rename`.)
-parse :: Path Abs File -> WithEnv WeakTermPlus
+-- parse :: Path Abs File -> WithEnv WeakTermPlus
+parse :: Path Abs File -> WithEnv WeakStmt
 parse inputPath = do
   content <- liftIO $ TIO.readFile $ toFilePath inputPath
   stmtList <- strToTree content (toFilePath inputPath) >>= parse'
@@ -272,18 +271,21 @@ toIsEnumType name = do
 -- Represent the list of QuasiStmts in the target language, using `let`.
 -- (Note that `let x := e1 in e2` can be represented as `(lam x e2) e1`.)
 -- これはrenameのあとで呼ばれる
-concatQuasiStmtList :: [QuasiStmt] -> WithEnv WeakTermPlus
+concatQuasiStmtList :: [QuasiStmt] -> WithEnv WeakStmt
 concatQuasiStmtList [] = do
-  return (emptyMeta, WeakTermEnumIntro $ EnumValueLabel "unit")
+  return $
+    WeakStmtReturnTerm (emptyMeta, WeakTermEnumIntro $ EnumValueLabel "unit")
 -- for test
 concatQuasiStmtList [QuasiStmtLet _ _ e] = do
-  return e
+  return $ WeakStmtReturnTerm e
 concatQuasiStmtList (QuasiStmtConstDecl m xt:es) = do
   cont <- concatQuasiStmtList es
-  return (m, WeakTermConstDecl xt cont)
+  return $ WeakStmtConstDecl m xt cont
+  -- return (m, WeakTermConstDecl xt cont)
 concatQuasiStmtList (QuasiStmtLet m xt e:es) = do
   cont <- concatQuasiStmtList es
-  return (m, WeakTermPiElim (emptyMeta, WeakTermPiIntro [xt] cont) [e])
+  return $ WeakStmtLet m xt e cont
+  -- return (m, WeakTermPiElim (emptyMeta, WeakTermPiIntro [xt] cont) [e])
 concatQuasiStmtList (QuasiStmtDef xds:ss) = do
   let ds = map snd xds
   let baseSub = map defToSub ds
@@ -291,14 +293,16 @@ concatQuasiStmtList (QuasiStmtDef xds:ss) = do
   let varList = map (\(_, (m, x, _), _, _) -> (m, WeakTermUpsilon x)) ds
   let iterList = map (substWeakTermPlus sub) varList
   concatQuasiStmtList $ (toLetList $ zip xds iterList) ++ ss
-concatQuasiStmtList ((QuasiStmtLetInductive n m xt e):es) = do
-  insForm n xt e
+concatQuasiStmtList ((QuasiStmtLetInductive n m at e):es) = do
+  insForm n at e
   cont <- concatQuasiStmtList es
-  return (m, WeakTermPiElim (emptyMeta, WeakTermPiIntro [xt] cont) [e])
+  return $ WeakStmtLet m at e cont
+  -- return (m, WeakTermPiElim (emptyMeta, WeakTermPiIntro [xt] cont) [e])
 concatQuasiStmtList (QuasiStmtLetCoinductive n m at e:es) = do
   insForm n at e
   cont <- concatQuasiStmtList es
-  return (m, WeakTermPiElim (emptyMeta, WeakTermPiIntro [at] cont) [e])
+  return $ WeakStmtLet m at e cont
+  -- return (m, WeakTermPiElim (emptyMeta, WeakTermPiIntro [at] cont) [e])
 concatQuasiStmtList (QuasiStmtLetInductiveIntro m bt xts yts ats bts bInner isub as:ss) = do
   yts' <- mapM (internalize isub (ats ++ bts)) yts
   let s =
@@ -317,13 +321,6 @@ concatQuasiStmtList (QuasiStmtLetInductiveIntro m bt xts yts ats bts bInner isub
 concatQuasiStmtList (QuasiStmtLetCoinductiveElim m bt xtsyt codInner ats bts yt e1 e2 csub asOuter:ss) = do
   e2' <- externalize csub (ats ++ bts) codInner e2
   let codOuter = substWeakTermPlus csub codInner
-  -- p $ "let-coinductive-intro. b = " <> show ((\(_, b, _) -> b) bt)
-  -- p "content:"
-  -- pp
-  --   ( m
-  --   , WeakTermPiIntro
-  --       xtsyt
-  --       (m, WeakTermSigmaElim codOuter (ats ++ bts ++ [yt]) e1 e2'))
   let s =
         QuasiStmtLet
           m

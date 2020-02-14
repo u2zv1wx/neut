@@ -159,8 +159,8 @@ data QuasiStmt
 data WeakStmt
   = WeakStmtReturn
   | WeakStmtReturnTerm WeakTermPlus
-  | WeakStmtLet Meta IdentifierPlus WeakTermPlus
-  | WeakStmtConstDecl Meta IdentifierPlus
+  | WeakStmtLet Meta IdentifierPlus WeakTermPlus WeakStmt
+  | WeakStmtConstDecl Meta IdentifierPlus WeakStmt
   deriving (Show)
 
 toVar :: Identifier -> WeakTermPlus
