@@ -4,6 +4,7 @@ import Data.Maybe (fromMaybe)
 import Numeric.Half
 
 import Data.Basic
+import Data.WeakTerm hiding (IdentifierPlus)
 
 data Term
   = TermTau UnivLevel
@@ -22,7 +23,7 @@ data Term
   | TermFloat64 Double
   | TermEnum EnumType
   | TermEnumIntro EnumValue
-  | TermEnumElim TermPlus [(Case, TermPlus)]
+  | TermEnumElim (TermPlus, TermPlus) [(Case, TermPlus)]
   | TermArray TermPlus ArrayKind -- array n3 u8 ~= n3 -> u8
   | TermArrayIntro ArrayKind [TermPlus]
   | TermArrayElim
@@ -73,11 +74,12 @@ varTermPlus (_, TermFloat32 _) = []
 varTermPlus (_, TermFloat64 _) = []
 varTermPlus (_, TermEnum _) = []
 varTermPlus (_, TermEnumIntro _) = []
-varTermPlus (_, TermEnumElim e les) = do
+varTermPlus (_, TermEnumElim (e, t) les) = do
+  let xs0 = varTermPlus t
   let xs1 = varTermPlus e
   let es = map snd les
   let xs2 = concatMap varTermPlus es
-  xs1 ++ xs2
+  xs0 ++ xs1 ++ xs2
 varTermPlus (_, TermArray dom _) = varTermPlus dom
 varTermPlus (_, TermArrayIntro _ es) = do
   concatMap varTermPlus es
@@ -137,11 +139,12 @@ substTermPlus _ (m, TermFloat32 x) = (m, TermFloat32 x)
 substTermPlus _ (m, TermFloat64 x) = (m, TermFloat64 x)
 substTermPlus _ (m, TermEnum x) = (m, TermEnum x)
 substTermPlus _ (m, TermEnumIntro l) = (m, TermEnumIntro l)
-substTermPlus sub (m, TermEnumElim e branchList) = do
+substTermPlus sub (m, TermEnumElim (e, t) branchList) = do
+  let t' = substTermPlus sub t
   let e' = substTermPlus sub e
   let (caseList, es) = unzip branchList
   let es' = map (substTermPlus sub) es
-  (m, TermEnumElim e' (zip caseList es'))
+  (m, TermEnumElim (e', t') (zip caseList es'))
 substTermPlus sub (m, TermArray dom k) = do
   let dom' = substTermPlus sub dom
   (m, TermArray dom' k)
@@ -180,5 +183,79 @@ substTermPlusBindingsWithBody sub ((mx, x, t):xts) e = do
   let sub' = filter (\(k, _) -> k /= x) sub
   let (xts', e') = substTermPlusBindingsWithBody sub' xts e
   ((mx, x, substTermPlus sub t) : xts', e')
+
 -- univTerm :: TermPlus
 -- univTerm = (emptyMeta, TermTau l)
+weaken :: TermPlus -> WeakTermPlus
+weaken (m, TermTau l) = (m, WeakTermTau l)
+weaken (m, TermUpsilon x) = (m, WeakTermUpsilon x)
+weaken (m, TermPi mls xts t) = do
+  (m, WeakTermPi mls (weakenArgs xts) (weaken t))
+weaken (m, TermPiIntro xts body) = do
+  (m, WeakTermPiIntro (weakenArgs xts) (weaken body))
+weaken (m, TermPiElim e es) = do
+  let e' = weaken e
+  let es' = map weaken es
+  (m, WeakTermPiElim e' es')
+weaken (m, TermSigma xts) = do
+  (m, WeakTermSigma (weakenArgs xts))
+weaken (m, TermSigmaIntro t es) = do
+  let t' = weaken t
+  let es' = map weaken es
+  (m, WeakTermSigmaIntro t' es')
+weaken (m, TermSigmaElim t xts e1 e2) = do
+  let t' = weaken t
+  let xts' = weakenArgs xts
+  let e1' = weaken e1
+  let e2' = weaken e2
+  (m, WeakTermSigmaElim t' xts' e1' e2')
+weaken (m, TermIter (mx, x, t) xts e) = do
+  let t' = weaken t
+  let xts' = weakenArgs xts
+  let e' = weaken e
+  (m, WeakTermIter (mx, x, t') xts' e')
+weaken (m, TermConst x) = do
+  (m, WeakTermConst x)
+weaken (m, TermConstDecl (mx, x, t) e) = do
+  let t' = weaken t
+  let e' = weaken e
+  (m, WeakTermConstDecl (mx, x, t') e')
+weaken (m, TermFloat16 x) = (m, WeakTermFloat16 x)
+weaken (m, TermFloat32 x) = (m, WeakTermFloat32 x)
+weaken (m, TermFloat64 x) = (m, WeakTermFloat64 x)
+weaken (m, TermEnum x) = (m, WeakTermEnum x)
+weaken (m, TermEnumIntro l) = (m, WeakTermEnumIntro l)
+weaken (m, TermEnumElim (e, t) branchList) = do
+  let t' = weaken t
+  let e' = weaken e
+  let (caseList, es) = unzip branchList
+  let caseList' = map weakenCase caseList
+  let es' = map weaken es
+  (m, WeakTermEnumElim (e', t') (zip caseList' es'))
+weaken (m, TermArray dom k) = do
+  let dom' = weaken dom
+  (m, WeakTermArray dom' k)
+weaken (m, TermArrayIntro k es) = do
+  let es' = map weaken es
+  (m, WeakTermArrayIntro k es')
+weaken (m, TermArrayElim mk xts v e) = do
+  let v' = weaken v
+  let xts' = weakenArgs xts
+  let e' = weaken e
+  (m, WeakTermArrayElim mk xts' v' e')
+weaken (m, TermStruct ts) = do
+  (m, WeakTermStruct ts)
+weaken (m, TermStructIntro ets) = do
+  let (es, ts) = unzip ets
+  let es' = map weaken es
+  (m, WeakTermStructIntro $ zip es' ts)
+weaken (m, TermStructElim xts v e) = do
+  let v' = weaken v
+  let e' = weaken e
+  (m, WeakTermStructElim xts v' e')
+
+weakenArgs ::
+     [(Meta, Identifier, TermPlus)] -> [(Meta, Identifier, WeakTermPlus)]
+weakenArgs xts = do
+  let (ms, xs, ts) = unzip3 xts
+  zip3 ms xs (map weaken ts)

@@ -301,7 +301,7 @@ interpretWeakCase :: TreePlus -> WithEnv WeakCase
 -- foundational
 --
 interpretWeakCase (_, TreeNode [(_, TreeAtom "enum-introduction"), l]) = do
-  weaken <$> interpretEnumValue l
+  weakenEnumValue <$> interpretEnumValue l
 interpretWeakCase (_, TreeAtom "default") = return WeakCaseDefault
 --
 -- auxiliary
@@ -311,7 +311,7 @@ interpretWeakCase c
   , Just i' <- readMaybe $ T.unpack i = do
     h <- newHole m
     return $ WeakCaseInt h i'
-  | otherwise = weaken <$> interpretEnumValue c
+  | otherwise = weakenEnumValue <$> interpretEnumValue c
 
 -- {} interpretClause {}
 interpretClause :: TreePlus -> WithEnv (WeakCase, WeakTermPlus)

@@ -86,7 +86,7 @@ clarify (m, TermEnum _) = do
   return (m, CodeUpIntro v)
 clarify (m, TermEnumIntro l) = do
   return (m, CodeUpIntro (m, DataEnumIntro l))
-clarify (m, TermEnumElim e bs) = do
+clarify (m, TermEnumElim (e, _) bs) = do
   let (cs, es) = unzip bs
   es' <- mapM clarify es
   (yName, e', y) <- clarifyPlus e

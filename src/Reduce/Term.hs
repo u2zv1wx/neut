@@ -53,7 +53,8 @@ reduceTermPlus (m, TermConstDecl (mx, x, t) e) = do
   t' <- reduceTermPlus t
   e' <- reduceTermPlus e
   return (m, TermConstDecl (mx, x, t') e')
-reduceTermPlus (m, TermEnumElim e les) = do
+reduceTermPlus (m, TermEnumElim (e, t) les) = do
+  t' <- reduceTermPlus t
   e' <- reduceTermPlus e
   let (ls, es) = unzip les
   case e' of
@@ -66,11 +67,11 @@ reduceTermPlus (m, TermEnumElim e les) = do
             Nothing -> do
               es' <- mapM reduceTermPlus es
               let les' = zip ls es'
-              return (m, TermEnumElim e' les')
+              return (m, TermEnumElim (e', t') les')
     _ -> do
       es' <- mapM reduceTermPlus es
       let les' = zip ls es'
-      return (m, TermEnumElim e' les')
+      return (m, TermEnumElim (e', t') les')
 reduceTermPlus (m, TermArray dom k) = do
   dom' <- reduceTermPlus dom
   return (m, TermArray dom' k)

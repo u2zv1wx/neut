@@ -128,11 +128,12 @@ chainTermPlus' (_, TermFloat32 _) = return []
 chainTermPlus' (_, TermFloat64 _) = return []
 chainTermPlus' (_, TermEnum _) = return []
 chainTermPlus' (_, TermEnumIntro _) = return []
-chainTermPlus' (_, TermEnumElim e les) = do
+chainTermPlus' (_, TermEnumElim (e, t) les) = do
+  xs0 <- chainTermPlus' t
   xs1 <- chainTermPlus' e
   let es = map snd les
   xs2 <- concat <$> mapM (chainTermPlus') es
-  return $ xs1 ++ xs2
+  return $ xs0 ++ xs1 ++ xs2
 chainTermPlus' (_, TermArray dom _) = chainTermPlus' dom
 chainTermPlus' (_, TermArrayIntro _ es) = do
   concat <$> mapM (chainTermPlus') es

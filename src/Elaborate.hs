@@ -309,7 +309,7 @@ elaborate' (m, WeakTermEnumElim (e, t) les) = do
   case t' of
     (_, TermEnum x) -> do
       caseCheckEnumIdentifier x ls'
-      return (m, TermEnumElim e' (zip ls' es'))
+      return (m, TermEnumElim (e', t') (zip ls' es'))
     _ -> throwError' "type error (enum elim)"
 elaborate' (m, WeakTermArray dom k) = do
   dom' <- elaborate' dom

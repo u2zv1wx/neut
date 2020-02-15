@@ -475,11 +475,15 @@ showWeakCase (WeakCaseInt _ a) = T.pack $ show a
 showWeakCase (WeakCaseNat size a) = T.pack $ "n" ++ show size ++ "-" ++ show a
 showWeakCase WeakCaseDefault = "default"
 
-weaken :: EnumValue -> WeakCase
-weaken (EnumValueLabel l) = WeakCaseLabel l
-weaken (EnumValueIntS t a) = WeakCaseIntS t a
-weaken (EnumValueIntU t a) = WeakCaseIntU t a
-weaken (EnumValueNat size a) = WeakCaseNat size a
+weakenEnumValue :: EnumValue -> WeakCase
+weakenEnumValue (EnumValueLabel l) = WeakCaseLabel l
+weakenEnumValue (EnumValueIntS t a) = WeakCaseIntS t a
+weakenEnumValue (EnumValueIntU t a) = WeakCaseIntU t a
+weakenEnumValue (EnumValueNat size a) = WeakCaseNat size a
+
+weakenCase :: Case -> WeakCase
+weakenCase (CaseValue v) = weakenEnumValue v
+weakenCase CaseDefault = WeakCaseDefault
 
 -- weakCaseLookup :: EnumValue -> [(WeakCase, a)] -> Maybe a
 -- weakCaseLookup (EnumValueLabel l) les = lookup (WeakCaseLabe)
