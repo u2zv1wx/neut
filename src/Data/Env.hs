@@ -57,6 +57,7 @@ data Env =
     , coinductiveEnv :: RuleEnv -- "tail" ~> (head, Pi (A : tau). stream A -> A)
     , weakTypeEnv :: Map.HashMap Identifier (WeakTermPlus, UnivLevelPlus) -- var ~> (typeof(var), level-of-type)
     , equalityEnv :: [(UnivLevel, UnivLevel)]
+    , univInstEnv :: IntMap.IntMap [Int]
     , typeEnv :: Map.HashMap Identifier (TermPlus, UnivLevelPlus)
     , constraintEnv :: [PreConstraint] -- for type inference
     , constraintQueue :: ConstraintQueue
@@ -90,6 +91,7 @@ initialEnv path colorizeFlag =
     , inductiveEnv = Map.empty
     , coinductiveEnv = Map.empty
     , equalityEnv = []
+    , univInstEnv = IntMap.empty
     , weakTypeEnv = Map.empty
     , typeEnv = Map.empty
     , chainEnv = Map.empty
