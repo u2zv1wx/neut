@@ -52,12 +52,12 @@ elaborateStmt (WeakStmtLet m (mx, x, t) e cont) = do
   (t', mlt) <- inferType t
   insConstraintEnv te t'
   insLevelEQ mle mlt
-  modify (\env -> env {substEnv = Map.insert x e' (substEnv env)})
   -- Kantian type-inference ;)
   analyze >> synthesize >> refine >> cleanup
   e'' <- elaborate' e' >>= reduceTermPlus
   t'' <- elaborate' t' >>= reduceTermPlus
   insTypeEnv x t'' mlt
+  modify (\env -> env {substEnv = Map.insert x (weaken e'') (substEnv env)})
   cont' <- elaborateStmt cont
   return (m, TermPiElim (m, TermPiIntro [(mx, x, t'')] cont') [e''])
 elaborateStmt (WeakStmtConstDecl m (mx, x, t) cont) = do

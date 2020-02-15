@@ -90,25 +90,6 @@ infer' ctx (m, WeakTermPiIntro xts e) = do
   mlPi <- newLevelLE m $ mlPiCod : mlPiArgs
   let mls = mlPiArgs ++ [mlPiCod]
   return ((m, WeakTermPiIntro xts' e'), (m, WeakTermPi mls xts' t'), mlPi)
-infer' ctx (m, WeakTermPiElim (mPi, WeakTermPiIntro xts e) es) -- "let"
-  | length xts == length es = do
-    etls <- mapM (infer' ctx) es
-    let (ms, xs, ts) = unzip3 xts
-    tls' <- mapM (inferType' ctx) ts -- don't extend the context
-    forM_ (zip xs tls') $ uncurry insWeakTypeEnv
-    -- ctxをextendしなくてもdefListにそれ相当の情報がある
-    (e', tCod, ml) <- infer' ctx e -- don't extend the context
-    let (ts', mls) = unzip tls'
-    mlPi <- newLevelLE m $ ml : mls
-    let xts' = zip3 ms xs ts'
-    let etl =
-          ( (m, WeakTermPiIntro xts' e')
-          , (mPi, WeakTermPi (mls ++ [ml]) xts' tCod)
-          , mlPi)
-    let (es', _, _) = unzip3 etls
-    let defList = Map.fromList $ zip xs es'
-    modify (\env -> env {substEnv = defList `Map.union` substEnv env})
-    inferPiElim ctx m etl etls
 infer' ctx (m, WeakTermPiElim e es) = do
   etls <- mapM (infer' ctx) es
   etl <- infer' ctx e

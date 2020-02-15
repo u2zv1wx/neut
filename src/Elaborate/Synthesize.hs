@@ -247,6 +247,8 @@ showError' b e1 e2 = do
   setSGR' b [Reset]
   TIO.putStrLn
     "couldn't verify the definitional equality of the following two terms:"
+  -- putStrLn $ show e1
+  -- putStrLn $ show e2
   TIO.putStrLn $ "- " <> toText e1
   TIO.putStrLn $ "- " <> toText e2
 

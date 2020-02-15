@@ -29,6 +29,7 @@ import Parse.Read
 import Parse.Rename
 import Parse.Rule
 import Parse.Utility
+import Reduce.WeakTerm
 
 parse :: Path Abs File -> WithEnv WeakStmt
 parse inputPath = do
@@ -274,7 +275,7 @@ concatQuasiStmtList (QuasiStmtLetInductiveIntro m bt xts yts ats bts bInner isub
   insInductive as bt -- register the constructor (if necessary)
   concatQuasiStmtList $ s : ss
 concatQuasiStmtList (QuasiStmtLetCoinductiveElim m bt xtsyt codInner ats bts yt e1 e2 csub asOuter:ss) = do
-  e2' <- externalize csub (ats ++ bts) codInner e2
+  e2' <- reduceWeakTermPlus <$> externalize csub (ats ++ bts) codInner e2
   let codOuter = substWeakTermPlus csub codInner
   let s =
         QuasiStmtLet
