@@ -96,7 +96,7 @@ chainTermPlus e = do
 chainTermPlus' :: TermPlus -> WithEnv [(Meta, Identifier, TermPlus)]
 chainTermPlus' (_, TermTau _) = return []
 chainTermPlus' (m, TermUpsilon x) = do
-  t <- lookupTypeEnv x
+  t <- lookupTypeEnv' x
   xts <- chainWithName x t
   return $ xts ++ [(m, x, t)]
 chainTermPlus' (_, TermPi _ xts t) = chainTermPlus'' xts [t]
@@ -120,7 +120,7 @@ chainTermPlus' (_, TermIter (_, x, t) xts e) = do
   xs2 <- chainTermPlus'' xts [e]
   return $ xs1 ++ filter (\(_, y, _) -> y /= x) xs2
 chainTermPlus' (_, TermConst x) = do
-  t <- lookupTypeEnv x
+  t <- lookupTypeEnv' x
   chainWithName x t
 chainTermPlus' (_, TermConstDecl xt e) = chainTermPlus'' [xt] [e]
 chainTermPlus' (_, TermFloat16 _) = return []
@@ -156,7 +156,7 @@ chainTermPlus'' ::
 chainTermPlus'' [] es = concat <$> mapM (chainTermPlus') es
 chainTermPlus'' ((_, x, t):xts) es = do
   xs1 <- chainTermPlus' t
-  insTypeEnv x t
+  insTypeEnv' x t
   xs2 <- chainTermPlus'' xts es
   return $ xs1 ++ filter (\(_, y, _) -> y /= x) xs2
 

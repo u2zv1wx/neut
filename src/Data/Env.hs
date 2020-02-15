@@ -188,8 +188,8 @@ llvmTailChar x =
     then x
     else '-'
 
-lookupTypeEnv :: Identifier -> WithEnv TermPlus
-lookupTypeEnv s
+lookupTypeEnv' :: Identifier -> WithEnv TermPlus
+lookupTypeEnv' s
   | Just i <- asEnumNatConstant s = do
     return
       ( emptyMeta
@@ -307,6 +307,7 @@ piUnivLevelsfrom xts t = do
   let ms = map fst $ map (\(_, _, z) -> z) xts ++ [t]
   ls <- mapM (const newUnivLevel) ms
   return $ map UnivLevelPlus $ zip ms ls
+
 -- newUnivAccessor :: UnivLevel -> WithEnv UnivAccessor
 -- newUnivAccessor a = do
 --   i <- newUnivLevel
@@ -328,3 +329,7 @@ piUnivLevelsfrom xts t = do
 --   v2 <- readUnivAccessor u2
 --   eenv <- gets equalityEnv
 --   modify (\env -> env {equalityEnv = IntMap.insert i1 v2 eenv})
+-- insTypeEnv :: Identifier -> TermPlus -> WithEnv ()
+-- insTypeEnv i t = modify (\e -> e {typeEnv = Map.insert i t (typeEnv e)})
+insTypeEnv' :: Identifier -> TermPlus -> WithEnv ()
+insTypeEnv' i t = modify (\e -> e {typeEnv = Map.insert i t (typeEnv e)})

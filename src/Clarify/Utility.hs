@@ -358,9 +358,6 @@ lookupContext z ctx = do
     Nothing -> throwError' "lookupContext"
     Just t -> return t
 
-insTypeEnv :: Identifier -> TermPlus -> WithEnv ()
-insTypeEnv i t = modify (\e -> e {typeEnv = Map.insert i t (typeEnv e)})
-
 isClosedChain :: [(Identifier, CodePlus)] -> Bool
 isClosedChain xts = null (isClosedChain' xts)
 
