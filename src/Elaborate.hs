@@ -39,15 +39,51 @@ import qualified Data.UnionFind as UF
 -- S. Kong, and C. Roux. "Elaboration in Dependent Type Theory", arxiv,
 -- https://arxiv.org/abs/1505.04324, 2015.
 elaborate :: WeakStmt -> WithEnv TermPlus
-elaborate (WeakStmtReturn e) = do
+elaborate stmt = elaborateStmt stmt >>= reduceTermPlus
+
+-- elaborate (WeakStmtReturn e) = do
+--   (e', _, _) <- infer e
+--   analyze >> synthesize >> refine
+--   checkUnivSanity
+--   -- gets levelEnv >>= ensureDAG -- universe level check at the end of type inference
+--   elaborate' e' >>= reduceTermPlus
+-- elaborate (WeakStmtLet m (mx, x, t) e cont) = do
+--   p $ "==== " ++ T.unpack x ++ " ===="
+--   p $ T.unpack (toText e)
+--   p $ T.unpack (toText t)
+--   (e', te, mle) <- infer e
+--   (t', mlt) <- inferType t
+--   insConstraintEnv te t'
+--   insLevelEQ mle mlt
+--   modify (\env -> env {substEnv = Map.insert x e' (substEnv env)})
+--   -- Kantian type-inference
+--   analyze >> synthesize >> refine >> cleanup
+--   -- elaborate the related terms
+--   e'' <- elaborate' e' >>= reduceTermPlus
+--   t'' <- elaborate' t' >>= reduceTermPlus
+--   insTypeEnv x t'' mlt
+--   cont' <- elaborate cont
+--   return (m, TermPiElim (m, TermPiIntro [(mx, x, t'')] cont') [e''])
+-- elaborate (WeakStmtConstDecl m (mx, x, t) cont) = do
+--   p $ "==== " ++ T.unpack x ++ " ===="
+--   p $ T.unpack (toText t)
+--   (t', mlt) <- inferType t
+--   analyze >> synthesize >> refine >> cleanup
+--   t'' <- elaborate' t' >>= reduceTermPlus
+--   insTypeEnv x t'' mlt
+--   cont' <- elaborate cont
+--   return (m, TermConstDecl (mx, x, t'') cont')
+elaborateStmt :: WeakStmt -> WithEnv TermPlus
+elaborateStmt (WeakStmtReturn e) = do
   (e', _, _) <- infer e
   analyze >> synthesize >> refine
-  p "univ-check"
   checkUnivSanity
-  p "done"
   -- gets levelEnv >>= ensureDAG -- universe level check at the end of type inference
   elaborate' e' >>= reduceTermPlus
-elaborate (WeakStmtLet m (mx, x, t) e cont) = do
+elaborateStmt (WeakStmtLet m (mx, x, t) e cont) = do
+  p $ "==== " ++ T.unpack x ++ " ===="
+  p $ T.unpack (toText e)
+  p $ T.unpack (toText t)
   (e', te, mle) <- infer e
   (t', mlt) <- inferType t
   insConstraintEnv te t'
@@ -55,19 +91,20 @@ elaborate (WeakStmtLet m (mx, x, t) e cont) = do
   modify (\env -> env {substEnv = Map.insert x e' (substEnv env)})
   -- Kantian type-inference
   analyze >> synthesize >> refine >> cleanup
-  -- elaborate the related terms
+  -- elaborateStmt the related terms
   e'' <- elaborate' e' >>= reduceTermPlus
   t'' <- elaborate' t' >>= reduceTermPlus
   insTypeEnv x t'' mlt
-  -- p $ T.unpack x ++ ": " ++ T.unpack (toText $ weaken t'')
-  cont' <- elaborate cont
+  cont' <- elaborateStmt cont
   return (m, TermPiElim (m, TermPiIntro [(mx, x, t'')] cont') [e''])
-elaborate (WeakStmtConstDecl m (mx, x, t) cont) = do
+elaborateStmt (WeakStmtConstDecl m (mx, x, t) cont) = do
+  p $ "==== " ++ T.unpack x ++ " ===="
+  p $ T.unpack (toText t)
   (t', mlt) <- inferType t
   analyze >> synthesize >> refine >> cleanup
   t'' <- elaborate' t' >>= reduceTermPlus
   insTypeEnv x t'' mlt
-  cont' <- elaborate cont
+  cont' <- elaborateStmt cont
   return (m, TermConstDecl (mx, x, t'') cont')
 
 refine :: WithEnv ()
@@ -78,9 +115,25 @@ cleanup :: WithEnv ()
 cleanup = do
   modify (\env -> env {constraintEnv = []})
   modify (\env -> env {weakTypeEnv = Map.empty})
+  modify (\env -> env {zetaEnv = Map.empty})
 
 type LevelEdge = ((Meta, UnivLevel), (Integer, (Meta, UnivLevel)))
 
+-- equalityを処理してからedgeを構成していく
+-- quotient ::
+--      [(UnivLevel, UnivLevel)]
+--   -> UnivInstEnv
+--   -> [LevelConstraint]
+--   -> UF.UnionFind LevelGraph
+-- quotient ::
+--      [(UnivLevel, UnivLevel)]
+--   -> UnivInstEnv
+--   -> [LevelConstraint]
+--   -> UF.UnionFind (S.Set LevelEdge)
+-- quotient [] uienv g = quotient' uienv g
+-- quotient ((l1, l2):lls) uienv g = do
+--   UF.union l1 l2
+--   quotient lls uienv g
 quotient ::
      [(UnivLevel, UnivLevel)]
   -> UnivInstEnv
@@ -91,6 +144,32 @@ quotient ((l1, l2):lls) uienv g = do
   UF.union l1 l2
   quotient lls uienv g
 
+-- quotient' :: UnivInstEnv -> [LevelConstraint] -> UF.UnionFind LevelGraph
+-- quotient' _ [] = return IntMap.empty
+-- quotient' uienv ((UnivLevelPlus (m1, l1), (w, UnivLevelPlus (m2, l2))):xs) = do
+--   g <- quotient
+--   let domList = inst uienv l1
+--   let codList = inst uienv l2
+--   forM (cartesianProduct domList codList) $ \(dom, cod) -> do
+--     dom' <- UF.find dom
+--     cod' <- UF.find cod
+--     return ((m1, dom'), (w, (m2, cod')))
+-- quotient' :: UnivInstEnv -> [LevelConstraint] -> UF.UnionFind (S.Set LevelEdge)
+-- quotient' uienv [] = return S.empty
+-- quotient' uienv ((UnivLevelPlus (m1, l1), (w, UnivLevelPlus (m2, l2))):xs) = do
+--   s <- quotient' uienv xs
+--   let domList = inst uienv l1
+--   let codList = inst uienv l2
+--   hoge <-
+--     (flip mapM) (cartesianProduct domList codList) $ \(dom, cod) -> do
+--       dom' <- UF.find dom
+--       cod' <- UF.find cod
+--       return ((m1, dom'), (w, (m2, cod')))
+--   return $ S.union (S.fromList hoge) s
+-- foo dom cod = do
+--   dom' <- UF.find dom
+--   cod' <- UF.find cod
+--   return ((m1, dom'), (w, (m2, cod')))
 quotient' :: UnivInstEnv -> LevelConstraint -> UF.UnionFind [LevelEdge]
 quotient' uienv (UnivLevelPlus (m1, l1), (w, UnivLevelPlus (m2, l2))) = do
   let domList = inst uienv l1
@@ -99,9 +178,6 @@ quotient' uienv (UnivLevelPlus (m1, l1), (w, UnivLevelPlus (m2, l2))) = do
     dom' <- UF.find dom
     cod' <- UF.find cod
     return ((m1, dom'), (w, (m2, cod')))
-  -- l1' <- UF.find l1
-  -- l2' <- UF.find l2
-  -- return [((m1, l1'), (w, (m2, l2')))]
 
 cartesianProduct :: [a] -> [b] -> [(a, b)]
 cartesianProduct xs ys = do
@@ -120,11 +196,15 @@ checkUnivSanity = do
   g <- gets levelEnv
   eenv <- gets equalityEnv
   uienv <- gets univInstEnv
-  let g' = UF.run $ quotient eenv uienv g
-  let nodeList = nub $ concatMap (\(n1, (_, n2)) -> [n1, n2]) g'
-  -- let g'' = toGraph g'
-  g'' <- return $ toGraph g'
-  p "constructed graph"
+  let g' = nub $ UF.run $ quotient eenv uienv g
+  let nodeList = nub $ concatMap (\(n1, _) -> [n1]) g'
+  let g'' = toGraph g'
+  -- g'' <- return $ toGraph g'
+  -- let s = sum $ map (\(_, xs) -> length xs) $ IntMap.toList g''
+  -- p $ "constructed graph. size = " ++ show s
+  -- g2 <- return $ toGraph $ nub g'
+  -- let s2 = sum $ map (\(_, xs) -> length xs) $ IntMap.toList g2
+  -- p $ "constructed graph. size = " ++ show s2
   ensureDAG' g'' IntMap.empty nodeList
 
 type LevelGraph = IntMap.IntMap [(Integer, (Meta, UnivLevel))]
@@ -168,8 +248,8 @@ dfs ::
 dfs g (_, l) path visitInfo = do
   let mvs = fromMaybe [] $ IntMap.lookup l g
   sequence_ $
-    (flip map) mvs $ \(w', v') -> do
-      let path' = path ++ [(w', v')]
+    (flip map) mvs $ \wv'@(_, v') -> do
+      let path' = path ++ [wv']
       let l' = snd v'
       case IntMap.lookup l' visitInfo of
         Just NodeStateActive -> do

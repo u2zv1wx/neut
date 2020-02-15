@@ -73,9 +73,8 @@ infer' _ (m, WeakTermUpsilon x) = do
       ((_, t), UnivLevelPlus (_, l)) <- lookupWeakTypeEnv x
       return ((m, WeakTermUpsilon x), (m, t), UnivLevelPlus (m, l))
     Just (t, UnivLevelPlus (_, l)) -> do
-      (a@(_, t'), l') <- univInst (weaken t) l
-      -- p "instantiating:"
-      -- p' x
+      ((_, t'), l') <- univInst (weaken t) l
+      -- p $ "instantiate:" ++ T.unpack x
       -- p "from:"
       -- -- p $ T.unpack (toText (weaken t))
       -- p' t
@@ -200,7 +199,7 @@ infer' _ (m, WeakTermConst x)
         return ((m, WeakTermConst x), t, UnivLevelPlus (m, l)) -- ここのunivを自由にしてもいいかも
       Just (t, UnivLevelPlus (_, l)) -> do
         ((_, t'), l') <- univInst (weaken t) l
-        return ((m, WeakTermUpsilon x), (m, t'), UnivLevelPlus (m, l'))
+        return ((m, WeakTermConst x), (m, t'), UnivLevelPlus (m, l'))
 infer' ctx (m, WeakTermConstDecl (mx, x, t) e) = do
   tl'@(t', _) <- inferType' ctx t
   insWeakTypeEnv x tl'
@@ -651,6 +650,5 @@ levelInst l = do
       modify (\env -> env {univRenameEnv = IntMap.insert l l' urenv})
       uienv <- gets univInstEnv
       let s = S.fromList [l, l']
-      -- insert l ~> {l, l'}
       modify (\env -> env {univInstEnv = IntMap.insertWith S.union l s uienv})
       return l'

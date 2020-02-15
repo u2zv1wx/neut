@@ -48,18 +48,28 @@ clarify (m, TermSigmaIntro t es) = do
   case t' of
     (mSig, TermSigma xts)
       | length xts == length es -> do
-        z <- newNameWith "sigma"
-        l <- newUnivLevel
-        -- don't care the level since they're discarded immediately
-        -- (i.e. this translated term is not used as an argument of `weaken`)
-        let zu = (mSig, z, (mSig, TermTau l))
-        let xvs = map (\(_, x, _) -> toTermUpsilon x) xts
-        let bindArgsThen = \e -> (m, TermPiElim (m, TermPiIntro xts e) es)
-        k <- newNameWith "sig"
-        let kv = toTermUpsilon k
-        -- note that the result of clarification of Pi is the same term regardless of its dom/cod
-        let kp = (mSig, k, (mSig, TermPi [] [] (mSig, TermUpsilon "DONT_CARE")))
-        clarify $ bindArgsThen (m, TermPiIntro [zu, kp] (m, TermPiElim kv xvs))
+        tPi <- sigToPi mSig xts
+        case tPi of
+          (_, TermPi _ [zu, kp@(_, k, (_, TermPi _ yts _))] _) -- i.e. Sigma yts
+            | length yts == length es -> do
+              let xvs = map (\(_, x, _) -> toTermUpsilon x) yts
+              let kv = toTermUpsilon k
+              let bindArgsThen = \e -> (m, TermPiElim (m, TermPiIntro yts e) es)
+              clarify $
+                bindArgsThen (m, TermPiIntro [zu, kp] (m, TermPiElim kv xvs))
+          _ -> throwError' "the type of sigma-intro is wrong"
+        -- z <- newNameWith "sigma"
+        -- l <- newUnivLevel
+        -- -- don't care the level since they're discarded immediately
+        -- -- (i.e. this translated term is not used as an argument of `weaken`)
+        -- let zu = (mSig, z, (mSig, TermTau l))
+        -- let xvs = map (\(_, x, _) -> toTermUpsilon x) xts
+        -- let bindArgsThen = \e -> (m, TermPiElim (m, TermPiIntro xts e) es)
+        -- k <- newNameWith "sig"
+        -- let kv = toTermUpsilon k
+        -- -- note that the result of clarification of Pi is the same term regardless of its dom/cod
+        -- let kp = (mSig, k, (mSig, TermPi [] [] (mSig, TermUpsilon "DONT_CARE")))
+        -- clarify $ bindArgsThen (m, TermPiIntro [zu, kp] (m, TermPiElim kv xvs))
     _ -> throwError' "the type of sigma-intro is wrong"
 clarify (m, TermSigmaElim t xts e1 e2) = do
   clarify (m, TermPiElim e1 [t, (emptyMeta, TermPiIntro xts e2)])
@@ -519,16 +529,20 @@ retWithBorrowedVars ::
 retWithBorrowedVars m _ [] resultVarName =
   return (m, CodeUpIntro (m, DataUpsilon resultVarName))
 retWithBorrowedVars m cod xs resultVarName
-  | (_, TermPi _ [c, (mFun, funName, funType@(_, TermPi _ xts _))] _) <- cod
-  , length xts >= 1 = do
-    let (_, _, resultType) = last xts
-    let vs = map (\x -> (m, TermUpsilon x)) $ xs ++ [resultVarName]
-    insTypeEnv' resultVarName resultType
-    clarify
-      ( m
-      , TermPiIntro
-          [c, (mFun, funName, funType)]
-          (m, TermPiElim (m, TermUpsilon funName) vs))
+  | (mSig, TermSigma yts) <- cod
+  , length yts >= 1 = do
+    tPi <- sigToPi mSig yts
+    case tPi of
+      (_, TermPi _ [c, (mFun, funName, funType@(_, TermPi _ xts _))] _) -> do
+        let (_, _, resultType) = last xts
+        let vs = map (\x -> (m, TermUpsilon x)) $ xs ++ [resultVarName]
+        insTypeEnv' resultVarName resultType
+        clarify
+          ( m
+          , TermPiIntro
+              [c, (mFun, funName, funType)]
+              (m, TermPiElim (m, TermUpsilon funName) vs))
+      _ -> throwError' "retWithBorrowedVars (sig)"
   | otherwise = throwError' "retWithBorrowedVars"
 
 inferKind :: ArrayKind -> TermPlus
@@ -537,3 +551,19 @@ inferKind (ArrayKindIntU i) = (emptyMeta, TermEnum (EnumTypeIntU i))
 inferKind (ArrayKindFloat size) =
   (emptyMeta, TermConst $ "f" <> T.pack (show (sizeAsInt size)))
 inferKind _ = error "inferKind for void-pointer"
+
+sigToPi :: Meta -> [Data.Term.IdentifierPlus] -> WithEnv TermPlus
+sigToPi m xts = do
+  z <- newNameWith "sigma"
+  let zv = toTermUpsilon z
+  k <- newNameWith "sig"
+  -- Sigma [x1 : A1, ..., xn : An] = Pi (z : Type, _ : Pi [x1 : A1, ..., xn : An]. z). z
+  let piType = (emptyMeta, TermPi [] xts zv)
+  -- fixme: level info of sigma is required
+  -- let univTerm = undefined
+  l <- newUnivLevel
+  -- don't care the level since they're discarded immediately
+  -- (i.e. this translated term is not used as an argument of `weaken`)
+  let zu = (m, z, (m, TermTau l))
+  return (m, TermPi [] [zu, (emptyMeta, k, piType)] zv)
+  -- return (m, TermPi [] [(emptyMeta, z, zu), (emptyMeta, k, piType)] zv)

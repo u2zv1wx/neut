@@ -749,13 +749,20 @@ n15-4
 ;;   (nat.succ ((n (nat))) (nat)))
 
 ;; 引数ありのinductive typeの処理
+
+
 (inductive list ((A tau))
   (list.nil () (list A))
   (list.cons ((_ A) (_ (list A))) (list A)))
 
+(inductive LIST ((A tau))
+  (LIST.nil () (LIST A))
+  (LIST.cons ((_ A) (_ (LIST A))) (LIST A)))
+
 (inductive mylist ((A tau) (B tau))
   (mylist.nil () (mylist A B))
   (mylist.cons ((_ A) (_ (mylist A B))) (mylist A B)))
+
 
 ;; 量化された引数の部分はpiで包まないといけない（でないと全体で共有されてしまうので固定になる）
 ;; つまり、inductiveの引数は「そこを固定して」ってことなんだな。
@@ -779,13 +786,15 @@ n15-4
 (let a (vec.nil i64 (nat.succ (nat.zero))))
 
 
-;; (inductive item ((A tau))
-;;   (item.intro () (item A))
-;;   (item.cont ((_ (item A)) (_ (list (item A)))) (item A))
-;;   ;; (item.cont1 ((_ (item A)) (_ (list (list (item A))))) (item A))
-
-;;   ;; (item.cont1 ((_ (item A)) (_ (list (list (item A))))) (item A))
-;;   (item.cont2 ((_ A) (_ (item A))) (item A)))
+(inductive item ((A tau))
+  (item.intro () (item A))
+  ;; (item.cont0 ((_ (item A)) (_ (list (list (item A))))) (item A))
+  (item.cont0 ((_ (item A)) (_ (LIST (list (item A))))) (item A))
+  (item.cont1 ((_ (item A)) (_ (list (LIST (item A))))) (item A))
+  ;; (item.cont0 ((_ (item A)) (_ (LIST (LIST (item A))))) (item A))
+  ;; (item.cont1 ((_ (item A)) (_ (list (list (item A))))) (item A))
+  ;; (item.cont1 ((_ (item A)) (_ (list (list (item A))))) (item A))
+  (item.cont2 ((_ A) (_ (item A))) (item A)))
 
 ;; (inductive item ((A tau))
 ;;   (item.intro () (item A))
