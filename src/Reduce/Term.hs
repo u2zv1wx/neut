@@ -14,11 +14,11 @@ import Data.Env
 import Data.Term
 
 reduceTermPlus :: TermPlus -> WithEnv TermPlus
-reduceTermPlus (m, TermPi xts cod) = do
+reduceTermPlus (m, TermPi mls xts cod) = do
   let (ms, xs, ts) = unzip3 xts
   ts' <- mapM reduceTermPlus ts
   cod' <- reduceTermPlus cod
-  return $ (m, TermPi (zip3 ms xs ts') cod')
+  return $ (m, TermPi mls (zip3 ms xs ts') cod')
 reduceTermPlus (m, TermPiIntro xts e) = do
   let (ms, xs, ts) = unzip3 xts
   ts' <- mapM reduceTermPlus ts

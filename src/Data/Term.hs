@@ -8,7 +8,7 @@ import Data.Basic
 data Term
   = TermTau UnivLevel
   | TermUpsilon Identifier
-  | TermPi [IdentifierPlus] TermPlus
+  | TermPi [UnivLevelPlus] [IdentifierPlus] TermPlus
   | TermPiIntro [IdentifierPlus] TermPlus
   | TermPiElim TermPlus [TermPlus]
   | TermSigma [IdentifierPlus]
@@ -50,7 +50,7 @@ toTermUpsilon x = do
 varTermPlus :: TermPlus -> [Identifier]
 varTermPlus (_, TermTau _) = []
 varTermPlus (_, TermUpsilon x) = [x]
-varTermPlus (_, TermPi xts t) = varTermPlus' xts [t]
+varTermPlus (_, TermPi _ xts t) = varTermPlus' xts [t]
 varTermPlus (_, TermPiIntro xts e) = varTermPlus' xts [e]
 varTermPlus (_, TermPiElim e es) = do
   let xs1 = varTermPlus e
@@ -99,9 +99,9 @@ substTermPlus :: SubstTerm -> TermPlus -> TermPlus
 substTermPlus _ (m, TermTau l) = (m, TermTau l)
 substTermPlus sub (m, TermUpsilon x) =
   fromMaybe (m, TermUpsilon x) (lookup x sub)
-substTermPlus sub (m, TermPi xts t) = do
+substTermPlus sub (m, TermPi mls xts t) = do
   let (xts', t') = substTermPlusBindingsWithBody sub xts t
-  (m, TermPi xts' t')
+  (m, TermPi mls xts' t')
 substTermPlus sub (m, TermPiIntro xts body) = do
   let (xts', body') = substTermPlusBindingsWithBody sub xts body
   (m, TermPiIntro xts' body')

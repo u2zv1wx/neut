@@ -58,7 +58,7 @@ clarify (m, TermSigmaIntro t es) = do
         k <- newNameWith "sig"
         let kv = toTermUpsilon k
         -- note that the result of clarification of Pi is the same term regardless of its dom/cod
-        let kp = (mSig, k, (mSig, TermPi [] (mSig, TermUpsilon "DONT_CARE")))
+        let kp = (mSig, k, (mSig, TermPi [] [] (mSig, TermUpsilon "DONT_CARE")))
         clarify $ bindArgsThen (m, TermPiIntro [zu, kp] (m, TermPiElim kv xvs))
     _ -> throwError' "the type of sigma-intro is wrong"
 clarify (m, TermSigmaElim t xts e1 e2) = do
@@ -193,7 +193,7 @@ clarifyUnaryOp name op lowType m = do
   t <- lookupTypeEnv name
   t' <- reduceTermPlus t
   case t' of
-    (_, TermPi xts@[(mx, x, tx)] _) -> do
+    (_, TermPi _ xts@[(mx, x, tx)] _) -> do
       let varX = toDataUpsilon (x, mx)
       zts <- complementaryChainOf xts
       -- p "one-time closure (unary)"
@@ -210,7 +210,7 @@ clarifyBinaryOp name op lowType m = do
   t <- lookupTypeEnv name
   t' <- reduceTermPlus t
   case t' of
-    (_, TermPi xts@[(mx, x, tx), (my, y, ty)] _) -> do
+    (_, TermPi _ xts@[(mx, x, tx), (my, y, ty)] _) -> do
       let varX = toDataUpsilon (x, mx)
       let varY = toDataUpsilon (y, my)
       zts <- complementaryChainOf xts
@@ -227,7 +227,7 @@ clarifyIsEnum m = do
   t <- lookupTypeEnv "is-enum"
   t' <- reduceTermPlus t
   case t' of
-    (_, TermPi xts@[(mx, x, tx)] _) -> do
+    (_, TermPi _ xts@[(mx, x, tx)] _) -> do
       v <- cartesianImmediate m
       let varX = toDataUpsilon (x, mx)
       aff <- newNameWith "aff"
@@ -255,7 +255,7 @@ clarifyArrayAccess m name lowType = do
   arrayAccessType <- lookupTypeEnv name
   arrayAccessType' <- reduceTermPlus arrayAccessType
   case arrayAccessType' of
-    (_, TermPi xts cod)
+    (_, TermPi _ xts cod)
       | length xts == 3 -> do
         (xs, ds, headerList) <-
           computeHeader m xts [ArgUnused, ArgArray, ArgImmediate]
@@ -278,7 +278,7 @@ clarifySysCall name sysCall args m = do
   sysCallType <- lookupTypeEnv name
   sysCallType' <- reduceTermPlus sysCallType
   case sysCallType' of
-    (_, TermPi xts cod)
+    (_, TermPi _ xts cod)
       | length xts == length args -> do
         zts <- complementaryChainOf xts
         (xs, ds, headerList) <- computeHeader m xts args
@@ -519,7 +519,7 @@ retWithBorrowedVars ::
 retWithBorrowedVars m _ [] resultVarName =
   return (m, CodeUpIntro (m, DataUpsilon resultVarName))
 retWithBorrowedVars m cod xs resultVarName
-  | (_, TermPi [c, (mFun, funName, funType@(_, TermPi xts _))] _) <- cod
+  | (_, TermPi _ [c, (mFun, funName, funType@(_, TermPi _ xts _))] _) <- cod
   , length xts >= 1 = do
     let (_, _, resultType) = last xts
     let vs = map (\x -> (m, TermUpsilon x)) $ xs ++ [resultVarName]

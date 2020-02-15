@@ -99,7 +99,7 @@ chainTermPlus' (m, TermUpsilon x) = do
   t <- lookupTypeEnv x
   xts <- chainWithName x t
   return $ xts ++ [(m, x, t)]
-chainTermPlus' (_, TermPi xts t) = chainTermPlus'' xts [t]
+chainTermPlus' (_, TermPi _ xts t) = chainTermPlus'' xts [t]
 chainTermPlus' (_, TermPiIntro xts e) = chainTermPlus'' xts [e]
 chainTermPlus' (_, TermPiElim e es) = do
   xs1 <- chainTermPlus' e

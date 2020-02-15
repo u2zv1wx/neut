@@ -181,10 +181,10 @@ elaborate' (m, WeakTermTau l) = do
   return (m, TermTau l)
 elaborate' (m, WeakTermUpsilon x) = do
   return (m, TermUpsilon x)
-elaborate' (m, WeakTermPi _ xts t) = do
+elaborate' (m, WeakTermPi mls xts t) = do
   xts' <- mapM elaboratePlus xts
   t' <- elaborate' t
-  return (m, TermPi xts' t')
+  return (m, TermPi mls xts' t')
 elaborate' (m, WeakTermPiIntro xts e) = do
   e' <- elaborate' e
   xts' <- mapM elaboratePlus xts
