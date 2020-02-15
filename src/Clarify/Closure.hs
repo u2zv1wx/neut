@@ -105,6 +105,16 @@ chainTermPlus' (_, TermPiElim e es) = do
   xs1 <- chainTermPlus' e
   xs2 <- concat <$> mapM (chainTermPlus') es
   return $ xs1 ++ xs2
+chainTermPlus' (_, TermSigma xts) = chainTermPlus'' xts []
+chainTermPlus' (_, TermSigmaIntro t es) = do
+  xs1 <- chainTermPlus' t
+  xs2 <- concat <$> mapM chainTermPlus' es
+  return $ xs1 ++ xs2
+chainTermPlus' (_, TermSigmaElim t xts e1 e2) = do
+  xs <- chainTermPlus' t
+  ys <- chainTermPlus' e1
+  zs <- chainTermPlus'' xts [e2]
+  return $ xs ++ ys ++ zs
 chainTermPlus' (_, TermIter (_, x, t) xts e) = do
   xs1 <- chainTermPlus' t
   xs2 <- chainTermPlus'' xts [e]

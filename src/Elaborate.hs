@@ -208,32 +208,35 @@ elaborate' (m, WeakTermPiElim e es) = do
   return (m, TermPiElim e' es')
 elaborate' (m, WeakTermSigma xts) = do
   xts' <- mapM elaboratePlus xts
-  z <- newNameWith "sigma"
-  let zv = toTermUpsilon z
-  k <- newNameWith "sig"
-  -- Sigma [x1 : A1, ..., xn : An] = Pi (z : Type, _ : Pi [x1 : A1, ..., xn : An]. z). z
-  let piType = (emptyMeta, TermPi xts' zv)
-  -- fixme: level info of sigma is required
-  let univTerm = undefined
-  return (m, TermPi [(emptyMeta, z, univTerm), (emptyMeta, k, piType)] zv)
+  return (m, TermSigma xts')
+  -- z <- newNameWith "sigma"
+  -- let zv = toTermUpsilon z
+  -- k <- newNameWith "sig"
+  -- -- Sigma [x1 : A1, ..., xn : An] = Pi (z : Type, _ : Pi [x1 : A1, ..., xn : An]. z). z
+  -- let piType = (emptyMeta, TermPi xts' zv)
+  -- -- fixme: level info of sigma is required
+  -- let univTerm = undefined
+  -- return (m, TermPi [(emptyMeta, z, univTerm), (emptyMeta, k, piType)] zv)
 elaborate' (m, WeakTermSigmaIntro t es) = do
-  t' <- elaborate' t >>= reduceTermPlus
+  t' <- elaborate' t
   es' <- mapM elaborate' es
-  case t' of
-    (_, TermPi [zu, kp@(_, k, (_, TermPi xts _))] _) -- i.e. Sigma xts
-      | length xts == length es' -> do
-        let xvs = map (\(_, x, _) -> toTermUpsilon x) xts
-        let kv = toTermUpsilon k
-        let bindArgsThen = \e -> (m, TermPiElim (m, TermPiIntro xts e) es')
-        return $ bindArgsThen (m, TermPiIntro [zu, kp] (m, TermPiElim kv xvs))
-    _ -> throwError' "the type of sigma-intro is wrong"
+  return (m, TermSigmaIntro t' es')
+  -- case t' of
+  --   (_, TermPi [zu, kp@(_, k, (_, TermPi xts _))] _) -- i.e. Sigma xts
+  --     | length xts == length es' -> do
+  --       let xvs = map (\(_, x, _) -> toTermUpsilon x) xts
+  --       let kv = toTermUpsilon k
+  --       let bindArgsThen = \e -> (m, TermPiElim (m, TermPiIntro xts e) es')
+  --       return $ bindArgsThen (m, TermPiIntro [zu, kp] (m, TermPiElim kv xvs))
+  --   _ -> throwError' "the type of sigma-intro is wrong"
 elaborate' (m, WeakTermSigmaElim t xts e1 e2) = do
   t' <- elaborate' t
   xts' <- mapM elaboratePlus xts
   e1' <- elaborate' e1
   e2' <- elaborate' e2
+  return (m, TermSigmaElim t' xts' e1' e2')
   -- sigma-elim t xts e1 e2 = e1 @ (t, lam xts. e2)
-  return (m, TermPiElim e1' [t', (emptyMeta, TermPiIntro xts' e2')])
+  -- return (m, TermPiElim e1' [t', (emptyMeta, TermPiIntro xts' e2')])
 elaborate' (m, WeakTermIter (mx, x, t) xts e) = do
   t' <- elaborate' t
   xts' <- mapM elaboratePlus xts

@@ -42,6 +42,27 @@ clarify lam@(m, TermPiIntro mxts e) = do
 clarify (m, TermPiElim e es) = do
   e' <- clarify e
   callClosure' m e' es
+clarify (m, TermSigma _) = returnClosureType m -- Sigma is translated into Pi
+clarify (m, TermSigmaIntro t es) = do
+  t' <- reduceTermPlus t
+  case t' of
+    (mSig, TermSigma xts)
+      | length xts == length es -> do
+        z <- newNameWith "sigma"
+        l <- newUnivLevel
+        -- don't care the level since they're discarded immediately
+        -- (i.e. this translated term is not used as an argument of `weaken`)
+        let zu = (mSig, z, (mSig, TermTau l))
+        let xvs = map (\(_, x, _) -> toTermUpsilon x) xts
+        let bindArgsThen = \e -> (m, TermPiElim (m, TermPiIntro xts e) es)
+        k <- newNameWith "sig"
+        let kv = toTermUpsilon k
+        -- note that the result of clarification of Pi is the same term regardless of its dom/cod
+        let kp = (mSig, k, (mSig, TermPi [] (mSig, TermUpsilon "DONT_CARE")))
+        clarify $ bindArgsThen (m, TermPiIntro [zu, kp] (m, TermPiElim kv xvs))
+    _ -> throwError' "the type of sigma-intro is wrong"
+clarify (m, TermSigmaElim t xts e1 e2) = do
+  clarify (m, TermPiElim e1 [t, (emptyMeta, TermPiIntro xts e2)])
 clarify iter@(m, TermIter (_, x, t) mxts e) = do
   let (_, xs, ts) = unzip3 mxts
   let xts = zip xs ts
