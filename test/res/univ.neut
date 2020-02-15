@@ -1,0 +1,22 @@
+(include "notation.neut")
+
+;; (include "enum.neut")
+
+(include "top.neut")
+
+(inductive ind ((A tau))
+  (ind.intro ((_ A) (_ (ind A))) (ind A))
+  )
+
+(inductive IND ((A tau))
+  (IND.intro ((_ A) (_ (IND A))) (IND A))
+  )
+
+(inductive item ()
+  (item.cont00 ((_ (ind (ind (item))))) (item))
+  ;; (item.cont10 ((_ (IND (ind (item))))) (item))
+  ;; (item.cont01 ((_ (ind (IND (item))))) (item))
+  ;; (item.cont11 ((_ (IND (IND (item))))) (item))
+)
+
+unit
