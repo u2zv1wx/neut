@@ -26,7 +26,7 @@ import Reduce.Term
 import qualified Text.Show.Pretty as Pr
 
 clarify :: TermPlus -> WithEnv CodePlus
-clarify (m, TermTau) = do
+clarify (m, TermTau _) = do
   v <- cartesianUniv m
   return (m, CodeUpIntro v)
 clarify (m, TermUpsilon x) = return (m, CodeUpIntro (m, DataUpsilon x))

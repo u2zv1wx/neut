@@ -94,7 +94,7 @@ chainTermPlus e = do
   return $ nubBy (\(_, x, _) (_, y, _) -> x == y) tmp
 
 chainTermPlus' :: TermPlus -> WithEnv [(Meta, Identifier, TermPlus)]
-chainTermPlus' (_, TermTau) = return []
+chainTermPlus' (_, TermTau _) = return []
 chainTermPlus' (m, TermUpsilon x) = do
   t <- lookupTypeEnv x
   xts <- chainWithName x t

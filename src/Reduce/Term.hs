@@ -385,7 +385,7 @@ asEnum True = TermEnumIntro $ EnumValueLabel "true"
 asEnum False = TermEnumIntro $ EnumValueLabel "false"
 
 isValue :: TermPlus -> WithEnv Bool
-isValue (_, TermTau) = return True
+isValue (_, TermTau _) = return True
 isValue (_, TermUpsilon _) = return True
 isValue (_, TermPi {}) = return True
 isValue (_, TermPiIntro {}) = return True

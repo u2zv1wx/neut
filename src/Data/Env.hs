@@ -196,7 +196,9 @@ lookupTypeEnv s
       , TermPiElim
           (emptyMeta, TermConst "is-enum")
           [(emptyMeta, TermEnum $ EnumTypeNat i)])
-  | Just _ <- asLowTypeMaybe s = return univTerm
+  | Just _ <- asLowTypeMaybe s = do
+    l <- newUnivLevel
+    return (emptyMeta, TermTau l)
   | otherwise = do
     mt <- gets (Map.lookup s . typeEnv)
     case mt of

@@ -35,6 +35,20 @@ data EnumType
   | EnumTypeNat Integer -- n{k}
   deriving (Show, Eq)
 
+-- note that UnivLevel is just the name of the level of a universe (i.e. the integer
+-- itself is not the level of the universe)
+type UnivLevel = Int
+
+newtype UnivLevelPlus =
+  UnivLevelPlus (Meta, UnivLevel)
+
+instance Show UnivLevelPlus where
+  show (UnivLevelPlus (m, l)) = "[" ++ show l ++ "]:" ++ showMeta m
+  -- show (UnivLevelPlus (_, l)) = "[" ++ show l ++ "]"
+
+instance Eq UnivLevelPlus where
+  (UnivLevelPlus (_, l1)) == (UnivLevelPlus (_, l2)) = l1 == l2
+
 data Meta =
   Meta
     { metaFileName :: Maybe (Path Abs File)

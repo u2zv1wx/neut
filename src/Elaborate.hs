@@ -123,11 +123,6 @@ toGraph :: [LevelEdge] -> LevelGraph
 toGraph [] = Map.empty
 toGraph (((_, l1), v@(_, (_, _))):kvs) =
   Map.insertWith (\v1 v2 -> v1 ++ v2) l1 [v] $ toGraph kvs
-  -- | l1 == l2 =
-  --   if w == 0
-  --     then toGraph kvs
-  --     else undefined -- found cycle
-  -- | otherwise = Map.insertWith (\v1 v2 -> v1 ++ v2) l1 [v] $ toGraph kvs
 
 ensureDAG' :: LevelGraph -> NodeInfo -> [(Meta, UnivLevel)] -> WithEnv ()
 ensureDAG' _ _ [] = return ()
@@ -182,8 +177,8 @@ weightOf path = sum $ map fst $ tail path
 -- reduction-preserving way. Here, we translate types into units (nullary product).
 -- This doesn't cause any problem since types doesn't have any beta-reduction.
 elaborate' :: WeakTermPlus -> WithEnv TermPlus
-elaborate' (m, WeakTermTau _) = do
-  return (m, TermTau)
+elaborate' (m, WeakTermTau l) = do
+  return (m, TermTau l)
 elaborate' (m, WeakTermUpsilon x) = do
   return (m, TermUpsilon x)
 elaborate' (m, WeakTermPi _ xts t) = do
@@ -218,6 +213,8 @@ elaborate' (m, WeakTermSigma xts) = do
   k <- newNameWith "sig"
   -- Sigma [x1 : A1, ..., xn : An] = Pi (z : Type, _ : Pi [x1 : A1, ..., xn : An]. z). z
   let piType = (emptyMeta, TermPi xts' zv)
+  -- fixme: level info of sigma is required
+  let univTerm = undefined
   return (m, TermPi [(emptyMeta, z, univTerm), (emptyMeta, k, piType)] zv)
 elaborate' (m, WeakTermSigmaIntro t es) = do
   t' <- elaborate' t >>= reduceTermPlus

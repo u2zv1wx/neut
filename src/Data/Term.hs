@@ -6,7 +6,7 @@ import Numeric.Half
 import Data.Basic
 
 data Term
-  = TermTau
+  = TermTau UnivLevel
   | TermUpsilon Identifier
   | TermPi [IdentifierPlus] TermPlus
   | TermPiIntro [IdentifierPlus] TermPlus
@@ -45,7 +45,7 @@ toTermUpsilon x = do
   (emptyMeta, TermUpsilon x)
 
 varTermPlus :: TermPlus -> [Identifier]
-varTermPlus (_, TermTau) = []
+varTermPlus (_, TermTau _) = []
 varTermPlus (_, TermUpsilon x) = [x]
 varTermPlus (_, TermPi xts t) = varTermPlus' xts [t]
 varTermPlus (_, TermPiIntro xts e) = varTermPlus' xts [e]
@@ -85,7 +85,7 @@ varTermPlus' ((_, x, t):xts) es = do
   xs1 ++ filter (\y -> y /= x) xs2
 
 substTermPlus :: SubstTerm -> TermPlus -> TermPlus
-substTermPlus _ (m, TermTau) = (m, TermTau)
+substTermPlus _ (m, TermTau l) = (m, TermTau l)
 substTermPlus sub (m, TermUpsilon x) =
   fromMaybe (m, TermUpsilon x) (lookup x sub)
 substTermPlus sub (m, TermPi xts t) = do
@@ -149,6 +149,5 @@ substTermPlusBindingsWithBody sub ((mx, x, t):xts) e = do
   let sub' = filter (\(k, _) -> k /= x) sub
   let (xts', e') = substTermPlusBindingsWithBody sub' xts e
   ((mx, x, substTermPlus sub t) : xts', e')
-
-univTerm :: TermPlus
-univTerm = (emptyMeta, TermTau)
+-- univTerm :: TermPlus
+-- univTerm = (emptyMeta, TermTau l)
