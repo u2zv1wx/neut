@@ -11,6 +11,9 @@ data Term
   | TermPi [IdentifierPlus] TermPlus
   | TermPiIntro [IdentifierPlus] TermPlus
   | TermPiElim TermPlus [TermPlus]
+  | TermSigma [IdentifierPlus]
+  | TermSigmaIntro TermPlus [TermPlus]
+  | TermSigmaElim TermPlus [IdentifierPlus] TermPlus TermPlus
   | TermIter IdentifierPlus [IdentifierPlus] TermPlus
   | TermConst Identifier
   | TermConstDecl IdentifierPlus TermPlus
@@ -53,6 +56,14 @@ varTermPlus (_, TermPiElim e es) = do
   let xs1 = varTermPlus e
   let xs2 = concatMap varTermPlus es
   xs1 ++ xs2
+varTermPlus (_, TermSigma xts) = varTermPlus' xts []
+varTermPlus (_, TermSigmaIntro t es) = do
+  varTermPlus t ++ concatMap varTermPlus es
+varTermPlus (_, TermSigmaElim t xts e1 e2) = do
+  let xs = varTermPlus t
+  let ys = varTermPlus e1
+  let zs = varTermPlus' xts [e2]
+  xs ++ ys ++ zs
 varTermPlus (_, TermIter (_, x, t) xts e) =
   varTermPlus t ++ filter (/= x) (varTermPlus' xts [e])
 varTermPlus (_, TermConst _) = []
@@ -98,6 +109,18 @@ substTermPlus sub (m, TermPiElim e es) = do
   let e' = substTermPlus sub e
   let es' = map (substTermPlus sub) es
   (m, TermPiElim e' es')
+substTermPlus sub (m, TermSigma xts) = do
+  let xts' = substTermPlusBindings sub xts
+  (m, TermSigma xts')
+substTermPlus sub (m, TermSigmaIntro t es) = do
+  let t' = substTermPlus sub t
+  let es' = map (substTermPlus sub) es
+  (m, TermSigmaIntro t' es')
+substTermPlus sub (m, TermSigmaElim t xts e1 e2) = do
+  let t' = substTermPlus sub t
+  let e1' = substTermPlus sub e1
+  let (xts', e2') = substTermPlusBindingsWithBody sub xts e2
+  (m, TermSigmaElim t' xts' e1' e2')
 substTermPlus sub (m, TermIter (mx, x, t) xts e) = do
   let t' = substTermPlus sub t
   let sub' = filter (\(k, _) -> k /= x) sub
@@ -141,6 +164,14 @@ substTermPlus sub (m, TermStructElim xts v e) = do
   let sub' = filter (\(k, _) -> k `notElem` xs) sub
   let e' = substTermPlus sub' e
   (m, TermStructElim xts v' e')
+
+substTermPlusBindings :: SubstTerm -> [IdentifierPlus] -> [IdentifierPlus]
+substTermPlusBindings _ [] = []
+substTermPlusBindings sub ((m, x, t):xts) = do
+  let sub' = filter (\(k, _) -> k /= x) sub
+  let xts' = substTermPlusBindings sub' xts
+  let t' = substTermPlus sub t
+  (m, x, t') : xts'
 
 substTermPlusBindingsWithBody ::
      SubstTerm -> [IdentifierPlus] -> TermPlus -> ([IdentifierPlus], TermPlus)
