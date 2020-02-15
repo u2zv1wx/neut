@@ -533,22 +533,19 @@ levelOf (UnivLevelPlus (_, l)) = l
 
 unit :: WeakTermPlus
 unit = (emptyMeta, WeakTermEnumIntro $ EnumValueLabel "unit")
-
-type UnivEnv = IntMap.IntMap [UnivLevel]
-
-type UnivInst a = State UnivEnv a
-
-univInst :: WeakTermPlus -> UnivLevel -> ((WeakTermPlus, UnivLevel), UnivEnv)
-univInst e l = runState (foo e l) IntMap.empty
-
-foo :: WeakTermPlus -> UnivLevel -> UnivInst (WeakTermPlus, UnivLevel)
-foo e l = do
-  l' <- levelInst l
-  e' <- univInst' e
-  return (e', l')
-
-univInst' :: WeakTermPlus -> UnivInst WeakTermPlus
-univInst' = undefined
-
-levelInst :: UnivLevel -> UnivInst UnivLevel
-levelInst = undefined
+-- type UnivEnv = IntMap.IntMap [UnivLevel]
+-- type UnivInst a = State UnivEnv a
+-- univInst :: WeakTermPlus -> UnivLevel -> ((WeakTermPlus, UnivLevel), UnivEnv)
+-- univInst e l = runState (foo e l) IntMap.empty
+-- foo :: WeakTermPlus -> UnivLevel -> UnivInst (WeakTermPlus, UnivLevel)
+-- foo e l = do
+--   l' <- levelInst l
+--   e' <- univInst' e
+--   return (e', l')
+-- univInst' :: WeakTermPlus -> UnivInst WeakTermPlus
+-- univInst' = undefined
+-- levelInst :: UnivLevel -> UnivInst UnivLevel
+-- levelInst l = do
+--   l' <- newUnivLevel
+--   modify (\uienv -> IntMap.insertWith (++) [l'] uienv)
+--   return l'

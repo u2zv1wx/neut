@@ -40,7 +40,7 @@ elaborate :: WeakStmt -> WithEnv TermPlus
 elaborate (WeakStmtReturn e) = do
   (e', _, _) <- infer e
   analyze >> synthesize >> refine
-  gets levelEnv >>= ensureDAG -- universe level check
+  gets levelEnv >>= ensureDAG -- universe level check at the end of type inference
   elaborate' e' >>= reduceTermPlus
 elaborate (WeakStmtLet m (mx, x, t) e cont) = do
   (e', te, mle) <- infer e

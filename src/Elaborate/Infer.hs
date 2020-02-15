@@ -12,6 +12,7 @@ import Control.Monad.State
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.IntMap.Strict as IntMap
+import qualified Data.Set as S
 import qualified Data.Text as T
 
 import Data.Basic
@@ -72,10 +73,8 @@ infer' _ (m, WeakTermUpsilon x) = do
       ((_, t), UnivLevelPlus (_, l)) <- lookupWeakTypeEnv x
       return ((m, WeakTermUpsilon x), (m, t), UnivLevelPlus (m, l))
     Just (t, UnivLevelPlus (_, l)) -> do
-      uienv <- gets univInstEnv
-      let (((_, t'), l'), uienv') = univInst (weaken t) l
-      modify (\env -> env {univInstEnv = IntMap.unionWith (++) uienv' uienv})
-      return ((m, WeakTermUpsilon x), (m, t'), UnivLevelPlus (m, l'))
+      (_, t') <- univInst $ weaken t
+      return ((m, WeakTermUpsilon x), (m, t'), UnivLevelPlus (m, l))
 infer' ctx (m, WeakTermPi mls xts t) = do
   (xtls', (t', mlPiCod)) <- inferPi ctx xts t
   let (xts', mlPiArgs) = unzip xtls'
@@ -533,3 +532,107 @@ insLevelLT ml1 ml2 =
 insLevelEQ :: UnivLevelPlus -> UnivLevelPlus -> WithEnv ()
 insLevelEQ (UnivLevelPlus (_, l1)) (UnivLevelPlus (_, l2)) = do
   modify (\env -> env {equalityEnv = (l1, l2) : equalityEnv env})
+
+univInst :: WeakTermPlus -> WithEnv WeakTermPlus
+univInst e = do
+  modify (\env -> env {univRenameEnv = IntMap.empty})
+  univInst' e
+
+univInst' :: WeakTermPlus -> WithEnv WeakTermPlus
+univInst' (m, WeakTermTau l) = do
+  l' <- levelInst l
+  return (m, WeakTermTau l')
+univInst' (m, WeakTermUpsilon x) = return (m, WeakTermUpsilon x)
+univInst' (m, WeakTermPi mls xts t) = do
+  xts' <- univInstArgs xts
+  t' <- univInst' t
+  return (m, WeakTermPi mls xts' t')
+univInst' (m, WeakTermPiIntro xts e) = do
+  xts' <- univInstArgs xts
+  e' <- univInst' e
+  return (m, WeakTermPiIntro xts' e')
+univInst' (m, WeakTermPiElim e es) = do
+  e' <- univInst' e
+  es' <- mapM univInst' es
+  return (m, WeakTermPiElim e' es')
+univInst' (m, WeakTermSigma xts) = do
+  xts' <- univInstArgs xts
+  return (m, WeakTermSigma xts')
+univInst' (m, WeakTermSigmaIntro t es) = do
+  t' <- univInst' t
+  es' <- mapM univInst' es
+  return (m, WeakTermSigmaIntro t' es')
+univInst' (m, WeakTermSigmaElim t xts e1 e2) = do
+  t' <- univInst' t
+  xts' <- univInstArgs xts
+  e1' <- univInst' e1
+  e2' <- univInst' e2
+  return (m, WeakTermSigmaElim t' xts' e1' e2')
+univInst' (m, WeakTermIter (mx, x, t) xts e) = do
+  t' <- univInst' t
+  xts' <- univInstArgs xts
+  e' <- univInst' e
+  return (m, WeakTermIter (mx, x, t') xts' e')
+univInst' (m, WeakTermConst x) = return (m, WeakTermConst x)
+univInst' (m, WeakTermConstDecl (mx, x, t) e) = do
+  t' <- univInst' t
+  e' <- univInst' e
+  return (m, WeakTermConstDecl (mx, x, t') e')
+univInst' (m, WeakTermZeta x) = return (m, WeakTermZeta x)
+univInst' (m, WeakTermInt t a) = do
+  t' <- univInst' t
+  return (m, WeakTermInt t' a)
+univInst' (m, WeakTermFloat16 a) = return (m, WeakTermFloat16 a)
+univInst' (m, WeakTermFloat32 a) = return (m, WeakTermFloat32 a)
+univInst' (m, WeakTermFloat64 a) = return (m, WeakTermFloat64 a)
+univInst' (m, WeakTermFloat t a) = do
+  t' <- univInst' t
+  return (m, WeakTermFloat t' a)
+univInst' (m, WeakTermEnum x) = return (m, WeakTermEnum x)
+univInst' (m, WeakTermEnumIntro l) = return (m, WeakTermEnumIntro l)
+univInst' (m, WeakTermEnumElim (e, t) les) = do
+  t' <- univInst' t
+  e' <- univInst' e
+  let (ls, es) = unzip les
+  es' <- mapM univInst' es
+  return (m, WeakTermEnumElim (e', t') (zip ls es'))
+univInst' (m, WeakTermArray dom k) = do
+  dom' <- univInst' dom
+  return (m, WeakTermArray dom' k)
+univInst' (m, WeakTermArrayIntro k es) = do
+  es' <- mapM univInst' es
+  return (m, WeakTermArrayIntro k es')
+univInst' (m, WeakTermArrayElim k xts d e) = do
+  xts' <- univInstArgs xts
+  d' <- univInst' d
+  e' <- univInst' e
+  return (m, WeakTermArrayElim k xts' d' e')
+univInst' (m, WeakTermStruct ks) = return (m, WeakTermStruct ks)
+univInst' (m, WeakTermStructIntro ets) = do
+  let (es, ks) = unzip ets
+  es' <- mapM univInst' es
+  return (m, WeakTermStructIntro (zip es' ks))
+univInst' (m, WeakTermStructElim xts d e) = do
+  d' <- univInst' d
+  e' <- univInst' e
+  return (m, WeakTermStructElim xts d' e')
+
+univInstArgs :: [IdentifierPlus] -> WithEnv [IdentifierPlus]
+univInstArgs xts = do
+  let (ms, xs, ts) = unzip3 xts
+  ts' <- mapM univInst' ts
+  return $ zip3 ms xs ts'
+
+levelInst :: UnivLevel -> WithEnv UnivLevel
+levelInst l = do
+  urenv <- gets univRenameEnv
+  case IntMap.lookup l urenv of
+    Just l' -> return l'
+    Nothing -> do
+      l' <- newUnivLevel
+      modify (\env -> env {univRenameEnv = IntMap.insert l l' urenv})
+      uienv <- gets univInstEnv
+      let s = S.fromList [l, l']
+      -- insert l ~> {l, l'}
+      modify (\env -> env {univInstEnv = IntMap.insertWith S.union l s uienv})
+      return l'
