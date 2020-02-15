@@ -23,8 +23,6 @@ import Data.Env
 import Data.Term
 import Reduce.Term
 
-import qualified Text.Show.Pretty as Pr
-
 clarify :: TermPlus -> WithEnv CodePlus
 clarify (m, TermTau _) = do
   v <- cartesianUniv m
@@ -58,18 +56,6 @@ clarify (m, TermSigmaIntro t es) = do
               clarify $
                 bindArgsThen (m, TermPiIntro [zu, kp] (m, TermPiElim kv xvs))
           _ -> throwError' "the type of sigma-intro is wrong"
-        -- z <- newNameWith "sigma"
-        -- l <- newUnivLevel
-        -- -- don't care the level since they're discarded immediately
-        -- -- (i.e. this translated term is not used as an argument of `weaken`)
-        -- let zu = (mSig, z, (mSig, TermTau l))
-        -- let xvs = map (\(_, x, _) -> toTermUpsilon x) xts
-        -- let bindArgsThen = \e -> (m, TermPiElim (m, TermPiIntro xts e) es)
-        -- k <- newNameWith "sig"
-        -- let kv = toTermUpsilon k
-        -- -- note that the result of clarification of Pi is the same term regardless of its dom/cod
-        -- let kp = (mSig, k, (mSig, TermPi [] [] (mSig, TermUpsilon "DONT_CARE")))
-        -- clarify $ bindArgsThen (m, TermPiIntro [zu, kp] (m, TermPiElim kv xvs))
     _ -> throwError' "the type of sigma-intro is wrong"
 clarify (m, TermSigmaElim t xts e1 e2) = do
   clarify (m, TermPiElim e1 [t, (emptyMeta, TermPiIntro xts e2)])
@@ -182,21 +168,15 @@ clarifyConst m name
   | Just _ <- asLowTypeMaybe name = clarify (m, TermEnum $ EnumTypeLabel "top")
 clarifyConst m name
   | Just lowType <- asArrayAccessMaybe name = clarifyArrayAccess m name lowType
--- clarifyConst m "is-enum" = clarifyIsEnum m
 clarifyConst m "file-descriptor" = clarify (m, TermConst "i64")
 clarifyConst m "stdin" = clarify (m, TermEnumIntro (EnumValueIntS 64 0))
 clarifyConst m "stdout" = clarify (m, TermEnumIntro (EnumValueIntS 64 1))
 clarifyConst m "stderr" = clarify (m, TermEnumIntro (EnumValueIntS 64 2))
 clarifyConst m name = do
-  mx <- asEnumConstant name
-  case mx of
-    Just i ->
-      clarify (m, TermEnumIntro (EnumValueIntU 64 i)) -- enum.top ~> 1, enum.choice ~> 2, etc.
-    Nothing -> do
-      cenv <- gets constantEnv
-      if name `elem` cenv
-        then return (m, CodeUpIntro (m, DataTheta name))
-        else throwError' $ "clarify.theta: " <> name
+  cenv <- gets constantEnv
+  if name `elem` cenv
+    then return (m, CodeUpIntro (m, DataTheta name))
+    else throwError' $ "clarify.theta: " <> name
 
 clarifyUnaryOp :: Identifier -> UnaryOp -> LowType -> Meta -> WithEnv CodePlus
 clarifyUnaryOp name op lowType m = do
@@ -232,33 +212,6 @@ clarifyBinaryOp name op lowType m = do
         (m, CodeTheta (ThetaBinaryOp op lowType varX varY))
     _ -> throwError' $ "the arity of " <> name <> " is wrong"
 
--- clarifyIsEnum :: Meta -> WithEnv CodePlus
--- clarifyIsEnum m = do
---   t <- lookupTypeEnv' "is-enum"
---   t' <- reduceTermPlus t
---   case t' of
---     (_, TermPi _ xts@[(mx, x, tx)] _) -> do
---       v <- cartesianImmediate m
---       let varX = toDataUpsilon (x, mx)
---       aff <- newNameWith "aff"
---       rel <- newNameWith "rel"
---       retImmType <- returnCartesianImmediate
---       zts <- complementaryChainOf xts
---       -- p "one-time closure (is-enum)"
---       retClosure
---         (Just "is-enum")
---         zts
---         m
---         [(mx, x, tx)]
---         ( m
---         , CodeSigmaElim
---             arrVoidPtr
---             [(aff, retImmType), (rel, retImmType)]
---             varX
---             (m, CodeUpIntro v))
---     _ ->
---       throwError' $
---       "the type of is-enum is wrong. t :\n" <> T.pack (Pr.ppShow t)
 clarifyArrayAccess :: Meta -> Identifier -> LowType -> WithEnv CodePlus
 clarifyArrayAccess m name lowType = do
   arrayAccessType <- lookupTypeEnv' name
@@ -558,11 +511,8 @@ sigToPi m xts = do
   k <- newNameWith "sig"
   -- Sigma [x1 : A1, ..., xn : An] = Pi (z : Type, _ : Pi [x1 : A1, ..., xn : An]. z). z
   let piType = (emptyMeta, TermPi [] xts zv)
-  -- fixme: level info of sigma is required
-  -- let univTerm = undefined
   l <- newUnivLevel
   -- don't care the level since they're discarded immediately
   -- (i.e. this translated term is not used as an argument of `weaken`)
   let zu = (m, z, (m, TermTau l))
   return (m, TermPi [] [zu, (emptyMeta, k, piType)] zv)
-  -- return (m, TermPi [] [(emptyMeta, z, zu), (emptyMeta, k, piType)] zv)

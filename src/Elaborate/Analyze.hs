@@ -170,29 +170,17 @@ simp' ((e1, e2):cs) = do
               [] -> simpPattern h2 ies2 e2' e1' cs
               _ -> simp $ (substWeakTermPlus (zip zs es) e1', e2') : cs
         (Just (StuckPiElimUpsilon x1 _), _)
-          | Just body <- Map.lookup x1 sub
-            -- p $ "expand: "
-            -- p' x1
-            -- p "body:"
-            -- p $ T.unpack (toText body)
-           -> do
+          | Just body <- Map.lookup x1 sub -> do
             let m = supMeta (supMeta (metaOf e1) (metaOf e2)) (metaOf body) -- x1 == e1 == body
             let e1' = (m, snd e1)
             let e2' = (m, snd e2)
-            -- let body' = (m, snd body)
             body' <- termInst (m, snd body)
             simp $ (substWeakTermPlus [(x1, body')] e1', e2') : cs
         (_, Just (StuckPiElimUpsilon x2 _))
-          | Just body <- Map.lookup x2 sub
-            -- p $ "expand:"
-            -- p' x2
-            -- p "body:"
-            -- p $ T.unpack (toText body)
-           -> do
+          | Just body <- Map.lookup x2 sub -> do
             let m = supMeta (supMeta (metaOf e1) (metaOf e2)) (metaOf body) -- x2 == e2 == body
             let e1' = (m, snd e1)
             let e2' = (m, snd e2)
-            -- let body' = (m, snd body)
             body' <- termInst (m, snd body)
             simp $ (e1', substWeakTermPlus [(x2, body')] e2') : cs
         (Just (StuckPiElimUpsilon x1 ess1), Just (StuckPiElimUpsilon x2 ess2))
@@ -242,7 +230,6 @@ simp' ((e1, e2):cs) = do
             simpFlexRigid h2 ies2 e2' e1' fmvs cs
         _ -> simpOther e1 e2 fmvs cs
 
--- {} simpBinder {}
 simpBinder ::
      [IdentifierPlus]
   -> [IdentifierPlus]
@@ -263,7 +250,6 @@ simpBinder ((_, x1, t1):xts1) ((_, x2, t2):xts2) (Just (cod1, cod2)) cs = do
   simpBinder xts1 xts2' (Just (cod1, cod2')) cs
 simpBinder _ _ _ _ = throwError' "cannot simplify (simpBinder)"
 
--- {} simpPattern {}
 simpPattern ::
      Identifier
   -> [[WeakTermPlus]]
@@ -278,7 +264,6 @@ simpPattern h1 ies1 _ e2 cs = do
   visit h1
   simp cs
 
--- {} simpQuasiPattern {}
 simpQuasiPattern ::
      Identifier
   -> [[WeakTermPlus]]
@@ -292,7 +277,6 @@ simpQuasiPattern h1 ies1 e1 e2 fmvs cs = do
     Enriched (e1, e2) fmvs (ConstraintQuasiPattern h1 ies1 e2)
   simp cs
 
--- {} simpFlexRigid {}
 simpFlexRigid ::
      Hole
   -> [[WeakTermPlus]]
@@ -305,7 +289,6 @@ simpFlexRigid h1 ies1 e1 e2 fmvs cs = do
   insConstraintQueue $ Enriched (e1, e2) fmvs (ConstraintFlexRigid h1 ies1 e2)
   simp cs
 
--- {} simpOther {}
 simpOther ::
      WeakTermPlus -> WeakTermPlus -> [Hole] -> [PreConstraint] -> WithEnv ()
 simpOther e1 e2 fmvs cs = do
@@ -319,7 +302,6 @@ data Stuck
   | StuckPiElimIter IterInfo [(Meta, [WeakTermPlus])]
   | StuckPiElimConst Identifier [[WeakTermPlus]]
 
--- {} asStuckedTerm {}
 asStuckedTerm :: WeakTermPlus -> Maybe Stuck
 asStuckedTerm (_, WeakTermUpsilon x) = Just $ StuckPiElimUpsilon x []
 asStuckedTerm (_, WeakTermZeta h) = Just $ StuckPiElimZetaStrict h []
@@ -350,7 +332,6 @@ asStuckedTerm (m, WeakTermPiElim e es) =
     Nothing -> Nothing
 asStuckedTerm _ = Nothing
 
--- {} stuckReasonOf {}
 stuckReasonOf :: Stuck -> Maybe Hole
 stuckReasonOf (StuckPiElimUpsilon _ _) = Nothing
 stuckReasonOf (StuckPiElimZeta h _) = Just h
@@ -358,21 +339,15 @@ stuckReasonOf (StuckPiElimZetaStrict h _) = Just h
 stuckReasonOf (StuckPiElimIter {}) = Nothing
 stuckReasonOf (StuckPiElimConst _ _) = Nothing
 
--- stuckReasonOf (StuckUpsilon _) = Nothing
--- {} occurCheck {}
 occurCheck :: Identifier -> [Identifier] -> Bool
 occurCheck h fmvs = h `notElem` fmvs
 
--- {} includeCheck {}
 includeCheck :: [Identifier] -> WeakTermPlus -> [Identifier]
--- includeCheck xs e = all (`elem` xs) $ varWeakTermPlus e
 includeCheck xs e = filter (`notElem` xs) $ varWeakTermPlus e
 
--- {} getVarList {}
 getVarList :: [WeakTermPlus] -> [Identifier]
 getVarList xs = catMaybes $ map asUpsilon xs
 
--- {} toPiElim {}
 toPiElim :: WeakTermPlus -> [(Meta, [WeakTermPlus])] -> WeakTermPlus
 toPiElim e [] = e
 toPiElim e ((m, es):ess) = toPiElim (m, WeakTermPiElim e es) ess
@@ -380,7 +355,6 @@ toPiElim e ((m, es):ess) = toPiElim (m, WeakTermPiElim e es) ess
 unfoldIter :: IterInfo -> WeakTermPlus
 unfoldIter (mi, x, xts, body, self) = do
   let m = supMeta mi (metaOf body)
-  -- let body' = substWeakTermPlus [(x, self)] body
   let body' = substWeakTermPlus [(x, self)] (m, snd body)
   (fst self, WeakTermPiIntro xts body')
 
@@ -396,7 +370,6 @@ visit m = do
   simp $ map (\(Enriched c _ _) -> c) $ Q.toList q1
 
 -- [e, x, y, y, e2, e3, z] ~> [p, x, y, y, q, r, z]  (p, q, r: new variables)
--- {} toVarList {}
 toVarList :: [WeakTermPlus] -> WithEnv [IdentifierPlus]
 toVarList [] = return []
 toVarList ((m, WeakTermUpsilon x):es) = do

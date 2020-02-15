@@ -66,8 +66,6 @@ infer' _ (m, WeakTermTau _) = do
   ml0 <- newLevelLT m []
   ml1 <- newLevelLT m [ml0]
   ml2 <- newLevelLT m [ml1]
-  -- p $ "inferred tau at " ++ showMeta m ++ ":"
-  -- p' (ml0, ml1, ml2)
   return (asUniv ml0, asUniv ml1, ml2)
 infer' _ (m, WeakTermUpsilon x) = do
   mt <- lookupTypeEnv x
@@ -77,14 +75,6 @@ infer' _ (m, WeakTermUpsilon x) = do
       return ((m, WeakTermUpsilon x), (m, t), UnivLevelPlus (m, l))
     Just (t, UnivLevelPlus (_, l)) -> do
       ((_, t'), l') <- univInst (weaken t) l
-      -- p $ "instantiate:" ++ T.unpack x
-      -- p "from:"
-      -- -- p $ T.unpack (toText (weaken t))
-      -- p' t
-      -- p "to:"
-      -- -- p $ T.unpack (toText a)
-      -- p' a
-      -- p $ "level: " ++ show l ++ " ~> " ++ show l'
       return ((m, WeakTermUpsilon x), (m, t'), UnivLevelPlus (m, l'))
 infer' ctx (m, WeakTermPi _ xts t) = do
   mls <- piUnivLevelsfrom xts t
@@ -477,13 +467,6 @@ constrainList (t1:t2:ts) = do
   insConstraintEnv t1 t2
   constrainList $ t2 : ts
 
--- toIsEnumType :: Integer -> Meta -> WithEnv WeakTermPlus
--- toIsEnumType i m = do
---   return
---     ( m
---     , WeakTermPiElim
---         (emptyMeta, WeakTermConst "is-enum")
---         [(emptyMeta, WeakTermEnum $ EnumTypeNat i)])
 newHole :: WithEnv WeakTermPlus
 newHole = do
   h <- newNameWith "hole"

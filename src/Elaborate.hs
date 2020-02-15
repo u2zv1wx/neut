@@ -7,8 +7,7 @@ module Elaborate
 import Control.Monad.Except
 import Control.Monad.State
 import Data.List (nub)
-import Data.Maybe (catMaybes, fromMaybe)
-import Debug.Trace
+import Data.Maybe (fromMaybe)
 import Numeric.Half
 import System.Console.ANSI
 
@@ -46,33 +45,22 @@ elaborateStmt :: WeakStmt -> WithEnv TermPlus
 elaborateStmt (WeakStmtReturn e) = do
   (e', _, _) <- infer e
   analyze >> synthesize >> refine
-  -- p "univ-level"
-  -- _ <- error "stop"
   checkUnivSanity
-  -- p "done"
   elaborate' e' >>= reduceTermPlus
 elaborateStmt (WeakStmtLet m (mx, x, t) e cont) = do
   (e', te, mle) <- infer e
   (t', mlt) <- inferType t
-  -- p $ "==== " ++ T.unpack x ++ " ===="
-  -- p $ T.unpack (toText e')
-  -- p $ T.unpack (toText t')
   insConstraintEnv te t'
   insLevelEQ mle mlt
   modify (\env -> env {substEnv = Map.insert x e' (substEnv env)})
-  -- Kantian type-inference
+  -- Kantian type-inference ;)
   analyze >> synthesize >> refine >> cleanup
-  -- elaborateStmt the related terms
   e'' <- elaborate' e' >>= reduceTermPlus
   t'' <- elaborate' t' >>= reduceTermPlus
   insTypeEnv x t'' mlt
-  -- outputGraph
   cont' <- elaborateStmt cont
   return (m, TermPiElim (m, TermPiIntro [(mx, x, t'')] cont') [e''])
-elaborateStmt (WeakStmtConstDecl m (mx, x, t) cont)
-  -- p $ "==== " ++ T.unpack x ++ " ===="
-  -- p $ T.unpack (toText t)
- = do
+elaborateStmt (WeakStmtConstDecl m (mx, x, t) cont) = do
   (t', mlt) <- inferType t
   analyze >> synthesize >> refine >> cleanup
   t'' <- elaborate' t' >>= reduceTermPlus
@@ -130,49 +118,10 @@ checkUnivSanity = do
   eenv <- gets equalityEnv
   uienv <- gets univInstEnv
   let g' = nub $ UF.run $ quotient eenv uienv g
-  -- p' $ map (\(a, (w, b)) -> (UnivLevelPlus a, (w, UnivLevelPlus b))) g'
   let nodeList = nub $ concatMap (\(n1, _) -> [n1]) g'
   let g'' = toGraph g'
-  -- g'' <- return $ toGraph g'
-  -- let s = sum $ map (\(_, xs) -> length xs) $ IntMap.toList g''
-  -- p $ "constructed graph. size = " ++ show s
-  -- p $ "nodes: " ++ show (length nodeList)
-  -- forGraphviz $ IntMap.toList g''
-  -- g2 <- return $ toGraph $ nub g'
-  -- let s2 = sum $ map (\(_, xs) -> length xs) $ IntMap.toList g2
-  -- p $ "constructed graph. size = " ++ show s2
-  ensureDAG' g'' IntMap.empty nodeList
+  ensureDAG g'' IntMap.empty nodeList
 
--- outputGraph :: WithEnv ()
--- outputGraph = do
---   g <- gets levelEnv
---   eenv <- gets equalityEnv
---   uienv <- gets univInstEnv
---   let g' = nub $ UF.run $ quotient eenv uienv g
---   let g'' = toGraph g'
---   -- p' g''
---   forGraphviz $ IntMap.toList g''
--- forGraphviz :: [(IntMap.Key, [(Integer, (a, Int))])] -> WithEnv ()
--- forGraphviz wxs
---   -- p "digraph {"
---  = do
---   forGraphviz' wxs
---   -- p "}"
--- forGraphviz' :: [(IntMap.Key, [(Integer, (a, Int))])] -> WithEnv ()
--- forGraphviz' [] = return ()
--- forGraphviz' ((i1, ws):xs) = do
---   forGraphviz'' i1 ws
---   forGraphviz' xs
--- forGraphviz'' :: IntMap.Key -> [(Integer, (a, Int))] -> WithEnv ()
--- forGraphviz'' _ [] = return ()
--- forGraphviz'' i ((w, (_, j)):wjs) = do
---   if w <= 0
---     then p $ "  " ++ show i ++ " <= " ++ show j
---     else p $ "  " ++ show i ++ " < " ++ show j
---   -- if w <= 0
---   --   then p $ "  " ++ show i ++ " -> " ++ show j ++ ";"
---   --   else p $ "  " ++ show i ++ " -> " ++ show j ++ "[color=red];"
---   forGraphviz'' i wjs
 type LevelGraph = IntMap.IntMap [(Integer, (Meta, UnivLevel))]
 
 toGraph :: [LevelEdge] -> LevelGraph
@@ -180,26 +129,24 @@ toGraph [] = IntMap.empty
 toGraph (((_, l1), v@(_, (_, _))):kvs) =
   IntMap.insertWith (++) l1 [v] $ toGraph kvs
 
-ensureDAG' :: LevelGraph -> NodeInfo -> [(Meta, UnivLevel)] -> WithEnv ()
-ensureDAG' _ _ [] = return ()
-ensureDAG' g nodeInfo (v:vs) = do
+ensureDAG :: LevelGraph -> NodeInfo -> [(Meta, UnivLevel)] -> WithEnv ()
+ensureDAG _ _ [] = return ()
+ensureDAG g nodeInfo (v:vs) = do
   let l = snd v
   case IntMap.lookup l nodeInfo of
-    Just NodeStateFinish -> ensureDAG' g nodeInfo vs
+    Just NodeStateFinish -> ensureDAG g nodeInfo vs
     Just NodeStateActive -> error "invalid argument"
     Nothing ->
       case dfs g v [(0, v)] nodeInfo of
         Right finishedList -> do
           let info = IntMap.fromList $ zip finishedList (repeat NodeStateFinish)
-          ensureDAG' g (IntMap.union info nodeInfo) vs
-          -- ensureDAG' g (IntMap.insert l NodeStateFinish nodeInfo) vs
+          ensureDAG g (IntMap.union info nodeInfo) vs
         Left closedPath ->
           throwError' $
           "found cyclic univ level:\n" <>
-          T.pack (show $ map (\(x, y) -> (x, UnivLevelPlus y)) closedPath)
+          T.pack
+            (show $ map (\(x, y) -> (x, UnivLevelPlus y)) (reverse closedPath))
 
--- toGraph ((UnivLevelPlus (_, l), v):kvs) = do
---   Map.insertWith (\v1 v2 -> v1 ++ v2) l [v] $ toGraph kvs
 type UnivPath = [(Integer, (Meta, UnivLevel))]
 
 type NodeInfo = IntMap.IntMap NodeState
@@ -216,11 +163,9 @@ dfs ::
   -> Either UnivPath [UnivLevel]
 dfs g (_, l) path visitInfo = do
   let mvs = fromMaybe [] $ IntMap.lookup l g
-  foo <-
+  lss <-
     sequence $
-    (flip map) mvs $ \wv'@(_, v')
-      -- let path' = path ++ [wv']
-     -> do
+    (flip map) mvs $ \wv'@(_, v') -> do
       let path' = wv' : path
       let l' = snd v'
       case IntMap.lookup l' visitInfo of
@@ -232,8 +177,7 @@ dfs g (_, l) path visitInfo = do
         Just NodeStateFinish -> return []
         Nothing -> do
           dfs g v' path' (IntMap.insert l NodeStateActive visitInfo)
-  --         return $ l' : ls
-  return $ l : concat foo
+  return $ l : concat lss
 
 weightOf :: UnivPath -> Integer
 weightOf path = sum $ map fst $ tail path
@@ -274,34 +218,16 @@ elaborate' (m, WeakTermPiElim e es) = do
 elaborate' (m, WeakTermSigma xts) = do
   xts' <- mapM elaboratePlus xts
   return (m, TermSigma xts')
-  -- z <- newNameWith "sigma"
-  -- let zv = toTermUpsilon z
-  -- k <- newNameWith "sig"
-  -- -- Sigma [x1 : A1, ..., xn : An] = Pi (z : Type, _ : Pi [x1 : A1, ..., xn : An]. z). z
-  -- let piType = (emptyMeta, TermPi xts' zv)
-  -- -- fixme: level info of sigma is required
-  -- let univTerm = undefined
-  -- return (m, TermPi [(emptyMeta, z, univTerm), (emptyMeta, k, piType)] zv)
 elaborate' (m, WeakTermSigmaIntro t es) = do
   t' <- elaborate' t
   es' <- mapM elaborate' es
   return (m, TermSigmaIntro t' es')
-  -- case t' of
-  --   (_, TermPi [zu, kp@(_, k, (_, TermPi xts _))] _) -- i.e. Sigma xts
-  --     | length xts == length es' -> do
-  --       let xvs = map (\(_, x, _) -> toTermUpsilon x) xts
-  --       let kv = toTermUpsilon k
-  --       let bindArgsThen = \e -> (m, TermPiElim (m, TermPiIntro xts e) es')
-  --       return $ bindArgsThen (m, TermPiIntro [zu, kp] (m, TermPiElim kv xvs))
-  --   _ -> throwError' "the type of sigma-intro is wrong"
 elaborate' (m, WeakTermSigmaElim t xts e1 e2) = do
   t' <- elaborate' t
   xts' <- mapM elaboratePlus xts
   e1' <- elaborate' e1
   e2' <- elaborate' e2
   return (m, TermSigmaElim t' xts' e1' e2')
-  -- sigma-elim t xts e1 e2 = e1 @ (t, lam xts. e2)
-  -- return (m, TermPiElim e1' [t', (emptyMeta, TermPiIntro xts' e2')])
 elaborate' (m, WeakTermIter (mx, x, t) xts e) = do
   t' <- elaborate' t
   xts' <- mapM elaboratePlus xts
@@ -314,11 +240,7 @@ elaborate' (_, WeakTermZeta x) = do
     Just e -> do
       e' <- elaborate' e
       return e'
-elaborate' (m, WeakTermConst x) = do
-  mi <- elaborateIsEnum x
-  case mi of
-    Nothing -> return (m, TermConst x)
-    Just i -> return (m, TermEnumIntro (EnumValueIntU 64 i))
+elaborate' (m, WeakTermConst x) = return (m, TermConst x)
 elaborate' (m, WeakTermConstDecl (mx, x, t) e) = do
   t' <- elaborate' t
   e' <- elaborate' e
@@ -334,7 +256,6 @@ elaborate' (m, WeakTermInt t x) = do
       liftIO $ setSGR [SetConsoleIntensity BoldIntensity]
       liftIO $ putStrLn $ showMeta m ++ ":"
       liftIO $ setSGR [Reset]
-      -- p $ showMeta m
       throwError' $
         "the type of `" <>
         T.pack (show x) <>
@@ -368,7 +289,6 @@ elaborate' (m, WeakTermEnumElim (e, t) les) = do
   let (ls, es) = unzip les
   ls' <- mapM elaborateWeakCase ls
   es' <- mapM elaborate' es
-  -- les' <- forM les elaboratePlus
   t' <- elaborate' t >>= reduceTermPlus
   case t' of
     (_, TermEnum x) -> do
@@ -424,22 +344,6 @@ elaboratePlus :: (Meta, a, WeakTermPlus) -> WithEnv (Meta, a, TermPlus)
 elaboratePlus (m, x, t) = do
   t' <- elaborate' t
   return (m, x, t')
-
--- enum.n{i}   ~> Just i
--- enum.choice ~> Just 2 (assuming choice = {left, right})
--- otherwise   ~> Nothing
-elaborateIsEnum :: Identifier -> WithEnv (Maybe Integer)
-elaborateIsEnum x
-  | Just i <- asEnumNatConstant x = return $ Just i
-elaborateIsEnum x
-  | ["enum", enumStr] <- wordsBy '.' x = do
-    b <- isDefinedEnum enumStr
-    if not b
-      then return Nothing
-      else do
-        ls <- lookupEnumSet enumStr
-        return $ Just $ toInteger $ length ls
-elaborateIsEnum _ = return Nothing
 
 caseCheckEnumIdentifier :: EnumType -> [Case] -> WithEnv ()
 caseCheckEnumIdentifier (EnumTypeLabel x) ls = do

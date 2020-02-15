@@ -834,9 +834,9 @@ n15-4
 ;;   (stream.tail ((_ (stream A))) (stream A)))
 
 ;; これも通った
-;; (coinductive nested-stream ((A tau))
-;;   (nested-stream.head ((_ (nested-stream A))) A)
-;;   (nested-stream.tail ((_ (nested-stream A))) (stream (list (stream (nested-stream A))))))
+(coinductive modified-stream ((A tau))
+  (modified-stream.head ((_ (modified-stream A))) A)
+  (modified-stream.tail ((_ (modified-stream A))) (stream (list (stream (modified-stream A))))))
 
 ;; (coinductive nested-stream ((A tau))
 ;;   (nested-stream.head ((_ (nested-stream A))) A)

@@ -407,14 +407,7 @@ isValue _ = return False
 
 isValueConst :: Identifier -> WithEnv Bool
 isValueConst x
-  -- | "is-enum" <- x = return True
   | Just _ <- asLowTypeMaybe x = return True
   | Just _ <- asUnaryOpMaybe x = return True
   | Just _ <- asBinaryOpMaybe x = return True
-  | otherwise = do
-    m <- asEnumConstant x
-    case m of
-      Nothing -> return False
-      Just _ -> return True
-      -- return False
--- isValueConst _ = return False
+  | otherwise = return False

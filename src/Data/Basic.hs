@@ -164,16 +164,8 @@ readEnumValueNat str -- n1-0, n2-0, n2-1, ...
   , 0 <= j && j <= i - 1 = Just $ EnumValueNat i j
   | otherwise = Nothing
 
-asEnumNatConstant :: Identifier -> Maybe Integer
-asEnumNatConstant x
-  | T.length x >= 7 -- length "enum.n4" == 7
-  , ["enum", y] <- wordsBy '.' x
-  , Just i <- readEnumTypeNat y = Just i -- enum.n{i} is a constant
-asEnumNatConstant _ = Nothing
-
 isConstant :: Identifier -> Bool
 isConstant x
-  | Just _ <- asEnumNatConstant x = True
   | Just (LowTypeFloat _) <- asLowTypeMaybe x = True
   | Just _ <- asUnaryOpMaybe x = True
   | Just _ <- asBinaryOpMaybe x = True

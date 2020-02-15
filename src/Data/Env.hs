@@ -196,12 +196,6 @@ llvmTailChar x =
 
 lookupTypeEnv' :: Identifier -> WithEnv TermPlus
 lookupTypeEnv' s
-  | Just i <- asEnumNatConstant s = do
-    return
-      ( emptyMeta
-      , TermPiElim
-          (emptyMeta, TermConst "is-enum")
-          [(emptyMeta, TermEnum $ EnumTypeNat i)])
   | Just _ <- asLowTypeMaybe s = do
     l <- newUnivLevel
     return (emptyMeta, TermTau l)
@@ -280,29 +274,11 @@ enumValueToInteger labelOrNat =
     EnumValueNat _ j -> return j
 
 getEnumNum :: Identifier -> WithEnv Int
-getEnumNum label
-  -- ienv <- gets enumEnv
- = do
+getEnumNum label = do
   renv <- gets revEnumEnv
   case Map.lookup label renv of
     Nothing -> throwError [TIO.putStrLn $ "no such enum is defined: " <> label]
     Just (_, i) -> return i
-  -- case (getEnumNum' label $ Map.elems ienv) of
-  --   Nothing -> throwError [TIO.putStrLn $ "no such enum is defined: " <> label]
-  --   Just i -> return i
-
--- {enum.top, enum.choice, etc.} ~> {(the number of contents in enum)}
--- enum.n{i}とかも処理できないとだめ。
--- これ、enumNatNumのやつを後ろにしてたってことは、enum.n8とかがNothingになってたってこと？
-asEnumConstant :: Identifier -> WithEnv (Maybe Integer)
-asEnumConstant x
-  | ["enum", y] <- wordsBy '.' x = do
-    eenv <- gets enumEnv
-    case Map.lookup y eenv of
-      Nothing -> return Nothing
-      Just ls -> return $ Just $ toInteger $ length ls
-  | Just i <- asEnumNatConstant x = return $ Just i
-asEnumConstant _ = return Nothing
 
 pp :: WeakTermPlus -> WithEnv ()
 pp e = liftIO $ TIO.putStrLn $ toText e
@@ -314,29 +290,6 @@ piUnivLevelsfrom xts t = do
   ls <- mapM (const newUnivLevel) ms
   return $ map UnivLevelPlus $ zip ms ls
 
--- newUnivAccessor :: UnivLevel -> WithEnv UnivAccessor
--- newUnivAccessor a = do
---   i <- newUnivLevel
---   eenv <- gets equalityEnv
---   modify (\env -> env {equalityEnv = IntMap.insert i a eenv})
---   return $ UnivAccessor i
--- newUnivAccessor' :: WithEnv UnivAccessor
--- newUnivAccessor' = do
---   l <- fromInteger <$> newCount
---   newUnivAccessor l
--- readUnivAccessor :: UnivAccessor -> WithEnv UnivLevel
--- readUnivAccessor (UnivAccessor i) = do
---   eenv <- gets equalityEnv
---   case IntMap.lookup i eenv of
---     Nothing -> throwError' "readUnivAccessor"
---     Just b' -> return b'
--- writeUnivAccessor :: UnivAccessor -> UnivAccessor -> WithEnv ()
--- writeUnivAccessor (UnivAccessor i1) u2 = do
---   v2 <- readUnivAccessor u2
---   eenv <- gets equalityEnv
---   modify (\env -> env {equalityEnv = IntMap.insert i1 v2 eenv})
--- insTypeEnv :: Identifier -> TermPlus -> WithEnv ()
--- insTypeEnv i t = modify (\e -> e {typeEnv = Map.insert i t (typeEnv e)})
 insTypeEnv :: Identifier -> TermPlus -> UnivLevelPlus -> WithEnv ()
 insTypeEnv i t ml =
   modify (\e -> e {typeEnv = Map.insert i (t, ml) (typeEnv e)})
@@ -351,12 +304,3 @@ lookupTypeEnv :: Identifier -> WithEnv (Maybe (TermPlus, UnivLevelPlus))
 lookupTypeEnv s = do
   tenv <- gets typeEnv
   return $ Map.lookup s tenv
---     Just t -> return $ t
---     Nothing -> throwError' $ s <> " is not found in the weak type environment."
--- lookupWeakTypeEnvMaybe ::
---      Identifier -> WithEnv (Maybe (WeakTermPlus, UnivLevelPlus))
--- lookupWeakTypeEnvMaybe s = do
---   mt <- gets (Map.lookup s . weakTypeEnv)
---   case mt of
---     Nothing -> return Nothing
---     Just t -> return $ Just t
