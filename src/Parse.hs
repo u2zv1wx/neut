@@ -124,17 +124,18 @@ parse' ((m, TreeNode ((_, TreeAtom "enum"):(_, TreeAtom name):ts)):as) = do
   -- Thus, `enum.choice` is, for example, translated into 2, assuming that choice = {left, right}.
   -- In the example of `print`, this integer in turn represents the length of the array `str`,
   -- which is indispensable for the system call `write`.
-  let constName = "enum." <> name
-  modify (\e -> e {constantEnv = S.insert constName (constantEnv e)})
+  -- let constName = "enum." <> name
+  -- modify (\e -> e {constantEnv = S.insert constName (constantEnv e)})
   -- type constraint for constName
   -- e.g. t == is-enum @ (choice)
-  isEnumType <- toIsEnumType name
+  -- isEnumType <- toIsEnumType name
   -- add `(constant enum.choice (is-enum choice))` to defList in order to insert appropriate type constraint
-  let ascription = QuasiStmtConstDecl m' (m', constName, isEnumType)
+  -- let ascription = QuasiStmtConstDecl m' (m', constName, isEnumType)
   -- register the name of the constant
-  modify (\env -> env {nameEnv = Map.insert constName constName (nameEnv env)})
-  defList <- parse' as
-  return $ ascription : defList
+  -- modify (\env -> env {nameEnv = Map.insert constName constName (nameEnv env)})
+  parse' as
+  -- defList <- parse' as
+  -- return $ ascription : defList
 parse' ((_, TreeNode [(_, TreeAtom "include"), (_, TreeAtom pathString)]):as) =
   case readMaybe (T.unpack pathString) :: Maybe String of
     Nothing -> throwError' "the argument of `include` must be a string"
@@ -259,14 +260,13 @@ isSpecialForm (_, TreeNode ((_, TreeAtom "coinductive"):_)) = True
 isSpecialForm _ = False
 
 -- {} toIsEnumType {}
-toIsEnumType :: Identifier -> WithEnv WeakTermPlus
-toIsEnumType name = do
-  return
-    ( emptyMeta
-    , WeakTermPiElim
-        (emptyMeta, WeakTermConst "is-enum")
-        [(emptyMeta, WeakTermEnum $ EnumTypeLabel name)])
-
+-- toIsEnumType :: Identifier -> WithEnv WeakTermPlus
+-- toIsEnumType name = do
+--   return
+--     ( emptyMeta
+--     , WeakTermPiElim
+--         (emptyMeta, WeakTermConst "is-enum")
+--         [(emptyMeta, WeakTermEnum $ EnumTypeLabel name)])
 -- {} concatQuasiStmtList {}
 -- Represent the list of QuasiStmts in the target language, using `let`.
 -- (Note that `let x := e1 in e2` can be represented as `(lam x e2) e1`.)

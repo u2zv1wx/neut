@@ -182,10 +182,10 @@ infer' ctx (m, WeakTermZeta x) = do
       return (app, higherApp, ml)
 infer' _ (m, WeakTermConst x)
   -- enum.n8, enum.n64, etc.
-  | Just i <- asEnumNatConstant x = do
-    t <- toIsEnumType i m
-    ml <- newLevelLE m []
-    return ((m, WeakTermConst x), t, ml)
+  -- Just i <- asEnumNatConstant x = do
+  --   t <- toIsEnumType i m
+  --   ml <- newLevelLE m []
+  --   return ((m, WeakTermConst x), t, ml)
   -- i64, f16, u8, etc.
   | Just _ <- asLowTypeMaybe x = do
     ml0 <- newLevelLE m []
@@ -477,14 +477,13 @@ constrainList (t1:t2:ts) = do
   insConstraintEnv t1 t2
   constrainList $ t2 : ts
 
-toIsEnumType :: Integer -> Meta -> WithEnv WeakTermPlus
-toIsEnumType i m = do
-  return
-    ( m
-    , WeakTermPiElim
-        (emptyMeta, WeakTermConst "is-enum")
-        [(emptyMeta, WeakTermEnum $ EnumTypeNat i)])
-
+-- toIsEnumType :: Integer -> Meta -> WithEnv WeakTermPlus
+-- toIsEnumType i m = do
+--   return
+--     ( m
+--     , WeakTermPiElim
+--         (emptyMeta, WeakTermConst "is-enum")
+--         [(emptyMeta, WeakTermEnum $ EnumTypeNat i)])
 newHole :: WithEnv WeakTermPlus
 newHole = do
   h <- newNameWith "hole"

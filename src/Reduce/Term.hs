@@ -407,7 +407,7 @@ isValue _ = return False
 
 isValueConst :: Identifier -> WithEnv Bool
 isValueConst x
-  | "is-enum" <- x = return True
+  -- | "is-enum" <- x = return True
   | Just _ <- asLowTypeMaybe x = return True
   | Just _ <- asUnaryOpMaybe x = return True
   | Just _ <- asBinaryOpMaybe x = return True

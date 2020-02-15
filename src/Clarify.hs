@@ -182,7 +182,7 @@ clarifyConst m name
   | Just _ <- asLowTypeMaybe name = clarify (m, TermEnum $ EnumTypeLabel "top")
 clarifyConst m name
   | Just lowType <- asArrayAccessMaybe name = clarifyArrayAccess m name lowType
-clarifyConst m "is-enum" = clarifyIsEnum m
+-- clarifyConst m "is-enum" = clarifyIsEnum m
 clarifyConst m "file-descriptor" = clarify (m, TermConst "i64")
 clarifyConst m "stdin" = clarify (m, TermEnumIntro (EnumValueIntS 64 0))
 clarifyConst m "stdout" = clarify (m, TermEnumIntro (EnumValueIntS 64 1))
@@ -232,34 +232,33 @@ clarifyBinaryOp name op lowType m = do
         (m, CodeTheta (ThetaBinaryOp op lowType varX varY))
     _ -> throwError' $ "the arity of " <> name <> " is wrong"
 
-clarifyIsEnum :: Meta -> WithEnv CodePlus
-clarifyIsEnum m = do
-  t <- lookupTypeEnv' "is-enum"
-  t' <- reduceTermPlus t
-  case t' of
-    (_, TermPi _ xts@[(mx, x, tx)] _) -> do
-      v <- cartesianImmediate m
-      let varX = toDataUpsilon (x, mx)
-      aff <- newNameWith "aff"
-      rel <- newNameWith "rel"
-      retImmType <- returnCartesianImmediate
-      zts <- complementaryChainOf xts
-      -- p "one-time closure (is-enum)"
-      retClosure
-        (Just "is-enum")
-        zts
-        m
-        [(mx, x, tx)]
-        ( m
-        , CodeSigmaElim
-            arrVoidPtr
-            [(aff, retImmType), (rel, retImmType)]
-            varX
-            (m, CodeUpIntro v))
-    _ ->
-      throwError' $
-      "the type of is-enum is wrong. t :\n" <> T.pack (Pr.ppShow t)
-
+-- clarifyIsEnum :: Meta -> WithEnv CodePlus
+-- clarifyIsEnum m = do
+--   t <- lookupTypeEnv' "is-enum"
+--   t' <- reduceTermPlus t
+--   case t' of
+--     (_, TermPi _ xts@[(mx, x, tx)] _) -> do
+--       v <- cartesianImmediate m
+--       let varX = toDataUpsilon (x, mx)
+--       aff <- newNameWith "aff"
+--       rel <- newNameWith "rel"
+--       retImmType <- returnCartesianImmediate
+--       zts <- complementaryChainOf xts
+--       -- p "one-time closure (is-enum)"
+--       retClosure
+--         (Just "is-enum")
+--         zts
+--         m
+--         [(mx, x, tx)]
+--         ( m
+--         , CodeSigmaElim
+--             arrVoidPtr
+--             [(aff, retImmType), (rel, retImmType)]
+--             varX
+--             (m, CodeUpIntro v))
+--     _ ->
+--       throwError' $
+--       "the type of is-enum is wrong. t :\n" <> T.pack (Pr.ppShow t)
 clarifyArrayAccess :: Meta -> Identifier -> LowType -> WithEnv CodePlus
 clarifyArrayAccess m name lowType = do
   arrayAccessType <- lookupTypeEnv' name

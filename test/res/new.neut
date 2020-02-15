@@ -55,11 +55,11 @@
 ;;     c))
 
 ;; このときはたしかに、is-enumによってutf8-codeは長さの情報を保持することができている。
-(definition utf8-code
-  (sigma
-    ((A type)
-     (prf (is-enum A)))
-    (array A u8)))
+;; (definition utf8-code
+;;   (sigma
+;;     ((A type)
+;;      (prf (is-enum A)))
+;;     (array A u8)))
 
 ;; (definition utf8-code
 ;;   (sigma
