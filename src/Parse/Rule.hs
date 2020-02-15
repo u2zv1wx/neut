@@ -94,15 +94,15 @@ toInductive ats bts connective@(m, a, xts, _) = do
         formationRule
         (m, WeakTermPiIntro xts (m, WeakTermPi mls1 (ats ++ bts) cod))
     -- induction principle
-    -- , QuasiStmtLet
-    --     m
-    --     ( m
-    --     , a <> "." <> "induction"
-    --     , (m, WeakTermPi mls2 (xts ++ atsbts' ++ [zt]) cod'))
-    --     ( m
-    --     , WeakTermPiIntro
-    --         (xts ++ atsbts' ++ [zt])
-    --         (m, WeakTermPiElim (toVar' zt) (map toVar' atsbts')))
+    , QuasiStmtLet
+        m
+        ( m
+        , a <> "." <> "induction"
+        , (m, WeakTermPi mls2 (xts ++ atsbts' ++ [zt]) cod'))
+        ( m
+        , WeakTermPiIntro
+            (xts ++ atsbts' ++ [zt])
+            (m, WeakTermPiElim (toVar' zt) (map toVar' atsbts')))
     ]
 
 toInductiveIntroList :: [IdentifierPlus] -> Connective -> WithEnv [QuasiStmt]
