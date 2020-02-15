@@ -3,16 +3,12 @@
 
 module Data.WeakTerm where
 
-import Control.Monad.State
 import Numeric.Half
 
-import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Text as T
 
 import Data.Basic
 
--- instance Ord UnivLevelPlus where
---   compare (UnivLevelPlus (_, l1)) (UnivLevelPlus (_, l2)) = compare l1 l2
 data WeakTerm
   = WeakTermTau UnivLevel
   | WeakTermUpsilon Identifier
@@ -439,7 +435,8 @@ toText (_, WeakTermEnum enumType) =
 toText (_, WeakTermEnumIntro v) = showEnumValue v
 toText (_, WeakTermEnumElim (e, _) les) =
   showCons ["case", toText e, showItems (map showClause les)]
-toText (_, WeakTermArray dom _) = toText dom
+toText (_, WeakTermArray dom k) =
+  showCons ["array", toText dom, showArrayKind k]
 toText (_, WeakTermArrayIntro _ es) = showArray $ map toText es
 toText (_, WeakTermArrayElim _ xts e1 e2) = do
   let argStr = inParen $ showItems $ map showArg xts

@@ -36,6 +36,8 @@ type Justification = Loc
 
 type RuleEnv = Map.HashMap Identifier (Maybe [Data.WeakTerm.IdentifierPlus])
 
+type UnivInstEnv = IntMap.IntMap (S.Set Int)
+
 data Env =
   Env
     { count :: Integer -- to generate fresh symbols
@@ -57,7 +59,7 @@ data Env =
     , coinductiveEnv :: RuleEnv -- "tail" ~> (head, Pi (A : tau). stream A -> A)
     , weakTypeEnv :: Map.HashMap Identifier (WeakTermPlus, UnivLevelPlus) -- var ~> (typeof(var), level-of-type)
     , equalityEnv :: [(UnivLevel, UnivLevel)]
-    , univInstEnv :: IntMap.IntMap (S.Set Int)
+    , univInstEnv :: UnivInstEnv
     , univRenameEnv :: IntMap.IntMap Int
     , typeEnv :: Map.HashMap Identifier (TermPlus, UnivLevelPlus)
     , constraintEnv :: [PreConstraint] -- for type inference

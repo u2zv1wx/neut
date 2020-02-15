@@ -44,6 +44,7 @@
 
 
 ;; 文字列をunicode encodingされたu8 arrayへと変換して保持
+;; なんかこのtestがn3に推論されてるんですが？？
 (definition test ()
   "あ")
 
@@ -82,9 +83,16 @@
 ;; (write n3 stdout (test) enum.n3)
 (write hole stdout (test) 3)
 
-(let str-with-len
+(definition string
+  (sigma
+    ((A type))
+    (array A u8)))
+
+(let (str-with-len string)
   (sigma-introduction n3 (test)))
 
+;; (let str-with-len
+;;   (with-type string (sigma-introduction n3 (test))))
 
 ;; (definition string
 ;;   (sigma
@@ -92,10 +100,7 @@
 ;;     (content (array index u8))))
 
 ;; test : Pi (). stringとの一致が問題になってる？
-(definition string
-  (sigma
-    ((A type))
-    (array A u8)))
+
 
 ;; こっちでは、(n3, [p, q, r])みたいな感じで。
 ;; 型としては長さの情報があるけど、termとしては長さの情報がない、という状況。
@@ -235,7 +240,7 @@
 ;; (notation (zero)
 ;;   (sigma-introduction left unit))
 
-(ascription zero nat)
+;; (ascription zero nat)
 
 ;; (keyword succ)
 
@@ -243,23 +248,23 @@
 ;;   (sigma-introduction right x))
 
 ;; 関数として定義したほうがよくね。
-(definition succ ((x nat))
-  (sigma-introduction right x))
+;; (definition succ ((x nat))
+;;   (sigma-introduction right x))
 
-(ascription succ
-  (hom nat nat))
+;; (ascription succ
+;;   (hom nat nat))
 
 ;; こうするとあたかもsuccがコンストラクタであるかのようにつかえる。
-(let (bar (nat-inner))
-  (succ foo))
+;; (let (bar (nat-inner))
+;;   (succ foo))
 
 ;; ちゃんと推論できてる。えらい。
-(let (buz nat)
-  (succ bar))
+;; (let (buz nat)
+;;   (succ bar))
 
-(ascription bar nat)
+;; (ascription bar nat)
 
-(ascription buz nat)
+;; (ascription buz nat)
 
 ;; natの上の関数とかってかけるかな？
 ;; この引数xについてのパターンマッチをしたい。
@@ -777,27 +782,29 @@ n15-4
 ;; (inductive item ((A tau))
 ;;   (item.intro () (item A))
 ;;   (item.cont ((_ (item A)) (_ (list (item A)))) (item A))
-;;   (item.cont1 ((_ (item A)) (_ (list (list (item A))))) (item A))
+;;   ;; (item.cont1 ((_ (item A)) (_ (list (list (item A))))) (item A))
+
+;;   ;; (item.cont1 ((_ (item A)) (_ (list (list (item A))))) (item A))
 ;;   (item.cont2 ((_ A) (_ (item A))) (item A)))
 
-(inductive item ((A tau))
-  (item.intro () (item A))
-  (item.cont ((_ (item A)) (_ (list (item A)))) (item A))
-  (item.cont2
-    ((_ A)
-     (_ (pi
-          ((_ (pi ((_ (item A))) i64)))
-           (item A))))
-    (item A))
-  (item.dom-sig ((_ (sigma ((_ (item A))) (item A)))) (item A))
-  ;; (item.cont3 ((_ A) (_ (pi ((_ (item A))) (item A)))) (item A))
-  (item.cont1 ((_ (item A))
-               (_ (list (list (item A))))
-               (_ (list (mylist (item A) i64)))
-               (_ A)
-               (_ (nat))
-               (_ i64))
-              (item A)))
+;; (inductive item ((A tau))
+;;   (item.intro () (item A))
+;;   (item.cont ((_ (item A)) (_ (list (item A)))) (item A))
+;;   (item.cont2
+;;     ((_ A)
+;;      (_ (pi
+;;           ((_ (pi ((_ (item A))) i64)))
+;;            (item A))))
+;;     (item A))
+;;   (item.dom-sig ((_ (sigma ((_ (item A))) (item A)))) (item A))
+;;   ;; (item.cont3 ((_ A) (_ (pi ((_ (item A))) (item A)))) (item A))
+;;   (item.cont1 ((_ (item A))
+;;                (_ (list (list (item A))))
+;;                (_ (list (mylist (item A) i64)))
+;;                (_ A)
+;;                (_ (nat))
+;;                (_ i64))
+;;               (item A)))
 
 
 (coinductive stream ((A tau))
@@ -809,6 +816,10 @@ n15-4
 ;;   (stream.tail ((_ (stream A))) (stream A)))
 
 ;; これも通った
+;; (coinductive nested-stream ((A tau))
+;;   (nested-stream.head ((_ (nested-stream A))) A)
+;;   (nested-stream.tail ((_ (nested-stream A))) (stream (list (stream (nested-stream A))))))
+
 ;; (coinductive nested-stream ((A tau))
 ;;   (nested-stream.head ((_ (nested-stream A))) A)
 ;;   (nested-stream.tail ((_ (nested-stream A))) (stream (stream (nested-stream A)))))
@@ -832,17 +843,17 @@ n15-4
 (i64.add 100 10)
 
 ;; 初期値付きのenum
-(enum test
-  foo
-  bar
-  (buz 10)
-  qux
-  (pohe 100)
-  popo)
+;; (enum test
+;;   foo
+;;   bar
+;;   (buz 10)
+;;   qux
+;;   (pohe 100)
+;;   popo)
 
 ;; bar
 
-popo
+;; popo
 ;; (i64.add 3 0)
 
 ;; ここのエラーでnatの型を開かずに済ませたいところ。

@@ -12,6 +12,8 @@ import Numeric.Half
 import System.Console.ANSI
 
 import qualified Data.HashMap.Strict as Map
+import qualified Data.IntMap.Strict as IntMap
+import qualified Data.Set as S
 import qualified Data.Text as T
 
 import Data.Basic
@@ -40,7 +42,10 @@ elaborate :: WeakStmt -> WithEnv TermPlus
 elaborate (WeakStmtReturn e) = do
   (e', _, _) <- infer e
   analyze >> synthesize >> refine
-  gets levelEnv >>= ensureDAG -- universe level check at the end of type inference
+  p "univ-check"
+  checkUnivSanity
+  p "done"
+  -- gets levelEnv >>= ensureDAG -- universe level check at the end of type inference
   elaborate' e' >>= reduceTermPlus
 elaborate (WeakStmtLet m (mx, x, t) e cont) = do
   (e', te, mle) <- infer e
@@ -54,6 +59,7 @@ elaborate (WeakStmtLet m (mx, x, t) e cont) = do
   e'' <- elaborate' e' >>= reduceTermPlus
   t'' <- elaborate' t' >>= reduceTermPlus
   insTypeEnv x t'' mlt
+  -- p $ T.unpack x ++ ": " ++ T.unpack (toText $ weaken t'')
   cont' <- elaborate cont
   return (m, TermPiElim (m, TermPiIntro [(mx, x, t'')] cont') [e''])
 elaborate (WeakStmtConstDecl m (mx, x, t) cont) = do
@@ -73,67 +79,71 @@ cleanup = do
   modify (\env -> env {constraintEnv = []})
   modify (\env -> env {weakTypeEnv = Map.empty})
 
--- judgement :: WithEnv ()
--- judgement = do
---   analyze
---   synthesize
---   refine
--- elaborateWeakTermPlus :: WeakTermPlus -> WithEnv TermPlus
--- elaborateWeakTermPlus e = do
---   e' <- infer e
---   undefined
---   -- -- Kantian type-inference
---   -- analyze
---   -- synthesize
---   -- -- we shouldn't resort to `type(l) : type(l)`
---   -- gets levelEnv >>= ensureDAG
---   -- _ <- error "exit"
---   -- -- for faster elaboration
---   -- refine
---   -- -- elaborate the given term
---   -- elaborate' e' >>= reduceTermPlus
---   -- -- let info2 = toInfo "elaborated term is not closed:" e''
---   -- assertMP info2 (return e'') $ null (varTermPlus e'')
 type LevelEdge = ((Meta, UnivLevel), (Integer, (Meta, UnivLevel)))
 
 quotient ::
-     [(UnivLevel, UnivLevel)] -> [LevelConstraint] -> UF.UnionFind [LevelEdge]
-quotient [] g = mapM quotient' g
-quotient ((l1, l2):lls) g = do
+     [(UnivLevel, UnivLevel)]
+  -> UnivInstEnv
+  -> [LevelConstraint]
+  -> UF.UnionFind [LevelEdge]
+quotient [] uienv g = concat <$> mapM (quotient' uienv) g
+quotient ((l1, l2):lls) uienv g = do
   UF.union l1 l2
-  quotient lls g
+  quotient lls uienv g
 
-quotient' :: LevelConstraint -> UF.UnionFind LevelEdge
-quotient' (UnivLevelPlus (m1, l1), (w, UnivLevelPlus (m2, l2))) = do
-  l1' <- UF.find l1
-  l2' <- UF.find l2
-  return ((m1, l1'), (w, (m2, l2')))
+quotient' :: UnivInstEnv -> LevelConstraint -> UF.UnionFind [LevelEdge]
+quotient' uienv (UnivLevelPlus (m1, l1), (w, UnivLevelPlus (m2, l2))) = do
+  let domList = inst uienv l1
+  let codList = inst uienv l2
+  forM (cartesianProduct domList codList) $ \(dom, cod) -> do
+    dom' <- UF.find dom
+    cod' <- UF.find cod
+    return ((m1, dom'), (w, (m2, cod')))
+  -- l1' <- UF.find l1
+  -- l2' <- UF.find l2
+  -- return [((m1, l1'), (w, (m2, l2')))]
 
-ensureDAG :: [LevelConstraint] -> WithEnv ()
-ensureDAG g = do
+cartesianProduct :: [a] -> [b] -> [(a, b)]
+cartesianProduct xs ys = do
+  x <- xs
+  y <- ys
+  return (x, y)
+
+inst :: UnivInstEnv -> UnivLevel -> [UnivLevel]
+inst uienv l =
+  case IntMap.lookup l uienv of
+    Nothing -> [l]
+    Just ls -> S.toList ls
+
+checkUnivSanity :: WithEnv ()
+checkUnivSanity = do
+  g <- gets levelEnv
   eenv <- gets equalityEnv
-  let g' = UF.run $ quotient eenv g
+  uienv <- gets univInstEnv
+  let g' = UF.run $ quotient eenv uienv g
   let nodeList = nub $ concatMap (\(n1, (_, n2)) -> [n1, n2]) g'
-  let g'' = toGraph g'
-  ensureDAG' g'' Map.empty nodeList
+  -- let g'' = toGraph g'
+  g'' <- return $ toGraph g'
+  p "constructed graph"
+  ensureDAG' g'' IntMap.empty nodeList
 
-type LevelGraph = Map.HashMap UnivLevel [(Integer, (Meta, UnivLevel))]
+type LevelGraph = IntMap.IntMap [(Integer, (Meta, UnivLevel))]
 
 toGraph :: [LevelEdge] -> LevelGraph
-toGraph [] = Map.empty
+toGraph [] = IntMap.empty
 toGraph (((_, l1), v@(_, (_, _))):kvs) =
-  Map.insertWith (\v1 v2 -> v1 ++ v2) l1 [v] $ toGraph kvs
+  IntMap.insertWith (++) l1 [v] $ toGraph kvs
 
 ensureDAG' :: LevelGraph -> NodeInfo -> [(Meta, UnivLevel)] -> WithEnv ()
 ensureDAG' _ _ [] = return ()
 ensureDAG' g nodeInfo (v:vs) = do
   let l = snd v
-  case Map.lookup l nodeInfo of
+  case IntMap.lookup l nodeInfo of
     Just NodeStateFinish -> ensureDAG' g nodeInfo vs
     Just NodeStateActive -> error "invalid argument"
     Nothing ->
       case dfs g v [(0, v)] nodeInfo of
-        Right _ -> ensureDAG' g (Map.insert l NodeStateFinish nodeInfo) vs
+        Right _ -> ensureDAG' g (IntMap.insert l NodeStateFinish nodeInfo) vs
         Left closedPath ->
           throwError' $
           "found cyclic univ level:\n" <>
@@ -143,7 +153,7 @@ ensureDAG' g nodeInfo (v:vs) = do
 --   Map.insertWith (\v1 v2 -> v1 ++ v2) l [v] $ toGraph kvs
 type UnivPath = [(Integer, (Meta, UnivLevel))]
 
-type NodeInfo = Map.HashMap UnivLevel NodeState
+type NodeInfo = IntMap.IntMap NodeState
 
 data NodeState
   = NodeStateActive
@@ -156,19 +166,19 @@ dfs ::
   -> NodeInfo
   -> Either UnivPath ()
 dfs g (_, l) path visitInfo = do
-  let mvs = fromMaybe [] $ Map.lookup l g
+  let mvs = fromMaybe [] $ IntMap.lookup l g
   sequence_ $
     (flip map) mvs $ \(w', v') -> do
       let path' = path ++ [(w', v')]
       let l' = snd v'
-      case Map.lookup l' visitInfo of
+      case IntMap.lookup l' visitInfo of
         Just NodeStateActive -> do
           let closedPath = dropWhile (\(_, ml'') -> snd ml'' /= l') path'
           if weightOf closedPath > 0
             then Left closedPath
             else return ()
         Just NodeStateFinish -> return ()
-        Nothing -> dfs g v' path' $ Map.insert l NodeStateActive visitInfo
+        Nothing -> dfs g v' path' $ IntMap.insert l NodeStateActive visitInfo
 
 weightOf :: UnivPath -> Integer
 weightOf path = sum $ map fst $ tail path

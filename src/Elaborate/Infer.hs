@@ -73,8 +73,16 @@ infer' _ (m, WeakTermUpsilon x) = do
       ((_, t), UnivLevelPlus (_, l)) <- lookupWeakTypeEnv x
       return ((m, WeakTermUpsilon x), (m, t), UnivLevelPlus (m, l))
     Just (t, UnivLevelPlus (_, l)) -> do
-      (_, t') <- univInst $ weaken t
-      return ((m, WeakTermUpsilon x), (m, t'), UnivLevelPlus (m, l))
+      (a@(_, t'), l') <- univInst (weaken t) l
+      -- p "instantiating:"
+      -- p' x
+      -- p "from:"
+      -- -- p $ T.unpack (toText (weaken t))
+      -- p' t
+      -- p "to:"
+      -- -- p $ T.unpack (toText a)
+      -- p' a
+      return ((m, WeakTermUpsilon x), (m, t'), UnivLevelPlus (m, l'))
 infer' ctx (m, WeakTermPi mls xts t) = do
   (xtls', (t', mlPiCod)) <- inferPi ctx xts t
   let (xts', mlPiArgs) = unzip xtls'
@@ -185,8 +193,14 @@ infer' _ (m, WeakTermConst x)
     ml1 <- newLevelLT m [ml0]
     return ((m, WeakTermConst x), (asUniv ml0), ml1)
   | otherwise = do
-    (t, UnivLevelPlus (_, l)) <- lookupWeakTypeEnv x
-    return ((m, WeakTermConst x), t, UnivLevelPlus (m, l)) -- ここのunivを自由にしてもいいかも
+    mt <- lookupTypeEnv x
+    case mt of
+      Nothing -> do
+        (t, UnivLevelPlus (_, l)) <- lookupWeakTypeEnv x
+        return ((m, WeakTermConst x), t, UnivLevelPlus (m, l)) -- ここのunivを自由にしてもいいかも
+      Just (t, UnivLevelPlus (_, l)) -> do
+        ((_, t'), l') <- univInst (weaken t) l
+        return ((m, WeakTermUpsilon x), (m, t'), UnivLevelPlus (m, l'))
 infer' ctx (m, WeakTermConstDecl (mx, x, t) e) = do
   tl'@(t', _) <- inferType' ctx t
   insWeakTypeEnv x tl'
@@ -533,10 +547,12 @@ insLevelEQ :: UnivLevelPlus -> UnivLevelPlus -> WithEnv ()
 insLevelEQ (UnivLevelPlus (_, l1)) (UnivLevelPlus (_, l2)) = do
   modify (\env -> env {equalityEnv = (l1, l2) : equalityEnv env})
 
-univInst :: WeakTermPlus -> WithEnv WeakTermPlus
-univInst e = do
+univInst :: WeakTermPlus -> UnivLevel -> WithEnv (WeakTermPlus, UnivLevel)
+univInst e l = do
   modify (\env -> env {univRenameEnv = IntMap.empty})
-  univInst' e
+  e' <- univInst' e
+  l' <- levelInst l
+  return (e', l')
 
 univInst' :: WeakTermPlus -> WithEnv WeakTermPlus
 univInst' (m, WeakTermTau l) = do
@@ -546,7 +562,9 @@ univInst' (m, WeakTermUpsilon x) = return (m, WeakTermUpsilon x)
 univInst' (m, WeakTermPi mls xts t) = do
   xts' <- univInstArgs xts
   t' <- univInst' t
-  return (m, WeakTermPi mls xts' t')
+  let (ms, ls) = unzip $ map (\(UnivLevelPlus x) -> x) mls
+  ls' <- mapM levelInst ls
+  return (m, WeakTermPi (map UnivLevelPlus $ zip ms ls') xts' t')
 univInst' (m, WeakTermPiIntro xts e) = do
   xts' <- univInstArgs xts
   e' <- univInst' e
