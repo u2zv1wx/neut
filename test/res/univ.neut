@@ -1,22 +1,29 @@
-(include "notation.neut")
-
-;; (include "enum.neut")
-
 (include "top.neut")
 
 (inductive ind ((A tau))
-  (ind.intro ((_ A) (_ (ind A))) (ind A))
-  )
+  (ind.intro ((_ A)) (ind A)))
 
 (inductive IND ((A tau))
-  (IND.intro ((_ A) (_ (IND A))) (IND A))
-  )
+  (IND.intro ((_ A)) (IND A)))
 
+
+
+;; (inductive tuple ((A tau) (B tau))
+;;   (tuple.make ((_ A) (_ B)) (tuple A B)))
+
+;; (let tmp ind)
+
+;; これはエラー
+;; (inductive item ()
+;;   (item.cont00 ((_ (ind (ind (item))))) (item)))
+
+;; 逆になんでこのときうまくいくのかがよくわからない。
+;; indとINDはtauの違いを無視すればbeta-equivalentであり、
+;; そしてtau部分はuniversally quantifiedであるはずで。
 (inductive item ()
-  (item.cont00 ((_ (ind (ind (item))))) (item))
-  ;; (item.cont10 ((_ (IND (ind (item))))) (item))
-  ;; (item.cont01 ((_ (ind (IND (item))))) (item))
-  ;; (item.cont11 ((_ (IND (IND (item))))) (item))
-)
+  (item.cont00 ((_ (ind (ind (ind (item)))))) (item)))
+
+
+;; (tuple.make (zeta _) (zeta _) unit top)
 
 unit

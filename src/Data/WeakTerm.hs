@@ -393,7 +393,7 @@ substWeakTermPlusBindingsWithBody sub ((m, x, t):xts) e = do
   ((m, x, t') : xts', e')
 
 toText :: WeakTermPlus -> Identifier
-toText (_, WeakTermTau _) = "tau"
+toText (_, WeakTermTau l) = showCons ["tau", T.pack $ show l]
 toText (_, WeakTermUpsilon x) = x
 toText (_, WeakTermPi _ xts t) = do
   let argStr = inParen $ showItems $ map showArg xts

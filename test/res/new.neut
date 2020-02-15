@@ -759,6 +759,10 @@ n15-4
   (LIST.nil () (LIST A))
   (LIST.cons ((_ A) (_ (LIST A))) (LIST A)))
 
+(inductive TEST ((A tau))
+  (TEST.nil () (TEST A))
+  (TEST.cons ((_ A) (_ (TEST A))) (TEST A)))
+
 (inductive mylist ((A tau) (B tau))
   (mylist.nil () (mylist A B))
   (mylist.cons ((_ A) (_ (mylist A B))) (mylist A B)))
@@ -786,34 +790,39 @@ n15-4
 (let a (vec.nil i64 (nat.succ (nat.zero))))
 
 
-(inductive item ((A tau))
-  (item.intro () (item A))
-  ;; (item.cont0 ((_ (item A)) (_ (list (list (item A))))) (item A))
-  (item.cont0 ((_ (item A)) (_ (LIST (list (item A))))) (item A))
-  (item.cont1 ((_ (item A)) (_ (list (LIST (item A))))) (item A))
-  ;; (item.cont0 ((_ (item A)) (_ (LIST (LIST (item A))))) (item A))
-  ;; (item.cont1 ((_ (item A)) (_ (list (list (item A))))) (item A))
-  ;; (item.cont1 ((_ (item A)) (_ (list (list (item A))))) (item A))
-  (item.cont2 ((_ A) (_ (item A))) (item A)))
-
 ;; (inductive item ((A tau))
 ;;   (item.intro () (item A))
-;;   (item.cont ((_ (item A)) (_ (list (item A)))) (item A))
-;;   (item.cont2
-;;     ((_ A)
-;;      (_ (pi
-;;           ((_ (pi ((_ (item A))) i64)))
-;;            (item A))))
-;;     (item A))
-;;   (item.dom-sig ((_ (sigma ((_ (item A))) (item A)))) (item A))
-;;   ;; (item.cont3 ((_ A) (_ (pi ((_ (item A))) (item A)))) (item A))
-;;   (item.cont1 ((_ (item A))
-;;                (_ (list (list (item A))))
-;;                (_ (list (mylist (item A) i64)))
-;;                (_ A)
-;;                (_ (nat))
-;;                (_ i64))
-;;               (item A)))
+;;   ;; (item.cont0 ((_ (item A)) (_ (list (list (item A))))) (item A))
+
+;;   ;; (item.cont0 ((_ (item A)) (_ (LIST (TEST (list (item A)))))) (item A))
+;;   ;; (item.cont1 ((_ (item A)) (_ (list (item A)))) (item A))
+;;   ;; (item.cont5 ((_ (item A)) (_ (LIST (list (item A))))) (item A))
+;;   ;; (item.cont6 ((_ (item A)) (_ (TEST (list (item A))))) (item A))
+;;   (item.cont7 ((_ (item A)) (_ (LIST (TEST (item A))))) (item A))
+;;   ;; (item.cont10 ((_ (item A)) (_ (list (TEST (item A))))) (item A))
+;; ;; (item.cont0 ((_ (item A)) (_ (LIST (LIST (item A))))) (item A))
+;;   ;; (item.cont1 ((_ (item A)) (_ (list (list (item A))))) (item A))
+;;   ;; (item.cont1 ((_ (item A)) (_ (list (list (item A))))) (item A))
+;;   (item.cont2 ((_ A) (_ (item A))) (item A)))
+
+(inductive item ((A tau))
+  (item.intro () (item A))
+  (item.cont ((_ (item A)) (_ (list (item A)))) (item A))
+  (item.cont2
+    ((_ A)
+     (_ (pi
+          ((_ (pi ((_ (item A))) i64)))
+           (item A))))
+    (item A))
+  (item.dom-sig ((_ (sigma ((_ (item A))) (item A)))) (item A))
+  ;; (item.cont3 ((_ A) (_ (pi ((_ (item A))) (item A)))) (item A))
+  (item.cont1 ((_ (item A))
+               (_ (list (list (item A))))
+               (_ (list (mylist (item A) i64)))
+               (_ A)
+               (_ (nat))
+               (_ i64))
+              (item A)))
 
 
 (coinductive stream ((A tau))
@@ -835,7 +844,7 @@ n15-4
 
 (coinductive nested-stream ((A tau))
   (nested-stream.head ((_ (nested-stream A))) A)
-  (nested-stream.tail ((_ (nested-stream A))) (stream (nested-stream A))))
+  (nested-stream.tail ((_ (nested-stream A))) (list (stream (nested-stream A)))))
 
 ;; これも通る。えらすぎる。
 (coinductive list-stream ((A tau))

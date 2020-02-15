@@ -170,18 +170,30 @@ simp' ((e1, e2):cs) = do
               [] -> simpPattern h2 ies2 e2' e1' cs
               _ -> simp $ (substWeakTermPlus (zip zs es) e1', e2') : cs
         (Just (StuckPiElimUpsilon x1 _), _)
-          | Just body <- Map.lookup x1 sub -> do
+          | Just body <- Map.lookup x1 sub
+            -- p $ "expand: "
+            -- p' x1
+            -- p "body:"
+            -- p $ T.unpack (toText body)
+           -> do
             let m = supMeta (supMeta (metaOf e1) (metaOf e2)) (metaOf body) -- x1 == e1 == body
             let e1' = (m, snd e1)
             let e2' = (m, snd e2)
-            let body' = (m, snd body)
+            -- let body' = (m, snd body)
+            body' <- termInst (m, snd body)
             simp $ (substWeakTermPlus [(x1, body')] e1', e2') : cs
         (_, Just (StuckPiElimUpsilon x2 _))
-          | Just body <- Map.lookup x2 sub -> do
+          | Just body <- Map.lookup x2 sub
+            -- p $ "expand:"
+            -- p' x2
+            -- p "body:"
+            -- p $ T.unpack (toText body)
+           -> do
             let m = supMeta (supMeta (metaOf e1) (metaOf e2)) (metaOf body) -- x2 == e2 == body
             let e1' = (m, snd e1)
             let e2' = (m, snd e2)
-            let body' = (m, snd body)
+            -- let body' = (m, snd body)
+            body' <- termInst (m, snd body)
             simp $ (e1', substWeakTermPlus [(x2, body')] e2') : cs
         (Just (StuckPiElimUpsilon x1 ess1), Just (StuckPiElimUpsilon x2 ess2))
           | x1 == x2

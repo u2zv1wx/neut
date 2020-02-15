@@ -5,6 +5,7 @@ module Elaborate.Infer
   , inferType
   , insLevelEQ
   , insConstraintEnv
+  , termInst
   ) where
 
 import Control.Monad.Except
@@ -61,10 +62,12 @@ infer' ::
      Context
   -> WeakTermPlus
   -> WithEnv (WeakTermPlus, WeakTermPlus, UnivLevelPlus)
-infer' _ (m, WeakTermTau l0) = do
-  let ml0 = UnivLevelPlus (m, l0)
+infer' _ (m, WeakTermTau _) = do
+  ml0 <- newLevelLT m []
   ml1 <- newLevelLT m [ml0]
   ml2 <- newLevelLT m [ml1]
+  -- p $ "inferred tau at " ++ showMeta m ++ ":"
+  -- p' (ml0, ml1, ml2)
   return (asUniv ml0, asUniv ml1, ml2)
 infer' _ (m, WeakTermUpsilon x) = do
   mt <- lookupTypeEnv x
@@ -81,8 +84,10 @@ infer' _ (m, WeakTermUpsilon x) = do
       -- p "to:"
       -- -- p $ T.unpack (toText a)
       -- p' a
+      -- p $ "level: " ++ show l ++ " ~> " ++ show l'
       return ((m, WeakTermUpsilon x), (m, t'), UnivLevelPlus (m, l'))
-infer' ctx (m, WeakTermPi mls xts t) = do
+infer' ctx (m, WeakTermPi _ xts t) = do
+  mls <- piUnivLevelsfrom xts t
   (xtls', (t', mlPiCod)) <- inferPi ctx xts t
   let (xts', mlPiArgs) = unzip xtls'
   ml0 <- newLevelLE m $ mlPiCod : mlPiArgs
@@ -181,11 +186,6 @@ infer' ctx (m, WeakTermZeta x) = do
       modify (\env -> env {zetaEnv = Map.insert x (app, higherApp, ml) zenv})
       return (app, higherApp, ml)
 infer' _ (m, WeakTermConst x)
-  -- enum.n8, enum.n64, etc.
-  -- Just i <- asEnumNatConstant x = do
-  --   t <- toIsEnumType i m
-  --   ml <- newLevelLE m []
-  --   return ((m, WeakTermConst x), t, ml)
   -- i64, f16, u8, etc.
   | Just _ <- asLowTypeMaybe x = do
     ml0 <- newLevelLE m []
@@ -196,7 +196,7 @@ infer' _ (m, WeakTermConst x)
     case mt of
       Nothing -> do
         (t, UnivLevelPlus (_, l)) <- lookupWeakTypeEnv x
-        return ((m, WeakTermConst x), t, UnivLevelPlus (m, l)) -- ここのunivを自由にしてもいいかも
+        return ((m, WeakTermConst x), t, UnivLevelPlus (m, l))
       Just (t, UnivLevelPlus (_, l)) -> do
         ((_, t'), l') <- univInst (weaken t) l
         return ((m, WeakTermConst x), (m, t'), UnivLevelPlus (m, l'))
@@ -551,6 +551,11 @@ univInst e l = do
   e' <- univInst' e
   l' <- levelInst l
   return (e', l')
+
+termInst :: WeakTermPlus -> WithEnv WeakTermPlus
+termInst e = do
+  modify (\env -> env {univRenameEnv = IntMap.empty})
+  univInst' e
 
 univInst' :: WeakTermPlus -> WithEnv WeakTermPlus
 univInst' (m, WeakTermTau l) = do
