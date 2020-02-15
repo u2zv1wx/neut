@@ -57,7 +57,7 @@ data Env =
     , coinductiveEnv :: RuleEnv -- "tail" ~> (head, Pi (A : tau). stream A -> A)
     , weakTypeEnv :: Map.HashMap Identifier (WeakTermPlus, UnivLevelPlus) -- var ~> (typeof(var), level-of-type)
     , equalityEnv :: [(UnivLevel, UnivLevel)]
-    , typeEnv :: Map.HashMap Identifier TermPlus
+    , typeEnv :: Map.HashMap Identifier (TermPlus, UnivLevelPlus)
     , constraintEnv :: [PreConstraint] -- for type inference
     , constraintQueue :: ConstraintQueue
     , levelEnv :: [LevelConstraint]
@@ -202,7 +202,7 @@ lookupTypeEnv' s
   | otherwise = do
     mt <- gets (Map.lookup s . typeEnv)
     case mt of
-      Just t -> return t
+      Just (t, _) -> return t
       Nothing ->
         throwError
           [TIO.putStrLn $ s <> " is not found in the type environment."]
@@ -331,5 +331,26 @@ piUnivLevelsfrom xts t = do
 --   modify (\env -> env {equalityEnv = IntMap.insert i1 v2 eenv})
 -- insTypeEnv :: Identifier -> TermPlus -> WithEnv ()
 -- insTypeEnv i t = modify (\e -> e {typeEnv = Map.insert i t (typeEnv e)})
+insTypeEnv :: Identifier -> TermPlus -> UnivLevelPlus -> WithEnv ()
+insTypeEnv i t ml =
+  modify (\e -> e {typeEnv = Map.insert i (t, ml) (typeEnv e)})
+
 insTypeEnv' :: Identifier -> TermPlus -> WithEnv ()
-insTypeEnv' i t = modify (\e -> e {typeEnv = Map.insert i t (typeEnv e)})
+insTypeEnv' i t = do
+  l <- newUnivLevel
+  let ml = UnivLevelPlus (fst t, l)
+  modify (\e -> e {typeEnv = Map.insert i (t, ml) (typeEnv e)})
+
+lookupTypeEnv :: Identifier -> WithEnv (Maybe (TermPlus, UnivLevelPlus))
+lookupTypeEnv s = do
+  tenv <- gets typeEnv
+  return $ Map.lookup s tenv
+--     Just t -> return $ t
+--     Nothing -> throwError' $ s <> " is not found in the weak type environment."
+-- lookupWeakTypeEnvMaybe ::
+--      Identifier -> WithEnv (Maybe (WeakTermPlus, UnivLevelPlus))
+-- lookupWeakTypeEnvMaybe s = do
+--   mt <- gets (Map.lookup s . weakTypeEnv)
+--   case mt of
+--     Nothing -> return Nothing
+--     Just t -> return $ Just t

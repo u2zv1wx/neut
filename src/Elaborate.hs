@@ -54,13 +54,14 @@ elaborate (WeakStmtLet m (mx, x, t) e cont) = do
   e'' <- elaborate' e' >>= reduceTermPlus
   t'' <- elaborate' t' >>= reduceTermPlus
   -- fixme: update the type env
+  insTypeEnv x t'' mlt
   cont' <- elaborate cont
   return (m, TermPiElim (m, TermPiIntro [(mx, x, t'')] cont') [e''])
 elaborate (WeakStmtConstDecl m (mx, x, t) cont) = do
-  (t', _) <- inferType t
+  (t', mlt) <- inferType t
   analyze >> synthesize >> refine >> cleanup
   t'' <- elaborate' t' >>= reduceTermPlus
-  modify (\env -> env {constraintEnv = []})
+  insTypeEnv x t'' mlt
   cont' <- elaborate cont
   return (m, TermConstDecl (mx, x, t'') cont')
 
