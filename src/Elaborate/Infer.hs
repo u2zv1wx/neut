@@ -2,7 +2,9 @@
 
 module Elaborate.Infer
   ( infer
+  , inferType
   , insLevelEQ
+  , insConstraintEnv
   ) where
 
 import Control.Monad.Except
@@ -40,12 +42,17 @@ type Context = [(IdentifierPlus, UnivLevelPlus)]
 -- Dynamic Pattern Unification for Dependent Types and Records". Typed Lambda
 -- Calculi and Applications, 2011.
 -- {termはrename済みでclosed} infer' {termはrename済みでclosedで、かつすべてのsubtermが型でannotateされている}
-infer :: WeakTermPlus -> WithEnv WeakTermPlus
-infer e = do
-  (e', _, _) <- infer' [] e
-  let vs = varWeakTermPlus e'
-  let info = toInfo "inferred term is not closed. freevars:" vs
-  return $ assertP info e' $ null vs
+-- infer :: WeakTermPlus -> WithEnv WeakTermPlus
+-- infer e = do
+--   (e', _, _) <- infer' [] e
+--   let vs = varWeakTermPlus e'
+--   let info = toInfo "inferred term is not closed. freevars:" vs
+--   return $ assertP info e' $ null vs
+infer :: WeakTermPlus -> WithEnv (WeakTermPlus, WeakTermPlus, UnivLevelPlus)
+infer e = infer' [] e
+
+inferType :: WeakTermPlus -> WithEnv (WeakTermPlus, UnivLevelPlus)
+inferType t = inferType' [] t
 
 infer' ::
      Context
@@ -76,7 +83,7 @@ infer' ctx (m, WeakTermPiElim (mPi, WeakTermPiIntro xts e) es) -- "let"
   | length xts == length es = do
     etls <- mapM (infer' ctx) es
     let (ms, xs, ts) = unzip3 xts
-    tls' <- mapM (inferType ctx) ts -- don't extend the context
+    tls' <- mapM (inferType' ctx) ts -- don't extend the context
     forM_ (zip xs tls') $ uncurry insWeakTypeEnv
     -- ctxをextendしなくてもdefListにそれ相当の情報がある
     (e', tCod, ml) <- infer' ctx e -- don't extend the context
@@ -101,7 +108,7 @@ infer' ctx (m, WeakTermSigma xts) = do
   ml1 <- newLevelLT m [ml0]
   return ((m, WeakTermSigma xts'), (asUniv ml0), ml1)
 infer' ctx (m, WeakTermSigmaIntro t es) = do
-  (t', mlSigma) <- inferType ctx t
+  (t', mlSigma) <- inferType' ctx t
   (es', ts, mlSigmaArgList) <- unzip3 <$> mapM (infer' ctx) es
   ys <- mapM (const $ newNameWith "arg") es'
   -- yts = [(y1, ?M1 @ (ctx[0], ..., ctx[n])),
@@ -122,7 +129,7 @@ infer' ctx (m, WeakTermSigmaIntro t es) = do
   -- 中身をsigmaTypeにすることでelaborateのときに確実に中身を取り出せるようにする
   return ((m, WeakTermSigmaIntro sigmaType es'), sigmaType, mlSigma)
 infer' ctx (m, WeakTermSigmaElim t xts e1 e2) = do
-  (t', mlResult) <- inferType ctx t
+  (t', mlResult) <- inferType' ctx t
   (e1', t1, mlSigma) <- infer' ctx e1
   xtls <- inferSigma ctx xts
   let (xts', mlSigArgList) = unzip xtls
@@ -134,7 +141,7 @@ infer' ctx (m, WeakTermSigmaElim t xts e1 e2) = do
   insLevelEQ mlResult ml2
   return ((m, WeakTermSigmaElim t' xts' e1' e2'), t2, ml2)
 infer' ctx (m, WeakTermIter (mx, x, t) xts e) = do
-  tl'@(t', ml') <- inferType ctx t
+  tl'@(t', ml') <- inferType' ctx t
   insWeakTypeEnv x tl'
   -- Note that we cannot extend context with x. The type of e cannot be dependent on `x`.
   -- Otherwise the type of `mu x. e` might have `x` as free variable, which is unsound.
@@ -172,13 +179,13 @@ infer' _ (m, WeakTermConst x)
     (t, UnivLevelPlus (_, l)) <- lookupWeakTypeEnv x
     return ((m, WeakTermConst x), t, UnivLevelPlus (m, l)) -- ここのunivを自由にしてもいいかも
 infer' ctx (m, WeakTermConstDecl (mx, x, t) e) = do
-  tl'@(t', _) <- inferType ctx t
+  tl'@(t', _) <- inferType' ctx t
   insWeakTypeEnv x tl'
   -- the type of `e` doesn't depend on `x`
   (e', t'', ml) <- infer' ctx e
   return ((m, WeakTermConstDecl (mx, x, t') e'), t'', ml)
 infer' _ (m, WeakTermInt t i) = do
-  (t', UnivLevelPlus (_, l)) <- inferType [] t -- ctx == [] since t' should be i64, i8, etc. (i.e. t must be closed)
+  (t', UnivLevelPlus (_, l)) <- inferType' [] t -- ctx == [] since t' should be i64, i8, etc. (i.e. t must be closed)
   return ((m, WeakTermInt t' i), t', UnivLevelPlus (m, l))
 infer' _ (m, WeakTermFloat16 f) = do
   ml <- newLevelLE m []
@@ -190,7 +197,7 @@ infer' _ (m, WeakTermFloat64 f) = do
   ml <- newLevelLE m []
   return ((m, WeakTermFloat64 f), (m, WeakTermConst "f64"), ml)
 infer' _ (m, WeakTermFloat t f) = do
-  (t', UnivLevelPlus (_, l)) <- inferType [] t -- t must be closed
+  (t', UnivLevelPlus (_, l)) <- inferType' [] t -- t must be closed
   return ((m, WeakTermFloat t' f), t', UnivLevelPlus (m, l))
 infer' _ (m, WeakTermEnum name) = do
   ml0 <- newLevelLE m []
@@ -213,7 +220,7 @@ infer' _ (m, WeakTermEnumIntro v) = do
       let t = (m, WeakTermEnum $ EnumTypeLabel k)
       return ((m, WeakTermEnumIntro v), t, ml)
 infer' ctx (m, WeakTermEnumElim (e, t) ces) = do
-  (tEnum, mlEnum) <- inferType ctx t
+  (tEnum, mlEnum) <- inferType' ctx t
   (e', t', ml') <- infer' ctx e
   insConstraintEnv tEnum t'
   insLevelEQ mlEnum ml'
@@ -230,7 +237,7 @@ infer' ctx (m, WeakTermEnumElim (e, t) ces) = do
       constrainList $ map asUniv mls
       return ((m, WeakTermEnumElim (e', t') $ zip cs' es'), head ts, head mls)
 infer' ctx (m, WeakTermArray dom k) = do
-  (dom', mlDom) <- inferType ctx dom
+  (dom', mlDom) <- inferType' ctx dom
   ml0 <- newLevelLE m [mlDom]
   ml1 <- newLevelLT m [ml0]
   return ((m, WeakTermArray dom' k), asUniv ml0, ml1)
@@ -279,8 +286,8 @@ infer' ctx (m, WeakTermStructElim xks e1 e2) = do
   (e2', t2, ml2) <- infer' (ctx ++ zip (zip3 ms xs ts) mls) e2
   return ((m, WeakTermStructElim xks e1' e2'), t2, ml2)
 
-inferType :: Context -> WeakTermPlus -> WithEnv (WeakTermPlus, UnivLevelPlus)
-inferType ctx t = do
+inferType' :: Context -> WeakTermPlus -> WithEnv (WeakTermPlus, UnivLevelPlus)
+inferType' ctx t = do
   (t', u, l) <- infer' ctx t
   ml <- newLevelLE (fst t') []
   insConstraintEnv u (asUniv ml)
@@ -300,10 +307,10 @@ inferPi ::
   -> WeakTermPlus
   -> WithEnv ([(IdentifierPlus, UnivLevelPlus)], (WeakTermPlus, UnivLevelPlus))
 inferPi ctx [] cod = do
-  (cod', mlPiCod) <- inferType ctx cod
+  (cod', mlPiCod) <- inferType' ctx cod
   return ([], (cod', mlPiCod))
 inferPi ctx ((mx, x, t):xts) cod = do
-  tl'@(t', ml) <- inferType ctx t
+  tl'@(t', ml) <- inferType' ctx t
   insWeakTypeEnv x tl'
   (xtls', tlCod) <- inferPi (ctx ++ [((mx, x, t'), ml)]) xts cod
   return (((mx, x, t'), ml) : xtls', tlCod)
@@ -312,7 +319,7 @@ inferSigma ::
      Context -> [IdentifierPlus] -> WithEnv [(IdentifierPlus, UnivLevelPlus)]
 inferSigma _ [] = return []
 inferSigma ctx ((mx, x, t):xts) = do
-  tl'@(t', ml) <- inferType ctx t
+  tl'@(t', ml) <- inferType' ctx t
   insWeakTypeEnv x tl'
   xts' <- inferSigma (ctx ++ [((mx, x, t'), ml)]) xts
   return $ ((mx, x, t'), ml) : xts'
@@ -327,7 +334,7 @@ inferBinder ctx [] e = do
   etl' <- infer' ctx e
   return ([], etl')
 inferBinder ctx ((mx, x, t):xts) e = do
-  tl'@(t', ml) <- inferType ctx t
+  tl'@(t', ml) <- inferType' ctx t
   insWeakTypeEnv x tl'
   (xtls', etl') <- inferBinder (ctx ++ [((mx, x, t'), ml)]) xts e
   return (((mx, x, t'), ml) : xtls', etl')
@@ -435,7 +442,7 @@ inferWeakCase _ l@(WeakCaseIntS size _) =
 inferWeakCase _ l@(WeakCaseIntU size _) =
   return (l, (emptyMeta, WeakTermEnum (EnumTypeIntU size)))
 inferWeakCase ctx (WeakCaseInt t a) = do
-  (t', _) <- inferType ctx t
+  (t', _) <- inferType' ctx t
   return (WeakCaseInt t' a, t')
 inferWeakCase ctx WeakCaseDefault = do
   (h, _) <- newTypeHoleInCtx ctx emptyMeta

@@ -157,8 +157,7 @@ data QuasiStmt
   deriving (Show)
 
 data WeakStmt
-  = WeakStmtReturn
-  | WeakStmtReturnTerm WeakTermPlus
+  = WeakStmtReturn WeakTermPlus
   | WeakStmtLet Meta IdentifierPlus WeakTermPlus WeakStmt
   | WeakStmtConstDecl Meta IdentifierPlus WeakStmt
   deriving (Show)
@@ -539,3 +538,6 @@ asUniv (UnivLevelPlus (m, l)) = (m, WeakTermTau l)
 levelOf :: UnivLevelPlus -> UnivLevel
 -- levelOf = undefined
 levelOf (UnivLevelPlus (_, l)) = l
+
+unit :: WeakTermPlus
+unit = (emptyMeta, WeakTermEnumIntro $ EnumValueLabel "unit")

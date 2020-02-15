@@ -273,11 +273,10 @@ toIsEnumType name = do
 -- これはrenameのあとで呼ばれる
 concatQuasiStmtList :: [QuasiStmt] -> WithEnv WeakStmt
 concatQuasiStmtList [] = do
-  return $
-    WeakStmtReturnTerm (emptyMeta, WeakTermEnumIntro $ EnumValueLabel "unit")
+  return $ WeakStmtReturn (emptyMeta, WeakTermEnumIntro $ EnumValueLabel "unit")
 -- for test
 concatQuasiStmtList [QuasiStmtLet _ _ e] = do
-  return $ WeakStmtReturnTerm e
+  return $ WeakStmtReturn e
 concatQuasiStmtList (QuasiStmtConstDecl m xt:es) = do
   cont <- concatQuasiStmtList es
   return $ WeakStmtConstDecl m xt cont

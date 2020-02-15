@@ -36,22 +36,64 @@ import qualified Data.UnionFind as UF
 -- The inference algorithm in this module is based on L. de Moura, J. Avigad,
 -- S. Kong, and C. Roux. "Elaboration in Dependent Type Theory", arxiv,
 -- https://arxiv.org/abs/1505.04324, 2015.
-elaborate :: WeakTermPlus -> WithEnv TermPlus
-elaborate e = do
-  e' <- infer e
-  -- Kantian type-inference ;)
-  analyze
-  synthesize
-  -- we shouldn't resort to `type(l) : type(l)`
-  gets levelEnv >>= ensureDAG
-  _ <- error "exit"
-  -- for faster elaboration
-  reduceSubstEnv
-  -- elaborate the given term
+elaborate :: WeakStmt -> WithEnv TermPlus
+elaborate (WeakStmtReturn e) = do
+  (e', _, _) <- infer e
+  analyze >> synthesize >> refine
+  gets levelEnv >>= ensureDAG -- universe level check
   elaborate' e' >>= reduceTermPlus
-  -- let info2 = toInfo "elaborated term is not closed:" e''
-  -- assertMP info2 (return e'') $ null (varTermPlus e'')
+elaborate (WeakStmtLet m (mx, x, t) e cont) = do
+  (e', te, mle) <- infer e
+  (t', mlt) <- inferType t
+  insConstraintEnv te t'
+  insLevelEQ mle mlt
+  modify (\env -> env {substEnv = Map.insert x e' (substEnv env)})
+  -- Kantian type-inference
+  analyze >> synthesize >> refine >> cleanup
+  -- elaborate the related terms
+  e'' <- elaborate' e' >>= reduceTermPlus
+  t'' <- elaborate' t' >>= reduceTermPlus
+  -- fixme: update the type env
+  cont' <- elaborate cont
+  return (m, TermPiElim (m, TermPiIntro [(mx, x, t'')] cont') [e''])
+elaborate (WeakStmtConstDecl m (mx, x, t) cont) = do
+  (t', _) <- inferType t
+  analyze >> synthesize >> refine >> cleanup
+  t'' <- elaborate' t' >>= reduceTermPlus
+  modify (\env -> env {constraintEnv = []})
+  cont' <- elaborate cont
+  return (m, TermConstDecl (mx, x, t'') cont')
 
+refine :: WithEnv ()
+refine =
+  modify (\env -> env {substEnv = Map.map reduceWeakTermPlus (substEnv env)})
+
+cleanup :: WithEnv ()
+cleanup = do
+  modify (\env -> env {constraintEnv = []})
+  modify (\env -> env {weakTypeEnv = Map.empty})
+
+-- judgement :: WithEnv ()
+-- judgement = do
+--   analyze
+--   synthesize
+--   refine
+-- elaborateWeakTermPlus :: WeakTermPlus -> WithEnv TermPlus
+-- elaborateWeakTermPlus e = do
+--   e' <- infer e
+--   undefined
+--   -- -- Kantian type-inference
+--   -- analyze
+--   -- synthesize
+--   -- -- we shouldn't resort to `type(l) : type(l)`
+--   -- gets levelEnv >>= ensureDAG
+--   -- _ <- error "exit"
+--   -- -- for faster elaboration
+--   -- refine
+--   -- -- elaborate the given term
+--   -- elaborate' e' >>= reduceTermPlus
+--   -- -- let info2 = toInfo "elaborated term is not closed:" e''
+--   -- assertMP info2 (return e'') $ null (varTermPlus e'')
 type LevelEdge = ((Meta, UnivLevel), (Integer, (Meta, UnivLevel)))
 
 quotient ::
@@ -362,9 +404,3 @@ lookupEnumSet name = do
   case Map.lookup name eenv of
     Nothing -> throwError' $ "no such enum defined: " <> name
     Just xis -> return $ map fst xis
-
-reduceSubstEnv :: WithEnv ()
-reduceSubstEnv = do
-  senv <- gets substEnv
-  let senv' = Map.map reduceWeakTermPlus senv
-  modify (\env -> env {substEnv = senv'})
