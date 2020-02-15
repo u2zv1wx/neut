@@ -11,10 +11,12 @@ import Control.Monad.Except
 import Control.Monad.State
 
 import qualified Data.HashMap.Strict as Map
+import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Text as T
 
 import Data.Basic
 import Data.Env
+import Data.Term hiding (IdentifierPlus)
 import Data.WeakTerm
 
 type Context = [(IdentifierPlus, UnivLevelPlus)]
@@ -64,8 +66,16 @@ infer' _ (m, WeakTermTau l0) = do
   ml2 <- newLevelLT m [ml1]
   return (asUniv ml0, asUniv ml1, ml2)
 infer' _ (m, WeakTermUpsilon x) = do
-  ((_, t), UnivLevelPlus (_, l)) <- lookupWeakTypeEnv x
-  return ((m, WeakTermUpsilon x), (m, t), UnivLevelPlus (m, l))
+  mt <- lookupTypeEnv x
+  case mt of
+    Nothing -> do
+      ((_, t), UnivLevelPlus (_, l)) <- lookupWeakTypeEnv x
+      return ((m, WeakTermUpsilon x), (m, t), UnivLevelPlus (m, l))
+    Just (t, UnivLevelPlus (_, l)) -> do
+      uienv <- gets univInstEnv
+      let (((_, t'), l'), uienv') = univInst (weaken t) l
+      modify (\env -> env {univInstEnv = IntMap.unionWith (++) uienv' uienv})
+      return ((m, WeakTermUpsilon x), (m, t'), UnivLevelPlus (m, l'))
 infer' ctx (m, WeakTermPi mls xts t) = do
   (xtls', (t', mlPiCod)) <- inferPi ctx xts t
   let (xts', mlPiArgs) = unzip xtls'

@@ -3,8 +3,10 @@
 
 module Data.WeakTerm where
 
+import Control.Monad.State
 import Numeric.Half
 
+import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Text as T
 
 import Data.Basic
@@ -531,3 +533,22 @@ levelOf (UnivLevelPlus (_, l)) = l
 
 unit :: WeakTermPlus
 unit = (emptyMeta, WeakTermEnumIntro $ EnumValueLabel "unit")
+
+type UnivEnv = IntMap.IntMap [UnivLevel]
+
+type UnivInst a = State UnivEnv a
+
+univInst :: WeakTermPlus -> UnivLevel -> ((WeakTermPlus, UnivLevel), UnivEnv)
+univInst e l = runState (foo e l) IntMap.empty
+
+foo :: WeakTermPlus -> UnivLevel -> UnivInst (WeakTermPlus, UnivLevel)
+foo e l = do
+  l' <- levelInst l
+  e' <- univInst' e
+  return (e', l')
+
+univInst' :: WeakTermPlus -> UnivInst WeakTermPlus
+univInst' = undefined
+
+levelInst :: UnivLevel -> UnivInst UnivLevel
+levelInst = undefined

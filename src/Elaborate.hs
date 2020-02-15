@@ -53,7 +53,6 @@ elaborate (WeakStmtLet m (mx, x, t) e cont) = do
   -- elaborate the related terms
   e'' <- elaborate' e' >>= reduceTermPlus
   t'' <- elaborate' t' >>= reduceTermPlus
-  -- fixme: update the type env
   insTypeEnv x t'' mlt
   cont' <- elaborate cont
   return (m, TermPiElim (m, TermPiIntro [(mx, x, t'')] cont') [e''])
