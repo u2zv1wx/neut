@@ -117,6 +117,7 @@ chainTermPlus' (_, TermSigmaElim t xts e1 e2) = do
   return $ xs ++ ys ++ zs
 chainTermPlus' (_, TermIter (_, x, t) xts e) = do
   xs1 <- chainTermPlus' t
+  insTypeEnv' x t
   xs2 <- chainTermPlus'' xts [e]
   return $ xs1 ++ filter (\(_, y, _) -> y /= x) xs2
 chainTermPlus' (_, TermConst x) = do
