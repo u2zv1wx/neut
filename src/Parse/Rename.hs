@@ -36,6 +36,12 @@ renameQuasiStmtList' nenv ((QuasiStmtLet m (mx, x, t) e):ss) = do
   e' <- rename' nenv e
   ss' <- renameQuasiStmtList' (Map.insert x x' nenv) ss
   return $ QuasiStmtLet m (mx, x', t') e' : ss'
+renameQuasiStmtList' nenv ((QuasiStmtLetWT m (mx, x, t) e):ss) = do
+  t' <- rename' nenv t
+  x' <- newLLVMNameWith x
+  e' <- rename' nenv e
+  ss' <- renameQuasiStmtList' (Map.insert x x' nenv) ss
+  return $ QuasiStmtLetWT m (mx, x', t') e' : ss'
 renameQuasiStmtList' nenv ((QuasiStmtDef xds):ss) = do
   let (xs, ds) = unzip xds
   -- rename for deflist

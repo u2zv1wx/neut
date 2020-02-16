@@ -94,7 +94,7 @@ toInductive ats bts connective@(m, a, xts, _) = do
         formationRule
         (m, WeakTermPiIntro xts (m, WeakTermPi mls1 (ats ++ bts) cod))
     -- induction principle
-    , QuasiStmtLet
+    , QuasiStmtLetWT
         m
         ( m
         , a <> "." <> "induction"
@@ -159,7 +159,7 @@ toCoinductive ats bts c@(m, a, xts, _) = do
         ( m
         , WeakTermPiIntro xts (m, WeakTermSigma (ats ++ bts ++ [(m, z, cod)])))
     -- coinduction principle
-    , QuasiStmtLet
+    , QuasiStmtLetWT
         m
         ( m
         , a <> "." <> "coinduction"

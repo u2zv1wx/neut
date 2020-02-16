@@ -852,7 +852,7 @@ n15-4
   (list-stream.tail ((_ (list-stream A))) (list (list-stream A))))
 
 ;; induction principleを自動生成できるようにした。これでnatの内部実装を気にせずにnatを利用できるようになる。
-;; (i64.add 100 nat.induction)
+;; (i64.add 100 (list.cons 10))
 
 
 ;; coinduction principleも自動生成できるようにした。偉すぎる。

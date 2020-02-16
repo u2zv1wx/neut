@@ -60,6 +60,16 @@ elaborateStmt (WeakStmtLet m (mx, x, t) e cont) = do
   modify (\env -> env {substEnv = Map.insert x (weaken e'') (substEnv env)})
   cont' <- elaborateStmt cont
   return (m, TermPiElim (m, TermPiIntro [(mx, x, t'')] cont') [e''])
+elaborateStmt (WeakStmtLetWT m (mx, x, t) e cont) = do
+  (t', mlt) <- inferType t
+  analyze >> synthesize >> refine >> cleanup
+  e' <- elaborate' e -- `e` is supposed to be well-typed
+  t'' <- elaborate' t' >>= reduceTermPlus
+  insTypeEnv x t'' mlt
+  -- don't update substEnv with x ~> e' (i.e. don't unfold `nat`, `list.cons`, etc. in type inference)
+  modify (\env -> env {quasiConstEnv = S.insert x (quasiConstEnv env)})
+  cont' <- elaborateStmt cont
+  return (m, TermPiElim (m, TermPiIntro [(mx, x, t'')] cont') [e'])
 elaborateStmt (WeakStmtConstDecl m (mx, x, t) cont) = do
   (t', mlt) <- inferType t
   analyze >> synthesize >> refine >> cleanup

@@ -14,6 +14,7 @@ import qualified Data.HashMap.Strict as Map
 import qualified Data.PQueue.Min as Q
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
+import qualified Text.Show.Pretty as Pr
 
 import Data.Basic
 import Data.Constraint
@@ -210,12 +211,11 @@ setupPosInfo ((Enriched (e1, e2) _ _):cs) = do
 
 showErrors :: [PosInfo] -> [(PosInfo, PreConstraint)] -> WithEnv [IO ()]
 showErrors _ [] = return []
-showErrors ps ((pos, (e1, e2)):pcs)
-  -- e1' <- invRename e1
-  -- e2' <- invRename e2
- = do
-  let e1' = e1
-  let e2' = e2
+showErrors ps ((pos, (e1, e2)):pcs) = do
+  e1' <- invRename e1
+  e2' <- invRename e2
+  -- let e1' = e1
+  -- let e2' = e2
   showErrors' pos ps e1' e2' pcs
 
 showErrors' ::
@@ -247,8 +247,8 @@ showError' b e1 e2 = do
   setSGR' b [Reset]
   TIO.putStrLn
     "couldn't verify the definitional equality of the following two terms:"
-  -- putStrLn $ show e1
-  -- putStrLn $ show e2
+  -- putStrLn $ Pr.ppShow e1
+  -- putStrLn $ Pr.ppShow e2
   TIO.putStrLn $ "- " <> toText e1
   TIO.putStrLn $ "- " <> toText e2
 

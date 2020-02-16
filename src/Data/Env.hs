@@ -61,6 +61,7 @@ data Env =
     , equalityEnv :: [(UnivLevel, UnivLevel)]
     , univInstEnv :: UnivInstEnv
     , univRenameEnv :: IntMap.IntMap Int
+    , quasiConstEnv :: S.Set Identifier
     , typeEnv :: Map.HashMap Identifier (TermPlus, UnivLevelPlus)
     , constraintEnv :: [PreConstraint] -- for type inference
     , constraintQueue :: ConstraintQueue
@@ -96,6 +97,7 @@ initialEnv path colorizeFlag =
     , equalityEnv = []
     , univInstEnv = IntMap.empty
     , univRenameEnv = IntMap.empty
+    , quasiConstEnv = S.empty
     , weakTypeEnv = Map.empty
     , typeEnv = Map.empty
     , chainEnv = Map.empty

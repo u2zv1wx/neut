@@ -96,6 +96,8 @@ data QuasiStmt
   -- translated intro lam + app as in the usual way
   --   (let (x t) e)
   = QuasiStmtLet Meta IdentifierPlus WeakTermPlus
+  -- special case of `let` in which the `e` in `let x := e` is known to be well-typed
+  | QuasiStmtLetWT Meta IdentifierPlus WeakTermPlus
   -- mutually recursive definition (n >= 0)
   --   (definition
   --     ((f1 A1) (ARGS-1) e1)
@@ -143,6 +145,8 @@ data QuasiStmt
 data WeakStmt
   = WeakStmtReturn WeakTermPlus
   | WeakStmtLet Meta IdentifierPlus WeakTermPlus WeakStmt
+  -- special case of `let` in which the `e` in `let x := e in cont` is known to be well-typed
+  | WeakStmtLetWT Meta IdentifierPlus WeakTermPlus WeakStmt
   | WeakStmtConstDecl Meta IdentifierPlus WeakStmt
   deriving (Show)
 

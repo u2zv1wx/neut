@@ -19,6 +19,7 @@ import System.Timeout
 import qualified Data.HashMap.Strict as Map
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.PQueue.Min as Q
+import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Text.Show.Pretty as Pr
 
@@ -121,6 +122,7 @@ simp' ((e1, e2):cs) = do
     Nothing -> do
       let hs1 = holeWeakTermPlus e1
       let hs2 = holeWeakTermPlus e2
+      qenv <- gets quasiConstEnv
       case (ms1, ms2) of
         (Just (StuckPiElimConst f1 ess1), Just (StuckPiElimConst f2 ess2))
           | f1 == f2
@@ -151,7 +153,7 @@ simp' ((e1, e2):cs) = do
           , occurCheck h1 hs2
           , linearCheck xs1
           , zs <- includeCheck xs1 e2
-          , Just es <- lookupAll zs sub -> do
+          , Just es <- lookupAll qenv zs sub -> do
             let m = supMeta (metaOf e1) (metaOf e2)
             let e1' = (m, snd e1)
             let e2' = (m, snd e2)
@@ -163,7 +165,7 @@ simp' ((e1, e2):cs) = do
           , occurCheck h2 hs1
           , linearCheck xs2
           , zs <- includeCheck xs2 e1
-          , Just es <- lookupAll zs sub -> do
+          , Just es <- lookupAll qenv zs sub -> do
             let m = supMeta (metaOf e1) (metaOf e2)
             let e1' = (m, snd e1)
             let e2' = (m, snd e2)
@@ -197,7 +199,7 @@ simp' ((e1, e2):cs) = do
           | xs1 <- concatMap getVarList ies1
           , occurCheck h1 hs2
           , zs <- includeCheck xs1 e2
-          , Just es <- lookupAll zs sub -> do
+          , Just es <- lookupAll qenv zs sub -> do
             let m = supMeta (metaOf e1) (metaOf e2)
             let e1' = (m, snd e1)
             let e2' = (m, snd e2)
@@ -208,7 +210,7 @@ simp' ((e1, e2):cs) = do
           | xs2 <- concatMap getVarList ies2
           , occurCheck h2 hs1
           , zs <- includeCheck xs2 e1
-          , Just es <- lookupAll zs sub -> do
+          , Just es <- lookupAll qenv zs sub -> do
             let m = supMeta (metaOf e1) (metaOf e2)
             let e1' = (m, snd e1)
             let e2' = (m, snd e2)
@@ -411,9 +413,16 @@ lookupAny (h:ks) sub = do
     Just v -> Just (h, v)
     _ -> lookupAny ks sub
 
-lookupAll :: [Identifier] -> Map.HashMap Identifier a -> Maybe [a]
-lookupAll [] _ = return []
-lookupAll (x:xs) sub = do
-  v <- Map.lookup x sub
-  vs <- lookupAll xs sub
-  return $ v : vs
+lookupAll ::
+     S.Set Identifier -> [Identifier] -> Map.HashMap Identifier a -> Maybe [a]
+lookupAll _ [] _ = return []
+lookupAll qenv (x:xs) sub
+  | S.member x qenv = lookupAll qenv xs sub
+  | otherwise = do
+    v <- Map.lookup x sub
+    vs <- lookupAll qenv xs sub
+    return $ v : vs
+-- lookupAll qenv (x:xs) sub = do
+--   v <- Map.lookup x sub
+--   vs <- lookupAll qenv xs sub
+  -- return $ v : vs
