@@ -2,7 +2,6 @@
 
 module Clarify.Utility where
 
-import Control.Monad.Except
 import Control.Monad.State
 
 import Data.Basic
@@ -237,118 +236,10 @@ relevantStruct m ks = do
                     ])))
       return theta
 
-renameData :: DataPlus -> WithEnv DataPlus
-renameData (m, DataTheta x) = return (m, DataTheta x)
-renameData (m, DataUpsilon x) = do
-  x' <- lookupNameEnv x
-  return (m, DataUpsilon x')
-renameData (m, DataSigmaIntro mk ds) = do
-  ds' <- mapM renameData ds
-  return (m, DataSigmaIntro mk ds')
-renameData (m, DataFloat16 x) = return (m, DataFloat16 x)
-renameData (m, DataFloat32 x) = return (m, DataFloat32 x)
-renameData (m, DataFloat64 x) = return (m, DataFloat64 x)
-renameData (m, DataEnumIntro x) = return (m, DataEnumIntro x)
-renameData (m, DataStructIntro dks) = do
-  let (ds, ks) = unzip dks
-  ds' <- mapM renameData ds
-  return (m, DataStructIntro $ zip ds' ks)
-
-renameCode :: CodePlus -> WithEnv CodePlus
-renameCode (m, CodeTheta theta) = do
-  theta' <- renameTheta theta
-  return (m, CodeTheta theta')
-renameCode (m, CodePiElimDownElim v vs) = do
-  v' <- renameData v
-  vs' <- mapM renameData vs
-  return (m, CodePiElimDownElim v' vs')
-renameCode (m, CodeSigmaElim mk xts d e) = do
-  d' <- renameData d
-  (xts', e') <- renameBinderWithBody xts e
-  return (m, CodeSigmaElim mk xts' d' e')
-renameCode (m, CodeUpIntro d) = do
-  d' <- renameData d
-  return (m, CodeUpIntro d')
-renameCode (m, CodeUpElim x e1 e2) = do
-  e1' <- renameCode e1
-  local $ do
-    x' <- newNameWith x
-    e2' <- renameCode e2
-    return (m, CodeUpElim x' e1' e2')
-renameCode (m, CodeEnumElim d les) = do
-  d' <- renameData d
-  les' <- renameCaseList les
-  return (m, CodeEnumElim d' les')
-renameCode (m, CodeStructElim xks d e) = do
-  d' <- renameData d
-  (xks', e') <- renameStruct xks e
-  return (m, CodeStructElim xks' d' e')
-
-renameStruct ::
-     [(Identifier, ArrayKind)]
-  -> CodePlus
-  -> WithEnv ([(Identifier, ArrayKind)], CodePlus)
-renameStruct [] e = do
-  e' <- renameCode e
-  return ([], e')
-renameStruct ((x, t):xts) e = do
-  local $ do
-    x' <- newNameWith x
-    (xts', e') <- renameStruct xts e
-    return ((x', t) : xts', e')
-
-renameBinderWithBody ::
-     [(Identifier, CodePlus)]
-  -> CodePlus
-  -> WithEnv ([(Identifier, CodePlus)], CodePlus)
-renameBinderWithBody [] e = do
-  e' <- renameCode e
-  return ([], e')
-renameBinderWithBody ((x, t):xts) e = do
-  t' <- renameCode t
-  local $ do
-    x' <- newNameWith x
-    (xts', e') <- renameBinderWithBody xts e
-    return ((x', t') : xts', e')
-
-renameCaseList :: [(Case, CodePlus)] -> WithEnv [(Case, CodePlus)]
-renameCaseList les =
-  forM les $ \(l, body) ->
-    local $ do
-      body' <- renameCode body
-      return (l, body')
-
-renameTheta :: Theta -> WithEnv Theta
-renameTheta (ThetaUnaryOp op t d) = do
-  d' <- renameData d
-  return $ ThetaUnaryOp op t d'
-renameTheta (ThetaBinaryOp op t d1 d2) = do
-  d1' <- renameData d1
-  d2' <- renameData d2
-  return $ ThetaBinaryOp op t d1' d2'
-renameTheta (ThetaArrayAccess t d1 d2) = do
-  d1' <- renameData d1
-  d2' <- renameData d2
-  return $ ThetaArrayAccess t d1' d2'
-renameTheta (ThetaSysCall c ds) = do
-  ds' <- mapM renameData ds
-  return $ ThetaSysCall c ds'
-
-local :: WithEnv a -> WithEnv a
-local comp = do
-  env <- get
-  x <- comp
-  modify (\e -> env {count = count e})
-  return x
-
 insCodeEnv :: Identifier -> [Identifier] -> CodePlus -> WithEnv ()
 insCodeEnv name args e = do
-  args' <- mapM newNameWith args
   e' <- reduceCodePlus e
-  e'' <- renameCode e'
-  -- Since LLVM doesn't allow variable shadowing, we must explicitly
-  -- rename variables here.
-  modify (\env -> env {codeEnv = Map.insert name (args', e'') (codeEnv env)})
+  modify (\env -> env {codeEnv = Map.insert name (args, e') (codeEnv env)})
 
 lookupContext :: Identifier -> Context -> WithEnv TermPlus
 lookupContext z ctx = do
