@@ -797,6 +797,7 @@ n15-4
   (item.cont0 ((_ (item A)) (_ (LIST (TEST (list (item A)))))) (item A))
   (item.cont1 ((_ (item A)) (_ (list (item A)))) (item A))
   (item.cont5 ((_ (item A)) (_ (LIST (list (item A))))) (item A))
+  (item.cont0 ((_ (item A)) (_ (LIST (list (item A))))) (item A))
   (item.cont6 ((_ (item A)) (_ (TEST (list (item A))))) (item A))
   (item.cont7 ((_ (item A)) (_ (LIST (TEST (item A))))) (item A))
   ;; (item.cont10 ((_ (item A)) (_ (list (TEST (item A))))) (item A))

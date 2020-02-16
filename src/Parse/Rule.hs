@@ -44,6 +44,7 @@ parseConnective ts f g = do
   fs <- mapM formationRuleOf connectiveList
   ats <- mapM ruleAsIdentPlus fs
   bts <- concat <$> mapM toInternalRuleList connectiveList
+  checkNameSanity $ ats ++ bts
   connectiveList' <- concat <$> mapM (f ats bts) connectiveList
   ruleList <- concat <$> mapM (g ats) connectiveList
   return $ connectiveList' ++ ruleList
@@ -73,6 +74,13 @@ renameFormArgs ((m, a, t):ats) = do
   let sub = [(a, (m, WeakTermUpsilon a'))]
   ats' <- renameFormArgs $ substWeakTermPlusBindings sub ats
   return $ (m, a', t) : ats'
+
+checkNameSanity :: [IdentifierPlus] -> WithEnv ()
+checkNameSanity atsbts = do
+  let asbs = map (\(_, x, _) -> x) atsbts
+  when (not $ linearCheck asbs) $
+    throwError'
+      "the names of the rules of inductive/coinductive type must be distinct"
 
 -- represent the inductive logical connective within CoC
 toInductive ::
