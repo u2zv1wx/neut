@@ -17,6 +17,7 @@ import Data.Maybe
 import System.Timeout
 
 import qualified Data.HashMap.Strict as Map
+import qualified Data.IntMap.Strict as IntMap
 import qualified Data.PQueue.Min as Q
 import qualified Data.Text as T
 import qualified Text.Show.Pretty as Pr
@@ -169,27 +170,29 @@ simp' ((e1, e2):cs) = do
             case es of
               [] -> simpPattern h2 ies2 e2' e1' cs
               _ -> simp $ (substWeakTermPlus (zip zs es) e1', e2') : cs
-        (Just (StuckPiElimUpsilon x1 _), _)
+        (Just (StuckPiElimUpsilon (x1, m1) _), _)
           | Just body <- Map.lookup x1 sub -> do
             let m = supMeta (supMeta (metaOf e1) (metaOf e2)) (metaOf body) -- x1 == e1 == body
             let e1' = (m, snd e1)
             let e2' = (m, snd e2)
-            body' <- termInst (m, snd body)
+            body' <- univInstWith (metaUnivParams m1) (m, snd body)
             simp $ (substWeakTermPlus [(x1, body')] e1', e2') : cs
-        (_, Just (StuckPiElimUpsilon x2 _))
+        (_, Just (StuckPiElimUpsilon (x2, m2) _))
           | Just body <- Map.lookup x2 sub -> do
             let m = supMeta (supMeta (metaOf e1) (metaOf e2)) (metaOf body) -- x2 == e2 == body
             let e1' = (m, snd e1)
             let e2' = (m, snd e2)
-            body' <- termInst (m, snd body)
+            body' <- univInstWith (metaUnivParams m2) (m, snd body)
             simp $ (e1', substWeakTermPlus [(x2, body')] e2') : cs
-        (Just (StuckPiElimUpsilon x1 ess1), Just (StuckPiElimUpsilon x2 ess2))
+        (Just (StuckPiElimUpsilon (x1, m1) ess1), Just (StuckPiElimUpsilon (x2, m2) ess2))
           | x1 == x2
           , length ess1 == length ess2
           , es1 <- concat ess1
           , es2 <- concat ess2
           -- es1 = [[a, b], [c]], es2 =  [[d], [e, f]]とかを許してしまっているので修正すること
-          , length es1 == length es2 -> simp $ zip es1 es2 ++ cs
+          , length es1 == length es2 -> do
+            simpUnivParams (metaUnivParams m1) (metaUnivParams m2)
+            simp $ zip es1 es2 ++ cs
         (Just (StuckPiElimZetaStrict h1 ies1), _)
           | xs1 <- concatMap getVarList ies1
           , occurCheck h1 hs2
@@ -295,15 +298,28 @@ simpOther e1 e2 fmvs cs = do
   insConstraintQueue $ Enriched (e1, e2) fmvs $ ConstraintOther
   simp cs
 
+simpUnivParams :: UnivParams -> UnivParams -> WithEnv ()
+simpUnivParams umap1 umap2 = do
+  let ks1 = IntMap.keys umap1
+  let ks2 = IntMap.keys umap2
+  if ks1 /= ks2
+    then throwError' "simpUnivParams"
+    else do
+      let vs1 = IntMap.elems umap1
+      let vs2 = IntMap.elems umap2
+      forM_ (zip vs1 vs2) $ \(l1, l2) ->
+        modify (\env -> env {equalityEnv = (l1, l2) : equalityEnv env})
+
+-- modify (\env -> env {equalityEnv = (l1, l2) : equalityEnv env})
 data Stuck
-  = StuckPiElimUpsilon Identifier [[WeakTermPlus]]
+  = StuckPiElimUpsilon (Identifier, Meta) [[WeakTermPlus]]
   | StuckPiElimZeta Identifier [[WeakTermPlus]]
   | StuckPiElimZetaStrict Identifier [[WeakTermPlus]]
   | StuckPiElimIter IterInfo [(Meta, [WeakTermPlus])]
   | StuckPiElimConst Identifier [[WeakTermPlus]]
 
 asStuckedTerm :: WeakTermPlus -> Maybe Stuck
-asStuckedTerm (_, WeakTermUpsilon x) = Just $ StuckPiElimUpsilon x []
+asStuckedTerm (m, WeakTermUpsilon x) = Just $ StuckPiElimUpsilon (x, m) []
 asStuckedTerm (_, WeakTermZeta h) = Just $ StuckPiElimZetaStrict h []
 asStuckedTerm (_, WeakTermConst x) = Just $ StuckPiElimConst x []
 asStuckedTerm self@(mi, WeakTermIter (_, x, _) xts body) =

@@ -4,6 +4,7 @@ module Data.Basic where
 
 import Path
 
+import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Text as T
 
 -- import Control.Exception (assert)
@@ -50,6 +51,8 @@ instance Show UnivLevelPlus
 instance Eq UnivLevelPlus where
   (UnivLevelPlus (_, l1)) == (UnivLevelPlus (_, l2)) = l1 == l2
 
+type UnivParams = IntMap.IntMap UnivLevel
+
 data Meta =
   Meta
     { metaFileName :: Maybe (Path Abs File)
@@ -57,6 +60,7 @@ data Meta =
     , metaConstraintLocation :: Maybe Loc
     , metaIsPublic :: Bool
     , metaIsAppropriateAsCompletionCandidate :: Bool
+    , metaUnivParams :: UnivParams
     }
 
 -- required to derive the eqality on WeakTerm
@@ -115,6 +119,7 @@ emptyMeta =
     , metaFileName = Nothing
     , metaIsPublic = True
     , metaIsAppropriateAsCompletionCandidate = True
+    , metaUnivParams = IntMap.empty
     }
 
 readEnumType :: Char -> Identifier -> Integer -> (Maybe Integer)

@@ -8,7 +8,7 @@ import Control.Monad.Except
 import Control.Monad.State
 import Text.Parsec hiding (count)
 
--- import Text.Parsec.Text
+import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Text as T
 
 import Data.Basic
@@ -75,4 +75,5 @@ currentMeta = do
       , metaConstraintLocation = Just (0, l, c)
       , metaIsPublic = True
       , metaIsAppropriateAsCompletionCandidate = True
+      , metaUnivParams = IntMap.empty
       }

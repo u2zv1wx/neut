@@ -5,7 +5,7 @@ module Elaborate.Infer
   , inferType
   , insLevelEQ
   , insConstraintEnv
-  , termInst
+  , univInstWith
   ) where
 
 import Control.Monad.Except
@@ -75,7 +75,9 @@ infer' _ (m, WeakTermUpsilon x) = do
       return ((m, WeakTermUpsilon x), (m, t), UnivLevelPlus (m, l))
     Just (t, UnivLevelPlus (_, l)) -> do
       ((_, t'), l') <- univInst (weaken t) l
-      return ((m, WeakTermUpsilon x), (m, t'), UnivLevelPlus (m, l'))
+      univParams <- gets univRenameEnv
+      let m' = m {metaUnivParams = univParams}
+      return ((m', WeakTermUpsilon x), (m, t'), UnivLevelPlus (m, l'))
 infer' ctx (m, WeakTermPi _ xts t) = do
   mls <- piUnivLevelsfrom xts t
   (xtls', (t', mlPiCod)) <- inferPi ctx xts t
@@ -516,9 +518,10 @@ univInst e l = do
   l' <- levelInst l
   return (e', l')
 
-termInst :: WeakTermPlus -> WithEnv WeakTermPlus
-termInst e = do
-  modify (\env -> env {univRenameEnv = IntMap.empty})
+univInstWith :: IntMap.IntMap UnivLevel -> WeakTermPlus -> WithEnv WeakTermPlus
+univInstWith univParams e = do
+  modify (\env -> env {univRenameEnv = univParams})
+  -- modify (\env -> env {univRenameEnv = IntMap.empty})
   univInst' e
 
 univInst' :: WeakTermPlus -> WithEnv WeakTermPlus
