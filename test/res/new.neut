@@ -1,6 +1,6 @@
 (include "notation.neut")
 
-(include "enum.neut")
+;; (include "enum.neut")
 
 (include "top.neut")
 
@@ -216,22 +216,22 @@
 ;;  ...
 ;; という感じ。
 
-;; (let (nat tau) (nat-inner))
+(let (local-nat tau) (nat-inner))
 
 ;; (definition nat)
 
 ;; out-3
 ;; (write n3 stdout (test) enum.n3)
 
-;; (definition nat-helper ((x choice))
-;;   (enum-elimination x
-;;     (left top)
-;;     (right nat)))
+(definition nat-helper ((x choice))
+  (enum-elimination x
+    (left top)
+    (right local-nat)))
 
 ;; (write n15 stdout (test) enum.n15)
 
-;; (let (foo (nat-inner))
-;;   (sigma-introduction left unit))
+(let (foo (nat-inner))
+  (sigma-introduction left unit))
 
 ;; (definition zero
 ;;   (sigma-introduction left unit))
@@ -852,7 +852,7 @@ n15-4
   (list-stream.tail ((_ (list-stream A))) (list (list-stream A))))
 
 ;; induction principleを自動生成できるようにした。これでnatの内部実装を気にせずにnatを利用できるようになる。
-;; (i64.add 100 (list.cons 10))
+;; (i64.add 100 (nat.succ unit))
 
 
 ;; coinduction principleも自動生成できるようにした。偉すぎる。

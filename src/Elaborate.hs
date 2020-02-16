@@ -39,7 +39,11 @@ import qualified Data.UnionFind as UF
 -- S. Kong, and C. Roux. "Elaboration in Dependent Type Theory", arxiv,
 -- https://arxiv.org/abs/1505.04324, 2015.
 elaborate :: WeakStmt -> WithEnv TermPlus
-elaborate stmt = elaborateStmt stmt >>= reduceTermPlus
+elaborate stmt = do
+  e <- elaborateStmt stmt >>= reduceTermPlus
+  -- p $ T.unpack $ "- " <> toText (weaken e)
+  -- p' e
+  return e
 
 elaborateStmt :: WeakStmt -> WithEnv TermPlus
 elaborateStmt (WeakStmtReturn e) = do
@@ -58,6 +62,10 @@ elaborateStmt (WeakStmtLet m (mx, x, t) e cont) = do
   t'' <- elaborate' t' >>= reduceTermPlus
   insTypeEnv x t'' mlt
   modify (\env -> env {substEnv = Map.insert x (weaken e'') (substEnv env)})
+  -- p $ T.unpack $ "- " <> toText (weaken e'')
+  -- p $ T.unpack $ "- " <> toText (weaken t'')
+  -- p' e''
+  -- p' t''
   cont' <- elaborateStmt cont
   return (m, TermPiElim (m, TermPiIntro [(mx, x, t'')] cont') [e''])
 elaborateStmt (WeakStmtLetWT m (mx, x, t) e cont) = do
@@ -68,6 +76,8 @@ elaborateStmt (WeakStmtLetWT m (mx, x, t) e cont) = do
   insTypeEnv x t'' mlt
   -- don't update substEnv with x ~> e' (i.e. don't unfold `nat`, `list.cons`, etc. in type inference)
   modify (\env -> env {quasiConstEnv = S.insert x (quasiConstEnv env)})
+  -- p $ T.unpack $ "- " <> toText (weaken e')
+  -- p $ T.unpack $ "- " <> toText (weaken t'')
   cont' <- elaborateStmt cont
   return (m, TermPiElim (m, TermPiIntro [(mx, x, t'')] cont') [e'])
 elaborateStmt (WeakStmtConstDecl m (mx, x, t) cont) = do

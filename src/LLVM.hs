@@ -20,14 +20,16 @@ toLLVM mainTerm = do
   penv <- gets codeEnv
   forM_ (Map.toList penv) $ \(name, (args, e)) -> do
     llvm <- llvmCode e
-    insLLVMEnv name args llvm
-  l <- llvmCode mainTerm
+    (args', llvm') <- rename args llvm
+    insLLVMEnv name args' llvm'
+  mainTerm' <- llvmCode mainTerm
   -- the result of "main" must be i64, not i8*
   (result, resultVar) <- newDataUpsilonWith "result"
   (cast, castThen) <- llvmCast (Just "cast") resultVar (LowTypeIntS 64)
   castResult <- castThen (LLVMReturn cast)
   -- let result: i8* := (main-term) in {cast result to i64}
-  return $ commConv result l $ castResult
+  mainTerm'' <- commConv result mainTerm' $ castResult
+  snd <$> rename [] mainTerm''
 
 llvmCode :: CodePlus -> WithEnv LLVM
 llvmCode (m, CodeTheta theta) = llvmCodeTheta m theta
@@ -50,7 +52,7 @@ llvmCode (_, CodeUpIntro d) = do
 llvmCode (_, CodeUpElim x e1 e2) = do
   e1' <- llvmCode e1
   e2' <- llvmCode e2
-  return $ commConv x e1' e2'
+  commConv x e1' e2'
 llvmCode (_, CodeEnumElim v branchList) = llvmCodeEnumElim v branchList
 llvmCode (_, CodeStructElim xks v e) = do
   let (xs, ks) = unzip xks
@@ -113,7 +115,7 @@ loadContent' ::
 loadContent' bp bt [] cont = do
   l <- llvmUncast (Just $ takeBaseName' bp) bp bt
   tmp <- newNameWith' $ Just $ takeBaseName' bp
-  return $ commConv tmp l $ LLVMCont (LLVMOpFree (LLVMDataLocal tmp)) cont
+  commConv tmp l $ LLVMCont (LLVMOpFree (LLVMDataLocal tmp)) cont
 loadContent' bp bt ((i, (x, et)):xis) cont = do
   cont' <- loadContent' bp bt xis cont
   (posName, pos) <- newDataLocal' (Just x)
@@ -255,7 +257,7 @@ llvmUncastFloat mName floatResult i = do
 llvmUncastLet :: Identifier -> LLVMData -> LowType -> LLVM -> WithEnv LLVM
 llvmUncastLet x d lowType cont = do
   l <- llvmUncast (Just x) d lowType
-  return $ commConv x l cont
+  commConv x l cont
 
 -- LLVMLet x e1' e2'
 -- `llvmDataLet x d cont` binds the data `d` to the variable `x`, and computes the
@@ -491,17 +493,103 @@ isCompareOp BinaryOpLT = True
 isCompareOp BinaryOpLE = True
 isCompareOp _ = False
 
--- commutative conversion
-commConv :: Identifier -> LLVM -> LLVM -> LLVM
+commConv :: Identifier -> LLVM -> LLVM -> WithEnv LLVM
 commConv x (LLVMReturn d) cont =
-  LLVMLet x (LLVMOpBitcast d voidPtr voidPtr) cont -- nop
-commConv x (LLVMLet y op cont1) cont2 = LLVMLet y op $ commConv x cont1 cont2
-commConv x (LLVMCont op cont1) cont2 = LLVMCont op $ commConv x cont1 cont2
+  return $ LLVMLet x (LLVMOpBitcast d voidPtr voidPtr) cont -- nop
+commConv x (LLVMLet y op cont1) cont2 = do
+  cont <- commConv x cont1 cont2
+  return $ LLVMLet y op cont
+commConv x (LLVMCont op cont1) cont2 = do
+  cont <- commConv x cont1 cont2
+  return $ LLVMCont op cont
 commConv x (LLVMSwitch (d, t) defaultCase caseList) cont2 = do
   let (ds, es) = unzip caseList
-  let es' = map (\e -> commConv x e cont2) es
+  es' <- mapM (\e -> commConv x e cont2) es
   let caseList' = zip ds es'
-  let defaultCase' = commConv x defaultCase cont2
-  LLVMSwitch (d, t) defaultCase' caseList'
-commConv x (LLVMCall d ds) cont2 = LLVMLet x (LLVMOpCall d ds) cont2
-commConv _ LLVMUnreachable _ = LLVMUnreachable
+  defaultCase' <- commConv x defaultCase cont2
+  return $ LLVMSwitch (d, t) defaultCase' caseList'
+commConv x (LLVMCall d ds) cont2 = return $ LLVMLet x (LLVMOpCall d ds) cont2
+commConv _ LLVMUnreachable _ = return LLVMUnreachable
+
+rename :: [Identifier] -> LLVM -> WithEnv ([Identifier], LLVM)
+rename args e = do
+  modify (\env -> env {nameEnv = Map.empty})
+  args' <- mapM newNameWith args
+  e' <- renameLLVM e
+  return (args', e')
+
+renameLLVMData :: LLVMData -> WithEnv LLVMData
+renameLLVMData (LLVMDataLocal x) = do
+  nenv <- gets nameEnv
+  case Map.lookup x nenv of
+    Just x' -> return $ LLVMDataLocal x'
+    Nothing -> return $ LLVMDataLocal x
+renameLLVMData d = return d
+
+renameLLVM :: LLVM -> WithEnv LLVM
+renameLLVM (LLVMReturn d) = do
+  d' <- renameLLVMData d
+  return $ LLVMReturn d'
+renameLLVM (LLVMLet x op cont) = do
+  op' <- renameLLVMOp op
+  x' <- newNameWith x
+  cont' <- renameLLVM cont
+  return $ LLVMLet x' op' cont'
+renameLLVM (LLVMCont op cont) = do
+  op' <- renameLLVMOp op
+  cont' <- renameLLVM cont
+  return $ LLVMCont op' cont'
+renameLLVM (LLVMSwitch (d, t) defaultBranch les) = do
+  let (ls, es) = unzip les
+  d' <- renameLLVMData d
+  defaultBranch' <- renameLLVM defaultBranch
+  es' <- mapM renameLLVM es
+  return $ LLVMSwitch (d', t) defaultBranch' (zip ls es')
+renameLLVM (LLVMCall d ds) = do
+  d' <- renameLLVMData d
+  ds' <- mapM renameLLVMData ds
+  return $ LLVMCall d' ds'
+renameLLVM LLVMUnreachable = return LLVMUnreachable
+
+renameLLVMOp :: LLVMOp -> WithEnv LLVMOp
+renameLLVMOp (LLVMOpCall d ds) = do
+  d' <- renameLLVMData d
+  ds' <- mapM renameLLVMData ds
+  return $ LLVMOpCall d' ds'
+renameLLVMOp (LLVMOpGetElementPtr (d, t) dts) = do
+  d' <- renameLLVMData d
+  let (ds, ts) = unzip dts
+  ds' <- mapM renameLLVMData ds
+  return $ LLVMOpGetElementPtr (d', t) (zip ds' ts)
+renameLLVMOp (LLVMOpBitcast d t1 t2) = do
+  d' <- renameLLVMData d
+  return $ LLVMOpBitcast d' t1 t2
+renameLLVMOp (LLVMOpIntToPointer d t1 t2) = do
+  d' <- renameLLVMData d
+  return $ LLVMOpIntToPointer d' t1 t2
+renameLLVMOp (LLVMOpPointerToInt d t1 t2) = do
+  d' <- renameLLVMData d
+  return $ LLVMOpPointerToInt d' t1 t2
+renameLLVMOp (LLVMOpLoad d t) = do
+  d' <- renameLLVMData d
+  return $ LLVMOpLoad d' t
+renameLLVMOp (LLVMOpStore t d1 d2) = do
+  d1' <- renameLLVMData d1
+  d2' <- renameLLVMData d2
+  return $ LLVMOpStore t d1' d2'
+renameLLVMOp (LLVMOpAlloc d) = do
+  d' <- renameLLVMData d
+  return $ LLVMOpAlloc d'
+renameLLVMOp (LLVMOpFree d) = do
+  d' <- renameLLVMData d
+  return $ LLVMOpFree d'
+renameLLVMOp (LLVMOpUnaryOp op d) = do
+  d' <- renameLLVMData d
+  return $ LLVMOpUnaryOp op d'
+renameLLVMOp (LLVMOpBinaryOp op d1 d2) = do
+  d1' <- renameLLVMData d1
+  d2' <- renameLLVMData d2
+  return $ LLVMOpBinaryOp op d1' d2'
+renameLLVMOp (LLVMOpSysCall i ds) = do
+  ds' <- mapM renameLLVMData ds
+  return $ LLVMOpSysCall i ds'

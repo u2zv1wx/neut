@@ -264,17 +264,6 @@ concatQuasiStmtList (QuasiStmtLetCoinductive n m at e:es) = do
   return $ WeakStmtLetWT m at e cont
 concatQuasiStmtList (QuasiStmtLetInductiveIntro m bt xts yts ats bts bInner isub as:ss) = do
   yts' <- mapM (internalize isub (ats ++ bts)) yts
-  -- let s =
-  --       QuasiStmtLet
-  --         m
-  --         bt
-  --         ( m
-  --         , WeakTermPiIntro
-  --             (xts ++ yts)
-  --             ( m
-  --             , WeakTermPiIntro
-  --                 (ats ++ bts) -- ats = [list : (...)], bts = [nil : Pi (yts). list A, cons : (...)]
-  --                 (m, WeakTermPiElim bInner yts')))
   insInductive as bt -- register the constructor (if necessary)
   cont <- concatQuasiStmtList ss
   return $
@@ -290,16 +279,10 @@ concatQuasiStmtList (QuasiStmtLetInductiveIntro m bt xts yts ats bts bInner isub
               (m, WeakTermPiElim bInner yts')))
       cont
   -- concatQuasiStmtList $ s : ss
-concatQuasiStmtList (QuasiStmtLetCoinductiveElim m bt xtsyt codInner ats bts yt e1 e2 csub asOuter:ss) = do
-  e2' <- reduceWeakTermPlus <$> externalize csub (ats ++ bts) codInner e2
-  -- let s =
-  --       QuasiStmtLet
-  --         m
-  --         bt
-  --         ( m
-  --         , WeakTermPiIntro
-  --             xtsyt
-  --             (m, WeakTermSigmaElim codOuter (ats ++ bts ++ [yt]) e1 e2'))
+concatQuasiStmtList (QuasiStmtLetCoinductiveElim m bt xtsyt codInner ats bts yt e1 e2 csub asOuter:ss)
+  -- e2' <- reduceWeakTermPlus <$> externalize csub (ats ++ bts) codInner e2
+ = do
+  e2' <- externalize csub (ats ++ bts) codInner e2
   insCoinductive asOuter bt -- register the destructor (if necessary)
   cont <- concatQuasiStmtList ss
   let codOuter = substWeakTermPlus csub codInner
@@ -399,6 +382,7 @@ ensureDAG' a visited g =
 toIdentList :: [QuasiStmt] -> [IdentifierPlus]
 toIdentList [] = []
 toIdentList ((QuasiStmtLet _ mxt _):ds) = mxt : toIdentList ds
+toIdentList ((QuasiStmtLetWT _ mxt _):ds) = mxt : toIdentList ds
 toIdentList ((QuasiStmtDef xds):ds) = do
   let mxts = map (\(_, (_, mxt, _, _)) -> mxt) xds
   mxts ++ toIdentList ds

@@ -245,8 +245,6 @@ renameData (m, DataUpsilon x) = do
 renameData (m, DataSigmaIntro mk ds) = do
   ds' <- mapM renameData ds
   return (m, DataSigmaIntro mk ds')
--- renameData (m, DataIntS size x) = return (m, DataIntS size x)
--- renameData (m, DataIntU size x) = return (m, DataIntU size x)
 renameData (m, DataFloat16 x) = return (m, DataFloat16 x)
 renameData (m, DataFloat32 x) = return (m, DataFloat32 x)
 renameData (m, DataFloat64 x) = return (m, DataFloat64 x)

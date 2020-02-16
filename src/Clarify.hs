@@ -35,11 +35,16 @@ clarify lam@(m, TermPiIntro mxts e) = do
   let xts = zip xs ts
   forM_ xts $ uncurry insTypeEnv'
   e' <- clarify e
+  -- p "chain-pi-intro. xs:"
+  -- p' $ map (\(_, x, _) -> x) mxts
   fvs <- chainTermPlus lam
   retClosure Nothing fvs m mxts e'
 clarify (m, TermPiElim e es) = do
+  es' <- mapM clarifyPlus es
   e' <- clarify e
-  callClosure' m e' es
+  callClosure m e' es'
+  -- e' <- clarify e
+  -- callClosure' m e' es
 clarify (m, TermSigma _) = returnClosureType m -- Sigma is translated into Pi
 clarify (m, TermSigmaIntro t es) = do
   t' <- reduceTermPlus t
@@ -53,6 +58,9 @@ clarify (m, TermSigmaIntro t es) = do
               let xvs = map (\(_, x, _) -> toTermUpsilon x) yts
               let kv = toTermUpsilon k
               let bindArgsThen = \e -> (m, TermPiElim (m, TermPiIntro yts e) es)
+              -- let lam = (m, TermPiIntro [zu, kp] (m, TermPiElim kv xvs))
+              -- p "lam:"
+              -- p' lam
               clarify $
                 bindArgsThen (m, TermPiIntro [zu, kp] (m, TermPiElim kv xvs))
           _ -> throwError' "the type of sigma-intro is wrong"
@@ -64,6 +72,8 @@ clarify iter@(m, TermIter (_, x, t) mxts e) = do
   let xts = zip xs ts
   forM_ ((x, t) : xts) $ uncurry insTypeEnv'
   e' <- clarify e
+  -- p "chain for: "
+  -- p' x
   fvs <- chainTermPlus iter
   retClosure' x fvs m mxts e'
 clarify (m, TermConst x) = clarifyConst m x
@@ -311,11 +321,6 @@ makeClosure' mName fvs m xts e = do
   xts' <- clarifyBinder xts
   makeClosure mName fvs' m xts' e
 
-callClosure' :: Meta -> CodePlus -> [TermPlus] -> WithEnv CodePlus
-callClosure' m e es = do
-  tmp <- mapM (clarifyPlus) es
-  callClosure m e tmp
-
 knot :: Identifier -> DataPlus -> WithEnv ()
 knot z cls = do
   cenv <- gets codeEnv
@@ -510,9 +515,8 @@ sigToPi m xts = do
   let zv = toTermUpsilon z
   k <- newNameWith "sig"
   -- Sigma [x1 : A1, ..., xn : An] = Pi (z : Type, _ : Pi [x1 : A1, ..., xn : An]. z). z
-  let piType = (emptyMeta, TermPi [] xts zv)
   l <- newUnivLevel
   -- don't care the level since they're discarded immediately
   -- (i.e. this translated term is not used as an argument of `weaken`)
-  let zu = (m, z, (m, TermTau l))
-  return (m, TermPi [] [zu, (emptyMeta, k, piType)] zv)
+  return
+    (m, TermPi [] [(m, z, (m, TermTau l)), (m, k, (m, TermPi [] xts zv))] zv)
