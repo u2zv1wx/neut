@@ -41,8 +41,7 @@ import qualified Data.UnionFind as UF
 elaborate :: WeakStmt -> WithEnv TermPlus
 elaborate stmt = do
   e <- elaborateStmt stmt >>= reduceTermPlus
-  -- p $ T.unpack $ "- " <> toText (weaken e)
-  -- p' e
+  p "elaborated"
   return e
 
 elaborateStmt :: WeakStmt -> WithEnv TermPlus
@@ -105,20 +104,35 @@ quotient ::
      [(UnivLevel, UnivLevel)]
   -> UnivInstEnv
   -> [LevelConstraint]
-  -> UF.UnionFind [LevelEdge]
-quotient [] uienv g = concat <$> mapM (quotient' uienv) g
+  -> UF.UnionFind (S.Set (Meta, UnivLevel), S.Set LevelEdge)
+quotient [] uienv g = quotient' uienv g
 quotient ((l1, l2):lls) uienv g = do
   UF.union l1 l2
   quotient lls uienv g
 
-quotient' :: UnivInstEnv -> LevelConstraint -> UF.UnionFind [LevelEdge]
-quotient' uienv (UnivLevelPlus (m1, l1), (w, UnivLevelPlus (m2, l2))) = do
+quotient' ::
+     UnivInstEnv
+  -> [LevelConstraint]
+  -> UF.UnionFind (S.Set (Meta, UnivLevel), S.Set LevelEdge)
+quotient' _ [] = return (S.empty, S.empty)
+quotient' uienv ((UnivLevelPlus (m1, l1), (w, UnivLevelPlus (m2, l2))):ss) = do
+  (vs, g) <- quotient' uienv ss
   let domList = inst uienv l1
   let codList = inst uienv l2
-  forM (cartesianProduct domList codList) $ \(dom, cod) -> do
-    dom' <- UF.find dom
-    cod' <- UF.find cod
-    return ((m1, dom'), (w, (m2, cod')))
+  return
+    ( S.insert (m1, l1) vs
+    , quotient'' g m1 w m2 $ cartesianProduct domList codList)
+
+quotient'' ::
+     S.Set LevelEdge
+  -> Meta
+  -> Integer
+  -> Meta
+  -> [(UnivLevel, UnivLevel)]
+  -> S.Set LevelEdge
+quotient'' g _ _ _ [] = g
+quotient'' g m1 w m2 ((dom, cod):rest) =
+  S.insert ((m1, dom), (w, (m2, cod))) $ quotient'' g m1 w m2 rest
 
 cartesianProduct :: [a] -> [b] -> [(a, b)]
 cartesianProduct xs ys = do
@@ -137,10 +151,9 @@ checkUnivSanity = do
   g <- gets levelEnv
   eenv <- gets equalityEnv
   uienv <- gets univInstEnv
-  let g' = nub $ UF.run $ quotient eenv uienv g
-  let nodeList = nub $ concatMap (\(n1, _) -> [n1]) g'
-  let g'' = toGraph g'
-  ensureDAG g'' IntMap.empty nodeList
+  let (vs, g') = UF.run $ quotient eenv uienv g
+  let g'' = toGraph $ S.toList g'
+  ensureDAG g'' IntMap.empty (S.toList vs)
 
 type LevelGraph = IntMap.IntMap [(Integer, (Meta, UnivLevel))]
 

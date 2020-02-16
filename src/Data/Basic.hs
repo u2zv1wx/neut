@@ -70,6 +70,9 @@ instance Eq Meta where
 instance Show Meta where
   show _ = "_"
 
+instance Ord Meta where
+  compare _ _ = EQ
+
 showMeta :: Meta -> String
 showMeta m =
   case (metaFileName m, metaConstraintLocation m) of
