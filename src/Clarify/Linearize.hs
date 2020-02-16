@@ -233,17 +233,6 @@ distinguishCode z (ml, CodeStructElim xts d e) = do
       (vs2, e') <- distinguishCode z e
       return (vs1 ++ vs2, (ml, CodeStructElim xts d' e'))
 
--- distinguishCode z (ml, CodeArrayElim k d1 d2) = do
---   (vs1, d1') <- distinguishData z d1
---   (vs2, d2') <- distinguishData z d2
---   return (vs1 ++ vs2, (ml, CodeArrayElim k d1' d2'))
--- distinguishCode z (ml, CodeArrayElimPositive k xs d e) = do
---   (vs1, d') <- distinguishData z d
---   if z `elem` xs
---     then return (vs1, (ml, CodeArrayElimPositive k xs d' e))
---     else do
---       (vs2, e') <- distinguishCode z e
---       return (vs1 ++ vs2, (ml, CodeArrayElimPositive k xs d' e'))
 -- {} distinguishTheta z theta {結果のtermにzは出現せず、かつ、renameされた結果がリストに格納されている}
 distinguishTheta :: Identifier -> Theta -> WithEnv ([Identifier], Theta)
 distinguishTheta z (ThetaUnaryOp op lowType d) = do
@@ -260,11 +249,10 @@ distinguishTheta z (ThetaArrayAccess lowType d1 d2) = do
 distinguishTheta z (ThetaSysCall num ds) = do
   (vss, ds') <- unzip <$> mapM (distinguishData z) ds
   return (concat vss, ThetaSysCall num ds')
-
-isLinearOn :: CodePlus -> [Identifier] -> WithEnv Bool
-isLinearOn _ [] = return True
-isLinearOn e (x:xs) = do
-  (zs, _) <- distinguishCode x e
-  case zs of
-    [_] -> e `isLinearOn` xs
-    _ -> return False
+-- isLinearOn :: CodePlus -> [Identifier] -> WithEnv Bool
+-- isLinearOn _ [] = return True
+-- isLinearOn e (x:xs) = do
+--   (zs, _) <- distinguishCode x e
+--   case zs of
+--     [_] -> e `isLinearOn` xs
+--     _ -> return False
