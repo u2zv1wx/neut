@@ -11,8 +11,6 @@ data Data
   = DataTheta Identifier
   | DataUpsilon Identifier
   | DataSigmaIntro ArrayKind [DataPlus]
-  -- | DataIntS IntSize Integer
-  -- | DataIntU IntSize Integer
   | DataFloat16 Half
   | DataFloat32 Float
   | DataFloat64 Double
@@ -29,6 +27,8 @@ data Code
       DataPlus
       CodePlus
   | CodeUpIntro DataPlus
+  -- the variable introduced by CodeUpElim is assumed to be used linearly
+  -- (this property is exploited to, for example, prevent unnecessary copy of array in array-access)
   | CodeUpElim Identifier CodePlus CodePlus
   | CodeEnumElim DataPlus [(Case, CodePlus)]
   | CodeStructElim [(Identifier, ArrayKind)] DataPlus CodePlus

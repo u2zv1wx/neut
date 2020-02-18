@@ -181,6 +181,9 @@ parse' ((_, TreeNode ((_, TreeAtom "coinductive"):ts)):as) = do
   stmtList1 <- parseCoinductive ts
   stmtList2 <- parse' as
   return $ stmtList1 ++ stmtList2
+parse' ((m, TreeNode [(mLet, TreeAtom "let"), (mx, TreeAtom x), t, e]):as) = do
+  let xt = (mx, TreeNode [(mx, TreeAtom x), t])
+  parse' ((m, TreeNode [(mLet, TreeAtom "let"), xt, e]) : as)
 parse' ((m, TreeNode [(_, TreeAtom "let"), xt, e]):as) = do
   m' <- adjustPhase m
   e' <- macroExpand e >>= interpret

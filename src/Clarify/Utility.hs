@@ -237,9 +237,8 @@ relevantStruct m ks = do
       return theta
 
 insCodeEnv :: Identifier -> [Identifier] -> CodePlus -> WithEnv ()
-insCodeEnv name args e = do
-  e' <- reduceCodePlus e
-  modify (\env -> env {codeEnv = Map.insert name (args, e') (codeEnv env)})
+insCodeEnv name args e =
+  modify (\env -> env {codeEnv = Map.insert name (args, e) (codeEnv env)})
 
 lookupContext :: Identifier -> Context -> WithEnv TermPlus
 lookupContext z ctx = do

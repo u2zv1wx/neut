@@ -41,7 +41,6 @@ import qualified Data.UnionFind as UF
 elaborate :: WeakStmt -> WithEnv TermPlus
 elaborate stmt = do
   e <- elaborateStmt stmt >>= reduceTermPlus
-  p "elaborated"
   return e
 
 elaborateStmt :: WeakStmt -> WithEnv TermPlus
@@ -73,8 +72,10 @@ elaborateStmt (WeakStmtLetWT m (mx, x, t) e cont) = do
   e' <- elaborate' e -- `e` is supposed to be well-typed
   t'' <- elaborate' t' >>= reduceTermPlus
   insTypeEnv x t'' mlt
-  -- don't update substEnv with x ~> e' (i.e. don't unfold `nat`, `list.cons`, etc. in type inference)
   modify (\env -> env {quasiConstEnv = S.insert x (quasiConstEnv env)})
+  -- ignore:
+  --   don't update substEnv with x ~> e' (i.e. don't unfold `nat`, `list.cons`, etc. in type inference)
+  modify (\env -> env {substEnv = Map.insert x (weaken e') (substEnv env)})
   -- p $ T.unpack $ "- " <> toText (weaken e')
   -- p $ T.unpack $ "- " <> toText (weaken t'')
   cont' <- elaborateStmt cont

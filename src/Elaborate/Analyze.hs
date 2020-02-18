@@ -417,7 +417,7 @@ lookupAll ::
      S.Set Identifier -> [Identifier] -> Map.HashMap Identifier a -> Maybe [a]
 lookupAll _ [] _ = return []
 lookupAll qenv (x:xs) sub
-  | S.member x qenv = lookupAll qenv xs sub
+  -- | S.member x qenv = lookupAll qenv xs sub
   | otherwise = do
     v <- Map.lookup x sub
     vs <- lookupAll qenv xs sub

@@ -852,9 +852,138 @@ n15-4
   (list-stream.head ((_ (list-stream A))) A)
   (list-stream.tail ((_ (list-stream A))) (list (list-stream A))))
 
+;; identity type
+(inductive identity ((A tau) (x A) (y A))
+  (identity.reflexive ((a A)) (identity A a a)))
+
+(inductive bool ()
+  (bool.true () (bool))
+  (bool.false () (bool)))
+
+;; (inductive sample ((A tau))
+;;   (sample.true () (sample A))
+;;   (sample.false () (sample A)))
+
+(inductive sample ((b (bool)))
+  (sample.true () (sample (bool.true)))
+  (sample.false () (sample (bool.false))))
 ;; induction principleを自動生成できるようにした。これでnatの内部実装を気にせずにnatを利用できるようになる。
 ;; (i64.add 100 (nat.succ unit))
 
+;; (let list.recursion.helper
+;;   hole
+;;   (lambda ((y hole)
+;;            (xs (list i64)))
+;;     (list.induction
+;;       hole
+;;       hole
+;;       (lambda ()
+;;         (sigma-introduction FOO (list.nil i64)))
+;;       (lambda ((x hole) (p (sigma ((_ hole)) hole)))
+;;         (sigma-elimination
+;;           ((acc hole)
+;;            (ys hole))
+;;           p
+;;           (sigma-introduction BAR (list.cons i64 x xs))))
+;;       (sigma-introduction xs (list.nil i64)))))
+
+  ;; k y xs := fold (\x (acc, xs) -> (g y x xs acc, x : xs)) (f y, [])
+
+;; (i64.add 100 list.induction)
+
+;; identity typeのelimination:
+;; (i64.add 100 identity.induction)
+
+;; (i64.add 100 bool.true)
+
+;; (Π ((B (Π () tau))
+;;     (ON_TRUE (Π () (B)))
+;;     (ON_FALSE (Π () (B)))
+;;     (VALUE (bool)))
+;;   (B))
+;; (let my-bool-induction
+;;   (pi ((F (pi (_ (bool)) tau))
+;;        (b (bool))
+;;        (_ (F (bool.true)))
+;;        (_ (F (bool.false))))
+;;       (F b))
+;;   (lambda ((F (pi (_ (bool)) tau))
+;;            (b (bool))
+;;            (t (F (bool.true)))
+;;            (f (F (bool.false))))
+;;     (bool.induction
+;;       (lambda () (F b))
+;;       (lambda () t) ;; ここだよな〜〜。tと書くと(F (bool.true))になってしまう。実際にはこれで問題ないんだけど（b = trueのときしか呼ばれないので）。
+;;       (lambda () f)
+;;       b)))
+;; 「b = trueのときしか呼ばれない」ってのを利用して強いinduction principleを用意するってのがありうるな。
+;; Π (F : bool → Type) (b : bool),
+;;   F bool.true →
+;;   F bool.false →
+;;   F b
+
+(let not
+  (pi ((_ (bool)))
+    (bool))
+  (lambda ((b (bool)))
+    (bool.induction
+      (lambda () (bool))
+      bool.false
+      bool.true
+      b)))
+
+(definition mysig
+  (sigma
+    ((A tau))
+    (pi ((_ A)) A)))
+
+(let foo
+  mysig
+  (sigma-introduction i64 (lambda ((x i64)) x)))
+
+;; (let bar
+;;   (sigma-elimination
+;;     ((A tau)
+;;      (x2 (pi ((_ A)) A)))
+;;     foo
+;;     x2))
+
+;; (let foo (not (not (b))))
+
+;; (Π ((B (Π () (tau 6602)))
+;;     (ON_TRUE (Π () (B)))
+;;     (ON_FALSE (Π () (B)))
+;;     (VALUE (bool)))
+;;   (B))
+
+;; (let test
+;;   (bool.induction
+;;     (lambda () tau)
+;;     ;; (lambda () top)
+;;     (lambda () (identity (bool) (not (not (bool.true))) (bool.true)))
+;;     ;; (lambda () (identity (bool) (not (not (bool.true)))) (bool.true))
+;;     (lambda () (identity (bool) (not (not (bool.false))) (bool.false)))
+;;     ;; (lambda () (identity (bool) (not (not (bool.false)))) (bool.false))
+;;     (bool.true)))
+
+;; これは(bool.true) = bとかが不明ってことでエラーになる。
+;; 原因はなに？どうすれば修正できるだろう？
+;; branchごとに値が実際には具体化されてるんだけど、それを型システムのほうで表現できていないのが原因。
+
+;; 定理の名前を番号だけにするとなんか論文とかとそのまんまの対応がとれてうれしいかも。
+(theorem 3.2.2-flip-true
+  (identity (bool) (not (not (bool.true))) (bool.true))
+  (identity.reflexive (bool) (bool.true) (bool.true) (bool.true)))
+
+;; (theorem 3.2.3
+;;   (forall ((b (bool)))
+;;     (identity (bool) (not (not b)) b))
+;;   (assume ((b (bool)))
+;;     (bool.induction
+;;       (lambda () (identity (bool) (not (not b)) b))
+;;       (lambda () (identity.reflexive (bool) b b b))
+;;       (lambda () (identity.reflexive (bool) b b b))
+;;       b)))
 
 ;; coinduction principleも自動生成できるようにした。偉すぎる。
 ;; (i64.add 1000 stream.coinduction)

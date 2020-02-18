@@ -359,7 +359,7 @@ getRegList = do
     OSDarwin -> return ["rax", "rdi", "rsi", "rdx", "r10", "r8", "r9"]
 
 showLowType :: LowType -> B.ByteString
-showLowType (LowTypeIntS i) = "i" <> BC.pack (show i)
+showLowType (LowTypeIntS i) = "i" <> BC.pack (show i) -- fixme: should use intDec or something
 -- LLVM doesn't distinguish unsigned integers from signed ones
 showLowType (LowTypeIntU i) = "i" <> BC.pack (show i)
 showLowType (LowTypeFloat FloatSize16) = "half"

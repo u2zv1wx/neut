@@ -135,6 +135,15 @@
 (notation (to-hole-list e e+)
   ((_ hole) (splice (to-hole-list e+))))
 
+(keyword theorem)
+
+(notation (theorem x t e)
+  (let (x t) e))
+
+(keyword assume)
+
+(notation assume lambda)
+
 ;; (notation (sigma-introduction e+)
 ;;   (lambda
 ;;     ((elim-result-type tau)
