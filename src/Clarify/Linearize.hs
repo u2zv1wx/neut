@@ -58,14 +58,6 @@ withHeader xts e = do
   (nm, e') <- distinguishCode (map fst xts) e
   withHeader' nm (reverse xts) e'
 
--- withHeader [] e = return e
--- withHeader ((x, t):xts) e = do
---   e' <- withHeader xts e
---   (xs, e'') <- distinguishCode x e'
---   case xs of
---     [] -> withHeaderAffine x t e''
---     [z] -> withHeaderLinear z x e''
---     (z1:z2:zs) -> withHeaderRelevant x t z1 z2 zs e''
 type NameMap = Map.HashMap Identifier [Identifier]
 
 withHeader' ::
@@ -76,7 +68,7 @@ withHeader' ::
 withHeader' _ [] e = return e
 withHeader' nm ((x, t):xts) e = do
   (nmT, t') <- distinguishCode (map fst xts) t
-  let newNm = Map.unionWith (++) nmT nm
+  let newNm = merge [nmT, nm]
   e' <- withHeader'' newNm x t' e
   withHeader' newNm xts e'
 
@@ -222,21 +214,6 @@ distinguishData zs (m, DataStructIntro dks) = do
   return (merge vss, (m, DataStructIntro $ zip ds' ks))
 distinguishData _ d = return (Map.empty, d)
 
--- distinguishData :: Identifier -> DataPlus -> WithEnv ([Identifier], DataPlus)
--- distinguishData z d@(ml, DataUpsilon x) =
---   if x /= z
---     then return ([], d)
---     else do
---       x' <- newNameWith z
---       return ([x'], (ml, DataUpsilon x'))
--- distinguishData z (ml, DataSigmaIntro mk ds) = do
---   (vss, ds') <- unzip <$> mapM (distinguishData z) ds
---   return (concat vss, (ml, DataSigmaIntro mk ds'))
--- distinguishData z (m, DataStructIntro dks) = do
---   let (ds, ks) = unzip dks
---   (vss, ds') <- unzip <$> mapM (distinguishData z) ds
---   return (concat vss, (m, DataStructIntro $ zip ds' ks))
--- distinguishData _ d = return ([], d)
 distinguishCode :: [Identifier] -> CodePlus -> WithEnv (NameMap, CodePlus)
 distinguishCode zs (ml, CodeTheta theta) = do
   (vs, theta') <- distinguishTheta zs theta
@@ -248,9 +225,6 @@ distinguishCode zs (ml, CodePiElimDownElim d ds) = do
 distinguishCode zs (ml, CodeSigmaElim mk xts d e) = do
   (vs1, d') <- distinguishData zs d
   let zs' = filter (`notElem` map fst xts) zs
-  -- if zs `elem` map fst xts
-  --   then return (vs1, (ml, CodeSigmaElim mk xts d' e))
-  --   else do
   (vs2, e') <- distinguishCode zs' e
   return (merge [vs1, vs2], (ml, CodeSigmaElim mk xts d' e'))
 distinguishCode zs (ml, CodeUpIntro d) = do
@@ -271,64 +245,9 @@ distinguishCode zs (ml, CodeEnumElim d branchList) = do
 distinguishCode zs (ml, CodeStructElim xts d e) = do
   (vs1, d') <- distinguishData zs d
   let zs' = filter (`notElem` map fst xts) zs
-  -- if zs `elem` map fst xts
-  --   then return (vs1, (ml, CodeStructElim xts d' e))
-  --   else do
   (vs2, e') <- distinguishCode zs' e
   return (merge [vs1, vs2], (ml, CodeStructElim xts d' e'))
 
--- distinguishTheta :: Identifier -> Theta -> WithEnv ([Identifier], Theta)
--- distinguishTheta z (ThetaUnaryOp op lowType d) = do
---   (vs, d') <- distinguishData z d
---   return (vs, ThetaUnaryOp op lowType d')
--- distinguishTheta z (ThetaBinaryOp op lowType d1 d2) = do
---   (vs1, d1') <- distinguishData z d1
---   (vs2, d2') <- distinguishData z d2
---   return (vs1 ++ vs2, ThetaBinaryOp op lowType d1' d2')
--- distinguishTheta z (ThetaArrayAccess lowType d1 d2) = do
---   (vs1, d1') <- distinguishData z d1
---   (vs2, d2') <- distinguishData z d2
---   return (vs1 ++ vs2, ThetaArrayAccess lowType d1' d2')
--- distinguishTheta z (ThetaSysCall num ds) = do
---   (vss, ds') <- unzip <$> mapM (distinguishData z) ds
---   return (concat vss, ThetaSysCall num ds')
--- distinguishCode :: Identifier -> CodePlus -> WithEnv ([Identifier], CodePlus)
--- distinguishCode z (ml, CodeTheta theta) = do
---   (vs, theta') <- distinguishTheta z theta
---   return (vs, (ml, CodeTheta theta'))
--- distinguishCode z (ml, CodePiElimDownElim d ds) = do
---   (vs, d') <- distinguishData z d
---   (vss, ds') <- unzip <$> mapM (distinguishData z) ds
---   return (vs ++ concat vss, (ml, CodePiElimDownElim d' ds'))
--- distinguishCode z (ml, CodeSigmaElim mk xts d e) = do
---   (vs1, d') <- distinguishData z d
---   if z `elem` map fst xts
---     then return (vs1, (ml, CodeSigmaElim mk xts d' e))
---     else do
---       (vs2, e') <- distinguishCode z e
---       return (vs1 ++ vs2, (ml, CodeSigmaElim mk xts d' e'))
--- distinguishCode z (ml, CodeUpIntro d) = do
---   (vs, d') <- distinguishData z d
---   return (vs, (ml, CodeUpIntro d'))
--- distinguishCode z (ml, CodeUpElim x e1 e2) = do
---   (vs1, e1') <- distinguishCode z e1
---   if x == z
---     then return (vs1, (ml, CodeUpElim x e1' e2))
---     else do
---       (vs2, e2') <- distinguishCode z e2
---       return (vs1 ++ vs2, (ml, CodeUpElim x e1' e2'))
--- distinguishCode z (ml, CodeEnumElim d branchList) = do
---   (vs, d') <- distinguishData z d
---   let (cs, es) = unzip branchList
---   (vss, es') <- unzip <$> mapM (distinguishCode z) es
---   return (vs ++ concat vss, (ml, CodeEnumElim d' (zip cs es')))
--- distinguishCode z (ml, CodeStructElim xts d e) = do
---   (vs1, d') <- distinguishData z d
---   if z `elem` map fst xts
---     then return (vs1, (ml, CodeStructElim xts d' e))
---     else do
---       (vs2, e') <- distinguishCode z e
---       return (vs1 ++ vs2, (ml, CodeStructElim xts d' e'))
 distinguishTheta :: [Identifier] -> Theta -> WithEnv (NameMap, Theta)
 distinguishTheta zs (ThetaUnaryOp op lowType d) = do
   (vs, d') <- distinguishData zs d
@@ -344,18 +263,3 @@ distinguishTheta zs (ThetaArrayAccess lowType d1 d2) = do
 distinguishTheta zs (ThetaSysCall num ds) = do
   (vss, ds') <- unzip <$> mapM (distinguishData zs) ds
   return (merge vss, ThetaSysCall num ds')
--- distinguishTheta :: Identifier -> Theta -> WithEnv ([Identifier], Theta)
--- distinguishTheta z (ThetaUnaryOp op lowType d) = do
---   (vs, d') <- distinguishData z d
---   return (vs, ThetaUnaryOp op lowType d')
--- distinguishTheta z (ThetaBinaryOp op lowType d1 d2) = do
---   (vs1, d1') <- distinguishData z d1
---   (vs2, d2') <- distinguishData z d2
---   return (vs1 ++ vs2, ThetaBinaryOp op lowType d1' d2')
--- distinguishTheta z (ThetaArrayAccess lowType d1 d2) = do
---   (vs1, d1') <- distinguishData z d1
---   (vs2, d2') <- distinguishData z d2
---   return (vs1 ++ vs2, ThetaArrayAccess lowType d1' d2')
--- distinguishTheta z (ThetaSysCall num ds) = do
---   (vss, ds') <- unzip <$> mapM (distinguishData z) ds
---   return (concat vss, ThetaSysCall num ds')
