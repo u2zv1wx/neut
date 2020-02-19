@@ -5,6 +5,7 @@
 --
 module Clarify
   ( clarify
+  , toSNF
   ) where
 
 import Control.Monad.Except
@@ -15,6 +16,7 @@ import qualified Data.HashMap.Strict as Map
 import qualified Data.Text as T
 
 import Clarify.Closure
+import Clarify.Linearize
 import Clarify.Sigma
 import Clarify.Utility
 import Data.Basic

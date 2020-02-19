@@ -21,6 +21,7 @@ data Data
 data Code
   = CodeTheta Theta
   | CodePiElimDownElim DataPlus [DataPlus] -- ((force v) v1 ... vn)
+  -- the variable introduced by CodeSigmaElim is must be used (practically) linearly
   | CodeSigmaElim
       ArrayKind
       [(Identifier, CodePlus)] -- [(x1, return t1), ..., (xn, return tn)] with xi : ti

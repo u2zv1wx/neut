@@ -73,8 +73,6 @@ elaborateStmt (WeakStmtLetWT m (mx, x, t) e cont) = do
   t'' <- elaborate' t' >>= reduceTermPlus
   insTypeEnv x t'' mlt
   modify (\env -> env {quasiConstEnv = S.insert x (quasiConstEnv env)})
-  -- ignore:
-  --   don't update substEnv with x ~> e' (i.e. don't unfold `nat`, `list.cons`, etc. in type inference)
   modify (\env -> env {substEnv = Map.insert x (weaken e') (substEnv env)})
   -- p $ T.unpack $ "- " <> toText (weaken e')
   -- p $ T.unpack $ "- " <> toText (weaken t'')
@@ -88,6 +86,7 @@ elaborateStmt (WeakStmtConstDecl m (mx, x, t) cont) = do
   cont' <- elaborateStmt cont
   return (m, TermConstDecl (mx, x, t'') cont')
 
+-- fixme: 余計なreduceをしているので修正すること
 refine :: WithEnv ()
 refine =
   modify (\env -> env {substEnv = Map.map reduceWeakTermPlus (substEnv env)})

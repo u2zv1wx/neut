@@ -2,7 +2,10 @@
 
 module Clarify.Linearize
   ( linearize
+  , toSNF
   ) where
+
+import Control.Monad.State
 
 import qualified Data.HashMap.Strict as Map
 
@@ -10,72 +13,75 @@ import Clarify.Utility
 import Data.Basic
 import Data.Code
 import Data.Env
+import Data.Term
+  --linearize' xts e
 
 -- linearizeの第1引数はeのなかでlinearに使用されるべき自由変数のリスト。closed chainでなければならないことに注意。
 -- [x1, ..., xn] = map fst xtsとする。
 -- {xtsはclosed chain} linearize {resultにおいて、x1, ..., xnはすべてlinearに出現する}
 -- 「出現するならばlinearである」ってしたほうがいいのか？
-linearize :: [(Identifier, CodePlus)] -> CodePlus -> WithEnv CodePlus
-linearize xts e = linearize' xts e
-
--- e' <- linearize xts eのとき、e'は、eとbeta-equivalentであり、かつ、xtsに含まれる変数の使用がlinearであるようなterm.
-linearize' :: [(Identifier, CodePlus)] -> CodePlus -> WithEnv CodePlus
-linearize' xts (m, CodeSigmaElim ArrayKindVoidPtr yts d e) = do
-  let xts' = filter (\(x, _) -> x `elem` varCode e) xts
-  e' <- linearize (xts' ++ yts) e
-  withHeader xts (m, CodeSigmaElim ArrayKindVoidPtr yts d e')
-linearize' xts (m, CodeSigmaElim k ys d e) = do
-  let xts' = filter (\(x, _) -> x `elem` varCode e) xts
-  e' <- linearize xts' e
-  withHeader xts (m, CodeSigmaElim k ys d e')
-linearize' xts (m, CodeUpElim z e1 e2) = do
-  let xts2' = filter (\(x, _) -> x `elem` varCode e2) xts
-  e2' <- linearize xts2' e2
-  let xts1' = filter (\(x, _) -> x `elem` varCode e1) xts
-  e1' <- linearize xts1' e1
-  withHeader xts (m, CodeUpElim z e1' e2')
-linearize' xts (m, CodeEnumElim d les) = do
-  let (ls, es) = unzip les
-  let xts' = filter (\(x, _) -> x `elem` concatMap varCode es) xts
-  es' <- mapM (linearize xts') es
-  withHeader xts (m, CodeEnumElim d $ zip ls es')
-linearize' xts (m, CodeStructElim yks d e) = do
-  let xts' = filter (\(x, _) -> x `elem` varCode e) xts
-  e' <- linearize xts' e
-  withHeader xts (m, CodeStructElim yks d e')
-linearize' xts e = withHeader xts e -- e doesn't contain any CodePlus
-
--- eのなかでxtsがpractically linearになるよう適切にheaderを挿入する。
--- withHeaderの引数ってclosed chainである必要ある？別にないのか？依存の向きだけあってればいい？
--- 型のなかに出現する変数の名前は基本そのままで。えーと？
--- {xtsはclosed chain} withHeader xts e {eの中でmap fst xs = [x1, ..., xn]はすべてlinearに出現する}
+-- linearize :: [(Identifier, CodePlus)] -> CodePlus -> WithEnv CodePlus
+-- linearize xts e = withHeader xts e
+-- -- e' <- linearize xts eのとき、e'は、eとbeta-equivalentであり、かつ、xtsに含まれる変数の使用がlinearであるようなterm.
+-- linearize' :: [(Identifier, CodePlus)] -> CodePlus -> WithEnv CodePlus
+-- linearize' xts (m, CodeSigmaElim ArrayKindVoidPtr yts d e)
+--   -- let xts' = filter (\(x, _) -> x `elem` varCode e) xts
+--   -- e' <- linearize (xts' ++ yts) e
+--  = do
+--   e' <- linearize yts e -- don't have to linearize e by yts
+--   withHeader xts (m, CodeSigmaElim ArrayKindVoidPtr yts d e')
+-- linearize' xts (m, CodeSigmaElim k ys d e)
+--   -- let xts' = filter (\(x, _) -> x `elem` varCode e) xts
+--   -- e' <- linearize xts' e
+--   -- withHeader xts (m, CodeSigmaElim k ys d e')
+--  = do
+--   withHeader xts (m, CodeSigmaElim k ys d e)
+-- linearize' xts (m, CodeUpElim z e1 e2)
+--   -- let xts2' = filter (\(x, _) -> x `elem` varCode e2) xts
+--   -- e2' <- linearize xts2' e2
+--   -- let xts1' = filter (\(x, _) -> x `elem` varCode e1) xts
+--   -- e1' <- linearize xts1' e1
+--   -- withHeader xts (m, CodeUpElim z e1' e2')
+--  = do
+--   withHeader xts (m, CodeUpElim z e1 e2)
+-- linearize' xts (m, CodeEnumElim d les) = do
+--   let (ls, es) = unzip les
+--   let xts' = filter (\(x, _) -> x `elem` concatMap varCode es) xts
+--   es' <- mapM (linearize xts') es
+--   withHeader xts (m, CodeEnumElim d $ zip ls es')
+-- linearize' xts (m, CodeStructElim yks d e)
+--   -- let xts' = filter (\(x, _) -> x `elem` varCode e) xts
+--   -- e' <- linearize xts' e
+--   -- withHeader xts (m, CodeStructElim yks d e')
+--  = do
+--   withHeader xts (m, CodeStructElim yks d e)
+-- linearize' xts e = withHeader xts e -- e doesn't contain any CodePlus
 -- insert header for a closed chain
-withHeader ::
+linearize ::
      [(Identifier, CodePlus)] -- [(x1, t1), ..., (xn, tn)]  (closed chain)
   -> CodePlus
   -> WithEnv CodePlus
-withHeader xts e = do
+linearize xts e = do
   (nm, e') <- distinguishCode (map fst xts) e
-  withHeader' nm (reverse xts) e'
+  withHeader nm (reverse xts) e'
 
 type NameMap = Map.HashMap Identifier [Identifier]
 
-withHeader' ::
+withHeader ::
      NameMap
   -> [(Identifier, CodePlus)] -- [(xn, tn), ..., (x1, t1)]  (reversed closed chain)
   -> CodePlus
   -> WithEnv CodePlus
-withHeader' _ [] e = return e
-withHeader' nm ((x, t):xts) e = do
+withHeader _ [] e = return e
+withHeader nm ((x, t):xts) e = do
   (nmT, t') <- distinguishCode (map fst xts) t
   let newNm = merge [nmT, nm]
-  e' <- withHeader'' newNm x t' e
-  withHeader' newNm xts e'
+  e' <- withHeader' newNm x t' e
+  withHeader newNm xts e'
 
 -- insert header for a variable
-withHeader'' ::
-     NameMap -> Identifier -> CodePlus -> CodePlus -> WithEnv CodePlus
-withHeader'' nm x t e =
+withHeader' :: NameMap -> Identifier -> CodePlus -> CodePlus -> WithEnv CodePlus
+withHeader' nm x t e =
   case Map.lookup x nm of
     Nothing -> withHeaderAffine x t e
     Just [] -> error $ "impossible. x: " ++ show x
@@ -237,16 +243,35 @@ distinguishCode zs (ml, CodeUpElim x e1 e2) = do
     else do
       (vs2, e2') <- distinguishCode zs e2
       return (merge [vs1, vs2], (ml, CodeUpElim x e1' e2'))
+distinguishCode zs (ml, CodeEnumElim d []) = do
+  (vs, d') <- distinguishData zs d
+  return (vs, (ml, CodeEnumElim d' []))
 distinguishCode zs (ml, CodeEnumElim d branchList) = do
   (vs, d') <- distinguishData zs d
   let (cs, es) = unzip branchList
-  (vss, es') <- unzip <$> mapM (distinguishCode zs) es
-  return (merge $ vs : vss, (ml, CodeEnumElim d' (zip cs es')))
+  -- esにおけるrenameを統一する必要がある（同じ名前にrenameされる必要がある）
+  -- envを取得して、esをすべて同一のenvでdistinguishすることになる、かな？
+  -- それだと変数の出現順序が違ったときにrenameの整合性を保つことが出来ない。
+  env <- get
+  (vss, es') <- unzip <$> mapM (distinguishCode zs) es -- fixme : 1つのbranchだけから変数情報をとるようにする。
+  return (merge (vs : vss), (ml, CodeEnumElim d' (zip cs es'))) -- return (merge [vs, head vss], (ml, CodeEnumElim d' (zip cs es')))
 distinguishCode zs (ml, CodeStructElim xts d e) = do
   (vs1, d') <- distinguishData zs d
   let zs' = filter (`notElem` map fst xts) zs
   (vs2, e') <- distinguishCode zs' e
   return (merge [vs1, vs2], (ml, CodeStructElim xts d' e'))
+
+distinguishBranch ::
+     Env -> [Identifier] -> [CodePlus] -> WithEnv [(NameMap, CodePlus)]
+distinguishBranch _ _ [] = return []
+distinguishBranch _ zs [e] = do
+  foo <- distinguishCode zs e
+  return [foo]
+distinguishBranch env zs (e:es) = do
+  foo <- distinguishBranch env zs es
+  (nm, e') <- distinguishCode zs e
+  put env
+  return $ (nm, e') : foo
 
 distinguishTheta :: [Identifier] -> Theta -> WithEnv (NameMap, Theta)
 distinguishTheta zs (ThetaUnaryOp op lowType d) = do
@@ -263,3 +288,183 @@ distinguishTheta zs (ThetaArrayAccess lowType d1 d2) = do
 distinguishTheta zs (ThetaSysCall num ds) = do
   (vss, ds') <- unzip <$> mapM (distinguishData zs) ds
   return (merge vss, ThetaSysCall num ds')
+
+-- this function adjusts variable occurrence of each branch in EnumElim:
+--   case d of
+--     c1 -> (x, x, y)
+--     c2 -> (y, z)
+--     c3 -> 3
+--     c4 -> w
+--
+--   ~>
+--
+--   case d of
+--     c1 -> let _ := z in
+--           let _ := w in
+--           (x, x, y)
+--     c2 -> let _ := x in
+--           let _ := x in
+--           let _ := w in
+--           (y, z)
+--     c3 -> let _ := x in
+--           let _ := x in
+--           let _ := y in
+--           let _ := z in
+--           let _ := w in
+--           3
+--     c4 -> let _ := x in
+--           let _ := x in
+--           let _ := y in
+--           let _ := z in
+--           w
+--
+-- I define such EnumElim to be supremum-normal (because we're computing the supremum of variable sets).
+-- I also define a term to be supremum-normal-form (SNF) when all the EnumElim in the term is supremum-normal.
+type VarInfo = Map.HashMap Identifier Int
+
+toSNF :: TermPlus -> WithEnv TermPlus
+toSNF e = snd <$> toSNF' e
+
+toSNF' :: TermPlus -> WithEnv (VarInfo, TermPlus)
+toSNF' (m, TermTau l) = return (Map.empty, (m, TermTau l))
+toSNF' (m, TermUpsilon x) = return (Map.singleton x 1, (m, TermUpsilon x))
+toSNF' (m, TermPi mls xts t) = do
+  (vi, xts', t') <- toSNFBinder xts t
+  return (vi, (m, TermPi mls xts' t'))
+toSNF' (m, TermPiIntro xts e) = do
+  (vi, xts', e') <- toSNFBinder xts e
+  return (vi, (m, TermPiIntro xts' e'))
+toSNF' (m, TermPiElim e es) = do
+  (vi, e') <- toSNF' e
+  (vis, es') <- unzip <$> mapM toSNF' es
+  return (addVI (vi : vis), (m, TermPiElim e' es'))
+toSNF' (m, TermSigma xts) = do
+  (vi, xts') <- toSNFSigma xts
+  -- (vi, xts') <- toSNF'' xts
+  return (vi, (m, TermSigma xts'))
+toSNF' (m, TermSigmaIntro t es) = do
+  (vi, t') <- toSNF' t
+  (vis, es') <- unzip <$> mapM toSNF' es
+  return (addVI (vi : vis), (m, TermSigmaIntro t' es'))
+toSNF' (m, TermSigmaElim t xts e1 e2) = do
+  (vi3, t') <- toSNF' t
+  (vi1, e1') <- toSNF' e1
+  (vi2, xts', e2') <- toSNFBinder xts e2
+  -- (vi4, xts') <- toSNF'' xts
+  -- (vi2, e2') <- toSNF' e2
+  return (addVI [vi1, vi2, vi3], (m, TermSigmaElim t' xts' e1' e2'))
+toSNF' (m, TermIter (mx, x, t) xts e) = do
+  insTypeEnv' x t
+  (vi1, t') <- toSNF' t
+  (vi2, xts', e') <- toSNFBinder xts e
+  let vi2' = Map.delete x vi2
+  -- (vi2, xts') <- toSNF'' xts
+  -- (vi3, e') <- toSNF' e
+  return (addVI [vi1, vi2'], (m, TermIter (mx, x, t') xts' e'))
+toSNF' (m, TermConst x) = return (Map.empty, (m, TermConst x))
+toSNF' (m, TermConstDecl (mx, x, t) e) = do
+  (vi1, t') <- toSNF' t
+  (vi2, e') <- toSNF' e
+  return (addVI [vi1, vi2], (m, TermConstDecl (mx, x, t') e'))
+toSNF' (m, TermFloat16 x) = return (Map.empty, (m, TermFloat16 x))
+toSNF' (m, TermFloat32 x) = return (Map.empty, (m, TermFloat32 x))
+toSNF' (m, TermFloat64 x) = return (Map.empty, (m, TermFloat64 x))
+toSNF' (m, TermEnum x) = return (Map.empty, (m, TermEnum x))
+toSNF' (m, TermEnumIntro l) = return (Map.empty, (m, TermEnumIntro l))
+toSNF' (m, TermEnumElim (e, t) branchList) = do
+  (vi1, t') <- toSNF' t
+  (vi2, e') <- toSNF' e
+  let (caseList, es) = unzip branchList
+  vies <- mapM toSNF' es
+  let vis = map fst vies
+  let vi = supVI vis
+  es' <- mapM (uncurry $ toSNFBranch vi) vies
+  let vi' = addVI [vi1, vi2, vi]
+  return (vi', (m, TermEnumElim (e', t') (zip caseList es')))
+toSNF' (m, TermArray dom k) = do
+  (vi, dom') <- toSNF' dom
+  return (vi, (m, TermArray dom' k))
+toSNF' (m, TermArrayIntro k es) = do
+  (vis, es') <- unzip <$> mapM toSNF' es
+  return (addVI vis, (m, TermArrayIntro k es'))
+toSNF' (m, TermArrayElim mk xts v e) = do
+  (vi1, v') <- toSNF' v
+  (vi2, xts', e') <- toSNFBinder xts e
+  return (addVI [vi1, vi2], (m, TermArrayElim mk xts' v' e'))
+toSNF' (m, TermStruct ts) = return (Map.empty, (m, TermStruct ts))
+toSNF' (m, TermStructIntro ets) = do
+  let (es, ts) = unzip ets
+  (vis, es') <- unzip <$> mapM toSNF' es
+  return (addVI vis, (m, TermStructIntro $ zip es' ts))
+toSNF' (m, TermStructElim xts v e) = do
+  (vi1, v') <- toSNF' v
+  (vi2, e') <- toSNF' e -- fixme : delete (map fst xts)
+  let vi2' = filterVI (map (\(_, x, _) -> x) xts) vi2
+  return (addVI [vi1, vi2'], (m, TermStructElim xts v' e'))
+
+toSNFBinder ::
+     [(Meta, Identifier, TermPlus)]
+  -> TermPlus
+  -> WithEnv (VarInfo, [(Meta, Identifier, TermPlus)], TermPlus)
+toSNFBinder [] e = do
+  (vi, e') <- toSNF' e
+  return (vi, [], e')
+toSNFBinder ((m, x, t):xts) e = do
+  insTypeEnv' x t
+  (vi1, xts', e') <- toSNFBinder xts e
+  let vi1' = Map.delete x vi1
+  (vi2, t') <- toSNF' t
+  return (addVI [vi1', vi2], (m, x, t') : xts', e')
+
+toSNFSigma ::
+     [(Meta, Identifier, TermPlus)]
+  -> WithEnv (VarInfo, [(Meta, Identifier, TermPlus)])
+toSNFSigma [] = return (Map.empty, [])
+toSNFSigma ((m, x, t):xts) = do
+  insTypeEnv' x t
+  (vi1, xts') <- toSNFSigma xts
+  let vi1' = Map.delete x vi1
+  (vi2, t') <- toSNF' t
+  return (addVI [vi1', vi2], (m, x, t') : xts')
+
+toSNFBranch :: VarInfo -> VarInfo -> TermPlus -> WithEnv TermPlus
+toSNFBranch sup vi e
+  -- p "toSNFBranch. sup:"
+  -- p' sup
+  -- p "vi:"
+  -- p' vi
+ = do
+  toSNFBranch' (Map.toList $ diffVI sup vi) e
+
+toSNFBranch' :: [(Identifier, Int)] -> TermPlus -> WithEnv TermPlus
+toSNFBranch' [] e = return e
+toSNFBranch' ((x, i):xis) e = do
+  e' <- toSNFBranch' xis e
+  t <- lookupTypeEnv' x
+  insHeader x t i e'
+
+addVI :: [VarInfo] -> VarInfo
+addVI = foldr (Map.unionWith (+)) Map.empty
+
+supVI :: [VarInfo] -> VarInfo
+supVI = foldr (Map.unionWith max) Map.empty
+
+diffVI :: VarInfo -> VarInfo -> VarInfo
+diffVI vi1 vi2 = Map.differenceWith (\i1 i2 -> Just (i1 - i2)) vi1 vi2
+
+filterVI :: [Identifier] -> VarInfo -> VarInfo
+filterVI [] vi = vi
+filterVI (x:xs) vi = Map.delete x $ filterVI xs vi
+
+-- insHeader x t i e ~>
+--   let (_ : t) := x in   --
+--   ...                   -- i times
+--   let (_ : t) := x in   --
+--   e
+insHeader :: Identifier -> TermPlus -> Int -> TermPlus -> WithEnv TermPlus
+insHeader _ _ 0 e = return e
+insHeader x t i e = do
+  e' <- insHeader x t (i - 1) e
+  h <- newNameWith x
+  let m = fst e
+  return (m, TermPiElim (m, TermPiIntro [(m, h, t)] e') [(m, TermUpsilon x)])

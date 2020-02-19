@@ -33,6 +33,7 @@ dependencies:
 - text
 - ansi-terminal
 - array
+- text-format
 
 library:
   source-dirs: src

@@ -801,7 +801,7 @@ n15-4
   (item.cont6 ((_ (item A)) (_ (TEST (list (item A))))) (item A))
   (item.cont7 ((_ (item A)) (_ (LIST (TEST (item A))))) (item A))
   ;; (item.cont10 ((_ (item A)) (_ (list (TEST (item A))))) (item A))
-;; (item.cont0 ((_ (item A)) (_ (LIST (LIST (item A))))) (item A))
+  ;; (item.cont0 ((_ (item A)) (_ (LIST (LIST (item A))))) (item A))
   ;; (item.cont1 ((_ (item A)) (_ (list (list (item A))))) (item A))
   ;; (item.cont1 ((_ (item A)) (_ (list (list (item A))))) (item A))
   (item.cont2 ((_ A) (_ (item A))) (item A)))
@@ -887,7 +887,7 @@ n15-4
 ;;           (sigma-introduction BAR (list.cons i64 x xs))))
 ;;       (sigma-introduction xs (list.nil i64)))))
 
-  ;; k y xs := fold (\x (acc, xs) -> (g y x xs acc, x : xs)) (f y, [])
+;; k y xs := fold (\x (acc, xs) -> (g y x xs acc, x : xs)) (f y, [])
 
 ;; (i64.add 100 list.induction)
 
@@ -970,11 +970,11 @@ n15-4
 ;; 原因はなに？どうすれば修正できるだろう？
 ;; branchごとに値が実際には具体化されてるんだけど、それを型システムのほうで表現できていないのが原因。
 
-;; 定理の名前を番号だけにするとなんか論文とかとそのまんまの対応がとれてうれしいかも。
 (theorem 3.2.2-flip-true
   (identity (bool) (not (not (bool.true))) (bool.true))
   (identity.reflexive (bool) (bool.true) (bool.true) (bool.true)))
 
+;; 定理の名前を番号だけにするとなんか論文とかとそのまんまの対応がとれてうれしいかも。
 ;; (theorem 3.2.3
 ;;   (forall ((b (bool)))
 ;;     (identity (bool) (not (not b)) b))
