@@ -43,8 +43,8 @@ type UnivInstEnv = IntMap.IntMap (S.Set Int)
 
 data Env =
   Env
-    { count :: Integer -- to generate fresh symbols
-    , phase :: Integer
+    { count :: Int
+    , phase :: Int
     , target :: Maybe Target
     , mainFilePath :: Path Abs File
     , currentFilePath :: Path Abs File
@@ -55,14 +55,14 @@ data Env =
     , fileEnv :: FileEnv -- path ~> identifiers defined in the file at toplevel
     , enumEnv :: Map.HashMap T.Text [(T.Text, Int)] -- [("choice", [("left", 0), ("right", 1)]), ...]
     , revEnumEnv :: Map.HashMap T.Text (T.Text, Int) -- [("left", ("choice", 0)), ("right", ("choice", 1)), ...]
-    , nameEnv :: Map.HashMap Int Identifier -- [("foo", "foo.13"), ...]
-    , revNameEnv :: Map.HashMap Int Identifier -- [("foo.13", "foo"), ...]
+    , nameEnv :: Map.HashMap Int Int -- [("foo", "foo.13"), ...] (as corresponding int)
+    , revNameEnv :: Map.HashMap Int Int -- [("foo.13", "foo"), ...] (as corresponding int)
     -- , nameEnv :: Map.HashMap Identifier Identifier -- [("foo", "foo.13"), ...]
     -- , revNameEnv :: Map.HashMap Identifier Identifier -- [("foo.13", "foo"), ...]
     , formationEnv :: Map.HashMap Int (Maybe WeakTermPlus)
     , inductiveEnv :: RuleEnv -- "list" ~> (cons, Pi (A : tau). A -> list A -> list A)
     , coinductiveEnv :: RuleEnv -- "tail" ~> (head, Pi (A : tau). stream A -> A)
-    , weakTypeEnv :: Map.HashMap Identifier (WeakTermPlus, UnivLevelPlus) -- var ~> (typeof(var), level-of-type)
+    , weakTypeEnv :: Map.HashMap Int (WeakTermPlus, UnivLevelPlus) -- var ~> (typeof(var), level-of-type)
     , equalityEnv :: [(UnivLevel, UnivLevel)]
     , univInstEnv :: UnivInstEnv
     , univRenameEnv :: IntMap.IntMap Int
@@ -72,11 +72,9 @@ data Env =
     , constraintEnv :: [PreConstraint] -- for type inference
     , constraintQueue :: ConstraintQueue
     , levelEnv :: [LevelConstraint]
-    , substEnv :: Map.HashMap Identifier WeakTermPlus -- metavar ~> beta-equivalent weakterm
-    , zetaEnv :: Map.HashMap Identifier ( WeakTermPlus
-                                        , WeakTermPlus
-                                        , UnivLevelPlus)
-    , chainEnv :: Map.HashMap Identifier [(Meta, Identifier, TermPlus)] -- var/const ~> the closed var chain of its type
+    , substEnv :: Map.HashMap Int WeakTermPlus -- metavar ~> beta-equivalent weakterm
+    , zetaEnv :: Map.HashMap Int (WeakTermPlus, WeakTermPlus, UnivLevelPlus)
+    , chainEnv :: Map.HashMap Int [(Meta, Identifier, TermPlus)] -- var/const ~> the closed var chain of its type
     , codeEnv :: Map.HashMap Identifier ([Identifier], CodePlus) -- f ~> thunk (lam (x1 ... xn) e)
     , llvmEnv :: Map.HashMap Identifier ([Identifier], LLVM)
     , shouldColorize :: Bool
@@ -132,77 +130,43 @@ evalWithEnv c env = do
 throwError' :: T.Text -> WithEnv a
 throwError' x = throwError [TIO.putStrLn x]
 
-addErrorAction :: IO () -> WithEnv a -> WithEnv a
-addErrorAction action computation = do
-  catchError computation $ \err -> throwError $ action : err
-
--- evalWithEnv :: (Show a) => WithEnv a -> Env -> IO (Either String a)
--- evalWithEnv c env = do
---   resultOrErr <- runExceptT (runStateT c env)
---   case resultOrErr of
---     Left err -> return $ Left $ T.unpack err
---     Right (result, _) -> return $ Right result
-newCount :: WithEnv Integer
+-- fixme: return error if i + 1 == 0 (overflow)
+newCount :: WithEnv Int
 newCount = do
   i <- gets count
-  -- let i = count env
   modify (\e -> e {count = i + 1})
   return i
 
 newUnivLevel :: WithEnv UnivLevel
-newUnivLevel = fromInteger <$> newCount
+newUnivLevel = newCount
 
 newName :: WithEnv Identifier
 newName = do
   i <- newCount
-  -- return $ "-" <> T.toStrict (TE.decodeUtf8 (toLazyByteString $ integerDec i))
-  return $ I ("-", fromInteger i)
-  -- return $ "-" <> T.pack (show i)
+  return $ I ("-", i)
 
 newNameWith :: Identifier -> WithEnv Identifier
-newNameWith (I (s, j)) = do
-  i <- newCount
-  -- let s' = s <> i -- slow
-  -- let s' = i
-  modify (\e -> e {nameEnv = Map.insert j (I (s, fromInteger i)) (nameEnv e)})
-  -- modify (\e -> e {nameEnv = Map.insert s s' (nameEnv e)})
-  -- modify (\e -> e {revNameEnv = Map.insert s' s (revNameEnv e)})
-  return $ I (s, fromInteger i)
-  -- return s'
+newNameWith (I (s, i)) = do
+  j <- newCount
+  modify (\e -> e {nameEnv = Map.insert i j (nameEnv e)})
+  return $ I (s, j)
 
 newNameWith' :: T.Text -> WithEnv Identifier
 newNameWith' s = do
   i <- newCount
-  -- modify (\e -> e {nameEnv = Map.insert 0 (I (s, fromInteger i)) (nameEnv e)})
-  return $ I (s, fromInteger i)
+  return $ I (s, i)
 
 newLLVMNameWith :: Identifier -> WithEnv Identifier
-newLLVMNameWith (I (s, j)) = do
-  i <- newCount
-  -- i <- newName
-  let s' = llvmString s
-  -- let s' = llvmString s <> i
-  modify (\e -> e {nameEnv = Map.insert (fromInteger i) (I (s, j)) (nameEnv e)})
-  modify
-    (\e -> e {revNameEnv = Map.insert j (I (s', fromInteger i)) (revNameEnv e)})
-  -- modify (\e -> e {nameEnv = Map.insert s s (nameEnv e)})
-  -- modify (\e -> e {revNameEnv = Map.insert s s (revNameEnv e)})
-  -- return s
-  return $ I (s', fromInteger i)
+newLLVMNameWith (I (s, i)) = do
+  j <- newCount
+  modify (\e -> e {nameEnv = Map.insert i j (nameEnv e)})
+  modify (\e -> e {revNameEnv = Map.insert j i (revNameEnv e)})
+  return $ I (llvmString s, j)
 
 newLLVMNameWith' :: T.Text -> WithEnv Identifier
 newLLVMNameWith' s = do
   i <- newCount
-  -- i <- newName
-  let s' = llvmString s
-  -- let s' = llvmString s <> i
-  modify (\e -> e {nameEnv = Map.insert (fromInteger i) (I (s, 0)) (nameEnv e)})
-  -- modify
-    -- (\e -> e {revNameEnv = Map.insert j (I (s', fromInteger i)) (revNameEnv e)})
-  -- modify (\e -> e {nameEnv = Map.insert s s (nameEnv e)})
-  -- modify (\e -> e {revNameEnv = Map.insert s s (revNameEnv e)})
-  -- return s
-  return $ I (s', fromInteger i)
+  return $ I (llvmString s, i)
 
 llvmString :: T.Text -> T.Text
 llvmString "" = error "llvmString called for the empty string"
@@ -249,7 +213,7 @@ lookupNameEnv :: Identifier -> WithEnv Identifier
 lookupNameEnv (I (s, i)) = do
   env <- get
   case Map.lookup i (nameEnv env) of
-    Just s' -> return s'
+    Just i' -> return $ I (s, i')
     Nothing -> throwError [TIO.putStrLn $ "undefined variable: " <> s]
 
 isDefinedEnum :: T.Text -> WithEnv Bool
@@ -303,10 +267,10 @@ newDataUpsilonWith' name m = do
   x <- newNameWith name
   return (x, (m, DataUpsilon x))
 
-enumValueToInteger :: EnumValue -> WithEnv Integer
+enumValueToInteger :: EnumValue -> WithEnv Int
 enumValueToInteger labelOrNat =
   case labelOrNat of
-    EnumValueLabel l -> toInteger <$> getEnumNum l
+    EnumValueLabel l -> getEnumNum l
     EnumValueIntS _ i -> return i
     EnumValueIntU _ i -> return i
     EnumValueNat _ j -> return j

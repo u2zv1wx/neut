@@ -137,27 +137,20 @@ renameDef nenv (m, (mx, x, t), xts, e) = do
     Nothing -> throwError' "renameDef"
     Just x' -> return (m, (mx, x', t'), xts', e')
 
-type NameEnv = Map.HashMap Identifier Identifier
+type NameEnv = Map.HashMap Int Identifier
 
 -- Alpha-convert all the variables so that different variables have different names.
 rename' :: NameEnv -> WeakTermPlus -> WithEnv WeakTermPlus
 rename' _ (m, WeakTermTau l) = return (m, WeakTermTau l)
-rename' nenv (m, WeakTermUpsilon x) = do
-  case Map.lookup x nenv of
+rename' nenv (m, WeakTermUpsilon x@(I (s, i))) = do
+  case Map.lookup i nenv of
     Just x'
       | x == x' -> return (m, WeakTermConst x')
     Just x' -> return (m, WeakTermUpsilon x')
     Nothing
-      | isConstant x -> return (m, WeakTermConst x)
+      | isConstant x -> return (m, WeakTermConst s)
     Nothing ->
-      throwError' $ T.pack (showMeta m) <> ": undefined variable: " <> x
-    -- Nothing -> do
-    --   p "not found:"
-    --   p' x
-    --   throwError' $
-    --   -- T.pack (showMeta m) <> ": undefined variable: " <> x throwError' $
-    --     T.pack (showMeta m) <>
-    --     ": undefined variable: " <> x <> "\nnenv:\n" <> T.pack (show nenv)
+      throwError' $ T.pack (showMeta m) <> ": undefined variable: " <> s
 rename' nenv (m, WeakTermPi mls xts t) = do
   (xts', t') <- renameBinder nenv xts t
   return (m, WeakTermPi mls xts' t')
@@ -332,13 +325,13 @@ lookupStrict :: NameEnv -> IdentifierPlus -> WithEnv Identifier
 lookupStrict nenv (_, x, _) =
   case Map.lookup x nenv of
     Just x' -> return x'
-    Nothing -> throwError' $ "[lookupStrict] undefined variable:  " <> x
+    Nothing -> throwError' $ "[lookupStrict] undefined variable:  " <> asText x
 
 lookupStrict' :: NameEnv -> IdentifierPlus -> WithEnv WeakTermPlus
 lookupStrict' nenv (m, x, _) =
   case Map.lookup x nenv of
     Just x' -> return (m, WeakTermUpsilon x')
-    Nothing -> throwError' $ "[lookupStrict] undefined variable:  " <> x
+    Nothing -> throwError' $ "[lookupStrict] undefined variable:  " <> asText x
 
 checkSanity :: [Identifier] -> WeakTermPlus -> Bool
 checkSanity _ (_, WeakTermTau _) = True
@@ -414,9 +407,9 @@ data IdentKind
   | IdentKindZeta
 
 invRenameIdentifier :: IdentKind -> Identifier -> WithEnv Identifier
-invRenameIdentifier IdentKindUpsilon x = do
+invRenameIdentifier IdentKindUpsilon x@(I (_, j)) = do
   rnenv <- gets revNameEnv
-  case Map.lookup x rnenv of
+  case Map.lookup j rnenv of
     Just x' -> traceIdentifier rnenv x'
     Nothing -> do
       i <- newCount

@@ -59,10 +59,10 @@ data WeakTerm
 type WeakTermPlus = (Meta, WeakTerm)
 
 data WeakCase
-  = WeakCaseIntS IntSize Integer
-  | WeakCaseIntU IntSize Integer
-  | WeakCaseInt WeakTermPlus Integer
-  | WeakCaseNat Integer Integer
+  = WeakCaseIntS IntSize Int
+  | WeakCaseIntU IntSize Int
+  | WeakCaseInt WeakTermPlus Int
+  | WeakCaseNat Int Int
   | WeakCaseLabel T.Text
   | WeakCaseDefault
   deriving (Show, Eq)
@@ -159,10 +159,10 @@ toIntS size = (emptyMeta, WeakTermEnum $ EnumTypeIntS size)
 toIntU :: IntSize -> WeakTermPlus
 toIntU size = (emptyMeta, WeakTermEnum $ EnumTypeIntU size)
 
-toValueIntS :: IntSize -> Integer -> WeakTerm
+toValueIntS :: IntSize -> Int -> WeakTerm
 toValueIntS size i = WeakTermEnumIntro $ EnumValueIntS size i
 
-toValueIntU :: IntSize -> Integer -> WeakTerm
+toValueIntU :: IntSize -> Int -> WeakTerm
 toValueIntU size i = WeakTermEnumIntro $ EnumValueIntU size i
 
 f16 :: WeakTermPlus
