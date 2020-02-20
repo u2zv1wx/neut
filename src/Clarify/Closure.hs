@@ -34,7 +34,7 @@ makeClosure mName mxts2 m mxts1 e = do
   let xts2 = zip xs2 ts2
   let (_, xs1, ts1) = unzip3 mxts1
   let xts1 = zip xs1 ts1
-  expName <- newNameWith "exp"
+  expName <- newNameWith' "exp"
   envExp <- cartesianSigma expName m arrVoidPtr $ map Right xts2
   (envVarName, envVar) <- newDataUpsilonWith "env"
   -- let xts = xts2 ++ xts1
@@ -61,8 +61,8 @@ callClosure m e zexes = do
   (typeVarName, typeVar) <- newDataUpsilonWith "exp"
   (envVarName, envVar) <- newDataUpsilonWith "env"
   (lamVarName, lamVar) <- newDataUpsilonWith "thunk"
-  affVarName <- newNameWith "aff"
-  relVarName <- newNameWith "rel"
+  affVarName <- newNameWith' "aff"
+  relVarName <- newNameWith' "rel"
   retUnivType <- returnCartesianUniv
   retImmType <- returnCartesianImmediate
   return $
@@ -87,7 +87,7 @@ nameFromMaybe :: Maybe Identifier -> WithEnv Identifier
 nameFromMaybe mName =
   case mName of
     Just lamThetaName -> return lamThetaName
-    Nothing -> newNameWith "thunk"
+    Nothing -> newNameWith' "thunk"
 
 chainTermPlus :: TermPlus -> WithEnv [(Meta, Identifier, TermPlus)]
 chainTermPlus e = do
@@ -169,11 +169,11 @@ chainTermPlus'' ((_, x, t):xts) es = do
 -- if not, use the cached result.
 chainWithName ::
      Identifier -> TermPlus -> WithEnv [(Meta, Identifier, TermPlus)]
-chainWithName x t = do
+chainWithName (I (_, i)) t = do
   cenv <- gets chainEnv
-  case Map.lookup x cenv of
+  case Map.lookup i cenv of
     Just xts -> return xts -- use cached result
     Nothing -> do
       xts <- chainTermPlus' t
-      modify (\env -> env {chainEnv = Map.insert x xts cenv})
+      modify (\env -> env {chainEnv = Map.insert i xts cenv})
       return xts
