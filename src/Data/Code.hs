@@ -54,10 +54,10 @@ toDataUpsilon (x, m) = (m, DataUpsilon x)
 toDataUpsilon' :: Identifier -> DataPlus
 toDataUpsilon' x = (emptyMeta, DataUpsilon x)
 
-toIntS :: IntSize -> Int -> Data
+toIntS :: IntSize -> Integer -> Data
 toIntS size i = DataEnumIntro (EnumValueIntS size i)
 
-toIntU :: IntSize -> Int -> Data
+toIntU :: IntSize -> Integer -> Data
 toIntU size i = DataEnumIntro (EnumValueIntU size i)
 
 type SubstDataPlus = [(Identifier, DataPlus)]

@@ -156,9 +156,9 @@ readEnumTypeIntU :: T.Text -> (Maybe Int)
 readEnumTypeIntU str = readEnumType 'u' str 23
 
 data EnumValue
-  = EnumValueIntS IntSize Int
-  | EnumValueIntU IntSize Int
-  | EnumValueNat Int Int
+  = EnumValueIntS IntSize Integer
+  | EnumValueIntU IntSize Integer
+  | EnumValueNat Integer Integer
   | EnumValueLabel T.Text
   deriving (Show, Eq, Ord)
 

@@ -267,10 +267,10 @@ newDataUpsilonWith' name m = do
   x <- newNameWith name
   return (x, (m, DataUpsilon x))
 
-enumValueToInteger :: EnumValue -> WithEnv Int
+enumValueToInteger :: EnumValue -> WithEnv Integer
 enumValueToInteger labelOrNat =
   case labelOrNat of
-    EnumValueLabel l -> getEnumNum l
+    EnumValueLabel l -> toInteger <$> getEnumNum l
     EnumValueIntS _ i -> return i
     EnumValueIntU _ i -> return i
     EnumValueNat _ j -> return j
