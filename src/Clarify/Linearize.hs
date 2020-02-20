@@ -52,7 +52,7 @@ withHeader nm x t e =
 -- 変数xに型t由来のaffineを適用して破棄する。
 withHeaderAffine :: Identifier -> CodePlus -> CodePlus -> WithEnv CodePlus
 withHeaderAffine x t e = do
-  hole <- newNameWith "unit"
+  hole <- newNameWith' "unit"
   discardUnusedVar <- toAffineApp emptyMeta x t
   return (emptyMeta, CodeUpElim hole discardUnusedVar e)
 
@@ -127,7 +127,7 @@ toLinearChain :: [Identifier] -> WithEnv LinearChain
 toLinearChain xs = do
   let valueSeq = init $ tail xs
   tmpSeq <-
-    mapM (const $ newNameWith "linear-chain") $ replicate (length xs - 3) ()
+    mapM (const $ newNameWith' "linear-chain") $ replicate (length xs - 3) ()
   let tmpSeq' = [head xs] ++ tmpSeq ++ [last xs]
   let pairSeq = zip valueSeq (tail tmpSeq')
   return $ zip (init tmpSeq') pairSeq
