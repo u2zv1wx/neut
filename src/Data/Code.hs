@@ -31,7 +31,7 @@ data Code
   -- the variable introduced by CodeUpElim is assumed to be used linearly
   -- (this property is exploited to, for example, prevent unnecessary copy of array in array-access)
   | CodeUpElim Identifier CodePlus CodePlus
-  | CodeEnumElim DataPlus [(Case, CodePlus)]
+  | CodeEnumElim SubstDataPlus DataPlus [(Case, CodePlus)]
   | CodeStructElim [(Identifier, ArrayKind)] DataPlus CodePlus
   deriving (Show)
 
@@ -69,8 +69,6 @@ substDataPlus sub (m, DataUpsilon s) =
 substDataPlus sub (m, DataSigmaIntro mk vs) = do
   let vs' = map (substDataPlus sub) vs
   (m, DataSigmaIntro mk vs')
--- substDataPlus _ (m, DataIntS size l) = (m, DataIntS size l)
--- substDataPlus _ (m, DataIntU size l) = (m, DataIntU size l)
 substDataPlus _ (m, DataFloat16 l) = (m, DataFloat16 l)
 substDataPlus _ (m, DataFloat32 l) = (m, DataFloat32 l)
 substDataPlus _ (m, DataFloat64 l) = (m, DataFloat64 l)
@@ -100,12 +98,15 @@ substCodePlus sub (m, CodeUpElim x e1 e2) = do
   let sub' = filter (\(y, _) -> y /= x) sub
   let e2' = substCodePlus sub' e2
   (m, CodeUpElim x e1' e2')
-substCodePlus sub (m, CodeEnumElim v branchList) = do
+substCodePlus sub (m, CodeEnumElim fvInfo v branchList) = do
+  let (from, to) = unzip fvInfo
+  let to' = map (substDataPlus sub) to
+  let fvInfo' = zip from to'
   let v' = substDataPlus sub v
-  let (cs, es) = unzip branchList
-  let es' = map (substCodePlus sub) es
-  let branchList' = zip cs es'
-  (m, CodeEnumElim v' branchList')
+  -- let (cs, es) = unzip branchList
+  -- let es' = map (substCodePlus sub) es
+  -- let branchList' = zip cs es'
+  (m, CodeEnumElim fvInfo' v' branchList)
 substCodePlus sub (m, CodeStructElim xks v e) = do
   let v' = substDataPlus sub v
   let sub' = filter (\(k, _) -> k `notElem` map fst xks) sub
@@ -139,31 +140,29 @@ substDataPlusSigmaElim sub ((x, t):xs) e = do
   let sub' = filter (\(y, _) -> y /= x) sub
   let (xs', e') = substDataPlusSigmaElim sub' xs e
   ((x, t') : xs', e')
-
-varData :: DataPlus -> [Identifier]
-varData (_, DataUpsilon x) = [x]
-varData (_, DataSigmaIntro _ ds) = concatMap varData ds
-varData (_, DataStructIntro dks) = concatMap (varData . fst) dks
-varData _ = []
-
-varCode :: CodePlus -> [Identifier]
-varCode (_, CodeTheta theta) = varTheta theta
-varCode (_, CodePiElimDownElim d ds) = concatMap varData $ d : ds
-varCode (_, CodeSigmaElim _ xts d e) = varData d ++ varCode' xts e
-varCode (_, CodeUpIntro d) = varData d
-varCode (_, CodeUpElim x e1 e2) = varCode e1 ++ filter (/= x) (varCode e2)
-varCode (_, CodeEnumElim d les) = do
-  let (_, es) = unzip les
-  varData d ++ concatMap varCode es
-varCode (_, CodeStructElim xks d e) =
-  varData d ++ filter (`notElem` map fst xks) (varCode e)
-
-varTheta :: Theta -> [Identifier]
-varTheta (ThetaUnaryOp _ _ d) = varData d
-varTheta (ThetaBinaryOp _ _ d1 d2) = varData d1 ++ varData d2
-varTheta (ThetaArrayAccess _ d1 d2) = varData d1 ++ varData d2
-varTheta (ThetaSysCall _ ds) = concatMap varData ds
-
-varCode' :: [(Identifier, CodePlus)] -> CodePlus -> [Identifier]
-varCode' [] e = varCode e
-varCode' ((x, t):xts) e = varCode t ++ (filter ((/=) x) $ varCode' xts e)
+-- varData :: DataPlus -> [Identifier]
+-- varData (_, DataUpsilon x) = [x]
+-- varData (_, DataSigmaIntro _ ds) = concatMap varData ds
+-- varData (_, DataStructIntro dks) = concatMap (varData . fst) dks
+-- varData _ = []
+-- varCode :: CodePlus -> [Identifier]
+-- varCode (_, CodeTheta theta) = varTheta theta
+-- varCode (_, CodePiElimDownElim d ds) = concatMap varData $ d : ds
+-- varCode (_, CodeSigmaElim _ xts d e) = varData d ++ varCode' xts e
+-- varCode (_, CodeUpIntro d) = varData d
+-- varCode (_, CodeUpElim x e1 e2) = varCode e1 ++ filter (/= x) (varCode e2)
+-- varCode (_, CodeEnumElim xs d _)
+--   -- let (_, es) = unzip les
+--  = do
+--   varData d ++ xs
+--     -- concatMap varCode es
+-- varCode (_, CodeStructElim xks d e) =
+--   varData d ++ filter (`notElem` map fst xks) (varCode e)
+-- varTheta :: Theta -> [Identifier]
+-- varTheta (ThetaUnaryOp _ _ d) = varData d
+-- varTheta (ThetaBinaryOp _ _ d1 d2) = varData d1 ++ varData d2
+-- varTheta (ThetaArrayAccess _ d1 d2) = varData d1 ++ varData d2
+-- varTheta (ThetaSysCall _ ds) = concatMap varData ds
+-- varCode' :: [(Identifier, CodePlus)] -> CodePlus -> [Identifier]
+-- varCode' [] e = varCode e
+-- varCode' ((x, t):xts) e = varCode t ++ (filter ((/=) x) $ varCode' xts e)

@@ -67,8 +67,8 @@ affineSigma thetaName m k mxts = do
             bindLet
               (zip ys as)
               (m, CodeUpIntro (m, DataSigmaIntro arrVoidPtr []))
-      let info = toInfo "affineSigma: arg of linearize is not closed:" xts
-      assertUP info $ isClosedChain xts
+      -- let info = toInfo "affineSigma: arg of linearize is not closed:" xts
+      -- assertUP info $ isClosedChain xts
       body' <- linearize xts body
       insCodeEnv thetaName [z] (m, CodeSigmaElim k xts varZ body')
       return theta
@@ -112,8 +112,8 @@ relevantSigma thetaName m k mxts = do
       (pairVarNameList, pairVarTypeList) <- unzip <$> mapM toPairInfo xts
       transposedPair <- transposeSigma k pairVarTypeList
       let body = bindLet (zip pairVarNameList as) transposedPair
-      let info = toInfo "relevantSigma: arg of linearize is not closed:" xts
-      assertUP info $ isClosedChain xts
+      -- let info = toInfo "relevantSigma: arg of linearize is not closed:" xts
+      -- assertUP info $ isClosedChain xts
       body' <- linearize xts body
       insCodeEnv thetaName [z] (m, CodeSigmaElim k xts varZ body')
       return theta

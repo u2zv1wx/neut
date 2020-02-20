@@ -5,7 +5,6 @@
 --
 module Clarify
   ( clarify
-  , toSNF
   ) where
 
 import Control.Monad.Except
@@ -16,7 +15,6 @@ import qualified Data.HashMap.Strict as Map
 import qualified Data.Text as T
 
 import Clarify.Closure
-import Clarify.Linearize
 import Clarify.Sigma
 import Clarify.Utility
 import Data.Basic
@@ -96,9 +94,17 @@ clarify (m, TermEnumIntro l) = do
   return (m, CodeUpIntro (m, DataEnumIntro l))
 clarify (m, TermEnumElim (e, _) bs) = do
   let (cs, es) = unzip bs
+  -- ここでそれぞれのesから自由変数を集めてくる必要がある
+  -- で、それぞれのbranchをクロージャとしてcallする。
+  fvss <- mapM chainTermPlus' es
+  let fvs = nubBy (\(_, x, _) (_, y, _) -> x == y) $ concat fvss
   es' <- mapM clarify es
+  es'' <- mapM (retClosure Nothing fvs m []) es'
+  es''' <- mapM (\cls -> callClosure m cls []) es''
   (yName, e', y) <- clarifyPlus e
-  return $ bindLet [(yName, e')] (m, CodeEnumElim y (zip cs es'))
+  let varInfo = map (\(mx, x, _) -> (x, toDataUpsilon (x, mx))) fvs
+  return $ bindLet [(yName, e')] (m, CodeEnumElim varInfo y (zip cs es'''))
+  -- return $ bindLet [(yName, e')] (m, CodeEnumElim y (zip cs es'))
 clarify (m, TermArray {}) = do
   returnArrayType m
 clarify (m, TermArrayIntro k es) = do

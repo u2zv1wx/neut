@@ -45,19 +45,22 @@ reduceCodePlus (m, CodeUpElim x e1 e2) = do
     _ -> do
       e2' <- reduceCodePlus e2
       return (m, CodeUpElim x e1' e2')
-reduceCodePlus (m, CodeEnumElim v les) = do
-  let (ls, es) = unzip les
-  es' <- mapM reduceCodePlus es
+reduceCodePlus (m, CodeEnumElim varInfo v les) = do
   case v of
     (_, DataEnumIntro l) ->
       case lookup (CaseValue l) les of
-        Just body -> reduceCodePlus body
+        Just body -> reduceCodePlus $ substCodePlus varInfo body
         Nothing ->
           case lookup CaseDefault les of
-            Just body -> reduceCodePlus body
-            Nothing -> return (m, CodeEnumElim v $ zip ls es')
+            Just body -> reduceCodePlus $ substCodePlus varInfo body
+            Nothing -> do
+              let (ls, es) = unzip les
+              es' <- mapM reduceCodePlus es
+              return (m, CodeEnumElim varInfo v $ zip ls es')
     _ -> do
-      return (m, CodeEnumElim v $ zip ls es')
+      let (ls, es) = unzip les
+      es' <- mapM reduceCodePlus es
+      return (m, CodeEnumElim varInfo v $ zip ls es')
 reduceCodePlus (m, CodeStructElim xks d e) = do
   case d of
     (_, DataStructIntro eks)

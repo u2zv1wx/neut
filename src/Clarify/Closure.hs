@@ -4,6 +4,7 @@ module Clarify.Closure
   ( makeClosure
   , callClosure
   , chainTermPlus
+  , chainTermPlus'
   , chainTermPlus''
   ) where
 
@@ -36,9 +37,9 @@ makeClosure mName mxts2 m mxts1 e = do
   expName <- newNameWith "exp"
   envExp <- cartesianSigma expName m arrVoidPtr $ map Right xts2
   (envVarName, envVar) <- newDataUpsilonWith "env"
-  let xts = xts2 ++ xts1
-  let info1 = toInfo "makeClosure: arg of linearize is not closed chain:" xts
-  assertUP info1 $ isClosedChain xts
+  -- let xts = xts2 ++ xts1
+  -- let info1 = toInfo "makeClosure: arg of linearize is not closed chain:" xts
+  -- assertUP info1 $ isClosedChain xts
   -- これxts1がclosedとは限らないんでは？
   -- いや、closedchainを構成するときにけっきょくxts2に入ってくるから問題ないのか。
   e' <- linearize (xts2 ++ xts1) e
@@ -91,6 +92,7 @@ nameFromMaybe mName =
 chainTermPlus :: TermPlus -> WithEnv [(Meta, Identifier, TermPlus)]
 chainTermPlus e = do
   tmp <- chainTermPlus' e
+  -- return tmp
   return $ nubBy (\(_, x, _) (_, y, _) -> x == y) tmp
 
 chainTermPlus' :: TermPlus -> WithEnv [(Meta, Identifier, TermPlus)]

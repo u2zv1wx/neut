@@ -184,7 +184,7 @@ writeResult result outputPath OutputKindObject = do
 
 build :: Path Abs File -> WithEnv [B.ByteString]
 build inputPath = do
-  parse inputPath >>= elaborate >>= toSNF >>= clarify >>= toLLVM >>= emit
+  parse inputPath >>= elaborate >>= clarify >>= toLLVM >>= emit
 
 check :: Path Abs File -> WithEnv ()
 check inputPath = do

@@ -53,7 +53,10 @@ llvmCode (_, CodeUpElim x e1 e2) = do
   e1' <- llvmCode e1
   e2' <- llvmCode e2
   commConv x e1' e2'
-llvmCode (_, CodeEnumElim v branchList) = llvmCodeEnumElim v branchList
+llvmCode (_, CodeEnumElim sub v branchList) = do
+  let (ls, es) = unzip branchList
+  let es' = map (substCodePlus sub) es
+  llvmCodeEnumElim v $ zip ls es'
 llvmCode (_, CodeStructElim xks v e) = do
   let (xs, ks) = unzip xks
   let ts = map arrayKindToLowType ks

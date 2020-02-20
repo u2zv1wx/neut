@@ -245,11 +245,9 @@ lookupContext z ctx = do
   case lookup z ctx of
     Nothing -> throwError' "lookupContext"
     Just t -> return t
-
-isClosedChain :: [(Identifier, CodePlus)] -> Bool
-isClosedChain xts = null (isClosedChain' xts)
-
-isClosedChain' :: [(Identifier, CodePlus)] -> [Identifier]
-isClosedChain' [] = []
-isClosedChain' ((x, t):xts) =
-  varCode t ++ (filter ((/=) x) $ isClosedChain' xts)
+-- isClosedChain :: [(Identifier, CodePlus)] -> Bool
+-- isClosedChain xts = null (isClosedChain' xts)
+-- isClosedChain' :: [(Identifier, CodePlus)] -> [Identifier]
+-- isClosedChain' [] = []
+-- isClosedChain' ((x, t):xts) =
+--   varCode t ++ (filter ((/=) x) $ isClosedChain' xts)

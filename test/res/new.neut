@@ -856,6 +856,35 @@ n15-4
 (inductive identity ((A tau) (x A) (y A))
   (identity.reflexive ((a A)) (identity A a a)))
 
+;; enumよりもmodeのほうがキーワードとしてよさそう。
+
+;; (mode bool true false)
+
+;; (mode choice left right)
+
+;; (mode top unit)
+
+;; (mode item
+;;   foo
+;;   bar
+;;   buz)
+
+;; (mode ionian c d e f g a b)
+
+;; (mode C-Dorian C D Eb F G A Bb)
+
+;; (mode-elimination some-item
+;;   (left foo)
+;;   (bar hoge))
+
+;; ;; from C3
+;; (switch C-ionian
+;;   (C "261Hz")
+;;   (D "277Hz")
+;;   ...
+;;   (A "440Hz")
+;;   (B "498Hz"))
+
 (inductive bool ()
   (bool.true () (bool))
   (bool.false () (bool)))
@@ -989,6 +1018,8 @@ n15-4
 ;; (i64.add 1000 stream.coinduction)
 
 (i64.add 100 10)
+
+(fact 4)
 
 ;; 初期値付きのenum
 ;; (enum test
