@@ -164,7 +164,7 @@ readEnumTypeIntU str = readEnumType 'u' str 23
 data EnumValue
   = EnumValueIntS IntSize Integer
   | EnumValueIntU IntSize Integer
-  | EnumValueNat Integer Integer
+  | EnumValueNat Int Int
   | EnumValueLabel T.Text
   deriving (Show, Eq, Ord)
 

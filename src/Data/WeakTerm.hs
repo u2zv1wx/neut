@@ -62,7 +62,7 @@ data WeakCase
   = WeakCaseIntS IntSize Integer
   | WeakCaseIntU IntSize Integer
   | WeakCaseInt WeakTermPlus Integer
-  | WeakCaseNat Integer Integer
+  | WeakCaseNat Int Int
   | WeakCaseLabel T.Text
   | WeakCaseDefault
   deriving (Show, Eq)

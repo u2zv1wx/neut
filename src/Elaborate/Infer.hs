@@ -159,9 +159,9 @@ infer' ctx (m, WeakTermZeta x) = do
       modify
         (\env -> env {zetaEnv = Map.insert (asInt x) (app, higherApp, ml) zenv})
       return (app, higherApp, ml)
-infer' _ (m, WeakTermConst x)
+infer' _ (m, WeakTermConst x@(I (s, _)))
   -- i64, f16, u8, etc.
-  | Just _ <- asLowTypeMaybe x = do
+  | Just _ <- asLowTypeMaybe s = do
     ml0 <- newLevelLE m []
     ml1 <- newLevelLT m [ml0]
     return ((m, WeakTermConst x), (asUniv ml0), ml1)
@@ -242,7 +242,7 @@ infer' ctx (m, WeakTermArrayIntro k es) = do
   (es', ts, mls) <- unzip3 <$> mapM (infer' ctx) es
   forM_ (zip ts (repeat tCod)) $ uncurry insConstraintEnv
   constrainList $ map asUniv mls
-  let len = toInteger $ length es
+  let len = length es
   let dom = (emptyMeta, WeakTermEnum (EnumTypeNat len))
   let t = (m, WeakTermArray dom k)
   ml <- newLevelLE m mls
@@ -252,7 +252,7 @@ infer' ctx (m, WeakTermArrayElim k xts e1 e2) = do
   (xtls', (e2', t2, ml2)) <- inferBinder ctx xts e2
   let (xts', mls) = unzip xtls'
   forM_ mls $ \mlArrArg -> insLevelLE mlArrArg mlArr
-  let dom = (emptyMeta, WeakTermEnum (EnumTypeNat (toInteger $ length xts)))
+  let dom = (emptyMeta, WeakTermEnum (EnumTypeNat (length xts)))
   insConstraintEnv t1 (fst e1', WeakTermArray dom k)
   let ts = map (\(_, _, t) -> t) xts'
   forM_ (zip ts (repeat (inferKind k))) $ uncurry insConstraintEnv

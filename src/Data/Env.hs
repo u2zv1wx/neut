@@ -271,7 +271,7 @@ enumValueToInteger labelOrNat =
     EnumValueLabel l -> toInteger <$> getEnumNum l
     EnumValueIntS _ i -> return i
     EnumValueIntU _ i -> return i
-    EnumValueNat _ j -> return j
+    EnumValueNat _ j -> return $ toInteger j
 
 getEnumNum :: T.Text -> WithEnv Int
 getEnumNum label = do
