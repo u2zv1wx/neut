@@ -104,7 +104,7 @@ infer' ctx (m, WeakTermSigma xts) = do
 infer' ctx (m, WeakTermSigmaIntro t es) = do
   (t', mlSigma) <- inferType' ctx t
   (es', ts, mlSigmaArgList) <- unzip3 <$> mapM (infer' ctx) es
-  ys <- mapM (const $ newNameWith "arg") es'
+  ys <- mapM (const $ newNameWith' "arg") es'
   -- yts = [(y1, ?M1 @ (ctx[0], ..., ctx[n])),
   --        (y2, ?M2 @ (ctx[0], ..., ctx[n], y1)),
   --        ...,
@@ -185,13 +185,16 @@ infer' _ (m, WeakTermInt t i) = do
   return ((m, WeakTermInt t' i), t', UnivLevelPlus (m, l))
 infer' _ (m, WeakTermFloat16 f) = do
   ml <- newLevelLE m []
-  return ((m, WeakTermFloat16 f), (m, WeakTermConst "f16"), ml)
+  (_, f16) <- lookupFloat16
+  return ((m, WeakTermFloat16 f), (m, f16), ml)
 infer' _ (m, WeakTermFloat32 f) = do
   ml <- newLevelLE m []
-  return ((m, WeakTermFloat32 f), (m, WeakTermConst "f32"), ml)
+  (_, f32) <- lookupFloat32
+  return ((m, WeakTermFloat32 f), (m, f32), ml)
 infer' _ (m, WeakTermFloat64 f) = do
   ml <- newLevelLE m []
-  return ((m, WeakTermFloat64 f), (m, WeakTermConst "f64"), ml)
+  (_, f64) <- lookupFloat64
+  return ((m, WeakTermFloat64 f), (m, f64), ml)
 infer' _ (m, WeakTermFloat t f) = do
   (t', UnivLevelPlus (_, l)) <- inferType' [] t -- t must be closed
   return ((m, WeakTermFloat t' f), t', UnivLevelPlus (m, l))
@@ -238,7 +241,7 @@ infer' ctx (m, WeakTermArray dom k) = do
   ml1 <- newLevelLT m [ml0]
   return ((m, WeakTermArray dom' k), asUniv ml0, ml1)
 infer' ctx (m, WeakTermArrayIntro k es) = do
-  let tCod = inferKind k
+  tCod <- inferKind k
   (es', ts, mls) <- unzip3 <$> mapM (infer' ctx) es
   forM_ (zip ts (repeat tCod)) $ uncurry insConstraintEnv
   constrainList $ map asUniv mls
@@ -255,7 +258,8 @@ infer' ctx (m, WeakTermArrayElim k xts e1 e2) = do
   let dom = (emptyMeta, WeakTermEnum (EnumTypeNat (length xts)))
   insConstraintEnv t1 (fst e1', WeakTermArray dom k)
   let ts = map (\(_, _, t) -> t) xts'
-  forM_ (zip ts (repeat (inferKind k))) $ uncurry insConstraintEnv
+  tCod <- inferKind k
+  forM_ (zip ts (repeat tCod)) $ uncurry insConstraintEnv
   return ((m, WeakTermArrayElim k xts' e1' e2'), t2, ml2)
 infer' _ (m, WeakTermStruct ts) = do
   ml0 <- newLevelLE m []
@@ -263,7 +267,7 @@ infer' _ (m, WeakTermStruct ts) = do
   return ((m, WeakTermStruct ts), asUniv ml0, ml1)
 infer' ctx (m, WeakTermStructIntro eks) = do
   let (es, ks) = unzip eks
-  let ts = map inferKind ks
+  ts <- mapM inferKind ks
   let structType = (m, WeakTermStruct ks)
   (es', ts', mls) <- unzip3 <$> mapM (infer' ctx) es
   forM_ (zip ts' ts) $ uncurry insConstraintEnv
@@ -272,7 +276,7 @@ infer' ctx (m, WeakTermStructIntro eks) = do
 infer' ctx (m, WeakTermStructElim xks e1 e2) = do
   (e1', t1, mlStruct) <- infer' ctx e1
   let (ms, xs, ks) = unzip3 xks
-  let ts = map inferKind ks
+  ts <- mapM inferKind ks
   ls <- mapM (const newUnivLevel) ts
   let mls = map UnivLevelPlus $ zip (repeat m) ls
   forM_ mls $ \mlStructArg -> insLevelLE mlStructArg mlStruct
@@ -290,11 +294,12 @@ inferType' ctx t = do
   insLevelLT ml l
   return (t', ml)
 
-inferKind :: ArrayKind -> WeakTermPlus
-inferKind (ArrayKindIntS i) = (emptyMeta, WeakTermEnum (EnumTypeIntS i))
-inferKind (ArrayKindIntU i) = (emptyMeta, WeakTermEnum (EnumTypeIntU i))
-inferKind (ArrayKindFloat size) =
-  (emptyMeta, WeakTermConst $ "f" <> T.pack (show (sizeAsInt size)))
+inferKind :: ArrayKind -> WithEnv WeakTermPlus
+inferKind (ArrayKindIntS i) = return (emptyMeta, WeakTermEnum (EnumTypeIntS i))
+inferKind (ArrayKindIntU i) = return (emptyMeta, WeakTermEnum (EnumTypeIntU i))
+inferKind (ArrayKindFloat size) = do
+  lookupConstant $ "f" <> T.pack (show (sizeAsInt size))
+  -- (emptyMeta, WeakTermConst $ "f" <> T.pack (show (sizeAsInt size)))
 inferKind _ = error "inferKind for void-pointer"
 
 inferPi ::
@@ -357,7 +362,7 @@ inferPiElim ctx m (e, t, mlPi) etls = do
         let cod' = substWeakTermPlus (zip xs es) cod
         return ((m, WeakTermPiElim e es), cod', mlPiCod')
     _ -> do
-      ys <- mapM (const $ newNameWith "arg") es
+      ys <- mapM (const $ newNameWith' "arg") es
       -- yts = [(y1, ?M1 @ (ctx[0], ..., ctx[n])),
       --        (y2, ?M2 @ (ctx[0], ..., ctx[n], y1)),
       --        ...,
@@ -453,7 +458,7 @@ constrainList (t1:t2:ts) = do
 
 newHole :: WithEnv WeakTermPlus
 newHole = do
-  h <- newNameWith "hole"
+  h <- newNameWith' "hole"
   return (emptyMeta, WeakTermZeta h)
 
 insConstraintEnv :: WeakTermPlus -> WeakTermPlus -> WithEnv ()
