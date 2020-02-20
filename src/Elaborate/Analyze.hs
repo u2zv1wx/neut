@@ -85,17 +85,29 @@ simp' (((_, WeakTermEnumIntro (EnumValueIntU s1 l1)), (_, WeakTermInt t2 l2)):cs
 simp' (((_, WeakTermInt t1 l1), (_, WeakTermInt t2 l2)):cs)
   | l1 == l2 = simp $ (t1, t2) : cs
 simp' (((_, WeakTermFloat t1 l1), (_, WeakTermFloat16 l2)):cs)
-  | show l1 == show l2 = simp $ (t1, f16) : cs
+  | show l1 == show l2 = do
+    f16 <- lookupFloat16
+    simp $ (t1, f16) : cs
 simp' (((_, WeakTermFloat16 l1), (_, WeakTermFloat t2 l2)):cs)
-  | show l1 == show l2 = simp $ (f16, t2) : cs
+  | show l1 == show l2 = do
+    f16 <- lookupFloat16
+    simp $ (f16, t2) : cs
 simp' (((_, WeakTermFloat t1 l1), (_, WeakTermFloat32 l2)):cs)
-  | show l1 == show l2 = simp $ (t1, f32) : cs
+  | show l1 == show l2 = do
+    f32 <- lookupFloat32
+    simp $ (t1, f32) : cs
 simp' (((_, WeakTermFloat32 l1), (_, WeakTermFloat t2 l2)):cs)
-  | show l1 == show l2 = simp $ (f32, t2) : cs
+  | show l1 == show l2 = do
+    f32 <- lookupFloat32
+    simp $ (f32, t2) : cs
 simp' (((_, WeakTermFloat t1 l1), (_, WeakTermFloat64 l2)):cs)
-  | l1 == l2 = simp $ (t1, f64) : cs
+  | l1 == l2 = do
+    f64 <- lookupFloat64
+    simp $ (t1, f64) : cs
 simp' (((_, WeakTermFloat64 l1), (_, WeakTermFloat t2 l2)):cs)
-  | l1 == l2 = simp $ (f64, t2) : cs
+  | l1 == l2 = do
+    f64 <- lookupFloat64
+    simp $ (f64, t2) : cs
 simp' (((_, WeakTermFloat t1 l1), (_, WeakTermFloat t2 l2)):cs)
   | l1 == l2 = simp $ (t1, t2) : cs
 simp' (((_, WeakTermArray dom1 k1), (_, WeakTermArray dom2 k2)):cs)
@@ -172,15 +184,15 @@ simp' ((e1, e2):cs) = do
             case es of
               [] -> simpPattern h2 ies2 e2' e1' cs
               _ -> simp $ (substWeakTermPlus (zip zs es) e1', e2') : cs
-        (Just (StuckPiElimUpsilon (x1, m1) _), _)
-          | Just body <- Map.lookup x1 sub -> do
+        (Just (StuckPiElimUpsilon (x1@(I (_, i1)), m1) _), _)
+          | Just body <- Map.lookup i1 sub -> do
             let m = supMeta (supMeta (metaOf e1) (metaOf e2)) (metaOf body) -- x1 == e1 == body
             let e1' = (m, snd e1)
             let e2' = (m, snd e2)
             body' <- univInstWith (metaUnivParams m1) (m, snd body)
             simp $ (substWeakTermPlus [(x1, body')] e1', e2') : cs
-        (_, Just (StuckPiElimUpsilon (x2, m2) _))
-          | Just body <- Map.lookup x2 sub -> do
+        (_, Just (StuckPiElimUpsilon (x2@(I (_, i2)), m2) _))
+          | Just body <- Map.lookup i2 sub -> do
             let m = supMeta (supMeta (metaOf e1) (metaOf e2)) (metaOf body) -- x2 == e2 == body
             let e1' = (m, snd e1)
             let e2' = (m, snd e2)
@@ -262,10 +274,10 @@ simpPattern ::
   -> WeakTermPlus
   -> [PreConstraint]
   -> WithEnv ()
-simpPattern h1 ies1 _ e2 cs = do
+simpPattern h1@(I (_, i)) ies1 _ e2 cs = do
   xss <- mapM toVarList ies1
   let lam = bindFormalArgs e2 xss
-  modify (\env -> env {substEnv = Map.insert h1 lam (substEnv env)})
+  modify (\env -> env {substEnv = Map.insert i lam (substEnv env)})
   visit h1
   simp cs
 
@@ -392,12 +404,12 @@ toVarList :: [WeakTermPlus] -> WithEnv [IdentifierPlus]
 toVarList [] = return []
 toVarList ((m, WeakTermUpsilon x):es) = do
   xts <- toVarList es
-  let t = (emptyMeta, WeakTermUpsilon "_")
+  let t = (emptyMeta, WeakTermUpsilon (I ("_", 0)))
   return $ (m, x, t) : xts
 toVarList ((m, _):es) = do
   xts <- toVarList es
-  x <- newNameWith "hole"
-  let t = (emptyMeta, WeakTermUpsilon "_")
+  x <- newNameWith' "hole"
+  let t = (emptyMeta, WeakTermUpsilon (I ("_", 0)))
   return $ (m, x, t) : xts
 
 bindFormalArgs :: WeakTermPlus -> [[IdentifierPlus]] -> WeakTermPlus
@@ -406,20 +418,19 @@ bindFormalArgs e (xts:xtss) = do
   let e' = bindFormalArgs e xtss
   (emptyMeta, WeakTermPiIntro xts e')
 
-lookupAny :: [Hole] -> Map.HashMap Identifier a -> Maybe (Hole, a)
+lookupAny :: [Hole] -> Map.HashMap Int a -> Maybe (Hole, a)
 lookupAny [] _ = Nothing
-lookupAny (h:ks) sub = do
-  case Map.lookup h sub of
+lookupAny (h@(I (_, i)):ks) sub = do
+  case Map.lookup i sub of
     Just v -> Just (h, v)
     _ -> lookupAny ks sub
 
-lookupAll ::
-     S.Set Identifier -> [Identifier] -> Map.HashMap Identifier a -> Maybe [a]
+lookupAll :: S.Set Identifier -> [Identifier] -> Map.HashMap Int a -> Maybe [a]
 lookupAll _ [] _ = return []
-lookupAll qenv (x:xs) sub
+lookupAll qenv ((I (_, i)):xs) sub
   -- | S.member x qenv = lookupAll qenv xs sub
   | otherwise = do
-    v <- Map.lookup x sub
+    v <- Map.lookup i sub
     vs <- lookupAll qenv xs sub
     return $ v : vs
 -- lookupAll qenv (x:xs) sub = do

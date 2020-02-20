@@ -35,7 +35,7 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
       | length xts == length es' -> do
         let xs = map (\(_, x, _) -> x) xts
         reduceWeakTermPlus $ substWeakTermPlus (zip xs es') body
-    (_, WeakTermConst constant) ->
+    (_, WeakTermConst (I (constant, _))) ->
       reduceWeakTermPlusTheta (m, app) es' m constant
     _ -> (m, app)
 reduceWeakTermPlus (m, WeakTermSigma xts) = do
