@@ -33,11 +33,11 @@ instance Ord Identifier where
   compare (I (_, i1)) (I (_, i2)) = compare i1 i2
 
 -- type Identifier = T.Text
-type Phase = Integer
+type Phase = Int
 
-type Line = Integer
+type Line = Int
 
-type Column = Integer
+type Column = Int
 
 type Loc = (Phase, Line, Column)
 
@@ -48,9 +48,9 @@ data Case
 
 data EnumType
   = EnumTypeLabel T.Text
-  | EnumTypeIntS Integer -- i{k}
-  | EnumTypeIntU Integer -- u{k}
-  | EnumTypeNat Integer -- n{k}
+  | EnumTypeIntS Int -- i{k}
+  | EnumTypeIntU Int -- u{k}
+  | EnumTypeNat Int -- n{k}
   deriving (Show, Eq)
 
 -- note that UnivLevel is just the name of the level of a universe (i.e. the integer
@@ -60,10 +60,9 @@ type UnivLevel = Int
 newtype UnivLevelPlus =
   UnivLevelPlus (Meta, UnivLevel)
 
-instance Show UnivLevelPlus
-  -- show (UnivLevelPlus (_, l)) = "[" ++ show l ++ "]"
-                                                        where
+instance Show UnivLevelPlus where
   show (UnivLevelPlus (m, l)) = "[" ++ show l ++ "]:" ++ showMeta m
+  -- show (UnivLevelPlus (_, l)) = "[" ++ show l ++ "]"
 
 instance Eq UnivLevelPlus where
   (UnivLevelPlus (_, l1)) == (UnivLevelPlus (_, l2)) = l1 == l2
@@ -142,7 +141,7 @@ emptyMeta =
     , metaUnivParams = IntMap.empty
     }
 
-readEnumType :: Char -> T.Text -> Integer -> (Maybe Integer)
+readEnumType :: Char -> T.Text -> Int -> (Maybe Int)
 readEnumType c str k -- n1, n2, ..., n{i}, ..., n{2^64}
   | T.length str >= 2
   , T.head str == c
@@ -150,19 +149,19 @@ readEnumType c str k -- n1, n2, ..., n{i}, ..., n{2^64}
   , 1 <= i && i <= 2 ^ k = Just i
 readEnumType _ _ _ = Nothing
 
-readEnumTypeNat :: T.Text -> (Maybe Integer)
+readEnumTypeNat :: T.Text -> (Maybe Int)
 readEnumTypeNat str = readEnumType 'n' str 64
 
-readEnumTypeIntS :: T.Text -> (Maybe Integer)
+readEnumTypeIntS :: T.Text -> (Maybe Int)
 readEnumTypeIntS str = readEnumType 'i' str 23
 
-readEnumTypeIntU :: T.Text -> (Maybe Integer)
+readEnumTypeIntU :: T.Text -> (Maybe Int)
 readEnumTypeIntU str = readEnumType 'u' str 23
 
 data EnumValue
-  = EnumValueIntS IntSize Integer
-  | EnumValueIntU IntSize Integer
-  | EnumValueNat Integer Integer
+  = EnumValueIntS IntSize Int
+  | EnumValueIntU IntSize Int
+  | EnumValueNat Int Int
   | EnumValueLabel T.Text
   deriving (Show, Eq, Ord)
 
@@ -184,7 +183,7 @@ readEnumValueNat str -- n1-0, n2-0, n2-1, ...
   , T.head str == 'n'
   , [iStr, jStr] <- wordsBy '-' (T.tail str)
   , Just i <- readMaybe $ T.unpack iStr
-  , 1 <= i && i <= 2 ^ (64 :: Integer)
+  , 1 <= i && i <= 2 ^ (64 :: Int)
   , Just j <- readMaybe $ T.unpack jStr
   , 0 <= j && j <= i - 1 = Just $ EnumValueNat i j
   | otherwise = Nothing
@@ -203,18 +202,18 @@ data LowType
   | LowTypeVoidPtr
   | LowTypeFunctionPtr [LowType] LowType
   | LowTypeStructPtr [LowType]
-  | LowTypeArrayPtr Integer LowType -- [n x LOWTYPE]*
+  | LowTypeArrayPtr Int LowType -- [n x LOWTYPE]*
   | LowTypeIntS64Ptr
   deriving (Eq, Show)
 
-lowTypeToAllocSize' :: Integer -> Integer
+lowTypeToAllocSize' :: Int -> Int
 lowTypeToAllocSize' i = do
   let (q, r) = quotRem i 8
   if r == 0
     then q
     else q + 1
 
-type IntSize = Integer
+type IntSize = Int
 
 asIntS :: Integral a => a -> a -> a
 asIntS size n = do
@@ -234,14 +233,14 @@ data FloatSize
   | FloatSize64
   deriving (Eq, Show)
 
-sizeAsInt :: FloatSize -> Integer
+sizeAsInt :: FloatSize -> Int
 sizeAsInt FloatSize16 = 16
 sizeAsInt FloatSize32 = 32
 sizeAsInt FloatSize64 = 64
 
 data ArrayKind
-  = ArrayKindIntS Integer
-  | ArrayKindIntU Integer
+  = ArrayKindIntS Int
+  | ArrayKindIntU Int
   | ArrayKindFloat FloatSize
   | ArrayKindVoidPtr
   deriving (Show, Eq)
@@ -331,11 +330,11 @@ asLowTypeMaybe "" = Nothing
 asLowTypeMaybe s
   | 'i' <- T.head s
   , Just n <- readMaybe $ T.unpack $ T.tail s
-  , 0 < n && n < (2 ^ (23 :: Integer)) - 1 = Just $ LowTypeIntS n
+  , 0 < n && n < (2 ^ (23 :: Int)) - 1 = Just $ LowTypeIntS n
 asLowTypeMaybe s
   | 'u' <- T.head s
   , Just n <- readMaybe $ T.unpack $ T.tail s
-  , 0 < n && n < (2 ^ (23 :: Integer)) - 1 = Just $ LowTypeIntU n
+  , 0 < n && n < (2 ^ (23 :: Int)) - 1 = Just $ LowTypeIntU n
 asLowTypeMaybe s
   | 'f' <- T.head s
   , Just n <- readMaybe $ T.unpack $ T.tail s
