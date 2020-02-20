@@ -70,8 +70,6 @@ renameFormArgs :: [IdentifierPlus] -> WithEnv [IdentifierPlus]
 renameFormArgs [] = return []
 renameFormArgs ((m, a@(I (_, i)), t):ats) = do
   a' <- newNameWith' "var"
-  -- modify (\e -> e {nameEnv = Map.insert a a' (nameEnv e)})
-  -- modify (\e -> e {nameEnv = Map.insert i a' (nameEnv e)})
   let sub = [(a, (m, WeakTermUpsilon a'))]
   ats' <- renameFormArgs $ substWeakTermPlusBindings sub ats
   return $ (m, a', t) : ats'

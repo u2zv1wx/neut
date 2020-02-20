@@ -25,7 +25,6 @@ import Data.Env
 import Data.Tree
 import Data.WeakTerm
 
--- {} interpret {}
 interpret :: TreePlus -> WithEnv WeakTermPlus
 --
 -- foundational interpretations
@@ -51,13 +50,10 @@ interpret (m, TreeNode ((_, TreeAtom "pi-elimination"):e:es)) = do
   es' <- mapM interpret es
   m' <- adjustPhase m
   return (m', WeakTermPiElim e' es')
--- interpret (m, TreeNode ((_, TreeAtom "sigma"):xts)) = do
---   xts' <- mapM interpretIdentifierPlus xts
---   return (m, WeakTermSigma xts')
 interpret (m, TreeNode [(_, TreeAtom "sigma"), (_, TreeNode xts), t]) = do
   xts' <- mapM interpretIdentifierPlus xts
   t' <- interpret t
-  placeholder <- newNameWith $ asIdent "cod"
+  placeholder <- newNameWith' "cod"
   m' <- adjustPhase m
   return (m', WeakTermSigma $ xts' ++ [(fst t', placeholder, t')])
 interpret (m, TreeNode ((_, TreeAtom "sigma-introduction"):es)) = do
@@ -74,13 +70,7 @@ interpret (m, TreeNode [(_, TreeAtom "sigma-elimination"), (_, TreeNode xts), e1
   return (m', WeakTermSigmaElim h xts' e1' e2')
 interpret (m, TreeNode [(_, TreeAtom "iterate"), xt, xts@(_, TreeNode _), e]) = do
   (m', xt', xts', e') <- interpretIter (m, TreeNode [xt, xts, e])
-  -- xt' <- interpretIdentifierPlus xt
-  -- (xts', e') <- interpretBinder xts e
-  -- m' <- adjustPhase m
   return (m', WeakTermIter xt' xts' e')
--- interpret t@(_, TreeNode [(_, TreeAtom "iterate"), _, (_, TreeNode _), _]) = do
---   (m', xt', xts', e') <- interpretIter t
--- interpret (m, TreeNode [(_, TreeAtom "zeta"), (_, TreeAtom x)]) = do
 interpret (m, TreeNode [(_, TreeAtom "zeta"), x]) = do
   (_, x') <- interpretAtom x
   m' <- adjustPhase m
@@ -168,7 +158,7 @@ interpret (m, TreeNode [(_, TreeAtom "struct-elimination"), (_, TreeNode xts), e
 interpret (m, TreeNode ((_, TreeAtom "product"):ts)) = do
   ts' <- mapM interpret ts
   let ms = map fst ts'
-  xs <- mapM (const $ newNameWith $ asIdent "sig") ts'
+  xs <- mapM (const $ newNameWith' "sig") ts'
   m' <- adjustPhase m
   return (m', WeakTermSigma (zip3 ms xs ts'))
 interpret (m, TreeAtom x)
@@ -219,15 +209,12 @@ interpret t@(m, TreeNode es) = do
     then throwError' $ "interpret: syntax error:\n" <> T.pack (Pr.ppShow t)
     else interpret (m', TreeNode ((m, TreeAtom "pi-elimination") : es))
 
--- {} interpretIdentifierPlus {}
 interpretIdentifierPlus :: TreePlus -> WithEnv IdentifierPlus
 interpretIdentifierPlus (m, TreeAtom x) = do
   (m', x') <- interpretAtom (m, TreeAtom x)
   h <- newHole m'
   return (m', x', h)
-interpretIdentifierPlus (_, TreeNode [x, t])
-  -- m' <- adjustPhase m
- = do
+interpretIdentifierPlus (_, TreeNode [x, t]) = do
   (m', x') <- interpretAtom x
   t' <- interpret t
   return (m', x', t')
@@ -236,7 +223,6 @@ interpretIdentifierPlus ut =
   "interpretIdentifierPlus: syntax error:\n" <> T.pack (Pr.ppShow ut)
 
 interpretIter :: TreePlus -> WithEnv Def
--- interpretIter (m, TreeNode [(_, TreeAtom "iterate"), xt, (_, TreeNode xts), e]) = do
 interpretIter (m, TreeNode [xt, (_, TreeNode xts), e]) = do
   xt' <- interpretIdentifierPlus xt
   (xts', e') <- interpretBinder xts e
@@ -244,12 +230,11 @@ interpretIter (m, TreeNode [xt, (_, TreeNode xts), e]) = do
   return (m', xt', xts', e')
 interpretIter _ = throwError' "interpretIter"
 
--- {} interpretAtom {}
 interpretAtom :: TreePlus -> WithEnv (Meta, Identifier)
 interpretAtom (m, TreeAtom "_") = do
   m' <- adjustPhase m
   let m'' = m' {metaIsAppropriateAsCompletionCandidate = False}
-  h <- newNameWith $ asIdent "H"
+  h <- newNameWith' "H"
   return (m'', h)
 interpretAtom (m, TreeAtom x) = do
   m' <- adjustPhase m
@@ -257,10 +242,6 @@ interpretAtom (m, TreeAtom x) = do
 interpretAtom t =
   throwError' $ "interpretAtom: syntax error:\n" <> T.pack (Pr.ppShow t)
 
--- interpretAtom "_" = newNameWith "H"
--- -- interpretAtom "_" = newNameWith "hole-explicit"
--- interpretAtom x = return x
--- {} interpretEnumValueMaybe {}
 interpretEnumValueMaybe :: TreePlus -> WithEnv (Maybe EnumValue)
 interpretEnumValueMaybe (_, TreeAtom x)
   | Just v <- readEnumValueNat x = return $ Just v
@@ -275,7 +256,6 @@ interpretEnumValueMaybe (_, TreeAtom x) = do
     else return Nothing
 interpretEnumValueMaybe _ = return Nothing
 
--- {} interpretEnumValue {}
 interpretEnumValue :: TreePlus -> WithEnv EnumValue
 interpretEnumValue l = do
   ml' <- interpretEnumValueMaybe l
@@ -285,9 +265,6 @@ interpretEnumValue l = do
       throwError' $
       "interpretEnumValue: syntax error:\n" <> T.pack (Pr.ppShow l)
 
--- {} interpretBinder {}
--- `xts` はatomまたは(atom, tree)であることが想定されているけれど、どうせ、interpretIdentifierPlusは
--- 任意のtreeを読んで読めなかったらたんに失敗するだけだから問題なし。それゆえ事前条件がemptyになる。
 interpretBinder ::
      [TreePlus] -> TreePlus -> WithEnv ([IdentifierPlus], WeakTermPlus)
 interpretBinder xts t = do
@@ -295,7 +272,6 @@ interpretBinder xts t = do
   t' <- interpret t
   return (xts', t')
 
--- {} interpretWeakCase {}
 interpretWeakCase :: TreePlus -> WithEnv WeakCase
 --
 -- foundational
@@ -313,7 +289,6 @@ interpretWeakCase c
     return $ WeakCaseInt h i'
   | otherwise = weakenEnumValue <$> interpretEnumValue c
 
--- {} interpretClause {}
 interpretClause :: TreePlus -> WithEnv (WeakCase, WeakTermPlus)
 interpretClause (_, TreeNode [c, e]) = do
   c' <- interpretWeakCase c
@@ -337,7 +312,6 @@ interpretStructElim (_, TreeNode [(m, TreeAtom x), k]) = do
 interpretStructElim e =
   throwError' $ "interpretStructElim: syntax error:\n " <> T.pack (Pr.ppShow e)
 
--- {} interpretEnumItem {}
 interpretEnumItem :: [TreePlus] -> WithEnv [(T.Text, Int)]
 interpretEnumItem ts = do
   xis <- interpretEnumItem' $ reverse ts
@@ -367,11 +341,9 @@ headDiscriminantOf :: [(T.Text, Int)] -> Int
 headDiscriminantOf [] = 0
 headDiscriminantOf ((_, i):_) = i
 
--- {} isDefinedEnumName {}
 isDefinedEnumName :: T.Text -> WithEnv Bool
 isDefinedEnumName name = do
   env <- get
-  -- let enumNameList = Map.elems $ enumEnv env
   let enumNameList = Map.keys $ enumEnv env
   return $ name `elem` enumNameList
 
@@ -381,14 +353,13 @@ adjustPhase m = do
   let newLoc = adjustPhase' i (metaLocation m)
   return $ m {metaLocation = newLoc, metaConstraintLocation = newLoc}
 
-adjustPhase' :: Integer -> Maybe Loc -> Maybe Loc
+adjustPhase' :: Int -> Maybe Loc -> Maybe Loc
 adjustPhase' _ Nothing = Nothing
--- adjustPhase' i (Just (j, l, c)) = Just (i + j, l, c)
 adjustPhase' i (Just (_, l, c)) = Just (i, l, c)
 
 newHole :: Meta -> WithEnv WeakTermPlus
 newHole m = do
-  h <- newNameWith $ asIdent "hole-aux"
+  h <- newNameWith' "hole-aux"
   return (m, WeakTermZeta h)
 
 asArrayKind :: T.Text -> WithEnv ArrayKind
@@ -405,7 +376,6 @@ asStructKind (_, TreeAtom x) = asArrayKind x
 asStructKind t =
   throwError' $ "asStructKind: syntax error:\n" <> T.pack (Pr.ppShow t)
 
--- {} encodechar {(the output is valid as utf8 string)}
 -- adopted from https://hackage.haskell.org/package/utf8-string-1.0.1.1/docs/src/Codec-Binary-UTF8-String.html
 encodeChar :: Char -> [Word8]
 encodeChar c = do
@@ -427,19 +397,16 @@ encodeChar c = do
         , 0x80 + oc .&. 0x3f
         ]
 
--- {} encode {(the output is valid as utf-8 encoded string)}
 -- adopted from https://hackage.haskell.org/package/utf8-string-1.0.1.1/docs/src/Codec-Binary-UTF8-String.html
 encode :: String -> [Word8]
 encode input = do
   let result = concatMap encodeChar input
   assertP "encode" result (decode result == input)
 
--- {} replacement_character {}
 -- adopted from https://hackage.haskell.org/package/utf8-string-1.0.1.1/docs/src/Codec-Binary-UTF8-String.html
 replacement_character :: Char
 replacement_character = '\xfffd'
 
--- {} decode {}
 -- adopted from https://hackage.haskell.org/package/utf8-string-1.0.1.1/docs/src/Codec-Binary-UTF8-String.html
 -- this function is used only for assertion.
 decode :: [Word8] -> String
