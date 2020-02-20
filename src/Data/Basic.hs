@@ -17,6 +17,9 @@ import qualified Data.Set as S
 newtype Identifier =
   I (T.Text, Int)
 
+asText :: Identifier -> T.Text
+asText (I (s, i)) = s <> T.pack (show i)
+
 instance Show Identifier where
   show (I (s, i)) = T.unpack s ++ "-" ++ show i
 
@@ -157,7 +160,7 @@ data EnumValue
   = EnumValueIntS IntSize Integer
   | EnumValueIntU IntSize Integer
   | EnumValueNat Integer Integer
-  | EnumValueLabel Identifier
+  | EnumValueLabel T.Text
   deriving (Show, Eq, Ord)
 
 readEnumValueIntS :: Identifier -> Identifier -> Maybe EnumValue
