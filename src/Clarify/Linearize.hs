@@ -18,25 +18,25 @@ linearize ::
   -> WithEnv CodePlus
 linearize xts e = do
   (nm, e') <- distinguishCode (map fst xts) e
-  withHeader nm (reverse xts) e'
+  linearize' nm (reverse xts) e'
 
 type NameMap = Map.HashMap Identifier [Identifier]
 
-withHeader ::
+linearize' ::
      NameMap
   -> [(Identifier, CodePlus)] -- [(xn, tn), ..., (x1, t1)]  (reversed closed chain)
   -> CodePlus
   -> WithEnv CodePlus
-withHeader _ [] e = return e -- ここでnamemapを返すようにする？
-withHeader nm ((x, t):xts) e = do
+linearize' _ [] e = return e -- ここでnamemapを返すようにする？
+linearize' nm ((x, t):xts) e = do
   (nmT, t') <- distinguishCode (map fst xts) t
   let newNm = merge [nmT, nm]
-  e' <- withHeader' newNm x t' e
-  withHeader newNm xts e'
+  e' <- withHeader newNm x t' e
+  linearize' newNm xts e'
 
 -- insert header for a variable
-withHeader' :: NameMap -> Identifier -> CodePlus -> CodePlus -> WithEnv CodePlus
-withHeader' nm x t e =
+withHeader :: NameMap -> Identifier -> CodePlus -> CodePlus -> WithEnv CodePlus
+withHeader nm x t e =
   case Map.lookup x nm of
     Nothing -> withHeaderAffine x t e
     Just [] -> error $ "impossible. x: " ++ show x
