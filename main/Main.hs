@@ -32,9 +32,9 @@ type CheckOptEndOfEntry = String
 
 type CheckOptColorize = Bool
 
-type Line = Integer
+type Line = Int
 
-type Column = Integer
+type Column = Int
 
 data OutputKind
   = OutputKindObject
