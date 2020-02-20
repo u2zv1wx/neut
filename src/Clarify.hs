@@ -94,8 +94,6 @@ clarify (m, TermEnumIntro l) = do
   return (m, CodeUpIntro (m, DataEnumIntro l))
 clarify (m, TermEnumElim (e, _) bs) = do
   let (cs, es) = unzip bs
-  -- ここでそれぞれのesから自由変数を集めてくる必要がある
-  -- で、それぞれのbranchをクロージャとしてcallする。
   fvss <- mapM chainTermPlus' es
   let fvs = nubBy (\(_, x, _) (_, y, _) -> x == y) $ concat fvss
   es' <- mapM clarify es
@@ -104,7 +102,6 @@ clarify (m, TermEnumElim (e, _) bs) = do
   (yName, e', y) <- clarifyPlus e
   let varInfo = map (\(mx, x, _) -> (x, toDataUpsilon (x, mx))) fvs
   return $ bindLet [(yName, e')] (m, CodeEnumElim varInfo y (zip cs es'''))
-  -- return $ bindLet [(yName, e')] (m, CodeEnumElim y (zip cs es'))
 clarify (m, TermArray {}) = do
   returnArrayType m
 clarify (m, TermArrayIntro k es) = do
