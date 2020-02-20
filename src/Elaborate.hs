@@ -78,7 +78,7 @@ elaborateStmt (WeakStmtConstDecl m (mx, x, t) cont) = do
   (t', mlt) <- inferType t
   analyze >> synthesize >> refine >> cleanup
   t'' <- elaborate' t' >>= reduceTermPlus
-  i <- lookupConstNum x
+  i <- lookupConstNum' x
   insTypeEnv (I (x, i)) t'' mlt
   cont' <- elaborateStmt cont
   return (m, TermConstDecl (mx, I (x, i), t'') cont')

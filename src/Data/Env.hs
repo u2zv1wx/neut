@@ -257,12 +257,12 @@ toStr s = Pr.ppShow s
 toInfo :: (Show a) => String -> a -> String
 toInfo s x = "assertion failure:\n" ++ s ++ "\n" ++ toStr x
 
-newDataUpsilonWith :: Identifier -> WithEnv (Identifier, DataPlus)
+newDataUpsilonWith :: T.Text -> WithEnv (Identifier, DataPlus)
 newDataUpsilonWith name = newDataUpsilonWith' name emptyMeta
 
-newDataUpsilonWith' :: Identifier -> Meta -> WithEnv (Identifier, DataPlus)
+newDataUpsilonWith' :: T.Text -> Meta -> WithEnv (Identifier, DataPlus)
 newDataUpsilonWith' name m = do
-  x <- newNameWith name
+  x <- newNameWith' name
   return (x, (m, DataUpsilon x))
 
 enumValueToInteger :: EnumValue -> WithEnv Integer
@@ -310,6 +310,16 @@ lookupConstNum constName = do
   cenv <- gets constantEnv
   case Map.lookup constName cenv of
     Just i -> return i
+    Nothing -> do
+      i <- newCount
+      modify (\env -> env {constantEnv = Map.insert constName i cenv})
+      return i
+
+lookupConstNum' :: T.Text -> WithEnv Int
+lookupConstNum' constName = do
+  cenv <- gets constantEnv
+  case Map.lookup constName cenv of
+    Just i -> return i
     Nothing -> throwError' $ "no such constant: " <> constName
 
 lookupConstant :: T.Text -> WithEnv WeakTermPlus
@@ -318,16 +328,6 @@ lookupConstant constName = do
   case me of
     Just e -> return e
     Nothing -> throwError' $ "no such constant: " <> constName
-  -- | isConstant constName = do
-  --   cenv <- gets constantEnv
-  --   case Map.lookup constName cenv of
-  --     Just i -> return (emptyMeta, WeakTermConst $ I (constName, i))
-  --     Nothing -> do
-  --       i <- newCount
-  --       let ident = I (constName, i)
-  --       modify (\env -> env {constantEnv = Map.insert constName i cenv})
-  --       return (emptyMeta, WeakTermConst ident)
-  -- | otherwise = throwError' $ "no such constant: " <> constName
 
 lookupConstantMaybe :: T.Text -> WithEnv (Maybe WeakTermPlus)
 lookupConstantMaybe constName

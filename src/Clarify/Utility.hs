@@ -4,11 +4,12 @@ module Clarify.Utility where
 
 import Control.Monad.State
 
+import qualified Data.Text as T
+
 import Data.Basic
 import Data.Code
 import Data.Env
 import Data.Term
-import Reduce.Code
 
 import qualified Data.HashMap.Strict as Map
 
@@ -82,6 +83,12 @@ returnCartesianUniv = do
   v <- cartesianUniv emptyMeta
   return (emptyMeta, CodeUpIntro v)
 
+foo :: T.Text -> Meta -> WithEnv (Identifier, DataPlus)
+foo thetaName m = do
+  i <- lookupConstNum thetaName
+  let ident = I (thetaName, i)
+  return (ident, (m, DataTheta ident))
+
 cartesianImmediate :: Meta -> WithEnv DataPlus
 cartesianImmediate m = do
   aff <- affineImmediate m
@@ -91,14 +98,15 @@ cartesianImmediate m = do
 affineImmediate :: Meta -> WithEnv DataPlus
 affineImmediate m = do
   cenv <- gets codeEnv
-  let thetaName = "affine-immediate"
-  let theta = (m, DataTheta thetaName)
-  case Map.lookup thetaName cenv of
+  -- let thetaName = "affine-immediate"
+  -- let theta = (m, DataTheta thetaName)
+  (ident, theta) <- foo "affine-immediate" m
+  case Map.lookup ident cenv of
     Just _ -> return theta
     Nothing -> do
-      immVarName <- newNameWith "arg"
+      immVarName <- newNameWith' "arg"
       insCodeEnv
-        thetaName
+        ident
         [immVarName]
         (emptyMeta, CodeUpIntro (emptyMeta, DataSigmaIntro arrVoidPtr []))
       return theta
@@ -106,14 +114,15 @@ affineImmediate m = do
 relevantImmediate :: Meta -> WithEnv DataPlus
 relevantImmediate m = do
   cenv <- gets codeEnv
-  let thetaName = "relevant-immediate"
-  let theta = (m, DataTheta thetaName)
-  case Map.lookup thetaName cenv of
+  -- let thetaName = "relevant-immediate"
+  -- let theta = (m, DataTheta thetaName)
+  (ident, theta) <- foo "relevant-immediate" m
+  case Map.lookup ident cenv of
     Just _ -> return theta
     Nothing -> do
       (immVarName, immVar) <- newDataUpsilonWith "arg"
       insCodeEnv
-        thetaName
+        ident
         [immVarName]
         ( emptyMeta
         , CodeUpIntro (emptyMeta, DataSigmaIntro arrVoidPtr [immVar, immVar]))
@@ -129,17 +138,18 @@ cartesianUniv m = do
 affineUniv :: Meta -> WithEnv DataPlus
 affineUniv m = do
   cenv <- gets codeEnv
-  let thetaName = "affine-univ"
-  let theta = (m, DataTheta thetaName)
-  case Map.lookup thetaName cenv of
+  -- let thetaName = "affine-univ"
+  -- let theta = (m, DataTheta thetaName)
+  (ident, theta) <- foo "affine-univ" m
+  case Map.lookup ident cenv of
     Just _ -> return theta
     Nothing -> do
       (univVarName, univVar) <- newDataUpsilonWith "univ"
-      affVarName <- newNameWith "aff-univ"
-      relVarName <- newNameWith "rel-univ"
+      affVarName <- newNameWith' "aff-univ"
+      relVarName <- newNameWith' "rel-univ"
       retImmType <- returnCartesianImmediate
       insCodeEnv
-        thetaName
+        ident
         [univVarName]
         -- let (a, b) := x in return ()
         ( emptyMeta
@@ -153,9 +163,10 @@ affineUniv m = do
 relevantUniv :: Meta -> WithEnv DataPlus
 relevantUniv m = do
   cenv <- gets codeEnv
-  let thetaName = "relevant-univ"
-  let theta = (m, DataTheta thetaName)
-  case Map.lookup thetaName cenv of
+  -- let thetaName = "relevant-univ"
+  -- let theta = (m, DataTheta thetaName)
+  (ident, theta) <- foo "relevant-univ" m
+  case Map.lookup ident cenv of
     Just _ -> return theta
     Nothing -> do
       (univVarName, univVar) <- newDataUpsilonWith "univ"
@@ -163,7 +174,7 @@ relevantUniv m = do
       (relVarName, relVar) <- newDataUpsilonWith "rel-univ"
       retImmType <- returnCartesianImmediate
       insCodeEnv
-        thetaName
+        ident
         [univVarName]
         -- let (a, b) := x in return ((a, b), (a, b))
         ( emptyMeta
@@ -190,15 +201,14 @@ cartesianStruct m ks = do
 affineStruct :: Meta -> [ArrayKind] -> WithEnv DataPlus
 affineStruct m ks = do
   cenv <- gets codeEnv
-  let thetaName = "affine-struct"
-  let theta = (m, DataTheta thetaName)
-  case Map.lookup thetaName cenv of
+  (ident, theta) <- foo "affine-struct" m
+  case Map.lookup ident cenv of
     Just _ -> return theta
     Nothing -> do
       (structVarName, structVar) <- newDataUpsilonWith "struct"
-      xs <- mapM (const $ newNameWith "var") ks
+      xs <- mapM (const $ newNameWith' "var") ks
       insCodeEnv
-        thetaName
+        ident
         [structVarName]
         ( emptyMeta
         , CodeStructElim
@@ -210,17 +220,21 @@ affineStruct m ks = do
 relevantStruct :: Meta -> [ArrayKind] -> WithEnv DataPlus
 relevantStruct m ks = do
   cenv <- gets codeEnv
-  let thetaName = "relevant-struct"
-  let theta = (m, DataTheta thetaName)
-  case Map.lookup thetaName cenv of
+  -- let thetaName = "relevant-struct"
+  -- i <- lookupConstNum thetaName
+  -- let ident = I ("affine-struct", i)
+  -- let theta = (m, DataTheta ident)
+  -- let theta = (m, DataTheta thetaName)
+  (ident, theta) <- foo "relevant-struct" m
+  case Map.lookup ident cenv of
     Just _ -> return theta
     Nothing -> do
       (structVarName, structVar) <- newDataUpsilonWith "struct"
-      xs <- mapM (const $ newNameWith "var") ks
+      xs <- mapM (const $ newNameWith' "var") ks
       let vs = map (\y -> (emptyMeta, DataUpsilon y)) xs
       let vks = zip vs ks
       insCodeEnv
-        thetaName
+        ident
         [structVarName]
         ( emptyMeta
         , CodeStructElim

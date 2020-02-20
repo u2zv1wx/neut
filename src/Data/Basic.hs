@@ -1,12 +1,16 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 module Data.Basic where
 
+import Data.Hashable
+import GHC.Generics (Generic)
 import Path
 
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Text as T
 
+-- import Data.Hashable
 -- import Control.Exception (assert)
 import Data.Bits
 import Data.Maybe (fromMaybe)
@@ -16,6 +20,9 @@ import qualified Data.Set as S
 
 newtype Identifier =
   I (T.Text, Int)
+  deriving (Generic)
+
+instance Hashable Identifier
 
 asText :: Identifier -> T.Text
 asText (I (s, _)) = s
