@@ -25,8 +25,10 @@ emit mainTerm = do
   g <- emitGlobal
   zs <- emitDefinition "main" [] mainTerm
   xs <-
-    forM (Map.toList lenv) $ \(name, (args, body)) ->
-      emitDefinition (TE.encodeUtf8 name) (map TE.encodeUtf8 args) body
+    forM (Map.toList lenv) $ \(name, (args, body)) -> do
+      let name' = asText' name
+      let args' = map asText' args
+      emitDefinition (TE.encodeUtf8 name') (map TE.encodeUtf8 args') body
   return $ g <> zs <> concat xs
 
 emitDefinition ::
@@ -44,16 +46,16 @@ sig name args = "define i8* " <> "@" <> name <> showLocals args
 -- sig name args =
 --   "define i8* " <>
 --   showLLVMData (LLVMDataGlobal name) <> showArgs (map LLVMDataLocal args)
-emitBlock :: B.ByteString -> T.Text -> LLVM -> WithEnv [B.ByteString]
+emitBlock :: B.ByteString -> Identifier -> LLVM -> WithEnv [B.ByteString]
 emitBlock funName name asm = do
   a <- emitLLVM funName asm
-  return $ emitLabel name : a
+  return $ emitLabel (asText' name) : a
 
 -- FIXME: callはcall fastccにするべきっぽい？
 emitLLVM :: B.ByteString -> LLVM -> WithEnv [B.ByteString]
 emitLLVM funName (LLVMReturn d) = emitRet funName d
 emitLLVM funName (LLVMCall f args) = do
-  tmp <- newNameWith "tmp"
+  tmp <- newNameWith' "tmp"
   op <-
     emitOp $
     BC.unwords
@@ -65,7 +67,7 @@ emitLLVM funName (LLVMCall f args) = do
   a <- emitRet funName (LLVMDataLocal tmp)
   return $ op <> a
 emitLLVM funName (LLVMSwitch (d, lowType) defaultBranch branchList) = do
-  defaultLabel <- newNameWith "default"
+  defaultLabel <- newNameWith' "default"
   labelList <- constructLabelList branchList
   op <-
     emitOp $
@@ -292,10 +294,10 @@ emitRet _ d = emitOp $ BC.unwords ["ret i8*", showLLVMData d]
 emitLabel :: T.Text -> B.ByteString
 emitLabel s = TE.encodeUtf8 s <> ":"
 
-constructLabelList :: [(Int, LLVM)] -> WithEnv [T.Text]
+constructLabelList :: [(Int, LLVM)] -> WithEnv [Identifier]
 constructLabelList [] = return []
 constructLabelList ((_, _):rest) = do
-  label <- newNameWith "case"
+  label <- newNameWith' "case"
   labelList <- constructLabelList rest
   return $ label : labelList
 
@@ -303,7 +305,7 @@ showRegList :: [B.ByteString] -> B.ByteString
 showRegList [] = ""
 showRegList (s:ss) = ",{" <> s <> "}" <> showRegList ss
 
-showBranchList :: LowType -> [(Int, T.Text)] -> B.ByteString
+showBranchList :: LowType -> [(Int, Identifier)] -> B.ByteString
 showBranchList lowType xs =
   "[" <> showItems (uncurry (showBranch lowType)) xs <> "]"
 
@@ -312,7 +314,7 @@ showIndex [] = ""
 showIndex [(d, t)] = showLowType t <> " " <> showLLVMData d
 showIndex ((d, t):dts) = showIndex [(d, t)] <> ", " <> showIndex dts
 
-showBranch :: LowType -> Int -> T.Text -> B.ByteString
+showBranch :: LowType -> Int -> Identifier -> B.ByteString
 showBranch lowType i label =
   showLowType lowType <>
   " " <> BC.pack (show i) <> ", label " <> showLLVMData (LLVMDataLocal label)
@@ -375,8 +377,12 @@ showLowType (LowTypeArrayPtr i t) = do
 showLowType LowTypeIntS64Ptr = "i64*"
 
 showLLVMData :: LLVMData -> B.ByteString
-showLLVMData (LLVMDataLocal x) = "%" <> TE.encodeUtf8 x
-showLLVMData (LLVMDataGlobal x) = "@" <> TE.encodeUtf8 x
+showLLVMData (LLVMDataLocal (I (s, i))) =
+  "%" <> TE.encodeUtf8 s <> BC.pack (show i)
+showLLVMData (LLVMDataGlobal (I (s, i))) =
+  "@" <> TE.encodeUtf8 s <> BC.pack (show i)
+-- showLLVMData (LLVMDataLocal x) = "%" <> TE.encodeUtf8 x
+-- showLLVMData (LLVMDataGlobal x) = "@" <> TE.encodeUtf8 x
 showLLVMData (LLVMDataInt i) = BC.pack $ show i
 showLLVMData (LLVMDataFloat16 x) = BC.pack $ show x
 showLLVMData (LLVMDataFloat32 x) = BC.pack $ show x

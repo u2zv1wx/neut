@@ -28,7 +28,7 @@ asText :: Identifier -> T.Text
 asText (I (s, _)) = s
 
 asText' :: Identifier -> T.Text
-asText' (I (s, i)) = s <> T.pack (show i)
+asText' (I (s, i)) = s <> "-" <> T.pack (show i)
 
 asIdent :: T.Text -> Identifier
 asIdent s = I (s, 0)
