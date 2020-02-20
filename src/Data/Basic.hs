@@ -20,6 +20,9 @@ newtype Identifier =
 asText :: Identifier -> T.Text
 asText (I (s, i)) = s <> T.pack (show i)
 
+asIdent :: T.Text -> Identifier
+asIdent s = I (s, 0)
+
 instance Show Identifier where
   show (I (s, i)) = T.unpack s ++ "-" ++ show i
 
@@ -44,7 +47,7 @@ data Case
   deriving (Show, Eq, Ord)
 
 data EnumType
-  = EnumTypeLabel Identifier
+  = EnumTypeLabel T.Text
   | EnumTypeIntS Integer -- i{k}
   | EnumTypeIntU Integer -- u{k}
   | EnumTypeNat Integer -- n{k}
@@ -139,21 +142,21 @@ emptyMeta =
     , metaUnivParams = IntMap.empty
     }
 
-readEnumType :: Char -> Identifier -> Integer -> (Maybe Integer)
-readEnumType c (I (str, _)) k -- n1, n2, ..., n{i}, ..., n{2^64}
+readEnumType :: Char -> T.Text -> Integer -> (Maybe Integer)
+readEnumType c str k -- n1, n2, ..., n{i}, ..., n{2^64}
   | T.length str >= 2
   , T.head str == c
   , Just i <- readMaybe $ T.unpack $ T.tail str
   , 1 <= i && i <= 2 ^ k = Just i
 readEnumType _ _ _ = Nothing
 
-readEnumTypeNat :: Identifier -> (Maybe Integer)
+readEnumTypeNat :: T.Text -> (Maybe Integer)
 readEnumTypeNat str = readEnumType 'n' str 64
 
-readEnumTypeIntS :: Identifier -> (Maybe Integer)
+readEnumTypeIntS :: T.Text -> (Maybe Integer)
 readEnumTypeIntS str = readEnumType 'i' str 23
 
-readEnumTypeIntU :: Identifier -> (Maybe Integer)
+readEnumTypeIntU :: T.Text -> (Maybe Integer)
 readEnumTypeIntU str = readEnumType 'u' str 23
 
 data EnumValue
@@ -163,20 +166,20 @@ data EnumValue
   | EnumValueLabel T.Text
   deriving (Show, Eq, Ord)
 
-readEnumValueIntS :: Identifier -> Identifier -> Maybe EnumValue
-readEnumValueIntS (I (t, _)) (I (x, _))
+readEnumValueIntS :: T.Text -> T.Text -> Maybe EnumValue
+readEnumValueIntS t x
   | Just (LowTypeIntS i) <- asLowTypeMaybe t
   , Just x' <- readMaybe $ T.unpack x = Just $ EnumValueIntS i x'
   | otherwise = Nothing
 
-readEnumValueIntU :: Identifier -> Identifier -> Maybe EnumValue
-readEnumValueIntU (I (t, _)) (I (x, _))
+readEnumValueIntU :: T.Text -> T.Text -> Maybe EnumValue
+readEnumValueIntU t x
   | Just (LowTypeIntU i) <- asLowTypeMaybe t
   , Just x' <- readMaybe $ T.unpack x = Just $ EnumValueIntU i x'
   | otherwise = Nothing
 
-readEnumValueNat :: Identifier -> Maybe EnumValue
-readEnumValueNat (I (str, _)) -- n1-0, n2-0, n2-1, ...
+readEnumValueNat :: T.Text -> Maybe EnumValue
+readEnumValueNat str -- n1-0, n2-0, n2-1, ...
   | T.length str >= 4
   , T.head str == 'n'
   , [iStr, jStr] <- wordsBy '-' (T.tail str)

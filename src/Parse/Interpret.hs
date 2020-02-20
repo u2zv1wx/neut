@@ -36,7 +36,7 @@ interpret (m, TreeAtom "tau") = do
   return (m', WeakTermTau l)
 interpret (m, TreeNode [(_, TreeAtom "upsilon"), (_, TreeAtom x)]) = do
   m' <- adjustPhase m
-  return (m', WeakTermUpsilon x)
+  return (m', WeakTermUpsilon $ asIdent x)
 interpret (m, TreeNode [(_, TreeAtom "pi"), (_, TreeNode xts), t]) = do
   (xts', t') <- interpretBinder xts t
   mls <- piUnivLevelsfrom xts' t'
@@ -57,7 +57,7 @@ interpret (m, TreeNode ((_, TreeAtom "pi-elimination"):e:es)) = do
 interpret (m, TreeNode [(_, TreeAtom "sigma"), (_, TreeNode xts), t]) = do
   xts' <- mapM interpretIdentifierPlus xts
   t' <- interpret t
-  placeholder <- newNameWith "cod"
+  placeholder <- newNameWith $ asIdent "cod"
   m' <- adjustPhase m
   return (m', WeakTermSigma $ xts' ++ [(fst t', placeholder, t')])
 interpret (m, TreeNode ((_, TreeAtom "sigma-introduction"):es)) = do
@@ -168,7 +168,7 @@ interpret (m, TreeNode [(_, TreeAtom "struct-elimination"), (_, TreeNode xts), e
 interpret (m, TreeNode ((_, TreeAtom "product"):ts)) = do
   ts' <- mapM interpret ts
   let ms = map fst ts'
-  xs <- mapM (const $ newNameWith "sig") ts'
+  xs <- mapM (const $ newNameWith $ asIdent "sig") ts'
   m' <- adjustPhase m
   return (m', WeakTermSigma (zip3 ms xs ts'))
 interpret (m, TreeAtom x)
@@ -212,7 +212,7 @@ interpret t@(m, TreeAtom x) = do
     -- Those are reinterpreted into constants in Rename.
     -- This is to handle terms like `lam (i64 : bool). e` (i.e. bound variable
     -- with the same name of a constant) in saner way.
-    (_, False) -> return (m', WeakTermUpsilon x)
+    (_, False) -> return (m', WeakTermUpsilon $ asIdent x)
 interpret t@(m, TreeNode es) = do
   m' <- adjustPhase m
   if null es
@@ -249,11 +249,11 @@ interpretAtom :: TreePlus -> WithEnv (Meta, Identifier)
 interpretAtom (m, TreeAtom "_") = do
   m' <- adjustPhase m
   let m'' = m' {metaIsAppropriateAsCompletionCandidate = False}
-  h <- newNameWith "H"
+  h <- newNameWith $ asIdent "H"
   return (m'', h)
 interpretAtom (m, TreeAtom x) = do
   m' <- adjustPhase m
-  return (m', x)
+  return (m', asIdent x)
 interpretAtom t =
   throwError' $ "interpretAtom: syntax error:\n" <> T.pack (Pr.ppShow t)
 
@@ -333,12 +333,12 @@ interpretStructIntro e =
 interpretStructElim :: TreePlus -> WithEnv (Meta, Identifier, ArrayKind)
 interpretStructElim (_, TreeNode [(m, TreeAtom x), k]) = do
   k' <- asStructKind k
-  return (m, x, k')
+  return (m, asIdent x, k')
 interpretStructElim e =
   throwError' $ "interpretStructElim: syntax error:\n " <> T.pack (Pr.ppShow e)
 
 -- {} interpretEnumItem {}
-interpretEnumItem :: [TreePlus] -> WithEnv [(Identifier, Int)]
+interpretEnumItem :: [TreePlus] -> WithEnv [(T.Text, Int)]
 interpretEnumItem ts = do
   xis <- interpretEnumItem' $ reverse ts
   if linearCheck (map snd xis)
@@ -346,7 +346,7 @@ interpretEnumItem ts = do
     else throwError'
            "found a collision of discriminant with previous definition"
 
-interpretEnumItem' :: [TreePlus] -> WithEnv [(Identifier, Int)]
+interpretEnumItem' :: [TreePlus] -> WithEnv [(T.Text, Int)]
 interpretEnumItem' [] = return []
 interpretEnumItem' [t] = do
   (s, mj) <- interpretEnumItem'' t
@@ -356,19 +356,19 @@ interpretEnumItem' (t:ts) = do
   (s, mj) <- interpretEnumItem'' t
   return $ (s, fromMaybe (1 + headDiscriminantOf ts') mj) : ts'
 
-interpretEnumItem'' :: TreePlus -> WithEnv (Identifier, Maybe Int)
+interpretEnumItem'' :: TreePlus -> WithEnv (T.Text, Maybe Int)
 interpretEnumItem'' (_, TreeAtom s) = return (s, Nothing)
 interpretEnumItem'' (_, TreeNode [(_, TreeAtom s), (_, TreeAtom i)])
   | Just i' <- readMaybe $ T.unpack i = return (s, Just i')
 interpretEnumItem'' t =
   throwError' $ "interpretEnumItem: syntax error:\n" <> T.pack (Pr.ppShow t)
 
-headDiscriminantOf :: [(Identifier, Int)] -> Int
+headDiscriminantOf :: [(T.Text, Int)] -> Int
 headDiscriminantOf [] = 0
 headDiscriminantOf ((_, i):_) = i
 
 -- {} isDefinedEnumName {}
-isDefinedEnumName :: Identifier -> WithEnv Bool
+isDefinedEnumName :: T.Text -> WithEnv Bool
 isDefinedEnumName name = do
   env <- get
   -- let enumNameList = Map.elems $ enumEnv env
@@ -388,10 +388,10 @@ adjustPhase' i (Just (_, l, c)) = Just (i, l, c)
 
 newHole :: Meta -> WithEnv WeakTermPlus
 newHole m = do
-  h <- newNameWith "hole-aux"
+  h <- newNameWith $ asIdent "hole-aux"
   return (m, WeakTermZeta h)
 
-asArrayKind :: Identifier -> WithEnv ArrayKind
+asArrayKind :: T.Text -> WithEnv ArrayKind
 asArrayKind x =
   case asLowTypeMaybe x of
     Nothing -> throwError' "asArrayKind: syntax error"

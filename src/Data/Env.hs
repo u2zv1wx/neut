@@ -53,8 +53,8 @@ data Env =
     , notationEnv :: [(TreePlus, TreePlus)] -- macro transformers
     , constantEnv :: S.Set Identifier
     , fileEnv :: FileEnv -- path ~> identifiers defined in the file at toplevel
-    , enumEnv :: Map.HashMap Identifier [(Identifier, Int)] -- [("choice", [("left", 0), ("right", 1)]), ...]
-    , revEnumEnv :: Map.HashMap T.Text (Identifier, Int) -- [("left", ("choice", 0)), ("right", ("choice", 1)), ...]
+    , enumEnv :: Map.HashMap T.Text [(T.Text, Int)] -- [("choice", [("left", 0), ("right", 1)]), ...]
+    , revEnumEnv :: Map.HashMap T.Text (T.Text, Int) -- [("left", ("choice", 0)), ("right", ("choice", 1)), ...]
     , nameEnv :: Map.HashMap Int Identifier -- [("foo", "foo.13"), ...]
     , revNameEnv :: Map.HashMap Int Identifier -- [("foo.13", "foo"), ...]
     -- , nameEnv :: Map.HashMap Identifier Identifier -- [("foo", "foo.13"), ...]
@@ -232,7 +232,7 @@ lookupNameEnv (I (s, i)) = do
     Just s' -> return s'
     Nothing -> throwError [TIO.putStrLn $ "undefined variable: " <> s]
 
-isDefinedEnum :: Identifier -> WithEnv Bool
+isDefinedEnum :: T.Text -> WithEnv Bool
 isDefinedEnum name = do
   env <- get
   let labelList = join $ Map.elems $ enumEnv env

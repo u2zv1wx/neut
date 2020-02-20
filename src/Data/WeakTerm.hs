@@ -432,7 +432,7 @@ toText (_, WeakTermFloat64 a) = T.pack $ show a
 toText (_, WeakTermFloat _ a) = T.pack $ show a
 toText (_, WeakTermEnum enumType) =
   case enumType of
-    EnumTypeLabel l -> asText l
+    EnumTypeLabel l -> l
     EnumTypeIntS size -> "i" <> T.pack (show size)
     EnumTypeIntU size -> "u" <> T.pack (show size)
     EnumTypeNat size -> "n" <> T.pack (show size)
