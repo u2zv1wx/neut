@@ -23,9 +23,13 @@ cartesianSigma ::
   -> ArrayKind
   -> [Either CodePlus (Identifier, CodePlus)]
   -> WithEnv DataPlus
-cartesianSigma thetaName m k mxts = do
-  aff <- affineSigma ("affine-" <> thetaName) m k mxts
-  rel <- relevantSigma ("relevant-" <> thetaName) m k mxts
+cartesianSigma (I (thetaName, _)) m k mxts = do
+  affName <- newNameWith' $ "affine-" <> thetaName
+  relName <- newNameWith' $ "relevant-" <> thetaName
+  -- aff <- affineSigma ("affine-" <> thetaName) m k mxts
+  -- rel <- relevantSigma ("relevant-" <> thetaName) m k mxts
+  aff <- affineSigma affName m k mxts
+  rel <- relevantSigma relName m k mxts
   return (m, DataSigmaIntro arrVoidPtr [aff, rel])
 
 -- (Assuming `ti` = `return di` for some `di` such that `xi : di`)
@@ -62,7 +66,7 @@ affineSigma thetaName m k mxts = do
       (z, varZ) <- newDataUpsilonWith "arg"
       -- As == [APP-1, ..., APP-n]   (`a` here stands for `app`)
       as <- forM xts $ \(x, t) -> toAffineApp m x t
-      ys <- mapM (const $ newNameWith "arg") xts
+      ys <- mapM (const $ newNameWith' "arg") xts
       let body =
             bindLet
               (zip ys as)
@@ -156,7 +160,7 @@ bindSigmaElim (((x, y), (d, t)):xyds) cont = do
 supplyName :: Either b (Identifier, b) -> WithEnv (Identifier, b)
 supplyName (Right (x, t)) = return (x, t)
 supplyName (Left t) = do
-  x <- newNameWith "unused-sigarg"
+  x <- newNameWith' "unused-sigarg"
   return (x, t)
 
 returnArrayType :: Meta -> WithEnv CodePlus
@@ -166,7 +170,7 @@ returnArrayType ml = do
   let retArrVar = (ml, CodeUpIntro arrVar)
   v <-
     cartesianSigma
-      "array-closure"
+      (I ("array-closure", 0))
       ml
       arrVoidPtr
       [Right (arrVarName, retTau), Left retArrVar]
@@ -180,7 +184,7 @@ returnClosureType m = do
   let retEnvVar = (m, CodeUpIntro envVar)
   closureType <-
     cartesianSigma
-      "closure"
+      (I ("closure", 0))
       m
       arrVoidPtr
       [Right (envVarName, retUnivType), Left retEnvVar, Left retImmType]
