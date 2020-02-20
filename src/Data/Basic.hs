@@ -23,6 +23,9 @@ asText (I (s, i)) = s <> T.pack (show i)
 asIdent :: T.Text -> Identifier
 asIdent s = I (s, 0)
 
+asInt :: Identifier -> Int
+asInt (I (_, i)) = i
+
 instance Show Identifier where
   show (I (s, i)) = T.unpack s ++ "-" ++ show i
 
