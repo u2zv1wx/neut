@@ -14,7 +14,6 @@ import qualified Data.HashMap.Strict as Map
 import qualified Data.PQueue.Min as Q
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
-import qualified Text.Show.Pretty as Pr
 
 import Data.Basic
 import Data.Constraint
@@ -99,8 +98,8 @@ resolvePiElim m ess e = do
 
 -- {} resolveHole {}
 resolveHole :: Hole -> WeakTermPlus -> WithEnv ()
-resolveHole m e = do
-  modify (\env -> env {substEnv = Map.insert m e (substEnv env)})
+resolveHole m@(I (_, i)) e = do
+  modify (\env -> env {substEnv = Map.insert i e (substEnv env)})
   q <- gets constraintQueue
   let (q1, q2) = Q.partition (\(Enriched _ ms _) -> m `elem` ms) q
   let q1' = Q.mapU asAnalyzable q1
@@ -177,7 +176,7 @@ discardInactive xs indexList =
       Just j
         | i == j -> return (mx, x, t)
       _ -> do
-        y <- newNameWith "hole"
+        y <- newNameWith' "hole"
         return (mx, y, t)
 
 -- takeByCount [1, 3, 2] [a, b, c, d, e, f, g, h] ~> [[a], [b, c, d], [e, f]]
