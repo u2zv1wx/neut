@@ -41,7 +41,7 @@ compInfoDef c info (_, (mx, x, t), xts, e) = do
 compInfoWeakTermPlus ::
      CursorName -> CompInfo -> WeakTermPlus -> Either CompInfo ()
 compInfoWeakTermPlus _ _ (_, WeakTermTau _) = return ()
-compInfoWeakTermPlus c info (_, WeakTermUpsilon x)
+compInfoWeakTermPlus c info (_, WeakTermUpsilon (I (x, _)))
   | c == x = Left info
   | otherwise = return ()
 compInfoWeakTermPlus c info (_, WeakTermPi _ xts t) =
@@ -126,7 +126,7 @@ compInfoSigma s info ((mx, x, t):xts) = do
   compInfoSigma s info' xts
 
 filterCompInfo :: Prefix -> (Identifier, Meta) -> Bool
-filterCompInfo prefix (x, m)
+filterCompInfo prefix (I (x, _), m)
   | True <- metaIsAppropriateAsCompletionCandidate m = prefix `T.isPrefixOf` x
   | otherwise = False
 
