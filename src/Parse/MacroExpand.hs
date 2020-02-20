@@ -16,7 +16,7 @@ import Data.Env
 import Data.Maybe (fromMaybe)
 import Data.Tree
 
-type MacroSubst = [(Identifier, TreePlus)]
+type MacroSubst = [(T.Text, TreePlus)]
 
 -- {} macroExpand {noSplice, noKeyword}
 -- CBV-like macro expansion

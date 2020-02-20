@@ -49,7 +49,7 @@ data Env =
     , mainFilePath :: Path Abs File
     , currentFilePath :: Path Abs File
     , includeGraph :: IncludeGraph -- to detect cyclic `include`
-    , keywordEnv :: S.Set Identifier -- list of reserved keywords
+    , keywordEnv :: S.Set T.Text -- list of reserved keywords
     , notationEnv :: [(TreePlus, TreePlus)] -- macro transformers
     , constantEnv :: S.Set Identifier
     , fileEnv :: FileEnv -- path ~> identifiers defined in the file at toplevel
