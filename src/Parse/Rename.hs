@@ -10,7 +10,6 @@ module Parse.Rename
 import Control.Monad.Except
 import Control.Monad.State
 
--- import Data.Tuple (swap)
 import qualified Data.HashMap.Strict as Map
 import qualified Data.Text as T
 
@@ -18,7 +17,6 @@ import Data.Basic
 import Data.Env
 import Data.WeakTerm
 
--- {} rename' nenv {(every bound variable has fresh name)}
 rename :: WeakTermPlus -> WithEnv WeakTermPlus
 rename e = do
   result <- rename' Map.empty e
@@ -249,11 +247,6 @@ renameArgs nenv ((mx, x, t):xts) = do
   (xts', nenv') <- renameArgs (insertName x x' nenv) xts
   return ((mx, x', t') : xts', nenv')
 
--- renameIdentPlus :: NameEnv -> IdentifierPlus -> WithEnv IdentifierPlus
--- renameIdentPlus nenv (m, x, t) = do
---   t' <- rename' nenv t
---   x' <- newLLVMNameWith x
---   return (m, x', t')
 renameIdentPlus' ::
      NameEnv -> IdentifierPlus -> WithEnv (IdentifierPlus, NameEnv)
 renameIdentPlus' nenv (m, x, t) = do
@@ -261,14 +254,6 @@ renameIdentPlus' nenv (m, x, t) = do
   x' <- newLLVMNameWith x
   return ((m, x', t'), insertName x x' nenv)
 
--- renameIdentPlus :: NameEnv -> IdentifierPlus -> WithEnv IdentifierPlus
--- renameIdentPlus nenv (m, x, t) = do
---   t' <- rename' nenv t
---   case lookupName x nenv of
---     Just x' -> return (m, x', t')
---     Nothing ->
---       throwError' $
---       T.pack (showMeta m) <> ": (renameIdentPlus'') undefined variable: " <> x
 renameIter ::
      NameEnv
   -> IdentifierPlus
@@ -398,7 +383,6 @@ checkSanity'' ctx ((_, x, _):_) _
 checkSanity'' ctx ((_, x, _):xts) e = do
   checkSanity'' (x : ctx) xts e
 
--- {} invRename {(every bound variable has fresh name)}
 prepareInvRename :: WithEnv ()
 prepareInvRename = do
   modify (\env -> env {count = 0})
@@ -560,7 +544,6 @@ invRenameStruct ((mx, x, t):xts) e = do
 insertName :: Identifier -> Identifier -> NameEnv -> NameEnv
 insertName (I (_, i)) (I (_, j)) nenv = Map.insert i j nenv
 
--- insertName x x' nenv
 lookupName :: Identifier -> NameEnv -> Maybe Identifier
 lookupName (I (s, i)) nenv = do
   j <- Map.lookup i nenv
