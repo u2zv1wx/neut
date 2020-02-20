@@ -14,8 +14,19 @@ import Text.Read
 
 import qualified Data.Set as S
 
-type Identifier = T.Text
+newtype Identifier =
+  I (T.Text, Int)
 
+instance Show Identifier where
+  show (I (s, i)) = T.unpack s ++ "-" ++ show i
+
+instance Eq Identifier where
+  (I (_, i1)) == (I (_, i2)) = i1 == i2
+
+instance Ord Identifier where
+  compare (I (_, i1)) (I (_, i2)) = compare i1 i2
+
+-- type Identifier = T.Text
 type Phase = Integer
 
 type Line = Integer
@@ -126,7 +137,7 @@ emptyMeta =
     }
 
 readEnumType :: Char -> Identifier -> Integer -> (Maybe Integer)
-readEnumType c str k -- n1, n2, ..., n{i}, ..., n{2^64}
+readEnumType c (I (str, _)) k -- n1, n2, ..., n{i}, ..., n{2^64}
   | T.length str >= 2
   , T.head str == c
   , Just i <- readMaybe $ T.unpack $ T.tail str
@@ -150,19 +161,19 @@ data EnumValue
   deriving (Show, Eq, Ord)
 
 readEnumValueIntS :: Identifier -> Identifier -> Maybe EnumValue
-readEnumValueIntS t x
+readEnumValueIntS (I (t, _)) (I (x, _))
   | Just (LowTypeIntS i) <- asLowTypeMaybe t
   , Just x' <- readMaybe $ T.unpack x = Just $ EnumValueIntS i x'
   | otherwise = Nothing
 
 readEnumValueIntU :: Identifier -> Identifier -> Maybe EnumValue
-readEnumValueIntU t x
+readEnumValueIntU (I (t, _)) (I (x, _))
   | Just (LowTypeIntU i) <- asLowTypeMaybe t
   , Just x' <- readMaybe $ T.unpack x = Just $ EnumValueIntU i x'
   | otherwise = Nothing
 
 readEnumValueNat :: Identifier -> Maybe EnumValue
-readEnumValueNat str -- n1-0, n2-0, n2-1, ...
+readEnumValueNat (I (str, _)) -- n1-0, n2-0, n2-1, ...
   | T.length str >= 4
   , T.head str == 'n'
   , [iStr, jStr] <- wordsBy '-' (T.tail str)
@@ -173,8 +184,8 @@ readEnumValueNat str -- n1-0, n2-0, n2-1, ...
   | otherwise = Nothing
 
 isConstant :: Identifier -> Bool
-isConstant x
-  | Just (LowTypeFloat _) <- asLowTypeMaybe x = True
+isConstant x@(I (x', _))
+  | Just (LowTypeFloat _) <- asLowTypeMaybe x' = True
   | Just _ <- asUnaryOpMaybe x = True
   | Just _ <- asBinaryOpMaybe x = True
   | otherwise = False
@@ -307,9 +318,9 @@ data Arch =
   deriving (Eq, Show)
 
 asLowType :: Identifier -> LowType
-asLowType n = fromMaybe (LowTypeIntS 64) (asLowTypeMaybe n)
+asLowType (I (n, _)) = fromMaybe (LowTypeIntS 64) (asLowTypeMaybe n)
 
-asLowTypeMaybe :: Identifier -> Maybe LowType
+asLowTypeMaybe :: T.Text -> Maybe LowType
 asLowTypeMaybe "" = Nothing
 asLowTypeMaybe s
   | 'i' <- T.head s
@@ -332,17 +343,17 @@ asFloatSize 64 = Just FloatSize64
 asFloatSize _ = Nothing
 
 asUnaryOpMaybe :: Identifier -> Maybe (LowType, UnaryOp)
-asUnaryOpMaybe name
+asUnaryOpMaybe (I (name, _))
   | [typeStr, "neg"] <- wordsBy '.' name
   , Just lowType <- asLowTypeMaybe typeStr = Just (lowType, UnaryOpNeg)
-asUnaryOpMaybe name
+asUnaryOpMaybe (I (name, _))
   | [domTypeStr, convOpStr, codTypeStr] <- wordsBy '.' name
   , Just domType <- asLowTypeMaybe domTypeStr
   , Just codType <- asLowTypeMaybe codTypeStr
   , Just op <- asConvOpMaybe codType convOpStr = Just (domType, op)
 asUnaryOpMaybe _ = Nothing
 
-asConvOpMaybe :: LowType -> Identifier -> Maybe UnaryOp
+asConvOpMaybe :: LowType -> T.Text -> Maybe UnaryOp
 asConvOpMaybe codType "trunc" = Just $ UnaryOpTrunc codType
 asConvOpMaybe codType "zext" = Just $ UnaryOpZext codType
 asConvOpMaybe codType "sext" = Just $ UnaryOpSext codType
@@ -351,13 +362,13 @@ asConvOpMaybe codType "to" = Just $ UnaryOpTo codType
 asConvOpMaybe _ _ = Nothing
 
 asBinaryOpMaybe :: Identifier -> Maybe (LowType, BinaryOp)
-asBinaryOpMaybe name
+asBinaryOpMaybe (I (name, _))
   | [typeStr, opStr] <- wordsBy '.' name -- e.g. name == "i8.add"
   , Just lowType <- asLowTypeMaybe typeStr
   , Just op <- asBinaryOpMaybe' opStr = Just (lowType, op)
 asBinaryOpMaybe _ = Nothing
 
-asBinaryOpMaybe' :: Identifier -> Maybe BinaryOp
+asBinaryOpMaybe' :: T.Text -> Maybe BinaryOp
 asBinaryOpMaybe' "add" = Just BinaryOpAdd
 asBinaryOpMaybe' "sub" = Just BinaryOpSub
 asBinaryOpMaybe' "mul" = Just BinaryOpMul
