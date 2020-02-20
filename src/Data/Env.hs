@@ -129,8 +129,8 @@ evalWithEnv c env = do
     Left err -> return $ Left err
     Right (result, _) -> return $ Right result
 
-throwError' :: Identifier -> WithEnv a
-throwError' x = throwError [TIO.putStrLn $ asText x]
+throwError' :: T.Text -> WithEnv a
+throwError' x = throwError [TIO.putStrLn x]
 
 addErrorAction :: IO () -> WithEnv a -> WithEnv a
 addErrorAction action computation = do

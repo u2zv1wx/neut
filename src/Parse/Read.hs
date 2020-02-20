@@ -51,7 +51,7 @@ parseNode = do
 skip :: Parser ()
 skip = spaces >> (comment <|> spaces)
 
-symbol :: Parser Identifier
+symbol :: Parser T.Text
 symbol = do
   s <- many1 (noneOf "()[] \n;")
   return $ T.pack s
