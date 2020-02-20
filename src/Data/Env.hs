@@ -305,6 +305,13 @@ lookupTypeEnv (I (_, i)) = do
   tenv <- gets typeEnv
   return $ Map.lookup i tenv
 
+lookupConstNum :: T.Text -> WithEnv Int
+lookupConstNum constName = do
+  cenv <- gets constantEnv
+  case Map.lookup constName cenv of
+    Just i -> return i
+    Nothing -> throwError' $ "no such constant: " <> constName
+
 lookupConstant :: T.Text -> WithEnv WeakTermPlus
 lookupConstant constName = do
   me <- lookupConstantMaybe constName

@@ -119,7 +119,7 @@ reduceTermPlus t = return t
 
 reduceTermPlusTheta ::
      TermPlus -> [TermPlus] -> Meta -> Identifier -> WithEnv TermPlus
-reduceTermPlusTheta orig es m constant
+reduceTermPlusTheta orig es m (I (constant, _))
   | Just (lowType, op) <- asUnaryOpMaybe constant
   , [arg] <- es = return $ reduceTermPlusUnary orig arg m lowType op
   | Just (lowType, op) <- asBinaryOpMaybe constant
@@ -406,7 +406,7 @@ isValue (_, TermArrayIntro _ es) = do
 isValue _ = return False
 
 isValueConst :: Identifier -> WithEnv Bool
-isValueConst x
+isValueConst (I (x, _))
   | Just _ <- asLowTypeMaybe x = return True
   | Just _ <- asUnaryOpMaybe x = return True
   | Just _ <- asBinaryOpMaybe x = return True

@@ -49,7 +49,7 @@ elaborateStmt (WeakStmtReturn e) = do
   analyze >> synthesize >> refine
   checkUnivSanity
   elaborate' e' >>= reduceTermPlus
-elaborateStmt (WeakStmtLet m (mx, x, t) e cont) = do
+elaborateStmt (WeakStmtLet m (mx, x@(I (_, i)), t) e cont) = do
   (e', te, mle) <- infer e
   (t', mlt) <- inferType t
   insConstraintEnv te t'
@@ -59,21 +59,17 @@ elaborateStmt (WeakStmtLet m (mx, x, t) e cont) = do
   e'' <- elaborate' e' >>= reduceTermPlus
   t'' <- elaborate' t' >>= reduceTermPlus
   insTypeEnv x t'' mlt
-  modify (\env -> env {substEnv = Map.insert x (weaken e'') (substEnv env)})
-  -- p $ T.unpack $ "- " <> toText (weaken e'')
-  -- p $ T.unpack $ "- " <> toText (weaken t'')
-  -- p' e''
-  -- p' t''
+  modify (\env -> env {substEnv = Map.insert i (weaken e'') (substEnv env)})
   cont' <- elaborateStmt cont
   return (m, TermPiElim (m, TermPiIntro [(mx, x, t'')] cont') [e''])
-elaborateStmt (WeakStmtLetWT m (mx, x, t) e cont) = do
+elaborateStmt (WeakStmtLetWT m (mx, x@(I (_, i)), t) e cont) = do
   (t', mlt) <- inferType t
   analyze >> synthesize >> refine >> cleanup
   e' <- elaborate' e -- `e` is supposed to be well-typed
   t'' <- elaborate' t' >>= reduceTermPlus
   insTypeEnv x t'' mlt
   modify (\env -> env {quasiConstEnv = S.insert x (quasiConstEnv env)})
-  modify (\env -> env {substEnv = Map.insert x (weaken e') (substEnv env)})
+  modify (\env -> env {substEnv = Map.insert i (weaken e') (substEnv env)})
   -- p $ T.unpack $ "- " <> toText (weaken e')
   -- p $ T.unpack $ "- " <> toText (weaken t'')
   cont' <- elaborateStmt cont
@@ -82,9 +78,10 @@ elaborateStmt (WeakStmtConstDecl m (mx, x, t) cont) = do
   (t', mlt) <- inferType t
   analyze >> synthesize >> refine >> cleanup
   t'' <- elaborate' t' >>= reduceTermPlus
-  insTypeEnv x t'' mlt
+  i <- lookupConstNum x
+  insTypeEnv (I (x, i)) t'' mlt
   cont' <- elaborateStmt cont
-  return (m, TermConstDecl (mx, x, t'') cont')
+  return (m, TermConstDecl (mx, I (x, i), t'') cont')
 
 -- fixme: 余計なreduceをしているので修正すること
 refine :: WithEnv ()
@@ -231,7 +228,7 @@ elaborate' (m, WeakTermPiIntro xts e) = do
   e' <- elaborate' e
   xts' <- mapM elaboratePlus xts
   return (m, TermPiIntro xts' e')
-elaborate' (m, WeakTermPiElim (_, WeakTermZeta x) es) = do
+elaborate' (m, WeakTermPiElim (_, WeakTermZeta (I (_, x))) es) = do
   sub <- gets substEnv
   case Map.lookup x sub of
     Nothing ->
@@ -266,10 +263,10 @@ elaborate' (m, WeakTermIter (mx, x, t) xts e) = do
   xts' <- mapM elaboratePlus xts
   e' <- elaborate' e
   return (m, TermIter (mx, x, t') xts' e')
-elaborate' (_, WeakTermZeta x) = do
+elaborate' (_, WeakTermZeta x@(I (_, i))) = do
   sub <- gets substEnv
-  case Map.lookup x sub of
-    Nothing -> throwError' $ "elaborate' i: remaining hole: " <> x
+  case Map.lookup i sub of
+    Nothing -> throwError' $ "elaborate' i: remaining hole: " <> asText' x
     Just e -> do
       e' <- elaborate' e
       return e'
@@ -302,7 +299,7 @@ elaborate' (m, WeakTermFloat64 x) = do
 elaborate' (m, WeakTermFloat t x) = do
   t' <- elaborate' t >>= reduceTermPlus
   case t' of
-    (_, TermConst floatType) -> do
+    (_, TermConst (I (floatType, _))) -> do
       let x16 = realToFrac x :: Half
       let x32 = realToFrac x :: Float
       case asLowTypeMaybe floatType of
@@ -381,7 +378,7 @@ elaboratePlus (m, x, t) = do
 caseCheckEnumIdentifier :: EnumType -> [Case] -> WithEnv ()
 caseCheckEnumIdentifier (EnumTypeLabel x) ls = do
   es <- lookupEnumSet x
-  caseCheckEnumIdentifier' (toInteger $ length es) ls
+  caseCheckEnumIdentifier' (length es) ls
 caseCheckEnumIdentifier (EnumTypeNat i) ls = do
   caseCheckEnumIdentifier' i ls
 caseCheckEnumIdentifier (EnumTypeIntS _) ls =
@@ -389,9 +386,9 @@ caseCheckEnumIdentifier (EnumTypeIntS _) ls =
 caseCheckEnumIdentifier (EnumTypeIntU _) ls =
   throwIfFalse $ CaseDefault `elem` ls
 
-caseCheckEnumIdentifier' :: Integer -> [Case] -> WithEnv ()
+caseCheckEnumIdentifier' :: Int -> [Case] -> WithEnv ()
 caseCheckEnumIdentifier' i labelList = do
-  let len = toInteger $ length (nub labelList)
+  let len = length (nub labelList)
   throwIfFalse $ i <= len || CaseDefault `elem` labelList
 
 throwIfFalse :: Bool -> WithEnv ()
@@ -400,7 +397,7 @@ throwIfFalse b =
     then return ()
     else throwError' "non-exhaustive pattern"
 
-lookupEnumSet :: Identifier -> WithEnv [Identifier]
+lookupEnumSet :: T.Text -> WithEnv [T.Text]
 lookupEnumSet name = do
   eenv <- gets enumEnv
   case Map.lookup name eenv of
