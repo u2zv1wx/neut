@@ -29,7 +29,6 @@ import Parse.Read
 import Parse.Rename
 import Parse.Rule
 import Parse.Utility
-import Reduce.WeakTerm
 
 parse :: Path Abs File -> WithEnv WeakStmt
 parse inputPath = do
@@ -50,7 +49,7 @@ showCompInfo ((x, m):xms) = do
     Nothing -> showCompInfo xms
     Just (path, (_, l, c)) -> do
       let pathStr = "\"" <> toFilePath path <> "\""
-      let x' = T.unpack x
+      let x' = T.unpack $ asText x
       let str =
             "(\"" ++
             x' ++ "\" (" ++ pathStr ++ " " ++ show l ++ " " ++ show c ++ "))"
@@ -59,7 +58,7 @@ showCompInfo ((x, m):xms) = do
 parseForCompletion :: Path Abs File -> Line -> Column -> WithEnv CompInfo
 parseForCompletion inputPath l c = do
   content <- liftIO $ TIO.readFile $ toFilePath inputPath
-  s <- newNameWith "cursor"
+  s <- newNameWith' "cursor"
   case modifyFileForCompletion s content l c of
     Nothing -> return []
     Just (prefix, content') -> do
@@ -75,9 +74,9 @@ parseForCompletion inputPath l c = do
 -- parenとかのときは何も返さないからNothingにする
 modifyFileForCompletion ::
      CursorName -> T.Text -> Line -> Column -> Maybe (Prefix, T.Text)
-modifyFileForCompletion s content l c = do
+modifyFileForCompletion (I (s, _)) content l c = do
   let xs = T.lines content
-  let (ys, ws) = splitAt (fromInteger $ l - 1) xs
+  let (ys, ws) = splitAt (l - 1) xs
   (targetLine, zs) <- headTailMaybe ws
   (s1, s2) <- splitAtMaybe (c - 1) targetLine
   (ch, s2') <- headTailMaybeText s2
@@ -196,7 +195,7 @@ parse' (a:as) = do
     then parse' $ e : as
     else do
       e'@(meta, _) <- interpret e
-      name <- newNameWith "hole-parse-last"
+      name <- newNameWith' "hole-parse-last"
       t <- newHole
       defList <- parse' as
       let meta' = meta {metaIsAppropriateAsCompletionCandidate = False}
@@ -217,8 +216,9 @@ insImplicitBegin (m, TreeNode (xt:xts:body:rest)) = do
 insImplicitBegin _ = throwError' "insImplicitBegin"
 
 extractFunName :: TreePlus -> WithEnv Identifier
-extractFunName (_, TreeNode ((_, TreeAtom x):_)) = return x
-extractFunName (_, TreeNode ((_, TreeNode [(_, TreeAtom x), _]):_)) = return x
+extractFunName (_, TreeNode ((_, TreeAtom x):_)) = return $ asIdent x
+extractFunName (_, TreeNode ((_, TreeNode [(_, TreeAtom x), _]):_)) =
+  return $ asIdent x
 extractFunName _ = throwError' "extractFunName"
 
 isSpecialForm :: TreePlus -> Bool
@@ -322,16 +322,16 @@ compose s1 s2 = do
 
 newHole :: WithEnv WeakTermPlus
 newHole = do
-  h <- newNameWith "hole-parse-zeta"
+  h <- newNameWith' "hole-parse-zeta"
   return (emptyMeta, WeakTermZeta h)
 
-checkKeywordSanity :: Identifier -> WithEnv ()
+checkKeywordSanity :: T.Text -> WithEnv ()
 checkKeywordSanity "" = throwError' "empty string for a keyword"
 checkKeywordSanity x
   | T.last x == '+' = throwError' "A +-suffixed name cannot be a keyword"
 checkKeywordSanity _ = return ()
 
-insEnumEnv :: Meta -> Identifier -> [(Identifier, Int)] -> WithEnv ()
+insEnumEnv :: Meta -> T.Text -> [(T.Text, Int)] -> WithEnv ()
 insEnumEnv m name xis = do
   eenv <- gets enumEnv
   let definedEnums = Map.keys eenv ++ map fst (concat (Map.elems eenv))
@@ -389,7 +389,8 @@ toIdentList ((QuasiStmtLetWT _ mxt _):ds) = mxt : toIdentList ds
 toIdentList ((QuasiStmtDef xds):ds) = do
   let mxts = map (\(_, (_, mxt, _, _)) -> mxt) xds
   mxts ++ toIdentList ds
-toIdentList ((QuasiStmtConstDecl _ mxt):ds) = mxt : toIdentList ds
+toIdentList ((QuasiStmtConstDecl _ (m, x, t)):ds) =
+  (m, asIdent x, t) : toIdentList ds
 toIdentList ((QuasiStmtLetInductive _ _ mxt _):ds) = mxt : toIdentList ds
 toIdentList ((QuasiStmtLetCoinductive _ _ mxt _):ds) = mxt : toIdentList ds
 toIdentList ((QuasiStmtLetInductiveIntro _ b _ _ _ _ _ _ _):ss) =
@@ -399,14 +400,14 @@ toIdentList ((QuasiStmtLetCoinductiveElim _ b _ _ _ _ _ _ _ _ _):ss) =
 
 toQuasiStmtLetFooter ::
      Path Abs File -> (Meta, Identifier, WeakTermPlus) -> QuasiStmt
-toQuasiStmtLetFooter path (m, x, t) = do
-  let x' = "(" <> T.pack (toFilePath path) <> ":" <> x <> ")" -- user cannot write this var since it contains parenthesis
+toQuasiStmtLetFooter path (m, x@(I (s, _)), t) = do
+  let s' = "(" <> T.pack (toFilePath path) <> ":" <> s <> ")" -- user cannot write this var since it contains parenthesis
   let m' = m {metaIsAppropriateAsCompletionCandidate = False}
-  QuasiStmtLet m' (m', x', t) (m, WeakTermUpsilon x)
+  QuasiStmtLet m' (m', I (s', 0), t) (m, WeakTermUpsilon x)
 
 toQuasiStmtLetHeader ::
      Path Abs File -> (Meta, Identifier, WeakTermPlus) -> QuasiStmt
-toQuasiStmtLetHeader path (m, x, t) = do
-  let x' = "(" <> T.pack (toFilePath path) <> ":" <> x <> ")" -- user cannot write this var since it contains parenthesis
+toQuasiStmtLetHeader path (m, x@(I (s, _)), t) = do
+  let s' = "(" <> T.pack (toFilePath path) <> ":" <> s <> ")" -- user cannot write this var since it contains parenthesis
   let m' = m {metaIsAppropriateAsCompletionCandidate = False}
-  QuasiStmtLet m' (m, x, t) (m', WeakTermUpsilon x')
+  QuasiStmtLet m' (m, x, t) (m', WeakTermUpsilon (I (s', 0)))

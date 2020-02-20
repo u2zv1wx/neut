@@ -9,6 +9,8 @@ import Data.Fixed (mod')
 import Numeric.Half
 import Unsafe.Coerce -- for int -> word, word -> int
 
+import qualified Data.Text as T
+
 import Data.Basic
 
 import Data.WeakTerm
@@ -115,7 +117,7 @@ reduceWeakTermPlus (m, WeakTermStructElim xks e1 e2) = do
 reduceWeakTermPlus e = e
 
 reduceWeakTermPlusTheta ::
-     WeakTermPlus -> [WeakTermPlus] -> Meta -> Identifier -> WeakTermPlus
+     WeakTermPlus -> [WeakTermPlus] -> Meta -> T.Text -> WeakTermPlus
 reduceWeakTermPlusTheta orig es m constant
   | Just (lowType, op) <- asUnaryOpMaybe constant
   , [arg] <- es = reduceWeakTermPlusUnary orig arg m lowType op

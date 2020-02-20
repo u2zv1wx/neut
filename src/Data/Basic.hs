@@ -18,7 +18,10 @@ newtype Identifier =
   I (T.Text, Int)
 
 asText :: Identifier -> T.Text
-asText (I (s, i)) = s <> T.pack (show i)
+asText (I (s, _)) = s
+
+asText' :: Identifier -> T.Text
+asText' (I (s, i)) = s <> T.pack (show i)
 
 asIdent :: T.Text -> Identifier
 asIdent s = I (s, 0)
@@ -188,9 +191,9 @@ readEnumValueNat str -- n1-0, n2-0, n2-1, ...
   , 0 <= j && j <= i - 1 = Just $ EnumValueNat i j
   | otherwise = Nothing
 
-isConstant :: Identifier -> Bool
-isConstant x@(I (x', _))
-  | Just (LowTypeFloat _) <- asLowTypeMaybe x' = True
+isConstant :: T.Text -> Bool
+isConstant x
+  | Just (LowTypeFloat _) <- asLowTypeMaybe x = True
   | Just _ <- asUnaryOpMaybe x = True
   | Just _ <- asBinaryOpMaybe x = True
   | otherwise = False
@@ -347,11 +350,11 @@ asFloatSize 32 = Just FloatSize32
 asFloatSize 64 = Just FloatSize64
 asFloatSize _ = Nothing
 
-asUnaryOpMaybe :: Identifier -> Maybe (LowType, UnaryOp)
-asUnaryOpMaybe (I (name, _))
+asUnaryOpMaybe :: T.Text -> Maybe (LowType, UnaryOp)
+asUnaryOpMaybe name
   | [typeStr, "neg"] <- wordsBy '.' name
   , Just lowType <- asLowTypeMaybe typeStr = Just (lowType, UnaryOpNeg)
-asUnaryOpMaybe (I (name, _))
+asUnaryOpMaybe name
   | [domTypeStr, convOpStr, codTypeStr] <- wordsBy '.' name
   , Just domType <- asLowTypeMaybe domTypeStr
   , Just codType <- asLowTypeMaybe codTypeStr
@@ -366,8 +369,8 @@ asConvOpMaybe codType "ext" = Just $ UnaryOpFpExt codType
 asConvOpMaybe codType "to" = Just $ UnaryOpTo codType
 asConvOpMaybe _ _ = Nothing
 
-asBinaryOpMaybe :: Identifier -> Maybe (LowType, BinaryOp)
-asBinaryOpMaybe (I (name, _))
+asBinaryOpMaybe :: T.Text -> Maybe (LowType, BinaryOp)
+asBinaryOpMaybe name
   | [typeStr, opStr] <- wordsBy '.' name -- e.g. name == "i8.add"
   , Just lowType <- asLowTypeMaybe typeStr
   , Just op <- asBinaryOpMaybe' opStr = Just (lowType, op)

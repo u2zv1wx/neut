@@ -11,6 +11,7 @@ import Control.Monad.Except
 import Control.Monad.State
 
 import qualified Data.HashMap.Strict as Map
+import qualified Data.Set as S
 import qualified Data.Text as T
 
 import Data.Basic
@@ -58,7 +59,9 @@ renameQuasiStmtList' nenv ((QuasiStmtDef xds):ss) = do
   return $ QuasiStmtDef (zip xs' ds') : ss'
 renameQuasiStmtList' nenv ((QuasiStmtConstDecl m (mx, x, t)):ss) = do
   t' <- rename' nenv t
-  ss' <- renameQuasiStmtList' (insertName x x nenv) ss
+  -- e' <- rename' (Map.insert i 0 nenv) e
+  -- ss' <- renameQuasiStmtList' (insertName x x nenv) ss
+  ss' <- renameQuasiStmtList' nenv ss
   return $ QuasiStmtConstDecl m (mx, x, t') : ss'
 renameQuasiStmtList' nenv ((QuasiStmtLetInductive n m (mx, a, t) e):ss) = do
   t' <- rename' nenv t
@@ -140,15 +143,17 @@ type NameEnv = Map.HashMap Int Int
 -- Alpha-convert all the variables so that different variables have different names.
 rename' :: NameEnv -> WeakTermPlus -> WithEnv WeakTermPlus
 rename' _ (m, WeakTermTau l) = return (m, WeakTermTau l)
-rename' nenv (m, WeakTermUpsilon x@(I (s, _))) = do
+rename' nenv (m, WeakTermUpsilon x@(I (s, _)))
+  -- ふつうにNothingだったらconstEnvを参照してconstかどうかをチェック、くらいでよさそう。
+ = do
+  cenv <- gets constantEnv
   case lookupName x nenv of
-    Just (I (_, j))
-      | j == 0 -> return (m, WeakTermConst s)
     Just x' -> return (m, WeakTermUpsilon x')
     Nothing
-      | isConstant x -> return (m, WeakTermConst s)
-    Nothing ->
-      throwError' $ T.pack (showMeta m) <> ": undefined variable: " <> s
+      | s `S.member` cenv -> return (m, WeakTermConst s)
+      | isConstant s -> return (m, WeakTermConst s)
+      | otherwise ->
+        throwError' $ T.pack (showMeta m) <> ": undefined variable: " <> s
 rename' nenv (m, WeakTermPi mls xts t) = do
   (xts', t') <- renameBinder nenv xts t
   return (m, WeakTermPi mls xts' t')
@@ -175,9 +180,10 @@ rename' nenv (m, WeakTermIter xt xts e) = do
   (xt', xts', e') <- renameIter nenv xt xts e
   return (m, WeakTermIter xt' xts' e')
 rename' _ (m, WeakTermConst x) = return (m, WeakTermConst x)
-rename' nenv (m, WeakTermConstDecl (mx, x@(I (_, i)), t) e) = do
+rename' nenv (m, WeakTermConstDecl (mx, x, t) e) = do
   t' <- rename' nenv t
-  e' <- rename' (Map.insert i 0 nenv) e
+  -- e' <- rename' (Map.insert i 0 nenv) e
+  e' <- rename' nenv e
   -- e' <- rename' (insertName x x nenv) e
   return (m, WeakTermConstDecl (mx, x, t') e')
 rename' _ (m, WeakTermZeta h) = return (m, WeakTermZeta h)

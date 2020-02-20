@@ -49,7 +49,7 @@ data Env =
     , includeGraph :: IncludeGraph -- to detect cyclic `include`
     , keywordEnv :: S.Set T.Text -- list of reserved keywords
     , notationEnv :: [(TreePlus, TreePlus)] -- macro transformers
-    , constantEnv :: S.Set Identifier
+    , constantEnv :: S.Set T.Text
     , fileEnv :: FileEnv -- path ~> identifiers defined in the file at toplevel
     , enumEnv :: Map.HashMap T.Text [(T.Text, Int)] -- [("choice", [("left", 0), ("right", 1)]), ...]
     , revEnumEnv :: Map.HashMap T.Text (T.Text, Int) -- [("left", ("choice", 0)), ("right", ("choice", 1)), ...]

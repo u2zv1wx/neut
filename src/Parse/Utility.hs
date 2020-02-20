@@ -7,7 +7,7 @@ import Data.WeakTerm
 
 type CompInfo = [(Identifier, Meta)]
 
-type CursorName = T.Text
+type CursorName = Identifier
 
 compInfo :: CursorName -> [QuasiStmt] -> Either CompInfo ()
 compInfo c ss = compInfoQuasiStmtList c [] ss
@@ -26,7 +26,7 @@ compInfoQuasiStmtList c info ((QuasiStmtDef xds):ss) = do
   compInfoQuasiStmtList c info' ss
 compInfoQuasiStmtList c info ((QuasiStmtConstDecl _ (mx, x, t)):ss) = do
   compInfoWeakTermPlus c info t
-  let info' = (x, mx) : info
+  let info' = (asIdent x, mx) : info
   compInfoQuasiStmtList c info' ss
 compInfoQuasiStmtList c info (_:ss) = compInfoQuasiStmtList c info ss
 
@@ -41,8 +41,8 @@ compInfoDef c info (_, (mx, x, t), xts, e) = do
 compInfoWeakTermPlus ::
      CursorName -> CompInfo -> WeakTermPlus -> Either CompInfo ()
 compInfoWeakTermPlus _ _ (_, WeakTermTau _) = return ()
-compInfoWeakTermPlus c info (_, WeakTermUpsilon (I (x, _)))
-  | c == x = Left info
+compInfoWeakTermPlus c info (_, WeakTermUpsilon x)
+  | asText c == asText x = Left info
   | otherwise = return ()
 compInfoWeakTermPlus c info (_, WeakTermPi _ xts t) =
   compInfoBinder c info xts t
@@ -141,9 +141,8 @@ headTailMaybeText s
   | s == T.empty = Nothing
   | otherwise = return (T.head s, T.tail s)
 
-splitAtMaybe :: Integer -> T.Text -> Maybe (T.Text, T.Text)
+splitAtMaybe :: Int -> T.Text -> Maybe (T.Text, T.Text)
 splitAtMaybe i xs = do
-  let i' = fromInteger i
-  if 0 <= i' && i' < T.length xs
-    then return $ T.splitAt i' xs
+  if 0 <= i && i < T.length xs
+    then return $ T.splitAt i xs
     else Nothing

@@ -68,7 +68,7 @@ parseRule _ = throwError' "parseRule: syntax error"
 
 renameFormArgs :: [IdentifierPlus] -> WithEnv [IdentifierPlus]
 renameFormArgs [] = return []
-renameFormArgs ((m, a@(I (_, i)), t):ats) = do
+renameFormArgs ((m, a, t):ats) = do
   a' <- newNameWith' "var"
   let sub = [(a, (m, WeakTermUpsilon a'))]
   ats' <- renameFormArgs $ substWeakTermPlusBindings sub ats
@@ -77,7 +77,7 @@ renameFormArgs ((m, a@(I (_, i)), t):ats) = do
 checkNameSanity :: [IdentifierPlus] -> WithEnv ()
 checkNameSanity atsbts = do
   let asbs = map (\(_, x, _) -> x) atsbts
-  when (not $ linearCheck asbs) $
+  when (not $ linearCheck $ map asInt asbs) $
     throwError'
       "the names of the rules of inductive/coinductive type must be distinct"
 

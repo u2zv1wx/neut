@@ -106,7 +106,7 @@ data QuasiStmt
   | QuasiStmtDef [(Identifier, Def)]
   -- declaration of a constant
   --   (constant x t)
-  | QuasiStmtConstDecl Meta IdentifierPlus
+  | QuasiStmtConstDecl Meta (Meta, T.Text, WeakTermPlus)
   | QuasiStmtLetInductive Int Meta IdentifierPlus WeakTermPlus
   | QuasiStmtLetCoinductive Int Meta IdentifierPlus WeakTermPlus
   -- let (b : B) :=
@@ -147,7 +147,7 @@ data WeakStmt
   | WeakStmtLet Meta IdentifierPlus WeakTermPlus WeakStmt
   -- special case of `let` in which the `e` in `let x := e in cont` is known to be well-typed
   | WeakStmtLetWT Meta IdentifierPlus WeakTermPlus WeakStmt
-  | WeakStmtConstDecl Meta IdentifierPlus WeakStmt
+  | WeakStmtConstDecl Meta (Meta, T.Text, WeakTermPlus) WeakStmt
   deriving (Show)
 
 toVar :: Identifier -> WeakTermPlus
@@ -398,7 +398,7 @@ substWeakTermPlusBindingsWithBody sub ((m, x, t):xts) e = do
 
 toText :: WeakTermPlus -> T.Text
 toText (_, WeakTermTau l) = showCons ["tau", T.pack $ show l]
-toText (_, WeakTermUpsilon x) = asText x
+toText (_, WeakTermUpsilon x) = asText' x
 toText (_, WeakTermPi _ xts t) = do
   let argStr = inParen $ showItems $ map showArg xts
   showCons ["Π", argStr, toText t]
@@ -420,11 +420,11 @@ toText (_, WeakTermSigmaElim _ xts e1 e2) = do
   showCons ["sigma-elimination", argStr, toText e1, toText e2]
 toText (_, WeakTermIter (_, x, _) xts e) = do
   let argStr = inParen $ showItems $ map showArg xts
-  showCons ["μ", asText x, argStr, toText e]
+  showCons ["μ", asText' x, argStr, toText e]
 toText (_, WeakTermConst x) = x
 toText (_, WeakTermConstDecl xt e) = do
   showCons ["constant-declaration", showArg xt, toText e]
-toText (_, WeakTermZeta x) = asText x
+toText (_, WeakTermZeta x) = asText' x
 toText (_, WeakTermInt _ a) = T.pack $ show a
 toText (_, WeakTermFloat16 a) = T.pack $ show a
 toText (_, WeakTermFloat32 a) = T.pack $ show a
@@ -449,7 +449,7 @@ toText (_, WeakTermStruct ks) = showCons $ "struct" : map showArrayKind ks
 toText (_, WeakTermStructIntro ets) = do
   showStruct $ map (toText . fst) ets
 toText (_, WeakTermStructElim xts e1 e2) = do
-  let argStr = inParen $ showItems $ map (\(_, x, _) -> asText x) xts
+  let argStr = inParen $ showItems $ map (\(_, x, _) -> asText' x) xts
   showCons ["struct-elimination", argStr, toText e1, toText e2]
 
 inParen :: T.Text -> T.Text
@@ -465,7 +465,7 @@ inBracket :: T.Text -> T.Text
 inBracket s = "[" <> s <> "]"
 
 showArg :: (Meta, Identifier, WeakTermPlus) -> T.Text
-showArg (_, x, t) = inParen $ asText x <> " " <> toText t
+showArg (_, x, t) = inParen $ asText' x <> " " <> toText t
 
 showClause :: (WeakCase, WeakTermPlus) -> T.Text
 showClause (c, e) = inParen $ showWeakCase c <> " " <> toText e
