@@ -17,8 +17,6 @@ import Data.Tree
 
 type Parser a = ParsecT T.Text () (StateT Env (ExceptT [IO ()] IO)) a
 
--- {} strToTree {}
--- (as long as the input is translated into a tree, this function is considered valid)
 strToTree :: T.Text -> String -> WithEnv [TreePlus]
 strToTree input fileName = do
   modify (\e -> e {count = 1 + count e})
@@ -65,8 +63,8 @@ comment = do
 currentMeta :: Parser Meta
 currentMeta = do
   pos <- getPosition
-  let l = toInteger $ sourceLine pos
-  let c = toInteger $ sourceColumn pos
+  let l = sourceLine pos
+  let c = sourceColumn pos
   name <- gets currentFilePath
   return $
     Meta
