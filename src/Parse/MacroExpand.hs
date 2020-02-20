@@ -18,8 +18,6 @@ import Data.Tree
 
 type MacroSubst = [(T.Text, TreePlus)]
 
--- {} macroExpand {noSplice, noKeyword}
--- CBV-like macro expansion
 macroExpand :: TreePlus -> WithEnv TreePlus
 macroExpand t = do
   result <- recurM (macroExpand1 . splice) t
@@ -46,7 +44,6 @@ isLeft :: Either a b -> Bool
 isLeft (Left _) = True
 isLeft _ = False
 
--- noRemKeywordというか、noMatchが正解。
 hasNoMatch :: TreePlus -> WithEnv Bool
 hasNoMatch t = do
   nenv <- gets notationEnv
@@ -55,15 +52,12 @@ hasNoMatch t = do
     Just _ -> return False
     Nothing -> return True
 
--- {} recurM {}
 recurM :: (Monad m) => (TreePlus -> m TreePlus) -> TreePlus -> m TreePlus
 recurM f (m, TreeAtom s) = f (m, TreeAtom s)
 recurM f (m, TreeNode ts) = do
   ts' <- mapM (recurM f) ts
   f (m, TreeNode ts')
 
--- substの結果がkeywordを含んでいることは普通にありうる。
--- {(noSplice)} macroExpand1 {(noSplice, noMatch)}
 macroExpand1 :: TreePlus -> WithEnv TreePlus
 macroExpand1 t@(i, _) = do
   assertUP (toInfo "macroExpand1.pre" t) $ hasNoRemSplice t
@@ -80,7 +74,6 @@ macroExpand1 t@(i, _) = do
 
 type Notation = TreePlus
 
--- {} macroMatch {}
 macroMatch ::
      TreePlus -- input tree
   -> Notation -- registered notation
@@ -114,7 +107,6 @@ macroMatch (_, TreeNode ts1) (_, TreeNode ts2)
     return $ mzs >>= \zs -> Just $ join zs
   | otherwise = return Nothing
 
--- {} applySubst {}
 applySubst :: MacroSubst -> Notation -> TreePlus
 applySubst sub (i, TreeAtom s) = fromMaybe (i, TreeAtom s) (lookup s sub)
 applySubst sub (i, TreeNode ts) = (i, TreeNode $ map (applySubst sub) ts)
@@ -124,13 +116,11 @@ toSpliceTree ts =
   ( emptyMeta
   , TreeNode [(emptyMeta, TreeAtom "splice"), (emptyMeta, TreeNode ts)])
 
--- {} checkNotation {}
 checkNotationSanity :: Notation -> WithEnv ()
 checkNotationSanity t = do
   checkKeywordCondition t
   checkPlusCondition t
 
--- {} checkKeywordCondition {}
 checkKeywordCondition :: Notation -> WithEnv ()
 checkKeywordCondition t = do
   kenv <- gets keywordEnv
@@ -138,7 +128,6 @@ checkKeywordCondition t = do
     then return ()
     else throwError' "A notation must include at least one keyword"
 
--- {} checkPlusCondition {}
 checkPlusCondition :: Notation -> WithEnv ()
 checkPlusCondition (_, TreeAtom s) =
   if T.last s /= '+'
@@ -152,7 +141,6 @@ checkPlusCondition (_, TreeNode ts) = do
     (_, TreeAtom _) -> return ()
     ts' -> checkPlusCondition ts'
 
--- {} splice {noSplice}
 splice :: TreePlus -> TreePlus
 splice t = do
   let result = splice' t
@@ -166,19 +154,16 @@ splice' (m, TreeNode ts) = do
   let ts' = map splice' ts
   (m, TreeNode $ expandSplice $ map findSplice ts')
 
--- {} findSplice {}
 findSplice :: TreePlus -> Either TreePlus [TreePlus]
 findSplice (_, TreeNode [(_, TreeAtom "splice"), (_, TreeNode ts)]) = do
   Right ts
 findSplice t = Left t
 
--- {} expandSplice {}
 expandSplice :: [Either TreePlus [TreePlus]] -> [TreePlus]
 expandSplice [] = []
 expandSplice (Left t:rest) = t : expandSplice rest
 expandSplice (Right ts:rest) = ts ++ expandSplice rest
 
--- {} try {}
 -- returns the first "Just"
 try :: (Monad m) => (a -> m (Maybe b)) -> [(a, c)] -> m (Maybe (b, c))
 try _ [] = return Nothing
