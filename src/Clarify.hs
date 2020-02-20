@@ -107,7 +107,7 @@ clarify (m, TermArray {}) = do
 clarify (m, TermArrayIntro k es) = do
   retImmType <- returnCartesianImmediate
   -- arrayType = Sigma{k} [_ : IMMEDIATE, ..., _ : IMMEDIATE]
-  name <- newNameWith "array"
+  name <- newNameWith' "array"
   let ts = map Left $ replicate (length es) retImmType
   arrayType <- cartesianSigma name m k ts
   (zs, es', xs) <- unzip3 <$> mapM clarifyPlus es
@@ -126,8 +126,8 @@ clarify (m, TermArrayElim k mxts e1 e2) = do
   (arrTypeVarName, arrTypeVar) <- newDataUpsilonWith "arr-type"
   let retArrTypeVar = (m, CodeUpIntro arrTypeVar)
   (arrInnerVarName, arrInnerVar) <- newDataUpsilonWith "arr-inner"
-  affVarName <- newNameWith "aff"
-  relVarName <- newNameWith "rel"
+  affVarName <- newNameWith' "aff"
+  relVarName <- newNameWith' "rel"
   retUnivType <- returnCartesianUniv
   retImmType <- returnCartesianImmediate
   ts' <- mapM clarify ts
@@ -157,7 +157,7 @@ clarify (m, TermStructIntro eks) = do
 clarify (m, TermStructElim xks e1 e2) = do
   e1' <- clarify e1
   let (_, xs, ks) = unzip3 xks
-  let ts = map inferKind ks
+  ts <- mapM inferKind ks
   forM_ (zip xs ts) $ uncurry insTypeEnv'
   e2' <- clarify e2
   (structVarName, structVar) <- newDataUpsilonWith "struct"
@@ -171,27 +171,33 @@ clarifyPlus e@(m, _) = do
   return (varName, e', var)
 
 clarifyConst :: Meta -> Identifier -> WithEnv CodePlus
-clarifyConst m name
-  | Just (lowType, op) <- asUnaryOpMaybe name = clarifyUnaryOp name op lowType m
-clarifyConst m name
-  | Just (lowType, op) <- asBinaryOpMaybe name =
-    clarifyBinaryOp name op lowType m
-clarifyConst m name
-  | Just (sysCall, len) <- asSysCallMaybe name =
-    clarifySysCall name sysCall len m
-clarifyConst m name
-  | Just _ <- asLowTypeMaybe name = clarify (m, TermEnum $ EnumTypeLabel "top")
+clarifyConst m name@(I (x, _))
+  | Just (lowType, op) <- asUnaryOpMaybe x = clarifyUnaryOp name op lowType m
+clarifyConst m name@(I (x, _))
+  | Just (lowType, op) <- asBinaryOpMaybe x = clarifyBinaryOp name op lowType m
+clarifyConst m name@(I (x, _))
+  | Just (sysCall, len) <- asSysCallMaybe x = clarifySysCall name sysCall len m
+clarifyConst m (I (x, _))
+  | Just _ <- asLowTypeMaybe x = clarify (m, TermEnum $ EnumTypeLabel "top")
 clarifyConst m name
   | Just lowType <- asArrayAccessMaybe name = clarifyArrayAccess m name lowType
-clarifyConst m "file-descriptor" = clarify (m, TermConst "i64")
-clarifyConst m "stdin" = clarify (m, TermEnumIntro (EnumValueIntS 64 0))
-clarifyConst m "stdout" = clarify (m, TermEnumIntro (EnumValueIntS 64 1))
-clarifyConst m "stderr" = clarify (m, TermEnumIntro (EnumValueIntS 64 2))
-clarifyConst m name = do
+clarifyConst m (I ("file-descriptor", _)) = do
+  i <- lookupConstNum "i64"
+  clarify (m, TermConst (I ("i64", i)))
+clarifyConst m (I ("stdin", _)) =
+  clarify (m, TermEnumIntro (EnumValueIntS 64 0))
+clarifyConst m (I ("stdout", _)) =
+  clarify (m, TermEnumIntro (EnumValueIntS 64 1))
+clarifyConst m (I ("stderr", _)) =
+  clarify (m, TermEnumIntro (EnumValueIntS 64 2))
+clarifyConst m name@(I (x, _)) = do
   cenv <- gets constantEnv
-  if name `elem` cenv
-    then return (m, CodeUpIntro (m, DataTheta name))
-    else throwError' $ "clarify.theta: " <> name
+  case Map.lookup x cenv of
+    Just _ -> return (m, CodeUpIntro (m, DataTheta name))
+    Nothing -> throwError' $ "clarify.theta: " <> x
+  -- if name `elem` cenv
+  --   then return (m, CodeUpIntro (m, DataTheta name))
+  --   else throwError' $ "clarify.theta: " <> name
 
 clarifyUnaryOp :: Identifier -> UnaryOp -> LowType -> Meta -> WithEnv CodePlus
 clarifyUnaryOp name op lowType m = do
@@ -208,7 +214,7 @@ clarifyUnaryOp name op lowType m = do
         m
         [(mx, x, tx)]
         (m, CodeTheta (ThetaUnaryOp op lowType varX))
-    _ -> throwError' $ "the arity of " <> name <> " is wrong"
+    _ -> throwError' $ "the arity of " <> asText name <> " is wrong"
 
 clarifyBinaryOp :: Identifier -> BinaryOp -> LowType -> Meta -> WithEnv CodePlus
 clarifyBinaryOp name op lowType m = do
@@ -225,7 +231,7 @@ clarifyBinaryOp name op lowType m = do
         m
         [(mx, x, tx), (my, y, ty)]
         (m, CodeTheta (ThetaBinaryOp op lowType varX varY))
-    _ -> throwError' $ "the arity of " <> name <> " is wrong"
+    _ -> throwError' $ "the arity of " <> asText name <> " is wrong"
 
 clarifyArrayAccess :: Meta -> Identifier -> LowType -> WithEnv CodePlus
 clarifyArrayAccess m name lowType = do
@@ -264,10 +270,10 @@ clarifySysCall name sysCall args m = do
         os <- getOS
         case (sysCall, os) of
           (SysCallFork, OSDarwin) -> do
-            name' <- newNameWith "fork"
+            name' <- newNameWith' "fork"
             retClosure (Just name') zts m xts body
           _ -> retClosure (Just name) zts m xts body
-    _ -> throwError' $ "the type of " <> name <> " is wrong"
+    _ -> throwError' $ "the type of " <> asText name <> " is wrong"
 
 iterativeApp :: [a -> a] -> a -> a
 iterativeApp [] x = x
@@ -308,8 +314,9 @@ retClosure' ::
   -> [(Meta, Identifier, TermPlus)] -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
   -> CodePlus -- the `e` in `lam (x1, ..., xn). e`
   -> WithEnv CodePlus
-retClosure' x fvs m xts e = do
-  modify (\env -> env {nameEnv = Map.insert x x (nameEnv env)})
+retClosure' x fvs m xts e
+  -- modify (\env -> env {nameEnv = Map.insert x x (nameEnv env)})
+ = do
   cls <- makeClosure' (Just x) fvs m xts e
   knot x cls
   return (m, CodeUpIntro cls)
@@ -348,12 +355,12 @@ pop x mp = do
 -- array-access-u8 ~> Just u8
 -- array-access-i12341234 ~> Just i12341234
 asArrayAccessMaybe :: Identifier -> Maybe LowType
-asArrayAccessMaybe name
+asArrayAccessMaybe (I (name, _))
   | ["array-access", typeStr] <- sepAtLast '-' name
   , Just lowType <- asLowTypeMaybe typeStr = Just lowType
 asArrayAccessMaybe _ = Nothing
 
-asSysCallMaybe :: Identifier -> Maybe (SysCall, [Arg])
+asSysCallMaybe :: T.Text -> Maybe (SysCall, [Arg])
 asSysCallMaybe "write" =
   Just (SysCallWrite, [ArgUnused, ArgImmediate, ArgArray, ArgImmediate])
 asSysCallMaybe "read" =
@@ -399,7 +406,7 @@ toHeaderInfo m x t ArgStruct = do
     , [structVar]
     , \cont -> (m, CodeUpElim structVarName (m, CodeUpIntro (toVar x)) cont))
 toHeaderInfo m x t ArgArray = do
-  arrayVarName <- newNameWith "array"
+  arrayVarName <- newNameWith' "array"
   insTypeEnv' arrayVarName t
   (arrayTypeName, arrayType) <- newDataUpsilonWith "array-type"
   (arrayInnerName, arrayInner) <- newDataUpsilonWith "array-inner"
@@ -449,16 +456,17 @@ toSysCallTail ::
   -> [Identifier] -- borrowed variables
   -> WithEnv CodePlus
 toSysCallTail m cod syscall args xs = do
-  resultVarName <- newNameWith "result"
+  resultVarName <- newNameWith' "result"
   result <- retWithBorrowedVars m cod xs resultVarName
   os <- getOS
   case (syscall, os) of
     (SysCallFork, OSDarwin) -> do
+      i <- lookupConstNum' "fork"
       return
         ( m
         , CodeUpElim
             resultVarName
-            (m, CodePiElimDownElim (m, DataTheta "fork") args)
+            (m, CodePiElimDownElim (m, DataTheta (I ("fork", i))) args)
             result)
     _ ->
       return
@@ -477,7 +485,7 @@ toArrayAccessTail ::
   -> [Identifier] -- borrowed variables
   -> WithEnv CodePlus
 toArrayAccessTail m lowType cod arr index xs = do
-  resultVarName <- newNameWith "result"
+  resultVarName <- newNameWith' "result"
   result <- retWithBorrowedVars m cod xs resultVarName
   return
     ( m
@@ -507,18 +515,21 @@ retWithBorrowedVars m cod xs resultVarName
       _ -> throwError' "retWithBorrowedVars (sig)"
   | otherwise = throwError' "retWithBorrowedVars"
 
-inferKind :: ArrayKind -> TermPlus
-inferKind (ArrayKindIntS i) = (emptyMeta, TermEnum (EnumTypeIntS i))
-inferKind (ArrayKindIntU i) = (emptyMeta, TermEnum (EnumTypeIntU i))
-inferKind (ArrayKindFloat size) =
-  (emptyMeta, TermConst $ "f" <> T.pack (show (sizeAsInt size)))
+inferKind :: ArrayKind -> WithEnv TermPlus
+inferKind (ArrayKindIntS i) = return (emptyMeta, TermEnum (EnumTypeIntS i))
+inferKind (ArrayKindIntU i) = return (emptyMeta, TermEnum (EnumTypeIntU i))
+inferKind (ArrayKindFloat size) = do
+  let constName = "f" <> T.pack (show (sizeAsInt size))
+  i <- lookupConstNum' constName
+  return (emptyMeta, TermConst (I (constName, i)))
+  -- (emptyMeta, TermConst $ "f" <> T.pack (show (sizeAsInt size)))
 inferKind _ = error "inferKind for void-pointer"
 
 sigToPi :: Meta -> [Data.Term.IdentifierPlus] -> WithEnv TermPlus
 sigToPi m xts = do
-  z <- newNameWith "sigma"
+  z <- newNameWith' "sigma"
   let zv = toTermUpsilon z
-  k <- newNameWith "sig"
+  k <- newNameWith' "sig"
   -- Sigma [x1 : A1, ..., xn : An] = Pi (z : Type, _ : Pi [x1 : A1, ..., xn : An]. z). z
   l <- newUnivLevel
   -- don't care the level since they're discarded immediately
