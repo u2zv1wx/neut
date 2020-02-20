@@ -54,7 +54,7 @@ parseConnective' (m, TreeNode ((_, TreeAtom name):(_, TreeNode xts):rules)) = do
   m' <- adjustPhase m
   xts' <- mapM interpretIdentifierPlus xts
   rules' <- mapM parseRule rules
-  return (m', name, xts', rules')
+  return (m', asIdent name, xts', rules')
 parseConnective' _ = throwError' "parseConnective: syntax error"
 
 parseRule :: TreePlus -> WithEnv Rule
@@ -63,14 +63,15 @@ parseRule (m, TreeNode [(mName, TreeAtom name), (_, TreeNode xts), t]) = do
   mName' <- adjustPhase mName
   t' <- interpret t
   xts' <- mapM interpretIdentifierPlus xts
-  return (m', name, mName', xts', t')
+  return (m', asIdent name, mName', xts', t')
 parseRule _ = throwError' "parseRule: syntax error"
 
 renameFormArgs :: [IdentifierPlus] -> WithEnv [IdentifierPlus]
 renameFormArgs [] = return []
-renameFormArgs ((m, a, t):ats) = do
-  a' <- newNameWith "var"
-  modify (\e -> e {nameEnv = Map.insert a a' (nameEnv e)})
+renameFormArgs ((m, a@(I (_, i)), t):ats) = do
+  a' <- newNameWith' "var"
+  -- modify (\e -> e {nameEnv = Map.insert a a' (nameEnv e)})
+  modify (\e -> e {nameEnv = Map.insert i a' (nameEnv e)})
   let sub = [(a, (m, WeakTermUpsilon a'))]
   ats' <- renameFormArgs $ substWeakTermPlusBindings sub ats
   return $ (m, a', t) : ats'
@@ -85,13 +86,13 @@ checkNameSanity atsbts = do
 -- represent the inductive logical connective within CoC
 toInductive ::
      [IdentifierPlus] -> [IdentifierPlus] -> Connective -> WithEnv [QuasiStmt]
-toInductive ats bts connective@(m, a, xts, _) = do
+toInductive ats bts connective@(m, a@(I (ai, _)), xts, _) = do
   formationRule <- formationRuleOf connective >>= ruleAsIdentPlus
   atsbts' <- renameFormArgs $ ats ++ bts
   a' <- lookupNameEnv a
   let cod = (m, WeakTermPiElim (m, WeakTermUpsilon a) (map toVar' xts))
   let cod' = (m, WeakTermPiElim (m, WeakTermUpsilon a') (map toVar' xts))
-  z <- newLLVMNameWith "_"
+  z <- newLLVMNameWith' "_"
   let zt = (m, z, cod)
   mls1 <- piUnivLevelsfrom (ats ++ bts) cod
   mls2 <- piUnivLevelsfrom (xts ++ atsbts' ++ [zt]) cod'
@@ -105,7 +106,7 @@ toInductive ats bts connective@(m, a, xts, _) = do
     , QuasiStmtLetWT
         m
         ( m
-        , a <> "." <> "induction"
+        , asIdent (ai <> "." <> "induction")
         , (m, WeakTermPi mls2 (xts ++ atsbts' ++ [zt]) cod'))
         ( m
         , WeakTermPiIntro
@@ -126,7 +127,7 @@ toInductiveIntro ::
   -> Identifier
   -> Rule
   -> WithEnv QuasiStmt
-toInductiveIntro ats bts xts a (mb, b, m, yts, cod)
+toInductiveIntro ats bts xts a@(I (ai, _)) (mb, b, m, yts, cod)
   | (_, WeakTermPiElim (_, WeakTermUpsilon a') es) <- cod
   , a == a'
   , length xts == length es = do
@@ -145,18 +146,18 @@ toInductiveIntro ats bts xts a (mb, b, m, yts, cod)
   | otherwise =
     throwError' $
     "the succedent of an introduction rule of `" <>
-    a <>
-    "` must be of the form `(" <> showItems (a : map (const "_") xts) <> ")`"
+    ai <>
+    "` must be of the form `(" <> showItems (ai : map (const "_") xts) <> ")`"
 
 toCoinductive ::
      [IdentifierPlus] -> [IdentifierPlus] -> Connective -> WithEnv [QuasiStmt]
-toCoinductive ats bts c@(m, a, xts, _) = do
+toCoinductive ats bts c@(m, a@(I (ai, _)), xts, _) = do
   f <- formationRuleOf c >>= ruleAsIdentPlus
   atsbts' <- renameFormArgs $ ats ++ bts
   a' <- lookupNameEnv a
   let cod = (m, WeakTermPiElim (m, WeakTermUpsilon a) (map toVar' xts))
   let cod' = (m, WeakTermPiElim (m, WeakTermUpsilon a') (map toVar' xts))
-  z <- newLLVMNameWith "_"
+  z <- newLLVMNameWith' "_"
   let zt' = (m, z, cod')
   mls <- piUnivLevelsfrom (xts ++ atsbts' ++ [zt']) cod
   return
@@ -170,7 +171,7 @@ toCoinductive ats bts c@(m, a, xts, _) = do
     , QuasiStmtLetWT
         m
         ( m
-        , a <> "." <> "coinduction"
+        , asIdent (ai <> "." <> "coinduction")
         , (m, WeakTermPi mls (xts ++ atsbts' ++ [zt']) cod))
         ( m
         , WeakTermPiIntro
@@ -194,7 +195,7 @@ toCoinductiveElim ::
   -> Identifier
   -> Rule
   -> WithEnv QuasiStmt
-toCoinductiveElim ats bts xts a (mb, b, m, yts, cod)
+toCoinductiveElim ats bts xts a@(I (ai, _)) (mb, b, m, yts, cod)
   | [yt@(_, _, dom)] <- yts
   , (_, WeakTermPiElim (_, WeakTermUpsilon a') es) <- dom
   , a == a'
@@ -216,8 +217,8 @@ toCoinductiveElim ats bts xts a (mb, b, m, yts, cod)
   | otherwise =
     throwError' $
     "the antecedent of an elimination rule of `" <>
-    a <>
-    "` must be of the form `(" <> showItems (a : map (const "_") xts) <> ")`"
+    ai <>
+    "` must be of the form `(" <> showItems (ai : map (const "_") xts) <> ")`"
 
 ruleAsIdentPlus :: Rule -> WithEnv IdentifierPlus
 ruleAsIdentPlus (mb, b, m, xts, t) = do
@@ -236,30 +237,30 @@ toVar' :: IdentifierPlus -> WeakTermPlus
 toVar' (m, x, _) = (m, WeakTermUpsilon x)
 
 insForm :: Int -> IdentifierPlus -> WeakTermPlus -> WithEnv ()
-insForm 1 (_, a, _) e =
-  modify (\env -> env {formationEnv = Map.insert a (Just e) (formationEnv env)})
-insForm _ (_, a, _) _ =
-  modify (\env -> env {formationEnv = Map.insert a Nothing (formationEnv env)})
+insForm 1 (_, I (_, i), _) e =
+  modify (\env -> env {formationEnv = Map.insert i (Just e) (formationEnv env)})
+insForm _ (_, I (_, i), _) _ =
+  modify (\env -> env {formationEnv = Map.insert i Nothing (formationEnv env)})
 
 insInductive :: [Identifier] -> IdentifierPlus -> WithEnv ()
-insInductive [a] bt = do
+insInductive [I (_, i)] bt = do
   ienv <- gets inductiveEnv
   modify
-    (\env -> env {inductiveEnv = Map.insertWith optConcat a (Just [bt]) ienv})
+    (\env -> env {inductiveEnv = Map.insertWith optConcat i (Just [bt]) ienv})
 insInductive as _ = do
-  forM_ as $ \a -> do
+  forM_ as $ \(I (_, i)) -> do
     modify
-      (\env -> env {inductiveEnv = Map.insert a Nothing (inductiveEnv env)})
+      (\env -> env {inductiveEnv = Map.insert i Nothing (inductiveEnv env)})
 
 insCoinductive :: [Identifier] -> IdentifierPlus -> WithEnv ()
-insCoinductive [a] bt = do
+insCoinductive [I (_, i)] bt = do
   cenv <- gets coinductiveEnv
   modify
-    (\env -> env {coinductiveEnv = Map.insertWith optConcat a (Just [bt]) cenv})
+    (\env -> env {coinductiveEnv = Map.insertWith optConcat i (Just [bt]) cenv})
 insCoinductive as _ = do
-  forM_ as $ \a -> do
+  forM_ as $ \(I (_, i)) -> do
     modify
-      (\env -> env {coinductiveEnv = Map.insert a Nothing (coinductiveEnv env)})
+      (\env -> env {coinductiveEnv = Map.insert i Nothing (coinductiveEnv env)})
 
 optConcat :: Maybe [a] -> Maybe [a] -> Maybe [a]
 optConcat mNew mOld = do
@@ -313,19 +314,19 @@ zeta mode isub csub atsbts t e = do
   case t of
     (_, WeakTermPi _ xts cod) -> zetaPi mode isub csub atsbts xts cod e
     (_, WeakTermSigma xts) -> zetaSigma mode isub csub atsbts xts e
-    (_, WeakTermPiElim va@(_, WeakTermUpsilon a) es) -- esの長さをチェックするべきでは？
+    (_, WeakTermPiElim va@(_, WeakTermUpsilon a@(I (_, i))) es) -- esの長さをチェックするべきでは？
       | Just _ <- lookup a (isub ++ isub') ->
         zetaInductive mode isub atsbts es e
       | Just _ <- lookup a (csub ++ csub') ->
         zetaCoinductive mode csub atsbts es e va
-      | Just (Just bts) <- Map.lookup a ienv
+      | Just (Just bts) <- Map.lookup i ienv
       , not (all (isResolved (isub ++ csub)) es) ->
         zetaInductiveNested mode isub csub atsbts e va a es bts
-      | Just (Just bts) <- Map.lookup a cenv
+      | Just (Just bts) <- Map.lookup i cenv
       , not (all (isResolved (isub ++ csub)) es) ->
         zetaCoinductiveNested mode isub csub atsbts e va a es bts
-      | Just Nothing <- Map.lookup a ienv -> zetaInductiveNestedMutual a
-      | Just Nothing <- Map.lookup a cenv -> zetaCoinductiveNestedMutual a
+      | Just Nothing <- Map.lookup i ienv -> zetaInductiveNestedMutual a
+      | Just Nothing <- Map.lookup i cenv -> zetaCoinductiveNestedMutual a
     _ -> do
       if isResolved (isub ++ csub) t -- flipが絡むのでは？
         then return e
@@ -461,7 +462,8 @@ zetaCoinductiveNested ::
 zetaCoinductiveNested mode isub csub atsbts e va aOuter es bts = do
   (xts, (_, aInner, aType), btsInner) <- lookupCoinductive aOuter
   let es' = map (substWeakTermPlus (isub ++ csub)) es
-  a' <- newNameWith "coinductive"
+  -- a' <- newNameWith "coinductive"
+  a' <- newNameWith' "coinductive"
   args <-
     zipWithM
       (toExternalizedArg mode isub csub aInner a' xts atsbts es es')
@@ -482,22 +484,22 @@ zetaCoinductiveNested mode isub csub atsbts e va aOuter es bts = do
         [(m, WeakTermPiIntro xts (m, WeakTermPiElim va es))])
 
 zetaInductiveNestedMutual :: Identifier -> WithEnv WeakTermPlus
-zetaInductiveNestedMutual a =
+zetaInductiveNestedMutual (I (a, _)) =
   throwError' $
   "mutual inductive type `" <>
   a <> "` cannot be used to construct a nested inductive type"
 
 zetaCoinductiveNestedMutual :: Identifier -> WithEnv WeakTermPlus
-zetaCoinductiveNestedMutual a =
+zetaCoinductiveNestedMutual (I (a, _)) =
   throwError' $
   "mutual coinductive type `" <>
   a <> "` cannot be used to construct a nested coinductive type"
 
 lookupInductive ::
      Identifier -> WithEnv ([IdentifierPlus], IdentifierPlus, [IdentifierPlus])
-lookupInductive a = do
+lookupInductive (I (ai, i)) = do
   fenv <- gets formationEnv
-  case Map.lookup a fenv of
+  case Map.lookup i fenv of
     Just (Just (_, WeakTermPiIntro xts (_, WeakTermPi _ atsbts (_, WeakTermPiElim (_, WeakTermUpsilon _) _)))) -> do
       let at = head atsbts
       let bts = tail atsbts -- valid since a is not mutual
@@ -507,15 +509,15 @@ lookupInductive a = do
       "[compiler bug] malformed inductive type (Parse.lookupInductive)"
     Just Nothing ->
       throwError' $
-      "the inductive type `" <> a <> "` must be a non-mutual inductive type"
+      "the inductive type `" <> ai <> "` must be a non-mutual inductive type"
     Nothing ->
-      throwError' $ "[compiler bug] no such inductive type defined: " <> a
+      throwError' $ "[compiler bug] no such inductive type defined: " <> ai
 
 lookupCoinductive ::
      Identifier -> WithEnv ([IdentifierPlus], IdentifierPlus, [IdentifierPlus])
-lookupCoinductive a = do
+lookupCoinductive (I (ai, i)) = do
   fenv <- gets formationEnv
-  case Map.lookup a fenv of
+  case Map.lookup i fenv of
     Just (Just (_, WeakTermPiIntro xts (_, WeakTermSigma atsbtscod))) -> do
       let at = head atsbtscod
       let bts = tail $ init atsbtscod -- valid since a is not mutual
@@ -525,9 +527,10 @@ lookupCoinductive a = do
       "[compiler bug] malformed coinductive type (Parse.lookupCoinductive)"
     Just Nothing ->
       throwError' $
-      "the coinductive type `" <> a <> "` must be a non-mutual coinductive type"
+      "the coinductive type `" <>
+      ai <> "` must be a non-mutual coinductive type"
     Nothing ->
-      throwError' $ "[compiler bug] no such coinductive type defined: " <> a
+      throwError' $ "[compiler bug] no such coinductive type defined: " <> ai
 
 toInternalizedArg ::
      Mode

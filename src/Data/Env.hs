@@ -37,7 +37,7 @@ type FileEnv = Map.HashMap (Path Abs File) FileInfo
 
 type Justification = Loc
 
-type RuleEnv = Map.HashMap Identifier (Maybe [Data.WeakTerm.IdentifierPlus])
+type RuleEnv = Map.HashMap Int (Maybe [Data.WeakTerm.IdentifierPlus])
 
 type UnivInstEnv = IntMap.IntMap (S.Set Int)
 
@@ -59,7 +59,7 @@ data Env =
     , revNameEnv :: Map.HashMap Int Identifier -- [("foo.13", "foo"), ...]
     -- , nameEnv :: Map.HashMap Identifier Identifier -- [("foo", "foo.13"), ...]
     -- , revNameEnv :: Map.HashMap Identifier Identifier -- [("foo.13", "foo"), ...]
-    , formationEnv :: Map.HashMap Identifier (Maybe WeakTermPlus)
+    , formationEnv :: Map.HashMap Int (Maybe WeakTermPlus)
     , inductiveEnv :: RuleEnv -- "list" ~> (cons, Pi (A : tau). A -> list A -> list A)
     , coinductiveEnv :: RuleEnv -- "tail" ~> (head, Pi (A : tau). stream A -> A)
     , weakTypeEnv :: Map.HashMap Identifier (WeakTermPlus, UnivLevelPlus) -- var ~> (typeof(var), level-of-type)
@@ -170,6 +170,12 @@ newNameWith (I (s, j)) = do
   return $ I (s, fromInteger i)
   -- return s'
 
+newNameWith' :: T.Text -> WithEnv Identifier
+newNameWith' s = do
+  i <- newCount
+  -- modify (\e -> e {nameEnv = Map.insert 0 (I (s, fromInteger i)) (nameEnv e)})
+  return $ I (s, fromInteger i)
+
 newLLVMNameWith :: Identifier -> WithEnv Identifier
 newLLVMNameWith (I (s, j)) = do
   i <- newCount
@@ -179,6 +185,20 @@ newLLVMNameWith (I (s, j)) = do
   modify (\e -> e {nameEnv = Map.insert (fromInteger i) (I (s, j)) (nameEnv e)})
   modify
     (\e -> e {revNameEnv = Map.insert j (I (s', fromInteger i)) (revNameEnv e)})
+  -- modify (\e -> e {nameEnv = Map.insert s s (nameEnv e)})
+  -- modify (\e -> e {revNameEnv = Map.insert s s (revNameEnv e)})
+  -- return s
+  return $ I (s', fromInteger i)
+
+newLLVMNameWith' :: T.Text -> WithEnv Identifier
+newLLVMNameWith' s = do
+  i <- newCount
+  -- i <- newName
+  let s' = llvmString s
+  -- let s' = llvmString s <> i
+  modify (\e -> e {nameEnv = Map.insert (fromInteger i) (I (s, 0)) (nameEnv e)})
+  -- modify
+    -- (\e -> e {revNameEnv = Map.insert j (I (s', fromInteger i)) (revNameEnv e)})
   -- modify (\e -> e {nameEnv = Map.insert s s (nameEnv e)})
   -- modify (\e -> e {revNameEnv = Map.insert s s (revNameEnv e)})
   -- return s
