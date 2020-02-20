@@ -5,7 +5,6 @@ module Data.Env where
 
 import Control.Monad.Except
 import Control.Monad.State
-import Data.ByteString.Builder
 import Path
 import System.Info
 
@@ -23,8 +22,9 @@ import qualified Data.PQueue.Min as Q
 import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
-import qualified Data.Text.Lazy as T (toStrict)
-import qualified Data.Text.Lazy.Encoding as TE
+
+-- import qualified Data.Text.Lazy as T (toStrict)
+-- import qualified Data.Text.Lazy.Encoding as TE
 import qualified Text.Show.Pretty as Pr
 
 type ConstraintQueue = Q.MinQueue EnrichedConstraint
@@ -54,9 +54,11 @@ data Env =
     , constantEnv :: S.Set Identifier
     , fileEnv :: FileEnv -- path ~> identifiers defined in the file at toplevel
     , enumEnv :: Map.HashMap Identifier [(Identifier, Int)] -- [("choice", [("left", 0), ("right", 1)]), ...]
-    , revEnumEnv :: Map.HashMap Identifier (Identifier, Int) -- [("left", ("choice", 0)), ("right", ("choice", 1)), ...]
-    , nameEnv :: Map.HashMap Identifier Identifier -- [("foo", "foo.13"), ...]
-    , revNameEnv :: Map.HashMap Identifier Identifier -- [("foo.13", "foo"), ...]
+    , revEnumEnv :: Map.HashMap T.Text (Identifier, Int) -- [("left", ("choice", 0)), ("right", ("choice", 1)), ...]
+    , nameEnv :: Map.HashMap Int Identifier -- [("foo", "foo.13"), ...]
+    , revNameEnv :: Map.HashMap Int Identifier -- [("foo.13", "foo"), ...]
+    -- , nameEnv :: Map.HashMap Identifier Identifier -- [("foo", "foo.13"), ...]
+    -- , revNameEnv :: Map.HashMap Identifier Identifier -- [("foo.13", "foo"), ...]
     , formationEnv :: Map.HashMap Identifier (Maybe WeakTermPlus)
     , inductiveEnv :: RuleEnv -- "list" ~> (cons, Pi (A : tau). A -> list A -> list A)
     , coinductiveEnv :: RuleEnv -- "tail" ~> (head, Pi (A : tau). stream A -> A)
@@ -65,7 +67,8 @@ data Env =
     , univInstEnv :: UnivInstEnv
     , univRenameEnv :: IntMap.IntMap Int
     , quasiConstEnv :: S.Set Identifier
-    , typeEnv :: Map.HashMap Identifier (TermPlus, UnivLevelPlus)
+    , typeEnv :: Map.HashMap Int (TermPlus, UnivLevelPlus)
+    -- , typeEnv :: Map.HashMap Identifier (TermPlus, UnivLevelPlus)
     , constraintEnv :: [PreConstraint] -- for type inference
     , constraintQueue :: ConstraintQueue
     , levelEnv :: [LevelConstraint]
@@ -127,7 +130,7 @@ evalWithEnv c env = do
     Right (result, _) -> return $ Right result
 
 throwError' :: Identifier -> WithEnv a
-throwError' x = throwError [TIO.putStrLn x]
+throwError' x = throwError [TIO.putStrLn $ asText x]
 
 addErrorAction :: IO () -> WithEnv a -> WithEnv a
 addErrorAction action computation = do
@@ -153,26 +156,35 @@ newName :: WithEnv Identifier
 newName = do
   i <- newCount
   -- return $ "-" <> T.toStrict (TE.decodeUtf8 (toLazyByteString $ integerDec i))
-  return $ "-" <> T.pack (show i)
+  return $ I ("-", fromInteger i)
+  -- return $ "-" <> T.pack (show i)
 
 newNameWith :: Identifier -> WithEnv Identifier
-newNameWith s = do
-  i <- newName
+newNameWith (I (s, j)) = do
+  i <- newCount
   -- let s' = s <> i -- slow
-  let s' = i
-  modify (\e -> e {nameEnv = Map.insert s s' (nameEnv e)})
+  -- let s' = i
+  modify (\e -> e {nameEnv = Map.insert j (I (s, fromInteger i)) (nameEnv e)})
+  -- modify (\e -> e {nameEnv = Map.insert s s' (nameEnv e)})
   -- modify (\e -> e {revNameEnv = Map.insert s' s (revNameEnv e)})
-  return s'
+  return $ I (s, fromInteger i)
+  -- return s'
 
 newLLVMNameWith :: Identifier -> WithEnv Identifier
-newLLVMNameWith s = do
-  i <- newName
-  let s' = llvmString s <> i
-  modify (\e -> e {nameEnv = Map.insert s' s (nameEnv e)})
-  modify (\e -> e {revNameEnv = Map.insert s' s (revNameEnv e)})
-  return s'
+newLLVMNameWith (I (s, j)) = do
+  i <- newCount
+  -- i <- newName
+  let s' = llvmString s
+  -- let s' = llvmString s <> i
+  modify (\e -> e {nameEnv = Map.insert (fromInteger i) (I (s, j)) (nameEnv e)})
+  modify
+    (\e -> e {revNameEnv = Map.insert j (I (s', fromInteger i)) (revNameEnv e)})
+  -- modify (\e -> e {nameEnv = Map.insert s s (nameEnv e)})
+  -- modify (\e -> e {revNameEnv = Map.insert s s (revNameEnv e)})
+  -- return s
+  return $ I (s', fromInteger i)
 
-llvmString :: Identifier -> Identifier
+llvmString :: T.Text -> T.Text
 llvmString "" = error "llvmString called for the empty string"
 llvmString s = T.cons (llvmHeadChar $ T.head s) (T.map llvmTailChar $ T.tail s)
 
@@ -201,12 +213,12 @@ llvmTailChar x =
     else '-'
 
 lookupTypeEnv' :: Identifier -> WithEnv TermPlus
-lookupTypeEnv' s
+lookupTypeEnv' (I (s, i))
   | Just _ <- asLowTypeMaybe s = do
     l <- newUnivLevel
     return (emptyMeta, TermTau l)
   | otherwise = do
-    mt <- gets (Map.lookup s . typeEnv)
+    mt <- gets (Map.lookup i . typeEnv)
     case mt of
       Just (t, _) -> return t
       Nothing ->
@@ -214,9 +226,9 @@ lookupTypeEnv' s
           [TIO.putStrLn $ s <> " is not found in the type environment."]
 
 lookupNameEnv :: Identifier -> WithEnv Identifier
-lookupNameEnv s = do
+lookupNameEnv (I (s, i)) = do
   env <- get
-  case Map.lookup s (nameEnv env) of
+  case Map.lookup i (nameEnv env) of
     Just s' -> return s'
     Nothing -> throwError [TIO.putStrLn $ "undefined variable: " <> s]
 
@@ -279,7 +291,7 @@ enumValueToInteger labelOrNat =
     EnumValueIntU _ i -> return i
     EnumValueNat _ j -> return j
 
-getEnumNum :: Identifier -> WithEnv Int
+getEnumNum :: T.Text -> WithEnv Int
 getEnumNum label = do
   renv <- gets revEnumEnv
   case Map.lookup label renv of
@@ -297,16 +309,16 @@ piUnivLevelsfrom xts t = do
   return $ map UnivLevelPlus $ zip ms ls
 
 insTypeEnv :: Identifier -> TermPlus -> UnivLevelPlus -> WithEnv ()
-insTypeEnv i t ml =
+insTypeEnv (I (_, i)) t ml =
   modify (\e -> e {typeEnv = Map.insert i (t, ml) (typeEnv e)})
 
 insTypeEnv' :: Identifier -> TermPlus -> WithEnv ()
-insTypeEnv' i t = do
+insTypeEnv' (I (_, i)) t = do
   l <- newUnivLevel
   let ml = UnivLevelPlus (fst t, l)
   modify (\e -> e {typeEnv = Map.insert i (t, ml) (typeEnv e)})
 
 lookupTypeEnv :: Identifier -> WithEnv (Maybe (TermPlus, UnivLevelPlus))
-lookupTypeEnv s = do
+lookupTypeEnv (I (_, i)) = do
   tenv <- gets typeEnv
-  return $ Map.lookup s tenv
+  return $ Map.lookup i tenv
