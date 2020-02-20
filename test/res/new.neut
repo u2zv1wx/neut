@@ -184,6 +184,21 @@
 
 (enum nat-enum zero-inner succ-inner)
 
+;; (mode nat-mode
+;;   nat-mode.zero
+;;   nat-mode.succ)
+
+;; --
+;; なんかしらの文章。
+
+;; --
+;; (mode top unit)
+;; --
+;; ここにまたなんかしらの文章。topはただひとつのmode-valueからなるmodeである、みたいな。
+
+
+;; --
+
 ;; 無限ループしないように修正していく
 ;; こういうときはsigmaが(sigma ((x1 A1) ... (xn An)) B)って形式になってるほうがうれしい。
 ;; 他方、stringのときとかは(sigma (x1 A1) ... (xn An))のほうがうれしい。
@@ -215,6 +230,11 @@
 ;; 3 = (right (right (right (left unit))))
 ;;  ...
 ;; という感じ。
+
+;; (mode color red blue yellow)
+
+;; (mode suit
+;;   club diamond heart spade)
 
 (let (local-nat tau) (nat-inner))
 
@@ -858,7 +878,7 @@ n15-4
 
 ;; enumよりもmodeのほうがキーワードとしてよさそう。
 
-;; (mode bool true false)
+;; (mode bool false true) ;; true should be 1, false should be 0
 
 ;; (mode choice left right)
 
@@ -878,6 +898,7 @@ n15-4
 ;;   (bar hoge))
 
 ;; ;; from C3
+;; ;; modeに応じた処理の分岐
 ;; (switch C-ionian
 ;;   (C "261Hz")
 ;;   (D "277Hz")
