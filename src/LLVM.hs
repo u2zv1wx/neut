@@ -41,13 +41,13 @@ llvmCode (_, CodePiElimDownElim v ds) = do
 llvmCode (_, CodeSigmaElim k xts v e) = do
   let xs = map fst xts
   let et = arrayKindToLowType k -- elem type
-  let bt = LowTypeArrayPtr (toInteger $ length xs) et -- base pointer type  ([(length xs) x ARRAY_ELEM_TYPE])
+  let bt = LowTypeArrayPtr (length xs) et -- base pointer type  ([(length xs) x ARRAY_ELEM_TYPE])
   let idxList = map (\i -> (LLVMDataInt i, i32)) [0 ..]
   ys <- mapM newNameWith xs
   let xts' = zip xs (repeat et)
   loadContent v bt (zip idxList (zip ys xts')) e
 llvmCode (_, CodeUpIntro d) = do
-  result <- newNameWith $ takeBaseName d
+  result <- newNameWith' $ takeBaseName d
   llvmDataLet result d $ LLVMReturn $ LLVMDataLocal result
 llvmCode (_, CodeUpElim x e1 e2) = do
   e1' <- llvmCode e1
@@ -72,9 +72,9 @@ uncastList ((y, (x, et)):yxs) e = do
   e' <- uncastList yxs e
   llvmUncastLet x (LLVMDataLocal y) et e'
 
-takeBaseName :: DataPlus -> Identifier
-takeBaseName (_, DataTheta x) = x
-takeBaseName (_, DataUpsilon x) = x
+takeBaseName :: DataPlus -> T.Text
+takeBaseName (_, DataTheta (I (s, _))) = s
+takeBaseName (_, DataUpsilon (I (s, _))) = s
 takeBaseName (_, DataSigmaIntro _ ds) = "array" <> T.pack (show (length ds))
 takeBaseName (_, DataFloat16 _) = "half"
 takeBaseName (_, DataFloat32 _) = "float"
@@ -86,9 +86,9 @@ takeBaseName (_, DataEnumIntro (EnumValueIntU size _)) =
 takeBaseName (_, DataEnumIntro _) = "i64"
 takeBaseName (_, DataStructIntro dks) = "struct" <> T.pack (show (length dks))
 
-takeBaseName' :: LLVMData -> Identifier
-takeBaseName' (LLVMDataLocal x) = x
-takeBaseName' (LLVMDataGlobal x) = x
+takeBaseName' :: LLVMData -> T.Text
+takeBaseName' (LLVMDataLocal (I (s, _))) = s
+takeBaseName' (LLVMDataGlobal (I (s, _))) = s
 takeBaseName' (LLVMDataInt _) = "int"
 takeBaseName' (LLVMDataFloat16 _) = "half"
 takeBaseName' (LLVMDataFloat32 _) = "float"
@@ -117,11 +117,11 @@ loadContent' ::
   -> WithEnv LLVM
 loadContent' bp bt [] cont = do
   l <- llvmUncast (Just $ takeBaseName' bp) bp bt
-  tmp <- newNameWith' $ Just $ takeBaseName' bp
+  tmp <- newNameWith'' $ Just $ takeBaseName' bp
   commConv tmp l $ LLVMCont (LLVMOpFree (LLVMDataLocal tmp)) cont
 loadContent' bp bt ((i, (x, et)):xis) cont = do
   cont' <- loadContent' bp bt xis cont
-  (posName, pos) <- newDataLocal' (Just x)
+  (posName, pos) <- newDataLocal' (Just $ asText x)
   return $
     LLVMLet
       posName
@@ -142,8 +142,8 @@ llvmCodeTheta _ (ThetaArrayAccess lowType arr idx) = do
   (arrVar, castArrThen) <- llvmCast (Just $ takeBaseName arr) arr arrayType
   (idxVar, castIdxThen) <- llvmCast (Just $ takeBaseName idx) idx i64
   (resPtrName, resPtr) <- newDataLocal "result-ptr"
-  resName <- newNameWith "result"
-  uncast <- llvmUncast (Just resName) (LLVMDataLocal resName) lowType
+  resName <- newNameWith' "result"
+  uncast <- llvmUncast (Just $ asText resName) (LLVMDataLocal resName) lowType
   (castArrThen >=> castIdxThen) $
     LLVMLet
       resPtrName
@@ -153,7 +153,7 @@ llvmCodeTheta _ (ThetaArrayAccess lowType arr idx) = do
       (LLVMLet resName (LLVMOpLoad resPtr lowType) uncast)
 llvmCodeTheta _ (ThetaSysCall num args) = do
   (xs, vs) <- unzip <$> mapM (const $ newDataLocal "sys-call-arg") args
-  res <- newNameWith "result"
+  res <- newNameWith' "result"
   num' <- sysCallNumAsInt num
   llvmDataLet' (zip xs args) $
     LLVMLet res (LLVMOpSysCall num' vs) $ LLVMReturn (LLVMDataLocal res)
@@ -161,8 +161,8 @@ llvmCodeTheta _ (ThetaSysCall num args) = do
 llvmCodeUnaryOp :: UnaryOp -> LowType -> LowType -> DataPlus -> WithEnv LLVM
 llvmCodeUnaryOp op domType codType d = do
   (x, castThen) <- llvmCast (Just "unary-op") d domType
-  result <- newNameWith "unary-op-result"
-  uncast <- llvmUncast (Just result) (LLVMDataLocal result) codType
+  result <- newNameWith' "unary-op-result"
+  uncast <- llvmUncast (Just $ asText result) (LLVMDataLocal result) codType
   castThen $ LLVMLet result (LLVMOpUnaryOp (op, domType) x) uncast
 
 llvmCodeBinaryOp ::
@@ -170,14 +170,14 @@ llvmCodeBinaryOp ::
 llvmCodeBinaryOp op domType codType v1 v2 = do
   (x1, cast1then) <- llvmCast (Just "binary-op-fst") v1 domType
   (x2, cast2then) <- llvmCast (Just "binary-op-snd") v2 domType
-  result <- newNameWith "binary-op-result"
-  uncast <- llvmUncast (Just result) (LLVMDataLocal result) codType
+  result <- newNameWith' "binary-op-result"
+  uncast <- llvmUncast (Just $ asText result) (LLVMDataLocal result) codType
   (cast1then >=> cast2then) $
     LLVMLet result (LLVMOpBinaryOp (op, domType) x1 x2) uncast
 
 -- alloca + storeで実現すべき？
 llvmCast ::
-     Maybe Identifier
+     Maybe T.Text
   -> DataPlus
   -> LowType
   -> WithEnv (LLVMData, LLVM -> WithEnv LLVM)
@@ -185,8 +185,8 @@ llvmCast mName v lowType@(LowTypeIntS _) = llvmCastInt mName v lowType
 llvmCast mName v lowType@(LowTypeIntU _) = llvmCastInt mName v lowType
 llvmCast mName v (LowTypeFloat i) = llvmCastFloat mName v i
 llvmCast mName v ptrType = do
-  tmp <- newNameWith' mName
-  x <- newNameWith' mName
+  tmp <- newNameWith'' mName
+  x <- newNameWith'' mName
   return
     ( LLVMDataLocal x
     , \cont -> do
@@ -194,13 +194,13 @@ llvmCast mName v ptrType = do
           LLVMLet x (LLVMOpBitcast (LLVMDataLocal tmp) voidPtr ptrType) cont)
 
 llvmCastInt ::
-     Maybe Identifier -- base name for newly created variables
+     Maybe T.Text -- base name for newly created variables
   -> DataPlus
   -> LowType
   -> WithEnv (LLVMData, LLVM -> WithEnv LLVM)
 llvmCastInt mName v lowType = do
-  x <- newNameWith' mName
-  y <- newNameWith' mName
+  x <- newNameWith'' mName
+  y <- newNameWith'' mName
   return
     ( LLVMDataLocal y
     , \cont -> do
@@ -209,7 +209,7 @@ llvmCastInt mName v lowType = do
           cont)
 
 llvmCastFloat ::
-     Maybe Identifier -- base name for newly created variables
+     Maybe T.Text -- base name for newly created variables
   -> DataPlus
   -> FloatSize
   -> WithEnv (LLVMData, LLVM -> WithEnv LLVM)
@@ -218,7 +218,7 @@ llvmCastFloat mName v size = do
   let intType = LowTypeIntS $ sizeAsInt size
   (xName, x) <- newDataLocal' mName
   (yName, y) <- newDataLocal' mName
-  z <- newNameWith' mName
+  z <- newNameWith'' mName
   return
     ( LLVMDataLocal z
     , \cont -> do
@@ -227,39 +227,39 @@ llvmCastFloat mName v size = do
           LLVMLet z (LLVMOpBitcast y intType floatType) cont)
 
 -- uncast: {some-concrete-type} -> voidPtr
-llvmUncast :: Maybe Identifier -> LLVMData -> LowType -> WithEnv LLVM
+llvmUncast :: Maybe T.Text -> LLVMData -> LowType -> WithEnv LLVM
 llvmUncast mName result lowType@(LowTypeIntS _) =
   llvmUncastInt mName result lowType
 llvmUncast mName result lowType@(LowTypeIntU _) =
   llvmUncastInt mName result lowType
 llvmUncast mName result (LowTypeFloat i) = llvmUncastFloat mName result i
 llvmUncast mName result ptrType = do
-  x <- newNameWith' mName
+  x <- newNameWith'' mName
   return $
     LLVMLet x (LLVMOpBitcast result ptrType voidPtr) $
     LLVMReturn (LLVMDataLocal x)
 
-llvmUncastInt :: Maybe Identifier -> LLVMData -> LowType -> WithEnv LLVM
+llvmUncastInt :: Maybe T.Text -> LLVMData -> LowType -> WithEnv LLVM
 llvmUncastInt mName result lowType = do
-  x <- newNameWith' mName
+  x <- newNameWith'' mName
   return $
     LLVMLet x (LLVMOpIntToPointer result lowType voidPtr) $
     LLVMReturn (LLVMDataLocal x)
 
-llvmUncastFloat :: Maybe Identifier -> LLVMData -> FloatSize -> WithEnv LLVM
+llvmUncastFloat :: Maybe T.Text -> LLVMData -> FloatSize -> WithEnv LLVM
 llvmUncastFloat mName floatResult i = do
   let floatType = LowTypeFloat i
   let intType = LowTypeIntS $ sizeAsInt i
-  tmp <- newNameWith' mName
-  x <- newNameWith' mName
+  tmp <- newNameWith'' mName
+  x <- newNameWith'' mName
   return $
     LLVMLet tmp (LLVMOpBitcast floatResult floatType intType) $
     LLVMLet x (LLVMOpIntToPointer (LLVMDataLocal tmp) intType voidPtr) $
     LLVMReturn (LLVMDataLocal x)
 
 llvmUncastLet :: Identifier -> LLVMData -> LowType -> LLVM -> WithEnv LLVM
-llvmUncastLet x d lowType cont = do
-  l <- llvmUncast (Just x) d lowType
+llvmUncastLet x@(I (s, _)) d lowType cont = do
+  l <- llvmUncast (Just s) d lowType
   commConv x l cont
 
 -- LLVMLet x e1' e2'
@@ -270,15 +270,16 @@ llvmDataLet x (_, DataTheta y) cont = do
   cenv <- gets codeEnv
   case Map.lookup y cenv of
     Nothing
-      | y == "fork" -> llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType []) cont
-    Nothing -> throwError' $ "no such global label defined: " <> y
+      | asText y == "fork" ->
+        llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType []) cont
+    Nothing -> throwError' $ "no such global label defined: " <> asText y
     Just (args, _) ->
       llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType args) cont
 llvmDataLet x (_, DataUpsilon y) cont =
   llvmUncastLet x (LLVMDataLocal y) voidPtr cont
 llvmDataLet x (_, DataSigmaIntro k ds) cont = do
   let elemType = arrayKindToLowType k
-  let arrayType = LowTypeArrayPtr (toInteger $ length ds) elemType
+  let arrayType = LowTypeArrayPtr (length ds) elemType
   let dts = zip ds (repeat elemType)
   storeContent x arrayType dts cont
 llvmDataLet x (_, DataFloat16 f) cont =
@@ -293,7 +294,8 @@ llvmDataLet x (_, DataEnumIntro labelOrNat) cont = do
       llvmUncastLet x (LLVMDataInt i) (LowTypeIntS size) cont
     EnumValueIntU size i ->
       llvmUncastLet x (LLVMDataInt i) (LowTypeIntU size) cont
-    EnumValueNat _ i -> llvmUncastLet x (LLVMDataInt i) (LowTypeIntS 64) cont
+    EnumValueNat _ i ->
+      llvmUncastLet x (LLVMDataInt $ toInteger i) (LowTypeIntS 64) cont
     EnumValueLabel l -> do
       i <- toInteger <$> getEnumNum l
       llvmUncastLet x (LLVMDataInt i) (LowTypeIntS 64) cont
@@ -375,7 +377,7 @@ storeContent ::
      Identifier -> LowType -> [(DataPlus, LowType)] -> LLVM -> WithEnv LLVM
 storeContent reg aggPtrType dts cont = do
   (cast, castThen) <-
-    llvmCast (Just reg) (emptyMeta, DataUpsilon reg) aggPtrType
+    llvmCast (Just $ asText reg) (emptyMeta, DataUpsilon reg) aggPtrType
   storeThenCont <- storeContent' cast aggPtrType (zip [0 ..] dts) cont
   castThenStoreThenCont <- castThen $ storeThenCont
   -- FIXME: getelementptrでsizeofを実現する方式を使えばallocsizeを計算する必要はそもそもないはず？
@@ -387,8 +389,8 @@ storeContent reg aggPtrType dts cont = do
         (LLVMOpAlloc (LLVMDataInt (toInteger i)))
         castThenStoreThenCont
     AllocSizePtrList n -> do
-      (c, cVar) <- newDataLocal $ "sizeof-" <> reg
-      (i, iVar) <- newDataLocal $ "sizeof-" <> reg
+      (c, cVar) <- newDataLocal $ "sizeof-" <> asText reg
+      (i, iVar) <- newDataLocal $ "sizeof-" <> asText reg
       -- Use getelementptr to realize `sizeof`. More info:
       --   http://nondot.org/sabre/LLVMNotes/SizeOf-OffsetOf-VariableSizedStructs.txt
       return $
@@ -426,14 +428,14 @@ toFunPtrType :: [a] -> LowType
 toFunPtrType xs = do
   LowTypeFunctionPtr (map (const voidPtr) xs) voidPtr
 
-newDataLocal :: Identifier -> WithEnv (Identifier, LLVMData)
+newDataLocal :: T.Text -> WithEnv (Identifier, LLVMData)
 newDataLocal name = do
-  x <- newNameWith name
+  x <- newNameWith' name
   return $ (x, LLVMDataLocal x)
 
-newDataLocal' :: Maybe Identifier -> WithEnv (Identifier, LLVMData)
+newDataLocal' :: Maybe T.Text -> WithEnv (Identifier, LLVMData)
 newDataLocal' mName = do
-  x <- newNameWith' mName
+  x <- newNameWith'' mName
   return $ (x, LLVMDataLocal x)
 
 lowTypeToAllocSize :: LowType -> AllocSize
@@ -443,8 +445,7 @@ lowTypeToAllocSize (LowTypeFloat size) =
   AllocSizeExact $ lowTypeToAllocSize' $ sizeAsInt size
 lowTypeToAllocSize LowTypeVoidPtr = AllocSizePtrList 1
 lowTypeToAllocSize (LowTypeFunctionPtr _ _) = AllocSizePtrList 1
-lowTypeToAllocSize (LowTypeStructPtr ts) =
-  AllocSizePtrList $ toInteger $ length ts
+lowTypeToAllocSize (LowTypeStructPtr ts) = AllocSizePtrList $ length ts
 lowTypeToAllocSize (LowTypeArrayPtr i t) =
   case lowTypeToAllocSize t of
     AllocSizeExact s -> AllocSizeExact $ s * i
@@ -457,9 +458,9 @@ i64 = LowTypeIntS 64
 i32 :: LowType
 i32 = LowTypeIntS 32
 
-newNameWith' :: Maybe Identifier -> WithEnv Identifier
-newNameWith' Nothing = newNameWith "var"
-newNameWith' (Just name) = newNameWith name
+newNameWith'' :: Maybe T.Text -> WithEnv Identifier
+newNameWith'' Nothing = newNameWith' "var"
+newNameWith'' (Just name) = newNameWith' name
 
 insLLVMEnv :: Identifier -> [Identifier] -> LLVM -> WithEnv ()
 insLLVMEnv funName args e =
@@ -522,10 +523,10 @@ rename args e = do
   return (args', e')
 
 renameLLVMData :: LLVMData -> WithEnv LLVMData
-renameLLVMData (LLVMDataLocal x) = do
+renameLLVMData (LLVMDataLocal x@(I (s, i))) = do
   nenv <- gets nameEnv
-  case Map.lookup x nenv of
-    Just x' -> return $ LLVMDataLocal x'
+  case Map.lookup i nenv of
+    Just i' -> return $ LLVMDataLocal $ I (s, i')
     Nothing -> return $ LLVMDataLocal x
 renameLLVMData d = return d
 

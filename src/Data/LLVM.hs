@@ -46,8 +46,8 @@ data LLVMOp
   deriving (Show)
 
 data AllocSize
-  = AllocSizeExact Integer
-  | AllocSizePtrList Integer
+  = AllocSizeExact Int
+  | AllocSizePtrList Int
   deriving (Show)
 
 type SubstLLVM = [(Identifier, LLVMData)]
