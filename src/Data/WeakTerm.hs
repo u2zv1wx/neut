@@ -34,7 +34,7 @@ data WeakTerm
   -- CBN recursion ~ CBV iteration
   | WeakTermIter IdentifierPlus [IdentifierPlus] WeakTermPlus
   | WeakTermZeta Identifier
-  | WeakTermConst T.Text
+  | WeakTermConst Identifier
   | WeakTermConstDecl IdentifierPlus WeakTermPlus
   | WeakTermInt WeakTermPlus Integer
   | WeakTermFloat16 Half
@@ -165,15 +165,12 @@ toValueIntS size i = WeakTermEnumIntro $ EnumValueIntS size i
 toValueIntU :: IntSize -> Integer -> WeakTerm
 toValueIntU size i = WeakTermEnumIntro $ EnumValueIntU size i
 
-f16 :: WeakTermPlus
-f16 = (emptyMeta, WeakTermConst "f16")
-
-f32 :: WeakTermPlus
-f32 = (emptyMeta, WeakTermConst "f32")
-
-f64 :: WeakTermPlus
-f64 = (emptyMeta, WeakTermConst "f64")
-
+-- f16 :: WeakTermPlus
+-- f16 = (emptyMeta, WeakTermConst "f16")
+-- f32 :: WeakTermPlus
+-- f32 = (emptyMeta, WeakTermConst "f32")
+-- f64 :: WeakTermPlus
+-- f64 = (emptyMeta, WeakTermConst "f64")
 varWeakTermPlus :: WeakTermPlus -> [Identifier]
 varWeakTermPlus (_, WeakTermTau _) = []
 varWeakTermPlus (_, WeakTermUpsilon x) = x : []
@@ -421,7 +418,7 @@ toText (_, WeakTermSigmaElim _ xts e1 e2) = do
 toText (_, WeakTermIter (_, x, _) xts e) = do
   let argStr = inParen $ showItems $ map showArg xts
   showCons ["μ", asText' x, argStr, toText e]
-toText (_, WeakTermConst x) = x
+toText (_, WeakTermConst x) = asText' x
 toText (_, WeakTermConstDecl xt e) = do
   showCons ["constant-declaration", showArg xt, toText e]
 toText (_, WeakTermZeta x) = asText' x

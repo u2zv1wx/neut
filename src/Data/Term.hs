@@ -3,8 +3,6 @@ module Data.Term where
 import Data.Maybe (fromMaybe)
 import Numeric.Half
 
-import qualified Data.Text as T
-
 import Data.Basic
 import Data.WeakTerm hiding (IdentifierPlus)
 
@@ -18,7 +16,7 @@ data Term
   | TermSigmaIntro TermPlus [TermPlus]
   | TermSigmaElim TermPlus [IdentifierPlus] TermPlus TermPlus
   | TermIter IdentifierPlus [IdentifierPlus] TermPlus
-  | TermConst T.Text
+  | TermConst Identifier
   | TermConstDecl IdentifierPlus TermPlus
   | TermFloat16 Half
   | TermFloat32 Float

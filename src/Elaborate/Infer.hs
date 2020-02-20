@@ -149,14 +149,15 @@ infer' ctx (m, WeakTermIter (mx, x, t) xts e) = do
 infer' ctx (m, WeakTermZeta x) = do
   (app, higherApp, ml) <- newHoleInCtx ctx m
   zenv <- gets zetaEnv
-  case Map.lookup x zenv of
+  case Map.lookup (asInt x) zenv of
     Just (app', higherApp', ml') -> do
       insConstraintEnv app app'
       insConstraintEnv higherApp higherApp'
       insLevelEQ ml ml'
       return (app, higherApp, ml)
     Nothing -> do
-      modify (\env -> env {zetaEnv = Map.insert x (app, higherApp, ml) zenv})
+      modify
+        (\env -> env {zetaEnv = Map.insert (asInt x) (app, higherApp, ml) zenv})
       return (app, higherApp, ml)
 infer' _ (m, WeakTermConst x)
   -- i64, f16, u8, etc.
@@ -460,7 +461,7 @@ insConstraintEnv t1 t2 =
   modify (\e -> e {constraintEnv = (t1, t2) : constraintEnv e})
 
 insWeakTypeEnv :: Identifier -> (WeakTermPlus, UnivLevelPlus) -> WithEnv ()
-insWeakTypeEnv i tl =
+insWeakTypeEnv (I (_, i)) tl =
   modify (\e -> e {weakTypeEnv = Map.insert i tl (weakTypeEnv e)})
 
 lookupWeakTypeEnv :: Identifier -> WithEnv (WeakTermPlus, UnivLevelPlus)
@@ -468,17 +469,18 @@ lookupWeakTypeEnv s = do
   mt <- lookupWeakTypeEnvMaybe s
   case mt of
     Just t -> return t
-    Nothing -> throwError' $ s <> " is not found in the weak type environment."
+    Nothing ->
+      throwError' $ asText s <> " is not found in the weak type environment."
 
 lookupWeakTypeEnvMaybe ::
      Identifier -> WithEnv (Maybe (WeakTermPlus, UnivLevelPlus))
-lookupWeakTypeEnvMaybe s = do
+lookupWeakTypeEnvMaybe (I (_, s)) = do
   mt <- gets (Map.lookup s . weakTypeEnv)
   case mt of
     Nothing -> return Nothing
     Just t -> return $ Just t
 
-lookupKind :: Identifier -> WithEnv Identifier
+lookupKind :: T.Text -> WithEnv T.Text
 lookupKind name = do
   renv <- gets revEnumEnv
   case Map.lookup name renv of

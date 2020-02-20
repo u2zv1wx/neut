@@ -152,10 +152,11 @@ parse' ((_, TreeNode ((_, TreeAtom "statement"):as1)):as2) = do
 parse' ((m, TreeNode [(_, TreeAtom "constant"), (mn, TreeAtom name), t]):as) = do
   t' <- macroExpand t >>= interpret
   cenv <- gets constantEnv
-  if name `S.member` cenv
-    then throwError' $ "the constant " <> name <> " is already defined"
-    else do
-      modify (\e -> e {constantEnv = S.insert name (constantEnv e)})
+  case Map.lookup name cenv of
+    Just _ -> throwError' $ "the constant " <> name <> " is already defined"
+    Nothing -> do
+      i <- newCount
+      modify (\e -> e {constantEnv = Map.insert name i (constantEnv e)})
       defList <- parse' as
       m' <- adjustPhase m
       mn' <- adjustPhase mn

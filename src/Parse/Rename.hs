@@ -11,7 +11,6 @@ import Control.Monad.Except
 import Control.Monad.State
 
 import qualified Data.HashMap.Strict as Map
-import qualified Data.Set as S
 import qualified Data.Text as T
 
 import Data.Basic
@@ -143,17 +142,12 @@ type NameEnv = Map.HashMap Int Int
 -- Alpha-convert all the variables so that different variables have different names.
 rename' :: NameEnv -> WeakTermPlus -> WithEnv WeakTermPlus
 rename' _ (m, WeakTermTau l) = return (m, WeakTermTau l)
-rename' nenv (m, WeakTermUpsilon x@(I (s, _)))
-  -- ふつうにNothingだったらconstEnvを参照してconstかどうかをチェック、くらいでよさそう。
- = do
-  cenv <- gets constantEnv
-  case lookupName x nenv of
-    Just x' -> return (m, WeakTermUpsilon x')
-    Nothing
-      | s `S.member` cenv -> return (m, WeakTermConst s)
-      | isConstant s -> return (m, WeakTermConst s)
-      | otherwise ->
-        throwError' $ T.pack (showMeta m) <> ": undefined variable: " <> s
+rename' nenv (m, WeakTermUpsilon x@(I (s, _))) = do
+  mc <- lookupConstantMaybe s
+  case (lookupName x nenv, mc) of
+    (Just x', _) -> return (m, WeakTermUpsilon x')
+    (_, Just c) -> return c
+    _ -> throwError' $ T.pack (showMeta m) <> ": undefined variable: " <> s
 rename' nenv (m, WeakTermPi mls xts t) = do
   (xts', t') <- renameBinder nenv xts t
   return (m, WeakTermPi mls xts' t')
@@ -182,9 +176,7 @@ rename' nenv (m, WeakTermIter xt xts e) = do
 rename' _ (m, WeakTermConst x) = return (m, WeakTermConst x)
 rename' nenv (m, WeakTermConstDecl (mx, x, t) e) = do
   t' <- rename' nenv t
-  -- e' <- rename' (Map.insert i 0 nenv) e
   e' <- rename' nenv e
-  -- e' <- rename' (insertName x x nenv) e
   return (m, WeakTermConstDecl (mx, x, t') e')
 rename' _ (m, WeakTermZeta h) = return (m, WeakTermZeta h)
 rename' _ (m, WeakTermInt t x) = do

@@ -78,7 +78,7 @@ interpret (m, TreeNode [(_, TreeAtom "zeta"), x]) = do
   return (m'', WeakTermZeta x')
 interpret (m, TreeNode [(_, TreeAtom "constant"), (_, TreeAtom x)]) = do
   m' <- adjustPhase m
-  return (m', WeakTermConst x)
+  return (m', WeakTermConst $ asIdent x)
 interpret (m, TreeNode [(_, TreeAtom "constant-declaration"), xt, e]) = do
   xt' <- interpretIdentifierPlus xt
   e' <- interpret e

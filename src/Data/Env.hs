@@ -49,7 +49,7 @@ data Env =
     , includeGraph :: IncludeGraph -- to detect cyclic `include`
     , keywordEnv :: S.Set T.Text -- list of reserved keywords
     , notationEnv :: [(TreePlus, TreePlus)] -- macro transformers
-    , constantEnv :: S.Set T.Text
+    , constantEnv :: Map.HashMap T.Text Int
     , fileEnv :: FileEnv -- path ~> identifiers defined in the file at toplevel
     , enumEnv :: Map.HashMap T.Text [(T.Text, Int)] -- [("choice", [("left", 0), ("right", 1)]), ...]
     , revEnumEnv :: Map.HashMap T.Text (T.Text, Int) -- [("left", ("choice", 0)), ("right", ("choice", 1)), ...]
@@ -87,7 +87,7 @@ initialEnv path colorizeFlag =
     , includeGraph = Map.empty
     , notationEnv = []
     , keywordEnv = S.empty
-    , constantEnv = S.empty
+    , constantEnv = Map.empty
     , enumEnv = Map.empty
     , fileEnv = Map.empty
     , revEnumEnv = Map.empty
@@ -304,3 +304,51 @@ lookupTypeEnv :: Identifier -> WithEnv (Maybe (TermPlus, UnivLevelPlus))
 lookupTypeEnv (I (_, i)) = do
   tenv <- gets typeEnv
   return $ Map.lookup i tenv
+
+lookupConstant :: T.Text -> WithEnv WeakTermPlus
+lookupConstant constName = do
+  me <- lookupConstantMaybe constName
+  case me of
+    Just e -> return e
+    Nothing -> throwError' $ "no such constant: " <> constName
+  -- | isConstant constName = do
+  --   cenv <- gets constantEnv
+  --   case Map.lookup constName cenv of
+  --     Just i -> return (emptyMeta, WeakTermConst $ I (constName, i))
+  --     Nothing -> do
+  --       i <- newCount
+  --       let ident = I (constName, i)
+  --       modify (\env -> env {constantEnv = Map.insert constName i cenv})
+  --       return (emptyMeta, WeakTermConst ident)
+  -- | otherwise = throwError' $ "no such constant: " <> constName
+
+lookupConstantMaybe :: T.Text -> WithEnv (Maybe WeakTermPlus)
+lookupConstantMaybe constName
+  | isConstant constName = do
+    cenv <- gets constantEnv
+    case Map.lookup constName cenv of
+      Just i -> return $ Just (emptyMeta, WeakTermConst $ I (constName, i))
+      Nothing -> do
+        i <- newCount
+        let ident = I (constName, i)
+        modify (\env -> env {constantEnv = Map.insert constName i cenv})
+        return $ Just (emptyMeta, WeakTermConst ident)
+  | otherwise = return Nothing
+
+lookupFloat16 :: WithEnv WeakTermPlus
+lookupFloat16 = lookupConstant "f16"
+
+lookupFloat32 :: WithEnv WeakTermPlus
+lookupFloat32 = lookupConstant "f32"
+
+lookupFloat64 :: WithEnv WeakTermPlus
+lookupFloat64 = lookupConstant "f64"
+-- lookupConstant :: T.Text -> WithEnv WeakTermPlus
+-- lookupConstant x
+--   | isConstant x = lookupConstant
+-- isConstant :: T.Text -> Bool
+-- isConstant x
+--   | Just (LowTypeFloat _) <- asLowTypeMaybe x = True
+--   | Just _ <- asUnaryOpMaybe x = True
+--   | Just _ <- asBinaryOpMaybe x = True
+--   | otherwise = False
