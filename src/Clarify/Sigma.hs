@@ -23,9 +23,11 @@ cartesianSigma ::
   -> ArrayKind
   -> [Either CodePlus (Identifier, CodePlus)]
   -> WithEnv DataPlus
-cartesianSigma (I (thetaName, _)) m k mxts = do
-  affName <- newNameWith' $ "affine-" <> thetaName
-  relName <- newNameWith' $ "relevant-" <> thetaName
+cartesianSigma (I (thetaName, i)) m k mxts = do
+  let affName = I ("affine-" <> thetaName, i)
+  let relName = I ("relevant-" <> thetaName, i)
+  -- affName <- newNameWith' $ "affine-" <> thetaName
+  -- relName <- newNameWith' $ "relevant-" <> thetaName
   -- aff <- affineSigma ("affine-" <> thetaName) m k mxts
   -- rel <- relevantSigma ("relevant-" <> thetaName) m k mxts
   aff <- affineSigma affName m k mxts

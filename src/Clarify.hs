@@ -318,9 +318,7 @@ retClosure' ::
   -> [(Meta, Identifier, TermPlus)] -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
   -> CodePlus -- the `e` in `lam (x1, ..., xn). e`
   -> WithEnv CodePlus
-retClosure' x fvs m xts e
-  -- modify (\env -> env {nameEnv = Map.insert x x (nameEnv env)})
- = do
+retClosure' x fvs m xts e = do
   cls <- makeClosure' (Just x) fvs m xts e
   knot x cls
   return (m, CodeUpIntro cls)

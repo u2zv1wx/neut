@@ -51,7 +51,6 @@ data Env =
     , fileEnv :: FileEnv -- path ~> identifiers defined in the file at toplevel
     , enumEnv :: Map.HashMap T.Text [(T.Text, Int)] -- [("choice", [("left", 0), ("right", 1)]), ...]
     , revEnumEnv :: Map.HashMap T.Text (T.Text, Int) -- [("left", ("choice", 0)), ("right", ("choice", 1)), ...]
-    , nameEnv :: IntMap.IntMap Int -- [("foo", "foo.13"), ...] (as corresponding int)
     , revNameEnv :: IntMap.IntMap Int -- [("foo.13", "foo"), ...] (as corresponding int)
     , formationEnv :: IntMap.IntMap (Maybe WeakTermPlus)
     , inductiveEnv :: RuleEnv -- "list" ~> (cons, Pi (A : tau). A -> list A -> list A)
@@ -88,7 +87,6 @@ initialEnv path colorizeFlag =
     , enumEnv = Map.empty
     , fileEnv = Map.empty
     , revEnumEnv = Map.empty
-    , nameEnv = IntMap.empty
     , revNameEnv = IntMap.empty
     , formationEnv = IntMap.empty
     , inductiveEnv = Map.empty
@@ -131,9 +129,8 @@ newCount = do
   return i
 
 newNameWith :: Identifier -> WithEnv Identifier
-newNameWith (I (s, i)) = do
+newNameWith (I (s, _)) = do
   j <- newCount
-  modify (\e -> e {nameEnv = IntMap.insert i j (nameEnv e)})
   return $ I (s, j)
 
 newNameWith' :: T.Text -> WithEnv Identifier
@@ -149,7 +146,6 @@ newNameWith'' s = do
 newLLVMNameWith :: Identifier -> WithEnv Identifier
 newLLVMNameWith (I (s, i)) = do
   j <- newCount
-  modify (\e -> e {nameEnv = IntMap.insert i j (nameEnv e)})
   modify (\e -> e {revNameEnv = IntMap.insert j i (revNameEnv e)})
   return $ I (llvmString s, j)
 
