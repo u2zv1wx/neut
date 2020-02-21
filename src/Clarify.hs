@@ -364,6 +364,13 @@ asArrayAccessMaybe (I (name, _))
   , Just lowType <- asLowTypeMaybe typeStr = Just lowType
 asArrayAccessMaybe _ = Nothing
 
+sepAtLast :: Char -> T.Text -> [T.Text]
+sepAtLast c s =
+  case wordsBy c s of
+    [] -> []
+    [s'] -> [s']
+    ss -> [T.intercalate (T.singleton c) (init ss), last ss]
+
 asSysCallMaybe :: T.Text -> Maybe (SysCall, [Arg])
 asSysCallMaybe "write" =
   Just (SysCallWrite, [ArgUnused, ArgImmediate, ArgArray, ArgImmediate])

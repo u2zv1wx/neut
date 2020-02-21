@@ -8,13 +8,12 @@ import GHC.Generics (Generic)
 import Path
 
 import qualified Data.IntMap.Strict as IntMap
+import qualified Data.Set as S
 import qualified Data.Text as T
 
 import Data.Bits
 import Data.Maybe (fromMaybe)
 import Text.Read
-
-import qualified Data.Set as S
 
 newtype Identifier =
   I (T.Text, Int)
@@ -42,27 +41,12 @@ instance Show Identifier where
 instance Ord Identifier where
   compare (I (_, i1)) (I (_, i2)) = compare i1 i2
 
-type Phase = Int
-
-type Line = Int
-
-type Column = Int
-
-type Loc = (Phase, Line, Column)
-
 data Case
   = CaseValue EnumValue
   | CaseDefault
   deriving (Show, Eq, Ord)
 
-data EnumType
-  = EnumTypeLabel T.Text
-  | EnumTypeIntS Int -- i{k}
-  | EnumTypeIntU Int -- u{k}
-  | EnumTypeNat Int -- n{k}
-  deriving (Show, Eq)
-
--- note that UnivLevel is just the name of the level of a universe (i.e. the integer
+-- note that UnivLevel is just a name of the level of a universe (i.e. the integer
 -- itself is not the level of the universe)
 type UnivLevel = Int
 
@@ -77,6 +61,14 @@ instance Eq UnivLevelPlus where
   (UnivLevelPlus (_, l1)) == (UnivLevelPlus (_, l2)) = l1 == l2
 
 type UnivParams = IntMap.IntMap UnivLevel
+
+type Phase = Int
+
+type Line = Int
+
+type Column = Int
+
+type Loc = (Phase, Line, Column)
 
 data Meta =
   Meta
@@ -143,42 +135,33 @@ emptyMeta =
     , metaUnivParams = IntMap.empty
     }
 
+type IntSize = Int
+
+data FloatSize
+  = FloatSize16
+  | FloatSize32
+  | FloatSize64
+  deriving (Eq, Show)
+
+asFloatSize :: Int -> Maybe FloatSize
+asFloatSize 16 = Just FloatSize16
+asFloatSize 32 = Just FloatSize32
+asFloatSize 64 = Just FloatSize64
+asFloatSize _ = Nothing
+
+data EnumType
+  = EnumTypeLabel T.Text
+  | EnumTypeIntS Int -- i{k}
+  | EnumTypeIntU Int -- u{k}
+  | EnumTypeNat Int -- n{k}
+  deriving (Show, Eq)
+
 data EnumValue
   = EnumValueIntS IntSize Integer
   | EnumValueIntU IntSize Integer
   | EnumValueNat Int Int
   | EnumValueLabel T.Text
   deriving (Show, Eq, Ord)
-
-readEnumValueIntS :: T.Text -> T.Text -> Maybe EnumValue
-readEnumValueIntS t x
-  | Just (LowTypeIntS i) <- asLowTypeMaybe t
-  , Just x' <- readMaybe $ T.unpack x = Just $ EnumValueIntS i x'
-  | otherwise = Nothing
-
-readEnumValueIntU :: T.Text -> T.Text -> Maybe EnumValue
-readEnumValueIntU t x
-  | Just (LowTypeIntU i) <- asLowTypeMaybe t
-  , Just x' <- readMaybe $ T.unpack x = Just $ EnumValueIntU i x'
-  | otherwise = Nothing
-
-readEnumValueNat :: T.Text -> Maybe EnumValue
-readEnumValueNat str -- n1-0, n2-0, n2-1, ...
-  | T.length str >= 4
-  , T.head str == 'n'
-  , [iStr, jStr] <- wordsBy '-' (T.tail str)
-  , Just i <- readMaybe $ T.unpack iStr
-  , 1 <= toInteger i && toInteger i <= 2 ^ (64 :: Integer)
-  , Just j <- readMaybe $ T.unpack jStr
-  , 0 <= toInteger j && toInteger j <= toInteger i - 1 = Just $ EnumValueNat i j
-  | otherwise = Nothing
-
-isConstant :: T.Text -> Bool
-isConstant x
-  | Just (LowTypeFloat _) <- asLowTypeMaybe x = True
-  | Just _ <- asUnaryOpMaybe x = True
-  | Just _ <- asBinaryOpMaybe x = True
-  | otherwise = False
 
 data LowType
   = LowTypeIntS IntSize
@@ -189,122 +172,6 @@ data LowType
   | LowTypeStructPtr [LowType]
   | LowTypeArrayPtr Int LowType -- [n x LOWTYPE]*
   | LowTypeIntS64Ptr
-  deriving (Eq, Show)
-
-lowTypeToAllocSize' :: Int -> Int
-lowTypeToAllocSize' i = do
-  let (q, r) = quotRem i 8
-  if r == 0
-    then q
-    else q + 1
-
-type IntSize = Int
-
-asIntS :: Integral a => a -> a -> a
-asIntS size n = do
-  let upperBound = 2 ^ (size - 1)
-  let m = 2 * upperBound
-  let a = mod n m
-  if a >= upperBound
-    then a - m
-    else a
-
-asIntU :: Integral a => a -> a -> a
-asIntU size n = mod n (2 ^ size)
-
-data FloatSize
-  = FloatSize16
-  | FloatSize32
-  | FloatSize64
-  deriving (Eq, Show)
-
-sizeAsInt :: FloatSize -> Int
-sizeAsInt FloatSize16 = 16
-sizeAsInt FloatSize32 = 32
-sizeAsInt FloatSize64 = 64
-
-data ArrayKind
-  = ArrayKindIntS Int
-  | ArrayKindIntU Int
-  | ArrayKindFloat FloatSize
-  | ArrayKindVoidPtr
-  deriving (Show, Eq)
-
-asArrayKindMaybe :: LowType -> Maybe ArrayKind
-asArrayKindMaybe (LowTypeIntS i) = Just $ ArrayKindIntS i
-asArrayKindMaybe (LowTypeIntU i) = Just $ ArrayKindIntU i
-asArrayKindMaybe (LowTypeFloat size) = Just $ ArrayKindFloat size
-asArrayKindMaybe _ = Nothing
-
-arrayKindToLowType :: ArrayKind -> LowType
-arrayKindToLowType (ArrayKindIntS i) = LowTypeIntS i
-arrayKindToLowType (ArrayKindIntU i) = LowTypeIntU i
-arrayKindToLowType (ArrayKindFloat size) = LowTypeFloat size
-arrayKindToLowType ArrayKindVoidPtr = LowTypeVoidPtr
-
-voidPtr :: LowType
-voidPtr = LowTypeVoidPtr
-
-arrVoidPtr :: ArrayKind
-arrVoidPtr = ArrayKindVoidPtr
-
-data UnaryOp
-  = UnaryOpNeg -- fneg
-  | UnaryOpTrunc LowType -- trunc, fptrunc
-  | UnaryOpZext LowType -- zext
-  | UnaryOpSext LowType -- sext
-  | UnaryOpFpExt LowType -- fpext
-  | UnaryOpTo LowType -- fp-to-ui, fp-to-si, ui-to-fp, si-to-fp (f32.to.i32, i32.to.f64, etc.)
-  deriving (Eq, Show)
-
-data BinaryOp
-  = BinaryOpAdd
-  | BinaryOpSub
-  | BinaryOpMul
-  | BinaryOpDiv
-  | BinaryOpRem
-  | BinaryOpEQ
-  | BinaryOpNE
-  | BinaryOpGT
-  | BinaryOpGE
-  | BinaryOpLT
-  | BinaryOpLE
-  | BinaryOpShl
-  | BinaryOpLshr
-  | BinaryOpAshr
-  | BinaryOpAnd
-  | BinaryOpOr
-  | BinaryOpXor
-  deriving (Eq, Show)
-
-data SysCall
-  = SysCallWrite
-  | SysCallRead
-  | SysCallExit
-  | SysCallOpen
-  | SysCallClose
-  | SysCallFork
-  | SysCallSocket
-  | SysCallListen
-  | SysCallWait4
-  | SysCallBind
-  | SysCallAccept
-  | SysCallConnect
-  deriving (Eq, Show)
-
-type ArgLen = Int
-
-type UsedArgIndexList = [Int]
-
-type Target = (OS, Arch)
-
-data OS
-  = OSLinux
-  | OSDarwin
-  deriving (Eq, Show)
-
-data Arch =
-  Arch64
   deriving (Eq, Show)
 
 asLowType :: Identifier -> LowType
@@ -326,11 +193,44 @@ asLowTypeMaybe s
   , Just size <- asFloatSize n = Just $ LowTypeFloat size
 asLowTypeMaybe _ = Nothing
 
-asFloatSize :: Int -> Maybe FloatSize
-asFloatSize 16 = Just FloatSize16
-asFloatSize 32 = Just FloatSize32
-asFloatSize 64 = Just FloatSize64
-asFloatSize _ = Nothing
+asIntS :: Integral a => a -> a -> a
+asIntS size n = do
+  let upperBound = 2 ^ (size - 1)
+  let m = 2 * upperBound
+  let a = mod n m
+  if a >= upperBound
+    then a - m
+    else a
+
+asIntU :: Integral a => a -> a -> a
+asIntU size n = mod n (2 ^ size)
+
+sizeAsInt :: FloatSize -> Int
+sizeAsInt FloatSize16 = 16
+sizeAsInt FloatSize32 = 32
+sizeAsInt FloatSize64 = 64
+
+data ArrayKind
+  = ArrayKindIntS Int
+  | ArrayKindIntU Int
+  | ArrayKindFloat FloatSize
+  | ArrayKindVoidPtr
+  deriving (Show, Eq)
+
+voidPtr :: LowType
+voidPtr = LowTypeVoidPtr
+
+arrVoidPtr :: ArrayKind
+arrVoidPtr = ArrayKindVoidPtr
+
+data UnaryOp
+  = UnaryOpNeg -- fneg
+  | UnaryOpTrunc LowType -- trunc, fptrunc
+  | UnaryOpZext LowType -- zext
+  | UnaryOpSext LowType -- sext
+  | UnaryOpFpExt LowType -- fpext
+  | UnaryOpTo LowType -- fp-to-ui, fp-to-si, ui-to-fp, si-to-fp (f32.to.i32, i32.to.f64, etc.)
+  deriving (Eq, Show)
 
 asUnaryOpMaybe :: T.Text -> Maybe (LowType, UnaryOp)
 asUnaryOpMaybe name
@@ -350,6 +250,26 @@ asConvOpMaybe codType "sext" = Just $ UnaryOpSext codType
 asConvOpMaybe codType "ext" = Just $ UnaryOpFpExt codType
 asConvOpMaybe codType "to" = Just $ UnaryOpTo codType
 asConvOpMaybe _ _ = Nothing
+
+data BinaryOp
+  = BinaryOpAdd
+  | BinaryOpSub
+  | BinaryOpMul
+  | BinaryOpDiv
+  | BinaryOpRem
+  | BinaryOpEQ
+  | BinaryOpNE
+  | BinaryOpGT
+  | BinaryOpGE
+  | BinaryOpLT
+  | BinaryOpLE
+  | BinaryOpShl
+  | BinaryOpLshr
+  | BinaryOpAshr
+  | BinaryOpAnd
+  | BinaryOpOr
+  | BinaryOpXor
+  deriving (Eq, Show)
 
 asBinaryOpMaybe :: T.Text -> Maybe (LowType, BinaryOp)
 asBinaryOpMaybe name
@@ -378,6 +298,32 @@ asBinaryOpMaybe' "or" = Just BinaryOpOr
 asBinaryOpMaybe' "xor" = Just BinaryOpXor
 asBinaryOpMaybe' _ = Nothing
 
+data SysCall
+  = SysCallWrite
+  | SysCallRead
+  | SysCallExit
+  | SysCallOpen
+  | SysCallClose
+  | SysCallFork
+  | SysCallSocket
+  | SysCallListen
+  | SysCallWait4
+  | SysCallBind
+  | SysCallAccept
+  | SysCallConnect
+  deriving (Eq, Show)
+
+type Target = (OS, Arch)
+
+data OS
+  = OSLinux
+  | OSDarwin
+  deriving (Eq, Show)
+
+data Arch =
+  Arch64
+  deriving (Eq, Show)
+
 -- {} linearCheck {}
 linearCheck :: (Eq a, Ord a) => [a] -> Bool
 linearCheck xs = linearCheck' S.empty xs
@@ -396,13 +342,12 @@ wordsBy c s =
       let (w, s'') = T.break (== c) s'
       w : wordsBy c s''
 
--- sepAtLast '-' "array-access-u8" ~> ["array-access", "u8"]
-sepAtLast :: Char -> T.Text -> [T.Text]
-sepAtLast c s =
-  case wordsBy c s of
-    [] -> []
-    [s'] -> [s']
-    ss -> [T.intercalate (T.singleton c) (init ss), last ss]
+splitLast :: [a] -> Maybe ([a], a)
+splitLast [] = Nothing
+splitLast [x] = return ([], x)
+splitLast (x:xs) = do
+  (xs', z) <- splitLast xs
+  return (x : xs', z)
 
 ushiftR :: Int -> Int -> Int
 ushiftR n k = fromIntegral (fromIntegral n `shiftR` k :: Word)
@@ -462,10 +407,3 @@ assertPostMP msg mx b = assertMP (msg ++ ".post") mx b
 
 assertPostPM :: (Monad m) => String -> a -> m Bool -> m a
 assertPostPM msg x mb = assertPM (msg ++ ".post") x mb
-
-splitLast :: [a] -> Maybe ([a], a)
-splitLast [] = Nothing
-splitLast [x] = return ([], x)
-splitLast (x:xs) = do
-  (xs', z) <- splitLast xs
-  return (x : xs', z)

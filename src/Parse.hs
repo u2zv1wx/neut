@@ -408,11 +408,11 @@ toQuasiStmtLetFooter ::
 toQuasiStmtLetFooter path (m, x, t) = do
   let s' = "(" <> T.pack (toFilePath path) <> ":" <> asText' x <> ")" -- user cannot write this var since it contains parenthesis
   let m' = m {metaIsAppropriateAsCompletionCandidate = False}
-  QuasiStmtLet m' (m', I (s', 0), t) (m, WeakTermUpsilon x)
+  QuasiStmtLet m' (m', I (llvmString s', 0), t) (m, WeakTermUpsilon x)
 
 toQuasiStmtLetHeader ::
      Path Abs File -> (Meta, Identifier, WeakTermPlus) -> QuasiStmt
 toQuasiStmtLetHeader path (m, x, t) = do
   let s' = "(" <> T.pack (toFilePath path) <> ":" <> asText' x <> ")" -- user cannot write this var since it contains parenthesis
   let m' = m {metaIsAppropriateAsCompletionCandidate = False}
-  QuasiStmtLet m' (m, x, t) (m', WeakTermUpsilon (I (s', 0)))
+  QuasiStmtLet m' (m, x, t) (m', WeakTermUpsilon (I (llvmString s', 0)))

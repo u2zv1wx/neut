@@ -359,6 +359,35 @@ readEnumTypeIntS str = readEnumType 'i' str 23
 readEnumTypeIntU :: T.Text -> (Maybe Int)
 readEnumTypeIntU str = readEnumType 'u' str 23
 
+readEnumValueIntS :: T.Text -> T.Text -> Maybe EnumValue
+readEnumValueIntS t x
+  | Just (LowTypeIntS i) <- asLowTypeMaybe t
+  , Just x' <- readMaybe $ T.unpack x = Just $ EnumValueIntS i x'
+  | otherwise = Nothing
+
+readEnumValueIntU :: T.Text -> T.Text -> Maybe EnumValue
+readEnumValueIntU t x
+  | Just (LowTypeIntU i) <- asLowTypeMaybe t
+  , Just x' <- readMaybe $ T.unpack x = Just $ EnumValueIntU i x'
+  | otherwise = Nothing
+
+readEnumValueNat :: T.Text -> Maybe EnumValue
+readEnumValueNat str -- n1-0, n2-0, n2-1, ...
+  | T.length str >= 4
+  , T.head str == 'n'
+  , [iStr, jStr] <- wordsBy '-' (T.tail str)
+  , Just i <- readMaybe $ T.unpack iStr
+  , 1 <= toInteger i && toInteger i <= 2 ^ (64 :: Integer)
+  , Just j <- readMaybe $ T.unpack jStr
+  , 0 <= toInteger j && toInteger j <= toInteger i - 1 = Just $ EnumValueNat i j
+  | otherwise = Nothing
+
+asArrayKindMaybe :: LowType -> Maybe ArrayKind
+asArrayKindMaybe (LowTypeIntS i) = Just $ ArrayKindIntS i
+asArrayKindMaybe (LowTypeIntU i) = Just $ ArrayKindIntU i
+asArrayKindMaybe (LowTypeFloat size) = Just $ ArrayKindFloat size
+asArrayKindMaybe _ = Nothing
+
 adjustPhase :: Meta -> WithEnv Meta
 adjustPhase m = do
   i <- gets phase

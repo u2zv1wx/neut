@@ -425,6 +425,12 @@ indexTypeOf :: LowType -> LowType
 indexTypeOf (LowTypeStructPtr _) = LowTypeIntS 32
 indexTypeOf _ = LowTypeIntS 64
 
+arrayKindToLowType :: ArrayKind -> LowType
+arrayKindToLowType (ArrayKindIntS i) = LowTypeIntS i
+arrayKindToLowType (ArrayKindIntU i) = LowTypeIntU i
+arrayKindToLowType (ArrayKindFloat size) = LowTypeFloat size
+arrayKindToLowType ArrayKindVoidPtr = LowTypeVoidPtr
+
 toFunPtrType :: [a] -> LowType
 toFunPtrType xs = do
   LowTypeFunctionPtr (map (const voidPtr) xs) voidPtr
@@ -452,6 +458,13 @@ lowTypeToAllocSize (LowTypeArrayPtr i t) =
     AllocSizeExact s -> AllocSizeExact $ s * i
     AllocSizePtrList s -> AllocSizePtrList $ s * i -- shouldn't occur
 lowTypeToAllocSize LowTypeIntS64Ptr = AllocSizePtrList 1
+
+lowTypeToAllocSize' :: Int -> Int
+lowTypeToAllocSize' i = do
+  let (q, r) = quotRem i 8
+  if r == 0
+    then q
+    else q + 1
 
 i64 :: LowType
 i64 = LowTypeIntS 64

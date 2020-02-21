@@ -114,7 +114,6 @@ initialEnv path colorizeFlag =
     , shouldColorize = colorizeFlag
     }
 
--- type WithEnv a = StateT Env (ExceptT Identifier IO) a
 type WithEnv a = StateT Env (ExceptT [IO ()] IO) a
 
 evalWithEnv :: (Show a) => WithEnv a -> Env -> IO (Either [IO ()] a)
@@ -361,3 +360,10 @@ lookupFloat32 = lookupConstantPlus' "f32"
 
 lookupFloat64 :: WithEnv WeakTermPlus
 lookupFloat64 = lookupConstantPlus' "f64"
+
+isConstant :: T.Text -> Bool
+isConstant x
+  | Just (LowTypeFloat _) <- asLowTypeMaybe x = True
+  | Just _ <- asUnaryOpMaybe x = True
+  | Just _ <- asBinaryOpMaybe x = True
+  | otherwise = False
