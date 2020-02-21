@@ -45,6 +45,4 @@ instance Ord EnrichedConstraint where
 
 type SubstWeakTerm' = Map.HashMap Identifier ([Hole], WeakTermPlus)
 
-type Weight = Integer
-
 type LevelConstraint = (UnivLevelPlus, (Integer, UnivLevelPlus))

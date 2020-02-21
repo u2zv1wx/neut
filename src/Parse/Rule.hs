@@ -17,7 +17,6 @@ import Data.Monoid ((<>))
 import qualified Data.HashMap.Strict as Map
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Text as T
-import qualified Data.Text.IO as TIO
 
 import Data.Basic
 import Data.Env
@@ -92,7 +91,7 @@ toInductive ::
 toInductive ats bts connective@(m, a@(I (ai, _)), xts, _) = do
   formationRule <- formationRuleOf connective >>= ruleAsIdentPlus
   let cod = (m, WeakTermPiElim (m, WeakTermUpsilon a) (map toVar' xts))
-  z <- newLLVMNameWith' "_"
+  z <- newNameWith' "_"
   let zt = (m, z, cod)
   (atsbts', cod') <- renameFormArgs (ats ++ bts) cod
   mls1 <- piUnivLevelsfrom (ats ++ bts) cod
@@ -156,7 +155,7 @@ toCoinductive ats bts c@(m, a@(I (ai, _)), xts, _) = do
   f <- formationRuleOf c >>= ruleAsIdentPlus
   let cod = (m, WeakTermPiElim (m, WeakTermUpsilon a) (map toVar' xts))
   (atsbts', cod') <- renameFormArgs (ats ++ bts) cod
-  z <- newLLVMNameWith' "_"
+  z <- newNameWith' "_"
   let zt' = (m, z, cod')
   mls <- piUnivLevelsfrom (xts ++ atsbts' ++ [zt']) cod
   return
@@ -287,14 +286,7 @@ externalize ::
   -> WeakTermPlus
   -> WeakTermPlus
   -> WithEnv WeakTermPlus
-externalize csub atsbts t e
-  -- p "externalize. atsbts::"
-  -- p' atsbts
-  -- p "t:"
-  -- p' t
-  -- p "e:"
-  -- p' e
- = do
+externalize csub atsbts t e = do
   zeta ModeForward [] csub atsbts t e
 
 flipMode :: Mode -> Mode
@@ -572,7 +564,6 @@ toInternalizedArg mode isub csub aInner aOuter xts atsbts es es' b (mbInner, _, 
   ys' <- mapM newNameWith ys
   -- これで引数の型の調整が終わったので、あらためてidentPlusの形に整える
   -- もしかしたらyって名前を別名に変更したほうがいいかもしれないが。
-  -- let ytsInner' = zip3 ms ys ts''
   let ytsInner' = zip3 ms ys' ts''
   -- 引数をコンストラクタに渡せるようにするために再帰的にinternalizeをおこなう。
   -- list (item-outer A)みたいな形だったものは、list (item-inner A)となっているはずなので、zetaは停止する。
@@ -625,7 +616,6 @@ toExternalizedArg mode isub csub aInner a' xts atsbts es es' b (mbInner, _, (_, 
   let cod'' = substWeakTermPlus (zip xs es) cod'
   -- cod''をこう表現することよってzetaがwell-founded relationに沿って停止する。
   -- あとは適用のtermを構成して、
-  -- let app = (mbInner, WeakTermPiElim (toVar' b) (es ++ (map toVar' yts)))
   let app = (mbInner, WeakTermPiElim (toVar' b) (es ++ (map toVar' yts')))
   -- それを再帰的に処理すればよい。
   app' <- zeta mode isub csub atsbts cod'' app

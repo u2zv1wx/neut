@@ -160,7 +160,7 @@ parse' ((m, TreeNode [(_, TreeAtom "constant"), (mn, TreeAtom name), t]):as) = d
       defList <- parse' as
       m' <- adjustPhase m
       mn' <- adjustPhase mn
-      return $ QuasiStmtConstDecl m' (mn', name, t') : defList
+      return $ QuasiStmtConstDecl m' (mn', I (name, i), t') : defList
 parse' ((m, TreeNode [(mDef, TreeAtom "definition"), name@(_, TreeAtom _), body]):as) =
   parse' $ (m, TreeNode [(mDef, TreeAtom "let"), name, body]) : as
 parse' ((m, TreeNode (def@(_, TreeAtom "definition"):name@(mFun, TreeAtom _):xts@(_, TreeNode _):body:rest)):as) =
@@ -282,14 +282,7 @@ concatQuasiStmtList (QuasiStmtLetInductiveIntro m bt xts yts ats bts bInner isub
               (ats ++ bts) -- ats = [list : (...)], bts = [nil : Pi (yts). list A, cons : (...)]
               (m, WeakTermPiElim bInner yts')))
       cont
-  -- concatQuasiStmtList $ s : ss
-concatQuasiStmtList (QuasiStmtLetCoinductiveElim m bt xtsyt codInner ats bts yt e1 e2 csub asOuter:ss)
-  -- e2' <- reduceWeakTermPlus <$> externalize csub (ats ++ bts) codInner e2
-  -- p "bt:"
-  -- p' bt
-  -- p "e2:"
-  -- p' e2
- = do
+concatQuasiStmtList (QuasiStmtLetCoinductiveElim m bt xtsyt codInner ats bts yt e1 e2 csub asOuter:ss) = do
   e2' <- externalize csub (ats ++ bts) codInner e2
   insCoinductive asOuter bt -- register the destructor (if necessary)
   cont <- concatQuasiStmtList ss
@@ -303,7 +296,6 @@ concatQuasiStmtList (QuasiStmtLetCoinductiveElim m bt xtsyt codInner ats bts yt 
           xtsyt
           (m, WeakTermSigmaElim codOuter (ats ++ bts ++ [yt]) e1 e2'))
       cont
-  -- concatQuasiStmtList $ s : ss
 
 toLetList :: [(IdentDef, WeakTermPlus)] -> [QuasiStmt]
 toLetList [] = []
@@ -394,8 +386,7 @@ toIdentList ((QuasiStmtLetWT _ mxt _):ds) = mxt : toIdentList ds
 toIdentList ((QuasiStmtDef xds):ds) = do
   let mxts = map (\(_, (_, mxt, _, _)) -> mxt) xds
   mxts ++ toIdentList ds
-toIdentList ((QuasiStmtConstDecl _ (m, x, t)):ds) =
-  (m, asIdent x, t) : toIdentList ds
+toIdentList ((QuasiStmtConstDecl _ (m, x, t)):ds) = (m, x, t) : toIdentList ds
 toIdentList ((QuasiStmtLetInductive _ _ mxt _):ds) = mxt : toIdentList ds
 toIdentList ((QuasiStmtLetCoinductive _ _ mxt _):ds) = mxt : toIdentList ds
 toIdentList ((QuasiStmtLetInductiveIntro _ b _ _ _ _ _ _ _):ss) =

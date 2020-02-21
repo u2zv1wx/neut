@@ -26,7 +26,7 @@ compInfoQuasiStmtList c info ((QuasiStmtDef xds):ss) = do
   compInfoQuasiStmtList c info' ss
 compInfoQuasiStmtList c info ((QuasiStmtConstDecl _ (mx, x, t)):ss) = do
   compInfoWeakTermPlus c info t
-  let info' = (asIdent x, mx) : info
+  let info' = (x, mx) : info
   compInfoQuasiStmtList c info' ss
 compInfoQuasiStmtList c info (_:ss) = compInfoQuasiStmtList c info ss
 

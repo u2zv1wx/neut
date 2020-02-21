@@ -386,10 +386,12 @@ isValue (_, TermTau _) = return True
 isValue (_, TermUpsilon _) = return True
 isValue (_, TermPi {}) = return True
 isValue (_, TermPiIntro {}) = return True
+isValue (_, TermSigma {}) = return True
+isValue (_, TermSigmaIntro _ es) = do
+  bs <- mapM isValue es
+  return $ and bs
 isValue (_, TermIter {}) = return True
 isValue (_, TermConst x) = isValueConst x
--- isValue (_, TermIntS _ _) = return True
--- isValue (_, TermIntU _ _) = return True
 isValue (_, TermFloat16 _) = return True
 isValue (_, TermFloat32 _) = return True
 isValue (_, TermFloat64 _) = return True
@@ -398,6 +400,10 @@ isValue (_, TermEnumIntro _) = return True
 isValue (_, TermArray {}) = return True
 isValue (_, TermArrayIntro _ es) = do
   bs <- mapM isValue es
+  return $ and bs
+isValue (_, TermStruct {}) = return True
+isValue (_, TermStructIntro eks) = do
+  bs <- mapM (isValue . fst) eks
   return $ and bs
 isValue _ = return False
 

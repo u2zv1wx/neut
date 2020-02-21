@@ -62,8 +62,6 @@ renameQuasiStmtList' nenv ((QuasiStmtDef xds):ss) = do
   return $ QuasiStmtDef (zip xs' ds') : ss'
 renameQuasiStmtList' nenv ((QuasiStmtConstDecl m (mx, x, t)):ss) = do
   t' <- rename' nenv t
-  -- e' <- rename' (Map.insert i 0 nenv) e
-  -- ss' <- renameQuasiStmtList' (insertName x x nenv) ss
   ss' <- renameQuasiStmtList' nenv ss
   return $ QuasiStmtConstDecl m (mx, x, t') : ss'
 renameQuasiStmtList' nenv ((QuasiStmtLetInductive n m (mx, a, t) e):ss) = do
@@ -117,10 +115,6 @@ renameQuasiStmtList' nenv ((QuasiStmtLetCoinductiveElim m (mb, b, t) xtsyt codIn
   asOuter <- mapM (lookupStrict nenv) ats
   asInner <- mapM (lookupStrict nenv'''') ats
   let info = zip asInner asOuterPlus
-  -- p "renamed coinductiveelim. xtsytatsbts (before:)"
-  -- p' $ xtsyt ++ ats ++ bts
-  -- p "after:"
-  -- p' $ xtsyt' ++ ats' ++ bts'
   return $
     QuasiStmtLetCoinductiveElim
       m

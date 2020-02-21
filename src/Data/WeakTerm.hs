@@ -1,4 +1,3 @@
-{-# LANGUAGE GADTs #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Data.WeakTerm where
@@ -105,7 +104,7 @@ data QuasiStmt
   | QuasiStmtDef [(Identifier, Def)]
   -- declaration of a constant
   --   (constant x t)
-  | QuasiStmtConstDecl Meta (Meta, T.Text, WeakTermPlus)
+  | QuasiStmtConstDecl Meta IdentifierPlus
   | QuasiStmtLetInductive Int Meta IdentifierPlus WeakTermPlus
   | QuasiStmtLetCoinductive Int Meta IdentifierPlus WeakTermPlus
   -- let (b : B) :=
@@ -146,7 +145,7 @@ data WeakStmt
   | WeakStmtLet Meta IdentifierPlus WeakTermPlus WeakStmt
   -- special case of `let` in which the `e` in `let x := e in cont` is known to be well-typed
   | WeakStmtLetWT Meta IdentifierPlus WeakTermPlus WeakStmt
-  | WeakStmtConstDecl Meta (Meta, T.Text, WeakTermPlus) WeakStmt
+  | WeakStmtConstDecl Meta IdentifierPlus WeakStmt
   deriving (Show)
 
 toVar :: Identifier -> WeakTermPlus
