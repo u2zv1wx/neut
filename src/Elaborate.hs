@@ -51,21 +51,9 @@ elaborateStmt (WeakStmtReturn e) = do
   analyze >> synthesize >> refine
   checkUnivSanity
   elaborate' e' >>= reduceTermPlus
-elaborateStmt (WeakStmtLet m (mx, x@(I (_, i)), t) e cont)
-  -- p' t
-  -- p "-----------"
-  -- p $ show x
-  -- p "body:"
-  -- liftIO $ TIO.putStrLn $ toText e
-  -- p "type of body:"
-  -- liftIO $ TIO.putStrLn $ toText t
- = do
+elaborateStmt (WeakStmtLet m (mx, x@(I (_, i)), t) e cont) = do
   (e', te, mle) <- infer e
   (t', mlt) <- inferType t
-  -- p "insConstraint:"
-  -- liftIO $ TIO.putStrLn $ toText te
-  -- liftIO $ TIO.putStrLn $ toText t'
-  -- p' (te, t')
   insConstraintEnv te t'
   insLevelEQ mle mlt
   -- Kantian type-inference ;)
@@ -77,27 +65,13 @@ elaborateStmt (WeakStmtLet m (mx, x@(I (_, i)), t) e cont)
   -- liftIO $ TIO.putStrLn $ toText $ weaken t''
   cont' <- elaborateStmt cont
   return (m, TermPiElim (m, TermPiIntro [(mx, x, t'')] cont') [e''])
-elaborateStmt (WeakStmtLetWT m (mx, x@(I (_, i)), t) e cont)
-  -- p "-----------"
-  -- p $ show x
-  -- p "body:"
-  -- liftIO $ TIO.putStrLn $ toText e
-  -- p "type of body:"
-  -- liftIO $ TIO.putStrLn $ toText t
- = do
+elaborateStmt (WeakStmtLetWT m (mx, x@(I (_, i)), t) e cont) = do
   (t', mlt) <- inferType t
-  -- p "t':"
-  -- liftIO $ TIO.putStrLn $ toText t'
   analyze >> synthesize >> refine >> cleanup
   e' <- elaborate' e -- `e` is supposed to be well-typed
   t'' <- elaborate' t' >>= reduceTermPlus
   insTypeEnv x t'' mlt
-  modify (\env -> env {quasiConstEnv = S.insert x (quasiConstEnv env)})
   modify (\env -> env {substEnv = IntMap.insert i (weaken e') (substEnv env)})
-  -- p $ T.unpack $ "- " <> toText (weaken e')
-  -- p $ T.unpack $ "- " <> toText (weaken t'')
-  -- p $ show x
-  -- liftIO $ TIO.putStrLn $ toText $ weaken t''
   cont' <- elaborateStmt cont
   return (m, TermPiElim (m, TermPiIntro [(mx, x, t'')] cont') [e'])
 elaborateStmt (WeakStmtConstDecl m (mx, x, t) cont) = do

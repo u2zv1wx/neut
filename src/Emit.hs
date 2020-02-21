@@ -12,7 +12,6 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.HashMap.Strict as Map
 
-import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 
 import Data.Basic
@@ -51,7 +50,7 @@ sig name args = "define i8* " <> "@" <> name <> showLocals args
 --   "define i8* " <>
 --   showLLVMData (LLVMDataGlobal name) <> showArgs (map LLVMDataLocal args)
 emitBlock :: B.ByteString -> Identifier -> LLVM -> WithEnv [B.ByteString]
-emitBlock funName name@(I (_, i)) asm = do
+emitBlock funName (I (_, i)) asm = do
   a <- emitLLVM funName asm
   -- "%_" <> BC.pack (show i)
   -- return $ emitLabel (showLLVMData $ LLVMDataLocal name) : a

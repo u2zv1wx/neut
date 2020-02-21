@@ -13,6 +13,7 @@ import Data.List (nubBy)
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.Text as T
+import qualified Data.Text.IO as TIO
 
 import Clarify.Closure
 import Clarify.Sigma
@@ -21,6 +22,7 @@ import Data.Basic
 import Data.Code
 import Data.Env
 import Data.Term
+import Data.WeakTerm hiding (toVar)
 import Reduce.Term
 
 clarify :: TermPlus -> WithEnv CodePlus
@@ -38,6 +40,10 @@ clarify lam@(m, TermPiIntro mxts e) = do
   -- p "chain-pi-intro. xs:"
   -- p' $ map (\(_, x, _) -> x) mxts
   fvs <- chainTermPlus lam
+  -- p "term:"
+  -- liftIO $ TIO.putStrLn $ toText $ weaken lam
+  -- p "chain:"
+  -- p' fvs
   retClosure Nothing fvs m mxts e'
 clarify (m, TermPiElim e es) = do
   es' <- mapM clarifyPlus es

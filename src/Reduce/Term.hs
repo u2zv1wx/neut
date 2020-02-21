@@ -35,10 +35,6 @@ reduceTermPlus (m, TermPiElim e es) = do
       , valueCond -> do
         let xs = map (\(_, x, _) -> x) xts
         reduceTermPlus $ substTermPlus (zip xs es') body
-    -- (_, TermMu (x, _) body)
-    --   -- reduce pseudo-recursive terms
-    --   | x `notElem` varTermPlus body -> do
-    --     reduceTermPlus (m, TermPiElim body es')
     (_, TermConst constant) -> reduceTermPlusTheta (m, app) es' m constant
     _ -> return (m, app)
 reduceTermPlus (m, TermIter (mx, x, t) xts e)
