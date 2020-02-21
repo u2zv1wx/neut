@@ -71,9 +71,7 @@ reduceTermPlus (m, TermEnumElim (e, t) les) = do
 reduceTermPlus (m, TermArray dom k) = do
   dom' <- reduceTermPlus dom
   return (m, TermArray dom' k)
-reduceTermPlus (m, TermArrayIntro k es)
-  -- let (ls, es) = unzip les
- = do
+reduceTermPlus (m, TermArrayIntro k es) = do
   es' <- mapM reduceTermPlus es
   return (m, TermArrayIntro k es')
 reduceTermPlus (m, TermArrayElim k xts e1 e2) = do
@@ -85,20 +83,6 @@ reduceTermPlus (m, TermArrayElim k xts e1 e2) = do
         let xs = map (\(_, x, _) -> x) xts
         reduceTermPlus $ substTermPlus (zip xs es) e2
     _ -> return (m, TermArrayElim k xts e1' e2)
-  -- case v of
-  --   (_, DataSigmaIntro mk' ds)
-  --     | length ds == length xs
-  --     , mk == mk' -> do reduceCodePlus $ substCodePlus (zip xs ds) e
-  --   _ -> do
-  --     e' <- reduceCodePlus e
-  --     ts' <- mapM reduceCodePlus ts
-  --     return (m, CodeSigmaElim mk (zip xs ts') v e')
-  -- e2' <- reduceTermPlus e2
-  -- case (e1', e2') of
-  --   ((_, TermArrayIntro k' les), (_, TermEnumIntro l))
-  --     | k == k'
-  --     , Just e <- lookup l les -> reduceTermPlus e
-    -- _ -> return (m, TermArrayElim k e1' e2')
 reduceTermPlus (m, TermStructIntro eks) = do
   let (es, ks) = unzip eks
   es' <- mapM reduceTermPlus es
@@ -254,24 +238,6 @@ data UnaryArgInfo
   | UnaryArgInfoFloat64 Double
   deriving (Show, Eq)
 
--- getUnaryArgInfo :: LowType -> TermPlus -> Maybe UnaryArgInfo
--- -- IntS
--- getUnaryArgInfo (LowTypeIntS s) (_, TermIntS s1 x)
---   | s == s1 = return $ UnaryArgInfoIntS s x
--- -- IntU
--- getUnaryArgInfo (LowTypeIntU s) (_, TermIntU s1 x)
---   | s == s1 = return $ UnaryArgInfoIntU s x
--- -- Float16
--- getUnaryArgInfo (LowTypeFloat FloatSize16) (_, TermFloat16 x) =
---   return $ UnaryArgInfoFloat16 x
--- -- Float32
--- getUnaryArgInfo (LowTypeFloat FloatSize32) (_, TermFloat32 x) =
---   return $ UnaryArgInfoFloat32 x
--- -- Float64
--- getUnaryArgInfo (LowTypeFloat FloatSize64) (_, TermFloat64 x) =
---   return $ UnaryArgInfoFloat64 x
--- -- otherwise (invalid argument)
--- getUnaryArgInfo _ _ = Nothing
 getUnaryArgInfo :: LowType -> TermPlus -> Maybe UnaryArgInfo
 -- IntS
 getUnaryArgInfo (LowTypeIntS s) (_, TermEnumIntro (EnumValueIntS s1 x))
@@ -299,24 +265,6 @@ data BinaryArgInfo
   | BinaryArgInfoFloat64 Double Double
   deriving (Show, Eq)
 
--- getBinaryArgInfo :: LowType -> TermPlus -> TermPlus -> Maybe BinaryArgInfo
--- -- IntS
--- getBinaryArgInfo (LowTypeIntS s) (_, TermIntS s1 x) (_, TermIntS s2 y)
---   | s == s1 && s == s2 = return $ BinaryArgInfoIntS s x y
--- -- IntU
--- getBinaryArgInfo (LowTypeIntU s) (_, TermIntU s1 x) (_, TermIntU s2 y)
---   | s == s1 && s == s2 = return $ BinaryArgInfoIntU s x y
--- -- Float16
--- getBinaryArgInfo (LowTypeFloat FloatSize16) (_, TermFloat16 x) (_, TermFloat16 y) =
---   return $ BinaryArgInfoFloat16 x y
--- -- Float32
--- getBinaryArgInfo (LowTypeFloat FloatSize32) (_, TermFloat32 x) (_, TermFloat32 y) =
---   return $ BinaryArgInfoFloat32 x y
--- -- Float64
--- getBinaryArgInfo (LowTypeFloat FloatSize64) (_, TermFloat64 x) (_, TermFloat64 y) =
---   return $ BinaryArgInfoFloat64 x y
--- -- otherwise (invalid arguments)
--- getBinaryArgInfo _ _ _ = Nothing
 getBinaryArgInfo :: LowType -> TermPlus -> TermPlus -> Maybe BinaryArgInfo
 -- IntS
 getBinaryArgInfo (LowTypeIntS s) (_, TermEnumIntro (EnumValueIntS s1 x)) (_, TermEnumIntro (EnumValueIntS s2 y))
