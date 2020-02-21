@@ -73,7 +73,7 @@ elaborateStmt (WeakStmtLet m (mx, x@(I (_, i)), t) e cont)
   e'' <- elaborate' e' >>= reduceTermPlus
   t'' <- elaborate' t' >>= reduceTermPlus
   insTypeEnv x t'' mlt
-  modify (\env -> env {substEnv = Map.insert i (weaken e'') (substEnv env)})
+  modify (\env -> env {substEnv = IntMap.insert i (weaken e'') (substEnv env)})
   -- liftIO $ TIO.putStrLn $ toText $ weaken t''
   cont' <- elaborateStmt cont
   return (m, TermPiElim (m, TermPiIntro [(mx, x, t'')] cont') [e''])
@@ -93,7 +93,7 @@ elaborateStmt (WeakStmtLetWT m (mx, x@(I (_, i)), t) e cont)
   t'' <- elaborate' t' >>= reduceTermPlus
   insTypeEnv x t'' mlt
   modify (\env -> env {quasiConstEnv = S.insert x (quasiConstEnv env)})
-  modify (\env -> env {substEnv = Map.insert i (weaken e') (substEnv env)})
+  modify (\env -> env {substEnv = IntMap.insert i (weaken e') (substEnv env)})
   -- p $ T.unpack $ "- " <> toText (weaken e')
   -- p $ T.unpack $ "- " <> toText (weaken t'')
   -- p $ show x
@@ -112,13 +112,13 @@ elaborateStmt (WeakStmtConstDecl m (mx, x, t) cont) = do
 -- fixme: 余計なreduceをしているので修正すること
 refine :: WithEnv ()
 refine =
-  modify (\env -> env {substEnv = Map.map reduceWeakTermPlus (substEnv env)})
+  modify (\env -> env {substEnv = IntMap.map reduceWeakTermPlus (substEnv env)})
 
 cleanup :: WithEnv ()
 cleanup = do
   modify (\env -> env {constraintEnv = []})
-  modify (\env -> env {weakTypeEnv = Map.empty})
-  modify (\env -> env {zetaEnv = Map.empty})
+  modify (\env -> env {weakTypeEnv = IntMap.empty})
+  modify (\env -> env {zetaEnv = IntMap.empty})
 
 type LevelEdge = ((Meta, UnivLevel), (Integer, (Meta, UnivLevel)))
 
@@ -256,7 +256,7 @@ elaborate' (m, WeakTermPiIntro xts e) = do
   return (m, TermPiIntro xts' e')
 elaborate' (m, WeakTermPiElim (_, WeakTermZeta (I (_, x))) es) = do
   sub <- gets substEnv
-  case Map.lookup x sub of
+  case IntMap.lookup x sub of
     Nothing ->
       throwError' $
       T.pack (showMeta m) <>
@@ -291,7 +291,7 @@ elaborate' (m, WeakTermIter (mx, x, t) xts e) = do
   return (m, TermIter (mx, x, t') xts' e')
 elaborate' (_, WeakTermZeta x@(I (_, i))) = do
   sub <- gets substEnv
-  case Map.lookup i sub of
+  case IntMap.lookup i sub of
     Nothing -> throwError' $ "elaborate' i: remaining hole: " <> asText' x
     Just e -> do
       e' <- elaborate' e

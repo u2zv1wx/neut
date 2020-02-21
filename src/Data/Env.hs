@@ -53,26 +53,26 @@ data Env =
     , fileEnv :: FileEnv -- path ~> identifiers defined in the file at toplevel
     , enumEnv :: Map.HashMap T.Text [(T.Text, Int)] -- [("choice", [("left", 0), ("right", 1)]), ...]
     , revEnumEnv :: Map.HashMap T.Text (T.Text, Int) -- [("left", ("choice", 0)), ("right", ("choice", 1)), ...]
-    , nameEnv :: Map.HashMap Int Int -- [("foo", "foo.13"), ...] (as corresponding int)
-    , revNameEnv :: Map.HashMap Int Int -- [("foo.13", "foo"), ...] (as corresponding int)
+    , nameEnv :: IntMap.IntMap Int -- [("foo", "foo.13"), ...] (as corresponding int)
+    , revNameEnv :: IntMap.IntMap Int -- [("foo.13", "foo"), ...] (as corresponding int)
     -- , nameEnv :: Map.HashMap Identifier Identifier -- [("foo", "foo.13"), ...]
     -- , revNameEnv :: Map.HashMap Identifier Identifier -- [("foo.13", "foo"), ...]
-    , formationEnv :: Map.HashMap Int (Maybe WeakTermPlus)
+    , formationEnv :: IntMap.IntMap (Maybe WeakTermPlus)
     , inductiveEnv :: RuleEnv -- "list" ~> (cons, Pi (A : tau). A -> list A -> list A)
     , coinductiveEnv :: RuleEnv -- "tail" ~> (head, Pi (A : tau). stream A -> A)
-    , weakTypeEnv :: Map.HashMap Int (WeakTermPlus, UnivLevelPlus) -- var ~> (typeof(var), level-of-type)
+    , weakTypeEnv :: IntMap.IntMap (WeakTermPlus, UnivLevelPlus) -- var ~> (typeof(var), level-of-type)
     , equalityEnv :: [(UnivLevel, UnivLevel)]
     , univInstEnv :: UnivInstEnv
     , univRenameEnv :: IntMap.IntMap Int
     , quasiConstEnv :: S.Set Identifier
-    , typeEnv :: Map.HashMap Int (TermPlus, UnivLevelPlus)
+    , typeEnv :: IntMap.IntMap (TermPlus, UnivLevelPlus)
     -- , typeEnv :: Map.HashMap Identifier (TermPlus, UnivLevelPlus)
     , constraintEnv :: [PreConstraint] -- for type inference
     , constraintQueue :: ConstraintQueue
     , levelEnv :: [LevelConstraint]
-    , substEnv :: Map.HashMap Int WeakTermPlus -- metavar ~> beta-equivalent weakterm
-    , zetaEnv :: Map.HashMap Int (WeakTermPlus, WeakTermPlus, UnivLevelPlus)
-    , chainEnv :: Map.HashMap Int [(Meta, Identifier, TermPlus)] -- var/const ~> the closed var chain of its type
+    , substEnv :: IntMap.IntMap WeakTermPlus -- metavar ~> beta-equivalent weakterm
+    , zetaEnv :: IntMap.IntMap (WeakTermPlus, WeakTermPlus, UnivLevelPlus)
+    , chainEnv :: IntMap.IntMap [(Meta, Identifier, TermPlus)] -- var/const ~> the closed var chain of its type
     , codeEnv :: Map.HashMap Identifier ([Identifier], CodePlus) -- f ~> thunk (lam (x1 ... xn) e)
     , llvmEnv :: Map.HashMap Identifier ([Identifier], LLVM)
     , shouldColorize :: Bool
@@ -91,25 +91,25 @@ initialEnv path colorizeFlag =
     , enumEnv = Map.empty
     , fileEnv = Map.empty
     , revEnumEnv = Map.empty
-    , nameEnv = Map.empty
-    , revNameEnv = Map.empty
-    , formationEnv = Map.empty
+    , nameEnv = IntMap.empty
+    , revNameEnv = IntMap.empty
+    , formationEnv = IntMap.empty
     , inductiveEnv = Map.empty
     , coinductiveEnv = Map.empty
     , equalityEnv = []
     , univInstEnv = IntMap.empty
     , univRenameEnv = IntMap.empty
     , quasiConstEnv = S.empty
-    , weakTypeEnv = Map.empty
-    , typeEnv = Map.empty
-    , chainEnv = Map.empty
+    , weakTypeEnv = IntMap.empty
+    , typeEnv = IntMap.empty
+    , chainEnv = IntMap.empty
     , codeEnv = Map.empty
     , llvmEnv = Map.empty
     , constraintEnv = []
     , constraintQueue = Q.empty
     , levelEnv = []
-    , substEnv = Map.empty
-    , zetaEnv = Map.empty
+    , substEnv = IntMap.empty
+    , zetaEnv = IntMap.empty
     , mainFilePath = path
     , currentFilePath = path
     , shouldColorize = colorizeFlag
@@ -146,7 +146,7 @@ newName = do
 newNameWith :: Identifier -> WithEnv Identifier
 newNameWith (I (s, i)) = do
   j <- newCount
-  modify (\e -> e {nameEnv = Map.insert i j (nameEnv e)})
+  modify (\e -> e {nameEnv = IntMap.insert i j (nameEnv e)})
   return $ I (s, j)
 
 newNameWith' :: T.Text -> WithEnv Identifier
@@ -162,8 +162,8 @@ newNameWith'' s = do
 newLLVMNameWith :: Identifier -> WithEnv Identifier
 newLLVMNameWith (I (s, i)) = do
   j <- newCount
-  modify (\e -> e {nameEnv = Map.insert i j (nameEnv e)})
-  modify (\e -> e {revNameEnv = Map.insert j i (revNameEnv e)})
+  modify (\e -> e {nameEnv = IntMap.insert i j (nameEnv e)})
+  modify (\e -> e {revNameEnv = IntMap.insert j i (revNameEnv e)})
   return $ I (llvmString s, j)
 
 newLLVMNameWith' :: T.Text -> WithEnv Identifier
@@ -205,7 +205,7 @@ lookupTypeEnv' (I (s, i))
     l <- newUnivLevel
     return (emptyMeta, TermTau l)
   | otherwise = do
-    mt <- gets (Map.lookup i . typeEnv)
+    mt <- gets (IntMap.lookup i . typeEnv)
     case mt of
       Just (t, _) -> return t
       Nothing ->
@@ -215,7 +215,7 @@ lookupTypeEnv' (I (s, i))
 lookupNameEnv :: Identifier -> WithEnv Identifier
 lookupNameEnv (I (s, i)) = do
   env <- get
-  case Map.lookup i (nameEnv env) of
+  case IntMap.lookup i (nameEnv env) of
     Just i' -> return $ I (s, i')
     Nothing -> throwError [TIO.putStrLn $ "undefined variable: " <> s]
 
@@ -297,18 +297,18 @@ piUnivLevelsfrom xts t = do
 
 insTypeEnv :: Identifier -> TermPlus -> UnivLevelPlus -> WithEnv ()
 insTypeEnv (I (_, i)) t ml =
-  modify (\e -> e {typeEnv = Map.insert i (t, ml) (typeEnv e)})
+  modify (\e -> e {typeEnv = IntMap.insert i (t, ml) (typeEnv e)})
 
 insTypeEnv' :: Identifier -> TermPlus -> WithEnv ()
 insTypeEnv' (I (_, i)) t = do
   l <- newUnivLevel
   let ml = UnivLevelPlus (fst t, l)
-  modify (\e -> e {typeEnv = Map.insert i (t, ml) (typeEnv e)})
+  modify (\e -> e {typeEnv = IntMap.insert i (t, ml) (typeEnv e)})
 
 lookupTypeEnv :: Identifier -> WithEnv (Maybe (TermPlus, UnivLevelPlus))
 lookupTypeEnv (I (_, i)) = do
   tenv <- gets typeEnv
-  return $ Map.lookup i tenv
+  return $ IntMap.lookup i tenv
 
 lookupConstNum :: T.Text -> WithEnv Int
 lookupConstNum constName = do

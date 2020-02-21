@@ -15,6 +15,7 @@ import Control.Monad.State
 import Data.Monoid ((<>))
 
 import qualified Data.HashMap.Strict as Map
+import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 
@@ -238,9 +239,11 @@ toVar' (m, x, _) = (m, WeakTermUpsilon x)
 
 insForm :: Int -> IdentifierPlus -> WeakTermPlus -> WithEnv ()
 insForm 1 (_, I (_, i), _) e =
-  modify (\env -> env {formationEnv = Map.insert i (Just e) (formationEnv env)})
+  modify
+    (\env -> env {formationEnv = IntMap.insert i (Just e) (formationEnv env)})
 insForm _ (_, I (_, i), _) _ =
-  modify (\env -> env {formationEnv = Map.insert i Nothing (formationEnv env)})
+  modify
+    (\env -> env {formationEnv = IntMap.insert i Nothing (formationEnv env)})
 
 insInductive :: [Identifier] -> IdentifierPlus -> WithEnv ()
 insInductive [I (_, i)] bt = do
@@ -507,7 +510,7 @@ lookupInductive ::
      Identifier -> WithEnv ([IdentifierPlus], IdentifierPlus, [IdentifierPlus])
 lookupInductive (I (ai, i)) = do
   fenv <- gets formationEnv
-  case Map.lookup i fenv of
+  case IntMap.lookup i fenv of
     Just (Just (_, WeakTermPiIntro xts (_, WeakTermPi _ atsbts (_, WeakTermPiElim (_, WeakTermUpsilon _) _)))) -> do
       let at = head atsbts
       let bts = tail atsbts -- valid since a is not mutual
@@ -525,7 +528,7 @@ lookupCoinductive ::
      Identifier -> WithEnv ([IdentifierPlus], IdentifierPlus, [IdentifierPlus])
 lookupCoinductive (I (ai, i)) = do
   fenv <- gets formationEnv
-  case Map.lookup i fenv of
+  case IntMap.lookup i fenv of
     Just (Just (_, WeakTermPiIntro xts (_, WeakTermSigma atsbtscod))) -> do
       let at = head atsbtscod
       let bts = tail $ init atsbtscod -- valid since a is not mutual

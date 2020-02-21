@@ -8,6 +8,7 @@ import Control.Monad.Except
 import Control.Monad.State
 
 import qualified Data.HashMap.Strict as Map
+import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Text as T
 
 import Data.Basic
@@ -517,7 +518,7 @@ commConv _ LLVMUnreachable _ = return LLVMUnreachable
 
 rename :: [Identifier] -> LLVM -> WithEnv ([Identifier], LLVM)
 rename args e = do
-  modify (\env -> env {nameEnv = Map.empty})
+  modify (\env -> env {nameEnv = IntMap.empty})
   args' <- mapM newNameWith args
   e' <- renameLLVM e
   return (args', e')
@@ -525,7 +526,7 @@ rename args e = do
 renameLLVMData :: LLVMData -> WithEnv LLVMData
 renameLLVMData (LLVMDataLocal x@(I (s, i))) = do
   nenv <- gets nameEnv
-  case Map.lookup i nenv of
+  case IntMap.lookup i nenv of
     Just i' -> return $ LLVMDataLocal $ I (s, i')
     Nothing -> do
       p "undefined variable:"

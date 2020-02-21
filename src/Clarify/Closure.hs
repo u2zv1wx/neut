@@ -12,6 +12,9 @@ import Control.Monad.Except
 import Control.Monad.State
 import Data.List
 
+import qualified Data.HashMap.Strict as Map
+import qualified Data.IntMap.Strict as IntMap
+
 import Clarify.Linearize
 import Clarify.Sigma
 import Clarify.Utility
@@ -19,8 +22,6 @@ import Data.Basic
 import Data.Code
 import Data.Env
 import Data.Term
-
-import qualified Data.HashMap.Strict as Map
 
 makeClosure ::
      Maybe Identifier -- the name of newly created closure
@@ -171,9 +172,9 @@ chainWithName ::
      Identifier -> TermPlus -> WithEnv [(Meta, Identifier, TermPlus)]
 chainWithName (I (_, i)) t = do
   cenv <- gets chainEnv
-  case Map.lookup i cenv of
+  case IntMap.lookup i cenv of
     Just xts -> return xts -- use cached result
     Nothing -> do
       xts <- chainTermPlus' t
-      modify (\env -> env {chainEnv = Map.insert i xts cenv})
+      modify (\env -> env {chainEnv = IntMap.insert i xts cenv})
       return xts

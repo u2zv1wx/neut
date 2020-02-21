@@ -16,7 +16,6 @@ import Control.Monad.State
 import Data.Maybe
 import System.Timeout
 
-import qualified Data.HashMap.Strict as Map
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.PQueue.Min as Q
 import qualified Data.Set as S
@@ -185,14 +184,14 @@ simp' ((e1, e2):cs) = do
               [] -> simpPattern h2 ies2 e2' e1' cs
               _ -> simp $ (substWeakTermPlus (zip zs es) e1', e2') : cs
         (Just (StuckPiElimUpsilon (x1@(I (_, i1)), m1) _), _)
-          | Just body <- Map.lookup i1 sub -> do
+          | Just body <- IntMap.lookup i1 sub -> do
             let m = supMeta (supMeta (metaOf e1) (metaOf e2)) (metaOf body) -- x1 == e1 == body
             let e1' = (m, snd e1)
             let e2' = (m, snd e2)
             body' <- univInstWith (metaUnivParams m1) (m, snd body)
             simp $ (substWeakTermPlus [(x1, body')] e1', e2') : cs
         (_, Just (StuckPiElimUpsilon (x2@(I (_, i2)), m2) _))
-          | Just body <- Map.lookup i2 sub -> do
+          | Just body <- IntMap.lookup i2 sub -> do
             let m = supMeta (supMeta (metaOf e1) (metaOf e2)) (metaOf body) -- x2 == e2 == body
             let e1' = (m, snd e1)
             let e2' = (m, snd e2)
@@ -277,7 +276,7 @@ simpPattern ::
 simpPattern h1@(I (_, i)) ies1 _ e2 cs = do
   xss <- mapM toVarList ies1
   let lam = bindFormalArgs e2 xss
-  modify (\env -> env {substEnv = Map.insert i lam (substEnv env)})
+  modify (\env -> env {substEnv = IntMap.insert i lam (substEnv env)})
   visit h1
   simp cs
 
@@ -418,19 +417,19 @@ bindFormalArgs e (xts:xtss) = do
   let e' = bindFormalArgs e xtss
   (emptyMeta, WeakTermPiIntro xts e')
 
-lookupAny :: [Hole] -> Map.HashMap Int a -> Maybe (Hole, a)
+lookupAny :: [Hole] -> IntMap.IntMap a -> Maybe (Hole, a)
 lookupAny [] _ = Nothing
 lookupAny (h@(I (_, i)):ks) sub = do
-  case Map.lookup i sub of
+  case IntMap.lookup i sub of
     Just v -> Just (h, v)
     _ -> lookupAny ks sub
 
-lookupAll :: S.Set Identifier -> [Identifier] -> Map.HashMap Int a -> Maybe [a]
+lookupAll :: S.Set Identifier -> [Identifier] -> IntMap.IntMap a -> Maybe [a]
 lookupAll _ [] _ = return []
 lookupAll qenv ((I (_, i)):xs) sub
   -- | S.member x qenv = lookupAll qenv xs sub
   | otherwise = do
-    v <- Map.lookup i sub
+    v <- IntMap.lookup i sub
     vs <- lookupAll qenv xs sub
     return $ v : vs
 -- lookupAll qenv (x:xs) sub = do

@@ -14,6 +14,7 @@ import Control.Monad.Except
 import Control.Monad.State
 
 import qualified Data.HashMap.Strict as Map
+import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Text as T
 
 import Data.Basic
@@ -401,7 +402,7 @@ data IdentKind
 invRenameIdentifier :: IdentKind -> Identifier -> WithEnv Identifier
 invRenameIdentifier IdentKindUpsilon (I (s, i)) = do
   rnenv <- gets revNameEnv
-  case Map.lookup i rnenv of
+  case IntMap.lookup i rnenv of
     Just i' -> do
       i'' <- traceIdentifier rnenv i'
       return $ I (s, i'')
@@ -413,7 +414,7 @@ invRenameIdentifier IdentKindUpsilon (I (s, i)) = do
       return $ asIdent s'
 invRenameIdentifier IdentKindZeta (I (s, i)) = do
   rnenv <- gets revNameEnv
-  case Map.lookup i rnenv of
+  case IntMap.lookup i rnenv of
     Just i' -> do
       i'' <- traceIdentifier rnenv i'
       return $ I (s, i'')
@@ -424,9 +425,9 @@ invRenameIdentifier IdentKindZeta (I (s, i)) = do
       -- modify (\env -> env {revNameEnv = insertName x s rnenv})
       return $ asIdent s'
 
-traceIdentifier :: Map.HashMap Int Int -> Int -> WithEnv Int
+traceIdentifier :: IntMap.IntMap Int -> Int -> WithEnv Int
 traceIdentifier rnenv i = do
-  case Map.lookup i rnenv of
+  case IntMap.lookup i rnenv of
     Nothing -> return i
     Just i' -> traceIdentifier rnenv i'
 

@@ -149,7 +149,7 @@ infer' ctx (m, WeakTermIter (mx, x, t) xts e) = do
 infer' ctx (m, WeakTermZeta x) = do
   (app, higherApp, ml) <- newHoleInCtx ctx m
   zenv <- gets zetaEnv
-  case Map.lookup (asInt x) zenv of
+  case IntMap.lookup (asInt x) zenv of
     Just (app', higherApp', ml') -> do
       insConstraintEnv app app'
       insConstraintEnv higherApp higherApp'
@@ -157,7 +157,8 @@ infer' ctx (m, WeakTermZeta x) = do
       return (app, higherApp, ml)
     Nothing -> do
       modify
-        (\env -> env {zetaEnv = Map.insert (asInt x) (app, higherApp, ml) zenv})
+        (\env ->
+           env {zetaEnv = IntMap.insert (asInt x) (app, higherApp, ml) zenv})
       return (app, higherApp, ml)
 infer' _ (m, WeakTermConst x@(I (s, _)))
   -- i64, f16, u8, etc.
@@ -467,7 +468,7 @@ insConstraintEnv t1 t2 =
 
 insWeakTypeEnv :: Identifier -> (WeakTermPlus, UnivLevelPlus) -> WithEnv ()
 insWeakTypeEnv (I (_, i)) tl =
-  modify (\e -> e {weakTypeEnv = Map.insert i tl (weakTypeEnv e)})
+  modify (\e -> e {weakTypeEnv = IntMap.insert i tl (weakTypeEnv e)})
 
 lookupWeakTypeEnv :: Identifier -> WithEnv (WeakTermPlus, UnivLevelPlus)
 lookupWeakTypeEnv s = do
@@ -480,7 +481,7 @@ lookupWeakTypeEnv s = do
 lookupWeakTypeEnvMaybe ::
      Identifier -> WithEnv (Maybe (WeakTermPlus, UnivLevelPlus))
 lookupWeakTypeEnvMaybe (I (_, s)) = do
-  mt <- gets (Map.lookup s . weakTypeEnv)
+  mt <- gets (IntMap.lookup s . weakTypeEnv)
   case mt of
     Nothing -> return Nothing
     Just t -> return $ Just t
