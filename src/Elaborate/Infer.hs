@@ -272,7 +272,7 @@ infer' ctx (m, WeakTermStructElim xks e1 e2) = do
   (e1', t1, mlStruct) <- infer' ctx e1
   let (ms, xs, ks) = unzip3 xks
   ts <- mapM inferKind ks
-  ls <- mapM (const newUnivLevel) ts
+  ls <- mapM (const newCount) ts
   let mls = map UnivLevelPlus $ zip (repeat m) ls
   forM_ mls $ \mlStructArg -> insLevelLE mlStructArg mlStruct
   let structType = (fst e1', WeakTermStruct ks)
@@ -292,9 +292,8 @@ inferType' ctx t = do
 inferKind :: ArrayKind -> WithEnv WeakTermPlus
 inferKind (ArrayKindIntS i) = return (emptyMeta, WeakTermEnum (EnumTypeIntS i))
 inferKind (ArrayKindIntU i) = return (emptyMeta, WeakTermEnum (EnumTypeIntU i))
-inferKind (ArrayKindFloat size) = do
-  lookupConstantPlus' $ "f" <> T.pack (show (sizeAsInt size))
-  -- (emptyMeta, WeakTermConst $ "f" <> T.pack (show (sizeAsInt size)))
+inferKind (ArrayKindFloat size) =
+  lookupConstantPlus $ "f" <> T.pack (show (sizeAsInt size))
 inferKind _ = error "inferKind for void-pointer"
 
 inferPi ::
@@ -393,7 +392,7 @@ newHoleInCtx ctx m = do
   let higherApp = (m, WeakTermPiElim higherHole varSeq)
   hole <- newHole
   let app = (m, WeakTermPiElim hole varSeq)
-  l <- newUnivLevel
+  l <- newCount
   return (app, higherApp, UnivLevelPlus (m, l))
 
 -- In a context (x1 : A1, ..., xn : An), this function creates a metavariable
@@ -403,7 +402,7 @@ newTypeHoleInCtx :: Context -> Meta -> WithEnv (WeakTermPlus, UnivLevelPlus)
 newTypeHoleInCtx ctx m = do
   let varSeq = map (\((_, x, _), _) -> toVar x) ctx
   hole <- newHole
-  l <- newUnivLevel
+  l <- newCount
   return ((m, WeakTermPiElim hole varSeq), UnivLevelPlus (m, l))
 
 -- In context ctx == [x1, ..., xn], `newTypeHoleListInCtx ctx [y1, ..., ym]` generates
@@ -489,14 +488,14 @@ lookupKind name = do
 
 newLevelLE :: Meta -> [UnivLevelPlus] -> WithEnv UnivLevelPlus
 newLevelLE m mls = do
-  l <- newUnivLevel
+  l <- newCount
   let ml = UnivLevelPlus (m, l)
   forM_ mls $ \ml' -> insLevelLE ml' ml
   return ml
 
 newLevelLT :: Meta -> [UnivLevelPlus] -> WithEnv UnivLevelPlus
 newLevelLT m mls = do
-  l <- newUnivLevel
+  l <- newCount
   let ml = UnivLevelPlus (m, l)
   forM_ mls $ \ml' -> insLevelLT ml' ml
   return ml
@@ -615,7 +614,7 @@ levelInst l = do
   case IntMap.lookup l urenv of
     Just l' -> return l'
     Nothing -> do
-      l' <- newUnivLevel
+      l' <- newCount
       modify (\env -> env {univRenameEnv = IntMap.insert l l' urenv})
       uienv <- gets univInstEnv
       let s = S.fromList [l, l']

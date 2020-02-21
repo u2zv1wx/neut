@@ -154,10 +154,8 @@ toCoinductive ::
      [IdentifierPlus] -> [IdentifierPlus] -> Connective -> WithEnv [QuasiStmt]
 toCoinductive ats bts c@(m, a@(I (ai, _)), xts, _) = do
   f <- formationRuleOf c >>= ruleAsIdentPlus
-  -- a' <- lookupNameEnv a
   let cod = (m, WeakTermPiElim (m, WeakTermUpsilon a) (map toVar' xts))
   (atsbts', cod') <- renameFormArgs (ats ++ bts) cod
-  -- let cod' = (m, WeakTermPiElim (m, WeakTermUpsilon a') (map toVar' xts))
   z <- newLLVMNameWith' "_"
   let zt' = (m, z, cod')
   mls <- piUnivLevelsfrom (xts ++ atsbts' ++ [zt']) cod
@@ -228,7 +226,7 @@ ruleAsIdentPlus (mb, b, m, xts, t) = do
 
 formationRuleOf :: Connective -> WithEnv Rule
 formationRuleOf (m, a, xts, _) = do
-  l <- newUnivLevel
+  l <- newCount
   return (m, a, m, xts, (m, WeakTermTau l))
 
 toInternalRuleList :: Connective -> WithEnv [IdentifierPlus]

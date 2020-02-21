@@ -1,4 +1,3 @@
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Data.Env where
@@ -133,9 +132,6 @@ newCount = do
   modify (\e -> e {count = i + 1})
   return i
 
-newUnivLevel :: WithEnv UnivLevel
-newUnivLevel = newCount
-
 newName :: WithEnv Identifier
 newName = do
   i <- newCount
@@ -190,38 +186,11 @@ llvmTailCharSet =
   "-$._" <>
   "abcdefghijklmnopqrstuvwxyz" <> "ABCDEFGHIJKLMNOPQRSTUVWXYZ" <> "0123456789"
 
--- foo = S.fromList $ "-$._" <> "abcdefghijklmnopqrstuvwxyz" <> "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 llvmTailChar :: Char -> Char
 llvmTailChar x =
   if x `S.member` llvmTailCharSet
     then x
     else '-'
-
-lookupTypeEnv' :: Identifier -> WithEnv TermPlus
-lookupTypeEnv' (I (s, i))
-  | Just _ <- asLowTypeMaybe s = do
-    l <- newUnivLevel
-    return (emptyMeta, TermTau l)
-  | otherwise = do
-    mt <- gets (IntMap.lookup i . typeEnv)
-    case mt of
-      Just (t, _) -> return t
-      Nothing ->
-        throwError
-          [TIO.putStrLn $ s <> " is not found in the type environment."]
-
-lookupNameEnv :: Identifier -> WithEnv Identifier
-lookupNameEnv (I (s, i)) = do
-  env <- get
-  case IntMap.lookup i (nameEnv env) of
-    Just i' -> return $ I (s, i')
-    Nothing -> throwError [TIO.putStrLn $ "undefined variable: " <> s]
-
-isDefinedEnum :: T.Text -> WithEnv Bool
-isDefinedEnum name = do
-  env <- get
-  let labelList = join $ Map.elems $ enumEnv env
-  return $ name `elem` map fst labelList
 
 getTarget :: WithEnv Target
 getTarget = do
@@ -247,13 +216,6 @@ getArch = do
     s ->
       throwError [TIO.putStrLn $ "unsupported target arch: " <> T.pack (show s)]
 
--- for debug
-p :: String -> WithEnv ()
-p s = liftIO $ putStrLn s
-
-p' :: (Show a) => a -> WithEnv ()
-p' s = liftIO $ putStrLn $ Pr.ppShow s
-
 toStr :: (Show a) => a -> String
 toStr s = Pr.ppShow s
 
@@ -268,21 +230,6 @@ newDataUpsilonWith' name m = do
   x <- newNameWith' name
   return (x, (m, DataUpsilon x))
 
-enumValueToInteger :: EnumValue -> WithEnv Integer
-enumValueToInteger labelOrNat =
-  case labelOrNat of
-    EnumValueLabel l -> toInteger <$> getEnumNum l
-    EnumValueIntS _ i -> return i
-    EnumValueIntU _ i -> return i
-    EnumValueNat _ j -> return $ toInteger j
-
-getEnumNum :: T.Text -> WithEnv Int
-getEnumNum label = do
-  renv <- gets revEnumEnv
-  case Map.lookup label renv of
-    Nothing -> throwError [TIO.putStrLn $ "no such enum is defined: " <> label]
-    Just (_, i) -> return i
-
 pp :: WeakTermPlus -> WithEnv ()
 pp e = liftIO $ TIO.putStrLn $ toText e
 
@@ -290,7 +237,7 @@ piUnivLevelsfrom ::
      [Data.WeakTerm.IdentifierPlus] -> WeakTermPlus -> WithEnv [UnivLevelPlus]
 piUnivLevelsfrom xts t = do
   let ms = map fst $ map (\(_, _, z) -> z) xts ++ [t]
-  ls <- mapM (const newUnivLevel) ms
+  ls <- mapM (const newCount) ms
   return $ map UnivLevelPlus $ zip ms ls
 
 insTypeEnv :: Identifier -> TermPlus -> UnivLevelPlus -> WithEnv ()
@@ -299,7 +246,7 @@ insTypeEnv (I (_, i)) t ml =
 
 insTypeEnv' :: Identifier -> TermPlus -> WithEnv ()
 insTypeEnv' (I (_, i)) t = do
-  l <- newUnivLevel
+  l <- newCount
   let ml = UnivLevelPlus (fst t, l)
   modify (\e -> e {typeEnv = IntMap.insert i (t, ml) (typeEnv e)})
 
@@ -307,6 +254,19 @@ lookupTypeEnv :: Identifier -> WithEnv (Maybe (TermPlus, UnivLevelPlus))
 lookupTypeEnv (I (_, i)) = do
   tenv <- gets typeEnv
   return $ IntMap.lookup i tenv
+
+lookupTypeEnv' :: Identifier -> WithEnv TermPlus
+lookupTypeEnv' (I (s, i))
+  | Just _ <- asLowTypeMaybe s = do
+    l <- newCount
+    return (emptyMeta, TermTau l)
+  | otherwise = do
+    mt <- gets (IntMap.lookup i . typeEnv)
+    case mt of
+      Just (t, _) -> return t
+      Nothing ->
+        throwError
+          [TIO.putStrLn $ s <> " is not found in the type environment."]
 
 lookupConstNum :: T.Text -> WithEnv Int
 lookupConstNum constName = do
@@ -332,34 +292,25 @@ lookupConstantMaybe constName = do
     Just i -> return $ Just (emptyMeta, WeakTermConst $ I (constName, i))
     Nothing -> return Nothing
 
-lookupConstantPlus :: T.Text -> WithEnv (Maybe WeakTermPlus)
-lookupConstantPlus constName
-  | isConstant constName = do
-    cenv <- gets constantEnv
-    case Map.lookup constName cenv of
-      Just i -> return $ Just (emptyMeta, WeakTermConst $ I (constName, i))
-      Nothing -> do
-        i <- newCount
-        let ident = I (constName, i)
-        modify (\env -> env {constantEnv = Map.insert constName i cenv})
-        return $ Just (emptyMeta, WeakTermConst ident)
-  | otherwise = return Nothing
-
-lookupConstantPlus' :: T.Text -> WithEnv WeakTermPlus
-lookupConstantPlus' constName = do
-  me <- lookupConstantPlus constName
-  case me of
-    Just e -> return e
-    Nothing -> throwError' $ "no such constant: " <> constName
+lookupConstantPlus :: T.Text -> WithEnv WeakTermPlus
+lookupConstantPlus constName = do
+  cenv <- gets constantEnv
+  case Map.lookup constName cenv of
+    Just i -> return (emptyMeta, WeakTermConst $ I (constName, i))
+    Nothing -> do
+      i <- newCount
+      let ident = I (constName, i)
+      modify (\env -> env {constantEnv = Map.insert constName i cenv})
+      return (emptyMeta, WeakTermConst ident)
 
 lookupFloat16 :: WithEnv WeakTermPlus
-lookupFloat16 = lookupConstantPlus' "f16"
+lookupFloat16 = lookupConstantPlus "f16"
 
 lookupFloat32 :: WithEnv WeakTermPlus
-lookupFloat32 = lookupConstantPlus' "f32"
+lookupFloat32 = lookupConstantPlus "f32"
 
 lookupFloat64 :: WithEnv WeakTermPlus
-lookupFloat64 = lookupConstantPlus' "f64"
+lookupFloat64 = lookupConstantPlus "f64"
 
 isConstant :: T.Text -> Bool
 isConstant x
@@ -367,3 +318,10 @@ isConstant x
   | Just _ <- asUnaryOpMaybe x = True
   | Just _ <- asBinaryOpMaybe x = True
   | otherwise = False
+
+-- for debug
+p :: String -> WithEnv ()
+p s = liftIO $ putStrLn s
+
+p' :: (Show a) => a -> WithEnv ()
+p' s = liftIO $ putStrLn $ Pr.ppShow s

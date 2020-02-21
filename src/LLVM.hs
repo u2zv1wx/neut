@@ -10,6 +10,7 @@ import Control.Monad.State
 import qualified Data.HashMap.Strict as Map
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Text as T
+import qualified Data.Text.IO as TIO
 
 import Data.Basic
 import Data.Code
@@ -475,6 +476,21 @@ i32 = LowTypeIntS 32
 newNameWith'' :: Maybe T.Text -> WithEnv Identifier
 newNameWith'' Nothing = newNameWith' "var"
 newNameWith'' (Just name) = newNameWith' name
+
+enumValueToInteger :: EnumValue -> WithEnv Integer
+enumValueToInteger labelOrNat =
+  case labelOrNat of
+    EnumValueLabel l -> toInteger <$> getEnumNum l
+    EnumValueIntS _ i -> return i
+    EnumValueIntU _ i -> return i
+    EnumValueNat _ j -> return $ toInteger j
+
+getEnumNum :: T.Text -> WithEnv Int
+getEnumNum label = do
+  renv <- gets revEnumEnv
+  case Map.lookup label renv of
+    Nothing -> throwError [TIO.putStrLn $ "no such enum is defined: " <> label]
+    Just (_, i) -> return i
 
 insLLVMEnv :: Identifier -> [Identifier] -> LLVM -> WithEnv ()
 insLLVMEnv funName args e =

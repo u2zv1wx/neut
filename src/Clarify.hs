@@ -543,7 +543,7 @@ sigToPi m xts = do
   let zv = toTermUpsilon z
   k <- newNameWith' "sig"
   -- Sigma [x1 : A1, ..., xn : An] = Pi (z : Type, _ : Pi [x1 : A1, ..., xn : An]. z). z
-  l <- newUnivLevel
+  l <- newCount
   -- don't care the level since they're discarded immediately
   -- (i.e. this translated term is not used as an argument of `weaken`)
   return

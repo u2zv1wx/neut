@@ -31,7 +31,7 @@ interpret :: TreePlus -> WithEnv WeakTermPlus
 --
 interpret (m, TreeAtom "tau") = do
   m' <- adjustPhase m
-  l <- newUnivLevel
+  l <- newCount
   return (m', WeakTermTau l)
 interpret (m, TreeNode [(_, TreeAtom "upsilon"), (_, TreeAtom x)]) = do
   m' <- adjustPhase m
@@ -335,6 +335,12 @@ interpretEnumItem'' t =
 headDiscriminantOf :: [(T.Text, Int)] -> Int
 headDiscriminantOf [] = 0
 headDiscriminantOf ((_, i):_) = i
+
+isDefinedEnum :: T.Text -> WithEnv Bool
+isDefinedEnum name = do
+  env <- get
+  let labelList = join $ Map.elems $ enumEnv env
+  return $ name `elem` map fst labelList
 
 isDefinedEnumName :: T.Text -> WithEnv Bool
 isDefinedEnumName name = do
