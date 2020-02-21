@@ -216,10 +216,10 @@ weaken (m, TermIter (mx, x, t) xts e) = do
   (m, WeakTermIter (mx, x, t') xts' e')
 weaken (m, TermConst x) = do
   (m, WeakTermConst x)
-weaken (m, TermConstDecl (mx, x, t) e) = do
-  let t' = weaken t
-  let e' = weaken e
-  (m, WeakTermConstDecl (mx, x, t') e')
+weaken (_, TermConstDecl {}) = undefined
+  -- let t' = weaken t
+  -- let e' = weaken e
+  -- (m, WeakTermConstDecl (mx, x, t') e')
 weaken (m, TermFloat16 x) = (m, WeakTermFloat16 x)
 weaken (m, TermFloat32 x) = (m, WeakTermFloat32 x)
 weaken (m, TermFloat64 x) = (m, WeakTermFloat64 x)

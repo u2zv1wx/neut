@@ -681,13 +681,6 @@ substRuleType sub (m, WeakTermIter (mx, x, t) xts e) = do
       (xts', e') <- substRuleTypeBindingsWithBody sub xts e
       return (m, WeakTermIter (mx, x, t') xts' e')
 substRuleType _ (m, WeakTermConst x) = return (m, WeakTermConst x)
-substRuleType sub (m, WeakTermConstDecl (mx, x, t) e) = do
-  t' <- substRuleType sub t
-  if fst (fst sub) == x
-    then return (m, WeakTermConstDecl (mx, x, t') e)
-    else do
-      e' <- substRuleType sub e
-      return (m, WeakTermConstDecl (mx, x, t') e')
 substRuleType _ (m, WeakTermZeta x) = return (m, WeakTermZeta x)
 substRuleType sub (m, WeakTermInt t x) = do
   t' <- substRuleType sub t

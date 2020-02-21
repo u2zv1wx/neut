@@ -35,7 +35,6 @@ data WeakTerm
   | WeakTermIter IdentifierPlus [IdentifierPlus] WeakTermPlus
   | WeakTermZeta Identifier
   | WeakTermConst Identifier
-  | WeakTermConstDecl IdentifierPlus WeakTermPlus
   | WeakTermInt WeakTermPlus Integer
   | WeakTermFloat16 Half
   | WeakTermFloat32 Float
@@ -193,7 +192,6 @@ varWeakTermPlus (_, WeakTermSigmaElim t xts e1 e2) = do
 varWeakTermPlus (_, WeakTermIter (_, x, t) xts e) = do
   varWeakTermPlus t ++ filter (/= x) (varWeakTermPlusBindings xts [e])
 varWeakTermPlus (_, WeakTermConst _) = []
-varWeakTermPlus (_, WeakTermConstDecl xt e) = varWeakTermPlusBindings [xt] [e]
 varWeakTermPlus (_, WeakTermZeta _) = []
 varWeakTermPlus (_, WeakTermInt t _) = varWeakTermPlus t
 varWeakTermPlus (_, WeakTermFloat16 _) = []
@@ -246,7 +244,6 @@ holeWeakTermPlus (_, WeakTermIter (_, _, t) xts e) =
   holeWeakTermPlus t ++ holeWeakTermPlusBindings xts [e]
 holeWeakTermPlus (_, WeakTermZeta h) = h : []
 holeWeakTermPlus (_, WeakTermConst _) = []
-holeWeakTermPlus (_, WeakTermConstDecl xt e) = holeWeakTermPlusBindings [xt] [e]
 holeWeakTermPlus (_, WeakTermInt t _) = holeWeakTermPlus t
 holeWeakTermPlus (_, WeakTermFloat16 _) = []
 holeWeakTermPlus (_, WeakTermFloat32 _) = []
@@ -312,10 +309,6 @@ substWeakTermPlus sub (m, WeakTermIter (mx, x, t) xts e) = do
   (m, WeakTermIter (mx, x, t') xts' e')
 substWeakTermPlus _ (m, WeakTermConst x) = do
   (m, WeakTermConst x)
-substWeakTermPlus sub (m, WeakTermConstDecl (mx, x, t) e) = do
-  let t' = substWeakTermPlus sub t
-  let e' = substWeakTermPlus (filter (\(k, _) -> k /= x) sub) e
-  (m, WeakTermConstDecl (mx, x, t') e')
 substWeakTermPlus sub e1@(_, WeakTermZeta x)
   -- case lookup x sub of
   --   Just (_, e) -> (m, e)
@@ -419,8 +412,6 @@ toText (_, WeakTermIter (_, x, _) xts e) = do
   let argStr = inParen $ showItems $ map showArg xts
   showCons ["μ", asText' x, argStr, toText e]
 toText (_, WeakTermConst x) = asText' x
-toText (_, WeakTermConstDecl xt e) = do
-  showCons ["constant-declaration", showArg xt, toText e]
 toText (_, WeakTermZeta x) = asText' x
 toText (_, WeakTermInt _ a) = T.pack $ show a
 toText (_, WeakTermFloat16 a) = T.pack $ show a

@@ -42,6 +42,7 @@ type UnivInstEnv = IntMap.IntMap (S.Set Int)
 data Env =
   Env
     { count :: Int
+    -- parse
     , phase :: Int
     , target :: Maybe Target
     , mainFilePath :: Path Abs File
@@ -55,24 +56,24 @@ data Env =
     , revEnumEnv :: Map.HashMap T.Text (T.Text, Int) -- [("left", ("choice", 0)), ("right", ("choice", 1)), ...]
     , nameEnv :: IntMap.IntMap Int -- [("foo", "foo.13"), ...] (as corresponding int)
     , revNameEnv :: IntMap.IntMap Int -- [("foo.13", "foo"), ...] (as corresponding int)
-    -- , nameEnv :: Map.HashMap Identifier Identifier -- [("foo", "foo.13"), ...]
-    -- , revNameEnv :: Map.HashMap Identifier Identifier -- [("foo.13", "foo"), ...]
     , formationEnv :: IntMap.IntMap (Maybe WeakTermPlus)
     , inductiveEnv :: RuleEnv -- "list" ~> (cons, Pi (A : tau). A -> list A -> list A)
     , coinductiveEnv :: RuleEnv -- "tail" ~> (head, Pi (A : tau). stream A -> A)
+    -- elaborate
     , weakTypeEnv :: IntMap.IntMap (WeakTermPlus, UnivLevelPlus) -- var ~> (typeof(var), level-of-type)
     , equalityEnv :: [(UnivLevel, UnivLevel)]
     , univInstEnv :: UnivInstEnv
     , univRenameEnv :: IntMap.IntMap Int
     , typeEnv :: IntMap.IntMap (TermPlus, UnivLevelPlus)
-    -- , typeEnv :: Map.HashMap Identifier (TermPlus, UnivLevelPlus)
     , constraintEnv :: [PreConstraint] -- for type inference
     , constraintQueue :: ConstraintQueue
     , levelEnv :: [LevelConstraint]
     , substEnv :: IntMap.IntMap WeakTermPlus -- metavar ~> beta-equivalent weakterm
     , zetaEnv :: IntMap.IntMap (WeakTermPlus, WeakTermPlus, UnivLevelPlus)
+    -- clarify
     , chainEnv :: IntMap.IntMap [(Meta, Identifier, TermPlus)] -- var/const ~> the closed var chain of its type
     , codeEnv :: Map.HashMap Identifier ([Identifier], CodePlus) -- f ~> thunk (lam (x1 ... xn) e)
+    -- LLVM
     , llvmEnv :: Map.HashMap Identifier ([Identifier], LLVM)
     , shouldColorize :: Bool
     }
@@ -331,10 +332,6 @@ lookupConstantMaybe constName = do
   case Map.lookup constName cenv of
     Just i -> return $ Just (emptyMeta, WeakTermConst $ I (constName, i))
     Nothing -> return Nothing
-      -- i <- newCount
-      -- let ident = I (constName, i)
-      -- modify (\env -> env {constantEnv = Map.insert constName i cenv})
-      -- return $ Just (emptyMeta, WeakTermConst ident)
 
 lookupConstantPlus :: T.Text -> WithEnv (Maybe WeakTermPlus)
 lookupConstantPlus constName
@@ -364,12 +361,3 @@ lookupFloat32 = lookupConstantPlus' "f32"
 
 lookupFloat64 :: WithEnv WeakTermPlus
 lookupFloat64 = lookupConstantPlus' "f64"
--- lookupConstant :: T.Text -> WithEnv WeakTermPlus
--- lookupConstant x
---   | isConstant x = lookupConstant
--- isConstant :: T.Text -> Bool
--- isConstant x
---   | Just (LowTypeFloat _) <- asLowTypeMaybe x = True
---   | Just _ <- asUnaryOpMaybe x = True
---   | Just _ <- asBinaryOpMaybe x = True
---   | otherwise = False

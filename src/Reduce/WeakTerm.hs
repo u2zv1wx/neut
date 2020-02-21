@@ -68,10 +68,6 @@ reduceWeakTermPlus (m, WeakTermIter (mx, x, t) xts e)
     let (ms, xs, ts) = unzip3 xts
     let ts' = map reduceWeakTermPlus ts
     (m, WeakTermIter (mx, x, t') (zip3 ms xs ts') e')
-reduceWeakTermPlus (m, WeakTermConstDecl (mx, x, t) e) = do
-  let t' = reduceWeakTermPlus t
-  let e' = reduceWeakTermPlus e
-  (m, WeakTermConstDecl (mx, x, t') e')
 reduceWeakTermPlus (m, WeakTermEnumElim (e, t) les) = do
   let e' = reduceWeakTermPlus e
   let (ls, es) = unzip les

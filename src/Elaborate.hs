@@ -271,10 +271,6 @@ elaborate' (_, WeakTermZeta x@(I (_, i))) = do
       e' <- elaborate' e
       return e'
 elaborate' (m, WeakTermConst x) = return (m, TermConst x)
-elaborate' (m, WeakTermConstDecl (mx, x, t) e) = do
-  t' <- elaborate' t
-  e' <- elaborate' e
-  return (m, TermConstDecl (mx, x, t') e')
 elaborate' (m, WeakTermInt t x) = do
   t' <- elaborate' t >>= reduceTermPlus
   case t' of

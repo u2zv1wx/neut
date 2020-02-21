@@ -13,7 +13,6 @@ import Data.List (nubBy)
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.Text as T
-import qualified Data.Text.IO as TIO
 
 import Clarify.Closure
 import Clarify.Sigma
@@ -22,7 +21,6 @@ import Data.Basic
 import Data.Code
 import Data.Env
 import Data.Term
-import Data.WeakTerm hiding (toVar)
 import Reduce.Term
 
 clarify :: TermPlus -> WithEnv CodePlus

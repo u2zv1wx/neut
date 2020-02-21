@@ -182,10 +182,6 @@ rename' nenv (m, WeakTermIter xt xts e) = do
   (xt', xts', e') <- renameIter nenv xt xts e
   return (m, WeakTermIter xt' xts' e')
 rename' _ (m, WeakTermConst x) = return (m, WeakTermConst x)
-rename' nenv (m, WeakTermConstDecl (mx, x, t) e) = do
-  t' <- rename' nenv t
-  e' <- rename' nenv e
-  return (m, WeakTermConstDecl (mx, x, t') e')
 rename' _ (m, WeakTermZeta h) = do
   return (m, WeakTermZeta h)
 rename' _ (m, WeakTermInt t x) = do
@@ -342,8 +338,6 @@ checkSanity ctx (_, WeakTermSigmaElim t xts e1 e2) = do
 checkSanity ctx (_, WeakTermIter xt xts e) = do
   checkSanity' ctx (xt : xts) e
 checkSanity _ (_, WeakTermConst _) = True
-checkSanity ctx (_, WeakTermConstDecl (_, _, t) e) = do
-  checkSanity ctx t && checkSanity ctx e
 checkSanity _ (_, WeakTermZeta _) = True
 checkSanity ctx (_, WeakTermInt t _) = checkSanity ctx t
 checkSanity _ (_, WeakTermFloat16 _) = True
@@ -467,10 +461,6 @@ invRename (m, WeakTermIter (mx, x, t) xts e) = do
   (xts', e') <- invRenameBinder xts e
   return (m, WeakTermIter (mx, x', t) xts' e')
 invRename (m, WeakTermConst x) = return (m, WeakTermConst x)
-invRename (m, WeakTermConstDecl (mx, x, t) e) = do
-  t' <- invRename t
-  e' <- invRename e
-  return (m, WeakTermConstDecl (mx, x, t') e')
 invRename (m, WeakTermZeta h) = do
   h' <- invRenameIdentifier IdentKindZeta h
   return (m, WeakTermZeta h')

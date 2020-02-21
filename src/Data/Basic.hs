@@ -10,8 +10,6 @@ import Path
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Text as T
 
--- import Data.Hashable
--- import Control.Exception (assert)
 import Data.Bits
 import Data.Maybe (fromMaybe)
 import Text.Read
@@ -44,7 +42,6 @@ instance Show Identifier where
 instance Ord Identifier where
   compare (I (_, i1)) (I (_, i2)) = compare i1 i2
 
--- type Identifier = T.Text
 type Phase = Int
 
 type Line = Int
@@ -105,15 +102,10 @@ showMeta :: Meta -> String
 showMeta m =
   case (metaFileName m, metaConstraintLocation m) of
     (Just name, Nothing) -> toFilePath name
-    -- (Just name, Just (_, l,))
-    --   | (_, l, c) <- minimum xs ->
-    --     toFilePath name ++ ":" ++ show l ++ ":" ++ show c
     (Just name, Just (_, l, c)) ->
       toFilePath name ++ ":" ++ show l ++ ":" ++ show c
     (Nothing, Nothing) -> "_"
     (Nothing, Just (_, l, c)) -> "<unknown-file>:" ++ show l ++ ":" ++ show c
-    -- (Nothing, xs)
-    --   | (_, l, c) <- minimum xs -> "<unknown-file>:" ++ show l ++ ":" ++ show c
 
 showMeta' :: Meta -> String
 showMeta' m =
@@ -124,8 +116,6 @@ showMeta' m =
     (Nothing, Nothing) -> "_"
     (Nothing, Just (ph, l, c)) ->
       "<unknown-file>:" ++ show ph ++ ":" ++ show l ++ ":" ++ show c
-    -- (Nothing, xs)
-    --   | (_, l, c) <- minimum xs -> "<unknown-file>:" ++ show l ++ ":" ++ show c
 
 supMeta :: Meta -> Meta -> Meta
 supMeta m1 m2
@@ -152,23 +142,6 @@ emptyMeta =
     , metaIsAppropriateAsCompletionCandidate = True
     , metaUnivParams = IntMap.empty
     }
-
-readEnumType :: Char -> T.Text -> Int -> (Maybe Int)
-readEnumType c str k -- n1, n2, ..., n{i}, ..., n{2^64}
-  | T.length str >= 2
-  , T.head str == c
-  , Just i <- (readMaybe $ T.unpack $ T.tail str :: Maybe Int)
-  , 1 <= toInteger i && toInteger i <= 2 ^ k = Just i
-readEnumType _ _ _ = Nothing
-
-readEnumTypeNat :: T.Text -> (Maybe Int)
-readEnumTypeNat str = readEnumType 'n' str 64
-
-readEnumTypeIntS :: T.Text -> (Maybe Int)
-readEnumTypeIntS str = readEnumType 'i' str 23
-
-readEnumTypeIntU :: T.Text -> (Maybe Int)
-readEnumTypeIntU str = readEnumType 'u' str 23
 
 data EnumValue
   = EnumValueIntS IntSize Integer

@@ -79,11 +79,6 @@ interpret (m, TreeNode [(_, TreeAtom "zeta"), x]) = do
 interpret (m, TreeNode [(_, TreeAtom "constant"), (_, TreeAtom x)]) = do
   m' <- adjustPhase m
   return (m', WeakTermConst $ asIdent x)
-interpret (m, TreeNode [(_, TreeAtom "constant-declaration"), xt, e]) = do
-  xt' <- interpretIdentifierPlus xt
-  e' <- interpret e
-  m' <- adjustPhase m
-  return (m', WeakTermConstDecl xt' e')
 interpret (m, TreeNode [(_, TreeAtom "f16"), (_, TreeAtom x)])
   | Just x' <- readMaybe $ T.unpack x = do
     m' <- adjustPhase m
@@ -346,6 +341,23 @@ isDefinedEnumName name = do
   env <- get
   let enumNameList = Map.keys $ enumEnv env
   return $ name `elem` enumNameList
+
+readEnumType :: Char -> T.Text -> Int -> (Maybe Int)
+readEnumType c str k -- n1, n2, ..., n{i}, ..., n{2^64}
+  | T.length str >= 2
+  , T.head str == c
+  , Just i <- (readMaybe $ T.unpack $ T.tail str :: Maybe Int)
+  , 1 <= toInteger i && toInteger i <= 2 ^ k = Just i
+readEnumType _ _ _ = Nothing
+
+readEnumTypeNat :: T.Text -> (Maybe Int)
+readEnumTypeNat str = readEnumType 'n' str 64
+
+readEnumTypeIntS :: T.Text -> (Maybe Int)
+readEnumTypeIntS str = readEnumType 'i' str 23
+
+readEnumTypeIntU :: T.Text -> (Maybe Int)
+readEnumTypeIntU str = readEnumType 'u' str 23
 
 adjustPhase :: Meta -> WithEnv Meta
 adjustPhase m = do

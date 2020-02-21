@@ -70,8 +70,6 @@ simp' (((_, WeakTermIter xt1@(_, x1, _) xts1 e1), (_, WeakTermIter xt2@(_, x2, _
   | x1 == x2
   , length xts1 == length xts2 =
     simpBinder (xt1 : xts1) (xt2 : xts2) (Just (e1, e2)) cs
-simp' (((_, WeakTermConstDecl xt1 e1), (_, WeakTermConstDecl xt2 e2)):cs) = do
-  simpBinder [xt1] [xt2] (Just (e1, e2)) cs
 simp' (((_, WeakTermInt t1 l1), (_, WeakTermEnumIntro (EnumValueIntS s2 l2))):cs)
   | l1 == l2 = simp $ (t1, toIntS s2) : cs
 simp' (((_, WeakTermEnumIntro (EnumValueIntS s1 l1)), (_, WeakTermInt t2 l2)):cs)

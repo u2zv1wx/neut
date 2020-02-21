@@ -175,12 +175,6 @@ infer' _ (m, WeakTermConst x@(I (s, _)))
       Just (t, UnivLevelPlus (_, l)) -> do
         ((_, t'), l') <- univInst (weaken t) l
         return ((m, WeakTermConst x), (m, t'), UnivLevelPlus (m, l'))
-infer' ctx (m, WeakTermConstDecl (mx, x, t) e) = do
-  tl'@(t', _) <- inferType' ctx t
-  insWeakTypeEnv x tl'
-  -- the type of `e` doesn't depend on `x`
-  (e', t'', ml) <- infer' ctx e
-  return ((m, WeakTermConstDecl (mx, x, t') e'), t'', ml)
 infer' _ (m, WeakTermInt t i) = do
   (t', UnivLevelPlus (_, l)) <- inferType' [] t -- ctx == [] since t' should be i64, i8, etc. (i.e. t must be closed)
   return ((m, WeakTermInt t' i), t', UnivLevelPlus (m, l))
@@ -570,10 +564,6 @@ univInst' (m, WeakTermIter (mx, x, t) xts e) = do
   e' <- univInst' e
   return (m, WeakTermIter (mx, x, t') xts' e')
 univInst' (m, WeakTermConst x) = return (m, WeakTermConst x)
-univInst' (m, WeakTermConstDecl (mx, x, t) e) = do
-  t' <- univInst' t
-  e' <- univInst' e
-  return (m, WeakTermConstDecl (mx, x, t') e')
 univInst' (m, WeakTermZeta x) = return (m, WeakTermZeta x)
 univInst' (m, WeakTermInt t a) = do
   t' <- univInst' t
