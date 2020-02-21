@@ -111,7 +111,7 @@ initialEnv path colorizeFlag =
 
 type WithEnv a = StateT Env (ExceptT [IO ()] IO) a
 
-evalWithEnv :: (Show a) => WithEnv a -> Env -> IO (Either [IO ()] a)
+evalWithEnv :: WithEnv a -> Env -> IO (Either [IO ()] a)
 evalWithEnv c env = do
   resultOrErr <- runExceptT (runStateT c env)
   case resultOrErr of

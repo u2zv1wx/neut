@@ -6,78 +6,66 @@ module Emit
 
 import Control.Monad.Except
 import Control.Monad.State
+import Data.ByteString.Builder
 import Data.Monoid ((<>))
+import Numeric.Half
 
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString.Lazy as L
 import qualified Data.HashMap.Strict as Map
-
 import qualified Data.Text.Encoding as TE
 
 import Data.Basic
 import Data.Env
 import Data.LLVM
 
-emit :: LLVM -> WithEnv [B.ByteString]
+emit :: LLVM -> WithEnv L.ByteString
 emit mainTerm = do
   lenv <- gets llvmEnv
   g <- emitGlobal
-  zs <- emitDefinition "main" [] mainTerm
+  zs <- emitDefinition "i64" "main" [] mainTerm
   xs <-
     forM (Map.toList lenv) $ \(name, (args, body)) -> do
       let name' = asText' name
-      -- let args' = map asText' args
       let args' = map (showLLVMData . LLVMDataLocal) args
-      -- emitDefinition (TE.encodeUtf8 name') (map TE.encodeUtf8 args') body
-      emitDefinition (TE.encodeUtf8 name') args' body
-  return $ g <> zs <> concat xs
+      emitDefinition "i8*" (TE.encodeUtf8Builder name') args' body
+  return $ toLazyByteString $ unlinesL $ g <> zs <> concat xs
 
-emitDefinition ::
-     B.ByteString -> [B.ByteString] -> LLVM -> WithEnv [B.ByteString]
-emitDefinition name args asm = do
-  let header = sig name args <> " {"
-  content <- emitLLVM name asm
+emitDefinition :: Builder -> Builder -> [Builder] -> LLVM -> WithEnv [Builder]
+emitDefinition retType name args asm = do
+  let header = sig retType name args <> " {"
+  content <- emitLLVM retType asm
   let footer = "}"
   return $ [header] <> content <> [footer]
 
-sig :: B.ByteString -> [B.ByteString] -> B.ByteString
-sig "main" args = "define i64 @main" <> showLocals args
-sig name args = "define i8* " <> "@" <> name <> showLocals args
+sig :: Builder -> Builder -> [Builder] -> Builder
+sig retType name args = "define " <> retType <> " @" <> name <> showLocals args
 
--- sig "main" args = "define i64 @main" <> showLocals args
--- sig name args = "define i8* " <> "@" <> name <> showLocals args
--- sig name args =
---   "define i8* " <>
---   showLLVMData (LLVMDataGlobal name) <> showArgs (map LLVMDataLocal args)
-emitBlock :: B.ByteString -> Identifier -> LLVM -> WithEnv [B.ByteString]
+emitBlock :: Builder -> Identifier -> LLVM -> WithEnv [Builder]
 emitBlock funName (I (_, i)) asm = do
   a <- emitLLVM funName asm
-  -- "%_" <> BC.pack (show i)
-  -- return $ emitLabel (showLLVMData $ LLVMDataLocal name) : a
-  return $ emitLabel ("_" <> BC.pack (show i)) : a
-  -- return $ emitLabel (asText' name) : a
+  return $ emitLabel ("_" <> intDec i) : a
 
 -- FIXME: callはcall fastccにするべきっぽい？
-emitLLVM :: B.ByteString -> LLVM -> WithEnv [B.ByteString]
-emitLLVM funName (LLVMReturn d) = emitRet funName d
-emitLLVM funName (LLVMCall f args) = do
+emitLLVM :: Builder -> LLVM -> WithEnv [Builder]
+emitLLVM retType (LLVMReturn d) = emitRet retType d
+emitLLVM retType (LLVMCall f args) = do
   tmp <- newNameWith' "tmp"
   op <-
     emitOp $
-    BC.unwords
+    unwordsL
       [ showLLVMData (LLVMDataLocal tmp)
       , "="
       , "tail call i8*"
       , showLLVMData f <> showArgs args
       ]
-  a <- emitRet funName (LLVMDataLocal tmp)
+  a <- emitRet retType (LLVMDataLocal tmp)
   return $ op <> a
-emitLLVM funName (LLVMSwitch (d, lowType) defaultBranch branchList) = do
+emitLLVM retType (LLVMSwitch (d, lowType) defaultBranch branchList) = do
   defaultLabel <- newNameWith' "default"
   labelList <- constructLabelList branchList
   op <-
     emitOp $
-    BC.unwords
+    unwordsL
       [ "switch"
       , showLowType lowType
       , showLLVMData d <> ","
@@ -88,26 +76,26 @@ emitLLVM funName (LLVMSwitch (d, lowType) defaultBranch branchList) = do
   let asmList = map snd branchList
   xs <-
     forM (zip labelList asmList <> [(defaultLabel, defaultBranch)]) $
-    uncurry (emitBlock funName)
+    uncurry (emitBlock retType)
   return $ op <> concat xs
-emitLLVM funName (LLVMCont op cont) = do
+emitLLVM retType (LLVMCont op cont) = do
   s <- emitLLVMOp op
   str <- emitOp s
-  a <- emitLLVM funName cont
+  a <- emitLLVM retType cont
   return $ str <> a
-emitLLVM funName (LLVMLet x op cont) = do
+emitLLVM retType (LLVMLet x op cont) = do
   s <- emitLLVMOp op
   str <- emitOp $ showLLVMData (LLVMDataLocal x) <> " = " <> s
-  a <- emitLLVM funName cont
+  a <- emitLLVM retType cont
   return $ str <> a
-emitLLVM _ LLVMUnreachable = emitOp $ BC.unwords ["unreachable"]
+emitLLVM _ LLVMUnreachable = emitOp $ unwordsL ["unreachable"]
 
-emitLLVMOp :: LLVMOp -> WithEnv B.ByteString
+emitLLVMOp :: LLVMOp -> WithEnv Builder
 emitLLVMOp (LLVMOpCall d ds) = do
-  return $ BC.unwords ["call i8*", showLLVMData d <> showArgs ds]
+  return $ unwordsL ["call i8*", showLLVMData d <> showArgs ds]
 emitLLVMOp (LLVMOpGetElementPtr (base, n) is) = do
   return $
-    BC.unwords
+    unwordsL
       [ "getelementptr"
       , showLowTypeAsIfNonPtr n <> ","
       -- , showLowType n <> "*"
@@ -123,7 +111,7 @@ emitLLVMOp (LLVMOpPointerToInt d fromType toType) =
   emitLLVMConvOp "ptrtoint" d fromType toType
 emitLLVMOp (LLVMOpLoad d lowType) = do
   return $
-    BC.unwords
+    unwordsL
       [ "load"
       , showLowType lowType <> ","
       , showLowTypeAsIfPtr lowType
@@ -131,7 +119,7 @@ emitLLVMOp (LLVMOpLoad d lowType) = do
       ]
 emitLLVMOp (LLVMOpStore t d1 d2) = do
   return $
-    BC.unwords
+    unwordsL
       [ "store"
       , showLowType t
       , showLLVMData d1 <> ","
@@ -139,9 +127,9 @@ emitLLVMOp (LLVMOpStore t d1 d2) = do
       , showLLVMData d2
       ]
 emitLLVMOp (LLVMOpAlloc d) = do
-  return $ BC.unwords ["call", "i8*", "@malloc(i64 " <> showLLVMData d <> ")"]
+  return $ unwordsL ["call", "i8*", "@malloc(i64 " <> showLLVMData d <> ")"]
 emitLLVMOp (LLVMOpFree d) = do
-  return $ BC.unwords ["call", "void", "@free(i8* " <> showLLVMData d <> ")"]
+  return $ unwordsL ["call", "void", "@free(i8* " <> showLLVMData d <> ")"]
 emitLLVMOp (LLVMOpSysCall num ds) = do
   emitSysCallOp num ds
 emitLLVMOp (LLVMOpUnaryOp (UnaryOpNeg, t@(LowTypeFloat _)) d) = do
@@ -262,23 +250,21 @@ emitLLVMOp (LLVMOpBinaryOp (BinaryOpXor, t@(LowTypeIntU _)) d1 d2) =
   emitBinaryOp t "xor" d1 d2
 emitLLVMOp _ = throwError' "emitLLVMOp"
 
-emitUnaryOp :: LowType -> B.ByteString -> LLVMData -> WithEnv B.ByteString
+emitUnaryOp :: LowType -> Builder -> LLVMData -> WithEnv Builder
 emitUnaryOp t inst d = do
-  return $ BC.unwords [inst, showLowType t, showLLVMData d]
+  return $ unwordsL [inst, showLowType t, showLLVMData d]
 
-emitBinaryOp ::
-     LowType -> B.ByteString -> LLVMData -> LLVMData -> WithEnv B.ByteString
+emitBinaryOp :: LowType -> Builder -> LLVMData -> LLVMData -> WithEnv Builder
 emitBinaryOp t inst d1 d2 = do
   return $
-    BC.unwords [inst, showLowType t, showLLVMData d1 <> ",", showLLVMData d2]
+    unwordsL [inst, showLowType t, showLLVMData d1 <> ",", showLLVMData d2]
 
-emitLLVMConvOp ::
-     B.ByteString -> LLVMData -> LowType -> LowType -> WithEnv B.ByteString
+emitLLVMConvOp :: Builder -> LLVMData -> LowType -> LowType -> WithEnv Builder
 emitLLVMConvOp cast d dom cod = do
   return $
-    BC.unwords [cast, showLowType dom, showLLVMData d, "to", showLowType cod]
+    unwordsL [cast, showLowType dom, showLLVMData d, "to", showLowType cod]
 
-emitSysCallOp :: Integer -> [LLVMData] -> WithEnv B.ByteString
+emitSysCallOp :: Integer -> [LLVMData] -> WithEnv Builder
 emitSysCallOp num ds = do
   regList <- getRegList
   currentArch <- getArch
@@ -287,21 +273,17 @@ emitSysCallOp num ds = do
       let args = (LLVMDataInt num, LowTypeIntS 64) : zip ds (repeat voidPtr)
       let argStr = "(" <> showIndex args <> ")"
       let regStr = "\"=r" <> showRegList (take (length args) regList) <> "\""
-      return $
-        BC.unwords ["call i8* asm sideeffect \"syscall\",", regStr, argStr]
+      return $ unwordsL ["call i8* asm sideeffect \"syscall\",", regStr, argStr]
 
-emitOp :: B.ByteString -> WithEnv [B.ByteString]
+emitOp :: Builder -> WithEnv [Builder]
 emitOp s = return ["  " <> s]
 
-emitRet :: B.ByteString -> LLVMData -> WithEnv [B.ByteString]
-emitRet "main" d = emitOp $ BC.unwords ["ret i64", showLLVMData d]
-emitRet _ d = emitOp $ BC.unwords ["ret i8*", showLLVMData d]
+emitRet :: Builder -> LLVMData -> WithEnv [Builder]
+emitRet retType d = emitOp $ unwordsL ["ret", retType, showLLVMData d]
 
-emitLabel :: B.ByteString -> B.ByteString
+emitLabel :: Builder -> Builder
 emitLabel s = s <> ":"
 
--- emitLabel :: T.Text -> B.ByteString
--- emitLabel s = TE.encodeUtf8 s <> ":"
 constructLabelList :: [(Int, LLVM)] -> WithEnv [Identifier]
 constructLabelList [] = return []
 constructLabelList ((_, _):rest) = do
@@ -309,44 +291,57 @@ constructLabelList ((_, _):rest) = do
   labelList <- constructLabelList rest
   return $ label : labelList
 
-showRegList :: [B.ByteString] -> B.ByteString
+showRegList :: [Builder] -> Builder
 showRegList [] = ""
 showRegList (s:ss) = ",{" <> s <> "}" <> showRegList ss
 
-showBranchList :: LowType -> [(Int, Identifier)] -> B.ByteString
+showBranchList :: LowType -> [(Int, Identifier)] -> Builder
 showBranchList lowType xs =
   "[" <> showItems (uncurry (showBranch lowType)) xs <> "]"
 
-showIndex :: [(LLVMData, LowType)] -> B.ByteString
+showIndex :: [(LLVMData, LowType)] -> Builder
 showIndex [] = ""
 showIndex [(d, t)] = showLowType t <> " " <> showLLVMData d
 showIndex ((d, t):dts) = showIndex [(d, t)] <> ", " <> showIndex dts
 
-showBranch :: LowType -> Int -> Identifier -> B.ByteString
+showBranch :: LowType -> Int -> Identifier -> Builder
 showBranch lowType i label =
   showLowType lowType <>
-  " " <> BC.pack (show i) <> ", label " <> showLLVMData (LLVMDataLocal label)
+  " " <> intDec i <> ", label " <> showLLVMData (LLVMDataLocal label)
 
-showArg :: LLVMData -> B.ByteString
+showArg :: LLVMData -> Builder
 showArg d = "i8* " <> showLLVMData d
 
-showLocal :: B.ByteString -> B.ByteString
+showLocal :: Builder -> Builder
 showLocal x = "i8* " <> x
 
-showArgs :: [LLVMData] -> B.ByteString
+showArgs :: [LLVMData] -> Builder
 showArgs ds = "(" <> showItems showArg ds <> ")"
 
-showLocals :: [B.ByteString] -> B.ByteString
+showLocals :: [Builder] -> Builder
 showLocals ds = "(" <> showItems showLocal ds <> ")"
 
-showLowTypeAsIfPtr :: LowType -> B.ByteString
+showLowTypeAsIfPtr :: LowType -> Builder
 showLowTypeAsIfPtr t = showLowType t <> "*"
 
-showLowTypeAsIfNonPtr :: LowType -> B.ByteString
-showLowTypeAsIfNonPtr t = BC.init $ showLowType t
+showLowTypeAsIfNonPtr :: LowType -> Builder
+showLowTypeAsIfNonPtr (LowTypeIntS i) = "i" <> intDec i
+showLowTypeAsIfNonPtr (LowTypeIntU i) = "i" <> intDec i
+showLowTypeAsIfNonPtr (LowTypeFloat FloatSize16) = "half"
+showLowTypeAsIfNonPtr (LowTypeFloat FloatSize32) = "float"
+showLowTypeAsIfNonPtr (LowTypeFloat FloatSize64) = "double"
+showLowTypeAsIfNonPtr LowTypeVoidPtr = "i8"
+showLowTypeAsIfNonPtr (LowTypeStructPtr ts) =
+  "{" <> showItems showLowType ts <> "}"
+showLowTypeAsIfNonPtr (LowTypeFunctionPtr ts t) =
+  showLowType t <> " (" <> showItems showLowType ts <> ")"
+showLowTypeAsIfNonPtr (LowTypeArrayPtr i t) = do
+  let s = showLowType t
+  "[" <> intDec i <> " x " <> s <> "]"
+showLowTypeAsIfNonPtr LowTypeIntS64Ptr = "i64"
 
 -- for now
-emitGlobal :: WithEnv [B.ByteString]
+emitGlobal :: WithEnv [Builder]
 emitGlobal = do
   os <- getOS
   case os of
@@ -361,17 +356,17 @@ emitGlobal = do
         ]
     _ -> return ["declare i8* @malloc(i64)", "declare void @free(i8*)"]
 
-getRegList :: WithEnv [B.ByteString]
+getRegList :: WithEnv [Builder]
 getRegList = do
   targetOS <- getOS
   case targetOS of
     OSLinux -> return ["rax", "rdi", "rsi", "rdx", "rcx", "r8", "r9"]
     OSDarwin -> return ["rax", "rdi", "rsi", "rdx", "r10", "r8", "r9"]
 
-showLowType :: LowType -> B.ByteString
-showLowType (LowTypeIntS i) = "i" <> BC.pack (show i) -- fixme: should use intDec or something
+showLowType :: LowType -> Builder
+showLowType (LowTypeIntS i) = "i" <> intDec i
 -- LLVM doesn't distinguish unsigned integers from signed ones
-showLowType (LowTypeIntU i) = "i" <> BC.pack (show i)
+showLowType (LowTypeIntU i) = "i" <> intDec i
 showLowType (LowTypeFloat FloatSize16) = "half"
 showLowType (LowTypeFloat FloatSize32) = "float"
 showLowType (LowTypeFloat FloatSize64) = "double"
@@ -381,28 +376,32 @@ showLowType (LowTypeFunctionPtr ts t) =
   showLowType t <> " (" <> showItems showLowType ts <> ")*"
 showLowType (LowTypeArrayPtr i t) = do
   let s = showLowType t
-  "[" <> BC.pack (show i) <> " x " <> s <> "]*"
+  "[" <> intDec i <> " x " <> s <> "]*"
 showLowType LowTypeIntS64Ptr = "i64*"
 
-showLLVMData :: LLVMData -> B.ByteString
-showLLVMData (LLVMDataLocal (I (_, i))) = "%_" <> BC.pack (show i)
--- showLLVMData (LLVMDataGlobal (I (_, i))) = "@_" <> BC.pack (show i)
--- showLLVMData (LLVMDataGlobal (I (s, _))) = "@" <> TE.encodeUtf8 s
+showLLVMData :: LLVMData -> Builder
+showLLVMData (LLVMDataLocal (I (_, i))) = "%_" <> intDec i
 showLLVMData (LLVMDataGlobal (I ("fork", 0))) = "@fork"
-showLLVMData (LLVMDataGlobal x) = "@" <> TE.encodeUtf8 (asText' x)
--- showLLVMData (LLVMDataLocal (I (s, i))) =
---   "%" <> TE.encodeUtf8 s <> BC.pack (show i)
--- showLLVMData (LLVMDataGlobal (I (s, i))) =
---   "@" <> TE.encodeUtf8 s <> BC.pack (show i)
--- showLLVMData (LLVMDataLocal x) = "%" <> TE.encodeUtf8 x
--- showLLVMData (LLVMDataGlobal x) = "@" <> TE.encodeUtf8 x
-showLLVMData (LLVMDataInt i) = BC.pack $ show i
-showLLVMData (LLVMDataFloat16 x) = BC.pack $ show x
-showLLVMData (LLVMDataFloat32 x) = BC.pack $ show x
-showLLVMData (LLVMDataFloat64 x) = BC.pack $ show x
+showLLVMData (LLVMDataGlobal x) = "@" <> TE.encodeUtf8Builder (asText' x)
+showLLVMData (LLVMDataInt i) = integerDec i
+showLLVMData (LLVMDataFloat16 x) = floatDec $ fromHalf x
+showLLVMData (LLVMDataFloat32 x) = floatDec x
+showLLVMData (LLVMDataFloat64 x) = doubleDec x
 showLLVMData LLVMDataNull = "null"
 
-showItems :: (a -> B.ByteString) -> [a] -> B.ByteString
+showItems :: (a -> Builder) -> [a] -> Builder
 showItems _ [] = ""
 showItems f [a] = f a
 showItems f (a:as) = f a <> ", " <> showItems f as
+
+{-# INLINE unwordsL #-}
+unwordsL :: [Builder] -> Builder
+unwordsL [] = ""
+unwordsL [b] = b
+unwordsL (b:bs) = b <> " " <> unwordsL bs
+
+{-# INLINE unlinesL #-}
+unlinesL :: [Builder] -> Builder
+unlinesL [] = ""
+unlinesL [b] = b
+unlinesL (b:bs) = b <> "\n" <> unlinesL bs

@@ -10,8 +10,7 @@ import System.Exit
 import System.Process
 import Text.Read (readMaybe)
 
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString.Lazy as L
 
 import Clarify
 import Data.Env
@@ -155,7 +154,6 @@ run (Complete inputPathStr l c) = do
     evalWithEnv (complete inputPath l c) (initialEnv inputPath True)
   case resultOrErr of
     Left _ -> return () -- don't show any errors, just quit silently
-    -- Left err -> seqIO err >> exitWith (ExitFailure 1)
     Right result -> mapM_ putStrLn result
 
 constructOutputPath ::
@@ -168,21 +166,19 @@ constructOutputPath basename Nothing OutputKindObject = do
   return $ dir </> basename
 constructOutputPath _ (Just path) _ = return path
 
-writeResult :: [B.ByteString] -> Path Abs File -> OutputKind -> IO ()
+writeResult :: L.ByteString -> Path Abs File -> OutputKind -> IO ()
 writeResult result outputPath OutputKindLLVM = do
-  let content = BC.unlines result
-  B.writeFile (toFilePath outputPath) content
+  L.writeFile (toFilePath outputPath) result
 writeResult result outputPath OutputKindObject = do
-  let content = BC.unlines result
   tmpOutputPath <- liftIO $ outputPath <.> "ll"
   let tmpOutputPathStr = toFilePath tmpOutputPath
-  B.writeFile tmpOutputPathStr content
+  L.writeFile tmpOutputPathStr result
   callProcess
     "clang"
     [tmpOutputPathStr, "-Wno-override-module", "-o" ++ toFilePath outputPath]
   removeFile tmpOutputPath
 
-build :: Path Abs File -> WithEnv [B.ByteString]
+build :: Path Abs File -> WithEnv L.ByteString
 build inputPath = do
   parse inputPath >>= elaborate >>= clarify >>= toLLVM >>= emit
 
