@@ -12,7 +12,7 @@ import qualified Data.Text as T
 
 import Data.Basic
 import Data.Code
-import Data.Env
+import Data.Env hiding (newNameWith'')
 import Data.LLVM
 
 toLLVM :: CodePlus -> WithEnv LLVM
@@ -527,7 +527,10 @@ renameLLVMData (LLVMDataLocal x@(I (s, i))) = do
   nenv <- gets nameEnv
   case Map.lookup i nenv of
     Just i' -> return $ LLVMDataLocal $ I (s, i')
-    Nothing -> return $ LLVMDataLocal x
+    Nothing -> do
+      p "undefined variable:"
+      p' x
+      return $ LLVMDataLocal x
 renameLLVMData d = return d
 
 renameLLVM :: LLVM -> WithEnv LLVM

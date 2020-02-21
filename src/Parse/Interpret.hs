@@ -234,7 +234,7 @@ interpretAtom :: TreePlus -> WithEnv (Meta, Identifier)
 interpretAtom (m, TreeAtom "_") = do
   m' <- adjustPhase m
   let m'' = m' {metaIsAppropriateAsCompletionCandidate = False}
-  h <- newNameWith' "H"
+  h <- newNameWith'' "H"
   return (m'', h)
 interpretAtom (m, TreeAtom x) = do
   m' <- adjustPhase m
@@ -359,7 +359,7 @@ adjustPhase' i (Just (_, l, c)) = Just (i, l, c)
 
 newHole :: Meta -> WithEnv WeakTermPlus
 newHole m = do
-  h <- newNameWith' "hole-aux"
+  h <- newNameWith'' "hole-aux"
   return (m, WeakTermZeta h)
 
 asArrayKind :: T.Text -> WithEnv ArrayKind

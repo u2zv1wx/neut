@@ -298,7 +298,7 @@ inferKind :: ArrayKind -> WithEnv WeakTermPlus
 inferKind (ArrayKindIntS i) = return (emptyMeta, WeakTermEnum (EnumTypeIntS i))
 inferKind (ArrayKindIntU i) = return (emptyMeta, WeakTermEnum (EnumTypeIntU i))
 inferKind (ArrayKindFloat size) = do
-  lookupConstant $ "f" <> T.pack (show (sizeAsInt size))
+  lookupConstantPlus' $ "f" <> T.pack (show (sizeAsInt size))
   -- (emptyMeta, WeakTermConst $ "f" <> T.pack (show (sizeAsInt size)))
 inferKind _ = error "inferKind for void-pointer"
 

@@ -196,7 +196,7 @@ parse' (a:as) = do
     then parse' $ e : as
     else do
       e'@(meta, _) <- interpret e
-      name <- newNameWith' "hole-parse-last"
+      name <- newNameWith'' "hole-parse-last"
       t <- newHole
       defList <- parse' as
       let meta' = meta {metaIsAppropriateAsCompletionCandidate = False}
@@ -285,6 +285,10 @@ concatQuasiStmtList (QuasiStmtLetInductiveIntro m bt xts yts ats bts bInner isub
   -- concatQuasiStmtList $ s : ss
 concatQuasiStmtList (QuasiStmtLetCoinductiveElim m bt xtsyt codInner ats bts yt e1 e2 csub asOuter:ss)
   -- e2' <- reduceWeakTermPlus <$> externalize csub (ats ++ bts) codInner e2
+  -- p "bt:"
+  -- p' bt
+  -- p "e2:"
+  -- p' e2
  = do
   e2' <- externalize csub (ats ++ bts) codInner e2
   insCoinductive asOuter bt -- register the destructor (if necessary)
@@ -323,7 +327,7 @@ compose s1 s2 = do
 
 newHole :: WithEnv WeakTermPlus
 newHole = do
-  h <- newNameWith' "hole-parse-zeta"
+  h <- newNameWith'' "hole-parse-zeta"
   return (emptyMeta, WeakTermZeta h)
 
 checkKeywordSanity :: T.Text -> WithEnv ()
@@ -401,14 +405,14 @@ toIdentList ((QuasiStmtLetCoinductiveElim _ b _ _ _ _ _ _ _ _ _):ss) =
 
 toQuasiStmtLetFooter ::
      Path Abs File -> (Meta, Identifier, WeakTermPlus) -> QuasiStmt
-toQuasiStmtLetFooter path (m, x@(I (s, _)), t) = do
-  let s' = "(" <> T.pack (toFilePath path) <> ":" <> s <> ")" -- user cannot write this var since it contains parenthesis
+toQuasiStmtLetFooter path (m, x, t) = do
+  let s' = "(" <> T.pack (toFilePath path) <> ":" <> asText' x <> ")" -- user cannot write this var since it contains parenthesis
   let m' = m {metaIsAppropriateAsCompletionCandidate = False}
   QuasiStmtLet m' (m', I (s', 0), t) (m, WeakTermUpsilon x)
 
 toQuasiStmtLetHeader ::
      Path Abs File -> (Meta, Identifier, WeakTermPlus) -> QuasiStmt
-toQuasiStmtLetHeader path (m, x@(I (s, _)), t) = do
-  let s' = "(" <> T.pack (toFilePath path) <> ":" <> s <> ")" -- user cannot write this var since it contains parenthesis
+toQuasiStmtLetHeader path (m, x, t) = do
+  let s' = "(" <> T.pack (toFilePath path) <> ":" <> asText' x <> ")" -- user cannot write this var since it contains parenthesis
   let m' = m {metaIsAppropriateAsCompletionCandidate = False}
   QuasiStmtLet m' (m, x, t) (m', WeakTermUpsilon (I (s', 0)))

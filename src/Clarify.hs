@@ -460,13 +460,14 @@ toSysCallTail m cod syscall args xs = do
   result <- retWithBorrowedVars m cod xs resultVarName
   os <- getOS
   case (syscall, os) of
-    (SysCallFork, OSDarwin) -> do
-      i <- lookupConstNum' "fork"
+    (SysCallFork, OSDarwin)
+      -- i <- lookupConstNum' "fork"
+     -> do
       return
         ( m
         , CodeUpElim
             resultVarName
-            (m, CodePiElimDownElim (m, DataTheta (I ("fork", i))) args)
+            (m, CodePiElimDownElim (m, DataTheta (I ("fork", 0))) args)
             result)
     _ ->
       return

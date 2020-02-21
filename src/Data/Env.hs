@@ -154,6 +154,11 @@ newNameWith' s = do
   i <- newCount
   return $ I (s, i)
 
+newNameWith'' :: T.Text -> WithEnv Identifier
+newNameWith'' s = do
+  i <- newCount
+  return $ I (s <> "-" <> T.pack (show i), i)
+
 newLLVMNameWith :: Identifier -> WithEnv Identifier
 newLLVMNameWith (I (s, i)) = do
   j <- newCount
@@ -164,7 +169,7 @@ newLLVMNameWith (I (s, i)) = do
 newLLVMNameWith' :: T.Text -> WithEnv Identifier
 newLLVMNameWith' s = do
   i <- newCount
-  return $ I (llvmString s, i)
+  return $ I (llvmString s <> "-" <> T.pack (show i), i)
 
 llvmString :: T.Text -> T.Text
 llvmString "" = error "llvmString called for the empty string"
@@ -322,15 +327,19 @@ lookupConstNum' constName = do
     Just i -> return i
     Nothing -> throwError' $ "no such constant: " <> constName
 
-lookupConstant :: T.Text -> WithEnv WeakTermPlus
-lookupConstant constName = do
-  me <- lookupConstantMaybe constName
-  case me of
-    Just e -> return e
-    Nothing -> throwError' $ "no such constant: " <> constName
-
 lookupConstantMaybe :: T.Text -> WithEnv (Maybe WeakTermPlus)
-lookupConstantMaybe constName
+lookupConstantMaybe constName = do
+  cenv <- gets constantEnv
+  case Map.lookup constName cenv of
+    Just i -> return $ Just (emptyMeta, WeakTermConst $ I (constName, i))
+    Nothing -> return Nothing
+      -- i <- newCount
+      -- let ident = I (constName, i)
+      -- modify (\env -> env {constantEnv = Map.insert constName i cenv})
+      -- return $ Just (emptyMeta, WeakTermConst ident)
+
+lookupConstantPlus :: T.Text -> WithEnv (Maybe WeakTermPlus)
+lookupConstantPlus constName
   | isConstant constName = do
     cenv <- gets constantEnv
     case Map.lookup constName cenv of
@@ -342,14 +351,21 @@ lookupConstantMaybe constName
         return $ Just (emptyMeta, WeakTermConst ident)
   | otherwise = return Nothing
 
+lookupConstantPlus' :: T.Text -> WithEnv WeakTermPlus
+lookupConstantPlus' constName = do
+  me <- lookupConstantPlus constName
+  case me of
+    Just e -> return e
+    Nothing -> throwError' $ "no such constant: " <> constName
+
 lookupFloat16 :: WithEnv WeakTermPlus
-lookupFloat16 = lookupConstant "f16"
+lookupFloat16 = lookupConstantPlus' "f16"
 
 lookupFloat32 :: WithEnv WeakTermPlus
-lookupFloat32 = lookupConstant "f32"
+lookupFloat32 = lookupConstantPlus' "f32"
 
 lookupFloat64 :: WithEnv WeakTermPlus
-lookupFloat64 = lookupConstant "f64"
+lookupFloat64 = lookupConstantPlus' "f64"
 -- lookupConstant :: T.Text -> WithEnv WeakTermPlus
 -- lookupConstant x
 --   | isConstant x = lookupConstant

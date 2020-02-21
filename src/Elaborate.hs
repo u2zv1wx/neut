@@ -15,6 +15,7 @@ import qualified Data.HashMap.Strict as Map
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Set as S
 import qualified Data.Text as T
+import qualified Data.Text.IO as TIO
 
 import Data.Basic
 import Data.Constraint
@@ -41,6 +42,7 @@ import qualified Data.UnionFind as UF
 elaborate :: WeakStmt -> WithEnv TermPlus
 elaborate stmt = do
   e <- elaborateStmt stmt >>= reduceTermPlus
+  -- _ <- error "well-typed"
   return e
 
 elaborateStmt :: WeakStmt -> WithEnv TermPlus
@@ -49,9 +51,21 @@ elaborateStmt (WeakStmtReturn e) = do
   analyze >> synthesize >> refine
   checkUnivSanity
   elaborate' e' >>= reduceTermPlus
-elaborateStmt (WeakStmtLet m (mx, x@(I (_, i)), t) e cont) = do
+elaborateStmt (WeakStmtLet m (mx, x@(I (_, i)), t) e cont)
+  -- p' t
+  -- p "-----------"
+  -- p $ show x
+  -- p "body:"
+  -- liftIO $ TIO.putStrLn $ toText e
+  -- p "type of body:"
+  -- liftIO $ TIO.putStrLn $ toText t
+ = do
   (e', te, mle) <- infer e
   (t', mlt) <- inferType t
+  -- p "insConstraint:"
+  -- liftIO $ TIO.putStrLn $ toText te
+  -- liftIO $ TIO.putStrLn $ toText t'
+  -- p' (te, t')
   insConstraintEnv te t'
   insLevelEQ mle mlt
   -- Kantian type-inference ;)
@@ -60,10 +74,20 @@ elaborateStmt (WeakStmtLet m (mx, x@(I (_, i)), t) e cont) = do
   t'' <- elaborate' t' >>= reduceTermPlus
   insTypeEnv x t'' mlt
   modify (\env -> env {substEnv = Map.insert i (weaken e'') (substEnv env)})
+  -- liftIO $ TIO.putStrLn $ toText $ weaken t''
   cont' <- elaborateStmt cont
   return (m, TermPiElim (m, TermPiIntro [(mx, x, t'')] cont') [e''])
-elaborateStmt (WeakStmtLetWT m (mx, x@(I (_, i)), t) e cont) = do
+elaborateStmt (WeakStmtLetWT m (mx, x@(I (_, i)), t) e cont)
+  -- p "-----------"
+  -- p $ show x
+  -- p "body:"
+  -- liftIO $ TIO.putStrLn $ toText e
+  -- p "type of body:"
+  -- liftIO $ TIO.putStrLn $ toText t
+ = do
   (t', mlt) <- inferType t
+  -- p "t':"
+  -- liftIO $ TIO.putStrLn $ toText t'
   analyze >> synthesize >> refine >> cleanup
   e' <- elaborate' e -- `e` is supposed to be well-typed
   t'' <- elaborate' t' >>= reduceTermPlus
@@ -72,6 +96,8 @@ elaborateStmt (WeakStmtLetWT m (mx, x@(I (_, i)), t) e cont) = do
   modify (\env -> env {substEnv = Map.insert i (weaken e') (substEnv env)})
   -- p $ T.unpack $ "- " <> toText (weaken e')
   -- p $ T.unpack $ "- " <> toText (weaken t'')
+  -- p $ show x
+  -- liftIO $ TIO.putStrLn $ toText $ weaken t''
   cont' <- elaborateStmt cont
   return (m, TermPiElim (m, TermPiIntro [(mx, x, t'')] cont') [e'])
 elaborateStmt (WeakStmtConstDecl m (mx, x, t) cont) = do

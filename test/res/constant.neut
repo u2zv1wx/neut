@@ -1,6 +1,6 @@
 ;; should be loaded after `notation`, `top`.
 
-(constant file-descriptor tau)
+(constant file-descriptor type)
 
 (constant stdin file-descriptor)
 
@@ -23,7 +23,7 @@
 
 (constant array-access-u8
   (pi
-    ((A tau)
+    ((A type)
      (arr (array A u8))
      (n A))
     (product (array A u8) u8)))
@@ -32,7 +32,7 @@
 ;; writeのlenの部分はi64にしてよさげ。
 (constant read
   (pi
-    ((A tau)
+    ((A type)
      (in file-descriptor)
      (buf (array A u8))
      (len i64))
@@ -40,7 +40,7 @@
 
 (constant write
   (pi
-    ((A tau)
+    ((A type)
      (out file-descriptor)
      (str (array A u8))
      (len i64))
@@ -53,7 +53,7 @@
 
 (constant open
   (pi
-    ((A tau)
+    ((A type)
      (path (array A u8))
      (flags i64)
      (mode i64))
@@ -152,7 +152,7 @@
 (constant socket
   (pi
     ((domain i64)
-     (socket-tau i64)
+     (socket-type i64)
      (protocol i64))
     i64))
 

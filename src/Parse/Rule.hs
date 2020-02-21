@@ -16,6 +16,7 @@ import Data.Monoid ((<>))
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.Text as T
+import qualified Data.Text.IO as TIO
 
 import Data.Basic
 import Data.Env
@@ -66,32 +67,33 @@ parseRule (m, TreeNode [(mName, TreeAtom name), (_, TreeNode xts), t]) = do
   return (m', asIdent name, mName', xts', t')
 parseRule _ = throwError' "parseRule: syntax error"
 
-renameFormArgs :: [IdentifierPlus] -> WithEnv [IdentifierPlus]
-renameFormArgs [] = return []
-renameFormArgs ((m, a, t):ats) = do
-  a' <- newNameWith' "var"
+renameFormArgs ::
+     [IdentifierPlus]
+  -> WeakTermPlus
+  -> WithEnv ([IdentifierPlus], WeakTermPlus)
+renameFormArgs [] tLast = return ([], tLast)
+renameFormArgs ((m, a, t):ats) tLast = do
+  a' <- newNameWith'' "var"
   let sub = [(a, (m, WeakTermUpsilon a'))]
-  ats' <- renameFormArgs $ substWeakTermPlusBindings sub ats
-  return $ (m, a', t) : ats'
+  let (ats', tLast') = substWeakTermPlusBindingsWithBody sub ats tLast
+  (ats'', tLast'') <- renameFormArgs ats' tLast'
+  return ((m, a', t) : ats'', tLast'')
 
 checkNameSanity :: [IdentifierPlus] -> WithEnv ()
 checkNameSanity atsbts = do
   let asbs = map (\(_, x, _) -> x) atsbts
-  when (not $ linearCheck $ map asInt asbs) $
+  when (not $ linearCheck $ map asText asbs) $
     throwError'
       "the names of the rules of inductive/coinductive type must be distinct"
 
--- represent the inductive logical connective within CoC
 toInductive ::
      [IdentifierPlus] -> [IdentifierPlus] -> Connective -> WithEnv [QuasiStmt]
 toInductive ats bts connective@(m, a@(I (ai, _)), xts, _) = do
   formationRule <- formationRuleOf connective >>= ruleAsIdentPlus
-  atsbts' <- renameFormArgs $ ats ++ bts
-  a' <- lookupNameEnv a
   let cod = (m, WeakTermPiElim (m, WeakTermUpsilon a) (map toVar' xts))
-  let cod' = (m, WeakTermPiElim (m, WeakTermUpsilon a') (map toVar' xts))
   z <- newLLVMNameWith' "_"
   let zt = (m, z, cod)
+  (atsbts', cod') <- renameFormArgs (ats ++ bts) cod
   mls1 <- piUnivLevelsfrom (ats ++ bts) cod
   mls2 <- piUnivLevelsfrom (xts ++ atsbts' ++ [zt]) cod'
   return $
@@ -151,10 +153,10 @@ toCoinductive ::
      [IdentifierPlus] -> [IdentifierPlus] -> Connective -> WithEnv [QuasiStmt]
 toCoinductive ats bts c@(m, a@(I (ai, _)), xts, _) = do
   f <- formationRuleOf c >>= ruleAsIdentPlus
-  atsbts' <- renameFormArgs $ ats ++ bts
-  a' <- lookupNameEnv a
+  -- a' <- lookupNameEnv a
   let cod = (m, WeakTermPiElim (m, WeakTermUpsilon a) (map toVar' xts))
-  let cod' = (m, WeakTermPiElim (m, WeakTermUpsilon a') (map toVar' xts))
+  (atsbts', cod') <- renameFormArgs (ats ++ bts) cod
+  -- let cod' = (m, WeakTermPiElim (m, WeakTermUpsilon a') (map toVar' xts))
   z <- newLLVMNameWith' "_"
   let zt' = (m, z, cod')
   mls <- piUnivLevelsfrom (xts ++ atsbts' ++ [zt']) cod
@@ -284,7 +286,15 @@ externalize ::
   -> WeakTermPlus
   -> WeakTermPlus
   -> WithEnv WeakTermPlus
-externalize csub atsbts t e = zeta ModeForward [] csub atsbts t e
+externalize csub atsbts t e
+  -- p "externalize. atsbts::"
+  -- p' atsbts
+  -- p "t:"
+  -- p' t
+  -- p "e:"
+  -- p' e
+ = do
+  zeta ModeForward [] csub atsbts t e
 
 flipMode :: Mode -> Mode
 flipMode ModeForward = ModeBackward
@@ -461,7 +471,7 @@ zetaCoinductiveNested mode isub csub atsbts e va aOuter es bts = do
   (xts, (_, aInner, aType), btsInner) <- lookupCoinductive aOuter
   let es' = map (substWeakTermPlus (isub ++ csub)) es
   -- a' <- newNameWith "coinductive"
-  a' <- newNameWith' "coinductive"
+  a' <- newNameWith'' "coinductive"
   args <-
     zipWithM
       (toExternalizedArg mode isub csub aInner a' xts atsbts es es')

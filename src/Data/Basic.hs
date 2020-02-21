@@ -20,7 +20,7 @@ import qualified Data.Set as S
 
 newtype Identifier =
   I (T.Text, Int)
-  deriving (Generic)
+  deriving (Generic, Eq)
 
 instance Hashable Identifier
 
@@ -39,9 +39,8 @@ asInt (I (_, i)) = i
 instance Show Identifier where
   show (I (s, i)) = T.unpack s ++ "-" ++ show i
 
-instance Eq Identifier where
-  (I (_, i1)) == (I (_, i2)) = i1 == i2
-
+-- instance Eq Identifier where
+--   (I (_, i1)) == (I (_, i2)) = i1 == i2
 instance Ord Identifier where
   compare (I (_, i1)) (I (_, i2)) = compare i1 i2
 
@@ -74,8 +73,8 @@ newtype UnivLevelPlus =
   UnivLevelPlus (Meta, UnivLevel)
 
 instance Show UnivLevelPlus where
-  show (UnivLevelPlus (m, l)) = "[" ++ show l ++ "]:" ++ showMeta m
-  -- show (UnivLevelPlus (_, l)) = "[" ++ show l ++ "]"
+  show (UnivLevelPlus (_, l)) = "[" ++ show l ++ "]"
+  -- show (UnivLevelPlus (m, l)) = "[" ++ show l ++ "]:" ++ showMeta m
 
 instance Eq UnivLevelPlus where
   (UnivLevelPlus (_, l1)) == (UnivLevelPlus (_, l2)) = l1 == l2
@@ -158,8 +157,8 @@ readEnumType :: Char -> T.Text -> Int -> (Maybe Int)
 readEnumType c str k -- n1, n2, ..., n{i}, ..., n{2^64}
   | T.length str >= 2
   , T.head str == c
-  , Just i <- readMaybe $ T.unpack $ T.tail str
-  , 1 <= i && i <= 2 ^ k = Just i
+  , Just i <- (readMaybe $ T.unpack $ T.tail str :: Maybe Int)
+  , 1 <= toInteger i && toInteger i <= 2 ^ k = Just i
 readEnumType _ _ _ = Nothing
 
 readEnumTypeNat :: T.Text -> (Maybe Int)
@@ -196,9 +195,9 @@ readEnumValueNat str -- n1-0, n2-0, n2-1, ...
   , T.head str == 'n'
   , [iStr, jStr] <- wordsBy '-' (T.tail str)
   , Just i <- readMaybe $ T.unpack iStr
-  , 1 <= i && i <= 2 ^ (64 :: Int)
+  , 1 <= toInteger i && toInteger i <= 2 ^ (64 :: Integer)
   , Just j <- readMaybe $ T.unpack jStr
-  , 0 <= j && j <= i - 1 = Just $ EnumValueNat i j
+  , 0 <= toInteger j && toInteger j <= toInteger i - 1 = Just $ EnumValueNat i j
   | otherwise = Nothing
 
 isConstant :: T.Text -> Bool

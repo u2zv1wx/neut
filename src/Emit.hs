@@ -27,8 +27,10 @@ emit mainTerm = do
   xs <-
     forM (Map.toList lenv) $ \(name, (args, body)) -> do
       let name' = asText' name
-      let args' = map asText' args
-      emitDefinition (TE.encodeUtf8 name') (map TE.encodeUtf8 args') body
+      -- let args' = map asText' args
+      let args' = map (showLLVMData . LLVMDataLocal) args
+      -- emitDefinition (TE.encodeUtf8 name') (map TE.encodeUtf8 args') body
+      emitDefinition (TE.encodeUtf8 name') args' body
   return $ g <> zs <> concat xs
 
 emitDefinition ::
@@ -43,13 +45,18 @@ sig :: B.ByteString -> [B.ByteString] -> B.ByteString
 sig "main" args = "define i64 @main" <> showLocals args
 sig name args = "define i8* " <> "@" <> name <> showLocals args
 
+-- sig "main" args = "define i64 @main" <> showLocals args
+-- sig name args = "define i8* " <> "@" <> name <> showLocals args
 -- sig name args =
 --   "define i8* " <>
 --   showLLVMData (LLVMDataGlobal name) <> showArgs (map LLVMDataLocal args)
 emitBlock :: B.ByteString -> Identifier -> LLVM -> WithEnv [B.ByteString]
-emitBlock funName name asm = do
+emitBlock funName name@(I (_, i)) asm = do
   a <- emitLLVM funName asm
-  return $ emitLabel (asText' name) : a
+  -- "%_" <> BC.pack (show i)
+  -- return $ emitLabel (showLLVMData $ LLVMDataLocal name) : a
+  return $ emitLabel ("_" <> BC.pack (show i)) : a
+  -- return $ emitLabel (asText' name) : a
 
 -- FIXME: callはcall fastccにするべきっぽい？
 emitLLVM :: B.ByteString -> LLVM -> WithEnv [B.ByteString]
@@ -291,9 +298,11 @@ emitRet :: B.ByteString -> LLVMData -> WithEnv [B.ByteString]
 emitRet "main" d = emitOp $ BC.unwords ["ret i64", showLLVMData d]
 emitRet _ d = emitOp $ BC.unwords ["ret i8*", showLLVMData d]
 
-emitLabel :: T.Text -> B.ByteString
-emitLabel s = TE.encodeUtf8 s <> ":"
+emitLabel :: B.ByteString -> B.ByteString
+emitLabel s = s <> ":"
 
+-- emitLabel :: T.Text -> B.ByteString
+-- emitLabel s = TE.encodeUtf8 s <> ":"
 constructLabelList :: [(Int, LLVM)] -> WithEnv [Identifier]
 constructLabelList [] = return []
 constructLabelList ((_, _):rest) = do
@@ -323,7 +332,7 @@ showArg :: LLVMData -> B.ByteString
 showArg d = "i8* " <> showLLVMData d
 
 showLocal :: B.ByteString -> B.ByteString
-showLocal x = "i8* %" <> x
+showLocal x = "i8* " <> x
 
 showArgs :: [LLVMData] -> B.ByteString
 showArgs ds = "(" <> showItems showArg ds <> ")"
@@ -377,10 +386,15 @@ showLowType (LowTypeArrayPtr i t) = do
 showLowType LowTypeIntS64Ptr = "i64*"
 
 showLLVMData :: LLVMData -> B.ByteString
-showLLVMData (LLVMDataLocal (I (s, i))) =
-  "%" <> TE.encodeUtf8 s <> BC.pack (show i)
-showLLVMData (LLVMDataGlobal (I (s, i))) =
-  "@" <> TE.encodeUtf8 s <> BC.pack (show i)
+showLLVMData (LLVMDataLocal (I (_, i))) = "%_" <> BC.pack (show i)
+-- showLLVMData (LLVMDataGlobal (I (_, i))) = "@_" <> BC.pack (show i)
+-- showLLVMData (LLVMDataGlobal (I (s, _))) = "@" <> TE.encodeUtf8 s
+showLLVMData (LLVMDataGlobal (I ("fork", 0))) = "@fork"
+showLLVMData (LLVMDataGlobal x) = "@" <> TE.encodeUtf8 (asText' x)
+-- showLLVMData (LLVMDataLocal (I (s, i))) =
+--   "%" <> TE.encodeUtf8 s <> BC.pack (show i)
+-- showLLVMData (LLVMDataGlobal (I (s, i))) =
+--   "@" <> TE.encodeUtf8 s <> BC.pack (show i)
 -- showLLVMData (LLVMDataLocal x) = "%" <> TE.encodeUtf8 x
 -- showLLVMData (LLVMDataGlobal x) = "@" <> TE.encodeUtf8 x
 showLLVMData (LLVMDataInt i) = BC.pack $ show i

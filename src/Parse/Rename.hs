@@ -3,6 +3,9 @@
 module Parse.Rename
   ( rename
   , renameQuasiStmtList
+  , insertName
+  , rename'
+  , NameEnv
   , invRename
   , prepareInvRename
   ) where
@@ -45,13 +48,13 @@ renameQuasiStmtList' nenv ((QuasiStmtDef xds):ss) = do
   -- rename for deflist
   let ys = map (\(_, (_, y, _), _, _) -> y) ds
   ys' <- mapM newLLVMNameWith ys
-  let yis = map asInt ys
+  let yis = map asText ys
   let yis' = map asInt ys'
   let nenvForDef = Map.fromList (zip yis yis') `Map.union` nenv
   ds' <- mapM (renameDef nenvForDef) ds
   -- rename for continuation
   xs' <- mapM newLLVMNameWith xs
-  let xis = map asInt xs
+  let xis = map asText xs
   let xis' = map asInt xs'
   let nenvForCont = Map.fromList (zip xis xis') `Map.union` nenv
   ss' <- renameQuasiStmtList' nenvForCont ss
@@ -113,6 +116,10 @@ renameQuasiStmtList' nenv ((QuasiStmtLetCoinductiveElim m (mb, b, t) xtsyt codIn
   asOuter <- mapM (lookupStrict nenv) ats
   asInner <- mapM (lookupStrict nenv'''') ats
   let info = zip asInner asOuterPlus
+  -- p "renamed coinductiveelim. xtsytatsbts (before:)"
+  -- p' $ xtsyt ++ ats ++ bts
+  -- p "after:"
+  -- p' $ xtsyt' ++ ats' ++ bts'
   return $
     QuasiStmtLetCoinductiveElim
       m
@@ -137,7 +144,7 @@ renameDef nenv (m, (mx, x, t), xts, e) = do
     Just x' -> return (m, (mx, x', t'), xts', e')
 
 -- type NameEnv = Map.HashMap Int Identifier
-type NameEnv = Map.HashMap Int Int
+type NameEnv = Map.HashMap T.Text Int
 
 -- Alpha-convert all the variables so that different variables have different names.
 rename' :: NameEnv -> WeakTermPlus -> WithEnv WeakTermPlus
@@ -178,7 +185,8 @@ rename' nenv (m, WeakTermConstDecl (mx, x, t) e) = do
   t' <- rename' nenv t
   e' <- rename' nenv e
   return (m, WeakTermConstDecl (mx, x, t') e')
-rename' _ (m, WeakTermZeta h) = return (m, WeakTermZeta h)
+rename' _ (m, WeakTermZeta h) = do
+  return (m, WeakTermZeta h)
 rename' _ (m, WeakTermInt t x) = do
   t' <- rename t
   return (m, WeakTermInt t' x)
@@ -391,30 +399,36 @@ data IdentKind
 
 -- fixme
 invRenameIdentifier :: IdentKind -> Identifier -> WithEnv Identifier
-invRenameIdentifier IdentKindUpsilon x@(I (_, _)) = do
+invRenameIdentifier IdentKindUpsilon (I (s, i)) = do
   rnenv <- gets revNameEnv
-  case lookupName x rnenv of
-    Just x' -> traceIdentifier rnenv x'
+  case Map.lookup i rnenv of
+    Just i' -> do
+      i'' <- traceIdentifier rnenv i'
+      return $ I (s, i'')
     Nothing -> do
-      i <- newCount
-      let s = T.pack $ "var" ++ show i
-      -- modify (\env -> env {revNameEnv = insertName x s rnenv})
-      return $ asIdent s
-invRenameIdentifier IdentKindZeta x = do
+      j <- newCount
+      let s' = T.pack $ "var" ++ show j
+      -- fixme
+      -- modify (\env -> env {revNameEnv = Map.insert i x s rnenv})
+      return $ asIdent s'
+invRenameIdentifier IdentKindZeta (I (s, i)) = do
   rnenv <- gets revNameEnv
-  case lookupName x rnenv of
-    Just x' -> traceIdentifier rnenv x'
+  case Map.lookup i rnenv of
+    Just i' -> do
+      i'' <- traceIdentifier rnenv i'
+      return $ I (s, i'')
     Nothing -> do
-      i <- newCount
-      let s = T.pack $ "?M" ++ show i
+      j <- newCount
+      let s' = T.pack $ "?M" ++ show j
+      -- fixme
       -- modify (\env -> env {revNameEnv = insertName x s rnenv})
-      return $ asIdent s
+      return $ asIdent s'
 
-traceIdentifier :: NameEnv -> Identifier -> WithEnv Identifier
-traceIdentifier rnenv x = do
-  case lookupName x rnenv of
-    Nothing -> return x
-    Just x' -> traceIdentifier rnenv x'
+traceIdentifier :: Map.HashMap Int Int -> Int -> WithEnv Int
+traceIdentifier rnenv i = do
+  case Map.lookup i rnenv of
+    Nothing -> return i
+    Just i' -> traceIdentifier rnenv i'
 
 -- Alpha-convert all the variables so that different variables have different names.
 invRename :: WeakTermPlus -> WithEnv WeakTermPlus
@@ -540,9 +554,10 @@ invRenameStruct ((mx, x, t):xts) e = do
   return ((mx, x', t) : xts', e')
 
 insertName :: Identifier -> Identifier -> NameEnv -> NameEnv
-insertName (I (_, i)) (I (_, j)) nenv = Map.insert i j nenv
+insertName (I (s, _)) (I (_, j)) nenv = Map.insert s j nenv
 
 lookupName :: Identifier -> NameEnv -> Maybe Identifier
-lookupName (I (s, i)) nenv = do
-  j <- Map.lookup i nenv
-  return $ I (s, j)
+lookupName (I (s, _)) nenv = do
+  j <- Map.lookup s nenv
+  return $ I (llvmString s, j)
+  -- return $ I (s, j)
