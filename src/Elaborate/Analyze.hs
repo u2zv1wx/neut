@@ -428,3 +428,9 @@ lookupAll ((I (_, i)):xs) sub
     v <- IntMap.lookup i sub
     vs <- lookupAll xs sub
     return $ v : vs
+
+toIntS :: IntSize -> WeakTermPlus
+toIntS size = (emptyMeta, WeakTermEnum $ EnumTypeIntS size)
+
+toIntU :: IntSize -> WeakTermPlus
+toIntU size = (emptyMeta, WeakTermEnum $ EnumTypeIntU size)

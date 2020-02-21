@@ -152,31 +152,11 @@ data WeakStmt
 toVar :: Identifier -> WeakTermPlus
 toVar x = (emptyMeta, WeakTermUpsilon x)
 
-toIntS :: IntSize -> WeakTermPlus
-toIntS size = (emptyMeta, WeakTermEnum $ EnumTypeIntS size)
-
-toIntU :: IntSize -> WeakTermPlus
-toIntU size = (emptyMeta, WeakTermEnum $ EnumTypeIntU size)
-
-toValueIntS :: IntSize -> Integer -> WeakTerm
-toValueIntS size i = WeakTermEnumIntro $ EnumValueIntS size i
-
-toValueIntU :: IntSize -> Integer -> WeakTerm
-toValueIntU size i = WeakTermEnumIntro $ EnumValueIntU size i
-
--- f16 :: WeakTermPlus
--- f16 = (emptyMeta, WeakTermConst "f16")
--- f32 :: WeakTermPlus
--- f32 = (emptyMeta, WeakTermConst "f32")
--- f64 :: WeakTermPlus
--- f64 = (emptyMeta, WeakTermConst "f64")
 varWeakTermPlus :: WeakTermPlus -> [Identifier]
 varWeakTermPlus (_, WeakTermTau _) = []
 varWeakTermPlus (_, WeakTermUpsilon x) = x : []
-varWeakTermPlus (_, WeakTermPi _ xts t) = do
-  varWeakTermPlusBindings xts [t]
-varWeakTermPlus (_, WeakTermPiIntro xts e) = do
-  varWeakTermPlusBindings xts [e]
+varWeakTermPlus (_, WeakTermPi _ xts t) = varWeakTermPlusBindings xts [t]
+varWeakTermPlus (_, WeakTermPiIntro xts e) = varWeakTermPlusBindings xts [e]
 varWeakTermPlus (_, WeakTermPiElim e es) = do
   let xhs = varWeakTermPlus e
   let yhs = concatMap varWeakTermPlus es
@@ -189,7 +169,7 @@ varWeakTermPlus (_, WeakTermSigmaElim t xts e1 e2) = do
   let ys = varWeakTermPlus e1
   let zs = varWeakTermPlusBindings xts [e2]
   xs ++ ys ++ zs
-varWeakTermPlus (_, WeakTermIter (_, x, t) xts e) = do
+varWeakTermPlus (_, WeakTermIter (_, x, t) xts e) =
   varWeakTermPlus t ++ filter (/= x) (varWeakTermPlusBindings xts [e])
 varWeakTermPlus (_, WeakTermConst _) = []
 varWeakTermPlus (_, WeakTermZeta _) = []
@@ -206,8 +186,7 @@ varWeakTermPlus (_, WeakTermEnumElim (e, t) les) = do
   let zhs = concatMap (varWeakTermPlus . snd) les
   xhs ++ yhs ++ zhs
 varWeakTermPlus (_, WeakTermArray dom _) = varWeakTermPlus dom
-varWeakTermPlus (_, WeakTermArrayIntro _ es) = do
-  concatMap varWeakTermPlus es
+varWeakTermPlus (_, WeakTermArrayIntro _ es) = concatMap varWeakTermPlus es
 varWeakTermPlus (_, WeakTermArrayElim _ xts d e) =
   varWeakTermPlus d ++ varWeakTermPlusBindings xts [e]
 varWeakTermPlus (_, WeakTermStruct {}) = []
@@ -218,8 +197,7 @@ varWeakTermPlus (_, WeakTermStructElim xts d e) = do
   varWeakTermPlus d ++ filter (`notElem` xs) (varWeakTermPlus e)
 
 varWeakTermPlusBindings :: [IdentifierPlus] -> [WeakTermPlus] -> [Hole]
-varWeakTermPlusBindings [] es = do
-  concatMap varWeakTermPlus es
+varWeakTermPlusBindings [] es = concatMap varWeakTermPlus es
 varWeakTermPlusBindings ((_, x, t):xts) es = do
   let hs1 = varWeakTermPlus t
   let hs2 = varWeakTermPlusBindings xts es
@@ -233,7 +211,7 @@ holeWeakTermPlus (_, WeakTermPiIntro xts e) = holeWeakTermPlusBindings xts [e]
 holeWeakTermPlus (_, WeakTermPiElim e es) =
   holeWeakTermPlus e ++ concatMap holeWeakTermPlus es
 holeWeakTermPlus (_, WeakTermSigma xts) = holeWeakTermPlusBindings xts []
-holeWeakTermPlus (_, WeakTermSigmaIntro t es) = do
+holeWeakTermPlus (_, WeakTermSigmaIntro t es) =
   holeWeakTermPlus t ++ concatMap holeWeakTermPlus es
 holeWeakTermPlus (_, WeakTermSigmaElim t xts e1 e2) = do
   let xs = holeWeakTermPlus t
@@ -257,20 +235,18 @@ holeWeakTermPlus (_, WeakTermEnumElim (e, t) les) = do
   let zhs = concatMap (\(_, body) -> holeWeakTermPlus body) les
   xhs ++ yhs ++ zhs
 holeWeakTermPlus (_, WeakTermArray dom _) = holeWeakTermPlus dom
-holeWeakTermPlus (_, WeakTermArrayIntro _ es) = do
-  concatMap holeWeakTermPlus es
+holeWeakTermPlus (_, WeakTermArrayIntro _ es) = concatMap holeWeakTermPlus es
 holeWeakTermPlus (_, WeakTermArrayElim _ xts d e) =
   holeWeakTermPlus d ++ holeWeakTermPlusBindings xts [e]
 holeWeakTermPlus (_, WeakTermStruct {}) = []
 holeWeakTermPlus (_, WeakTermStructIntro ets) =
   concatMap (holeWeakTermPlus . fst) ets
-holeWeakTermPlus (_, WeakTermStructElim _ d e) = do
+holeWeakTermPlus (_, WeakTermStructElim _ d e) =
   holeWeakTermPlus d ++ holeWeakTermPlus e
 
 holeWeakTermPlusBindings :: [IdentifierPlus] -> [WeakTermPlus] -> [Hole]
-holeWeakTermPlusBindings [] es = do
-  concatMap holeWeakTermPlus es
-holeWeakTermPlusBindings ((_, _, t):xts) es = do
+holeWeakTermPlusBindings [] es = concatMap holeWeakTermPlus es
+holeWeakTermPlusBindings ((_, _, t):xts) es =
   holeWeakTermPlus t ++ holeWeakTermPlusBindings xts es
 
 substWeakTermPlus :: SubstWeakTerm -> WeakTermPlus -> WeakTermPlus
@@ -279,7 +255,6 @@ substWeakTermPlus sub e1@(_, WeakTermUpsilon x) = do
   case lookup x sub of
     Nothing -> e1
     Just e2@(_, e) -> (supMeta (metaOf e1) (metaOf e2), e)
-  -- fromMaybe (m, WeakTermUpsilon x) (lookup x sub)
 substWeakTermPlus sub (m, WeakTermPi mls xts t) = do
   let (xts', t') = substWeakTermPlusBindingsWithBody sub xts t
   (m, WeakTermPi mls xts' t')
@@ -307,17 +282,11 @@ substWeakTermPlus sub (m, WeakTermIter (mx, x, t) xts e) = do
   let sub' = filter (\(k, _) -> k /= x) sub
   let (xts', e') = substWeakTermPlusBindingsWithBody sub' xts e
   (m, WeakTermIter (mx, x, t') xts' e')
-substWeakTermPlus _ (m, WeakTermConst x) = do
-  (m, WeakTermConst x)
-substWeakTermPlus sub e1@(_, WeakTermZeta x)
-  -- case lookup x sub of
-  --   Just (_, e) -> (m, e)
-  --   Nothing -> (m, WeakTermZeta x)
- = do
+substWeakTermPlus _ (m, WeakTermConst x) = (m, WeakTermConst x)
+substWeakTermPlus sub e1@(_, WeakTermZeta x) = do
   case lookup x sub of
     Nothing -> e1
     Just e2@(_, e) -> (supMeta (metaOf e1) (metaOf e2), e)
-  -- fromMaybe (m, WeakTermZeta x) (lookup x sub)
 substWeakTermPlus sub (m, WeakTermInt t x) = do
   let t' = substWeakTermPlus sub t
   (m, WeakTermInt t' x)
@@ -385,6 +354,19 @@ substWeakTermPlusBindingsWithBody sub ((m, x, t):xts) e = do
   let (xts', e') = substWeakTermPlusBindingsWithBody sub' xts e
   let t' = substWeakTermPlus sub t
   ((m, x, t') : xts', e')
+
+metaOf :: WeakTermPlus -> Meta
+metaOf e = fst e
+
+asUpsilon :: WeakTermPlus -> Maybe Identifier
+asUpsilon (_, WeakTermUpsilon x) = Just x
+asUpsilon _ = Nothing
+
+asUniv :: UnivLevelPlus -> WeakTermPlus
+asUniv (UnivLevelPlus (m, l)) = (m, WeakTermTau l)
+
+unit :: WeakTermPlus
+unit = (emptyMeta, WeakTermEnumIntro $ EnumValueLabel "unit")
 
 toText :: WeakTermPlus -> T.Text
 toText (_, WeakTermTau l) = showCons ["tau", T.pack $ show l]
@@ -476,8 +458,6 @@ weakenCase :: Case -> WeakCase
 weakenCase (CaseValue v) = weakenEnumValue v
 weakenCase CaseDefault = WeakCaseDefault
 
--- weakCaseLookup :: EnumValue -> [(WeakCase, a)] -> Maybe a
--- weakCaseLookup (EnumValueLabel l) les = lookup (WeakCaseLabe)
 showEnumValue :: EnumValue -> T.Text
 showEnumValue (EnumValueLabel l) = l
 showEnumValue (EnumValueIntS _ a) = T.pack $ show a
@@ -488,7 +468,7 @@ showArrayKind :: ArrayKind -> T.Text
 showArrayKind (ArrayKindIntS size) = T.pack $ "i" ++ show size
 showArrayKind (ArrayKindIntU size) = T.pack $ "u" ++ show size
 showArrayKind (ArrayKindFloat size) = T.pack $ "f" ++ show (sizeAsInt size)
-showArrayKind ArrayKindVoidPtr = "void*" -- shouldn't be used
+showArrayKind ArrayKindVoidPtr = "void*"
 
 showItems :: [T.Text] -> T.Text
 showItems = T.intercalate " "
@@ -504,37 +484,3 @@ showArray = inBracket . T.intercalate " "
 
 showStruct :: [T.Text] -> T.Text
 showStruct = inBrace . T.intercalate " "
-
-metaOf :: WeakTermPlus -> Meta
-metaOf e = fst e
-
--- {} asUpsilon {}
-asUpsilon :: WeakTermPlus -> Maybe Identifier
-asUpsilon (_, WeakTermUpsilon x) = Just x
-asUpsilon _ = Nothing
-
-asUniv :: UnivLevelPlus -> WeakTermPlus
-asUniv (UnivLevelPlus (m, l)) = (m, WeakTermTau l)
-
-levelOf :: UnivLevelPlus -> UnivLevel
--- levelOf = undefined
-levelOf (UnivLevelPlus (_, l)) = l
-
-unit :: WeakTermPlus
-unit = (emptyMeta, WeakTermEnumIntro $ EnumValueLabel "unit")
--- type UnivEnv = IntMap.IntMap [UnivLevel]
--- type UnivInst a = State UnivEnv a
--- univInst :: WeakTermPlus -> UnivLevel -> ((WeakTermPlus, UnivLevel), UnivEnv)
--- univInst e l = runState (foo e l) IntMap.empty
--- foo :: WeakTermPlus -> UnivLevel -> UnivInst (WeakTermPlus, UnivLevel)
--- foo e l = do
---   l' <- levelInst l
---   e' <- univInst' e
---   return (e', l')
--- univInst' :: WeakTermPlus -> UnivInst WeakTermPlus
--- univInst' = undefined
--- levelInst :: UnivLevel -> UnivInst UnivLevel
--- levelInst l = do
---   l' <- newUnivLevel
---   modify (\uienv -> IntMap.insertWith (++) [l'] uienv)
---   return l'

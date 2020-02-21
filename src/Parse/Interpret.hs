@@ -423,6 +423,9 @@ asStructKind (_, TreeAtom x) = asArrayKind x
 asStructKind t =
   throwError' $ "asStructKind: syntax error:\n" <> T.pack (Pr.ppShow t)
 
+toValueIntU :: IntSize -> Integer -> WeakTerm
+toValueIntU size i = WeakTermEnumIntro $ EnumValueIntU size i
+
 -- adopted from https://hackage.haskell.org/package/utf8-string-1.0.1.1/docs/src/Codec-Binary-UTF8-String.html
 encodeChar :: Char -> [Word8]
 encodeChar c = do
