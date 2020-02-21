@@ -82,27 +82,27 @@ simp' (((_, WeakTermInt t1 l1), (_, WeakTermInt t2 l2)):cs)
   | l1 == l2 = simp $ (t1, t2) : cs
 simp' (((_, WeakTermFloat t1 l1), (_, WeakTermFloat16 l2)):cs)
   | show l1 == show l2 = do
-    f16 <- lookupFloat16
+    f16 <- lookupConstantPlus "f16"
     simp $ (t1, f16) : cs
 simp' (((_, WeakTermFloat16 l1), (_, WeakTermFloat t2 l2)):cs)
   | show l1 == show l2 = do
-    f16 <- lookupFloat16
+    f16 <- lookupConstantPlus "f16"
     simp $ (f16, t2) : cs
 simp' (((_, WeakTermFloat t1 l1), (_, WeakTermFloat32 l2)):cs)
   | show l1 == show l2 = do
-    f32 <- lookupFloat32
+    f32 <- lookupConstantPlus "f32"
     simp $ (t1, f32) : cs
 simp' (((_, WeakTermFloat32 l1), (_, WeakTermFloat t2 l2)):cs)
   | show l1 == show l2 = do
-    f32 <- lookupFloat32
+    f32 <- lookupConstantPlus "f32"
     simp $ (f32, t2) : cs
 simp' (((_, WeakTermFloat t1 l1), (_, WeakTermFloat64 l2)):cs)
   | l1 == l2 = do
-    f64 <- lookupFloat64
+    f64 <- lookupConstantPlus "f64"
     simp $ (t1, f64) : cs
 simp' (((_, WeakTermFloat64 l1), (_, WeakTermFloat t2 l2)):cs)
   | l1 == l2 = do
-    f64 <- lookupFloat64
+    f64 <- lookupConstantPlus "f64"
     simp $ (f64, t2) : cs
 simp' (((_, WeakTermFloat t1 l1), (_, WeakTermFloat t2 l2)):cs)
   | l1 == l2 = simp $ (t1, t2) : cs

@@ -180,15 +180,15 @@ infer' _ (m, WeakTermInt t i) = do
   return ((m, WeakTermInt t' i), t', UnivLevelPlus (m, l))
 infer' _ (m, WeakTermFloat16 f) = do
   ml <- newLevelLE m []
-  (_, f16) <- lookupFloat16
+  (_, f16) <- lookupConstantPlus "f16"
   return ((m, WeakTermFloat16 f), (m, f16), ml)
 infer' _ (m, WeakTermFloat32 f) = do
   ml <- newLevelLE m []
-  (_, f32) <- lookupFloat32
+  (_, f32) <- lookupConstantPlus "f32"
   return ((m, WeakTermFloat32 f), (m, f32), ml)
 infer' _ (m, WeakTermFloat64 f) = do
   ml <- newLevelLE m []
-  (_, f64) <- lookupFloat64
+  (_, f64) <- lookupConstantPlus "f64"
   return ((m, WeakTermFloat64 f), (m, f64), ml)
 infer' _ (m, WeakTermFloat t f) = do
   (t', UnivLevelPlus (_, l)) <- inferType' [] t -- t must be closed

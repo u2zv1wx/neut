@@ -32,8 +32,6 @@ type FileInfo = [(Meta, Identifier, WeakTermPlus)]
 
 type FileEnv = Map.HashMap (Path Abs File) FileInfo
 
-type Justification = Loc
-
 type RuleEnv = Map.HashMap Int (Maybe [Data.WeakTerm.IdentifierPlus])
 
 type UnivInstEnv = IntMap.IntMap (S.Set Int)
@@ -132,11 +130,6 @@ newCount = do
   modify (\e -> e {count = i + 1})
   return i
 
-newName :: WithEnv Identifier
-newName = do
-  i <- newCount
-  return $ I ("-", i)
-
 newNameWith :: Identifier -> WithEnv Identifier
 newNameWith (I (s, i)) = do
   j <- newCount
@@ -216,12 +209,6 @@ getArch = do
     s ->
       throwError [TIO.putStrLn $ "unsupported target arch: " <> T.pack (show s)]
 
-toStr :: (Show a) => a -> String
-toStr s = Pr.ppShow s
-
-toInfo :: (Show a) => String -> a -> String
-toInfo s x = "assertion failure:\n" ++ s ++ "\n" ++ toStr x
-
 newDataUpsilonWith :: T.Text -> WithEnv (Identifier, DataPlus)
 newDataUpsilonWith name = newDataUpsilonWith' name emptyMeta
 
@@ -229,9 +216,6 @@ newDataUpsilonWith' :: T.Text -> Meta -> WithEnv (Identifier, DataPlus)
 newDataUpsilonWith' name m = do
   x <- newNameWith' name
   return (x, (m, DataUpsilon x))
-
-pp :: WeakTermPlus -> WithEnv ()
-pp e = liftIO $ TIO.putStrLn $ toText e
 
 piUnivLevelsfrom ::
      [Data.WeakTerm.IdentifierPlus] -> WeakTermPlus -> WithEnv [UnivLevelPlus]
@@ -303,25 +287,18 @@ lookupConstantPlus constName = do
       modify (\env -> env {constantEnv = Map.insert constName i cenv})
       return (emptyMeta, WeakTermConst ident)
 
-lookupFloat16 :: WithEnv WeakTermPlus
-lookupFloat16 = lookupConstantPlus "f16"
-
-lookupFloat32 :: WithEnv WeakTermPlus
-lookupFloat32 = lookupConstantPlus "f32"
-
-lookupFloat64 :: WithEnv WeakTermPlus
-lookupFloat64 = lookupConstantPlus "f64"
-
-isConstant :: T.Text -> Bool
-isConstant x
-  | Just (LowTypeFloat _) <- asLowTypeMaybe x = True
-  | Just _ <- asUnaryOpMaybe x = True
-  | Just _ <- asBinaryOpMaybe x = True
-  | otherwise = False
-
 -- for debug
 p :: String -> WithEnv ()
 p s = liftIO $ putStrLn s
 
 p' :: (Show a) => a -> WithEnv ()
 p' s = liftIO $ putStrLn $ Pr.ppShow s
+
+pp :: WeakTermPlus -> WithEnv ()
+pp e = liftIO $ TIO.putStrLn $ toText e
+
+toStr :: (Show a) => a -> String
+toStr s = Pr.ppShow s
+
+toInfo :: (Show a) => String -> a -> String
+toInfo s x = "assertion failure:\n" ++ s ++ "\n" ++ toStr x
