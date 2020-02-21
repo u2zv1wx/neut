@@ -65,7 +65,7 @@ type SubstDataPlus = [(Identifier, DataPlus)]
 substDataPlus :: SubstDataPlus -> DataPlus -> DataPlus
 substDataPlus _ (m, DataTheta x) = (m, DataTheta x)
 substDataPlus sub (m, DataUpsilon s) =
-  fromMaybe (m, DataUpsilon s) (lookup s sub)
+  fromMaybe (m, DataUpsilon s) (lookup s sub) -- ここではsの整数部分を比較したほうがよさそう？
 substDataPlus sub (m, DataSigmaIntro mk vs) = do
   let vs' = map (substDataPlus sub) vs
   (m, DataSigmaIntro mk vs')

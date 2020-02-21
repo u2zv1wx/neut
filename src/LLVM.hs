@@ -579,7 +579,6 @@ renameLLVM l nenv (LLVMReturn d) = do
 renameLLVM l nenv (LLVMLet (I (s, i)) op cont) = do
   op' <- renameLLVMOp nenv op
   let x' = I (s, l)
-  -- x'@(I (_, j)) <- newNameWith x
   (cont', l') <- renameLLVM (l + 1) (IntMap.insert i l nenv) cont
   return (LLVMLet x' op' cont', l')
 renameLLVM l nenv (LLVMCont op cont) = do
@@ -590,7 +589,6 @@ renameLLVM l nenv (LLVMSwitch (d, t) defaultBranch les) = do
   let (ls, es) = unzip les
   d' <- renameLLVMData nenv d
   (defaultBranch', l') <- renameLLVM l nenv defaultBranch
-  -- es' <- mapM (renameLLVM l nenv) es
   (es', l'') <- renameLLVM' l' nenv es
   return (LLVMSwitch (d', t) defaultBranch' (zip ls es'), l'')
 renameLLVM l nenv (LLVMCall d ds) = do
