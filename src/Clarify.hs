@@ -316,23 +316,12 @@ makeClosure' mName fvs m xts e = do
 knot :: Identifier -> DataPlus -> WithEnv ()
 knot z cls = do
   cenv <- gets codeEnv
-  case pop z cenv of
+  case Map.lookup z cenv of
     Nothing -> throwError' "knot"
-    Just ((Definition _ args body), cenv') -> do
+    Just (Definition _ args body) -> do
       let body' = substCodePlus [(z, cls)] body
       let def' = Definition (IsFixed True) args body'
-      let cenv'' = Map.insert z def' cenv'
-      modify (\env -> env {codeEnv = cenv''})
-
--- lookup and remove the matching element from the given assoc list
--- (hashmapだったらpopする必要あらず)
-pop ::
-     Identifier
-  -> Map.HashMap Identifier b
-  -> Maybe (b, Map.HashMap Identifier b)
-pop x mp = do
-  v <- Map.lookup x mp
-  return (v, Map.delete x mp)
+      modify (\env -> env {codeEnv = Map.insert z def' cenv})
 
 -- array-access-u8 ~> Just u8
 -- array-access-i12341234 ~> Just i12341234
