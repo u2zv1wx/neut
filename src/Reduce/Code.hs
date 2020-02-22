@@ -47,6 +47,8 @@ reduceCodePlus (m, CodeUpElim x e1 e2) = do
   e1' <- reduceCodePlus e1
   case e1' of
     (_, CodeUpIntro d) -> reduceCodePlus $ substCodePlus [(x, d)] e2
+    (my, CodeUpElim y ey1 ey2) -> do
+      reduceCodePlus (my, CodeUpElim y ey1 (m, CodeUpElim x ey2 e2)) -- commutative conversion
     _ -> do
       e2' <- reduceCodePlus e2
       case e2' of

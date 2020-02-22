@@ -45,7 +45,6 @@ emitBlock funName (I (_, i)) asm = do
   a <- emitLLVM funName asm
   return $ emitLabel ("_" <> intDec i) : a
 
--- FIXME: callはcall fastccにするべきっぽい？
 emitLLVM :: Builder -> LLVM -> WithEnv [Builder]
 emitLLVM retType (LLVMReturn d) = emitRet retType d
 emitLLVM retType (LLVMCall f args) = do
@@ -55,7 +54,7 @@ emitLLVM retType (LLVMCall f args) = do
     unwordsL
       [ showLLVMData (LLVMDataLocal tmp)
       , "="
-      , "tail call i8*"
+      , "tail call i8*" -- fastcc?
       , showLLVMData f <> showArgs args
       ]
   a <- emitRet retType (LLVMDataLocal tmp)
