@@ -9,6 +9,7 @@ import Control.Monad.State
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.IntMap.Strict as IntMap
+import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 
@@ -20,12 +21,7 @@ import Reduce.Code
 
 toLLVM :: CodePlus -> WithEnv LLVM
 toLLVM mainTerm = do
-  penv <- gets codeEnv
-  forM_ (Map.toList penv) $ \(name, (Definition _ args e)) -> do
-    llvm <- llvmCode e
-    (args', llvm') <- rename args llvm
-    insLLVMEnv name args' llvm'
-  mainTerm' <- llvmCode mainTerm
+  mainTerm' <- reduceCodePlus mainTerm >>= llvmCode
   -- the result of "main" must be i64, not i8*
   (result, resultVar) <- newDataUpsilonWith "result"
   (cast, castThen) <- llvmCast (Just "cast") resultVar (LowTypeIntS 64)
@@ -272,13 +268,20 @@ llvmUncastLet x@(I (s, _)) d lowType cont = do
 llvmDataLet :: Identifier -> DataPlus -> LLVM -> WithEnv LLVM
 llvmDataLet x (_, DataTheta y) cont = do
   cenv <- gets codeEnv
+  ns <- gets nameSet
   case Map.lookup y cenv of
     Nothing
       | asText y == "fork" ->
         llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType []) cont
     Nothing -> throwError' $ "no such global label defined: " <> asText y
-    Just (Definition _ args _) ->
-      llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType args) cont
+    Just (Definition _ args e)
+      | not (y `S.member` ns) -> do
+        modify (\env -> env {nameSet = S.insert y (nameSet env)})
+        llvm <- llvmCode e
+        (args', llvm') <- rename args llvm
+        insLLVMEnv y args' llvm'
+        llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType args) cont
+      | otherwise -> llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType args) cont
 llvmDataLet x (_, DataUpsilon y) cont =
   llvmUncastLet x (LLVMDataLocal y) voidPtr cont
 llvmDataLet x (_, DataSigmaIntro k ds) cont = do

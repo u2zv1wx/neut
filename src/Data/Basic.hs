@@ -17,7 +17,7 @@ import Text.Read
 
 newtype Identifier =
   I (T.Text, Int)
-  deriving (Generic, Eq)
+  deriving (Generic, Eq, Ord)
 
 instance Hashable Identifier
 
@@ -38,9 +38,8 @@ instance Show Identifier where
 
 -- instance Eq Identifier where
 --   (I (_, i1)) == (I (_, i2)) = i1 == i2
-instance Ord Identifier where
-  compare (I (_, i1)) (I (_, i2)) = compare i1 i2
-
+-- instance Ord Identifier where
+--   compare (I (_, i1)) (I (_, i2)) = compare i1 i2
 data Case
   = CaseValue EnumValue
   | CaseDefault

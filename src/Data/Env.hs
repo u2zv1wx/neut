@@ -69,6 +69,7 @@ data Env =
     -- clarify
     , chainEnv :: IntMap.IntMap [(Meta, Identifier, TermPlus)] -- var/const ~> the closed var chain of its type
     , codeEnv :: Map.HashMap Identifier Definition -- f ~> thunk (lam (x1 ... xn) e)
+    , nameSet :: S.Set Identifier
     -- LLVM
     , llvmEnv :: Map.HashMap Identifier ([Identifier], LLVM)
     , shouldColorize :: Bool
@@ -104,6 +105,7 @@ initialEnv path colorizeFlag =
     , levelEnv = []
     , substEnv = IntMap.empty
     , zetaEnv = IntMap.empty
+    , nameSet = S.empty
     , mainFilePath = path
     , currentFilePath = path
     , shouldColorize = colorizeFlag

@@ -334,6 +334,7 @@ knot z cls = do
       modify (\env -> env {codeEnv = cenv''})
 
 -- lookup and remove the matching element from the given assoc list
+-- (hashmapだったらpopする必要あらず)
 pop ::
      Identifier
   -> Map.HashMap Identifier b
