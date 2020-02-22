@@ -68,7 +68,7 @@ data Env =
     , zetaEnv :: IntMap.IntMap (WeakTermPlus, WeakTermPlus, UnivLevelPlus)
     -- clarify
     , chainEnv :: IntMap.IntMap [(Meta, Identifier, TermPlus)] -- var/const ~> the closed var chain of its type
-    , codeEnv :: Map.HashMap Identifier ([Identifier], CodePlus) -- f ~> thunk (lam (x1 ... xn) e)
+    , codeEnv :: Map.HashMap Identifier Definition -- f ~> thunk (lam (x1 ... xn) e)
     -- LLVM
     , llvmEnv :: Map.HashMap Identifier ([Identifier], LLVM)
     , shouldColorize :: Bool

@@ -26,10 +26,6 @@ cartesianSigma ::
 cartesianSigma (I (thetaName, i)) m k mxts = do
   let affName = I ("affine-" <> thetaName, i)
   let relName = I ("relevant-" <> thetaName, i)
-  -- affName <- newNameWith' $ "affine-" <> thetaName
-  -- relName <- newNameWith' $ "relevant-" <> thetaName
-  -- aff <- affineSigma ("affine-" <> thetaName) m k mxts
-  -- rel <- relevantSigma ("relevant-" <> thetaName) m k mxts
   aff <- affineSigma affName m k mxts
   rel <- relevantSigma relName m k mxts
   return (m, DataSigmaIntro arrVoidPtr [aff, rel])

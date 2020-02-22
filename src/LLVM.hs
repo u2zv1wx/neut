@@ -21,13 +21,9 @@ import Reduce.Code
 toLLVM :: CodePlus -> WithEnv LLVM
 toLLVM mainTerm = do
   penv <- gets codeEnv
-  forM_ (Map.toList penv) $ \(name, (args, e))
-    -- llvm <- reduceCodePlus e >>= llvmCode
-   -> do
+  forM_ (Map.toList penv) $ \(name, (Definition _ args e)) -> do
     llvm <- llvmCode e
     (args', llvm') <- rename args llvm
-    -- insLLVMEnv name args llvm
-    -- (args', llvm') <- rename args llvm
     insLLVMEnv name args' llvm'
   mainTerm' <- llvmCode mainTerm
   -- the result of "main" must be i64, not i8*
@@ -281,7 +277,7 @@ llvmDataLet x (_, DataTheta y) cont = do
       | asText y == "fork" ->
         llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType []) cont
     Nothing -> throwError' $ "no such global label defined: " <> asText y
-    Just (args, _) ->
+    Just (Definition _ args _) ->
       llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType args) cont
 llvmDataLet x (_, DataUpsilon y) cont =
   llvmUncastLet x (LLVMDataLocal y) voidPtr cont

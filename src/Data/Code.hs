@@ -42,6 +42,14 @@ data Theta
   | ThetaSysCall SysCall [DataPlus]
   deriving (Show)
 
+newtype IsFixed =
+  IsFixed Bool
+  deriving (Show)
+
+data Definition =
+  Definition IsFixed [Identifier] CodePlus
+  deriving (Show)
+
 type IdentifierPlus = (Identifier, DataPlus)
 
 type DataPlus = (Meta, Data)

@@ -35,20 +35,12 @@ clarify lam@(m, TermPiIntro mxts e) = do
   let xts = zip xs ts
   forM_ xts $ uncurry insTypeEnv'
   e' <- clarify e
-  -- p "chain-pi-intro. xs:"
-  -- p' $ map (\(_, x, _) -> x) mxts
   fvs <- chainTermPlus lam
-  -- p "term:"
-  -- liftIO $ TIO.putStrLn $ toText $ weaken lam
-  -- p "chain:"
-  -- p' fvs
   retClosure Nothing fvs m mxts e'
 clarify (m, TermPiElim e es) = do
   es' <- mapM clarifyPlus es
   e' <- clarify e
   callClosure m e' es'
-  -- e' <- clarify e
-  -- callClosure' m e' es
 clarify (m, TermSigma _) = returnClosureType m -- Sigma is translated into Pi
 clarify (m, TermSigmaIntro t es) = do
   t' <- reduceTermPlus t
@@ -62,9 +54,6 @@ clarify (m, TermSigmaIntro t es) = do
               let xvs = map (\(_, x, _) -> toTermUpsilon x) yts
               let kv = toTermUpsilon k
               let bindArgsThen = \e -> (m, TermPiElim (m, TermPiIntro yts e) es)
-              -- let lam = (m, TermPiIntro [zu, kp] (m, TermPiElim kv xvs))
-              -- p "lam:"
-              -- p' lam
               clarify $
                 bindArgsThen (m, TermPiIntro [zu, kp] (m, TermPiElim kv xvs))
           _ -> throwError' "the type of sigma-intro is wrong"
@@ -76,8 +65,6 @@ clarify iter@(m, TermIter (_, x, t) mxts e) = do
   let xts = zip xs ts
   forM_ ((x, t) : xts) $ uncurry insTypeEnv'
   e' <- clarify e
-  -- p "chain for: "
-  -- p' x
   fvs <- chainTermPlus iter
   retClosure' x fvs m mxts e'
 clarify (m, TermConst x) = clarifyConst m x
@@ -340,9 +327,10 @@ knot z cls = do
   cenv <- gets codeEnv
   case pop z cenv of
     Nothing -> throwError' "knot"
-    Just ((args, body), cenv') -> do
+    Just ((Definition _ args body), cenv') -> do
       let body' = substCodePlus [(z, cls)] body
-      let cenv'' = Map.insert z (args, body') cenv'
+      let def' = Definition (IsFixed True) args body'
+      let cenv'' = Map.insert z def' cenv'
       modify (\env -> env {codeEnv = cenv''})
 
 -- lookup and remove the matching element from the given assoc list
