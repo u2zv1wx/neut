@@ -22,12 +22,14 @@ emit :: LLVM -> WithEnv L.ByteString
 emit mainTerm = do
   lenv <- gets llvmEnv
   g <- emitGlobal
-  zs <- emitDefinition "i64" "main" [] mainTerm
+  let mainTerm' = reduceLLVM mainTerm
+  zs <- emitDefinition "i64" "main" [] mainTerm'
   xs <-
     forM (Map.toList lenv) $ \(name, (args, body)) -> do
       let name' = asText' name
       let args' = map (showLLVMData . LLVMDataLocal) args
-      emitDefinition "i8*" (TE.encodeUtf8Builder name') args' body
+      let body' = reduceLLVM body
+      emitDefinition "i8*" (TE.encodeUtf8Builder name') args' body'
   return $ toLazyByteString $ unlinesL $ g <> zs <> concat xs
 
 emitDefinition :: Builder -> Builder -> [Builder] -> LLVM -> WithEnv [Builder]

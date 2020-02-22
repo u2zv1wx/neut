@@ -25,7 +25,7 @@ cartesianSigma ::
   -> WithEnv DataPlus
 cartesianSigma (I (thetaName, i)) m k mxts = do
   cenv <- gets codeEnv
-  let ident = I ("cartesian" <> thetaName, i)
+  let ident = I ("cartesian-" <> thetaName, i)
   let theta = (m, DataTheta ident)
   case Map.lookup ident cenv of
     Just _ -> return theta

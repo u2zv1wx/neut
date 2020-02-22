@@ -50,11 +50,41 @@ data AllocSize
   | AllocSizePtrList Int
   deriving (Show)
 
-type SubstLLVM = [(Identifier, LLVMData)]
+type SubstLLVM = [(Int, LLVMData)]
+
+reduceLLVM :: LLVM -> LLVM
+reduceLLVM l = reduceLLVM' [] l
+
+reduceLLVM' :: SubstLLVM -> LLVM -> LLVM
+reduceLLVM' sub (LLVMReturn d) = LLVMReturn $ substLLVMData sub d
+reduceLLVM' sub (LLVMLet x (LLVMOpBitcast d from to) cont)
+  | from == to = reduceLLVM' ((asInt x, substLLVMData sub d) : sub) cont
+reduceLLVM' sub (LLVMLet x op cont) = do
+  let op' = substLLVMOp sub op
+  -- SSAだからsubをfilterする必要なし
+  let cont' = reduceLLVM' sub cont
+  -- 変数が使われてなかったら落とす、みたいなことをするべき？
+  LLVMLet x op' cont'
+reduceLLVM' sub (LLVMCont op cont) = do
+  let op' = substLLVMOp sub op
+  let cont' = reduceLLVM' sub cont
+  LLVMCont op' cont'
+reduceLLVM' sub (LLVMSwitch (d, t) defaultBranch les) = do
+  let (ls, es) = unzip les
+  let d' = substLLVMData sub d
+  let defaultBranch' = reduceLLVM' sub defaultBranch
+  let es' = map (reduceLLVM' sub) es
+  LLVMSwitch (d', t) defaultBranch' (zip ls es')
+reduceLLVM' sub (LLVMCall d ds) = do
+  let d' = substLLVMData sub d
+  let ds' = map (substLLVMData sub) ds
+  LLVMCall d' ds'
+  -- LLVMCall d ds
+reduceLLVM' _ LLVMUnreachable = LLVMUnreachable
 
 substLLVMData :: SubstLLVM -> LLVMData -> LLVMData
 substLLVMData sub (LLVMDataLocal x) =
-  case lookup x sub of
+  case lookup (asInt x) sub of
     Just d -> d
     Nothing -> LLVMDataLocal x
 substLLVMData _ d = d
@@ -63,7 +93,7 @@ substLLVM :: SubstLLVM -> LLVM -> LLVM
 substLLVM sub (LLVMReturn d) = LLVMReturn $ substLLVMData sub d
 substLLVM sub (LLVMLet x op cont) = do
   let op' = substLLVMOp sub op
-  let sub' = filter (\(y, _) -> y /= x) sub
+  let sub' = filter (\(y, _) -> y /= asInt x) sub
   let cont' = substLLVM sub' cont
   LLVMLet x op' cont'
 substLLVM sub (LLVMCont op cont) = do

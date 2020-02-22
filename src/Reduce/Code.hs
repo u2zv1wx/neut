@@ -49,6 +49,14 @@ reduceCodePlus (m, CodeUpElim x e1 e2) = do
     (_, CodeUpIntro d) -> reduceCodePlus $ substCodePlus [(x, d)] e2
     (my, CodeUpElim y ey1 ey2) -> do
       reduceCodePlus (my, CodeUpElim y ey1 (m, CodeUpElim x ey2 e2)) -- commutative conversion
+    (my, CodeSigmaElim mk yts vy ey) -> do
+      reduceCodePlus (my, CodeSigmaElim mk yts vy (m, CodeUpElim x ey e2)) -- commutative conversion
+    (my, CodeStructElim yts vy ey) -> do
+      reduceCodePlus (my, CodeStructElim yts vy (m, CodeUpElim x ey e2)) -- commutative conversion
+    -- (my, CodeEnumElim varInfo v les) -> do
+    --   let (ls, es) = unzip les
+    --   let es' = map (\e -> (m, CodeUpElim x e e2)) es
+    --   reduceCodePlus (my, CodeEnumElim varInfo v (zip ls es'))
     _ -> do
       e2' <- reduceCodePlus e2
       case e2' of

@@ -61,7 +61,8 @@ llvmCode (_, CodeUpElim x e1 e2) = do
 llvmCode (_, CodeEnumElim sub v branchList) = do
   let (ls, es) = unzip branchList
   let es' = map (substCodePlus sub) es
-  llvmCodeEnumElim v $ zip ls es'
+  es'' <- mapM reduceCodePlus es'
+  llvmCodeEnumElim v $ zip ls es''
 llvmCode (_, CodeStructElim xks v e) = do
   let (xs, ks) = unzip xks
   let ts = map arrayKindToLowType ks
