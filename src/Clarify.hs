@@ -424,7 +424,7 @@ toHeaderInfo m x t ArgArray = do
             ( m
             , CodeUpElim
                 arrayInnerTmpName
-                (m, CodeUpIntro arrayInner)
+                (m, CodeUpIntroNoReduce arrayInner)
                 ( m
                 , CodeUpElim
                     arrayVarName

@@ -28,6 +28,7 @@ data Code
       DataPlus
       CodePlus
   | CodeUpIntro DataPlus
+  | CodeUpIntroNoReduce DataPlus
   -- the variable introduced by CodeUpElim is assumed to be used linearly
   -- (this property is exploited to, for example, prevent unnecessary copy of array in array-access)
   | CodeUpElim Identifier CodePlus CodePlus
@@ -101,6 +102,9 @@ substCodePlus sub (m, CodeSigmaElim mk xts v e) = do
 substCodePlus sub (m, CodeUpIntro v) = do
   let v' = substDataPlus sub v
   (m, CodeUpIntro v')
+substCodePlus sub (m, CodeUpIntroNoReduce v) = do
+  let v' = substDataPlus sub v
+  (m, CodeUpIntroNoReduce v')
 substCodePlus sub (m, CodeUpElim x e1 e2) = do
   let e1' = substCodePlus sub e1
   let sub' = filter (\(y, _) -> y /= x) sub

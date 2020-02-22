@@ -51,6 +51,9 @@ llvmCode (_, CodeSigmaElim k xts v e) = do
 llvmCode (_, CodeUpIntro d) = do
   result <- newNameWith' $ takeBaseName d
   llvmDataLet result d $ LLVMReturn $ LLVMDataLocal result
+llvmCode (_, CodeUpIntroNoReduce d) = do
+  result <- newNameWith' $ takeBaseName d
+  llvmDataLet result d $ LLVMReturn $ LLVMDataLocal result
 llvmCode (_, CodeUpElim x e1 e2) = do
   e1' <- llvmCode e1
   e2' <- llvmCode e2

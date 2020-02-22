@@ -191,6 +191,9 @@ distinguishCode zs (ml, CodeSigmaElim mk xts d e) = do
 distinguishCode zs (ml, CodeUpIntro d) = do
   (vs, d') <- distinguishData zs d
   return (vs, (ml, CodeUpIntro d'))
+distinguishCode zs (ml, CodeUpIntroNoReduce d) = do
+  (vs, d') <- distinguishData zs d
+  return (vs, (ml, CodeUpIntroNoReduce d'))
 distinguishCode zs (ml, CodeUpElim x e1 e2) = do
   (vs1, e1') <- distinguishCode zs e1
   if x `elem` zs
