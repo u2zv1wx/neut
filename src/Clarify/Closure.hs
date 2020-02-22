@@ -51,8 +51,6 @@ makeClosure mName mxts2 m mxts1 e = do
   when (name `notElem` Map.keys cenv) $ insCodeEnv name args body
   let fvEnv = (m, DataSigmaIntro arrVoidPtr $ map (toDataUpsilon' . fst) xts2)
   return (m, DataSigmaIntro arrVoidPtr [envExp, fvEnv, (m, DataTheta name)])
-  -- let cls = (m, DataSigmaIntro [envExp, fvEnv, (m, DataTheta name)])
-  -- return (m, CodeUpIntro cls)
 
 callClosure ::
      Meta -> CodePlus -> [(Identifier, CodePlus, DataPlus)] -> WithEnv CodePlus
@@ -62,9 +60,6 @@ callClosure m e zexes = do
   (typeVarName, _) <- newDataUpsilonWith "exp"
   (envVarName, envVar) <- newDataUpsilonWith "env"
   (lamVarName, lamVar) <- newDataUpsilonWith "thunk"
-  -- affVarName <- newNameWith' "aff"
-  -- relVarName <- newNameWith' "rel"
-  -- retUnivType <- returnCartesianUniv
   retImmType <- returnCartesianImmediate
   return $
     bindLet
@@ -76,25 +71,8 @@ callClosure m e zexes = do
           , (envVarName, returnUpsilon typeVarName)
           , (lamVarName, retImmType)
           ]
-          -- [ (typeVarName, retUnivType)
-          -- , (envVarName, returnUpsilon typeVarName)
-          -- , (lamVarName, retImmType)
-          -- ]
           clsVar
           (m, CodePiElimDownElim lamVar (envVar : xs)))
-          -- ( m
-          -- , CodeSigmaElim
-          --     arrVoidPtr
-          --     [(affVarName, retImmType), (relVarName, retImmType)]
-          --     typeVar
-          --     (m, CodePiElimDownElim lamVar (envVar : xs))))
-          -- typeVarはimmなのでfreeの必要性がなくなる
-          -- ( m
-          -- , CodeSigmaElim
-          --     arrVoidPtr
-          --     [(affVarName, retImmType), (relVarName, retImmType)]
-          --     typeVar
-          --     (m, CodePiElimDownElim lamVar (envVar : xs))))
 
 nameFromMaybe :: Maybe Identifier -> WithEnv Identifier
 nameFromMaybe mName =

@@ -24,9 +24,7 @@ import Data.Term
 import Reduce.Term
 
 clarify :: TermPlus -> WithEnv CodePlus
-clarify (m, TermTau _)
-  -- v <- cartesianUniv m
- = do
+clarify (m, TermTau _) = do
   v <- cartesianImmediate m
   return (m, CodeUpIntro v)
 clarify (m, TermUpsilon x) = return (m, CodeUpIntro (m, DataUpsilon x))
@@ -114,14 +112,10 @@ clarify (m, TermArrayElim k mxts e1 e2) = do
   let (_, xs, ts) = unzip3 mxts
   let xts = zip xs ts
   forM_ xts $ uncurry insTypeEnv'
-  -- let (_, xs, ts) = unzip3 xts
   (arrVarName, arrVar) <- newDataUpsilonWith "arr"
   (arrTypeVarName, arrTypeVar) <- newDataUpsilonWith "arr-type"
   let retArrTypeVar = (m, CodeUpIntro arrTypeVar)
   (arrInnerVarName, arrInnerVar) <- newDataUpsilonWith "arr-inner"
-  -- affVarName <- newNameWith' "aff"
-  -- relVarName <- newNameWith' "rel"
-  -- retUnivType <- returnCartesianUniv
   retImmType <- returnCartesianImmediate
   ts' <- mapM clarify ts
   let xts' = zip xs ts'
@@ -131,16 +125,9 @@ clarify (m, TermArrayElim k mxts e1 e2) = do
     ( m
     , CodeSigmaElim
         arrVoidPtr
-        -- [(arrTypeVarName, retUnivType), (arrInnerVarName, retArrTypeVar)]
         [(arrTypeVarName, retImmType), (arrInnerVarName, retArrTypeVar)]
         arrVar
         (m, CodeSigmaElim k xts' arrInnerVar e2'))
-        -- ( m
-        -- , CodeSigmaElim
-        --     arrVoidPtr
-        --     [(affVarName, retImmType), (relVarName, retImmType)]
-        --     arrTypeVar
-        --     (m, CodeSigmaElim k xts' arrInnerVar e2')))
 clarify (m, TermStruct ks) = do
   t <- cartesianStruct m ks
   return (m, CodeUpIntro t)
@@ -414,7 +401,6 @@ toHeaderInfo m x t ArgArray = do
   (arrayInnerName, arrayInner) <- newDataUpsilonWith "array-inner"
   (arrayInnerTmpName, arrayInnerTmp) <- newDataUpsilonWith "array-tmp"
   retImmType <- returnCartesianImmediate
-  -- retUnivType <- returnCartesianUniv
   return
     ( [arrayVarName]
     , [arrayInnerTmp]
@@ -425,9 +411,6 @@ toHeaderInfo m x t ArgArray = do
             [ (arrayTypeName, retImmType)
             , (arrayInnerName, (m, CodeUpIntro arrayType))
             ]
-            -- [ (arrayTypeName, retUnivType)
-            -- , (arrayInnerName, (m, CodeUpIntro arrayType))
-            -- ]
             (toVar x)
             ( m
             , CodeUpElim
