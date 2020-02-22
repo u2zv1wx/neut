@@ -394,11 +394,23 @@ storeContent reg aggPtrType dts cont = do
   castThenStoreThenCont <- castThen $ storeThenCont
   -- FIXME: getelementptrでsizeofを実現する方式を使えばallocsizeを計算する必要はそもそもないはず？
   case lowTypeToAllocSize aggPtrType of
+    AllocSizeExact 0 ->
+      return $
+      LLVMLet
+        reg
+        (LLVMOpBitcast LLVMDataNull voidPtr voidPtr)
+        castThenStoreThenCont
     AllocSizeExact i ->
       return $
       LLVMLet
         reg
         (LLVMOpAlloc (LLVMDataInt (toInteger i)))
+        castThenStoreThenCont
+    AllocSizePtrList 0 ->
+      return $
+      LLVMLet
+        reg
+        (LLVMOpBitcast LLVMDataNull voidPtr voidPtr)
         castThenStoreThenCont
     AllocSizePtrList n -> do
       (c, cVar) <- newDataLocal $ "sizeof-" <> asText reg
