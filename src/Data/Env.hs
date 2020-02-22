@@ -123,12 +123,13 @@ evalWithEnv c env = do
 throwError' :: T.Text -> WithEnv a
 throwError' x = throwError [TIO.putStrLn x]
 
--- fixme: return error if i + 1 == 0 (overflow)
 newCount :: WithEnv Int
 newCount = do
   i <- gets count
   modify (\e -> e {count = i + 1})
-  return i
+  if i + 1 == 0
+    then error "counter exhausted"
+    else return i
 
 newNameWith :: Identifier -> WithEnv Identifier
 newNameWith (I (s, _)) = do
