@@ -21,15 +21,17 @@ import Reduce.Code
 
 toLLVM :: CodePlus -> WithEnv LLVM
 toLLVM mainTerm = do
-  mainTerm' <- reduceCodePlus mainTerm >>= llvmCode
+  mainTerm' <- reduceCodePlus mainTerm
+  modify (\env -> env {nameSet = S.empty})
+  mainTerm'' <- llvmCode mainTerm'
   -- the result of "main" must be i64, not i8*
   (result, resultVar) <- newDataUpsilonWith "result"
   (cast, castThen) <- llvmCast (Just "cast") resultVar (LowTypeIntS 64)
   castResult <- castThen (LLVMReturn cast)
   -- let result: i8* := (main-term) in {cast result to i64}
-  -- commConv result mainTerm' $ castResult
-  mainTerm'' <- commConv result mainTerm' $ castResult
-  snd <$> rename [] mainTerm''
+  -- commConv result mainTerm'' $ castResult
+  mainTerm''' <- commConv result mainTerm'' $ castResult
+  snd <$> rename [] mainTerm'''
 
 llvmCode :: CodePlus -> WithEnv LLVM
 llvmCode (m, CodeTheta theta) = llvmCodeTheta m theta
@@ -276,7 +278,7 @@ llvmDataLet x (_, DataTheta y) cont = do
     Nothing -> throwError' $ "no such global label defined: " <> asText y
     Just (Definition _ args e)
       | not (y `S.member` ns) -> do
-        modify (\env -> env {nameSet = S.insert y (nameSet env)})
+        modify (\env -> env {nameSet = S.insert y ns})
         llvm <- llvmCode e
         (args', llvm') <- rename args llvm
         insLLVMEnv y args' llvm'

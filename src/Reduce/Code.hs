@@ -8,8 +8,8 @@ import Data.Fixed (mod')
 import Unsafe.Coerce -- for int -> word, word -> int
 
 import qualified Data.HashMap.Strict as Map
+import qualified Data.Set as S
 
-import Clarify.Utility
 import Data.Basic
 import Data.Code
 import Data.Env
@@ -17,18 +17,21 @@ import Data.Env
 reduceCodePlus :: CodePlus -> WithEnv CodePlus
 reduceCodePlus (m, CodePiElimDownElim v ds) = do
   cenv <- gets codeEnv
+  ns <- gets nameSet
   case v of
     (_, DataTheta x)
       | Just (Definition (IsFixed False) xs body) <- Map.lookup x cenv
       , length xs == length ds ->
         reduceCodePlus $ substCodePlus (zip xs ds) body
-    -- (_, DataTheta x)
-    --   | Just (Definition (IsFixed True) xs body) <- Map.lookup x cenv
-    --   , length xs == length ds -> do
-    --     body' <- reduceCodePlus body
-    --     let def = Definition (IsFixed True) xs body'
-    --     modify (\env -> env {codeEnv = Map.insert x def cenv})
-    --     return (m, CodePiElimDownElim v ds)
+    (_, DataTheta x)
+      | Just (Definition (IsFixed True) xs body) <- Map.lookup x cenv
+      , length xs == length ds
+      , not (x `S.member` ns) -> do
+        modify (\env -> env {nameSet = S.insert x ns})
+        body' <- reduceCodePlus body
+        let def = Definition (IsFixed True) xs body'
+        modify (\env -> env {codeEnv = Map.insert x def cenv})
+        return (m, CodePiElimDownElim v ds)
     _ -> return (m, CodePiElimDownElim v ds)
 reduceCodePlus (m, CodeSigmaElim mk xts v e) = do
   let (xs, ts) = unzip xts
@@ -46,7 +49,10 @@ reduceCodePlus (m, CodeUpElim x e1 e2) = do
     (_, CodeUpIntro d) -> reduceCodePlus $ substCodePlus [(x, d)] e2
     _ -> do
       e2' <- reduceCodePlus e2
-      return (m, CodeUpElim x e1' e2')
+      case e2' of
+        (_, CodeUpIntro (_, DataUpsilon y))
+          | x == y -> return e1' -- eta-reduce
+        _ -> return (m, CodeUpElim x e1' e2')
 reduceCodePlus (m, CodeEnumElim varInfo v les) = do
   case v of
     (_, DataEnumIntro l) ->
