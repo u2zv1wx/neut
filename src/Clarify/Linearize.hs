@@ -46,8 +46,7 @@ withHeader nm x t e =
 -- withHeaderAffine x t e ~>
 --   bind _ :=
 --     bind exp := t^# in        --
---     let (aff, rel) := exp in  -- AffineApp
---     aff @ x in                --
+--     exp @ (0, x) in           -- AffineApp
 --   e
 --
 -- withHeaderAffine x t e ~>
@@ -73,11 +72,10 @@ withHeaderLinear z x e = do
 
 -- withHeaderRelevant x t [x1, ..., x{N}] e ~>
 --   bind exp := t in
---   let (aff, rel) := exp in
---   bind sigTmp1 := rel @ x in                    --
+--   bind sigTmp1 := exp @ (0, x) in               --
 --   let (x1, tmp1) := sigTmp1 in                  --
 --   ...                                           -- withHeaderRelevant'
---   bind sigTmp{N-1} := rel @ tmp{N-2} in         --
+--   bind sigTmp{N-1} := exp @ (0, tmp{N-2}) in    --
 --   let (x{N-1}, x{N}) := sigTmp{N-1} in          --
 --   e                                             --
 -- (assuming N >= 2)
@@ -125,12 +123,12 @@ toLinearChain xs = do
   let pairSeq = zip valueSeq (tail tmpSeq')
   return $ zip (init tmpSeq') pairSeq
 
--- withHeaderRelevant' relVar [(x1, (x2, tmpA)), (tmpA, (x3, tmpB)), (tmpB, (x3, x4))] ~>
---   bind sigVar1 := relVar @ x1 in
+-- withHeaderRelevant' expVar [(x1, (x2, tmpA)), (tmpA, (x3, tmpB)), (tmpB, (x3, x4))] ~>
+--   bind sigVar1 := expVar @ (1, x1) in
 --   let (x2, tmpA) := sigVar1 in
---   bind sigVar2 := relVar @ tmpA in
+--   bind sigVar2 := expVar @ (1, tmpA) in
 --   let (x3, tmpB) := sigVar2 in
---   bind sigVar3 := relVar @ tmpB in
+--   bind sigVar3 := expVar @ (1, tmpB) in
 --   let (x3, x4) := sigVar3 in
 --   e
 withHeaderRelevant' ::
