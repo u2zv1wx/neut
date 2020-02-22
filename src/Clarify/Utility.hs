@@ -83,8 +83,8 @@ returnCartesianUniv = do
   v <- cartesianUniv emptyMeta
   return (emptyMeta, CodeUpIntro v)
 
-foo :: T.Text -> Meta -> WithEnv (Identifier, DataPlus)
-foo thetaName m = do
+toThetaInfo :: T.Text -> Meta -> WithEnv (Identifier, DataPlus)
+toThetaInfo thetaName m = do
   i <- lookupConstNum thetaName
   let ident = I (thetaName, i)
   return (ident, (m, DataTheta ident))
@@ -98,9 +98,7 @@ cartesianImmediate m = do
 affineImmediate :: Meta -> WithEnv DataPlus
 affineImmediate m = do
   cenv <- gets codeEnv
-  -- let thetaName = "affine-immediate"
-  -- let theta = (m, DataTheta thetaName)
-  (ident, theta) <- foo "affine-immediate" m
+  (ident, theta) <- toThetaInfo "affine-immediate" m
   case Map.lookup ident cenv of
     Just _ -> return theta
     Nothing -> do
@@ -114,9 +112,7 @@ affineImmediate m = do
 relevantImmediate :: Meta -> WithEnv DataPlus
 relevantImmediate m = do
   cenv <- gets codeEnv
-  -- let thetaName = "relevant-immediate"
-  -- let theta = (m, DataTheta thetaName)
-  (ident, theta) <- foo "relevant-immediate" m
+  (ident, theta) <- toThetaInfo "relevant-immediate" m
   case Map.lookup ident cenv of
     Just _ -> return theta
     Nothing -> do
@@ -138,9 +134,7 @@ cartesianUniv m = do
 affineUniv :: Meta -> WithEnv DataPlus
 affineUniv m = do
   cenv <- gets codeEnv
-  -- let thetaName = "affine-univ"
-  -- let theta = (m, DataTheta thetaName)
-  (ident, theta) <- foo "affine-univ" m
+  (ident, theta) <- toThetaInfo "affine-univ" m
   case Map.lookup ident cenv of
     Just _ -> return theta
     Nothing -> do
@@ -163,9 +157,7 @@ affineUniv m = do
 relevantUniv :: Meta -> WithEnv DataPlus
 relevantUniv m = do
   cenv <- gets codeEnv
-  -- let thetaName = "relevant-univ"
-  -- let theta = (m, DataTheta thetaName)
-  (ident, theta) <- foo "relevant-univ" m
+  (ident, theta) <- toThetaInfo "relevant-univ" m
   case Map.lookup ident cenv of
     Just _ -> return theta
     Nothing -> do
@@ -201,7 +193,7 @@ cartesianStruct m ks = do
 affineStruct :: Meta -> [ArrayKind] -> WithEnv DataPlus
 affineStruct m ks = do
   cenv <- gets codeEnv
-  (ident, theta) <- foo "affine-struct" m
+  (ident, theta) <- toThetaInfo "affine-struct" m
   case Map.lookup ident cenv of
     Just _ -> return theta
     Nothing -> do
@@ -220,12 +212,7 @@ affineStruct m ks = do
 relevantStruct :: Meta -> [ArrayKind] -> WithEnv DataPlus
 relevantStruct m ks = do
   cenv <- gets codeEnv
-  -- let thetaName = "relevant-struct"
-  -- i <- lookupConstNum thetaName
-  -- let ident = I ("affine-struct", i)
-  -- let theta = (m, DataTheta ident)
-  -- let theta = (m, DataTheta thetaName)
-  (ident, theta) <- foo "relevant-struct" m
+  (ident, theta) <- toThetaInfo "relevant-struct" m
   case Map.lookup ident cenv of
     Just _ -> return theta
     Nothing -> do
@@ -254,7 +241,6 @@ insCodeEnv :: Identifier -> [Identifier] -> CodePlus -> WithEnv ()
 insCodeEnv name args e = do
   let def = Definition (IsFixed False) args e
   modify (\env -> env {codeEnv = Map.insert name def (codeEnv env)})
-  -- modify (\env -> env {codeEnv = Map.insert name (args, e) (codeEnv env)})
 
 lookupContext :: Identifier -> Context -> WithEnv TermPlus
 lookupContext z ctx = do
