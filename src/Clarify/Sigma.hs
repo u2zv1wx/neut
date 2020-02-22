@@ -24,11 +24,83 @@ cartesianSigma ::
   -> [Either CodePlus (Identifier, CodePlus)]
   -> WithEnv DataPlus
 cartesianSigma (I (thetaName, i)) m k mxts = do
-  let affName = I ("affine-" <> thetaName, i)
-  let relName = I ("relevant-" <> thetaName, i)
-  aff <- affineSigma affName m k mxts
-  rel <- relevantSigma relName m k mxts
-  return (m, DataSigmaIntro arrVoidPtr [aff, rel])
+  cenv <- gets codeEnv
+  let ident = I ("cartesian" <> thetaName, i)
+  let theta = (m, DataTheta ident)
+  -- (ident, theta) <- toThetaInfo "cartesian-immediate" m
+  case Map.lookup ident cenv of
+    Just _ -> return theta
+    Nothing -> do
+      (switchVarName, switchVar) <- newDataUpsilonWith "switch"
+      (argVarName, argVar) <- newDataUpsilonWith "argsig"
+      aff <- affineSigma argVar m k mxts
+      rel <- relevantSigma argVar m k mxts
+      insCodeEnv
+        ident
+        [switchVarName, argVarName]
+        ( emptyMeta
+        , CodeEnumElim
+            [(argVarName, argVar)]
+            switchVar
+            [(CaseValue (EnumValueIntS 64 0), aff), (CaseDefault, rel)])
+      return theta
+
+-- (Assuming `ti` = `return di` for some `di` such that `xi : di`)
+-- affineSigma NAME LOC [(x1, t1), ..., (xn, tn)]   ~>
+--   update CodeEnv with NAME ~> (thunk LAM), where LAM is:
+--   lam z.
+--     let (x1, ..., xn) := z in
+--     <LINEARIZE_HEADER for x1, .., xn> in                     ---
+--     bind y1 :=                                    ---        ---
+--       bind f1 = t1 in              ---            ---        ---
+--       let (aff-1, rel-1) = f1 in   ---  APP-1     ---        ---
+--       aff-1 @ x1 in                ---            ---        ---
+--     ...                                           ---  body  ---  body'
+--     bind yn :=                                    ---        ---
+--       bind fn = tn in              ---            ---        ---
+--       let (aff-n, rel-n) := fn in  ---  APP-n     ---        ---
+--       aff-n @ xn in                ---            ---        ---
+--     return ()                                     ---        ---
+--
+affineSigma ::
+     DataPlus
+  -> Meta
+  -> ArrayKind
+  -> [Either CodePlus (Identifier, CodePlus)]
+  -> WithEnv CodePlus
+affineSigma argVar m k mxts = do
+  xts <- mapM supplyName mxts
+  -- as == [APP-1, ..., APP-n]   (`a` here stands for `app`)
+  as <- forM xts $ \(x, t) -> toAffineApp m x t
+  ys <- mapM (const $ newNameWith' "arg") xts
+  let body =
+        bindLet (zip ys as) (m, CodeUpIntro (m, DataSigmaIntro arrVoidPtr []))
+  body' <- linearize xts body
+  return (m, CodeSigmaElim k xts argVar body')
+  -- let affName = I ("affine-" <> thetaName, i)
+  -- let relName = I ("relevant-" <> thetaName, i)
+  -- aff <- affineSigma affName m k mxts
+  -- rel <- relevantSigma relName m k mxts
+  -- return (m, DataSigmaIntro arrVoidPtr [aff, rel])
+
+relevantSigma ::
+     DataPlus
+  -> Meta
+  -> ArrayKind
+  -> [Either CodePlus (Identifier, CodePlus)]
+  -> WithEnv CodePlus
+relevantSigma argVar m k mxts = do
+  xts <- mapM supplyName mxts
+  -- as == [APP-1, ..., APP-n]
+  as <- forM xts $ \(x, t) -> toRelevantApp m x t
+  -- pairVarNameList == [pair-1, ...,  pair-n]
+  (pairVarNameList, pairVarTypeList) <- unzip <$> mapM toPairInfo xts
+  transposedPair <- transposeSigma k pairVarTypeList
+  let body = bindLet (zip pairVarNameList as) transposedPair
+  -- let info = toInfo "relevantSigma: arg of linearize is not closed:" xts
+  -- assertUP info $ isClosedChain xts
+  body' <- linearize xts body
+  return (m, CodeSigmaElim k xts argVar body')
 
 -- (Assuming `ti` = `return di` for some `di` such that `xi : di`)
 -- affineSigma NAME LOC [(x1, t1), ..., (xn, tn)]   ~>
@@ -48,33 +120,32 @@ cartesianSigma (I (thetaName, i)) m k mxts = do
 --     return ()                                     ---        ---
 --
 -- (Note that sigma-elim for yi is not necessary since all of them are units.)
-affineSigma ::
-     Identifier
-  -> Meta
-  -> ArrayKind
-  -> [Either CodePlus (Identifier, CodePlus)]
-  -> WithEnv DataPlus
-affineSigma thetaName m k mxts = do
-  cenv <- gets codeEnv
-  let theta = (m, DataTheta thetaName)
-  case Map.lookup thetaName cenv of
-    Just _ -> return theta
-    Nothing -> do
-      xts <- mapM supplyName mxts
-      (z, varZ) <- newDataUpsilonWith "arg"
-      -- As == [APP-1, ..., APP-n]   (`a` here stands for `app`)
-      as <- forM xts $ \(x, t) -> toAffineApp m x t
-      ys <- mapM (const $ newNameWith' "arg") xts
-      let body =
-            bindLet
-              (zip ys as)
-              (m, CodeUpIntro (m, DataSigmaIntro arrVoidPtr []))
-      -- let info = toInfo "affineSigma: arg of linearize is not closed:" xts
-      -- assertUP info $ isClosedChain xts
-      body' <- linearize xts body
-      insCodeEnv thetaName [z] (m, CodeSigmaElim k xts varZ body')
-      return theta
-
+-- affineSigma ::
+--      Identifier
+--   -> Meta
+--   -> ArrayKind
+--   -> [Either CodePlus (Identifier, CodePlus)]
+--   -> WithEnv DataPlus
+-- affineSigma thetaName m k mxts = do
+--   cenv <- gets codeEnv
+--   let theta = (m, DataTheta thetaName)
+--   case Map.lookup thetaName cenv of
+--     Just _ -> return theta
+--     Nothing -> do
+--       xts <- mapM supplyName mxts
+--       (z, varZ) <- newDataUpsilonWith "arg"
+--       -- As == [APP-1, ..., APP-n]   (`a` here stands for `app`)
+--       as <- forM xts $ \(x, t) -> toAffineApp m x t
+--       ys <- mapM (const $ newNameWith' "arg") xts
+--       let body =
+--             bindLet
+--               (zip ys as)
+--               (m, CodeUpIntro (m, DataSigmaIntro arrVoidPtr []))
+--       -- let info = toInfo "affineSigma: arg of linearize is not closed:" xts
+--       -- assertUP info $ isClosedChain xts
+--       body' <- linearize xts body
+--       insCodeEnv thetaName [z] (m, CodeSigmaElim k xts varZ body')
+--       return theta
 -- (Assuming `ti` = `return di` for some `di` such that `xi : di`)
 -- relevantSigma NAME LOC [(x1, t1), ..., (xn, tn)]   ~>
 --   update CodeEnv with NAME ~> (thunk LAM), where LAM is:
@@ -94,32 +165,31 @@ affineSigma thetaName m k mxts = do
 --     ...                                       ---  TRANSPOSED-PAIR  ---       ---
 --     let (pn1, pn2) := pair-n in               ---                   ---       ---
 --     return ((p11, ..., pn1), (p12, ..., pn2)) ---                   ---       ---
-relevantSigma ::
-     Identifier
-  -> Meta
-  -> ArrayKind
-  -> [Either CodePlus (Identifier, CodePlus)]
-  -> WithEnv DataPlus
-relevantSigma thetaName m k mxts = do
-  cenv <- gets codeEnv
-  let theta = (m, DataTheta thetaName)
-  case Map.lookup thetaName cenv of
-    Just _ -> return theta
-    Nothing -> do
-      xts <- mapM supplyName mxts
-      (z, varZ) <- newDataUpsilonWith "arg"
-      -- as == [APP-1, ..., APP-n]
-      as <- forM xts $ \(x, t) -> toRelevantApp m x t
-      -- pairVarNameList == [pair-1, ...,  pair-n]
-      (pairVarNameList, pairVarTypeList) <- unzip <$> mapM toPairInfo xts
-      transposedPair <- transposeSigma k pairVarTypeList
-      let body = bindLet (zip pairVarNameList as) transposedPair
-      -- let info = toInfo "relevantSigma: arg of linearize is not closed:" xts
-      -- assertUP info $ isClosedChain xts
-      body' <- linearize xts body
-      insCodeEnv thetaName [z] (m, CodeSigmaElim k xts varZ body')
-      return theta
-
+-- relevantSigma ::
+--      Identifier
+--   -> Meta
+--   -> ArrayKind
+--   -> [Either CodePlus (Identifier, CodePlus)]
+--   -> WithEnv DataPlus
+-- relevantSigma thetaName m k mxts = do
+--   cenv <- gets codeEnv
+--   let theta = (m, DataTheta thetaName)
+--   case Map.lookup thetaName cenv of
+--     Just _ -> return theta
+--     Nothing -> do
+--       xts <- mapM supplyName mxts
+--       (z, varZ) <- newDataUpsilonWith "arg"
+--       -- as == [APP-1, ..., APP-n]
+--       as <- forM xts $ \(x, t) -> toRelevantApp m x t
+--       -- pairVarNameList == [pair-1, ...,  pair-n]
+--       (pairVarNameList, pairVarTypeList) <- unzip <$> mapM toPairInfo xts
+--       transposedPair <- transposeSigma k pairVarTypeList
+--       let body = bindLet (zip pairVarNameList as) transposedPair
+--       -- let info = toInfo "relevantSigma: arg of linearize is not closed:" xts
+--       -- assertUP info $ isClosedChain xts
+--       body' <- linearize xts body
+--       insCodeEnv thetaName [z] (m, CodeSigmaElim k xts varZ body')
+--       return theta
 toPairInfo ::
      (Identifier, CodePlus) -> WithEnv (Identifier, (DataPlus, CodePlus))
 toPairInfo (_, t) = do
@@ -164,20 +234,21 @@ supplyName (Left t) = do
 returnArrayType :: Meta -> WithEnv CodePlus
 returnArrayType ml = do
   (arrVarName, arrVar) <- newDataUpsilonWith "arr"
-  retTau <- returnCartesianUniv
+  retImmType <- returnCartesianImmediate
+  -- retTau <- returnCartesianUniv
   let retArrVar = (ml, CodeUpIntro arrVar)
   v <-
     cartesianSigma
       (I ("array-closure", 0))
       ml
       arrVoidPtr
-      [Right (arrVarName, retTau), Left retArrVar]
+      [Right (arrVarName, retImmType), Left retArrVar]
   return (ml, CodeUpIntro v)
 
 returnClosureType :: Meta -> WithEnv CodePlus
 returnClosureType m = do
   (envVarName, envVar) <- newDataUpsilonWith "env"
-  retUnivType <- returnCartesianUniv
+  -- retUnivType <- returnCartesianUniv
   retImmType <- returnCartesianImmediate
   let retEnvVar = (m, CodeUpIntro envVar)
   closureType <-
@@ -185,5 +256,6 @@ returnClosureType m = do
       (I ("closure", 0))
       m
       arrVoidPtr
-      [Right (envVarName, retUnivType), Left retEnvVar, Left retImmType]
+      [Right (envVarName, retImmType), Left retEnvVar, Left retImmType]
+      -- [Right (envVarName, retUnivType), Left retEnvVar, Left retImmType]
   return (m, CodeUpIntro closureType)

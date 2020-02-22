@@ -49,6 +49,12 @@ withHeader nm x t e =
 --     let (aff, rel) := exp in  -- AffineApp
 --     aff @ x in                --
 --   e
+--
+-- withHeaderAffine x t e ~>
+--   bind _ :=
+--     bind exp := t^# in        -- AffineApp
+--     exp @ (0, x) in           --
+--   e
 -- 変数xに型t由来のaffineを適用して破棄する。
 withHeaderAffine :: Identifier -> CodePlus -> CodePlus -> WithEnv CodePlus
 withHeaderAffine x t e = do
@@ -85,23 +91,31 @@ withHeaderRelevant ::
   -> WithEnv CodePlus
 withHeaderRelevant x t x1 x2 xs e = do
   (expVarName, expVar) <- newDataUpsilonWith "exp"
-  (affVarName, _) <- newDataUpsilonWith "aff"
-  (relVarName, relVar) <- newDataUpsilonWith "rel"
+  -- (affVarName, _) <- newDataUpsilonWith "aff"
+  -- (relVarName, relVar) <- newDataUpsilonWith "rel"
   linearChain <- toLinearChain $ x : x1 : x2 : xs
   let ml = fst e
-  rel <- withHeaderRelevant' t relVar linearChain e
-  retImmType <- returnCartesianImmediate
-  return
-    ( ml
-    , CodeUpElim
-        expVarName
-        t
-        ( ml
-        , CodeSigmaElim
-            arrVoidPtr
-            [(affVarName, retImmType), (relVarName, retImmType)]
-            expVar
-            rel))
+  rel <- withHeaderRelevant' t expVar linearChain e
+  -- rel <- withHeaderRelevant' t relVar linearChain e
+  -- retImmType <- returnCartesianImmediate
+  return (ml, CodeUpElim expVarName t rel)
+        -- ( ml
+        -- , CodeSigmaElim
+        --     arrVoidPtr
+        --     [(affVarName, retImmType), (relVarName, retImmType)]
+        --     expVar
+        --     rel))
+  -- return
+  --   ( ml
+  --   , CodeUpElim
+  --       expVarName
+  --       t
+  --       ( ml
+  --       , CodeSigmaElim
+  --           arrVoidPtr
+  --           [(affVarName, retImmType), (relVarName, retImmType)]
+  --           expVar
+  --           rel))
 
 type LinearChain = [(Identifier, (Identifier, Identifier))]
 
@@ -143,17 +157,26 @@ toLinearChain xs = do
 withHeaderRelevant' ::
      CodePlus -> DataPlus -> LinearChain -> CodePlus -> WithEnv CodePlus
 withHeaderRelevant' _ _ [] cont = return cont
-withHeaderRelevant' t relVar ((x, (x1, x2)):chain) cont = do
+withHeaderRelevant' t expVar ((x, (x1, x2)):chain) cont = do
   let m = fst cont
-  cont' <- withHeaderRelevant' t relVar chain cont
+  cont' <- withHeaderRelevant' t expVar chain cont
   (sigVarName, sigVar) <- newDataUpsilonWith "sig"
   let varX = toDataUpsilon (x, emptyMeta)
   return $
     ( m
     , CodeUpElim
         sigVarName
-        (m, CodePiElimDownElim relVar [varX])
+        ( m
+        , CodePiElimDownElim
+            expVar
+            [(m, DataEnumIntro (EnumValueIntS 64 1)), varX])
         (m, CodeSigmaElim arrVoidPtr [(x1, t), (x2, t)] sigVar cont'))
+  -- return $
+  --   ( m
+  --   , CodeUpElim
+  --       sigVarName
+  --       (m, CodePiElimDownElim relVar [varX])
+  --       (m, CodeSigmaElim arrVoidPtr [(x1, t), (x2, t)] sigVar cont'))
 
 merge :: [NameMap] -> NameMap
 merge [] = Map.empty

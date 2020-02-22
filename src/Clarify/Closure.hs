@@ -59,12 +59,12 @@ callClosure ::
 callClosure m e zexes = do
   let (zs, es', xs) = unzip3 zexes
   (clsVarName, clsVar) <- newDataUpsilonWith "closure"
-  (typeVarName, typeVar) <- newDataUpsilonWith "exp"
+  (typeVarName, _) <- newDataUpsilonWith "exp"
   (envVarName, envVar) <- newDataUpsilonWith "env"
   (lamVarName, lamVar) <- newDataUpsilonWith "thunk"
-  affVarName <- newNameWith' "aff"
-  relVarName <- newNameWith' "rel"
-  retUnivType <- returnCartesianUniv
+  -- affVarName <- newNameWith' "aff"
+  -- relVarName <- newNameWith' "rel"
+  -- retUnivType <- returnCartesianUniv
   retImmType <- returnCartesianImmediate
   return $
     bindLet
@@ -72,17 +72,29 @@ callClosure m e zexes = do
       ( m
       , CodeSigmaElim
           arrVoidPtr
-          [ (typeVarName, retUnivType)
+          [ (typeVarName, retImmType)
           , (envVarName, returnUpsilon typeVarName)
           , (lamVarName, retImmType)
           ]
+          -- [ (typeVarName, retUnivType)
+          -- , (envVarName, returnUpsilon typeVarName)
+          -- , (lamVarName, retImmType)
+          -- ]
           clsVar
-          ( m
-          , CodeSigmaElim
-              arrVoidPtr
-              [(affVarName, retImmType), (relVarName, retImmType)]
-              typeVar
-              (m, CodePiElimDownElim lamVar (envVar : xs))))
+          (m, CodePiElimDownElim lamVar (envVar : xs)))
+          -- ( m
+          -- , CodeSigmaElim
+          --     arrVoidPtr
+          --     [(affVarName, retImmType), (relVarName, retImmType)]
+          --     typeVar
+          --     (m, CodePiElimDownElim lamVar (envVar : xs))))
+          -- typeVarはimmなのでfreeの必要性がなくなる
+          -- ( m
+          -- , CodeSigmaElim
+          --     arrVoidPtr
+          --     [(affVarName, retImmType), (relVarName, retImmType)]
+          --     typeVar
+          --     (m, CodePiElimDownElim lamVar (envVar : xs))))
 
 nameFromMaybe :: Maybe Identifier -> WithEnv Identifier
 nameFromMaybe mName =
@@ -90,6 +102,7 @@ nameFromMaybe mName =
     Just lamThetaName -> return lamThetaName
     Nothing -> newNameWith' "thunk"
 
+-- fixme : ここのtypeEnvは引数で取る必要があるはず。envだと壊れる。renameと同じ理由。
 chainTermPlus :: TermPlus -> WithEnv [(Meta, Identifier, TermPlus)]
 chainTermPlus e = do
   tmp <- chainTermPlus' e
