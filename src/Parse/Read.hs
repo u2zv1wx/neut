@@ -140,21 +140,27 @@ currentMeta = do
       , metaUnivParams = IntMap.empty
       }
 
+{-# INLINE isSymbolChar #-}
 isSymbolChar :: Char -> Bool
 isSymbolChar c = c `S.notMember` nonSymbolSet
 
+{-# INLINE spaceSet #-}
 spaceSet :: S.Set Char
 spaceSet = S.fromList " "
 
+{-# INLINE newlineSet #-}
 newlineSet :: S.Set Char
 newlineSet = S.fromList "\n"
 
+{-# INLINE nonSymbolSet #-}
 nonSymbolSet :: S.Set Char
 nonSymbolSet = S.fromList "()[] \n;"
 
+{-# INLINE updateStreamL #-}
 updateStreamL :: T.Text -> WithReadEnv ()
 updateStreamL s = modify (\env -> env {text = s, column = 1 + column env})
 
+{-# INLINE updateStreamC #-}
 updateStreamC :: Int -> T.Text -> WithReadEnv ()
 updateStreamC l s =
   modify (\env -> env {text = s, line = l + line env, column = 0})
