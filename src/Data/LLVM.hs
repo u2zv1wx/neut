@@ -34,7 +34,6 @@ data LLVMOp
       LowType -- cast to
   | LLVMOpIntToPointer LLVMData LowType LowType
   | LLVMOpPointerToInt LLVMData LowType LowType
-  | LLVMOpAlloca LowType
   | LLVMOpLoad LLVMData LowType
   | LLVMOpStore LowType LLVMData LLVMData
   | LLVMOpAlloc LLVMData -- size
@@ -132,7 +131,6 @@ substLLVMOp sub (LLVMOpIntToPointer d t1 t2) = do
 substLLVMOp sub (LLVMOpPointerToInt d t1 t2) = do
   let d' = substLLVMData sub d
   LLVMOpPointerToInt d' t1 t2
-substLLVMOp _ (LLVMOpAlloca t) = LLVMOpAlloca t
 substLLVMOp sub (LLVMOpLoad d t) = do
   let d' = substLLVMData sub d
   LLVMOpLoad d' t

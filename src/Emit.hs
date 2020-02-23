@@ -110,8 +110,6 @@ emitLLVMOp (LLVMOpIntToPointer d fromType toType) =
   emitLLVMConvOp "inttoptr" d fromType toType
 emitLLVMOp (LLVMOpPointerToInt d fromType toType) =
   emitLLVMConvOp "ptrtoint" d fromType toType
-emitLLVMOp (LLVMOpAlloca lowType) = do
-  return $ unwordsL ["alloca", showLowType lowType]
 emitLLVMOp (LLVMOpLoad d lowType) = do
   return $
     unwordsL
@@ -330,13 +328,9 @@ showLowTypeAsIfPtr t = showLowType t <> "*"
 showLowTypeAsIfNonPtr :: LowType -> Builder
 showLowTypeAsIfNonPtr (LowTypeIntS i) = "i" <> intDec i
 showLowTypeAsIfNonPtr (LowTypeIntU i) = "i" <> intDec i
-showLowTypeAsIfNonPtr (LowTypeIntPtrS i) = "i" <> intDec i
-showLowTypeAsIfNonPtr (LowTypeIntPtrU i) = "i" <> intDec i
 showLowTypeAsIfNonPtr (LowTypeFloat FloatSize16) = "half"
 showLowTypeAsIfNonPtr (LowTypeFloat FloatSize32) = "float"
 showLowTypeAsIfNonPtr (LowTypeFloat FloatSize64) = "double"
-showLowTypeAsIfNonPtr (LowTypeFloatPtr size) =
-  showLowTypeAsIfNonPtr (LowTypeFloat size)
 showLowTypeAsIfNonPtr LowTypeVoidPtr = "i8"
 showLowTypeAsIfNonPtr (LowTypeStructPtr ts) =
   "{" <> showItems showLowType ts <> "}"
@@ -374,12 +368,9 @@ showLowType :: LowType -> Builder
 showLowType (LowTypeIntS i) = "i" <> intDec i
 -- LLVM doesn't distinguish unsigned integers from signed ones
 showLowType (LowTypeIntU i) = "i" <> intDec i
-showLowType (LowTypeIntPtrS i) = "i" <> intDec i <> "*"
-showLowType (LowTypeIntPtrU i) = "i" <> intDec i <> "*"
 showLowType (LowTypeFloat FloatSize16) = "half"
 showLowType (LowTypeFloat FloatSize32) = "float"
 showLowType (LowTypeFloat FloatSize64) = "double"
-showLowType (LowTypeFloatPtr size) = showLowType (LowTypeFloat size) <> "*"
 showLowType LowTypeVoidPtr = "i8*"
 showLowType (LowTypeStructPtr ts) = "{" <> showItems showLowType ts <> "}*"
 showLowType (LowTypeFunctionPtr ts t) =
