@@ -27,7 +27,6 @@ data ReadEnv =
 
 type WithReadEnv a = StateT ReadEnv (ExceptT T.Text IO) a
 
--- type Parser a = ParsecT T.Text () (StateT Env (ExceptT [IO ()] IO)) a
 strToTree :: T.Text -> Path Abs File -> WithEnv [TreePlus]
 strToTree input path = do
   modify (\env -> env {count = 1 + count env})
@@ -36,10 +35,6 @@ strToTree input path = do
   case resultOrError of
     Left err -> throwError' $ T.pack (show err)
     Right (result, _) -> return result
-  -- t <- runParserT (skip >> parseSExpList) () fileName input
-  -- case t of
-  --   Left err -> throwError' $ T.pack (show err)
-  --   Right ts -> return ts
 
 readSExpList :: WithReadEnv [TreePlus]
 readSExpList = readSkip >> readSepEndBy readSExp readSkip
@@ -74,8 +69,8 @@ readChar c = do
     Just (c', rest)
       | c == c' -> do
         if c == '\n'
-          then updateStream 1 0 rest
-          else updateStream 0 1 rest
+          then updateStreamL rest
+          else updateStreamC 1 rest
       | otherwise -> throwError "non-expected char!"
 
 readSkip :: WithReadEnv ()
@@ -91,16 +86,16 @@ readSpace = do
   s <- gets text
   case T.uncons s of
     Just (c, rest)
-      | c `S.member` spaceSet -> updateStream 0 1 rest >> readSpace
-      | c `S.member` newlineSet -> updateStream 1 0 rest >> readSpace
+      | c `S.member` spaceSet -> updateStreamC 1 rest >> readSpace
+      | c `S.member` newlineSet -> updateStreamL rest >> readSpace
     _ -> return ()
 
 readComment :: WithReadEnv ()
 readComment = do
   s <- gets text
   case T.uncons s of
-    Just ('\n', rest) -> updateStream 1 0 rest >> readSkip
-    Just (_, rest) -> updateStream 0 1 rest >> readComment
+    Just ('\n', rest) -> updateStreamL rest >> readSkip
+    Just (_, rest) -> updateStreamC 1 rest >> readComment
     Nothing -> throwError "comment"
 
 readMany :: WithReadEnv a -> WithReadEnv [a]
@@ -127,7 +122,7 @@ readSymbol = do
     then throwError "sym"
     else do
       let rest = T.dropWhile isSymbolChar s
-      updateStream 0 (T.length x) rest
+      updateStreamC (T.length x) rest
       return x
 
 currentMeta :: WithReadEnv Meta
@@ -157,52 +152,9 @@ newlineSet = S.fromList "\n"
 nonSymbolSet :: S.Set Char
 nonSymbolSet = S.fromList "()[] \n;"
 
-updateStream :: Int -> Int -> T.Text -> WithReadEnv ()
-updateStream 0 c s = modify (\env -> env {text = s, column = c + column env})
-updateStream l 0 s =
+updateStreamL :: T.Text -> WithReadEnv ()
+updateStreamL s = modify (\env -> env {text = s, column = 1 + column env})
+
+updateStreamC :: Int -> T.Text -> WithReadEnv ()
+updateStreamC l s =
   modify (\env -> env {text = s, line = l + line env, column = 0})
-updateStream _ _ _ = throwError "updateStream"
-  -- modify (\env -> env {text = s, line = l + line env, column = c + column env})
--- parseSExpList :: Parser [TreePlus]
--- parseSExpList = sepEndBy parseStr skip
--- parseStr :: Parser TreePlus
--- parseStr = parseNode <|> parseAtom
--- parseAtom :: Parser TreePlus
--- parseAtom = do
---   m <- currentMeta
---   s <- symbol
---   _ <- skip
---   return (m, TreeAtom s)
--- parseNode :: Parser TreePlus
--- parseNode = do
---   m <- currentMeta
---   _ <- char '(' >> skip
---   itemList <- many parseStr
---   _ <- skip >> char ')' >> skip
---   return (m, TreeNode itemList)
--- skip :: Parser ()
--- skip = spaces >> (comment <|> spaces)
--- symbol :: Parser T.Text
--- symbol = do
---   s <- many1 (noneOf "()[] \n;")
---   return $ T.pack s
--- comment :: Parser ()
--- comment = do
---   _ <- char ';'
---   skipMany (noneOf "\n")
---   skip
--- currentMeta :: Parser Meta
--- currentMeta = do
---   pos <- getPosition
---   let l = sourceLine pos
---   let c = sourceColumn pos
---   name <- gets currentFilePath
---   return $
---     Meta
---       { metaFileName = Just name
---       , metaLocation = Just (0, l, c)
---       , metaConstraintLocation = Just (0, l, c)
---       , metaIsPublic = True
---       , metaIsAppropriateAsCompletionCandidate = True
---       , metaUnivParams = IntMap.empty
---       }
