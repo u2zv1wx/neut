@@ -41,8 +41,13 @@ reduceCodePlus (m, CodeSigmaElim mk xts v e) = do
       , mk == mk' -> do reduceCodePlus $ substCodePlus (zip xs ds) e
     _ -> do
       e' <- reduceCodePlus e
-      ts' <- mapM reduceCodePlus ts
-      return (m, CodeSigmaElim mk (zip xs ts') v e')
+      case e' of
+        (mUp, CodeUpIntro (_, DataSigmaIntro _ ds))
+          | Just ys <- mapM asUpsilon ds
+          , xs == ys -> return (mUp, CodeUpIntro v) -- eta-reduce
+        _ -> do
+          ts' <- mapM reduceCodePlus ts
+          return (m, CodeSigmaElim mk (zip xs ts') v e')
 reduceCodePlus (m, CodeUpElim x e1 e2) = do
   e1' <- reduceCodePlus e1
   case e1' of
@@ -80,12 +85,23 @@ reduceCodePlus (m, CodeEnumElim varInfo v les) = do
       es' <- mapM reduceCodePlus es
       return (m, CodeEnumElim varInfo v $ zip ls es')
 reduceCodePlus (m, CodeStructElim xks d e) = do
+  let (xs, ks1) = unzip xks
   case d of
     (_, DataStructIntro eks)
-      | (xs, ks1) <- unzip xks
-      , (es, ks2) <- unzip eks
+      | (es, ks2) <- unzip eks
       , ks1 == ks2 -> reduceCodePlus $ substCodePlus (zip xs es) e
-    _ -> return (m, CodeStructElim xks d e)
+    _ -> do
+      e' <- reduceCodePlus e
+      case e' of
+        (mUp, CodeUpIntro (_, DataStructIntro dks))
+          | (ds2, ks2) <- unzip dks
+          , ks1 == ks2
+          , Just ys <- mapM asUpsilon ds2
+          , xs == ys -> return (mUp, CodeUpIntro d) -- eta-reduce
+        _ -> return (m, CodeStructElim xks d e)
+      --     ts' <- mapM reduceCodePlus ts
+      --     return (m, CodeSigmaElim mk (zip xs ts') v e')
+      -- return (m, CodeStructElim xks d e)
 reduceCodePlus (m, CodeTheta theta) =
   case theta of
     ThetaUnaryOp op (LowTypeIntS s) (m1, DataEnumIntro (EnumValueIntS s1 x))

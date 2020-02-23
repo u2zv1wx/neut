@@ -63,6 +63,10 @@ toDataUpsilon (x, m) = (m, DataUpsilon x)
 toDataUpsilon' :: Identifier -> DataPlus
 toDataUpsilon' x = (emptyMeta, DataUpsilon x)
 
+asUpsilon :: DataPlus -> Maybe Identifier
+asUpsilon (_, DataUpsilon x) = Just x
+asUpsilon _ = Nothing
+
 toIntS :: IntSize -> Integer -> Data
 toIntS size i = DataEnumIntro (EnumValueIntS size i)
 
