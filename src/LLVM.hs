@@ -107,6 +107,7 @@ loadContent ::
   -> [((LLVMData, LowType), (Identifier, (Identifier, LowType)))] -- [(the index of an element, the variable to load the element)]
   -> CodePlus -- continuation
   -> WithEnv LLVM
+loadContent _ _ [] cont = llvmCode cont -- don't call redundant free
 loadContent v bt iyxs cont = do
   let ixs = map (\(i, (y, (_, k))) -> (i, (y, k))) iyxs
   (bp, castThen) <- llvmCast (Just $ takeBaseName v) v bt

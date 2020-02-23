@@ -33,7 +33,7 @@ import Parse.Utility
 parse :: Path Abs File -> WithEnv WeakStmt
 parse inputPath = do
   content <- liftIO $ TIO.readFile $ toFilePath inputPath
-  stmtList <- strToTree content (toFilePath inputPath) >>= parse'
+  stmtList <- strToTree content inputPath >>= parse'
   stmtList' <- renameQuasiStmtList stmtList
   concatQuasiStmtList stmtList'
 
@@ -62,7 +62,7 @@ parseForCompletion inputPath l c = do
   case modifyFileForCompletion s content l c of
     Nothing -> return []
     Just (prefix, content') -> do
-      stmtList <- strToTree content' (toFilePath inputPath) >>= parse'
+      stmtList <- strToTree content' inputPath >>= parse'
       case compInfo s stmtList of
         Right () -> return []
         Left info -> do
@@ -136,7 +136,8 @@ parse' ((_, TreeNode [(_, TreeAtom "include"), (_, TreeAtom pathString)]):as) =
               content <- liftIO $ TIO.readFile $ toFilePath newFilePath
               modify (\env -> env {currentFilePath = newFilePath})
               modify (\env -> env {phase = 1 + phase env})
-              includedQuasiStmtList <- strToTree content path >>= parse'
+              includedQuasiStmtList <- strToTree content newFilePath >>= parse'
+              -- includedQuasiStmtList <- strToTree content path >>= parse'
               let mxs = toIdentList includedQuasiStmtList
               modify (\env -> env {currentFilePath = oldFilePath})
               modify (\env -> env {phase = 1 + phase env})

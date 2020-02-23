@@ -40,6 +40,9 @@ data Env =
   Env
     { count :: Int
     -- parse
+    , inputText :: T.Text
+    , inputLine :: Int
+    , inputColumn :: Int
     , phase :: Int
     , target :: Maybe Target
     , mainFilePath :: Path Abs File
@@ -79,6 +82,9 @@ initialEnv :: Path Abs File -> Bool -> Env
 initialEnv path colorizeFlag =
   Env
     { count = 0
+    , inputText = T.empty
+    , inputLine = 0
+    , inputColumn = 0
     , phase = 0
     , target = Nothing
     , includeGraph = Map.empty
