@@ -181,11 +181,11 @@ asLowTypeMaybe "" = Nothing
 asLowTypeMaybe s
   | 'i' <- T.head s
   , Just n <- readMaybe $ T.unpack $ T.tail s
-  , 0 < n && n < (2 ^ (23 :: Int)) - 1 = Just $ LowTypeIntS n
+  , 0 < n && n <= 64 = Just $ LowTypeIntS n
 asLowTypeMaybe s
   | 'u' <- T.head s
   , Just n <- readMaybe $ T.unpack $ T.tail s
-  , 0 < n && n < (2 ^ (23 :: Int)) - 1 = Just $ LowTypeIntU n
+  , 0 < n && n <= 64 = Just $ LowTypeIntU n
 asLowTypeMaybe s
   | 'f' <- T.head s
   , Just n <- readMaybe $ T.unpack $ T.tail s
