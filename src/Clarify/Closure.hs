@@ -46,7 +46,7 @@ makeClosure mName mxts2 m mxts1 e = do
   e' <- linearize (xts2 ++ xts1) e
   cenv <- gets codeEnv
   name <- nameFromMaybe mName
-  let args = envVarName : map fst xts1
+  let args = map fst xts1 ++ [envVarName]
   let body = (m, CodeSigmaElim arrVoidPtr xts2 envVar e')
   when (name `notElem` Map.keys cenv) $ insCodeEnv name args body
   let fvEnv = (m, DataSigmaIntro arrVoidPtr $ map (toDataUpsilon' . fst) xts2)
@@ -72,7 +72,7 @@ callClosure m e zexes = do
           , (lamVarName, retImmType)
           ]
           clsVar
-          (m, CodePiElimDownElim lamVar (envVar : xs)))
+          (m, CodePiElimDownElim lamVar (xs ++ [envVar])))
 
 nameFromMaybe :: Maybe Identifier -> WithEnv Identifier
 nameFromMaybe mName =
