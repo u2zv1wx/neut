@@ -165,7 +165,10 @@ data EnumValue
 data LowType
   = LowTypeIntS IntSize
   | LowTypeIntU IntSize
+  | LowTypeIntPtrS IntSize
+  | LowTypeIntPtrU IntSize
   | LowTypeFloat FloatSize
+  | LowTypeFloatPtr FloatSize
   | LowTypeVoidPtr
   | LowTypeFunctionPtr [LowType] LowType
   | LowTypeStructPtr [LowType]

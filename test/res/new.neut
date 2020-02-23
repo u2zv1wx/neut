@@ -1038,7 +1038,7 @@ n15-4
 ;; coinduction principleも自動生成できるようにした。偉すぎる。
 ;; (i64.add 1000 stream.coinduction)
 
-(i64.add 100 unit)
+(i64.add 100 10)
 
 (fact 4)
 
