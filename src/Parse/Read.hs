@@ -30,7 +30,7 @@ type WithReadEnv a = StateT ReadEnv (ExceptT T.Text IO) a
 strToTree :: T.Text -> Path Abs File -> WithEnv [TreePlus]
 strToTree input path = do
   modify (\env -> env {count = 1 + count env})
-  let renv = ReadEnv {text = input, line = 0, column = 0, filePath = path}
+  let renv = ReadEnv {text = input, line = 1, column = 1, filePath = path}
   resultOrError <- liftIO $ runExceptT (runStateT readSExpList renv)
   case resultOrError of
     Left err -> throwError' $ T.pack (show err)
@@ -158,9 +158,9 @@ nonSymbolSet = S.fromList "()[] \n;"
 
 {-# INLINE updateStreamL #-}
 updateStreamL :: T.Text -> WithReadEnv ()
-updateStreamL s = modify (\env -> env {text = s, column = 1 + column env})
+updateStreamL s =
+  modify (\env -> env {text = s, line = 1 + line env, column = 1})
 
 {-# INLINE updateStreamC #-}
 updateStreamC :: Int -> T.Text -> WithReadEnv ()
-updateStreamC l s =
-  modify (\env -> env {text = s, line = l + line env, column = 0})
+updateStreamC c s = modify (\env -> env {text = s, column = c + column env})
