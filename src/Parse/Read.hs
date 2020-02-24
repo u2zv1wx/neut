@@ -193,7 +193,7 @@ newlineSet = S.fromList "\n"
 
 {-# INLINE nonSymbolSet #-}
 nonSymbolSet :: S.Set Char
-nonSymbolSet = S.fromList "()[] \n;"
+nonSymbolSet = S.fromList "()[] \"\n;"
 
 {-# INLINE updateStreamL #-}
 updateStreamL :: T.Text -> WithReadEnv ()
