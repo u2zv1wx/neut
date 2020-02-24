@@ -24,6 +24,41 @@
 
 (enum three three-0 three-1 three-2)
 
+;; (mode choice (left right))
+
+;; (mode X (a b c))
+
+;; (mode blood (blood-A blood-B blood-O blood-AB))
+
+;; (mode weather (sunny rainy cloudy))
+
+;; こういうのはあまりmodeじゃないよな。
+;; (mode fruit (apple banana orange melon))
+
+;; こっちのほうが素直か〜〜。
+
+;; (enum fruit (apple banana orange melon))
+
+;;--
+;; collectionはけっこういい気がする？でも内部に構造がない点のあつまりであるっていうニュアンスが出ない。……そしてそれは "set" っていう言葉に対しても同じことが言えるだろう。そう考えるとやっぱりenumかなあという気がしてくる。ところで「--」方式のコメントも許可したいところではある。
+;;
+;; そのほうがこんなふうに改行をいい感じにとりあつかえたりして嬉しい。こっちのほうが書いていてラクというか。普通のテキストファイルのときと同じように言葉を書くことができるってのがどれだけ快適なことであるのか、人類はまだ知らないのである。論文を書くようにしてプログラムを書くことができる、ということ。
+;;
+;; parserのほうの処理自体はたぶんカンタンなんだけど。シンタックスハイライトをどう定義すればいいのかがわからない。emacsの話ね。
+;;--
+
+;; (collection fruit (apple banana orange melon))
+
+;; セマンティクスになるべく対応させたsyntax、みたいな。
+;; (enum choice
+;;   ((left 0)
+;;    (right 1)))
+;; まあenumになるのか〜〜〜。
+
+;; --
+;; まあ、じゃあそういう感じでやっていくことになるのかなあ。enumでやっていくということになるのかしら。まあ標準的であるってことの強さだよな〜。
+;;
+;; --
 ;; (constant admit-explicit
 ;;   (pi ((A type)) A))
 

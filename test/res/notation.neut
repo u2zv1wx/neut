@@ -80,13 +80,13 @@
   ((lambda ((x t)) x) e))
   ;; ~> (lambda (_ t) cont) @ e
 
-(keyword to-type-list)
+;; (keyword to-type-list)
 
-(notation (to-type-list t)
-  ((_ t)))
+;; (notation (to-type-list t)
+;;   ((_ t)))
 
-(notation (to-type-list t t+)
-  ((_ t) (splice (to-type-list t+))))
+;; (notation (to-type-list t t+)
+;;   ((_ t) (splice (to-type-list t+))))
 
 ;; (keyword arrow)
 
@@ -127,13 +127,13 @@
 
 ;; (keyword sigma-introduction)
 
-(keyword to-hole-list)
+;; (keyword to-hole-list)
 
-(notation (to-hole-list e)
-  ((_ hole)))
+;; (notation (to-hole-list e)
+;;   ((_ hole)))
 
-(notation (to-hole-list e e+)
-  ((_ hole) (splice (to-hole-list e+))))
+;; (notation (to-hole-list e e+)
+;;   ((_ hole) (splice (to-hole-list e+))))
 
 (keyword theorem)
 

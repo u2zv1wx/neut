@@ -49,9 +49,16 @@ readSExp = do
 readAtom :: WithReadEnv TreePlus
 readAtom = do
   m <- currentMeta
-  x <- readSymbol
-  readSkip
-  return (m, TreeAtom x)
+  s <- gets text
+  case T.uncons s of
+    Just ('"', _) -> do
+      k <- readString
+      readSkip
+      return (m, TreeAtom k)
+    _ -> do
+      x <- readSymbol
+      readSkip
+      return (m, TreeAtom x)
 
 readNode :: WithReadEnv TreePlus
 readNode = do
@@ -113,7 +120,6 @@ readSepEndBy' f g acc = do
     Right item -> readSepEndBy' f g (item : acc)
     Left result -> return result
 
--- fixme: 本当は文字列もちゃんとreadできるようにするべき
 readSymbol :: WithReadEnv T.Text
 readSymbol = do
   s <- gets text
@@ -124,6 +130,39 @@ readSymbol = do
       let rest = T.dropWhile isSymbolChar s
       updateStreamC (T.length x) rest
       return x
+
+readString :: WithReadEnv T.Text
+readString = do
+  s <- gets text
+  case T.uncons s of
+    Just ('"', rest) -> do
+      len <- headStringLengthOf False rest 1
+      let (x, rest') = T.splitAt len s
+      modify (\env -> env {text = rest'})
+      return x
+    _ -> throwError "readString"
+
+type EscapeFlag = Bool
+
+headStringLengthOf :: EscapeFlag -> T.Text -> Int -> WithReadEnv Int
+headStringLengthOf flag s i = do
+  case T.uncons s of
+    Nothing -> error "EOF while reading string"
+    Just (c, rest)
+      | c == '"' -> do
+        incrementColumn
+        if flag
+          then headStringLengthOf False rest (i + 1)
+          else return $ i + 1
+      | c == '\\' -> do
+        incrementColumn
+        headStringLengthOf (not flag) rest (i + 1)
+      | c == '\n' -> do
+        incrementLine
+        headStringLengthOf False rest (i + 1)
+      | otherwise -> do
+        incrementColumn
+        headStringLengthOf False rest (i + 1)
 
 currentMeta :: WithReadEnv Meta
 currentMeta = do
@@ -164,3 +203,13 @@ updateStreamL s =
 {-# INLINE updateStreamC #-}
 updateStreamC :: Int -> T.Text -> WithReadEnv ()
 updateStreamC c s = modify (\env -> env {text = s, column = c + column env})
+
+incrementLine :: WithReadEnv ()
+incrementLine = modify (\env -> env {line = 1 + line env, column = 1})
+
+incrementColumn :: WithReadEnv ()
+incrementColumn = modify (\env -> env {column = 1 + column env})
+-- modify (\env -> env {line = 1 + line env, column = 1})
+--         updateLocByString rest
+--       | otherwise -> do
+--         modify (\env -> env {column = 1 + column env})
