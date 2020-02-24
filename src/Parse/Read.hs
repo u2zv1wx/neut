@@ -209,7 +209,3 @@ incrementLine = modify (\env -> env {line = 1 + line env, column = 1})
 
 incrementColumn :: WithReadEnv ()
 incrementColumn = modify (\env -> env {column = 1 + column env})
--- modify (\env -> env {line = 1 + line env, column = 1})
---         updateLocByString rest
---       | otherwise -> do
---         modify (\env -> env {column = 1 + column env})
