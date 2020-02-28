@@ -156,6 +156,12 @@ interpret (m, TreeNode ((_, TreeAtom "product"):ts)) = do
   xs <- mapM (const $ newNameWith' "sig") ts'
   m' <- adjustPhase m
   return (m', WeakTermSigma (zip3 ms xs ts'))
+-- interpret (m, TreeNode [(_, TreeAtom x), (_, TreeAtom v)])
+--   | Just i <- readEnumTypeIntS x
+--   , Just v' <- readEnumValueIntS ->
+--   | Just x' <- readMaybe $ T.unpack x = do
+--     m' <- adjustPhase m
+--     return (m', WeakTermFloat16 x')
 interpret (m, TreeAtom x)
   | Just x' <- readMaybe $ T.unpack x = do
     m' <- adjustPhase m
@@ -200,10 +206,15 @@ interpret t@(m, TreeAtom x) = do
     (_, False) -> return (m', WeakTermUpsilon $ asIdent x)
 interpret t@(m, TreeNode es) = do
   m' <- adjustPhase m
-  if null es
-    then throwError' $ "interpret: syntax error:\n" <> T.pack (Pr.ppShow t)
-    else interpret (m', TreeNode ((m, TreeAtom "pi-elimination") : es))
+  ml <- interpretEnumValueMaybe t
+  case ml of
+    Just l -> return (m', WeakTermEnumIntro l)
+    _ -> do
+      if null es
+        then throwError' $ "interpret: syntax error:\n" <> T.pack (Pr.ppShow t)
+        else interpret (m', TreeNode ((m, TreeAtom "pi-elimination") : es))
 
+--  m' <- adjustPhase m
 interpretIdentifierPlus :: TreePlus -> WithEnv IdentifierPlus
 interpretIdentifierPlus (m, TreeAtom x) = do
   (m', x') <- interpretAtom (m, TreeAtom x)
