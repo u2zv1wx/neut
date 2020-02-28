@@ -8,8 +8,10 @@ import Control.Monad.Except
 import Control.Monad.State
 import Data.ByteString.Builder
 import Data.Monoid ((<>))
-import Numeric.Half
 
+-- import Data.Word
+-- import Numeric.Half
+-- import Unsafe.Coerce
 import qualified Data.ByteString.Lazy as L
 import qualified Data.HashMap.Strict as Map
 import qualified Data.Text.Encoding as TE
@@ -385,9 +387,9 @@ showLLVMData (LLVMDataLocal (I (_, i))) = "%_" <> intDec i
 showLLVMData (LLVMDataGlobal (I ("fork", 0))) = "@fork"
 showLLVMData (LLVMDataGlobal x) = "@" <> TE.encodeUtf8Builder (asText' x)
 showLLVMData (LLVMDataInt i) = integerDec i
-showLLVMData (LLVMDataFloat16 x) = floatDec $ fromHalf x
-showLLVMData (LLVMDataFloat32 x) = floatDec x
-showLLVMData (LLVMDataFloat64 x) = doubleDec x
+showLLVMData (LLVMDataFloat16 x) = "0x" <> (doubleHexFixed $ realToFrac x)
+showLLVMData (LLVMDataFloat32 x) = "0x" <> (doubleHexFixed $ realToFrac x)
+showLLVMData (LLVMDataFloat64 x) = "0x" <> (doubleHexFixed x)
 showLLVMData LLVMDataNull = "null"
 
 showItems :: (a -> Builder) -> [a] -> Builder
