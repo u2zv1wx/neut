@@ -166,6 +166,7 @@ infer' _ (m, WeakTermConst x@(I (s, _)))
     ml0 <- newLevelLE m []
     ml1 <- newLevelLT m [ml0]
     return ((m, WeakTermConst x), (asUniv ml0), ml1)
+  -- fixme: u32.addのようなconstantを、declなしで型をとれるようにする
   | otherwise = do
     mt <- lookupTypeEnv x
     case mt of

@@ -1076,7 +1076,11 @@ n15-4
 ;; coinduction principleも自動生成できるようにした。偉すぎる。
 ;; (i64.add 1000 stream.coinduction)
 
-(i64.add 100 10)
+;; (i64.add 100 10)
+
+(u32.add 100 10)
+
+;; (i64.add 100 (unsafe-cast f32 i64 10.25))
 
 ;; (i64.add 100 (unsafe-cast (bool) i64 (bool.true)))
 

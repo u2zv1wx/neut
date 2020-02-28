@@ -279,7 +279,9 @@ lookupConstantMaybe constName = do
   cenv <- gets constantEnv
   case Map.lookup constName cenv of
     Just i -> return $ Just (emptyMeta, WeakTermConst $ I (constName, i))
-    Nothing -> return Nothing
+    Nothing
+      | isConstant constName -> Just <$> lookupConstantPlus constName
+      | otherwise -> return Nothing
 
 lookupConstantPlus :: T.Text -> WithEnv WeakTermPlus
 lookupConstantPlus constName = do
@@ -291,6 +293,19 @@ lookupConstantPlus constName = do
       let ident = I (constName, i)
       modify (\env -> env {constantEnv = Map.insert constName i cenv})
       return (emptyMeta, WeakTermConst ident)
+
+-- f32とかi64.addとかは定数
+isConstant :: T.Text -> Bool
+isConstant "f16" = True
+isConstant "f32" = True
+isConstant "f64" = True
+isConstant name
+  | name == "f16" = True
+  | name == "f32" = True
+  | name == "f64" = True
+  | Just _ <- asUnaryOpMaybe name = True
+  | Just _ <- asBinaryOpMaybe name = True
+  | otherwise = False
 
 -- for debug
 p :: String -> WithEnv ()
