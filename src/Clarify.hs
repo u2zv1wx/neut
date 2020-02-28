@@ -172,6 +172,20 @@ clarifyConst m (I ("stdout", _)) =
   clarify (m, TermEnumIntro (EnumValueIntS 64 1))
 clarifyConst m (I ("stderr", _)) =
   clarify (m, TermEnumIntro (EnumValueIntS 64 2))
+clarifyConst m (I ("unsafe-cast", _))
+  -- unsafe-cast : Pi (A : tau, B : tau, _ : A). B
+  -- ~> (lam ((A tau) (B tau) (x A)) x)
+  -- (note that we're treating the `x` in the function body as if of type B)
+ = do
+  a <- newNameWith' "t1"
+  b <- newNameWith' "t2"
+  x <- newNameWith' "x"
+  l <- newCount
+  let varA = (m, TermUpsilon a)
+  let u = (m, TermTau l)
+  clarify
+    (m, TermPiIntro [(m, a, u), (m, b, u), (m, x, varA)] (m, TermUpsilon x))
+  -- clarify (m, TermEnumIntro (EnumValueIntS 64 2))
 clarifyConst m name@(I (x, _)) = do
   cenv <- gets constantEnv
   case Map.lookup x cenv of

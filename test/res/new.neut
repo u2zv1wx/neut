@@ -44,7 +44,7 @@
 ;;
 ;; そのほうがこんなふうに改行をいい感じにとりあつかえたりして嬉しい。こっちのほうが書いていてラクというか。普通のテキストファイルのときと同じように言葉を書くことができるってのがどれだけ快適なことであるのか、人類はまだ知らないのである。論文を書くようにしてプログラムを書くことができる、ということ。
 ;;
-;; parserのほうの処理自体はたぶんカンタンなんだけど。シンタックスハイライトをどう定義すればいいのかがわからない。emacsの話ね。
+;; parserのほうの処理自体はたぶんカンタンなんだけど。シンタックスハイライトをどう定義すればいいのかがわからない。emacsの話ね。……regexpでよさそう。
 ;;--
 
 ;; (collection fruit (apple banana orange melon))
@@ -252,6 +252,7 @@
     (case p
       (left top)
       (right (nat-inner)))))
+
 
 ;; こっちなら、sigmaの中身が消えることによって無限ループは生じないはず。……実際、うまくいった。
 ;; (coproduct top (nat-inner))
@@ -885,6 +886,8 @@ n15-4
   (stream.head ((_ (stream A))) A)
   (stream.tail ((_ (stream A))) (stream A)))
 
+;; (i64.add stream.coinduction 3)
+
 ;; (coinductive stream ((A tau))
 ;;   (stream.head ((_ (stream A))) A)
 ;;   (stream.tail ((_ (stream A))) (stream A)))
@@ -1075,7 +1078,12 @@ n15-4
 
 (i64.add 100 10)
 
-(fact 4)
+;; (i64.add 100 (unsafe-cast (bool) i64 (bool.true)))
+
+;; (fact 4)
+
+;; (i64 10)
+;; (f32 10.3)
 
 ;; 初期値付きのenum
 ;; (enum test
