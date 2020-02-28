@@ -223,61 +223,88 @@ arrVoidPtr :: ArrayKind
 arrVoidPtr = ArrayKindVoidPtr
 
 data UnaryOp
-  = UnaryOpNeg -- fneg
-  | UnaryOpTrunc LowType -- trunc, fptrunc
-  | UnaryOpZext LowType -- zext
-  | UnaryOpSext LowType -- sext
-  | UnaryOpFpExt LowType -- fpext
-  | UnaryOpTo LowType -- fp-to-ui, fp-to-si, ui-to-fp, si-to-fp (f32.to.i32, i32.to.f64, etc.)
+  = UnaryOpNeg LowType -- fneg : X -> X
+  | UnaryOpTrunc LowType LowType -- trunc, fptrunc : X -> Y
+  | UnaryOpZext LowType LowType -- zext
+  | UnaryOpSext LowType LowType -- sext
+  | UnaryOpFpExt LowType LowType -- fpext
+  | UnaryOpTo LowType LowType -- fp-to-ui, fp-to-si, ui-to-fp, si-to-fp (f32.to.i32, i32.to.f64, etc.)
   deriving (Eq, Show)
 
-asUnaryOpMaybe :: T.Text -> Maybe (LowType, UnaryOp)
+asUnaryOpMaybe :: T.Text -> Maybe UnaryOp
 asUnaryOpMaybe name
   | [typeStr, "neg"] <- wordsBy '.' name
-  , Just lowType <- asLowTypeMaybe typeStr = Just (lowType, UnaryOpNeg)
+  , Just lowType <- asLowTypeMaybe typeStr = Just $ UnaryOpNeg lowType
 asUnaryOpMaybe name
   | [domTypeStr, convOpStr, codTypeStr] <- wordsBy '.' name
   , Just domType <- asLowTypeMaybe domTypeStr
   , Just codType <- asLowTypeMaybe codTypeStr
-  , Just op <- asConvOpMaybe codType convOpStr = Just (domType, op)
+  , Just op <- asConvOpMaybe domType codType convOpStr = Just op
 asUnaryOpMaybe _ = Nothing
 
-asConvOpMaybe :: LowType -> T.Text -> Maybe UnaryOp
-asConvOpMaybe codType "trunc" = Just $ UnaryOpTrunc codType
-asConvOpMaybe codType "zext" = Just $ UnaryOpZext codType
-asConvOpMaybe codType "sext" = Just $ UnaryOpSext codType
-asConvOpMaybe codType "ext" = Just $ UnaryOpFpExt codType
-asConvOpMaybe codType "to" = Just $ UnaryOpTo codType
-asConvOpMaybe _ _ = Nothing
+unaryOpToDomCod :: UnaryOp -> (LowType, LowType)
+unaryOpToDomCod (UnaryOpNeg t) = (t, t)
+unaryOpToDomCod (UnaryOpTrunc dom cod) = (dom, cod)
+unaryOpToDomCod (UnaryOpZext dom cod) = (dom, cod)
+unaryOpToDomCod (UnaryOpSext dom cod) = (dom, cod)
+unaryOpToDomCod (UnaryOpFpExt dom cod) = (dom, cod)
+unaryOpToDomCod (UnaryOpTo dom cod) = (dom, cod)
+
+asConvOpMaybe :: LowType -> LowType -> T.Text -> Maybe UnaryOp
+asConvOpMaybe domType codType "trunc" = Just $ UnaryOpTrunc domType codType
+asConvOpMaybe domType codType "zext" = Just $ UnaryOpZext domType codType
+asConvOpMaybe domType codType "sext" = Just $ UnaryOpSext domType codType
+asConvOpMaybe domType codType "ext" = Just $ UnaryOpFpExt domType codType
+asConvOpMaybe domType codType "to" = Just $ UnaryOpTo domType codType
+asConvOpMaybe _ _ _ = Nothing
 
 data BinaryOp
-  = BinaryOpAdd
-  | BinaryOpSub
-  | BinaryOpMul
-  | BinaryOpDiv
-  | BinaryOpRem
-  | BinaryOpEQ
-  | BinaryOpNE
-  | BinaryOpGT
-  | BinaryOpGE
-  | BinaryOpLT
-  | BinaryOpLE
-  | BinaryOpShl
-  | BinaryOpLshr
-  | BinaryOpAshr
-  | BinaryOpAnd
-  | BinaryOpOr
-  | BinaryOpXor
+  = BinaryOpAdd LowType -- (X, X) -> X
+  | BinaryOpSub LowType -- (X, X) -> X
+  | BinaryOpMul LowType -- (X, X) -> X
+  | BinaryOpDiv LowType -- (X, X) -> X
+  | BinaryOpRem LowType -- (X, X) -> X
+  | BinaryOpEQ LowType -- (X, X) -> bool
+  | BinaryOpNE LowType -- (X, X) -> bool
+  | BinaryOpGT LowType -- (X, X) -> bool
+  | BinaryOpGE LowType -- (X, X) -> bool
+  | BinaryOpLT LowType -- (X, X) -> bool
+  | BinaryOpLE LowType -- (X, X) -> bool
+  | BinaryOpShl LowType -- (X, X) -> X
+  | BinaryOpLshr LowType -- (X, X) -> X
+  | BinaryOpAshr LowType -- (X, X) -> X
+  | BinaryOpAnd LowType -- (X, X) -> X
+  | BinaryOpOr LowType -- (X, X) -> X
+  | BinaryOpXor LowType -- (X, X) -> X
   deriving (Eq, Show)
 
-asBinaryOpMaybe :: T.Text -> Maybe (LowType, BinaryOp)
+asBinaryOpMaybe :: T.Text -> Maybe BinaryOp
 asBinaryOpMaybe name
   | [typeStr, opStr] <- wordsBy '.' name -- e.g. name == "i8.add"
   , Just lowType <- asLowTypeMaybe typeStr
-  , Just op <- asBinaryOpMaybe' opStr = Just (lowType, op)
+  , Just f <- asBinaryOpMaybe' opStr = Just $ f lowType
 asBinaryOpMaybe _ = Nothing
 
-asBinaryOpMaybe' :: T.Text -> Maybe BinaryOp
+binaryOpToDomCod :: BinaryOp -> (LowType, LowType)
+binaryOpToDomCod (BinaryOpAdd t) = (t, t)
+binaryOpToDomCod (BinaryOpSub t) = (t, t)
+binaryOpToDomCod (BinaryOpMul t) = (t, t)
+binaryOpToDomCod (BinaryOpDiv t) = (t, t)
+binaryOpToDomCod (BinaryOpRem t) = (t, t)
+binaryOpToDomCod (BinaryOpEQ t) = (t, LowTypeIntS 1)
+binaryOpToDomCod (BinaryOpNE t) = (t, LowTypeIntS 1)
+binaryOpToDomCod (BinaryOpGT t) = (t, LowTypeIntS 1)
+binaryOpToDomCod (BinaryOpGE t) = (t, LowTypeIntS 1)
+binaryOpToDomCod (BinaryOpLT t) = (t, LowTypeIntS 1)
+binaryOpToDomCod (BinaryOpLE t) = (t, LowTypeIntS 1)
+binaryOpToDomCod (BinaryOpShl t) = (t, t)
+binaryOpToDomCod (BinaryOpLshr t) = (t, t)
+binaryOpToDomCod (BinaryOpAshr t) = (t, t)
+binaryOpToDomCod (BinaryOpAnd t) = (t, t)
+binaryOpToDomCod (BinaryOpOr t) = (t, t)
+binaryOpToDomCod (BinaryOpXor t) = (t, t)
+
+asBinaryOpMaybe' :: T.Text -> Maybe (LowType -> BinaryOp)
 asBinaryOpMaybe' "add" = Just BinaryOpAdd
 asBinaryOpMaybe' "sub" = Just BinaryOpSub
 asBinaryOpMaybe' "mul" = Just BinaryOpMul

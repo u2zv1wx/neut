@@ -136,14 +136,8 @@ loadContent' bp bt ((i, (x, et)):xis) cont = do
     LLVMLet x (LLVMOpLoad pos et) cont'
 
 llvmCodeTheta :: Meta -> Theta -> WithEnv LLVM
-llvmCodeTheta _ (ThetaUnaryOp op lowType v)
-  | UnaryOpNeg <- op = llvmCodeUnaryOp op lowType lowType v
-  | Just codType <- getCodType op = llvmCodeUnaryOp op lowType codType v
-  | otherwise = throwError' "llvmCodeTheta.ThetaUnaryOp"
-llvmCodeTheta _ (ThetaBinaryOp op lowType v1 v2)
-  | isArithOp op = llvmCodeBinaryOp op lowType lowType v1 v2
-  | isCompareOp op = llvmCodeBinaryOp op lowType (LowTypeIntS 1) v1 v2
-  | otherwise = throwError' "llvmCodeTheta.ThetaBinaryOp"
+llvmCodeTheta _ (ThetaUnaryOp op v) = llvmCodeUnaryOp op v
+llvmCodeTheta _ (ThetaBinaryOp op v1 v2) = llvmCodeBinaryOp op v1 v2
 llvmCodeTheta _ (ThetaArrayAccess lowType arr idx) = do
   let arrayType = LowTypeArrayPtr 0 lowType
   (arrVar, castArrThen) <- llvmCast (Just $ takeBaseName arr) arr arrayType
@@ -165,22 +159,22 @@ llvmCodeTheta _ (ThetaSysCall num args) = do
   llvmDataLet' (zip xs args) $
     LLVMLet res (LLVMOpSysCall num' vs) $ LLVMReturn (LLVMDataLocal res)
 
-llvmCodeUnaryOp :: UnaryOp -> LowType -> LowType -> DataPlus -> WithEnv LLVM
-llvmCodeUnaryOp op domType codType d = do
+llvmCodeUnaryOp :: UnaryOp -> DataPlus -> WithEnv LLVM
+llvmCodeUnaryOp op d = do
+  let (domType, codType) = unaryOpToDomCod op
   (x, castThen) <- llvmCast (Just "unary-op") d domType
   result <- newNameWith' "unary-op-result"
   uncast <- llvmUncast (Just $ asText result) (LLVMDataLocal result) codType
-  castThen $ LLVMLet result (LLVMOpUnaryOp (op, domType) x) uncast
+  castThen $ LLVMLet result (LLVMOpUnaryOp op x) uncast
 
-llvmCodeBinaryOp ::
-     BinaryOp -> LowType -> LowType -> DataPlus -> DataPlus -> WithEnv LLVM
-llvmCodeBinaryOp op domType codType v1 v2 = do
+llvmCodeBinaryOp :: BinaryOp -> DataPlus -> DataPlus -> WithEnv LLVM
+llvmCodeBinaryOp op v1 v2 = do
+  let (domType, codType) = binaryOpToDomCod op
   (x1, cast1then) <- llvmCast (Just "binary-op-fst") v1 domType
   (x2, cast2then) <- llvmCast (Just "binary-op-snd") v2 domType
   result <- newNameWith' "binary-op-result"
   uncast <- llvmUncast (Just $ asText result) (LLVMDataLocal result) codType
-  (cast1then >=> cast2then) $
-    LLVMLet result (LLVMOpBinaryOp (op, domType) x1 x2) uncast
+  (cast1then >=> cast2then) $ LLVMLet result (LLVMOpBinaryOp op x1 x2) uncast
 
 -- alloca + storeで実現すべき？
 llvmCast ::
@@ -519,37 +513,6 @@ getEnumNum label = do
 insLLVMEnv :: Identifier -> [Identifier] -> LLVM -> WithEnv ()
 insLLVMEnv funName args e =
   modify (\env -> env {llvmEnv = Map.insert funName (args, e) (llvmEnv env)})
-
-getCodType :: UnaryOp -> Maybe LowType
-getCodType (UnaryOpTrunc lowType) = Just lowType
-getCodType (UnaryOpZext lowType) = Just lowType
-getCodType (UnaryOpSext lowType) = Just lowType
-getCodType (UnaryOpFpExt lowType) = Just lowType
-getCodType (UnaryOpTo lowType) = Just lowType
-getCodType _ = Nothing
-
-isArithOp :: BinaryOp -> Bool
-isArithOp BinaryOpAdd = True
-isArithOp BinaryOpSub = True
-isArithOp BinaryOpMul = True
-isArithOp BinaryOpDiv = True
-isArithOp BinaryOpRem = True
-isArithOp BinaryOpShl = True
-isArithOp BinaryOpLshr = True
-isArithOp BinaryOpAshr = True
-isArithOp BinaryOpAnd = True
-isArithOp BinaryOpOr = True
-isArithOp BinaryOpXor = True
-isArithOp _ = False
-
-isCompareOp :: BinaryOp -> Bool
-isCompareOp BinaryOpEQ = True
-isCompareOp BinaryOpNE = True
-isCompareOp BinaryOpGT = True
-isCompareOp BinaryOpGE = True
-isCompareOp BinaryOpLT = True
-isCompareOp BinaryOpLE = True
-isCompareOp _ = False
 
 commConv :: Identifier -> LLVM -> LLVM -> WithEnv LLVM
 commConv x (LLVMReturn d) cont =

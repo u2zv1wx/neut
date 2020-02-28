@@ -37,8 +37,8 @@ data Code
   deriving (Show)
 
 data Theta
-  = ThetaUnaryOp UnaryOp LowType DataPlus
-  | ThetaBinaryOp BinaryOp LowType DataPlus DataPlus
+  = ThetaUnaryOp UnaryOp DataPlus
+  | ThetaBinaryOp BinaryOp DataPlus DataPlus
   | ThetaArrayAccess LowType DataPlus DataPlus
   | ThetaSysCall SysCall [DataPlus]
   deriving (Show)
@@ -127,13 +127,13 @@ substCodePlus sub (m, CodeStructElim xks v e) = do
   (m, CodeStructElim xks v' e')
 
 substTheta :: SubstDataPlus -> Theta -> Theta
-substTheta sub (ThetaUnaryOp a t v) = do
+substTheta sub (ThetaUnaryOp a v) = do
   let v' = substDataPlus sub v
-  ThetaUnaryOp a t v'
-substTheta sub (ThetaBinaryOp a t v1 v2) = do
+  ThetaUnaryOp a v'
+substTheta sub (ThetaBinaryOp a v1 v2) = do
   let v1' = substDataPlus sub v1
   let v2' = substDataPlus sub v2
-  ThetaBinaryOp a t v1' v2'
+  ThetaBinaryOp a v1' v2'
 substTheta sub (ThetaArrayAccess t d1 d2) = do
   let d1' = substDataPlus sub d1
   let d2' = substDataPlus sub d2

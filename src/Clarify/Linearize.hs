@@ -208,13 +208,13 @@ distinguishCode zs (ml, CodeStructElim xts d e) = do
   return (merge [vs1, vs2], (ml, CodeStructElim xts d' e'))
 
 distinguishTheta :: [Identifier] -> Theta -> WithEnv (NameMap, Theta)
-distinguishTheta zs (ThetaUnaryOp op lowType d) = do
+distinguishTheta zs (ThetaUnaryOp op d) = do
   (vs, d') <- distinguishData zs d
-  return (vs, ThetaUnaryOp op lowType d')
-distinguishTheta zs (ThetaBinaryOp op lowType d1 d2) = do
+  return (vs, ThetaUnaryOp op d')
+distinguishTheta zs (ThetaBinaryOp op d1 d2) = do
   (vs1, d1') <- distinguishData zs d1
   (vs2, d2') <- distinguishData zs d2
-  return (merge [vs1, vs2], ThetaBinaryOp op lowType d1' d2')
+  return (merge [vs1, vs2], ThetaBinaryOp op d1' d2')
 distinguishTheta zs (ThetaArrayAccess lowType d1 d2) = do
   (vs1, d1') <- distinguishData zs d1
   (vs2, d2') <- distinguishData zs d2

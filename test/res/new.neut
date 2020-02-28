@@ -6,6 +6,8 @@
 
 (include "bottom.neut")
 
+(enum bool true false)
+
 (include "constant.neut")
 
 ;; このstateの中でtop-unitが書き換えられてしまう。
@@ -19,6 +21,7 @@
 
 ;; もちろん、もう一回includeすれば書き換えの問題は解消される。
 (include "top.neut")
+
 
 (enum choice left right)
 
@@ -944,17 +947,17 @@ n15-4
 ;;   (A "440Hz")
 ;;   (B "498Hz"))
 
-(inductive bool ()
-  (bool.true () (bool))
-  (bool.false () (bool)))
+;; (inductive bool ()
+;;   (bool.true () (bool))
+;;   (bool.false () (bool)))
 
 ;; (inductive sample ((A tau))
 ;;   (sample.true () (sample A))
 ;;   (sample.false () (sample A)))
 
-(inductive sample ((b (bool)))
-  (sample.true () (sample (bool.true)))
-  (sample.false () (sample (bool.false))))
+;; (inductive sample ((b (bool)))
+;;   (sample.true () (sample (bool.true)))
+;;   (sample.false () (sample (bool.false))))
 ;; induction principleを自動生成できるようにした。これでnatの内部実装を気にせずにnatを利用できるようになる。
 ;; (i64.add 100 (nat.succ unit))
 
@@ -1010,15 +1013,15 @@ n15-4
 ;;   F bool.false →
 ;;   F b
 
-(let not
-  (pi ((_ (bool)))
-    (bool))
-  (lambda ((b (bool)))
-    (bool.induction
-      (lambda () (bool))
-      bool.false
-      bool.true
-      b)))
+;; (let not
+;;   (pi ((_ (bool)))
+;;     (bool))
+;;   (lambda ((b (bool)))
+;;     (bool.induction
+;;       (lambda () (bool))
+;;       bool.false
+;;       bool.true
+;;       b)))
 
 (definition mysig
   (sigma
@@ -1058,9 +1061,9 @@ n15-4
 ;; 原因はなに？どうすれば修正できるだろう？
 ;; branchごとに値が実際には具体化されてるんだけど、それを型システムのほうで表現できていないのが原因。
 
-(theorem 3.2.2-flip-true
-  (identity (bool) (not (not (bool.true))) (bool.true))
-  (identity.reflexive (bool) (bool.true) (bool.true) (bool.true)))
+;; (theorem 3.2.2-flip-true
+;;   (identity (bool) (not (not (bool.true))) (bool.true))
+;;   (identity.reflexive (bool) (bool.true) (bool.true) (bool.true)))
 
 ;; 定理の名前を番号だけにするとなんか論文とかとそのまんまの対応がとれてうれしいかも。
 ;; (theorem 3.2.3
@@ -1076,6 +1079,7 @@ n15-4
 ;; coinduction principleも自動生成できるようにした。偉すぎる。
 ;; (i64.add 1000 stream.coinduction)
 
+
 (i64.add 100 (i64 10))
 
 ;; (.add 100 10)
@@ -1090,6 +1094,10 @@ n15-4
 
 ;; (i64 10)
 (f32 10.3)
+
+(fact 5)
+
+;; (u32.add 200 300)
 
 ;; 初期値付きのenum
 ;; (enum test

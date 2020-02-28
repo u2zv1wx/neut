@@ -154,9 +154,9 @@ clarifyPlus e@(m, _) = do
 
 clarifyConst :: Meta -> Identifier -> WithEnv CodePlus
 clarifyConst m name@(I (x, _))
-  | Just (lowType, op) <- asUnaryOpMaybe x = clarifyUnaryOp name op lowType m
+  | Just op <- asUnaryOpMaybe x = clarifyUnaryOp name op m
 clarifyConst m name@(I (x, _))
-  | Just (lowType, op) <- asBinaryOpMaybe x = clarifyBinaryOp name op lowType m
+  | Just op <- asBinaryOpMaybe x = clarifyBinaryOp name op m
 clarifyConst m name@(I (x, _))
   | Just (sysCall, len) <- asSysCallMaybe x = clarifySysCall name sysCall len m
 clarifyConst m (I (x, _))
@@ -195,8 +195,8 @@ clarifyConst m name@(I (x, _)) = do
   --   then return (m, CodeUpIntro (m, DataTheta name))
   --   else throwError' $ "clarify.theta: " <> name
 
-clarifyUnaryOp :: Identifier -> UnaryOp -> LowType -> Meta -> WithEnv CodePlus
-clarifyUnaryOp name op lowType m = do
+clarifyUnaryOp :: Identifier -> UnaryOp -> Meta -> WithEnv CodePlus
+clarifyUnaryOp name op m = do
   t <- lookupTypeEnv' name
   t' <- reduceTermPlus t
   case t' of
@@ -209,11 +209,11 @@ clarifyUnaryOp name op lowType m = do
         zts
         m
         [(mx, x, tx)]
-        (m, CodeTheta (ThetaUnaryOp op lowType varX))
+        (m, CodeTheta (ThetaUnaryOp op varX))
     _ -> throwError' $ "the arity of " <> asText name <> " is wrong"
 
-clarifyBinaryOp :: Identifier -> BinaryOp -> LowType -> Meta -> WithEnv CodePlus
-clarifyBinaryOp name op lowType m = do
+clarifyBinaryOp :: Identifier -> BinaryOp -> Meta -> WithEnv CodePlus
+clarifyBinaryOp name op m = do
   t <- lookupTypeEnv' name
   t' <- reduceTermPlus t
   case t' of
@@ -226,7 +226,7 @@ clarifyBinaryOp name op lowType m = do
         zts
         m
         [(mx, x, tx), (my, y, ty)]
-        (m, CodeTheta (ThetaBinaryOp op lowType varX varY))
+        (m, CodeTheta (ThetaBinaryOp op varX varY))
     _ -> throwError' $ "the arity of " <> asText name <> " is wrong"
 
 clarifyArrayAccess :: Meta -> Identifier -> LowType -> WithEnv CodePlus

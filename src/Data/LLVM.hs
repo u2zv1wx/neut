@@ -38,8 +38,8 @@ data LLVMOp
   | LLVMOpStore LowType LLVMData LLVMData
   | LLVMOpAlloc LLVMData -- size
   | LLVMOpFree LLVMData
-  | LLVMOpUnaryOp (UnaryOp, LowType) LLVMData
-  | LLVMOpBinaryOp (BinaryOp, LowType) LLVMData LLVMData
+  | LLVMOpUnaryOp UnaryOp LLVMData
+  | LLVMOpBinaryOp BinaryOp LLVMData LLVMData
   | LLVMOpSysCall
       Integer -- syscall number
       [LLVMData] -- arguments

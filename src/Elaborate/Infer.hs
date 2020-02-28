@@ -470,7 +470,13 @@ lookupWeakTypeEnv s = do
   case mt of
     Just t -> return t
     Nothing ->
-      throwError' $ asText s <> " is not found in the weak type environment."
+      case lookupConstType s of
+        Nothing ->
+          throwError' $
+          asText s <> " is not found in the weak type environment."
+        Just t -> do
+          l <- newCount
+          return (t, UnivLevelPlus (fst t, l))
 
 lookupWeakTypeEnvMaybe ::
      Identifier -> WithEnv (Maybe (WeakTermPlus, UnivLevelPlus))
@@ -486,6 +492,9 @@ lookupKind name = do
   case Map.lookup name renv of
     Nothing -> throwError' $ "no such enum-intro is defined: " <> name
     Just (j, _) -> return j
+
+lookupConstType :: Identifier -> Maybe WeakTermPlus
+lookupConstType = undefined
 
 newLevelLE :: Meta -> [UnivLevelPlus] -> WithEnv UnivLevelPlus
 newLevelLE m mls = do
