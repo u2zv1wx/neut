@@ -24,12 +24,12 @@
 ;; (constant i64.mul
 ;;   (pi ((_ i64) (_ i64)) i64))
 
-(constant array-access-u8
-  (pi
-    ((A type)
-     (arr (array A u8))
-     (n A))
-    (product (array A u8) u8)))
+;; (constant array-access-u8
+;;   (pi
+;;     ((A type)
+;;      (arr (array A u8))
+;;      (n A))
+;;     (product (array A u8) u8)))
 
 ;; これ、buf : utf8-codeとかにしたほうがいいのかも？
 ;; writeのlenの部分はi64にしてよさげ。

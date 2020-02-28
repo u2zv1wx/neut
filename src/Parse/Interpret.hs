@@ -410,12 +410,6 @@ readEnumValueNat str -- n1-0, n2-0, n2-1, ...
   , 0 <= toInteger j && toInteger j <= toInteger i - 1 = Just $ EnumValueNat i j
   | otherwise = Nothing
 
-asArrayKindMaybe :: LowType -> Maybe ArrayKind
-asArrayKindMaybe (LowTypeIntS i) = Just $ ArrayKindIntS i
-asArrayKindMaybe (LowTypeIntU i) = Just $ ArrayKindIntU i
-asArrayKindMaybe (LowTypeFloat size) = Just $ ArrayKindFloat size
-asArrayKindMaybe _ = Nothing
-
 adjustPhase :: Meta -> WithEnv Meta
 adjustPhase m = do
   i <- gets phase

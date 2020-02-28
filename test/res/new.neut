@@ -624,8 +624,14 @@
 (let result
   (sigma-elimination
     ((new-buf hole) (value hole))
-    (array-access-u8 hole buf n15-2)
+    (u8:array-access hole buf n15-2)
     value))
+
+;; (let result
+;;   (sigma-elimination
+;;     ((new-buf hole) (value hole))
+;;     (array-access-u8 hole buf n15-2)
+;;     value))
 
 ;; (let result
 ;;   (sigma-elimination
@@ -1099,9 +1105,19 @@ n15-4
 
 (u8.add 200 200) ;; ~> 144 (overflow)
 
-(u4.sub (u4 10) 10)
+(u4.sub (u4 10) 11)
 
-(u4.sub (i32 10000) 10)
+(let item
+  (array-introduction u32 10 20 30))
+
+(sigma-elimination
+  ((_ hole) (v hole))
+  (u32:array-access hole item n3-1)
+  (u32.add v 100))
+
+;; (i4.sub 4 8)
+
+;; (u4.sub (i32 10000) 10)
 
 ;; (u32.add 200 300)
 

@@ -174,7 +174,10 @@ infer' _ (m, WeakTermConst x@(I (s, _)))
     t <- binaryOpToWeakType m op
     (t', l) <- inferType' [] t
     return ((m, WeakTermConst x), t', l)
-  -- fixme: u32.addのようなconstantを、declなしで型をとれるようにする
+  | Just lowType <- asArrayAccessMaybe s = do
+    t <- arrayAccessToWeakType m lowType
+    (t', l) <- inferType' [] t
+    return ((m, WeakTermConst x), t', l)
   | otherwise = do
     mt <- lookupTypeEnv x
     case mt of
@@ -669,3 +672,22 @@ binaryOpToWeakType m op = do
   let xts = [(m, x1, dom'), (m, x2, dom')]
   mls <- piUnivLevelsfrom xts cod'
   return (m, WeakTermPi mls xts cod')
+
+-- u8:array-access : Pi (A : tau, _ : Array A u8, _ : A). Sigma (_ : Array A u8). u8
+arrayAccessToWeakType :: Meta -> LowType -> WithEnv WeakTermPlus
+arrayAccessToWeakType m lowType = do
+  t <- lowTypeToWeakType m lowType
+  k <- lowTypeToArrayKind lowType
+  x1 <- newNameWith' "arg"
+  x2 <- newNameWith' "arg"
+  x3 <- newNameWith' "arg"
+  l <- newCount
+  let univ = (m, WeakTermTau l)
+  let idx = (m, WeakTermUpsilon x1)
+  let arr = (m, WeakTermArray idx k)
+  let xts = [(m, x1, univ), (m, x2, arr), (m, x3, idx)]
+  x4 <- newNameWith' "arg"
+  x5 <- newNameWith' "arg"
+  let cod = (m, WeakTermSigma [(m, x4, arr), (m, x5, t)])
+  mls <- piUnivLevelsfrom xts cod
+  return (m, WeakTermPi mls xts cod)

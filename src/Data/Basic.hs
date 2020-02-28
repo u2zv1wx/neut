@@ -222,6 +222,28 @@ voidPtr = LowTypeVoidPtr
 arrVoidPtr :: ArrayKind
 arrVoidPtr = ArrayKindVoidPtr
 
+asArrayAccessMaybe :: T.Text -> Maybe LowType
+asArrayAccessMaybe name
+  | [typeStr, "array-access"] <- wordsBy ':' name = asLowTypeMaybe typeStr
+  | otherwise = Nothing
+
+-- asArrayAccessMaybe :: Identifier -> Maybe LowType
+-- asArrayAccessMaybe (I (name, _))
+--   | ["array-access", typeStr] <- sepAtLast '-' name
+--   , Just lowType <- asLowTypeMaybe typeStr = Just lowType
+-- asArrayAccessMaybe _ = Nothing
+-- sepAtLast :: Char -> T.Text -> [T.Text]
+-- sepAtLast c s =
+--   case wordsBy c s of
+--     [] -> []
+--     [s'] -> [s']
+--     ss -> [T.intercalate (T.singleton c) (init ss), last ss]
+asArrayKindMaybe :: LowType -> Maybe ArrayKind
+asArrayKindMaybe (LowTypeIntS i) = Just $ ArrayKindIntS i
+asArrayKindMaybe (LowTypeIntU i) = Just $ ArrayKindIntU i
+asArrayKindMaybe (LowTypeFloat size) = Just $ ArrayKindFloat size
+asArrayKindMaybe _ = Nothing
+
 data UnaryOp
   = UnaryOpNeg LowType -- fneg : X -> X
   | UnaryOpTrunc LowType LowType -- trunc, fptrunc : X -> Y

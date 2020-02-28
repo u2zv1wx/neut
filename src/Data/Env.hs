@@ -251,6 +251,7 @@ lookupTypeEnv' (I (s, i))
     return (emptyMeta, TermTau l)
   | Just op <- asUnaryOpMaybe s = unaryOpToType emptyMeta op
   | Just op <- asBinaryOpMaybe s = binaryOpToType emptyMeta op
+  | Just lowType <- asArrayAccessMaybe s = arrayAccessToType emptyMeta lowType
   | otherwise = do
     mt <- gets (IntMap.lookup i . typeEnv)
     case mt of
@@ -289,6 +290,24 @@ binaryOpToType m op = do
   let xts = [(m, x1, dom'), (m, x2, dom')]
   -- mls <- piUnivLevelsfrom xts cod'
   return (m, TermPi [] xts cod')
+
+arrayAccessToType :: Meta -> LowType -> WithEnv TermPlus
+arrayAccessToType m lowType = do
+  t <- lowTypeToType m lowType
+  k <- lowTypeToArrayKind lowType
+  x1 <- newNameWith' "arg"
+  x2 <- newNameWith' "arg"
+  x3 <- newNameWith' "arg"
+  l <- newCount
+  let univ = (m, TermTau l)
+  let idx = (m, TermUpsilon x1)
+  let arr = (m, TermArray idx k)
+  let xts = [(m, x1, univ), (m, x2, arr), (m, x3, idx)]
+  x4 <- newNameWith' "arg"
+  x5 <- newNameWith' "arg"
+  let cod = (m, TermSigma [(m, x4, arr), (m, x5, t)])
+  -- mls <- piUnivLevelsfrom xts cod
+  return (m, TermPi [] xts cod)
 
 lookupConstNum :: T.Text -> WithEnv Int
 lookupConstNum constName = do
@@ -338,6 +357,7 @@ isConstant name
   | name == "f64" = True
   | Just _ <- asUnaryOpMaybe name = True
   | Just _ <- asBinaryOpMaybe name = True
+  | Just _ <- asArrayAccessMaybe name = True
   | otherwise = False
 
 -- for debug
@@ -355,3 +375,9 @@ toStr s = Pr.ppShow s
 
 toInfo :: (Show a) => String -> a -> String
 toInfo s x = "assertion failure:\n" ++ s ++ "\n" ++ toStr x
+
+lowTypeToArrayKind :: LowType -> WithEnv ArrayKind
+lowTypeToArrayKind lowType =
+  case asArrayKindMaybe lowType of
+    Just k -> return k
+    Nothing -> throwError' "Infer.lowTypeToArrayKind"

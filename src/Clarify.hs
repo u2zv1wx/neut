@@ -161,8 +161,8 @@ clarifyConst m name@(I (x, _))
   | Just (sysCall, len) <- asSysCallMaybe x = clarifySysCall name sysCall len m
 clarifyConst m (I (x, _))
   | Just _ <- asLowTypeMaybe x = clarify (m, TermEnum $ EnumTypeLabel "top")
-clarifyConst m name
-  | Just lowType <- asArrayAccessMaybe name = clarifyArrayAccess m name lowType
+clarifyConst m name@(I (x, _))
+  | Just lowType <- asArrayAccessMaybe x = clarifyArrayAccess m name lowType
 clarifyConst m (I ("file-descriptor", _)) = do
   i <- lookupConstNum "i64"
   clarify (m, TermConst (I ("i64", i)))
@@ -339,19 +339,11 @@ knot z cls = do
 
 -- array-access-u8 ~> Just u8
 -- array-access-i12341234 ~> Just i12341234
-asArrayAccessMaybe :: Identifier -> Maybe LowType
-asArrayAccessMaybe (I (name, _))
-  | ["array-access", typeStr] <- sepAtLast '-' name
-  , Just lowType <- asLowTypeMaybe typeStr = Just lowType
-asArrayAccessMaybe _ = Nothing
-
-sepAtLast :: Char -> T.Text -> [T.Text]
-sepAtLast c s =
-  case wordsBy c s of
-    [] -> []
-    [s'] -> [s']
-    ss -> [T.intercalate (T.singleton c) (init ss), last ss]
-
+-- asArrayAccessMaybe :: Identifier -> Maybe LowType
+-- asArrayAccessMaybe (I (name, _))
+--   | ["array-access", typeStr] <- sepAtLast '-' name
+--   , Just lowType <- asLowTypeMaybe typeStr = Just lowType
+-- asArrayAccessMaybe _ = Nothing
 asSysCallMaybe :: T.Text -> Maybe (SysCall, [Arg])
 asSysCallMaybe "write" =
   Just (SysCallWrite, [ArgUnused, ArgImmediate, ArgArray, ArgImmediate])
