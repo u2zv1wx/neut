@@ -276,10 +276,25 @@ elaborate' (m, WeakTermConst x) = return (m, TermConst x)
 elaborate' (m, WeakTermInt t x) = do
   t' <- elaborate' t >>= reduceTermPlus
   case t' of
-    (_, TermEnum (EnumTypeIntS size)) ->
-      return (m, TermEnumIntro (EnumValueIntS size x))
-    (_, TermEnum (EnumTypeIntU size)) ->
-      return (m, TermEnumIntro (EnumValueIntU size x))
+    (_, TermEnum (EnumTypeIntS size))
+      | (-1) * (2 ^ (size - 1)) <= x
+      , x < 2 ^ size -> return (m, TermEnumIntro (EnumValueIntS size x))
+      | otherwise ->
+        throwError' $
+        "the signed integer " <>
+        T.pack (show x) <>
+        " is inferred to be of type i" <>
+        T.pack (show size) <> ", but is out of range of i" <> T.pack (show size)
+    (_, TermEnum (EnumTypeIntU size))
+      | 0 <= x
+      , x < 2 ^ size -> return (m, TermEnumIntro (EnumValueIntU size x))
+      | otherwise ->
+        throwError' $
+        "the unsigned integer " <>
+        T.pack (show x) <>
+        " is inferred to be of type u" <>
+        T.pack (show size) <> ", but is out of range of u" <> T.pack (show size)
+        -- throwError' "out-of-range"
     _ -> do
       liftIO $ setSGR [SetConsoleIntensity BoldIntensity]
       liftIO $ putStrLn $ showMeta m ++ ":"
