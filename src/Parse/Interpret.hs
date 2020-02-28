@@ -6,6 +6,7 @@ module Parse.Interpret
   , interpretIter
   , interpretEnumItem
   , adjustPhase
+  , readEnumValueIntU
   ) where
 
 import Control.Monad.Except
@@ -156,12 +157,6 @@ interpret (m, TreeNode ((_, TreeAtom "product"):ts)) = do
   xs <- mapM (const $ newNameWith' "sig") ts'
   m' <- adjustPhase m
   return (m', WeakTermSigma (zip3 ms xs ts'))
--- interpret (m, TreeNode [(_, TreeAtom x), (_, TreeAtom v)])
---   | Just i <- readEnumTypeIntS x
---   , Just v' <- readEnumValueIntS ->
---   | Just x' <- readMaybe $ T.unpack x = do
---     m' <- adjustPhase m
---     return (m', WeakTermFloat16 x')
 interpret (m, TreeAtom x)
   | Just x' <- readMaybe $ T.unpack x = do
     m' <- adjustPhase m
@@ -252,9 +247,25 @@ interpretEnumValueMaybe :: TreePlus -> WithEnv (Maybe EnumValue)
 interpretEnumValueMaybe (_, TreeAtom x)
   | Just v <- readEnumValueNat x = return $ Just v
 interpretEnumValueMaybe (_, TreeNode [(_, TreeAtom t), (_, TreeAtom x)])
-  | Just v <- readEnumValueIntS t x = return $ Just v
+  | Just v@(EnumValueIntS size x') <- readEnumValueIntS t x =
+    if (-1) * (2 ^ (size - 1)) <= x' && x' < 2 ^ size
+      then return $ Just v
+      else throwError' $
+           "the signed integer " <>
+           T.pack (show x') <>
+           " is supposed to be of type i" <>
+           T.pack (show size) <>
+           ", but is out of range of i" <> T.pack (show size)
 interpretEnumValueMaybe (_, TreeNode [(_, TreeAtom t), (_, TreeAtom x)])
-  | Just v <- readEnumValueIntU t x = return $ Just v
+  | Just v@(EnumValueIntU size x') <- readEnumValueIntU t x =
+    if 0 <= x' && x' < 2 ^ size
+      then return $ Just v
+      else throwError' $
+           "the unsigned integer " <>
+           T.pack (show x') <>
+           " is supposed to be of type u" <>
+           T.pack (show size) <>
+           ", but is out of range of u" <> T.pack (show size)
 interpretEnumValueMaybe (_, TreeAtom x) = do
   b <- isDefinedEnum x
   if b
