@@ -249,6 +249,8 @@ lookupTypeEnv' (I (s, i))
   | Just _ <- asLowTypeMaybe s = do
     l <- newCount
     return (emptyMeta, TermTau l)
+  | Just op <- asUnaryOpMaybe s = unaryOpToType emptyMeta op
+  | Just op <- asBinaryOpMaybe s = binaryOpToType emptyMeta op
   | otherwise = do
     mt <- gets (IntMap.lookup i . typeEnv)
     case mt of
@@ -256,6 +258,37 @@ lookupTypeEnv' (I (s, i))
       Nothing ->
         throwError
           [TIO.putStrLn $ s <> " is not found in the type environment."]
+
+lowTypeToType :: Meta -> LowType -> WithEnv TermPlus
+lowTypeToType m (LowTypeIntS s) = return (m, TermEnum (EnumTypeIntS s))
+lowTypeToType m (LowTypeIntU s) = return (m, TermEnum (EnumTypeIntU s))
+lowTypeToType m (LowTypeFloat s) = do
+  let x = "f" <> T.pack (show (sizeAsInt s))
+  i <- lookupConstNum x
+  return (m, TermConst (I (x, i)))
+lowTypeToType _ _ =
+  error "[compiler bug] invalid argument passed to lowTypeToType"
+
+unaryOpToType :: Meta -> UnaryOp -> WithEnv TermPlus
+unaryOpToType m op = do
+  let (dom, cod) = unaryOpToDomCod op
+  dom' <- lowTypeToType m dom
+  cod' <- lowTypeToType m cod
+  x <- newNameWith' "arg"
+  let xts = [(m, x, dom')]
+  -- mls <- piUnivLevelsfrom xts cod'
+  return (m, TermPi [] xts cod')
+
+binaryOpToType :: Meta -> BinaryOp -> WithEnv TermPlus
+binaryOpToType m op = do
+  let (dom, cod) = binaryOpToDomCod op
+  dom' <- lowTypeToType m dom
+  cod' <- lowTypeToType m cod
+  x1 <- newNameWith' "arg"
+  x2 <- newNameWith' "arg"
+  let xts = [(m, x1, dom'), (m, x2, dom')]
+  -- mls <- piUnivLevelsfrom xts cod'
+  return (m, TermPi [] xts cod')
 
 lookupConstNum :: T.Text -> WithEnv Int
 lookupConstNum constName = do

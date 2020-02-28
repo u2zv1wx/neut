@@ -166,12 +166,22 @@ infer' _ (m, WeakTermConst x@(I (s, _)))
     ml0 <- newLevelLE m []
     ml1 <- newLevelLT m [ml0]
     return ((m, WeakTermConst x), (asUniv ml0), ml1)
+  | Just op <- asUnaryOpMaybe s = do
+    t <- unaryOpToWeakType m op
+    (t', l) <- inferType' [] t
+    return ((m, WeakTermConst x), t', l)
+  | Just op <- asBinaryOpMaybe s = do
+    t <- binaryOpToWeakType m op
+    (t', l) <- inferType' [] t
+    return ((m, WeakTermConst x), t', l)
   -- fixme: u32.addのようなconstantを、declなしで型をとれるようにする
   | otherwise = do
     mt <- lookupTypeEnv x
     case mt of
       Nothing -> do
+        p "here"
         (t, UnivLevelPlus (_, l)) <- lookupWeakTypeEnv x
+        p "and here"
         return ((m, WeakTermConst x), t, UnivLevelPlus (m, l))
       Just (t, UnivLevelPlus (_, l)) -> do
         ((_, t'), l') <- univInst (weaken t) l
@@ -630,3 +640,32 @@ levelInst l = do
       let s = S.fromList [l, l']
       modify (\env -> env {univInstEnv = IntMap.insertWith S.union l s uienv})
       return l'
+
+lowTypeToWeakType :: Meta -> LowType -> WithEnv WeakTermPlus
+lowTypeToWeakType m (LowTypeIntS s) = return (m, WeakTermEnum (EnumTypeIntS s))
+lowTypeToWeakType m (LowTypeIntU s) = return (m, WeakTermEnum (EnumTypeIntU s))
+lowTypeToWeakType _ (LowTypeFloat s) = do
+  lookupConstantPlus $ "f" <> T.pack (show (sizeAsInt s))
+lowTypeToWeakType _ _ =
+  error "[compiler bug] invalid argument passed to lowTypeToWeakType"
+
+unaryOpToWeakType :: Meta -> UnaryOp -> WithEnv WeakTermPlus
+unaryOpToWeakType m op = do
+  let (dom, cod) = unaryOpToDomCod op
+  dom' <- lowTypeToWeakType m dom
+  cod' <- lowTypeToWeakType m cod
+  x <- newNameWith' "arg"
+  let xts = [(m, x, dom')]
+  mls <- piUnivLevelsfrom xts cod'
+  return (m, WeakTermPi mls xts cod')
+
+binaryOpToWeakType :: Meta -> BinaryOp -> WithEnv WeakTermPlus
+binaryOpToWeakType m op = do
+  let (dom, cod) = binaryOpToDomCod op
+  dom' <- lowTypeToWeakType m dom
+  cod' <- lowTypeToWeakType m cod
+  x1 <- newNameWith' "arg"
+  x2 <- newNameWith' "arg"
+  let xts = [(m, x1, dom'), (m, x2, dom')]
+  mls <- piUnivLevelsfrom xts cod'
+  return (m, WeakTermPi mls xts cod')
