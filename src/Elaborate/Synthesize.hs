@@ -7,16 +7,15 @@ module Elaborate.Synthesize
 import Control.Monad.Except
 import Control.Monad.State
 import Data.List (sortBy)
-import System.Console.ANSI
 
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.PQueue.Min as Q
 import qualified Data.Text as T
-import qualified Data.Text.IO as TIO
 
 import Data.Basic
 import Data.Constraint
 import Data.Env
+import Data.Log
 import Data.WeakTerm
 import Elaborate.Analyze
 import Parse.Rename
@@ -37,9 +36,11 @@ synthesize = do
     Just (Enriched _ _ (ConstraintQuasiPattern m ess e)) ->
       resolvePiElim m ess e
     Just (Enriched _ _ (ConstraintFlexRigid m ess e)) -> resolvePiElim m ess e
-    Just (Enriched _ _ _) -> showErrorThenQuit q
-      -- p $ "rest: " ++ show (Q.size q)
-      -- throwError' $ "cannot simplify:\n" <> T.pack (Pr.ppShow (e1, e2))
+    Just (Enriched _ _ _) -> do
+      let pcs = setupPosInfo $ Q.toList q
+      let pcs' = sortBy (\x y -> fst x `compare` fst y) pcs
+      prepareInvRename
+      showErrors [] pcs' >>= throwError
 
 -- e1だけがstuckしているとき、e2だけがstuckしているとき、両方がstuckしているときをそれぞれ
 -- 独立したケースとして扱えるようにしたほうがよい（そうすればsubstを減らせる）
@@ -111,7 +112,7 @@ asAnalyzable (Enriched cs ms _) = Enriched cs ms ConstraintAnalyzable
 
 -- Try the list of alternatives.
 chain :: [WithEnv a] -> WithEnv a
-chain [] = throwError' $ "cannot synthesize(chain)."
+chain [] = raiseError' $ "cannot synthesize(chain)."
 chain [e] = e
 chain (e:es) = catchError e $ (const $ do chain es)
 
@@ -186,12 +187,6 @@ takeByCount (i:is) xs = do
   let yss = takeByCount is (drop i xs)
   ys : yss
 
-showErrorThenQuit :: ConstraintQueue -> WithEnv ()
-showErrorThenQuit q = do
-  let pcs = sortBy (\x y -> fst x `compare` fst y) $ setupPosInfo $ Q.toList q
-  prepareInvRename
-  showErrors [] pcs >>= throwError
-
 -- type PosInfo = (Path Abs File, Maybe Loc)
 setupPosInfo :: [EnrichedConstraint] -> [(PosInfo, PreConstraint)]
 setupPosInfo [] = []
@@ -206,7 +201,7 @@ setupPosInfo ((Enriched (e1, e2) _ _):cs) = do
     (Nothing, Just pos2) -> (pos2, (e2, e1)) : setupPosInfo cs
     _ -> setupPosInfo cs -- fixme (loc info not available)
 
-showErrors :: [PosInfo] -> [(PosInfo, PreConstraint)] -> WithEnv [IO ()]
+showErrors :: [PosInfo] -> [(PosInfo, PreConstraint)] -> WithEnv [Log]
 showErrors _ [] = return []
 showErrors ps ((pos, (e1, e2)):pcs) = do
   e1' <- invRename e1
@@ -221,37 +216,18 @@ showErrors' ::
   -> WeakTermPlus
   -> WeakTermPlus
   -> [(PosInfo, PreConstraint)]
-  -> WithEnv [IO ()]
+  -> WithEnv [Log]
 showErrors' pos ps e1 e2 pcs
   | pos `notElem` ps = do
-    b <- gets shouldColorize
-    let a = showErrorHeader b pos >> showError' b e1 e2
+    let msg = constructErrorMsg e1 e2
     as <- showErrors (pos : ps) pcs
-    return $ a : as
+    return $ logError (Just pos) msg : as
   | otherwise = showErrors ps pcs
 
-showErrorHeader :: Bool -> PosInfo -> IO ()
-showErrorHeader b (path, loc) = do
-  setSGR' b [SetConsoleIntensity BoldIntensity]
-  TIO.putStr $ T.pack (showPosInfo path loc)
-  TIO.putStrLn ":"
-  setSGR' b [Reset]
-
-showError' :: Bool -> WeakTermPlus -> WeakTermPlus -> IO ()
-showError' b e1 e2 = do
-  setSGR' b [SetConsoleIntensity BoldIntensity, SetColor Foreground Vivid Red]
-  TIO.putStr "error: "
-  setSGR' b [Reset]
-  TIO.putStrLn
-    "couldn't verify the definitional equality of the following two terms:"
-  -- putStrLn $ Pr.ppShow e1
-  -- putStrLn $ Pr.ppShow e2
-  TIO.putStrLn $ "- " <> toText e1
-  TIO.putStrLn $ "- " <> toText e2
-
-setSGR' :: Bool -> [SGR] -> IO ()
-setSGR' False _ = return ()
-setSGR' True arg = setSGR arg
+constructErrorMsg :: WeakTermPlus -> WeakTermPlus -> T.Text
+constructErrorMsg e1 e2 =
+  "couldn't verify the definitional equality of the following two terms:\n- " <>
+  toText e1 <> "\n- " <> toText e2
 
 getPosInfo' :: Meta -> Maybe PosInfo
 getPosInfo' m =
