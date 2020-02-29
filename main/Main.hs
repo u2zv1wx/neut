@@ -19,6 +19,8 @@ import Emit
 import LLVM
 import Parse
 
+import Data.Log
+
 type ImportOptScreenName = String
 
 type BuildOptInputPath = String
@@ -131,27 +133,28 @@ main = execParser optParser >>= run
 run :: Command -> IO ()
 run (Build inputPathStr mOutputPathStr outputKind) = do
   inputPath <- resolveFile' inputPathStr
-  resultOrErr <- evalWithEnv (build inputPath) (initialEnv inputPath True)
+  resultOrErr <- evalWithEnv (build inputPath) (initialEnv inputPath)
   basename <- setFileExtension "" $ filename inputPath
   mOutputPath <- mapM resolveFile' mOutputPathStr
   outputPath <- constructOutputPath basename mOutputPath outputKind
   case resultOrErr of
-    Left err -> seqIO err >> exitWith (ExitFailure 1)
+    Left err -> seqIO (map (outputLog True) err) >> exitWith (ExitFailure 1)
     Right result -> writeResult result outputPath outputKind
 run (Check inputPathStr colorizeFlag mEndOfEntry) = do
   inputPath <- resolveFile' inputPathStr
-  resultOrErr <-
-    evalWithEnv (check inputPath) (initialEnv inputPath colorizeFlag)
+  resultOrErr <- evalWithEnv (check inputPath) (initialEnv inputPath)
   case resultOrErr of
     Right _ -> return ()
     Left err ->
       case mEndOfEntry of
-        Just eoe -> seqIO' eoe err >> exitWith (ExitFailure 1)
-        Nothing -> seqIO err >> exitWith (ExitFailure 1)
+        Just eoe ->
+          seqIO' eoe (map (outputLog colorizeFlag) err) >>
+          exitWith (ExitFailure 1)
+        Nothing ->
+          seqIO (map (outputLog colorizeFlag) err) >> exitWith (ExitFailure 1)
 run (Complete inputPathStr l c) = do
   inputPath <- resolveFile' inputPathStr
-  resultOrErr <-
-    evalWithEnv (complete inputPath l c) (initialEnv inputPath True)
+  resultOrErr <- evalWithEnv (complete inputPath l c) (initialEnv inputPath)
   case resultOrErr of
     Left _ -> return () -- don't show any errors, just quit silently
     Right result -> mapM_ putStrLn result

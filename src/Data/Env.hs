@@ -76,11 +76,10 @@ data Env =
     , nameSet :: S.Set Identifier
     -- LLVM
     , llvmEnv :: Map.HashMap Identifier ([Identifier], LLVM)
-    , shouldColorize :: Bool
     }
 
-initialEnv :: Path Abs File -> Bool -> Env
-initialEnv path colorizeFlag =
+initialEnv :: Path Abs File -> Env
+initialEnv path =
   Env
     { count = 0
     , inputText = T.empty
@@ -115,7 +114,6 @@ initialEnv path colorizeFlag =
     , nameSet = S.empty
     , mainFilePath = path
     , currentFilePath = path
-    , shouldColorize = colorizeFlag
     }
 
 type WithEnv a = StateT Env (ExceptT [Log] IO) a
