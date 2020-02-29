@@ -50,20 +50,19 @@ outputLog b (Just pos, l, t) = do
 
 outputPosInfo :: Bool -> PosInfo -> IO ()
 outputPosInfo b (path, loc) = do
-  setSGR' b [SetConsoleIntensity BoldIntensity]
-  TIO.putStr $ T.pack (showPosInfo path loc)
-  TIO.putStrLn ":"
-  setSGR' b [Reset]
+  withSGR b [SetConsoleIntensity BoldIntensity] $ do
+    TIO.putStr $ T.pack (showPosInfo path loc)
+    TIO.putStrLn ":"
 
 outputLogLevel :: Bool -> LogLevel -> IO ()
 outputLogLevel b l = do
-  setSGR' b $ logLevelToSGR l
-  TIO.putStr $ logLevelToText l <> ": "
-  setSGR' b [Reset]
+  withSGR b (logLevelToSGR l) $ do
+    TIO.putStr $ logLevelToText l
+    TIO.putStr ": "
 
 outputLogText :: T.Text -> IO ()
 outputLogText = TIO.putStrLn
 
-setSGR' :: Bool -> [SGR] -> IO ()
-setSGR' False _ = return ()
-setSGR' True arg = setSGR arg
+withSGR :: Bool -> [SGR] -> IO () -> IO ()
+withSGR False _ f = f
+withSGR True arg f = setSGR arg >> f >> setSGR [Reset]
