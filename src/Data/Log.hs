@@ -1,8 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Data.Log
-  ( LogLevel
+  ( Log
   , outputLog
+  , logError
+  , logError'
+  , logCritical
+  , logCritical'
   ) where
 
 import System.Console.ANSI
@@ -16,7 +20,7 @@ data LogLevel
   = LogLevelHint
   | LogLevelWarning
   | LogLevelError
-  | LogLevelCritical
+  | LogLevelCritical -- "impossible" happened
   deriving (Show)
 
 logLevelToText :: LogLevel -> T.Text
@@ -66,3 +70,15 @@ outputLogText = TIO.putStrLn
 withSGR :: Bool -> [SGR] -> IO () -> IO ()
 withSGR False _ f = f
 withSGR True arg f = setSGR arg >> f >> setSGR [Reset]
+
+logError :: Maybe PosInfo -> T.Text -> Log
+logError mpos text = (mpos, LogLevelError, text)
+
+logError' :: T.Text -> Log
+logError' text = logError Nothing text
+
+logCritical :: Maybe PosInfo -> T.Text -> Log
+logCritical mpos text = (mpos, LogLevelCritical, text)
+
+logCritical' :: T.Text -> Log
+logCritical' text = logCritical Nothing text

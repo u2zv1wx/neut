@@ -11,6 +11,7 @@ import Data.Basic
 import Data.Code
 import Data.Constraint
 import Data.LLVM
+import Data.Log
 import Data.Term
 import Data.Tree
 import Data.WeakTerm
@@ -117,18 +118,18 @@ initialEnv path colorizeFlag =
     , shouldColorize = colorizeFlag
     }
 
-type WithEnv a = StateT Env (ExceptT [IO ()] IO) a
+type WithEnv a = StateT Env (ExceptT [Log] IO) a
 
-evalWithEnv :: WithEnv a -> Env -> IO (Either [IO ()] a)
+evalWithEnv :: WithEnv a -> Env -> IO (Either [Log] a)
 evalWithEnv c env = do
   resultOrErr <- runExceptT (runStateT c env)
   case resultOrErr of
     Left err -> return $ Left err
     Right (result, _) -> return $ Right result
+  -- throwError [TIO.putStrLn x]
 
-throwError' :: T.Text -> WithEnv a
-throwError' x = throwError [TIO.putStrLn x]
-
+-- throwError' :: T.Text -> WithEnv a
+-- throwError' _ = undefined
 newCount :: WithEnv Int
 newCount = do
   i <- gets count
@@ -205,14 +206,13 @@ getOS = do
   case os of
     "linux" -> return OSLinux
     "darwin" -> return OSDarwin
-    s -> throwError [putStrLn $ "unsupported target os: " <> show s]
+    s -> raiseError' $ "unsupported target os: " <> T.pack (show s)
 
 getArch :: WithEnv Arch
 getArch = do
   case arch of
     "x86_64" -> return Arch64
-    s ->
-      throwError [TIO.putStrLn $ "unsupported target arch: " <> T.pack (show s)]
+    s -> raiseError' $ "unsupported target arch: " <> T.pack (show s)
 
 newDataUpsilonWith :: T.Text -> WithEnv (Identifier, DataPlus)
 newDataUpsilonWith name = newDataUpsilonWith' name emptyMeta
@@ -256,9 +256,7 @@ lookupTypeEnv' (I (s, i))
     mt <- gets (IntMap.lookup i . typeEnv)
     case mt of
       Just (t, _) -> return t
-      Nothing ->
-        throwError
-          [TIO.putStrLn $ s <> " is not found in the type environment."]
+      Nothing -> raiseCritical' $ s <> " is not found in the type environment."
 
 lowTypeToType :: Meta -> LowType -> WithEnv TermPlus
 lowTypeToType m (LowTypeIntS s) = return (m, TermEnum (EnumTypeIntS s))
@@ -267,8 +265,7 @@ lowTypeToType m (LowTypeFloat s) = do
   let x = "f" <> T.pack (show (sizeAsInt s))
   i <- lookupConstNum x
   return (m, TermConst (I (x, i)))
-lowTypeToType _ _ =
-  error "[compiler bug] invalid argument passed to lowTypeToType"
+lowTypeToType _ _ = raiseCritical' "invalid argument passed to lowTypeToType"
 
 unaryOpToType :: Meta -> UnaryOp -> WithEnv TermPlus
 unaryOpToType m op = do
@@ -324,7 +321,7 @@ lookupConstNum' constName = do
   cenv <- gets constantEnv
   case Map.lookup constName cenv of
     Just i -> return i
-    Nothing -> throwError' $ "no such constant: " <> constName
+    Nothing -> raiseCritical' $ "no such constant: " <> constName
 
 lookupConstantMaybe :: T.Text -> WithEnv (Maybe WeakTermPlus)
 lookupConstantMaybe constName = do
@@ -373,10 +370,20 @@ pp e = liftIO $ TIO.putStrLn $ toText e
 toStr :: (Show a) => a -> String
 toStr s = Pr.ppShow s
 
--- toInfo :: (Show a) => String -> a -> String
--- toInfo s x = "assertion failure:\n" ++ s ++ "\n" ++ toStr x
 lowTypeToArrayKind :: LowType -> WithEnv ArrayKind
 lowTypeToArrayKind lowType =
   case asArrayKindMaybe lowType of
     Just k -> return k
-    Nothing -> throwError' "Infer.lowTypeToArrayKind"
+    Nothing -> raiseCritical' "Infer.lowTypeToArrayKind"
+
+raiseError :: Meta -> T.Text -> WithEnv a
+raiseError m text = throwError [logError (getPosInfo m) text]
+
+raiseError' :: T.Text -> WithEnv a
+raiseError' text = throwError [logError' text]
+
+raiseCritical :: Meta -> T.Text -> WithEnv a
+raiseCritical m text = throwError [logCritical (getPosInfo m) text]
+
+raiseCritical' :: T.Text -> WithEnv a
+raiseCritical' text = throwError [logCritical' text]

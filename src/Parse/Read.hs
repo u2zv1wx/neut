@@ -14,6 +14,7 @@ import qualified Data.Text as T
 
 import Data.Basic
 import Data.Env
+import Data.Log
 import Data.Tree
 
 data ReadEnv =
@@ -25,7 +26,7 @@ data ReadEnv =
     }
   deriving (Show)
 
-type WithReadEnv a = StateT ReadEnv (ExceptT T.Text IO) a
+type WithReadEnv a = StateT ReadEnv (ExceptT Log IO) a
 
 strToTree :: T.Text -> Path Abs File -> WithEnv [TreePlus]
 strToTree input path = do
@@ -33,7 +34,7 @@ strToTree input path = do
   let renv = ReadEnv {text = input, line = 1, column = 1, filePath = path}
   resultOrError <- liftIO $ runExceptT (runStateT readSExpList renv)
   case resultOrError of
-    Left err -> throwError' $ T.pack (show err)
+    Left err -> throwError [err]
     Right (result, _) -> return result
 
 readSExpList :: WithReadEnv [TreePlus]
@@ -72,13 +73,18 @@ readChar :: Char -> WithReadEnv ()
 readChar c = do
   s <- gets text
   case T.uncons s of
-    Nothing -> throwError "hey"
+    Nothing ->
+      raiseParseError $
+      "unexpected end of input\nexpecting: '" <> T.singleton c <> "'"
     Just (c', rest)
       | c == c' -> do
         if c == '\n'
           then updateStreamL rest
           else updateStreamC 1 rest
-      | otherwise -> throwError "non-expected char!"
+      | otherwise ->
+        raiseParseError $
+        "unexpected character: '" <>
+        T.singleton c' <> "'\nexpecting: '" <> T.singleton c <> "'"
 
 readSkip :: WithReadEnv ()
 readSkip = do
@@ -103,7 +109,8 @@ readComment = do
   case T.uncons s of
     Just ('\n', rest) -> updateStreamL rest >> readSkip
     Just (_, rest) -> updateStreamC 1 rest >> readComment
-    Nothing -> throwError "comment"
+    Nothing -> return () -- no newline at the end of file
+      -- raiseParseError "comment"
 
 readMany :: WithReadEnv a -> WithReadEnv [a]
 readMany f = readSepEndBy f (return ())
@@ -124,30 +131,35 @@ readSymbol :: WithReadEnv T.Text
 readSymbol = do
   s <- gets text
   let x = T.takeWhile isSymbolChar s
-  if T.null x
-    then throwError "sym"
-    else do
-      let rest = T.dropWhile isSymbolChar s
-      updateStreamC (T.length x) rest
-      return x
+  let rest = T.dropWhile isSymbolChar s
+  updateStreamC (T.length x) rest
+  return x
+  -- if T.null x
+  --   then raiseParseCritical
+  --          "Parse.Read.readSymbol is called for the empty input"
+  --   else do
+  --     let rest = T.dropWhile isSymbolChar s
+  --     updateStreamC (T.length x) rest
+  --     return x
 
 readString :: WithReadEnv T.Text
 readString = do
   s <- gets text
-  case T.uncons s of
-    Just ('"', rest) -> do
-      len <- headStringLengthOf False rest 1
-      let (x, rest') = T.splitAt len s
-      modify (\env -> env {text = rest'})
-      return x
-    _ -> throwError "readString"
+  let rest = T.tail s -- T.head s is known to be '"'
+  -- case T.uncons s of
+  --   Just ('"', rest) -> do
+  len <- headStringLengthOf False rest 1
+  let (x, rest') = T.splitAt len s
+  modify (\env -> env {text = rest'})
+  return x
+    -- _ -> raiseParseError "readString"
 
 type EscapeFlag = Bool
 
 headStringLengthOf :: EscapeFlag -> T.Text -> Int -> WithReadEnv Int
 headStringLengthOf flag s i = do
   case T.uncons s of
-    Nothing -> error "EOF while reading string"
+    Nothing -> raiseParseError "unexpected end of input while reading string"
     Just (c, rest)
       | c == '"' -> do
         incrementColumn
@@ -209,3 +221,12 @@ incrementLine = modify (\env -> env {line = 1 + line env, column = 1})
 
 incrementColumn :: WithReadEnv ()
 incrementColumn = modify (\env -> env {column = 1 + column env})
+
+raiseParseError :: T.Text -> WithReadEnv a
+raiseParseError txt = do
+  m <- currentMeta
+  throwError $ logError (getPosInfo m) txt
+-- raiseParseCritical :: T.Text -> WithReadEnv a
+-- raiseParseCritical txt = do
+--   m <- currentMeta
+--   throwError $ logCritical (getPosInfo m) txt
