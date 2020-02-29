@@ -153,9 +153,8 @@ insCodeEnv :: Identifier -> [Identifier] -> CodePlus -> WithEnv ()
 insCodeEnv name args e = do
   let def = Definition (IsFixed False) args e
   modify (\env -> env {codeEnv = Map.insert name def (codeEnv env)})
-
-lookupContext :: Identifier -> Context -> WithEnv TermPlus
-lookupContext z ctx = do
-  case lookup z ctx of
-    Nothing -> throwError' "lookupContext"
-    Just t -> return t
+-- lookupContext :: Identifier -> Context -> WithEnv TermPlus
+-- lookupContext z ctx = do
+--   case lookup z ctx of
+--     Nothing -> throwError' "lookupContext"
+--     Just t -> return t

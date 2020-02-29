@@ -56,8 +56,8 @@ clarify (m, TermSigmaIntro t es) = do
               let bindArgsThen = \e -> (m, TermPiElim (m, TermPiIntro yts e) es)
               clarify $
                 bindArgsThen (m, TermPiIntro [zu, kp] (m, TermPiElim kv xvs))
-          _ -> throwError' "the type of sigma-intro is wrong"
-    _ -> throwError' "the type of sigma-intro is wrong"
+          _ -> raiseCritical m "the type of sigma-intro is wrong"
+    _ -> raiseCritical m "the type of sigma-intro is wrong"
 clarify (m, TermSigmaElim t xts e1 e2) = do
   clarify (m, TermPiElim e1 [t, (emptyMeta, TermPiIntro xts e2)])
 clarify iter@(m, TermIter (_, x, t) mxts e) = do
@@ -186,11 +186,11 @@ clarifyConst m (I ("unsafe-cast", _))
   clarify
     (m, TermPiIntro [(m, a, u), (m, b, u), (m, x, varA)] (m, TermUpsilon x))
   -- clarify (m, TermEnumIntro (EnumValueIntS 64 2))
-clarifyConst m name@(I (x, _)) = do
-  cenv <- gets constantEnv
-  case Map.lookup x cenv of
-    Just _ -> return (m, CodeUpIntro (m, DataTheta name))
-    Nothing -> throwError' $ "clarify.theta: " <> x
+clarifyConst m name = return (m, CodeUpIntro (m, DataTheta name))
+  -- cenv <- gets constantEnv
+  -- case Map.lookup x cenv of
+  --   Just _ -> return (m, CodeUpIntro (m, DataTheta name))
+  --   Nothing -> raiseCritical m $ "clarify.theta: " <> x
   -- if name `elem` cenv
   --   then return (m, CodeUpIntro (m, DataTheta name))
   --   else throwError' $ "clarify.theta: " <> name
@@ -210,7 +210,7 @@ clarifyUnaryOp name op m = do
         m
         [(mx, x, tx)]
         (m, CodeTheta (ThetaUnaryOp op varX))
-    _ -> throwError' $ "the arity of " <> asText name <> " is wrong"
+    _ -> raiseCritical m $ "the arity of " <> asText name <> " is wrong"
 
 clarifyBinaryOp :: Identifier -> BinaryOp -> Meta -> WithEnv CodePlus
 clarifyBinaryOp name op m = do
@@ -227,7 +227,7 @@ clarifyBinaryOp name op m = do
         m
         [(mx, x, tx), (my, y, ty)]
         (m, CodeTheta (ThetaBinaryOp op varX varY))
-    _ -> throwError' $ "the arity of " <> asText name <> " is wrong"
+    _ -> raiseCritical m $ "the arity of " <> asText name <> " is wrong"
 
 clarifyArrayAccess :: Meta -> Identifier -> LowType -> WithEnv CodePlus
 clarifyArrayAccess m name lowType = do
@@ -244,8 +244,8 @@ clarifyArrayAccess m name lowType = do
             callThenReturn <- toArrayAccessTail m lowType cod arr index xs
             let body = iterativeApp headerList callThenReturn
             retClosure (Just name) zts m xts body
-          _ -> throwError' $ "the type of array-access is wrong"
-    _ -> throwError' $ "the type of array-access is wrong"
+          _ -> raiseCritical m $ "the type of array-access is wrong"
+    _ -> raiseCritical m $ "the type of array-access is wrong"
 
 clarifySysCall ::
      Identifier -- the name of theta
@@ -269,7 +269,7 @@ clarifySysCall name sysCall args m = do
             name' <- newNameWith' "fork"
             retClosure (Just name') zts m xts body
           _ -> retClosure (Just name) zts m xts body
-    _ -> throwError' $ "the type of " <> asText name <> " is wrong"
+    _ -> raiseCritical m $ "the type of " <> asText name <> " is wrong"
 
 iterativeApp :: [a -> a] -> a -> a
 iterativeApp [] x = x
@@ -331,7 +331,7 @@ knot :: Identifier -> DataPlus -> WithEnv ()
 knot z cls = do
   cenv <- gets codeEnv
   case Map.lookup z cenv of
-    Nothing -> throwError' "knot"
+    Nothing -> raiseCritical' "knot"
     Just (Definition _ args body) -> do
       let body' = substCodePlus [(z, cls)] body
       let def' = Definition (IsFixed True) args body'
@@ -497,8 +497,8 @@ retWithBorrowedVars m cod xs resultVarName
           , TermPiIntro
               [c, (mFun, funName, funType)]
               (m, TermPiElim (m, TermUpsilon funName) vs))
-      _ -> throwError' "retWithBorrowedVars (sig)"
-  | otherwise = throwError' "retWithBorrowedVars"
+      _ -> raiseCritical m "retWithBorrowedVars (sig)"
+  | otherwise = raiseCritical m "retWithBorrowedVars"
 
 inferKind :: ArrayKind -> WithEnv TermPlus
 inferKind (ArrayKindIntS i) = return (emptyMeta, TermEnum (EnumTypeIntS i))
@@ -507,8 +507,7 @@ inferKind (ArrayKindFloat size) = do
   let constName = "f" <> T.pack (show (sizeAsInt size))
   i <- lookupConstNum' constName
   return (emptyMeta, TermConst (I (constName, i)))
-  -- (emptyMeta, TermConst $ "f" <> T.pack (show (sizeAsInt size)))
-inferKind _ = error "inferKind for void-pointer"
+inferKind _ = raiseCritical' "inferKind for void-pointer"
 
 sigToPi :: Meta -> [Data.Term.IdentifierPlus] -> WithEnv TermPlus
 sigToPi m xts = do
