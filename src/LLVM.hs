@@ -11,7 +11,6 @@ import qualified Data.HashMap.Strict as Map
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Set as S
 import qualified Data.Text as T
-import qualified Data.Text.IO as TIO
 
 import Data.Basic
 import Data.Code
@@ -267,14 +266,14 @@ llvmUncastLet x@(I (s, _)) d lowType cont = do
 -- `llvmDataLet x d cont` binds the data `d` to the variable `x`, and computes the
 -- continuation `cont`.
 llvmDataLet :: Identifier -> DataPlus -> LLVM -> WithEnv LLVM
-llvmDataLet x (_, DataTheta y) cont = do
+llvmDataLet x (m, DataTheta y) cont = do
   cenv <- gets codeEnv
   ns <- gets nameSet
   case Map.lookup y cenv of
     Nothing
       | asText y == "fork" ->
         llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType []) cont
-    Nothing -> throwError' $ "no such global label defined: " <> asText y
+    Nothing -> raiseCritical m $ "no such global label defined: " <> asText y
     Just (Definition _ args e)
       | not (y `S.member` ns) -> do
         modify (\env -> env {nameSet = S.insert y ns})
@@ -339,7 +338,7 @@ sysCallNumAsInt num = do
         SysCallOpen -> return 0x2000005
         SysCallClose -> return 0x2000006
         SysCallFork ->
-          throwError'
+          raiseCritical'
             "syscall 0x2000002 (fork) cannot be used directly in Darwin"
         SysCallWait4 -> return 0x2000007
         SysCallSocket -> return 0x2000097
@@ -507,7 +506,7 @@ getEnumNum :: T.Text -> WithEnv Int
 getEnumNum label = do
   renv <- gets revEnumEnv
   case Map.lookup label renv of
-    Nothing -> throwError [TIO.putStrLn $ "no such enum is defined: " <> label]
+    Nothing -> raiseCritical' $ "no such enum is defined: " <> label
     Just (_, i) -> return i
 
 insLLVMEnv :: Identifier -> [Identifier] -> LLVM -> WithEnv ()
@@ -549,8 +548,8 @@ renameLLVMData nenv (LLVMDataLocal x@(I (s, i))) = do
   case IntMap.lookup i nenv of
     Just i' -> return $ LLVMDataLocal $ I (s, i')
     Nothing ->
-      throwError' $
-      "[compiler bug] renameLLVMData: unbourd variable: " <> asText' x
+      raiseCritical' $
+      "found an unbound variable when renaming LLVM code: " <> asText' x
 renameLLVMData _ d = return d
 
 renameLLVM :: Int -> NameEnv -> LLVM -> WithEnv (LLVM, Int)
