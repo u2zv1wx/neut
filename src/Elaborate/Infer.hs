@@ -224,7 +224,7 @@ infer' _ (m, WeakTermEnumIntro v) = do
       let t = (m, WeakTermEnum $ EnumTypeNat i)
       return ((m, WeakTermEnumIntro v), t, ml)
     EnumValueLabel l -> do
-      k <- lookupKind l
+      k <- lookupKind m l
       let t = (m, WeakTermEnum $ EnumTypeLabel k)
       return ((m, WeakTermEnumIntro v), t, ml)
 infer' ctx (m, WeakTermEnumElim (e, t) ces) = do
@@ -238,7 +238,7 @@ infer' ctx (m, WeakTermEnumElim (e, t) ces) = do
       return ((m, WeakTermEnumElim (e', t') []), h, ml) -- ex falso quodlibet
     else do
       let (cs, es) = unzip ces
-      (cs', tcs) <- unzip <$> mapM (inferWeakCase ctx) cs
+      (cs', tcs) <- unzip <$> mapM (inferWeakCase m ctx) cs
       forM_ (zip (repeat t') tcs) $ uncurry insConstraintEnv
       (es', ts, mls) <- unzip3 <$> mapM (infer' ctx) es
       constrainList $ ts
@@ -440,20 +440,20 @@ newTypeHoleListInCtx ctx ((x, m):rest) = do
   return $ ((m, x, t), ml) : ts
 
 -- caseにもmetaの情報がほしいか。それはたしかに？
-inferWeakCase :: Context -> WeakCase -> WithEnv (WeakCase, WeakTermPlus)
-inferWeakCase _ l@(WeakCaseLabel name) = do
-  k <- lookupKind name
-  return (l, (emptyMeta, WeakTermEnum $ EnumTypeLabel k))
-inferWeakCase _ l@(WeakCaseNat i _) =
-  return (l, (emptyMeta, WeakTermEnum $ EnumTypeNat i))
-inferWeakCase _ l@(WeakCaseIntS size _) =
-  return (l, (emptyMeta, WeakTermEnum (EnumTypeIntS size)))
-inferWeakCase _ l@(WeakCaseIntU size _) =
-  return (l, (emptyMeta, WeakTermEnum (EnumTypeIntU size)))
-inferWeakCase ctx (WeakCaseInt t a) = do
+inferWeakCase :: Meta -> Context -> WeakCase -> WithEnv (WeakCase, WeakTermPlus)
+inferWeakCase m _ l@(WeakCaseLabel name) = do
+  k <- lookupKind m name
+  return (l, (m, WeakTermEnum $ EnumTypeLabel k))
+inferWeakCase m _ l@(WeakCaseNat i _) =
+  return (l, (m, WeakTermEnum $ EnumTypeNat i))
+inferWeakCase m _ l@(WeakCaseIntS size _) =
+  return (l, (m, WeakTermEnum (EnumTypeIntS size)))
+inferWeakCase m _ l@(WeakCaseIntU size _) =
+  return (l, (m, WeakTermEnum (EnumTypeIntU size)))
+inferWeakCase _ ctx (WeakCaseInt t a) = do
   (t', _) <- inferType' ctx t
   return (WeakCaseInt t' a, t')
-inferWeakCase ctx WeakCaseDefault = do
+inferWeakCase _ ctx WeakCaseDefault = do
   (h, _) <- newTypeHoleInCtx ctx emptyMeta
   return (WeakCaseDefault, h)
 
@@ -485,7 +485,7 @@ lookupWeakTypeEnv s = do
     Nothing ->
       case lookupConstType s of
         Nothing ->
-          throwError' $
+          raiseCritical' $
           asText s <> " is not found in the weak type environment."
         Just t -> do
           l <- newCount
@@ -499,11 +499,11 @@ lookupWeakTypeEnvMaybe (I (_, s)) = do
     Nothing -> return Nothing
     Just t -> return $ Just t
 
-lookupKind :: T.Text -> WithEnv T.Text
-lookupKind name = do
+lookupKind :: Meta -> T.Text -> WithEnv T.Text
+lookupKind m name = do
   renv <- gets revEnumEnv
   case Map.lookup name renv of
-    Nothing -> throwError' $ "no such enum-intro is defined: " <> name
+    Nothing -> raiseError m $ "no such enum-intro is defined: " <> name
     Just (j, _) -> return j
 
 lookupConstType :: Identifier -> Maybe WeakTermPlus
