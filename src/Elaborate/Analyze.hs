@@ -14,12 +14,9 @@ module Elaborate.Analyze
 import Control.Monad.Except
 import Control.Monad.State
 import Data.Maybe
-import System.Timeout
 
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.PQueue.Min as Q
-import qualified Data.Text as T
-import qualified Text.Show.Pretty as Pr
 
 import Data.Basic
 import Data.Constraint
@@ -35,14 +32,15 @@ analyze = do
 
 simp :: [PreConstraint] -> WithEnv ()
 simp [] = return ()
-simp ((e1, e2):cs) = do
-  me1' <- return (reduceWeakTermPlus e1) >>= liftIO . timeout 5000000 . return
-  me2' <- return (reduceWeakTermPlus e2) >>= liftIO . timeout 5000000 . return
-  case (me1', me2') of
-    (Just e1', Just e2') -> simp' $ (e1', e2') : cs
-    _ ->
-      throwError' $
-      "cannot simplify [TIMEOUT]:\n" <> T.pack (Pr.ppShow (e1, e2))
+simp ((e1, e2):cs) = simp' $ (reduceWeakTermPlus e1, reduceWeakTermPlus e2) : cs
+  -- me1' <- return (reduceWeakTermPlus e1) >>= liftIO . timeout 5000000 . return
+  -- me2' <- return (reduceWeakTermPlus e2) >>= liftIO . timeout 5000000 . return
+  -- case (me1', me2') of
+  --   (Just e1', Just e2') -> simp' $ (e1', e2') : cs
+  --   (Nothing, _) ->
+  --     raiseError (metaOf e1) $ "cannot simplify [TIMEOUT]:\n" <> toText e1
+  --   (_, Nothing) ->
+  --     raiseError (metaOf e2) $ "cannot simplify [TIMEOUT]:\n" <> toText e2
 
 simp' :: [PreConstraint] -> WithEnv ()
 simp' [] = return ()
@@ -260,7 +258,7 @@ simpBinder ((_, x1, t1):xts1) ((_, x2, t2):xts2) (Just (cod1, cod2)) cs = do
   let (xts2', cod2') = substWeakTermPlusBindingsWithBody [(x2, var1)] xts2 cod2
   simp [(t1, t2)]
   simpBinder xts1 xts2' (Just (cod1, cod2')) cs
-simpBinder _ _ _ _ = throwError' "cannot simplify (simpBinder)"
+simpBinder _ _ _ _ = raiseCritical' "Simpbinder"
 
 simpPattern ::
      Identifier
@@ -306,20 +304,21 @@ simpOther ::
 simpOther e1 e2 fmvs cs = do
   insConstraintQueue $ Enriched (e1, e2) fmvs $ ConstraintOther
   simp cs
+  -- let ks1 = IntMap.keys umap1
+  -- let ks2 = IntMap.keys umap2
+  -- if ks1 /= ks2
+  --   then raiseCritical
+  --          m
+  --          "the same variable instantiated from different base univ-level"
+  --   else do
 
 simpUnivParams :: UnivParams -> UnivParams -> WithEnv ()
 simpUnivParams umap1 umap2 = do
-  let ks1 = IntMap.keys umap1
-  let ks2 = IntMap.keys umap2
-  if ks1 /= ks2
-    then throwError' "simpUnivParams"
-    else do
-      let vs1 = IntMap.elems umap1
-      let vs2 = IntMap.elems umap2
-      forM_ (zip vs1 vs2) $ \(l1, l2) ->
-        modify (\env -> env {equalityEnv = (l1, l2) : equalityEnv env})
+  let vs1 = IntMap.elems umap1
+  let vs2 = IntMap.elems umap2
+  forM_ (zip vs1 vs2) $ \(l1, l2) ->
+    modify (\env -> env {equalityEnv = (l1, l2) : equalityEnv env})
 
--- modify (\env -> env {equalityEnv = (l1, l2) : equalityEnv env})
 data Stuck
   = StuckPiElimUpsilon (Identifier, Meta) [[WeakTermPlus]]
   | StuckPiElimZeta Identifier [[WeakTermPlus]]
@@ -422,12 +421,10 @@ lookupAny (h@(I (_, i)):ks) sub = do
 
 lookupAll :: [Identifier] -> IntMap.IntMap a -> Maybe [a]
 lookupAll [] _ = return []
-lookupAll ((I (_, i)):xs) sub
-  -- | S.member x qenv = lookupAll qenv xs sub
-  | otherwise = do
-    v <- IntMap.lookup i sub
-    vs <- lookupAll xs sub
-    return $ v : vs
+lookupAll ((I (_, i)):xs) sub = do
+  v <- IntMap.lookup i sub
+  vs <- lookupAll xs sub
+  return $ v : vs
 
 toIntS :: IntSize -> WeakTermPlus
 toIntS size = (emptyMeta, WeakTermEnum $ EnumTypeIntS size)
