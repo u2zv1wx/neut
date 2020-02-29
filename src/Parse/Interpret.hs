@@ -429,8 +429,8 @@ toValueIntU size i = WeakTermEnumIntro $ EnumValueIntU size i
 raiseSyntaxError :: TreePlus -> T.Text -> WithEnv a
 raiseSyntaxError e form =
   raiseError (fst e) $
-  "couldn't interpret the input with the expected form:\n- " <>
-  showAsSExp e <> "\n- " <> form
+  "couldn't match the input with the expected form: " <> form
+  -- showAsSExp e <> "\n- " <> form
 
 -- the function `encodeChar` is adopted from https://hackage.haskell.org/package/utf8-string-1.0.1.1/docs/src/Codec-Binary-UTF8-String.html
 -- the license notice of this function is as follows:
