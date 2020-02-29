@@ -133,7 +133,7 @@ newCount = do
   i <- gets count
   modify (\e -> e {count = i + 1})
   if i + 1 == 0
-    then error "counter exhausted"
+    then raiseCritical' "counter exhausted"
     else return i
 
 newNameWith :: Identifier -> WithEnv Identifier

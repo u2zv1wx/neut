@@ -228,7 +228,7 @@ interpretIter (m, TreeNode [xt, (_, TreeNode xts), e]) = do
   (xts', e') <- interpretBinder xts e
   m' <- adjustPhase m
   return (m', xt', xts', e')
-interpretIter t = raiseSyntaxError t "(TREE TREE TREE)"
+interpretIter t = raiseSyntaxError t "(TREE (TREE ... TREE) TREE)"
 
 interpretAtom :: TreePlus -> WithEnv (Meta, Identifier)
 interpretAtom (m, TreeAtom "_") = do

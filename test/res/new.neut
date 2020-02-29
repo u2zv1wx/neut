@@ -765,8 +765,11 @@ n15-4
   (z ((z i64)) (p z))
   (a ((z i64)) (y z)))
 
+
 ;; 0要素のdefinitionも合法
 (definition)
+
+(definition (hoge ((hoge tau) ) hoge))
 
 ;; implicit beginもちゃんと処理できてる。
 (definition loo ((x i64))
