@@ -106,7 +106,7 @@ interpret (m, TreeNode [(_, TreeAtom "enum"), (_, TreeAtom x)]) = do
   isEnum <- isDefinedEnumName x
   m' <- adjustPhase m
   if not isEnum
-    then throwError' $ "No such enum-type defined: " <> x
+    then raiseError m $ "no such enum-type is defined: " <> x
     else return (m', WeakTermEnum $ EnumTypeLabel x)
 interpret (m, TreeNode [(_, TreeAtom "enum-introduction"), l]) = do
   l' <- interpretEnumValue l
@@ -118,24 +118,24 @@ interpret (m, TreeNode ((_, TreeAtom "enum-elimination"):e:cs)) = do
   m' <- adjustPhase m
   h <- newHole m'
   return (m', WeakTermEnumElim (e', h) cs')
-interpret (m, TreeNode [(_, TreeAtom "array"), dom, (_, TreeAtom kind)]) = do
+interpret (m, TreeNode [(_, TreeAtom "array"), dom, kind]) = do
   dom' <- interpret dom
   kind' <- asArrayKind kind
   m' <- adjustPhase m
   return (m', WeakTermArray dom' kind')
-interpret (m, TreeNode ((_, TreeAtom "array-introduction"):(_, TreeAtom kind):es)) = do
+interpret (m, TreeNode ((_, TreeAtom "array-introduction"):kind:es)) = do
   kind' <- asArrayKind kind
   es' <- mapM interpret es
   m' <- adjustPhase m
   return (m', WeakTermArrayIntro kind' es')
-interpret (m, TreeNode [(_, TreeAtom "array-elimination"), (_, TreeAtom kind), (_, TreeNode xts), e1, e2]) = do
+interpret (m, TreeNode [(_, TreeAtom "array-elimination"), kind, (_, TreeNode xts), e1, e2]) = do
   kind' <- asArrayKind kind
   e1' <- interpret e1
   (xts', e2') <- interpretBinder xts e2
   m' <- adjustPhase m
   return (m', WeakTermArrayElim kind' xts' e1' e2')
 interpret (m, TreeNode ((_, TreeAtom "struct"):ks)) = do
-  ks' <- mapM asStructKind ks
+  ks' <- mapM asArrayKind ks
   m' <- adjustPhase m
   return (m', WeakTermStruct ks')
 interpret (m, TreeNode ((_, TreeAtom "struct-introduction"):ets)) = do
@@ -206,7 +206,7 @@ interpret t@(m, TreeNode es) = do
     Just l -> return (m', WeakTermEnumIntro l)
     _ -> do
       if null es
-        then throwError' $ "interpret: syntax error:\n" <> T.pack (Pr.ppShow t)
+        then raiseSyntaxError t "(TREE ...)"
         else interpret (m', TreeNode ((m, TreeAtom "pi-elimination") : es))
 
 --  m' <- adjustPhase m
@@ -219,9 +219,7 @@ interpretIdentifierPlus (_, TreeNode [x, t]) = do
   (m', x') <- interpretAtom x
   t' <- interpret t
   return (m', x', t')
-interpretIdentifierPlus ut =
-  throwError' $
-  "interpretIdentifierPlus: syntax error:\n" <> T.pack (Pr.ppShow ut)
+interpretIdentifierPlus t = raiseSyntaxError t "(LEAF TREE)"
 
 interpretIter :: TreePlus -> WithEnv Def
 interpretIter (m, TreeNode [xt, (_, TreeNode xts), e]) = do
@@ -229,7 +227,7 @@ interpretIter (m, TreeNode [xt, (_, TreeNode xts), e]) = do
   (xts', e') <- interpretBinder xts e
   m' <- adjustPhase m
   return (m', xt', xts', e')
-interpretIter _ = throwError' "interpretIter"
+interpretIter t = raiseSyntaxError t "(TREE TREE TREE)"
 
 interpretAtom :: TreePlus -> WithEnv (Meta, Identifier)
 interpretAtom (m, TreeAtom "_") = do
@@ -240,27 +238,26 @@ interpretAtom (m, TreeAtom "_") = do
 interpretAtom (m, TreeAtom x) = do
   m' <- adjustPhase m
   return (m', asIdent x)
-interpretAtom t =
-  throwError' $ "interpretAtom: syntax error:\n" <> T.pack (Pr.ppShow t)
+interpretAtom t = raiseSyntaxError t "LEAF"
 
 interpretEnumValueMaybe :: TreePlus -> WithEnv (Maybe EnumValue)
 interpretEnumValueMaybe (_, TreeAtom x)
   | Just v <- readEnumValueNat x = return $ Just v
-interpretEnumValueMaybe (_, TreeNode [(_, TreeAtom t), (_, TreeAtom x)])
+interpretEnumValueMaybe (m, TreeNode [(_, TreeAtom t), (_, TreeAtom x)])
   | Just v@(EnumValueIntS size x') <- readEnumValueIntS t x =
     if (-1) * (2 ^ (size - 1)) <= x' && x' < 2 ^ size
       then return $ Just v
-      else throwError' $
+      else raiseError m $
            "the signed integer " <>
            T.pack (show x') <>
            " is supposed to be of type i" <>
            T.pack (show size) <>
            ", but is out of range of i" <> T.pack (show size)
-interpretEnumValueMaybe (_, TreeNode [(_, TreeAtom t), (_, TreeAtom x)])
+interpretEnumValueMaybe (m, TreeNode [(_, TreeAtom t), (_, TreeAtom x)])
   | Just v@(EnumValueIntU size x') <- readEnumValueIntU t x =
     if 0 <= x' && x' < 2 ^ size
       then return $ Just v
-      else throwError' $
+      else raiseError m $
            "the unsigned integer " <>
            T.pack (show x') <>
            " is supposed to be of type u" <>
@@ -279,7 +276,7 @@ interpretEnumValue l = do
   case ml' of
     Just l' -> return l'
     Nothing ->
-      throwError' $
+      raiseError (fst l) $
       "interpretEnumValue: syntax error:\n" <> T.pack (Pr.ppShow l)
 
 interpretBinder ::
@@ -311,31 +308,28 @@ interpretClause (_, TreeNode [c, e]) = do
   c' <- interpretWeakCase c
   e' <- interpret e
   return (c', e')
-interpretClause e =
-  throwError' $ "interpretClause: syntax error:\n " <> T.pack (Pr.ppShow e)
+interpretClause e = raiseSyntaxError e "(TREE TREE)"
 
 interpretStructIntro :: TreePlus -> WithEnv (WeakTermPlus, ArrayKind)
 interpretStructIntro (_, TreeNode [e, k]) = do
   e' <- interpret e
-  k' <- asStructKind k
+  k' <- asArrayKind k
   return (e', k')
-interpretStructIntro e =
-  throwError' $ "interpretStructIntro: syntax error:\n " <> T.pack (Pr.ppShow e)
+interpretStructIntro e = raiseSyntaxError e "(TREE TREE)"
+  -- "interpretStructIntro: syntax error:\n " <> T.pack (Pr.ppShow e)
 
 interpretStructElim :: TreePlus -> WithEnv (Meta, Identifier, ArrayKind)
 interpretStructElim (_, TreeNode [(m, TreeAtom x), k]) = do
-  k' <- asStructKind k
+  k' <- asArrayKind k
   return (m, asIdent x, k')
-interpretStructElim e =
-  throwError' $ "interpretStructElim: syntax error:\n " <> T.pack (Pr.ppShow e)
+interpretStructElim e = raiseSyntaxError e "(LEAF TREE)"
 
-interpretEnumItem :: [TreePlus] -> WithEnv [(T.Text, Int)]
-interpretEnumItem ts = do
+interpretEnumItem :: Meta -> [TreePlus] -> WithEnv [(T.Text, Int)]
+interpretEnumItem m ts = do
   xis <- interpretEnumItem' $ reverse ts
   if linearCheck (map snd xis)
     then return $ reverse xis
-    else throwError'
-           "found a collision of discriminant with previous definition"
+    else raiseError m "found a collision of discriminant"
 
 interpretEnumItem' :: [TreePlus] -> WithEnv [(T.Text, Int)]
 interpretEnumItem' [] = return []
@@ -351,8 +345,8 @@ interpretEnumItem'' :: TreePlus -> WithEnv (T.Text, Maybe Int)
 interpretEnumItem'' (_, TreeAtom s) = return (s, Nothing)
 interpretEnumItem'' (_, TreeNode [(_, TreeAtom s), (_, TreeAtom i)])
   | Just i' <- readMaybe $ T.unpack i = return (s, Just i')
-interpretEnumItem'' t =
-  throwError' $ "interpretEnumItem: syntax error:\n" <> T.pack (Pr.ppShow t)
+interpretEnumItem'' t = raiseSyntaxError t "LEAF | (LEAF LEAF)"
+  -- "interpretEnumItem: syntax error:\n" <> T.pack (Pr.ppShow t)
 
 headDiscriminantOf :: [(T.Text, Int)] -> Int
 headDiscriminantOf [] = 0
@@ -425,24 +419,57 @@ newHole m = do
   h <- newNameWith'' "hole-aux"
   return (m, WeakTermZeta h)
 
-asArrayKind :: T.Text -> WithEnv ArrayKind
-asArrayKind x =
+-- asArrayKind :: T.Text -> WithEnv ArrayKind
+asArrayKind :: TreePlus -> WithEnv ArrayKind
+asArrayKind (m, TreeAtom x) =
   case asLowTypeMaybe x of
-    Nothing -> throwError' "asArrayKind: syntax error"
+    Nothing -> raiseError m "asArrayKind: syntax error"
     Just t -> do
       case asArrayKindMaybe t of
-        Nothing -> throwError' "asArrayKind: syntax error"
+        Nothing -> raiseError m "asArrayKind: syntax error"
         Just a -> return a
+asArrayKind t = raiseSyntaxError t "LEAF"
 
-asStructKind :: TreePlus -> WithEnv ArrayKind
-asStructKind (_, TreeAtom x) = asArrayKind x
-asStructKind t =
-  throwError' $ "asStructKind: syntax error:\n" <> T.pack (Pr.ppShow t)
-
+-- asStructKind :: TreePlus -> WithEnv ArrayKind
+-- asStructKind (_, TreeAtom x) = asArrayKind x
+-- asStructKind t =
+--   raiseError (fst t) $ "asStructKind: syntax error:\n" <> T.pack (Pr.ppShow t)
 toValueIntU :: IntSize -> Integer -> WeakTerm
 toValueIntU size i = WeakTermEnumIntro $ EnumValueIntU size i
 
--- adopted from https://hackage.haskell.org/package/utf8-string-1.0.1.1/docs/src/Codec-Binary-UTF8-String.html
+raiseSyntaxError :: TreePlus -> T.Text -> WithEnv a
+raiseSyntaxError e form =
+  raiseError (fst e) $
+  "couldn't interpret the input with the expected form:\n- " <>
+  showAsSExp e <> "\n- " <> form
+
+-- the function `encodeChar` is adopted from https://hackage.haskell.org/package/utf8-string-1.0.1.1/docs/src/Codec-Binary-UTF8-String.html
+-- the license notice of this function is as follows:
+--
+--   Copyright (c) 2007, Galois Inc.
+--   All rights reserved.
+--
+--   Redistribution and use in source and binary forms, with or without
+--   modification, are permitted provided that the following conditions are met:
+--       * Redistributions of source code must retain the above copyright
+--         notice, this list of conditions and the following disclaimer.
+--       * Redistributions in binary form must reproduce the above copyright
+--         notice, this list of conditions and the following disclaimer in the
+--         documentation and/or other materials provided with the distribution.
+--       * Neither the name of Galois Inc. nor the
+--         names of its contributors may be used to endorse or promote products
+--         derived from this software without specific prior written permission.
+--
+--   THIS SOFTWARE IS PROVIDED BY Galois Inc. ``AS IS'' AND ANY
+--   EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+--   WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+--   DISCLAIMED. IN NO EVENT SHALL Galois Inc. BE LIABLE FOR ANY
+--   DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+--   (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+--   LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+--   ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+--   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+--   SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 encodeChar :: Char -> [Word8]
 encodeChar c = (map fromIntegral . go . ord) c
   -- let result = (map fromIntegral . go . ord) c
@@ -463,7 +490,33 @@ encodeChar c = (map fromIntegral . go . ord) c
         , 0x80 + oc .&. 0x3f
         ]
 
--- adopted from https://hackage.haskell.org/package/utf8-string-1.0.1.1/docs/src/Codec-Binary-UTF8-String.html
+-- the function `encode` is adopted from https://hackage.haskell.org/package/utf8-string-1.0.1.1/docs/src/Codec-Binary-UTF8-String.html
+-- the license notice of this function is as follows:
+--
+--   Copyright (c) 2007, Galois Inc.
+--   All rights reserved.
+--
+--   Redistribution and use in source and binary forms, with or without
+--   modification, are permitted provided that the following conditions are met:
+--       * Redistributions of source code must retain the above copyright
+--         notice, this list of conditions and the following disclaimer.
+--       * Redistributions in binary form must reproduce the above copyright
+--         notice, this list of conditions and the following disclaimer in the
+--         documentation and/or other materials provided with the distribution.
+--       * Neither the name of Galois Inc. nor the
+--         names of its contributors may be used to endorse or promote products
+--         derived from this software without specific prior written permission.
+--
+--   THIS SOFTWARE IS PROVIDED BY Galois Inc. ``AS IS'' AND ANY
+--   EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+--   WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+--   DISCLAIMED. IN NO EVENT SHALL Galois Inc. BE LIABLE FOR ANY
+--   DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+--   (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+--   LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+--   ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+--   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+--   SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 encode :: String -> [Word8]
 encode input = concatMap encodeChar input
   -- let result = concatMap encodeChar input

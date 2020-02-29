@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Data.Tree where
 
 import Data.Basic
@@ -15,3 +17,8 @@ type TreePlus = (Meta, Tree)
 atomListOf :: TreePlus -> S.Set T.Text
 atomListOf (_, TreeAtom x) = S.singleton x
 atomListOf (_, TreeNode ts) = S.unions $ map atomListOf ts
+
+showAsSExp :: TreePlus -> T.Text
+showAsSExp (_, TreeAtom x) = x
+showAsSExp (_, TreeNode ts) =
+  "(" <> T.intercalate " " (map showAsSExp ts) <> ")"
