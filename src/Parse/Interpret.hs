@@ -7,6 +7,7 @@ module Parse.Interpret
   , interpretEnumItem
   , adjustPhase
   , readEnumValueIntU
+  , raiseSyntaxError
   ) where
 
 import Control.Monad.Except
