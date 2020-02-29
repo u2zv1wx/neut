@@ -132,15 +132,6 @@ getPosInfo m =
 showPosInfo :: Path Abs File -> Loc -> String
 showPosInfo path (_, l, c) = toFilePath path ++ ":" ++ show l ++ ":" ++ show c
 
-data LogLevel
-  = LogLevelInfo
-  | LogLevelWarning
-  | LogLevelError
-  | LogLevelCritical
-  deriving (Show)
-
-type Log = (Maybe PosInfo, LogLevel, T.Text)
-
 type IntSize = Int
 
 data FloatSize
