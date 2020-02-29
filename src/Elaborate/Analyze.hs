@@ -33,14 +33,6 @@ analyze = do
 simp :: [PreConstraint] -> WithEnv ()
 simp [] = return ()
 simp ((e1, e2):cs) = simp' $ (reduceWeakTermPlus e1, reduceWeakTermPlus e2) : cs
-  -- me1' <- return (reduceWeakTermPlus e1) >>= liftIO . timeout 5000000 . return
-  -- me2' <- return (reduceWeakTermPlus e2) >>= liftIO . timeout 5000000 . return
-  -- case (me1', me2') of
-  --   (Just e1', Just e2') -> simp' $ (e1', e2') : cs
-  --   (Nothing, _) ->
-  --     raiseError (metaOf e1) $ "cannot simplify [TIMEOUT]:\n" <> toText e1
-  --   (_, Nothing) ->
-  --     raiseError (metaOf e2) $ "cannot simplify [TIMEOUT]:\n" <> toText e2
 
 simp' :: [PreConstraint] -> WithEnv ()
 simp' [] = return ()
