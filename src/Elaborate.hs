@@ -4,18 +4,15 @@ module Elaborate
   ( elaborate
   ) where
 
-import Control.Monad.Except
 import Control.Monad.State
 import Data.List (nub)
 import Data.Maybe (fromMaybe)
 import Numeric.Half
-import System.Console.ANSI
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Set as S
 import qualified Data.Text as T
-import qualified Data.Text.IO as TIO
 
 import Data.Basic
 import Data.Constraint
@@ -173,11 +170,12 @@ ensureDAG g nodeInfo (v:vs) = do
         Right finishedList -> do
           let info = IntMap.fromList $ zip finishedList (repeat NodeStateFinish)
           ensureDAG g (IntMap.union info nodeInfo) vs
-        Left closedPath ->
-          throwError' $
-          "found cyclic univ level:\n" <>
-          T.pack
-            (show $ map (\(x, y) -> (x, UnivLevelPlus y)) (reverse closedPath))
+        Left closedPath -> do
+          let (_, (m, _)) = head closedPath
+          raiseError m $
+            "found cyclic univ level:\n" <>
+            T.pack
+              (show $ map (\(x, y) -> (x, UnivLevelPlus y)) (reverse closedPath))
 
 type UnivPath = [(Integer, (Meta, UnivLevel))]
 
@@ -230,19 +228,21 @@ elaborate' (m, WeakTermPiIntro xts e) = do
   e' <- elaborate' e
   xts' <- mapM elaboratePlus xts
   return (m, TermPiIntro xts' e')
-elaborate' (m, WeakTermPiElim (_, WeakTermZeta (I (_, x))) es) = do
+elaborate' (m, WeakTermPiElim (_, WeakTermZeta h@(I (_, x))) es) = do
   sub <- gets substEnv
   case IntMap.lookup x sub of
     Nothing ->
-      throwError' $
-      T.pack (showMeta m) <>
-      ":error: couldn't instantiate the hole since no constraints are given on it"
+      raiseError m $
+      "couldn't instantiate the hole since no constraints are given on it"
     Just (_, WeakTermPiIntro xts e)
       | length xts == length es -> do
         let xs = map (\(_, y, _) -> y) xts
         e' <- elaborate' $ substWeakTermPlus (zip xs es) e
         return e'
-    Just _ -> throwError' "insane zeta"
+    Just _ ->
+      raiseCritical m $
+      "the hole " <>
+      asText' h <> " is not registered in the substitution environment"
 elaborate' (m, WeakTermPiElim e es) = do
   e' <- elaborate' e
   es' <- mapM elaborate' es
@@ -265,13 +265,10 @@ elaborate' (m, WeakTermIter (mx, x, t) xts e) = do
   xts' <- mapM elaboratePlus xts
   e' <- elaborate' e
   return (m, TermIter (mx, x, t') xts' e')
-elaborate' (_, WeakTermZeta x@(I (_, i))) = do
-  sub <- gets substEnv
-  case IntMap.lookup i sub of
-    Nothing -> throwError' $ "elaborate' i: remaining hole: " <> asText' x
-    Just e -> do
-      e' <- elaborate' e
-      return e'
+elaborate' (m, WeakTermZeta _) =
+  raiseCritical
+    m
+    "every meta-variable must be of the form (?M e1 ... en) where n >= 0, but found the meta-variable here that doesn't fit this pattern"
 elaborate' (m, WeakTermConst x) = return (m, TermConst x)
 elaborate' (m, WeakTermInt t x) = do
   t' <- elaborate' t >>= reduceTermPlus
@@ -280,7 +277,7 @@ elaborate' (m, WeakTermInt t x) = do
       | (-1) * (2 ^ (size - 1)) <= x
       , x < 2 ^ size -> return (m, TermEnumIntro (EnumValueIntS size x))
       | otherwise ->
-        throwError' $
+        raiseError m $
         "the signed integer " <>
         T.pack (show x) <>
         " is inferred to be of type i" <>
@@ -289,20 +286,16 @@ elaborate' (m, WeakTermInt t x) = do
       | 0 <= x
       , x < 2 ^ size -> return (m, TermEnumIntro (EnumValueIntU size x))
       | otherwise ->
-        throwError' $
+        raiseError m $
         "the unsigned integer " <>
         T.pack (show x) <>
         " is inferred to be of type u" <>
         T.pack (show size) <> ", but is out of range of u" <> T.pack (show size)
-        -- throwError' "out-of-range"
-    _ -> do
-      liftIO $ setSGR [SetConsoleIntensity BoldIntensity]
-      liftIO $ putStrLn $ showMeta m ++ ":"
-      liftIO $ setSGR [Reset]
-      throwError' $
-        "the type of `" <>
-        T.pack (show x) <>
-        "` should be an integer type, but is:\n" <> T.pack (show t')
+    _ ->
+      raiseError m $
+      "the type of `" <>
+      T.pack (show x) <>
+      "` should be an integer type, but is:\n" <> toText (weaken t')
 elaborate' (m, WeakTermFloat16 x) = do
   return (m, TermFloat16 x)
 elaborate' (m, WeakTermFloat32 x) = do
@@ -320,9 +313,13 @@ elaborate' (m, WeakTermFloat t x) = do
         Just (LowTypeFloat FloatSize32) -> return (m, TermFloat32 x32)
         Just (LowTypeFloat FloatSize64) -> return (m, TermFloat64 x)
         _ ->
-          throwError' $
-          T.pack (show x) <> " should be float, but is " <> floatType
-    _ -> throwError' "elaborate.WeakTermFloat"
+          raiseError m $
+          T.pack (show x) <> " must be float, but is " <> floatType
+    _ ->
+      raiseError m $
+      "the type of `" <>
+      T.pack (show x) <>
+      "` must be a float type, but is:\n" <> toText (weaken t')
 elaborate' (m, WeakTermEnum k) = do
   return (m, TermEnum k)
 elaborate' (m, WeakTermEnumIntro x) = do
@@ -335,9 +332,13 @@ elaborate' (m, WeakTermEnumElim (e, t) les) = do
   t' <- elaborate' t >>= reduceTermPlus
   case t' of
     (_, TermEnum x) -> do
-      caseCheckEnumIdentifier x ls'
+      caseCheckEnumIdentifier m x ls'
       return (m, TermEnumElim (e', t') (zip ls' es'))
-    _ -> throwError' "type error (enum elim)"
+    _ ->
+      raiseError m $
+      "the type of `" <>
+      toText (weaken e') <>
+      "` must be an enum type, but is:\n" <> toText (weaken t')
 elaborate' (m, WeakTermArray dom k) = do
   dom' <- elaborate' dom
   return (m, TermArray dom' k)
@@ -368,15 +369,10 @@ elaborateWeakCase (WeakCaseInt t x) = do
     (_, TermEnum (EnumTypeIntU size)) ->
       return $ CaseValue (EnumValueIntU size x)
     _ -> do
-      let m = fst t
-      liftIO $ setSGR [SetConsoleIntensity BoldIntensity]
-      liftIO $ putStrLn $ showMeta m ++ ":"
-      liftIO $ setSGR [Reset]
-      p $ showMeta m
-      throwError' $
+      raiseError (fst t) $
         "the type of `" <>
         T.pack (show x) <>
-        "` should be an integer type, but is:\n" <> T.pack (show t')
+        "` should be an integer type, but is:\n" <> toText (weaken t')
 elaborateWeakCase (WeakCaseLabel l) = return $ CaseValue $ EnumValueLabel l
 elaborateWeakCase (WeakCaseIntS t a) = return $ CaseValue $ EnumValueIntS t a
 elaborateWeakCase (WeakCaseIntU t a) = return $ CaseValue $ EnumValueIntU t a
@@ -388,31 +384,31 @@ elaboratePlus (m, x, t) = do
   t' <- elaborate' t
   return (m, x, t')
 
-caseCheckEnumIdentifier :: EnumType -> [Case] -> WithEnv ()
-caseCheckEnumIdentifier (EnumTypeLabel x) ls = do
-  es <- lookupEnumSet x
-  caseCheckEnumIdentifier' (length es) ls
-caseCheckEnumIdentifier (EnumTypeNat i) ls = do
-  caseCheckEnumIdentifier' i ls
-caseCheckEnumIdentifier (EnumTypeIntS _) ls =
-  throwIfFalse $ CaseDefault `elem` ls
-caseCheckEnumIdentifier (EnumTypeIntU _) ls =
-  throwIfFalse $ CaseDefault `elem` ls
+caseCheckEnumIdentifier :: Meta -> EnumType -> [Case] -> WithEnv ()
+caseCheckEnumIdentifier m (EnumTypeLabel x) ls = do
+  es <- lookupEnumSet m x
+  caseCheckEnumIdentifier' m (length es) ls
+caseCheckEnumIdentifier m (EnumTypeNat i) ls = do
+  caseCheckEnumIdentifier' m i ls
+caseCheckEnumIdentifier m (EnumTypeIntS _) ls =
+  throwIfFalse m $ CaseDefault `elem` ls
+caseCheckEnumIdentifier m (EnumTypeIntU _) ls =
+  throwIfFalse m $ CaseDefault `elem` ls
 
-caseCheckEnumIdentifier' :: Int -> [Case] -> WithEnv ()
-caseCheckEnumIdentifier' i labelList = do
+caseCheckEnumIdentifier' :: Meta -> Int -> [Case] -> WithEnv ()
+caseCheckEnumIdentifier' m i labelList = do
   let len = length (nub labelList)
-  throwIfFalse $ i <= len || CaseDefault `elem` labelList
+  throwIfFalse m $ i <= len || CaseDefault `elem` labelList
 
-throwIfFalse :: Bool -> WithEnv ()
-throwIfFalse b =
+throwIfFalse :: Meta -> Bool -> WithEnv ()
+throwIfFalse m b =
   if b
     then return ()
-    else throwError' "non-exhaustive pattern"
+    else raiseError m "non-exhaustive pattern"
 
-lookupEnumSet :: T.Text -> WithEnv [T.Text]
-lookupEnumSet name = do
+lookupEnumSet :: Meta -> T.Text -> WithEnv [T.Text]
+lookupEnumSet m name = do
   eenv <- gets enumEnv
   case Map.lookup name eenv of
-    Nothing -> throwError' $ "no such enum defined: " <> name
+    Nothing -> raiseError m $ "no such enum defined: " <> name
     Just xis -> return $ map fst xis
