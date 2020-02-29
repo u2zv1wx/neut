@@ -135,7 +135,7 @@ renameDef nenv (m, (mx, x, t), xts, e) = do
   t' <- rename' nenv t
   (xts', e') <- renameBinder nenv xts e
   case lookupName x nenv of
-    Nothing -> throwError' "renameDef"
+    Nothing -> raiseError mx $ "undefined variable: " <> asText x
     Just x' -> return (m, (mx, x', t'), xts', e')
 
 -- type NameEnv = Map.HashMap Int Identifier
@@ -149,7 +149,7 @@ rename' nenv (m, WeakTermUpsilon x@(I (s, _))) = do
   case (lookupName x nenv, mc) of
     (Just x', _) -> return (m, WeakTermUpsilon x')
     (_, Just c) -> return c
-    _ -> throwError' $ T.pack (showMeta m) <> ": undefined variable: " <> s
+    _ -> raiseError m $ "undefined variable: " <> s
 rename' nenv (m, WeakTermPi mls xts t) = do
   (xts', t') <- renameBinder nenv xts t
   return (m, WeakTermPi mls xts' t')
@@ -305,79 +305,75 @@ renameStruct nenv ((mx, x, t):xts) e = do
   return ((mx, x', t) : xts', e')
 
 lookupStrict :: NameEnv -> IdentifierPlus -> WithEnv Identifier
-lookupStrict nenv (_, x, _) =
+lookupStrict nenv (m, x, _) =
   case lookupName x nenv of
     Just x' -> return x'
-    Nothing -> throwError' $ "[lookupStrict] undefined variable:  " <> asText x
+    Nothing -> raiseError m $ "undefined variable:  " <> asText x
 
 lookupStrict' :: NameEnv -> IdentifierPlus -> WithEnv WeakTermPlus
 lookupStrict' nenv (m, x, _) =
   case lookupName x nenv of
     Just x' -> return (m, WeakTermUpsilon x')
-    Nothing -> throwError' $ "[lookupStrict] undefined variable:  " <> asText x
+    Nothing -> raiseError m $ "undefined variable:  " <> asText x
 
-checkSanity :: [Identifier] -> WeakTermPlus -> Bool
-checkSanity _ (_, WeakTermTau _) = True
-checkSanity _ (_, WeakTermUpsilon _) = True
-checkSanity ctx (_, WeakTermPi _ xts t) = do
-  checkSanity' ctx xts t
-checkSanity ctx (_, WeakTermPiIntro xts e) = do
-  checkSanity' ctx xts e
-checkSanity ctx (_, WeakTermPiElim e es) = do
-  checkSanity ctx e && all (checkSanity ctx) es
-checkSanity ctx (_, WeakTermSigma xts) = checkSanitySigma ctx xts
-checkSanity ctx (_, WeakTermSigmaIntro t es) = all (checkSanity ctx) $ t : es
-checkSanity ctx (_, WeakTermSigmaElim t xts e1 e2) = do
-  all (checkSanity ctx) [t, e1] && checkSanity' ctx xts e2
-checkSanity ctx (_, WeakTermIter xt xts e) = do
-  checkSanity' ctx (xt : xts) e
-checkSanity _ (_, WeakTermConst _) = True
-checkSanity _ (_, WeakTermZeta _) = True
-checkSanity ctx (_, WeakTermInt t _) = checkSanity ctx t
-checkSanity _ (_, WeakTermFloat16 _) = True
-checkSanity _ (_, WeakTermFloat32 _) = True
-checkSanity _ (_, WeakTermFloat64 _) = True
-checkSanity ctx (_, WeakTermFloat t _) = checkSanity ctx t
-checkSanity _ (_, WeakTermEnum _) = True
-checkSanity _ (_, WeakTermEnumIntro _) = True
-checkSanity ctx (_, WeakTermEnumElim (e, t) les) =
-  all (checkSanity ctx) $ e : t : map snd les
-checkSanity ctx (_, WeakTermArray dom _) = do
-  checkSanity ctx dom
-checkSanity ctx (_, WeakTermArrayIntro _ es) = do
-  all (checkSanity ctx) es
-checkSanity ctx (_, WeakTermArrayElim _ xts e1 e2) = do
-  checkSanity ctx e1 && checkSanity' ctx xts e2
-checkSanity _ (_, WeakTermStruct {}) = True
-checkSanity ctx (_, WeakTermStructIntro ets) =
-  all (checkSanity ctx) $ map fst ets
-checkSanity ctx (_, WeakTermStructElim xts e1 e2) = do
-  checkSanity ctx e1 && checkSanity'' ctx xts e2
-
-checkSanity' :: [Identifier] -> [IdentifierPlus] -> WeakTermPlus -> Bool
-checkSanity' ctx [] e = do
-  checkSanity ctx e
-checkSanity' ctx ((_, x, _):_) _
-  | x `elem` ctx = False
-checkSanity' ctx ((_, x, t):xts) e = do
-  checkSanity ctx t && checkSanity' (x : ctx) xts e
-
-checkSanitySigma :: [Identifier] -> [IdentifierPlus] -> Bool
-checkSanitySigma _ [] = True
-checkSanitySigma ctx ((_, x, _):_)
-  | x `elem` ctx = False
-checkSanitySigma ctx ((_, x, t):xts) = do
-  checkSanity ctx t && checkSanitySigma (x : ctx) xts
-
-checkSanity'' ::
-     [Identifier] -> [(Meta, Identifier, ArrayKind)] -> WeakTermPlus -> Bool
-checkSanity'' ctx [] e = do
-  checkSanity ctx e
-checkSanity'' ctx ((_, x, _):_) _
-  | x `elem` ctx = False
-checkSanity'' ctx ((_, x, _):xts) e = do
-  checkSanity'' (x : ctx) xts e
-
+-- checkSanity :: [Identifier] -> WeakTermPlus -> Bool
+-- checkSanity _ (_, WeakTermTau _) = True
+-- checkSanity _ (_, WeakTermUpsilon _) = True
+-- checkSanity ctx (_, WeakTermPi _ xts t) = do
+--   checkSanity' ctx xts t
+-- checkSanity ctx (_, WeakTermPiIntro xts e) = do
+--   checkSanity' ctx xts e
+-- checkSanity ctx (_, WeakTermPiElim e es) = do
+--   checkSanity ctx e && all (checkSanity ctx) es
+-- checkSanity ctx (_, WeakTermSigma xts) = checkSanitySigma ctx xts
+-- checkSanity ctx (_, WeakTermSigmaIntro t es) = all (checkSanity ctx) $ t : es
+-- checkSanity ctx (_, WeakTermSigmaElim t xts e1 e2) = do
+--   all (checkSanity ctx) [t, e1] && checkSanity' ctx xts e2
+-- checkSanity ctx (_, WeakTermIter xt xts e) = do
+--   checkSanity' ctx (xt : xts) e
+-- checkSanity _ (_, WeakTermConst _) = True
+-- checkSanity _ (_, WeakTermZeta _) = True
+-- checkSanity ctx (_, WeakTermInt t _) = checkSanity ctx t
+-- checkSanity _ (_, WeakTermFloat16 _) = True
+-- checkSanity _ (_, WeakTermFloat32 _) = True
+-- checkSanity _ (_, WeakTermFloat64 _) = True
+-- checkSanity ctx (_, WeakTermFloat t _) = checkSanity ctx t
+-- checkSanity _ (_, WeakTermEnum _) = True
+-- checkSanity _ (_, WeakTermEnumIntro _) = True
+-- checkSanity ctx (_, WeakTermEnumElim (e, t) les) =
+--   all (checkSanity ctx) $ e : t : map snd les
+-- checkSanity ctx (_, WeakTermArray dom _) = do
+--   checkSanity ctx dom
+-- checkSanity ctx (_, WeakTermArrayIntro _ es) = do
+--   all (checkSanity ctx) es
+-- checkSanity ctx (_, WeakTermArrayElim _ xts e1 e2) = do
+--   checkSanity ctx e1 && checkSanity' ctx xts e2
+-- checkSanity _ (_, WeakTermStruct {}) = True
+-- checkSanity ctx (_, WeakTermStructIntro ets) =
+--   all (checkSanity ctx) $ map fst ets
+-- checkSanity ctx (_, WeakTermStructElim xts e1 e2) = do
+--   checkSanity ctx e1 && checkSanity'' ctx xts e2
+-- checkSanity' :: [Identifier] -> [IdentifierPlus] -> WeakTermPlus -> Bool
+-- checkSanity' ctx [] e = do
+--   checkSanity ctx e
+-- checkSanity' ctx ((_, x, _):_) _
+--   | x `elem` ctx = False
+-- checkSanity' ctx ((_, x, t):xts) e = do
+--   checkSanity ctx t && checkSanity' (x : ctx) xts e
+-- checkSanitySigma :: [Identifier] -> [IdentifierPlus] -> Bool
+-- checkSanitySigma _ [] = True
+-- checkSanitySigma ctx ((_, x, _):_)
+--   | x `elem` ctx = False
+-- checkSanitySigma ctx ((_, x, t):xts) = do
+--   checkSanity ctx t && checkSanitySigma (x : ctx) xts
+-- checkSanity'' ::
+--      [Identifier] -> [(Meta, Identifier, ArrayKind)] -> WeakTermPlus -> Bool
+-- checkSanity'' ctx [] e = do
+--   checkSanity ctx e
+-- checkSanity'' ctx ((_, x, _):_) _
+--   | x `elem` ctx = False
+-- checkSanity'' ctx ((_, x, _):xts) e = do
+--   checkSanity'' (x : ctx) xts e
 prepareInvRename :: WithEnv ()
 prepareInvRename = do
   modify (\env -> env {count = 0})
