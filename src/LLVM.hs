@@ -269,11 +269,15 @@ llvmDataLet :: Identifier -> DataPlus -> LLVM -> WithEnv LLVM
 llvmDataLet x (m, DataTheta y) cont = do
   cenv <- gets codeEnv
   ns <- gets nameSet
+  -- nothingだったらglobalってしてしまってよさそう？
+  -- 型が不明だからnothingのときにもなんかうまくやる必要があるか。
   case Map.lookup y cenv of
     Nothing
       | asText y == "fork" ->
         llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType []) cont
-    Nothing -> raiseCritical m $ "no such global label defined: " <> asText y
+      | otherwise ->
+        raiseCritical m $ "no such global label defined: " <> asText y
+    -- Nothing -> raiseCritical m $ "no such global label defined: " <> asText y
     Just (Definition _ args e)
       | not (y `S.member` ns) -> do
         modify (\env -> env {nameSet = S.insert y ns})

@@ -175,20 +175,18 @@ asLowType :: Identifier -> LowType
 asLowType (I (n, _)) = fromMaybe (LowTypeIntS 64) (asLowTypeMaybe n)
 
 asLowTypeMaybe :: T.Text -> Maybe LowType
-asLowTypeMaybe "" = Nothing
-asLowTypeMaybe s
-  | 'i' <- T.head s
-  , Just n <- readMaybe $ T.unpack $ T.tail s
-  , 0 < n && n <= 64 = Just $ LowTypeIntS n
-asLowTypeMaybe s
-  | 'u' <- T.head s
-  , Just n <- readMaybe $ T.unpack $ T.tail s
-  , 0 < n && n <= 64 = Just $ LowTypeIntU n
-asLowTypeMaybe s
-  | 'f' <- T.head s
-  , Just n <- readMaybe $ T.unpack $ T.tail s
-  , Just size <- asFloatSize n = Just $ LowTypeFloat size
-asLowTypeMaybe _ = Nothing
+asLowTypeMaybe s =
+  case T.uncons s of
+    Just ('i', rest)
+      | Just n <- readMaybe $ T.unpack rest
+      , 0 < n && n <= 64 -> Just $ LowTypeIntS n
+    Just ('u', rest)
+      | Just n <- readMaybe $ T.unpack rest
+      , 0 < n && n <= 64 -> Just $ LowTypeIntU n
+    Just ('f', rest)
+      | Just n <- readMaybe $ T.unpack rest
+      , Just size <- asFloatSize n -> Just $ LowTypeFloat size
+    _ -> Nothing
 
 asIntS :: Integral a => a -> a -> a
 asIntS size n = do
