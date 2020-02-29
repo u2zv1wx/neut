@@ -236,10 +236,26 @@ asArrayAccessMaybe name
 --     [] -> []
 --     [s'] -> [s']
 --     ss -> [T.intercalate (T.singleton c) (init ss), last ss]
-asArrayKindMaybe :: LowType -> Maybe ArrayKind
-asArrayKindMaybe (LowTypeIntS i) = Just $ ArrayKindIntS i
-asArrayKindMaybe (LowTypeIntU i) = Just $ ArrayKindIntU i
-asArrayKindMaybe (LowTypeFloat size) = Just $ ArrayKindFloat size
+lowTypeToArrayKindMaybe :: LowType -> Maybe ArrayKind
+lowTypeToArrayKindMaybe (LowTypeIntS i) = Just $ ArrayKindIntS i
+lowTypeToArrayKindMaybe (LowTypeIntU i) = Just $ ArrayKindIntU i
+lowTypeToArrayKindMaybe (LowTypeFloat size) = Just $ ArrayKindFloat size
+lowTypeToArrayKindMaybe _ = Nothing
+
+asArrayKindMaybe :: T.Text -> Maybe ArrayKind
+asArrayKindMaybe "" = Nothing
+asArrayKindMaybe s
+  | 'i' <- T.head s
+  , Just n <- readMaybe $ T.unpack $ T.tail s
+  , 0 < n && n <= 64 = Just $ ArrayKindIntS n
+asArrayKindMaybe s
+  | 'u' <- T.head s
+  , Just n <- readMaybe $ T.unpack $ T.tail s
+  , 0 < n && n <= 64 = Just $ ArrayKindIntU n
+asArrayKindMaybe s
+  | 'f' <- T.head s
+  , Just n <- readMaybe $ T.unpack $ T.tail s
+  , Just size <- asFloatSize n = Just $ ArrayKindFloat size
 asArrayKindMaybe _ = Nothing
 
 data UnaryOp

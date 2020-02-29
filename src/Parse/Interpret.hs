@@ -19,8 +19,8 @@ import Text.Read (readMaybe)
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.Text as T
-import qualified Text.Show.Pretty as Pr
 
+-- import qualified Text.Show.Pretty as Pr
 import Data.Basic
 import Data.Env
 import Data.Tree
@@ -241,43 +241,40 @@ interpretAtom (m, TreeAtom x) = do
 interpretAtom t = raiseSyntaxError t "LEAF"
 
 interpretEnumValueMaybe :: TreePlus -> WithEnv (Maybe EnumValue)
-interpretEnumValueMaybe (_, TreeAtom x)
-  | Just v <- readEnumValueNat x = return $ Just v
-interpretEnumValueMaybe (m, TreeNode [(_, TreeAtom t), (_, TreeAtom x)])
-  | Just v@(EnumValueIntS size x') <- readEnumValueIntS t x =
-    if (-1) * (2 ^ (size - 1)) <= x' && x' < 2 ^ size
-      then return $ Just v
-      else raiseError m $
-           "the signed integer " <>
-           T.pack (show x') <>
-           " is supposed to be of type i" <>
-           T.pack (show size) <>
-           ", but is out of range of i" <> T.pack (show size)
-interpretEnumValueMaybe (m, TreeNode [(_, TreeAtom t), (_, TreeAtom x)])
-  | Just v@(EnumValueIntU size x') <- readEnumValueIntU t x =
-    if 0 <= x' && x' < 2 ^ size
-      then return $ Just v
-      else raiseError m $
-           "the unsigned integer " <>
-           T.pack (show x') <>
-           " is supposed to be of type u" <>
-           T.pack (show size) <>
-           ", but is out of range of u" <> T.pack (show size)
-interpretEnumValueMaybe (_, TreeAtom x) = do
-  b <- isDefinedEnum x
-  if b
-    then return $ Just $ EnumValueLabel x
-    else return Nothing
-interpretEnumValueMaybe _ = return Nothing
+interpretEnumValueMaybe t =
+  (Just <$> interpretEnumValue t) `catchError` (const $ return Nothing)
 
 interpretEnumValue :: TreePlus -> WithEnv EnumValue
-interpretEnumValue l = do
-  ml' <- interpretEnumValueMaybe l
-  case ml' of
-    Just l' -> return l'
-    Nothing ->
-      raiseError (fst l) $
-      "interpretEnumValue: syntax error:\n" <> T.pack (Pr.ppShow l)
+interpretEnumValue (m, TreeAtom x) = do
+  b <- isDefinedEnum x
+  case (readEnumValueNat x, b) of
+    (Just v, _) -> return v
+    (_, True) -> return $ EnumValueLabel x
+    _ -> raiseError m $ "no such enum-value is defined: " <> x
+interpretEnumValue e@(m, TreeNode [(_, TreeAtom t), (_, TreeAtom x)]) = do
+  let mv1 = readEnumValueIntS t x
+  let mv2 = readEnumValueIntU t x
+  case (mv1, mv2) of
+    (Just v@(EnumValueIntS size x'), _) ->
+      if (-1) * (2 ^ (size - 1)) <= x' && x' < 2 ^ size
+        then return v
+        else raiseError m $
+             "the signed integer " <>
+             T.pack (show x') <>
+             " is supposed to be of type i" <>
+             T.pack (show size) <>
+             ", but is out of range of i" <> T.pack (show size)
+    (_, Just v@(EnumValueIntU size x')) ->
+      if 0 <= x' && x' < 2 ^ size
+        then return v
+        else raiseError m $
+             "the unsigned integer " <>
+             T.pack (show x') <>
+             " is supposed to be of type u" <>
+             T.pack (show size) <>
+             ", but is out of range of u" <> T.pack (show size)
+    _ -> raiseSyntaxError e "(SINT-TYPE INT) | (UINT-TYPE INT)"
+interpretEnumValue t = raiseSyntaxError t "LEAF | (LEAF LEAF)"
 
 interpretBinder ::
      [TreePlus] -> TreePlus -> WithEnv ([IdentifierPlus], WeakTermPlus)
@@ -316,7 +313,6 @@ interpretStructIntro (_, TreeNode [e, k]) = do
   k' <- asArrayKind k
   return (e', k')
 interpretStructIntro e = raiseSyntaxError e "(TREE TREE)"
-  -- "interpretStructIntro: syntax error:\n " <> T.pack (Pr.ppShow e)
 
 interpretStructElim :: TreePlus -> WithEnv (Meta, Identifier, ArrayKind)
 interpretStructElim (_, TreeNode [(m, TreeAtom x), k]) = do
@@ -346,7 +342,6 @@ interpretEnumItem'' (_, TreeAtom s) = return (s, Nothing)
 interpretEnumItem'' (_, TreeNode [(_, TreeAtom s), (_, TreeAtom i)])
   | Just i' <- readMaybe $ T.unpack i = return (s, Just i')
 interpretEnumItem'' t = raiseSyntaxError t "LEAF | (LEAF LEAF)"
-  -- "interpretEnumItem: syntax error:\n" <> T.pack (Pr.ppShow t)
 
 headDiscriminantOf :: [(T.Text, Int)] -> Int
 headDiscriminantOf [] = 0
@@ -421,19 +416,12 @@ newHole m = do
 
 -- asArrayKind :: T.Text -> WithEnv ArrayKind
 asArrayKind :: TreePlus -> WithEnv ArrayKind
-asArrayKind (m, TreeAtom x) =
-  case asLowTypeMaybe x of
-    Nothing -> raiseError m "asArrayKind: syntax error"
-    Just t -> do
-      case asArrayKindMaybe t of
-        Nothing -> raiseError m "asArrayKind: syntax error"
-        Just a -> return a
+asArrayKind e@(_, TreeAtom x) =
+  case asArrayKindMaybe x of
+    Nothing -> raiseSyntaxError e "SINT-TYPE | UINT-TYPE | FLOAT-TYPE"
+    Just t -> return t
 asArrayKind t = raiseSyntaxError t "LEAF"
 
--- asStructKind :: TreePlus -> WithEnv ArrayKind
--- asStructKind (_, TreeAtom x) = asArrayKind x
--- asStructKind t =
---   raiseError (fst t) $ "asStructKind: syntax error:\n" <> T.pack (Pr.ppShow t)
 toValueIntU :: IntSize -> Integer -> WeakTerm
 toValueIntU size i = WeakTermEnumIntro $ EnumValueIntU size i
 

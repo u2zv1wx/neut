@@ -372,7 +372,7 @@ toStr s = Pr.ppShow s
 
 lowTypeToArrayKind :: LowType -> WithEnv ArrayKind
 lowTypeToArrayKind lowType =
-  case asArrayKindMaybe lowType of
+  case lowTypeToArrayKindMaybe lowType of
     Just k -> return k
     Nothing -> raiseCritical' "Infer.lowTypeToArrayKind"
 
