@@ -11,7 +11,7 @@ import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Set as S
 import qualified Data.Text as T
 
-import Data.Bits
+-- import Data.Bits
 import Data.Maybe (fromMaybe)
 import Text.Read
 
@@ -403,12 +403,10 @@ splitLast [x] = return ([], x)
 splitLast (x:xs) = do
   (xs', z) <- splitLast xs
   return (x : xs', z)
-
-ushiftR :: Int -> Int -> Int
-ushiftR n k = fromIntegral (fromIntegral n `shiftR` k :: Word)
-
-ushiftR' :: (Integral a) => a -> Int -> a
-ushiftR' n k = fromIntegral (fromIntegral n `shiftR` k :: Word)
+-- ushiftR :: Int -> Int -> Int
+-- ushiftR n k = fromIntegral (fromIntegral n `shiftR` k :: Word)
+-- ushiftR' :: (Integral a) => a -> Int -> a
+-- ushiftR' n k = fromIntegral (fromIntegral n `shiftR` k :: Word)
 -- assert :: (Monad m) => String -> Bool -> a -> m a
 -- assert str False _ = error str
 -- assert _ True x = return x
