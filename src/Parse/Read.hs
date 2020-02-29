@@ -109,6 +109,7 @@ readComment = do
   case T.uncons s of
     Just ('\n', rest) -> updateStreamL rest >> readSkip
     Just (_, rest) -> updateStreamC 1 rest >> readComment
+    -- Nothing -> raiseParseError "comment"
     Nothing -> return () -- no newline at the end of file
       -- raiseParseError "comment"
 
@@ -128,31 +129,30 @@ readSepEndBy' f g acc = do
     Left result -> return result
 
 readSymbol :: WithReadEnv T.Text
-readSymbol = do
+readSymbol
+  -- s <- gets text
+  -- let x = T.takeWhile isSymbolChar s
+  -- let rest = T.dropWhile isSymbolChar s
+  -- updateStreamC (T.length x) rest
+  -- return x
+ = do
   s <- gets text
   let x = T.takeWhile isSymbolChar s
-  let rest = T.dropWhile isSymbolChar s
-  updateStreamC (T.length x) rest
-  return x
-  -- if T.null x
-  --   then raiseParseCritical
-  --          "Parse.Read.readSymbol is called for the empty input"
-  --   else do
-  --     let rest = T.dropWhile isSymbolChar s
-  --     updateStreamC (T.length x) rest
-  --     return x
+  if T.null x
+    then raiseParseError "Parse.Read.readSymbol is called for the empty input"
+    else do
+      let rest = T.dropWhile isSymbolChar s
+      updateStreamC (T.length x) rest
+      return x
 
 readString :: WithReadEnv T.Text
 readString = do
   s <- gets text
   let rest = T.tail s -- T.head s is known to be '"'
-  -- case T.uncons s of
-  --   Just ('"', rest) -> do
   len <- headStringLengthOf False rest 1
   let (x, rest') = T.splitAt len s
   modify (\env -> env {text = rest'})
   return x
-    -- _ -> raiseParseError "readString"
 
 type EscapeFlag = Bool
 
