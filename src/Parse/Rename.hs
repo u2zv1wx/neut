@@ -22,10 +22,10 @@ import Data.Env
 import Data.WeakTerm
 
 rename :: WeakTermPlus -> WithEnv WeakTermPlus
-rename e = do
-  result <- rename' Map.empty e
-  let info = toInfo "rename.post" result
-  return $ assertP info result $ checkSanity [] result
+rename e = rename' Map.empty e
+  -- result <- rename' Map.empty e
+  -- let info = toInfo "rename.post" result
+  -- return $ assertP info result $ checkSanity [] result
 
 renameQuasiStmtList :: [QuasiStmt] -> WithEnv [QuasiStmt]
 renameQuasiStmtList = renameQuasiStmtList' Map.empty

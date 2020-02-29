@@ -11,8 +11,8 @@ module Parse.Interpret
 
 import Control.Monad.Except
 import Control.Monad.State
-import Data.Bits ((.&.), (.|.), shiftL, shiftR)
-import Data.Char (chr, ord)
+import Data.Bits ((.&.), shiftR)
+import Data.Char (ord)
 import Data.Maybe (fromMaybe)
 import Data.Word (Word8)
 import Text.Read (readMaybe)
@@ -444,9 +444,9 @@ toValueIntU size i = WeakTermEnumIntro $ EnumValueIntU size i
 
 -- adopted from https://hackage.haskell.org/package/utf8-string-1.0.1.1/docs/src/Codec-Binary-UTF8-String.html
 encodeChar :: Char -> [Word8]
-encodeChar c = do
-  let result = (map fromIntegral . go . ord) c
-  assertP "encodeChar" result (decode result == [c])
+encodeChar c = (map fromIntegral . go . ord) c
+  -- let result = (map fromIntegral . go . ord) c
+  -- assertP "encodeChar" result (decode result == [c])
   where
     go oc
       | oc <= 0x7f = [oc]
@@ -465,48 +465,46 @@ encodeChar c = do
 
 -- adopted from https://hackage.haskell.org/package/utf8-string-1.0.1.1/docs/src/Codec-Binary-UTF8-String.html
 encode :: String -> [Word8]
-encode input = do
-  let result = concatMap encodeChar input
-  assertP "encode" result (decode result == input)
-
+encode input = concatMap encodeChar input
+  -- let result = concatMap encodeChar input
+  -- assertP "encode" result (decode result == input)
 -- adopted from https://hackage.haskell.org/package/utf8-string-1.0.1.1/docs/src/Codec-Binary-UTF8-String.html
-replacement_character :: Char
-replacement_character = '\xfffd'
-
+-- replacement_character :: Char
+-- replacement_character = '\xfffd'
 -- adopted from https://hackage.haskell.org/package/utf8-string-1.0.1.1/docs/src/Codec-Binary-UTF8-String.html
 -- this function is used only for assertion.
-decode :: [Word8] -> String
-decode [] = ""
-decode (c:cs)
-  | c < 0x80 = chr (fromEnum c) : decode cs
-  | c < 0xc0 = replacement_character : decode cs
-  | c < 0xe0 = multi1
-  | c < 0xf0 = multi_byte 2 0xf 0x800
-  | c < 0xf8 = multi_byte 3 0x7 0x10000
-  | c < 0xfc = multi_byte 4 0x3 0x200000
-  | c < 0xfe = multi_byte 5 0x1 0x4000000
-  | otherwise = replacement_character : decode cs
-  where
-    multi1 =
-      case cs of
-        c1:ds
-          | c1 .&. 0xc0 == 0x80 ->
-            let d =
-                  ((fromEnum c .&. 0x1f) `shiftL` 6) .|. fromEnum (c1 .&. 0x3f)
-             in if d >= 0x000080
-                  then toEnum d : decode ds
-                  else replacement_character : decode ds
-        _ -> replacement_character : decode cs
-    multi_byte :: Int -> Word8 -> Int -> [Char]
-    multi_byte i mask overlong = aux i cs (fromEnum (c .&. mask))
-      where
-        aux 0 rs acc
-          | overlong <= acc &&
-              acc <= 0x10ffff &&
-              (acc < 0xd800 || 0xdfff < acc) && (acc < 0xfffe || 0xffff < acc) =
-            chr acc : decode rs
-          | otherwise = replacement_character : decode rs
-        aux n (r:rs) acc
-          | r .&. 0xc0 == 0x80 =
-            aux (n - 1) rs $ shiftL acc 6 .|. fromEnum (r .&. 0x3f)
-        aux _ rs _ = replacement_character : decode rs
+-- decode :: [Word8] -> String
+-- decode [] = ""
+-- decode (c:cs)
+--   | c < 0x80 = chr (fromEnum c) : decode cs
+--   | c < 0xc0 = replacement_character : decode cs
+--   | c < 0xe0 = multi1
+--   | c < 0xf0 = multi_byte 2 0xf 0x800
+--   | c < 0xf8 = multi_byte 3 0x7 0x10000
+--   | c < 0xfc = multi_byte 4 0x3 0x200000
+--   | c < 0xfe = multi_byte 5 0x1 0x4000000
+--   | otherwise = replacement_character : decode cs
+--   where
+--     multi1 =
+--       case cs of
+--         c1:ds
+--           | c1 .&. 0xc0 == 0x80 ->
+--             let d =
+--                   ((fromEnum c .&. 0x1f) `shiftL` 6) .|. fromEnum (c1 .&. 0x3f)
+--              in if d >= 0x000080
+--                   then toEnum d : decode ds
+--                   else replacement_character : decode ds
+--         _ -> replacement_character : decode cs
+--     multi_byte :: Int -> Word8 -> Int -> [Char]
+--     multi_byte i mask overlong = aux i cs (fromEnum (c .&. mask))
+--       where
+--         aux 0 rs acc
+--           | overlong <= acc &&
+--               acc <= 0x10ffff &&
+--               (acc < 0xd800 || 0xdfff < acc) && (acc < 0xfffe || 0xffff < acc) =
+--             chr acc : decode rs
+--           | otherwise = replacement_character : decode rs
+--         aux n (r:rs) acc
+--           | r .&. 0xc0 == 0x80 =
+--             aux (n - 1) rs $ shiftL acc 6 .|. fromEnum (r .&. 0x3f)
+--         aux _ rs _ = replacement_character : decode rs

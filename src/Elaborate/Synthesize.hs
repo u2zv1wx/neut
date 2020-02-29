@@ -7,7 +7,6 @@ module Elaborate.Synthesize
 import Control.Monad.Except
 import Control.Monad.State
 import Data.List (sortBy)
-import Path
 import System.Console.ANSI
 
 import qualified Data.IntMap.Strict as IntMap
@@ -193,12 +192,11 @@ showErrorThenQuit q = do
   prepareInvRename
   showErrors [] pcs >>= throwError
 
-type PosInfo = (Path Abs File, Maybe Loc)
-
+-- type PosInfo = (Path Abs File, Maybe Loc)
 setupPosInfo :: [EnrichedConstraint] -> [(PosInfo, PreConstraint)]
 setupPosInfo [] = []
 setupPosInfo ((Enriched (e1, e2) _ _):cs) = do
-  case (getLocInfo e1, getLocInfo e2) of
+  case (getPosInfo' $ metaOf e1, getPosInfo' $ metaOf e2) of
     (Just pos1, Just pos2) -> do
       case snd pos1 `compare` snd pos2 of
         LT -> (pos2, (e2, e1)) : setupPosInfo cs -- pos1 < pos2
@@ -235,7 +233,7 @@ showErrors' pos ps e1 e2 pcs
 showErrorHeader :: Bool -> PosInfo -> IO ()
 showErrorHeader b (path, loc) = do
   setSGR' b [SetConsoleIntensity BoldIntensity]
-  TIO.putStr $ T.pack (showPosInfo path $ maximum loc)
+  TIO.putStr $ T.pack (showPosInfo path loc)
   TIO.putStrLn ":"
   setSGR' b [Reset]
 
@@ -255,9 +253,8 @@ setSGR' :: Bool -> [SGR] -> IO ()
 setSGR' False _ = return ()
 setSGR' True arg = setSGR arg
 
-getLocInfo :: WeakTermPlus -> Maybe PosInfo
-getLocInfo (m, _) =
+getPosInfo' :: Meta -> Maybe PosInfo
+getPosInfo' m =
   case (metaFileName m, metaConstraintLocation m) of
-    (_, Nothing) -> Nothing
-    (Just path, l) -> return (path, l)
+    (Just path, Just l) -> return (path, l)
     _ -> Nothing

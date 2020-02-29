@@ -45,7 +45,7 @@ complete inputPath l c = do
 showCompInfo :: CompInfo -> [String]
 showCompInfo [] = []
 showCompInfo ((x, m):xms) = do
-  case getInfo m of
+  case getPosInfo m of
     Nothing -> showCompInfo xms
     Just (path, (_, l, c)) -> do
       let pathStr = "\"" <> toFilePath path <> "\""

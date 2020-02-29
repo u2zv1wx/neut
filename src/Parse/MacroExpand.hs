@@ -19,39 +19,35 @@ import Data.Tree
 type MacroSubst = [(T.Text, TreePlus)]
 
 macroExpand :: TreePlus -> WithEnv TreePlus
-macroExpand t = do
-  result <- recurM (macroExpand1 . splice) t
-  let info = toInfo "macroExpand.post" result
-  assertPM info result $ noSpliceOrKeyword result
+macroExpand t = recurM (macroExpand1 . splice) t
+  -- result <- recurM (macroExpand1 . splice) t
+  -- let info = toInfo "macroExpand.post" result
+  -- assertPM info result $ noSpliceOrKeyword result
 
 macroExpand' :: TreePlus -> WithEnv TreePlus
 macroExpand' t = recurM (macroExpand1 . splice) t
 
-noSpliceOrKeyword :: TreePlus -> WithEnv Bool
-noSpliceOrKeyword t = do
-  let noSplice = hasNoRemSplice t
-  noKeyword <- hasNoMatch t
-  return $ noSplice && noKeyword
-
-hasNoRemSplice :: TreePlus -> Bool
-hasNoRemSplice (_, TreeAtom _) = True
-hasNoRemSplice (_, TreeNode ts) = do
-  let b1 = all hasNoRemSplice ts
-  let b2 = all (isLeft . findSplice) ts
-  b1 && b2
-
-isLeft :: Either a b -> Bool
-isLeft (Left _) = True
-isLeft _ = False
-
-hasNoMatch :: TreePlus -> WithEnv Bool
-hasNoMatch t = do
-  nenv <- gets notationEnv
-  mMatch <- try (macroMatch t) nenv
-  case mMatch of
-    Just _ -> return False
-    Nothing -> return True
-
+-- noSpliceOrKeyword :: TreePlus -> WithEnv Bool
+-- noSpliceOrKeyword t = do
+--   let noSplice = hasNoRemSplice t
+--   noKeyword <- hasNoMatch t
+--   return $ noSplice && noKeyword
+-- hasNoRemSplice :: TreePlus -> Bool
+-- hasNoRemSplice (_, TreeAtom _) = True
+-- hasNoRemSplice (_, TreeNode ts) = do
+--   let b1 = all hasNoRemSplice ts
+--   let b2 = all (isLeft . findSplice) ts
+--   b1 && b2
+-- isLeft :: Either a b -> Bool
+-- isLeft (Left _) = True
+-- isLeft _ = False
+-- hasNoMatch :: TreePlus -> WithEnv Bool
+-- hasNoMatch t = do
+--   nenv <- gets notationEnv
+--   mMatch <- try (macroMatch t) nenv
+--   case mMatch of
+--     Just _ -> return False
+--     Nothing -> return True
 recurM :: (Monad m) => (TreePlus -> m TreePlus) -> TreePlus -> m TreePlus
 recurM f (m, TreeAtom s) = f (m, TreeAtom s)
 recurM f (m, TreeNode ts) = do
@@ -59,8 +55,9 @@ recurM f (m, TreeNode ts) = do
   f (m, TreeNode ts')
 
 macroExpand1 :: TreePlus -> WithEnv TreePlus
-macroExpand1 t@(i, _) = do
-  assertUP (toInfo "macroExpand1.pre" t) $ hasNoRemSplice t
+macroExpand1 t@(i, _)
+  -- assertUP (toInfo "macroExpand1.pre" t) $ hasNoRemSplice t
+ = do
   nenv <- gets notationEnv
   kenv <- gets keywordEnv
   -- the computation of atomListOf could be memoized
@@ -142,10 +139,10 @@ checkPlusCondition (_, TreeNode ts) = do
     ts' -> checkPlusCondition ts'
 
 splice :: TreePlus -> TreePlus
-splice t = do
-  let result = splice' t
-  let info = toInfo "splice" t
-  assertP info result $ hasNoRemSplice result
+splice t = splice' t
+  -- let result = splice' t
+  -- let info = toInfo "splice" t
+  -- assertP info result $ hasNoRemSplice result
 
 -- (a b (splice (c (splice (p q)) e)) f) ~> (a b c p q d e)
 splice' :: TreePlus -> TreePlus

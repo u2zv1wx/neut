@@ -36,10 +36,6 @@ asInt (I (_, i)) = i
 instance Show Identifier where
   show (I (s, i)) = T.unpack s ++ "-" ++ show i
 
--- instance Eq Identifier where
---   (I (_, i1)) == (I (_, i2)) = i1 == i2
--- instance Ord Identifier where
---   compare (I (_, i1)) (I (_, i2)) = compare i1 i2
 data Case
   = CaseValue EnumValue
   | CaseDefault
@@ -114,15 +110,6 @@ supMeta m1 m2
     m1 {metaConstraintLocation = metaConstraintLocation m2}
   | otherwise = m1
 
-getInfo :: Meta -> Maybe (Path Abs File, Loc)
-getInfo m =
-  case (metaFileName m, metaLocation m) of
-    (Just name, Just loc) -> return (name, loc)
-    _ -> Nothing
-
-showPosInfo :: Path Abs File -> Loc -> String
-showPosInfo path (_, l, c) = toFilePath path ++ ":" ++ show l ++ ":" ++ show c
-
 emptyMeta :: Meta
 emptyMeta =
   Meta
@@ -133,6 +120,26 @@ emptyMeta =
     , metaIsAppropriateAsCompletionCandidate = True
     , metaUnivParams = IntMap.empty
     }
+
+type PosInfo = (Path Abs File, Loc)
+
+getPosInfo :: Meta -> Maybe PosInfo
+getPosInfo m =
+  case (metaFileName m, metaLocation m) of
+    (Just name, Just loc) -> return (name, loc)
+    _ -> Nothing
+
+showPosInfo :: Path Abs File -> Loc -> String
+showPosInfo path (_, l, c) = toFilePath path ++ ":" ++ show l ++ ":" ++ show c
+
+data LogLevel
+  = LogLevelInfo
+  | LogLevelWarning
+  | LogLevelError
+  | LogLevelCritical
+  deriving (Show)
+
+type Log = (Maybe PosInfo, LogLevel, T.Text)
 
 type IntSize = Int
 
@@ -402,56 +409,44 @@ ushiftR n k = fromIntegral (fromIntegral n `shiftR` k :: Word)
 
 ushiftR' :: (Integral a) => a -> Int -> a
 ushiftR' n k = fromIntegral (fromIntegral n `shiftR` k :: Word)
-
-assert :: (Monad m) => String -> Bool -> a -> m a
-assert str False _ = error str
-assert _ True x = return x
-
+-- assert :: (Monad m) => String -> Bool -> a -> m a
+-- assert str False _ = error str
+-- assert _ True x = return x
 -- `P` is for "Pure"
-assertP :: String -> a -> Bool -> a
-assertP str _ False = error str
-assertP _ x True = x
-
+-- assertP :: String -> a -> Bool -> a
+-- assertP str _ False = error str
+-- assertP _ x True = x
 -- assert-pure-monadic
-assertPM :: (Monad m) => String -> a -> m Bool -> m a
-assertPM msg x m = do
-  b <- m
-  assert msg b x
-
+-- assertPM :: (Monad m) => String -> a -> m Bool -> m a
+-- assertPM msg x m = do
+--   b <- m
+--   assert msg b x
 -- assert-unit-monadic
-assertUM :: (Monad m) => String -> m Bool -> m ()
-assertUM msg mb = do
-  b <- mb
-  assert msg b ()
-
+-- assertUM :: (Monad m) => String -> m Bool -> m ()
+-- assertUM msg mb = do
+--   b <- mb
+--   assert msg b ()
 -- assert-unit-pure
-assertUP :: (Monad m) => String -> Bool -> m ()
-assertUP msg b = assert msg b ()
-
+-- assertUP :: (Monad m) => String -> Bool -> m ()
+-- assertUP msg b = assert msg b ()
 -- assert-monadic-monadic
-assertMM :: (Monad m) => String -> m a -> m Bool -> m a
-assertMM msg mx mb = do
-  b <- mb
-  x <- mx
-  assert msg b x
-
+-- assertMM :: (Monad m) => String -> m a -> m Bool -> m a
+-- assertMM msg mx mb = do
+--   b <- mb
+--   x <- mx
+--   assert msg b x
 -- assert-monadic-pure
-assertMP :: (Monad m) => String -> m a -> Bool -> m a
-assertMP msg mx b = do
-  x <- mx
-  assert msg b x
-
-assertPreUP :: (Monad m) => String -> Bool -> m ()
-assertPreUP msg b = assertUP (msg ++ ".pre") b
-
-assertPreUM :: (Monad m) => String -> m Bool -> m ()
-assertPreUM msg mb = assertUM (msg ++ ".pre") mb
-
-assertPostMM :: (Monad m) => String -> m a -> m Bool -> m a
-assertPostMM msg mx mb = assertMM (msg ++ ".post") mx mb
-
-assertPostMP :: (Monad m) => String -> m a -> Bool -> m a
-assertPostMP msg mx b = assertMP (msg ++ ".post") mx b
-
-assertPostPM :: (Monad m) => String -> a -> m Bool -> m a
-assertPostPM msg x mb = assertPM (msg ++ ".post") x mb
+-- assertMP :: (Monad m) => String -> m a -> Bool -> m a
+-- assertMP msg mx b = do
+--   x <- mx
+--   assert msg b x
+-- assertPreUP :: (Monad m) => String -> Bool -> m ()
+-- assertPreUP msg b = assertUP (msg ++ ".pre") b
+-- assertPreUM :: (Monad m) => String -> m Bool -> m ()
+-- assertPreUM msg mb = assertUM (msg ++ ".pre") mb
+-- assertPostMM :: (Monad m) => String -> m a -> m Bool -> m a
+-- assertPostMM msg mx mb = assertMM (msg ++ ".post") mx mb
+-- assertPostMP :: (Monad m) => String -> m a -> Bool -> m a
+-- assertPostMP msg mx b = assertMP (msg ++ ".post") mx b
+-- assertPostPM :: (Monad m) => String -> a -> m Bool -> m a
+-- assertPostPM msg x mb = assertPM (msg ++ ".post") x mb

@@ -373,9 +373,8 @@ pp e = liftIO $ TIO.putStrLn $ toText e
 toStr :: (Show a) => a -> String
 toStr s = Pr.ppShow s
 
-toInfo :: (Show a) => String -> a -> String
-toInfo s x = "assertion failure:\n" ++ s ++ "\n" ++ toStr x
-
+-- toInfo :: (Show a) => String -> a -> String
+-- toInfo s x = "assertion failure:\n" ++ s ++ "\n" ++ toStr x
 lowTypeToArrayKind :: LowType -> WithEnv ArrayKind
 lowTypeToArrayKind lowType =
   case asArrayKindMaybe lowType of
