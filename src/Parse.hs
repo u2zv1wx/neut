@@ -105,27 +105,27 @@ parse' ((_, TreeNode [(_, TreeAtom "notation"), from, to]):as) = do
   checkNotationSanity from
   modify (\e -> e {notationEnv = (from, to) : notationEnv e})
   parse' as
-parse' ((_, TreeNode [(_, TreeAtom "keyword"), (_, TreeAtom s)]):as) = do
-  checkKeywordSanity s
+parse' ((m, TreeNode [(_, TreeAtom "keyword"), (_, TreeAtom s)]):as) = do
+  checkKeywordSanity m s
   modify (\e -> e {keywordEnv = S.insert s (keywordEnv e)})
   parse' as
 parse' ((m, TreeNode ((_, TreeAtom "enum"):(_, TreeAtom name):ts)):as) = do
-  xis <- interpretEnumItem ts
+  xis <- interpretEnumItem m ts
   m' <- adjustPhase m
   insEnumEnv m' name xis
   parse' as
-parse' ((_, TreeNode [(_, TreeAtom "include"), (_, TreeAtom pathString)]):as) =
+parse' ((m, TreeNode [(_, TreeAtom "include"), (_, TreeAtom pathString)]):as) =
   case readMaybe (T.unpack pathString) :: Maybe String of
-    Nothing -> throwError' "the argument of `include` must be a string"
+    Nothing -> raiseError m "the argument of `include` must be a string"
     Just path -> do
       oldFilePath <- gets currentFilePath
       newFilePath <- resolveFile (parent oldFilePath) path
       b <- doesFileExist newFilePath
       if not b
-        then throwError' $ "no such file: " <> T.pack (toFilePath newFilePath)
+        then raiseError m $ "no such file: " <> T.pack (toFilePath newFilePath)
         else do
           insertPathInfo oldFilePath newFilePath
-          ensureDAG
+          ensureDAG m
           denv <- gets fileEnv
           case Map.lookup newFilePath denv of
             Just mxs -> do
@@ -154,7 +154,7 @@ parse' ((m, TreeNode [(_, TreeAtom "constant"), (mn, TreeAtom name), t]):as) = d
   t' <- macroExpand t >>= interpret
   cenv <- gets constantEnv
   case Map.lookup name cenv of
-    Just _ -> throwError' $ "the constant " <> name <> " is already defined"
+    Just _ -> raiseError m $ "the constant " <> name <> " is already defined"
     Nothing -> do
       i <- newCount
       modify (\e -> e {constantEnv = Map.insert name i (constantEnv e)})
@@ -172,14 +172,14 @@ parse' ((_, TreeNode ((_, TreeAtom "definition"):xds)):as) = do
   return $ stmt : stmtList
 parse' ((m, TreeNode (ind@(_, TreeAtom "inductive"):name@(mFun, TreeAtom _):xts@(_, TreeNode _):rest)):as) = do
   parse' $ (m, TreeNode [ind, (mFun, TreeNode (name : xts : rest))]) : as
-parse' ((_, TreeNode ((_, TreeAtom "inductive"):ts)):as) = do
-  stmtList1 <- parseInductive ts
+parse' ((m, TreeNode ((_, TreeAtom "inductive"):ts)):as) = do
+  stmtList1 <- parseInductive m ts
   stmtList2 <- parse' as
   return $ stmtList1 ++ stmtList2
 parse' ((m, TreeNode (coind@(_, TreeAtom "coinductive"):name@(mFun, TreeAtom _):xts@(_, TreeNode _):rest)):as) =
   parse' $ (m, TreeNode [coind, (mFun, TreeNode (name : xts : rest))]) : as
-parse' ((_, TreeNode ((_, TreeAtom "coinductive"):ts)):as) = do
-  stmtList1 <- parseCoinductive ts
+parse' ((m, TreeNode ((_, TreeAtom "coinductive"):ts)):as) = do
+  stmtList1 <- parseCoinductive m ts
   stmtList2 <- parse' as
   return $ stmtList1 ++ stmtList2
 parse' ((m, TreeNode [(mLet, TreeAtom "let"), (mx, TreeAtom x), t, e]):as) = do
@@ -215,13 +215,13 @@ insImplicitBegin (m, TreeNode (xt:xts:body:rest)) = do
   let m' = fst body
   let beginBlock = (m', TreeNode ((m', TreeAtom "begin") : body : rest))
   return (m, TreeNode [xt, xts, beginBlock])
-insImplicitBegin _ = throwError' "insImplicitBegin"
+insImplicitBegin t = raiseSyntaxError t "(TREE TREE TREE ...)"
 
 extractFunName :: TreePlus -> WithEnv Identifier
 extractFunName (_, TreeNode ((_, TreeAtom x):_)) = return $ asIdent x
 extractFunName (_, TreeNode ((_, TreeNode [(_, TreeAtom x), _]):_)) =
   return $ asIdent x
-extractFunName _ = throwError' "extractFunName"
+extractFunName t = raiseSyntaxError t "(LEAF ...) | ((LEAF TREE) ...)"
 
 isSpecialForm :: TreePlus -> Bool
 isSpecialForm (_, TreeNode [(_, TreeAtom "notation"), _, _]) = True
@@ -323,21 +323,18 @@ newHole = do
   h <- newNameWith'' "hole-parse-zeta"
   return (emptyMeta, WeakTermZeta h)
 
-checkKeywordSanity :: T.Text -> WithEnv ()
-checkKeywordSanity "" = throwError' "empty string for a keyword"
-checkKeywordSanity x
-  | T.last x == '+' = throwError' "A +-suffixed name cannot be a keyword"
-checkKeywordSanity _ = return ()
+checkKeywordSanity :: Meta -> T.Text -> WithEnv ()
+checkKeywordSanity m "" = raiseError m "empty string for a keyword"
+checkKeywordSanity m x
+  | T.last x == '+' = raiseError m "A +-suffixed name cannot be a keyword"
+checkKeywordSanity _ _ = return ()
 
 insEnumEnv :: Meta -> T.Text -> [(T.Text, Int)] -> WithEnv ()
 insEnumEnv m name xis = do
   eenv <- gets enumEnv
   let definedEnums = Map.keys eenv ++ map fst (concat (Map.elems eenv))
   case find (`elem` definedEnums) $ name : map fst xis of
-    Just x ->
-      throwError' $
-      T.pack (showMeta m) <>
-      ": " <> "the constant `" <> x <> "` is already defined"
+    Just x -> raiseError m $ "the constant `" <> x <> "` is already defined"
     _ -> do
       let (xs, is) = unzip xis
       let rev = Map.fromList $ zip xs (zip (repeat name) is)
@@ -354,14 +351,15 @@ insertPathInfo oldFilePath newFilePath = do
   let g' = Map.insertWith (++) oldFilePath [newFilePath] g
   modify (\env -> env {includeGraph = g'})
 
-ensureDAG :: WithEnv ()
-ensureDAG = do
+ensureDAG :: Meta -> WithEnv ()
+ensureDAG m = do
   g <- gets includeGraph
-  m <- gets mainFilePath
-  case ensureDAG' m [] g of
+  path <- gets mainFilePath
+  case ensureDAG' path [] g of
     Right _ -> return ()
     Left cyclicPath -> do
-      throwError' $ "found cyclic inclusion:\n" <> T.pack (Pr.ppShow cyclicPath)
+      raiseError m $
+        "found cyclic inclusion:\n" <> T.pack (Pr.ppShow cyclicPath)
 
 ensureDAG' ::
      Path Abs File
