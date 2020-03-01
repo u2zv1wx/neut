@@ -220,9 +220,6 @@ infer' _ (m, WeakTermEnumIntro v) = do
     EnumValueIntU size _ -> do
       let t = (m, WeakTermEnum (EnumTypeIntU size))
       return ((m, WeakTermEnumIntro v), t, ml)
-    -- EnumValueNat i _ -> do
-    --   let t = (m, WeakTermEnum $ EnumTypeNat i)
-    --   return ((m, WeakTermEnumIntro v), t, ml)
     EnumValueLabel l -> do
       k <- lookupKind m l
       let t = (m, WeakTermEnum $ EnumTypeLabel k)
@@ -258,9 +255,7 @@ infer' ctx (m, WeakTermArrayIntro k es) = do
   forM_ (zip ts (repeat tCod)) $ uncurry insConstraintEnv
   constrainList $ map asUniv mls
   let len = toInteger $ length es
-  -- let dom = (emptyMeta, WeakTermEnum (EnumTypeNat len))
   let dom = (m, WeakTermEnumIntro (EnumValueIntU 64 len))
-  -- let dom = (emptyMeta, WeakTermEnum (EnumTypeIntU 64))
   let t = (m, WeakTermArray dom k)
   ml <- newLevelLE m mls
   return ((m, WeakTermArrayIntro k es'), t, ml)
@@ -270,9 +265,7 @@ infer' ctx (m, WeakTermArrayElim k xts e1 e2) = do
   let (xts', mls) = unzip xtls'
   forM_ mls $ \mlArrArg -> insLevelLE mlArrArg mlArr
   let len = toInteger $ length xts
-  -- let dom = (emptyMeta, WeakTermEnum (EnumTypeNat (length xts)))
   let dom = (m, WeakTermEnumIntro (EnumValueIntU 64 len))
-  -- let dom = (emptyMeta, WeakTermEnum (EnumTypeIntU 64))
   insConstraintEnv t1 (fst e1', WeakTermArray dom k)
   let ts = map (\(_, _, t) -> t) xts'
   tCod <- inferKind m k
@@ -453,8 +446,6 @@ inferWeakCase :: Meta -> Context -> WeakCase -> WithEnv (WeakCase, WeakTermPlus)
 inferWeakCase m _ l@(WeakCaseLabel name) = do
   k <- lookupKind m name
   return (l, (m, WeakTermEnum $ EnumTypeLabel k))
--- inferWeakCase m _ l@(WeakCaseNat i _) =
---   return (l, (m, WeakTermEnum $ EnumTypeNat i))
 inferWeakCase m _ l@(WeakCaseIntS size _) =
   return (l, (m, WeakTermEnum (EnumTypeIntS size)))
 inferWeakCase m _ l@(WeakCaseIntU size _) =

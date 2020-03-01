@@ -299,14 +299,12 @@ llvmDataLet x (_, DataFloat32 f) cont =
   llvmUncastLet x (LLVMDataFloat32 f) (LowTypeFloat FloatSize32) cont
 llvmDataLet x (_, DataFloat64 f) cont =
   llvmUncastLet x (LLVMDataFloat64 f) (LowTypeFloat FloatSize64) cont
-llvmDataLet x (_, DataEnumIntro labelOrNat) cont = do
-  case labelOrNat of
+llvmDataLet x (_, DataEnumIntro intOrLabel) cont = do
+  case intOrLabel of
     EnumValueIntS size i ->
       llvmUncastLet x (LLVMDataInt i) (LowTypeIntS size) cont
     EnumValueIntU size i ->
       llvmUncastLet x (LLVMDataInt i) (LowTypeIntU size) cont
-    -- EnumValueNat _ i ->
-    --   llvmUncastLet x (LLVMDataInt $ toInteger i) (LowTypeIntS 64) cont
     EnumValueLabel l -> do
       i <- toInteger <$> getEnumNum l
       llvmUncastLet x (LLVMDataInt i) (LowTypeIntS 64) cont
@@ -499,12 +497,11 @@ newNameWith'' Nothing = newNameWith' "var"
 newNameWith'' (Just name) = newNameWith' name
 
 enumValueToInteger :: EnumValue -> WithEnv Integer
-enumValueToInteger labelOrNat =
-  case labelOrNat of
+enumValueToInteger intOrLabel =
+  case intOrLabel of
     EnumValueLabel l -> toInteger <$> getEnumNum l
     EnumValueIntS _ i -> return i
     EnumValueIntU _ i -> return i
-    -- EnumValueNat _ j -> return $ toInteger j
 
 getEnumNum :: T.Text -> WithEnv Int
 getEnumNum label = do

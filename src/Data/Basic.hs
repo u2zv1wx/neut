@@ -150,13 +150,11 @@ data EnumType
   = EnumTypeLabel T.Text
   | EnumTypeIntS Int -- i{k}
   | EnumTypeIntU Int -- u{k}
-  -- | EnumTypeNat Int -- n{k}
   deriving (Show, Eq)
 
 data EnumValue
   = EnumValueIntS IntSize Integer
   | EnumValueIntU IntSize Integer
-  -- | EnumValueNat Int Int
   | EnumValueLabel T.Text
   deriving (Show, Eq, Ord)
 
