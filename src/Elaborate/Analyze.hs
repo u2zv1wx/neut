@@ -4,7 +4,6 @@ module Elaborate.Analyze
   ( analyze
   , simp
   , toPiElim
-  , linearCheck
   , unfoldIter
   , toVarList
   , bindFormalArgs
@@ -60,14 +59,14 @@ simp' (((_, WeakTermIter xt1@(_, x1, _) xts1 e1), (_, WeakTermIter xt2@(_, x2, _
   | x1 == x2
   , length xts1 == length xts2 =
     simpBinder (xt1 : xts1) (xt2 : xts2) (Just (e1, e2)) cs
-simp' (((_, WeakTermInt t1 l1), (_, WeakTermEnumIntro (EnumValueIntS s2 l2))):cs)
-  | l1 == l2 = simp $ (t1, toIntS s2) : cs
-simp' (((_, WeakTermEnumIntro (EnumValueIntS s1 l1)), (_, WeakTermInt t2 l2)):cs)
-  | l1 == l2 = simp $ (toIntS s1, t2) : cs
-simp' (((_, WeakTermInt t1 l1), (_, WeakTermEnumIntro (EnumValueIntU s2 l2))):cs)
-  | l1 == l2 = simp $ (t1, toIntU s2) : cs
-simp' (((_, WeakTermEnumIntro (EnumValueIntU s1 l1)), (_, WeakTermInt t2 l2)):cs)
-  | l1 == l2 = simp $ (toIntU s1, t2) : cs
+simp' (((_, WeakTermInt t1 l1), (m, WeakTermEnumIntro (EnumValueIntS s2 l2))):cs)
+  | l1 == l2 = simp $ (t1, toIntS m s2) : cs
+simp' (((m, WeakTermEnumIntro (EnumValueIntS s1 l1)), (_, WeakTermInt t2 l2)):cs)
+  | l1 == l2 = simp $ (toIntS m s1, t2) : cs
+simp' (((_, WeakTermInt t1 l1), (m, WeakTermEnumIntro (EnumValueIntU s2 l2))):cs)
+  | l1 == l2 = simp $ (t1, toIntU m s2) : cs
+simp' (((m, WeakTermEnumIntro (EnumValueIntU s1 l1)), (_, WeakTermInt t2 l2)):cs)
+  | l1 == l2 = simp $ (toIntU m s1, t2) : cs
 simp' (((_, WeakTermInt t1 l1), (_, WeakTermInt t2 l2)):cs)
   | l1 == l2 = simp $ (t1, t2) : cs
 simp' (((_, WeakTermFloat t1 l1), (_, WeakTermFloat16 l2)):cs)
@@ -390,19 +389,19 @@ toVarList :: [WeakTermPlus] -> WithEnv [IdentifierPlus]
 toVarList [] = return []
 toVarList ((m, WeakTermUpsilon x):es) = do
   xts <- toVarList es
-  let t = (emptyMeta, WeakTermUpsilon (I ("_", 0)))
+  let t = (m, WeakTermUpsilon (I ("_", 0)))
   return $ (m, x, t) : xts
 toVarList ((m, _):es) = do
   xts <- toVarList es
   x <- newNameWith' "hole"
-  let t = (emptyMeta, WeakTermUpsilon (I ("_", 0)))
+  let t = (m, WeakTermUpsilon (I ("_", 0)))
   return $ (m, x, t) : xts
 
 bindFormalArgs :: WeakTermPlus -> [[IdentifierPlus]] -> WeakTermPlus
 bindFormalArgs e [] = e
 bindFormalArgs e (xts:xtss) = do
   let e' = bindFormalArgs e xtss
-  (emptyMeta, WeakTermPiIntro xts e')
+  (metaOf e', WeakTermPiIntro xts e')
 
 lookupAny :: [Hole] -> IntMap.IntMap a -> Maybe (Hole, a)
 lookupAny [] _ = Nothing
@@ -418,8 +417,8 @@ lookupAll ((I (_, i)):xs) sub = do
   vs <- lookupAll xs sub
   return $ v : vs
 
-toIntS :: IntSize -> WeakTermPlus
-toIntS size = (emptyMeta, WeakTermEnum $ EnumTypeIntS size)
+toIntS :: Meta -> IntSize -> WeakTermPlus
+toIntS m size = (m, WeakTermEnum $ EnumTypeIntS size)
 
-toIntU :: IntSize -> WeakTermPlus
-toIntU size = (emptyMeta, WeakTermEnum $ EnumTypeIntU size)
+toIntU :: Meta -> IntSize -> WeakTermPlus
+toIntU m size = (m, WeakTermEnum $ EnumTypeIntU size)
