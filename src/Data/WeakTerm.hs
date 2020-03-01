@@ -8,6 +8,8 @@ import qualified Data.Text as T
 
 import Data.Basic
 
+-- VectorをSigma[A, ..., A]の略記として入れてもいいかも。
+-- clarifyの時点でSigmaに落とす。
 data WeakTerm
   = WeakTermTau UnivLevel
   | WeakTermUpsilon Identifier
