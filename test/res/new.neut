@@ -167,6 +167,21 @@
       (write n stdout content 3)
       unit)))
 
+;; 長さ不明の文字列をwriteする
+(definition my-write ((str string))
+  (sigma-elimination
+    ((n u64) (content (array n u8)))
+    str
+    (sigma-elimination
+      (new-content (val i64))
+      (write n stdout content n)
+      val)))
+
+;; こう書けるようにしたいね：
+;; (definition my-write ((str string))
+;;   (let (n content) str)
+;;   (let val (write n stdout &content n))
+;;   (sigma-introduction n content))
 
 (ascription write-string
   (hom string top))

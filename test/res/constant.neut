@@ -40,7 +40,7 @@
     ((A u64)
      (in file-descriptor)
      (buf (array A u8))
-     (len i64))
+     (len u64))
     (product (array A u8) i64)))
 
 (constant write
@@ -48,7 +48,7 @@
     ((A u64)
      (out file-descriptor)
      (str (array A u8))
-     (len i64))
+     (len u64))
     (product (array A u8) i64)))
 
 (constant exit
