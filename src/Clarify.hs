@@ -236,10 +236,14 @@ clarifyArrayAccess m name lowType = do
   case arrayAccessType' of
     (_, TermPi _ xts cod)
       | length xts == 3 -> do
-        (xs, ds, headerList) <-
-          computeHeader m xts [ArgUnused, ArgArray, ArgImmediate]
+        (xs, ds, headerList)
+          -- computeHeader m xts [ArgUnused, ArgArray, ArgImmediate]
+           <-
+          computeHeader m xts [ArgImmediate, ArgUnused, ArgArray]
         case ds of
-          [arr, index] -> do
+          [index, arr]
+          -- [arr, index] -> do
+           -> do
             zts <- complementaryChainOf xts
             callThenReturn <- toArrayAccessTail m lowType cod arr index xs
             let body = iterativeApp headerList callThenReturn

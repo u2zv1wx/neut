@@ -305,8 +305,8 @@ llvmDataLet x (_, DataEnumIntro labelOrNat) cont = do
       llvmUncastLet x (LLVMDataInt i) (LowTypeIntS size) cont
     EnumValueIntU size i ->
       llvmUncastLet x (LLVMDataInt i) (LowTypeIntU size) cont
-    EnumValueNat _ i ->
-      llvmUncastLet x (LLVMDataInt $ toInteger i) (LowTypeIntS 64) cont
+    -- EnumValueNat _ i ->
+    --   llvmUncastLet x (LLVMDataInt $ toInteger i) (LowTypeIntS 64) cont
     EnumValueLabel l -> do
       i <- toInteger <$> getEnumNum l
       llvmUncastLet x (LLVMDataInt i) (LowTypeIntS 64) cont
@@ -504,7 +504,7 @@ enumValueToInteger labelOrNat =
     EnumValueLabel l -> toInteger <$> getEnumNum l
     EnumValueIntS _ i -> return i
     EnumValueIntU _ i -> return i
-    EnumValueNat _ j -> return $ toInteger j
+    -- EnumValueNat _ j -> return $ toInteger j
 
 getEnumNum :: T.Text -> WithEnv Int
 getEnumNum label = do

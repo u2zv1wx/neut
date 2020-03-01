@@ -376,7 +376,7 @@ elaborateWeakCase (WeakCaseInt t x) = do
 elaborateWeakCase (WeakCaseLabel l) = return $ CaseValue $ EnumValueLabel l
 elaborateWeakCase (WeakCaseIntS t a) = return $ CaseValue $ EnumValueIntS t a
 elaborateWeakCase (WeakCaseIntU t a) = return $ CaseValue $ EnumValueIntU t a
-elaborateWeakCase (WeakCaseNat t a) = return $ CaseValue $ EnumValueNat t a
+-- elaborateWeakCase (WeakCaseNat t a) = return $ CaseValue $ EnumValueNat t a
 elaborateWeakCase WeakCaseDefault = return $ CaseDefault
 
 elaboratePlus :: (Meta, a, WeakTermPlus) -> WithEnv (Meta, a, TermPlus)
@@ -388,8 +388,8 @@ caseCheckEnumIdentifier :: Meta -> EnumType -> [Case] -> WithEnv ()
 caseCheckEnumIdentifier m (EnumTypeLabel x) ls = do
   es <- lookupEnumSet m x
   caseCheckEnumIdentifier' m (length es) ls
-caseCheckEnumIdentifier m (EnumTypeNat i) ls = do
-  caseCheckEnumIdentifier' m i ls
+-- caseCheckEnumIdentifier m (EnumTypeNat i) ls = do
+--   caseCheckEnumIdentifier' m i ls
 caseCheckEnumIdentifier m (EnumTypeIntS _) ls =
   throwIfFalse m $ CaseDefault `elem` ls
 caseCheckEnumIdentifier m (EnumTypeIntU _) ls =

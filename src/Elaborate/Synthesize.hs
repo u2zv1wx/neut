@@ -217,13 +217,24 @@ showErrors' ::
   -> WeakTermPlus
   -> [(PosInfo, PreConstraint)]
   -> WithEnv [Log]
-showErrors' pos ps e1 e2 pcs
-  | pos `notElem` ps = do
-    let msg = constructErrorMsg e1 e2
-    as <- showErrors (pos : ps) pcs
-    return $ logError (Just pos) msg : as
-  | otherwise = showErrors ps pcs
+showErrors' pos ps e1 e2 pcs = do
+  let msg = constructErrorMsg e1 e2
+  as <- showErrors (pos : ps) pcs
+  return $ logError (Just pos) msg : as
 
+-- showErrors' ::
+--      PosInfo
+--   -> [PosInfo]
+--   -> WeakTermPlus
+--   -> WeakTermPlus
+--   -> [(PosInfo, PreConstraint)]
+--   -> WithEnv [Log]
+-- showErrors' pos ps e1 e2 pcs
+--   | pos `notElem` ps = do
+--     let msg = constructErrorMsg e1 e2
+--     as <- showErrors (pos : ps) pcs
+--     return $ logError (Just pos) msg : as
+--   | otherwise = showErrors ps pcs
 constructErrorMsg :: WeakTermPlus -> WeakTermPlus -> T.Text
 constructErrorMsg e1 e2 =
   "couldn't verify the definitional equality of the following two terms:\n- " <>

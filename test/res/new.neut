@@ -123,11 +123,11 @@
 
 (definition string
   (sigma
-    ((A type))
+    ((A u64))
     (array A u8)))
 
 (let (str-with-len string)
-  (sigma-introduction n3 (test)))
+  (sigma-introduction 3 (test)))
 
 ;; (let str-with-len
 ;;   (with-type string (sigma-introduction n3 (test))))
@@ -161,11 +161,12 @@
 ;; それにはwrite-stringを定数として定義する必要があるけどね。
 (definition write-string ((str string))
   (sigma-elimination
-    ((n type) (content (array n u8)))
+    ((n u64) (content (array n u8)))
     str
     (begin
       (write n stdout content 3)
       unit)))
+
 
 (ascription write-string
   (hom string top))
@@ -484,6 +485,7 @@
     0
     0)))
 
+
 (write hole stdout buf 3)
 ;; (write n15 stdout buf enum.n15)
 
@@ -605,7 +607,7 @@
 
 ;; こうしてu1の配列をつくっても、[u1, u1, u1]とかは結局1byte単位でalignされてしまうから目的の配列を得ることはできない。
 ;; むしろ[u8, u8, u8]などとする必要がでてくる。
-(definition bits ((A type))
+(definition bits ((A u64))
   (array A u1))
 
 ;; 3が返ってるってことは、0 = stdin, 1 = stdout, 2 = stderrだから、ちゃんとファイルが開けてるはず。
@@ -621,11 +623,18 @@
 ;; (let result-pair
 ;;   (array-access-u8 hole buf n15-2))
 
+;; (let result
+;;   (sigma-elimination
+;;     ((new-buf hole) (value hole))
+;;     (u8:array-access hole buf n15-2)
+;;     value))
 (let result
   (sigma-elimination
     ((new-buf hole) (value hole))
-    (u8:array-access hole buf n15-2)
+    ;; (u8:array-access hole buf 2)
+    (u8:array-access 2 15 buf)
     value))
+
 
 ;; (let result
 ;;   (sigma-elimination
@@ -704,7 +713,8 @@
 ;; 修正できた。いいね。
 ;; result
 
-n15-4
+(u64 4)
+;; n15-4
 
 ;; (definition foo ((x hole)) x)
 
@@ -1115,8 +1125,13 @@ n15-4
 
 (sigma-elimination
   ((_ hole) (v hole))
-  (u32:array-access hole item n3-1)
+  (u32:array-access 1 3 item)
+  ;; (u32:array-access hole item 1)
   (u32.add v 100))
+;; (sigma-elimination
+;;   ((_ hole) (v hole))
+;;   (u32:array-access hole item n3-1)
+;;   (u32.add v 100))
 
 ;; (i4.sub 4 8)
 

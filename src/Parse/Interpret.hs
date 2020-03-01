@@ -100,9 +100,9 @@ interpret (m, TreeNode [(_, TreeAtom "enum"), (_, TreeAtom x)])
   | Just i <- readEnumTypeIntU x = do
     m' <- adjustPhase m
     return (m', WeakTermEnum $ EnumTypeIntU i)
-  | Just i <- readEnumTypeNat x = do
-    m' <- adjustPhase m
-    return (m', WeakTermEnum $ EnumTypeNat i)
+  -- | Just i <- readEnumTypeNat x = do
+  --   m' <- adjustPhase m
+  --   return (m', WeakTermEnum $ EnumTypeNat i)
 interpret (m, TreeNode [(_, TreeAtom "enum"), (_, TreeAtom x)]) = do
   isEnum <- isDefinedEnumName x
   m' <- adjustPhase m
@@ -175,13 +175,13 @@ interpret (m, TreeAtom x)
   | Just i <- readEnumTypeIntU x = do
     m' <- adjustPhase m
     return (m', WeakTermEnum $ EnumTypeIntU i)
-  | Just i <- readEnumTypeNat x = do
-    m' <- adjustPhase m
-    return (m', WeakTermEnum $ EnumTypeNat i)
-interpret (m, TreeAtom x)
-  | Just v <- readEnumValueNat x = do
-    m' <- adjustPhase m
-    return (m', WeakTermEnumIntro v)
+  -- | Just i <- readEnumTypeNat x = do
+  --   m' <- adjustPhase m
+  --   return (m', WeakTermEnum $ EnumTypeNat i)
+-- interpret (m, TreeAtom x)
+--   | Just v <- readEnumValueNat x = do
+--     m' <- adjustPhase m
+--     return (m', WeakTermEnumIntro v)
 interpret (m, TreeAtom x)
   | Just str <- readMaybe $ T.unpack x = do
     m' <- adjustPhase m
@@ -248,10 +248,13 @@ interpretEnumValueMaybe t =
 interpretEnumValue :: TreePlus -> WithEnv EnumValue
 interpretEnumValue (m, TreeAtom x) = do
   b <- isDefinedEnum x
-  case (readEnumValueNat x, b) of
-    (Just v, _) -> return v
-    (_, True) -> return $ EnumValueLabel x
-    _ -> raiseError m $ "no such enum-value is defined: " <> x
+  -- case (readEnumValueNat x, b) of
+  --   (Just v, _) -> return v
+  --   (_, True) -> return $ EnumValueLabel x
+  --   _ -> raiseError m $ "no such enum-value is defined: " <> x
+  if b
+    then return $ EnumValueLabel x
+    else raiseError m $ "no such enum-value is defined: " <> x
 interpretEnumValue e@(m, TreeNode [(_, TreeAtom t), (_, TreeAtom x)]) = do
   let mv1 = readEnumValueIntS t x
   let mv2 = readEnumValueIntU t x
@@ -368,9 +371,8 @@ readEnumType c str k -- n1, n2, ..., n{i}, ..., n{2^64}
   , 1 <= toInteger i && toInteger i <= 2 ^ k = Just i
 readEnumType _ _ _ = Nothing
 
-readEnumTypeNat :: T.Text -> (Maybe Int)
-readEnumTypeNat str = readEnumType 'n' str 64
-
+-- readEnumTypeNat :: T.Text -> (Maybe Int)
+-- readEnumTypeNat str = readEnumType 'n' str 64
 readEnumTypeIntS :: T.Text -> (Maybe Int)
 readEnumTypeIntS str = readEnumType 'i' str 23
 
@@ -389,17 +391,16 @@ readEnumValueIntU t x
   , Just x' <- readMaybe $ T.unpack x = Just $ EnumValueIntU i x'
   | otherwise = Nothing
 
-readEnumValueNat :: T.Text -> Maybe EnumValue
-readEnumValueNat str -- n1-0, n2-0, n2-1, ...
-  | T.length str >= 4
-  , T.head str == 'n'
-  , [iStr, jStr] <- wordsBy '-' (T.tail str)
-  , Just i <- readMaybe $ T.unpack iStr
-  , 1 <= toInteger i && toInteger i <= 2 ^ (64 :: Integer)
-  , Just j <- readMaybe $ T.unpack jStr
-  , 0 <= toInteger j && toInteger j <= toInteger i - 1 = Just $ EnumValueNat i j
-  | otherwise = Nothing
-
+-- readEnumValueNat :: T.Text -> Maybe EnumValue
+-- readEnumValueNat str -- n1-0, n2-0, n2-1, ...
+--   | T.length str >= 4
+--   , T.head str == 'n'
+--   , [iStr, jStr] <- wordsBy '-' (T.tail str)
+--   , Just i <- readMaybe $ T.unpack iStr
+--   , 1 <= toInteger i && toInteger i <= 2 ^ (64 :: Integer)
+--   , Just j <- readMaybe $ T.unpack jStr
+--   , 0 <= toInteger j && toInteger j <= toInteger i - 1 = Just $ EnumValueNat i j
+--   | otherwise = Nothing
 adjustPhase :: Meta -> WithEnv Meta
 adjustPhase m = do
   i <- gets phase

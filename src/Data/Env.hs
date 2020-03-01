@@ -293,16 +293,27 @@ arrayAccessToType m lowType = do
   x1 <- newNameWith' "arg"
   x2 <- newNameWith' "arg"
   x3 <- newNameWith' "arg"
-  l <- newCount
-  let univ = (m, TermTau l)
-  let idx = (m, TermUpsilon x1)
+  let u64 = (m, TermEnum (EnumTypeIntU 64))
+  -- let univ = (m, TermEnum (EnumTypeIntU 64))
+  let idx = (m, TermUpsilon x2)
   let arr = (m, TermArray idx k)
-  let xts = [(m, x1, univ), (m, x2, arr), (m, x3, idx)]
+  let xts = [(m, x1, u64), (m, x2, u64), (m, x3, arr)]
+  -- let xts = [(m, x1, univ), (m, x2, arr), (m, x3, idx)]
   x4 <- newNameWith' "arg"
   x5 <- newNameWith' "arg"
   let cod = (m, TermSigma [(m, x4, arr), (m, x5, t)])
-  -- mls <- piUnivLevelsfrom xts cod
   return (m, TermPi [] xts cod)
+  -- -- l <- newCount
+  -- let univ = (m, TermEnum (EnumTypeIntU 64))
+  -- -- let univ = (m, TermTau l)
+  -- let idx = (m, TermUpsilon x1)
+  -- let arr = (m, TermArray idx k)
+  -- let xts = [(m, x1, univ), (m, x2, arr), (m, x3, idx)]
+  -- x4 <- newNameWith' "arg"
+  -- x5 <- newNameWith' "arg"
+  -- let cod = (m, TermSigma [(m, x4, arr), (m, x5, t)])
+  -- -- mls <- piUnivLevelsfrom xts cod
+  -- return (m, TermPi [] xts cod)
 
 lookupConstNum :: T.Text -> WithEnv Int
 lookupConstNum constName = do

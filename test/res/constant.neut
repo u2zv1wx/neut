@@ -1,6 +1,8 @@
 ;; should be loaded after `notation`, `top`.
 
-(constant file-descriptor type)
+(include "top.neut")
+
+(constant file-descriptor tau)
 
 (constant stdin file-descriptor)
 
@@ -35,7 +37,7 @@
 ;; writeのlenの部分はi64にしてよさげ。
 (constant read
   (pi
-    ((A type)
+    ((A u64)
      (in file-descriptor)
      (buf (array A u8))
      (len i64))
@@ -43,7 +45,7 @@
 
 (constant write
   (pi
-    ((A type)
+    ((A u64)
      (out file-descriptor)
      (str (array A u8))
      (len i64))
@@ -56,7 +58,7 @@
 
 (constant open
   (pi
-    ((A type)
+    ((A u64)
      (path (array A u8))
      (flags i64)
      (mode i64))
@@ -101,10 +103,10 @@
 (constant wait4
   (pi
     ((pid i64)
-     (stat-loc (array n1 i64))
+     (stat-loc (array 1 i64))
      (options i64)
      (usage rusage))
-    (product (array n1 i64) rusage i64)))
+    (product (array 1 i64) rusage i64)))
 
 (definition sockaddr
   (struct
@@ -142,8 +144,8 @@
   (pi
     ((sock i64)
      (address sockaddr)
-     (address-len (array n1 i64)))
-    (product sockaddr (array n1 i64) i64)))
+     (address-len (array 1 i64)))
+    (product sockaddr (array 1 i64) i64)))
 
 (constant connect
   (pi

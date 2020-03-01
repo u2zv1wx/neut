@@ -198,7 +198,7 @@ parse' (a:as) = do
     else do
       e'@(meta, _) <- interpret e
       name <- newNameWith'' "hole-parse-last"
-      t <- newHole
+      t <- newHole meta
       defList <- parse' as
       let meta' = meta {metaIsAppropriateAsCompletionCandidate = False}
       return $ QuasiStmtLet meta' (meta', name, t) e' : defList
@@ -318,10 +318,10 @@ compose s1 s2 = do
   let s1' = filter (\(ident, _) -> ident `notElem` domS2) s1
   s1' ++ zip domS2 codS2'
 
-newHole :: WithEnv WeakTermPlus
-newHole = do
+newHole :: Meta -> WithEnv WeakTermPlus
+newHole m = do
   h <- newNameWith'' "hole-parse-zeta"
-  return (emptyMeta, WeakTermZeta h)
+  return (m, WeakTermZeta h)
 
 checkKeywordSanity :: Meta -> T.Text -> WithEnv ()
 checkKeywordSanity m "" = raiseError m "empty string for a keyword"

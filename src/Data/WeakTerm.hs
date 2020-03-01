@@ -62,7 +62,7 @@ data WeakCase
   = WeakCaseIntS IntSize Integer
   | WeakCaseIntU IntSize Integer
   | WeakCaseInt WeakTermPlus Integer
-  | WeakCaseNat Int Int
+  -- | WeakCaseNat Int Int
   | WeakCaseLabel T.Text
   | WeakCaseDefault
   deriving (Show, Eq)
@@ -406,7 +406,7 @@ toText (_, WeakTermEnum enumType) =
     EnumTypeLabel l -> l
     EnumTypeIntS size -> "i" <> T.pack (show size)
     EnumTypeIntU size -> "u" <> T.pack (show size)
-    EnumTypeNat size -> "n" <> T.pack (show size)
+    -- EnumTypeNat size -> "n" <> T.pack (show size)
 toText (_, WeakTermEnumIntro v) = showEnumValue v
 toText (_, WeakTermEnumElim (e, _) les) =
   showCons ["case", toText e, showItems (map showClause les)]
@@ -446,15 +446,15 @@ showWeakCase (WeakCaseLabel l) = l
 showWeakCase (WeakCaseIntS _ a) = T.pack $ show a
 showWeakCase (WeakCaseIntU _ a) = T.pack $ show a
 showWeakCase (WeakCaseInt _ a) = T.pack $ show a
-showWeakCase (WeakCaseNat size a) = T.pack $ "n" ++ show size ++ "-" ++ show a
+-- showWeakCase (WeakCaseNat size a) = T.pack $ "n" ++ show size ++ "-" ++ show a
 showWeakCase WeakCaseDefault = "default"
 
 weakenEnumValue :: EnumValue -> WeakCase
 weakenEnumValue (EnumValueLabel l) = WeakCaseLabel l
 weakenEnumValue (EnumValueIntS t a) = WeakCaseIntS t a
 weakenEnumValue (EnumValueIntU t a) = WeakCaseIntU t a
-weakenEnumValue (EnumValueNat size a) = WeakCaseNat size a
 
+-- weakenEnumValue (EnumValueNat size a) = WeakCaseNat size a
 weakenCase :: Case -> WeakCase
 weakenCase (CaseValue v) = weakenEnumValue v
 weakenCase CaseDefault = WeakCaseDefault
@@ -463,8 +463,8 @@ showEnumValue :: EnumValue -> T.Text
 showEnumValue (EnumValueLabel l) = l
 showEnumValue (EnumValueIntS _ a) = T.pack $ show a
 showEnumValue (EnumValueIntU _ a) = T.pack $ show a
-showEnumValue (EnumValueNat size a) = T.pack $ "n" ++ show size ++ "-" ++ show a
 
+-- showEnumValue (EnumValueNat size a) = T.pack $ "n" ++ show size ++ "-" ++ show a
 showArrayKind :: ArrayKind -> T.Text
 showArrayKind (ArrayKindIntS size) = T.pack $ "i" ++ show size
 showArrayKind (ArrayKindIntU size) = T.pack $ "u" ++ show size
