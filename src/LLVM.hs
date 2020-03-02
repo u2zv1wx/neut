@@ -305,37 +305,35 @@ llvmDataLet x (_, DataStructIntro dks) cont = do
   let structType = LowTypeStructPtr ts
   storeContent x structType (zip ds ts) cont
 
-syscallToLLVM :: Identifier -> [LLVMData] -> WithEnv LLVM
-syscallToLLVM (I (syscallName, _)) ds = do
-  os <- getOS
-  case syscallToNumMaybe os syscallName of
-    Nothing -> do
+syscallToLLVM :: Syscall -> [LLVMData] -> WithEnv LLVM
+syscallToLLVM syscall ds = do
+  case syscall of
+    Left name -> do
       denv <- gets declEnv
-      when (not $ syscallName `Map.member` denv) $ do
+      when (not $ name `Map.member` denv) $ do
         let dom = map (const LowTypeVoidPtr) ds
         let cod = LowTypeVoidPtr
-        modify (\env -> env {declEnv = Map.insert syscallName (dom, cod) denv})
-      return $ LLVMCall (LLVMDataGlobal syscallName) ds
-    Just num -> do
+        modify (\env -> env {declEnv = Map.insert name (dom, cod) denv})
+      return $ LLVMCall (LLVMDataGlobal name) ds
+    Right (_, num) -> do
       res <- newNameWith' "result"
       return $
         LLVMLet res (LLVMOpSysCall num ds) $ LLVMReturn (LLVMDataLocal res)
 
-syscallToNumMaybe :: OS -> T.Text -> Maybe Integer
-syscallToNumMaybe OSLinux "read" = return 0
-syscallToNumMaybe OSLinux "write" = return 1
-syscallToNumMaybe OSLinux "open" = return 2
-syscallToNumMaybe OSLinux "close" = return 3
-syscallToNumMaybe OSLinux "socket" = return 41
-syscallToNumMaybe OSLinux "connect" = return 42
-syscallToNumMaybe OSLinux "accept" = return 43
-syscallToNumMaybe OSLinux "bind" = return 49
-syscallToNumMaybe OSLinux "listen" = return 50
-syscallToNumMaybe OSLinux "fork" = return 57
-syscallToNumMaybe OSLinux "exit" = return 60
-syscallToNumMaybe OSLinux "wait4" = return 61
-syscallToNumMaybe _ _ = Nothing -- direct use of syscall on Darwin is deprecated since macOS 10.12
-
+-- syscallToNumMaybe :: OS -> T.Text -> Maybe Integer
+-- syscallToNumMaybe OSLinux "read" = return 0
+-- syscallToNumMaybe OSLinux "write" = return 1
+-- syscallToNumMaybe OSLinux "open" = return 2
+-- syscallToNumMaybe OSLinux "close" = return 3
+-- syscallToNumMaybe OSLinux "socket" = return 41
+-- syscallToNumMaybe OSLinux "connect" = return 42
+-- syscallToNumMaybe OSLinux "accept" = return 43
+-- syscallToNumMaybe OSLinux "bind" = return 49
+-- syscallToNumMaybe OSLinux "listen" = return 50
+-- syscallToNumMaybe OSLinux "fork" = return 57
+-- syscallToNumMaybe OSLinux "exit" = return 60
+-- syscallToNumMaybe OSLinux "wait4" = return 61
+-- syscallToNumMaybe _ _ = Nothing -- direct use of syscall on Darwin is deprecated since macOS 10.12
 llvmDataLet' :: [(Identifier, DataPlus)] -> LLVM -> WithEnv LLVM
 llvmDataLet' [] cont = return cont
 llvmDataLet' ((x, d):rest) cont = do

@@ -40,7 +40,7 @@ data Theta
   = ThetaUnaryOp UnaryOp DataPlus
   | ThetaBinaryOp BinaryOp DataPlus DataPlus
   | ThetaArrayAccess LowType DataPlus DataPlus
-  | ThetaSysCall Identifier [DataPlus]
+  | ThetaSysCall Syscall [DataPlus]
   deriving (Show)
 
 newtype IsFixed =

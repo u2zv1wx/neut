@@ -157,8 +157,6 @@ clarifyConst m name@(I (x, _))
   | Just op <- asUnaryOpMaybe x = clarifyUnaryOp name op m
 clarifyConst m name@(I (x, _))
   | Just op <- asBinaryOpMaybe x = clarifyBinaryOp name op m
-clarifyConst m name@(I (x, _))
-  | Just argInfo <- asSysCallMaybe x = clarifySysCall name argInfo m
 clarifyConst m (I (x, _))
   | Just _ <- asLowTypeMaybe x = clarify (m, TermEnum $ EnumTypeLabel "top")
 clarifyConst m name@(I (x, _))
@@ -185,7 +183,11 @@ clarifyConst m (I ("unsafe-cast", _))
   let u = (m, TermTau l)
   clarify
     (m, TermPiIntro [(m, a, u), (m, b, u), (m, x, varA)] (m, TermUpsilon x))
-clarifyConst m name = return (m, CodeUpIntro (m, DataTheta name))
+clarifyConst m name@(I (x, _)) = do
+  os <- getOS
+  case asSysCallMaybe os x of
+    Just (syscall, argInfo) -> clarifySysCall name syscall argInfo m
+    Nothing -> return (m, CodeUpIntro (m, DataTheta name))
 
 clarifyUnaryOp :: Identifier -> UnaryOp -> Meta -> WithEnv CodePlus
 clarifyUnaryOp name op m = do
@@ -229,7 +231,7 @@ clarifyArrayAccess m name lowType = do
     (_, TermPi _ xts cod)
       | length xts == 3 -> do
         (xs, ds, headerList) <-
-          computeHeader m xts [ArgImmediate, ArgUnused, ArgArray]
+          computeHeader m xts [ArgImm, ArgUnused, ArgArray]
         case ds of
           [index, arr] -> do
             zts <- complementaryChainOf xts
@@ -241,10 +243,11 @@ clarifyArrayAccess m name lowType = do
 
 clarifySysCall ::
      Identifier -- the name of theta
+  -> Syscall
   -> [Arg] -- the length of the arguments of the theta
   -> Meta -- the meta of the theta
   -> WithEnv CodePlus
-clarifySysCall name args m = do
+clarifySysCall name syscall args m = do
   sysCallType <- lookupTypeEnv' name
   sysCallType' <- reduceTermPlus sysCallType
   case sysCallType' of
@@ -252,7 +255,8 @@ clarifySysCall name args m = do
       | length xts == length args -> do
         zts <- complementaryChainOf xts
         (xs, ds, headerList) <- computeHeader m xts args
-        callThenReturn <- toSysCallTail m cod name ds xs
+        callThenReturn <- toSysCallTail m cod syscall ds xs
+        -- callThenReturn <- toSysCallTail m cod name ds xs
         let body = iterativeApp headerList callThenReturn
         retClosure (Just name) zts m xts body
     _ -> raiseCritical m $ "the type of " <> asText name <> " is wrong"
@@ -323,30 +327,89 @@ knot z cls = do
       let def' = Definition (IsFixed True) args body'
       modify (\env -> env {codeEnv = Map.insert z def' cenv})
 
--- array-access-u8 ~> Just u8
--- array-access-i12341234 ~> Just i12341234
--- asArrayAccessMaybe :: Identifier -> Maybe LowType
--- asArrayAccessMaybe (I (name, _))
---   | ["array-access", typeStr] <- sepAtLast '-' name
---   , Just lowType <- asLowTypeMaybe typeStr = Just lowType
--- asArrayAccessMaybe _ = Nothing
-asSysCallMaybe :: T.Text -> Maybe [Arg]
-asSysCallMaybe "write" = Just [ArgUnused, ArgImmediate, ArgArray, ArgImmediate]
-asSysCallMaybe "read" = Just [ArgUnused, ArgImmediate, ArgArray, ArgImmediate]
-asSysCallMaybe "exit" = Just [ArgImmediate]
-asSysCallMaybe "open" = Just [ArgUnused, ArgArray, ArgImmediate, ArgImmediate]
-asSysCallMaybe "close" = Just [ArgImmediate]
-asSysCallMaybe "fork" = Just []
-asSysCallMaybe "socket" = Just [ArgImmediate, ArgImmediate, ArgImmediate]
-asSysCallMaybe "listen" = Just [ArgImmediate, ArgImmediate]
-asSysCallMaybe "wait4" = Just [ArgImmediate, ArgArray, ArgImmediate, ArgStruct]
-asSysCallMaybe "bind" = Just [ArgImmediate, ArgStruct, ArgImmediate]
-asSysCallMaybe "accept" = Just [ArgImmediate, ArgStruct, ArgArray]
-asSysCallMaybe "connect" = Just [ArgImmediate, ArgStruct, ArgImmediate]
-asSysCallMaybe _ = Nothing
+asSysCallMaybe :: OS -> T.Text -> Maybe (Syscall, [Arg])
+asSysCallMaybe OSLinux name =
+  case name of
+    "read" -> return (Right (name, 0), [ArgUnused, ArgImm, ArgArray, ArgImm])
+    "write" -> return (Right (name, 1), [ArgUnused, ArgImm, ArgArray, ArgImm])
+    "open" -> return (Right (name, 2), [ArgUnused, ArgArray, ArgImm, ArgImm])
+    "close" -> return (Right (name, 3), [ArgImm])
+    "socket" -> return (Right (name, 41), [ArgImm, ArgImm, ArgImm])
+    "connect" -> return (Right (name, 42), [ArgImm, ArgStruct, ArgImm])
+    "accept" -> return (Right (name, 43), [ArgImm, ArgStruct, ArgArray])
+    "bind" -> return (Right (name, 49), [ArgImm, ArgStruct, ArgImm])
+    "listen" -> return (Right (name, 50), [ArgImm, ArgImm])
+    "fork" -> return (Right (name, 57), [])
+    "exit" -> return (Right (name, 60), [ArgImm])
+    "wait4" -> return (Right (name, 61), [ArgImm, ArgArray, ArgImm, ArgStruct])
+    _ -> Nothing
+asSysCallMaybe OSDarwin name =
+  case name of
+    "exit" -> return (Left name, [ArgImm]) -- 0x2000001
+    "fork" -> return (Left name, []) -- 0x2000002
+    "read" -> return (Left name, [ArgUnused, ArgImm, ArgArray, ArgImm]) -- 0x2000003
+    "write" -> return (Left name, [ArgUnused, ArgImm, ArgArray, ArgImm]) -- 0x2000004
+    "open" -> return (Left name, [ArgUnused, ArgArray, ArgImm, ArgImm]) -- 0x2000005
+    "close" -> return (Left name, [ArgImm]) -- 0x2000006
+    "wait4" -> return (Left name, [ArgImm, ArgArray, ArgImm, ArgStruct]) -- 0x2000007
+    "accept" -> return (Left name, [ArgImm, ArgStruct, ArgArray]) -- 0x2000030
+    "socket" -> return (Left name, [ArgImm, ArgImm, ArgImm]) -- 0x2000097
+    "connect" -> return (Left name, [ArgImm, ArgStruct, ArgImm]) -- 0x2000098
+    "bind" -> return (Left name, [ArgImm, ArgStruct, ArgImm]) -- 0x2000104
+    "listen" -> return (Left name, [ArgImm, ArgImm]) -- 0x2000106
+    _ -> Nothing
+      -- case num of
+      --   SysCallRead -> return 0x2000003
+      --   SysCallWrite -> return 0x2000004
+      --   SysCallExit -> return 0x2000001
+      --   SysCallOpen -> return 0x2000005
+      --   SysCallClose -> return 0x2000006
+      --   SysCallFork ->
+      --     raiseCritical'
+      --       "syscall 0x2000002 (fork) cannot be used directly in Darwin"
+      --   SysCallWait4 -> return 0x2000007
+      --   SysCallSocket -> return 0x2000097
+      --   SysCallBind -> return 0x2000104
+      --   SysCallListen -> return 0x2000106
+      --   SysCallAccept -> return 0x2000030
+      --   SysCallConnect -> return 0x2000098
 
+-- asSysCallMaybe OSLinux name@"read" =
+--   return (Right (name, 0), [ArgUnused, ArgImm, ArgArray, ArgImm])
+-- asSysCallMaybe OSLinux name@"write" =
+--   return (Right (name, 1), [ArgUnused, ArgImm, ArgArray, ArgImm])
+-- asSysCallMaybe OSLinux name@"open" =
+--   return (Right (name, 2), [ArgUnused, ArgArray, ArgImm, ArgImm])
+-- asSysCallMaybe OSLinux name@"close" = return (Right (name, 3), [ArgImm])
+-- asSysCallMaybe OSLinux name@"socket" =
+--   return (Right (name, 41), [ArgImm, ArgImm, ArgImm])
+-- asSysCallMaybe OSLinux name@"connect" =
+--   return (Right (name, 42), [ArgImm, ArgStruct, ArgImm])
+-- asSysCallMaybe OSLinux name@"accept" =
+--   return (Right (name, 43), [ArgImm, ArgStruct, ArgArray])
+-- asSysCallMaybe OSLinux name@"bind" =
+--   return (Right (name, 49), [ArgImm, ArgStruct, ArgImm])
+-- asSysCallMaybe OSLinux name@"listen" =
+--   return (Right (name, 50), [ArgImm, ArgImm])
+-- asSysCallMaybe OSLinux name@"fork" = return (Right (name, 57), [])
+-- asSysCallMaybe OSLinux name@"exit" = return (Right (name, 60), [ArgImm])
+-- asSysCallMaybe OSLinux name@"wait4" =
+--   return (Right (name, 61), [ArgImm, ArgArray, ArgImm, ArgStruct])
+-- syscallToNumMaybe :: OS -> T.Text -> Maybe Integer
+-- syscallToNumMaybe OSLinux "read" = return 0
+-- syscallToNumMaybe OSLinux "write" = return 1
+-- syscallToNumMaybe OSLinux "open" = return 2
+-- syscallToNumMaybe OSLinux "close" = return 3
+-- syscallToNumMaybe OSLinux "socket" = return 41
+-- syscallToNumMaybe OSLinux "connect" = return 42
+-- syscallToNumMaybe OSLinux "accept" = return 43
+-- syscallToNumMaybe OSLinux "bind" = return 49
+-- syscallToNumMaybe OSLinux "listen" = return 50
+-- syscallToNumMaybe OSLinux "fork" = return 57
+-- syscallToNumMaybe OSLinux "exit" = return 60
+-- syscallToNumMaybe OSLinux "wait4" = return 61
 data Arg
-  = ArgImmediate
+  = ArgImm
   | ArgArray
   | ArgStruct
   | ArgUnused
@@ -358,7 +421,7 @@ toHeaderInfo ::
   -> TermPlus -- the type of argument
   -> Arg -- the way of use of argument (specifically)
   -> WithEnv ([Identifier], [DataPlus], CodePlus -> CodePlus) -- ([borrow], arg-to-syscall, ADD_HEADER_TO_CONTINUATION)
-toHeaderInfo _ x _ ArgImmediate = return ([], [toVar x], id)
+toHeaderInfo _ x _ ArgImm = return ([], [toVar x], id)
 toHeaderInfo _ _ _ ArgUnused = return ([], [], id)
 toHeaderInfo m x t ArgStruct = do
   (structVarName, structVar) <- newDataUpsilonWith "struct"
@@ -413,7 +476,7 @@ computeHeader m xts argInfoList = do
 toSysCallTail ::
      Meta
   -> TermPlus -- cod type
-  -> Identifier -- read, write, open, etc
+  -> Syscall -- read, write, open, etc
   -> [DataPlus] -- args of syscall
   -> [Identifier] -- borrowed variables
   -> WithEnv CodePlus

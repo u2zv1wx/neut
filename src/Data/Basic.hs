@@ -368,6 +368,11 @@ data Arch =
   Arch64
   deriving (Eq, Show)
 
+-- Left name-of-interface-function | Right (name-of-syscall, number-of-syscall)
+-- the `Left` here is required since direct use of syscall in macOS is deprecated since 10.12, and thus we need to
+-- use corresponding interface functions.
+type Syscall = Either T.Text (T.Text, Integer)
+
 linearCheck :: (Eq a, Ord a) => [a] -> Bool
 linearCheck xs = linearCheck' S.empty xs
 
