@@ -8,7 +8,7 @@
 
 (enum bool true false)
 
-(include "constant.neut")
+(include "darwin.neut")
 
 ;; このstateの中でtop-unitが書き換えられてしまう。
 ;; これは挙動として妥当だろうか？
