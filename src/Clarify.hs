@@ -197,7 +197,6 @@ clarifyUnaryOp name op m = do
     (_, TermPi _ xts@[(mx, x, tx)] _) -> do
       let varX = toDataUpsilon (x, mx)
       zts <- complementaryChainOf xts
-      -- p "one-time closure (unary)"
       retClosure
         (Just name)
         zts
@@ -256,7 +255,6 @@ clarifySysCall name syscall args m = do
         zts <- complementaryChainOf xts
         (xs, ds, headerList) <- computeHeader m xts args
         callThenReturn <- toSysCallTail m cod syscall ds xs
-        -- callThenReturn <- toSysCallTail m cod name ds xs
         let body = iterativeApp headerList callThenReturn
         retClosure (Just name) zts m xts body
     _ -> raiseCritical m $ "the type of " <> asText name <> " is wrong"
