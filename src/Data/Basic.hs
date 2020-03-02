@@ -172,6 +172,7 @@ data LowType
 asLowType :: Identifier -> LowType
 asLowType (I (n, _)) = fromMaybe (LowTypeIntS 64) (asLowTypeMaybe n)
 
+-- これasArrayKindMaybeから実装したほうがよさそう？
 asLowTypeMaybe :: T.Text -> Maybe LowType
 asLowTypeMaybe s =
   case T.uncons s of
