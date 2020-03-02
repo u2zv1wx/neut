@@ -11,7 +11,6 @@ import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Set as S
 import qualified Data.Text as T
 
--- import Data.Bits
 import Data.Maybe (fromMaybe)
 import Text.Read
 
@@ -358,20 +357,6 @@ asBinaryOpMaybe' "or" = Just BinaryOpOr
 asBinaryOpMaybe' "xor" = Just BinaryOpXor
 asBinaryOpMaybe' _ = Nothing
 
--- data SysCall
---   = SysCallWrite
---   | SysCallRead
---   | SysCallExit
---   | SysCallOpen
---   | SysCallClose
---   | SysCallFork
---   | SysCallSocket
---   | SysCallListen
---   | SysCallWait4
---   | SysCallBind
---   | SysCallAccept
---   | SysCallConnect
---   deriving (Eq, Show)
 type Target = (OS, Arch)
 
 data OS
@@ -383,7 +368,6 @@ data Arch =
   Arch64
   deriving (Eq, Show)
 
--- {} linearCheck {}
 linearCheck :: (Eq a, Ord a) => [a] -> Bool
 linearCheck xs = linearCheck' S.empty xs
 

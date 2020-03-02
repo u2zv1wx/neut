@@ -35,6 +35,17 @@ emit mainTerm = do
       emitDefinition "i8*" (TE.encodeUtf8Builder name') args' body'
   return $ toLazyByteString $ unlinesL $ g <> zs <> concat xs
 
+emitDeclarations :: WithEnv [Builder]
+emitDeclarations = do
+  denv <- Map.toList <$> gets declEnv
+  return $ map declToBuilder denv
+
+declToBuilder :: (T.Text, ([LowType], LowType)) -> Builder
+declToBuilder (name, (dom, cod)) = do
+  let name' = TE.encodeUtf8Builder name
+  "declare " <>
+    showLowType cod <> " @" <> name' <> "(" <> showItems showLowType dom <> ")"
+
 emitDefinition :: Builder -> Builder -> [Builder] -> LLVM -> WithEnv [Builder]
 emitDefinition retType name args asm = do
   let header = sig retType name args <> " {"
@@ -345,30 +356,6 @@ showLowTypeAsIfNonPtr (LowTypeArrayPtr i t) = do
   "[" <> intDec i <> " x " <> s <> "]"
 showLowTypeAsIfNonPtr LowTypeIntS64Ptr = "i64"
 
--- for now
-emitDeclarations :: WithEnv [Builder]
-emitDeclarations = do
-  denv <- Map.toList <$> gets declEnv
-  return $ map declToBuilder denv
-  -- os <- getOS
-  -- case os of
-  --   OSDarwin ->
-  --     return
-  --       [ "declare i8* @malloc(i64)"
-  --       , "declare void @free(i8*)"
-  --       -- The "direct" call of fork(2) via syscall seems to be broken in Darwin. It causes
-  --       -- malloc after fork to be broken with message `mach_vm_map(size=1048576) failed (error code=268435459)`.
-  --       -- Thus we need to declare the type of the interface function as follows and use it.
-  --       , "declare i8* @fork()"
-  --       ]
-  --   _ -> return ["declare i8* @malloc(i64)", "declare void @free(i8*)"]
-
-declToBuilder :: (T.Text, ([LowType], LowType)) -> Builder
-declToBuilder (name, (dom, cod)) = do
-  let name' = TE.encodeUtf8Builder name
-  "declare " <>
-    showLowType cod <> " @" <> name' <> "(" <> showItems showLowType dom <> ")"
-
 getRegList :: WithEnv [Builder]
 getRegList = do
   targetOS <- getOS
@@ -395,10 +382,7 @@ showLowType LowTypeIntS64Ptr = "i64*"
 
 showLLVMData :: LLVMData -> Builder
 showLLVMData (LLVMDataLocal (I (_, i))) = "%_" <> intDec i
--- showLLVMData (LLVMDataGlobal (I ("fork", 0))) = "@fork"
 showLLVMData (LLVMDataGlobal x) = "@" <> TE.encodeUtf8Builder x
--- showLLVMData (LLVMDataGlobal (I ("fork", 0))) = "@fork"
--- showLLVMData (LLVMDataGlobal x) = "@" <> TE.encodeUtf8Builder (asText' x)
 showLLVMData (LLVMDataInt i) = integerDec i
 showLLVMData (LLVMDataFloat16 x) = "0x" <> (doubleHexFixed $ realToFrac x)
 showLLVMData (LLVMDataFloat32 x) = "0x" <> (doubleHexFixed $ realToFrac x)
