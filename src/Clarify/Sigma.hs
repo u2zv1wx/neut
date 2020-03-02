@@ -174,5 +174,4 @@ returnClosureType m = do
       m
       arrVoidPtr
       [Right (envVarName, retImmType), Left retEnvVar, Left retImmType]
-      -- [Right (envVarName, retUnivType), Left retEnvVar, Left retImmType]
   return (m, CodeUpIntro closureType)

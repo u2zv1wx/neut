@@ -923,6 +923,11 @@
   (stream.head ((_ (stream A))) A)
   (stream.tail ((_ (stream A))) (stream A)))
 
+;; self-nested coinductive type shouldn't be allowed
+;; (coinductive stream ((A tau))
+;;   (stream.head ((_ (stream A))) A)
+;;   (stream.tail ((_ (stream A))) (stream (stream A))))
+
 ;; (i64.add stream.coinduction 3)
 
 ;; (coinductive stream ((A tau))
