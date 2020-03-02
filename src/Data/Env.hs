@@ -130,10 +130,7 @@ evalWithEnv c env = do
   case resultOrErr of
     Left err -> return $ Left err
     Right (result, _) -> return $ Right result
-  -- throwError [TIO.putStrLn x]
 
--- throwError' :: T.Text -> WithEnv a
--- throwError' _ = undefined
 newCount :: WithEnv Int
 newCount = do
   i <- gets count
@@ -278,7 +275,6 @@ unaryOpToType m op = do
   cod' <- lowTypeToType m cod
   x <- newNameWith' "arg"
   let xts = [(m, x, dom')]
-  -- mls <- piUnivLevelsfrom xts cod'
   return (m, TermPi [] xts cod')
 
 binaryOpToType :: Meta -> BinaryOp -> WithEnv TermPlus
@@ -289,7 +285,6 @@ binaryOpToType m op = do
   x1 <- newNameWith' "arg"
   x2 <- newNameWith' "arg"
   let xts = [(m, x1, dom'), (m, x2, dom')]
-  -- mls <- piUnivLevelsfrom xts cod'
   return (m, TermPi [] xts cod')
 
 arrayAccessToType :: Meta -> LowType -> WithEnv TermPlus
@@ -300,26 +295,13 @@ arrayAccessToType m lowType = do
   x2 <- newNameWith' "arg"
   x3 <- newNameWith' "arg"
   let u64 = (m, TermEnum (EnumTypeIntU 64))
-  -- let univ = (m, TermEnum (EnumTypeIntU 64))
   let idx = (m, TermUpsilon x2)
   let arr = (m, TermArray idx k)
   let xts = [(m, x1, u64), (m, x2, u64), (m, x3, arr)]
-  -- let xts = [(m, x1, univ), (m, x2, arr), (m, x3, idx)]
   x4 <- newNameWith' "arg"
   x5 <- newNameWith' "arg"
   let cod = (m, TermSigma [(m, x4, arr), (m, x5, t)])
   return (m, TermPi [] xts cod)
-  -- -- l <- newCount
-  -- let univ = (m, TermEnum (EnumTypeIntU 64))
-  -- -- let univ = (m, TermTau l)
-  -- let idx = (m, TermUpsilon x1)
-  -- let arr = (m, TermArray idx k)
-  -- let xts = [(m, x1, univ), (m, x2, arr), (m, x3, idx)]
-  -- x4 <- newNameWith' "arg"
-  -- x5 <- newNameWith' "arg"
-  -- let cod = (m, TermSigma [(m, x4, arr), (m, x5, t)])
-  -- -- mls <- piUnivLevelsfrom xts cod
-  -- return (m, TermPi [] xts cod)
 
 lookupConstNum :: T.Text -> WithEnv Int
 lookupConstNum constName = do
@@ -360,9 +342,6 @@ lookupConstantPlus constName = do
 
 -- f32とかi64.addとかは定数
 isConstant :: T.Text -> Bool
-isConstant "f16" = True
-isConstant "f32" = True
-isConstant "f64" = True
 isConstant name
   | name == "f16" = True
   | name == "f32" = True

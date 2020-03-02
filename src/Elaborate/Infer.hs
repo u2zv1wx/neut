@@ -673,7 +673,6 @@ binaryOpToWeakType m op = do
   mls <- piUnivLevelsfrom xts cod'
   return (m, WeakTermPi mls xts cod')
 
--- u8:array-access : Pi (A : tau, _ : Array A u8, _ : A). Sigma (_ : Array A u8). u8
 -- u8:array-access : Pi (i : u64, x : u64, xs : Array x u8). Sigma (_ : Array x u8). u8
 arrayAccessToWeakType :: Meta -> LowType -> WithEnv WeakTermPlus
 arrayAccessToWeakType m lowType = do
