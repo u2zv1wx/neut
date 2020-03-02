@@ -2,11 +2,13 @@ module Data.LLVM where
 
 import Numeric.Half
 
+import qualified Data.Text as T
+
 import Data.Basic
 
 data LLVMData
   = LLVMDataLocal Identifier
-  | LLVMDataGlobal Identifier
+  | LLVMDataGlobal T.Text
   | LLVMDataInt Integer
   | LLVMDataFloat16 Half
   | LLVMDataFloat32 Float

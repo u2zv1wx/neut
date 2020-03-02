@@ -93,7 +93,7 @@ takeBaseName (_, DataStructIntro dks) = "struct" <> T.pack (show (length dks))
 
 takeBaseName' :: LLVMData -> T.Text
 takeBaseName' (LLVMDataLocal (I (s, _))) = s
-takeBaseName' (LLVMDataGlobal (I (s, _))) = s
+takeBaseName' (LLVMDataGlobal s) = s
 takeBaseName' (LLVMDataInt _) = "int"
 takeBaseName' (LLVMDataFloat16 _) = "half"
 takeBaseName' (LLVMDataFloat32 _) = "float"
@@ -151,12 +151,15 @@ llvmCodeTheta _ (ThetaArrayAccess lowType arr idx) = do
          (arrVar, arrayType)
          [(LLVMDataInt 0, i32), (idxVar, i64)])
       (LLVMLet resName (LLVMOpLoad resPtr lowType) uncast)
-llvmCodeTheta _ (ThetaSysCall num args) = do
+llvmCodeTheta _ (ThetaSysCall syscall args) = do
   (xs, vs) <- unzip <$> mapM (const $ newDataLocal "sys-call-arg") args
-  res <- newNameWith' "result"
-  num' <- sysCallNumAsInt num
-  llvmDataLet' (zip xs args) $
-    LLVMLet res (LLVMOpSysCall num' vs) $ LLVMReturn (LLVMDataLocal res)
+  -- res <- newNameWith' "result"
+  -- ここはsyscallToLLVM num vsみたいに変更して、プラットフォームごとに変換先を変える感じで。
+  call <- syscallToLLVM syscall vs
+  -- syscall' <- sysCallNumAsInt syscall
+  llvmDataLet' (zip xs args) call
+  -- llvmDataLet' (zip xs args) $
+  --   LLVMLet res (LLVMOpSysCall syscall' vs) $ LLVMReturn (LLVMDataLocal res)
 
 llvmCodeUnaryOp :: UnaryOp -> DataPlus -> WithEnv LLVM
 llvmCodeUnaryOp op d = do
@@ -273,10 +276,10 @@ llvmDataLet x (m, DataTheta y) cont = do
   -- 型が不明だからnothingのときにもなんかうまくやる必要があるか。
   case Map.lookup y cenv of
     Nothing
-      | asText y == "fork" ->
-        llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType []) cont
-      | otherwise ->
-        raiseCritical m $ "no such global label defined: " <> asText y
+      -- | asText y == "fork" ->
+      --   llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType []) cont
+      -- | otherwise ->
+     -> raiseCritical m $ "no such global label defined: " <> asText y
     -- Nothing -> raiseCritical m $ "no such global label defined: " <> asText y
     Just (Definition _ args e)
       | not (y `S.member` ns) -> do
@@ -284,8 +287,9 @@ llvmDataLet x (m, DataTheta y) cont = do
         llvm <- llvmCode e
         (args', llvm') <- rename args llvm
         insLLVMEnv y args' llvm'
-        llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType args) cont
-      | otherwise -> llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType args) cont
+        llvmUncastLet x (LLVMDataGlobal $ asText' y) (toFunPtrType args) cont
+      | otherwise ->
+        llvmUncastLet x (LLVMDataGlobal $ asText' y) (toFunPtrType args) cont
 llvmDataLet x (_, DataUpsilon y) cont =
   llvmUncastLet x (LLVMDataLocal y) voidPtr cont
 llvmDataLet x (_, DataSigmaIntro k ds) cont = do
@@ -314,41 +318,86 @@ llvmDataLet x (_, DataStructIntro dks) cont = do
   let structType = LowTypeStructPtr ts
   storeContent x structType (zip ds ts) cont
 
-sysCallNumAsInt :: SysCall -> WithEnv Integer
-sysCallNumAsInt num = do
-  targetOS <- getOS
-  case targetOS of
-    OSLinux ->
-      case num of
-        SysCallRead -> return 0
-        SysCallWrite -> return 1
-        SysCallExit -> return 60
-        SysCallOpen -> return 2
-        SysCallClose -> return 3
-        SysCallFork -> return 57
-        SysCallWait4 -> return 61
-        SysCallSocket -> return 41
-        SysCallBind -> return 49
-        SysCallListen -> return 50
-        SysCallConnect -> return 42
-        SysCallAccept -> return 43
-    OSDarwin ->
-      case num of
-        SysCallRead -> return 0x2000003
-        SysCallWrite -> return 0x2000004
-        SysCallExit -> return 0x2000001
-        SysCallOpen -> return 0x2000005
-        SysCallClose -> return 0x2000006
-        SysCallFork ->
-          raiseCritical'
-            "syscall 0x2000002 (fork) cannot be used directly in Darwin"
-        SysCallWait4 -> return 0x2000007
-        SysCallSocket -> return 0x2000097
-        SysCallBind -> return 0x2000104
-        SysCallListen -> return 0x2000106
-        SysCallAccept -> return 0x2000030
-        SysCallConnect -> return 0x2000098
+--   LLVMLet res (LLVMOpSysCall syscall' vs) $ LLVMReturn (LLVMDataLocal res)
+syscallToLLVM :: Identifier -> [LLVMData] -> WithEnv LLVM
+syscallToLLVM (I (syscallName, _)) ds = do
+  os <- getOS
+  case syscallToNumMaybe os syscallName of
+    Nothing -> do
+      denv <- gets declEnv
+      when (not $ syscallName `Map.member` denv) $ do
+        let dom = map (const LowTypeVoidPtr) ds
+        let cod = LowTypeVoidPtr
+        modify (\env -> env {declEnv = Map.insert syscallName (dom, cod) denv})
+      -- _ <- undefined syscall -- ここでsyscallをdeclareする
+      return $ LLVMCall (LLVMDataGlobal syscallName) ds
+    Just num -> do
+      res <- newNameWith' "result"
+      return $
+        LLVMLet res (LLVMOpSysCall num ds) $ LLVMReturn (LLVMDataLocal res)
 
+syscallToNumMaybe :: OS -> T.Text -> Maybe Integer
+syscallToNumMaybe OSLinux "read" = return 0
+syscallToNumMaybe OSLinux "write" = return 1
+syscallToNumMaybe OSLinux "open" = return 2
+syscallToNumMaybe OSLinux "close" = return 3
+syscallToNumMaybe OSLinux "socket" = return 41
+syscallToNumMaybe OSLinux "connect" = return 42
+syscallToNumMaybe OSLinux "accept" = return 43
+syscallToNumMaybe OSLinux "bind" = return 49
+syscallToNumMaybe OSLinux "listen" = return 50
+syscallToNumMaybe OSLinux "fork" = return 57
+syscallToNumMaybe OSLinux "exit" = return 60
+syscallToNumMaybe OSLinux "wait4" = return 61
+syscallToNumMaybe _ _ = Nothing -- direct use of syscall on Darwin is deprecated since macOS 10.12
+  -- case targetOS of
+  --   OSLinux ->
+  --     case num of
+  --       SysCallRead -> return 0
+  --       SysCallWrite -> return 1
+  --       SysCallExit -> return 60
+  --       SysCallOpen -> return 2
+  --       SysCallClose -> return 3
+  --       SysCallFork -> return 57
+  --       SysCallWait4 -> return 61
+  --       SysCallSocket -> return 41
+  --       SysCallBind -> return 49
+  --       SysCallListen -> return 50
+  --       SysCallConnect -> return 42
+  --       SysCallAccept -> return 43
+  --   OSDarwin ->
+  --     case num of
+  --       SysCallRead -> return 0x2000003
+  --       SysCallWrite -> return 0x2000004
+  --       SysCallExit -> return 0x2000001
+  --       SysCallOpen -> return 0x2000005
+  --       SysCallClose -> return 0x2000006
+  --       SysCallFork ->
+  --         raiseCritical'
+  --           "syscall 0x2000002 (fork) cannot be used directly in Darwin"
+  --       SysCallWait4 -> return 0x2000007
+  --       SysCallSocket -> return 0x2000097
+  --       SysCallBind -> return 0x2000104
+  --       SysCallListen -> return 0x2000106
+  --       SysCallAccept -> return 0x2000030
+  --       SysCallConnect -> return 0x2000098
+
+-- syscallToNumMaybe "xnu-read" = return 0
+-- syscallToNumMaybe "xnu-write" = return 1
+-- syscallToNumMaybe "xnu-open" = return 2
+-- syscallToNumMaybe "xnu-close" = return 3
+-- syscallToNumMaybe "xnu-socket" = return 41
+-- syscallToNumMaybe "xnu-connect" = return 42
+-- syscallToNumMaybe "xnu-accept" = return 43
+-- syscallToNumMaybe "xnu-bind" = return 49
+-- syscallToNumMaybe "xnu-listen" = return 50
+-- syscallToNumMaybe "xnu-fork" = return 57
+-- syscallToNumMaybe "xnu-exit" = return 60
+-- syscallToNumMaybe "xnu-wait4" = return 61
+-- sysCallNumAsInt :: Identifier -> WithEnv Integer
+-- sysCallNumAsInt num = do
+--   targetOS <- getOS
+--   undefined
 llvmDataLet' :: [(Identifier, DataPlus)] -> LLVM -> WithEnv LLVM
 llvmDataLet' [] cont = return cont
 llvmDataLet' ((x, d):rest) cont = do
@@ -470,6 +519,7 @@ lowTypeToAllocSize (LowTypeIntS i) = AllocSizeExact $ lowTypeToAllocSize' i
 lowTypeToAllocSize (LowTypeIntU i) = AllocSizeExact $ lowTypeToAllocSize' i
 lowTypeToAllocSize (LowTypeFloat size) =
   AllocSizeExact $ lowTypeToAllocSize' $ sizeAsInt size
+lowTypeToAllocSize LowTypeVoid = AllocSizePtrList 1
 lowTypeToAllocSize LowTypeVoidPtr = AllocSizePtrList 1
 lowTypeToAllocSize (LowTypeFunctionPtr _ _) = AllocSizePtrList 1
 lowTypeToAllocSize (LowTypeStructPtr ts) = AllocSizePtrList $ length ts

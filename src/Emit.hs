@@ -14,6 +14,7 @@ import Data.Monoid ((<>))
 -- import Unsafe.Coerce
 import qualified Data.ByteString.Lazy as L
 import qualified Data.HashMap.Strict as Map
+import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 
 import Data.Basic
@@ -23,7 +24,7 @@ import Data.LLVM
 emit :: LLVM -> WithEnv L.ByteString
 emit mainTerm = do
   lenv <- gets llvmEnv
-  g <- emitGlobal
+  g <- emitDeclarations
   let mainTerm' = reduceLLVM mainTerm
   zs <- emitDefinition "i64" "main" [] mainTerm'
   xs <-
@@ -333,6 +334,7 @@ showLowTypeAsIfNonPtr (LowTypeIntU i) = "i" <> intDec i
 showLowTypeAsIfNonPtr (LowTypeFloat FloatSize16) = "half"
 showLowTypeAsIfNonPtr (LowTypeFloat FloatSize32) = "float"
 showLowTypeAsIfNonPtr (LowTypeFloat FloatSize64) = "double"
+showLowTypeAsIfNonPtr LowTypeVoid = "void"
 showLowTypeAsIfNonPtr LowTypeVoidPtr = "i8"
 showLowTypeAsIfNonPtr (LowTypeStructPtr ts) =
   "{" <> showItems showLowType ts <> "}"
@@ -344,20 +346,28 @@ showLowTypeAsIfNonPtr (LowTypeArrayPtr i t) = do
 showLowTypeAsIfNonPtr LowTypeIntS64Ptr = "i64"
 
 -- for now
-emitGlobal :: WithEnv [Builder]
-emitGlobal = do
-  os <- getOS
-  case os of
-    OSDarwin ->
-      return
-        [ "declare i8* @malloc(i64)"
-        , "declare void @free(i8*)"
-        -- The "direct" call of fork(2) via syscall seems to be broken in Darwin. It causes
-        -- malloc after fork to be broken with message `mach_vm_map(size=1048576) failed (error code=268435459)`.
-        -- Thus we need to declare the type of the interface function as follows and use it.
-        , "declare i8* @fork()"
-        ]
-    _ -> return ["declare i8* @malloc(i64)", "declare void @free(i8*)"]
+emitDeclarations :: WithEnv [Builder]
+emitDeclarations = do
+  denv <- Map.toList <$> gets declEnv
+  return $ map declToBuilder denv
+  -- os <- getOS
+  -- case os of
+  --   OSDarwin ->
+  --     return
+  --       [ "declare i8* @malloc(i64)"
+  --       , "declare void @free(i8*)"
+  --       -- The "direct" call of fork(2) via syscall seems to be broken in Darwin. It causes
+  --       -- malloc after fork to be broken with message `mach_vm_map(size=1048576) failed (error code=268435459)`.
+  --       -- Thus we need to declare the type of the interface function as follows and use it.
+  --       , "declare i8* @fork()"
+  --       ]
+  --   _ -> return ["declare i8* @malloc(i64)", "declare void @free(i8*)"]
+
+declToBuilder :: (T.Text, ([LowType], LowType)) -> Builder
+declToBuilder (name, (dom, cod)) = do
+  let name' = TE.encodeUtf8Builder name
+  "declare " <>
+    showLowType cod <> " @" <> name' <> "(" <> showItems showLowType dom <> ")"
 
 getRegList :: WithEnv [Builder]
 getRegList = do
@@ -373,6 +383,7 @@ showLowType (LowTypeIntU i) = "i" <> intDec i
 showLowType (LowTypeFloat FloatSize16) = "half"
 showLowType (LowTypeFloat FloatSize32) = "float"
 showLowType (LowTypeFloat FloatSize64) = "double"
+showLowType LowTypeVoid = "void"
 showLowType LowTypeVoidPtr = "i8*"
 showLowType (LowTypeStructPtr ts) = "{" <> showItems showLowType ts <> "}*"
 showLowType (LowTypeFunctionPtr ts t) =
@@ -384,8 +395,10 @@ showLowType LowTypeIntS64Ptr = "i64*"
 
 showLLVMData :: LLVMData -> Builder
 showLLVMData (LLVMDataLocal (I (_, i))) = "%_" <> intDec i
-showLLVMData (LLVMDataGlobal (I ("fork", 0))) = "@fork"
-showLLVMData (LLVMDataGlobal x) = "@" <> TE.encodeUtf8Builder (asText' x)
+-- showLLVMData (LLVMDataGlobal (I ("fork", 0))) = "@fork"
+showLLVMData (LLVMDataGlobal x) = "@" <> TE.encodeUtf8Builder x
+-- showLLVMData (LLVMDataGlobal (I ("fork", 0))) = "@fork"
+-- showLLVMData (LLVMDataGlobal x) = "@" <> TE.encodeUtf8Builder (asText' x)
 showLLVMData (LLVMDataInt i) = integerDec i
 showLLVMData (LLVMDataFloat16 x) = "0x" <> (doubleHexFixed $ realToFrac x)
 showLLVMData (LLVMDataFloat32 x) = "0x" <> (doubleHexFixed $ realToFrac x)

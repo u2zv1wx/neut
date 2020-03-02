@@ -162,6 +162,7 @@ data LowType
   = LowTypeIntS IntSize
   | LowTypeIntU IntSize
   | LowTypeFloat FloatSize
+  | LowTypeVoid -- to represent the cod of free
   | LowTypeVoidPtr
   | LowTypeFunctionPtr [LowType] LowType
   | LowTypeStructPtr [LowType]
@@ -357,21 +358,20 @@ asBinaryOpMaybe' "or" = Just BinaryOpOr
 asBinaryOpMaybe' "xor" = Just BinaryOpXor
 asBinaryOpMaybe' _ = Nothing
 
-data SysCall
-  = SysCallWrite
-  | SysCallRead
-  | SysCallExit
-  | SysCallOpen
-  | SysCallClose
-  | SysCallFork
-  | SysCallSocket
-  | SysCallListen
-  | SysCallWait4
-  | SysCallBind
-  | SysCallAccept
-  | SysCallConnect
-  deriving (Eq, Show)
-
+-- data SysCall
+--   = SysCallWrite
+--   | SysCallRead
+--   | SysCallExit
+--   | SysCallOpen
+--   | SysCallClose
+--   | SysCallFork
+--   | SysCallSocket
+--   | SysCallListen
+--   | SysCallWait4
+--   | SysCallBind
+--   | SysCallAccept
+--   | SysCallConnect
+--   deriving (Eq, Show)
 type Target = (OS, Arch)
 
 data OS

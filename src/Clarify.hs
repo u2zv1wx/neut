@@ -158,7 +158,7 @@ clarifyConst m name@(I (x, _))
 clarifyConst m name@(I (x, _))
   | Just op <- asBinaryOpMaybe x = clarifyBinaryOp name op m
 clarifyConst m name@(I (x, _))
-  | Just (sysCall, len) <- asSysCallMaybe x = clarifySysCall name sysCall len m
+  | Just argInfo <- asSysCallMaybe x = clarifySysCall name argInfo m
 clarifyConst m (I (x, _))
   | Just _ <- asLowTypeMaybe x = clarify (m, TermEnum $ EnumTypeLabel "top")
 clarifyConst m name@(I (x, _))
@@ -249,11 +249,10 @@ clarifyArrayAccess m name lowType = do
 
 clarifySysCall ::
      Identifier -- the name of theta
-  -> SysCall -- the kind of system call
   -> [Arg] -- the length of the arguments of the theta
   -> Meta -- the meta of the theta
   -> WithEnv CodePlus
-clarifySysCall name sysCall args m = do
+clarifySysCall name args m = do
   sysCallType <- lookupTypeEnv' name
   sysCallType' <- reduceTermPlus sysCallType
   case sysCallType' of
@@ -261,14 +260,15 @@ clarifySysCall name sysCall args m = do
       | length xts == length args -> do
         zts <- complementaryChainOf xts
         (xs, ds, headerList) <- computeHeader m xts args
-        callThenReturn <- toSysCallTail m cod sysCall ds xs
+        callThenReturn <- toSysCallTail m cod name ds xs
         let body = iterativeApp headerList callThenReturn
-        os <- getOS
-        case (sysCall, os) of
-          (SysCallFork, OSDarwin) -> do
-            name' <- newNameWith' "fork"
-            retClosure (Just name') zts m xts body
-          _ -> retClosure (Just name) zts m xts body
+        -- os <- getOS
+        retClosure (Just name) zts m xts body
+        -- case (name, os) of
+        --   (I ("fork", _), OSDarwin) -> do
+        --     name' <- newNameWith' "fork"
+        --     retClosure (Just name') zts m xts body
+        --   _ -> retClosure (Just name) zts m xts body
     _ -> raiseCritical m $ "the type of " <> asText name <> " is wrong"
 
 iterativeApp :: [a -> a] -> a -> a
@@ -344,29 +344,43 @@ knot z cls = do
 --   | ["array-access", typeStr] <- sepAtLast '-' name
 --   , Just lowType <- asLowTypeMaybe typeStr = Just lowType
 -- asArrayAccessMaybe _ = Nothing
-asSysCallMaybe :: T.Text -> Maybe (SysCall, [Arg])
-asSysCallMaybe "write" =
-  Just (SysCallWrite, [ArgUnused, ArgImmediate, ArgArray, ArgImmediate])
-asSysCallMaybe "read" =
-  Just (SysCallRead, [ArgUnused, ArgImmediate, ArgArray, ArgImmediate])
-asSysCallMaybe "exit" = Just (SysCallExit, [ArgImmediate])
-asSysCallMaybe "open" =
-  Just (SysCallOpen, [ArgUnused, ArgArray, ArgImmediate, ArgImmediate])
-asSysCallMaybe "close" = Just (SysCallClose, [ArgImmediate])
-asSysCallMaybe "fork" = Just (SysCallFork, [])
-asSysCallMaybe "socket" =
-  Just (SysCallSocket, [ArgImmediate, ArgImmediate, ArgImmediate])
-asSysCallMaybe "listen" = Just (SysCallListen, [ArgImmediate, ArgImmediate])
-asSysCallMaybe "wait4" =
-  Just (SysCallWait4, [ArgImmediate, ArgArray, ArgImmediate, ArgStruct])
-asSysCallMaybe "bind" =
-  Just (SysCallBind, [ArgImmediate, ArgStruct, ArgImmediate])
-asSysCallMaybe "accept" =
-  Just (SysCallAccept, [ArgImmediate, ArgStruct, ArgArray])
-asSysCallMaybe "connect" =
-  Just (SysCallConnect, [ArgImmediate, ArgStruct, ArgImmediate])
+asSysCallMaybe :: T.Text -> Maybe [Arg]
+asSysCallMaybe "write" = Just [ArgUnused, ArgImmediate, ArgArray, ArgImmediate]
+asSysCallMaybe "read" = Just [ArgUnused, ArgImmediate, ArgArray, ArgImmediate]
+asSysCallMaybe "exit" = Just [ArgImmediate]
+asSysCallMaybe "open" = Just [ArgUnused, ArgArray, ArgImmediate, ArgImmediate]
+asSysCallMaybe "close" = Just [ArgImmediate]
+asSysCallMaybe "fork" = Just []
+asSysCallMaybe "socket" = Just [ArgImmediate, ArgImmediate, ArgImmediate]
+asSysCallMaybe "listen" = Just [ArgImmediate, ArgImmediate]
+asSysCallMaybe "wait4" = Just [ArgImmediate, ArgArray, ArgImmediate, ArgStruct]
+asSysCallMaybe "bind" = Just [ArgImmediate, ArgStruct, ArgImmediate]
+asSysCallMaybe "accept" = Just [ArgImmediate, ArgStruct, ArgArray]
+asSysCallMaybe "connect" = Just [ArgImmediate, ArgStruct, ArgImmediate]
 asSysCallMaybe _ = Nothing
 
+-- asSysCallMaybe :: T.Text -> Maybe (SysCall, [Arg])
+-- asSysCallMaybe "write" =
+--   Just (SysCallWrite, [ArgUnused, ArgImmediate, ArgArray, ArgImmediate])
+-- asSysCallMaybe "read" =
+--   Just (SysCallRead, [ArgUnused, ArgImmediate, ArgArray, ArgImmediate])
+-- asSysCallMaybe "exit" = Just (SysCallExit, [ArgImmediate])
+-- asSysCallMaybe "open" =
+--   Just (SysCallOpen, [ArgUnused, ArgArray, ArgImmediate, ArgImmediate])
+-- asSysCallMaybe "close" = Just (SysCallClose, [ArgImmediate])
+-- asSysCallMaybe "fork" = Just (SysCallFork, [])
+-- asSysCallMaybe "socket" =
+--   Just (SysCallSocket, [ArgImmediate, ArgImmediate, ArgImmediate])
+-- asSysCallMaybe "listen" = Just (SysCallListen, [ArgImmediate, ArgImmediate])
+-- asSysCallMaybe "wait4" =
+--   Just (SysCallWait4, [ArgImmediate, ArgArray, ArgImmediate, ArgStruct])
+-- asSysCallMaybe "bind" =
+--   Just (SysCallBind, [ArgImmediate, ArgStruct, ArgImmediate])
+-- asSysCallMaybe "accept" =
+--   Just (SysCallAccept, [ArgImmediate, ArgStruct, ArgArray])
+-- asSysCallMaybe "connect" =
+--   Just (SysCallConnect, [ArgImmediate, ArgStruct, ArgImmediate])
+-- asSysCallMaybe _ = Nothing
 data Arg
   = ArgImmediate
   | ArgArray
@@ -435,31 +449,34 @@ computeHeader m xts argInfoList = do
 toSysCallTail ::
      Meta
   -> TermPlus -- cod type
-  -> SysCall -- read, write, open, etc
+  -> Identifier -- read, write, open, etc
   -> [DataPlus] -- args of syscall
   -> [Identifier] -- borrowed variables
   -> WithEnv CodePlus
 toSysCallTail m cod syscall args xs = do
   resultVarName <- newNameWith' "result"
   result <- retWithBorrowedVars m cod xs resultVarName
-  os <- getOS
-  case (syscall, os) of
-    (SysCallFork, OSDarwin)
-      -- i <- lookupConstNum' "fork"
-     -> do
-      return
-        ( m
-        , CodeUpElim
-            resultVarName
-            (m, CodePiElimDownElim (m, DataTheta (I ("fork", 0))) args)
-            result)
-    _ ->
-      return
-        ( m
-        , CodeUpElim
-            resultVarName
-            (m, CodeTheta (ThetaSysCall syscall args))
-            result)
+  -- os <- getOS
+  return
+    ( m
+    , CodeUpElim resultVarName (m, CodeTheta (ThetaSysCall syscall args)) result)
+  -- case (syscall, os) of
+  --   (I ("fork", _), OSDarwin)
+  --     -- i <- lookupConstNum' "fork"
+  --    -> do
+  --     return
+  --       ( m
+  --       , CodeUpElim
+  --           resultVarName
+  --           (m, CodePiElimDownElim (m, DataTheta (I ("fork", 0))) args)
+  --           result)
+  --   _ ->
+  --     return
+  --       ( m
+  --       , CodeUpElim
+  --           resultVarName
+  --           (m, CodeTheta (ThetaSysCall syscall args))
+  --           result)
 
 toArrayAccessTail ::
      Meta

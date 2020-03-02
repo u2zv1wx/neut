@@ -76,6 +76,7 @@ data Env =
     , nameSet :: S.Set Identifier
     -- LLVM
     , llvmEnv :: Map.HashMap Identifier ([Identifier], LLVM)
+    , declEnv :: Map.HashMap T.Text ([LowType], LowType) -- external functions that must be declared in LLVM IR
     }
 
 initialEnv :: Path Abs File -> Env
@@ -106,6 +107,11 @@ initialEnv path =
     , chainEnv = IntMap.empty
     , codeEnv = Map.empty
     , llvmEnv = Map.empty
+    , declEnv =
+        Map.fromList
+          [ ("malloc", ([LowTypeIntS 64], LowTypeVoidPtr))
+          , ("free", ([LowTypeVoidPtr], LowTypeVoid))
+          ]
     , constraintEnv = []
     , constraintQueue = Q.empty
     , levelEnv = []
