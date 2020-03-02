@@ -9,9 +9,6 @@ import Control.Monad.State
 import Data.ByteString.Builder
 import Data.Monoid ((<>))
 
--- import Data.Word
--- import Numeric.Half
--- import Unsafe.Coerce
 import qualified Data.ByteString.Lazy as L
 import qualified Data.HashMap.Strict as Map
 import qualified Data.Text as T

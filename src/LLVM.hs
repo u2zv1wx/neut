@@ -28,7 +28,6 @@ toLLVM mainTerm = do
   (cast, castThen) <- llvmCast (Just "cast") resultVar (LowTypeIntS 64)
   castResult <- castThen (LLVMReturn cast)
   -- let result: i8* := (main-term) in {cast result to i64}
-  -- commConv result mainTerm'' $ castResult
   mainTerm''' <- commConv result mainTerm'' $ castResult
   snd <$> rename [] mainTerm'''
 
@@ -320,20 +319,6 @@ syscallToLLVM syscall ds = do
       return $
         LLVMLet res (LLVMOpSysCall num ds) $ LLVMReturn (LLVMDataLocal res)
 
--- syscallToNumMaybe :: OS -> T.Text -> Maybe Integer
--- syscallToNumMaybe OSLinux "read" = return 0
--- syscallToNumMaybe OSLinux "write" = return 1
--- syscallToNumMaybe OSLinux "open" = return 2
--- syscallToNumMaybe OSLinux "close" = return 3
--- syscallToNumMaybe OSLinux "socket" = return 41
--- syscallToNumMaybe OSLinux "connect" = return 42
--- syscallToNumMaybe OSLinux "accept" = return 43
--- syscallToNumMaybe OSLinux "bind" = return 49
--- syscallToNumMaybe OSLinux "listen" = return 50
--- syscallToNumMaybe OSLinux "fork" = return 57
--- syscallToNumMaybe OSLinux "exit" = return 60
--- syscallToNumMaybe OSLinux "wait4" = return 61
--- syscallToNumMaybe _ _ = Nothing -- direct use of syscall on Darwin is deprecated since macOS 10.12
 llvmDataLet' :: [(Identifier, DataPlus)] -> LLVM -> WithEnv LLVM
 llvmDataLet' [] cont = return cont
 llvmDataLet' ((x, d):rest) cont = do

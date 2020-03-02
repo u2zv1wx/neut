@@ -358,56 +358,7 @@ asSysCallMaybe OSDarwin name =
     "bind" -> return (Left name, [ArgImm, ArgStruct, ArgImm]) -- 0x2000104
     "listen" -> return (Left name, [ArgImm, ArgImm]) -- 0x2000106
     _ -> Nothing
-      -- case num of
-      --   SysCallRead -> return 0x2000003
-      --   SysCallWrite -> return 0x2000004
-      --   SysCallExit -> return 0x2000001
-      --   SysCallOpen -> return 0x2000005
-      --   SysCallClose -> return 0x2000006
-      --   SysCallFork ->
-      --     raiseCritical'
-      --       "syscall 0x2000002 (fork) cannot be used directly in Darwin"
-      --   SysCallWait4 -> return 0x2000007
-      --   SysCallSocket -> return 0x2000097
-      --   SysCallBind -> return 0x2000104
-      --   SysCallListen -> return 0x2000106
-      --   SysCallAccept -> return 0x2000030
-      --   SysCallConnect -> return 0x2000098
 
--- asSysCallMaybe OSLinux name@"read" =
---   return (Right (name, 0), [ArgUnused, ArgImm, ArgArray, ArgImm])
--- asSysCallMaybe OSLinux name@"write" =
---   return (Right (name, 1), [ArgUnused, ArgImm, ArgArray, ArgImm])
--- asSysCallMaybe OSLinux name@"open" =
---   return (Right (name, 2), [ArgUnused, ArgArray, ArgImm, ArgImm])
--- asSysCallMaybe OSLinux name@"close" = return (Right (name, 3), [ArgImm])
--- asSysCallMaybe OSLinux name@"socket" =
---   return (Right (name, 41), [ArgImm, ArgImm, ArgImm])
--- asSysCallMaybe OSLinux name@"connect" =
---   return (Right (name, 42), [ArgImm, ArgStruct, ArgImm])
--- asSysCallMaybe OSLinux name@"accept" =
---   return (Right (name, 43), [ArgImm, ArgStruct, ArgArray])
--- asSysCallMaybe OSLinux name@"bind" =
---   return (Right (name, 49), [ArgImm, ArgStruct, ArgImm])
--- asSysCallMaybe OSLinux name@"listen" =
---   return (Right (name, 50), [ArgImm, ArgImm])
--- asSysCallMaybe OSLinux name@"fork" = return (Right (name, 57), [])
--- asSysCallMaybe OSLinux name@"exit" = return (Right (name, 60), [ArgImm])
--- asSysCallMaybe OSLinux name@"wait4" =
---   return (Right (name, 61), [ArgImm, ArgArray, ArgImm, ArgStruct])
--- syscallToNumMaybe :: OS -> T.Text -> Maybe Integer
--- syscallToNumMaybe OSLinux "read" = return 0
--- syscallToNumMaybe OSLinux "write" = return 1
--- syscallToNumMaybe OSLinux "open" = return 2
--- syscallToNumMaybe OSLinux "close" = return 3
--- syscallToNumMaybe OSLinux "socket" = return 41
--- syscallToNumMaybe OSLinux "connect" = return 42
--- syscallToNumMaybe OSLinux "accept" = return 43
--- syscallToNumMaybe OSLinux "bind" = return 49
--- syscallToNumMaybe OSLinux "listen" = return 50
--- syscallToNumMaybe OSLinux "fork" = return 57
--- syscallToNumMaybe OSLinux "exit" = return 60
--- syscallToNumMaybe OSLinux "wait4" = return 61
 data Arg
   = ArgImm
   | ArgArray
