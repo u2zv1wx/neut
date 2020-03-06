@@ -16,7 +16,6 @@ import Data.Monoid ((<>))
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.IntMap.Strict as IntMap
-import qualified Data.Text as T
 
 import Data.Basic
 import Data.Env
@@ -336,8 +335,7 @@ zeta mode isub csub atsbts t e = do
       if isResolved (isub ++ csub) t -- flipが絡むのでは？
         then return e
         else raiseError (metaOf t) $
-             "malformed inductive/coinductive type definition: " <>
-             T.pack (show t)
+             "malformed inductive/coinductive type definition: " <> toText t
 
 zetaPi ::
      Mode
