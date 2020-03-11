@@ -153,9 +153,19 @@ rename' nenv (m, WeakTermUpsilon x@(I (s, _))) = do
 rename' nenv (m, WeakTermPi mls xts t) = do
   (xts', t') <- renameBinder nenv xts t
   return (m, WeakTermPi mls xts' t')
+rename' nenv (m, WeakTermPiPlus name mls xts t) = do
+  (xts', t') <- renameBinder nenv xts t
+  return (m, WeakTermPiPlus name mls xts' t')
 rename' nenv (m, WeakTermPiIntro xts e) = do
   (xts', e') <- renameBinder nenv xts e
   return (m, WeakTermPiIntro xts' e')
+rename' nenv (m, WeakTermPiIntroPlus name idx s xts e) = do
+  (xts', e') <- renameBinder nenv xts e
+  let (is, es) = unzip s
+  is' <- mapM (renameIdentifier nenv m) is
+  es' <- mapM (rename' nenv) es
+  let s' = zip is' es'
+  return (m, WeakTermPiIntroPlus name idx s' xts' e')
 rename' nenv (m, WeakTermPiElim e es) = do
   es' <- mapM (rename' nenv) es
   e' <- rename' nenv e
@@ -213,6 +223,12 @@ rename' nenv (m, WeakTermStructElim xts e1 e2) = do
   e1' <- rename' nenv e1
   (xts', e2') <- renameStruct nenv xts e2
   return (m, WeakTermStructElim xts' e1' e2')
+
+renameIdentifier :: NameEnv -> Meta -> Identifier -> WithEnv Identifier
+renameIdentifier nenv m x@(I (s, _)) = do
+  case lookupName x nenv of
+    Just x' -> return x'
+    _ -> raiseError m $ "undefined variable: " <> s
 
 renameBinder ::
      NameEnv
@@ -424,9 +440,16 @@ invRename (m, WeakTermUpsilon x) = do
 invRename (m, WeakTermPi mls xts t) = do
   (xts', t') <- invRenameBinder xts t
   return (m, WeakTermPi mls xts' t')
+invRename (m, WeakTermPiPlus name mls xts t) = do
+  (xts', t') <- invRenameBinder xts t
+  return (m, WeakTermPiPlus name mls xts' t')
 invRename (m, WeakTermPiIntro xts e) = do
   (xts', e') <- invRenameBinder xts e
   return (m, WeakTermPiIntro xts' e')
+invRename (m, WeakTermPiIntroPlus name idx s xts e)
+  -- the "content" of this term is not used in toText, and so there's no need to rename this term
+ = do
+  return (m, WeakTermPiIntroPlus name idx s xts e)
 invRename (m, WeakTermPiElim e es) = do
   e' <- invRename e
   es' <- mapM invRename es
