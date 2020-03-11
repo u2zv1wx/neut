@@ -14,7 +14,14 @@ data WeakTerm
   = WeakTermTau UnivLevel
   | WeakTermUpsilon Identifier
   | WeakTermPi [UnivLevelPlus] [IdentifierPlus] WeakTermPlus
+  | WeakTermPiPlus T.Text [UnivLevelPlus] [IdentifierPlus] WeakTermPlus
   | WeakTermPiIntro [IdentifierPlus] WeakTermPlus
+  | WeakTermPiIntroPlus
+      T.Text
+      [Int] -- substのうちcaseのときに取得するべきindex. succ nでいうところのn, cons A x xsでいうところのx, xsの部分。
+      SubstWeakTerm
+      [IdentifierPlus]
+      WeakTermPlus
   | WeakTermPiElim WeakTermPlus [WeakTermPlus]
   -- We define Sigma here since n-ary Sigma cannot be defined in the target language.
   -- Although we can `define` it using `notation`, it makes the output of type error
@@ -157,11 +164,16 @@ varWeakTermPlus :: WeakTermPlus -> [Identifier]
 varWeakTermPlus (_, WeakTermTau _) = []
 varWeakTermPlus (_, WeakTermUpsilon x) = x : []
 varWeakTermPlus (_, WeakTermPi _ xts t) = varWeakTermPlusBindings xts [t]
+varWeakTermPlus (_, WeakTermPiPlus _ _ xts t) = varWeakTermPlusBindings xts [t]
 varWeakTermPlus (_, WeakTermPiIntro xts e) = varWeakTermPlusBindings xts [e]
+varWeakTermPlus (_, WeakTermPiIntroPlus _ _ sub xts e) = do
+  let ys = varWeakTermPlusBindings xts [e]
+  let (zs, es) = unzip sub
+  filter (`notElem` zs) ys ++ concatMap varWeakTermPlus es
 varWeakTermPlus (_, WeakTermPiElim e es) = do
-  let xhs = varWeakTermPlus e
-  let yhs = concatMap varWeakTermPlus es
-  xhs ++ yhs
+  let xs = varWeakTermPlus e
+  let ys = concatMap varWeakTermPlus es
+  xs ++ ys
 varWeakTermPlus (_, WeakTermSigma xts) = varWeakTermPlusBindings xts []
 varWeakTermPlus (_, WeakTermSigmaIntro t es) = do
   varWeakTermPlus t ++ concatMap varWeakTermPlus es
@@ -182,10 +194,10 @@ varWeakTermPlus (_, WeakTermFloat t _) = varWeakTermPlus t
 varWeakTermPlus (_, WeakTermEnum _) = []
 varWeakTermPlus (_, WeakTermEnumIntro _) = []
 varWeakTermPlus (_, WeakTermEnumElim (e, t) les) = do
-  let xhs = varWeakTermPlus t
-  let yhs = varWeakTermPlus e
-  let zhs = concatMap (varWeakTermPlus . snd) les
-  xhs ++ yhs ++ zhs
+  let xs = varWeakTermPlus t
+  let ys = varWeakTermPlus e
+  let zs = concatMap (varWeakTermPlus . snd) les
+  xs ++ ys ++ zs
 varWeakTermPlus (_, WeakTermArray dom _) = varWeakTermPlus dom
 varWeakTermPlus (_, WeakTermArrayIntro _ es) = concatMap varWeakTermPlus es
 varWeakTermPlus (_, WeakTermArrayElim _ xts d e) =
@@ -208,7 +220,12 @@ holeWeakTermPlus :: WeakTermPlus -> [Hole]
 holeWeakTermPlus (_, WeakTermTau _) = []
 holeWeakTermPlus (_, WeakTermUpsilon _) = []
 holeWeakTermPlus (_, WeakTermPi _ xts t) = holeWeakTermPlusBindings xts [t]
+holeWeakTermPlus (_, WeakTermPiPlus _ _ xts t) =
+  holeWeakTermPlusBindings xts [t]
 holeWeakTermPlus (_, WeakTermPiIntro xts e) = holeWeakTermPlusBindings xts [e]
+holeWeakTermPlus (_, WeakTermPiIntroPlus _ _ sub xts e) = do
+  let ys = holeWeakTermPlusBindings xts [e]
+  ys ++ concatMap (holeWeakTermPlus . snd) sub
 holeWeakTermPlus (_, WeakTermPiElim e es) =
   holeWeakTermPlus e ++ concatMap holeWeakTermPlus es
 holeWeakTermPlus (_, WeakTermSigma xts) = holeWeakTermPlusBindings xts []
@@ -231,10 +248,10 @@ holeWeakTermPlus (_, WeakTermFloat t _) = holeWeakTermPlus t
 holeWeakTermPlus (_, WeakTermEnum _) = []
 holeWeakTermPlus (_, WeakTermEnumIntro _) = []
 holeWeakTermPlus (_, WeakTermEnumElim (e, t) les) = do
-  let xhs = holeWeakTermPlus e
-  let yhs = holeWeakTermPlus t
-  let zhs = concatMap (\(_, body) -> holeWeakTermPlus body) les
-  xhs ++ yhs ++ zhs
+  let xs = holeWeakTermPlus e
+  let ys = holeWeakTermPlus t
+  let zs = concatMap (\(_, body) -> holeWeakTermPlus body) les
+  xs ++ ys ++ zs
 holeWeakTermPlus (_, WeakTermArray dom _) = holeWeakTermPlus dom
 holeWeakTermPlus (_, WeakTermArrayIntro _ es) = concatMap holeWeakTermPlus es
 holeWeakTermPlus (_, WeakTermArrayElim _ xts d e) =
@@ -259,9 +276,18 @@ substWeakTermPlus sub e1@(_, WeakTermUpsilon x) = do
 substWeakTermPlus sub (m, WeakTermPi mls xts t) = do
   let (xts', t') = substWeakTermPlusBindingsWithBody sub xts t
   (m, WeakTermPi mls xts' t')
+substWeakTermPlus sub (m, WeakTermPiPlus name mls xts t) = do
+  let (xts', t') = substWeakTermPlusBindingsWithBody sub xts t
+  (m, WeakTermPiPlus name mls xts' t')
 substWeakTermPlus sub (m, WeakTermPiIntro xts body) = do
   let (xts', body') = substWeakTermPlusBindingsWithBody sub xts body
   (m, WeakTermPiIntro xts' body')
+substWeakTermPlus sub (m, WeakTermPiIntroPlus name idx s xts body) = do
+  let sub' = filter (\(k, _) -> k `notElem` map fst s) sub -- lamに含まれる自由変数のうちsで「保護」されているものは無視
+  let (xts', body') = substWeakTermPlusBindingsWithBody sub' xts body
+  let (zs, es) = unzip s
+  let es' = map (substWeakTermPlus sub) es -- s自体の更新は行なう
+  (m, WeakTermPiIntroPlus name idx (zip zs es') xts' body')
 substWeakTermPlus sub (m, WeakTermPiElim e es) = do
   let e' = substWeakTermPlus sub e
   let es' = map (substWeakTermPlus sub) es
@@ -375,9 +401,12 @@ toText (_, WeakTermUpsilon x) = asText' x
 toText (_, WeakTermPi _ xts t) = do
   let argStr = inParen $ showItems $ map showArg xts
   showCons ["Π", argStr, toText t]
+toText (_, WeakTermPiPlus name _ _ _) = name -- Pi{nat} (...). (...) ~> nat
 toText (_, WeakTermPiIntro xts e) = do
   let argStr = inParen $ showItems $ map showArg xts
   showCons ["λ", argStr, toText e]
+toText (_, WeakTermPiIntroPlus name _ _ _ _) = do
+  "<#" <> name <> "-" <> "value" <> "#>" -- <#succ-value#>, <#cons-value#>, <#nil-value#>, etc.
 toText (_, WeakTermPiElim e es) = do
   showCons $ map toText $ e : es
 toText (_, WeakTermSigma xts)
