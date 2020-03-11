@@ -53,6 +53,7 @@ clarify (m, TermSigmaIntro t es) = do
             | length yts == length es -> do
               let xvs = map (\(_, x, _) -> toTermUpsilon x) yts
               let kv = toTermUpsilon k
+              -- eager product
               let bindArgsThen = \e -> (m, TermPiElim (m, TermPiIntro yts e) es)
               clarify $
                 bindArgsThen (m, TermPiIntro [zu, kp] (m, TermPiElim kv xvs))
