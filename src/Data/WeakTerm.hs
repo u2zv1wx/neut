@@ -62,6 +62,21 @@ data WeakTerm
   | WeakTermStruct [ArrayKind] -- e.g. (struct u8 u8 f16 f32 u64)
   | WeakTermStructIntro [(WeakTermPlus, ArrayKind)]
   | WeakTermStructElim [(Meta, Identifier, ArrayKind)] WeakTermPlus WeakTermPlus
+  -- µF -> FµF -> A (the isomorphism in Lambek's lemma + ordinary function from the coproduct FµF (i.e. pattern matching))
+  -- this syntactic construct is only for performance improvement, and doesn't enhance the expressiveness of the type system.
+  -- it might also make sense to add only the isomorphism part `µF -> FµF`, and let the user write the other part.
+  -- one might even think that this way is preferable from the viewpoint of theoretical virtue.
+  -- but I don't feel like doing so (at least for now) because this `case` construct is already just an optimization technique.
+  | WeakTermCase
+      (WeakTermPlus, WeakTermPlus) -- (the `e` in `case e of (...)`, the type of `e`)
+      [((T.Text, [IdentifierPlus]), WeakTermPlus)] -- ((cons x xs) e), ((nil) e), ((succ n) e).  (not ((cons A x xs) e).)
+  -- A -> FνF -> νF (i.e. copattern matching (although I think it's more correct to say "record" or something like that,
+  -- considering that the constructed term using `FνF -> νF` is just a record after all))
+  -- this syntactic construct is only for performance improvement, too.
+  -- (cocase c (c e) ... (c e))
+  | WeakTermCocase
+      T.Text -- the name of coinductive type (e.g. "stream", "some-record", etc.)
+      [(T.Text, WeakTermPlus)] -- (some-label any-term)
   deriving (Show, Eq)
 
 type WeakTermPlus = (Meta, WeakTerm)
