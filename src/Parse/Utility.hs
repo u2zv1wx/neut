@@ -1,5 +1,7 @@
 module Parse.Utility where
 
+import Control.Monad
+
 import qualified Data.Text as T
 
 import Data.Basic
@@ -93,6 +95,11 @@ compInfoWeakTermPlus c info (_, WeakTermStructIntro eks) = do
 compInfoWeakTermPlus c info (_, WeakTermStructElim mxks e1 e2) = do
   compInfoWeakTermPlus c info e1
   compInfoArrayElim c info mxks e2
+compInfoWeakTermPlus c info (_, WeakTermCase (e, _) cxtes) = do
+  compInfoWeakTermPlus c info e
+  forM_ cxtes $ \((_, xts), body) -> compInfoBinder c info xts body
+compInfoWeakTermPlus c info (_, WeakTermCocase _ ces) = do
+  forM_ ces $ \(_, e) -> compInfoWeakTermPlus c info e
 
 compInfoBinder ::
      CursorName
