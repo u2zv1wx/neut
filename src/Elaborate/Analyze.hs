@@ -255,12 +255,12 @@ simpBinder [] [] Nothing cs = simp cs
 simpBinder [] [] (Just (cod1, cod2)) cs = simp $ (cod1, cod2) : cs
 simpBinder ((_, x1, t1):xts1) ((_, x2, t2):xts2) Nothing cs = do
   let var1 = toVar x1
-  let xts2' = substWeakTermPlusBindings [(x2, var1)] xts2
+  let xts2' = substWeakTermPlus' [(x2, var1)] xts2
   simp [(t1, t2)]
   simpBinder xts1 xts2' Nothing cs
 simpBinder ((_, x1, t1):xts1) ((_, x2, t2):xts2) (Just (cod1, cod2)) cs = do
   let var1 = toVar x1
-  let (xts2', cod2') = substWeakTermPlusBindingsWithBody [(x2, var1)] xts2 cod2
+  let (xts2', cod2') = substWeakTermPlus'' [(x2, var1)] xts2 cod2
   simp [(t1, t2)]
   simpBinder xts1 xts2' (Just (cod1, cod2')) cs
 simpBinder _ _ _ _ = raiseCritical' "Simpbinder"
