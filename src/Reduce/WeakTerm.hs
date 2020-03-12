@@ -18,6 +18,11 @@ reduceWeakTermPlus (m, WeakTermPi mls xts cod) = do
   let ts' = map reduceWeakTermPlus ts
   let cod' = reduceWeakTermPlus cod
   (m, WeakTermPi mls (zip3 ms xs ts') cod')
+reduceWeakTermPlus (m, WeakTermPiPlus name mls xts cod) = do
+  let (ms, xs, ts) = unzip3 xts
+  let ts' = map reduceWeakTermPlus ts
+  let cod' = reduceWeakTermPlus cod
+  (m, WeakTermPiPlus name mls (zip3 ms xs ts') cod')
 reduceWeakTermPlus (m, WeakTermPiIntro xts e) = do
   let (ms, xs, ts) = unzip3 xts
   let ts' = map reduceWeakTermPlus ts
@@ -29,6 +34,10 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
   let app = WeakTermPiElim e' es'
   case e' of
     (_, WeakTermPiIntro xts body)
+      | length xts == length es' -> do
+        let xs = map (\(_, x, _) -> x) xts
+        reduceWeakTermPlus $ substWeakTermPlus (zip xs es') body
+    (_, WeakTermPiIntroPlus _ _ _ _ xts body)
       | length xts == length es' -> do
         let xs = map (\(_, x, _) -> x) xts
         reduceWeakTermPlus $ substWeakTermPlus (zip xs es') body
