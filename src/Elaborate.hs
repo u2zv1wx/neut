@@ -224,10 +224,20 @@ elaborate' (m, WeakTermPi mls xts t) = do
   xts' <- mapM elaboratePlus xts
   t' <- elaborate' t
   return (m, TermPi mls xts' t')
+elaborate' (m, WeakTermPiPlus name mls xts t) = do
+  xts' <- mapM elaboratePlus xts
+  t' <- elaborate' t
+  return (m, TermPiPlus name mls xts' t')
 elaborate' (m, WeakTermPiIntro xts e) = do
   e' <- elaborate' e
   xts' <- mapM elaboratePlus xts
   return (m, TermPiIntro xts' e')
+elaborate' (m, WeakTermPiIntroPlus name indName idx s xts e) = do
+  let (zs, es) = unzip s
+  es' <- mapM elaborate' es
+  e' <- elaborate' e
+  xts' <- mapM elaboratePlus xts
+  return (m, TermPiIntroPlus name indName idx (zip zs es') xts' e')
 elaborate' (m, WeakTermPiElim (_, WeakTermZeta h@(I (_, x))) es) = do
   sub <- gets substEnv
   case IntMap.lookup x sub of
