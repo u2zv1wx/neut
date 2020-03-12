@@ -390,6 +390,29 @@ elaborate' (m, WeakTermStructElim xts e1 e2) = do
   e1' <- elaborate' e1
   e2' <- elaborate' e2
   return (m, TermStructElim xts e1' e2')
+elaborate' (m, WeakTermCase (e, t) cxtes) = do
+  e' <- elaborate' e
+  t' <- elaborate' t >>= reduceTermPlus
+  cxtes' <-
+    forM cxtes $ \((c, xts), body) -> do
+      xts' <- mapM elaboratePlus xts
+      body' <- elaborate' body
+      return ((c, xts'), body')
+  case t' of
+    (_, TermPiPlus _ _ _ _) -> do
+      let _ = map (fst . fst) cxtes
+      -- _ <- undefined name cs -- fixme: check exhaustiveness
+      return (m, TermCase (e', t') cxtes')
+    _ ->
+      raiseError m $
+      "the type of `" <>
+      toText (weaken e') <>
+      "` must be an inductive type, but is:\n" <> toText (weaken t')
+elaborate' (m, WeakTermCocase name ces) = do
+  let (cs, es) = unzip ces
+  es' <- mapM elaborate' es
+  -- _ <- undefined name cs -- fixme: check exhaustiveness
+  return (m, TermCocase name (zip cs es'))
 
 elaborateWeakCase :: WeakCase -> WithEnv Case
 elaborateWeakCase (WeakCaseInt t x) = do
