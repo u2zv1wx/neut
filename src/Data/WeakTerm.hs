@@ -17,7 +17,8 @@ data WeakTerm
   | WeakTermPiPlus T.Text [UnivLevelPlus] [IdentifierPlus] WeakTermPlus
   | WeakTermPiIntro [IdentifierPlus] WeakTermPlus
   | WeakTermPiIntroPlus
-      T.Text
+      T.Text -- name of constructor
+      T.Text -- name of inductive type
       [Int] -- substのうちcaseのときに取得するべきindex. succ nでいうところのn, cons A x xsでいうところのx, xsの部分。
       SubstWeakTerm
       [IdentifierPlus]
@@ -166,7 +167,7 @@ varWeakTermPlus (_, WeakTermUpsilon x) = x : []
 varWeakTermPlus (_, WeakTermPi _ xts t) = varWeakTermPlusBindings xts [t]
 varWeakTermPlus (_, WeakTermPiPlus _ _ xts t) = varWeakTermPlusBindings xts [t]
 varWeakTermPlus (_, WeakTermPiIntro xts e) = varWeakTermPlusBindings xts [e]
-varWeakTermPlus (_, WeakTermPiIntroPlus _ _ sub xts e) = do
+varWeakTermPlus (_, WeakTermPiIntroPlus _ _ _ sub xts e) = do
   let ys = varWeakTermPlusBindings xts [e]
   let (zs, es) = unzip sub
   filter (`notElem` zs) ys ++ concatMap varWeakTermPlus es
@@ -223,7 +224,7 @@ holeWeakTermPlus (_, WeakTermPi _ xts t) = holeWeakTermPlusBindings xts [t]
 holeWeakTermPlus (_, WeakTermPiPlus _ _ xts t) =
   holeWeakTermPlusBindings xts [t]
 holeWeakTermPlus (_, WeakTermPiIntro xts e) = holeWeakTermPlusBindings xts [e]
-holeWeakTermPlus (_, WeakTermPiIntroPlus _ _ sub xts e) = do
+holeWeakTermPlus (_, WeakTermPiIntroPlus _ _ _ sub xts e) = do
   let ys = holeWeakTermPlusBindings xts [e]
   ys ++ concatMap (holeWeakTermPlus . snd) sub
 holeWeakTermPlus (_, WeakTermPiElim e es) =
@@ -282,12 +283,12 @@ substWeakTermPlus sub (m, WeakTermPiPlus name mls xts t) = do
 substWeakTermPlus sub (m, WeakTermPiIntro xts body) = do
   let (xts', body') = substWeakTermPlusBindingsWithBody sub xts body
   (m, WeakTermPiIntro xts' body')
-substWeakTermPlus sub (m, WeakTermPiIntroPlus name idx s xts body) = do
+substWeakTermPlus sub (m, WeakTermPiIntroPlus name indName idx s xts body) = do
   let sub' = filter (\(k, _) -> k `notElem` map fst s) sub -- lamに含まれる自由変数のうちsで「保護」されているものは無視
   let (xts', body') = substWeakTermPlusBindingsWithBody sub' xts body
   let (zs, es) = unzip s
   let es' = map (substWeakTermPlus sub) es -- s自体の更新は行なう
-  (m, WeakTermPiIntroPlus name idx (zip zs es') xts' body')
+  (m, WeakTermPiIntroPlus name indName idx (zip zs es') xts' body')
 substWeakTermPlus sub (m, WeakTermPiElim e es) = do
   let e' = substWeakTermPlus sub e
   let es' = map (substWeakTermPlus sub) es
@@ -405,7 +406,7 @@ toText (_, WeakTermPiPlus name _ _ _) = name -- Pi{nat} (...). (...) ~> nat
 toText (_, WeakTermPiIntro xts e) = do
   let argStr = inParen $ showItems $ map showArg xts
   showCons ["λ", argStr, toText e]
-toText (_, WeakTermPiIntroPlus name _ _ _ _) = do
+toText (_, WeakTermPiIntroPlus name _ _ _ _ _) = do
   "<#" <> name <> "-" <> "value" <> "#>" -- <#succ-value#>, <#cons-value#>, <#nil-value#>, etc.
 toText (_, WeakTermPiElim e es) = do
   showCons $ map toText $ e : es

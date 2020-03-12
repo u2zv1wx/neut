@@ -647,10 +647,10 @@ substRuleType sub (m, WeakTermPiPlus name mls xts t) = do
 substRuleType sub (m, WeakTermPiIntro xts body) = do
   (xts', body') <- substRuleTypeBindingsWithBody sub xts body
   return (m, WeakTermPiIntro xts' body')
-substRuleType sub (m, WeakTermPiIntroPlus name idx s xts body) = do
+substRuleType sub (m, WeakTermPiIntroPlus name indName idx s xts body) = do
   (xts', body') <- substRuleTypeBindingsWithBody sub xts body
   -- the `s` here doesn't have any significance yet
-  return (m, WeakTermPiIntroPlus name idx s xts' body')
+  return (m, WeakTermPiIntroPlus name indName idx s xts' body')
 substRuleType sub@((a1, es1), (a2, es2)) (m, WeakTermPiElim e es)
   | (mx, WeakTermUpsilon x) <- e
   , a1 == x =
