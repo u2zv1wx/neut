@@ -5,7 +5,7 @@ module Elaborate
   ) where
 
 import Control.Monad.State
-import Data.List (nub)
+import Data.List (findIndices, nub)
 import Data.Maybe (fromMaybe)
 import Numeric.Half
 
@@ -14,6 +14,7 @@ import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Set as S
 import qualified Data.Text as T
 
+import Clarify.Closure
 import Data.Basic
 import Data.Constraint
 import Data.Env
@@ -71,6 +72,26 @@ elaborateStmt (WeakStmtLetWT m (mx, x@(I (_, i)), t) e cont) = do
   modify (\env -> env {substEnv = IntMap.insert i (weaken e') (substEnv env)})
   cont' <- elaborateStmt cont
   return (m, TermPiElim (m, TermPiIntro [(mx, x, t'')] cont') [e'])
+elaborateStmt (WeakStmtLetInductiveIntro m (bi, ai) (mx, x@(I (_, i)), t) xts yts atsbts app cont) = do
+  (t', mlt) <- inferType t
+  analyze >> synthesize >> refine >> cleanup
+  -- the "elaborate' e" part in LetWT
+  app' <- elaborate' app
+  atsbts' <- mapM elaboratePlus atsbts
+  -- collect free-var info
+  ch <- chainTermPlus (m, TermPiIntro atsbts' app')
+  let s = map (\(mz, z, _) -> (z, (mz, TermUpsilon z))) ch
+  let ys = map (\(_, y, _) -> y) yts
+  let idx = findIndices (\(z, _) -> z `elem` ys) s
+  xtsyts' <- mapM elaboratePlus $ xts ++ yts
+  let lam =
+        (m, TermPiIntro xtsyts' (m, TermPiIntroPlus bi ai idx s atsbts' app'))
+  -- the "elaboreta' e" part ends here
+  t'' <- elaborate' t' >>= reduceTermPlus
+  insTypeEnv x t'' mlt
+  modify (\env -> env {substEnv = IntMap.insert i (weaken lam) (substEnv env)})
+  cont' <- elaborateStmt cont
+  return (m, TermPiElim (m, TermPiIntro [(mx, x, t'')] cont') [lam])
 elaborateStmt (WeakStmtConstDecl m (mx, x, t) cont) = do
   (t', mlt) <- inferType t
   analyze >> synthesize >> refine >> cleanup

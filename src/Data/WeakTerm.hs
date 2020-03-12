@@ -156,6 +156,15 @@ data WeakStmt
   | WeakStmtLet Meta IdentifierPlus WeakTermPlus WeakStmt
   -- special case of `let` in which the `e` in `let x := e in cont` is known to be well-typed
   | WeakStmtLetWT Meta IdentifierPlus WeakTermPlus WeakStmt
+  | WeakStmtLetInductiveIntro
+      Meta -- m
+      (T.Text, T.Text) -- biai
+      IdentifierPlus -- bt
+      [IdentifierPlus] -- yts
+      [IdentifierPlus] -- yts
+      [IdentifierPlus] -- atsbts
+      WeakTermPlus -- bInner @ yts'
+      WeakStmt -- cont
   | WeakStmtConstDecl Meta IdentifierPlus WeakStmt
   deriving (Show)
 
