@@ -81,7 +81,7 @@ renameFormArgs [] tLast = return ([], tLast)
 renameFormArgs ((m, a, t):ats) tLast = do
   a' <- newNameWith'' "var"
   let sub = [(a, (m, WeakTermUpsilon a'))]
-  let (ats', tLast') = substWeakTermPlusBindingsWithBody sub ats tLast
+  let (ats', tLast') = substWeakTermPlus'' sub ats tLast
   (ats'', tLast'') <- renameFormArgs ats' tLast'
   return ((m, a', t) : ats'', tLast'')
 
@@ -656,16 +656,16 @@ substRuleType :: (RuleType, RuleType) -> WeakTermPlus -> WithEnv WeakTermPlus
 substRuleType _ (m, WeakTermTau l) = return (m, WeakTermTau l)
 substRuleType _ (m, WeakTermUpsilon x) = return (m, WeakTermUpsilon x)
 substRuleType sub (m, WeakTermPi mls xts t) = do
-  (xts', t') <- substRuleTypeBindingsWithBody sub xts t
+  (xts', t') <- substRuleType'' sub xts t
   return (m, WeakTermPi mls xts' t')
 substRuleType sub (m, WeakTermPiPlus name mls xts t) = do
-  (xts', t') <- substRuleTypeBindingsWithBody sub xts t
+  (xts', t') <- substRuleType'' sub xts t
   return (m, WeakTermPiPlus name mls xts' t')
 substRuleType sub (m, WeakTermPiIntro xts body) = do
-  (xts', body') <- substRuleTypeBindingsWithBody sub xts body
+  (xts', body') <- substRuleType'' sub xts body
   return (m, WeakTermPiIntro xts' body')
 substRuleType sub (m, WeakTermPiIntroPlus name indName idx s xts body) = do
-  (xts', body') <- substRuleTypeBindingsWithBody sub xts body
+  (xts', body') <- substRuleType'' sub xts body
   -- the `s` here doesn't have any significance yet
   return (m, WeakTermPiIntroPlus name indName idx s xts' body')
 substRuleType sub@((a1, es1), (a2, es2)) (m, WeakTermPiElim e es)
@@ -683,7 +683,7 @@ substRuleType sub@((a1, es1), (a2, es2)) (m, WeakTermPiElim e es)
     es' <- mapM (substRuleType sub) es
     return (m, WeakTermPiElim e' es')
 substRuleType sub (m, WeakTermSigma xts) = do
-  xts' <- substRuleTypeBindings sub xts
+  xts' <- substRuleType' sub xts
   return (m, WeakTermSigma xts')
 substRuleType sub (m, WeakTermSigmaIntro t es) = do
   t' <- substRuleType sub t
@@ -692,14 +692,14 @@ substRuleType sub (m, WeakTermSigmaIntro t es) = do
 substRuleType sub (m, WeakTermSigmaElim t xts e1 e2) = do
   t' <- substRuleType sub t
   e1' <- substRuleType sub e1
-  (xts', e2') <- substRuleTypeBindingsWithBody sub xts e2
+  (xts', e2') <- substRuleType'' sub xts e2
   return (m, WeakTermSigmaElim t' xts' e1' e2')
 substRuleType sub (m, WeakTermIter (mx, x, t) xts e) = do
   t' <- substRuleType sub t
   if fst (fst sub) == x
     then return (m, WeakTermIter (mx, x, t') xts e)
     else do
-      (xts', e') <- substRuleTypeBindingsWithBody sub xts e
+      (xts', e') <- substRuleType'' sub xts e
       return (m, WeakTermIter (mx, x, t') xts' e')
 substRuleType _ (m, WeakTermConst x) = return (m, WeakTermConst x)
 substRuleType _ (m, WeakTermZeta x) = return (m, WeakTermZeta x)
@@ -731,7 +731,7 @@ substRuleType sub (m, WeakTermArrayIntro k es) = do
   return (m, WeakTermArrayIntro k es')
 substRuleType sub (m, WeakTermArrayElim mk xts v e) = do
   v' <- substRuleType sub v
-  (xts', e') <- substRuleTypeBindingsWithBody sub xts e
+  (xts', e') <- substRuleType'' sub xts e
   return (m, WeakTermArrayElim mk xts' v' e')
 substRuleType _ (m, WeakTermStruct ts) = return (m, WeakTermStruct ts)
 substRuleType sub (m, WeakTermStructIntro ets) = do
@@ -746,32 +746,46 @@ substRuleType sub (m, WeakTermStructElim xts v e) = do
     else do
       e' <- substRuleType sub e
       return (m, WeakTermStructElim xts v' e')
+substRuleType sub (m, WeakTermCase (e, t) cxtes) = do
+  e' <- substRuleType sub e
+  t' <- substRuleType sub t
+  cxtes' <-
+    flip mapM cxtes $ \((c, xts), body) -> do
+      (xts', body') <- substRuleType'' sub xts body
+      return ((c, xts'), body')
+  return (m, WeakTermCase (e', t') cxtes')
+substRuleType sub (m, WeakTermCocase name ces) = do
+  ces' <-
+    flip mapM ces $ \(c, e) -> do
+      e' <- substRuleType sub e
+      return (c, e')
+  return (m, WeakTermCocase name ces')
 
-substRuleTypeBindings ::
+substRuleType' ::
      (RuleType, RuleType) -> [IdentifierPlus] -> WithEnv [IdentifierPlus]
-substRuleTypeBindings _ [] = return []
-substRuleTypeBindings sub ((m, x, t):xts) = do
+substRuleType' _ [] = return []
+substRuleType' sub ((m, x, t):xts) = do
   t' <- substRuleType sub t
   if fst (fst sub) == x
     then return $ (m, x, t') : xts
     else do
-      xts' <- substRuleTypeBindings sub xts
+      xts' <- substRuleType' sub xts
       return $ (m, x, t') : xts'
 
-substRuleTypeBindingsWithBody ::
+substRuleType'' ::
      (RuleType, RuleType)
   -> [IdentifierPlus]
   -> WeakTermPlus
   -> WithEnv ([IdentifierPlus], WeakTermPlus)
-substRuleTypeBindingsWithBody sub [] e = do
+substRuleType'' sub [] e = do
   e' <- substRuleType sub e
   return ([], e')
-substRuleTypeBindingsWithBody sub ((m, x, t):xts) e = do
+substRuleType'' sub ((m, x, t):xts) e = do
   t' <- substRuleType sub t
   if fst (fst sub) == x
     then return ((m, x, t') : xts, e)
     else do
-      (xts', e') <- substRuleTypeBindingsWithBody sub xts e
+      (xts', e') <- substRuleType'' sub xts e
       return ((m, x, t') : xts', e')
 
 invSubst :: SubstWeakTerm -> WithEnv SubstWeakTerm
