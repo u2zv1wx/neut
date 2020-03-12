@@ -108,7 +108,8 @@ toInductive ats bts connective@(m, a@(I (ai, _)), xts, _) = do
         (length ats)
         m
         formationRule
-        (m, WeakTermPiIntro xts (m, WeakTermPi mls1 (ats ++ bts) cod))
+        -- nat := lam (...). Pi{nat} (...)
+        (m, WeakTermPiIntro xts (m, WeakTermPiPlus ai mls1 (ats ++ bts) cod))
     -- induction principle
     , QuasiStmtLetWT
         m
@@ -134,7 +135,7 @@ toInductiveIntro ::
   -> Identifier
   -> Rule
   -> WithEnv QuasiStmt
-toInductiveIntro ats bts xts a@(I (ai, _)) (mb, b, m, yts, cod)
+toInductiveIntro ats bts xts a@(I (ai, _)) (mb, b@(I (bi, _)), m, yts, cod)
   | (_, WeakTermPiElim (_, WeakTermUpsilon a') es) <- cod
   , a == a'
   , length xts == length es = do
@@ -142,6 +143,7 @@ toInductiveIntro ats bts xts a@(I (ai, _)) (mb, b, m, yts, cod)
     return $
       QuasiStmtLetInductiveIntro
         m
+        (bi, ai)
         (mb, b, (m, WeakTermPi mls (xts ++ yts) cod))
         xts
         yts

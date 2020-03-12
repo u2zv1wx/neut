@@ -267,7 +267,7 @@ concatQuasiStmtList (QuasiStmtLetCoinductive n m at e:es) = do
   insForm n at e
   cont <- concatQuasiStmtList es
   return $ WeakStmtLetWT m at e cont
-concatQuasiStmtList (QuasiStmtLetInductiveIntro m bt xts yts ats bts bInner isub as:ss) = do
+concatQuasiStmtList (QuasiStmtLetInductiveIntro m (bi, ai) bt xts yts ats bts bInner isub as:ss) = do
   yts' <- mapM (internalize isub (ats ++ bts)) yts
   insInductive as bt -- register the constructor (if necessary)
   cont <- concatQuasiStmtList ss
@@ -279,7 +279,11 @@ concatQuasiStmtList (QuasiStmtLetInductiveIntro m bt xts yts ats bts bInner isub
       , WeakTermPiIntro
           (xts ++ yts)
           ( m
-          , WeakTermPiIntro
+          , WeakTermPiIntroPlus
+              bi
+              ai
+              [] -- index/subst info is supplied after elaboration
+              []
               (ats ++ bts) -- ats = [list : (...)], bts = [nil : Pi (yts). list A, cons : (...)]
               (m, WeakTermPiElim bInner yts')))
       cont
@@ -372,7 +376,7 @@ toIdentList ((QuasiStmtDef xds):ds) = do
 toIdentList ((QuasiStmtConstDecl _ (m, x, t)):ds) = (m, x, t) : toIdentList ds
 toIdentList ((QuasiStmtLetInductive _ _ mxt _):ds) = mxt : toIdentList ds
 toIdentList ((QuasiStmtLetCoinductive _ _ mxt _):ds) = mxt : toIdentList ds
-toIdentList ((QuasiStmtLetInductiveIntro _ b _ _ _ _ _ _ _):ss) =
+toIdentList ((QuasiStmtLetInductiveIntro _ _ b _ _ _ _ _ _ _):ss) =
   b : toIdentList ss
 toIdentList ((QuasiStmtLetCoinductiveElim _ b _ _ _ _ _ _ _ _ _):ss) =
   b : toIdentList ss

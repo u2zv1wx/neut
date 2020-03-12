@@ -76,7 +76,7 @@ renameQuasiStmtList' nenv ((QuasiStmtLetCoinductive n m (mx, a, t) e):ss) = do
   e' <- rename' nenv e
   ss' <- renameQuasiStmtList' (insertName a a' nenv) ss
   return $ QuasiStmtLetCoinductive n m (mx, a', t') e' : ss'
-renameQuasiStmtList' nenv ((QuasiStmtLetInductiveIntro m (mb, b, t) xts yts ats bts bInner _ _):ss) = do
+renameQuasiStmtList' nenv ((QuasiStmtLetInductiveIntro m enumInfo (mb, b, t) xts yts ats bts bInner _ _):ss) = do
   t' <- rename' nenv t
   (xts', nenv') <- renameArgs nenv xts
   (yts', nenv'') <- renameArgs nenv' yts
@@ -91,6 +91,7 @@ renameQuasiStmtList' nenv ((QuasiStmtLetInductiveIntro m (mb, b, t) xts yts ats 
   return $
     QuasiStmtLetInductiveIntro
       m
+      enumInfo
       (mb, b', t')
       xts'
       yts'
@@ -145,8 +146,8 @@ type NameEnv = Map.HashMap T.Text Int
 rename' :: NameEnv -> WeakTermPlus -> WithEnv WeakTermPlus
 rename' _ (m, WeakTermTau l) = return (m, WeakTermTau l)
 rename' nenv (m, WeakTermUpsilon x@(I (s, _))) = do
-  b1 <- isDefinedEnum s
-  b2 <- isDefinedEnumName s
+  b1 <- isDefinedEnumValue s
+  b2 <- isDefinedEnumType s
   mc <- lookupConstantMaybe s
   case (lookupName x nenv, b1, b2, mc) of
     (Just x', _, _, _) -> return (m, WeakTermUpsilon x')

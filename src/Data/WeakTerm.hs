@@ -123,6 +123,7 @@ data QuasiStmt
   --       b-inner @ [y, ..., y]
   | QuasiStmtLetInductiveIntro
       Meta -- location of b
+      (T.Text, T.Text) -- ("zero", "nat") (i.e. enum info)
       IdentifierPlus -- b : B
       [IdentifierPlus] -- xts
       [IdentifierPlus] -- yts
