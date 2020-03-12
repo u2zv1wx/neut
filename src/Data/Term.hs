@@ -3,6 +3,8 @@ module Data.Term where
 import Data.Maybe (fromMaybe)
 import Numeric.Half
 
+import qualified Data.Text as T
+
 import Data.Basic
 import Data.WeakTerm hiding (IdentifierPlus)
 
@@ -10,7 +12,15 @@ data Term
   = TermTau UnivLevel
   | TermUpsilon Identifier
   | TermPi [UnivLevelPlus] [IdentifierPlus] TermPlus
+  | TermPiPlus T.Text [UnivLevelPlus] [IdentifierPlus] TermPlus
   | TermPiIntro [IdentifierPlus] TermPlus
+  | TermPiIntroPlus
+      T.Text -- name of constructor
+      T.Text -- name of inductive type
+      [Int] -- substのうちcaseのときに取得するべきindex. succ nでいうところのn, cons A x xsでいうところのx, xsの部分。
+      SubstTerm
+      [IdentifierPlus]
+      TermPlus
   | TermPiElim TermPlus [TermPlus]
   | TermSigma [IdentifierPlus]
   | TermSigmaIntro TermPlus [TermPlus]
@@ -52,7 +62,12 @@ varTermPlus :: TermPlus -> [Identifier]
 varTermPlus (_, TermTau _) = []
 varTermPlus (_, TermUpsilon x) = [x]
 varTermPlus (_, TermPi _ xts t) = varTermPlus' xts [t]
+varTermPlus (_, TermPiPlus _ _ xts t) = varTermPlus' xts [t]
 varTermPlus (_, TermPiIntro xts e) = varTermPlus' xts [e]
+varTermPlus (_, TermPiIntroPlus _ _ _ sub xts e) = do
+  let ys = varTermPlus' xts [e]
+  let (zs, es) = unzip sub
+  filter (`notElem` zs) ys ++ concatMap varTermPlus es
 varTermPlus (_, TermPiElim e es) = do
   let xs1 = varTermPlus e
   let xs2 = concatMap varTermPlus es
@@ -104,9 +119,18 @@ substTermPlus sub (m, TermUpsilon x) =
 substTermPlus sub (m, TermPi mls xts t) = do
   let (xts', t') = substTermPlusBindingsWithBody sub xts t
   (m, TermPi mls xts' t')
+substTermPlus sub (m, TermPiPlus name mls xts t) = do
+  let (xts', t') = substTermPlusBindingsWithBody sub xts t
+  (m, TermPiPlus name mls xts' t')
 substTermPlus sub (m, TermPiIntro xts body) = do
   let (xts', body') = substTermPlusBindingsWithBody sub xts body
   (m, TermPiIntro xts' body')
+substTermPlus sub (m, TermPiIntroPlus name indName idx s xts body) = do
+  let sub' = filter (\(k, _) -> k `notElem` map fst s) sub -- lamに含まれる自由変数のうちsで「保護」されているものは無視
+  let (xts', body') = substTermPlusBindingsWithBody sub' xts body
+  let (zs, es) = unzip s
+  let es' = map (substTermPlus sub) es -- s自体の更新は行なう
+  (m, TermPiIntroPlus name indName idx (zip zs es') xts' body')
 substTermPlus sub (m, TermPiElim e es) = do
   let e' = substTermPlus sub e
   let es' = map (substTermPlus sub) es
@@ -191,8 +215,15 @@ weaken (m, TermTau l) = (m, WeakTermTau l)
 weaken (m, TermUpsilon x) = (m, WeakTermUpsilon x)
 weaken (m, TermPi mls xts t) = do
   (m, WeakTermPi mls (weakenArgs xts) (weaken t))
+weaken (m, TermPiPlus name mls xts t) = do
+  (m, WeakTermPiPlus name mls (weakenArgs xts) (weaken t))
 weaken (m, TermPiIntro xts body) = do
   (m, WeakTermPiIntro (weakenArgs xts) (weaken body))
+weaken (m, TermPiIntroPlus name indName idx s xts body) = do
+  let (zs, es) = unzip s
+  let es' = map weaken es
+  let s' = zip zs es'
+  (m, WeakTermPiIntroPlus name indName idx s' (weakenArgs xts) (weaken body))
 weaken (m, TermPiElim e es) = do
   let e' = weaken e
   let es' = map weaken es
