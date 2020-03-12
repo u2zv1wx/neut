@@ -18,11 +18,24 @@ reduceTermPlus (m, TermPi mls xts cod) = do
   ts' <- mapM reduceTermPlus ts
   cod' <- reduceTermPlus cod
   return $ (m, TermPi mls (zip3 ms xs ts') cod')
+reduceTermPlus (m, TermPiPlus name mls xts cod) = do
+  let (ms, xs, ts) = unzip3 xts
+  ts' <- mapM reduceTermPlus ts
+  cod' <- reduceTermPlus cod
+  return $ (m, TermPiPlus name mls (zip3 ms xs ts') cod')
 reduceTermPlus (m, TermPiIntro xts e) = do
   let (ms, xs, ts) = unzip3 xts
   ts' <- mapM reduceTermPlus ts
   e' <- reduceTermPlus e
   return $ (m, TermPiIntro (zip3 ms xs ts') e')
+reduceTermPlus (m, TermPiIntroPlus name indName idx s xts e) = do
+  let (zs, es) = unzip s
+  es' <- mapM reduceTermPlus es
+  let (ms, xs, ts) = unzip3 xts
+  ts' <- mapM reduceTermPlus ts
+  e' <- reduceTermPlus e
+  return $
+    (m, TermPiIntroPlus name indName idx (zip zs es') (zip3 ms xs ts') e')
 reduceTermPlus (m, TermPiElim e es) = do
   e' <- reduceTermPlus e
   es' <- mapM reduceTermPlus es
@@ -34,6 +47,11 @@ reduceTermPlus (m, TermPiElim e es) = do
       , valueCond -> do
         let xs = map (\(_, x, _) -> x) xts
         reduceTermPlus $ substTermPlus (zip xs es') body
+    (_, TermPiIntroPlus _ _ _ s xts body)
+      | length xts == length es'
+      , valueCond -> do
+        let xs = map (\(_, x, _) -> x) xts
+        reduceTermPlus $ substTermPlus (s ++ zip xs es') body
     -- (_, TermConst constant) -> reduceTermPlusTheta (m, app) es' m constant
     _ -> return (m, app)
 reduceTermPlus (m, TermIter (mx, x, t) xts e)

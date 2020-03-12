@@ -28,6 +28,13 @@ reduceWeakTermPlus (m, WeakTermPiIntro xts e) = do
   let ts' = map reduceWeakTermPlus ts
   let e' = reduceWeakTermPlus e
   (m, WeakTermPiIntro (zip3 ms xs ts') e')
+reduceWeakTermPlus (m, WeakTermPiIntroPlus name indName idx s xts e) = do
+  let (zs, es) = unzip s
+  let es' = map reduceWeakTermPlus es
+  let (ms, xs, ts) = unzip3 xts
+  let ts' = map reduceWeakTermPlus ts
+  let e' = reduceWeakTermPlus e
+  (m, WeakTermPiIntroPlus name indName idx (zip zs es') (zip3 ms xs ts') e')
 reduceWeakTermPlus (m, WeakTermPiElim e es) = do
   let e' = reduceWeakTermPlus e
   let es' = map reduceWeakTermPlus es
@@ -37,10 +44,10 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
       | length xts == length es' -> do
         let xs = map (\(_, x, _) -> x) xts
         reduceWeakTermPlus $ substWeakTermPlus (zip xs es') body
-    (_, WeakTermPiIntroPlus _ _ _ _ xts body)
+    (_, WeakTermPiIntroPlus _ _ _ s xts body)
       | length xts == length es' -> do
         let xs = map (\(_, x, _) -> x) xts
-        reduceWeakTermPlus $ substWeakTermPlus (zip xs es') body
+        reduceWeakTermPlus $ substWeakTermPlus (s ++ zip xs es') body -- reify the explicit substitution `s`
     -- (_, WeakTermConst (I (constant, _))) ->
     --   reduceWeakTermPlusTheta (m, app) es' m constant
     _ -> (m, app)
