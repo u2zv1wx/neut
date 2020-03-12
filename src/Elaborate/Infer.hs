@@ -86,12 +86,31 @@ infer' ctx (m, WeakTermPi _ xts t) = do
   ml1 <- newLevelLT m [ml0]
   forM_ (zip mls (mlPiArgs ++ [mlPiCod])) $ uncurry insLevelEQ
   return ((m, WeakTermPi mls xts' t'), (asUniv ml0), ml1)
+infer' ctx (m, WeakTermPiPlus name _ xts t) = do
+  mls <- piUnivLevelsfrom xts t
+  (xtls', (t', mlPiCod)) <- inferPi ctx xts t
+  let (xts', mlPiArgs) = unzip xtls'
+  ml0 <- newLevelLE m $ mlPiCod : mlPiArgs
+  ml1 <- newLevelLT m [ml0]
+  forM_ (zip mls (mlPiArgs ++ [mlPiCod])) $ uncurry insLevelEQ
+  return ((m, WeakTermPiPlus name mls xts' t'), (asUniv ml0), ml1)
 infer' ctx (m, WeakTermPiIntro xts e) = do
   (xtls', (e', t', mlPiCod)) <- inferBinder ctx xts e
   let (xts', mlPiArgs) = unzip xtls'
   mlPi <- newLevelLE m $ mlPiCod : mlPiArgs
   let mls = mlPiArgs ++ [mlPiCod]
   return ((m, WeakTermPiIntro xts' e'), (m, WeakTermPi mls xts' t'), mlPi)
+infer' ctx (m, WeakTermPiIntroPlus name indName idx s xts e) = do
+  let (zs, es) = unzip s
+  es' <- map (\(z, _, _) -> z) <$> mapM (infer' ctx) es
+  (xtls', (e', t', mlPiCod)) <- inferBinder ctx xts e
+  let (xts', mlPiArgs) = unzip xtls'
+  mlPi <- newLevelLE m $ mlPiCod : mlPiArgs
+  let mls = mlPiArgs ++ [mlPiCod]
+  return
+    ( (m, WeakTermPiIntroPlus name indName idx (zip zs es') xts' e')
+    , (m, WeakTermPiPlus indName mls xts' t')
+    , mlPi)
 infer' ctx (m, WeakTermPiElim e es) = do
   etls <- mapM (infer' ctx) es
   etl <- infer' ctx e
@@ -559,10 +578,22 @@ univInst' (m, WeakTermPi mls xts t) = do
   let (ms, ls) = unzip $ map (\(UnivLevelPlus x) -> x) mls
   ls' <- mapM levelInst ls
   return (m, WeakTermPi (map UnivLevelPlus $ zip ms ls') xts' t')
+univInst' (m, WeakTermPiPlus name mls xts t) = do
+  xts' <- univInstArgs xts
+  t' <- univInst' t
+  let (ms, ls) = unzip $ map (\(UnivLevelPlus x) -> x) mls
+  ls' <- mapM levelInst ls
+  return (m, WeakTermPiPlus name (map UnivLevelPlus $ zip ms ls') xts' t')
 univInst' (m, WeakTermPiIntro xts e) = do
   xts' <- univInstArgs xts
   e' <- univInst' e
   return (m, WeakTermPiIntro xts' e')
+univInst' (m, WeakTermPiIntroPlus name indName idx s xts e) = do
+  let (zs, es) = unzip s
+  es' <- mapM univInst' es
+  xts' <- univInstArgs xts
+  e' <- univInst' e
+  return (m, WeakTermPiIntroPlus name indName idx (zip zs es') xts' e')
 univInst' (m, WeakTermPiElim e es) = do
   e' <- univInst' e
   es' <- mapM univInst' es
