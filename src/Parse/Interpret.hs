@@ -101,7 +101,7 @@ interpret (m, TreeNode [(_, TreeAtom "enum"), (_, TreeAtom x)])
     m' <- adjustPhase m
     return (m', WeakTermEnum $ EnumTypeIntU i)
 interpret (m, TreeNode [(_, TreeAtom "enum"), (_, TreeAtom x)]) = do
-  isEnum <- isDefinedEnumName x
+  isEnum <- isDefinedEnumType x
   m' <- adjustPhase m
   if not isEnum
     then raiseError m $ "no such enum-type is defined: " <> x
@@ -239,7 +239,7 @@ interpretEnumValueMaybe t =
 
 interpretEnumValue :: TreePlus -> WithEnv EnumValue
 interpretEnumValue (m, TreeAtom x) = do
-  b <- isDefinedEnum x
+  b <- isDefinedEnumValue x
   if b
     then return $ EnumValueLabel x
     else raiseError m $ "no such enum-value is defined: " <> x

@@ -401,14 +401,14 @@ raiseCritical m text = throwError [logCritical (getPosInfo m) text]
 raiseCritical' :: T.Text -> WithEnv a
 raiseCritical' text = throwError [logCritical' text]
 
-isDefinedEnum :: T.Text -> WithEnv Bool
-isDefinedEnum name = do
+isDefinedEnumValue :: T.Text -> WithEnv Bool
+isDefinedEnumValue name = do
   env <- get
   let labelList = join $ Map.elems $ enumEnv env
   return $ name `elem` map fst labelList
 
-isDefinedEnumName :: T.Text -> WithEnv Bool
-isDefinedEnumName name = do
+isDefinedEnumType :: T.Text -> WithEnv Bool
+isDefinedEnumType name = do
   env <- get
   let enumNameList = Map.keys $ enumEnv env
   return $ name `elem` enumNameList
