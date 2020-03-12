@@ -145,10 +145,14 @@ type NameEnv = Map.HashMap T.Text Int
 rename' :: NameEnv -> WeakTermPlus -> WithEnv WeakTermPlus
 rename' _ (m, WeakTermTau l) = return (m, WeakTermTau l)
 rename' nenv (m, WeakTermUpsilon x@(I (s, _))) = do
+  b1 <- isDefinedEnum s
+  b2 <- isDefinedEnumName s
   mc <- lookupConstantMaybe s
-  case (lookupName x nenv, mc) of
-    (Just x', _) -> return (m, WeakTermUpsilon x')
-    (_, Just c) -> return c
+  case (lookupName x nenv, b1, b2, mc) of
+    (Just x', _, _, _) -> return (m, WeakTermUpsilon x')
+    (_, True, _, _) -> return (m, WeakTermEnumIntro (EnumValueLabel s))
+    (_, _, True, _) -> return (m, WeakTermEnum (EnumTypeLabel s))
+    (_, _, _, Just c) -> return c
     _ -> raiseError m $ "undefined variable: " <> s
 rename' nenv (m, WeakTermPi mls xts t) = do
   (xts', t') <- renameBinder nenv xts t

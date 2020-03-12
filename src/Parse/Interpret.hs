@@ -18,7 +18,7 @@ import Data.Maybe (fromMaybe)
 import Data.Word (Word8)
 import Text.Read (readMaybe)
 
-import qualified Data.HashMap.Strict as Map
+-- import qualified Data.HashMap.Strict as Map
 import qualified Data.Text as T
 
 -- import qualified Text.Show.Pretty as Pr
@@ -178,18 +178,20 @@ interpret (m, TreeAtom x)
     u8s <- forM (encode str) $ \u -> return (m', toValueIntU 8 (toInteger u))
     -- parse string as utf-8 encoded u8 array
     return (m', WeakTermArrayIntro (ArrayKindIntU 8) u8s)
-interpret t@(m, TreeAtom x) = do
-  ml <- interpretEnumValueMaybe t
-  isEnum <- isDefinedEnumName x
+interpret (m, TreeAtom x)
+  -- ml <- interpretEnumValueMaybe t
+  -- isEnum <- isDefinedEnumName x
+ = do
   m' <- adjustPhase m
-  case (ml, isEnum) of
-    (Just l, _) -> return (m', WeakTermEnumIntro l)
-    (_, True) -> return (m', WeakTermEnum $ EnumTypeLabel x)
-    -- Note that constants are interpreted as variables at this stage.
-    -- Those are reinterpreted into constants in Rename.
-    -- This is to handle terms like `lam (i64 : bool). e` (i.e. bound variable
-    -- with the same name of a constant) in saner way.
-    (_, False) -> return (m', WeakTermUpsilon $ asIdent x)
+  -- Note that enums/constants are interpreted as variables at this stage.
+  -- Those are reinterpreted into constants in Rename.
+  -- This is to handle terms like `lam (i64 : bool). e` (i.e. bound variable
+  -- with the same name of a constant) in saner way.
+  return (m', WeakTermUpsilon $ asIdent x)
+  -- case (ml, isEnum) of
+  --   (Just l, _) -> return (m', WeakTermEnumIntro l)
+  --   (_, True) -> return (m', WeakTermEnum $ EnumTypeLabel x)
+  --   (_, False) -> return (m', WeakTermUpsilon $ asIdent x)
 interpret t@(m, TreeNode es) = do
   m' <- adjustPhase m
   ml <- interpretEnumValueMaybe t
@@ -336,18 +338,6 @@ interpretEnumItem'' t = raiseSyntaxError t "LEAF | (LEAF LEAF)"
 headDiscriminantOf :: [(T.Text, Int)] -> Int
 headDiscriminantOf [] = 0
 headDiscriminantOf ((_, i):_) = i
-
-isDefinedEnum :: T.Text -> WithEnv Bool
-isDefinedEnum name = do
-  env <- get
-  let labelList = join $ Map.elems $ enumEnv env
-  return $ name `elem` map fst labelList
-
-isDefinedEnumName :: T.Text -> WithEnv Bool
-isDefinedEnumName name = do
-  env <- get
-  let enumNameList = Map.keys $ enumEnv env
-  return $ name `elem` enumNameList
 
 readEnumType :: Char -> T.Text -> Int -> (Maybe Int)
 readEnumType c str k -- n1, n2, ..., n{i}, ..., n{2^64}

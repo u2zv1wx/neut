@@ -329,22 +329,6 @@ checkKeywordSanity m x
   | T.last x == '+' = raiseError m "A +-suffixed name cannot be a keyword"
 checkKeywordSanity _ _ = return ()
 
-insEnumEnv :: Meta -> T.Text -> [(T.Text, Int)] -> WithEnv ()
-insEnumEnv m name xis = do
-  eenv <- gets enumEnv
-  let definedEnums = Map.keys eenv ++ map fst (concat (Map.elems eenv))
-  case find (`elem` definedEnums) $ name : map fst xis of
-    Just x -> raiseError m $ "the constant `" <> x <> "` is already defined"
-    _ -> do
-      let (xs, is) = unzip xis
-      let rev = Map.fromList $ zip xs (zip (repeat name) is)
-      modify
-        (\e ->
-           e
-             { enumEnv = Map.insert name xis (enumEnv e)
-             , revEnumEnv = rev `Map.union` (revEnumEnv e)
-             })
-
 insertPathInfo :: Path Abs File -> Path Abs File -> WithEnv ()
 insertPathInfo oldFilePath newFilePath = do
   g <- gets includeGraph

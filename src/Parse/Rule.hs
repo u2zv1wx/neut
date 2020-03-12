@@ -42,9 +42,10 @@ parseConnective ::
   -> WithEnv [QuasiStmt]
 parseConnective m ts f g = do
   connectiveList <- mapM parseConnective' ts
-  fs <- mapM formationRuleOf connectiveList
+  fs <- mapM formationRuleOf' connectiveList
   ats <- mapM ruleAsIdentPlus fs
   bts <- concat <$> mapM toInternalRuleList connectiveList
+  -- registerIndEnum ats bts
   checkNameSanity m $ ats ++ bts
   connectiveList' <- concat <$> mapM (f ats bts) connectiveList
   ruleList <- concat <$> mapM (g ats) connectiveList
@@ -58,6 +59,11 @@ parseConnective' (m, TreeNode ((_, TreeAtom name):(_, TreeNode xts):rules)) = do
   return (m', asIdent name, xts', rules')
 parseConnective' t = raiseSyntaxError t "(LEAF (TREE ... TREE) ...)"
 
+-- registerIndEnum :: [IdentifierPlus] -> [IdentifierPlus] -> WithEnv ()
+-- registerIndEnum [] _ = return ()
+-- registerIndEnum (at:ats) bts = do
+--   let la = toEnumLabel at
+--   let lbs = map toEnumLabel bts
 parseRule :: TreePlus -> WithEnv Rule
 parseRule (m, TreeNode [(mName, TreeAtom name), (_, TreeNode xts), t]) = do
   m' <- adjustPhase m
@@ -226,6 +232,15 @@ ruleAsIdentPlus (mb, b, m, xts, t) = do
 
 formationRuleOf :: Connective -> WithEnv Rule
 formationRuleOf (m, a, xts, _) = do
+  l <- newCount
+  return (m, a, m, xts, (m, WeakTermTau l))
+
+formationRuleOf' :: Connective -> WithEnv Rule
+formationRuleOf' (m, a@(I (x, _)), xts, rules) = do
+  let bs = map (\(_, I (b, _), _, _, _) -> b) rules
+  let bis = zip bs [0 ..]
+  -- register "nat" ~> [("zero", 0), ("succ", 1)], "list" ~> [("nil", 0), ("cons", 1)], etc.
+  insEnumEnv m x bis
   l <- newCount
   return (m, a, m, xts, (m, WeakTermTau l))
 

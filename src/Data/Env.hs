@@ -4,6 +4,7 @@ module Data.Env where
 
 import Control.Monad.Except
 import Control.Monad.State
+import Data.List (find)
 import Path
 import System.Info
 
@@ -55,7 +56,7 @@ data Env =
     , fileEnv :: FileEnv -- path ~> identifiers defined in the file at toplevel
     , enumEnv :: Map.HashMap T.Text [(T.Text, Int)] -- [("choice", [("left", 0), ("right", 1)]), ...]
     , revEnumEnv :: Map.HashMap T.Text (T.Text, Int) -- [("left", ("choice", 0)), ("right", ("choice", 1)), ...]
-    , indEnumEnv :: Map.HashMap T.Text [T.Text] -- [("#nat#", ["#zero#", "#succ#"]), ...]
+    , indEnumEnv :: Map.HashMap T.Text [(T.Text, Int)] -- [("nat", [("zero", 0), ("succ", 1)]), ...]
     , revNameEnv :: IntMap.IntMap Int -- [("foo.13", "foo"), ...] (as corresponding int)
     , formationEnv :: IntMap.IntMap (Maybe WeakTermPlus)
     , inductiveEnv :: RuleEnv -- "list" ~> (cons, Pi (A : tau). A -> list A -> list A)
@@ -305,6 +306,22 @@ arrayAccessToType m lowType = do
   let cod = (m, TermSigma [(m, x4, arr), (m, x5, t)])
   return (m, TermPi [] xts cod)
 
+insEnumEnv :: Meta -> T.Text -> [(T.Text, Int)] -> WithEnv ()
+insEnumEnv m name xis = do
+  eenv <- gets enumEnv
+  let definedEnums = Map.keys eenv ++ map fst (concat (Map.elems eenv))
+  case find (`elem` definedEnums) $ name : map fst xis of
+    Just x -> raiseError m $ "the constant `" <> x <> "` is already defined"
+    _ -> do
+      let (xs, is) = unzip xis
+      let rev = Map.fromList $ zip xs (zip (repeat name) is)
+      modify
+        (\e ->
+           e
+             { enumEnv = Map.insert name xis (enumEnv e)
+             , revEnumEnv = rev `Map.union` (revEnumEnv e)
+             })
+
 lookupConstNum :: T.Text -> WithEnv Int
 lookupConstNum constName = do
   cenv <- gets constantEnv
@@ -383,3 +400,15 @@ raiseCritical m text = throwError [logCritical (getPosInfo m) text]
 
 raiseCritical' :: T.Text -> WithEnv a
 raiseCritical' text = throwError [logCritical' text]
+
+isDefinedEnum :: T.Text -> WithEnv Bool
+isDefinedEnum name = do
+  env <- get
+  let labelList = join $ Map.elems $ enumEnv env
+  return $ name `elem` map fst labelList
+
+isDefinedEnumName :: T.Text -> WithEnv Bool
+isDefinedEnumName name = do
+  env <- get
+  let enumNameList = Map.keys $ enumEnv env
+  return $ name `elem` enumNameList
