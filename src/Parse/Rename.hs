@@ -228,6 +228,18 @@ rename' nenv (m, WeakTermStructElim xts e1 e2) = do
   e1' <- rename' nenv e1
   (xts', e2') <- renameStruct nenv xts e2
   return (m, WeakTermStructElim xts' e1' e2')
+rename' nenv (m, WeakTermCase (e, t) cxtes) = do
+  e' <- rename' nenv e
+  t' <- rename' nenv t
+  cxtes' <-
+    flip mapM cxtes $ \((c, xts), body) -> do
+      (xts', body') <- renameBinder nenv xts body
+      return ((c, xts'), body')
+  return (m, WeakTermCase (e', t') cxtes')
+rename' nenv (m, WeakTermCocase name ces) = do
+  let (cs, es) = unzip ces
+  es' <- mapM (rename' nenv) es
+  return (m, WeakTermCocase name $ zip cs es')
 
 renameIdentifier :: NameEnv -> Meta -> Identifier -> WithEnv Identifier
 renameIdentifier nenv m x@(I (s, _)) = do
@@ -514,6 +526,18 @@ invRename (m, WeakTermStructElim xts e1 e2) = do
   e1' <- invRename e1
   (xts', e2') <- invRenameStruct xts e2
   return (m, WeakTermStructElim xts' e1' e2')
+invRename (m, WeakTermCase (e, t) cxtes) = do
+  e' <- invRename e
+  t' <- invRename t
+  cxtes' <-
+    flip mapM cxtes $ \((c, xts), body) -> do
+      (xts', body') <- invRenameBinder xts body
+      return ((c, xts'), body')
+  return (m, WeakTermCase (e', t') cxtes')
+invRename (m, WeakTermCocase name ces) = do
+  let (cs, es) = unzip ces
+  es' <- mapM invRename es
+  return (m, WeakTermCocase name $ zip cs es')
 
 invRenameBinder ::
      [IdentifierPlus]
