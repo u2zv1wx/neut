@@ -44,6 +44,12 @@ data Term
   | TermStruct [ArrayKind] -- e.g. (struct u8 u8 f16 f32 u64)
   | TermStructIntro [(TermPlus, ArrayKind)]
   | TermStructElim [(Meta, Identifier, ArrayKind)] TermPlus TermPlus
+  | TermCase
+      (TermPlus, TermPlus) -- (the `e` in `case e of (...)`, the type of `e`)
+      [((T.Text, [IdentifierPlus]), TermPlus)] -- ((cons x xs) e), ((nil) e), ((succ n) e).  (not ((cons A x xs) e).)
+  | TermCocase
+      T.Text -- the name of coinductive type (e.g. "stream", "some-record", etc.)
+      [(T.Text, TermPlus)] -- (some-label any-term)
   deriving (Show)
 
 type TermPlus = (Meta, Term)
@@ -104,6 +110,12 @@ varTermPlus (_, TermStructIntro ets) = concatMap (varTermPlus . fst) ets
 varTermPlus (_, TermStructElim xts d e) = do
   let xs = map (\(_, x, _) -> x) xts
   varTermPlus d ++ filter (`notElem` xs) (varTermPlus e)
+varTermPlus (_, TermCase (e, t) cxes) = do
+  let xs = varTermPlus e
+  let ys = varTermPlus t
+  let zs = concatMap (\((_, xts), body) -> varTermPlus' xts [body]) cxes
+  xs ++ ys ++ zs
+varTermPlus (_, TermCocase _ ces) = concatMap (varTermPlus . snd) ces
 
 varTermPlus' :: [IdentifierPlus] -> [TermPlus] -> [Identifier]
 varTermPlus' [] es = concatMap varTermPlus es
@@ -117,17 +129,17 @@ substTermPlus _ (m, TermTau l) = (m, TermTau l)
 substTermPlus sub (m, TermUpsilon x) =
   fromMaybe (m, TermUpsilon x) (lookup x sub)
 substTermPlus sub (m, TermPi mls xts t) = do
-  let (xts', t') = substTermPlusBindingsWithBody sub xts t
+  let (xts', t') = substTermPlus'' sub xts t
   (m, TermPi mls xts' t')
 substTermPlus sub (m, TermPiPlus name mls xts t) = do
-  let (xts', t') = substTermPlusBindingsWithBody sub xts t
+  let (xts', t') = substTermPlus'' sub xts t
   (m, TermPiPlus name mls xts' t')
 substTermPlus sub (m, TermPiIntro xts body) = do
-  let (xts', body') = substTermPlusBindingsWithBody sub xts body
+  let (xts', body') = substTermPlus'' sub xts body
   (m, TermPiIntro xts' body')
 substTermPlus sub (m, TermPiIntroPlus name indName idx s xts body) = do
   let sub' = filter (\(k, _) -> k `notElem` map fst s) sub -- lamに含まれる自由変数のうちsで「保護」されているものは無視
-  let (xts', body') = substTermPlusBindingsWithBody sub' xts body
+  let (xts', body') = substTermPlus'' sub' xts body
   let (zs, es) = unzip s
   let es' = map (substTermPlus sub) es -- s自体の更新は行なう
   (m, TermPiIntroPlus name indName idx (zip zs es') xts' body')
@@ -136,7 +148,7 @@ substTermPlus sub (m, TermPiElim e es) = do
   let es' = map (substTermPlus sub) es
   (m, TermPiElim e' es')
 substTermPlus sub (m, TermSigma xts) = do
-  let xts' = substTermPlusBindings sub xts
+  let xts' = substTermPlus' sub xts
   (m, TermSigma xts')
 substTermPlus sub (m, TermSigmaIntro t es) = do
   let t' = substTermPlus sub t
@@ -145,12 +157,12 @@ substTermPlus sub (m, TermSigmaIntro t es) = do
 substTermPlus sub (m, TermSigmaElim t xts e1 e2) = do
   let t' = substTermPlus sub t
   let e1' = substTermPlus sub e1
-  let (xts', e2') = substTermPlusBindingsWithBody sub xts e2
+  let (xts', e2') = substTermPlus'' sub xts e2
   (m, TermSigmaElim t' xts' e1' e2')
 substTermPlus sub (m, TermIter (mx, x, t) xts e) = do
   let t' = substTermPlus sub t
   let sub' = filter (\(k, _) -> k /= x) sub
-  let (xts', e') = substTermPlusBindingsWithBody sub' xts e
+  let (xts', e') = substTermPlus'' sub' xts e
   (m, TermIter (mx, x, t') xts' e')
 substTermPlus _ (m, TermConst x) = do
   (m, TermConst x)
@@ -177,7 +189,7 @@ substTermPlus sub (m, TermArrayIntro k es) = do
   (m, TermArrayIntro k es')
 substTermPlus sub (m, TermArrayElim mk xts v e) = do
   let v' = substTermPlus sub v
-  let (xts', e') = substTermPlusBindingsWithBody sub xts e
+  let (xts', e') = substTermPlus'' sub xts e
   (m, TermArrayElim mk xts' v' e')
 substTermPlus _ (m, TermStruct ts) = do
   (m, TermStruct ts)
@@ -191,21 +203,35 @@ substTermPlus sub (m, TermStructElim xts v e) = do
   let sub' = filter (\(k, _) -> k `notElem` xs) sub
   let e' = substTermPlus sub' e
   (m, TermStructElim xts v' e')
+substTermPlus sub (m, TermCase (e, t) cxtes) = do
+  let e' = substTermPlus sub e
+  let t' = substTermPlus sub t
+  let cxtes' =
+        flip map cxtes $ \((c, xts), body) -> do
+          let (xts', body') = substTermPlus'' sub xts body
+          ((c, xts'), body')
+  (m, TermCase (e', t') cxtes')
+substTermPlus sub (m, TermCocase name ces) = do
+  let ces' =
+        flip map ces $ \(c, e) -> do
+          let e' = substTermPlus sub e
+          (c, e')
+  (m, TermCocase name ces')
 
-substTermPlusBindings :: SubstTerm -> [IdentifierPlus] -> [IdentifierPlus]
-substTermPlusBindings _ [] = []
-substTermPlusBindings sub ((m, x, t):xts) = do
+substTermPlus' :: SubstTerm -> [IdentifierPlus] -> [IdentifierPlus]
+substTermPlus' _ [] = []
+substTermPlus' sub ((m, x, t):xts) = do
   let sub' = filter (\(k, _) -> k /= x) sub
-  let xts' = substTermPlusBindings sub' xts
+  let xts' = substTermPlus' sub' xts
   let t' = substTermPlus sub t
   (m, x, t') : xts'
 
-substTermPlusBindingsWithBody ::
+substTermPlus'' ::
      SubstTerm -> [IdentifierPlus] -> TermPlus -> ([IdentifierPlus], TermPlus)
-substTermPlusBindingsWithBody sub [] e = ([], substTermPlus sub e)
-substTermPlusBindingsWithBody sub ((mx, x, t):xts) e = do
+substTermPlus'' sub [] e = ([], substTermPlus sub e)
+substTermPlus'' sub ((mx, x, t):xts) e = do
   let sub' = filter (\(k, _) -> k /= x) sub
-  let (xts', e') = substTermPlusBindingsWithBody sub' xts e
+  let (xts', e') = substTermPlus'' sub' xts e
   ((mx, x, substTermPlus sub t) : xts', e')
 
 -- univTerm :: TermPlus
@@ -281,6 +307,19 @@ weaken (m, TermStructElim xts v e) = do
   let v' = weaken v
   let e' = weaken e
   (m, WeakTermStructElim xts v' e')
+weaken (m, TermCase (e, t) cxtes) = do
+  let e' = weaken e
+  let t' = weaken t
+  let cxtes' =
+        flip map cxtes $ \((c, xts), body) -> do
+          let xts' = weakenArgs xts
+          let body' = weaken body
+          ((c, xts'), body')
+  (m, WeakTermCase (e', t') cxtes')
+weaken (m, TermCocase name ces) = do
+  let (cs, es) = unzip ces
+  let es' = map weaken es
+  (m, WeakTermCocase name $ zip cs es')
 
 weakenArgs ::
      [(Meta, Identifier, TermPlus)] -> [(Meta, Identifier, WeakTermPlus)]

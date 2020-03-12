@@ -401,9 +401,9 @@ substWeakTermPlus sub (m, WeakTermCase (e, t) cxtes) = do
   let e' = substWeakTermPlus sub e
   let t' = substWeakTermPlus sub t
   let cxtes' =
-        flip map cxtes $ \((c, xt), body) -> do
-          let (xt', body') = substWeakTermPlus'' sub xt body
-          ((c, xt'), body')
+        flip map cxtes $ \((c, xts), body) -> do
+          let (xts', body') = substWeakTermPlus'' sub xts body
+          ((c, xts'), body')
   (m, WeakTermCase (e', t') cxtes')
 substWeakTermPlus sub (m, WeakTermCocase name ces) = do
   let ces' =
