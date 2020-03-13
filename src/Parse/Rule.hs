@@ -754,12 +754,13 @@ substRuleType sub (m, WeakTermCase (e, t) cxtes) = do
       (xts', body') <- substRuleType'' sub xts body
       return ((c, xts'), body')
   return (m, WeakTermCase (e', t') cxtes')
-substRuleType sub (m, WeakTermCocase name ces) = do
+substRuleType sub (m, WeakTermCocase (name, es) ces) = do
+  es' <- mapM (substRuleType sub) es
   ces' <-
     flip mapM ces $ \(c, e) -> do
       e' <- substRuleType sub e
       return (c, e')
-  return (m, WeakTermCocase name ces')
+  return (m, WeakTermCocase (name, es') ces')
 
 substRuleType' ::
      (RuleType, RuleType) -> [IdentifierPlus] -> WithEnv [IdentifierPlus]
