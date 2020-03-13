@@ -233,13 +233,17 @@ rename' nenv (m, WeakTermCase (e, t) cxtes) = do
   t' <- rename' nenv t
   cxtes' <-
     flip mapM cxtes $ \((c, xts), body) -> do
+      c' <- lookupStrict'' nenv m c
       (xts', body') <- renameBinder nenv xts body
-      return ((c, xts'), body')
+      return ((c', xts'), body')
   return (m, WeakTermCase (e', t') cxtes')
-rename' nenv (m, WeakTermCocase name ces) = do
+rename' nenv (m, WeakTermCocase (name, args) ces) = do
+  name' <- lookupStrict'' nenv m name
+  args' <- mapM (rename' nenv) args
   let (cs, es) = unzip ces
+  cs' <- mapM (lookupStrict'' nenv m) cs
   es' <- mapM (rename' nenv) es
-  return (m, WeakTermCocase name $ zip cs es')
+  return (m, WeakTermCocase (name', args') $ zip cs' es')
 
 renameIdentifier :: NameEnv -> Meta -> Identifier -> WithEnv Identifier
 renameIdentifier nenv m x@(I (s, _)) = do
@@ -347,6 +351,12 @@ lookupStrict' :: NameEnv -> IdentifierPlus -> WithEnv WeakTermPlus
 lookupStrict' nenv (m, x, _) =
   case lookupName x nenv of
     Just x' -> return (m, WeakTermUpsilon x')
+    Nothing -> raiseError m $ "undefined variable:  " <> asText x
+
+lookupStrict'' :: NameEnv -> Meta -> Identifier -> WithEnv Identifier
+lookupStrict'' nenv m x =
+  case lookupName' x nenv of
+    Just x' -> return x'
     Nothing -> raiseError m $ "undefined variable:  " <> asText x
 
 -- checkSanity :: [Identifier] -> WeakTermPlus -> Bool
@@ -594,3 +604,8 @@ lookupName (I (s, _)) nenv = do
   j <- Map.lookup s nenv
   return $ I (llvmString s, j)
   -- return $ I (s, j)
+
+lookupName' :: Identifier -> NameEnv -> Maybe Identifier
+lookupName' (I (s, _)) nenv = do
+  j <- Map.lookup s nenv
+  return $ I (s, j)
