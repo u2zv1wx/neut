@@ -201,9 +201,7 @@ infer' _ (m, WeakTermConst x@(I (s, _)))
     mt <- lookupTypeEnv x
     case mt of
       Nothing -> do
-        p "here"
         (t, UnivLevelPlus (_, l)) <- lookupWeakTypeEnv x
-        p "and here"
         return ((m, WeakTermConst x), t, UnivLevelPlus (m, l))
       Just (t, UnivLevelPlus (_, l)) -> do
         ((_, t'), l') <- univInst (weaken t) l
@@ -319,11 +317,45 @@ infer' ctx (m, WeakTermCase (e, t) cxtes) = do
   (e', t', ml') <- infer' ctx e
   insConstraintEnv tInd t'
   insLevelEQ mlInd ml'
-  undefined
-infer' ctx (m, WeakTermCocase name ces) = do
-  let (cs, es) = unzip ces
-  etls <- mapM (infer' ctx) es
-  undefined
+  (h, ml) <- newTypeHoleInCtx ctx m
+  cxtes' <-
+    forM cxtes $ \((c, xts), body) -> do
+      (xtls', (body', tBody', mlBody)) <- inferBinder ctx xts body
+      insConstraintEnv h tBody'
+      insLevelEQ ml mlBody
+      let (xts', mlArgs) = unzip xtls'
+      mt <- lookupTypeEnv c
+      case mt of
+        Nothing -> raiseError m $ "no such constructor defined: " <> asText c
+        Just (tIntroStrict, UnivLevelPlus (_, l)) -> do
+          (tIntro, _) <- univInst (weaken tIntroStrict) l
+          case tIntro of
+            (_, WeakTermPi mls yts _)
+              | length yts == length xts -> do
+                forM_ (zip mls (mlArgs ++ [mlBody])) $ uncurry insLevelEQ
+                let ts = map (\(_, _, tx) -> tx) xts'
+                let es = map (\(mx, x, _) -> (mx, WeakTermUpsilon x)) xts'
+                let ys = map (\(_, y, _) -> y) yts
+                let ts' =
+                      map (\(_, _, ty) -> substWeakTermPlus (zip ys es) ty) yts
+                forM_ (zip ts' ts) $ uncurry insConstraintEnv
+                return ((c, xts'), body')
+              | otherwise ->
+                raiseError m $
+                "the arity of `" <>
+                asText c <>
+                "` is supposed to be " <>
+                T.pack (show (length yts)) <>
+                ", but found " <> T.pack (show (length xts)) <> " argument(s)"
+            _ ->
+              raiseError m $
+              "the type of `" <>
+              asText c <> "` must be a Pi-type, but is:\n" <> toText tIntro
+  return ((m, WeakTermCase (e', t') cxtes'), h, ml)
+infer' _ (_, WeakTermCocase _ _) = undefined
+  -- let (cs, es) = unzip ces
+  -- etls <- mapM (infer' ctx) es
+  -- undefined
 
 inferType' :: Context -> WeakTermPlus -> WithEnv (WeakTermPlus, UnivLevelPlus)
 inferType' ctx t = do
