@@ -408,11 +408,12 @@ elaborate' (m, WeakTermCase (e, t) cxtes) = do
       "the type of `" <>
       toText (weaken e') <>
       "` must be an inductive type, but is:\n" <> toText (weaken t')
-elaborate' (m, WeakTermCocase name ces) = do
+elaborate' (m, WeakTermCocase (name, args) ces) = do
+  args' <- mapM elaborate' args
   let (cs, es) = unzip ces
   es' <- mapM elaborate' es
   -- _ <- undefined name cs -- fixme: check exhaustiveness
-  return (m, TermCocase name (zip cs es'))
+  return (m, TermCocase (name, args') (zip cs es'))
 
 elaborateWeakCase :: WeakCase -> WithEnv Case
 elaborateWeakCase (WeakCaseInt t x) = do
