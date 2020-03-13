@@ -46,10 +46,10 @@ data Term
   | TermStructElim [(Meta, Identifier, ArrayKind)] TermPlus TermPlus
   | TermCase
       (TermPlus, TermPlus) -- (the `e` in `case e of (...)`, the type of `e`)
-      [((T.Text, [IdentifierPlus]), TermPlus)] -- ((cons x xs) e), ((nil) e), ((succ n) e).  (not ((cons A x xs) e).)
+      [((Identifier, [IdentifierPlus]), TermPlus)] -- ((cons x xs) e), ((nil) e), ((succ n) e).  (not ((cons A x xs) e).)
   | TermCocase
-      T.Text -- the name of coinductive type (e.g. "stream", "some-record", etc.)
-      [(T.Text, TermPlus)] -- (some-label any-term)
+      (Identifier, [TermPlus]) -- a @ (e, ..., e)  (e.g. stream @ A)
+      [(Identifier, TermPlus)] -- (some-label any-term)
   deriving (Show)
 
 type TermPlus = (Meta, Term)
@@ -115,7 +115,8 @@ varTermPlus (_, TermCase (e, t) cxes) = do
   let ys = varTermPlus t
   let zs = concatMap (\((_, xts), body) -> varTermPlus' xts [body]) cxes
   xs ++ ys ++ zs
-varTermPlus (_, TermCocase _ ces) = concatMap (varTermPlus . snd) ces
+varTermPlus (_, TermCocase (_, es) ces) =
+  concatMap varTermPlus $ es ++ map snd ces
 
 varTermPlus' :: [IdentifierPlus] -> [TermPlus] -> [Identifier]
 varTermPlus' [] es = concatMap varTermPlus es
@@ -211,12 +212,13 @@ substTermPlus sub (m, TermCase (e, t) cxtes) = do
           let (xts', body') = substTermPlus'' sub xts body
           ((c, xts'), body')
   (m, TermCase (e', t') cxtes')
-substTermPlus sub (m, TermCocase name ces) = do
+substTermPlus sub (m, TermCocase (name, es) ces) = do
+  let es' = map (substTermPlus sub) es
   let ces' =
         flip map ces $ \(c, e) -> do
           let e' = substTermPlus sub e
           (c, e')
-  (m, TermCocase name ces')
+  (m, TermCocase (name, es') ces')
 
 substTermPlus' :: SubstTerm -> [IdentifierPlus] -> [IdentifierPlus]
 substTermPlus' _ [] = []
@@ -316,10 +318,10 @@ weaken (m, TermCase (e, t) cxtes) = do
           let body' = weaken body
           ((c, xts'), body')
   (m, WeakTermCase (e', t') cxtes')
-weaken (m, TermCocase name ces) = do
+weaken (m, TermCocase (name, args) ces) = do
   let (cs, es) = unzip ces
   let es' = map weaken es
-  (m, WeakTermCocase name $ zip cs es')
+  (m, WeakTermCocase (name, map weaken args) $ zip cs es')
 
 weakenArgs ::
      [(Meta, Identifier, TermPlus)] -> [(Meta, Identifier, WeakTermPlus)]

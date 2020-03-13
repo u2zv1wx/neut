@@ -314,6 +314,16 @@ infer' ctx (m, WeakTermStructElim xks e1 e2) = do
   forM_ (zip xs (zip ts mls)) $ uncurry insWeakTypeEnv
   (e2', t2, ml2) <- infer' (ctx ++ zip (zip3 ms xs ts) mls) e2
   return ((m, WeakTermStructElim xks e1' e2'), t2, ml2)
+infer' ctx (m, WeakTermCase (e, t) cxtes) = do
+  (tInd, mlInd) <- inferType' ctx t
+  (e', t', ml') <- infer' ctx e
+  insConstraintEnv tInd t'
+  insLevelEQ mlInd ml'
+  undefined
+infer' ctx (m, WeakTermCocase name ces) = do
+  let (cs, es) = unzip ces
+  etls <- mapM (infer' ctx) es
+  undefined
 
 inferType' :: Context -> WeakTermPlus -> WithEnv (WeakTermPlus, UnivLevelPlus)
 inferType' ctx t = do
@@ -655,6 +665,19 @@ univInst' (m, WeakTermStructElim xts d e) = do
   d' <- univInst' d
   e' <- univInst' e
   return (m, WeakTermStructElim xts d' e')
+univInst' (m, WeakTermCase (e, t) cxtes) = do
+  e' <- univInst' e
+  t' <- univInst' t
+  cxtes' <-
+    flip mapM cxtes $ \((c, xts), body) -> do
+      xts' <- univInstArgs xts
+      body' <- univInst' body
+      return ((c, xts'), body')
+  return (m, WeakTermCase (e', t') cxtes')
+univInst' (m, WeakTermCocase name ces) = do
+  let (cs, es) = unzip ces
+  es' <- mapM univInst' es
+  return (m, WeakTermCocase name $ zip cs es')
 
 univInstArgs :: [IdentifierPlus] -> WithEnv [IdentifierPlus]
 univInstArgs xts = do
