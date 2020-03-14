@@ -152,6 +152,12 @@ interpret (m, TreeNode ((_, TreeAtom "case"):e:cxtes)) = do
   m' <- adjustPhase m
   h <- newHole m'
   return (m', WeakTermCase (e', h) cxtes')
+interpret (m, TreeNode ((_, TreeAtom "cocase"):(_, TreeNode ((_, TreeAtom name):args)):ces)) = do
+  let name' = asIdent name
+  args' <- mapM interpret args
+  ces' <- mapM interpretCocaseClause ces
+  m' <- adjustPhase m
+  return (m', WeakTermCocase (name', args') ces')
 --
 -- auxiliary interpretations
 --
@@ -325,6 +331,12 @@ interpretCaseClause (_, TreeNode [(_, TreeNode ((_, TreeAtom c):xts)), e]) = do
   e' <- interpret e
   return ((asIdent c, xts'), e')
 interpretCaseClause t = raiseSyntaxError t "((LEAF TREE ... TREE) TREE)"
+
+interpretCocaseClause :: TreePlus -> WithEnv (Identifier, WeakTermPlus)
+interpretCocaseClause (_, TreeNode [(_, TreeAtom c), e]) = do
+  e' <- interpret e
+  return (asIdent c, e')
+interpretCocaseClause t = raiseSyntaxError t "(LEAF TREE)"
 
 interpretEnumItem :: Meta -> [TreePlus] -> WithEnv [(T.Text, Int)]
 interpretEnumItem m ts = do
