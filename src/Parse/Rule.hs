@@ -16,6 +16,7 @@ import Data.Monoid ((<>))
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.IntMap.Strict as IntMap
+import qualified Data.Text as T
 
 import Data.Basic
 import Data.Env
@@ -161,6 +162,8 @@ toInductiveIntro ats bts xts a@(I (ai, _)) (mb, b@(I (bi, _)), m, yts, cod)
 toCoinductive ::
      [IdentifierPlus] -> [IdentifierPlus] -> Connective -> WithEnv [QuasiStmt]
 toCoinductive ats bts c@(m, a@(I (ai, _)), xts, _) = do
+  let asbs = map textOf $ ats ++ bts
+  modify (\env -> env {labelEnv = Map.insert ai asbs (labelEnv env)})
   f <- formationRuleOf c >>= ruleAsIdentPlus
   let cod = (m, WeakTermPiElim (m, WeakTermUpsilon a) (map toVar' xts))
   (atsbts', cod') <- renameFormArgs (ats ++ bts) cod
@@ -251,6 +254,9 @@ toInternalRuleList (_, _, _, rules) = mapM ruleAsIdentPlus rules
 
 toVar' :: IdentifierPlus -> WeakTermPlus
 toVar' (m, x, _) = (m, WeakTermUpsilon x)
+
+textOf :: IdentifierPlus -> T.Text
+textOf (_, I (x, _), _) = x
 
 insForm :: Int -> IdentifierPlus -> WeakTermPlus -> WithEnv ()
 insForm 1 (_, I (_, i), _) e =

@@ -14,11 +14,12 @@ import Control.Monad.Except
 import Control.Monad.State
 import Data.Bits ((.&.), shiftR)
 import Data.Char (ord)
+import Data.List (elemIndex, sortOn)
 import Data.Maybe (fromMaybe)
 import Data.Word (Word8)
 import Text.Read (readMaybe)
 
--- import qualified Data.HashMap.Strict as Map
+import qualified Data.HashMap.Strict as Map
 import qualified Data.Text as T
 
 -- import qualified Text.Show.Pretty as Pr
@@ -152,12 +153,14 @@ interpret (m, TreeNode ((_, TreeAtom "case"):e:cxtes)) = do
   m' <- adjustPhase m
   h <- newHole m'
   return (m', WeakTermCase (e', h) cxtes')
--- interpret (m, TreeNode ((_, TreeAtom "cocase"):(_, TreeNode ((_, TreeAtom name):args)):ces)) = do
---   let name' = asIdent name
---   args' <- mapM interpret args
---   ces' <- mapM interpretCocaseClause ces
---   m' <- adjustPhase m
---   return (m', WeakTermCocase (name', args') ces')
+interpret (m, TreeNode ((_, TreeAtom "cocase"):codType:cocaseClauseList)) = do
+  (a, args) <- interpretCoinductive codType
+  m' <- adjustPhase m
+  cocaseClauseList' <- mapM interpretCocaseClause cocaseClauseList
+  let codType' = (m, WeakTermPiElim (m, WeakTermUpsilon a) args)
+  es <- cocaseAsSigmaIntro m a codType' cocaseClauseList'
+  return (m', WeakTermSigmaIntro codType' es)
+-- type CocaseClause = ((Identifier, [WeakTermPlus]), [(Identifier, WeakTermPlus)])
 --
 -- auxiliary interpretations
 --
@@ -332,11 +335,99 @@ interpretCaseClause (_, TreeNode [(_, TreeNode ((_, TreeAtom c):xts)), e]) = do
   return ((asIdent c, xts'), e')
 interpretCaseClause t = raiseSyntaxError t "((LEAF TREE ... TREE) TREE)"
 
--- interpretCocaseClause :: TreePlus -> WithEnv (Identifier, WeakTermPlus)
--- interpretCocaseClause (_, TreeNode [(_, TreeAtom c), e]) = do
---   e' <- interpret e
---   return (asIdent c, e')
--- interpretCocaseClause t = raiseSyntaxError t "(LEAF TREE)"
+type CocaseClause = ((Identifier, [WeakTermPlus]), [(Identifier, WeakTermPlus)])
+
+-- (cocase (a e ... e)
+--   ((a e ... e)
+--    (b e)
+--    ...
+--    (b e))
+--   ((a e ... e)
+--    (b e)
+--    ...
+--    (b e)))
+interpretCoinductive :: TreePlus -> WithEnv (Identifier, [WeakTermPlus])
+interpretCoinductive (_, TreeNode ((_, TreeAtom c):args)) = do
+  args' <- mapM interpret args
+  return (asIdent c, args')
+interpretCoinductive t = raiseSyntaxError t "(LEAF TREE ... TREE)"
+
+interpretCocaseClause :: TreePlus -> WithEnv CocaseClause
+interpretCocaseClause (_, TreeNode (coind:clauseList)) = do
+  (c, args) <- interpretCoinductive coind
+  clauseList' <- mapM interpretCocaseClause' clauseList
+  return ((c, args), clauseList')
+interpretCocaseClause t =
+  raiseSyntaxError t "((LEAF TREE ... TREE) (LEAF TREE) ... (LEAF TREE))"
+
+interpretCocaseClause' :: TreePlus -> WithEnv (Identifier, WeakTermPlus)
+interpretCocaseClause' (_, TreeNode [(_, TreeAtom label), body]) = do
+  body' <- interpret body
+  return (asIdent label, body')
+interpretCocaseClause' t = raiseSyntaxError t "(LEAF TREE)"
+
+cocaseAsSigmaIntro ::
+     Meta
+  -> Identifier
+  -> WeakTermPlus
+  -> [CocaseClause]
+  -> WithEnv [WeakTermPlus]
+cocaseAsSigmaIntro m (I (name, _)) codType cocaseClauseList = do
+  let aes = map (headNameOf m) cocaseClauseList
+  bes <- asLamClauseList m cocaseClauseList
+  lenv <- gets labelEnv
+  case Map.lookup name lenv of
+    Nothing -> raiseError m $ "no such coinductive type defined: " <> name
+    Just labelList -> do
+      iesjes <- labelToIndex m labelList $ aes ++ bes
+      let isLinear = linearCheck $ map fst iesjes
+      let isExhaustive = length iesjes == length labelList
+      case (isLinear, isExhaustive) of
+        (False, _) -> raiseError m $ "found a non-linear copattern"
+        (_, False) -> raiseError m $ "found a non-exhaustive copattern"
+        (True, True) ->
+          return $ (map snd $ sortOn fst iesjes) ++ [cocaseBaseValue m codType]
+
+labelToIndex :: Meta -> [T.Text] -> [(Identifier, a)] -> WithEnv [(Int, a)]
+labelToIndex _ _ [] = return []
+labelToIndex m lenv ((x, e):xes) =
+  case elemIndex (asText x) lenv of
+    Nothing -> raiseError m $ "no such destructor defined: " <> asText x
+    Just i -> do
+      ies <- labelToIndex m lenv xes
+      return $ (i, e) : ies
+
+asLamClauseList ::
+     Meta -> [CocaseClause] -> WithEnv [(Identifier, WeakTermPlus)]
+asLamClauseList m cocaseClauseList = do
+  fmap concat $
+    forM cocaseClauseList $ \((a', args), clauseList) -> do
+      let t = (m, WeakTermPiElim (m, WeakTermUpsilon a') args)
+      forM clauseList $ \(b, body) -> asLamClause b m t body
+
+asLamClause ::
+     Identifier
+  -> Meta
+  -> WeakTermPlus
+  -> WeakTermPlus
+  -> WithEnv (Identifier, WeakTermPlus)
+asLamClause b m t body = do
+  h <- newNameWith' "hole"
+  return (b, (m, WeakTermPiIntro [(m, h, t)] body))
+
+headNameOf :: Meta -> CocaseClause -> (Identifier, WeakTermPlus)
+headNameOf m ((a, _), _) = (a, (m, WeakTermUpsilon a))
+
+cocaseBaseValue :: Meta -> WeakTermPlus -> WeakTermPlus
+cocaseBaseValue m codType =
+  ( m
+  , WeakTermPiElim
+      (m, WeakTermUpsilon $ asIdent "unsafe-cast")
+      [ (m, WeakTermPi [] [] (m, WeakTermEnum (EnumTypeIntS 64)))
+      , codType
+      , (m, (WeakTermPiIntro [] (m, WeakTermEnumIntro (EnumValueIntS 64 0))))
+      ])
+
 interpretEnumItem :: Meta -> [TreePlus] -> WithEnv [(T.Text, Int)]
 interpretEnumItem m ts = do
   xis <- interpretEnumItem' $ reverse ts
