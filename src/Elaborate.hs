@@ -399,10 +399,18 @@ elaborate' (m, WeakTermCase (e, t) cxtes) = do
       body' <- elaborate' body
       return ((c, xts'), body')
   case t' of
-    (_, TermPiPlus _ _ _ _) -> do
-      let _ = map (fst . fst) cxtes
-      -- _ <- undefined name cs -- fixme: check exhaustiveness
-      return (m, TermCase (e', t') cxtes')
+    (_, TermPiPlus name _ _ _) -> do
+      eenv <- gets enumEnv
+      case Map.lookup name eenv of
+        Nothing -> raiseError m $ "no such inductive type defined: " <> name
+        Just bis -> do
+          let bs' = map (asText . fst . fst) cxtes
+          let isLinear = linearCheck bs'
+          let isExhaustive = length bis == length bs'
+          case (isLinear, isExhaustive) of
+            (False, _) -> raiseError m $ "found a non-linear pattern"
+            (_, False) -> raiseError m $ "found a non-exhaustive pattern"
+            (True, True) -> return (m, TermCase (e', t') cxtes')
     _ ->
       raiseError m $
       "the type of `" <>

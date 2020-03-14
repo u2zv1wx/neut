@@ -94,9 +94,16 @@ checkNameSanity m atsbts = do
       m
       "the names of the rules of inductive/coinductive type must be distinct"
 
+updateLabelEnv :: T.Text -> [IdentifierPlus] -> WithEnv ()
+updateLabelEnv ai xts = do
+  let xs = map textOf xts
+  modify (\env -> env {labelEnv = Map.insert ai xs (labelEnv env)})
+
 toInductive ::
      [IdentifierPlus] -> [IdentifierPlus] -> Connective -> WithEnv [QuasiStmt]
-toInductive ats bts connective@(m, a@(I (ai, _)), xts, _) = do
+toInductive ats bts connective@(m, a@(I (ai, _)), xts, _)
+  -- updateLabelEnv ai bts -- the "ats"-part is not needed
+ = do
   formationRule <- formationRuleOf connective >>= ruleAsIdentPlus
   let cod = (m, WeakTermPiElim (m, WeakTermUpsilon a) (map toVar' xts))
   z <- newNameWith' "_"
@@ -162,8 +169,7 @@ toInductiveIntro ats bts xts a@(I (ai, _)) (mb, b@(I (bi, _)), m, yts, cod)
 toCoinductive ::
      [IdentifierPlus] -> [IdentifierPlus] -> Connective -> WithEnv [QuasiStmt]
 toCoinductive ats bts c@(m, a@(I (ai, _)), xts, _) = do
-  let asbs = map textOf $ ats ++ bts
-  modify (\env -> env {labelEnv = Map.insert ai asbs (labelEnv env)})
+  updateLabelEnv ai $ ats ++ bts
   f <- formationRuleOf c >>= ruleAsIdentPlus
   let cod = (m, WeakTermPiElim (m, WeakTermUpsilon a) (map toVar' xts))
   (atsbts', cod') <- renameFormArgs (ats ++ bts) cod
