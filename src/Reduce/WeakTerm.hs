@@ -4,6 +4,8 @@ module Reduce.WeakTerm
   ( reduceWeakTermPlus
   ) where
 
+import Data.Basic
+
 -- import Data.Bits
 -- import Data.Fixed (mod')
 -- import Numeric.Half
@@ -123,6 +125,25 @@ reduceWeakTermPlus (m, WeakTermStructElim xks e1 e2) = do
       , (es, ks2) <- unzip eks
       , ks1 == ks2 -> reduceWeakTermPlus $ substWeakTermPlus (zip xs es) e2
     _ -> (m, WeakTermStructElim xks e1' e2)
+reduceWeakTermPlus (m, WeakTermCase (e, t) cxtes) = do
+  let e' = reduceWeakTermPlus e
+  let cxtes' = map (\((I (c, _), xts), body) -> (c, (xts, body))) cxtes
+  case e' of
+    (_, WeakTermPiIntroPlus name _ idx s _ _)
+      | s' <- map (snd . (s !!)) idx
+      , Just (xts, body) <- lookup name cxtes'
+      , length xts == length s' -> do
+        let (_, ys, _) = unzip3 xts
+        reduceWeakTermPlus $ substWeakTermPlus (zip ys s') body
+    _ -> do
+      let t' = reduceWeakTermPlus t
+      let cxtes'' =
+            flip map cxtes $ \((c, xts), body) -> do
+              let (ms, xs, ts) = unzip3 xts
+              let ts' = map reduceWeakTermPlus ts
+              let body' = reduceWeakTermPlus body
+              ((c, zip3 ms xs ts'), body')
+      (m, WeakTermCase (e', t') cxtes'')
 reduceWeakTermPlus e = e
   -- | Just (lowType, op) <- asUnaryOpMaybe constant
   -- , [arg] <- es = reduceWeakTermPlusUnary orig arg m lowType op
