@@ -146,6 +146,12 @@ interpret (m, TreeNode [(_, TreeAtom "struct-elimination"), (_, TreeNode xts), e
   e2' <- interpret e2
   m' <- adjustPhase m
   return (m', WeakTermStructElim xts' e1' e2')
+interpret (m, TreeNode ((_, TreeAtom "case"):e:cxtes)) = do
+  e' <- interpret e
+  cxtes' <- mapM interpretCaseClause cxtes
+  m' <- adjustPhase m
+  h <- newHole m'
+  return (m', WeakTermCase (e', h) cxtes')
 --
 -- auxiliary interpretations
 --
@@ -311,6 +317,14 @@ interpretStructElim (_, TreeNode [(m, TreeAtom x), k]) = do
   k' <- asArrayKind k
   return (m, asIdent x, k')
 interpretStructElim e = raiseSyntaxError e "(LEAF TREE)"
+
+interpretCaseClause ::
+     TreePlus -> WithEnv ((Identifier, [IdentifierPlus]), WeakTermPlus)
+interpretCaseClause (_, TreeNode [(_, TreeNode ((_, TreeAtom c):xts)), e]) = do
+  xts' <- mapM interpretIdentifierPlus xts
+  e' <- interpret e
+  return ((asIdent c, xts'), e')
+interpretCaseClause t = raiseSyntaxError t "((LEAF TREE ... TREE) TREE)"
 
 interpretEnumItem :: Meta -> [TreePlus] -> WithEnv [(T.Text, Int)]
 interpretEnumItem m ts = do
