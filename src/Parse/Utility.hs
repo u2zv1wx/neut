@@ -98,10 +98,10 @@ compInfoWeakTermPlus c info (_, WeakTermStructElim mxks e1 e2) = do
 compInfoWeakTermPlus c info (_, WeakTermCase (e, _) cxtes) = do
   compInfoWeakTermPlus c info e
   forM_ cxtes $ \((_, xts), body) -> compInfoBinder c info xts body
-compInfoWeakTermPlus c info (_, WeakTermCocase (_, es) ces) = do
-  forM_ es $ \e -> compInfoWeakTermPlus c info e
-  forM_ ces $ \(_, e) -> compInfoWeakTermPlus c info e
 
+-- compInfoWeakTermPlus c info (_, WeakTermCocase (_, es) ces) = do
+--   forM_ es $ \e -> compInfoWeakTermPlus c info e
+--   forM_ ces $ \(_, e) -> compInfoWeakTermPlus c info e
 compInfoBinder ::
      CursorName
   -> CompInfo

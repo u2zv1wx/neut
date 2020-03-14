@@ -74,9 +74,10 @@ data WeakTerm
   -- considering that the constructed term using `FνF -> νF` is just a record after all))
   -- this syntactic construct is only for performance improvement, too.
   -- (cocase c (c e) ... (c e))
-  | WeakTermCocase
-      (Identifier, [WeakTermPlus]) -- a @ (e, ..., e)  (e.g. stream @ A)
-      [(Identifier, WeakTermPlus)] -- (some-label any-term)
+  -- | WeakTermCocase
+  --     [Identifier] -- the list of mutually defined coinductive types
+  --     (Identifier, [WeakTermPlus]) -- a @ (e, ..., e)  (e.g. stream @ A)
+  --     [(Identifier, WeakTermPlus)] -- (some-label any-term)
   deriving (Show, Eq)
 
 type WeakTermPlus = (Meta, WeakTerm)
@@ -239,9 +240,9 @@ varWeakTermPlus (_, WeakTermCase (e, t) cxes) = do
   let ys = varWeakTermPlus t
   let zs = concatMap (\((_, xts), body) -> varWeakTermPlus' xts [body]) cxes
   xs ++ ys ++ zs
-varWeakTermPlus (_, WeakTermCocase (_, es) ces) =
-  concatMap varWeakTermPlus $ es ++ map snd ces
 
+-- varWeakTermPlus (_, WeakTermCocase as (_, es) ces) =
+--   as ++ (concatMap varWeakTermPlus $ es ++ map snd ces)
 varWeakTermPlus' :: [IdentifierPlus] -> [WeakTermPlus] -> [Identifier]
 varWeakTermPlus' [] es = concatMap varWeakTermPlus es
 varWeakTermPlus' ((_, x, t):xts) es = do
@@ -298,9 +299,9 @@ holeWeakTermPlus (_, WeakTermCase (e, t) cxes) = do
   let ys = holeWeakTermPlus t
   let zs = concatMap (\((_, xts), body) -> holeWeakTermPlus' xts [body]) cxes
   xs ++ ys ++ zs
-holeWeakTermPlus (_, WeakTermCocase (_, es) ces) =
-  concatMap holeWeakTermPlus $ es ++ map snd ces
 
+-- holeWeakTermPlus (_, WeakTermCocase _ (_, es) ces) =
+--   concatMap holeWeakTermPlus $ es ++ map snd ces
 holeWeakTermPlus' :: [IdentifierPlus] -> [WeakTermPlus] -> [Hole]
 holeWeakTermPlus' [] es = concatMap holeWeakTermPlus es
 holeWeakTermPlus' ((_, _, t):xts) es =
@@ -405,14 +406,14 @@ substWeakTermPlus sub (m, WeakTermCase (e, t) cxtes) = do
           let (xts', body') = substWeakTermPlus'' sub xts body
           ((c, xts'), body')
   (m, WeakTermCase (e', t') cxtes')
-substWeakTermPlus sub (m, WeakTermCocase (name, es) ces) = do
-  let es' = map (substWeakTermPlus sub) es
-  let ces' =
-        flip map ces $ \(c, e) -> do
-          let e' = substWeakTermPlus sub e
-          (c, e')
-  (m, WeakTermCocase (name, es') ces')
 
+-- substWeakTermPlus sub (m, WeakTermCocase as (name, es) ces) = do
+--   let es' = map (substWeakTermPlus sub) es
+--   let ces' =
+--         flip map ces $ \(c, e) -> do
+--           let e' = substWeakTermPlus sub e
+--           (c, e')
+--   (m, WeakTermCocase as (name, es') ces')
 substWeakTermPlus' :: SubstWeakTerm -> [IdentifierPlus] -> [IdentifierPlus]
 substWeakTermPlus' _ [] = []
 substWeakTermPlus' sub ((m, x, t):xts) = do
@@ -511,12 +512,12 @@ toText (_, WeakTermCase (e, _) cxtes) = do
      (flip map cxtes $ \((c, xts), body) -> do
         let xs = map (\(_, I (x, _), _) -> x) xts
         showCons [showCons (asText c : xs), toText body]))
-toText (_, WeakTermCocase (name, es) ces) = do
-  showCons
-    ("cocase" :
-     showCons (asText name : map toText es) :
-     (flip map ces $ \(c, e) -> showCons [asText c, toText e]))
 
+-- toText (_, WeakTermCocase _ (name, es) ces) = do
+--   showCons
+--     ("cocase" :
+--      showCons (asText name : map toText es) :
+--      (flip map ces $ \(c, e) -> showCons [asText c, toText e]))
 inParen :: T.Text -> T.Text
 inParen s = "(" <> s <> ")"
 

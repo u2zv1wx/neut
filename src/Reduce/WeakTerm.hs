@@ -144,6 +144,9 @@ reduceWeakTermPlus (m, WeakTermCase (e, t) cxtes) = do
               let body' = reduceWeakTermPlus body
               ((c, zip3 ms xs ts'), body')
       (m, WeakTermCase (e', t') cxtes'')
+-- reduceWeakTermPlus (m, WeakTermCocase (name, args) ces) = do
+--   let (cs, es) = unzip ces
+--   undefined
 reduceWeakTermPlus e = e
   -- | Just (lowType, op) <- asUnaryOpMaybe constant
   -- , [arg] <- es = reduceWeakTermPlusUnary orig arg m lowType op

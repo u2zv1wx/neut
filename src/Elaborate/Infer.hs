@@ -352,61 +352,61 @@ infer' ctx (m, WeakTermCase (e, t) cxtes) = do
               "the type of `" <>
               asText c <> "` must be a Pi-type, but is:\n" <> toText tIntro
   return ((m, WeakTermCase (e', t') cxtes'), h, ml)
-infer' ctx (m, WeakTermCocase (name, args) ces) = do
-  (args', tsArgs', lsArgs') <- unzip3 <$> mapM (infer' ctx) args
-  let (cs, es) = unzip ces
-  (es', ts', ls') <- unzip3 <$> mapM (infer' ctx) es
-  let cocase = (m, WeakTermCocase (name, args') $ zip cs es')
-  let tCoind = (m, WeakTermPiElim (m, WeakTermUpsilon name) args')
-  forM_ (zip cs (zip ts' ls')) $ \(c, (tBody, ml)) -> do
-    mt <- lookupTypeEnv c
-    case mt of
-      Nothing -> raiseError m $ "no such destructor defined: " <> asText c
-      Just (tElimStrict, UnivLevelPlus (_, l)) -> do
-        (tElim, _) <- univInst (weaken tElimStrict) l
-        case tElim of
-          (_, WeakTermPi mls xts cod)
-            | length xts == length args + 1 -> do
-              let xs = map (\(_, x, _) -> x) xts
-              let ts = map (\(_, _, tx) -> tx) xts
-              let sub = zip xs $ args' ++ [cocase]
-              let ts'' = map (substWeakTermPlus sub) ts
-              forM_ (zip ts'' (tsArgs' ++ [tCoind])) $ uncurry insConstraintEnv
-              let cod' = substWeakTermPlus sub cod
-              insConstraintEnv tBody cod'
-              forM_ (zip mls (lsArgs' ++ [ml])) $ uncurry insLevelEQ
-            | otherwise ->
-              raiseError m $
-              "the arity of `" <>
-              asText c <>
-              "` is supposed to be " <>
-              T.pack (show (length args + 1)) <>
-              ", but found " <> T.pack (show (length xts)) <> " argument(s)"
-          _ ->
-            raiseError m $
-            "the type of `" <>
-            asText c <> "` must be a Pi-type, but is:\n" <> toText tElim
-  mtName <- lookupTypeEnv name
-  case mtName of
-    Nothing ->
-      raiseError m $ "no such coinductive type defined: " <> asText name
-    Just (tNameStrict, UnivLevelPlus (_, lName)) -> do
-      (tName, _) <- univInst (weaken tNameStrict) lName
-      case tName of
-        (_, WeakTermPi mls xts _)
-          | length xts == length args' -> do
-            let xs = map (\(_, x, _) -> x) xts
-            let ts = map (\(_, _, tx) -> tx) xts
-            let sub = zip xs args'
-            let tsArgs'' = map (substWeakTermPlus sub) ts
-            forM_ (zip tsArgs' tsArgs'') $ uncurry insConstraintEnv
-            forM_ (zip mls lsArgs') $ uncurry insLevelEQ
-            return (cocase, tCoind, last mls)
-        _ ->
-          raiseError m $
-          "the type of `" <>
-          asText name <> "` must be a Pi-type, but is:\n" <> toText tName
 
+-- infer' ctx (m, WeakTermCocase (name, args) ces) = do
+--   (args', tsArgs', lsArgs') <- unzip3 <$> mapM (infer' ctx) args
+--   let (cs, es) = unzip ces
+--   (es', ts', ls') <- unzip3 <$> mapM (infer' ctx) es
+--   let cocase = (m, WeakTermCocase (name, args') $ zip cs es')
+--   let tCoind = (m, WeakTermPiElim (m, WeakTermUpsilon name) args')
+--   forM_ (zip cs (zip ts' ls')) $ \(c, (tBody, ml)) -> do
+--     mt <- lookupTypeEnv c
+--     case mt of
+--       Nothing -> raiseError m $ "no such destructor defined: " <> asText c
+--       Just (tElimStrict, UnivLevelPlus (_, l)) -> do
+--         (tElim, _) <- univInst (weaken tElimStrict) l
+--         case tElim of
+--           (_, WeakTermPi mls xts cod)
+--             | length xts == length args + 1 -> do
+--               let xs = map (\(_, x, _) -> x) xts
+--               let ts = map (\(_, _, tx) -> tx) xts
+--               let sub = zip xs $ args' ++ [cocase]
+--               let ts'' = map (substWeakTermPlus sub) ts
+--               forM_ (zip ts'' (tsArgs' ++ [tCoind])) $ uncurry insConstraintEnv
+--               let cod' = substWeakTermPlus sub cod
+--               insConstraintEnv tBody cod'
+--               forM_ (zip mls (lsArgs' ++ [ml])) $ uncurry insLevelEQ
+--             | otherwise ->
+--               raiseError m $
+--               "the arity of `" <>
+--               asText c <>
+--               "` is supposed to be " <>
+--               T.pack (show (length args + 1)) <>
+--               ", but found " <> T.pack (show (length xts)) <> " argument(s)"
+--           _ ->
+--             raiseError m $
+--             "the type of `" <>
+--             asText c <> "` must be a Pi-type, but is:\n" <> toText tElim
+--   mtName <- lookupTypeEnv name
+--   case mtName of
+--     Nothing ->
+--       raiseError m $ "no such coinductive type defined: " <> asText name
+--     Just (tNameStrict, UnivLevelPlus (_, lName)) -> do
+--       (tName, _) <- univInst (weaken tNameStrict) lName
+--       case tName of
+--         (_, WeakTermPi mls xts _)
+--           | length xts == length args' -> do
+--             let xs = map (\(_, x, _) -> x) xts
+--             let ts = map (\(_, _, tx) -> tx) xts
+--             let sub = zip xs args'
+--             let tsArgs'' = map (substWeakTermPlus sub) ts
+--             forM_ (zip tsArgs' tsArgs'') $ uncurry insConstraintEnv
+--             forM_ (zip mls lsArgs') $ uncurry insLevelEQ
+--             return (cocase, tCoind, last mls)
+--         _ ->
+--           raiseError m $
+--           "the type of `" <>
+--           asText name <> "` must be a Pi-type, but is:\n" <> toText tName
 inferType' :: Context -> WeakTermPlus -> WithEnv (WeakTermPlus, UnivLevelPlus)
 inferType' ctx t = do
   (t', u, l) <- infer' ctx t
@@ -756,11 +756,11 @@ univInst' (m, WeakTermCase (e, t) cxtes) = do
       body' <- univInst' body
       return ((c, xts'), body')
   return (m, WeakTermCase (e', t') cxtes')
-univInst' (m, WeakTermCocase name ces) = do
-  let (cs, es) = unzip ces
-  es' <- mapM univInst' es
-  return (m, WeakTermCocase name $ zip cs es')
 
+-- univInst' (m, WeakTermCocase name ces) = do
+--   let (cs, es) = unzip ces
+--   es' <- mapM univInst' es
+--   return (m, WeakTermCocase name $ zip cs es')
 univInstArgs :: [IdentifierPlus] -> WithEnv [IdentifierPlus]
 univInstArgs xts = do
   let (ms, xs, ts) = unzip3 xts

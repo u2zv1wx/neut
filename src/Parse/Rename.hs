@@ -237,14 +237,14 @@ rename' nenv (m, WeakTermCase (e, t) cxtes) = do
       (xts', body') <- renameBinder nenv xts body
       return ((c', xts'), body')
   return (m, WeakTermCase (e', t') cxtes')
-rename' nenv (m, WeakTermCocase (name, args) ces) = do
-  name' <- lookupStrict'' nenv m name
-  args' <- mapM (rename' nenv) args
-  let (cs, es) = unzip ces
-  cs' <- mapM (lookupStrict'' nenv m) cs
-  es' <- mapM (rename' nenv) es
-  return (m, WeakTermCocase (name', args') $ zip cs' es')
 
+-- rename' nenv (m, WeakTermCocase (name, args) ces) = do
+--   name' <- lookupStrict'' nenv m name
+--   args' <- mapM (rename' nenv) args
+--   let (cs, es) = unzip ces
+--   cs' <- mapM (lookupStrict'' nenv m) cs
+--   es' <- mapM (rename' nenv) es
+--   return (m, WeakTermCocase (name', args') $ zip cs' es')
 renameIdentifier :: NameEnv -> Meta -> Identifier -> WithEnv Identifier
 renameIdentifier nenv m x@(I (s, _)) = do
   case lookupName x nenv of
@@ -544,11 +544,11 @@ invRename (m, WeakTermCase (e, t) cxtes) = do
       (xts', body') <- invRenameBinder xts body
       return ((c, xts'), body')
   return (m, WeakTermCase (e', t') cxtes')
-invRename (m, WeakTermCocase name ces) = do
-  let (cs, es) = unzip ces
-  es' <- mapM invRename es
-  return (m, WeakTermCocase name $ zip cs es')
 
+-- invRename (m, WeakTermCocase name ces) = do
+--   let (cs, es) = unzip ces
+--   es' <- mapM invRename es
+--   return (m, WeakTermCocase name $ zip cs es')
 invRenameBinder ::
      [IdentifierPlus]
   -> WeakTermPlus
