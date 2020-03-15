@@ -30,6 +30,8 @@ clarify (m, TermTau _) = do
 clarify (m, TermUpsilon x) = return (m, CodeUpIntro (m, DataUpsilon x))
 clarify (m, TermPi {}) = do
   returnClosureType m
+clarify (m, TermPiPlus {}) = do
+  returnClosureType m
 clarify lam@(m, TermPiIntro mxts e) = do
   let (_, xs, ts) = unzip3 mxts
   let xts = zip xs ts
@@ -37,6 +39,13 @@ clarify lam@(m, TermPiIntro mxts e) = do
   e' <- clarify e
   fvs <- chainTermPlus lam
   retClosure Nothing fvs m mxts e'
+clarify lam@(m, TermPiIntroPlus name _ idx sub mxts e) = do
+  let (_, xs, ts) = unzip3 mxts
+  let xts = zip xs ts
+  forM_ xts $ uncurry insTypeEnv'
+  e' <- clarify e
+  fvs <- chainTermPlus lam
+  retClosure (Just name) fvs m mxts e'
 clarify (m, TermPiElim e es) = do
   es' <- mapM clarifyPlus es
   e' <- clarify e
@@ -146,6 +155,7 @@ clarify (m, TermStructElim xks e1 e2) = do
   (structVarName, structVar) <- newDataUpsilonWith "struct"
   return $
     bindLet [(structVarName, e1')] (m, CodeStructElim (zip xs ks) structVar e2')
+clarify (m, TermCase (e, _) cxtes) = undefined
 
 clarifyPlus :: TermPlus -> WithEnv (Identifier, CodePlus, DataPlus)
 clarifyPlus e@(m, _) = do
@@ -188,7 +198,7 @@ clarifyConst m name@(I (x, _)) = do
   os <- getOS
   case asSysCallMaybe os x of
     Just (syscall, argInfo) -> clarifySysCall name syscall argInfo m
-    Nothing -> return (m, CodeUpIntro (m, DataTheta name))
+    Nothing -> return (m, CodeUpIntro (m, DataTheta $ asText' name))
 
 clarifyUnaryOp :: Identifier -> UnaryOp -> Meta -> WithEnv CodePlus
 clarifyUnaryOp name op m = do
@@ -199,7 +209,7 @@ clarifyUnaryOp name op m = do
       let varX = toDataUpsilon (x, mx)
       zts <- complementaryChainOf xts
       retClosure
-        (Just name)
+        (Just $ asText' name)
         zts
         m
         [(mx, x, tx)]
@@ -216,7 +226,7 @@ clarifyBinaryOp name op m = do
       let varY = toDataUpsilon (y, my)
       zts <- complementaryChainOf xts
       retClosure
-        (Just name)
+        (Just $ asText' name)
         zts
         m
         [(mx, x, tx), (my, y, ty)]
@@ -237,7 +247,7 @@ clarifyArrayAccess m name lowType = do
             zts <- complementaryChainOf xts
             callThenReturn <- toArrayAccessTail m lowType cod arr index xs
             let body = iterativeApp headerList callThenReturn
-            retClosure (Just name) zts m xts body
+            retClosure (Just $ asText' name) zts m xts body
           _ -> raiseCritical m $ "the type of array-access is wrong"
     _ -> raiseCritical m $ "the type of array-access is wrong"
 
@@ -257,7 +267,7 @@ clarifySysCall name syscall args m = do
         (xs, ds, headerList) <- computeHeader m xts args
         callThenReturn <- toSysCallTail m cod syscall ds xs
         let body = iterativeApp headerList callThenReturn
-        retClosure (Just name) zts m xts body
+        retClosure (Just $ asText' name) zts m xts body
     _ -> raiseCritical m $ "the type of " <> asText name <> " is wrong"
 
 iterativeApp :: [a -> a] -> a -> a
@@ -282,7 +292,7 @@ clarifyBinder ((m, x, t):xts) = do
   return $ (m, x, t') : xts'
 
 retClosure ::
-     Maybe Identifier -- the name of newly created closure
+     Maybe T.Text -- the name of newly created closure
   -> [(Meta, Identifier, TermPlus)] -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
   -> Meta -- meta of lambda
   -> [(Meta, Identifier, TermPlus)] -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
@@ -300,12 +310,12 @@ retClosure' ::
   -> CodePlus -- the `e` in `lam (x1, ..., xn). e`
   -> WithEnv CodePlus
 retClosure' x fvs m xts e = do
-  cls <- makeClosure' (Just x) fvs m xts e
+  cls <- makeClosure' (Just $ asText' x) fvs m xts e
   knot x cls
   return (m, CodeUpIntro cls)
 
 makeClosure' ::
-     Maybe Identifier -- the name of newly created closure
+     Maybe T.Text -- the name of newly created closure
   -> [(Meta, Identifier, TermPlus)] -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
   -> Meta -- meta of lambda
   -> [(Meta, Identifier, TermPlus)] -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
@@ -319,12 +329,12 @@ makeClosure' mName fvs m xts e = do
 knot :: Identifier -> DataPlus -> WithEnv ()
 knot z cls = do
   cenv <- gets codeEnv
-  case Map.lookup z cenv of
+  case Map.lookup (asText' z) cenv of
     Nothing -> raiseCritical' "knot"
     Just (Definition _ args body) -> do
       let body' = substCodePlus [(z, cls)] body
       let def' = Definition (IsFixed True) args body'
-      modify (\env -> env {codeEnv = Map.insert z def' cenv})
+      modify (\env -> env {codeEnv = Map.insert (asText' z) def' cenv})
 
 asSysCallMaybe :: OS -> T.Text -> Maybe (Syscall, [Arg])
 asSysCallMaybe OSLinux name =

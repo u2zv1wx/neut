@@ -14,6 +14,7 @@ import Data.List
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.IntMap.Strict as IntMap
+import qualified Data.Text as T
 
 import Clarify.Linearize
 import Clarify.Sigma
@@ -24,7 +25,7 @@ import Data.Env
 import Data.Term
 
 makeClosure ::
-     Maybe Identifier -- the name of newly created closure
+     Maybe T.Text -- the name of newly created closure
   -> [(Meta, Identifier, CodePlus)] -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
   -> Meta -- meta of lambda
   -> [(Meta, Identifier, CodePlus)] -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
@@ -69,11 +70,11 @@ callClosure m e zexes = do
           clsVar
           (m, CodePiElimDownElim lamVar (xs ++ [envVar])))
 
-nameFromMaybe :: Maybe Identifier -> WithEnv Identifier
+nameFromMaybe :: Maybe T.Text -> WithEnv T.Text
 nameFromMaybe mName =
   case mName of
     Just lamThetaName -> return lamThetaName
-    Nothing -> newNameWith' "thunk"
+    Nothing -> asText' <$> newNameWith' "thunk"
 
 -- fixme : ここのtypeEnvは引数で取る必要があるはず。envだと壊れる。renameと同じ理由。
 chainTermPlus :: TermPlus -> WithEnv [(Meta, Identifier, TermPlus)]

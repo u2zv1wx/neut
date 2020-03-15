@@ -77,7 +77,7 @@ uncastList ((y, (x, et)):yxs) e = do
   llvmUncastLet x (LLVMDataLocal y) et e'
 
 takeBaseName :: DataPlus -> T.Text
-takeBaseName (_, DataTheta (I (s, _))) = s
+takeBaseName (_, DataTheta s) = s
 takeBaseName (_, DataUpsilon (I (s, _))) = s
 takeBaseName (_, DataSigmaIntro _ ds) = "array" <> T.pack (show (length ds))
 takeBaseName (_, DataFloat16 _) = "half"
@@ -266,16 +266,15 @@ llvmDataLet x (m, DataTheta y) cont = do
   cenv <- gets codeEnv
   ns <- gets nameSet
   case Map.lookup y cenv of
-    Nothing -> raiseCritical m $ "no such global label defined: " <> asText y -- fixme: support FFI (update declEnv)
+    Nothing -> raiseCritical m $ "no such global label defined: " <> y -- fixme: support FFI (update declEnv)
     Just (Definition _ args e)
       | not (y `S.member` ns) -> do
         modify (\env -> env {nameSet = S.insert y ns})
         llvm <- llvmCode e
         (args', llvm') <- rename args llvm
         insLLVMEnv y args' llvm'
-        llvmUncastLet x (LLVMDataGlobal $ asText' y) (toFunPtrType args) cont
-      | otherwise ->
-        llvmUncastLet x (LLVMDataGlobal $ asText' y) (toFunPtrType args) cont
+        llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType args) cont
+      | otherwise -> llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType args) cont
 llvmDataLet x (_, DataUpsilon y) cont =
   llvmUncastLet x (LLVMDataLocal y) voidPtr cont
 llvmDataLet x (_, DataSigmaIntro k ds) cont = do
@@ -481,7 +480,7 @@ getEnumNum label = do
     Nothing -> raiseCritical' $ "no such enum is defined: " <> label
     Just (_, i) -> return i
 
-insLLVMEnv :: Identifier -> [Identifier] -> LLVM -> WithEnv ()
+insLLVMEnv :: T.Text -> [Identifier] -> LLVM -> WithEnv ()
 insLLVMEnv funName args e =
   modify (\env -> env {llvmEnv = Map.insert funName (args, e) (llvmEnv env)})
 

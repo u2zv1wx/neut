@@ -26,10 +26,9 @@ emit mainTerm = do
   zs <- emitDefinition "i64" "main" [] mainTerm'
   xs <-
     forM (Map.toList lenv) $ \(name, (args, body)) -> do
-      let name' = asText' name
       let args' = map (showLLVMData . LLVMDataLocal) args
       let body' = reduceLLVM body
-      emitDefinition "i8*" (TE.encodeUtf8Builder name') args' body'
+      emitDefinition "i8*" (TE.encodeUtf8Builder name) args' body'
   return $ toLazyByteString $ unlinesL $ g <> zs <> concat xs
 
 emitDeclarations :: WithEnv [Builder]

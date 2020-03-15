@@ -75,10 +75,10 @@ data Env =
     , zetaEnv :: IntMap.IntMap (WeakTermPlus, WeakTermPlus, UnivLevelPlus)
     -- clarify
     , chainEnv :: IntMap.IntMap [(Meta, Identifier, TermPlus)] -- var/const ~> the closed var chain of its type
-    , codeEnv :: Map.HashMap Identifier Definition -- f ~> thunk (lam (x1 ... xn) e)
-    , nameSet :: S.Set Identifier
+    , codeEnv :: Map.HashMap T.Text Definition -- f ~> thunk (lam (x1 ... xn) e)
+    , nameSet :: S.Set T.Text
     -- LLVM
-    , llvmEnv :: Map.HashMap Identifier ([Identifier], LLVM)
+    , llvmEnv :: Map.HashMap T.Text ([Identifier], LLVM)
     , declEnv :: Map.HashMap T.Text ([LowType], LowType) -- external functions that must be declared in LLVM IR
     }
 

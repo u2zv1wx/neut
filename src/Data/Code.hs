@@ -3,12 +3,14 @@ module Data.Code where
 import Data.Maybe (fromMaybe)
 import Numeric.Half
 
+import qualified Data.Text as T
+
 import Data.Basic
 
 -- The definition of `Data` doesn't contain those type-level definitions like `DataTau`
 -- since they are translated to "exponents" immediately after polarization (and thus in Clarify.hs).
 data Data
-  = DataTheta Identifier
+  = DataTheta T.Text
   | DataUpsilon Identifier
   | DataSigmaIntro ArrayKind [DataPlus]
   | DataFloat16 Half

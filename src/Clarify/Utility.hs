@@ -62,10 +62,10 @@ returnCartesianImmediate = do
   v <- cartesianImmediate emptyMeta
   return (emptyMeta, CodeUpIntro v)
 
-toThetaInfo :: T.Text -> Meta -> WithEnv (Identifier, DataPlus)
+toThetaInfo :: T.Text -> Meta -> WithEnv (T.Text, DataPlus)
 toThetaInfo thetaName m = do
   i <- lookupConstNum thetaName
-  let ident = I (thetaName, i)
+  let ident = asText' $ I (thetaName, i)
   return (ident, (m, DataTheta ident))
 
 cartesianImmediate :: Meta -> WithEnv DataPlus
@@ -149,7 +149,7 @@ relevantStruct argVar ks = do
                 , (emptyMeta, DataStructIntro vks)
                 ])))
 
-insCodeEnv :: Identifier -> [Identifier] -> CodePlus -> WithEnv ()
+insCodeEnv :: T.Text -> [Identifier] -> CodePlus -> WithEnv ()
 insCodeEnv name args e = do
   let def = Definition (IsFixed False) args e
   modify (\env -> env {codeEnv = Map.insert name def (codeEnv env)})
