@@ -158,13 +158,53 @@ clarify (m, TermStructElim xks e1 e2) = do
   (structVarName, structVar) <- newDataUpsilonWith "struct"
   return $
     bindLet [(structVarName, e1')] (m, CodeStructElim (zip xs ks) structVar e2')
-clarify (_, TermCase (_, _) _) = undefined
+clarify (m, TermCase (e, _) cxtes) = do
+  e' <- clarify e
+  (clsVarName, clsVar) <- newDataUpsilonWith "closure"
+  (typeVarName, _) <- newDataUpsilonWith "exp"
+  (envVarName, _) <- newDataUpsilonWith "env"
+  (lamVarName, _) <- newDataUpsilonWith "thunk"
+  retImmType <- returnCartesianImmediate
+  cxtes' <- clarifyCase m cxtes lamVarName envVarName
+  return $
+    bindLet
+      [(clsVarName, e')]
+      ( m
+      , CodeSigmaElim
+          arrVoidPtr
+          [ (typeVarName, retImmType)
+          , (envVarName, returnUpsilon typeVarName)
+          , (lamVarName, retImmType)
+          ]
+          clsVar
+          cxtes')
 
 clarifyPlus :: TermPlus -> WithEnv (Identifier, CodePlus, DataPlus)
 clarifyPlus e@(m, _) = do
   e' <- clarify e
   (varName, var) <- newDataUpsilonWith' "var" m
   return (varName, e', var)
+
+clarifyCase ::
+     Meta
+  -> [((Identifier, [(Meta, Identifier, TermPlus)]), TermPlus)]
+  -> Identifier
+  -> Identifier
+  -> WithEnv CodePlus
+clarifyCase m cxtes lamVarName envVarName = do
+  let cs = map (\((c, _), _) -> c) cxtes
+  let cs' = map (CaseValue . EnumValueGlobal . asText) cs
+  es <- mapM (\cxte -> clarifyCase' cxte lamVarName envVarName) cxtes
+  let lamVar = toTermUpsilon lamVarName
+  let i64 = (m, TermEnum (EnumTypeIntS 64))
+  clarify (m, TermEnumElim (lamVar, i64) (zip cs' es))
+
+clarifyCase' ::
+     ((Identifier, [(Meta, Identifier, TermPlus)]), TermPlus)
+  -> Identifier
+  -> Identifier
+  -> WithEnv TermPlus
+clarifyCase' = undefined
 
 termLet :: [(Identifier, (TermPlus, TermPlus))] -> TermPlus -> TermPlus
 termLet [] cont = cont

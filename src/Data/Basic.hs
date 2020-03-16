@@ -155,6 +155,7 @@ data EnumValue
   = EnumValueIntS IntSize Integer
   | EnumValueIntU IntSize Integer
   | EnumValueLabel T.Text
+  | EnumValueGlobal T.Text
   deriving (Show, Eq, Ord)
 
 data LowType
