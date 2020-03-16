@@ -38,8 +38,9 @@ llvmCode (_, CodePiElimDownElim v ds) = do
   (fun, castThen) <- llvmCast (Just $ takeBaseName v) v $ toFunPtrType ds
   castThenCall <- castThen $ LLVMCall fun vs
   llvmDataLet' (zip xs ds) $ castThenCall
-llvmCode (_, CodeSigmaElim k xts v e) = do
-  let xs = map fst xts
+llvmCode (_, CodeSigmaElim k xs v e)
+  -- let xs = map fst xts
+ = do
   let et = arrayKindToLowType k -- elem type
   let bt = LowTypeArrayPtr (length xs) et -- base pointer type  ([(length xs) x ARRAY_ELEM_TYPE])
   let idxList = map (\i -> (LLVMDataInt i, i32)) [0 ..]

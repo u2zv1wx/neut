@@ -135,21 +135,22 @@ clarify (m, TermArrayElim k mxts e1 e2) = do
   let xts = zip xs ts
   forM_ xts $ uncurry insTypeEnv'
   (arrVarName, arrVar) <- newDataUpsilonWith "arr"
-  (arrTypeVarName, arrTypeVar) <- newDataUpsilonWith "arr-type"
-  let retArrTypeVar = (m, CodeUpIntro arrTypeVar)
+  (arrTypeVarName, _) <- newDataUpsilonWith "arr-type"
+  -- let retArrTypeVar = (m, CodeUpIntro arrTypeVar)
   (arrInnerVarName, arrInnerVar) <- newDataUpsilonWith "arr-inner"
-  retImmType <- returnCartesianImmediate
-  ts' <- mapM clarify ts
-  let xts' = zip xs ts'
+  -- retImmType <- returnCartesianImmediate
+  -- ts' <- mapM clarify ts
+  -- let xts' = zip xs ts'
   e2' <- clarify e2
   return $
     bindLet [(arrVarName, e1')] $
     ( m
     , CodeSigmaElim
         arrVoidPtr
-        [(arrTypeVarName, retImmType), (arrInnerVarName, retArrTypeVar)]
+        [arrTypeVarName, arrInnerVarName]
+        -- [(arrTypeVarName, retImmType), (arrInnerVarName, retArrTypeVar)]
         arrVar
-        (m, CodeSigmaElim k xts' arrInnerVar e2'))
+        (m, CodeSigmaElim k xs arrInnerVar e2'))
 clarify (m, TermStruct ks) = do
   t <- cartesianStruct m ks
   return (m, CodeUpIntro t)
@@ -173,7 +174,7 @@ clarify (m, TermCase (e, _) cxtes) = do
   (typeVarName, _) <- newDataUpsilonWith "exp"
   (envVarName, _) <- newDataUpsilonWith "env"
   (lamVarName, _) <- newDataUpsilonWith "thunk"
-  retImmType <- returnCartesianImmediate
+  -- retImmType <- returnCartesianImmediate
   cxtes' <- clarifyCase m cxtes lamVarName envVarName
   return $
     bindLet
@@ -181,10 +182,7 @@ clarify (m, TermCase (e, _) cxtes) = do
       ( m
       , CodeSigmaElim
           arrVoidPtr
-          [ (typeVarName, retImmType)
-          , (envVarName, returnUpsilon typeVarName)
-          , (lamVarName, retImmType)
-          ]
+          [typeVarName, envVarName, lamVarName]
           clsVar
           cxtes')
 
@@ -482,7 +480,7 @@ toHeaderInfo m x t ArgArray = do
   (arrayTypeName, arrayType) <- newDataUpsilonWith "array-type"
   (arrayInnerName, arrayInner) <- newDataUpsilonWith "array-inner"
   (arrayInnerTmpName, arrayInnerTmp) <- newDataUpsilonWith "array-tmp"
-  retImmType <- returnCartesianImmediate
+  -- retImmType <- returnCartesianImmediate
   return
     ( [arrayVarName]
     , [arrayInnerTmp]
@@ -490,9 +488,7 @@ toHeaderInfo m x t ArgArray = do
         ( m
         , CodeSigmaElim
             arrVoidPtr
-            [ (arrayTypeName, retImmType)
-            , (arrayInnerName, (m, CodeUpIntro arrayType))
-            ]
+            [arrayTypeName, arrayInnerName]
             (toVar x)
             ( m
             , CodeUpElim

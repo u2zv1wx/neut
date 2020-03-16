@@ -24,11 +24,7 @@ data Code
   = CodeTheta Theta
   | CodePiElimDownElim DataPlus [DataPlus] -- ((force v) v1 ... vn)
   -- the variable introduced by CodeSigmaElim is must be used (practically) linearly
-  | CodeSigmaElim
-      ArrayKind
-      [(Identifier, CodePlus)] -- [(x1, return t1), ..., (xn, return tn)] with xi : ti
-      DataPlus
-      CodePlus
+  | CodeSigmaElim ArrayKind [Identifier] DataPlus CodePlus
   | CodeUpIntro DataPlus
   | CodeUpIntroNoReduce DataPlus
   -- the variable introduced by CodeUpElim is assumed to be used linearly
@@ -101,10 +97,11 @@ substCodePlus sub (m, CodePiElimDownElim v ds) = do
   let v' = substDataPlus sub v
   let ds' = map (substDataPlus sub) ds
   (m, CodePiElimDownElim v' ds')
-substCodePlus sub (m, CodeSigmaElim mk xts v e) = do
+substCodePlus sub (m, CodeSigmaElim mk xs v e) = do
   let v' = substDataPlus sub v
-  let (xts', e') = substDataPlusSigmaElim sub xts e
-  (m, CodeSigmaElim mk xts' v' e')
+  let sub' = filter (\(y, _) -> y `notElem` xs) sub
+  let e' = substCodePlus sub' e
+  (m, CodeSigmaElim mk xs v' e')
 substCodePlus sub (m, CodeUpIntro v) = do
   let v' = substDataPlus sub v
   (m, CodeUpIntro v')
@@ -143,15 +140,10 @@ substTheta sub (ThetaArrayAccess t d1 d2) = do
 substTheta sub (ThetaSysCall sysCall ds) = do
   let ds' = map (substDataPlus sub) ds
   ThetaSysCall sysCall ds'
-
-substDataPlusSigmaElim ::
-     SubstDataPlus
-  -> [(Identifier, CodePlus)]
-  -> CodePlus
-  -> ([(Identifier, CodePlus)], CodePlus)
-substDataPlusSigmaElim sub [] e = ([], substCodePlus sub e)
-substDataPlusSigmaElim sub ((x, t):xs) e = do
-  let t' = substCodePlus sub t
-  let sub' = filter (\(y, _) -> y /= x) sub
-  let (xs', e') = substDataPlusSigmaElim sub' xs e
-  ((x, t') : xs', e')
+-- substDataPlusSigmaElim ::
+--      SubstDataPlus -> [Identifier] -> CodePlus -> ([Identifier], CodePlus)
+-- substDataPlusSigmaElim sub [] e = ([], substCodePlus sub e)
+-- substDataPlusSigmaElim sub (x:xs) e = do
+--   let sub' = filter (\(y, _) -> y /= x) sub
+--   let (xs', e') = substDataPlusSigmaElim sub' xs e
+--   (x : xs', e')

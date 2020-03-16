@@ -73,7 +73,7 @@ affineSigma argVar m k mxts = do
   let body =
         bindLet (zip ys as) (m, CodeUpIntro (m, DataSigmaIntro arrVoidPtr []))
   body' <- linearize xts body
-  return (m, CodeSigmaElim k xts argVar body')
+  return (m, CodeSigmaElim k (map fst xts) argVar body')
 
 -- (Assuming `ti` = `return di` for some `di` such that `xi : di`)
 -- relevantSigma NAME LOC [(x1, t1), ..., (xn, tn)]   ~>
@@ -107,7 +107,7 @@ relevantSigma argVar m k mxts = do
   transposedPair <- transposeSigma k pairVarTypeList
   let body = bindLet (zip pairVarNameList as) transposedPair
   body' <- linearize xts body
-  return (m, CodeSigmaElim k xts argVar body')
+  return (m, CodeSigmaElim k (map fst xts) argVar body')
 
 toPairInfo ::
      (Identifier, CodePlus) -> WithEnv (Identifier, (DataPlus, CodePlus))
@@ -140,9 +140,9 @@ transposeSigma k ds = do
 bindSigmaElim ::
      [((Identifier, Identifier), (DataPlus, CodePlus))] -> CodePlus -> CodePlus
 bindSigmaElim [] cont = cont
-bindSigmaElim (((x, y), (d, t)):xyds) cont = do
+bindSigmaElim (((x, y), (d, _)):xyds) cont = do
   let cont' = bindSigmaElim xyds cont
-  (fst cont', CodeSigmaElim arrVoidPtr [(x, t), (y, t)] d cont')
+  (fst cont', CodeSigmaElim arrVoidPtr [x, y] d cont')
 
 supplyName :: Either b (Identifier, b) -> WithEnv (Identifier, b)
 supplyName (Right (x, t)) = return (x, t)

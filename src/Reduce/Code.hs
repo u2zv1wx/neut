@@ -33,8 +33,7 @@ reduceCodePlus (m, CodePiElimDownElim v ds) = do
         modify (\env -> env {codeEnv = Map.insert x def cenv})
         return (m, CodePiElimDownElim v ds)
     _ -> return (m, CodePiElimDownElim v ds)
-reduceCodePlus (m, CodeSigmaElim mk xts v e) = do
-  let (xs, ts) = unzip xts
+reduceCodePlus (m, CodeSigmaElim mk xs v e) = do
   case v of
     (_, DataSigmaIntro mk' ds)
       | length ds == length xs
@@ -45,9 +44,10 @@ reduceCodePlus (m, CodeSigmaElim mk xts v e) = do
         (mUp, CodeUpIntro (_, DataSigmaIntro _ ds))
           | Just ys <- mapM asUpsilon ds
           , xs == ys -> return (mUp, CodeUpIntro v) -- eta-reduce
-        _ -> do
-          ts' <- mapM reduceCodePlus ts
-          return (m, CodeSigmaElim mk (zip xs ts') v e')
+        _
+          -- ts' <- mapM reduceCodePlus ts
+         -> do
+          return (m, CodeSigmaElim mk xs v e')
 reduceCodePlus (m, CodeUpElim x e1 e2) = do
   e1' <- reduceCodePlus e1
   case e1' of

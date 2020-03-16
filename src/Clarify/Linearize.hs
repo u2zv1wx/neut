@@ -147,7 +147,7 @@ withHeaderRelevant' t expVar ((x, (x1, x2)):chain) cont = do
         , CodePiElimDownElim
             expVar
             [(m, DataEnumIntro (EnumValueIntS 64 1)), varX])
-        (m, CodeSigmaElim arrVoidPtr [(x1, t), (x2, t)] sigVar cont'))
+        (m, CodeSigmaElim arrVoidPtr [x1, x2] sigVar cont'))
 
 merge :: [NameMap] -> NameMap
 merge [] = Map.empty
@@ -177,11 +177,11 @@ distinguishCode zs (ml, CodePiElimDownElim d ds) = do
   (vs, d') <- distinguishData zs d
   (vss, ds') <- unzip <$> mapM (distinguishData zs) ds
   return (merge $ vs : vss, (ml, CodePiElimDownElim d' ds'))
-distinguishCode zs (ml, CodeSigmaElim mk xts d e) = do
+distinguishCode zs (ml, CodeSigmaElim mk xs d e) = do
   (vs1, d') <- distinguishData zs d
-  let zs' = filter (`notElem` map fst xts) zs
+  let zs' = filter (`notElem` xs) zs
   (vs2, e') <- distinguishCode zs' e
-  return (merge [vs1, vs2], (ml, CodeSigmaElim mk xts d' e'))
+  return (merge [vs1, vs2], (ml, CodeSigmaElim mk xs d' e'))
 distinguishCode zs (ml, CodeUpIntro d) = do
   (vs, d') <- distinguishData zs d
   return (vs, (ml, CodeUpIntro d'))
