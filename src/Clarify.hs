@@ -109,11 +109,12 @@ clarify (m, TermEnumElim (e, _) bs) = do
   fvss <- mapM chainTermPlus' es
   let fvs = nubBy (\(_, x, _) (_, y, _) -> x == y) $ concat fvss
   es' <- mapM clarify es
-  es'' <- mapM (retClosure Nothing fvs m []) es'
-  es''' <- mapM (\cls -> callClosure m cls []) es''
-  (yName, e', y) <- clarifyPlus e
-  let varInfo = map (\(mx, x, _) -> (x, toDataUpsilon (x, mx))) fvs
-  return $ bindLet [(yName, e')] (m, CodeEnumElim varInfo y (zip cs es'''))
+  clarifyEnumElim m fvs e $ zip cs es'
+  -- es'' <- mapM (retClosure Nothing fvs m []) es'
+  -- es''' <- mapM (\cls -> callClosure m cls []) es''
+  -- (yName, e', y) <- clarifyPlus e
+  -- let varInfo = map (\(mx, x, _) -> (x, toDataUpsilon (x, mx))) fvs
+  -- return $ bindLet [(yName, e')] (m, CodeEnumElim varInfo y (zip cs es'''))
 clarify (m, TermArray {}) = do
   returnArrayType m
 clarify (m, TermArrayIntro k es) = do
@@ -193,6 +194,20 @@ clarifyPlus e@(m, _) = do
   (varName, var) <- newDataUpsilonWith' "var" m
   return (varName, e', var)
 
+clarifyEnumElim ::
+     Meta
+  -> [(Meta, Identifier, TermPlus)]
+  -> TermPlus
+  -> [(Case, CodePlus)]
+  -> WithEnv CodePlus
+clarifyEnumElim m fvs e bs = do
+  let (cs, es) = unzip bs
+  es' <- mapM (retClosure Nothing fvs m []) es
+  es'' <- mapM (\cls -> callClosure m cls []) es'
+  (yName, e', y) <- clarifyPlus e
+  let varInfo = map (\(mx, x, _) -> (x, toDataUpsilon (x, mx))) fvs
+  return $ bindLet [(yName, e')] (m, CodeEnumElim varInfo y (zip cs es''))
+
 clarifyCase ::
      Meta
   -> [((Identifier, [(Meta, Identifier, TermPlus)]), TermPlus)]
@@ -202,18 +217,32 @@ clarifyCase ::
 clarifyCase m cxtes lamVarName envVarName = do
   let cs = map (\((c, _), _) -> c) cxtes
   let cs' = map (CaseValue . EnumValueGlobal . asText) cs
-  es <- mapM (\cxte -> clarifyCase' cxte lamVarName envVarName) cxtes
+  es <- mapM (\cxte -> clarifyCase' m cxte envVarName) cxtes
   let lamVar = toTermUpsilon lamVarName
-  let i64 = (m, TermEnum (EnumTypeIntS 64))
-  clarify (m, TermEnumElim (lamVar, i64) (zip cs' es))
+  fvss <- mapM chainCaseClause cxtes
+  -- fvss <- mapM chainTermPlus' es
+  let fvs = nubBy (\(_, x, _) (_, y, _) -> x == y) $ concat fvss
+  clarifyEnumElim m fvs lamVar $ zip cs' es
+  -- clarify (m, TermEnumElim (lamVar, i64) (zip cs' es))
+
+chainCaseClause ::
+     ((Identifier, [(Meta, Identifier, TermPlus)]), TermPlus)
+  -> WithEnv [(Meta, Identifier, TermPlus)]
+chainCaseClause ((_, xts), body) = do
+  fvs <- chainTermPlus' body
+  let xs = map (\(_, x, _) -> x) xts
+  -- fixme: xts must be a closed chain
+  return $ filter (\(_, y, _) -> y `notElem` xs) fvs
 
 clarifyCase' ::
-     ((Identifier, [(Meta, Identifier, TermPlus)]), TermPlus)
+     Meta
+  -> ((Identifier, [(Meta, Identifier, TermPlus)]), TermPlus)
   -> Identifier
-  -> Identifier
-  -> WithEnv TermPlus
-clarifyCase' ((c, xts), e) lamVarName envVarName = do
+  -> WithEnv CodePlus
+clarifyCase' m ((_, xts), e) envVarName = do
+  let envVar = toDataUpsilon' envVarName
   undefined
+  -- return (m, TermSigmaElim)
 
 -- termLet :: [(Identifier, (TermPlus, TermPlus))] -> TermPlus -> TermPlus
 -- termLet [] cont = cont
