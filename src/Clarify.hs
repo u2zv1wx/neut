@@ -52,7 +52,6 @@ clarify (m, TermPiIntroPlus (name, args) mxts e) = do
   let xts = zip xs ts
   forM_ xts $ uncurry insTypeEnv'
   e' <- clarify e
-  -- fixme: check if args is indeed a closed chain
   case varTermPlus (m, TermPiIntro args termZero) of
     [] -> retClosure (Just name) args m mxts e'
     _ ->
@@ -137,11 +136,7 @@ clarify (m, TermArrayElim k mxts e1 e2) = do
   forM_ xts $ uncurry insTypeEnv'
   (arrVarName, arrVar) <- newDataUpsilonWith "arr"
   (arrTypeVarName, _) <- newDataUpsilonWith "arr-type"
-  -- let retArrTypeVar = (m, CodeUpIntro arrTypeVar)
   (arrInnerVarName, arrInnerVar) <- newDataUpsilonWith "arr-inner"
-  -- retImmType <- returnCartesianImmediate
-  -- ts' <- mapM clarify ts
-  -- let xts' = zip xs ts'
   e2' <- clarify e2
   return $
     bindLet [(arrVarName, e1')] $
@@ -149,7 +144,6 @@ clarify (m, TermArrayElim k mxts e1 e2) = do
     , CodeSigmaElim
         arrVoidPtr
         [arrTypeVarName, arrInnerVarName]
-        -- [(arrTypeVarName, retImmType), (arrInnerVarName, retArrTypeVar)]
         arrVar
         (m, CodeSigmaElim k xs arrInnerVar e2'))
 clarify (m, TermStruct ks) = do
@@ -219,10 +213,8 @@ clarifyCase m cxtes lamVarName envVarName = do
   es <- mapM (\cxte -> clarifyCase' m cxte envVarName) cxtes
   let lamVar = toTermUpsilon lamVarName
   fvss <- mapM chainCaseClause cxtes
-  -- fvss <- mapM chainTermPlus' es
   let fvs = nubBy (\(_, x, _) (_, y, _) -> x == y) $ concat fvss
   clarifyEnumElim m fvs lamVar $ zip cs' es
-  -- clarify (m, TermEnumElim (lamVar, i64) (zip cs' es))
 
 chainCaseClause ::
      ((Identifier, [(Meta, Identifier, TermPlus)]), TermPlus)
@@ -230,8 +222,6 @@ chainCaseClause ::
 chainCaseClause ((_, xts), body) = do
   fvs <- chainTermPlus' body
   let xs = map (\(_, x, _) -> x) xts
-  -- fixme: check if xts is indeed a closed chain
-  -- (対応するinductive typeのpi-intro-plusがclarifyできてたらオッケーだから放置でよさそう？)
   return $ filter (\(_, y, _) -> y `notElem` xs) fvs
 
 clarifyCase' ::
@@ -244,19 +234,13 @@ clarifyCase' m ((_, xts), e) envVarName = do
   xts' <- mapM clarifyArgs xts
   e'' <- linearize xts' e'
   let xs = map (\(_, x, _) -> x) xts
-  let envVar = toDataUpsilon' envVarName
-  return (m, CodeSigmaElim arrVoidPtr xs envVar e'')
+  return (m, CodeSigmaElim arrVoidPtr xs (toDataUpsilon' envVarName) e'')
 
 clarifyArgs :: (Meta, Identifier, TermPlus) -> WithEnv (Identifier, CodePlus)
 clarifyArgs (_, x, t) = do
   t' <- clarify t
   return (x, t')
 
--- termLet :: [(Identifier, (TermPlus, TermPlus))] -> TermPlus -> TermPlus
--- termLet [] cont = cont
--- termLet ((x, (e, t)):xets) cont = do
---   let m = fst e
---   (m, TermPiElim (m, TermPiIntro [(m, x, t)] (termLet xets cont)) [e])
 clarifyConst :: Meta -> Identifier -> WithEnv CodePlus
 clarifyConst m name@(I (x, _))
   | Just op <- asUnaryOpMaybe x = clarifyUnaryOp name op m
