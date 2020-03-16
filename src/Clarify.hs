@@ -39,13 +39,16 @@ clarify lam@(m, TermPiIntro mxts e) = do
   e' <- clarify e
   fvs <- chainTermPlus lam
   retClosure Nothing fvs m mxts e'
-clarify lam@(m, TermPiIntroPlus name _ idx sub mxts e) = do
-  let (_, xs, ts) = unzip3 mxts
-  let xts = zip xs ts
-  forM_ xts $ uncurry insTypeEnv'
-  e' <- clarify e
-  fvs <- chainTermPlus lam
-  retClosure (Just name) fvs m mxts e'
+clarify (m, TermPiIntroPlus name indName isReady sub mxts e) =
+  if not isReady
+    then clarify $ termLet sub (m, TermPiIntroPlus name indName True sub mxts e)
+    else do
+      let (_, xs, ts) = unzip3 mxts
+      let xts = zip xs ts
+      forM_ xts $ uncurry insTypeEnv'
+      e' <- clarify e
+      let fvs = map (\(z, ((mz, _), tz)) -> (mz, z, tz)) sub -- modの外側でsubのdomの変数はすべて束縛済みなのでこれでオーケー
+      retClosure (Just name) fvs m mxts e'
 clarify (m, TermPiElim e es) = do
   es' <- mapM clarifyPlus es
   e' <- clarify e
@@ -155,13 +158,19 @@ clarify (m, TermStructElim xks e1 e2) = do
   (structVarName, structVar) <- newDataUpsilonWith "struct"
   return $
     bindLet [(structVarName, e1')] (m, CodeStructElim (zip xs ks) structVar e2')
-clarify (m, TermCase (e, _) cxtes) = undefined
+clarify (_, TermCase (_, _) _) = undefined
 
 clarifyPlus :: TermPlus -> WithEnv (Identifier, CodePlus, DataPlus)
 clarifyPlus e@(m, _) = do
   e' <- clarify e
   (varName, var) <- newDataUpsilonWith' "var" m
   return (varName, e', var)
+
+termLet :: [(Identifier, (TermPlus, TermPlus))] -> TermPlus -> TermPlus
+termLet [] cont = cont
+termLet ((x, (e, t)):xets) cont = do
+  let m = fst e
+  (m, TermPiElim (m, TermPiIntro [(m, x, t)] (termLet xets cont)) [e])
 
 clarifyConst :: Meta -> Identifier -> WithEnv CodePlus
 clarifyConst m name@(I (x, _))

@@ -52,7 +52,7 @@ compInfoWeakTermPlus c info (_, WeakTermPiPlus _ _ xts t) =
   compInfoBinder c info xts t
 compInfoWeakTermPlus c info (_, WeakTermPiIntro xts e) =
   compInfoBinder c info xts e
-compInfoWeakTermPlus c info (_, WeakTermPiIntroPlus _ _ _ _ xts e) =
+compInfoWeakTermPlus c info (_, WeakTermPiIntroPlus _ _ _ xts e) =
   compInfoBinder c info xts e
 compInfoWeakTermPlus c info (_, WeakTermPiElim e es) = do
   mapM_ (compInfoWeakTermPlus c info) es

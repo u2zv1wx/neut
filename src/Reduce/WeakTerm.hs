@@ -30,13 +30,16 @@ reduceWeakTermPlus (m, WeakTermPiIntro xts e) = do
   let ts' = map reduceWeakTermPlus ts
   let e' = reduceWeakTermPlus e
   (m, WeakTermPiIntro (zip3 ms xs ts') e')
-reduceWeakTermPlus (m, WeakTermPiIntroPlus name indName idx s xts e) = do
-  let (zs, es) = unzip s
-  let es' = map reduceWeakTermPlus es
+reduceWeakTermPlus (m, WeakTermPiIntroPlus name indName s xts e) = do
+  let (zs, ees) = unzip s
+  let (es1, es2) = unzip ees
+  let es1' = map reduceWeakTermPlus es1
+  let es2' = map reduceWeakTermPlus es2
   let (ms, xs, ts) = unzip3 xts
   let ts' = map reduceWeakTermPlus ts
   let e' = reduceWeakTermPlus e
-  (m, WeakTermPiIntroPlus name indName idx (zip zs es') (zip3 ms xs ts') e')
+  let ees' = zip es1' es2'
+  (m, WeakTermPiIntroPlus name indName (zip zs ees') (zip3 ms xs ts') e')
 reduceWeakTermPlus (m, WeakTermPiElim e es) = do
   let e' = reduceWeakTermPlus e
   let es' = map reduceWeakTermPlus es
@@ -46,10 +49,11 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
       | length xts == length es' -> do
         let xs = map (\(_, x, _) -> x) xts
         reduceWeakTermPlus $ substWeakTermPlus (zip xs es') body
-    (_, WeakTermPiIntroPlus _ _ _ s xts body)
+    (_, WeakTermPiIntroPlus _ _ s xts body)
       | length xts == length es' -> do
         let xs = map (\(_, x, _) -> x) xts
-        reduceWeakTermPlus $ substWeakTermPlus (s ++ zip xs es') body -- reify the explicit substitution `s`
+        reduceWeakTermPlus $
+          substWeakTermPlus (asSubst s ++ zip xs es') body -- reify the explicit substitution `s`
     -- (_, WeakTermConst (I (constant, _))) ->
     --   reduceWeakTermPlusTheta (m, app) es' m constant
     _ -> (m, app)
@@ -129,11 +133,13 @@ reduceWeakTermPlus (m, WeakTermCase (e, t) cxtes) = do
   let e' = reduceWeakTermPlus e
   let cxtes' = map (\((I (c, _), xts), body) -> (c, (xts, body))) cxtes
   case e' of
-    (_, WeakTermPiIntroPlus name _ idx s _ _)
-      | s' <- map (snd . (s !!)) idx
+    (_, WeakTermPiIntroPlus name _ s _ _)
+      | idx <- undefined -- lookup idx from name
+      , s' <- map (fst . snd . (s !!)) idx
       , Just (xts, body) <- lookup name cxtes'
       , length xts == length s' -> do
         let (_, ys, _) = unzip3 xts
+        -- reduceWeakTermPlus $ substWeakTermPlus s body
         reduceWeakTermPlus $ substWeakTermPlus (zip ys s') body
     _ -> do
       let t' = reduceWeakTermPlus t

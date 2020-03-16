@@ -80,12 +80,13 @@ elaborateStmt (WeakStmtLetInductiveIntro m (bi, ai) (mx, x@(I (_, i)), t) xts yt
   atsbts' <- mapM elaboratePlus atsbts
   -- collect free-var info
   ch <- chainTermPlus (m, TermPiIntro atsbts' app')
-  let s = map (\(mz, z, _) -> (z, (mz, TermUpsilon z))) ch
+  let s = map (\(mz, z, tz) -> (z, ((mz, TermUpsilon z), tz))) ch
   let ys = map (\(_, y, _) -> y) yts
+  -- このidxはたぶんenvのほうに登録するべき
   let idx = findIndices (\(z, _) -> z `elem` ys) s
   xtsyts' <- mapM elaboratePlus $ xts ++ yts
   let lam =
-        (m, TermPiIntro xtsyts' (m, TermPiIntroPlus bi ai idx s atsbts' app'))
+        (m, TermPiIntro xtsyts' (m, TermPiIntroPlus bi ai False s atsbts' app'))
   -- the "elaboreta' e" part ends here
   t'' <- elaborate' t' >>= reduceTermPlus
   insTypeEnv x t'' mlt
@@ -253,12 +254,15 @@ elaborate' (m, WeakTermPiIntro xts e) = do
   e' <- elaborate' e
   xts' <- mapM elaboratePlus xts
   return (m, TermPiIntro xts' e')
-elaborate' (m, WeakTermPiIntroPlus name indName idx s xts e) = do
-  let (zs, es) = unzip s
-  es' <- mapM elaborate' es
+elaborate' (m, WeakTermPiIntroPlus name indName s xts e) = do
+  let (zs, ees) = unzip s
+  let (es1, es2) = unzip ees
+  es1' <- mapM elaborate' es1
+  es2' <- mapM elaborate' es2
   e' <- elaborate' e
   xts' <- mapM elaboratePlus xts
-  return (m, TermPiIntroPlus name indName idx (zip zs es') xts' e')
+  return
+    (m, TermPiIntroPlus name indName False (zip zs (zip es1' es2')) xts' e')
 elaborate' (m, WeakTermPiElim (_, WeakTermZeta h@(I (_, x))) es) = do
   sub <- gets substEnv
   case IntMap.lookup x sub of

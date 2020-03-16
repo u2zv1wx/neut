@@ -19,8 +19,7 @@ data WeakTerm
   | WeakTermPiIntroPlus
       T.Text -- name of constructor
       T.Text -- name of inductive type
-      [Int] -- substのうちcaseのときに取得するべきindex. succ nでいうところのn, cons A x xsでいうところのx, xsの部分。
-      SubstWeakTerm
+      WeakFVInfo
       [IdentifierPlus]
       WeakTermPlus
   | WeakTermPiElim WeakTermPlus [WeakTermPlus]
@@ -86,12 +85,18 @@ data WeakCase
   = WeakCaseIntS IntSize Integer
   | WeakCaseIntU IntSize Integer
   | WeakCaseInt WeakTermPlus Integer
-  -- | WeakCaseNat Int Int
   | WeakCaseLabel T.Text
   | WeakCaseDefault
   deriving (Show, Eq)
 
 type SubstWeakTerm = [(Identifier, WeakTermPlus)]
+
+type WeakFVInfo = [(Identifier, (WeakTermPlus, WeakTermPlus))]
+
+asSubst :: WeakFVInfo -> SubstWeakTerm
+asSubst info = do
+  let (zs, ets) = unzip info
+  zip zs (map fst ets)
 
 type Hole = Identifier
 
@@ -193,10 +198,12 @@ varWeakTermPlus (_, WeakTermUpsilon x) = x : []
 varWeakTermPlus (_, WeakTermPi _ xts t) = varWeakTermPlus' xts [t]
 varWeakTermPlus (_, WeakTermPiPlus _ _ xts t) = varWeakTermPlus' xts [t]
 varWeakTermPlus (_, WeakTermPiIntro xts e) = varWeakTermPlus' xts [e]
-varWeakTermPlus (_, WeakTermPiIntroPlus _ _ _ sub xts e) = do
+varWeakTermPlus (_, WeakTermPiIntroPlus _ _ sub xts e) = do
   let ys = varWeakTermPlus' xts [e]
-  let (zs, es) = unzip sub
-  filter (`notElem` zs) ys ++ concatMap varWeakTermPlus es
+  -- let (zs, es) = unzip sub
+  let (zs, ees) = unzip sub
+  let (es1, es2) = unzip ees
+  filter (`notElem` zs) ys ++ concatMap varWeakTermPlus (es1 ++ es2)
 varWeakTermPlus (_, WeakTermPiElim e es) = do
   let xs = varWeakTermPlus e
   let ys = concatMap varWeakTermPlus es
@@ -256,9 +263,11 @@ holeWeakTermPlus (_, WeakTermUpsilon _) = []
 holeWeakTermPlus (_, WeakTermPi _ xts t) = holeWeakTermPlus' xts [t]
 holeWeakTermPlus (_, WeakTermPiPlus _ _ xts t) = holeWeakTermPlus' xts [t]
 holeWeakTermPlus (_, WeakTermPiIntro xts e) = holeWeakTermPlus' xts [e]
-holeWeakTermPlus (_, WeakTermPiIntroPlus _ _ _ sub xts e) = do
+holeWeakTermPlus (_, WeakTermPiIntroPlus _ _ sub xts e) = do
   let ys = holeWeakTermPlus' xts [e]
-  ys ++ concatMap (holeWeakTermPlus . snd) sub
+  let (_, ees) = unzip sub
+  let (es1, es2) = unzip ees
+  ys ++ concatMap holeWeakTermPlus (es1 ++ es2)
 holeWeakTermPlus (_, WeakTermPiElim e es) =
   holeWeakTermPlus e ++ concatMap holeWeakTermPlus es
 holeWeakTermPlus (_, WeakTermSigma xts) = holeWeakTermPlus' xts []
@@ -322,12 +331,14 @@ substWeakTermPlus sub (m, WeakTermPiPlus name mls xts t) = do
 substWeakTermPlus sub (m, WeakTermPiIntro xts body) = do
   let (xts', body') = substWeakTermPlus'' sub xts body
   (m, WeakTermPiIntro xts' body')
-substWeakTermPlus sub (m, WeakTermPiIntroPlus name indName idx s xts body) = do
+substWeakTermPlus sub (m, WeakTermPiIntroPlus name indName s xts body) = do
   let sub' = filter (\(k, _) -> k `notElem` map fst s) sub -- lamに含まれる自由変数のうちsで「保護」されているものは無視
   let (xts', body') = substWeakTermPlus'' sub' xts body
-  let (zs, es) = unzip s
-  let es' = map (substWeakTermPlus sub) es -- s自体の更新は行なう
-  (m, WeakTermPiIntroPlus name indName idx (zip zs es') xts' body')
+  let (zs, ees) = unzip s
+  let (es1, es2) = unzip ees
+  let es1' = map (substWeakTermPlus sub) es1 -- s自体の更新は行なう
+  let es2' = map (substWeakTermPlus sub) es2
+  (m, WeakTermPiIntroPlus name indName (zip zs (zip es1' es2')) xts' body')
 substWeakTermPlus sub (m, WeakTermPiElim e es) = do
   let e' = substWeakTermPlus sub e
   let es' = map (substWeakTermPlus sub) es
@@ -459,7 +470,7 @@ toText (_, WeakTermPiPlus name _ _ _) = name -- Pi{nat} (...). (...) ~> nat
 toText (_, WeakTermPiIntro xts e) = do
   let argStr = inParen $ showItems $ map showArg xts
   showCons ["λ", argStr, toText e]
-toText (_, WeakTermPiIntroPlus name _ _ _ _ _) = do
+toText (_, WeakTermPiIntroPlus name _ _ _ _) = do
   "<#" <> name <> "-" <> "value" <> "#>" -- <#succ-value#>, <#cons-value#>, <#nil-value#>, etc.
 toText (_, WeakTermPiElim e es) = do
   showCons $ map toText $ e : es
