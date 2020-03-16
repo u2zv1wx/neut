@@ -14,6 +14,7 @@ data Term
   | TermPi [UnivLevelPlus] [IdentifierPlus] TermPlus
   | TermPiPlus T.Text [UnivLevelPlus] [IdentifierPlus] TermPlus
   | TermPiIntro [IdentifierPlus] TermPlus
+  | TermPiIntroNoReduce [IdentifierPlus] TermPlus
   | TermPiIntroPlus
       (T.Text, [IdentifierPlus]) -- (name of constructor, args of constructor)
       [IdentifierPlus]
@@ -69,6 +70,7 @@ varTermPlus (_, TermUpsilon x) = [x]
 varTermPlus (_, TermPi _ xts t) = varTermPlus' xts [t]
 varTermPlus (_, TermPiPlus _ _ xts t) = varTermPlus' xts [t]
 varTermPlus (_, TermPiIntro xts e) = varTermPlus' xts [e]
+varTermPlus (_, TermPiIntroNoReduce xts e) = varTermPlus' xts [e]
 varTermPlus (_, TermPiIntroPlus _ xts e) = varTermPlus' xts [e]
 varTermPlus (_, TermPiElim e es) = do
   let xs1 = varTermPlus e
@@ -134,6 +136,9 @@ substTermPlus sub (m, TermPiPlus name mls xts t) = do
 substTermPlus sub (m, TermPiIntro xts body) = do
   let (xts', body') = substTermPlus'' sub xts body
   (m, TermPiIntro xts' body')
+substTermPlus sub (m, TermPiIntroNoReduce xts body) = do
+  let (xts', body') = substTermPlus'' sub xts body
+  (m, TermPiIntroNoReduce xts' body')
 substTermPlus sub (m, TermPiIntroPlus (name, args) xts body) = do
   let args' = substTermPlus' sub args
   let (xts', body') = substTermPlus'' sub xts body
@@ -248,6 +253,8 @@ weaken (m, TermPiPlus name mls xts t) = do
   (m, WeakTermPiPlus name mls (weakenArgs xts) (weaken t))
 weaken (m, TermPiIntro xts body) = do
   (m, WeakTermPiIntro (weakenArgs xts) (weaken body))
+weaken (m, TermPiIntroNoReduce xts body) = do
+  (m, WeakTermPiIntroNoReduce (weakenArgs xts) (weaken body))
 weaken (m, TermPiIntroPlus (name, args) xts body) = do
   let args' = weakenArgs args
   (m, WeakTermPiIntroPlus (name, args') (weakenArgs xts) (weaken body))

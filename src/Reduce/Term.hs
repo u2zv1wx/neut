@@ -28,23 +28,22 @@ reduceTermPlus (m, TermPiIntro xts e) = do
   ts' <- mapM reduceTermPlus ts
   e' <- reduceTermPlus e
   return $ (m, TermPiIntro (zip3 ms xs ts') e')
-reduceTermPlus (m, TermPiIntroPlus name indName idx s xts e) = do
-  let (zs, ees) = unzip s
-  let (es1, es2) = unzip ees
-  es1' <- mapM reduceTermPlus es1
-  es2' <- mapM reduceTermPlus es2
+reduceTermPlus (m, TermPiIntroNoReduce xts e) = do
   let (ms, xs, ts) = unzip3 xts
   ts' <- mapM reduceTermPlus ts
   e' <- reduceTermPlus e
-  return $
-    ( m
-    , TermPiIntroPlus
-        name
-        indName
-        idx
-        (zip zs (zip es1' es2'))
-        (zip3 ms xs ts')
-        e')
+  return $ (m, TermPiIntroNoReduce (zip3 ms xs ts') e')
+reduceTermPlus (m, TermPiIntroPlus (name, args) xts e) = do
+  args' <- mapM reduceTermIdentPlus args
+  xts' <- mapM reduceTermIdentPlus xts
+  -- let (zs, ees) = unzip s
+  -- let (es1, es2) = unzip ees
+  -- es1' <- mapM reduceTermPlus es1
+  -- es2' <- mapM reduceTermPlus es2
+  -- let (ms, xs, ts) = unzip3 xts
+  -- ts' <- mapM reduceTermPlus ts
+  e' <- reduceTermPlus e
+  return $ (m, TermPiIntroPlus (name, args') xts' e')
 reduceTermPlus (m, TermPiElim e es) = do
   e' <- reduceTermPlus e
   es' <- mapM reduceTermPlus es
@@ -56,12 +55,14 @@ reduceTermPlus (m, TermPiElim e es) = do
       , valueCond -> do
         let xs = map (\(_, x, _) -> x) xts
         reduceTermPlus $ substTermPlus (zip xs es') body
-    (_, TermPiIntroPlus _ _ _ info xts body)
+    (_, TermPiIntroPlus _ xts body)
       | length xts == length es'
       , valueCond -> do
         let xs = map (\(_, x, _) -> x) xts
-        let s = map (\(z, (ez, _)) -> (z, ez)) info
-        reduceTermPlus $ substTermPlus (s ++ zip xs es') body
+        reduceTermPlus $ substTermPlus (zip xs es') body
+        --   let xs = map (\(_, x, _) -> x) xts
+        -- let s = map (\(z, (ez, _)) -> (z, ez)) info
+        -- reduceTermPlus $ substTermPlus (s ++ zip xs es') body
     -- (_, TermConst constant) -> reduceTermPlusTheta (m, app) es' m constant
     _ -> return (m, app)
 reduceTermPlus (m, TermIter (mx, x, t) xts e)
@@ -123,6 +124,11 @@ reduceTermPlus (m, TermStructElim xks e1 e2) = do
       , ks1 == ks2 -> reduceTermPlus $ substTermPlus (zip xs es) e2
     _ -> return (m, TermStructElim xks e1' e2)
 reduceTermPlus t = return t
+
+reduceTermIdentPlus :: IdentifierPlus -> WithEnv IdentifierPlus
+reduceTermIdentPlus (m, x, t) = do
+  t' <- reduceTermPlus t
+  return (m, x, t')
 
 -- reduceTermPlusTheta ::
 --      TermPlus -> [TermPlus] -> Meta -> Identifier -> WithEnv TermPlus
