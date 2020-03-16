@@ -15,6 +15,7 @@ import qualified Data.HashMap.Strict as Map
 import qualified Data.Text as T
 
 import Clarify.Closure
+import Clarify.Linearize
 import Clarify.Sigma
 import Clarify.Utility
 import Data.Basic
@@ -229,7 +230,8 @@ chainCaseClause ::
 chainCaseClause ((_, xts), body) = do
   fvs <- chainTermPlus' body
   let xs = map (\(_, x, _) -> x) xts
-  -- fixme: xts must be a closed chain
+  -- fixme: check if xts is indeed a closed chain
+  -- (対応するinductive typeのpi-intro-plusがclarifyできてたらオッケーだから放置でよさそう？)
   return $ filter (\(_, y, _) -> y `notElem` xs) fvs
 
 clarifyCase' ::
@@ -238,9 +240,17 @@ clarifyCase' ::
   -> Identifier
   -> WithEnv CodePlus
 clarifyCase' m ((_, xts), e) envVarName = do
+  e' <- clarify e
+  xts' <- mapM clarifyArgs xts
+  e'' <- linearize xts' e'
+  let xs = map (\(_, x, _) -> x) xts
   let envVar = toDataUpsilon' envVarName
-  undefined
-  -- return (m, TermSigmaElim)
+  return (m, CodeSigmaElim arrVoidPtr xs envVar e'')
+
+clarifyArgs :: (Meta, Identifier, TermPlus) -> WithEnv (Identifier, CodePlus)
+clarifyArgs (_, x, t) = do
+  t' <- clarify t
+  return (x, t')
 
 -- termLet :: [(Identifier, (TermPlus, TermPlus))] -> TermPlus -> TermPlus
 -- termLet [] cont = cont
