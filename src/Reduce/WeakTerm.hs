@@ -30,16 +30,16 @@ reduceWeakTermPlus (m, WeakTermPiIntro xts e) = do
   let ts' = map reduceWeakTermPlus ts
   let e' = reduceWeakTermPlus e
   (m, WeakTermPiIntro (zip3 ms xs ts') e')
-reduceWeakTermPlus (m, WeakTermPiIntroPlus name indName s xts e) = do
-  let (zs, ees) = unzip s
-  let (es1, es2) = unzip ees
-  let es1' = map reduceWeakTermPlus es1
-  let es2' = map reduceWeakTermPlus es2
+reduceWeakTermPlus (m, WeakTermPiIntroNoReduce xts e) = do
   let (ms, xs, ts) = unzip3 xts
   let ts' = map reduceWeakTermPlus ts
   let e' = reduceWeakTermPlus e
-  let ees' = zip es1' es2'
-  (m, WeakTermPiIntroPlus name indName (zip zs ees') (zip3 ms xs ts') e')
+  (m, WeakTermPiIntroNoReduce (zip3 ms xs ts') e')
+reduceWeakTermPlus (m, WeakTermPiIntroPlus (name, args) xts e) = do
+  let args' = map reduceWeakTermIdentPlus args
+  let xts' = map reduceWeakTermIdentPlus xts
+  let e' = reduceWeakTermPlus e
+  (m, WeakTermPiIntroPlus (name, args') xts' e')
 reduceWeakTermPlus (m, WeakTermPiElim e es) = do
   let e' = reduceWeakTermPlus e
   let es' = map reduceWeakTermPlus es
@@ -49,11 +49,11 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
       | length xts == length es' -> do
         let xs = map (\(_, x, _) -> x) xts
         reduceWeakTermPlus $ substWeakTermPlus (zip xs es') body
-    (_, WeakTermPiIntroPlus _ _ s xts body)
+    (_, WeakTermPiIntroPlus _ xts body)
       | length xts == length es' -> do
         let xs = map (\(_, x, _) -> x) xts
         reduceWeakTermPlus $
-          substWeakTermPlus (asSubst s ++ zip xs es') body -- reify the explicit substitution `s`
+          substWeakTermPlus (zip xs es') body -- reify the explicit substitution `s`
     -- (_, WeakTermConst (I (constant, _))) ->
     --   reduceWeakTermPlusTheta (m, app) es' m constant
     _ -> (m, app)
@@ -131,29 +131,30 @@ reduceWeakTermPlus (m, WeakTermStructElim xks e1 e2) = do
     _ -> (m, WeakTermStructElim xks e1' e2)
 reduceWeakTermPlus (m, WeakTermCase (e, t) cxtes) = do
   let e' = reduceWeakTermPlus e
-  let cxtes' = map (\((I (c, _), xts), body) -> (c, (xts, body))) cxtes
-  case e' of
-    (_, WeakTermPiIntroPlus name _ s _ _)
-      | idx <- undefined -- lookup idx from name
-      , s' <- map (fst . snd . (s !!)) idx
-      , Just (xts, body) <- lookup name cxtes'
-      , length xts == length s' -> do
-        let (_, ys, _) = unzip3 xts
-        -- reduceWeakTermPlus $ substWeakTermPlus s body
-        reduceWeakTermPlus $ substWeakTermPlus (zip ys s') body
-    _ -> do
-      let t' = reduceWeakTermPlus t
-      let cxtes'' =
-            flip map cxtes $ \((c, xts), body) -> do
-              let (ms, xs, ts) = unzip3 xts
-              let ts' = map reduceWeakTermPlus ts
-              let body' = reduceWeakTermPlus body
-              ((c, zip3 ms xs ts'), body')
-      (m, WeakTermCase (e', t') cxtes'')
+  -- let cxtes' = map (\((I (c, _), xts), body) -> (c, (xts, body))) cxtes
+  -- case e' of
+  --   (_, WeakTermPiIntroPlus (name, args) _ _) -- reduceするならPiElim + PiIntroNoReduce + PiIntroPlusの形
+  --     | Just (xts, body) <- lookup name cxtes'
+  --     , length xts == length args -> do
+  --       let (_, ys, _) = unzip3 xts
+  --       -- reduceWeakTermPlus $ substWeakTermPlus s body
+  --       reduceWeakTermPlus $ substWeakTermPlus (zip ys s') body
+  --   _ -> do
+  let t' = reduceWeakTermPlus t
+  let cxtes'' =
+        flip map cxtes $ \((c, xts), body) -> do
+          let (ms, xs, ts) = unzip3 xts
+          let ts' = map reduceWeakTermPlus ts
+          let body' = reduceWeakTermPlus body
+          ((c, zip3 ms xs ts'), body')
+  (m, WeakTermCase (e', t') cxtes'')
 -- reduceWeakTermPlus (m, WeakTermCocase (name, args) ces) = do
 --   let (cs, es) = unzip ces
 --   undefined
 reduceWeakTermPlus e = e
+
+reduceWeakTermIdentPlus :: IdentifierPlus -> IdentifierPlus
+reduceWeakTermIdentPlus (m, x, t) = (m, x, reduceWeakTermPlus t)
   -- | Just (lowType, op) <- asUnaryOpMaybe constant
   -- , [arg] <- es = reduceWeakTermPlusUnary orig arg m lowType op
   -- | Just (lowType, op) <- asBinaryOpMaybe constant
