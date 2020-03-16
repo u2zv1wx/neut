@@ -5,7 +5,7 @@ module Elaborate
   ) where
 
 import Control.Monad.State
-import Data.List (findIndices, nub)
+import Data.List (nub)
 import Data.Maybe (fromMaybe)
 import Numeric.Half
 
@@ -14,7 +14,6 @@ import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Set as S
 import qualified Data.Text as T
 
-import Clarify.Closure
 import Data.Basic
 import Data.Constraint
 import Data.Env
@@ -72,21 +71,26 @@ elaborateStmt (WeakStmtLetWT m (mx, x@(I (_, i)), t) e cont) = do
   modify (\env -> env {substEnv = IntMap.insert i (weaken e') (substEnv env)})
   cont' <- elaborateStmt cont
   return (m, TermPiElim (m, TermPiIntro [(mx, x, t'')] cont') [e'])
-elaborateStmt (WeakStmtLetInductiveIntro m (bi, ai) (mx, x@(I (_, i)), t) xts yts atsbts app cont) = do
+elaborateStmt (WeakStmtLetInductiveIntro m (bi, _) (mx, x@(I (_, i)), t) xts yts atsbts app cont) = do
   (t', mlt) <- inferType t
   analyze >> synthesize >> refine >> cleanup
   -- the "elaborate' e" part in LetWT
   app' <- elaborate' app
   atsbts' <- mapM elaboratePlus atsbts
   -- collect free-var info
-  ch <- chainTermPlus (m, TermPiIntro atsbts' app')
-  let s = map (\(mz, z, tz) -> (z, ((mz, TermUpsilon z), tz))) ch
-  let ys = map (\(_, y, _) -> y) yts
+  -- ch <- chainTermPlus (m, TermPiIntro atsbts' app')
+  -- let s = map (\(mz, z, tz) -> (z, ((mz, TermUpsilon z), tz))) ch
+  -- let ys = map (\(_, y, _) -> y) yts
   -- このidxはたぶんenvのほうに登録するべき
-  let idx = findIndices (\(z, _) -> z `elem` ys) s
+  -- let idx = findIndices (\(z, _) -> z `elem` ys) s
   xtsyts' <- mapM elaboratePlus $ xts ++ yts
   let lam =
-        (m, TermPiIntro xtsyts' (m, TermPiIntroPlus bi ai False s atsbts' app'))
+        ( m
+        , TermPiIntroNoReduce
+            xtsyts'
+            (m, TermPiIntroPlus (bi, xtsyts') atsbts' app'))
+  -- let lam =
+  --       (m, TermPiIntro xtsyts' (m, TermPiIntroPlus bi ai False s atsbts' app'))
   -- the "elaboreta' e" part ends here
   t'' <- elaborate' t' >>= reduceTermPlus
   insTypeEnv x t'' mlt
@@ -254,15 +258,21 @@ elaborate' (m, WeakTermPiIntro xts e) = do
   e' <- elaborate' e
   xts' <- mapM elaboratePlus xts
   return (m, TermPiIntro xts' e')
-elaborate' (m, WeakTermPiIntroPlus name indName s xts e) = do
-  let (zs, ees) = unzip s
-  let (es1, es2) = unzip ees
-  es1' <- mapM elaborate' es1
-  es2' <- mapM elaborate' es2
+elaborate' (m, WeakTermPiIntroNoReduce xts e) = do
   e' <- elaborate' e
   xts' <- mapM elaboratePlus xts
-  return
-    (m, TermPiIntroPlus name indName False (zip zs (zip es1' es2')) xts' e')
+  return (m, TermPiIntroNoReduce xts' e')
+elaborate' (m, WeakTermPiIntroPlus (name, args) xts e) = do
+  args' <- mapM elaboratePlus args
+  -- let (zs, ees) = unzip s
+  -- let (es1, es2) = unzip ees
+  -- es1' <- mapM elaborate' es1
+  -- es2' <- mapM elaborate' es2
+  e' <- elaborate' e
+  xts' <- mapM elaboratePlus xts
+  -- return
+  --   (m, TermPiIntroPlus name indName False (zip zs (zip es1' es2')) xts' e')
+  return (m, TermPiIntroPlus (name, args') xts' e')
 elaborate' (m, WeakTermPiElim (_, WeakTermZeta h@(I (_, x))) es) = do
   sub <- gets substEnv
   case IntMap.lookup x sub of
