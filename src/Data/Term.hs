@@ -64,6 +64,9 @@ type IdentifierPlus = (Meta, Identifier, TermPlus)
 toTermUpsilon :: Identifier -> TermPlus
 toTermUpsilon x = (emptyMeta, TermUpsilon x)
 
+termZero :: TermPlus
+termZero = (emptyMeta, TermEnumIntro (EnumValueIntS 64 0))
+
 varTermPlus :: TermPlus -> [Identifier]
 varTermPlus (_, TermTau _) = []
 varTermPlus (_, TermUpsilon x) = [x]

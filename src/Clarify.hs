@@ -52,17 +52,11 @@ clarify (m, TermPiIntroPlus (name, args) mxts e) = do
   forM_ xts $ uncurry insTypeEnv'
   e' <- clarify e
   -- fixme: check if args is indeed a closed chain
-  retClosure (Just name) args m mxts e'
-  -- clarify (m, TermPiIntroPlus name indName isReady sub mxts e) =
---   if not isReady
---     then clarify $ termLet sub (m, TermPiIntroPlus name indName True sub mxts e)
---     else do
---       let (_, xs, ts) = unzip3 mxts
---       let xts = zip xs ts
---       forM_ xts $ uncurry insTypeEnv'
---       e' <- clarify e
---       let fvs = map (\(z, ((mz, _), tz)) -> (mz, z, tz)) sub -- modの外側でsubのdomの変数はすべて束縛済みなのでこれでオーケー
---       retClosure (Just name) fvs m mxts e'
+  case varTermPlus (m, TermPiIntro args termZero) of
+    [] -> retClosure (Just name) args m mxts e'
+    _ ->
+      raiseError m $
+      "couldn't normalize the type of the inductive closure at compile time"
 clarify (m, TermPiElim e es) = do
   es' <- mapM clarifyPlus es
   e' <- clarify e
