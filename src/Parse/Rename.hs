@@ -164,15 +164,22 @@ rename' nenv (m, WeakTermPiPlus name mls xts t) = do
 rename' nenv (m, WeakTermPiIntro xts e) = do
   (xts', e') <- renameBinder nenv xts e
   return (m, WeakTermPiIntro xts' e')
-rename' nenv (m, WeakTermPiIntroPlus name indName s xts e) = do
+rename' nenv (m, WeakTermPiIntroNoReduce xts e) = do
   (xts', e') <- renameBinder nenv xts e
-  let (is, ees) = unzip s
-  is' <- mapM (renameIdentifier nenv m) is
-  let (es1, es2) = unzip ees
-  es1' <- mapM (rename' nenv) es1
-  es2' <- mapM (rename' nenv) es2
-  let s' = zip is' (zip es1' es2')
-  return (m, WeakTermPiIntroPlus name indName s' xts' e')
+  return (m, WeakTermPiIntroNoReduce xts' e')
+rename' nenv (m, WeakTermPiIntroPlus (name, args) xts e) = do
+  args' <- mapM (renameIdentPlus nenv) args
+  (xts', e') <- renameBinder nenv xts e
+  return (m, WeakTermPiIntroPlus (name, args') xts' e')
+-- rename' nenv (m, WeakTermPiIntroPlus name indName s xts e) = do
+--   (xts', e') <- renameBinder nenv xts e
+--   let (is, ees) = unzip s
+--   is' <- mapM (renameIdentifier nenv m) is
+--   let (es1, es2) = unzip ees
+--   es1' <- mapM (rename' nenv) es1
+--   es2' <- mapM (rename' nenv) es2
+--   let s' = zip is' (zip es1' es2')
+--   return (m, WeakTermPiIntroPlus name indName s' xts' e')
 rename' nenv (m, WeakTermPiElim e es) = do
   es' <- mapM (rename' nenv) es
   e' <- rename' nenv e
@@ -247,12 +254,6 @@ rename' nenv (m, WeakTermCase (e, t) cxtes) = do
 --   cs' <- mapM (lookupStrict'' nenv m) cs
 --   es' <- mapM (rename' nenv) es
 --   return (m, WeakTermCocase (name', args') $ zip cs' es')
-renameIdentifier :: NameEnv -> Meta -> Identifier -> WithEnv Identifier
-renameIdentifier nenv m x@(I (s, _)) = do
-  case lookupName x nenv of
-    Just x' -> return x'
-    _ -> raiseError m $ "undefined variable: " <> s
-
 renameBinder ::
      NameEnv
   -> [IdentifierPlus]
@@ -282,6 +283,18 @@ renameArgs nenv ((mx, x, t):xts) = do
   x' <- newLLVMNameWith x
   (xts', nenv') <- renameArgs (insertName x x' nenv) xts
   return ((mx, x', t') : xts', nenv')
+
+renameIdentifier :: NameEnv -> Meta -> Identifier -> WithEnv Identifier
+renameIdentifier nenv m x@(I (s, _)) = do
+  case lookupName x nenv of
+    Just x' -> return x'
+    _ -> raiseError m $ "undefined variable: " <> s
+
+renameIdentPlus :: NameEnv -> IdentifierPlus -> WithEnv IdentifierPlus
+renameIdentPlus nenv (m, x, t) = do
+  t' <- rename' nenv t
+  x' <- renameIdentifier nenv m x
+  return (m, x', t')
 
 renameIdentPlus' ::
      NameEnv -> IdentifierPlus -> WithEnv (IdentifierPlus, NameEnv)
@@ -475,10 +488,15 @@ invRename (m, WeakTermPiPlus name mls xts t) = do
 invRename (m, WeakTermPiIntro xts e) = do
   (xts', e') <- invRenameBinder xts e
   return (m, WeakTermPiIntro xts' e')
-invRename (m, WeakTermPiIntroPlus name indName s xts e)
-  -- the "content" of this term is not used in toText, and so there's no need to rename this term
- = do
-  return (m, WeakTermPiIntroPlus name indName s xts e)
+invRename (m, WeakTermPiIntroNoReduce xts e) = do
+  (xts', e') <- invRenameBinder xts e
+  return (m, WeakTermPiIntroNoReduce xts' e')
+-- the "content" of this term is not used in toText, and so there's no need to rename this term
+invRename (m, WeakTermPiIntroPlus (name, args) xts e) =
+  return (m, WeakTermPiIntroPlus (name, args) xts e)
+-- invRename (m, WeakTermPiIntroPlus name indName s xts e)
+--  = do
+--   return (m, WeakTermPiIntroPlus name indName s xts e)
 invRename (m, WeakTermPiElim e es) = do
   e' <- invRename e
   es' <- mapM invRename es
