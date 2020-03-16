@@ -39,16 +39,30 @@ clarify lam@(m, TermPiIntro mxts e) = do
   e' <- clarify e
   fvs <- chainTermPlus lam
   retClosure Nothing fvs m mxts e'
-clarify (m, TermPiIntroPlus name indName isReady sub mxts e) =
-  if not isReady
-    then clarify $ termLet sub (m, TermPiIntroPlus name indName True sub mxts e)
-    else do
-      let (_, xs, ts) = unzip3 mxts
-      let xts = zip xs ts
-      forM_ xts $ uncurry insTypeEnv'
-      e' <- clarify e
-      let fvs = map (\(z, ((mz, _), tz)) -> (mz, z, tz)) sub -- modの外側でsubのdomの変数はすべて束縛済みなのでこれでオーケー
-      retClosure (Just name) fvs m mxts e'
+clarify lam@(m, TermPiIntroNoReduce mxts e) = do
+  let (_, xs, ts) = unzip3 mxts
+  let xts = zip xs ts
+  forM_ xts $ uncurry insTypeEnv'
+  e' <- clarify e
+  fvs <- chainTermPlus lam
+  retClosure Nothing fvs m mxts e'
+clarify (m, TermPiIntroPlus (name, args) mxts e) = do
+  let (_, xs, ts) = unzip3 mxts
+  let xts = zip xs ts
+  forM_ xts $ uncurry insTypeEnv'
+  e' <- clarify e
+  -- fixme: check if args is indeed a closed chain
+  retClosure (Just name) args m mxts e'
+  -- clarify (m, TermPiIntroPlus name indName isReady sub mxts e) =
+--   if not isReady
+--     then clarify $ termLet sub (m, TermPiIntroPlus name indName True sub mxts e)
+--     else do
+--       let (_, xs, ts) = unzip3 mxts
+--       let xts = zip xs ts
+--       forM_ xts $ uncurry insTypeEnv'
+--       e' <- clarify e
+--       let fvs = map (\(z, ((mz, _), tz)) -> (mz, z, tz)) sub -- modの外側でsubのdomの変数はすべて束縛済みなのでこれでオーケー
+--       retClosure (Just name) fvs m mxts e'
 clarify (m, TermPiElim e es) = do
   es' <- mapM clarifyPlus es
   e' <- clarify e
@@ -205,15 +219,13 @@ clarifyCase' ::
   -> Identifier
   -> WithEnv TermPlus
 clarifyCase' ((c, xts), e) lamVarName envVarName = do
-  (idx, len) <- undefined c
   undefined
 
-termLet :: [(Identifier, (TermPlus, TermPlus))] -> TermPlus -> TermPlus
-termLet [] cont = cont
-termLet ((x, (e, t)):xets) cont = do
-  let m = fst e
-  (m, TermPiElim (m, TermPiIntro [(m, x, t)] (termLet xets cont)) [e])
-
+-- termLet :: [(Identifier, (TermPlus, TermPlus))] -> TermPlus -> TermPlus
+-- termLet [] cont = cont
+-- termLet ((x, (e, t)):xets) cont = do
+--   let m = fst e
+--   (m, TermPiElim (m, TermPiIntro [(m, x, t)] (termLet xets cont)) [e])
 clarifyConst :: Meta -> Identifier -> WithEnv CodePlus
 clarifyConst m name@(I (x, _))
   | Just op <- asUnaryOpMaybe x = clarifyUnaryOp name op m
