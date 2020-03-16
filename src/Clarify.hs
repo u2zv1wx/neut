@@ -204,7 +204,9 @@ clarifyCase' ::
   -> Identifier
   -> Identifier
   -> WithEnv TermPlus
-clarifyCase' = undefined
+clarifyCase' ((c, xts), e) lamVarName envVarName = do
+  (idx, len) <- undefined c
+  undefined
 
 termLet :: [(Identifier, (TermPlus, TermPlus))] -> TermPlus -> TermPlus
 termLet [] cont = cont
