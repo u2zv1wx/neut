@@ -203,6 +203,8 @@ emitLLVMOp (LLVMOpBinaryOp (BinaryOpEQ t@(LowTypeIntS _)) d1 d2) =
   emitBinaryOp t "icmp eq" d1 d2
 emitLLVMOp (LLVMOpBinaryOp (BinaryOpEQ t@(LowTypeIntU _)) d1 d2) =
   emitBinaryOp t "icmp eq" d1 d2
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpEQ t@LowTypeVoidPtr) d1 d2) =
+  emitBinaryOp t "icmp eq" d1 d2
 emitLLVMOp (LLVMOpBinaryOp (BinaryOpEQ t@(LowTypeFloat _)) d1 d2) =
   emitBinaryOp t "fcmp oeq" d1 d2
 emitLLVMOp (LLVMOpBinaryOp (BinaryOpNE t@(LowTypeIntS _)) d1 d2) =

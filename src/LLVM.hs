@@ -70,6 +70,11 @@ llvmCode (_, CodeStructElim xks v e) = do
   let idxList = map (\i -> (LLVMDataInt i, i32)) [0 ..]
   ys <- mapM newNameWith xs
   loadContent v bt (zip idxList (zip ys xts)) e
+llvmCode (m, CodeCase sub v branchList) = do
+  let (ls, es) = unzip branchList
+  let es' = map (substCodePlus sub) es
+  es'' <- mapM reduceCodePlus es'
+  llvmCodeCase m v $ zip ls es''
 
 uncastList :: [(Identifier, (Identifier, LowType))] -> CodePlus -> WithEnv LLVM
 uncastList [] e = llvmCode e
@@ -326,8 +331,7 @@ llvmDataLet' ((x, d):rest) cont = do
   llvmDataLet x d cont'
 
 -- returns Nothing iff the branch list is empty
-constructSwitch ::
-     [(LowCase, CodePlus)] -> WithEnv (Maybe (LLVM, [(Int, LLVM)]))
+constructSwitch :: [(Case, CodePlus)] -> WithEnv (Maybe (LLVM, [(Int, LLVM)]))
 constructSwitch [] = return Nothing
 constructSwitch [(CaseValue _, code)] = do
   code' <- llvmCode code
@@ -339,11 +343,11 @@ constructSwitch ((CaseValue l, code):rest) = do
   return $ do
     (defaultCase, caseList) <- m
     return (defaultCase, (i, code') : caseList)
-constructSwitch ((LowCaseDefault, code):_) = do
+constructSwitch ((CaseDefault, code):_) = do
   code' <- llvmCode code
   return $ Just (code', [])
 
-llvmCodeEnumElim :: DataPlus -> [(LowCase, CodePlus)] -> WithEnv LLVM
+llvmCodeEnumElim :: DataPlus -> [(Case, CodePlus)] -> WithEnv LLVM
 llvmCodeEnumElim v branchList = do
   m <- constructSwitch branchList
   case m of
@@ -352,6 +356,25 @@ llvmCodeEnumElim v branchList = do
       let t = LowTypeIntS 64
       (cast, castThen) <- llvmCast (Just "enum-base") v t
       castThen $ LLVMSwitch (cast, t) defaultCase caseList
+
+llvmCodeCase :: Meta -> DataPlus -> [(T.Text, CodePlus)] -> WithEnv LLVM
+llvmCodeCase _ _ [] = return LLVMUnreachable
+llvmCodeCase _ _ [(_, code)] = llvmCode code
+llvmCodeCase m v ((c, code):branchList) = do
+  cenv <- gets codeEnv
+  case Map.lookup c cenv of
+    Nothing -> raiseCritical m $ "no such global label defined: " <> c
+    Just (Definition _ args _) -> do
+      code' <- llvmCode code
+      cont <- llvmCodeCase m v branchList
+      (tmp, tmpVar) <- newDataLocal c
+      (base, baseVar) <- newDataLocal $ takeBaseName v
+      (isEq, isEqVar) <- newDataLocal "cmp"
+      uncastThenCmpThenBranch <-
+        llvmUncastLet tmp (LLVMDataGlobal c) (toFunPtrType args) $
+        LLVMLet isEq (LLVMOpBinaryOp (BinaryOpEQ voidPtr) tmpVar baseVar) $
+        LLVMBranch isEqVar code' cont
+      llvmDataLet base v uncastThenCmpThenBranch
 
 storeContent ::
      Identifier -> LowType -> [(DataPlus, LowType)] -> LLVM -> WithEnv LLVM
@@ -501,6 +524,10 @@ commConv x (LLVMSwitch (d, t) defaultCase caseList) cont2 = do
   let caseList' = zip ds es'
   defaultCase' <- commConv x defaultCase cont2
   return $ LLVMSwitch (d, t) defaultCase' caseList'
+commConv x (LLVMBranch d onTrue onFalse) cont2 = do
+  onTrue' <- commConv x onTrue cont2
+  onFalse' <- commConv x onFalse cont2
+  return $ LLVMBranch d onTrue' onFalse'
 commConv x (LLVMCall d ds) cont2 = return $ LLVMLet x (LLVMOpCall d ds) cont2
 commConv _ LLVMUnreachable _ = return LLVMUnreachable
 
@@ -544,6 +571,11 @@ renameLLVM l nenv (LLVMSwitch (d, t) defaultBranch les) = do
   (defaultBranch', l') <- renameLLVM l nenv defaultBranch
   (es', l'') <- renameLLVM' l' nenv es
   return (LLVMSwitch (d', t) defaultBranch' (zip ls es'), l'')
+renameLLVM l nenv (LLVMBranch d onTrue onFalse) = do
+  d' <- renameLLVMData nenv d
+  (onTrue', l') <- renameLLVM l nenv onTrue
+  (onFalse', l'') <- renameLLVM l' nenv onFalse
+  return (LLVMBranch d' onTrue' onFalse', l'')
 renameLLVM l nenv (LLVMCall d ds) = do
   d' <- renameLLVMData nenv d
   ds' <- mapM (renameLLVMData nenv) ds
