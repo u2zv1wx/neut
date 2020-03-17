@@ -30,8 +30,9 @@ data Code
   -- the variable introduced by CodeUpElim is assumed to be used linearly
   -- (this property is exploited to, for example, prevent unnecessary copy of array in array-access)
   | CodeUpElim Identifier CodePlus CodePlus
-  | CodeEnumElim SubstDataPlus DataPlus [(LowCase, CodePlus)]
+  | CodeEnumElim SubstDataPlus DataPlus [(Case, CodePlus)]
   | CodeStructElim [(Identifier, ArrayKind)] DataPlus CodePlus
+  | CodeCase SubstDataPlus DataPlus [(T.Text, CodePlus)]
   deriving (Show)
 
 data Theta
@@ -124,6 +125,12 @@ substCodePlus sub (m, CodeStructElim xks v e) = do
   let sub' = filter (\(k, _) -> k `notElem` map fst xks) sub
   let e' = substCodePlus sub' e
   (m, CodeStructElim xks v' e')
+substCodePlus sub (m, CodeCase fvInfo v branchList) = do
+  let (from, to) = unzip fvInfo
+  let to' = map (substDataPlus sub) to
+  let fvInfo' = zip from to'
+  let v' = substDataPlus sub v
+  (m, CodeCase fvInfo' v' branchList)
 
 substTheta :: SubstDataPlus -> Theta -> Theta
 substTheta sub (ThetaUnaryOp a v) = do

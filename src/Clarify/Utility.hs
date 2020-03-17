@@ -86,8 +86,8 @@ cartesianImmediate m = do
         , CodeEnumElim
             [(argVarName, argVar)]
             switchVar
-            -- [(CaseValue (EnumValueIntS 64 0), aff), (CaseDefault, rel)])
-            [(LowCaseValueIntS 64 0, aff), (LowCaseDefault, rel)])
+            [(CaseValue (EnumValueIntS 64 0), aff), (CaseDefault, rel)])
+            -- [(LowCaseValueIntS 64 0, aff), (LowCaseDefault, rel)])
       return theta
 
 affineImmediate :: DataPlus -> WithEnv CodePlus
@@ -118,8 +118,8 @@ cartesianStruct m ks = do
         , CodeEnumElim
             [(argVarName, argVar)]
             switchVar
-            -- [(CaseValue (EnumValueIntS 64 0), aff), (CaseDefault, rel)])
-            [(LowCaseValueIntS 64 0, aff), (LowCaseDefault, rel)])
+            [(CaseValue (EnumValueIntS 64 0), aff), (CaseDefault, rel)])
+            -- [(LowCaseValueIntS 64 0, aff), (LowCaseDefault, rel)])
       return theta
 
 affineStruct :: DataPlus -> [ArrayKind] -> WithEnv CodePlus

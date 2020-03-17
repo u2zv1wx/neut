@@ -109,7 +109,7 @@ clarify (m, TermEnumElim (e, _) bs) = do
   fvss <- mapM chainTermPlus' es
   let fvs = nubBy (\(_, x, _) (_, y, _) -> x == y) $ concat fvss
   es' <- mapM clarify es
-  clarifyEnumElim m fvs e $ zip (map toLowCase cs) es'
+  clarifyEnumElim m fvs e $ zip cs es'
 clarify (m, TermArray {}) = do
   returnArrayType m
 clarify (m, TermArrayIntro k es) = do
@@ -185,7 +185,7 @@ clarifyEnumElim ::
      Meta
   -> [(Meta, Identifier, TermPlus)]
   -> TermPlus
-  -> [(LowCase, CodePlus)]
+  -> [(Case, CodePlus)]
   -> WithEnv CodePlus
 clarifyEnumElim m fvs e bs = do
   let (cs, es) = unzip bs
@@ -195,6 +195,19 @@ clarifyEnumElim m fvs e bs = do
   let varInfo = map (\(mx, x, _) -> (x, toDataUpsilon (x, mx))) fvs
   return $ bindLet [(yName, e')] (m, CodeEnumElim varInfo y (zip cs es''))
 
+-- clarifyEnumElim ::
+--      Meta
+--   -> [(Meta, Identifier, TermPlus)]
+--   -> TermPlus
+--   -> [(Case, CodePlus)]
+--   -> WithEnv CodePlus
+-- clarifyEnumElim m fvs e bs = do
+--   let (cs, es) = unzip bs
+--   es' <- mapM (retClosure Nothing fvs m []) es
+--   es'' <- mapM (\cls -> callClosure m cls []) es'
+--   (yName, e', y) <- clarifyPlus e
+--   let varInfo = map (\(mx, x, _) -> (x, toDataUpsilon (x, mx))) fvs
+--   return $ bindLet [(yName, e')] (m, CodeEnumElim varInfo y (zip cs es''))
 clarifyCase ::
      Meta
   -> [((Identifier, [(Meta, Identifier, TermPlus)]), TermPlus)]
@@ -204,12 +217,19 @@ clarifyCase ::
 clarifyCase m cxtes lamVarName envVarName = do
   let cs = map (\((c, _), _) -> c) cxtes
   -- let cs' = map (CaseValue . EnumValueGlobal . asText) cs
-  let cs' = map (LowCaseValueGlobal . asText) cs
+  -- let cs' = map (LowCaseValueGlobal . asText) cs
   es <- mapM (\cxte -> clarifyCase' m cxte envVarName) cxtes
   let lamVar = toTermUpsilon lamVarName
   fvss <- mapM chainCaseClause cxtes
   let fvs = nubBy (\(_, x, _) (_, y, _) -> x == y) $ concat fvss
-  clarifyEnumElim m fvs lamVar $ zip cs' es
+  -- clarifyEnumElim m fvs lamVar $ zip cs' es
+  -- let (cs, es) = unzip bs
+  es' <- mapM (retClosure Nothing fvs m []) es
+  es'' <- mapM (\cls -> callClosure m cls []) es'
+  (yName, e', y) <- clarifyPlus lamVar
+  let varInfo = map (\(mx, x, _) -> (x, toDataUpsilon (x, mx))) fvs
+  return $
+    bindLet [(yName, e')] (m, CodeCase varInfo y (zip (map asText cs) es''))
 
 chainCaseClause ::
      ((Identifier, [(Meta, Identifier, TermPlus)]), TermPlus)
