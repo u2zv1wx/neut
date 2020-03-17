@@ -21,6 +21,7 @@ data LLVM
   | LLVMLet Identifier LLVMOp LLVM -- UpElim
   | LLVMCont LLVMOp LLVM -- LLVMLet that discards the result of LLVMOp
   | LLVMSwitch (LLVMData, LowType) LLVM [(Int, LLVM)] -- EnumElim
+  | LLVMBranch LLVMData LLVM LLVM
   | LLVMCall LLVMData [LLVMData]
   | LLVMUnreachable -- for empty case analysis
   deriving (Show)
@@ -77,6 +78,11 @@ reduceLLVM' sub (LLVMSwitch (d, t) defaultBranch les) = do
   let defaultBranch' = reduceLLVM' sub defaultBranch
   let es' = map (reduceLLVM' sub) es
   LLVMSwitch (d', t) defaultBranch' (zip ls es')
+reduceLLVM' sub (LLVMBranch d onTrue onFalse) = do
+  let d' = substLLVMData sub d
+  let onTrue' = reduceLLVM' sub onTrue
+  let onFalse' = reduceLLVM' sub onFalse
+  LLVMBranch d' onTrue' onFalse'
 reduceLLVM' sub (LLVMCall d ds) = do
   let d' = substLLVMData sub d
   let ds' = map (substLLVMData sub) ds
@@ -108,6 +114,11 @@ substLLVM sub (LLVMSwitch (d, t) defaultBranch les) = do
   let defaultBranch' = substLLVM sub defaultBranch
   let es' = map (substLLVM sub) es
   LLVMSwitch (d', t) defaultBranch' (zip ls es')
+substLLVM sub (LLVMBranch d onTrue onFalse) = do
+  let d' = substLLVMData sub d
+  let onTrue' = substLLVM sub onTrue
+  let onFalse' = substLLVM sub onFalse
+  LLVMBranch d' onTrue' onFalse'
 substLLVM sub (LLVMCall d ds) = do
   let d' = substLLVMData sub d
   let ds' = map (substLLVMData sub) ds
