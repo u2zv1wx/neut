@@ -89,6 +89,24 @@ emitLLVM retType (LLVMSwitch (d, lowType) defaultBranch branchList) = do
     forM (zip labelList asmList <> [(defaultLabel, defaultBranch)]) $
     uncurry (emitBlock retType)
   return $ op <> concat xs
+emitLLVM retType (LLVMBranch d onTrue onFalse) = do
+  onTrueLabel <- newNameWith' "case-true"
+  onFalseLabel <- newNameWith' "case-false"
+  op <-
+    emitOp $
+    unwordsL
+      [ "br"
+      , "i1"
+      , showLLVMData d <> ","
+      , "label"
+      , showLLVMData (LLVMDataLocal onTrueLabel) <> ","
+      , "label"
+      , showLLVMData (LLVMDataLocal onFalseLabel)
+      ]
+  xs <-
+    forM ([(onTrueLabel, onTrue), (onFalseLabel, onFalse)]) $
+    uncurry (emitBlock retType)
+  return $ op <> concat xs
 emitLLVM retType (LLVMCont op cont) = do
   s <- emitLLVMOp op
   str <- emitOp s
@@ -299,9 +317,9 @@ emitRet retType d = emitOp $ unwordsL ["ret", retType, showLLVMData d]
 emitLabel :: Builder -> Builder
 emitLabel s = s <> ":"
 
-constructLabelList :: [(Int, LLVM)] -> WithEnv [Identifier]
+constructLabelList :: [a] -> WithEnv [Identifier]
 constructLabelList [] = return []
-constructLabelList ((_, _):rest) = do
+constructLabelList (_:rest) = do
   label <- newNameWith' "case"
   labelList <- constructLabelList rest
   return $ label : labelList
