@@ -145,10 +145,10 @@ chainTermPlus' (_, TermStructElim xks e1 e2) = do
   xs2 <- chainTermPlus' e2
   let xs = map (\(_, y, _) -> y) xks
   return $ xs1 ++ filter (\(_, y, _) -> y `notElem` xs) xs2
-chainTermPlus' (_, TermCase (e, t) cxes) = do
+chainTermPlus' (_, TermCase (e, t) cxtes) = do
   xs <- chainTermPlus' e
   ys <- chainTermPlus' t
-  zs <- concat <$> mapM (\((_, xts), body) -> chainTermPlus'' xts [body]) cxes
+  zs <- concat <$> mapM (\((_, xts), body) -> chainTermPlus'' xts [body]) cxtes
   return $ xs ++ ys ++ zs
 
 chainTermPlus'' ::

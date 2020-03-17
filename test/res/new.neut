@@ -1140,7 +1140,7 @@
 
 (fact 5)
 
-(u8.add 200 200) ;; ~> 144 (overflow)
+(u8.add 200 200) ;; ~> 144 (= 400 - 2^8; overflow)
 
 (u4.sub (u4 10) 11)
 
@@ -1162,8 +1162,8 @@
 (let ys (list.nil i64))
 
 (case xs
-  ((list.nil A) (i64 10))
-  ((list.cons _ _ _) (i64 30)))
+  ((list.nil C) (i64 10))
+  ((list.cons A value _) value))
 
 ;; (i4.sub 4 8)
 

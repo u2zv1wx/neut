@@ -452,7 +452,8 @@ unit = (emptyMeta, WeakTermEnumIntro $ EnumValueLabel "unit")
 
 toText :: WeakTermPlus -> T.Text
 toText (_, WeakTermTau l) = showCons ["tau", T.pack $ show l]
-toText (_, WeakTermUpsilon x) = asText' x
+toText (_, WeakTermUpsilon x) = asText x
+-- toText (_, WeakTermUpsilon x) = asText' x
 toText (_, WeakTermPi _ xts t) = do
   let argStr = inParen $ showItems $ map showArg xts
   showCons ["Π", argStr, toText t]

@@ -223,8 +223,9 @@ chainCaseClause ::
      ((Identifier, [(Meta, Identifier, TermPlus)]), TermPlus)
   -> WithEnv [(Meta, Identifier, TermPlus)]
 chainCaseClause ((_, xts), body) = do
+  let (_, xs, ts) = unzip3 xts
+  forM_ (zip xs ts) $ uncurry insTypeEnv'
   fvs <- chainTermPlus' body
-  let xs = map (\(_, x, _) -> x) xts
   return $ filter (\(_, y, _) -> y `notElem` xs) fvs
 
 clarifyCase' ::
