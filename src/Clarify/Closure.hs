@@ -86,7 +86,10 @@ chainTermPlus' (m, TermUpsilon x) = do
   xts <- chainWithName x t
   return $ xts ++ [(m, x, t)]
 chainTermPlus' (_, TermPi _ xts t) = chainTermPlus'' xts [t]
+chainTermPlus' (_, TermPiPlus _ _ xts t) = chainTermPlus'' xts [t]
 chainTermPlus' (_, TermPiIntro xts e) = chainTermPlus'' xts [e]
+chainTermPlus' (_, TermPiIntroNoReduce xts e) = chainTermPlus'' xts [e]
+chainTermPlus' (_, TermPiIntroPlus _ _ xts e) = chainTermPlus'' xts [e]
 chainTermPlus' (_, TermPiElim e es) = do
   xs1 <- chainTermPlus' e
   xs2 <- concat <$> mapM (chainTermPlus') es
@@ -136,6 +139,11 @@ chainTermPlus' (_, TermStructElim xks e1 e2) = do
   xs2 <- chainTermPlus' e2
   let xs = map (\(_, y, _) -> y) xks
   return $ xs1 ++ filter (\(_, y, _) -> y `notElem` xs) xs2
+chainTermPlus' (_, TermCase (e, t) cxes) = do
+  xs <- chainTermPlus' e
+  ys <- chainTermPlus' t
+  zs <- concat <$> mapM (\((_, xts), body) -> chainTermPlus'' xts [body]) cxes
+  return $ xs ++ ys ++ zs
 
 chainTermPlus'' ::
      [(Meta, Identifier, TermPlus)]
