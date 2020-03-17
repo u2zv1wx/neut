@@ -217,7 +217,6 @@ clarifyCase ::
 clarifyCase m cxtes lamVarName envVarName = do
   let cs = map (\((c, _), _) -> c) cxtes
   -- let cs' = map (CaseValue . EnumValueGlobal . asText) cs
-  -- let cs' = map (LowCaseValueGlobal . asText) cs
   es <- mapM (\cxte -> clarifyCase' m cxte envVarName) cxtes
   let lamVar = toTermUpsilon lamVarName
   fvss <- mapM chainCaseClause cxtes

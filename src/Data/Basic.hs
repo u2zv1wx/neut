@@ -157,20 +157,6 @@ data Case
   | CaseDefault
   deriving (Show, Eq, Ord)
 
-data LowCase
-  = LowCaseValueIntS IntSize Integer
-  | LowCaseValueIntU IntSize Integer
-  | LowCaseValueLabel T.Text
-  | LowCaseValueGlobal T.Text
-  | LowCaseDefault
-  deriving (Show, Eq, Ord)
-
-toLowCase :: Case -> LowCase
-toLowCase (CaseValue (EnumValueIntS size i)) = LowCaseValueIntS size i
-toLowCase (CaseValue (EnumValueIntU size i)) = LowCaseValueIntU size i
-toLowCase (CaseValue (EnumValueLabel l)) = LowCaseValueLabel l
-toLowCase CaseDefault = LowCaseDefault
-
 data LowType
   = LowTypeIntS IntSize
   | LowTypeIntU IntSize
