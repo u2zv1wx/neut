@@ -71,7 +71,7 @@ elaborateStmt (WeakStmtLetWT m (mx, x@(I (_, i)), t) e cont) = do
   modify (\env -> env {substEnv = IntMap.insert i (weaken e') (substEnv env)})
   cont' <- elaborateStmt cont
   return (m, TermPiElim (m, TermPiIntro [(mx, x, t'')] cont') [e'])
-elaborateStmt (WeakStmtLetInductiveIntro m (bi, _) (mx, x@(I (_, i)), t) xts yts atsbts app cont) = do
+elaborateStmt (WeakStmtLetInductiveIntro m (bi, ai) (mx, x@(I (_, i)), t) xts yts atsbts app cont) = do
   (t', mlt) <- inferType t
   analyze >> synthesize >> refine >> cleanup
   -- the "elaborate' e" part in LetWT
@@ -88,7 +88,7 @@ elaborateStmt (WeakStmtLetInductiveIntro m (bi, _) (mx, x@(I (_, i)), t) xts yts
         ( m
         , TermPiIntroNoReduce
             xtsyts'
-            (m, TermPiIntroPlus (bi, xtsyts') atsbts' app'))
+            (m, TermPiIntroPlus ai (bi, xtsyts') atsbts' app'))
   -- let lam =
   --       (m, TermPiIntro xtsyts' (m, TermPiIntroPlus bi ai False s atsbts' app'))
   -- the "elaboreta' e" part ends here
@@ -262,7 +262,7 @@ elaborate' (m, WeakTermPiIntroNoReduce xts e) = do
   e' <- elaborate' e
   xts' <- mapM elaboratePlus xts
   return (m, TermPiIntroNoReduce xts' e')
-elaborate' (m, WeakTermPiIntroPlus (name, args) xts e) = do
+elaborate' (m, WeakTermPiIntroPlus ind (name, args) xts e) = do
   args' <- mapM elaboratePlus args
   -- let (zs, ees) = unzip s
   -- let (es1, es2) = unzip ees
@@ -272,7 +272,7 @@ elaborate' (m, WeakTermPiIntroPlus (name, args) xts e) = do
   xts' <- mapM elaboratePlus xts
   -- return
   --   (m, TermPiIntroPlus name indName False (zip zs (zip es1' es2')) xts' e')
-  return (m, TermPiIntroPlus (name, args') xts' e')
+  return (m, TermPiIntroPlus ind (name, args') xts' e')
 elaborate' (m, WeakTermPiElim (_, WeakTermZeta h@(I (_, x))) es) = do
   sub <- gets substEnv
   case IntMap.lookup x sub of

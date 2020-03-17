@@ -16,6 +16,7 @@ data Term
   | TermPiIntro [IdentifierPlus] TermPlus
   | TermPiIntroNoReduce [IdentifierPlus] TermPlus
   | TermPiIntroPlus
+      T.Text -- name of corresponding inductive type
       (T.Text, [IdentifierPlus]) -- (name of constructor, args of constructor)
       [IdentifierPlus]
       TermPlus
@@ -74,7 +75,7 @@ varTermPlus (_, TermPi _ xts t) = varTermPlus' xts [t]
 varTermPlus (_, TermPiPlus _ _ xts t) = varTermPlus' xts [t]
 varTermPlus (_, TermPiIntro xts e) = varTermPlus' xts [e]
 varTermPlus (_, TermPiIntroNoReduce xts e) = varTermPlus' xts [e]
-varTermPlus (_, TermPiIntroPlus _ xts e) = varTermPlus' xts [e]
+varTermPlus (_, TermPiIntroPlus _ _ xts e) = varTermPlus' xts [e]
 varTermPlus (_, TermPiElim e es) = do
   let xs1 = varTermPlus e
   let xs2 = concatMap varTermPlus es
@@ -142,10 +143,10 @@ substTermPlus sub (m, TermPiIntro xts body) = do
 substTermPlus sub (m, TermPiIntroNoReduce xts body) = do
   let (xts', body') = substTermPlus'' sub xts body
   (m, TermPiIntroNoReduce xts' body')
-substTermPlus sub (m, TermPiIntroPlus (name, args) xts body) = do
+substTermPlus sub (m, TermPiIntroPlus ind (name, args) xts body) = do
   let args' = substTermPlus' sub args
   let (xts', body') = substTermPlus'' sub xts body
-  (m, TermPiIntroPlus (name, args') xts' body')
+  (m, TermPiIntroPlus ind (name, args') xts' body')
   -- let sub' = filter (\(k, _) -> k `notElem` map fst s) sub -- lamに含まれる自由変数のうちsで「保護」されているものは無視
   -- let (xts', body') = substTermPlus'' sub' xts body
   -- let (zs, ees) = unzip s
@@ -258,9 +259,9 @@ weaken (m, TermPiIntro xts body) = do
   (m, WeakTermPiIntro (weakenArgs xts) (weaken body))
 weaken (m, TermPiIntroNoReduce xts body) = do
   (m, WeakTermPiIntroNoReduce (weakenArgs xts) (weaken body))
-weaken (m, TermPiIntroPlus (name, args) xts body) = do
+weaken (m, TermPiIntroPlus ind (name, args) xts body) = do
   let args' = weakenArgs args
-  (m, WeakTermPiIntroPlus (name, args') (weakenArgs xts) (weaken body))
+  (m, WeakTermPiIntroPlus ind (name, args') (weakenArgs xts) (weaken body))
   -- let (zs, ees) = unzip s
   -- let (es1, es2) = unzip ees
   -- let es1' = map weaken es1

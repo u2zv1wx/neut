@@ -33,7 +33,7 @@ reduceTermPlus (m, TermPiIntroNoReduce xts e) = do
   ts' <- mapM reduceTermPlus ts
   e' <- reduceTermPlus e
   return $ (m, TermPiIntroNoReduce (zip3 ms xs ts') e')
-reduceTermPlus (m, TermPiIntroPlus (name, args) xts e) = do
+reduceTermPlus (m, TermPiIntroPlus ind (name, args) xts e) = do
   args' <- mapM reduceTermIdentPlus args
   xts' <- mapM reduceTermIdentPlus xts
   -- let (zs, ees) = unzip s
@@ -43,7 +43,7 @@ reduceTermPlus (m, TermPiIntroPlus (name, args) xts e) = do
   -- let (ms, xs, ts) = unzip3 xts
   -- ts' <- mapM reduceTermPlus ts
   e' <- reduceTermPlus e
-  return $ (m, TermPiIntroPlus (name, args') xts' e')
+  return $ (m, TermPiIntroPlus ind (name, args') xts' e')
 reduceTermPlus (m, TermPiElim e es) = do
   e' <- reduceTermPlus e
   es' <- mapM reduceTermPlus es
@@ -55,7 +55,7 @@ reduceTermPlus (m, TermPiElim e es) = do
       , valueCond -> do
         let xs = map (\(_, x, _) -> x) xts
         reduceTermPlus $ substTermPlus (zip xs es') body
-    (_, TermPiIntroPlus _ xts body)
+    (_, TermPiIntroPlus _ _ xts body)
       | length xts == length es'
       , valueCond -> do
         let xs = map (\(_, x, _) -> x) xts

@@ -107,15 +107,15 @@ infer' ctx (m, WeakTermPiIntroNoReduce xts e) = do
   let mls = mlPiArgs ++ [mlPiCod]
   return
     ((m, WeakTermPiIntroNoReduce xts' e'), (m, WeakTermPi mls xts' t'), mlPi)
-infer' ctx (m, WeakTermPiIntroPlus (name, args) xts e) = do
+infer' ctx (m, WeakTermPiIntroPlus ind (name, args) xts e) = do
   (args', _) <- unzip <$> inferSigma ctx args
   (xtls', (e', t', mlPiCod)) <- inferBinder ctx xts e
   let (xts', mlPiArgs) = unzip xtls'
   mlPi <- newLevelLE m $ mlPiCod : mlPiArgs
   let mls = mlPiArgs ++ [mlPiCod]
   return
-    ( (m, WeakTermPiIntroPlus (name, args') xts' e')
-    , (m, WeakTermPiPlus undefined mls xts' t') -- fixme: lookup indName
+    ( (m, WeakTermPiIntroPlus ind (name, args') xts' e')
+    , (m, WeakTermPiPlus ind mls xts' t') -- fixme: lookup indName
     , mlPi)
 infer' ctx (m, WeakTermPiElim e es) = do
   etls <- mapM (infer' ctx) es
@@ -327,6 +327,7 @@ infer' ctx (m, WeakTermCase (e, t) cxtes) = do
   cxtes' <-
     forM cxtes $ \((c, xts), body) -> do
       (xtls', (body', tBody', mlBody)) <- inferBinder ctx xts body
+      -- c @ xtsの型がtと同一であるっていう制約を入れられたらそれでオッケーな気はする？
       insConstraintEnv h tBody'
       insLevelEQ ml mlBody
       let (xts', mlArgs) = unzip xtls'
@@ -600,13 +601,7 @@ lookupWeakTypeEnv s = do
   case mt of
     Just t -> return t
     Nothing ->
-      case lookupConstType s of
-        Nothing ->
-          raiseCritical' $
-          asText s <> " is not found in the weak type environment."
-        Just t -> do
-          l <- newCount
-          return (t, UnivLevelPlus (fst t, l))
+      raiseCritical' $ asText s <> " is not found in the weak type environment."
 
 lookupWeakTypeEnvMaybe ::
      Identifier -> WithEnv (Maybe (WeakTermPlus, UnivLevelPlus))
@@ -622,9 +617,6 @@ lookupKind m name = do
   case Map.lookup name renv of
     Nothing -> raiseError m $ "no such enum-intro is defined: " <> name
     Just (j, _) -> return j
-
-lookupConstType :: Identifier -> Maybe WeakTermPlus
-lookupConstType = undefined
 
 newLevelLE :: Meta -> [UnivLevelPlus] -> WithEnv UnivLevelPlus
 newLevelLE m mls = do
@@ -690,7 +682,7 @@ univInst' (m, WeakTermPiIntroNoReduce xts e) = do
   xts' <- univInstArgs xts
   e' <- univInst' e
   return (m, WeakTermPiIntroNoReduce xts' e')
-univInst' (m, WeakTermPiIntroPlus (name, args) xts e) = do
+univInst' (m, WeakTermPiIntroPlus ind (name, args) xts e) = do
   args' <- univInstArgs args
   -- let (zs, ees) = unzip s
   -- let (es1, es2) = unzip ees
@@ -698,7 +690,7 @@ univInst' (m, WeakTermPiIntroPlus (name, args) xts e) = do
   -- es2' <- mapM univInst' es2
   xts' <- univInstArgs xts
   e' <- univInst' e
-  return (m, WeakTermPiIntroPlus (name, args') xts' e')
+  return (m, WeakTermPiIntroPlus ind (name, args') xts' e')
 univInst' (m, WeakTermPiElim e es) = do
   e' <- univInst' e
   es' <- mapM univInst' es

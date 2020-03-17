@@ -53,8 +53,9 @@ simp' (((_, WeakTermPiPlus name1 mls1 xts1 cod1), (_, WeakTermPiPlus name2 mls2 
     simpBinder xts1 xts2 (Just (cod1, cod2)) $ zip us1 us2 ++ cs
 simp' (((_, WeakTermPiIntro xts1 e1), (_, WeakTermPiIntro xts2 e2)):cs)
   | length xts1 == length xts2 = simpBinder xts1 xts2 (Just (e1, e2)) cs
-simp' (((m1, WeakTermPiIntroPlus (name1, args1) xts1 e1), (m2, WeakTermPiIntroPlus (name2, args2) xts2 e2)):cs)
-  | name1 == name2
+simp' (((m1, WeakTermPiIntroPlus ind1 (name1, args1) xts1 e1), (m2, WeakTermPiIntroPlus ind2 (name2, args2) xts2 e2)):cs)
+  | ind1 == ind2
+  , name1 == name2
   , length args1 == length args2 = do
     simpBinder args1 args2 Nothing []
     simp' $ ((m1, WeakTermPiIntro xts1 e1), (m2, WeakTermPiIntro xts2 e2)) : cs

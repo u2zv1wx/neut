@@ -679,10 +679,10 @@ substRuleType sub (m, WeakTermPiIntro xts body) = do
 substRuleType sub (m, WeakTermPiIntroNoReduce xts body) = do
   (xts', body') <- substRuleType'' sub xts body
   return (m, WeakTermPiIntroNoReduce xts' body')
-substRuleType sub (m, WeakTermPiIntroPlus (name, args) xts body) = do
+substRuleType sub (m, WeakTermPiIntroPlus ind (name, args) xts body) = do
   args' <- substRuleType' sub args
   (xts', body') <- substRuleType'' sub xts body
-  return (m, WeakTermPiIntroPlus (name, args') xts' body')
+  return (m, WeakTermPiIntroPlus ind (name, args') xts' body')
 substRuleType sub@((a1, es1), (a2, es2)) (m, WeakTermPiElim e es)
   | (mx, WeakTermUpsilon x) <- e
   , a1 == x =

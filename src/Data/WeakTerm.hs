@@ -18,6 +18,7 @@ data WeakTerm
   | WeakTermPiIntro [IdentifierPlus] WeakTermPlus
   | WeakTermPiIntroNoReduce [IdentifierPlus] WeakTermPlus
   | WeakTermPiIntroPlus
+      T.Text -- name of inductive type
       (T.Text, [IdentifierPlus]) -- (name of construtor, arguments of constructor) (e.g. ("cons", (A : tau, x : A, xs : list A)))
       [IdentifierPlus]
       WeakTermPlus
@@ -197,7 +198,7 @@ varWeakTermPlus (_, WeakTermPi _ xts t) = varWeakTermPlus' xts [t]
 varWeakTermPlus (_, WeakTermPiPlus _ _ xts t) = varWeakTermPlus' xts [t]
 varWeakTermPlus (_, WeakTermPiIntro xts e) = varWeakTermPlus' xts [e]
 varWeakTermPlus (_, WeakTermPiIntroNoReduce xts e) = varWeakTermPlus' xts [e]
-varWeakTermPlus (_, WeakTermPiIntroPlus _ xts e) = varWeakTermPlus' xts [e]
+varWeakTermPlus (_, WeakTermPiIntroPlus _ _ xts e) = varWeakTermPlus' xts [e]
 varWeakTermPlus (_, WeakTermPiElim e es) = do
   let xs = varWeakTermPlus e
   let ys = concatMap varWeakTermPlus es
@@ -325,10 +326,10 @@ substWeakTermPlus sub (m, WeakTermPiIntro xts body) = do
 substWeakTermPlus sub (m, WeakTermPiIntroNoReduce xts body) = do
   let (xts', body') = substWeakTermPlus'' sub xts body
   (m, WeakTermPiIntroNoReduce xts' body')
-substWeakTermPlus sub (m, WeakTermPiIntroPlus (name, args) xts body) = do
+substWeakTermPlus sub (m, WeakTermPiIntroPlus ind (name, args) xts body) = do
   let args' = substWeakTermPlus' sub args
   let (xts', body') = substWeakTermPlus'' sub xts body
-  (m, WeakTermPiIntroPlus (name, args') xts' body')
+  (m, WeakTermPiIntroPlus ind (name, args') xts' body')
 substWeakTermPlus sub (m, WeakTermPiElim e es) = do
   let e' = substWeakTermPlus sub e
   let es' = map (substWeakTermPlus sub) es
@@ -463,7 +464,7 @@ toText (_, WeakTermPiIntro xts e) = do
 toText (_, WeakTermPiIntroNoReduce xts e) = do
   let argStr = inParen $ showItems $ map showArg xts
   showCons ["λ", argStr, toText e]
-toText (_, WeakTermPiIntroPlus (name, _) _ _) = do
+toText (_, WeakTermPiIntroPlus _ (name, _) _ _) = do
   "<#" <> name <> "-" <> "value" <> "#>" -- <#succ-value#>, <#cons-value#>, <#nil-value#>, etc.
 toText (_, WeakTermPiElim e es) = do
   showCons $ map toText $ e : es

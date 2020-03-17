@@ -47,7 +47,7 @@ clarify lam@(m, TermPiIntroNoReduce mxts e) = do
   e' <- clarify e
   fvs <- chainTermPlus lam
   retClosure Nothing fvs m mxts e'
-clarify (m, TermPiIntroPlus (name, args) mxts e) = do
+clarify (m, TermPiIntroPlus _ (name, args) mxts e) = do
   let (_, xs, ts) = unzip3 mxts
   let xts = zip xs ts
   forM_ xts $ uncurry insTypeEnv'
@@ -110,11 +110,6 @@ clarify (m, TermEnumElim (e, _) bs) = do
   let fvs = nubBy (\(_, x, _) (_, y, _) -> x == y) $ concat fvss
   es' <- mapM clarify es
   clarifyEnumElim m fvs e $ zip cs es'
-  -- es'' <- mapM (retClosure Nothing fvs m []) es'
-  -- es''' <- mapM (\cls -> callClosure m cls []) es''
-  -- (yName, e', y) <- clarifyPlus e
-  -- let varInfo = map (\(mx, x, _) -> (x, toDataUpsilon (x, mx))) fvs
-  -- return $ bindLet [(yName, e')] (m, CodeEnumElim varInfo y (zip cs es'''))
 clarify (m, TermArray {}) = do
   returnArrayType m
 clarify (m, TermArrayIntro k es) = do
@@ -169,7 +164,6 @@ clarify (m, TermCase (e, _) cxtes) = do
   (typeVarName, _) <- newDataUpsilonWith "exp"
   (envVarName, _) <- newDataUpsilonWith "env"
   (lamVarName, _) <- newDataUpsilonWith "thunk"
-  -- retImmType <- returnCartesianImmediate
   cxtes' <- clarifyCase m cxtes lamVarName envVarName
   return $
     bindLet

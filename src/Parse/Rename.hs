@@ -167,10 +167,10 @@ rename' nenv (m, WeakTermPiIntro xts e) = do
 rename' nenv (m, WeakTermPiIntroNoReduce xts e) = do
   (xts', e') <- renameBinder nenv xts e
   return (m, WeakTermPiIntroNoReduce xts' e')
-rename' nenv (m, WeakTermPiIntroPlus (name, args) xts e) = do
+rename' nenv (m, WeakTermPiIntroPlus ind (name, args) xts e) = do
   args' <- mapM (renameIdentPlus nenv) args
   (xts', e') <- renameBinder nenv xts e
-  return (m, WeakTermPiIntroPlus (name, args') xts' e')
+  return (m, WeakTermPiIntroPlus ind (name, args') xts' e')
 -- rename' nenv (m, WeakTermPiIntroPlus name indName s xts e) = do
 --   (xts', e') <- renameBinder nenv xts e
 --   let (is, ees) = unzip s
@@ -492,8 +492,8 @@ invRename (m, WeakTermPiIntroNoReduce xts e) = do
   (xts', e') <- invRenameBinder xts e
   return (m, WeakTermPiIntroNoReduce xts' e')
 -- the "content" of this term is not used in toText, and so there's no need to rename this term
-invRename (m, WeakTermPiIntroPlus (name, args) xts e) =
-  return (m, WeakTermPiIntroPlus (name, args) xts e)
+invRename (m, WeakTermPiIntroPlus ind (name, args) xts e) =
+  return (m, WeakTermPiIntroPlus ind (name, args) xts e)
 -- invRename (m, WeakTermPiIntroPlus name indName s xts e)
 --  = do
 --   return (m, WeakTermPiIntroPlus name indName s xts e)
