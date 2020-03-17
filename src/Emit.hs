@@ -211,6 +211,8 @@ emitLLVMOp (LLVMOpBinaryOp (BinaryOpNE t@(LowTypeIntS _)) d1 d2) =
   emitBinaryOp t "icmp ne" d1 d2
 emitLLVMOp (LLVMOpBinaryOp (BinaryOpNE t@(LowTypeIntU _)) d1 d2) =
   emitBinaryOp t "icmp ne" d1 d2
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpNE t@LowTypeVoidPtr) d1 d2) =
+  emitBinaryOp t "icmp ne" d1 d2
 emitLLVMOp (LLVMOpBinaryOp (BinaryOpNE t@(LowTypeFloat _)) d1 d2) =
   emitBinaryOp t "fcmp one" d1 d2
 emitLLVMOp (LLVMOpBinaryOp (BinaryOpGT t@(LowTypeIntS _)) d1 d2) =
