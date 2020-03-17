@@ -144,16 +144,9 @@ substTermPlus sub (m, TermPiIntroNoReduce xts body) = do
   let (xts', body') = substTermPlus'' sub xts body
   (m, TermPiIntroNoReduce xts' body')
 substTermPlus sub (m, TermPiIntroPlus ind (name, args) xts body) = do
-  let args' = substTermPlus' sub args
+  let args' = substTermPlus' sub args -- ここで変数名が被ってカットされちゃってるのか？
   let (xts', body') = substTermPlus'' sub xts body
   (m, TermPiIntroPlus ind (name, args') xts' body')
-  -- let sub' = filter (\(k, _) -> k `notElem` map fst s) sub -- lamに含まれる自由変数のうちsで「保護」されているものは無視
-  -- let (xts', body') = substTermPlus'' sub' xts body
-  -- let (zs, ees) = unzip s
-  -- let (es1, es2) = unzip ees
-  -- let es1' = map (substTermPlus sub) es1 -- s自体の更新は行なう
-  -- let es2' = map (substTermPlus sub) es2
-  -- (m, TermPiIntroPlus name indName idx (zip zs (zip es1' es2')) xts' body')
 substTermPlus sub (m, TermPiElim e es) = do
   let e' = substTermPlus sub e
   let es' = map (substTermPlus sub) es

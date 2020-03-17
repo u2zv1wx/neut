@@ -536,12 +536,13 @@ lookupInductive ::
 lookupInductive m (I (ai, i)) = do
   fenv <- gets formationEnv
   case IntMap.lookup i fenv of
-    Just (Just (_, WeakTermPiIntro xts (_, WeakTermPi _ atsbts (_, WeakTermPiElim (_, WeakTermUpsilon _) _)))) -> do
+    Just (Just (_, WeakTermPiIntro xts (_, WeakTermPiPlus _ _ atsbts (_, WeakTermPiElim (_, WeakTermUpsilon _) _)))) -> do
       let at = head atsbts
       let bts = tail atsbts -- valid since a is not mutual
       return (xts, at, bts)
-    Just (Just _) ->
-      raiseCritical m $ "malformed inductive type (Parse.lookupInductive)"
+    Just (Just e) ->
+      raiseCritical m $
+      "malformed inductive type (Parse.lookupInductive): \n" <> toText e
     Just Nothing ->
       raiseError m $
       "the inductive type `" <> ai <> "` must be a non-mutual inductive type"

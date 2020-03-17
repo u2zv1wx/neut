@@ -52,8 +52,7 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
     (_, WeakTermPiIntroPlus _ _ xts body)
       | length xts == length es' -> do
         let xs = map (\(_, x, _) -> x) xts
-        reduceWeakTermPlus $
-          substWeakTermPlus (zip xs es') body -- reify the explicit substitution `s`
+        reduceWeakTermPlus $ substWeakTermPlus (zip xs es') body
     -- (_, WeakTermConst (I (constant, _))) ->
     --   reduceWeakTermPlusTheta (m, app) es' m constant
     _ -> (m, app)

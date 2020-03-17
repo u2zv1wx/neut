@@ -54,6 +54,8 @@ reduceTermPlus (m, TermPiElim e es) = do
       | length xts == length es'
       , valueCond -> do
         let xs = map (\(_, x, _) -> x) xts
+        -- p "reduce. sub-dom:"
+        -- p' $ xs
         reduceTermPlus $ substTermPlus (zip xs es') body
     (_, TermPiIntroPlus _ _ xts body)
       | length xts == length es'
@@ -355,7 +357,10 @@ isValue :: TermPlus -> WithEnv Bool
 isValue (_, TermTau _) = return True
 isValue (_, TermUpsilon _) = return True
 isValue (_, TermPi {}) = return True
+isValue (_, TermPiPlus {}) = return True
 isValue (_, TermPiIntro {}) = return True
+isValue (_, TermPiIntroNoReduce {}) = return True
+isValue (_, TermPiIntroPlus {}) = return True
 isValue (_, TermSigma {}) = return True
 isValue (_, TermSigmaIntro _ es) = do
   bs <- mapM isValue es

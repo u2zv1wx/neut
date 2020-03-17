@@ -328,6 +328,8 @@ infer' ctx (m, WeakTermCase (e, t) cxtes) = do
     forM cxtes $ \((c, xts), body) -> do
       (xtls', (body', tBody', mlBody)) <- inferBinder ctx xts body
       -- c @ xtsの型がtと同一であるっていう制約を入れられたらそれでオッケーな気はする？
+      -- つまり、xtsをenvに登録したうえでc @ (x1, ..., xn)を推論して、で、その型とtの型とをmatchさせる、みたいな？
+      -- 推論結果はirrefutableに取り出す感じで。
       insConstraintEnv h tBody'
       insLevelEQ ml mlBody
       let (xts', mlArgs) = unzip xtls'

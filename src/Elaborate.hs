@@ -38,9 +38,11 @@ import qualified Data.UnionFind as UF
 -- https://arxiv.org/abs/1505.04324, 2015.
 elaborate :: WeakStmt -> WithEnv TermPlus
 elaborate stmt = do
-  e <- elaborateStmt stmt >>= reduceTermPlus
+  e <- elaborateStmt stmt
+  e' <- reduceTermPlus e
+  return e'
   -- _ <- error "well-typed"
-  return e
+  -- return e
 
 elaborateStmt :: WeakStmt -> WithEnv TermPlus
 elaborateStmt (WeakStmtReturn e) = do
