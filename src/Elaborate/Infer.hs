@@ -172,15 +172,11 @@ infer' ctx (m, WeakTermIter (mx, x, t) xts e) = do
   insLevelEQ mlPi ml'
   return ((m, WeakTermIter (mx, x, t') xts' e'), piType, mlPi)
 infer' ctx (m, WeakTermZeta x) = do
-  (app, higherApp, ml) <- newHoleInCtx ctx m
   zenv <- gets zetaEnv
   case IntMap.lookup (asInt x) zenv of
-    Just (app', higherApp', ml') -> do
-      insConstraintEnv app app'
-      insConstraintEnv higherApp higherApp'
-      insLevelEQ ml ml'
-      return (app, higherApp, ml)
+    Just hole -> return hole
     Nothing -> do
+      (app, higherApp, ml) <- newHoleInCtx ctx m
       modify
         (\env ->
            env {zetaEnv = IntMap.insert (asInt x) (app, higherApp, ml) zenv})
@@ -326,40 +322,15 @@ infer' ctx (m, WeakTermCase (e, t) cxtes) = do
   (h, ml) <- newTypeHoleInCtx ctx m
   cxtes' <-
     forM cxtes $ \((c, xts), body) -> do
-      (xtls', (body', tBody', mlBody)) <- inferBinder ctx xts body
-      -- c @ xtsの型がtと同一であるっていう制約を入れられたらそれでオッケーな気はする？
-      -- つまり、xtsをenvに登録したうえでc @ (x1, ..., xn)を推論して、で、その型とtの型とをmatchさせる、みたいな？
-      -- 推論結果はirrefutableに取り出す感じで。
-      insConstraintEnv h tBody'
-      insLevelEQ ml mlBody
-      let (xts', mlArgs) = unzip xtls'
-      mt <- lookupTypeEnv c
-      case mt of
-        Nothing -> raiseError m $ "no such constructor defined: " <> asText c
-        Just (tIntroStrict, UnivLevelPlus (_, l)) -> do
-          (tIntro, _) <- univInst (weaken tIntroStrict) l
-          case tIntro of
-            (_, WeakTermPi mls yts _)
-              | length yts == length xts -> do
-                forM_ (zip mls (mlArgs ++ [mlBody])) $ uncurry insLevelEQ
-                let ts = map (\(_, _, tx) -> tx) xts'
-                let es = map (\(mx, x, _) -> (mx, WeakTermUpsilon x)) xts'
-                let ys = map (\(_, y, _) -> y) yts
-                let ts' =
-                      map (\(_, _, ty) -> substWeakTermPlus (zip ys es) ty) yts
-                forM_ (zip ts' ts) $ uncurry insConstraintEnv
-                return ((c, xts'), body')
-              | otherwise ->
-                raiseError m $
-                "the arity of `" <>
-                asText c <>
-                "` is supposed to be " <>
-                T.pack (show (length yts)) <>
-                ", but found " <> T.pack (show (length xts)) <> " argument(s)"
-            _ ->
-              raiseError m $
-              "the type of `" <>
-              asText c <> "` must be a Pi-type, but is:\n" <> toText tIntro
+      (xts', ctx') <- inferPatArgs ctx xts
+      let vs = map (\(mx, x, _) -> (mx, WeakTermUpsilon x)) xts'
+      let app = (m, WeakTermPiElim (m, WeakTermUpsilon c) vs)
+      (_, appType, appLevel) <- infer' ctx' app
+      (body', bodyType, bodyLevel) <- infer' ctx' body
+      forM_ xts' insPatVarEnv
+      forM_ [(appType, t'), (bodyType, h)] $ uncurry insConstraintEnv
+      forM_ [(appLevel, mlInd), (bodyLevel, ml)] $ uncurry insLevelEQ
+      return ((c, xts'), body')
   return ((m, WeakTermCase (e', t') cxtes'), h, ml)
 
 -- infer' ctx (m, WeakTermCocase (name, args) ces) = do
@@ -454,6 +425,15 @@ inferSigma ctx ((mx, x, t):xts) = do
   insWeakTypeEnv x tl'
   xts' <- inferSigma (ctx ++ [((mx, x, t'), ml)]) xts
   return $ ((mx, x, t'), ml) : xts'
+
+inferPatArgs ::
+     Context -> [IdentifierPlus] -> WithEnv ([IdentifierPlus], Context)
+inferPatArgs ctx [] = return ([], ctx)
+inferPatArgs ctx ((mx, x, t):xts) = do
+  tl'@(t', ml) <- inferType' ctx t
+  insWeakTypeEnv x tl'
+  (xts', ctx') <- inferPatArgs (ctx ++ [((mx, x, t'), ml)]) xts
+  return ((mx, x, t') : xts', ctx')
 
 inferBinder ::
      Context
@@ -645,6 +625,10 @@ insLevelLT ml1 ml2 =
 insLevelEQ :: UnivLevelPlus -> UnivLevelPlus -> WithEnv ()
 insLevelEQ (UnivLevelPlus (_, l1)) (UnivLevelPlus (_, l2)) = do
   modify (\env -> env {equalityEnv = (l1, l2) : equalityEnv env})
+
+insPatVarEnv :: IdentifierPlus -> WithEnv ()
+insPatVarEnv (_, (I (_, i)), _) =
+  modify (\env -> env {patVarEnv = S.insert i (patVarEnv env)})
 
 univInst :: WeakTermPlus -> UnivLevel -> WithEnv (WeakTermPlus, UnivLevel)
 univInst e l = do
