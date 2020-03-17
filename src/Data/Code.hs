@@ -30,7 +30,7 @@ data Code
   -- the variable introduced by CodeUpElim is assumed to be used linearly
   -- (this property is exploited to, for example, prevent unnecessary copy of array in array-access)
   | CodeUpElim Identifier CodePlus CodePlus
-  | CodeEnumElim SubstDataPlus DataPlus [(Case, CodePlus)]
+  | CodeEnumElim SubstDataPlus DataPlus [(LowCase, CodePlus)]
   | CodeStructElim [(Identifier, ArrayKind)] DataPlus CodePlus
   deriving (Show)
 

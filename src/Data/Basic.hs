@@ -35,11 +35,6 @@ asInt (I (_, i)) = i
 instance Show Identifier where
   show (I (s, i)) = T.unpack s ++ "-" ++ show i
 
-data Case
-  = CaseValue EnumValue
-  | CaseDefault
-  deriving (Show, Eq, Ord)
-
 -- note that UnivLevel is just a name of the level of a universe (i.e. the integer
 -- itself is not the level of the universe)
 type UnivLevel = Int
@@ -155,8 +150,26 @@ data EnumValue
   = EnumValueIntS IntSize Integer
   | EnumValueIntU IntSize Integer
   | EnumValueLabel T.Text
-  | EnumValueGlobal T.Text
   deriving (Show, Eq, Ord)
+
+data Case
+  = CaseValue EnumValue
+  | CaseDefault
+  deriving (Show, Eq, Ord)
+
+data LowCase
+  = LowCaseValueIntS IntSize Integer
+  | LowCaseValueIntU IntSize Integer
+  | LowCaseValueLabel T.Text
+  | LowCaseValueGlobal T.Text
+  | LowCaseDefault
+  deriving (Show, Eq, Ord)
+
+toLowCase :: Case -> LowCase
+toLowCase (CaseValue (EnumValueIntS size i)) = LowCaseValueIntS size i
+toLowCase (CaseValue (EnumValueIntU size i)) = LowCaseValueIntU size i
+toLowCase (CaseValue (EnumValueLabel l)) = LowCaseValueLabel l
+toLowCase CaseDefault = LowCaseDefault
 
 data LowType
   = LowTypeIntS IntSize

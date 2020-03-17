@@ -326,7 +326,8 @@ llvmDataLet' ((x, d):rest) cont = do
   llvmDataLet x d cont'
 
 -- returns Nothing iff the branch list is empty
-constructSwitch :: [(Case, CodePlus)] -> WithEnv (Maybe (LLVM, [(Int, LLVM)]))
+constructSwitch ::
+     [(LowCase, CodePlus)] -> WithEnv (Maybe (LLVM, [(Int, LLVM)]))
 constructSwitch [] = return Nothing
 constructSwitch [(CaseValue _, code)] = do
   code' <- llvmCode code
@@ -338,11 +339,11 @@ constructSwitch ((CaseValue l, code):rest) = do
   return $ do
     (defaultCase, caseList) <- m
     return (defaultCase, (i, code') : caseList)
-constructSwitch ((CaseDefault, code):_) = do
+constructSwitch ((LowCaseDefault, code):_) = do
   code' <- llvmCode code
   return $ Just (code', [])
 
-llvmCodeEnumElim :: DataPlus -> [(Case, CodePlus)] -> WithEnv LLVM
+llvmCodeEnumElim :: DataPlus -> [(LowCase, CodePlus)] -> WithEnv LLVM
 llvmCodeEnumElim v branchList = do
   m <- constructSwitch branchList
   case m of

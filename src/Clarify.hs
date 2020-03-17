@@ -109,7 +109,7 @@ clarify (m, TermEnumElim (e, _) bs) = do
   fvss <- mapM chainTermPlus' es
   let fvs = nubBy (\(_, x, _) (_, y, _) -> x == y) $ concat fvss
   es' <- mapM clarify es
-  clarifyEnumElim m fvs e $ zip cs es'
+  clarifyEnumElim m fvs e $ zip (map toLowCase cs) es'
 clarify (m, TermArray {}) = do
   returnArrayType m
 clarify (m, TermArrayIntro k es) = do
@@ -185,7 +185,7 @@ clarifyEnumElim ::
      Meta
   -> [(Meta, Identifier, TermPlus)]
   -> TermPlus
-  -> [(Case, CodePlus)]
+  -> [(LowCase, CodePlus)]
   -> WithEnv CodePlus
 clarifyEnumElim m fvs e bs = do
   let (cs, es) = unzip bs
@@ -203,7 +203,8 @@ clarifyCase ::
   -> WithEnv CodePlus
 clarifyCase m cxtes lamVarName envVarName = do
   let cs = map (\((c, _), _) -> c) cxtes
-  let cs' = map (CaseValue . EnumValueGlobal . asText) cs
+  -- let cs' = map (CaseValue . EnumValueGlobal . asText) cs
+  let cs' = map (LowCaseValueGlobal . asText) cs
   es <- mapM (\cxte -> clarifyCase' m cxte envVarName) cxtes
   let lamVar = toTermUpsilon lamVarName
   fvss <- mapM chainCaseClause cxtes

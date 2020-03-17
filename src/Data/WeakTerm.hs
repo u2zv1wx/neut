@@ -86,7 +86,6 @@ data WeakCase
   | WeakCaseIntU IntSize Integer
   | WeakCaseInt WeakTermPlus Integer
   | WeakCaseLabel T.Text
-  | WeakCaseGlobal T.Text
   | WeakCaseDefault
   deriving (Show, Eq)
 
@@ -543,7 +542,6 @@ showClause (c, e) = inParen $ showWeakCase c <> " " <> toText e
 
 showWeakCase :: WeakCase -> T.Text
 showWeakCase (WeakCaseLabel l) = l
-showWeakCase (WeakCaseGlobal l) = l
 showWeakCase (WeakCaseIntS _ a) = T.pack $ show a
 showWeakCase (WeakCaseIntU _ a) = T.pack $ show a
 showWeakCase (WeakCaseInt _ a) = T.pack $ show a
@@ -553,8 +551,8 @@ weakenEnumValue :: EnumValue -> WeakCase
 weakenEnumValue (EnumValueLabel l) = WeakCaseLabel l
 weakenEnumValue (EnumValueIntS t a) = WeakCaseIntS t a
 weakenEnumValue (EnumValueIntU t a) = WeakCaseIntU t a
-weakenEnumValue (EnumValueGlobal l) = WeakCaseGlobal l
 
+-- weakenEnumValue (EnumValueGlobal l) = WeakCaseGlobal l
 -- weakenEnumValue (EnumValueNat size a) = WeakCaseNat size a
 weakenCase :: Case -> WeakCase
 weakenCase (CaseValue v) = weakenEnumValue v
@@ -564,8 +562,8 @@ showEnumValue :: EnumValue -> T.Text
 showEnumValue (EnumValueLabel l) = l
 showEnumValue (EnumValueIntS _ a) = T.pack $ show a
 showEnumValue (EnumValueIntU _ a) = T.pack $ show a
-showEnumValue (EnumValueGlobal l) = l
 
+-- showEnumValue (EnumValueGlobal l) = l
 -- showEnumValue (EnumValueNat size a) = T.pack $ "n" ++ show size ++ "-" ++ show a
 showArrayKind :: ArrayKind -> T.Text
 showArrayKind (ArrayKindIntS size) = T.pack $ "i" ++ show size

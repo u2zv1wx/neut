@@ -71,10 +71,10 @@ reduceCodePlus (m, CodeUpElim x e1 e2) = do
 reduceCodePlus (m, CodeEnumElim varInfo v les) = do
   case v of
     (_, DataEnumIntro l) ->
-      case lookup (CaseValue l) les of
+      case lookup (toLowCase $ CaseValue l) les of
         Just body -> reduceCodePlus $ substCodePlus varInfo body
         Nothing ->
-          case lookup CaseDefault les of
+          case lookup LowCaseDefault les of
             Just body -> reduceCodePlus $ substCodePlus varInfo body
             Nothing -> do
               let (ls, es) = unzip les
