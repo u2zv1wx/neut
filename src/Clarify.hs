@@ -160,11 +160,11 @@ clarify (m, TermStructElim xks e1 e2) = do
     bindLet [(structVarName, e1')] (m, CodeStructElim (zip xs ks) structVar e2')
 clarify (m, TermCase (e, _) cxtes) = do
   e' <- clarify e
-  (clsVarName, clsVar) <- newDataUpsilonWith "closure"
-  (typeVarName, _) <- newDataUpsilonWith "exp"
-  (envVarName, _) <- newDataUpsilonWith "env"
+  (clsVarName, clsVar) <- newDataUpsilonWith "case-closure"
+  (typeVarName, _) <- newDataUpsilonWith "case-exp"
+  (envVarName, _) <- newDataUpsilonWith "case-env"
   (lamVarName, _) <- newDataUpsilonWith "thunk"
-  cxtes' <- clarifyCase m cxtes lamVarName envVarName
+  cxtes' <- clarifyCase m cxtes typeVarName envVarName lamVarName
   return $
     bindLet
       [(clsVarName, e')]
@@ -195,38 +195,27 @@ clarifyEnumElim m fvs e bs = do
   let varInfo = map (\(mx, x, _) -> (x, toDataUpsilon (x, mx))) fvs
   return $ bindLet [(yName, e')] (m, CodeEnumElim varInfo y (zip cs es''))
 
--- clarifyEnumElim ::
---      Meta
---   -> [(Meta, Identifier, TermPlus)]
---   -> TermPlus
---   -> [(Case, CodePlus)]
---   -> WithEnv CodePlus
--- clarifyEnumElim m fvs e bs = do
---   let (cs, es) = unzip bs
---   es' <- mapM (retClosure Nothing fvs m []) es
---   es'' <- mapM (\cls -> callClosure m cls []) es'
---   (yName, e', y) <- clarifyPlus e
---   let varInfo = map (\(mx, x, _) -> (x, toDataUpsilon (x, mx))) fvs
---   return $ bindLet [(yName, e')] (m, CodeEnumElim varInfo y (zip cs es''))
 clarifyCase ::
      Meta
   -> [((Identifier, [(Meta, Identifier, TermPlus)]), TermPlus)]
   -> Identifier
   -> Identifier
+  -> Identifier
   -> WithEnv CodePlus
-clarifyCase m cxtes lamVarName envVarName = do
+clarifyCase m cxtes typeVarName envVarName lamVarName = do
   let cs = map (\((c, _), _) -> c) cxtes
-  -- let cs' = map (CaseValue . EnumValueGlobal . asText) cs
   es <- mapM (\cxte -> clarifyCase' m cxte envVarName) cxtes
   let lamVar = toTermUpsilon lamVarName
   fvss <- mapM chainCaseClause cxtes
   let fvs = nubBy (\(_, x, _) (_, y, _) -> x == y) $ concat fvss
-  -- clarifyEnumElim m fvs lamVar $ zip cs' es
-  -- let (cs, es) = unzip bs
-  es' <- mapM (retClosure Nothing fvs m []) es
+  let typeVarPlus = (m, typeVarName, (m, TermTau 0))
+  let typeVar = (m, TermUpsilon typeVarName)
+  let envVarPlus = (m, envVarName, typeVar)
+  let fvs' = [typeVarPlus, envVarPlus] ++ fvs
+  es' <- mapM (retClosure Nothing fvs' m []) es
   es'' <- mapM (\cls -> callClosure m cls []) es'
   (yName, e', y) <- clarifyPlus lamVar
-  let varInfo = map (\(mx, x, _) -> (x, toDataUpsilon (x, mx))) fvs
+  let varInfo = map (\(mx, x, _) -> (x, toDataUpsilon (x, mx))) fvs'
   return $
     bindLet [(yName, e')] (m, CodeCase varInfo y (zip (map asText cs) es''))
 

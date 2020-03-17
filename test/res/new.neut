@@ -223,10 +223,11 @@
 ;;        (left A)
 ;;        (right B)))))
 
+
 (definition coproduct ((A tau) (B tau))
   (sigma
     ((x choice))
-    (case x
+    (switch x
       (left A)
       (right B))))
 
@@ -268,7 +269,7 @@
 (definition nat-inner ()
   (sigma
     ((p choice))
-    (case p
+    (switch p
       (left top)
       (right (nat-inner)))))
 
@@ -882,6 +883,9 @@
 ;; このときはaの型はちゃんとvec i64 (nat.zero)になってる。
 (let a (vec.nil i64 (nat.succ (nat.zero))))
 
+(let xs (list.cons i64 10 (list.cons i64 100 (list.cons i64 1000 (list.nil i64)))))
+
+
 
 (inductive item ((A tau))
   (item.intro () (item A))
@@ -1152,6 +1156,14 @@
 ;;   ((_ hole) (v hole))
 ;;   (u32:array-access hole item n3-1)
 ;;   (u32.add v 100))
+
+(let xs (list.cons i64 10 (list.cons i64 100 (list.cons i64 1000 (list.nil i64)))))
+
+(let ys (list.nil i64))
+
+(case xs
+  ((list.nil A) (i64 10))
+  ((list.cons _ _ _) (i64 30)))
 
 ;; (i4.sub 4 8)
 

@@ -13,9 +13,9 @@
 
 (notation forall pi)
 
-(keyword case)
+(keyword switch)
 
-(notation case enum-elimination)
+(notation switch enum-elimination)
 
 (keyword hole)
 
