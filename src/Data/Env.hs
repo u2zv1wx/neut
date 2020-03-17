@@ -73,6 +73,7 @@ data Env =
     , levelEnv :: [LevelConstraint]
     , substEnv :: IntMap.IntMap WeakTermPlus -- metavar ~> beta-equivalent weakterm
     , zetaEnv :: IntMap.IntMap (WeakTermPlus, WeakTermPlus, UnivLevelPlus)
+    , patVarEnv :: S.Set Int
     -- clarify
     , chainEnv :: IntMap.IntMap [(Meta, Identifier, TermPlus)] -- var/const ~> the closed var chain of its type
     , codeEnv :: Map.HashMap T.Text Definition -- f ~> thunk (lam (x1 ... xn) e)
@@ -122,6 +123,7 @@ initialEnv path =
     , levelEnv = []
     , substEnv = IntMap.empty
     , zetaEnv = IntMap.empty
+    , patVarEnv = S.empty
     , nameSet = S.empty
     , mainFilePath = path
     , currentFilePath = path

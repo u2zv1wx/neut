@@ -16,6 +16,7 @@ import Data.Maybe
 
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.PQueue.Min as Q
+import qualified Data.Set as S
 
 import Data.Basic
 import Data.Constraint
@@ -122,6 +123,7 @@ simp' ((e1, e2):cs) = do
   -- list of stuck reasons (fmvs: free meta-variables)
   let fmvs = catMaybes [ms1 >>= stuckReasonOf, ms2 >>= stuckReasonOf]
   sub <- gets substEnv
+  pvenv <- gets patVarEnv
   case lookupAny fmvs sub of
     Just (h, e) -> do
       let m = supMeta (metaOf e1) (metaOf e2)
@@ -203,6 +205,14 @@ simp' ((e1, e2):cs) = do
           , length es1 == length es2 -> do
             simpUnivParams (metaUnivParams m1) (metaUnivParams m2)
             simp $ zip es1 es2 ++ cs
+        (Just (StuckPiElimUpsilon ((I (_, i1)), _) []), _)
+          | i1 `S.member` pvenv -> do
+            modify (\env -> env {substEnv = IntMap.insert i1 e2 (substEnv env)})
+            simp cs
+        (_, Just (StuckPiElimUpsilon ((I (_, i2)), _) []))
+          | i2 `S.member` pvenv -> do
+            modify (\env -> env {substEnv = IntMap.insert i2 e1 (substEnv env)})
+            simp cs
         (Just (StuckPiElimZetaStrict h1 ies1), _)
           | xs1 <- concatMap getVarList ies1
           , occurCheck h1 hs2
