@@ -206,6 +206,12 @@ distinguishCode zs (ml, CodeStructElim xts d e) = do
   let zs' = filter (`notElem` map fst xts) zs
   (vs2, e') <- distinguishCode zs' e
   return (merge [vs1, vs2], (ml, CodeStructElim xts d' e'))
+distinguishCode zs (ml, CodeCase varInfo d branchList) = do
+  (vs, d') <- distinguishData zs d
+  let (from, to) = unzip varInfo
+  (vss, to') <- unzip <$> mapM (distinguishData zs) to
+  let varInfo' = zip from to'
+  return (merge (vs : vss), (ml, CodeCase varInfo' d' branchList))
 
 distinguishTheta :: [Identifier] -> Theta -> WithEnv (NameMap, Theta)
 distinguishTheta zs (ThetaUnaryOp op d) = do
