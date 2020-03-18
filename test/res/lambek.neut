@@ -1,0 +1,67 @@
+(include "notation.neut")
+
+(include "top.neut")
+
+;; (include "bottom.neut")
+
+;; (include "darwin.neut")
+
+(constant unsafe-cast
+  (pi ((A tau) (B tau) (_ A)) B))
+
+(inductive list ((A tau))
+  (list.nil () (list A))
+  (list.cons ((_ A) (_ (list A))) (list A)))
+
+(coinductive my-record ()
+  (item-1 ((_ (my-record))) i64)
+  (item-2 ((_ (my-record))) u32)
+  (item-3 ((_ (my-record))) top))
+
+;; (let item
+;;   (cocase (my-record)
+;;     ((my-record)
+;;      (item-1 10)
+;;      (item-2 20))))
+
+(let item
+  (record (my-record)
+    (item-1 10)
+    (item-3 unit)
+    (item-2 20)))
+
+(let xs (list.cons i64 25 (list.cons i64 100 (list.cons i64 1000 (list.nil i64)))))
+
+(let ys (list.nil i64))
+
+(case xs
+  ((list.nil C) (i64 10))
+  ((list.cons _ value ys)
+   (case ys
+     ((list.nil C) (i64 20))
+     ((list.cons _ v2 zs) v2))))
+
+(item-2 item)
+
+(item-2 item)
+
+(item-1 item)
+
+(case xs
+  ((list.nil C) (i64 10))
+  ((list.cons _ value ys) (i64.add value 1)))
+
+(let xs (list.cons i64 1 (list.cons i64 2 (list.cons i64 (item-1 item) (list.nil i64)))))
+
+;; これがちゃんと動くようになった
+(definition sum ((xs (list i64)))
+  (case xs
+   ((list.nil _) 0)
+   ((list.cons _ z ys) (i64.add z (sum ys)))))
+
+(definition fact ((xs (list i64)))
+  (case xs
+   ((list.nil _) 1)
+   ((list.cons _ z ys) (i64.mul z (fact ys)))))
+
+(fact xs)
