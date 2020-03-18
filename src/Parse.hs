@@ -252,9 +252,9 @@ concatQuasiStmtList (QuasiStmtLet m xt e:es) = do
 concatQuasiStmtList (QuasiStmtLetWT m xt e:es) = do
   cont <- concatQuasiStmtList es
   return $ WeakStmtLetWT m xt e cont
-concatQuasiStmtList (QuasiStmtLetSigma m t xts e:es) = do
+concatQuasiStmtList (QuasiStmtLetSigma m xts e:es) = do
   cont <- concatQuasiStmtList es
-  return $ WeakStmtLetSigma m t xts e cont
+  return $ WeakStmtLetSigma m xts e cont
 concatQuasiStmtList (QuasiStmtDef xds:ss) = do
   let ds = map snd xds
   let baseSub = map defToSub ds
@@ -383,7 +383,7 @@ toIdentList :: [QuasiStmt] -> [IdentifierPlus]
 toIdentList [] = []
 toIdentList ((QuasiStmtLet _ mxt _):ds) = mxt : toIdentList ds
 toIdentList ((QuasiStmtLetWT _ mxt _):ds) = mxt : toIdentList ds
-toIdentList ((QuasiStmtLetSigma _ _ mxts _):ds) = mxts ++ toIdentList ds
+toIdentList ((QuasiStmtLetSigma _ mxts _):ds) = mxts ++ toIdentList ds
 toIdentList ((QuasiStmtDef xds):ds) = do
   let mxts = map (\(_, (_, mxt, _, _)) -> mxt) xds
   mxts ++ toIdentList ds

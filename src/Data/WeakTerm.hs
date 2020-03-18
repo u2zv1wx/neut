@@ -126,7 +126,7 @@ data QuasiStmt
   -- special case of `let` in which the `e` in `let x := e` is known to be well-typed
   | QuasiStmtLetWT Meta IdentifierPlus WeakTermPlus
   -- let-sigma for borro
-  | QuasiStmtLetSigma Meta WeakTermPlus [IdentifierPlus] WeakTermPlus
+  | QuasiStmtLetSigma Meta [IdentifierPlus] WeakTermPlus
   -- mutually recursive definition (n >= 0)
   --   (definition
   --     ((f1 A1) (ARGS-1) e1)
@@ -177,7 +177,7 @@ data WeakStmt
   | WeakStmtLet Meta IdentifierPlus WeakTermPlus WeakStmt
   -- special case of `let` in which the `e` in `let x := e in cont` is known to be well-typed
   | WeakStmtLetWT Meta IdentifierPlus WeakTermPlus WeakStmt
-  | WeakStmtLetSigma Meta WeakTermPlus [IdentifierPlus] WeakTermPlus WeakStmt
+  | WeakStmtLetSigma Meta [IdentifierPlus] WeakTermPlus WeakStmt
   | WeakStmtLetInductiveIntro
       Meta -- m
       (T.Text, T.Text) -- biai

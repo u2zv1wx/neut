@@ -44,13 +44,10 @@ renameQuasiStmtList' nenv ((QuasiStmtLetWT m (mx, x, t) e):ss) = do
   e' <- rename' nenv e
   ss' <- renameQuasiStmtList' (insertName x x' nenv) ss
   return $ QuasiStmtLetWT m (mx, x', t') e' : ss'
-renameQuasiStmtList' nenv (QuasiStmtLetSigma m t xts e:ss) = do
-  t' <- rename' nenv t
+renameQuasiStmtList' nenv (QuasiStmtLetSigma m xts e:ss) = do
   e' <- rename' nenv e
   (xts', ss') <- renameStmtBinder nenv xts ss
-  -- (xts', e2') <- renameBinder nenv xts e2
-  -- ss' <- renameQuasiStmtList' ()
-  return $ QuasiStmtLetSigma m t' xts' e' : ss'
+  return $ QuasiStmtLetSigma m xts' e' : ss'
 renameQuasiStmtList' nenv ((QuasiStmtDef xds):ss) = do
   let (xs, ds) = unzip xds
   -- rename for deflist
