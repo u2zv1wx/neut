@@ -199,20 +199,13 @@ interpret (m, TreeAtom x)
     u8s <- forM (encode str) $ \u -> return (m', toValueIntU 8 (toInteger u))
     -- parse string as utf-8 encoded u8 array
     return (m', WeakTermArrayIntro (ArrayKindIntU 8) u8s)
-interpret (m, TreeAtom x)
-  -- ml <- interpretEnumValueMaybe t
-  -- isEnum <- isDefinedEnumName x
- = do
+interpret (m, TreeAtom x) = do
   m' <- adjustPhase m
   -- Note that enums/constants are interpreted as variables at this stage.
   -- Those are reinterpreted into constants in Rename.
   -- This is to handle terms like `lam (i64 : bool). e` (i.e. bound variable
   -- with the same name of a constant) in saner way.
   return (m', WeakTermUpsilon $ asIdent x)
-  -- case (ml, isEnum) of
-  --   (Just l, _) -> return (m', WeakTermEnumIntro l)
-  --   (_, True) -> return (m', WeakTermEnum $ EnumTypeLabel x)
-  --   (_, False) -> return (m', WeakTermUpsilon $ asIdent x)
 interpret t@(m, TreeNode es) = do
   m' <- adjustPhase m
   ml <- interpretEnumValueMaybe t
@@ -223,7 +216,6 @@ interpret t@(m, TreeNode es) = do
         then raiseSyntaxError t "(TREE ...)"
         else interpret (m', TreeNode ((m, TreeAtom "pi-elimination") : es))
 
---  m' <- adjustPhase m
 interpretIdentifierPlus :: TreePlus -> WithEnv IdentifierPlus
 interpretIdentifierPlus (m, TreeAtom x) = do
   (m', x') <- interpretAtom (m, TreeAtom x)
