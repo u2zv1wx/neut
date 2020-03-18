@@ -15,7 +15,7 @@ import Control.Monad.State
 import Data.Bits ((.&.), shiftR)
 import Data.Char (ord)
 import Data.List (elemIndex, sortOn)
-import Data.Maybe (fromMaybe)
+import Data.Maybe (catMaybes, fromMaybe)
 import Data.Word (Word8)
 import Text.Read (readMaybe)
 
@@ -212,9 +212,49 @@ interpret t@(m, TreeNode es) = do
   case ml of
     Just l -> return (m', WeakTermEnumIntro l)
     _ -> do
-      if null es
-        then raiseSyntaxError t "(TREE ...)"
-        else interpret (m', TreeNode ((m, TreeAtom "pi-elimination") : es))
+      case es of
+        [] -> raiseSyntaxError t "(TREE ...)"
+        (f:args) -> interpretPiElim m f args -- interpret (m', TreeNode ((m', TreeAtom "pi-elimination") : es))
+
+interpretPiElim :: Meta -> TreePlus -> [TreePlus] -> WithEnv WeakTermPlus
+interpretPiElim m f args = do
+  (args', headerList) <- unzip <$> mapM interpretBorrow args
+  f' <- interpret f
+  return $ applyHeader headerList (m, WeakTermPiElim f' args')
+
+applyHeader :: [WeakTermPlus -> WeakTermPlus] -> WeakTermPlus -> WeakTermPlus
+applyHeader [] e = e
+applyHeader (f:fs) e = f (applyHeader fs e)
+
+-- (e e1 ... en)みたいなやつのei部分をチェックしてborrow成分を集める
+interpretBorrow ::
+     TreePlus -> WithEnv (WeakTermPlus, WeakTermPlus -> WeakTermPlus)
+interpretBorrow (m, TreeNode (f:args))
+  | (mmxs, args') <- unzip $ map interpretBorrow' args
+  , mxs <- catMaybes mmxs
+  , not (null mxs) = do
+    f' <- interpret f
+    args'' <- mapM interpret args'
+    tmp <- newNameWith'' "borrow"
+    xts <- mapM toIdentPlus $ mxs ++ [(m, tmp)]
+    h <- newHole m
+    let app = (m, WeakTermPiElim f' args'')
+    return
+      ((m, WeakTermUpsilon tmp), \term -> (m, WeakTermSigmaElim h xts app term))
+interpretBorrow e = do
+  e' <- interpret e
+  return (e', id)
+
+interpretBorrow' :: TreePlus -> (Maybe (Meta, Identifier), TreePlus)
+interpretBorrow' (m, TreeAtom s)
+  | T.length s > 1
+  , T.head s == '&' = (Just (m, asIdent $ T.tail s), (m, TreeAtom $ T.tail s))
+interpretBorrow' t = (Nothing, t)
+
+toIdentPlus :: (Meta, Identifier) -> WithEnv IdentifierPlus
+toIdentPlus (m, x) = do
+  h <- newHole m
+  return (m, x, h)
 
 interpretIdentifierPlus :: TreePlus -> WithEnv IdentifierPlus
 interpretIdentifierPlus (m, TreeAtom x) = do
