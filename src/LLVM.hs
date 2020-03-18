@@ -38,9 +38,7 @@ llvmCode (_, CodePiElimDownElim v ds) = do
   (fun, castThen) <- llvmCast (Just $ takeBaseName v) v $ toFunPtrType ds
   castThenCall <- castThen $ LLVMCall fun vs
   llvmDataLet' (zip xs ds) $ castThenCall
-llvmCode (_, CodeSigmaElim k xs v e)
-  -- let xs = map fst xts
- = do
+llvmCode (_, CodeSigmaElim k xs v e) = do
   let et = arrayKindToLowType k -- elem type
   let bt = LowTypeArrayPtr (length xs) et -- base pointer type  ([(length xs) x ARRAY_ELEM_TYPE])
   let idxList = map (\i -> (LLVMDataInt i, i32)) [0 ..]
@@ -60,7 +58,10 @@ llvmCode (_, CodeUpElim x e1 e2) = do
 llvmCode (_, CodeEnumElim sub v branchList) = do
   let (ls, es) = unzip branchList
   let es' = map (substCodePlus sub) es
+  ns <- gets nameSet
+  modify (\env -> env {nameSet = S.empty})
   es'' <- mapM reduceCodePlus es'
+  modify (\env -> env {nameSet = ns})
   llvmCodeEnumElim v $ zip ls es''
 llvmCode (_, CodeStructElim xks v e) = do
   let (xs, ks) = unzip xks
@@ -73,7 +74,10 @@ llvmCode (_, CodeStructElim xks v e) = do
 llvmCode (m, CodeCase sub v branchList) = do
   let (ls, es) = unzip branchList
   let es' = map (substCodePlus sub) es
+  ns <- gets nameSet
+  modify (\env -> env {nameSet = S.empty})
   es'' <- mapM reduceCodePlus es'
+  modify (\env -> env {nameSet = ns})
   llvmCodeCase m v $ zip ls es''
 
 uncastList :: [(Identifier, (Identifier, LowType))] -> CodePlus -> WithEnv LLVM
@@ -280,7 +284,8 @@ llvmDataLet x (m, DataTheta y) cont = do
         (args', llvm') <- rename args llvm
         insLLVMEnv y args' llvm'
         llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType args) cont
-      | otherwise -> llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType args) cont
+      | otherwise -> do
+        llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType args) cont
 llvmDataLet x (_, DataUpsilon y) cont =
   llvmUncastLet x (LLVMDataLocal y) voidPtr cont
 llvmDataLet x (_, DataSigmaIntro k ds) cont = do

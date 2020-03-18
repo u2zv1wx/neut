@@ -408,14 +408,16 @@ elaborate' (m, WeakTermStructElim xts e1 e2) = do
   return (m, TermStructElim xts e1' e2')
 elaborate' (m, WeakTermCase (e, t) cxtes) = do
   e' <- elaborate' e
-  t' <- elaborate' t >>= reduceTermPlus
   cxtes' <-
     forM cxtes $ \((c, xts), body) -> do
       xts' <- mapM elaboratePlus xts
       body' <- elaborate' body
       return ((c, xts'), body')
-  case t' of
-    (_, TermPiPlus name _ _ _) -> do
+  -- t' <- elaborate' t >>= reduceTermPlus
+  t' <- elaborate' t
+  t'' <- reduceWeakType $ weaken t'
+  case t'' of
+    (_, WeakTermPiPlus name _ _ _) -> do
       eenv <- gets enumEnv
       case Map.lookup name eenv of
         Nothing -> raiseError m $ "no such inductive type defined: " <> name
@@ -431,7 +433,17 @@ elaborate' (m, WeakTermCase (e, t) cxtes) = do
       raiseError m $
       "the type of `" <>
       toText (weaken e') <>
-      "` must be an inductive type, but is:\n" <> toText (weaken t')
+      "` must be an inductive type, but is:\n" <> toText t''
+
+reduceWeakType :: WeakTermPlus -> WithEnv WeakTermPlus
+reduceWeakType t = do
+  let t' = reduceWeakTermPlus t
+  senv <- gets substEnv
+  case t' of
+    (m, WeakTermPiElim (_, WeakTermUpsilon (I (_, i))) args)
+      | Just lam <- IntMap.lookup i senv ->
+        reduceWeakType (m, WeakTermPiElim lam args)
+    _ -> return t'
 
 -- elaborate' (m, WeakTermCocase (name, args) ces) = do
 --   args' <- mapM elaborate' args
