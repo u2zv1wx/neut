@@ -3,7 +3,9 @@
 module Elaborate.Infer
   ( infer
   , inferType
+  , inferSigma
   , insLevelEQ
+  , insLevelLE
   , insConstraintEnv
   , univInstWith
   ) where

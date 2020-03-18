@@ -240,9 +240,9 @@ isSpecialForm _ = False
 concatQuasiStmtList :: [QuasiStmt] -> WithEnv WeakStmt
 concatQuasiStmtList [] = do
   return $ WeakStmtReturn (emptyMeta, WeakTermEnumIntro $ EnumValueLabel "unit")
--- for test
-concatQuasiStmtList [QuasiStmtLet _ _ e] = do
-  return $ WeakStmtReturn e
+-- -- for test
+-- concatQuasiStmtList [QuasiStmtLet _ _ e] = do
+--   return $ WeakStmtReturn e
 concatQuasiStmtList (QuasiStmtConstDecl m xt:es) = do
   cont <- concatQuasiStmtList es
   return $ WeakStmtConstDecl m xt cont

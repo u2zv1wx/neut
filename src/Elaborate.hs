@@ -73,7 +73,19 @@ elaborateStmt (WeakStmtLetWT m (mx, x@(I (_, i)), t) e cont) = do
   modify (\env -> env {substEnv = IntMap.insert i (weaken e') (substEnv env)})
   cont' <- elaborateStmt cont
   return (m, TermPiElim (m, TermPiIntro [(mx, x, t'')] cont') [e'])
-elaborateStmt (WeakStmtLetSigma m t xts e cont) = undefined
+elaborateStmt (WeakStmtLetSigma m xts e cont) = do
+  (e', t1, mlSigma) <- infer e
+  xtls <- inferSigma [] xts
+  let (xts', mlSigArgList) = unzip xtls
+  insConstraintEnv t1 (fst e', WeakTermSigma xts')
+  forM_ mlSigArgList $ \mlSigArg -> insLevelLE mlSigArg mlSigma
+  analyze >> synthesize >> refine >> cleanup
+  e'' <- elaborate' e >>= reduceTermPlus
+  xts'' <- mapM elaboratePlus xts'
+  forM_ (zip xts'' mlSigArgList) $ \((_, x, tx), l) -> insTypeEnv x tx l
+  cont' <- elaborateStmt cont
+  return
+    (m, TermSigmaElim (m, TermEnumIntro $ EnumValueLabel "top") xts'' e'' cont')
 elaborateStmt (WeakStmtLetInductiveIntro m (bi, ai) (mx, x@(I (_, i)), t) xts yts atsbts app cont) = do
   (t', mlt) <- inferType t
   analyze >> synthesize >> refine >> cleanup
