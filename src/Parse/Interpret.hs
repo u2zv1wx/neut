@@ -160,7 +160,6 @@ interpret (m, TreeNode ((_, TreeAtom "cocase"):codType:cocaseClauseList)) = do
   let codType' = (m, WeakTermPiElim (m, WeakTermUpsilon a) args)
   es <- cocaseAsSigmaIntro m a codType' cocaseClauseList'
   return (m', WeakTermSigmaIntro codType' es)
--- type CocaseClause = ((Identifier, [WeakTermPlus]), [(Identifier, WeakTermPlus)])
 --
 -- auxiliary interpretations
 --
