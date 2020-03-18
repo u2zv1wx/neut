@@ -170,6 +170,13 @@ interpret (m, TreeNode ((_, TreeAtom "product"):ts)) = do
   xs <- mapM (const $ newNameWith' "sig") ts'
   m' <- adjustPhase m
   return (m', WeakTermSigma (zip3 ms xs ts'))
+interpret (m, TreeNode ((_, TreeAtom "record"):codType:clauseList)) = do
+  (a, args) <- interpretCoinductive codType
+  m' <- adjustPhase m
+  clauseList' <- mapM interpretCocaseClause' clauseList
+  let codType' = (m, WeakTermPiElim (m, WeakTermUpsilon a) args)
+  es <- cocaseAsSigmaIntro m a codType' [((a, args), clauseList')]
+  return (m', WeakTermSigmaIntro codType' es)
 interpret (m, TreeAtom x)
   | Just x' <- readMaybe $ T.unpack x = do
     m' <- adjustPhase m
