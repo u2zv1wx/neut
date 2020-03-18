@@ -12,6 +12,7 @@ import Data.Basic
 import Data.Env
 import Data.Term
 
+-- これpureにしてもいいかも
 reduceTermPlus :: TermPlus -> WithEnv TermPlus
 reduceTermPlus (m, TermPi mls xts cod) = do
   let (ms, xs, ts) = unzip3 xts
@@ -36,12 +37,6 @@ reduceTermPlus (m, TermPiIntroNoReduce xts e) = do
 reduceTermPlus (m, TermPiIntroPlus ind (name, args) xts e) = do
   args' <- mapM reduceTermIdentPlus args
   xts' <- mapM reduceTermIdentPlus xts
-  -- let (zs, ees) = unzip s
-  -- let (es1, es2) = unzip ees
-  -- es1' <- mapM reduceTermPlus es1
-  -- es2' <- mapM reduceTermPlus es2
-  -- let (ms, xs, ts) = unzip3 xts
-  -- ts' <- mapM reduceTermPlus ts
   e' <- reduceTermPlus e
   return $ (m, TermPiIntroPlus ind (name, args') xts' e')
 reduceTermPlus (m, TermPiElim e es) = do
@@ -54,17 +49,12 @@ reduceTermPlus (m, TermPiElim e es) = do
       | length xts == length es'
       , valueCond -> do
         let xs = map (\(_, x, _) -> x) xts
-        -- p "reduce. sub-dom:"
-        -- p' $ xs
         reduceTermPlus $ substTermPlus (zip xs es') body
     (_, TermPiIntroPlus _ _ xts body)
       | length xts == length es'
       , valueCond -> do
         let xs = map (\(_, x, _) -> x) xts
         reduceTermPlus $ substTermPlus (zip xs es') body
-        --   let xs = map (\(_, x, _) -> x) xts
-        -- let s = map (\(z, (ez, _)) -> (z, ez)) info
-        -- reduceTermPlus $ substTermPlus (s ++ zip xs es') body
     -- (_, TermConst constant) -> reduceTermPlusTheta (m, app) es' m constant
     _ -> return (m, app)
 reduceTermPlus (m, TermIter (mx, x, t) xts e)
