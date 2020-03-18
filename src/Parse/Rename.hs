@@ -44,6 +44,13 @@ renameQuasiStmtList' nenv ((QuasiStmtLetWT m (mx, x, t) e):ss) = do
   e' <- rename' nenv e
   ss' <- renameQuasiStmtList' (insertName x x' nenv) ss
   return $ QuasiStmtLetWT m (mx, x', t') e' : ss'
+renameQuasiStmtList' nenv (QuasiStmtLetSigma m t xts e:ss) = do
+  t' <- rename' nenv t
+  e' <- rename' nenv e
+  (xts', ss') <- renameStmtBinder nenv xts ss
+  -- (xts', e2') <- renameBinder nenv xts e2
+  -- ss' <- renameQuasiStmtList' ()
+  return $ QuasiStmtLetSigma m t' xts' e' : ss'
 renameQuasiStmtList' nenv ((QuasiStmtDef xds):ss) = do
   let (xs, ds) = unzip xds
   -- rename for deflist
@@ -130,6 +137,20 @@ renameQuasiStmtList' nenv ((QuasiStmtLetCoinductiveElim m (mb, b, t) xtsyt codIn
       info
       asOuter :
     ss'
+
+renameStmtBinder ::
+     NameEnv
+  -> [IdentifierPlus]
+  -> [QuasiStmt]
+  -> WithEnv ([IdentifierPlus], [QuasiStmt])
+renameStmtBinder nenv [] ss = do
+  ss' <- renameQuasiStmtList' nenv ss
+  return ([], ss')
+renameStmtBinder nenv ((mx, x, t):xts) ss = do
+  t' <- rename' nenv t
+  x' <- newLLVMNameWith x
+  (xts', ss') <- renameStmtBinder (insertName x x' nenv) xts ss
+  return ((mx, x', t') : xts', ss')
 
 renameDef :: NameEnv -> Def -> WithEnv Def
 renameDef nenv (m, (mx, x, t), xts, e) = do
