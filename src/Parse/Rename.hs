@@ -68,6 +68,10 @@ renameQuasiStmtList' nenv ((QuasiStmtConstDecl m (mx, x, t)):ss) = do
   t' <- rename' nenv t
   ss' <- renameQuasiStmtList' nenv ss
   return $ QuasiStmtConstDecl m (mx, x, t') : ss'
+renameQuasiStmtList' nenv ((QuasiStmtImplicit m x i):ss) = do
+  x' <- renameIdentifier nenv m x
+  ss' <- renameQuasiStmtList' nenv ss
+  return $ QuasiStmtImplicit m x' i : ss'
 renameQuasiStmtList' nenv ((QuasiStmtLetInductive n m (mx, a, t) e):ss) = do
   t' <- rename' nenv t
   a' <- newLLVMNameWith a
