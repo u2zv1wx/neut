@@ -8,6 +8,7 @@ module Parse
 import Control.Monad.Except
 import Control.Monad.State
 import Data.List
+import Data.Maybe (catMaybes)
 import Data.Monoid ((<>))
 import Path
 import Path.IO
@@ -190,18 +191,44 @@ parse' ((m, TreeNode [(_, TreeAtom "let"), xt, e]):as) = do
   e' <- macroExpand e >>= interpret
   (mx, x, t) <- macroExpand xt >>= interpretIdentifierPlus
   defList <- parse' as
-  return $ QuasiStmtLet m' (mx, x, t) e' : defList
+  case e' of
+    (_, WeakTermPiElim f args)
+      | (mmxs, args') <- unzip $ map parseBorrow args
+      , mxs <- catMaybes mmxs
+      , not (null mxs) -> do
+        xts <- mapM toIdentPlus mxs
+        let app = (m, WeakTermPiElim f args')
+        return $ QuasiStmtLetSigma m (xts ++ [(mx, x, t)]) app : defList
+    _ -> return $ QuasiStmtLet m' (mx, x, t) e' : defList
 parse' (a:as) = do
   e <- macroExpand a
   if isSpecialForm e
     then parse' $ e : as
     else do
-      e'@(meta, _) <- interpret e
-      name <- newNameWith'' "hole-parse-last"
-      t <- newHole meta
-      defList <- parse' as
-      let meta' = meta {metaIsAppropriateAsCompletionCandidate = False}
-      return $ QuasiStmtLet meta' (meta', name, t) e' : defList
+      e' <- interpret e
+      case e' of
+        (m, WeakTermPiElim f args)
+          | (mmxs, args') <- unzip $ map parseBorrow args
+          , mxs <- catMaybes mmxs
+          , not (null mxs) -> do
+            tmp <- newNameWith'' "borrow"
+            xts <- mapM toIdentPlus $ mxs ++ [(m, tmp)]
+            let app = (m, WeakTermPiElim f args')
+            defList <- parse' as
+            return $ QuasiStmtLetSigma m xts app : defList
+        (m, _) -> do
+          name <- newNameWith'' "hole-parse-last"
+          t <- newHole m
+          defList <- parse' as
+          let m' = m {metaIsAppropriateAsCompletionCandidate = False}
+          return $ QuasiStmtLet m' (m', name, t) e' : defList
+
+parseBorrow :: WeakTermPlus -> (Maybe (Meta, Identifier), WeakTermPlus)
+parseBorrow (m, WeakTermUpsilon (I (s, _)))
+  | T.length s > 1
+  , T.head s == '&' =
+    (Just (m, asIdent $ T.tail s), (m, WeakTermUpsilon $ asIdent $ T.tail s))
+parseBorrow t = (Nothing, t)
 
 parseDef :: [TreePlus] -> WithEnv QuasiStmt
 parseDef xds = do
@@ -237,6 +264,29 @@ isSpecialForm (_, TreeNode ((_, TreeAtom "inductive"):_)) = True
 isSpecialForm (_, TreeNode ((_, TreeAtom "coinductive"):_)) = True
 isSpecialForm _ = False
 
+-- funAndArgs :: TreePlus -> Maybe (TreePlus, [TreePlus])
+-- funAndArgs (m, TreeNode (f : args))
+--   | (_, TreeAtom "upsilon") <- f = Nothing
+--   | (_, TreeAtom "pi") <- f = Nothing
+--   | (_, TreeAtom "pi-introduction") <- f = Nothing
+--   | (_, TreeAtom "pi-elimination") <- f = Nothing
+--   | (_, TreeAtom "sigma") <- f = Nothing
+--   | (_, TreeAtom "sigma-introduction") <- f = Nothing
+--   | (_, TreeAtom "sigma-elimination") <- f = Nothing
+--   | (_, TreeAtom "iterate") <- f = Nothing
+--   | (_, TreeAtom "zeta") <- f = Nothing
+--   | (_, TreeAtom "constant") <- f = Nothing
+--   | (_, TreeAtom "f16") <- f = Nothing
+--   | (_, TreeAtom "f32") <- f = Nothing
+--   | (_, TreeAtom "f64") <- f = Nothing
+--   | (_, TreeAtom "enum") <- f = Nothing
+--   | (_, TreeAtom "enum-introduction") <- f = Nothing
+--   | (_, TreeAtom "enum-elimination") <- f = Nothing
+--   | (_, TreeAtom "array") <- f = Nothing
+--   | (_, TreeAtom "array-introduction") <- f = Nothing
+--   | (_, TreeAtom "array-elimination") <- f = Nothing
+--   | (_, TreeAtom "enum") <- f = Nothing
+-- funAndArgs _ = Nothing
 concatQuasiStmtList :: [QuasiStmt] -> WithEnv WeakStmt
 concatQuasiStmtList [] = do
   return $ WeakStmtReturn (emptyMeta, WeakTermEnumIntro $ EnumValueLabel "unit")

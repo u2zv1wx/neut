@@ -5,9 +5,11 @@ module Parse.Interpret
   , interpretIdentifierPlus
   , interpretIter
   , interpretEnumItem
+  , interpretEnumValueMaybe
   , adjustPhase
   , readEnumValueIntU
   , raiseSyntaxError
+  , toIdentPlus
   ) where
 
 import Control.Monad.Except
@@ -49,10 +51,12 @@ interpret (m, TreeNode [(_, TreeAtom "pi-introduction"), (_, TreeNode xts), e]) 
   m' <- adjustPhase m
   return (m', WeakTermPiIntro xts' e')
 interpret (m, TreeNode ((_, TreeAtom "pi-elimination"):e:es)) = do
-  e' <- interpret e
-  es' <- mapM interpret es
   m' <- adjustPhase m
-  return (m', WeakTermPiElim e' es')
+  interpretPiElim m' e es -- interpret (m', TreeNode ((m', TreeAtom "pi-elimination") : es)
+  -- e' <- interpret e
+  -- es' <- mapM interpret es
+  -- m' <- adjustPhase m
+  -- return (m', WeakTermPiElim e' es')
 interpret (m, TreeNode [(_, TreeAtom "sigma"), (_, TreeNode xts), t]) = do
   xts' <- mapM interpretIdentifierPlus xts
   t' <- interpret t
@@ -214,7 +218,7 @@ interpret t@(m, TreeNode es) = do
     _ -> do
       case es of
         [] -> raiseSyntaxError t "(TREE ...)"
-        (f:args) -> interpretPiElim m f args -- interpret (m', TreeNode ((m', TreeAtom "pi-elimination") : es))
+        _ -> interpret (m', TreeNode ((m', TreeAtom "pi-elimination") : es))
 
 interpretPiElim :: Meta -> TreePlus -> [TreePlus] -> WithEnv WeakTermPlus
 interpretPiElim m f args = do

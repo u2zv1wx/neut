@@ -1,0 +1,63 @@
+(include "notation.neut")
+
+(include "top.neut")
+
+;; (include "bottom.neut")
+
+;; (include "darwin.neut")
+
+(constant file-descriptor tau)
+
+(constant stdout file-descriptor)
+
+(constant write
+  (pi
+    ((A u64)
+     (out file-descriptor)
+     (str (array A u8))
+     (len u64))
+    (product (array A u8) i64)))
+
+(constant unsafe-cast
+  (pi ((A tau) (B tau) (_ A)) B))
+
+(constant exit
+  (pi
+    ((status i64))
+    top))
+
+(let test "あ")
+
+;; こっちだとmalloc/freeがめっちゃ発生する。
+;; (begin
+;;   (let len (write hole stdout test 3))
+;;   (let len (write hole stdout test 3))
+;;   (let len (write hole stdout test 3))
+;;   len)
+
+;; (write hole stdout &test 3)
+
+
+;; こっちだと最初と最後の1回だけ。
+(begin
+  (let len (write hole stdout &test 3)) ;; このへんでコピーが入る
+  (let len (write hole stdout &test 3))
+  (let len (write hole stdout &test 3))
+  len) ;; ここでtestがfreeされる（直前のwriteでborrowされているので）
+
+;; 上のコードはborrowによって次のように書き換えられる：
+;; (begin
+;;   (let-sigma (test, tmp) (write hole stdout test 3))
+;;   (let len tmp)
+;;   (let-sigma (test, tmp) (write hole stdout test 3))
+;;   (let len tmp)
+;;   (let-sigma (test, tmp) (write hole stdout test 3))
+;;   (let len tmp)
+;;   len)
+
+;; トップレベルにおけるborrowingの利用。
+(let a (write hole stdout &test 3))
+(let a (write hole stdout &test 3))
+(let a (write hole stdout &test 3))
+
+;; (write hole stdout &test 3)

@@ -80,7 +80,7 @@ elaborateStmt (WeakStmtLetSigma m xts e cont) = do
   insConstraintEnv t1 (fst e', WeakTermSigma xts')
   forM_ mlSigArgList $ \mlSigArg -> insLevelLE mlSigArg mlSigma
   analyze >> synthesize >> refine >> cleanup
-  e'' <- elaborate' e >>= reduceTermPlus
+  e'' <- elaborate' e' >>= reduceTermPlus
   xts'' <- mapM elaboratePlus xts'
   forM_ (zip xts'' mlSigArgList) $ \((_, x, tx), l) -> insTypeEnv x tx l
   cont' <- elaborateStmt cont
