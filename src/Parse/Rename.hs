@@ -69,7 +69,11 @@ renameQuasiStmtList' nenv ((QuasiStmtConstDecl m (mx, x, t)):ss) = do
   ss' <- renameQuasiStmtList' nenv ss
   return $ QuasiStmtConstDecl m (mx, x, t') : ss'
 renameQuasiStmtList' nenv ((QuasiStmtImplicit m x i):ss) = do
-  x' <- renameIdentifier nenv m x
+  cenv <- gets constantEnv
+  x' <-
+    case Map.lookup (asText x) cenv of
+      Just j -> return $ I (asText x, j)
+      Nothing -> renameIdentifier nenv m x
   ss' <- renameQuasiStmtList' nenv ss
   return $ QuasiStmtImplicit m x' i : ss'
 renameQuasiStmtList' nenv ((QuasiStmtLetInductive n m (mx, a, t) e):ss) = do

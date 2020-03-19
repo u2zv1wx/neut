@@ -69,17 +69,21 @@ infer' _ (m, WeakTermTau _) = do
   ml1 <- newLevelLT m [ml0]
   ml2 <- newLevelLT m [ml1]
   return (asUniv ml0, asUniv ml1, ml2)
-infer' _ (m, WeakTermUpsilon x) = do
-  mt <- lookupTypeEnv x
-  case mt of
+infer' ctx f@(m, WeakTermUpsilon x) = do
+  ienv <- gets impEnv
+  case IntMap.lookup (asInt x) ienv of
+    Just is -> inferImplicit ctx m x f is
     Nothing -> do
-      ((_, t), UnivLevelPlus (_, l)) <- lookupWeakTypeEnv x
-      return ((m, WeakTermUpsilon x), (m, t), UnivLevelPlus (m, l))
-    Just (t, UnivLevelPlus (_, l)) -> do
-      ((_, t'), l') <- univInst (weaken t) l
-      univParams <- gets univRenameEnv
-      let m' = m {metaUnivParams = univParams}
-      return ((m', WeakTermUpsilon x), (m, t'), UnivLevelPlus (m, l'))
+      mt <- lookupTypeEnv x
+      case mt of
+        Nothing -> do
+          ((_, t), UnivLevelPlus (_, l)) <- lookupWeakTypeEnv x
+          return ((m, WeakTermUpsilon x), (m, t), UnivLevelPlus (m, l))
+        Just (t, UnivLevelPlus (_, l)) -> do
+          ((_, t'), l') <- univInst (weaken t) l
+          univParams <- gets univRenameEnv
+          let m' = m {metaUnivParams = univParams}
+          return ((m', WeakTermUpsilon x), (m, t'), UnivLevelPlus (m, l'))
 infer' ctx (m, WeakTermPi _ xts t) = do
   mls <- piUnivLevelsfrom xts t
   (xtls', (t', mlPiCod)) <- inferPi ctx xts t
@@ -183,7 +187,7 @@ infer' ctx (m, WeakTermZeta x) = do
         (\env ->
            env {zetaEnv = IntMap.insert (asInt x) (app, higherApp, ml) zenv})
       return (app, higherApp, ml)
-infer' _ (m, WeakTermConst x@(I (s, _)))
+infer' ctx f@(m, WeakTermConst x@(I (s, _)))
   -- i64, f16, u8, etc.
   | Just _ <- asLowTypeMaybe s = do
     ml0 <- newLevelLE m []
@@ -202,14 +206,18 @@ infer' _ (m, WeakTermConst x@(I (s, _)))
     (t', l) <- inferType' [] t
     return ((m, WeakTermConst x), t', l)
   | otherwise = do
-    mt <- lookupTypeEnv x
-    case mt of
+    ienv <- gets impEnv
+    case IntMap.lookup (asInt x) ienv of
+      Just is -> inferImplicit ctx m x f is
       Nothing -> do
-        (t, UnivLevelPlus (_, l)) <- lookupWeakTypeEnv x
-        return ((m, WeakTermConst x), t, UnivLevelPlus (m, l))
-      Just (t, UnivLevelPlus (_, l)) -> do
-        ((_, t'), l') <- univInst (weaken t) l
-        return ((m, WeakTermConst x), (m, t'), UnivLevelPlus (m, l'))
+        mt <- lookupTypeEnv x
+        case mt of
+          Nothing -> do
+            (t, UnivLevelPlus (_, l)) <- lookupWeakTypeEnv x
+            return ((m, WeakTermConst x), t, UnivLevelPlus (m, l))
+          Just (t, UnivLevelPlus (_, l)) -> do
+            ((_, t'), l') <- univInst (weaken t) l
+            return ((m, WeakTermConst x), (m, t'), UnivLevelPlus (m, l'))
 infer' _ (m, WeakTermInt t i) = do
   (t', UnivLevelPlus (_, l)) <- inferType' [] t -- ctx == [] since t' should be i64, i8, etc. (i.e. t must be closed)
   return ((m, WeakTermInt t' i), t', UnivLevelPlus (m, l))
@@ -335,60 +343,55 @@ infer' ctx (m, WeakTermCase (e, t) cxtes) = do
       return ((c, xts'), body')
   return ((m, WeakTermCase (e', t') cxtes'), h, ml)
 
--- infer' ctx (m, WeakTermCocase (name, args) ces) = do
---   (args', tsArgs', lsArgs') <- unzip3 <$> mapM (infer' ctx) args
---   let (cs, es) = unzip ces
---   (es', ts', ls') <- unzip3 <$> mapM (infer' ctx) es
---   let cocase = (m, WeakTermCocase (name, args') $ zip cs es')
---   let tCoind = (m, WeakTermPiElim (m, WeakTermUpsilon name) args')
---   forM_ (zip cs (zip ts' ls')) $ \(c, (tBody, ml)) -> do
---     mt <- lookupTypeEnv c
---     case mt of
---       Nothing -> raiseError m $ "no such destructor defined: " <> asText c
---       Just (tElimStrict, UnivLevelPlus (_, l)) -> do
---         (tElim, _) <- univInst (weaken tElimStrict) l
---         case tElim of
---           (_, WeakTermPi mls xts cod)
---             | length xts == length args + 1 -> do
---               let xs = map (\(_, x, _) -> x) xts
---               let ts = map (\(_, _, tx) -> tx) xts
---               let sub = zip xs $ args' ++ [cocase]
---               let ts'' = map (substWeakTermPlus sub) ts
---               forM_ (zip ts'' (tsArgs' ++ [tCoind])) $ uncurry insConstraintEnv
---               let cod' = substWeakTermPlus sub cod
---               insConstraintEnv tBody cod'
---               forM_ (zip mls (lsArgs' ++ [ml])) $ uncurry insLevelEQ
---             | otherwise ->
---               raiseError m $
---               "the arity of `" <>
---               asText c <>
---               "` is supposed to be " <>
---               T.pack (show (length args + 1)) <>
---               ", but found " <> T.pack (show (length xts)) <> " argument(s)"
---           _ ->
---             raiseError m $
---             "the type of `" <>
---             asText c <> "` must be a Pi-type, but is:\n" <> toText tElim
---   mtName <- lookupTypeEnv name
---   case mtName of
---     Nothing ->
---       raiseError m $ "no such coinductive type defined: " <> asText name
---     Just (tNameStrict, UnivLevelPlus (_, lName)) -> do
---       (tName, _) <- univInst (weaken tNameStrict) lName
---       case tName of
---         (_, WeakTermPi mls xts _)
---           | length xts == length args' -> do
---             let xs = map (\(_, x, _) -> x) xts
---             let ts = map (\(_, _, tx) -> tx) xts
---             let sub = zip xs args'
---             let tsArgs'' = map (substWeakTermPlus sub) ts
---             forM_ (zip tsArgs' tsArgs'') $ uncurry insConstraintEnv
---             forM_ (zip mls lsArgs') $ uncurry insLevelEQ
---             return (cocase, tCoind, last mls)
---         _ ->
---           raiseError m $
---           "the type of `" <>
---           asText name <> "` must be a Pi-type, but is:\n" <> toText tName
+inferImplicit ::
+     Context
+  -> Meta
+  -> Identifier
+  -> WeakTermPlus
+  -> [Int]
+  -> WithEnv (WeakTermPlus, WeakTermPlus, UnivLevelPlus)
+inferImplicit ctx m x f is = do
+  mt <- lookupTypeEnv x
+  case mt of
+    Nothing -> raiseCritical m $ ""
+    Just (t@(_, TermPi _ _ _), UnivLevelPlus (_, l)) -> do
+      ((_, (WeakTermPi mls xts cod)), l') <- univInst (weaken t) l
+      univParams <- gets univRenameEnv
+      let m' = m {metaUnivParams = univParams}
+      let xtis = zip (zip xts mls) [0 ..]
+      let vs = map toVar' xts
+      let app = (m, WeakTermPiElim f vs)
+      (xtis', e', cod') <- inferImplicit' ctx is xtis app cod
+      let lam = (m', WeakTermPiIntro xtis' e')
+      let mls' = map fst $ filter (\(_, k) -> k `notElem` is) $ zip mls [0 ..]
+      let piType = (m', WeakTermPi mls' xtis' cod')
+      return (lam, piType, UnivLevelPlus (m, l'))
+    Just (t, _) ->
+      raiseCritical m $
+      "the type of `" <>
+      asText x <> "` must be a Pi-type, but is:\n" <> toText (weaken t)
+
+inferImplicit' ::
+     Context
+  -> [Int]
+  -> [((IdentifierPlus, UnivLevelPlus), Int)]
+  -> WeakTermPlus
+  -> WeakTermPlus
+  -> WithEnv ([IdentifierPlus], WeakTermPlus, WeakTermPlus)
+inferImplicit' _ _ [] e cod = return ([], e, cod)
+inferImplicit' ctx is ((c@((m, x, t), mlx), i):xtis) e cod
+  | i `elem` is = do
+    (app, higherApp, ml) <- newHoleInCtx ctx m
+    insConstraintEnv higherApp t
+    insLevelEQ mlx ml
+    let (xtls, ks) = unzip xtis
+    let (xts, ls) = unzip xtls
+    let (xts', e', cod') = substWeakTermPlus''' [(x, app)] xts e cod
+    inferImplicit' ctx is (zip (zip xts' ls) ks) e' cod'
+  | otherwise = do
+    (xtis', e', cod') <- inferImplicit' (ctx ++ [c]) is xtis e cod
+    return ((m, x, t) : xtis', e', cod')
+
 inferType' :: Context -> WeakTermPlus -> WithEnv (WeakTermPlus, UnivLevelPlus)
 inferType' ctx t = do
   (t', u, l) <- infer' ctx t
@@ -819,3 +822,22 @@ arrayAccessToWeakType m lowType = do
   let cod = (m, WeakTermSigma [(m, x4, arr), (m, x5, t)])
   mls <- piUnivLevelsfrom xts cod
   return (m, WeakTermPi mls xts cod)
+
+toVar' :: IdentifierPlus -> WeakTermPlus
+toVar' (m, x, _) = (m, WeakTermUpsilon x)
+
+substWeakTermPlus''' ::
+     SubstWeakTerm
+  -> [IdentifierPlus]
+  -> WeakTermPlus
+  -> WeakTermPlus
+  -> ([IdentifierPlus], WeakTermPlus, WeakTermPlus)
+substWeakTermPlus''' sub [] e1 e2 = do
+  let e1' = substWeakTermPlus sub e1
+  let e2' = substWeakTermPlus sub e2
+  ([], e1', e2')
+substWeakTermPlus''' sub ((m, x, t):xts) e1 e2 = do
+  let sub' = filter (\(k, _) -> k /= x) sub
+  let (xts', e1', e2') = substWeakTermPlus''' sub' xts e1 e2
+  let t' = substWeakTermPlus sub t
+  ((m, x, t') : xts', e1', e2')
