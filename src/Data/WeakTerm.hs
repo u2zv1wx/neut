@@ -192,8 +192,8 @@ data WeakStmt
   | WeakStmtConstDecl Meta IdentifierPlus WeakStmt
   deriving (Show)
 
-toVar :: Identifier -> WeakTermPlus
-toVar x = (emptyMeta, WeakTermUpsilon x)
+toVarFromPlus :: IdentifierPlus -> WeakTermPlus
+toVarFromPlus (m, x, _) = (m, WeakTermUpsilon x)
 
 varWeakTermPlus :: WeakTermPlus -> [Identifier]
 varWeakTermPlus (_, WeakTermTau _) = []
@@ -452,9 +452,8 @@ asUpsilon _ = Nothing
 asUniv :: UnivLevelPlus -> WeakTermPlus
 asUniv (UnivLevelPlus (m, l)) = (m, WeakTermTau l)
 
-unit :: WeakTermPlus
-unit = (emptyMeta, WeakTermEnumIntro $ EnumValueLabel "unit")
-
+-- unit :: WeakTermPlus
+-- unit = (emptyMeta, WeakTermEnumIntro $ EnumValueLabel "unit")
 toText :: WeakTermPlus -> T.Text
 toText (_, WeakTermTau l) = showCons ["tau", T.pack $ show l]
 toText (_, WeakTermUpsilon x) = asText x

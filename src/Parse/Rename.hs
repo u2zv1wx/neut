@@ -174,7 +174,7 @@ rename' _ (m, WeakTermTau l) = return (m, WeakTermTau l)
 rename' nenv (m, WeakTermUpsilon x@(I (s, _))) = do
   b1 <- isDefinedEnumValue s
   b2 <- isDefinedEnumType s
-  mc <- lookupConstantMaybe s
+  mc <- lookupConstantMaybe m s
   case (lookupName x nenv, b1, b2, mc) of
     (Just x', _, _, _) -> return (m, WeakTermUpsilon x')
     (_, True, _, _) -> return (m, WeakTermEnumIntro (EnumValueLabel s))

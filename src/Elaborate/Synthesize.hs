@@ -7,6 +7,7 @@ module Elaborate.Synthesize
 import Control.Monad.Except
 import Control.Monad.State
 import Data.List (sortBy)
+import Debug.Trace
 
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.PQueue.Min as Q
@@ -199,7 +200,11 @@ setupPosInfo ((Enriched (e1, e2) _ _):cs) = do
         GT -> (pos1, (e1, e2)) : setupPosInfo cs -- pos1 > pos2
     (Just pos1, Nothing) -> (pos1, (e1, e2)) : setupPosInfo cs
     (Nothing, Just pos2) -> (pos2, (e2, e1)) : setupPosInfo cs
-    _ -> setupPosInfo cs -- fixme (loc info not available)
+    _ ->
+      trace
+        ("Nothing! e1.meta:\n" <>
+         showMeta' (fst e1) <> "\ne2.meta:\n" <> showMeta' (fst e2)) $
+      setupPosInfo cs -- fixme (loc info not available)
 
 showErrors :: [PosInfo] -> [(PosInfo, PreConstraint)] -> WithEnv [Log]
 showErrors _ [] = return []

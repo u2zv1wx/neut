@@ -91,14 +91,14 @@ macroMatch (_, TreeAtom _) (_, TreeNode _) = return Nothing
 macroMatch (_, TreeNode []) (_, TreeNode []) = return $ Just []
 macroMatch (_, TreeNode _) (_, TreeNode []) = return Nothing
 macroMatch (_, TreeNode []) (_, TreeNode _) = return Nothing
-macroMatch (_, TreeNode ts1) (_, TreeNode ts2)
+macroMatch (m1, TreeNode ts1) (_, TreeNode ts2)
   | (_, TreeAtom s2) <- last ts2
   , T.last s2 == '+' -- this ensures that s2 is not a keyword
   , length ts1 >= length ts2 = do
     let (xs, rest) = splitAt (length ts2 - 1) ts1
     let ys = take (length ts2 - 1) ts2
     mzs <- sequence <$> zipWithM macroMatch xs ys
-    return $ mzs >>= \zs -> Just $ (s2, toSpliceTree rest) : join zs
+    return $ mzs >>= \zs -> Just $ (s2, toSpliceTree m1 rest) : join zs
   | length ts1 == length ts2 = do
     mzs <- sequence <$> zipWithM macroMatch ts1 ts2
     return $ mzs >>= \zs -> Just $ join zs
@@ -108,10 +108,8 @@ applySubst :: MacroSubst -> Notation -> TreePlus
 applySubst sub (i, TreeAtom s) = fromMaybe (i, TreeAtom s) (lookup s sub)
 applySubst sub (i, TreeNode ts) = (i, TreeNode $ map (applySubst sub) ts)
 
-toSpliceTree :: [TreePlus] -> TreePlus
-toSpliceTree ts =
-  ( emptyMeta
-  , TreeNode [(emptyMeta, TreeAtom "splice"), (emptyMeta, TreeNode ts)])
+toSpliceTree :: Meta -> [TreePlus] -> TreePlus
+toSpliceTree m ts = (m, TreeNode [(m, TreeAtom "splice"), (m, TreeNode ts)])
 
 checkNotationSanity :: Notation -> WithEnv ()
 checkNotationSanity t = do

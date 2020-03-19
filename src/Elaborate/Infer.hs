@@ -223,15 +223,15 @@ infer' _ (m, WeakTermInt t i) = do
   return ((m, WeakTermInt t' i), t', UnivLevelPlus (m, l))
 infer' _ (m, WeakTermFloat16 f) = do
   ml <- newLevelLE m []
-  (_, f16) <- lookupConstantPlus "f16"
+  (_, f16) <- lookupConstantPlus m "f16"
   return ((m, WeakTermFloat16 f), (m, f16), ml)
 infer' _ (m, WeakTermFloat32 f) = do
   ml <- newLevelLE m []
-  (_, f32) <- lookupConstantPlus "f32"
+  (_, f32) <- lookupConstantPlus m "f32"
   return ((m, WeakTermFloat32 f), (m, f32), ml)
 infer' _ (m, WeakTermFloat64 f) = do
   ml <- newLevelLE m []
-  (_, f64) <- lookupConstantPlus "f64"
+  (_, f64) <- lookupConstantPlus m "f64"
   return ((m, WeakTermFloat64 f), (m, f64), ml)
 infer' _ (m, WeakTermFloat t f) = do
   (t', UnivLevelPlus (_, l)) <- inferType' [] t -- t must be closed
@@ -404,7 +404,7 @@ inferKind :: Meta -> ArrayKind -> WithEnv WeakTermPlus
 inferKind m (ArrayKindIntS i) = return (m, WeakTermEnum (EnumTypeIntS i))
 inferKind m (ArrayKindIntU i) = return (m, WeakTermEnum (EnumTypeIntU i))
 inferKind m (ArrayKindFloat size) = do
-  (_, t) <- lookupConstantPlus $ "f" <> T.pack (show (sizeAsInt size))
+  (_, t) <- lookupConstantPlus m $ "f" <> T.pack (show (sizeAsInt size))
   return (m, t)
 inferKind m _ = raiseCritical m "inferKind for void-pointer"
 
@@ -509,7 +509,8 @@ newHoleInCtx ::
      Context -> Meta -> WithEnv (WeakTermPlus, WeakTermPlus, UnivLevelPlus)
 newHoleInCtx ctx m = do
   higherHole <- newHole m
-  let varSeq = map (\((_, x, _), _) -> toVar x) ctx
+  -- let varSeq = map (\((_, x, _), _) -> toVar x) ctx
+  let varSeq = map (\((mx, x, _), _) -> (mx, WeakTermUpsilon x)) ctx
   let higherApp = (m, WeakTermPiElim higherHole varSeq)
   hole <- newHole m
   let app = (m, WeakTermPiElim hole varSeq)
@@ -521,7 +522,7 @@ newHoleInCtx ctx m = do
 -- and return ?M @ (x1, ..., xn) : Univ{i}.
 newTypeHoleInCtx :: Context -> Meta -> WithEnv (WeakTermPlus, UnivLevelPlus)
 newTypeHoleInCtx ctx m = do
-  let varSeq = map (\((_, x, _), _) -> toVar x) ctx
+  let varSeq = map (\((mx, x, _), _) -> (mx, WeakTermUpsilon x)) ctx
   hole <- newHole m
   l <- newCount
   return ((m, WeakTermPiElim hole varSeq), UnivLevelPlus (m, l))
@@ -779,8 +780,8 @@ levelInst l = do
 lowTypeToWeakType :: Meta -> LowType -> WithEnv WeakTermPlus
 lowTypeToWeakType m (LowTypeIntS s) = return (m, WeakTermEnum (EnumTypeIntS s))
 lowTypeToWeakType m (LowTypeIntU s) = return (m, WeakTermEnum (EnumTypeIntU s))
-lowTypeToWeakType _ (LowTypeFloat s) = do
-  lookupConstantPlus $ "f" <> T.pack (show (sizeAsInt s))
+lowTypeToWeakType m (LowTypeFloat s) = do
+  lookupConstantPlus m $ "f" <> T.pack (show (sizeAsInt s))
 lowTypeToWeakType _ _ =
   error "[compiler bug] invalid argument passed to lowTypeToWeakType"
 

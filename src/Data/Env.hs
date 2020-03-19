@@ -345,25 +345,25 @@ lookupConstNum' constName = do
     Just i -> return i
     Nothing -> raiseCritical' $ "no such constant: " <> constName
 
-lookupConstantMaybe :: T.Text -> WithEnv (Maybe WeakTermPlus)
-lookupConstantMaybe constName = do
+lookupConstantMaybe :: Meta -> T.Text -> WithEnv (Maybe WeakTermPlus)
+lookupConstantMaybe m constName = do
   cenv <- gets constantEnv
   case Map.lookup constName cenv of
-    Just i -> return $ Just (emptyMeta, WeakTermConst $ I (constName, i))
+    Just i -> return $ Just (m, WeakTermConst $ I (constName, i))
     Nothing
-      | isConstant constName -> Just <$> lookupConstantPlus constName
+      | isConstant constName -> Just <$> lookupConstantPlus m constName
       | otherwise -> return Nothing
 
-lookupConstantPlus :: T.Text -> WithEnv WeakTermPlus
-lookupConstantPlus constName = do
+lookupConstantPlus :: Meta -> T.Text -> WithEnv WeakTermPlus
+lookupConstantPlus m constName = do
   cenv <- gets constantEnv
   case Map.lookup constName cenv of
-    Just i -> return (emptyMeta, WeakTermConst $ I (constName, i))
+    Just i -> return (m, WeakTermConst $ I (constName, i))
     Nothing -> do
       i <- newCount
       let ident = I (constName, i)
       modify (\env -> env {constantEnv = Map.insert constName i cenv})
-      return (emptyMeta, WeakTermConst ident)
+      return (m, WeakTermConst ident)
 
 -- f32とかi64.addとかは定数
 isConstant :: T.Text -> Bool

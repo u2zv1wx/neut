@@ -61,7 +61,7 @@ simp' (((m1, WeakTermPiIntroPlus ind1 (name1, args1) xts1 e1), (m2, WeakTermPiIn
     simpBinder args1 args2 Nothing []
     simp' $ ((m1, WeakTermPiIntro xts1 e1), (m2, WeakTermPiIntro xts2 e2)) : cs
 simp' (((_, WeakTermPiIntro xts body1@(m1, _)), e2@(_, _)):cs) = do
-  let vs = map (\(_, x, _) -> toVar x) xts
+  let vs = map (\(m, x, _) -> (m, WeakTermUpsilon x)) xts
   simp $ (body1, (m1, WeakTermPiElim e2 vs)) : cs
 simp' ((e1, e2@(_, WeakTermPiIntro {})):cs) = simp' $ (e2, e1) : cs
 simp' (((_, WeakTermSigma xts1), (_, WeakTermSigma xts2)):cs)
@@ -82,29 +82,29 @@ simp' (((m, WeakTermEnumIntro (EnumValueIntU s1 l1)), (_, WeakTermInt t2 l2)):cs
   | l1 == l2 = simp $ (toIntU m s1, t2) : cs
 simp' (((_, WeakTermInt t1 l1), (_, WeakTermInt t2 l2)):cs)
   | l1 == l2 = simp $ (t1, t2) : cs
-simp' (((_, WeakTermFloat t1 l1), (_, WeakTermFloat16 l2)):cs)
+simp' (((_, WeakTermFloat t1 l1), (m2, WeakTermFloat16 l2)):cs)
   | show l1 == show l2 = do
-    f16 <- lookupConstantPlus "f16"
+    f16 <- lookupConstantPlus m2 "f16"
     simp $ (t1, f16) : cs
-simp' (((_, WeakTermFloat16 l1), (_, WeakTermFloat t2 l2)):cs)
+simp' (((m1, WeakTermFloat16 l1), (_, WeakTermFloat t2 l2)):cs)
   | show l1 == show l2 = do
-    f16 <- lookupConstantPlus "f16"
+    f16 <- lookupConstantPlus m1 "f16"
     simp $ (f16, t2) : cs
-simp' (((_, WeakTermFloat t1 l1), (_, WeakTermFloat32 l2)):cs)
+simp' (((_, WeakTermFloat t1 l1), (m2, WeakTermFloat32 l2)):cs)
   | show l1 == show l2 = do
-    f32 <- lookupConstantPlus "f32"
+    f32 <- lookupConstantPlus m2 "f32"
     simp $ (t1, f32) : cs
-simp' (((_, WeakTermFloat32 l1), (_, WeakTermFloat t2 l2)):cs)
+simp' (((m1, WeakTermFloat32 l1), (_, WeakTermFloat t2 l2)):cs)
   | show l1 == show l2 = do
-    f32 <- lookupConstantPlus "f32"
+    f32 <- lookupConstantPlus m1 "f32"
     simp $ (f32, t2) : cs
-simp' (((_, WeakTermFloat t1 l1), (_, WeakTermFloat64 l2)):cs)
+simp' (((_, WeakTermFloat t1 l1), (m2, WeakTermFloat64 l2)):cs)
   | l1 == l2 = do
-    f64 <- lookupConstantPlus "f64"
+    f64 <- lookupConstantPlus m2 "f64"
     simp $ (t1, f64) : cs
-simp' (((_, WeakTermFloat64 l1), (_, WeakTermFloat t2 l2)):cs)
+simp' (((m1, WeakTermFloat64 l1), (_, WeakTermFloat t2 l2)):cs)
   | l1 == l2 = do
-    f64 <- lookupConstantPlus "f64"
+    f64 <- lookupConstantPlus m1 "f64"
     simp $ (f64, t2) : cs
 simp' (((_, WeakTermFloat t1 l1), (_, WeakTermFloat t2 l2)):cs)
   | l1 == l2 = simp $ (t1, t2) : cs
@@ -261,13 +261,13 @@ simpBinder ::
   -> WithEnv ()
 simpBinder [] [] Nothing cs = simp cs
 simpBinder [] [] (Just (cod1, cod2)) cs = simp $ (cod1, cod2) : cs
-simpBinder ((_, x1, t1):xts1) ((_, x2, t2):xts2) Nothing cs = do
-  let var1 = toVar x1
+simpBinder ((m1, x1, t1):xts1) ((_, x2, t2):xts2) Nothing cs = do
+  let var1 = (m1, WeakTermUpsilon x1)
   let xts2' = substWeakTermPlus' [(x2, var1)] xts2
   simp [(t1, t2)]
   simpBinder xts1 xts2' Nothing cs
-simpBinder ((_, x1, t1):xts1) ((_, x2, t2):xts2) (Just (cod1, cod2)) cs = do
-  let var1 = toVar x1
+simpBinder ((m1, x1, t1):xts1) ((_, x2, t2):xts2) (Just (cod1, cod2)) cs = do
+  let var1 = (m1, WeakTermUpsilon x1)
   let (xts2', cod2') = substWeakTermPlus'' [(x2, var1)] xts2 cod2
   simp [(t1, t2)]
   simpBinder xts1 xts2' (Just (cod1, cod2')) cs
