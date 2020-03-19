@@ -86,6 +86,23 @@ elaborateStmt (WeakStmtLetSigma m xts e cont) = do
   cont' <- elaborateStmt cont
   return
     (m, TermSigmaElim (m, TermEnumIntro $ EnumValueLabel "top") xts'' e'' cont')
+elaborateStmt (WeakStmtImplicit m x@(I (_, i)) idx cont) = do
+  t <- lookupTypeEnv' x >>= reduceTermPlus
+  case t of
+    (_, TermPi _ xts _) -> do
+      if 0 <= idx && idx < length xts
+        then do
+          ienv <- gets impEnv
+          modify (\env -> env {impEnv = IntMap.insertWith (++) i [idx] ienv})
+          elaborateStmt cont
+        else raiseError m $
+             "the specified index `" <>
+             T.pack (show i) <>
+             "` is out of range of the domain of " <> asText x
+    _ ->
+      raiseError m $
+      "the type of " <>
+      asText x <> " is supposed to be a Pi-type, but is:\n" <> toText (weaken t)
 elaborateStmt (WeakStmtLetInductiveIntro m (bi, ai) (mx, x@(I (_, i)), t) xts yts atsbts app cont) = do
   (t', mlt) <- inferType t
   analyze >> synthesize >> refine >> cleanup
