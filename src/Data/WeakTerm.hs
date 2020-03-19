@@ -133,6 +133,7 @@ data QuasiStmt
   --     ...
   --     ((fn An) (ARGS-n) en))
   | QuasiStmtDef [(Identifier, Def)]
+  | QuasiStmtImplicit Meta Identifier Int
   -- declaration of a constant
   --   (constant x t)
   | QuasiStmtConstDecl Meta IdentifierPlus
@@ -178,6 +179,7 @@ data WeakStmt
   -- special case of `let` in which the `e` in `let x := e in cont` is known to be well-typed
   | WeakStmtLetWT Meta IdentifierPlus WeakTermPlus WeakStmt
   | WeakStmtLetSigma Meta [IdentifierPlus] WeakTermPlus WeakStmt
+  | WeakStmtImplicit Meta Identifier Int WeakStmt
   | WeakStmtLetInductiveIntro
       Meta -- m
       (T.Text, T.Text) -- biai

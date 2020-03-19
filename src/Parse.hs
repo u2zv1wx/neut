@@ -163,6 +163,10 @@ parse' ((m, TreeNode [(_, TreeAtom "constant"), (mn, TreeAtom name), t]):as) = d
       m' <- adjustPhase m
       mn' <- adjustPhase mn
       return $ QuasiStmtConstDecl m' (mn', I (name, i), t') : defList
+parse' ((_, TreeNode ((_, TreeAtom "attribute"):(_, TreeAtom name):attrList)):as) = do
+  ss1 <- mapM (parseAttr name) attrList
+  ss2 <- parse' as
+  return $ ss1 ++ ss2
 parse' ((m, TreeNode [(mDef, TreeAtom "definition"), name@(_, TreeAtom _), body]):as) =
   parse' $ (m, TreeNode [(mDef, TreeAtom "let"), name, body]) : as
 parse' ((m, TreeNode (def@(_, TreeAtom "definition"):name@(mFun, TreeAtom _):xts@(_, TreeNode _):body:rest)):as) =
@@ -230,6 +234,13 @@ parseBorrow (m, WeakTermUpsilon (I (s, _)))
     (Just (m, asIdent $ T.tail s), (m, WeakTermUpsilon $ asIdent $ T.tail s))
 parseBorrow t = (Nothing, t)
 
+parseAttr :: T.Text -> TreePlus -> WithEnv QuasiStmt
+parseAttr name (m, TreeNode [(_, TreeAtom "implicit"), (_, TreeAtom num)]) = do
+  case readMaybe $ T.unpack num of
+    Nothing -> undefined
+    Just i -> return $ QuasiStmtImplicit m (asIdent name) i
+parseAttr _ t = raiseError (fst t) $ "invalid attribute: " <> showAsSExp t
+
 parseDef :: [TreePlus] -> WithEnv QuasiStmt
 parseDef xds = do
   xds' <- mapM (insImplicitBegin >=> macroExpand) xds
@@ -255,6 +266,7 @@ isSpecialForm (_, TreeNode [(_, TreeAtom "notation"), _, _]) = True
 isSpecialForm (_, TreeNode [(_, TreeAtom "keyword"), (_, TreeAtom _)]) = True
 isSpecialForm (_, TreeNode ((_, TreeAtom "enum"):(_, TreeAtom _):_)) = True
 isSpecialForm (_, TreeNode [(_, TreeAtom "include"), (_, TreeAtom _)]) = True
+isSpecialForm (_, TreeNode ((_, TreeAtom "attribute"):_)) = True
 isSpecialForm (_, TreeNode [(_, TreeAtom "constant"), (_, TreeAtom _), _]) =
   True
 isSpecialForm (_, TreeNode ((_, TreeAtom "statement"):_)) = True
@@ -305,6 +317,9 @@ concatQuasiStmtList (QuasiStmtLetWT m xt e:es) = do
 concatQuasiStmtList (QuasiStmtLetSigma m xts e:es) = do
   cont <- concatQuasiStmtList es
   return $ WeakStmtLetSigma m xts e cont
+concatQuasiStmtList (QuasiStmtImplicit m x i:es) = do
+  cont <- concatQuasiStmtList es
+  return $ WeakStmtImplicit m x i cont
 concatQuasiStmtList (QuasiStmtDef xds:ss) = do
   let ds = map snd xds
   let baseSub = map defToSub ds
@@ -434,6 +449,7 @@ toIdentList [] = []
 toIdentList ((QuasiStmtLet _ mxt _):ds) = mxt : toIdentList ds
 toIdentList ((QuasiStmtLetWT _ mxt _):ds) = mxt : toIdentList ds
 toIdentList ((QuasiStmtLetSigma _ mxts _):ds) = mxts ++ toIdentList ds
+toIdentList ((QuasiStmtImplicit {}):ds) = toIdentList ds
 toIdentList ((QuasiStmtDef xds):ds) = do
   let mxts = map (\(_, (_, mxt, _, _)) -> mxt) xds
   mxts ++ toIdentList ds
