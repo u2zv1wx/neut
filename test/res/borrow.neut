@@ -39,8 +39,10 @@
 
 
 ;; こっちだと最初と最後の1回だけ。
+;; ここの最初の「&test」も「test」に解決されるわけだけど、するとbeginのあとでも「test」が
+;; 使用されていることから、ここでtestのコピーが走ることになる。
 (begin
-  (let len (write hole stdout &test 3)) ;; このへんでコピーが入る
+  (let len (write hole stdout &test 3))
   (let len (write hole stdout &test 3))
   (let len (write hole stdout &test 3))
   len) ;; ここでtestがfreeされる（直前のwriteでborrowされているので）
