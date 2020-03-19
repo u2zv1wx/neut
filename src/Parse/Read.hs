@@ -45,6 +45,7 @@ readSExp = do
   s <- gets text
   case T.uncons s of
     Just ('(', _) -> readNode
+    Just ('[', _) -> readNodeSquare
     _ -> readAtom
 
 readAtom :: WithReadEnv TreePlus
@@ -68,6 +69,14 @@ readNode = do
   itemList <- readMany readSExp
   readSkip >> readChar ')' >> readSkip
   return (m, TreeNode itemList)
+
+readNodeSquare :: WithReadEnv TreePlus
+readNodeSquare = do
+  m <- currentMeta
+  readChar '[' >> readSkip
+  itemList <- readMany readSExp
+  readSkip >> readChar ']' >> readSkip
+  return (m, TreeNodeSquare itemList)
 
 readChar :: Char -> WithReadEnv ()
 readChar c = do

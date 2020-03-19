@@ -219,6 +219,8 @@ interpret t@(m, TreeNode es) = do
       case es of
         [] -> raiseSyntaxError t "(TREE ...)"
         _ -> interpret (m', TreeNode ((m', TreeAtom "pi-elimination") : es))
+interpret (m, TreeNodeSquare _) =
+  raiseError m "found square-node at inappropriate position"
 
 interpretPiElim :: Meta -> TreePlus -> [TreePlus] -> WithEnv WeakTermPlus
 interpretPiElim m f args = do

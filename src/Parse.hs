@@ -172,9 +172,9 @@ parse' ((m, TreeNode [(mDef, TreeAtom "definition"), name@(_, TreeAtom _), body]
 parse' ((m, TreeNode (def@(_, TreeAtom "definition"):name@(mFun, TreeAtom _):xts@(_, TreeNode _):body:rest)):as) =
   parse' $ (m, TreeNode [def, (mFun, TreeNode (name : xts : body : rest))]) : as
 parse' ((_, TreeNode ((_, TreeAtom "definition"):xds)):as) = do
-  stmt <- parseDef xds
-  stmtList <- parse' as
-  return $ stmt : stmtList
+  ss1 <- parseDef xds
+  ss2 <- parse' as
+  return $ ss1 ++ ss2
 parse' ((m, TreeNode (ind@(_, TreeAtom "inductive"):name@(mFun, TreeAtom _):xts@(_, TreeNode _):rest)):as) = do
   parse' $ (m, TreeNode [ind, (mFun, TreeNode (name : xts : rest))]) : as
 parse' ((m, TreeNode ((_, TreeAtom "inductive"):ts)):as) = do
@@ -241,12 +241,25 @@ parseAttr name (m, TreeNode [(_, TreeAtom "implicit"), (_, TreeAtom num)]) = do
     Just i -> return $ QuasiStmtImplicit m (asIdent name) i
 parseAttr _ t = raiseError (fst t) $ "invalid attribute: " <> showAsSExp t
 
-parseDef :: [TreePlus] -> WithEnv QuasiStmt
+parseDef :: [TreePlus] -> WithEnv [QuasiStmt]
 parseDef xds = do
   xds' <- mapM (insImplicitBegin >=> macroExpand) xds
-  mxs <- mapM extractFunName xds'
-  xds'' <- mapM interpretIter xds'
-  return $ QuasiStmtDef $ zip mxs xds''
+  xs <- mapM extractFunName xds'
+  (xds'', miss) <- unzip <$> mapM takeSquare xds'
+  xds''' <- mapM interpretIter xds''
+  let attrStmtList =
+        concat $ zipWith (\x (m, is) -> map (QuasiStmtImplicit m x) is) xs miss
+  return $ QuasiStmtDef (zip xs xds''') : attrStmtList
+
+takeSquare :: TreePlus -> WithEnv (TreePlus, (Meta, [Int]))
+takeSquare (m, TreeNode [xt, (mArg, TreeNode xts), body]) = do
+  let (xts', mis) = unzip $ map takeSquare' $ zip xts [0 ..]
+  return ((m, TreeNode [xt, (mArg, TreeNode xts'), body]), (m, catMaybes mis))
+takeSquare t = raiseSyntaxError t "(TREE (TREE ... TREE) TREE)"
+
+takeSquare' :: (TreePlus, Int) -> (TreePlus, Maybe Int)
+takeSquare' ((m, TreeNodeSquare es), i) = ((m, TreeNode es), Just i)
+takeSquare' (t, _) = (t, Nothing)
 
 insImplicitBegin :: TreePlus -> WithEnv TreePlus
 insImplicitBegin (m, TreeNode (xt:xts:body:rest)) = do
@@ -276,35 +289,9 @@ isSpecialForm (_, TreeNode ((_, TreeAtom "inductive"):_)) = True
 isSpecialForm (_, TreeNode ((_, TreeAtom "coinductive"):_)) = True
 isSpecialForm _ = False
 
--- funAndArgs :: TreePlus -> Maybe (TreePlus, [TreePlus])
--- funAndArgs (m, TreeNode (f : args))
---   | (_, TreeAtom "upsilon") <- f = Nothing
---   | (_, TreeAtom "pi") <- f = Nothing
---   | (_, TreeAtom "pi-introduction") <- f = Nothing
---   | (_, TreeAtom "pi-elimination") <- f = Nothing
---   | (_, TreeAtom "sigma") <- f = Nothing
---   | (_, TreeAtom "sigma-introduction") <- f = Nothing
---   | (_, TreeAtom "sigma-elimination") <- f = Nothing
---   | (_, TreeAtom "iterate") <- f = Nothing
---   | (_, TreeAtom "zeta") <- f = Nothing
---   | (_, TreeAtom "constant") <- f = Nothing
---   | (_, TreeAtom "f16") <- f = Nothing
---   | (_, TreeAtom "f32") <- f = Nothing
---   | (_, TreeAtom "f64") <- f = Nothing
---   | (_, TreeAtom "enum") <- f = Nothing
---   | (_, TreeAtom "enum-introduction") <- f = Nothing
---   | (_, TreeAtom "enum-elimination") <- f = Nothing
---   | (_, TreeAtom "array") <- f = Nothing
---   | (_, TreeAtom "array-introduction") <- f = Nothing
---   | (_, TreeAtom "array-elimination") <- f = Nothing
---   | (_, TreeAtom "enum") <- f = Nothing
--- funAndArgs _ = Nothing
 concatQuasiStmtList :: [QuasiStmt] -> WithEnv WeakStmt
 concatQuasiStmtList [] = do
   return $ WeakStmtReturn (emptyMeta, WeakTermEnumIntro $ EnumValueLabel "unit")
--- -- for test
--- concatQuasiStmtList [QuasiStmtLet _ _ e] = do
---   return $ WeakStmtReturn e
 concatQuasiStmtList (QuasiStmtConstDecl m xt:es) = do
   cont <- concatQuasiStmtList es
   return $ WeakStmtConstDecl m xt cont
@@ -349,22 +336,6 @@ concatQuasiStmtList (QuasiStmtLetInductiveIntro m (bi, ai) bt xts yts ats bts bI
       (ats ++ bts)
       (m, WeakTermPiElim bInner yts')
       cont
-  -- return $
-  --   WeakStmtLetWT
-  --     m
-  --     bt
-  --     ( m
-  --     , WeakTermPiIntro
-  --         (xts ++ yts)
-  --         ( m
-  --         , WeakTermPiIntroPlus
-  --             bi
-  --             ai
-  --             [] -- index/subst info is supplied after elaboration
-  --             []
-  --             (ats ++ bts) -- ats = [list : (...)], bts = [nil : Pi (yts). list A, cons : (...)]
-  --             (m, WeakTermPiElim bInner yts')))
-  --     cont
 concatQuasiStmtList (QuasiStmtLetCoinductiveElim m bt xtsyt codInner ats bts yt e1 e2 csub asOuter:ss) = do
   e2' <- externalize csub (ats ++ bts) codInner e2
   insCoinductive asOuter bt -- register the destructor (if necessary)
