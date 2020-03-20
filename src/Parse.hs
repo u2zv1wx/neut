@@ -290,7 +290,10 @@ isSpecialForm _ = False
 
 concatQuasiStmtList :: [QuasiStmt] -> WithEnv WeakStmt
 concatQuasiStmtList [] = do
-  return $ WeakStmtReturn (emptyMeta, WeakTermEnumIntro $ EnumValueLabel "unit")
+  path <- gets currentFilePath
+  content <- liftIO $ TIO.readFile $ toFilePath path
+  let m = newMeta (length $ T.lines content) 1 path
+  return $ WeakStmtReturn (m, WeakTermEnumIntro $ EnumValueLabel "unit")
 concatQuasiStmtList (QuasiStmtConstDecl m xt:es) = do
   cont <- concatQuasiStmtList es
   return $ WeakStmtConstDecl m xt cont

@@ -114,6 +114,17 @@ emptyMeta =
     , metaUnivParams = IntMap.empty
     }
 
+newMeta :: Int -> Int -> Path Abs File -> Meta
+newMeta l c path = do
+  Meta
+    { metaFileName = Just path
+    , metaLocation = Just (0, l, c)
+    , metaConstraintLocation = Just (0, l, c)
+    , metaIsPublic = True
+    , metaIsAppropriateAsCompletionCandidate = True
+    , metaUnivParams = IntMap.empty
+    }
+
 type PosInfo = (Path Abs File, Loc)
 
 getPosInfo :: Meta -> Maybe PosInfo

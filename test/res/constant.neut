@@ -1,6 +1,6 @@
 ;; should be loaded after `notation`, `top`.
 
-(include "top.neut")
+;; (include "top.neut")
 
 (constant file-descriptor tau)
 
@@ -51,10 +51,16 @@
      (len u64))
     (product (array A u8) i64)))
 
+;; (constant exit
+;;   (pi
+;;     ((status i64))
+;;     top))
+
 (constant exit
   (pi
-    ((status i64))
-    top))
+    ((A tau)
+     (status i64))
+    A))
 
 (constant open
   (pi

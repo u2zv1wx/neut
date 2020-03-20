@@ -8,7 +8,6 @@ import Control.Monad.Except
 import Control.Monad.State
 import Path
 
-import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Set as S
 import qualified Data.Text as T
 
@@ -185,15 +184,7 @@ currentMeta = do
   l <- gets line
   c <- gets column
   path <- gets filePath
-  return $
-    Meta
-      { metaFileName = Just path
-      , metaLocation = Just (0, l, c)
-      , metaConstraintLocation = Just (0, l, c)
-      , metaIsPublic = True
-      , metaIsAppropriateAsCompletionCandidate = True
-      , metaUnivParams = IntMap.empty
-      }
+  return $ newMeta l c path
 
 {-# INLINE isSymbolChar #-}
 isSymbolChar :: Char -> Bool
