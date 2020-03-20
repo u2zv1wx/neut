@@ -119,33 +119,30 @@ parse' ((m, TreeNode [(_, TreeLeaf "include"), (_, TreeLeaf pathString)]):as) =
   case readMaybe (T.unpack pathString) :: Maybe String of
     Nothing -> raiseError m "the argument of `include` must be a string"
     Just path -> do
-      oldFilePath <- gets currentFilePath
-      newFilePath <- resolveFile (parent oldFilePath) path
-      b <- doesFileExist newFilePath
+      oldPath <- gets currentFilePath
+      newPath <- resolveFile (parent oldPath) path
+      b <- doesFileExist newPath
       if not b
-        then raiseError m $ "no such file: " <> T.pack (toFilePath newFilePath)
+        then raiseError m $ "no such file: " <> T.pack (toFilePath newPath)
         else do
-          insertPathInfo oldFilePath newFilePath
+          insertPathInfo oldPath newPath
           ensureDAG m
           denv <- gets fileEnv
-          case Map.lookup newFilePath denv of
-            Just mxs -> do
-              let header = map (toQuasiStmtLetHeader newFilePath) mxs
+          case Map.lookup newPath denv of
+            Just _ -> do
               defList <- parse' as
-              return $ header ++ defList
+              return defList
             Nothing -> do
-              content <- liftIO $ TIO.readFile $ toFilePath newFilePath
-              modify (\env -> env {currentFilePath = newFilePath})
+              content <- liftIO $ TIO.readFile $ toFilePath newPath
+              modify (\env -> env {currentFilePath = newPath})
               modify (\env -> env {phase = 1 + phase env})
               includedQuasiStmtList <- tokenize content >>= parse'
-              let mxs = toIdentList includedQuasiStmtList
-              modify (\env -> env {currentFilePath = oldFilePath})
+              modify (\env -> env {currentFilePath = oldPath})
               modify (\env -> env {phase = 1 + phase env})
-              modify (\env -> env {fileEnv = Map.insert newFilePath mxs denv})
+              modify
+                (\env -> env {fileEnv = Map.insert newPath [] (fileEnv env)})
               defList <- parse' as
-              let footer = map (toQuasiStmtLetFooter newFilePath) mxs
-              let header = map (toQuasiStmtLetHeader newFilePath) mxs
-              return $ includedQuasiStmtList ++ footer ++ header ++ defList
+              return $ includedQuasiStmtList ++ defList
 parse' ((_, TreeNode ((_, TreeLeaf "statement"):as1)):as2) = do
   defList1 <- parse' as1
   defList2 <- parse' as2
@@ -415,35 +412,3 @@ ensureDAG' a visited g =
         -- result = z -> path{0} -> ... -> path{n} -> z
         Left $ dropWhile (/= z) visited ++ [a, z]
     Just as -> mapM_ (\x -> ensureDAG' x (visited ++ [a]) g) as
-
--- これが呼ばれるのはまだrenameされる前
-toIdentList :: [QuasiStmt] -> [IdentifierPlus]
-toIdentList [] = []
-toIdentList ((QuasiStmtLet _ mxt _):ds) = mxt : toIdentList ds
-toIdentList ((QuasiStmtLetWT _ mxt _):ds) = mxt : toIdentList ds
-toIdentList ((QuasiStmtLetSigma _ mxts _):ds) = mxts ++ toIdentList ds
-toIdentList ((QuasiStmtImplicit {}):ds) = toIdentList ds
-toIdentList ((QuasiStmtDef xds):ds) = do
-  let mxts = map (\(_, (_, mxt, _, _)) -> mxt) xds
-  mxts ++ toIdentList ds
-toIdentList ((QuasiStmtConstDecl _ (m, x, t)):ds) = (m, x, t) : toIdentList ds
-toIdentList ((QuasiStmtLetInductive _ _ mxt _):ds) = mxt : toIdentList ds
-toIdentList ((QuasiStmtLetCoinductive _ _ mxt _):ds) = mxt : toIdentList ds
-toIdentList ((QuasiStmtLetInductiveIntro _ _ b _ _ _ _ _ _ _):ss) =
-  b : toIdentList ss
-toIdentList ((QuasiStmtLetCoinductiveElim _ b _ _ _ _ _ _ _ _ _):ss) =
-  b : toIdentList ss
-
-toQuasiStmtLetFooter ::
-     Path Abs File -> (Meta, Identifier, WeakTermPlus) -> QuasiStmt
-toQuasiStmtLetFooter path (m, x, t) = do
-  let s' = "(" <> T.pack (toFilePath path) <> ":" <> asText' x <> ")" -- user cannot write this var since it contains parenthesis
-  let m' = m {metaIsAppropriateAsCompletionCandidate = False}
-  QuasiStmtLet m' (m', I (llvmString s', 0), t) (m, WeakTermUpsilon x)
-
-toQuasiStmtLetHeader ::
-     Path Abs File -> (Meta, Identifier, WeakTermPlus) -> QuasiStmt
-toQuasiStmtLetHeader path (m, x, t) = do
-  let s' = "(" <> T.pack (toFilePath path) <> ":" <> asText' x <> ")" -- user cannot write this var since it contains parenthesis
-  let m' = m {metaIsAppropriateAsCompletionCandidate = False}
-  QuasiStmtLet m' (m, x, t) (m', WeakTermUpsilon (I (llvmString s', 0)))
