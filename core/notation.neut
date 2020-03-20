@@ -93,3 +93,8 @@
 
 (notation (destruct e xts rest+)
   (sigma-elimination xts e (begin rest+)))
+
+(keyword cast)
+
+(notation (cast t e)
+  (unsafe-cast hole t e))

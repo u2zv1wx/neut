@@ -1,3 +1,5 @@
+(include "../top.neut")
+
 (constant file-descriptor tau)
 
 (constant stdin file-descriptor)
@@ -16,6 +18,8 @@
      (buf (array A u8))
      (len u64))
     (product (array A u8) i64)))
+
+(attribute read (implicit 0))
 
 (constant write
   (pi
@@ -40,6 +44,8 @@
      (flags i64)
      (mode i64))
     (product (array A u8) file-descriptor)))
+
+(attribute open (implicit 0))
 
 (constant close
   (pi

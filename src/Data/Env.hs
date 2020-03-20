@@ -316,6 +316,10 @@ insEnumEnv :: Meta -> T.Text -> [(T.Text, Int)] -> WithEnv ()
 insEnumEnv m name xis = do
   eenv <- gets enumEnv
   let definedEnums = Map.keys eenv ++ map fst (concat (Map.elems eenv))
+  -- let name' = llvmString name
+  -- let (xs, is) = unzip xis
+  -- let xs' = map llvmString xs
+  -- let xis' = zip xs' is
   case find (`elem` definedEnums) $ name : map fst xis of
     Just x -> raiseError m $ "the constant `" <> x <> "` is already defined"
     _ -> do
