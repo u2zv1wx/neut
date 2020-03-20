@@ -45,12 +45,6 @@ makeClosure mName mxts2 m mxts1 e = do
   let args = map fst xts1 ++ [envVarName]
   let body = (m, CodeSigmaElim arrVoidPtr (map fst xts2) envVar e')
   when (name `notElem` Map.keys cenv) $ insCodeEnv name args body
-  when (name == "thunk-9536") $ do
-    p "found"
-    p "args:"
-    p' args
-    p "body:"
-    p' body
   let fvEnv = (m, DataSigmaIntro arrVoidPtr $ map (toDataUpsilon' . fst) xts2)
   return (m, DataSigmaIntro arrVoidPtr [envExp, fvEnv, (m, DataTheta name)])
 
@@ -62,7 +56,6 @@ callClosure m e zexes = do
   (typeVarName, _) <- newDataUpsilonWith "exp"
   (envVarName, envVar) <- newDataUpsilonWith "env"
   (lamVarName, lamVar) <- newDataUpsilonWith "thunk"
-  -- retImmType <- returnCartesianImmediate
   return $
     bindLet
       ((clsVarName, e) : zip zs es')

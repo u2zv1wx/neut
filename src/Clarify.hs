@@ -478,7 +478,6 @@ toHeaderInfo m x t ArgArray = do
   (arrayTypeName, arrayType) <- newDataUpsilonWith "array-type"
   (arrayInnerName, arrayInner) <- newDataUpsilonWith "array-inner"
   (arrayInnerTmpName, arrayInnerTmp) <- newDataUpsilonWith "array-tmp"
-  -- retImmType <- returnCartesianImmediate
   return
     ( [arrayVarName]
     , [arrayInnerTmp]
