@@ -127,7 +127,6 @@ emitLLVMOp (LLVMOpGetElementPtr (base, n) is) = do
     unwordsL
       [ "getelementptr"
       , showLowTypeAsIfNonPtr n <> ","
-      -- , showLowType n <> "*"
       , showLowType n
       , showLLVMData base <> ","
       , showIndex is
