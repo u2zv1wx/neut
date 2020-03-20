@@ -23,9 +23,6 @@ import Data.WeakTerm
 
 rename :: WeakTermPlus -> WithEnv WeakTermPlus
 rename e = rename' Map.empty e
-  -- result <- rename' Map.empty e
-  -- let info = toInfo "rename.post" result
-  -- return $ assertP info result $ checkSanity [] result
 
 renameQuasiStmtList :: [QuasiStmt] -> WithEnv [QuasiStmt]
 renameQuasiStmtList = renameQuasiStmtList' Map.empty
@@ -165,7 +162,6 @@ renameDef nenv (m, (mx, x, t), xts, e) = do
     Nothing -> raiseError mx $ "undefined variable: " <> asText x
     Just x' -> return (m, (mx, x', t'), xts', e')
 
--- type NameEnv = Map.HashMap Int Identifier
 type NameEnv = Map.HashMap T.Text Int
 
 -- Alpha-convert all the variables so that different variables have different names.
@@ -197,15 +193,6 @@ rename' nenv (m, WeakTermPiIntroPlus ind (name, args) xts e) = do
   args' <- mapM (renameIdentPlus nenv) args
   (xts', e') <- renameBinder nenv xts e
   return (m, WeakTermPiIntroPlus ind (name, args') xts' e')
--- rename' nenv (m, WeakTermPiIntroPlus name indName s xts e) = do
---   (xts', e') <- renameBinder nenv xts e
---   let (is, ees) = unzip s
---   is' <- mapM (renameIdentifier nenv m) is
---   let (es1, es2) = unzip ees
---   es1' <- mapM (rename' nenv) es1
---   es2' <- mapM (rename' nenv) es2
---   let s' = zip is' (zip es1' es2')
---   return (m, WeakTermPiIntroPlus name indName s' xts' e')
 rename' nenv (m, WeakTermPiElim e es) = do
   es' <- mapM (rename' nenv) es
   e' <- rename' nenv e
@@ -273,13 +260,6 @@ rename' nenv (m, WeakTermCase (e, t) cxtes) = do
       return ((c', xts'), body')
   return (m, WeakTermCase (e', t') cxtes')
 
--- rename' nenv (m, WeakTermCocase (name, args) ces) = do
---   name' <- lookupStrict'' nenv m name
---   args' <- mapM (rename' nenv) args
---   let (cs, es) = unzip ces
---   cs' <- mapM (lookupStrict'' nenv m) cs
---   es' <- mapM (rename' nenv) es
---   return (m, WeakTermCocase (name', args') $ zip cs' es')
 renameBinder ::
      NameEnv
   -> [IdentifierPlus]
@@ -400,64 +380,6 @@ lookupStrict'' nenv m x =
     Just x' -> return x'
     Nothing -> raiseError m $ "undefined variable:  " <> asText x
 
--- checkSanity :: [Identifier] -> WeakTermPlus -> Bool
--- checkSanity _ (_, WeakTermTau _) = True
--- checkSanity _ (_, WeakTermUpsilon _) = True
--- checkSanity ctx (_, WeakTermPi _ xts t) = do
---   checkSanity' ctx xts t
--- checkSanity ctx (_, WeakTermPiIntro xts e) = do
---   checkSanity' ctx xts e
--- checkSanity ctx (_, WeakTermPiElim e es) = do
---   checkSanity ctx e && all (checkSanity ctx) es
--- checkSanity ctx (_, WeakTermSigma xts) = checkSanitySigma ctx xts
--- checkSanity ctx (_, WeakTermSigmaIntro t es) = all (checkSanity ctx) $ t : es
--- checkSanity ctx (_, WeakTermSigmaElim t xts e1 e2) = do
---   all (checkSanity ctx) [t, e1] && checkSanity' ctx xts e2
--- checkSanity ctx (_, WeakTermIter xt xts e) = do
---   checkSanity' ctx (xt : xts) e
--- checkSanity _ (_, WeakTermConst _) = True
--- checkSanity _ (_, WeakTermZeta _) = True
--- checkSanity ctx (_, WeakTermInt t _) = checkSanity ctx t
--- checkSanity _ (_, WeakTermFloat16 _) = True
--- checkSanity _ (_, WeakTermFloat32 _) = True
--- checkSanity _ (_, WeakTermFloat64 _) = True
--- checkSanity ctx (_, WeakTermFloat t _) = checkSanity ctx t
--- checkSanity _ (_, WeakTermEnum _) = True
--- checkSanity _ (_, WeakTermEnumIntro _) = True
--- checkSanity ctx (_, WeakTermEnumElim (e, t) les) =
---   all (checkSanity ctx) $ e : t : map snd les
--- checkSanity ctx (_, WeakTermArray dom _) = do
---   checkSanity ctx dom
--- checkSanity ctx (_, WeakTermArrayIntro _ es) = do
---   all (checkSanity ctx) es
--- checkSanity ctx (_, WeakTermArrayElim _ xts e1 e2) = do
---   checkSanity ctx e1 && checkSanity' ctx xts e2
--- checkSanity _ (_, WeakTermStruct {}) = True
--- checkSanity ctx (_, WeakTermStructIntro ets) =
---   all (checkSanity ctx) $ map fst ets
--- checkSanity ctx (_, WeakTermStructElim xts e1 e2) = do
---   checkSanity ctx e1 && checkSanity'' ctx xts e2
--- checkSanity' :: [Identifier] -> [IdentifierPlus] -> WeakTermPlus -> Bool
--- checkSanity' ctx [] e = do
---   checkSanity ctx e
--- checkSanity' ctx ((_, x, _):_) _
---   | x `elem` ctx = False
--- checkSanity' ctx ((_, x, t):xts) e = do
---   checkSanity ctx t && checkSanity' (x : ctx) xts e
--- checkSanitySigma :: [Identifier] -> [IdentifierPlus] -> Bool
--- checkSanitySigma _ [] = True
--- checkSanitySigma ctx ((_, x, _):_)
---   | x `elem` ctx = False
--- checkSanitySigma ctx ((_, x, t):xts) = do
---   checkSanity ctx t && checkSanitySigma (x : ctx) xts
--- checkSanity'' ::
---      [Identifier] -> [(Meta, Identifier, ArrayKind)] -> WeakTermPlus -> Bool
--- checkSanity'' ctx [] e = do
---   checkSanity ctx e
--- checkSanity'' ctx ((_, x, _):_) _
---   | x `elem` ctx = False
--- checkSanity'' ctx ((_, x, _):xts) e = do
---   checkSanity'' (x : ctx) xts e
 prepareInvRename :: WithEnv ()
 prepareInvRename = do
   modify (\env -> env {count = 0})
@@ -478,7 +400,7 @@ invRenameIdentifier IdentKindUpsilon (I (s, i)) = do
       j <- newCount
       let s' = T.pack $ "var" ++ show j
       -- fixme
-      -- modify (\env -> env {revNameEnv = Map.insert i x s rnenv})
+      -- modify (\env -> env {revNameEnv = IntMap.insert i j rnenv})
       return $ asIdent s'
 invRenameIdentifier IdentKindZeta (I (s, i)) = do
   rnenv <- gets revNameEnv
@@ -520,9 +442,6 @@ invRename (m, WeakTermPiIntroNoReduce xts e) = do
 -- the "content" of this term is not used in toText, and so there's no need to rename this term
 invRename (m, WeakTermPiIntroPlus ind (name, args) xts e) =
   return (m, WeakTermPiIntroPlus ind (name, args) xts e)
--- invRename (m, WeakTermPiIntroPlus name indName s xts e)
---  = do
---   return (m, WeakTermPiIntroPlus name indName s xts e)
 invRename (m, WeakTermPiElim e es) = do
   e' <- invRename e
   es' <- mapM invRename es
@@ -591,10 +510,6 @@ invRename (m, WeakTermCase (e, t) cxtes) = do
       return ((c, xts'), body')
   return (m, WeakTermCase (e', t') cxtes')
 
--- invRename (m, WeakTermCocase name ces) = do
---   let (cs, es) = unzip ces
---   es' <- mapM invRename es
---   return (m, WeakTermCocase name $ zip cs es')
 invRenameBinder ::
      [IdentifierPlus]
   -> WeakTermPlus
@@ -649,7 +564,6 @@ lookupName :: Identifier -> NameEnv -> Maybe Identifier
 lookupName (I (s, _)) nenv = do
   j <- Map.lookup s nenv
   return $ I (llvmString s, j)
-  -- return $ I (s, j)
 
 lookupName' :: Identifier -> NameEnv -> Maybe Identifier
 lookupName' (I (s, _)) nenv = do

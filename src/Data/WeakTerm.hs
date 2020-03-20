@@ -66,17 +66,11 @@ data WeakTerm
   -- it might also make sense to add only the isomorphism part `µF -> FµF`, and let the user write the other part.
   -- one might even think that this way is preferable from the viewpoint of theoretical virtue.
   -- but I don't feel like doing so (at least for now) because this `case` construct is already just an optimization technique.
+  -- Incidentally, we can also add the syntax for copattern matching A -> FνF -> νF here. But since its implementation is
+  -- simple enough to implement it in Interpret, I don't add it as syntactic construct.
   | WeakTermCase
       (WeakTermPlus, WeakTermPlus) -- (the `e` in `case e of (...)`, the type of `e`)
       [((Identifier, [IdentifierPlus]), WeakTermPlus)] -- ((cons x xs) e), ((nil) e), ((succ n) e).  (not ((cons A x xs) e).)
-  -- A -> FνF -> νF (i.e. copattern matching (although I think it's more correct to say "record" or something like that,
-  -- considering that the constructed term using `FνF -> νF` is just a record after all))
-  -- this syntactic construct is only for performance improvement, too.
-  -- (cocase c (c e) ... (c e))
-  -- | WeakTermCocase
-  --     [Identifier] -- the list of mutually defined coinductive types
-  --     (Identifier, [WeakTermPlus]) -- a @ (e, ..., e)  (e.g. stream @ A)
-  --     [(Identifier, WeakTermPlus)] -- (some-label any-term)
   deriving (Show, Eq)
 
 type WeakTermPlus = (Meta, WeakTerm)
@@ -91,11 +85,6 @@ data WeakCase
 
 type SubstWeakTerm = [(Identifier, WeakTermPlus)]
 
--- type WeakFVInfo = [(Identifier, (WeakTermPlus, WeakTermPlus))]
--- asSubst :: WeakFVInfo -> SubstWeakTerm
--- asSubst info = do
---   let (zs, ets) = unzip info
---   zip zs (map fst ets)
 type Hole = Identifier
 
 type IdentifierPlus = (Meta, Identifier, WeakTermPlus)
@@ -176,24 +165,20 @@ data QuasiStmt
 data WeakStmt
   = WeakStmtReturn WeakTermPlus
   | WeakStmtLet Meta IdentifierPlus WeakTermPlus WeakStmt
-  -- special case of `let` in which the `e` in `let x := e in cont` is known to be well-typed
   | WeakStmtLetWT Meta IdentifierPlus WeakTermPlus WeakStmt
   | WeakStmtLetSigma Meta [IdentifierPlus] WeakTermPlus WeakStmt
   | WeakStmtImplicit Meta Identifier Int WeakStmt
   | WeakStmtLetInductiveIntro
-      Meta -- m
-      (T.Text, T.Text) -- biai
-      IdentifierPlus -- bt
-      [IdentifierPlus] -- yts
-      [IdentifierPlus] -- yts
-      [IdentifierPlus] -- atsbts
-      WeakTermPlus -- bInner @ yts'
-      WeakStmt -- cont
+      Meta
+      (T.Text, T.Text)
+      IdentifierPlus
+      [IdentifierPlus]
+      [IdentifierPlus]
+      [IdentifierPlus]
+      WeakTermPlus
+      WeakStmt
   | WeakStmtConstDecl Meta IdentifierPlus WeakStmt
   deriving (Show)
-
-toVarFromPlus :: IdentifierPlus -> WeakTermPlus
-toVarFromPlus (m, x, _) = (m, WeakTermUpsilon x)
 
 varWeakTermPlus :: WeakTermPlus -> [Identifier]
 varWeakTermPlus (_, WeakTermTau _) = []
@@ -247,8 +232,6 @@ varWeakTermPlus (_, WeakTermCase (e, t) cxes) = do
   let zs = concatMap (\((_, xts), body) -> varWeakTermPlus' xts [body]) cxes
   xs ++ ys ++ zs
 
--- varWeakTermPlus (_, WeakTermCocase as (_, es) ces) =
---   as ++ (concatMap varWeakTermPlus $ es ++ map snd ces)
 varWeakTermPlus' :: [IdentifierPlus] -> [WeakTermPlus] -> [Identifier]
 varWeakTermPlus' [] es = concatMap varWeakTermPlus es
 varWeakTermPlus' ((_, x, t):xts) es = do
@@ -305,8 +288,6 @@ holeWeakTermPlus (_, WeakTermCase (e, t) cxes) = do
   let zs = concatMap (\((_, xts), body) -> holeWeakTermPlus' xts [body]) cxes
   xs ++ ys ++ zs
 
--- holeWeakTermPlus (_, WeakTermCocase _ (_, es) ces) =
---   concatMap holeWeakTermPlus $ es ++ map snd ces
 holeWeakTermPlus' :: [IdentifierPlus] -> [WeakTermPlus] -> [Hole]
 holeWeakTermPlus' [] es = concatMap holeWeakTermPlus es
 holeWeakTermPlus' ((_, _, t):xts) es =
@@ -413,13 +394,6 @@ substWeakTermPlus sub (m, WeakTermCase (e, t) cxtes) = do
           ((c, xts'), body')
   (m, WeakTermCase (e', t') cxtes')
 
--- substWeakTermPlus sub (m, WeakTermCocase as (name, es) ces) = do
---   let es' = map (substWeakTermPlus sub) es
---   let ces' =
---         flip map ces $ \(c, e) -> do
---           let e' = substWeakTermPlus sub e
---           (c, e')
---   (m, WeakTermCocase as (name, es') ces')
 substWeakTermPlus' :: SubstWeakTerm -> [IdentifierPlus] -> [IdentifierPlus]
 substWeakTermPlus' _ [] = []
 substWeakTermPlus' sub ((m, x, t):xts) = do
@@ -452,12 +426,9 @@ asUpsilon _ = Nothing
 asUniv :: UnivLevelPlus -> WeakTermPlus
 asUniv (UnivLevelPlus (m, l)) = (m, WeakTermTau l)
 
--- unit :: WeakTermPlus
--- unit = (emptyMeta, WeakTermEnumIntro $ EnumValueLabel "unit")
 toText :: WeakTermPlus -> T.Text
 toText (_, WeakTermTau l) = showCons ["tau", T.pack $ show l]
 toText (_, WeakTermUpsilon x) = asText x
--- toText (_, WeakTermUpsilon x) = asText' x
 toText (_, WeakTermPi _ xts t) = do
   let argStr = inParen $ showItems $ map showArg xts
   showCons ["Π", argStr, toText t]
@@ -479,7 +450,6 @@ toText (_, WeakTermSigma xts)
   | otherwise = "(product)" -- <> : (product)
 toText (_, WeakTermSigmaIntro _ es) = do
   showCons ("sigma-introduction" : map toText es)
-  -- showTuple $ map toText es
 toText (_, WeakTermSigmaElim _ xts e1 e2) = do
   let argStr = inParen $ showItems $ map showArg xts
   showCons ["sigma-elimination", argStr, toText e1, toText e2]
@@ -498,7 +468,6 @@ toText (_, WeakTermEnum enumType) =
     EnumTypeLabel l -> l
     EnumTypeIntS size -> "i" <> T.pack (show size)
     EnumTypeIntU size -> "u" <> T.pack (show size)
-    -- EnumTypeNat size -> "n" <> T.pack (show size)
 toText (_, WeakTermEnumIntro v) = showEnumValue v
 toText (_, WeakTermEnumElim (e, _) les) =
   showCons ["case", toText e, showItems (map showClause les)]
@@ -522,11 +491,6 @@ toText (_, WeakTermCase (e, _) cxtes) = do
         let xs = map (\(_, I (x, _), _) -> x) xts
         showCons [showCons (asText c : xs), toText body]))
 
--- toText (_, WeakTermCocase _ (name, es) ces) = do
---   showCons
---     ("cocase" :
---      showCons (asText name : map toText es) :
---      (flip map ces $ \(c, e) -> showCons [asText c, toText e]))
 inParen :: T.Text -> T.Text
 inParen s = "(" <> s <> ")"
 
@@ -557,8 +521,6 @@ weakenEnumValue (EnumValueLabel l) = WeakCaseLabel l
 weakenEnumValue (EnumValueIntS t a) = WeakCaseIntS t a
 weakenEnumValue (EnumValueIntU t a) = WeakCaseIntU t a
 
--- weakenEnumValue (EnumValueGlobal l) = WeakCaseGlobal l
--- weakenEnumValue (EnumValueNat size a) = WeakCaseNat size a
 weakenCase :: Case -> WeakCase
 weakenCase (CaseValue v) = weakenEnumValue v
 weakenCase CaseDefault = WeakCaseDefault
@@ -568,8 +530,6 @@ showEnumValue (EnumValueLabel l) = l
 showEnumValue (EnumValueIntS _ a) = T.pack $ show a
 showEnumValue (EnumValueIntU _ a) = T.pack $ show a
 
--- showEnumValue (EnumValueGlobal l) = l
--- showEnumValue (EnumValueNat size a) = T.pack $ "n" ++ show size ++ "-" ++ show a
 showArrayKind :: ArrayKind -> T.Text
 showArrayKind (ArrayKindIntS size) = T.pack $ "i" ++ show size
 showArrayKind (ArrayKindIntU size) = T.pack $ "u" ++ show size

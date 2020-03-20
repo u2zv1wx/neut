@@ -157,6 +157,8 @@ interpret (m, TreeNode ((_, TreeLeaf "case"):e:cxtes)) = do
   m' <- adjustPhase m
   h <- newHole m'
   return (m', WeakTermCase (e', h) cxtes')
+-- A -> FνF -> νF (i.e. copattern matching (although I think it's more correct to say "record" or something like that,
+-- considering that the constructed term using `FνF -> νF` is just a record after all))
 interpret (m, TreeNode ((_, TreeLeaf "cocase"):codType:cocaseClauseList)) = do
   (a, args) <- interpretCoinductive codType
   m' <- adjustPhase m

@@ -46,7 +46,6 @@ parseConnective m ts f g = do
   fs <- mapM formationRuleOf' connectiveList
   ats <- mapM ruleAsIdentPlus fs
   bts <- concat <$> mapM toInternalRuleList connectiveList
-  -- registerIndEnum ats bts
   checkNameSanity m $ ats ++ bts
   connectiveList' <- concat <$> mapM (f ats bts) connectiveList
   ruleList <- concat <$> mapM (g ats) connectiveList
@@ -60,11 +59,6 @@ parseConnective' (m, TreeNode ((_, TreeLeaf name):(_, TreeNode xts):rules)) = do
   return (m', asIdent name, xts', rules')
 parseConnective' t = raiseSyntaxError t "(LEAF (TREE ... TREE) ...)"
 
--- registerIndEnum :: [IdentifierPlus] -> [IdentifierPlus] -> WithEnv ()
--- registerIndEnum [] _ = return ()
--- registerIndEnum (at:ats) bts = do
---   let la = toEnumLabel at
---   let lbs = map toEnumLabel bts
 parseRule :: TreePlus -> WithEnv Rule
 parseRule (m, TreeNode [(mName, TreeLeaf name), (_, TreeNode xts), t]) = do
   m' <- adjustPhase m
@@ -101,9 +95,7 @@ updateLabelEnv ai xts = do
 
 toInductive ::
      [IdentifierPlus] -> [IdentifierPlus] -> Connective -> WithEnv [QuasiStmt]
-toInductive ats bts connective@(m, a@(I (ai, _)), xts, _)
-  -- updateLabelEnv ai bts -- the "ats"-part is not needed
- = do
+toInductive ats bts connective@(m, a@(I (ai, _)), xts, _) = do
   formationRule <- formationRuleOf connective >>= ruleAsIdentPlus
   let cod = (m, WeakTermPiElim (m, WeakTermUpsilon a) (map toVar' xts))
   z <- newNameWith' "_"
@@ -299,7 +291,6 @@ optConcat mNew mOld = do
   -- insert mNew at the end of the list (to respect the structure of ind/coind represented as pi/sigma)
   return $ mOld' ++ mNew'
 
--- ここでモジュールを切るべき？
 data Mode
   = ModeForward
   | ModeBackward
@@ -496,7 +487,6 @@ zetaCoinductiveNested ::
 zetaCoinductiveNested mode isub csub atsbts e va aOuter es bts = do
   (xts, (_, aInner, aType), btsInner) <- lookupCoinductive (metaOf va) aOuter
   let es' = map (substWeakTermPlus (isub ++ csub)) es
-  -- a' <- newNameWith "coinductive"
   a' <- newNameWith'' "coinductive"
   args <-
     zipWithM
@@ -771,13 +761,6 @@ substRuleType sub (m, WeakTermCase (e, t) cxtes) = do
       return ((c, xts'), body')
   return (m, WeakTermCase (e', t') cxtes')
 
--- substRuleType sub (m, WeakTermCocase (name, es) ces) = do
---   es' <- mapM (substRuleType sub) es
---   ces' <-
---     flip mapM ces $ \(c, e) -> do
---       e' <- substRuleType sub e
---       return (c, e')
---   return (m, WeakTermCocase (name, es') ces')
 substRuleType' ::
      (RuleType, RuleType) -> [IdentifierPlus] -> WithEnv [IdentifierPlus]
 substRuleType' _ [] = return []
