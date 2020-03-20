@@ -1,0 +1,77 @@
+;; define basic notations
+
+(include "top.neut")
+
+;; synonyms
+(keyword type)
+
+(notation type tau)
+
+(keyword universe)
+
+(notation universe tau)
+
+(keyword forall)
+
+(notation forall pi)
+
+(keyword switch)
+
+(notation switch enum-elimination)
+
+(keyword hole)
+
+(notation hole (zeta _))
+
+(keyword let)
+
+(keyword begin)
+
+(notation (begin e) e)
+
+(notation (begin e rest+)
+  ((pi-introduction ((_ hole)) (begin rest+)) (begin e)))
+
+(notation (begin (let x e+) rest+)
+  ((pi-introduction ((x hole)) (begin rest+)) (begin e+)))
+
+(notation (begin (let (x t) e+) rest+)
+  ((pi-introduction ((x t)) (begin rest+)) (begin e+)))
+
+;; lambda: pi-introduction with implicit begin block
+(keyword lambda)
+
+(notation (lambda () e+)
+  (pi-introduction () (begin e+)))
+
+(notation (lambda (xts+) e+)
+  (pi-introduction (xts+) (begin e+)))
+
+;; type ascription
+(keyword ascription)
+
+(notation (ascription e t)
+  (let (_ t) e))
+
+(keyword with-type)
+
+(notation (with-type t e)
+  ((lambda ((x t)) x) e))
+
+(keyword hom)
+
+(notation (hom t) t)
+
+(notation (hom t rest+)
+  (pi
+    ((_ t))
+    (hom rest+)))
+
+(keyword theorem)
+
+(notation (theorem x t e)
+  (let (x t) e))
+
+(keyword assume)
+
+(notation assume lambda)

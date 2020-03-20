@@ -1,0 +1,19 @@
+(include "notation.neut")
+
+(include "constant/darwin.neut")
+
+(enum bool (true 1) (false 0))
+
+(definition bool:as-i1 ((b bool))
+  (unsafe-cast bool i1 b))
+
+(definition bool:and ((b1 bool) (b2 bool))
+  (unsafe-cast i1 bool (i1.and (bool:as-i1 b1) (bool:as-i1 b2))))
+
+(definition bool:or ((b1 bool) (b2 bool))
+  (unsafe-cast i1 bool (i1.or (bool:as-i1 b1) (bool:as-i1 b2))))
+
+(definition bool:not ((b bool))
+  (switch b
+    (true false)
+    (false true)))

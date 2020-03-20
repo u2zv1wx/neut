@@ -1,0 +1,168 @@
+;; should be loaded after `notation`, `top`.
+
+(include "top.neut")
+
+(constant file-descriptor tau)
+
+(constant stdin file-descriptor)
+
+(constant stdout file-descriptor)
+
+(constant stderr file-descriptor)
+
+(constant unsafe-cast
+  (pi ((A tau) (B tau) (_ A)) B))
+
+;; file-descriptor as int, みたいな操作を許すための定数が必要っぽい。まあそれはそのうち。
+
+;; add-i64とかにしたほうがよい。
+;; このへんの定数はそのうち「まとめて」処理できるようにする。無限個あるのでconstantとして書くのは無理。
+;; (constant i64.add
+;;   (pi ((_ i64) (_ i64)) i64))
+
+;; (constant i64.sub
+;;   (pi ((_ i64) (_ i64)) i64))
+
+;; (constant i64.mul
+;;   (pi ((_ i64) (_ i64)) i64))
+
+;; (constant array-access-u8
+;;   (pi
+;;     ((A type)
+;;      (arr (array A u8))
+;;      (n A))
+;;     (product (array A u8) u8)))
+
+;; これ、buf : utf8-codeとかにしたほうがいいのかも？
+;; writeのlenの部分はi64にしてよさげ。
+(constant read
+  (pi
+    ((A u64)
+     (in file-descriptor)
+     (buf (array A u8))
+     (len u64))
+    (product (array A u8) i64)))
+
+(constant write
+  (pi
+    ((A u64)
+     (out file-descriptor)
+     (str (array A u8))
+     (len u64))
+    (product (array A u8) i64)))
+
+(constant exit
+  (pi
+    ((status i64))
+    top))
+
+(constant open
+  (pi
+    ((A u64)
+     (path (array A u8))
+     (flags i64)
+     (mode i64))
+    (product (array A u8) file-descriptor)))
+
+;; closeは簡単。
+(constant close
+  (pi
+    ((_ file-descriptor))
+    i64))
+
+;; darwinではこのforkは定数関数に落ちる。linuxではsyscallになる。
+(constant fork
+  (pi
+    ()
+    i64))
+
+;; (definition time-t i64)
+;; structの中でtime-tって使いたいし、やっぱ一般化してelaborateの時点で具体化するほうがいいか？
+
+(definition rusage
+  (struct
+    i64   ;; ru_utime           user CPU time used
+    i64   ;; (microsec)
+    i64   ;; ru_stime           system CPU time used
+    i64   ;; (microsec)
+    i64   ;; ru_maxrss;         maximum resident set size
+    i64   ;; ru_ixrss;          integral shared memory size
+    i64   ;; ru_idrss;          integral unshared data size
+    i64   ;; ru_isrss;          integral unshared stack size
+    i64   ;; ru_minflt;         page reclaims (soft page faults)
+    i64   ;; ru_majflt;         page faults (hard page faults)
+    i64   ;; ru_nswap;          swaps
+    i64   ;; ru_inblock;        block input operations
+    i64   ;; ru_oublock;        block output operations
+    i64   ;; ru_msgsnd;         IPC messages sent
+    i64   ;; ru_msgrcv;         IPC messages received
+    i64   ;; ru_nsignals;       signals received
+    i64   ;; ru_nvcsw;          voluntary context switches
+    i64)) ;; ru_nivcsw;         involuntary context switches
+
+(constant wait4
+  (pi
+    ((pid i64)
+     (stat-loc (array 1 i64))
+     (options i64)
+     (usage rusage))
+    (product (array 1 i64) rusage i64)))
+
+(definition sockaddr
+  (struct
+    u8    ;; total length
+    u8    ;; address family
+    u16   ;; empty (4 byte so far)
+    u32   ;; empty (8 byte so far)
+    u64)) ;; empty (16 byte so far)
+
+(definition sockaddr-in
+  (struct
+    u8    ;; total length
+    u8    ;; address family
+    u16   ;; ipv4 port
+    u32   ;; ipv4 addr
+    u64)) ;; empty
+
+(definition sockaddr-in6
+  (struct
+    u8    ;; length of this struct
+    u8    ;; AF_INET6
+    u16   ;; Transport layer port
+    u32   ;; IP6 flow information
+    u32   ;; IP6 address
+    u32)) ;; scope zone index
+
+(constant bind
+  (pi
+    ((sock i64)
+     (address sockaddr)
+     (sock-len i64))
+    (product sockaddr i64)))
+
+(constant accept
+  (pi
+    ((sock i64)
+     (address sockaddr)
+     (address-len (array 1 i64)))
+    (product sockaddr (array 1 i64) i64)))
+
+(constant connect
+  (pi
+    ((sock i64)
+     (address sockaddr)
+     (address-len i64))
+    (product sockaddr i64)))
+
+(constant socket
+  (pi
+    ((domain i64)
+     (socket-type i64)
+     (protocol i64))
+    i64))
+
+(constant listen
+  (pi
+    ((sock i64)
+     (backlog i64))
+    i64))
