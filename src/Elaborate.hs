@@ -39,8 +39,6 @@ import qualified Data.UnionFind as UF
 elaborate :: WeakStmt -> WithEnv TermPlus
 elaborate stmt = do
   reduceTermPlus <$> elaborateStmt stmt
-  -- _ <- error "well-typed"
-  -- return e
 
 elaborateStmt :: WeakStmt -> WithEnv TermPlus
 elaborateStmt (WeakStmtReturn e) = do
@@ -59,7 +57,6 @@ elaborateStmt (WeakStmtLet m (mx, x@(I (_, i)), t) e cont) = do
   t'' <- reduceTermPlus <$> elaborate' t'
   insTypeEnv x t'' mlt
   modify (\env -> env {substEnv = IntMap.insert i (weaken e'') (substEnv env)})
-  -- liftIO $ TIO.putStrLn $ toText $ weaken t''
   cont' <- elaborateStmt cont
   return (m, TermPiElim (m, TermPiIntro [(mx, x, t'')] cont') [e''])
 elaborateStmt (WeakStmtLetWT m (mx, x@(I (_, i)), t) e cont) = do
@@ -107,21 +104,12 @@ elaborateStmt (WeakStmtLetInductiveIntro m (bi, ai) (mx, x@(I (_, i)), t) xts yt
   -- the "elaborate' e" part in LetWT
   app' <- elaborate' app
   atsbts' <- mapM elaboratePlus atsbts
-  -- collect free-var info
-  -- ch <- chainTermPlus (m, TermPiIntro atsbts' app')
-  -- let s = map (\(mz, z, tz) -> (z, ((mz, TermUpsilon z), tz))) ch
-  -- let ys = map (\(_, y, _) -> y) yts
-  -- このidxはたぶんenvのほうに登録するべき
-  -- let idx = findIndices (\(z, _) -> z `elem` ys) s
   xtsyts' <- mapM elaboratePlus $ xts ++ yts
   let lam =
         ( m
         , TermPiIntroNoReduce
             xtsyts'
             (m, TermPiIntroPlus ai (bi, xtsyts') atsbts' app'))
-  -- let lam =
-  --       (m, TermPiIntro xtsyts' (m, TermPiIntroPlus bi ai False s atsbts' app'))
-  -- the "elaboreta' e" part ends here
   t'' <- reduceTermPlus <$> elaborate' t'
   insTypeEnv x t'' mlt
   modify (\env -> env {substEnv = IntMap.insert i (weaken lam) (substEnv env)})
@@ -131,12 +119,9 @@ elaborateStmt (WeakStmtConstDecl m (mx, x, t) cont) = do
   (t', mlt) <- inferType t
   analyze >> synthesize >> refine >> cleanup
   t'' <- reduceTermPlus <$> elaborate' t'
-  -- i <- lookupConstNum' x
   insTypeEnv x t'' mlt
-  -- insTypeEnv (I (x, i)) t'' mlt
   cont' <- elaborateStmt cont
   return (m, TermConstDecl (mx, x, t'') cont')
-  -- return (m, TermConstDecl (mx, I (x, i), t'') cont')
 
 -- fixme: 余計なreduceをしているので修正すること
 refine :: WithEnv ()
@@ -294,14 +279,8 @@ elaborate' (m, WeakTermPiIntroNoReduce xts e) = do
   return (m, TermPiIntroNoReduce xts' e')
 elaborate' (m, WeakTermPiIntroPlus ind (name, args) xts e) = do
   args' <- mapM elaboratePlus args
-  -- let (zs, ees) = unzip s
-  -- let (es1, es2) = unzip ees
-  -- es1' <- mapM elaborate' es1
-  -- es2' <- mapM elaborate' es2
   e' <- elaborate' e
   xts' <- mapM elaboratePlus xts
-  -- return
-  --   (m, TermPiIntroPlus name indName False (zip zs (zip es1' es2')) xts' e')
   return (m, TermPiIntroPlus ind (name, args') xts' e')
 elaborate' (m, WeakTermPiElim (_, WeakTermZeta h@(I (_, x))) es) = do
   sub <- gets substEnv
@@ -441,7 +420,6 @@ elaborate' (m, WeakTermCase (e, t) cxtes) = do
       xts' <- mapM elaboratePlus xts
       body' <- elaborate' body
       return ((c, xts'), body')
-  -- t' <- elaborate' t >>= reduceTermPlus
   t' <- elaborate' t
   t'' <- reduceWeakType $ weaken t'
   case t'' of
@@ -473,12 +451,6 @@ reduceWeakType t = do
         reduceWeakType (m, WeakTermPiElim lam args)
     _ -> return t'
 
--- elaborate' (m, WeakTermCocase (name, args) ces) = do
---   args' <- mapM elaborate' args
---   let (cs, es) = unzip ces
---   es' <- mapM elaborate' es
---   -- _ <- undefined name cs -- fixme: check exhaustiveness
---   return (m, TermCocase (name, args') (zip cs es'))
 elaborateWeakCase :: WeakCase -> WithEnv Case
 elaborateWeakCase (WeakCaseInt t x) = do
   t' <- reduceTermPlus <$> elaborate' t
