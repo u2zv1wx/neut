@@ -1,0 +1,16 @@
+(include "notation.neut")
+
+(include "constant/darwin.neut")
+
+(definition string
+  (sigma
+    ((len u64))
+    (array len u8)))
+
+(definition print-string ((str string))
+  (destruct str (n content)
+    (let len (write stdout &content 3))
+    (with-type (product string u64)
+      (tuple (tuple n content) len))))
+
+;; (tuple+ string n content) のように書けてもいいかもしれない。

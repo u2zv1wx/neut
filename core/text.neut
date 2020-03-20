@@ -1,0 +1,8 @@
+(include "notation.neut")
+
+(include "constant/darwin.neut")
+
+(definition text
+  (sigma
+    ((len u64))
+    (array len u64)))
