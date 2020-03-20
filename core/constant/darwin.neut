@@ -23,7 +23,9 @@
      (out file-descriptor)
      (str (array A u8))
      (len u64))
-    (product (array A u8) i64)))
+    (product (array A u8) u64)))
+
+(attribute write (implicit 0))
 
 (constant exit
   (pi

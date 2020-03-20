@@ -75,3 +75,21 @@
 (keyword assume)
 
 (notation assume lambda)
+
+(keyword admit)
+
+(notation admit
+  (exit hole 1))
+
+(keyword tuple)
+
+(notation tuple sigma-introduction)
+
+(keyword construct)
+
+(notation construct sigma-introduction)
+
+(keyword destruct)
+
+(notation (destruct e xts rest+)
+  (sigma-elimination xts e (begin rest+)))
