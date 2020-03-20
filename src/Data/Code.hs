@@ -147,10 +147,3 @@ substTheta sub (ThetaArrayAccess t d1 d2) = do
 substTheta sub (ThetaSysCall sysCall ds) = do
   let ds' = map (substDataPlus sub) ds
   ThetaSysCall sysCall ds'
--- substDataPlusSigmaElim ::
---      SubstDataPlus -> [Identifier] -> CodePlus -> ([Identifier], CodePlus)
--- substDataPlusSigmaElim sub [] e = ([], substCodePlus sub e)
--- substDataPlusSigmaElim sub (x:xs) e = do
---   let sub' = filter (\(y, _) -> y /= x) sub
---   let (xs', e') = substDataPlusSigmaElim sub' xs e
---   (x : xs', e')

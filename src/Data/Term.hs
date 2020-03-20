@@ -46,10 +46,6 @@ data Term
   | TermCase
       (TermPlus, TermPlus) -- (the `e` in `case e of (...)`, the type of `e`)
       [((Identifier, [IdentifierPlus]), TermPlus)] -- ((cons x xs) e), ((nil) e), ((succ n) e).  (not ((cons A x xs) e).)
-  -- | TermCocase
-  --     [Identifier]
-  --     (Identifier, [TermPlus]) -- a @ (e, ..., e)  (e.g. stream @ A)
-  --     [(Identifier, TermPlus)] -- (some-label any-term)
   deriving (Show)
 
 type TermPlus = (Meta, Term)
@@ -118,8 +114,6 @@ varTermPlus (_, TermCase (e, t) cxes) = do
   let zs = concatMap (\((_, xts), body) -> varTermPlus' xts [body]) cxes
   xs ++ ys ++ zs
 
--- varTermPlus (_, TermCocase as (_, es) ces) =
---   as ++ (concatMap varTermPlus $ es ++ map snd ces)
 varTermPlus' :: [IdentifierPlus] -> [TermPlus] -> [Identifier]
 varTermPlus' [] es = concatMap varTermPlus es
 varTermPlus' ((_, x, t):xts) es = do
@@ -144,7 +138,7 @@ substTermPlus sub (m, TermPiIntroNoReduce xts body) = do
   let (xts', body') = substTermPlus'' sub xts body
   (m, TermPiIntroNoReduce xts' body')
 substTermPlus sub (m, TermPiIntroPlus ind (name, args) xts body) = do
-  let args' = substTermPlus' sub args -- ここで変数名が被ってカットされちゃってるのか？
+  let args' = substTermPlus' sub args
   let (xts', body') = substTermPlus'' sub xts body
   (m, TermPiIntroPlus ind (name, args') xts' body')
 substTermPlus sub (m, TermPiElim e es) = do
@@ -216,13 +210,6 @@ substTermPlus sub (m, TermCase (e, t) cxtes) = do
           ((c, xts'), body')
   (m, TermCase (e', t') cxtes')
 
--- substTermPlus sub (m, TermCocase as (name, es) ces) = do
---   let es' = map (substTermPlus sub) es
---   let ces' =
---         flip map ces $ \(c, e) -> do
---           let e' = substTermPlus sub e
---           (c, e')
---   (m, TermCocase as (name, es') ces')
 substTermPlus' :: SubstTerm -> [IdentifierPlus] -> [IdentifierPlus]
 substTermPlus' _ [] = []
 substTermPlus' sub ((m, x, t):xts) = do
@@ -239,8 +226,6 @@ substTermPlus'' sub ((mx, x, t):xts) e = do
   let (xts', e') = substTermPlus'' sub' xts e
   ((mx, x, substTermPlus sub t) : xts', e')
 
--- univTerm :: TermPlus
--- univTerm = (emptyMeta, TermTau l)
 weaken :: TermPlus -> WeakTermPlus
 weaken (m, TermTau l) = (m, WeakTermTau l)
 weaken (m, TermUpsilon x) = (m, WeakTermUpsilon x)
@@ -255,12 +240,6 @@ weaken (m, TermPiIntroNoReduce xts body) = do
 weaken (m, TermPiIntroPlus ind (name, args) xts body) = do
   let args' = weakenArgs args
   (m, WeakTermPiIntroPlus ind (name, args') (weakenArgs xts) (weaken body))
-  -- let (zs, ees) = unzip s
-  -- let (es1, es2) = unzip ees
-  -- let es1' = map weaken es1
-  -- let es2' = map weaken es2
-  -- let s' = zip zs (zip es1' es2')
-  -- (m, WeakTermPiIntroPlus name indName s' (weakenArgs xts) (weaken body))
 weaken (m, TermPiElim e es) = do
   let e' = weaken e
   let es' = map weaken es

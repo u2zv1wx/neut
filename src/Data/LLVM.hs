@@ -64,9 +64,7 @@ reduceLLVM' sub (LLVMLet x (LLVMOpBitcast d from to) cont)
   | from == to = reduceLLVM' ((asInt x, substLLVMData sub d) : sub) cont
 reduceLLVM' sub (LLVMLet x op cont) = do
   let op' = substLLVMOp sub op
-  -- SSAだからsubをfilterする必要なし
   let cont' = reduceLLVM' sub cont
-  -- 変数が使われてなかったら落とす、みたいなことをするべき？
   LLVMLet x op' cont'
 reduceLLVM' sub (LLVMCont op cont) = do
   let op' = substLLVMOp sub op
@@ -87,7 +85,6 @@ reduceLLVM' sub (LLVMCall d ds) = do
   let d' = substLLVMData sub d
   let ds' = map (substLLVMData sub) ds
   LLVMCall d' ds'
-  -- LLVMCall d ds
 reduceLLVM' _ LLVMUnreachable = LLVMUnreachable
 
 substLLVMData :: SubstLLVM -> LLVMData -> LLVMData

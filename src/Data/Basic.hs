@@ -44,7 +44,6 @@ newtype UnivLevelPlus =
 
 instance Show UnivLevelPlus where
   show (UnivLevelPlus (_, l)) = "[" ++ show l ++ "]"
-  -- show (UnivLevelPlus (m, l)) = "[" ++ show l ++ "]:" ++ showMeta m
 
 instance Eq UnivLevelPlus where
   (UnivLevelPlus (_, l1)) == (UnivLevelPlus (_, l2)) = l1 == l2
@@ -396,48 +395,3 @@ splitLast [x] = return ([], x)
 splitLast (x:xs) = do
   (xs', z) <- splitLast xs
   return (x : xs', z)
--- ushiftR :: Int -> Int -> Int
--- ushiftR n k = fromIntegral (fromIntegral n `shiftR` k :: Word)
--- ushiftR' :: (Integral a) => a -> Int -> a
--- ushiftR' n k = fromIntegral (fromIntegral n `shiftR` k :: Word)
--- assert :: (Monad m) => String -> Bool -> a -> m a
--- assert str False _ = error str
--- assert _ True x = return x
--- `P` is for "Pure"
--- assertP :: String -> a -> Bool -> a
--- assertP str _ False = error str
--- assertP _ x True = x
--- assert-pure-monadic
--- assertPM :: (Monad m) => String -> a -> m Bool -> m a
--- assertPM msg x m = do
---   b <- m
---   assert msg b x
--- assert-unit-monadic
--- assertUM :: (Monad m) => String -> m Bool -> m ()
--- assertUM msg mb = do
---   b <- mb
---   assert msg b ()
--- assert-unit-pure
--- assertUP :: (Monad m) => String -> Bool -> m ()
--- assertUP msg b = assert msg b ()
--- assert-monadic-monadic
--- assertMM :: (Monad m) => String -> m a -> m Bool -> m a
--- assertMM msg mx mb = do
---   b <- mb
---   x <- mx
---   assert msg b x
--- assert-monadic-pure
--- assertMP :: (Monad m) => String -> m a -> Bool -> m a
--- assertMP msg mx b = do
---   x <- mx
---   assert msg b x
--- assertPreUP :: (Monad m) => String -> Bool -> m ()
--- assertPreUP msg b = assertUP (msg ++ ".pre") b
--- assertPreUM :: (Monad m) => String -> m Bool -> m ()
--- assertPreUM msg mb = assertUM (msg ++ ".pre") mb
--- assertPostMM :: (Monad m) => String -> m a -> m Bool -> m a
--- assertPostMM msg mx mb = assertMM (msg ++ ".post") mx mb
--- assertPostMP :: (Monad m) => String -> m a -> Bool -> m a
--- assertPostMP msg mx b = assertMP (msg ++ ".post") mx b
--- assertPostPM :: (Monad m) => String -> a -> m Bool -> m a
--- assertPostPM msg x mb = assertPM (msg ++ ".post") x mb
