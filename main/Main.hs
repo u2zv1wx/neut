@@ -1,6 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Main where
+module Main
+  ( main
+  ) where
 
 import Control.Monad.State
 import Options.Applicative
@@ -20,8 +22,6 @@ import LLVM
 import Parse
 
 import Data.Log
-
-type ImportOptScreenName = String
 
 type BuildOptInputPath = String
 
@@ -52,6 +52,22 @@ data Command
   | Check CheckOptInputPath CheckOptColorize (Maybe CheckOptEndOfEntry)
   | Complete FilePath Line Column
 
+main :: IO ()
+main = execParser (info (helper <*> parseOpt) fullDesc) >>= run
+
+parseOpt :: Parser Command
+parseOpt =
+  subparser $
+  (command
+     "build"
+     (info (helper <*> parseBuildOpt) (progDesc "build given file")) <>
+   command
+     "check"
+     (info (helper <*> parseCheckOpt) (progDesc "check specified file")) <>
+   command
+     "complete"
+     (info (helper <*> parseCompleteOpt) (progDesc "show completion info")))
+
 parseBuildOpt :: Parser Command
 parseBuildOpt = do
   let inputPathOpt =
@@ -74,6 +90,13 @@ parseBuildOpt = do
           , help "The type of output file"
           ]
   Build <$> inputPathOpt <*> outputPathOpt <*> outputKindOpt
+
+kindReader :: ReadM OutputKind
+kindReader = do
+  s <- str
+  case readMaybe s of
+    Nothing -> readerError $ "unknown mode:" ++ s
+    Just m -> return m
 
 parseCheckOpt :: Parser Command
 parseCheckOpt = do
@@ -104,32 +127,6 @@ parseCompleteOpt = do
         argument auto $ mconcat [help "Column number", metavar "COLUMN"]
   Complete <$> inputPathOpt <*> lineOpt <*> columnOpt
 
-kindReader :: ReadM OutputKind
-kindReader = do
-  s <- str
-  case readMaybe s of
-    Nothing -> readerError $ "unknown mode:" ++ s
-    Just m -> return m
-
-parseOpt :: Parser Command
-parseOpt =
-  subparser $
-  (command
-     "build"
-     (info (helper <*> parseBuildOpt) (progDesc "build given file")) <>
-   command
-     "check"
-     (info (helper <*> parseCheckOpt) (progDesc "check specified file")) <>
-   command
-     "complete"
-     (info (helper <*> parseCompleteOpt) (progDesc "show completion info")))
-
-optParser :: ParserInfo Command
-optParser = info (helper <*> parseOpt) fullDesc
-
-main :: IO ()
-main = execParser optParser >>= run
-
 run :: Command -> IO ()
 run (Build inputPathStr mOutputPathStr outputKind) = do
   inputPath <- resolveFile' inputPathStr
@@ -138,7 +135,7 @@ run (Build inputPathStr mOutputPathStr outputKind) = do
   mOutputPath <- mapM resolveFile' mOutputPathStr
   outputPath <- constructOutputPath basename mOutputPath outputKind
   case resultOrErr of
-    Left err -> seqIO (map (outputLog True) err) >> exitWith (ExitFailure 1)
+    Left err -> seqIO "" (map (outputLog True) err) >> exitWith (ExitFailure 1)
     Right result -> writeResult result outputPath outputKind
 run (Check inputPathStr colorizeFlag mEndOfEntry) = do
   inputPath <- resolveFile' inputPathStr
@@ -148,15 +145,16 @@ run (Check inputPathStr colorizeFlag mEndOfEntry) = do
     Left err ->
       case mEndOfEntry of
         Just eoe ->
-          seqIO' eoe (map (outputLog colorizeFlag) err) >>
+          seqIO (eoe ++ "\n") (map (outputLog colorizeFlag) err) >>
           exitWith (ExitFailure 1)
         Nothing ->
-          seqIO (map (outputLog colorizeFlag) err) >> exitWith (ExitFailure 1)
+          seqIO "" (map (outputLog colorizeFlag) err) >>
+          exitWith (ExitFailure 1)
 run (Complete inputPathStr l c) = do
   inputPath <- resolveFile' inputPathStr
   resultOrErr <- evalWithEnv (complete inputPath l c) (initialEnv inputPath)
   case resultOrErr of
-    Left _ -> return () -- don't show any errors, just quit silently
+    Left _ -> return () -- just quit silently
     Right result -> mapM_ putStrLn result
 
 constructOutputPath ::
@@ -186,14 +184,8 @@ build inputPath = do
   parse inputPath >>= elaborate >>= clarify >>= toLLVM >>= emit
 
 check :: Path Abs File -> WithEnv ()
-check inputPath = do
-  _ <- parse inputPath >>= elaborate
-  return ()
+check inputPath = parse inputPath >>= elaborate >> return ()
 
-seqIO :: [IO ()] -> IO ()
-seqIO [] = return ()
-seqIO (a:as) = a >> seqIO as
-
-seqIO' :: String -> [IO ()] -> IO ()
-seqIO' _ [] = return ()
-seqIO' eoe (a:as) = a >> putStrLn eoe >> seqIO' eoe as
+seqIO :: String -> [IO ()] -> IO ()
+seqIO _ [] = return ()
+seqIO eoe (a:as) = a >> putStr eoe >> seqIO eoe as
