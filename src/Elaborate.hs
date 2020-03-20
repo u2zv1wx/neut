@@ -115,13 +115,12 @@ elaborateStmt (WeakStmtLetInductiveIntro m (bi, ai) (mx, x@(I (_, i)), t) xts yt
   modify (\env -> env {substEnv = IntMap.insert i (weaken lam) (substEnv env)})
   cont' <- elaborateStmt cont
   return (m, TermPiElim (m, TermPiIntro [(mx, x, t'')] cont') [lam])
-elaborateStmt (WeakStmtConstDecl m (mx, x, t) cont) = do
+elaborateStmt (WeakStmtConstDecl _ (_, x, t) cont) = do
   (t', mlt) <- inferType t
   analyze >> synthesize >> refine >> cleanup
   t'' <- reduceTermPlus <$> elaborate' t'
   insTypeEnv x t'' mlt
-  cont' <- elaborateStmt cont
-  return (m, TermConstDecl (mx, x, t'') cont')
+  elaborateStmt cont
 
 -- fixme: 余計なreduceをしているので修正すること
 refine :: WithEnv ()

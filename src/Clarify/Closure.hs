@@ -111,7 +111,6 @@ chainTermPlus' (_, TermIter (_, x, t) xts e) = do
 chainTermPlus' (_, TermConst x) = do
   t <- lookupTypeEnv' x
   chainWithName x t
-chainTermPlus' (_, TermConstDecl xt e) = chainTermPlus'' [xt] [e]
 chainTermPlus' (_, TermFloat16 _) = return []
 chainTermPlus' (_, TermFloat32 _) = return []
 chainTermPlus' (_, TermFloat64 _) = return []

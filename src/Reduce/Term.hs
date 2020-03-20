@@ -58,10 +58,6 @@ reduceTermPlus (m, TermIter (mx, x, t) xts e)
     let ts' = map reduceTermPlus ts
     let e' = reduceTermPlus e
     (m, TermIter (mx, x, t') (zip3 ms xs ts') e')
-reduceTermPlus (m, TermConstDecl (mx, x, t) e) = do
-  let t' = reduceTermPlus t
-  let e' = reduceTermPlus e
-  (m, TermConstDecl (mx, x, t') e')
 reduceTermPlus (m, TermEnumElim (e, t) les) = do
   let t' = reduceTermPlus t
   let e' = reduceTermPlus e

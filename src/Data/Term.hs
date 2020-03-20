@@ -26,7 +26,6 @@ data Term
   | TermSigmaElim TermPlus [IdentifierPlus] TermPlus TermPlus
   | TermIter IdentifierPlus [IdentifierPlus] TermPlus
   | TermConst Identifier
-  | TermConstDecl IdentifierPlus TermPlus
   | TermFloat16 Half
   | TermFloat32 Float
   | TermFloat64 Double
@@ -87,7 +86,6 @@ varTermPlus (_, TermSigmaElim t xts e1 e2) = do
 varTermPlus (_, TermIter (_, x, t) xts e) =
   varTermPlus t ++ filter (/= x) (varTermPlus' xts [e])
 varTermPlus (_, TermConst _) = []
-varTermPlus (_, TermConstDecl xt e) = varTermPlus' [xt] [e]
 varTermPlus (_, TermFloat16 _) = []
 varTermPlus (_, TermFloat32 _) = []
 varTermPlus (_, TermFloat64 _) = []
@@ -164,10 +162,6 @@ substTermPlus sub (m, TermIter (mx, x, t) xts e) = do
   (m, TermIter (mx, x, t') xts' e')
 substTermPlus _ (m, TermConst x) = do
   (m, TermConst x)
-substTermPlus sub (m, TermConstDecl (mx, x, t) e) = do
-  let t' = substTermPlus sub t
-  let e' = substTermPlus (filter (\(k, _) -> k /= x) sub) e
-  (m, TermConstDecl (mx, x, t') e')
 substTermPlus _ (m, TermFloat16 x) = (m, TermFloat16 x)
 substTermPlus _ (m, TermFloat32 x) = (m, TermFloat32 x)
 substTermPlus _ (m, TermFloat64 x) = (m, TermFloat64 x)
@@ -263,7 +257,6 @@ weaken (m, TermIter (mx, x, t) xts e) = do
   (m, WeakTermIter (mx, x, t') xts' e')
 weaken (m, TermConst x) = do
   (m, WeakTermConst x)
-weaken (_, TermConstDecl {}) = undefined
 weaken (m, TermFloat16 x) = (m, WeakTermFloat16 x)
 weaken (m, TermFloat32 x) = (m, WeakTermFloat32 x)
 weaken (m, TermFloat64 x) = (m, WeakTermFloat64 x)

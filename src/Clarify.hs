@@ -89,10 +89,6 @@ clarify iter@(m, TermIter (_, x, t) mxts e) = do
   fvs <- chainTermPlus iter
   retClosure' x fvs m mxts e'
 clarify (m, TermConst x) = clarifyConst m x
-clarify (_, TermConstDecl (_, x, t) e) = do
-  _ <- clarify t
-  insTypeEnv' x t
-  clarify e
 clarify (m, TermFloat16 l) = do
   return (m, CodeUpIntro (m, DataFloat16 l))
 clarify (m, TermFloat32 l) = do
