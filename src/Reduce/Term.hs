@@ -42,12 +42,12 @@ reduceTermPlus (m, TermPiElim e es) = do
     (_, TermPiIntro xts body) -- fixme: reduceできるだけreduceするようにする (partial evaluation)
       | length xts == length es'
       , valueCond -> do
-        let xs = map (\(_, x, _) -> x) xts
+        let xs = map (\(_, x, _) -> asInt x) xts
         reduceTermPlus $ substTermPlus (zip xs es') body
     (_, TermPiIntroPlus _ _ xts body)
       | length xts == length es'
       , valueCond -> do
-        let xs = map (\(_, x, _) -> x) xts
+        let xs = map (\(_, x, _) -> asInt x) xts
         reduceTermPlus $ substTermPlus (zip xs es') body
     _ -> (m, app)
 reduceTermPlus (m, TermIter (mx, x, t) xts e)
@@ -89,7 +89,7 @@ reduceTermPlus (m, TermArrayElim k xts e1 e2) = do
     (_, TermArrayIntro k' es)
       | length es == length xts
       , k == k' -> do
-        let xs = map (\(_, x, _) -> x) xts
+        let xs = map (\(_, x, _) -> asInt x) xts
         reduceTermPlus $ substTermPlus (zip xs es) e2
     _ -> (m, TermArrayElim k xts e1' e2)
 reduceTermPlus (m, TermStructIntro eks) = do
@@ -102,7 +102,7 @@ reduceTermPlus (m, TermStructElim xks e1 e2) = do
     (_, TermStructIntro eks)
       | (_, xs, ks1) <- unzip3 xks
       , (es, ks2) <- unzip eks
-      , ks1 == ks2 -> reduceTermPlus $ substTermPlus (zip xs es) e2
+      , ks1 == ks2 -> reduceTermPlus $ substTermPlus (zip (map asInt xs) es) e2
     _ -> (m, TermStructElim xks e1' e2)
 reduceTermPlus t = t
 
@@ -135,6 +135,6 @@ isValue _ = False
 isValueConst :: Identifier -> Bool
 isValueConst (I (x, _))
   | Just _ <- asLowTypeMaybe x = True
-  | Just _ <- asUnaryOpMaybe x = True
-  | Just _ <- asBinaryOpMaybe x = True
+  -- | Just _ <- asUnaryOpMaybe x = True
+  -- | Just _ <- asBinaryOpMaybe x = True
   | otherwise = False

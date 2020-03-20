@@ -37,15 +37,14 @@ import qualified Data.UnionFind as UF
 -- S. Kong, and C. Roux. "Elaboration in Dependent Type Theory", arxiv,
 -- https://arxiv.org/abs/1505.04324, 2015.
 elaborate :: WeakStmt -> WithEnv TermPlus
-elaborate stmt = do
-  reduceTermPlus <$> elaborateStmt stmt
+elaborate stmt = reduceTermPlus <$> elaborateStmt stmt
 
 elaborateStmt :: WeakStmt -> WithEnv TermPlus
 elaborateStmt (WeakStmtReturn e) = do
   (e', _, _) <- infer e
   analyze >> synthesize >> refine
   checkUnivSanity
-  reduceTermPlus <$> elaborate' e'
+  elaborate' e'
 elaborateStmt (WeakStmtLet m (mx, x@(I (_, i)), t) e cont) = do
   (e', te, mle) <- infer e
   (t', mlt) <- inferType t
@@ -53,7 +52,7 @@ elaborateStmt (WeakStmtLet m (mx, x@(I (_, i)), t) e cont) = do
   insLevelEQ mle mlt
   -- Kantian type-inference ;)
   analyze >> synthesize >> refine >> cleanup
-  e'' <- reduceTermPlus <$> elaborate' e'
+  e'' <- elaborate' e'
   t'' <- reduceTermPlus <$> elaborate' t'
   insTypeEnv x t'' mlt
   modify (\env -> env {substEnv = IntMap.insert i (weaken e'') (substEnv env)})
@@ -75,9 +74,10 @@ elaborateStmt (WeakStmtLetSigma m xts e cont) = do
   insConstraintEnv t1 (fst e', WeakTermSigma xts')
   forM_ mlSigArgList $ \mlSigArg -> insLevelLE mlSigArg mlSigma
   analyze >> synthesize >> refine >> cleanup
-  e'' <- reduceTermPlus <$> elaborate' e'
+  e'' <- elaborate' e'
   xts'' <- mapM elaboratePlus xts'
-  forM_ (zip xts'' mlSigArgList) $ \((_, x, tx), l) -> insTypeEnv x tx l
+  forM_ (zip xts'' mlSigArgList) $ \((_, x, tx), l) ->
+    insTypeEnv x (reduceTermPlus tx) l
   cont' <- elaborateStmt cont
   return
     (m, TermSigmaElim (m, TermEnumIntro $ EnumValueLabel "top") xts'' e'' cont')

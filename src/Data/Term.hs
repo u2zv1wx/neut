@@ -49,9 +49,7 @@ data Term
 
 type TermPlus = (Meta, Term)
 
-type SubstTerm = [(Identifier, TermPlus)]
-
-type FVInfo = [(Identifier, (TermPlus, TermPlus))] -- var ~> (substituted var, the type of var)
+type SubstTerm = [(Int, TermPlus)]
 
 type Hole = Identifier
 
@@ -122,7 +120,7 @@ varTermPlus' ((_, x, t):xts) es = do
 substTermPlus :: SubstTerm -> TermPlus -> TermPlus
 substTermPlus _ (m, TermTau l) = (m, TermTau l)
 substTermPlus sub (m, TermUpsilon x) =
-  fromMaybe (m, TermUpsilon x) (lookup x sub)
+  fromMaybe (m, TermUpsilon x) (lookup (asInt x) sub)
 substTermPlus sub (m, TermPi mls xts t) = do
   let (xts', t') = substTermPlus'' sub xts t
   (m, TermPi mls xts' t')
@@ -157,7 +155,7 @@ substTermPlus sub (m, TermSigmaElim t xts e1 e2) = do
   (m, TermSigmaElim t' xts' e1' e2')
 substTermPlus sub (m, TermIter (mx, x, t) xts e) = do
   let t' = substTermPlus sub t
-  let sub' = filter (\(k, _) -> k /= x) sub
+  let sub' = filter (\(k, _) -> k /= asInt x) sub
   let (xts', e') = substTermPlus'' sub' xts e
   (m, TermIter (mx, x, t') xts' e')
 substTermPlus _ (m, TermConst x) = do
@@ -191,7 +189,7 @@ substTermPlus sub (m, TermStructIntro ets) = do
   (m, TermStructIntro $ zip es' ts)
 substTermPlus sub (m, TermStructElim xts v e) = do
   let v' = substTermPlus sub v
-  let xs = map (\(_, x, _) -> x) xts
+  let xs = map (\(_, x, _) -> asInt x) xts
   let sub' = filter (\(k, _) -> k `notElem` xs) sub
   let e' = substTermPlus sub' e
   (m, TermStructElim xts v' e')
@@ -207,7 +205,7 @@ substTermPlus sub (m, TermCase (e, t) cxtes) = do
 substTermPlus' :: SubstTerm -> [IdentifierPlus] -> [IdentifierPlus]
 substTermPlus' _ [] = []
 substTermPlus' sub ((m, x, t):xts) = do
-  let sub' = filter (\(k, _) -> k /= x) sub
+  let sub' = filter (\(k, _) -> k /= asInt x) sub
   let xts' = substTermPlus' sub' xts
   let t' = substTermPlus sub t
   (m, x, t') : xts'
@@ -216,7 +214,7 @@ substTermPlus'' ::
      SubstTerm -> [IdentifierPlus] -> TermPlus -> ([IdentifierPlus], TermPlus)
 substTermPlus'' sub [] e = ([], substTermPlus sub e)
 substTermPlus'' sub ((mx, x, t):xts) e = do
-  let sub' = filter (\(k, _) -> k /= x) sub
+  let sub' = filter (\(k, _) -> k /= asInt x) sub
   let (xts', e') = substTermPlus'' sub' xts e
   ((mx, x, substTermPlus sub t) : xts', e')
 
