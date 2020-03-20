@@ -38,9 +38,7 @@ import qualified Data.UnionFind as UF
 -- https://arxiv.org/abs/1505.04324, 2015.
 elaborate :: WeakStmt -> WithEnv TermPlus
 elaborate stmt = do
-  e <- elaborateStmt stmt
-  e' <- reduceTermPlus e
-  return e'
+  reduceTermPlus <$> elaborateStmt stmt
   -- _ <- error "well-typed"
   -- return e
 
@@ -49,7 +47,7 @@ elaborateStmt (WeakStmtReturn e) = do
   (e', _, _) <- infer e
   analyze >> synthesize >> refine
   checkUnivSanity
-  elaborate' e' >>= reduceTermPlus
+  reduceTermPlus <$> elaborate' e'
 elaborateStmt (WeakStmtLet m (mx, x@(I (_, i)), t) e cont) = do
   (e', te, mle) <- infer e
   (t', mlt) <- inferType t
@@ -57,8 +55,8 @@ elaborateStmt (WeakStmtLet m (mx, x@(I (_, i)), t) e cont) = do
   insLevelEQ mle mlt
   -- Kantian type-inference ;)
   analyze >> synthesize >> refine >> cleanup
-  e'' <- elaborate' e' >>= reduceTermPlus
-  t'' <- elaborate' t' >>= reduceTermPlus
+  e'' <- reduceTermPlus <$> elaborate' e'
+  t'' <- reduceTermPlus <$> elaborate' t'
   insTypeEnv x t'' mlt
   modify (\env -> env {substEnv = IntMap.insert i (weaken e'') (substEnv env)})
   -- liftIO $ TIO.putStrLn $ toText $ weaken t''
@@ -68,7 +66,7 @@ elaborateStmt (WeakStmtLetWT m (mx, x@(I (_, i)), t) e cont) = do
   (t', mlt) <- inferType t
   analyze >> synthesize >> refine >> cleanup
   e' <- elaborate' e -- `e` is supposed to be well-typed
-  t'' <- elaborate' t' >>= reduceTermPlus
+  t'' <- reduceTermPlus <$> elaborate' t'
   insTypeEnv x t'' mlt
   modify (\env -> env {substEnv = IntMap.insert i (weaken e') (substEnv env)})
   cont' <- elaborateStmt cont
@@ -80,7 +78,7 @@ elaborateStmt (WeakStmtLetSigma m xts e cont) = do
   insConstraintEnv t1 (fst e', WeakTermSigma xts')
   forM_ mlSigArgList $ \mlSigArg -> insLevelLE mlSigArg mlSigma
   analyze >> synthesize >> refine >> cleanup
-  e'' <- elaborate' e' >>= reduceTermPlus
+  e'' <- reduceTermPlus <$> elaborate' e'
   xts'' <- mapM elaboratePlus xts'
   forM_ (zip xts'' mlSigArgList) $ \((_, x, tx), l) -> insTypeEnv x tx l
   cont' <- elaborateStmt cont
@@ -124,7 +122,7 @@ elaborateStmt (WeakStmtLetInductiveIntro m (bi, ai) (mx, x@(I (_, i)), t) xts yt
   -- let lam =
   --       (m, TermPiIntro xtsyts' (m, TermPiIntroPlus bi ai False s atsbts' app'))
   -- the "elaboreta' e" part ends here
-  t'' <- elaborate' t' >>= reduceTermPlus
+  t'' <- reduceTermPlus <$> elaborate' t'
   insTypeEnv x t'' mlt
   modify (\env -> env {substEnv = IntMap.insert i (weaken lam) (substEnv env)})
   cont' <- elaborateStmt cont
@@ -132,7 +130,7 @@ elaborateStmt (WeakStmtLetInductiveIntro m (bi, ai) (mx, x@(I (_, i)), t) xts yt
 elaborateStmt (WeakStmtConstDecl m (mx, x, t) cont) = do
   (t', mlt) <- inferType t
   analyze >> synthesize >> refine >> cleanup
-  t'' <- elaborate' t' >>= reduceTermPlus
+  t'' <- reduceTermPlus <$> elaborate' t'
   -- i <- lookupConstNum' x
   insTypeEnv x t'' mlt
   -- insTypeEnv (I (x, i)) t'' mlt
@@ -348,7 +346,7 @@ elaborate' (m, WeakTermZeta _) =
     "every meta-variable must be of the form (?M e1 ... en) where n >= 0, but found the meta-variable here that doesn't fit this pattern"
 elaborate' (m, WeakTermConst x) = return (m, TermConst x)
 elaborate' (m, WeakTermInt t x) = do
-  t' <- elaborate' t >>= reduceTermPlus
+  t' <- reduceTermPlus <$> elaborate' t
   case t' of
     (_, TermEnum (EnumTypeIntS size))
       | (-1) * (2 ^ (size - 1)) <= x
@@ -380,7 +378,7 @@ elaborate' (m, WeakTermFloat32 x) = do
 elaborate' (m, WeakTermFloat64 x) = do
   return (m, TermFloat64 x)
 elaborate' (m, WeakTermFloat t x) = do
-  t' <- elaborate' t >>= reduceTermPlus
+  t' <- reduceTermPlus <$> elaborate' t
   case t' of
     (_, TermConst (I (floatType, _))) -> do
       let x16 = realToFrac x :: Half
@@ -406,7 +404,7 @@ elaborate' (m, WeakTermEnumElim (e, t) les) = do
   let (ls, es) = unzip les
   ls' <- mapM elaborateWeakCase ls
   es' <- mapM elaborate' es
-  t' <- elaborate' t >>= reduceTermPlus
+  t' <- reduceTermPlus <$> elaborate' t
   case t' of
     (_, TermEnum x) -> do
       caseCheckEnumIdentifier m x ls'
@@ -483,7 +481,7 @@ reduceWeakType t = do
 --   return (m, TermCocase (name, args') (zip cs es'))
 elaborateWeakCase :: WeakCase -> WithEnv Case
 elaborateWeakCase (WeakCaseInt t x) = do
-  t' <- elaborate' t >>= reduceTermPlus
+  t' <- reduceTermPlus <$> elaborate' t
   case t' of
     (_, TermEnum (EnumTypeIntS size)) ->
       return $ CaseValue (EnumValueIntS size x)

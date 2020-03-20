@@ -63,7 +63,7 @@ clarify (m, TermPiElim e es) = do
   callClosure m e' es'
 clarify (m, TermSigma _) = returnClosureType m -- Sigma is translated into Pi
 clarify (m, TermSigmaIntro t es) = do
-  t' <- reduceTermPlus t
+  let t' = reduceTermPlus t
   case t' of
     (mSig, TermSigma xts)
       | length xts == length es -> do
@@ -285,7 +285,7 @@ clarifyConst m name@(I (x, _)) = do
 clarifyUnaryOp :: Identifier -> UnaryOp -> Meta -> WithEnv CodePlus
 clarifyUnaryOp name op m = do
   t <- lookupTypeEnv' name
-  t' <- reduceTermPlus t
+  let t' = reduceTermPlus t
   case t' of
     (_, TermPi _ xts@[(mx, x, tx)] _) -> do
       let varX = toDataUpsilon (x, mx)
@@ -301,7 +301,7 @@ clarifyUnaryOp name op m = do
 clarifyBinaryOp :: Identifier -> BinaryOp -> Meta -> WithEnv CodePlus
 clarifyBinaryOp name op m = do
   t <- lookupTypeEnv' name
-  t' <- reduceTermPlus t
+  let t' = reduceTermPlus t
   case t' of
     (_, TermPi _ xts@[(mx, x, tx), (my, y, ty)] _) -> do
       let varX = toDataUpsilon (x, mx)
@@ -318,7 +318,7 @@ clarifyBinaryOp name op m = do
 clarifyArrayAccess :: Meta -> Identifier -> LowType -> WithEnv CodePlus
 clarifyArrayAccess m name lowType = do
   arrayAccessType <- lookupTypeEnv' name
-  arrayAccessType' <- reduceTermPlus arrayAccessType
+  let arrayAccessType' = reduceTermPlus arrayAccessType
   case arrayAccessType' of
     (_, TermPi _ xts cod)
       | length xts == 3 -> do
@@ -341,7 +341,7 @@ clarifySysCall ::
   -> WithEnv CodePlus
 clarifySysCall name syscall args m = do
   sysCallType <- lookupTypeEnv' name
-  sysCallType' <- reduceTermPlus sysCallType
+  let sysCallType' = reduceTermPlus sysCallType
   case sysCallType' of
     (_, TermPi _ xts cod)
       | length xts == length args -> do
