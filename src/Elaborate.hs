@@ -284,9 +284,10 @@ elaborate' (m, WeakTermPiIntroPlus ind (name, args) xts e) = do
 elaborate' (m, WeakTermPiElim (_, WeakTermZeta h@(I (_, x))) es) = do
   sub <- gets substEnv
   case IntMap.lookup x sub of
-    Nothing ->
+    Nothing -> do
+      p' h
       raiseError m $
-      "couldn't instantiate the hole since no constraints are given on it"
+        "couldn't instantiate the hole since no constraints are given on it"
     Just (_, WeakTermPiIntro xts e)
       | length xts == length es -> do
         let xs = map (\(_, y, _) -> y) xts

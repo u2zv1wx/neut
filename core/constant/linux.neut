@@ -53,8 +53,9 @@
 
 (constant exit
   (pi
-    ((status i64))
-    top))
+    ((A tau)
+     (status i64))
+    A))
 
 (constant open
   (pi

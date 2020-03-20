@@ -427,12 +427,12 @@ asSysCallMaybe OSLinux name =
     "bind" -> return (Right (name, 49), [ArgImm, ArgStruct, ArgImm])
     "listen" -> return (Right (name, 50), [ArgImm, ArgImm])
     "fork" -> return (Right (name, 57), [])
-    "exit" -> return (Right (name, 60), [ArgImm])
+    "exit" -> return (Right (name, 60), [ArgUnused, ArgImm])
     "wait4" -> return (Right (name, 61), [ArgImm, ArgArray, ArgImm, ArgStruct])
     _ -> Nothing
 asSysCallMaybe OSDarwin name =
   case name of
-    "exit" -> return (Left name, [ArgImm]) -- 0x2000001
+    "exit" -> return (Left name, [ArgUnused, ArgImm]) -- 0x2000001
     "fork" -> return (Left name, []) -- 0x2000002
     "read" -> return (Left name, [ArgUnused, ArgImm, ArgArray, ArgImm]) -- 0x2000003
     "write" -> return (Left name, [ArgUnused, ArgImm, ArgArray, ArgImm]) -- 0x2000004

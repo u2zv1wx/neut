@@ -4,18 +4,22 @@
   (list:nil () (list a))
   (list:cons ((x a) (xs (list a))) (list a)))
 
-;; ここでoptionをincludeするとなぜかエラーになる。修正すること。
-;; (include "option.neut")
+(include "option.neut")
 
-;; (definition list:head ([a tau] (xs (list a)))
-;;   (case xs
-;;     ((list:nil _) (option:none a))
-;;     ((list:cons _ y _) (option:some a y))))
+(definition list:head ([a tau] (xs (list a)))
+  (case xs
+    ((list:nil _) (option:none a))
+    ((list:cons _ y _) (option:some a y))))
 
 (definition list:length ([a tau] (xs (list a)))
   (case xs
     ((list:nil _) 0)
     ((list:cons _ _ ys) (u64.add 1 (list:length a ys)))))
+
+(definition list:map ([a tau] [b tau] (f (hom a b)) (xs (list a)))
+  (case xs
+    ((list:nil _) (list:nil b))
+    ((list:cons _ y ys) (list:cons b (f y) (list:map a b f ys)))))
 
 (include "bool.neut")
 
@@ -23,8 +27,3 @@
   (case xs
     ((list:nil _) true)
     ((list:cons _ _ _) false)))
-
-(definition list:map ([a tau] [b tau] (f (hom a b)) (xs (list a)))
-  (case xs
-    ((list:nil _) (list:nil b))
-    ((list:cons _ y ys) (list:cons b (f y) (list:map a b f ys)))))

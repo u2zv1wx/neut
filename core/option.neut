@@ -1,7 +1,5 @@
 (include "notation.neut")
 
-(include "constant/darwin.neut")
-
 (inductive option ((a tau))
   (option:none () (option a))
   (option:some ((x a)) (option a)))

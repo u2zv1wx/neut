@@ -1,7 +1,3 @@
-;; should be loaded after `notation`, `top`.
-
-(enum top unit)
-
 (constant file-descriptor tau)
 
 (constant stdin file-descriptor)
