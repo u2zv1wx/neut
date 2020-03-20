@@ -66,7 +66,7 @@ emitLLVM retType (LLVMCall f args) = do
     unwordsL
       [ showLLVMData (LLVMDataLocal tmp)
       , "="
-      , "tail call i8*" -- fastcc?
+      , "tail call fastcc i8*"
       , showLLVMData f <> showArgs args
       ]
   a <- emitRet retType (LLVMDataLocal tmp)
@@ -121,7 +121,7 @@ emitLLVM _ LLVMUnreachable = emitOp $ unwordsL ["unreachable"]
 
 emitLLVMOp :: LLVMOp -> WithEnv Builder
 emitLLVMOp (LLVMOpCall d ds) = do
-  return $ unwordsL ["call i8*", showLLVMData d <> showArgs ds]
+  return $ unwordsL ["call fastcc i8*", showLLVMData d <> showArgs ds]
 emitLLVMOp (LLVMOpGetElementPtr (base, n) is) = do
   return $
     unwordsL
@@ -155,9 +155,11 @@ emitLLVMOp (LLVMOpStore t d1 d2) = do
       , showLLVMData d2
       ]
 emitLLVMOp (LLVMOpAlloc d) = do
-  return $ unwordsL ["call", "i8*", "@malloc(i64 " <> showLLVMData d <> ")"]
+  return $
+    unwordsL ["call fastcc", "i8*", "@malloc(i64 " <> showLLVMData d <> ")"]
 emitLLVMOp (LLVMOpFree d) = do
-  return $ unwordsL ["call", "void", "@free(i8* " <> showLLVMData d <> ")"]
+  return $
+    unwordsL ["call fastcc", "void", "@free(i8* " <> showLLVMData d <> ")"]
 emitLLVMOp (LLVMOpSysCall num ds) = do
   emitSysCallOp num ds
 emitLLVMOp (LLVMOpUnaryOp (UnaryOpNeg t@(LowTypeFloat _)) d) = do
@@ -305,7 +307,8 @@ emitSysCallOp num ds = do
       let args = (LLVMDataInt num, LowTypeIntS 64) : zip ds (repeat voidPtr)
       let argStr = "(" <> showIndex args <> ")"
       let regStr = "\"=r" <> showRegList (take (length args) regList) <> "\""
-      return $ unwordsL ["call i8* asm sideeffect \"syscall\",", regStr, argStr]
+      return $
+        unwordsL ["call fastcc i8* asm sideeffect \"syscall\",", regStr, argStr]
 
 emitOp :: Builder -> WithEnv [Builder]
 emitOp s = return ["  " <> s]
