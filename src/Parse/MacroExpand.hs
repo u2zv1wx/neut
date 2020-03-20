@@ -33,7 +33,7 @@ macroExpand' t = recurM (macroExpand1 . splice) t
 --   noKeyword <- hasNoMatch t
 --   return $ noSplice && noKeyword
 -- hasNoRemSplice :: TreePlus -> Bool
--- hasNoRemSplice (_, TreeAtom _) = True
+-- hasNoRemSplice (_, TreeLeaf _) = True
 -- hasNoRemSplice (_, TreeNode ts) = do
 --   let b1 = all hasNoRemSplice ts
 --   let b2 = all (isLeft . findSplice) ts
@@ -49,7 +49,7 @@ macroExpand' t = recurM (macroExpand1 . splice) t
 --     Just _ -> return False
 --     Nothing -> return True
 recurM :: (Monad m) => (TreePlus -> m TreePlus) -> TreePlus -> m TreePlus
-recurM f (m, TreeAtom s) = f (m, TreeAtom s)
+recurM f (m, TreeLeaf s) = f (m, TreeLeaf s)
 recurM f (m, TreeNode ts) = do
   ts' <- mapM (recurM f) ts
   f (m, TreeNode ts')
@@ -78,24 +78,24 @@ macroMatch ::
      TreePlus -- input tree
   -> Notation -- registered notation
   -> WithEnv (Maybe MacroSubst) -- {symbols in a pattern} -> {trees}
-macroMatch t1@(_, TreeAtom s1) (_, TreeAtom s2) = do
+macroMatch t1@(_, TreeLeaf s1) (_, TreeLeaf s2) = do
   kenv <- gets keywordEnv
   case s2 `elem` kenv of
     True
       | s1 == s2 -> return $ Just []
       | otherwise -> return Nothing
     False -> return $ Just [(s2, t1)]
-macroMatch t1@(_, TreeNode _) (_, TreeAtom s2) = do
+macroMatch t1@(_, TreeNode _) (_, TreeLeaf s2) = do
   kenv <- gets keywordEnv
   case s2 `elem` kenv of
     True -> return Nothing
     False -> return $ Just [(s2, t1)]
-macroMatch (_, TreeAtom _) (_, TreeNode _) = return Nothing
+macroMatch (_, TreeLeaf _) (_, TreeNode _) = return Nothing
 macroMatch (_, TreeNode []) (_, TreeNode []) = return $ Just []
 macroMatch (_, TreeNode _) (_, TreeNode []) = return Nothing
 macroMatch (_, TreeNode []) (_, TreeNode _) = return Nothing
 macroMatch (m1, TreeNode ts1) (_, TreeNode ts2)
-  | (_, TreeAtom s2) <- last ts2
+  | (_, TreeLeaf s2) <- last ts2
   , T.last s2 == '+' -- this ensures that s2 is not a keyword
   , length ts1 >= length ts2 = do
     let (xs, rest) = splitAt (length ts2 - 1) ts1
@@ -109,13 +109,13 @@ macroMatch (m1, TreeNode ts1) (_, TreeNode ts2)
 macroMatch _ _ = return Nothing
 
 applySubst :: MacroSubst -> Notation -> TreePlus
-applySubst sub (i, TreeAtom s) = fromMaybe (i, TreeAtom s) (lookup s sub)
+applySubst sub (i, TreeLeaf s) = fromMaybe (i, TreeLeaf s) (lookup s sub)
 applySubst sub (i, TreeNode ts) = (i, TreeNode $ map (applySubst sub) ts)
 applySubst sub (i, TreeNodeSquare ts) =
   (i, TreeNodeSquare $ map (applySubst sub) ts)
 
 toSpliceTree :: Meta -> [TreePlus] -> TreePlus
-toSpliceTree m ts = (m, TreeNode [(m, TreeAtom "splice"), (m, TreeNode ts)])
+toSpliceTree m ts = (m, TreeNode [(m, TreeLeaf "splice"), (m, TreeNode ts)])
 
 checkNotationSanity :: Notation -> WithEnv ()
 checkNotationSanity t = do
@@ -130,7 +130,7 @@ checkKeywordCondition t = do
     else raiseError (fst t) "A notation must include at least one keyword"
 
 checkPlusCondition :: Notation -> WithEnv ()
-checkPlusCondition (m, TreeAtom s) =
+checkPlusCondition (m, TreeLeaf s) =
   if T.last s /= '+'
     then return ()
     else raiseError
@@ -140,12 +140,12 @@ checkPlusCondition (_, TreeNode []) = return ()
 checkPlusCondition (_, TreeNode ts) = do
   mapM_ checkPlusCondition $ init ts
   case last ts of
-    (_, TreeAtom _) -> return ()
+    (_, TreeLeaf _) -> return ()
     ts' -> checkPlusCondition ts'
 checkPlusCondition (_, TreeNodeSquare ts) = do
   mapM_ checkPlusCondition $ init ts
   case last ts of
-    (_, TreeAtom _) -> return ()
+    (_, TreeLeaf _) -> return ()
     ts' -> checkPlusCondition ts'
 
 splice :: TreePlus -> TreePlus
@@ -156,7 +156,7 @@ splice t = splice' t
 
 -- (a b (splice (c (splice (p q)) e)) f) ~> (a b c p q d e)
 splice' :: TreePlus -> TreePlus
-splice' t@(_, TreeAtom _) = t
+splice' t@(_, TreeLeaf _) = t
 splice' (m, TreeNode ts) = do
   let ts' = map splice' ts
   (m, TreeNode $ expandSplice $ map findSplice ts')
@@ -165,7 +165,7 @@ splice' (m, TreeNodeSquare ts) = do
   (m, TreeNodeSquare $ expandSplice $ map findSplice ts')
 
 findSplice :: TreePlus -> Either TreePlus [TreePlus]
-findSplice (_, TreeNode [(_, TreeAtom "splice"), (_, TreeNode ts)]) = do
+findSplice (_, TreeNode [(_, TreeLeaf "splice"), (_, TreeNode ts)]) = do
   Right ts
 findSplice t = Left t
 

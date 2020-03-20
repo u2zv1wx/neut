@@ -102,20 +102,20 @@ modifyFileForCompletion (I (s, _)) content l c = do
 
 parse' :: [TreePlus] -> WithEnv [QuasiStmt]
 parse' [] = return []
-parse' ((_, TreeNode [(_, TreeAtom "notation"), from, to]):as) = do
+parse' ((_, TreeNode [(_, TreeLeaf "notation"), from, to]):as) = do
   checkNotationSanity from
   modify (\e -> e {notationEnv = (from, to) : notationEnv e})
   parse' as
-parse' ((m, TreeNode [(_, TreeAtom "keyword"), (_, TreeAtom s)]):as) = do
+parse' ((m, TreeNode [(_, TreeLeaf "keyword"), (_, TreeLeaf s)]):as) = do
   checkKeywordSanity m s
   modify (\e -> e {keywordEnv = S.insert s (keywordEnv e)})
   parse' as
-parse' ((m, TreeNode ((_, TreeAtom "enum"):(_, TreeAtom name):ts)):as) = do
+parse' ((m, TreeNode ((_, TreeLeaf "enum"):(_, TreeLeaf name):ts)):as) = do
   xis <- interpretEnumItem m ts
   m' <- adjustPhase m
   insEnumEnv m' name xis
   parse' as
-parse' ((m, TreeNode [(_, TreeAtom "include"), (_, TreeAtom pathString)]):as) =
+parse' ((m, TreeNode [(_, TreeLeaf "include"), (_, TreeLeaf pathString)]):as) =
   case readMaybe (T.unpack pathString) :: Maybe String of
     Nothing -> raiseError m "the argument of `include` must be a string"
     Just path -> do
@@ -146,11 +146,11 @@ parse' ((m, TreeNode [(_, TreeAtom "include"), (_, TreeAtom pathString)]):as) =
               let footer = map (toQuasiStmtLetFooter newFilePath) mxs
               let header = map (toQuasiStmtLetHeader newFilePath) mxs
               return $ includedQuasiStmtList ++ footer ++ header ++ defList
-parse' ((_, TreeNode ((_, TreeAtom "statement"):as1)):as2) = do
+parse' ((_, TreeNode ((_, TreeLeaf "statement"):as1)):as2) = do
   defList1 <- parse' as1
   defList2 <- parse' as2
   return $ defList1 ++ defList2
-parse' ((m, TreeNode [(_, TreeAtom "constant"), (mn, TreeAtom name), t]):as) = do
+parse' ((m, TreeNode [(_, TreeLeaf "constant"), (mn, TreeLeaf name), t]):as) = do
   t' <- macroExpand t >>= interpret
   cenv <- gets constantEnv
   case Map.lookup name cenv of
@@ -162,34 +162,34 @@ parse' ((m, TreeNode [(_, TreeAtom "constant"), (mn, TreeAtom name), t]):as) = d
       m' <- adjustPhase m
       mn' <- adjustPhase mn
       return $ QuasiStmtConstDecl m' (mn', I (name, i), t') : defList
-parse' ((_, TreeNode ((_, TreeAtom "attribute"):(_, TreeAtom name):attrList)):as) = do
+parse' ((_, TreeNode ((_, TreeLeaf "attribute"):(_, TreeLeaf name):attrList)):as) = do
   ss1 <- mapM (parseAttr name) attrList
   ss2 <- parse' as
   return $ ss1 ++ ss2
-parse' ((m, TreeNode [(mDef, TreeAtom "definition"), name@(_, TreeAtom _), body]):as) =
-  parse' $ (m, TreeNode [(mDef, TreeAtom "let"), name, body]) : as
-parse' ((m, TreeNode (def@(_, TreeAtom "definition"):name@(mFun, TreeAtom _):xts@(_, TreeNode _):body:rest)):as) =
+parse' ((m, TreeNode [(mDef, TreeLeaf "definition"), name@(_, TreeLeaf _), body]):as) =
+  parse' $ (m, TreeNode [(mDef, TreeLeaf "let"), name, body]) : as
+parse' ((m, TreeNode (def@(_, TreeLeaf "definition"):name@(mFun, TreeLeaf _):xts@(_, TreeNode _):body:rest)):as) =
   parse' $ (m, TreeNode [def, (mFun, TreeNode (name : xts : body : rest))]) : as
-parse' ((_, TreeNode ((_, TreeAtom "definition"):xds)):as) = do
+parse' ((_, TreeNode ((_, TreeLeaf "definition"):xds)):as) = do
   ss1 <- parseDef xds
   ss2 <- parse' as
   return $ ss1 ++ ss2
-parse' ((m, TreeNode (ind@(_, TreeAtom "inductive"):name@(mFun, TreeAtom _):xts@(_, TreeNode _):rest)):as) = do
+parse' ((m, TreeNode (ind@(_, TreeLeaf "inductive"):name@(mFun, TreeLeaf _):xts@(_, TreeNode _):rest)):as) = do
   parse' $ (m, TreeNode [ind, (mFun, TreeNode (name : xts : rest))]) : as
-parse' ((m, TreeNode ((_, TreeAtom "inductive"):ts)):as) = do
+parse' ((m, TreeNode ((_, TreeLeaf "inductive"):ts)):as) = do
   stmtList1 <- parseInductive m ts
   stmtList2 <- parse' as
   return $ stmtList1 ++ stmtList2
-parse' ((m, TreeNode (coind@(_, TreeAtom "coinductive"):name@(mFun, TreeAtom _):xts@(_, TreeNode _):rest)):as) =
+parse' ((m, TreeNode (coind@(_, TreeLeaf "coinductive"):name@(mFun, TreeLeaf _):xts@(_, TreeNode _):rest)):as) =
   parse' $ (m, TreeNode [coind, (mFun, TreeNode (name : xts : rest))]) : as
-parse' ((m, TreeNode ((_, TreeAtom "coinductive"):ts)):as) = do
+parse' ((m, TreeNode ((_, TreeLeaf "coinductive"):ts)):as) = do
   stmtList1 <- parseCoinductive m ts
   stmtList2 <- parse' as
   return $ stmtList1 ++ stmtList2
-parse' ((m, TreeNode [(mLet, TreeAtom "let"), (mx, TreeAtom x), t, e]):as) = do
-  let xt = (mx, TreeNode [(mx, TreeAtom x), t])
-  parse' ((m, TreeNode [(mLet, TreeAtom "let"), xt, e]) : as)
-parse' ((m, TreeNode [(_, TreeAtom "let"), xt, e]):as) = do
+parse' ((m, TreeNode [(mLet, TreeLeaf "let"), (mx, TreeLeaf x), t, e]):as) = do
+  let xt = (mx, TreeNode [(mx, TreeLeaf x), t])
+  parse' ((m, TreeNode [(mLet, TreeLeaf "let"), xt, e]) : as)
+parse' ((m, TreeNode [(_, TreeLeaf "let"), xt, e]):as) = do
   m' <- adjustPhase m
   e' <- macroExpand e >>= interpret
   (mx, x, t) <- macroExpand xt >>= interpretIdentifierPlus
@@ -234,7 +234,7 @@ parseBorrow (m, WeakTermUpsilon (I (s, _)))
 parseBorrow t = (Nothing, t)
 
 parseAttr :: T.Text -> TreePlus -> WithEnv QuasiStmt
-parseAttr name (m, TreeNode [(_, TreeAtom "implicit"), (_, TreeAtom num)]) = do
+parseAttr name (m, TreeNode [(_, TreeLeaf "implicit"), (_, TreeLeaf num)]) = do
   case readMaybe $ T.unpack num of
     Nothing -> undefined
     Just i -> return $ QuasiStmtImplicit m (asIdent name) i
@@ -263,29 +263,29 @@ takeSquare' (t, _) = (t, Nothing)
 insImplicitBegin :: TreePlus -> WithEnv TreePlus
 insImplicitBegin (m, TreeNode (xt:xts:body:rest)) = do
   let m' = fst body
-  let beginBlock = (m', TreeNode ((m', TreeAtom "begin") : body : rest))
+  let beginBlock = (m', TreeNode ((m', TreeLeaf "begin") : body : rest))
   return (m, TreeNode [xt, xts, beginBlock])
 insImplicitBegin t = raiseSyntaxError t "(TREE TREE TREE ...)"
 
 extractFunName :: TreePlus -> WithEnv Identifier
-extractFunName (_, TreeNode ((_, TreeAtom x):_)) = return $ asIdent x
-extractFunName (_, TreeNode ((_, TreeNode [(_, TreeAtom x), _]):_)) =
+extractFunName (_, TreeNode ((_, TreeLeaf x):_)) = return $ asIdent x
+extractFunName (_, TreeNode ((_, TreeNode [(_, TreeLeaf x), _]):_)) =
   return $ asIdent x
 extractFunName t = raiseSyntaxError t "(LEAF ...) | ((LEAF TREE) ...)"
 
 isSpecialForm :: TreePlus -> Bool
-isSpecialForm (_, TreeNode [(_, TreeAtom "notation"), _, _]) = True
-isSpecialForm (_, TreeNode [(_, TreeAtom "keyword"), (_, TreeAtom _)]) = True
-isSpecialForm (_, TreeNode ((_, TreeAtom "enum"):(_, TreeAtom _):_)) = True
-isSpecialForm (_, TreeNode [(_, TreeAtom "include"), (_, TreeAtom _)]) = True
-isSpecialForm (_, TreeNode ((_, TreeAtom "attribute"):_)) = True
-isSpecialForm (_, TreeNode [(_, TreeAtom "constant"), (_, TreeAtom _), _]) =
+isSpecialForm (_, TreeNode [(_, TreeLeaf "notation"), _, _]) = True
+isSpecialForm (_, TreeNode [(_, TreeLeaf "keyword"), (_, TreeLeaf _)]) = True
+isSpecialForm (_, TreeNode ((_, TreeLeaf "enum"):(_, TreeLeaf _):_)) = True
+isSpecialForm (_, TreeNode [(_, TreeLeaf "include"), (_, TreeLeaf _)]) = True
+isSpecialForm (_, TreeNode ((_, TreeLeaf "attribute"):_)) = True
+isSpecialForm (_, TreeNode [(_, TreeLeaf "constant"), (_, TreeLeaf _), _]) =
   True
-isSpecialForm (_, TreeNode ((_, TreeAtom "statement"):_)) = True
-isSpecialForm (_, TreeNode [(_, TreeAtom "let"), _, _]) = True
-isSpecialForm (_, TreeNode ((_, TreeAtom "definition"):_)) = True
-isSpecialForm (_, TreeNode ((_, TreeAtom "inductive"):_)) = True
-isSpecialForm (_, TreeNode ((_, TreeAtom "coinductive"):_)) = True
+isSpecialForm (_, TreeNode ((_, TreeLeaf "statement"):_)) = True
+isSpecialForm (_, TreeNode [(_, TreeLeaf "let"), _, _]) = True
+isSpecialForm (_, TreeNode ((_, TreeLeaf "definition"):_)) = True
+isSpecialForm (_, TreeNode ((_, TreeLeaf "inductive"):_)) = True
+isSpecialForm (_, TreeNode ((_, TreeLeaf "coinductive"):_)) = True
 isSpecialForm _ = False
 
 concatQuasiStmtList :: [QuasiStmt] -> WithEnv WeakStmt

@@ -58,10 +58,16 @@ leaf = do
       k <- string
       skip
       return (m, TreeLeaf k)
-    _ -> do
-      x <- symbol
-      skip
-      return (m, TreeLeaf x)
+    Just (c, _)
+      | isSymbolChar c -> do
+        x <- symbol
+        skip
+        return (m, TreeLeaf x)
+      | otherwise ->
+        raiseTokenizeError $
+        "unexpected character: '" <>
+        T.singleton c <> "'\nexpecting: SYMBOL-CHAR"
+    Nothing -> raiseTokenizeError $ "unexpected end of input\nexpecting: LEAF"
 
 node :: Tokenizer TreePlus
 node = do
@@ -139,12 +145,9 @@ symbol :: Tokenizer T.Text
 symbol = do
   s <- gets text
   let x = T.takeWhile isSymbolChar s
-  if T.null x
-    then raiseTokenizeError "Parse.Lex.symbol is called for the empty input"
-    else do
-      let rest = T.dropWhile isSymbolChar s
-      updateStreamC (T.length x) rest
-      return x
+  let rest = T.dropWhile isSymbolChar s
+  updateStreamC (T.length x) rest
+  return x
 
 string :: Tokenizer T.Text
 string = do

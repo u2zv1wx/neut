@@ -34,130 +34,130 @@ interpret :: TreePlus -> WithEnv WeakTermPlus
 --
 -- foundational interpretations
 --
-interpret (m, TreeAtom "tau") = do
+interpret (m, TreeLeaf "tau") = do
   m' <- adjustPhase m
   l <- newCount
   return (m', WeakTermTau l)
-interpret (m, TreeNode [(_, TreeAtom "upsilon"), (_, TreeAtom x)]) = do
+interpret (m, TreeNode [(_, TreeLeaf "upsilon"), (_, TreeLeaf x)]) = do
   m' <- adjustPhase m
   return (m', WeakTermUpsilon $ asIdent x)
-interpret (m, TreeNode [(_, TreeAtom "pi"), (_, TreeNode xts), t]) = do
+interpret (m, TreeNode [(_, TreeLeaf "pi"), (_, TreeNode xts), t]) = do
   (xts', t') <- interpretBinder xts t
   mls <- piUnivLevelsfrom xts' t'
   m' <- adjustPhase m
   return (m', WeakTermPi mls xts' t')
-interpret (m, TreeNode [(_, TreeAtom "pi-introduction"), (_, TreeNode xts), e]) = do
+interpret (m, TreeNode [(_, TreeLeaf "pi-introduction"), (_, TreeNode xts), e]) = do
   (xts', e') <- interpretBinder xts e
   m' <- adjustPhase m
   return (m', WeakTermPiIntro xts' e')
-interpret (m, TreeNode ((_, TreeAtom "pi-elimination"):e:es)) = do
+interpret (m, TreeNode ((_, TreeLeaf "pi-elimination"):e:es)) = do
   m' <- adjustPhase m
-  interpretPiElim m' e es -- interpret (m', TreeNode ((m', TreeAtom "pi-elimination") : es)
+  interpretPiElim m' e es -- interpret (m', TreeNode ((m', TreeLeaf "pi-elimination") : es)
   -- e' <- interpret e
   -- es' <- mapM interpret es
   -- m' <- adjustPhase m
   -- return (m', WeakTermPiElim e' es')
-interpret (m, TreeNode [(_, TreeAtom "sigma"), (_, TreeNode xts), t]) = do
+interpret (m, TreeNode [(_, TreeLeaf "sigma"), (_, TreeNode xts), t]) = do
   xts' <- mapM interpretIdentifierPlus xts
   t' <- interpret t
   placeholder <- newNameWith' "cod"
   m' <- adjustPhase m
   return (m', WeakTermSigma $ xts' ++ [(fst t', placeholder, t')])
-interpret (m, TreeNode ((_, TreeAtom "sigma-introduction"):es)) = do
+interpret (m, TreeNode ((_, TreeLeaf "sigma-introduction"):es)) = do
   m' <- adjustPhase m
   h <- newHole m'
   es' <- mapM interpret es
   return (m', WeakTermSigmaIntro h es')
-interpret (m, TreeNode [(_, TreeAtom "sigma-elimination"), (_, TreeNode xts), e1, e2]) = do
+interpret (m, TreeNode [(_, TreeLeaf "sigma-elimination"), (_, TreeNode xts), e1, e2]) = do
   xts' <- mapM interpretIdentifierPlus xts
   e1' <- interpret e1
   e2' <- interpret e2
   m' <- adjustPhase m
   h <- newHole m'
   return (m', WeakTermSigmaElim h xts' e1' e2')
-interpret (m, TreeNode [(_, TreeAtom "iterate"), xt, xts@(_, TreeNode _), e]) = do
+interpret (m, TreeNode [(_, TreeLeaf "iterate"), xt, xts@(_, TreeNode _), e]) = do
   (m', xt', xts', e') <- interpretIter (m, TreeNode [xt, xts, e])
   return (m', WeakTermIter xt' xts' e')
-interpret (m, TreeNode [(_, TreeAtom "zeta"), x]) = do
-  (_, x') <- interpretAtom x
+interpret (m, TreeNode [(_, TreeLeaf "zeta"), x]) = do
+  (_, x') <- interpretLeaf x
   m' <- adjustPhase m
   let m'' = m' {metaIsAppropriateAsCompletionCandidate = False}
   return (m'', WeakTermZeta x')
-interpret (m, TreeNode [(_, TreeAtom "constant"), (_, TreeAtom x)]) = do
+interpret (m, TreeNode [(_, TreeLeaf "constant"), (_, TreeLeaf x)]) = do
   m' <- adjustPhase m
   return (m', WeakTermConst $ asIdent x)
-interpret (m, TreeNode [(_, TreeAtom "f16"), (_, TreeAtom x)])
+interpret (m, TreeNode [(_, TreeLeaf "f16"), (_, TreeLeaf x)])
   | Just x' <- readMaybe $ T.unpack x = do
     m' <- adjustPhase m
     return (m', WeakTermFloat16 x')
-interpret (m, TreeNode [(_, TreeAtom "f32"), (_, TreeAtom x)])
+interpret (m, TreeNode [(_, TreeLeaf "f32"), (_, TreeLeaf x)])
   | Just x' <- readMaybe $ T.unpack x = do
     m' <- adjustPhase m
     return (m', WeakTermFloat32 x')
-interpret (m, TreeNode [(_, TreeAtom "f64"), (_, TreeAtom x)])
+interpret (m, TreeNode [(_, TreeLeaf "f64"), (_, TreeLeaf x)])
   | Just x' <- readMaybe $ T.unpack x = do
     m' <- adjustPhase m
     return (m', WeakTermFloat64 x')
-interpret (m, TreeNode [(_, TreeAtom "enum"), (_, TreeAtom x)])
+interpret (m, TreeNode [(_, TreeLeaf "enum"), (_, TreeLeaf x)])
   | Just i <- readEnumTypeIntS x = do
     m' <- adjustPhase m
     return (m', WeakTermEnum $ EnumTypeIntS i)
   | Just i <- readEnumTypeIntU x = do
     m' <- adjustPhase m
     return (m', WeakTermEnum $ EnumTypeIntU i)
-interpret (m, TreeNode [(_, TreeAtom "enum"), (_, TreeAtom x)]) = do
+interpret (m, TreeNode [(_, TreeLeaf "enum"), (_, TreeLeaf x)]) = do
   isEnum <- isDefinedEnumType x
   m' <- adjustPhase m
   if not isEnum
     then raiseError m $ "no such enum-type is defined: " <> x
     else return (m', WeakTermEnum $ EnumTypeLabel x)
-interpret (m, TreeNode [(_, TreeAtom "enum-introduction"), l]) = do
+interpret (m, TreeNode [(_, TreeLeaf "enum-introduction"), l]) = do
   l' <- interpretEnumValue l
   m' <- adjustPhase m
   return (m', WeakTermEnumIntro l')
-interpret (m, TreeNode ((_, TreeAtom "enum-elimination"):e:cs)) = do
+interpret (m, TreeNode ((_, TreeLeaf "enum-elimination"):e:cs)) = do
   e' <- interpret e
   cs' <- mapM interpretClause cs
   m' <- adjustPhase m
   h <- newHole m'
   return (m', WeakTermEnumElim (e', h) cs')
-interpret (m, TreeNode [(_, TreeAtom "array"), dom, kind]) = do
+interpret (m, TreeNode [(_, TreeLeaf "array"), dom, kind]) = do
   dom' <- interpret dom
   kind' <- asArrayKind kind
   m' <- adjustPhase m
   return (m', WeakTermArray dom' kind')
-interpret (m, TreeNode ((_, TreeAtom "array-introduction"):kind:es)) = do
+interpret (m, TreeNode ((_, TreeLeaf "array-introduction"):kind:es)) = do
   kind' <- asArrayKind kind
   es' <- mapM interpret es
   m' <- adjustPhase m
   return (m', WeakTermArrayIntro kind' es')
-interpret (m, TreeNode [(_, TreeAtom "array-elimination"), kind, (_, TreeNode xts), e1, e2]) = do
+interpret (m, TreeNode [(_, TreeLeaf "array-elimination"), kind, (_, TreeNode xts), e1, e2]) = do
   kind' <- asArrayKind kind
   e1' <- interpret e1
   (xts', e2') <- interpretBinder xts e2
   m' <- adjustPhase m
   return (m', WeakTermArrayElim kind' xts' e1' e2')
-interpret (m, TreeNode ((_, TreeAtom "struct"):ks)) = do
+interpret (m, TreeNode ((_, TreeLeaf "struct"):ks)) = do
   ks' <- mapM asArrayKind ks
   m' <- adjustPhase m
   return (m', WeakTermStruct ks')
-interpret (m, TreeNode ((_, TreeAtom "struct-introduction"):ets)) = do
+interpret (m, TreeNode ((_, TreeLeaf "struct-introduction"):ets)) = do
   ets' <- mapM interpretStructIntro ets
   m' <- adjustPhase m
   return (m', WeakTermStructIntro ets')
-interpret (m, TreeNode [(_, TreeAtom "struct-elimination"), (_, TreeNode xts), e1, e2]) = do
+interpret (m, TreeNode [(_, TreeLeaf "struct-elimination"), (_, TreeNode xts), e1, e2]) = do
   e1' <- interpret e1
   xts' <- mapM interpretStructElim xts
   e2' <- interpret e2
   m' <- adjustPhase m
   return (m', WeakTermStructElim xts' e1' e2')
-interpret (m, TreeNode ((_, TreeAtom "case"):e:cxtes)) = do
+interpret (m, TreeNode ((_, TreeLeaf "case"):e:cxtes)) = do
   e' <- interpret e
   cxtes' <- mapM interpretCaseClause cxtes
   m' <- adjustPhase m
   h <- newHole m'
   return (m', WeakTermCase (e', h) cxtes')
-interpret (m, TreeNode ((_, TreeAtom "cocase"):codType:cocaseClauseList)) = do
+interpret (m, TreeNode ((_, TreeLeaf "cocase"):codType:cocaseClauseList)) = do
   (a, args) <- interpretCoinductive codType
   m' <- adjustPhase m
   cocaseClauseList' <- mapM interpretCocaseClause cocaseClauseList
@@ -167,43 +167,43 @@ interpret (m, TreeNode ((_, TreeAtom "cocase"):codType:cocaseClauseList)) = do
 --
 -- auxiliary interpretations
 --
-interpret (m, TreeNode ((_, TreeAtom "product"):ts)) = do
+interpret (m, TreeNode ((_, TreeLeaf "product"):ts)) = do
   ts' <- mapM interpret ts
   let ms = map fst ts'
   xs <- mapM (const $ newNameWith' "sig") ts'
   m' <- adjustPhase m
   return (m', WeakTermSigma (zip3 ms xs ts'))
-interpret (m, TreeNode ((_, TreeAtom "record"):codType:clauseList)) = do
+interpret (m, TreeNode ((_, TreeLeaf "record"):codType:clauseList)) = do
   (a, args) <- interpretCoinductive codType
   m' <- adjustPhase m
   clauseList' <- mapM interpretCocaseClause' clauseList
   let codType' = (m, WeakTermPiElim (m, WeakTermUpsilon a) args)
   es <- cocaseAsSigmaIntro m a codType' [((a, args), clauseList')]
   return (m', WeakTermSigmaIntro codType' es)
-interpret (m, TreeAtom x)
+interpret (m, TreeLeaf x)
   | Just x' <- readMaybe $ T.unpack x = do
     m' <- adjustPhase m
     h <- newHole m'
     return (m', WeakTermInt h x')
-interpret (m, TreeAtom x)
+interpret (m, TreeLeaf x)
   | Just x' <- readMaybe $ T.unpack x = do
     m' <- adjustPhase m
     h <- newHole m'
     return (m', WeakTermFloat h x')
-interpret (m, TreeAtom x)
+interpret (m, TreeLeaf x)
   | Just i <- readEnumTypeIntS x = do
     m' <- adjustPhase m
     return (m', WeakTermEnum $ EnumTypeIntS i)
   | Just i <- readEnumTypeIntU x = do
     m' <- adjustPhase m
     return (m', WeakTermEnum $ EnumTypeIntU i)
-interpret (m, TreeAtom x)
+interpret (m, TreeLeaf x)
   | Just str <- readMaybe $ T.unpack x = do
     m' <- adjustPhase m
     u8s <- forM (encode str) $ \u -> return (m', toValueIntU 8 (toInteger u))
     -- parse string as utf-8 encoded u8 array
     return (m', WeakTermArrayIntro (ArrayKindIntU 8) u8s)
-interpret (m, TreeAtom x) = do
+interpret (m, TreeLeaf x) = do
   m' <- adjustPhase m
   -- Note that enums/constants are interpreted as variables at this stage.
   -- Those are reinterpreted into constants in Rename.
@@ -218,7 +218,7 @@ interpret t@(m, TreeNode es) = do
     _ -> do
       case es of
         [] -> raiseSyntaxError t "(TREE ...)"
-        _ -> interpret (m', TreeNode ((m', TreeAtom "pi-elimination") : es))
+        _ -> interpret (m', TreeNode ((m', TreeLeaf "pi-elimination") : es))
 interpret (m, TreeNodeSquare _) =
   raiseError m "found square-node at inappropriate position"
 
@@ -252,9 +252,9 @@ interpretBorrow e = do
   return (e', id)
 
 interpretBorrow' :: TreePlus -> (Maybe (Meta, Identifier), TreePlus)
-interpretBorrow' (m, TreeAtom s)
+interpretBorrow' (m, TreeLeaf s)
   | T.length s > 1
-  , T.head s == '&' = (Just (m, asIdent $ T.tail s), (m, TreeAtom $ T.tail s))
+  , T.head s == '&' = (Just (m, asIdent $ T.tail s), (m, TreeLeaf $ T.tail s))
 interpretBorrow' t = (Nothing, t)
 
 toIdentPlus :: (Meta, Identifier) -> WithEnv IdentifierPlus
@@ -263,12 +263,12 @@ toIdentPlus (m, x) = do
   return (m, x, h)
 
 interpretIdentifierPlus :: TreePlus -> WithEnv IdentifierPlus
-interpretIdentifierPlus (m, TreeAtom x) = do
-  (m', x') <- interpretAtom (m, TreeAtom x)
+interpretIdentifierPlus (m, TreeLeaf x) = do
+  (m', x') <- interpretLeaf (m, TreeLeaf x)
   h <- newHole m'
   return (m', x', h)
 interpretIdentifierPlus (_, TreeNode [x, t]) = do
-  (m', x') <- interpretAtom x
+  (m', x') <- interpretLeaf x
   t' <- interpret t
   return (m', x', t')
 interpretIdentifierPlus t = raiseSyntaxError t "(LEAF TREE)"
@@ -281,28 +281,28 @@ interpretIter (m, TreeNode [xt, (_, TreeNode xts), e]) = do
   return (m', xt', xts', e')
 interpretIter t = raiseSyntaxError t "(TREE (TREE ... TREE) TREE)"
 
-interpretAtom :: TreePlus -> WithEnv (Meta, Identifier)
-interpretAtom (m, TreeAtom "_") = do
+interpretLeaf :: TreePlus -> WithEnv (Meta, Identifier)
+interpretLeaf (m, TreeLeaf "_") = do
   m' <- adjustPhase m
   let m'' = m' {metaIsAppropriateAsCompletionCandidate = False}
   h <- newNameWith'' "H"
   return (m'', h)
-interpretAtom (m, TreeAtom x) = do
+interpretLeaf (m, TreeLeaf x) = do
   m' <- adjustPhase m
   return (m', asIdent x)
-interpretAtom t = raiseSyntaxError t "LEAF"
+interpretLeaf t = raiseSyntaxError t "LEAF"
 
 interpretEnumValueMaybe :: TreePlus -> WithEnv (Maybe EnumValue)
 interpretEnumValueMaybe t =
   (Just <$> interpretEnumValue t) `catchError` (const $ return Nothing)
 
 interpretEnumValue :: TreePlus -> WithEnv EnumValue
-interpretEnumValue (m, TreeAtom x) = do
+interpretEnumValue (m, TreeLeaf x) = do
   b <- isDefinedEnumValue x
   if b
     then return $ EnumValueLabel x
     else raiseError m $ "no such enum-value is defined: " <> x
-interpretEnumValue e@(m, TreeNode [(_, TreeAtom t), (_, TreeAtom x)]) = do
+interpretEnumValue e@(m, TreeNode [(_, TreeLeaf t), (_, TreeLeaf x)]) = do
   let mv1 = readEnumValueIntS t x
   let mv2 = readEnumValueIntU t x
   case (mv1, mv2) of
@@ -338,14 +338,14 @@ interpretWeakCase :: TreePlus -> WithEnv WeakCase
 --
 -- foundational
 --
-interpretWeakCase (_, TreeNode [(_, TreeAtom "enum-introduction"), l]) = do
+interpretWeakCase (_, TreeNode [(_, TreeLeaf "enum-introduction"), l]) = do
   weakenEnumValue <$> interpretEnumValue l
-interpretWeakCase (_, TreeAtom "default") = return WeakCaseDefault
+interpretWeakCase (_, TreeLeaf "default") = return WeakCaseDefault
 --
 -- auxiliary
 --
 interpretWeakCase c
-  | (m, TreeAtom i) <- c
+  | (m, TreeLeaf i) <- c
   , Just i' <- readMaybe $ T.unpack i = do
     h <- newHole m
     return $ WeakCaseInt h i'
@@ -366,14 +366,14 @@ interpretStructIntro (_, TreeNode [e, k]) = do
 interpretStructIntro e = raiseSyntaxError e "(TREE TREE)"
 
 interpretStructElim :: TreePlus -> WithEnv (Meta, Identifier, ArrayKind)
-interpretStructElim (_, TreeNode [(m, TreeAtom x), k]) = do
+interpretStructElim (_, TreeNode [(m, TreeLeaf x), k]) = do
   k' <- asArrayKind k
   return (m, asIdent x, k')
 interpretStructElim e = raiseSyntaxError e "(LEAF TREE)"
 
 interpretCaseClause ::
      TreePlus -> WithEnv ((Identifier, [IdentifierPlus]), WeakTermPlus)
-interpretCaseClause (_, TreeNode [(_, TreeNode ((_, TreeAtom c):xts)), e]) = do
+interpretCaseClause (_, TreeNode [(_, TreeNode ((_, TreeLeaf c):xts)), e]) = do
   xts' <- mapM interpretIdentifierPlus xts
   e' <- interpret e
   return ((asIdent c, xts'), e')
@@ -391,7 +391,7 @@ type CocaseClause = ((Identifier, [WeakTermPlus]), [(Identifier, WeakTermPlus)])
 --    ...
 --    (b e)))
 interpretCoinductive :: TreePlus -> WithEnv (Identifier, [WeakTermPlus])
-interpretCoinductive (_, TreeNode ((_, TreeAtom c):args)) = do
+interpretCoinductive (_, TreeNode ((_, TreeLeaf c):args)) = do
   args' <- mapM interpret args
   return (asIdent c, args')
 interpretCoinductive t = raiseSyntaxError t "(LEAF TREE ... TREE)"
@@ -405,7 +405,7 @@ interpretCocaseClause t =
   raiseSyntaxError t "((LEAF TREE ... TREE) (LEAF TREE) ... (LEAF TREE))"
 
 interpretCocaseClause' :: TreePlus -> WithEnv (Identifier, WeakTermPlus)
-interpretCocaseClause' (_, TreeNode [(_, TreeAtom label), body]) = do
+interpretCocaseClause' (_, TreeNode [(_, TreeLeaf label), body]) = do
   body' <- interpret body
   return (asIdent label, body')
 interpretCocaseClause' t = raiseSyntaxError t "(LEAF TREE)"
@@ -490,8 +490,8 @@ interpretEnumItem' (t:ts) = do
   return $ (s, fromMaybe (1 + headDiscriminantOf ts') mj) : ts'
 
 interpretEnumItem'' :: TreePlus -> WithEnv (T.Text, Maybe Int)
-interpretEnumItem'' (_, TreeAtom s) = return (s, Nothing)
-interpretEnumItem'' (_, TreeNode [(_, TreeAtom s), (_, TreeAtom i)])
+interpretEnumItem'' (_, TreeLeaf s) = return (s, Nothing)
+interpretEnumItem'' (_, TreeNode [(_, TreeLeaf s), (_, TreeLeaf i)])
   | Just i' <- readMaybe $ T.unpack i = return (s, Just i')
 interpretEnumItem'' t = raiseSyntaxError t "LEAF | (LEAF LEAF)"
 
@@ -541,7 +541,7 @@ newHole m = do
   return (m, WeakTermZeta h)
 
 asArrayKind :: TreePlus -> WithEnv ArrayKind
-asArrayKind e@(_, TreeAtom x) =
+asArrayKind e@(_, TreeLeaf x) =
   case asArrayKindMaybe x of
     Nothing -> raiseSyntaxError e "SINT-TYPE | UINT-TYPE | FLOAT-TYPE"
     Just t -> return t

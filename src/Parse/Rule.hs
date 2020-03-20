@@ -53,7 +53,7 @@ parseConnective m ts f g = do
   return $ connectiveList' ++ ruleList
 
 parseConnective' :: TreePlus -> WithEnv Connective
-parseConnective' (m, TreeNode ((_, TreeAtom name):(_, TreeNode xts):rules)) = do
+parseConnective' (m, TreeNode ((_, TreeLeaf name):(_, TreeNode xts):rules)) = do
   m' <- adjustPhase m
   xts' <- mapM interpretIdentifierPlus xts
   rules' <- mapM parseRule rules
@@ -66,7 +66,7 @@ parseConnective' t = raiseSyntaxError t "(LEAF (TREE ... TREE) ...)"
 --   let la = toEnumLabel at
 --   let lbs = map toEnumLabel bts
 parseRule :: TreePlus -> WithEnv Rule
-parseRule (m, TreeNode [(mName, TreeAtom name), (_, TreeNode xts), t]) = do
+parseRule (m, TreeNode [(mName, TreeLeaf name), (_, TreeNode xts), t]) = do
   m' <- adjustPhase m
   mName' <- adjustPhase mName
   t' <- interpret t
