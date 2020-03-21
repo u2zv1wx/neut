@@ -1,6 +1,4 @@
-(include "notation.neut")
-
-(include "constant/darwin.neut")
+(include "foundation.neut")
 
 (enum bool
   (true 1)

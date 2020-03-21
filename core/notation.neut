@@ -1,7 +1,5 @@
 ;; define basic notations
 
-(include "top.neut")
-
 ;; synonyms
 (keyword type)
 

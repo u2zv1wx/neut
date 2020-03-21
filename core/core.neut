@@ -1,8 +1,4 @@
-(select-statement OS
-  (darwin (include "constant/darwin.neut"))
-  (linux (include "constant/linux.neut")))
-
-(include "notation.neut")
+(include "foundation.neut")
 
 (include "top.neut")
 

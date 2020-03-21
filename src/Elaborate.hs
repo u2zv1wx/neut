@@ -79,8 +79,7 @@ elaborateStmt (WeakStmtLetSigma m xts e cont) = do
   forM_ (zip xts'' mlSigArgList) $ \((_, x, tx), l) ->
     insTypeEnv x (reduceTermPlus tx) l
   cont' <- elaborateStmt cont
-  return
-    (m, TermSigmaElim (m, TermEnumIntro $ EnumValueLabel "top") xts'' e'' cont')
+  return (m, TermSigmaElim (m, TermEnum $ EnumTypeIntS 64) xts'' e'' cont')
 elaborateStmt (WeakStmtImplicit m x@(I (_, i)) idx cont) = do
   t <- lookupTypeEnv' x
   case t of
