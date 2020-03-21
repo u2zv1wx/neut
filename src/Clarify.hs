@@ -415,35 +415,39 @@ knot z cls = do
       modify (\env -> env {codeEnv = Map.insert (asText' z) def' cenv})
 
 asSysCallMaybe :: OS -> T.Text -> Maybe (Syscall, [Arg])
-asSysCallMaybe OSLinux name =
+asSysCallMaybe OSLinux name = do
   case name of
-    "read" -> return (Right (name, 0), [ArgUnused, ArgImm, ArgArray, ArgImm])
-    "write" -> return (Right (name, 1), [ArgUnused, ArgImm, ArgArray, ArgImm])
-    "open" -> return (Right (name, 2), [ArgUnused, ArgArray, ArgImm, ArgImm])
-    "close" -> return (Right (name, 3), [ArgImm])
-    "socket" -> return (Right (name, 41), [ArgImm, ArgImm, ArgImm])
-    "connect" -> return (Right (name, 42), [ArgImm, ArgStruct, ArgImm])
-    "accept" -> return (Right (name, 43), [ArgImm, ArgStruct, ArgArray])
-    "bind" -> return (Right (name, 49), [ArgImm, ArgStruct, ArgImm])
-    "listen" -> return (Right (name, 50), [ArgImm, ArgImm])
-    "fork" -> return (Right (name, 57), [])
-    "exit" -> return (Right (name, 60), [ArgUnused, ArgImm])
-    "wait4" -> return (Right (name, 61), [ArgImm, ArgArray, ArgImm, ArgStruct])
+    "os:read" ->
+      return (Right ("read", 0), [ArgUnused, ArgImm, ArgArray, ArgImm])
+    "os:write" ->
+      return (Right ("write", 1), [ArgUnused, ArgImm, ArgArray, ArgImm])
+    "os:open" ->
+      return (Right ("open", 2), [ArgUnused, ArgArray, ArgImm, ArgImm])
+    "os:close" -> return (Right ("close", 3), [ArgImm])
+    "os:socket" -> return (Right ("socket", 41), [ArgImm, ArgImm, ArgImm])
+    "os:connect" -> return (Right ("connect", 42), [ArgImm, ArgStruct, ArgImm])
+    "os:accept" -> return (Right ("accept", 43), [ArgImm, ArgStruct, ArgArray])
+    "os:bind" -> return (Right ("bind", 49), [ArgImm, ArgStruct, ArgImm])
+    "os:listen" -> return (Right ("listen", 50), [ArgImm, ArgImm])
+    "os:fork" -> return (Right ("fork", 57), [])
+    "os:exit" -> return (Right ("exit", 60), [ArgUnused, ArgImm])
+    "os:wait4" ->
+      return (Right ("wait4", 61), [ArgImm, ArgArray, ArgImm, ArgStruct])
     _ -> Nothing
 asSysCallMaybe OSDarwin name =
   case name of
-    "exit" -> return (Left name, [ArgUnused, ArgImm]) -- 0x2000001
-    "fork" -> return (Left name, []) -- 0x2000002
-    "read" -> return (Left name, [ArgUnused, ArgImm, ArgArray, ArgImm]) -- 0x2000003
-    "write" -> return (Left name, [ArgUnused, ArgImm, ArgArray, ArgImm]) -- 0x2000004
-    "open" -> return (Left name, [ArgUnused, ArgArray, ArgImm, ArgImm]) -- 0x2000005
-    "close" -> return (Left name, [ArgImm]) -- 0x2000006
-    "wait4" -> return (Left name, [ArgImm, ArgArray, ArgImm, ArgStruct]) -- 0x2000007
-    "accept" -> return (Left name, [ArgImm, ArgStruct, ArgArray]) -- 0x2000030
-    "socket" -> return (Left name, [ArgImm, ArgImm, ArgImm]) -- 0x2000097
-    "connect" -> return (Left name, [ArgImm, ArgStruct, ArgImm]) -- 0x2000098
-    "bind" -> return (Left name, [ArgImm, ArgStruct, ArgImm]) -- 0x2000104
-    "listen" -> return (Left name, [ArgImm, ArgImm]) -- 0x2000106
+    "os:exit" -> return (Left "exit", [ArgUnused, ArgImm]) -- 0x2000001
+    "os:fork" -> return (Left "fork", []) -- 0x2000002
+    "os:read" -> return (Left "read", [ArgUnused, ArgImm, ArgArray, ArgImm]) -- 0x2000003
+    "os:write" -> return (Left "write", [ArgUnused, ArgImm, ArgArray, ArgImm]) -- 0x2000004
+    "os:open" -> return (Left "open", [ArgUnused, ArgArray, ArgImm, ArgImm]) -- 0x2000005
+    "os:close" -> return (Left "close", [ArgImm]) -- 0x2000006
+    "os:wait4" -> return (Left "wait4", [ArgImm, ArgArray, ArgImm, ArgStruct]) -- 0x2000007
+    "os:accept" -> return (Left "accept", [ArgImm, ArgStruct, ArgArray]) -- 0x2000030
+    "os:socket" -> return (Left "socket", [ArgImm, ArgImm, ArgImm]) -- 0x2000097
+    "os:connect" -> return (Left "connect", [ArgImm, ArgStruct, ArgImm]) -- 0x2000098
+    "os:bind" -> return (Left "bind", [ArgImm, ArgStruct, ArgImm]) -- 0x2000104
+    "os:listen" -> return (Left "listen", [ArgImm, ArgImm]) -- 0x2000106
     _ -> Nothing
 
 data Arg

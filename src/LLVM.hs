@@ -276,7 +276,7 @@ llvmDataLet x (m, DataTheta y) cont = do
   cenv <- gets codeEnv
   ns <- gets nameSet
   case Map.lookup y cenv of
-    Nothing -> raiseCritical m $ "THETA: no such global label defined: " <> y -- fixme: support FFI (update declEnv)
+    Nothing -> raiseCritical m $ "no such global label defined: " <> y -- fixme: support FFI (update declEnv)
     Just (Definition _ args e)
       | not (y `S.member` ns) -> do
         modify (\env -> env {nameSet = S.insert y ns})

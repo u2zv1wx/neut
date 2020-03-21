@@ -1,7 +1,3 @@
-;; should be loaded after `notation`, `top`.
-
-(include "top.neut")
-
 (constant file-descriptor tau)
 
 (constant stdin file-descriptor)
@@ -13,29 +9,9 @@
 (constant unsafe-cast
   (pi ((A tau) (B tau) (_ A)) B))
 
-;; file-descriptor as int, みたいな操作を許すための定数が必要っぽい。まあそれはそのうち。
+;; prefix every syscall with "os:"
 
-;; add-i64とかにしたほうがよい。
-;; このへんの定数はそのうち「まとめて」処理できるようにする。無限個あるのでconstantとして書くのは無理。
-;; (constant i64.add
-;;   (pi ((_ i64) (_ i64)) i64))
-
-;; (constant i64.sub
-;;   (pi ((_ i64) (_ i64)) i64))
-
-;; (constant i64.mul
-;;   (pi ((_ i64) (_ i64)) i64))
-
-;; (constant array-access-u8
-;;   (pi
-;;     ((A type)
-;;      (arr (array A u8))
-;;      (n A))
-;;     (product (array A u8) u8)))
-
-;; これ、buf : utf8-codeとかにしたほうがいいのかも？
-;; writeのlenの部分はi64にしてよさげ。
-(constant read
+(constant os:read
   (pi
     ((A u64)
      (in file-descriptor)
@@ -43,7 +19,9 @@
      (len u64))
     (product (array A u8) i64)))
 
-(constant write
+(attribute os:read (implicit 0))
+
+(constant os:write
   (pi
     ((A u64)
      (out file-descriptor)
@@ -51,13 +29,15 @@
      (len u64))
     (product (array A u8) i64)))
 
-(constant exit
+(attribute os:write (implicit 0))
+
+(constant os:exit
   (pi
     ((A tau)
      (status i64))
     A))
 
-(constant open
+(constant os:open
   (pi
     ((A u64)
      (path (array A u8))
@@ -65,20 +45,17 @@
      (mode i64))
     (product (array A u8) file-descriptor)))
 
-;; closeは簡単。
-(constant close
+(attribute os:open (implicit 0))
+
+(constant os:close
   (pi
     ((_ file-descriptor))
     i64))
 
-;; darwinではこのforkは定数関数に落ちる。linuxではsyscallになる。
-(constant fork
+(constant os:fork
   (pi
     ()
     i64))
-
-;; (definition time-t i64)
-;; structの中でtime-tって使いたいし、やっぱ一般化してelaborateの時点で具体化するほうがいいか？
 
 (definition rusage
   (struct
@@ -101,7 +78,7 @@
     i64   ;; ru_nvcsw;          voluntary context switches
     i64)) ;; ru_nivcsw;         involuntary context switches
 
-(constant wait4
+(constant os:wait4
   (pi
     ((pid i64)
      (stat-loc (array 1 i64))
@@ -134,35 +111,35 @@
     u32   ;; IP6 address
     u32)) ;; scope zone index
 
-(constant bind
+(constant os:bind
   (pi
     ((sock i64)
      (address sockaddr)
      (sock-len i64))
     (product sockaddr i64)))
 
-(constant accept
+(constant os:accept
   (pi
     ((sock i64)
      (address sockaddr)
      (address-len (array 1 i64)))
     (product sockaddr (array 1 i64) i64)))
 
-(constant connect
+(constant os:connect
   (pi
     ((sock i64)
      (address sockaddr)
      (address-len i64))
     (product sockaddr i64)))
 
-(constant socket
+(constant os:socket
   (pi
     ((domain i64)
      (socket-type i64)
      (protocol i64))
     i64))
 
-(constant listen
+(constant os:listen
   (pi
     ((sock i64)
      (backlog i64))

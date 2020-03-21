@@ -9,7 +9,7 @@
 
 (definition print-string ((str string))
   (destruct str (n content)
-    (let len (write stdout &content 3))
+    (let len (os:write stdout &content 3))
     (with-type (product string u64)
       (tuple (tuple n content) len))))
 

@@ -8,7 +8,8 @@
 
 (enum bool true false)
 
-(include "darwin.neut")
+;; (include "darwin.neut")
+(include "../../core/constant/darwin.neut")
 
 ;; このstateの中でtop-unitが書き換えられてしまう。
 ;; これは挙動として妥当だろうか？
@@ -119,7 +120,7 @@
 
 ;; out-1
 ;; (write n3 stdout (test) enum.n3)
-(write hole stdout (test) 3)
+(os:write stdout (test) 3)
 
 (definition string
   (sigma
@@ -164,7 +165,7 @@
     ((n u64) (content (array n u8)))
     str
     (begin
-      (write n stdout content 3)
+      (os:write stdout content 3)
       unit)))
 
 ;; 長さ不明の文字列をwriteする
@@ -173,8 +174,8 @@
     ((n u64) (content (array n u8)))
     str
     (sigma-elimination
-      (new-content (val i64))
-      (write n stdout content n)
+      (new-content (val u64))
+      (os:write stdout content n)
       val)))
 
 ;; こう書けるようにしたいね：
@@ -502,7 +503,7 @@
     0)))
 
 
-(write hole stdout buf 3)
+(os:write stdout buf 3)
 ;; (write n15 stdout buf enum.n15)
 
 ;; (definition a
@@ -610,16 +611,16 @@
 ;; forkしたあとでmallocしたらなんでダメなの？
 ;; forkはリソースを完全にコピーするんだよね？
 ;; (i64.add 3 3)
-(let pid (fork))
+(let pid (os:fork))
 
 ;; ((lambda (pid) pid) (fork))
 
 ;; (exit 20)
 
 ;; letはクロージャになるから、たしかに、mallocの処理はここで入る。
-(fork)
+(os:fork)
 
-(fork)
+(os:fork)
 
 ;; こうしてu1の配列をつくっても、[u1, u1, u1]とかは結局1byte単位でalignされてしまうから目的の配列を得ることはできない。
 ;; むしろ[u8, u8, u8]などとする必要がでてくる。
@@ -751,8 +752,8 @@
 ;; ~> 修正した。ちゃんと適切な場所にエラーが表示されるようになった。
 ;; (fact zero)
 
-(definition pohe
-  (sigma-introduction left unit))
+;; (definition pohe
+;;   (sigma-introduction left unit))
 
 ;; (ascription pohe (sigma ((x choice)) top))
 
@@ -806,12 +807,12 @@
   (let longest-name i64.add i64.sub)
   longest-longest-name)
 
-(definition foo ((x i64))
-  (let y x)
-  y)
+;; (definition foo ((x i64))
+;;   (let y x)
+;;   y)
 
-(let foo
-  (lambda ((x i64)) ((lambda ((y hole)) y) x)))
+;; (let foo
+;;   (lambda ((x i64)) ((lambda ((y hole)) y) x)))
 
 ;; これはxのほうにunderlineがきてほしいような。
 ;; natの定義が展開されるときに後ろに情報がながれてるって話か。
@@ -881,7 +882,7 @@
 ;; あれ？ここは型エラーになるべきでは？
 ;; いや、vecのこの引数のほうは「どうでもいいやつ」だから関係ない。いわばパラメータの部分なので。
 ;; このときはaの型はちゃんとvec i64 (nat.zero)になってる。
-(let a (vec.nil i64 (nat.succ (nat.zero))))
+;; (let a (vec.nil i64 (nat.succ (nat.zero))))
 
 (let xs (list.cons i64 10 (list.cons i64 100 (list.cons i64 1000 (list.nil i64)))))
 
@@ -1071,9 +1072,9 @@
     ((A tau))
     (pi ((_ A)) A)))
 
-(let foo
-  mysig
-  (sigma-introduction i64 (lambda ((x i64)) x)))
+;; (let foo
+;;   mysig
+;;   (sigma-introduction i64 (lambda ((x i64)) x)))
 
 ;; (let bar
 ;;   (sigma-elimination
@@ -1144,24 +1145,24 @@
 
 (u4.sub (u4 10) 11)
 
-(let item
-  (array-introduction u32 10 20 30))
+;; (let item
+;;   (array-introduction u32 10 20 30))
 
-(sigma-elimination
-  ((_ hole) (v hole))
-  (u32:array-access 1 3 item)
-  ;; (u32:array-access hole item 1)
-  (u32.add v 100))
+;; (sigma-elimination
+;;   ((_ hole) (v hole))
+;;   (u32:array-access 1 3 item)
+;;   ;; (u32:array-access hole item 1)
+;;   (u32.add v 100))
 ;; (sigma-elimination
 ;;   ((_ hole) (v hole))
 ;;   (u32:array-access hole item n3-1)
 ;;   (u32.add v 100))
 
-(let xs (list.cons i64 10 (list.cons i64 100 (list.cons i64 1000 (list.nil i64)))))
+(let zs (list.cons i64 10 (list.cons i64 100 (list.cons i64 1000 (list.nil i64)))))
 
 (let ys (list.nil i64))
 
-(case xs
+(case zs
   ((list.nil C) (i64 10))
   ((list.cons A value _) value))
 
