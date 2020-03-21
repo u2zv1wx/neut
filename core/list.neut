@@ -4,38 +4,37 @@
   (list:nil () (list a))
   (list:cons ((x a) (xs (list a))) (list a)))
 
+(attribute list:nil (implicit 0))
+
+(attribute list:cons (implicit 0))
+
 (include "option.neut")
 
 (definition list:head ([a tau] (xs (list a)))
   (case xs
-    ((list:nil _) (option:none a))
-    ((list:cons _ y _) (option:some a y))))
+    ((list:nil) (option:none a))
+    ((list:cons y _) (option:some a y))))
 
 (definition list:length ([a tau] (xs (list a)))
   (case xs
-    ((list:nil _) 0)
-    ((list:cons _ _ ys) (u64.add 1 (list:length a ys)))))
+    ((list:nil) 0)
+    ((list:cons _ ys) (u64.add 1 (list:length a ys)))))
 
 (definition list:map ([a tau] [b tau] (f (hom a b)) (xs (list a)))
   (case xs
-    ((list:nil _) (list:nil b))
-    ((list:cons _ y ys) (list:cons b (f y) (list:map a b f ys)))))
-
-;; (definition list:map ([a tau] [b tau] (f (hom a b)) (xs (list a)))
-;;   (case xs
-;;     ((list:nil _) (list:nil b))
-;;     ((list:cons _ y ys) (list:cons b (f y) (list:map a b f ys)))))
+    ((list:nil) (list:nil))
+    ((list:cons y ys) (list:cons (f y) (list:map a b f ys)))))
 
 (definition some-function ([a tau] (xs (list a)))
   (case xs
-    ((list:nil _) true)
-    ((list:cons _ _ _) false)))
+    ((list:nil) true)
+    ((list:cons _ _) false)))
 
 (include "bool.neut")
 
-(attribute list:nil (implicit 0))
+;; (attribute list:nil (implicit 0))
 
-(attribute list:cons (implicit 0))
+;; (attribute list:cons (implicit 0))
 
 ;; (list:cons (i64 3) (list:nil i64))
 
@@ -43,9 +42,3 @@
   (case xs
     ((list:nil) true)
     ((list:cons _ _) false)))
-
-
-;; (definition list:is-null ([a tau] (xs (list a)))
-;;   (case xs
-;;     ((list:nil _) true)
-;;     ((list:cons _ _ _) false)))
