@@ -38,7 +38,7 @@
     ((list:nil _) true)
     ((list:cons _ _ _) false)))
 
-(definition list:is-null2 ([a tau] (xs (list a)))
-  (case xs
-    ((list:nil _) true)
-    ((list:cons _ _ _) false)))
+;; (definition list:is-null ([a tau] (xs (list a)))
+;;   (case xs
+;;     ((list:nil _) true)
+;;     ((list:cons _ _ _) false)))

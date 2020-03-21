@@ -42,6 +42,8 @@ type RuleEnv = Map.HashMap Int (Maybe [Data.WeakTerm.IdentifierPlus])
 
 type UnivInstEnv = IntMap.IntMap (S.Set Int)
 
+type FileTrace = [Path Abs File]
+
 data Env =
   Env
     { count :: Int
@@ -59,6 +61,7 @@ data Env =
     , notationEnv :: [(TreePlus, TreePlus)] -- macro transformers
     , constantEnv :: Map.HashMap T.Text Int
     , fileEnv :: FileEnv -- path ~> identifiers defined in the file at toplevel
+    , traceEnv :: FileTrace
     , enumEnv :: Map.HashMap T.Text [(T.Text, Int)] -- [("choice", [("left", 0), ("right", 1)]), ...]
     , revEnumEnv :: Map.HashMap T.Text (T.Text, Int) -- [("left", ("choice", 0)), ("right", ("choice", 1)), ...]
     , indEnumEnv :: Map.HashMap T.Text [(T.Text, Int)] -- [("nat", [("zero", 0), ("succ", 1)]), ...]
@@ -106,6 +109,7 @@ initialEnv path =
     , enumEnv = Map.empty
     , indEnumEnv = Map.empty
     , fileEnv = Map.empty
+    , traceEnv = []
     , revEnumEnv = Map.empty
     , revNameEnv = IntMap.empty
     , formationEnv = IntMap.empty

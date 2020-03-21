@@ -18,7 +18,6 @@ import qualified Data.HashMap.Strict as Map
 import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
-import qualified Text.Show.Pretty as Pr
 
 import Data.Basic
 import Data.Env
@@ -33,12 +32,28 @@ import Parse.Utility
 
 parse :: Path Abs File -> WithEnv WeakStmt
 parse inputPath = do
-  content <- liftIO $ TIO.readFile $ toFilePath inputPath
-  modify
-    (\env -> env {fileEnv = Map.insert inputPath VisitInfoActive (fileEnv env)})
-  stmtList <- tokenize content >>= parse'
+  stmtList <- visit inputPath
   stmtList' <- renameQuasiStmtList stmtList
   concatQuasiStmtList stmtList'
+
+visit :: Path Abs File -> WithEnv [QuasiStmt]
+visit path = do
+  pushTrace path
+  modify (\env -> env {fileEnv = Map.insert path VisitInfoActive (fileEnv env)})
+  content <- liftIO $ TIO.readFile $ toFilePath path
+  tokenize content >>= parse'
+
+leave :: WithEnv [QuasiStmt]
+leave = do
+  path <- gets currentFilePath
+  popTrace path $ newMeta 1 1 path
+  modify (\env -> env {fileEnv = Map.insert path VisitInfoFinish (fileEnv env)})
+  return []
+
+look :: Path Abs File -> WithEnv ()
+look path = do
+  modify (\env -> env {currentFilePath = path})
+  modify (\env -> env {phase = 1 + phase env})
 
 complete :: Path Abs File -> Line -> Column -> WithEnv [String]
 complete inputPath l c = do
@@ -103,10 +118,7 @@ modifyFileForCompletion (I (s, _)) content l c = do
       return (prefix, T.unlines $ ys ++ [targetLine'] ++ zs)
 
 parse' :: [TreePlus] -> WithEnv [QuasiStmt]
-parse' [] = do
-  path <- gets currentFilePath
-  modify (\env -> env {fileEnv = Map.insert path VisitInfoFinish (fileEnv env)})
-  return []
+parse' [] = leave
 parse' ((_, TreeNode [(_, TreeLeaf "notation"), from, to]):as) = do
   checkNotationSanity from
   modify (\e -> e {notationEnv = (from, to) : notationEnv e})
@@ -130,27 +142,19 @@ parse' ((m, TreeNode [(_, TreeLeaf "include"), (_, TreeLeaf pathString)]):as) =
       if not b
         then raiseError m $ "no such file: " <> T.pack (toFilePath newPath)
         else do
-          insertPathInfo oldPath newPath
-          ensureDAG m
           denv <- gets fileEnv
           case Map.lookup newPath denv of
             Just VisitInfoActive -> do
+              tenv <- gets traceEnv
+              let cyclicPath =
+                    dropWhile (/= newPath) (reverse tenv) ++ [newPath]
               raiseError m $
-                "found cyclic inclusion of: " <> T.pack (toFilePath newPath)
+                "found cyclic inclusion:\n" <> showCyclicPath cyclicPath
             Just VisitInfoFinish -> parse' as
             Nothing -> do
-              modify
-                (\env ->
-                   env
-                     { fileEnv =
-                         Map.insert newPath VisitInfoActive (fileEnv env)
-                     })
-              modify (\env -> env {currentFilePath = newPath})
-              modify (\env -> env {phase = 1 + phase env})
-              content <- liftIO $ TIO.readFile $ toFilePath newPath
-              includedQuasiStmtList <- tokenize content >>= parse'
-              modify (\env -> env {currentFilePath = oldPath})
-              modify (\env -> env {phase = 1 + phase env})
+              look newPath
+              includedQuasiStmtList <- visit newPath
+              look oldPath
               defList <- parse' as
               return $ includedQuasiStmtList ++ defList
 parse' ((_, TreeNode ((_, TreeLeaf "statement"):as1)):as2) = do
@@ -391,34 +395,28 @@ checkKeywordSanity m x
   | T.last x == '+' = raiseError m "A +-suffixed name cannot be a keyword"
 checkKeywordSanity _ _ = return ()
 
-insertPathInfo :: Path Abs File -> Path Abs File -> WithEnv ()
-insertPathInfo oldFilePath newFilePath = do
-  g <- gets includeGraph
-  let g' = Map.insertWith (++) oldFilePath [newFilePath] g
-  modify (\env -> env {includeGraph = g'})
+pushTrace :: Path Abs File -> WithEnv ()
+pushTrace path = modify (\env -> env {traceEnv = path : traceEnv env})
 
-ensureDAG :: Meta -> WithEnv ()
-ensureDAG m = do
-  g <- gets includeGraph
-  path <- gets mainFilePath
-  case ensureDAG' path [] g of
-    Right _ -> return ()
-    Left cyclicPath -> do
-      raiseError m $
-        "found cyclic inclusion:\n" <> T.pack (Pr.ppShow cyclicPath)
+popTrace :: Path Abs File -> Meta -> WithEnv ()
+popTrace path m = do
+  tenv <- gets traceEnv
+  case tenv of
+    [] ->
+      raiseCritical m $
+      "finished parsing the file `" <>
+      T.pack (toFilePath path) <>
+      "`, but the file-trace environment is empty and so the compiler cannot reflect that fact to the environment"
+    (_:rest) -> modify (\env -> env {traceEnv = rest})
 
-ensureDAG' ::
-     Path Abs File
-  -> [Path Abs File]
-  -> IncludeGraph
-  -> Either [Path Abs File] () -- cyclic path (if any)
-ensureDAG' a visited g =
-  case Map.lookup a g of
-    Nothing -> Right ()
-    Just as
-      | xs <- as `intersect` visited
-      , not (null xs) -> do
-        let z = head xs
-        -- result = z -> path{0} -> ... -> path{n} -> z
-        Left $ dropWhile (/= z) visited ++ [a, z]
-    Just as -> mapM_ (\x -> ensureDAG' x (visited ++ [a]) g) as
+showCyclicPath :: [Path Abs File] -> T.Text
+showCyclicPath [] = ""
+showCyclicPath [path] = T.pack (toFilePath path)
+showCyclicPath (path:ps) =
+  "     " <> T.pack (toFilePath path) <> showCyclicPath' ps
+
+showCyclicPath' :: [Path Abs File] -> T.Text
+showCyclicPath' [] = ""
+showCyclicPath' [path] = "\n  ~> " <> T.pack (toFilePath path)
+showCyclicPath' (path:ps) =
+  "\n  ~> " <> T.pack (toFilePath path) <> showCyclicPath' ps
