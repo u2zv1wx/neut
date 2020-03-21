@@ -32,7 +32,7 @@ type IncludeGraph = Map.HashMap (Path Abs File) [Path Abs File]
 
 type FileInfo = [(Meta, Identifier, WeakTermPlus)]
 
-type FileEnv = Map.HashMap (Path Abs File) FileInfo
+type FileEnv = S.Set (Path Abs File)
 
 type RuleEnv = Map.HashMap Int (Maybe [Data.WeakTerm.IdentifierPlus])
 
@@ -99,7 +99,7 @@ initialEnv path =
     , constantEnv = Map.empty
     , enumEnv = Map.empty
     , indEnumEnv = Map.empty
-    , fileEnv = Map.empty
+    , fileEnv = S.empty
     , revEnumEnv = Map.empty
     , revNameEnv = IntMap.empty
     , formationEnv = IntMap.empty

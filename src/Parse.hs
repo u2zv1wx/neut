@@ -128,19 +128,18 @@ parse' ((m, TreeNode [(_, TreeLeaf "include"), (_, TreeLeaf pathString)]):as) =
           insertPathInfo oldPath newPath
           ensureDAG m
           denv <- gets fileEnv
-          case Map.lookup newPath denv of
-            Just _ -> do
+          if S.member newPath denv
+            then do
               defList <- parse' as
               return defList
-            Nothing -> do
+            else do
               content <- liftIO $ TIO.readFile $ toFilePath newPath
               modify (\env -> env {currentFilePath = newPath})
               modify (\env -> env {phase = 1 + phase env})
               includedQuasiStmtList <- tokenize content >>= parse'
               modify (\env -> env {currentFilePath = oldPath})
               modify (\env -> env {phase = 1 + phase env})
-              modify
-                (\env -> env {fileEnv = Map.insert newPath [] (fileEnv env)})
+              modify (\env -> env {fileEnv = S.insert newPath (fileEnv env)})
               defList <- parse' as
               return $ includedQuasiStmtList ++ defList
 parse' ((_, TreeNode ((_, TreeLeaf "statement"):as1)):as2) = do
