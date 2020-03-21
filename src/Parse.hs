@@ -258,7 +258,7 @@ parseBorrow t = (Nothing, t)
 parseAttr :: T.Text -> TreePlus -> WithEnv QuasiStmt
 parseAttr name (m, TreeNode [(_, TreeLeaf "implicit"), (_, TreeLeaf num)]) = do
   case readMaybe $ T.unpack num of
-    Nothing -> undefined
+    Nothing -> raiseError m "the argument of `implicit` must be an integer"
     Just i -> return $ QuasiStmtImplicit m (asIdent name) i
 parseAttr _ t = raiseError (fst t) $ "invalid attribute: " <> showAsSExp t
 
