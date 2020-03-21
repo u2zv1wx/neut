@@ -30,7 +30,7 @@ type Tokenizer a = StateT TEnv (ExceptT Log IO) a
 tokenize :: T.Text -> WithEnv [TreePlus]
 tokenize input = do
   modify (\env -> env {count = 1 + count env})
-  path <- gets currentFilePath
+  path <- getCurrentFilePath
   let env = TEnv {text = input, line = 1, column = 1, filePath = path}
   resultOrError <- liftIO $ runExceptT (runStateT program env)
   case resultOrError of

@@ -130,7 +130,7 @@ parseCompleteOpt = do
 run :: Command -> IO ()
 run (Build inputPathStr mOutputPathStr outputKind) = do
   inputPath <- resolveFile' inputPathStr
-  resultOrErr <- evalWithEnv (build inputPath) (initialEnv inputPath)
+  resultOrErr <- evalWithEnv (build inputPath) initialEnv
   basename <- setFileExtension "" $ filename inputPath
   mOutputPath <- mapM resolveFile' mOutputPathStr
   outputPath <- constructOutputPath basename mOutputPath outputKind
@@ -139,7 +139,7 @@ run (Build inputPathStr mOutputPathStr outputKind) = do
     Right result -> writeResult result outputPath outputKind
 run (Check inputPathStr colorizeFlag mEndOfEntry) = do
   inputPath <- resolveFile' inputPathStr
-  resultOrErr <- evalWithEnv (check inputPath) (initialEnv inputPath)
+  resultOrErr <- evalWithEnv (check inputPath) initialEnv
   case resultOrErr of
     Right _ -> return ()
     Left err ->
@@ -152,7 +152,7 @@ run (Check inputPathStr colorizeFlag mEndOfEntry) = do
           exitWith (ExitFailure 1)
 run (Complete inputPathStr l c) = do
   inputPath <- resolveFile' inputPathStr
-  resultOrErr <- evalWithEnv (complete inputPath l c) (initialEnv inputPath)
+  resultOrErr <- evalWithEnv (complete inputPath l c) initialEnv
   case resultOrErr of
     Left _ -> return () -- just quit silently
     Right result -> mapM_ putStrLn result

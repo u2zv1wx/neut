@@ -34,26 +34,23 @@ parse :: Path Abs File -> WithEnv WeakStmt
 parse inputPath = do
   stmtList <- visit inputPath
   stmtList' <- renameQuasiStmtList stmtList
+  pushTrace inputPath
   concatQuasiStmtList stmtList'
 
 visit :: Path Abs File -> WithEnv [QuasiStmt]
 visit path = do
   pushTrace path
   modify (\env -> env {fileEnv = Map.insert path VisitInfoActive (fileEnv env)})
+  modify (\env -> env {phase = 1 + phase env})
   content <- liftIO $ TIO.readFile $ toFilePath path
   tokenize content >>= parse'
 
 leave :: WithEnv [QuasiStmt]
 leave = do
-  path <- gets currentFilePath
+  path <- getCurrentFilePath
   popTrace path $ newMeta 1 1 path
   modify (\env -> env {fileEnv = Map.insert path VisitInfoFinish (fileEnv env)})
   return []
-
-look :: Path Abs File -> WithEnv ()
-look path = do
-  modify (\env -> env {currentFilePath = path})
-  modify (\env -> env {phase = 1 + phase env})
 
 complete :: Path Abs File -> Line -> Column -> WithEnv [String]
 complete inputPath l c = do
@@ -136,27 +133,17 @@ parse' ((m, TreeNode [(_, TreeLeaf "include"), (_, TreeLeaf pathString)]):as) =
   case readMaybe (T.unpack pathString) :: Maybe String of
     Nothing -> raiseError m "the argument of `include` must be a string"
     Just path -> do
-      oldPath <- gets currentFilePath
+      oldPath <- getCurrentFilePath
       newPath <- resolveFile (parent oldPath) path
-      b <- doesFileExist newPath
-      if not b
-        then raiseError m $ "no such file: " <> T.pack (toFilePath newPath)
-        else do
-          denv <- gets fileEnv
-          case Map.lookup newPath denv of
-            Just VisitInfoActive -> do
-              tenv <- gets traceEnv
-              let cyclicPath =
-                    dropWhile (/= newPath) (reverse tenv) ++ [newPath]
-              raiseError m $
-                "found cyclic inclusion:\n" <> showCyclicPath cyclicPath
-            Just VisitInfoFinish -> parse' as
-            Nothing -> do
-              look newPath
-              includedQuasiStmtList <- visit newPath
-              look oldPath
-              defList <- parse' as
-              return $ includedQuasiStmtList ++ defList
+      ensureFileExistence m newPath
+      denv <- gets fileEnv
+      case Map.lookup newPath denv of
+        Just VisitInfoActive -> reportCyclicPath m newPath
+        Just VisitInfoFinish -> parse' as
+        Nothing -> do
+          includedQuasiStmtList <- visit newPath
+          defList <- parse' as
+          return $ includedQuasiStmtList ++ defList
 parse' ((_, TreeNode ((_, TreeLeaf "statement"):as1)):as2) = do
   defList1 <- parse' as1
   defList2 <- parse' as2
@@ -301,7 +288,7 @@ isSpecialForm _ = False
 
 concatQuasiStmtList :: [QuasiStmt] -> WithEnv WeakStmt
 concatQuasiStmtList [] = do
-  path <- gets currentFilePath
+  path <- getCurrentFilePath
   content <- liftIO $ TIO.readFile $ toFilePath path
   let m = newMeta (length $ T.lines content) 1 path
   return $ WeakStmtReturn (m, WeakTermEnumIntro $ EnumValueLabel "unit")
@@ -420,3 +407,16 @@ showCyclicPath' [] = ""
 showCyclicPath' [path] = "\n  ~> " <> T.pack (toFilePath path)
 showCyclicPath' (path:ps) =
   "\n  ~> " <> T.pack (toFilePath path) <> showCyclicPath' ps
+
+reportCyclicPath :: Meta -> Path Abs File -> WithEnv a
+reportCyclicPath m newPath = do
+  tenv <- gets traceEnv
+  let cyclicPath = dropWhile (/= newPath) (reverse tenv) ++ [newPath]
+  raiseError m $ "found cyclic inclusion:\n" <> showCyclicPath cyclicPath
+
+ensureFileExistence :: Meta -> Path Abs File -> WithEnv ()
+ensureFileExistence m path = do
+  b <- doesFileExist path
+  if b
+    then return ()
+    else raiseError m $ "no such file: " <> T.pack (toFilePath path)

@@ -28,10 +28,6 @@ import qualified Text.Show.Pretty as Pr
 
 type ConstraintQueue = Q.MinQueue EnrichedConstraint
 
-type IncludeGraph = Map.HashMap (Path Abs File) [Path Abs File]
-
-type FileInfo = [(Meta, Identifier, WeakTermPlus)]
-
 data VisitInfo
   = VisitInfoActive
   | VisitInfoFinish
@@ -42,8 +38,6 @@ type RuleEnv = Map.HashMap Int (Maybe [Data.WeakTerm.IdentifierPlus])
 
 type UnivInstEnv = IntMap.IntMap (S.Set Int)
 
-type FileTrace = [Path Abs File]
-
 data Env =
   Env
     { count :: Int
@@ -53,15 +47,12 @@ data Env =
     , inputColumn :: Int
     , phase :: Int
     , target :: Maybe Target
-    , mainFilePath :: Path Abs File
-    , currentFilePath :: Path Abs File
-    , includeGraph :: IncludeGraph -- to detect cyclic `include`
     , keywordEnv :: S.Set T.Text -- list of reserved keywords
     , defEnv :: S.Set T.Text -- list of defined variables
     , notationEnv :: [(TreePlus, TreePlus)] -- macro transformers
     , constantEnv :: Map.HashMap T.Text Int
     , fileEnv :: FileEnv -- path ~> identifiers defined in the file at toplevel
-    , traceEnv :: FileTrace
+    , traceEnv :: [Path Abs File]
     , enumEnv :: Map.HashMap T.Text [(T.Text, Int)] -- [("choice", [("left", 0), ("right", 1)]), ...]
     , revEnumEnv :: Map.HashMap T.Text (T.Text, Int) -- [("left", ("choice", 0)), ("right", ("choice", 1)), ...]
     , indEnumEnv :: Map.HashMap T.Text [(T.Text, Int)] -- [("nat", [("zero", 0), ("succ", 1)]), ...]
@@ -92,8 +83,8 @@ data Env =
     , declEnv :: Map.HashMap T.Text ([LowType], LowType) -- external functions that must be declared in LLVM IR
     }
 
-initialEnv :: Path Abs File -> Env
-initialEnv path =
+initialEnv :: Env
+initialEnv =
   Env
     { count = 0
     , inputText = T.empty
@@ -101,7 +92,6 @@ initialEnv path =
     , inputColumn = 0
     , phase = 0
     , target = Nothing
-    , includeGraph = Map.empty
     , notationEnv = []
     , keywordEnv = S.empty
     , defEnv = S.empty
@@ -137,8 +127,6 @@ initialEnv path =
     , zetaEnv = IntMap.empty
     , patVarEnv = S.empty
     , nameSet = S.empty
-    , mainFilePath = path
-    , currentFilePath = path
     }
 
 type WithEnv a = StateT Env (ExceptT [Log] IO) a
@@ -432,3 +420,8 @@ isDefinedEnumType name = do
   env <- get
   let enumNameList = Map.keys $ enumEnv env
   return $ name `elem` enumNameList
+
+getCurrentFilePath :: WithEnv (Path Abs File)
+getCurrentFilePath = do
+  tenv <- gets traceEnv
+  return $ head tenv
