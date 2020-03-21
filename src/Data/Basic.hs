@@ -374,9 +374,16 @@ data OS
   | OSDarwin
   deriving (Eq, Show)
 
+showOS :: OS -> T.Text
+showOS OSLinux = "linux"
+showOS OSDarwin = "darwin"
+
 data Arch =
   Arch64
   deriving (Eq, Show)
+
+showArch :: Arch -> T.Text
+showArch Arch64 = "x64"
 
 -- Left name-of-interface-function | Right (name-of-syscall, number-of-syscall)
 -- the `Left` here is required since direct use of syscall in macOS is deprecated since 10.12, and thus we need to

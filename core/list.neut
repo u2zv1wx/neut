@@ -31,14 +31,18 @@
     ((list:nil _) true)
     ((list:cons _ _ _) false)))
 
-(include "bool.neut")
+(select-statement OS
+  (darwin (include "bool.neut"))
+  (linux (include "option.neut")))
+
+;; (include "bool.neut")
+
+;; (include "bool.neut")
 
 (definition list:is-null ([a tau] (xs (list a)))
   (case xs
     ((list:nil _) true)
     ((list:cons _ _ _) false)))
-
-
 
 ;; (definition list:is-null ([a tau] (xs (list a)))
 ;;   (case xs

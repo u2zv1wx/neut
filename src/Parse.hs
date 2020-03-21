@@ -158,10 +158,15 @@ parse' ((m, TreeNode ((_, TreeLeaf "include"):rest)):as)
             defList <- parse' as
             return $ includedQuasiStmtList ++ defList
   | otherwise = raiseSyntaxError m "(include LEAF)"
-parse' ((_, TreeNode ((_, TreeLeaf "statement"):as1)):as2) = do
-  defList1 <- parse' as1
-  defList2 <- parse' as2
-  return $ defList1 ++ defList2
+parse' ((_, TreeNode ((_, TreeLeaf "statement"):as1)):as2) = parse' $ as1 ++ as2
+parse' ((m, TreeNode ((_, TreeLeaf "select-statement"):rest)):as2)
+  | ((mx, TreeLeaf x):stmtClauseList) <- rest = do
+    val <- retrieveCompileTimeVarValue mx x
+    stmtClauseList' <- mapM parseStmtClause stmtClauseList
+    case lookup val stmtClauseList' of
+      Nothing -> parse' as2
+      Just as1 -> parse' $ as1 ++ as2
+  | otherwise = raiseSyntaxError m "(select-statement LEAF TREE*)"
 parse' ((m, TreeNode ((_, TreeLeaf "constant"):rest)):as)
   | [(mn, TreeLeaf name), t] <- rest = do
     t' <- macroExpand t >>= interpret
@@ -295,6 +300,16 @@ extractFunName (_, TreeNode ((_, TreeNode [(_, TreeLeaf x), _]):_)) =
   return $ asIdent x
 extractFunName t = raiseSyntaxError (fst t) "(LEAF ...) | ((LEAF TREE) ...)"
 
+parseStmtClause :: TreePlus -> WithEnv (T.Text, [TreePlus])
+parseStmtClause (_, TreeNode ((_, TreeLeaf x):stmtList)) = return (x, stmtList)
+parseStmtClause (m, _) = raiseSyntaxError m "(LEAF TREE*)"
+
+retrieveCompileTimeVarValue :: Meta -> T.Text -> WithEnv T.Text
+retrieveCompileTimeVarValue _ "OS" = showOS <$> getOS
+retrieveCompileTimeVarValue _ "architecture" = showArch <$> getArch
+retrieveCompileTimeVarValue m var =
+  raiseError m $ "no such compile-time variable defined: " <> var
+
 isSpecialForm :: TreePlus -> Bool
 isSpecialForm (_, TreeNode ((_, TreeLeaf x):_)) = S.member x keywordSet
 isSpecialForm _ = False
@@ -309,6 +324,7 @@ keywordSet =
     , "attribute"
     , "constant"
     , "statement"
+    , "select-statement"
     , "let"
     , "definition"
     , "inductive"
