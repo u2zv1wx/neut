@@ -329,19 +329,30 @@ infer' ctx (m, WeakTermCase (e, t) cxtes) = do
   (e', t', ml') <- infer' ctx e
   insConstraintEnv tInd t'
   insLevelEQ mlInd ml'
-  (h, ml) <- newTypeHoleInCtx ctx m
-  cxtes' <-
-    forM cxtes $ \((c, xts), body) -> do
-      (xts', ctx') <- inferPatArgs ctx xts
-      let vs = map (\(mx, x, _) -> (mx, WeakTermUpsilon x)) xts'
-      let app = (m, WeakTermPiElim (m, WeakTermUpsilon c) vs)
-      (_, appType, appLevel) <- infer' ctx' app
-      (body', bodyType, bodyLevel) <- infer' ctx' body
-      forM_ xts' insPatVarEnv
-      forM_ [(appType, t'), (bodyType, h)] $ uncurry insConstraintEnv
-      forM_ [(appLevel, mlInd), (bodyLevel, ml)] $ uncurry insLevelEQ
-      return ((c, xts'), body')
-  return ((m, WeakTermCase (e', t') cxtes'), h, ml)
+  if null cxtes
+    then do
+      (h, ml) <- newTypeHoleInCtx ctx m
+      return ((m, WeakTermCase (e', t') []), h, ml) -- ex falso quodlibet
+    else do
+      cxttes' <-
+        forM cxtes $ \((c, xts), body) -> do
+          (xts', ctx') <- inferPatArgs ctx xts
+          let vs = map (\(mx, x, _) -> (mx, WeakTermUpsilon x)) xts'
+          let app = (m, WeakTermPiElim (m, WeakTermUpsilon c) vs) -- caseのmetaがほしいところ
+          (_, appType, appLevel) <- infer' ctx app
+          (body', bodyType, bodyLevel) <- infer' ctx' body
+          forM_ xts' insPatVarEnv
+          insConstraintEnv appType t'
+          insLevelEQ appLevel mlInd
+          return (((c, xts'), body'), (bodyType, bodyLevel))
+      let (cxtes', bodyTypeLevelList) = unzip cxttes'
+      let (bodyTypeList, bodyLevelList) = unzip bodyTypeLevelList
+      constrainList bodyTypeList
+      constrainLevelList bodyLevelList
+      return
+        ( (m, WeakTermCase (e', t') cxtes')
+        , head bodyTypeList
+        , head bodyLevelList)
 
 inferImplicit ::
      Context
@@ -569,6 +580,13 @@ constrainList [_] = return ()
 constrainList (t1:t2:ts) = do
   insConstraintEnv t1 t2
   constrainList $ t2 : ts
+
+constrainLevelList :: [UnivLevelPlus] -> WithEnv ()
+constrainLevelList [] = return ()
+constrainLevelList [_] = return ()
+constrainLevelList (l1:l2:ls) = do
+  insLevelEQ l1 l2
+  constrainLevelList $ l2 : ls
 
 newHole :: Meta -> WithEnv WeakTermPlus
 newHole m = do
