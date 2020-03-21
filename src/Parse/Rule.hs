@@ -140,12 +140,14 @@ toInductiveIntro ats bts xts a@(I (ai, _)) (mb, b@(I (bi, _)), m, yts, cod)
   , a == a'
   , length xts == length es = do
     mls <- piUnivLevelsfrom (xts ++ yts) cod
+    let vs = varWeakTermPlus (m, WeakTermPi mls yts cod)
+    let xts' = filter (\(_, x, _) -> x `elem` vs) xts
     return $
       QuasiStmtLetInductiveIntro
         m
         (bi, ai)
-        (mb, b, (m, WeakTermPi mls (xts ++ yts) cod))
-        xts
+        (mb, b, (m, WeakTermPi mls (xts' ++ yts) cod))
+        xts'
         yts
         ats
         bts
@@ -209,11 +211,13 @@ toCoinductiveElim ats bts xts a@(I (ai, _)) (mb, b, m, yts, cod)
   , a == a'
   , length xts == length es = do
     mls <- piUnivLevelsfrom (xts ++ [yt]) cod
+    let vs = varWeakTermPlus (m, WeakTermPi mls [yt] cod)
+    let xts' = filter (\(_, x, _) -> x `elem` vs) xts
     return $
       QuasiStmtLetCoinductiveElim
         m
-        (mb, b, (m, WeakTermPi mls (xts ++ [yt]) cod))
-        (xts ++ [yt])
+        (mb, b, (m, WeakTermPi mls (xts' ++ [yt]) cod))
+        (xts' ++ [yt])
         cod
         ats
         bts
