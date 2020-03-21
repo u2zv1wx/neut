@@ -205,12 +205,14 @@ simp' ((e1, e2):cs) = do
           , length es1 == length es2 -> do
             simpUnivParams (metaUnivParams m1) (metaUnivParams m2)
             simp $ zip es1 es2 ++ cs
-        (Just (StuckPiElimUpsilon ((I (_, i1)), _) []), _)
-          | i1 `S.member` pvenv -> do
+        (Just (StuckPiElimUpsilon (x1@(I (_, i1)), _) []), _)
+          | i1 `S.member` pvenv
+          , occurCheck x1 (varWeakTermPlus e2) -> do
             modify (\env -> env {substEnv = IntMap.insert i1 e2 (substEnv env)})
             simp cs
-        (_, Just (StuckPiElimUpsilon ((I (_, i2)), _) []))
-          | i2 `S.member` pvenv -> do
+        (_, Just (StuckPiElimUpsilon (x2@(I (_, i2)), _) []))
+          | i2 `S.member` pvenv
+          , occurCheck x2 (varWeakTermPlus e1) -> do
             modify (\env -> env {substEnv = IntMap.insert i2 e1 (substEnv env)})
             simp cs
         (Just (StuckPiElimZetaStrict h1 ies1), _)
