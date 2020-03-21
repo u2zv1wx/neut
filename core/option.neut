@@ -6,5 +6,5 @@
 
 (definition from-option ([a tau] (x a) (m (option a)))
   (case m
-    ((option:none _) x)
-    ((option:some _ y) y)))
+    ((option:none) x)
+    ((option:some y) y)))

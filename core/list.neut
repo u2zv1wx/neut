@@ -4,16 +4,16 @@
   (list:nil () (list a))
   (list:cons ((x a) (xs (list a))) (list a)))
 
-(attribute list:nil (implicit 0))
-
-(attribute list:cons (implicit 0))
+;; auto-implicit:
+;;   (attribute list:nil (implicit 0))
+;;   (attribute list:cons (implicit 0))
 
 (include "option.neut")
 
 (definition list:head ([a tau] (xs (list a)))
   (case xs
-    ((list:nil) (option:none a))
-    ((list:cons y _) (option:some a y))))
+    ((list:nil) (option:none))
+    ((list:cons y _) (option:some y))))
 
 (definition list:length ([a tau] (xs (list a)))
   (case xs

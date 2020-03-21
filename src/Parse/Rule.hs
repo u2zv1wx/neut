@@ -125,7 +125,7 @@ toInductive ats bts connective@(m, a@(I (ai, _)), xts, _) = do
 toInductiveIntroList :: [IdentifierPlus] -> Connective -> WithEnv [QuasiStmt]
 toInductiveIntroList ats (_, a, xts, rules) = do
   bts <- mapM ruleAsIdentPlus rules
-  mapM (toInductiveIntro ats bts xts a) rules
+  concat <$> mapM (toInductiveIntro ats bts xts a) rules
 
 -- represent the introduction rule within CoC
 toInductiveIntro ::
@@ -134,7 +134,7 @@ toInductiveIntro ::
   -> [IdentifierPlus]
   -> Identifier
   -> Rule
-  -> WithEnv QuasiStmt
+  -> WithEnv [QuasiStmt]
 toInductiveIntro ats bts xts a@(I (ai, _)) (mb, b@(I (bi, _)), m, yts, cod)
   | (_, WeakTermPiElim (_, WeakTermUpsilon a') es) <- cod
   , a == a'
@@ -142,18 +142,20 @@ toInductiveIntro ats bts xts a@(I (ai, _)) (mb, b@(I (bi, _)), m, yts, cod)
     mls <- piUnivLevelsfrom (xts ++ yts) cod
     let vs = varWeakTermPlus (m, WeakTermPi mls yts cod)
     let xts' = filter (\(_, x, _) -> x `elem` vs) xts
-    return $
-      QuasiStmtLetInductiveIntro
-        m
-        (bi, ai)
-        (mb, b, (m, WeakTermPi mls (xts' ++ yts) cod))
-        xts'
-        yts
-        ats
-        bts
-        (mb, WeakTermUpsilon b)
-        []
-        (map (\(_, x, _) -> x) ats)
+    -- let attrList = map (QuasiStmtImplicit m (asIdent bi)) [0 .. length xts']
+    return
+      (QuasiStmtLetInductiveIntro
+         m
+         (bi, ai)
+         (mb, b, (m, WeakTermPi mls (xts' ++ yts) cod))
+         xts'
+         yts
+         ats
+         bts
+         (mb, WeakTermUpsilon b)
+         []
+         (map (\(_, x, _) -> x) ats) :
+       map (QuasiStmtImplicit m b) [0 .. length xts' - 1])
   | otherwise =
     raiseError m $
     "the succedent of an introduction rule of `" <>
@@ -195,7 +197,7 @@ toCoinductive ats bts c@(m, a@(I (ai, _)), xts, _) = do
 toCoinductiveElimList :: [IdentifierPlus] -> Connective -> WithEnv [QuasiStmt]
 toCoinductiveElimList ats (_, a, xts, rules) = do
   bts <- mapM ruleAsIdentPlus rules
-  mapM (toCoinductiveElim ats bts xts a) rules
+  concat <$> mapM (toCoinductiveElim ats bts xts a) rules
 
 -- represent the elimination rule within CoC
 toCoinductiveElim ::
@@ -204,7 +206,7 @@ toCoinductiveElim ::
   -> [IdentifierPlus]
   -> Identifier
   -> Rule
-  -> WithEnv QuasiStmt
+  -> WithEnv [QuasiStmt]
 toCoinductiveElim ats bts xts a@(I (ai, _)) (mb, b, m, yts, cod)
   | [yt@(_, _, dom)] <- yts
   , (_, WeakTermPiElim (_, WeakTermUpsilon a') es) <- dom
@@ -213,19 +215,20 @@ toCoinductiveElim ats bts xts a@(I (ai, _)) (mb, b, m, yts, cod)
     mls <- piUnivLevelsfrom (xts ++ [yt]) cod
     let vs = varWeakTermPlus (m, WeakTermPi mls [yt] cod)
     let xts' = filter (\(_, x, _) -> x `elem` vs) xts
-    return $
-      QuasiStmtLetCoinductiveElim
-        m
-        (mb, b, (m, WeakTermPi mls (xts' ++ [yt]) cod))
-        (xts' ++ [yt])
-        cod
-        ats
-        bts
-        yt
-        (toVar' yt)
-        (m, WeakTermPiElim (mb, WeakTermUpsilon b) [toVar' yt])
-        []
-        (map (\(_, x, _) -> x) ats)
+    return
+      (QuasiStmtLetCoinductiveElim
+         m
+         (mb, b, (m, WeakTermPi mls (xts' ++ [yt]) cod))
+         (xts' ++ [yt])
+         cod
+         ats
+         bts
+         yt
+         (toVar' yt)
+         (m, WeakTermPiElim (mb, WeakTermUpsilon b) [toVar' yt])
+         []
+         (map (\(_, x, _) -> x) ats) :
+       map (QuasiStmtImplicit m b) [0 .. length xts' - 1])
   | otherwise =
     raiseError m $
     "the antecedent of an elimination rule of `" <>
