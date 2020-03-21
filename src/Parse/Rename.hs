@@ -31,13 +31,13 @@ renameQuasiStmtList' :: NameEnv -> [QuasiStmt] -> WithEnv [QuasiStmt]
 renameQuasiStmtList' _ [] = return []
 renameQuasiStmtList' nenv ((QuasiStmtLet m (mx, x, t) e):ss) = do
   t' <- rename' nenv t
-  x' <- newLLVMNameWith x
+  x' <- newLLVMNameWithStrict m nenv x
   e' <- rename' nenv e
   ss' <- renameQuasiStmtList' (insertName x x' nenv) ss
   return $ QuasiStmtLet m (mx, x', t') e' : ss'
 renameQuasiStmtList' nenv ((QuasiStmtLetWT m (mx, x, t) e):ss) = do
   t' <- rename' nenv t
-  x' <- newLLVMNameWith x
+  x' <- newLLVMNameWithStrict m nenv x
   e' <- rename' nenv e
   ss' <- renameQuasiStmtList' (insertName x x' nenv) ss
   return $ QuasiStmtLetWT m (mx, x', t') e' : ss'
@@ -48,9 +48,9 @@ renameQuasiStmtList' nenv (QuasiStmtLetSigma m xts e:ss) = do
 renameQuasiStmtList' nenv ((QuasiStmtDef xds):ss) = do
   let (xs, ds) = unzip xds
   -- rename for deflist
-  let ys = map (\(_, (_, y, _), _, _) -> y) ds
-  ys' <- mapM newLLVMNameWith ys
-  let yis = map asText ys
+  let mys = map (\(_, (my, y, _), _, _) -> (my, y)) ds
+  ys' <- mapM (\(my, y) -> newLLVMNameWithStrict my nenv y) mys
+  let yis = map (asText . snd) mys
   let yis' = map asInt ys'
   let nenvForDef = Map.fromList (zip yis yis') `Map.union` nenv
   ds' <- mapM (renameDef nenvForDef) ds
@@ -75,13 +75,13 @@ renameQuasiStmtList' nenv ((QuasiStmtImplicit m x i):ss) = do
   return $ QuasiStmtImplicit m x' i : ss'
 renameQuasiStmtList' nenv ((QuasiStmtLetInductive n m (mx, a, t) e):ss) = do
   t' <- rename' nenv t
-  a' <- newLLVMNameWith a
+  a' <- newLLVMNameWithStrict m nenv a
   e' <- rename' nenv e
   ss' <- renameQuasiStmtList' (insertName a a' nenv) ss
   return $ QuasiStmtLetInductive n m (mx, a', t') e' : ss'
 renameQuasiStmtList' nenv ((QuasiStmtLetCoinductive n m (mx, a, t) e):ss) = do
   t' <- rename' nenv t
-  a' <- newLLVMNameWith a
+  a' <- newLLVMNameWithStrict m nenv a
   e' <- rename' nenv e
   ss' <- renameQuasiStmtList' (insertName a a' nenv) ss
   return $ QuasiStmtLetCoinductive n m (mx, a', t') e' : ss'
@@ -92,7 +92,7 @@ renameQuasiStmtList' nenv ((QuasiStmtLetInductiveIntro m enumInfo (mb, b, t) xts
   (ats', nenv''') <- renameArgs nenv'' ats
   (bts', nenv'''') <- renameArgs nenv''' bts
   bInner' <- rename' nenv'''' bInner
-  b' <- newLLVMNameWith b
+  b' <- newLLVMNameWithStrict m nenv b
   ss' <- renameQuasiStmtList' (insertName b b' nenv) ss
   asOuter <- mapM (lookupStrict nenv) ats
   asInnerPlus <- mapM (lookupStrict' nenv'''') ats
@@ -119,7 +119,7 @@ renameQuasiStmtList' nenv ((QuasiStmtLetCoinductiveElim m (mb, b, t) xtsyt codIn
   (yt', nenv'''') <- renameIdentPlus' nenv''' yt
   codInner' <- rename' nenv'''' codInner
   e2' <- rename' nenv'''' e2
-  b' <- newLLVMNameWith b
+  b' <- newLLVMNameWithStrict m nenv b
   ss' <- renameQuasiStmtList' (insertName b b' nenv) ss
   asOuterPlus <- mapM (lookupStrict' nenv) ats
   asOuter <- mapM (lookupStrict nenv) ats
@@ -139,6 +139,14 @@ renameQuasiStmtList' nenv ((QuasiStmtLetCoinductiveElim m (mb, b, t) xtsyt codIn
       info
       asOuter :
     ss'
+
+newLLVMNameWithStrict :: Meta -> NameEnv -> Identifier -> WithEnv Identifier
+newLLVMNameWithStrict m nenv x = do
+  case Map.lookup (asText x) nenv of
+    Nothing -> newLLVMNameWith x
+    Just _ ->
+      raiseError m $
+      "the identifier `" <> asText x <> "` is already defined at top level"
 
 renameStmtBinder ::
      NameEnv

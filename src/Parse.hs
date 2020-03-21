@@ -34,6 +34,8 @@ import Parse.Utility
 parse :: Path Abs File -> WithEnv WeakStmt
 parse inputPath = do
   content <- liftIO $ TIO.readFile $ toFilePath inputPath
+  modify
+    (\env -> env {fileEnv = Map.insert inputPath VisitInfoActive (fileEnv env)})
   stmtList <- tokenize content >>= parse'
   stmtList' <- renameQuasiStmtList stmtList
   concatQuasiStmtList stmtList'
@@ -101,7 +103,10 @@ modifyFileForCompletion (I (s, _)) content l c = do
       return (prefix, T.unlines $ ys ++ [targetLine'] ++ zs)
 
 parse' :: [TreePlus] -> WithEnv [QuasiStmt]
-parse' [] = return []
+parse' [] = do
+  path <- gets currentFilePath
+  modify (\env -> env {fileEnv = Map.insert path VisitInfoFinish (fileEnv env)})
+  return []
 parse' ((_, TreeNode [(_, TreeLeaf "notation"), from, to]):as) = do
   checkNotationSanity from
   modify (\e -> e {notationEnv = (from, to) : notationEnv e})
@@ -128,18 +133,24 @@ parse' ((m, TreeNode [(_, TreeLeaf "include"), (_, TreeLeaf pathString)]):as) =
           insertPathInfo oldPath newPath
           ensureDAG m
           denv <- gets fileEnv
-          if S.member newPath denv
-            then do
-              defList <- parse' as
-              return defList
-            else do
-              content <- liftIO $ TIO.readFile $ toFilePath newPath
+          case Map.lookup newPath denv of
+            Just VisitInfoActive -> do
+              raiseError m $
+                "found cyclic inclusion of: " <> T.pack (toFilePath newPath)
+            Just VisitInfoFinish -> parse' as
+            Nothing -> do
+              modify
+                (\env ->
+                   env
+                     { fileEnv =
+                         Map.insert newPath VisitInfoActive (fileEnv env)
+                     })
               modify (\env -> env {currentFilePath = newPath})
               modify (\env -> env {phase = 1 + phase env})
+              content <- liftIO $ TIO.readFile $ toFilePath newPath
               includedQuasiStmtList <- tokenize content >>= parse'
               modify (\env -> env {currentFilePath = oldPath})
               modify (\env -> env {phase = 1 + phase env})
-              modify (\env -> env {fileEnv = S.insert newPath (fileEnv env)})
               defList <- parse' as
               return $ includedQuasiStmtList ++ defList
 parse' ((_, TreeNode ((_, TreeLeaf "statement"):as1)):as2) = do

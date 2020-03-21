@@ -32,7 +32,11 @@ type IncludeGraph = Map.HashMap (Path Abs File) [Path Abs File]
 
 type FileInfo = [(Meta, Identifier, WeakTermPlus)]
 
-type FileEnv = S.Set (Path Abs File)
+data VisitInfo
+  = VisitInfoActive
+  | VisitInfoFinish
+
+type FileEnv = Map.HashMap (Path Abs File) VisitInfo
 
 type RuleEnv = Map.HashMap Int (Maybe [Data.WeakTerm.IdentifierPlus])
 
@@ -51,6 +55,7 @@ data Env =
     , currentFilePath :: Path Abs File
     , includeGraph :: IncludeGraph -- to detect cyclic `include`
     , keywordEnv :: S.Set T.Text -- list of reserved keywords
+    , defEnv :: S.Set T.Text -- list of defined variables
     , notationEnv :: [(TreePlus, TreePlus)] -- macro transformers
     , constantEnv :: Map.HashMap T.Text Int
     , fileEnv :: FileEnv -- path ~> identifiers defined in the file at toplevel
@@ -96,10 +101,11 @@ initialEnv path =
     , includeGraph = Map.empty
     , notationEnv = []
     , keywordEnv = S.empty
+    , defEnv = S.empty
     , constantEnv = Map.empty
     , enumEnv = Map.empty
     , indEnumEnv = Map.empty
-    , fileEnv = S.empty
+    , fileEnv = Map.empty
     , revEnumEnv = Map.empty
     , revNameEnv = IntMap.empty
     , formationEnv = IntMap.empty
