@@ -10,30 +10,21 @@ extra-source-files:
 
 dependencies:
 - base >= 4.7 && < 5
-- pretty-show
-- mtl
-- transformers
-- free
-- comonad
-- deriving-compat
-- recursion-schemes
-- pqueue
-- directory
-- filepath
-- optparse-applicative
-- process
+- ansi-terminal
+- binary
+- bytestring
 - containers
-- unordered-containers
 - half
+- hashable
+- mtl
+- optparse-applicative
 - path
 - path-io
-- bytestring
-- binary
+- pqueue
+- pretty-show
+- process
 - text
-- ansi-terminal
-- array
-- text-format
-- hashable
+- unordered-containers
 
 library:
   source-dirs: src
