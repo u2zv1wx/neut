@@ -219,7 +219,7 @@ interpret t@(m, TreeNode es) = do
     Just l -> return (m', WeakTermEnumIntro l)
     _ -> do
       case es of
-        [] -> raiseSyntaxError t "(TREE ...)"
+        [] -> raiseSyntaxError (fst t) "(TREE ...)"
         _ -> interpret (m', TreeNode ((m', TreeLeaf "pi-elimination") : es))
 interpret (m, TreeNodeSquare _) =
   raiseError m "found square-node at inappropriate position"
@@ -273,7 +273,7 @@ interpretIdentifierPlus (_, TreeNode [x, t]) = do
   (m', x') <- interpretLeaf x
   t' <- interpret t
   return (m', x', t')
-interpretIdentifierPlus t = raiseSyntaxError t "(LEAF TREE)"
+interpretIdentifierPlus t = raiseSyntaxError (fst t) "(LEAF TREE)"
 
 interpretIter :: TreePlus -> WithEnv Def
 interpretIter (m, TreeNode [xt, (_, TreeNode xts), e]) = do
@@ -281,7 +281,7 @@ interpretIter (m, TreeNode [xt, (_, TreeNode xts), e]) = do
   (xts', e') <- interpretBinder xts e
   m' <- adjustPhase m
   return (m', xt', xts', e')
-interpretIter t = raiseSyntaxError t "(TREE (TREE ... TREE) TREE)"
+interpretIter t = raiseSyntaxError (fst t) "(TREE (TREE ... TREE) TREE)"
 
 interpretLeaf :: TreePlus -> WithEnv (Meta, Identifier)
 interpretLeaf (m, TreeLeaf "_") = do
@@ -292,7 +292,7 @@ interpretLeaf (m, TreeLeaf "_") = do
 interpretLeaf (m, TreeLeaf x) = do
   m' <- adjustPhase m
   return (m', asIdent x)
-interpretLeaf t = raiseSyntaxError t "LEAF"
+interpretLeaf t = raiseSyntaxError (fst t) "LEAF"
 
 interpretEnumValueMaybe :: TreePlus -> WithEnv (Maybe EnumValue)
 interpretEnumValueMaybe t =
@@ -326,8 +326,8 @@ interpretEnumValue e@(m, TreeNode [(_, TreeLeaf t), (_, TreeLeaf x)]) = do
              " is supposed to be of type u" <>
              T.pack (show size) <>
              ", but is out of range of u" <> T.pack (show size)
-    _ -> raiseSyntaxError e "(SINT-TYPE INT) | (UINT-TYPE INT)"
-interpretEnumValue t = raiseSyntaxError t "LEAF | (LEAF LEAF)"
+    _ -> raiseSyntaxError (fst e) "(SINT-TYPE INT) | (UINT-TYPE INT)"
+interpretEnumValue t = raiseSyntaxError (fst t) "LEAF | (LEAF LEAF)"
 
 interpretBinder ::
      [TreePlus] -> TreePlus -> WithEnv ([IdentifierPlus], WeakTermPlus)
@@ -358,20 +358,20 @@ interpretClause (_, TreeNode [c, e]) = do
   c' <- interpretWeakCase c
   e' <- interpret e
   return (c', e')
-interpretClause e = raiseSyntaxError e "(TREE TREE)"
+interpretClause e = raiseSyntaxError (fst e) "(TREE TREE)"
 
 interpretStructIntro :: TreePlus -> WithEnv (WeakTermPlus, ArrayKind)
 interpretStructIntro (_, TreeNode [e, k]) = do
   e' <- interpret e
   k' <- asArrayKind k
   return (e', k')
-interpretStructIntro e = raiseSyntaxError e "(TREE TREE)"
+interpretStructIntro e = raiseSyntaxError (fst e) "(TREE TREE)"
 
 interpretStructElim :: TreePlus -> WithEnv (Meta, Identifier, ArrayKind)
 interpretStructElim (_, TreeNode [(m, TreeLeaf x), k]) = do
   k' <- asArrayKind k
   return (m, asIdent x, k')
-interpretStructElim e = raiseSyntaxError e "(LEAF TREE)"
+interpretStructElim e = raiseSyntaxError (fst e) "(LEAF TREE)"
 
 interpretCaseClause ::
      TreePlus -> WithEnv ((Identifier, [IdentifierPlus]), WeakTermPlus)
@@ -379,7 +379,7 @@ interpretCaseClause (_, TreeNode [(_, TreeNode ((_, TreeLeaf c):xts)), e]) = do
   xts' <- mapM interpretIdentifierPlus xts
   e' <- interpret e
   return ((asIdent c, xts'), e')
-interpretCaseClause t = raiseSyntaxError t "((LEAF TREE ... TREE) TREE)"
+interpretCaseClause t = raiseSyntaxError (fst t) "((LEAF TREE ... TREE) TREE)"
 
 type CocaseClause = ((Identifier, [WeakTermPlus]), [(Identifier, WeakTermPlus)])
 
@@ -396,7 +396,7 @@ interpretCoinductive :: TreePlus -> WithEnv (Identifier, [WeakTermPlus])
 interpretCoinductive (_, TreeNode ((_, TreeLeaf c):args)) = do
   args' <- mapM interpret args
   return (asIdent c, args')
-interpretCoinductive t = raiseSyntaxError t "(LEAF TREE ... TREE)"
+interpretCoinductive t = raiseSyntaxError (fst t) "(LEAF TREE ... TREE)"
 
 interpretCocaseClause :: TreePlus -> WithEnv CocaseClause
 interpretCocaseClause (_, TreeNode (coind:clauseList)) = do
@@ -404,13 +404,13 @@ interpretCocaseClause (_, TreeNode (coind:clauseList)) = do
   clauseList' <- mapM interpretCocaseClause' clauseList
   return ((c, args), clauseList')
 interpretCocaseClause t =
-  raiseSyntaxError t "((LEAF TREE ... TREE) (LEAF TREE) ... (LEAF TREE))"
+  raiseSyntaxError (fst t) "((LEAF TREE ... TREE) (LEAF TREE) ... (LEAF TREE))"
 
 interpretCocaseClause' :: TreePlus -> WithEnv (Identifier, WeakTermPlus)
 interpretCocaseClause' (_, TreeNode [(_, TreeLeaf label), body]) = do
   body' <- interpret body
   return (asIdent label, body')
-interpretCocaseClause' t = raiseSyntaxError t "(LEAF TREE)"
+interpretCocaseClause' t = raiseSyntaxError (fst t) "(LEAF TREE)"
 
 cocaseAsSigmaIntro ::
      Meta
@@ -495,7 +495,7 @@ interpretEnumItem'' :: TreePlus -> WithEnv (T.Text, Maybe Int)
 interpretEnumItem'' (_, TreeLeaf s) = return (s, Nothing)
 interpretEnumItem'' (_, TreeNode [(_, TreeLeaf s), (_, TreeLeaf i)])
   | Just i' <- readMaybe $ T.unpack i = return (s, Just i')
-interpretEnumItem'' t = raiseSyntaxError t "LEAF | (LEAF LEAF)"
+interpretEnumItem'' t = raiseSyntaxError (fst t) "LEAF | (LEAF LEAF)"
 
 headDiscriminantOf :: [(T.Text, Int)] -> Int
 headDiscriminantOf [] = 0
@@ -545,17 +545,16 @@ newHole m = do
 asArrayKind :: TreePlus -> WithEnv ArrayKind
 asArrayKind e@(_, TreeLeaf x) =
   case asArrayKindMaybe x of
-    Nothing -> raiseSyntaxError e "SINT-TYPE | UINT-TYPE | FLOAT-TYPE"
+    Nothing -> raiseSyntaxError (fst e) "SINT-TYPE | UINT-TYPE | FLOAT-TYPE"
     Just t -> return t
-asArrayKind t = raiseSyntaxError t "LEAF"
+asArrayKind t = raiseSyntaxError (fst t) "LEAF"
 
 toValueIntU :: IntSize -> Integer -> WeakTerm
 toValueIntU size i = WeakTermEnumIntro $ EnumValueIntU size i
 
-raiseSyntaxError :: TreePlus -> T.Text -> WithEnv a
-raiseSyntaxError e form =
-  raiseError (fst e) $
-  "couldn't match the input with the expected form: " <> form
+raiseSyntaxError :: Meta -> T.Text -> WithEnv a
+raiseSyntaxError m form =
+  raiseError m $ "couldn't match the input with the expected form: " <> form
 
 -- the function `encodeChar` is adopted from https://hackage.haskell.org/package/utf8-string-1.0.1.1/docs/src/Codec-Binary-UTF8-String.html
 -- the license notice of this function is as follows:

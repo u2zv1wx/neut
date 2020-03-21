@@ -57,7 +57,7 @@ parseConnective' (m, TreeNode ((_, TreeLeaf name):(_, TreeNode xts):rules)) = do
   xts' <- mapM interpretIdentifierPlus xts
   rules' <- mapM parseRule rules
   return (m', asIdent name, xts', rules')
-parseConnective' t = raiseSyntaxError t "(LEAF (TREE ... TREE) ...)"
+parseConnective' t = raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) ...)"
 
 parseRule :: TreePlus -> WithEnv Rule
 parseRule (m, TreeNode [(mName, TreeLeaf name), (_, TreeNode xts), t]) = do
@@ -66,7 +66,7 @@ parseRule (m, TreeNode [(mName, TreeLeaf name), (_, TreeNode xts), t]) = do
   t' <- interpret t
   xts' <- mapM interpretIdentifierPlus xts
   return (m', asIdent name, mName', xts', t')
-parseRule t = raiseSyntaxError t "(LEAF (TREE ... TREE) TREE)"
+parseRule t = raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) TREE)"
 
 renameFormArgs ::
      [IdentifierPlus]
