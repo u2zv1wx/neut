@@ -38,25 +38,29 @@ interpret (m, TreeLeaf "tau") = do
   m' <- adjustPhase m
   l <- newCount
   return (m', WeakTermTau l)
-interpret (m, TreeNode [(_, TreeLeaf "upsilon"), (_, TreeLeaf x)]) = do
-  m' <- adjustPhase m
-  return (m', WeakTermUpsilon $ asIdent x)
-interpret (m, TreeNode [(_, TreeLeaf "pi"), (_, TreeNode xts), t]) = do
-  (xts', t') <- interpretBinder xts t
-  mls <- piUnivLevelsfrom xts' t'
-  m' <- adjustPhase m
-  return (m', WeakTermPi mls xts' t')
-interpret (m, TreeNode [(_, TreeLeaf "pi-introduction"), (_, TreeNode xts), e]) = do
-  (xts', e') <- interpretBinder xts e
-  m' <- adjustPhase m
-  return (m', WeakTermPiIntro xts' e')
-interpret (m, TreeNode ((_, TreeLeaf "pi-elimination"):e:es)) = do
-  m' <- adjustPhase m
-  interpretPiElim m' e es -- interpret (m', TreeNode ((m', TreeLeaf "pi-elimination") : es)
-  -- e' <- interpret e
-  -- es' <- mapM interpret es
-  -- m' <- adjustPhase m
-  -- return (m', WeakTermPiElim e' es')
+interpret (m, TreeNode ((_, TreeLeaf "upsilon"):rest))
+  | [(_, TreeLeaf x)] <- rest = do
+    m' <- adjustPhase m
+    return (m', WeakTermUpsilon $ asIdent x)
+  | otherwise = raiseSyntaxError m "(upsilon TREE)"
+interpret (m, TreeNode ((_, TreeLeaf "pi"):rest))
+  | [(_, TreeNode xts), t] <- rest = do
+    (xts', t') <- interpretBinder xts t
+    mls <- piUnivLevelsfrom xts' t'
+    m' <- adjustPhase m
+    return (m', WeakTermPi mls xts' t')
+  | otherwise = raiseSyntaxError m "(pi (TREE ... TREE) TREE)"
+interpret (m, TreeNode ((_, TreeLeaf "pi-introduction"):rest))
+  | [(_, TreeNode xts), e] <- rest = do
+    (xts', e') <- interpretBinder xts e
+    m' <- adjustPhase m
+    return (m', WeakTermPiIntro xts' e')
+  | otherwise = raiseSyntaxError m "(pi-introduction (TREE ... TREE) TREE)"
+interpret (m, TreeNode ((_, TreeLeaf "pi-elimination"):rest))
+  | e:es <- rest = do
+    m' <- adjustPhase m
+    interpretPiElim m' e es
+  | otherwise = raiseSyntaxError m "(pi-elimination TREE ... TREE)" -- e' <- interpret e
 interpret (m, TreeNode [(_, TreeLeaf "sigma"), (_, TreeNode xts), t]) = do
   xts' <- mapM interpretIdentifierPlus xts
   t' <- interpret t
