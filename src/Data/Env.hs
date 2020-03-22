@@ -6,6 +6,7 @@ import Control.Monad.Except
 import Control.Monad.State
 import Data.List (find)
 import Path
+import Path.IO
 import System.Info
 
 import Data.Basic
@@ -418,3 +419,12 @@ getCurrentFilePath :: WithEnv (Path Abs File)
 getCurrentFilePath = do
   tenv <- gets traceEnv
   return $ head tenv
+
+getCurrentDirPath :: WithEnv (Path Abs Dir)
+getCurrentDirPath = parent <$> getCurrentFilePath
+
+getLibraryDirPath :: WithEnv (Path Abs Dir)
+getLibraryDirPath = do
+  homeDirPath <- getHomeDir
+  relLibPath <- parseRelDir ".local/share/neut/library"
+  return $ homeDirPath </> relLibPath

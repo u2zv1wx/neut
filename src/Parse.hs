@@ -142,22 +142,11 @@ parse' ((m, TreeNode ((_, TreeLeaf "enum"):rest)):as)
     parse' as
   | otherwise = raiseSyntaxError m "(enum LEAF TREE ... TREE)"
 parse' ((m, TreeNode ((_, TreeLeaf "include"):rest)):as)
-  | [(_, TreeLeaf pathString)] <- rest = do
-    case readMaybe (T.unpack pathString) :: Maybe String of
-      Nothing -> raiseError m "the argument of `include` must be a string"
-      Just path -> do
-        oldPath <- getCurrentFilePath
-        newPath <- resolveFile (parent oldPath) path
-        ensureFileExistence m newPath
-        denv <- gets fileEnv
-        case Map.lookup newPath denv of
-          Just VisitInfoActive -> reportCyclicPath m newPath
-          Just VisitInfoFinish -> parse' as
-          Nothing -> do
-            includedQuasiStmtList <- visit newPath
-            defList <- parse' as
-            return $ includedQuasiStmtList ++ defList
-  | otherwise = raiseSyntaxError m "(include LEAF)"
+  | [(mPath, TreeLeaf pathString)] <- rest =
+    includeFile m mPath pathString getCurrentDirPath as
+  | [(_, TreeLeaf "library"), (mPath, TreeLeaf pathString)] <- rest =
+    includeFile m mPath pathString getLibraryDirPath as
+  | otherwise = raiseSyntaxError m "(include LEAF) | (include library LEAF)"
 parse' ((_, TreeNode ((_, TreeLeaf "statement"):as1)):as2) = parse' $ as1 ++ as2
 parse' ((m, TreeNode ((_, TreeLeaf "introspect"):rest)):as2)
   | ((mx, TreeLeaf x):stmtClauseList) <- rest = do
@@ -266,6 +255,37 @@ parseAttr name (m, TreeNode [(_, TreeLeaf "implicit"), (_, TreeLeaf num)]) = do
     Nothing -> raiseError m "the argument of `implicit` must be an integer"
     Just i -> return $ QuasiStmtImplicit m (asIdent name) i
 parseAttr _ t = raiseError (fst t) $ "invalid attribute: " <> showAsSExp t
+
+parsePath :: Meta -> T.Text -> WithEnv String
+parsePath m pathString =
+  case readMaybe (T.unpack pathString) of
+    Nothing -> raiseError m "the argument of `include` must be a string"
+    Just path -> return path
+
+includeFile ::
+     Meta
+  -> Meta
+  -> T.Text
+  -> WithEnv (Path Abs Dir)
+  -> [TreePlus]
+  -> WithEnv [QuasiStmt]
+includeFile m mPath pathString getDirPath as = do
+  path <- parsePath mPath pathString
+  dirPath <- getDirPath
+  newPath <- resolveFile dirPath path
+  includeFile' m newPath as
+
+includeFile' :: Meta -> Path Abs File -> [TreePlus] -> WithEnv [QuasiStmt]
+includeFile' m path as = do
+  ensureFileExistence m path
+  denv <- gets fileEnv
+  case Map.lookup path denv of
+    Just VisitInfoActive -> reportCyclicPath m path
+    Just VisitInfoFinish -> parse' as
+    Nothing -> do
+      includedQuasiStmtList <- visit path
+      defList <- parse' as
+      return $ includedQuasiStmtList ++ defList
 
 parseDef :: [TreePlus] -> WithEnv [QuasiStmt]
 parseDef xds = do
