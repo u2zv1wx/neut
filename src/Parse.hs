@@ -10,10 +10,14 @@ import Control.Monad.State
 import Data.List
 import Data.Maybe (catMaybes)
 import Data.Monoid ((<>))
+import Network.HTTP.Simple
 import Path
 import Path.IO
 import Text.Read (readMaybe)
 
+import qualified Codec.Archive.Tar as Tar
+import qualified Codec.Compression.GZip as GZip
+import qualified Data.ByteString.Lazy as L
 import qualified Data.HashMap.Strict as Map
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -147,6 +151,21 @@ parse' ((m, TreeNode ((_, TreeLeaf "include"):rest)):as)
   | [(_, TreeLeaf "library"), (mPath, TreeLeaf pathString)] <- rest =
     includeFile m mPath pathString getLibraryDirPath as
   | otherwise = raiseSyntaxError m "(include LEAF) | (include library LEAF)"
+parse' ((m, TreeNode ((_, TreeLeaf "use"):rest)):as)
+  | [(_, TreeLeaf pkg), (mUrl, TreeLeaf urlStr)] <- rest = do
+    libDir <- getLibraryDirPath
+    pkg' <- parseRelDir $ T.unpack pkg
+    let path = libDir </> pkg'
+    isAlreadyInstalled <- doesDirExist path
+    when (not isAlreadyInstalled) $ do
+      urlStr' <- parseStr mUrl urlStr
+      outputNote $ "downloading " <> pkg <> " from " <> T.pack urlStr'
+      req <- parseRequest urlStr'
+      item <- httpLBS req
+      outputNote $ "installing " <> pkg <> " into " <> T.pack (toFilePath path)
+      install (getResponseBody item) path
+    parse' as
+  | otherwise = raiseSyntaxError m "(use LEAF LEAF)"
 parse' ((_, TreeNode ((_, TreeLeaf "statement"):as1)):as2) = parse' $ as1 ++ as2
 parse' ((m, TreeNode ((_, TreeLeaf "introspect"):rest)):as2)
   | ((mx, TreeLeaf x):stmtClauseList) <- rest = do
@@ -256,11 +275,11 @@ parseAttr name (m, TreeNode [(_, TreeLeaf "implicit"), (_, TreeLeaf num)]) = do
     Just i -> return $ QuasiStmtImplicit m (asIdent name) i
 parseAttr _ t = raiseError (fst t) $ "invalid attribute: " <> showAsSExp t
 
-parsePath :: Meta -> T.Text -> WithEnv String
-parsePath m pathString =
-  case readMaybe (T.unpack pathString) of
+parseStr :: Meta -> T.Text -> WithEnv String
+parseStr m quotedStr =
+  case readMaybe (T.unpack quotedStr) of
     Nothing -> raiseError m "the argument of `include` must be a string"
-    Just path -> return path
+    Just str -> return str
 
 includeFile ::
      Meta
@@ -270,7 +289,7 @@ includeFile ::
   -> [TreePlus]
   -> WithEnv [QuasiStmt]
 includeFile m mPath pathString getDirPath as = do
-  path <- parsePath mPath pathString
+  path <- parseStr mPath pathString
   dirPath <- getDirPath
   newPath <- resolveFile dirPath path
   includeFile' m newPath as
@@ -341,6 +360,7 @@ keywordSet =
     , "keyword"
     , "enum"
     , "include"
+    , "use"
     , "attribute"
     , "constant"
     , "statement"
@@ -471,3 +491,7 @@ ensureFileExistence m path = do
   if b
     then return ()
     else raiseError m $ "no such file: " <> T.pack (toFilePath path)
+
+install :: L.ByteString -> Path Abs Dir -> WithEnv ()
+install bytestr pkgPath = do
+  liftIO $ Tar.unpack (toFilePath pkgPath) $ Tar.read $ GZip.decompress bytestr

@@ -3,6 +3,8 @@
 module Data.Log
   ( Log
   , outputLog
+  , logInfo
+  , logInfo'
   , logError
   , logError'
   , logCritical
@@ -17,20 +19,20 @@ import qualified Data.Text.IO as TIO
 import Data.Basic
 
 data LogLevel
-  = LogLevelHint
+  = LogLevelNote
   | LogLevelWarning
   | LogLevelError
   | LogLevelCritical -- "impossible" happened
   deriving (Show)
 
 logLevelToText :: LogLevel -> T.Text
-logLevelToText LogLevelHint = "hint"
+logLevelToText LogLevelNote = "note"
 logLevelToText LogLevelWarning = "warning"
 logLevelToText LogLevelError = "error"
 logLevelToText LogLevelCritical = "critical"
 
 logLevelToSGR :: LogLevel -> [SGR]
-logLevelToSGR LogLevelHint =
+logLevelToSGR LogLevelNote =
   [SetConsoleIntensity BoldIntensity, SetColor Foreground Vivid Blue]
 logLevelToSGR LogLevelWarning =
   [SetConsoleIntensity BoldIntensity, SetColor Foreground Vivid Yellow]
@@ -70,6 +72,12 @@ outputLogText = TIO.putStrLn
 withSGR :: Bool -> [SGR] -> IO () -> IO ()
 withSGR False _ f = f
 withSGR True arg f = setSGR arg >> f >> setSGR [Reset]
+
+logInfo :: Maybe PosInfo -> T.Text -> Log
+logInfo mpos text = (mpos, LogLevelNote, text)
+
+logInfo' :: T.Text -> Log
+logInfo' text = logInfo Nothing text
 
 logError :: Maybe PosInfo -> T.Text -> Log
 logError mpos text = (mpos, LogLevelError, text)

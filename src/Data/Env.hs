@@ -428,3 +428,8 @@ getLibraryDirPath = do
   homeDirPath <- getHomeDir
   relLibPath <- parseRelDir ".local/share/neut/library"
   return $ homeDirPath </> relLibPath
+
+outputNote :: T.Text -> WithEnv ()
+outputNote str = do
+  let li = logInfo' str
+  liftIO $ outputLog True li

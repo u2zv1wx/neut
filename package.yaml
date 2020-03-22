@@ -17,6 +17,7 @@ dependencies:
 - directory
 - half
 - hashable
+- http-conduit
 - mtl
 - network
 - optparse-applicative

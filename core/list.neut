@@ -47,5 +47,9 @@
     ((list:nil) true)
     ((list:cons _ _) false)))
 
+(use libarchive/3.4.2
+  "https://www.libarchive.org/downloads/libarchive-3.4.2.tar.gz")
+
+;; ここ以降ではもう自由に (include library "libarchive/3.4.2/(...)") などと書ける
 
 ;; (list:cons (i64 10))
