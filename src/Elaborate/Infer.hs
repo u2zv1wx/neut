@@ -664,7 +664,6 @@ univInst e l = do
 univInstWith :: IntMap.IntMap UnivLevel -> WeakTermPlus -> WithEnv WeakTermPlus
 univInstWith univParams e = do
   modify (\env -> env {univRenameEnv = univParams})
-  -- modify (\env -> env {univRenameEnv = IntMap.empty})
   univInst' e
 
 univInst' :: WeakTermPlus -> WithEnv WeakTermPlus
@@ -694,10 +693,6 @@ univInst' (m, WeakTermPiIntroNoReduce xts e) = do
   return (m, WeakTermPiIntroNoReduce xts' e')
 univInst' (m, WeakTermPiIntroPlus ind (name, args) xts e) = do
   args' <- univInstArgs args
-  -- let (zs, ees) = unzip s
-  -- let (es1, es2) = unzip ees
-  -- es1' <- mapM univInst' es1
-  -- es2' <- mapM univInst' es2
   xts' <- univInstArgs xts
   e' <- univInst' e
   return (m, WeakTermPiIntroPlus ind (name, args') xts' e')
@@ -772,10 +767,6 @@ univInst' (m, WeakTermCase (e, t) cxtes) = do
       return ((c, xts'), body')
   return (m, WeakTermCase (e', t') cxtes')
 
--- univInst' (m, WeakTermCocase name ces) = do
---   let (cs, es) = unzip ces
---   es' <- mapM univInst' es
---   return (m, WeakTermCocase name $ zip cs es')
 univInstArgs :: [IdentifierPlus] -> WithEnv [IdentifierPlus]
 univInstArgs xts = do
   let (ms, xs, ts) = unzip3 xts
