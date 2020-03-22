@@ -12,6 +12,7 @@ module Parse.Rule
 
 import Control.Monad.Except
 import Control.Monad.State
+import Data.Maybe (catMaybes)
 import Data.Monoid ((<>))
 
 import qualified Data.HashMap.Strict as Map
@@ -211,7 +212,9 @@ toCoinductiveElim ats bts xts a@(I (ai, _)) (mb, b, m, yts, cod)
   | [yt@(_, _, dom)] <- yts
   , (_, WeakTermPiElim (_, WeakTermUpsilon a') es) <- dom
   , a == a'
-  , length xts == length es = do
+  , xs <- map (\(_, x, _) -> x) xts
+  , xs' <- catMaybes $ map asUpsilon es
+  , map asText xs == map asText xs' = do
     mls <- piUnivLevelsfrom (xts ++ [yt]) cod
     let vs = varWeakTermPlus (m, WeakTermPi mls [yt] cod)
     let xts' = filter (\(_, x, _) -> x `elem` vs) xts
@@ -233,7 +236,8 @@ toCoinductiveElim ats bts xts a@(I (ai, _)) (mb, b, m, yts, cod)
     raiseError m $
     "the antecedent of an elimination rule of `" <>
     ai <>
-    "` must be of the form `(" <> showItems (ai : map (const "_") xts) <> ")`"
+    "` must be of the form `(" <>
+    showItems (ai : map (\(_, x, _) -> asText x) xts) <> ")`"
 
 ruleAsIdentPlus :: Rule -> WithEnv IdentifierPlus
 ruleAsIdentPlus (mb, b, m, xts, t) = do
