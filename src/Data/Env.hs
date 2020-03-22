@@ -56,7 +56,9 @@ data Env =
     , enumEnv :: Map.HashMap T.Text [(T.Text, Int)] -- [("choice", [("left", 0), ("right", 1)]), ...]
     , revEnumEnv :: Map.HashMap T.Text (T.Text, Int) -- [("left", ("choice", 0)), ("right", ("choice", 1)), ...]
     , indEnumEnv :: Map.HashMap T.Text [(T.Text, Int)] -- [("nat", [("zero", 0), ("succ", 1)]), ...]
+    , nameEnv :: Map.HashMap T.Text T.Text
     , revNameEnv :: IntMap.IntMap Int -- [("foo.13", "foo"), ...] (as corresponding int)
+    -- , specifiedNameSet :: S.Set T.Text
     , formationEnv :: IntMap.IntMap (Maybe WeakTermPlus)
     , labelEnv :: Map.HashMap T.Text [T.Text] -- "stream" ~> ["stream", "other-record-type", "head", "tail", "other-destructor"]
     , inductiveEnv :: RuleEnv -- "list" ~> (cons, Pi (A : tau). A -> list A -> list A)
@@ -101,7 +103,9 @@ initialEnv =
     , fileEnv = Map.empty
     , traceEnv = []
     , revEnumEnv = Map.empty
+    , nameEnv = Map.empty
     , revNameEnv = IntMap.empty
+    -- , specifiedNameSet = S.empty
     , formationEnv = IntMap.empty
     , inductiveEnv = Map.empty
     , coinductiveEnv = Map.empty
@@ -162,15 +166,11 @@ newNameWith'' s = do
   return $ I (s <> "-" <> T.pack (show i), i)
 
 newLLVMNameWith :: Identifier -> WithEnv Identifier
-newLLVMNameWith (I (s, i)) = do
+newLLVMNameWith (I (s, _)) = do
   j <- newCount
-  modify (\e -> e {revNameEnv = IntMap.insert j i (revNameEnv e)})
+  -- modify (\e -> e {revNameEnv = IntMap.insert j i (revNameEnv e)})
+  modify (\e -> e {nameEnv = Map.insert s s (nameEnv e)})
   return $ I (llvmString s, j)
-
-newLLVMNameWith' :: T.Text -> WithEnv Identifier
-newLLVMNameWith' s = do
-  i <- newCount
-  return $ I (llvmString s <> "-" <> T.pack (show i), i)
 
 llvmString :: T.Text -> T.Text
 llvmString "" = error "llvmString called for the empty string"

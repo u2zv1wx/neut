@@ -6,8 +6,7 @@ module Elaborate.Synthesize
 
 import Control.Monad.Except
 import Control.Monad.State
-import Data.List (sortBy)
-import Debug.Trace
+import Data.List (sortOn)
 
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.PQueue.Min as Q
@@ -37,11 +36,7 @@ synthesize = do
     Just (Enriched _ _ (ConstraintQuasiPattern m ess e)) ->
       resolvePiElim m ess e
     Just (Enriched _ _ (ConstraintFlexRigid m ess e)) -> resolvePiElim m ess e
-    Just (Enriched _ _ _) -> do
-      let pcs = setupPosInfo $ Q.toList q
-      let pcs' = sortBy (\x y -> fst x `compare` fst y) pcs
-      prepareInvRename
-      showErrors [] pcs' >>= throwError
+    Just (Enriched _ _ _) -> throwTypeErrors
 
 -- e1だけがstuckしているとき、e2だけがstuckしているとき、両方がstuckしているときをそれぞれ
 -- 独立したケースとして扱えるようにしたほうがよい（そうすればsubstを減らせる）
@@ -188,11 +183,17 @@ takeByCount (i:is) xs = do
   let yss = takeByCount is (drop i xs)
   ys : yss
 
--- type PosInfo = (Path Abs File, Maybe Loc)
+throwTypeErrors :: WithEnv ()
+throwTypeErrors = do
+  q <- gets constraintQueue
+  let pcs = sortOn fst $ setupPosInfo $ Q.toList q
+  modify (\env -> env {count = 0})
+  constructErrors [] pcs >>= throwError
+
 setupPosInfo :: [EnrichedConstraint] -> [(PosInfo, PreConstraint)]
 setupPosInfo [] = []
 setupPosInfo ((Enriched (e1, e2) _ _):cs) = do
-  case (getPosInfo' $ metaOf e1, getPosInfo' $ metaOf e2) of
+  case (getConstraintPosInfo $ metaOf e1, getConstraintPosInfo $ metaOf e2) of
     (Just pos1, Just pos2) -> do
       case snd pos1 `compare` snd pos2 of
         LT -> (pos2, (e2, e1)) : setupPosInfo cs -- pos1 < pos2
@@ -200,31 +201,15 @@ setupPosInfo ((Enriched (e1, e2) _ _):cs) = do
         GT -> (pos1, (e1, e2)) : setupPosInfo cs -- pos1 > pos2
     (Just pos1, Nothing) -> (pos1, (e1, e2)) : setupPosInfo cs
     (Nothing, Just pos2) -> (pos2, (e2, e1)) : setupPosInfo cs
-    _ ->
-      trace
-        ("Nothing! e1.meta:\n" <>
-         showMeta' (fst e1) <> "\ne2.meta:\n" <> showMeta' (fst e2)) $
-      setupPosInfo cs -- fixme (loc info not available)
+    _ -> setupPosInfo cs -- fixme (loc info not available)
 
-showErrors :: [PosInfo] -> [(PosInfo, PreConstraint)] -> WithEnv [Log]
-showErrors _ [] = return []
-showErrors ps ((pos, (e1, e2)):pcs) = do
+constructErrors :: [PosInfo] -> [(PosInfo, PreConstraint)] -> WithEnv [Log]
+constructErrors _ [] = return []
+constructErrors ps ((pos, (e1, e2)):pcs) = do
   e1' <- invRename e1
   e2' <- invRename e2
-  -- let e1' = e1
-  -- let e2' = e2
-  showErrors' pos ps e1' e2' pcs
-
-showErrors' ::
-     PosInfo
-  -> [PosInfo]
-  -> WeakTermPlus
-  -> WeakTermPlus
-  -> [(PosInfo, PreConstraint)]
-  -> WithEnv [Log]
-showErrors' pos ps e1 e2 pcs = do
-  let msg = constructErrorMsg e1 e2
-  as <- showErrors (pos : ps) pcs
+  let msg = constructErrorMsg e1' e2'
+  as <- constructErrors (pos : ps) pcs
   return $ logError (Just pos) msg : as
 
 constructErrorMsg :: WeakTermPlus -> WeakTermPlus -> T.Text
@@ -232,8 +217,8 @@ constructErrorMsg e1 e2 =
   "couldn't verify the definitional equality of the following two terms:\n- " <>
   toText e1 <> "\n- " <> toText e2
 
-getPosInfo' :: Meta -> Maybe PosInfo
-getPosInfo' m =
+getConstraintPosInfo :: Meta -> Maybe PosInfo
+getConstraintPosInfo m =
   case (metaFileName m, metaConstraintLocation m) of
     (Just path, Just l) -> return (path, l)
     _ -> Nothing

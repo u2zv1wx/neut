@@ -158,7 +158,7 @@ infer' ctx (m, WeakTermSigmaElim t xts e1 e2) = do
   (e1', t1, mlSigma) <- infer' ctx e1
   xtls <- inferSigma ctx xts
   let (xts', mlSigArgList) = unzip xtls
-  (e2', t2, ml2) <- infer' (ctx ++ xtls) e2
+  (e2', t2, ml2) <- infer' (ctx ++ xtls) e2 -- ここでxtlsでctxを伸ばさないほうがよい？
   -- insert constraints
   insConstraintEnv t1 (fst e1', WeakTermSigma xts')
   forM_ mlSigArgList $ \mlSigArg -> insLevelLE mlSigArg mlSigma

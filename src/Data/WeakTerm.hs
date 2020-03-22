@@ -458,7 +458,9 @@ toText (_, WeakTermIter (_, x, _) xts e) = do
   let argStr = inParen $ showItems $ map showArg xts
   showCons ["μ", asText' x, argStr, toText e]
 toText (_, WeakTermConst x) = asText' x
-toText (_, WeakTermZeta x) = asText' x
+toText (_, WeakTermZeta (I (_, i))) = "?M" <> T.pack (show i)
+  -- asText' x
+-- toText (_, WeakTermZeta x) = asText' x
 toText (_, WeakTermInt _ a) = T.pack $ show a
 toText (_, WeakTermFloat16 a) = T.pack $ show a
 toText (_, WeakTermFloat32 a) = T.pack $ show a

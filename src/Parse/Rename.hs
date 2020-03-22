@@ -7,7 +7,6 @@ module Parse.Rename
   , rename'
   , NameEnv
   , invRename
-  , prepareInvRename
   ) where
 
 import Control.Monad.Except
@@ -388,52 +387,10 @@ lookupStrict'' nenv m x =
     Just x' -> return x'
     Nothing -> raiseError m $ "undefined variable:  " <> asText x
 
-prepareInvRename :: WithEnv ()
-prepareInvRename = do
-  modify (\env -> env {count = 0})
-
-data IdentKind
-  = IdentKindUpsilon
-  | IdentKindZeta
-
--- fixme
-invRenameIdentifier :: IdentKind -> Identifier -> WithEnv Identifier
-invRenameIdentifier IdentKindUpsilon (I (s, i)) = do
-  rnenv <- gets revNameEnv
-  case IntMap.lookup i rnenv of
-    Just i' -> do
-      i'' <- traceIdentifier rnenv i'
-      return $ I (s, i'')
-    Nothing -> do
-      j <- newCount
-      let s' = T.pack $ "var" ++ show j
-      -- fixme
-      -- modify (\env -> env {revNameEnv = IntMap.insert i j rnenv})
-      return $ asIdent s'
-invRenameIdentifier IdentKindZeta (I (s, i)) = do
-  rnenv <- gets revNameEnv
-  case IntMap.lookup i rnenv of
-    Just i' -> do
-      i'' <- traceIdentifier rnenv i'
-      return $ I (s, i'')
-    Nothing -> do
-      j <- newCount
-      let s' = T.pack $ "?M" ++ show j
-      -- fixme
-      -- modify (\env -> env {revNameEnv = insertName x s rnenv})
-      return $ asIdent s'
-
-traceIdentifier :: IntMap.IntMap Int -> Int -> WithEnv Int
-traceIdentifier rnenv i = do
-  case IntMap.lookup i rnenv of
-    Nothing -> return i
-    Just i' -> traceIdentifier rnenv i'
-
--- Alpha-convert all the variables so that different variables have different names.
 invRename :: WeakTermPlus -> WithEnv WeakTermPlus
 invRename (m, WeakTermTau l) = return (m, WeakTermTau l)
 invRename (m, WeakTermUpsilon x) = do
-  x' <- invRenameIdentifier IdentKindUpsilon x
+  x' <- invRenameUpsilon x
   return (m, WeakTermUpsilon x')
 invRename (m, WeakTermPi mls xts t) = do
   (xts', t') <- invRenameBinder xts t
@@ -470,12 +427,12 @@ invRename (m, WeakTermSigmaElim t xts e1 e2) = do
   (xts', e2') <- invRenameBinder xts e2
   return (m, WeakTermSigmaElim t xts' e1' e2')
 invRename (m, WeakTermIter (mx, x, t) xts e) = do
-  x' <- invRenameIdentifier IdentKindUpsilon x
+  x' <- invRenameUpsilon x
   (xts', e') <- invRenameBinder xts e
   return (m, WeakTermIter (mx, x', t) xts' e')
 invRename (m, WeakTermConst x) = return (m, WeakTermConst x)
 invRename (m, WeakTermZeta h) = do
-  h' <- invRenameIdentifier IdentKindZeta h
+  h' <- invRenameZeta h
   return (m, WeakTermZeta h')
 invRename (m, WeakTermInt t x) = do
   return (m, WeakTermInt t x)
@@ -518,6 +475,27 @@ invRename (m, WeakTermCase (e, t) cxtes) = do
       return ((c, xts'), body')
   return (m, WeakTermCase (e', t') cxtes')
 
+invRenameUpsilon :: Identifier -> WithEnv Identifier
+invRenameUpsilon (I (s, i)) = do
+  nenv <- gets nameEnv
+  case Map.lookup s nenv of
+    Just s' -> return $ I (s', i)
+    Nothing -> do
+      j <- newCount
+      let s' = T.pack $ "var" ++ show j
+      modify (\e -> e {nameEnv = Map.insert s s' nenv})
+      return $ I (s', i)
+
+invRenameZeta :: Identifier -> WithEnv Identifier
+invRenameZeta (I (s, i)) = do
+  rnenv <- gets revNameEnv
+  case IntMap.lookup i rnenv of
+    Just j -> return $ I (s, j)
+    Nothing -> do
+      j <- newCount
+      modify (\env -> env {revNameEnv = IntMap.insert i j rnenv})
+      return $ I (s, j)
+
 invRenameBinder ::
      [IdentifierPlus]
   -> WeakTermPlus
@@ -527,7 +505,7 @@ invRenameBinder [] e = do
   return ([], e')
 invRenameBinder ((mx, x, t):xts) e = do
   t' <- invRename t
-  x' <- invRenameIdentifier IdentKindUpsilon x
+  x' <- invRenameUpsilon x
   (xts', e') <- invRenameBinder xts e
   return ((mx, x', t') : xts', e')
 
@@ -535,7 +513,7 @@ invRenameSigma :: [IdentifierPlus] -> WithEnv [IdentifierPlus]
 invRenameSigma [] = return []
 invRenameSigma ((mx, x, t):xts) = do
   t' <- invRename t
-  x' <- invRenameIdentifier IdentKindUpsilon x
+  x' <- invRenameUpsilon x
   xts' <- invRenameSigma xts
   return $ (mx, x', t') : xts'
 
@@ -561,7 +539,7 @@ invRenameStruct [] e = do
   e' <- invRename e
   return ([], e')
 invRenameStruct ((mx, x, t):xts) e = do
-  x' <- invRenameIdentifier IdentKindUpsilon x
+  x' <- invRenameUpsilon x
   (xts', e') <- invRenameStruct xts e
   return ((mx, x', t) : xts', e')
 

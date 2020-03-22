@@ -46,3 +46,6 @@
   (case xs
     ((list:nil) true)
     ((list:cons _ _) false)))
+
+
+(list:cons (i64 10))
