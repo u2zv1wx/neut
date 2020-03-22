@@ -159,14 +159,14 @@ parse' ((m, TreeNode ((_, TreeLeaf "include"):rest)):as)
             return $ includedQuasiStmtList ++ defList
   | otherwise = raiseSyntaxError m "(include LEAF)"
 parse' ((_, TreeNode ((_, TreeLeaf "statement"):as1)):as2) = parse' $ as1 ++ as2
-parse' ((m, TreeNode ((_, TreeLeaf "select-statement"):rest)):as2)
+parse' ((m, TreeNode ((_, TreeLeaf "introspect"):rest)):as2)
   | ((mx, TreeLeaf x):stmtClauseList) <- rest = do
     val <- retrieveCompileTimeVarValue mx x
     stmtClauseList' <- mapM parseStmtClause stmtClauseList
     case lookup val stmtClauseList' of
       Nothing -> parse' as2
       Just as1 -> parse' $ as1 ++ as2
-  | otherwise = raiseSyntaxError m "(select-statement LEAF TREE*)"
+  | otherwise = raiseSyntaxError m "(introspect LEAF TREE*)"
 parse' ((m, TreeNode ((_, TreeLeaf "constant"):rest)):as)
   | [(mn, TreeLeaf name), t] <- rest = do
     t' <- macroExpand t >>= interpret
@@ -324,7 +324,7 @@ keywordSet =
     , "attribute"
     , "constant"
     , "statement"
-    , "select-statement"
+    , "introspect"
     , "let"
     , "definition"
     , "inductive"

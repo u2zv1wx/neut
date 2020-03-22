@@ -1,4 +1,4 @@
-(select-statement OS
+(introspect OS
   (linux (include "constant/linux.neut"))
   (darwin (include "constant/darwin.neut")))
 

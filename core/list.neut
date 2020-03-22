@@ -12,8 +12,10 @@
 
 (definition list:head ([a tau] (xs (list a)))
   (case xs
-    ((list:nil) (option:none))
-    ((list:cons y _) (option:some y))))
+    ((list:nil)
+      (option:none))
+    ((list:cons y _)
+      (option:some y))))
 
 (definition list:length ([a tau] (xs (list a)))
   (case xs
@@ -22,8 +24,10 @@
 
 (definition list:map ([a tau] [b tau] (f (hom a b)) (xs (list a)))
   (case xs
-    ((list:nil) (list:nil))
-    ((list:cons y ys) (list:cons (f y) (list:map a b f ys)))))
+    ((list:nil)
+      (list:nil))
+    ((list:cons y ys)
+      (list:cons (f y) (list:map a b f ys)))))
 
 (definition some-function ([a tau] (xs (list a)))
   (case xs

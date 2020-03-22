@@ -691,10 +691,10 @@ substRuleType sub@((a1, es1), (a2, es2)) (m, WeakTermPiElim e es)
     case (mapM asUpsilon es1, mapM asUpsilon es) of
       (Just xs', Just ys')
         | xs' == ys' -> return (m, WeakTermPiElim (mx, WeakTermUpsilon a2) es2)
-      (_, _) ->
+      _ ->
         raiseError
           m
-          "generalized inductive/coinductive type cannot be used to construct a nested inductive/coinductive type"
+          "generalized inductive type cannot be used to construct a nested inductive type"
   | otherwise = do
     e' <- substRuleType sub e
     es' <- mapM (substRuleType sub) es
