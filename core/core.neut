@@ -11,7 +11,3 @@
 (include "option.neut")
 
 (include "string.neut")
-
-(coinductive stream ((a tau))
-  (head ((_ (stream a))) a)
-  (tail ((_ (stream a))) (stream a)))
