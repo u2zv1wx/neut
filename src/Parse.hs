@@ -23,9 +23,9 @@ import Data.Basic
 import Data.Env
 import Data.Tree
 import Data.WeakTerm
+import Parse.Discern
 import Parse.Interpret
 import Parse.MacroExpand
-import Parse.Rename
 import Parse.Rule
 import Parse.Tokenize
 import Parse.Utility
@@ -33,7 +33,7 @@ import Parse.Utility
 parse :: Path Abs File -> WithEnv WeakStmt
 parse inputPath = do
   stmtList <- visit inputPath
-  stmtList' <- renameQuasiStmtList stmtList
+  stmtList' <- discern stmtList
   pushTrace inputPath
   concatQuasiStmtList stmtList'
 

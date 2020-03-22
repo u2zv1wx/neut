@@ -165,13 +165,6 @@ newNameWith'' s = do
   i <- newCount
   return $ I (s <> "-" <> T.pack (show i), i)
 
-newLLVMNameWith :: Identifier -> WithEnv Identifier
-newLLVMNameWith (I (s, _)) = do
-  j <- newCount
-  -- modify (\e -> e {revNameEnv = IntMap.insert j i (revNameEnv e)})
-  modify (\e -> e {nameEnv = Map.insert s s (nameEnv e)})
-  return $ I (llvmString s, j)
-
 llvmString :: T.Text -> T.Text
 llvmString "" = error "llvmString called for the empty string"
 llvmString s = T.cons (llvmHeadChar $ T.head s) (T.map llvmTailChar $ T.tail s)
