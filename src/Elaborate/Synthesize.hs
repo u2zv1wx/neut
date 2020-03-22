@@ -18,7 +18,7 @@ import Data.Env
 import Data.Log
 import Data.WeakTerm
 import Elaborate.Analyze
-import Parse.Rename
+import Elaborate.Unravel
 
 -- Given a queue of constraints (easier ones comes earlier), try to synthesize
 -- all of them using heuristics.
