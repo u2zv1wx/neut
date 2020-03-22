@@ -1,3 +1,5 @@
+(no-implicit-core)
+
 (include "foundation.neut")
 
 (include "top.neut")

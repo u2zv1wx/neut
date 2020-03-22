@@ -1,4 +1,4 @@
-(include library "core/core.neut")
+;; (include library "core/core.neut")
 
 (coinductive my-record ()
   (item-1 ((_ (my-record))) i64)

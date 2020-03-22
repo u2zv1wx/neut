@@ -1,3 +1,5 @@
+(no-implicit-core)
+
 (include "notation.neut")
 
 (inductive option ((a tau))

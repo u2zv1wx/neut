@@ -1,3 +1,5 @@
+(no-implicit-core)
+
 (constant file-descriptor tau)
 
 (constant stdin file-descriptor)
