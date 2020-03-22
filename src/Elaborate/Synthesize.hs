@@ -199,8 +199,8 @@ setupPosInfo ((Enriched (e1, e2) _ _):cs) = do
 constructErrors :: [PosInfo] -> [(PosInfo, PreConstraint)] -> WithEnv [Log]
 constructErrors _ [] = return []
 constructErrors ps ((pos, (e1, e2)):pcs) = do
-  e1' <- invRename e1
-  e2' <- invRename e2
+  e1' <- unravel e1
+  e2' <- unravel e2
   let msg = constructErrorMsg e1' e2'
   as <- constructErrors (pos : ps) pcs
   return $ logError (Just pos) msg : as

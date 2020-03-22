@@ -6,7 +6,7 @@ module Parse.Rename
   , insertName
   , rename'
   , NameEnv
-  , invRename
+  , unravel
   ) where
 
 import Control.Monad.Except
@@ -387,96 +387,96 @@ lookupStrict'' nenv m x =
     Just x' -> return x'
     Nothing -> raiseError m $ "undefined variable:  " <> asText x
 
-invRename :: WeakTermPlus -> WithEnv WeakTermPlus
-invRename (m, WeakTermTau l) = return (m, WeakTermTau l)
-invRename (m, WeakTermUpsilon x) = do
-  x' <- invRenameUpsilon x
+unravel :: WeakTermPlus -> WithEnv WeakTermPlus
+unravel (m, WeakTermTau l) = return (m, WeakTermTau l)
+unravel (m, WeakTermUpsilon x) = do
+  x' <- unravelUpsilon x
   return (m, WeakTermUpsilon x')
-invRename (m, WeakTermPi mls xts t) = do
-  (xts', t') <- invRenameBinder xts t
+unravel (m, WeakTermPi mls xts t) = do
+  (xts', t') <- unravelBinder xts t
   return (m, WeakTermPi mls xts' t')
-invRename (m, WeakTermPiPlus name mls xts t) = do
-  (xts', t') <- invRenameBinder xts t
+unravel (m, WeakTermPiPlus name mls xts t) = do
+  (xts', t') <- unravelBinder xts t
   return (m, WeakTermPiPlus name mls xts' t')
-invRename (m, WeakTermPiIntro xts e) = do
-  (xts', e') <- invRenameBinder xts e
+unravel (m, WeakTermPiIntro xts e) = do
+  (xts', e') <- unravelBinder xts e
   return (m, WeakTermPiIntro xts' e')
-invRename (m, WeakTermPiIntroNoReduce xts e) = do
-  (xts', e') <- invRenameBinder xts e
+unravel (m, WeakTermPiIntroNoReduce xts e) = do
+  (xts', e') <- unravelBinder xts e
   return (m, WeakTermPiIntroNoReduce xts' e')
 -- the "content" of this term is not used in toText, and so there's no need to rename this term
-invRename (m, WeakTermPiIntroPlus ind (name, args) xts e) =
+unravel (m, WeakTermPiIntroPlus ind (name, args) xts e) =
   return (m, WeakTermPiIntroPlus ind (name, args) xts e)
-invRename (m, WeakTermPiElim e es) = do
-  e' <- invRename e
-  es' <- mapM invRename es
+unravel (m, WeakTermPiElim e es) = do
+  e' <- unravel e
+  es' <- mapM unravel es
   return (m, WeakTermPiElim e' es')
-invRename (m, WeakTermSigma xts) =
+unravel (m, WeakTermSigma xts) =
   case splitLast xts of
     Nothing -> return (m, WeakTermSigma xts)
     Just (yts, (my, y, t)) -> do
-      yts' <- invRenameSigma yts
-      t' <- invRename t
+      yts' <- unravelSigma yts
+      t' <- unravel t
       return (m, WeakTermSigma $ yts' ++ [(my, y, t')])
-invRename (m, WeakTermSigmaIntro t es) = do
-  es' <- mapM invRename es
+unravel (m, WeakTermSigmaIntro t es) = do
+  es' <- mapM unravel es
   -- don't rename t since it is not printed
   return (m, WeakTermSigmaIntro t es')
-invRename (m, WeakTermSigmaElim t xts e1 e2) = do
-  e1' <- invRename e1
-  (xts', e2') <- invRenameBinder xts e2
+unravel (m, WeakTermSigmaElim t xts e1 e2) = do
+  e1' <- unravel e1
+  (xts', e2') <- unravelBinder xts e2
   return (m, WeakTermSigmaElim t xts' e1' e2')
-invRename (m, WeakTermIter (mx, x, t) xts e) = do
-  x' <- invRenameUpsilon x
-  (xts', e') <- invRenameBinder xts e
+unravel (m, WeakTermIter (mx, x, t) xts e) = do
+  x' <- unravelUpsilon x
+  (xts', e') <- unravelBinder xts e
   return (m, WeakTermIter (mx, x', t) xts' e')
-invRename (m, WeakTermConst x) = return (m, WeakTermConst x)
-invRename (m, WeakTermZeta h) = do
-  h' <- invRenameZeta h
+unravel (m, WeakTermConst x) = return (m, WeakTermConst x)
+unravel (m, WeakTermZeta h) = do
+  h' <- unravelZeta h
   return (m, WeakTermZeta h')
-invRename (m, WeakTermInt t x) = do
+unravel (m, WeakTermInt t x) = do
   return (m, WeakTermInt t x)
-invRename (m, WeakTermFloat16 x) = return (m, WeakTermFloat16 x)
-invRename (m, WeakTermFloat32 x) = return (m, WeakTermFloat32 x)
-invRename (m, WeakTermFloat64 x) = return (m, WeakTermFloat64 x)
-invRename (m, WeakTermFloat t x) = do
+unravel (m, WeakTermFloat16 x) = return (m, WeakTermFloat16 x)
+unravel (m, WeakTermFloat32 x) = return (m, WeakTermFloat32 x)
+unravel (m, WeakTermFloat64 x) = return (m, WeakTermFloat64 x)
+unravel (m, WeakTermFloat t x) = do
   return (m, WeakTermFloat t x)
-invRename (m, WeakTermEnum s) = return (m, WeakTermEnum s)
-invRename (m, WeakTermEnumIntro x) = return (m, WeakTermEnumIntro x)
-invRename (m, WeakTermEnumElim (e, t) caseList) = do
-  e' <- invRename e
-  caseList' <- invRenameCaseList caseList
+unravel (m, WeakTermEnum s) = return (m, WeakTermEnum s)
+unravel (m, WeakTermEnumIntro x) = return (m, WeakTermEnumIntro x)
+unravel (m, WeakTermEnumElim (e, t) caseList) = do
+  e' <- unravel e
+  caseList' <- unravelCaseList caseList
   return (m, WeakTermEnumElim (e', t) caseList')
-invRename (m, WeakTermArray dom kind) = do
-  dom' <- invRename dom
+unravel (m, WeakTermArray dom kind) = do
+  dom' <- unravel dom
   return (m, WeakTermArray dom' kind)
-invRename (m, WeakTermArrayIntro kind es) = do
-  es' <- mapM invRename es
+unravel (m, WeakTermArrayIntro kind es) = do
+  es' <- mapM unravel es
   return (m, WeakTermArrayIntro kind es')
-invRename (m, WeakTermArrayElim kind xts e1 e2) = do
-  e1' <- invRename e1
-  (xts', e2') <- invRenameBinder xts e2
+unravel (m, WeakTermArrayElim kind xts e1 e2) = do
+  e1' <- unravel e1
+  (xts', e2') <- unravelBinder xts e2
   return (m, WeakTermArrayElim kind xts' e1' e2')
-invRename (m, WeakTermStruct ts) = return (m, WeakTermStruct ts)
-invRename (m, WeakTermStructIntro ets) = do
+unravel (m, WeakTermStruct ts) = return (m, WeakTermStruct ts)
+unravel (m, WeakTermStructIntro ets) = do
   let (es, ts) = unzip ets
-  es' <- mapM invRename es
+  es' <- mapM unravel es
   return (m, WeakTermStructIntro $ zip es' ts)
-invRename (m, WeakTermStructElim xts e1 e2) = do
-  e1' <- invRename e1
-  (xts', e2') <- invRenameStruct xts e2
+unravel (m, WeakTermStructElim xts e1 e2) = do
+  e1' <- unravel e1
+  (xts', e2') <- unravelStruct xts e2
   return (m, WeakTermStructElim xts' e1' e2')
-invRename (m, WeakTermCase (e, t) cxtes) = do
-  e' <- invRename e
-  t' <- invRename t
+unravel (m, WeakTermCase (e, t) cxtes) = do
+  e' <- unravel e
+  t' <- unravel t
   cxtes' <-
     flip mapM cxtes $ \((c, xts), body) -> do
-      (xts', body') <- invRenameBinder xts body
+      (xts', body') <- unravelBinder xts body
       return ((c, xts'), body')
   return (m, WeakTermCase (e', t') cxtes')
 
-invRenameUpsilon :: Identifier -> WithEnv Identifier
-invRenameUpsilon (I (s, i)) = do
+unravelUpsilon :: Identifier -> WithEnv Identifier
+unravelUpsilon (I (s, i)) = do
   nenv <- gets nameEnv
   case Map.lookup s nenv of
     Just s' -> return $ I (s', i)
@@ -486,8 +486,8 @@ invRenameUpsilon (I (s, i)) = do
       modify (\e -> e {nameEnv = Map.insert s s' nenv})
       return $ I (s', i)
 
-invRenameZeta :: Identifier -> WithEnv Identifier
-invRenameZeta (I (s, i)) = do
+unravelZeta :: Identifier -> WithEnv Identifier
+unravelZeta (I (s, i)) = do
   rnenv <- gets revNameEnv
   case IntMap.lookup i rnenv of
     Just j -> return $ I (s, j)
@@ -496,51 +496,51 @@ invRenameZeta (I (s, i)) = do
       modify (\env -> env {revNameEnv = IntMap.insert i j rnenv})
       return $ I (s, j)
 
-invRenameBinder ::
+unravelBinder ::
      [IdentifierPlus]
   -> WeakTermPlus
   -> WithEnv ([IdentifierPlus], WeakTermPlus)
-invRenameBinder [] e = do
-  e' <- invRename e
+unravelBinder [] e = do
+  e' <- unravel e
   return ([], e')
-invRenameBinder ((mx, x, t):xts) e = do
-  t' <- invRename t
-  x' <- invRenameUpsilon x
-  (xts', e') <- invRenameBinder xts e
+unravelBinder ((mx, x, t):xts) e = do
+  t' <- unravel t
+  x' <- unravelUpsilon x
+  (xts', e') <- unravelBinder xts e
   return ((mx, x', t') : xts', e')
 
-invRenameSigma :: [IdentifierPlus] -> WithEnv [IdentifierPlus]
-invRenameSigma [] = return []
-invRenameSigma ((mx, x, t):xts) = do
-  t' <- invRename t
-  x' <- invRenameUpsilon x
-  xts' <- invRenameSigma xts
+unravelSigma :: [IdentifierPlus] -> WithEnv [IdentifierPlus]
+unravelSigma [] = return []
+unravelSigma ((mx, x, t):xts) = do
+  t' <- unravel t
+  x' <- unravelUpsilon x
+  xts' <- unravelSigma xts
   return $ (mx, x', t') : xts'
 
-invRenameCaseList ::
+unravelCaseList ::
      [(WeakCase, WeakTermPlus)] -> WithEnv [(WeakCase, WeakTermPlus)]
-invRenameCaseList caseList = do
+unravelCaseList caseList = do
   let (ls, es) = unzip caseList
-  ls' <- mapM invRenameWeakCase ls
-  es' <- mapM invRename es
+  ls' <- mapM unravelWeakCase ls
+  es' <- mapM unravel es
   return $ zip ls' es'
 
-invRenameWeakCase :: WeakCase -> WithEnv WeakCase
-invRenameWeakCase (WeakCaseInt t a) = do
-  t' <- invRename t
+unravelWeakCase :: WeakCase -> WithEnv WeakCase
+unravelWeakCase (WeakCaseInt t a) = do
+  t' <- unravel t
   return $ WeakCaseInt t' a
-invRenameWeakCase l = return l
+unravelWeakCase l = return l
 
-invRenameStruct ::
+unravelStruct ::
      [(Meta, Identifier, ArrayKind)]
   -> WeakTermPlus
   -> WithEnv ([(Meta, Identifier, ArrayKind)], WeakTermPlus)
-invRenameStruct [] e = do
-  e' <- invRename e
+unravelStruct [] e = do
+  e' <- unravel e
   return ([], e')
-invRenameStruct ((mx, x, t):xts) e = do
-  x' <- invRenameUpsilon x
-  (xts', e') <- invRenameStruct xts e
+unravelStruct ((mx, x, t):xts) e = do
+  x' <- unravelUpsilon x
+  (xts', e') <- unravelStruct xts e
   return ((mx, x', t) : xts', e')
 
 insertName :: Identifier -> Identifier -> NameEnv -> NameEnv
