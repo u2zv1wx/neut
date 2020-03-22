@@ -152,7 +152,7 @@ parse' ((m, TreeNode ((_, TreeLeaf "include"):rest)):as)
   | [(_, TreeLeaf "library"), (mPath, TreeLeaf pathString)] <- rest =
     includeFile m mPath pathString getLibraryDirPath as
   | otherwise = raiseSyntaxError m "(include LEAF) | (include library LEAF)"
-parse' ((m, TreeNode ((_, TreeLeaf "use"):rest)):as)
+parse' ((m, TreeNode ((_, TreeLeaf "ensure"):rest)):as)
   | [(_, TreeLeaf pkg), (mUrl, TreeLeaf urlStr)] <- rest = do
     libDir <- getLibraryDirPath
     pkg' <- parseRelDir $ T.unpack pkg
@@ -166,7 +166,7 @@ parse' ((m, TreeNode ((_, TreeLeaf "use"):rest)):as)
       outputNote $ "installing " <> pkg <> " into " <> T.pack (toFilePath path)
       install (getResponseBody item) path
     parse' as
-  | otherwise = raiseSyntaxError m "(use LEAF LEAF)"
+  | otherwise = raiseSyntaxError m "(ensure LEAF LEAF)"
 parse' ((_, TreeNode ((_, TreeLeaf "statement"):as1)):as2) = parse' $ as1 ++ as2
 parse' ((m, TreeNode ((_, TreeLeaf "introspect"):rest)):as2)
   | ((mx, TreeLeaf x):stmtClauseList) <- rest = do
@@ -361,7 +361,7 @@ keywordSet =
     , "keyword"
     , "enum"
     , "include"
-    , "use"
+    , "ensure"
     , "attribute"
     , "constant"
     , "statement"
