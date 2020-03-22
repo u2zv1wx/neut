@@ -22,7 +22,6 @@ import Parse.Rename
 
 -- Given a queue of constraints (easier ones comes earlier), try to synthesize
 -- all of them using heuristics.
--- {} synthesize {}
 synthesize :: WithEnv ()
 synthesize = do
   q <- gets constraintQueue
@@ -81,7 +80,6 @@ resolveDelta iter mess1 mess2 = do
 -- If the given pattern is a flex-rigid pattern like ?M @ x @ x @ e1 @ y == e,
 -- this function replaces all the arguments that are not variable by
 -- fresh variables, and try to resolve the new quasi-pattern ?M @ x @ x @ z @ y == e.
--- {} resolvePiElim {}
 resolvePiElim :: Hole -> [[WeakTermPlus]] -> WeakTermPlus -> WithEnv ()
 resolvePiElim m ess e = do
   let lengthInfo = map length ess
@@ -92,7 +90,6 @@ resolvePiElim m ess e = do
   deleteMin
   chain $ map (resolveHole m) lamList
 
--- {} resolveHole {}
 resolveHole :: Hole -> WeakTermPlus -> WithEnv ()
 resolveHole m@(I (_, i)) e = do
   modify (\env -> env {substEnv = IntMap.insert i e (substEnv env)})
@@ -102,7 +99,6 @@ resolveHole m@(I (_, i)) e = do
   modify (\env -> env {constraintQueue = q1' `Q.union` q2})
   synthesize
 
--- {} asAnalyzable {}
 asAnalyzable :: EnrichedConstraint -> EnrichedConstraint
 asAnalyzable (Enriched cs ms _) = Enriched cs ms ConstraintAnalyzable
 
@@ -128,9 +124,6 @@ toAltList :: [IdentifierPlus] -> WithEnv [[IdentifierPlus]]
 toAltList xts = do
   let xs = map (\(_, x, _) -> x) xts
   result <- mapM (discardInactive xts) $ chooseActive $ toIndexInfo xs
-  -- forM_ (map (map fst) result) $ \xs -> do
-  --   let info = toInfo "toAltList: linearity is not satisfied:" xs
-  --   assertUP info $ linearCheck xs
   return result
 
 -- [x, x, y, z, z] ~> [(x, [0, 1]), (y, [2]), (z, [3, 4])]
