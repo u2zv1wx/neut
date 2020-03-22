@@ -8,7 +8,7 @@ import Control.Monad.State
 import Options.Applicative
 import Path
 import Path.IO
-import System.Directory (getDirectoryContents)
+import System.Directory (listDirectory)
 import System.Exit
 import System.Process
 import Text.Read (readMaybe)
@@ -181,9 +181,9 @@ run (Check inputPathStr colorizeFlag mEndOfEntry) = do
           exitWith (ExitFailure 1)
 run (Archive inputPathStr mOutputPathStr) = do
   inputPath <- resolveDir' inputPathStr
+  contents <- listDirectory $ toFilePath inputPath
   mOutputPath <- mapM resolveFile' mOutputPathStr
   outputPath <- toFilePath <$> constructOutputArchivePath inputPath mOutputPath
-  contents <- getDirectoryContents $ toFilePath inputPath
   archive outputPath (toFilePath inputPath) contents
 run (Complete inputPathStr l c) = do
   inputPath <- resolveFile' inputPathStr
