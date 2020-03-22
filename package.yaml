@@ -14,6 +14,7 @@ dependencies:
 - binary
 - bytestring
 - containers
+- directory
 - half
 - hashable
 - mtl
@@ -23,8 +24,10 @@ dependencies:
 - pqueue
 - pretty-show
 - process
+- tar
 - text
 - unordered-containers
+- zlib
 
 library:
   source-dirs: src
