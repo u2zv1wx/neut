@@ -6,7 +6,6 @@ module Data.Log
   , logInfo
   , logInfo'
   , logError
-  -- , logError'
   , logCritical
   , logCritical'
   ) where
@@ -82,11 +81,8 @@ logInfo' text = (Nothing, LogLevelNote, text)
 logError :: PosInfo -> T.Text -> Log
 logError pos text = (Just pos, LogLevelError, text)
 
--- logError' :: T.Text -> Log
--- logError' text = logError Nothing text
 logCritical :: PosInfo -> T.Text -> Log
 logCritical pos text = (Just pos, LogLevelCritical, text)
 
 logCritical' :: T.Text -> Log
 logCritical' text = (Nothing, LogLevelCritical, text)
-  -- logCritical Nothing text
