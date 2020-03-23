@@ -105,7 +105,7 @@ clarify (m, TermEnumElim (e, _) bs) = do
 clarify (m, TermArray {}) = do
   returnArrayType m
 clarify (m, TermArrayIntro k es) = do
-  retImmType <- returnCartesianImmediate
+  retImmType <- returnCartesianImmediate m
   -- arrayType = Sigma{k} [_ : IMMEDIATE, ..., _ : IMMEDIATE]
   name <- newNameWith' "array"
   let ts = map Left $ replicate (length es) retImmType

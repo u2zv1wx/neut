@@ -56,18 +56,17 @@ withHeader nm x t e =
 --   e
 -- 変数xに型t由来のaffineを適用して破棄する。
 withHeaderAffine :: Identifier -> CodePlus -> CodePlus -> WithEnv CodePlus
-withHeaderAffine x t e = do
+withHeaderAffine x t e@(m, _) = do
   hole <- newNameWith' "unit"
-  discardUnusedVar <- toAffineApp emptyMeta x t
-  return (emptyMeta, CodeUpElim hole discardUnusedVar e)
+  discardUnusedVar <- toAffineApp m x t
+  return (m, CodeUpElim hole discardUnusedVar e)
 
 -- withHeaderLinear z x e ~>
 --   bind z := return x in
 --   e
 -- renameするだけ。
 withHeaderLinear :: Identifier -> Identifier -> CodePlus -> WithEnv CodePlus
-withHeaderLinear z x e = do
-  let m = emptyMeta
+withHeaderLinear z x e@(m, _) =
   return (m, CodeUpElim z (m, CodeUpIntro (m, DataUpsilon x)) e)
 
 -- withHeaderRelevant x t [x1, ..., x{N}] e ~>
@@ -134,11 +133,10 @@ toLinearChain xs = do
 withHeaderRelevant' ::
      CodePlus -> DataPlus -> LinearChain -> CodePlus -> WithEnv CodePlus
 withHeaderRelevant' _ _ [] cont = return cont
-withHeaderRelevant' t expVar ((x, (x1, x2)):chain) cont = do
-  let m = fst cont
+withHeaderRelevant' t expVar ((x, (x1, x2)):chain) cont@(m, _) = do
   cont' <- withHeaderRelevant' t expVar chain cont
   (sigVarName, sigVar) <- newDataUpsilonWith "sig"
-  let varX = toDataUpsilon (x, emptyMeta)
+  let varX = toDataUpsilon (x, m)
   return $
     ( m
     , CodeUpElim

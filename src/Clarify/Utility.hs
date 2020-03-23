@@ -54,13 +54,10 @@ bindLet :: [(Identifier, CodePlus)] -> CodePlus -> CodePlus
 bindLet [] cont = cont
 bindLet ((x, e):xes) cont = (fst e, CodeUpElim x e $ bindLet xes cont)
 
-returnUpsilon :: Identifier -> CodePlus
-returnUpsilon x = (emptyMeta, CodeUpIntro (emptyMeta, DataUpsilon x))
-
-returnCartesianImmediate :: WithEnv CodePlus
-returnCartesianImmediate = do
-  v <- cartesianImmediate emptyMeta
-  return (emptyMeta, CodeUpIntro v)
+returnCartesianImmediate :: Meta -> WithEnv CodePlus
+returnCartesianImmediate m = do
+  v <- cartesianImmediate m
+  return (m, CodeUpIntro v)
 
 toThetaInfo :: T.Text -> Meta -> WithEnv (T.Text, DataPlus)
 toThetaInfo thetaName m = do
@@ -82,7 +79,7 @@ cartesianImmediate m = do
       insCodeEnv
         ident
         [switchVarName, argVarName]
-        ( emptyMeta
+        ( m
         , CodeEnumElim
             [(argVarName, argVar)]
             switchVar
@@ -90,14 +87,12 @@ cartesianImmediate m = do
       return theta
 
 affineImmediate :: DataPlus -> WithEnv CodePlus
-affineImmediate _ =
-  return (emptyMeta, CodeUpIntro (emptyMeta, DataSigmaIntro arrVoidPtr []))
+affineImmediate (m, _) =
+  return (m, CodeUpIntro (m, DataSigmaIntro arrVoidPtr []))
 
 relevantImmediate :: DataPlus -> WithEnv CodePlus
-relevantImmediate argVar =
-  return
-    ( emptyMeta
-    , CodeUpIntro (emptyMeta, DataSigmaIntro arrVoidPtr [argVar, argVar]))
+relevantImmediate argVar@(m, _) =
+  return (m, CodeUpIntro (m, DataSigmaIntro arrVoidPtr [argVar, argVar]))
 
 cartesianStruct :: Meta -> [ArrayKind] -> WithEnv DataPlus
 cartesianStruct m ks = do
@@ -113,7 +108,7 @@ cartesianStruct m ks = do
       insCodeEnv
         ident
         [switchVarName, argVarName]
-        ( emptyMeta
+        ( m
         , CodeEnumElim
             [(argVarName, argVar)]
             switchVar
@@ -121,33 +116,31 @@ cartesianStruct m ks = do
       return theta
 
 affineStruct :: DataPlus -> [ArrayKind] -> WithEnv CodePlus
-affineStruct argVar ks = do
+affineStruct argVar@(m, _) ks = do
   xs <- mapM (const $ newNameWith' "var") ks
   return
-    ( emptyMeta
+    ( m
     , CodeStructElim
         (zip xs ks)
         argVar
-        (emptyMeta, CodeUpIntro (emptyMeta, DataSigmaIntro arrVoidPtr [])))
+        (m, CodeUpIntro (m, DataSigmaIntro arrVoidPtr [])))
 
 relevantStruct :: DataPlus -> [ArrayKind] -> WithEnv CodePlus
-relevantStruct argVar ks = do
+relevantStruct argVar@(m, _) ks = do
   xs <- mapM (const $ newNameWith' "var") ks
-  let vs = map (\y -> (emptyMeta, DataUpsilon y)) xs
+  let vs = map (\y -> (m, DataUpsilon y)) xs
   let vks = zip vs ks
   return
-    ( emptyMeta
+    ( m
     , CodeStructElim
         (zip xs ks)
         argVar
-        ( emptyMeta
+        ( m
         , CodeUpIntro
-            ( emptyMeta
+            ( m
             , DataSigmaIntro
                 arrVoidPtr
-                [ (emptyMeta, DataStructIntro vks)
-                , (emptyMeta, DataStructIntro vks)
-                ])))
+                [(m, DataStructIntro vks), (m, DataStructIntro vks)])))
 
 insCodeEnv :: T.Text -> [Identifier] -> CodePlus -> WithEnv ()
 insCodeEnv name args e = do
