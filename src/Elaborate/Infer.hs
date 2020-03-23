@@ -340,7 +340,7 @@ infer' ctx (m, WeakTermCase (e, t) cxtes) = do
           ienv <- gets impEnv
           let imp = concat $ maybeToList $ IntMap.lookup (asInt c) ienv
           xts' <- setupPatArgs m imp xts
-          (xts'', _) <- inferPatArgs ctx xts'
+          xts'' <- inferPatArgs ctx xts'
           let vs = map (\(mx, x, _) -> (mx, WeakTermUpsilon x)) xts''
           let expCons = (m {metaIsExplicit = True}, WeakTermUpsilon c)
           let app = (m, WeakTermPiElim expCons vs)
@@ -455,14 +455,13 @@ inferSigma ctx ((mx, x, t):xts) = do
   xts' <- inferSigma (ctx ++ [((mx, x, t'), ml)]) xts
   return $ ((mx, x, t'), ml) : xts'
 
-inferPatArgs ::
-     Context -> [IdentifierPlus] -> WithEnv ([IdentifierPlus], Context)
-inferPatArgs ctx [] = return ([], ctx)
+inferPatArgs :: Context -> [IdentifierPlus] -> WithEnv [IdentifierPlus]
+inferPatArgs _ [] = return []
 inferPatArgs ctx ((mx, x, t):xts) = do
   tl'@(t', ml) <- inferType' ctx t
   insWeakTypeEnv x tl'
-  (xts', ctx') <- inferPatArgs (ctx ++ [((mx, x, t'), ml)]) xts
-  return ((mx, x, t') : xts', ctx')
+  xts' <- inferPatArgs (ctx ++ [((mx, x, t'), ml)]) xts
+  return $ (mx, x, t') : xts'
 
 inferBinder ::
      Context
