@@ -59,9 +59,6 @@ type CodePlus = (Meta, Code)
 toDataUpsilon :: (Identifier, Meta) -> DataPlus
 toDataUpsilon (x, m) = (m, DataUpsilon x)
 
-toDataUpsilon' :: Identifier -> DataPlus
-toDataUpsilon' x = (emptyMeta, DataUpsilon x)
-
 asUpsilon :: DataPlus -> Maybe Identifier
 asUpsilon (_, DataUpsilon x) = Just x
 asUpsilon _ = Nothing

@@ -167,6 +167,12 @@ parse' ((m, TreeNode ((_, TreeLeaf "ensure"):rest)):as)
       install (getResponseBody item) path
     parse' as
   | otherwise = raiseSyntaxError m "(ensure LEAF LEAF)"
+parse' ((m, TreeNode ((_, TreeLeaf "attribute"):rest)):as)
+  | (_, TreeLeaf name):attrList <- rest = do
+    ss1 <- mapM (parseAttr name) attrList
+    ss2 <- parse' as
+    return $ ss1 ++ ss2
+  | otherwise = raiseSyntaxError m "(attribute LEAF TREE ... TREE)"
 parse' ((_, TreeNode ((_, TreeLeaf "statement"):as1)):as2) = parse' $ as1 ++ as2
 parse' ((m, TreeNode ((_, TreeLeaf "introspect"):rest)):as2)
   | ((mx, TreeLeaf x):stmtClauseList) <- rest = do
@@ -269,6 +275,13 @@ parseStr m quotedStr =
     Nothing -> raiseError m "the argument of `include` must be a string"
     Just str -> return str
 
+parseAttr :: T.Text -> TreePlus -> WithEnv QuasiStmt
+parseAttr name (m, TreeNode [(_, TreeLeaf "implicit"), (_, TreeLeaf num)]) = do
+  case readMaybe $ T.unpack num of
+    Nothing -> raiseError m "the argument of `implicit` must be an integer"
+    Just i -> return $ QuasiStmtImplicit m (asIdent name) i
+parseAttr _ t = raiseError (fst t) $ "invalid attribute: " <> showAsSExp t
+
 includeFile ::
      Meta
   -> Meta
@@ -351,6 +364,7 @@ keywordSet =
     , "ensure"
     , "constant"
     , "statement"
+    , "attribute"
     , "introspect"
     , "let"
     , "definition"

@@ -45,7 +45,9 @@ makeClosure mName mxts2 m mxts1 e = do
   let args = map fst xts1 ++ [envVarName]
   let body = (m, CodeSigmaElim arrVoidPtr (map fst xts2) envVar e')
   when (name `notElem` Map.keys cenv) $ insCodeEnv name args body
-  let fvEnv = (m, DataSigmaIntro arrVoidPtr $ map (toDataUpsilon' . fst) xts2)
+  let vs = map (\(mx, x, _) -> toDataUpsilon (x, mx)) mxts2
+  let fvEnv = (m, DataSigmaIntro arrVoidPtr vs)
+  -- let fvEnv = (m, DataSigmaIntro arrVoidPtr $ map (toDataUpsilon' . fst) xts2)
   return (m, DataSigmaIntro arrVoidPtr [envExp, fvEnv, (m, DataTheta name)])
 
 callClosure ::

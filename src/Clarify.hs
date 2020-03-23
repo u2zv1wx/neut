@@ -230,7 +230,7 @@ clarifyCase' m ((_, xts), e) envVarName = do
   xts' <- mapM clarifyArgs xts
   e'' <- linearize xts' e'
   let xs = map (\(_, x, _) -> x) xts
-  return (m, CodeSigmaElim arrVoidPtr xs (toDataUpsilon' envVarName) e'')
+  return (m, CodeSigmaElim arrVoidPtr xs (toDataUpsilon (envVarName, m)) e'')
 
 lookupRevCaseEnv :: Meta -> Int -> WithEnv T.Text
 lookupRevCaseEnv m i = do
