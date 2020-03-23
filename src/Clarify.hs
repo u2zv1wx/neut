@@ -77,7 +77,7 @@ clarify (m, TermSigmaIntro t es) = do
           _ -> raiseCritical m "the type of sigma-intro is wrong"
     _ -> raiseCritical m "the type of sigma-intro is wrong"
 clarify (m, TermSigmaElim t xts e1 e2) = do
-  clarify (m, TermPiElim e1 [t, (emptyMeta, TermPiIntro xts e2)])
+  clarify (m, TermPiElim e1 [t, (m, TermPiIntro xts e2)])
 clarify iter@(m, TermIter mxt@(_, x, _) mxts e) = do
   forM_ (mxt : mxts) insTypeEnv'
   e' <- clarify e
@@ -143,7 +143,7 @@ clarify (m, TermStructIntro eks) = do
 clarify (m, TermStructElim xks e1 e2) = do
   e1' <- clarify e1
   let (ms, xs, ks) = unzip3 xks
-  ts <- mapM inferKind ks
+  ts <- mapM (inferKind m) ks
   forM_ (zip3 ms xs ts) insTypeEnv'
   e2' <- clarify e2
   (structVarName, structVar) <- newDataUpsilonWith "struct"
@@ -362,8 +362,8 @@ complementaryChainOf xts = do
   zts <- chainTermPlus'' tenv xts []
   return $ nubBy (\(_, x, _) (_, y, _) -> x == y) zts
 
-toVar :: Identifier -> DataPlus
-toVar x = (emptyMeta, DataUpsilon x)
+toVar :: Meta -> Identifier -> DataPlus
+toVar m x = (m, DataUpsilon x)
 
 clarifyBinder ::
      [(Meta, Identifier, TermPlus)] -> WithEnv [(Meta, Identifier, CodePlus)]
@@ -467,7 +467,7 @@ toHeaderInfo ::
   -> TermPlus -- the type of argument
   -> Arg -- the way of use of argument (specifically)
   -> WithEnv ([Identifier], [DataPlus], CodePlus -> CodePlus) -- ([borrow], arg-to-syscall, ADD_HEADER_TO_CONTINUATION)
-toHeaderInfo _ x _ ArgImm = return ([], [toVar x], id)
+toHeaderInfo m x _ ArgImm = return ([], [toVar m x], id)
 toHeaderInfo _ _ _ ArgUnused = return ([], [], id)
 toHeaderInfo m x t ArgStruct = do
   (structVarName, structVar) <- newDataUpsilonWith "struct"
@@ -475,7 +475,7 @@ toHeaderInfo m x t ArgStruct = do
   return
     ( [structVarName]
     , [structVar]
-    , \cont -> (m, CodeUpElim structVarName (m, CodeUpIntro (toVar x)) cont))
+    , \cont -> (m, CodeUpElim structVarName (m, CodeUpIntro (toVar m x)) cont))
 toHeaderInfo m x t ArgArray = do
   arrayVarName <- newNameWith' "array"
   insTypeEnv' (m, arrayVarName, t)
@@ -490,7 +490,7 @@ toHeaderInfo m x t ArgArray = do
         , CodeSigmaElim
             arrVoidPtr
             [arrayTypeName, arrayInnerName]
-            (toVar x)
+            (toVar m x)
             ( m
             , CodeUpElim
                 arrayInnerTmpName
@@ -569,14 +569,14 @@ retWithBorrowedVars m cod xs resultVarName
       _ -> raiseCritical m "retWithBorrowedVars (sig)"
   | otherwise = raiseCritical m "retWithBorrowedVars"
 
-inferKind :: ArrayKind -> WithEnv TermPlus
-inferKind (ArrayKindIntS i) = return (emptyMeta, TermEnum (EnumTypeIntS i))
-inferKind (ArrayKindIntU i) = return (emptyMeta, TermEnum (EnumTypeIntU i))
-inferKind (ArrayKindFloat size) = do
+inferKind :: Meta -> ArrayKind -> WithEnv TermPlus
+inferKind m (ArrayKindIntS i) = return (m, TermEnum (EnumTypeIntS i))
+inferKind m (ArrayKindIntU i) = return (m, TermEnum (EnumTypeIntU i))
+inferKind m (ArrayKindFloat size) = do
   let constName = "f" <> T.pack (show (sizeAsInt size))
   i <- lookupConstNum' constName
-  return (emptyMeta, TermConst (I (constName, i)))
-inferKind _ = raiseCritical' "inferKind for void-pointer"
+  return (m, TermConst (I (constName, i)))
+inferKind _ _ = raiseCritical' "inferKind for void-pointer"
 
 sigToPi :: Meta -> [Data.Term.IdentifierPlus] -> WithEnv TermPlus
 sigToPi m xts = do
