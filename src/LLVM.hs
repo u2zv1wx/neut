@@ -289,11 +289,11 @@ llvmDataLet x (m, DataTheta y) cont = do
         llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType args) cont
 llvmDataLet x (_, DataUpsilon y) cont =
   llvmUncastLet x (LLVMDataLocal y) voidPtr cont
-llvmDataLet x (_, DataSigmaIntro k ds) cont = do
+llvmDataLet x (m, DataSigmaIntro k ds) cont = do
   let elemType = arrayKindToLowType k
   let arrayType = LowTypeArrayPtr (length ds) elemType
   let dts = zip ds (repeat elemType)
-  storeContent x arrayType dts cont
+  storeContent m x arrayType dts cont
 llvmDataLet x (_, DataFloat16 f) cont =
   llvmUncastLet x (LLVMDataFloat16 f) (LowTypeFloat FloatSize16) cont
 llvmDataLet x (_, DataFloat32 f) cont =
@@ -309,11 +309,11 @@ llvmDataLet x (_, DataEnumIntro intOrLabel) cont = do
     EnumValueLabel l -> do
       i <- toInteger <$> getEnumNum l
       llvmUncastLet x (LLVMDataInt i) (LowTypeIntS 64) cont
-llvmDataLet x (_, DataStructIntro dks) cont = do
+llvmDataLet x (m, DataStructIntro dks) cont = do
   let (ds, ks) = unzip dks
   let ts = map arrayKindToLowType ks
   let structType = LowTypeStructPtr ts
-  storeContent x structType (zip ds ts) cont
+  storeContent m x structType (zip ds ts) cont
 
 syscallToLLVM :: Syscall -> [LLVMData] -> WithEnv LLVM
 syscallToLLVM syscall ds = do
@@ -392,10 +392,15 @@ getLabelType m c = do
       return $ toFunPtrType []
 
 storeContent ::
-     Identifier -> LowType -> [(DataPlus, LowType)] -> LLVM -> WithEnv LLVM
-storeContent reg aggPtrType dts cont = do
+     Meta
+  -> Identifier
+  -> LowType
+  -> [(DataPlus, LowType)]
+  -> LLVM
+  -> WithEnv LLVM
+storeContent m reg aggPtrType dts cont = do
   (cast, castThen) <-
-    llvmCast (Just $ asText reg) (emptyMeta, DataUpsilon reg) aggPtrType
+    llvmCast (Just $ asText reg) (m, DataUpsilon reg) aggPtrType
   storeThenCont <- storeContent' cast aggPtrType (zip [0 ..] dts) cont
   castThenStoreThenCont <- castThen $ storeThenCont
   -- FIXME: getelementptrでsizeofを実現する方式を使えばallocsizeを計算する必要はそもそもないはず？
