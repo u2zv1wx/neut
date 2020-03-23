@@ -384,7 +384,7 @@ inferImplicit ctx m x f is = do
       let xtis = zip (zip xts mls) [0 ..]
       let vs = map toVar' xts
       let app = (m, WeakTermPiElim f vs)
-      (xtis', e', cod') <- inferImplicit' ctx is xtis app cod
+      (xtis', e', cod') <- inferImplicit' ctx m' is xtis app cod
       let lam = (m', WeakTermPiIntro xtis' e')
       let mls' = map fst $ filter (\(_, k) -> k `notElem` is) $ zip mls [0 ..]
       let piType = (m', WeakTermPi mls' xtis' cod')
@@ -396,23 +396,29 @@ inferImplicit ctx m x f is = do
 
 inferImplicit' ::
      Context
+  -> Meta
   -> [Int]
   -> [((IdentifierPlus, UnivLevelPlus), Int)]
   -> WeakTermPlus
   -> WeakTermPlus
   -> WithEnv ([IdentifierPlus], WeakTermPlus, WeakTermPlus)
-inferImplicit' _ _ [] e cod = return ([], e, cod)
-inferImplicit' ctx is ((c@((m, x, t), mlx), i):xtis) e cod
-  | i `elem` is = do
+inferImplicit' _ _ _ [] e cod = return ([], e, cod)
+inferImplicit' ctx m is ((c@((_, x, t), mlx), i):xtis) e cod
+  | i `elem` is
+    -- p "inferImplicit:"
+    -- p $ showMeta' m
+    -- p "mx:"
+    -- p $ showMeta' mx
+   = do
     (app, higherApp, ml) <- newHoleInCtx ctx m
     insConstraintEnv higherApp t
     insLevelEQ mlx ml
     let (xtls, ks) = unzip xtis
     let (xts, ls) = unzip xtls
     let (xts', e', cod') = substWeakTermPlus''' [(x, app)] xts e cod
-    inferImplicit' ctx is (zip (zip xts' ls) ks) e' cod'
+    inferImplicit' ctx m is (zip (zip xts' ls) ks) e' cod'
   | otherwise = do
-    (xtis', e', cod') <- inferImplicit' (ctx ++ [c]) is xtis e cod
+    (xtis', e', cod') <- inferImplicit' (ctx ++ [c]) m is xtis e cod
     return ((m, x, t) : xtis', e', cod')
 
 inferType' :: Context -> WeakTermPlus -> WithEnv (WeakTermPlus, UnivLevelPlus)

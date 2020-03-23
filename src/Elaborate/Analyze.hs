@@ -208,12 +208,18 @@ simp' ((e1, e2):cs) = do
         (Just (StuckPiElimUpsilon (x1@(I (_, i1)), _) []), _)
           | i1 `S.member` pvenv
           , occurCheck x1 (varWeakTermPlus e2) -> do
-            modify (\env -> env {substEnv = IntMap.insert i1 e2 (substEnv env)})
+            let m = supMeta (metaOf e1) (metaOf e2)
+            let e2' = (m, snd e2)
+            modify
+              (\env -> env {substEnv = IntMap.insert i1 e2' (substEnv env)})
             simp cs
         (_, Just (StuckPiElimUpsilon (x2@(I (_, i2)), _) []))
           | i2 `S.member` pvenv
           , occurCheck x2 (varWeakTermPlus e1) -> do
-            modify (\env -> env {substEnv = IntMap.insert i2 e1 (substEnv env)})
+            let m = supMeta (metaOf e1) (metaOf e2)
+            let e1' = (m, snd e1)
+            modify
+              (\env -> env {substEnv = IntMap.insert i2 e1' (substEnv env)})
             simp cs
         (Just (StuckPiElimZetaStrict h1 ies1), _)
           | xs1 <- concatMap getVarList ies1

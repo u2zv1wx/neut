@@ -97,7 +97,10 @@ showMeta' m = do
 supMeta :: Meta -> Meta -> Meta
 supMeta m1 m2
   | metaConstraintLocation m1 < metaConstraintLocation m2 =
-    m1 {metaConstraintLocation = metaConstraintLocation m2}
+    m1
+      { metaConstraintLocation = metaConstraintLocation m2
+      -- , metaFileName = metaFileName m2
+      }
   | otherwise = m1
 
 newMeta :: Int -> Int -> Path Abs File -> Meta
