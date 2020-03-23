@@ -81,7 +81,7 @@ elaborateStmt (WeakStmtLetSigma m xts e cont) = do
   cont' <- elaborateStmt cont
   return (m, TermSigmaElim (m, TermEnum $ EnumTypeIntS 64) xts'' e'' cont')
 elaborateStmt (WeakStmtImplicit m x@(I (_, i)) idx cont) = do
-  t <- lookupTypeEnv' x
+  t <- lookupTypeEnv' m x
   case t of
     (_, TermPi _ xts _) -> do
       if 0 <= idx && idx < length xts

@@ -235,28 +235,28 @@ lookupTypeEnv (I (_, i)) = do
   tenv <- gets typeEnv
   return $ IntMap.lookup i tenv
 
-lookupTypeEnv' :: Identifier -> WithEnv TermPlus
-lookupTypeEnv' (I (s, i))
+lookupTypeEnv' :: Meta -> Identifier -> WithEnv TermPlus
+lookupTypeEnv' m (I (s, i))
   | Just _ <- asLowTypeMaybe s = do
     l <- newCount
-    return (emptyMeta, TermTau l)
-  | Just op <- asUnaryOpMaybe s = unaryOpToType emptyMeta op
-  | Just op <- asBinaryOpMaybe s = binaryOpToType emptyMeta op
-  | Just lowType <- asArrayAccessMaybe s = arrayAccessToType emptyMeta lowType
+    return (m, TermTau l)
+  | Just op <- asUnaryOpMaybe s = unaryOpToType m op
+  | Just op <- asBinaryOpMaybe s = binaryOpToType m op
+  | Just lowType <- asArrayAccessMaybe s = arrayAccessToType m lowType
   | otherwise = do
     mt <- gets (IntMap.lookup i . typeEnv)
     case mt of
       Just (t, _) -> return t
-      Nothing -> raiseCritical' $ s <> " is not found in the type environment."
+      Nothing -> raiseCritical m $ s <> " is not found in the type environment."
 
-lookupTypeEnv'' :: Identifier -> TypeEnv -> WithEnv TermPlus
-lookupTypeEnv'' x@(I (s, i)) tenv
+lookupTypeEnv'' :: Meta -> Identifier -> TypeEnv -> WithEnv TermPlus
+lookupTypeEnv'' m x@(I (s, i)) tenv
   | Just _ <- asLowTypeMaybe s = do
     l <- newCount
-    return (emptyMeta, TermTau l)
-  | Just op <- asUnaryOpMaybe s = unaryOpToType emptyMeta op
-  | Just op <- asBinaryOpMaybe s = binaryOpToType emptyMeta op
-  | Just lowType <- asArrayAccessMaybe s = arrayAccessToType emptyMeta lowType
+    return (m, TermTau l)
+  | Just op <- asUnaryOpMaybe s = unaryOpToType m op
+  | Just op <- asBinaryOpMaybe s = binaryOpToType m op
+  | Just lowType <- asArrayAccessMaybe s = arrayAccessToType m lowType
   | otherwise = do
     case IntMap.lookup i tenv of
       Just (t, _) -> return t

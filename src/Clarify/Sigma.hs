@@ -37,7 +37,7 @@ cartesianSigma (I (thetaName, i)) m k mxts = do
       insCodeEnv
         ident
         [switchVarName, argVarName]
-        ( emptyMeta
+        ( m
         , CodeEnumElim
             [(argVarName, argVar)]
             switchVar
@@ -104,7 +104,7 @@ relevantSigma argVar m k mxts = do
   as <- forM xts $ \(x, t) -> toRelevantApp m x t
   -- pairVarNameList == [pair-1, ...,  pair-n]
   (pairVarNameList, pairVarTypeList) <- unzip <$> mapM toPairInfo xts
-  transposedPair <- transposeSigma k pairVarTypeList
+  transposedPair <- transposeSigma m k pairVarTypeList
   let body = bindLet (zip pairVarNameList as) transposedPair
   body' <- linearize xts body
   return (m, CodeSigmaElim k (map fst xts) argVar body')
@@ -120,22 +120,21 @@ toPairInfo (_, t) = do
 --   ...
 --   let (xn, yn) := dn in
 --   return ((x1, ..., xn), (y1, ..., yn))
-transposeSigma :: ArrayKind -> [(DataPlus, CodePlus)] -> WithEnv CodePlus
-transposeSigma k ds = do
+transposeSigma ::
+     Meta -> ArrayKind -> [(DataPlus, CodePlus)] -> WithEnv CodePlus
+transposeSigma m k ds = do
   (xVarNameList, xVarList) <-
     unzip <$> mapM (const $ newDataUpsilonWith "sig-x") ds
   (yVarNameList, yVarList) <-
     unzip <$> mapM (const $ newDataUpsilonWith "sig-y") ds
   return $
     bindSigmaElim (zip (zip xVarNameList yVarNameList) ds) $
-    ( emptyMeta
+    ( m
     , CodeUpIntro
-        ( emptyMeta
+        ( m
         , DataSigmaIntro
             arrVoidPtr
-            [ (emptyMeta, DataSigmaIntro k xVarList)
-            , (emptyMeta, DataSigmaIntro k yVarList)
-            ]))
+            [(m, DataSigmaIntro k xVarList), (m, DataSigmaIntro k yVarList)]))
 
 bindSigmaElim ::
      [((Identifier, Identifier), (DataPlus, CodePlus))] -> CodePlus -> CodePlus

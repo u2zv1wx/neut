@@ -55,11 +55,11 @@ type Hole = Identifier
 
 type IdentifierPlus = (Meta, Identifier, TermPlus)
 
-toTermUpsilon :: Identifier -> TermPlus
-toTermUpsilon x = (emptyMeta, TermUpsilon x)
+toTermUpsilon :: Meta -> Identifier -> TermPlus
+toTermUpsilon m x = (m, TermUpsilon x)
 
-termZero :: TermPlus
-termZero = (emptyMeta, TermEnumIntro (EnumValueIntS 64 0))
+termZero :: Meta -> TermPlus
+termZero m = (m, TermEnumIntro (EnumValueIntS 64 0))
 
 varTermPlus :: TermPlus -> [Identifier]
 varTermPlus (_, TermTau _) = []

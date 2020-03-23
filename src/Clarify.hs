@@ -46,7 +46,7 @@ clarify lam@(m, TermPiIntroNoReduce mxts e) = do
   retClosure Nothing fvs m mxts e'
 clarify (m, TermPiIntroPlus _ (name, args) mxts e) = do
   forM_ mxts insTypeEnv'
-  case varTermPlus (m, TermPiIntro args termZero) of
+  case varTermPlus (m, TermPiIntro args $ termZero m) of
     [] -> do
       name' <- lookupLLVMEnumEnv m name
       e' <- clarify e
@@ -66,10 +66,10 @@ clarify (m, TermSigmaIntro t es) = do
       | length xts == length es -> do
         tPi <- sigToPi mSig xts
         case tPi of
-          (_, TermPi _ [zu, kp@(_, k, (_, TermPi _ yts _))] _) -- i.e. Sigma yts
+          (_, TermPi _ [zu, kp@(mk, k, (_, TermPi _ yts _))] _) -- i.e. Sigma yts
             | length yts == length es -> do
-              let xvs = map (\(_, x, _) -> toTermUpsilon x) yts
-              let kv = toTermUpsilon k
+              let xvs = map (\(mx, x, _) -> toTermUpsilon mx x) yts
+              let kv = toTermUpsilon mk k
               -- eager product
               let bindArgsThen = \e -> (m, TermPiElim (m, TermPiIntro yts e) es)
               clarify $
@@ -195,7 +195,7 @@ clarifyCase ::
   -> WithEnv CodePlus
 clarifyCase m cxtes typeVarName envVarName lamVarName = do
   es <- mapM (\cxte -> clarifyCase' m cxte envVarName) cxtes
-  let lamVar = toTermUpsilon lamVarName
+  let lamVar = toTermUpsilon m lamVarName
   fvss <- mapM chainCaseClause cxtes
   let fvs = nubBy (\(_, x, _) (_, y, _) -> x == y) $ concat fvss
   let typeVarPlus = (m, typeVarName, (m, TermTau 0))
@@ -283,7 +283,7 @@ clarifyConst m name@(I (x, _)) = do
 
 clarifyUnaryOp :: Identifier -> UnaryOp -> Meta -> WithEnv CodePlus
 clarifyUnaryOp name op m = do
-  t <- lookupTypeEnv' name
+  t <- lookupTypeEnv' m name
   let t' = reduceTermPlus t
   case t' of
     (_, TermPi _ xts@[(mx, x, tx)] _) -> do
@@ -299,7 +299,7 @@ clarifyUnaryOp name op m = do
 
 clarifyBinaryOp :: Identifier -> BinaryOp -> Meta -> WithEnv CodePlus
 clarifyBinaryOp name op m = do
-  t <- lookupTypeEnv' name
+  t <- lookupTypeEnv' m name
   let t' = reduceTermPlus t
   case t' of
     (_, TermPi _ xts@[(mx, x, tx), (my, y, ty)] _) -> do
@@ -316,7 +316,7 @@ clarifyBinaryOp name op m = do
 
 clarifyArrayAccess :: Meta -> Identifier -> LowType -> WithEnv CodePlus
 clarifyArrayAccess m name lowType = do
-  arrayAccessType <- lookupTypeEnv' name
+  arrayAccessType <- lookupTypeEnv' m name
   let arrayAccessType' = reduceTermPlus arrayAccessType
   case arrayAccessType' of
     (_, TermPi _ xts cod)
@@ -339,7 +339,7 @@ clarifySysCall ::
   -> Meta -- the meta of the theta
   -> WithEnv CodePlus
 clarifySysCall name syscall args m = do
-  sysCallType <- lookupTypeEnv' name
+  sysCallType <- lookupTypeEnv' m name
   let sysCallType' = reduceTermPlus sysCallType
   case sysCallType' of
     (_, TermPi _ xts cod)
@@ -581,7 +581,7 @@ inferKind _ = raiseCritical' "inferKind for void-pointer"
 sigToPi :: Meta -> [Data.Term.IdentifierPlus] -> WithEnv TermPlus
 sigToPi m xts = do
   z <- newNameWith' "sigma"
-  let zv = toTermUpsilon z
+  let zv = toTermUpsilon m z
   k <- newNameWith' "sig"
   -- Sigma [x1 : A1, ..., xn : An] = Pi (z : Type, _ : Pi [x1 : A1, ..., xn : An]. z). z
   l <- newCount

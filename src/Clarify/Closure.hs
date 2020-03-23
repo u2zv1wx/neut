@@ -81,7 +81,7 @@ chainTermPlus e = do
 chainTermPlus' :: TypeEnv -> TermPlus -> WithEnv [(Meta, Identifier, TermPlus)]
 chainTermPlus' _ (_, TermTau _) = return []
 chainTermPlus' tenv (m, TermUpsilon x) = do
-  t <- lookupTypeEnv'' x tenv
+  t <- lookupTypeEnv'' m x tenv
   xts <- chainTermPlus' tenv t
   return $ xts ++ [(m, x, t)]
 chainTermPlus' tenv (_, TermPi _ xts t) = chainTermPlus'' tenv xts [t]
@@ -109,8 +109,8 @@ chainTermPlus' tenv (_, TermIter (_, x, t) xts e) = do
   xs1 <- chainTermPlus' tenv t
   xs2 <- chainTermPlus'' (insTypeEnv'' x t tenv) xts [e]
   return $ xs1 ++ filter (\(_, y, _) -> y /= x) xs2
-chainTermPlus' tenv (_, TermConst x) = do
-  t <- lookupTypeEnv'' x tenv
+chainTermPlus' tenv (m, TermConst x) = do
+  t <- lookupTypeEnv'' m x tenv
   chainTermPlus' tenv t
 chainTermPlus' _ (_, TermFloat16 _) = return []
 chainTermPlus' _ (_, TermFloat32 _) = return []
