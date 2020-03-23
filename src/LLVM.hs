@@ -12,6 +12,7 @@ import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Set as S
 import qualified Data.Text as T
 
+import Clarify.Utility
 import Data.Basic
 import Data.Code
 import Data.Env hiding (newNameWith'')
@@ -370,21 +371,29 @@ llvmCodeCase :: Meta -> DataPlus -> [(T.Text, CodePlus)] -> WithEnv LLVM
 llvmCodeCase _ _ [] = return LLVMUnreachable
 llvmCodeCase _ _ [(_, code)] = llvmCode code
 llvmCodeCase m v ((c, code):branchList) = do
+  funPtrType <- getLabelType m c
+  code' <- llvmCode code
+  cont <- llvmCodeCase m v branchList
+  (tmp, tmpVar) <- newDataLocal c
+  (base, baseVar) <- newDataLocal $ takeBaseName v
+  (isEq, isEqVar) <- newDataLocal "cmp"
+  uncastThenCmpThenBranch <-
+    llvmUncastLet tmp (LLVMDataGlobal c) funPtrType $
+    LLVMLet isEq (LLVMOpBinaryOp (BinaryOpEQ voidPtr) tmpVar baseVar) $
+    LLVMBranch isEqVar code' cont
+  llvmDataLet base v uncastThenCmpThenBranch
+
+getLabelType :: Meta -> T.Text -> WithEnv LowType
+getLabelType m c = do
   cenv <- gets codeEnv
-  -- ここはreduceでバグりうるから引数情報をenvに保持すべき
   case Map.lookup c cenv of
-    Nothing -> raiseCritical m $ "[CASE]no such global label defined: " <> c
-    Just (Definition _ args _) -> do
-      code' <- llvmCode code
-      cont <- llvmCodeCase m v branchList
-      (tmp, tmpVar) <- newDataLocal c
-      (base, baseVar) <- newDataLocal $ takeBaseName v
-      (isEq, isEqVar) <- newDataLocal "cmp"
-      uncastThenCmpThenBranch <-
-        llvmUncastLet tmp (LLVMDataGlobal c) (toFunPtrType args) $
-        LLVMLet isEq (LLVMOpBinaryOp (BinaryOpEQ voidPtr) tmpVar baseVar) $
-        LLVMBranch isEqVar code' cont
-      llvmDataLet base v uncastThenCmpThenBranch
+    Just (Definition _ args _) -> return $ toFunPtrType args
+    Nothing -> do
+      let body = (m, CodeUpIntro (m, DataEnumIntro (EnumValueIntS 64 0)))
+      insCodeEnv c [] body
+      llvm <- llvmCode body
+      insLLVMEnv c [] llvm
+      return $ toFunPtrType []
 
 storeContent ::
      Identifier -> LowType -> [(DataPlus, LowType)] -> LLVM -> WithEnv LLVM
