@@ -200,14 +200,16 @@ getArch = do
     "x86_64" -> return Arch64
     s -> raiseError' $ "unsupported target arch: " <> T.pack (show s)
 
-newDataUpsilonWith :: T.Text -> WithEnv (Identifier, DataPlus)
-newDataUpsilonWith name = newDataUpsilonWith' name emptyMeta
-
-newDataUpsilonWith' :: T.Text -> Meta -> WithEnv (Identifier, DataPlus)
-newDataUpsilonWith' name m = do
+newDataUpsilonWith :: Meta -> T.Text -> WithEnv (Identifier, DataPlus)
+newDataUpsilonWith m name = do
   x <- newNameWith' name
   return (x, (m, DataUpsilon x))
+  -- newDataUpsilonWith' name m
 
+-- newDataUpsilonWith' :: T.Text -> Meta -> WithEnv (Identifier, DataPlus)
+-- newDataUpsilonWith' name m = do
+--   x <- newNameWith' name
+--   return (x, (m, DataUpsilon x))
 piUnivLevelsfrom ::
      [Data.WeakTerm.IdentifierPlus] -> WeakTermPlus -> WithEnv [UnivLevelPlus]
 piUnivLevelsfrom xts t = do

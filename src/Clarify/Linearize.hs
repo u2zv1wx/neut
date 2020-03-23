@@ -86,12 +86,11 @@ withHeaderRelevant ::
   -> [Identifier]
   -> CodePlus
   -> WithEnv CodePlus
-withHeaderRelevant x t x1 x2 xs e = do
-  (expVarName, expVar) <- newDataUpsilonWith "exp"
+withHeaderRelevant x t x1 x2 xs e@(m, _) = do
+  (expVarName, expVar) <- newDataUpsilonWith m "exp"
   linearChain <- toLinearChain $ x : x1 : x2 : xs
-  let ml = fst e
   rel <- withHeaderRelevant' t expVar linearChain e
-  return (ml, CodeUpElim expVarName t rel)
+  return (m, CodeUpElim expVarName t rel)
 
 type LinearChain = [(Identifier, (Identifier, Identifier))]
 
@@ -135,7 +134,7 @@ withHeaderRelevant' ::
 withHeaderRelevant' _ _ [] cont = return cont
 withHeaderRelevant' t expVar ((x, (x1, x2)):chain) cont@(m, _) = do
   cont' <- withHeaderRelevant' t expVar chain cont
-  (sigVarName, sigVar) <- newDataUpsilonWith "sig"
+  (sigVarName, sigVar) <- newDataUpsilonWith m "sig"
   let varX = toDataUpsilon (x, m)
   return $
     ( m

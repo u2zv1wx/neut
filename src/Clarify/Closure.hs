@@ -38,7 +38,7 @@ makeClosure mName mxts2 m mxts1 e = do
   let xts1 = zip xs1 ts1
   expName <- newNameWith' "exp"
   envExp <- cartesianSigma expName m arrVoidPtr $ map Right xts2
-  (envVarName, envVar) <- newDataUpsilonWith "env"
+  (envVarName, envVar) <- newDataUpsilonWith m "env"
   e' <- linearize (xts2 ++ xts1) e
   cenv <- gets codeEnv
   name <- nameFromMaybe mName
@@ -47,17 +47,16 @@ makeClosure mName mxts2 m mxts1 e = do
   when (name `notElem` Map.keys cenv) $ insCodeEnv name args body
   let vs = map (\(mx, x, _) -> toDataUpsilon (x, mx)) mxts2
   let fvEnv = (m, DataSigmaIntro arrVoidPtr vs)
-  -- let fvEnv = (m, DataSigmaIntro arrVoidPtr $ map (toDataUpsilon' . fst) xts2)
   return (m, DataSigmaIntro arrVoidPtr [envExp, fvEnv, (m, DataTheta name)])
 
 callClosure ::
      Meta -> CodePlus -> [(Identifier, CodePlus, DataPlus)] -> WithEnv CodePlus
 callClosure m e zexes = do
   let (zs, es', xs) = unzip3 zexes
-  (clsVarName, clsVar) <- newDataUpsilonWith "closure"
-  (typeVarName, _) <- newDataUpsilonWith "exp"
-  (envVarName, envVar) <- newDataUpsilonWith "env"
-  (lamVarName, lamVar) <- newDataUpsilonWith "thunk"
+  (clsVarName, clsVar) <- newDataUpsilonWith m "closure"
+  (typeVarName, _) <- newDataUpsilonWith m "exp"
+  (envVarName, envVar) <- newDataUpsilonWith m "env"
+  (lamVarName, lamVar) <- newDataUpsilonWith m "thunk"
   return $
     bindLet
       ((clsVarName, e) : zip zs es')

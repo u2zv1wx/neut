@@ -107,18 +107,6 @@ supMeta m1 m2
     m1 {metaConstraintLocation = metaConstraintLocation m2}
   | otherwise = m1
 
-emptyMeta :: Meta
-emptyMeta =
-  Meta
-    { metaLocation = Nothing
-    , metaConstraintLocation = Nothing
-    , metaFileName = Nothing
-    , metaIsPublic = True
-    , metaIsAppropriateAsCompletionCandidate = True
-    , metaUnivParams = IntMap.empty
-    , metaIsExplicit = False
-    }
-
 newMeta :: Int -> Int -> Path Abs File -> Meta
 newMeta l c path = do
   Meta

@@ -30,8 +30,8 @@ cartesianSigma (I (thetaName, i)) m k mxts = do
   case Map.lookup ident cenv of
     Just _ -> return theta
     Nothing -> do
-      (switchVarName, switchVar) <- newDataUpsilonWith "switch"
-      (argVarName, argVar) <- newDataUpsilonWith "argsig"
+      (switchVarName, switchVar) <- newDataUpsilonWith m "switch"
+      (argVarName, argVar) <- newDataUpsilonWith m "argsig"
       aff <- affineSigma argVar m k mxts
       rel <- relevantSigma argVar m k mxts
       insCodeEnv
@@ -111,8 +111,8 @@ relevantSigma argVar m k mxts = do
 
 toPairInfo ::
      (Identifier, CodePlus) -> WithEnv (Identifier, (DataPlus, CodePlus))
-toPairInfo (_, t) = do
-  (name, var) <- newDataUpsilonWith "pair"
+toPairInfo (_, t@(m, _)) = do
+  (name, var) <- newDataUpsilonWith m "pair"
   return (name, (var, t))
 
 -- transposeSigma [d1, ..., dn] :=
@@ -124,9 +124,9 @@ transposeSigma ::
      Meta -> ArrayKind -> [(DataPlus, CodePlus)] -> WithEnv CodePlus
 transposeSigma m k ds = do
   (xVarNameList, xVarList) <-
-    unzip <$> mapM (const $ newDataUpsilonWith "sig-x") ds
+    unzip <$> mapM (const $ newDataUpsilonWith m "sig-x") ds
   (yVarNameList, yVarList) <-
-    unzip <$> mapM (const $ newDataUpsilonWith "sig-y") ds
+    unzip <$> mapM (const $ newDataUpsilonWith m "sig-y") ds
   return $
     bindSigmaElim (zip (zip xVarNameList yVarNameList) ds) $
     ( m
@@ -150,21 +150,21 @@ supplyName (Left t) = do
   return (x, t)
 
 returnArrayType :: Meta -> WithEnv CodePlus
-returnArrayType ml = do
-  (arrVarName, arrVar) <- newDataUpsilonWith "arr"
-  retImmType <- returnCartesianImmediate ml
-  let retArrVar = (ml, CodeUpIntro arrVar)
+returnArrayType m = do
+  (arrVarName, arrVar) <- newDataUpsilonWith m "arr"
+  retImmType <- returnCartesianImmediate m
+  let retArrVar = (m, CodeUpIntro arrVar)
   v <-
     cartesianSigma
       (I ("array-closure", 0))
-      ml
+      m
       arrVoidPtr
       [Right (arrVarName, retImmType), Left retArrVar]
-  return (ml, CodeUpIntro v)
+  return (m, CodeUpIntro v)
 
 returnClosureType :: Meta -> WithEnv CodePlus
 returnClosureType m = do
-  (envVarName, envVar) <- newDataUpsilonWith "env"
+  (envVarName, envVar) <- newDataUpsilonWith m "env"
   retImmType <- returnCartesianImmediate m
   let retEnvVar = (m, CodeUpIntro envVar)
   closureType <-

@@ -20,12 +20,12 @@ import Data.LLVM
 import Reduce.Code
 
 toLLVM :: CodePlus -> WithEnv LLVM
-toLLVM mainTerm = do
+toLLVM mainTerm@(m, _) = do
   mainTerm' <- reduceCodePlus mainTerm
   modify (\env -> env {nameSet = S.empty})
   mainTerm'' <- llvmCode mainTerm'
   -- the result of "main" must be i64, not i8*
-  (result, resultVar) <- newDataUpsilonWith "result"
+  (result, resultVar) <- newDataUpsilonWith m "result"
   (cast, castThen) <- llvmCast (Just "cast") resultVar (LowTypeIntS 64)
   castResult <- castThen (LLVMReturn cast)
   -- let result: i8* := (main-term) in {cast result to i64}

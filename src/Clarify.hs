@@ -120,9 +120,9 @@ clarify (m, TermArrayElim k mxts e1 e2) = do
   e1' <- clarify e1
   let (_, xs, _) = unzip3 mxts
   forM_ mxts insTypeEnv'
-  (arrVarName, arrVar) <- newDataUpsilonWith "arr"
-  (arrTypeVarName, _) <- newDataUpsilonWith "arr-type"
-  (arrInnerVarName, arrInnerVar) <- newDataUpsilonWith "arr-inner"
+  (arrVarName, arrVar) <- newDataUpsilonWith m "arr"
+  (arrTypeVarName, _) <- newDataUpsilonWith m "arr-type"
+  (arrInnerVarName, arrInnerVar) <- newDataUpsilonWith m "arr-inner"
   e2' <- clarify e2
   return $
     bindLet [(arrVarName, e1')] $
@@ -146,15 +146,15 @@ clarify (m, TermStructElim xks e1 e2) = do
   ts <- mapM (inferKind m) ks
   forM_ (zip3 ms xs ts) insTypeEnv'
   e2' <- clarify e2
-  (structVarName, structVar) <- newDataUpsilonWith "struct"
+  (structVarName, structVar) <- newDataUpsilonWith m "struct"
   return $
     bindLet [(structVarName, e1')] (m, CodeStructElim (zip xs ks) structVar e2')
 clarify (m, TermCase (e, _) cxtes) = do
   e' <- clarify e
-  (clsVarName, clsVar) <- newDataUpsilonWith "case-closure"
-  (typeVarName, _) <- newDataUpsilonWith "case-exp"
-  (envVarName, _) <- newDataUpsilonWith "case-env"
-  (lamVarName, _) <- newDataUpsilonWith "label"
+  (clsVarName, clsVar) <- newDataUpsilonWith m "case-closure"
+  (typeVarName, _) <- newDataUpsilonWith m "case-exp"
+  (envVarName, _) <- newDataUpsilonWith m "case-env"
+  (lamVarName, _) <- newDataUpsilonWith m "label"
   cxtes' <- clarifyCase m cxtes typeVarName envVarName lamVarName
   return $
     bindLet
@@ -169,7 +169,7 @@ clarify (m, TermCase (e, _) cxtes) = do
 clarifyPlus :: TermPlus -> WithEnv (Identifier, CodePlus, DataPlus)
 clarifyPlus e@(m, _) = do
   e' <- clarify e
-  (varName, var) <- newDataUpsilonWith' "var" m
+  (varName, var) <- newDataUpsilonWith m "var"
   return (varName, e', var)
 
 clarifyEnumElim ::
@@ -470,7 +470,7 @@ toHeaderInfo ::
 toHeaderInfo m x _ ArgImm = return ([], [toVar m x], id)
 toHeaderInfo _ _ _ ArgUnused = return ([], [], id)
 toHeaderInfo m x t ArgStruct = do
-  (structVarName, structVar) <- newDataUpsilonWith "struct"
+  (structVarName, structVar) <- newDataUpsilonWith m "struct"
   insTypeEnv' (m, structVarName, t)
   return
     ( [structVarName]
@@ -479,9 +479,9 @@ toHeaderInfo m x t ArgStruct = do
 toHeaderInfo m x t ArgArray = do
   arrayVarName <- newNameWith' "array"
   insTypeEnv' (m, arrayVarName, t)
-  (arrayTypeName, arrayType) <- newDataUpsilonWith "array-type"
-  (arrayInnerName, arrayInner) <- newDataUpsilonWith "array-inner"
-  (arrayInnerTmpName, arrayInnerTmp) <- newDataUpsilonWith "array-tmp"
+  (arrayTypeName, arrayType) <- newDataUpsilonWith m "array-type"
+  (arrayInnerName, arrayInner) <- newDataUpsilonWith m "array-inner"
+  (arrayInnerTmpName, arrayInnerTmp) <- newDataUpsilonWith m "array-tmp"
   return
     ( [arrayVarName]
     , [arrayInnerTmp]

@@ -22,7 +22,7 @@ type Context = [(Identifier, TermPlus)]
 -- {} toAffineApp {}
 toAffineApp :: Meta -> Identifier -> CodePlus -> WithEnv CodePlus
 toAffineApp m x t = do
-  (expVarName, expVar) <- newDataUpsilonWith "aff-app-exp"
+  (expVarName, expVar) <- newDataUpsilonWith m "aff-app-exp"
   return
     ( m
     , CodeUpElim
@@ -39,7 +39,7 @@ toAffineApp m x t = do
 --
 toRelevantApp :: Meta -> Identifier -> CodePlus -> WithEnv CodePlus
 toRelevantApp m x t = do
-  (expVarName, expVar) <- newDataUpsilonWith "rel-app-exp"
+  (expVarName, expVar) <- newDataUpsilonWith m "rel-app-exp"
   return
     ( m
     , CodeUpElim
@@ -72,8 +72,8 @@ cartesianImmediate m = do
   case Map.lookup ident cenv of
     Just _ -> return theta
     Nothing -> do
-      (switchVarName, switchVar) <- newDataUpsilonWith "switch"
-      (argVarName, argVar) <- newDataUpsilonWith "argimm"
+      (switchVarName, switchVar) <- newDataUpsilonWith m "switch"
+      (argVarName, argVar) <- newDataUpsilonWith m "argimm"
       aff <- affineImmediate argVar
       rel <- relevantImmediate argVar
       insCodeEnv
@@ -101,8 +101,8 @@ cartesianStruct m ks = do
   case Map.lookup ident cenv of
     Just _ -> return theta
     Nothing -> do
-      (switchVarName, switchVar) <- newDataUpsilonWith "switch"
-      (argVarName, argVar) <- newDataUpsilonWith "argstruct"
+      (switchVarName, switchVar) <- newDataUpsilonWith m "switch"
+      (argVarName, argVar) <- newDataUpsilonWith m "argstruct"
       aff <- affineStruct argVar ks
       rel <- relevantStruct argVar ks
       insCodeEnv
