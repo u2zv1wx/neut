@@ -12,6 +12,7 @@ module Elaborate.Infer
 
 import Control.Monad.Except
 import Control.Monad.State
+import Data.Maybe (maybeToList)
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.IntMap.Strict as IntMap
@@ -71,9 +72,9 @@ infer' _ (m, WeakTermTau _) = do
   return (asUniv ml0, asUniv ml1, ml2)
 infer' ctx f@(m, WeakTermUpsilon x) = do
   ienv <- gets impEnv
-  case IntMap.lookup (asInt x) ienv of
-    Just is -> inferImplicit ctx m x f is
-    Nothing -> do
+  case (metaIsExplicit m, IntMap.lookup (asInt x) ienv) of
+    (False, Just is) -> inferImplicit ctx m x f is
+    _ -> do
       mt <- lookupTypeEnv x
       case mt of
         Nothing -> do
@@ -336,15 +337,19 @@ infer' ctx (m, WeakTermCase (e, t) cxtes) = do
     else do
       cxttes' <-
         forM cxtes $ \((c, xts), body) -> do
-          (xts', ctx') <- inferPatArgs ctx xts
-          let vs = map (\(mx, x, _) -> (mx, WeakTermUpsilon x)) xts'
-          let app = (m, WeakTermPiElim (m, WeakTermUpsilon c) vs) -- caseのmetaがほしいところ
+          ienv <- gets impEnv
+          let imp = concat $ maybeToList $ IntMap.lookup (asInt c) ienv
+          xts' <- setupPatArgs m imp xts
+          (xts'', _) <- inferPatArgs ctx xts'
+          let vs = map (\(mx, x, _) -> (mx, WeakTermUpsilon x)) xts''
+          let expCons = (m {metaIsExplicit = True}, WeakTermUpsilon c)
+          let app = (m, WeakTermPiElim expCons vs)
           (_, appType, appLevel) <- infer' ctx app
-          (body', bodyType, bodyLevel) <- infer' ctx' body
-          forM_ xts' insPatVarEnv
+          (body', bodyType, bodyLevel) <- infer' ctx body
+          forM_ xts'' insPatVarEnv
           insConstraintEnv appType t'
           insLevelEQ appLevel mlInd
-          return (((c, xts'), body'), (bodyType, bodyLevel))
+          return (((c, xts''), body'), (bodyType, bodyLevel))
       let (cxtes', bodyTypeLevelList) = unzip cxttes'
       let (bodyTypeList, bodyLevelList) = unzip bodyTypeLevelList
       constrainList bodyTypeList
@@ -353,6 +358,14 @@ infer' ctx (m, WeakTermCase (e, t) cxtes) = do
         ( (m, WeakTermCase (e', t') cxtes')
         , head bodyTypeList
         , head bodyLevelList)
+
+setupPatArgs :: Meta -> [Int] -> [IdentifierPlus] -> WithEnv [IdentifierPlus]
+setupPatArgs _ [] xts = return xts
+setupPatArgs m (_:is) xts = do
+  xts' <- setupPatArgs m is xts
+  h <- newHole m
+  x <- newNameWith'' "pat"
+  return $ (m, x, h) : xts'
 
 inferImplicit ::
      Context
@@ -588,11 +601,10 @@ constrainLevelList (l1:l2:ls) = do
   insLevelEQ l1 l2
   constrainLevelList $ l2 : ls
 
-newHole :: Meta -> WithEnv WeakTermPlus
-newHole m = do
-  h <- newNameWith' "hole"
-  return (m, WeakTermZeta h)
-
+-- newHole :: Meta -> WithEnv WeakTermPlus
+-- newHole m = do
+--   h <- newNameWith' "hole"
+--   return (m, WeakTermZeta h)
 insConstraintEnv :: WeakTermPlus -> WeakTermPlus -> WithEnv ()
 insConstraintEnv t1 t2 =
   modify (\e -> e {constraintEnv = (t1, t2) : constraintEnv e})

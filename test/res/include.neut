@@ -1,15 +1,15 @@
 ;; (include library "core/core.neut")
 
-(coinductive my-record ()
-  (item-1 ((_ (my-record))) i64)
-  (item-2 ((_ (my-record))) u32)
-  (item-3 ((_ (my-record))) top))
+;; (coinductive my-record ()
+;;   (item-1 ((_ (my-record))) i64)
+;;   (item-2 ((_ (my-record))) u32)
+;;   (item-3 ((_ (my-record))) top))
 
-(let item
-  (record (my-record)
-    (item-1 10)
-    (item-3 unit)
-    (item-2 20)))
+;; (let item
+;;   (record (my-record)
+;;     (item-1 10)
+;;     (item-3 unit)
+;;     (item-2 20)))
 
 (let xs (list i64)
   (list:cons 25 (list:cons 100 (list:cons 1000 (list:nil)))))
@@ -24,12 +24,26 @@
 
 (case xs
   ((list:nil) (i64 10))
+  ((list:cons value ys) (i64 20)))
+
+(case xs
+  ((list:nil) (i64 10))
   ((list:cons value ys)
    (case ys
      ((list:nil) (i64 20))
      ((list:cons v2 zs) v2))))
 
-(sum xs)
+;; (os:exit i64 (case xs
+;;   ((list:nil) (i64 10))
+;;   ((list:cons value ys)
+;;    (case ys
+;;      ((list:nil) (i64 20))
+;;      ((list:cons v2 zs) v2)))))
+
+(let zs (list i64)
+  (list:cons 1 (list:cons 2 (list:cons 3 (list:nil)))))
+
+(os:exit i64 (sum zs))
 ;; (item-2 item)
 
 ;; (item-2 item)

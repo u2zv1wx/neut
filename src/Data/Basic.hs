@@ -69,6 +69,7 @@ data Meta =
     , metaIsPublic :: Bool
     , metaIsAppropriateAsCompletionCandidate :: Bool
     , metaUnivParams :: UnivParams
+    , metaIsExplicit :: Bool
     }
 
 -- required to derive the eqality on WeakTerm
@@ -115,6 +116,7 @@ emptyMeta =
     , metaIsPublic = True
     , metaIsAppropriateAsCompletionCandidate = True
     , metaUnivParams = IntMap.empty
+    , metaIsExplicit = False
     }
 
 newMeta :: Int -> Int -> Path Abs File -> Meta
@@ -126,6 +128,7 @@ newMeta l c path = do
     , metaIsPublic = True
     , metaIsAppropriateAsCompletionCandidate = True
     , metaUnivParams = IntMap.empty
+    , metaIsExplicit = False
     }
 
 type PosInfo = (Path Abs File, Loc)

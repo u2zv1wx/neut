@@ -172,6 +172,11 @@ newNameWith'' s = do
   i <- newCount
   return $ I (s <> "-" <> T.pack (show i), i)
 
+newHole :: Meta -> WithEnv WeakTermPlus
+newHole m = do
+  h <- newNameWith'' "hole-parse-zeta"
+  return (m, WeakTermZeta h)
+
 getTarget :: WithEnv Target
 getTarget = do
   mtarget <- gets target

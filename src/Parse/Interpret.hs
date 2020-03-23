@@ -566,11 +566,10 @@ adjustPhase' :: Int -> Maybe Loc -> Maybe Loc
 adjustPhase' _ Nothing = Nothing
 adjustPhase' i (Just (_, l, c)) = Just (i, l, c)
 
-newHole :: Meta -> WithEnv WeakTermPlus
-newHole m = do
-  h <- newNameWith'' "hole-aux"
-  return (m, WeakTermZeta h)
-
+-- newHole :: Meta -> WithEnv WeakTermPlus
+-- newHole m = do
+--   h <- newNameWith'' "hole-aux"
+--   return (m, WeakTermZeta h)
 asArrayKind :: TreePlus -> WithEnv ArrayKind
 asArrayKind e@(_, TreeLeaf x) =
   case asArrayKindMaybe x of

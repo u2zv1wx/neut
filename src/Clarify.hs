@@ -216,7 +216,6 @@ chainCaseClause ::
 chainCaseClause ((_, xts), body) = do
   let (_, xs, _) = unzip3 xts
   forM_ xts insTypeEnv'
-  -- forM_ (zip xs ts) $ uncurry insTypeEnv'
   tenv <- gets typeEnv
   fvs <- chainTermPlus' tenv body
   return $ filter (\(_, y, _) -> y `notElem` xs) fvs
