@@ -37,8 +37,13 @@ import qualified Data.UnionFind as UF
 -- S. Kong, and C. Roux. "Elaboration in Dependent Type Theory", arxiv,
 -- https://arxiv.org/abs/1505.04324, 2015.
 elaborate :: WeakStmt -> WithEnv TermPlus
-elaborate stmt = reduceTermPlus <$> elaborateStmt stmt
+-- elaborate stmt = reduceTermPlus <$> elaborateStmt stmt
+elaborate stmt = elaborateStmt stmt -- e <- elaborateStmt stmt
 
+-- elaborate stmt = do
+--   e <- elaborateStmt stmt
+--   p' e
+--   return e
 elaborateStmt :: WeakStmt -> WithEnv TermPlus
 elaborateStmt (WeakStmtReturn e) = do
   (e', _, _) <- infer e

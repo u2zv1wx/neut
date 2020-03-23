@@ -12,6 +12,7 @@ import Control.Monad.State
 import Data.List (nubBy)
 
 import qualified Data.HashMap.Strict as Map
+import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Text as T
 
 import Clarify.Closure
@@ -34,26 +35,19 @@ clarify (m, TermPi {}) = do
 clarify (m, TermPiPlus {}) = do
   returnClosureType m
 clarify lam@(m, TermPiIntro mxts e) = do
-  let (_, xs, ts) = unzip3 mxts
-  let xts = zip xs ts
-  forM_ xts $ uncurry insTypeEnv'
-  e' <- clarify e
   fvs <- chainTermPlus lam
+  e' <- clarify e
   retClosure Nothing fvs m mxts e'
 clarify lam@(m, TermPiIntroNoReduce mxts e) = do
-  let (_, xs, ts) = unzip3 mxts
-  let xts = zip xs ts
-  forM_ xts $ uncurry insTypeEnv'
-  e' <- clarify e
   fvs <- chainTermPlus lam
+  e' <- clarify e
   retClosure Nothing fvs m mxts e'
 clarify (m, TermPiIntroPlus _ (name, args) mxts e) = do
-  let (_, xs, ts) = unzip3 mxts
-  let xts = zip xs ts
-  forM_ xts $ uncurry insTypeEnv'
-  e' <- clarify e
   case varTermPlus (m, TermPiIntro args termZero) of
-    [] -> retClosure (Just name) args m mxts e'
+    [] -> do
+      name' <- lookupLLVMEnumEnv m name
+      e' <- clarify e
+      retClosure (Just name') args m mxts e'
     _ ->
       raiseError m $
       "couldn't normalize the type of the inductive closure at compile time"
@@ -102,7 +96,8 @@ clarify (m, TermEnumIntro l) = do
   return (m, CodeUpIntro (m, DataEnumIntro l))
 clarify (m, TermEnumElim (e, _) bs) = do
   let (cs, es) = unzip bs
-  fvss <- mapM chainTermPlus' es
+  tenv <- gets typeEnv
+  fvss <- mapM (chainTermPlus' tenv) es
   let fvs = nubBy (\(_, x, _) (_, y, _) -> x == y) $ concat fvss
   es' <- mapM clarify es
   clarifyEnumElim m fvs e $ zip cs es'
@@ -159,7 +154,7 @@ clarify (m, TermCase (e, _) cxtes) = do
   (clsVarName, clsVar) <- newDataUpsilonWith "case-closure"
   (typeVarName, _) <- newDataUpsilonWith "case-exp"
   (envVarName, _) <- newDataUpsilonWith "case-env"
-  (lamVarName, _) <- newDataUpsilonWith "thunk"
+  (lamVarName, _) <- newDataUpsilonWith "label"
   cxtes' <- clarifyCase m cxtes typeVarName envVarName lamVarName
   return $
     bindLet
@@ -199,7 +194,6 @@ clarifyCase ::
   -> Identifier
   -> WithEnv CodePlus
 clarifyCase m cxtes typeVarName envVarName lamVarName = do
-  let cs = map (\((c, _), _) -> c) cxtes
   es <- mapM (\cxte -> clarifyCase' m cxte envVarName) cxtes
   let lamVar = toTermUpsilon lamVarName
   fvss <- mapM chainCaseClause cxtes
@@ -212,8 +206,9 @@ clarifyCase m cxtes typeVarName envVarName lamVarName = do
   es'' <- mapM (\cls -> callClosure m cls []) es'
   (yName, e', y) <- clarifyPlus lamVar
   let varInfo = map (\(mx, x, _) -> (x, toDataUpsilon (x, mx))) fvs'
-  return $
-    bindLet [(yName, e')] (m, CodeCase varInfo y (zip (map asText cs) es''))
+  let is = map (\((c, _), _) -> asInt c) cxtes
+  cs' <- mapM (lookupRevCaseEnv m) is
+  return $ bindLet [(yName, e')] (m, CodeCase varInfo y (zip cs' es''))
 
 chainCaseClause ::
      ((Identifier, [(Meta, Identifier, TermPlus)]), TermPlus)
@@ -221,7 +216,8 @@ chainCaseClause ::
 chainCaseClause ((_, xts), body) = do
   let (_, xs, ts) = unzip3 xts
   forM_ (zip xs ts) $ uncurry insTypeEnv'
-  fvs <- chainTermPlus' body
+  tenv <- gets typeEnv
+  fvs <- chainTermPlus' tenv body
   return $ filter (\(_, y, _) -> y `notElem` xs) fvs
 
 clarifyCase' ::
@@ -235,6 +231,13 @@ clarifyCase' m ((_, xts), e) envVarName = do
   e'' <- linearize xts' e'
   let xs = map (\(_, x, _) -> x) xts
   return (m, CodeSigmaElim arrVoidPtr xs (toDataUpsilon' envVarName) e'')
+
+lookupRevCaseEnv :: Meta -> Int -> WithEnv T.Text
+lookupRevCaseEnv m i = do
+  renv <- gets revCaseEnv
+  case IntMap.lookup i renv of
+    Nothing -> raiseCritical m $ "revCaseEnv"
+    Just label -> return label
 
 clarifyArgs :: (Meta, Identifier, TermPlus) -> WithEnv (Identifier, CodePlus)
 clarifyArgs (_, x, t) = do
@@ -355,7 +358,8 @@ iterativeApp (f:fs) x = f (iterativeApp fs x)
 complementaryChainOf ::
      [(Meta, Identifier, TermPlus)] -> WithEnv [(Meta, Identifier, TermPlus)]
 complementaryChainOf xts = do
-  zts <- chainTermPlus'' xts []
+  tenv <- gets typeEnv
+  zts <- chainTermPlus'' tenv xts []
   return $ nubBy (\(_, x, _) (_, y, _) -> x == y) zts
 
 toVar :: Identifier -> DataPlus

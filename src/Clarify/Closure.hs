@@ -13,7 +13,8 @@ import Control.Monad.State
 import Data.List
 
 import qualified Data.HashMap.Strict as Map
-import qualified Data.IntMap.Strict as IntMap
+
+-- import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Text as T
 
 import Clarify.Linearize
@@ -72,98 +73,86 @@ nameFromMaybe mName =
     Just lamThetaName -> return lamThetaName
     Nothing -> asText' <$> newNameWith' "thunk"
 
--- fixme : ここのtypeEnvは引数で取る必要があるはず。envだと壊れる。renameと同じ理由。
 chainTermPlus :: TermPlus -> WithEnv [(Meta, Identifier, TermPlus)]
 chainTermPlus e = do
-  tmp <- chainTermPlus' e
+  tenv <- gets typeEnv
+  tmp <- chainTermPlus' tenv e
   return $ nubBy (\(_, x, _) (_, y, _) -> x == y) tmp
 
-chainTermPlus' :: TermPlus -> WithEnv [(Meta, Identifier, TermPlus)]
-chainTermPlus' (_, TermTau _) = return []
-chainTermPlus' (m, TermUpsilon x) = do
-  t <- lookupTypeEnv' x
-  xts <- chainWithName x t
+chainTermPlus' :: TypeEnv -> TermPlus -> WithEnv [(Meta, Identifier, TermPlus)]
+chainTermPlus' _ (_, TermTau _) = return []
+chainTermPlus' tenv (m, TermUpsilon x) = do
+  t <- lookupTypeEnv'' x tenv
+  xts <- chainTermPlus' tenv t
   return $ xts ++ [(m, x, t)]
-chainTermPlus' (_, TermPi _ xts t) = chainTermPlus'' xts [t]
-chainTermPlus' (_, TermPiPlus _ _ xts t) = chainTermPlus'' xts [t]
-chainTermPlus' (_, TermPiIntro xts e) = chainTermPlus'' xts [e]
-chainTermPlus' (_, TermPiIntroNoReduce xts e) = chainTermPlus'' xts [e]
-chainTermPlus' (_, TermPiIntroPlus _ _ xts e) = chainTermPlus'' xts [e]
-chainTermPlus' (_, TermPiElim e es) = do
-  xs1 <- chainTermPlus' e
-  xs2 <- concat <$> mapM (chainTermPlus') es
+chainTermPlus' tenv (_, TermPi _ xts t) = chainTermPlus'' tenv xts [t]
+chainTermPlus' tenv (_, TermPiPlus _ _ xts t) = chainTermPlus'' tenv xts [t]
+chainTermPlus' tenv (_, TermPiIntro xts e) = chainTermPlus'' tenv xts [e]
+chainTermPlus' tenv (_, TermPiIntroNoReduce xts e) =
+  chainTermPlus'' tenv xts [e]
+chainTermPlus' tenv (_, TermPiIntroPlus _ _ xts e) =
+  chainTermPlus'' tenv xts [e]
+chainTermPlus' tenv (_, TermPiElim e es) = do
+  xs1 <- chainTermPlus' tenv e
+  xs2 <- concat <$> mapM (chainTermPlus' tenv) es
   return $ xs1 ++ xs2
-chainTermPlus' (_, TermSigma xts) = chainTermPlus'' xts []
-chainTermPlus' (_, TermSigmaIntro t es) = do
-  xs1 <- chainTermPlus' t
-  xs2 <- concat <$> mapM chainTermPlus' es
+chainTermPlus' tenv (_, TermSigma xts) = chainTermPlus'' tenv xts []
+chainTermPlus' tenv (_, TermSigmaIntro t es) = do
+  xs1 <- chainTermPlus' tenv t
+  xs2 <- concat <$> mapM (chainTermPlus' tenv) es
   return $ xs1 ++ xs2
-chainTermPlus' (_, TermSigmaElim t xts e1 e2) = do
-  xs <- chainTermPlus' t
-  ys <- chainTermPlus' e1
-  zs <- chainTermPlus'' xts [e2]
+chainTermPlus' tenv (_, TermSigmaElim t xts e1 e2) = do
+  xs <- chainTermPlus' tenv t
+  ys <- chainTermPlus' tenv e1
+  zs <- chainTermPlus'' tenv xts [e2]
   return $ xs ++ ys ++ zs
-chainTermPlus' (_, TermIter (_, x, t) xts e) = do
-  xs1 <- chainTermPlus' t
-  insTypeEnv' x t
-  xs2 <- chainTermPlus'' xts [e]
+chainTermPlus' tenv (_, TermIter (_, x, t) xts e) = do
+  xs1 <- chainTermPlus' tenv t
+  xs2 <- chainTermPlus'' (insTypeEnv'' x t tenv) xts [e]
   return $ xs1 ++ filter (\(_, y, _) -> y /= x) xs2
-chainTermPlus' (_, TermConst x) = do
-  t <- lookupTypeEnv' x
-  chainWithName x t
-chainTermPlus' (_, TermFloat16 _) = return []
-chainTermPlus' (_, TermFloat32 _) = return []
-chainTermPlus' (_, TermFloat64 _) = return []
-chainTermPlus' (_, TermEnum _) = return []
-chainTermPlus' (_, TermEnumIntro _) = return []
-chainTermPlus' (_, TermEnumElim (e, t) les) = do
-  xs0 <- chainTermPlus' t
-  xs1 <- chainTermPlus' e
+chainTermPlus' tenv (_, TermConst x) = do
+  t <- lookupTypeEnv'' x tenv
+  chainTermPlus' tenv t
+chainTermPlus' _ (_, TermFloat16 _) = return []
+chainTermPlus' _ (_, TermFloat32 _) = return []
+chainTermPlus' _ (_, TermFloat64 _) = return []
+chainTermPlus' _ (_, TermEnum _) = return []
+chainTermPlus' _ (_, TermEnumIntro _) = return []
+chainTermPlus' tenv (_, TermEnumElim (e, t) les) = do
+  xs0 <- chainTermPlus' tenv t
+  xs1 <- chainTermPlus' tenv e
   let es = map snd les
-  xs2 <- concat <$> mapM (chainTermPlus') es
+  xs2 <- concat <$> mapM (chainTermPlus' tenv) es
   return $ xs0 ++ xs1 ++ xs2
-chainTermPlus' (_, TermArray dom _) = chainTermPlus' dom
-chainTermPlus' (_, TermArrayIntro _ es) = do
-  concat <$> mapM (chainTermPlus') es
-chainTermPlus' (_, TermArrayElim _ xts e1 e2) = do
-  xs1 <- chainTermPlus' e1
-  xs2 <- chainTermPlus'' xts [e2]
+chainTermPlus' tenv (_, TermArray dom _) = chainTermPlus' tenv dom
+chainTermPlus' tenv (_, TermArrayIntro _ es) = do
+  concat <$> mapM (chainTermPlus' tenv) es
+chainTermPlus' tenv (_, TermArrayElim _ xts e1 e2) = do
+  xs1 <- chainTermPlus' tenv e1
+  xs2 <- chainTermPlus'' tenv xts [e2]
   return $ xs1 ++ xs2
-chainTermPlus' (_, TermStruct _) = return []
-chainTermPlus' (_, TermStructIntro eks) =
-  concat <$> mapM (chainTermPlus' . fst) eks
-chainTermPlus' (_, TermStructElim xks e1 e2) = do
-  xs1 <- chainTermPlus' e1
-  xs2 <- chainTermPlus' e2
+chainTermPlus' _ (_, TermStruct _) = return []
+chainTermPlus' tenv (_, TermStructIntro eks) =
+  concat <$> mapM (chainTermPlus' tenv . fst) eks
+chainTermPlus' tenv (_, TermStructElim xks e1 e2) = do
+  xs1 <- chainTermPlus' tenv e1
+  xs2 <- chainTermPlus' tenv e2
   let xs = map (\(_, y, _) -> y) xks
   return $ xs1 ++ filter (\(_, y, _) -> y `notElem` xs) xs2
-chainTermPlus' (_, TermCase (e, t) cxtes) = do
-  xs <- chainTermPlus' e
-  ys <- chainTermPlus' t
-  zs <- concat <$> mapM (\((_, xts), body) -> chainTermPlus'' xts [body]) cxtes
+chainTermPlus' tenv (_, TermCase (e, t) cxtes) = do
+  xs <- chainTermPlus' tenv e
+  ys <- chainTermPlus' tenv t
+  zs <-
+    concat <$> mapM (\((_, xts), body) -> chainTermPlus'' tenv xts [body]) cxtes
   return $ xs ++ ys ++ zs
 
 chainTermPlus'' ::
-     [(Meta, Identifier, TermPlus)]
+     TypeEnv
+  -> [(Meta, Identifier, TermPlus)]
   -> [TermPlus]
   -> WithEnv [(Meta, Identifier, TermPlus)]
-chainTermPlus'' [] es = concat <$> mapM (chainTermPlus') es
-chainTermPlus'' ((_, x, t):xts) es = do
-  xs1 <- chainTermPlus' t
-  insTypeEnv' x t
-  xs2 <- chainTermPlus'' xts es
+chainTermPlus'' tenv [] es = concat <$> mapM (chainTermPlus' tenv) es
+chainTermPlus'' tenv ((_, x, t):xts) es = do
+  xs1 <- chainTermPlus' tenv t
+  xs2 <- chainTermPlus'' (insTypeEnv'' x t tenv) xts es
   return $ xs1 ++ filter (\(_, y, _) -> y /= x) xs2
-
--- assuming the type of `x` is `t`, obtain the closed chain of the type of `x`.
--- if the chain is computed for the first time, this function caches the computed result.
--- if not, use the cached result.
-chainWithName ::
-     Identifier -> TermPlus -> WithEnv [(Meta, Identifier, TermPlus)]
-chainWithName (I (_, i)) t = do
-  cenv <- gets chainEnv
-  case IntMap.lookup i cenv of
-    Just xts -> return xts -- use cached result
-    Nothing -> do
-      xts <- chainTermPlus' t
-      modify (\env -> env {chainEnv = IntMap.insert i xts cenv})
-      return xts

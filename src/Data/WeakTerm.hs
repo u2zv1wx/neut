@@ -428,7 +428,8 @@ asUniv (UnivLevelPlus (m, l)) = (m, WeakTermTau l)
 
 toText :: WeakTermPlus -> T.Text
 toText (_, WeakTermTau _) = "tau"
-toText (_, WeakTermUpsilon x) = asText x
+toText (_, WeakTermUpsilon x) = asText' x
+-- toText (_, WeakTermUpsilon x) = asText x
 toText (_, WeakTermPi _ xts t) = do
   let argStr = inParen $ showItems $ map showArg xts
   showCons ["Π", argStr, toText t]
@@ -507,8 +508,9 @@ inBracket :: T.Text -> T.Text
 inBracket s = "[" <> s <> "]"
 
 showArg :: (Meta, Identifier, WeakTermPlus) -> T.Text
-showArg (_, x, t) = inParen $ asText x <> " " <> toText t
+showArg (_, x, t) = inParen $ asText' x <> " " <> toText t
 
+-- showArg (_, x, t) = inParen $ asText x <> " " <> toText t
 showClause :: (WeakCase, WeakTermPlus) -> T.Text
 showClause (c, e) = inParen $ showWeakCase c <> " " <> toText e
 

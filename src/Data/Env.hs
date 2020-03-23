@@ -39,6 +39,8 @@ type RuleEnv = Map.HashMap Int (Maybe [Data.WeakTerm.IdentifierPlus])
 
 type UnivInstEnv = IntMap.IntMap (S.Set Int)
 
+type TypeEnv = IntMap.IntMap (TermPlus, UnivLevelPlus)
+
 data Env =
   Env
     { count :: Int
@@ -56,6 +58,8 @@ data Env =
     , traceEnv :: [Path Abs File]
     , enumEnv :: Map.HashMap T.Text [(T.Text, Int)] -- [("choice", [("left", 0), ("right", 1)]), ...]
     , revEnumEnv :: Map.HashMap T.Text (T.Text, Int) -- [("left", ("choice", 0)), ("right", ("choice", 1)), ...]
+    , llvmEnumEnv :: Map.HashMap T.Text T.Text -- "list:nil" ~> "list-nil-12", etc.
+    , revCaseEnv :: IntMap.IntMap T.Text
     , indEnumEnv :: Map.HashMap T.Text [(T.Text, Int)] -- [("nat", [("zero", 0), ("succ", 1)]), ...]
     , nameEnv :: Map.HashMap T.Text T.Text
     , revNameEnv :: IntMap.IntMap Int -- [("foo.13", "foo"), ...] (as corresponding int)
@@ -70,7 +74,7 @@ data Env =
     , equalityEnv :: [(UnivLevel, UnivLevel)]
     , univInstEnv :: UnivInstEnv
     , univRenameEnv :: IntMap.IntMap Int
-    , typeEnv :: IntMap.IntMap (TermPlus, UnivLevelPlus)
+    , typeEnv :: TypeEnv
     , constraintEnv :: [PreConstraint] -- for type inference
     , constraintQueue :: ConstraintQueue
     , levelEnv :: [LevelConstraint]
@@ -78,7 +82,7 @@ data Env =
     , zetaEnv :: IntMap.IntMap (WeakTermPlus, WeakTermPlus, UnivLevelPlus)
     , patVarEnv :: S.Set Int
     -- clarify
-    , chainEnv :: IntMap.IntMap [(Meta, Identifier, TermPlus)] -- var/const ~> the closed var chain of its type
+    -- , chainEnv :: IntMap.IntMap [(Meta, Identifier, TermPlus)] -- var/const ~> the closed var chain of its type
     , codeEnv :: Map.HashMap T.Text Definition -- f ~> thunk (lam (x1 ... xn) e)
     , nameSet :: S.Set T.Text
     -- LLVM
@@ -104,6 +108,8 @@ initialEnv =
     , fileEnv = Map.empty
     , traceEnv = []
     , revEnumEnv = Map.empty
+    , llvmEnumEnv = Map.empty
+    , revCaseEnv = IntMap.empty
     , nameEnv = Map.empty
     , revNameEnv = IntMap.empty
     -- , specifiedNameSet = S.empty
@@ -117,7 +123,7 @@ initialEnv =
     , impEnv = IntMap.empty
     , weakTypeEnv = IntMap.empty
     , typeEnv = IntMap.empty
-    , chainEnv = IntMap.empty
+    -- , chainEnv = IntMap.empty
     , codeEnv = Map.empty
     , llvmEnv = Map.empty
     , declEnv =
@@ -241,6 +247,11 @@ insTypeEnv' (I (_, i)) t = do
   let ml = UnivLevelPlus (fst t, l)
   modify (\e -> e {typeEnv = IntMap.insert i (t, ml) (typeEnv e)})
 
+insTypeEnv'' :: Identifier -> TermPlus -> TypeEnv -> TypeEnv
+insTypeEnv'' (I (_, i)) t tenv = do
+  let ml = UnivLevelPlus (fst t, 0)
+  IntMap.insert i (t, ml) tenv
+
 lookupTypeEnv :: Identifier -> WithEnv (Maybe (TermPlus, UnivLevelPlus))
 lookupTypeEnv (I (_, i)) = do
   tenv <- gets typeEnv
@@ -257,6 +268,19 @@ lookupTypeEnv' (I (s, i))
   | otherwise = do
     mt <- gets (IntMap.lookup i . typeEnv)
     case mt of
+      Just (t, _) -> return t
+      Nothing -> raiseCritical' $ s <> " is not found in the type environment."
+
+lookupTypeEnv'' :: Identifier -> TypeEnv -> WithEnv TermPlus
+lookupTypeEnv'' (I (s, i)) tenv
+  | Just _ <- asLowTypeMaybe s = do
+    l <- newCount
+    return (emptyMeta, TermTau l)
+  | Just op <- asUnaryOpMaybe s = unaryOpToType emptyMeta op
+  | Just op <- asBinaryOpMaybe s = binaryOpToType emptyMeta op
+  | Just lowType <- asArrayAccessMaybe s = arrayAccessToType emptyMeta lowType
+  | otherwise = do
+    case IntMap.lookup i tenv of
       Just (t, _) -> return t
       Nothing -> raiseCritical' $ s <> " is not found in the type environment."
 
@@ -308,14 +332,11 @@ insEnumEnv :: Meta -> T.Text -> [(T.Text, Int)] -> WithEnv ()
 insEnumEnv m name xis = do
   eenv <- gets enumEnv
   let definedEnums = Map.keys eenv ++ map fst (concat (Map.elems eenv))
-  -- let name' = llvmString name
-  -- let (xs, is) = unzip xis
-  -- let xs' = map llvmString xs
-  -- let xis' = zip xs' is
   case find (`elem` definedEnums) $ name : map fst xis of
     Just x -> raiseError m $ "the constant `" <> x <> "` is already defined"
     _ -> do
       let (xs, is) = unzip xis
+      forM_ xs insLLVMEnumEnv
       let rev = Map.fromList $ zip xs (zip (repeat name) is)
       modify
         (\e ->
@@ -323,6 +344,21 @@ insEnumEnv m name xis = do
              { enumEnv = Map.insert name xis (enumEnv e)
              , revEnumEnv = rev `Map.union` (revEnumEnv e)
              })
+
+insLLVMEnumEnv :: T.Text -> WithEnv ()
+insLLVMEnumEnv labelName = do
+  j <- newCount
+  let x = llvmString labelName
+  let name = x <> "-" <> T.pack (show j)
+  lenv <- gets llvmEnumEnv
+  modify (\env -> env {llvmEnumEnv = Map.insert labelName name lenv})
+
+lookupLLVMEnumEnv :: Meta -> T.Text -> WithEnv T.Text
+lookupLLVMEnumEnv m labelName = do
+  lenv <- gets llvmEnumEnv
+  case Map.lookup labelName lenv of
+    Nothing -> raiseCritical m $ "no such enum-label defined: " <> labelName
+    Just labelName' -> return labelName'
 
 lookupConstNum :: T.Text -> WithEnv Int
 lookupConstNum constName = do

@@ -8,6 +8,7 @@ import Control.Monad.Except
 import Control.Monad.State
 
 import qualified Data.HashMap.Strict as Map
+import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Text as T
 
 import Data.Basic
@@ -17,7 +18,7 @@ import Data.WeakTerm
 discern :: [QuasiStmt] -> WithEnv [QuasiStmt]
 discern = discern' Map.empty
 
-type NameEnv = Map.HashMap T.Text Int
+type NameEnv = Map.HashMap T.Text Identifier
 
 discern' :: NameEnv -> [QuasiStmt] -> WithEnv [QuasiStmt]
 discern' _ [] = return []
@@ -43,14 +44,12 @@ discern' nenv ((QuasiStmtDef xds):ss) = do
   let mys = map (\(_, (my, y, _), _, _) -> (my, y)) ds
   ys' <- mapM (\(my, y) -> newLLVMNameWith' my nenv y) mys
   let yis = map (asText . snd) mys
-  let yis' = map asInt ys'
-  let nenvForDef = Map.fromList (zip yis yis') `Map.union` nenv
+  let nenvForDef = Map.fromList (zip yis ys') `Map.union` nenv
   ds' <- mapM (discernDef nenvForDef) ds
   -- discern for continuation
   xs' <- mapM newLLVMNameWith xs
   let xis = map asText xs
-  let xis' = map asInt xs'
-  let nenvForCont = Map.fromList (zip xis xis') `Map.union` nenv
+  let nenvForCont = Map.fromList (zip xis xs') `Map.union` nenv
   ss' <- discern' nenvForCont ss
   return $ QuasiStmtDef (zip xs' ds') : ss'
 discern' nenv ((QuasiStmtConstDecl m (mx, x, t)):ss) = do
@@ -245,6 +244,9 @@ discern'' nenv (m, WeakTermCase (e, t) cxtes) = do
   cxtes' <-
     flip mapM cxtes $ \((c, xts), body) -> do
       c' <- lookupName' m c nenv
+      label <- lookupLLVMEnumEnv m (asText c)
+      renv <- gets revCaseEnv
+      modify (\env -> env {revCaseEnv = IntMap.insert (asInt c') label renv})
       (xts', body') <- discernBinder nenv xts body
       return ((c', xts'), body')
   return (m, WeakTermCase (e', t') cxtes')
@@ -369,12 +371,10 @@ lookupStrict' nenv xt@(m, _, _) = do
   return (m, WeakTermUpsilon x')
 
 insertName :: Identifier -> Identifier -> NameEnv -> NameEnv
-insertName (I (s, _)) (I (_, j)) nenv = Map.insert s j nenv
+insertName (I (s, _)) y nenv = Map.insert s y nenv
 
 lookupName :: Identifier -> NameEnv -> Maybe Identifier
-lookupName (I (s, _)) nenv = do
-  j <- Map.lookup s nenv
-  return $ I (llvmString s, j)
+lookupName (I (s, _)) nenv = Map.lookup s nenv
 
 lookupName' :: Meta -> Identifier -> NameEnv -> WithEnv Identifier
 lookupName' m x nenv = do

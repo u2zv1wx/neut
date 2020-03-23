@@ -25,18 +25,18 @@
 
 ;; (item-2 item)
 
-(item-2 item)
+;; (item-2 item)
 
 ;; (item-1 item)
 
 ;; (let xs (list.cons i64 1 (list.cons i64 2 (list.cons i64 (item-1 item) (list.nil i64)))))
 
 ;; ;; これがちゃんと動くようになった
-(definition sum ((xs (list i64)))
-  (case xs
-    ((list:nil) 0)
-    ((list:cons z ys)
-      (i64.add z (sum ys)))))
+;; (definition sum ((xs (list i64)))
+;;   (case xs
+;;     ((list:nil) 0)
+;;     ((list:cons z ys)
+;;       (i64.add z (sum ys)))))
 
 ;; (definition fact ((xs (list i64)))
 ;;   (case xs
