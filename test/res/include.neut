@@ -16,6 +16,12 @@
 
 ;; (list! 25 100 1000)みたいな略記を許すようにしてもいいかもしれないが。
 
+(definition sum ((xs (list i64)))
+  (case xs
+    ((list:nil) 0)
+    ((list:cons z ys)
+      (i64.add z (sum ys)))))
+
 (case xs
   ((list:nil) (i64 10))
   ((list:cons value ys)
@@ -23,6 +29,7 @@
      ((list:nil) (i64 20))
      ((list:cons v2 zs) v2))))
 
+(sum xs)
 ;; (item-2 item)
 
 ;; (item-2 item)
@@ -32,11 +39,7 @@
 ;; (let xs (list.cons i64 1 (list.cons i64 2 (list.cons i64 (item-1 item) (list.nil i64)))))
 
 ;; ;; これがちゃんと動くようになった
-;; (definition sum ((xs (list i64)))
-;;   (case xs
-;;     ((list:nil) 0)
-;;     ((list:cons z ys)
-;;       (i64.add z (sum ys)))))
+
 
 ;; (definition fact ((xs (list i64)))
 ;;   (case xs

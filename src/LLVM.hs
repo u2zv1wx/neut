@@ -21,9 +21,7 @@ import Reduce.Code
 
 toLLVM :: CodePlus -> WithEnv LLVM
 toLLVM mainTerm = do
-  let mainTerm' = mainTerm
-  -- p' mainTerm'
-  -- mainTerm' <- reduceCodePlus mainTerm
+  mainTerm' <- reduceCodePlus mainTerm
   modify (\env -> env {nameSet = S.empty})
   mainTerm'' <- llvmCode mainTerm'
   -- the result of "main" must be i64, not i8*
@@ -63,8 +61,7 @@ llvmCode (_, CodeEnumElim sub v branchList) = do
   let es' = map (substCodePlus sub) es
   ns <- gets nameSet
   modify (\env -> env {nameSet = S.empty})
-  let es'' = es'
-  -- es'' <- mapM reduceCodePlus es'
+  es'' <- mapM reduceCodePlus es'
   modify (\env -> env {nameSet = ns})
   llvmCodeEnumElim v $ zip ls es''
 llvmCode (_, CodeStructElim xks v e) = do
@@ -80,7 +77,6 @@ llvmCode (m, CodeCase sub v branchList) = do
   let es' = map (substCodePlus sub) es
   ns <- gets nameSet
   modify (\env -> env {nameSet = S.empty})
-  -- let es'' = es'
   es'' <- mapM reduceCodePlus es'
   modify (\env -> env {nameSet = ns})
   llvmCodeCase m v $ zip ls es''

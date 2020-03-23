@@ -172,33 +172,28 @@ newNameWith'' s = do
   i <- newCount
   return $ I (s <> "-" <> T.pack (show i), i)
 
-llvmString :: T.Text -> T.Text
-llvmString "" = error "llvmString called for the empty string"
-llvmString s = T.cons (llvmHeadChar $ T.head s) (T.map llvmTailChar $ T.tail s)
-
-llvmHeadCharSet :: S.Set Char
-llvmHeadCharSet =
-  S.fromList $
-  "-$._" <> "abcdefghijklmnopqrstuvwxyz" <> "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-
-llvmHeadChar :: Char -> Char
-llvmHeadChar x =
-  if x `S.member` llvmHeadCharSet
-    then x
-    else '-'
-
-llvmTailCharSet :: S.Set Char
-llvmTailCharSet =
-  S.fromList $
-  "-$._" <>
-  "abcdefghijklmnopqrstuvwxyz" <> "ABCDEFGHIJKLMNOPQRSTUVWXYZ" <> "0123456789"
-
-llvmTailChar :: Char -> Char
-llvmTailChar x =
-  if x `S.member` llvmTailCharSet
-    then x
-    else '-'
-
+-- llvmString :: T.Text -> T.Text
+-- llvmString "" = error "llvmString called for the empty string"
+-- llvmString s = T.cons (llvmHeadChar $ T.head s) (T.map llvmTailChar $ T.tail s)
+-- llvmHeadCharSet :: S.Set Char
+-- llvmHeadCharSet =
+--   S.fromList $
+--   "-$._" <> "abcdefghijklmnopqrstuvwxyz" <> "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+-- llvmHeadChar :: Char -> Char
+-- llvmHeadChar x =
+--   if x `S.member` llvmHeadCharSet
+--     then x
+--     else '-'
+-- llvmTailCharSet :: S.Set Char
+-- llvmTailCharSet =
+--   S.fromList $
+--   "-$._" <>
+--   "abcdefghijklmnopqrstuvwxyz" <> "ABCDEFGHIJKLMNOPQRSTUVWXYZ" <> "0123456789"
+-- llvmTailChar :: Char -> Char
+-- llvmTailChar x =
+--   if x `S.member` llvmTailCharSet
+--     then x
+--     else '-'
 getTarget :: WithEnv Target
 getTarget = do
   mtarget <- gets target
@@ -354,8 +349,9 @@ insEnumEnv m name xis = do
 insLLVMEnumEnv :: T.Text -> WithEnv ()
 insLLVMEnumEnv labelName = do
   j <- newCount
-  let x = llvmString labelName
-  let name = x <> "-" <> T.pack (show j)
+  -- let x = llvmString labelName
+  -- let name = x <> "-" <> T.pack (show j)
+  let name = "_" <> T.pack (show j)
   lenv <- gets llvmEnumEnv
   modify (\env -> env {llvmEnumEnv = Map.insert labelName name lenv})
 

@@ -352,7 +352,7 @@ newLLVMNameWith :: Identifier -> WithEnv Identifier
 newLLVMNameWith (I (s, _)) = do
   j <- newCount
   modify (\e -> e {nameEnv = Map.insert s s (nameEnv e)})
-  return $ I (llvmString s, j)
+  return $ I (s, j)
 
 newLLVMNameWith' :: Meta -> NameEnv -> Identifier -> WithEnv Identifier
 newLLVMNameWith' m nenv x = do

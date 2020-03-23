@@ -28,7 +28,7 @@ emit mainTerm = do
     forM (Map.toList lenv) $ \(name, (args, body)) -> do
       let args' = map (showLLVMData . LLVMDataLocal) args
       let body' = reduceLLVM body
-      emitDefinition "i8*" (TE.encodeUtf8Builder $ llvmString name) args' body'
+      emitDefinition "i8*" (TE.encodeUtf8Builder name) args' body'
   return $ toLazyByteString $ unlinesL $ g <> zs <> concat xs
 
 emitDeclarations :: WithEnv [Builder]
@@ -402,7 +402,7 @@ showLowType LowTypeIntS64Ptr = "i64*"
 
 showLLVMData :: LLVMData -> Builder
 showLLVMData (LLVMDataLocal (I (_, i))) = "%_" <> intDec i
-showLLVMData (LLVMDataGlobal x) = "@" <> TE.encodeUtf8Builder (llvmString x)
+showLLVMData (LLVMDataGlobal x) = "@" <> TE.encodeUtf8Builder x
 showLLVMData (LLVMDataInt i) = integerDec i
 showLLVMData (LLVMDataFloat16 x) = "0x" <> (doubleHexFixed $ realToFrac x)
 showLLVMData (LLVMDataFloat32 x) = "0x" <> (doubleHexFixed $ realToFrac x)
