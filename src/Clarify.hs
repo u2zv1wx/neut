@@ -35,22 +35,25 @@ clarify (m, TermPi {}) = do
 clarify (m, TermPiPlus {}) = do
   returnClosureType m
 clarify lam@(m, TermPiIntro mxts e) = do
+  forM_ mxts insTypeEnv'
   fvs <- chainTermPlus lam
   e' <- clarify e
   retClosure Nothing fvs m mxts e'
 clarify lam@(m, TermPiIntroNoReduce mxts e) = do
+  forM_ mxts insTypeEnv'
   fvs <- chainTermPlus lam
   e' <- clarify e
   retClosure Nothing fvs m mxts e'
 clarify (m, TermPiIntroPlus _ (name, args) mxts e) = do
+  forM_ mxts insTypeEnv'
   case varTermPlus (m, TermPiIntro args termZero) of
     [] -> do
       name' <- lookupLLVMEnumEnv m name
       e' <- clarify e
       retClosure (Just name') args m mxts e'
-    _ ->
+    _ -> do
       raiseError m $
-      "couldn't normalize the type of the inductive closure at compile time"
+        "couldn't normalize the type of the inductive closure at compile time"
 clarify (m, TermPiElim e es) = do
   es' <- mapM clarifyPlus es
   e' <- clarify e
@@ -75,10 +78,8 @@ clarify (m, TermSigmaIntro t es) = do
     _ -> raiseCritical m "the type of sigma-intro is wrong"
 clarify (m, TermSigmaElim t xts e1 e2) = do
   clarify (m, TermPiElim e1 [t, (emptyMeta, TermPiIntro xts e2)])
-clarify iter@(m, TermIter (_, x, t) mxts e) = do
-  let (_, xs, ts) = unzip3 mxts
-  let xts = zip xs ts
-  forM_ ((x, t) : xts) $ uncurry insTypeEnv'
+clarify iter@(m, TermIter mxt@(_, x, _) mxts e) = do
+  forM_ (mxt : mxts) insTypeEnv'
   e' <- clarify e
   fvs <- chainTermPlus iter
   retClosure' x fvs m mxts e'
@@ -117,9 +118,8 @@ clarify (m, TermArrayIntro k es) = do
       (m, DataSigmaIntro arrVoidPtr [arrayType, (m, DataSigmaIntro k xs)]))
 clarify (m, TermArrayElim k mxts e1 e2) = do
   e1' <- clarify e1
-  let (_, xs, ts) = unzip3 mxts
-  let xts = zip xs ts
-  forM_ xts $ uncurry insTypeEnv'
+  let (_, xs, _) = unzip3 mxts
+  forM_ mxts insTypeEnv'
   (arrVarName, arrVar) <- newDataUpsilonWith "arr"
   (arrTypeVarName, _) <- newDataUpsilonWith "arr-type"
   (arrInnerVarName, arrInnerVar) <- newDataUpsilonWith "arr-inner"
@@ -142,9 +142,9 @@ clarify (m, TermStructIntro eks) = do
     bindLet (zip xs es') $ (m, CodeUpIntro (m, DataStructIntro (zip vs ks)))
 clarify (m, TermStructElim xks e1 e2) = do
   e1' <- clarify e1
-  let (_, xs, ks) = unzip3 xks
+  let (ms, xs, ks) = unzip3 xks
   ts <- mapM inferKind ks
-  forM_ (zip xs ts) $ uncurry insTypeEnv'
+  forM_ (zip3 ms xs ts) insTypeEnv'
   e2' <- clarify e2
   (structVarName, structVar) <- newDataUpsilonWith "struct"
   return $
@@ -214,8 +214,9 @@ chainCaseClause ::
      ((Identifier, [(Meta, Identifier, TermPlus)]), TermPlus)
   -> WithEnv [(Meta, Identifier, TermPlus)]
 chainCaseClause ((_, xts), body) = do
-  let (_, xs, ts) = unzip3 xts
-  forM_ (zip xs ts) $ uncurry insTypeEnv'
+  let (_, xs, _) = unzip3 xts
+  forM_ xts insTypeEnv'
+  -- forM_ (zip xs ts) $ uncurry insTypeEnv'
   tenv <- gets typeEnv
   fvs <- chainTermPlus' tenv body
   return $ filter (\(_, y, _) -> y `notElem` xs) fvs
@@ -471,14 +472,14 @@ toHeaderInfo _ x _ ArgImm = return ([], [toVar x], id)
 toHeaderInfo _ _ _ ArgUnused = return ([], [], id)
 toHeaderInfo m x t ArgStruct = do
   (structVarName, structVar) <- newDataUpsilonWith "struct"
-  insTypeEnv' structVarName t
+  insTypeEnv' (m, structVarName, t)
   return
     ( [structVarName]
     , [structVar]
     , \cont -> (m, CodeUpElim structVarName (m, CodeUpIntro (toVar x)) cont))
 toHeaderInfo m x t ArgArray = do
   arrayVarName <- newNameWith' "array"
-  insTypeEnv' arrayVarName t
+  insTypeEnv' (m, arrayVarName, t)
   (arrayTypeName, arrayType) <- newDataUpsilonWith "array-type"
   (arrayInnerName, arrayInner) <- newDataUpsilonWith "array-inner"
   (arrayInnerTmpName, arrayInnerTmp) <- newDataUpsilonWith "array-tmp"
@@ -558,9 +559,9 @@ retWithBorrowedVars m cod xs resultVarName
     tPi <- sigToPi mSig yts
     case tPi of
       (_, TermPi _ [c, (mFun, funName, funType@(_, TermPi _ xts _))] _) -> do
-        let (_, _, resultType) = last xts
+        let (mResult, _, resultType) = last xts
         let vs = map (\x -> (m, TermUpsilon x)) $ xs ++ [resultVarName]
-        insTypeEnv' resultVarName resultType
+        insTypeEnv' (mResult, resultVarName, resultType)
         clarify
           ( m
           , TermPiIntro

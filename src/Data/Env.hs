@@ -241,12 +241,17 @@ insTypeEnv :: Identifier -> TermPlus -> UnivLevelPlus -> WithEnv ()
 insTypeEnv (I (_, i)) t ml =
   modify (\e -> e {typeEnv = IntMap.insert i (t, ml) (typeEnv e)})
 
-insTypeEnv' :: Identifier -> TermPlus -> WithEnv ()
-insTypeEnv' (I (_, i)) t = do
+insTypeEnv' :: Data.Term.IdentifierPlus -> WithEnv ()
+insTypeEnv' (_, I (_, i), t) = do
   l <- newCount
   let ml = UnivLevelPlus (fst t, l)
   modify (\e -> e {typeEnv = IntMap.insert i (t, ml) (typeEnv e)})
 
+-- insTypeEnv' :: Identifier -> TermPlus -> WithEnv ()
+-- insTypeEnv' (I (_, i)) t = do
+--   l <- newCount
+--   let ml = UnivLevelPlus (fst t, l)
+--   modify (\e -> e {typeEnv = IntMap.insert i (t, ml) (typeEnv e)})
 insTypeEnv'' :: Identifier -> TermPlus -> TypeEnv -> TypeEnv
 insTypeEnv'' (I (_, i)) t tenv = do
   let ml = UnivLevelPlus (fst t, 0)
@@ -272,7 +277,7 @@ lookupTypeEnv' (I (s, i))
       Nothing -> raiseCritical' $ s <> " is not found in the type environment."
 
 lookupTypeEnv'' :: Identifier -> TypeEnv -> WithEnv TermPlus
-lookupTypeEnv'' (I (s, i)) tenv
+lookupTypeEnv'' x@(I (s, i)) tenv
   | Just _ <- asLowTypeMaybe s = do
     l <- newCount
     return (emptyMeta, TermTau l)
@@ -282,7 +287,8 @@ lookupTypeEnv'' (I (s, i)) tenv
   | otherwise = do
     case IntMap.lookup i tenv of
       Just (t, _) -> return t
-      Nothing -> raiseCritical' $ s <> " is not found in the type environment."
+      Nothing ->
+        raiseCritical' $ asText' x <> " is not found in the type environment."
 
 lowTypeToType :: Meta -> LowType -> WithEnv TermPlus
 lowTypeToType m (LowTypeIntS s) = return (m, TermEnum (EnumTypeIntS s))
