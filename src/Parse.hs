@@ -190,12 +190,6 @@ parse' ((m, TreeNode ((_, TreeLeaf "constant"):rest)):as)
         mn' <- adjustPhase mn
         return $ QuasiStmtConstDecl m' (mn', I (name, i), t') : defList
   | otherwise = raiseSyntaxError m "(constant LEAF TREE)"
-parse' ((m, TreeNode ((_, TreeLeaf "attribute"):rest)):as)
-  | (_, TreeLeaf name):attrList <- rest = do
-    ss1 <- mapM (parseAttr name) attrList
-    ss2 <- parse' as
-    return $ ss1 ++ ss2
-  | otherwise = raiseSyntaxError m "(attribute LEAF TREE ... TREE)"
 parse' ((m, TreeNode (def@(mDef, TreeLeaf "definition"):rest)):as)
   | [name@(_, TreeLeaf _), body] <- rest =
     parse' $ (m, TreeNode [(mDef, TreeLeaf "let"), name, body]) : as
@@ -268,13 +262,6 @@ parseBorrow (m, WeakTermUpsilon (I (s, _)))
   , T.head s == '&' =
     (Just (m, asIdent $ T.tail s), (m, WeakTermUpsilon $ asIdent $ T.tail s))
 parseBorrow t = (Nothing, t)
-
-parseAttr :: T.Text -> TreePlus -> WithEnv QuasiStmt
-parseAttr name (m, TreeNode [(_, TreeLeaf "implicit"), (_, TreeLeaf num)]) = do
-  case readMaybe $ T.unpack num of
-    Nothing -> raiseError m "the argument of `implicit` must be an integer"
-    Just i -> return $ QuasiStmtImplicit m (asIdent name) i
-parseAttr _ t = raiseError (fst t) $ "invalid attribute: " <> showAsSExp t
 
 parseStr :: Meta -> T.Text -> WithEnv String
 parseStr m quotedStr =
@@ -362,7 +349,6 @@ keywordSet =
     , "enum"
     , "include"
     , "ensure"
-    , "attribute"
     , "constant"
     , "statement"
     , "introspect"
