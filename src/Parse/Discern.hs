@@ -24,13 +24,13 @@ discern' :: NameEnv -> [QuasiStmt] -> WithEnv [QuasiStmt]
 discern' _ [] = return []
 discern' nenv ((QuasiStmtLet m (mx, x, t) e):ss) = do
   t' <- discern'' nenv t
-  x' <- newLLVMNameWith' m nenv x
+  x' <- newDefinedNameWith' m nenv x
   e' <- discern'' nenv e
   ss' <- discern' (insertName x x' nenv) ss
   return $ QuasiStmtLet m (mx, x', t') e' : ss'
 discern' nenv ((QuasiStmtLetWT m (mx, x, t) e):ss) = do
   t' <- discern'' nenv t
-  x' <- newLLVMNameWith' m nenv x
+  x' <- newDefinedNameWith' m nenv x
   e' <- discern'' nenv e
   ss' <- discern' (insertName x x' nenv) ss
   return $ QuasiStmtLetWT m (mx, x', t') e' : ss'
@@ -42,12 +42,12 @@ discern' nenv ((QuasiStmtDef xds):ss) = do
   let (xs, ds) = unzip xds
   -- discern for deflist
   let mys = map (\(_, (my, y, _), _, _) -> (my, y)) ds
-  ys' <- mapM (\(my, y) -> newLLVMNameWith' my nenv y) mys
+  ys' <- mapM (\(my, y) -> newDefinedNameWith' my nenv y) mys
   let yis = map (asText . snd) mys
   let nenvForDef = Map.fromList (zip yis ys') `Map.union` nenv
   ds' <- mapM (discernDef nenvForDef) ds
   -- discern for continuation
-  xs' <- mapM newLLVMNameWith xs
+  xs' <- mapM newDefinedNameWith xs
   let xis = map asText xs
   let nenvForCont = Map.fromList (zip xis xs') `Map.union` nenv
   ss' <- discern' nenvForCont ss
@@ -66,13 +66,13 @@ discern' nenv ((QuasiStmtImplicit m x i):ss) = do
   return $ QuasiStmtImplicit m x' i : ss'
 discern' nenv ((QuasiStmtLetInductive n m (mx, a, t) e):ss) = do
   t' <- discern'' nenv t
-  a' <- newLLVMNameWith' m nenv a
+  a' <- newDefinedNameWith' m nenv a
   e' <- discern'' nenv e
   ss' <- discern' (insertName a a' nenv) ss
   return $ QuasiStmtLetInductive n m (mx, a', t') e' : ss'
 discern' nenv ((QuasiStmtLetCoinductive n m (mx, a, t) e):ss) = do
   t' <- discern'' nenv t
-  a' <- newLLVMNameWith' m nenv a
+  a' <- newDefinedNameWith' m nenv a
   e' <- discern'' nenv e
   ss' <- discern' (insertName a a' nenv) ss
   return $ QuasiStmtLetCoinductive n m (mx, a', t') e' : ss'
@@ -83,7 +83,7 @@ discern' nenv ((QuasiStmtLetInductiveIntro m enumInfo (mb, b, t) xts yts ats bts
   (ats', nenv''') <- discernArgs nenv'' ats
   (bts', nenv'''') <- discernArgs nenv''' bts
   bInner' <- discern'' nenv'''' bInner
-  b' <- newLLVMNameWith' m nenv b
+  b' <- newDefinedNameWith' m nenv b
   ss' <- discern' (insertName b b' nenv) ss
   asOuter <- mapM (lookupStrict nenv) ats
   asInnerPlus <- mapM (lookupStrict' nenv'''') ats
@@ -110,7 +110,7 @@ discern' nenv ((QuasiStmtLetCoinductiveElim m (mb, b, t) xtsyt codInner ats bts 
   (yt', nenv'''') <- discernIdentPlus' nenv''' yt
   codInner' <- discern'' nenv'''' codInner
   e2' <- discern'' nenv'''' e2
-  b' <- newLLVMNameWith' m nenv b
+  b' <- newDefinedNameWith' m nenv b
   ss' <- discern' (insertName b b' nenv) ss
   asOuterPlus <- mapM (lookupStrict' nenv) ats
   asOuter <- mapM (lookupStrict nenv) ats
@@ -141,7 +141,7 @@ discernStmtBinder nenv [] ss = do
   return ([], ss')
 discernStmtBinder nenv ((mx, x, t):xts) ss = do
   t' <- discern'' nenv t
-  x' <- newLLVMNameWith x
+  x' <- newDefinedNameWith x
   (xts', ss') <- discernStmtBinder (insertName x x' nenv) xts ss
   return ((mx, x', t') : xts', ss')
 
@@ -261,7 +261,7 @@ discernBinder nenv [] e = do
   return ([], e')
 discernBinder nenv ((mx, x, t):xts) e = do
   t' <- discern'' nenv t
-  x' <- newLLVMNameWith x
+  x' <- newDefinedNameWith x
   (xts', e') <- discernBinder (insertName x x' nenv) xts e
   return ((mx, x', t') : xts', e')
 
@@ -269,7 +269,7 @@ discernSigma :: NameEnv -> [IdentifierPlus] -> WithEnv [IdentifierPlus]
 discernSigma _ [] = return []
 discernSigma nenv ((mx, x, t):xts) = do
   t' <- discern'' nenv t
-  x' <- newLLVMNameWith x
+  x' <- newDefinedNameWith x
   xts' <- discernSigma (insertName x x' nenv) xts
   return $ (mx, x', t') : xts'
 
@@ -278,7 +278,7 @@ discernArgs ::
 discernArgs nenv [] = return ([], nenv)
 discernArgs nenv ((mx, x, t):xts) = do
   t' <- discern'' nenv t
-  x' <- newLLVMNameWith x
+  x' <- newDefinedNameWith x
   (xts', nenv') <- discernArgs (insertName x x' nenv) xts
   return ((mx, x', t') : xts', nenv')
 
@@ -292,7 +292,7 @@ discernIdentPlus' ::
      NameEnv -> IdentifierPlus -> WithEnv (IdentifierPlus, NameEnv)
 discernIdentPlus' nenv (m, x, t) = do
   t' <- discern'' nenv t
-  x' <- newLLVMNameWith x
+  x' <- newDefinedNameWith x
   return ((m, x', t'), insertName x x' nenv)
 
 discernIter ::
@@ -312,12 +312,12 @@ discernIter' ::
   -> WeakTermPlus
   -> WithEnv (IdentifierPlus, [IdentifierPlus], WeakTermPlus)
 discernIter' nenv (mx, x, t') [] e = do
-  x' <- newLLVMNameWith x
+  x' <- newDefinedNameWith x
   e' <- discern'' (insertName x x' nenv) e
   return ((mx, x', t'), [], e')
 discernIter' nenv xt ((mx, x, t):xts) e = do
   t' <- discern'' nenv t
-  x' <- newLLVMNameWith x
+  x' <- newDefinedNameWith x
   (xt', xts', e') <- discernIter' (insertName x x' nenv) xt xts e
   return (xt', (mx, x', t') : xts', e')
 
@@ -344,20 +344,20 @@ discernStruct nenv [] e = do
   e' <- discern'' nenv e
   return ([], e')
 discernStruct nenv ((mx, x, t):xts) e = do
-  x' <- newLLVMNameWith x
+  x' <- newDefinedNameWith x
   (xts', e') <- discernStruct (insertName x x' nenv) xts e
   return ((mx, x', t) : xts', e')
 
-newLLVMNameWith :: Identifier -> WithEnv Identifier
-newLLVMNameWith (I (s, _)) = do
+newDefinedNameWith :: Identifier -> WithEnv Identifier
+newDefinedNameWith (I (s, _)) = do
   j <- newCount
   modify (\e -> e {nameEnv = Map.insert s s (nameEnv e)})
   return $ I (s, j)
 
-newLLVMNameWith' :: Meta -> NameEnv -> Identifier -> WithEnv Identifier
-newLLVMNameWith' m nenv x = do
+newDefinedNameWith' :: Meta -> NameEnv -> Identifier -> WithEnv Identifier
+newDefinedNameWith' m nenv x = do
   case Map.lookup (asText x) nenv of
-    Nothing -> newLLVMNameWith x
+    Nothing -> newDefinedNameWith x
     Just _ ->
       raiseError m $
       "the identifier `" <> asText x <> "` is already defined at top level"
