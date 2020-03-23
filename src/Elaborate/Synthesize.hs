@@ -55,7 +55,7 @@ resolveDelta ::
   -> [(Meta, [WeakTermPlus])]
   -> [(Meta, [WeakTermPlus])]
   -> WithEnv ()
-resolveDelta iter mess1 mess2 = do
+resolveDelta iter@(m, _, _, _, _) mess1 mess2 = do
   let planA = do
         let ess1 = map snd mess1
         let ess2 = map snd mess2
@@ -67,7 +67,7 @@ resolveDelta iter mess1 mess2 = do
         simp $ [(e1, e2)]
         synthesize
   deleteMin
-  chain [planA, planB]
+  chain m [planA, planB]
 
 -- synthesize `hole @ arg-1 @ ... @ arg-n = e`, where arg-i is a variable.
 -- Suppose that we received a quasi-pattern ?M @ x @ x @ y @ z == e.
@@ -88,7 +88,7 @@ resolvePiElim m ess e = do
   let xsss = map (takeByCount lengthInfo) xss
   let lamList = map (bindFormalArgs e) xsss
   deleteMin
-  chain $ map (resolveHole m) lamList
+  chain (metaOf e) $ map (resolveHole m) lamList
 
 resolveHole :: Hole -> WeakTermPlus -> WithEnv ()
 resolveHole m@(I (_, i)) e = do
@@ -103,10 +103,10 @@ asAnalyzable :: EnrichedConstraint -> EnrichedConstraint
 asAnalyzable (Enriched cs ms _) = Enriched cs ms ConstraintAnalyzable
 
 -- Try the list of alternatives.
-chain :: [WithEnv a] -> WithEnv a
-chain [] = raiseError' $ "cannot synthesize(chain)."
-chain [e] = e
-chain (e:es) = catchError e $ (const $ do chain es)
+chain :: Meta -> [WithEnv a] -> WithEnv a
+chain m [] = raiseError m $ "cannot synthesize(chain)."
+chain _ [e] = e
+chain m (e:es) = catchError e $ (const $ do chain m es)
 
 deleteMin :: WithEnv ()
 deleteMin = do
@@ -186,15 +186,21 @@ throwTypeErrors = do
 setupPosInfo :: [EnrichedConstraint] -> [(PosInfo, PreConstraint)]
 setupPosInfo [] = []
 setupPosInfo ((Enriched (e1, e2) _ _):cs) = do
-  case (getConstraintPosInfo $ metaOf e1, getConstraintPosInfo $ metaOf e2) of
-    (Just pos1, Just pos2) -> do
-      case snd pos1 `compare` snd pos2 of
-        LT -> (pos2, (e2, e1)) : setupPosInfo cs -- pos1 < pos2
-        EQ -> (pos1, (e1, e2)) : setupPosInfo cs -- pos1 = pos2 (どっちで表示してもオーケー)
-        GT -> (pos1, (e1, e2)) : setupPosInfo cs -- pos1 > pos2
-    (Just pos1, Nothing) -> (pos1, (e1, e2)) : setupPosInfo cs
-    (Nothing, Just pos2) -> (pos2, (e2, e1)) : setupPosInfo cs
-    _ -> setupPosInfo cs -- fixme (loc info not available)
+  let pos1 = getConstraintPosInfo $ metaOf e1
+  let pos2 = getConstraintPosInfo $ metaOf e2
+  case snd pos1 `compare` snd pos2 of
+    LT -> (pos2, (e2, e1)) : setupPosInfo cs -- pos1 < pos2
+    EQ -> (pos1, (e1, e2)) : setupPosInfo cs -- pos1 = pos2 (どっちで表示してもオーケー)
+    GT -> (pos1, (e1, e2)) : setupPosInfo cs -- pos1 > pos2
+  -- case (getConstraintPosInfo $ metaOf e1, getConstraintPosInfo $ metaOf e2) of
+  --   (Just pos1, Just pos2) -> do
+  --     case snd pos1 `compare` snd pos2 of
+  --       LT -> (pos2, (e2, e1)) : setupPosInfo cs -- pos1 < pos2
+  --       EQ -> (pos1, (e1, e2)) : setupPosInfo cs -- pos1 = pos2 (どっちで表示してもオーケー)
+  --       GT -> (pos1, (e1, e2)) : setupPosInfo cs -- pos1 > pos2
+  --   (Just pos1, Nothing) -> (pos1, (e1, e2)) : setupPosInfo cs
+  --   (Nothing, Just pos2) -> (pos2, (e2, e1)) : setupPosInfo cs
+  --   _ -> setupPosInfo cs -- fixme (loc info not available)
 
 constructErrors :: [PosInfo] -> [(PosInfo, PreConstraint)] -> WithEnv [Log]
 constructErrors _ [] = return []
@@ -204,18 +210,18 @@ constructErrors ps ((pos, (e1, e2)):pcs) = do
   -- let msg = constructErrorMsg e1' e2'
   let msg = constructErrorMsg e1 e2
   as <- constructErrors (pos : ps) pcs
-  return $ logError (Just pos) msg : as
+  return $ logError pos msg : as
 
 constructErrorMsg :: WeakTermPlus -> WeakTermPlus -> T.Text
 constructErrorMsg e1 e2 =
   "couldn't verify the definitional equality of the following two terms:\n- " <>
   toText e1 <> "\n- " <> toText e2
 
-getConstraintPosInfo :: Meta -> Maybe PosInfo
-getConstraintPosInfo m =
-  case (metaFileName m, metaConstraintLocation m) of
-    (Just path, Just l) -> return (path, l)
-    _ -> Nothing
+getConstraintPosInfo :: Meta -> PosInfo
+getConstraintPosInfo m = (metaFileName m, metaConstraintLocation m)
+  -- case (metaFileName m, metaConstraintLocation m) of
+  --   (Just path, Just l) -> return (path, l)
+  --   _ -> Nothing
 
 unravel :: WeakTermPlus -> WithEnv WeakTermPlus
 unravel (m, WeakTermTau l) = return (m, WeakTermTau l)

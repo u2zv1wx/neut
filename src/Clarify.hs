@@ -393,7 +393,7 @@ retClosure' ::
   -> WithEnv CodePlus
 retClosure' x fvs m xts e = do
   cls <- makeClosure' (Just $ asText'' x) fvs m xts e
-  knot x cls
+  knot m x cls
   return (m, CodeUpIntro cls)
 
 makeClosure' ::
@@ -408,11 +408,11 @@ makeClosure' mName fvs m xts e = do
   xts' <- clarifyBinder xts
   makeClosure mName fvs' m xts' e
 
-knot :: Identifier -> DataPlus -> WithEnv ()
-knot z cls = do
+knot :: Meta -> Identifier -> DataPlus -> WithEnv ()
+knot m z cls = do
   cenv <- gets codeEnv
   case Map.lookup (asText'' z) cenv of
-    Nothing -> raiseCritical' "knot"
+    Nothing -> raiseCritical m "knot"
     Just (Definition _ args body) -> do
       let body' = substCodePlus [(z, cls)] body
       let def' = Definition (IsFixed True) args body'
@@ -574,9 +574,9 @@ inferKind m (ArrayKindIntS i) = return (m, TermEnum (EnumTypeIntS i))
 inferKind m (ArrayKindIntU i) = return (m, TermEnum (EnumTypeIntU i))
 inferKind m (ArrayKindFloat size) = do
   let constName = "f" <> T.pack (show (sizeAsInt size))
-  i <- lookupConstNum' constName
+  i <- lookupConstNum' m constName
   return (m, TermConst (I (constName, i)))
-inferKind _ _ = raiseCritical' "inferKind for void-pointer"
+inferKind m _ = raiseCritical m "inferKind for void-pointer"
 
 sigToPi :: Meta -> [Data.Term.IdentifierPlus] -> WithEnv TermPlus
 sigToPi m xts = do

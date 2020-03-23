@@ -4,9 +4,9 @@ module Data.Log
   ( Log
   , outputLog
   , logInfo
-  , logInfo'
+  -- , logInfo'
   , logError
-  , logError'
+  -- , logError'
   , logCritical
   , logCritical'
   ) where
@@ -73,20 +73,19 @@ withSGR :: Bool -> [SGR] -> IO () -> IO ()
 withSGR False _ f = f
 withSGR True arg f = setSGR arg >> f >> setSGR [Reset]
 
-logInfo :: Maybe PosInfo -> T.Text -> Log
-logInfo mpos text = (mpos, LogLevelNote, text)
+logInfo :: PosInfo -> T.Text -> Log
+logInfo pos text = (Just pos, LogLevelNote, text)
 
-logInfo' :: T.Text -> Log
-logInfo' text = logInfo Nothing text
+-- logInfo' :: T.Text -> Log
+-- logInfo' text = logInfo Nothing text
+logError :: PosInfo -> T.Text -> Log
+logError pos text = (Just pos, LogLevelError, text)
 
-logError :: Maybe PosInfo -> T.Text -> Log
-logError mpos text = (mpos, LogLevelError, text)
-
-logError' :: T.Text -> Log
-logError' text = logError Nothing text
-
-logCritical :: Maybe PosInfo -> T.Text -> Log
-logCritical mpos text = (mpos, LogLevelCritical, text)
+-- logError' :: T.Text -> Log
+-- logError' text = logError Nothing text
+logCritical :: PosInfo -> T.Text -> Log
+logCritical pos text = (Just pos, LogLevelCritical, text)
 
 logCritical' :: T.Text -> Log
-logCritical' text = logCritical Nothing text
+logCritical' text = (Nothing, LogLevelCritical, text)
+  -- logCritical Nothing text

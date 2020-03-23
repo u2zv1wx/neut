@@ -71,15 +71,16 @@ complete inputPath l c = do
 showCompInfo :: CompInfo -> [String]
 showCompInfo [] = []
 showCompInfo ((x, m):xms) = do
-  case getPosInfo m of
-    Nothing -> showCompInfo xms
-    Just (path, (_, l, c)) -> do
-      let pathStr = "\"" <> toFilePath path <> "\""
-      let x' = T.unpack $ asText x
-      let str =
-            "(\"" ++
-            x' ++ "\" (" ++ pathStr ++ " " ++ show l ++ " " ++ show c ++ "))"
-      str : showCompInfo xms
+  let (path, (_, l, c)) = getPosInfo m
+  -- case getPosInfo m of
+  --   Nothing -> showCompInfo xms
+  --   Just (path, (_, l, c)) -> do
+  let pathStr = "\"" <> toFilePath path <> "\""
+  let x' = T.unpack $ asText x
+  let str =
+        "(\"" ++
+        x' ++ "\" (" ++ pathStr ++ " " ++ show l ++ " " ++ show c ++ "))"
+  str : showCompInfo xms
 
 parseForCompletion :: Path Abs File -> Line -> Column -> WithEnv CompInfo
 parseForCompletion inputPath l c = do
@@ -160,10 +161,12 @@ parse' ((m, TreeNode ((_, TreeLeaf "ensure"):rest)):as)
     isAlreadyInstalled <- doesDirExist path
     when (not isAlreadyInstalled) $ do
       urlStr' <- parseStr mUrl urlStr
-      outputNote $ "downloading " <> pkg <> " from " <> T.pack urlStr'
+      outputNote m $ "downloading " <> pkg <> " from " <> T.pack urlStr'
       req <- parseRequest urlStr'
       item <- httpLBS req
-      outputNote $ "installing " <> pkg <> " into " <> T.pack (toFilePath path)
+      -- fixme: ここのmetaはかえってジャマかも
+      outputNote m $
+        "installing " <> pkg <> " into " <> T.pack (toFilePath path)
       install (getResponseBody item) path
     parse' as
   | otherwise = raiseSyntaxError m "(ensure LEAF LEAF)"

@@ -78,7 +78,7 @@ infer' ctx f@(m, WeakTermUpsilon x) = do
       mt <- lookupTypeEnv x
       case mt of
         Nothing -> do
-          ((_, t), UnivLevelPlus (_, l)) <- lookupWeakTypeEnv x
+          ((_, t), UnivLevelPlus (_, l)) <- lookupWeakTypeEnv m x
           return ((m, WeakTermUpsilon x), (m, t), UnivLevelPlus (m, l))
         Just (t, UnivLevelPlus (_, l)) -> do
           ((_, t'), l') <- univInst (weaken t) l
@@ -214,7 +214,7 @@ infer' ctx f@(m, WeakTermConst x@(I (s, _)))
         mt <- lookupTypeEnv x
         case mt of
           Nothing -> do
-            (t, UnivLevelPlus (_, l)) <- lookupWeakTypeEnv x
+            (t, UnivLevelPlus (_, l)) <- lookupWeakTypeEnv m x
             return ((m, WeakTermConst x), t, UnivLevelPlus (m, l))
           Just (t, UnivLevelPlus (_, l)) -> do
             ((_, t'), l') <- univInst (weaken t) l
@@ -612,13 +612,14 @@ insWeakTypeEnv :: Identifier -> (WeakTermPlus, UnivLevelPlus) -> WithEnv ()
 insWeakTypeEnv (I (_, i)) tl =
   modify (\e -> e {weakTypeEnv = IntMap.insert i tl (weakTypeEnv e)})
 
-lookupWeakTypeEnv :: Identifier -> WithEnv (WeakTermPlus, UnivLevelPlus)
-lookupWeakTypeEnv s = do
+lookupWeakTypeEnv :: Meta -> Identifier -> WithEnv (WeakTermPlus, UnivLevelPlus)
+lookupWeakTypeEnv m s = do
   mt <- lookupWeakTypeEnvMaybe s
   case mt of
     Just t -> return t
     Nothing ->
-      raiseCritical' $ asText s <> " is not found in the weak type environment."
+      raiseCritical m $
+      asText s <> " is not found in the weak type environment."
 
 lookupWeakTypeEnvMaybe ::
      Identifier -> WithEnv (Maybe (WeakTermPlus, UnivLevelPlus))
@@ -830,7 +831,7 @@ binaryOpToWeakType m op = do
 arrayAccessToWeakType :: Meta -> LowType -> WithEnv WeakTermPlus
 arrayAccessToWeakType m lowType = do
   t <- lowTypeToWeakType m lowType
-  k <- lowTypeToArrayKind lowType
+  k <- lowTypeToArrayKind m lowType
   x1 <- newNameWith' "arg"
   x2 <- newNameWith' "arg"
   x3 <- newNameWith' "arg"

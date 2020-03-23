@@ -570,9 +570,8 @@ adjustPhase m = do
   let newLoc = adjustPhase' i (metaLocation m)
   return $ m {metaLocation = newLoc, metaConstraintLocation = newLoc}
 
-adjustPhase' :: Int -> Maybe Loc -> Maybe Loc
-adjustPhase' _ Nothing = Nothing
-adjustPhase' i (Just (_, l, c)) = Just (i, l, c)
+adjustPhase' :: Int -> Loc -> Loc
+adjustPhase' i (_, l, c) = (i, l, c)
 
 -- newHole :: Meta -> WithEnv WeakTermPlus
 -- newHole m = do

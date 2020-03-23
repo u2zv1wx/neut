@@ -300,14 +300,14 @@ llvmDataLet x (_, DataFloat32 f) cont =
   llvmUncastLet x (LLVMDataFloat32 f) (LowTypeFloat FloatSize32) cont
 llvmDataLet x (_, DataFloat64 f) cont =
   llvmUncastLet x (LLVMDataFloat64 f) (LowTypeFloat FloatSize64) cont
-llvmDataLet x (_, DataEnumIntro intOrLabel) cont = do
+llvmDataLet x (m, DataEnumIntro intOrLabel) cont = do
   case intOrLabel of
     EnumValueIntS size i ->
       llvmUncastLet x (LLVMDataInt i) (LowTypeIntS size) cont
     EnumValueIntU size i ->
       llvmUncastLet x (LLVMDataInt i) (LowTypeIntU size) cont
     EnumValueLabel l -> do
-      i <- toInteger <$> getEnumNum l
+      i <- toInteger <$> getEnumNum m l
       llvmUncastLet x (LLVMDataInt i) (LowTypeIntS 64) cont
 llvmDataLet x (m, DataStructIntro dks) cont = do
   let (ds, ks) = unzip dks
@@ -342,12 +342,12 @@ constructSwitch [] = return Nothing
 constructSwitch [(CaseValue _, code)] = do
   code' <- llvmCode code
   return $ Just (code', [])
-constructSwitch ((CaseValue l, code):rest) = do
-  i <- fromInteger <$> enumValueToInteger l
+constructSwitch ((CaseValue l, code@(m, _)):rest) = do
+  i <- fromInteger <$> enumValueToInteger m l
   code' <- llvmCode code
-  m <- constructSwitch rest
+  mSwitch <- constructSwitch rest
   return $ do
-    (defaultCase, caseList) <- m
+    (defaultCase, caseList) <- mSwitch
     return (defaultCase, (i, code') : caseList)
 constructSwitch ((CaseDefault, code):_) = do
   code' <- llvmCode code
@@ -511,18 +511,18 @@ newNameWith'' :: Maybe T.Text -> WithEnv Identifier
 newNameWith'' Nothing = newNameWith' "var"
 newNameWith'' (Just name) = newNameWith' name
 
-enumValueToInteger :: EnumValue -> WithEnv Integer
-enumValueToInteger intOrLabel =
+enumValueToInteger :: Meta -> EnumValue -> WithEnv Integer
+enumValueToInteger m intOrLabel =
   case intOrLabel of
-    EnumValueLabel l -> toInteger <$> getEnumNum l
+    EnumValueLabel l -> toInteger <$> getEnumNum m l
     EnumValueIntS _ i -> return i
     EnumValueIntU _ i -> return i
 
-getEnumNum :: T.Text -> WithEnv Int
-getEnumNum label = do
+getEnumNum :: Meta -> T.Text -> WithEnv Int
+getEnumNum m label = do
   renv <- gets revEnumEnv
   case Map.lookup label renv of
-    Nothing -> raiseCritical' $ "no such enum is defined: " <> label
+    Nothing -> raiseCritical m $ "no such enum is defined: " <> label
     Just (_, i) -> return i
 
 insLLVMEnv :: T.Text -> [Identifier] -> LLVM -> WithEnv ()

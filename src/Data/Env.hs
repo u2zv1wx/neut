@@ -192,13 +192,13 @@ getOS = do
   case os of
     "linux" -> return OSLinux
     "darwin" -> return OSDarwin
-    s -> raiseError' $ "unsupported target os: " <> T.pack (show s)
+    s -> raiseCritical' $ "unsupported target os: " <> T.pack (show s)
 
 getArch :: WithEnv Arch
 getArch = do
   case arch of
     "x86_64" -> return Arch64
-    s -> raiseError' $ "unsupported target arch: " <> T.pack (show s)
+    s -> raiseCritical' $ "unsupported target arch: " <> T.pack (show s)
 
 newDataUpsilonWith :: Meta -> T.Text -> WithEnv (Identifier, DataPlus)
 newDataUpsilonWith m name = do
@@ -263,7 +263,7 @@ lookupTypeEnv'' m x@(I (s, i)) tenv
     case IntMap.lookup i tenv of
       Just (t, _) -> return t
       Nothing ->
-        raiseCritical' $ asText' x <> " is not found in the type environment."
+        raiseCritical m $ asText' x <> " is not found in the type environment."
 
 lowTypeToType :: Meta -> LowType -> WithEnv TermPlus
 lowTypeToType m (LowTypeIntS s) = return (m, TermEnum (EnumTypeIntS s))
@@ -272,7 +272,7 @@ lowTypeToType m (LowTypeFloat s) = do
   let x = "f" <> T.pack (show (sizeAsInt s))
   i <- lookupConstNum x
   return (m, TermConst (I (x, i)))
-lowTypeToType _ _ = raiseCritical' "invalid argument passed to lowTypeToType"
+lowTypeToType m _ = raiseCritical m "invalid argument passed to lowTypeToType"
 
 unaryOpToType :: Meta -> UnaryOp -> WithEnv TermPlus
 unaryOpToType m op = do
@@ -296,7 +296,7 @@ binaryOpToType m op = do
 arrayAccessToType :: Meta -> LowType -> WithEnv TermPlus
 arrayAccessToType m lowType = do
   t <- lowTypeToType m lowType
-  k <- lowTypeToArrayKind lowType
+  k <- lowTypeToArrayKind m lowType
   x1 <- newNameWith' "arg"
   x2 <- newNameWith' "arg"
   x3 <- newNameWith' "arg"
@@ -350,12 +350,12 @@ lookupConstNum constName = do
       modify (\env -> env {constantEnv = Map.insert constName i cenv})
       return i
 
-lookupConstNum' :: T.Text -> WithEnv Int
-lookupConstNum' constName = do
+lookupConstNum' :: Meta -> T.Text -> WithEnv Int
+lookupConstNum' m constName = do
   cenv <- gets constantEnv
   case Map.lookup constName cenv of
     Just i -> return i
-    Nothing -> raiseCritical' $ "no such constant: " <> constName
+    Nothing -> raiseCritical m $ "no such constant: " <> constName
 
 lookupConstantMaybe :: Meta -> T.Text -> WithEnv (Maybe WeakTermPlus)
 lookupConstantMaybe m constName = do
@@ -401,18 +401,17 @@ pp e = liftIO $ TIO.putStrLn $ toText e
 toStr :: (Show a) => a -> String
 toStr s = Pr.ppShow s
 
-lowTypeToArrayKind :: LowType -> WithEnv ArrayKind
-lowTypeToArrayKind lowType =
+lowTypeToArrayKind :: Meta -> LowType -> WithEnv ArrayKind
+lowTypeToArrayKind m lowType =
   case lowTypeToArrayKindMaybe lowType of
     Just k -> return k
-    Nothing -> raiseCritical' "Infer.lowTypeToArrayKind"
+    Nothing -> raiseCritical m "Infer.lowTypeToArrayKind"
 
 raiseError :: Meta -> T.Text -> WithEnv a
 raiseError m text = throwError [logError (getPosInfo m) text]
 
-raiseError' :: T.Text -> WithEnv a
-raiseError' text = throwError [logError' text]
-
+-- raiseError' :: T.Text -> WithEnv a
+-- raiseError' text = throwError [logError' text]
 raiseCritical :: Meta -> T.Text -> WithEnv a
 raiseCritical m text = throwError [logCritical (getPosInfo m) text]
 
@@ -445,7 +444,7 @@ getLibraryDirPath = do
   relLibPath <- parseRelDir ".local/share/neut/library"
   return $ homeDirPath </> relLibPath
 
-outputNote :: T.Text -> WithEnv ()
-outputNote str = do
-  let li = logInfo' str
+outputNote :: Meta -> T.Text -> WithEnv ()
+outputNote m str = do
+  let li = logInfo (getPosInfo m) str
   liftIO $ outputLog True li
