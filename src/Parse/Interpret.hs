@@ -281,11 +281,13 @@ interpretBorrow (m, TreeNode (f:args))
     f' <- interpret f
     args'' <- mapM interpret args'
     tmp <- newNameWith'' "borrow"
-    xts <- mapM toIdentPlus $ mxs ++ [(m, tmp)]
-    h <- newHole m
-    let app = (m, WeakTermPiElim f' args'')
+    m' <- adjustPhase m
+    xts <- mapM toIdentPlus $ mxs ++ [(m', tmp)]
+    h <- newHole m'
+    let app = (m', WeakTermPiElim f' args'')
     return
-      ((m, WeakTermUpsilon tmp), \term -> (m, WeakTermSigmaElim h xts app term))
+      ( (m', WeakTermUpsilon tmp)
+      , \term -> (m', WeakTermSigmaElim h xts app term))
 interpretBorrow e = do
   e' <- interpret e
   return (e', id)
@@ -573,10 +575,6 @@ adjustPhase m = do
 adjustPhase' :: Int -> Loc -> Loc
 adjustPhase' i (_, l, c) = (i, l, c)
 
--- newHole :: Meta -> WithEnv WeakTermPlus
--- newHole m = do
---   h <- newNameWith'' "hole-aux"
---   return (m, WeakTermZeta h)
 asArrayKind :: TreePlus -> WithEnv ArrayKind
 asArrayKind e@(_, TreeLeaf x) =
   case asArrayKindMaybe x of

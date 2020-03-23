@@ -319,13 +319,6 @@ simpOther ::
 simpOther e1 e2 fmvs cs = do
   insConstraintQueue $ Enriched (e1, e2) fmvs $ ConstraintOther
   simp cs
-  -- let ks1 = IntMap.keys umap1
-  -- let ks2 = IntMap.keys umap2
-  -- if ks1 /= ks2
-  --   then raiseCritical
-  --          m
-  --          "the same variable instantiated from different base univ-level"
-  --   else do
 
 simpUnivParams :: UnivParams -> UnivParams -> WithEnv ()
 simpUnivParams umap1 umap2 = do

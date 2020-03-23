@@ -189,26 +189,16 @@ setupPosInfo ((Enriched (e1, e2) _ _):cs) = do
   let pos1 = getConstraintPosInfo $ metaOf e1
   let pos2 = getConstraintPosInfo $ metaOf e2
   case snd pos1 `compare` snd pos2 of
-    LT -> (pos2, (e2, e1)) : setupPosInfo cs -- pos1 < pos2
-    EQ -> (pos1, (e1, e2)) : setupPosInfo cs -- pos1 = pos2 (どっちで表示してもオーケー)
-    GT -> (pos1, (e1, e2)) : setupPosInfo cs -- pos1 > pos2
-  -- case (getConstraintPosInfo $ metaOf e1, getConstraintPosInfo $ metaOf e2) of
-  --   (Just pos1, Just pos2) -> do
-  --     case snd pos1 `compare` snd pos2 of
-  --       LT -> (pos2, (e2, e1)) : setupPosInfo cs -- pos1 < pos2
-  --       EQ -> (pos1, (e1, e2)) : setupPosInfo cs -- pos1 = pos2 (どっちで表示してもオーケー)
-  --       GT -> (pos1, (e1, e2)) : setupPosInfo cs -- pos1 > pos2
-  --   (Just pos1, Nothing) -> (pos1, (e1, e2)) : setupPosInfo cs
-  --   (Nothing, Just pos2) -> (pos2, (e2, e1)) : setupPosInfo cs
-  --   _ -> setupPosInfo cs -- fixme (loc info not available)
+    LT -> (pos2, (e2, e1)) : setupPosInfo cs
+    EQ -> (pos1, (e1, e2)) : setupPosInfo cs
+    GT -> (pos1, (e1, e2)) : setupPosInfo cs
 
 constructErrors :: [PosInfo] -> [(PosInfo, PreConstraint)] -> WithEnv [Log]
 constructErrors _ [] = return []
 constructErrors ps ((pos, (e1, e2)):pcs) = do
   e1' <- unravel e1
   e2' <- unravel e2
-  -- let msg = constructErrorMsg e1' e2'
-  let msg = constructErrorMsg e1 e2
+  let msg = constructErrorMsg e1' e2'
   as <- constructErrors (pos : ps) pcs
   return $ logError pos msg : as
 
@@ -219,9 +209,6 @@ constructErrorMsg e1 e2 =
 
 getConstraintPosInfo :: Meta -> PosInfo
 getConstraintPosInfo m = (metaFileName m, metaConstraintLocation m)
-  -- case (metaFileName m, metaConstraintLocation m) of
-  --   (Just path, Just l) -> return (path, l)
-  --   _ -> Nothing
 
 unravel :: WeakTermPlus -> WithEnv WeakTermPlus
 unravel (m, WeakTermTau l) = return (m, WeakTermTau l)

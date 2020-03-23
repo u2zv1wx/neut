@@ -51,7 +51,6 @@ data Env =
     , phase :: Int
     , target :: Maybe Target
     , keywordEnv :: S.Set T.Text -- list of reserved keywords
-    , defEnv :: S.Set T.Text -- list of defined variables
     , notationEnv :: [(TreePlus, TreePlus)] -- macro transformers
     , constantEnv :: Map.HashMap T.Text Int
     , fileEnv :: FileEnv -- path ~> identifiers defined in the file at toplevel
@@ -63,7 +62,6 @@ data Env =
     , indEnumEnv :: Map.HashMap T.Text [(T.Text, Int)] -- [("nat", [("zero", 0), ("succ", 1)]), ...]
     , nameEnv :: Map.HashMap T.Text T.Text
     , revNameEnv :: IntMap.IntMap Int -- [("foo.13", "foo"), ...] (as corresponding int)
-    -- , specifiedNameSet :: S.Set T.Text
     , formationEnv :: IntMap.IntMap (Maybe WeakTermPlus)
     , labelEnv :: Map.HashMap T.Text [T.Text] -- "stream" ~> ["stream", "other-record-type", "head", "tail", "other-destructor"]
     , inductiveEnv :: RuleEnv -- "list" ~> (cons, Pi (A : tau). A -> list A -> list A)
@@ -82,7 +80,6 @@ data Env =
     , zetaEnv :: IntMap.IntMap (WeakTermPlus, WeakTermPlus, UnivLevelPlus)
     , patVarEnv :: S.Set Int
     -- clarify
-    -- , chainEnv :: IntMap.IntMap [(Meta, Identifier, TermPlus)] -- var/const ~> the closed var chain of its type
     , codeEnv :: Map.HashMap T.Text Definition -- f ~> thunk (lam (x1 ... xn) e)
     , nameSet :: S.Set T.Text
     -- LLVM
@@ -101,7 +98,6 @@ initialEnv =
     , target = Nothing
     , notationEnv = []
     , keywordEnv = S.empty
-    , defEnv = S.empty
     , constantEnv = Map.empty
     , enumEnv = Map.empty
     , indEnumEnv = Map.empty
@@ -112,7 +108,6 @@ initialEnv =
     , revCaseEnv = IntMap.empty
     , nameEnv = Map.empty
     , revNameEnv = IntMap.empty
-    -- , specifiedNameSet = S.empty
     , formationEnv = IntMap.empty
     , inductiveEnv = Map.empty
     , coinductiveEnv = Map.empty
@@ -123,7 +118,6 @@ initialEnv =
     , impEnv = IntMap.empty
     , weakTypeEnv = IntMap.empty
     , typeEnv = IntMap.empty
-    -- , chainEnv = IntMap.empty
     , codeEnv = Map.empty
     , llvmEnv = Map.empty
     , declEnv =
@@ -174,7 +168,7 @@ newNameWith'' s = do
 
 newHole :: Meta -> WithEnv WeakTermPlus
 newHole m = do
-  h <- newNameWith'' "hole-parse-zeta"
+  h <- newNameWith'' "hole"
   return (m, WeakTermZeta h)
 
 getTarget :: WithEnv Target
@@ -204,12 +198,7 @@ newDataUpsilonWith :: Meta -> T.Text -> WithEnv (Identifier, DataPlus)
 newDataUpsilonWith m name = do
   x <- newNameWith' name
   return (x, (m, DataUpsilon x))
-  -- newDataUpsilonWith' name m
 
--- newDataUpsilonWith' :: T.Text -> Meta -> WithEnv (Identifier, DataPlus)
--- newDataUpsilonWith' name m = do
---   x <- newNameWith' name
---   return (x, (m, DataUpsilon x))
 piUnivLevelsfrom ::
      [Data.WeakTerm.IdentifierPlus] -> WeakTermPlus -> WithEnv [UnivLevelPlus]
 piUnivLevelsfrom xts t = do
@@ -410,8 +399,6 @@ lowTypeToArrayKind m lowType =
 raiseError :: Meta -> T.Text -> WithEnv a
 raiseError m text = throwError [logError (getPosInfo m) text]
 
--- raiseError' :: T.Text -> WithEnv a
--- raiseError' text = throwError [logError' text]
 raiseCritical :: Meta -> T.Text -> WithEnv a
 raiseCritical m text = throwError [logCritical (getPosInfo m) text]
 
@@ -444,7 +431,5 @@ getLibraryDirPath = do
   relLibPath <- parseRelDir ".local/share/neut/library"
   return $ homeDirPath </> relLibPath
 
-outputNote :: Meta -> T.Text -> WithEnv ()
-outputNote m str = do
-  let li = logInfo (getPosInfo m) str
-  liftIO $ outputLog True li
+note :: T.Text -> WithEnv ()
+note str = liftIO $ outputLog True $ logInfo' str

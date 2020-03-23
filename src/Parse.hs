@@ -72,9 +72,6 @@ showCompInfo :: CompInfo -> [String]
 showCompInfo [] = []
 showCompInfo ((x, m):xms) = do
   let (path, (_, l, c)) = getPosInfo m
-  -- case getPosInfo m of
-  --   Nothing -> showCompInfo xms
-  --   Just (path, (_, l, c)) -> do
   let pathStr = "\"" <> toFilePath path <> "\""
   let x' = T.unpack $ asText x
   let str =
@@ -161,12 +158,10 @@ parse' ((m, TreeNode ((_, TreeLeaf "ensure"):rest)):as)
     isAlreadyInstalled <- doesDirExist path
     when (not isAlreadyInstalled) $ do
       urlStr' <- parseStr mUrl urlStr
-      outputNote m $ "downloading " <> pkg <> " from " <> T.pack urlStr'
+      note $ "downloading " <> pkg <> " from " <> T.pack urlStr'
       req <- parseRequest urlStr'
       item <- httpLBS req
-      -- fixme: ここのmetaはかえってジャマかも
-      outputNote m $
-        "installing " <> pkg <> " into " <> T.pack (toFilePath path)
+      note $ "installing " <> pkg <> " into " <> T.pack (toFilePath path)
       install (getResponseBody item) path
     parse' as
   | otherwise = raiseSyntaxError m "(ensure LEAF LEAF)"

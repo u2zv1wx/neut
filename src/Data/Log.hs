@@ -4,7 +4,7 @@ module Data.Log
   ( Log
   , outputLog
   , logInfo
-  -- , logInfo'
+  , logInfo'
   , logError
   -- , logError'
   , logCritical
@@ -76,8 +76,9 @@ withSGR True arg f = setSGR arg >> f >> setSGR [Reset]
 logInfo :: PosInfo -> T.Text -> Log
 logInfo pos text = (Just pos, LogLevelNote, text)
 
--- logInfo' :: T.Text -> Log
--- logInfo' text = logInfo Nothing text
+logInfo' :: T.Text -> Log
+logInfo' text = (Nothing, LogLevelNote, text)
+
 logError :: PosInfo -> T.Text -> Log
 logError pos text = (Just pos, LogLevelError, text)
 

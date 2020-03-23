@@ -87,25 +87,12 @@ showMeta m = do
   let name = metaFileName m
   let (_, l, c) = metaConstraintLocation m
   toFilePath name ++ ":" ++ show l ++ ":" ++ show c
-  -- case (metaFileName m, metaConstraintLocation m) of
-  --   (Just name, Nothing) -> toFilePath name
-  --   (Just name, Just (_, l, c)) ->
-  --     toFilePath name ++ ":" ++ show l ++ ":" ++ show c
-  --   (Nothing, Nothing) -> "_"
-  --   (Nothing, Just (_, l, c)) -> "<unknown-file>:" ++ show l ++ ":" ++ show c
 
 showMeta' :: Meta -> String
 showMeta' m = do
   let name = metaFileName m
   let (ph, l, c) = metaConstraintLocation m
   toFilePath name ++ ":" ++ show ph ++ ":" ++ show l ++ ":" ++ show c
-  -- case (metaFileName m, metaConstraintLocation m) of
-  --   (Just name, Nothing) -> toFilePath name
-  --   (Just name, Just (ph, l, c)) ->
-  --     toFilePath name ++ ":" ++ show ph ++ ":" ++ show l ++ ":" ++ show c
-  --   (Nothing, Nothing) -> "_"
-  --   (Nothing, Just (ph, l, c)) ->
-  --     "<unknown-file>:" ++ show ph ++ ":" ++ show l ++ ":" ++ show c
 
 supMeta :: Meta -> Meta -> Meta
 supMeta m1 m2
@@ -129,9 +116,6 @@ type PosInfo = (Path Abs File, Loc)
 
 getPosInfo :: Meta -> PosInfo
 getPosInfo m = (metaFileName m, metaLocation m)
-  -- case (metaFileName m, metaLocation m) of
-  --   (name, Just loc) -> return (name, loc)
-  --   _ -> Nothing
 
 showPosInfo :: Path Abs File -> Loc -> String
 showPosInfo path (_, l, c) = toFilePath path ++ ":" ++ show l ++ ":" ++ show c

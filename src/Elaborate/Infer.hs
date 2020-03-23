@@ -273,7 +273,6 @@ infer' ctx (m, WeakTermEnumElim (e, t) ces) = do
       return ((m, WeakTermEnumElim (e', t') $ zip cs' es'), head ts, head mls)
 infer' ctx (m, WeakTermArray dom k) = do
   (dom', tDom, mlDom) <- infer' ctx dom
-  -- (dom', mlDom) <- inferType' ctx dom
   let tDom' = (m, WeakTermEnum (EnumTypeIntU 64))
   insConstraintEnv tDom tDom'
   ml0 <- newLevelLE m [mlDom]
@@ -600,10 +599,6 @@ constrainLevelList (l1:l2:ls) = do
   insLevelEQ l1 l2
   constrainLevelList $ l2 : ls
 
--- newHole :: Meta -> WithEnv WeakTermPlus
--- newHole m = do
---   h <- newNameWith' "hole"
---   return (m, WeakTermZeta h)
 insConstraintEnv :: WeakTermPlus -> WeakTermPlus -> WithEnv ()
 insConstraintEnv t1 t2 =
   modify (\e -> e {constraintEnv = (t1, t2) : constraintEnv e})

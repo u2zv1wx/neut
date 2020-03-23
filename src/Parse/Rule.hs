@@ -804,4 +804,6 @@ invSubst [] = return []
 invSubst ((x, (m, WeakTermUpsilon x')):sub) = do
   sub' <- invSubst sub
   return $ (x', (m, WeakTermUpsilon x)) : sub'
-invSubst _ = raiseCritical' "invSubst"
+invSubst _ =
+  raiseCritical'
+    "substitution used in internalization/externalization must be of the form {VAR ~> VAR, ..., VAR ~> VAR}"
