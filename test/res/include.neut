@@ -43,6 +43,9 @@
 (let zs (list i64)
   (list:cons 1 (list:cons 2 (list:cons 3 (list:nil)))))
 
+(let ws
+  (@list:cons i64 1 (list:cons 2 (list:cons 3 (list:nil)))))
+
 (os:exit i64 (sum zs))
 ;; (item-2 item)
 

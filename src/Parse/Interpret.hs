@@ -237,13 +237,21 @@ interpret (m, TreeLeaf x)
     m' <- adjustPhase m
     u8s <- forM (encode str) $ \u -> return (m', toValueIntU 8 (toInteger u))
     return (m', WeakTermArrayIntro (ArrayKindIntU 8) u8s) -- parse string as utf-8 encoded u8 array
+  -- note that enums/constants are interpreted as variables at this stage.
+  -- Those are reinterpreted into constants in Rename.
+  -- This is to handle terms like `lam (i64 : bool). e` (i.e. bound variable
+  -- with the same name of a constant) in saner way.
   | otherwise = do
     m' <- adjustPhase m
-    -- Note that enums/constants are interpreted as variables at this stage.
-    -- Those are reinterpreted into constants in Rename.
-    -- This is to handle terms like `lam (i64 : bool). e` (i.e. bound variable
-    -- with the same name of a constant) in saner way.
-    return (m', WeakTermUpsilon $ asIdent x)
+    -- '@'-prefixed variables are interpreted as explicit variables
+    case T.uncons x of
+      Nothing -> raiseCritical m' "encountered a variable with empty identifier"
+      Just (c, rest)
+        | c /= '@' -> return (m', WeakTermUpsilon $ asIdent x)
+        | T.length rest == 0 ->
+          raiseError m' "found a explicit variable with empty identifier"
+        | otherwise ->
+          return (m' {metaIsExplicit = True}, WeakTermUpsilon $ asIdent rest)
 interpret t@(m, TreeNode es) = do
   m' <- adjustPhase m
   ml <- interpretEnumValueMaybe t
