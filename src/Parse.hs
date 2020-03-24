@@ -139,11 +139,13 @@ parse' ((m, TreeNode ((_, TreeLeaf "keyword"):es)):as)
   | otherwise = raiseSyntaxError m "(keyword LEAF)"
 parse' ((m, TreeNode ((_, TreeLeaf "use"):es)):as)
   | [(_, TreeLeaf s)] <- es = do
+    modify (\e -> e {prefixEnv = s : prefixEnv e}) -- required to check sanity of `include`
     stmtList <- parse' as
     return $ QuasiStmtUse s : stmtList
   | otherwise = raiseSyntaxError m "(use LEAF)"
 parse' ((m, TreeNode ((_, TreeLeaf "unuse"):es)):as)
   | [(_, TreeLeaf s)] <- es = do
+    modify (\e -> e {prefixEnv = filter (/= s) (prefixEnv e)}) -- required to check sanity of `include`
     stmtList <- parse' as
     return $ QuasiStmtUnuse s : stmtList
   | otherwise = raiseSyntaxError m "(unuse LEAF)"
@@ -255,9 +257,10 @@ parse' ((m, TreeNode ((mLet, TreeLeaf "let"):rest)):as)
     let xt = (mx, TreeNode [(mx, TreeLeaf x), t])
     parse' ((m, TreeNode [(mLet, TreeLeaf "let"), xt, e]) : as)
   | [xt, e] <- rest = do
+    xt' <- prefixIdentPlus xt
     m' <- adjustPhase m
     e' <- macroExpand e >>= interpret
-    (mx, x, t) <- macroExpand xt >>= interpretIdentifierPlus
+    (mx, x, t) <- macroExpand xt' >>= interpretIdentifierPlus
     defList <- parse' as
     case e' of
       (_, WeakTermPiElim f args)
@@ -339,6 +342,7 @@ includeFile ::
   -> [TreePlus]
   -> WithEnv [QuasiStmt]
 includeFile m mPath pathString getDirPath as = do
+  ensureEnvSanity m
   path <- parseStr mPath pathString
   dirPath <- getDirPath
   newPath <- resolveFile dirPath path
@@ -355,6 +359,16 @@ includeFile' m path as = do
       includedQuasiStmtList <- visit path
       defList <- parse' as
       return $ includedQuasiStmtList ++ defList
+
+ensureEnvSanity :: Meta -> WithEnv ()
+ensureEnvSanity m = do
+  ns <- gets namespace
+  penv <- gets prefixEnv
+  case (ns, penv) of
+    (_:_, []) -> raiseError m "`include` can only be used at top-level section"
+    ([], _:_) ->
+      raiseError m "`include` can only be used with no prefix assumption"
+    _ -> return ()
 
 parseDef :: [TreePlus] -> WithEnv [QuasiStmt]
 parseDef xds = do

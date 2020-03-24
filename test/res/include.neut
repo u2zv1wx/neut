@@ -11,7 +11,10 @@
 ;;     (item-3 unit)
 ;;     (item-2 20)))
 
+
 (section some-library)
+
+;; (include "notation.neut")  <- should raise error (`include` must be at top level)
 
 (use list)
 
@@ -48,9 +51,7 @@
     ((nil) 0)
     ((cons _ ys) (u64.add 1 (pohe a ys)))))
 
-
-
-(case xs
+(case some-library:xs
   ((nil) (i64 10))
   ((cons value ys) (i64 20)))
 

@@ -2,15 +2,15 @@
 
 (include "notation.neut")
 
+(section option)
+
 (inductive option ((a tau))
   (option:none () (option a))
   (option:some ((x a)) (option a)))
 
-(use option)
-
-(definition option:from-option ([a tau] (x a) (m (option a)))
+(definition from-option ([a tau] (x a) (m (option a)))
   (case m
     ((none) x)
     ((some y) y)))
 
-(unuse option)
+(end option)

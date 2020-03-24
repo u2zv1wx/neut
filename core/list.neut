@@ -12,10 +12,6 @@
   (list:nil () (list a))
   (list:cons ((x a) (xs (list a))) (list a)))
 
-;; auto-implicit:
-;;   (attribute list:nil (implicit 0))
-;;   (attribute list:cons (implicit 0))
-
 (use option)
 
 (definition head ([a tau] (xs (list a)))

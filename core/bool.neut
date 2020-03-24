@@ -2,24 +2,24 @@
 
 (include "foundation.neut")
 
+(section bool)
+
 (enum bool
   (true 1)
   (false 0))
 
-(use bool)
-
-(definition bool:as-i1 ((b bool))
+(definition as-i1 ((b bool))
   (unsafe-cast bool i1 b))
 
-(definition bool:and ((b1 bool) (b2 bool))
+(definition and ((b1 bool) (b2 bool))
   (unsafe-cast i1 bool (i1.and (as-i1 b1) (as-i1 b2))))
 
-(definition bool:or ((b1 bool) (b2 bool))
+(definition or ((b1 bool) (b2 bool))
   (unsafe-cast i1 bool (i1.or (as-i1 b1) (as-i1 b2))))
 
-(definition bool:not ((b bool))
+(definition not ((b bool))
   (switch b
     (true false)
     (false true)))
 
-(unuse bool)
+(end bool)
