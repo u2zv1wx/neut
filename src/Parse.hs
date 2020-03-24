@@ -55,6 +55,7 @@ leave = do
   path <- getCurrentFilePath
   popTrace
   modify (\env -> env {fileEnv = Map.insert path VisitInfoFinish (fileEnv env)})
+  modify (\env -> env {prefixEnv = []})
   return []
 
 pushTrace :: Path Abs File -> WithEnv ()
