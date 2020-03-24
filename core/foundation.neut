@@ -1,10 +1,13 @@
 (no-implicit-core)
 
-(constant unsafe:cast
-  (pi ((A tau) (B tau) (_ A)) B))
-
 (introspect OS
   (linux (include "constant/linux.neut"))
   (darwin (include "constant/darwin.neut")))
 
 (include "notation.neut")
+
+(constant unsafe:cast
+  (pi ((A tau) (B tau) (_ A)) B))
+
+(definition unsafe:cast-to ([A tau] (B tau) (x A))
+  (unsafe:cast A B x))

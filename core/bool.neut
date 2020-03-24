@@ -4,21 +4,17 @@
 
 (section bool)
 
-;; auto-prefix: true ~> bool:true, false ~> bool:false
 (enum bool
   (true 1)
   (false 0))
 
 (use unsafe)
 
-(definition as-i1 ((b bool))
-  (cast bool i1 b))
-
 (definition and ((b1 bool) (b2 bool))
-  (cast i1 bool (i1.and (as-i1 b1) (as-i1 b2))))
+  (cast-to bool (i1.and (cast-to i1 b1) (cast-to i1 b2))))
 
 (definition or ((b1 bool) (b2 bool))
-  (cast i1 bool (i1.or (as-i1 b1) (as-i1 b2))))
+  (cast-to bool (i1.or (cast-to i1 b1) (cast-to i1 b2))))
 
 (unuse unsafe)
 
