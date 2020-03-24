@@ -32,8 +32,9 @@
 
 (definition some-function ([a tau] (xs (list a)))
   (case xs
-    ((nil) true)
-    ((cons _ _) false)))
+    ((nil) bool:true)
+    ((cons _ _) bool:false)))
+
 
 
 ;; (attribute list:nil (implicit 0))
@@ -44,8 +45,8 @@
 
 (definition is-null ([a tau] (xs (list a)))
   (case xs
-    ((nil) true)
-    ((cons _ _) false)))
+    ((nil) bool:true)
+    ((cons _ _) bool:false)))
 
 (ensure libarchive/3.4.2
   "https://www.libarchive.org/downloads/libarchive-3.4.2.tar.gz")

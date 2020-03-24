@@ -173,7 +173,7 @@ parse' ((m, TreeNode ((_, TreeLeaf "end"):es)):as)
   | otherwise = raiseSyntaxError m "(end LEAF)"
 parse' ((m, TreeNode ((_, TreeLeaf "enum"):rest)):as)
   | (_, TreeLeaf name):ts <- rest = do
-    xis <- interpretEnumItem m ts
+    xis <- interpretEnumItem m name ts
     m' <- adjustPhase m
     insEnumEnv m' name xis
     parse' as

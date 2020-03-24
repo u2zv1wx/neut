@@ -513,22 +513,22 @@ cocaseBaseValue m codType =
       , (m, (WeakTermPiIntro [] (m, WeakTermEnumIntro (EnumValueIntS 64 0))))
       ])
 
-interpretEnumItem :: Meta -> [TreePlus] -> WithEnv [(T.Text, Int)]
-interpretEnumItem m ts = do
-  xis <- interpretEnumItem' $ reverse ts
+interpretEnumItem :: Meta -> T.Text -> [TreePlus] -> WithEnv [(T.Text, Int)]
+interpretEnumItem m name ts = do
+  xis <- interpretEnumItem' name $ reverse ts
   if linearCheck (map snd xis)
     then return $ reverse xis
     else raiseError m "found a collision of discriminant"
 
-interpretEnumItem' :: [TreePlus] -> WithEnv [(T.Text, Int)]
-interpretEnumItem' [] = return []
-interpretEnumItem' [t] = do
+interpretEnumItem' :: T.Text -> [TreePlus] -> WithEnv [(T.Text, Int)]
+interpretEnumItem' _ [] = return []
+interpretEnumItem' name [t] = do
   (s, mj) <- interpretEnumItem'' t
-  return [(s, fromMaybe 0 mj)]
-interpretEnumItem' (t:ts) = do
-  ts' <- interpretEnumItem' ts
+  return [(name <> ":" <> s, fromMaybe 0 mj)]
+interpretEnumItem' name (t:ts) = do
+  ts' <- interpretEnumItem' name ts
   (s, mj) <- interpretEnumItem'' t
-  return $ (s, fromMaybe (1 + headDiscriminantOf ts') mj) : ts'
+  return $ (name <> ":" <> s, fromMaybe (1 + headDiscriminantOf ts') mj) : ts'
 
 interpretEnumItem'' :: TreePlus -> WithEnv (T.Text, Maybe Int)
 interpretEnumItem'' (_, TreeLeaf s) = return (s, Nothing)
