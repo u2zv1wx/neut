@@ -12,12 +12,12 @@
   (nil () (list a))
   (cons ((x a) (xs (list a))) (list a)))
 
-;; (use option)
+(use option)
 
 (definition head ([a tau] (xs (list a)))
   (case xs
-    ((nil) (option:none))
-    ((cons y _) (option:some y))))
+    ((nil) (none))
+    ((cons y _) (some y))))
 
 (definition length ([a tau] (xs (list a)))
   (case xs
@@ -30,11 +30,12 @@
     ((cons y ys)
       (cons (f y) (map a b f ys)))))
 
+(use bool)
+
 (definition some-function ([a tau] (xs (list a)))
   (case xs
-    ((nil) bool:true)
-    ((cons _ _) bool:false)))
-
+    ((nil) true)
+    ((cons _ _) false)))
 
 
 ;; (attribute list:nil (implicit 0))
@@ -45,8 +46,10 @@
 
 (definition is-null ([a tau] (xs (list a)))
   (case xs
-    ((nil) bool:true)
-    ((cons _ _) bool:false)))
+    ((nil) true)
+    ((cons _ _) false)))
+
+(unuse bool)
 
 (ensure libarchive/3.4.2
   "https://www.libarchive.org/downloads/libarchive-3.4.2.tar.gz")
