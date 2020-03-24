@@ -147,6 +147,28 @@ parse' ((m, TreeNode ((_, TreeLeaf "unuse"):es)):as)
     stmtList <- parse' as
     return $ QuasiStmtUnuse s : stmtList
   | otherwise = raiseSyntaxError m "(unuse LEAF)"
+parse' ((m, TreeNode ((_, TreeLeaf "section"):es)):as)
+  | [(_, TreeLeaf s)] <- es = do
+    modify (\e -> e {namespace = s : namespace e})
+    n <- getCurrentSection
+    stmtList <- parse' as
+    return $ QuasiStmtUse n : stmtList -- auto-use
+  | otherwise = raiseSyntaxError m "(section LEAF)"
+parse' ((m, TreeNode ((_, TreeLeaf "end"):es)):as)
+  | [(_, TreeLeaf s)] <- es = do
+    ns <- gets namespace
+    case ns of
+      [] -> raiseError m "there is no section to end"
+      (s':ns')
+        | s == s' -> do
+          n <- getCurrentSection
+          modify (\e -> e {namespace = ns'})
+          stmtList <- parse' as
+          return $ QuasiStmtUnuse n : stmtList -- auto-unuse
+        | otherwise ->
+          raiseError m $
+          "the innermost section is not `" <> s <> "`, but is `" <> s' <> "`"
+  | otherwise = raiseSyntaxError m "(end LEAF)"
 parse' ((m, TreeNode ((_, TreeLeaf "enum"):rest)):as)
   | (_, TreeLeaf name):ts <- rest = do
     xis <- interpretEnumItem m ts
@@ -270,6 +292,25 @@ parse' (a:as) = do
           let m' = m {metaIsAppropriateAsCompletionCandidate = False}
           return $ QuasiStmtLet m' (m', name, t) e' : defList
 
+withSectionPrefix :: T.Text -> WithEnv T.Text
+withSectionPrefix x = do
+  ns <- gets namespace
+  return $ withSectionPrefix' ns x
+
+withSectionPrefix' :: [T.Text] -> T.Text -> T.Text
+withSectionPrefix' [] x = x
+withSectionPrefix' (n:ns) x = withSectionPrefix' ns $ n <> ":" <> x
+
+getCurrentSection :: WithEnv T.Text
+getCurrentSection = do
+  ns <- gets namespace
+  return $ getCurrentSection' ns
+
+getCurrentSection' :: [T.Text] -> T.Text
+getCurrentSection' [] = ""
+getCurrentSection' [n] = n
+getCurrentSection' (n:ns) = getCurrentSection' ns <> ":" <> n
+
 parseBorrow :: WeakTermPlus -> (Maybe (Meta, Identifier), WeakTermPlus)
 parseBorrow (m, WeakTermUpsilon (I (s, _)))
   | T.length s > 1
@@ -339,8 +380,18 @@ insImplicitBegin :: TreePlus -> WithEnv TreePlus
 insImplicitBegin (m, TreeNode (xt:xts:body:rest)) = do
   let m' = fst body
   let beginBlock = (m', TreeNode ((m', TreeLeaf "begin") : body : rest))
-  return (m, TreeNode [xt, xts, beginBlock])
+  xt' <- prefixIdentPlus xt
+  return (m, TreeNode [xt', xts, beginBlock])
 insImplicitBegin t = raiseSyntaxError (fst t) "(TREE TREE TREE ...)"
+
+prefixIdentPlus :: TreePlus -> WithEnv TreePlus
+prefixIdentPlus (m, TreeLeaf x) = do
+  x' <- withSectionPrefix x
+  return (m, TreeLeaf x')
+prefixIdentPlus (m, TreeNode [(mx, TreeLeaf x), t]) = do
+  x' <- withSectionPrefix x
+  return (m, TreeNode [(mx, TreeLeaf x'), t])
+prefixIdentPlus t = raiseSyntaxError (fst t) "LEAF | (LEAF TREE)"
 
 extractFunName :: TreePlus -> WithEnv Identifier
 extractFunName (_, TreeNode ((_, TreeLeaf x):_)) = return $ asIdent x
@@ -373,6 +424,8 @@ keywordSet =
     , "constant"
     , "use"
     , "unuse"
+    , "section"
+    , "end"
     , "statement"
     , "attribute"
     , "introspect"

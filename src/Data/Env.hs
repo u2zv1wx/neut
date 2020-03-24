@@ -63,6 +63,7 @@ data Env =
     , nameEnv :: Map.HashMap T.Text T.Text
     , revNameEnv :: IntMap.IntMap Int -- [("foo.13", "foo"), ...] (as corresponding int)
     , prefixEnv :: [T.Text]
+    , namespace :: [T.Text]
     , formationEnv :: IntMap.IntMap (Maybe WeakTermPlus)
     , labelEnv :: Map.HashMap T.Text [T.Text] -- "stream" ~> ["stream", "other-record-type", "head", "tail", "other-destructor"]
     , inductiveEnv :: RuleEnv -- "list" ~> (cons, Pi (A : tau). A -> list A -> list A)
@@ -110,6 +111,7 @@ initialEnv =
     , nameEnv = Map.empty
     , revNameEnv = IntMap.empty
     , prefixEnv = []
+    , namespace = []
     , formationEnv = IntMap.empty
     , inductiveEnv = Map.empty
     , coinductiveEnv = Map.empty

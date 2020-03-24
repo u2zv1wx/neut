@@ -2,6 +2,12 @@
 
 (include "notation.neut")
 
+(include "option.neut")
+
+(include "bool.neut")
+
+(section list)
+
 (inductive list ((a tau))
   (list:nil () (list a))
   (list:cons ((x a) (xs (list a))) (list a)))
@@ -10,23 +16,19 @@
 ;;   (attribute list:nil (implicit 0))
 ;;   (attribute list:cons (implicit 0))
 
-(include "option.neut")
-
-(use list)
-
 (use option)
 
-(definition list:head ([a tau] (xs (list a)))
+(definition head ([a tau] (xs (list a)))
   (case xs
     ((nil) (none))
     ((cons y _) (some y))))
 
-(definition list:length ([a tau] (xs (list a)))
+(definition length ([a tau] (xs (list a)))
   (case xs
     ((nil) 0)
     ((cons _ ys) (u64.add 1 (length a ys)))))
 
-(definition list:map ([a tau] [b tau] (f (hom a b)) (xs (list a)))
+(definition map ([a tau] [b tau] (f (hom a b)) (xs (list a)))
   (case xs
     ((nil) (nil))
     ((cons y ys)
@@ -37,7 +39,6 @@
     ((nil) true)
     ((cons _ _) false)))
 
-(include "bool.neut")
 
 ;; (attribute list:nil (implicit 0))
 
@@ -45,7 +46,7 @@
 
 ;; (list:cons (i64 3) (list:nil i64))
 
-(definition list:is-null ([a tau] (xs (list a)))
+(definition is-null ([a tau] (xs (list a)))
   (case xs
     ((nil) true)
     ((cons _ _) false)))
@@ -55,7 +56,7 @@
 
 (unuse option)
 
-(unuse list)
+(end list)
 
 ;; ここ以降ではもう自由に (include library "libarchive/3.4.2/(...)") などと書ける
 
