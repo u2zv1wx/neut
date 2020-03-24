@@ -1,4 +1,9 @@
+;; preliminary:
+
 (no-implicit-core)
+
+(ensure libarchive/3.4.2
+  "https://www.libarchive.org/downloads/libarchive-3.4.2.tar.gz")
 
 (include "notation.neut")
 
@@ -9,6 +14,8 @@
 (use option)
 
 (use bool)
+
+;; content:
 
 (section list)
 
@@ -41,8 +48,5 @@
   (case xs
     ((nil) true)
     ((cons _ _) false)))
-
-(ensure libarchive/3.4.2
-  "https://www.libarchive.org/downloads/libarchive-3.4.2.tar.gz")
 
 (end list)

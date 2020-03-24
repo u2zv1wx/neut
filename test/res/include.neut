@@ -79,11 +79,6 @@
 
 (exit i64 (some-library:item:sum zs))
 
-;; (unuse list)
-;; (item-2 item)
-
-;; (item-2 item)
-
 ;; (item-1 item)
 
 ;; (let xs (list.cons i64 1 (list.cons i64 2 (list.cons i64 (item-1 item) (list.nil i64)))))
