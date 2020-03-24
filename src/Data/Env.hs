@@ -356,12 +356,6 @@ lookupConstantMaybe m penv constName = do
   case me of
     Just e -> return $ Just e
     Nothing -> lookupConstantMaybe' m penv constName
-  -- cenv <- gets constantEnv
-  -- case Map.lookup constName cenv of
-  --   Just i -> return $ Just (m, WeakTermConst $ I (constName, i))
-  --   Nothing
-  --     | isConstant constName -> Just <$> lookupConstantPlus m constName
-  --     | otherwise -> return Nothing
 
 lookupConstantMaybe' :: Meta -> [T.Text] -> T.Text -> WithEnv (Maybe Identifier)
 lookupConstantMaybe' _ [] _ = return Nothing
@@ -376,7 +370,6 @@ lookupConstantMaybe'' constName = do
   cenv <- gets constantEnv
   case Map.lookup constName cenv of
     Just i -> return $ Just $ I (constName, i)
-    -- Just i -> return $ Just (m, WeakTermConst $ I (constName, i))
     Nothing
       | isConstant constName -> Just <$> lookupConstantPlus' constName
       | otherwise -> return Nothing
