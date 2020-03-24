@@ -338,11 +338,11 @@ interpretEnumValueMaybe t =
   (Just <$> interpretEnumValue t) `catchError` (const $ return Nothing)
 
 interpretEnumValue :: TreePlus -> WithEnv EnumValue
-interpretEnumValue (m, TreeLeaf x) = do
-  b <- isDefinedEnumValue x
-  if b
-    then return $ EnumValueLabel x
-    else raiseError m $ "no such enum-value is defined: " <> x
+interpretEnumValue (_, TreeLeaf x) = return $ EnumValueLabel x
+  -- b <- isDefinedEnumValue x
+  -- if b
+  --   then return $ EnumValueLabel x
+    -- else raiseError m $ "no such enum-value is defined: " <> x
 interpretEnumValue e@(m, TreeNode [(_, TreeLeaf t), (_, TreeLeaf x)]) = do
   let mv1 = readEnumValueIntS t x
   let mv2 = readEnumValueIntU t x

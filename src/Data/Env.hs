@@ -348,8 +348,31 @@ lookupConstNum' m constName = do
     Just i -> return i
     Nothing -> raiseCritical m $ "no such constant: " <> constName
 
-lookupConstantMaybe :: Meta -> T.Text -> WithEnv (Maybe WeakTermPlus)
-lookupConstantMaybe m constName = do
+lookupConstantMaybe ::
+     Meta -> [T.Text] -> T.Text -> WithEnv (Maybe WeakTermPlus)
+lookupConstantMaybe m penv constName = do
+  me <- lookupConstantMaybe'' m constName
+  case me of
+    Just e -> return $ Just e
+    Nothing -> lookupConstantMaybe' m penv constName
+  -- cenv <- gets constantEnv
+  -- case Map.lookup constName cenv of
+  --   Just i -> return $ Just (m, WeakTermConst $ I (constName, i))
+  --   Nothing
+  --     | isConstant constName -> Just <$> lookupConstantPlus m constName
+  --     | otherwise -> return Nothing
+
+lookupConstantMaybe' ::
+     Meta -> [T.Text] -> T.Text -> WithEnv (Maybe WeakTermPlus)
+lookupConstantMaybe' _ [] _ = return Nothing
+lookupConstantMaybe' m (prefix:prefixList) name = do
+  me <- lookupConstantMaybe'' m $ prefix <> ":" <> name
+  case me of
+    Just e -> return $ Just e
+    Nothing -> lookupConstantMaybe' m prefixList name
+
+lookupConstantMaybe'' :: Meta -> T.Text -> WithEnv (Maybe WeakTermPlus)
+lookupConstantMaybe'' m constName = do
   cenv <- gets constantEnv
   case Map.lookup constName cenv of
     Just i -> return $ Just (m, WeakTermConst $ I (constName, i))
@@ -406,18 +429,6 @@ raiseCritical m text = throwError [logCritical (getPosInfo m) text]
 
 raiseCritical' :: T.Text -> WithEnv a
 raiseCritical' text = throwError [logCritical' text]
-
-isDefinedEnumValue :: T.Text -> WithEnv Bool
-isDefinedEnumValue name = do
-  env <- get
-  let labelList = join $ Map.elems $ enumEnv env
-  return $ name `elem` map fst labelList
-
-isDefinedEnumType :: T.Text -> WithEnv Bool
-isDefinedEnumType name = do
-  env <- get
-  let enumNameList = Map.keys $ enumEnv env
-  return $ name `elem` enumNameList
 
 getCurrentFilePath :: WithEnv (Path Abs File)
 getCurrentFilePath = do

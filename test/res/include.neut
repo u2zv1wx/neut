@@ -63,7 +63,7 @@
 
 (use os)
 
-(os:exit i64 (sum zs))
+(exit i64 (sum zs))
 
 (unuse list)
 ;; (item-2 item)
