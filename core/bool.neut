@@ -4,6 +4,7 @@
 
 (section bool)
 
+;; auto-prefix: true ~> bool:true, false ~> bool:false
 (enum bool
   (true 1)
   (false 0))

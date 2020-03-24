@@ -3,5 +3,5 @@
 (include "notation.neut")
 
 (inductive coproduct ((a tau) (b tau))
-  (coproduct:left ((_ a)) (coproduct a b))
-  (coproduct:right ((_ b)) (coproduct a b)))
+  (left ((_ a)) (coproduct a b))
+  (right ((_ b)) (coproduct a b)))

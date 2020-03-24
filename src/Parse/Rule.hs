@@ -136,7 +136,7 @@ toInductiveIntro ::
   -> Identifier
   -> Rule
   -> WithEnv [QuasiStmt]
-toInductiveIntro ats bts xts a@(I (ai, _)) (mb, b@(I (bi, _)), m, yts, cod)
+toInductiveIntro ats bts xts a@(I (ai, _)) (mb, b@(I (bi, k)), m, yts, cod)
   | (_, WeakTermPiElim (_, WeakTermUpsilon a') es) <- cod
   , a == a'
   , length xts == length es = do
@@ -144,11 +144,13 @@ toInductiveIntro ats bts xts a@(I (ai, _)) (mb, b@(I (bi, _)), m, yts, cod)
     let vs = varWeakTermPlus (m, WeakTermPi mls yts cod)
     let xts' = filter (\(_, x, _) -> x `elem` vs) xts
     -- let attrList = map (QuasiStmtImplicit m (asIdent bi)) [0 .. length xts']
+    let b' = I (ai <> ":" <> bi, k)
     return
       (QuasiStmtLetInductiveIntro
          m
-         (bi, ai)
-         (mb, b, (m, WeakTermPi mls (xts' ++ yts) cod))
+         -- (ai <> ":" <> bi, ai)
+         (ai <> ":" <> bi, ai)
+         (mb, b', (m, WeakTermPi mls (xts' ++ yts) cod))
          xts'
          yts
          ats
@@ -156,7 +158,7 @@ toInductiveIntro ats bts xts a@(I (ai, _)) (mb, b@(I (bi, _)), m, yts, cod)
          (mb, WeakTermUpsilon b)
          []
          (map (\(_, x, _) -> x) ats) :
-       map (QuasiStmtImplicit m b) [0 .. length xts' - 1])
+       map (QuasiStmtImplicit m b') [0 .. length xts' - 1])
   | otherwise =
     raiseError m $
     "the succedent of an introduction rule of `" <>
@@ -218,10 +220,11 @@ toCoinductiveElim ats bts xts a@(I (ai, _)) (mb, b, m, yts, cod)
     mls <- piUnivLevelsfrom (xts ++ [yt]) cod
     let vs = varWeakTermPlus (m, WeakTermPi mls [yt] cod)
     let xts' = filter (\(_, x, _) -> x `elem` vs) xts
+    let b' = I (ai <> ":" <> asText b, asInt b)
     return
       (QuasiStmtLetCoinductiveElim
          m
-         (mb, b, (m, WeakTermPi mls (xts' ++ [yt]) cod))
+         (mb, b', (m, WeakTermPi mls (xts' ++ [yt]) cod))
          (xts' ++ [yt])
          cod
          ats
@@ -231,7 +234,7 @@ toCoinductiveElim ats bts xts a@(I (ai, _)) (mb, b, m, yts, cod)
          (m, WeakTermPiElim (mb, WeakTermUpsilon b) [toVar' yt])
          []
          (map (\(_, x, _) -> x) ats) :
-       map (QuasiStmtImplicit m b) [0 .. length xts' - 1])
+       map (QuasiStmtImplicit m b') [0 .. length xts' - 1])
   | otherwise =
     raiseError m $
     "the antecedent of an elimination rule of `" <>
@@ -251,7 +254,7 @@ formationRuleOf (m, a, xts, _) = do
 
 formationRuleOf' :: Connective -> WithEnv Rule
 formationRuleOf' (m, a@(I (x, _)), xts, rules) = do
-  let bs = map (\(_, I (b, _), _, _, _) -> b) rules
+  let bs = map (\(_, I (b, _), _, _, _) -> x <> ":" <> b) rules
   let bis = zip bs [0 ..]
   -- register "nat" ~> [("zero", 0), ("succ", 1)], "list" ~> [("nil", 0), ("cons", 1)], etc.
   insEnumEnv m x bis

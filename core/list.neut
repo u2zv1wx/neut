@@ -9,15 +9,15 @@
 (section list)
 
 (inductive list ((a tau))
-  (list:nil () (list a))
-  (list:cons ((x a) (xs (list a))) (list a)))
+  (nil () (list a))
+  (cons ((x a) (xs (list a))) (list a)))
 
-(use option)
+;; (use option)
 
 (definition head ([a tau] (xs (list a)))
   (case xs
-    ((nil) (none))
-    ((cons y _) (some y))))
+    ((nil) (option:none))
+    ((cons y _) (option:some y))))
 
 (definition length ([a tau] (xs (list a)))
   (case xs
