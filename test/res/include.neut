@@ -13,13 +13,13 @@
 
 (use list)
 
-;; (let xs (list i64)
-;;   (list:cons 25 (list:cons 100 (list:cons 1000 (list:nil)))))
-
 (let xs (list i64)
-  (cons 25 (cons 100 (cons 1000 (nil)))))
+  (list:cons 25 (list:cons 100 (list:cons 1000 (list:nil)))))
 
-(unuse list)
+;; (let xs (list i64)
+;;   (cons 25 (cons 100 (cons 1000 (nil)))))
+
+;; (unuse list)
 
 (let ps (list i64)
   (cons 25 (cons 100 (cons 1000 (nil)))))
@@ -30,22 +30,23 @@
 
 ;; (list! 25 100 1000)みたいな略記を許すようにしてもいいかもしれないが。
 
+;; 名前空間というかauto-prefixがあるとコードがかなりスッキリしますね。
 (definition sum ((xs (list i64)))
   (case xs
-    ((list:nil) 0)
-    ((list:cons z ys)
+    ((nil) 0)
+    ((cons z ys)
       (i64.add z (sum ys)))))
 
 (case xs
-  ((list:nil) (i64 10))
-  ((list:cons value ys) (i64 20)))
+  ((nil) (i64 10))
+  ((cons value ys) (i64 20)))
 
 (case xs
-  ((list:nil) (i64 10))
-  ((list:cons value ys)
+  ((nil) (i64 10))
+  ((cons value ys)
    (case ys
-     ((list:nil) (i64 20))
-     ((list:cons v2 zs) v2))))
+     ((nil) (i64 20))
+     ((cons v2 zs) v2))))
 
 ;; (os:exit i64 (case xs
 ;;   ((list:nil) (i64 10))
@@ -55,12 +56,16 @@
 ;;      ((list:cons v2 zs) v2)))))
 
 (let zs (list i64)
-  (list:cons 1 (list:cons 2 (list:cons 3 (list:nil)))))
+  (cons 1 (cons 2 (cons 3 (nil)))))
 
 (let ws
-  (@list:cons i64 1 (list:cons 2 (list:cons 3 (list:nil)))))
+  (@cons i64 1 (cons 2 (cons 3 (nil)))))
+
+(use os)
 
 (os:exit i64 (sum zs))
+
+(unuse list)
 ;; (item-2 item)
 
 ;; (item-2 item)

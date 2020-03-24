@@ -58,10 +58,11 @@ discern' nenv ((QuasiStmtConstDecl m (mx, x, t)):ss) = do
   return $ QuasiStmtConstDecl m (mx, x, t') : ss'
 discern' nenv ((QuasiStmtImplicit m x i):ss) = do
   cenv <- gets constantEnv
+  penv <- gets prefixEnv
   x' <-
     case Map.lookup (asText x) cenv of
       Just j -> return $ I (asText x, j)
-      Nothing -> lookupName' m x nenv
+      Nothing -> lookupNameWithPrefix m penv x nenv
   ss' <- discern' nenv ss
   return $ QuasiStmtImplicit m x' i : ss'
 discern' nenv ((QuasiStmtLetInductive n m (mx, a, t) e):ss) = do
@@ -155,23 +156,24 @@ discernDef :: NameEnv -> Def -> WithEnv Def
 discernDef nenv (m, (mx, x, t), xts, e) = do
   t' <- discern'' nenv t
   (xts', e') <- discernBinder nenv xts e
-  x' <- lookupName' mx x nenv
+  penv <- gets prefixEnv
+  x' <- lookupNameWithPrefix mx penv x nenv
   return (m, (mx, x', t'), xts', e')
 
 -- Alpha-convert all the variables so that different variables have different names.
 discern'' :: NameEnv -> WeakTermPlus -> WithEnv WeakTermPlus
 discern'' _ (m, WeakTermTau l) = return (m, WeakTermTau l)
 discern'' nenv (m, WeakTermUpsilon x@(I (s, _))) = do
+  penv <- gets prefixEnv
   b1 <- isDefinedEnumValue s
   b2 <- isDefinedEnumType s
   mc <- lookupConstantMaybe m s
-  penv <- gets prefixEnv
   case (lookupName x nenv, b1, b2, mc) of
     (Just x', _, _, _) -> return (m, WeakTermUpsilon x')
     (_, True, _, _) -> return (m, WeakTermEnumIntro (EnumValueLabel s))
     (_, _, True, _) -> return (m, WeakTermEnum (EnumTypeLabel s))
     (_, _, _, Just c) -> return c
-    _ -> lookupNameWithPrefix m penv x nenv
+    _ -> lookupNameWithPrefixPlus m penv x nenv
 discern'' nenv (m, WeakTermPi mls xts t) = do
   (xts', t') <- discernBinder nenv xts t
   return (m, WeakTermPi mls xts' t')
@@ -248,10 +250,11 @@ discern'' nenv (m, WeakTermStructElim xts e1 e2) = do
 discern'' nenv (m, WeakTermCase (e, t) cxtes) = do
   e' <- discern'' nenv e
   t' <- discern'' nenv t
+  penv <- gets prefixEnv
   cxtes' <-
     flip mapM cxtes $ \((c, xts), body) -> do
-      c' <- lookupName' m c nenv
-      label <- lookupLLVMEnumEnv m (asText c)
+      (expandedName, c') <- lookupConsNameWithPrefix m penv c nenv
+      label <- lookupLLVMEnumEnv m expandedName
       renv <- gets revCaseEnv
       modify (\env -> env {revCaseEnv = IntMap.insert (asInt c') label renv})
       (xts', body') <- discernBinder nenv xts body
@@ -292,7 +295,8 @@ discernArgs nenv ((mx, x, t):xts) = do
 discernIdentPlus :: NameEnv -> IdentifierPlus -> WithEnv IdentifierPlus
 discernIdentPlus nenv (m, x, t) = do
   t' <- discern'' nenv t
-  x' <- lookupName' m x nenv
+  penv <- gets prefixEnv
+  x' <- lookupNameWithPrefix m penv x nenv
   return (m, x', t')
 
 discernIdentPlus' ::
@@ -370,7 +374,9 @@ newDefinedNameWith' m nenv x = do
       "the identifier `" <> asText x <> "` is already defined at top level"
 
 lookupStrict :: NameEnv -> IdentifierPlus -> WithEnv Identifier
-lookupStrict nenv (m, x, _) = lookupName' m x nenv
+lookupStrict nenv (m, x, _) = do
+  penv <- gets prefixEnv
+  lookupNameWithPrefix m penv x nenv
 
 lookupStrict' :: NameEnv -> IdentifierPlus -> WithEnv WeakTermPlus
 lookupStrict' nenv xt@(m, _, _) = do
@@ -384,16 +390,57 @@ lookupName :: Identifier -> NameEnv -> Maybe Identifier
 lookupName (I (s, _)) nenv = Map.lookup s nenv
 
 lookupNameWithPrefix ::
-     Meta -> [T.Text] -> Identifier -> NameEnv -> WithEnv WeakTermPlus
-lookupNameWithPrefix m [] x _ =
-  raiseError m $ "undefined variable: " <> asText x
-lookupNameWithPrefix m (prefix:prefixList) x nenv =
-  case Map.lookup (prefix <> ":" <> asText x) nenv of
-    Just x' -> return (m, WeakTermUpsilon x')
-    Nothing -> lookupNameWithPrefix m prefixList x nenv
-
-lookupName' :: Meta -> Identifier -> NameEnv -> WithEnv Identifier
-lookupName' m x nenv = do
+     Meta -> [T.Text] -> Identifier -> NameEnv -> WithEnv Identifier
+lookupNameWithPrefix m penv x nenv =
   case lookupName x nenv of
     Just x' -> return x'
-    Nothing -> raiseError m $ "undefined variable:  " <> asText x
+    Nothing -> lookupNameWithPrefix' m penv x nenv
+
+--   raiseError m $ "undefined variable: " <> asText x
+-- lookupNameWithPrefix m (prefix:prefixList) x nenv =
+--   case Map.lookup (prefix <> ":" <> asText x) nenv of
+--     Just x' -> return x'
+--     Nothing -> lookupNameWithPrefix m prefixList x nenv
+lookupNameWithPrefix' ::
+     Meta -> [T.Text] -> Identifier -> NameEnv -> WithEnv Identifier
+lookupNameWithPrefix' m [] x _ =
+  raiseError m $ "undefined variable: " <> asText x
+lookupNameWithPrefix' m (prefix:prefixList) x nenv =
+  case Map.lookup (prefix <> ":" <> asText x) nenv of
+    Just x' -> return x'
+    Nothing -> lookupNameWithPrefix' m prefixList x nenv
+
+lookupConsNameWithPrefix ::
+     Meta -> [T.Text] -> Identifier -> NameEnv -> WithEnv (T.Text, Identifier)
+lookupConsNameWithPrefix m penv x nenv =
+  case lookupName x nenv of
+    Just x' -> return (asText x, x')
+    Nothing -> lookupConsNameWithPrefix' m penv x nenv
+
+lookupConsNameWithPrefix' ::
+     Meta -> [T.Text] -> Identifier -> NameEnv -> WithEnv (T.Text, Identifier)
+lookupConsNameWithPrefix' m [] x _ =
+  raiseError m $ "undefined variable: " <> asText x
+lookupConsNameWithPrefix' m (prefix:prefixList) x nenv = do
+  let query = prefix <> ":" <> asText x
+  case Map.lookup query nenv of
+    Just x' -> return (query, x')
+    Nothing -> lookupConsNameWithPrefix' m prefixList x nenv
+      -- c' <- lookupConsNameWithPrefix m penv c nenv
+
+lookupNameWithPrefixPlus ::
+     Meta -> [T.Text] -> Identifier -> NameEnv -> WithEnv WeakTermPlus
+lookupNameWithPrefixPlus m penv x nenv = do
+  x' <- lookupNameWithPrefix' m penv x nenv
+  return (m, WeakTermUpsilon x')
+-- lookupNameWithPrefixPlus m [] x _ =
+--   raiseError m $ "undefined variable: " <> asText x
+-- lookupNameWithPrefix m (prefix:prefixList) x nenv =
+--   case Map.lookup (prefix <> ":" <> asText x) nenv of
+--     Just x' -> return (m, WeakTermUpsilon x')
+--     Nothing -> lookupNameWithPrefix m prefixList x nenv
+-- lookupName' :: Meta -> Identifier -> NameEnv -> WithEnv Identifier
+-- lookupName' m x nenv = do
+--   case lookupName x nenv of
+--     Just x' -> return x'
+--     Nothing -> raiseError m $ "undefined variable:  " <> asText x

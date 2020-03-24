@@ -12,29 +12,30 @@
 
 (include "option.neut")
 
+(use list)
+
+(use option)
+
 (definition list:head ([a tau] (xs (list a)))
   (case xs
-    ((list:nil)
-      (option:none))
-    ((list:cons y _)
-      (option:some y))))
+    ((nil) (none))
+    ((cons y _) (some y))))
 
 (definition list:length ([a tau] (xs (list a)))
   (case xs
-    ((list:nil) 0)
-    ((list:cons _ ys) (u64.add 1 (list:length a ys)))))
+    ((nil) 0)
+    ((cons _ ys) (u64.add 1 (length a ys)))))
 
 (definition list:map ([a tau] [b tau] (f (hom a b)) (xs (list a)))
   (case xs
-    ((list:nil)
-      (list:nil))
-    ((list:cons y ys)
-      (list:cons (f y) (list:map a b f ys)))))
+    ((nil) (nil))
+    ((cons y ys)
+      (cons (f y) (map a b f ys)))))
 
 (definition some-function ([a tau] (xs (list a)))
   (case xs
-    ((list:nil) true)
-    ((list:cons _ _) false)))
+    ((nil) true)
+    ((cons _ _) false)))
 
 (include "bool.neut")
 
@@ -46,11 +47,15 @@
 
 (definition list:is-null ([a tau] (xs (list a)))
   (case xs
-    ((list:nil) true)
-    ((list:cons _ _) false)))
+    ((nil) true)
+    ((cons _ _) false)))
 
 (ensure libarchive/3.4.2
   "https://www.libarchive.org/downloads/libarchive-3.4.2.tar.gz")
+
+(unuse option)
+
+(unuse list)
 
 ;; ここ以降ではもう自由に (include library "libarchive/3.4.2/(...)") などと書ける
 
