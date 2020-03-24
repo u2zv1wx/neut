@@ -31,11 +31,16 @@
 ;; (list! 25 100 1000)みたいな略記を許すようにしてもいいかもしれないが。
 
 ;; 名前空間というかauto-prefixがあるとコードがかなりスッキリしますね。
+(section item)
+
 (definition sum ((xs (list i64)))
   (case xs
     ((nil) 0)
     ((cons z ys)
       (i64.add z (sum ys)))))
+
+(end item)
+
 
 (case xs
   ((nil) (i64 10))

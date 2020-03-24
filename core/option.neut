@@ -6,7 +6,11 @@
   (option:none () (option a))
   (option:some ((x a)) (option a)))
 
-(definition from-option ([a tau] (x a) (m (option a)))
+(use option)
+
+(definition option:from-option ([a tau] (x a) (m (option a)))
   (case m
-    ((option:none) x)
-    ((option:some y) y)))
+    ((none) x)
+    ((some y) y)))
+
+(unuse option)
