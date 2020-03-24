@@ -366,9 +366,9 @@ ensureEnvSanity :: Meta -> WithEnv ()
 ensureEnvSanity m = do
   ns <- gets namespace
   penv <- gets prefixEnv
-  case (ns, penv) of
-    (_:_, []) -> raiseError m "`include` can only be used at top-level section"
-    ([], _:_) ->
+  case (null ns, null penv) of
+    (False, _) -> raiseError m "`include` can only be used at top-level section"
+    (_, False) ->
       raiseError m "`include` can only be used with no prefix assumption"
     _ -> return ()
 
