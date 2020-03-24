@@ -130,6 +130,12 @@ discern' nenv ((QuasiStmtLetCoinductiveElim m (mb, b, t) xtsyt codInner ats bts 
       info
       asOuter :
     ss'
+discern' nenv ((QuasiStmtUse prefix):ss) = do
+  modify (\e -> e {prefixEnv = prefix : prefixEnv e})
+  discern' nenv ss
+discern' nenv ((QuasiStmtUnuse prefix):ss) = do
+  modify (\e -> e {prefixEnv = filter (/= prefix) (prefixEnv e)})
+  discern' nenv ss
 
 discernStmtBinder ::
      NameEnv
@@ -159,12 +165,13 @@ discern'' nenv (m, WeakTermUpsilon x@(I (s, _))) = do
   b1 <- isDefinedEnumValue s
   b2 <- isDefinedEnumType s
   mc <- lookupConstantMaybe m s
+  penv <- gets prefixEnv
   case (lookupName x nenv, b1, b2, mc) of
     (Just x', _, _, _) -> return (m, WeakTermUpsilon x')
     (_, True, _, _) -> return (m, WeakTermEnumIntro (EnumValueLabel s))
     (_, _, True, _) -> return (m, WeakTermEnum (EnumTypeLabel s))
     (_, _, _, Just c) -> return c
-    _ -> raiseError m $ "undefined variable: " <> s
+    _ -> lookupNameWithPrefix m penv x nenv
 discern'' nenv (m, WeakTermPi mls xts t) = do
   (xts', t') <- discernBinder nenv xts t
   return (m, WeakTermPi mls xts' t')
@@ -375,6 +382,15 @@ insertName (I (s, _)) y nenv = Map.insert s y nenv
 
 lookupName :: Identifier -> NameEnv -> Maybe Identifier
 lookupName (I (s, _)) nenv = Map.lookup s nenv
+
+lookupNameWithPrefix ::
+     Meta -> [T.Text] -> Identifier -> NameEnv -> WithEnv WeakTermPlus
+lookupNameWithPrefix m [] x _ =
+  raiseError m $ "undefined variable: " <> asText x
+lookupNameWithPrefix m (prefix:prefixList) x nenv =
+  case Map.lookup (prefix <> ":" <> asText x) nenv of
+    Just x' -> return (m, WeakTermUpsilon x')
+    Nothing -> lookupNameWithPrefix m prefixList x nenv
 
 lookupName' :: Meta -> Identifier -> NameEnv -> WithEnv Identifier
 lookupName' m x nenv = do

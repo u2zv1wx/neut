@@ -137,6 +137,16 @@ parse' ((m, TreeNode ((_, TreeLeaf "keyword"):es)):as)
     modify (\e -> e {keywordEnv = S.insert s (keywordEnv e)})
     parse' as
   | otherwise = raiseSyntaxError m "(keyword LEAF)"
+parse' ((m, TreeNode ((_, TreeLeaf "use"):es)):as)
+  | [(_, TreeLeaf s)] <- es = do
+    stmtList <- parse' as
+    return $ QuasiStmtUse s : stmtList
+  | otherwise = raiseSyntaxError m "(use LEAF)"
+parse' ((m, TreeNode ((_, TreeLeaf "unuse"):es)):as)
+  | [(_, TreeLeaf s)] <- es = do
+    stmtList <- parse' as
+    return $ QuasiStmtUnuse s : stmtList
+  | otherwise = raiseSyntaxError m "(unuse LEAF)"
 parse' ((m, TreeNode ((_, TreeLeaf "enum"):rest)):as)
   | (_, TreeLeaf name):ts <- rest = do
     xis <- interpretEnumItem m ts
@@ -361,6 +371,8 @@ keywordSet =
     , "include"
     , "ensure"
     , "constant"
+    , "use"
+    , "unuse"
     , "statement"
     , "attribute"
     , "introspect"
@@ -434,6 +446,8 @@ concatQuasiStmtList (QuasiStmtLetCoinductiveElim m bt xtsyt codInner ats bts yt 
           xtsyt
           (m, WeakTermSigmaElim codOuter (ats ++ bts ++ [yt]) e1 e2'))
       cont
+concatQuasiStmtList (QuasiStmtUse _:ss) = concatQuasiStmtList ss
+concatQuasiStmtList (QuasiStmtUnuse _:ss) = concatQuasiStmtList ss
 
 toLetList :: [(IdentDef, WeakTermPlus)] -> [QuasiStmt]
 toLetList [] = []

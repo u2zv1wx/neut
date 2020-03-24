@@ -11,12 +11,22 @@
 ;;     (item-3 unit)
 ;;     (item-2 20)))
 
+(use list)
+
+;; (let xs (list i64)
+;;   (list:cons 25 (list:cons 100 (list:cons 1000 (list:nil)))))
+
 (let xs (list i64)
-  (list:cons 25 (list:cons 100 (list:cons 1000 (list:nil)))))
+  (cons 25 (cons 100 (cons 1000 (nil)))))
+
+(unuse list)
+
+(let ps (list i64)
+  (cons 25 (cons 100 (cons 1000 (nil)))))
 
 ;; ↓ こう書くとエラーがlist.neutのほうで報告されてしまうという問題がある。修正すること。
-(let item
-  (list:cons 25 (list:cons 100 (list:cons 1000 (list:nil)))))
+;; (let item
+;;   (list:cons 25 (list:cons 100 (list:cons 1000 (list:nil)))))
 
 ;; (list! 25 100 1000)みたいな略記を許すようにしてもいいかもしれないが。
 

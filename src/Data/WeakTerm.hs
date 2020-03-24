@@ -160,6 +160,8 @@ data QuasiStmt
       WeakTermPlus -- b-inner @ [c] (must be externalized later) --
       SubstWeakTerm -- the `a` defined beforehand ~> the `a` in `ats`
       [Identifier] -- as (to be used to update the environment with constructor info)
+  | QuasiStmtUse T.Text
+  | QuasiStmtUnuse T.Text
   deriving (Show)
 
 data WeakStmt
