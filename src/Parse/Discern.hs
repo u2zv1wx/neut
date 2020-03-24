@@ -80,6 +80,9 @@ discern' nenv ((QuasiStmtImplicitPlus m x i):ss) = do
          Nothing -> lookupNameWithPrefix'' m penv x nenv
   ss' <- discern' nenv ss
   return $ QuasiStmtImplicitPlus m x' i : ss'
+discern' nenv ((QuasiStmtEnum m name xis):ss) = do
+  insEnumEnv m name xis
+  discern' nenv ss
 discern' nenv ((QuasiStmtLetInductive n m (mx, a, t) e):ss) = do
   t' <- discern'' nenv t
   a' <- newDefinedNameWith' m nenv a

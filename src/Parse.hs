@@ -176,8 +176,8 @@ parse' ((m, TreeNode ((_, TreeLeaf "enum"):rest)):as)
   | (_, TreeLeaf name):ts <- rest = do
     xis <- interpretEnumItem m name ts
     m' <- adjustPhase m
-    insEnumEnv m' name xis
-    parse' as
+    ss <- parse' as
+    return $ QuasiStmtEnum m' name xis : ss
   | otherwise = raiseSyntaxError m "(enum LEAF TREE ... TREE)"
 parse' ((m, TreeNode ((_, TreeLeaf "include"):rest)):as)
   | [(mPath, TreeLeaf pathString)] <- rest =
@@ -475,6 +475,7 @@ concatQuasiStmtList (QuasiStmtImplicit m x i:es) = do
 concatQuasiStmtList (QuasiStmtImplicitPlus m x i:es) = do
   cont <- concatQuasiStmtList es
   return $ WeakStmtImplicit m x i cont
+concatQuasiStmtList (QuasiStmtEnum {}:ss) = concatQuasiStmtList ss
 concatQuasiStmtList (QuasiStmtDef xds:ss) = do
   let ds = map snd xds
   let baseSub = map defToSub ds

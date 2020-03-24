@@ -124,6 +124,7 @@ data QuasiStmt
   | QuasiStmtDef [(Identifier, Def)]
   | QuasiStmtImplicit Meta Identifier Int
   | QuasiStmtImplicitPlus Meta Identifier Int
+  | QuasiStmtEnum Meta T.Text [(T.Text, Int)]
   -- declaration of a constant
   --   (constant x t)
   | QuasiStmtConstDecl Meta IdentifierPlus
