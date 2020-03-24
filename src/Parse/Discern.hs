@@ -227,7 +227,7 @@ discern'' _ (m, WeakTermEnumIntro x) = return (m, WeakTermEnumIntro x)
 discern'' nenv (m, WeakTermEnumElim (e, t) caseList) = do
   e' <- discern'' nenv e
   t' <- discern'' nenv t
-  caseList' <- discernCaseList nenv caseList
+  caseList' <- discernCaseList m nenv caseList
   return (m, WeakTermEnumElim (e', t') caseList')
 discern'' nenv (m, WeakTermArray dom kind) = do
   dom' <- discern'' nenv dom
@@ -334,18 +334,27 @@ discernIter' nenv xt ((mx, x, t):xts) e = do
   return (xt', (mx, x', t') : xts', e')
 
 discernCaseList ::
-     NameEnv -> [(WeakCase, WeakTermPlus)] -> WithEnv [(WeakCase, WeakTermPlus)]
-discernCaseList nenv caseList =
+     Meta
+  -> NameEnv
+  -> [(WeakCase, WeakTermPlus)]
+  -> WithEnv [(WeakCase, WeakTermPlus)]
+discernCaseList m nenv caseList =
   forM caseList $ \(l, body) -> do
-    l' <- discernWeakCase nenv l
+    l' <- discernWeakCase m nenv l
     body' <- discern'' nenv body
     return (l', body')
 
-discernWeakCase :: NameEnv -> WeakCase -> WithEnv WeakCase
-discernWeakCase nenv (WeakCaseInt t a) = do
+discernWeakCase :: Meta -> NameEnv -> WeakCase -> WithEnv WeakCase
+discernWeakCase _ nenv (WeakCaseInt t a) = do
   t' <- discern'' nenv t
   return (WeakCaseInt t' a)
-discernWeakCase _ l = return l
+discernWeakCase m _ (WeakCaseLabel l) = do
+  penv <- gets prefixEnv
+  ml <- lookupEnumValueNameWithPrefix penv l
+  case ml of
+    Just l' -> return (WeakCaseLabel l')
+    Nothing -> raiseError m $ "no such enum-value is defined: " <> l
+discernWeakCase _ _ l = return l
 
 discernStruct ::
      NameEnv
