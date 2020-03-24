@@ -23,6 +23,9 @@
   (nil () (list a))
   (cons ((x a) (xs (list a))) (list a)))
 
+
+;; (attribute cons (implicit 1))
+
 (definition head ([a tau] (xs (list a)))
   (case xs
     ((nil) (none))

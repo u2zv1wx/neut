@@ -472,6 +472,9 @@ concatQuasiStmtList (QuasiStmtLetSigma m xts e:es) = do
 concatQuasiStmtList (QuasiStmtImplicit m x i:es) = do
   cont <- concatQuasiStmtList es
   return $ WeakStmtImplicit m x i cont
+concatQuasiStmtList (QuasiStmtImplicitPlus m x i:es) = do
+  cont <- concatQuasiStmtList es
+  return $ WeakStmtImplicit m x i cont
 concatQuasiStmtList (QuasiStmtDef xds:ss) = do
   let ds = map snd xds
   let baseSub = map defToSub ds

@@ -123,6 +123,7 @@ data QuasiStmt
   --     ((fn An) (ARGS-n) en))
   | QuasiStmtDef [(Identifier, Def)]
   | QuasiStmtImplicit Meta Identifier Int
+  | QuasiStmtImplicitPlus Meta Identifier Int
   -- declaration of a constant
   --   (constant x t)
   | QuasiStmtConstDecl Meta IdentifierPlus

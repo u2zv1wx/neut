@@ -158,7 +158,7 @@ toInductiveIntro ats bts xts a@(I (ai, _)) (mb, b@(I (bi, k)), m, yts, cod)
          (mb, WeakTermUpsilon b)
          []
          (map (\(_, x, _) -> x) ats) :
-       map (QuasiStmtImplicit m b') [0 .. length xts' - 1])
+       map (QuasiStmtImplicitPlus m b') [0 .. length xts' - 1])
   | otherwise =
     raiseError m $
     "the succedent of an introduction rule of `" <>
@@ -234,7 +234,7 @@ toCoinductiveElim ats bts xts a@(I (ai, _)) (mb, b, m, yts, cod)
          (m, WeakTermPiElim (mb, WeakTermUpsilon b) [toVar' yt])
          []
          (map (\(_, x, _) -> x) ats) :
-       map (QuasiStmtImplicit m b') [0 .. length xts' - 1])
+       map (QuasiStmtImplicitPlus m b') [0 .. length xts' - 1])
   | otherwise =
     raiseError m $
     "the antecedent of an elimination rule of `" <>

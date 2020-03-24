@@ -9,6 +9,7 @@ import Control.Monad.State
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.IntMap.Strict as IntMap
+import qualified Data.Set as S
 import qualified Data.Text as T
 
 import Data.Basic
@@ -63,8 +64,22 @@ discern' nenv ((QuasiStmtImplicit m x i):ss) = do
        case mc of
          Just c -> return c
          Nothing -> lookupNameWithPrefix'' m penv x nenv
+  ienv <- gets introEnv
+  when (S.member (asInt x') ienv) $ do
+    raiseError m $
+      "modifying implicit attribute of a constructor `" <>
+      asText x' <> "` is prohibited"
   ss' <- discern' nenv ss
   return $ QuasiStmtImplicit m x' i : ss'
+discern' nenv ((QuasiStmtImplicitPlus m x i):ss) = do
+  penv <- gets prefixEnv
+  x' <-
+    do mc <- lookupConstantMaybe m penv (asText x)
+       case mc of
+         Just c -> return c
+         Nothing -> lookupNameWithPrefix'' m penv x nenv
+  ss' <- discern' nenv ss
+  return $ QuasiStmtImplicitPlus m x' i : ss'
 discern' nenv ((QuasiStmtLetInductive n m (mx, a, t) e):ss) = do
   t' <- discern'' nenv t
   a' <- newDefinedNameWith' m nenv a
@@ -85,6 +100,7 @@ discern' nenv ((QuasiStmtLetInductiveIntro m enumInfo (mb, b, t) xts yts ats bts
   (bts', nenv'''') <- discernArgs nenv''' bts
   bInner' <- discern'' nenv'''' bInner
   b' <- newDefinedNameWith' m nenv b
+  modify (\env -> env {introEnv = S.insert (asInt b') (introEnv env)})
   ss' <- discern' (insertName b b' nenv) ss
   asOuter <- mapM (lookupStrict nenv) ats
   asInnerPlus <- mapM (lookupStrict' nenv'''') ats
