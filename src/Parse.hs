@@ -217,16 +217,17 @@ parse' ((m, TreeNode ((_, TreeLeaf "introspect"):rest)):as2)
 parse' ((m, TreeNode ((_, TreeLeaf "constant"):rest)):as)
   | [(mn, TreeLeaf name), t] <- rest = do
     t' <- macroExpand t >>= interpret
+    name' <- withSectionPrefix name
     cenv <- gets constantEnv
-    case Map.lookup name cenv of
-      Just _ -> raiseError m $ "the constant " <> name <> " is already defined"
+    case Map.lookup name' cenv of
+      Just _ -> raiseError m $ "the constant " <> name' <> " is already defined"
       Nothing -> do
         i <- newCount
-        modify (\e -> e {constantEnv = Map.insert name i (constantEnv e)})
+        modify (\e -> e {constantEnv = Map.insert name' i (constantEnv e)})
         defList <- parse' as
         m' <- adjustPhase m
         mn' <- adjustPhase mn
-        return $ QuasiStmtConstDecl m' (mn', I (name, i), t') : defList
+        return $ QuasiStmtConstDecl m' (mn', I (name', i), t') : defList
   | otherwise = raiseSyntaxError m "(constant LEAF TREE)"
 parse' ((m, TreeNode (def@(mDef, TreeLeaf "definition"):rest)):as)
   | [name@(_, TreeLeaf _), body] <- rest =

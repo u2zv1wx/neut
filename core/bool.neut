@@ -9,14 +9,18 @@
   (true 1)
   (false 0))
 
+(use unsafe)
+
 (definition as-i1 ((b bool))
-  (unsafe-cast bool i1 b))
+  (cast bool i1 b))
 
 (definition and ((b1 bool) (b2 bool))
-  (unsafe-cast i1 bool (i1.and (as-i1 b1) (as-i1 b2))))
+  (cast i1 bool (i1.and (as-i1 b1) (as-i1 b2))))
 
 (definition or ((b1 bool) (b2 bool))
-  (unsafe-cast i1 bool (i1.or (as-i1 b1) (as-i1 b2))))
+  (cast i1 bool (i1.or (as-i1 b1) (as-i1 b2))))
+
+(unuse unsafe)
 
 (definition not ((b bool))
   (switch b

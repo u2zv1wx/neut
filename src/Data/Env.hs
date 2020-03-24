@@ -350,10 +350,9 @@ lookupConstNum' m constName = do
     Just i -> return i
     Nothing -> raiseCritical m $ "no such constant: " <> constName
 
-lookupConstantMaybe ::
-     Meta -> [T.Text] -> T.Text -> WithEnv (Maybe WeakTermPlus)
+lookupConstantMaybe :: Meta -> [T.Text] -> T.Text -> WithEnv (Maybe Identifier)
 lookupConstantMaybe m penv constName = do
-  me <- lookupConstantMaybe'' m constName
+  me <- lookupConstantMaybe'' constName
   case me of
     Just e -> return $ Just e
     Nothing -> lookupConstantMaybe' m penv constName
@@ -364,22 +363,22 @@ lookupConstantMaybe m penv constName = do
   --     | isConstant constName -> Just <$> lookupConstantPlus m constName
   --     | otherwise -> return Nothing
 
-lookupConstantMaybe' ::
-     Meta -> [T.Text] -> T.Text -> WithEnv (Maybe WeakTermPlus)
+lookupConstantMaybe' :: Meta -> [T.Text] -> T.Text -> WithEnv (Maybe Identifier)
 lookupConstantMaybe' _ [] _ = return Nothing
 lookupConstantMaybe' m (prefix:prefixList) name = do
-  me <- lookupConstantMaybe'' m $ prefix <> ":" <> name
+  me <- lookupConstantMaybe'' $ prefix <> ":" <> name
   case me of
     Just e -> return $ Just e
     Nothing -> lookupConstantMaybe' m prefixList name
 
-lookupConstantMaybe'' :: Meta -> T.Text -> WithEnv (Maybe WeakTermPlus)
-lookupConstantMaybe'' m constName = do
+lookupConstantMaybe'' :: T.Text -> WithEnv (Maybe Identifier)
+lookupConstantMaybe'' constName = do
   cenv <- gets constantEnv
   case Map.lookup constName cenv of
-    Just i -> return $ Just (m, WeakTermConst $ I (constName, i))
+    Just i -> return $ Just $ I (constName, i)
+    -- Just i -> return $ Just (m, WeakTermConst $ I (constName, i))
     Nothing
-      | isConstant constName -> Just <$> lookupConstantPlus m constName
+      | isConstant constName -> Just <$> lookupConstantPlus' constName
       | otherwise -> return Nothing
 
 lookupConstantPlus :: Meta -> T.Text -> WithEnv WeakTermPlus
@@ -392,6 +391,17 @@ lookupConstantPlus m constName = do
       let ident = I (constName, i)
       modify (\env -> env {constantEnv = Map.insert constName i cenv})
       return (m, WeakTermConst ident)
+
+lookupConstantPlus' :: T.Text -> WithEnv Identifier
+lookupConstantPlus' constName = do
+  cenv <- gets constantEnv
+  case Map.lookup constName cenv of
+    Just i -> return $ I (constName, i)
+    Nothing -> do
+      i <- newCount
+      let ident = I (constName, i)
+      modify (\env -> env {constantEnv = Map.insert constName i cenv})
+      return ident
 
 -- f32とかi64.addとかは定数
 isConstant :: T.Text -> Bool

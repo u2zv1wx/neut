@@ -57,12 +57,12 @@ discern' nenv ((QuasiStmtConstDecl m (mx, x, t)):ss) = do
   ss' <- discern' nenv ss
   return $ QuasiStmtConstDecl m (mx, x, t') : ss'
 discern' nenv ((QuasiStmtImplicit m x i):ss) = do
-  cenv <- gets constantEnv
   penv <- gets prefixEnv
   x' <-
-    case Map.lookup (asText x) cenv of
-      Just j -> return $ I (asText x, j)
-      Nothing -> lookupNameWithPrefix'' m penv x nenv
+    do mc <- lookupConstantMaybe m penv (asText x)
+       case mc of
+         Just c -> return c
+         Nothing -> lookupNameWithPrefix'' m penv x nenv
   ss' <- discern' nenv ss
   return $ QuasiStmtImplicit m x' i : ss'
 discern' nenv ((QuasiStmtLetInductive n m (mx, a, t) e):ss) = do
@@ -173,7 +173,7 @@ discern'' nenv (m, WeakTermUpsilon x@(I (s, _))) = do
     (Just x', _, _, _) -> return (m, WeakTermUpsilon x')
     (_, Just s', _, _) -> return (m, WeakTermEnumIntro (EnumValueLabel s'))
     (_, _, Just s', _) -> return (m, WeakTermEnum (EnumTypeLabel s'))
-    (_, _, _, Just c) -> return c
+    (_, _, _, Just c) -> return (m, WeakTermConst c)
     _ -> raiseError m $ "undefined variable:  " <> asText x
 discern'' nenv (m, WeakTermPi mls xts t) = do
   (xts', t') <- discernBinder nenv xts t
