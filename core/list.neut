@@ -6,13 +6,15 @@
 
 (include "bool.neut")
 
+(use option)
+
+(use bool)
+
 (section list)
 
 (inductive list ((a tau))
   (nil () (list a))
   (cons ((x a) (xs (list a))) (list a)))
-
-(use option)
 
 (definition head ([a tau] (xs (list a)))
   (case xs
@@ -30,19 +32,10 @@
     ((cons y ys)
       (cons (f y) (map a b f ys)))))
 
-(use bool)
-
 (definition some-function ([a tau] (xs (list a)))
   (case xs
     ((nil) true)
     ((cons _ _) false)))
-
-
-;; (attribute list:nil (implicit 0))
-
-;; (attribute list:cons (implicit 0))
-
-;; (list:cons (i64 3) (list:nil i64))
 
 (definition is-null ([a tau] (xs (list a)))
   (case xs
