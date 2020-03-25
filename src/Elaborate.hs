@@ -280,11 +280,11 @@ elaborate' (m, WeakTermPiIntroPlus ind (name, args) xts e) = do
   e' <- elaborate' e
   xts' <- mapM elaboratePlus xts
   return (m, TermPiIntroPlus ind (name, args') xts' e')
-elaborate' (m, WeakTermPiElim (_, WeakTermZeta h@(I (_, x))) es) = do
+elaborate' (_, WeakTermPiElim (mh, WeakTermZeta h@(I (_, x))) es) = do
   sub <- gets substEnv
   case IntMap.lookup x sub of
     Nothing -> do
-      raiseError m $
+      raiseError mh $
         "couldn't instantiate the hole here since no constraints are given on it"
     Just (_, WeakTermPiIntro xts e)
       | length xts == length es -> do
@@ -292,7 +292,7 @@ elaborate' (m, WeakTermPiElim (_, WeakTermZeta h@(I (_, x))) es) = do
         e' <- elaborate' $ substWeakTermPlus (zip xs es) e
         return e'
     Just _ ->
-      raiseCritical m $
+      raiseCritical mh $
       "the hole " <>
       asText' h <> " is not registered in the substitution environment"
 elaborate' (m, WeakTermPiElim e es) = do
