@@ -266,9 +266,8 @@ clarifyConst m (I ("unsafe:cast", _)) = do
   a <- newNameWith' "t1"
   b <- newNameWith' "t2"
   x <- newNameWith' "x"
-  l <- newCount
   let varA = (m, TermUpsilon a)
-  let u = (m, TermTau l)
+  let u = (m, TermTau 0)
   clarify
     (m, TermPiIntro [(m, a, u), (m, b, u), (m, x, varA)] (m, TermUpsilon x))
 clarifyConst m name@(I (x, _)) = do
@@ -581,8 +580,7 @@ sigToPi m xts = do
   let zv = toTermUpsilon m z
   k <- newNameWith' "sig"
   -- Sigma [x1 : A1, ..., xn : An] = Pi (z : Type, _ : Pi [x1 : A1, ..., xn : An]. z). z
-  l <- newCount
   -- don't care the level since they're discarded immediately
   -- (i.e. this translated term is not used as an argument of `weaken`)
   return
-    (m, TermPi [] [(m, z, (m, TermTau l)), (m, k, (m, TermPi [] xts zv))] zv)
+    (m, TermPi [] [(m, z, (m, TermTau 0)), (m, k, (m, TermPi [] xts zv))] zv)
