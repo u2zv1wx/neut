@@ -40,7 +40,7 @@ data LLVMOp
   | LLVMOpLoad LLVMData LowType
   | LLVMOpStore LowType LLVMData LLVMData
   | LLVMOpAlloc LLVMData -- size
-  | LLVMOpFree LLVMData
+  | LLVMOpFree LLVMData SizeInfo
   | LLVMOpUnaryOp UnaryOp LLVMData
   | LLVMOpBinaryOp BinaryOp LLVMData LLVMData
   | LLVMOpSysCall
@@ -48,10 +48,9 @@ data LLVMOp
       [LLVMData] -- arguments
   deriving (Show)
 
-data AllocSize
-  = AllocSizeExact Int
-  | AllocSizePtrList Int
-  deriving (Show)
+-- (elem-type, num of elems)
+-- to be used to eliminate free-then-malloc-with-the-same-size.
+type SizeInfo = (LowType, Int)
 
 type SubstLLVM = [(Int, LLVMData)]
 
@@ -151,9 +150,9 @@ substLLVMOp sub (LLVMOpStore t d1 d2) = do
 substLLVMOp sub (LLVMOpAlloc d) = do
   let d' = substLLVMData sub d
   LLVMOpAlloc d'
-substLLVMOp sub (LLVMOpFree d) = do
+substLLVMOp sub (LLVMOpFree d sizeInfo) = do
   let d' = substLLVMData sub d
-  LLVMOpFree d'
+  LLVMOpFree d' sizeInfo
 substLLVMOp sub (LLVMOpUnaryOp op d) = do
   let d' = substLLVMData sub d
   LLVMOpUnaryOp op d'

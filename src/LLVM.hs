@@ -45,7 +45,8 @@ llvmCode (_, CodeSigmaElim k xs v e) = do
   let idxList = map (\i -> (LLVMDataInt i, i32)) [0 ..]
   ys <- mapM newNameWith xs
   let xts' = zip xs (repeat et)
-  loadContent v bt (zip idxList (zip ys xts')) e
+  let sizeInfo = (et, length xs)
+  loadContent v bt sizeInfo (zip idxList (zip ys xts')) e
 llvmCode (_, CodeUpIntro d) = do
   result <- newNameWith' $ takeBaseName d
   llvmDataLet result d $ LLVMReturn $ LLVMDataLocal result
@@ -71,7 +72,8 @@ llvmCode (_, CodeStructElim xks v e) = do
   let bt = LowTypeStructPtr ts
   let idxList = map (\i -> (LLVMDataInt i, i32)) [0 ..]
   ys <- mapM newNameWith xs
-  loadContent v bt (zip idxList (zip ys xts)) e
+  let sizeInfo = (LowTypeIntS64Ptr, length ts)
+  loadContent v bt sizeInfo (zip idxList (zip ys xts)) e
 llvmCode (m, CodeCase sub v branchList) = do
   let (ls, es) = unzip branchList
   let es' = map (substCodePlus sub) es
@@ -113,30 +115,33 @@ takeBaseName' LLVMDataNull = "null"
 loadContent ::
      DataPlus -- base pointer
   -> LowType -- the type of base pointer
+  -> SizeInfo
   -> [((LLVMData, LowType), (Identifier, (Identifier, LowType)))] -- [(the index of an element, the variable to load the element)]
   -> CodePlus -- continuation
   -> WithEnv LLVM
-loadContent _ _ [] cont = llvmCode cont -- don't call redundant free
-loadContent v bt iyxs cont = do
+loadContent _ _ _ [] cont = llvmCode cont -- don't call redundant free
+loadContent v bt sizeInfo iyxs cont = do
   let ixs = map (\(i, (y, (_, k))) -> (i, (y, k))) iyxs
   (bp, castThen) <- llvmCast (Just $ takeBaseName v) v bt
   let yxs = map (\(_, yx) -> yx) iyxs
   uncastThenCont <- uncastList yxs cont
-  extractThenFreeThenUncastThenCont <- loadContent' bp bt ixs uncastThenCont
+  extractThenFreeThenUncastThenCont <-
+    loadContent' bp bt sizeInfo ixs uncastThenCont
   castThen extractThenFreeThenUncastThenCont
 
 loadContent' ::
      LLVMData -- base pointer
   -> LowType -- the type of base pointer
+  -> SizeInfo
   -> [((LLVMData, LowType), (Identifier, LowType))] -- [(the index of an element, the variable to keep the loaded content)]
   -> LLVM -- continuation
   -> WithEnv LLVM
-loadContent' bp bt [] cont = do
+loadContent' bp bt sizeInfo [] cont = do
   l <- llvmUncast (Just $ takeBaseName' bp) bp bt
   tmp <- newNameWith'' $ Just $ takeBaseName' bp
-  commConv tmp l $ LLVMCont (LLVMOpFree (LLVMDataLocal tmp)) cont
-loadContent' bp bt ((i, (x, et)):xis) cont = do
-  cont' <- loadContent' bp bt xis cont
+  commConv tmp l $ LLVMCont (LLVMOpFree (LLVMDataLocal tmp) sizeInfo) cont
+loadContent' bp bt sizeInfo ((i, (x, et)):xis) cont = do
+  cont' <- loadContent' bp bt sizeInfo xis cont
   (posName, pos) <- newDataLocal' (Just $ asText x)
   return $
     LLVMLet
@@ -611,9 +616,9 @@ renameLLVMOp nenv (LLVMOpStore t d1 d2) = do
 renameLLVMOp nenv (LLVMOpAlloc d) = do
   d' <- renameLLVMData nenv d
   return $ LLVMOpAlloc d'
-renameLLVMOp nenv (LLVMOpFree d) = do
+renameLLVMOp nenv (LLVMOpFree d sizeInfo) = do
   d' <- renameLLVMData nenv d
-  return $ LLVMOpFree d'
+  return $ LLVMOpFree d' sizeInfo
 renameLLVMOp nenv (LLVMOpUnaryOp op d) = do
   d' <- renameLLVMData nenv d
   return $ LLVMOpUnaryOp op d'
