@@ -36,10 +36,7 @@ clarify (m, TermPiPlus {}) = do
   returnClosureType m
 clarify lam@(m, TermPiIntro mxts e) = do
   forM_ mxts insTypeEnv'
-  -- p "here-lam"
-  -- p' lam
   fvs <- chainTermPlus lam
-  -- p "and-here-lam"
   e' <- clarify e
   retClosure Nothing fvs m mxts e'
 clarify lam@(m, TermPiIntroNoReduce mxts e) = do
@@ -63,7 +60,6 @@ clarify (m, TermPiElim e es) = do
   callClosure m e' es'
 clarify (m, TermSigma _) = returnClosureType m -- Sigma is translated into Pi
 clarify (m, TermSigmaIntro t es) = do
-  p "sigma-intro"
   let t' = reduceTermPlus t
   case t' of
     (mSig, TermSigma xts)
@@ -81,7 +77,6 @@ clarify (m, TermSigmaIntro t es) = do
           _ -> raiseCritical m "the type of sigma-intro is wrong"
     _ -> raiseCritical m "the type of sigma-intro is wrong"
 clarify (m, TermSigmaElim t xts e1 e2) = do
-  p "sigma-elim"
   clarify (m, TermPiElim e1 [t, (m, TermPiIntro xts e2)])
 clarify iter@(m, TermIter mxt@(_, x, _) mxts e) = do
   forM_ (mxt : mxts) insTypeEnv'
@@ -365,9 +360,7 @@ complementaryChainOf ::
      [(Meta, Identifier, TermPlus)] -> WithEnv [(Meta, Identifier, TermPlus)]
 complementaryChainOf xts = do
   tenv <- gets typeEnv
-  -- p "here"
   zts <- chainTermPlus'' tenv xts []
-  -- p "and here"
   return $ nubBy (\(_, x, _) (_, y, _) -> x == y) zts
 
 toVar :: Meta -> Identifier -> DataPlus
@@ -566,12 +559,7 @@ retWithBorrowedVars m _ [] resultVarName =
 retWithBorrowedVars m cod xs resultVarName
   | (mSig, TermSigma yts) <- cod
   , length yts >= 1 = do
-    p "ret-with-borrowed-vars."
-    p "sig:"
-    p' cod
     tPi <- sigToPi mSig yts
-    p "tPi:"
-    p' tPi
     case tPi of
       (_, TermPi _ [c, (mFun, funName, funType@(_, TermPi _ xts _))] _) -> do
         let (mResult, _, resultType) = last xts
