@@ -38,14 +38,30 @@
 (notation (begin (let (x t) e+) rest+)
   ((pi-introduction ((x t)) (begin rest+)) (begin e+)))
 
-;; lambda: pi-introduction with implicit begin block
+(keyword with)
+
+;; (with identity:bind (let x foo) (let y bar) buz (let p qux) result) みたいなのが合法になる。
+(notation (with bind e) e)
+
+(notation (with bind e rest+)
+  (bind (with bind e) (pi-introduction ((_ hole)) (with bind rest+))))
+
+(notation (with bind (let x e+) rest+)
+  (bind (with bind e+) (pi-introduction ((x hole)) (with bind rest+))))
+
+(notation (with bind (let (x t) e+) rest+)
+  (bind (with bind e+) (pi-introduction ((x t)) (with bind rest+))))
+
 (keyword lambda)
 
-(notation (lambda () e+)
-  (pi-introduction () (begin e+)))
+(notation lambda pi-introduction)
 
-(notation (lambda (xts+) e+)
-  (pi-introduction (xts+) (begin e+)))
+;; lambda: pi-introduction with implicit begin block -> (discard)
+;; (notation (lambda () e+)
+;;   (pi-introduction () (begin e+)))
+
+;; (notation (lambda (xts+) e+)
+;;   (pi-introduction (xts+) (begin e+)))
 
 ;; type ascription
 (keyword ascription)

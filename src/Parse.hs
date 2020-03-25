@@ -374,7 +374,7 @@ ensureEnvSanity m = do
 
 parseDef :: [TreePlus] -> WithEnv [QuasiStmt]
 parseDef xds = do
-  xds' <- mapM (insImplicitBegin >=> macroExpand) xds
+  xds' <- mapM (prefixFunName >=> macroExpand) xds
   xs <- mapM extractFunName xds'
   (xds'', miss) <- unzip <$> mapM takeSquare xds'
   xds''' <- mapM interpretIter xds''
@@ -392,13 +392,11 @@ takeSquare' :: (TreePlus, Int) -> (TreePlus, Maybe Int)
 takeSquare' ((m, TreeNodeSquare es), i) = ((m, TreeNode es), Just i)
 takeSquare' (t, _) = (t, Nothing)
 
-insImplicitBegin :: TreePlus -> WithEnv TreePlus
-insImplicitBegin (m, TreeNode (xt:xts:body:rest)) = do
-  let m' = fst body
-  let beginBlock = (m', TreeNode ((m', TreeLeaf "begin") : body : rest))
+prefixFunName :: TreePlus -> WithEnv TreePlus
+prefixFunName (m, TreeNode [xt, xts, body]) = do
   xt' <- prefixIdentPlus xt
-  return (m, TreeNode [xt', xts, beginBlock])
-insImplicitBegin t = raiseSyntaxError (fst t) "(TREE TREE TREE ...)"
+  return (m, TreeNode [xt', xts, body])
+prefixFunName t = raiseSyntaxError (fst t) "(TREE TREE TREE)"
 
 prefixIdentPlus :: TreePlus -> WithEnv TreePlus
 prefixIdentPlus (m, TreeLeaf x) = do
