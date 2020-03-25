@@ -193,9 +193,9 @@ infer' ctx f@(m, WeakTermConst x@(I (s, _)))
     return ((m, WeakTermConst x), t', l)
   | otherwise = do
     ienv <- gets impEnv
-    case IntMap.lookup (asInt x) ienv of
-      Just is -> inferImplicit ctx m x f is
-      Nothing -> do
+    case (metaIsExplicit m, IntMap.lookup (asInt x) ienv) of
+      (False, Just is) -> inferImplicit ctx m x f is
+      _ -> do
         (m', mt, ml) <- inferSymbol m x
         return ((m', WeakTermConst x), mt, ml)
 infer' _ (m, WeakTermInt t i) = do
