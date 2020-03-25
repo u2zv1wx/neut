@@ -262,11 +262,7 @@ clarifyConst m (I ("os:stdout", _)) =
   clarify (m, TermEnumIntro (EnumValueIntS 64 1))
 clarifyConst m (I ("os:stderr", _)) =
   clarify (m, TermEnumIntro (EnumValueIntS 64 2))
-clarifyConst m (I ("unsafe:cast", _))
-  -- unsafe-cast : Pi (A : tau, B : tau, _ : A). B
-  -- ~> (lam ((A tau) (B tau) (x A)) x)
-  -- (note that we're treating the `x` in the function body as if of type B)
- = do
+clarifyConst m (I ("unsafe:cast", _)) = do
   a <- newNameWith' "t1"
   b <- newNameWith' "t2"
   x <- newNameWith' "x"
