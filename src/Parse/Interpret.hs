@@ -412,15 +412,17 @@ interpretStructIntro e = raiseSyntaxError (fst e) "(TREE TREE)"
 interpretStructElim :: TreePlus -> WithEnv (Meta, Identifier, ArrayKind)
 interpretStructElim (_, TreeNode [(m, TreeLeaf x), k]) = do
   k' <- asArrayKind k
-  return (m, asIdent x, k')
+  m' <- adjustPhase m
+  return (m', asIdent x, k')
 interpretStructElim e = raiseSyntaxError (fst e) "(LEAF TREE)"
 
 interpretCaseClause ::
-     TreePlus -> WithEnv ((Identifier, [IdentifierPlus]), WeakTermPlus)
-interpretCaseClause (_, TreeNode [(_, TreeNode ((_, TreeLeaf c):xts)), e]) = do
+     TreePlus -> WithEnv (((Meta, Identifier), [IdentifierPlus]), WeakTermPlus)
+interpretCaseClause (_, TreeNode [(_, TreeNode ((m, TreeLeaf c):xts)), e]) = do
   xts' <- mapM interpretIdentifierPlus xts
   e' <- interpret e
-  return ((asIdent c, xts'), e')
+  m' <- adjustPhase m
+  return (((m', asIdent c), xts'), e')
 interpretCaseClause t = raiseSyntaxError (fst t) "((LEAF TREE ... TREE) TREE)"
 
 type CocaseClause = ((Identifier, [WeakTermPlus]), [(Identifier, WeakTermPlus)])

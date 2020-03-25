@@ -426,7 +426,7 @@ elaborate' (m, WeakTermCase (e, t) cxtes) = do
       case Map.lookup name eenv of
         Nothing -> raiseError m $ "no such inductive type defined: " <> name
         Just bis -> do
-          let bs' = map (asText . fst . fst) cxtes
+          let bs' = map (asText . snd . fst . fst) cxtes
           let isLinear = linearCheck bs'
           let isExhaustive = length bis == length bs'
           case (isLinear, isExhaustive) of

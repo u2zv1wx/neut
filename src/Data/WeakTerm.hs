@@ -70,7 +70,7 @@ data WeakTerm
   -- simple enough to implement it in Interpret, I don't add it as syntactic construct.
   | WeakTermCase
       (WeakTermPlus, WeakTermPlus) -- (the `e` in `case e of (...)`, the type of `e`)
-      [((Identifier, [IdentifierPlus]), WeakTermPlus)] -- ((cons x xs) e), ((nil) e), ((succ n) e).  (not ((cons A x xs) e).)
+      [(((Meta, Identifier), [IdentifierPlus]), WeakTermPlus)] -- ((cons x xs) e), ((nil) e), ((succ n) e).  (not ((cons A x xs) e).)
   deriving (Show, Eq)
 
 type WeakTermPlus = (Meta, WeakTerm)
@@ -501,7 +501,7 @@ toText (_, WeakTermCase (e, _) cxtes) = do
      toText e :
      (flip map cxtes $ \((c, xts), body) -> do
         let xs = map (\(_, I (x, _), _) -> x) xts
-        showCons [showCons (asText c : xs), toText body]))
+        showCons [showCons (asText (snd c) : xs), toText body]))
 
 inParen :: T.Text -> T.Text
 inParen s = "(" <> s <> ")"

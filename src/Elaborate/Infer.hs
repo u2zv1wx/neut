@@ -314,10 +314,10 @@ infer' ctx (m, WeakTermCase (e, t) cxtes) = do
       return ((m, WeakTermCase (e', t') []), h, ml) -- ex falso quodlibet
     else do
       cxttes' <-
-        forM cxtes $ \((c, xts), body) -> do
+        forM cxtes $ \(((mc, c), xts), body) -> do
           ienv <- gets impEnv
           let imp = concat $ maybeToList $ IntMap.lookup (asInt c) ienv
-          xts' <- setupPatArgs m imp xts
+          xts' <- setupPatArgs mc imp xts
           xts'' <- inferPatArgs ctx xts'
           let vs = map (\(mx, x, _) -> (mx, WeakTermUpsilon x)) xts''
           let expCons = (m {metaIsExplicit = True}, WeakTermUpsilon c)
@@ -327,7 +327,7 @@ infer' ctx (m, WeakTermCase (e, t) cxtes) = do
           forM_ xts'' insPatVarEnv
           insConstraintEnv appType t'
           insLevelEQ appLevel mlInd
-          return (((c, xts''), body'), (bodyType, bodyLevel))
+          return ((((mc, c), xts''), body'), (bodyType, bodyLevel))
       let (cxtes', bodyTypeLevelList) = unzip cxttes'
       let (bodyTypeList, bodyLevelList) = unzip bodyTypeLevelList
       constrainList bodyTypeList

@@ -272,13 +272,13 @@ discern'' nenv (m, WeakTermCase (e, t) cxtes) = do
   t' <- discern'' nenv t
   penv <- gets prefixEnv
   cxtes' <-
-    flip mapM cxtes $ \((c, xts), body) -> do
-      (expandedName, c') <- lookupConsNameWithPrefix m penv c nenv
-      label <- lookupLLVMEnumEnv m expandedName
+    flip mapM cxtes $ \(((mc, c), xts), body) -> do
+      (expandedName, c') <- lookupConsNameWithPrefix mc penv c nenv
+      label <- lookupLLVMEnumEnv mc expandedName
       renv <- gets revCaseEnv
       modify (\env -> env {revCaseEnv = IntMap.insert (asInt c') label renv})
       (xts', body') <- discernBinder nenv xts body
-      return ((c', xts'), body')
+      return (((mc, c'), xts'), body')
   return (m, WeakTermCase (e', t') cxtes')
 
 discernBinder ::
