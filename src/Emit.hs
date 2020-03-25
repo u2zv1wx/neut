@@ -371,10 +371,14 @@ showLowTypeAsIfNonPtr (LowTypeStructPtr ts) =
   "{" <> showItems showLowType ts <> "}"
 showLowTypeAsIfNonPtr (LowTypeFunctionPtr ts t) =
   showLowType t <> " (" <> showItems showLowType ts <> ")"
+showLowTypeAsIfNonPtr (LowTypeArray t) = do
+  let s = showLowType t
+  "[0 x " <> s <> "]"
 showLowTypeAsIfNonPtr (LowTypeArrayPtr i t) = do
   let s = showLowType t
   "[" <> intDec i <> " x " <> s <> "]"
 showLowTypeAsIfNonPtr LowTypeIntS64Ptr = "i64"
+showLowTypeAsIfNonPtr (LowTypePtr t) = showLowType t
 
 getRegList :: WithEnv [Builder]
 getRegList = do
@@ -395,10 +399,14 @@ showLowType LowTypeVoidPtr = "i8*"
 showLowType (LowTypeStructPtr ts) = "{" <> showItems showLowType ts <> "}*"
 showLowType (LowTypeFunctionPtr ts t) =
   showLowType t <> " (" <> showItems showLowType ts <> ")*"
+showLowType (LowTypeArray t) = do
+  let s = showLowType t
+  "[0 x " <> s <> "]"
 showLowType (LowTypeArrayPtr i t) = do
   let s = showLowType t
   "[" <> intDec i <> " x " <> s <> "]*"
 showLowType LowTypeIntS64Ptr = "i64*"
+showLowType (LowTypePtr t) = showLowType t <> "*"
 
 showLLVMData :: LLVMData -> Builder
 showLLVMData (LLVMDataLocal (I (_, i))) = "%_" <> intDec i
@@ -408,6 +416,7 @@ showLLVMData (LLVMDataFloat16 x) = "0x" <> (doubleHexFixed $ realToFrac x)
 showLLVMData (LLVMDataFloat32 x) = "0x" <> (doubleHexFixed $ realToFrac x)
 showLLVMData (LLVMDataFloat64 x) = "0x" <> (doubleHexFixed x)
 showLLVMData LLVMDataNull = "null"
+showLLVMData LLVMDataEmptyArray = "[]"
 
 showItems :: (a -> Builder) -> [a] -> Builder
 showItems _ [] = ""

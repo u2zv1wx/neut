@@ -109,6 +109,7 @@ takeBaseName' (LLVMDataFloat16 _) = "half"
 takeBaseName' (LLVMDataFloat32 _) = "float"
 takeBaseName' (LLVMDataFloat64 _) = "double"
 takeBaseName' LLVMDataNull = "null"
+takeBaseName' LLVMDataEmptyArray = "array"
 
 loadContent ::
      DataPlus -- base pointer
@@ -291,7 +292,7 @@ llvmDataLet x (_, DataUpsilon y) cont =
   llvmUncastLet x (LLVMDataLocal y) voidPtr cont
 llvmDataLet x (m, DataSigmaIntro k ds) cont = do
   let elemType = arrayKindToLowType k
-  let arrayType = LowTypeArrayPtr (length ds) elemType
+  let arrayType = AggPtrTypeArray (length ds) elemType
   let dts = zip ds (repeat elemType)
   storeContent m x arrayType dts cont
 llvmDataLet x (_, DataFloat16 f) cont =
@@ -312,7 +313,7 @@ llvmDataLet x (m, DataEnumIntro intOrLabel) cont = do
 llvmDataLet x (m, DataStructIntro dks) cont = do
   let (ds, ks) = unzip dks
   let ts = map arrayKindToLowType ks
-  let structType = LowTypeStructPtr ts
+  let structType = AggPtrTypeStruct ts
   storeContent m x structType (zip ds ts) cont
 
 syscallToLLVM :: Syscall -> [LLVMData] -> WithEnv LLVM
@@ -391,51 +392,95 @@ getLabelType m c = do
       insLLVMEnv c [] llvm
       return $ toFunPtrType []
 
+data AggPtrType
+  = AggPtrTypeArray Int LowType
+  | AggPtrTypeStruct [LowType]
+
+toLowType :: AggPtrType -> LowType
+toLowType (AggPtrTypeArray i t) = LowTypeArrayPtr i t
+toLowType (AggPtrTypeStruct ts) = LowTypeStructPtr ts
+
 storeContent ::
      Meta
   -> Identifier
-  -> LowType
+  -> AggPtrType
   -> [(DataPlus, LowType)]
   -> LLVM
   -> WithEnv LLVM
 storeContent m reg aggPtrType dts cont = do
-  (cast, castThen) <-
-    llvmCast (Just $ asText reg) (m, DataUpsilon reg) aggPtrType
-  storeThenCont <- storeContent' cast aggPtrType (zip [0 ..] dts) cont
+  let lowType = toLowType aggPtrType
+  (cast, castThen) <- llvmCast (Just $ asText reg) (m, DataUpsilon reg) lowType
+  storeThenCont <- storeContent' cast lowType (zip [0 ..] dts) cont
   castThenStoreThenCont <- castThen $ storeThenCont
   -- FIXME: getelementptrでsizeofを実現する方式を使えばallocsizeを計算する必要はそもそもないはず？
-  case lowTypeToAllocSize aggPtrType of
-    AllocSizeExact 0 ->
-      return $
-      LLVMLet
-        reg
-        (LLVMOpBitcast LLVMDataNull voidPtr voidPtr)
-        castThenStoreThenCont
-    AllocSizeExact i ->
-      return $
-      LLVMLet
-        reg
-        (LLVMOpAlloc (LLVMDataInt (toInteger i)))
-        castThenStoreThenCont
-    AllocSizePtrList 0 ->
-      return $
-      LLVMLet
-        reg
-        (LLVMOpBitcast LLVMDataNull voidPtr voidPtr)
-        castThenStoreThenCont
-    AllocSizePtrList n -> do
-      (c, cVar) <- newDataLocal $ "sizeof-" <> asText reg
-      (i, iVar) <- newDataLocal $ "sizeof-" <> asText reg
-      -- Use getelementptr to realize `sizeof`. More info:
-      --   http://nondot.org/sabre/LLVMNotes/SizeOf-OffsetOf-VariableSizedStructs.txt
-      return $
-        LLVMLet
-          c
-          (LLVMOpGetElementPtr
-             (LLVMDataNull, LowTypeIntS64Ptr)
-             [(LLVMDataInt (toInteger n), i64)]) $
-        LLVMLet i (LLVMOpPointerToInt cVar LowTypeIntS64Ptr (LowTypeIntS 64)) $
-        LLVMLet reg (LLVMOpAlloc iVar) castThenStoreThenCont
+  -- (c, cVar) <- newDataLocal $ "sizeof-" <> asText reg
+  -- (i, iVar) <- newDataLocal $ "sizeof-" <> asText reg
+  -- Use getelementptr to realize `sizeof`. More info:
+  --   http://nondot.org/sabre/LLVMNotes/SizeOf-OffsetOf-VariableSizedStructs.txt
+  case aggPtrType of
+    AggPtrTypeStruct ts ->
+      storeContent'' reg LowTypeIntS64Ptr (length ts) castThenStoreThenCont
+      -- return $
+      --   LLVMLet
+      --     c
+      --     (LLVMOpGetElementPtr
+      --        (LLVMDataNull, LowTypeIntS64Ptr)
+      --        [(LLVMDataInt (toInteger (length ts)), i64)]) $
+      --   LLVMLet i (LLVMOpPointerToInt cVar LowTypeIntS64Ptr (LowTypeIntS 64)) $
+      --   LLVMLet reg (LLVMOpAlloc iVar) castThenStoreThenCont
+    AggPtrTypeArray size t
+      -- storeContent'' reg (LowTypeArray t) size castThenStoreThenCont
+     -> storeContent'' reg (LowTypePtr t) size castThenStoreThenCont
+      -- return $
+      --   LLVMLet
+      --     c
+      --     (LLVMOpGetElementPtr
+      --        (undefined, LowTypeArray t)
+      --        [(LLVMDataInt (toInteger size), i64)]) $
+      --   LLVMLet i (LLVMOpPointerToInt cVar LowTypeIntS64Ptr (LowTypeIntS 64)) $
+      --   LLVMLet reg (LLVMOpAlloc iVar) castThenStoreThenCont
+      -- undefined
+  -- let (value, baseType, size) = aggPtrTypeToSizeCalculator aggPtrType
+  -- (c, cVar) <- newDataLocal $ "sizeof-" <> asText reg
+  -- (i, iVar) <- newDataLocal $ "sizeof-" <> asText reg
+  -- -- Use getelementptr to realize `sizeof`. More info:
+  -- --   http://nondot.org/sabre/LLVMNotes/SizeOf-OffsetOf-VariableSizedStructs.txt
+  -- return $
+  --   LLVMLet c (LLVMOpGetElementPtr (value, baseType) [(LLVMDataInt size, i64)]) $
+  --   LLVMLet i (LLVMOpPointerToInt cVar LowTypeIntS64Ptr (LowTypeIntS 64)) $
+  --   LLVMLet reg (LLVMOpAlloc iVar) castThenStoreThenCont
+  -- case aggPtrTypeToAllocSize aggPtrType of
+  --   AllocSizeExact 0 ->
+  --     return $
+  --     LLVMLet
+  --       reg
+  --       (LLVMOpBitcast LLVMDataNull voidPtr voidPtr)
+  --       castThenStoreThenCont
+  --   AllocSizeExact i ->
+  --     return $
+  --     LLVMLet
+  --       reg
+  --       (LLVMOpAlloc (LLVMDataInt (toInteger i)))
+  --       castThenStoreThenCont
+  --   AllocSizePtrList 0 ->
+  --     return $
+  --     LLVMLet
+  --       reg
+  --       (LLVMOpBitcast LLVMDataNull voidPtr voidPtr)
+  --       castThenStoreThenCont
+  --   AllocSizePtrList n -> do
+  --     (c, cVar) <- newDataLocal $ "sizeof-" <> asText reg
+  --     (i, iVar) <- newDataLocal $ "sizeof-" <> asText reg
+  --     -- Use getelementptr to realize `sizeof`. More info:
+  --     --   http://nondot.org/sabre/LLVMNotes/SizeOf-OffsetOf-VariableSizedStructs.txt
+  --     return $
+  --       LLVMLet
+  --         c
+  --         (LLVMOpGetElementPtr
+  --            (LLVMDataNull, LowTypeIntS64Ptr)
+  --            [(LLVMDataInt (toInteger n), i64)]) $
+  --       LLVMLet i (LLVMOpPointerToInt cVar LowTypeIntS64Ptr (LowTypeIntS 64)) $
+  --       LLVMLet reg (LLVMOpAlloc iVar) castThenStoreThenCont
 
 storeContent' ::
      LLVMData -- base pointer
@@ -454,6 +499,19 @@ storeContent' bp bt ((i, (d, et)):ids) cont = do
       locName
       (LLVMOpGetElementPtr (bp, bt) [(LLVMDataInt 0, i32), (LLVMDataInt i, it)]) $
     LLVMCont (LLVMOpStore et cast loc) cont'
+
+storeContent'' :: Identifier -> LowType -> Int -> LLVM -> WithEnv LLVM
+storeContent'' reg elemType size cont = do
+  (c, cVar) <- newDataLocal $ "sizeof-" <> asText reg
+  (i, iVar) <- newDataLocal $ "sizeof-" <> asText reg
+  return $
+    LLVMLet
+      c
+      (LLVMOpGetElementPtr
+         (LLVMDataNull, elemType)
+         [(LLVMDataInt (toInteger size), i64)]) $
+    LLVMLet i (LLVMOpPointerToInt cVar elemType (LowTypeIntS 64)) $
+    LLVMLet reg (LLVMOpAlloc iVar) cont
 
 indexTypeOf :: LowType -> LowType
 indexTypeOf (LowTypeStructPtr _) = LowTypeIntS 32
@@ -479,28 +537,49 @@ newDataLocal' mName = do
   x <- newNameWith'' mName
   return $ (x, LLVMDataLocal x)
 
-lowTypeToAllocSize :: LowType -> AllocSize
-lowTypeToAllocSize (LowTypeIntS i) = AllocSizeExact $ lowTypeToAllocSize' i
-lowTypeToAllocSize (LowTypeIntU i) = AllocSizeExact $ lowTypeToAllocSize' i
-lowTypeToAllocSize (LowTypeFloat size) =
-  AllocSizeExact $ lowTypeToAllocSize' $ sizeAsInt size
-lowTypeToAllocSize LowTypeVoid = AllocSizePtrList 1
-lowTypeToAllocSize LowTypeVoidPtr = AllocSizePtrList 1
-lowTypeToAllocSize (LowTypeFunctionPtr _ _) = AllocSizePtrList 1
-lowTypeToAllocSize (LowTypeStructPtr ts) = AllocSizePtrList $ length ts
-lowTypeToAllocSize (LowTypeArrayPtr i t) =
-  case lowTypeToAllocSize t of
-    AllocSizeExact s -> AllocSizeExact $ s * i
-    AllocSizePtrList s -> AllocSizePtrList $ s * i -- shouldn't occur
-lowTypeToAllocSize LowTypeIntS64Ptr = AllocSizePtrList 1
-
-lowTypeToAllocSize' :: Int -> Int
-lowTypeToAllocSize' i = do
-  let (q, r) = quotRem i 8
-  if r == 0
-    then q
-    else q + 1
-
+-- aggPtrTypeToSizeCalculator :: AggPtrType -> (LLVMData, LowType, Integer)
+-- aggPtrTypeToSizeCalculator (AggPtrTypeStruct ts) =
+--   (LLVMDataNull, LowTypeIntS64Ptr, toInteger $ length ts)
+-- aggPtrTypeToSizeCalculator (AggPtrTypeArray i t) = undefined
+-- aggPtrTypeToAllocSize :: AggPtrType -> AllocSize
+-- aggPtrTypeToAllocSize (AggPtrTypeArray i t) =
+--   case aggPtrTypeToAllocSize t of
+--     AllocSizeExact s -> AllocSizeExact $ s * i
+--     AllocSizePtrList s -> AllocSizePtrList $ s * i -- shouldn't occur
+-- aggPtrTypeToAllocSize (AggPtrTypeStruct ts) = AllocSizePtrList $ length ts
+-- aggPtrTypeToAllocSize (LowTypeIntS i) = AllocSizeExact $ aggPtrTypeToAllocSize' i
+-- aggPtrTypeToAllocSize (LowTypeIntU i) = AllocSizeExact $ aggPtrTypeToAllocSize' i
+-- aggPtrTypeToAllocSize (LowTypeFloat size) =
+--   AllocSizeExact $ aggPtrTypeToAllocSize' $ sizeAsInt size
+-- aggPtrTypeToAllocSize LowTypeVoid = AllocSizePtrList 1
+-- aggPtrTypeToAllocSize LowTypeVoidPtr = AllocSizePtrList 1
+-- aggPtrTypeToAllocSize (LowTypeFunctionPtr _ _) = AllocSizePtrList 1
+-- aggPtrTypeToAllocSize (LowTypeStructPtr ts) = AllocSizePtrList $ length ts
+-- aggPtrTypeToAllocSize (LowTypeArrayPtr i t) =
+--   case aggPtrTypeToAllocSize t of
+--     AllocSizeExact s -> AllocSizeExact $ s * i
+--     AllocSizePtrList s -> AllocSizePtrList $ s * i -- shouldn't occur
+-- aggPtrTypeToAllocSize LowTypeIntS64Ptr = AllocSizePtrList 1
+-- aggPtrTypeToAllocSize' :: Int -> Int
+-- aggPtrTypeToAllocSize' i = do
+--   let (q, r) = quotRem i 8
+--   if r == 0
+--     then q
+--     else q + 1
+-- arrayKindToAllocSize :: ArrayKind -> AllocSize
+-- arrayKindToAllocSize (ArrayKindIntS i) =
+--   AllocSizeExact $ arrayKindToAllocSize' i
+-- arrayKindToAllocSize (ArrayKindIntU i) =
+--   AllocSizeExact $ arrayKindToAllocSize' i
+-- arrayKindToAllocSize (ArrayKindFloat size) =
+--   AllocSizeExact $ arrayKindToAllocSize' $ sizeAsInt size
+-- arrayKindToAllocSize ArrayKindVoidPtr = AllocSizePtrList 1
+-- arrayKindToAllocSize' :: Int -> Int
+-- arrayKindToAllocSize' i = do
+--   let (q, r) = quotRem i 8
+--   if r == 0
+--     then q
+--     else q + 1
 i64 :: LowType
 i64 = LowTypeIntS 64
 

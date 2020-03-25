@@ -163,8 +163,10 @@ data LowType
   | LowTypeVoidPtr
   | LowTypeFunctionPtr [LowType] LowType
   | LowTypeStructPtr [LowType]
+  | LowTypeArray LowType -- [0 x LOWTYPE]
   | LowTypeArrayPtr Int LowType -- [n x LOWTYPE]*
   | LowTypeIntS64Ptr
+  | LowTypePtr LowType
   deriving (Eq, Show)
 
 asLowType :: Identifier -> LowType

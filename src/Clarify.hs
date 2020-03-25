@@ -36,7 +36,10 @@ clarify (m, TermPiPlus {}) = do
   returnClosureType m
 clarify lam@(m, TermPiIntro mxts e) = do
   forM_ mxts insTypeEnv'
+  -- p "here-lam"
+  -- p' lam
   fvs <- chainTermPlus lam
+  -- p "and-here-lam"
   e' <- clarify e
   retClosure Nothing fvs m mxts e'
 clarify lam@(m, TermPiIntroNoReduce mxts e) = do
@@ -60,6 +63,7 @@ clarify (m, TermPiElim e es) = do
   callClosure m e' es'
 clarify (m, TermSigma _) = returnClosureType m -- Sigma is translated into Pi
 clarify (m, TermSigmaIntro t es) = do
+  p "sigma-intro"
   let t' = reduceTermPlus t
   case t' of
     (mSig, TermSigma xts)
@@ -77,6 +81,7 @@ clarify (m, TermSigmaIntro t es) = do
           _ -> raiseCritical m "the type of sigma-intro is wrong"
     _ -> raiseCritical m "the type of sigma-intro is wrong"
 clarify (m, TermSigmaElim t xts e1 e2) = do
+  p "sigma-elim"
   clarify (m, TermPiElim e1 [t, (m, TermPiIntro xts e2)])
 clarify iter@(m, TermIter mxt@(_, x, _) mxts e) = do
   forM_ (mxt : mxts) insTypeEnv'
@@ -253,16 +258,16 @@ clarifyConst m (I (x, _))
   | Just _ <- asLowTypeMaybe x = clarify (m, TermEnum $ EnumTypeLabel "top")
 clarifyConst m name@(I (x, _))
   | Just lowType <- asArrayAccessMaybe x = clarifyArrayAccess m name lowType
-clarifyConst m (I ("file-descriptor", _)) = do
+clarifyConst m (I ("os:file-descriptor", _)) = do
   i <- lookupConstNum "i64"
   clarify (m, TermConst (I ("i64", i)))
-clarifyConst m (I ("stdin", _)) =
+clarifyConst m (I ("os:stdin", _)) =
   clarify (m, TermEnumIntro (EnumValueIntS 64 0))
-clarifyConst m (I ("stdout", _)) =
+clarifyConst m (I ("os:stdout", _)) =
   clarify (m, TermEnumIntro (EnumValueIntS 64 1))
-clarifyConst m (I ("stderr", _)) =
+clarifyConst m (I ("os:stderr", _)) =
   clarify (m, TermEnumIntro (EnumValueIntS 64 2))
-clarifyConst m (I ("unsafe-cast", _))
+clarifyConst m (I ("unsafe:cast", _))
   -- unsafe-cast : Pi (A : tau, B : tau, _ : A). B
   -- ~> (lam ((A tau) (B tau) (x A)) x)
   -- (note that we're treating the `x` in the function body as if of type B)
@@ -346,6 +351,7 @@ clarifySysCall name syscall args m = do
       | length xts == length args -> do
         zts <- complementaryChainOf xts
         (xs, ds, headerList) <- computeHeader m xts args
+        forM_ xts insTypeEnv'
         callThenReturn <- toSysCallTail m cod syscall ds xs
         let body = iterativeApp headerList callThenReturn
         retClosure (Just $ asText'' name) zts m xts body
@@ -359,7 +365,9 @@ complementaryChainOf ::
      [(Meta, Identifier, TermPlus)] -> WithEnv [(Meta, Identifier, TermPlus)]
 complementaryChainOf xts = do
   tenv <- gets typeEnv
+  -- p "here"
   zts <- chainTermPlus'' tenv xts []
+  -- p "and here"
   return $ nubBy (\(_, x, _) (_, y, _) -> x == y) zts
 
 toVar :: Meta -> Identifier -> DataPlus
@@ -525,6 +533,9 @@ toSysCallTail ::
   -> WithEnv CodePlus
 toSysCallTail m cod syscall args xs = do
   resultVarName <- newNameWith' "result"
+  p "toSysCallTail."
+  p "cod:"
+  p' cod
   result <- retWithBorrowedVars m cod xs resultVarName
   return
     ( m
@@ -555,7 +566,12 @@ retWithBorrowedVars m _ [] resultVarName =
 retWithBorrowedVars m cod xs resultVarName
   | (mSig, TermSigma yts) <- cod
   , length yts >= 1 = do
+    p "ret-with-borrowed-vars."
+    p "sig:"
+    p' cod
     tPi <- sigToPi mSig yts
+    p "tPi:"
+    p' tPi
     case tPi of
       (_, TermPi _ [c, (mFun, funName, funType@(_, TermPi _ xts _))] _) -> do
         let (mResult, _, resultType) = last xts

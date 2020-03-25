@@ -138,4 +138,7 @@ isValueConst (I (x, _))
   | Just _ <- asLowTypeMaybe x = True
   -- | Just _ <- asUnaryOpMaybe x = True
   -- | Just _ <- asBinaryOpMaybe x = True
+  | x == "os:stdin" = True
+  | x == "os:stdout" = True
+  | x == "os:stderr" = True
   | otherwise = False

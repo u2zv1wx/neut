@@ -291,7 +291,7 @@ parse' (a:as) = do
             defList <- parse' as
             return $ QuasiStmtLetSigma m xts app : defList
         (m, _) -> do
-          name <- newNameWith'' "hole-parse-last"
+          name <- newNameWith'' "hole"
           t <- newHole m
           defList <- parse' as
           let m' = m {metaIsAppropriateAsCompletionCandidate = False}

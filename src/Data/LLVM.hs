@@ -14,6 +14,7 @@ data LLVMData
   | LLVMDataFloat32 Float
   | LLVMDataFloat64 Double
   | LLVMDataNull
+  | LLVMDataEmptyArray
   deriving (Show)
 
 data LLVM
