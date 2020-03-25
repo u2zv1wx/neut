@@ -169,9 +169,6 @@ emitLLVMOp (LLVMOpStore t d1 d2) = do
 emitLLVMOp (LLVMOpAlloc d _) = do
   return $
     unwordsL ["call fastcc", "i8*", "@malloc(i64 " <> showLLVMData d <> ")"]
--- emitLLVMOp (LLVMOpFree d _ _) = do
---   return $
---     unwordsL ["call fastcc", "void", "@free(i8* " <> showLLVMData d <> ")"]
 emitLLVMOp (LLVMOpSysCall num ds) = do
   emitSysCallOp num ds
 emitLLVMOp (LLVMOpUnaryOp (UnaryOpNeg t@(LowTypeFloat _)) d) = do
