@@ -289,8 +289,7 @@ elaborate' (_, WeakTermPiElim (mh, WeakTermZeta h@(I (_, x))) es) = do
     Just (_, WeakTermPiIntro xts e)
       | length xts == length es -> do
         let xs = map (\(_, y, _) -> y) xts
-        e' <- elaborate' $ substWeakTermPlus (zip xs es) e
-        return e'
+        elaborate' $ substWeakTermPlus (zip xs es) e
     Just _ ->
       raiseCritical mh $
       "the hole " <>
