@@ -40,7 +40,7 @@ data LLVMOp
   | LLVMOpLoad LLVMData LowType
   | LLVMOpStore LowType LLVMData LLVMData
   | LLVMOpAlloc LLVMData SizeInfo
-  | LLVMOpFree LLVMData SizeInfo
+  | LLVMOpFree LLVMData SizeInfo Int -- (var, size-of-var, name-of-free)   (name-of-free is only for optimization)
   | LLVMOpUnaryOp UnaryOp LLVMData
   | LLVMOpBinaryOp BinaryOp LLVMData LLVMData
   | LLVMOpSysCall
@@ -54,38 +54,28 @@ type SizeInfo = (LowType, Int)
 
 type SubstLLVM = [(Int, LLVMData)]
 
-reduceLLVM :: LLVM -> LLVM
-reduceLLVM l = reduceLLVM' [] l
-
-reduceLLVM' :: SubstLLVM -> LLVM -> LLVM
-reduceLLVM' sub (LLVMReturn d) = LLVMReturn $ substLLVMData sub d
-reduceLLVM' sub (LLVMLet x (LLVMOpBitcast d from to) cont)
-  | from == to = reduceLLVM' ((asInt x, substLLVMData sub d) : sub) cont
-reduceLLVM' sub (LLVMLet x op cont) = do
-  let op' = substLLVMOp sub op
-  let cont' = reduceLLVM' sub cont
-  LLVMLet x op' cont'
-reduceLLVM' sub (LLVMCont op cont) = do
-  let op' = substLLVMOp sub op
-  let cont' = reduceLLVM' sub cont
-  LLVMCont op' cont'
-reduceLLVM' sub (LLVMSwitch (d, t) defaultBranch les) = do
-  let (ls, es) = unzip les
-  let d' = substLLVMData sub d
-  let defaultBranch' = reduceLLVM' sub defaultBranch
-  let es' = map (reduceLLVM' sub) es
-  LLVMSwitch (d', t) defaultBranch' (zip ls es')
-reduceLLVM' sub (LLVMBranch d onTrue onFalse) = do
-  let d' = substLLVMData sub d
-  let onTrue' = reduceLLVM' sub onTrue
-  let onFalse' = reduceLLVM' sub onFalse
-  LLVMBranch d' onTrue' onFalse'
-reduceLLVM' sub (LLVMCall d ds) = do
-  let d' = substLLVMData sub d
-  let ds' = map (substLLVMData sub) ds
-  LLVMCall d' ds'
-reduceLLVM' _ LLVMUnreachable = LLVMUnreachable
-
+-- reduceLLVM :: LLVM -> LLVM
+-- reduceLLVM (LLVMReturn d) = LLVMReturn d
+-- reduceLLVM (LLVMLet x (LLVMOpBitcast d from to) cont)
+--   | from == to = reduceLLVM $ substLLVM [(asInt x, d)] cont
+-- reduceLLVM (LLVMLet x op cont) = do
+--   let cont' = reduceLLVM cont
+--   LLVMLet x op cont'
+-- reduceLLVM (LLVMCont op cont) = do
+--   let cont' = reduceLLVM cont
+--   LLVMCont op cont'
+-- reduceLLVM (LLVMSwitch (d, t) defaultBranch les) = do
+--   let (ls, es) = unzip les
+--   let defaultBranch' = reduceLLVM defaultBranch
+--   let es' = map reduceLLVM es
+--   LLVMSwitch (d, t) defaultBranch' (zip ls es')
+-- reduceLLVM (LLVMBranch d onTrue onFalse) = do
+--   let onTrue' = reduceLLVM onTrue
+--   let onFalse' = reduceLLVM onFalse
+--   LLVMBranch d onTrue' onFalse'
+-- reduceLLVM (LLVMCall d ds) = do
+--   LLVMCall d ds
+-- reduceLLVM LLVMUnreachable = LLVMUnreachable
 substLLVMData :: SubstLLVM -> LLVMData -> LLVMData
 substLLVMData sub (LLVMDataLocal x) =
   case lookup (asInt x) sub of
@@ -150,9 +140,9 @@ substLLVMOp sub (LLVMOpStore t d1 d2) = do
 substLLVMOp sub (LLVMOpAlloc d sizeInfo) = do
   let d' = substLLVMData sub d
   LLVMOpAlloc d' sizeInfo
-substLLVMOp sub (LLVMOpFree d sizeInfo) = do
+substLLVMOp sub (LLVMOpFree d sizeInfo i) = do
   let d' = substLLVMData sub d
-  LLVMOpFree d' sizeInfo
+  LLVMOpFree d' sizeInfo i
 substLLVMOp sub (LLVMOpUnaryOp op d) = do
   let d' = substLLVMData sub d
   LLVMOpUnaryOp op d'

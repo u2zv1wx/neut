@@ -11,23 +11,25 @@ import Data.Monoid ((<>))
 
 import qualified Data.ByteString.Lazy as L
 import qualified Data.HashMap.Strict as Map
+import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 
 import Data.Basic
 import Data.Env
 import Data.LLVM
+import Reduce.LLVM
 
 emit :: LLVM -> WithEnv L.ByteString
 emit mainTerm = do
   lenv <- gets llvmEnv
   g <- emitDeclarations
-  let mainTerm' = reduceLLVM mainTerm
+  mainTerm' <- reduceLLVM Map.empty mainTerm
   zs <- emitDefinition "i64" "main" [] mainTerm'
   xs <-
     forM (Map.toList lenv) $ \(name, (args, body)) -> do
       let args' = map (showLLVMData . LLVMDataLocal) args
-      let body' = reduceLLVM body
+      body' <- reduceLLVM Map.empty body
       emitDefinition "i8*" (TE.encodeUtf8Builder name) args' body'
   return $ toLazyByteString $ unlinesL $ g <> zs <> concat xs
 
@@ -107,6 +109,16 @@ emitLLVM retType (LLVMBranch d onTrue onFalse) = do
     forM ([(onTrueLabel, onTrue), (onFalseLabel, onFalse)]) $
     uncurry (emitBlock retType)
   return $ op <> concat xs
+emitLLVM retType (LLVMCont (LLVMOpFree d _ j) cont) = do
+  nenv <- gets nopFreeSet
+  if S.member j nenv
+    then emitLLVM retType cont
+    else do
+      str <-
+        emitOp $
+        unwordsL ["call fastcc", "void", "@free(i8* " <> showLLVMData d <> ")"]
+      a <- emitLLVM retType cont
+      return $ str <> a
 emitLLVM retType (LLVMCont op cont) = do
   s <- emitLLVMOp op
   str <- emitOp s
@@ -157,9 +169,9 @@ emitLLVMOp (LLVMOpStore t d1 d2) = do
 emitLLVMOp (LLVMOpAlloc d _) = do
   return $
     unwordsL ["call fastcc", "i8*", "@malloc(i64 " <> showLLVMData d <> ")"]
-emitLLVMOp (LLVMOpFree d _) = do
-  return $
-    unwordsL ["call fastcc", "void", "@free(i8* " <> showLLVMData d <> ")"]
+-- emitLLVMOp (LLVMOpFree d _ _) = do
+--   return $
+--     unwordsL ["call fastcc", "void", "@free(i8* " <> showLLVMData d <> ")"]
 emitLLVMOp (LLVMOpSysCall num ds) = do
   emitSysCallOp num ds
 emitLLVMOp (LLVMOpUnaryOp (UnaryOpNeg t@(LowTypeFloat _)) d) = do
@@ -367,6 +379,8 @@ showLowTypeAsIfNonPtr (LowTypeFloat FloatSize32) = "float"
 showLowTypeAsIfNonPtr (LowTypeFloat FloatSize64) = "double"
 showLowTypeAsIfNonPtr LowTypeVoid = "void"
 showLowTypeAsIfNonPtr LowTypeVoidPtr = "i8"
+showLowTypeAsIfNonPtr (LowTypeStruct ts) =
+  "{" <> showItems showLowType ts <> "}"
 showLowTypeAsIfNonPtr (LowTypeStructPtr ts) =
   "{" <> showItems showLowType ts <> "}"
 showLowTypeAsIfNonPtr (LowTypeFunctionPtr ts t) =
@@ -396,6 +410,7 @@ showLowType (LowTypeFloat FloatSize32) = "float"
 showLowType (LowTypeFloat FloatSize64) = "double"
 showLowType LowTypeVoid = "void"
 showLowType LowTypeVoidPtr = "i8*"
+showLowType (LowTypeStruct ts) = "{" <> showItems showLowType ts <> "}"
 showLowType (LowTypeStructPtr ts) = "{" <> showItems showLowType ts <> "}*"
 showLowType (LowTypeFunctionPtr ts t) =
   showLowType t <> " (" <> showItems showLowType ts <> ")*"

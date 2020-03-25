@@ -139,7 +139,8 @@ loadContent' ::
 loadContent' bp bt sizeInfo [] cont = do
   l <- llvmUncast (Just $ takeBaseName' bp) bp bt
   tmp <- newNameWith'' $ Just $ takeBaseName' bp
-  commConv tmp l $ LLVMCont (LLVMOpFree (LLVMDataLocal tmp) sizeInfo) cont
+  j <- newCount
+  commConv tmp l $ LLVMCont (LLVMOpFree (LLVMDataLocal tmp) sizeInfo j) cont
 loadContent' bp bt sizeInfo ((i, (x, et)):xis) cont = do
   cont' <- loadContent' bp bt sizeInfo xis cont
   (posName, pos) <- newDataLocal' (Just $ asText x)
@@ -616,9 +617,9 @@ renameLLVMOp nenv (LLVMOpStore t d1 d2) = do
 renameLLVMOp nenv (LLVMOpAlloc d sizeInfo) = do
   d' <- renameLLVMData nenv d
   return $ LLVMOpAlloc d' sizeInfo
-renameLLVMOp nenv (LLVMOpFree d sizeInfo) = do
+renameLLVMOp nenv (LLVMOpFree d sizeInfo j) = do
   d' <- renameLLVMData nenv d
-  return $ LLVMOpFree d' sizeInfo
+  return $ LLVMOpFree d' sizeInfo j
 renameLLVMOp nenv (LLVMOpUnaryOp op d) = do
   d' <- renameLLVMData nenv d
   return $ LLVMOpUnaryOp op d'

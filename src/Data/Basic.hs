@@ -128,7 +128,9 @@ data FloatSize
   = FloatSize16
   | FloatSize32
   | FloatSize64
-  deriving (Eq, Show)
+  deriving (Generic, Eq, Show)
+
+instance Hashable FloatSize
 
 asFloatSize :: Int -> Maybe FloatSize
 asFloatSize 16 = Just FloatSize16
@@ -168,7 +170,9 @@ data LowType
   | LowTypeArrayPtr Int LowType -- [n x LOWTYPE]*
   | LowTypeIntS64Ptr
   | LowTypePtr LowType
-  deriving (Eq, Show)
+  deriving (Generic, Eq, Show)
+
+instance Hashable LowType
 
 asLowType :: Identifier -> LowType
 asLowType (I (n, _)) = fromMaybe (LowTypeIntS 64) (asLowTypeMaybe n)

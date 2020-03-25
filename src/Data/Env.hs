@@ -88,6 +88,7 @@ data Env =
     -- LLVM
     , llvmEnv :: Map.HashMap T.Text ([Identifier], LLVM)
     , declEnv :: Map.HashMap T.Text ([LowType], LowType) -- external functions that must be declared in LLVM IR
+    , nopFreeSet :: S.Set Int
     }
 
 initialEnv :: Env
@@ -138,6 +139,7 @@ initialEnv =
     , zetaEnv = IntMap.empty
     , patVarEnv = S.empty
     , nameSet = S.empty
+    , nopFreeSet = S.empty
     }
 
 type WithEnv a = StateT Env (ExceptT [Log] IO) a
