@@ -416,7 +416,6 @@ showLLVMData (LLVMDataFloat16 x) = "0x" <> (doubleHexFixed $ realToFrac x)
 showLLVMData (LLVMDataFloat32 x) = "0x" <> (doubleHexFixed $ realToFrac x)
 showLLVMData (LLVMDataFloat64 x) = "0x" <> (doubleHexFixed x)
 showLLVMData LLVMDataNull = "null"
-showLLVMData LLVMDataEmptyArray = "[]"
 
 showItems :: (a -> Builder) -> [a] -> Builder
 showItems _ [] = ""

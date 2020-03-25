@@ -109,7 +109,6 @@ takeBaseName' (LLVMDataFloat16 _) = "half"
 takeBaseName' (LLVMDataFloat32 _) = "float"
 takeBaseName' (LLVMDataFloat64 _) = "double"
 takeBaseName' LLVMDataNull = "null"
-takeBaseName' LLVMDataEmptyArray = "array"
 
 loadContent ::
      DataPlus -- base pointer
