@@ -180,7 +180,7 @@ throwTypeErrors :: WithEnv ()
 throwTypeErrors = do
   q <- gets constraintQueue
   let pcs = sortOn fst $ setupPosInfo $ Q.toList q
-  modify (\env -> env {count = 0})
+  modify (\env -> env {ppCount = 0})
   constructErrors [] pcs >>= throwError
 
 setupPosInfo :: [EnrichedConstraint] -> [(PosInfo, PreConstraint)]
@@ -304,7 +304,7 @@ unravelUpsilon (I (s, i)) = do
   case Map.lookup s nenv of
     Just s' -> return $ I (s', i)
     Nothing -> do
-      j <- newCount
+      j <- newCountPP
       let s' = T.pack $ "var" ++ show j
       modify (\e -> e {nameEnv = Map.insert s s' nenv})
       return $ I (s', i)
@@ -315,7 +315,7 @@ unravelZeta (I (s, i)) = do
   case IntMap.lookup i rnenv of
     Just j -> return $ I (s, j)
     Nothing -> do
-      j <- newCount
+      j <- newCountPP
       modify (\env -> env {revNameEnv = IntMap.insert i j rnenv})
       return $ I (s, j)
 

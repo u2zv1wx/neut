@@ -44,6 +44,7 @@ type TypeEnv = IntMap.IntMap (TermPlus, UnivLevelPlus)
 data Env =
   Env
     { count :: Int
+    , ppCount :: Int -- count used only for pretty printing
     -- parse
     , inputText :: T.Text
     , inputLine :: Int
@@ -95,6 +96,7 @@ initialEnv :: Env
 initialEnv =
   Env
     { count = 0
+    , ppCount = 0
     , inputText = T.empty
     , inputLine = 0
     , inputColumn = 0
@@ -155,6 +157,14 @@ newCount :: WithEnv Int
 newCount = do
   i <- gets count
   modify (\e -> e {count = i + 1})
+  if i + 1 == 0
+    then raiseCritical' "counter exhausted"
+    else return i
+
+newCountPP :: WithEnv Int
+newCountPP = do
+  i <- gets ppCount
+  modify (\e -> e {ppCount = i + 1})
   if i + 1 == 0
     then raiseCritical' "counter exhausted"
     else return i
