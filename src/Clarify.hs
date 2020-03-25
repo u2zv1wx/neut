@@ -101,7 +101,7 @@ clarify (m, TermEnumElim (e, _) bs) = do
   fvss <- mapM (chainTermPlus' tenv) es
   let fvs = nubBy (\(_, x, _) (_, y, _) -> x == y) $ concat fvss
   es' <- mapM clarify es
-  clarifyEnumElim m fvs e $ zip cs es'
+  clarifyEnumElim m fvs e $ zip (map snd cs) es'
 clarify (m, TermArray {}) = do
   returnArrayType m
 clarify (m, TermArrayIntro k es) = do

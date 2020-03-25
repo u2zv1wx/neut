@@ -31,7 +31,7 @@ data Term
   | TermFloat64 Double
   | TermEnum EnumType
   | TermEnumIntro EnumValue
-  | TermEnumElim (TermPlus, TermPlus) [(Case, TermPlus)]
+  | TermEnumElim (TermPlus, TermPlus) [(CasePlus, TermPlus)]
   | TermArray TermPlus ArrayKind -- array n3 u8 ~= n3 -> u8
   | TermArrayIntro ArrayKind [TermPlus]
   | TermArrayElim
@@ -297,6 +297,10 @@ weaken (m, TermCase (e, t) cxtes) = do
           let body' = weaken body
           ((c, xts'), body')
   (m, WeakTermCase (e', t') cxtes')
+
+weakenCase :: CasePlus -> WeakCasePlus
+weakenCase (m, CaseValue v) = (m, weakenEnumValue v)
+weakenCase (m, CaseDefault) = (m, WeakCaseDefault)
 
 weakenArgs ::
      [(Meta, Identifier, TermPlus)] -> [(Meta, Identifier, WeakTermPlus)]

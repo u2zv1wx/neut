@@ -50,7 +50,7 @@ data WeakTerm
   | WeakTermFloat WeakTermPlus Double
   | WeakTermEnum EnumType
   | WeakTermEnumIntro EnumValue
-  | WeakTermEnumElim (WeakTermPlus, WeakTermPlus) [(WeakCase, WeakTermPlus)]
+  | WeakTermEnumElim (WeakTermPlus, WeakTermPlus) [(WeakCasePlus, WeakTermPlus)]
   | WeakTermArray WeakTermPlus ArrayKind -- array n3 u8 ~= n3 -> u8
   | WeakTermArrayIntro ArrayKind [WeakTermPlus]
   | WeakTermArrayElim
@@ -82,6 +82,8 @@ data WeakCase
   | WeakCaseLabel T.Text
   | WeakCaseDefault
   deriving (Show, Eq)
+
+type WeakCasePlus = (Meta, WeakCase)
 
 type SubstWeakTerm = [(Identifier, WeakTermPlus)]
 
@@ -477,7 +479,9 @@ toText (_, WeakTermEnum enumType) =
     EnumTypeIntS size -> "i" <> T.pack (show size)
     EnumTypeIntU size -> "u" <> T.pack (show size)
 toText (_, WeakTermEnumIntro v) = showEnumValue v
-toText (_, WeakTermEnumElim (e, _) les) =
+toText (_, WeakTermEnumElim (e, _) mles) = do
+  let (mls, es) = unzip mles
+  let les = zip (map snd mls) es
   showCons ["case", toText e, showItems (map showClause les)]
 toText (_, WeakTermArray dom k) =
   showCons ["array", toText dom, showArrayKind k]
@@ -529,10 +533,6 @@ weakenEnumValue :: EnumValue -> WeakCase
 weakenEnumValue (EnumValueLabel l) = WeakCaseLabel l
 weakenEnumValue (EnumValueIntS t a) = WeakCaseIntS t a
 weakenEnumValue (EnumValueIntU t a) = WeakCaseIntU t a
-
-weakenCase :: Case -> WeakCase
-weakenCase (CaseValue v) = weakenEnumValue v
-weakenCase CaseDefault = WeakCaseDefault
 
 showEnumValue :: EnumValue -> T.Text
 showEnumValue (EnumValueLabel l) = l

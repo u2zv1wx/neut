@@ -341,17 +341,17 @@ unravelSigma ((mx, x, t):xts) = do
   return $ (mx, x', t') : xts'
 
 unravelCaseList ::
-     [(WeakCase, WeakTermPlus)] -> WithEnv [(WeakCase, WeakTermPlus)]
+     [(WeakCasePlus, WeakTermPlus)] -> WithEnv [(WeakCasePlus, WeakTermPlus)]
 unravelCaseList caseList = do
   let (ls, es) = unzip caseList
   ls' <- mapM unravelWeakCase ls
   es' <- mapM unravel es
   return $ zip ls' es'
 
-unravelWeakCase :: WeakCase -> WithEnv WeakCase
-unravelWeakCase (WeakCaseInt t a) = do
+unravelWeakCase :: WeakCasePlus -> WithEnv WeakCasePlus
+unravelWeakCase (m, WeakCaseInt t a) = do
   t' <- unravel t
-  return $ WeakCaseInt t' a
+  return (m, WeakCaseInt t' a)
 unravelWeakCase l = return l
 
 unravelStruct ::

@@ -384,7 +384,7 @@ elaborate' (m, WeakTermEnumElim (e, t) les) = do
   t' <- reduceTermPlus <$> elaborate' t
   case t' of
     (_, TermEnum x) -> do
-      caseCheckEnumIdentifier m x ls'
+      caseCheckEnumIdentifier m x $ map snd ls'
       return (m, TermEnumElim (e', t') (zip ls' es'))
     _ ->
       raiseError m $
@@ -449,23 +449,26 @@ reduceWeakType t = do
         reduceWeakType (m, WeakTermPiElim lam args)
     _ -> return t'
 
-elaborateWeakCase :: WeakCase -> WithEnv Case
-elaborateWeakCase (WeakCaseInt t x) = do
+elaborateWeakCase :: WeakCasePlus -> WithEnv CasePlus
+elaborateWeakCase (m, WeakCaseInt t x) = do
   t' <- reduceTermPlus <$> elaborate' t
   case t' of
     (_, TermEnum (EnumTypeIntS size)) ->
-      return $ CaseValue (EnumValueIntS size x)
+      return (m, CaseValue (EnumValueIntS size x))
     (_, TermEnum (EnumTypeIntU size)) ->
-      return $ CaseValue (EnumValueIntU size x)
+      return (m, CaseValue (EnumValueIntU size x))
     _ -> do
-      raiseError (fst t) $
+      raiseError m $
         "the type of `" <>
         T.pack (show x) <>
         "` should be an integer type, but is:\n" <> toText (weaken t')
-elaborateWeakCase (WeakCaseLabel l) = return $ CaseValue $ EnumValueLabel l
-elaborateWeakCase (WeakCaseIntS t a) = return $ CaseValue $ EnumValueIntS t a
-elaborateWeakCase (WeakCaseIntU t a) = return $ CaseValue $ EnumValueIntU t a
-elaborateWeakCase WeakCaseDefault = return $ CaseDefault
+elaborateWeakCase (m, WeakCaseLabel l) =
+  return (m, CaseValue $ EnumValueLabel l)
+elaborateWeakCase (m, WeakCaseIntS t a) =
+  return (m, CaseValue $ EnumValueIntS t a)
+elaborateWeakCase (m, WeakCaseIntU t a) =
+  return (m, CaseValue $ EnumValueIntU t a)
+elaborateWeakCase (m, WeakCaseDefault) = return (m, CaseDefault)
 
 elaboratePlus :: (Meta, a, WeakTermPlus) -> WithEnv (Meta, a, TermPlus)
 elaboratePlus (m, x, t) = do

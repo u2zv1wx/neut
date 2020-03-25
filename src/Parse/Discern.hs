@@ -246,7 +246,7 @@ discern'' _ (m, WeakTermEnumIntro x) = return (m, WeakTermEnumIntro x)
 discern'' nenv (m, WeakTermEnumElim (e, t) caseList) = do
   e' <- discern'' nenv e
   t' <- discern'' nenv t
-  caseList' <- discernCaseList m nenv caseList
+  caseList' <- discernCaseList nenv caseList
   return (m, WeakTermEnumElim (e', t') caseList')
 discern'' nenv (m, WeakTermArray dom kind) = do
   dom' <- discern'' nenv dom
@@ -353,15 +353,14 @@ discernIter' nenv xt ((mx, x, t):xts) e = do
   return (xt', (mx, x', t') : xts', e')
 
 discernCaseList ::
-     Meta
-  -> NameEnv
-  -> [(WeakCase, WeakTermPlus)]
-  -> WithEnv [(WeakCase, WeakTermPlus)]
-discernCaseList m nenv caseList =
-  forM caseList $ \(l, body) -> do
-    l' <- discernWeakCase m nenv l
+     NameEnv
+  -> [(WeakCasePlus, WeakTermPlus)]
+  -> WithEnv [(WeakCasePlus, WeakTermPlus)]
+discernCaseList nenv caseList =
+  forM caseList $ \((mCase, l), body) -> do
+    l' <- discernWeakCase mCase nenv l
     body' <- discern'' nenv body
-    return (l', body')
+    return ((mCase, l'), body')
 
 discernWeakCase :: Meta -> NameEnv -> WeakCase -> WithEnv WeakCase
 discernWeakCase _ nenv (WeakCaseInt t a) = do

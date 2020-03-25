@@ -153,6 +153,8 @@ data Case
   | CaseDefault
   deriving (Show, Eq, Ord)
 
+type CasePlus = (Meta, Case)
+
 data LowType
   = LowTypeIntS IntSize
   | LowTypeIntU IntSize

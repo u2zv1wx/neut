@@ -62,12 +62,13 @@ reduceTermPlus (m, TermEnumElim (e, t) les) = do
   let t' = reduceTermPlus t
   let e' = reduceTermPlus e
   let (ls, es) = unzip les
+  let les'' = zip (map snd ls) es
   case e' of
     (_, TermEnumIntro l) ->
-      case lookup (CaseValue l) les of
+      case lookup (CaseValue l) les'' of
         Just body -> reduceTermPlus body
         Nothing ->
-          case lookup CaseDefault les of
+          case lookup CaseDefault les'' of
             Just body -> reduceTermPlus body
             Nothing -> do
               let es' = map reduceTermPlus es

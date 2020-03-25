@@ -244,7 +244,7 @@ infer' ctx (m, WeakTermEnumElim (e, t) ces) = do
       return ((m, WeakTermEnumElim (e', t') []), h, ml) -- ex falso quodlibet
     else do
       let (cs, es) = unzip ces
-      (cs', tcs) <- unzip <$> mapM (inferWeakCase m ctx) cs
+      (cs', tcs) <- unzip <$> mapM (inferWeakCase ctx) cs
       forM_ (zip (repeat t') tcs) $ uncurry insConstraintEnv
       (es', ts, mls) <- unzip3 <$> mapM (infer' ctx) es
       constrainList $ ts
@@ -565,21 +565,20 @@ newTypeHoleListInCtx ctx ((x, m):rest) = do
   ts <- newTypeHoleListInCtx (ctx ++ [((m, x, t), ml)]) rest
   return $ ((m, x, t), ml) : ts
 
--- caseにもmetaの情報がほしいか。それはたしかに？
-inferWeakCase :: Meta -> Context -> WeakCase -> WithEnv (WeakCase, WeakTermPlus)
-inferWeakCase m _ l@(WeakCaseLabel name) = do
+inferWeakCase :: Context -> WeakCasePlus -> WithEnv (WeakCasePlus, WeakTermPlus)
+inferWeakCase _ l@(m, WeakCaseLabel name) = do
   k <- lookupKind m name
   return (l, (m, WeakTermEnum $ EnumTypeLabel k))
-inferWeakCase m _ l@(WeakCaseIntS size _) =
+inferWeakCase _ l@(m, WeakCaseIntS size _) =
   return (l, (m, WeakTermEnum (EnumTypeIntS size)))
-inferWeakCase m _ l@(WeakCaseIntU size _) =
+inferWeakCase _ l@(m, WeakCaseIntU size _) =
   return (l, (m, WeakTermEnum (EnumTypeIntU size)))
-inferWeakCase _ ctx (WeakCaseInt t a) = do
+inferWeakCase ctx (m, WeakCaseInt t a) = do
   (t', _) <- inferType' ctx t
-  return (WeakCaseInt t' a, t')
-inferWeakCase m ctx WeakCaseDefault = do
+  return ((m, WeakCaseInt t' a), t')
+inferWeakCase ctx (m, WeakCaseDefault) = do
   (h, _) <- newTypeHoleInCtx ctx m
-  return (WeakCaseDefault, h)
+  return ((m, WeakCaseDefault), h)
 
 constrainList :: [WeakTermPlus] -> WithEnv ()
 constrainList [] = return ()

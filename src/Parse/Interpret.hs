@@ -375,13 +375,14 @@ interpretBinder xts t = do
   t' <- interpret t
   return (xts', t')
 
-interpretWeakCase :: TreePlus -> WithEnv WeakCase
+interpretWeakCase :: TreePlus -> WithEnv WeakCasePlus
 --
 -- foundational
 --
-interpretWeakCase (_, TreeNode [(_, TreeLeaf "enum-introduction"), l]) = do
-  weakenEnumValue <$> interpretEnumValue l
-interpretWeakCase (_, TreeLeaf "default") = return WeakCaseDefault
+interpretWeakCase (m, TreeNode [(_, TreeLeaf "enum-introduction"), l]) = do
+  v <- weakenEnumValue <$> interpretEnumValue l
+  return (m, v)
+interpretWeakCase (m, TreeLeaf "default") = return (m, WeakCaseDefault)
 --
 -- auxiliary
 --
@@ -389,10 +390,12 @@ interpretWeakCase c
   | (m, TreeLeaf i) <- c
   , Just i' <- readMaybe $ T.unpack i = do
     h <- newHole m
-    return $ WeakCaseInt h i'
-  | otherwise = weakenEnumValue <$> interpretEnumValue c
+    return (m, WeakCaseInt h i')
+  | otherwise = do
+    v <- weakenEnumValue <$> interpretEnumValue c
+    return (fst c, v)
 
-interpretClause :: TreePlus -> WithEnv (WeakCase, WeakTermPlus)
+interpretClause :: TreePlus -> WithEnv (WeakCasePlus, WeakTermPlus)
 interpretClause (_, TreeNode [c, e]) = do
   c' <- interpretWeakCase c
   e' <- interpret e

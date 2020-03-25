@@ -81,13 +81,14 @@ reduceWeakTermPlus (m, WeakTermEnumElim (e, t) les) = do
   let (ls, es) = unzip les
   let es' = map reduceWeakTermPlus es
   let les' = zip ls es'
+  let les'' = zip (map snd ls) es'
   let t' = reduceWeakTermPlus t
   case e' of
     (_, WeakTermEnumIntro l) ->
-      case lookup (weakenEnumValue l) les' of
+      case lookup (weakenEnumValue l) les'' of
         Just body -> reduceWeakTermPlus body
         Nothing ->
-          case lookup WeakCaseDefault les' of
+          case lookup WeakCaseDefault les'' of
             Just body -> reduceWeakTermPlus body
             Nothing -> (m, WeakTermEnumElim (e', t') les')
     _ -> (m, WeakTermEnumElim (e', t') les')
