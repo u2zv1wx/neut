@@ -66,7 +66,6 @@ data Meta =
     { metaFileName :: Path Abs File
     , metaLocation :: Loc
     , metaConstraintLocation :: Loc
-    , metaIsPublic :: Bool
     , metaIsAppropriateAsCompletionCandidate :: Bool
     , metaUnivParams :: UnivParams
     , metaIsExplicit :: Bool
@@ -109,7 +108,7 @@ newMeta l c path = do
     { metaFileName = path
     , metaLocation = (0, l, c)
     , metaConstraintLocation = (0, l, c)
-    , metaIsPublic = True
+    -- , metaIsPublic = True
     , metaIsAppropriateAsCompletionCandidate = True
     , metaUnivParams = IntMap.empty
     , metaIsExplicit = False

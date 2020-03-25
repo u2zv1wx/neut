@@ -285,7 +285,7 @@ elaborate' (m, WeakTermPiElim (_, WeakTermZeta h@(I (_, x))) es) = do
   case IntMap.lookup x sub of
     Nothing -> do
       raiseError m $
-        "couldn't instantiate the hole since no constraints are given on it"
+        "couldn't instantiate the hole here since no constraints are given on it"
     Just (_, WeakTermPiIntro xts e)
       | length xts == length es -> do
         let xs = map (\(_, y, _) -> y) xts

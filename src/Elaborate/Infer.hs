@@ -48,13 +48,6 @@ type Context = [(IdentifierPlus, UnivLevelPlus)]
 -- Interested readers are referred to A. Abel and B. Pientka. "Higher-Order
 -- Dynamic Pattern Unification for Dependent Types and Records". Typed Lambda
 -- Calculi and Applications, 2011.
--- {termはrename済みでclosed} infer' {termはrename済みでclosedで、かつすべてのsubtermが型でannotateされている}
--- infer :: WeakTermPlus -> WithEnv WeakTermPlus
--- infer e = do
---   (e', _, _) <- infer' [] e
---   let vs = varWeakTermPlus e'
---   let info = toInfo "inferred term is not closed. freevars:" vs
---   return $ assertP info e' $ null vs
 infer :: WeakTermPlus -> WithEnv (WeakTermPlus, WeakTermPlus, UnivLevelPlus)
 infer e = infer' [] e
 
@@ -75,16 +68,8 @@ infer' ctx f@(m, WeakTermUpsilon x) = do
   case (metaIsExplicit m, IntMap.lookup (asInt x) ienv) of
     (False, Just is) -> inferImplicit ctx m x f is
     _ -> do
-      mt <- lookupTypeEnv x
-      case mt of
-        Nothing -> do
-          ((_, t), UnivLevelPlus (_, l)) <- lookupWeakTypeEnv m x
-          return ((m, WeakTermUpsilon x), (m, t), UnivLevelPlus (m, l))
-        Just (t, UnivLevelPlus (_, l)) -> do
-          ((_, t'), l') <- univInst (weaken t) l
-          univParams <- gets univRenameEnv
-          let m' = m {metaUnivParams = univParams}
-          return ((m', WeakTermUpsilon x), (m, t'), UnivLevelPlus (m, l'))
+      (m', mt, ml) <- inferSymbol m x
+      return ((m', WeakTermUpsilon x), mt, ml)
 infer' ctx (m, WeakTermPi _ xts t) = do
   mls <- piUnivLevelsfrom xts t
   (xtls', (t', mlPiCod)) <- inferPi ctx xts t
@@ -211,14 +196,8 @@ infer' ctx f@(m, WeakTermConst x@(I (s, _)))
     case IntMap.lookup (asInt x) ienv of
       Just is -> inferImplicit ctx m x f is
       Nothing -> do
-        mt <- lookupTypeEnv x
-        case mt of
-          Nothing -> do
-            (t, UnivLevelPlus (_, l)) <- lookupWeakTypeEnv m x
-            return ((m, WeakTermConst x), t, UnivLevelPlus (m, l))
-          Just (t, UnivLevelPlus (_, l)) -> do
-            ((_, t'), l') <- univInst (weaken t) l
-            return ((m, WeakTermConst x), (m, t'), UnivLevelPlus (m, l'))
+        (m', mt, ml) <- inferSymbol m x
+        return ((m', WeakTermConst x), mt, ml)
 infer' _ (m, WeakTermInt t i) = do
   (t', UnivLevelPlus (_, l)) <- inferType' [] t -- ctx == [] since t' should be i64, i8, etc. (i.e. t must be closed)
   return ((m, WeakTermInt t' i), t', UnivLevelPlus (m, l))
@@ -366,6 +345,19 @@ setupPatArgs m (_:is) xts = do
   x <- newNameWith'' "pat"
   return $ (m, x, h) : xts'
 
+inferSymbol :: Meta -> Identifier -> WithEnv (Meta, WeakTermPlus, UnivLevelPlus)
+inferSymbol m x = do
+  mt <- lookupTypeEnv x
+  case mt of
+    Nothing -> do
+      ((_, t), UnivLevelPlus (_, l)) <- lookupWeakTypeEnv m x
+      return (m, (m, t), UnivLevelPlus (m, l))
+    Just (t, UnivLevelPlus (_, l)) -> do
+      ((_, t'), l') <- univInst (weaken t) l
+      univParams <- gets univRenameEnv
+      let m' = m {metaUnivParams = univParams}
+      return (m', (m, t'), UnivLevelPlus (m, l'))
+
 inferImplicit ::
      Context
   -> Meta
@@ -376,13 +368,17 @@ inferImplicit ::
 inferImplicit ctx m x f is = do
   mt <- lookupTypeEnv x
   case mt of
-    Nothing -> raiseCritical m $ ""
+    Nothing ->
+      raiseCritical m $
+      "the type of `" <>
+      asText x <>
+      "` is supposed to be an implicit type, but its type is not even in the type environment"
     Just (t@(_, TermPi _ _ _), UnivLevelPlus (_, l)) -> do
       ((_, (WeakTermPi mls xts cod)), l') <- univInst (weaken t) l
       univParams <- gets univRenameEnv
       let m' = m {metaUnivParams = univParams}
       let xtis = zip (zip xts mls) [0 ..]
-      let vs = map toVar' xts
+      let vs = map (\(mx, y, _) -> (supMeta m mx, WeakTermUpsilon y)) xts
       let app = (m, WeakTermPiElim f vs)
       (xtis', e', cod') <- inferImplicit' ctx m' is xtis app cod
       let lam = (m', WeakTermPiIntro xtis' e')
@@ -404,12 +400,7 @@ inferImplicit' ::
   -> WithEnv ([IdentifierPlus], WeakTermPlus, WeakTermPlus)
 inferImplicit' _ _ _ [] e cod = return ([], e, cod)
 inferImplicit' ctx m is ((c@((_, x, t), mlx), i):xtis) e cod
-  | i `elem` is
-    -- p "inferImplicit:"
-    -- p $ showMeta' m
-    -- p "mx:"
-    -- p $ showMeta' mx
-   = do
+  | i `elem` is = do
     (app, higherApp, ml) <- newHoleInCtx ctx m
     insConstraintEnv higherApp t
     insLevelEQ mlx ml
@@ -537,8 +528,7 @@ newHoleInCtx ::
      Context -> Meta -> WithEnv (WeakTermPlus, WeakTermPlus, UnivLevelPlus)
 newHoleInCtx ctx m = do
   higherHole <- newHole m
-  -- let varSeq = map (\((_, x, _), _) -> toVar x) ctx
-  let varSeq = map (\((mx, x, _), _) -> (mx, WeakTermUpsilon x)) ctx
+  let varSeq = map (\((_, x, _), _) -> (m, WeakTermUpsilon x)) ctx
   let higherApp = (m, WeakTermPiElim higherHole varSeq)
   hole <- newHole m
   let app = (m, WeakTermPiElim hole varSeq)
@@ -550,7 +540,7 @@ newHoleInCtx ctx m = do
 -- and return ?M @ (x1, ..., xn) : Univ{i}.
 newTypeHoleInCtx :: Context -> Meta -> WithEnv (WeakTermPlus, UnivLevelPlus)
 newTypeHoleInCtx ctx m = do
-  let varSeq = map (\((mx, x, _), _) -> (mx, WeakTermUpsilon x)) ctx
+  let varSeq = map (\((_, x, _), _) -> (m, WeakTermUpsilon x)) ctx
   hole <- newHole m
   l <- newCount
   return ((m, WeakTermPiElim hole varSeq), UnivLevelPlus (m, l))
@@ -845,9 +835,6 @@ arrayAccessToWeakType m lowType = do
   let cod = (m, WeakTermSigma [(m, x4, arr), (m, x5, t)])
   mls <- piUnivLevelsfrom xts cod
   return (m, WeakTermPi mls xts cod)
-
-toVar' :: IdentifierPlus -> WeakTermPlus
-toVar' (m, x, _) = (m, WeakTermUpsilon x)
 
 substWeakTermPlus''' ::
      SubstWeakTerm
