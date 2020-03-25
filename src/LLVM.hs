@@ -420,8 +420,7 @@ storeContent m reg aggPtrType dts cont = do
   --   http://nondot.org/sabre/LLVMNotes/SizeOf-OffsetOf-VariableSizedStructs.txt
   case aggPtrType of
     AggPtrTypeStruct ts ->
-      storeContent'' reg voidPtr (length ts) castThenStoreThenCont
-      -- storeContent'' reg LowTypeIntS64Ptr (length ts) castThenStoreThenCont
+      storeContent'' reg (LowTypeStruct ts) 1 castThenStoreThenCont
     AggPtrTypeArray len t -> storeContent'' reg t len castThenStoreThenCont
 
 storeContent' ::
@@ -443,7 +442,6 @@ storeContent' bp bt ((i, (d, et)):ids) cont = do
     LLVMCont (LLVMOpStore et cast loc) cont'
 
 storeContent'' :: Identifier -> LowType -> Int -> LLVM -> WithEnv LLVM
--- storeContent'' reg elemPtrType len cont = do
 storeContent'' reg elemType len cont = do
   (c, cVar) <- newDataLocal $ "sizeof-" <> asText reg
   (i, iVar) <- newDataLocal $ "sizeof-" <> asText reg

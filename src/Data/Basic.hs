@@ -162,6 +162,7 @@ data LowType
   | LowTypeVoid -- to represent the cod of free
   | LowTypeVoidPtr
   | LowTypeFunctionPtr [LowType] LowType
+  | LowTypeStruct [LowType] -- to calculate the size
   | LowTypeStructPtr [LowType]
   | LowTypeArray LowType -- [0 x LOWTYPE]
   | LowTypeArrayPtr Int LowType -- [n x LOWTYPE]*
