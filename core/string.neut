@@ -11,9 +11,6 @@
 
 (use os)
 
-(definition identity:bind ([a tau] [b tau] (x a) (f (hom a b)))
-  (f x))
-
 (definition print-string ((str string))
   (destruct str (n content)
     (let len (write stdout &content 3))
