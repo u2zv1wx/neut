@@ -154,10 +154,10 @@ emitLLVMOp (LLVMOpStore t d1 d2) = do
       , showLowTypeAsIfPtr t
       , showLLVMData d2
       ]
-emitLLVMOp (LLVMOpAlloc d) = do
+emitLLVMOp (LLVMOpAlloc d _) = do
   return $
     unwordsL ["call fastcc", "i8*", "@malloc(i64 " <> showLLVMData d <> ")"]
-emitLLVMOp (LLVMOpFree d) = do
+emitLLVMOp (LLVMOpFree d _) = do
   return $
     unwordsL ["call fastcc", "void", "@free(i8* " <> showLLVMData d <> ")"]
 emitLLVMOp (LLVMOpSysCall num ds) = do

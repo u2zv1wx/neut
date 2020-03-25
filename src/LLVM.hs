@@ -420,9 +420,9 @@ storeContent m reg aggPtrType dts cont = do
   --   http://nondot.org/sabre/LLVMNotes/SizeOf-OffsetOf-VariableSizedStructs.txt
   case aggPtrType of
     AggPtrTypeStruct ts ->
-      storeContent'' reg LowTypeIntS64Ptr (length ts) castThenStoreThenCont
-    AggPtrTypeArray len t ->
-      storeContent'' reg (LowTypePtr t) len castThenStoreThenCont
+      storeContent'' reg voidPtr (length ts) castThenStoreThenCont
+      -- storeContent'' reg LowTypeIntS64Ptr (length ts) castThenStoreThenCont
+    AggPtrTypeArray len t -> storeContent'' reg t len castThenStoreThenCont
 
 storeContent' ::
      LLVMData -- base pointer
@@ -443,17 +443,19 @@ storeContent' bp bt ((i, (d, et)):ids) cont = do
     LLVMCont (LLVMOpStore et cast loc) cont'
 
 storeContent'' :: Identifier -> LowType -> Int -> LLVM -> WithEnv LLVM
-storeContent'' reg elemPtrType size cont = do
+-- storeContent'' reg elemPtrType len cont = do
+storeContent'' reg elemType len cont = do
   (c, cVar) <- newDataLocal $ "sizeof-" <> asText reg
   (i, iVar) <- newDataLocal $ "sizeof-" <> asText reg
+  let sizeInfo = (elemType, len)
   return $
     LLVMLet
       c
       (LLVMOpGetElementPtr
-         (LLVMDataNull, elemPtrType)
-         [(LLVMDataInt (toInteger size), i64)]) $
-    LLVMLet i (LLVMOpPointerToInt cVar elemPtrType (LowTypeIntS 64)) $
-    LLVMLet reg (LLVMOpAlloc iVar) cont
+         (LLVMDataNull, LowTypePtr elemType)
+         [(LLVMDataInt (toInteger len), i64)]) $
+    LLVMLet i (LLVMOpPointerToInt cVar (LowTypePtr elemType) (LowTypeIntS 64)) $
+    LLVMLet reg (LLVMOpAlloc iVar sizeInfo) cont
 
 indexTypeOf :: LowType -> LowType
 indexTypeOf (LowTypeStructPtr _) = LowTypeIntS 32
@@ -613,9 +615,9 @@ renameLLVMOp nenv (LLVMOpStore t d1 d2) = do
   d1' <- renameLLVMData nenv d1
   d2' <- renameLLVMData nenv d2
   return $ LLVMOpStore t d1' d2'
-renameLLVMOp nenv (LLVMOpAlloc d) = do
+renameLLVMOp nenv (LLVMOpAlloc d sizeInfo) = do
   d' <- renameLLVMData nenv d
-  return $ LLVMOpAlloc d'
+  return $ LLVMOpAlloc d' sizeInfo
 renameLLVMOp nenv (LLVMOpFree d sizeInfo) = do
   d' <- renameLLVMData nenv d
   return $ LLVMOpFree d' sizeInfo

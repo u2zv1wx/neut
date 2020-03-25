@@ -39,7 +39,7 @@ data LLVMOp
   | LLVMOpPointerToInt LLVMData LowType LowType
   | LLVMOpLoad LLVMData LowType
   | LLVMOpStore LowType LLVMData LLVMData
-  | LLVMOpAlloc LLVMData -- size
+  | LLVMOpAlloc LLVMData SizeInfo
   | LLVMOpFree LLVMData SizeInfo
   | LLVMOpUnaryOp UnaryOp LLVMData
   | LLVMOpBinaryOp BinaryOp LLVMData LLVMData
@@ -147,9 +147,9 @@ substLLVMOp sub (LLVMOpStore t d1 d2) = do
   let d1' = substLLVMData sub d1
   let d2' = substLLVMData sub d2
   LLVMOpStore t d1' d2'
-substLLVMOp sub (LLVMOpAlloc d) = do
+substLLVMOp sub (LLVMOpAlloc d sizeInfo) = do
   let d' = substLLVMData sub d
-  LLVMOpAlloc d'
+  LLVMOpAlloc d' sizeInfo
 substLLVMOp sub (LLVMOpFree d sizeInfo) = do
   let d' = substLLVMData sub d
   LLVMOpFree d' sizeInfo
