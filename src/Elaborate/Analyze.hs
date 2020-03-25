@@ -41,37 +41,52 @@ simp' (((_, e1), (_, e2)):cs)
 simp' (((m1, WeakTermTau l1), (m2, WeakTermTau l2)):cs) = do
   insLevelEQ (UnivLevelPlus (m1, l1)) (UnivLevelPlus (m2, l2))
   simp cs
-simp' (((_, WeakTermPi mls1 xts1 cod1), (_, WeakTermPi mls2 xts2 cod2)):cs)
+simp' (((m1, WeakTermPi mls1 xts1 cod1), (m2, WeakTermPi mls2 xts2 cod2)):cs)
   | length xts1 == length xts2 = do
     let us1 = map asUniv mls1
     let us2 = map asUniv mls2
-    simpBinder xts1 xts2 (Just (cod1, cod2)) $ zip us1 us2 ++ cs
-simp' (((_, WeakTermPiPlus name1 mls1 xts1 cod1), (_, WeakTermPiPlus name2 mls2 xts2 cod2)):cs)
+    xt1 <- asIdentPlus m1 cod1
+    xt2 <- asIdentPlus m2 cod2
+    simpBinder (xts1 ++ [xt1]) (xts2 ++ [xt2])
+    simp $ zip us1 us2 ++ cs
+simp' (((m1, WeakTermPiPlus name1 mls1 xts1 cod1), (m2, WeakTermPiPlus name2 mls2 xts2 cod2)):cs)
   | name1 == name2
   , length xts1 == length xts2 = do
     let us1 = map asUniv mls1
     let us2 = map asUniv mls2
-    simpBinder xts1 xts2 (Just (cod1, cod2)) $ zip us1 us2 ++ cs
-simp' (((_, WeakTermPiIntro xts1 e1), (_, WeakTermPiIntro xts2 e2)):cs)
-  | length xts1 == length xts2 = simpBinder xts1 xts2 (Just (e1, e2)) cs
+    xt1 <- asIdentPlus m1 cod1
+    xt2 <- asIdentPlus m2 cod2
+    simpBinder (xts1 ++ [xt1]) (xts2 ++ [xt2])
+    simp $ zip us1 us2 ++ cs
+simp' (((m1, WeakTermPiIntro xts1 e1), (m2, WeakTermPiIntro xts2 e2)):cs)
+  | length xts1 == length xts2 = do
+    xt1 <- asIdentPlus m1 e1
+    xt2 <- asIdentPlus m2 e2
+    simpBinder (xts1 ++ [xt1]) (xts2 ++ [xt2])
+    simp cs
 simp' (((m1, WeakTermPiIntroPlus ind1 (name1, args1) xts1 e1), (m2, WeakTermPiIntroPlus ind2 (name2, args2) xts2 e2)):cs)
   | ind1 == ind2
   , name1 == name2
   , length args1 == length args2 = do
-    simpBinder args1 args2 Nothing []
-    simp' $ ((m1, WeakTermPiIntro xts1 e1), (m2, WeakTermPiIntro xts2 e2)) : cs
+    simpBinder args1 args2
+    simp $ ((m1, WeakTermPiIntro xts1 e1), (m2, WeakTermPiIntro xts2 e2)) : cs
 simp' (((_, WeakTermPiIntro xts body1@(m1, _)), e2@(_, _)):cs) = do
   let vs = map (\(m, x, _) -> (m, WeakTermUpsilon x)) xts
   simp $ (body1, (m1, WeakTermPiElim e2 vs)) : cs
 simp' ((e1, e2@(_, WeakTermPiIntro {})):cs) = simp' $ (e2, e1) : cs
 simp' (((_, WeakTermSigma xts1), (_, WeakTermSigma xts2)):cs)
-  | length xts1 == length xts2 = simpBinder xts1 xts2 Nothing cs
+  | length xts1 == length xts2 = do
+    simpBinder xts1 xts2
+    simp cs
 simp' (((_, WeakTermSigmaIntro t1 es1), (_, WeakTermSigmaIntro t2 es2)):cs)
   | length es1 == length es2 = simp $ (t1, t2) : zip es1 es2 ++ cs
-simp' (((_, WeakTermIter xt1@(_, x1, _) xts1 e1), (_, WeakTermIter xt2@(_, x2, _) xts2 e2)):cs)
+simp' (((m1, WeakTermIter xt1@(_, x1, _) xts1 e1), (m2, WeakTermIter xt2@(_, x2, _) xts2 e2)):cs)
   | x1 == x2
-  , length xts1 == length xts2 =
-    simpBinder (xt1 : xts1) (xt2 : xts2) (Just (e1, e2)) cs
+  , length xts1 == length xts2 = do
+    yt1 <- asIdentPlus m1 e1
+    yt2 <- asIdentPlus m2 e2
+    simpBinder (xt1 : xts1 ++ [yt1]) (xt2 : xts2 ++ [yt2])
+    simp cs
 simp' (((_, WeakTermInt t1 l1), (m, WeakTermEnumIntro (EnumValueIntS s2 l2))):cs)
   | l1 == l2 = simp $ (t1, toIntS m s2) : cs
 simp' (((m, WeakTermEnumIntro (EnumValueIntS s1 l1)), (_, WeakTermInt t2 l2)):cs)
@@ -261,25 +276,13 @@ simp' ((e1, e2):cs) = do
             simpFlexRigid h2 ies2 e2' e1' fmvs cs
         _ -> simpOther e1 e2 fmvs cs
 
-simpBinder ::
-     [IdentifierPlus]
-  -> [IdentifierPlus]
-  -> Maybe (WeakTermPlus, WeakTermPlus)
-  -> [(WeakTermPlus, WeakTermPlus)]
-  -> WithEnv ()
-simpBinder [] [] Nothing cs = simp cs
-simpBinder [] [] (Just (cod1, cod2)) cs = simp $ (cod1, cod2) : cs
-simpBinder ((m1, x1, t1):xts1) ((m2, x2, t2):xts2) Nothing cs = do
+simpBinder :: [IdentifierPlus] -> [IdentifierPlus] -> WithEnv ()
+simpBinder ((m1, x1, t1):xts1) ((m2, x2, t2):xts2) = do
   let var1 = (supMeta m1 m2, WeakTermUpsilon x1)
   let xts2' = substWeakTermPlus' [(x2, var1)] xts2
   simp [(t1, t2)]
-  simpBinder xts1 xts2' Nothing cs
-simpBinder ((m1, x1, t1):xts1) ((m2, x2, t2):xts2) (Just (cod1, cod2)) cs = do
-  let var1 = (supMeta m1 m2, WeakTermUpsilon x1)
-  let (xts2', cod2') = substWeakTermPlus'' [(x2, var1)] xts2 cod2
-  simp [(t1, t2)]
-  simpBinder xts1 xts2' (Just (cod1, cod2')) cs
-simpBinder _ _ _ _ = raiseCritical' "Simpbinder"
+  simpBinder xts1 xts2'
+simpBinder _ _ = return ()
 
 simpPattern ::
      Identifier
@@ -332,6 +335,11 @@ simpUnivParams umap1 umap2 = do
   let vs2 = IntMap.elems umap2
   forM_ (zip vs1 vs2) $ \(l1, l2) ->
     modify (\env -> env {equalityEnv = (l1, l2) : equalityEnv env})
+
+asIdentPlus :: Meta -> WeakTermPlus -> WithEnv IdentifierPlus
+asIdentPlus m t = do
+  h <- newNameWith' "hole"
+  return (m, h, t)
 
 data Stuck
   = StuckPiElimUpsilon (Identifier, Meta) [[WeakTermPlus]]
