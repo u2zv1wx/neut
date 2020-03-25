@@ -498,8 +498,7 @@ toHeaderInfo m x t ArgArray = do
                     , CodeUpIntro
                         ( m
                         , DataSigmaIntro arrVoidPtr [arrayType, arrayInnerTmp]))
-                    cont -- contの中でarrayInnerTmpを使用することで配列を利用
-                 ))))
+                    cont))))
 
 computeHeader ::
      Meta
