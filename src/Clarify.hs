@@ -526,9 +526,6 @@ toSysCallTail ::
   -> WithEnv CodePlus
 toSysCallTail m cod syscall args xs = do
   resultVarName <- newNameWith' "result"
-  p "toSysCallTail."
-  p "cod:"
-  p' cod
   result <- retWithBorrowedVars m cod xs resultVarName
   return
     ( m
