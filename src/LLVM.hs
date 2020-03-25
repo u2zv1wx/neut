@@ -417,8 +417,8 @@ storeContent m reg aggPtrType dts cont = do
   case aggPtrType of
     AggPtrTypeStruct ts ->
       storeContent'' reg LowTypeIntS64Ptr (length ts) castThenStoreThenCont
-    AggPtrTypeArray size t ->
-      storeContent'' reg (LowTypePtr t) size castThenStoreThenCont
+    AggPtrTypeArray len t ->
+      storeContent'' reg (LowTypePtr t) len castThenStoreThenCont
 
 storeContent' ::
      LLVMData -- base pointer
@@ -439,16 +439,16 @@ storeContent' bp bt ((i, (d, et)):ids) cont = do
     LLVMCont (LLVMOpStore et cast loc) cont'
 
 storeContent'' :: Identifier -> LowType -> Int -> LLVM -> WithEnv LLVM
-storeContent'' reg elemType size cont = do
+storeContent'' reg elemPtrType size cont = do
   (c, cVar) <- newDataLocal $ "sizeof-" <> asText reg
   (i, iVar) <- newDataLocal $ "sizeof-" <> asText reg
   return $
     LLVMLet
       c
       (LLVMOpGetElementPtr
-         (LLVMDataNull, elemType)
+         (LLVMDataNull, elemPtrType)
          [(LLVMDataInt (toInteger size), i64)]) $
-    LLVMLet i (LLVMOpPointerToInt cVar elemType (LowTypeIntS 64)) $
+    LLVMLet i (LLVMOpPointerToInt cVar elemPtrType (LowTypeIntS 64)) $
     LLVMLet reg (LLVMOpAlloc iVar) cont
 
 indexTypeOf :: LowType -> LowType
