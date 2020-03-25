@@ -1,0 +1,2 @@
+;; test2 for cyclic inclusion
+;; (include "new.neut")

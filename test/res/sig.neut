@@ -1,0 +1,19 @@
+(include "notation.neut")
+
+(include "top.neut")
+
+(enum choice left right)
+
+(definition nat-inner ()
+  (sigma
+    ((p choice))
+    (enum-elimination p
+      (left top)
+      (right (nat-inner)))))
+
+;; (let (local-nat tau) (nat-inner))
+
+(let (foo (nat-inner))
+  (sigma-introduction left unit))
+
+unit

@@ -1,0 +1,57 @@
+(include "top.neut")
+
+(inductive list ((A tau))
+  (list.nil () (list A))
+  (list.cons ((_ A) (_ (list A))) (list A)))
+
+(inductive LIST ((A tau))
+  (LIST.nil () (LIST A))
+  (LIST.cons ((_ A) (_ (LIST A))) (LIST A)))
+
+(inductive TEST ((A tau))
+  (TEST.nil () (TEST A))
+  (TEST.cons ((_ A) (_ (TEST A))) (TEST A)))
+
+;; (inductive mylist ((A tau) (B tau))
+;;   (mylist.nil () (mylist A B))
+;;   (mylist.cons ((_ A) (_ (mylist A B))) (mylist A B)))
+
+
+;; 量化された引数の部分はpiで包まないといけない（でないと全体で共有されてしまうので固定になる）
+;; ;; つまり、inductiveの引数は「そこを固定して」ってことなんだな。
+;; (inductive vec ((A tau) (n (nat)))
+;;   (vec.nil () (vec A (nat.zero)))
+;;   (vec.cons ((m (nat)) (_ A) (_ (vec A m))) (vec A (nat.succ m))))
+
+;; こっちはwell-typed
+;; (inductive my-vec ((A tau) (n (nat)))
+;;   (vec-zero () (my-vec A (zero))))
+
+;; (inductive my-vec ((A tau) (n (nat)))
+;;   (vec-cons ((_ A) (_ (my-vec A n))) (my-vec A (succ n))))
+
+;; (i64.add 100 (vec.cons i64 (nat.zero) (nat.zero) 10 (vec.nil i64 (nat.zero))))
+
+;; こんな感じでvecも使える。
+;; あれ？ここは型エラーになるべきでは？
+;; いや、vecのこの引数のほうは「どうでもいいやつ」だから関係ない。いわばパラメータの部分なので。
+;; このときはaの型はちゃんとvec i64 (nat.zero)になってる。
+;; (let a (vec.nil i64 (nat.succ (nat.zero))))
+
+
+(inductive item ((A tau))
+  (item.intro () (item A))
+  ;; (item.cont0 ((_ (item A)) (_ (list (list (item A))))) (item A))
+
+  (item.cont0 ((_ (item A)) (_ (LIST (TEST (list (item A)))))) (item A))
+  ;; (item.cont1 ((_ (item A)) (_ (list (item A)))) (item A))
+  ;; (item.cont5 ((_ (item A)) (_ (LIST (list (item A))))) (item A))
+  ;; (item.cont6 ((_ (item A)) (_ (TEST (list (item A))))) (item A))
+  (item.cont7 ((_ (item A)) (_ (LIST (TEST (item A))))) (item A))
+  ;; (item.cont10 ((_ (item A)) (_ (list (TEST (item A))))) (item A))
+;; (item.cont0 ((_ (item A)) (_ (LIST (LIST (item A))))) (item A))
+  ;; (item.cont1 ((_ (item A)) (_ (list (list (item A))))) (item A))
+  ;; (item.cont1 ((_ (item A)) (_ (list (list (item A))))) (item A))
+  (item.cont2 ((_ A) (_ (item A))) (item A)))
+
+unit

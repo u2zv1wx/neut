@@ -1,0 +1,4 @@
+(definition some-function ([a tau] (xs (list a)))
+  (case xs
+    ((list:nil _) true)
+    ((list:cons _ _ _) false)))

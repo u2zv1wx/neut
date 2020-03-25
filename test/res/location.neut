@@ -1,0 +1,28 @@
+;; エラー報告位置の話。
+
+(no-implicit-core)
+
+(inductive item ((a tau))
+  (make () (item a)))
+
+;; (include library "core/foundation.neut")
+
+;; (definition id ((a tau) (x a)) x)
+
+;; (@id (pi ((a tau) (x a)) a) id)
+
+;; (inductive list ((a tau))
+;;   (nil () (list a))
+;;   (cons ((x a) (xs (list a))) (list a)))
+;; (item:make)
+
+
+;; (enum top unit)
+
+;; (item:make 1000)
+;; (item:make top)
+
+;; (list:cons 1000 (list:nil))
+
+;; (let item
+;;   (list:cons 25 (list:cons 100 (list:cons 1000 (list:nil)))))

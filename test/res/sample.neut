@@ -1,0 +1,12 @@
+(include "../../core/core.neut")
+
+(let xs (list:cons i64 10 (list:cons i64 100 (list:cons i64 1000 (list:nil i64)))))
+
+(let ys (list:nil i64))
+
+(let foo
+  (case xs
+    ((list:nil C) (i64 10))
+    ((list:cons A value _) value)))
+
+(exit u64 foo)

@@ -1,0 +1,44 @@
+(include "notation.neut")
+
+(include "top.neut")
+
+(constant file-descriptor type)
+
+(constant stdout file-descriptor)
+
+;; (mode choice left right)
+
+;; (enum bottom)
+
+(constant write
+  (pi
+    ((A type)
+     (out file-descriptor)
+     (str (array A u8))
+     (len i64))
+    (product (array A u8) i64)))
+
+(definition string
+  (sigma
+    ((A type) (_ i64))
+    (array A u8)))
+
+(let (hello string)
+  (sigma-introduction n18 18 "hello, \" \\\nworld!\n"))
+
+(definition write-string ((str string))
+  (sigma-elimination
+    ((n type) (len i64) (content (array n u8)))
+    str
+    (begin
+      (write n stdout content len)
+      unit)))
+
+;; こう書くとhelloが2回作られて2回freeされる
+(write-string hello)
+;; (write-string hello)
+;; write-stringで直前のhelloをそのまま返すようにできると同じものが使えそう
+;; そしてそれを(write-string &hello)みたいに書けるようにすると、まあ、神なわけですね。
+
+
+unit

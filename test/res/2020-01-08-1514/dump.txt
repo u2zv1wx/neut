@@ -1,0 +1,540 @@
+( _
+, TermConstDecl
+    ( "is-enum"
+    , ( _
+      , TermPi
+          [ ( "hole-explicit-0-103" , ( _ , TermTau ) ) ] ( _ , TermTau )
+      )
+    )
+    ( _
+    , TermConstDecl
+        ( "enum.top"
+        , ( _
+          , TermPiElim
+              ( _ , TermConst "is-enum" )
+              [ ( _ , TermEnum (EnumTypeLabel "top") ) ]
+          )
+        )
+        ( _
+        , TermConstDecl
+            ( "enum.bottom"
+            , ( _
+              , TermPiElim
+                  ( _ , TermConst "is-enum" )
+                  [ ( _ , TermEnum (EnumTypeLabel "bottom") ) ]
+              )
+            )
+            ( _
+            , TermConstDecl
+                ( "file-descriptor" , ( _ , TermTau ) )
+                ( _
+                , TermConstDecl
+                    ( "stdin" , ( _ , TermConst "file-descriptor" ) )
+                    ( _
+                    , TermConstDecl
+                        ( "stdout" , ( _ , TermConst "file-descriptor" ) )
+                        ( _
+                        , TermConstDecl
+                            ( "stderr" , ( _ , TermConst "file-descriptor" ) )
+                            ( _
+                            , TermConstDecl
+                                ( "write"
+                                , ( _
+                                  , TermPi
+                                      [ ( "A-104" , ( _ , TermTau ) )
+                                      , ( "out-105" , ( _ , TermConst "file-descriptor" ) )
+                                      , ( "str-106"
+                                        , ( _
+                                          , TermArray (ArrayKindIntU 8) ( _ , TermUpsilon "A-104" )
+                                          )
+                                        )
+                                      , ( "len-107"
+                                        , ( _
+                                          , TermPiElim
+                                              ( _ , TermConst "is-enum" )
+                                              [ ( _ , TermUpsilon "A-104" ) ]
+                                          )
+                                        )
+                                      ]
+                                      ( _ , TermEnum (EnumTypeLabel "top") )
+                                  )
+                                )
+                                ( _
+                                , TermConstDecl
+                                    ( "i64.add"
+                                    , ( _
+                                      , TermPi
+                                          [ ( "hole-explicit-1-108" , ( _ , TermConst "i64" ) )
+                                          , ( "hole-explicit-2-109" , ( _ , TermConst "i64" ) )
+                                          ]
+                                          ( _ , TermConst "i64" )
+                                      )
+                                    )
+                                    ( _
+                                    , TermConstDecl
+                                        ( "enum.choice"
+                                        , ( _
+                                          , TermPiElim
+                                              ( _ , TermConst "is-enum" )
+                                              [ ( _ , TermEnum (EnumTypeLabel "choice") ) ]
+                                          )
+                                        )
+                                        ( _
+                                        , TermConstDecl
+                                            ( "enum.three"
+                                            , ( _
+                                              , TermPiElim
+                                                  ( _ , TermConst "is-enum" )
+                                                  [ ( _ , TermEnum (EnumTypeLabel "three") ) ]
+                                              )
+                                            )
+                                            ( _
+                                            , TermConstDecl
+                                                ( "admit-explicit"
+                                                , ( _
+                                                  , TermPi
+                                                      [ ( "A-132" , ( _ , TermTau ) ) ]
+                                                      ( _ , TermUpsilon "A-132" )
+                                                  )
+                                                )
+                                                ( _
+                                                , TermPiElim
+                                                    ( _
+                                                    , TermPiIntro
+                                                        [ ( "hole-parse-last-34-136"
+                                                          , ( _ , TermEnum (EnumTypeLabel "top") )
+                                                          )
+                                                        ]
+                                                        ( _
+                                                        , TermPiElim
+                                                            ( _
+                                                            , TermPiIntro
+                                                                [ ( "hole-parse-last-36-137"
+                                                                  , ( _
+                                                                    , TermEnum (EnumTypeLabel "top")
+                                                                    )
+                                                                  )
+                                                                ]
+                                                                ( _
+                                                                , TermPiElim
+                                                                    ( _
+                                                                    , TermPiIntro
+                                                                        [ ( "hole-parse-last-38-138"
+                                                                          , ( _
+                                                                            , TermEnum
+                                                                                (EnumTypeLabel
+                                                                                   "top")
+                                                                            )
+                                                                          )
+                                                                        ]
+                                                                        ( _
+                                                                        , TermConstDecl
+                                                                            ( "enum.nat-enum"
+                                                                            , ( _
+                                                                              , TermPiElim
+                                                                                  ( _
+                                                                                  , TermConst
+                                                                                      "is-enum"
+                                                                                  )
+                                                                                  [ ( _
+                                                                                    , TermEnum
+                                                                                        (EnumTypeLabel
+                                                                                           "nat-enum")
+                                                                                    )
+                                                                                  ]
+                                                                              )
+                                                                            )
+                                                                            ( _
+                                                                            , TermPiElim
+                                                                                ( _
+                                                                                , TermPiIntro
+                                                                                    [ ( "nat-inner-143"
+                                                                                      , ( _
+                                                                                        , TermPi
+                                                                                            []
+                                                                                            ( _
+                                                                                            , TermTau
+                                                                                            )
+                                                                                        )
+                                                                                      )
+                                                                                    ]
+                                                                                    ( _
+                                                                                    , TermPiElim
+                                                                                        ( _
+                                                                                        , TermPiIntro
+                                                                                            [ ( "nat-144"
+                                                                                              , ( _
+                                                                                                , TermTau
+                                                                                                )
+                                                                                              )
+                                                                                            ]
+                                                                                            ( _
+                                                                                            , TermIntS
+                                                                                                64
+                                                                                                23
+                                                                                            )
+                                                                                        )
+                                                                                        [ ( _
+                                                                                          , TermPiElim
+                                                                                              ( _
+                                                                                              , TermUpsilon
+                                                                                                  "nat-inner-143"
+                                                                                              )
+                                                                                              []
+                                                                                          )
+                                                                                        ]
+                                                                                    )
+                                                                                )
+                                                                                [ ( _
+                                                                                  , TermMu
+                                                                                      ( "nat-inner-205"
+                                                                                      , ( _
+                                                                                        , TermPi
+                                                                                            []
+                                                                                            ( _
+                                                                                            , TermTau
+                                                                                            )
+                                                                                        )
+                                                                                      )
+                                                                                      ( _
+                                                                                      , TermPiIntro
+                                                                                          []
+                                                                                          ( _
+                                                                                          , TermPiElim
+                                                                                              ( _
+                                                                                              , TermPiIntro
+                                                                                                  [ ( "A-207"
+                                                                                                    , ( _
+                                                                                                      , TermTau
+                                                                                                      )
+                                                                                                    )
+                                                                                                  , ( "B-208"
+                                                                                                    , ( _
+                                                                                                      , TermTau
+                                                                                                      )
+                                                                                                    )
+                                                                                                  ]
+                                                                                                  ( _
+                                                                                                  , TermPi
+                                                                                                      [ ( "c-209"
+                                                                                                        , ( _
+                                                                                                          , TermTau
+                                                                                                          )
+                                                                                                        )
+                                                                                                      , ( "hole-explicit-41-212"
+                                                                                                        , ( _
+                                                                                                          , TermPi
+                                                                                                              [ ( "x-210"
+                                                                                                                , ( _
+                                                                                                                  , TermEnum
+                                                                                                                      (EnumTypeLabel
+                                                                                                                         "choice")
+                                                                                                                  )
+                                                                                                                )
+                                                                                                              , ( "hole-explicit-42-211"
+                                                                                                                , ( _
+                                                                                                                  , TermEnumElim
+                                                                                                                      ( _
+                                                                                                                      , TermUpsilon
+                                                                                                                          "x-210"
+                                                                                                                      )
+                                                                                                                      [ ( CaseValue
+                                                                                                                            (EnumValueLabel
+                                                                                                                               "left")
+                                                                                                                        , ( _
+                                                                                                                          , TermUpsilon
+                                                                                                                              "A-207"
+                                                                                                                          )
+                                                                                                                        )
+                                                                                                                      , ( CaseValue
+                                                                                                                            (EnumValueLabel
+                                                                                                                               "right")
+                                                                                                                        , ( _
+                                                                                                                          , TermUpsilon
+                                                                                                                              "B-208"
+                                                                                                                          )
+                                                                                                                        )
+                                                                                                                      ]
+                                                                                                                  )
+                                                                                                                )
+                                                                                                              ]
+                                                                                                              ( _
+                                                                                                              , TermUpsilon
+                                                                                                                  "c-209"
+                                                                                                              )
+                                                                                                          )
+                                                                                                        )
+                                                                                                      ]
+                                                                                                      ( _
+                                                                                                      , TermUpsilon
+                                                                                                          "c-209"
+                                                                                                      )
+                                                                                                  )
+                                                                                              )
+                                                                                              [ ( _
+                                                                                                , TermEnum
+                                                                                                    (EnumTypeLabel
+                                                                                                       "top")
+                                                                                                )
+                                                                                              , ( _
+                                                                                                , TermPiElim
+                                                                                                    ( _
+                                                                                                    , TermUpsilon
+                                                                                                        "nat-inner-205"
+                                                                                                    )
+                                                                                                    []
+                                                                                                )
+                                                                                              ]
+                                                                                          )
+                                                                                      )
+                                                                                  )
+                                                                                ]
+                                                                            )
+                                                                        )
+                                                                    )
+                                                                    [ ( _
+                                                                      , TermPiElim
+                                                                          ( _ , TermConst "write" )
+                                                                          [ ( _
+                                                                            , TermEnum
+                                                                                (EnumTypeNatNum 15)
+                                                                            )
+                                                                          , ( _
+                                                                            , TermConst "stdout"
+                                                                            )
+                                                                          , ( _
+                                                                            , TermArrayIntro
+                                                                                (ArrayKindIntU 8)
+                                                                                [ ( EnumValueNatNum
+                                                                                      15 0
+                                                                                  , ( _
+                                                                                    , TermIntU 8 227
+                                                                                    )
+                                                                                  )
+                                                                                , ( EnumValueNatNum
+                                                                                      15 1
+                                                                                  , ( _
+                                                                                    , TermIntU 8 129
+                                                                                    )
+                                                                                  )
+                                                                                , ( EnumValueNatNum
+                                                                                      15 2
+                                                                                  , ( _
+                                                                                    , TermIntU 8 130
+                                                                                    )
+                                                                                  )
+                                                                                , ( EnumValueNatNum
+                                                                                      15 3
+                                                                                  , ( _
+                                                                                    , TermIntU 8 227
+                                                                                    )
+                                                                                  )
+                                                                                , ( EnumValueNatNum
+                                                                                      15 4
+                                                                                  , ( _
+                                                                                    , TermIntU 8 129
+                                                                                    )
+                                                                                  )
+                                                                                , ( EnumValueNatNum
+                                                                                      15 5
+                                                                                  , ( _
+                                                                                    , TermIntU 8 132
+                                                                                    )
+                                                                                  )
+                                                                                , ( EnumValueNatNum
+                                                                                      15 6
+                                                                                  , ( _
+                                                                                    , TermIntU 8 227
+                                                                                    )
+                                                                                  )
+                                                                                , ( EnumValueNatNum
+                                                                                      15 7
+                                                                                  , ( _
+                                                                                    , TermIntU 8 129
+                                                                                    )
+                                                                                  )
+                                                                                , ( EnumValueNatNum
+                                                                                      15 8
+                                                                                  , ( _
+                                                                                    , TermIntU 8 151
+                                                                                    )
+                                                                                  )
+                                                                                , ( EnumValueNatNum
+                                                                                      15 9
+                                                                                  , ( _
+                                                                                    , TermIntU 8 227
+                                                                                    )
+                                                                                  )
+                                                                                , ( EnumValueNatNum
+                                                                                      15 10
+                                                                                  , ( _
+                                                                                    , TermIntU 8 129
+                                                                                    )
+                                                                                  )
+                                                                                , ( EnumValueNatNum
+                                                                                      15 11
+                                                                                  , ( _
+                                                                                    , TermIntU 8 166
+                                                                                    )
+                                                                                  )
+                                                                                , ( EnumValueNatNum
+                                                                                      15 12
+                                                                                  , ( _
+                                                                                    , TermIntU 8 227
+                                                                                    )
+                                                                                  )
+                                                                                , ( EnumValueNatNum
+                                                                                      15 13
+                                                                                  , ( _
+                                                                                    , TermIntU 8 130
+                                                                                    )
+                                                                                  )
+                                                                                , ( EnumValueNatNum
+                                                                                      15 14
+                                                                                  , ( _
+                                                                                    , TermIntU 8 139
+                                                                                    )
+                                                                                  )
+                                                                                ]
+                                                                            )
+                                                                          , ( _ , TermIntU 64 15 )
+                                                                          ]
+                                                                      )
+                                                                    ]
+                                                                )
+                                                            )
+                                                            [ ( _
+                                                              , TermPiElim
+                                                                  ( _ , TermConst "write" )
+                                                                  [ ( _
+                                                                    , TermEnum (EnumTypeNatNum 15)
+                                                                    )
+                                                                  , ( _ , TermConst "stdout" )
+                                                                  , ( _
+                                                                    , TermArrayIntro
+                                                                        (ArrayKindIntU 8)
+                                                                        [ ( EnumValueNatNum 15 0
+                                                                          , ( _ , TermIntU 8 227 )
+                                                                          )
+                                                                        , ( EnumValueNatNum 15 1
+                                                                          , ( _ , TermIntU 8 129 )
+                                                                          )
+                                                                        , ( EnumValueNatNum 15 2
+                                                                          , ( _ , TermIntU 8 130 )
+                                                                          )
+                                                                        , ( EnumValueNatNum 15 3
+                                                                          , ( _ , TermIntU 8 227 )
+                                                                          )
+                                                                        , ( EnumValueNatNum 15 4
+                                                                          , ( _ , TermIntU 8 129 )
+                                                                          )
+                                                                        , ( EnumValueNatNum 15 5
+                                                                          , ( _ , TermIntU 8 132 )
+                                                                          )
+                                                                        , ( EnumValueNatNum 15 6
+                                                                          , ( _ , TermIntU 8 227 )
+                                                                          )
+                                                                        , ( EnumValueNatNum 15 7
+                                                                          , ( _ , TermIntU 8 129 )
+                                                                          )
+                                                                        , ( EnumValueNatNum 15 8
+                                                                          , ( _ , TermIntU 8 151 )
+                                                                          )
+                                                                        , ( EnumValueNatNum 15 9
+                                                                          , ( _ , TermIntU 8 227 )
+                                                                          )
+                                                                        , ( EnumValueNatNum 15 10
+                                                                          , ( _ , TermIntU 8 129 )
+                                                                          )
+                                                                        , ( EnumValueNatNum 15 11
+                                                                          , ( _ , TermIntU 8 166 )
+                                                                          )
+                                                                        , ( EnumValueNatNum 15 12
+                                                                          , ( _ , TermIntU 8 227 )
+                                                                          )
+                                                                        , ( EnumValueNatNum 15 13
+                                                                          , ( _ , TermIntU 8 130 )
+                                                                          )
+                                                                        , ( EnumValueNatNum 15 14
+                                                                          , ( _ , TermIntU 8 139 )
+                                                                          )
+                                                                        ]
+                                                                    )
+                                                                  , ( _ , TermIntU 64 15 )
+                                                                  ]
+                                                              )
+                                                            ]
+                                                        )
+                                                    )
+                                                    [ ( _
+                                                      , TermPiElim
+                                                          ( _ , TermConst "write" )
+                                                          [ ( _ , TermEnum (EnumTypeNatNum 15) )
+                                                          , ( _ , TermConst "stdout" )
+                                                          , ( _
+                                                            , TermArrayIntro
+                                                                (ArrayKindIntU 8)
+                                                                [ ( EnumValueNatNum 15 0
+                                                                  , ( _ , TermIntU 8 227 )
+                                                                  )
+                                                                , ( EnumValueNatNum 15 1
+                                                                  , ( _ , TermIntU 8 129 )
+                                                                  )
+                                                                , ( EnumValueNatNum 15 2
+                                                                  , ( _ , TermIntU 8 130 )
+                                                                  )
+                                                                , ( EnumValueNatNum 15 3
+                                                                  , ( _ , TermIntU 8 227 )
+                                                                  )
+                                                                , ( EnumValueNatNum 15 4
+                                                                  , ( _ , TermIntU 8 129 )
+                                                                  )
+                                                                , ( EnumValueNatNum 15 5
+                                                                  , ( _ , TermIntU 8 132 )
+                                                                  )
+                                                                , ( EnumValueNatNum 15 6
+                                                                  , ( _ , TermIntU 8 227 )
+                                                                  )
+                                                                , ( EnumValueNatNum 15 7
+                                                                  , ( _ , TermIntU 8 129 )
+                                                                  )
+                                                                , ( EnumValueNatNum 15 8
+                                                                  , ( _ , TermIntU 8 151 )
+                                                                  )
+                                                                , ( EnumValueNatNum 15 9
+                                                                  , ( _ , TermIntU 8 227 )
+                                                                  )
+                                                                , ( EnumValueNatNum 15 10
+                                                                  , ( _ , TermIntU 8 129 )
+                                                                  )
+                                                                , ( EnumValueNatNum 15 11
+                                                                  , ( _ , TermIntU 8 166 )
+                                                                  )
+                                                                , ( EnumValueNatNum 15 12
+                                                                  , ( _ , TermIntU 8 227 )
+                                                                  )
+                                                                , ( EnumValueNatNum 15 13
+                                                                  , ( _ , TermIntU 8 130 )
+                                                                  )
+                                                                , ( EnumValueNatNum 15 14
+                                                                  , ( _ , TermIntU 8 139 )
+                                                                  )
+                                                                ]
+                                                            )
+                                                          , ( _ , TermIntU 64 15 )
+                                                          ]
+                                                      )
+                                                    ]
+                                                )
+                                            )
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )
+    )
+)

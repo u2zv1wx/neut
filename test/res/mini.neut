@@ -1,0 +1,72 @@
+(include "notation.neut")
+
+;; (include "enum.neut")
+
+;; (include "top.neut")
+
+
+;; (inductive nat ()
+;;   (nat-zero () (nat))
+;;   (nat-succ ((n (nat))) (nat)))
+
+;; (inductive vec ((A tau) (n (nat)))
+;;   (vec-nil () (vec A (nat-zero)))
+;;   (vec-cons ((m (nat)) (_ A) (_ (vec A m))) (vec A (nat-succ m))))
+
+;; (enum top unit)
+
+;; (definition string
+;;   (sigma
+;;     ((A type))
+;;     (array A u8)))
+
+;; (definition foo ((A type) (x A)) x)
+;; (let foo
+;;   (pi ((A type)) A))
+
+;; (pi ((A type)) A)
+
+(definition id ((A type) (x A)) x)
+
+;; universe polymorphism
+(id (pi ((A type) (x A)) A) id)
+
+;; (definition f ((A type)) A)
+
+;; (definition foo ((A type))
+;;   (sigma ((_ (f A))) (f A)))
+
+;; (inductive foo ((A tau))
+;;   (foo.b () (foo A)))
+
+;; (definition foo ((A tau))
+;;   (pi ((foo (pi ((A tau)) tau))
+;;        (foo.b (pi () (foo A))))
+;;     (foo A)))
+
+;; cycle
+(definition foo ((A tau)) A)
+
+(definition bar ()
+  (pi ((buz (pi () tau))
+       (buz.b (pi ((_ (foo (buz)))) (buz))))
+    (buz)))
+
+;; SECTION 6.2.1
+;;
+;; ここにはふつうに文章を書くことができる。みたいな。証明を書くんだから言語としてふつうにこういうのはサポートされていてほしいでしょう。次のstmtがくるまで、とか？なんかしらの文章をこうやってゴリゴリ書けるってのは実際重要だと思うんよね。
+;; でも「{| ... |}」はちょっとエキゾチックすぎるよね。ふつうの文章って感じがしない。どういうのだったら普通の文章って感じがするだろう？
+;; 「begin-comment ... end-comment」とかもなくはないけど、まあlispから外れるから微妙かなあ。
+;; R6RSでは「#| .... |#」になっているらしい。
+;; うーん、でもエキゾチックだなあ。
+
+;; (definition foo (...) bar)
+
+;; こんなかんじで別にone-lineのコメントを大量に書くってのも悪くない気がしてきた。というか、一つのパラグラフが長くなってもそれを普通に改行せずにごりごり書いてしまってもいい気が   する。80-columnなんていうのはまあ昔の制約で、今の時代はエディタが折り返して表示してくれるわけでして。パラグラフごとにコメントの「;;」をひとつ入力する感じでいいんじゃない？    別に、普通に読みやすいと思うし。
+;; 段落が変わるとこうなる。Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam eu condimentum ligula. Suspendisse potenti. Phasellus aliq   uam felis a auctor euismod. Ut feugiat sed eros vel pellentesque. Nunc malesuada quis risus et fringilla. Etiam in varius lorem, vel pharetra    nunc. Nunc non porta purus. Aenean in bibendum nibh. Vivamus tristique vehicula ipsum vitae iaculis. Vestibulum accumsan mi et urna accumsan,    in molestie nulla blandit. Nunc congue cursus lacinia.
+;; どうでしょう。依存型 (いぞんがた、英: dependent type) とは、計算機科学と論理学において、値に依存する型のことである。数学の型理論の表現形式と計算機科学における型システムの   特徴を併せ持つ。直観主義的型理論においては、全称量化子や存在量化子のような論理学における量化子をエンコードするために依存型が用いられている。ATS（英語版）、Agda、Idris（英語   版）、Epigram（英語版）などのいくつかの関数型プログラミング言語では、依存型を使った非常に表現力の強い型によって、バグを防止している。
+;; 実際には結果としてバグが防止されているだけでロジックから見ればプログラミング言語がどうなっていようが知ったことではないのだけど。
+;; いやー、まあでも、「;;」はやっぱり頭になんらかの負荷を与えているように思う。本当はそこになにもあるべきではないのに。エディタのほうで折り返しをうまくインデントして表示してくれ   るとある程度読みやすくなるのかな。それはそれで、やっぱり「;;」が目障りであるような。
+
+(definition item ((x (foo (bar))))
+  (lambda ((A i64)) A))

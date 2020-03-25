@@ -1,0 +1,60 @@
+(no-implicit-core)
+
+
+(include library "core/notation.neut")
+
+(include library "core/option.neut")
+
+;; boolを「あとで」設定してもうまくいってしまうのが非直感的なので修正しましょう、という話。
+;; ~> 修正した。
+
+(include library "core/bool.neut")
+
+(use option)
+
+(use bool)
+
+;; content:
+
+(section my-list)
+
+(inductive my-list ((a tau))
+  (nil () (my-list a))
+  (cons ((x a) (xs (my-list a))) (my-list a)))
+
+
+;; (attribute cons (implicit 1))
+
+(definition head ([a tau] (xs (my-list a)))
+  (case xs
+    ((nil) (none))
+    ((cons y _) (some y))))
+
+(definition length ([a tau] (xs (my-list a)))
+  (case xs
+    ((nil) 0)
+    ((cons _ ys) (u64.add 1 (length a ys)))))
+
+(definition map ([a tau] [b tau] (f (hom a b)) (xs (my-list a)))
+  (case xs
+    ((nil) (nil))
+    ((cons y ys)
+      (cons (f y) (map a b f ys)))))
+
+(definition some-function ([a tau] (xs (my-list a)))
+  (case xs
+    ((nil) true)
+    ((cons _ _) false)))
+
+(definition is-null ([a tau] (xs (my-list a)))
+  (case xs
+    ((nil) true)
+    ((cons _ _) false)))
+
+(end my-list)
+
+(unuse option)
+
+(unuse bool)
+
+;; (include library "core/bool.neut") ;; これがちゃんとエラーになるようになった。

@@ -1,0 +1,46 @@
+(no-implicit-core)
+
+;; (inductive list ((a tau))
+;;   (list:nil () (list a))
+;;   (list:cons ((x a) (xs (list a))) (list a))
+;;   )
+
+(inductive item ((a tau))
+  (item:one () (item a))
+  (item:two ((x a)) (item a))
+  )
+
+;; (inductive item ()
+;;   (item:one () (item))
+;;   (item:two ((x i64)) (item))
+;;   )
+
+;; (let xs (list i64) (list:nil))
+
+(let bar (item i64)
+  (item:two 3))
+
+;; (let bar (item)
+;;   (item:two 3))
+
+(case bar
+  ((item:one) (i64 10))
+  ((item:two foo) (i64 20)))
+
+(constant os:exit
+  (pi
+    ((A tau)
+     (status i64))
+    A))
+
+(os:exit i64
+  (case bar
+    ((item:one) (i64 10))
+    ((item:two foo) (i64 20))))
+
+;; (let xs (list i64)
+;;   (list:cons 25 (list:cons 100 (list:nil))))
+
+;; (case xs
+;;   ((list:nil) (i64 10))
+;;   ((list:cons value ys) (i64 20)))
