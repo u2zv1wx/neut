@@ -109,15 +109,12 @@ clarify (m, TermArrayElim k mxts e1 e2) = do
   forM_ mxts insTypeEnv'
   (arr, arrVar) <- newDataUpsilonWith m "arr"
   arrType <- newNameWith' "arr-type"
-  (arrInner, arrInnerVar) <- newDataUpsilonWith m "arr-inner"
+  (content, contentVar) <- newDataUpsilonWith m "arr-content"
   e2' <- clarify e2
   return $
     bindLet [(arr, e1')] $
     ( m
-    , sigmaElim
-        [arrType, arrInner]
-        arrVar
-        (m, CodeSigmaElim k xs arrInnerVar e2'))
+    , sigmaElim [arrType, content] arrVar (m, CodeSigmaElim k xs contentVar e2'))
 clarify (m, TermStruct ks) = do
   t <- cartesianStruct m ks
   return (m, CodeUpIntro t)
