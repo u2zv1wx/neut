@@ -31,7 +31,7 @@ toAffineApp m x t = do
         ( m
         , CodePiElimDownElim
             expVar
-            [(m, DataEnumIntro (EnumValueIntS 64 0)), toDataUpsilon (x, m)]))
+            [(m, DataEnumIntro (EnumValueIntS 64 0)), (m, DataUpsilon x)]))
 
 -- toRelevantApp meta x t ~>
 --   bind exp := t in
@@ -48,7 +48,7 @@ toRelevantApp m x t = do
         ( m
         , CodePiElimDownElim
             expVar
-            [(m, DataEnumIntro (EnumValueIntS 64 1)), toDataUpsilon (x, m)]))
+            [(m, DataEnumIntro (EnumValueIntS 64 1)), (m, DataUpsilon x)]))
 
 bindLet :: [(Identifier, CodePlus)] -> CodePlus -> CodePlus
 bindLet [] cont = cont

@@ -277,7 +277,7 @@ clarifyUnaryOp name op m = do
   let t' = reduceTermPlus t
   case t' of
     (_, TermPi _ xts@[(mx, x, tx)] _) -> do
-      let varX = toDataUpsilon (x, mx)
+      let varX = (mx, DataUpsilon x)
       zts <- complementaryChainOf xts
       retClosure
         (Just $ asText'' name)
@@ -293,8 +293,8 @@ clarifyBinaryOp name op m = do
   let t' = reduceTermPlus t
   case t' of
     (_, TermPi _ xts@[(mx, x, tx), (my, y, ty)] _) -> do
-      let varX = toDataUpsilon (x, mx)
-      let varY = toDataUpsilon (y, my)
+      let varX = (mx, DataUpsilon x)
+      let varY = (my, DataUpsilon y)
       zts <- complementaryChainOf xts
       retClosure
         (Just $ asText'' name)

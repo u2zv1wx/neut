@@ -135,7 +135,7 @@ withHeaderRelevant' _ _ [] cont = return cont
 withHeaderRelevant' t expVar ((x, (x1, x2)):chain) cont@(m, _) = do
   cont' <- withHeaderRelevant' t expVar chain cont
   (sigVarName, sigVar) <- newDataUpsilonWith m "sig"
-  let varX = toDataUpsilon (x, m)
+  let varX = (m, DataUpsilon x)
   return $
     ( m
     , CodeUpElim

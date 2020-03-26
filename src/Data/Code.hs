@@ -50,13 +50,9 @@ data Definition =
   Definition IsFixed [Identifier] CodePlus
   deriving (Show)
 
--- type IdentifierPlus = (Identifier, DataPlus)
 type DataPlus = (Meta, Data)
 
 type CodePlus = (Meta, Code)
-
-toDataUpsilon :: (Identifier, Meta) -> DataPlus
-toDataUpsilon (x, m) = (m, DataUpsilon x)
 
 asUpsilon :: DataPlus -> Maybe Identifier
 asUpsilon (_, DataUpsilon x) = Just x

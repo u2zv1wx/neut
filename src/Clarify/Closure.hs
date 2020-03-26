@@ -32,29 +32,38 @@ makeClosure ::
   -> CodePlus -- the `e` in `lam (x1, ..., xn). e`
   -> WithEnv DataPlus
 makeClosure mName mxts2 m mxts1 e = do
-  let (_, xs2, ts2) = unzip3 mxts2
-  let xts2 = zip xs2 ts2
-  let (_, xs1, ts1) = unzip3 mxts1
-  let xts1 = zip xs1 ts1
+  let xts1 = dropFst mxts1
+  let xts2 = dropFst mxts2
   expName <- newNameWith' "exp"
   envExp <- cartesianSigma expName m arrVoidPtr $ map Right xts2
-  (envVarName, envVar) <- newDataUpsilonWith m "env"
-  e' <- linearize (xts2 ++ xts1) e
-  cenv <- gets codeEnv
   name <- nameFromMaybe mName
-  let args = map fst xts1 ++ [envVarName]
-  let body = (m, CodeSigmaElim arrVoidPtr (map fst xts2) envVar e')
-  when (name `notElem` Map.keys cenv) $ insCodeEnv name args body
-  let vs = map (\(mx, x, _) -> toDataUpsilon (x, mx)) mxts2
+  registerIfNecessary m name xts1 xts2 e
+  let vs = map (\(mx, x, _) -> (mx, DataUpsilon x)) mxts2
   let fvEnv = (m, DataSigmaIntro arrVoidPtr vs)
   return (m, DataSigmaIntro arrVoidPtr [envExp, fvEnv, (m, DataTheta name)])
+
+registerIfNecessary ::
+     Meta
+  -> T.Text
+  -> [(Identifier, CodePlus)]
+  -> [(Identifier, CodePlus)]
+  -> CodePlus
+  -> WithEnv ()
+registerIfNecessary m name xts1 xts2 e = do
+  cenv <- gets codeEnv
+  when (name `notElem` Map.keys cenv) $ do
+    e' <- linearize (xts2 ++ xts1) e
+    (envVarName, envVar) <- newDataUpsilonWith m "env"
+    let args = map fst xts1 ++ [envVarName]
+    let body = (m, CodeSigmaElim arrVoidPtr (map fst xts2) envVar e')
+    insCodeEnv name args body
 
 callClosure ::
      Meta -> CodePlus -> [(Identifier, CodePlus, DataPlus)] -> WithEnv CodePlus
 callClosure m e zexes = do
   let (zs, es', xs) = unzip3 zexes
   (clsVarName, clsVar) <- newDataUpsilonWith m "closure"
-  (typeVarName, _) <- newDataUpsilonWith m "exp"
+  typeVarName <- newNameWith' "exp"
   (envVarName, envVar) <- newDataUpsilonWith m "env"
   (lamVarName, lamVar) <- newDataUpsilonWith m "thunk"
   return $
@@ -153,3 +162,8 @@ chainTermPlus'' tenv ((_, x, t):xts) es = do
   xs1 <- chainTermPlus' tenv t
   xs2 <- chainTermPlus'' (insTypeEnv'' x t tenv) xts es
   return $ xs1 ++ filter (\(_, y, _) -> y /= x) xs2
+
+dropFst :: [(a, b, c)] -> [(b, c)]
+dropFst xyzs = do
+  let (_, ys, zs) = unzip3 xyzs
+  zip ys zs
