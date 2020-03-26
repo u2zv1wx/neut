@@ -146,6 +146,15 @@ initialEnv =
 
 type WithEnv a = StateT Env (ExceptT [Log] IO) a
 
+type App a = State Env (Either [Log] (IO a))
+
+sample :: App ()
+sample = do
+  m <- get
+  k <- return $ Left []
+  return $ return $ putStr "hello"
+  -- undefined
+
 evalWithEnv :: WithEnv a -> Env -> IO (Either [Log] a)
 evalWithEnv c env = do
   resultOrErr <- runExceptT (runStateT c env)

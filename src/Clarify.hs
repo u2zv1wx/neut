@@ -60,21 +60,32 @@ clarify (m, TermPiElim e es) = do
   callClosure m e' es'
 clarify (m, TermSigma _) = returnClosureType m -- Sigma is translated into Pi
 clarify (m, TermSigmaIntro t es) = do
-  let t' = reduceTermPlus t
-  case t' of
-    (mSig, TermSigma xts)
-      | length xts == length es -> do
-        tPi <- sigToPi mSig xts
-        case tPi of
-          (_, TermPi _ [zu, kp@(mk, k, (_, TermPi _ yts _))] _) -- i.e. Sigma yts
-            | length yts == length es -> do
-              let xvs = map (\(mx, x, _) -> toTermUpsilon mx x) yts
-              let kv = toTermUpsilon mk k
-              -- eager product
-              let bindArgsThen = \e -> (m, TermPiElim (m, TermPiIntro yts e) es)
-              clarify $
-                bindArgsThen (m, TermPiIntro [zu, kp] (m, TermPiElim kv xvs))
-          _ -> raiseCritical m "the type of sigma-intro is wrong"
+  case reduceTermPlus t of
+    (mSig, TermSigma xts) -> do
+      tPi <- sigToPi mSig xts
+      case tPi of
+        (_, TermPi _ [zu, kp@(mk, k, _)] _) ->
+          clarify
+            (m, TermPiIntro [zu, kp] (m, TermPiElim (mk, TermUpsilon k) es))
+    -- (mSig, TermSigma xts)
+    --   | length xts == length es -> do
+    --     tPi <- sigToPi mSig xts
+    --     case tPi of
+    --       (_, TermPi _ [zu, kp@(mk, k, _)] _) ->
+    --         clarify
+    --           (m, TermPiIntro [zu, kp] (m, TermPiElim (mk, TermUpsilon k) es))
+        -- case tPi of
+        --   (_, TermPi _ [zu, kp@(mk, k, (_, TermPi _ yts _))] _) -- i.e. Sigma yts
+        --     -- | length yts == length es
+        --       -- let xvs = map (\(mx, x, _) -> toTermUpsilon mx x) yts
+        --    -> do
+        --     let kv = toTermUpsilon mk k
+        --       -- eager product
+        --       -- let bindArgsThen = \e -> (m, TermPiElim (m, TermPiIntro yts e) es)
+        --       -- clarify $
+        --       --   bindArgsThen (m, TermPiIntro [zu, kp] (m, TermPiElim kv xvs))
+        --     clarify (m, TermPiIntro [zu, kp] (m, TermPiElim kv es))
+        _ -> raiseCritical m "the type of sigma-intro is wrong"
     _ -> raiseCritical m "the type of sigma-intro is wrong"
 clarify (m, TermSigmaElim t xts e1 e2) = do
   clarify (m, TermPiElim e1 [t, (m, TermPiIntro xts e2)])
