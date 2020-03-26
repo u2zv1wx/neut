@@ -16,6 +16,7 @@ import Text.Read (readMaybe)
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Compression.GZip as GZip
 import qualified Data.ByteString.Lazy as L
+import qualified Data.IntMap.Strict as IntMap
 
 import Clarify
 import Data.Env
@@ -224,7 +225,7 @@ writeResult result outputPath OutputKindObject = do
 
 build :: Path Abs File -> WithEnv L.ByteString
 build inputPath = do
-  parse inputPath >>= elaborate >>= clarify >>= toLLVM >>= emit
+  parse inputPath >>= elaborate >>= clarify IntMap.empty >>= toLLVM >>= emit
 
 check :: Path Abs File -> WithEnv ()
 check inputPath = parse inputPath >>= elaborate >> return ()
