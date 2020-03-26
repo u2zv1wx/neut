@@ -25,12 +25,9 @@ import Data.Term
 import Reduce.Term
 
 clarify :: TermPlus -> WithEnv CodePlus
-clarify (m, TermTau _) = do
-  v <- cartesianImmediate m
-  return (m, CodeUpIntro v)
+clarify (m, TermTau _) = returnCartesianImmediate m
 clarify (m, TermUpsilon x) = return (m, CodeUpIntro (m, DataUpsilon x))
-clarify (m, TermPi {}) = do
-  returnClosureType m
+clarify (m, TermPi {}) = returnClosureType m
 clarify (m, TermPiPlus {}) = returnClosureType m
 clarify lam@(m, TermPiIntro mxts e) = do
   forM_ mxts insTypeEnv'
@@ -56,7 +53,7 @@ clarify (m, TermPiElim e es) = do
   es' <- mapM clarifyPlus es
   e' <- clarify e
   callClosure m e' es'
-clarify (m, TermSigma _) = returnClosureType m -- Sigma is translated into Pi
+clarify (m, TermSigma _) = returnClosureType m -- vaild since Sigma is translated into Pi
 clarify (m, TermSigmaIntro t es) = do
   (zu, kp@(mk, k, _)) <- sigToPi m $ reduceTermPlus t
   clarify (m, TermPiIntro [zu, kp] (m, TermPiElim (mk, TermUpsilon k) es))
@@ -71,9 +68,7 @@ clarify (m, TermConst x) = clarifyConst m x
 clarify (m, TermFloat16 l) = return (m, CodeUpIntro (m, DataFloat16 l))
 clarify (m, TermFloat32 l) = return (m, CodeUpIntro (m, DataFloat32 l))
 clarify (m, TermFloat64 l) = return (m, CodeUpIntro (m, DataFloat64 l))
-clarify (m, TermEnum _) = do
-  v <- cartesianImmediate m
-  return (m, CodeUpIntro v)
+clarify (m, TermEnum _) = returnCartesianImmediate m
 clarify (m, TermEnumIntro l) = return (m, CodeUpIntro (m, DataEnumIntro l))
 clarify (m, TermEnumElim (e, _) bs) = do
   let (cs, es) = unzip bs
@@ -96,12 +91,12 @@ clarify (m, TermArrayIntro k es) = do
     (m, CodeUpIntro $ (m, sigmaIntro [arrayType, (m, DataSigmaIntro k xs)]))
 clarify (m, TermArrayElim k mxts e1 e2) = do
   e1' <- clarify e1
-  let (_, xs, _) = unzip3 mxts
   forM_ mxts insTypeEnv'
   (arr, arrVar) <- newDataUpsilonWith m "arr"
   arrType <- newNameWith' "arr-type"
   (content, contentVar) <- newDataUpsilonWith m "arr-content"
   e2' <- clarify e2
+  let (_, xs, _) = unzip3 mxts
   return $
     bindLet [(arr, e1')] $
     ( m
@@ -138,18 +133,18 @@ clarifyPlus e@(m, _) = do
   return (varName, e', var)
 
 constructEnumFVS :: TypeEnv -> [TermPlus] -> WithEnv [IdentifierPlus]
-constructEnumFVS tenv es = do
-  fvss <- mapM (chainTermPlus' tenv) es
-  return $ nubBy (\(_, x, _) (_, y, _) -> x == y) $ concat fvss
+constructEnumFVS tenv es = nubFVS <$> concat <$> mapM (chainTermPlus' tenv) es
 
 alignFVS :: Meta -> [IdentifierPlus] -> [CodePlus] -> WithEnv [CodePlus]
 alignFVS m fvs es = do
   es' <- mapM (retClosure Nothing fvs m []) es
   mapM (\cls -> callClosure m cls []) es'
 
+type Clause = (((Meta, Identifier), [IdentifierPlus]), TermPlus)
+
 clarifyCase ::
      Meta
-  -> [(((Meta, Identifier), [IdentifierPlus]), TermPlus)]
+  -> [Clause]
   -> Identifier
   -> Identifier
   -> Identifier
@@ -163,33 +158,21 @@ clarifyCase m cxtes typeVarName envVarName lamVarName = do
   return $ bindLet [(y, e')] (m, CodeCase sub yVar (zip cs es))
 
 constructCaseFVS ::
-     [(((Meta, Identifier), [IdentifierPlus]), TermPlus)]
-  -> Meta
-  -> Identifier
-  -> Identifier
-  -> WithEnv [IdentifierPlus]
+     [Clause] -> Meta -> Identifier -> Identifier -> WithEnv [IdentifierPlus]
 constructCaseFVS cxtes m typeVarName envVarName = do
   fvss <- mapM chainCaseClause cxtes
-  let fvs = nubBy (\(_, x, _) (_, y, _) -> x == y) $ concat fvss
+  let fvs = nubFVS $ concat fvss
   return $
     (m, typeVarName, (m, TermTau 0)) :
     (m, envVarName, (m, TermUpsilon typeVarName)) : fvs
 
-chainCaseClause ::
-     (((Meta, Identifier), [IdentifierPlus]), TermPlus)
-  -> WithEnv [IdentifierPlus]
-chainCaseClause ((_, xts), body) = do
-  let (_, xs, _) = unzip3 xts
-  forM_ xts insTypeEnv'
-  tenv <- gets typeEnv
-  fvs <- chainTermPlus' tenv body
-  return $ filter (\(_, y, _) -> y `notElem` xs) fvs
+chainCaseClause :: Clause -> WithEnv [IdentifierPlus]
+chainCaseClause (((m, _), xts), body) = chainTermPlus (m, TermPiIntro xts body)
 
-clarifyCase' ::
-     Meta
-  -> Identifier
-  -> (((Meta, Identifier), [IdentifierPlus]), TermPlus)
-  -> WithEnv CodePlus
+nubFVS :: [IdentifierPlus] -> [IdentifierPlus]
+nubFVS fvs = nubBy (\(_, x, _) (_, y, _) -> x == y) fvs
+
+clarifyCase' :: Meta -> Identifier -> Clause -> WithEnv CodePlus
 clarifyCase' m envVarName ((_, xts), e) = do
   xts' <- clarifyBinder xts
   e' <- clarify e >>= linearize (dropFst xts')
@@ -301,8 +284,7 @@ iterativeApp (f:fs) x = f (iterativeApp fs x)
 complementaryChainOf :: [IdentifierPlus] -> WithEnv [IdentifierPlus]
 complementaryChainOf xts = do
   tenv <- gets typeEnv
-  zts <- chainTermPlus'' tenv xts []
-  return $ nubBy (\(_, x, _) (_, y, _) -> x == y) zts
+  nubFVS <$> chainTermPlus'' tenv xts []
 
 clarifyBinder :: [IdentifierPlus] -> WithEnv [(Meta, Identifier, CodePlus)]
 clarifyBinder [] = return []
