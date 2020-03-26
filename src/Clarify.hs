@@ -285,8 +285,8 @@ clarifySysCall tenv name syscall args m = do
       | length xts == length args -> do
         zts <- complementaryChainOf xts
         (xs, ds, headerList) <- computeHeader m xts args
-        -- forM_ xts insTypeEnv'
-        callThenReturn <- toSysCallTail tenv m cod syscall ds xs -- fixme?
+        let tenv' = insTypeEnv1 xts tenv
+        callThenReturn <- toSysCallTail tenv' m cod syscall ds xs
         let body = iterativeApp headerList callThenReturn
         retClosure tenv (Just $ asText'' name) zts m xts body
     _ -> raiseCritical m $ "the type of " <> asText name <> " is wrong"
@@ -306,7 +306,6 @@ clarifyBinder _ [] = return []
 clarifyBinder tenv ((m, x, t):xts) = do
   t' <- clarify' tenv t
   xts' <- clarifyBinder (insTypeEnv'' x t tenv) xts
-  -- xts' <- clarifyBinder tenv xts
   return $ (m, x, t') : xts'
 
 knot :: Meta -> Identifier -> DataPlus -> WithEnv ()
@@ -367,25 +366,23 @@ toHeaderInfo ::
   -> Identifier -- argument
   -> TermPlus -- the type of argument
   -> Arg -- the way of use of argument (specifically)
-  -> WithEnv ([Identifier], [DataPlus], CodePlus -> CodePlus) -- ([borrow], arg-to-syscall, ADD_HEADER_TO_CONTINUATION)
+  -> WithEnv ([IdentifierPlus], [DataPlus], CodePlus -> CodePlus) -- ([borrow], arg-to-syscall, ADD_HEADER_TO_CONTINUATION)
 toHeaderInfo m x _ ArgImm = return ([], [(m, DataUpsilon x)], id)
 toHeaderInfo _ _ _ ArgUnused = return ([], [], id)
 toHeaderInfo m x t ArgStruct = do
   (structVarName, structVar) <- newDataUpsilonWith m "struct"
-  insTypeEnv' (m, structVarName, t)
   return
-    ( [structVarName]
+    ( [(m, structVarName, t)]
     , [structVar]
     , \cont ->
         (m, CodeUpElim structVarName (m, CodeUpIntro (m, DataUpsilon x)) cont))
 toHeaderInfo m x t ArgArray = do
   arrayVarName <- newNameWith' "array"
-  insTypeEnv' (m, arrayVarName, t)
   (arrayTypeName, arrayType) <- newDataUpsilonWith m "array-type"
   (arrayInnerName, arrayInner) <- newDataUpsilonWith m "array-inner"
   (arrayInnerTmpName, arrayInnerTmp) <- newDataUpsilonWith m "array-tmp"
   return
-    ( [arrayVarName]
+    ( [(m, arrayVarName, t)]
     , [arrayInnerTmp]
     , \cont ->
         ( m
@@ -406,7 +403,7 @@ computeHeader ::
      Meta
   -> [IdentifierPlus]
   -> [Arg]
-  -> WithEnv ([Identifier], [DataPlus], [CodePlus -> CodePlus])
+  -> WithEnv ([IdentifierPlus], [DataPlus], [CodePlus -> CodePlus])
 computeHeader m xts argInfoList = do
   let xtas = zip xts argInfoList
   (xss, dss, headerList) <-
@@ -419,7 +416,7 @@ toSysCallTail ::
   -> TermPlus -- cod type
   -> Syscall -- read, write, open, etc
   -> [DataPlus] -- args of syscall
-  -> [Identifier] -- borrowed variables
+  -> [IdentifierPlus] -- borrowed variables
   -> WithEnv CodePlus
 toSysCallTail tenv m cod syscall args xs = do
   resultVarName <- newNameWith' "result"
@@ -435,7 +432,7 @@ toArrayAccessTail ::
   -> TermPlus -- cod type
   -> DataPlus -- array (inner)
   -> DataPlus -- index
-  -> [Identifier] -- borrowed variables
+  -> [IdentifierPlus] -- borrowed variables
   -> WithEnv CodePlus
 toArrayAccessTail tenv m lowType cod arr index xs = do
   resultVarName <- newNameWith' "result"
@@ -451,19 +448,19 @@ retWithBorrowedVars ::
      TypeEnv
   -> Meta
   -> TermPlus
-  -> [Identifier]
+  -> [IdentifierPlus]
   -> Identifier
   -> WithEnv CodePlus
 retWithBorrowedVars _ m _ [] resultVarName =
   return (m, CodeUpIntro (m, DataUpsilon resultVarName))
-retWithBorrowedVars tenv m cod xs resultVarName = do
+retWithBorrowedVars tenv m cod xts resultVarName = do
   (zu, kp@(mk, k, sigArgs)) <- sigToPi m cod
   -- sigArgs = [BORRORED, ..., BORROWED, ACTUAL_RESULT]
   (_, resultType) <- rightmostOf sigArgs
+  let xs = map (\(_, x, _) -> x) xts
   let vs = map (\x -> (m, TermUpsilon x)) $ xs ++ [resultVarName]
-  -- insTypeEnv' (mResult, resultVarName, resultType)
   -- resultの型の情報はkpの型の中にあるが。
-  let tenv' = insTypeEnv'' resultVarName resultType tenv -- fixme?
+  let tenv' = insTypeEnv1 (xts ++ [(m, resultVarName, resultType)]) tenv
   clarify'
     tenv'
     (m, TermPiIntro [zu, kp] (m, TermPiElim (mk, TermUpsilon k) vs))
