@@ -123,12 +123,10 @@ toPairInfo (_, t@(m, _)) = do
 transposeSigma ::
      Meta -> ArrayKind -> [(DataPlus, CodePlus)] -> WithEnv CodePlus
 transposeSigma m k ds = do
-  (xVarNameList, xVarList) <-
-    unzip <$> mapM (const $ newDataUpsilonWith m "sig-x") ds
-  (yVarNameList, yVarList) <-
-    unzip <$> mapM (const $ newDataUpsilonWith m "sig-y") ds
+  (xList, xVarList) <- unzip <$> mapM (const $ newDataUpsilonWith m "sig-x") ds
+  (yList, yVarList) <- unzip <$> mapM (const $ newDataUpsilonWith m "sig-y") ds
   return $
-    bindSigmaElim (zip (zip xVarNameList yVarNameList) ds) $
+    bindSigmaElim (zip (zip xList yList) ds) $
     ( m
     , CodeUpIntro
         ( m
@@ -139,9 +137,8 @@ transposeSigma m k ds = do
 bindSigmaElim ::
      [((Identifier, Identifier), (DataPlus, CodePlus))] -> CodePlus -> CodePlus
 bindSigmaElim [] cont = cont
-bindSigmaElim (((x, y), (d, _)):xyds) cont = do
-  let cont' = bindSigmaElim xyds cont
-  (fst cont', CodeSigmaElim arrVoidPtr [x, y] d cont')
+bindSigmaElim (((x, y), (d, _)):xyds) cont =
+  (fst cont, CodeSigmaElim arrVoidPtr [x, y] d $ bindSigmaElim xyds cont)
 
 supplyName :: Either b (Identifier, b) -> WithEnv (Identifier, b)
 supplyName (Right (x, t)) = return (x, t)
@@ -151,26 +148,24 @@ supplyName (Left t) = do
 
 returnArrayType :: Meta -> WithEnv CodePlus
 returnArrayType m = do
-  (arrVarName, arrVar) <- newDataUpsilonWith m "arr"
+  (arr, arrVar) <- newDataUpsilonWith m "arr"
   retImmType <- returnCartesianImmediate m
-  let retArrVar = (m, CodeUpIntro arrVar)
-  v <-
+  t <-
     cartesianSigma
       (I ("array-closure", 0))
       m
       arrVoidPtr
-      [Right (arrVarName, retImmType), Left retArrVar]
-  return (m, CodeUpIntro v)
+      [Right (arr, retImmType), Left (m, CodeUpIntro arrVar)]
+  return (m, CodeUpIntro t)
 
 returnClosureType :: Meta -> WithEnv CodePlus
 returnClosureType m = do
-  (envVarName, envVar) <- newDataUpsilonWith m "env"
+  (env, envVar) <- newDataUpsilonWith m "env"
   retImmType <- returnCartesianImmediate m
-  let retEnvVar = (m, CodeUpIntro envVar)
-  closureType <-
+  t <-
     cartesianSigma
       (I ("closure", 0))
       m
       arrVoidPtr
-      [Right (envVarName, retImmType), Left retEnvVar, Left retImmType]
-  return (m, CodeUpIntro closureType)
+      [Right (env, retImmType), Left (m, CodeUpIntro envVar), Left retImmType]
+  return (m, CodeUpIntro t)
