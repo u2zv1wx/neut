@@ -44,10 +44,12 @@ data Term
   | TermStructElim [(Meta, Identifier, ArrayKind)] TermPlus TermPlus
   | TermCase
       (TermPlus, TermPlus) -- (the `e` in `case e of (...)`, the type of `e`)
-      [(((Meta, Identifier), [IdentifierPlus]), TermPlus)] -- ((cons x xs) e), ((nil) e), ((succ n) e).  (not ((cons A x xs) e).)
+      [Clause] -- ((cons x xs) e), ((nil) e), ((succ n) e).  (not ((cons A x xs) e).)
   deriving (Show)
 
 type TermPlus = (Meta, Term)
+
+type Clause = (((Meta, Identifier), [IdentifierPlus]), TermPlus)
 
 type SubstTerm = [(Int, TermPlus)]
 

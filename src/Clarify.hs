@@ -139,8 +139,6 @@ alignFVS tenv m fvs es = do
   es' <- mapM (retClosure tenv Nothing fvs m []) es
   mapM (\cls -> callClosure m cls []) es'
 
-type Clause = (((Meta, Identifier), [IdentifierPlus]), TermPlus)
-
 clarifyCase ::
      TypeEnv
   -> Meta
