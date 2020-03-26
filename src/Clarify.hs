@@ -292,41 +292,6 @@ clarifyBinder ((m, x, t):xts) = do
   xts' <- clarifyBinder xts
   return $ (m, x, t') : xts'
 
-retClosure ::
-     Maybe T.Text -- the name of newly created closure
-  -> [IdentifierPlus] -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
-  -> Meta -- meta of lambda
-  -> [IdentifierPlus] -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
-  -> CodePlus -- the `e` in `lam (x1, ..., xn). e`
-  -> WithEnv CodePlus
-retClosure mName fvs m xts e = do
-  cls <- makeClosure' mName fvs m xts e
-  return (m, CodeUpIntro cls)
-
-retClosure' ::
-     Identifier -- the name of newly created closure
-  -> [IdentifierPlus] -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
-  -> Meta -- meta of lambda
-  -> [IdentifierPlus] -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
-  -> CodePlus -- the `e` in `lam (x1, ..., xn). e`
-  -> WithEnv CodePlus
-retClosure' x fvs m xts e = do
-  cls <- makeClosure' (Just $ asText'' x) fvs m xts e
-  knot m x cls
-  return (m, CodeUpIntro cls)
-
-makeClosure' ::
-     Maybe T.Text -- the name of newly created closure
-  -> [IdentifierPlus] -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
-  -> Meta -- meta of lambda
-  -> [IdentifierPlus] -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
-  -> CodePlus -- the `e` in `lam (x1, ..., xn). e`
-  -> WithEnv DataPlus
-makeClosure' mName fvs m xts e = do
-  fvs' <- clarifyBinder fvs
-  xts' <- clarifyBinder xts
-  makeClosure mName fvs' m xts' e
-
 knot :: Meta -> Identifier -> DataPlus -> WithEnv ()
 knot m z cls = do
   cenv <- gets codeEnv
@@ -542,6 +507,41 @@ registerIfNecessary m name xts1 xts2 e = do
     let args = map fst xts1 ++ [envVarName]
     let body = (m, sigmaElim (map fst xts2) envVar e')
     insCodeEnv name args body
+
+makeClosure' ::
+     Maybe T.Text -- the name of newly created closure
+  -> [IdentifierPlus] -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
+  -> Meta -- meta of lambda
+  -> [IdentifierPlus] -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
+  -> CodePlus -- the `e` in `lam (x1, ..., xn). e`
+  -> WithEnv DataPlus
+makeClosure' mName fvs m xts e = do
+  fvs' <- clarifyBinder fvs
+  xts' <- clarifyBinder xts
+  makeClosure mName fvs' m xts' e
+
+retClosure ::
+     Maybe T.Text -- the name of newly created closure
+  -> [IdentifierPlus] -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
+  -> Meta -- meta of lambda
+  -> [IdentifierPlus] -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
+  -> CodePlus -- the `e` in `lam (x1, ..., xn). e`
+  -> WithEnv CodePlus
+retClosure mName fvs m xts e = do
+  cls <- makeClosure' mName fvs m xts e
+  return (m, CodeUpIntro cls)
+
+retClosure' ::
+     Identifier -- the name of newly created closure
+  -> [IdentifierPlus] -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
+  -> Meta -- meta of lambda
+  -> [IdentifierPlus] -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
+  -> CodePlus -- the `e` in `lam (x1, ..., xn). e`
+  -> WithEnv CodePlus
+retClosure' x fvs m xts e = do
+  cls <- makeClosure' (Just $ asText'' x) fvs m xts e
+  knot m x cls
+  return (m, CodeUpIntro cls)
 
 callClosure ::
      Meta -> CodePlus -> [(Identifier, CodePlus, DataPlus)] -> WithEnv CodePlus
