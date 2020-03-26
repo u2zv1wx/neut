@@ -58,16 +58,8 @@ clarify (m, TermPiElim e es) = do
   callClosure m e' es'
 clarify (m, TermSigma _) = returnClosureType m -- Sigma is translated into Pi
 clarify (m, TermSigmaIntro t es) = do
-  case reduceTermPlus t of
-    (mSig, TermSigma xts)
-      | length xts == length es -> do
-        tPi <- sigToPi mSig xts
-        case tPi of
-          (_, TermPi _ [zu, kp@(mk, k, _)] _) ->
-            clarify
-              (m, TermPiIntro [zu, kp] (m, TermPiElim (mk, TermUpsilon k) es))
-          _ -> raiseCritical m "the type of sigma-intro is wrong"
-    _ -> raiseCritical m "the type of sigma-intro is wrong"
+  (zu, kp@(mk, k, _)) <- sigToPi m $ reduceTermPlus t
+  clarify (m, TermPiIntro [zu, kp] (m, TermPiElim (mk, TermUpsilon k) es))
 clarify (m, TermSigmaElim t xts e1 e2) =
   clarify (m, TermPiElim e1 [t, (m, TermPiIntro xts e2)])
 clarify iter@(m, TermIter mxt@(_, x, _) mxts e) = do
@@ -494,22 +486,13 @@ retWithBorrowedVars ::
      Meta -> TermPlus -> [Identifier] -> Identifier -> WithEnv CodePlus
 retWithBorrowedVars m _ [] resultVarName =
   return (m, CodeUpIntro (m, DataUpsilon resultVarName))
-retWithBorrowedVars m cod xs resultVarName
-  | (mSig, TermSigma yts) <- cod
-  , length yts >= 1 = do
-    tPi <- sigToPi mSig yts
-    case tPi of
-      (_, TermPi _ [c, (mFun, funName, funType@(_, TermPi _ xts _))] _) -> do
-        let (mResult, _, resultType) = last xts
-        let vs = map (\x -> (m, TermUpsilon x)) $ xs ++ [resultVarName]
-        insTypeEnv' (mResult, resultVarName, resultType)
-        clarify
-          ( m
-          , TermPiIntro
-              [c, (mFun, funName, funType)]
-              (m, TermPiElim (m, TermUpsilon funName) vs))
-      _ -> raiseCritical m "retWithBorrowedVars (sig)"
-  | otherwise = raiseCritical m "retWithBorrowedVars"
+retWithBorrowedVars m cod xs resultVarName = do
+  (zu, kp@(mk, k, sigArgs)) <- sigToPi m cod
+  -- sigArgs = [BORRORED, ..., BORROWED, ACTUAL_RESULT]
+  (mResult, resultType) <- rightmostOf sigArgs
+  let vs = map (\x -> (m, TermUpsilon x)) $ xs ++ [resultVarName]
+  insTypeEnv' (mResult, resultVarName, resultType)
+  clarify (m, TermPiIntro [zu, kp] (m, TermPiElim (mk, TermUpsilon k) vs))
 
 inferKind :: Meta -> ArrayKind -> WithEnv TermPlus
 inferKind m (ArrayKindIntS i) = return (m, TermEnum (EnumTypeIntS i))
@@ -520,8 +503,25 @@ inferKind m (ArrayKindFloat size) = do
   return (m, TermConst (I (constName, i)))
 inferKind m _ = raiseCritical m "inferKind for void-pointer"
 
-sigToPi :: Meta -> [IdentifierPlus] -> WithEnv TermPlus
-sigToPi m xts = do
+rightmostOf :: TermPlus -> WithEnv (Meta, TermPlus)
+rightmostOf (_, TermPi _ xts _)
+  | length xts >= 1 = do
+    let (m, _, t) = last xts
+    return (m, t)
+rightmostOf (m, _) = raiseCritical m "rightmost"
+
+sigToPi :: Meta -> TermPlus -> WithEnv (IdentifierPlus, IdentifierPlus)
+sigToPi m sig = do
+  case sig of
+    (mSig, TermSigma xts) -> do
+      tPi <- sigToPi' mSig xts
+      case tPi of
+        (_, TermPi _ [zu, kp] _) -> return (zu, kp)
+        _ -> raiseCritical m "the type of sigma-intro is wrong"
+    _ -> raiseCritical m "the type of sigma-intro is wrong"
+
+sigToPi' :: Meta -> [IdentifierPlus] -> WithEnv TermPlus
+sigToPi' m xts = do
   z <- newNameWith' "sigma"
   let zv = toTermUpsilon m z
   k <- newNameWith' "sig"
