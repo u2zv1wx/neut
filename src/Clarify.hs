@@ -23,135 +23,137 @@ import Data.Env
 import Data.Term
 import Reduce.Term
 
-clarify :: TermPlus -> WithEnv CodePlus
-clarify (m, TermTau _) = returnCartesianImmediate m
-clarify (m, TermUpsilon x) = return (m, CodeUpIntro (m, DataUpsilon x))
-clarify (m, TermPi {}) = returnClosureType m
-clarify (m, TermPiPlus {}) = returnClosureType m
-clarify lam@(m, TermPiIntro mxts e) = do
+clarify :: TypeEnv -> TermPlus -> WithEnv CodePlus
+clarify _ (m, TermTau _) = returnCartesianImmediate m
+clarify _ (m, TermUpsilon x) = return (m, CodeUpIntro (m, DataUpsilon x))
+clarify _ (m, TermPi {}) = returnClosureType m
+clarify _ (m, TermPiPlus {}) = returnClosureType m
+clarify tenv lam@(m, TermPiIntro mxts e) = do
   forM_ mxts insTypeEnv'
   fvs <- chainTermPlus lam
-  e' <- clarify e
-  retClosure Nothing fvs m mxts e'
-clarify lam@(m, TermPiIntroNoReduce mxts e) = do
+  e' <- clarify tenv e
+  retClosure tenv Nothing fvs m mxts e'
+clarify tenv lam@(m, TermPiIntroNoReduce mxts e) = do
   forM_ mxts insTypeEnv'
   fvs <- chainTermPlus lam
-  e' <- clarify e
-  retClosure Nothing fvs m mxts e'
-clarify (m, TermPiIntroPlus _ (name, args) mxts e) = do
+  e' <- clarify tenv e
+  retClosure tenv Nothing fvs m mxts e'
+clarify tenv (m, TermPiIntroPlus _ (name, args) mxts e) = do
   forM_ mxts insTypeEnv'
   case varTermPlus (m, TermPiIntro args $ termZero m) of
     [] -> do
       name' <- lookupLLVMEnumEnv m name
-      e' <- clarify e
-      retClosure (Just name') args m mxts e'
+      e' <- clarify tenv e
+      retClosure tenv (Just name') args m mxts e'
     _ -> do
       raiseError m $
         "couldn't normalize the type of the inductive closure at compile time"
-clarify (m, TermPiElim e es) = do
-  es' <- mapM clarifyPlus es
-  e' <- clarify e
+clarify tenv (m, TermPiElim e es) = do
+  es' <- mapM (clarifyPlus tenv) es
+  e' <- clarify tenv e
   callClosure m e' es'
-clarify (m, TermSigma _) = returnClosureType m -- vaild since Sigma is translated into Pi
-clarify (m, TermSigmaIntro t es) = do
+clarify _ (m, TermSigma _) = returnClosureType m -- vaild since Sigma is translated into Pi
+clarify tenv (m, TermSigmaIntro t es) = do
   (zu, kp@(mk, k, _)) <- sigToPi m $ reduceTermPlus t
-  clarify (m, TermPiIntro [zu, kp] (m, TermPiElim (mk, TermUpsilon k) es))
-clarify (m, TermSigmaElim t xts e1 e2) =
-  clarify (m, TermPiElim e1 [t, (m, TermPiIntro xts e2)])
-clarify iter@(m, TermIter mxt@(_, x, _) mxts e) = do
+  clarify tenv (m, TermPiIntro [zu, kp] (m, TermPiElim (mk, TermUpsilon k) es))
+clarify tenv (m, TermSigmaElim t xts e1 e2) =
+  clarify tenv (m, TermPiElim e1 [t, (m, TermPiIntro xts e2)])
+clarify tenv iter@(m, TermIter mxt@(_, x, _) mxts e) = do
   forM_ (mxt : mxts) insTypeEnv'
-  e' <- clarify e
+  e' <- clarify tenv e
   fvs <- chainTermPlus iter
-  retClosure' x fvs m mxts e'
-clarify (m, TermConst x) = clarifyConst m x
-clarify (m, TermFloat16 l) = return (m, CodeUpIntro (m, DataFloat16 l))
-clarify (m, TermFloat32 l) = return (m, CodeUpIntro (m, DataFloat32 l))
-clarify (m, TermFloat64 l) = return (m, CodeUpIntro (m, DataFloat64 l))
-clarify (m, TermEnum _) = returnCartesianImmediate m
-clarify (m, TermEnumIntro l) = return (m, CodeUpIntro (m, DataEnumIntro l))
-clarify (m, TermEnumElim (e, _) bs) = do
+  retClosure' tenv x fvs m mxts e'
+clarify tenv (m, TermConst x) = clarifyConst tenv m x
+clarify _ (m, TermFloat16 l) = return (m, CodeUpIntro (m, DataFloat16 l))
+clarify _ (m, TermFloat32 l) = return (m, CodeUpIntro (m, DataFloat32 l))
+clarify _ (m, TermFloat64 l) = return (m, CodeUpIntro (m, DataFloat64 l))
+clarify _ (m, TermEnum _) = returnCartesianImmediate m
+clarify _ (m, TermEnumIntro l) = return (m, CodeUpIntro (m, DataEnumIntro l))
+clarify tenv (m, TermEnumElim (e, _) bs) = do
   let (cs, es) = unzip bs
-  tenv <- gets typeEnv
+  -- tenv <- gets typeEnv
   fvs <- constructEnumFVS tenv es
-  es' <- (mapM clarify >=> alignFVS m fvs) es
+  es' <- (mapM (clarify tenv) >=> alignFVS tenv m fvs) es
   let sub = map (\(mx, x, _) -> (x, (mx, DataUpsilon x))) fvs
-  (y, e', yVar) <- clarifyPlus e
+  (y, e', yVar) <- clarifyPlus tenv e
   return $ bindLet [(y, e')] (m, CodeEnumElim sub yVar (zip (map snd cs) es'))
-clarify (m, TermArray {}) = returnArrayType m
-clarify (m, TermArrayIntro k es) = do
+clarify _ (m, TermArray {}) = returnArrayType m
+clarify tenv (m, TermArrayIntro k es) = do
   retImmType <- returnCartesianImmediate m
   -- arrayType = Sigma{k} [_ : IMMEDIATE, ..., _ : IMMEDIATE]
   name <- newNameWith' "array"
   let ts = map Left $ replicate (length es) retImmType
   arrayType <- cartesianSigma name m k ts
-  (zs, es', xs) <- unzip3 <$> mapM clarifyPlus es
+  (zs, es', xs) <- unzip3 <$> mapM (clarifyPlus tenv) es
   return $
     bindLet (zip zs es') $
     (m, CodeUpIntro $ (m, sigmaIntro [arrayType, (m, DataSigmaIntro k xs)]))
-clarify (m, TermArrayElim k mxts e1 e2) = do
-  e1' <- clarify e1
+clarify tenv (m, TermArrayElim k mxts e1 e2) = do
+  e1' <- clarify tenv e1
   forM_ mxts insTypeEnv'
   (arr, arrVar) <- newDataUpsilonWith m "arr"
   arrType <- newNameWith' "arr-type"
   (content, contentVar) <- newDataUpsilonWith m "arr-content"
-  e2' <- clarify e2
+  e2' <- clarify tenv e2
   let (_, xs, _) = unzip3 mxts
   return $
     bindLet [(arr, e1')] $
     ( m
     , sigmaElim [arrType, content] arrVar (m, CodeSigmaElim k xs contentVar e2'))
-clarify (m, TermStruct ks) = do
+clarify _ (m, TermStruct ks) = do
   t <- cartesianStruct m ks
   return (m, CodeUpIntro t)
-clarify (m, TermStructIntro eks) = do
+clarify tenv (m, TermStructIntro eks) = do
   let (es, ks) = unzip eks
-  (xs, es', vs) <- unzip3 <$> mapM clarifyPlus es
+  (xs, es', vs) <- unzip3 <$> mapM (clarifyPlus tenv) es
   return $
     bindLet (zip xs es') $ (m, CodeUpIntro (m, DataStructIntro (zip vs ks)))
-clarify (m, TermStructElim xks e1 e2) = do
-  e1' <- clarify e1
+clarify tenv (m, TermStructElim xks e1 e2) = do
+  e1' <- clarify tenv e1
   let (ms, xs, ks) = unzip3 xks
   ts <- mapM (inferKind m) ks
   forM_ (zip3 ms xs ts) insTypeEnv'
-  e2' <- clarify e2
+  e2' <- clarify tenv e2
   (struct, structVar) <- newDataUpsilonWith m "struct"
   return $ bindLet [(struct, e1')] (m, CodeStructElim (zip xs ks) structVar e2')
-clarify (m, TermCase (e, _) cxtes) = do
-  e' <- clarify e
+clarify tenv (m, TermCase (e, _) cxtes) = do
+  e' <- clarify tenv e
   (cls, clsVar) <- newDataUpsilonWith m "case-closure"
   res <- newNameWith' "case-res"
   env <- newNameWith' "case-env"
   lam <- newNameWith' "label"
-  cxtes' <- clarifyCase m cxtes res env lam
+  cxtes' <- clarifyCase tenv m cxtes res env lam
   return $ bindLet [(cls, e')] (m, sigmaElim [res, env, lam] clsVar cxtes')
 
-clarifyPlus :: TermPlus -> WithEnv (Identifier, CodePlus, DataPlus)
-clarifyPlus e@(m, _) = do
-  e' <- clarify e
+clarifyPlus :: TypeEnv -> TermPlus -> WithEnv (Identifier, CodePlus, DataPlus)
+clarifyPlus tenv e@(m, _) = do
+  e' <- clarify tenv e
   (varName, var) <- newDataUpsilonWith m "var"
   return (varName, e', var)
 
 constructEnumFVS :: TypeEnv -> [TermPlus] -> WithEnv [IdentifierPlus]
 constructEnumFVS tenv es = nubFVS <$> concat <$> mapM (chainTermPlus' tenv) es
 
-alignFVS :: Meta -> [IdentifierPlus] -> [CodePlus] -> WithEnv [CodePlus]
-alignFVS m fvs es = do
-  es' <- mapM (retClosure Nothing fvs m []) es
+alignFVS ::
+     TypeEnv -> Meta -> [IdentifierPlus] -> [CodePlus] -> WithEnv [CodePlus]
+alignFVS tenv m fvs es = do
+  es' <- mapM (retClosure tenv Nothing fvs m []) es
   mapM (\cls -> callClosure m cls []) es'
 
 type Clause = (((Meta, Identifier), [IdentifierPlus]), TermPlus)
 
 clarifyCase ::
-     Meta
+     TypeEnv
+  -> Meta
   -> [Clause]
   -> Identifier
   -> Identifier
   -> Identifier
   -> WithEnv CodePlus
-clarifyCase m cxtes typeVarName envVarName lamVarName = do
+clarifyCase tenv m cxtes typeVarName envVarName lamVarName = do
   fvs <- constructCaseFVS cxtes m typeVarName envVarName
-  es <- (mapM (clarifyCase' m envVarName) >=> alignFVS m fvs) cxtes
-  (y, e', yVar) <- clarifyPlus (m, TermUpsilon lamVarName)
+  es <- (mapM (clarifyCase' tenv m envVarName) >=> alignFVS tenv m fvs) cxtes
+  (y, e', yVar) <- clarifyPlus tenv (m, TermUpsilon lamVarName)
   let sub = map (\(mx, x, _) -> (x, (mx, DataUpsilon x))) fvs
   let cs = map (\cxte -> fst $ fst cxte) cxtes
   return $ bindLet [(y, e')] (m, CodeCase sub yVar (zip cs es))
@@ -171,49 +173,54 @@ chainCaseClause (((m, _), xts), body) = chainTermPlus (m, TermPiIntro xts body)
 nubFVS :: [IdentifierPlus] -> [IdentifierPlus]
 nubFVS fvs = nubBy (\(_, x, _) (_, y, _) -> x == y) fvs
 
-clarifyCase' :: Meta -> Identifier -> Clause -> WithEnv CodePlus
-clarifyCase' m envVarName ((_, xts), e) = do
-  xts' <- clarifyBinder xts
-  e' <- clarify e >>= linearize (dropFst xts')
+clarifyCase' :: TypeEnv -> Meta -> Identifier -> Clause -> WithEnv CodePlus
+clarifyCase' tenv m envVarName ((_, xts), e) = do
+  xts' <- clarifyBinder tenv xts
+  e' <- clarify tenv e >>= linearize (dropFst xts')
   let xs = map (\(_, x, _) -> x) xts
   return (m, sigmaElim xs (m, DataUpsilon envVarName) e')
 
-clarifyConst :: Meta -> Identifier -> WithEnv CodePlus
-clarifyConst m name@(I (x, _))
-  | Just op <- asUnaryOpMaybe x = clarifyUnaryOp name op m
-  | Just op <- asBinaryOpMaybe x = clarifyBinaryOp name op m
-  | Just _ <- asLowTypeMaybe x = clarify (m, TermEnum $ EnumTypeLabel "top")
-  | Just lowType <- asArrayAccessMaybe x = clarifyArrayAccess m name lowType
-  | x == "os:file-descriptor" = clarify (m, TermEnum $ EnumTypeLabel "top")
-  | x == "os:stdin" = clarify (m, TermEnumIntro (EnumValueIntS 64 0))
-  | x == "os:stdout" = clarify (m, TermEnumIntro (EnumValueIntS 64 1))
-  | x == "os:stderr" = clarify (m, TermEnumIntro (EnumValueIntS 64 2))
-  | x == "unsafe:cast" = clarifyCast m
+clarifyConst :: TypeEnv -> Meta -> Identifier -> WithEnv CodePlus
+clarifyConst tenv m name@(I (x, _))
+  | Just op <- asUnaryOpMaybe x = clarifyUnaryOp tenv name op m
+  | Just op <- asBinaryOpMaybe x = clarifyBinaryOp tenv name op m
+  | Just _ <- asLowTypeMaybe x =
+    clarify tenv (m, TermEnum $ EnumTypeLabel "top")
+  | Just lowType <- asArrayAccessMaybe x =
+    clarifyArrayAccess tenv m name lowType
+  | x == "os:file-descriptor" = clarify tenv (m, TermEnum $ EnumTypeLabel "top")
+  | x == "os:stdin" = clarify tenv (m, TermEnumIntro (EnumValueIntS 64 0))
+  | x == "os:stdout" = clarify tenv (m, TermEnumIntro (EnumValueIntS 64 1))
+  | x == "os:stderr" = clarify tenv (m, TermEnumIntro (EnumValueIntS 64 2))
+  | x == "unsafe:cast" = clarifyCast tenv m
   | otherwise = do
     os <- getOS
     case asSysCallMaybe os x of
-      Just (syscall, argInfo) -> clarifySysCall name syscall argInfo m
+      Just (syscall, argInfo) -> clarifySysCall tenv name syscall argInfo m
       Nothing -> return (m, CodeUpIntro (m, DataTheta $ asText'' name))
 
-clarifyCast :: Meta -> WithEnv CodePlus
-clarifyCast m = do
+clarifyCast :: TypeEnv -> Meta -> WithEnv CodePlus
+clarifyCast tenv m = do
   a <- newNameWith' "t1"
   b <- newNameWith' "t2"
   z <- newNameWith' "z"
   let varA = (m, TermUpsilon a)
   let u = (m, TermTau 0)
   clarify
+    tenv
     (m, TermPiIntro [(m, a, u), (m, b, u), (m, z, varA)] (m, TermUpsilon z))
 
-clarifyUnaryOp :: Identifier -> UnaryOp -> Meta -> WithEnv CodePlus
-clarifyUnaryOp name op m = do
-  t <- lookupTypeEnv' m name
+clarifyUnaryOp :: TypeEnv -> Identifier -> UnaryOp -> Meta -> WithEnv CodePlus
+clarifyUnaryOp tenv name op m = do
+  t <- lookupTypeEnv'' m name tenv
+  -- t <- lookupTypeEnv' m name
   let t' = reduceTermPlus t
   case t' of
     (_, TermPi _ xts@[(mx, x, tx)] _) -> do
       let varX = (mx, DataUpsilon x)
       zts <- complementaryChainOf xts
       retClosure
+        tenv
         (Just $ asText'' name)
         zts
         m
@@ -221,9 +228,11 @@ clarifyUnaryOp name op m = do
         (m, CodeTheta (ThetaUnaryOp op varX))
     _ -> raiseCritical m $ "the arity of " <> asText name <> " is wrong"
 
-clarifyBinaryOp :: Identifier -> BinaryOp -> Meta -> WithEnv CodePlus
-clarifyBinaryOp name op m = do
-  t <- lookupTypeEnv' m name
+clarifyBinaryOp :: TypeEnv -> Identifier -> BinaryOp -> Meta -> WithEnv CodePlus
+clarifyBinaryOp tenv name op m
+  -- t <- lookupTypeEnv' m name
+ = do
+  t <- lookupTypeEnv'' m name tenv
   let t' = reduceTermPlus t
   case t' of
     (_, TermPi _ xts@[(mx, x, tx), (my, y, ty)] _) -> do
@@ -231,6 +240,7 @@ clarifyBinaryOp name op m = do
       let varY = (my, DataUpsilon y)
       zts <- complementaryChainOf xts
       retClosure
+        tenv
         (Just $ asText'' name)
         zts
         m
@@ -238,9 +248,10 @@ clarifyBinaryOp name op m = do
         (m, CodeTheta (ThetaBinaryOp op varX varY))
     _ -> raiseCritical m $ "the arity of " <> asText name <> " is wrong"
 
-clarifyArrayAccess :: Meta -> Identifier -> LowType -> WithEnv CodePlus
-clarifyArrayAccess m name lowType = do
-  arrayAccessType <- lookupTypeEnv' m name
+clarifyArrayAccess ::
+     TypeEnv -> Meta -> Identifier -> LowType -> WithEnv CodePlus
+clarifyArrayAccess tenv m name lowType = do
+  arrayAccessType <- lookupTypeEnv'' m name tenv
   let arrayAccessType' = reduceTermPlus arrayAccessType
   case arrayAccessType' of
     (_, TermPi _ xts cod)
@@ -250,20 +261,21 @@ clarifyArrayAccess m name lowType = do
         case ds of
           [index, arr] -> do
             zts <- complementaryChainOf xts
-            callThenReturn <- toArrayAccessTail m lowType cod arr index xs
+            callThenReturn <- toArrayAccessTail tenv m lowType cod arr index xs
             let body = iterativeApp headerList callThenReturn
-            retClosure (Just $ asText'' name) zts m xts body
+            retClosure tenv (Just $ asText'' name) zts m xts body
           _ -> raiseCritical m $ "the type of array-access is wrong"
     _ -> raiseCritical m $ "the type of array-access is wrong"
 
 clarifySysCall ::
-     Identifier -- the name of theta
+     TypeEnv
+  -> Identifier -- the name of theta
   -> Syscall
   -> [Arg] -- the length of the arguments of the theta
   -> Meta -- the meta of the theta
   -> WithEnv CodePlus
-clarifySysCall name syscall args m = do
-  sysCallType <- lookupTypeEnv' m name
+clarifySysCall tenv name syscall args m = do
+  sysCallType <- lookupTypeEnv'' m name tenv
   let sysCallType' = reduceTermPlus sysCallType
   case sysCallType' of
     (_, TermPi _ xts cod)
@@ -271,9 +283,9 @@ clarifySysCall name syscall args m = do
         zts <- complementaryChainOf xts
         (xs, ds, headerList) <- computeHeader m xts args
         forM_ xts insTypeEnv'
-        callThenReturn <- toSysCallTail m cod syscall ds xs
+        callThenReturn <- toSysCallTail tenv m cod syscall ds xs
         let body = iterativeApp headerList callThenReturn
-        retClosure (Just $ asText'' name) zts m xts body
+        retClosure tenv (Just $ asText'' name) zts m xts body
     _ -> raiseCritical m $ "the type of " <> asText name <> " is wrong"
 
 iterativeApp :: [a -> a] -> a -> a
@@ -285,11 +297,12 @@ complementaryChainOf xts = do
   tenv <- gets typeEnv
   nubFVS <$> chainTermPlus'' tenv xts []
 
-clarifyBinder :: [IdentifierPlus] -> WithEnv [(Meta, Identifier, CodePlus)]
-clarifyBinder [] = return []
-clarifyBinder ((m, x, t):xts) = do
-  t' <- clarify t
-  xts' <- clarifyBinder xts
+clarifyBinder ::
+     TypeEnv -> [IdentifierPlus] -> WithEnv [(Meta, Identifier, CodePlus)]
+clarifyBinder _ [] = return []
+clarifyBinder tenv ((m, x, t):xts) = do
+  t' <- clarify tenv t
+  xts' <- clarifyBinder tenv xts
   return $ (m, x, t') : xts'
 
 knot :: Meta -> Identifier -> DataPlus -> WithEnv ()
@@ -397,30 +410,32 @@ computeHeader m xts argInfoList = do
   return (concat xss, concat dss, headerList)
 
 toSysCallTail ::
-     Meta
+     TypeEnv
+  -> Meta
   -> TermPlus -- cod type
   -> Syscall -- read, write, open, etc
   -> [DataPlus] -- args of syscall
   -> [Identifier] -- borrowed variables
   -> WithEnv CodePlus
-toSysCallTail m cod syscall args xs = do
+toSysCallTail tenv m cod syscall args xs = do
   resultVarName <- newNameWith' "result"
-  result <- retWithBorrowedVars m cod xs resultVarName
+  result <- retWithBorrowedVars tenv m cod xs resultVarName
   return
     ( m
     , CodeUpElim resultVarName (m, CodeTheta (ThetaSysCall syscall args)) result)
 
 toArrayAccessTail ::
-     Meta
+     TypeEnv
+  -> Meta
   -> LowType
   -> TermPlus -- cod type
   -> DataPlus -- array (inner)
   -> DataPlus -- index
   -> [Identifier] -- borrowed variables
   -> WithEnv CodePlus
-toArrayAccessTail m lowType cod arr index xs = do
+toArrayAccessTail tenv m lowType cod arr index xs = do
   resultVarName <- newNameWith' "result"
-  result <- retWithBorrowedVars m cod xs resultVarName
+  result <- retWithBorrowedVars tenv m cod xs resultVarName
   return
     ( m
     , CodeUpElim
@@ -429,16 +444,21 @@ toArrayAccessTail m lowType cod arr index xs = do
         result)
 
 retWithBorrowedVars ::
-     Meta -> TermPlus -> [Identifier] -> Identifier -> WithEnv CodePlus
-retWithBorrowedVars m _ [] resultVarName =
+     TypeEnv
+  -> Meta
+  -> TermPlus
+  -> [Identifier]
+  -> Identifier
+  -> WithEnv CodePlus
+retWithBorrowedVars _ m _ [] resultVarName =
   return (m, CodeUpIntro (m, DataUpsilon resultVarName))
-retWithBorrowedVars m cod xs resultVarName = do
+retWithBorrowedVars tenv m cod xs resultVarName = do
   (zu, kp@(mk, k, sigArgs)) <- sigToPi m cod
   -- sigArgs = [BORRORED, ..., BORROWED, ACTUAL_RESULT]
   (mResult, resultType) <- rightmostOf sigArgs
   let vs = map (\x -> (m, TermUpsilon x)) $ xs ++ [resultVarName]
   insTypeEnv' (mResult, resultVarName, resultType)
-  clarify (m, TermPiIntro [zu, kp] (m, TermPiElim (mk, TermUpsilon k) vs))
+  clarify tenv (m, TermPiIntro [zu, kp] (m, TermPiElim (mk, TermUpsilon k) vs))
 
 inferKind :: Meta -> ArrayKind -> WithEnv TermPlus
 inferKind m (ArrayKindIntS i) = return (m, TermEnum (EnumTypeIntS i))
@@ -509,37 +529,40 @@ registerIfNecessary m name xts1 xts2 e = do
     insCodeEnv name args body
 
 makeClosure' ::
-     Maybe T.Text -- the name of newly created closure
+     TypeEnv
+  -> Maybe T.Text -- the name of newly created closure
   -> [IdentifierPlus] -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
   -> Meta -- meta of lambda
   -> [IdentifierPlus] -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
   -> CodePlus -- the `e` in `lam (x1, ..., xn). e`
   -> WithEnv DataPlus
-makeClosure' mName fvs m xts e = do
-  fvs' <- clarifyBinder fvs
-  xts' <- clarifyBinder xts
+makeClosure' tenv mName fvs m xts e = do
+  fvs' <- clarifyBinder tenv fvs
+  xts' <- clarifyBinder tenv xts
   makeClosure mName fvs' m xts' e
 
 retClosure ::
-     Maybe T.Text -- the name of newly created closure
+     TypeEnv
+  -> Maybe T.Text -- the name of newly created closure
   -> [IdentifierPlus] -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
   -> Meta -- meta of lambda
   -> [IdentifierPlus] -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
   -> CodePlus -- the `e` in `lam (x1, ..., xn). e`
   -> WithEnv CodePlus
-retClosure mName fvs m xts e = do
-  cls <- makeClosure' mName fvs m xts e
+retClosure tenv mName fvs m xts e = do
+  cls <- makeClosure' tenv mName fvs m xts e
   return (m, CodeUpIntro cls)
 
 retClosure' ::
-     Identifier -- the name of newly created closure
+     TypeEnv
+  -> Identifier -- the name of newly created closure
   -> [IdentifierPlus] -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
   -> Meta -- meta of lambda
   -> [IdentifierPlus] -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
   -> CodePlus -- the `e` in `lam (x1, ..., xn). e`
   -> WithEnv CodePlus
-retClosure' x fvs m xts e = do
-  cls <- makeClosure' (Just $ asText'' x) fvs m xts e
+retClosure' tenv x fvs m xts e = do
+  cls <- makeClosure' tenv (Just $ asText'' x) fvs m xts e
   knot m x cls
   return (m, CodeUpIntro cls)
 
