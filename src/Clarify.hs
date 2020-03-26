@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 --
--- clarification == polarization + closure conversion + linearization (+ rename, for LLVM IR)
+-- clarification == polarization + closure conversion + linearization
 --
 module Clarify
   ( clarify
