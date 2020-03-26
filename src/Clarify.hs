@@ -107,15 +107,15 @@ clarify (m, TermArrayElim k mxts e1 e2) = do
   e1' <- clarify e1
   let (_, xs, _) = unzip3 mxts
   forM_ mxts insTypeEnv'
-  (arrVarName, arrVar) <- newDataUpsilonWith m "arr"
-  (arrTypeVarName, _) <- newDataUpsilonWith m "arr-type"
-  (arrInnerVarName, arrInnerVar) <- newDataUpsilonWith m "arr-inner"
+  (arr, arrVar) <- newDataUpsilonWith m "arr"
+  arrType <- newNameWith' "arr-type"
+  (arrInner, arrInnerVar) <- newDataUpsilonWith m "arr-inner"
   e2' <- clarify e2
   return $
-    bindLet [(arrVarName, e1')] $
+    bindLet [(arr, e1')] $
     ( m
     , sigmaElim
-        [arrTypeVarName, arrInnerVarName]
+        [arrType, arrInner]
         arrVar
         (m, CodeSigmaElim k xs arrInnerVar e2'))
 clarify (m, TermStruct ks) = do
@@ -132,20 +132,16 @@ clarify (m, TermStructElim xks e1 e2) = do
   ts <- mapM (inferKind m) ks
   forM_ (zip3 ms xs ts) insTypeEnv'
   e2' <- clarify e2
-  (structVarName, structVar) <- newDataUpsilonWith m "struct"
-  return $
-    bindLet [(structVarName, e1')] (m, CodeStructElim (zip xs ks) structVar e2')
+  (struct, structVar) <- newDataUpsilonWith m "struct"
+  return $ bindLet [(struct, e1')] (m, CodeStructElim (zip xs ks) structVar e2')
 clarify (m, TermCase (e, _) cxtes) = do
   e' <- clarify e
-  (clsVarName, clsVar) <- newDataUpsilonWith m "case-closure"
-  typeVarName <- newNameWith' "case-exp"
-  envVarName <- newNameWith' "case-env"
-  lamVarName <- newNameWith' "label"
-  cxtes' <- clarifyCase m cxtes typeVarName envVarName lamVarName
-  return $
-    bindLet
-      [(clsVarName, e')]
-      (m, sigmaElim [typeVarName, envVarName, lamVarName] clsVar cxtes')
+  (cls, clsVar) <- newDataUpsilonWith m "case-closure"
+  res <- newNameWith' "case-res"
+  env <- newNameWith' "case-env"
+  lam <- newNameWith' "label"
+  cxtes' <- clarifyCase m cxtes res env lam
+  return $ bindLet [(cls, e')] (m, sigmaElim [res, env, lam] clsVar cxtes')
 
 clarifyPlus :: TermPlus -> WithEnv (Identifier, CodePlus, DataPlus)
 clarifyPlus e@(m, _) = do
