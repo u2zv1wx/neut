@@ -369,10 +369,12 @@ llvmCodeEnumElim v branchList = do
       (cast, castThen) <- llvmCast (Just "enum-base") v t
       castThen $ LLVMSwitch (cast, t) defaultCase caseList
 
-llvmCodeCase :: Meta -> DataPlus -> [(T.Text, CodePlus)] -> WithEnv LLVM
+llvmCodeCase ::
+     Meta -> DataPlus -> [((Meta, Identifier), CodePlus)] -> WithEnv LLVM
 llvmCodeCase _ _ [] = return LLVMUnreachable
 llvmCodeCase _ _ [(_, code)] = llvmCode code
-llvmCodeCase m v ((c, code):branchList) = do
+llvmCodeCase m v (((mc, x), code):branchList) = do
+  c <- lookupRevCaseEnv mc $ asInt x
   funPtrType <- getLabelType m c
   code' <- llvmCode code
   cont <- llvmCodeCase m v branchList
@@ -630,3 +632,10 @@ renameLLVMOp nenv (LLVMOpBinaryOp op d1 d2) = do
 renameLLVMOp nenv (LLVMOpSysCall i ds) = do
   ds' <- mapM (renameLLVMData nenv) ds
   return $ LLVMOpSysCall i ds'
+
+lookupRevCaseEnv :: Meta -> Int -> WithEnv T.Text
+lookupRevCaseEnv m i = do
+  renv <- gets revCaseEnv
+  case IntMap.lookup i renv of
+    Nothing -> raiseCritical m $ "revCaseEnv"
+    Just label -> return label

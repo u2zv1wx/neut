@@ -32,7 +32,8 @@ data Code
   | CodeUpElim Identifier CodePlus CodePlus
   | CodeEnumElim SubstDataPlus DataPlus [(Case, CodePlus)]
   | CodeStructElim [(Identifier, ArrayKind)] DataPlus CodePlus
-  | CodeCase SubstDataPlus DataPlus [(T.Text, CodePlus)]
+  -- | CodeCase SubstDataPlus DataPlus [(T.Text, CodePlus)]
+  | CodeCase SubstDataPlus DataPlus [((Meta, Identifier), CodePlus)]
   deriving (Show)
 
 data Theta

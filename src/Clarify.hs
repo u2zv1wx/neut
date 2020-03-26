@@ -12,7 +12,8 @@ import Control.Monad.State
 import Data.List (nubBy)
 
 import qualified Data.HashMap.Strict as Map
-import qualified Data.IntMap.Strict as IntMap
+
+-- import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Text as T
 
 import Clarify.Closure
@@ -168,9 +169,8 @@ clarifyCase m cxtes typeVarName envVarName lamVarName = do
   es <- (mapM (clarifyCase' m envVarName) >=> alignFVS m fvs) cxtes
   (y, e', yVar) <- clarifyPlus (m, TermUpsilon lamVarName)
   let sub = map (\(mx, x, _) -> (x, (mx, DataUpsilon x))) fvs
-  let is = map (\cxte -> asInt $ snd $ fst $ fst cxte) cxtes
-  cs' <- mapM (lookupRevCaseEnv m) is
-  return $ bindLet [(y, e')] (m, CodeCase sub yVar (zip cs' es))
+  let cs = map (\cxte -> fst $ fst cxte) cxtes
+  return $ bindLet [(y, e')] (m, CodeCase sub yVar (zip cs es))
 
 constructCaseFVS ::
      [(((Meta, Identifier), [IdentifierPlus]), TermPlus)]
@@ -181,15 +181,9 @@ constructCaseFVS ::
 constructCaseFVS cxtes m typeVarName envVarName = do
   fvss <- mapM chainCaseClause cxtes
   let fvs = nubBy (\(_, x, _) (_, y, _) -> x == y) $ concat fvss
-  return $ caseFVS m typeVarName envVarName fvs
-
-caseFVS ::
-     Meta -> Identifier -> Identifier -> [IdentifierPlus] -> [IdentifierPlus]
-caseFVS m typeVarName envVarName fvs = do
-  let typeVarPlus = (m, typeVarName, (m, TermTau 0))
-  let typeVar = (m, TermUpsilon typeVarName)
-  let envVarPlus = (m, envVarName, typeVar)
-  [typeVarPlus, envVarPlus] ++ fvs
+  return $
+    (m, typeVarName, (m, TermTau 0)) :
+    (m, envVarName, (m, TermUpsilon typeVarName)) : fvs
 
 chainCaseClause ::
      (((Meta, Identifier), [IdentifierPlus]), TermPlus)
@@ -207,22 +201,10 @@ clarifyCase' ::
   -> (((Meta, Identifier), [IdentifierPlus]), TermPlus)
   -> WithEnv CodePlus
 clarifyCase' m envVarName ((_, xts), e) = do
-  xts' <- mapM clarifyArgs xts
-  e' <- clarify e >>= linearize xts'
+  xts' <- clarifyBinder xts
+  e' <- clarify e >>= linearize (dropFst xts')
   let xs = map (\(_, x, _) -> x) xts
   return (m, sigmaElim xs (m, DataUpsilon envVarName) e')
-
-lookupRevCaseEnv :: Meta -> Int -> WithEnv T.Text
-lookupRevCaseEnv m i = do
-  renv <- gets revCaseEnv
-  case IntMap.lookup i renv of
-    Nothing -> raiseCritical m $ "revCaseEnv"
-    Just label -> return label
-
-clarifyArgs :: IdentifierPlus -> WithEnv (Identifier, CodePlus)
-clarifyArgs (_, x, t) = do
-  t' <- clarify t
-  return (x, t')
 
 clarifyConst :: Meta -> Identifier -> WithEnv CodePlus
 clarifyConst m name@(I (x, _))
@@ -332,9 +314,6 @@ complementaryChainOf xts = do
   zts <- chainTermPlus'' tenv xts []
   return $ nubBy (\(_, x, _) (_, y, _) -> x == y) zts
 
-toVar :: Meta -> Identifier -> DataPlus
-toVar m x = (m, DataUpsilon x)
-
 clarifyBinder :: [IdentifierPlus] -> WithEnv [(Meta, Identifier, CodePlus)]
 clarifyBinder [] = return []
 clarifyBinder ((m, x, t):xts) = do
@@ -436,7 +415,7 @@ toHeaderInfo ::
   -> TermPlus -- the type of argument
   -> Arg -- the way of use of argument (specifically)
   -> WithEnv ([Identifier], [DataPlus], CodePlus -> CodePlus) -- ([borrow], arg-to-syscall, ADD_HEADER_TO_CONTINUATION)
-toHeaderInfo m x _ ArgImm = return ([], [toVar m x], id)
+toHeaderInfo m x _ ArgImm = return ([], [(m, DataUpsilon x)], id)
 toHeaderInfo _ _ _ ArgUnused = return ([], [], id)
 toHeaderInfo m x t ArgStruct = do
   (structVarName, structVar) <- newDataUpsilonWith m "struct"
@@ -444,7 +423,8 @@ toHeaderInfo m x t ArgStruct = do
   return
     ( [structVarName]
     , [structVar]
-    , \cont -> (m, CodeUpElim structVarName (m, CodeUpIntro (toVar m x)) cont))
+    , \cont ->
+        (m, CodeUpElim structVarName (m, CodeUpIntro (m, DataUpsilon x)) cont))
 toHeaderInfo m x t ArgArray = do
   arrayVarName <- newNameWith' "array"
   insTypeEnv' (m, arrayVarName, t)
@@ -458,7 +438,7 @@ toHeaderInfo m x t ArgArray = do
         ( m
         , sigmaElim
             [arrayTypeName, arrayInnerName]
-            (toVar m x)
+            (m, DataUpsilon x)
             ( m
             , CodeUpElim
                 arrayInnerTmpName

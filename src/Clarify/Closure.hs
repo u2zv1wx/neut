@@ -6,6 +6,7 @@ module Clarify.Closure
   , chainTermPlus
   , chainTermPlus'
   , chainTermPlus''
+  , dropFst
   ) where
 
 import Control.Monad.Except
