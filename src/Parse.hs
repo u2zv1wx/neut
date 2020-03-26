@@ -297,7 +297,6 @@ parse' (a:as) = do
           defList <- parse' as
           modify
             (\env -> env {nonCandSet = S.insert (asText name) (nonCandSet env)})
-          -- let m' = m {metaIsAppropriateAsCompletionCandidate = False}
           return $ QuasiStmtLet m' (m', name, t) e' : defList
 
 withSectionPrefix :: T.Text -> WithEnv T.Text

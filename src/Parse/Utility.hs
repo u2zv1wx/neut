@@ -140,9 +140,6 @@ filterCompInfo prefix (I (x, _), _) = do
   nenv <- gets nonCandSet
   return $ prefix `T.isPrefixOf` x && not (S.member x nenv)
 
--- filterCompInfo prefix (I (x, _), m)
---   | True <- metaIsAppropriateAsCompletionCandidate m = prefix `T.isPrefixOf` x
---   | otherwise = False
 type Prefix = T.Text
 
 headTailMaybe :: [a] -> Maybe (a, [a])

@@ -91,7 +91,6 @@ interpret (m, TreeNode ((_, TreeLeaf "zeta"):rest))
     (_, x') <- interpretLeaf x
     m' <- adjustPhase m
     modify (\env -> env {nonCandSet = S.insert (asText x') (nonCandSet env)})
-    -- let m'' = m' {metaIsAppropriateAsCompletionCandidate = False}
     return (m', WeakTermZeta x')
   | otherwise = raiseSyntaxError m "(zeta LEAF)"
 interpret (m, TreeNode ((_, TreeLeaf "constant"):rest))
@@ -327,7 +326,6 @@ interpretIter t = raiseSyntaxError (fst t) "(TREE (TREE ... TREE) TREE)"
 interpretLeaf :: TreePlus -> WithEnv (Meta, Identifier)
 interpretLeaf (m, TreeLeaf "_") = do
   m' <- adjustPhase m
-  -- let m'' = m' {metaIsAppropriateAsCompletionCandidate = False}
   h <- newNameWith'' "H"
   modify (\env -> env {nonCandSet = S.insert (asText h) (nonCandSet env)})
   return (m', h)
@@ -342,10 +340,6 @@ interpretEnumValueMaybe t =
 
 interpretEnumValue :: TreePlus -> WithEnv EnumValue
 interpretEnumValue (_, TreeLeaf x) = return $ EnumValueLabel x
-  -- b <- isDefinedEnumValue x
-  -- if b
-  --   then return $ EnumValueLabel x
-    -- else raiseError m $ "no such enum-value is defined: " <> x
 interpretEnumValue e@(m, TreeNode [(_, TreeLeaf t), (_, TreeLeaf x)]) = do
   let mv1 = readEnumValueIntS t x
   let mv2 = readEnumValueIntU t x
