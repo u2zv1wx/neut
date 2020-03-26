@@ -1,10 +1,13 @@
 module Parse.Utility where
 
 import Control.Monad
+import Control.Monad.State
 
+import qualified Data.Set as S
 import qualified Data.Text as T
 
 import Data.Basic
+import Data.Env
 import Data.WeakTerm
 
 type CompInfo = [(Identifier, Meta)]
@@ -132,11 +135,14 @@ compInfoSigma s info ((mx, x, t):xts) = do
   let info' = (x, mx) : info
   compInfoSigma s info' xts
 
-filterCompInfo :: Prefix -> (Identifier, Meta) -> Bool
-filterCompInfo prefix (I (x, _), m)
-  | True <- metaIsAppropriateAsCompletionCandidate m = prefix `T.isPrefixOf` x
-  | otherwise = False
+filterCompInfo :: Prefix -> (Identifier, Meta) -> WithEnv Bool
+filterCompInfo prefix (I (x, _), _) = do
+  nenv <- gets nonCandSet
+  return $ prefix `T.isPrefixOf` x && not (S.member x nenv)
 
+-- filterCompInfo prefix (I (x, _), m)
+--   | True <- metaIsAppropriateAsCompletionCandidate m = prefix `T.isPrefixOf` x
+--   | otherwise = False
 type Prefix = T.Text
 
 headTailMaybe :: [a] -> Maybe (a, [a])

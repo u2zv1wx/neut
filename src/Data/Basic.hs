@@ -65,8 +65,6 @@ data Meta =
   Meta
     { metaFileName :: Path Abs File
     , metaLocation :: Loc
-    , metaConstraintLocation :: Loc
-    , metaIsAppropriateAsCompletionCandidate :: Bool
     , metaUnivParams :: UnivParams
     , metaIsExplicit :: Bool
     }
@@ -84,32 +82,47 @@ instance Ord Meta where
 showMeta :: Meta -> String
 showMeta m = do
   let name = metaFileName m
-  let (_, l, c) = metaConstraintLocation m
+  let (_, l, c) = metaLocation m
   toFilePath name ++ ":" ++ show l ++ ":" ++ show c
 
 showMeta' :: Meta -> String
 showMeta' m = do
   let name = metaFileName m
-  let (ph, l, c) = metaConstraintLocation m
+  let (ph, l, c) = metaLocation m
   toFilePath name ++ ":" ++ show ph ++ ":" ++ show l ++ ":" ++ show c
 
 supMeta :: Meta -> Meta -> Meta
-supMeta m1 m2
-  | metaConstraintLocation m1 < metaConstraintLocation m2 =
-    m1
-      { metaConstraintLocation = metaConstraintLocation m2
-      -- , metaFileName = metaFileName m2
-      }
-  | otherwise = m1
+supMeta m1 m2 =
+  Meta
+    { metaFileName = supFileName m1 m2
+    , metaLocation = supLocation m1 m2
+    , metaUnivParams = supUnivParams m1 m2
+    , metaIsExplicit = False
+    }
+
+supFileName :: Meta -> Meta -> Path Abs File
+supFileName m1 m2 =
+  case metaLocation m1 `compare` metaLocation m2 of
+    GT -> metaFileName m1
+    _ -> metaFileName m2
+
+supLocation :: Meta -> Meta -> Loc
+supLocation m1 m2 =
+  case metaLocation m1 `compare` metaLocation m2 of
+    GT -> metaLocation m1
+    _ -> metaLocation m2
+
+supUnivParams :: Meta -> Meta -> UnivParams
+supUnivParams m1 m2 = do
+  let up1 = metaUnivParams m1
+  let up2 = metaUnivParams m2
+  undefined
 
 newMeta :: Int -> Int -> Path Abs File -> Meta
 newMeta l c path = do
   Meta
     { metaFileName = path
     , metaLocation = (0, l, c)
-    , metaConstraintLocation = (0, l, c)
-    -- , metaIsPublic = True
-    , metaIsAppropriateAsCompletionCandidate = True
     , metaUnivParams = IntMap.empty
     , metaIsExplicit = False
     }

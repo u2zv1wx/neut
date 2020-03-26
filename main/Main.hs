@@ -17,7 +17,6 @@ import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Compression.GZip as GZip
 import qualified Data.ByteString.Lazy as L
 
--- import qualified Data.IntMap.Strict as IntMap
 import Clarify
 import Data.Env
 import Elaborate

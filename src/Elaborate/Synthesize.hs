@@ -186,8 +186,8 @@ throwTypeErrors = do
 setupPosInfo :: [EnrichedConstraint] -> [(PosInfo, PreConstraint)]
 setupPosInfo [] = []
 setupPosInfo ((Enriched (e1, e2) _ _):cs) = do
-  let pos1 = getConstraintPosInfo $ metaOf e1
-  let pos2 = getConstraintPosInfo $ metaOf e2
+  let pos1 = getPosInfo $ metaOf e1
+  let pos2 = getPosInfo $ metaOf e2
   case snd pos1 `compare` snd pos2 of
     LT -> (pos2, (e2, e1)) : setupPosInfo cs
     EQ -> (pos1, (e1, e2)) : setupPosInfo cs
@@ -206,9 +206,6 @@ constructErrorMsg :: WeakTermPlus -> WeakTermPlus -> T.Text
 constructErrorMsg e1 e2 =
   "couldn't verify the definitional equality of the following two terms:\n- " <>
   toText e1 <> "\n- " <> toText e2
-
-getConstraintPosInfo :: Meta -> PosInfo
-getConstraintPosInfo m = (metaFileName m, metaConstraintLocation m)
 
 unravel :: WeakTermPlus -> WithEnv WeakTermPlus
 unravel (m, WeakTermTau l) = return (m, WeakTermTau l)

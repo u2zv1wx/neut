@@ -20,6 +20,7 @@ import Data.Word (Word8)
 import Text.Read (readMaybe)
 
 import qualified Data.HashMap.Strict as Map
+import qualified Data.Set as S
 import qualified Data.Text as T
 
 import Data.Basic
@@ -89,8 +90,9 @@ interpret (m, TreeNode ((_, TreeLeaf "zeta"):rest))
   | [x@(_, TreeLeaf _)] <- rest = do
     (_, x') <- interpretLeaf x
     m' <- adjustPhase m
-    let m'' = m' {metaIsAppropriateAsCompletionCandidate = False}
-    return (m'', WeakTermZeta x')
+    modify (\env -> env {nonCandSet = S.insert (asText x') (nonCandSet env)})
+    -- let m'' = m' {metaIsAppropriateAsCompletionCandidate = False}
+    return (m', WeakTermZeta x')
   | otherwise = raiseSyntaxError m "(zeta LEAF)"
 interpret (m, TreeNode ((_, TreeLeaf "constant"):rest))
   | [(_, TreeLeaf x)] <- rest = do
@@ -325,9 +327,10 @@ interpretIter t = raiseSyntaxError (fst t) "(TREE (TREE ... TREE) TREE)"
 interpretLeaf :: TreePlus -> WithEnv (Meta, Identifier)
 interpretLeaf (m, TreeLeaf "_") = do
   m' <- adjustPhase m
-  let m'' = m' {metaIsAppropriateAsCompletionCandidate = False}
+  -- let m'' = m' {metaIsAppropriateAsCompletionCandidate = False}
   h <- newNameWith'' "H"
-  return (m'', h)
+  modify (\env -> env {nonCandSet = S.insert (asText h) (nonCandSet env)})
+  return (m', h)
 interpretLeaf (m, TreeLeaf x) = do
   m' <- adjustPhase m
   return (m', asIdent x)
@@ -575,7 +578,7 @@ adjustPhase :: Meta -> WithEnv Meta
 adjustPhase m = do
   i <- gets phase
   let newLoc = adjustPhase' i (metaLocation m)
-  return $ m {metaLocation = newLoc, metaConstraintLocation = newLoc}
+  return $ m {metaLocation = newLoc}
 
 adjustPhase' :: Int -> Loc -> Loc
 adjustPhase' i (_, l, c) = (i, l, c)

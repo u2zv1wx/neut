@@ -70,6 +70,7 @@ data Env =
     , inductiveEnv :: RuleEnv -- "list" ~> (cons, Pi (A : tau). A -> list A -> list A)
     , coinductiveEnv :: RuleEnv -- "tail" ~> (head, Pi (A : tau). stream A -> A)
     , introEnv :: S.Set Int -- set of the names of constructors (e.g. ["nil", "cons", "zero", "succ", ...] (as int))
+    , nonCandSet :: S.Set T.Text
     -- elaborate
     , impEnv :: IntMap.IntMap [Int] -- var ~> (index of implicit arguments of the var)
     , weakTypeEnv :: IntMap.IntMap (WeakTermPlus, UnivLevelPlus) -- var ~> (typeof(var), level-of-type)
@@ -120,6 +121,7 @@ initialEnv =
     , inductiveEnv = Map.empty
     , coinductiveEnv = Map.empty
     , introEnv = S.empty
+    , nonCandSet = S.empty
     , labelEnv = Map.empty
     , equalityEnv = []
     , univInstEnv = IntMap.empty

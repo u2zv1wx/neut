@@ -91,7 +91,7 @@ parseForCompletion inputPath l c = do
       case compInfo s stmtList of
         Right () -> return []
         Left info -> do
-          let info' = filter (filterCompInfo prefix) info
+          info' <- filterM (filterCompInfo prefix) info
           let compareLoc m1 m2 = metaLocation m2 `compare` metaLocation m1
           return $ nub $ sortBy (\(_, m1) (_, m2) -> compareLoc m1 m2) info'
 
@@ -292,9 +292,12 @@ parse' (a:as) = do
             return $ QuasiStmtLetSigma m xts app : defList
         (m, _) -> do
           name <- newNameWith'' "hole"
-          t <- newHole m
+          m' <- adjustPhase m
+          t <- newHole m'
           defList <- parse' as
-          let m' = m {metaIsAppropriateAsCompletionCandidate = False}
+          modify
+            (\env -> env {nonCandSet = S.insert (asText name) (nonCandSet env)})
+          -- let m' = m {metaIsAppropriateAsCompletionCandidate = False}
           return $ QuasiStmtLet m' (m', name, t) e' : defList
 
 withSectionPrefix :: T.Text -> WithEnv T.Text
