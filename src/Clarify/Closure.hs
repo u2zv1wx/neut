@@ -73,13 +73,13 @@ nameFromMaybe mName =
     Just lamThetaName -> return lamThetaName
     Nothing -> asText' <$> newNameWith' "thunk"
 
-chainTermPlus :: TermPlus -> WithEnv [(Meta, Identifier, TermPlus)]
+chainTermPlus :: TermPlus -> WithEnv [IdentifierPlus]
 chainTermPlus e = do
   tenv <- gets typeEnv
   tmp <- chainTermPlus' tenv e
   return $ nubBy (\(_, x, _) (_, y, _) -> x == y) tmp
 
-chainTermPlus' :: TypeEnv -> TermPlus -> WithEnv [(Meta, Identifier, TermPlus)]
+chainTermPlus' :: TypeEnv -> TermPlus -> WithEnv [IdentifierPlus]
 chainTermPlus' _ (_, TermTau _) = return []
 chainTermPlus' tenv (m, TermUpsilon x) = do
   t <- lookupTypeEnv'' m x tenv
@@ -147,10 +147,7 @@ chainTermPlus' tenv (_, TermCase (e, t) cxtes) = do
   return $ xs ++ ys ++ zs
 
 chainTermPlus'' ::
-     TypeEnv
-  -> [(Meta, Identifier, TermPlus)]
-  -> [TermPlus]
-  -> WithEnv [(Meta, Identifier, TermPlus)]
+     TypeEnv -> [IdentifierPlus] -> [TermPlus] -> WithEnv [IdentifierPlus]
 chainTermPlus'' tenv [] es = concat <$> mapM (chainTermPlus' tenv) es
 chainTermPlus'' tenv ((_, x, t):xts) es = do
   xs1 <- chainTermPlus' tenv t
