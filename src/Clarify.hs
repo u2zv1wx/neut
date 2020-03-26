@@ -234,33 +234,29 @@ clarifyArgs (_, x, t) = do
 clarifyConst :: Meta -> Identifier -> WithEnv CodePlus
 clarifyConst m name@(I (x, _))
   | Just op <- asUnaryOpMaybe x = clarifyUnaryOp name op m
-clarifyConst m name@(I (x, _))
   | Just op <- asBinaryOpMaybe x = clarifyBinaryOp name op m
-clarifyConst m (I (x, _))
   | Just _ <- asLowTypeMaybe x = clarify (m, TermEnum $ EnumTypeLabel "top")
-clarifyConst m name@(I (x, _))
   | Just lowType <- asArrayAccessMaybe x = clarifyArrayAccess m name lowType
-clarifyConst m (I ("os:file-descriptor", _)) =
-  clarify (m, TermEnum $ EnumTypeLabel "top")
-clarifyConst m (I ("os:stdin", _)) =
-  clarify (m, TermEnumIntro (EnumValueIntS 64 0))
-clarifyConst m (I ("os:stdout", _)) =
-  clarify (m, TermEnumIntro (EnumValueIntS 64 1))
-clarifyConst m (I ("os:stderr", _)) =
-  clarify (m, TermEnumIntro (EnumValueIntS 64 2))
-clarifyConst m (I ("unsafe:cast", _)) = do
+  | x == "os:file-descriptor" = clarify (m, TermEnum $ EnumTypeLabel "top")
+  | x == "os:stdin" = clarify (m, TermEnumIntro (EnumValueIntS 64 0))
+  | x == "os:stdout" = clarify (m, TermEnumIntro (EnumValueIntS 64 1))
+  | x == "os:stderr" = clarify (m, TermEnumIntro (EnumValueIntS 64 2))
+  | x == "unsafe:cast" = clarifyCast m
+  | otherwise = do
+    os <- getOS
+    case asSysCallMaybe os x of
+      Just (syscall, argInfo) -> clarifySysCall name syscall argInfo m
+      Nothing -> return (m, CodeUpIntro (m, DataTheta $ asText'' name))
+
+clarifyCast :: Meta -> WithEnv CodePlus
+clarifyCast m = do
   a <- newNameWith' "t1"
   b <- newNameWith' "t2"
-  x <- newNameWith' "x"
+  z <- newNameWith' "z"
   let varA = (m, TermUpsilon a)
   let u = (m, TermTau 0)
   clarify
-    (m, TermPiIntro [(m, a, u), (m, b, u), (m, x, varA)] (m, TermUpsilon x))
-clarifyConst m name@(I (x, _)) = do
-  os <- getOS
-  case asSysCallMaybe os x of
-    Just (syscall, argInfo) -> clarifySysCall name syscall argInfo m
-    Nothing -> return (m, CodeUpIntro (m, DataTheta $ asText'' name))
+    (m, TermPiIntro [(m, a, u), (m, b, u), (m, z, varA)] (m, TermUpsilon z))
 
 clarifyUnaryOp :: Identifier -> UnaryOp -> Meta -> WithEnv CodePlus
 clarifyUnaryOp name op m = do
@@ -553,13 +549,10 @@ inferKind m (ArrayKindFloat size) = do
   return (m, TermConst (I (constName, i)))
 inferKind m _ = raiseCritical m "inferKind for void-pointer"
 
-sigToPi :: Meta -> [Data.Term.IdentifierPlus] -> WithEnv TermPlus
+sigToPi :: Meta -> [IdentifierPlus] -> WithEnv TermPlus
 sigToPi m xts = do
   z <- newNameWith' "sigma"
   let zv = toTermUpsilon m z
   k <- newNameWith' "sig"
-  -- Sigma [x1 : A1, ..., xn : An] = Pi (z : Type, _ : Pi [x1 : A1, ..., xn : An]. z). z
-  -- don't care the level since they're discarded immediately
-  -- (i.e. this translated term is not used as an argument of `weaken`)
   return
     (m, TermPi [] [(m, z, (m, TermTau 0)), (m, k, (m, TermPi [] xts zv))] zv)
