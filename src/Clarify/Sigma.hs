@@ -37,11 +37,7 @@ cartesianSigma (I (thetaName, i)) m k mxts = do
       insCodeEnv
         ident
         [switchVarName, argVarName]
-        ( m
-        , CodeEnumElim
-            [(argVarName, argVar)]
-            switchVar
-            [(CaseValue (EnumValueIntS 64 0), aff), (CaseDefault, rel)])
+        (m, CodeEnumElim [(argVarName, argVar)] switchVar (switch aff rel))
       return theta
 
 -- (Assuming `ti` = `return di` for some `di` such that `xi : di`)

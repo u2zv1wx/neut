@@ -65,6 +65,9 @@ toThetaInfo thetaName m = do
   let ident = asText' $ I (thetaName, i)
   return (ident, (m, DataTheta ident))
 
+switch :: CodePlus -> CodePlus -> [(Case, CodePlus)]
+switch e1 e2 = [(CaseValue (EnumValueIntS 64 0), e1), (CaseDefault, e2)]
+
 cartesianImmediate :: Meta -> WithEnv DataPlus
 cartesianImmediate m = do
   cenv <- gets codeEnv
@@ -79,11 +82,7 @@ cartesianImmediate m = do
       insCodeEnv
         ident
         [switchVarName, argVarName]
-        ( m
-        , CodeEnumElim
-            [(argVarName, argVar)]
-            switchVar
-            [(CaseValue (EnumValueIntS 64 0), aff), (CaseDefault, rel)])
+        (m, CodeEnumElim [(argVarName, argVar)] switchVar (switch aff rel))
       return theta
 
 affineImmediate :: DataPlus -> WithEnv CodePlus
@@ -108,11 +107,7 @@ cartesianStruct m ks = do
       insCodeEnv
         ident
         [switchVarName, argVarName]
-        ( m
-        , CodeEnumElim
-            [(argVarName, argVar)]
-            switchVar
-            [(CaseValue (EnumValueIntS 64 0), aff), (CaseDefault, rel)])
+        (m, CodeEnumElim [(argVarName, argVar)] switchVar (switch aff rel))
       return theta
 
 affineStruct :: DataPlus -> [ArrayKind] -> WithEnv CodePlus
@@ -128,8 +123,7 @@ affineStruct argVar@(m, _) ks = do
 relevantStruct :: DataPlus -> [ArrayKind] -> WithEnv CodePlus
 relevantStruct argVar@(m, _) ks = do
   xs <- mapM (const $ newNameWith' "var") ks
-  let vs = map (\y -> (m, DataUpsilon y)) xs
-  let vks = zip vs ks
+  let vks = zip (map (\y -> (m, DataUpsilon y)) xs) ks
   return
     ( m
     , CodeStructElim
