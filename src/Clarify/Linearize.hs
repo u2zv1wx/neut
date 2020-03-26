@@ -27,7 +27,7 @@ linearize' ::
   -> [(Identifier, CodePlus)] -- [(xn, tn), ..., (x1, t1)]  (reversed closed chain)
   -> CodePlus
   -> WithEnv CodePlus
-linearize' _ [] e = return e -- ここでnamemapを返すようにする？
+linearize' _ [] e = return e
 linearize' nm ((x, t):xts) e = do
   (nmT, t') <- distinguishCode (map fst xts) t
   let newNm = merge [nmT, nm]
@@ -39,7 +39,7 @@ withHeader :: NameMap -> Identifier -> CodePlus -> CodePlus -> WithEnv CodePlus
 withHeader nm x t e =
   case Map.lookup x nm of
     Nothing -> withHeaderAffine x t e
-    Just [] -> error $ "impossible. x: " ++ show x
+    Just [] -> raiseCritical' $ "impossible. x: " <> asText' x
     Just [z] -> withHeaderLinear z x e
     Just (z1:z2:zs) -> withHeaderRelevant x t z1 z2 zs e
 
@@ -115,8 +115,7 @@ type LinearChain = [(Identifier, (Identifier, Identifier))]
 toLinearChain :: [Identifier] -> WithEnv LinearChain
 toLinearChain xs = do
   let valueSeq = init $ tail xs
-  tmpSeq <-
-    mapM (const $ newNameWith' "linear-chain") $ replicate (length xs - 3) ()
+  tmpSeq <- mapM (const $ newNameWith' "chain") $ replicate (length xs - 3) ()
   let tmpSeq' = [head xs] ++ tmpSeq ++ [last xs]
   let pairSeq = zip valueSeq (tail tmpSeq')
   return $ zip (init tmpSeq') pairSeq
@@ -135,7 +134,6 @@ withHeaderRelevant' _ _ [] cont = return cont
 withHeaderRelevant' t expVar ((x, (x1, x2)):chain) cont@(m, _) = do
   cont' <- withHeaderRelevant' t expVar chain cont
   (sigVarName, sigVar) <- newDataUpsilonWith m "sig"
-  let varX = (m, DataUpsilon x)
   return $
     ( m
     , CodeUpElim
@@ -143,7 +141,7 @@ withHeaderRelevant' t expVar ((x, (x1, x2)):chain) cont@(m, _) = do
         ( m
         , CodePiElimDownElim
             expVar
-            [(m, DataEnumIntro (EnumValueIntS 64 1)), varX])
+            [(m, DataEnumIntro (EnumValueIntS 64 1)), (m, DataUpsilon x)])
         (m, CodeSigmaElim arrVoidPtr [x1, x2] sigVar cont'))
 
 merge :: [NameMap] -> NameMap
