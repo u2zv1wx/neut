@@ -50,8 +50,7 @@ data Definition =
   Definition IsFixed [Identifier] CodePlus
   deriving (Show)
 
-type IdentifierPlus = (Identifier, DataPlus)
-
+-- type IdentifierPlus = (Identifier, DataPlus)
 type DataPlus = (Meta, Data)
 
 type CodePlus = (Meta, Code)

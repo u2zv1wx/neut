@@ -92,22 +92,12 @@ clarify (m, TermEnumIntro l) = do
 clarify (m, TermEnumElim (e, _) bs) = do
   let (cs, es) = unzip bs
   tenv <- gets typeEnv
-  fvss <- mapM (chainTermPlus' tenv) es
-  let fvs = nubBy (\(_, x, _) (_, y, _) -> x == y) $ concat fvss
-  -- es' <- mapM clarify es
-  -- let bs = zip (map snd cs) es'
-  let cs' = map snd cs
-  -- let (cs', es) = unzip bs
-  es' <- mapM (clarify >=> retClosure Nothing fvs m []) es
-  -- es' <- mapM (retClosure Nothing fvs m []) es'
-  es'' <- mapM (\cls -> callClosure m cls []) es'
-  let varInfo = map (\(mx, x, _) -> (x, (mx, DataUpsilon x))) fvs
-  -- let varInfo = map (\(mx, x, _) -> (x, toDataUpsilon (x, mx))) fvs
-  (yName, e', y) <- clarifyPlus e
-  return $ bindLet [(yName, e')] (m, CodeEnumElim varInfo y (zip cs' es''))
-  -- clarifyEnumElim m fvs e $ zip (map snd cs) es'
-clarify (m, TermArray {}) = do
-  returnArrayType m
+  fvs <- takeFVS tenv es
+  es' <- alignFVS m fvs es
+  let sub = map (\(mx, x, _) -> (x, (mx, DataUpsilon x))) fvs
+  (y, e', yVar) <- clarifyPlus e
+  return $ bindLet [(y, e')] (m, CodeEnumElim sub yVar (zip (map snd cs) es'))
+clarify (m, TermArray {}) = returnArrayType m
 clarify (m, TermArrayIntro k es) = do
   retImmType <- returnCartesianImmediate m
   -- arrayType = Sigma{k} [_ : IMMEDIATE, ..., _ : IMMEDIATE]
@@ -176,6 +166,12 @@ clarifyPlus e@(m, _) = do
   (varName, var) <- newDataUpsilonWith m "var"
   return (varName, e', var)
 
+alignFVS :: Meta -> [IdentifierPlus] -> [TermPlus] -> WithEnv [CodePlus]
+alignFVS m fvs es = do
+  es' <- mapM clarify es
+  es'' <- mapM (retClosure Nothing fvs m []) es'
+  mapM (\cls -> callClosure m cls []) es''
+
 -- clarifyEnumElim ::
 --      Meta
 --   -> [(Meta, Identifier, TermPlus)]
@@ -234,6 +230,11 @@ clarifyCase' m ((_, xts), e) envVarName = do
   e'' <- linearize xts' e'
   let xs = map (\(_, x, _) -> x) xts
   return (m, CodeSigmaElim arrVoidPtr xs (toDataUpsilon (envVarName, m)) e'')
+
+takeFVS :: TypeEnv -> [TermPlus] -> WithEnv [(Meta, Identifier, TermPlus)]
+takeFVS tenv es = do
+  fvss <- mapM (chainTermPlus' tenv) es
+  return $ nubBy (\(_, x, _) (_, y, _) -> x == y) $ concat fvss
 
 lookupRevCaseEnv :: Meta -> Int -> WithEnv T.Text
 lookupRevCaseEnv m i = do
