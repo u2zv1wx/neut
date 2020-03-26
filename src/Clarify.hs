@@ -102,9 +102,7 @@ clarify (m, TermArrayIntro k es) = do
   (zs, es', xs) <- unzip3 <$> mapM clarifyPlus es
   return $
     bindLet (zip zs es') $
-    ( m
-    , CodeUpIntro $
-      (m, DataSigmaIntro arrVoidPtr [arrayType, (m, DataSigmaIntro k xs)]))
+    (m, CodeUpIntro $ (m, sigmaIntro [arrayType, (m, DataSigmaIntro k xs)]))
 clarify (m, TermArrayElim k mxts e1 e2) = do
   e1' <- clarify e1
   let (_, xs, _) = unzip3 mxts
@@ -116,8 +114,7 @@ clarify (m, TermArrayElim k mxts e1 e2) = do
   return $
     bindLet [(arrVarName, e1')] $
     ( m
-    , CodeSigmaElim
-        arrVoidPtr
+    , sigmaElim
         [arrTypeVarName, arrInnerVarName]
         arrVar
         (m, CodeSigmaElim k xs arrInnerVar e2'))
@@ -148,12 +145,7 @@ clarify (m, TermCase (e, _) cxtes) = do
   return $
     bindLet
       [(clsVarName, e')]
-      ( m
-      , CodeSigmaElim
-          arrVoidPtr
-          [typeVarName, envVarName, lamVarName]
-          clsVar
-          cxtes')
+      (m, sigmaElim [typeVarName, envVarName, lamVarName] clsVar cxtes')
 
 clarifyPlus :: TermPlus -> WithEnv (Identifier, CodePlus, DataPlus)
 clarifyPlus e@(m, _) = do
@@ -225,7 +217,7 @@ clarifyCase' m envVarName ((_, xts), e) = do
   xts' <- mapM clarifyArgs xts
   e' <- clarify e >>= linearize xts'
   let xs = map (\(_, x, _) -> x) xts
-  return (m, CodeSigmaElim arrVoidPtr xs (m, DataUpsilon envVarName) e')
+  return (m, sigmaElim xs (m, DataUpsilon envVarName) e')
 
 lookupRevCaseEnv :: Meta -> Int -> WithEnv T.Text
 lookupRevCaseEnv m i = do
@@ -248,9 +240,8 @@ clarifyConst m (I (x, _))
   | Just _ <- asLowTypeMaybe x = clarify (m, TermEnum $ EnumTypeLabel "top")
 clarifyConst m name@(I (x, _))
   | Just lowType <- asArrayAccessMaybe x = clarifyArrayAccess m name lowType
-clarifyConst m (I ("os:file-descriptor", _)) = do
-  i <- lookupConstNum "i64"
-  clarify (m, TermConst (I ("i64", i)))
+clarifyConst m (I ("os:file-descriptor", _)) =
+  clarify (m, TermEnum $ EnumTypeLabel "top")
 clarifyConst m (I ("os:stdin", _)) =
   clarify (m, TermEnumIntro (EnumValueIntS 64 0))
 clarifyConst m (I ("os:stdout", _)) =
@@ -476,8 +467,7 @@ toHeaderInfo m x t ArgArray = do
     , [arrayInnerTmp]
     , \cont ->
         ( m
-        , CodeSigmaElim
-            arrVoidPtr
+        , sigmaElim
             [arrayTypeName, arrayInnerName]
             (toVar m x)
             ( m
@@ -487,10 +477,7 @@ toHeaderInfo m x t ArgArray = do
                 ( m
                 , CodeUpElim
                     arrayVarName
-                    ( m
-                    , CodeUpIntro
-                        ( m
-                        , DataSigmaIntro arrVoidPtr [arrayType, arrayInnerTmp]))
+                    (m, CodeUpIntro (m, sigmaIntro [arrayType, arrayInnerTmp]))
                     cont))))
 
 computeHeader ::

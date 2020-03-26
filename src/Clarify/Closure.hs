@@ -39,8 +39,8 @@ makeClosure mName mxts2 m mxts1 e = do
   name <- nameFromMaybe mName
   registerIfNecessary m name xts1 xts2 e
   let vs = map (\(mx, x, _) -> (mx, DataUpsilon x)) mxts2
-  let fvEnv = (m, DataSigmaIntro arrVoidPtr vs)
-  return (m, DataSigmaIntro arrVoidPtr [envExp, fvEnv, (m, DataTheta name)])
+  let fvEnv = (m, sigmaIntro vs)
+  return (m, sigmaIntro [envExp, fvEnv, (m, DataTheta name)])
 
 registerIfNecessary ::
      Meta
@@ -55,7 +55,7 @@ registerIfNecessary m name xts1 xts2 e = do
     e' <- linearize (xts2 ++ xts1) e
     (envVarName, envVar) <- newDataUpsilonWith m "env"
     let args = map fst xts1 ++ [envVarName]
-    let body = (m, CodeSigmaElim arrVoidPtr (map fst xts2) envVar e')
+    let body = (m, sigmaElim (map fst xts2) envVar e')
     insCodeEnv name args body
 
 callClosure ::
@@ -70,8 +70,7 @@ callClosure m e zexes = do
     bindLet
       ((clsVarName, e) : zip zs es')
       ( m
-      , CodeSigmaElim
-          arrVoidPtr
+      , sigmaElim
           [typeVarName, envVarName, lamVarName]
           clsVar
           (m, CodePiElimDownElim lamVar (xs ++ [envVar])))

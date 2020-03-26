@@ -58,6 +58,12 @@ asUpsilon :: DataPlus -> Maybe Identifier
 asUpsilon (_, DataUpsilon x) = Just x
 asUpsilon _ = Nothing
 
+sigmaIntro :: [DataPlus] -> Data
+sigmaIntro = DataSigmaIntro arrVoidPtr
+
+sigmaElim :: [Identifier] -> DataPlus -> CodePlus -> Code
+sigmaElim = CodeSigmaElim arrVoidPtr
+
 toIntS :: IntSize -> Integer -> Data
 toIntS size i = DataEnumIntro (EnumValueIntS size i)
 

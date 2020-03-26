@@ -142,7 +142,7 @@ withHeaderRelevant' t expVar ((x, (x1, x2)):chain) cont@(m, _) = do
         , CodePiElimDownElim
             expVar
             [(m, DataEnumIntro (EnumValueIntS 64 1)), (m, DataUpsilon x)])
-        (m, CodeSigmaElim arrVoidPtr [x1, x2] sigVar cont'))
+        (m, sigmaElim [x1, x2] sigVar cont'))
 
 merge :: [NameMap] -> NameMap
 merge [] = Map.empty

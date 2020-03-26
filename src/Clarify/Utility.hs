@@ -86,12 +86,11 @@ cartesianImmediate m = do
       return theta
 
 affineImmediate :: DataPlus -> WithEnv CodePlus
-affineImmediate (m, _) =
-  return (m, CodeUpIntro (m, DataSigmaIntro arrVoidPtr []))
+affineImmediate (m, _) = return (m, CodeUpIntro (m, sigmaIntro []))
 
 relevantImmediate :: DataPlus -> WithEnv CodePlus
 relevantImmediate argVar@(m, _) =
-  return (m, CodeUpIntro (m, DataSigmaIntro arrVoidPtr [argVar, argVar]))
+  return (m, CodeUpIntro (m, sigmaIntro [argVar, argVar]))
 
 cartesianStruct :: Meta -> [ArrayKind] -> WithEnv DataPlus
 cartesianStruct m ks = do
@@ -114,11 +113,7 @@ affineStruct :: DataPlus -> [ArrayKind] -> WithEnv CodePlus
 affineStruct argVar@(m, _) ks = do
   xs <- mapM (const $ newNameWith' "var") ks
   return
-    ( m
-    , CodeStructElim
-        (zip xs ks)
-        argVar
-        (m, CodeUpIntro (m, DataSigmaIntro arrVoidPtr [])))
+    (m, CodeStructElim (zip xs ks) argVar (m, CodeUpIntro (m, sigmaIntro [])))
 
 relevantStruct :: DataPlus -> [ArrayKind] -> WithEnv CodePlus
 relevantStruct argVar@(m, _) ks = do
@@ -131,10 +126,7 @@ relevantStruct argVar@(m, _) ks = do
         argVar
         ( m
         , CodeUpIntro
-            ( m
-            , DataSigmaIntro
-                arrVoidPtr
-                [(m, DataStructIntro vks), (m, DataStructIntro vks)])))
+            (m, sigmaIntro [(m, DataStructIntro vks), (m, DataStructIntro vks)])))
 
 insCodeEnv :: T.Text -> [Identifier] -> CodePlus -> WithEnv ()
 insCodeEnv name args e = do

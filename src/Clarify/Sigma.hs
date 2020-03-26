@@ -66,8 +66,7 @@ affineSigma argVar m k mxts = do
   -- as == [APP-1, ..., APP-n]   (`a` here stands for `app`)
   as <- forM xts $ \(x, t) -> toAffineApp m x t
   ys <- mapM (const $ newNameWith' "arg") xts
-  let body =
-        bindLet (zip ys as) (m, CodeUpIntro (m, DataSigmaIntro arrVoidPtr []))
+  let body = bindLet (zip ys as) (m, CodeUpIntro (m, sigmaIntro []))
   body' <- linearize xts body
   return (m, CodeSigmaElim k (map fst xts) argVar body')
 
@@ -126,15 +125,14 @@ transposeSigma m k ds = do
     ( m
     , CodeUpIntro
         ( m
-        , DataSigmaIntro
-            arrVoidPtr
+        , sigmaIntro
             [(m, DataSigmaIntro k xVarList), (m, DataSigmaIntro k yVarList)]))
 
 bindSigmaElim ::
      [((Identifier, Identifier), (DataPlus, CodePlus))] -> CodePlus -> CodePlus
 bindSigmaElim [] cont = cont
 bindSigmaElim (((x, y), (d, _)):xyds) cont =
-  (fst cont, CodeSigmaElim arrVoidPtr [x, y] d $ bindSigmaElim xyds cont)
+  (fst cont, sigmaElim [x, y] d $ bindSigmaElim xyds cont)
 
 supplyName :: Either b (Identifier, b) -> WithEnv (Identifier, b)
 supplyName (Right (x, t)) = return (x, t)
