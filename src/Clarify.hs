@@ -61,31 +61,14 @@ clarify (m, TermPiElim e es) = do
 clarify (m, TermSigma _) = returnClosureType m -- Sigma is translated into Pi
 clarify (m, TermSigmaIntro t es) = do
   case reduceTermPlus t of
-    (mSig, TermSigma xts) -> do
-      tPi <- sigToPi mSig xts
-      case tPi of
-        (_, TermPi _ [zu, kp@(mk, k, _)] _) ->
-          clarify
-            (m, TermPiIntro [zu, kp] (m, TermPiElim (mk, TermUpsilon k) es))
-    -- (mSig, TermSigma xts)
-    --   | length xts == length es -> do
-    --     tPi <- sigToPi mSig xts
-    --     case tPi of
-    --       (_, TermPi _ [zu, kp@(mk, k, _)] _) ->
-    --         clarify
-    --           (m, TermPiIntro [zu, kp] (m, TermPiElim (mk, TermUpsilon k) es))
-        -- case tPi of
-        --   (_, TermPi _ [zu, kp@(mk, k, (_, TermPi _ yts _))] _) -- i.e. Sigma yts
-        --     -- | length yts == length es
-        --       -- let xvs = map (\(mx, x, _) -> toTermUpsilon mx x) yts
-        --    -> do
-        --     let kv = toTermUpsilon mk k
-        --       -- eager product
-        --       -- let bindArgsThen = \e -> (m, TermPiElim (m, TermPiIntro yts e) es)
-        --       -- clarify $
-        --       --   bindArgsThen (m, TermPiIntro [zu, kp] (m, TermPiElim kv xvs))
-        --     clarify (m, TermPiIntro [zu, kp] (m, TermPiElim kv es))
-        _ -> raiseCritical m "the type of sigma-intro is wrong"
+    (mSig, TermSigma xts)
+      | length xts == length es -> do
+        tPi <- sigToPi mSig xts
+        case tPi of
+          (_, TermPi _ [zu, kp@(mk, k, _)] _) ->
+            clarify
+              (m, TermPiIntro [zu, kp] (m, TermPiElim (mk, TermUpsilon k) es))
+          _ -> raiseCritical m "the type of sigma-intro is wrong"
     _ -> raiseCritical m "the type of sigma-intro is wrong"
 clarify (m, TermSigmaElim t xts e1 e2) = do
   clarify (m, TermPiElim e1 [t, (m, TermPiIntro xts e2)])
@@ -111,8 +94,18 @@ clarify (m, TermEnumElim (e, _) bs) = do
   tenv <- gets typeEnv
   fvss <- mapM (chainTermPlus' tenv) es
   let fvs = nubBy (\(_, x, _) (_, y, _) -> x == y) $ concat fvss
-  es' <- mapM clarify es
-  clarifyEnumElim m fvs e $ zip (map snd cs) es'
+  -- es' <- mapM clarify es
+  -- let bs = zip (map snd cs) es'
+  let cs' = map snd cs
+  -- let (cs', es) = unzip bs
+  es' <- mapM (clarify >=> retClosure Nothing fvs m []) es
+  -- es' <- mapM (retClosure Nothing fvs m []) es'
+  es'' <- mapM (\cls -> callClosure m cls []) es'
+  let varInfo = map (\(mx, x, _) -> (x, (mx, DataUpsilon x))) fvs
+  -- let varInfo = map (\(mx, x, _) -> (x, toDataUpsilon (x, mx))) fvs
+  (yName, e', y) <- clarifyPlus e
+  return $ bindLet [(yName, e')] (m, CodeEnumElim varInfo y (zip cs' es''))
+  -- clarifyEnumElim m fvs e $ zip (map snd cs) es'
 clarify (m, TermArray {}) = do
   returnArrayType m
 clarify (m, TermArrayIntro k es) = do
@@ -183,20 +176,19 @@ clarifyPlus e@(m, _) = do
   (varName, var) <- newDataUpsilonWith m "var"
   return (varName, e', var)
 
-clarifyEnumElim ::
-     Meta
-  -> [(Meta, Identifier, TermPlus)]
-  -> TermPlus
-  -> [(Case, CodePlus)]
-  -> WithEnv CodePlus
-clarifyEnumElim m fvs e bs = do
-  let (cs, es) = unzip bs
-  es' <- mapM (retClosure Nothing fvs m []) es
-  es'' <- mapM (\cls -> callClosure m cls []) es'
-  (yName, e', y) <- clarifyPlus e
-  let varInfo = map (\(mx, x, _) -> (x, toDataUpsilon (x, mx))) fvs
-  return $ bindLet [(yName, e')] (m, CodeEnumElim varInfo y (zip cs es''))
-
+-- clarifyEnumElim ::
+--      Meta
+--   -> [(Meta, Identifier, TermPlus)]
+--   -> TermPlus
+--   -> [(Case, CodePlus)]
+--   -> WithEnv CodePlus
+-- clarifyEnumElim m fvs e bs = do
+--   let (cs, es) = unzip bs
+--   es' <- mapM (retClosure Nothing fvs m []) es
+--   es'' <- mapM (\cls -> callClosure m cls []) es'
+--   (yName, e', y) <- clarifyPlus e
+--   let varInfo = map (\(mx, x, _) -> (x, toDataUpsilon (x, mx))) fvs
+--   return $ bindLet [(yName, e')] (m, CodeEnumElim varInfo y (zip cs es''))
 clarifyCase ::
      Meta
   -> [(((Meta, Identifier), [(Meta, Identifier, TermPlus)]), TermPlus)]
