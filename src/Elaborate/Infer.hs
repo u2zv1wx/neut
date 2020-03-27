@@ -387,7 +387,7 @@ inferImplicit ctx m x is = do
     Just (t@(_, TermPi {}), UnivLevelPlus (_, l)) -> do
       (up, (_, WeakTermPi mls xts cod), l') <- instantiate m t l -- irrefutable pat
       let xtis = zip (zip xts mls) [0 ..]
-      let vs = map (\(mx, y, _) -> (supMeta m mx, WeakTermUpsilon y)) xts
+      let vs = map (\(_, y, _) -> (m, WeakTermUpsilon y)) xts
       let app = (m, WeakTermPiElim (m, WeakTermConst x up) vs)
       (xtis', e', cod') <- inferImplicit' ctx m is xtis app cod
       let mls' = map fst $ filter (\(_, k) -> k `notElem` is) $ zip mls [0 ..]

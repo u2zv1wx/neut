@@ -130,7 +130,7 @@ simp' (((_, WeakTermStructIntro eks1), (_, WeakTermStructIntro eks2)):cs)
   | (es1, ks1) <- unzip eks1
   , (es2, ks2) <- unzip eks2
   , ks1 == ks2 = simp $ zip es1 es2 ++ cs
-simp' ((e1, e2):cs) = do
+simp' ((e1@(m1, _), e2@(m2, _)):cs) = do
   let ms1 = asStuckedTerm e1
   let ms2 = asStuckedTerm e2
   -- list of stuck reasons (fmvs: free meta-variables)
@@ -138,13 +138,15 @@ simp' ((e1, e2):cs) = do
   sub <- gets substEnv
   tenv <- gets termEnv
   pvenv <- gets patVarEnv
+  let m = supMeta m1 m2
   case lookupAny fmvs sub of
     Just (h, e) -> do
-      let m = supMeta (metaOf e1) (metaOf e2)
       let e1' = substWeakTermPlus [(h, e)] (m, snd e1)
       let e2' = substWeakTermPlus [(h, e)] (m, snd e2)
       simp $ (e1', e2') : cs
     Nothing -> do
+      let e1' = (m, snd e1)
+      let e2' = (m, snd e2)
       let hs1 = holeWeakTermPlus e1
       let hs2 = holeWeakTermPlus e2
       case (ms1, ms2) of
@@ -154,22 +156,16 @@ simp' ((e1, e2):cs) = do
         (Just (StuckPiElimUpsilon x1@(I (_, i1)) []), _)
           | i1 `S.member` pvenv
           , occurCheck x1 (varWeakTermPlus e2) -> do
-            let m = supMeta (metaOf e1) (metaOf e2)
-            let e2' = (m, snd e2)
-            modify
-              (\env -> env {substEnv = IntMap.insert i1 e2' (substEnv env)})
+            modify (\env -> env {substEnv = IntMap.insert i1 e2' sub})
             simp cs
         (_, Just (StuckPiElimUpsilon x2@(I (_, i2)) []))
           | i2 `S.member` pvenv
           , occurCheck x2 (varWeakTermPlus e1) -> do
-            let m = supMeta (metaOf e1) (metaOf e2)
-            let e1' = (m, snd e1)
-            modify
-              (\env -> env {substEnv = IntMap.insert i2 e1' (substEnv env)})
+            modify (\env -> env {substEnv = IntMap.insert i2 e1' sub})
             simp cs
         (Just (StuckPiElimConst x1 up1 mess1), _)
           | Just body <- IntMap.lookup (asInt x1) tenv -> do
-            body' <- univInstWith up1 $ weaken body
+            body' <- univInstWith up1 $ weaken body -- fixme: supmeta
             simp $ (toPiElim body' mess1, e2) : cs
         (_, Just (StuckPiElimConst x2 up2 mess2))
           | Just body <- IntMap.lookup (asInt x2) tenv -> do
@@ -186,19 +182,16 @@ simp' ((e1, e2):cs) = do
             let c = Enriched (e1, e2) [] $ ConstraintDelta iter1 mess1 mess2
             insConstraintQueue c
             simp cs
-        (Just (StuckPiElimIter iter1 mess1), _) -> do
+        (Just (StuckPiElimIter iter1 mess1), _) ->
           simp $ (toPiElim (unfoldIter iter1) mess1, e2) : cs
-        (_, Just (StuckPiElimIter iter2 mess2)) -> do
+        (_, Just (StuckPiElimIter iter2 mess2)) ->
           simp $ (e1, toPiElim (unfoldIter iter2) mess2) : cs
         (Just (StuckPiElimZetaStrict h1 ies1), _)
           | xs1 <- concatMap getVarList ies1
           , occurCheck h1 hs2
           , linearCheck xs1
           , zs <- includeCheck xs1 e2
-          , Just es <- lookupAll zs sub -> do
-            let m = supMeta (metaOf e1) (metaOf e2)
-            let e1' = (m, snd e1)
-            let e2' = (m, snd e2)
+          , Just es <- lookupAll zs sub ->
             case es of
               [] -> simpPattern h1 ies1 e1' e2' cs
               _ -> simp $ (e1', substWeakTermPlus (zip zs es) e2') : cs
@@ -207,10 +200,7 @@ simp' ((e1, e2):cs) = do
           , occurCheck h2 hs1
           , linearCheck xs2
           , zs <- includeCheck xs2 e1
-          , Just es <- lookupAll zs sub -> do
-            let m = supMeta (metaOf e1) (metaOf e2)
-            let e1' = (m, snd e1)
-            let e2' = (m, snd e2)
+          , Just es <- lookupAll zs sub ->
             case es of
               [] -> simpPattern h2 ies2 e2' e1' cs
               _ -> simp $ (substWeakTermPlus (zip zs es) e1', e2') : cs
@@ -218,10 +208,7 @@ simp' ((e1, e2):cs) = do
           | xs1 <- concatMap getVarList ies1
           , occurCheck h1 hs2
           , zs <- includeCheck xs1 e2
-          , Just es <- lookupAll zs sub -> do
-            let m = supMeta (metaOf e1) (metaOf e2)
-            let e1' = (m, snd e1)
-            let e2' = (m, snd e2)
+          , Just es <- lookupAll zs sub ->
             case es of
               [] -> simpQuasiPattern h1 ies1 e1' e2' fmvs cs
               _ -> simp $ (e1', substWeakTermPlus (zip zs es) e2') : cs
@@ -229,29 +216,18 @@ simp' ((e1, e2):cs) = do
           | xs2 <- concatMap getVarList ies2
           , occurCheck h2 hs1
           , zs <- includeCheck xs2 e1
-          , Just es <- lookupAll zs sub -> do
-            let m = supMeta (metaOf e1) (metaOf e2)
-            let e1' = (m, snd e1)
-            let e2' = (m, snd e2)
+          , Just es <- lookupAll zs sub ->
             case es of
               [] -> simpQuasiPattern h2 ies2 e2' e1' fmvs cs
               _ -> simp $ (substWeakTermPlus (zip zs es) e1', e2') : cs
         (Just (StuckPiElimZeta h1 ies1), Nothing)
           | xs1 <- concatMap getVarList ies1
           , occurCheck h1 hs2
-          , [] <- includeCheck xs1 e2 -> do
-            let m = supMeta (metaOf e1) (metaOf e2)
-            let e1' = (m, snd e1)
-            let e2' = (m, snd e2)
-            simpFlexRigid h1 ies1 e1' e2' fmvs cs
+          , [] <- includeCheck xs1 e2 -> simpFlexRigid h1 ies1 e1' e2' fmvs cs
         (Nothing, Just (StuckPiElimZeta h2 ies2))
           | xs2 <- concatMap getVarList ies2
           , occurCheck h2 hs1
-          , [] <- includeCheck xs2 e1 -> do
-            let m = supMeta (metaOf e1) (metaOf e2)
-            let e1' = (m, snd e1)
-            let e2' = (m, snd e2)
-            simpFlexRigid h2 ies2 e2' e1' fmvs cs
+          , [] <- includeCheck xs2 e1 -> simpFlexRigid h2 ies2 e2' e1' fmvs cs
         _ -> simpOther e1 e2 fmvs cs
 
 simpBinder :: [IdentifierPlus] -> [IdentifierPlus] -> WithEnv ()
@@ -308,9 +284,7 @@ simpOther e1 e2 fmvs cs = do
   simp cs
 
 simpUnivParams :: UnivParams -> UnivParams -> WithEnv ()
-simpUnivParams up1 up2 = do
-  let is = IntMap.keys up1
-  simpUnivParams' is up1 up2
+simpUnivParams up1 up2 = simpUnivParams' (IntMap.keys up1) up1 up2
 
 simpUnivParams' :: [Int] -> UnivParams -> UnivParams -> WithEnv ()
 simpUnivParams' [] _ _ = return ()
@@ -408,9 +382,9 @@ insConstraintQueue c = do
   modify (\env -> env {constraintQueue = Q.insert c (constraintQueue env)})
 
 visit :: Identifier -> WithEnv ()
-visit m = do
+visit h = do
   q <- gets constraintQueue
-  let (q1, q2) = Q.partition (\(Enriched _ ms _) -> m `elem` ms) q
+  let (q1, q2) = Q.partition (\(Enriched _ hs _) -> h `elem` hs) q
   modify (\env -> env {constraintQueue = q2})
   simp $ map (\(Enriched c _ _) -> c) $ Q.toList q1
 
