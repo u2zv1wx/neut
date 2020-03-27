@@ -79,7 +79,7 @@ elaborateStmt (WeakStmtLetSigma m xts e cont) = do
   e'' <- elaborate' e'
   xts'' <- mapM elaboratePlus xts'
   forM_ (zip xts'' mlSigArgList) $ \((_, x, tx), l) ->
-    insWeakTypeEnv x ((weaken (reduceTermPlus tx)), l)
+    insWeakTypeEnv x (weaken (reduceTermPlus tx), l)
   cont' <- elaborateStmt cont
   return (m, TermSigmaElim (m, TermEnum $ EnumTypeIntS 64) xts'' e'' cont')
 elaborateStmt (WeakStmtImplicit m x@(I (_, i)) idx cont) = do
