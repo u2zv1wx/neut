@@ -446,15 +446,6 @@ elaborate' (m, WeakTermCase (e, t) cxtes) = do
         toText (weaken e') <>
         "` must be an inductive type, but is:\n" <> toText t''
 
--- reduceWeakType :: WeakTermPlus -> WithEnv WeakTermPlus
--- reduceWeakType t = do
---   let t' = reduceWeakTermPlus t
---   senv <- gets substEnv
---   case t' of
---     (m, WeakTermPiElim (_, WeakTermUpsilon (I (_, i))) args)
---       | Just lam <- IntMap.lookup i senv ->
---         reduceWeakType (m, WeakTermPiElim lam args)
---     _ -> return t'
 reduceWeakType :: WeakTermPlus -> WithEnv WeakTermPlus
 reduceWeakType t = do
   let t' = reduceWeakTermPlus t
@@ -464,8 +455,6 @@ reduceWeakType t = do
       | Just body <- IntMap.lookup (asInt x) tenv -> do
         body' <- univInstWith up $ weaken body
         reduceWeakType (m, WeakTermPiElim body' args)
-      -- | Just lam <- IntMap.lookup i senv ->
-      --   reduceWeakType (m, WeakTermPiElim lam args)
     _ -> return t'
 
 elaborateWeakCase :: WeakCasePlus -> WithEnv CasePlus
