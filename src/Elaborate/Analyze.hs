@@ -10,7 +10,6 @@ module Elaborate.Analyze
   , lookupAny
   ) where
 
-import Control.Monad.Except
 import Control.Monad.State
 import Data.Maybe
 
@@ -311,11 +310,18 @@ simpOther e1 e2 fmvs cs = do
   simp cs
 
 simpUnivParams :: UnivParams -> UnivParams -> WithEnv ()
-simpUnivParams umap1 umap2 = do
-  let vs1 = IntMap.elems umap1
-  let vs2 = IntMap.elems umap2
-  forM_ (zip vs1 vs2) $ \(l1, l2) ->
-    modify (\env -> env {equalityEnv = (l1, l2) : equalityEnv env})
+simpUnivParams up1 up2 = do
+  let is = IntMap.keys up1
+  simpUnivParams' is up1 up2
+
+simpUnivParams' :: [Int] -> UnivParams -> UnivParams -> WithEnv ()
+simpUnivParams' [] _ _ = return ()
+simpUnivParams' (i:is) up1 up2 = do
+  case (IntMap.lookup i up1, IntMap.lookup i up2) of
+    (Just l1, Just l2) -> do
+      modify (\env -> env {equalityEnv = (l1, l2) : equalityEnv env})
+      simpUnivParams' is up1 up2
+    _ -> simpUnivParams' is up1 up2
 
 asIdentPlus :: Meta -> WeakTermPlus -> WithEnv IdentifierPlus
 asIdentPlus m t = do
