@@ -124,7 +124,6 @@ elaborateStmt (WeakStmtConstDecl _ (_, x, t) cont) = do
   insTypeEnv x t'' mlt
   elaborateStmt cont
 
--- fixme: 余計なreduceをしているので修正すること
 refine :: WithEnv ()
 refine =
   modify (\env -> env {substEnv = IntMap.map reduceWeakTermPlus (substEnv env)})
