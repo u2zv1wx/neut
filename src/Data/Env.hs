@@ -72,7 +72,6 @@ data Env =
     , introEnv :: S.Set Int -- set of the names of constructors (e.g. ["nil", "cons", "zero", "succ", ...] (as int))
     , nonCandSet :: S.Set T.Text
     -- elaborate
-    , termEnv :: IntMap.IntMap TermPlus
     , impEnv :: IntMap.IntMap [Int] -- var ~> (index of implicit arguments of the var)
     , weakTypeEnv :: IntMap.IntMap (WeakTermPlus, UnivLevelPlus) -- var ~> (typeof(var), level-of-type)
     , equalityEnv :: [(UnivLevel, UnivLevel)]
@@ -86,7 +85,7 @@ data Env =
     , zetaEnv :: IntMap.IntMap (WeakTermPlus, WeakTermPlus, UnivLevelPlus)
     , patVarEnv :: S.Set Int
     -- clarify
-    , cacheEnv :: IntMap.IntMap CodePlus
+    , cacheEnv :: IntMap.IntMap (Either TermPlus CodePlus)
     , codeEnv :: Map.HashMap T.Text Definition -- f ~> thunk (lam (x1 ... xn) e)
     , nameSet :: S.Set T.Text
     -- LLVM
@@ -123,7 +122,6 @@ initialEnv =
     , inductiveEnv = Map.empty
     , coinductiveEnv = Map.empty
     , introEnv = S.empty
-    , termEnv = IntMap.empty
     , nonCandSet = S.empty
     , labelEnv = Map.empty
     , equalityEnv = []

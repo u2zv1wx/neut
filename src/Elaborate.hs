@@ -55,20 +55,22 @@ elaborateStmt (WeakStmtLet m (mx, x@(I (_, i)), t) e cont) = do
   e'' <- elaborate' e'
   t'' <- reduceTermPlus <$> elaborate' t'
   insTypeEnv x t'' mlt
-  modify (\env -> env {termEnv = IntMap.insert i e'' (termEnv env)})
+  modify (\env -> env {cacheEnv = IntMap.insert i (Left e'') (cacheEnv env)})
   cont' <- elaborateStmt cont
   x' <- newNameWith x
-  return (m, TermPiElim (m, TermPiIntro [(mx, x', t'')] cont') [e''])
+  let c = (m, TermConst x emptyUP)
+  return (m, TermPiElim (m, TermPiIntro [(mx, x', t'')] cont') [c])
 elaborateStmt (WeakStmtLetWT m (mx, x@(I (_, i)), t) e cont) = do
   (t', mlt) <- inferType t
   analyze >> synthesize >> refine >> cleanup
   e' <- elaborate' e -- `e` is supposed to be well-typed
   t'' <- reduceTermPlus <$> elaborate' t'
   insTypeEnv x t'' mlt
-  modify (\env -> env {termEnv = IntMap.insert i e' (termEnv env)})
+  modify (\env -> env {cacheEnv = IntMap.insert i (Left e') (cacheEnv env)})
   cont' <- elaborateStmt cont
   x' <- newNameWith x
-  return (m, TermPiElim (m, TermPiIntro [(mx, x', t'')] cont') [e'])
+  let c = (m, TermConst x emptyUP)
+  return (m, TermPiElim (m, TermPiIntro [(mx, x', t'')] cont') [c])
 elaborateStmt (WeakStmtLetSigma m xts e cont) = do
   (e', t1, mlSigma) <- infer e
   xtls <- inferSigma [] xts
@@ -113,10 +115,11 @@ elaborateStmt (WeakStmtLetInductiveIntro m (bi, ai) (mx, x@(I (_, i)), t) xts yt
             (m, TermPiIntroPlus ai (bi, xtsyts') atsbts' app'))
   t'' <- reduceTermPlus <$> elaborate' t'
   insTypeEnv x t'' mlt
-  modify (\env -> env {termEnv = IntMap.insert i lam (termEnv env)})
+  modify (\env -> env {cacheEnv = IntMap.insert i (Left lam) (cacheEnv env)})
   cont' <- elaborateStmt cont
   x' <- newNameWith x
-  return (m, TermPiElim (m, TermPiIntro [(mx, x', t'')] cont') [lam])
+  let c = (m, TermConst x emptyUP)
+  return (m, TermPiElim (m, TermPiIntro [(mx, x', t'')] cont') [c])
 elaborateStmt (WeakStmtConstDecl _ (_, x, t) cont) = do
   (t', mlt) <- inferType t
   analyze >> synthesize >> refine >> cleanup
@@ -260,8 +263,8 @@ elaborate' :: WeakTermPlus -> WithEnv TermPlus
 elaborate' (m, WeakTermTau l) = do
   return (m, TermTau l)
 elaborate' (m, WeakTermUpsilon x) = do
-  tenv <- gets termEnv
-  if IntMap.member (asInt x) tenv
+  cenv <- gets cacheEnv
+  if IntMap.member (asInt x) cenv
     then do
       (t, UnivLevelPlus (_, l)) <- lookupTypeEnv1 m x
       (up, _, _) <- instantiate m t l
@@ -449,10 +452,10 @@ elaborate' (m, WeakTermCase (e, t) cxtes) = do
 reduceWeakType :: WeakTermPlus -> WithEnv WeakTermPlus
 reduceWeakType t = do
   let t' = reduceWeakTermPlus t
-  tenv <- gets termEnv
+  cenv <- gets cacheEnv
   case t' of
     (m, WeakTermPiElim (_, WeakTermConst x up) args)
-      | Just body <- IntMap.lookup (asInt x) tenv -> do
+      | Just (Left body) <- IntMap.lookup (asInt x) cenv -> do
         body' <- univInstWith up $ weaken body
         reduceWeakType (m, WeakTermPiElim body' args)
     _ -> return t'

@@ -136,7 +136,7 @@ simp' ((e1@(m1, _), e2@(m2, _)):cs) = do
   -- list of stuck reasons (fmvs: free meta-variables)
   let fmvs = catMaybes [ms1 >>= stuckReasonOf, ms2 >>= stuckReasonOf]
   sub <- gets substEnv
-  tenv <- gets termEnv
+  cenv <- gets cacheEnv
   pvenv <- gets patVarEnv
   let m = supMeta m1 m2
   case lookupAny fmvs sub of
@@ -164,11 +164,11 @@ simp' ((e1@(m1, _), e2@(m2, _)):cs) = do
             modify (\env -> env {substEnv = IntMap.insert i2 e1' sub})
             simp cs
         (Just (StuckPiElimConst x1 mx1 up1 mess1), _)
-          | Just (mBody, body) <- IntMap.lookup (asInt x1) tenv -> do
+          | Just (Left (mBody, body)) <- IntMap.lookup (asInt x1) cenv -> do
             body' <- univInstWith up1 $ weaken (supMeta mx1 mBody, body)
             simp $ (toPiElim body' mess1, e2) : cs
         (_, Just (StuckPiElimConst x2 mx2 up2 mess2))
-          | Just (mBody, body) <- IntMap.lookup (asInt x2) tenv -> do
+          | Just (Left (mBody, body)) <- IntMap.lookup (asInt x2) cenv -> do
             body' <- univInstWith up2 $ weaken (supMeta mx2 mBody, body)
             simp $ (e1, toPiElim body' mess2) : cs
         (Just (StuckPiElimConst f1 _ up1 mess1), Just (StuckPiElimConst f2 _ up2 mess2))

@@ -198,17 +198,14 @@ clarifyConst tenv m name@(I (x, i))
     case asSysCallMaybe os x of
       Just (syscall, argInfo) -> clarifySysCall tenv name syscall argInfo m
       Nothing -> do
-        teEnv <- gets termEnv
-        case IntMap.lookup i teEnv of
-          Nothing -> return (m, CodeUpIntro (m, DataTheta $ asText'' name))
-          Just body -> do
-            cenv <- gets cacheEnv
-            case IntMap.lookup i cenv of
-              Just e -> return e
-              Nothing -> do
-                e <- clarify' tenv body
-                modify (\env -> env {cacheEnv = IntMap.insert i e cenv})
-                return e
+        cenv <- gets cacheEnv
+        case IntMap.lookup i cenv of
+          Nothing -> return (m, CodeUpIntro (m, DataTheta $ asText'' name)) -- external
+          Just (Right e) -> return e
+          Just (Left e) -> do
+            e' <- clarify' tenv e
+            modify (\env -> env {cacheEnv = IntMap.insert i (Right e') cenv})
+            return e'
 
 clarifyCast :: TypeEnv -> Meta -> WithEnv CodePlus
 clarifyCast tenv m = do
