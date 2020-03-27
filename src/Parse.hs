@@ -6,22 +6,27 @@ module Parse
   ) where
 
 import Control.Monad.Except
-import Control.Monad.State
+import Control.Monad.State hiding (get)
+import Data.ByteString.Builder
 import Data.List
 import Data.Maybe (catMaybes)
 import Data.Monoid ((<>))
-import Network.HTTP.Simple
+import Network.Http.Client
 import Path
 import Path.IO
+import System.IO.Streams (InputStream)
 import Text.Read (readMaybe)
 
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Compression.GZip as GZip
+import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as L
 import qualified Data.HashMap.Strict as Map
 import qualified Data.Set as S
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as TE
 import qualified Data.Text.IO as TIO
+import qualified System.IO.Streams as Streams
 
 import Data.Basic
 import Data.Env
@@ -192,12 +197,11 @@ parse' ((m, TreeNode ((_, TreeLeaf "ensure"):rest)):as)
     let path = libDir </> pkg'
     isAlreadyInstalled <- doesDirExist path
     when (not isAlreadyInstalled) $ do
-      urlStr' <- parseStr mUrl urlStr
-      note $ "downloading " <> pkg <> " from " <> T.pack urlStr'
-      req <- parseRequest urlStr'
-      item <- httpLBS req
+      urlStr' <- parseByteString mUrl urlStr
+      note $ "downloading " <> pkg <> " from " <> TE.decodeUtf8 urlStr'
+      item <- liftIO $ get urlStr' lazyConcatHandler
       note $ "installing " <> pkg <> " into " <> T.pack (toFilePath path)
-      install (getResponseBody item) path
+      install item path
     parse' as
   | otherwise = raiseSyntaxError m "(ensure LEAF LEAF)"
 parse' ((m, TreeNode ((_, TreeLeaf "attribute"):rest)):as)
@@ -299,6 +303,12 @@ parse' (a:as) = do
             (\env -> env {nonCandSet = S.insert (asText name) (nonCandSet env)})
           return $ QuasiStmtLet m' (m', name, t) e' : defList
 
+lazyConcatHandler :: Response -> InputStream B.ByteString -> IO L.ByteString
+lazyConcatHandler _ i1 = do
+  i2 <- Streams.map byteString i1
+  x <- Streams.fold mappend mempty i2
+  return $ toLazyByteString x
+
 withSectionPrefix :: T.Text -> WithEnv T.Text
 withSectionPrefix x = do
   ns <- gets namespace
@@ -325,8 +335,14 @@ parseBorrow (m, WeakTermUpsilon (I (s, _)))
     (Just (m, asIdent $ T.tail s), (m, WeakTermUpsilon $ asIdent $ T.tail s))
 parseBorrow t = (Nothing, t)
 
-parseStr :: Meta -> T.Text -> WithEnv String
-parseStr m quotedStr =
+parseByteString :: Meta -> T.Text -> WithEnv B.ByteString
+parseByteString m quotedStr =
+  case readMaybe (T.unpack quotedStr) of
+    Nothing -> raiseError m "the argument of `include` must be a string"
+    Just str -> return str
+
+parseString :: Meta -> T.Text -> WithEnv String
+parseString m quotedStr =
   case readMaybe (T.unpack quotedStr) of
     Nothing -> raiseError m "the argument of `include` must be a string"
     Just str -> return str
@@ -347,7 +363,7 @@ includeFile ::
   -> WithEnv [QuasiStmt]
 includeFile m mPath pathString getDirPath as = do
   ensureEnvSanity m
-  path <- parseStr mPath pathString
+  path <- parseString mPath pathString
   dirPath <- getDirPath
   newPath <- resolveFile dirPath path
   includeFile' m newPath as
