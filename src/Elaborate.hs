@@ -47,14 +47,19 @@ elaborateStmt (WeakStmtReturn e) = do
   checkUnivSanity
   elaborate' e'
 elaborateStmt (WeakStmtLet _ (_, x@(I (_, i)), t) e cont) = do
+  p' x
   (e', te, mle) <- infer e
+  p "done: infer"
   (t', mlt) <- inferType t
+  p "done: infer-type"
   insConstraintEnv te t'
   insLevelEQ mle mlt
   -- Kantian type-inference ;)
   analyze >> synthesize >> refine >> cleanup
+  p "done: synth"
   e'' <- elaborate' e'
   t'' <- reduceTermPlus <$> elaborate' t'
+  p "done"
   insTypeEnv x t'' mlt
   -- modify (\env -> env {substEnv = IntMap.insert i (weaken e'') (substEnv env)})
   modify (\env -> env {termEnv = IntMap.insert i e'' (termEnv env)})
@@ -62,10 +67,12 @@ elaborateStmt (WeakStmtLet _ (_, x@(I (_, i)), t) e cont) = do
   -- cont' <- elaborateStmt cont
   -- return (m, TermPiElim (m, TermPiIntro [(mx, x, t'')] cont') [e''])
 elaborateStmt (WeakStmtLetWT _ (_, x@(I (_, i)), t) e cont) = do
+  p' x
   (t', mlt) <- inferType t
   analyze >> synthesize >> refine >> cleanup
   e' <- elaborate' e -- `e` is supposed to be well-typed
   t'' <- reduceTermPlus <$> elaborate' t'
+  p "done"
   insTypeEnv x t'' mlt
   -- modify (\env -> env {substEnv = IntMap.insert i (weaken e') (substEnv env)})
   modify (\env -> env {termEnv = IntMap.insert i e' (termEnv env)})
@@ -103,6 +110,7 @@ elaborateStmt (WeakStmtImplicit m x@(I (_, i)) idx cont) = do
       "the type of " <>
       asText x <> " is supposed to be a Pi-type, but is:\n" <> toText (weaken t)
 elaborateStmt (WeakStmtLetInductiveIntro m (bi, ai) (_, x@(I (_, i)), t) xts yts atsbts app cont) = do
+  p' x
   (t', mlt) <- inferType t
   analyze >> synthesize >> refine >> cleanup
   -- the "elaborate' e" part in LetWT
@@ -115,6 +123,7 @@ elaborateStmt (WeakStmtLetInductiveIntro m (bi, ai) (_, x@(I (_, i)), t) xts yts
             xtsyts'
             (m, TermPiIntroPlus ai (bi, xtsyts') atsbts' app'))
   t'' <- reduceTermPlus <$> elaborate' t'
+  p "done"
   insTypeEnv x t'' mlt
   -- modify (\env -> env {substEnv = IntMap.insert i (weaken lam) (substEnv env)})
   modify (\env -> env {termEnv = IntMap.insert i lam (termEnv env)})
@@ -445,14 +454,26 @@ elaborate' (m, WeakTermCase (e, t) cxtes) = do
         toText (weaken e') <>
         "` must be an inductive type, but is:\n" <> toText t''
 
+-- reduceWeakType :: WeakTermPlus -> WithEnv WeakTermPlus
+-- reduceWeakType t = do
+--   let t' = reduceWeakTermPlus t
+--   senv <- gets substEnv
+--   case t' of
+--     (m, WeakTermPiElim (_, WeakTermUpsilon (I (_, i))) args)
+--       | Just lam <- IntMap.lookup i senv ->
+--         reduceWeakType (m, WeakTermPiElim lam args)
+--     _ -> return t'
 reduceWeakType :: WeakTermPlus -> WithEnv WeakTermPlus
 reduceWeakType t = do
   let t' = reduceWeakTermPlus t
-  senv <- gets substEnv
+  tenv <- gets termEnv
   case t' of
-    (m, WeakTermPiElim (_, WeakTermUpsilon (I (_, i))) args)
-      | Just lam <- IntMap.lookup i senv ->
-        reduceWeakType (m, WeakTermPiElim lam args)
+    (m, WeakTermPiElim (_, WeakTermConst x up) args)
+      | Just body <- IntMap.lookup (asInt x) tenv -> do
+        body' <- univInstWith up $ weaken body
+        reduceWeakType (m, WeakTermPiElim body' args)
+      -- | Just lam <- IntMap.lookup i senv ->
+      --   reduceWeakType (m, WeakTermPiElim lam args)
     _ -> return t'
 
 elaborateWeakCase :: WeakCasePlus -> WithEnv CasePlus

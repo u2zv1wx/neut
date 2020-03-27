@@ -160,7 +160,7 @@ substTermPlus sub (m, TermIter (mx, x, t) xts e) = do
   let sub' = filter (\(k, _) -> k /= asInt x) sub
   let (xts', e') = substTermPlus'' sub' xts e
   (m, TermIter (mx, x, t') xts' e')
-substTermPlus _ (m, TermConst x up) = (m, TermConst x up)
+substTermPlus _ e@(_, TermConst _ _) = e
 substTermPlus _ (m, TermFloat16 x) = (m, TermFloat16 x)
 substTermPlus _ (m, TermFloat32 x) = (m, TermFloat32 x)
 substTermPlus _ (m, TermFloat64 x) = (m, TermFloat64 x)

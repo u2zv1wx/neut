@@ -61,7 +61,7 @@
   (cons 1 (cons 2 (cons 3 (nil)))))
 
 (let ws
-  (@cons i64 1 (cons 2 (cons 3 (nil)))))
+  (@cons i64 1 (cons 2 (cons 3 (top:unit)))))
 
 (use os)
 

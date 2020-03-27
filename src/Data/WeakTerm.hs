@@ -342,7 +342,7 @@ substWeakTermPlus sub (m, WeakTermIter (mx, x, t) xts e) = do
   let sub' = filter (\(k, _) -> k /= x) sub
   let (xts', e') = substWeakTermPlus'' sub' xts e
   (m, WeakTermIter (mx, x, t') xts' e')
-substWeakTermPlus _ (m, WeakTermConst x up) = (m, WeakTermConst x up)
+substWeakTermPlus _ e@(_, WeakTermConst _ _) = e
 substWeakTermPlus sub e1@(_, WeakTermZeta x) = do
   case lookup x sub of
     Nothing -> e1
