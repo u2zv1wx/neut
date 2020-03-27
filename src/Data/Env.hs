@@ -72,6 +72,7 @@ data Env =
     , introEnv :: S.Set Int -- set of the names of constructors (e.g. ["nil", "cons", "zero", "succ", ...] (as int))
     , nonCandSet :: S.Set T.Text
     -- elaborate
+    , termEnv :: IntMap.IntMap TermPlus
     , impEnv :: IntMap.IntMap [Int] -- var ~> (index of implicit arguments of the var)
     , weakTypeEnv :: IntMap.IntMap (WeakTermPlus, UnivLevelPlus) -- var ~> (typeof(var), level-of-type)
     , equalityEnv :: [(UnivLevel, UnivLevel)]
@@ -121,6 +122,7 @@ initialEnv =
     , inductiveEnv = Map.empty
     , coinductiveEnv = Map.empty
     , introEnv = S.empty
+    , termEnv = IntMap.empty
     , nonCandSet = S.empty
     , labelEnv = Map.empty
     , equalityEnv = []
@@ -282,13 +284,6 @@ unaryOpToType m op = do
   let xts = [(m, x, dom')]
   mls <- piUnivLevelsfrom xts cod'
   return (m, TermPi mls xts cod')
-  -- let (dom, cod) = unaryOpToDomCod op
-  -- dom' <- lowTypeToWeakType m dom
-  -- cod' <- lowTypeToWeakType m cod
-  -- x <- newNameWith' "arg"
-  -- let xts = [(m, x, dom')]
-  -- mls <- piUnivLevelsfrom xts cod'
-  -- return (m, WeakTermPi mls xts cod')
 
 binaryOpToType :: Meta -> BinaryOp -> WithEnv TermPlus
 binaryOpToType m op = do
@@ -300,14 +295,6 @@ binaryOpToType m op = do
   let xts = [(m, x1, dom'), (m, x2, dom')]
   mls <- piUnivLevelsfrom xts cod'
   return (m, TermPi mls xts cod')
-  -- let (dom, cod) = binaryOpToDomCod op
-  -- dom' <- lowTypeToWeakType m dom
-  -- cod' <- lowTypeToWeakType m cod
-  -- x1 <- newNameWith' "arg"
-  -- x2 <- newNameWith' "arg"
-  -- let xts = [(m, x1, dom'), (m, x2, dom')]
-  -- mls <- piUnivLevelsfrom xts cod'
-  -- return (m, WeakTermPi mls xts cod')
 
 arrayAccessToType :: Meta -> LowType -> WithEnv TermPlus
 arrayAccessToType m lowType = do
@@ -325,20 +312,6 @@ arrayAccessToType m lowType = do
   let cod = (m, TermSigma [(m, x4, arr), (m, x5, t)])
   mls <- piUnivLevelsfrom xts cod
   return (m, TermPi mls xts cod)
-  -- t <- lowTypeToWeakType m lowType
-  -- k <- lowTypeToArrayKind m lowType
-  -- x1 <- newNameWith' "arg"
-  -- x2 <- newNameWith' "arg"
-  -- x3 <- newNameWith' "arg"
-  -- let u64 = (m, WeakTermEnum (EnumTypeIntU 64))
-  -- let idx = (m, WeakTermUpsilon x2)
-  -- let arr = (m, WeakTermArray idx k)
-  -- let xts = [(m, x1, u64), (m, x2, u64), (m, x3, arr)]
-  -- x4 <- newNameWith' "arg"
-  -- x5 <- newNameWith' "arg"
-  -- let cod = (m, WeakTermSigma [(m, x4, arr), (m, x5, t)])
-  -- mls <- piUnivLevelsfrom xts cod
-  -- return (m, WeakTermPi mls xts cod)
 
 insEnumEnv :: Meta -> T.Text -> [(T.Text, Int)] -> WithEnv ()
 insEnumEnv m name xis = do

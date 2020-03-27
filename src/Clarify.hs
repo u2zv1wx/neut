@@ -12,6 +12,7 @@ import Control.Monad.State
 import Data.List (nubBy)
 
 import qualified Data.HashMap.Strict as Map
+import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Text as T
 
 import Clarify.Linearize
@@ -46,6 +47,8 @@ clarify' tenv (m, TermPiIntroPlus _ (name, args) mxts e) = do
     -- fixme (定数化したからここはチェック不要になるはず)
         of
     [] -> do
+      p "empty for:"
+      p' name
       name' <- lookupLLVMEnumEnv m name
       e' <- clarify' (insTypeEnv1 mxts tenv) e
       retClosure tenv (Just name') args m mxts e'
@@ -186,7 +189,7 @@ clarifyCase' tenv m envVarName ((_, xts), e) = do
   return (m, sigmaElim xs (m, DataUpsilon envVarName) e')
 
 clarifyConst :: TypeEnv -> Meta -> Identifier -> WithEnv CodePlus
-clarifyConst tenv m name@(I (x, _))
+clarifyConst tenv m name@(I (x, i))
   | Just op <- asUnaryOpMaybe x = clarifyUnaryOp tenv name op m
   | Just op <- asBinaryOpMaybe x = clarifyBinaryOp tenv name op m
   | Just _ <- asLowTypeMaybe x =
@@ -203,7 +206,11 @@ clarifyConst tenv m name@(I (x, _))
     os <- getOS
     case asSysCallMaybe os x of
       Just (syscall, argInfo) -> clarifySysCall tenv name syscall argInfo m
-      Nothing -> return (m, CodeUpIntro (m, DataTheta $ asText'' name))
+      Nothing -> do
+        teEnv <- gets termEnv
+        case IntMap.lookup i teEnv of
+          Just body -> clarify' tenv body
+          Nothing -> return (m, CodeUpIntro (m, DataTheta $ asText'' name))
 
 clarifyCast :: TypeEnv -> Meta -> WithEnv CodePlus
 clarifyCast tenv m = do

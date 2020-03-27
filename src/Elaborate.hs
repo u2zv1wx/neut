@@ -37,15 +37,16 @@ import qualified Data.UnionFind as UF
 -- S. Kong, and C. Roux. "Elaboration in Dependent Type Theory", arxiv,
 -- https://arxiv.org/abs/1505.04324, 2015.
 elaborate :: WeakStmt -> WithEnv TermPlus
-elaborate stmt = reduceTermPlus <$> elaborateStmt stmt
+elaborate stmt = elaborateStmt stmt
 
+-- elaborate stmt = reduceTermPlus <$> elaborateStmt stmt
 elaborateStmt :: WeakStmt -> WithEnv TermPlus
 elaborateStmt (WeakStmtReturn e) = do
   (e', _, _) <- infer e
   analyze >> synthesize >> refine
   checkUnivSanity
   elaborate' e'
-elaborateStmt (WeakStmtLet m (mx, x@(I (_, i)), t) e cont) = do
+elaborateStmt (WeakStmtLet _ (_, x@(I (_, i)), t) e cont) = do
   (e', te, mle) <- infer e
   (t', mlt) <- inferType t
   insConstraintEnv te t'
@@ -55,18 +56,22 @@ elaborateStmt (WeakStmtLet m (mx, x@(I (_, i)), t) e cont) = do
   e'' <- elaborate' e'
   t'' <- reduceTermPlus <$> elaborate' t'
   insTypeEnv x t'' mlt
-  modify (\env -> env {substEnv = IntMap.insert i (weaken e'') (substEnv env)})
-  cont' <- elaborateStmt cont
-  return (m, TermPiElim (m, TermPiIntro [(mx, x, t'')] cont') [e''])
-elaborateStmt (WeakStmtLetWT m (mx, x@(I (_, i)), t) e cont) = do
+  -- modify (\env -> env {substEnv = IntMap.insert i (weaken e'') (substEnv env)})
+  modify (\env -> env {termEnv = IntMap.insert i e'' (termEnv env)})
+  elaborateStmt cont
+  -- cont' <- elaborateStmt cont
+  -- return (m, TermPiElim (m, TermPiIntro [(mx, x, t'')] cont') [e''])
+elaborateStmt (WeakStmtLetWT _ (_, x@(I (_, i)), t) e cont) = do
   (t', mlt) <- inferType t
   analyze >> synthesize >> refine >> cleanup
   e' <- elaborate' e -- `e` is supposed to be well-typed
   t'' <- reduceTermPlus <$> elaborate' t'
   insTypeEnv x t'' mlt
-  modify (\env -> env {substEnv = IntMap.insert i (weaken e') (substEnv env)})
-  cont' <- elaborateStmt cont
-  return (m, TermPiElim (m, TermPiIntro [(mx, x, t'')] cont') [e'])
+  -- modify (\env -> env {substEnv = IntMap.insert i (weaken e') (substEnv env)})
+  modify (\env -> env {termEnv = IntMap.insert i e' (termEnv env)})
+  elaborateStmt cont
+  -- cont' <- elaborateStmt cont
+  -- return (m, TermPiElim (m, TermPiIntro [(mx, x, t'')] cont') [e'])
 elaborateStmt (WeakStmtLetSigma m xts e cont) = do
   (e', t1, mlSigma) <- infer e
   xtls <- inferSigma [] xts
@@ -76,8 +81,8 @@ elaborateStmt (WeakStmtLetSigma m xts e cont) = do
   analyze >> synthesize >> refine >> cleanup
   e'' <- elaborate' e'
   xts'' <- mapM elaboratePlus xts'
-  forM_ (zip xts'' mlSigArgList) $ \((_, x, tx), l) ->
-    insTypeEnv x (reduceTermPlus tx) l
+  -- forM_ (zip xts'' mlSigArgList) $ \((_, x, tx), l) ->
+  --   insTypeEnv x (reduceTermPlus tx) l
   cont' <- elaborateStmt cont
   return (m, TermSigmaElim (m, TermEnum $ EnumTypeIntS 64) xts'' e'' cont')
 elaborateStmt (WeakStmtImplicit m x@(I (_, i)) idx cont) = do
@@ -97,7 +102,7 @@ elaborateStmt (WeakStmtImplicit m x@(I (_, i)) idx cont) = do
       raiseError m $
       "the type of " <>
       asText x <> " is supposed to be a Pi-type, but is:\n" <> toText (weaken t)
-elaborateStmt (WeakStmtLetInductiveIntro m (bi, ai) (mx, x@(I (_, i)), t) xts yts atsbts app cont) = do
+elaborateStmt (WeakStmtLetInductiveIntro m (bi, ai) (_, x@(I (_, i)), t) xts yts atsbts app cont) = do
   (t', mlt) <- inferType t
   analyze >> synthesize >> refine >> cleanup
   -- the "elaborate' e" part in LetWT
@@ -111,9 +116,11 @@ elaborateStmt (WeakStmtLetInductiveIntro m (bi, ai) (mx, x@(I (_, i)), t) xts yt
             (m, TermPiIntroPlus ai (bi, xtsyts') atsbts' app'))
   t'' <- reduceTermPlus <$> elaborate' t'
   insTypeEnv x t'' mlt
-  modify (\env -> env {substEnv = IntMap.insert i (weaken lam) (substEnv env)})
-  cont' <- elaborateStmt cont
-  return (m, TermPiElim (m, TermPiIntro [(mx, x, t'')] cont') [lam])
+  -- modify (\env -> env {substEnv = IntMap.insert i (weaken lam) (substEnv env)})
+  modify (\env -> env {termEnv = IntMap.insert i lam (termEnv env)})
+  elaborateStmt cont
+  -- cont' <- elaborateStmt cont
+  -- return (m, TermPiElim (m, TermPiIntro [(mx, x, t'')] cont') [lam])
 elaborateStmt (WeakStmtConstDecl _ (_, x, t) cont) = do
   (t', mlt) <- inferType t
   analyze >> synthesize >> refine >> cleanup
@@ -432,11 +439,11 @@ elaborate' (m, WeakTermCase (e, t) cxtes) = do
             (False, _) -> raiseError m $ "found a non-linear pattern"
             (_, False) -> raiseError m $ "found a non-exhaustive pattern"
             (True, True) -> return (m, TermCase (e', t') cxtes')
-    _ ->
+    _ -> do
       raiseError m $
-      "the type of `" <>
-      toText (weaken e') <>
-      "` must be an inductive type, but is:\n" <> toText t''
+        "the type of `" <>
+        toText (weaken e') <>
+        "` must be an inductive type, but is:\n" <> toText t''
 
 reduceWeakType :: WeakTermPlus -> WithEnv WeakTermPlus
 reduceWeakType t = do
