@@ -173,31 +173,33 @@ infer' ctx (m, WeakTermZeta x) = do
         (\env ->
            env {zetaEnv = IntMap.insert (asInt x) (app, higherApp, ml) zenv})
       return (app, higherApp, ml)
-infer' ctx f@(m, WeakTermConst x@(I (s, _)))
+infer' ctx f@(m, WeakTermConst x@(I (s, _)) _)
   -- i64, f16, u8, etc.
   | Just _ <- asLowTypeMaybe s = do
     ml0 <- newLevelLE m []
     ml1 <- newLevelLT m [ml0]
-    return ((m, WeakTermConst x), (asUniv ml0), ml1)
+    return ((m, WeakTermConst x undefined), (asUniv ml0), ml1)
   | Just op <- asUnaryOpMaybe s = do
     t <- unaryOpToWeakType m op
     (t', l) <- inferType' [] t
-    return ((m, WeakTermConst x), t', l)
+    return ((m, WeakTermConst x undefined), t', l)
   | Just op <- asBinaryOpMaybe s = do
     t <- binaryOpToWeakType m op
     (t', l) <- inferType' [] t
-    return ((m, WeakTermConst x), t', l)
+    return ((m, WeakTermConst x undefined), t', l)
   | Just lowType <- asArrayAccessMaybe s = do
     t <- arrayAccessToWeakType m lowType
     (t', l) <- inferType' [] t
-    return ((m, WeakTermConst x), t', l)
+    return ((m, WeakTermConst x undefined), t', l)
   | otherwise = do
     ienv <- gets impEnv
     case (metaIsExplicit m, IntMap.lookup (asInt x) ienv) of
       (False, Just is) -> inferImplicit ctx m x f is
       _ -> do
-        (m', mt, ml) <- inferSymbol m x
-        return ((m', WeakTermConst x), mt, ml)
+        _ <- inferSymbol m x
+        -- (m', mt, ml) <- inferSymbol m x
+        undefined
+        -- return ((m', WeakTermConst x), mt, ml)
 infer' _ (m, WeakTermInt t i) = do
   (t', UnivLevelPlus (_, l)) <- inferType' [] t -- ctx == [] since t' should be i64, i8, etc. (i.e. t must be closed)
   return ((m, WeakTermInt t' i), t', UnivLevelPlus (m, l))
@@ -352,11 +354,14 @@ inferSymbol m x = do
     Nothing -> do
       ((_, t), UnivLevelPlus (_, l)) <- lookupWeakTypeEnv m x
       return (m, (m, t), UnivLevelPlus (m, l))
-    Just (t, UnivLevelPlus (_, l)) -> do
-      ((_, t'), l') <- univInst (weaken t) l
-      univParams <- gets univRenameEnv
-      let m' = m {metaUnivParams = univParams}
-      return (m', (m, t'), UnivLevelPlus (m, l'))
+    _ -> undefined
+    -- Just (t, UnivLevelPlus (_, l)) -> undefined
+    -- Just (t, UnivLevelPlus (_, l)) -> undefined
+      -- ((_, t'), l') <- univInst (weaken t) l
+      -- univParams <- gets univRenameEnv
+      -- undefined
+      -- let m' = m {metaUnivParams = univParams}
+      -- return (m', (m, t'), UnivLevelPlus (m, l'))
 
 inferImplicit ::
      Context
@@ -365,7 +370,7 @@ inferImplicit ::
   -> WeakTermPlus
   -> [Int]
   -> WithEnv (WeakTermPlus, WeakTermPlus, UnivLevelPlus)
-inferImplicit ctx m x f is = do
+inferImplicit _ m x _ _ = do
   mt <- lookupTypeEnv x
   case mt of
     Nothing ->
@@ -373,18 +378,20 @@ inferImplicit ctx m x f is = do
       "the type of `" <>
       asText x <>
       "` is supposed to be an implicit type, but its type is not even in the type environment"
-    Just (t@(_, TermPi _ _ _), UnivLevelPlus (_, l)) -> do
-      ((_, (WeakTermPi mls xts cod)), l') <- univInst (weaken t) l
-      univParams <- gets univRenameEnv
-      let m' = m {metaUnivParams = univParams}
-      let xtis = zip (zip xts mls) [0 ..]
-      let vs = map (\(mx, y, _) -> (supMeta m mx, WeakTermUpsilon y)) xts
-      let app = (m, WeakTermPiElim f vs)
-      (xtis', e', cod') <- inferImplicit' ctx m' is xtis app cod
-      let lam = (m', WeakTermPiIntro xtis' e')
-      let mls' = map fst $ filter (\(_, k) -> k `notElem` is) $ zip mls [0 ..]
-      let piType = (m', WeakTermPi mls' xtis' cod')
-      return (lam, piType, UnivLevelPlus (m, l'))
+    Just ((_, TermPi _ _ _), UnivLevelPlus (_, _)) -> undefined
+    -- Just (t@(_, TermPi _ _ _), UnivLevelPlus (_, l)) -> undefined
+      -- ((_, (WeakTermPi mls xts cod)), l') <- univInst (weaken t) l
+      -- univParams <- gets univRenameEnv
+      -- undefined
+      -- let m' = m {metaUnivParams = univParams}
+      -- let xtis = zip (zip xts mls) [0 ..]
+      -- let vs = map (\(mx, y, _) -> (supMeta m mx, WeakTermUpsilon y)) xts
+      -- let app = (m, WeakTermPiElim f vs)
+      -- (xtis', e', cod') <- inferImplicit' ctx m' is xtis app cod
+      -- let lam = (m', WeakTermPiIntro xtis' e')
+      -- let mls' = map fst $ filter (\(_, k) -> k `notElem` is) $ zip mls [0 ..]
+      -- let piType = (m', WeakTermPi mls' xtis' cod')
+      -- return (lam, piType, UnivLevelPlus (m, l'))
     Just (t, _) ->
       raiseCritical m $
       "the type of `" <>
@@ -720,7 +727,8 @@ univInst' (m, WeakTermIter (mx, x, t) xts e) = do
   xts' <- univInstArgs xts
   e' <- univInst' e
   return (m, WeakTermIter (mx, x, t') xts' e')
-univInst' (m, WeakTermConst x) = return (m, WeakTermConst x)
+univInst' (_, WeakTermConst {}) = undefined
+  -- return (m, WeakTermConst x)
 univInst' (m, WeakTermZeta x) = return (m, WeakTermZeta x)
 univInst' (m, WeakTermInt t a) = do
   t' <- univInst' t

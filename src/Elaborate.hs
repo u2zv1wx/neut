@@ -320,7 +320,7 @@ elaborate' (m, WeakTermZeta _) =
   raiseCritical
     m
     "every meta-variable must be of the form (?M e1 ... en) where n >= 0, but found the meta-variable here that doesn't fit this pattern"
-elaborate' (m, WeakTermConst x) = return (m, TermConst x)
+elaborate' (m, WeakTermConst x up) = return (m, TermConst x up)
 elaborate' (m, WeakTermInt t x) = do
   t' <- reduceTermPlus <$> elaborate' t
   case t' of
@@ -356,7 +356,7 @@ elaborate' (m, WeakTermFloat64 x) = do
 elaborate' (m, WeakTermFloat t x) = do
   t' <- reduceTermPlus <$> elaborate' t
   case t' of
-    (_, TermConst (I (floatType, _))) -> do
+    (_, TermConst (I (floatType, _)) _) -> do
       let x16 = realToFrac x :: Half
       let x32 = realToFrac x :: Float
       case asLowTypeMaybe floatType of

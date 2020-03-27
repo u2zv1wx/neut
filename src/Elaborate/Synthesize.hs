@@ -250,7 +250,7 @@ unravel (m, WeakTermIter (mx, x, t) xts e) = do
   x' <- unravelUpsilon x
   (xts', e') <- unravelBinder xts e
   return (m, WeakTermIter (mx, x', t) xts' e')
-unravel (m, WeakTermConst x) = return (m, WeakTermConst x)
+unravel (m, WeakTermConst x up) = return (m, WeakTermConst x up)
 unravel (m, WeakTermZeta h) = do
   h' <- unravelZeta h
   return (m, WeakTermZeta h')

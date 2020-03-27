@@ -42,7 +42,9 @@ clarify' tenv lam@(m, TermPiIntroNoReduce mxts e) = do
   e' <- clarify' (insTypeEnv1 mxts tenv) e
   retClosure tenv Nothing fvs m mxts e'
 clarify' tenv (m, TermPiIntroPlus _ (name, args) mxts e) = do
-  case varTermPlus (m, TermPiIntro args $ termZero m) of
+  case varTermPlus (m, TermPiIntro args $ termZero m)
+    -- fixme (定数化したからここはチェック不要になるはず)
+        of
     [] -> do
       name' <- lookupLLVMEnumEnv m name
       e' <- clarify' (insTypeEnv1 mxts tenv) e
@@ -65,7 +67,7 @@ clarify' tenv iter@(m, TermIter (_, x, t) mxts e) = do
   e' <- clarify' (insTypeEnv1 mxts tenv') e
   fvs <- nubFVS <$> chainTermPlus' tenv iter
   retClosure' tenv x fvs m mxts e'
-clarify' tenv (m, TermConst x) = clarifyConst tenv m x
+clarify' tenv (m, TermConst x _) = clarifyConst tenv m x
 clarify' _ (m, TermFloat16 l) = return (m, CodeUpIntro (m, DataFloat16 l))
 clarify' _ (m, TermFloat32 l) = return (m, CodeUpIntro (m, DataFloat32 l))
 clarify' _ (m, TermFloat64 l) = return (m, CodeUpIntro (m, DataFloat64 l))
@@ -469,7 +471,7 @@ inferKind m (ArrayKindIntU i) = return (m, TermEnum (EnumTypeIntU i))
 inferKind m (ArrayKindFloat size) = do
   let constName = "f" <> T.pack (show (sizeAsInt size))
   i <- lookupConstNum' m constName
-  return (m, TermConst (I (constName, i)))
+  return (m, TermConst (I (constName, i)) emptyUP)
 inferKind m _ = raiseCritical m "inferKind for void-pointer"
 
 rightmostOf :: TermPlus -> WithEnv (Meta, TermPlus)
@@ -623,7 +625,7 @@ chainTermPlus' tenv (_, TermIter (_, x, t) xts e) = do
   xs1 <- chainTermPlus' tenv t
   xs2 <- chainTermPlus'' (insTypeEnv'' x t tenv) xts [e]
   return $ xs1 ++ filter (\(_, y, _) -> y /= x) xs2
-chainTermPlus' tenv (m, TermConst x) = do
+chainTermPlus' tenv (m, TermConst x _) = do
   t <- lookupTypeEnv'' m x tenv
   chainTermPlus' tenv t
 chainTermPlus' _ (_, TermFloat16 _) = return []
