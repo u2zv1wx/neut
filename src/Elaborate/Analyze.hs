@@ -26,9 +26,7 @@ import Elaborate.Infer
 import Reduce.WeakTerm
 
 analyze :: WithEnv ()
-analyze = do
-  cs <- gets constraintEnv
-  simp cs
+analyze = gets constraintEnv >>= simp
 
 simp :: [PreConstraint] -> WithEnv ()
 simp [] = return ()
