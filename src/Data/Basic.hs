@@ -65,7 +65,7 @@ data Meta =
   Meta
     { metaFileName :: Path Abs File
     , metaLocation :: Loc
-    , metaUnivParams :: UnivParams
+    -- , metaUnivParams :: UnivParams
     , metaIsExplicit :: Bool
     }
 
@@ -96,7 +96,7 @@ supMeta m1 m2 =
   Meta
     { metaFileName = supFileName m1 m2
     , metaLocation = supLocation m1 m2
-    , metaUnivParams = supUnivParams m1 m2
+    -- , metaUnivParams = supUnivParams m1 m2
     , metaIsExplicit = False
     }
 
@@ -112,18 +112,17 @@ supLocation m1 m2 =
     GT -> metaLocation m1
     _ -> metaLocation m2
 
-supUnivParams :: Meta -> Meta -> UnivParams
-supUnivParams m1 m2 = do
-  let up1 = metaUnivParams m1
-  let up2 = metaUnivParams m2
-  undefined
-
+-- supUnivParams :: Meta -> Meta -> UnivParams
+-- supUnivParams m1 m2 = do
+--   let up1 = metaUnivParams m1
+--   let up2 = metaUnivParams m2
+--   undefined
 newMeta :: Int -> Int -> Path Abs File -> Meta
 newMeta l c path = do
   Meta
     { metaFileName = path
     , metaLocation = (0, l, c)
-    , metaUnivParams = IntMap.empty
+    -- , metaUnivParams = IntMap.empty
     , metaIsExplicit = False
     }
 

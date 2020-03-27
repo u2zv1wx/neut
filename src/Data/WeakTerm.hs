@@ -42,7 +42,7 @@ data WeakTerm
   -- CBN recursion ~ CBV iteration
   | WeakTermIter IdentifierPlus [IdentifierPlus] WeakTermPlus
   | WeakTermZeta Identifier
-  | WeakTermConst Identifier
+  | WeakTermConst Identifier UnivParams
   | WeakTermInt WeakTermPlus Integer
   | WeakTermFloat16 Half
   | WeakTermFloat32 Float
@@ -208,7 +208,7 @@ varWeakTermPlus (_, WeakTermSigmaElim t xts e1 e2) = do
   xs ++ ys ++ zs
 varWeakTermPlus (_, WeakTermIter (_, x, t) xts e) =
   varWeakTermPlus t ++ filter (/= x) (varWeakTermPlus' xts [e])
-varWeakTermPlus (_, WeakTermConst _) = []
+varWeakTermPlus (_, WeakTermConst _ _) = []
 varWeakTermPlus (_, WeakTermZeta _) = []
 varWeakTermPlus (_, WeakTermInt t _) = varWeakTermPlus t
 varWeakTermPlus (_, WeakTermFloat16 _) = []
@@ -266,7 +266,7 @@ holeWeakTermPlus (_, WeakTermSigmaElim t xts e1 e2) = do
 holeWeakTermPlus (_, WeakTermIter (_, _, t) xts e) =
   holeWeakTermPlus t ++ holeWeakTermPlus' xts [e]
 holeWeakTermPlus (_, WeakTermZeta h) = h : []
-holeWeakTermPlus (_, WeakTermConst _) = []
+holeWeakTermPlus (_, WeakTermConst _ _) = []
 holeWeakTermPlus (_, WeakTermInt t _) = holeWeakTermPlus t
 holeWeakTermPlus (_, WeakTermFloat16 _) = []
 holeWeakTermPlus (_, WeakTermFloat32 _) = []
@@ -342,7 +342,7 @@ substWeakTermPlus sub (m, WeakTermIter (mx, x, t) xts e) = do
   let sub' = filter (\(k, _) -> k /= x) sub
   let (xts', e') = substWeakTermPlus'' sub' xts e
   (m, WeakTermIter (mx, x, t') xts' e')
-substWeakTermPlus _ (m, WeakTermConst x) = (m, WeakTermConst x)
+substWeakTermPlus _ (m, WeakTermConst x up) = (m, WeakTermConst x up)
 substWeakTermPlus sub e1@(_, WeakTermZeta x) = do
   case lookup x sub of
     Nothing -> e1
@@ -464,7 +464,7 @@ toText (_, WeakTermSigmaElim _ xts e1 e2) = do
 toText (_, WeakTermIter (_, x, _) xts e) = do
   let argStr = inParen $ showItems $ map showArg xts
   showCons ["μ", asText' x, argStr, toText e]
-toText (_, WeakTermConst x) = asText' x
+toText (_, WeakTermConst x _) = asText' x
 toText (_, WeakTermZeta (I (_, i))) = "?M" <> T.pack (show i)
   -- asText' x
 -- toText (_, WeakTermZeta x) = asText' x
