@@ -43,18 +43,9 @@ clarify' tenv lam@(m, TermPiIntroNoReduce mxts e) = do
   e' <- clarify' (insTypeEnv1 mxts tenv) e
   retClosure tenv Nothing fvs m mxts e'
 clarify' tenv (m, TermPiIntroPlus _ (name, args) mxts e) = do
-  case varTermPlus (m, TermPiIntro args $ termZero m)
-    -- fixme (定数化したからここはチェック不要になるはず)
-        of
-    [] -> do
-      p "empty for:"
-      p' name
-      name' <- lookupLLVMEnumEnv m name
-      e' <- clarify' (insTypeEnv1 mxts tenv) e
-      retClosure tenv (Just name') args m mxts e'
-    _ -> do
-      raiseError m $
-        "couldn't normalize the type of the inductive closure at compile time"
+  name' <- lookupLLVMEnumEnv m name
+  e' <- clarify' (insTypeEnv1 mxts tenv) e
+  retClosure tenv (Just name') args m mxts e'
 clarify' tenv (m, TermPiElim e es) = do
   es' <- mapM (clarifyPlus tenv) es
   e' <- clarify' tenv e
@@ -209,8 +200,15 @@ clarifyConst tenv m name@(I (x, i))
       Nothing -> do
         teEnv <- gets termEnv
         case IntMap.lookup i teEnv of
-          Just body -> clarify' tenv body
           Nothing -> return (m, CodeUpIntro (m, DataTheta $ asText'' name))
+          Just body -> do
+            cenv <- gets cacheEnv
+            case IntMap.lookup i cenv of
+              Just e -> return e
+              Nothing -> do
+                e <- clarify' tenv body
+                modify (\env -> env {cacheEnv = IntMap.insert i e cenv})
+                return e
 
 clarifyCast :: TypeEnv -> Meta -> WithEnv CodePlus
 clarifyCast tenv m = do

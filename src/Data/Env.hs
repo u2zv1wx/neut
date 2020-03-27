@@ -86,6 +86,7 @@ data Env =
     , zetaEnv :: IntMap.IntMap (WeakTermPlus, WeakTermPlus, UnivLevelPlus)
     , patVarEnv :: S.Set Int
     -- clarify
+    , cacheEnv :: IntMap.IntMap CodePlus
     , codeEnv :: Map.HashMap T.Text Definition -- f ~> thunk (lam (x1 ... xn) e)
     , nameSet :: S.Set T.Text
     -- LLVM
@@ -131,6 +132,7 @@ initialEnv =
     , impEnv = IntMap.empty
     , weakTypeEnv = IntMap.empty
     , typeEnv = IntMap.empty
+    , cacheEnv = IntMap.empty
     , codeEnv = Map.empty
     , llvmEnv = Map.empty
     , declEnv =
@@ -246,6 +248,14 @@ lookupTypeEnv :: Identifier -> WithEnv (Maybe (TermPlus, UnivLevelPlus))
 lookupTypeEnv (I (_, i)) = do
   tenv <- gets typeEnv
   return $ IntMap.lookup i tenv
+
+lookupTypeEnv1 :: Meta -> Identifier -> WithEnv (TermPlus, UnivLevelPlus)
+lookupTypeEnv1 m x@(I (_, i)) = do
+  tenv <- gets typeEnv
+  case IntMap.lookup i tenv of
+    Just (t, l) -> return (t, l)
+    Nothing ->
+      raiseCritical m $ asText' x <> " is not found in the type environment."
 
 lookupTypeEnv' :: Meta -> Identifier -> WithEnv TermPlus
 lookupTypeEnv' m x = do

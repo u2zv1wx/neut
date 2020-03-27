@@ -8,6 +8,8 @@ module Elaborate.Infer
   , insLevelLE
   , insConstraintEnv
   , univInstWith
+  , instantiate
+  , insWeakTypeEnv
   ) where
 
 import Control.Monad.Except
@@ -384,14 +386,12 @@ inferImplicit ctx m x is = do
       "` is supposed to be an implicit type, but its type is not even in the type environment"
     Just (t@(_, TermPi {}), UnivLevelPlus (_, l)) -> do
       (up, (_, WeakTermPi mls xts cod), l') <- instantiate m t l -- irrefutable pat
-      -- let m' = m {metaUnivParams = univParams}
       let xtis = zip (zip xts mls) [0 ..]
       let vs = map (\(mx, y, _) -> (supMeta m mx, WeakTermUpsilon y)) xts
       let app = (m, WeakTermPiElim (m, WeakTermConst x up) vs)
       (xtis', e', cod') <- inferImplicit' ctx m is xtis app cod
       let mls' = map fst $ filter (\(_, k) -> k `notElem` is) $ zip mls [0 ..]
       let piType = (m, WeakTermPi mls' xtis' cod')
-      -- return (lam, piType, UnivLevelPlus (m, l'))
       return ((m, WeakTermPiIntro xtis' e'), piType, l')
     Just (t, _) ->
       raiseCritical m $
@@ -617,7 +617,7 @@ lookupWeakTypeEnv m s = do
     Just t -> return t
     Nothing ->
       raiseCritical m $
-      asText s <> " is not found in the weak type environment."
+      asText' s <> " is not found in the weak type environment."
 
 lookupWeakTypeEnvMaybe ::
      Identifier -> WithEnv (Maybe (WeakTermPlus, UnivLevelPlus))
