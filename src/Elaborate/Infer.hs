@@ -64,10 +64,6 @@ infer' _ (m, WeakTermTau _) = do
   ml2 <- newLevelLT m [ml1]
   return (asUniv ml0, asUniv ml1, ml2)
 infer' ctx (m, WeakTermUpsilon x) = inferSymbol ctx m x
-  -- ienv <- gets impEnv
-  -- case (metaIsExplicit m, IntMap.lookup (asInt x) ienv) of
-  --   (False, Just is) -> inferImplicit ctx m x is
-  --   _ -> inferSymbol m x
 infer' ctx (m, WeakTermPi _ xts t) = do
   mls <- piUnivLevelsfrom xts t
   (xtls', (t', mlPiCod)) <- inferPi ctx xts t
@@ -176,15 +172,12 @@ infer' ctx (m, WeakTermConst x@(I (s, _)) _)
   | Just _ <- asLowTypeMaybe s = do
     ml0 <- newLevelLE m []
     ml1 <- newLevelLT m [ml0]
-    return ((m, WeakTermConst x undefined), (asUniv ml0), ml1)
+    -- i64とかf16とかは定義に展開されないのでunivParamsをもつ必要がない、はず
+    return ((m, WeakTermConst x emptyUP), (asUniv ml0), ml1)
   | Just op <- asUnaryOpMaybe s = inferExternal m x (unaryOpToType m op)
   | Just op <- asBinaryOpMaybe s = inferExternal m x (binaryOpToType m op)
   | Just lt <- asArrayAccessMaybe s = inferExternal m x (arrayAccessToType m lt)
   | otherwise = inferSymbol ctx m x
-    -- ienv <- gets impEnv
-    -- case (metaIsExplicit m, IntMap.lookup (asInt x) ienv) of
-    --   (False, Just is) -> inferImplicit ctx m x is
-    --   _ -> inferSymbol m x
 infer' _ (m, WeakTermInt t i) = do
   (t', UnivLevelPlus (_, l)) <- inferType' [] t -- ctx == [] since t' should be i64, i8, etc. (i.e. t must be closed)
   return ((m, WeakTermInt t' i), t', UnivLevelPlus (m, l))
@@ -339,8 +332,9 @@ inferExternal ::
   -> WithEnv (WeakTermPlus, WeakTermPlus, UnivLevelPlus)
 inferExternal m x comp = do
   t <- comp
-  (up, t', l') <- instantiate m t undefined
-  return ((m, WeakTermConst x up), t', l')
+  l <- newCount
+  (_, t', l') <- instantiate m t l
+  return ((m, WeakTermConst x emptyUP), t', l')
 
 inferSymbol ::
      Context
@@ -353,7 +347,6 @@ inferSymbol ctx m x = do
     (False, Just is) -> inferImplicit ctx m x is
     _ -> inferSymbol' m x
 
--- inferSymbol :: Meta -> Identifier -> WithEnv (Meta, WeakTermPlus, UnivLevelPlus)
 inferSymbol' ::
      Meta -> Identifier -> WithEnv (WeakTermPlus, WeakTermPlus, UnivLevelPlus)
 inferSymbol' m x = do
@@ -365,17 +358,6 @@ inferSymbol' m x = do
     Just (t, UnivLevelPlus (_, l)) -> do
       (up, t', l') <- instantiate m t l
       return ((m, WeakTermConst x up), t', l')
-      -- ((_, t'), l') <- univInst (weaken t) l
-      -- up <- gets univRenameEnv
-      -- return ((m, WeakTermConst x up), (m, t'), UnivLevelPlus (m, l'))
-    -- _ -> undefined
-    -- Just (t, UnivLevelPlus (_, l)) -> undefined
-    -- Just (t, UnivLevelPlus (_, l)) -> undefined
-      -- ((_, t'), l') <- univInst (weaken t) l
-      -- univParams <- gets univRenameEnv
-      -- undefined
-      -- let m' = m {metaUnivParams = univParams}
-      -- return (m', (m, t'), UnivLevelPlus (m, l'))
 
 instantiate ::
      Meta
@@ -748,8 +730,9 @@ univInst' (m, WeakTermIter (mx, x, t) xts e) = do
   xts' <- univInstArgs xts
   e' <- univInst' e
   return (m, WeakTermIter (mx, x, t') xts' e')
-univInst' (_, WeakTermConst {}) = undefined
-  -- return (m, WeakTermConst x)
+univInst' (m, WeakTermConst x up) = do
+  up' <- mapM levelInst up
+  return (m, WeakTermConst x up')
 univInst' (m, WeakTermZeta x) = return (m, WeakTermZeta x)
 univInst' (m, WeakTermInt t a) = do
   t' <- univInst' t
@@ -817,49 +800,6 @@ levelInst l = do
       modify (\env -> env {univInstEnv = IntMap.insertWith S.union l s uienv})
       return l'
 
--- lowTypeToWeakType :: Meta -> LowType -> WithEnv WeakTermPlus
--- lowTypeToWeakType m (LowTypeIntS s) = return (m, WeakTermEnum (EnumTypeIntS s))
--- lowTypeToWeakType m (LowTypeIntU s) = return (m, WeakTermEnum (EnumTypeIntU s))
--- lowTypeToWeakType m (LowTypeFloat s) = do
---   lookupConstantPlus m $ "f" <> T.pack (show (sizeAsInt s))
--- lowTypeToWeakType _ _ =
---   error "[compiler bug] invalid argument passed to lowTypeToWeakType"
--- unaryOpToWeakType :: Meta -> UnaryOp -> WithEnv WeakTermPlus
--- unaryOpToWeakType m op = do
---   let (dom, cod) = unaryOpToDomCod op
---   dom' <- lowTypeToWeakType m dom
---   cod' <- lowTypeToWeakType m cod
---   x <- newNameWith' "arg"
---   let xts = [(m, x, dom')]
---   mls <- piUnivLevelsfrom xts cod'
---   return (m, WeakTermPi mls xts cod')
--- binaryOpToWeakType :: Meta -> BinaryOp -> WithEnv WeakTermPlus
--- binaryOpToWeakType m op = do
---   let (dom, cod) = binaryOpToDomCod op
---   dom' <- lowTypeToWeakType m dom
---   cod' <- lowTypeToWeakType m cod
---   x1 <- newNameWith' "arg"
---   x2 <- newNameWith' "arg"
---   let xts = [(m, x1, dom'), (m, x2, dom')]
---   mls <- piUnivLevelsfrom xts cod'
---   return (m, WeakTermPi mls xts cod')
--- u8:array-access : Pi (i : u64, x : u64, xs : Array x u8). Sigma (_ : Array x u8). u8
--- arrayAccessToWeakType :: Meta -> LowType -> WithEnv WeakTermPlus
--- arrayAccessToWeakType m lowType = do
---   t <- lowTypeToWeakType m lowType
---   k <- lowTypeToArrayKind m lowType
---   x1 <- newNameWith' "arg"
---   x2 <- newNameWith' "arg"
---   x3 <- newNameWith' "arg"
---   let u64 = (m, WeakTermEnum (EnumTypeIntU 64))
---   let idx = (m, WeakTermUpsilon x2)
---   let arr = (m, WeakTermArray idx k)
---   let xts = [(m, x1, u64), (m, x2, u64), (m, x3, arr)]
---   x4 <- newNameWith' "arg"
---   x5 <- newNameWith' "arg"
---   let cod = (m, WeakTermSigma [(m, x4, arr), (m, x5, t)])
---   mls <- piUnivLevelsfrom xts cod
---   return (m, WeakTermPi mls xts cod)
 substWeakTermPlus''' ::
      SubstWeakTerm
   -> [IdentifierPlus]
