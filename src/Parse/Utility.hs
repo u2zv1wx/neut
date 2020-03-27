@@ -73,7 +73,7 @@ compInfoWeakTermPlus c info (_, WeakTermIter (mx, x, t) xts e) = do
   let info' = (x, mx) : info
   compInfoBinder c info' xts e
 compInfoWeakTermPlus _ _ (_, WeakTermZeta _) = return ()
-compInfoWeakTermPlus _ _ (_, WeakTermConst _) = return ()
+compInfoWeakTermPlus _ _ (_, WeakTermConst _ _) = return ()
 compInfoWeakTermPlus c info (_, WeakTermInt t _) = compInfoWeakTermPlus c info t
 compInfoWeakTermPlus _ _ (_, WeakTermFloat16 _) = return ()
 compInfoWeakTermPlus _ _ (_, WeakTermFloat32 _) = return ()

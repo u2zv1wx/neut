@@ -96,7 +96,7 @@ interpret (m, TreeNode ((_, TreeLeaf "zeta"):rest))
 interpret (m, TreeNode ((_, TreeLeaf "constant"):rest))
   | [(_, TreeLeaf x)] <- rest = do
     m' <- adjustPhase m
-    return (m', WeakTermConst $ asIdent x)
+    return (m', WeakTermConst (asIdent x) emptyUP)
   | otherwise = raiseSyntaxError m "(constant LEAF)"
 interpret (m, TreeNode ((_, TreeLeaf "f16"):rest))
   | [(mx, TreeLeaf x)] <- rest = do

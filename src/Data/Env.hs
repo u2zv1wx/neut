@@ -271,7 +271,7 @@ lowTypeToType m (LowTypeIntU s) = return (m, TermEnum (EnumTypeIntU s))
 lowTypeToType m (LowTypeFloat s) = do
   let x = "f" <> T.pack (show (sizeAsInt s))
   i <- lookupConstNum x
-  return (m, TermConst (I (x, i)))
+  return (m, TermConst (I (x, i)) emptyUP)
 lowTypeToType m _ = raiseCritical m "invalid argument passed to lowTypeToType"
 
 unaryOpToType :: Meta -> UnaryOp -> WithEnv TermPlus
@@ -385,12 +385,12 @@ lookupConstantPlus :: Meta -> T.Text -> WithEnv WeakTermPlus
 lookupConstantPlus m constName = do
   cenv <- gets constantEnv
   case Map.lookup constName cenv of
-    Just i -> return (m, WeakTermConst $ I (constName, i))
+    Just i -> return (m, WeakTermConst (I (constName, i)) emptyUP)
     Nothing -> do
       i <- newCount
       let ident = I (constName, i)
       modify (\env -> env {constantEnv = Map.insert constName i cenv})
-      return (m, WeakTermConst ident)
+      return (m, WeakTermConst ident emptyUP)
 
 lookupConstantPlus' :: T.Text -> WithEnv Identifier
 lookupConstantPlus' constName = do

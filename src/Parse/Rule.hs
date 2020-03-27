@@ -721,7 +721,7 @@ substRuleType sub (m, WeakTermIter (mx, x, t) xts e) = do
     else do
       (xts', e') <- substRuleType'' sub xts e
       return (m, WeakTermIter (mx, x, t') xts' e')
-substRuleType _ (m, WeakTermConst x) = return (m, WeakTermConst x)
+substRuleType _ (m, WeakTermConst x up) = return (m, WeakTermConst x up)
 substRuleType _ (m, WeakTermZeta x) = return (m, WeakTermZeta x)
 substRuleType sub (m, WeakTermInt t x) = do
   t' <- substRuleType sub t

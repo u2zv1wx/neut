@@ -53,6 +53,9 @@ instance Eq UnivLevelPlus where
 
 type UnivParams = IntMap.IntMap UnivLevel
 
+emptyUP :: UnivParams
+emptyUP = IntMap.empty
+
 type Phase = Int
 
 type Line = Int
