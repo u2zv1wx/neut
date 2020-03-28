@@ -8,6 +8,22 @@
   (none () (option a))
   (some ((x a)) (option a)))
 
+(definition map ([a tau] [b tau] (f (hom a b)) (m (option a)))
+  (witness (option b)
+    (case m
+      ((none) (none))
+      ((some x) (some (f x))))))
+
+(definition return ([a tau] (x a))
+  (witness (option a)
+    (some x)))
+
+(definition bind ([a tau] [b tau] (m (option a)) (k (hom a (option b))))
+  (witness (option b)
+    (case m
+      ((none) (none))
+      ((some x) (k x)))))
+
 (definition from-option ([a tau] (x a) (m (option a)))
   (case m
     ((none) x)
