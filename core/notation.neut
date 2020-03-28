@@ -95,7 +95,7 @@
 (keyword admit)
 
 (notation admit
-  (exit hole 1))
+  (os:exit hole 1))
 
 (keyword tuple)
 

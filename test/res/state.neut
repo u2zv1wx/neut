@@ -5,23 +5,45 @@
 ;;   (lambda ((env S))
 ;;     (sigma-introduction env x)))
 
-(definition state ((S type) (A type))
-  (hom S (product S A)))
+(section state)
 
-(ascription state
-  (pi
-    ((S type)
-     (A type))
-    type))
+(inductive state ((s tau) (a tau))
+  (get () (state s s))
+  (put ((_ s)) (state s top)))
 
-(definition state-return ((S type) (A type) (x A))
-  (lambda ((env S))
-    (sigma-introduction env x)))
+;; なんかへんなバグがあるな。inferにおけるcaseの推論とかだろうか。
+;; いや、バグじゃなかった。これ、型システムのほうが正しい。
+;; パターンマッチングとGADTの組み合わせはけっこう謎、ということかな。
+(definition run ([s tau] [a tau] (m (state s a)) (x s))
+  (case m
+    ((get) (i64 10))
+    ((put p) (i64 20))))
 
-;; これで40個くらい制約が入ってる。
-(ascription state-return
-  (pi
-    ((S type)
-     (A type)
-     (x A))
-    (hom S (product S A))))
+;; runState :: State s a -> s -> (a, s)
+;; runState p s = case (view p) of
+;;   Return x -> (x, s)
+;;   Get :>>= k -> runState (k s) s
+;;   Put x :>>= k -> runState (k ()) x
+
+(end state)
+
+;; (definition state ((S type) (A type))
+;;   (hom S (product S A)))
+
+;; (ascription state
+;;   (pi
+;;     ((S type)
+;;      (A type))
+;;     type))
+
+;; (definition state-return ((S type) (A type) (x A))
+;;   (lambda ((env S))
+;;     (sigma-introduction env x)))
+
+;; ;; これで40個くらい制約が入ってる。
+;; (ascription state-return
+;;   (pi
+;;     ((S type)
+;;      (A type)
+;;      (x A))
+;;     (hom S (product S A))))

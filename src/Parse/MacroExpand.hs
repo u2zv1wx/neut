@@ -13,7 +13,6 @@ import qualified Data.Text as T
 
 import Data.Basic
 import Data.Env
-import Data.Maybe (fromMaybe)
 import Data.Tree
 
 type MacroSubst = [(T.Text, TreePlus)]
@@ -43,7 +42,7 @@ macroExpand1 t@(i, _) = do
     else do
       mMatch <- try (macroMatch t) nenv
       case mMatch of
-        Just (sub, (_, skel)) -> macroExpand' $ applySubst sub (i, skel)
+        Just (sub, skel) -> macroExpand' $ applySubst sub $ replaceMeta i skel
         Nothing -> return t
 
 type Notation = TreePlus
@@ -83,7 +82,10 @@ macroMatch (m1, TreeNode ts1) (_, TreeNode ts2)
 macroMatch _ _ = return Nothing
 
 applySubst :: MacroSubst -> Notation -> TreePlus
-applySubst sub (i, TreeLeaf s) = fromMaybe (i, TreeLeaf s) (lookup s sub)
+applySubst sub (i, TreeLeaf s) = do
+  case lookup s sub of
+    Nothing -> (i, TreeLeaf s)
+    Just t -> replaceMeta i t
 applySubst sub (i, TreeNode ts) = (i, TreeNode $ map (applySubst sub) ts)
 applySubst sub (i, TreeNodeSquare ts) =
   (i, TreeNodeSquare $ map (applySubst sub) ts)

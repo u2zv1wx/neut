@@ -305,6 +305,10 @@ infer' ctx (m, WeakTermCase (e, t) cxtes) = do
           let expCons = (m {metaIsExplicit = True}, WeakTermUpsilon c)
           let app = (m, WeakTermPiElim expCons vs)
           (_, appType, appLevel) <- infer' ctx app
+          p "app:"
+          p' app
+          p "appType:"
+          p' appType
           (body', bodyType, bodyLevel) <- infer' ctx body
           forM_ xts'' insPatVarEnv
           insConstraintEnv appType t'
