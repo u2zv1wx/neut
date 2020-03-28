@@ -20,36 +20,75 @@
 (section list)
 
 (inductive list ((a tau))
-  (nil () (list a))
-  (cons ((x a) (xs (list a))) (list a)))
-
+  (nil ()
+    (list a))
+  (cons ((x a) (xs (list a)))
+    (list a)))
 
 ;; (attribute cons (implicit 1))
 
 (definition head ([a tau] (xs (list a)))
   (case xs
-    ((nil) (none))
-    ((cons y _) (some y))))
+    ((nil)
+      (none))
+    ((cons y _)
+      (some y))))
 
 (definition length ([a tau] (xs (list a)))
   (case xs
-    ((nil) 0)
-    ((cons _ ys) (u64.add 1 (length a ys)))))
+    ((nil)
+      0)
+    ((cons _ ys)
+      (u64.add 1 (length a ys)))))
 
+(definition append ([a tau] (xs (list a)) (ys (list a)))
+  (witness (list a)
+    (case xs
+      ((nil)
+        ys)
+      ((cons z zs)
+        (cons z (append a zs ys))))))
+
+;; the axiom K
 (definition map ([a tau] [b tau] (f (hom a b)) (xs (list a)))
   (case xs
-    ((nil) (nil))
+    ((nil)
+      (nil))
     ((cons y ys)
       (cons (f y) (map a b f ys)))))
 
-(definition some-function ([a tau] (xs (list a)))
-  (case xs
-    ((nil) true)
-    ((cons _ _) false)))
+;; A -> T A is the axiom-M in possible world semantics (reflexivity)
+(definition reflexivity ([a tau] (x a))
+  (witness (list a)
+    (cons x (nil))))
+
+;; alias for easier use
+(definition return ([a tau] (x a))
+  (@list:reflexivity a x))
+
+;; T (T A) -> T A is the axiom-4 in possible world semantics (transitivity)
+(definition transitivity ([a tau] (m (list (list a))))
+  (witness (list a)
+    (case m
+      ((nil)
+        (nil))
+      ((cons x xs)
+        (append x (transitivity a xs))))))
+
+;; alias
+(definition concat ([a tau] (m (list (list a))))
+  (witness (list a)
+    (@list:transitivity a m)))
+
+(definition bind ([a tau] [b tau] (m (list a)) (k (hom a (list b))))
+  (witness (list b)
+    (transitivity (map k m))))
 
 (definition is-null ([a tau] (xs (list a)))
   (case xs
-    ((nil) true)
-    ((cons _ _) false)))
+    ((nil)
+      true)
+    ((cons _ _)
+      false)))
 
 (end list)
