@@ -26,18 +26,20 @@
     (list a)))
 
 (definition head ([a tau] (xs (list a)))
-  (case xs
-    ((nil)
-      (none))
-    ((cons y _)
-      (some y))))
+  (witness (option a)
+    (case xs
+      ((nil)
+        (none))
+      ((cons y _)
+        (some y)))))
 
 (definition length ([a tau] (xs (list a)))
-  (case xs
-    ((nil)
-      0)
-    ((cons _ ys)
-      (u64.add 1 (length a ys)))))
+  (witness u64
+    (case xs
+      ((nil)
+        0)
+      ((cons _ ys)
+        (u64.add 1 (length a ys))))))
 
 (definition append ([a tau] (xs (list a)) (ys (list a)))
   (witness (list a)
@@ -48,19 +50,21 @@
         (cons z (append a zs ys))))))
 
 (definition is-null ([a tau] (xs (list a)))
-  (case xs
-    ((nil)
-      true)
-    ((cons _ _)
-      false)))
+  (witness bool
+    (case xs
+      ((nil)
+        true)
+      ((cons _ _)
+        false))))
 
 ;; the axiom K
 (definition map ([a tau] [b tau] (f (hom a b)) (xs (list a)))
-  (case xs
-    ((nil)
-      (nil))
-    ((cons y ys)
-      (cons (f y) (map a b f ys)))))
+  (witness (list b)
+    (case xs
+      ((nil)
+        (nil))
+      ((cons y ys)
+        (cons (f y) (map a b f ys))))))
 
 ;; A -> T A is the axiom-M in possible world semantics (reflexivity)
 (definition reflexivity ([a tau] (x a))
@@ -69,7 +73,8 @@
 
 ;; alias for easier use
 (definition return ([a tau] (x a))
-  (@list:reflexivity a x))
+  (witness (list a)
+    (@list:reflexivity a x)))
 
 ;; T (T A) -> T A is the axiom-4 in possible world semantics (transitivity)
 (definition transitivity ([a tau] (m (list (list a))))
