@@ -509,7 +509,7 @@ cocaseBaseValue :: Meta -> WeakTermPlus -> WeakTermPlus
 cocaseBaseValue m codType =
   ( m
   , WeakTermPiElim
-      (m, WeakTermUpsilon $ asIdent "unsafe-cast")
+      (m, WeakTermUpsilon $ asIdent "unsafe:cast")
       [ (m, WeakTermPi [] [] (m, WeakTermEnum (EnumTypeIntS 64)))
       , codType
       , (m, (WeakTermPiIntro [] (m, WeakTermEnumIntro (EnumValueIntS 64 0))))
