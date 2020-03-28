@@ -49,6 +49,13 @@
       ((cons z zs)
         (cons z (append a zs ys))))))
 
+(definition is-null ([a tau] (xs (list a)))
+  (case xs
+    ((nil)
+      true)
+    ((cons _ _)
+      false)))
+
 ;; the axiom K
 (definition map ([a tau] [b tau] (f (hom a b)) (xs (list a)))
   (case xs
@@ -83,12 +90,5 @@
 (definition bind ([a tau] [b tau] (m (list a)) (k (hom a (list b))))
   (witness (list b)
     (transitivity (map k m))))
-
-(definition is-null ([a tau] (xs (list a)))
-  (case xs
-    ((nil)
-      true)
-    ((cons _ _)
-      false)))
 
 (end list)
