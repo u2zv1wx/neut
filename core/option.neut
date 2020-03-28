@@ -1,18 +1,24 @@
 (no-implicit-core)
 
-(include "notation.neut")
+(include "foundation.neut")
+
+(include "monad.neut")
 
 (section option)
 
 (inductive option ((a tau))
-  (none () (option a))
-  (some ((x a)) (option a)))
+  (none ()
+    (option a))
+  (some ((x a))
+    (option a)))
 
 (definition map ([a tau] [b tau] (f (hom a b)) (m (option a)))
   (witness (option b)
     (case m
-      ((none) (none))
-      ((some x) (some (f x))))))
+      ((none)
+        (none))
+      ((some x)
+        (some (f x))))))
 
 (definition return ([a tau] (x a))
   (witness (option a)
@@ -21,12 +27,28 @@
 (definition bind ([a tau] [b tau] (m (option a)) (k (hom a (option b))))
   (witness (option b)
     (case m
-      ((none) (none))
-      ((some x) (k x)))))
+      ((none)
+        (none))
+      ((some x)
+        (k x)))))
 
 (definition from-option ([a tau] (x a) (m (option a)))
-  (case m
-    ((none) x)
-    ((some y) y)))
+  (witness a
+    (case m
+      ((none)
+        x)
+      ((some y)
+        y))))
+
+;; (functor.coinduction option @option:map (i64 0))
+
+(definition witness-functor
+  (witness (functor option)
+    (record (functor option)
+      (map @option:map))))
+
+;; (definition witness-monad
+;;   (witness (monad option)
+;;     (record (monad))))
 
 (end option)
