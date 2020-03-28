@@ -1,0 +1,55 @@
+;; state.neut
+
+(use top)
+
+(definition state ((s tau) (a tau))
+  (pi ((_ s)) (product s a)))
+
+(section state)
+
+(definition map ([s tau] [a tau] [b tau] (f (hom a b)) (m (state s a)))
+  (witness (state s b)
+    (lambda ((env s))
+      (destruct (m env)
+        ((new-env s) (val a))
+        (witness (product s b)
+          (tuple new-env (f val)))))))
+
+(definition return ([s tau] [a tau] (x a))
+  (witness (state s a)
+    (lambda ((env s))
+      (tuple env x))))
+
+(definition bind ([s tau] [a tau] [b tau] (comp (state s a)) (k (hom a (state s b))))
+  (witness (state s b)
+    (lambda ((env s))
+      (destruct (comp env)
+        ((new-env s) (val a))
+        ((k val) new-env)))))
+
+(definition get ([s tau])
+  (witness (state s s)
+    (lambda (env) (tuple env env))))
+
+(definition put ([s tau] (env s))
+  (witness (state s top)
+    (lambda (_) (tuple env unit))))
+
+(definition foo ((env i64))
+  (witness (state i64 i64)
+    (with bind
+      (let x (@return i64 i64 (i64 10)))
+      (let y (get))
+      (let z (get))
+      (put (i64.add env 20))
+      (return (i64.add y (i64.add z 10))))))
+
+(end state)
+
+(destruct ((@state:foo 12) (i64 8))
+  (foo bar)
+  bar)
+
+;; (@admit i64 1)
+
+;; (os:exit i64 ((@state:foo i64 10)))
