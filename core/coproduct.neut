@@ -2,6 +2,30 @@
 
 (include "notation.neut")
 
-(inductive coproduct ((a tau) (b tau))
-  (left ((_ a)) (coproduct a b))
-  (right ((_ b)) (coproduct a b)))
+(section coproduct)
+
+(inductive coproduct ((e tau) (a tau))
+  (left ((_ e)) (coproduct e a))
+  (right ((_ a)) (coproduct e a)))
+
+(definition map ([e tau] [a tau] [b tau] (f (hom a b)) (m (coproduct e a)))
+  (witness (coproduct e b)
+    (case m
+      ((left err) (left err))
+      ((right val) (right (f val))))))
+
+(definition return ([e tau] [a tau] (x a))
+  (witness (coproduct e a)
+    (right x)))
+
+(definition bind ([e tau] [a tau] [b tau] (comp (coproduct e a)) (k (hom a (coproduct e b))))
+  (witness (coproduct e b)
+    (case comp
+      ((left err) (left err))
+      ((right val) (k val)))))
+
+(definition throw ([e tau] [a tau] (err e))
+  (witness (coproduct e a)
+    (left err)))
+
+(end coproduct)
