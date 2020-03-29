@@ -577,13 +577,8 @@ concatQuasiStmtList (QuasiStmtLetInductiveIntro m bt e as:ss) = do
   case e of
     (_, WeakTermPiIntroNoReduce xtsyts (_, WeakTermPiIntroPlus ai (bi, xts, yts) atsbts (_, WeakTermPiElim b _))) -> do
       let isub = zip as (map toVar' atsbts) -- outer ~> innerで、ytsの型のなかのouterをinnerにしていく
-      p "yts:"
-      p' yts
-      yts' <- mapM (internalize isub atsbts) yts
-      p "yts':"
-      p' yts'
+      yts' <- mapM (internalize isub atsbts) $ drop (length xts) xtsyts
       insInductive as bt -- register the constructor (if necessary)
-      cont <- concatQuasiStmtList ss
       let lam =
             ( m
             , WeakTermPiIntroNoReduce
@@ -594,29 +589,10 @@ concatQuasiStmtList (QuasiStmtLetInductiveIntro m bt e as:ss) = do
                     (bi, xts, yts)
                     atsbts
                     (m, WeakTermPiElim b yts')))
-      -- return $ WeakStmtLetWT m bt lam cont -- return $
-      return $ WeakStmtLet m bt lam cont -- return $
-    _ -> raiseCritical m "inductive-intro" --   WeakStmtLetInductiveIntro
-  --     m
-  --     (bi, ai)
-  --     bt
-  --     xts
-  --     yts
-  --     (ats ++ bts)
-  --     (m, WeakTermPiElim bInner yts')
-  --     cont
--- concatQuasiStmtList (QuasiStmtLetInductiveIntro m (bi, ai) bt xts yts ats bts bInner isub as:ss) = do
---   yts' <- mapM (internalize isub (ats ++ bts)) yts
---   insInductive as bt -- register the constructor (if necessary)
---   cont <- concatQuasiStmtList ss
---   let xtsyts' = xts ++ yts
---   let app = (m, WeakTermPiElim bInner yts')
---   let lam =
---         ( m
---         , WeakTermPiIntroNoReduce
---             xtsyts'
---             (m, WeakTermPiIntroPlus ai (bi, xts, yts) (ats ++ bts) app))
---   return $ WeakStmtLetWT m bt lam cont -- return $
+      cont <- concatQuasiStmtList ss
+      -- return $ WeakStmtLetWT m bt lam cont
+      return $ WeakStmtLet m bt lam cont
+    _ -> raiseCritical m "inductive-intro"
 concatQuasiStmtList (QuasiStmtUse _:ss) = concatQuasiStmtList ss
 concatQuasiStmtList (QuasiStmtUnuse _:ss) = concatQuasiStmtList ss
 

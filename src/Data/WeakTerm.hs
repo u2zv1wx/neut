@@ -416,7 +416,11 @@ toText (_, WeakTermUpsilon x) = asText' x
 toText (_, WeakTermPi _ xts t) = do
   let argStr = inParen $ showItems $ map showArg xts
   showCons ["Π", argStr, toText t]
-toText (_, WeakTermPiPlus _ _ _ cod) = toText cod -- Pi{nat} (...). (...) ~> nat
+toText (_, WeakTermPiPlus _ _ xts cod) = do
+  let argStr = inParen $ showItems $ map showArg xts
+  showCons ["Π+", argStr, toText cod]
+  -- toText cod -- Pi{nat} (...). (...) ~> nat
+-- toText (_, WeakTermPiPlus _ _ _ cod) = toText cod -- Pi{nat} (...). (...) ~> nat
 -- toText (_, WeakTermPiPlus name _ _ _) = name -- Pi{nat} (...). (...) ~> nat
 toText (_, WeakTermPiIntro xts e) = do
   let argStr = inParen $ showItems $ map showArg xts
@@ -424,8 +428,11 @@ toText (_, WeakTermPiIntro xts e) = do
 toText (_, WeakTermPiIntroNoReduce xts e) = do
   let argStr = inParen $ showItems $ map showArg xts
   showCons ["λ", argStr, toText e]
-toText (_, WeakTermPiIntroPlus _ (name, _, _) _ _) = do
-  "<#" <> name <> "-" <> "value" <> "#>" -- <#succ-value#>, <#cons-value#>, <#nil-value#>, etc.
+toText (_, WeakTermPiIntroPlus _ (_, _, _) xts e) = do
+  let argStr = inParen $ showItems $ map showArg xts
+  showCons ["λ", argStr, toText e]
+-- toText (_, WeakTermPiIntroPlus _ (name, _, _) _ _) = do
+--   "<#" <> name <> "-" <> "value" <> "#>" -- <#succ-value#>, <#cons-value#>, <#nil-value#>, etc.
 toText (_, WeakTermPiElim e es) = do
   showCons $ map toText $ e : es
 toText (_, WeakTermSigma xts)

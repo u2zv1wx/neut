@@ -144,28 +144,6 @@ toInductiveIntro ats bts xts a@(I (ai, _)) (mb, b@(I (bi, k)), m, yts, cod)
     let attrList = map (QuasiStmtImplicit m b') [0 .. length xts' - 1]
     let as = map (\(_, x, _) -> x) ats
     return (QuasiStmtLetInductiveIntro m (mb, b', piType) lam as : attrList)
-       -- map (QuasiStmtImplicitPlus m b') [0 .. length xts' - 1])
-         -- xts'
-         -- yts
-         -- ats
-         -- bts
-         -- (mb, WeakTermUpsilon b)
-         -- []
-         -- (map (\(_, x, _) -> x) ats) :
-    -- return
-    --   (QuasiStmtLetInductiveIntro
-    --      m
-    --      -- (ai <> ":" <> bi, ai)
-    --      (ai <> ":" <> bi, ai)
-    --      (mb, b', (m, WeakTermPi mls (xts' ++ yts) cod))
-    --      xts'
-    --      yts
-    --      ats
-    --      bts
-    --      (mb, WeakTermUpsilon b)
-    --      []
-    --      (map (\(_, x, _) -> x) ats) :
-    --    map (QuasiStmtImplicitPlus m b') [0 .. length xts' - 1])
   | otherwise =
     raiseError m $
     "the succedent of an introduction rule of `" <>
