@@ -155,7 +155,7 @@ toInductiveIntro ats bts xts a@(I (ai, _)) (mb, b@(I (bi, k)), m, yts, cod)
               (m, WeakTermPiIntroPlus ai (bi, xts', yts) atsbts app))
     let attrList = map (QuasiStmtImplicit m b') [0 .. length xts' - 1]
     let as = map (\(_, x, _) -> x) ats
-    return (QuasiStmtLetInductiveIntro2 m (mb, b', piType) lam as : attrList)
+    return (QuasiStmtLetInductiveIntro m (mb, b', piType) lam as : attrList)
        -- map (QuasiStmtImplicitPlus m b') [0 .. length xts' - 1])
          -- xts'
          -- yts

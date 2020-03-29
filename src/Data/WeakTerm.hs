@@ -136,7 +136,7 @@ data QuasiStmt
   --   lam (xts ++ yts).
   --     lam (ats ++ bts).
   --       b-inner @ [y, ..., y]
-  | QuasiStmtLetInductiveIntro2 Meta IdentifierPlus WeakTermPlus [Identifier]
+  | QuasiStmtLetInductiveIntro Meta IdentifierPlus WeakTermPlus [Identifier]
   -- | QuasiStmtLetInductiveIntro
   --     Meta -- location of b
   --     (T.Text, T.Text) -- ("zero", "nat") (i.e. enum info)
@@ -322,11 +322,10 @@ substWeakTermPlus sub (m, WeakTermPiIntro xts body) = do
 substWeakTermPlus sub (m, WeakTermPiIntroNoReduce xts body) = do
   let (xts', body') = substWeakTermPlus'' sub xts body
   (m, WeakTermPiIntroNoReduce xts' body')
-substWeakTermPlus sub (m, WeakTermPiIntroPlus ind (name, args1, args2) xts body)
-  -- let args' = substWeakTermPlus' sub args
- = do
-  let args1' = undefined
-  let args2' = undefined
+substWeakTermPlus sub (m, WeakTermPiIntroPlus ind (name, args1, args2) xts body) = do
+  let args' = substWeakTermPlus' sub $ args1 ++ args2
+  let args1' = take (length args1) args'
+  let args2' = drop (length args1) args'
   let (xts', body') = substWeakTermPlus'' sub xts body
   (m, WeakTermPiIntroPlus ind (name, args1', args2') xts' body')
 substWeakTermPlus sub (m, WeakTermPiElim e es) = do

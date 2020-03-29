@@ -95,13 +95,13 @@ discern' nenv ((QuasiStmtLetInductive n m (mx, a, t) e):ss) = do
 --   e' <- discern'' nenv e
 --   ss' <- discern' (insertName a a' nenv) ss
 --   return $ QuasiStmtLetCoinductive n m (mx, a', t') e' : ss'
-discern' nenv ((QuasiStmtLetInductiveIntro2 m (mx, x, t) e as):ss) = do
+discern' nenv ((QuasiStmtLetInductiveIntro m (mx, x, t) e as):ss) = do
   t' <- discern'' nenv t
   x' <- newDefinedNameWith' m nenv x
   e' <- discern'' nenv e
   ss' <- discern' (insertName x x' nenv) ss
   as' <- mapM (lookupStrict'' m nenv) as
-  return $ QuasiStmtLetInductiveIntro2 m (mx, x', t') e' as' : ss'
+  return $ QuasiStmtLetInductiveIntro m (mx, x', t') e' as' : ss'
 -- discern' nenv ((QuasiStmtLetInductiveIntro m enumInfo (mb, b, t) xts yts ats bts bInner _ _):ss) = do
 --   t' <- discern'' nenv t
 --   (xts', nenv') <- discernArgs nenv xts

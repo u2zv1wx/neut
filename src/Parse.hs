@@ -515,7 +515,7 @@ concatQuasiStmtList ((QuasiStmtLetInductive n m at e):es) = do
 --   insForm n at e
 --   cont <- concatQuasiStmtList es
 --   return $ WeakStmtLetWT m at e cont
-concatQuasiStmtList (QuasiStmtLetInductiveIntro2 m bt e as:ss) = do
+concatQuasiStmtList (QuasiStmtLetInductiveIntro m bt e as:ss) = do
   case e of
     (_, WeakTermPiIntroNoReduce xtsyts (_, WeakTermPiIntroPlus ai (bi, xts, yts) atsbts (_, WeakTermPiElim b _))) -> do
       let isub = zip as (map toVar' atsbts) -- outer ~> innerで、ytsの型のなかのouterをinnerにしていく
