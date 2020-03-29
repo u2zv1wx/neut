@@ -252,14 +252,15 @@ parse' ((m, TreeNode (ind@(_, TreeLeaf "inductive"):rest)):as)
     stmtList1 <- parseInductive m rest'
     stmtList2 <- parse' as
     return $ stmtList1 ++ stmtList2
--- parse' ((m, TreeNode (coind@(_, TreeLeaf "coinductive"):rest)):as)
---   | name@(mFun, TreeLeaf _):xts@(_, TreeNode _):rest' <- rest = do
---     parse' $ (m, TreeNode [coind, (mFun, TreeNode (name : xts : rest'))]) : as
---   | otherwise = do
---     rest' <- mapM macroExpand rest
---     stmtList1 <- parseCoinductive m rest'
---     stmtList2 <- parse' as
---     return $ stmtList1 ++ stmtList2
+parse' ((m, TreeNode (coind@(_, TreeLeaf "coinductive"):rest)):as)
+  | name@(mFun, TreeLeaf _):xts@(_, TreeNode _):rest' <- rest = do
+    parse' $ (m, TreeNode [coind, (mFun, TreeNode (name : xts : rest'))]) : as
+  | otherwise = do
+    rest' <- mapM macroExpand rest
+    rest'' <- asInductive rest'
+    stmtList1 <- parseInductive m rest''
+    stmtList2 <- parse' as
+    return $ stmtList1 ++ stmtList2
 parse' ((m, TreeNode ((mLet, TreeLeaf "let"):rest)):as)
   | [(mx, TreeLeaf x), t, e] <- rest = do
     let xt = (mx, TreeNode [(mx, TreeLeaf x), t])
@@ -329,6 +330,9 @@ getCurrentSection' :: [T.Text] -> T.Text
 getCurrentSection' [] = ""
 getCurrentSection' [n] = n
 getCurrentSection' (n:ns) = getCurrentSection' ns <> ":" <> n
+
+asInductive :: [TreePlus] -> WithEnv [TreePlus]
+asInductive = undefined
 
 parseBorrow :: WeakTermPlus -> (Maybe (Meta, Identifier), WeakTermPlus)
 parseBorrow (m, WeakTermUpsilon (I (s, _)))
