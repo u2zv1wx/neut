@@ -89,12 +89,6 @@ discern' nenv ((QuasiStmtLetInductive n m (mx, a, t) e):ss) = do
   e' <- discern'' nenv e
   ss' <- discern' (insertName a a' nenv) ss
   return $ QuasiStmtLetInductive n m (mx, a', t') e' : ss'
--- discern' nenv ((QuasiStmtLetCoinductive n m (mx, a, t) e):ss) = do
---   t' <- discern'' nenv t
---   a' <- newDefinedNameWith' m nenv a
---   e' <- discern'' nenv e
---   ss' <- discern' (insertName a a' nenv) ss
---   return $ QuasiStmtLetCoinductive n m (mx, a', t') e' : ss'
 discern' nenv ((QuasiStmtLetInductiveIntro m (mx, x, t) e as):ss) = do
   t' <- discern'' nenv t
   x' <- newDefinedNameWith' m nenv x
@@ -125,35 +119,6 @@ discern' nenv ((QuasiStmtLetInductiveIntro m (mx, x, t) e as):ss) = do
 --       ats'
 --       bts'
 --       bInner'
---       info
---       asOuter :
---     ss'
--- discern' nenv ((QuasiStmtLetCoinductiveElim m (mb, b, t) xtsyt codInner ats bts yt e1 e2 _ _):ss) = do
---   t' <- discern'' nenv t
---   (xtsyt', nenv') <- discernArgs nenv xtsyt
---   e1' <- discern'' nenv' e1
---   (ats', nenv'') <- discernArgs nenv' ats
---   (bts', nenv''') <- discernArgs nenv'' bts
---   (yt', nenv'''') <- discernIdentPlus' nenv''' yt
---   codInner' <- discern'' nenv'''' codInner
---   e2' <- discern'' nenv'''' e2
---   b' <- newDefinedNameWith' m nenv b
---   ss' <- discern' (insertName b b' nenv) ss
---   asOuterPlus <- mapM (lookupStrict' nenv) ats
---   asOuter <- mapM (lookupStrict nenv) ats
---   asInner <- mapM (lookupStrict nenv'''') ats
---   let info = zip asInner asOuterPlus
---   return $
---     QuasiStmtLetCoinductiveElim
---       m
---       (mb, b', t')
---       xtsyt'
---       codInner'
---       ats'
---       bts'
---       yt'
---       e1'
---       e2'
 --       info
 --       asOuter :
 --     ss'
@@ -313,26 +278,6 @@ discernSigma nenv ((mx, x, t):xts) = do
   xts' <- discernSigma (insertName x x' nenv) xts
   return $ (mx, x', t') : xts'
 
--- discernArgs ::
---      NameEnv -> [IdentifierPlus] -> WithEnv ([IdentifierPlus], NameEnv)
--- discernArgs nenv [] = return ([], nenv)
--- discernArgs nenv ((mx, x, t):xts) = do
---   t' <- discern'' nenv t
---   x' <- newDefinedNameWith x
---   (xts', nenv') <- discernArgs (insertName x x' nenv) xts
---   return ((mx, x', t') : xts', nenv')
--- discernIdentPlus :: NameEnv -> IdentifierPlus -> WithEnv IdentifierPlus
--- discernIdentPlus nenv (m, x, t) = do
---   t' <- discern'' nenv t
---   penv <- gets prefixEnv
---   x' <- lookupNameWithPrefix'' m penv x nenv
---   return (m, x', t')
--- discernIdentPlus' ::
---      NameEnv -> IdentifierPlus -> WithEnv (IdentifierPlus, NameEnv)
--- discernIdentPlus' nenv (m, x, t) = do
---   t' <- discern'' nenv t
---   x' <- newDefinedNameWith x
---   return ((m, x', t'), insertName x x' nenv)
 discernIter ::
      NameEnv
   -> IdentifierPlus
@@ -408,14 +353,6 @@ newDefinedNameWith' m nenv x = do
       raiseError m $
       "the identifier `" <> asText x <> "` is already defined at top level"
 
--- lookupStrict :: NameEnv -> IdentifierPlus -> WithEnv Identifier
--- lookupStrict nenv (m, x, _) = do
---   penv <- gets prefixEnv
---   lookupNameWithPrefix'' m penv x nenv
--- lookupStrict' :: NameEnv -> IdentifierPlus -> WithEnv WeakTermPlus
--- lookupStrict' nenv xt@(m, _, _) = do
---   x' <- lookupStrict nenv xt
---   return (m, WeakTermUpsilon x')
 lookupStrict'' :: Meta -> NameEnv -> Identifier -> WithEnv Identifier
 lookupStrict'' m nenv x = do
   penv <- gets prefixEnv
