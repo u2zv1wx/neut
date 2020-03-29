@@ -318,9 +318,21 @@ arrayAccessToType m lowType = do
   x4 <- newNameWith' "arg"
   x5 <- newNameWith' "arg"
   -- let cod = (m, TermSigma [(m, x4, arr), (m, x5, t)])
-  let cod = (m, termSigma [(m, x4, arr), (m, x5, t)])
+  cod <- termSigma m [(m, x4, arr), (m, x5, t)]
+  -- let cod = (m, termSigma [(m, x4, arr), (m, x5, t)])
   mls <- piUnivLevelsfrom xts cod
   return (m, TermPi mls xts cod)
+
+termSigma :: Meta -> [Data.Term.IdentifierPlus] -> WithEnv TermPlus
+termSigma m xts = do
+  z <- newNameWith' "sigma"
+  let vz = (m, TermUpsilon z)
+  k <- newNameWith' "sigma"
+  l <- newCount
+  mls2 <- piUnivLevelsfrom xts vz
+  let yts = [(m, z, (m, TermTau l)), (m, k, (m, TermPi mls2 xts vz))]
+  mls1 <- piUnivLevelsfrom yts vz
+  return (m, TermPi mls1 yts vz)
 
 insEnumEnv :: Meta -> T.Text -> [(T.Text, Int)] -> WithEnv ()
 insEnumEnv m name xis = do

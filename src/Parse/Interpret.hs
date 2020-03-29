@@ -301,7 +301,7 @@ sigmaElim ::
   -> WeakTermPlus
   -> WeakTermPlus
   -> WeakTermPlus
-sigmaElim = undefined
+sigmaElim m t xts e1 e2 = (m, WeakTermPiElim e1 [t, (m, WeakTermPi [] xts e2)])
 
 interpretBorrow' :: TreePlus -> (Maybe (Meta, Identifier), TreePlus)
 interpretBorrow' (m, TreeLeaf s)

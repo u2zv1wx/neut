@@ -63,12 +63,6 @@ toTermUpsilon m x = (m, TermUpsilon x)
 termZero :: Meta -> TermPlus
 termZero m = (m, TermEnumIntro (EnumValueIntS 64 0))
 
-termSigma :: [IdentifierPlus] -> Term
-termSigma = undefined
-
-termSigmaElim :: TermPlus -> [IdentifierPlus] -> TermPlus -> TermPlus -> Term
-termSigmaElim = undefined
-
 varTermPlus :: TermPlus -> [Identifier]
 varTermPlus (_, TermTau _) = []
 varTermPlus (_, TermUpsilon x) = [x]

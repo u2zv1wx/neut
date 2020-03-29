@@ -89,7 +89,8 @@ elaborateStmt (WeakStmtLetSigma m xts e cont) = do
   forM_ (zip xts'' mlSigArgList) $ \((_, x, tx), l) ->
     insWeakTypeEnv x (weaken (reduceTermPlus tx), l)
   cont' <- elaborateStmt cont
-  return (m, termSigmaElim (m, TermEnum $ EnumTypeIntS 64) xts'' e'' cont')
+  termSigmaElim m (m, TermEnum $ EnumTypeIntS 64) xts'' e'' cont'
+  -- return (m, termSigmaElim (m, TermEnum $ EnumTypeIntS 64) xts'' e'' cont')
 elaborateStmt (WeakStmtImplicit m x@(I (_, i)) idx cont) = do
   t <- lookupTypeEnv' m x
   case t of
@@ -144,8 +145,28 @@ elaborateStmt (WeakStmtConstDecl _ (_, x, t) cont) = do
   insTypeEnv x t'' mlt
   elaborateStmt cont
 
+-- Sigma [x1 : A1, ..., xn : An] = Pi (z : Tau, k : Pi (x1 : A1, ..., xn : An). z). z
 weakTermSigma :: Meta -> [Data.WeakTerm.IdentifierPlus] -> WithEnv WeakTermPlus
-weakTermSigma = undefined
+weakTermSigma m xts = do
+  z <- newNameWith' "sigma"
+  let vz = (m, WeakTermUpsilon z)
+  k <- newNameWith' "sigma"
+  l <- newCount
+  mls2 <- piUnivLevelsfrom xts vz
+  let yts = [(m, z, (m, WeakTermTau l)), (m, k, (m, WeakTermPi mls2 xts vz))]
+  mls1 <- piUnivLevelsfrom yts vz
+  return (m, WeakTermPi mls1 yts vz)
+
+termSigmaElim ::
+     Meta
+  -> TermPlus
+  -> [Data.Term.IdentifierPlus]
+  -> TermPlus
+  -> TermPlus
+  -> WithEnv TermPlus
+termSigmaElim m t xts e1 e2 = do
+  mls <- piUnivLevelsfrom xts e2
+  return $ (m, TermPiElim e1 [t, (m, TermPi mls xts e2)])
 
 refine :: WithEnv ()
 refine =
