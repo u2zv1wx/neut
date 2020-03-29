@@ -381,7 +381,7 @@ toInternalizedArg mode isub aInner aOuter xts atsbts es es' b (mbInner, _, (_, W
   --   - aOuterの中身はすべて処理済み
   --   - aOuterの外にはeiが出現しうる
   -- という状況が実現できる。これはrecursionの停止を与える。
-  let xs = map (\(_, x, _) -> x) xts
+  let xs = map (\(_, x, _) -> x) xts -- fixme: このへんもrenameBinderでやったほうがいい？
   let ts'' = map (substWeakTermPlus (zip xs es)) ts'
   ys' <- mapM newNameWith ys
   -- これで引数の型の調整が終わったので、あらためてidentPlusの形に整える

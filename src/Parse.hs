@@ -577,17 +577,8 @@ concatQuasiStmtList ((QuasiStmtLetInductive n m at e):es) = do
   return $ WeakStmtLet m at e cont
 concatQuasiStmtList (QuasiStmtLetInductiveIntro m bt e as:ss) = do
   case e of
-    (_, WeakTermPiIntroNoReduce xtsyts (_, WeakTermPiIntroPlus ai (bi, xts, yts) atsbts (_, WeakTermPiElim b _)))
-      -- p "e:"
-      -- p $ T.unpack (toText e)
-     -> do
+    (_, WeakTermPiIntroNoReduce xtsyts (_, WeakTermPiIntroPlus ai (bi, xts, yts) atsbts (_, WeakTermPiElim b _))) -> do
       let isub = zip as (map toVar' atsbts) -- outer ~> innerで、ytsの型のなかのouterをinnerにしていく
-      -- p "internalize with isub:"
-      -- p' isub
-      -- p "atsbts:"
-      -- p' atsbts
-      -- p "yts:"
-      p' $ drop (length xts) xtsyts
       yts' <- mapM (internalize isub atsbts) $ drop (length xts) xtsyts
       insInductive as bt -- register the constructor (if necessary)
       let lam =
@@ -600,8 +591,6 @@ concatQuasiStmtList (QuasiStmtLetInductiveIntro m bt e as:ss) = do
                     (bi, xts, yts)
                     atsbts
                     (m, WeakTermPiElim b yts')))
-      p "lam:"
-      p $ T.unpack (toText lam)
       cont <- concatQuasiStmtList ss
       return $ WeakStmtLet m bt lam cont
     _ -> raiseCritical m "inductive-intro"
