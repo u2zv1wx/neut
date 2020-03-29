@@ -95,14 +95,17 @@ infer' ctx (m, WeakTermPiIntroNoReduce xts e) = do
   let mls = mlPiArgs ++ [mlPiCod]
   return
     ((m, WeakTermPiIntroNoReduce xts' e'), (m, WeakTermPi mls xts' t'), mlPi)
-infer' ctx (m, WeakTermPiIntroPlus ind (name, args) xts e) = do
+infer' ctx (m, WeakTermPiIntroPlus ind (name, args1, args2) xts e) = do
+  let args = args1 ++ args2
   (args', _) <- unzip <$> inferSigma ctx args
+  let args1' = take (length args1) args'
+  let args2' = drop (length args1) args'
   (xtls', (e', t', mlPiCod)) <- inferBinder ctx xts e
   let (xts', mlPiArgs) = unzip xtls'
   mlPi <- newLevelLE m $ mlPiCod : mlPiArgs
   let mls = mlPiArgs ++ [mlPiCod]
   return
-    ( (m, WeakTermPiIntroPlus ind (name, args') xts' e')
+    ( (m, WeakTermPiIntroPlus ind (name, args1', args2') xts' e')
     , (m, WeakTermPiPlus ind mls xts' t') -- fixme: lookup indName
     , mlPi)
 infer' ctx (m, WeakTermPiElim e es) = do
@@ -703,11 +706,12 @@ univInst' (m, WeakTermPiIntroNoReduce xts e) = do
   xts' <- univInstArgs xts
   e' <- univInst' e
   return (m, WeakTermPiIntroNoReduce xts' e')
-univInst' (m, WeakTermPiIntroPlus ind (name, args) xts e) = do
-  args' <- univInstArgs args
+univInst' (m, WeakTermPiIntroPlus ind (name, args1, args2) xts e) = do
+  args1' <- univInstArgs args1
+  args2' <- univInstArgs args2
   xts' <- univInstArgs xts
   e' <- univInst' e
-  return (m, WeakTermPiIntroPlus ind (name, args') xts' e')
+  return (m, WeakTermPiIntroPlus ind (name, args1', args2') xts' e')
 univInst' (m, WeakTermPiElim e es) = do
   e' <- univInst' e
   es' <- mapM univInst' es

@@ -141,27 +141,41 @@ toInductiveIntro ats bts xts a@(I (ai, _)) (mb, b@(I (bi, k)), m, yts, cod)
     mls <- piUnivLevelsfrom (xts ++ yts) cod
     let vs = varWeakTermPlus (m, WeakTermPi mls yts cod)
     let xts' = filter (\(_, x, _) -> x `elem` vs) xts
-    -- let attrList = map (QuasiStmtImplicit m (asIdent bi)) [0 .. length xts']
     let b' = I (ai <> ":" <> bi, k)
-    -- let lam =
-    --       ( m
-    --       , WeakTermPiIntroNoReduce
-    --           xtsyts'
-    --           (m, WeakTermPiIntroPlus ai (bi, xtsyts') atsbts' app'))
-    return
-      (QuasiStmtLetInductiveIntro
-         m
-         -- (ai <> ":" <> bi, ai)
-         (ai <> ":" <> bi, ai)
-         (mb, b', (m, WeakTermPi mls (xts' ++ yts) cod))
-         xts'
-         yts
-         ats
-         bts
-         (mb, WeakTermUpsilon b)
-         []
-         (map (\(_, x, _) -> x) ats) :
-       map (QuasiStmtImplicitPlus m b') [0 .. length xts' - 1])
+    let piType = (m, WeakTermPi mls (xts' ++ yts) cod)
+    let xtsyts = xts' ++ yts
+    let atsbts = ats ++ bts
+    let bInner = (mb, WeakTermUpsilon b)
+    let app = (m, WeakTermPiElim bInner (map toVar' yts))
+    let lam =
+          ( m
+          , WeakTermPiIntroNoReduce
+              xtsyts
+              (m, WeakTermPiIntroPlus ai (bi, xts', yts) atsbts app))
+    let attrList = map (QuasiStmtImplicit m b') [0 .. length xts' - 1]
+    return (QuasiStmtLetInductiveIntro2 m (mb, b', piType) lam : attrList)
+       -- map (QuasiStmtImplicitPlus m b') [0 .. length xts' - 1])
+         -- xts'
+         -- yts
+         -- ats
+         -- bts
+         -- (mb, WeakTermUpsilon b)
+         -- []
+         -- (map (\(_, x, _) -> x) ats) :
+    -- return
+    --   (QuasiStmtLetInductiveIntro
+    --      m
+    --      -- (ai <> ":" <> bi, ai)
+    --      (ai <> ":" <> bi, ai)
+    --      (mb, b', (m, WeakTermPi mls (xts' ++ yts) cod))
+    --      xts'
+    --      yts
+    --      ats
+    --      bts
+    --      (mb, WeakTermUpsilon b)
+    --      []
+    --      (map (\(_, x, _) -> x) ats) :
+    --    map (QuasiStmtImplicitPlus m b') [0 .. length xts' - 1])
   | otherwise =
     raiseError m $
     "the succedent of an introduction rule of `" <>
@@ -313,6 +327,10 @@ internalize ::
 internalize isub atsbts (m, y, t) =
   zeta ModeForward isub [] atsbts t (m, WeakTermUpsilon y)
 
+-- internalize2 ::
+--      SubstWeakTerm -> [IdentifierPlus] -> WeakTermPlus -> WithEnv WeakTermPlus
+-- internalize2 isub atsbts (m, y, t) =
+--   zeta ModeForward isub [] atsbts t (m, WeakTermUpsilon y)
 -- externalize ::
 --      SubstWeakTerm
 --   -> [IdentifierPlus]
@@ -676,10 +694,11 @@ substRuleType sub (m, WeakTermPiIntro xts body) = do
 substRuleType sub (m, WeakTermPiIntroNoReduce xts body) = do
   (xts', body') <- substRuleType'' sub xts body
   return (m, WeakTermPiIntroNoReduce xts' body')
-substRuleType sub (m, WeakTermPiIntroPlus ind (name, args) xts body) = do
-  args' <- substRuleType' sub args
-  (xts', body') <- substRuleType'' sub xts body
-  return (m, WeakTermPiIntroPlus ind (name, args') xts' body')
+substRuleType sub (m, WeakTermPiIntroPlus ind (name, args1, args2) xts body) = do
+  undefined
+  -- args' <- substRuleType' sub args
+  -- (xts', body') <- substRuleType'' sub xts body
+  -- return (m, WeakTermPiIntroPlus ind (name, args') xts' body')
 substRuleType sub@((a1, es1), (a2, es2)) (m, WeakTermPiElim e es)
   | (mx, WeakTermUpsilon x) <- e
   , a1 == x =

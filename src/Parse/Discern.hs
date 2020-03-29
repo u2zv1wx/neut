@@ -95,6 +95,12 @@ discern' nenv ((QuasiStmtLetInductive n m (mx, a, t) e):ss) = do
 --   e' <- discern'' nenv e
 --   ss' <- discern' (insertName a a' nenv) ss
 --   return $ QuasiStmtLetCoinductive n m (mx, a', t') e' : ss'
+discern' nenv ((QuasiStmtLetInductiveIntro2 m (mx, x, t) e):ss) = do
+  t' <- discern'' nenv t
+  x' <- newDefinedNameWith' m nenv x
+  e' <- discern'' nenv e
+  ss' <- discern' (insertName x x' nenv) ss
+  return $ QuasiStmtLetInductiveIntro2 m (mx, x', t') e' : ss'
 discern' nenv ((QuasiStmtLetInductiveIntro m enumInfo (mb, b, t) xts yts ats bts bInner _ _):ss) = do
   t' <- discern'' nenv t
   (xts', nenv') <- discernArgs nenv xts
@@ -206,10 +212,11 @@ discern'' nenv (m, WeakTermPiIntro xts e) = do
 discern'' nenv (m, WeakTermPiIntroNoReduce xts e) = do
   (xts', e') <- discernBinder nenv xts e
   return (m, WeakTermPiIntroNoReduce xts' e')
-discern'' nenv (m, WeakTermPiIntroPlus ind (name, args) xts e) = do
-  args' <- mapM (discernIdentPlus nenv) args
-  (xts', e') <- discernBinder nenv xts e
-  return (m, WeakTermPiIntroPlus ind (name, args') xts' e')
+discern'' nenv (m, WeakTermPiIntroPlus ind (name, args1, args2) xts e) = do
+  undefined
+  -- args' <- mapM (discernIdentPlus nenv) args -- ところでこれは前のargsに後ろのargsが依存できないから間違いですね
+  -- (xts', e') <- discernBinder nenv xts e
+  -- return (m, WeakTermPiIntroPlus ind (name, args') xts' e')
 discern'' nenv (m, WeakTermPiElim e es) = do
   es' <- mapM (discern'' nenv) es
   e' <- discern'' nenv e

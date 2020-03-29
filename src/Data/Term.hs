@@ -17,7 +17,7 @@ data Term
   | TermPiIntroNoReduce [IdentifierPlus] TermPlus
   | TermPiIntroPlus
       T.Text -- name of corresponding inductive type
-      (T.Text, [IdentifierPlus]) -- (name of constructor, args of constructor)
+      (T.Text, [IdentifierPlus], [IdentifierPlus]) -- (name of constructor, args of constructor)
       [IdentifierPlus]
       TermPlus
   | TermPiElim TermPlus [TermPlus]
@@ -135,10 +135,13 @@ substTermPlus sub (m, TermPiIntro xts body) = do
 substTermPlus sub (m, TermPiIntroNoReduce xts body) = do
   let (xts', body') = substTermPlus'' sub xts body
   (m, TermPiIntroNoReduce xts' body')
-substTermPlus sub (m, TermPiIntroPlus ind (name, args) xts body) = do
-  let args' = substTermPlus' sub args
+substTermPlus sub (m, TermPiIntroPlus ind (name, args1, args2) xts body)
+  -- let args' = substTermPlus' sub args
+ = do
+  let args1' = undefined
+  let args2' = undefined
   let (xts', body') = substTermPlus'' sub xts body
-  (m, TermPiIntroPlus ind (name, args') xts' body')
+  (m, TermPiIntroPlus ind (name, args1', args2') xts' body')
 substTermPlus sub (m, TermPiElim e es) = do
   let e' = substTermPlus sub e
   let es' = map (substTermPlus sub) es
@@ -230,9 +233,11 @@ weaken (m, TermPiIntro xts body) = do
   (m, WeakTermPiIntro (weakenArgs xts) (weaken body))
 weaken (m, TermPiIntroNoReduce xts body) = do
   (m, WeakTermPiIntroNoReduce (weakenArgs xts) (weaken body))
-weaken (m, TermPiIntroPlus ind (name, args) xts body) = do
-  let args' = weakenArgs args
-  (m, WeakTermPiIntroPlus ind (name, args') (weakenArgs xts) (weaken body))
+weaken (m, TermPiIntroPlus ind (name, args1, args2) xts body) = do
+  let args1' = weakenArgs args1
+  let args2' = weakenArgs args2
+  let xts' = (weakenArgs xts)
+  (m, WeakTermPiIntroPlus ind (name, args1', args2') xts' (weaken body))
 weaken (m, TermPiElim e es) = do
   let e' = weaken e
   let es' = map weaken es

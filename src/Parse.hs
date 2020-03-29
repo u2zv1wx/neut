@@ -475,11 +475,7 @@ concatQuasiStmtList [] = do
   content <- liftIO $ TIO.readFile $ toFilePath path
   let m = newMeta (length $ T.lines content) 1 path
   return $ WeakStmtReturn (m, WeakTermEnumIntro $ EnumValueIntS 64 0)
-concatQuasiStmtList [QuasiStmtLet _ _ e]
-  -- path <- getCurrentFilePath
-  -- content <- liftIO $ TIO.readFile $ toFilePath path
-  -- let m = newMeta (length $ T.lines content) 1 path
- = do
+concatQuasiStmtList [QuasiStmtLet _ _ e] = do
   return $ WeakStmtReturn e
 concatQuasiStmtList (QuasiStmtConstDecl m xt:es) = do
   cont <- concatQuasiStmtList es
@@ -515,6 +511,30 @@ concatQuasiStmtList ((QuasiStmtLetInductive n m at e):es) = do
 --   insForm n at e
 --   cont <- concatQuasiStmtList es
 --   return $ WeakStmtLetWT m at e cont
+concatQuasiStmtList (QuasiStmtLetInductiveIntro2 m bt e:ss) = do
+  case e of
+    (_, WeakTermPiIntroNoReduce xtsyts (_, WeakTermPiIntroPlus ai (bi, xts, yts) atsbts (_, WeakTermPiElim b args))) -> do
+      let isub = undefined
+      let as = undefined
+      -- argsの型はまあ、xtsytsを分解すれば取得できる。
+      -- piIntroPlusで(bi, xts, yts)みたいに保持しておけばいい。
+      -- だからargsのほうはよくて、isubをどうやって構成するか、という話になる。
+      -- asOuterは、discernの時点で普通にatsをrenameすれば得られるはず。
+      -- asInnerは、atsBtsとasOuterのzipをとれば得られるはず？
+      -- filterして引数が減るのはあくまでxtsのほうだから、いけそう、かな？
+      -- piIntroPlusのaiをidentifierにしてやって、それとformationEnvから頑張る？
+      yts' <- mapM (internalize isub atsbts) (undefined args)
+      insInductive as bt -- register the constructor (if necessary)
+      cont <- concatQuasiStmtList ss
+      let app = (m, WeakTermPiElim b yts')
+      let lam =
+            ( m
+            , WeakTermPiIntroNoReduce
+                xtsyts
+                (m, WeakTermPiIntroPlus ai (bi, xts, yts) atsbts app))
+      return $ WeakStmtLetWT m bt lam cont -- return $
+      -- undefined
+    _ -> undefined
 concatQuasiStmtList (QuasiStmtLetInductiveIntro m (bi, ai) bt xts yts ats bts bInner isub as:ss) = do
   yts' <- mapM (internalize isub (ats ++ bts)) yts
   insInductive as bt -- register the constructor (if necessary)
@@ -525,7 +545,7 @@ concatQuasiStmtList (QuasiStmtLetInductiveIntro m (bi, ai) bt xts yts ats bts bI
         ( m
         , WeakTermPiIntroNoReduce
             xtsyts'
-            (m, WeakTermPiIntroPlus ai (bi, xtsyts') (ats ++ bts) app))
+            (m, WeakTermPiIntroPlus ai (bi, xts, yts) (ats ++ bts) app))
   return $ WeakStmtLetWT m bt lam cont -- return $
   --   WeakStmtLetInductiveIntro
   --     m
