@@ -248,14 +248,16 @@ parse' ((m, TreeNode (ind@(_, TreeLeaf "inductive"):rest)):as)
   | name@(mFun, TreeLeaf _):xts@(_, TreeNode _):rest' <- rest = do
     parse' $ (m, TreeNode [ind, (mFun, TreeNode (name : xts : rest'))]) : as
   | otherwise = do
-    stmtList1 <- parseInductive m rest
+    rest' <- mapM macroExpand rest
+    stmtList1 <- parseInductive m rest'
     stmtList2 <- parse' as
     return $ stmtList1 ++ stmtList2
 parse' ((m, TreeNode (coind@(_, TreeLeaf "coinductive"):rest)):as)
   | name@(mFun, TreeLeaf _):xts@(_, TreeNode _):rest' <- rest = do
     parse' $ (m, TreeNode [coind, (mFun, TreeNode (name : xts : rest'))]) : as
   | otherwise = do
-    stmtList1 <- parseCoinductive m rest
+    rest' <- mapM macroExpand rest
+    stmtList1 <- parseCoinductive m rest'
     stmtList2 <- parse' as
     return $ stmtList1 ++ stmtList2
 parse' ((m, TreeNode ((mLet, TreeLeaf "let"):rest)):as)
@@ -473,6 +475,12 @@ concatQuasiStmtList [] = do
   content <- liftIO $ TIO.readFile $ toFilePath path
   let m = newMeta (length $ T.lines content) 1 path
   return $ WeakStmtReturn (m, WeakTermEnumIntro $ EnumValueIntS 64 0)
+concatQuasiStmtList [QuasiStmtLet _ _ e]
+  -- path <- getCurrentFilePath
+  -- content <- liftIO $ TIO.readFile $ toFilePath path
+  -- let m = newMeta (length $ T.lines content) 1 path
+ = do
+  return $ WeakStmtReturn e
 concatQuasiStmtList (QuasiStmtConstDecl m xt:es) = do
   cont <- concatQuasiStmtList es
   return $ WeakStmtConstDecl m xt cont

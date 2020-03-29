@@ -129,7 +129,7 @@ infer' ctx (m, WeakTermSigmaIntro t es) = do
   --        ?M2 @ (ctx[0], ..., ctx[n], e1),
   --        ...,
   --        ?Mm @ (ctx[0], ..., ctx[n], e1, ..., e{m-1})]
-  let ts' = map (\(_, _, ty) -> substWeakTermPlus (zip ys es) ty) yts
+  let ts' = map (\(_, _, ty) -> substWeakTermPlus (zip ys es') ty) yts -- ここがzip ys esになってたのがバグの原因？
   let sigmaType = (m, WeakTermSigma yts)
   forM_ ((sigmaType, t') : zip ts ts') $ uncurry insConstraintEnv
   forM_ (zip mlSigmaArgList mls') $ uncurry insLevelEQ
@@ -305,10 +305,6 @@ infer' ctx (m, WeakTermCase (e, t) cxtes) = do
           let expCons = (m {metaIsExplicit = True}, WeakTermUpsilon c)
           let app = (m, WeakTermPiElim expCons vs)
           (_, appType, appLevel) <- infer' ctx app
-          p "app:"
-          p' app
-          p "appType:"
-          p' appType
           (body', bodyType, bodyLevel) <- infer' ctx body
           forM_ xts'' insPatVarEnv
           insConstraintEnv appType t'

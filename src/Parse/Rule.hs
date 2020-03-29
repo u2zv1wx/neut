@@ -145,6 +145,11 @@ toInductiveIntro ats bts xts a@(I (ai, _)) (mb, b@(I (bi, k)), m, yts, cod)
     let xts' = filter (\(_, x, _) -> x `elem` vs) xts
     -- let attrList = map (QuasiStmtImplicit m (asIdent bi)) [0 .. length xts']
     let b' = I (ai <> ":" <> bi, k)
+    -- let lam =
+    --       ( m
+    --       , WeakTermPiIntroNoReduce
+    --           xtsyts'
+    --           (m, WeakTermPiIntroPlus ai (bi, xtsyts') atsbts' app'))
     return
       (QuasiStmtLetInductiveIntro
          m
@@ -171,10 +176,10 @@ toCoinductive ats bts c@(m, a@(I (ai, _)), xts, _) = do
   updateLabelEnv ai $ ats ++ bts
   f <- formationRuleOf c >>= ruleAsIdentPlus
   let cod = (m, WeakTermPiElim (m, WeakTermUpsilon a) (map toVar' xts))
-  (atsbts', cod') <- renameFormArgs (ats ++ bts) cod
+  -- (atsbts', cod') <- renameFormArgs (ats ++ bts) cod
   z <- newNameWith' "_"
-  let zt' = (m, z, cod')
-  mls <- piUnivLevelsfrom (xts ++ atsbts' ++ [zt']) cod
+  -- let zt' = (m, z, cod')
+  -- mls <- piUnivLevelsfrom (xts ++ atsbts' ++ [zt']) cod
   return
     [ QuasiStmtLetCoinductive
         (length ats)
@@ -183,18 +188,18 @@ toCoinductive ats bts c@(m, a@(I (ai, _)), xts, _) = do
         ( m
         , WeakTermPiIntro xts (m, WeakTermSigma (ats ++ bts ++ [(m, z, cod)])))
     -- coinduction principle
-    , QuasiStmtLetWT
-        m
-        ( m
-        , asIdent (ai <> "." <> "coinduction")
-        , (m, WeakTermPi mls (xts ++ atsbts' ++ [zt']) cod))
-        ( m
-        , WeakTermPiIntro
-            (xts ++ atsbts' ++ [zt'])
-            ( m
-            , WeakTermSigmaIntro
-                (m, WeakTermSigma (ats ++ bts ++ [(m, z, cod)]))
-                (map toVar' (atsbts' ++ [zt']))))
+    -- , QuasiStmtLetWT
+    --     m
+    --     ( m
+    --     , asIdent (ai <> "." <> "coinduction")
+    --     , (m, WeakTermPi mls (xts ++ atsbts' ++ [zt']) cod))
+    --     ( m
+    --     , WeakTermPiIntro
+    --         (xts ++ atsbts' ++ [zt'])
+    --         ( m
+    --         , WeakTermSigmaIntro
+    --             (m, WeakTermSigma (ats ++ bts ++ [(m, z, cod)]))
+    --             (map toVar' (atsbts' ++ [zt']))))
     ]
 
 toCoinductiveElimList :: [IdentifierPlus] -> Connective -> WithEnv [QuasiStmt]

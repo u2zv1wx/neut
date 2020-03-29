@@ -74,6 +74,11 @@
 (notation (with-type t e)
   ((lambda ((x t)) x) e))
 
+(keyword witness)
+
+(notation (witness t e)
+  ((lambda ((x t)) x) e))
+
 (keyword hom)
 
 (notation (hom t) t)
@@ -91,11 +96,6 @@
 (keyword assume)
 
 (notation assume lambda)
-
-(keyword admit)
-
-(notation admit
-  (os:exit hole 1))
 
 (keyword tuple)
 

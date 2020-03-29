@@ -185,7 +185,10 @@ data WeakStmt
       WeakStmt
   | WeakStmtConstDecl Meta IdentifierPlus WeakStmt
   deriving (Show)
+  -- | WeakTermSigmaIntro WeakTermPlus [WeakTermPlus]
 
+-- weakTermSigmaIntro :: WeakTermPlus -> [WeakTermPlus] -> WeakTerm
+-- weakTermSigmaIntro t es = undefined
 varWeakTermPlus :: WeakTermPlus -> [Identifier]
 varWeakTermPlus (_, WeakTermTau _) = []
 varWeakTermPlus (_, WeakTermUpsilon x) = x : []

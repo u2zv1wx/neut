@@ -1,8 +1,9 @@
 (no-implicit-core)
 
-(include library "core/foundation.neut")
+;; (include library "core/foundation.neut")
+(include "notation.neut")
 
 (coinductive functor ((f (hom tau tau)))
   (map ((_ (functor f)))
-    (pi ((a tau) (b tau) (_ (hom a b)))
-      (hom (f a) (f b)))))
+    (pi ((a tau) (b tau) (_ (hom a b)) (_ (f a)))
+      (f b))))

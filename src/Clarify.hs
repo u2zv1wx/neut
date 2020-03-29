@@ -39,7 +39,9 @@ clarify' tenv lam@(m, TermPiIntro mxts e) = do
   e' <- clarify' (insTypeEnv1 mxts tenv) e
   retClosure tenv Nothing fvs m mxts e'
 clarify' tenv lam@(m, TermPiIntroNoReduce mxts e) = do
+  p "here"
   fvs <- nubFVS <$> chainTermPlus' tenv lam
+  p "and here"
   e' <- clarify' (insTypeEnv1 mxts tenv) e
   retClosure tenv Nothing fvs m mxts e'
 clarify' tenv (m, TermPiIntroPlus _ (name, args) mxts e) = do
@@ -54,8 +56,11 @@ clarify' _ (m, TermSigma _) = returnClosureType m -- vaild since Sigma is transl
 clarify' tenv (m, TermSigmaIntro t es) = do
   (zu, kp@(mk, k, _)) <- sigToPi m $ reduceTermPlus t
   clarify' tenv (m, TermPiIntro [zu, kp] (m, TermPiElim (mk, TermUpsilon k) es))
-clarify' tenv (m, TermSigmaElim t xts e1 e2) =
-  clarify' tenv (m, TermPiElim e1 [t, (m, TermPiIntro xts e2)])
+clarify' tenv (m, TermSigmaElim t xts e1 e2) = do
+  p "sigmaElim"
+  tmp <- clarify' tenv (m, TermPiElim e1 [t, (m, TermPiIntro xts e2)])
+  p "done"
+  return tmp
 clarify' tenv iter@(m, TermIter (_, x, t) mxts e) = do
   let tenv' = insTypeEnv'' x t tenv
   e' <- clarify' (insTypeEnv1 mxts tenv') e
