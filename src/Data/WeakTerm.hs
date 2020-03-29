@@ -131,23 +131,7 @@ data QuasiStmt
   --   (constant x t)
   | QuasiStmtConstDecl Meta IdentifierPlus
   | QuasiStmtLetInductive Int Meta IdentifierPlus WeakTermPlus
-  -- let (b : B) :=
-  --   lam (xts ++ yts).
-  --     lam (ats ++ bts).
-  --       b-inner @ [y, ..., y]
   | QuasiStmtLetInductiveIntro Meta IdentifierPlus WeakTermPlus [Identifier]
-  -- | QuasiStmtLetInductiveIntro
-  --     Meta -- location of b
-  --     (T.Text, T.Text) -- ("zero", "nat") (i.e. enum info)
-  --     IdentifierPlus -- b : B
-  --     [IdentifierPlus] -- xts
-  --     [IdentifierPlus] -- yts
-  --     [IdentifierPlus] -- ats
-  --     [IdentifierPlus] -- bts
-  --     WeakTermPlus -- b-inner
-  --     -- [IdentifierPlus] -- [(y, t), ..., (y, t)]  (must be internalized later)
-  --     SubstWeakTerm -- the `a` in `ats` ~> the `a` defined beforehand
-  --     [Identifier] -- as (to be used to update the environment with constructor info)
   | QuasiStmtUse T.Text
   | QuasiStmtUnuse T.Text
   deriving (Show)
