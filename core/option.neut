@@ -2,6 +2,8 @@
 
 (include "foundation.neut")
 
+(include "functor.neut")
+
 (include "monad.neut")
 
 (section option)
@@ -39,9 +41,6 @@
         x)
       ((some y)
         y))))
-
-
-;; (functor.coinduction option @option:map (i64 0))
 
 (definition witness-functor
   (witness (functor option)

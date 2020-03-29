@@ -69,18 +69,17 @@ parseRule (m, TreeNode [(mName, TreeLeaf name), (_, TreeNode xts), t]) = do
   return (m', asIdent name, mName', xts', t')
 parseRule t = raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) TREE)"
 
-renameFormArgs ::
-     [IdentifierPlus]
-  -> WeakTermPlus
-  -> WithEnv ([IdentifierPlus], WeakTermPlus)
-renameFormArgs [] tLast = return ([], tLast)
-renameFormArgs ((m, a, t):ats) tLast = do
-  a' <- newNameWith'' "var"
-  let sub = [(a, (m, WeakTermUpsilon a'))]
-  let (ats', tLast') = substWeakTermPlus'' sub ats tLast
-  (ats'', tLast'') <- renameFormArgs ats' tLast'
-  return ((m, a', t) : ats'', tLast'')
-
+-- renameFormArgs ::
+--      [IdentifierPlus]
+--   -> WeakTermPlus
+--   -> WithEnv ([IdentifierPlus], WeakTermPlus)
+-- renameFormArgs [] tLast = return ([], tLast)
+-- renameFormArgs ((m, a, t):ats) tLast = do
+--   a' <- newNameWith'' "var"
+--   let sub = [(a, (m, WeakTermUpsilon a'))]
+--   let (ats', tLast') = substWeakTermPlus'' sub ats tLast
+--   (ats'', tLast'') <- renameFormArgs ats' tLast'
+--   return ((m, a', t) : ats'', tLast'')
 checkNameSanity :: Meta -> [IdentifierPlus] -> WithEnv ()
 checkNameSanity m atsbts = do
   let asbs = map (\(_, x, _) -> x) atsbts
@@ -99,11 +98,11 @@ toInductive ::
 toInductive ats bts connective@(m, a@(I (ai, _)), xts, _) = do
   formationRule <- formationRuleOf connective >>= ruleAsIdentPlus
   let cod = (m, WeakTermPiElim (m, WeakTermUpsilon a) (map toVar' xts))
-  z <- newNameWith' "_"
-  let zt = (m, z, cod)
-  (atsbts', cod') <- renameFormArgs (ats ++ bts) cod
+  -- z <- newNameWith' "_"
+  -- let zt = (m, z, cod)
+  -- (atsbts', cod') <- renameFormArgs (ats ++ bts) cod
   mls1 <- piUnivLevelsfrom (ats ++ bts) cod
-  mls2 <- piUnivLevelsfrom (xts ++ atsbts' ++ [zt]) cod'
+  -- mls2 <- piUnivLevelsfrom (xts ++ atsbts' ++ [zt]) cod'
   return $
     [ QuasiStmtLetInductive
         (length ats)
@@ -112,15 +111,15 @@ toInductive ats bts connective@(m, a@(I (ai, _)), xts, _) = do
         -- nat := lam (...). Pi{nat} (...)
         (m, WeakTermPiIntro xts (m, WeakTermPiPlus ai mls1 (ats ++ bts) cod))
     -- induction principle
-    , QuasiStmtLetWT
-        m
-        ( m
-        , asIdent (ai <> "." <> "induction")
-        , (m, WeakTermPi mls2 (xts ++ atsbts' ++ [zt]) cod'))
-        ( m
-        , WeakTermPiIntro
-            (xts ++ atsbts' ++ [zt])
-            (m, WeakTermPiElim (toVar' zt) (map toVar' atsbts')))
+    -- , QuasiStmtLetWT
+    --     m
+    --     ( m
+    --     , asIdent (ai <> "." <> "induction")
+    --     , (m, WeakTermPi mls2 (xts ++ atsbts' ++ [zt]) cod'))
+    --     ( m
+    --     , WeakTermPiIntro
+    --         (xts ++ atsbts' ++ [zt])
+    --         (m, WeakTermPiElim (toVar' zt) (map toVar' atsbts')))
     ]
 
 toInductiveIntroList :: [IdentifierPlus] -> Connective -> WithEnv [QuasiStmt]
