@@ -145,18 +145,6 @@ elaborateStmt (WeakStmtConstDecl _ (_, x, t) cont) = do
   insTypeEnv x t'' mlt
   elaborateStmt cont
 
--- Sigma [x1 : A1, ..., xn : An] = Pi (z : Tau, k : Pi (x1 : A1, ..., xn : An). z). z
-weakTermSigma :: Meta -> [Data.WeakTerm.IdentifierPlus] -> WithEnv WeakTermPlus
-weakTermSigma m xts = do
-  z <- newNameWith' "sigma"
-  let vz = (m, WeakTermUpsilon z)
-  k <- newNameWith' "sigma"
-  l <- newCount
-  mls2 <- piUnivLevelsfrom xts vz
-  let yts = [(m, z, (m, WeakTermTau l)), (m, k, (m, WeakTermPi mls2 xts vz))]
-  mls1 <- piUnivLevelsfrom yts vz
-  return (m, WeakTermPi mls1 yts vz)
-
 termSigmaElim ::
      Meta
   -> TermPlus

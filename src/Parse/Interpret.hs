@@ -59,28 +59,29 @@ interpret (m, TreeNode ((_, TreeLeaf "pi-elimination"):rest))
     m' <- adjustPhase m
     interpretPiElim m' e es
   | otherwise = raiseSyntaxError m "(pi-elimination TREE TREE*)" -- e' <- interpret e
--- interpret (m, TreeNode ((_, TreeLeaf "sigma"):rest))
---   | [(_, TreeNode xts), t] <- rest = do
---     xts' <- mapM interpretIdentifierPlus xts
---     t' <- interpret t
---     placeholder <- newNameWith' "cod"
---     m' <- adjustPhase m
---     return (m', WeakTermSigma $ xts' ++ [(fst t', placeholder, t')])
---   | otherwise = raiseSyntaxError m "(sigma (TREE*) TREE)"
--- interpret (m, TreeNode ((_, TreeLeaf "sigma-introduction"):es)) = do
---   m' <- adjustPhase m
---   h <- newHole m'
---   es' <- mapM interpret es
---   return (m', WeakTermSigmaIntro h es')
--- interpret (m, TreeNode ((_, TreeLeaf "sigma-elimination"):rest))
---   | [(_, TreeNode xts), e1, e2] <- rest = do
---     xts' <- mapM interpretIdentifierPlus xts
---     e1' <- interpret e1
---     e2' <- interpret e2
---     m' <- adjustPhase m
---     h <- newHole m'
---     return (m', WeakTermSigmaElim h xts' e1' e2')
---   | otherwise = raiseSyntaxError m "(sigma-elimination (TREE*) TREE TREE)"
+interpret (m, TreeNode ((_, TreeLeaf "sigma"):rest))
+  | [(_, TreeNode xts), t] <- rest = do
+    xts' <- mapM interpretIdentifierPlus xts
+    t' <- interpret t
+    placeholder <- newNameWith' "cod"
+    m' <- adjustPhase m
+    weakTermSigma m' $ xts' ++ [(fst t', placeholder, t')]
+    -- return (m', WeakTermSigma $ xts' ++ [(fst t', placeholder, t')])
+  | otherwise = raiseSyntaxError m "(sigma (TREE*) TREE)"
+interpret (m, TreeNode ((_, TreeLeaf "sigma-introduction"):es)) = do
+  m' <- adjustPhase m
+  es' <- mapM interpret es
+  sigmaIntro m' es' -- return (m', WeakTermSigmaIntro h es')
+interpret (m, TreeNode ((_, TreeLeaf "sigma-elimination"):rest))
+  | [(_, TreeNode xts), e1, e2] <- rest = do
+    xts' <- mapM interpretIdentifierPlus xts
+    e1' <- interpret e1
+    e2' <- interpret e2
+    m' <- adjustPhase m
+    h <- newHole m'
+    return $ sigmaElim m' h xts' e1' e2'
+    -- return (m', WeakTermSigmaElim h xts' e1' e2')
+  | otherwise = raiseSyntaxError m "(sigma-elimination (TREE*) TREE TREE)"
 interpret (m, TreeNode ((_, TreeLeaf "iterate"):rest))
   | [xt, xts@(_, TreeNode _), e] <- rest = do
     (m', xt', xts', e') <- interpretIter (m, TreeNode [xt, xts, e])
@@ -294,6 +295,19 @@ interpretBorrow e = do
   e' <- interpret e
   return (e', id)
 
+sigmaIntro :: Meta -> [WeakTermPlus] -> WithEnv WeakTermPlus
+sigmaIntro m es = do
+  z <- newNameWith' "sigma"
+  l <- newCount
+  k <- newNameWith' "sigma"
+  th <- newHole m
+  return
+    ( m
+    , WeakTermPiIntro
+        [(m, z, (m, WeakTermTau l)), (m, k, th)]
+        (m, WeakTermPiElim (m, WeakTermUpsilon k) es))
+
+--   return (m', WeakTermSigmaIntro h es')
 sigmaElim ::
      Meta
   -> WeakTermPlus

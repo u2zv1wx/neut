@@ -323,6 +323,17 @@ arrayAccessToType m lowType = do
   mls <- piUnivLevelsfrom xts cod
   return (m, TermPi mls xts cod)
 
+weakTermSigma :: Meta -> [Data.WeakTerm.IdentifierPlus] -> WithEnv WeakTermPlus
+weakTermSigma m xts = do
+  z <- newNameWith' "sigma"
+  let vz = (m, WeakTermUpsilon z)
+  k <- newNameWith' "sigma"
+  l <- newCount
+  mls2 <- piUnivLevelsfrom xts vz
+  let yts = [(m, z, (m, WeakTermTau l)), (m, k, (m, WeakTermPi mls2 xts vz))]
+  mls1 <- piUnivLevelsfrom yts vz
+  return (m, WeakTermPi mls1 yts vz)
+
 termSigma :: Meta -> [Data.Term.IdentifierPlus] -> WithEnv TermPlus
 termSigma m xts = do
   z <- newNameWith' "sigma"
