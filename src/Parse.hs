@@ -511,43 +511,26 @@ concatQuasiStmtList ((QuasiStmtLetInductive n m at e):es) = do
 --   insForm n at e
 --   cont <- concatQuasiStmtList es
 --   return $ WeakStmtLetWT m at e cont
-concatQuasiStmtList (QuasiStmtLetInductiveIntro2 m bt e:ss) = do
+concatQuasiStmtList (QuasiStmtLetInductiveIntro2 m bt e as:ss) = do
   case e of
-    (_, WeakTermPiIntroNoReduce xtsyts (_, WeakTermPiIntroPlus ai (bi, xts, yts) atsbts (_, WeakTermPiElim b args))) -> do
-      let isub = undefined
-      let as = undefined
-      -- argsの型はまあ、xtsytsを分解すれば取得できる。
-      -- piIntroPlusで(bi, xts, yts)みたいに保持しておけばいい。
-      -- だからargsのほうはよくて、isubをどうやって構成するか、という話になる。
-      -- asOuterは、discernの時点で普通にatsをrenameすれば得られるはず。
-      -- asInnerは、atsBtsとasOuterのzipをとれば得られるはず？
-      -- filterして引数が減るのはあくまでxtsのほうだから、いけそう、かな？
-      -- piIntroPlusのaiをidentifierにしてやって、それとformationEnvから頑張る？
-      yts' <- mapM (internalize isub atsbts) (undefined args)
+    (_, WeakTermPiIntroNoReduce xtsyts (_, WeakTermPiIntroPlus ai (bi, xts, yts) atsbts (_, WeakTermPiElim b _))) -> do
+      let isub = zip as (map toVar' atsbts) -- outer ~> innerで、ytsの型のなかのouterをinnerにしていく
+      yts' <- mapM (internalize isub atsbts) yts
       insInductive as bt -- register the constructor (if necessary)
       cont <- concatQuasiStmtList ss
-      let app = (m, WeakTermPiElim b yts')
       let lam =
             ( m
             , WeakTermPiIntroNoReduce
                 xtsyts
-                (m, WeakTermPiIntroPlus ai (bi, xts, yts) atsbts app))
+                ( m
+                , WeakTermPiIntroPlus
+                    ai
+                    (bi, xts, yts)
+                    atsbts
+                    (m, WeakTermPiElim b yts')))
       return $ WeakStmtLetWT m bt lam cont -- return $
       -- undefined
-    _ -> undefined
-concatQuasiStmtList (QuasiStmtLetInductiveIntro m (bi, ai) bt xts yts ats bts bInner isub as:ss) = do
-  yts' <- mapM (internalize isub (ats ++ bts)) yts
-  insInductive as bt -- register the constructor (if necessary)
-  cont <- concatQuasiStmtList ss
-  let xtsyts' = xts ++ yts
-  let app = (m, WeakTermPiElim bInner yts')
-  let lam =
-        ( m
-        , WeakTermPiIntroNoReduce
-            xtsyts'
-            (m, WeakTermPiIntroPlus ai (bi, xts, yts) (ats ++ bts) app))
-  return $ WeakStmtLetWT m bt lam cont -- return $
-  --   WeakStmtLetInductiveIntro
+    _ -> raiseCritical m "inductive-intro" --   WeakStmtLetInductiveIntro
   --     m
   --     (bi, ai)
   --     bt
@@ -556,6 +539,18 @@ concatQuasiStmtList (QuasiStmtLetInductiveIntro m (bi, ai) bt xts yts ats bts bI
   --     (ats ++ bts)
   --     (m, WeakTermPiElim bInner yts')
   --     cont
+-- concatQuasiStmtList (QuasiStmtLetInductiveIntro m (bi, ai) bt xts yts ats bts bInner isub as:ss) = do
+--   yts' <- mapM (internalize isub (ats ++ bts)) yts
+--   insInductive as bt -- register the constructor (if necessary)
+--   cont <- concatQuasiStmtList ss
+--   let xtsyts' = xts ++ yts
+--   let app = (m, WeakTermPiElim bInner yts')
+--   let lam =
+--         ( m
+--         , WeakTermPiIntroNoReduce
+--             xtsyts'
+--             (m, WeakTermPiIntroPlus ai (bi, xts, yts) (ats ++ bts) app))
+--   return $ WeakStmtLetWT m bt lam cont -- return $
 -- concatQuasiStmtList (QuasiStmtLetCoinductiveElim m bt xtsyt codInner ats bts yt e1 e2 csub asOuter:ss) = do
 --   e2' <- externalize csub (ats ++ bts) codInner e2
 --   insCoinductive asOuter bt -- register the destructor (if necessary)
