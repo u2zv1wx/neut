@@ -79,7 +79,9 @@ elaborateStmt (WeakStmtLetSigma m xts e cont) = do
   (e', t1, mlSigma) <- infer e
   xtls <- inferSigma [] xts
   let (xts', mlSigArgList) = unzip xtls
-  insConstraintEnv t1 (fst e', WeakTermSigma xts')
+  sig <- weakTermSigma (fst e') xts'
+  insConstraintEnv t1 sig
+  -- insConstraintEnv t1 (fst e', WeakTermSigma xts')
   forM_ mlSigArgList $ \mlSigArg -> insLevelLE mlSigArg mlSigma
   analyze >> synthesize >> refine >> cleanup
   e'' <- elaborate' e'
@@ -87,7 +89,7 @@ elaborateStmt (WeakStmtLetSigma m xts e cont) = do
   forM_ (zip xts'' mlSigArgList) $ \((_, x, tx), l) ->
     insWeakTypeEnv x (weaken (reduceTermPlus tx), l)
   cont' <- elaborateStmt cont
-  return (m, TermSigmaElim (m, TermEnum $ EnumTypeIntS 64) xts'' e'' cont')
+  return (m, termSigmaElim (m, TermEnum $ EnumTypeIntS 64) xts'' e'' cont')
 elaborateStmt (WeakStmtImplicit m x@(I (_, i)) idx cont) = do
   t <- lookupTypeEnv' m x
   case t of
@@ -141,6 +143,9 @@ elaborateStmt (WeakStmtConstDecl _ (_, x, t) cont) = do
   t'' <- reduceTermPlus <$> elaborate' t'
   insTypeEnv x t'' mlt
   elaborateStmt cont
+
+weakTermSigma :: Meta -> [Data.WeakTerm.IdentifierPlus] -> WithEnv WeakTermPlus
+weakTermSigma = undefined
 
 refine :: WithEnv ()
 refine =
@@ -325,19 +330,19 @@ elaborate' (m, WeakTermPiElim e es) = do
   e' <- elaborate' e
   es' <- mapM elaborate' es
   return (m, TermPiElim e' es')
-elaborate' (m, WeakTermSigma xts) = do
-  xts' <- mapM elaboratePlus xts
-  return (m, TermSigma xts')
-elaborate' (m, WeakTermSigmaIntro t es) = do
-  t' <- elaborate' t
-  es' <- mapM elaborate' es
-  return (m, TermSigmaIntro t' es')
-elaborate' (m, WeakTermSigmaElim t xts e1 e2) = do
-  t' <- elaborate' t
-  xts' <- mapM elaboratePlus xts
-  e1' <- elaborate' e1
-  e2' <- elaborate' e2
-  return (m, TermSigmaElim t' xts' e1' e2')
+-- elaborate' (m, WeakTermSigma xts) = do
+--   xts' <- mapM elaboratePlus xts
+--   return (m, TermSigma xts')
+-- elaborate' (m, WeakTermSigmaIntro t es) = do
+--   t' <- elaborate' t
+--   es' <- mapM elaborate' es
+--   return (m, TermSigmaIntro t' es')
+-- elaborate' (m, WeakTermSigmaElim t xts e1 e2) = do
+--   t' <- elaborate' t
+--   xts' <- mapM elaboratePlus xts
+--   e1' <- elaborate' e1
+--   e2' <- elaborate' e2
+--   return (m, TermSigmaElim t' xts' e1' e2')
 elaborate' (m, WeakTermIter (mx, x, t) xts e) = do
   t' <- elaborate' t
   xts' <- mapM elaboratePlus xts

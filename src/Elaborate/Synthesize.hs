@@ -232,21 +232,21 @@ unravel (m, WeakTermPiElim e es) = do
   e' <- unravel e
   es' <- mapM unravel es
   return (m, WeakTermPiElim e' es')
-unravel (m, WeakTermSigma xts) =
-  case splitLast xts of
-    Nothing -> return (m, WeakTermSigma xts)
-    Just (yts, (my, y, t)) -> do
-      yts' <- unravelSigma yts
-      t' <- unravel t
-      return (m, WeakTermSigma $ yts' ++ [(my, y, t')])
-unravel (m, WeakTermSigmaIntro t es) = do
-  es' <- mapM unravel es
-  -- don't rename t since it is not printed
-  return (m, WeakTermSigmaIntro t es')
-unravel (m, WeakTermSigmaElim t xts e1 e2) = do
-  e1' <- unravel e1
-  (xts', e2') <- unravelBinder xts e2
-  return (m, WeakTermSigmaElim t xts' e1' e2')
+-- unravel (m, WeakTermSigma xts) =
+--   case splitLast xts of
+--     Nothing -> return (m, WeakTermSigma xts)
+--     Just (yts, (my, y, t)) -> do
+--       yts' <- unravelSigma yts
+--       t' <- unravel t
+--       return (m, WeakTermSigma $ yts' ++ [(my, y, t')])
+-- unravel (m, WeakTermSigmaIntro t es) = do
+--   es' <- mapM unravel es
+--   -- don't rename t since it is not printed
+--   return (m, WeakTermSigmaIntro t es')
+-- unravel (m, WeakTermSigmaElim t xts e1 e2) = do
+--   e1' <- unravel e1
+--   (xts', e2') <- unravelBinder xts e2
+--   return (m, WeakTermSigmaElim t xts' e1' e2')
 unravel (m, WeakTermIter (mx, x, t) xts e) = do
   x' <- unravelUpsilon x
   (xts', e') <- unravelBinder xts e
@@ -330,14 +330,13 @@ unravelBinder ((mx, x, t):xts) e = do
   (xts', e') <- unravelBinder xts e
   return ((mx, x', t') : xts', e')
 
-unravelSigma :: [IdentifierPlus] -> WithEnv [IdentifierPlus]
-unravelSigma [] = return []
-unravelSigma ((mx, x, t):xts) = do
-  t' <- unravel t
-  x' <- unravelUpsilon x
-  xts' <- unravelSigma xts
-  return $ (mx, x', t') : xts'
-
+-- unravelSigma :: [IdentifierPlus] -> WithEnv [IdentifierPlus]
+-- unravelSigma [] = return []
+-- unravelSigma ((mx, x, t):xts) = do
+--   t' <- unravel t
+--   x' <- unravelUpsilon x
+--   xts' <- unravelSigma xts
+--   return $ (mx, x', t') : xts'
 unravelCaseList ::
      [(WeakCasePlus, WeakTermPlus)] -> WithEnv [(WeakCasePlus, WeakTermPlus)]
 unravelCaseList caseList = do

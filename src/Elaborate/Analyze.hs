@@ -89,12 +89,12 @@ simp' (((_, WeakTermPiIntro xts body1@(m1, _)), e2@(_, _)):cs) = do
   let vs = map (\(m, x, _) -> (m, WeakTermUpsilon x)) xts
   simp $ (body1, (m1, WeakTermPiElim e2 vs)) : cs
 simp' ((e1, e2@(_, WeakTermPiIntro {})):cs) = simp' $ (e2, e1) : cs
-simp' (((_, WeakTermSigma xts1), (_, WeakTermSigma xts2)):cs)
-  | length xts1 == length xts2 = do
-    simpBinder xts1 xts2
-    simp cs
-simp' (((_, WeakTermSigmaIntro t1 es1), (_, WeakTermSigmaIntro t2 es2)):cs)
-  | length es1 == length es2 = simp $ (t1, t2) : zip es1 es2 ++ cs
+-- simp' (((_, WeakTermSigma xts1), (_, WeakTermSigma xts2)):cs)
+--   | length xts1 == length xts2 = do
+--     simpBinder xts1 xts2
+--     simp cs
+-- simp' (((_, WeakTermSigmaIntro t1 es1), (_, WeakTermSigmaIntro t2 es2)):cs)
+--   | length es1 == length es2 = simp $ (t1, t2) : zip es1 es2 ++ cs
 simp' (((m1, WeakTermIter xt1@(_, x1, _) xts1 e1), (m2, WeakTermIter xt2@(_, x2, _) xts2 e2)):cs)
   | x1 == x2
   , length xts1 == length xts2 = do

@@ -62,12 +62,12 @@ compInfoWeakTermPlus c info (_, WeakTermPiIntroPlus _ _ xts e) =
 compInfoWeakTermPlus c info (_, WeakTermPiElim e es) = do
   mapM_ (compInfoWeakTermPlus c info) es
   compInfoWeakTermPlus c info e
-compInfoWeakTermPlus c info (_, WeakTermSigma xts) = compInfoSigma c info xts
-compInfoWeakTermPlus c info (_, WeakTermSigmaIntro _ es) =
-  mapM_ (compInfoWeakTermPlus c info) es
-compInfoWeakTermPlus c info (_, WeakTermSigmaElim _ xts e1 e2) = do
-  compInfoWeakTermPlus c info e1
-  compInfoBinder c info xts e2
+-- compInfoWeakTermPlus c info (_, WeakTermSigma xts) = compInfoSigma c info xts
+-- compInfoWeakTermPlus c info (_, WeakTermSigmaIntro _ es) =
+--   mapM_ (compInfoWeakTermPlus c info) es
+-- compInfoWeakTermPlus c info (_, WeakTermSigmaElim _ xts e1 e2) = do
+--   compInfoWeakTermPlus c info e1
+--   compInfoBinder c info xts e2
 compInfoWeakTermPlus c info (_, WeakTermIter (mx, x, t) xts e) = do
   compInfoWeakTermPlus c info t
   let info' = (x, mx) : info
@@ -127,14 +127,13 @@ compInfoArrayElim s info ((mx, x, _):xts) e = do
   let info' = (x, mx) : info
   compInfoArrayElim s info' xts e
 
-compInfoSigma ::
-     CursorName -> CompInfo -> [IdentifierPlus] -> Either CompInfo ()
-compInfoSigma _ _ [] = return ()
-compInfoSigma s info ((mx, x, t):xts) = do
-  compInfoWeakTermPlus s info t
-  let info' = (x, mx) : info
-  compInfoSigma s info' xts
-
+-- compInfoSigma ::
+--      CursorName -> CompInfo -> [IdentifierPlus] -> Either CompInfo ()
+-- compInfoSigma _ _ [] = return ()
+-- compInfoSigma s info ((mx, x, t):xts) = do
+--   compInfoWeakTermPlus s info t
+--   let info' = (x, mx) : info
+--   compInfoSigma s info' xts
 filterCompInfo :: Prefix -> (Identifier, Meta) -> WithEnv Bool
 filterCompInfo prefix (I (x, _), _) = do
   nenv <- gets nonCandSet

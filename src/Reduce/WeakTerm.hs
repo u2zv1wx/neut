@@ -47,27 +47,27 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
         let xs = map (\(_, x, _) -> x) xts
         reduceWeakTermPlus $ substWeakTermPlus (zip xs es') body
     _ -> (m, app)
-reduceWeakTermPlus (m, WeakTermSigma xts) = do
-  let (ms, xs, ts) = unzip3 xts
-  let ts' = map reduceWeakTermPlus ts
-  (m, WeakTermSigma $ zip3 ms xs ts')
-reduceWeakTermPlus (m, WeakTermSigmaIntro t es) = do
-  let t' = reduceWeakTermPlus t
-  let es' = map reduceWeakTermPlus es
-  (m, WeakTermSigmaIntro t' es')
-reduceWeakTermPlus (m, WeakTermSigmaElim t xts e1 e2) = do
-  let e1' = reduceWeakTermPlus e1
-  case e1' of
-    (_, WeakTermSigmaIntro _ es)
-      | xs <- map (\(_, x, _) -> x) xts
-      , length xs == length es ->
-        reduceWeakTermPlus $ substWeakTermPlus (zip xs es) e2
-    _ -> do
-      let t' = reduceWeakTermPlus t
-      let e2' = reduceWeakTermPlus e2
-      let (ms, xs, ts) = unzip3 xts
-      let ts' = map reduceWeakTermPlus ts
-      (m, WeakTermSigmaElim t' (zip3 ms xs ts') e1' e2')
+-- reduceWeakTermPlus (m, WeakTermSigma xts) = do
+--   let (ms, xs, ts) = unzip3 xts
+--   let ts' = map reduceWeakTermPlus ts
+--   (m, WeakTermSigma $ zip3 ms xs ts')
+-- reduceWeakTermPlus (m, WeakTermSigmaIntro t es) = do
+--   let t' = reduceWeakTermPlus t
+--   let es' = map reduceWeakTermPlus es
+--   (m, WeakTermSigmaIntro t' es')
+-- reduceWeakTermPlus (m, WeakTermSigmaElim t xts e1 e2) = do
+--   let e1' = reduceWeakTermPlus e1
+--   case e1' of
+--     (_, WeakTermSigmaIntro _ es)
+--       | xs <- map (\(_, x, _) -> x) xts
+--       , length xs == length es ->
+--         reduceWeakTermPlus $ substWeakTermPlus (zip xs es) e2
+--     _ -> do
+--       let t' = reduceWeakTermPlus t
+--       let e2' = reduceWeakTermPlus e2
+--       let (ms, xs, ts) = unzip3 xts
+--       let ts' = map reduceWeakTermPlus ts
+--       (m, WeakTermSigmaElim t' (zip3 ms xs ts') e1' e2')
 reduceWeakTermPlus (m, WeakTermIter (mx, x, t) xts e)
   | x `notElem` varWeakTermPlus e = do
     reduceWeakTermPlus (m, WeakTermPiIntro xts e)

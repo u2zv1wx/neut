@@ -317,7 +317,8 @@ arrayAccessToType m lowType = do
   let xts = [(m, x1, u64), (m, x2, u64), (m, x3, arr)]
   x4 <- newNameWith' "arg"
   x5 <- newNameWith' "arg"
-  let cod = (m, TermSigma [(m, x4, arr), (m, x5, t)])
+  -- let cod = (m, TermSigma [(m, x4, arr), (m, x5, t)])
+  let cod = (m, termSigma [(m, x4, arr), (m, x5, t)])
   mls <- piUnivLevelsfrom xts cod
   return (m, TermPi mls xts cod)
 

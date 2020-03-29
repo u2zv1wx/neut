@@ -59,28 +59,28 @@ interpret (m, TreeNode ((_, TreeLeaf "pi-elimination"):rest))
     m' <- adjustPhase m
     interpretPiElim m' e es
   | otherwise = raiseSyntaxError m "(pi-elimination TREE TREE*)" -- e' <- interpret e
-interpret (m, TreeNode ((_, TreeLeaf "sigma"):rest))
-  | [(_, TreeNode xts), t] <- rest = do
-    xts' <- mapM interpretIdentifierPlus xts
-    t' <- interpret t
-    placeholder <- newNameWith' "cod"
-    m' <- adjustPhase m
-    return (m', WeakTermSigma $ xts' ++ [(fst t', placeholder, t')])
-  | otherwise = raiseSyntaxError m "(sigma (TREE*) TREE)"
-interpret (m, TreeNode ((_, TreeLeaf "sigma-introduction"):es)) = do
-  m' <- adjustPhase m
-  h <- newHole m'
-  es' <- mapM interpret es
-  return (m', WeakTermSigmaIntro h es')
-interpret (m, TreeNode ((_, TreeLeaf "sigma-elimination"):rest))
-  | [(_, TreeNode xts), e1, e2] <- rest = do
-    xts' <- mapM interpretIdentifierPlus xts
-    e1' <- interpret e1
-    e2' <- interpret e2
-    m' <- adjustPhase m
-    h <- newHole m'
-    return (m', WeakTermSigmaElim h xts' e1' e2')
-  | otherwise = raiseSyntaxError m "(sigma-elimination (TREE*) TREE TREE)"
+-- interpret (m, TreeNode ((_, TreeLeaf "sigma"):rest))
+--   | [(_, TreeNode xts), t] <- rest = do
+--     xts' <- mapM interpretIdentifierPlus xts
+--     t' <- interpret t
+--     placeholder <- newNameWith' "cod"
+--     m' <- adjustPhase m
+--     return (m', WeakTermSigma $ xts' ++ [(fst t', placeholder, t')])
+--   | otherwise = raiseSyntaxError m "(sigma (TREE*) TREE)"
+-- interpret (m, TreeNode ((_, TreeLeaf "sigma-introduction"):es)) = do
+--   m' <- adjustPhase m
+--   h <- newHole m'
+--   es' <- mapM interpret es
+--   return (m', WeakTermSigmaIntro h es')
+-- interpret (m, TreeNode ((_, TreeLeaf "sigma-elimination"):rest))
+--   | [(_, TreeNode xts), e1, e2] <- rest = do
+--     xts' <- mapM interpretIdentifierPlus xts
+--     e1' <- interpret e1
+--     e2' <- interpret e2
+--     m' <- adjustPhase m
+--     h <- newHole m'
+--     return (m', WeakTermSigmaElim h xts' e1' e2')
+--   | otherwise = raiseSyntaxError m "(sigma-elimination (TREE*) TREE TREE)"
 interpret (m, TreeNode ((_, TreeLeaf "iterate"):rest))
   | [xt, xts@(_, TreeNode _), e] <- rest = do
     (m', xt', xts', e') <- interpretIter (m, TreeNode [xt, xts, e])
@@ -192,33 +192,33 @@ interpret (m, TreeNode ((_, TreeLeaf "case"):rest))
   | otherwise = raiseSyntaxError m "(case TREE TREE*)"
 -- A -> FνF -> νF (i.e. copattern matching (although I think it's more correct to say "record" or something like that,
 -- considering that the constructed term using `FνF -> νF` is just a record after all))
-interpret (m, TreeNode ((_, TreeLeaf "cocase"):rest))
-  | codType:cocaseClauseList <- rest = do
-    (a, args) <- interpretCoinductive codType
-    m' <- adjustPhase m
-    cocaseClauseList' <- mapM interpretCocaseClause cocaseClauseList
-    let codType' = (m, WeakTermPiElim (m, WeakTermUpsilon a) args)
-    es <- cocaseAsSigmaIntro m a codType' cocaseClauseList'
-    return (m', WeakTermSigmaIntro codType' es)
-  | otherwise = raiseSyntaxError m "(cocase TREE TREE*)"
+-- interpret (m, TreeNode ((_, TreeLeaf "cocase"):rest))
+--   | codType:cocaseClauseList <- rest = do
+--     (a, args) <- interpretCoinductive codType
+--     m' <- adjustPhase m
+--     cocaseClauseList' <- mapM interpretCocaseClause cocaseClauseList
+--     let codType' = (m, WeakTermPiElim (m, WeakTermUpsilon a) args)
+--     es <- cocaseAsSigmaIntro m a codType' cocaseClauseList'
+--     return (m', WeakTermSigmaIntro codType' es)
+--   | otherwise = raiseSyntaxError m "(cocase TREE TREE*)"
 --
 -- auxiliary interpretations
 --
-interpret (m, TreeNode ((_, TreeLeaf "product"):ts)) = do
-  ts' <- mapM interpret ts
-  let ms = map fst ts'
-  xs <- mapM (const $ newNameWith' "sig") ts'
-  m' <- adjustPhase m
-  return (m', WeakTermSigma (zip3 ms xs ts'))
-interpret (m, TreeNode ((_, TreeLeaf "record"):rest))
-  | codType:clauseList <- rest = do
-    (a, args) <- interpretCoinductive codType
-    m' <- adjustPhase m
-    clauseList' <- mapM interpretCocaseClause' clauseList
-    let codType' = (m, WeakTermPiElim (m, WeakTermUpsilon a) args)
-    es <- cocaseAsSigmaIntro m a codType' [((a, args), clauseList')]
-    return (m', WeakTermSigmaIntro codType' es)
-  | otherwise = raiseSyntaxError m "(record TREE TREE*)"
+-- interpret (m, TreeNode ((_, TreeLeaf "product"):ts)) = do
+--   ts' <- mapM interpret ts
+--   let ms = map fst ts'
+--   xs <- mapM (const $ newNameWith' "sig") ts'
+--   m' <- adjustPhase m
+--   return (m', WeakTermSigma (zip3 ms xs ts'))
+-- interpret (m, TreeNode ((_, TreeLeaf "record"):rest))
+--   | codType:clauseList <- rest = do
+--     (a, args) <- interpretCoinductive codType
+--     m' <- adjustPhase m
+--     clauseList' <- mapM interpretCocaseClause' clauseList
+--     let codType' = (m, WeakTermPiElim (m, WeakTermUpsilon a) args)
+--     es <- cocaseAsSigmaIntro m a codType' [((a, args), clauseList')]
+--     return (m', WeakTermSigmaIntro codType' es)
+--   | otherwise = raiseSyntaxError m "(record TREE TREE*)"
 interpret (m, TreeLeaf x)
   | Just x' <- readMaybe $ T.unpack x = do
     m' <- adjustPhase m
@@ -286,12 +286,22 @@ interpretBorrow (m, TreeNode (f:args))
     xts <- mapM toIdentPlus $ mxs ++ [(m', tmp)]
     h <- newHole m'
     let app = (m', WeakTermPiElim f' args'')
-    return
-      ( (m', WeakTermUpsilon tmp)
-      , \term -> (m', WeakTermSigmaElim h xts app term))
+    return ((m', WeakTermUpsilon tmp), \term -> sigmaElim m' h xts app term)
+    -- return
+    --   ( (m', WeakTermUpsilon tmp)
+    --   , \term -> (m', WeakTermSigmaElim h xts app term))
 interpretBorrow e = do
   e' <- interpret e
   return (e', id)
+
+sigmaElim ::
+     Meta
+  -> WeakTermPlus
+  -> [IdentifierPlus]
+  -> WeakTermPlus
+  -> WeakTermPlus
+  -> WeakTermPlus
+sigmaElim = undefined
 
 interpretBorrow' :: TreePlus -> (Maybe (Meta, Identifier), TreePlus)
 interpretBorrow' (m, TreeLeaf s)
