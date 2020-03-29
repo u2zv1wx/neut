@@ -214,10 +214,12 @@ discern'' nenv (m, WeakTermPiIntroNoReduce xts e) = do
   (xts', e') <- discernBinder nenv xts e
   return (m, WeakTermPiIntroNoReduce xts' e')
 discern'' nenv (m, WeakTermPiIntroPlus ind (name, args1, args2) xts e) = do
-  undefined
-  -- args' <- mapM (discernIdentPlus nenv) args -- ところでこれは前のargsに後ろのargsが依存できないから間違いですね
-  -- (xts', e') <- discernBinder nenv xts e
-  -- return (m, WeakTermPiIntroPlus ind (name, args') xts' e')
+  let discarded = (m, WeakTermTau 0) -- just to use discernBinder
+  (args', _) <- discernBinder nenv (args1 ++ args2) discarded
+  let args1' = take (length args1) args'
+  let args2' = drop (length args1) args'
+  (xts', e') <- discernBinder nenv xts e
+  return (m, WeakTermPiIntroPlus ind (name, args1', args2') xts' e')
 discern'' nenv (m, WeakTermPiElim e es) = do
   es' <- mapM (discern'' nenv) es
   e' <- discern'' nenv e
@@ -319,13 +321,12 @@ discernSigma nenv ((mx, x, t):xts) = do
 --   x' <- newDefinedNameWith x
 --   (xts', nenv') <- discernArgs (insertName x x' nenv) xts
 --   return ((mx, x', t') : xts', nenv')
-discernIdentPlus :: NameEnv -> IdentifierPlus -> WithEnv IdentifierPlus
-discernIdentPlus nenv (m, x, t) = do
-  t' <- discern'' nenv t
-  penv <- gets prefixEnv
-  x' <- lookupNameWithPrefix'' m penv x nenv
-  return (m, x', t')
-
+-- discernIdentPlus :: NameEnv -> IdentifierPlus -> WithEnv IdentifierPlus
+-- discernIdentPlus nenv (m, x, t) = do
+--   t' <- discern'' nenv t
+--   penv <- gets prefixEnv
+--   x' <- lookupNameWithPrefix'' m penv x nenv
+--   return (m, x', t')
 -- discernIdentPlus' ::
 --      NameEnv -> IdentifierPlus -> WithEnv (IdentifierPlus, NameEnv)
 -- discernIdentPlus' nenv (m, x, t) = do
