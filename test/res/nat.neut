@@ -2,6 +2,35 @@
 
 (include library "core/notation.neut")
 
-(inductive nat ()
-  (zero () (nat))
-  (succ ((_ (nat))) (nat)))
+;; (inductive nat ()
+;;   (zero () (nat))
+;;   (succ ((_ (nat))) (nat)))
+
+;; (inductive list ((a tau))
+;;   (nil () (list a))
+;;   (cons ((_ a) (_ (list a))) (list a)))
+
+;; (coinductive stream ((a tau))
+;;   (head ((_ (stream a))) a)
+;;   (tail ((_ (stream a))) (stream a)))
+
+;; (inductive
+;;   (item ()
+;;     (unfold ((map (pi ((a tau) (_ a)) i64)))
+;;       (item))))
+
+(inductive item ()
+  (foo ((_ (pi ((a tau) (_ a)) (item)))) (item)))
+
+
+;; error case
+;; (inductive
+;;   (functor ((f (pi ((_ tau)) tau)))
+;;     (unfold ((item (pi ((f (pi ((_ tau)) tau))) tau))
+;;              (map (pi ((_ (item f))) (pi ((a tau) (_ (f a))) i64)))
+;;              (hoge (item f)))
+;;       (functor f))))
+
+(coinductive functor ((f (hom tau tau)))
+  (map ((_ (functor f)))
+    (pi ((a tau) (_ (f a))) i64)))

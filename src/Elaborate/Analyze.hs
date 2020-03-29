@@ -47,6 +47,22 @@ simp' (((m1, WeakTermPi mls1 xts1 cod1), (m2, WeakTermPi mls2 xts2 cod2)):cs)
     xt2 <- asIdentPlus m2 cod2
     simpBinder (xts1 ++ [xt1]) (xts2 ++ [xt2])
     simp $ zip us1 us2 ++ cs
+simp' (((m1, WeakTermPi mls1 xts1 cod1), (m2, WeakTermPiPlus _ mls2 xts2 cod2)):cs)
+  | length xts1 == length xts2 = do
+    let us1 = map asUniv mls1
+    let us2 = map asUniv mls2
+    xt1 <- asIdentPlus m1 cod1
+    xt2 <- asIdentPlus m2 cod2
+    simpBinder (xts1 ++ [xt1]) (xts2 ++ [xt2])
+    simp $ zip us1 us2 ++ cs
+simp' (((m1, WeakTermPiPlus _ mls1 xts1 cod1), (m2, WeakTermPi mls2 xts2 cod2)):cs)
+  | length xts1 == length xts2 = do
+    let us1 = map asUniv mls1
+    let us2 = map asUniv mls2
+    xt1 <- asIdentPlus m1 cod1
+    xt2 <- asIdentPlus m2 cod2
+    simpBinder (xts1 ++ [xt1]) (xts2 ++ [xt2])
+    simp $ zip us1 us2 ++ cs
 simp' (((m1, WeakTermPiPlus name1 mls1 xts1 cod1), (m2, WeakTermPiPlus name2 mls2 xts2 cod2)):cs)
   | name1 == name2
   , length xts1 == length xts2 = do

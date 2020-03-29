@@ -179,8 +179,7 @@ discern'' nenv (m, WeakTermPiIntroNoReduce xts e) = do
   (xts', e') <- discernBinder nenv xts e
   return (m, WeakTermPiIntroNoReduce xts' e')
 discern'' nenv (m, WeakTermPiIntroPlus ind (name, args1, args2) xts e) = do
-  let discarded = (m, WeakTermTau 0) -- just to use discernBinder
-  (args', _) <- discernBinder nenv (args1 ++ args2) discarded
+  args' <- mapM (discernIdentPlus nenv) (args1 ++ args2)
   let args1' = take (length args1) args'
   let args2' = drop (length args1) args'
   (xts', e') <- discernBinder nenv xts e
@@ -269,6 +268,13 @@ discernBinder nenv ((mx, x, t):xts) e = do
   x' <- newDefinedNameWith x
   (xts', e') <- discernBinder (insertName x x' nenv) xts e
   return ((mx, x', t') : xts', e')
+
+discernIdentPlus :: NameEnv -> IdentifierPlus -> WithEnv IdentifierPlus
+discernIdentPlus nenv (m, x, t) = do
+  t' <- discern'' nenv t
+  penv <- gets prefixEnv
+  x' <- lookupNameWithPrefix'' m penv x nenv
+  return (m, x', t')
 
 discernSigma :: NameEnv -> [IdentifierPlus] -> WithEnv [IdentifierPlus]
 discernSigma _ [] = return []

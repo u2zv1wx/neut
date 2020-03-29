@@ -256,17 +256,17 @@ zetaPi ::
   -> WeakTermPlus
   -> WithEnv WeakTermPlus
 zetaPi mode isub atsbts xts cod e = do
-  let (ms, xs, ts) = unzip3 xts
-  xs' <- mapM newNameWith xs
-  let vs' = zipWith (\m x -> (m, WeakTermUpsilon x)) ms xs'
+  (xts', cod') <- renameBinder xts cod
+  let (ms', xs', ts') = unzip3 xts'
+  let vs' = zipWith (\m x -> (m, WeakTermUpsilon x)) ms' xs'
   -- backward conversion to create (A', ..., A') -> (A, ..., A)
   isub' <- invSubst isub
-  vs <- zipWithM (zeta (flipMode mode) isub' atsbts) ts vs'
+  vs <- zipWithM (zeta (flipMode mode) isub' atsbts) ts' vs' -- これだとtsの中のxの出現が狂う、というわけ？
   -- forward conversion to create B -> B'
-  app' <- zeta mode isub atsbts cod (fst e, WeakTermPiElim e vs)
+  app' <- zeta mode isub atsbts cod' (fst e, WeakTermPiElim e vs)
   -- return the composition: (A' ..., A') -> (A, ..., A) -> B -> B'
-  let ts' = map (substWeakTermPlus isub) ts
-  return (fst e, WeakTermPiIntro (zip3 ms xs' ts') app')
+  let ts'' = map (substWeakTermPlus isub) ts'
+  return (fst e, WeakTermPiIntro (zip3 ms' xs' ts'') app')
 
 zetaSigma ::
      Mode
@@ -402,6 +402,18 @@ toInternalizedArg _ _ _ _ _ _ _ _ _ (m, _, _) =
   raiseCritical
     m
     "the type of an introduction rule must be represented by a Pi-type, but its not"
+
+renameBinder ::
+     [IdentifierPlus]
+  -> WeakTermPlus
+  -> WithEnv ([IdentifierPlus], WeakTermPlus)
+renameBinder [] e = return ([], e)
+renameBinder ((m, x, t):ats) e = do
+  x' <- newNameWith x
+  let sub = [(x, (m, WeakTermUpsilon x'))]
+  let (ats', e') = substWeakTermPlus'' sub ats e -- discern済みなのでこれでオーケーのはず
+  (ats'', e'') <- renameBinder ats' e'
+  return ((m, x', t) : ats'', e'')
 
 type RuleType = (Identifier, [WeakTermPlus])
 

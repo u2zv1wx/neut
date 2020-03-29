@@ -198,7 +198,8 @@ constructErrors _ [] = return []
 constructErrors ps ((pos, (e1, e2)):pcs) = do
   e1' <- unravel e1
   e2' <- unravel e2
-  let msg = constructErrorMsg e1' e2'
+  -- let msg = constructErrorMsg e1' e2'
+  let msg = constructErrorMsg e1 e2
   as <- constructErrors (pos : ps) pcs
   return $ logError pos msg : as
 

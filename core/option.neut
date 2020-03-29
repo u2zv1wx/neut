@@ -2,9 +2,9 @@
 
 (include "foundation.neut")
 
-(include "functor.neut")
+;; (include "functor.neut")
 
-(include "monad.neut")
+;; (include "monad.neut")
 
 (section option)
 
@@ -42,10 +42,10 @@
       ((some y)
         y))))
 
-(definition witness-functor
-  (witness (functor option)
-    (record (functor option)
-      (map @option:map))))
+;; (definition witness-functor
+;;   (witness (functor option)
+;;     (record (functor option)
+;;       (map @option:map))))
 
 ;; (definition witness-monad
 ;;   (witness (monad option)
