@@ -103,25 +103,36 @@ elaborateStmt (WeakStmtImplicit m x@(I (_, i)) idx cont) = do
       raiseError m $
       "the type of " <>
       asText x <> " is supposed to be a Pi-type, but is:\n" <> toText (weaken t)
-elaborateStmt (WeakStmtLetInductiveIntro m (bi, ai) (mx, x@(I (_, i)), t) xts yts atsbts app cont) = do
-  (t', mlt) <- inferType t
-  analyze >> synthesize >> refine >> cleanup
-  -- the "elaborate' e" part in LetWT
-  app' <- elaborate' app
-  atsbts' <- mapM elaboratePlus atsbts
-  xtsyts' <- mapM elaboratePlus $ xts ++ yts
-  let lam =
-        ( m
-        , TermPiIntroNoReduce
-            xtsyts'
-            (m, TermPiIntroPlus ai (bi, xtsyts') atsbts' app'))
-  t'' <- reduceTermPlus <$> elaborate' t'
-  insTypeEnv x t'' mlt
-  modify (\env -> env {cacheEnv = IntMap.insert i (Left lam) (cacheEnv env)})
-  cont' <- elaborateStmt cont
-  x' <- newNameWith x
-  let c = (m, TermConst x emptyUP)
-  return (m, TermPiElim (m, TermPiIntro [(mx, x', t'')] cont') [c])
+-- elaborateStmt (WeakStmtLetInductiveIntro m (mx, x@(I (_, i)), t) lam cont) = do
+--   (t', mlt) <- inferType t
+--   analyze >> synthesize >> refine >> cleanup
+--   lam' <- elaborate' lam
+--   t'' <- reduceTermPlus <$> elaborate' t'
+--   insTypeEnv x t'' mlt
+--   modify (\env -> env {cacheEnv = IntMap.insert i (Left lam') (cacheEnv env)})
+--   cont' <- elaborateStmt cont
+--   x' <- newNameWith x
+--   let c = (m, TermConst x emptyUP)
+--   return (m, TermPiElim (m, TermPiIntro [(mx, x', t'')] cont') [c])
+-- elaborateStmt (WeakStmtLetInductiveIntro m (bi, ai) (mx, x@(I (_, i)), t) xts yts atsbts app cont) = do
+--   (t', mlt) <- inferType t
+--   analyze >> synthesize >> refine >> cleanup
+--   -- the "elaborate' e" part in LetWT
+--   app' <- elaborate' app
+--   atsbts' <- mapM elaboratePlus atsbts
+--   xtsyts' <- mapM elaboratePlus $ xts ++ yts
+--   let lam =
+--         ( m
+--         , TermPiIntroNoReduce
+--             xtsyts'
+--             (m, TermPiIntroPlus ai (bi, xtsyts') atsbts' app'))
+--   t'' <- reduceTermPlus <$> elaborate' t'
+--   insTypeEnv x t'' mlt
+--   modify (\env -> env {cacheEnv = IntMap.insert i (Left lam) (cacheEnv env)})
+--   cont' <- elaborateStmt cont
+--   x' <- newNameWith x
+--   let c = (m, TermConst x emptyUP)
+--   return (m, TermPiElim (m, TermPiIntro [(mx, x', t'')] cont') [c])
 elaborateStmt (WeakStmtConstDecl _ (_, x, t) cont) = do
   (t', mlt) <- inferType t
   analyze >> synthesize >> refine >> cleanup

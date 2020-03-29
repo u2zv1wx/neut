@@ -174,15 +174,16 @@ data WeakStmt
   | WeakStmtLetWT Meta IdentifierPlus WeakTermPlus WeakStmt
   | WeakStmtLetSigma Meta [IdentifierPlus] WeakTermPlus WeakStmt
   | WeakStmtImplicit Meta Identifier Int WeakStmt
-  | WeakStmtLetInductiveIntro
-      Meta
-      (T.Text, T.Text)
-      IdentifierPlus
-      [IdentifierPlus]
-      [IdentifierPlus]
-      [IdentifierPlus]
-      WeakTermPlus
-      WeakStmt
+  -- | WeakStmtLetInductiveIntro Meta IdentifierPlus WeakTermPlus WeakStmt
+  -- | WeakStmtLetInductiveIntro
+  --     Meta
+  --     (T.Text, T.Text)
+  --     IdentifierPlus
+  --     [IdentifierPlus]
+  --     [IdentifierPlus]
+  --     [IdentifierPlus]
+  --     WeakTermPlus
+  --     WeakStmt
   | WeakStmtConstDecl Meta IdentifierPlus WeakStmt
   deriving (Show)
   -- | WeakTermSigmaIntro WeakTermPlus [WeakTermPlus]

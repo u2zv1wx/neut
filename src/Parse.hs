@@ -519,16 +519,23 @@ concatQuasiStmtList (QuasiStmtLetInductiveIntro m (bi, ai) bt xts yts ats bts bI
   yts' <- mapM (internalize isub (ats ++ bts)) yts
   insInductive as bt -- register the constructor (if necessary)
   cont <- concatQuasiStmtList ss
-  return $
-    WeakStmtLetInductiveIntro
-      m
-      (bi, ai)
-      bt
-      xts
-      yts
-      (ats ++ bts)
-      (m, WeakTermPiElim bInner yts')
-      cont
+  let xtsyts' = xts ++ yts
+  let app = (m, WeakTermPiElim bInner yts')
+  let lam =
+        ( m
+        , WeakTermPiIntroNoReduce
+            xtsyts'
+            (m, WeakTermPiIntroPlus ai (bi, xtsyts') (ats ++ bts) app))
+  return $ WeakStmtLetWT m bt lam cont -- return $
+  --   WeakStmtLetInductiveIntro
+  --     m
+  --     (bi, ai)
+  --     bt
+  --     xts
+  --     yts
+  --     (ats ++ bts)
+  --     (m, WeakTermPiElim bInner yts')
+  --     cont
 -- concatQuasiStmtList (QuasiStmtLetCoinductiveElim m bt xtsyt codInner ats bts yt e1 e2 csub asOuter:ss) = do
 --   e2' <- externalize csub (ats ++ bts) codInner e2
 --   insCoinductive asOuter bt -- register the destructor (if necessary)
