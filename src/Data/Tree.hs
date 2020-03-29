@@ -35,3 +35,10 @@ replaceMeta m (_, TreeNode ts) = do
 replaceMeta m (_, TreeNodeSquare ts) = do
   let ts' = map (replaceMeta m) ts
   (m, TreeNodeSquare ts')
+
+substTree :: (T.Text, T.Text) -> TreePlus -> TreePlus
+substTree (from, to) (m, TreeLeaf x)
+  | x == from = (m, TreeLeaf to)
+  | otherwise = (m, TreeLeaf x)
+substTree sub (m, TreeNode ts) = (m, TreeNode $ map (substTree sub) ts)
+substTree sub (m, TreeNodeSquare ts) = (m, TreeNode $ map (substTree sub) ts)

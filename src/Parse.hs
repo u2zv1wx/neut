@@ -258,6 +258,11 @@ parse' ((m, TreeNode (coind@(_, TreeLeaf "coinductive"):rest)):as)
   | otherwise = do
     rest' <- mapM macroExpand rest
     rest'' <- asInductive rest'
+    p "coinductive:"
+    p $ T.unpack $ showAsSExp (m, TreeNode ((m, TreeLeaf "coinductive") : rest))
+    p "translated:"
+    p $ T.unpack $ showAsSExp (m, TreeNode ((m, TreeLeaf "inductive") : rest''))
+    _ <- error "stop"
     stmtList1 <- parseInductive m rest''
     stmtList2 <- parse' as
     return $ stmtList1 ++ stmtList2
@@ -332,8 +337,76 @@ getCurrentSection' [n] = n
 getCurrentSection' (n:ns) = getCurrentSection' ns <> ":" <> n
 
 asInductive :: [TreePlus] -> WithEnv [TreePlus]
-asInductive = undefined
+asInductive [] = return []
+asInductive (t:ts) = do
+  (sub, t') <- asInductive' t
+  ts' <- asInductive $ map (substTree sub) ts
+  return $ t' : ts'
 
+asInductive' :: TreePlus -> WithEnv ((T.Text, T.Text), TreePlus)
+asInductive' (m, TreeNode ((_, TreeLeaf a):(_, TreeNode xts):rules)) = do
+  let a' = "[" <> a <> "]"
+  let sub = (a, a')
+  let xts' = map (substTree sub) xts
+  rules'' <- mapM styleRule $ map (substTree sub) rules
+  let hole = "[_]"
+  argList <- mapM extractArg xts
+  let result =
+        ( m
+        , TreeNode
+            [ (m, TreeLeaf a)
+            , (m, TreeNode xts')
+            , ( m
+              , TreeNode
+                  [ (m, TreeLeaf "unfold")
+                  , ( m
+                    , TreeNode
+                        ([ ( m
+                           , TreeNode
+                               [ (m, TreeLeaf a')
+                               , ( m
+                                 , TreeNode
+                                     [ (m, TreeLeaf "pi")
+                                     , (m, TreeNode xts')
+                                     , (m, TreeLeaf "tau")
+                                     ])
+                               ])
+                         ] ++
+                         rules'' ++
+                         [ ( m
+                           , TreeNode
+                               [ (m, TreeLeaf hole)
+                               , (m, TreeNode ((m, TreeLeaf a') : argList))
+                               ])
+                         ]))
+                  , (m, TreeNode ((m, TreeLeaf a) : argList))
+                  ])
+            ])
+  return ((a, a'), result)
+asInductive' t = raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) ...)"
+
+extractArg :: TreePlus -> WithEnv TreePlus
+extractArg (m, TreeLeaf x) = return (m, TreeLeaf x)
+extractArg (_, TreeNode [(m, TreeLeaf x), _]) = return (m, TreeLeaf x)
+extractArg t = raiseSyntaxError (fst t) "LEAF | (LEAF TREE)"
+
+styleRule :: TreePlus -> WithEnv TreePlus
+styleRule (m, TreeNode [(mName, TreeLeaf name), (_, TreeNode xts), t]) = do
+  return
+    ( m
+    , TreeNode
+        [ (mName, TreeLeaf name)
+        , (m, TreeNode [(m, TreeLeaf "pi"), (m, TreeNode xts), t])
+        ])
+styleRule t = raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) TREE)"
+
+-- parseConnective' :: TreePlus -> WithEnv Connective
+-- parseConnective' (m, TreeNode ((_, TreeLeaf name):(_, TreeNode xts):rules)) = do
+--   m' <- adjustPhase m
+--   xts' <- mapM interpretIdentifierPlus xts
+--   rules' <- mapM parseRule rules
+--   return (m', asIdent name, xts', rules')
+-- parseConnective' t = raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) ...)"
 parseBorrow :: WeakTermPlus -> (Maybe (Meta, Identifier), WeakTermPlus)
 parseBorrow (m, WeakTermUpsilon (I (s, _)))
   | T.length s > 1
