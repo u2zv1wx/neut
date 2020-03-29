@@ -131,7 +131,6 @@ data QuasiStmt
   --   (constant x t)
   | QuasiStmtConstDecl Meta IdentifierPlus
   | QuasiStmtLetInductive Int Meta IdentifierPlus WeakTermPlus
-  -- | QuasiStmtLetCoinductive Int Meta IdentifierPlus WeakTermPlus
   -- let (b : B) :=
   --   lam (xts ++ yts).
   --     lam (ats ++ bts).
@@ -149,22 +148,6 @@ data QuasiStmt
   --     -- [IdentifierPlus] -- [(y, t), ..., (y, t)]  (must be internalized later)
   --     SubstWeakTerm -- the `a` in `ats` ~> the `a` defined beforehand
   --     [Identifier] -- as (to be used to update the environment with constructor info)
-  -- let (b : B) :=
-  --   lam (xts ++ [(z, t)]).
-  --     let (ats ++ bts ++ [(c, t)]) := z in
-  --     b-inner @ [c]
-  -- | QuasiStmtLetCoinductiveElim
-  --     Meta
-  --     IdentifierPlus
-  --     [IdentifierPlus] -- xts ++ [(z, t)]
-  --     WeakTermPlus -- the type of b-inner @ [c]                  --
-  --     [IdentifierPlus] -- ats                                    --
-  --     [IdentifierPlus] -- bts                                    -- sigma-elim
-  --     IdentifierPlus -- (c, t)                                   --
-  --     WeakTermPlus -- z                                          --
-  --     WeakTermPlus -- b-inner @ [c] (must be externalized later) --
-  --     SubstWeakTerm -- the `a` defined beforehand ~> the `a` in `ats`
-  --     [Identifier] -- as (to be used to update the environment with constructor info)
   | QuasiStmtUse T.Text
   | QuasiStmtUnuse T.Text
   deriving (Show)
@@ -175,22 +158,9 @@ data WeakStmt
   | WeakStmtLetWT Meta IdentifierPlus WeakTermPlus WeakStmt
   | WeakStmtLetSigma Meta [IdentifierPlus] WeakTermPlus WeakStmt
   | WeakStmtImplicit Meta Identifier Int WeakStmt
-  -- | WeakStmtLetInductiveIntro Meta IdentifierPlus WeakTermPlus WeakStmt
-  -- | WeakStmtLetInductiveIntro
-  --     Meta
-  --     (T.Text, T.Text)
-  --     IdentifierPlus
-  --     [IdentifierPlus]
-  --     [IdentifierPlus]
-  --     [IdentifierPlus]
-  --     WeakTermPlus
-  --     WeakStmt
   | WeakStmtConstDecl Meta IdentifierPlus WeakStmt
   deriving (Show)
-  -- | WeakTermSigmaIntro WeakTermPlus [WeakTermPlus]
 
--- weakTermSigmaIntro :: WeakTermPlus -> [WeakTermPlus] -> WeakTerm
--- weakTermSigmaIntro t es = undefined
 varWeakTermPlus :: WeakTermPlus -> [Identifier]
 varWeakTermPlus (_, WeakTermTau _) = []
 varWeakTermPlus (_, WeakTermUpsilon x) = x : []
@@ -525,7 +495,6 @@ inBracket s = "[" <> s <> "]"
 showArg :: (Meta, Identifier, WeakTermPlus) -> T.Text
 showArg (_, x, t) = inParen $ asText' x <> " " <> toText t
 
--- showArg (_, x, t) = inParen $ asText x <> " " <> toText t
 showClause :: (WeakCase, WeakTermPlus) -> T.Text
 showClause (c, e) = inParen $ showWeakCase c <> " " <> toText e
 
