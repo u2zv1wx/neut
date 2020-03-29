@@ -364,7 +364,7 @@ toInternalizedArg ::
   -> [IdentifierPlus] -- aの引数。
   -> [IdentifierPlus] -- base caseでのinternalizeのための情報。
   -> [WeakTermPlus] -- list @ (e1, ..., en)の引数部分。
-  -> [WeakTermPlus] -- eiをisub ++ csubでsubstしたもの。
+  -> [WeakTermPlus] -- eiをisubでsubstしたもの。
   -> IdentifierPlus -- outerでのコンストラクタ。
   -> IdentifierPlus -- innerでのコンストラクタ。xts部分の引数だけouterのコンストラクタと型がずれていることに注意。
   -> WithEnv WeakTermPlus
