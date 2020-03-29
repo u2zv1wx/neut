@@ -258,14 +258,7 @@ parse' ((m, TreeNode (coind@(_, TreeLeaf "coinductive"):rest)):as)
   | otherwise = do
     rest' <- mapM macroExpand rest
     rest'' <- asInductive rest'
-    p "coinductive:"
-    p $ T.unpack $ showAsSExp (m, TreeNode ((m, TreeLeaf "coinductive") : rest))
-    p "translated:"
-    p $ T.unpack $ showAsSExp (m, TreeNode ((m, TreeLeaf "inductive") : rest''))
-    -- _ <- error "stop"
     stmtList1 <- parseInductive m rest''
-    p "as-inductive:"
-    p' stmtList1
     stmtList2 <- parse' as
     return $ stmtList1 ++ stmtList2
 parse' ((m, TreeNode ((mLet, TreeLeaf "let"):rest)):as)

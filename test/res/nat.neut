@@ -1,38 +1,7 @@
-(include "./coproduct.neut")
+(no-implicit-core)
 
-;; nat := Sigma (n : u32). vector n top とするべきかもしれない
-(definition nat
-  (coproduct top nat))
+(include library "core/notation.neut")
 
-; natでfixの中身をproductで包めばreductionが無限ループになるのを避けられる。
-; nat := fix x. (product (top + x))
-; このときはzeroとかoneとかはsingleton pairになる。
-; zero == pair (left(*))
-; one  == pair (right(pair (left(*))))
-; (definition nat
-;   (product (coproduct top nat)))
-
-; (reserve nat)
-
-;; (notation nat nat.inner)
-
-(reserve succ)
-
-(notation (succ e)
-  (pair right e))
-
-(let zero (pair left unit))
-(ascription zero nat)
-
-; (let one (succ zero))
-; (ascription one nat)
-
-; (let two (succ one))
-; (ascription two nat)
-
-; (definition next (n)
-;   (pair right n))
-; (ascription next
-;   (arrow nat nat))
-
-; (let three (next two))
+(inductive nat ()
+  (zero () (nat))
+  (succ ((_ (nat))) (nat)))
