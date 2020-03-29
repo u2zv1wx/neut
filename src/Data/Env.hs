@@ -349,7 +349,9 @@ lookupLLVMEnumEnv :: Meta -> T.Text -> WithEnv T.Text
 lookupLLVMEnumEnv m labelName = do
   lenv <- gets llvmEnumEnv
   case Map.lookup labelName lenv of
-    Nothing -> raiseCritical m $ "no such enum-label defined: " <> labelName
+    Nothing -> do
+      p' lenv
+      raiseCritical m $ "no such enum-label defined: " <> labelName
     Just labelName' -> return labelName'
 
 lookupConstNum :: T.Text -> WithEnv Int
