@@ -252,14 +252,14 @@ parse' ((m, TreeNode (ind@(_, TreeLeaf "inductive"):rest)):as)
     stmtList1 <- parseInductive m rest'
     stmtList2 <- parse' as
     return $ stmtList1 ++ stmtList2
-parse' ((m, TreeNode (coind@(_, TreeLeaf "coinductive"):rest)):as)
-  | name@(mFun, TreeLeaf _):xts@(_, TreeNode _):rest' <- rest = do
-    parse' $ (m, TreeNode [coind, (mFun, TreeNode (name : xts : rest'))]) : as
-  | otherwise = do
-    rest' <- mapM macroExpand rest
-    stmtList1 <- parseCoinductive m rest'
-    stmtList2 <- parse' as
-    return $ stmtList1 ++ stmtList2
+-- parse' ((m, TreeNode (coind@(_, TreeLeaf "coinductive"):rest)):as)
+--   | name@(mFun, TreeLeaf _):xts@(_, TreeNode _):rest' <- rest = do
+--     parse' $ (m, TreeNode [coind, (mFun, TreeNode (name : xts : rest'))]) : as
+--   | otherwise = do
+--     rest' <- mapM macroExpand rest
+--     stmtList1 <- parseCoinductive m rest'
+--     stmtList2 <- parse' as
+--     return $ stmtList1 ++ stmtList2
 parse' ((m, TreeNode ((mLet, TreeLeaf "let"):rest)):as)
   | [(mx, TreeLeaf x), t, e] <- rest = do
     let xt = (mx, TreeNode [(mx, TreeLeaf x), t])
@@ -511,10 +511,10 @@ concatQuasiStmtList ((QuasiStmtLetInductive n m at e):es) = do
   insForm n at e
   cont <- concatQuasiStmtList es
   return $ WeakStmtLetWT m at e cont
-concatQuasiStmtList (QuasiStmtLetCoinductive n m at e:es) = do
-  insForm n at e
-  cont <- concatQuasiStmtList es
-  return $ WeakStmtLetWT m at e cont
+-- concatQuasiStmtList (QuasiStmtLetCoinductive n m at e:es) = do
+--   insForm n at e
+--   cont <- concatQuasiStmtList es
+--   return $ WeakStmtLetWT m at e cont
 concatQuasiStmtList (QuasiStmtLetInductiveIntro m (bi, ai) bt xts yts ats bts bInner isub as:ss) = do
   yts' <- mapM (internalize isub (ats ++ bts)) yts
   insInductive as bt -- register the constructor (if necessary)
@@ -529,20 +529,20 @@ concatQuasiStmtList (QuasiStmtLetInductiveIntro m (bi, ai) bt xts yts ats bts bI
       (ats ++ bts)
       (m, WeakTermPiElim bInner yts')
       cont
-concatQuasiStmtList (QuasiStmtLetCoinductiveElim m bt xtsyt codInner ats bts yt e1 e2 csub asOuter:ss) = do
-  e2' <- externalize csub (ats ++ bts) codInner e2
-  insCoinductive asOuter bt -- register the destructor (if necessary)
-  cont <- concatQuasiStmtList ss
-  let codOuter = substWeakTermPlus csub codInner
-  return $
-    WeakStmtLetWT
-      m
-      bt
-      ( m
-      , WeakTermPiIntro
-          xtsyt
-          (m, WeakTermSigmaElim codOuter (ats ++ bts ++ [yt]) e1 e2'))
-      cont
+-- concatQuasiStmtList (QuasiStmtLetCoinductiveElim m bt xtsyt codInner ats bts yt e1 e2 csub asOuter:ss) = do
+--   e2' <- externalize csub (ats ++ bts) codInner e2
+--   insCoinductive asOuter bt -- register the destructor (if necessary)
+--   cont <- concatQuasiStmtList ss
+--   let codOuter = substWeakTermPlus csub codInner
+--   return $
+--     WeakStmtLetWT
+--       m
+--       bt
+--       ( m
+--       , WeakTermPiIntro
+--           xtsyt
+--           (m, WeakTermSigmaElim codOuter (ats ++ bts ++ [yt]) e1 e2'))
+--       cont
 concatQuasiStmtList (QuasiStmtUse _:ss) = concatQuasiStmtList ss
 concatQuasiStmtList (QuasiStmtUnuse _:ss) = concatQuasiStmtList ss
 

@@ -131,7 +131,7 @@ data QuasiStmt
   --   (constant x t)
   | QuasiStmtConstDecl Meta IdentifierPlus
   | QuasiStmtLetInductive Int Meta IdentifierPlus WeakTermPlus
-  | QuasiStmtLetCoinductive Int Meta IdentifierPlus WeakTermPlus
+  -- | QuasiStmtLetCoinductive Int Meta IdentifierPlus WeakTermPlus
   -- let (b : B) :=
   --   lam (xts ++ yts).
   --     lam (ats ++ bts).
@@ -152,18 +152,18 @@ data QuasiStmt
   --   lam (xts ++ [(z, t)]).
   --     let (ats ++ bts ++ [(c, t)]) := z in
   --     b-inner @ [c]
-  | QuasiStmtLetCoinductiveElim
-      Meta
-      IdentifierPlus
-      [IdentifierPlus] -- xts ++ [(z, t)]
-      WeakTermPlus -- the type of b-inner @ [c]                  --
-      [IdentifierPlus] -- ats                                    --
-      [IdentifierPlus] -- bts                                    -- sigma-elim
-      IdentifierPlus -- (c, t)                                   --
-      WeakTermPlus -- z                                          --
-      WeakTermPlus -- b-inner @ [c] (must be externalized later) --
-      SubstWeakTerm -- the `a` defined beforehand ~> the `a` in `ats`
-      [Identifier] -- as (to be used to update the environment with constructor info)
+  -- | QuasiStmtLetCoinductiveElim
+  --     Meta
+  --     IdentifierPlus
+  --     [IdentifierPlus] -- xts ++ [(z, t)]
+  --     WeakTermPlus -- the type of b-inner @ [c]                  --
+  --     [IdentifierPlus] -- ats                                    --
+  --     [IdentifierPlus] -- bts                                    -- sigma-elim
+  --     IdentifierPlus -- (c, t)                                   --
+  --     WeakTermPlus -- z                                          --
+  --     WeakTermPlus -- b-inner @ [c] (must be externalized later) --
+  --     SubstWeakTerm -- the `a` defined beforehand ~> the `a` in `ats`
+  --     [Identifier] -- as (to be used to update the environment with constructor info)
   | QuasiStmtUse T.Text
   | QuasiStmtUnuse T.Text
   deriving (Show)
