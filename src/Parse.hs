@@ -262,8 +262,10 @@ parse' ((m, TreeNode (coind@(_, TreeLeaf "coinductive"):rest)):as)
     p $ T.unpack $ showAsSExp (m, TreeNode ((m, TreeLeaf "coinductive") : rest))
     p "translated:"
     p $ T.unpack $ showAsSExp (m, TreeNode ((m, TreeLeaf "inductive") : rest''))
-    _ <- error "stop"
+    -- _ <- error "stop"
     stmtList1 <- parseInductive m rest''
+    p "as-inductive:"
+    p' stmtList1
     stmtList2 <- parse' as
     return $ stmtList1 ++ stmtList2
 parse' ((m, TreeNode ((mLet, TreeLeaf "let"):rest)):as)
@@ -400,13 +402,6 @@ styleRule (m, TreeNode [(mName, TreeLeaf name), (_, TreeNode xts), t]) = do
         ])
 styleRule t = raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) TREE)"
 
--- parseConnective' :: TreePlus -> WithEnv Connective
--- parseConnective' (m, TreeNode ((_, TreeLeaf name):(_, TreeNode xts):rules)) = do
---   m' <- adjustPhase m
---   xts' <- mapM interpretIdentifierPlus xts
---   rules' <- mapM parseRule rules
---   return (m', asIdent name, xts', rules')
--- parseConnective' t = raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) ...)"
 parseBorrow :: WeakTermPlus -> (Maybe (Meta, Identifier), WeakTermPlus)
 parseBorrow (m, WeakTermUpsilon (I (s, _)))
   | T.length s > 1
@@ -562,7 +557,7 @@ concatQuasiStmtList (QuasiStmtLet m xt e:es) = do
   return $ WeakStmtLet m xt e cont
 concatQuasiStmtList (QuasiStmtLetWT m xt e:es) = do
   cont <- concatQuasiStmtList es
-  return $ WeakStmtLetWT m xt e cont
+  return $ WeakStmtLet m xt e cont
 concatQuasiStmtList (QuasiStmtLetSigma m xts e:es) = do
   cont <- concatQuasiStmtList es
   return $ WeakStmtLetSigma m xts e cont
@@ -583,16 +578,17 @@ concatQuasiStmtList (QuasiStmtDef xds:ss) = do
 concatQuasiStmtList ((QuasiStmtLetInductive n m at e):es) = do
   insForm n at e
   cont <- concatQuasiStmtList es
-  return $ WeakStmtLetWT m at e cont
--- concatQuasiStmtList (QuasiStmtLetCoinductive n m at e:es) = do
---   insForm n at e
---   cont <- concatQuasiStmtList es
---   return $ WeakStmtLetWT m at e cont
+  -- return $ WeakStmtLetWT m at e cont
+  return $ WeakStmtLet m at e cont
 concatQuasiStmtList (QuasiStmtLetInductiveIntro m bt e as:ss) = do
   case e of
     (_, WeakTermPiIntroNoReduce xtsyts (_, WeakTermPiIntroPlus ai (bi, xts, yts) atsbts (_, WeakTermPiElim b _))) -> do
       let isub = zip as (map toVar' atsbts) -- outer ~> innerで、ytsの型のなかのouterをinnerにしていく
+      p "yts:"
+      p' yts
       yts' <- mapM (internalize isub atsbts) yts
+      p "yts':"
+      p' yts'
       insInductive as bt -- register the constructor (if necessary)
       cont <- concatQuasiStmtList ss
       let lam =
@@ -605,8 +601,8 @@ concatQuasiStmtList (QuasiStmtLetInductiveIntro m bt e as:ss) = do
                     (bi, xts, yts)
                     atsbts
                     (m, WeakTermPiElim b yts')))
-      return $ WeakStmtLetWT m bt lam cont -- return $
-      -- undefined
+      -- return $ WeakStmtLetWT m bt lam cont -- return $
+      return $ WeakStmtLet m bt lam cont -- return $
     _ -> raiseCritical m "inductive-intro" --   WeakStmtLetInductiveIntro
   --     m
   --     (bi, ai)
@@ -628,20 +624,6 @@ concatQuasiStmtList (QuasiStmtLetInductiveIntro m bt e as:ss) = do
 --             xtsyts'
 --             (m, WeakTermPiIntroPlus ai (bi, xts, yts) (ats ++ bts) app))
 --   return $ WeakStmtLetWT m bt lam cont -- return $
--- concatQuasiStmtList (QuasiStmtLetCoinductiveElim m bt xtsyt codInner ats bts yt e1 e2 csub asOuter:ss) = do
---   e2' <- externalize csub (ats ++ bts) codInner e2
---   insCoinductive asOuter bt -- register the destructor (if necessary)
---   cont <- concatQuasiStmtList ss
---   let codOuter = substWeakTermPlus csub codInner
---   return $
---     WeakStmtLetWT
---       m
---       bt
---       ( m
---       , WeakTermPiIntro
---           xtsyt
---           (m, WeakTermSigmaElim codOuter (ats ++ bts ++ [yt]) e1 e2'))
---       cont
 concatQuasiStmtList (QuasiStmtUse _:ss) = concatQuasiStmtList ss
 concatQuasiStmtList (QuasiStmtUnuse _:ss) = concatQuasiStmtList ss
 
