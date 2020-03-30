@@ -1,19 +1,28 @@
-(include "notation.neut")
+(no-implicit-core)
 
-(include "top.neut")
+;; (include "notation.neut")
 
-(enum choice left right)
+;; (include "top.neut")
 
-(definition nat-inner ()
-  (sigma
-    ((p choice))
-    (enum-elimination p
-      (left top)
-      (right (nat-inner)))))
+;; (enum choice left right)
 
-;; (let (local-nat tau) (nat-inner))
+;; (definition nat-inner ()
+;;   (sigma
+;;     ((p choice))
+;;     (enum-elimination p
+;;       (left top)
+;;       (right (nat-inner)))))
 
-(let (foo (nat-inner))
-  (sigma-introduction left unit))
+;; ;; (let (local-nat tau) (nat-inner))
 
-unit
+;; (let (foo (nat-inner))
+;;   (sigma-introduction left unit))
+
+;; unit
+
+(constant foo
+  (pi
+    ((A u64)
+     (buf (array A u8))
+     (len u64))
+    (product (array A u8) i64)))

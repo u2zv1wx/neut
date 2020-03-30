@@ -186,7 +186,7 @@ newNameWith' s = do
 newNameWith'' :: T.Text -> WithEnv Identifier
 newNameWith'' s = do
   i <- newCount
-  return $ I (s <> "-" <> T.pack (show i), i)
+  return $ I ("[" <> s <> "-" <> T.pack (show i) <> "]", i)
 
 newHole :: Meta -> WithEnv WeakTermPlus
 newHole m = do
@@ -325,9 +325,9 @@ arrayAccessToType m lowType = do
 
 weakTermSigma :: Meta -> [Data.WeakTerm.IdentifierPlus] -> WithEnv WeakTermPlus
 weakTermSigma m xts = do
-  z <- newNameWith' "sigma"
+  z <- newNameWith'' "sigma"
   let vz = (m, WeakTermUpsilon z)
-  k <- newNameWith' "sigma"
+  k <- newNameWith'' "sigma"
   l <- newCount
   mls2 <- piUnivLevelsfrom xts vz
   let yts = [(m, z, (m, WeakTermTau l)), (m, k, (m, WeakTermPi mls2 xts vz))]
@@ -336,9 +336,9 @@ weakTermSigma m xts = do
 
 termSigma :: Meta -> [Data.Term.IdentifierPlus] -> WithEnv TermPlus
 termSigma m xts = do
-  z <- newNameWith' "sigma"
+  z <- newNameWith'' "sigma"
   let vz = (m, TermUpsilon z)
-  k <- newNameWith' "sigma"
+  k <- newNameWith'' "sigma"
   l <- newCount
   mls2 <- piUnivLevelsfrom xts vz
   let yts = [(m, z, (m, TermTau l)), (m, k, (m, TermPi mls2 xts vz))]

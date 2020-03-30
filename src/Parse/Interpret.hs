@@ -63,7 +63,7 @@ interpret (m, TreeNode ((_, TreeLeaf "sigma"):rest))
   | [(_, TreeNode xts), t] <- rest = do
     xts' <- mapM interpretIdentifierPlus xts
     t' <- interpret t
-    placeholder <- newNameWith' "cod"
+    placeholder <- newNameWith'' "cod"
     m' <- adjustPhase m
     weakTermSigma m' $ xts' ++ [(fst t', placeholder, t')]
     -- return (m', WeakTermSigma $ xts' ++ [(fst t', placeholder, t')])
@@ -71,7 +71,8 @@ interpret (m, TreeNode ((_, TreeLeaf "sigma"):rest))
 interpret (m, TreeNode ((_, TreeLeaf "sigma-introduction"):es)) = do
   m' <- adjustPhase m
   es' <- mapM interpret es
-  sigmaIntro m' es' -- return (m', WeakTermSigmaIntro h es')
+  h <- newHole m
+  sigmaIntro m' h es' -- return (m', WeakTermSigmaIntro h es')
 interpret (m, TreeNode ((_, TreeLeaf "sigma-elimination"):rest))
   | [(_, TreeNode xts), e1, e2] <- rest = do
     xts' <- mapM interpretIdentifierPlus xts
@@ -193,33 +194,44 @@ interpret (m, TreeNode ((_, TreeLeaf "case"):rest))
   | otherwise = raiseSyntaxError m "(case TREE TREE*)"
 -- A -> FνF -> νF (i.e. copattern matching (although I think it's more correct to say "record" or something like that,
 -- considering that the constructed term using `FνF -> νF` is just a record after all))
--- interpret (m, TreeNode ((_, TreeLeaf "cocase"):rest))
---   | codType:cocaseClauseList <- rest = do
---     (a, args) <- interpretCoinductive codType
---     m' <- adjustPhase m
---     cocaseClauseList' <- mapM interpretCocaseClause cocaseClauseList
---     let codType' = (m, WeakTermPiElim (m, WeakTermUpsilon a) args)
---     es <- cocaseAsSigmaIntro m a codType' cocaseClauseList'
---     return (m', WeakTermSigmaIntro codType' es)
---   | otherwise = raiseSyntaxError m "(cocase TREE TREE*)"
+interpret (m, TreeNode ((_, TreeLeaf "cocase"):rest))
+  | codType:cocaseClauseList <- rest = do
+    (a, args) <- interpretCoinductive codType
+    m' <- adjustPhase m
+    let ai = asIdent a
+    cocaseClauseList' <- mapM interpretCocaseClause cocaseClauseList
+    let codType' = (m, WeakTermPiElim (m, WeakTermUpsilon ai) args)
+    es <- cocaseAsSigmaIntro m a codType' cocaseClauseList'
+    -- (a:unfold e1 ... en)に落とす
+    let f = (m', WeakTermUpsilon $ asIdent $ a <> ":unfold")
+    return (m', WeakTermPiElim f es)
+    -- sigmaIntro m' codType' es
+    -- return (m', WeakTermSigmaIntro codType' es)
+  | otherwise = raiseSyntaxError m "(cocase TREE TREE*)"
 --
 -- auxiliary interpretations
 --
--- interpret (m, TreeNode ((_, TreeLeaf "product"):ts)) = do
---   ts' <- mapM interpret ts
---   let ms = map fst ts'
---   xs <- mapM (const $ newNameWith' "sig") ts'
---   m' <- adjustPhase m
---   return (m', WeakTermSigma (zip3 ms xs ts'))
--- interpret (m, TreeNode ((_, TreeLeaf "record"):rest))
---   | codType:clauseList <- rest = do
---     (a, args) <- interpretCoinductive codType
---     m' <- adjustPhase m
---     clauseList' <- mapM interpretCocaseClause' clauseList
---     let codType' = (m, WeakTermPiElim (m, WeakTermUpsilon a) args)
---     es <- cocaseAsSigmaIntro m a codType' [((a, args), clauseList')]
---     return (m', WeakTermSigmaIntro codType' es)
---   | otherwise = raiseSyntaxError m "(record TREE TREE*)"
+interpret (m, TreeNode ((_, TreeLeaf "product"):ts)) = do
+  ts' <- mapM interpret ts
+  let ms = map fst ts'
+  xs <- mapM (const $ newNameWith'' "sig") ts'
+  m' <- adjustPhase m
+  -- p "product:"
+  -- tmp <- weakTermSigma m' (zip3 ms xs ts')
+  -- p $ T.unpack $ toText tmp
+  weakTermSigma m' (zip3 ms xs ts') -- return (m', WeakTermSigma (zip3 ms xs ts'))
+interpret (m, TreeNode ((_, TreeLeaf "record"):rest))
+  | codType:clauseList <- rest = do
+    (a, args) <- interpretCoinductive codType
+    m' <- adjustPhase m
+    let ai = asIdent a
+    clauseList' <- mapM interpretCocaseClause' clauseList
+    let codType' = (m, WeakTermPiElim (m, WeakTermUpsilon ai) args)
+    es <- cocaseAsSigmaIntro m a codType' [((ai, args), clauseList')]
+    let f = (m', WeakTermUpsilon $ asIdent $ a <> ":unfold")
+    return (m', WeakTermPiElim f es)
+    -- return (m', WeakTermSigmaIntro codType' es)
+  | otherwise = raiseSyntaxError m "(record TREE TREE*)"
 interpret (m, TreeLeaf x)
   | Just x' <- readMaybe $ T.unpack x = do
     m' <- adjustPhase m
@@ -295,16 +307,15 @@ interpretBorrow e = do
   e' <- interpret e
   return (e', id)
 
-sigmaIntro :: Meta -> [WeakTermPlus] -> WithEnv WeakTermPlus
-sigmaIntro m es = do
-  z <- newNameWith' "sigma"
+sigmaIntro :: Meta -> WeakTermPlus -> [WeakTermPlus] -> WithEnv WeakTermPlus
+sigmaIntro m t es = do
+  z <- newNameWith'' "sigma"
   l <- newCount
-  k <- newNameWith' "sigma"
-  th <- newHole m
+  k <- newNameWith'' "sigma"
   return
     ( m
     , WeakTermPiIntro
-        [(m, z, (m, WeakTermTau l)), (m, k, th)]
+        [(m, z, (m, WeakTermTau l)), (m, k, t)]
         (m, WeakTermPiElim (m, WeakTermUpsilon k) es))
 
 --   return (m', WeakTermSigmaIntro h es')
@@ -457,17 +468,17 @@ type CocaseClause = ((Identifier, [WeakTermPlus]), [(Identifier, WeakTermPlus)])
 --    (b e)
 --    ...
 --    (b e)))
-interpretCoinductive :: TreePlus -> WithEnv (Identifier, [WeakTermPlus])
+interpretCoinductive :: TreePlus -> WithEnv (T.Text, [WeakTermPlus])
 interpretCoinductive (_, TreeNode ((_, TreeLeaf c):args)) = do
   args' <- mapM interpret args
-  return (asIdent c, args')
+  return (c, args')
 interpretCoinductive t = raiseSyntaxError (fst t) "(LEAF TREE ... TREE)"
 
 interpretCocaseClause :: TreePlus -> WithEnv CocaseClause
 interpretCocaseClause (_, TreeNode (coind:clauseList)) = do
   (c, args) <- interpretCoinductive coind
   clauseList' <- mapM interpretCocaseClause' clauseList
-  return ((c, args), clauseList')
+  return ((asIdent c, args), clauseList')
 interpretCocaseClause t =
   raiseSyntaxError (fst t) "((LEAF TREE ... TREE) (LEAF TREE) ... (LEAF TREE))"
 
@@ -478,12 +489,8 @@ interpretCocaseClause' (_, TreeNode [(_, TreeLeaf label), body]) = do
 interpretCocaseClause' t = raiseSyntaxError (fst t) "(LEAF TREE)"
 
 cocaseAsSigmaIntro ::
-     Meta
-  -> Identifier
-  -> WeakTermPlus
-  -> [CocaseClause]
-  -> WithEnv [WeakTermPlus]
-cocaseAsSigmaIntro m (I (name, _)) codType cocaseClauseList = do
+     Meta -> T.Text -> WeakTermPlus -> [CocaseClause] -> WithEnv [WeakTermPlus]
+cocaseAsSigmaIntro m name codType cocaseClauseList = do
   let aes = map (headNameOf m) cocaseClauseList
   bes <- asLamClauseList m cocaseClauseList
   lenv <- gets labelEnv
@@ -523,7 +530,7 @@ asLamClause ::
   -> WeakTermPlus
   -> WithEnv (Identifier, WeakTermPlus)
 asLamClause b m t body = do
-  h <- newNameWith' "hole"
+  h <- newNameWith'' "hole"
   return (b, (m, WeakTermPiIntro [(m, h, t)] body))
 
 headNameOf :: Meta -> CocaseClause -> (Identifier, WeakTermPlus)
