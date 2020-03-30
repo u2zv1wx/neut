@@ -28,14 +28,14 @@ synthesize = do
   sub <- gets substEnv
   case Q.getMin q of
     Nothing -> return ()
-    Just (Enriched (e1, e2) ms _)
-      | Just (m, e) <- lookupAny ms sub -> resolveStuck e1 e2 m e
+    Just (Enriched (e1, e2) hs _)
+      | Just (h, e) <- lookupAny hs sub -> resolveStuck e1 e2 h e
     Just (Enriched _ _ (ConstraintDelta iter mess1 mess2)) ->
       resolveDelta iter mess1 mess2
     Just (Enriched _ _ (ConstraintQuasiPattern m ess e)) ->
       resolvePiElim m ess e
     Just (Enriched _ _ (ConstraintFlexRigid m ess e)) -> resolvePiElim m ess e
-    Just (Enriched _ _ _) -> throwTypeErrors
+    Just (Enriched _ _ _) -> resolveOther $ Q.toList q
 
 -- e1だけがstuckしているとき、e2だけがstuckしているとき、両方がstuckしているときをそれぞれ
 -- 独立したケースとして扱えるようにしたほうがよい（そうすればsubstを減らせる）
@@ -98,6 +98,16 @@ resolveHole m@(I (_, i)) e = do
   let q1' = Q.mapU asAnalyzable q1
   modify (\env -> env {constraintQueue = q1' `Q.union` q2})
   synthesize
+
+resolveOther :: [EnrichedConstraint] -> WithEnv ()
+resolveOther [] = throwTypeErrors
+resolveOther ((Enriched (e1, e2) _ _):cs) = do
+  sub <- gets substEnv
+  let hs1 = holeWeakTermPlus e1
+  let hs2 = holeWeakTermPlus e2
+  case lookupAny (hs1 ++ hs2) sub of
+    Just (h, e) -> resolveStuck e1 e2 h e
+    Nothing -> resolveOther cs
 
 asAnalyzable :: EnrichedConstraint -> EnrichedConstraint
 asAnalyzable (Enriched cs ms _) = Enriched cs ms ConstraintAnalyzable

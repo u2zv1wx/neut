@@ -48,29 +48,17 @@ simp' (((m1, WeakTermPi mls1 xts1 cod1), (m2, WeakTermPi mls2 xts2 cod2)):cs)
     simp $ zip us1 us2 ++ cs
 simp' (((m1, WeakTermPi mls1 xts1 cod1), (m2, WeakTermPiPlus _ mls2 xts2 cod2)):cs)
   | length xts1 == length xts2 = do
-    let us1 = map asUniv mls1
-    let us2 = map asUniv mls2
-    xt1 <- asIdentPlus m1 cod1
-    xt2 <- asIdentPlus m2 cod2
-    simpBinder (xts1 ++ [xt1]) (xts2 ++ [xt2])
-    simp $ zip us1 us2 ++ cs
+    simp' $
+      ((m1, WeakTermPi mls1 xts1 cod1), (m2, WeakTermPi mls2 xts2 cod2)) : cs
 simp' (((m1, WeakTermPiPlus _ mls1 xts1 cod1), (m2, WeakTermPi mls2 xts2 cod2)):cs)
   | length xts1 == length xts2 = do
-    let us1 = map asUniv mls1
-    let us2 = map asUniv mls2
-    xt1 <- asIdentPlus m1 cod1
-    xt2 <- asIdentPlus m2 cod2
-    simpBinder (xts1 ++ [xt1]) (xts2 ++ [xt2])
-    simp $ zip us1 us2 ++ cs
+    simp' $
+      ((m1, WeakTermPi mls1 xts1 cod1), (m2, WeakTermPi mls2 xts2 cod2)) : cs
 simp' (((m1, WeakTermPiPlus name1 mls1 xts1 cod1), (m2, WeakTermPiPlus name2 mls2 xts2 cod2)):cs)
   | name1 == name2
   , length xts1 == length xts2 = do
-    let us1 = map asUniv mls1
-    let us2 = map asUniv mls2
-    xt1 <- asIdentPlus m1 cod1
-    xt2 <- asIdentPlus m2 cod2
-    simpBinder (xts1 ++ [xt1]) (xts2 ++ [xt2])
-    simp $ zip us1 us2 ++ cs
+    simp' $
+      ((m1, WeakTermPi mls1 xts1 cod1), (m2, WeakTermPi mls2 xts2 cod2)) : cs
 simp' (((m1, WeakTermPiIntro xts1 e1), (m2, WeakTermPiIntro xts2 e2)):cs)
   | length xts1 == length xts2 = do
     xt1 <- asIdentPlus m1 e1
@@ -181,9 +169,9 @@ simp' ((e1@(m1, _), e2@(m2, _)):cs) = do
             let c = Enriched (e1, e2) [] $ ConstraintDelta iter1 mess1 mess2
             insConstraintQueue c
             simp cs
-        (Just (StuckPiElimIter iter1 mess1), _) ->
+        (Just (StuckPiElimIter iter1 mess1), _) -> do
           simp $ (toPiElim (unfoldIter iter1) mess1, e2) : cs
-        (_, Just (StuckPiElimIter iter2 mess2)) ->
+        (_, Just (StuckPiElimIter iter2 mess2)) -> do
           simp $ (e1, toPiElim (unfoldIter iter2) mess2) : cs
         (Just (StuckPiElimZetaStrict h1 ies1), _)
           | xs1 <- concatMap getVarList ies1

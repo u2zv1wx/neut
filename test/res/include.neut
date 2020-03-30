@@ -33,18 +33,18 @@
 
 (section item)
 
-(definition sum ((xs (list i64)))
-  (case xs
-    ((nil) 0)
-    ((cons z ys)
-      (i64.add z (sum ys)))))
+;; (definition sum ((xs (list i64)))
+;;   (case xs
+;;     ((nil) 0)
+;;     ((cons z ys)
+;;       (i64.add z (sum ys)))))
 
-(end item)
+;; (end item)
 
-(definition pohe ([a tau] (xs (list a)))
-  (case xs
-    ((nil) 0)
-    ((cons _ ys) (u64.add 1 (pohe a ys)))))
+;; (definition pohe ([a tau] (xs (list a)))
+;;   (case xs
+;;     ((nil) 0)
+;;     ((cons _ ys) (u64.add 1 (pohe a ys)))))
 
 (case some-library:xs
   ((nil) (i64 10))
@@ -57,14 +57,14 @@
      ((nil) (i64 20))
      ((cons v2 zs) v2))))
 
-(let zs (list i64)
-  (cons 1 (cons 2 (cons 3 (nil)))))
+;; (let zs (list i64)
+;;   (cons (i64 1) (cons 2 (cons 3 (nil)))))
 
-(let ws
-  (@cons i64 1 (cons 2 (cons 3 (nil)))))
+;; (let ws
+;;   (@cons i64 1 (cons 2 (cons 3 (nil)))))
 
-(use os)
+;; (use os)
 
-(exit i64 (some-library:item:sum zs))
+;; (exit i64 (some-library:item:sum zs))
 
-(end some-library)
+;; (end some-library)
