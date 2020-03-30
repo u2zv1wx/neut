@@ -482,13 +482,11 @@ inferPiElim ctx m (e, t, mlPi) etls = do
   --         ?Mm @ (ctx[0], ..., ctx[n], e1, ..., e{m-1})]
   let ts'' = map (\(_, _, ty) -> substWeakTermPlus (zip ys es) ty) yts
   (cod, mlPiCod) <- newTypeHoleInCtx (ctx ++ ytls) m
+  insConstraintEnv t (fst e, WeakTermPi (mlPiDomList ++ [mlPiCod]) yts cod)
   forM_ (zip ts ts'') $ uncurry insConstraintEnv
   forM_ (zip mlPiDomList mls') $ uncurry insLevelEQ
-  forM_ mlPiDomList $ \mlPiDom -> insLevelLE mlPiDom mlPi
-  insLevelLE mlPiCod mlPi
-  insConstraintEnv t (fst e, WeakTermPi (mlPiDomList ++ [mlPiCod]) yts cod)
-  let cod' = substWeakTermPlus (zip ys es) cod
-  return ((m, WeakTermPiElim e es), cod', mlPiCod)
+  forM_ (mlPiCod : mlPiDomList) $ \ml -> insLevelLE ml mlPi
+  return ((m, WeakTermPiElim e es), substWeakTermPlus (zip ys es) cod, mlPiCod)
   -- case t of
   --   (_, WeakTermPi mls xts cod) -- performance optimization (not necessary for correctness)
   --     | length xts == length etls -> do

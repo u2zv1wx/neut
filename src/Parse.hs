@@ -540,8 +540,8 @@ concatQuasiStmtList [] = do
   content <- liftIO $ TIO.readFile $ toFilePath path
   let m = newMeta (length $ T.lines content) 1 path
   return $ WeakStmtReturn (m, WeakTermEnumIntro $ EnumValueIntS 64 0)
-concatQuasiStmtList [QuasiStmtLet _ _ e] = do
-  return $ WeakStmtReturn e
+-- concatQuasiStmtList [QuasiStmtLet _ _ e] = do
+--   return $ WeakStmtReturn e
 concatQuasiStmtList (QuasiStmtConstDecl m xt:es) = do
   cont <- concatQuasiStmtList es
   return $ WeakStmtConstDecl m xt cont

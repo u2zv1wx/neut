@@ -3,24 +3,43 @@
 
 ;; (os:write os:stdout (test) 3)
 
-;; (no-implicit-core)
+(no-implicit-core)
 
 ;; (introspect OS
 ;;   (linux (include library "core/constant/linux.neut"))
 ;;   (darwin (include library "core/constant/darwin.neut")))
 
-;; (include "notation.neut")
+(include library "core/notation.neut")
 
 (let test "あ")
+
+(section os)
+
+(constant file-descriptor tau)
+
+(constant stdout file-descriptor)
+
+
+(constant write
+  (pi
+    ((A u64)
+     (out file-descriptor)
+     (str (array A u8))
+     (len u64))
+    (product (array A u8) u64)))
+
+(attribute write (implicit 0))
+
+(end os)
 
 (use os)
 
 ;; こっちだとmalloc/freeがめっちゃ発生する。
-(begin
-  (let len (write stdout test 3))
-  (let len (@os:write 3 stdout test 3))
-  (let len (write stdout test 3))
-  len)
+;; (begin
+;;   (let len (write stdout test 3))
+;;   (let len (@os:write 3 stdout test 3))
+;;   (let len (write stdout test 3))
+;;   len)
 
 ;; (write hole stdout &test 3)
 
@@ -28,18 +47,22 @@
 ;; こっちだと最初と最後の1回だけ。
 ;; ここの最初の「&test」も「test」に解決されるわけだけど、するとbeginのあとでも「test」が
 ;; 使用されていることから、ここでtestのコピーが走ることになる。
-;; (begin
-;;   (let len (os:write os:stdout &test 3))
-;;   (let len (os:write os:stdout &test 3))
-;;   (let len (os:write os:stdout &test 3))
-;;   len) ;; ここでtestがfreeされる（直前のwriteでborrowされているので）
+(begin
+  (let len (os:write os:stdout &test 3))
+  (let len (os:write os:stdout &test 3))
+  (let len (os:write os:stdout &test 3))
+  len) ;; ここでtestがfreeされる（直前のwriteでborrowされているので）
 
 ;; (@os:write 3 os:stdout "あ" 3)
 ;; (@os:write 3 os:stdout "あ" 3)
 ;; (@os:write 3 os:stdout "あ" 3)
 
-;; (let a (os:write os:stdout &test 3))
-;; (let a (os:write os:stdout &test 3))
-;; (let a (os:write os:stdout &test 3))
+(let a (os:write os:stdout &test 3))
+(let a (os:write os:stdout &test 3))
+(let a (os:write os:stdout &test 3))
+
+;; (let a1 (os:write os:stdout test 3))
+;; (let a2 (os:write os:stdout test 3))
+;; (let a3 (os:write os:stdout test 3))
 
 ;; (i64 0)

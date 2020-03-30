@@ -121,8 +121,7 @@ termSigmaElim ::
   -> TermPlus
   -> WithEnv TermPlus
 termSigmaElim m t xts e1 e2 = do
-  mls <- piUnivLevelsfrom xts e2
-  return $ (m, TermPiElim e1 [t, (m, TermPi mls xts e2)])
+  return $ (m, TermPiElim e1 [t, (m, TermPiIntro xts e2)])
 
 refine :: WithEnv ()
 refine =
