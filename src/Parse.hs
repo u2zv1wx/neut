@@ -258,8 +258,6 @@ parse' ((m, TreeNode (coind@(_, TreeLeaf "coinductive"):rest)):as)
   | otherwise = do
     rest' <- mapM macroExpand rest
     rest'' <- asInductive rest'
-    -- p "translated:"
-    -- p $ T.unpack (showAsSExp (m, TreeNode ((m, TreeLeaf "inductive") : rest'')))
     stmtList1 <- parseInductive m rest''
     stmtList2 <- parse' as
     return $ stmtList1 ++ stmtList2
@@ -552,7 +550,7 @@ concatQuasiStmtList (QuasiStmtLet m xt e:es) = do
   return $ WeakStmtLet m xt e cont
 concatQuasiStmtList (QuasiStmtLetWT m xt e:es) = do
   cont <- concatQuasiStmtList es
-  return $ WeakStmtLet m xt e cont
+  return $ WeakStmtLetWT m xt e cont
 concatQuasiStmtList (QuasiStmtLetSigma m xts e:es) = do
   cont <- concatQuasiStmtList es
   return $ WeakStmtLetSigma m xts e cont
@@ -573,8 +571,8 @@ concatQuasiStmtList (QuasiStmtDef xds:ss) = do
 concatQuasiStmtList ((QuasiStmtLetInductive n m at e):es) = do
   insForm n at e
   cont <- concatQuasiStmtList es
-  -- return $ WeakStmtLetWT m at e cont
-  return $ WeakStmtLet m at e cont
+  return $ WeakStmtLetWT m at e cont
+  -- return $ WeakStmtLet m at e cont
 concatQuasiStmtList (QuasiStmtLetInductiveIntro m bt e as:ss) = do
   case e of
     (_, WeakTermPiIntroNoReduce xtsyts (_, WeakTermPiIntroPlus ai (bi, xts, yts) atsbts (_, WeakTermPiElim b _))) -> do
@@ -592,7 +590,8 @@ concatQuasiStmtList (QuasiStmtLetInductiveIntro m bt e as:ss) = do
                     atsbts
                     (m, WeakTermPiElim b yts')))
       cont <- concatQuasiStmtList ss
-      return $ WeakStmtLet m bt lam cont
+      return $ WeakStmtLetWT m bt lam cont
+      -- return $ WeakStmtLet m bt lam cont
     _ -> raiseCritical m "inductive-intro"
 concatQuasiStmtList (QuasiStmtUse _:ss) = concatQuasiStmtList ss
 concatQuasiStmtList (QuasiStmtUnuse _:ss) = concatQuasiStmtList ss

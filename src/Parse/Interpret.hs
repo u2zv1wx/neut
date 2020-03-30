@@ -66,18 +66,11 @@ interpret (m, TreeNode ((_, TreeLeaf "sigma"):rest))
     placeholder <- newNameWith'' "cod"
     m' <- adjustPhase m
     weakTermSigma m' $ xts' ++ [(fst t', placeholder, t')]
-    -- return (m', WeakTermSigma $ xts' ++ [(fst t', placeholder, t')])
   | otherwise = raiseSyntaxError m "(sigma (TREE*) TREE)"
 interpret (m, TreeNode ((_, TreeLeaf "sigma-introduction"):es)) = do
   m' <- adjustPhase m
   es' <- mapM interpret es
   sigmaIntro m' es'
-  -- p "sig-intro:"
-  -- tmp <- sigmaIntro m' es'
-  -- -- p $ T.unpack $ toText tmp
-  -- p' tmp
-  -- return tmp
-  -- sigmaIntro m' h es' -- return (m', WeakTermSigmaIntro h es')
 interpret (m, TreeNode ((_, TreeLeaf "sigma-elimination"):rest))
   | [(_, TreeNode xts), e1, e2] <- rest = do
     xts' <- mapM interpretIdentifierPlus xts
@@ -86,7 +79,6 @@ interpret (m, TreeNode ((_, TreeLeaf "sigma-elimination"):rest))
     m' <- adjustPhase m
     h <- newHole m'
     return $ sigmaElim m' h xts' e1' e2'
-    -- return (m', WeakTermSigmaElim h xts' e1' e2')
   | otherwise = raiseSyntaxError m "(sigma-elimination (TREE*) TREE TREE)"
 interpret (m, TreeNode ((_, TreeLeaf "iterate"):rest))
   | [xt, xts@(_, TreeNode _), e] <- rest = do
@@ -207,7 +199,6 @@ interpret (m, TreeNode ((_, TreeLeaf "cocase"):rest))
     cocaseClauseList' <- mapM interpretCocaseClause cocaseClauseList
     let codType' = (m, WeakTermPiElim (m, WeakTermUpsilon ai) args)
     es <- cocaseAsSigmaIntro m a codType' cocaseClauseList'
-    -- (a:unfold e1 ... en)に落とす
     let f = (m', WeakTermUpsilon $ asIdent $ a <> ":unfold")
     return (m', WeakTermPiElim f es)
     -- sigmaIntro m' codType' es
@@ -221,10 +212,7 @@ interpret (m, TreeNode ((_, TreeLeaf "product"):ts)) = do
   let ms = map fst ts'
   xs <- mapM (const $ newNameWith'' "sig") ts'
   m' <- adjustPhase m
-  -- p "product:"
-  -- tmp <- weakTermSigma m' (zip3 ms xs ts')
-  -- p $ T.unpack $ toText tmp
-  weakTermSigma m' (zip3 ms xs ts') -- return (m', WeakTermSigma (zip3 ms xs ts'))
+  weakTermSigma m' (zip3 ms xs ts')
 interpret (m, TreeNode ((_, TreeLeaf "record"):rest))
   | codType:clauseList <- rest = do
     (a, args) <- interpretCoinductive codType
@@ -305,9 +293,6 @@ interpretBorrow (m, TreeNode (f:args))
     h <- newHole m'
     let app = (m', WeakTermPiElim f' args'')
     return ((m', WeakTermUpsilon tmp), \term -> sigmaElim m' h xts app term)
-    -- return
-    --   ( (m', WeakTermUpsilon tmp)
-    --   , \term -> (m', WeakTermSigmaElim h xts app term))
 interpretBorrow e = do
   e' <- interpret e
   return (e', id)

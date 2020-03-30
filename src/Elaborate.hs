@@ -307,19 +307,6 @@ elaborate' (m, WeakTermPiElim e es) = do
   e' <- elaborate' e
   es' <- mapM elaborate' es
   return (m, TermPiElim e' es')
--- elaborate' (m, WeakTermSigma xts) = do
---   xts' <- mapM elaboratePlus xts
---   return (m, TermSigma xts')
--- elaborate' (m, WeakTermSigmaIntro t es) = do
---   t' <- elaborate' t
---   es' <- mapM elaborate' es
---   return (m, TermSigmaIntro t' es')
--- elaborate' (m, WeakTermSigmaElim t xts e1 e2) = do
---   t' <- elaborate' t
---   xts' <- mapM elaboratePlus xts
---   e1' <- elaborate' e1
---   e2' <- elaborate' e2
---   return (m, TermSigmaElim t' xts' e1' e2')
 elaborate' (m, WeakTermIter (mx, x, t) xts e) = do
   t' <- elaborate' t
   xts' <- mapM elaboratePlus xts

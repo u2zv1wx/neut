@@ -112,44 +112,6 @@ infer' ctx (m, WeakTermPiElim e es) = do
   etls <- mapM (infer' ctx) es
   etl <- infer' ctx e
   inferPiElim ctx m etl etls
-  -- return ((m, WeakTermSigmaElim t' xts' e1' e2'), t2, ml2)
--- infer' ctx (m, WeakTermSigma xts) = do
---   (xts', mls) <- unzip <$> inferSigma ctx xts
---   ml0 <- newLevelLE m $ mls
---   ml1 <- newLevelLT m [ml0]
---   return ((m, WeakTermSigma xts'), (asUniv ml0), ml1)
--- infer' ctx (m, WeakTermSigmaIntro t es) = do
---   (t', mlSigma) <- inferType' ctx t
---   (es', ts, mlSigmaArgList) <- unzip3 <$> mapM (infer' ctx) es
---   ys <- mapM (const $ newNameWith' "arg") es'
---   -- yts = [(y1, ?M1 @ (ctx[0], ..., ctx[n])),
---   --        (y2, ?M2 @ (ctx[0], ..., ctx[n], y1)),
---   --        ...,
---   --        (ym, ?Mm @ (ctx[0], ..., ctx[n], y1, ..., y{m-1}))]
---   ytls <- newTypeHoleListInCtx ctx $ zip ys (map fst es')
---   let (yts, mls') = unzip ytls
---   forM_ mlSigmaArgList $ \mlSigmaArg -> insLevelLE mlSigmaArg mlSigma
---   -- ts' = [?M1 @ (ctx[0], ..., ctx[n]),
---   --        ?M2 @ (ctx[0], ..., ctx[n], e1),
---   --        ...,
---   --        ?Mm @ (ctx[0], ..., ctx[n], e1, ..., e{m-1})]
---   let ts' = map (\(_, _, ty) -> substWeakTermPlus (zip ys es') ty) yts -- ここがzip ys esになってたのがバグの原因？
---   let sigmaType = (m, WeakTermSigma yts)
---   forM_ ((sigmaType, t') : zip ts ts') $ uncurry insConstraintEnv
---   forM_ (zip mlSigmaArgList mls') $ uncurry insLevelEQ
---   -- 中身をsigmaTypeにすることでelaborateのときに確実に中身を取り出せるようにする
---   return ((m, WeakTermSigmaIntro sigmaType es'), sigmaType, mlSigma)
--- infer' ctx (m, WeakTermSigmaElim t xts e1 e2) = do
---   (t', mlResult) <- inferType' ctx t
---   (e1', t1, mlSigma) <- infer' ctx e1
---   xtls <- inferSigma ctx xts
---   let (xts', mlSigArgList) = unzip xtls
---   (e2', t2, ml2) <- infer' (ctx ++ xtls) e2 -- ここでxtlsでctxを伸ばさないほうがよい？
---   -- insert constraints
---   insConstraintEnv t1 (fst e1', WeakTermSigma xts')
---   forM_ mlSigArgList $ \mlSigArg -> insLevelLE mlSigArg mlSigma
---   insConstraintEnv t2 t'
---   insLevelEQ mlResult ml2
 infer' ctx (m, WeakTermIter (mx, x, t) xts e) = do
   tl'@(t', ml') <- inferType' ctx t
   insWeakTypeEnv x tl'
@@ -493,40 +455,60 @@ inferPiElim ::
   -> WithEnv (WeakTermPlus, WeakTermPlus, UnivLevelPlus)
 inferPiElim ctx m (e, t, mlPi) etls = do
   let (es, ts, mlPiDomList) = unzip3 etls
-  case t of
-    (_, WeakTermPi mls xts cod) -- performance optimization (not necessary for correctness)
-      | length xts == length etls -> do
-        let mlPiDomList' = init mls
-        let mlPiCod' = last mls
-        let xs = map (\(_, x, _) -> x) xts
-        let ts'' = map (\(_, _, tx) -> substWeakTermPlus (zip xs es) tx) xts
-        forM_ (zip ts'' ts) $ uncurry insConstraintEnv
-        forM_ (zip mlPiDomList mlPiDomList') $ uncurry insLevelEQ
-        forM_ mlPiDomList $ \mlPiDom -> insLevelLE mlPiDom mlPi
-        insLevelLE mlPiCod' mlPi
-        let cod' = substWeakTermPlus (zip xs es) cod
-        return ((m, WeakTermPiElim e es), cod', mlPiCod')
-    _ -> do
-      ys <- mapM (const $ newNameWith' "arg") es
-      -- yts = [(y1, ?M1 @ (ctx[0], ..., ctx[n])),
-      --        (y2, ?M2 @ (ctx[0], ..., ctx[n], y1)),
-      --        ...,
-      --        (ym, ?Mm @ (ctx[0], ..., ctx[n], y1, ..., y{m-1}))]
-      ytls <- newTypeHoleListInCtx ctx $ zip ys (map fst es)
-      let (yts, mls') = unzip ytls
-      -- ts'' = [?M1 @ (ctx[0], ..., ctx[n]),
-      --         ?M2 @ (ctx[0], ..., ctx[n], e1),
-      --         ...,
-      --         ?Mm @ (ctx[0], ..., ctx[n], e1, ..., e{m-1})]
-      let ts'' = map (\(_, _, ty) -> substWeakTermPlus (zip ys es) ty) yts
-      (cod, mlPiCod) <- newTypeHoleInCtx (ctx ++ ytls) m
-      let cod' = substWeakTermPlus (zip ys es) cod
-      forM_ (zip ts ts'') $ uncurry insConstraintEnv
-      forM_ (zip mlPiDomList mls') $ uncurry insLevelEQ
-      forM_ mlPiDomList $ \mlPiDom -> insLevelLE mlPiDom mlPi
-      insLevelLE mlPiCod mlPi
-      insConstraintEnv t (fst e, WeakTermPi (mlPiDomList ++ [mlPiCod]) yts cod)
-      return ((m, WeakTermPiElim e es), cod', mlPiCod)
+  ys <- mapM (const $ newNameWith' "arg") es
+  -- yts = [(y1, ?M1 @ (ctx[0], ..., ctx[n])),
+  --        (y2, ?M2 @ (ctx[0], ..., ctx[n], y1)),
+  --        ...,
+  --        (ym, ?Mm @ (ctx[0], ..., ctx[n], y1, ..., y{m-1}))]
+  ytls <- newTypeHoleListInCtx ctx $ zip ys (map fst es)
+  let (yts, mls') = unzip ytls
+  -- ts'' = [?M1 @ (ctx[0], ..., ctx[n]),
+  --         ?M2 @ (ctx[0], ..., ctx[n], e1),
+  --         ...,
+  --         ?Mm @ (ctx[0], ..., ctx[n], e1, ..., e{m-1})]
+  let ts'' = map (\(_, _, ty) -> substWeakTermPlus (zip ys es) ty) yts
+  (cod, mlPiCod) <- newTypeHoleInCtx (ctx ++ ytls) m
+  let cod' = substWeakTermPlus (zip ys es) cod
+  forM_ (zip ts ts'') $ uncurry insConstraintEnv
+  forM_ (zip mlPiDomList mls') $ uncurry insLevelEQ
+  forM_ mlPiDomList $ \mlPiDom -> insLevelLE mlPiDom mlPi
+  insLevelLE mlPiCod mlPi
+  insConstraintEnv t (fst e, WeakTermPi (mlPiDomList ++ [mlPiCod]) yts cod)
+  return ((m, WeakTermPiElim e es), cod', mlPiCod)
+  -- case t of
+  --   (_, WeakTermPi mls xts cod) -- performance optimization (not necessary for correctness)
+  --     | length xts == length etls -> do
+  --       let mlPiDomList' = init mls
+  --       let mlPiCod' = last mls
+  --       let xs = map (\(_, x, _) -> x) xts
+  --       let ts'' = map (\(_, _, tx) -> substWeakTermPlus (zip xs es) tx) xts
+  --       forM_ (zip ts'' ts) $ uncurry insConstraintEnv
+  --       forM_ (zip mlPiDomList mlPiDomList') $ uncurry insLevelEQ
+  --       forM_ mlPiDomList $ \mlPiDom -> insLevelLE mlPiDom mlPi
+  --       insLevelLE mlPiCod' mlPi
+  --       let cod' = substWeakTermPlus (zip xs es) cod
+  --       return ((m, WeakTermPiElim e es), cod', mlPiCod')
+  --   _ -> do
+  --     ys <- mapM (const $ newNameWith' "arg") es
+  --     -- yts = [(y1, ?M1 @ (ctx[0], ..., ctx[n])),
+  --     --        (y2, ?M2 @ (ctx[0], ..., ctx[n], y1)),
+  --     --        ...,
+  --     --        (ym, ?Mm @ (ctx[0], ..., ctx[n], y1, ..., y{m-1}))]
+  --     ytls <- newTypeHoleListInCtx ctx $ zip ys (map fst es)
+  --     let (yts, mls') = unzip ytls
+  --     -- ts'' = [?M1 @ (ctx[0], ..., ctx[n]),
+  --     --         ?M2 @ (ctx[0], ..., ctx[n], e1),
+  --     --         ...,
+  --     --         ?Mm @ (ctx[0], ..., ctx[n], e1, ..., e{m-1})]
+  --     let ts'' = map (\(_, _, ty) -> substWeakTermPlus (zip ys es) ty) yts
+  --     (cod, mlPiCod) <- newTypeHoleInCtx (ctx ++ ytls) m
+  --     let cod' = substWeakTermPlus (zip ys es) cod
+  --     forM_ (zip ts ts'') $ uncurry insConstraintEnv
+  --     forM_ (zip mlPiDomList mls') $ uncurry insLevelEQ
+  --     forM_ mlPiDomList $ \mlPiDom -> insLevelLE mlPiDom mlPi
+  --     insLevelLE mlPiCod mlPi
+  --     insConstraintEnv t (fst e, WeakTermPi (mlPiDomList ++ [mlPiCod]) yts cod)
+  --     return ((m, WeakTermPiElim e es), cod', mlPiCod)
 
 -- In a context (x1 : A1, ..., xn : An), this function creates metavariables
 --   ?M  : Pi (x1 : A1, ..., xn : An). ?Mt @ (x1, ..., xn)
@@ -716,19 +698,6 @@ univInst' (m, WeakTermPiElim e es) = do
   e' <- univInst' e
   es' <- mapM univInst' es
   return (m, WeakTermPiElim e' es')
--- univInst' (m, WeakTermSigma xts) = do
---   xts' <- univInstArgs xts
---   return (m, WeakTermSigma xts')
--- univInst' (m, WeakTermSigmaIntro t es) = do
---   t' <- univInst' t
---   es' <- mapM univInst' es
---   return (m, WeakTermSigmaIntro t' es')
--- univInst' (m, WeakTermSigmaElim t xts e1 e2) = do
---   t' <- univInst' t
---   xts' <- univInstArgs xts
---   e1' <- univInst' e1
---   e2' <- univInst' e2
---   return (m, WeakTermSigmaElim t' xts' e1' e2')
 univInst' (m, WeakTermIter (mx, x, t) xts e) = do
   t' <- univInst' t
   xts' <- univInstArgs xts

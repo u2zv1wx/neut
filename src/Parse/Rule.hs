@@ -268,27 +268,6 @@ zetaPi mode isub atsbts xts cod e = do
   let ts'' = map (substWeakTermPlus isub) ts'
   return (fst e, WeakTermPiIntro (zip3 ms' xs' ts'') app')
 
--- zetaSigma ::
---      Mode
---   -> SubstWeakTerm
---   -> [IdentifierPlus]
---   -> [IdentifierPlus]
---   -> WeakTermPlus
---   -> WithEnv WeakTermPlus
--- zetaSigma mode isub atsbts xts e = do
---   let (ms, xs, ts) = unzip3 xts
---   xs' <- mapM newNameWith xs
---   let vs = zipWith (\m x -> (m, WeakTermUpsilon x)) ms xs'
---   vs' <- zipWithM (zeta mode isub atsbts) ts vs
---   let ts' = map (substWeakTermPlus isub) ts
---   let sigType = (fst e, WeakTermSigma (zip3 ms xs ts'))
---   return
---     ( fst e
---     , WeakTermSigmaElim
---         sigType
---         (zip3 ms xs' ts)
---         e
---         (fst e, WeakTermSigmaIntro sigType vs'))
 zetaInductive ::
      Mode
   -> SubstWeakTerm
@@ -452,18 +431,6 @@ substRuleType sub@((a1, es1), (a2, es2)) (m, WeakTermPiElim e es)
     e' <- substRuleType sub e
     es' <- mapM (substRuleType sub) es
     return (m, WeakTermPiElim e' es')
--- substRuleType sub (m, WeakTermSigma xts) = do
---   xts' <- substRuleType' sub xts
---   return (m, WeakTermSigma xts')
--- substRuleType sub (m, WeakTermSigmaIntro t es) = do
---   t' <- substRuleType sub t
---   es' <- mapM (substRuleType sub) es
---   return (m, WeakTermSigmaIntro t' es')
--- substRuleType sub (m, WeakTermSigmaElim t xts e1 e2) = do
---   t' <- substRuleType sub t
---   e1' <- substRuleType sub e1
---   (xts', e2') <- substRuleType'' sub xts e2
---   return (m, WeakTermSigmaElim t' xts' e1' e2')
 substRuleType sub (m, WeakTermIter (mx, x, t) xts e) = do
   t' <- substRuleType sub t
   if fst (fst sub) == x

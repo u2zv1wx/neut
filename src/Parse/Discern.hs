@@ -96,32 +96,6 @@ discern' nenv ((QuasiStmtLetInductiveIntro m (mx, x, t) e as):ss) = do
   ss' <- discern' (insertName x x' nenv) ss
   as' <- mapM (lookupStrict'' m nenv) as
   return $ QuasiStmtLetInductiveIntro m (mx, x', t') e' as' : ss'
--- discern' nenv ((QuasiStmtLetInductiveIntro m enumInfo (mb, b, t) xts yts ats bts bInner _ _):ss) = do
---   t' <- discern'' nenv t
---   (xts', nenv') <- discernArgs nenv xts
---   (yts', nenv'') <- discernArgs nenv' yts
---   (ats', nenv''') <- discernArgs nenv'' ats
---   (bts', nenv'''') <- discernArgs nenv''' bts
---   bInner' <- discern'' nenv'''' bInner
---   b' <- newDefinedNameWith' m nenv b
---   modify (\env -> env {introEnv = S.insert (asInt b') (introEnv env)})
---   ss' <- discern' (insertName b b' nenv) ss
---   asOuter <- mapM (lookupStrict nenv) ats
---   asInnerPlus <- mapM (lookupStrict' nenv'''') ats
---   let info = zip asOuter asInnerPlus
---   return $
---     QuasiStmtLetInductiveIntro
---       m
---       enumInfo
---       (mb, b', t')
---       xts'
---       yts'
---       ats'
---       bts'
---       bInner'
---       info
---       asOuter :
---     ss'
 discern' nenv ((QuasiStmtUse prefix):ss) = do
   modify (\e -> e {prefixEnv = prefix : prefixEnv e})
   discern' nenv ss
@@ -188,18 +162,6 @@ discern'' nenv (m, WeakTermPiElim e es) = do
   es' <- mapM (discern'' nenv) es
   e' <- discern'' nenv e
   return (m, WeakTermPiElim e' es')
--- discern'' nenv (m, WeakTermSigma xts) = do
---   xts' <- discernSigma nenv xts
---   return (m, WeakTermSigma xts')
--- discern'' nenv (m, WeakTermSigmaIntro t es) = do
---   t' <- discern'' nenv t
---   es' <- mapM (discern'' nenv) es
---   return (m, WeakTermSigmaIntro t' es')
--- discern'' nenv (m, WeakTermSigmaElim t xts e1 e2) = do
---   t' <- discern'' nenv t
---   e1' <- discern'' nenv e1
---   (xts', e2') <- discernBinder nenv xts e2
---   return (m, WeakTermSigmaElim t' xts' e1' e2')
 discern'' nenv (m, WeakTermIter xt xts e) = do
   (xt', xts', e') <- discernIter nenv xt xts e
   return (m, WeakTermIter xt' xts' e')
@@ -276,13 +238,6 @@ discernIdentPlus nenv (m, x, t) = do
   x' <- lookupNameWithPrefix'' m penv x nenv
   return (m, x', t')
 
--- discernSigma :: NameEnv -> [IdentifierPlus] -> WithEnv [IdentifierPlus]
--- discernSigma _ [] = return []
--- discernSigma nenv ((mx, x, t):xts) = do
---   t' <- discern'' nenv t
---   x' <- newDefinedNameWith x
---   xts' <- discernSigma (insertName x x' nenv) xts
---   return $ (mx, x', t') : xts'
 discernIter ::
      NameEnv
   -> IdentifierPlus

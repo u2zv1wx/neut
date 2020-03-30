@@ -50,13 +50,6 @@ clarify' tenv (m, TermPiElim e es) = do
   es' <- mapM (clarifyPlus tenv) es
   e' <- clarify' tenv e
   callClosure m e' es'
--- clarify' _ (m, TermSigma _) = returnClosureType m -- vaild since Sigma is translated into Pi
--- clarify' tenv (m, TermSigmaIntro t es) = do
---   (zu, kp@(mk, k, _)) <- sigToPi m $ reduceTermPlus t
---   clarify' tenv (m, TermPiIntro [zu, kp] (m, TermPiElim (mk, TermUpsilon k) es))
--- clarify' tenv (m, TermSigmaElim t xts e1 e2) = do
---   tmp <- clarify' tenv (m, TermPiElim e1 [t, (m, TermPiIntro xts e2)])
---   return tmp
 clarify' tenv iter@(m, TermIter (_, x, t) mxts e) = do
   let tenv' = insTypeEnv'' x t tenv
   e' <- clarify' (insTypeEnv1 mxts tenv') e
@@ -490,21 +483,6 @@ sigToPi m tPi = do
     (_, TermPi _ [zu, kp] _) -> return (zu, kp)
     _ -> raiseCritical m "the type of sigma-intro is wrong"
 
--- sigToPi m sig = do
---   case sig of
---     (mSig, TermSigma xts) -> do
---       tPi <- sigToPi' mSig xts
---       case tPi of
---         (_, TermPi _ [zu, kp] _) -> return (zu, kp)
---         _ -> raiseCritical m "the type of sigma-intro is wrong"
---     _ -> raiseCritical m "the type of sigma-intro is wrong"
--- sigToPi' :: Meta -> [IdentifierPlus] -> WithEnv TermPlus
--- sigToPi' m xts = do
---   z <- newNameWith' "sigma"
---   let zv = toTermUpsilon m z
---   k <- newNameWith' "sig"
---   return
---     (m, TermPi [] [(m, z, (m, TermTau 0)), (m, k, (m, TermPi [] xts zv))] zv)
 makeClosure ::
      Maybe T.Text -- the name of newly created closure
   -> [(Meta, Identifier, CodePlus)] -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
@@ -617,16 +595,6 @@ chainTermPlus' tenv (_, TermPiElim e es) = do
   xs1 <- chainTermPlus' tenv e
   xs2 <- concat <$> mapM (chainTermPlus' tenv) es
   return $ xs1 ++ xs2
--- chainTermPlus' tenv (_, TermSigma xts) = chainTermPlus'' tenv xts []
--- chainTermPlus' tenv (_, TermSigmaIntro t es) = do
---   xs1 <- chainTermPlus' tenv t
---   xs2 <- concat <$> mapM (chainTermPlus' tenv) es
---   return $ xs1 ++ xs2
--- chainTermPlus' tenv (_, TermSigmaElim t xts e1 e2) = do
---   xs <- chainTermPlus' tenv t
---   ys <- chainTermPlus' tenv e1
---   zs <- chainTermPlus'' tenv xts [e2]
---   return $ xs ++ ys ++ zs
 chainTermPlus' tenv (_, TermIter (_, x, t) xts e) = do
   xs1 <- chainTermPlus' tenv t
   xs2 <- chainTermPlus'' (insTypeEnv'' x t tenv) xts [e]
