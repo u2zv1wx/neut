@@ -12,10 +12,16 @@
 (use os)
 
 (definition print-string ((str string))
-  (destruct str (n content)
-    (let len (write stdout &content 3))
-    (with-type (product string u64)
-      (tuple (tuple n content) len))))
+  (witness (product string u64)
+    (destruct str (n content)
+      (let len (write stdout &content 3))
+        (tuple (tuple n content) len))))
+
+;; (definition print-string ((str string))
+;;   (destruct str (n content)
+;;     (let len (write stdout &content 3))
+;;     (with-type (product string u64)
+;;       (tuple (tuple n content) len))))
 
 (unuse os)
 

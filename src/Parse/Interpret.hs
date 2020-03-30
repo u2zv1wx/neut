@@ -71,11 +71,12 @@ interpret (m, TreeNode ((_, TreeLeaf "sigma"):rest))
 interpret (m, TreeNode ((_, TreeLeaf "sigma-introduction"):es)) = do
   m' <- adjustPhase m
   es' <- mapM interpret es
-  p "sig-intro:"
-  tmp <- sigmaIntro m' es'
-  -- p $ T.unpack $ toText tmp
-  p' tmp
-  return tmp
+  sigmaIntro m' es'
+  -- p "sig-intro:"
+  -- tmp <- sigmaIntro m' es'
+  -- -- p $ T.unpack $ toText tmp
+  -- p' tmp
+  -- return tmp
   -- sigmaIntro m' h es' -- return (m', WeakTermSigmaIntro h es')
 interpret (m, TreeNode ((_, TreeLeaf "sigma-elimination"):rest))
   | [(_, TreeNode xts), e1, e2] <- rest = do
@@ -84,8 +85,6 @@ interpret (m, TreeNode ((_, TreeLeaf "sigma-elimination"):rest))
     e2' <- interpret e2
     m' <- adjustPhase m
     h <- newHole m'
-    p "sigelim:"
-    p $ T.unpack $ toText $ sigmaElim m' h xts' e1' e2'
     return $ sigmaElim m' h xts' e1' e2'
     -- return (m', WeakTermSigmaElim h xts' e1' e2')
   | otherwise = raiseSyntaxError m "(sigma-elimination (TREE*) TREE TREE)"
@@ -337,7 +336,8 @@ sigmaElim ::
   -> WeakTermPlus
   -> WeakTermPlus
   -> WeakTermPlus
-sigmaElim m t xts e1 e2 = (m, WeakTermPiElim e1 [t, (m, WeakTermPi [] xts e2)])
+sigmaElim m t xts e1 e2 =
+  (m, WeakTermPiElim e1 [t, (m, WeakTermPiIntro xts e2)])
 
 interpretBorrow' :: TreePlus -> (Maybe (Meta, Identifier), TreePlus)
 interpretBorrow' (m, TreeLeaf s)
