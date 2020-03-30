@@ -8,8 +8,6 @@ import qualified Data.Text as T
 
 import Data.Basic
 
--- VectorをSigma[A, ..., A]の略記として入れてもいいかも。
--- clarifyの時点でSigmaに落とす。
 data WeakTerm
   = WeakTermTau UnivLevel
   | WeakTermUpsilon Identifier
@@ -23,22 +21,6 @@ data WeakTerm
       [IdentifierPlus]
       WeakTermPlus
   | WeakTermPiElim WeakTermPlus [WeakTermPlus]
-  -- -- We define Sigma here since n-ary Sigma cannot be defined in the target language.
-  -- -- Although we can `define` it using `notation`, it makes the output of type error
-  -- -- harder to read. Also, by explicitly introducing Sigma as a syntactic construct,
-  -- -- the type inference of Sigma becomes a little more efficient. So we chose to define
-  -- -- it as a syntactic construct.
-  -- -- Of course, we can define 2-ary Sigma and use it to express n-ary Sigma. However,
-  -- -- it sacrifices the performance of output code. I don't choose that way.
-  -- -- Note that this "Sigma" is decomposed into Pi in the standard way that you see in CoC after type inference.
-  -- -- (sigma (x1 A1) ... (xn An))
-  -- | WeakTermSigma [IdentifierPlus]
-  -- -- (sigma-intro type-of-this-sigma-intro e1 ... en)
-  -- -- type-annotation is required when this construct is translated into Pi in elaboration.
-  -- | WeakTermSigmaIntro WeakTermPlus [WeakTermPlus]
-  -- -- (sigma-elimination type-of-e2 ((x1 A1) ... (xn An)) e1 e2)
-  -- -- again, type-annotation is required when this construct is translated into Pi in elaboration.
-  -- | WeakTermSigmaElim WeakTermPlus [IdentifierPlus] WeakTermPlus WeakTermPlus
   -- CBN recursion ~ CBV iteration
   | WeakTermIter IdentifierPlus [IdentifierPlus] WeakTermPlus
   | WeakTermZeta Identifier
@@ -116,7 +98,7 @@ data QuasiStmt
   = QuasiStmtLet Meta IdentifierPlus WeakTermPlus
   -- special case of `let` in which the `e` in `let x := e` is known to be well-typed
   | QuasiStmtLetWT Meta IdentifierPlus WeakTermPlus
-  -- let-sigma for borro
+  -- let-sigma for borrowing
   | QuasiStmtLetSigma Meta [IdentifierPlus] WeakTermPlus
   -- mutually recursive definition (n >= 0)
   --   (definition
@@ -157,14 +139,6 @@ varWeakTermPlus (_, WeakTermPiElim e es) = do
   let xs = varWeakTermPlus e
   let ys = concatMap varWeakTermPlus es
   xs ++ ys
--- varWeakTermPlus (_, WeakTermSigma xts) = varWeakTermPlus' xts []
--- varWeakTermPlus (_, WeakTermSigmaIntro t es) = do
---   varWeakTermPlus t ++ concatMap varWeakTermPlus es
--- varWeakTermPlus (_, WeakTermSigmaElim t xts e1 e2) = do
---   let xs = varWeakTermPlus t
---   let ys = varWeakTermPlus e1
---   let zs = varWeakTermPlus' xts [e2]
---   xs ++ ys ++ zs
 varWeakTermPlus (_, WeakTermIter (_, x, t) xts e) =
   varWeakTermPlus t ++ filter (/= x) (varWeakTermPlus' xts [e])
 varWeakTermPlus (_, WeakTermConst _ _) = []
@@ -214,14 +188,6 @@ holeWeakTermPlus (_, WeakTermPiIntroNoReduce xts e) = holeWeakTermPlus' xts [e]
 holeWeakTermPlus (_, WeakTermPiIntroPlus {}) = []
 holeWeakTermPlus (_, WeakTermPiElim e es) =
   holeWeakTermPlus e ++ concatMap holeWeakTermPlus es
--- holeWeakTermPlus (_, WeakTermSigma xts) = holeWeakTermPlus' xts []
--- holeWeakTermPlus (_, WeakTermSigmaIntro t es) =
---   holeWeakTermPlus t ++ concatMap holeWeakTermPlus es
--- holeWeakTermPlus (_, WeakTermSigmaElim t xts e1 e2) = do
---   let xs = holeWeakTermPlus t
---   let ys = holeWeakTermPlus e1
---   let zs = holeWeakTermPlus' xts [e2]
---   xs ++ ys ++ zs
 holeWeakTermPlus (_, WeakTermIter (_, _, t) xts e) =
   holeWeakTermPlus t ++ holeWeakTermPlus' xts [e]
 holeWeakTermPlus (_, WeakTermZeta h) = h : []
@@ -286,18 +252,6 @@ substWeakTermPlus sub (m, WeakTermPiElim e es) = do
   let e' = substWeakTermPlus sub e
   let es' = map (substWeakTermPlus sub) es
   (m, WeakTermPiElim e' es')
--- substWeakTermPlus sub (m, WeakTermSigma xts) = do
---   let xts' = substWeakTermPlus' sub xts
---   (m, WeakTermSigma xts')
--- substWeakTermPlus sub (m, WeakTermSigmaIntro t es) = do
---   let t' = substWeakTermPlus sub t
---   let es' = map (substWeakTermPlus sub) es
---   (m, WeakTermSigmaIntro t' es')
--- substWeakTermPlus sub (m, WeakTermSigmaElim t xts e1 e2) = do
---   let t' = substWeakTermPlus sub t
---   let e1' = substWeakTermPlus sub e1
---   let (xts', e2') = substWeakTermPlus'' sub xts e2
---   (m, WeakTermSigmaElim t' xts' e1' e2')
 substWeakTermPlus sub (m, WeakTermIter (mx, x, t) xts e) = do
   let t' = substWeakTermPlus sub t
   let sub' = filter (\(k, _) -> k /= x) sub
@@ -468,8 +422,8 @@ toText (_, WeakTermCase (e, _) cxtes) = do
     ("case" :
      toText e :
      (flip map cxtes $ \((c, xts), body) -> do
-        let xs = map (\(_, I (x, _), _) -> x) xts
-        showCons [showCons (asText (snd c) : xs), toText body]))
+        let xs = map (\(_, x, _) -> asText' x) xts
+        showCons [showCons (asText' (snd c) : xs), toText body]))
 
 inParen :: T.Text -> T.Text
 inParen s = "(" <> s <> ")"

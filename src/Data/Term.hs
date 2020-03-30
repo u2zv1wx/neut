@@ -21,9 +21,6 @@ data Term
       [IdentifierPlus]
       TermPlus
   | TermPiElim TermPlus [TermPlus]
-  -- | TermSigma [IdentifierPlus]
-  -- | TermSigmaIntro TermPlus [TermPlus]
-  -- | TermSigmaElim TermPlus [IdentifierPlus] TermPlus TermPlus
   | TermIter IdentifierPlus [IdentifierPlus] TermPlus
   | TermConst Identifier UnivParams
   | TermFloat16 Half
@@ -75,14 +72,6 @@ varTermPlus (_, TermPiElim e es) = do
   let xs1 = varTermPlus e
   let xs2 = concatMap varTermPlus es
   xs1 ++ xs2
--- varTermPlus (_, TermSigma xts) = varTermPlus' xts []
--- varTermPlus (_, TermSigmaIntro t es) = do
---   varTermPlus t ++ concatMap varTermPlus es
--- varTermPlus (_, TermSigmaElim t xts e1 e2) = do
---   let xs = varTermPlus t
---   let ys = varTermPlus e1
---   let zs = varTermPlus' xts [e2]
---   xs ++ ys ++ zs
 varTermPlus (_, TermIter (_, x, t) xts e) =
   varTermPlus t ++ filter (/= x) (varTermPlus' xts [e])
 varTermPlus (_, TermConst _ _) = []
@@ -145,18 +134,6 @@ substTermPlus sub (m, TermPiElim e es) = do
   let e' = substTermPlus sub e
   let es' = map (substTermPlus sub) es
   (m, TermPiElim e' es')
--- substTermPlus sub (m, TermSigma xts) = do
---   let xts' = substTermPlus' sub xts
---   (m, TermSigma xts')
--- substTermPlus sub (m, TermSigmaIntro t es) = do
---   let t' = substTermPlus sub t
---   let es' = map (substTermPlus sub) es
---   (m, TermSigmaIntro t' es')
--- substTermPlus sub (m, TermSigmaElim t xts e1 e2) = do
---   let t' = substTermPlus sub t
---   let e1' = substTermPlus sub e1
---   let (xts', e2') = substTermPlus'' sub xts e2
---   (m, TermSigmaElim t' xts' e1' e2')
 substTermPlus sub (m, TermIter (mx, x, t) xts e) = do
   let t' = substTermPlus sub t
   let sub' = filter (\(k, _) -> k /= asInt x) sub
@@ -241,18 +218,6 @@ weaken (m, TermPiElim e es) = do
   let e' = weaken e
   let es' = map weaken es
   (m, WeakTermPiElim e' es')
--- weaken (m, TermSigma xts) = do
---   (m, WeakTermSigma (weakenArgs xts))
--- weaken (m, TermSigmaIntro t es) = do
---   let t' = weaken t
---   let es' = map weaken es
---   (m, WeakTermSigmaIntro t' es')
--- weaken (m, TermSigmaElim t xts e1 e2) = do
---   let t' = weaken t
---   let xts' = weakenArgs xts
---   let e1' = weaken e1
---   let e2' = weaken e2
---   (m, WeakTermSigmaElim t' xts' e1' e2')
 weaken (m, TermIter (mx, x, t) xts e) = do
   let t' = weaken t
   let xts' = weakenArgs xts
