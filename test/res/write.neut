@@ -13,12 +13,14 @@
 
 (let test "あ")
 
+(use os)
+
 ;; こっちだとmalloc/freeがめっちゃ発生する。
-;; (begin
-;;   (let len (write hole stdout test 3))
-;;   (let len (write hole stdout test 3))
-;;   (let len (write hole stdout test 3))
-;;   len)
+(begin
+  (let len (write stdout test 3))
+  (let len (@os:write 3 stdout test 3))
+  (let len (write stdout test 3))
+  len)
 
 ;; (write hole stdout &test 3)
 
@@ -32,8 +34,12 @@
 ;;   (let len (os:write os:stdout &test 3))
 ;;   len) ;; ここでtestがfreeされる（直前のwriteでborrowされているので）
 
-(@os:write 3 os:stdout "あ" 3)
+;; (@os:write 3 os:stdout "あ" 3)
+;; (@os:write 3 os:stdout "あ" 3)
+;; (@os:write 3 os:stdout "あ" 3)
 
-(let a (os:write os:stdout &test 3))
-(let a (os:write os:stdout &test 3))
-(let a (os:write os:stdout &test 3))
+;; (let a (os:write os:stdout &test 3))
+;; (let a (os:write os:stdout &test 3))
+;; (let a (os:write os:stdout &test 3))
+
+;; (i64 0)
