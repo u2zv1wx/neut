@@ -44,6 +44,11 @@ elaborate stmt = do
 elaborateStmt :: WeakStmt -> WithEnv TermPlus
 elaborateStmt (WeakStmtReturn e) = do
   (e', _, _) <- infer e
+  -- cs <- gets constraintEnv
+  -- forM_ cs $ \(e1, e2) -> do
+  --   p "---------------"
+  --   p $ T.unpack $ toText e1
+  --   p $ T.unpack $ toText e2
   analyze >> synthesize >> refine
   checkUnivSanity
   elaborate' e'
