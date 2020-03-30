@@ -71,8 +71,12 @@ interpret (m, TreeNode ((_, TreeLeaf "sigma"):rest))
 interpret (m, TreeNode ((_, TreeLeaf "sigma-introduction"):es)) = do
   m' <- adjustPhase m
   es' <- mapM interpret es
-  h <- newHole m
-  sigmaIntro m' h es' -- return (m', WeakTermSigmaIntro h es')
+  p "sig-intro:"
+  tmp <- sigmaIntro m' es'
+  -- p $ T.unpack $ toText tmp
+  p' tmp
+  return tmp
+  -- sigmaIntro m' h es' -- return (m', WeakTermSigmaIntro h es')
 interpret (m, TreeNode ((_, TreeLeaf "sigma-elimination"):rest))
   | [(_, TreeNode xts), e1, e2] <- rest = do
     xts' <- mapM interpretIdentifierPlus xts
@@ -80,6 +84,8 @@ interpret (m, TreeNode ((_, TreeLeaf "sigma-elimination"):rest))
     e2' <- interpret e2
     m' <- adjustPhase m
     h <- newHole m'
+    p "sigelim:"
+    p $ T.unpack $ toText $ sigmaElim m' h xts' e1' e2'
     return $ sigmaElim m' h xts' e1' e2'
     -- return (m', WeakTermSigmaElim h xts' e1' e2')
   | otherwise = raiseSyntaxError m "(sigma-elimination (TREE*) TREE TREE)"
@@ -307,15 +313,20 @@ interpretBorrow e = do
   e' <- interpret e
   return (e', id)
 
-sigmaIntro :: Meta -> WeakTermPlus -> [WeakTermPlus] -> WithEnv WeakTermPlus
-sigmaIntro m t es = do
+sigmaIntro :: Meta -> [WeakTermPlus] -> WithEnv WeakTermPlus
+sigmaIntro m es = do
   z <- newNameWith'' "sigma"
+  let zv = (m, WeakTermUpsilon z)
   l <- newCount
   k <- newNameWith'' "sigma"
+  ts <- mapM (const (newHole m)) es
+  xs <- mapM (const (newNameWith'' "hole")) es
+  let xts = zipWith (\x t -> (m, x, t)) xs ts
+  let piType = (m, WeakTermPi [] xts zv)
   return
     ( m
     , WeakTermPiIntro
-        [(m, z, (m, WeakTermTau l)), (m, k, t)]
+        [(m, z, (m, WeakTermTau l)), (m, k, piType)]
         (m, WeakTermPiElim (m, WeakTermUpsilon k) es))
 
 --   return (m', WeakTermSigmaIntro h es')

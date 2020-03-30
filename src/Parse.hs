@@ -88,7 +88,7 @@ showCompInfo ((x, m):xms) = do
 parseForCompletion :: Path Abs File -> Line -> Column -> WithEnv CompInfo
 parseForCompletion inputPath l c = do
   content <- liftIO $ TIO.readFile $ toFilePath inputPath
-  s <- newNameWith' "cursor"
+  s <- newNameWith'' "cursor"
   case modifyFileForCompletion s content l c of
     Nothing -> return []
     Just (prefix, content') -> do

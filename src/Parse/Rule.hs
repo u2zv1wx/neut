@@ -86,7 +86,7 @@ toInductive ::
 toInductive ats bts connective@(m, a@(I (ai, _)), xts, _) = do
   formationRule <- formationRuleOf connective >>= ruleAsIdentPlus
   let cod = (m, WeakTermPiElim (m, WeakTermUpsilon a) (map toVar' xts))
-  -- z <- newNameWith' "_"
+  -- z <- newNameWith'' "_"
   -- let zt = (m, z, cod)
   -- (atsbts', cod') <- renameFormArgs (ats ++ bts) cod
   mls1 <- piUnivLevelsfrom (ats ++ bts) cod
