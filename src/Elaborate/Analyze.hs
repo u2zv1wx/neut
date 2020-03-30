@@ -16,8 +16,6 @@ import Data.Maybe
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.PQueue.Min as Q
 
--- import qualified Data.Set as S
--- import qualified Data.Text as T
 import Data.Basic
 import Data.Constraint
 import Data.Env
@@ -90,12 +88,6 @@ simp' (((_, WeakTermPiIntro xts body1@(m1, _)), e2@(_, _)):cs) = do
   let vs = map (\(m, x, _) -> (m, WeakTermUpsilon x)) xts
   simp $ (body1, (m1, WeakTermPiElim e2 vs)) : cs
 simp' ((e1, e2@(_, WeakTermPiIntro {})):cs) = simp' $ (e2, e1) : cs
--- simp' (((_, WeakTermSigma xts1), (_, WeakTermSigma xts2)):cs)
---   | length xts1 == length xts2 = do
---     simpBinder xts1 xts2
---     simp cs
--- simp' (((_, WeakTermSigmaIntro t1 es1), (_, WeakTermSigmaIntro t2 es2)):cs)
---   | length es1 == length es2 = simp $ (t1, t2) : zip es1 es2 ++ cs
 simp' (((m1, WeakTermIter xt1@(_, x1, _) xts1 e1), (m2, WeakTermIter xt2@(_, x2, _) xts2 e2)):cs)
   | x1 == x2
   , length xts1 == length xts2 = do
@@ -155,7 +147,6 @@ simp' ((e1@(m1, _), e2@(m2, _)):cs) = do
   let fmvs = catMaybes [ms1 >>= stuckReasonOf, ms2 >>= stuckReasonOf]
   sub <- gets substEnv
   cenv <- gets cacheEnv
-  -- pvenv <- gets patVarEnv
   let m = supMeta m1 m2
   case lookupAny fmvs sub of
     Just (h, e) -> do
@@ -171,22 +162,6 @@ simp' ((e1@(m1, _), e2@(m2, _)):cs) = do
         (Just (StuckPiElimUpsilon x1 ess1), Just (StuckPiElimUpsilon x2 ess2))
           | x1 == x2
           , Just pairList <- asPairList ess1 ess2 -> simp $ pairList ++ cs
-        -- (Just (StuckPiElimUpsilon x1@(I (_, i1)) []), _)
-        --   | i1 `S.member` pvenv
-        --   , occurCheck x1 (varWeakTermPlus e2) -> do
-        --     p $
-        --       "pat-subst: " <>
-        --       T.unpack (asText' x1) <> " ~> " <> T.unpack (toText e2')
-        --     modify (\env -> env {substEnv = IntMap.insert i1 e2' sub})
-        --     simp cs
-        -- (_, Just (StuckPiElimUpsilon x2@(I (_, i2)) []))
-        --   | i2 `S.member` pvenv
-        --   , occurCheck x2 (varWeakTermPlus e1) -> do
-        --     p $
-        --       "pat-subst: " <>
-        --       T.unpack (asText' x2) <> " ~> " <> T.unpack (toText e1')
-        --     modify (\env -> env {substEnv = IntMap.insert i2 e1' sub})
-        --     simp cs
         (Just (StuckPiElimConst x1 mx1 up1 mess1), _)
           | Just (Left (mBody, body)) <- IntMap.lookup (asInt x1) cenv -> do
             body' <- univInstWith up1 $ weaken (supMeta mx1 mBody, body)

@@ -263,25 +263,10 @@ infer' ctx (m, WeakTermCase (e, t) cxtes) = do
       cxttes' <-
         forM cxtes $ \(((mc, c), xts), body) -> do
           xts' <- inferPatArgs ctx xts
-          -- ienv <- gets impEnv
-          -- let imp = concat $ maybeToList $ IntMap.lookup (asInt c) ienv
-          -- xts' <- setupPatArgs mc imp xts >>= inferPatArgs ctx
-          -- xts'' <- inferPatArgs ctx xts'
           (tc, l) <- inferPattern mc ctx c xts'
           insConstraintEnv tc t'
           insLevelEQ l mlInd
-          -- let vs = map (\(mx, x, _) -> (mx, WeakTermUpsilon x)) xts''
-          -- let expCons = (m {metaIsExplicit = True}, WeakTermUpsilon c)
-          -- let app = (m, WeakTermPiElim expCons vs)
-          -- (_, appType, appLevel) <- infer' ctx app
-          p "additional:"
-          p' xts'
           (body', bodyType, bodyLevel) <- infer' ctx body
-          p "bodyType:"
-          p' bodyType
-          -- forM_ xts' insPatVarEnv
-          -- insConstraintEnv appType t'
-          -- insLevelEQ appLevel mlInd
           return ((((mc, c), xts'), body'), (bodyType, bodyLevel))
       let (cxtes', bodyTypeLevelList) = unzip cxttes'
       let (bodyTypeList, bodyLevelList) = unzip bodyTypeLevelList
@@ -316,21 +301,11 @@ inferPattern' [] [] cod = return cod
 inferPattern' ((mx, x, tx):xts) ((my, y, ty):yts) cod = do
   insConstraintEnv tx ty
   let varX = (supMeta mx my, WeakTermUpsilon x)
-  let yts' = substWeakTermPlus' [(y, varX)] yts
-  let cod' = substWeakTermPlus [(y, varX)] cod
+  let (yts', cod') = substWeakTermPlus'' [(y, varX)] yts cod
   inferPattern' xts yts' cod'
 inferPattern' _ _ _ =
   raiseCritical' "invalid argument(s) passed to Infer.inferPattern"
 
--- pattern argsの前にatsに対応するplaceholderを追加する
--- setupPatArgs :: Meta -> [Int] -> [IdentifierPlus] -> WithEnv [IdentifierPlus]
--- setupPatArgs _ [] xts = return xts
--- setupPatArgs m (_:is) xts = do
---   xts' <- setupPatArgs m is xts
---   h <- newHole m
---   x <- newNameWith'' "pat"
---   return $ (m, x, h) : xts'
--- ここで新しいContextも返す？
 inferPatArgs :: Context -> [IdentifierPlus] -> WithEnv [IdentifierPlus]
 inferPatArgs _ [] = return []
 inferPatArgs ctx ((mx, x, t):xts) = do
@@ -683,10 +658,6 @@ insLevelLT ml1 ml2 =
 insLevelEQ :: UnivLevelPlus -> UnivLevelPlus -> WithEnv ()
 insLevelEQ (UnivLevelPlus (_, l1)) (UnivLevelPlus (_, l2)) = do
   modify (\env -> env {equalityEnv = (l1, l2) : equalityEnv env})
-
-insPatVarEnv :: IdentifierPlus -> WithEnv ()
-insPatVarEnv (_, (I (_, i)), _) =
-  modify (\env -> env {patVarEnv = S.insert i (patVarEnv env)})
 
 univInst ::
      WeakTermPlus -> UnivLevel -> WithEnv (UnivParams, WeakTermPlus, UnivLevel)

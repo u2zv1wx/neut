@@ -68,7 +68,6 @@ data Env =
     , formationEnv :: IntMap.IntMap (Maybe WeakTermPlus)
     , labelEnv :: Map.HashMap T.Text [T.Text] -- "stream" ~> ["stream", "other-record-type", "head", "tail", "other-destructor"]
     , inductiveEnv :: RuleEnv -- "list" ~> (cons, Pi (A : tau). A -> list A -> list A)
-    -- , coinductiveEnv :: RuleEnv -- "tail" ~> (head, Pi (A : tau). stream A -> A)
     , introEnv :: S.Set Int -- set of the names of constructors (e.g. ["nil", "cons", "zero", "succ", ...] (as int))
     , nonCandSet :: S.Set T.Text
     -- elaborate
@@ -83,7 +82,6 @@ data Env =
     , levelEnv :: [LevelConstraint]
     , substEnv :: IntMap.IntMap WeakTermPlus -- metavar ~> beta-equivalent weakterm
     , zetaEnv :: IntMap.IntMap (WeakTermPlus, WeakTermPlus, UnivLevelPlus)
-    , patVarEnv :: S.Set Int
     -- clarify
     , cacheEnv :: IntMap.IntMap (Either TermPlus CodePlus)
     , codeEnv :: Map.HashMap T.Text Definition -- f ~> thunk (lam (x1 ... xn) e)
@@ -120,7 +118,6 @@ initialEnv =
     , namespace = []
     , formationEnv = IntMap.empty
     , inductiveEnv = Map.empty
-    -- , coinductiveEnv = Map.empty
     , introEnv = S.empty
     , nonCandSet = S.empty
     , labelEnv = Map.empty
@@ -143,7 +140,6 @@ initialEnv =
     , levelEnv = []
     , substEnv = IntMap.empty
     , zetaEnv = IntMap.empty
-    , patVarEnv = S.empty
     , nameSet = S.empty
     , nopFreeSet = S.empty
     }
