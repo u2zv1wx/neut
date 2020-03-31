@@ -127,13 +127,13 @@ simp' ((e1@(m1, _), e2@(m2, _)):cs) = do
   let ms1 = asStuckedTerm e1
   let ms2 = asStuckedTerm e2
   -- list of stuck reasons (fmvs: free meta-variables)
-  let fmvs = catMaybes [ms1 >>= stuckReasonOf, ms2 >>= stuckReasonOf]
   sub <- gets substEnv
   cenv <- gets cacheEnv
   let m = supMeta m1 m2
   let hs1 = holeWeakTermPlus e1
   let hs2 = holeWeakTermPlus e2
-  case lookupAny (hs1 ++ hs2) sub of
+  let fmvs = hs1 ++ hs2
+  case lookupAny fmvs sub of
     Just (h, e) -> do
       let e1' = substWeakTermPlus [(h, e)] (m, snd e1)
       let e2' = substWeakTermPlus [(h, e)] (m, snd e2)
@@ -210,7 +210,7 @@ simp' ((e1@(m1, _), e2@(m2, _)):cs) = do
           | xs2 <- concatMap getVarList ies2
           , occurCheck h2 hs1
           , [] <- includeCheck xs2 e1 -> simpFlexRigid h2 ies2 e2' e1' fmvs cs
-        _ -> simpOther e1 e2 (hs1 ++ hs2) cs
+        _ -> simpOther e1 e2 fmvs cs
 
 simpBinder :: [IdentifierPlus] -> [IdentifierPlus] -> WithEnv ()
 simpBinder xts1 xts2 = simpBinder' [] xts1 xts2
@@ -336,13 +336,6 @@ asStuckedTerm (m, WeakTermPiElim e es) =
     Just (StuckPiElimUpsilon x ess) -> Just $ StuckPiElimUpsilon x $ ess ++ [es]
     Nothing -> Nothing
 asStuckedTerm _ = Nothing
-
-stuckReasonOf :: Stuck -> Maybe Hole
-stuckReasonOf (StuckPiElimUpsilon _ _) = Nothing
-stuckReasonOf (StuckPiElimZeta h _) = Just h
-stuckReasonOf (StuckPiElimZetaStrict h _) = Just h
-stuckReasonOf (StuckPiElimIter {}) = Nothing
-stuckReasonOf (StuckPiElimConst {}) = Nothing
 
 occurCheck :: Identifier -> [Identifier] -> Bool
 occurCheck h fmvs = h `notElem` fmvs
