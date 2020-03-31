@@ -32,9 +32,10 @@ synthesize = do
       | Just (h, e) <- lookupAny hs sub -> resolveStuck e1 e2 h e
     Just (Enriched _ _ (ConstraintDelta iter mess1 mess2)) ->
       resolveDelta iter mess1 mess2
-    Just (Enriched _ _ (ConstraintQuasiPattern m ess e)) ->
+    Just (Enriched _ _ (ConstraintQuasiPattern m ess e)) -> do
       resolvePiElim m ess e
-    Just (Enriched _ _ (ConstraintFlexRigid m ess e)) -> resolvePiElim m ess e
+    Just (Enriched _ _ (ConstraintFlexRigid m ess e)) -> do
+      resolvePiElim m ess e
     Just (Enriched _ _ _) -> resolveOther $ Q.toList q
 
 -- e1だけがstuckしているとき、e2だけがstuckしているとき、両方がstuckしているときをそれぞれ
@@ -116,7 +117,12 @@ asAnalyzable (Enriched cs ms _) = Enriched cs ms ConstraintAnalyzable
 chain :: Meta -> [WithEnv a] -> WithEnv a
 chain m [] = raiseError m $ "cannot synthesize(chain)."
 chain _ [e] = e
-chain m (e:es) = catchError e (const $ chain m es)
+chain m (e:es) =
+  catchError
+    e
+    (const $ do
+       p "trying another chain"
+       chain m es)
 
 deleteMin :: WithEnv ()
 deleteMin = do

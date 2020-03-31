@@ -131,7 +131,9 @@ simp' ((e1@(m1, _), e2@(m2, _)):cs) = do
   sub <- gets substEnv
   cenv <- gets cacheEnv
   let m = supMeta m1 m2
-  case lookupAny fmvs sub of
+  let hs1 = holeWeakTermPlus e1
+  let hs2 = holeWeakTermPlus e2
+  case lookupAny (hs1 ++ hs2) sub of
     Just (h, e) -> do
       let e1' = substWeakTermPlus [(h, e)] (m, snd e1)
       let e2' = substWeakTermPlus [(h, e)] (m, snd e2)
@@ -139,8 +141,6 @@ simp' ((e1@(m1, _), e2@(m2, _)):cs) = do
     Nothing -> do
       let e1' = (m, snd e1)
       let e2' = (m, snd e2)
-      let hs1 = holeWeakTermPlus e1
-      let hs2 = holeWeakTermPlus e2
       case (ms1, ms2) of
         (Just (StuckPiElimUpsilon x1 ess1), Just (StuckPiElimUpsilon x2 ess2))
           | x1 == x2
@@ -210,7 +210,7 @@ simp' ((e1@(m1, _), e2@(m2, _)):cs) = do
           | xs2 <- concatMap getVarList ies2
           , occurCheck h2 hs1
           , [] <- includeCheck xs2 e1 -> simpFlexRigid h2 ies2 e2' e1' fmvs cs
-        _ -> simpOther e1 e2 fmvs cs
+        _ -> simpOther e1 e2 (hs1 ++ hs2) cs
 
 simpBinder :: [IdentifierPlus] -> [IdentifierPlus] -> WithEnv ()
 simpBinder xts1 xts2 = simpBinder' [] xts1 xts2
