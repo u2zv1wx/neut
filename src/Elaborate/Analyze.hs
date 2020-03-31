@@ -39,14 +39,10 @@ simp' (((m1, WeakTermTau l1), (m2, WeakTermTau l2)):cs) = do
   insLevelEQ (UnivLevelPlus (m1, l1)) (UnivLevelPlus (m2, l2))
   simp cs
 simp' (((m1, WeakTermPi xts1 cod1), (m2, WeakTermPi xts2 cod2)):cs)
-  | length xts1 == length xts2
-    -- let us1 = map asUniv mls1
-    -- let us2 = map asUniv mls2
-   = do
+  | length xts1 == length xts2 = do
     xt1 <- asIdentPlus m1 cod1
     xt2 <- asIdentPlus m2 cod2
     simpBinder (xts1 ++ [xt1]) (xts2 ++ [xt2])
-    -- simp $ zip us1 us2 ++ cs
     simp cs
 simp' (((m1, WeakTermPi xts1 cod1), (m2, WeakTermPiPlus _ xts2 cod2)):cs)
   | length xts1 == length xts2 = do
