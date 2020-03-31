@@ -14,7 +14,11 @@
   (some ((x a))
     (option a)))
 
-(definition map ([a tau] [b tau] (f (hom a b)) (m (option a)))
+(definition map
+  ([a tau]
+   [b tau]
+   (f (hom a b))
+   (m (option a)))
   (witness (option b)
     (case m
       ((none)
@@ -22,11 +26,17 @@
       ((some x)
         (some (f x))))))
 
-(definition return ([a tau] (x a))
+(definition return
+  ([a tau]
+   (x a))
   (witness (option a)
     (some x)))
 
-(definition bind ([a tau] [b tau] (m (option a)) (k (hom a (option b))))
+(definition bind
+  ([a tau]
+   [b tau]
+   (m (option a))
+   (k (hom a (option b))))
   (witness (option b)
     (case m
       ((none)
@@ -42,7 +52,6 @@
       ((some y)
         y))))
 
-
 ;; (definition witness-functor
 ;;   (witness (functor option)
 ;;     (record (functor option)
@@ -52,8 +61,12 @@
   (witness (functor option)
     (functor:unfold
       functor
-      (lambda ((_ (functor option))) @option:map)
-      (unsafe:cast (hom tau tau) (functor option) (lambda (x) x)))))
+      (lambda ((_ (functor option)))
+        @option:map)
+      (unsafe:cast
+        (hom tau tau)
+        (functor option)
+        (lambda (x) x)))))
 
 ;; (definition witness-monad
 ;;   (witness (monad option)
