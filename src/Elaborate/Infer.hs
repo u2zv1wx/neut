@@ -405,59 +405,6 @@ supplyImplicit' m idx len is xts
       else supplyImplicit' m (idx + 1) len is xts
   | otherwise = return xts
 
--- inferImplicit ::
---      Context
---   -> Meta
---   -> Identifier
---   -> [Int]
---   -> WithEnv (WeakTermPlus, WeakTermPlus, UnivLevelPlus)
--- inferImplicit ctx m x is = do
---   mt <- lookupTypeEnv x
---   case mt of
---     Nothing ->
---       raiseCritical m $
---       "the type of `" <>
---       asText x <>
---       "` is supposed to be an implicit type, but its type is not even in the type environment"
---     Just (t@(_, TermPi {}), UnivLevelPlus (_, l)) -> do
---       (up, (_, WeakTermPi _ xts cod), l') <- instantiate m t l -- irrefutable pat
---       let xtis = zip xts [0 ..]
---       -- let xtis = zip (zip xts mls) [0 ..]
---       let vs = map (\(_, y, _) -> (m, WeakTermUpsilon y)) xts
---       let app = (m, WeakTermPiElim (m, WeakTermConst x up) vs)
---       (xtis', e', cod') <- inferImplicit' ctx m is xtis app cod
---       p "xtis:"
---       p' xtis
---       p "xtis':"
---       p' xtis'
---       -- let mls' = map fst $ filter (\(_, k) -> k `notElem` is) $ zip mls [0 ..]
---       let piType = (m, weakTermPi xtis' cod')
---       return ((m, WeakTermPiIntro xtis' e'), piType, l')
---     Just (t, _) ->
---       raiseCritical m $
---       "the type of `" <>
---       asText x <> "` must be a Pi-type, but is:\n" <> toText (weaken t)
--- inferImplicit' ::
---      Context
---   -> Meta
---   -> [Int]
---   -> [(IdentifierPlus, Int)]
---   -> WeakTermPlus
---   -> WeakTermPlus
---   -> WithEnv ([IdentifierPlus], WeakTermPlus, WeakTermPlus)
--- inferImplicit' _ _ _ [] e cod = return ([], e, cod)
--- inferImplicit' ctx m is ((c@(_, x, t), i):xtis) e cod
---   | i `elem` is = do
---     (app, higherApp, _) <- newHoleInCtx ctx m
---     p "ins:"
---     p' (higherApp, t)
---     insConstraintEnv higherApp t
---     let (xts, ks) = unzip xtis
---     let (xts', e', cod') = substWeakTermPlus''' [(x, app)] xts e cod
---     inferImplicit' ctx m is (zip xts' ks) e' cod'
---   | otherwise = do
---     (xtis', e', cod') <- inferImplicit' (ctx ++ [c]) m is xtis e cod
---     return ((m, x, t) : xtis', e', cod')
 inferType' :: Context -> WeakTermPlus -> WithEnv (WeakTermPlus, UnivLevelPlus)
 inferType' ctx t = do
   (t', u, l) <- infer' ctx t

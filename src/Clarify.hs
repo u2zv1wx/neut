@@ -24,8 +24,6 @@ import Data.Env
 import Data.Term
 import Reduce.Term
 
-import qualified Data.WeakTerm as WT
-
 clarify :: TermPlus -> WithEnv CodePlus
 clarify e = do
   tenv <- gets typeEnv
@@ -138,9 +136,7 @@ clarifyCase ::
   -> Identifier
   -> Identifier
   -> WithEnv CodePlus
-clarifyCase tenv m cxtes typeVarName envVarName lamVarName
-  -- cxtes' <- mapM supplyImplicit cxtes
- = do
+clarifyCase tenv m cxtes typeVarName envVarName lamVarName = do
   fvs <- constructCaseFVS tenv cxtes m typeVarName envVarName
   es <- (mapM (clarifyCase' tenv m envVarName) >=> alignFVS tenv m fvs) cxtes
   (y, e', yVar) <- clarifyPlus tenv (m, TermUpsilon lamVarName)
@@ -148,35 +144,6 @@ clarifyCase tenv m cxtes typeVarName envVarName lamVarName
   let cs = map (\cxte -> fst $ fst cxte) cxtes
   return $ bindLet [(y, e')] (m, CodeCase sub yVar (zip cs es))
 
--- supplyImplicit :: Clause -> WithEnv Clause
--- supplyImplicit (((m, c), xts), body) = do
---   ienv <- gets impEnv
---   t <- lookupTypeEnv' m c
---   case (t, IntMap.lookup (asInt c) ienv) of
---     ((_, TermPi _ yts _), Just is) -> do
---       let argLen = length yts
---       xts' <- supplyImplicit' 0 argLen is yts xts
---       return (((m, c), xts'), body)
---     (_, Nothing) -> return (((m, c), xts), body)
---     _ ->
---       raiseCritical m $
---       "the type of " <>
---       asText' c <> " must be a pi-type, but is:\n" <> WT.toText (weaken t)
--- supplyImplicit' ::
---      Int
---   -> Int
---   -> [Int]
---   -> [IdentifierPlus]
---   -> [IdentifierPlus]
---   -> WithEnv [IdentifierPlus]
--- supplyImplicit' idx len is yts xts
---   | idx < len = do
---     if idx `elem` is
---       then do
---         xts' <- supplyImplicit' (idx + 1) len is yts xts
---         return $ yts !! idx : xts'
---       else supplyImplicit' (idx + 1) len is yts xts
---   | otherwise = return xts
 constructCaseFVS ::
      TypeEnv
   -> [Clause]
