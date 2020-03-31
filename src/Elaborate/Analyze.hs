@@ -212,14 +212,17 @@ simp' ((e1@(m1, _), e2@(m2, _)):cs) = do
           , [] <- includeCheck xs2 e1 -> simpFlexRigid h2 ies2 e2' e1' fmvs cs
         _ -> simpOther e1 e2 fmvs cs
 
--- subも引数にもつようにしてsimpと同時にsubstを行うようにしたほうが高速
 simpBinder :: [IdentifierPlus] -> [IdentifierPlus] -> WithEnv ()
-simpBinder ((m1, x1, t1):xts1) ((m2, x2, t2):xts2) = do
-  simp [(t1, t2)]
+simpBinder xts1 xts2 = simpBinder' [] xts1 xts2
+
+simpBinder' ::
+     SubstWeakTerm -> [IdentifierPlus] -> [IdentifierPlus] -> WithEnv ()
+simpBinder' sub ((m1, x1, t1):xts1) ((m2, x2, t2):xts2) = do
+  simp [(t1, substWeakTermPlus sub t2)]
   let var1 = (supMeta m1 m2, WeakTermUpsilon x1)
-  let xts2' = substWeakTermPlus' [(x2, var1)] xts2
-  simpBinder xts1 xts2'
-simpBinder _ _ = return ()
+  let sub' = (x2, var1) : sub
+  simpBinder' sub' xts1 xts2
+simpBinder' _ _ _ = return ()
 
 simpPattern ::
      Identifier
