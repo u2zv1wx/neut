@@ -252,7 +252,7 @@ infer' ctx (m, WeakTermCase (e, t) cxtes) = do
     else do
       cxttes' <-
         forM cxtes $ \(((mc, c), xts), body) -> do
-          xts' <- inferPatArgs ctx xts
+          xts' <- supplyImplicit mc c xts >>= inferPatArgs ctx
           -- fixme: inferSymbolからimplicitの議論を消したのでcaseのほうでも処理を更新する必要あり。
           (tc, l) <- inferPattern mc c xts'
           insConstraintEnv tc t'
@@ -351,15 +351,7 @@ inferExternal m x comp = do
 
 inferSymbol ::
      Meta -> Identifier -> WithEnv (WeakTermPlus, WeakTermPlus, UnivLevelPlus)
-inferSymbol m x = inferSymbol' m x
-  -- ienv <- gets impEnv
-  -- case (metaIsExplicit m, IntMap.lookup (asInt x) ienv) of
-  --   (False, Just is) -> inferImplicit ctx m x is
-  --   _ -> inferSymbol' m x
-
-inferSymbol' ::
-     Meta -> Identifier -> WithEnv (WeakTermPlus, WeakTermPlus, UnivLevelPlus)
-inferSymbol' m x = do
+inferSymbol m x = do
   mt <- lookupTypeEnv x
   case mt of
     Nothing -> do
@@ -377,6 +369,34 @@ instantiate ::
 instantiate m t l = do
   (up, (_, t'), l') <- univInst (weaken t) l
   return (up, (m, t'), UnivLevelPlus (m, l'))
+
+supplyImplicit ::
+     Meta -> Identifier -> [IdentifierPlus] -> WithEnv [IdentifierPlus]
+supplyImplicit m c xts = do
+  ienv <- gets impEnv
+  t <- lookupTypeEnv' m c
+  case (t, IntMap.lookup (asInt c) ienv) of
+    ((_, TermPi _ yts _), Just is) -> do
+      let argLen = length yts
+      supplyImplicit' m 0 argLen is xts
+    (_, Nothing) -> return xts
+    _ ->
+      raiseCritical m $
+      "the type of " <>
+      asText' c <> " must be a pi-type, but is:\n" <> toText (weaken t)
+
+supplyImplicit' ::
+     Meta -> Int -> Int -> [Int] -> [IdentifierPlus] -> WithEnv [IdentifierPlus]
+supplyImplicit' m idx len is xts
+  | idx < len = do
+    if idx `elem` is
+      then do
+        xts' <- supplyImplicit' m (idx + 1) len is xts
+        h <- newNameWith' "pat"
+        t <- newHole m
+        return $ (m, h, t) : xts'
+      else supplyImplicit' m (idx + 1) len is xts
+  | otherwise = return xts
 
 -- inferImplicit ::
 --      Context

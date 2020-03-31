@@ -62,9 +62,9 @@ elaborateStmt (WeakStmtLet m (mx, x@(I (_, i)), t) e cont) = do
   analyze >> synthesize >> refine >> cleanup
   e'' <- elaborate' e'
   t'' <- reduceTermPlus <$> elaborate' t'
-  p "--------------"
-  p $ T.unpack (asText' x) <> " : " <> T.unpack (toText (weaken t''))
-  p $ T.unpack (toText $ weaken e'')
+  -- p "--------------"
+  -- p $ T.unpack (asText' x) <> " : " <> T.unpack (toText (weaken t''))
+  -- p $ T.unpack (toText $ weaken e'')
   insTypeEnv x t'' mlt
   modify (\env -> env {cacheEnv = IntMap.insert i (Left e'') (cacheEnv env)})
   -- p "done"
@@ -72,8 +72,9 @@ elaborateStmt (WeakStmtLet m (mx, x@(I (_, i)), t) e cont) = do
   x' <- newNameWith x
   let c = (m, TermConst x emptyUP)
   return (m, TermPiElim (m, TermPiIntro [(mx, x', t'')] cont') [c])
-elaborateStmt (WeakStmtLetWT m (mx, x@(I (_, i)), t) e cont) = do
-  p' x
+elaborateStmt (WeakStmtLetWT m (mx, x@(I (_, i)), t) e cont)
+  -- p' x
+ = do
   (t', mlt) <- inferType t
   analyze >> synthesize >> refine >> cleanup
   e' <- elaborate' e -- `e` is supposed to be well-typed
