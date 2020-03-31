@@ -773,18 +773,3 @@ levelInst l = do
       let s = S.fromList [l, l']
       modify (\env -> env {univInstEnv = IntMap.insertWith S.union l s uienv})
       return l'
--- substWeakTermPlus''' ::
---      SubstWeakTerm
---   -> [IdentifierPlus]
---   -> WeakTermPlus
---   -> WeakTermPlus
---   -> ([IdentifierPlus], WeakTermPlus, WeakTermPlus)
--- substWeakTermPlus''' sub [] e1 e2 = do
---   let e1' = substWeakTermPlus sub e1
---   let e2' = substWeakTermPlus sub e2
---   ([], e1', e2')
--- substWeakTermPlus''' sub ((m, x, t):xts) e1 e2 = do
---   let sub' = filter (\(k, _) -> k /= x) sub
---   let (xts', e1', e2') = substWeakTermPlus''' sub' xts e1 e2
---   let t' = substWeakTermPlus sub t
---   ((m, x, t') : xts', e1', e2')
