@@ -13,9 +13,9 @@
 
 (definition print-string ((str string))
   (witness (product string u64)
-    (destruct str (n content)
+    (destruct str ((n u64) (content (array n u8)))
       (let len (write stdout &content 3))
-        (tuple (tuple n content) len))))
+      (tuple (tuple n content) len))))
 
 ;; (definition print-string ((str string))
 ;;   (destruct str (n content)

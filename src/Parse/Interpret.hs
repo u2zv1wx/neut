@@ -221,6 +221,9 @@ interpret (m, TreeNode ((_, TreeLeaf "record"):rest))
     let codType' = (m, WeakTermPiElim (m, WeakTermUpsilon ai) args)
     es <- cocaseAsSigmaIntro m a codType' [((ai, args), clauseList')]
     let f = (m', WeakTermUpsilon $ asIdent $ a <> ":unfold")
+    p "record:"
+    p' (m', WeakTermPiElim f es)
+    _ <- error "stop"
     return (m', WeakTermPiElim f es)
     -- return (m', WeakTermSigmaIntro codType' es)
   | otherwise = raiseSyntaxError m "(record TREE TREE*)"
@@ -489,6 +492,8 @@ cocaseAsSigmaIntro m name codType cocaseClauseList = do
   let aes = map (headNameOf m) cocaseClauseList
   bes <- asLamClauseList m cocaseClauseList
   lenv <- gets labelEnv
+  eenv <- gets enumEnv
+  p' $ Map.lookup name eenv
   case Map.lookup name lenv of
     Nothing -> raiseError m $ "no such coinductive type defined: " <> name
     Just labelList -> do

@@ -14,14 +14,6 @@
         ((new-env s) (val a))
         (tuple new-env (f val))))))
 
-;; (definition map ([s tau] [a tau] [b tau] (f (hom a b)) (m (state s a)))
-;;   (witness (state s b)
-;;     (lambda ((env s))
-;;       (destruct (m env)
-;;         ((new-env s) (val a))
-;;         (witness (product s b)
-;;           (tuple new-env (f val)))))))
-
 (definition return ([s tau] [a tau] (x a))
   (witness (state s a)
     (lambda ((env s))

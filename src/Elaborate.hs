@@ -39,6 +39,12 @@ import qualified Data.UnionFind as UF
 elaborate :: WeakStmt -> WithEnv TermPlus
 elaborate stmt = do
   tmp <- reduceTermPlus <$> elaborateStmt stmt
+  -- _ <- error "stop."
+  -- p "elaborated:"
+  -- p $ T.unpack $ toText (weaken tmp)
+  -- p "tenv:"
+  -- tenv <- gets typeEnv
+  -- p' tenv
   return tmp
 
 elaborateStmt :: WeakStmt -> WithEnv TermPlus
@@ -56,13 +62,18 @@ elaborateStmt (WeakStmtLet m (mx, x@(I (_, i)), t) e cont) = do
   analyze >> synthesize >> refine >> cleanup
   e'' <- elaborate' e'
   t'' <- reduceTermPlus <$> elaborate' t'
+  p "--------------"
+  p $ T.unpack (asText' x) <> " : " <> T.unpack (toText (weaken t''))
+  p $ T.unpack (toText $ weaken e'')
   insTypeEnv x t'' mlt
   modify (\env -> env {cacheEnv = IntMap.insert i (Left e'') (cacheEnv env)})
+  -- p "done"
   cont' <- elaborateStmt cont
   x' <- newNameWith x
   let c = (m, TermConst x emptyUP)
   return (m, TermPiElim (m, TermPiIntro [(mx, x', t'')] cont') [c])
 elaborateStmt (WeakStmtLetWT m (mx, x@(I (_, i)), t) e cont) = do
+  p' x
   (t', mlt) <- inferType t
   analyze >> synthesize >> refine >> cleanup
   e' <- elaborate' e -- `e` is supposed to be well-typed

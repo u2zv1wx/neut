@@ -15,6 +15,7 @@ import Data.Maybe
 
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.PQueue.Min as Q
+import qualified Data.Text as T
 
 import Data.Basic
 import Data.Constraint
@@ -67,10 +68,10 @@ simp' (((m1, WeakTermPiIntroPlus ind1 (name1, args11, args12) xts1 e1), (m2, Wea
   , length args12 == length args22 = do
     simpBinder (args11 ++ args12) (args21 ++ args22)
     simp $ ((m1, WeakTermPiIntro xts1 e1), (m2, WeakTermPiIntro xts2 e2)) : cs
-simp' (((_, WeakTermPiIntro xts body1@(m1, _)), e2@(_, _)):cs) = do
-  let vs = map (\(m, x, _) -> (m, WeakTermUpsilon x)) xts
-  simp $ (body1, (m1, WeakTermPiElim e2 vs)) : cs
-simp' ((e1, e2@(_, WeakTermPiIntro {})):cs) = simp' $ (e2, e1) : cs
+-- simp' (((_, WeakTermPiIntro xts body1@(m1, _)), e2@(_, _)):cs) = do
+--   let vs = map (\(m, x, _) -> (m, WeakTermUpsilon x)) xts
+--   simp $ (body1, (m1, WeakTermPiElim e2 vs)) : cs
+-- simp' ((e1, e2@(_, WeakTermPiIntro {})):cs) = simp' $ (e2, e1) : cs
 simp' (((m1, WeakTermIter xt1@(_, x1, _) xts1 e1), (m2, WeakTermIter xt2@(_, x2, _) xts2 e2)):cs)
   | x1 == x2
   , length xts1 == length xts2 = do
@@ -234,6 +235,7 @@ simpPattern ::
 simpPattern h1@(I (_, i)) ies1 _ e2 cs = do
   xss <- mapM toVarList ies1
   let lam = bindFormalArgs e2 xss
+  -- p $ "resolve: " <> T.unpack (asText' h1) <> " ~> " <> T.unpack (toText lam)
   modify (\env -> env {substEnv = IntMap.insert i lam (substEnv env)})
   visit h1
   simp cs

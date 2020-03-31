@@ -354,9 +354,10 @@ toText (_, WeakTermUpsilon x) = asText' x
 toText (_, WeakTermPi Nothing xts t) = do
   let argStr = inParen $ showItems $ map showArg xts
   showCons ["Π", argStr, toText t]
-toText (_, WeakTermPi (Just _) xts cod) = do
-  let argStr = inParen $ showItems $ map showArg xts
-  showCons ["Π+", argStr, toText cod]
+toText (_, WeakTermPi (Just _) _ cod) = do
+  toText cod
+  -- let argStr = inParen $ showItems $ map showArg xts
+  -- showCons ["Π+", argStr, toText cod]
   -- toText cod -- Pi{nat} (...). (...) ~> nat
 -- toText (_, WeakTermPiPlus _ _ _ cod) = toText cod -- Pi{nat} (...). (...) ~> nat
 -- toText (_, WeakTermPiPlus name _ _ _) = name -- Pi{nat} (...). (...) ~> nat
