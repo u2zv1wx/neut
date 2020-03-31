@@ -286,8 +286,7 @@ unaryOpToType m op = do
   cod' <- lowTypeToType m cod
   x <- newNameWith' "arg"
   let xts = [(m, x, dom')]
-  mls <- piUnivLevelsfrom xts cod'
-  return (m, TermPi mls xts cod')
+  return (m, TermPi xts cod')
 
 binaryOpToType :: Meta -> BinaryOp -> WithEnv TermPlus
 binaryOpToType m op = do
@@ -297,8 +296,7 @@ binaryOpToType m op = do
   x1 <- newNameWith' "arg"
   x2 <- newNameWith' "arg"
   let xts = [(m, x1, dom'), (m, x2, dom')]
-  mls <- piUnivLevelsfrom xts cod'
-  return (m, TermPi mls xts cod')
+  return (m, TermPi xts cod')
 
 arrayAccessToType :: Meta -> LowType -> WithEnv TermPlus
 arrayAccessToType m lowType = do
@@ -316,8 +314,7 @@ arrayAccessToType m lowType = do
   -- let cod = (m, TermSigma [(m, x4, arr), (m, x5, t)])
   cod <- termSigma m [(m, x4, arr), (m, x5, t)]
   -- let cod = (m, termSigma [(m, x4, arr), (m, x5, t)])
-  mls <- piUnivLevelsfrom xts cod
-  return (m, TermPi mls xts cod)
+  return (m, TermPi xts cod)
 
 weakTermSigma :: Meta -> [Data.WeakTerm.IdentifierPlus] -> WithEnv WeakTermPlus
 weakTermSigma m xts = do
@@ -325,10 +322,8 @@ weakTermSigma m xts = do
   let vz = (m, WeakTermUpsilon z)
   k <- newNameWith'' "sigma"
   l <- newCount
-  mls2 <- piUnivLevelsfrom xts vz
-  let yts = [(m, z, (m, WeakTermTau l)), (m, k, (m, WeakTermPi mls2 xts vz))]
-  mls1 <- piUnivLevelsfrom yts vz
-  return (m, WeakTermPi mls1 yts vz)
+  let yts = [(m, z, (m, WeakTermTau l)), (m, k, (m, WeakTermPi xts vz))]
+  return (m, WeakTermPi yts vz)
 
 termSigma :: Meta -> [Data.Term.IdentifierPlus] -> WithEnv TermPlus
 termSigma m xts = do
@@ -336,10 +331,8 @@ termSigma m xts = do
   let vz = (m, TermUpsilon z)
   k <- newNameWith'' "sigma"
   l <- newCount
-  mls2 <- piUnivLevelsfrom xts vz
-  let yts = [(m, z, (m, TermTau l)), (m, k, (m, TermPi mls2 xts vz))]
-  mls1 <- piUnivLevelsfrom yts vz
-  return (m, TermPi mls1 yts vz)
+  let yts = [(m, z, (m, TermTau l)), (m, k, (m, TermPi xts vz))]
+  return (m, TermPi yts vz)
 
 insEnumEnv :: Meta -> T.Text -> [(T.Text, Int)] -> WithEnv ()
 insEnumEnv m name xis = do

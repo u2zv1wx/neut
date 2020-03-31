@@ -11,8 +11,8 @@ import Data.Basic
 data WeakTerm
   = WeakTermTau UnivLevel
   | WeakTermUpsilon Identifier
-  | WeakTermPi [UnivLevelPlus] [IdentifierPlus] WeakTermPlus
-  | WeakTermPiPlus T.Text [UnivLevelPlus] [IdentifierPlus] WeakTermPlus
+  | WeakTermPi [IdentifierPlus] WeakTermPlus
+  | WeakTermPiPlus T.Text [IdentifierPlus] WeakTermPlus
   | WeakTermPiIntro [IdentifierPlus] WeakTermPlus
   | WeakTermPiIntroNoReduce [IdentifierPlus] WeakTermPlus
   | WeakTermPiIntroPlus
@@ -130,8 +130,8 @@ data WeakStmt
 varWeakTermPlus :: WeakTermPlus -> [Identifier]
 varWeakTermPlus (_, WeakTermTau _) = []
 varWeakTermPlus (_, WeakTermUpsilon x) = x : []
-varWeakTermPlus (_, WeakTermPi _ xts t) = varWeakTermPlus' xts [t]
-varWeakTermPlus (_, WeakTermPiPlus _ _ xts t) = varWeakTermPlus' xts [t]
+varWeakTermPlus (_, WeakTermPi xts t) = varWeakTermPlus' xts [t]
+varWeakTermPlus (_, WeakTermPiPlus _ xts t) = varWeakTermPlus' xts [t]
 varWeakTermPlus (_, WeakTermPiIntro xts e) = varWeakTermPlus' xts [e]
 varWeakTermPlus (_, WeakTermPiIntroNoReduce xts e) = varWeakTermPlus' xts [e]
 varWeakTermPlus (_, WeakTermPiIntroPlus _ _ xts e) = varWeakTermPlus' xts [e]
@@ -181,8 +181,8 @@ varWeakTermPlus' ((_, x, t):xts) es = do
 holeWeakTermPlus :: WeakTermPlus -> [Hole]
 holeWeakTermPlus (_, WeakTermTau _) = []
 holeWeakTermPlus (_, WeakTermUpsilon _) = []
-holeWeakTermPlus (_, WeakTermPi _ xts t) = holeWeakTermPlus' xts [t]
-holeWeakTermPlus (_, WeakTermPiPlus _ _ xts t) = holeWeakTermPlus' xts [t]
+holeWeakTermPlus (_, WeakTermPi xts t) = holeWeakTermPlus' xts [t]
+holeWeakTermPlus (_, WeakTermPiPlus _ xts t) = holeWeakTermPlus' xts [t]
 holeWeakTermPlus (_, WeakTermPiIntro xts e) = holeWeakTermPlus' xts [e]
 holeWeakTermPlus (_, WeakTermPiIntroNoReduce xts e) = holeWeakTermPlus' xts [e]
 holeWeakTermPlus (_, WeakTermPiIntroPlus {}) = []
@@ -230,12 +230,12 @@ substWeakTermPlus sub e1@(_, WeakTermUpsilon x) = do
   case lookup x sub of
     Nothing -> e1
     Just e2@(_, e) -> (supMeta (metaOf e1) (metaOf e2), e)
-substWeakTermPlus sub (m, WeakTermPi mls xts t) = do
+substWeakTermPlus sub (m, WeakTermPi xts t) = do
   let (xts', t') = substWeakTermPlus'' sub xts t
-  (m, WeakTermPi mls xts' t')
-substWeakTermPlus sub (m, WeakTermPiPlus name mls xts t) = do
+  (m, WeakTermPi xts' t')
+substWeakTermPlus sub (m, WeakTermPiPlus name xts t) = do
   let (xts', t') = substWeakTermPlus'' sub xts t
-  (m, WeakTermPiPlus name mls xts' t')
+  (m, WeakTermPiPlus name xts' t')
 substWeakTermPlus sub (m, WeakTermPiIntro xts body) = do
   let (xts', body') = substWeakTermPlus'' sub xts body
   (m, WeakTermPiIntro xts' body')
@@ -351,10 +351,10 @@ toText :: WeakTermPlus -> T.Text
 toText (_, WeakTermTau _) = "tau"
 toText (_, WeakTermUpsilon x) = asText' x
 -- toText (_, WeakTermUpsilon x) = asText x
-toText (_, WeakTermPi _ xts t) = do
+toText (_, WeakTermPi xts t) = do
   let argStr = inParen $ showItems $ map showArg xts
   showCons ["Π", argStr, toText t]
-toText (_, WeakTermPiPlus _ _ xts cod) = do
+toText (_, WeakTermPiPlus _ xts cod) = do
   let argStr = inParen $ showItems $ map showArg xts
   showCons ["Π+", argStr, toText cod]
   -- toText cod -- Pi{nat} (...). (...) ~> nat

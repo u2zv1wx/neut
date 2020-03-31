@@ -89,7 +89,6 @@ toInductive ats bts connective@(m, a@(I (ai, _)), xts, _) = do
   -- z <- newNameWith'' "_"
   -- let zt = (m, z, cod)
   -- (atsbts', cod') <- renameFormArgs (ats ++ bts) cod
-  mls1 <- piUnivLevelsfrom (ats ++ bts) cod
   -- mls2 <- piUnivLevelsfrom (xts ++ atsbts' ++ [zt]) cod'
   return $
     [ QuasiStmtLetInductive
@@ -97,7 +96,7 @@ toInductive ats bts connective@(m, a@(I (ai, _)), xts, _) = do
         m
         formationRule
         -- nat := lam (...). Pi{nat} (...)
-        (m, WeakTermPiIntro xts (m, WeakTermPiPlus ai mls1 (ats ++ bts) cod))
+        (m, WeakTermPiIntro xts (m, WeakTermPiPlus ai (ats ++ bts) cod))
     -- induction principle
     -- , QuasiStmtLetWT
     --     m
@@ -127,11 +126,10 @@ toInductiveIntro ats bts xts a@(I (ai, _)) (mb, b@(I (bi, k)), m, yts, cod)
   | (_, WeakTermPiElim (_, WeakTermUpsilon a') es) <- cod
   , a == a'
   , length xts == length es = do
-    mls <- piUnivLevelsfrom (xts ++ yts) cod
-    let vs = varWeakTermPlus (m, WeakTermPi mls yts cod)
+    let vs = varWeakTermPlus (m, WeakTermPi yts cod)
     let xts' = filter (\(_, x, _) -> x `elem` vs) xts
     let b' = I (ai <> ":" <> bi, k)
-    let piType = (m, WeakTermPi mls (xts' ++ yts) cod)
+    let piType = (m, WeakTermPi (xts' ++ yts) cod)
     let xtsyts = xts' ++ yts
     let atsbts = ats ++ bts
     let bInner = (mb, WeakTermUpsilon b)
@@ -152,8 +150,7 @@ toInductiveIntro ats bts xts a@(I (ai, _)) (mb, b@(I (bi, k)), m, yts, cod)
 
 ruleAsIdentPlus :: Rule -> WithEnv IdentifierPlus
 ruleAsIdentPlus (mb, b, m, xts, t) = do
-  mls <- piUnivLevelsfrom xts t
-  return (mb, b, (m, WeakTermPi mls xts t))
+  return (mb, b, (m, WeakTermPi xts t))
 
 formationRuleOf :: Connective -> WithEnv Rule
 formationRuleOf (m, a, xts, _) = do
@@ -231,7 +228,7 @@ zeta mode isub atsbts t e = do
   ienv <- gets inductiveEnv
   isub' <- invSubst isub
   case t of
-    (_, WeakTermPi _ xts cod) -> zetaPi mode isub atsbts xts cod e
+    (_, WeakTermPi xts cod) -> zetaPi mode isub atsbts xts cod e
     -- (_, WeakTermSigma xts) -> zetaSigma mode isub atsbts xts e
     (_, WeakTermPiElim va@(_, WeakTermUpsilon a@(I (_, i))) es) -- esの長さをチェックするべきでは？
       | Just _ <- lookup a (isub ++ isub') ->
@@ -322,7 +319,7 @@ lookupInductive ::
 lookupInductive m (I (ai, i)) = do
   fenv <- gets formationEnv
   case IntMap.lookup i fenv of
-    Just (Just (_, WeakTermPiIntro xts (_, WeakTermPiPlus _ _ atsbts (_, WeakTermPiElim (_, WeakTermUpsilon _) _)))) -> do
+    Just (Just (_, WeakTermPiIntro xts (_, WeakTermPiPlus _ atsbts (_, WeakTermPiElim (_, WeakTermUpsilon _) _)))) -> do
       let at = head atsbts
       let bts = tail atsbts -- valid since a is not mutual
       return (xts, at, bts)
@@ -346,7 +343,7 @@ toInternalizedArg ::
   -> IdentifierPlus -- outerでのコンストラクタ。
   -> IdentifierPlus -- innerでのコンストラクタ。xts部分の引数だけouterのコンストラクタと型がずれていることに注意。
   -> WithEnv WeakTermPlus
-toInternalizedArg mode isub aInner aOuter xts atsbts es es' b (mbInner, _, (_, WeakTermPi _ ytsInner _)) = do
+toInternalizedArg mode isub aInner aOuter xts atsbts es es' b (mbInner, _, (_, WeakTermPi ytsInner _)) = do
   let (ms, ys, ts) = unzip3 ytsInner
   let vxs = map toVar' xts
   -- 引数の型を適切にsubstする。これによって、aInner (x1, ..., xn)の出現がaOuter (e1', ..., en')へと置き換えられて、
@@ -399,12 +396,12 @@ type RuleType = (Identifier, [WeakTermPlus])
 substRuleType :: (RuleType, RuleType) -> WeakTermPlus -> WithEnv WeakTermPlus
 substRuleType _ (m, WeakTermTau l) = return (m, WeakTermTau l)
 substRuleType _ (m, WeakTermUpsilon x) = return (m, WeakTermUpsilon x)
-substRuleType sub (m, WeakTermPi mls xts t) = do
+substRuleType sub (m, WeakTermPi xts t) = do
   (xts', t') <- substRuleType'' sub xts t
-  return (m, WeakTermPi mls xts' t')
-substRuleType sub (m, WeakTermPiPlus name mls xts t) = do
+  return (m, WeakTermPi xts' t')
+substRuleType sub (m, WeakTermPiPlus name xts t) = do
   (xts', t') <- substRuleType'' sub xts t
-  return (m, WeakTermPiPlus name mls xts' t')
+  return (m, WeakTermPiPlus name xts' t')
 substRuleType sub (m, WeakTermPiIntro xts body) = do
   (xts', body') <- substRuleType'' sub xts body
   return (m, WeakTermPiIntro xts' body')

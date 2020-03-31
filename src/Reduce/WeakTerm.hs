@@ -7,16 +7,16 @@ module Reduce.WeakTerm
 import Data.WeakTerm
 
 reduceWeakTermPlus :: WeakTermPlus -> WeakTermPlus
-reduceWeakTermPlus (m, WeakTermPi mls xts cod) = do
+reduceWeakTermPlus (m, WeakTermPi xts cod) = do
   let (ms, xs, ts) = unzip3 xts
   let ts' = map reduceWeakTermPlus ts
   let cod' = reduceWeakTermPlus cod
-  (m, WeakTermPi mls (zip3 ms xs ts') cod')
-reduceWeakTermPlus (m, WeakTermPiPlus name mls xts cod) = do
+  (m, WeakTermPi (zip3 ms xs ts') cod')
+reduceWeakTermPlus (m, WeakTermPiPlus name xts cod) = do
   let (ms, xs, ts) = unzip3 xts
   let ts' = map reduceWeakTermPlus ts
   let cod' = reduceWeakTermPlus cod
-  (m, WeakTermPiPlus name mls (zip3 ms xs ts') cod')
+  (m, WeakTermPiPlus name (zip3 ms xs ts') cod')
 reduceWeakTermPlus (m, WeakTermPiIntro xts e) = do
   let (ms, xs, ts) = unzip3 xts
   let ts' = map reduceWeakTermPlus ts

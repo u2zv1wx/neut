@@ -11,8 +11,8 @@ import Data.WeakTerm hiding (IdentifierPlus)
 data Term
   = TermTau UnivLevel
   | TermUpsilon Identifier
-  | TermPi [UnivLevelPlus] [IdentifierPlus] TermPlus
-  | TermPiPlus T.Text [UnivLevelPlus] [IdentifierPlus] TermPlus
+  | TermPi [IdentifierPlus] TermPlus
+  | TermPiPlus T.Text [IdentifierPlus] TermPlus
   | TermPiIntro [IdentifierPlus] TermPlus
   | TermPiIntroNoReduce [IdentifierPlus] TermPlus
   | TermPiIntroPlus
@@ -63,8 +63,8 @@ termZero m = (m, TermEnumIntro (EnumValueIntS 64 0))
 varTermPlus :: TermPlus -> [Identifier]
 varTermPlus (_, TermTau _) = []
 varTermPlus (_, TermUpsilon x) = [x]
-varTermPlus (_, TermPi _ xts t) = varTermPlus' xts [t]
-varTermPlus (_, TermPiPlus _ _ xts t) = varTermPlus' xts [t]
+varTermPlus (_, TermPi xts t) = varTermPlus' xts [t]
+varTermPlus (_, TermPiPlus _ xts t) = varTermPlus' xts [t]
 varTermPlus (_, TermPiIntro xts e) = varTermPlus' xts [e]
 varTermPlus (_, TermPiIntroNoReduce xts e) = varTermPlus' xts [e]
 varTermPlus (_, TermPiIntroPlus _ _ xts e) = varTermPlus' xts [e]
@@ -112,12 +112,12 @@ substTermPlus :: SubstTerm -> TermPlus -> TermPlus
 substTermPlus _ (m, TermTau l) = (m, TermTau l)
 substTermPlus sub (m, TermUpsilon x) =
   fromMaybe (m, TermUpsilon x) (lookup (asInt x) sub)
-substTermPlus sub (m, TermPi mls xts t) = do
+substTermPlus sub (m, TermPi xts t) = do
   let (xts', t') = substTermPlus'' sub xts t
-  (m, TermPi mls xts' t')
-substTermPlus sub (m, TermPiPlus name mls xts t) = do
+  (m, TermPi xts' t')
+substTermPlus sub (m, TermPiPlus name xts t) = do
   let (xts', t') = substTermPlus'' sub xts t
-  (m, TermPiPlus name mls xts' t')
+  (m, TermPiPlus name xts' t')
 substTermPlus sub (m, TermPiIntro xts body) = do
   let (xts', body') = substTermPlus'' sub xts body
   (m, TermPiIntro xts' body')
@@ -201,10 +201,9 @@ substTermPlus'' sub ((mx, x, t):xts) e = do
 weaken :: TermPlus -> WeakTermPlus
 weaken (m, TermTau l) = (m, WeakTermTau l)
 weaken (m, TermUpsilon x) = (m, WeakTermUpsilon x)
-weaken (m, TermPi mls xts t) = do
-  (m, WeakTermPi mls (weakenArgs xts) (weaken t))
-weaken (m, TermPiPlus name mls xts t) = do
-  (m, WeakTermPiPlus name mls (weakenArgs xts) (weaken t))
+weaken (m, TermPi xts t) = (m, WeakTermPi (weakenArgs xts) (weaken t))
+weaken (m, TermPiPlus name xts t) =
+  (m, WeakTermPiPlus name (weakenArgs xts) (weaken t))
 weaken (m, TermPiIntro xts body) = do
   (m, WeakTermPiIntro (weakenArgs xts) (weaken body))
 weaken (m, TermPiIntroNoReduce xts body) = do
