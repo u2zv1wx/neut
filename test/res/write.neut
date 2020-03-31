@@ -3,7 +3,7 @@
 
 ;; (os:write os:stdout (test) 3)
 
-(no-implicit-core)
+;; (no-implicit-core)
 
 ;; (introspect OS
 ;;   (linux (include library "core/constant/linux.neut"))
@@ -13,24 +13,24 @@
 
 (let test "あ")
 
-(section os)
+;; (section os)
 
-(constant file-descriptor tau)
+;; (constant file-descriptor tau)
 
-(constant stdout file-descriptor)
+;; (constant stdout file-descriptor)
 
 
-(constant write
-  (pi
-    ((A u64)
-     (out file-descriptor)
-     (str (array A u8))
-     (len u64))
-    (product (array A u8) u64)))
+;; (constant write
+;;   (pi
+;;     ((A u64)
+;;      (out file-descriptor)
+;;      (str (array A u8))
+;;      (len u64))
+;;     (product (array A u8) u64)))
 
-(attribute write (implicit 0))
+;; (attribute write (implicit 0))
 
-(end os)
+;; (end os)
 
 (use os)
 
