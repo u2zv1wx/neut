@@ -12,7 +12,6 @@ data WeakTerm
   = WeakTermTau UnivLevel
   | WeakTermUpsilon Identifier
   | WeakTermPi (Maybe T.Text) [IdentifierPlus] WeakTermPlus
-  -- | WeakTermPiPlus T.Text [IdentifierPlus] WeakTermPlus
   | WeakTermPiIntro [IdentifierPlus] WeakTermPlus
   | WeakTermPiIntroNoReduce [IdentifierPlus] WeakTermPlus
   | WeakTermPiIntroPlus
@@ -134,7 +133,6 @@ varWeakTermPlus :: WeakTermPlus -> [Identifier]
 varWeakTermPlus (_, WeakTermTau _) = []
 varWeakTermPlus (_, WeakTermUpsilon x) = x : []
 varWeakTermPlus (_, WeakTermPi _ xts t) = varWeakTermPlus' xts [t]
--- varWeakTermPlus (_, WeakTermPiPlus _ xts t) = varWeakTermPlus' xts [t]
 varWeakTermPlus (_, WeakTermPiIntro xts e) = varWeakTermPlus' xts [e]
 varWeakTermPlus (_, WeakTermPiIntroNoReduce xts e) = varWeakTermPlus' xts [e]
 varWeakTermPlus (_, WeakTermPiIntroPlus _ _ xts e) = varWeakTermPlus' xts [e]
@@ -185,7 +183,6 @@ holeWeakTermPlus :: WeakTermPlus -> [Hole]
 holeWeakTermPlus (_, WeakTermTau _) = []
 holeWeakTermPlus (_, WeakTermUpsilon _) = []
 holeWeakTermPlus (_, WeakTermPi _ xts t) = holeWeakTermPlus' xts [t]
--- holeWeakTermPlus (_, WeakTermPiPlus _ xts t) = holeWeakTermPlus' xts [t]
 holeWeakTermPlus (_, WeakTermPiIntro xts e) = holeWeakTermPlus' xts [e]
 holeWeakTermPlus (_, WeakTermPiIntroNoReduce xts e) = holeWeakTermPlus' xts [e]
 holeWeakTermPlus (_, WeakTermPiIntroPlus {}) = []
