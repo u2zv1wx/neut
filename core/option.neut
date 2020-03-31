@@ -65,7 +65,7 @@
     (functor:unfold
       functor
       (lambda ((_ (functor option)))
-        @option:map)
+        option:map)
       (unsafe:cast
         (hom tau tau)
         (functor option)
