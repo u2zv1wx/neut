@@ -35,10 +35,20 @@ tokenize input = do
   resultOrError <- liftIO $ runExceptT (runStateT program env)
   case resultOrError of
     Left err -> throwError [err]
-    Right (result, _) -> return result
+    Right (result, _) -> do
+      return result
 
 program :: Tokenizer [TreePlus]
-program = skip >> sepEndBy term skip
+program = program' []
+
+program' :: [TreePlus] -> Tokenizer [TreePlus]
+program' ts = do
+  skip
+  t <- term
+  s <- gets text
+  if T.null s
+    then return $ reverse $ t : ts
+    else program' $ t : ts
 
 term :: Tokenizer TreePlus
 term = do
