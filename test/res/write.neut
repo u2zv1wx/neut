@@ -9,7 +9,7 @@
 ;;   (linux (include library "core/constant/linux.neut"))
 ;;   (darwin (include library "core/constant/darwin.neut")))
 
-(include library "core/notation.neut")
+;; (include library "core/notation.neut")
 
 (let test "あ")
 

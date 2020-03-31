@@ -15,7 +15,7 @@ import Data.Maybe
 
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.PQueue.Min as Q
-import qualified Data.Text as T
+import qualified Data.Set as S
 
 import Data.Basic
 import Data.Constraint
@@ -130,6 +130,7 @@ simp' ((e1@(m1, _), e2@(m2, _)):cs) = do
   -- list of stuck reasons (fmvs: free meta-variables)
   sub <- gets substEnv
   cenv <- gets cacheEnv
+  pvenv <- gets patVarEnv
   let m = supMeta m1 m2
   let hs1 = holeWeakTermPlus e1
   let hs2 = holeWeakTermPlus e2
@@ -207,6 +208,16 @@ simp' ((e1@(m1, _), e2@(m2, _)):cs) = do
           | xs1 <- concatMap getVarList ies1
           , occurCheck h1 hs2
           , [] <- includeCheck xs1 e2 -> simpFlexRigid h1 ies1 e1' e2' fmvs cs
+        (Just (StuckPiElimUpsilon x1@(I (_, i1)) []), _)
+          | i1 `S.member` pvenv
+          , occurCheck x1 (varWeakTermPlus e2) -> do
+            modify (\env -> env {substEnv = IntMap.insert i1 e2' sub})
+            simp cs
+        (_, Just (StuckPiElimUpsilon x2@(I (_, i2)) []))
+          | i2 `S.member` pvenv
+          , occurCheck x2 (varWeakTermPlus e1) -> do
+            modify (\env -> env {substEnv = IntMap.insert i2 e1' sub})
+            simp cs
         (Nothing, Just (StuckPiElimZeta h2 ies2))
           | xs2 <- concatMap getVarList ies2
           , occurCheck h2 hs1

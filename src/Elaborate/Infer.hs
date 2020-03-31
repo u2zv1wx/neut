@@ -301,30 +301,37 @@ inferPatArgs _ [] = return []
 inferPatArgs ctx ((mx, x, t):xts) = do
   tl'@(t', _) <- inferType' ctx t
   insWeakTypeEnv x tl'
+  modify (\env -> env {patVarEnv = S.insert (asInt x) (patVarEnv env)})
   xts' <- inferPatArgs (ctx ++ [(mx, x, t')]) xts
   return $ (mx, x, t') : xts'
 
 insertHoleIfNecessary ::
      WeakTermPlus -> [WeakTermPlus] -> WithEnv [WeakTermPlus]
 insertHoleIfNecessary (m, WeakTermUpsilon x) es
-  | not (metaIsExplicit m) = do
-    ienv <- gets impEnv
-    case IntMap.lookup (asInt x) ienv of
-      Nothing -> return es
-      Just is -> do
-        mt <- lookupTypeEnv x
-        case mt of
-          Nothing ->
-            raiseCritical m $
-            "the type of `" <>
-            asText x <>
-            "` is supposed to be a Pi-type, but its type is not even in the type environment"
-          Just ((_, TermPi _ xts _), _) -> supplyHole' m 0 (length xts) is es
-          Just (t, _) ->
-            raiseCritical m $
-            "the type of `" <>
-            asText x <> "` must be a Pi-type, but is:\n" <> toText (weaken t)
+  | not (metaIsExplicit m) = insertHoleIfNecessary' m x es
+insertHoleIfNecessary (m, WeakTermConst x _) es
+  | not (metaIsExplicit m) = insertHoleIfNecessary' m x es
 insertHoleIfNecessary _ es = return es
+
+insertHoleIfNecessary' ::
+     Meta -> Identifier -> [WeakTermPlus] -> WithEnv [WeakTermPlus]
+insertHoleIfNecessary' m x es = do
+  ienv <- gets impEnv
+  case IntMap.lookup (asInt x) ienv of
+    Nothing -> return es
+    Just is -> do
+      mt <- lookupTypeEnv x
+      case mt of
+        Nothing ->
+          raiseCritical m $
+          "the type of `" <>
+          asText x <>
+          "` is supposed to be a Pi-type, but its type is not even in the type environment"
+        Just ((_, TermPi _ xts _), _) -> supplyHole' m 0 (length xts) is es
+        Just (t, _) ->
+          raiseCritical m $
+          "the type of `" <>
+          asText x <> "` must be a Pi-type, but is:\n" <> toText (weaken t)
 
 supplyHole' ::
      Meta -> Int -> Int -> [Int] -> [WeakTermPlus] -> WithEnv [WeakTermPlus]

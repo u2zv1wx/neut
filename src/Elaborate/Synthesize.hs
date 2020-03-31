@@ -118,12 +118,7 @@ asAnalyzable (Enriched cs ms _) = Enriched cs ms ConstraintAnalyzable
 chain :: Meta -> [WithEnv a] -> WithEnv a
 chain m [] = raiseError m $ "cannot synthesize(chain)."
 chain _ [e] = e
-chain m (e:es) =
-  catchError
-    e
-    (const $ do
-       p "trying another chain"
-       chain m es)
+chain m (e:es) = catchError e (const $ chain m es)
 
 deleteMin :: WithEnv ()
 deleteMin = do

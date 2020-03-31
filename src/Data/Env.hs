@@ -70,6 +70,7 @@ data Env =
     , inductiveEnv :: RuleEnv -- "list" ~> (cons, Pi (A : tau). A -> list A -> list A)
     , introEnv :: S.Set Int -- set of the names of constructors (e.g. ["nil", "cons", "zero", "succ", ...] (as int))
     , nonCandSet :: S.Set T.Text
+    , patVarEnv :: S.Set Int
     -- elaborate
     , impEnv :: IntMap.IntMap [Int] -- var ~> (index of implicit arguments of the var)
     , weakTypeEnv :: IntMap.IntMap (WeakTermPlus, UnivLevelPlus) -- var ~> (typeof(var), level-of-type)
@@ -121,6 +122,7 @@ initialEnv =
     , introEnv = S.empty
     , nonCandSet = S.empty
     , labelEnv = Map.empty
+    , patVarEnv = S.empty
     , equalityEnv = []
     , univInstEnv = IntMap.empty
     , univRenameEnv = IntMap.empty
