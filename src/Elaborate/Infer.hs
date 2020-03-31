@@ -73,12 +73,6 @@ infer' ctx (m, WeakTermPi mName xts t) = do
   ml0 <- newLevelLE m $ mlPiCod : mlPiArgs
   ml1 <- newLevelLT m [ml0]
   return ((m, WeakTermPi mName xts' t'), (asUniv ml0), ml1)
--- infer' ctx (m, WeakTermPiPlus name xts t) = do
---   (xtls', (t', mlPiCod)) <- inferPi ctx xts t
---   let (xts', mlPiArgs) = unzip xtls'
---   ml0 <- newLevelLE m $ mlPiCod : mlPiArgs
---   ml1 <- newLevelLT m [ml0]
---   return ((m, WeakTermPiPlus name xts' t'), (asUniv ml0), ml1)
 infer' ctx (m, WeakTermPiIntro xts e) = do
   (xtls', (e', t', mlPiCod)) <- inferBinder ctx xts e
   let (xts', mlPiArgs) = unzip xtls'

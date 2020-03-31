@@ -36,7 +36,8 @@ synthesize = do
       resolvePiElim m ess e
     Just (Enriched _ _ (ConstraintFlexRigid m ess e)) -> do
       resolvePiElim m ess e
-    Just (Enriched _ _ _) -> resolveOther $ Q.toList q
+    Just (Enriched _ _ _) -> do
+      resolveOther $ Q.toList q
 
 -- e1だけがstuckしているとき、e2だけがstuckしているとき、両方がstuckしているときをそれぞれ
 -- 独立したケースとして扱えるようにしたほうがよい（そうすればsubstを減らせる）
