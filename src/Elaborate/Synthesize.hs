@@ -223,12 +223,9 @@ unravel (m, WeakTermTau l) = return (m, WeakTermTau l)
 unravel (m, WeakTermUpsilon x) = do
   x' <- unravelUpsilon x
   return (m, WeakTermUpsilon x')
-unravel (m, WeakTermPi xts t) = do
+unravel (m, WeakTermPi mName xts t) = do
   (xts', t') <- unravelBinder xts t
-  return (m, WeakTermPi xts' t')
-unravel (m, WeakTermPiPlus name xts t) = do
-  (xts', t') <- unravelBinder xts t
-  return (m, WeakTermPiPlus name xts' t')
+  return (m, WeakTermPi mName xts' t')
 unravel (m, WeakTermPiIntro xts e) = do
   (xts', e') <- unravelBinder xts e
   return (m, WeakTermPiIntro xts' e')

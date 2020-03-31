@@ -92,7 +92,7 @@ elaborateStmt (WeakStmtLetSigma m xts e cont) = do
 elaborateStmt (WeakStmtImplicit m x@(I (_, i)) idx cont) = do
   t <- lookupTypeEnv' m x
   case t of
-    (_, TermPi xts _) -> do
+    (_, TermPi _ xts _) -> do
       if 0 <= idx && idx < length xts
         then do
           ienv <- gets impEnv
@@ -266,14 +266,10 @@ elaborate' (m, WeakTermUpsilon x) = do
       (up, _, _) <- instantiate m t l
       return (m, TermConst x up)
     else return (m, TermUpsilon x)
-elaborate' (m, WeakTermPi xts t) = do
+elaborate' (m, WeakTermPi mName xts t) = do
   xts' <- mapM elaboratePlus xts
   t' <- elaborate' t
-  return (m, TermPi xts' t')
-elaborate' (m, WeakTermPiPlus name xts t) = do
-  xts' <- mapM elaboratePlus xts
-  t' <- elaborate' t
-  return (m, TermPiPlus name xts' t')
+  return (m, TermPi mName xts' t')
 elaborate' (m, WeakTermPiIntro xts e) = do
   e' <- elaborate' e
   xts' <- mapM elaboratePlus xts
@@ -415,7 +411,7 @@ elaborate' (m, WeakTermCase (e, t) cxtes) = do
   t' <- elaborate' t
   t'' <- reduceWeakType $ weaken t'
   case t'' of
-    (_, WeakTermPiPlus name _ _) -> do
+    (_, WeakTermPi (Just name) _ _) -> do
       eenv <- gets enumEnv
       case Map.lookup name eenv of
         Nothing -> raiseError m $ "no such inductive type defined: " <> name

@@ -45,7 +45,7 @@ interpret (m, TreeNode ((_, TreeLeaf "pi"):rest))
   | [(_, TreeNode xts), t] <- rest = do
     (xts', t') <- interpretBinder xts t
     m' <- adjustPhase m
-    return (m', WeakTermPi xts' t')
+    return (m', weakTermPi xts' t')
   | otherwise = raiseSyntaxError m "(pi (TREE*) TREE)"
 interpret (m, TreeNode ((_, TreeLeaf "pi-introduction"):rest))
   | [(_, TreeNode xts), e] <- rest = do
@@ -305,7 +305,7 @@ sigmaIntro m es = do
   ts <- mapM (const (newHole m)) es
   xs <- mapM (const (newNameWith'' "hole")) es
   let xts = zipWith (\x t -> (m, x, t)) xs ts
-  let piType = (m, WeakTermPi xts zv)
+  let piType = (m, weakTermPi xts zv)
   return
     ( m
     , WeakTermPiIntro
@@ -536,7 +536,7 @@ cocaseBaseValue m codType =
   ( m
   , WeakTermPiElim
       (m, WeakTermUpsilon $ asIdent "unsafe:cast")
-      [ (m, WeakTermPi [] (m, WeakTermEnum (EnumTypeIntS 64)))
+      [ (m, weakTermPi [] (m, WeakTermEnum (EnumTypeIntS 64)))
       , codType
       , (m, (WeakTermPiIntro [] (m, WeakTermEnumIntro (EnumValueIntS 64 0))))
       ])

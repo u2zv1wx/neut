@@ -140,12 +140,12 @@ discern'' nenv (m, WeakTermUpsilon x@(I (s, _))) = do
     (_, _, Just s', _) -> return (m, WeakTermEnum (EnumTypeLabel s'))
     (_, _, _, Just c) -> return (m, WeakTermConst c emptyUP)
     _ -> raiseError m $ "undefined variable:  " <> asText x
-discern'' nenv (m, WeakTermPi xts t) = do
+discern'' nenv (m, WeakTermPi mName xts t) = do
   (xts', t') <- discernBinder nenv xts t
-  return (m, WeakTermPi xts' t')
-discern'' nenv (m, WeakTermPiPlus name xts t) = do
-  (xts', t') <- discernBinder nenv xts t
-  return (m, WeakTermPiPlus name xts' t')
+  return (m, WeakTermPi mName xts' t')
+-- discern'' nenv (m, WeakTermPiPlus name xts t) = do
+--   (xts', t') <- discernBinder nenv xts t
+--   return (m, WeakTermPiPlus name xts' t')
 discern'' nenv (m, WeakTermPiIntro xts e) = do
   (xts', e') <- discernBinder nenv xts e
   return (m, WeakTermPiIntro xts' e')

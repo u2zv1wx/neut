@@ -38,22 +38,22 @@ simp' (((_, e1), (_, e2)):cs)
 simp' (((m1, WeakTermTau l1), (m2, WeakTermTau l2)):cs) = do
   insLevelEQ (UnivLevelPlus (m1, l1)) (UnivLevelPlus (m2, l2))
   simp cs
-simp' (((m1, WeakTermPi xts1 cod1), (m2, WeakTermPi xts2 cod2)):cs)
+simp' (((m1, WeakTermPi Nothing xts1 cod1), (m2, WeakTermPi Nothing xts2 cod2)):cs)
   | length xts1 == length xts2 = do
     xt1 <- asIdentPlus m1 cod1
     xt2 <- asIdentPlus m2 cod2
     simpBinder (xts1 ++ [xt1]) (xts2 ++ [xt2])
     simp cs
-simp' (((m1, WeakTermPi xts1 cod1), (m2, WeakTermPiPlus _ xts2 cod2)):cs)
+simp' (((m1, WeakTermPi Nothing xts1 cod1), (m2, WeakTermPi (Just _) xts2 cod2)):cs)
   | length xts1 == length xts2 = do
-    simp' $ ((m1, WeakTermPi xts1 cod1), (m2, WeakTermPi xts2 cod2)) : cs
-simp' (((m1, WeakTermPiPlus _ xts1 cod1), (m2, WeakTermPi xts2 cod2)):cs)
+    simp' $ ((m1, weakTermPi xts1 cod1), (m2, weakTermPi xts2 cod2)) : cs
+simp' (((m1, WeakTermPi (Just _) xts1 cod1), (m2, WeakTermPi Nothing xts2 cod2)):cs)
   | length xts1 == length xts2 = do
-    simp' $ ((m1, WeakTermPi xts1 cod1), (m2, WeakTermPi xts2 cod2)) : cs
-simp' (((m1, WeakTermPiPlus name1 xts1 cod1), (m2, WeakTermPiPlus name2 xts2 cod2)):cs)
+    simp' $ ((m1, weakTermPi xts1 cod1), (m2, weakTermPi xts2 cod2)) : cs
+simp' (((m1, WeakTermPi (Just name1) xts1 cod1), (m2, WeakTermPi (Just name2) xts2 cod2)):cs)
   | name1 == name2
   , length xts1 == length xts2 = do
-    simp' $ ((m1, WeakTermPi xts1 cod1), (m2, WeakTermPi xts2 cod2)) : cs
+    simp' $ ((m1, weakTermPi xts1 cod1), (m2, weakTermPi xts2 cod2)) : cs
 simp' (((m1, WeakTermPiIntro xts1 e1), (m2, WeakTermPiIntro xts2 e2)):cs)
   | length xts1 == length xts2 = do
     xt1 <- asIdentPlus m1 e1

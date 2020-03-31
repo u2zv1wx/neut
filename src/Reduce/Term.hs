@@ -8,16 +8,11 @@ import Data.Basic
 import Data.Term
 
 reduceTermPlus :: TermPlus -> TermPlus
-reduceTermPlus (m, TermPi xts cod) = do
+reduceTermPlus (m, TermPi mName xts cod) = do
   let (ms, xs, ts) = unzip3 xts
   let ts' = map reduceTermPlus ts
   let cod' = reduceTermPlus cod
-  (m, TermPi (zip3 ms xs ts') cod')
-reduceTermPlus (m, TermPiPlus name xts cod) = do
-  let (ms, xs, ts) = unzip3 xts
-  let ts' = map reduceTermPlus ts
-  let cod' = reduceTermPlus cod
-  (m, TermPiPlus name (zip3 ms xs ts') cod')
+  (m, TermPi mName (zip3 ms xs ts') cod')
 reduceTermPlus (m, TermPiIntro xts e) = do
   let (ms, xs, ts) = unzip3 xts
   let ts' = map reduceTermPlus ts
@@ -115,7 +110,6 @@ isValue :: TermPlus -> Bool
 isValue (_, TermTau _) = True
 isValue (_, TermUpsilon _) = True
 isValue (_, TermPi {}) = True
-isValue (_, TermPiPlus {}) = True
 isValue (_, TermPiIntro {}) = True
 isValue (_, TermPiIntroNoReduce {}) = True
 isValue (_, TermPiIntroPlus {}) = True

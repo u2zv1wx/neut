@@ -11,8 +11,8 @@ import Data.WeakTerm hiding (IdentifierPlus)
 data Term
   = TermTau UnivLevel
   | TermUpsilon Identifier
-  | TermPi [IdentifierPlus] TermPlus
-  | TermPiPlus T.Text [IdentifierPlus] TermPlus
+  | TermPi (Maybe T.Text) [IdentifierPlus] TermPlus
+  -- | TermPiPlus [IdentifierPlus] TermPlus
   | TermPiIntro [IdentifierPlus] TermPlus
   | TermPiIntroNoReduce [IdentifierPlus] TermPlus
   | TermPiIntroPlus
@@ -60,11 +60,14 @@ toTermUpsilon m x = (m, TermUpsilon x)
 termZero :: Meta -> TermPlus
 termZero m = (m, TermEnumIntro (EnumValueIntS 64 0))
 
+termPi :: [IdentifierPlus] -> TermPlus -> Term
+termPi = TermPi Nothing
+
 varTermPlus :: TermPlus -> [Identifier]
 varTermPlus (_, TermTau _) = []
 varTermPlus (_, TermUpsilon x) = [x]
-varTermPlus (_, TermPi xts t) = varTermPlus' xts [t]
-varTermPlus (_, TermPiPlus _ xts t) = varTermPlus' xts [t]
+varTermPlus (_, TermPi _ xts t) = varTermPlus' xts [t]
+-- varTermPlus (_, TermPiPlus _ xts t) = varTermPlus' xts [t]
 varTermPlus (_, TermPiIntro xts e) = varTermPlus' xts [e]
 varTermPlus (_, TermPiIntroNoReduce xts e) = varTermPlus' xts [e]
 varTermPlus (_, TermPiIntroPlus _ _ xts e) = varTermPlus' xts [e]
@@ -112,12 +115,12 @@ substTermPlus :: SubstTerm -> TermPlus -> TermPlus
 substTermPlus _ (m, TermTau l) = (m, TermTau l)
 substTermPlus sub (m, TermUpsilon x) =
   fromMaybe (m, TermUpsilon x) (lookup (asInt x) sub)
-substTermPlus sub (m, TermPi xts t) = do
+substTermPlus sub (m, TermPi mName xts t) = do
   let (xts', t') = substTermPlus'' sub xts t
-  (m, TermPi xts' t')
-substTermPlus sub (m, TermPiPlus name xts t) = do
-  let (xts', t') = substTermPlus'' sub xts t
-  (m, TermPiPlus name xts' t')
+  (m, TermPi mName xts' t')
+-- substTermPlus sub (m, TermPiPlus name xts t) = do
+--   let (xts', t') = substTermPlus'' sub xts t
+--   (m, TermPiPlus name xts' t')
 substTermPlus sub (m, TermPiIntro xts body) = do
   let (xts', body') = substTermPlus'' sub xts body
   (m, TermPiIntro xts' body')
@@ -201,9 +204,10 @@ substTermPlus'' sub ((mx, x, t):xts) e = do
 weaken :: TermPlus -> WeakTermPlus
 weaken (m, TermTau l) = (m, WeakTermTau l)
 weaken (m, TermUpsilon x) = (m, WeakTermUpsilon x)
-weaken (m, TermPi xts t) = (m, WeakTermPi (weakenArgs xts) (weaken t))
-weaken (m, TermPiPlus name xts t) =
-  (m, WeakTermPiPlus name (weakenArgs xts) (weaken t))
+weaken (m, TermPi mName xts t) =
+  (m, WeakTermPi mName (weakenArgs xts) (weaken t))
+-- weaken (m, TermPiPlus name xts t) =
+--   (m, WeakTermPiPlus name (weakenArgs xts) (weaken t))
 weaken (m, TermPiIntro xts body) = do
   (m, WeakTermPiIntro (weakenArgs xts) (weaken body))
 weaken (m, TermPiIntroNoReduce xts body) = do

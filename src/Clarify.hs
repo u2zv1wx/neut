@@ -35,7 +35,6 @@ clarify' :: TypeEnv -> TermPlus -> WithEnv CodePlus
 clarify' _ (m, TermTau _) = returnCartesianImmediate m
 clarify' _ (m, TermUpsilon x) = return (m, CodeUpIntro (m, DataUpsilon x))
 clarify' _ (m, TermPi {}) = returnClosureType m
-clarify' _ (m, TermPiPlus {}) = returnClosureType m
 clarify' tenv lam@(m, TermPiIntro mxts e) = do
   fvs <- nubFVS <$> chainTermPlus' tenv lam
   e' <- clarify' (insTypeEnv1 mxts tenv) e
@@ -153,7 +152,7 @@ supplyImplicit (((m, c), xts), body) = do
   ienv <- gets impEnv
   t <- lookupTypeEnv' m c
   case (t, IntMap.lookup (asInt c) ienv) of
-    ((_, TermPi yts _), Just is) -> do
+    ((_, TermPi _ yts _), Just is) -> do
       let argLen = length yts
       xts' <- supplyImplicit' 0 argLen is yts xts
       return (((m, c), xts'), body)
@@ -251,7 +250,7 @@ clarifyUnaryOp tenv name op m = do
   t <- lookupTypeEnv'' m name tenv
   let t' = reduceTermPlus t
   case t' of
-    (_, TermPi xts@[(mx, x, tx)] _) -> do
+    (_, TermPi _ xts@[(mx, x, tx)] _) -> do
       let varX = (mx, DataUpsilon x)
       zts <- complementaryChainOf xts
       retClosure
@@ -268,7 +267,7 @@ clarifyBinaryOp tenv name op m = do
   t <- lookupTypeEnv'' m name tenv
   let t' = reduceTermPlus t
   case t' of
-    (_, TermPi xts@[(mx, x, tx), (my, y, ty)] _) -> do
+    (_, TermPi _ xts@[(mx, x, tx), (my, y, ty)] _) -> do
       let varX = (mx, DataUpsilon x)
       let varY = (my, DataUpsilon y)
       zts <- complementaryChainOf xts
@@ -287,7 +286,7 @@ clarifyArrayAccess tenv m name lowType = do
   arrayAccessType <- lookupTypeEnv'' m name tenv
   let arrayAccessType' = reduceTermPlus arrayAccessType
   case arrayAccessType' of
-    (_, TermPi xts cod)
+    (_, TermPi _ xts cod)
       | length xts == 3 -> do
         (xs, ds, headerList) <-
           computeHeader m xts [ArgImm, ArgUnused, ArgArray]
@@ -311,7 +310,7 @@ clarifySysCall tenv name syscall args m = do
   sysCallType <- lookupTypeEnv'' m name tenv
   let sysCallType' = reduceTermPlus sysCallType
   case sysCallType' of
-    (_, TermPi xts cod)
+    (_, TermPi _ xts cod)
       | length xts == length args -> do
         zts <- complementaryChainOf xts
         (xs, ds, headerList) <- computeHeader m xts args
@@ -505,7 +504,7 @@ inferKind m (ArrayKindFloat size) = do
 inferKind m _ = raiseCritical m "inferKind for void-pointer"
 
 rightmostOf :: TermPlus -> WithEnv (Meta, TermPlus)
-rightmostOf (_, TermPi xts _)
+rightmostOf (_, TermPi _ xts _)
   | length xts >= 1 = do
     let (m, _, t) = last xts
     return (m, t)
@@ -514,7 +513,7 @@ rightmostOf (m, _) = raiseCritical m "rightmost"
 sigToPi :: Meta -> TermPlus -> WithEnv (IdentifierPlus, IdentifierPlus)
 sigToPi m tPi = do
   case tPi of
-    (_, TermPi [zu, kp] _) -> return (zu, kp)
+    (_, TermPi _ [zu, kp] _) -> return (zu, kp)
     _ -> raiseCritical m "the type of sigma-intro is wrong"
 
 makeClosure ::
@@ -618,8 +617,7 @@ chainTermPlus' tenv (m, TermUpsilon x) = do
   t <- lookupTypeEnv'' m x tenv
   xts <- chainTermPlus' tenv t
   return $ xts ++ [(m, x, t)]
-chainTermPlus' tenv (_, TermPi xts t) = chainTermPlus'' tenv xts [t]
-chainTermPlus' tenv (_, TermPiPlus _ xts t) = chainTermPlus'' tenv xts [t]
+chainTermPlus' tenv (_, TermPi _ xts t) = chainTermPlus'' tenv xts [t]
 chainTermPlus' tenv (_, TermPiIntro xts e) = chainTermPlus'' tenv xts [e]
 chainTermPlus' tenv (_, TermPiIntroNoReduce xts e) =
   chainTermPlus'' tenv xts [e]
