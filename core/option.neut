@@ -44,7 +44,10 @@
       ((some x)
         (k x)))))
 
-(definition from-option ([a tau] (x a) (m (option a)))
+(definition from-option
+  ([a tau]
+   (x a)
+   (m (option a)))
   (witness a
     (case m
       ((none)
