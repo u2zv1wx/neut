@@ -61,17 +61,6 @@
       (map
         option:map))))
 
-;; (definition witness-functor
-;;   (witness (functor option)
-;;     (functor:unfold
-;;       functor
-;;       (lambda ((_ (functor option)))
-;;         option:map)
-;;       (unsafe:cast
-;;         (hom tau tau)
-;;         (functor option)
-;;         (lambda (x) x)))))
-
 (definition witness-monad
   (witness (monad option)
     (record (monad option)
