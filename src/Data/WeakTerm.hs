@@ -351,6 +351,13 @@ toText :: WeakTermPlus -> T.Text
 toText (_, WeakTermTau _) = "tau"
 toText (_, WeakTermUpsilon x) = asText' x
 -- toText (_, WeakTermUpsilon x) = asText x
+toText (_, WeakTermPi Nothing xts@[(_, x, dom)] cod) = do
+  if x `notElem` varWeakTermPlus cod
+    then do
+      showCons ["hom", toText dom, toText cod]
+    else do
+      let argStr = inParen $ showItems $ map showArg xts
+      showCons ["Π", argStr, toText cod]
 toText (_, WeakTermPi Nothing xts t) = do
   let argStr = inParen $ showItems $ map showArg xts
   showCons ["Π", argStr, toText t]
