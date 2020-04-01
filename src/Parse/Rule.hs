@@ -73,17 +73,6 @@ parseRule (m, TreeNode [(mName, TreeLeaf name), (_, TreeNode xts), t]) = do
   return (m', asIdent name, mName', xts', t')
 parseRule t = raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) TREE)"
 
--- renameFormArgs ::
---      [IdentifierPlus]
---   -> WeakTermPlus
---   -> WithEnv ([IdentifierPlus], WeakTermPlus)
--- renameFormArgs [] tLast = return ([], tLast)
--- renameFormArgs ((m, a, t):ats) tLast = do
---   a' <- newNameWith'' "var"
---   let sub = [(a, (m, WeakTermUpsilon a'))]
---   let (ats', tLast') = substWeakTermPlus'' sub ats tLast
---   (ats'', tLast'') <- renameFormArgs ats' tLast'
---   return ((m, a', t) : ats'', tLast'')
 checkNameSanity :: Meta -> [IdentifierPlus] -> WithEnv ()
 checkNameSanity m atsbts = do
   let asbs = map (\(_, x, _) -> x) atsbts
@@ -99,8 +88,6 @@ toInductive ats bts connective@(m, a@(I (ai, _)), xts, _) = do
   let cod = (m, WeakTermPiElim (m, WeakTermUpsilon a) (map toVar' xts))
   z <- newNameWith'' "_"
   let zt = (m, z, cod)
-  -- (atsbts', cod') <- renameFormArgs (ats ++ bts) cod
-  -- mls2 <- piUnivLevelsfrom (xts ++ atsbts' ++ [zt]) cod'
   return $
     [ QuasiStmtLetInductive
         (length ats)
@@ -118,15 +105,6 @@ toInductive ats bts connective@(m, a@(I (ai, _)), xts, _) = do
         , WeakTermPiIntro
             (xts ++ [zt] ++ ats ++ bts)
             (m, WeakTermPiElim (toVar' zt) (map toVar' (ats ++ bts))))
-    -- , QuasiStmtLet
-    --     m
-    --     ( m
-    --     , asIdent (ai <> ":" <> "induction")
-    --     , (m, WeakTermPi Nothing (xts ++ atsbts' ++ [zt]) cod'))
-    --     ( m
-    --     , WeakTermPiIntro
-    --         (xts ++ atsbts' ++ [zt])
-    --         (m, WeakTermPiElim (toVar' zt) (map toVar' atsbts')))
     ]
 
 toInductiveIntroList :: [IdentifierPlus] -> Connective -> WithEnv [QuasiStmt]
