@@ -20,23 +20,13 @@
           (tuple new-env (f val)))))))
 
 (definition return ((s tau))
-  (witness
-    (pi
-      ((a tau)
-       (x a))
-      ((state s) a))
+  (witness (monad-return-form (state s))
     (lambda (a x)
       (lambda (env)
         (tuple env x)))))
 
 (definition bind ((s tau))
-  (witness
-    (pi
-      ((a tau)
-       (b tau)
-       (comp ((state s) a))
-       (k (hom a ((state s) b))))
-      ((state s) b))
+  (witness (monad-bind-form (state s))
     (lambda (a b comp k)
       (lambda (env)
         (destruct (comp env)

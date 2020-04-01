@@ -4,12 +4,26 @@
 
 (include library "core/functor.neut")
 
+(definition monad-return-form ((m (hom tau tau)))
+  (pi
+    ((a tau)
+     (_ a))
+    (m a)))
+
+(definition monad-bind-form ((m (hom tau tau)))
+  (pi
+    ((a tau)
+     (b tau)
+     (_ (m a))
+     (_ (hom a (m b))))
+    (m b)))
+
 (coinductive monad ((m (hom tau tau)))
   (witness-functor ((_ (monad m)))
     (functor m))
   (return ((_ (monad m)))
-    (pi ((a tau) (_ a))
-      (m a)))
+    (monad-return-form m))
+    ;; (pi ((a tau) (_ a))
+    ;;   (m a)))
   (bind ((_ (monad m)))
-    (pi ((a tau) (b tau) (_ (m a)) (k (hom a (m b))))
-      (m b))))
+    (monad-bind-form m)))

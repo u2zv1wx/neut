@@ -15,34 +15,29 @@
     (option a)))
 
 (definition map
-  ([a tau]
-   [b tau]
-   (f (hom a b))
-   (m (option a)))
-  (witness (option b)
-    (case m
-      ((none)
-        (none))
-      ((some x)
-        (some (f x))))))
+  (witness (functor-form option)
+    (lambda (a b f m)
+      (case m
+        ((none)
+          (none))
+        ((some x)
+          (some (f x)))))))
+
+;; (satisfies-functor option), (satisfies-return option)みたいに書いてもいいかも。
 
 (definition return
-  ([a tau]
-   (x a))
-  (witness (option a)
-    (some x)))
+  (witness (monad-return-form option)
+    (lambda (a x)
+      (some x))))
 
 (definition bind
-  ([a tau]
-   [b tau]
-   (m (option a))
-   (k (hom a (option b))))
-  (witness (option b)
-    (case m
-      ((none)
-        (none))
-      ((some x)
-        (k x)))))
+  (witness (monad-bind-form option)
+    (lambda (a b m k)
+      (case m
+        ((none)
+          (none))
+        ((some x)
+          (k x))))))
 
 (definition from-option
   ([a tau]
