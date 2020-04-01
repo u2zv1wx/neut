@@ -2,6 +2,10 @@
 
 (include "notation.neut")
 
+(include "functor.neut")
+
+(include "monad.neut")
+
 (section coproduct)
 
 (inductive coproduct ((e tau) (a tau))
@@ -27,5 +31,57 @@
 (definition throw ([e tau] [a tau] (err e))
   (witness (coproduct e a)
     (left err)))
+
+(definition either ((e tau))
+  (witness (hom tau tau)
+    (lambda ((a tau))
+      (coproduct e a))))
+
+(definition either-map ((e tau))
+  (witness
+    (forall
+      ((a tau)
+       (b tau)
+       (_ (hom a b))
+       (_ ((either e) a)))
+      ((either e) b))
+    (lambda (a b f m)
+      (coproduct:map f m))))
+
+(definition either-return ((e tau))
+  (witness
+    (pi
+      ((a tau)
+       (_ a))
+      ((either e) a))
+    (lambda (a x)
+      (coproduct:return x))))
+
+(definition either-bind ((e tau))
+  (witness
+    (pi
+      ((a tau)
+       (b tau)
+       (_ ((either e) a))
+       (_ (hom a ((either e) b))))
+      ((either e) b))
+    (lambda (a b m k)
+      (coproduct:bind m k))))
+
+(definition witness-functor ((e tau))
+  (witness (functor (either e))
+    (record (functor (either e))
+      (map
+        (either-map e)))))
+
+(definition witness-monad ((e tau))
+  (witness (monad (either e))
+    (record (monad (either e))
+      (witness-functor
+        (witness-functor e))
+      (return
+        (either-return e))
+      (bind
+        (either-bind e)))))
 
 (end coproduct)
