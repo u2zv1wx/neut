@@ -4,7 +4,6 @@
 
 (include library "core/functor.neut")
 
-;; clarifyのときにa : tauがtypeEnvにみつからないっていうバグが出るので修正すること
 (coinductive monad ((m (hom tau tau)))
   (witness-functor ((_ (monad m)))
     (functor m))
