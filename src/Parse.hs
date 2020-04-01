@@ -257,6 +257,11 @@ parse' ((m, TreeNode (coind@(_, TreeLeaf "coinductive"):rest)):as)
     parse' $ (m, TreeNode [coind, (mFun, TreeNode (name : xts : rest'))]) : as
   | otherwise = do
     rest' <- mapM macroExpand rest
+    -- atsbts <- toLabelList rest'
+    -- p "labelList:"
+    -- p' atsbts
+    -- _ <- error "stop"
+    registerLabelInfo rest'
     rest'' <- asInductive rest'
     stmtList1 <- parseInductive m rest''
     stmtList2 <- parse' as

@@ -55,24 +55,31 @@
       ((some y)
         y))))
 
-;; (definition witness-functor
-;;   (witness (functor option)
-;;     (record (functor option)
-;;       (map @option:map))))
-
 (definition witness-functor
   (witness (functor option)
-    (functor:unfold
-      functor
-      (lambda ((_ (functor option)))
-        option:map)
-      (unsafe:cast
-        (hom tau tau)
-        (functor option)
-        (lambda (x) x)))))
+    (record (functor option)
+      (map
+        option:map))))
 
-;; (definition witness-monad
-;;   (witness (monad option)
-;;     (record (monad))))
+;; (definition witness-functor
+;;   (witness (functor option)
+;;     (functor:unfold
+;;       functor
+;;       (lambda ((_ (functor option)))
+;;         option:map)
+;;       (unsafe:cast
+;;         (hom tau tau)
+;;         (functor option)
+;;         (lambda (x) x)))))
+
+(definition witness-monad
+  (witness (monad option)
+    (record (monad option)
+      (witness-functor
+        option:witness-functor)
+      (return
+        option:return)
+      (bind
+        option:bind))))
 
 (end option)

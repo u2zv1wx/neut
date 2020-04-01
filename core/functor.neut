@@ -3,6 +3,17 @@
 ;; (include library "core/foundation.neut")
 (include "notation.neut")
 
+;; (coinductive
+;;   (foo ((f (hom tau tau)))
+;;     (some-item ((_ (functor f))) i64)
+;;     (map ((_ (functor f)))
+;;       (pi ((a tau) (b tau) (_ (hom a b)) (_ (f a)))
+;;         (f b))))
+;;   (bar ((a tau))
+;;     (elem-1 ((_ (bar a))) u64)
+;;     (elem-2 ((_ (bar a))) (hom tau a))))
+
+
 (coinductive functor ((f (hom tau tau)))
   (map ((_ (functor f)))
     (pi ((a tau) (b tau) (_ (hom a b)) (_ (f a)))

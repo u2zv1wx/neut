@@ -6,6 +6,7 @@ module Parse.Rule
   , insInductive
   , internalize
   , toVar'
+  , registerLabelInfo
   ) where
 
 import Control.Monad.Except
@@ -52,6 +53,16 @@ parseConnective' (m, TreeNode ((_, TreeLeaf name):(_, TreeNode xts):rules)) = do
   rules' <- mapM parseRule rules
   return (m', asIdent name, xts', rules')
 parseConnective' t = raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) ...)"
+
+registerLabelInfo :: [TreePlus] -> WithEnv ()
+registerLabelInfo ts = do
+  connectiveList <- mapM parseConnective' ts
+  fs <- mapM formationRuleOf connectiveList
+  ats <- mapM ruleAsIdentPlus fs
+  bts <- concat <$> mapM toInternalRuleList connectiveList
+  forM_ ats $ \(_, I (a, _), _) -> do
+    let asbs = map (\(_, x, _) -> asText x) $ ats ++ bts
+    modify (\env -> env {labelEnv = Map.insert a asbs (labelEnv env)})
 
 parseRule :: TreePlus -> WithEnv Rule
 parseRule (m, TreeNode [(mName, TreeLeaf name), (_, TreeNode xts), t]) = do

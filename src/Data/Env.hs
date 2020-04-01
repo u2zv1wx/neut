@@ -341,7 +341,8 @@ insEnumEnv m name xis = do
   eenv <- gets enumEnv
   let definedEnums = Map.keys eenv ++ map fst (concat (Map.elems eenv))
   case find (`elem` definedEnums) $ name : map fst xis of
-    Just x -> raiseError m $ "the constant `" <> x <> "` is already defined"
+    Just x ->
+      raiseError m $ "the constant `" <> x <> "` is already defined [ENUM]"
     _ -> do
       let (xs, is) = unzip xis
       forM_ xs insLLVMEnumEnv
