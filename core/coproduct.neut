@@ -60,12 +60,12 @@
       (coproduct:map f m))))
 
 (definition either-return ((e tau))
-  (witness (monad-return-form (either e))
+  (witness (return-type (either e))
     (lambda (a x)
       (coproduct:return x))))
 
 (definition either-bind ((e tau))
-  (witness (monad-bind-form (either e))
+  (witness (bind-type (either e))
     (lambda (a b m k)
       (coproduct:bind m k))))
 

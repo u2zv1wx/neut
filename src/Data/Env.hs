@@ -46,9 +46,6 @@ data Env =
     { count :: Int
     , ppCount :: Int -- count used only for pretty printing
     -- parse
-    , inputText :: T.Text
-    , inputLine :: Int
-    , inputColumn :: Int
     , phase :: Int
     , target :: Maybe Target
     , keywordEnv :: S.Set T.Text -- list of reserved keywords
@@ -98,9 +95,6 @@ initialEnv =
   Env
     { count = 0
     , ppCount = 0
-    , inputText = T.empty
-    , inputLine = 0
-    , inputColumn = 0
     , phase = 0
     , target = Nothing
     , notationEnv = []

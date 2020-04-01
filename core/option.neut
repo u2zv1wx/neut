@@ -26,12 +26,12 @@
 ;; (satisfies-functor option), (satisfies-return option)みたいに書いてもいいかも。
 
 (definition return
-  (witness (monad-return-form option)
+  (witness (return-type option)
     (lambda (a x)
       (some x))))
 
 (definition bind
-  (witness (monad-bind-form option)
+  (witness (bind-type option)
     (lambda (a b m k)
       (case m
         ((none)

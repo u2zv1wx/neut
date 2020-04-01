@@ -97,8 +97,8 @@ toInductive ::
 toInductive ats bts connective@(m, a@(I (ai, _)), xts, _) = do
   formationRule <- formationRuleOf connective >>= ruleAsIdentPlus
   let cod = (m, WeakTermPiElim (m, WeakTermUpsilon a) (map toVar' xts))
-  -- z <- newNameWith'' "_"
-  -- let zt = (m, z, cod)
+  z <- newNameWith'' "_"
+  let zt = (m, z, cod)
   -- (atsbts', cod') <- renameFormArgs (ats ++ bts) cod
   -- mls2 <- piUnivLevelsfrom (xts ++ atsbts' ++ [zt]) cod'
   return $
@@ -109,11 +109,20 @@ toInductive ats bts connective@(m, a@(I (ai, _)), xts, _) = do
         -- nat := lam (...). Pi{nat} (...)
         (m, WeakTermPiIntro xts (m, WeakTermPi (Just ai) (ats ++ bts) cod))
     -- induction principle
-    -- , QuasiStmtLetWT
+    , QuasiStmtLet
+        m
+        ( m
+        , asIdent (ai <> ":" <> "induction")
+        , (m, WeakTermPi Nothing (xts ++ [zt] ++ ats ++ bts) cod))
+        ( m
+        , WeakTermPiIntro
+            (xts ++ [zt] ++ ats ++ bts)
+            (m, WeakTermPiElim (toVar' zt) (map toVar' (ats ++ bts))))
+    -- , QuasiStmtLet
     --     m
     --     ( m
-    --     , asIdent (ai <> "." <> "induction")
-    --     , (m, WeakTermPi mls2 (xts ++ atsbts' ++ [zt]) cod'))
+    --     , asIdent (ai <> ":" <> "induction")
+    --     , (m, WeakTermPi Nothing (xts ++ atsbts' ++ [zt]) cod'))
     --     ( m
     --     , WeakTermPiIntro
     --         (xts ++ atsbts' ++ [zt])
