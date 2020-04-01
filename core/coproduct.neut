@@ -12,23 +12,40 @@
   (left ((_ e)) (coproduct e a))
   (right ((_ a)) (coproduct e a)))
 
-(definition map ([e tau] [a tau] [b tau] (f (hom a b)) (m (coproduct e a)))
+(definition map
+  ([e tau]
+   [a tau]
+   [b tau]
+   (f (hom a b))
+   (m (coproduct e a)))
   (witness (coproduct e b)
     (case m
-      ((left err) (left err))
-      ((right val) (right (f val))))))
+      ((left err)
+        (left err))
+      ((right val)
+        (right (f val))))))
 
 (definition return ([e tau] [a tau] (x a))
   (witness (coproduct e a)
     (right x)))
 
-(definition bind ([e tau] [a tau] [b tau] (comp (coproduct e a)) (k (hom a (coproduct e b))))
+(definition bind
+  ([e tau]
+   [a tau]
+   [b tau]
+   (comp (coproduct e a))
+   (k (hom a (coproduct e b))))
   (witness (coproduct e b)
     (case comp
-      ((left err) (left err))
-      ((right val) (k val)))))
+      ((left err)
+        (left err))
+      ((right val)
+        (k val)))))
 
-(definition throw ([e tau] [a tau] (err e))
+(definition throw
+  ([e tau]
+   [a tau]
+   (err e))
   (witness (coproduct e a)
     (left err)))
 
@@ -59,7 +76,7 @@
 
 (definition either-bind ((e tau))
   (witness
-    (pi
+    (forall
       ((a tau)
        (b tau)
        (_ ((either e) a))
