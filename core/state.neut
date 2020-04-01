@@ -12,13 +12,7 @@
 (section state)
 
 (definition map ((s tau))
-  (witness
-    (pi
-      ((a tau)
-       (b tau)
-       (f (hom a b))
-       (m ((state s) a)))
-      ((state s) b))
+  (witness (functor-form (state s))
     (lambda (a b f m)
       (lambda (env)
         (destruct (m env)

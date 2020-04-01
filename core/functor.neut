@@ -13,8 +13,22 @@
 ;;     (elem-1 ((_ (bar a))) u64)
 ;;     (elem-2 ((_ (bar a))) (hom tau a))))
 
+(definition functor-form ((m (hom tau tau)))
+  (pi
+    ((a tau)
+     (b tau)
+     (_ (hom a b))
+     (_ (m a)))
+    (m b)))
 
 (coinductive functor ((f (hom tau tau)))
   (map ((_ (functor f)))
-    (pi ((a tau) (b tau) (_ (hom a b)) (_ (f a)))
-      (f b))))
+    (functor-form f)))
+;;     (pi ((a tau) (b tau) (_ (hom a b)) (_ (f a)))
+;;       (f b))))
+
+;; (coinductive functor ((f (hom tau tau)))
+;;   (map ((_ (functor f)))
+;;     (pi ((a tau) (b tau) (_ (hom a b)) (_ (f a)))
+;;       (f b))))
+;; axiom-functorとかってしてもいいかも。
