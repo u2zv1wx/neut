@@ -1,38 +1,77 @@
 ;; state.neut
 
+(include library "core/functor.neut")
+
 (use top)
 
-(definition state ((s tau) (a tau))
-  (pi ((_ s)) (product s a)))
+(definition state ((s tau))
+  (witness (hom tau tau)
+    (lambda (a)
+      (hom s (product s a)))))
 
 (section state)
 
-(definition map ([s tau] [a tau] [b tau] (f (hom a b)) (m (state s a)))
-  (witness (state s b)
-    (lambda ((env s))
-      (destruct (m env)
-        ((new-env s) (val a))
-        (tuple new-env (f val))))))
+(definition map ((s tau))
+  (witness
+    (pi
+      ((a tau)
+       (b tau)
+       (f (hom a b))
+       (m ((state s) a)))
+      ((state s) b))
+    (lambda (a b f m)
+      (lambda (env)
+        (destruct (m env)
+          (new-env val)
+          (tuple new-env (f val)))))))
 
-(definition return ([s tau] [a tau] (x a))
-  (witness (state s a)
-    (lambda ((env s))
-      (tuple env x))))
+(definition return ((s tau))
+  (witness
+    (pi
+      ((a tau)
+       (x a))
+      ((state s) a))
+    (lambda (a x)
+      (lambda (env)
+        (tuple env x)))))
 
-(definition bind ([s tau] [a tau] [b tau] (comp (state s a)) (k (hom a (state s b))))
-  (witness (state s b)
-    (lambda ((env s))
-      (destruct (comp env)
-        ((new-env s) (val a))
-        ((k val) new-env)))))
+(definition bind ((s tau))
+  (witness
+    (pi
+      ((a tau)
+       (b tau)
+       (comp ((state s) a))
+       (k (hom a ((state s) b))))
+      ((state s) b))
+    (lambda (a b comp k)
+      (lambda (env)
+        (destruct (comp env)
+          (new-env val)
+          ((k val) new-env))))))
 
 (definition get ([s tau])
-  (witness (state s s)
+  (witness ((state s) s)
     (lambda (env) (tuple env env))))
 
 (definition put ([s tau] (env s))
-  (witness (state s top)
+  (witness ((state s) top)
     (lambda (_) (tuple env unit))))
+
+(definition witness-functor ((s tau))
+  (witness (functor (state s))
+    (record (functor (state s))
+      (map
+        (state:map s)))))
+
+(definition witness-monad ((s tau))
+  (witness (monad (state s))
+    (record (monad (state s))
+      (witness-functor
+        (state:witness-functor s))
+      (return
+        (state:return s))
+      (bind
+        (state:bind s)))))
 
 (end state)
 
