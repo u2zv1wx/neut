@@ -10,6 +10,8 @@ module Elaborate.Infer
   , univInstWith
   , instantiate
   , insWeakTypeEnv
+  , newTypeHoleInCtx
+  , Context
   ) where
 
 import Control.Monad.Except
@@ -25,7 +27,6 @@ import Data.Basic
 import Data.Env
 import Data.Term hiding (IdentifierPlus)
 import Data.WeakTerm
-import Reduce.WeakTerm
 
 type Context = [IdentifierPlus]
 
@@ -245,27 +246,28 @@ infer' ctx (m, WeakTermCase (e, t) cxtes) = do
   (e', t', ml') <- infer' ctx e
   insConstraintEnv tInd t'
   insLevelEQ mlInd ml'
+  resultType <- newTypeHoleInCtx ctx m
+  resultLevel <- newLevelLE m []
   if null cxtes
     then do
-      h <- newTypeHoleInCtx ctx m
-      ml <- newLevelLE m []
-      return ((m, WeakTermCase (e', t') []), h, ml) -- ex falso quodlibet
+      return ((m, WeakTermCase (e', t') []), resultType, resultLevel) -- ex falso quodlibet
     else do
       (name, indInfo) <- getIndInfo $ map (fst . fst) cxtes
       (indType, argHoleList) <- constructIndType ctx name
       -- indType = a @ (HOLE, ..., HOLE)
       insConstraintEnv indType tInd
-      resultType <- newTypeHoleInCtx ctx m
-      resultLevel <- newLevelLE m []
       cxtes' <-
         forM (zip indInfo cxtes) $ \(is, (((mc, c), patArgs), body)) -> do
           let usedHoleList = map (\i -> argHoleList !! i) is
           let var = (mc {metaIsExplicit = True}, WeakTermUpsilon c)
-          let hs = map (\(h, _, _) -> h) usedHoleList
-          patArgs' <- inferPatArgs ctx patArgs
-          let vs = map (\(mx, x, _) -> (mx, WeakTermUpsilon x)) patArgs'
-          let app = (mc, WeakTermPiElim var (hs ++ vs))
-          _ <- infer' ctx app
+          (patArgs', mls) <- unzip <$> inferPatArgs ctx patArgs
+          let items =
+                zipWith
+                  (\(mx, x, tx) ml -> ((mx, WeakTermUpsilon x), tx, ml))
+                  patArgs'
+                  mls
+          etl <- infer' ctx var
+          _ <- inferPiElim ctx m etl (usedHoleList ++ items)
           (body', bodyType, bodyLevel) <- infer' (ctx ++ patArgs') body
           insConstraintEnv resultType bodyType
           insLevelEQ resultLevel bodyLevel
@@ -308,7 +310,7 @@ constructIndType ctx i = do
           holeList <- mapM (const $ newHoleInCtx ctx m) xts
           _ <- applyArgs' xts holeList
           let es = map (\(h, _, _) -> h) holeList
-          return (reduceWeakTermPlus (m, WeakTermPiElim e' es), holeList)
+          return ((m, WeakTermPiElim e' es), holeList)
         _ -> undefined
     _ -> undefined
 
@@ -337,13 +339,14 @@ checkIntegrity' i (j:js) =
     then checkIntegrity' i js
     else raiseError (supMeta (fst i) (fst j)) "foo"
 
-inferPatArgs :: Context -> [IdentifierPlus] -> WithEnv [IdentifierPlus]
+inferPatArgs ::
+     Context -> [IdentifierPlus] -> WithEnv [(IdentifierPlus, UnivLevelPlus)]
 inferPatArgs _ [] = return []
 inferPatArgs ctx ((mx, x, t):xts) = do
-  tl'@(t', _) <- inferType' ctx t
+  tl'@(t', ml) <- inferType' ctx t
   insWeakTypeEnv x tl'
   xts' <- inferPatArgs (ctx ++ [(mx, x, t')]) xts
-  return $ (mx, x, t') : xts'
+  return $ ((mx, x, t'), ml) : xts'
 
 insertHoleIfNecessary ::
      WeakTermPlus -> [WeakTermPlus] -> WithEnv [WeakTermPlus]
@@ -417,32 +420,6 @@ instantiate m t l = do
   (up, (_, t'), l') <- univInst (weaken t) l
   return (up, (m, t'), UnivLevelPlus (m, l'))
 
--- supplyImplicit ::
---      Meta -> Identifier -> [IdentifierPlus] -> WithEnv [IdentifierPlus]
--- supplyImplicit m c xts = do
---   ienv <- gets impEnv
---   t <- lookupTypeEnv' m c
---   case (t, IntMap.lookup (asInt c) ienv) of
---     ((_, TermPi _ yts _), Just is) -> do
---       let argLen = length yts
---       supplyImplicit' m 0 argLen is xts
---     (_, Nothing) -> return xts
---     _ ->
---       raiseCritical m $
---       "the type of " <>
---       asText' c <> " must be a pi-type, but is:\n" <> toText (weaken t)
--- supplyImplicit' ::
---      Meta -> Int -> Int -> [Int] -> [IdentifierPlus] -> WithEnv [IdentifierPlus]
--- supplyImplicit' m idx len is xts
---   | idx < len = do
---     if idx `elem` is
---       then do
---         xts' <- supplyImplicit' m (idx + 1) len is xts
---         h <- newNameWith' "pat"
---         t <- newHole m
---         return $ (m, h, t) : xts'
---       else supplyImplicit' m (idx + 1) len is xts
---   | otherwise = return xts
 inferType' :: Context -> WeakTermPlus -> WithEnv (WeakTermPlus, UnivLevelPlus)
 inferType' ctx t = do
   (t', u, l) <- infer' ctx t
@@ -585,12 +562,6 @@ constrainList (t1:t2:ts) = do
   insConstraintEnv t1 t2
   constrainList $ t2 : ts
 
--- constrainLevelList :: [UnivLevelPlus] -> WithEnv ()
--- constrainLevelList [] = return ()
--- constrainLevelList [_] = return ()
--- constrainLevelList (l1:l2:ls) = do
---   insLevelEQ l1 l2
---   constrainLevelList $ l2 : ls
 insConstraintEnv :: WeakTermPlus -> WeakTermPlus -> WithEnv ()
 insConstraintEnv t1 t2 =
   modify (\e -> e {constraintEnv = (t1, t2) : constraintEnv e})

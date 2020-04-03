@@ -39,9 +39,9 @@ import qualified Data.UnionFind as UF
 elaborate :: WeakStmt -> WithEnv TermPlus
 elaborate stmt = do
   tmp <- reduceTermPlus <$> elaborateStmt stmt
-  -- _ <- error "stop."
   -- p "elaborated:"
   -- p $ T.unpack $ toText (weaken tmp)
+  -- _ <- error "stop."
   -- p "tenv:"
   -- tenv <- gets typeEnv
   -- p' tenv
@@ -62,13 +62,18 @@ elaborateStmt (WeakStmtLet m (mx, x@(I (_, i)), t) e cont) = do
   insLevelEQ mle mlt
   -- Kantian type-inference ;)
   -- cs <- gets constraintEnv
+  -- forM_ cs $ \(e1, e2) -> do
+  --   p "--------------"
+  --   p $ T.unpack (toText e1)
+  --   p $ T.unpack (toText e2)
+  -- p "--------------"
   -- p' cs
   analyze >> synthesize >> refine >> cleanup
   -- p' e'
   -- p' t'
   e'' <- elaborate' e'
   t'' <- reduceTermPlus <$> elaborate' t'
-  -- p "--------------"
+  -- p "---------------------------------------------"
   -- p $ T.unpack (asText' x) <> " : " <> T.unpack (toText (weaken t''))
   -- p $ T.unpack (toText $ weaken e'')
   insTypeEnv x t'' mlt
@@ -87,6 +92,8 @@ elaborateStmt (WeakStmtLetWT m (mx, x@(I (_, i)), t) e cont)
   t'' <- reduceTermPlus <$> elaborate' t'
   insTypeEnv x t'' mlt
   modify (\env -> env {cacheEnv = IntMap.insert i (Left e') (cacheEnv env)})
+  -- p "--------------"
+  -- p $ T.unpack (asText' x) <> " : " <> T.unpack (toText (weaken t''))
   cont' <- elaborateStmt cont
   x' <- newNameWith x
   let c = (m, TermConst x emptyUP)
@@ -302,21 +309,14 @@ elaborate' (m, WeakTermPiIntroPlus ind (name, is, args1, args2) xts e) = do
   e' <- elaborate' e
   xts' <- mapM elaboratePlus xts
   return (m, TermPiIntroPlus ind (name, is, args1', args2') xts' e')
-elaborate' (_, WeakTermPiElim (mh, WeakTermZeta h@(I (_, x))) es) = do
+elaborate' (m, WeakTermPiElim (mh, WeakTermZeta h@(I (_, x))) es) = do
   sub <- gets substEnv
   case IntMap.lookup x sub of
     Nothing -> do
       p' h
       raiseError mh $
         "couldn't instantiate the hole here since no constraints are given on it"
-    Just (_, WeakTermPiIntro xts e)
-      | length xts == length es -> do
-        let xs = map (\(_, y, _) -> y) xts
-        elaborate' $ substWeakTermPlus (zip xs es) e
-    Just _ ->
-      raiseCritical mh $
-      "the hole " <>
-      asText' h <> " is not registered in the substitution environment"
+    Just e -> elaborate' $ reduceWeakTermPlus (m, WeakTermPiElim e es)
 elaborate' (m, WeakTermPiElim e es) = do
   e' <- elaborate' e
   es' <- mapM elaborate' es
@@ -425,13 +425,10 @@ elaborate' (m, WeakTermCase (e, t) cxtes) = do
   cxtes' <-
     forM cxtes $ \((c, xts), body) -> do
       xts' <- mapM elaboratePlus xts
-      -- let xts'' = map reduceTermIdentPlus xts'
       body' <- elaborate' body
       return ((c, xts'), body')
   t' <- elaborate' t
   t'' <- reduceWeakType $ weaken t'
-  -- p "cxtes:"
-  -- p' cxtes'
   case t'' of
     (_, WeakTermPi (Just name) _ _) -> do
       eenv <- gets enumEnv

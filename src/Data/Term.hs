@@ -64,6 +64,10 @@ termZero m = (m, TermEnumIntro (EnumValueIntS 64 0))
 termPi :: [IdentifierPlus] -> TermPlus -> Term
 termPi = TermPi Nothing
 
+asUpsilon :: TermPlus -> Maybe Identifier
+asUpsilon (_, TermUpsilon x) = Just x
+asUpsilon _ = Nothing
+
 varTermPlus :: TermPlus -> [Identifier]
 varTermPlus (_, TermTau _) = []
 varTermPlus (_, TermUpsilon x) = [x]

@@ -14,6 +14,9 @@ reduceTermPlus (m, TermPi mName xts cod) = do
   let ts' = map reduceTermPlus ts
   let cod' = reduceTermPlus cod
   (m, TermPi mName (zip3 ms xs ts') cod')
+reduceTermPlus (_, TermPiIntro xts (_, TermPiElim e args))
+  | Just ys <- mapM asUpsilon args
+  , ys == map (\(_, x, _) -> x) xts = e
 reduceTermPlus (m, TermPiIntro xts e) = do
   let (ms, xs, ts) = unzip3 xts
   let ts' = map reduceTermPlus ts
@@ -102,6 +105,17 @@ reduceTermPlus (m, TermStructElim xks e1 e2) = do
       , (es, ks2) <- unzip eks
       , ks1 == ks2 -> reduceTermPlus $ substTermPlus (zip (map asInt xs) es) e2
     _ -> (m, TermStructElim xks e1' e2)
+reduceTermPlus (m, TermCase (e, t) cxtes) = do
+  let e' = reduceTermPlus e
+  let t' = reduceTermPlus t
+  let cxtes'' =
+        flip map cxtes $ \((c, xts), body) -> do
+          let (ms, xs, ts) = unzip3 xts
+          let ts' = map reduceTermPlus ts
+          let body' = reduceTermPlus body
+          ((c, zip3 ms xs ts'), body')
+  (m, TermCase (e', t') cxtes'')
+-- fixme: add reduction for case
 reduceTermPlus t = t
 
 reduceTermIdentPlus :: IdentifierPlus -> IdentifierPlus
