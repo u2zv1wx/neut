@@ -2,6 +2,7 @@
 
 module Reduce.WeakTerm
   ( reduceWeakTermPlus
+  , reduceWeakTermIdentPlus
   ) where
 
 import Data.WeakTerm

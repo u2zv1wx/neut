@@ -2,6 +2,7 @@
 
 module Reduce.Term
   ( reduceTermPlus
+  , reduceTermIdentPlus
   ) where
 
 import Data.Basic

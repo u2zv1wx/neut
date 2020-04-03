@@ -79,10 +79,10 @@
     (fake:unfold
       fake
       (lambda ((_ (fake option))) option:map)
-      (unsafe:cast i64 (fake option) (i64 10)))))
+      (unsafe:cast (hom tau tau) (fake option) (lambda (x) x)))))
       ;; (map
       ;;   option:map))))
 
 (let pohe (functor-form option)
   (case witness-fake
-    ((fake:unfold f ma base-value) (ma (i64 10)))))
+    ((fake:unfold f ma base-value) (ma base-value))))

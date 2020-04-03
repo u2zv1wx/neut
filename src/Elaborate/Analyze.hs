@@ -253,7 +253,7 @@ simpPattern ::
 simpPattern h1@(I (_, i)) ies1 _ e2 cs = do
   xss <- mapM toVarList ies1
   let lam = bindFormalArgs e2 xss
-  p $ "resolve: " <> T.unpack (asText' h1) <> " ~> " <> T.unpack (toText lam)
+  -- p $ "resolve: " <> T.unpack (asText' h1) <> " ~> " <> T.unpack (toText lam)
   modify (\env -> env {substEnv = IntMap.insert i lam (substEnv env)})
   visit h1
   simp cs
