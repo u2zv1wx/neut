@@ -41,7 +41,7 @@ clarify' tenv lam@(m, TermPiIntroNoReduce mxts e) = do
   fvs <- nubFVS <$> chainTermPlus' tenv lam
   e' <- clarify' (insTypeEnv1 mxts tenv) e
   retClosure tenv Nothing fvs m mxts e'
-clarify' tenv (m, TermPiIntroPlus indName (name, args1, args2) mxts e) = do
+clarify' tenv (m, TermPiIntroPlus (I (indName, _)) (name, _, args1, args2) mxts e) = do
   name' <- lookupLLVMEnumEnv m $ indName <> ":" <> name
   e' <- clarify' (insTypeEnv1 mxts tenv) e
   retClosure tenv (Just name') (args1 ++ args2) m mxts e'

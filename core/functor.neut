@@ -27,6 +27,13 @@
 ;;     (pi ((a tau) (b tau) (_ (hom a b)) (_ (f a)))
 ;;       (f b))))
 
+(inductive fake ((f (hom tau tau)))
+  (unfold
+    ((k (hom (hom tau tau) tau))
+     (_ (pi ((_ (k f))) (functor-form f)))
+     (_ (k f)))
+    (fake f)))
+
 ;; (coinductive functor ((f (hom tau tau)))
 ;;   (map ((_ (functor f)))
 ;;     (pi ((a tau) (b tau) (_ (hom a b)) (_ (f a)))

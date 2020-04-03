@@ -67,3 +67,22 @@
         option:bind))))
 
 (end option)
+
+;; 射影はこういう実装になるはずだけど。推論が通ってねえ。
+;; やっぱcaseの推論は修正する必要がある。
+;; (let k (functor-form option)
+;;   (case option:witness-functor
+;;     ((functor:unfold f ma base-value) (ma base-value))))
+
+(definition witness-fake
+  (witness (fake option)
+    (fake:unfold
+      fake
+      (lambda ((_ (fake option))) option:map)
+      (unsafe:cast i64 (fake option) (i64 10)))))
+      ;; (map
+      ;;   option:map))))
+
+(let k (functor-form option)
+  (case witness-fake
+    ((fake:unfold f ma base-value) (ma base-value))))

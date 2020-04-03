@@ -65,9 +65,10 @@ data Env =
     , formationEnv :: IntMap.IntMap (Maybe WeakTermPlus)
     , labelEnv :: Map.HashMap T.Text [T.Text] -- "stream" ~> ["stream", "other-record-type", "head", "tail", "other-destructor"]
     , inductiveEnv :: RuleEnv -- "list" ~> (cons, Pi (A : tau). A -> list A -> list A)
+    , consToInd :: IntMap.IntMap Int -- "list:cons-8" ~> list
+    , consToArgs :: IntMap.IntMap [Int] -- "list:cons-8" ~> [0] (the used indices of xts)
     , introEnv :: S.Set Int -- set of the names of constructors (e.g. ["nil", "cons", "zero", "succ", ...] (as int))
     , nonCandSet :: S.Set T.Text
-    , patVarEnv :: S.Set Int
     -- elaborate
     , impEnv :: IntMap.IntMap [Int] -- var ~> (index of implicit arguments of the var)
     , weakTypeEnv :: IntMap.IntMap (WeakTermPlus, UnivLevelPlus) -- var ~> (typeof(var), level-of-type)
@@ -109,6 +110,8 @@ initialEnv =
     , revCaseEnv = IntMap.empty
     , nameEnv = Map.empty
     , revNameEnv = IntMap.empty
+    , consToInd = IntMap.empty
+    , consToArgs = IntMap.empty
     , prefixEnv = []
     , namespace = []
     , formationEnv = IntMap.empty
@@ -116,7 +119,6 @@ initialEnv =
     , introEnv = S.empty
     , nonCandSet = S.empty
     , labelEnv = Map.empty
-    , patVarEnv = S.empty
     , equalityEnv = []
     , univInstEnv = IntMap.empty
     , univRenameEnv = IntMap.empty

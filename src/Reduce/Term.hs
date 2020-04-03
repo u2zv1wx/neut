@@ -23,12 +23,12 @@ reduceTermPlus (m, TermPiIntroNoReduce xts e) = do
   let ts' = map reduceTermPlus ts
   let e' = reduceTermPlus e
   (m, TermPiIntroNoReduce (zip3 ms xs ts') e')
-reduceTermPlus (m, TermPiIntroPlus ind (name, args1, args2) xts e) = do
+reduceTermPlus (m, TermPiIntroPlus ind (name, is, args1, args2) xts e) = do
   let args1' = map reduceTermIdentPlus args1
   let args2' = map reduceTermIdentPlus args2
   let xts' = map reduceTermIdentPlus xts
   let e' = reduceTermPlus e
-  (m, TermPiIntroPlus ind (name, args1', args2') xts' e')
+  (m, TermPiIntroPlus ind (name, is, args1', args2') xts' e')
 reduceTermPlus (m, TermPiElim e es) = do
   let e' = reduceTermPlus e
   let es' = map reduceTermPlus es

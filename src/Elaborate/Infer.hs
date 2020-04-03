@@ -83,7 +83,7 @@ infer' ctx (m, WeakTermPiIntroNoReduce xts e) = do
   let (xts', mlPiArgs) = unzip xtls'
   mlPi <- newLevelLE m $ mlPiCod : mlPiArgs
   return ((m, WeakTermPiIntroNoReduce xts' e'), (m, weakTermPi xts' t'), mlPi)
-infer' ctx (m, WeakTermPiIntroPlus ind (name, args1, args2) xts e) = do
+infer' ctx (m, WeakTermPiIntroPlus ind (name, is, args1, args2) xts e) = do
   let args = args1 ++ args2
   (args', _) <- unzip <$> inferSigma ctx args
   let args1' = take (length args1) args'
@@ -92,8 +92,8 @@ infer' ctx (m, WeakTermPiIntroPlus ind (name, args1, args2) xts e) = do
   let (xts', mlPiArgs) = unzip xtls'
   mlPi <- newLevelLE m $ mlPiCod : mlPiArgs
   return
-    ( (m, WeakTermPiIntroPlus ind (name, args1', args2') xts' e')
-    , (m, WeakTermPi (Just ind) xts' t') -- fixme: lookup indName
+    ( (m, WeakTermPiIntroPlus ind (name, is, args1', args2') xts' e')
+    , (m, WeakTermPi (Just $ asText ind) xts' t') -- fixme: lookup indName
     , mlPi)
 infer' ctx (m, WeakTermPiElim e es) = do
   es' <- insertHoleIfNecessary e es
@@ -250,31 +250,100 @@ infer' ctx (m, WeakTermCase (e, t) cxtes) = do
       ml <- newLevelLE m []
       return ((m, WeakTermCase (e', t') []), h, ml) -- ex falso quodlibet
     else do
-      cxttes' <-
-        forM cxtes $ \(((mc, c), xts), body) -> do
-          xts' <- supplyImplicit mc c xts >>= inferPatArgs ctx
-          -- fixme: inferSymbolからimplicitの議論を消したのでcaseのほうでも処理を更新する必要あり。
-          (tc, l) <- inferPattern mc c xts'
-          insConstraintEnv tc t'
-          insLevelEQ l mlInd
-          (body', bodyType, bodyLevel) <- infer' ctx body
-          return ((((mc, c), xts'), body'), (bodyType, bodyLevel))
-      let (cxtes', bodyTypeLevelList) = unzip cxttes'
-      let (bodyTypeList, bodyLevelList) = unzip bodyTypeLevelList
-      constrainList bodyTypeList
-      constrainLevelList bodyLevelList
-      return
-        ( (m, WeakTermCase (e', t') cxtes')
-        , head bodyTypeList
-        , head bodyLevelList)
+      (name, indInfo) <- getIndInfo $ map (fst . fst) cxtes
+      (indType, argHoleList) <- constructIndType name
+      insConstraintEnv indType tInd
+      resultType <- newTypeHoleInCtx ctx m
+      resultLevel <- newLevelLE m []
+      cxtes' <-
+        forM (zip indInfo cxtes) $ \(is, (((mc, c), xts), body)) -> do
+          let usedHoleList = map (\i -> argHoleList !! i) is
+          consType <- lookupTypeEnv' mc c
+          dom <- applyArgs consType usedHoleList
+          (ctx', xts') <- typeCheckAlong ctx dom xts
+          (body', bodyType, bodyLevel) <- infer' ctx' body
+          insConstraintEnv resultType bodyType
+          insLevelEQ resultLevel bodyLevel
+          return (((mc, c), xts'), body')
+      return ((m, WeakTermCase (e', t') cxtes'), resultType, resultLevel)
+          -- return ((((mc, c), xts'), body'), (bodyType, bodyLevel))
+          -- undefined
+          -- xts' <- supplyImplicit mc c xts
+          -- holeList <- mapM (\(mx, _, _) -> newHoleInCtx ctx mx) xts'
+          -- xts'' <- inferPatArgs ctx $ zip xts' holeList
+          -- (tc, l) <- inferPattern mc c holeList
+          -- insConstraintEnv tc t'
+          -- insLevelEQ l mlInd
+          -- (body', bodyType, bodyLevel) <- infer' ctx body
+          -- return ((((mc, c), xts''), body'), (bodyType, bodyLevel))
+      -- let (cxtes', bodyTypeLevelList) = unzip cxttes'
+      -- let (bodyTypeList, bodyLevelList) = unzip bodyTypeLevelList
+      -- constrainList bodyTypeList
+      -- constrainLevelList bodyLevelList
+
+typeCheckAlong ::
+     Context
+  -> [IdentifierPlus]
+  -> [IdentifierPlus]
+  -> WithEnv (Context, [IdentifierPlus])
+typeCheckAlong = undefined
+
+-- pi-typeからdom部分を抜いて、そのdomの冒頭を具体的なものに変換したものをつくる
+applyArgs ::
+     TermPlus -> [(WeakTermPlus, WeakTermPlus)] -> WithEnv [IdentifierPlus]
+applyArgs t ets = do
+  case weaken t of
+    (_, WeakTermPi _ xts _) -> applyArgs' xts ets
+    _ -> undefined
+
+applyArgs' ::
+     [IdentifierPlus]
+  -> [(WeakTermPlus, WeakTermPlus)]
+  -> WithEnv [IdentifierPlus]
+applyArgs' xts [] = return xts
+applyArgs' ((_, x, t):xts) (et:ets) = do
+  insConstraintEnv t (snd et)
+  let xts' = substWeakTermPlus' [(x, (fst et))] xts
+  applyArgs' xts' ets
+applyArgs' [] _ = undefined
+
+constructIndType ::
+     Int -> WithEnv (WeakTermPlus, [(WeakTermPlus, WeakTermPlus)])
+constructIndType = undefined
+
+getIndInfo :: [(Meta, Identifier)] -> WithEnv (Int, [[Int]])
+getIndInfo cs = do
+  (indNameList, usedPosList) <- unzip <$> mapM getIndInfo' cs
+  checkIntegrity indNameList
+  return (snd $ head indNameList, usedPosList)
+
+getIndInfo' :: (Meta, Identifier) -> WithEnv ((Meta, Int), [Int])
+getIndInfo' (m, (I (_, j))) = do
+  cienv <- gets consToInd
+  caenv <- gets consToArgs
+  case (IntMap.lookup j cienv, IntMap.lookup j caenv) of
+    (Just i, Just is) -> return ((m, i), is)
+    _ -> undefined
+
+checkIntegrity :: [(Meta, Int)] -> WithEnv ()
+checkIntegrity [] = return ()
+checkIntegrity (mi:is) = checkIntegrity' mi is
+
+checkIntegrity' :: (Meta, Int) -> [(Meta, Int)] -> WithEnv ()
+checkIntegrity' _ [] = return ()
+checkIntegrity' i (j:js) =
+  if snd i == snd j
+    then checkIntegrity' i js
+    else raiseError (supMeta (fst i) (fst j)) "foo"
 
 inferPattern ::
      Meta
   -> Identifier
-  -> [IdentifierPlus]
+  -- -> [IdentifierPlus]
+  -> [(WeakTermPlus, WeakTermPlus, UnivLevelPlus)]
   -> WithEnv (WeakTermPlus, UnivLevelPlus)
 inferPattern m c xts = do
-  (_, t, l) <- inferSymbol m c -- ここでctxを与えてるのがへん？
+  (_, t, l) <- inferSymbol m c
   case t of
     (_, WeakTermPi _ yts cod)
       | length xts == length yts -> do
@@ -283,28 +352,66 @@ inferPattern m c xts = do
     _ -> raiseError m "arity mismatch"
 
 inferPattern' ::
-     [IdentifierPlus]
+     [(WeakTermPlus, WeakTermPlus, UnivLevelPlus)]
+  -- [IdentifierPlus]
   -> [IdentifierPlus]
   -> WeakTermPlus
   -> WithEnv WeakTermPlus
 inferPattern' [] [] cod = return cod
-inferPattern' ((mx, x, tx):xts) ((my, y, ty):yts) cod = do
-  insConstraintEnv tx ty
-  let varX = (supMeta mx my, WeakTermUpsilon x)
-  let (yts', cod') = substWeakTermPlus'' [(y, varX)] yts cod
+inferPattern' ((app, higherApp, _):xts) ((_, y, ty):yts) cod
+  -- p "ins-pat':"
+  -- p' (higherApp, ty)
+ = do
+  insConstraintEnv higherApp ty
+  let (yts', cod') = substWeakTermPlus'' [(y, app)] yts cod
   inferPattern' xts yts' cod'
+  -- undefined
+  -- insConstraintEnv tx ty
+  -- -- p "ins-constraint:"
+  -- -- p' (tx, ty)
+  -- let varX = (supMeta mx my, WeakTermUpsilon x)
+  -- let (yts', cod') = substWeakTermPlus'' [(y, varX)] yts cod
+  -- inferPattern' xts yts' cod'
+-- inferPattern' ((mx, x, tx):xts) ((my, y, ty):yts) cod = do
+--   insConstraintEnv tx ty
+--   -- p "ins-constraint:"
+--   -- p' (tx, ty)
+--   let varX = (supMeta mx my, WeakTermUpsilon x)
+--   let (yts', cod') = substWeakTermPlus'' [(y, varX)] yts cod
+--   inferPattern' xts yts' cod'
 inferPattern' _ _ _ =
   raiseCritical' "invalid argument(s) passed to Infer.inferPattern"
 
-inferPatArgs :: Context -> [IdentifierPlus] -> WithEnv [IdentifierPlus]
+inferPatArgs ::
+     Context
+  -> [(IdentifierPlus, (WeakTermPlus, WeakTermPlus, UnivLevelPlus))]
+  -> WithEnv [IdentifierPlus]
 inferPatArgs _ [] = return []
-inferPatArgs ctx ((mx, x, t):xts) = do
-  tl'@(t', _) <- inferType' ctx t
-  insWeakTypeEnv x tl'
-  modify (\env -> env {patVarEnv = S.insert (asInt x) (patVarEnv env)})
-  xts' <- inferPatArgs (ctx ++ [(mx, x, t')]) xts
-  return $ (mx, x, t') : xts'
+inferPatArgs ctx (((mx, x, t), (app, higherApp, ml)):xts) = do
+  (t', mlx) <- inferType' ctx t
+  -- p "ins-pat-arg-type:"
+  -- p' (x, tl')
+  -- p "ins-pat-args:"
+  -- p' (t', higherApp)
+  p "pat-arg-equivalence:"
+  p' (x, app)
+  insConstraintEnv t' higherApp
+  insLevelEQ mlx ml
+  insWeakTypeEnv x (higherApp, ml)
+  xts' <- inferPatArgs ctx xts
+  -- xts' <- inferPatArgs (ctx ++ [(mx, x, higherApp)]) xts
+  return $ (mx, x, higherApp) : xts'
 
+-- inferPatArgs :: Context -> [IdentifierPlus] -> WithEnv [IdentifierPlus]
+-- inferPatArgs _ [] = return []
+-- inferPatArgs ctx ((mx, x, t):xts) = do
+--   tl'@(t', _) <- inferType' ctx t
+--   -- p "ins-pat-arg-type:"
+--   -- p' (x, tl')
+--   insWeakTypeEnv x tl'
+--   modify (\env -> env {patVarEnv = S.insert (asInt x) (patVarEnv env)})
+--   xts' <- inferPatArgs (ctx ++ [(mx, x, t')]) xts
+--   return $ (mx, x, t') : xts'
 insertHoleIfNecessary ::
      WeakTermPlus -> [WeakTermPlus] -> WithEnv [WeakTermPlus]
 insertHoleIfNecessary (m, WeakTermUpsilon x) es
@@ -643,12 +750,12 @@ univInst' (m, WeakTermPiIntroNoReduce xts e) = do
   xts' <- univInstArgs xts
   e' <- univInst' e
   return (m, WeakTermPiIntroNoReduce xts' e')
-univInst' (m, WeakTermPiIntroPlus ind (name, args1, args2) xts e) = do
+univInst' (m, WeakTermPiIntroPlus ind (name, is, args1, args2) xts e) = do
   args1' <- univInstArgs args1
   args2' <- univInstArgs args2
   xts' <- univInstArgs xts
   e' <- univInst' e
-  return (m, WeakTermPiIntroPlus ind (name, args1', args2') xts' e')
+  return (m, WeakTermPiIntroPlus ind (name, is, args1', args2') xts' e')
 univInst' (m, WeakTermPiElim e es) = do
   e' <- univInst' e
   es' <- mapM univInst' es

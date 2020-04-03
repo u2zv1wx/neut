@@ -22,6 +22,7 @@ import qualified Codec.Compression.GZip as GZip
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as L
 import qualified Data.HashMap.Strict as Map
+import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
@@ -264,8 +265,9 @@ parse' ((m, TreeNode (coind@(_, TreeLeaf "coinductive"):rest)):as)
     registerLabelInfo rest'
     rest'' <- asInductive rest'
     stmtList1 <- parseInductive m rest''
-    stmtList2 <- parse' as
-    return $ stmtList1 ++ stmtList2
+    -- stmtList2 <- constructProjections rest'
+    stmtList3 <- parse' as
+    return $ stmtList1 ++ stmtList3
 parse' ((m, TreeNode ((mLet, TreeLeaf "let"):rest)):as)
   | [(mx, TreeLeaf x), t, e] <- rest = do
     let xt = (mx, TreeNode [(mx, TreeLeaf x), t])
@@ -400,6 +402,8 @@ styleRule (m, TreeNode [(mName, TreeLeaf name), (_, TreeNode xts), t]) = do
         ])
 styleRule t = raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) TREE)"
 
+-- constructProjections :: [TreePlus] -> WithEnv [QuasiStmt]
+-- constructProjections = undefined
 parseBorrow :: WeakTermPlus -> (Maybe (Meta, Identifier), WeakTermPlus)
 parseBorrow (m, WeakTermUpsilon (I (s, _)))
   | T.length s > 1
@@ -578,9 +582,11 @@ concatQuasiStmtList ((QuasiStmtLetInductive n m at e):es) = do
   cont <- concatQuasiStmtList es
   return $ WeakStmtLetWT m at e cont
   -- return $ WeakStmtLet m at e cont
-concatQuasiStmtList (QuasiStmtLetInductiveIntro m bt e as:ss) = do
+concatQuasiStmtList (QuasiStmtLetInductiveIntro m bt@(_, I (_, j), _) e as:ss) = do
   case e of
-    (_, WeakTermPiIntroNoReduce xtsyts (_, WeakTermPiIntroPlus ai (bi, xts, yts) atsbts (_, WeakTermPiElim b _))) -> do
+    (_, WeakTermPiIntroNoReduce xtsyts (_, WeakTermPiIntroPlus ai@(I (_, i)) (bi, is, xts, yts) atsbts (_, WeakTermPiElim b _))) -> do
+      modify (\env -> env {consToInd = IntMap.insert j i (consToInd env)})
+      modify (\env -> env {consToArgs = IntMap.insert j is (consToArgs env)})
       let isub = zip as (map toVar' atsbts) -- outer ~> innerで、ytsの型のなかのouterをinnerにしていく
       yts' <- mapM (internalize isub atsbts) $ drop (length xts) xtsyts
       insInductive as bt -- register the constructor (if necessary)
@@ -591,7 +597,7 @@ concatQuasiStmtList (QuasiStmtLetInductiveIntro m bt e as:ss) = do
                 ( m
                 , WeakTermPiIntroPlus
                     ai
-                    (bi, xts, yts)
+                    (bi, is, xts, yts)
                     atsbts
                     (m, WeakTermPiElim b yts')))
       cont <- concatQuasiStmtList ss

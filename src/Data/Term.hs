@@ -16,8 +16,9 @@ data Term
   | TermPiIntro [IdentifierPlus] TermPlus
   | TermPiIntroNoReduce [IdentifierPlus] TermPlus
   | TermPiIntroPlus
-      T.Text -- name of corresponding inductive type
-      (T.Text, [IdentifierPlus], [IdentifierPlus]) -- (name of constructor, args of constructor)
+      Identifier -- name of corresponding inductive type
+      -- (T.Text, [IdentifierPlus], [IdentifierPlus]) -- (name of constructor, args of constructor)
+      (T.Text, [Int], [IdentifierPlus], [IdentifierPlus]) -- (name of constructor, args of constructor)
       [IdentifierPlus]
       TermPlus
   | TermPiElim TermPlus [TermPlus]
@@ -127,12 +128,12 @@ substTermPlus sub (m, TermPiIntro xts body) = do
 substTermPlus sub (m, TermPiIntroNoReduce xts body) = do
   let (xts', body') = substTermPlus'' sub xts body
   (m, TermPiIntroNoReduce xts' body')
-substTermPlus sub (m, TermPiIntroPlus ind (name, args1, args2) xts body) = do
+substTermPlus sub (m, TermPiIntroPlus ind (name, is, args1, args2) xts body) = do
   let args' = substTermPlus' sub $ args1 ++ args2
   let args1' = take (length args1) args'
   let args2' = drop (length args1) args'
   let (xts', body') = substTermPlus'' sub xts body
-  (m, TermPiIntroPlus ind (name, args1', args2') xts' body')
+  (m, TermPiIntroPlus ind (name, is, args1', args2') xts' body')
 substTermPlus sub (m, TermPiElim e es) = do
   let e' = substTermPlus sub e
   let es' = map (substTermPlus sub) es
@@ -212,11 +213,11 @@ weaken (m, TermPiIntro xts body) = do
   (m, WeakTermPiIntro (weakenArgs xts) (weaken body))
 weaken (m, TermPiIntroNoReduce xts body) = do
   (m, WeakTermPiIntroNoReduce (weakenArgs xts) (weaken body))
-weaken (m, TermPiIntroPlus ind (name, args1, args2) xts body) = do
+weaken (m, TermPiIntroPlus ind (name, is, args1, args2) xts body) = do
   let args1' = weakenArgs args1
   let args2' = weakenArgs args2
   let xts' = (weakenArgs xts)
-  (m, WeakTermPiIntroPlus ind (name, args1', args2') xts' (weaken body))
+  (m, WeakTermPiIntroPlus ind (name, is, args1', args2') xts' (weaken body))
 weaken (m, TermPiElim e es) = do
   let e' = weaken e
   let es' = map weaken es

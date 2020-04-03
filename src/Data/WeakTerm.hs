@@ -15,8 +15,9 @@ data WeakTerm
   | WeakTermPiIntro [IdentifierPlus] WeakTermPlus
   | WeakTermPiIntroNoReduce [IdentifierPlus] WeakTermPlus
   | WeakTermPiIntroPlus
-      T.Text -- name of inductive type
-      (T.Text, [IdentifierPlus], [IdentifierPlus]) -- (name of construtor, xts, yts)
+      Identifier -- name of inductive type
+      (T.Text, [Int], [IdentifierPlus], [IdentifierPlus]) -- (name of construtor, xts, yts)
+      -- (T.Text, [IdentifierPlus], [IdentifierPlus]) -- (name of construtor, xts, yts)
       [IdentifierPlus]
       WeakTermPlus
   | WeakTermPiElim WeakTermPlus [WeakTermPlus]
@@ -242,12 +243,12 @@ substWeakTermPlus sub (m, WeakTermPiIntro xts body) = do
 substWeakTermPlus sub (m, WeakTermPiIntroNoReduce xts body) = do
   let (xts', body') = substWeakTermPlus'' sub xts body
   (m, WeakTermPiIntroNoReduce xts' body')
-substWeakTermPlus sub (m, WeakTermPiIntroPlus ind (name, args1, args2) xts body) = do
+substWeakTermPlus sub (m, WeakTermPiIntroPlus ind (name, is, args1, args2) xts body) = do
   let args' = substWeakTermPlus' sub $ args1 ++ args2
   let args1' = take (length args1) args'
   let args2' = drop (length args1) args'
   let (xts', body') = substWeakTermPlus'' sub xts body
-  (m, WeakTermPiIntroPlus ind (name, args1', args2') xts' body')
+  (m, WeakTermPiIntroPlus ind (name, is, args1', args2') xts' body')
 substWeakTermPlus sub (m, WeakTermPiElim e es) = do
   let e' = substWeakTermPlus sub e
   let es' = map (substWeakTermPlus sub) es
@@ -374,7 +375,7 @@ toText (_, WeakTermPiIntro xts e) = do
 toText (_, WeakTermPiIntroNoReduce xts e) = do
   let argStr = inParen $ showItems $ map showArg xts
   showCons ["λ", argStr, toText e]
-toText (_, WeakTermPiIntroPlus _ (_, _, _) xts e) = do
+toText (_, WeakTermPiIntroPlus _ (_, _, _, _) xts e) = do
   let argStr = inParen $ showItems $ map showArg xts
   showCons ["λ", argStr, toText e]
 -- toText (_, WeakTermPiIntroPlus _ (name, _, _) _ _) = do

@@ -50,6 +50,8 @@ elaborate stmt = do
 elaborateStmt :: WeakStmt -> WithEnv TermPlus
 elaborateStmt (WeakStmtReturn e) = do
   (e', _, _) <- infer e
+  -- cs <- gets constraintEnv
+  -- p' cs
   analyze >> synthesize >> refine
   checkUnivSanity
   elaborate' e'
@@ -59,7 +61,11 @@ elaborateStmt (WeakStmtLet m (mx, x@(I (_, i)), t) e cont) = do
   insConstraintEnv te t'
   insLevelEQ mle mlt
   -- Kantian type-inference ;)
+  -- cs <- gets constraintEnv
+  -- p' cs
   analyze >> synthesize >> refine >> cleanup
+  -- p' e'
+  -- p' t'
   e'' <- elaborate' e'
   t'' <- reduceTermPlus <$> elaborate' t'
   -- p "--------------"
@@ -290,16 +296,17 @@ elaborate' (m, WeakTermPiIntroNoReduce xts e) = do
   e' <- elaborate' e
   xts' <- mapM elaboratePlus xts
   return (m, TermPiIntroNoReduce xts' e')
-elaborate' (m, WeakTermPiIntroPlus ind (name, args1, args2) xts e) = do
+elaborate' (m, WeakTermPiIntroPlus ind (name, is, args1, args2) xts e) = do
   args1' <- mapM elaboratePlus args1
   args2' <- mapM elaboratePlus args2
   e' <- elaborate' e
   xts' <- mapM elaboratePlus xts
-  return (m, TermPiIntroPlus ind (name, args1', args2') xts' e')
+  return (m, TermPiIntroPlus ind (name, is, args1', args2') xts' e')
 elaborate' (_, WeakTermPiElim (mh, WeakTermZeta h@(I (_, x))) es) = do
   sub <- gets substEnv
   case IntMap.lookup x sub of
     Nothing -> do
+      p' h
       raiseError mh $
         "couldn't instantiate the hole here since no constraints are given on it"
     Just (_, WeakTermPiIntro xts e)
@@ -415,6 +422,8 @@ elaborate' (m, WeakTermStructElim xts e1 e2) = do
   return (m, TermStructElim xts e1' e2')
 elaborate' (m, WeakTermCase (e, t) cxtes) = do
   e' <- elaborate' e
+  p "cxtes:"
+  p' cxtes
   cxtes' <-
     forM cxtes $ \((c, xts), body) -> do
       xts' <- mapM elaboratePlus xts

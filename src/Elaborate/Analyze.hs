@@ -15,7 +15,7 @@ import Data.Maybe
 
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.PQueue.Min as Q
-import qualified Data.Set as S
+import qualified Data.Text as T
 
 import Data.Basic
 import Data.Constraint
@@ -61,9 +61,10 @@ simp' (((m1, WeakTermPiIntro xts1 e1), (m2, WeakTermPiIntro xts2 e2)):cs)
     xt2 <- asIdentPlus m2 e2
     simpBinder (xts1 ++ [xt1]) (xts2 ++ [xt2])
     simp cs
-simp' (((m1, WeakTermPiIntroPlus ind1 (name1, args11, args12) xts1 e1), (m2, WeakTermPiIntroPlus ind2 (name2, args21, args22) xts2 e2)):cs)
+simp' (((m1, WeakTermPiIntroPlus ind1 (name1, is1, args11, args12) xts1 e1), (m2, WeakTermPiIntroPlus ind2 (name2, is2, args21, args22) xts2 e2)):cs)
   | ind1 == ind2
   , name1 == name2
+  , is1 == is2
   , length args11 == length args21
   , length args12 == length args22 = do
     simpBinder (args11 ++ args12) (args21 ++ args22)
@@ -130,7 +131,7 @@ simp' ((e1@(m1, _), e2@(m2, _)):cs) = do
   -- list of stuck reasons (fmvs: free meta-variables)
   sub <- gets substEnv
   cenv <- gets cacheEnv
-  pvenv <- gets patVarEnv
+  -- pvenv <- gets patVarEnv
   let m = supMeta m1 m2
   let hs1 = holeWeakTermPlus e1
   let hs2 = holeWeakTermPlus e2
@@ -208,16 +209,22 @@ simp' ((e1@(m1, _), e2@(m2, _)):cs) = do
           | xs1 <- concatMap getVarList ies1
           , occurCheck h1 hs2
           , [] <- includeCheck xs1 e2 -> simpFlexRigid h1 ies1 e1' e2' fmvs cs
-        (Just (StuckPiElimUpsilon x1@(I (_, i1)) []), _)
-          | i1 `S.member` pvenv
-          , occurCheck x1 (varWeakTermPlus e2) -> do
-            modify (\env -> env {substEnv = IntMap.insert i1 e2' sub})
-            simp cs
-        (_, Just (StuckPiElimUpsilon x2@(I (_, i2)) []))
-          | i2 `S.member` pvenv
-          , occurCheck x2 (varWeakTermPlus e1) -> do
-            modify (\env -> env {substEnv = IntMap.insert i2 e1' sub})
-            simp cs
+        -- (Just (StuckPiElimUpsilon x1@(I (_, i1)) []), _)
+        --   | i1 `S.member` pvenv
+        --   , occurCheck x1 (varWeakTermPlus e2) -> do
+        --     p $
+        --       "patvar-resolve: " <>
+        --       T.unpack (asText' x1) <> " ~> " <> T.unpack (toText e2')
+        --     modify (\env -> env {substEnv = IntMap.insert i1 e2' sub})
+        --     simp cs
+        -- (_, Just (StuckPiElimUpsilon x2@(I (_, i2)) []))
+        --   | i2 `S.member` pvenv
+        --   , occurCheck x2 (varWeakTermPlus e1) -> do
+        --     p $
+        --       "patvar-resolve: " <>
+        --       T.unpack (asText' x2) <> " ~> " <> T.unpack (toText e1')
+        --     modify (\env -> env {substEnv = IntMap.insert i2 e1' sub})
+        --     simp cs
         (Nothing, Just (StuckPiElimZeta h2 ies2))
           | xs2 <- concatMap getVarList ies2
           , occurCheck h2 hs1
@@ -246,7 +253,7 @@ simpPattern ::
 simpPattern h1@(I (_, i)) ies1 _ e2 cs = do
   xss <- mapM toVarList ies1
   let lam = bindFormalArgs e2 xss
-  -- p $ "resolve: " <> T.unpack (asText' h1) <> " ~> " <> T.unpack (toText lam)
+  p $ "resolve: " <> T.unpack (asText' h1) <> " ~> " <> T.unpack (toText lam)
   modify (\env -> env {substEnv = IntMap.insert i lam (substEnv env)})
   visit h1
   simp cs
