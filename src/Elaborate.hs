@@ -39,7 +39,7 @@ import qualified Data.UnionFind as UF
 elaborate :: WeakStmt -> WithEnv TermPlus
 elaborate stmt = do
   tmp <- reduceTermPlus <$> elaborateStmt stmt
-  -- _ <- error "stop."
+  _ <- error "stop."
   -- p "elaborated:"
   -- p $ T.unpack $ toText (weaken tmp)
   -- p "tenv:"
@@ -422,8 +422,6 @@ elaborate' (m, WeakTermStructElim xts e1 e2) = do
   return (m, TermStructElim xts e1' e2')
 elaborate' (m, WeakTermCase (e, t) cxtes) = do
   e' <- elaborate' e
-  p "cxtes:"
-  p' cxtes
   cxtes' <-
     forM cxtes $ \((c, xts), body) -> do
       xts' <- mapM elaboratePlus xts
