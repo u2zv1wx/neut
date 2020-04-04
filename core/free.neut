@@ -1,0 +1,65 @@
+(no-implicit-core)
+
+(include library "core/foundation.neut")
+
+(include library "core/functor.neut")
+
+(include library "core/monad.neut")
+
+(inductive free-flat ((g (hom tau tau)) (a tau))
+  (leaf
+    ((_ a))
+    (free-flat g a))
+  (node
+    ((b tau)
+     (_ (g b))
+     (_ (hom b (free-flat g a))))
+    (free-flat g a)))
+
+(use free-flat)
+
+(definition free ((g (hom tau tau)))
+  (witness (hom tau tau)
+    (lambda (a)
+      (free-flat g a))))
+
+(section free)
+
+(definition map ((g (hom tau tau)))
+  (witness (functor-form (free g))
+    (lambda (a b f m)
+      (case m
+        ((leaf x)
+          (leaf (f x)))
+        ((node p val cont)
+          (node p val
+            (lambda ((x p))
+              ((map g) a b f (cont x)))))))))
+
+(definition return ((g (hom tau tau)))
+  (witness (return-type (free g))
+    (lambda (a x)
+      (leaf x))))
+
+(definition bind ((g (hom tau tau)))
+  (witness (bind-type (free g))
+    (lambda
+      ((a tau)
+       (b tau)
+       (m ((free g) a))
+       (k (hom a ((free g) b))))
+      (case m
+        ((leaf x)
+          (k x))
+        ((node p val cont)
+          (node
+            p
+            val
+            (lambda ((x p))
+              ((bind g)
+                a
+                b
+                (cont x)
+                k))))))))
+
+(end free)
