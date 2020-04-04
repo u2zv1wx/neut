@@ -2,6 +2,8 @@
 
 (include "foundation.neut")
 
+(include "base.neut")
+
 (include "top.neut")
 
 (include "bool.neut")

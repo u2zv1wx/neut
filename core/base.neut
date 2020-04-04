@@ -1,0 +1,17 @@
+(no-implicit-core)
+
+(include "foundation.neut")
+
+(definition compose
+  ([a tau]
+   [b tau]
+   [c tau]
+   (f (hom a b))
+   (g (hom b c)))
+  (witness (hom a c)
+    (lambda ((x a))
+      (g (f x)))))
+
+(definition let-bind ([a tau] [b tau] (x a) (k (hom a b)))
+  (witness b
+    (k x)))

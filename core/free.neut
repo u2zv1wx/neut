@@ -6,6 +6,8 @@
 
 (include library "core/monad.neut")
 
+(include library "core/base.neut")
+
 (inductive free-internal ((g (hom tau tau)) (a tau))
   (leaf
     ((_ a))
@@ -27,20 +29,20 @@
 
 (definition map ((g (hom tau tau)))
   (witness (functor-form (free g))
-    (lambda (a b f m)
+    (lambda (a b (f (hom a b)) m)
       (case m
         ((leaf x)
           (leaf (f x)))
-        ((node p val cont)
-          (node p val
-            (lambda ((x p))
-              ((map g) a b f (cont x)))))))))
+        ((node (p tau) val (cont (hom p ((free g) a))))
+          (with let-bind
+            (let f' (lambda (x) ((map g) a b f x)))
+            (node p val (compose cont f'))))))))
 
 (definition witness-functor ((g (hom tau tau)))
   (witness (functor (free g))
     (record (functor (free g))
       (map
-        (map g)))))
+        (free:map g)))))
 
 (definition return ((g (hom tau tau)))
   (witness (return-type (free g))
@@ -58,25 +60,20 @@
         ((leaf x)
           (k x))
         ((node p val cont)
-          (node
-            p
-            val
-            (lambda ((x p))
-              ((bind g)
-                a
-                b
-                (cont x)
-                k))))))))
+          (with let-bind
+            (let cont-then-k
+              (lambda ((x p))
+                ((bind g) a b (cont x) k)))
+            (node p val cont-then-k)))))))
 
 (definition witness-monad ((g (hom tau tau)))
   (witness (monad (free g))
     (record (monad (free g))
       (witness-functor
-        (witness-functor g))
+        (free:witness-functor g))
       (return
-        (return g))
+        (free:return g))
       (bind
-        (bind g)))))
-
+        (free:bind g)))))
 
 (end free)
