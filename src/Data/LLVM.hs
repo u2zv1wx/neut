@@ -54,28 +54,6 @@ type SizeInfo = (LowType, Int)
 
 type SubstLLVM = [(Int, LLVMData)]
 
--- reduceLLVM :: LLVM -> LLVM
--- reduceLLVM (LLVMReturn d) = LLVMReturn d
--- reduceLLVM (LLVMLet x (LLVMOpBitcast d from to) cont)
---   | from == to = reduceLLVM $ substLLVM [(asInt x, d)] cont
--- reduceLLVM (LLVMLet x op cont) = do
---   let cont' = reduceLLVM cont
---   LLVMLet x op cont'
--- reduceLLVM (LLVMCont op cont) = do
---   let cont' = reduceLLVM cont
---   LLVMCont op cont'
--- reduceLLVM (LLVMSwitch (d, t) defaultBranch les) = do
---   let (ls, es) = unzip les
---   let defaultBranch' = reduceLLVM defaultBranch
---   let es' = map reduceLLVM es
---   LLVMSwitch (d, t) defaultBranch' (zip ls es')
--- reduceLLVM (LLVMBranch d onTrue onFalse) = do
---   let onTrue' = reduceLLVM onTrue
---   let onFalse' = reduceLLVM onFalse
---   LLVMBranch d onTrue' onFalse'
--- reduceLLVM (LLVMCall d ds) = do
---   LLVMCall d ds
--- reduceLLVM LLVMUnreachable = LLVMUnreachable
 substLLVMData :: SubstLLVM -> LLVMData -> LLVMData
 substLLVMData sub (LLVMDataLocal x) =
   case lookup (asInt x) sub of

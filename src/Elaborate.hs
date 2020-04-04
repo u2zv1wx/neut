@@ -411,15 +411,16 @@ elaborate' (m, WeakTermCase indName e cxtes) = do
       xts' <- mapM elaboratePlus xts
       body' <- elaborate' body
       return ((c, xts'), body')
-  -- t' <- elaborate' t
-  -- t'' <- reduceWeakType $ weaken t'
+  eenv <- gets enumEnv
   case cxtes' of
-    [] -> return (m, TermCase indName e' cxtes')
-    _
-  -- case t'' of
-  --   (_, WeakTermPi (Just name) _ _) -> do
-     -> do
-      eenv <- gets enumEnv
+    [] -> do
+      case Map.lookup indName eenv of
+        Nothing -> raiseError m $ "no such inductive type defined: " <> indName
+        Just [] -> return (m, TermCase indName e' cxtes')
+        Just _ ->
+          raiseError m $
+          "the inductive type `" <> indName <> "` is not a bottom-type"
+    _ -> do
       case Map.lookup indName eenv of
         Nothing -> raiseError m $ "no such inductive type defined: " <> indName
         Just bis -> do
@@ -430,22 +431,7 @@ elaborate' (m, WeakTermCase indName e cxtes) = do
             (False, _) -> raiseError m $ "found a non-linear pattern"
             (_, False) -> raiseError m $ "found a non-exhaustive pattern"
             (True, True) -> return (m, TermCase indName e' cxtes')
-    -- _ -> do
-    --   raiseError m $
-    --     "the type of `" <>
-    --     toText (weaken e') <>
-    --     "` must be an inductive type, but is:\n" <> toText t''
 
--- reduceWeakType :: WeakTermPlus -> WithEnv WeakTermPlus
--- reduceWeakType t = do
---   let t' = reduceWeakTermPlus t
---   cenv <- gets cacheEnv
---   case t' of
---     (m, WeakTermPiElim (_, WeakTermConst x up) args)
---       | Just (Left body) <- IntMap.lookup (asInt x) cenv -> do
---         body' <- univInstWith up $ weaken body
---         reduceWeakType (m, WeakTermPiElim body' args)
---     _ -> return t'
 elaborateWeakCase :: WeakCasePlus -> WithEnv CasePlus
 elaborateWeakCase (m, WeakCaseInt t x) = do
   t' <- reduceTermPlus <$> elaborate' t

@@ -580,18 +580,9 @@ nameFromMaybe mName =
 
 chainTermPlus' :: TypeEnv -> TermPlus -> WithEnv [IdentifierPlus]
 chainTermPlus' _ (_, TermTau _) = return []
-chainTermPlus' tenv (m, TermUpsilon x)
-  -- mt <- lookupTypeEnvMaybe x tenv
-  -- case mt of
-  --   Nothing -> return [(m, x, (m, TermTau 0))] -- 型が登録されてなかったら定数として処理してよいはず
-  --   Just t
-  --    -> do
- = do
+chainTermPlus' tenv (m, TermUpsilon x) = do
   (xts, t) <- obtainChain m x tenv
   return $ xts ++ [(m, x, t)]
-  -- t <- lookupTypeEnv'' m x tenv
-  -- xts <- chainTermPlus' tenv t
-  -- return $ xts ++ [(m, x, t)]
 chainTermPlus' tenv (_, TermPi _ xts t) = chainTermPlus'' tenv xts [t]
 chainTermPlus' tenv (_, TermPiIntro xts e) = chainTermPlus'' tenv xts [e]
 chainTermPlus' tenv (_, TermPiIntroNoReduce xts e) =
@@ -606,18 +597,9 @@ chainTermPlus' tenv (_, TermIter (_, x, t) xts e) = do
   xs1 <- chainTermPlus' tenv t
   xs2 <- chainTermPlus'' (insTypeEnv'' x t tenv) xts [e]
   return $ xs1 ++ filter (\(_, y, _) -> y /= x) xs2
-chainTermPlus' tenv (m, TermConst x _)
-  -- mt <- lookupTypeEnvMaybe x tenv
-  -- case mt of
-  --   Nothing -> return [(m, x, (m, TermTau 0))] -- 型が登録されてなかったら定数として処理してよいはず
-  --   Just t -> do
-  --     xts <- chainTermPlus' tenv t
-  --     return $ xts ++ [(m, x, t)]
- = do
+chainTermPlus' tenv (m, TermConst x _) = do
   (xts, _) <- obtainChain m x tenv
   return xts
-  -- t <- lookupTypeEnv'' m x tenv
-  -- chainTermPlus' tenv t
 chainTermPlus' _ (_, TermFloat16 _) = return []
 chainTermPlus' _ (_, TermFloat32 _) = return []
 chainTermPlus' _ (_, TermFloat64 _) = return []
@@ -672,10 +654,7 @@ obtainChain ::
 obtainChain m x tenv = do
   cenv <- gets chainEnv
   case IntMap.lookup (asInt x) cenv of
-    Just xtst
-      -- p "using cache"
-     -> do
-      return xtst
+    Just xtst -> return xtst
     Nothing -> do
       t <- lookupTypeEnv'' m x tenv
       xts <- chainTermPlus' tenv t

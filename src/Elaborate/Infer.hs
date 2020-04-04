@@ -241,12 +241,8 @@ infer' ctx (m, WeakTermStructElim xks e1 e2) = do
   forM_ (zip xs (zip ts mls)) $ uncurry insWeakTypeEnv
   (e2', t2, ml2) <- infer' (ctx ++ zip3 ms xs ts) e2
   return ((m, WeakTermStructElim xks e1' e2'), t2, ml2)
-infer' ctx (m, WeakTermCase indName e cxtes)
-  -- (tInd, mlInd) <- inferType' ctx t
- = do
+infer' ctx (m, WeakTermCase indName e cxtes) = do
   (e', t', ml') <- infer' ctx e
-  -- insConstraintEnv tInd t'
-  -- insLevelEQ mlInd ml'
   resultType <- newTypeHoleInCtx ctx m
   resultLevel <- newLevelLE m []
   if null cxtes
@@ -270,7 +266,6 @@ infer' ctx (m, WeakTermCase indName e cxtes)
           etl <- infer' ctx var
           (_, _, appLevel) <- inferPiElim ctx m etl (usedHoleList ++ items)
           insLevelEQ ml' appLevel
-          -- (body', bodyType, bodyLevel) <- infer' ctx body
           (body', bodyType, bodyLevel) <- infer' (ctx ++ patArgs') body
           insConstraintEnv resultType bodyType
           insLevelEQ resultLevel bodyLevel
@@ -474,7 +469,6 @@ inferBinder ctx [] e = do
 inferBinder ctx ((mx, x, t):xts) e = do
   tl'@(t', ml) <- inferType' ctx t
   insWeakTypeEnv x tl'
-  -- (xtls', etl') <- inferBinder (ctx ++ [((mx, x, t'), ml)]) xts e
   (xtls', etl') <- inferBinder (ctx ++ [(mx, x, t')]) xts e
   return (((mx, x, t'), ml) : xtls', etl')
 
