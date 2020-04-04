@@ -51,7 +51,8 @@ data WeakTerm
   -- Incidentally, we can also add the syntax for copattern matching A -> FνF -> νF here. But since its implementation is
   -- simple enough to implement it in Interpret, I don't add it as syntactic construct.
   | WeakTermCase
-      (WeakTermPlus, WeakTermPlus) -- (the `e` in `case e of (...)`, the type of `e`)
+      T.Text
+      WeakTermPlus
       [(((Meta, Identifier), [IdentifierPlus]), WeakTermPlus)] -- ((cons x xs) e), ((nil) e), ((succ n) e).  (not ((cons A x xs) e).)
   deriving (Show, Eq)
 
@@ -167,11 +168,10 @@ varWeakTermPlus (_, WeakTermStructIntro ets) =
 varWeakTermPlus (_, WeakTermStructElim xts d e) = do
   let xs = map (\(_, x, _) -> x) xts
   varWeakTermPlus d ++ filter (`notElem` xs) (varWeakTermPlus e)
-varWeakTermPlus (_, WeakTermCase (e, t) cxes) = do
+varWeakTermPlus (_, WeakTermCase _ e cxes) = do
   let xs = varWeakTermPlus e
-  let ys = varWeakTermPlus t
-  let zs = concatMap (\((_, xts), body) -> varWeakTermPlus' xts [body]) cxes
-  xs ++ ys ++ zs
+  let ys = concatMap (\((_, xts), body) -> varWeakTermPlus' xts [body]) cxes
+  xs ++ ys
 
 varWeakTermPlus' :: [IdentifierPlus] -> [WeakTermPlus] -> [Identifier]
 varWeakTermPlus' [] es = concatMap varWeakTermPlus es
@@ -214,11 +214,10 @@ holeWeakTermPlus (_, WeakTermStructIntro ets) =
   concatMap (holeWeakTermPlus . fst) ets
 holeWeakTermPlus (_, WeakTermStructElim _ d e) =
   holeWeakTermPlus d ++ holeWeakTermPlus e
-holeWeakTermPlus (_, WeakTermCase (e, t) cxes) = do
+holeWeakTermPlus (_, WeakTermCase _ e cxes) = do
   let xs = holeWeakTermPlus e
-  let ys = holeWeakTermPlus t
-  let zs = concatMap (\((_, xts), body) -> holeWeakTermPlus' xts [body]) cxes
-  xs ++ ys ++ zs
+  let ys = concatMap (\((_, xts), body) -> holeWeakTermPlus' xts [body]) cxes
+  xs ++ ys
 
 holeWeakTermPlus' :: [IdentifierPlus] -> [WeakTermPlus] -> [Hole]
 holeWeakTermPlus' [] es = concatMap holeWeakTermPlus es
@@ -307,14 +306,13 @@ substWeakTermPlus sub (m, WeakTermStructElim xts v e) = do
   let sub' = filter (\(k, _) -> k `notElem` xs) sub
   let e' = substWeakTermPlus sub' e
   (m, WeakTermStructElim xts v' e')
-substWeakTermPlus sub (m, WeakTermCase (e, t) cxtes) = do
+substWeakTermPlus sub (m, WeakTermCase indName e cxtes) = do
   let e' = substWeakTermPlus sub e
-  let t' = substWeakTermPlus sub t
   let cxtes' =
         flip map cxtes $ \((c, xts), body) -> do
           let (xts', body') = substWeakTermPlus'' sub xts body
           ((c, xts'), body')
-  (m, WeakTermCase (e', t') cxtes')
+  (m, WeakTermCase indName e' cxtes')
 
 substWeakTermPlus' :: SubstWeakTerm -> [IdentifierPlus] -> [IdentifierPlus]
 substWeakTermPlus' _ [] = []
@@ -426,7 +424,7 @@ toText (_, WeakTermStructIntro ets) = do
 toText (_, WeakTermStructElim xts e1 e2) = do
   let argStr = inParen $ showItems $ map (\(_, x, _) -> asText' x) xts
   showCons ["struct-elimination", argStr, toText e1, toText e2]
-toText (_, WeakTermCase (e, _) cxtes) = do
+toText (_, WeakTermCase _ e cxtes) = do
   showCons
     ("case" :
      toText e :

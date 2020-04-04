@@ -65,7 +65,7 @@ data Env =
     , formationEnv :: IntMap.IntMap (Maybe WeakTermPlus)
     , labelEnv :: Map.HashMap T.Text [T.Text] -- "stream" ~> ["stream", "other-record-type", "head", "tail", "other-destructor"]
     , inductiveEnv :: RuleEnv -- "list" ~> (cons, Pi (A : tau). A -> list A -> list A)
-    , consToInd :: IntMap.IntMap Int -- "list:cons-8" ~> list
+    , consToInd :: IntMap.IntMap Identifier -- "list:cons-8" ~> list
     , consToArgs :: IntMap.IntMap [Int] -- "list:cons-8" ~> [0] (the used indices of xts)
     , introEnv :: S.Set Int -- set of the names of constructors (e.g. ["nil", "cons", "zero", "succ", ...] (as int))
     , nonCandSet :: S.Set T.Text

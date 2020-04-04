@@ -281,14 +281,13 @@ unravel (m, WeakTermStructElim xts e1 e2) = do
   e1' <- unravel e1
   (xts', e2') <- unravelStruct xts e2
   return (m, WeakTermStructElim xts' e1' e2')
-unravel (m, WeakTermCase (e, t) cxtes) = do
+unravel (m, WeakTermCase indName e cxtes) = do
   e' <- unravel e
-  t' <- unravel t
   cxtes' <-
     flip mapM cxtes $ \((c, xts), body) -> do
       (xts', body') <- unravelBinder xts body
       return ((c, xts'), body')
-  return (m, WeakTermCase (e', t') cxtes')
+  return (m, WeakTermCase indName e' cxtes')
 
 unravelUpsilon :: Identifier -> WithEnv Identifier
 unravelUpsilon (I (s, i)) = do

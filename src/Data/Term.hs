@@ -41,7 +41,8 @@ data Term
   | TermStructIntro [(TermPlus, ArrayKind)]
   | TermStructElim [(Meta, Identifier, ArrayKind)] TermPlus TermPlus
   | TermCase
-      (TermPlus, TermPlus) -- (the `e` in `case e of (...)`, the type of `e`)
+      T.Text
+      TermPlus -- (the `e` in `case e of (...)`, the type of `e`)
       [Clause] -- ((cons x xs) e), ((nil) e), ((succ n) e).  (not ((cons A x xs) e).)
   deriving (Show)
 
@@ -103,11 +104,10 @@ varTermPlus (_, TermStructIntro ets) = concatMap (varTermPlus . fst) ets
 varTermPlus (_, TermStructElim xts d e) = do
   let xs = map (\(_, x, _) -> x) xts
   varTermPlus d ++ filter (`notElem` xs) (varTermPlus e)
-varTermPlus (_, TermCase (e, t) cxes) = do
+varTermPlus (_, TermCase _ e cxes) = do
   let xs = varTermPlus e
-  let ys = varTermPlus t
-  let zs = concatMap (\((_, xts), body) -> varTermPlus' xts [body]) cxes
-  xs ++ ys ++ zs
+  let ys = concatMap (\((_, xts), body) -> varTermPlus' xts [body]) cxes
+  xs ++ ys
 
 varTermPlus' :: [IdentifierPlus] -> [TermPlus] -> [Identifier]
 varTermPlus' [] es = concatMap varTermPlus es
@@ -181,14 +181,13 @@ substTermPlus sub (m, TermStructElim xts v e) = do
   let sub' = filter (\(k, _) -> k `notElem` xs) sub
   let e' = substTermPlus sub' e
   (m, TermStructElim xts v' e')
-substTermPlus sub (m, TermCase (e, t) cxtes) = do
+substTermPlus sub (m, TermCase indName e cxtes) = do
   let e' = substTermPlus sub e
-  let t' = substTermPlus sub t
   let cxtes' =
         flip map cxtes $ \((c, xts), body) -> do
           let (xts', body') = substTermPlus'' sub xts body
           ((c, xts'), body')
-  (m, TermCase (e', t') cxtes')
+  (m, TermCase indName e' cxtes')
 
 substTermPlus' :: SubstTerm -> [IdentifierPlus] -> [IdentifierPlus]
 substTermPlus' _ [] = []
@@ -265,15 +264,14 @@ weaken (m, TermStructElim xts v e) = do
   let v' = weaken v
   let e' = weaken e
   (m, WeakTermStructElim xts v' e')
-weaken (m, TermCase (e, t) cxtes) = do
+weaken (m, TermCase indName e cxtes) = do
   let e' = weaken e
-  let t' = weaken t
   let cxtes' =
         flip map cxtes $ \((c, xts), body) -> do
           let xts' = weakenArgs xts
           let body' = weaken body
           ((c, xts'), body')
-  (m, WeakTermCase (e', t') cxtes')
+  (m, WeakTermCase indName e' cxtes')
 
 weakenCase :: CasePlus -> WeakCasePlus
 weakenCase (m, CaseValue v) = (m, weakenEnumValue v)

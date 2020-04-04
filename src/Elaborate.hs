@@ -404,20 +404,24 @@ elaborate' (m, WeakTermStructElim xts e1 e2) = do
   e1' <- elaborate' e1
   e2' <- elaborate' e2
   return (m, TermStructElim xts e1' e2')
-elaborate' (m, WeakTermCase (e, t) cxtes) = do
+elaborate' (m, WeakTermCase indName e cxtes) = do
   e' <- elaborate' e
   cxtes' <-
     forM cxtes $ \((c, xts), body) -> do
       xts' <- mapM elaboratePlus xts
       body' <- elaborate' body
       return ((c, xts'), body')
-  t' <- elaborate' t
-  t'' <- reduceWeakType $ weaken t'
-  case t'' of
-    (_, WeakTermPi (Just name) _ _) -> do
+  -- t' <- elaborate' t
+  -- t'' <- reduceWeakType $ weaken t'
+  case cxtes' of
+    [] -> return (m, TermCase indName e' cxtes')
+    _
+  -- case t'' of
+  --   (_, WeakTermPi (Just name) _ _) -> do
+     -> do
       eenv <- gets enumEnv
-      case Map.lookup name eenv of
-        Nothing -> raiseError m $ "no such inductive type defined: " <> name
+      case Map.lookup indName eenv of
+        Nothing -> raiseError m $ "no such inductive type defined: " <> indName
         Just bis -> do
           let bs' = map (asText . snd . fst . fst) cxtes
           let isLinear = linearCheck bs'
@@ -425,24 +429,23 @@ elaborate' (m, WeakTermCase (e, t) cxtes) = do
           case (isLinear, isExhaustive) of
             (False, _) -> raiseError m $ "found a non-linear pattern"
             (_, False) -> raiseError m $ "found a non-exhaustive pattern"
-            (True, True) -> return (m, TermCase (e', t') cxtes')
-    _ -> do
-      raiseError m $
-        "the type of `" <>
-        toText (weaken e') <>
-        "` must be an inductive type, but is:\n" <> toText t''
+            (True, True) -> return (m, TermCase indName e' cxtes')
+    -- _ -> do
+    --   raiseError m $
+    --     "the type of `" <>
+    --     toText (weaken e') <>
+    --     "` must be an inductive type, but is:\n" <> toText t''
 
-reduceWeakType :: WeakTermPlus -> WithEnv WeakTermPlus
-reduceWeakType t = do
-  let t' = reduceWeakTermPlus t
-  cenv <- gets cacheEnv
-  case t' of
-    (m, WeakTermPiElim (_, WeakTermConst x up) args)
-      | Just (Left body) <- IntMap.lookup (asInt x) cenv -> do
-        body' <- univInstWith up $ weaken body
-        reduceWeakType (m, WeakTermPiElim body' args)
-    _ -> return t'
-
+-- reduceWeakType :: WeakTermPlus -> WithEnv WeakTermPlus
+-- reduceWeakType t = do
+--   let t' = reduceWeakTermPlus t
+--   cenv <- gets cacheEnv
+--   case t' of
+--     (m, WeakTermPiElim (_, WeakTermConst x up) args)
+--       | Just (Left body) <- IntMap.lookup (asInt x) cenv -> do
+--         body' <- univInstWith up $ weaken body
+--         reduceWeakType (m, WeakTermPiElim body' args)
+--     _ -> return t'
 elaborateWeakCase :: WeakCasePlus -> WithEnv CasePlus
 elaborateWeakCase (m, WeakCaseInt t x) = do
   t' <- reduceTermPlus <$> elaborate' t

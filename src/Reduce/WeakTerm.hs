@@ -98,16 +98,15 @@ reduceWeakTermPlus (m, WeakTermStructElim xks e1 e2) = do
       , (es, ks2) <- unzip eks
       , ks1 == ks2 -> reduceWeakTermPlus $ substWeakTermPlus (zip xs es) e2
     _ -> (m, WeakTermStructElim xks e1' e2)
-reduceWeakTermPlus (m, WeakTermCase (e, t) cxtes) = do
+reduceWeakTermPlus (m, WeakTermCase indName e cxtes) = do
   let e' = reduceWeakTermPlus e
-  let t' = reduceWeakTermPlus t
   let cxtes'' =
         flip map cxtes $ \((c, xts), body) -> do
           let (ms, xs, ts) = unzip3 xts
           let ts' = map reduceWeakTermPlus ts
           let body' = reduceWeakTermPlus body
           ((c, zip3 ms xs ts'), body')
-  (m, WeakTermCase (e', t') cxtes'')
+  (m, WeakTermCase indName e' cxtes'')
 reduceWeakTermPlus e = e
 
 reduceWeakTermIdentPlus :: IdentifierPlus -> IdentifierPlus

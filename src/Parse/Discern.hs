@@ -205,9 +205,8 @@ discern'' nenv (m, WeakTermStructElim xts e1 e2) = do
   e1' <- discern'' nenv e1
   (xts', e2') <- discernStruct nenv xts e2
   return (m, WeakTermStructElim xts' e1' e2')
-discern'' nenv (m, WeakTermCase (e, t) cxtes) = do
+discern'' nenv (m, WeakTermCase indName e cxtes) = do
   e' <- discern'' nenv e
-  t' <- discern'' nenv t
   penv <- gets prefixEnv
   cxtes' <-
     flip mapM cxtes $ \(((mc, c), xts), body) -> do
@@ -217,7 +216,7 @@ discern'' nenv (m, WeakTermCase (e, t) cxtes) = do
       modify (\env -> env {revCaseEnv = IntMap.insert (asInt c') label renv})
       (xts', body') <- discernBinder nenv xts body
       return (((mc, c'), xts'), body')
-  return (m, WeakTermCase (e', t') cxtes')
+  return (m, WeakTermCase indName e' cxtes')
 
 discernBinder ::
      NameEnv

@@ -104,7 +104,7 @@ clarify' tenv (m, TermStructElim xks e1 e2) = do
   e2' <- clarify' (insTypeEnv1 (zip3 ms xs ts) tenv) e2
   (struct, structVar) <- newDataUpsilonWith m "struct"
   return $ bindLet [(struct, e1')] (m, CodeStructElim (zip xs ks) structVar e2')
-clarify' tenv (m, TermCase (e, _) cxtes) = do
+clarify' tenv (m, TermCase _ e cxtes) = do
   e' <- clarify' tenv e
   (cls, clsVar) <- newDataUpsilonWith m "case-closure"
   res <- newNameWith' "case-res"
@@ -644,12 +644,11 @@ chainTermPlus' tenv (_, TermStructElim xks e1 e2) = do
   xs2 <- chainTermPlus' tenv e2
   let xs = map (\(_, y, _) -> y) xks
   return $ xs1 ++ filter (\(_, y, _) -> y `notElem` xs) xs2
-chainTermPlus' tenv (_, TermCase (e, t) cxtes) = do
+chainTermPlus' tenv (_, TermCase _ e cxtes) = do
   xs <- chainTermPlus' tenv e
-  ys <- chainTermPlus' tenv t
-  zs <-
+  ys <-
     concat <$> mapM (\((_, xts), body) -> chainTermPlus'' tenv xts [body]) cxtes
-  return $ xs ++ ys ++ zs
+  return $ xs ++ ys
 
 chainTermPlus'' ::
      TypeEnv -> [IdentifierPlus] -> [TermPlus] -> WithEnv [IdentifierPlus]

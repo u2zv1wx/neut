@@ -185,8 +185,7 @@ interpret (m, TreeNode ((_, TreeLeaf "case"):rest))
     e' <- interpret e
     cxtes' <- mapM interpretCaseClause cxtes
     m' <- adjustPhase m
-    h <- newHole m'
-    return (m', WeakTermCase (e', h) cxtes')
+    return (m', WeakTermCase "UNKNOWN" e' cxtes')
   | otherwise = raiseSyntaxError m "(case TREE TREE*)"
 -- A -> FνF -> νF (i.e. copattern matching (although I think it's more correct to say "record" or something like that,
 -- considering that the constructed term using `FνF -> νF` is just a record after all))

@@ -241,21 +241,22 @@ infer' ctx (m, WeakTermStructElim xks e1 e2) = do
   forM_ (zip xs (zip ts mls)) $ uncurry insWeakTypeEnv
   (e2', t2, ml2) <- infer' (ctx ++ zip3 ms xs ts) e2
   return ((m, WeakTermStructElim xks e1' e2'), t2, ml2)
-infer' ctx (m, WeakTermCase (e, t) cxtes) = do
-  (tInd, mlInd) <- inferType' ctx t
+infer' ctx (m, WeakTermCase indName e cxtes)
+  -- (tInd, mlInd) <- inferType' ctx t
+ = do
   (e', t', ml') <- infer' ctx e
-  insConstraintEnv tInd t'
-  insLevelEQ mlInd ml'
+  -- insConstraintEnv tInd t'
+  -- insLevelEQ mlInd ml'
   resultType <- newTypeHoleInCtx ctx m
   resultLevel <- newLevelLE m []
   if null cxtes
     then do
-      return ((m, WeakTermCase (e', t') []), resultType, resultLevel) -- ex falso quodlibet
+      return ((m, WeakTermCase indName e' []), resultType, resultLevel) -- ex falso quodlibet
     else do
-      (name, indInfo) <- getIndInfo $ map (fst . fst) cxtes
+      (I (nameStr, name), indInfo) <- getIndInfo $ map (fst . fst) cxtes
       (indType, argHoleList) <- constructIndType ctx name
       -- indType = a @ (HOLE, ..., HOLE)
-      insConstraintEnv indType tInd
+      insConstraintEnv indType t'
       cxtes' <-
         forM (zip indInfo cxtes) $ \(is, (((mc, c), patArgs), body)) -> do
           let usedHoleList = map (\i -> argHoleList !! i) is
@@ -267,14 +268,15 @@ infer' ctx (m, WeakTermCase (e, t) cxtes) = do
                   patArgs'
                   mls
           etl <- infer' ctx var
-          _ <- inferPiElim ctx m etl (usedHoleList ++ items)
+          (_, _, appLevel) <- inferPiElim ctx m etl (usedHoleList ++ items)
+          insLevelEQ ml' appLevel
           -- (body', bodyType, bodyLevel) <- infer' ctx body
           (body', bodyType, bodyLevel) <- infer' (ctx ++ patArgs') body
           insConstraintEnv resultType bodyType
           insLevelEQ resultLevel bodyLevel
           xts <- mapM (toIdentPlus mc) usedHoleList
           return (((mc, c), xts ++ patArgs'), body')
-      return ((m, WeakTermCase (e', t') cxtes'), resultType, resultLevel)
+      return ((m, WeakTermCase nameStr e' cxtes'), resultType, resultLevel)
 
 toIdentPlus ::
      Meta
@@ -315,13 +317,13 @@ constructIndType ctx i = do
         _ -> undefined
     _ -> undefined
 
-getIndInfo :: [(Meta, Identifier)] -> WithEnv (Int, [[Int]])
+getIndInfo :: [(Meta, Identifier)] -> WithEnv (Identifier, [[Int]])
 getIndInfo cs = do
   (indNameList, usedPosList) <- unzip <$> mapM getIndInfo' cs
   checkIntegrity indNameList
   return (snd $ head indNameList, usedPosList)
 
-getIndInfo' :: (Meta, Identifier) -> WithEnv ((Meta, Int), [Int])
+getIndInfo' :: (Meta, Identifier) -> WithEnv ((Meta, Identifier), [Int])
 getIndInfo' (m, (I (_, j))) = do
   cienv <- gets consToInd
   caenv <- gets consToArgs
@@ -329,11 +331,11 @@ getIndInfo' (m, (I (_, j))) = do
     (Just i, Just is) -> return ((m, i), is)
     _ -> undefined
 
-checkIntegrity :: [(Meta, Int)] -> WithEnv ()
+checkIntegrity :: [(Meta, Identifier)] -> WithEnv ()
 checkIntegrity [] = return ()
 checkIntegrity (mi:is) = checkIntegrity' mi is
 
-checkIntegrity' :: (Meta, Int) -> [(Meta, Int)] -> WithEnv ()
+checkIntegrity' :: (Meta, Identifier) -> [(Meta, Identifier)] -> WithEnv ()
 checkIntegrity' _ [] = return ()
 checkIntegrity' i (j:js) =
   if snd i == snd j
@@ -708,15 +710,14 @@ univInst' (m, WeakTermStructElim xts d e) = do
   d' <- univInst' d
   e' <- univInst' e
   return (m, WeakTermStructElim xts d' e')
-univInst' (m, WeakTermCase (e, t) cxtes) = do
+univInst' (m, WeakTermCase indName e cxtes) = do
   e' <- univInst' e
-  t' <- univInst' t
   cxtes' <-
     flip mapM cxtes $ \((c, xts), body) -> do
       xts' <- univInstArgs xts
       body' <- univInst' body
       return ((c, xts'), body')
-  return (m, WeakTermCase (e', t') cxtes')
+  return (m, WeakTermCase indName e' cxtes')
 
 univInstArgs :: [IdentifierPlus] -> WithEnv [IdentifierPlus]
 univInstArgs xts = do

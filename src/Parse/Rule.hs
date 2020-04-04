@@ -102,7 +102,8 @@ generateProjections ts = do
                 (xts ++ [dom])
                 ( mb
                 , WeakTermCase
-                    ((my, WeakTermUpsilon y), ty)
+                    (asText a)
+                    (my, WeakTermUpsilon y)
                     [ ( ( (mb, asIdent (asText a <> ":" <> "unfold"))
                         , [(ma, a, ta)] ++ bts ++ [(mb, v, ty)])
                       , ( mb
@@ -536,14 +537,13 @@ substRuleType sub (m, WeakTermStructElim xts v e) = do
     else do
       e' <- substRuleType sub e
       return (m, WeakTermStructElim xts v' e')
-substRuleType sub (m, WeakTermCase (e, t) cxtes) = do
+substRuleType sub (m, WeakTermCase indName e cxtes) = do
   e' <- substRuleType sub e
-  t' <- substRuleType sub t
   cxtes' <-
     flip mapM cxtes $ \((c, xts), body) -> do
       (xts', body') <- substRuleType'' sub xts body
       return ((c, xts'), body')
-  return (m, WeakTermCase (e', t') cxtes')
+  return (m, WeakTermCase indName e' cxtes')
 
 substRuleType' ::
      (RuleType, RuleType) -> [IdentifierPlus] -> WithEnv [IdentifierPlus]

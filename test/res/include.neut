@@ -12,7 +12,6 @@
     (item-3 top:unit)
     (item-2 20)))
 
-
 (section some-library)
 
 ;; (include "notation.neut")  <- should raise error (`include` must be at top level)
@@ -23,7 +22,13 @@
   (cons 25 (list:cons 100 (cons 1000 (nil)))))
 
 (let ps (list i64)
-  (cons 25 (cons 100 (cons 1000 (nil)))))
+  (cons
+    25
+    (cons
+      100
+      (cons
+        1000
+        (nil)))))
 
 
 ;; ↓ こう書くとエラーがlist.neutのほうで報告されてしまうという問題がある。修正すること。

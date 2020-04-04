@@ -52,20 +52,20 @@
 ;; list a = construction identity aだし、binary-tree a = construction (X -> X * X) aだし、tree a = construction list aだし、という。
 ;; もちろんtree-plus a = construction tree aとすることもできて。同様にしてn次元のtreeが定義される。何に使うのかは知らん。
 ;; というか、これ、inductiveな構造ぜんぶ定義できるまであるんでは？
-(inductive tree
-  ((g (hom tau tau))
-   (a tau))
-  (leaf
-    ((_ a))
-    (tree g a))
-  (node
-    ((b tau)
-     (_ (g b))
-     (_ (hom b (tree g a))))
-    (tree g a)))
+;; (inductive tree
+;;   ((g (hom tau tau))
+;;    (a tau))
+;;   (leaf
+;;     ((_ a))
+;;     (tree g a))
+;;   (node
+;;     ((b tau)
+;;      (_ (g b))
+;;      (_ (hom b (tree g a))))
+;;     (tree g a)))
 
-(attribute tree:node
-  (implicit 2))
+;; (attribute tree:node
+;;   (implicit 2))
 
 ;; g x -> (x -> FFree g a) -> FFree g a
 

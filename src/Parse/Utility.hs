@@ -92,7 +92,7 @@ compInfoWeakTermPlus c info (_, WeakTermStructIntro eks) = do
 compInfoWeakTermPlus c info (_, WeakTermStructElim mxks e1 e2) = do
   compInfoWeakTermPlus c info e1
   compInfoArrayElim c info mxks e2
-compInfoWeakTermPlus c info (_, WeakTermCase (e, _) cxtes) = do
+compInfoWeakTermPlus c info (_, WeakTermCase _ e cxtes) = do
   compInfoWeakTermPlus c info e
   forM_ cxtes $ \((_, xts), body) -> compInfoBinder c info xts body
 
