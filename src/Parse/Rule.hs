@@ -16,6 +16,7 @@ import Data.Monoid ((<>))
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.IntMap.Strict as IntMap
+import qualified Data.Text as T
 
 import Data.Basic
 import Data.Env
@@ -24,7 +25,20 @@ import Data.WeakTerm
 import Parse.Interpret
 
 parseInductive :: Meta -> [TreePlus] -> WithEnv [QuasiStmt]
-parseInductive m ts = parseConnective m ts toInductive toInductiveIntroList
+parseInductive m ts = do
+  ts' <- mapM setupIndPrefix ts
+  parseConnective m ts' toInductive toInductiveIntroList
+
+setupIndPrefix :: TreePlus -> WithEnv TreePlus
+setupIndPrefix (m, TreeNode ((ma, TreeLeaf a):xts:rules)) = do
+  rules' <- mapM (setupIndPrefix' a) rules
+  return (m, TreeNode ((ma, TreeLeaf a) : xts : rules'))
+setupIndPrefix t = raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) TREE)"
+
+setupIndPrefix' :: T.Text -> TreePlus -> WithEnv TreePlus
+setupIndPrefix' a (m, TreeNode ((mb, TreeLeaf b):rest)) =
+  return (m, TreeNode ((mb, TreeLeaf (a <> ":" <> b)) : rest))
+setupIndPrefix' _ t = raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) TREE)"
 
 -- variable naming convention on parsing connectives:
 --   a : the name of a formation rule, like `nat`, `list`, `stream`, etc.
@@ -163,7 +177,7 @@ toInductiveIntro ::
   -> Identifier
   -> Rule
   -> WithEnv [QuasiStmt]
-toInductiveIntro ats bts xts a@(I (ai, _)) (mb, b@(I (bi, k)), m, yts, cod)
+toInductiveIntro ats bts xts a@(I (ai, _)) (mb, b@(I (bi, _)), m, yts, cod)
   | (_, WeakTermPiElim (_, WeakTermUpsilon a') es) <- cod
   , a == a'
   , length xts == length es = do
@@ -172,7 +186,6 @@ toInductiveIntro ats bts xts a@(I (ai, _)) (mb, b@(I (bi, k)), m, yts, cod)
     let bar = filter (\(_, (_, x, _)) -> x `elem` vs) foo
     let buz = map fst bar
     let xts' = filter (\(_, x, _) -> x `elem` vs) xts
-    let b' = I (ai <> ":" <> bi, k)
     let piType = (m, weakTermPi (xts' ++ yts) cod)
     let lam =
           ( m
@@ -184,9 +197,9 @@ toInductiveIntro ats bts xts a@(I (ai, _)) (mb, b@(I (bi, k)), m, yts, cod)
                   (bi, buz, xts', yts)
                   (ats ++ bts)
                   (m, WeakTermPiElim (mb, WeakTermUpsilon b) (map toVar' yts))))
-    let attrList = map (QuasiStmtImplicit m b') [0 .. length xts' - 1]
+    let attrList = map (QuasiStmtImplicit m b) [0 .. length xts' - 1]
     let as = map (\(_, x, _) -> x) ats
-    return (QuasiStmtLetInductiveIntro m (mb, b', piType) lam as : attrList)
+    return (QuasiStmtLetInductiveIntro m (mb, b, piType) lam as : attrList)
   | otherwise =
     raiseError m $
     "the succedent of an introduction rule of `" <>
@@ -204,7 +217,8 @@ formationRuleOf (m, a, xts, _) = do
 
 formationRuleOf' :: Connective -> WithEnv Rule
 formationRuleOf' (m, a@(I (x, _)), xts, rules) = do
-  let bs = map (\(_, I (b, _), _, _, _) -> x <> ":" <> b) rules
+  let bs = map (\(_, I (b, _), _, _, _) -> b) rules
+  -- let bs = map (\(_, I (b, _), _, _, _) -> x <> ":" <> b) rules
   let bis = zip bs [0 ..]
   -- register "nat" ~> [("zero", 0), ("succ", 1)], "list" ~> [("nil", 0), ("cons", 1)], etc.
   insEnumEnv m x bis
@@ -444,9 +458,6 @@ substRuleType _ (m, WeakTermUpsilon x) = return (m, WeakTermUpsilon x)
 substRuleType sub (m, WeakTermPi mName xts t) = do
   (xts', t') <- substRuleType'' sub xts t
   return (m, WeakTermPi mName xts' t')
--- substRuleType sub (m, WeakTermPiPlus name xts t) = do
---   (xts', t') <- substRuleType'' sub xts t
---   return (m, WeakTermPiPlus name xts' t')
 substRuleType sub (m, WeakTermPiIntro xts body) = do
   (xts', body') <- substRuleType'' sub xts body
   return (m, WeakTermPiIntro xts' body')

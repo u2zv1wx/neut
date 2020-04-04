@@ -398,8 +398,6 @@ styleRule (m, TreeNode [(mName, TreeLeaf name), (_, TreeNode xts), t]) = do
         ])
 styleRule t = raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) TREE)"
 
--- constructProjections :: [TreePlus] -> WithEnv [QuasiStmt]
--- constructProjections = undefined
 parseBorrow :: WeakTermPlus -> (Maybe (Meta, Identifier), WeakTermPlus)
 parseBorrow (m, WeakTermUpsilon (I (s, _)))
   | T.length s > 1
