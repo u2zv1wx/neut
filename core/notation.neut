@@ -114,3 +114,10 @@
 
 (notation (cast t e)
   (unsafe-cast hole t e))
+
+(keyword if)
+
+(notation (if b e1 e2)
+  (switch b
+    (bool:true e1)
+    (bool:false e2)))
