@@ -6,22 +6,22 @@
 
 (include library "core/monad.neut")
 
-(inductive free-flat ((g (hom tau tau)) (a tau))
+(inductive free-internal ((g (hom tau tau)) (a tau))
   (leaf
     ((_ a))
-    (free-flat g a))
+    (free-internal g a))
   (node
     ((b tau)
      (_ (g b))
-     (_ (hom b (free-flat g a))))
-    (free-flat g a)))
+     (_ (hom b (free-internal g a))))
+    (free-internal g a)))
 
-(use free-flat)
+(use free-internal)
 
 (definition free ((g (hom tau tau)))
   (witness (hom tau tau)
     (lambda (a)
-      (free-flat g a))))
+      (free-internal g a))))
 
 (section free)
 
