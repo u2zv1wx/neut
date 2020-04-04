@@ -18,12 +18,16 @@
      (_ (hom a (m b))))
     (m b)))
 
-(coinductive monad ((m (hom tau tau)))
-  (witness-functor ((_ (monad m)))
+(coinductive monad
+  ((m (hom tau tau)))
+  (witness-functor
+    ((_ (monad m)))
     (functor m))
-  (return ((_ (monad m)))
+  (return
+    ((_ (monad m)))
     (return-type m))
-  (bind ((_ (monad m)))
+  (bind
+    ((_ (monad m)))
     (bind-type m)))
 
 (inductive left-kan-extension

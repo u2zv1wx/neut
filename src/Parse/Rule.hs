@@ -7,6 +7,7 @@ module Parse.Rule
   , internalize
   , toVar'
   , registerLabelInfo
+  , generateProjections
   ) where
 
 import Control.Monad.Except
@@ -63,6 +64,48 @@ registerLabelInfo ts = do
   forM_ ats $ \(_, I (a, _), _) -> do
     let asbs = map (\(_, x, _) -> asText x) $ ats ++ bts
     modify (\env -> env {labelEnv = Map.insert a asbs (labelEnv env)})
+
+generateProjections :: [TreePlus] -> WithEnv [QuasiStmt]
+generateProjections ts = do
+  connectiveList <- mapM parseConnective' ts
+  fs <- mapM formationRuleOf connectiveList
+  ats <- mapM ruleAsIdentPlus fs
+  bts <- concat <$> mapM toInternalRuleList connectiveList
+  stmtListList <-
+    forM ats $ \(ma, a, ta) -> do
+      forM bts $ \(mb, b, tb) -> do
+        xts <- takeXTS ta
+        (dom@(my, y, ty), cod) <- separate tb
+        v <- newNameWith'' "base"
+        let b' = asIdent (asText a <> ":" <> asText b)
+        let attrList = map (QuasiStmtImplicit mb b') [0 .. length xts - 1]
+        return $
+          QuasiStmtLet
+            mb
+            (mb, b', (mb, WeakTermPi Nothing (xts ++ [dom]) cod))
+            ( mb
+            , WeakTermPiIntro
+                (xts ++ [dom])
+                ( mb
+                , WeakTermCase
+                    ((my, WeakTermUpsilon y), ty)
+                    [ ( ( (mb, asIdent (asText a <> ":" <> "unfold"))
+                        , [(ma, a, ta)] ++ bts ++ [(mb, v, ty)])
+                      , ( mb
+                        , WeakTermPiElim
+                            (mb, WeakTermUpsilon b)
+                            [(mb, WeakTermUpsilon v)]))
+                    ])) :
+          attrList
+  return $ concat $ concat stmtListList
+
+separate :: WeakTermPlus -> WithEnv (IdentifierPlus, WeakTermPlus)
+separate (_, WeakTermPi _ [xt] cod) = return (xt, cod)
+separate t = raiseSyntaxError (fst t) "(pi (TREE) TREE)"
+
+takeXTS :: WeakTermPlus -> WithEnv [IdentifierPlus]
+takeXTS (_, WeakTermPi _ xts _) = return xts
+takeXTS t = raiseSyntaxError (fst t) "(pi (TREE ... TREE) TREE)"
 
 parseRule :: TreePlus -> WithEnv Rule
 parseRule (m, TreeNode [(mName, TreeLeaf name), (_, TreeNode xts), t]) = do

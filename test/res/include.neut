@@ -1,15 +1,16 @@
 ;; (include library "core/core.neut")
 
-;; (coinductive my-record ()
-;;   (item-1 ((_ (my-record))) i64)
-;;   (item-2 ((_ (my-record))) u32)
-;;   (item-3 ((_ (my-record))) top))
+(coinductive my-record ((a tau))
+  (item-1 ((_ (my-record a))) a)
+  (item-2 ((_ (my-record a))) u32)
+  (item-3 ((_ (my-record a))) top))
 
-;; (let item
-;;   (record (my-record)
-;;     (item-1 10)
-;;     (item-3 unit)
-;;     (item-2 20)))
+
+(let item
+  (record (my-record i64)
+    (item-1 10)
+    (item-3 top:unit)
+    (item-2 20)))
 
 
 (section some-library)
@@ -56,6 +57,10 @@
    (case ys
      ((nil) (i64 20))
      ((cons v2 zs) v2))))
+
+;; (os:exit i64 20)
+
+(os:exit i64 (my-record:item-1 item))
 
 ;; (let zs (list i64)
 ;;   (cons (i64 1) (cons 2 (cons 3 (nil)))))
