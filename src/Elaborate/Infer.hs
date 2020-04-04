@@ -268,6 +268,7 @@ infer' ctx (m, WeakTermCase (e, t) cxtes) = do
                   mls
           etl <- infer' ctx var
           _ <- inferPiElim ctx m etl (usedHoleList ++ items)
+          -- (body', bodyType, bodyLevel) <- infer' ctx body
           (body', bodyType, bodyLevel) <- infer' (ctx ++ patArgs') body
           insConstraintEnv resultType bodyType
           insLevelEQ resultLevel bodyLevel

@@ -83,6 +83,6 @@
       ;; (map
       ;;   option:map))))
 
-(let pohe (functor-form option)
-  (case witness-fake
-    ((fake:unfold f ma base-value) (ma base-value))))
+;; (let pohe (functor-form option)
+;;   (case witness-fake
+;;     ((fake:unfold f ma base-value) (ma base-value))))

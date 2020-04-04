@@ -85,6 +85,7 @@ data Env =
     , cacheEnv :: IntMap.IntMap (Either TermPlus CodePlus)
     , codeEnv :: Map.HashMap T.Text Definition -- f ~> thunk (lam (x1 ... xn) e)
     , nameSet :: S.Set T.Text
+    , chainEnv :: IntMap.IntMap ([Data.Term.IdentifierPlus], TermPlus)
     -- LLVM
     , llvmEnv :: Map.HashMap T.Text ([Identifier], LLVM)
     , declEnv :: Map.HashMap T.Text ([LowType], LowType) -- external functions that must be declared in LLVM IR
@@ -127,6 +128,7 @@ initialEnv =
     , typeEnv = IntMap.empty
     , cacheEnv = IntMap.empty
     , codeEnv = Map.empty
+    , chainEnv = IntMap.empty
     , llvmEnv = Map.empty
     , declEnv =
         Map.fromList
@@ -267,6 +269,21 @@ lookupTypeEnv'' m x@(I (s, i)) tenv
       Just (t, _) -> return t
       Nothing ->
         raiseCritical m $ asText' x <> " is not found in the type environment."
+
+lookupTypeEnvMaybe :: Identifier -> TypeEnv -> WithEnv (Maybe TermPlus)
+lookupTypeEnvMaybe (I (_, i)) tenv
+  -- | Just _ <- asLowTypeMaybe s = do
+  --   l <- newCount
+  --   return (m, TermTau l)
+  -- | Just op <- asUnaryOpMaybe s = unaryOpToType m op
+  -- | Just op <- asBinaryOpMaybe s = binaryOpToType m op
+  -- | Just lowType <- asArrayAccessMaybe s = arrayAccessToType m lowType
+  -- | otherwise = do
+ = do
+  case IntMap.lookup i tenv of
+    Just (t, _) -> return $ Just t
+    Nothing -> return Nothing
+        -- raiseCritical m $ asText' x <> " is not found in the type environment."
 
 lowTypeToType :: Meta -> LowType -> WithEnv TermPlus
 lowTypeToType m (LowTypeIntS s) = return (m, TermEnum (EnumTypeIntS s))

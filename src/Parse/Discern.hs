@@ -381,9 +381,8 @@ lookupEnumValueNameWithPrefix' (prefix:prefixList) name = do
 
 isDefinedEnumValue :: T.Text -> WithEnv Bool
 isDefinedEnumValue name = do
-  env <- get
-  let labelList = join $ Map.elems $ enumEnv env
-  return $ name `elem` map fst labelList
+  renv <- gets revEnumEnv
+  return $ name `Map.member` renv
 
 lookupEnumTypeNameWithPrefix :: [T.Text] -> T.Text -> WithEnv (Maybe T.Text)
 lookupEnumTypeNameWithPrefix penv name = do
@@ -403,6 +402,5 @@ lookupEnumTypeNameWithPrefix' (prefix:prefixList) name = do
 
 isDefinedEnumType :: T.Text -> WithEnv Bool
 isDefinedEnumType name = do
-  env <- get
-  let enumNameList = Map.keys $ enumEnv env
-  return $ name `elem` enumNameList
+  eenv <- gets enumEnv
+  return $ name `Map.member` eenv

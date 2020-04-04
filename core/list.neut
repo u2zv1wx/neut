@@ -57,41 +57,41 @@
       ((cons _ _)
         false))))
 
-;; the axiom K
-(definition map ([a tau] [b tau] (f (hom a b)) (xs (list a)))
-  (witness (list b)
-    (case xs
-      ((nil)
-        (nil))
-      ((cons y ys)
-        (cons (f y) (map a b f ys))))))
+;; ;; the axiom K
+;; (definition map ([a tau] [b tau] (f (hom a b)) (xs (list a)))
+;;   (witness (list b)
+;;     (case xs
+;;       ((nil)
+;;         (nil))
+;;       ((cons y ys)
+;;         (cons (f y) (map a b f ys))))))
 
-;; A -> T A is the axiom-M in possible world semantics (reflexivity)
-(definition reflexivity ([a tau] (x a))
-  (witness (list a)
-    (cons x (nil))))
+;; ;; A -> T A is the axiom-M in possible world semantics (reflexivity)
+;; (definition reflexivity ([a tau] (x a))
+;;   (witness (list a)
+;;     (cons x (nil))))
 
-;; alias for easier use
-(definition return ([a tau] (x a))
-  (witness (list a)
-    (@list:reflexivity a x)))
+;; ;; alias for easier use
+;; (definition return ([a tau] (x a))
+;;   (witness (list a)
+;;     (@list:reflexivity a x)))
 
-;; T (T A) -> T A is the axiom-4 in possible world semantics (transitivity)
-(definition transitivity ([a tau] (m (list (list a))))
-  (witness (list a)
-    (case m
-      ((nil)
-        (nil))
-      ((cons x xs)
-        (append x (transitivity a xs))))))
+;; ;; T (T A) -> T A is the axiom-4 in possible world semantics (transitivity)
+;; (definition transitivity ([a tau] (m (list (list a))))
+;;   (witness (list a)
+;;     (case m
+;;       ((nil)
+;;         (nil))
+;;       ((cons x xs)
+;;         (append x (transitivity a xs))))))
 
-;; alias
-(definition concat ([a tau] (m (list (list a))))
-  (witness (list a)
-    (@list:transitivity a m)))
+;; ;; alias
+;; (definition concat ([a tau] (m (list (list a))))
+;;   (witness (list a)
+;;     (@list:transitivity a m)))
 
-(definition bind ([a tau] [b tau] (m (list a)) (k (hom a (list b))))
-  (witness (list b)
-    (transitivity (map k m))))
+;; (definition bind ([a tau] [b tau] (m (list a)) (k (hom a (list b))))
+;;   (witness (list b)
+;;     (transitivity (map k m))))
 
 (end list)

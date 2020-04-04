@@ -60,40 +60,22 @@ elaborateStmt (WeakStmtLet m (mx, x@(I (_, i)), t) e cont) = do
   (t', mlt) <- inferType t
   insConstraintEnv te t'
   insLevelEQ mle mlt
-  -- Kantian type-inference ;)
-  -- cs <- gets constraintEnv
-  -- forM_ cs $ \(e1, e2) -> do
-  --   p "--------------"
-  --   p $ T.unpack (toText e1)
-  --   p $ T.unpack (toText e2)
-  -- p "--------------"
-  -- p' cs
   analyze >> synthesize >> refine >> cleanup
-  -- p' e'
-  -- p' t'
   e'' <- elaborate' e'
   t'' <- reduceTermPlus <$> elaborate' t'
-  -- p "---------------------------------------------"
-  -- p $ T.unpack (asText' x) <> " : " <> T.unpack (toText (weaken t''))
-  -- p $ T.unpack (toText $ weaken e'')
   insTypeEnv x t'' mlt
   modify (\env -> env {cacheEnv = IntMap.insert i (Left e'') (cacheEnv env)})
-  -- p "done"
   cont' <- elaborateStmt cont
   x' <- newNameWith x
   let c = (m, TermConst x emptyUP)
   return (m, TermPiElim (m, TermPiIntro [(mx, x', t'')] cont') [c])
-elaborateStmt (WeakStmtLetWT m (mx, x@(I (_, i)), t) e cont)
-  -- p' x
- = do
+elaborateStmt (WeakStmtLetWT m (mx, x@(I (_, i)), t) e cont) = do
   (t', mlt) <- inferType t
   analyze >> synthesize >> refine >> cleanup
   e' <- elaborate' e -- `e` is supposed to be well-typed
   t'' <- reduceTermPlus <$> elaborate' t'
   insTypeEnv x t'' mlt
   modify (\env -> env {cacheEnv = IntMap.insert i (Left e') (cacheEnv env)})
-  -- p "--------------"
-  -- p $ T.unpack (asText' x) <> " : " <> T.unpack (toText (weaken t''))
   cont' <- elaborateStmt cont
   x' <- newNameWith x
   let c = (m, TermConst x emptyUP)
@@ -104,7 +86,6 @@ elaborateStmt (WeakStmtLetSigma m xts e cont) = do
   let (xts', mlSigArgList) = unzip xtls
   sig <- weakTermSigma (fst e') xts'
   insConstraintEnv t1 sig
-  -- insConstraintEnv t1 (fst e', WeakTermSigma xts')
   forM_ mlSigArgList $ \mlSigArg -> insLevelLE mlSigArg mlSigma
   analyze >> synthesize >> refine >> cleanup
   e'' <- elaborate' e'
@@ -113,7 +94,6 @@ elaborateStmt (WeakStmtLetSigma m xts e cont) = do
     insWeakTypeEnv x (weaken (reduceTermPlus tx), l)
   cont' <- elaborateStmt cont
   termSigmaElim m (m, TermEnum $ EnumTypeIntS 64) xts'' e'' cont'
-  -- return (m, termSigmaElim (m, TermEnum $ EnumTypeIntS 64) xts'' e'' cont')
 elaborateStmt (WeakStmtImplicit m x@(I (_, i)) idx cont) = do
   t <- lookupTypeEnv' m x
   case t of
@@ -316,6 +296,10 @@ elaborate' (m, WeakTermPiElim (mh, WeakTermZeta h@(I (_, x))) es) = do
       p' h
       raiseError mh $
         "couldn't instantiate the hole here since no constraints are given on it"
+    Just (_, WeakTermPiIntro xts e)
+      | length xts == length es -> do
+        let xs = map (\(_, y, _) -> y) xts
+        elaborate' $ substWeakTermPlus (zip xs es) e
     Just e -> elaborate' $ reduceWeakTermPlus (m, WeakTermPiElim e es)
 elaborate' (m, WeakTermPiElim e es) = do
   e' <- elaborate' e
