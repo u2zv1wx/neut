@@ -74,12 +74,12 @@
 ;;   (case option:witness-functor
 ;;     ((functor:unfold f ma base-value) (ma base-value))))
 
-(definition witness-fake
-  (witness (fake option)
-    (fake:unfold
-      fake
-      (lambda ((_ (fake option))) option:map)
-      (unsafe:cast (hom tau tau) (fake option) (lambda (x) x)))))
+;; (definition witness-fake
+;;   (witness (fake option)
+;;     (fake:unfold
+;;       fake
+;;       (lambda ((_ (fake option))) option:map)
+;;       (unsafe:cast (hom tau tau) (fake option) (lambda (x) x)))))
       ;; (map
       ;;   option:map))))
 

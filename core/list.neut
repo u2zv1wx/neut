@@ -2,8 +2,9 @@
 
 (no-implicit-core)
 
-(ensure libarchive/3.4.2
-  "https://www.libarchive.org/downloads/libarchive-3.4.2.tar.gz")
+;; for test
+;; (ensure libarchive/3.4.2
+;;   "https://www.libarchive.org/downloads/libarchive-3.4.2.tar.gz")
 
 (include "notation.neut")
 
@@ -25,7 +26,9 @@
   (cons ((x a) (xs (list a)))
     (list a)))
 
-(definition head ([a tau] (xs (list a)))
+(definition head
+  ([a tau]
+   (xs (list a)))
   (witness (option a)
     (case xs
       ((nil)
@@ -33,7 +36,9 @@
       ((cons y _)
         (some y)))))
 
-(definition length ([a tau] (xs (list a)))
+(definition length
+  ([a tau]
+   (xs (list a)))
   (witness u64
     (case xs
       ((nil)
@@ -41,7 +46,10 @@
       ((cons _ ys)
         (u64.add 1 (length a ys))))))
 
-(definition append ([a tau] (xs (list a)) (ys (list a)))
+(definition append
+  ([a tau]
+   (xs (list a))
+   (ys (list a)))
   (witness (list a)
     (case xs
       ((nil)
@@ -49,7 +57,9 @@
       ((cons z zs)
         (cons z (append a zs ys))))))
 
-(definition is-null ([a tau] (xs (list a)))
+(definition is-null
+  ([a tau]
+   (xs (list a)))
   (witness bool
     (case xs
       ((nil)
@@ -57,41 +67,47 @@
       ((cons _ _)
         false))))
 
-;; ;; the axiom K
-;; (definition map ([a tau] [b tau] (f (hom a b)) (xs (list a)))
-;;   (witness (list b)
-;;     (case xs
-;;       ((nil)
-;;         (nil))
-;;       ((cons y ys)
-;;         (cons (f y) (map a b f ys))))))
+(definition map
+  ([a tau]
+   [b tau]
+   (f (hom a b))
+   (xs (list a)))
+  (witness (list b)
+    (case xs
+      ((nil)
+        (nil))
+      ((cons y ys)
+        (cons
+          (f y)
+          (map a b f ys))))))
 
-;; ;; A -> T A is the axiom-M in possible world semantics (reflexivity)
-;; (definition reflexivity ([a tau] (x a))
-;;   (witness (list a)
-;;     (cons x (nil))))
+(definition return
+  ([a tau]
+   (x a))
+  (witness (list a)
+    (cons x (nil))))
 
-;; ;; alias for easier use
-;; (definition return ([a tau] (x a))
-;;   (witness (list a)
-;;     (@list:reflexivity a x)))
+(definition concatenate
+  ([a tau]
+   (m (list (list a))))
+  (witness (list a)
+    (case m
+      ((nil)
+        (nil))
+      ((cons x xs)
+        (append x (concatenate a xs))))))
 
-;; ;; T (T A) -> T A is the axiom-4 in possible world semantics (transitivity)
-;; (definition transitivity ([a tau] (m (list (list a))))
-;;   (witness (list a)
-;;     (case m
-;;       ((nil)
-;;         (nil))
-;;       ((cons x xs)
-;;         (append x (transitivity a xs))))))
+(definition bind
+  ([a tau]
+   [b tau]
+   (m (list a))
+   (k (hom a (list b))))
+  (witness (list b)
+    (concatenate (map k m))))
 
-;; ;; alias
-;; (definition concat ([a tau] (m (list (list a))))
-;;   (witness (list a)
-;;     (@list:transitivity a m)))
-
-;; (definition bind ([a tau] [b tau] (m (list a)) (k (hom a (list b))))
-;;   (witness (list b)
-;;     (transitivity (map k m))))
+(definition bind-2
+  (witness (bind-type list)
+    (lambda (a b m k)
+      (concatenate (map k m)))))
 
 (end list)

@@ -2,16 +2,19 @@
 
 (include library "core/foundation.neut")
 
+(definition string-internal ((len u64))
+  (array len u8))
+
 (definition string
   (sigma
     ((len u64))
-    (array len u8)))
+    (string-internal len)))
 
 (use os)
 
 (definition print-string ((str string))
   (witness (product string u64)
-    (destruct str ((n u64) (content (array n u8)))
+    (destruct str ((n u64) (content (string-internal n)))
       (let len (write stdout &content n))
       (tuple (tuple n content) len))))
 

@@ -1,8 +1,15 @@
-(include "notation.neut")
+(no-implicit-core)
 
-(include "constant/darwin.neut")
+(include library "core/foundation.neut")
+
+(definition text-internal ((length u64))
+  (array length u64))
 
 (definition text
   (sigma
-    ((len u64))
-    (array len u64)))
+    ((length u64))
+    (text-internal length)))
+
+(section text)
+
+(end text)
