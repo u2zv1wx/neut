@@ -36,6 +36,12 @@
             (lambda ((x p))
               ((map g) a b f (cont x)))))))))
 
+(definition witness-functor ((g (hom tau tau)))
+  (witness (functor (free g))
+    (record (functor (free g))
+      (map
+        (map g)))))
+
 (definition return ((g (hom tau tau)))
   (witness (return-type (free g))
     (lambda (a x)
@@ -61,5 +67,16 @@
                 b
                 (cont x)
                 k))))))))
+
+(definition witness-monad ((g (hom tau tau)))
+  (witness (monad (free g))
+    (record (monad (free g))
+      (witness-functor
+        (witness-functor g))
+      (return
+        (return g))
+      (bind
+        (bind g)))))
+
 
 (end free)
