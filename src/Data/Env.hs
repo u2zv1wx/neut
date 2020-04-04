@@ -57,7 +57,6 @@ data Env =
     , revEnumEnv :: Map.HashMap T.Text (T.Text, Int) -- [("left", ("choice", 0)), ("right", ("choice", 1)), ...]
     , llvmEnumEnv :: Map.HashMap T.Text T.Text -- "list:nil" ~> "list-nil-12", etc.
     , revCaseEnv :: IntMap.IntMap T.Text
-    , indEnumEnv :: Map.HashMap T.Text [(T.Text, Int)] -- [("nat", [("zero", 0), ("succ", 1)]), ...]
     , nameEnv :: Map.HashMap T.Text T.Text
     , revNameEnv :: IntMap.IntMap Int -- [("foo.13", "foo"), ...] (as corresponding int)
     , prefixEnv :: [T.Text]
@@ -103,7 +102,6 @@ initialEnv =
     , keywordEnv = S.empty
     , constantEnv = Map.empty
     , enumEnv = Map.empty
-    , indEnumEnv = Map.empty
     , fileEnv = Map.empty
     , traceEnv = []
     , revEnumEnv = Map.empty
