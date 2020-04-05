@@ -230,17 +230,6 @@ asArrayAccessMaybe name
   | [typeStr, "array-access"] <- wordsBy ':' name = asLowTypeMaybe typeStr
   | otherwise = Nothing
 
--- asArrayAccessMaybe :: Identifier -> Maybe LowType
--- asArrayAccessMaybe (I (name, _))
---   | ["array-access", typeStr] <- sepAtLast '-' name
---   , Just lowType <- asLowTypeMaybe typeStr = Just lowType
--- asArrayAccessMaybe _ = Nothing
--- sepAtLast :: Char -> T.Text -> [T.Text]
--- sepAtLast c s =
---   case wordsBy c s of
---     [] -> []
---     [s'] -> [s']
---     ss -> [T.intercalate (T.singleton c) (init ss), last ss]
 lowTypeToArrayKindMaybe :: LowType -> Maybe ArrayKind
 lowTypeToArrayKindMaybe (LowTypeIntS i) = Just $ ArrayKindIntS i
 lowTypeToArrayKindMaybe (LowTypeIntU i) = Just $ ArrayKindIntU i
@@ -321,7 +310,7 @@ data BinaryOp
 
 asBinaryOpMaybe :: T.Text -> Maybe BinaryOp
 asBinaryOpMaybe name
-  | [typeStr, opStr] <- wordsBy '.' name -- e.g. name == "i8.add"
+  | [typeStr, opStr] <- wordsBy ':' name -- e.g. name == "i8.add"
   , Just lowType <- asLowTypeMaybe typeStr
   , Just f <- asBinaryOpMaybe' opStr = Just $ f lowType
 asBinaryOpMaybe _ = Nothing

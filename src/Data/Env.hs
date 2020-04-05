@@ -45,49 +45,74 @@ data Env =
   Env
     { count :: Int
     , ppCount :: Int -- count used only for pretty printing
+    --
     -- parse
+    --
     , phase :: Int
     , target :: Maybe Target
-    , keywordEnv :: S.Set T.Text -- list of reserved keywords
-    , notationEnv :: [(TreePlus, TreePlus)] -- macro transformers
+    -- list of reserved keywords
+    , keywordEnv :: S.Set T.Text
+    -- macro transformers
+    , notationEnv :: [(TreePlus, TreePlus)]
     , constantEnv :: Map.HashMap T.Text Int
-    , fileEnv :: FileEnv -- path ~> identifiers defined in the file at toplevel
+    -- path ~> identifiers defined in the file at toplevel
+    , fileEnv :: FileEnv
     , traceEnv :: [Path Abs File]
-    , enumEnv :: Map.HashMap T.Text [(T.Text, Int)] -- [("choice", [("left", 0), ("right", 1)]), ...]
-    , revEnumEnv :: Map.HashMap T.Text (T.Text, Int) -- [("left", ("choice", 0)), ("right", ("choice", 1)), ...]
-    , llvmEnumEnv :: Map.HashMap T.Text T.Text -- "list:nil" ~> "list-nil-12", etc.
+    -- [("choice", [("left", 0), ("right", 1)]), ...]
+    , enumEnv :: Map.HashMap T.Text [(T.Text, Int)]
+    -- [("left", ("choice", 0)), ("right", ("choice", 1)), ...]
+    , revEnumEnv :: Map.HashMap T.Text (T.Text, Int)
+    -- "list:nil" ~> "list-nil-12", etc.
+    , llvmEnumEnv :: Map.HashMap T.Text T.Text
     , revCaseEnv :: IntMap.IntMap T.Text
     , nameEnv :: Map.HashMap T.Text T.Text
-    , revNameEnv :: IntMap.IntMap Int -- [("foo.13", "foo"), ...] (as corresponding int)
+    -- [("foo.13", "foo"), ...] (as corresponding int)
+    , revNameEnv :: IntMap.IntMap Int
     , prefixEnv :: [T.Text]
     , namespace :: [T.Text]
     , formationEnv :: IntMap.IntMap (Maybe WeakTermPlus)
-    , labelEnv :: Map.HashMap T.Text [T.Text] -- "stream" ~> ["stream", "other-record-type", "head", "tail", "other-destructor"]
-    , inductiveEnv :: RuleEnv -- "list" ~> (cons, Pi (A : tau). A -> list A -> list A)
-    , consToInd :: IntMap.IntMap Identifier -- "list:cons-8" ~> list
-    , consToArgs :: IntMap.IntMap [Int] -- "list:cons-8" ~> [0] (the used indices of xts)
-    , introEnv :: S.Set Int -- set of the names of constructors (e.g. ["nil", "cons", "zero", "succ", ...] (as int))
-    , nonCandSet :: S.Set T.Text
+    -- "stream" ~> ["stream", "other-record-type", "head", "tail", "other-destructor"]
+    , labelEnv :: Map.HashMap T.Text [T.Text]
+    -- "list" ~> (cons, Pi (A : tau). A -> list A -> list A)
+    , inductiveEnv :: RuleEnv
+    -- "list:cons-8" ~> list
+    , consToInd :: IntMap.IntMap Identifier
+    -- "list:cons-8" ~> [0] (the used indices of xts)
+    , consToArgs :: IntMap.IntMap [Int]
+    --
     -- elaborate
-    , impEnv :: IntMap.IntMap [Int] -- var ~> (index of implicit arguments of the var)
-    , weakTypeEnv :: IntMap.IntMap (WeakTermPlus, UnivLevelPlus) -- var ~> (typeof(var), level-of-type)
+    --
+    -- set of the names of constructors (e.g. ["nil", "cons", "zero", "succ", ...] (as int))
+    , introEnv :: S.Set Int
+    , nonCandSet :: S.Set T.Text
+    -- var ~> (index of implicit arguments of the var)
+    , impEnv :: IntMap.IntMap [Int]
+    -- var ~> (typeof(var), level-of-type)
+    , weakTypeEnv :: IntMap.IntMap (WeakTermPlus, UnivLevelPlus)
     , equalityEnv :: [(UnivLevel, UnivLevel)]
     , univInstEnv :: UnivInstEnv
     , univRenameEnv :: IntMap.IntMap Int
     , typeEnv :: TypeEnv
-    , constraintEnv :: [PreConstraint] -- for type inference
+    , constraintEnv :: [PreConstraint]
     , constraintQueue :: ConstraintQueue
     , levelEnv :: [LevelConstraint]
-    , substEnv :: IntMap.IntMap WeakTermPlus -- metavar ~> beta-equivalent weakterm
+    -- metavar ~> beta-equivalent weakterm
+    , substEnv :: IntMap.IntMap WeakTermPlus
     , zetaEnv :: IntMap.IntMap (WeakTermPlus, WeakTermPlus, UnivLevelPlus)
+    --
     -- clarify
+    --
     , cacheEnv :: IntMap.IntMap (Either TermPlus CodePlus)
-    , codeEnv :: Map.HashMap T.Text Definition -- f ~> thunk (lam (x1 ... xn) e)
+    -- f ~> thunk (lam (x1 ... xn) e)
+    , codeEnv :: Map.HashMap T.Text Definition
     , nameSet :: S.Set T.Text
     , chainEnv :: IntMap.IntMap ([Data.Term.IdentifierPlus], TermPlus)
+    --
     -- LLVM
+    --
     , llvmEnv :: Map.HashMap T.Text ([Identifier], LLVM)
-    , declEnv :: Map.HashMap T.Text ([LowType], LowType) -- external functions that must be declared in LLVM IR
+    -- external functions that must be declared in LLVM IR
+    , declEnv :: Map.HashMap T.Text ([LowType], LowType)
     , nopFreeSet :: S.Set Int
     }
 

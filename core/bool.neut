@@ -11,10 +11,10 @@
 (use unsafe)
 
 (definition and ((b1 bool) (b2 bool))
-  (cast-to bool (i1.and (cast-to i1 b1) (cast-to i1 b2))))
+  (cast-to bool (i1:and (cast-to i1 b1) (cast-to i1 b2))))
 
 (definition or ((b1 bool) (b2 bool))
-  (cast-to bool (i1.or (cast-to i1 b1) (cast-to i1 b2))))
+  (cast-to bool (i1:or (cast-to i1 b1) (cast-to i1 b2))))
 
 (unuse unsafe)
 

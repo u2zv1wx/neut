@@ -12,5 +12,16 @@
 (definition unsafe:cast-to ([A tau] (B tau) (x A))
   (unsafe:cast A B x))
 
-(definition admit ([a tau] (x i64))
-  (os:exit a x))
+;; (definition admit-implicit ([a tau])
+;;   (os:exit a 1))
+
+(definition admit-internal ([a tau])
+  (os:exit a 1))
+
+(keyword admit)
+
+(notation admit
+  (admit-internal))
+
+(definition admit-explicit ((a tau))
+  (os:exit a 1))
