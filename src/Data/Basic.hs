@@ -219,7 +219,8 @@ arrVoidPtr = ArrayKindVoidPtr
 
 asArrayAccessMaybe :: T.Text -> Maybe LowType
 asArrayAccessMaybe name
-  | [typeStr, "array-access"] <- wordsBy ':' name = asLowTypeMaybe typeStr
+  | Just (typeStr, "array-access") <- breakOnMaybe ":" name =
+    asLowTypeMaybe typeStr
   | otherwise = Nothing
 
 lowTypeToArrayKindMaybe :: LowType -> Maybe ArrayKind
@@ -255,10 +256,11 @@ data UnaryOp
 
 asUnaryOpMaybe :: T.Text -> Maybe UnaryOp
 asUnaryOpMaybe name
-  | [typeStr, "neg"] <- wordsBy '.' name
+  | Just (typeStr, "neg") <- breakOnMaybe ":" name
   , Just lowType <- asLowTypeMaybe typeStr = Just $ UnaryOpNeg lowType
 asUnaryOpMaybe name
-  | [domTypeStr, convOpStr, codTypeStr] <- wordsBy '.' name
+  | Just (domTypeStr, rest) <- breakOnMaybe ":" name
+  , Just (convOpStr, codTypeStr) <- breakOnMaybe ":" rest
   , Just domType <- asLowTypeMaybe domTypeStr
   , Just codType <- asLowTypeMaybe codTypeStr
   , Just op <- asConvOpMaybe domType codType convOpStr = Just op
@@ -302,7 +304,7 @@ data BinaryOp
 
 asBinaryOpMaybe :: T.Text -> Maybe BinaryOp
 asBinaryOpMaybe name
-  | [typeStr, opStr] <- wordsBy ':' name -- e.g. name == "i8.add"
+  | Just (typeStr, opStr) <- breakOnMaybe ":" name -- e.g. name == "i8.add"
   , Just lowType <- asLowTypeMaybe typeStr
   , Just f <- asBinaryOpMaybe' opStr = Just $ f lowType
 asBinaryOpMaybe _ = Nothing
@@ -378,13 +380,16 @@ linearCheck' found (x:_)
   | x `S.member` found = False
 linearCheck' found (x:xs) = linearCheck' (S.insert x found) xs
 
-wordsBy :: Char -> T.Text -> [T.Text]
-wordsBy c s =
-  case T.dropWhile (== c) s of
-    "" -> []
-    s' -> do
-      let (w, s'') = T.break (== c) s'
-      w : wordsBy c s''
+{-# INLINE breakOnMaybe #-}
+breakOnMaybe :: T.Text -> T.Text -> Maybe (T.Text, T.Text)
+breakOnMaybe needle text =
+  if T.null text
+    then Nothing
+    else do
+      let (h, t) = T.breakOn needle text
+      if T.null t
+        then Nothing
+        else return (h, T.tail t)
 
 splitLast :: [a] -> Maybe ([a], a)
 splitLast [] = Nothing
