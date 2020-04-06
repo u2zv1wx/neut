@@ -141,6 +141,11 @@ simp' ((e1@(m1, _), e2@(m2, _)):cs) = do
         (Just (StuckPiElimUpsilon x1 ess1), Just (StuckPiElimUpsilon x2 ess2))
           | x1 == x2
           , Just pairList <- asPairList ess1 ess2 -> simp $ pairList ++ cs
+        (Just (StuckPiElimConst x1 _ _ mess1), Just (StuckPiElimConst x2 _ _ mess2))
+          | x1 == x2
+          , Nothing <- IntMap.lookup (asInt x1) cenv
+          , Just pairList <- asPairList (map snd mess1) (map snd mess2) -> do
+            simp $ pairList ++ cs
         (Just (StuckPiElimZetaStrict h1 ies1), _)
           | xs1 <- concatMap getVarList ies1
           , occurCheck h1 hs2
@@ -191,7 +196,9 @@ simp' ((e1@(m1, _), e2@(m2, _)):cs) = do
           | xs2 <- concatMap getVarList ies2
           , occurCheck h2 hs1
           , [] <- includeCheck xs2 fvs1 -> simpFlexRigid h2 ies2 e2' e1' fmvs cs
-        _ -> simpOther e1 e2 fmvs cs
+        _ -> do
+          insConstraintQueue $ Enriched (e1, e2) fmvs $ ConstraintOther
+          simp cs
 
 simpBinder :: [IdentifierPlus] -> [IdentifierPlus] -> WithEnv ()
 simpBinder xts1 xts2 = simpBinder' [] xts1 xts2
@@ -244,16 +251,6 @@ simpFlexRigid ::
   -> WithEnv ()
 simpFlexRigid h1 ies1 e1 e2 fmvs cs = do
   insConstraintQueue $ Enriched (e1, e2) fmvs (ConstraintFlexRigid h1 ies1 e2)
-  simp cs
-
-simpOther ::
-     WeakTermPlus
-  -> WeakTermPlus
-  -> S.Set Identifier
-  -> [PreConstraint]
-  -> WithEnv ()
-simpOther e1 e2 fmvs cs = do
-  insConstraintQueue $ Enriched (e1, e2) fmvs $ ConstraintOther
   simp cs
 
 asIdentPlus :: Meta -> WeakTermPlus -> WithEnv IdentifierPlus
