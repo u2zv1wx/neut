@@ -3,7 +3,6 @@
 module Elaborate.Analyze
   ( analyze
   , simp
-  , toPiElim
   , toVarList
   , bindFormalArgs
   , lookupAny
