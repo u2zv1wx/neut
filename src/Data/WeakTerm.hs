@@ -340,7 +340,7 @@ toText piType@(_, WeakTermPi Nothing xts@[(_, x, dom)] cod) = do
         Just (zts, (_, _, t)) -> do
           let argStr = inParen $ showItems $ map showArg zts
           showCons ["Σ", argStr, toText t]
-        _ -> "(product)" -- <> : (product)
+        _ -> "(product)"
     Nothing -> do
       if x `notElem` varWeakTermPlus cod
         then do
@@ -353,19 +353,21 @@ toText piType@(_, WeakTermPi Nothing xts cod) = do
     Just yts -> do
       case splitLast yts of
         Just (zts, (_, _, t)) -> do
-          let argStr = inParen $ showItems $ map showArg zts
-          showCons ["Σ", argStr, toText t]
-        _ -> "(product)" -- <> : (product)
+          let (_, zs, ts) = unzip3 zts
+          if all (\z -> z `notElem` concatMap varWeakTermPlus ts) zs
+            then showCons $ "product" : map toText ts ++ [toText t]
+            else do
+              let argStr = inParen $ showArgs zs ts
+              showCons ["Σ", argStr, toText t]
+        _ -> "(product)"
     Nothing -> do
-      let argStr = inParen $ showItems $ map showArg xts
+      let (_, xs, ts) = unzip3 xts
+      let argStr = inParen $ showArgs xs ts
       showCons ["Π", argStr, toText cod]
-toText (_, WeakTermPi (Just _) _ cod) = do
-  toText cod
+toText (_, WeakTermPi (Just _) _ cod) = toText cod
   -- let argStr = inParen $ showItems $ map showArg xts
   -- showCons ["Π+", argStr, toText cod]
   -- toText cod -- Pi{nat} (...). (...) ~> nat
--- toText (_, WeakTermPiPlus _ _ _ cod) = toText cod -- Pi{nat} (...). (...) ~> nat
--- toText (_, WeakTermPiPlus name _ _ _) = name -- Pi{nat} (...). (...) ~> nat
 toText (_, WeakTermPiIntro xts e) = do
   let argStr = inParen $ showItems $ map showArg xts
   showCons ["λ", argStr, toText e]
@@ -379,23 +381,11 @@ toText (_, WeakTermPiIntroPlus _ (_, _, _, _) xts e) = do
 --   "<#" <> name <> "-" <> "value" <> "#>" -- <#succ-value#>, <#cons-value#>, <#nil-value#>, etc.
 toText (_, WeakTermPiElim e es) = do
   showCons $ map toText $ e : es
--- toText (_, WeakTermSigma xts)
---   | Just (yts, (_, _, t)) <- splitLast xts = do
---     let argStr = inParen $ showItems $ map showArg yts
---     showCons ["Σ", argStr, toText t]
---   | otherwise = "(product)" -- <> : (product)
--- toText (_, WeakTermSigmaIntro _ es) = do
---   showCons ("sigma-introduction" : map toText es)
--- toText (_, WeakTermSigmaElim _ xts e1 e2) = do
---   let argStr = inParen $ showItems $ map showArg xts
---   showCons ["sigma-elimination", argStr, toText e1, toText e2]
 toText (_, WeakTermIter (_, x, _) xts e) = do
   let argStr = inParen $ showItems $ map showArg xts
   showCons ["μ", asText' x, argStr, toText e]
 toText (_, WeakTermConst x _) = asText' x
 toText (_, WeakTermZeta (I (_, i))) = "?M" <> T.pack (show i)
-  -- asText' x
--- toText (_, WeakTermZeta x) = asText' x
 toText (_, WeakTermInt _ a) = T.pack $ show a
 toText (_, WeakTermFloat16 a) = T.pack $ show a
 toText (_, WeakTermFloat32 a) = T.pack $ show a
@@ -445,6 +435,20 @@ inBracket s = "[" <> s <> "]"
 
 showArg :: (Meta, Identifier, WeakTermPlus) -> T.Text
 showArg (_, x, t) = inParen $ asText' x <> " " <> toText t
+
+showArgs :: [Identifier] -> [WeakTermPlus] -> T.Text
+showArgs [] [] = T.empty
+showArgs [_] [t] = inParen $ "_" <> " " <> toText t
+showArgs (x:xs) (t:ts)
+  | x `elem` concatMap varWeakTermPlus ts = do
+    let s1 = inParen $ asText' x <> " " <> toText t
+    let s2 = showArgs xs ts
+    s1 <> " " <> s2
+  | otherwise = do
+    let s1 = inParen $ "_" <> " " <> toText t
+    let s2 = showArgs xs ts
+    s1 <> " " <> s2
+showArgs _ _ = error "showArgs"
 
 showClause :: (WeakCase, WeakTermPlus) -> T.Text
 showClause (c, e) = inParen $ showWeakCase c <> " " <> toText e
