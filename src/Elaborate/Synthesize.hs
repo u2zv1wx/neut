@@ -30,8 +30,8 @@ synthesize = do
     Nothing -> return ()
     Just (Enriched (e1, e2) hs _)
       | Just (h, e) <- lookupAny hs sub -> resolveStuck e1 e2 h e
-    Just (Enriched _ _ (ConstraintDelta iter mess1 mess2)) ->
-      resolveDelta iter mess1 mess2
+    Just (Enriched _ _ (ConstraintDelta e mess1 mess2)) ->
+      resolveDelta e mess1 mess2
     Just (Enriched _ _ (ConstraintQuasiPattern m ess e)) -> do
       resolvePiElim m ess e
     Just (Enriched _ _ (ConstraintFlexRigid m ess e)) -> do
@@ -53,23 +53,23 @@ resolveStuck e1 e2 h e = do
   synthesize
 
 resolveDelta ::
-     IterInfo
+     WeakTermPlus
   -> [(Meta, [WeakTermPlus])]
   -> [(Meta, [WeakTermPlus])]
   -> WithEnv ()
-resolveDelta iter@(m, _, _, _, _) mess1 mess2 = do
+resolveDelta e mess1 mess2 = do
   let planA = do
         let ess1 = map snd mess1
         let ess2 = map snd mess2
         simp $ zip (concat ess1) (concat ess2)
         synthesize
   let planB = do
-        let e1 = toPiElim (unfoldIter iter) mess1
-        let e2 = toPiElim (unfoldIter iter) mess2
+        let e1 = toPiElim e mess1
+        let e2 = toPiElim e mess2
         simp $ [(e1, e2)]
         synthesize
   deleteMin
-  chain m [planA, planB]
+  chain (metaOf e) [planA, planB]
 
 -- synthesize `hole @ arg-1 @ ... @ arg-n = e`, where arg-i is a variable.
 -- Suppose that we received a quasi-pattern ?M @ x @ x @ y @ z == e.

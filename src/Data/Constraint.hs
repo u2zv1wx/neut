@@ -9,7 +9,11 @@ type IterInfo = (Meta, Identifier, [IdentifierPlus], WeakTermPlus, WeakTermPlus)
 
 data Constraint
   = ConstraintAnalyzable
-  | ConstraintDelta IterInfo [(Meta, [WeakTermPlus])] [(Meta, [WeakTermPlus])]
+  | ConstraintDelta
+      WeakTermPlus
+      [(Meta, [WeakTermPlus])]
+      [(Meta, [WeakTermPlus])]
+  -- | ConstraintDelta IterInfo [(Meta, [WeakTermPlus])] [(Meta, [WeakTermPlus])]
   | ConstraintQuasiPattern Hole [[WeakTermPlus]] WeakTermPlus
   | ConstraintFlexRigid Hole [[WeakTermPlus]] WeakTermPlus
   | ConstraintOther
