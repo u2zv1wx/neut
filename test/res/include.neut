@@ -65,6 +65,8 @@
 
 ;; (os:exit i64 20)
 
+;; (os:exit i64 10)
+
 (os:exit i64 (my-record:item-1 item))
 
 ;; (let zs (list i64)

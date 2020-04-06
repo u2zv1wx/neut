@@ -15,9 +15,9 @@ reduceWeakTermPlus (m, WeakTermPi mName xts cod) = do
   (m, WeakTermPi mName (zip3 ms xs ts') cod')
 -- eta-reduce (note that reduceWeakTermPlus expects the argument to be pure; this reduction is
 -- unsound if `e` has certain sort of side-effect, like print)
-reduceWeakTermPlus (_, WeakTermPiIntro xts (_, WeakTermPiElim e args))
-  | Just ys <- mapM asUpsilon args
-  , ys == map (\(_, x, _) -> x) xts = e
+-- reduceWeakTermPlus (_, WeakTermPiIntro xts (_, WeakTermPiElim e args))
+--   | Just ys <- mapM asUpsilon args
+--   , ys == map (\(_, x, _) -> x) xts = e
 reduceWeakTermPlus (m, WeakTermPiIntro xts e) = do
   let (ms, xs, ts) = unzip3 xts
   let ts' = map reduceWeakTermPlus ts

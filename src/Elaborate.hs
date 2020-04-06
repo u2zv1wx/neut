@@ -336,9 +336,9 @@ elaborate' (m, WeakTermInt t x) = do
         T.pack (show size) <> ", but is out of range of u" <> T.pack (show size)
     _ ->
       raiseError m $
-      "the type of `" <>
+      "the term `" <>
       T.pack (show x) <>
-      "` should be an integer type, but is:\n" <> toText (weaken t')
+      "` is an integer, but its type is: " <> toText (weaken t')
 elaborate' (m, WeakTermFloat16 x) = do
   return (m, TermFloat16 x)
 elaborate' (m, WeakTermFloat32 x) = do
@@ -360,9 +360,9 @@ elaborate' (m, WeakTermFloat t x) = do
           T.pack (show x) <> " must be float, but is " <> floatType
     _ ->
       raiseError m $
-      "the type of `" <>
+      "the term `" <>
       T.pack (show x) <>
-      "` must be a float type, but is:\n" <> toText (weaken t')
+      "` is a float, but its type is:\n" <> toText (weaken t')
 elaborate' (m, WeakTermEnum k) = do
   return (m, TermEnum k)
 elaborate' (m, WeakTermEnumIntro x) = do
@@ -442,7 +442,7 @@ elaborateWeakCase (m, WeakCaseInt t x) = do
       raiseError m $
         "the type of `" <>
         T.pack (show x) <>
-        "` should be an integer type, but is:\n" <> toText (weaken t')
+        "` must be an integer type, but is: " <> toText (weaken t')
 elaborateWeakCase (m, WeakCaseLabel l) =
   return (m, CaseValue $ EnumValueLabel l)
 elaborateWeakCase (m, WeakCaseIntS t a) =

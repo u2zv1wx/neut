@@ -35,36 +35,6 @@
 
 (section monad)
 
-(definition return-plus
-  ([a tau]
-   [m (hom tau tau)]
-   (M (monad m)))
-  (witness
-    (hom a (m a))
-    (lambda (x) ((return M) a x))))
-
-;; こう書けると嬉しい、のかな〜？
-;; (definition return-plus
-;;   ([a tau]
-;;    [m (hom tau tau)]
-;;    (M (monad m)))
-;;   (witness
-;;     (hom a (m a))
-;;     (lambda (x) (M.return a x))))
-
-(definition bind-plus
-  ([a tau]
-   [b tau]
-   [m (hom tau tau)]
-   (M (monad m)))
-  (witness
-    (forall
-      ((x (m a))
-       (f (hom a (m b))))
-      (m b))
-    (lambda (x f)
-      ((monad:bind M) a b x f))))
-
 ;; monadic composition
 (definition compose
   ([m hole]
@@ -76,7 +46,7 @@
    (g (hom b (m c))))
   (witness (hom a (m c))
     (lambda (x)
-      (with (bind-plus M)
+      (with (bind M)
         (let tmp (f x))
         (g tmp)))))
 
@@ -88,6 +58,6 @@
   (witness (f top)
     (if condition
       comp
-      ((return-plus M) top:unit))))
+      ((return M) top top:unit))))
 
 (end monad)

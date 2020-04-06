@@ -96,7 +96,8 @@ generateProjections ts = do
         let b' = asIdent (asText a <> ":" <> asText b)
         let attrList = map (QuasiStmtImplicit mb b') [0 .. length xts - 1]
         return $
-          QuasiStmtLetWT
+          -- caseが入っているので推論の必要アリ (LetWTにすると狂う)
+          QuasiStmtLet
             mb
             (mb, b', (mb, WeakTermPi Nothing (xts ++ [dom]) cod))
             ( mb

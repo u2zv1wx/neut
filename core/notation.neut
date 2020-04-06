@@ -40,17 +40,25 @@
 
 (keyword with)
 
-;; (with identity:bind (let x foo) (let y bar) buz (let p qux) result) みたいなのが合法になる。
 (notation (with bind e) e)
 
+;; (notation (with bind e rest+)
+;;   (bind (with bind e) (pi-introduction ((_ hole)) (with bind rest+))))
+
+;; (notation (with bind (let x e+) rest+)
+;;   (bind (with bind e+) (pi-introduction ((x hole)) (with bind rest+))))
+
+;; (notation (with bind (let (x t) e+) rest+)
+;;   (bind (with bind e+) (pi-introduction ((x t)) (with bind rest+))))
+
 (notation (with bind e rest+)
-  (bind (with bind e) (pi-introduction ((_ hole)) (with bind rest+))))
+  (bind hole hole (with bind e) (pi-introduction ((_ hole)) (with bind rest+))))
 
 (notation (with bind (let x e+) rest+)
-  (bind (with bind e+) (pi-introduction ((x hole)) (with bind rest+))))
+  (bind hole hole (with bind e+) (pi-introduction ((x hole)) (with bind rest+))))
 
 (notation (with bind (let (x t) e+) rest+)
-  (bind (with bind e+) (pi-introduction ((x t)) (with bind rest+))))
+  (bind hole hole (with bind e+) (pi-introduction ((x t)) (with bind rest+))))
 
 (keyword lambda)
 
