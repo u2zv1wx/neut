@@ -333,16 +333,32 @@ toText :: WeakTermPlus -> T.Text
 toText (_, WeakTermTau _) = "tau"
 toText (_, WeakTermUpsilon x) = asText' x
 -- toText (_, WeakTermUpsilon x) = asText x
-toText (_, WeakTermPi Nothing xts@[(_, x, dom)] cod) = do
-  if x `notElem` varWeakTermPlus cod
-    then do
-      showCons ["hom", toText dom, toText cod]
-    else do
+toText piType@(_, WeakTermPi Nothing xts@[(_, x, dom)] cod) = do
+  case extractSigmaArg piType of
+    Just yts -> do
+      case splitLast yts of
+        Just (zts, (_, _, t)) -> do
+          let argStr = inParen $ showItems $ map showArg zts
+          showCons ["Σ", argStr, toText t]
+        _ -> "(product)" -- <> : (product)
+    Nothing -> do
+      if x `notElem` varWeakTermPlus cod
+        then do
+          showCons ["hom", toText dom, toText cod]
+        else do
+          let argStr = inParen $ showItems $ map showArg xts
+          showCons ["Π", argStr, toText cod]
+toText piType@(_, WeakTermPi Nothing xts cod) = do
+  case extractSigmaArg piType of
+    Just yts -> do
+      case splitLast yts of
+        Just (zts, (_, _, t)) -> do
+          let argStr = inParen $ showItems $ map showArg zts
+          showCons ["Σ", argStr, toText t]
+        _ -> "(product)" -- <> : (product)
+    Nothing -> do
       let argStr = inParen $ showItems $ map showArg xts
       showCons ["Π", argStr, toText cod]
-toText (_, WeakTermPi Nothing xts t) = do
-  let argStr = inParen $ showItems $ map showArg xts
-  showCons ["Π", argStr, toText t]
 toText (_, WeakTermPi (Just _) _ cod) = do
   toText cod
   -- let argStr = inParen $ showItems $ map showArg xts
@@ -470,9 +486,16 @@ showArray = inBracket . T.intercalate " "
 
 showStruct :: [T.Text] -> T.Text
 showStruct = inBrace . T.intercalate " "
--- splitLast :: [a] -> Maybe ([a], a)
--- splitLast [] = Nothing
--- splitLast [x] = return ([], x)
--- splitLast (x:xs) = do
---   (xs', z) <- splitLast xs
---   return (x : xs', z)
+
+extractSigmaArg :: WeakTermPlus -> Maybe [IdentifierPlus]
+extractSigmaArg (_, WeakTermPi _ [(_, z, (_, WeakTermTau _)), (_, _, (_, WeakTermPi _ xts (_, WeakTermUpsilon z')))] (_, WeakTermUpsilon z''))
+  | z == z'
+  , z == z'' = return xts
+extractSigmaArg _ = Nothing
+
+splitLast :: [a] -> Maybe ([a], a)
+splitLast [] = Nothing
+splitLast [x] = return ([], x)
+splitLast (x:xs) = do
+  (xs', z) <- splitLast xs
+  return (x : xs', z)
