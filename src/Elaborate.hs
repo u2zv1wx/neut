@@ -50,8 +50,6 @@ elaborate stmt = do
 elaborateStmt :: WeakStmt -> WithEnv TermPlus
 elaborateStmt (WeakStmtReturn e) = do
   (e', _, _) <- infer e
-  -- cs <- gets constraintEnv
-  -- p' cs
   analyze >> synthesize >> refine
   checkUnivSanity
   elaborate' e'
@@ -267,7 +265,7 @@ elaborate' (m, WeakTermUpsilon x) = do
   cenv <- gets cacheEnv
   if IntMap.member (asInt x) cenv
     then do
-      (t, UnivLevelPlus (_, l)) <- lookupTypeEnv1 m x
+      (t, UnivLevelPlus (_, l)) <- lookupTypeEnv m x
       (up, _, _) <- instantiate m t l
       return (m, TermConst x up)
     else return (m, TermUpsilon x)
