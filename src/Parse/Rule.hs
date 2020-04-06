@@ -62,11 +62,12 @@ parseConnective m ts f g = do
   return $ connectiveList' ++ ruleList
 
 parseConnective' :: TreePlus -> WithEnv Connective
-parseConnective' (m, TreeNode ((_, TreeLeaf name):(_, TreeNode xts):rules)) = do
-  m' <- adjustPhase m
+parseConnective' (m, TreeNode ((_, TreeLeaf name):(_, TreeNode xts):rules))
+  -- m' <- adjustPhase m
+ = do
   xts' <- mapM interpretIdentifierPlus xts
   rules' <- mapM parseRule rules
-  return (m', asIdent name, xts', rules')
+  return (m, asIdent name, xts', rules')
 parseConnective' t = raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) ...)"
 
 registerLabelInfo :: [TreePlus] -> WithEnv ()
@@ -123,12 +124,13 @@ takeXTS (_, WeakTermPi _ xts _) = return xts
 takeXTS t = raiseSyntaxError (fst t) "(pi (TREE ... TREE) TREE)"
 
 parseRule :: TreePlus -> WithEnv Rule
-parseRule (m, TreeNode [(mName, TreeLeaf name), (_, TreeNode xts), t]) = do
-  m' <- adjustPhase m
-  mName' <- adjustPhase mName
+parseRule (m, TreeNode [(mName, TreeLeaf name), (_, TreeNode xts), t])
+  -- m' <- adjustPhase m
+  -- mName' <- adjustPhase mName
+ = do
   t' <- interpret t
   xts' <- mapM interpretIdentifierPlus xts
-  return (m', asIdent name, mName', xts', t')
+  return (m, asIdent name, mName, xts', t')
 parseRule t = raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) TREE)"
 
 checkNameSanity :: Meta -> [IdentifierPlus] -> WithEnv ()

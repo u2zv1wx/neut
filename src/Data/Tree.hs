@@ -28,13 +28,13 @@ showAsSExp (_, TreeNodeSquare ts) =
   "[" <> T.intercalate " " (map showAsSExp ts) <> "]"
 
 replaceMeta :: Meta -> TreePlus -> TreePlus
-replaceMeta m (_, TreeLeaf x) = (m, TreeLeaf x)
-replaceMeta m (_, TreeNode ts) = do
+replaceMeta m (m', TreeLeaf x) = (supMeta m m', TreeLeaf x)
+replaceMeta m (mt, TreeNode ts) = do
   let ts' = map (replaceMeta m) ts
-  (m, TreeNode ts')
-replaceMeta m (_, TreeNodeSquare ts) = do
+  (supMeta m mt, TreeNode ts')
+replaceMeta m (mt, TreeNodeSquare ts) = do
   let ts' = map (replaceMeta m) ts
-  (m, TreeNodeSquare ts')
+  (supMeta m mt, TreeNodeSquare ts')
 
 substTree :: (T.Text, T.Text) -> TreePlus -> TreePlus
 substTree (from, to) (m, TreeLeaf x)

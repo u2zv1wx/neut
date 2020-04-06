@@ -182,7 +182,7 @@ parse' ((m, TreeNode ((_, TreeLeaf "end"):es)):as)
 parse' ((m, TreeNode ((_, TreeLeaf "enum"):rest)):as)
   | (_, TreeLeaf name):ts <- rest = do
     xis <- interpretEnumItem m name ts
-    m' <- adjustPhase m
+    m' <- adjust' m
     ss <- parse' as
     return $ QuasiStmtEnum m' name xis : ss
   | otherwise = raiseSyntaxError m "(enum LEAF TREE ... TREE)"
@@ -223,7 +223,8 @@ parse' ((m, TreeNode ((_, TreeLeaf "introspect"):rest)):as2)
   | otherwise = raiseSyntaxError m "(introspect LEAF TREE*)"
 parse' ((m, TreeNode ((_, TreeLeaf "constant"):rest)):as)
   | [(mn, TreeLeaf name), t] <- rest = do
-    t' <- macroExpand t >>= interpret
+    t' <- adjust t >>= macroExpand >>= interpret
+      -- t' <- macroExpand t >>= interpret
     name' <- withSectionPrefix name
     cenv <- gets constantEnv
     case Map.lookup name' cenv of
@@ -232,8 +233,8 @@ parse' ((m, TreeNode ((_, TreeLeaf "constant"):rest)):as)
         i <- newCount
         modify (\e -> e {constantEnv = Map.insert name' i (constantEnv e)})
         defList <- parse' as
-        m' <- adjustPhase m
-        mn' <- adjustPhase mn
+        m' <- adjust' m
+        mn' <- adjust' mn
         return $ QuasiStmtConstDecl m' (mn', I (name', i), t') : defList
   | otherwise = raiseSyntaxError m "(constant LEAF TREE)"
 parse' ((m, TreeNode (def@(mDef, TreeLeaf "definition"):rest)):as)
@@ -250,15 +251,16 @@ parse' ((m, TreeNode (ind@(_, TreeLeaf "inductive"):rest)):as)
   | name@(mFun, TreeLeaf _):xts@(_, TreeNode _):rest' <- rest = do
     parse' $ (m, TreeNode [ind, (mFun, TreeNode (name : xts : rest'))]) : as
   | otherwise = do
-    rest' <- mapM macroExpand rest
-    stmtList1 <- parseInductive m rest'
+    rest' <- mapM (adjust >=> macroExpand) rest
+    m' <- adjust' m
+    stmtList1 <- parseInductive m' rest'
     stmtList2 <- parse' as
     return $ stmtList1 ++ stmtList2
 parse' ((m, TreeNode (coind@(_, TreeLeaf "coinductive"):rest)):as)
   | name@(mFun, TreeLeaf _):xts@(_, TreeNode _):rest' <- rest = do
     parse' $ (m, TreeNode [coind, (mFun, TreeNode (name : xts : rest'))]) : as
   | otherwise = do
-    rest' <- mapM macroExpand rest
+    rest' <- mapM (adjust >=> macroExpand) rest
     registerLabelInfo rest'
     rest'' <- asInductive rest'
     stmtList1 <- parseInductive m rest''
@@ -271,9 +273,11 @@ parse' ((m, TreeNode ((mLet, TreeLeaf "let"):rest)):as)
     parse' ((m, TreeNode [(mLet, TreeLeaf "let"), xt, e]) : as)
   | [xt, e] <- rest = do
     xt' <- prefixIdentPlus xt
-    m' <- adjustPhase m
-    e' <- macroExpand e >>= interpret
-    (mx, x, t) <- macroExpand xt' >>= interpretIdentifierPlus
+    m' <- adjust' m
+    e' <- adjust e >>= macroExpand >>= interpret
+    -- e' <- macroExpand e >>= interpret
+    -- (mx, x, t) <- macroExpand xt' >>= interpretIdentifierPlus
+    (mx, x, t) <- adjust xt' >>= macroExpand >>= interpretIdentifierPlus
     defList <- parse' as
     case e' of
       (_, WeakTermPiElim f args)
@@ -281,12 +285,13 @@ parse' ((m, TreeNode ((mLet, TreeLeaf "let"):rest)):as)
         , mxs <- catMaybes mmxs
         , not (null mxs) -> do
           xts <- mapM toIdentPlus mxs
-          let app = (m, WeakTermPiElim f args')
-          return $ QuasiStmtLetSigma m (xts ++ [(mx, x, t)]) app : defList
+          let app = (m', WeakTermPiElim f args')
+          return $ QuasiStmtLetSigma m' (xts ++ [(mx, x, t)]) app : defList
       _ -> return $ QuasiStmtLet m' (mx, x, t) e' : defList
   | otherwise = raiseSyntaxError m "(let LEAF TREE TREE) | (let TREE TREE)"
 parse' (a:as) = do
-  e <- macroExpand a
+  e <- adjust a >>= macroExpand
+  -- e <- macroExpand a
   if isSpecialForm e
     then parse' $ e : as
     else do
@@ -303,7 +308,7 @@ parse' (a:as) = do
             return $ QuasiStmtLetSigma m xts app : defList
         (m, _) -> do
           name <- newNameWith'' "hole"
-          m' <- adjustPhase m
+          m' <- adjust' m
           t <- newHole m'
           defList <- parse' as
           modify
@@ -463,7 +468,7 @@ ensureEnvSanity m = do
 
 parseDef :: [TreePlus] -> WithEnv [QuasiStmt]
 parseDef xds = do
-  xds' <- mapM (prefixFunName >=> macroExpand) xds
+  xds' <- mapM (adjust >=> prefixFunName >=> macroExpand) xds
   xs <- mapM extractFunName xds'
   (xds'', miss) <- unzip <$> mapM takeSquare xds'
   xds''' <- mapM interpretIter xds''
@@ -665,3 +670,22 @@ includeCore' m =
       , (m, TreeLeaf "library")
       , (m, TreeLeaf "\"core/core.neut\"")
       ])
+
+adjust :: TreePlus -> WithEnv TreePlus
+adjust (m, TreeLeaf x) = do
+  m' <- adjust' m
+  return (m', TreeLeaf x)
+adjust (m, TreeNode ts) = do
+  m' <- adjust' m
+  ts' <- mapM adjust ts
+  return (m', TreeNode ts')
+adjust (m, TreeNodeSquare ts) = do
+  m' <- adjust' m
+  ts' <- mapM adjust ts
+  return (m', TreeNodeSquare ts')
+
+adjust' :: Meta -> WithEnv Meta
+adjust' m = do
+  i <- gets phase
+  let (_, l, c) = metaLocation m
+  return $ m {metaLocation = (i, l, c)}

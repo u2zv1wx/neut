@@ -5,7 +5,6 @@ module Parse.Interpret
   , interpretIdentifierPlus
   , interpretIter
   , interpretEnumItem
-  , adjustPhase
   , raiseSyntaxError
   , toIdentPlus
   ) where
@@ -33,51 +32,41 @@ interpret :: TreePlus -> WithEnv WeakTermPlus
 -- foundational interpretations
 --
 interpret (m, TreeLeaf "tau") = do
-  m' <- adjustPhase m
   l <- newCount
-  return (m', WeakTermTau l)
+  return (m, WeakTermTau l)
 interpret (m, TreeNode ((_, TreeLeaf "upsilon"):rest))
-  | [(_, TreeLeaf x)] <- rest = do
-    m' <- adjustPhase m
-    return (m', WeakTermUpsilon $ asIdent x)
+  | [(_, TreeLeaf x)] <- rest = do return (m, WeakTermUpsilon $ asIdent x)
   | otherwise = raiseSyntaxError m "(upsilon TREE)"
 interpret (m, TreeNode ((_, TreeLeaf "pi"):rest))
   | [(_, TreeNode xts), t] <- rest = do
     (xts', t') <- interpretBinder xts t
-    m' <- adjustPhase m
-    return (m', weakTermPi xts' t')
+    return (m, weakTermPi xts' t')
   | otherwise = raiseSyntaxError m "(pi (TREE*) TREE)"
 interpret (m, TreeNode ((_, TreeLeaf "pi-introduction"):rest))
   | [(_, TreeNode xts), e] <- rest = do
     (xts', e') <- interpretBinder xts e
-    m' <- adjustPhase m
-    return (m', WeakTermPiIntro xts' e')
+    return (m, WeakTermPiIntro xts' e')
   | otherwise = raiseSyntaxError m "(pi-introduction (TREE*) TREE)"
 interpret (m, TreeNode ((_, TreeLeaf "pi-elimination"):rest))
-  | e:es <- rest = do
-    m' <- adjustPhase m
-    interpretPiElim m' e es
+  | e:es <- rest = do interpretPiElim m e es
   | otherwise = raiseSyntaxError m "(pi-elimination TREE TREE*)" -- e' <- interpret e
 interpret (m, TreeNode ((_, TreeLeaf "sigma"):rest))
   | [(_, TreeNode xts), t] <- rest = do
     xts' <- mapM interpretIdentifierPlus xts
     t' <- interpret t
     placeholder <- newNameWith'' "cod"
-    m' <- adjustPhase m
-    weakTermSigma m' $ xts' ++ [(fst t', placeholder, t')]
+    weakTermSigma m $ xts' ++ [(fst t', placeholder, t')]
   | otherwise = raiseSyntaxError m "(sigma (TREE*) TREE)"
 interpret (m, TreeNode ((_, TreeLeaf "sigma-introduction"):es)) = do
-  m' <- adjustPhase m
   es' <- mapM interpret es
-  sigmaIntro m' es'
+  sigmaIntro m es'
 interpret (m, TreeNode ((_, TreeLeaf "sigma-elimination"):rest))
   | [(_, TreeNode xts), e1, e2] <- rest = do
     xts' <- mapM interpretIdentifierPlus xts
     e1' <- interpret e1
     e2' <- interpret e2
-    m' <- adjustPhase m
-    h <- newHole m'
-    return $ sigmaElim m' h xts' e1' e2'
+    h <- newHole m
+    return $ sigmaElim m h xts' e1' e2'
   | otherwise = raiseSyntaxError m "(sigma-elimination (TREE*) TREE TREE)"
 interpret (m, TreeNode ((_, TreeLeaf "iterate"):rest))
   | [xt, xts@(_, TreeNode _), e] <- rest = do
@@ -87,120 +76,101 @@ interpret (m, TreeNode ((_, TreeLeaf "iterate"):rest))
 interpret (m, TreeNode ((_, TreeLeaf "zeta"):rest))
   | [x@(_, TreeLeaf _)] <- rest = do
     (_, x') <- interpretLeaf x
-    m' <- adjustPhase m
     modify (\env -> env {nonCandSet = S.insert (asText x') (nonCandSet env)})
-    return (m', WeakTermZeta x')
+    return (m, WeakTermZeta x')
   | otherwise = raiseSyntaxError m "(zeta LEAF)"
 interpret (m, TreeNode ((_, TreeLeaf "constant"):rest))
-  | [(_, TreeLeaf x)] <- rest = do
-    m' <- adjustPhase m
-    return (m', WeakTermConst (asIdent x) emptyUP)
+  | [(_, TreeLeaf x)] <- rest = do return (m, WeakTermConst (asIdent x) emptyUP)
   | otherwise = raiseSyntaxError m "(constant LEAF)"
 interpret (m, TreeNode ((_, TreeLeaf "f16"):rest))
   | [(mx, TreeLeaf x)] <- rest = do
     case readMaybe $ T.unpack x of
       Nothing -> raiseError mx "the argument of `f16` must be a float"
       Just x' -> do
-        m' <- adjustPhase m
-        return (m', WeakTermFloat16 x')
+        return (m, WeakTermFloat16 x')
   | otherwise = raiseSyntaxError m "(f16 LEAF)"
 interpret (m, TreeNode ((_, TreeLeaf "f32"):rest))
   | [(mx, TreeLeaf x)] <- rest = do
     case readMaybe $ T.unpack x of
       Nothing -> raiseError mx "the argument of `f32` must be a float"
       Just x' -> do
-        m' <- adjustPhase m
-        return (m', WeakTermFloat32 x')
+        return (m, WeakTermFloat32 x')
   | otherwise = raiseSyntaxError m "(f32 LEAF)"
 interpret (m, TreeNode ((_, TreeLeaf "f64"):rest))
   | [(mx, TreeLeaf x)] <- rest = do
     case readMaybe $ T.unpack x of
       Nothing -> raiseError mx "the argument of `f64` must be a float"
       Just x' -> do
-        m' <- adjustPhase m
-        return (m', WeakTermFloat64 x')
+        return (m, WeakTermFloat64 x')
   | otherwise = raiseSyntaxError m "(f64 LEAF)"
 interpret (m, TreeNode ((_, TreeLeaf "enum"):rest))
   | [(_, TreeLeaf x)] <- rest = do
-    m' <- adjustPhase m
     case (readEnumTypeIntS x, readEnumTypeIntU x) of
-      (Just i, _) -> return (m', WeakTermEnum $ EnumTypeIntS i)
-      (_, Just i) -> return (m', WeakTermEnum $ EnumTypeIntU i)
-      _ -> return (m', WeakTermEnum $ EnumTypeLabel x)
+      (Just i, _) -> return (m, WeakTermEnum $ EnumTypeIntS i)
+      (_, Just i) -> return (m, WeakTermEnum $ EnumTypeIntU i)
+      _ -> return (m, WeakTermEnum $ EnumTypeLabel x)
   | otherwise = raiseSyntaxError m "(enum LEAF)"
 interpret (m, TreeNode ((_, TreeLeaf "enum-introduction"):rest))
   | [l] <- rest = do
     l' <- interpretEnumValue l
-    m' <- adjustPhase m
-    return (m', WeakTermEnumIntro l')
+    return (m, WeakTermEnumIntro l')
   | otherwise = raiseSyntaxError m "(enum-introduction TREE)"
 interpret (m, TreeNode ((_, TreeLeaf "enum-elimination"):rest))
   | e:cs <- rest = do
     e' <- interpret e
     cs' <- mapM interpretClause cs
-    m' <- adjustPhase m
-    h <- newHole m'
-    return (m', WeakTermEnumElim (e', h) cs')
+    h <- newHole m
+    return (m, WeakTermEnumElim (e', h) cs')
   | otherwise = raiseSyntaxError m "(enum-elimination TREE TREE*)"
 interpret (m, TreeNode ((_, TreeLeaf "array"):rest))
   | [dom, kind] <- rest = do
     dom' <- interpret dom
     kind' <- asArrayKind kind
-    m' <- adjustPhase m
-    return (m', WeakTermArray dom' kind')
+    return (m, WeakTermArray dom' kind')
   | otherwise = raiseSyntaxError m "(array TREE TREE)"
 interpret (m, TreeNode ((_, TreeLeaf "array-introduction"):rest))
   | kind:es <- rest = do
     kind' <- asArrayKind kind
     es' <- mapM interpret es
-    m' <- adjustPhase m
-    return (m', WeakTermArrayIntro kind' es')
+    return (m, WeakTermArrayIntro kind' es')
   | otherwise = raiseSyntaxError m "(array-introduction TREE TREE*)"
 interpret (m, TreeNode ((_, TreeLeaf "array-elimination"):rest))
   | [kind, (_, TreeNode xts), e1, e2] <- rest = do
     kind' <- asArrayKind kind
     e1' <- interpret e1
     (xts', e2') <- interpretBinder xts e2
-    m' <- adjustPhase m
-    return (m', WeakTermArrayElim kind' xts' e1' e2')
+    return (m, WeakTermArrayElim kind' xts' e1' e2')
   | otherwise = raiseSyntaxError m "(array-elimination TREE (TREE*) TREE TREE)"
 interpret (m, TreeNode ((_, TreeLeaf "struct"):ks)) = do
   ks' <- mapM asArrayKind ks
-  m' <- adjustPhase m
-  return (m', WeakTermStruct ks')
+  return (m, WeakTermStruct ks')
 interpret (m, TreeNode ((_, TreeLeaf "struct-introduction"):ets)) = do
   ets' <- mapM interpretStructIntro ets
-  m' <- adjustPhase m
-  return (m', WeakTermStructIntro ets')
+  return (m, WeakTermStructIntro ets')
 interpret (m, TreeNode ((_, TreeLeaf "struct-elimination"):rest))
   | [(_, TreeNode xts), e1, e2] <- rest = do
     e1' <- interpret e1
     xts' <- mapM interpretStructElim xts
     e2' <- interpret e2
-    m' <- adjustPhase m
-    return (m', WeakTermStructElim xts' e1' e2')
+    return (m, WeakTermStructElim xts' e1' e2')
   | otherwise = raiseSyntaxError m "(struct-elimination (TREE*) TREE TREE)"
 interpret (m, TreeNode ((_, TreeLeaf "case"):rest))
   | e:cxtes <- rest = do
     e' <- interpret e
     cxtes' <- mapM interpretCaseClause cxtes
-    m' <- adjustPhase m
-    return (m', WeakTermCase "UNKNOWN" e' cxtes')
+    return (m, WeakTermCase "UNKNOWN" e' cxtes')
   | otherwise = raiseSyntaxError m "(case TREE TREE*)"
 -- A -> FνF -> νF (i.e. copattern matching (although I think it's more correct to say "record" or something like that,
 -- considering that the constructed term using `FνF -> νF` is just a record after all))
 interpret (m, TreeNode ((_, TreeLeaf "cocase"):rest))
   | codType:cocaseClauseList <- rest = do
     (a, args) <- interpretCoinductive codType
-    m' <- adjustPhase m
     let ai = asIdent a
     cocaseClauseList' <- mapM interpretCocaseClause cocaseClauseList
     let codType' = (m, WeakTermPiElim (m, WeakTermUpsilon ai) args)
     es <- cocaseAsSigmaIntro m a codType' cocaseClauseList'
-    let f = (m', WeakTermUpsilon $ asIdent $ a <> ":unfold")
-    return (m', WeakTermPiElim f es)
-    -- sigmaIntro m' codType' es
-    -- return (m', WeakTermSigmaIntro codType' es)
+    let f = (m, WeakTermUpsilon $ asIdent $ a <> ":unfold")
+    return (m, WeakTermPiElim f es)
   | otherwise = raiseSyntaxError m "(cocase TREE TREE*)"
 --
 -- auxiliary interpretations
@@ -209,64 +179,50 @@ interpret (m, TreeNode ((_, TreeLeaf "product"):ts)) = do
   ts' <- mapM interpret ts
   let ms = map fst ts'
   xs <- mapM (const $ newNameWith'' "sig") ts'
-  m' <- adjustPhase m
-  weakTermSigma m' (zip3 ms xs ts')
+  weakTermSigma m (zip3 ms xs ts')
 interpret (m, TreeNode ((_, TreeLeaf "record"):rest))
   | codType:clauseList <- rest = do
     (a, args) <- interpretCoinductive codType
-    m' <- adjustPhase m
     let ai = asIdent a
     clauseList' <- mapM interpretCocaseClause' clauseList
     let codType' = (m, WeakTermPiElim (m, WeakTermUpsilon ai) args)
     es <- cocaseAsSigmaIntro m a codType' [((ai, args), clauseList')]
-    let f = (m', WeakTermUpsilon $ asIdent $ a <> ":unfold")
-    -- p "record:"
-    -- p' (m', WeakTermPiElim f es)
-    -- _ <- error "stop"
-    return (m', WeakTermPiElim f es)
-    -- return (m', WeakTermSigmaIntro codType' es)
+    let f = (m, WeakTermUpsilon $ asIdent $ a <> ":unfold")
+    return (m, WeakTermPiElim f es)
   | otherwise = raiseSyntaxError m "(record TREE TREE*)"
 interpret (m, TreeLeaf x)
   | Just x' <- readMaybe $ T.unpack x = do
-    m' <- adjustPhase m
-    h <- newHole m'
-    return (m', WeakTermInt h x')
+    h <- newHole m
+    return (m, WeakTermInt h x')
   | Just x' <- readMaybe $ T.unpack x = do
-    m' <- adjustPhase m
-    h <- newHole m'
-    return (m', WeakTermFloat h x')
-  | Just i <- readEnumTypeIntS x = do
-    m' <- adjustPhase m
-    return (m', WeakTermEnum $ EnumTypeIntS i)
-  | Just i <- readEnumTypeIntU x = do
-    m' <- adjustPhase m
-    return (m', WeakTermEnum $ EnumTypeIntU i)
+    h <- newHole m
+    return (m, WeakTermFloat h x')
+  | Just i <- readEnumTypeIntS x = do return (m, WeakTermEnum $ EnumTypeIntS i)
+  | Just i <- readEnumTypeIntU x = do return (m, WeakTermEnum $ EnumTypeIntU i)
   | Just str <- readMaybe $ T.unpack x = do
-    m' <- adjustPhase m
-    u8s <- forM (encode str) $ \u -> return (m', toValueIntU 8 (toInteger u))
-    return (m', WeakTermArrayIntro (ArrayKindIntU 8) u8s) -- parse string as utf-8 encoded u8 array
+    u8s <- forM (encode str) $ \u -> return (m, toValueIntU 8 (toInteger u))
+    return (m, WeakTermArrayIntro (ArrayKindIntU 8) u8s) -- parse string as utf-8 encoded u8 array
   -- note that enums/constants are interpreted as variables at this stage.
   -- Those are reinterpreted into constants in Rename.
   -- This is to handle terms like `lam (i64 : bool). e` (i.e. bound variable
   -- with the same name of a constant) in saner way.
-  | otherwise = do
-    m' <- adjustPhase m
+  | otherwise
     -- '@'-prefixed variables are interpreted as explicit variables
+   = do
     case T.uncons x of
-      Nothing -> raiseCritical m' "encountered a variable with empty identifier"
+      Nothing -> raiseCritical m "encountered a variable with empty identifier"
       Just (c, rest)
-        | c /= '@' -> return (m', WeakTermUpsilon $ asIdent x)
+        | c /= '@' -> return (m, WeakTermUpsilon $ asIdent x)
         | T.length rest == 0 ->
-          raiseError m' "found a explicit variable with empty identifier"
+          raiseError m "found a explicit variable with empty identifier"
         | otherwise ->
-          return (m' {metaIsExplicit = True}, WeakTermUpsilon $ asIdent rest)
+          return (m {metaIsExplicit = True}, WeakTermUpsilon $ asIdent rest)
 interpret t@(m, TreeNode es) = do
-  m' <- adjustPhase m
   ml <- interpretEnumValueMaybe t
   case (ml, es) of
-    (Just l, _) -> return (m', WeakTermEnumIntro l)
+    (Just l, _) -> return (m, WeakTermEnumIntro l)
     (_, []) -> raiseSyntaxError (fst t) "(TREE TREE*)"
-    (_, f:args) -> interpretPiElim m' f args
+    (_, f:args) -> interpretPiElim m f args
 interpret (m, TreeNodeSquare _) = raiseSyntaxError m "LEAF | TREE"
 
 interpretPiElim :: Meta -> TreePlus -> [TreePlus] -> WithEnv WeakTermPlus
@@ -289,11 +245,10 @@ interpretBorrow (m, TreeNode (f:args))
     f' <- interpret f
     args'' <- mapM interpret args'
     tmp <- newNameWith'' "borrow"
-    m' <- adjustPhase m
-    xts <- mapM toIdentPlus $ mxs ++ [(m', tmp)]
-    h <- newHole m'
-    let app = (m', WeakTermPiElim f' args'')
-    return ((m', WeakTermUpsilon tmp), \term -> sigmaElim m' h xts app term)
+    xts <- mapM toIdentPlus $ mxs ++ [(m, tmp)]
+    h <- newHole m
+    let app = (m, WeakTermPiElim f' args'')
+    return ((m, WeakTermUpsilon tmp), \term -> sigmaElim m h xts app term)
 interpretBorrow e = do
   e' <- interpret e
   return (e', id)
@@ -314,7 +269,7 @@ sigmaIntro m es = do
         [(m, z, (m, WeakTermTau l)), (m, k, piType)]
         (m, WeakTermPiElim (m, WeakTermUpsilon k) es))
 
---   return (m', WeakTermSigmaIntro h es')
+--   return (m, WeakTermSigmaIntro h es')
 sigmaElim ::
      Meta
   -> WeakTermPlus
@@ -337,33 +292,30 @@ toIdentPlus (m, x) = do
   return (m, x, h)
 
 interpretIdentifierPlus :: TreePlus -> WithEnv IdentifierPlus
-interpretIdentifierPlus (m, TreeLeaf x) = do
-  (m', x') <- interpretLeaf (m, TreeLeaf x)
-  h <- newHole m'
-  return (m', x', h)
+interpretIdentifierPlus leaf@(_, TreeLeaf _) = do
+  (m, x') <- interpretLeaf leaf
+  h <- newHole m
+  return (m, x', h)
 interpretIdentifierPlus (_, TreeNode [x, t]) = do
-  (m', x') <- interpretLeaf x
+  (m, x') <- interpretLeaf x
   t' <- interpret t
-  return (m', x', t')
+  return (m, x', t')
 interpretIdentifierPlus t = raiseSyntaxError (fst t) "(LEAF TREE)"
 
 interpretIter :: TreePlus -> WithEnv Def
 interpretIter (m, TreeNode [xt, (_, TreeNode xts), e]) = do
   xt' <- interpretIdentifierPlus xt
   (xts', e') <- interpretBinder xts e
-  m' <- adjustPhase m
-  return (m', xt', xts', e')
+  return (m, xt', xts', e')
 interpretIter t = raiseSyntaxError (fst t) "(TREE (TREE ... TREE) TREE)"
 
 interpretLeaf :: TreePlus -> WithEnv (Meta, Identifier)
 interpretLeaf (m, TreeLeaf "_") = do
-  m' <- adjustPhase m
   h <- newNameWith'' "H"
   modify (\env -> env {nonCandSet = S.insert (asText h) (nonCandSet env)})
-  return (m', h)
+  return (m, h)
 interpretLeaf (m, TreeLeaf x) = do
-  m' <- adjustPhase m
-  return (m', asIdent x)
+  return (m, asIdent x)
 interpretLeaf t = raiseSyntaxError (fst t) "LEAF"
 
 interpretEnumValueMaybe :: TreePlus -> WithEnv (Maybe EnumValue)
@@ -441,8 +393,7 @@ interpretStructIntro e = raiseSyntaxError (fst e) "(TREE TREE)"
 interpretStructElim :: TreePlus -> WithEnv (Meta, Identifier, ArrayKind)
 interpretStructElim (_, TreeNode [(m, TreeLeaf x), k]) = do
   k' <- asArrayKind k
-  m' <- adjustPhase m
-  return (m', asIdent x, k')
+  return (m, asIdent x, k')
 interpretStructElim e = raiseSyntaxError (fst e) "(LEAF TREE)"
 
 interpretCaseClause ::
@@ -450,8 +401,7 @@ interpretCaseClause ::
 interpretCaseClause (_, TreeNode [(_, TreeNode ((m, TreeLeaf c):xts)), e]) = do
   xts' <- mapM interpretIdentifierPlus xts
   e' <- interpret e
-  m' <- adjustPhase m
-  return (((m', asIdent c), xts'), e')
+  return (((m, asIdent c), xts'), e')
 interpretCaseClause t = raiseSyntaxError (fst t) "((LEAF TREE ... TREE) TREE)"
 
 type CocaseClause = ((Identifier, [WeakTermPlus]), [(Identifier, WeakTermPlus)])
@@ -595,15 +545,6 @@ readEnumValueIntU t x
   | Just (LowTypeIntU i) <- asLowTypeMaybe t
   , Just x' <- readMaybe $ T.unpack x = Just $ EnumValueIntU i x'
   | otherwise = Nothing
-
-adjustPhase :: Meta -> WithEnv Meta
-adjustPhase m = do
-  i <- gets phase
-  let newLoc = adjustPhase' i (metaLocation m)
-  return $ m {metaLocation = newLoc}
-
-adjustPhase' :: Int -> Loc -> Loc
-adjustPhase' i (_, l, c) = (i, l, c)
 
 asArrayKind :: TreePlus -> WithEnv ArrayKind
 asArrayKind e@(_, TreeLeaf x) =
