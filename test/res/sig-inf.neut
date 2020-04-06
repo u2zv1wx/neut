@@ -1,0 +1,21 @@
+(no-implicit-core)
+
+(include "notation.neut")
+
+;
+
+(definition string
+  (sigma
+    ((len u64))
+    (array len u8)))
+
+(definition intro ()
+  (sigma-introduction (u64 1) (i64 3)))
+
+(definition test ()
+  (sigma-elimination (x y) (intro) x))
+
+(definition foo ((str string))
+  (sigma-elimination (n content) str
+    (with-type (product string u64)
+      (tuple (tuple n content) 3))))

@@ -1,0 +1,10 @@
+(no-implicit-core)
+
+(include library "core/notation.neut")
+
+;; (definition foo ((bar (pi ((a tau) (_ a)) i64)))
+;;   (witness i64 0))
+
+(inductive test ()
+  (make ((_ (pi ((a tau) (_ a)) i64)))
+    (test)))

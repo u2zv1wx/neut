@@ -1,0 +1,59 @@
+(no-implicit-core)
+
+(include library "core/notation.neut")
+
+(constant unsafe:cast
+  (pi ((A tau) (B tau) (_ A)) B))
+
+(inductive pohe ((a (hom tau tau)))
+  (unfold
+    ((k (hom (hom tau tau) tau))
+     (foo (hom (k a) i64))
+     (base (k a)))
+    (pohe a)))
+
+(let id (hom tau tau)
+  (lambda ((x tau)) x))
+
+(definition thu
+  (witness (pohe id)
+    (pohe:unfold
+      pohe
+      (lambda ((_ (pohe id)))
+        (i64 10))
+      (unsafe:cast
+        (hom tau tau)
+        (pohe id)
+        (lambda ((x tau)) x)))))
+
+;; (unfolded terms for debug)
+;; (definition my-pohe ((a (hom tau tau)))
+;;   (pi
+;;     ((self
+;;       (hom
+;;         (hom tau tau)
+;;         tau))
+;;      (unfold
+;;        (pi
+;;          ((k (hom (hom tau tau) tau))
+;;           (foo (pi ((_ (k a))) i64))
+;;           (_ (k a)))
+;;          (self a))))
+;;     (self a)))
+;; (definition my-unfold
+;;   ((a (hom tau tau))
+;;    (k (hom (hom tau tau) tau))
+;;    (foo (pi ((_ (k a))) i64))
+;;    (base (k a)))
+;;   (witness (my-pohe a)
+;;     (lambda
+;;       ((inner-self
+;;          (hom (hom tau tau) tau))
+;;        (unfold
+;;          (pi
+;;            ((k (hom (hom tau tau) tau))
+;;             (foo (pi ((_ (k a))) i64))
+;;             (_ (k a)))
+;;            (inner-self a))))
+;;       (unfold k foo base))))
+;; (attribute my-unfold (implicit 0))

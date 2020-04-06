@@ -1,0 +1,12 @@
+(no-implicit-core)
+
+(inductive list ((a tau))
+  (nil ()
+    (list a))
+  (cons ((x a) (xs (list a)))
+    (list a)))
+
+(use list)
+
+(let xs (list i64)
+  (cons 25 (cons 100 (cons 1000 (nil)))))

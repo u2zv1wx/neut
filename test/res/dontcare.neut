@@ -1,0 +1,60 @@
+(no-implicit-core)
+
+(include library "core/notation.neut")
+
+;; (include library "core/functor.neut")
+
+;; (include library "core/monad.neut")
+
+
+(inductive option ((a tau))
+  (none ()
+    (option a))
+  (some ((x a))
+    (option a)))
+
+(definition functor-form ((m (hom tau tau)))
+  (pi
+    ((a tau)
+     (b tau)
+     (_ (hom a b))
+     (_ (m a)))
+    (m b)))
+
+(inductive fake ((f (hom tau tau)))
+  (unfold
+    ((k (hom (hom tau tau) tau))
+     (_ (pi ((_ (k f))) (functor-form f)))
+     (_ (k f)))
+    (fake f)))
+
+(definition map
+  (witness (functor-form option)
+    (lambda (a b f m)
+      (case m
+        ((option:none)
+          (option:none))
+        ((option:some x)
+          (option:some (f x)))))))
+
+(constant unsafe:cast
+  (pi
+    ((A tau)
+     (B tau)
+     (_ A))
+    B))
+
+(definition witness-fake
+  (witness (fake option)
+    (fake:unfold
+      fake
+      (lambda ((_ (fake option)))
+        map)
+      (unsafe:cast
+        (hom tau tau)
+        (fake option)
+        (lambda (x) x)))))
+
+(let pohe (functor-form option)
+  (case witness-fake
+    ((fake:unfold f ma base-value) (ma base-value))))

@@ -1,0 +1,11 @@
+;; unbalanced paren (should raise error)
+
+(no-implicit-core)
+
+(definition id ())
+
+;; hogehoge
+
+(i50 0)
+
+;; some-text

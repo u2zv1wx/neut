@@ -1,0 +1,27 @@
+
+(inductive tree ()
+  (sup ((a tau) (f (hom a (tree)))) (tree)))
+
+(definition foo ((t (tree)))
+  (witness tau
+    (case t
+      ((tree:sup a foo-func) a))))
+
+;; 型のなかにcaseが入るけど、それは推論できない
+;; というのは、このときは、tの型の(tree)と(tree:sup buz qux)の型の(tree)とがまず等しくなるというだけでなくて、
+;; quxの型のhom buz (tree)と(hom (foo t) tree)とが一致する必要が出てくるから。
+;; これはbuz = foo tを要求するが、fooの定義を展開してみても、まあ、解けない。
+(definition bar ((t (tree)))
+  (witness (hom (foo t) (tree))
+    (case t
+      ((tree:sup buz qux) qux))))
+
+;; f : (t : Tree) -> a t -> Tree
+;; f (sup a f) = f
+
+
+
+;; a : Tree -> Type
+;; a (sup a _) = a
+;; data Tree : Type where
+;;   sup : (a : Type) -> (f : a -> Tree) -> Tree

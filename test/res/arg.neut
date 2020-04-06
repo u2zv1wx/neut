@@ -1,0 +1,12 @@
+
+(no-implicit-core)
+
+(enum top unit)
+
+(inductive item ((a tau))
+  (make ((_ i64)) (item top)))
+
+;; これバグじゃなくて正しいやつですね。「ちゃんと型エラーになってる」という状況。
+(definition f ((a tau) (m (item top)))
+  (case m
+    ((item:make p) top:unit)))

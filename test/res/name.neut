@@ -1,0 +1,28 @@
+(no-implicit-core)
+
+(include library "core/notation.neut")
+
+;; (inductive option ((z tau))
+;;   (some ((x z)) (option z)))
+
+(inductive option ((z tau))
+  (some ((x i64)) (option z)))
+
+(definition foo ((a tau) (m (option a)))
+  (witness i64
+    (case m
+      ((option:some x) x))))
+
+;; (definition bar ((a tau) (x hole))
+;;   (witness (option a)
+;;     (@option:some hole x)))
+
+;; (definition foo ((a tau) (m (option a)))
+;;   (witness a
+;;     (case m
+;;       ((option:some x) x))))
+
+
+;; (definition map ((a tau) (m (option a)))
+;;     (case m
+;;       ((option:some x) x)))

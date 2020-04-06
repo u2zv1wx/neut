@@ -1,0 +1,14 @@
+(no-implicit-core)
+
+(include library "core/notation.neut")
+
+(constant unsafe:cast
+  (pi ((A tau) (B tau) (_ A)) B))
+
+(coinductive sample ()
+  (item ((_ (sample)))
+    (pi () i64)))
+
+(witness (sample)
+  (record (sample)
+    (item (lambda () 10))))

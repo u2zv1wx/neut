@@ -1,0 +1,24 @@
+(no-implicit-core)
+
+(include library "core/notation.neut")
+
+(inductive fake ()
+  (make
+    ((k tau)
+     (_ k)
+     )
+    (fake)))
+
+(definition witness-fake
+  (witness (fake)
+    (fake:make
+      i64
+      (i64 3)
+      )))
+
+;; (case witness-fake
+;;   ((fake:make k ma) ma))
+    ;; ((fake:make k ma) (i64 10)))
+;; (definition context ((x tau))
+;;   (case witness-fake
+;;     ((fake:make k ma base-value) (ma base-value))))
