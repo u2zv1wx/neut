@@ -4,7 +4,8 @@ module Clarify.Linearize
   ( linearize
   ) where
 
-import qualified Data.HashMap.Strict as Map
+-- import qualified Data.HashMap.Strict as Map
+import qualified Data.IntMap.Strict as IntMap
 
 import Clarify.Utility
 import Data.Basic
@@ -20,7 +21,8 @@ linearize xts e = do
   (nm, e') <- distinguishCode (map fst xts) e
   linearize' nm (reverse xts) e'
 
-type NameMap = Map.HashMap Identifier [Identifier]
+-- type NameMap = Map.HashMap Identifier [Identifier]
+type NameMap = IntMap.IntMap [Identifier]
 
 linearize' ::
      NameMap
@@ -36,8 +38,10 @@ linearize' nm ((x, t):xts) e = do
 
 -- insert header for a variable
 withHeader :: NameMap -> Identifier -> CodePlus -> CodePlus -> WithEnv CodePlus
-withHeader nm x t e =
-  case Map.lookup x nm of
+withHeader nm x t e
+  -- case Map.lookup x nm of
+ =
+  case IntMap.lookup (asInt x) nm of
     Nothing -> withHeaderAffine x t e
     Just [] -> raiseCritical' $ "impossible. x: " <> asText' x
     Just [z] -> withHeaderLinear z x e
@@ -145,16 +149,18 @@ withHeaderRelevant' t expVar ((x, (x1, x2)):chain) cont@(m, _) = do
         (m, sigmaElim [x1, x2] sigVar cont'))
 
 merge :: [NameMap] -> NameMap
-merge [] = Map.empty
-merge (m:ms) = Map.unionWith (++) m $ merge ms
+merge [] = IntMap.empty
+merge (m:ms) = IntMap.unionWith (++) m $ merge ms
 
+-- merge [] = Map.empty
+-- merge (m:ms) = Map.unionWith (++) m $ merge ms
 distinguishData :: [Identifier] -> DataPlus -> WithEnv (NameMap, DataPlus)
 distinguishData zs d@(ml, DataUpsilon x) =
   if x `notElem` zs
-    then return (Map.empty, d)
+    then return (IntMap.empty, d)
     else do
       x' <- newNameWith x
-      return (Map.singleton x [x'], (ml, DataUpsilon x'))
+      return (IntMap.singleton (asInt x) [x'], (ml, DataUpsilon x'))
 distinguishData zs (ml, DataSigmaIntro mk ds) = do
   (vss, ds') <- unzip <$> mapM (distinguishData zs) ds
   return (merge vss, (ml, DataSigmaIntro mk ds'))
@@ -162,7 +168,7 @@ distinguishData zs (m, DataStructIntro dks) = do
   let (ds, ks) = unzip dks
   (vss, ds') <- unzip <$> mapM (distinguishData zs) ds
   return (merge vss, (m, DataStructIntro $ zip ds' ks))
-distinguishData _ d = return (Map.empty, d)
+distinguishData _ d = return (IntMap.empty, d)
 
 distinguishCode :: [Identifier] -> CodePlus -> WithEnv (NameMap, CodePlus)
 distinguishCode zs (ml, CodeTheta theta) = do

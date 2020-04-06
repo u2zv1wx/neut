@@ -660,6 +660,7 @@ includeCore :: Meta -> [TreePlus] -> [TreePlus]
 includeCore _ ((_, TreeNode [(_, TreeLeaf "no-implicit-core")]):rest) = rest
 includeCore m treeList = includeCore' m : treeList
 
+-- test
 includeCore' :: Meta -> TreePlus
 includeCore' m =
   ( m

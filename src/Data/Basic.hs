@@ -3,8 +3,8 @@
 
 module Data.Basic where
 
-import Data.Hashable
-import GHC.Generics (Generic)
+-- import Data.Hashable
+-- import GHC.Generics (Generic)
 import Path
 
 import qualified Data.IntMap.Strict as IntMap
@@ -16,10 +16,10 @@ import Text.Read
 
 newtype Identifier =
   I (T.Text, Int)
-  deriving (Generic, Eq, Ord)
+  deriving (Eq, Ord)
+  -- deriving (Generic, Eq, Ord)
 
-instance Hashable Identifier
-
+-- instance Hashable Identifier
 asText :: Identifier -> T.Text
 asText (I (s, _)) = s
 
@@ -131,10 +131,9 @@ data FloatSize
   = FloatSize16
   | FloatSize32
   | FloatSize64
-  deriving (Generic, Eq, Show)
+  deriving (Eq, Ord, Show)
 
-instance Hashable FloatSize
-
+-- instance Hashable FloatSize
 asFloatSize :: Int -> Maybe FloatSize
 asFloatSize 16 = Just FloatSize16
 asFloatSize 32 = Just FloatSize32
@@ -165,18 +164,21 @@ data LowType
   | LowTypeIntU IntSize
   | LowTypeFloat FloatSize
   | LowTypeVoid -- to represent the cod of free
-  | LowTypeVoidPtr
   | LowTypeFunctionPtr [LowType] LowType
-  | LowTypeStruct [LowType] -- to calculate the size
-  | LowTypeStructPtr [LowType]
-  | LowTypeArray LowType -- [0 x LOWTYPE]
-  | LowTypeArrayPtr Int LowType -- [n x LOWTYPE]*
-  | LowTypeIntS64Ptr
+  | LowTypeStruct [LowType]
+  | LowTypeArray Int LowType -- [n x LOWTYPE]
   | LowTypePtr LowType
-  deriving (Generic, Eq, Show)
+  -- | LowTypeVoidPtr
+  -- | LowTypeStructPtr [LowType]
+  -- | LowTypeArrayPtr Int LowType -- [n x LOWTYPE]*
+  -- | LowTypeIntS64Ptr
+  deriving (Eq, Ord, Show)
 
-instance Hashable LowType
+-- `1` stands for 1 byte
+lowTypeToSize :: LowType -> Int
+lowTypeToSize _ = undefined
 
+-- instance Hashable LowType
 asLowType :: Identifier -> LowType
 asLowType (I (n, _)) = fromMaybe (LowTypeIntS 64) (asLowTypeMaybe n)
 
@@ -220,8 +222,9 @@ data ArrayKind
   deriving (Show, Eq)
 
 voidPtr :: LowType
-voidPtr = LowTypeVoidPtr
+voidPtr = LowTypePtr (LowTypeIntS 8)
 
+-- voidPtr = LowTypeVoidPtr
 arrVoidPtr :: ArrayKind
 arrVoidPtr = ArrayKindVoidPtr
 

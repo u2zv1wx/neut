@@ -41,7 +41,7 @@ llvmCode (_, CodePiElimDownElim v ds) = do
   llvmDataLet' (zip xs ds) $ castThenCall
 llvmCode (_, CodeSigmaElim k xs v e) = do
   let et = arrayKindToLowType k -- elem type
-  let bt = LowTypeArrayPtr (length xs) et -- base pointer type  ([(length xs) x ARRAY_ELEM_TYPE])
+  let bt = LowTypePtr $ LowTypeArray (length xs) et -- base pointer type  ([(length xs) x ARRAY_ELEM_TYPE])
   let idxList = map (\i -> (LLVMDataInt i, i32)) [0 ..]
   ys <- mapM newNameWith xs
   let xts' = zip xs (repeat et)
@@ -69,10 +69,11 @@ llvmCode (_, CodeStructElim xks v e) = do
   let (xs, ks) = unzip xks
   let ts = map arrayKindToLowType ks
   let xts = zip xs ts
-  let bt = LowTypeStructPtr ts
+  let bt = LowTypePtr $ LowTypeStruct ts
   let idxList = map (\i -> (LLVMDataInt i, i32)) [0 ..]
   ys <- mapM newNameWith xs
-  let sizeInfo = (LowTypeIntS64Ptr, length ts)
+  let sizeInfo = (LowTypePtr (LowTypeIntS 64), length ts)
+  -- let sizeInfo = (LowTypeIntS64Ptr, length ts)
   loadContent v bt sizeInfo (zip idxList (zip ys xts)) e
 llvmCode (m, CodeCase sub v branchList) = do
   let (ls, es) = unzip branchList
@@ -154,7 +155,7 @@ llvmCodeTheta :: Meta -> Theta -> WithEnv LLVM
 llvmCodeTheta _ (ThetaUnaryOp op v) = llvmCodeUnaryOp op v
 llvmCodeTheta _ (ThetaBinaryOp op v1 v2) = llvmCodeBinaryOp op v1 v2
 llvmCodeTheta _ (ThetaArrayAccess lowType arr idx) = do
-  let arrayType = LowTypeArrayPtr 0 lowType
+  let arrayType = LowTypePtr $ LowTypeArray 0 lowType
   (arrVar, castArrThen) <- llvmCast (Just $ takeBaseName arr) arr arrayType
   (idxVar, castIdxThen) <- llvmCast (Just $ takeBaseName idx) idx i64
   (resPtrName, resPtr) <- newDataLocal "result-ptr"
@@ -327,8 +328,8 @@ syscallToLLVM syscall ds = do
     Left name -> do
       denv <- gets declEnv
       when (not $ name `Map.member` denv) $ do
-        let dom = map (const LowTypeVoidPtr) ds
-        let cod = LowTypeVoidPtr
+        let dom = map (const voidPtr) ds
+        let cod = voidPtr
         modify (\env -> env {declEnv = Map.insert name (dom, cod) denv})
       return $ LLVMCall (LLVMDataGlobal name) ds
     Right (_, num) -> do
@@ -404,9 +405,10 @@ data AggPtrType
   | AggPtrTypeStruct [LowType]
 
 toLowType :: AggPtrType -> LowType
-toLowType (AggPtrTypeArray i t) = LowTypeArrayPtr i t
-toLowType (AggPtrTypeStruct ts) = LowTypeStructPtr ts
+toLowType (AggPtrTypeArray i t) = LowTypePtr $ LowTypeArray i t
+toLowType (AggPtrTypeStruct ts) = LowTypePtr $ LowTypeStruct ts
 
+-- toLowType (AggPtrTypeStruct ts) = LowTypeStructPtr ts
 storeContent ::
      Meta
   -> Identifier
@@ -459,14 +461,15 @@ storeContent'' reg elemType len cont = do
     LLVMLet reg (LLVMOpAlloc iVar sizeInfo) cont
 
 indexTypeOf :: LowType -> LowType
-indexTypeOf (LowTypeStructPtr _) = LowTypeIntS 32
+indexTypeOf (LowTypePtr (LowTypeStruct _)) = LowTypeIntS 32
+-- indexTypeOf (LowTypeStructPtr _) = LowTypeIntS 32
 indexTypeOf _ = LowTypeIntS 64
 
 arrayKindToLowType :: ArrayKind -> LowType
 arrayKindToLowType (ArrayKindIntS i) = LowTypeIntS i
 arrayKindToLowType (ArrayKindIntU i) = LowTypeIntU i
 arrayKindToLowType (ArrayKindFloat size) = LowTypeFloat size
-arrayKindToLowType ArrayKindVoidPtr = LowTypeVoidPtr
+arrayKindToLowType ArrayKindVoidPtr = voidPtr
 
 toFunPtrType :: [a] -> LowType
 toFunPtrType xs = do

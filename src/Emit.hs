@@ -10,7 +10,8 @@ import Data.ByteString.Builder
 import Data.Monoid ((<>))
 
 import qualified Data.ByteString.Lazy as L
-import qualified Data.HashMap.Strict as Map
+import qualified Data.HashMap.Strict as HashMap
+import qualified Data.Map as Map
 import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
@@ -27,7 +28,7 @@ emit mainTerm = do
   mainTerm' <- reduceLLVM [] Map.empty mainTerm
   zs <- emitDefinition "i64" "main" [] mainTerm'
   xs <-
-    forM (Map.toList lenv) $ \(name, (args, body)) -> do
+    forM (HashMap.toList lenv) $ \(name, (args, body)) -> do
       let args' = map (showLLVMData . LLVMDataLocal) args
       body' <- reduceLLVM [] Map.empty body
       emitDefinition "i8*" (TE.encodeUtf8Builder name) args' body'
@@ -35,7 +36,7 @@ emit mainTerm = do
 
 emitDeclarations :: WithEnv [Builder]
 emitDeclarations = do
-  denv <- Map.toList <$> gets declEnv
+  denv <- HashMap.toList <$> gets declEnv
   return $ map declToBuilder denv
 
 declToBuilder :: (T.Text, ([LowType], LowType)) -> Builder
@@ -231,7 +232,7 @@ emitLLVMOp (LLVMOpBinaryOp (BinaryOpEQ t@(LowTypeIntS _)) d1 d2) =
   emitBinaryOp t "icmp eq" d1 d2
 emitLLVMOp (LLVMOpBinaryOp (BinaryOpEQ t@(LowTypeIntU _)) d1 d2) =
   emitBinaryOp t "icmp eq" d1 d2
-emitLLVMOp (LLVMOpBinaryOp (BinaryOpEQ t@LowTypeVoidPtr) d1 d2) =
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpEQ t@(LowTypePtr (LowTypeIntS 8))) d1 d2) =
   emitBinaryOp t "icmp eq" d1 d2
 emitLLVMOp (LLVMOpBinaryOp (BinaryOpEQ t@(LowTypeFloat _)) d1 d2) =
   emitBinaryOp t "fcmp oeq" d1 d2
@@ -239,7 +240,7 @@ emitLLVMOp (LLVMOpBinaryOp (BinaryOpNE t@(LowTypeIntS _)) d1 d2) =
   emitBinaryOp t "icmp ne" d1 d2
 emitLLVMOp (LLVMOpBinaryOp (BinaryOpNE t@(LowTypeIntU _)) d1 d2) =
   emitBinaryOp t "icmp ne" d1 d2
-emitLLVMOp (LLVMOpBinaryOp (BinaryOpNE t@LowTypeVoidPtr) d1 d2) =
+emitLLVMOp (LLVMOpBinaryOp (BinaryOpNE t@(LowTypePtr (LowTypeIntS 8))) d1 d2) =
   emitBinaryOp t "icmp ne" d1 d2
 emitLLVMOp (LLVMOpBinaryOp (BinaryOpNE t@(LowTypeFloat _)) d1 d2) =
   emitBinaryOp t "fcmp one" d1 d2
@@ -375,20 +376,23 @@ showLowTypeAsIfNonPtr (LowTypeFloat FloatSize16) = "half"
 showLowTypeAsIfNonPtr (LowTypeFloat FloatSize32) = "float"
 showLowTypeAsIfNonPtr (LowTypeFloat FloatSize64) = "double"
 showLowTypeAsIfNonPtr LowTypeVoid = "void"
-showLowTypeAsIfNonPtr LowTypeVoidPtr = "i8"
+-- showLowTypeAsIfNonPtr LowTypeVoidPtr = "i8"
 showLowTypeAsIfNonPtr (LowTypeStruct ts) =
   "{" <> showItems showLowType ts <> "}"
-showLowTypeAsIfNonPtr (LowTypeStructPtr ts) =
-  "{" <> showItems showLowType ts <> "}"
+-- showLowTypeAsIfNonPtr (LowTypeStructPtr ts) =
+--   "{" <> showItems showLowType ts <> "}"
 showLowTypeAsIfNonPtr (LowTypeFunctionPtr ts t) =
   showLowType t <> " (" <> showItems showLowType ts <> ")"
-showLowTypeAsIfNonPtr (LowTypeArray t) = do
-  let s = showLowType t
-  "[0 x " <> s <> "]"
-showLowTypeAsIfNonPtr (LowTypeArrayPtr i t) = do
+showLowTypeAsIfNonPtr (LowTypeArray i t) = do
   let s = showLowType t
   "[" <> intDec i <> " x " <> s <> "]"
-showLowTypeAsIfNonPtr LowTypeIntS64Ptr = "i64"
+-- showLowTypeAsIfNonPtr (LowTypeArray t) = do
+--   let s = showLowType t
+--   "[0 x " <> s <> "]"
+-- showLowTypeAsIfNonPtr (LowTypeArrayPtr i t) = do
+--   let s = showLowType t
+--   "[" <> intDec i <> " x " <> s <> "]"
+-- showLowTypeAsIfNonPtr LowTypeIntS64Ptr = "i64"
 showLowTypeAsIfNonPtr (LowTypePtr t) = showLowType t
 
 getRegList :: WithEnv [Builder]
@@ -406,18 +410,18 @@ showLowType (LowTypeFloat FloatSize16) = "half"
 showLowType (LowTypeFloat FloatSize32) = "float"
 showLowType (LowTypeFloat FloatSize64) = "double"
 showLowType LowTypeVoid = "void"
-showLowType LowTypeVoidPtr = "i8*"
+-- showLowType LowTypeVoidPtr = "i8*"
 showLowType (LowTypeStruct ts) = "{" <> showItems showLowType ts <> "}"
-showLowType (LowTypeStructPtr ts) = "{" <> showItems showLowType ts <> "}*"
+-- showLowType (LowTypeStructPtr ts) = "{" <> showItems showLowType ts <> "}*"
 showLowType (LowTypeFunctionPtr ts t) =
   showLowType t <> " (" <> showItems showLowType ts <> ")*"
-showLowType (LowTypeArray t) = do
+showLowType (LowTypeArray i t) = do
   let s = showLowType t
-  "[0 x " <> s <> "]"
-showLowType (LowTypeArrayPtr i t) = do
-  let s = showLowType t
-  "[" <> intDec i <> " x " <> s <> "]*"
-showLowType LowTypeIntS64Ptr = "i64*"
+  "[" <> intDec i <> " x " <> s <> "]"
+-- showLowType (LowTypeArrayPtr i t) = do
+--   let s = showLowType t
+--   "[" <> intDec i <> " x " <> s <> "]*"
+-- showLowType LowTypeIntS64Ptr = "i64*"
 showLowType (LowTypePtr t) = showLowType t <> "*"
 
 showLLVMData :: LLVMData -> Builder

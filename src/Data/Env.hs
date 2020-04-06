@@ -155,8 +155,8 @@ initialEnv =
     , llvmEnv = Map.empty
     , declEnv =
         Map.fromList
-          [ ("malloc", ([LowTypeIntS 64], LowTypeVoidPtr))
-          , ("free", ([LowTypeVoidPtr], LowTypeVoid))
+          [ ("malloc", ([LowTypeIntS 64], voidPtr))
+          , ("free", ([voidPtr], LowTypeVoid))
           ]
     , constraintEnv = []
     , constraintQueue = Q.empty

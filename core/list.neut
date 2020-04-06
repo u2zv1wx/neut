@@ -44,7 +44,7 @@
       ((nil)
         0)
       ((cons _ ys)
-        (u64.add 1 (length a ys))))))
+        (u64:add 1 (length a ys))))))
 
 (definition append
   ([a tau]
