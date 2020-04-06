@@ -23,6 +23,10 @@
 
 (notation hole (zeta _))
 
+(keyword lambda)
+
+(notation lambda pi-introduction)
+
 (keyword let)
 
 (keyword begin)
@@ -30,46 +34,44 @@
 (notation (begin e) e)
 
 (notation (begin e rest+)
-  ((pi-introduction ((_ hole)) (begin rest+)) (begin e)))
+  ((lambda ((_ hole)) (begin rest+)) (begin e)))
 
 (notation (begin (let x e+) rest+)
-  ((pi-introduction ((x hole)) (begin rest+)) (begin e+)))
+  ((lambda ((x hole)) (begin rest+)) (begin e+)))
 
 (notation (begin (let (x t) e+) rest+)
-  ((pi-introduction ((x t)) (begin rest+)) (begin e+)))
+  ((lambda ((x t)) (begin rest+)) (begin e+)))
 
 (keyword with)
 
 (notation (with bind e) e)
 
 ;; (notation (with bind e rest+)
-;;   (bind (with bind e) (pi-introduction ((_ hole)) (with bind rest+))))
+;;   (bind (with bind e) (lambda ((_ hole)) (with bind rest+))))
 
 ;; (notation (with bind (let x e+) rest+)
-;;   (bind (with bind e+) (pi-introduction ((x hole)) (with bind rest+))))
+;;   (bind (with bind e+) (lambda ((x hole)) (with bind rest+))))
 
 ;; (notation (with bind (let (x t) e+) rest+)
-;;   (bind (with bind e+) (pi-introduction ((x t)) (with bind rest+))))
+;;   (bind (with bind e+) (lambda ((x t)) (with bind rest+))))
 
 (notation (with bind e rest+)
-  (bind hole hole (with bind e) (pi-introduction ((_ hole)) (with bind rest+))))
+  (bind hole hole (with bind e) (lambda ((_ hole)) (with bind rest+))))
 
 (notation (with bind (let x e+) rest+)
-  (bind hole hole (with bind e+) (pi-introduction ((x hole)) (with bind rest+))))
+  (bind hole hole (with bind e+) (lambda ((x hole)) (with bind rest+))))
 
 (notation (with bind (let (x t) e+) rest+)
-  (bind hole hole (with bind e+) (pi-introduction ((x t)) (with bind rest+))))
+  (bind hole hole (with bind e+) (lambda ((x t)) (with bind rest+))))
 
-(keyword lambda)
 
-(notation lambda pi-introduction)
 
-;; lambda: pi-introduction with implicit begin block -> (discard)
+;; lambda: lambda with implicit begin block -> (discard)
 ;; (notation (lambda () e+)
-;;   (pi-introduction () (begin e+)))
+;;   (lambda () (begin e+)))
 
 ;; (notation (lambda (xts+) e+)
-;;   (pi-introduction (xts+) (begin e+)))
+;;   (lambda (xts+) (begin e+)))
 
 ;; type ascription
 (keyword ascription)

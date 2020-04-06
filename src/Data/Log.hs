@@ -22,7 +22,7 @@ data LogLevel
   | LogLevelWarning
   | LogLevelError
   | LogLevelCritical -- "impossible" happened
-  deriving (Show)
+  deriving (Show, Eq)
 
 logLevelToText :: LogLevel -> T.Text
 logLevelToText LogLevelNote = "note"

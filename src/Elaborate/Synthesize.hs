@@ -6,7 +6,7 @@ module Elaborate.Synthesize
 
 import Control.Monad.Except
 import Control.Monad.State
-import Data.List (sortOn)
+import Data.List (nub, sortOn)
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.IntMap.Strict as IntMap
@@ -169,8 +169,9 @@ takeByCount (i:is) xs = do
 throwTypeErrors :: WithEnv ()
 throwTypeErrors = do
   q <- gets constraintQueue
-  let pcs = sortOn fst $ setupPosInfo $ Q.toList q
-  constructErrors [] pcs >>= throwError
+  let pcs = sortOn fst $ nub $ setupPosInfo $ Q.toList q
+  errorList <- constructErrors [] pcs
+  throwError errorList
 
 setupPosInfo :: [EnrichedConstraint] -> [(PosInfo, PreConstraint)]
 setupPosInfo [] = []
