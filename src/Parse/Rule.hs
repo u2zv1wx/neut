@@ -219,7 +219,6 @@ formationRuleOf (m, a, xts, _) = do
 formationRuleOf' :: Connective -> WithEnv Rule
 formationRuleOf' (m, a@(I (x, _)), xts, rules) = do
   let bs = map (\(_, I (b, _), _, _, _) -> b) rules
-  -- let bs = map (\(_, I (b, _), _, _, _) -> x <> ":" <> b) rules
   let bis = zip bs [0 ..]
   -- register "nat" ~> [("zero", 0), ("succ", 1)], "list" ~> [("nil", 0), ("cons", 1)], etc.
   insEnumEnv m x bis
