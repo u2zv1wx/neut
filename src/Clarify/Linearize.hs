@@ -4,7 +4,6 @@ module Clarify.Linearize
   ( linearize
   ) where
 
--- import qualified Data.HashMap.Strict as Map
 import qualified Data.IntMap.Strict as IntMap
 
 import Clarify.Utility
@@ -21,7 +20,6 @@ linearize xts e = do
   (nm, e') <- distinguishCode (map fst xts) e
   linearize' nm (reverse xts) e'
 
--- type NameMap = Map.HashMap Identifier [Identifier]
 type NameMap = IntMap.IntMap [Identifier]
 
 linearize' ::
@@ -38,9 +36,7 @@ linearize' nm ((x, t):xts) e = do
 
 -- insert header for a variable
 withHeader :: NameMap -> Identifier -> CodePlus -> CodePlus -> WithEnv CodePlus
-withHeader nm x t e
-  -- case Map.lookup x nm of
- =
+withHeader nm x t e =
   case IntMap.lookup (asInt x) nm of
     Nothing -> withHeaderAffine x t e
     Just [] -> raiseCritical' $ "impossible. x: " <> asText' x
@@ -152,8 +148,6 @@ merge :: [NameMap] -> NameMap
 merge [] = IntMap.empty
 merge (m:ms) = IntMap.unionWith (++) m $ merge ms
 
--- merge [] = Map.empty
--- merge (m:ms) = Map.unionWith (++) m $ merge ms
 distinguishData :: [Identifier] -> DataPlus -> WithEnv (NameMap, DataPlus)
 distinguishData zs d@(ml, DataUpsilon x) =
   if x `notElem` zs

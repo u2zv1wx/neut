@@ -216,13 +216,12 @@ clarifyUnaryOp tenv name op m = do
   t <- lookupTypeEnv'' m name tenv
   let t' = reduceTermPlus t
   case t' of
-    (_, TermPi _ xts@[(mx, x, tx)] _) -> do
+    (_, TermPi _ [(mx, x, tx)] _) -> do
       let varX = (mx, DataUpsilon x)
-      zts <- complementaryChainOf xts
       retClosure
         tenv
         (Just $ asText'' name)
-        zts
+        []
         m
         [(mx, x, tx)]
         (m, CodeTheta (ThetaUnaryOp op varX))
@@ -233,14 +232,13 @@ clarifyBinaryOp tenv name op m = do
   t <- lookupTypeEnv'' m name tenv
   let t' = reduceTermPlus t
   case t' of
-    (_, TermPi _ xts@[(mx, x, tx), (my, y, ty)] _) -> do
+    (_, TermPi _ [(mx, x, tx), (my, y, ty)] _) -> do
       let varX = (mx, DataUpsilon x)
       let varY = (my, DataUpsilon y)
-      zts <- complementaryChainOf xts
       retClosure
         tenv
         (Just $ asText'' name)
-        zts
+        []
         m
         [(mx, x, tx), (my, y, ty)]
         (m, CodeTheta (ThetaBinaryOp op varX varY))
@@ -258,10 +256,9 @@ clarifyArrayAccess tenv m name lowType = do
           computeHeader m xts [ArgImm, ArgUnused, ArgArray]
         case ds of
           [index, arr] -> do
-            zts <- complementaryChainOf xts
             callThenReturn <- toArrayAccessTail tenv m lowType cod arr index xs
             let body = iterativeApp headerList callThenReturn
-            retClosure tenv (Just $ asText'' name) zts m xts body
+            retClosure tenv (Just $ asText'' name) [] m xts body
           _ -> raiseCritical m $ "the type of array-access is wrong"
     _ -> raiseCritical m $ "the type of array-access is wrong"
 
@@ -278,22 +275,16 @@ clarifySysCall tenv name syscall args m = do
   case sysCallType' of
     (_, TermPi _ xts cod)
       | length xts == length args -> do
-        zts <- complementaryChainOf xts
         (xs, ds, headerList) <- computeHeader m xts args
         let tenv' = insTypeEnv1 xts tenv
         callThenReturn <- toSysCallTail tenv' m cod syscall ds xs
         let body = iterativeApp headerList callThenReturn
-        retClosure tenv (Just $ asText'' name) zts m xts body
+        retClosure tenv (Just $ asText'' name) [] m xts body
     _ -> raiseCritical m $ "the type of " <> asText name <> " is wrong"
 
 iterativeApp :: [a -> a] -> a -> a
 iterativeApp [] x = x
 iterativeApp (f:fs) x = f (iterativeApp fs x)
-
-complementaryChainOf :: [IdentifierPlus] -> WithEnv [IdentifierPlus]
-complementaryChainOf xts = do
-  tenv <- gets typeEnv
-  nubFVS <$> chainTermPlus'' tenv xts []
 
 clarifyBinder ::
      TypeEnv -> [IdentifierPlus] -> WithEnv [(Meta, Identifier, CodePlus)]
