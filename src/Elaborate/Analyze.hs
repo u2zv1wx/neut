@@ -127,6 +127,8 @@ simp' ((e1@(m1, _), e2@(m2, _)):cs) = do
   let hs1 = holeWeakTermPlus e1
   let hs2 = holeWeakTermPlus e2
   let fmvs = hs1 ++ hs2
+  let fvs1 = varWeakTermPlus e1
+  let fvs2 = varWeakTermPlus e2
   case lookupAny fmvs sub of
     Just (h, e) -> do
       let e1' = substWeakTermPlus [(h, e)] (m, snd e1)
@@ -142,21 +144,20 @@ simp' ((e1@(m1, _), e2@(m2, _)):cs) = do
         (Just (StuckPiElimZetaStrict h1 ies1), _)
           | xs1 <- concatMap getVarList ies1
           , occurCheck h1 hs2
-          , linearCheck xs1
-          , zs <- includeCheck xs1 e2
+          , linearCheck $ filter (\x -> x `elem` fvs2) xs1
+          , zs <- includeCheck xs1 fvs2
           , Just es <- lookupAll zs sub ->
             case es of
-              [] -> simpPattern h1 ies1 e1' e2' cs
+              [] -> simpPattern h1 ies1 e1' e2' fvs2 cs
               _ -> simp $ (e1', substWeakTermPlus (zip zs es) e2') : cs
-        -- linearであるべきなのは「関係のある」変数だけなので修正すべき
         (_, Just (StuckPiElimZetaStrict h2 ies2))
           | xs2 <- concatMap getVarList ies2
           , occurCheck h2 hs1
-          , linearCheck xs2
-          , zs <- includeCheck xs2 e1
+          , linearCheck $ filter (\x -> x `elem` fvs1) xs2
+          , zs <- includeCheck xs2 fvs1
           , Just es <- lookupAll zs sub ->
             case es of
-              [] -> simpPattern h2 ies2 e2' e1' cs
+              [] -> simpPattern h2 ies2 e2' e1' fvs1 cs
               _ -> simp $ (substWeakTermPlus (zip zs es) e1', e2') : cs
         (Just (StuckPiElimConst x1 mx1 up1 mess1), _)
           | Just (Left (mBody, body)) <- IntMap.lookup (asInt x1) cenv -> do
@@ -169,7 +170,7 @@ simp' ((e1@(m1, _), e2@(m2, _)):cs) = do
         (Just (StuckPiElimZetaStrict h1 ies1), _)
           | xs1 <- concatMap getVarList ies1
           , occurCheck h1 hs2
-          , zs <- includeCheck xs1 e2
+          , zs <- includeCheck xs1 fvs2
           , Just es <- lookupAll zs sub ->
             case es of
               [] -> simpQuasiPattern h1 ies1 e1' e2' fmvs cs
@@ -177,7 +178,7 @@ simp' ((e1@(m1, _), e2@(m2, _)):cs) = do
         (_, Just (StuckPiElimZetaStrict h2 ies2))
           | xs2 <- concatMap getVarList ies2
           , occurCheck h2 hs1
-          , zs <- includeCheck xs2 e1
+          , zs <- includeCheck xs2 fvs1
           , Just es <- lookupAll zs sub ->
             case es of
               [] -> simpQuasiPattern h2 ies2 e2' e1' fmvs cs
@@ -185,11 +186,11 @@ simp' ((e1@(m1, _), e2@(m2, _)):cs) = do
         (Just (StuckPiElimZeta h1 ies1), Nothing)
           | xs1 <- concatMap getVarList ies1
           , occurCheck h1 hs2
-          , [] <- includeCheck xs1 e2 -> simpFlexRigid h1 ies1 e1' e2' fmvs cs
+          , [] <- includeCheck xs1 fvs2 -> simpFlexRigid h1 ies1 e1' e2' fmvs cs
         (Nothing, Just (StuckPiElimZeta h2 ies2))
           | xs2 <- concatMap getVarList ies2
           , occurCheck h2 hs1
-          , [] <- includeCheck xs2 e1 -> simpFlexRigid h2 ies2 e2' e1' fmvs cs
+          , [] <- includeCheck xs2 fvs1 -> simpFlexRigid h2 ies2 e2' e1' fmvs cs
         _ -> simpOther e1 e2 fmvs cs
 
 simpBinder :: [IdentifierPlus] -> [IdentifierPlus] -> WithEnv ()
@@ -209,10 +210,11 @@ simpPattern ::
   -> [[WeakTermPlus]]
   -> WeakTermPlus
   -> WeakTermPlus
+  -> [Identifier]
   -> [PreConstraint]
   -> WithEnv ()
-simpPattern h1@(I (_, i)) ies1 _ e2 cs = do
-  xss <- mapM toVarList ies1
+simpPattern h1@(I (_, i)) ies1 _ e2 fvs2 cs = do
+  xss <- mapM (toVarList fvs2) ies1
   let lam = bindFormalArgs e2 xss
   -- p $ "resolve: " <> T.unpack (asText' h1) <> " ~> " <> T.unpack (toText lam)
   modify (\env -> env {substEnv = IntMap.insert i lam (substEnv env)})
@@ -309,8 +311,9 @@ asStuckedTerm _ = Nothing
 occurCheck :: Identifier -> [Identifier] -> Bool
 occurCheck h fmvs = h `notElem` fmvs
 
-includeCheck :: [Identifier] -> WeakTermPlus -> [Identifier]
-includeCheck xs e = filter (`notElem` xs) $ varWeakTermPlus e
+-- includeCheck :: [Identifier] -> WeakTermPlus -> [Identifier]
+includeCheck :: [Identifier] -> [Identifier] -> [Identifier]
+includeCheck xs ys = filter (`notElem` xs) ys
 
 getVarList :: [WeakTermPlus] -> [Identifier]
 getVarList xs = catMaybes $ map asUpsilon xs
@@ -330,22 +333,39 @@ visit h = do
   modify (\env -> env {constraintQueue = q2})
   simp $ map (\(Enriched c _ _) -> c) $ Q.toList q1
 
--- [e, x, y, y, e2, e3, z] ~> [p, x, y, y, q, r, z]  (p, q, r: new variables)
-toVarList :: [WeakTermPlus] -> WithEnv [IdentifierPlus]
-toVarList es = toVarList' [] es
+toVarList :: [Identifier] -> [WeakTermPlus] -> WithEnv [IdentifierPlus]
+toVarList xs es = toVarList' [] xs es
 
-toVarList' :: Context -> [WeakTermPlus] -> WithEnv [IdentifierPlus]
-toVarList' _ [] = return []
-toVarList' ctx ((m, WeakTermUpsilon x):es) = do
-  t <- newTypeHoleInCtx ctx m
-  xts <- toVarList' (ctx ++ [(m, x, t)]) es
-  return $ (m, x, t) : xts
-toVarList' ctx ((m, _):es) = do
-  t <- newTypeHoleInCtx ctx m
-  x <- newNameWith' "hole"
-  xts <- toVarList' (ctx ++ [(m, x, t)]) es
-  return $ (m, x, t) : xts
+toVarList' ::
+     Context -> [Identifier] -> [WeakTermPlus] -> WithEnv [IdentifierPlus]
+toVarList' _ _ [] = return []
+toVarList' ctx xs (e:es)
+  | (m, WeakTermUpsilon x) <- e
+  , x `elem` xs = do
+    t <- newTypeHoleInCtx ctx m
+    xts <- toVarList' (ctx ++ [(m, x, t)]) xs es
+    return $ (m, x, t) : xts
+  | otherwise = do
+    let m = metaOf e
+    t <- newTypeHoleInCtx ctx m
+    x <- newNameWith' "hole"
+    xts <- toVarList' (ctx ++ [(m, x, t)]) xs es
+    return $ (m, x, t) : xts
 
+-- -- [e, x, y, y, e2, e3, z] ~> [p, x, y, y, q, r, z]  (p, q, r: new variables)
+-- toVarList :: [WeakTermPlus] -> WithEnv [IdentifierPlus]
+-- toVarList es = toVarList' [] es
+-- toVarList' :: Context -> [WeakTermPlus] -> WithEnv [IdentifierPlus]
+-- toVarList' _ [] = return []
+-- toVarList' ctx ((m, WeakTermUpsilon x):es) = do
+--   t <- newTypeHoleInCtx ctx m
+--   xts <- toVarList' (ctx ++ [(m, x, t)]) es
+--   return $ (m, x, t) : xts
+-- toVarList' ctx ((m, _):es) = do
+--   t <- newTypeHoleInCtx ctx m
+--   x <- newNameWith' "hole"
+--   xts <- toVarList' (ctx ++ [(m, x, t)]) es
+--   return $ (m, x, t) : xts
 bindFormalArgs :: WeakTermPlus -> [[IdentifierPlus]] -> WeakTermPlus
 bindFormalArgs e [] = e
 bindFormalArgs e (xts:xtss) = do

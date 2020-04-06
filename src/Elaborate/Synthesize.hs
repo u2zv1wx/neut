@@ -19,8 +19,8 @@ import Data.Env
 import Data.Log
 import Data.WeakTerm
 import Elaborate.Analyze
-import Elaborate.Infer (Context, newTypeHoleInCtx)
 
+-- import Elaborate.Infer (Context, newTypeHoleInCtx)
 -- Given a queue of constraints (easier ones comes earlier), try to synthesize
 -- all of them using heuristics.
 synthesize :: WithEnv ()
@@ -66,7 +66,7 @@ resolvePiElim :: Hole -> [[WeakTermPlus]] -> WeakTermPlus -> WithEnv ()
 resolvePiElim h ess e = do
   let lengthInfo = map length ess
   let es = concat ess
-  xss <- toVarListMod (varWeakTermPlus e) es >>= toAltList
+  xss <- toVarList (varWeakTermPlus e) es >>= toAltList
   -- xss <- toVarList es >>= toAltList
   let xsss = map (takeByCount lengthInfo) xss
   let lamList = map (bindFormalArgs e) xsss
@@ -95,25 +95,23 @@ resolveOther ((Enriched (e1, e2) _ _):cs) = do
 asAnalyzable :: EnrichedConstraint -> EnrichedConstraint
 asAnalyzable (Enriched cs ms _) = Enriched cs ms ConstraintAnalyzable
 
-toVarListMod :: [Identifier] -> [WeakTermPlus] -> WithEnv [IdentifierPlus]
-toVarListMod xs es = toVarListMod' [] xs es
-
-toVarListMod' ::
-     Context -> [Identifier] -> [WeakTermPlus] -> WithEnv [IdentifierPlus]
-toVarListMod' _ _ [] = return []
-toVarListMod' ctx xs (e:es)
-  | (m, WeakTermUpsilon x) <- e
-  , x `elem` xs = do
-    t <- newTypeHoleInCtx ctx m
-    xts <- toVarListMod' (ctx ++ [(m, x, t)]) xs es
-    return $ (m, x, t) : xts
-  | otherwise = do
-    let m = metaOf e
-    t <- newTypeHoleInCtx ctx m
-    x <- newNameWith' "hole"
-    xts <- toVarListMod' (ctx ++ [(m, x, t)]) xs es
-    return $ (m, x, t) : xts
-
+-- toVarListMod :: [Identifier] -> [WeakTermPlus] -> WithEnv [IdentifierPlus]
+-- toVarListMod xs es = toVarListMod' [] xs es
+-- toVarListMod' ::
+--      Context -> [Identifier] -> [WeakTermPlus] -> WithEnv [IdentifierPlus]
+-- toVarListMod' _ _ [] = return []
+-- toVarListMod' ctx xs (e:es)
+--   | (m, WeakTermUpsilon x) <- e
+--   , x `elem` xs = do
+--     t <- newTypeHoleInCtx ctx m
+--     xts <- toVarListMod' (ctx ++ [(m, x, t)]) xs es
+--     return $ (m, x, t) : xts
+--   | otherwise = do
+--     let m = metaOf e
+--     t <- newTypeHoleInCtx ctx m
+--     x <- newNameWith' "hole"
+--     xts <- toVarListMod' (ctx ++ [(m, x, t)]) xs es
+--     return $ (m, x, t) : xts
 -- toVarListMod' ctx xs ((m, _):es) = do
 -- Try the list of alternatives.
 tryPlanList :: Meta -> [WithEnv a] -> WithEnv a
