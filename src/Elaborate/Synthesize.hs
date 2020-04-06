@@ -19,6 +19,7 @@ import Data.Env
 import Data.Log
 import Data.WeakTerm
 import Elaborate.Analyze
+import Elaborate.Infer (Context, newTypeHoleInCtx)
 
 -- Given a queue of constraints (easier ones comes earlier), try to synthesize
 -- all of them using heuristics.
@@ -30,8 +31,8 @@ synthesize = do
     Nothing -> return ()
     Just (Enriched (e1, e2) hs _)
       | Just (h, e) <- lookupAny hs sub -> resolveStuck e1 e2 h e
-    Just (Enriched _ _ (ConstraintDelta e mess1 mess2)) ->
-      resolveDelta e mess1 mess2
+    -- Just (Enriched _ _ (ConstraintDelta e mess1 mess2)) ->
+    --   resolveDelta e mess1 mess2
     Just (Enriched _ _ (ConstraintQuasiPattern m ess e)) -> do
       resolvePiElim m ess e
     Just (Enriched _ _ (ConstraintFlexRigid m ess e)) -> do
@@ -52,25 +53,25 @@ resolveStuck e1 e2 h e = do
   simp [(e1', e2')]
   synthesize
 
-resolveDelta ::
-     WeakTermPlus
-  -> [(Meta, [WeakTermPlus])]
-  -> [(Meta, [WeakTermPlus])]
-  -> WithEnv ()
-resolveDelta e mess1 mess2 = do
-  let planA = do
-        let ess1 = map snd mess1
-        let ess2 = map snd mess2
-        simp $ zip (concat ess1) (concat ess2)
-        synthesize
-  let planB = do
-        let e1 = toPiElim e mess1
-        let e2 = toPiElim e mess2
-        simp $ [(e1, e2)]
-        synthesize
-  deleteMin
-  chain (metaOf e) [planA, planB]
-
+-- resolveDelta ::
+--      WeakTermPlus
+--   -> [(Meta, [WeakTermPlus])]
+--   -> [(Meta, [WeakTermPlus])]
+--   -> WithEnv ()
+-- resolveDelta e mess1 mess2 = do
+--   let planA = do
+--         let ess1 = map snd mess1
+--         let ess2 = map snd mess2
+--         simp $ zip (concat ess1) (concat ess2)
+--         synthesize
+--   let planB = do
+--         let e1 = toPiElim e mess1
+--         let e2 = toPiElim e mess2
+--         simp $ [(e1, e2)]
+--         synthesize
+--   deleteMin
+--   tryPlanList (metaOf e) [planB]
+--   -- tryPlanList (metaOf e) [planA, planB]
 -- synthesize `hole @ arg-1 @ ... @ arg-n = e`, where arg-i is a variable.
 -- Suppose that we received a quasi-pattern ?M @ x @ x @ y @ z == e.
 -- What this function do is to try two alternatives in this case:
@@ -83,20 +84,21 @@ resolveDelta e mess1 mess2 = do
 -- this function replaces all the arguments that are not variable by
 -- fresh variables, and try to resolve the new quasi-pattern ?M @ x @ x @ z @ y == e.
 resolvePiElim :: Hole -> [[WeakTermPlus]] -> WeakTermPlus -> WithEnv ()
-resolvePiElim m ess e = do
+resolvePiElim h ess e = do
   let lengthInfo = map length ess
   let es = concat ess
-  xss <- toVarList es >>= toAltList
+  xss <- toVarListMod (varWeakTermPlus e) es >>= toAltList
+  -- xss <- toVarList es >>= toAltList
   let xsss = map (takeByCount lengthInfo) xss
   let lamList = map (bindFormalArgs e) xsss
   deleteMin
-  chain (metaOf e) $ map (resolveHole m) lamList
+  tryPlanList (metaOf e) $ map (resolveHole h) lamList
 
 resolveHole :: Hole -> WeakTermPlus -> WithEnv ()
-resolveHole m@(I (_, i)) e = do
+resolveHole h@(I (_, i)) e = do
   modify (\env -> env {substEnv = IntMap.insert i e (substEnv env)})
   q <- gets constraintQueue
-  let (q1, q2) = Q.partition (\(Enriched _ ms _) -> m `elem` ms) q
+  let (q1, q2) = Q.partition (\(Enriched _ hs _) -> h `elem` hs) q
   let q1' = Q.mapU asAnalyzable q1
   modify (\env -> env {constraintQueue = q1' `Q.union` q2})
   synthesize
@@ -114,11 +116,31 @@ resolveOther ((Enriched (e1, e2) _ _):cs) = do
 asAnalyzable :: EnrichedConstraint -> EnrichedConstraint
 asAnalyzable (Enriched cs ms _) = Enriched cs ms ConstraintAnalyzable
 
+toVarListMod :: [Identifier] -> [WeakTermPlus] -> WithEnv [IdentifierPlus]
+toVarListMod xs es = toVarListMod' [] xs es
+
+toVarListMod' ::
+     Context -> [Identifier] -> [WeakTermPlus] -> WithEnv [IdentifierPlus]
+toVarListMod' _ _ [] = return []
+toVarListMod' ctx xs (e:es)
+  | (m, WeakTermUpsilon x) <- e
+  , x `elem` xs = do
+    t <- newTypeHoleInCtx ctx m
+    xts <- toVarListMod' (ctx ++ [(m, x, t)]) xs es
+    return $ (m, x, t) : xts
+  | otherwise = do
+    let m = metaOf e
+    t <- newTypeHoleInCtx ctx m
+    x <- newNameWith' "hole"
+    xts <- toVarListMod' (ctx ++ [(m, x, t)]) xs es
+    return $ (m, x, t) : xts
+
+-- toVarListMod' ctx xs ((m, _):es) = do
 -- Try the list of alternatives.
-chain :: Meta -> [WithEnv a] -> WithEnv a
-chain m [] = raiseError m $ "cannot synthesize(chain)."
-chain _ [e] = e
-chain m (e:es) = catchError e (const $ chain m es)
+tryPlanList :: Meta -> [WithEnv a] -> WithEnv a
+tryPlanList m [] = raiseError m $ "cannot synthesize(tryPlanList)."
+tryPlanList _ [plan] = plan
+tryPlanList m (plan:planList) = catchError plan (const $ tryPlanList m planList)
 
 deleteMin :: WithEnv ()
 deleteMin = do
@@ -192,7 +214,7 @@ throwTypeErrors :: WithEnv ()
 throwTypeErrors = do
   q <- gets constraintQueue
   let pcs = sortOn fst $ setupPosInfo $ Q.toList q
-  modify (\env -> env {ppCount = 0})
+  -- modify (\env -> env {ppCount = 0})
   constructErrors [] pcs >>= throwError
 
 setupPosInfo :: [EnrichedConstraint] -> [(PosInfo, PreConstraint)]
@@ -210,8 +232,7 @@ constructErrors _ [] = return []
 constructErrors ps ((pos, (e1, e2)):pcs) = do
   e1' <- unravel e1
   e2' <- unravel e2
-  -- let msg = constructErrorMsg e1' e2'
-  let msg = constructErrorMsg e1 e2
+  let msg = constructErrorMsg e1' e2'
   as <- constructErrors (pos : ps) pcs
   return $ logError pos msg : as
 

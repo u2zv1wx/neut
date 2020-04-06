@@ -139,23 +139,23 @@ simp' ((e1@(m1, _), e2@(m2, _)):cs) = do
         (Just (StuckPiElimUpsilon x1 ess1), Just (StuckPiElimUpsilon x2 ess2))
           | x1 == x2
           , Just pairList <- asPairList ess1 ess2 -> simp $ pairList ++ cs
-        (Just (StuckPiElimConst x1 mx1 up1 mess1), Just (StuckPiElimConst x2 mx2 up2 mess2))
-          | x1 == x2
-          , Just (Left (_, body)) <- IntMap.lookup (asInt x1) cenv
-          , Just _ <- asPairList (map snd mess1) (map snd mess2) -> do
-            body' <- univInstWith up1 $ weaken (supMeta mx1 mx2, body)
-            let c = Enriched (e1, e2) [] $ ConstraintDelta body' mess1 mess2
-            insConstraintQueue c
-            simpUnivParams up1 up2
-            simp cs
-        (Just (StuckPiElimIter iter1@(_, x1, _, _, _) mess1), Just (StuckPiElimIter (_, x2, _, _, _) mess2))
-          | x1 == x2
-          , Just _ <- asPairList (map snd mess1) (map snd mess2) -> do
-            let c =
-                  Enriched (e1, e2) [] $
-                  ConstraintDelta (unfoldIter iter1) mess1 mess2
-            insConstraintQueue c
-            simp cs
+        -- (Just (StuckPiElimConst x1 mx1 up1 mess1), Just (StuckPiElimConst x2 mx2 up2 mess2))
+        --   | x1 == x2
+        --   , Just (Left (_, body)) <- IntMap.lookup (asInt x1) cenv
+        --   , Just _ <- asPairList (map snd mess1) (map snd mess2) -> do
+        --     body' <- univInstWith up1 $ weaken (supMeta mx1 mx2, body)
+        --     let c = Enriched (e1, e2) [] $ ConstraintDelta body' mess1 mess2
+        --     insConstraintQueue c
+        --     simpUnivParams up1 up2
+        --     simp cs
+        -- (Just (StuckPiElimIter iter1@(_, x1, _, _, _) mess1), Just (StuckPiElimIter (_, x2, _, _, _) mess2))
+        --   | x1 == x2
+        --   , Just _ <- asPairList (map snd mess1) (map snd mess2) -> do
+        --     let c =
+        --           Enriched (e1, e2) [] $
+        --           ConstraintDelta (unfoldIter iter1) mess1 mess2
+        --     insConstraintQueue c
+        --     simp cs
         (Just (StuckPiElimZetaStrict h1 ies1), _)
           | xs1 <- concatMap getVarList ies1
           , occurCheck h1 hs2
@@ -165,6 +165,7 @@ simp' ((e1@(m1, _), e2@(m2, _)):cs) = do
             case es of
               [] -> simpPattern h1 ies1 e1' e2' cs
               _ -> simp $ (e1', substWeakTermPlus (zip zs es) e2') : cs
+        -- linearであるべきなのは「関係のある」変数だけなので修正すべき
         (_, Just (StuckPiElimZetaStrict h2 ies2))
           | xs2 <- concatMap getVarList ies2
           , occurCheck h2 hs1
@@ -174,6 +175,16 @@ simp' ((e1@(m1, _), e2@(m2, _)):cs) = do
             case es of
               [] -> simpPattern h2 ies2 e2' e1' cs
               _ -> simp $ (substWeakTermPlus (zip zs es) e1', e2') : cs
+        -- (Just (StuckPiElimConst f1 _ up1 mess1), Just (StuckPiElimConst f2 _ up2 mess2))
+        --   | f1 == f2
+        --   , Just pairList <- asPairList (map snd mess1) (map snd mess2) -> do
+        --     simpUnivParams up1 up2
+        --     simp $ pairList ++ cs
+        -- (Just (StuckPiElimConst f1 _ up1 mess1), Just (StuckPiElimConst f2 _ up2 mess2))
+        --   | f1 == f2
+        --   , Just pairList <- asPairList (map snd mess1) (map snd mess2) -> do
+        --     simpUnivParams up1 up2
+        --     simp $ pairList ++ cs
         (Just (StuckPiElimConst x1 mx1 up1 mess1), _)
           | Just (Left (mBody, body)) <- IntMap.lookup (asInt x1) cenv -> do
             body' <- univInstWith up1 $ weaken (supMeta mx1 mBody, body)
@@ -182,15 +193,19 @@ simp' ((e1@(m1, _), e2@(m2, _)):cs) = do
           | Just (Left (mBody, body)) <- IntMap.lookup (asInt x2) cenv -> do
             body' <- univInstWith up2 $ weaken (supMeta mx2 mBody, body)
             simp $ (e1, toPiElim body' mess2) : cs
-        (Just (StuckPiElimConst f1 _ up1 mess1), Just (StuckPiElimConst f2 _ up2 mess2))
-          | f1 == f2
-          , Just pairList <- asPairList (map snd mess1) (map snd mess2) -> do
-            simpUnivParams up1 up2
-            simp $ pairList ++ cs
-        (Just (StuckPiElimIter iter1 mess1), _) -> do
-          simp $ (toPiElim (unfoldIter iter1) mess1, e2) : cs
-        (_, Just (StuckPiElimIter iter2 mess2)) -> do
-          simp $ (e1, toPiElim (unfoldIter iter2) mess2) : cs
+        -- (Just (StuckPiElimConst f1 _ up1 mess1), Just (StuckPiElimConst f2 _ up2 mess2))
+        --   | f1 == f2
+        --   , Just pairList <- asPairList (map snd mess1) (map snd mess2) -> do
+        --     simpUnivParams up1 up2
+        --     simp $ pairList ++ cs
+        -- (Just (StuckPiElimIter (_, x1, _, _, _) mess1), Just (StuckPiElimIter (_, x2, _, _, _) mess2))
+        --   | x1 == x2
+        --   , Just pairList <- asPairList (map snd mess1) (map snd mess2) -> do
+        --     simp $ pairList ++ cs
+        -- (Just (StuckPiElimIter iter1 mess1), _) -> do
+        --   simp $ (toPiElim (unfoldIter iter1) mess1, e2) : cs
+        -- (_, Just (StuckPiElimIter iter2 mess2)) -> do
+        --   simp $ (e1, toPiElim (unfoldIter iter2) mess2) : cs
         (Just (StuckPiElimZetaStrict h1 ies1), _)
           | xs1 <- concatMap getVarList ies1
           , occurCheck h1 hs2
@@ -275,18 +290,16 @@ simpOther e1 e2 fmvs cs = do
   insConstraintQueue $ Enriched (e1, e2) fmvs $ ConstraintOther
   simp cs
 
-simpUnivParams :: UnivParams -> UnivParams -> WithEnv ()
-simpUnivParams up1 up2 = simpUnivParams' (IntMap.keys up1) up1 up2
-
-simpUnivParams' :: [Int] -> UnivParams -> UnivParams -> WithEnv ()
-simpUnivParams' [] _ _ = return ()
-simpUnivParams' (i:is) up1 up2 = do
-  case (IntMap.lookup i up1, IntMap.lookup i up2) of
-    (Just l1, Just l2) -> do
-      modify (\env -> env {equalityEnv = (l1, l2) : equalityEnv env})
-      simpUnivParams' is up1 up2
-    _ -> simpUnivParams' is up1 up2
-
+-- simpUnivParams :: UnivParams -> UnivParams -> WithEnv ()
+-- simpUnivParams up1 up2 = simpUnivParams' (IntMap.keys up1) up1 up2
+-- simpUnivParams' :: [Int] -> UnivParams -> UnivParams -> WithEnv ()
+-- simpUnivParams' [] _ _ = return ()
+-- simpUnivParams' (i:is) up1 up2 = do
+--   case (IntMap.lookup i up1, IntMap.lookup i up2) of
+--     (Just l1, Just l2) -> do
+--       modify (\env -> env {equalityEnv = (l1, l2) : equalityEnv env})
+--       simpUnivParams' is up1 up2
+--     _ -> simpUnivParams' is up1 up2
 asIdentPlus :: Meta -> WeakTermPlus -> WithEnv IdentifierPlus
 asIdentPlus m t = do
   h <- newNameWith' "hole"
@@ -356,12 +369,11 @@ toPiElim :: WeakTermPlus -> [(Meta, [WeakTermPlus])] -> WeakTermPlus
 toPiElim e [] = e
 toPiElim e ((m, es):ess) = toPiElim (m, WeakTermPiElim e es) ess
 
-unfoldIter :: IterInfo -> WeakTermPlus
-unfoldIter (mi, x, xts, body, self) = do
-  let m = supMeta mi (metaOf body)
-  let body' = substWeakTermPlus [(x, self)] (m, snd body)
-  (fst self, WeakTermPiIntro xts body')
-
+-- unfoldIter :: IterInfo -> WeakTermPlus
+-- unfoldIter (mi, x, xts, body, self) = do
+--   let m = supMeta mi (metaOf body)
+--   let body' = substWeakTermPlus [(x, self)] (m, snd body)
+--   (fst self, WeakTermPiIntro xts body')
 insConstraintQueue :: EnrichedConstraint -> WithEnv ()
 insConstraintQueue c =
   modify (\env -> env {constraintQueue = Q.insert c (constraintQueue env)})

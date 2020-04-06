@@ -9,10 +9,10 @@ type IterInfo = (Meta, Identifier, [IdentifierPlus], WeakTermPlus, WeakTermPlus)
 
 data Constraint
   = ConstraintAnalyzable
-  | ConstraintDelta
-      WeakTermPlus
-      [(Meta, [WeakTermPlus])]
-      [(Meta, [WeakTermPlus])]
+  -- | ConstraintDelta
+  --     WeakTermPlus
+  --     [(Meta, [WeakTermPlus])]
+  --     [(Meta, [WeakTermPlus])]
   -- | ConstraintDelta IterInfo [(Meta, [WeakTermPlus])] [(Meta, [WeakTermPlus])]
   | ConstraintQuasiPattern Hole [[WeakTermPlus]] WeakTermPlus
   | ConstraintFlexRigid Hole [[WeakTermPlus]] WeakTermPlus
@@ -21,10 +21,10 @@ data Constraint
 
 constraintToInt :: Constraint -> Int
 constraintToInt ConstraintAnalyzable = 0
-constraintToInt ConstraintDelta {} = 1
-constraintToInt ConstraintQuasiPattern {} = 2
-constraintToInt ConstraintFlexRigid {} = 3
-constraintToInt ConstraintOther = 4
+-- constraintToInt ConstraintDelta {} = 1
+constraintToInt ConstraintQuasiPattern {} = 1
+constraintToInt ConstraintFlexRigid {} = 2
+constraintToInt ConstraintOther = 3
 
 instance Eq Constraint where
   c1 == c2 = constraintToInt c1 == constraintToInt c2

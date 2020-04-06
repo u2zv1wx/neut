@@ -10,8 +10,6 @@
 
 (constant stderr file-descriptor)
 
-;; prefix every syscall with ""
-
 (constant read
   (pi
     ((A u64)
