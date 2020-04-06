@@ -15,6 +15,7 @@ import Data.Maybe
 
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.PQueue.Min as Q
+import qualified Data.Text as T
 
 import Data.Basic
 import Data.Constraint
@@ -38,22 +39,19 @@ simp' (((_, e1), (_, e2)):cs)
 simp' (((m1, WeakTermTau l1), (m2, WeakTermTau l2)):cs) = do
   insLevelEQ (UnivLevelPlus (m1, l1)) (UnivLevelPlus (m2, l2))
   simp cs
-simp' (((m1, WeakTermPi Nothing xts1 cod1), (m2, WeakTermPi Nothing xts2 cod2)):cs)
-  | length xts1 == length xts2 = do
-    xt1 <- asIdentPlus m1 cod1
-    xt2 <- asIdentPlus m2 cod2
-    simpBinder (xts1 ++ [xt1]) (xts2 ++ [xt2])
-    simp cs
-simp' (((m1, WeakTermPi Nothing xts1 cod1), (m2, WeakTermPi (Just _) xts2 cod2)):cs)
-  | length xts1 == length xts2 = do
-    simp' $ ((m1, weakTermPi xts1 cod1), (m2, weakTermPi xts2 cod2)) : cs
-simp' (((m1, WeakTermPi (Just _) xts1 cod1), (m2, WeakTermPi Nothing xts2 cod2)):cs)
-  | length xts1 == length xts2 = do
-    simp' $ ((m1, weakTermPi xts1 cod1), (m2, weakTermPi xts2 cod2)) : cs
-simp' (((m1, WeakTermPi (Just name1) xts1 cod1), (m2, WeakTermPi (Just name2) xts2 cod2)):cs)
-  | name1 == name2
-  , length xts1 == length xts2 = do
-    simp' $ ((m1, weakTermPi xts1 cod1), (m2, weakTermPi xts2 cod2)) : cs
+simp' (((m1, WeakTermPi name1 xts1 cod1), (m2, WeakTermPi name2 xts2 cod2)):cs)
+  | name1 == name2 = do
+    if length xts1 /= length xts2
+      then do
+        let m = supMeta m1 m2
+        case snd (getPosInfo m1) `compare` snd (getPosInfo m2) of
+          LT -> showArityError m (length xts2) (length xts1)
+          _ -> showArityError m (length xts1) (length xts2)
+      else do
+        xt1 <- asIdentPlus m1 cod1
+        xt2 <- asIdentPlus m2 cod2
+        simpBinder (xts1 ++ [xt1]) (xts2 ++ [xt2])
+        simp cs
 simp' (((m1, WeakTermPiIntro xts1 e1), (m2, WeakTermPiIntro xts2 e2)):cs)
   | length xts1 == length xts2 = do
     xt1 <- asIdentPlus m1 e1
@@ -416,3 +414,9 @@ toIntS m size = (m, WeakTermEnum $ EnumTypeIntS size)
 
 toIntU :: Meta -> IntSize -> WeakTermPlus
 toIntU m size = (m, WeakTermEnum $ EnumTypeIntU size)
+
+showArityError :: Meta -> Int -> Int -> WithEnv a
+showArityError m i1 i2 =
+  raiseError m $
+  "the arity of the term is " <>
+  T.pack (show i1) <> ", but found " <> T.pack (show i2) <> " arguments"

@@ -94,7 +94,7 @@ generateProjections ts = do
         let b' = asIdent (asText a <> ":" <> asText b)
         let attrList = map (QuasiStmtImplicit mb b') [0 .. length xts - 1]
         return $
-          QuasiStmtLet
+          QuasiStmtLetWT
             mb
             (mb, b', (mb, WeakTermPi Nothing (xts ++ [dom]) cod))
             ( mb
@@ -154,7 +154,7 @@ toInductive ats bts connective@(m, a@(I (ai, _)), xts, _) = do
         -- nat := lam (...). Pi{nat} (...)
         (m, WeakTermPiIntro xts (m, WeakTermPi (Just ai) (ats ++ bts) cod))
     -- induction principle
-    , QuasiStmtLet
+    , QuasiStmtLetWT
         m
         ( m
         , asIdent (ai <> ":" <> "induction")

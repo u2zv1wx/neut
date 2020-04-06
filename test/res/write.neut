@@ -57,6 +57,8 @@
 ;; (@os:write 3 os:stdout "あ" 3)
 ;; (@os:write 3 os:stdout "あ" 3)
 
+
+(let a (os:write os:stdout &test 3))
 (let a (os:write os:stdout &test 3))
 (let a (os:write os:stdout &test 3))
 (let a (os:write os:stdout &test 3))

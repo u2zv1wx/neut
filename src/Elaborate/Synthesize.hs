@@ -202,8 +202,8 @@ setupPosInfo ((Enriched (e1, e2) _ _):cs) = do
   let pos2 = getPosInfo $ metaOf e2
   case snd pos1 `compare` snd pos2 of
     LT -> (pos2, (e2, e1)) : setupPosInfo cs
-    EQ -> (pos1, (e1, e2)) : setupPosInfo cs
-    GT -> (pos1, (e1, e2)) : setupPosInfo cs
+    _ -> (pos1, (e1, e2)) : setupPosInfo cs
+    -- GT -> (pos1, (e1, e2)) : setupPosInfo cs
 
 constructErrors :: [PosInfo] -> [(PosInfo, PreConstraint)] -> WithEnv [Log]
 constructErrors _ [] = return []
