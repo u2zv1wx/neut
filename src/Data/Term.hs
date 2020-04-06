@@ -12,13 +12,11 @@ data Term
   = TermTau UnivLevel
   | TermUpsilon Identifier
   | TermPi (Maybe T.Text) [IdentifierPlus] TermPlus
-  -- | TermPiPlus [IdentifierPlus] TermPlus
   | TermPiIntro [IdentifierPlus] TermPlus
   | TermPiIntroNoReduce [IdentifierPlus] TermPlus
   | TermPiIntroPlus
       Identifier -- name of corresponding inductive type
-      -- (T.Text, [IdentifierPlus], [IdentifierPlus]) -- (name of constructor, args of constructor)
-      (T.Text, [Int], [IdentifierPlus], [IdentifierPlus]) -- (name of constructor, args of constructor)
+      (T.Text, [Int], [IdentifierPlus], [IdentifierPlus])
       [IdentifierPlus]
       TermPlus
   | TermPiElim TermPlus [TermPlus]
@@ -52,15 +50,7 @@ type Clause = (((Meta, Identifier), [IdentifierPlus]), TermPlus)
 
 type SubstTerm = [(Int, TermPlus)]
 
-type Hole = Identifier
-
 type IdentifierPlus = (Meta, Identifier, TermPlus)
-
-toTermUpsilon :: Meta -> Identifier -> TermPlus
-toTermUpsilon m x = (m, TermUpsilon x)
-
-termZero :: Meta -> TermPlus
-termZero m = (m, TermEnumIntro (EnumValueIntS 64 0))
 
 termPi :: [IdentifierPlus] -> TermPlus -> Term
 termPi = TermPi Nothing
@@ -73,7 +63,6 @@ varTermPlus :: TermPlus -> [Identifier]
 varTermPlus (_, TermTau _) = []
 varTermPlus (_, TermUpsilon x) = [x]
 varTermPlus (_, TermPi _ xts t) = varTermPlus' xts [t]
--- varTermPlus (_, TermPiPlus _ xts t) = varTermPlus' xts [t]
 varTermPlus (_, TermPiIntro xts e) = varTermPlus' xts [e]
 varTermPlus (_, TermPiIntroNoReduce xts e) = varTermPlus' xts [e]
 varTermPlus (_, TermPiIntroPlus _ _ xts e) = varTermPlus' xts [e]
@@ -123,9 +112,6 @@ substTermPlus sub (m, TermUpsilon x) =
 substTermPlus sub (m, TermPi mName xts t) = do
   let (xts', t') = substTermPlus'' sub xts t
   (m, TermPi mName xts' t')
--- substTermPlus sub (m, TermPiPlus name xts t) = do
---   let (xts', t') = substTermPlus'' sub xts t
---   (m, TermPiPlus name xts' t')
 substTermPlus sub (m, TermPiIntro xts body) = do
   let (xts', body') = substTermPlus'' sub xts body
   (m, TermPiIntro xts' body')
@@ -210,8 +196,6 @@ weaken (m, TermTau l) = (m, WeakTermTau l)
 weaken (m, TermUpsilon x) = (m, WeakTermUpsilon x)
 weaken (m, TermPi mName xts t) =
   (m, WeakTermPi mName (weakenArgs xts) (weaken t))
--- weaken (m, TermPiPlus name xts t) =
---   (m, WeakTermPiPlus name (weakenArgs xts) (weaken t))
 weaken (m, TermPiIntro xts body) = do
   (m, WeakTermPiIntro (weakenArgs xts) (weaken body))
 weaken (m, TermPiIntroNoReduce xts body) = do

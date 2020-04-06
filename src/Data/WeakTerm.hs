@@ -17,11 +17,9 @@ data WeakTerm
   | WeakTermPiIntroPlus
       Identifier -- name of inductive type
       (T.Text, [Int], [IdentifierPlus], [IdentifierPlus]) -- (name of construtor, xts, yts)
-      -- (T.Text, [IdentifierPlus], [IdentifierPlus]) -- (name of construtor, xts, yts)
       [IdentifierPlus]
       WeakTermPlus
   | WeakTermPiElim WeakTermPlus [WeakTermPlus]
-  -- CBN recursion ~ CBV iteration
   | WeakTermIter IdentifierPlus [IdentifierPlus] WeakTermPlus
   | WeakTermZeta Identifier
   | WeakTermConst Identifier UnivParams
@@ -43,17 +41,10 @@ data WeakTerm
   | WeakTermStruct [ArrayKind] -- e.g. (struct u8 u8 f16 f32 u64)
   | WeakTermStructIntro [(WeakTermPlus, ArrayKind)]
   | WeakTermStructElim [(Meta, Identifier, ArrayKind)] WeakTermPlus WeakTermPlus
-  -- µF -> FµF -> A (the isomorphism in Lambek's lemma + ordinary function from the coproduct FµF (i.e. pattern matching))
-  -- this syntactic construct is only for performance improvement, and doesn't enhance the expressiveness of the type system.
-  -- it might also make sense to add only the isomorphism part `µF -> FµF`, and let the user write the other part.
-  -- one might even think that this way is preferable from the viewpoint of theoretical virtue.
-  -- but I don't feel like doing so (at least for now) because this `case` construct is already just an optimization technique.
-  -- Incidentally, we can also add the syntax for copattern matching A -> FνF -> νF here. But since its implementation is
-  -- simple enough to implement it in Interpret, I don't add it as syntactic construct.
   | WeakTermCase
       T.Text
       WeakTermPlus
-      [(((Meta, Identifier), [IdentifierPlus]), WeakTermPlus)] -- ((cons x xs) e), ((nil) e), ((succ n) e).  (not ((cons A x xs) e).)
+      [(((Meta, Identifier), [IdentifierPlus]), WeakTermPlus)]
   deriving (Show, Eq)
 
 type WeakTermPlus = (Meta, WeakTerm)
@@ -94,8 +85,6 @@ type Connective
       )
 
 data QuasiStmt
-  -- translated intro lam + app as in the usual way
-  --   (let (x t) e)
   = QuasiStmtLet Meta IdentifierPlus WeakTermPlus
   -- special case of `let` in which the `e` in `let x := e` is known to be well-typed
   | QuasiStmtLetWT Meta IdentifierPlus WeakTermPlus
@@ -110,8 +99,6 @@ data QuasiStmt
   | QuasiStmtImplicit Meta Identifier Int
   | QuasiStmtImplicitPlus Meta Identifier Int
   | QuasiStmtEnum Meta T.Text [(T.Text, Int)]
-  -- declaration of a constant
-  --   (constant x t)
   | QuasiStmtConstDecl Meta IdentifierPlus
   | QuasiStmtLetInductive Int Meta IdentifierPlus WeakTermPlus
   | QuasiStmtLetInductiveIntro Meta IdentifierPlus WeakTermPlus [Identifier]
@@ -230,9 +217,6 @@ substWeakTermPlus sub e1@(_, WeakTermUpsilon x) = do
   case lookup x sub of
     Nothing -> e1
     Just e2@(_, e) -> (supMeta (metaOf e1) (metaOf e2), e)
--- substWeakTermPlus sub (m, WeakTermPi xts t) = do
---   let (xts', t') = substWeakTermPlus'' sub xts t
---   (m, WeakTermPi xts' t')
 substWeakTermPlus sub (m, WeakTermPi mName xts t) = do
   let (xts', t') = substWeakTermPlus'' sub xts t
   (m, WeakTermPi mName xts' t')

@@ -1,7 +1,5 @@
 module Data.Constraint where
 
-import qualified Data.HashMap.Strict as Map
-
 import Data.Basic
 import Data.WeakTerm
 
@@ -42,7 +40,5 @@ instance Eq EnrichedConstraint where
 
 instance Ord EnrichedConstraint where
   compare (Enriched _ _ c1) (Enriched _ _ c2) = compare c1 c2
-
-type SubstWeakTerm' = Map.HashMap Identifier ([Hole], WeakTermPlus)
 
 type LevelConstraint = (UnivLevelPlus, (Integer, UnivLevelPlus))
