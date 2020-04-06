@@ -53,7 +53,7 @@ clarify' tenv iter@(m, TermIter (_, x, t) mxts e) = do
   let tenv' = insTypeEnv'' x t tenv
   e' <- clarify' (insTypeEnv1 mxts tenv') e
   fvs <- nubFVS <$> chainTermPlus' tenv iter
-  retClosure' tenv x fvs m mxts e'
+  retClosureFix tenv x fvs m mxts e'
 clarify' tenv (m, TermConst x _) = clarifyConst tenv m x
 clarify' _ (m, TermFloat16 l) = return (m, CodeUpIntro (m, DataFloat16 l))
 clarify' _ (m, TermFloat32 l) = return (m, CodeUpIntro (m, DataFloat32 l))
@@ -533,7 +533,7 @@ retClosure tenv mName fvs m xts e = do
   cls <- makeClosure' tenv mName fvs m xts e
   return (m, CodeUpIntro cls)
 
-retClosure' ::
+retClosureFix ::
      TypeEnv
   -> Identifier -- the name of newly created closure
   -> [IdentifierPlus] -- list of free variables in `lam (x1, ..., xn). e` (this must be a closed chain)
@@ -541,7 +541,7 @@ retClosure' ::
   -> [IdentifierPlus] -- the `(x1 : A1, ..., xn : An)` in `lam (x1 : A1, ..., xn : An). e`
   -> CodePlus -- the `e` in `lam (x1, ..., xn). e`
   -> WithEnv CodePlus
-retClosure' tenv x fvs m xts e = do
+retClosureFix tenv x fvs m xts e = do
   cls <- makeClosure' tenv (Just $ asText'' x) fvs m xts e
   knot m x cls
   return (m, CodeUpIntro cls)

@@ -14,9 +14,6 @@ reduceTermPlus (m, TermPi mName xts cod) = do
   let ts' = map reduceTermPlus ts
   let cod' = reduceTermPlus cod
   (m, TermPi mName (zip3 ms xs ts') cod')
-reduceTermPlus (_, TermPiIntro xts (_, TermPiElim e args))
-  | Just ys <- mapM asUpsilon args
-  , ys == map (\(_, x, _) -> x) xts = e
 reduceTermPlus (m, TermPiIntro xts e) = do
   let (ms, xs, ts) = unzip3 xts
   let ts' = map reduceTermPlus ts
@@ -114,7 +111,6 @@ reduceTermPlus (m, TermCase indName e cxtes) = do
           let body' = reduceTermPlus body
           ((c, zip3 ms xs ts'), body')
   (m, TermCase indName e' cxtes'')
--- fixme: add reduction for case
 reduceTermPlus t = t
 
 reduceTermIdentPlus :: IdentifierPlus -> IdentifierPlus
@@ -143,8 +139,8 @@ isValue _ = False
 isValueConst :: Identifier -> Bool
 isValueConst (I (x, _))
   | Just _ <- asLowTypeMaybe x = True
-  -- | Just _ <- asUnaryOpMaybe x = True
-  -- | Just _ <- asBinaryOpMaybe x = True
+  | Just _ <- asUnaryOpMaybe x = True
+  | Just _ <- asBinaryOpMaybe x = True
   | x == "os:stdin" = True
   | x == "os:stdout" = True
   | x == "os:stderr" = True
