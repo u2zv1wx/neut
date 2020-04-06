@@ -31,8 +31,6 @@ synthesize = do
     Nothing -> return ()
     Just (Enriched (e1, e2) hs _)
       | Just (h, e) <- lookupAny hs sub -> resolveStuck e1 e2 h e
-    -- Just (Enriched _ _ (ConstraintDelta e mess1 mess2)) ->
-    --   resolveDelta e mess1 mess2
     Just (Enriched _ _ (ConstraintQuasiPattern m ess e)) -> do
       resolvePiElim m ess e
     Just (Enriched _ _ (ConstraintFlexRigid m ess e)) -> do
@@ -53,25 +51,6 @@ resolveStuck e1 e2 h e = do
   simp [(e1', e2')]
   synthesize
 
--- resolveDelta ::
---      WeakTermPlus
---   -> [(Meta, [WeakTermPlus])]
---   -> [(Meta, [WeakTermPlus])]
---   -> WithEnv ()
--- resolveDelta e mess1 mess2 = do
---   let planA = do
---         let ess1 = map snd mess1
---         let ess2 = map snd mess2
---         simp $ zip (concat ess1) (concat ess2)
---         synthesize
---   let planB = do
---         let e1 = toPiElim e mess1
---         let e2 = toPiElim e mess2
---         simp $ [(e1, e2)]
---         synthesize
---   deleteMin
---   tryPlanList (metaOf e) [planB]
---   -- tryPlanList (metaOf e) [planA, planB]
 -- synthesize `hole @ arg-1 @ ... @ arg-n = e`, where arg-i is a variable.
 -- Suppose that we received a quasi-pattern ?M @ x @ x @ y @ z == e.
 -- What this function do is to try two alternatives in this case:
@@ -214,7 +193,6 @@ throwTypeErrors :: WithEnv ()
 throwTypeErrors = do
   q <- gets constraintQueue
   let pcs = sortOn fst $ setupPosInfo $ Q.toList q
-  -- modify (\env -> env {ppCount = 0})
   constructErrors [] pcs >>= throwError
 
 setupPosInfo :: [EnrichedConstraint] -> [(PosInfo, PreConstraint)]
@@ -225,7 +203,6 @@ setupPosInfo ((Enriched (e1, e2) _ _):cs) = do
   case snd pos1 `compare` snd pos2 of
     LT -> (pos2, (e2, e1)) : setupPosInfo cs
     _ -> (pos1, (e1, e2)) : setupPosInfo cs
-    -- GT -> (pos1, (e1, e2)) : setupPosInfo cs
 
 constructErrors :: [PosInfo] -> [(PosInfo, PreConstraint)] -> WithEnv [Log]
 constructErrors _ [] = return []
