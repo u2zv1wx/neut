@@ -249,8 +249,8 @@ infer' ctx (m, WeakTermCase indName e cxtes) = do
     then do
       return ((m, WeakTermCase indName e' []), resultType, resultLevel) -- ex falso quodlibet
     else do
-      (I (nameStr, name), indInfo) <- getIndInfo $ map (fst . fst) cxtes
-      (indType, argHoleList) <- constructIndType ctx name
+      (name@(I (nameStr, _)), indInfo) <- getIndInfo $ map (fst . fst) cxtes
+      (indType, argHoleList) <- constructIndType m ctx name
       -- indType = a @ (HOLE, ..., HOLE)
       insConstraintEnv indType t'
       cxtes' <-
@@ -281,36 +281,41 @@ toIdentPlus m (_, t, _) = do
   x <- newNameWith' "pat"
   return (m, x, t)
 
-applyArgs' ::
-     [IdentifierPlus]
+applyArgs ::
+     Meta
+  -> [IdentifierPlus]
   -> [(WeakTermPlus, WeakTermPlus, UnivLevelPlus)]
   -> WithEnv ([IdentifierPlus], [IdentifierPlus])
-applyArgs' xts [] = return (xts, [])
-applyArgs' ((mx, x, t):xts) ((hole, higherHole, _):ets) = do
+applyArgs _ xts [] = return (xts, [])
+applyArgs m ((mx, x, t):xts) ((hole, higherHole, _):ets) = do
   insConstraintEnv t higherHole
   let xts' = substWeakTermPlus' [(x, hole)] xts
-  (xts'', tmp) <- applyArgs' xts' ets
+  (xts'', tmp) <- applyArgs m xts' ets
   return (xts'', tmp ++ [(mx, x, higherHole)])
-applyArgs' [] _ = undefined
+applyArgs m [] _ = raiseCritical m $ "invalid argument passed to applyArgs"
 
 -- indの名前から定義をlookupして、それにholeを適切に適用したものを返す。あとholeも（型情報つきで）返す。
 constructIndType ::
-     Context
-  -> Int
+     Meta
+  -> Context
+  -> Identifier
   -> WithEnv (WeakTermPlus, [(WeakTermPlus, WeakTermPlus, UnivLevelPlus)])
-constructIndType ctx i = do
+constructIndType m ctx i = do
   cenv <- gets cacheEnv
   -- ホントはinstantiateするべき？
-  case IntMap.lookup i cenv of
+  case IntMap.lookup (asInt i) cenv of
     Just (Left e) -> do
       case weaken e of
-        e'@(m, WeakTermPiIntro xts _) -> do
-          holeList <- mapM (const $ newHoleInCtx ctx m) xts
-          _ <- applyArgs' xts holeList
+        e'@(me, WeakTermPiIntro xts _) -> do
+          holeList <- mapM (const $ newHoleInCtx ctx me) xts
+          _ <- applyArgs m xts holeList
           let es = map (\(h, _, _) -> h) holeList
-          return ((m, WeakTermPiElim e' es), holeList)
-        _ -> undefined
-    _ -> undefined
+          return ((me, WeakTermPiElim e' es), holeList)
+        e' ->
+          raiseCritical m $
+          "the definition of inductive type must be of the form `(lambda (xts) (...))`, but is:\n" <>
+          toText e'
+    _ -> raiseCritical m $ "no such inductive type defined: " <> asText i
 
 getIndInfo :: [(Meta, Identifier)] -> WithEnv (Identifier, [[Int]])
 getIndInfo cs = do
@@ -319,12 +324,12 @@ getIndInfo cs = do
   return (snd $ head indNameList, usedPosList)
 
 getIndInfo' :: (Meta, Identifier) -> WithEnv ((Meta, Identifier), [Int])
-getIndInfo' (m, (I (_, j))) = do
+getIndInfo' (m, c@(I (_, j))) = do
   cienv <- gets consToInd
   caenv <- gets consToArgs
   case (IntMap.lookup j cienv, IntMap.lookup j caenv) of
     (Just i, Just is) -> return ((m, i), is)
-    _ -> undefined
+    _ -> raiseError m $ "no such constructor defined: " <> asText c
 
 checkIntegrity :: [(Meta, Identifier)] -> WithEnv ()
 checkIntegrity [] = return ()
