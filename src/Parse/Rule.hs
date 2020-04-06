@@ -244,11 +244,11 @@ insInductive :: [Identifier] -> IdentifierPlus -> WithEnv ()
 insInductive [I (_, i)] bt = do
   ienv <- gets inductiveEnv
   modify
-    (\env -> env {inductiveEnv = Map.insertWith optConcat i (Just [bt]) ienv})
+    (\env -> env {inductiveEnv = IntMap.insertWith optConcat i (Just [bt]) ienv})
 insInductive as _ = do
   forM_ as $ \(I (_, i)) -> do
     modify
-      (\env -> env {inductiveEnv = Map.insert i Nothing (inductiveEnv env)})
+      (\env -> env {inductiveEnv = IntMap.insert i Nothing (inductiveEnv env)})
 
 optConcat :: Maybe [a] -> Maybe [a] -> Maybe [a]
 optConcat mNew mOld = do
@@ -293,10 +293,10 @@ zeta mode isub atsbts t e = do
     (_, WeakTermPiElim va@(_, WeakTermUpsilon a@(I (_, i))) es) -- esの長さをチェックするべきでは？
       | Just _ <- lookup a (isub ++ isub') ->
         zetaInductive mode isub atsbts es e
-      | Just (Just bts) <- Map.lookup i ienv
+      | Just (Just bts) <- IntMap.lookup i ienv
       , not (all (isResolved isub) es) ->
         zetaInductiveNested mode isub atsbts e va a es bts
-      | Just Nothing <- Map.lookup i ienv ->
+      | Just Nothing <- IntMap.lookup i ienv ->
         zetaInductiveNestedMutual (metaOf t) a
     _ -> do
       if isResolved isub t -- flipが絡むのでは？

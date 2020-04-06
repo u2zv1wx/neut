@@ -27,6 +27,7 @@ import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import qualified Data.Text.IO as TIO
+
 import qualified System.IO.Streams as Streams
 
 import Data.Basic

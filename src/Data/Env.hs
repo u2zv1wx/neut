@@ -35,7 +35,7 @@ data VisitInfo
 
 type FileEnv = Map.HashMap (Path Abs File) VisitInfo
 
-type RuleEnv = Map.HashMap Int (Maybe [Data.WeakTerm.IdentifierPlus])
+type RuleEnv = IntMap.IntMap (Maybe [Data.WeakTerm.IdentifierPlus])
 
 type UnivInstEnv = IntMap.IntMap (S.Set Int)
 
@@ -139,7 +139,7 @@ initialEnv =
     , prefixEnv = []
     , namespace = []
     , formationEnv = IntMap.empty
-    , inductiveEnv = Map.empty
+    , inductiveEnv = IntMap.empty
     , introEnv = S.empty
     , nonCandSet = S.empty
     , labelEnv = Map.empty
