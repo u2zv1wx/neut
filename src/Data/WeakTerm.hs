@@ -97,7 +97,6 @@ data QuasiStmt
   --     ((fn An) (ARGS-n) en))
   | QuasiStmtDef [(Identifier, Def)]
   | QuasiStmtImplicit Meta Identifier Int
-  | QuasiStmtImplicitPlus Meta Identifier Int
   | QuasiStmtEnum Meta T.Text [(T.Text, Int)]
   | QuasiStmtConstDecl Meta IdentifierPlus
   | QuasiStmtLetInductive Int Meta IdentifierPlus WeakTermPlus

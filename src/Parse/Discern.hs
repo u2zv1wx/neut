@@ -71,15 +71,6 @@ discern' nenv ((QuasiStmtImplicit m x i):ss) = do
       asText x' <> "` is prohibited"
   ss' <- discern' nenv ss
   return $ QuasiStmtImplicit m x' i : ss'
-discern' nenv ((QuasiStmtImplicitPlus m x i):ss) = do
-  penv <- gets prefixEnv
-  x' <-
-    do mc <- lookupConstantMaybe m penv (asText x)
-       case mc of
-         Just c -> return c
-         Nothing -> lookupNameWithPrefix'' m penv x nenv
-  ss' <- discern' nenv ss
-  return $ QuasiStmtImplicitPlus m x' i : ss'
 discern' nenv ((QuasiStmtEnum m name xis):ss) = do
   insEnumEnv m name xis
   discern' nenv ss
