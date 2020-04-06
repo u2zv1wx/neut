@@ -7,8 +7,6 @@ import qualified Data.Text as T
 
 import Data.Basic
 
--- The definition of `Data` doesn't contain those type-level definitions like `DataTau`
--- since they are translated to "exponents" immediately after polarization (and thus in Clarify.hs).
 data Data
   = DataTheta T.Text
   | DataUpsilon Identifier
@@ -23,16 +21,12 @@ data Data
 data Code
   = CodeTheta Theta
   | CodePiElimDownElim DataPlus [DataPlus] -- ((force v) v1 ... vn)
-  -- the variable introduced by CodeSigmaElim is must be used (practically) linearly
   | CodeSigmaElim ArrayKind [Identifier] DataPlus CodePlus
   | CodeUpIntro DataPlus
   | CodeUpIntroNoReduce DataPlus
-  -- the variable introduced by CodeUpElim is assumed to be used linearly
-  -- (this property is exploited to, for example, prevent unnecessary copy of array in array-access)
   | CodeUpElim Identifier CodePlus CodePlus
   | CodeEnumElim SubstDataPlus DataPlus [(Case, CodePlus)]
   | CodeStructElim [(Identifier, ArrayKind)] DataPlus CodePlus
-  -- | CodeCase SubstDataPlus DataPlus [(T.Text, CodePlus)]
   | CodeCase SubstDataPlus DataPlus [((Meta, Identifier), CodePlus)]
   deriving (Show)
 
@@ -64,12 +58,6 @@ sigmaIntro = DataSigmaIntro arrVoidPtr
 
 sigmaElim :: [Identifier] -> DataPlus -> CodePlus -> Code
 sigmaElim = CodeSigmaElim arrVoidPtr
-
-toIntS :: IntSize -> Integer -> Data
-toIntS size i = DataEnumIntro (EnumValueIntS size i)
-
-toIntU :: IntSize -> Integer -> Data
-toIntU size i = DataEnumIntro (EnumValueIntU size i)
 
 type SubstDataPlus = [(Identifier, DataPlus)]
 
