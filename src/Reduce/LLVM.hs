@@ -4,7 +4,6 @@ module Reduce.LLVM
 
 import Control.Monad.State
 
--- import qualified Data.HashMap.Strict as Map
 import qualified Data.Map as Map
 import qualified Data.Set as S
 
@@ -12,7 +11,6 @@ import Data.Basic
 import Data.Env
 import Data.LLVM
 
--- type SizeMap = Map.HashMap SizeInfo [(Int, LLVMData)]
 type SizeMap = Map.Map SizeInfo [(Int, LLVMData)]
 
 reduceLLVM :: SubstLLVM -> SizeMap -> LLVM -> WithEnv LLVM

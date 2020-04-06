@@ -16,7 +16,6 @@ dependencies:
 - containers
 - directory
 - half
-- hashable
 - http-streams
 - io-streams
 - mtl

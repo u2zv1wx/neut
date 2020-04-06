@@ -72,7 +72,9 @@ llvmCode (_, CodeStructElim xks v e) = do
   let bt = LowTypePtr $ LowTypeStruct ts
   let idxList = map (\i -> (LLVMDataInt i, i32)) [0 ..]
   ys <- mapM newNameWith xs
-  let sizeInfo = (LowTypePtr (LowTypeIntS 64), length ts)
+  -- これ間違いでは？tsのそれぞれの要素をとる必要があるのでは。
+  -- let sizeInfo = (LowTypePtr (LowTypeIntS 64), length ts)
+  let sizeInfo = (LowTypeStruct ts, 1)
   -- let sizeInfo = (LowTypeIntS64Ptr, length ts)
   loadContent v bt sizeInfo (zip idxList (zip ys xts)) e
 llvmCode (m, CodeCase sub v branchList) = do
@@ -276,7 +278,6 @@ llvmUncastLet x@(I (s, _)) d lowType cont = do
   l <- llvmUncast (Just s) d lowType
   commConv x l cont
 
--- LLVMLet x e1' e2'
 -- `llvmDataLet x d cont` binds the data `d` to the variable `x`, and computes the
 -- continuation `cont`.
 llvmDataLet :: Identifier -> DataPlus -> LLVM -> WithEnv LLVM
@@ -408,7 +409,6 @@ toLowType :: AggPtrType -> LowType
 toLowType (AggPtrTypeArray i t) = LowTypePtr $ LowTypeArray i t
 toLowType (AggPtrTypeStruct ts) = LowTypePtr $ LowTypeStruct ts
 
--- toLowType (AggPtrTypeStruct ts) = LowTypeStructPtr ts
 storeContent ::
      Meta
   -> Identifier
@@ -462,7 +462,6 @@ storeContent'' reg elemType len cont = do
 
 indexTypeOf :: LowType -> LowType
 indexTypeOf (LowTypePtr (LowTypeStruct _)) = LowTypeIntS 32
--- indexTypeOf (LowTypeStructPtr _) = LowTypeIntS 32
 indexTypeOf _ = LowTypeIntS 64
 
 arrayKindToLowType :: ArrayKind -> LowType

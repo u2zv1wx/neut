@@ -376,23 +376,13 @@ showLowTypeAsIfNonPtr (LowTypeFloat FloatSize16) = "half"
 showLowTypeAsIfNonPtr (LowTypeFloat FloatSize32) = "float"
 showLowTypeAsIfNonPtr (LowTypeFloat FloatSize64) = "double"
 showLowTypeAsIfNonPtr LowTypeVoid = "void"
--- showLowTypeAsIfNonPtr LowTypeVoidPtr = "i8"
 showLowTypeAsIfNonPtr (LowTypeStruct ts) =
   "{" <> showItems showLowType ts <> "}"
--- showLowTypeAsIfNonPtr (LowTypeStructPtr ts) =
---   "{" <> showItems showLowType ts <> "}"
 showLowTypeAsIfNonPtr (LowTypeFunctionPtr ts t) =
   showLowType t <> " (" <> showItems showLowType ts <> ")"
 showLowTypeAsIfNonPtr (LowTypeArray i t) = do
   let s = showLowType t
   "[" <> intDec i <> " x " <> s <> "]"
--- showLowTypeAsIfNonPtr (LowTypeArray t) = do
---   let s = showLowType t
---   "[0 x " <> s <> "]"
--- showLowTypeAsIfNonPtr (LowTypeArrayPtr i t) = do
---   let s = showLowType t
---   "[" <> intDec i <> " x " <> s <> "]"
--- showLowTypeAsIfNonPtr LowTypeIntS64Ptr = "i64"
 showLowTypeAsIfNonPtr (LowTypePtr t) = showLowType t
 
 getRegList :: WithEnv [Builder]
@@ -410,18 +400,12 @@ showLowType (LowTypeFloat FloatSize16) = "half"
 showLowType (LowTypeFloat FloatSize32) = "float"
 showLowType (LowTypeFloat FloatSize64) = "double"
 showLowType LowTypeVoid = "void"
--- showLowType LowTypeVoidPtr = "i8*"
 showLowType (LowTypeStruct ts) = "{" <> showItems showLowType ts <> "}"
--- showLowType (LowTypeStructPtr ts) = "{" <> showItems showLowType ts <> "}*"
 showLowType (LowTypeFunctionPtr ts t) =
   showLowType t <> " (" <> showItems showLowType ts <> ")*"
 showLowType (LowTypeArray i t) = do
   let s = showLowType t
   "[" <> intDec i <> " x " <> s <> "]"
--- showLowType (LowTypeArrayPtr i t) = do
---   let s = showLowType t
---   "[" <> intDec i <> " x " <> s <> "]*"
--- showLowType LowTypeIntS64Ptr = "i64*"
 showLowType (LowTypePtr t) = showLowType t <> "*"
 
 showLLVMData :: LLVMData -> Builder

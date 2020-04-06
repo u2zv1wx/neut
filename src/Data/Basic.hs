@@ -3,8 +3,6 @@
 
 module Data.Basic where
 
--- import Data.Hashable
--- import GHC.Generics (Generic)
 import Path
 
 import qualified Data.IntMap.Strict as IntMap
@@ -17,9 +15,7 @@ import Text.Read
 newtype Identifier =
   I (T.Text, Int)
   deriving (Eq, Ord)
-  -- deriving (Generic, Eq, Ord)
 
--- instance Hashable Identifier
 asText :: Identifier -> T.Text
 asText (I (s, _)) = s
 
@@ -133,7 +129,6 @@ data FloatSize
   | FloatSize64
   deriving (Eq, Ord, Show)
 
--- instance Hashable FloatSize
 asFloatSize :: Int -> Maybe FloatSize
 asFloatSize 16 = Just FloatSize16
 asFloatSize 32 = Just FloatSize32
@@ -168,17 +163,12 @@ data LowType
   | LowTypeStruct [LowType]
   | LowTypeArray Int LowType -- [n x LOWTYPE]
   | LowTypePtr LowType
-  -- | LowTypeVoidPtr
-  -- | LowTypeStructPtr [LowType]
-  -- | LowTypeArrayPtr Int LowType -- [n x LOWTYPE]*
-  -- | LowTypeIntS64Ptr
   deriving (Eq, Ord, Show)
 
 -- `1` stands for 1 byte
 lowTypeToSize :: LowType -> Int
 lowTypeToSize _ = undefined
 
--- instance Hashable LowType
 asLowType :: Identifier -> LowType
 asLowType (I (n, _)) = fromMaybe (LowTypeIntS 64) (asLowTypeMaybe n)
 
@@ -224,7 +214,6 @@ data ArrayKind
 voidPtr :: LowType
 voidPtr = LowTypePtr (LowTypeIntS 8)
 
--- voidPtr = LowTypeVoidPtr
 arrVoidPtr :: ArrayKind
 arrVoidPtr = ArrayKindVoidPtr
 
