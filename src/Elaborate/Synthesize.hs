@@ -11,6 +11,7 @@ import Data.List (sortOn)
 import qualified Data.HashMap.Strict as Map
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.PQueue.Min as Q
+import qualified Data.Set as S
 import qualified Data.Text as T
 
 import Data.Basic
@@ -20,7 +21,6 @@ import Data.Log
 import Data.WeakTerm
 import Elaborate.Analyze
 
--- import Elaborate.Infer (Context, newTypeHoleInCtx)
 -- Given a queue of constraints (easier ones comes earlier), try to synthesize
 -- all of them using heuristics.
 synthesize :: WithEnv ()
@@ -30,7 +30,7 @@ synthesize = do
   case Q.getMin q of
     Nothing -> return ()
     Just (Enriched (e1, e2) hs _)
-      | Just (h, e) <- lookupAny hs sub -> resolveStuck e1 e2 h e
+      | Just (h, e) <- lookupAny (S.toList hs) sub -> resolveStuck e1 e2 h e
     Just (Enriched _ _ (ConstraintQuasiPattern m ess e)) -> do
       resolvePiElim m ess e
     Just (Enriched _ _ (ConstraintFlexRigid m ess e)) -> do
@@ -43,7 +43,7 @@ synthesize = do
 -- つまり、e1とe2のstuck reasonをそれぞれ別々に保持したほうがよい。
 -- synthのときにlookupAnyできるかでseparateするとか？
 resolveStuck ::
-     WeakTermPlus -> WeakTermPlus -> Hole -> WeakTermPlus -> WithEnv ()
+     WeakTermPlus -> WeakTermPlus -> Identifier -> WeakTermPlus -> WithEnv ()
 resolveStuck e1 e2 h e = do
   let e1' = substWeakTermPlus [(h, e)] e1
   let e2' = substWeakTermPlus [(h, e)] e2
@@ -62,19 +62,18 @@ resolveStuck e1 e2 h e = do
 -- If the given pattern is a flex-rigid pattern like ?M @ x @ x @ e1 @ y == e,
 -- this function replaces all the arguments that are not variable by
 -- fresh variables, and try to resolve the new quasi-pattern ?M @ x @ x @ z @ y == e.
-resolvePiElim :: Hole -> [[WeakTermPlus]] -> WeakTermPlus -> WithEnv ()
+resolvePiElim :: Identifier -> [[WeakTermPlus]] -> WeakTermPlus -> WithEnv ()
 resolvePiElim h ess e = do
   let lengthInfo = map length ess
   let es = concat ess
   xss <- toVarList (varWeakTermPlus e) es >>= toAltList
-  -- xss <- toVarList es >>= toAltList
   let xsss = map (takeByCount lengthInfo) xss
   let lamList = map (bindFormalArgs e) xsss
   deleteMin
-  tryPlanList (metaOf e) $ map (resolveHole h) lamList
+  tryPlanList (metaOf e) $ map (resolveIdentifier h) lamList
 
-resolveHole :: Hole -> WeakTermPlus -> WithEnv ()
-resolveHole h@(I (_, i)) e = do
+resolveIdentifier :: Identifier -> WeakTermPlus -> WithEnv ()
+resolveIdentifier h@(I (_, i)) e = do
   modify (\env -> env {substEnv = IntMap.insert i e (substEnv env)})
   q <- gets constraintQueue
   let (q1, q2) = Q.partition (\(Enriched _ hs _) -> h `elem` hs) q
@@ -84,35 +83,15 @@ resolveHole h@(I (_, i)) e = do
 
 resolveOther :: [EnrichedConstraint] -> WithEnv ()
 resolveOther [] = throwTypeErrors
-resolveOther ((Enriched (e1, e2) _ _):cs) = do
+resolveOther ((Enriched (e1, e2) fmvs _):cs) = do
   sub <- gets substEnv
-  let hs1 = holeWeakTermPlus e1
-  let hs2 = holeWeakTermPlus e2
-  case lookupAny (hs1 ++ hs2) sub of
+  case lookupAny (S.toList fmvs) sub of
     Just (h, e) -> resolveStuck e1 e2 h e
     Nothing -> resolveOther cs
 
 asAnalyzable :: EnrichedConstraint -> EnrichedConstraint
 asAnalyzable (Enriched cs ms _) = Enriched cs ms ConstraintAnalyzable
 
--- toVarListMod :: [Identifier] -> [WeakTermPlus] -> WithEnv [IdentifierPlus]
--- toVarListMod xs es = toVarListMod' [] xs es
--- toVarListMod' ::
---      Context -> [Identifier] -> [WeakTermPlus] -> WithEnv [IdentifierPlus]
--- toVarListMod' _ _ [] = return []
--- toVarListMod' ctx xs (e:es)
---   | (m, WeakTermUpsilon x) <- e
---   , x `elem` xs = do
---     t <- newTypeHoleInCtx ctx m
---     xts <- toVarListMod' (ctx ++ [(m, x, t)]) xs es
---     return $ (m, x, t) : xts
---   | otherwise = do
---     let m = metaOf e
---     t <- newTypeHoleInCtx ctx m
---     x <- newNameWith' "hole"
---     xts <- toVarListMod' (ctx ++ [(m, x, t)]) xs es
---     return $ (m, x, t) : xts
--- toVarListMod' ctx xs ((m, _):es) = do
 -- Try the list of alternatives.
 tryPlanList :: Meta -> [WithEnv a] -> WithEnv a
 tryPlanList m [] = raiseError m $ "cannot synthesize(tryPlanList)."

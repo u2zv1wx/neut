@@ -16,6 +16,7 @@ import Data.Monoid ((<>))
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.IntMap.Strict as IntMap
+import qualified Data.Set as S
 import qualified Data.Text as T
 
 import Data.Basic
@@ -186,9 +187,9 @@ toInductiveIntro ats bts xts a@(I (ai, _)) (mb, b@(I (bi, _)), m, yts, cod)
   , length xts == length es = do
     let vs = varWeakTermPlus (m, weakTermPi yts cod)
     let foo = zip [0 ..] xts
-    let bar = filter (\(_, (_, x, _)) -> x `elem` vs) foo
+    let bar = filter (\(_, (_, x, _)) -> x `S.member` vs) foo
     let buz = map fst bar
-    let xts' = filter (\(_, x, _) -> x `elem` vs) xts
+    let xts' = filter (\(_, x, _) -> x `S.member` vs) xts
     let piType = (m, weakTermPi (xts' ++ yts) cod)
     let lam =
           ( m
@@ -276,7 +277,7 @@ isResolved :: SubstWeakTerm -> WeakTermPlus -> Bool
 isResolved sub e = do
   let xs = map fst sub
   let ys = varWeakTermPlus e
-  all (\x -> x `notElem` ys) xs
+  all (\x -> x `S.notMember` ys) xs
 
 zeta ::
      Mode -- 現在の変換がinvertedかそうでないかをtrackするための変数

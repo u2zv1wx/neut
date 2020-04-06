@@ -1,5 +1,7 @@
 module Data.Constraint where
 
+import qualified Data.Set as S
+
 import Data.Basic
 import Data.WeakTerm
 
@@ -9,8 +11,8 @@ type IterInfo = (Meta, Identifier, [IdentifierPlus], WeakTermPlus, WeakTermPlus)
 
 data Constraint
   = ConstraintAnalyzable
-  | ConstraintQuasiPattern Hole [[WeakTermPlus]] WeakTermPlus
-  | ConstraintFlexRigid Hole [[WeakTermPlus]] WeakTermPlus
+  | ConstraintQuasiPattern Identifier [[WeakTermPlus]] WeakTermPlus
+  | ConstraintFlexRigid Identifier [[WeakTermPlus]] WeakTermPlus
   | ConstraintOther
   deriving (Show)
 
@@ -29,7 +31,8 @@ instance Ord Constraint where
 data EnrichedConstraint =
   Enriched
     PreConstraint
-    [Hole] -- list of metavariables that cause stuck
+    (S.Set Identifier) -- the set of metavariables that cause stuck
+    -- [Identifier] -- list of metavariables that cause stuck
     Constraint
   deriving (Show)
 

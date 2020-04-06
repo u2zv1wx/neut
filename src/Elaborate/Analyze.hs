@@ -14,6 +14,7 @@ import Data.Maybe
 
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.PQueue.Min as Q
+import qualified Data.Set as S
 import qualified Data.Text as T
 
 import Data.Basic
@@ -126,10 +127,10 @@ simp' ((e1@(m1, _), e2@(m2, _)):cs) = do
   let m = supMeta m1 m2
   let hs1 = holeWeakTermPlus e1
   let hs2 = holeWeakTermPlus e2
-  let fmvs = hs1 ++ hs2
+  let fmvs = S.union hs1 hs2
   let fvs1 = varWeakTermPlus e1
   let fvs2 = varWeakTermPlus e2
-  case lookupAny fmvs sub of
+  case lookupAny (S.toList fmvs) sub of
     Just (h, e) -> do
       let e1' = substWeakTermPlus [(h, e)] (m, snd e1)
       let e2' = substWeakTermPlus [(h, e)] (m, snd e2)
@@ -144,7 +145,7 @@ simp' ((e1@(m1, _), e2@(m2, _)):cs) = do
         (Just (StuckPiElimZetaStrict h1 ies1), _)
           | xs1 <- concatMap getVarList ies1
           , occurCheck h1 hs2
-          , linearCheck $ filter (\x -> x `elem` fvs2) xs1
+          , linearCheck $ filter (`S.member` fvs2) xs1
           , zs <- includeCheck xs1 fvs2
           , Just es <- lookupAll zs sub ->
             case es of
@@ -153,7 +154,7 @@ simp' ((e1@(m1, _), e2@(m2, _)):cs) = do
         (_, Just (StuckPiElimZetaStrict h2 ies2))
           | xs2 <- concatMap getVarList ies2
           , occurCheck h2 hs1
-          , linearCheck $ filter (\x -> x `elem` fvs1) xs2
+          , linearCheck $ filter (`S.member` fvs1) xs2
           , zs <- includeCheck xs2 fvs1
           , Just es <- lookupAll zs sub ->
             case es of
@@ -210,7 +211,7 @@ simpPattern ::
   -> [[WeakTermPlus]]
   -> WeakTermPlus
   -> WeakTermPlus
-  -> [Identifier]
+  -> S.Set Identifier
   -> [PreConstraint]
   -> WithEnv ()
 simpPattern h1@(I (_, i)) ies1 _ e2 fvs2 cs = do
@@ -226,7 +227,7 @@ simpQuasiPattern ::
   -> [[WeakTermPlus]]
   -> WeakTermPlus
   -> WeakTermPlus
-  -> [Identifier]
+  -> S.Set Identifier
   -> [PreConstraint]
   -> WithEnv ()
 simpQuasiPattern h1 ies1 e1 e2 fmvs cs = do
@@ -235,11 +236,11 @@ simpQuasiPattern h1 ies1 e1 e2 fmvs cs = do
   simp cs
 
 simpFlexRigid ::
-     Hole
+     Identifier
   -> [[WeakTermPlus]]
   -> WeakTermPlus
   -> WeakTermPlus
-  -> [Identifier]
+  -> S.Set Identifier
   -> [PreConstraint]
   -> WithEnv ()
 simpFlexRigid h1 ies1 e1 e2 fmvs cs = do
@@ -247,7 +248,11 @@ simpFlexRigid h1 ies1 e1 e2 fmvs cs = do
   simp cs
 
 simpOther ::
-     WeakTermPlus -> WeakTermPlus -> [Hole] -> [PreConstraint] -> WithEnv ()
+     WeakTermPlus
+  -> WeakTermPlus
+  -> S.Set Identifier
+  -> [PreConstraint]
+  -> WithEnv ()
 simpOther e1 e2 fmvs cs = do
   insConstraintQueue $ Enriched (e1, e2) fmvs $ ConstraintOther
   simp cs
@@ -308,12 +313,11 @@ asStuckedTerm (m, WeakTermPiElim e es) =
     Nothing -> Nothing
 asStuckedTerm _ = Nothing
 
-occurCheck :: Identifier -> [Identifier] -> Bool
-occurCheck h fmvs = h `notElem` fmvs
+occurCheck :: Identifier -> S.Set Identifier -> Bool
+occurCheck h fmvs = h `S.notMember` fmvs
 
--- includeCheck :: [Identifier] -> WeakTermPlus -> [Identifier]
-includeCheck :: [Identifier] -> [Identifier] -> [Identifier]
-includeCheck xs ys = filter (`notElem` xs) ys
+includeCheck :: [Identifier] -> S.Set Identifier -> [Identifier]
+includeCheck xs ys = filter (`notElem` xs) $ S.toList ys
 
 getVarList :: [WeakTermPlus] -> [Identifier]
 getVarList xs = catMaybes $ map asUpsilon xs
@@ -329,19 +333,19 @@ insConstraintQueue c =
 visit :: Identifier -> WithEnv ()
 visit h = do
   q <- gets constraintQueue
-  let (q1, q2) = Q.partition (\(Enriched _ hs _) -> h `elem` hs) q
+  let (q1, q2) = Q.partition (\(Enriched _ hs _) -> h `S.member` hs) q
   modify (\env -> env {constraintQueue = q2})
   simp $ map (\(Enriched c _ _) -> c) $ Q.toList q1
 
-toVarList :: [Identifier] -> [WeakTermPlus] -> WithEnv [IdentifierPlus]
+toVarList :: S.Set Identifier -> [WeakTermPlus] -> WithEnv [IdentifierPlus]
 toVarList xs es = toVarList' [] xs es
 
 toVarList' ::
-     Context -> [Identifier] -> [WeakTermPlus] -> WithEnv [IdentifierPlus]
+     Context -> S.Set Identifier -> [WeakTermPlus] -> WithEnv [IdentifierPlus]
 toVarList' _ _ [] = return []
 toVarList' ctx xs (e:es)
   | (m, WeakTermUpsilon x) <- e
-  , x `elem` xs = do
+  , x `S.member` xs = do
     t <- newTypeHoleInCtx ctx m
     xts <- toVarList' (ctx ++ [(m, x, t)]) xs es
     return $ (m, x, t) : xts
@@ -352,27 +356,13 @@ toVarList' ctx xs (e:es)
     xts <- toVarList' (ctx ++ [(m, x, t)]) xs es
     return $ (m, x, t) : xts
 
--- -- [e, x, y, y, e2, e3, z] ~> [p, x, y, y, q, r, z]  (p, q, r: new variables)
--- toVarList :: [WeakTermPlus] -> WithEnv [IdentifierPlus]
--- toVarList es = toVarList' [] es
--- toVarList' :: Context -> [WeakTermPlus] -> WithEnv [IdentifierPlus]
--- toVarList' _ [] = return []
--- toVarList' ctx ((m, WeakTermUpsilon x):es) = do
---   t <- newTypeHoleInCtx ctx m
---   xts <- toVarList' (ctx ++ [(m, x, t)]) es
---   return $ (m, x, t) : xts
--- toVarList' ctx ((m, _):es) = do
---   t <- newTypeHoleInCtx ctx m
---   x <- newNameWith' "hole"
---   xts <- toVarList' (ctx ++ [(m, x, t)]) es
---   return $ (m, x, t) : xts
 bindFormalArgs :: WeakTermPlus -> [[IdentifierPlus]] -> WeakTermPlus
 bindFormalArgs e [] = e
 bindFormalArgs e (xts:xtss) = do
   let e' = bindFormalArgs e xtss
   (metaOf e', WeakTermPiIntro xts e')
 
-lookupAny :: [Hole] -> IntMap.IntMap a -> Maybe (Hole, a)
+lookupAny :: [Identifier] -> IntMap.IntMap a -> Maybe (Identifier, a)
 lookupAny [] _ = Nothing
 lookupAny (h@(I (_, i)):ks) sub = do
   case IntMap.lookup i sub of

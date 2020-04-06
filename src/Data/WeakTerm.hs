@@ -4,6 +4,7 @@ module Data.WeakTerm where
 
 import Numeric.Half
 
+import qualified Data.Set as S
 import qualified Data.Text as T
 
 import Data.Basic
@@ -61,8 +62,7 @@ type WeakCasePlus = (Meta, WeakCase)
 
 type SubstWeakTerm = [(Identifier, WeakTermPlus)]
 
-type Hole = Identifier
-
+-- type Hole = Identifier
 type IdentifierPlus = (Meta, Identifier, WeakTermPlus)
 
 type Def = (Meta, IdentifierPlus, [IdentifierPlus], WeakTermPlus)
@@ -117,98 +117,116 @@ data WeakStmt
 weakTermPi :: [IdentifierPlus] -> WeakTermPlus -> WeakTerm
 weakTermPi = WeakTermPi Nothing
 
-varWeakTermPlus :: WeakTermPlus -> [Identifier]
-varWeakTermPlus (_, WeakTermTau _) = []
-varWeakTermPlus (_, WeakTermUpsilon x) = x : []
+varWeakTermPlus :: WeakTermPlus -> S.Set Identifier
+varWeakTermPlus (_, WeakTermTau _) = S.empty
+varWeakTermPlus (_, WeakTermUpsilon x) = S.singleton x
 varWeakTermPlus (_, WeakTermPi _ xts t) = varWeakTermPlus' xts [t]
 varWeakTermPlus (_, WeakTermPiIntro xts e) = varWeakTermPlus' xts [e]
 varWeakTermPlus (_, WeakTermPiIntroNoReduce xts e) = varWeakTermPlus' xts [e]
 varWeakTermPlus (_, WeakTermPiIntroPlus _ _ xts e) = varWeakTermPlus' xts [e]
 varWeakTermPlus (_, WeakTermPiElim e es) = do
   let xs = varWeakTermPlus e
-  let ys = concatMap varWeakTermPlus es
-  xs ++ ys
-varWeakTermPlus (_, WeakTermIter (_, x, t) xts e) =
-  varWeakTermPlus t ++ filter (/= x) (varWeakTermPlus' xts [e])
-varWeakTermPlus (_, WeakTermConst _ _) = []
-varWeakTermPlus (_, WeakTermZeta _) = []
+  let ys = S.unions $ map varWeakTermPlus es
+  S.union xs ys
+varWeakTermPlus (_, WeakTermIter (_, x, t) xts e) = do
+  let set1 = varWeakTermPlus t
+  let set2 = S.filter (/= x) (varWeakTermPlus' xts [e])
+  S.union set1 set2
+varWeakTermPlus (_, WeakTermConst _ _) = S.empty
+varWeakTermPlus (_, WeakTermZeta _) = S.empty
 varWeakTermPlus (_, WeakTermInt t _) = varWeakTermPlus t
-varWeakTermPlus (_, WeakTermFloat16 _) = []
-varWeakTermPlus (_, WeakTermFloat32 _) = []
-varWeakTermPlus (_, WeakTermFloat64 _) = []
+varWeakTermPlus (_, WeakTermFloat16 _) = S.empty
+varWeakTermPlus (_, WeakTermFloat32 _) = S.empty
+varWeakTermPlus (_, WeakTermFloat64 _) = S.empty
 varWeakTermPlus (_, WeakTermFloat t _) = varWeakTermPlus t
-varWeakTermPlus (_, WeakTermEnum _) = []
-varWeakTermPlus (_, WeakTermEnumIntro _) = []
+varWeakTermPlus (_, WeakTermEnum _) = S.empty
+varWeakTermPlus (_, WeakTermEnumIntro _) = S.empty
 varWeakTermPlus (_, WeakTermEnumElim (e, t) les) = do
   let xs = varWeakTermPlus t
   let ys = varWeakTermPlus e
-  let zs = concatMap (varWeakTermPlus . snd) les
-  xs ++ ys ++ zs
+  let zs = S.unions $ map (varWeakTermPlus . snd) les
+  S.unions [xs, ys, zs]
 varWeakTermPlus (_, WeakTermArray dom _) = varWeakTermPlus dom
-varWeakTermPlus (_, WeakTermArrayIntro _ es) = concatMap varWeakTermPlus es
+varWeakTermPlus (_, WeakTermArrayIntro _ es) = S.unions $ map varWeakTermPlus es
 varWeakTermPlus (_, WeakTermArrayElim _ xts d e) =
-  varWeakTermPlus d ++ varWeakTermPlus' xts [e]
-varWeakTermPlus (_, WeakTermStruct {}) = []
+  varWeakTermPlus d `S.union` varWeakTermPlus' xts [e]
+varWeakTermPlus (_, WeakTermStruct {}) = S.empty
 varWeakTermPlus (_, WeakTermStructIntro ets) =
-  concatMap (varWeakTermPlus . fst) ets
+  S.unions $ map (varWeakTermPlus . fst) ets
 varWeakTermPlus (_, WeakTermStructElim xts d e) = do
   let xs = map (\(_, x, _) -> x) xts
-  varWeakTermPlus d ++ filter (`notElem` xs) (varWeakTermPlus e)
+  let set1 = varWeakTermPlus d
+  let set2 = S.filter (`notElem` xs) (varWeakTermPlus e)
+  S.union set1 set2
+  -- varWeakTermPlus d ++ filter (`notElem` xs) (varWeakTermPlus e)
 varWeakTermPlus (_, WeakTermCase _ e cxes) = do
   let xs = varWeakTermPlus e
-  let ys = concatMap (\((_, xts), body) -> varWeakTermPlus' xts [body]) cxes
-  xs ++ ys
+  let ys =
+        S.unions $ map (\((_, xts), body) -> varWeakTermPlus' xts [body]) cxes
+  S.union xs ys
 
-varWeakTermPlus' :: [IdentifierPlus] -> [WeakTermPlus] -> [Identifier]
-varWeakTermPlus' [] es = concatMap varWeakTermPlus es
+varWeakTermPlus' :: [IdentifierPlus] -> [WeakTermPlus] -> S.Set Identifier
+varWeakTermPlus' [] es = S.unions $ map varWeakTermPlus es
 varWeakTermPlus' ((_, x, t):xts) es = do
   let hs1 = varWeakTermPlus t
   let hs2 = varWeakTermPlus' xts es
-  hs1 ++ filter (/= x) hs2
+  S.union hs1 $ S.filter (/= x) hs2
 
-holeWeakTermPlus :: WeakTermPlus -> [Hole]
-holeWeakTermPlus (_, WeakTermTau _) = []
-holeWeakTermPlus (_, WeakTermUpsilon _) = []
+holeWeakTermPlus :: WeakTermPlus -> S.Set Identifier
+holeWeakTermPlus (_, WeakTermTau _) = S.empty
+holeWeakTermPlus (_, WeakTermUpsilon _) = S.empty
 holeWeakTermPlus (_, WeakTermPi _ xts t) = holeWeakTermPlus' xts [t]
 holeWeakTermPlus (_, WeakTermPiIntro xts e) = holeWeakTermPlus' xts [e]
 holeWeakTermPlus (_, WeakTermPiIntroNoReduce xts e) = holeWeakTermPlus' xts [e]
-holeWeakTermPlus (_, WeakTermPiIntroPlus {}) = []
-holeWeakTermPlus (_, WeakTermPiElim e es) =
-  holeWeakTermPlus e ++ concatMap holeWeakTermPlus es
-holeWeakTermPlus (_, WeakTermIter (_, _, t) xts e) =
-  holeWeakTermPlus t ++ holeWeakTermPlus' xts [e]
-holeWeakTermPlus (_, WeakTermZeta h) = h : []
-holeWeakTermPlus (_, WeakTermConst _ _) = []
+holeWeakTermPlus (_, WeakTermPiIntroPlus {}) = S.empty
+holeWeakTermPlus (_, WeakTermPiElim e es) = do
+  let set1 = holeWeakTermPlus e
+  let set2 = S.unions $ map holeWeakTermPlus es
+  S.union set1 set2
+holeWeakTermPlus (_, WeakTermIter (_, _, t) xts e) = do
+  let set1 = holeWeakTermPlus t
+  let set2 = holeWeakTermPlus' xts [e]
+  S.union set1 set2
+holeWeakTermPlus (_, WeakTermZeta h) = S.singleton h
+holeWeakTermPlus (_, WeakTermConst _ _) = S.empty
 holeWeakTermPlus (_, WeakTermInt t _) = holeWeakTermPlus t
-holeWeakTermPlus (_, WeakTermFloat16 _) = []
-holeWeakTermPlus (_, WeakTermFloat32 _) = []
-holeWeakTermPlus (_, WeakTermFloat64 _) = []
+holeWeakTermPlus (_, WeakTermFloat16 _) = S.empty
+holeWeakTermPlus (_, WeakTermFloat32 _) = S.empty
+holeWeakTermPlus (_, WeakTermFloat64 _) = S.empty
 holeWeakTermPlus (_, WeakTermFloat t _) = holeWeakTermPlus t
-holeWeakTermPlus (_, WeakTermEnum _) = []
-holeWeakTermPlus (_, WeakTermEnumIntro _) = []
+holeWeakTermPlus (_, WeakTermEnum _) = S.empty
+holeWeakTermPlus (_, WeakTermEnumIntro _) = S.empty
 holeWeakTermPlus (_, WeakTermEnumElim (e, t) les) = do
-  let xs = holeWeakTermPlus e
-  let ys = holeWeakTermPlus t
-  let zs = concatMap (\(_, body) -> holeWeakTermPlus body) les
-  xs ++ ys ++ zs
+  let set1 = holeWeakTermPlus e
+  let set2 = holeWeakTermPlus t
+  let set3 = S.unions $ map (\(_, body) -> holeWeakTermPlus body) les
+  S.unions [set1, set2, set3]
 holeWeakTermPlus (_, WeakTermArray dom _) = holeWeakTermPlus dom
-holeWeakTermPlus (_, WeakTermArrayIntro _ es) = concatMap holeWeakTermPlus es
-holeWeakTermPlus (_, WeakTermArrayElim _ xts d e) =
-  holeWeakTermPlus d ++ holeWeakTermPlus' xts [e]
-holeWeakTermPlus (_, WeakTermStruct {}) = []
+holeWeakTermPlus (_, WeakTermArrayIntro _ es) =
+  S.unions $ map holeWeakTermPlus es
+holeWeakTermPlus (_, WeakTermArrayElim _ xts d e) = do
+  let set1 = holeWeakTermPlus d
+  let set2 = holeWeakTermPlus' xts [e]
+  S.union set1 set2
+holeWeakTermPlus (_, WeakTermStruct {}) = S.empty
 holeWeakTermPlus (_, WeakTermStructIntro ets) =
-  concatMap (holeWeakTermPlus . fst) ets
-holeWeakTermPlus (_, WeakTermStructElim _ d e) =
-  holeWeakTermPlus d ++ holeWeakTermPlus e
+  S.unions $ map (holeWeakTermPlus . fst) ets
+holeWeakTermPlus (_, WeakTermStructElim _ d e) = do
+  let set1 = holeWeakTermPlus d
+  let set2 = holeWeakTermPlus e
+  S.union set1 set2
 holeWeakTermPlus (_, WeakTermCase _ e cxes) = do
-  let xs = holeWeakTermPlus e
-  let ys = concatMap (\((_, xts), body) -> holeWeakTermPlus' xts [body]) cxes
-  xs ++ ys
+  let set1 = holeWeakTermPlus e
+  let set2 =
+        S.unions $ map (\((_, xts), body) -> holeWeakTermPlus' xts [body]) cxes
+  S.union set1 set2
 
-holeWeakTermPlus' :: [IdentifierPlus] -> [WeakTermPlus] -> [Hole]
-holeWeakTermPlus' [] es = concatMap holeWeakTermPlus es
-holeWeakTermPlus' ((_, _, t):xts) es =
-  holeWeakTermPlus t ++ holeWeakTermPlus' xts es
+holeWeakTermPlus' :: [IdentifierPlus] -> [WeakTermPlus] -> S.Set Identifier
+holeWeakTermPlus' [] es = S.unions $ map holeWeakTermPlus es
+holeWeakTermPlus' ((_, _, t):xts) es = do
+  let set1 = holeWeakTermPlus t
+  let set2 = holeWeakTermPlus' xts es
+  S.union set1 set2
 
 substWeakTermPlus :: SubstWeakTerm -> WeakTermPlus -> WeakTermPlus
 substWeakTermPlus _ tau@(_, WeakTermTau _) = tau
@@ -354,7 +372,7 @@ toText piType@(_, WeakTermPi Nothing xts cod) = do
       case splitLast yts of
         Just (zts, (_, _, t)) -> do
           let (_, zs, ts) = unzip3 zts
-          if all (\z -> z `notElem` concatMap varWeakTermPlus ts) zs
+          if all (\z -> z `S.notMember` S.unions (map varWeakTermPlus ts)) zs
             then showCons $ "product" : map toText ts ++ [toText t]
             else do
               let argStr = inParen $ showArgs zs ts
@@ -440,7 +458,7 @@ showArgs :: [Identifier] -> [WeakTermPlus] -> T.Text
 showArgs [] [] = T.empty
 showArgs [_] [t] = inParen $ "_" <> " " <> toText t
 showArgs (x:xs) (t:ts)
-  | x `elem` concatMap varWeakTermPlus ts = do
+  | x `S.member` S.unions (map varWeakTermPlus ts) = do
     let s1 = inParen $ asText' x <> " " <> toText t
     let s2 = showArgs xs ts
     s1 <> " " <> s2
