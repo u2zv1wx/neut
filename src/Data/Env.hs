@@ -240,20 +240,8 @@ newDataUpsilonWith m name = do
   x <- newNameWith' name
   return (x, (m, DataUpsilon x))
 
-piUnivLevelsfrom :: [(a, b, (Meta, c))] -> (Meta, c) -> WithEnv [UnivLevelPlus]
-piUnivLevelsfrom xts t = do
-  let ms = map fst $ map (\(_, _, z) -> z) xts ++ [t]
-  ls <- mapM (const newCount) ms
-  return $ map UnivLevelPlus $ zip ms ls
-
 insTypeEnv :: Identifier -> TermPlus -> UnivLevelPlus -> WithEnv ()
 insTypeEnv (I (_, i)) t ml =
-  modify (\e -> e {typeEnv = IntMap.insert i (t, ml) (typeEnv e)})
-
-insTypeEnv' :: Data.Term.IdentifierPlus -> WithEnv ()
-insTypeEnv' (_, I (_, i), t) = do
-  l <- newCount
-  let ml = UnivLevelPlus (fst t, l)
   modify (\e -> e {typeEnv = IntMap.insert i (t, ml) (typeEnv e)})
 
 insTypeEnv'' :: Identifier -> TermPlus -> TypeEnv -> TypeEnv
@@ -292,21 +280,6 @@ lookupTypeEnv'' m x@(I (s, i)) tenv
       Just (t, _) -> return t
       Nothing ->
         raiseCritical m $ asText' x <> " is not found in the type environment."
-
-lookupTypeEnvMaybe :: Identifier -> TypeEnv -> WithEnv (Maybe TermPlus)
-lookupTypeEnvMaybe (I (_, i)) tenv
-  -- | Just _ <- asLowTypeMaybe s = do
-  --   l <- newCount
-  --   return (m, TermTau l)
-  -- | Just op <- asUnaryOpMaybe s = unaryOpToType m op
-  -- | Just op <- asBinaryOpMaybe s = binaryOpToType m op
-  -- | Just lowType <- asArrayAccessMaybe s = arrayAccessToType m lowType
-  -- | otherwise = do
- = do
-  case IntMap.lookup i tenv of
-    Just (t, _) -> return $ Just t
-    Nothing -> return Nothing
-        -- raiseCritical m $ asText' x <> " is not found in the type environment."
 
 lowTypeToType :: Meta -> LowType -> WithEnv TermPlus
 lowTypeToType m (LowTypeIntS s) = return (m, TermEnum (EnumTypeIntS s))
@@ -349,9 +322,7 @@ arrayAccessToType m lowType = do
   let xts = [(m, x1, u64), (m, x2, u64), (m, x3, arr)]
   x4 <- newNameWith' "arg"
   x5 <- newNameWith' "arg"
-  -- let cod = (m, TermSigma [(m, x4, arr), (m, x5, t)])
   cod <- termSigma m [(m, x4, arr), (m, x5, t)]
-  -- let cod = (m, termSigma [(m, x4, arr), (m, x5, t)])
   return (m, termPi xts cod)
 
 weakTermSigma :: Meta -> [Data.WeakTerm.IdentifierPlus] -> WithEnv WeakTermPlus
@@ -489,9 +460,6 @@ p' s = liftIO $ putStrLn $ Pr.ppShow s
 
 pp :: WeakTermPlus -> WithEnv ()
 pp e = liftIO $ TIO.putStrLn $ toText e
-
-toStr :: (Show a) => a -> String
-toStr s = Pr.ppShow s
 
 lowTypeToArrayKind :: Meta -> LowType -> WithEnv ArrayKind
 lowTypeToArrayKind m lowType =

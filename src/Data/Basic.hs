@@ -9,7 +9,6 @@ import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Set as S
 import qualified Data.Text as T
 
-import Data.Maybe (fromMaybe)
 import Text.Read
 
 newtype Identifier =
@@ -165,13 +164,6 @@ data LowType
   | LowTypePtr LowType
   deriving (Eq, Ord, Show)
 
--- `1` stands for 1 byte
-lowTypeToSize :: LowType -> Int
-lowTypeToSize _ = undefined
-
-asLowType :: Identifier -> LowType
-asLowType (I (n, _)) = fromMaybe (LowTypeIntS 64) (asLowTypeMaybe n)
-
 -- これasArrayKindMaybeから実装したほうがよさそう？
 asLowTypeMaybe :: T.Text -> Maybe LowType
 asLowTypeMaybe s =
@@ -186,18 +178,6 @@ asLowTypeMaybe s =
       | Just n <- readMaybe $ T.unpack rest
       , Just size <- asFloatSize n -> Just $ LowTypeFloat size
     _ -> Nothing
-
-asIntS :: Integral a => a -> a -> a
-asIntS size n = do
-  let upperBound = 2 ^ (size - 1)
-  let m = 2 * upperBound
-  let a = mod n m
-  if a >= upperBound
-    then a - m
-    else a
-
-asIntU :: Integral a => a -> a -> a
-asIntU size n = mod n (2 ^ size)
 
 sizeAsInt :: FloatSize -> Int
 sizeAsInt FloatSize16 = 16
@@ -390,10 +370,3 @@ breakOnMaybe needle text =
       if T.null t
         then Nothing
         else return (h, T.tail t)
-
-splitLast :: [a] -> Maybe ([a], a)
-splitLast [] = Nothing
-splitLast [x] = return ([], x)
-splitLast (x:xs) = do
-  (xs', z) <- splitLast xs
-  return (x : xs', z)

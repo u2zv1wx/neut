@@ -487,3 +487,9 @@ showArray = inBracket . T.intercalate " "
 
 showStruct :: [T.Text] -> T.Text
 showStruct = inBrace . T.intercalate " "
+-- splitLast :: [a] -> Maybe ([a], a)
+-- splitLast [] = Nothing
+-- splitLast [x] = return ([], x)
+-- splitLast (x:xs) = do
+--   (xs', z) <- splitLast xs
+--   return (x : xs', z)
