@@ -361,15 +361,10 @@ insertHoleIfNecessary' m x es = do
   case IntMap.lookup (asInt x) ienv of
     Nothing -> return es
     Just is -> do
-      mt <- lookupTypeEnv x
-      case mt of
-        Nothing ->
-          raiseCritical m $
-          "the type of `" <>
-          asText x <>
-          "` is supposed to be a Pi-type, but its type is not even in the type environment"
-        Just ((_, TermPi _ xts _), _) -> supplyHole' m 0 (length xts) is es
-        Just (t, _) ->
+      tl <- lookupTypeEnv m x
+      case tl of
+        ((_, TermPi _ xts _), _) -> supplyHole' m 0 (length xts) is es
+        (t, _) ->
           raiseCritical m $
           "the type of `" <>
           asText x <> "` must be a Pi-type, but is:\n" <> toText (weaken t)
@@ -400,7 +395,7 @@ inferExternal m x comp = do
 inferSymbol ::
      Meta -> Identifier -> WithEnv (WeakTermPlus, WeakTermPlus, UnivLevelPlus)
 inferSymbol m x = do
-  mt <- lookupTypeEnv x
+  mt <- lookupTypeEnvMaybe x
   case mt of
     Nothing -> do
       ((_, t), UnivLevelPlus (_, l)) <- lookupWeakTypeEnv m x

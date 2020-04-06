@@ -249,18 +249,18 @@ insTypeEnv'' (I (_, i)) t tenv = do
   let ml = UnivLevelPlus (fst t, 0)
   IntMap.insert i (t, ml) tenv
 
-lookupTypeEnv :: Identifier -> WithEnv (Maybe (TermPlus, UnivLevelPlus))
-lookupTypeEnv (I (_, i)) = do
-  tenv <- gets typeEnv
-  return $ IntMap.lookup i tenv
-
-lookupTypeEnv1 :: Meta -> Identifier -> WithEnv (TermPlus, UnivLevelPlus)
-lookupTypeEnv1 m x@(I (_, i)) = do
-  tenv <- gets typeEnv
-  case IntMap.lookup i tenv of
-    Just (t, l) -> return (t, l)
+lookupTypeEnv :: Meta -> Identifier -> WithEnv (TermPlus, UnivLevelPlus)
+lookupTypeEnv m x = do
+  mt <- lookupTypeEnvMaybe x
+  case mt of
+    Just tl -> return tl
     Nothing ->
       raiseCritical m $ asText' x <> " is not found in the type environment."
+
+lookupTypeEnvMaybe :: Identifier -> WithEnv (Maybe (TermPlus, UnivLevelPlus))
+lookupTypeEnvMaybe (I (_, i)) = do
+  tenv <- gets typeEnv
+  return $ IntMap.lookup i tenv
 
 lookupTypeEnv' :: Meta -> Identifier -> WithEnv TermPlus
 lookupTypeEnv' m x = do
