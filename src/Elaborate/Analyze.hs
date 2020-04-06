@@ -45,8 +45,8 @@ simp' (((m1, WeakTermPi name1 xts1 cod1), (m2, WeakTermPi name2 xts2 cod2)):cs)
       then do
         let m = supMeta m1 m2
         case snd (getPosInfo m1) `compare` snd (getPosInfo m2) of
-          LT -> showArityError m (length xts2) (length xts1)
-          _ -> showArityError m (length xts1) (length xts2)
+          LT -> throwArityError m (length xts2) (length xts1)
+          _ -> throwArityError m (length xts1) (length xts2)
       else do
         xt1 <- asIdentPlus m1 cod1
         xt2 <- asIdentPlus m2 cod2
@@ -415,8 +415,8 @@ toIntS m size = (m, WeakTermEnum $ EnumTypeIntS size)
 toIntU :: Meta -> IntSize -> WeakTermPlus
 toIntU m size = (m, WeakTermEnum $ EnumTypeIntU size)
 
-showArityError :: Meta -> Int -> Int -> WithEnv a
-showArityError m i1 i2 =
+throwArityError :: Meta -> Int -> Int -> WithEnv a
+throwArityError m i1 i2 =
   raiseError m $
   "the arity of the term is " <>
   T.pack (show i1) <> ", but found " <> T.pack (show i2) <> " arguments"
