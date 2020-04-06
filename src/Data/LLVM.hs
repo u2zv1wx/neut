@@ -48,9 +48,7 @@ data LLVMOp
       [LLVMData] -- arguments
   deriving (Show)
 
--- (elem-type, num of elems)
--- to be used to eliminate free-then-malloc-with-the-same-size.
-type SizeInfo = (LowType, Int)
+type SizeInfo = LowType
 
 type SubstLLVM = [(Int, LLVMData)]
 

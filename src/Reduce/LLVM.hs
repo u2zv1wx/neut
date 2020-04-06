@@ -19,7 +19,9 @@ reduceLLVM sub _ (LLVMReturn d) = do
   return $ LLVMReturn d'
 reduceLLVM sub sm (LLVMLet x (LLVMOpBitcast d from to) cont)
   | from == to = reduceLLVM ((asInt x, substLLVMData sub d) : sub) sm cont
-reduceLLVM sub sm (LLVMLet x (LLVMOpAlloc _ (_, 0)) cont) = do
+reduceLLVM sub sm (LLVMLet x (LLVMOpAlloc _ (LowTypePtr (LowTypeArray 0 _))) cont) = do
+  reduceLLVM ((asInt x, LLVMDataNull) : sub) sm cont
+reduceLLVM sub sm (LLVMLet x (LLVMOpAlloc _ (LowTypePtr (LowTypeStruct []))) cont) = do
   reduceLLVM ((asInt x, LLVMDataNull) : sub) sm cont
 reduceLLVM sub sm (LLVMLet x op@(LLVMOpAlloc _ size) cont) = do
   case Map.lookup size sm of

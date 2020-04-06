@@ -45,8 +45,7 @@ llvmCode (_, CodeSigmaElim k xs v e) = do
   let idxList = map (\i -> (LLVMDataInt i, i32)) [0 ..]
   ys <- mapM newNameWith xs
   let xts' = zip xs (repeat et)
-  let sizeInfo = (et, length xs)
-  loadContent v bt sizeInfo (zip idxList (zip ys xts')) e
+  loadContent v bt (zip idxList (zip ys xts')) e
 llvmCode (_, CodeUpIntro d) = do
   result <- newNameWith' $ takeBaseName d
   llvmDataLet result d $ LLVMReturn $ LLVMDataLocal result
@@ -72,11 +71,7 @@ llvmCode (_, CodeStructElim xks v e) = do
   let bt = LowTypePtr $ LowTypeStruct ts
   let idxList = map (\i -> (LLVMDataInt i, i32)) [0 ..]
   ys <- mapM newNameWith xs
-  -- これ間違いでは？tsのそれぞれの要素をとる必要があるのでは。
-  -- let sizeInfo = (LowTypePtr (LowTypeIntS 64), length ts)
-  let sizeInfo = (LowTypeStruct ts, 1)
-  -- let sizeInfo = (LowTypeIntS64Ptr, length ts)
-  loadContent v bt sizeInfo (zip idxList (zip ys xts)) e
+  loadContent v bt (zip idxList (zip ys xts)) e
 llvmCode (m, CodeCase sub v branchList) = do
   let (ls, es) = unzip branchList
   let es' = map (substCodePlus sub) es
@@ -118,34 +113,31 @@ takeBaseName' LLVMDataNull = "null"
 loadContent ::
      DataPlus -- base pointer
   -> LowType -- the type of base pointer
-  -> SizeInfo
   -> [((LLVMData, LowType), (Identifier, (Identifier, LowType)))] -- [(the index of an element, the variable to load the element)]
   -> CodePlus -- continuation
   -> WithEnv LLVM
-loadContent _ _ _ [] cont = llvmCode cont -- don't call redundant free
-loadContent v bt sizeInfo iyxs cont = do
+loadContent _ _ [] cont = llvmCode cont -- don't call redundant free
+loadContent v bt iyxs cont = do
   let ixs = map (\(i, (y, (_, k))) -> (i, (y, k))) iyxs
   (bp, castThen) <- llvmCast (Just $ takeBaseName v) v bt
   let yxs = map (\(_, yx) -> yx) iyxs
   uncastThenCont <- uncastList yxs cont
-  extractThenFreeThenUncastThenCont <-
-    loadContent' bp bt sizeInfo ixs uncastThenCont
+  extractThenFreeThenUncastThenCont <- loadContent' bp bt ixs uncastThenCont
   castThen extractThenFreeThenUncastThenCont
 
 loadContent' ::
      LLVMData -- base pointer
   -> LowType -- the type of base pointer
-  -> SizeInfo
   -> [((LLVMData, LowType), (Identifier, LowType))] -- [(the index of an element, the variable to keep the loaded content)]
   -> LLVM -- continuation
   -> WithEnv LLVM
-loadContent' bp bt sizeInfo [] cont = do
+loadContent' bp bt [] cont = do
   l <- llvmUncast (Just $ takeBaseName' bp) bp bt
   tmp <- newNameWith'' $ Just $ takeBaseName' bp
   j <- newCount
-  commConv tmp l $ LLVMCont (LLVMOpFree (LLVMDataLocal tmp) sizeInfo j) cont
-loadContent' bp bt sizeInfo ((i, (x, et)):xis) cont = do
-  cont' <- loadContent' bp bt sizeInfo xis cont
+  commConv tmp l $ LLVMCont (LLVMOpFree (LLVMDataLocal tmp) bt j) cont
+loadContent' bp bt ((i, (x, et)):xis) cont = do
+  cont' <- loadContent' bp bt xis cont
   (posName, pos) <- newDataLocal' (Just $ asText x)
   return $
     LLVMLet
@@ -425,8 +417,9 @@ storeContent m reg aggPtrType dts cont = do
   --   http://nondot.org/sabre/LLVMNotes/SizeOf-OffsetOf-VariableSizedStructs.txt
   case aggPtrType of
     AggPtrTypeStruct ts ->
-      storeContent'' reg (LowTypeStruct ts) 1 castThenStoreThenCont
-    AggPtrTypeArray len t -> storeContent'' reg t len castThenStoreThenCont
+      storeContent'' reg (LowTypeStruct ts) lowType 1 castThenStoreThenCont
+    AggPtrTypeArray len t ->
+      storeContent'' reg t lowType len castThenStoreThenCont
 
 storeContent' ::
      LLVMData -- base pointer
@@ -446,11 +439,11 @@ storeContent' bp bt ((i, (d, et)):ids) cont = do
       (LLVMOpGetElementPtr (bp, bt) [(LLVMDataInt 0, i32), (LLVMDataInt i, it)]) $
     LLVMCont (LLVMOpStore et cast loc) cont'
 
-storeContent'' :: Identifier -> LowType -> Int -> LLVM -> WithEnv LLVM
-storeContent'' reg elemType len cont = do
+storeContent'' ::
+     Identifier -> LowType -> SizeInfo -> Int -> LLVM -> WithEnv LLVM
+storeContent'' reg elemType sizeInfo len cont = do
   (c, cVar) <- newDataLocal $ "sizeof-" <> asText reg
   (i, iVar) <- newDataLocal $ "sizeof-" <> asText reg
-  let sizeInfo = (elemType, len)
   return $
     LLVMLet
       c
