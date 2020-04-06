@@ -4,7 +4,6 @@ module Elaborate.Analyze
   ( analyze
   , simp
   , toPiElim
-  , unfoldIter
   , toVarList
   , bindFormalArgs
   , lookupAny
@@ -142,7 +141,8 @@ simp' ((e1@(m1, _), e2@(m2, _)):cs) = do
           , Just pairList <- asPairList ess1 ess2 -> simp $ pairList ++ cs
         (Just (StuckPiElimConst x1 mx1 up1 mess1), Just (StuckPiElimConst x2 mx2 up2 mess2))
           | x1 == x2
-          , Just (Left (_, body)) <- IntMap.lookup (asInt x1) cenv -> do
+          , Just (Left (_, body)) <- IntMap.lookup (asInt x1) cenv
+          , Just _ <- asPairList (map snd mess1) (map snd mess2) -> do
             body' <- univInstWith up1 $ weaken (supMeta mx1 mx2, body)
             let c = Enriched (e1, e2) [] $ ConstraintDelta body' mess1 mess2
             insConstraintQueue c
