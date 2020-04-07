@@ -125,7 +125,7 @@ parseCheckOpt = do
         strOption $
         mconcat
           [ long "end-of-entry"
-          , value "\n"
+          , value ""
           , help "String printed after each entry"
           , metavar "STRING"
           ]
@@ -171,12 +171,11 @@ run (Check inputPathStr colorizeFlag eoe) = do
   inputPath <- resolveFile' inputPathStr
   resultOrErr <-
     evalWithEnv (check inputPath) $
-    initialEnv {shouldColorize = colorizeFlag, endOfEntry = "\n" ++ eoe ++ "\n"}
+    initialEnv {shouldColorize = colorizeFlag, endOfEntry = eoe}
   case resultOrErr of
     Right _ -> return ()
     Left err ->
-      seqIO (map (outputLog colorizeFlag (eoe ++ "\n")) err) >>
-      exitWith (ExitFailure 1)
+      seqIO (map (outputLog colorizeFlag eoe) err) >> exitWith (ExitFailure 1)
 run (Archive inputPathStr mOutputPathStr) = do
   inputPath <- resolveDir' inputPathStr
   contents <- listDirectory $ toFilePath inputPath

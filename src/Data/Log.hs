@@ -48,12 +48,16 @@ outputLog :: ColorFlag -> String -> Log -> IO ()
 outputLog b eoe (Nothing, l, t) = do
   outputLogLevel b l
   outputLogText t
-  putStr eoe
+  outputFooter eoe
 outputLog b eoe (Just pos, l, t) = do
   outputPosInfo b pos
   outputLogLevel b l
   outputLogText t
-  putStr eoe
+  outputFooter eoe
+
+outputFooter :: String -> IO ()
+outputFooter "" = return ()
+outputFooter eoe = putStrLn eoe
 
 outputPosInfo :: Bool -> PosInfo -> IO ()
 outputPosInfo b (path, loc) = do
@@ -68,7 +72,7 @@ outputLogLevel b l = do
     TIO.putStr ": "
 
 outputLogText :: T.Text -> IO ()
-outputLogText = TIO.putStr
+outputLogText = TIO.putStrLn
 
 withSGR :: Bool -> [SGR] -> IO () -> IO ()
 withSGR False _ f = f

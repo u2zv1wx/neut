@@ -56,12 +56,13 @@
   len) ;; ここでtestがfreeされる（直前のwriteでborrowされているので）
 
 (theorem some-theorem
-  (forall ((A tau))
+  (Π ((A tau))
     (hom A A))
   (lambda (a)
     (lambda (x) x)))
 
-(verify ((lambda ((x tau)) x) top))
+
+(verify ((λ ((x tau)) x) top))
 
 (verify some-theorem)
 

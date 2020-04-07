@@ -15,6 +15,10 @@
 
 (notation forall pi)
 
+(keyword Π)
+
+(notation Π pi)
+
 (keyword switch)
 
 (notation switch enum-elimination)
@@ -26,6 +30,10 @@
 (keyword lambda)
 
 (notation lambda pi-introduction)
+
+(keyword λ)
+
+(notation λ lambda)
 
 (keyword let)
 
