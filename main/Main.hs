@@ -159,7 +159,9 @@ parseCompleteOpt = do
 run :: Command -> IO ()
 run (Build inputPathStr mOutputPathStr outputKind) = do
   inputPath <- resolveFile' inputPathStr
-  resultOrErr <- evalWithEnv (build inputPath) initialEnv
+  resultOrErr <-
+    evalWithEnv (build inputPath) $
+    initialEnv {shouldColorize = True, endOfEntry = ""}
   basename <- setFileExtension "" $ filename inputPath
   mOutputPath <- mapM resolveFile' mOutputPathStr
   outputPath <- constructOutputPath basename mOutputPath outputKind

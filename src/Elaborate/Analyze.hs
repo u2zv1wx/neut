@@ -105,6 +105,10 @@ simp' (((m1, WeakTermFloat64 l1), (_, WeakTermFloat t2 l2)):cs)
     simp $ (f64, t2) : cs
 simp' (((_, WeakTermFloat t1 l1), (_, WeakTermFloat t2 l2)):cs)
   | l1 == l2 = simp $ (t1, t2) : cs
+simp' (((_, WeakTermEnum (EnumTypeIntS 1)), (_, WeakTermEnum (EnumTypeLabel "bool"))):cs) =
+  simp cs
+simp' (((_, WeakTermEnum (EnumTypeLabel "bool")), (_, WeakTermEnum (EnumTypeIntS 1))):cs) =
+  simp cs
 simp' (((_, WeakTermArray dom1 k1), (_, WeakTermArray dom2 k2)):cs)
   | k1 == k2 = simp $ (dom1, dom2) : cs
 simp' (((_, WeakTermArrayIntro k1 es1), (_, WeakTermArrayIntro k2 es2)):cs)

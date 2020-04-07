@@ -292,7 +292,9 @@ emitLLVMOp (LLVMOpBinaryOp (BinaryOpXor t@(LowTypeIntS _)) d1 d2) =
   emitBinaryOp t "xor" d1 d2
 emitLLVMOp (LLVMOpBinaryOp (BinaryOpXor t@(LowTypeIntU _)) d1 d2) =
   emitBinaryOp t "xor" d1 d2
-emitLLVMOp _ = raiseCritical' "ill-typed LLVMOp"
+emitLLVMOp foo = do
+  p' foo
+  raiseCritical' "ill-typed LLVMOp"
 
 emitUnaryOp :: LowType -> Builder -> LLVMData -> WithEnv Builder
 emitUnaryOp t inst d = do

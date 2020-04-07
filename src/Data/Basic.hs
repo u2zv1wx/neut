@@ -300,6 +300,7 @@ asBinaryOpMaybe' "ne" = Just BinaryOpNE
 asBinaryOpMaybe' "gt" = Just BinaryOpGT
 asBinaryOpMaybe' "ge" = Just BinaryOpGE
 asBinaryOpMaybe' "lt" = Just BinaryOpLT
+asBinaryOpMaybe' "<" = Just BinaryOpLT
 asBinaryOpMaybe' "le" = Just BinaryOpLE
 asBinaryOpMaybe' "shl" = Just BinaryOpShl
 asBinaryOpMaybe' "lshr" = Just BinaryOpLshr

@@ -315,6 +315,8 @@ elaborateWeakCase (m, WeakCaseInt t x) = do
       return (m, CaseValue (EnumValueIntS size x))
     (_, TermEnum (EnumTypeIntU size)) ->
       return (m, CaseValue (EnumValueIntU size x))
+    (_, TermEnum (EnumTypeLabel "bool")) ->
+      return (m, CaseValue (EnumValueIntS 1 x))
     _ -> do
       raiseError m $
         "the type of `" <>

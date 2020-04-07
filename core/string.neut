@@ -2,6 +2,8 @@
 
 (include library "core/foundation.neut")
 
+(include library "core/top.neut")
+
 (definition string-internal ((len u64))
   (array len u8))
 
@@ -12,7 +14,14 @@
 
 (use os)
 
-(definition print-string ((str string))
+(definition print-character ((value u8))
+  (witness top
+    (with let-bind
+      (let char (array-introduction u8 value))
+      (os:write os:stdout char 1)
+      top:unit)))
+
+(definition string:print ((str string))
   (witness (product string u64)
     (destruct str ((n u64) (content (string-internal n)))
       (let len (write stdout &content n))

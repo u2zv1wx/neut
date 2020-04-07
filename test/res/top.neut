@@ -1,1 +1,3 @@
+(no-implicit-core)
+
 (enum top unit)

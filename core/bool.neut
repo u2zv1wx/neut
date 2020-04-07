@@ -8,19 +8,13 @@
   (true 1)
   (false 0))
 
-(use unsafe)
+(definition and i1:and)
 
-(definition and ((b1 bool) (b2 bool))
-  (cast-to bool (i1:and (cast-to i1 b1) (cast-to i1 b2))))
-
-(definition or ((b1 bool) (b2 bool))
-  (cast-to bool (i1:or (cast-to i1 b1) (cast-to i1 b2))))
-
-(unuse unsafe)
+(definition or i1:or)
 
 (definition not ((b bool))
-  (switch b
-    (true false)
-    (false true)))
+  (if b
+    false
+    true))
 
 (end bool)

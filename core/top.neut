@@ -1,3 +1,11 @@
 (no-implicit-core)
 
 (enum top unit)
+
+(include library "core/base.neut")
+
+(definition execute ([a tau] (x a))
+  (witness top
+    (with let-bind
+      x
+      top:unit)))

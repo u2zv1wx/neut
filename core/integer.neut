@@ -16,22 +16,19 @@
   (witness i64
     (mul x -1)))
 
-;; 48 + xを書けばオーケー？
 (definition print-digit ((x i64))
   (witness top
     (with let-bind
-      (let value (add x 48))
       (print-character (unsafe:cast i64 u8 (add x 48))))))
-
 
 ;; とりあえず直接printする。ホントはbufferをつかって実装するべき。
 (definition print ((x i64))
   (witness top
-    (if (lt x 0)
+    (if (< x 0)
       (with let-bind
-        (print-character 45)
+        (print-character 45) ;; print '-'
         (print (negate x)))
-      (if (lt x 10)
+      (if (< x 10)
         (print-digit x)
         (with let-bind
           (let q (div x 10))

@@ -11,6 +11,8 @@
 
 ;; (include library "core/notation.neut")
 
+(include library "core/integer.neut")
+
 (let test "あ")
 
 ;; (section os)
@@ -75,6 +77,10 @@
 (let a (os:write os:stdout &test 3))
 (let a (os:write os:stdout &test 3))
 (let a (os:write os:stdout &test 3))
+
+;; (print-character 45)
+
+(i64:print -1234321)
 
 ;; (let a1 (os:write os:stdout test 3))
 ;; (let a2 (os:write os:stdout test 3))
