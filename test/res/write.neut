@@ -46,8 +46,6 @@
 ;;   (let len (write stdout test 3))
 ;;   (let len (@os:write 3 stdout test 3))
 ;;   (let len (write stdout test 3))
-
-
 ;;   len)
 
 ;; (write hole stdout &test 3)
@@ -116,6 +114,8 @@
 ;; (i64:print (fact 10))
 
 (i64:print (fact (unsafe:cast u64 i64 (list:length xs))))
+
+;; 「?」の1文字でholeを表現できるようにしてもいいかもしれない。
 
 (string:print "\n")
 
