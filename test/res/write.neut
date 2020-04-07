@@ -116,8 +116,6 @@
 
 (i64:print (fact (unsafe:cast u64 i64 (list:length xs))))
 
-;; 「?」の1文字でholeを表現できるようにしてもいいかもしれない。
-
 (?string:print "\n")
 
 ;; (let a1 (os:write os:stdout test 3))

@@ -192,11 +192,9 @@ infer' ctx (m, WeakTermCase indName e cxtes) = do
           xts <- mapM (toIdentPlus mc) usedHoleList
           return (((mc, c), xts ++ patArgs'), body')
       return ((m, WeakTermCase nameStr e' cxtes'), resultType)
-infer' ctx (m, WeakTermWithNote e t) = do
+infer' ctx (m, WeakTermWithNote e _) = do
   (e', te) <- infer' ctx e
-  t' <- inferType' ctx t
-  insConstraintEnv te t'
-  return ((m, WeakTermWithNote e' te), t')
+  return ((m, WeakTermWithNote e' te), te)
 
 toIdentPlus :: Meta -> (WeakTermPlus, WeakTermPlus) -> WithEnv IdentifierPlus
 toIdentPlus m (_, t) = do
