@@ -14,4 +14,4 @@
 
 (include "option.neut")
 
-;; (include "string.neut")
+(include "string.neut")

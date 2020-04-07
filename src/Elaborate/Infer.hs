@@ -198,18 +198,18 @@ toIdentPlus m (_, t) = do
   x <- newNameWith' "pat"
   return (m, x, t)
 
-applyArgs ::
+inferArgs ::
      Meta
-  -> [IdentifierPlus]
   -> [(WeakTermPlus, WeakTermPlus)]
-  -> WithEnv ([IdentifierPlus], [IdentifierPlus])
-applyArgs _ xts [] = return (xts, [])
-applyArgs m ((mx, x, t):xts) ((hole, higherHole):ets) = do
-  insConstraintEnv t higherHole
-  let xts' = substWeakTermPlus' [(x, hole)] xts
-  (xts'', tmp) <- applyArgs m xts' ets
-  return (xts'', tmp ++ [(mx, x, higherHole)])
-applyArgs m [] _ = raiseCritical m $ "invalid argument passed to applyArgs"
+  -> [IdentifierPlus]
+  -> WeakTermPlus
+  -> WithEnv WeakTermPlus
+inferArgs _ [] [] cod = return cod
+inferArgs m ((e, t):ets) ((_, x, tx):xts) cod = do
+  insConstraintEnv t tx
+  let (xts', cod') = substWeakTermPlus'' [(x, e)] xts cod
+  inferArgs m ets xts' cod'
+inferArgs m _ _ _ = raiseCritical m $ "invalid argument passed to inferArgs"
 
 constructIndType ::
      Meta
@@ -221,9 +221,9 @@ constructIndType m ctx i = do
   case IntMap.lookup (asInt i) cenv of
     Just (Left e) -> do
       case weaken e of
-        e'@(me, WeakTermPiIntro xts _) -> do
+        e'@(me, WeakTermPiIntro xts cod) -> do
           holeList <- mapM (const $ newHoleInCtx ctx me) xts
-          _ <- applyArgs m xts holeList
+          _ <- inferArgs m holeList xts cod
           let es = map (\(h, _) -> h) holeList
           return ((me, WeakTermPiElim e' es), holeList)
         e' ->
@@ -313,10 +313,10 @@ inferSymbol :: Meta -> Identifier -> WithEnv (WeakTermPlus, WeakTermPlus)
 inferSymbol m x = do
   mt <- lookupTypeEnvMaybe x
   case mt of
+    Just t -> return ((m, WeakTermConst x), (m, snd $ weaken t))
     Nothing -> do
       (_, t) <- lookupWeakTypeEnv m x
       return ((m, WeakTermUpsilon x), (m, t))
-    Just t -> return ((m, WeakTermConst x), weaken t)
 
 inferType' :: Context -> WeakTermPlus -> WithEnv WeakTermPlus
 inferType' ctx t = do
@@ -375,23 +375,19 @@ inferPiElim ::
   -> [(WeakTermPlus, WeakTermPlus)]
   -> WithEnv (WeakTermPlus, WeakTermPlus)
 inferPiElim ctx m (e, t) ets = do
-  let (es, ts) = unzip ets
+  let es = map fst ets
   case t of
     (_, WeakTermPi _ xts cod)
       | length xts == length ets -> do
-        let xs = map (\(_, x, _) -> x) xts
-        let ts'' = map (\(_, _, tx) -> substWeakTermPlus (zip xs es) tx) xts
-        forM_ (zip ts'' ts) $ uncurry insConstraintEnv
-        let cod' = substWeakTermPlus (zip xs es) cod
+        cod' <- inferArgs m ets xts cod
         return ((m, WeakTermPiElim e es), cod')
     _ -> do
       ys <- mapM (const $ newNameWith' "arg") es
-      yts <- newTypeHoleListInCtx ctx $ zip ys (map fst es)
-      let ts'' = map (\(_, _, ty) -> substWeakTermPlus (zip ys es) ty) yts
+      yts <- newTypeHoleListInCtx ctx $ zip ys (map metaOf es)
       cod <- newTypeHoleInCtx (ctx ++ yts) m
-      insConstraintEnv t (fst e, weakTermPi yts cod)
-      forM_ (zip ts ts'') $ uncurry insConstraintEnv
-      return ((m, WeakTermPiElim e es), substWeakTermPlus (zip ys es) cod)
+      insConstraintEnv t (metaOf e, weakTermPi yts cod)
+      cod' <- inferArgs m ets yts cod
+      return ((m, WeakTermPiElim e es), cod')
 
 -- In a context (x1 : A1, ..., xn : An), this function creates metavariables
 --   ?M  : Pi (x1 : A1, ..., xn : An). ?Mt @ (x1, ..., xn)

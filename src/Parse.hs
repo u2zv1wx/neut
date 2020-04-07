@@ -271,10 +271,11 @@ parse' ((m, TreeNode ((mLet, TreeLeaf "let"):rest)):as)
     let xt = (mx, TreeNode [(mx, TreeLeaf x), t])
     parse' ((m, TreeNode [(mLet, TreeLeaf "let"), xt, e]) : as)
   | [xt, e] <- rest = do
-    xt' <- prefixIdentPlus xt
     m' <- adjustPhase' m
     e' <- adjustPhase e >>= macroExpand >>= interpret
-    (mx, x, t) <- adjustPhase xt' >>= macroExpand >>= interpretIdentifierPlus
+    xt' <-
+      adjustPhase xt >>= macroExpand >>= prefixIdentPlus >>=
+      interpretIdentifierPlus
     defList <- parse' as
     case e' of
       (_, WeakTermPiElim f args)
@@ -283,8 +284,8 @@ parse' ((m, TreeNode ((mLet, TreeLeaf "let"):rest)):as)
         , not (null mxs) -> do
           xts <- mapM toIdentPlus mxs
           let app = (m', WeakTermPiElim f args')
-          return $ QuasiStmtLetSigma m' (xts ++ [(mx, x, t)]) app : defList
-      _ -> return $ QuasiStmtLet m' (mx, x, t) e' : defList
+          return $ QuasiStmtLetSigma m' (xts ++ [xt']) app : defList
+      _ -> return $ QuasiStmtLet m' xt' e' : defList
   | otherwise = raiseSyntaxError m "(let LEAF TREE TREE) | (let TREE TREE)"
 parse' ((m, TreeNode ((_, TreeLeaf "verify"):rest)):as)
   | [e] <- rest = do

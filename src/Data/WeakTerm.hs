@@ -369,11 +369,11 @@ toText piType@(_, WeakTermPi Nothing xts cod) = do
       case splitLast yts of
         Just (zts, (_, _, t)) -> do
           let (_, zs, ts) = unzip3 zts
-          if all (\z -> z `S.notMember` S.unions (map varWeakTermPlus ts)) zs
-            then showCons $ "product" : map toText ts ++ [toText t]
-            else do
-              let argStr = inParen $ showArgs zs ts
-              showCons ["Σ", argStr, toText t]
+          -- if all (\z -> z `S.notMember` S.unions (map varWeakTermPlus ts)) zs
+          --   then showCons $ "product" : map toText ts ++ [toText t]
+          --   else do
+          let argStr = inParen $ showArgs zs ts
+          showCons ["Σ", argStr, toText t]
         _ -> "(product)"
     Nothing -> do
       let (_, xs, ts) = unzip3 xts
@@ -453,16 +453,17 @@ showArg (_, x, t) = inParen $ asText x <> " " <> toText t
 
 showArgs :: [Identifier] -> [WeakTermPlus] -> T.Text
 showArgs [] [] = T.empty
-showArgs [_] [t] = inParen $ "_" <> " " <> toText t
+-- showArgs [_] [t] = inParen $ "_" <> " " <> toText t
+showArgs [x] [t] = inParen $ asText x <> " " <> toText t
 showArgs (x:xs) (t:ts)
-  | x `S.member` S.unions (map varWeakTermPlus ts) = do
-    let s1 = inParen $ asText x <> " " <> toText t
-    let s2 = showArgs xs ts
-    s1 <> " " <> s2
-  | otherwise = do
-    let s1 = inParen $ "_" <> " " <> toText t
-    let s2 = showArgs xs ts
-    s1 <> " " <> s2
+  -- | x `S.member` S.unions (map varWeakTermPlus ts) = do
+ = do
+  let s1 = inParen $ asText x <> " " <> toText t
+  let s2 = showArgs xs ts
+  s1 <> " " <> s2 -- | otherwise = do
+  --   let s1 = inParen $ "_" <> " " <> toText t
+  --   let s2 = showArgs xs ts
+  --   s1 <> " " <> s2
 showArgs _ _ = error "showArgs"
 
 showClause :: (WeakCase, WeakTermPlus) -> T.Text
