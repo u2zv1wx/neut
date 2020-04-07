@@ -61,7 +61,6 @@
   (lambda (a)
     (lambda (x) x)))
 
-
 (verify ((λ ((x tau)) x) top))
 
 (verify some-theorem)

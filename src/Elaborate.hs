@@ -6,6 +6,8 @@ module Elaborate
 
 import Control.Monad.State
 import Data.List (nub)
+import Data.Time
+import Numeric
 import Numeric.Half
 
 import qualified Data.HashMap.Strict as Map
@@ -84,10 +86,13 @@ elaborateStmt (WeakStmtLetSigma m xts e cont) = do
   termSigmaElim m (m, TermEnum $ EnumTypeIntS 64) xts'' e'' cont'
 elaborateStmt (WeakStmtVerify m e cont) = do
   e' <- elaborate' e
+  start <- liftIO $ getCurrentTime
   e'' <- normalize e'
+  stop <- liftIO $ getCurrentTime
+  let sec = realToFrac $ diffUTCTime stop start :: Float
   note m $
-    "verification succeeded with the following normal form:\n" <>
-    toText (weaken e'')
+    "verification succeeded with the following normal form (" <>
+    T.pack (showFloat' sec) <> " seconds):\n" <> toText (weaken e'')
   elaborateStmt cont
 elaborateStmt (WeakStmtImplicit m x@(I (_, i)) idx cont) = do
   t <- lookupTypeEnv' m x
@@ -112,6 +117,9 @@ elaborateStmt (WeakStmtConstDecl _ (_, x, t) cont) = do
   t'' <- reduceTermPlus <$> elaborate' t'
   insTypeEnv x t''
   elaborateStmt cont
+
+showFloat' :: Float -> String
+showFloat' x = showFFloat Nothing x ""
 
 termSigmaElim ::
      Meta

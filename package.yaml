@@ -27,6 +27,7 @@ dependencies:
 - process
 - tar
 - text
+- time
 - unordered-containers
 - zlib
 
