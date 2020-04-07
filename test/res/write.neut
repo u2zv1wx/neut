@@ -39,6 +39,8 @@
 ;;   (let len (write stdout test 3))
 ;;   (let len (@os:write 3 stdout test 3))
 ;;   (let len (write stdout test 3))
+
+
 ;;   len)
 
 ;; (write hole stdout &test 3)
@@ -52,6 +54,16 @@
   (let len (os:write os:stdout &test 3))
   (let len (os:write os:stdout &test 3))
   len) ;; ここでtestがfreeされる（直前のwriteでborrowされているので）
+
+(theorem some-theorem
+  (forall ((A tau))
+    (hom A A))
+  (lambda (a)
+    (lambda (x) x)))
+
+(verify ((lambda ((x tau)) x) top))
+
+(verify some-theorem)
 
 ;; (@os:write 3 os:stdout "あ" 3)
 ;; (@os:write 3 os:stdout "あ" 3)

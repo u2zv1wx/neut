@@ -46,6 +46,8 @@ data Env =
   Env
     { count :: Int
     , ppCount :: Int -- count used only for pretty printing
+    , shouldColorize :: Bool
+    , endOfEntry :: String
     --
     -- parse
     --
@@ -119,6 +121,8 @@ initialEnv =
   Env
     { count = 0
     , ppCount = 0
+    , shouldColorize = False
+    , endOfEntry = "\n"
     , phase = 0
     , target = Nothing
     , notationEnv = []
@@ -480,5 +484,14 @@ getLibraryDirPath = do
   relLibPath <- parseRelDir ".local/share/neut/library"
   return $ homeDirPath </> relLibPath
 
-note :: T.Text -> WithEnv ()
-note str = liftIO $ outputLog True $ logInfo' str
+note :: Meta -> T.Text -> WithEnv ()
+note m str = do
+  b <- gets shouldColorize
+  eoe <- gets endOfEntry
+  liftIO $ outputLog b eoe $ logInfo (getPosInfo m) str
+
+note' :: T.Text -> WithEnv ()
+note' str = do
+  b <- gets shouldColorize
+  eoe <- gets endOfEntry
+  liftIO $ outputLog b eoe $ logInfo' str

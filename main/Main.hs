@@ -56,7 +56,7 @@ instance Read OutputKind where
 
 data Command
   = Build BuildOptInputPath (Maybe BuildOptOutputPath) OutputKind
-  | Check CheckOptInputPath CheckOptColorize (Maybe CheckOptEndOfEntry)
+  | Check CheckOptInputPath CheckOptColorize CheckOptEndOfEntry
   | Archive ArchiveOptInputPath (Maybe ArchiveOptOutputPath)
   | Complete FilePath Line Column
 
@@ -122,10 +122,10 @@ parseCheckOpt = do
           , help "Set this to disable colorization of the output"
           ]
   let footerOpt =
-        optional $
         strOption $
         mconcat
           [ long "end-of-entry"
+          , value "\n"
           , help "String printed after each entry"
           , metavar "STRING"
           ]
@@ -164,21 +164,19 @@ run (Build inputPathStr mOutputPathStr outputKind) = do
   mOutputPath <- mapM resolveFile' mOutputPathStr
   outputPath <- constructOutputPath basename mOutputPath outputKind
   case resultOrErr of
-    Left err -> seqIO "" (map (outputLog True) err) >> exitWith (ExitFailure 1)
+    Left err ->
+      seqIO (map (outputLog True "\n") err) >> exitWith (ExitFailure 1)
     Right result -> writeResult result outputPath outputKind
-run (Check inputPathStr colorizeFlag mEndOfEntry) = do
+run (Check inputPathStr colorizeFlag eoe) = do
   inputPath <- resolveFile' inputPathStr
-  resultOrErr <- evalWithEnv (check inputPath) initialEnv
+  resultOrErr <-
+    evalWithEnv (check inputPath) $
+    initialEnv {shouldColorize = colorizeFlag, endOfEntry = "\n" ++ eoe ++ "\n"}
   case resultOrErr of
     Right _ -> return ()
     Left err ->
-      case mEndOfEntry of
-        Just eoe ->
-          seqIO (eoe ++ "\n") (map (outputLog colorizeFlag) err) >>
-          exitWith (ExitFailure 1)
-        Nothing ->
-          seqIO "" (map (outputLog colorizeFlag) err) >>
-          exitWith (ExitFailure 1)
+      seqIO (map (outputLog colorizeFlag (eoe ++ "\n")) err) >>
+      exitWith (ExitFailure 1)
 run (Archive inputPathStr mOutputPathStr) = do
   inputPath <- resolveDir' inputPathStr
   contents <- listDirectory $ toFilePath inputPath
@@ -229,9 +227,9 @@ build inputPath = do
 check :: Path Abs File -> WithEnv ()
 check inputPath = parse inputPath >>= elaborate >> return ()
 
-seqIO :: String -> [IO ()] -> IO ()
-seqIO _ [] = return ()
-seqIO eoe (a:as) = a >> putStr eoe >> seqIO eoe as
+seqIO :: [IO ()] -> IO ()
+seqIO [] = return ()
+seqIO (a:as) = a >> seqIO as
 
 archive :: FilePath -> FilePath -> [FilePath] -> IO ()
 archive tarPath base dir = do

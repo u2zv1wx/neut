@@ -200,9 +200,9 @@ parse' ((m, TreeNode ((_, TreeLeaf "ensure"):rest)):as)
     isAlreadyInstalled <- doesDirExist path
     when (not isAlreadyInstalled) $ do
       urlStr' <- parseByteString mUrl urlStr
-      note $ "downloading " <> pkg <> " from " <> TE.decodeUtf8 urlStr'
+      note' $ "downloading " <> pkg <> " from " <> TE.decodeUtf8 urlStr'
       item <- liftIO $ get urlStr' lazyConcatHandler
-      note $ "installing " <> pkg <> " into " <> T.pack (toFilePath path)
+      note' $ "installing " <> pkg <> " into " <> T.pack (toFilePath path)
       install item path
     parse' as
   | otherwise = raiseSyntaxError m "(ensure LEAF LEAF)"
@@ -286,6 +286,13 @@ parse' ((m, TreeNode ((mLet, TreeLeaf "let"):rest)):as)
           return $ QuasiStmtLetSigma m' (xts ++ [(mx, x, t)]) app : defList
       _ -> return $ QuasiStmtLet m' (mx, x, t) e' : defList
   | otherwise = raiseSyntaxError m "(let LEAF TREE TREE) | (let TREE TREE)"
+parse' ((m, TreeNode ((_, TreeLeaf "verify"):rest)):as)
+  | [e] <- rest = do
+    e' <- adjustPhase e >>= macroExpand >>= interpret
+    m' <- adjustPhase' m
+    defList <- parse' as
+    return $ QuasiStmtVerify m' e' : defList
+  | otherwise = raiseSyntaxError m "(include LEAF) | (include library LEAF)"
 parse' (a:as) = do
   e <- adjustPhase a >>= macroExpand
   if isSpecialForm e

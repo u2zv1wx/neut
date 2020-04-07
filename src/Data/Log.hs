@@ -44,14 +44,16 @@ type Log = (Maybe PosInfo, LogLevel, T.Text)
 
 type ColorFlag = Bool
 
-outputLog :: ColorFlag -> Log -> IO ()
-outputLog b (Nothing, l, t) = do
+outputLog :: ColorFlag -> String -> Log -> IO ()
+outputLog b eoe (Nothing, l, t) = do
   outputLogLevel b l
   outputLogText t
-outputLog b (Just pos, l, t) = do
+  putStr eoe
+outputLog b eoe (Just pos, l, t) = do
   outputPosInfo b pos
   outputLogLevel b l
   outputLogText t
+  putStr eoe
 
 outputPosInfo :: Bool -> PosInfo -> IO ()
 outputPosInfo b (path, loc) = do
@@ -66,7 +68,7 @@ outputLogLevel b l = do
     TIO.putStr ": "
 
 outputLogText :: T.Text -> IO ()
-outputLogText = TIO.putStrLn
+outputLogText = TIO.putStr
 
 withSGR :: Bool -> [SGR] -> IO () -> IO ()
 withSGR False _ f = f

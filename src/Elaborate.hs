@@ -84,6 +84,10 @@ elaborateStmt (WeakStmtLetSigma m xts e cont) = do
   termSigmaElim m (m, TermEnum $ EnumTypeIntS 64) xts'' e'' cont'
 elaborateStmt (WeakStmtVerify m e cont) = do
   e' <- elaborate' e
+  e'' <- normalize e'
+  note m $
+    "verification succeeded with the following normal form:\n" <>
+    toText (weaken e'')
   elaborateStmt cont
 elaborateStmt (WeakStmtImplicit m x@(I (_, i)) idx cont) = do
   t <- lookupTypeEnv' m x
