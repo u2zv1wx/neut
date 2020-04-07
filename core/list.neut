@@ -26,6 +26,17 @@
   (cons ((x a) (xs (list a)))
     (list a)))
 
+(keyword list:new)
+
+(notation (list:new)
+  (list:nil))
+
+(notation (list:new a)
+  (list:cons a (list:nil)))
+
+(notation (list:new a rest+)
+  (list:cons a (list:new rest+)))
+
 (definition head
   ([a tau]
    (xs (list a)))
