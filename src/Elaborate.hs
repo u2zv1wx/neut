@@ -85,14 +85,15 @@ elaborateStmt (WeakStmtLetSigma m xts e cont) = do
   cont' <- elaborateStmt cont
   termSigmaElim m (m, TermEnum $ EnumTypeIntS 64) xts'' e'' cont'
 elaborateStmt (WeakStmtVerify m e cont) = do
-  e' <- elaborate' e
+  (e', _) <- infer e
+  e'' <- elaborate' e'
   start <- liftIO $ getCurrentTime
-  e'' <- normalize e'
+  e''' <- normalize e''
   stop <- liftIO $ getCurrentTime
   let sec = realToFrac $ diffUTCTime stop start :: Float
   note m $
     "verification succeeded with the following normal form (" <>
-    T.pack (showFloat' sec) <> " seconds):\n" <> toText (weaken e'')
+    T.pack (showFloat' sec) <> " seconds):\n" <> toText (weaken e''')
   elaborateStmt cont
 elaborateStmt (WeakStmtImplicit m x@(I (_, i)) idx cont) = do
   t <- lookupTypeEnv' m x
@@ -303,6 +304,11 @@ elaborate' (m, WeakTermCase indName e cxtes) = do
             (False, _) -> raiseError m $ "found a non-linear pattern"
             (_, False) -> raiseError m $ "found a non-exhaustive pattern"
             (True, True) -> return (m, TermCase indName e' cxtes')
+elaborate' (m, WeakTermWithNote e t) = do
+  e' <- elaborate' e
+  t' <- elaborate' t
+  note m $ toText (weaken t')
+  return e'
 
 elaborateWeakCase :: WeakCasePlus -> WithEnv CasePlus
 elaborateWeakCase (m, WeakCaseInt t x) = do

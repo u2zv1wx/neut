@@ -160,6 +160,12 @@ interpret (m, TreeNode ((_, TreeLeaf "case"):rest))
   | otherwise = raiseSyntaxError m "(case TREE TREE*)"
 -- A -> FνF -> νF (i.e. copattern matching (although I think it's more correct to say "record" or something like that,
 -- considering that the constructed term using `FνF -> νF` is just a record after all))
+interpret (m, TreeNode ((_, TreeLeaf "question"):rest))
+  | [e] <- rest = do
+    e' <- interpret e
+    h <- newHole m
+    return (m, WeakTermWithNote e' h)
+  | otherwise = raiseSyntaxError m "(question TREE)"
 interpret (m, TreeNode ((_, TreeLeaf "cocase"):rest))
   | codType:cocaseClauseList <- rest = do
     (a, args) <- interpretCoinductive codType
@@ -210,11 +216,23 @@ interpret (m, TreeLeaf x)
     case T.uncons x of
       Nothing -> raiseCritical m "encountered a variable with empty identifier"
       Just (c, rest)
-        | c /= '@' -> return (m, WeakTermUpsilon $ asIdent x)
-        | T.length rest == 0 ->
-          raiseError m "found a explicit variable with empty identifier"
-        | otherwise ->
-          return (m {metaIsExplicit = True}, WeakTermUpsilon $ asIdent rest)
+        | c == '@' ->
+          if T.length rest == 0
+            then raiseError m "found a explicit variable with empty identifier"
+            else return
+                   (m {metaIsExplicit = True}, WeakTermUpsilon $ asIdent rest)
+        | c == '?' ->
+          if T.length rest == 0
+            then raiseError m "found a note-variable with empty identifier"
+            else do
+              h <- newHole m
+              return (m, WeakTermWithNote (m, WeakTermUpsilon (asIdent rest)) h)
+        | otherwise -> return (m, WeakTermUpsilon $ asIdent x)
+        -- | c == '@'
+        -- , T.length rest == 0 ->
+        --   raiseError m "found a explicit variable with empty identifier"
+        -- | otherwise ->
+        --   return (m {metaIsExplicit = True}, WeakTermUpsilon $ asIdent rest)
 interpret t@(m, TreeNode es) = do
   ml <- interpretEnumValueMaybe t
   case (ml, es) of

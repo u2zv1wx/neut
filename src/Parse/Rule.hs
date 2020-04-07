@@ -539,6 +539,10 @@ substRuleType sub (m, WeakTermCase indName e cxtes) = do
       (xts', body') <- substRuleType'' sub xts body
       return ((c, xts'), body')
   return (m, WeakTermCase indName e' cxtes')
+substRuleType sub (m, WeakTermWithNote e t) = do
+  e' <- substRuleType sub e
+  t' <- substRuleType sub t
+  return (m, WeakTermWithNote e' t')
 
 substRuleType' ::
      (RuleType, RuleType) -> [IdentifierPlus] -> WithEnv [IdentifierPlus]

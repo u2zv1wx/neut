@@ -46,6 +46,7 @@ data WeakTerm
       T.Text
       WeakTermPlus
       [(((Meta, Identifier), [IdentifierPlus]), WeakTermPlus)]
+  | WeakTermWithNote WeakTermPlus WeakTermPlus -- e : t (output the type `t` as note)
   deriving (Show, Eq)
 
 type WeakTermPlus = (Meta, WeakTerm)
@@ -164,6 +165,10 @@ varWeakTermPlus (_, WeakTermCase _ e cxes) = do
   let ys =
         S.unions $ map (\((_, xts), body) -> varWeakTermPlus' xts [body]) cxes
   S.union xs ys
+varWeakTermPlus (_, WeakTermWithNote e t) = do
+  let set1 = varWeakTermPlus e
+  let set2 = varWeakTermPlus t
+  S.union set1 set2
 
 varWeakTermPlus' :: [IdentifierPlus] -> [WeakTermPlus] -> S.Set Identifier
 varWeakTermPlus' [] es = S.unions $ map varWeakTermPlus es
@@ -219,6 +224,10 @@ holeWeakTermPlus (_, WeakTermCase _ e cxes) = do
   let set1 = holeWeakTermPlus e
   let set2 =
         S.unions $ map (\((_, xts), body) -> holeWeakTermPlus' xts [body]) cxes
+  S.union set1 set2
+holeWeakTermPlus (_, WeakTermWithNote e t) = do
+  let set1 = holeWeakTermPlus e
+  let set2 = holeWeakTermPlus t
   S.union set1 set2
 
 holeWeakTermPlus' :: [IdentifierPlus] -> [WeakTermPlus] -> S.Set Identifier
@@ -314,6 +323,10 @@ substWeakTermPlus sub (m, WeakTermCase indName e cxtes) = do
           let (xts', body') = substWeakTermPlus'' sub xts body
           ((c, xts'), body')
   (m, WeakTermCase indName e' cxtes')
+substWeakTermPlus sub (m, WeakTermWithNote e t) = do
+  let e' = substWeakTermPlus sub e
+  let t' = substWeakTermPlus sub t
+  (m, WeakTermWithNote e' t')
 
 substWeakTermPlus' :: SubstWeakTerm -> [IdentifierPlus] -> [IdentifierPlus]
 substWeakTermPlus' _ [] = []
@@ -435,6 +448,7 @@ toText (_, WeakTermCase _ e cxtes) = do
      (flip map cxtes $ \((c, xts), body) -> do
         let xs = map (\(_, x, _) -> asText x) xts
         showCons [showCons (asText (snd c) : xs), toText body]))
+toText (_, WeakTermWithNote e _) = toText e
 
 inParen :: T.Text -> T.Text
 inParen s = "(" <> s <> ")"

@@ -23,5 +23,10 @@
 (notation admit
   (admit-internal))
 
+(keyword ?admit)
+
+(notation ?admit
+  (question admit))
+
 (definition admit-explicit ((a tau))
   (os:exit a 1))

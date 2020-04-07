@@ -209,6 +209,10 @@ discern'' nenv (m, WeakTermCase indName e cxtes) = do
       (xts', body') <- discernBinder nenv xts body
       return (((mc, c'), xts'), body')
   return (m, WeakTermCase indName e' cxtes')
+discern'' nenv (m, WeakTermWithNote e t) = do
+  e' <- discern'' nenv e
+  t' <- discern'' nenv t
+  return (m, WeakTermWithNote e' t')
 
 discernBinder ::
      NameEnv
