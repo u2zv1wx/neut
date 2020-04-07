@@ -6,19 +6,13 @@ module Elaborate
 
 import Control.Monad.State
 import Data.List (nub)
-
--- import Data.Maybe (fromMaybe)
 import Numeric.Half
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.IntMap.Strict as IntMap
-
--- import qualified Data.Set as S
 import qualified Data.Text as T
 
 import Data.Basic
-
--- import Data.Constraint
 import Data.Env
 import Data.Term
 import Data.WeakTerm
@@ -28,7 +22,6 @@ import Elaborate.Synthesize
 import Reduce.Term
 import Reduce.WeakTerm
 
--- import qualified Data.UnionFind as UF
 -- Given a term `e` and its name `main`, this function
 --   (1) traces `e` using `infer e`, collecting type constraints,
 --   (2) updates weakTypeEnv for `main` by the result of `infer e`,
@@ -53,13 +46,11 @@ elaborateStmt :: WeakStmt -> WithEnv TermPlus
 elaborateStmt (WeakStmtReturn e) = do
   (e', _) <- infer e
   analyze >> synthesize >> refine
-  -- checkUnivSanity
   elaborate' e'
 elaborateStmt (WeakStmtLet m (mx, x@(I (_, i)), t) e cont) = do
   (e', te) <- infer e
   t' <- inferType t
   insConstraintEnv te t'
-  -- insLevelEQ mle mlt
   analyze >> synthesize >> refine >> cleanup
   e'' <- elaborate' e'
   t'' <- reduceTermPlus <$> elaborate' t'
@@ -82,18 +73,18 @@ elaborateStmt (WeakStmtLetWT m (mx, x@(I (_, i)), t) e cont) = do
   return (m, TermPiElim (m, TermPiIntro [(mx, x', t'')] cont') [c])
 elaborateStmt (WeakStmtLetSigma m xts e cont) = do
   (e', t1) <- infer e
-  -- xtls <- inferSigma [] xts
   xts' <- inferSigma [] xts
-  -- let (xts', mlSigArgList) = unzip xtls
   sig <- weakTermSigma (fst e') xts'
   insConstraintEnv t1 sig
-  -- forM_ mlSigArgList $ \mlSigArg -> insLevelLE mlSigArg mlSigma
   analyze >> synthesize >> refine >> cleanup
   e'' <- elaborate' e'
   xts'' <- mapM elaboratePlus xts'
   forM_ xts'' $ \(_, x, tx) -> insWeakTypeEnv x (weaken (reduceTermPlus tx))
   cont' <- elaborateStmt cont
   termSigmaElim m (m, TermEnum $ EnumTypeIntS 64) xts'' e'' cont'
+elaborateStmt (WeakStmtVerify m e cont) = do
+  e' <- elaborate' e
+  elaborateStmt cont
 elaborateStmt (WeakStmtImplicit m x@(I (_, i)) idx cont) = do
   t <- lookupTypeEnv' m x
   case t of
@@ -138,110 +129,6 @@ cleanup = do
   modify (\env -> env {weakTypeEnv = IntMap.empty})
   modify (\env -> env {zetaEnv = IntMap.empty})
 
--- type LevelEdge = ((Meta, UnivLevel), (Integer, (Meta, UnivLevel)))
--- equalityを処理してからedgeを構成していく
--- quotient ::
---      [(UnivLevel, UnivLevel)]
---   -> UnivInstEnv
---   -> [LevelConstraint]
---   -> UF.UnionFind (S.Set (Meta, UnivLevel), S.Set LevelEdge)
--- quotient [] uienv g = quotient' uienv g
--- quotient ((l1, l2):lls) uienv g = do
---   UF.union l1 l2
---   quotient lls uienv g
--- quotient' ::
---      UnivInstEnv
---   -> [LevelConstraint]
---   -> UF.UnionFind (S.Set (Meta, UnivLevel), S.Set LevelEdge)
--- quotient' _ [] = return (S.empty, S.empty)
--- quotient' uienv ((UnivLevelPlus (m1, l1), (w, UnivLevelPlus (m2, l2))):ss) = do
---   (vs, g) <- quotient' uienv ss
---   let domList = inst uienv l1
---   let codList = inst uienv l2
---   return
---     ( S.insert (m1, l1) vs
---     , quotient'' g m1 w m2 $ cartesianProduct domList codList)
--- quotient'' ::
---      S.Set LevelEdge
---   -> Meta
---   -> Integer
---   -> Meta
---   -> [(UnivLevel, UnivLevel)]
---   -> S.Set LevelEdge
--- quotient'' g _ _ _ [] = g
--- quotient'' g m1 w m2 ((dom, cod):rest) =
---   S.insert ((m1, dom), (w, (m2, cod))) $ quotient'' g m1 w m2 rest
--- cartesianProduct :: [a] -> [b] -> [(a, b)]
--- cartesianProduct xs ys = do
---   x <- xs
---   y <- ys
---   return (x, y)
--- inst :: UnivInstEnv -> UnivLevel -> [UnivLevel]
--- inst uienv l =
---   case IntMap.lookup l uienv of
---     Nothing -> [l]
---     Just ls -> S.toList ls
--- checkUnivSanity :: WithEnv ()
--- checkUnivSanity = do
---   g <- gets levelEnv
---   eenv <- gets equalityEnv
---   uienv <- gets univInstEnv
---   let (vs, g') = UF.run $ quotient eenv uienv g
---   let g'' = toGraph $ S.toList g'
---   ensureDAG g'' IntMap.empty (S.toList vs)
--- type LevelGraph = IntMap.IntMap [(Integer, (Meta, UnivLevel))]
--- toGraph :: [LevelEdge] -> LevelGraph
--- toGraph [] = IntMap.empty
--- toGraph (((_, l1), v@(_, (_, _))):kvs) =
---   IntMap.insertWith (++) l1 [v] $ toGraph kvs
--- ensureDAG :: LevelGraph -> NodeInfo -> [(Meta, UnivLevel)] -> WithEnv ()
--- ensureDAG _ _ [] = return ()
--- ensureDAG g nodeInfo (v:vs) = do
---   let l = snd v
---   case IntMap.lookup l nodeInfo of
---     Just NodeStateFinish -> ensureDAG g nodeInfo vs
---     Just NodeStateActive -> error "invalid argument"
---     Nothing ->
---       case dfs g v [(0, v)] nodeInfo of
---         Right finishedList -> do
---           let info = IntMap.fromList $ zip finishedList (repeat NodeStateFinish)
---           ensureDAG g (IntMap.union info nodeInfo) vs
---         Left closedPath -> do
---           let (_, (m, _)) = head closedPath
---           raiseError m $
---             "found cyclic univ level:\n" <>
---             T.pack
---               (show $ map (\(x, y) -> (x, UnivLevelPlus y)) (reverse closedPath))
--- type UnivPath = [(Integer, (Meta, UnivLevel))]
--- type NodeInfo = IntMap.IntMap NodeState
--- data NodeState
---   = NodeStateActive
---   | NodeStateFinish
--- dfs ::
---      LevelGraph
---   -> (Meta, UnivLevel)
---   -> UnivPath
---   -> NodeInfo
---   -> Either UnivPath [UnivLevel]
--- dfs g (_, l) path visitInfo = do
---   let mvs = fromMaybe [] $ IntMap.lookup l g
---   lss <-
---     sequence $
---     (flip map) mvs $ \wv'@(_, v') -> do
---       let path' = wv' : path
---       let l' = snd v'
---       case IntMap.lookup l' visitInfo of
---         Just NodeStateActive -> do
---           let closedPath = dropWhile (\(_, ml'') -> snd ml'' /= l') path'
---           if weightOf closedPath > 0
---             then Left closedPath
---             else return []
---         Just NodeStateFinish -> return []
---         Nothing -> do
---           dfs g v' path' (IntMap.insert l NodeStateActive visitInfo)
---   return $ l : concat lss
--- weightOf :: UnivPath -> Integer
--- weightOf path = sum $ map fst $ tail path
 -- This function translates a well-typed term into an untyped term in a
 -- reduction-preserving way. Here, we translate types into units (nullary product).
 -- This doesn't cause any problem since types doesn't have any beta-reduction.
@@ -250,10 +137,7 @@ elaborate' (m, WeakTermTau) = return (m, TermTau)
 elaborate' (m, WeakTermUpsilon x) = do
   cenv <- gets cacheEnv
   if IntMap.member (asInt x) cenv
-      -- (t, UnivLevelPlus (_, l)) <- lookupTypeEnv m x
-      -- (up, _, _) <- instantiate m t l
-    then do
-      return (m, TermConst x)
+    then return (m, TermConst x)
     else return (m, TermUpsilon x)
 elaborate' (m, WeakTermPi mName xts t) = do
   xts' <- mapM elaboratePlus xts
@@ -325,12 +209,9 @@ elaborate' (m, WeakTermInt t x) = do
       "the term `" <>
       T.pack (show x) <>
       "` is an integer, but its type is: " <> toText (weaken t')
-elaborate' (m, WeakTermFloat16 x) = do
-  return (m, TermFloat16 x)
-elaborate' (m, WeakTermFloat32 x) = do
-  return (m, TermFloat32 x)
-elaborate' (m, WeakTermFloat64 x) = do
-  return (m, TermFloat64 x)
+elaborate' (m, WeakTermFloat16 x) = return (m, TermFloat16 x)
+elaborate' (m, WeakTermFloat32 x) = return (m, TermFloat32 x)
+elaborate' (m, WeakTermFloat64 x) = return (m, TermFloat64 x)
 elaborate' (m, WeakTermFloat t x) = do
   t' <- reduceTermPlus <$> elaborate' t
   case t' of
@@ -349,10 +230,8 @@ elaborate' (m, WeakTermFloat t x) = do
       "the term `" <>
       T.pack (show x) <>
       "` is a float, but its type is:\n" <> toText (weaken t')
-elaborate' (m, WeakTermEnum k) = do
-  return (m, TermEnum k)
-elaborate' (m, WeakTermEnumIntro x) = do
-  return (m, TermEnumIntro x)
+elaborate' (m, WeakTermEnum k) = return (m, TermEnum k)
+elaborate' (m, WeakTermEnumIntro x) = return (m, TermEnumIntro x)
 elaborate' (m, WeakTermEnumElim (e, t) les) = do
   e' <- elaborate' e
   let (ls, es) = unzip les

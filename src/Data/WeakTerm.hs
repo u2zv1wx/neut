@@ -23,7 +23,6 @@ data WeakTerm
   | WeakTermPiElim WeakTermPlus [WeakTermPlus]
   | WeakTermIter IdentifierPlus [IdentifierPlus] WeakTermPlus
   | WeakTermZeta Identifier
-  -- | WeakTermConst Identifier UnivParams
   | WeakTermConst Identifier
   | WeakTermInt WeakTermPlus Integer
   | WeakTermFloat16 Half
@@ -63,7 +62,6 @@ type WeakCasePlus = (Meta, WeakCase)
 
 type SubstWeakTerm = [(Identifier, WeakTermPlus)]
 
--- type Hole = Identifier
 type IdentifierPlus = (Meta, Identifier, WeakTermPlus)
 
 type Def = (Meta, IdentifierPlus, [IdentifierPlus], WeakTermPlus)
@@ -97,6 +95,7 @@ data QuasiStmt
   --     ...
   --     ((fn An) (ARGS-n) en))
   | QuasiStmtDef [(Identifier, Def)]
+  | QuasiStmtVerify Meta WeakTermPlus
   | QuasiStmtImplicit Meta Identifier Int
   | QuasiStmtEnum Meta T.Text [(T.Text, Int)]
   | QuasiStmtConstDecl Meta IdentifierPlus
@@ -111,6 +110,7 @@ data WeakStmt
   | WeakStmtLet Meta IdentifierPlus WeakTermPlus WeakStmt
   | WeakStmtLetWT Meta IdentifierPlus WeakTermPlus WeakStmt
   | WeakStmtLetSigma Meta [IdentifierPlus] WeakTermPlus WeakStmt
+  | WeakStmtVerify Meta WeakTermPlus WeakStmt
   | WeakStmtImplicit Meta Identifier Int WeakStmt
   | WeakStmtConstDecl Meta IdentifierPlus WeakStmt
   deriving (Show)
@@ -159,7 +159,6 @@ varWeakTermPlus (_, WeakTermStructElim xts d e) = do
   let set1 = varWeakTermPlus d
   let set2 = S.filter (`notElem` xs) (varWeakTermPlus e)
   S.union set1 set2
-  -- varWeakTermPlus d ++ filter (`notElem` xs) (varWeakTermPlus e)
 varWeakTermPlus (_, WeakTermCase _ e cxes) = do
   let xs = varWeakTermPlus e
   let ys =
@@ -345,8 +344,6 @@ asUpsilon :: WeakTermPlus -> Maybe Identifier
 asUpsilon (_, WeakTermUpsilon x) = Just x
 asUpsilon _ = Nothing
 
--- asUniv :: UnivLevelPlus -> WeakTermPlus
--- asUniv (UnivLevelPlus (m, l)) = (m, WeakTermTau l)
 toText :: WeakTermPlus -> T.Text
 toText (_, WeakTermTau) = "tau"
 toText (_, WeakTermUpsilon x) = asText' x

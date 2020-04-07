@@ -35,10 +35,6 @@ simp' :: [PreConstraint] -> WithEnv ()
 simp' [] = return ()
 simp' (((_, e1), (_, e2)):cs)
   | e1 == e2 = simp cs
--- simp' (((m1, WeakTermTau), (, WeakTermTau)):cs)
---   -- insLevelEQ (UnivLevelPlus (m1, l1)) (UnivLevelPlus (m2, l2))
---  = do
---   simp cs
 simp' (((m1, WeakTermPi name1 xts1 cod1), (m2, WeakTermPi name2 xts2 cod2)):cs)
   | name1 == name2 = do
     if length xts1 /= length xts2

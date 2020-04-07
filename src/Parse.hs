@@ -559,6 +559,9 @@ concatQuasiStmtList (QuasiStmtLetWT m xt e:es) = do
 concatQuasiStmtList (QuasiStmtLetSigma m xts e:es) = do
   cont <- concatQuasiStmtList es
   return $ WeakStmtLetSigma m xts e cont
+concatQuasiStmtList (QuasiStmtVerify m e:es) = do
+  cont <- concatQuasiStmtList es
+  return $ WeakStmtVerify m e cont
 concatQuasiStmtList (QuasiStmtImplicit m x i:es) = do
   cont <- concatQuasiStmtList es
   return $ WeakStmtImplicit m x i cont
@@ -594,7 +597,6 @@ concatQuasiStmtList (QuasiStmtLetInductiveIntro m bt@(_, I (_, j), _) e as:ss) =
                     (m, WeakTermPiElim b yts')))
       cont <- concatQuasiStmtList ss
       return $ WeakStmtLetWT m bt lam cont
-      -- return $ WeakStmtLet m bt lam cont
     _ -> raiseCritical m "inductive-intro"
 concatQuasiStmtList (QuasiStmtUse _:ss) = concatQuasiStmtList ss
 concatQuasiStmtList (QuasiStmtUnuse _:ss) = concatQuasiStmtList ss

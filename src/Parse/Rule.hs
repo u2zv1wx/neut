@@ -63,9 +63,7 @@ parseConnective m ts f g = do
   return $ connectiveList' ++ ruleList
 
 parseConnective' :: TreePlus -> WithEnv Connective
-parseConnective' (m, TreeNode ((_, TreeLeaf name):(_, TreeNode xts):rules))
-  -- m' <- adjustPhase m
- = do
+parseConnective' (m, TreeNode ((_, TreeLeaf name):(_, TreeNode xts):rules)) = do
   xts' <- mapM interpretIdentifierPlus xts
   rules' <- mapM parseRule rules
   return (m, asIdent name, xts', rules')
@@ -126,10 +124,7 @@ takeXTS (_, WeakTermPi _ xts _) = return xts
 takeXTS t = raiseSyntaxError (fst t) "(pi (TREE ... TREE) TREE)"
 
 parseRule :: TreePlus -> WithEnv Rule
-parseRule (m, TreeNode [(mName, TreeLeaf name), (_, TreeNode xts), t])
-  -- m' <- adjustPhase m
-  -- mName' <- adjustPhase mName
- = do
+parseRule (m, TreeNode [(mName, TreeLeaf name), (_, TreeNode xts), t]) = do
   t' <- interpret t
   xts' <- mapM interpretIdentifierPlus xts
   return (m, asIdent name, mName, xts', t')

@@ -90,14 +90,9 @@ data Env =
     , impEnv :: IntMap.IntMap [Int]
     -- var ~> (typeof(var), level-of-type)
     , weakTypeEnv :: IntMap.IntMap WeakTermPlus
-    -- , weakTypeEnv :: IntMap.IntMap (WeakTermPlus, UnivLevelPlus)
-    -- , equalityEnv :: [(UnivLevel, UnivLevel)]
-    , univInstEnv :: UnivInstEnv
-    , univRenameEnv :: IntMap.IntMap Int
     , typeEnv :: TypeEnv
     , constraintEnv :: [PreConstraint]
     , constraintQueue :: ConstraintQueue
-    -- , levelEnv :: [LevelConstraint]
     -- metavar ~> beta-equivalent weakterm
     , substEnv :: IntMap.IntMap WeakTermPlus
     , zetaEnv :: IntMap.IntMap (WeakTermPlus, WeakTermPlus)
@@ -146,9 +141,6 @@ initialEnv =
     , introEnv = S.empty
     , nonCandSet = S.empty
     , labelEnv = Map.empty
-    -- , equalityEnv = []
-    , univInstEnv = IntMap.empty
-    , univRenameEnv = IntMap.empty
     , impEnv = IntMap.empty
     , weakTypeEnv = IntMap.empty
     , typeEnv = IntMap.empty
@@ -247,13 +239,8 @@ insTypeEnv :: Identifier -> TermPlus -> WithEnv ()
 insTypeEnv (I (_, i)) t =
   modify (\e -> e {typeEnv = IntMap.insert i t (typeEnv e)})
 
--- insTypeEnv :: Identifier -> TermPlus -> UnivLevelPlus -> WithEnv ()
--- insTypeEnv (I (_, i)) t ml =
---   modify (\e -> e {typeEnv = IntMap.insert i (t, ml) (typeEnv e)})
 insTypeEnv'' :: Identifier -> TermPlus -> TypeEnv -> TypeEnv
-insTypeEnv'' (I (_, i)) t tenv
-  -- let ml = UnivLevelPlus (fst t, 0)
- = do
+insTypeEnv'' (I (_, i)) t tenv = do
   IntMap.insert i t tenv
 
 lookupTypeEnv :: Meta -> Identifier -> WithEnv TermPlus
@@ -292,7 +279,6 @@ lowTypeToType m (LowTypeIntU s) = return (m, TermEnum (EnumTypeIntU s))
 lowTypeToType m (LowTypeFloat s) = do
   let x = "f" <> T.pack (show (sizeAsInt s))
   i <- lookupConstNum x
-  -- return (m, TermConst (I (x, i)) emptyUP)
   return (m, TermConst (I (x, i)))
 lowTypeToType m _ = raiseCritical m "invalid argument passed to lowTypeToType"
 
@@ -336,7 +322,6 @@ weakTermSigma m xts = do
   z <- newNameWith'' "sigma"
   let vz = (m, WeakTermUpsilon z)
   k <- newNameWith'' "sigma"
-  -- l <- newCount
   let yts = [(m, z, (m, WeakTermTau)), (m, k, (m, weakTermPi xts vz))]
   return (m, weakTermPi yts vz)
 
@@ -345,7 +330,6 @@ termSigma m xts = do
   z <- newNameWith'' "sigma"
   let vz = (m, TermUpsilon z)
   k <- newNameWith'' "sigma"
-  -- l <- newCount
   let yts = [(m, z, (m, TermTau)), (m, k, (m, termPi xts vz))]
   return (m, termPi yts vz)
 

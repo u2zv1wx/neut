@@ -21,7 +21,6 @@ data Term
       TermPlus
   | TermPiElim TermPlus [TermPlus]
   | TermIter IdentifierPlus [IdentifierPlus] TermPlus
-  -- | TermConst Identifier UnivParams
   | TermConst Identifier
   | TermFloat16 Half
   | TermFloat32 Float

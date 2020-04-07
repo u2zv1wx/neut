@@ -57,6 +57,10 @@ discern' nenv ((QuasiStmtConstDecl m (mx, x, t)):ss) = do
   t' <- discern'' nenv t
   ss' <- discern' nenv ss
   return $ QuasiStmtConstDecl m (mx, x, t') : ss'
+discern' nenv ((QuasiStmtVerify m e):ss) = do
+  e' <- discern'' nenv e
+  ss' <- discern' nenv ss
+  return $ QuasiStmtVerify m e' : ss'
 discern' nenv ((QuasiStmtImplicit m x i):ss) = do
   penv <- gets prefixEnv
   x' <-
@@ -134,9 +138,6 @@ discern'' nenv (m, WeakTermUpsilon x@(I (s, _))) = do
 discern'' nenv (m, WeakTermPi mName xts t) = do
   (xts', t') <- discernBinder nenv xts t
   return (m, WeakTermPi mName xts' t')
--- discern'' nenv (m, WeakTermPiPlus name xts t) = do
---   (xts', t') <- discernBinder nenv xts t
---   return (m, WeakTermPiPlus name xts' t')
 discern'' nenv (m, WeakTermPiIntro xts e) = do
   (xts', e') <- discernBinder nenv xts e
   return (m, WeakTermPiIntro xts' e')
