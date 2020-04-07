@@ -4,13 +4,10 @@
 
 (include library "core/top.neut")
 
-(definition string-internal ((len u64))
-  (array len u8))
-
 (definition string
   (sigma
     ((len u64))
-    (string-internal len)))
+    (array len u8)))
 
 (use os)
 
@@ -23,7 +20,7 @@
 
 (definition string:print ((str string))
   (witness (product string u64)
-    (destruct str ((n u64) (content (string-internal n)))
+    (destruct str ((n u64) (content (array n u8)))
       (let len (write stdout &content n))
       (tuple (tuple n content) len))))
 

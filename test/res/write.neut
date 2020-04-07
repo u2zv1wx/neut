@@ -87,9 +87,30 @@
 ;; (let a (os:write os:stdout &test 3))
 ;; (let a (os:write os:stdout &test 3))
 
+(let a (string:print &test))
+(let a (string:print &test))
+(let a (string:print &test))
+(let a (string:print &test))
+
 ;; (print-character 45)
 
 (i64:print -1234321)
+
+(definition fact ((n i64))
+  (witness i64
+    (if (i64:le n 0)
+      1
+      (with let-bind
+        (string:print "looping with (もちろん日本語も出力できるよ): ")
+        (i64:print n)
+        (string:print "\n")
+        (i64:mul n (fact (i64:sub n 1)))))))
+
+(string:print "\n")
+
+(i64:print (fact 10))
+
+(string:print "\n")
 
 ;; (let a1 (os:write os:stdout test 3))
 ;; (let a2 (os:write os:stdout test 3))

@@ -26,7 +26,8 @@
   (witness top
     (if (< x 0)
       (with let-bind
-        (print-character 45) ;; print '-'
+        (string:print "-")
+        ;; (print-character 45) ;; print '-'
         (print (negate x)))
       (if (< x 10)
         (print-digit x)

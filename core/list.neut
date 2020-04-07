@@ -105,9 +105,4 @@
   (witness (list b)
     (concatenate (map k m))))
 
-(definition bind-2
-  (witness (bind-type list)
-    (lambda (a b m k)
-      (concatenate (map k m)))))
-
 (end list)

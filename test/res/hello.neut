@@ -1,3 +1,5 @@
 ;; hello, world!
 
-(string:print "hello, world!\n")
+(use string)
+
+(print "hello, world!\n")
