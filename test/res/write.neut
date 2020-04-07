@@ -58,8 +58,8 @@
 (theorem some-theorem
   (Π ((A tau))
     (hom A A))
-  (lambda (a)
-    (lambda (x) x)))
+  (assume (a)
+    (assume (x) x)))
 
 (verify ((λ ((x tau)) x) top))
 

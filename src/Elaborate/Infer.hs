@@ -25,28 +25,6 @@ import Data.WeakTerm
 
 type Context = [IdentifierPlus]
 
--- Given a term and a context, return the type of the term, updating the
--- constraint environment. This is more or less the same process in ordinary
--- Hindley-Milner type inference algorithm. The difference is that, when we
--- create a type variable, the type variable may depend on terms.
--- For example, consider generating constraints from an application `e1 @ e2`.
--- In ordinary predicate logic, we generate a type variable `?M` and add a
--- constraint `<type-of-e1> == <type-of-e2> -> ?M`. In dependent situation, however,
--- we cannot take this approach, since the `?M` may depend on other terms defined
--- beforehand. If `?M` depends on other terms, we cannot define substitution for terms
--- that contain metavariables because we don't know whether a substitution {x := e}
--- affects the content of a metavariable.
--- To handle this situation, we define metavariables to be *closed*. To represent
--- dependence, we apply all the names defined beforehand to the metavariables.
--- In other words, when we generate a metavariable, we use `?M @ (x1, ..., xn)` as a
--- representation of the hole, where x1, ..., xn are the defined names, or the context.
--- With this design, we can handle dependence in a simple way. This design decision
--- is due to "Elaboration in Dependent Type Theory". There also exists an approach
--- that deals with this situation which uses so-called contextual modality.
--- Interested readers are referred to A. Abel and B. Pientka. "Higher-Order
--- Dynamic Pattern Unification for Dependent Types and Records". Typed Lambda
--- Calculi and Applications, 2011.
--- infer :: WeakTermPlus -> WithEnv (WeakTermPlus, WeakTermPlus, UnivLevelPlus)
 infer :: WeakTermPlus -> WithEnv (WeakTermPlus, WeakTermPlus)
 infer e = infer' [] e
 
@@ -233,7 +211,6 @@ applyArgs m ((mx, x, t):xts) ((hole, higherHole):ets) = do
   return (xts'', tmp ++ [(mx, x, higherHole)])
 applyArgs m [] _ = raiseCritical m $ "invalid argument passed to applyArgs"
 
--- indの名前から定義をlookupして、それにholeを適切に適用したものを返す。あとholeも（型情報つきで）返す。
 constructIndType ::
      Meta
   -> Context

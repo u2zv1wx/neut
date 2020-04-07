@@ -346,8 +346,8 @@ asUpsilon _ = Nothing
 
 toText :: WeakTermPlus -> T.Text
 toText (_, WeakTermTau) = "tau"
-toText (_, WeakTermUpsilon x) = asText' x
--- toText (_, WeakTermUpsilon x) = asText x
+-- toText (_, WeakTermUpsilon x) = asText' x
+toText (_, WeakTermUpsilon x) = asText x
 toText piType@(_, WeakTermPi Nothing xts@[(_, x, dom)] cod) = do
   case extractSigmaArg piType of
     Just yts -> do
@@ -398,8 +398,8 @@ toText (_, WeakTermPiElim e es) = do
   showCons $ map toText $ e : es
 toText (_, WeakTermIter (_, x, _) xts e) = do
   let argStr = inParen $ showItems $ map showArg xts
-  showCons ["μ", asText' x, argStr, toText e]
-toText (_, WeakTermConst x) = asText' x
+  showCons ["μ", asText x, argStr, toText e]
+toText (_, WeakTermConst x) = asText x
 toText (_, WeakTermZeta (I (_, i))) = "?M" <> T.pack (show i)
 toText (_, WeakTermInt _ a) = T.pack $ show a
 toText (_, WeakTermFloat16 a) = T.pack $ show a
@@ -426,15 +426,15 @@ toText (_, WeakTermStruct ks) = showCons $ "struct" : map showArrayKind ks
 toText (_, WeakTermStructIntro ets) = do
   showStruct $ map (toText . fst) ets
 toText (_, WeakTermStructElim xts e1 e2) = do
-  let argStr = inParen $ showItems $ map (\(_, x, _) -> asText' x) xts
+  let argStr = inParen $ showItems $ map (\(_, x, _) -> asText x) xts
   showCons ["struct-elimination", argStr, toText e1, toText e2]
 toText (_, WeakTermCase _ e cxtes) = do
   showCons
     ("case" :
      toText e :
      (flip map cxtes $ \((c, xts), body) -> do
-        let xs = map (\(_, x, _) -> asText' x) xts
-        showCons [showCons (asText' (snd c) : xs), toText body]))
+        let xs = map (\(_, x, _) -> asText x) xts
+        showCons [showCons (asText (snd c) : xs), toText body]))
 
 inParen :: T.Text -> T.Text
 inParen s = "(" <> s <> ")"
@@ -449,14 +449,14 @@ inBracket :: T.Text -> T.Text
 inBracket s = "[" <> s <> "]"
 
 showArg :: (Meta, Identifier, WeakTermPlus) -> T.Text
-showArg (_, x, t) = inParen $ asText' x <> " " <> toText t
+showArg (_, x, t) = inParen $ asText x <> " " <> toText t
 
 showArgs :: [Identifier] -> [WeakTermPlus] -> T.Text
 showArgs [] [] = T.empty
 showArgs [_] [t] = inParen $ "_" <> " " <> toText t
 showArgs (x:xs) (t:ts)
   | x `S.member` S.unions (map varWeakTermPlus ts) = do
-    let s1 = inParen $ asText' x <> " " <> toText t
+    let s1 = inParen $ asText x <> " " <> toText t
     let s2 = showArgs xs ts
     s1 <> " " <> s2
   | otherwise = do

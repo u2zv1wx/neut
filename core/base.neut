@@ -12,6 +12,9 @@
     (lambda ((x a))
       (g (f x)))))
 
-(definition let-bind ([a tau] [b tau] (x a) (k (hom a b)))
+(definition let-bind ((a tau) (b tau) (x a) (k (hom a b)))
   (witness b
     (k x)))
+;; (definition let-bind ([a tau] [b tau] (x a) (k (hom a b)))
+;;   (witness b
+;;     (k x)))
