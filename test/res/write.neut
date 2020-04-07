@@ -11,7 +11,10 @@
 
 ;; (include library "core/notation.neut")
 
+
 (include library "core/integer.neut")
+
+(include library "core/string.neut")
 
 (let test "あ")
 
@@ -52,20 +55,26 @@
 ;; ここの最初の「&test」も「test」に解決されるわけだけど、するとbeginのあとでも「test」が
 ;; 使用されていることから、ここでtestのコピーが走ることになる。
 (begin
-  (let len (os:write os:stdout &test 3))
-  (let len (os:write os:stdout &test 3))
-  (let len (os:write os:stdout &test 3))
+  (let len (string:print &test))
+  (let len (string:print &test))
+  (let len (string:print &test))
   len) ;; ここでtestがfreeされる（直前のwriteでborrowされているので）
 
-(theorem some-theorem
-  (Π ((A tau))
-    (hom A A))
-  (assume (a)
-    (assume (x) x)))
+;; (begin
+;;   (let len (os:write os:stdout &test 3))
+;;   (let len (os:write os:stdout &test 3))
+;;   (let len (os:write os:stdout &test 3))
+;;   len) ;; ここでtestがfreeされる（直前のwriteでborrowされているので）
 
-(verify ((λ ((x tau)) x) top))
+;; (theorem some-theorem
+;;   (Π ((A tau))
+;;     (hom A A))
+;;   (assume (a)
+;;     (assume (x) x)))
 
-(verify some-theorem)
+;; (verify ((λ ((x tau)) x) top))
+
+;; (verify some-theorem)
 
 ;; (@os:write 3 os:stdout "あ" 3)
 ;; (@os:write 3 os:stdout "あ" 3)
@@ -73,10 +82,10 @@
 
 ;; (i64:add (os:write os:stdout test 3) 10)
 
-(let a (os:write os:stdout &test 3))
-(let a (os:write os:stdout &test 3))
-(let a (os:write os:stdout &test 3))
-(let a (os:write os:stdout &test 3))
+;; (let a (os:write os:stdout &test 3))
+;; (let a (os:write os:stdout &test 3))
+;; (let a (os:write os:stdout &test 3))
+;; (let a (os:write os:stdout &test 3))
 
 ;; (print-character 45)
 

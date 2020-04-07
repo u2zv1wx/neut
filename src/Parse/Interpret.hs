@@ -199,7 +199,7 @@ interpret (m, TreeLeaf x)
   | Just i <- readEnumTypeIntU x = do return (m, WeakTermEnum $ EnumTypeIntU i)
   | Just str <- readMaybe $ T.unpack x = do
     u8s <- forM (encode str) $ \u -> return (m, toValueIntU 8 (toInteger u))
-    return (m, WeakTermArrayIntro (ArrayKindIntU 8) u8s) -- parse string as utf-8 encoded u8 array
+    sigmaIntroString m u8s
   -- note that enums/constants are interpreted as variables at this stage.
   -- Those are reinterpreted into constants in Rename.
   -- This is to handle terms like `lam (i64 : bool). e` (i.e. bound variable
@@ -267,7 +267,42 @@ sigmaIntro m es = do
         [(m, z, (m, WeakTermTau)), (m, k, piType)]
         (m, WeakTermPiElim (m, WeakTermUpsilon k) es))
 
---   return (m, WeakTermSigmaIntro h es')
+-- (definition string
+--   (Σ
+--     ((len u64))
+--     (array len u8)))
+sigmaIntroString :: Meta -> [WeakTermPlus] -> WithEnv WeakTermPlus
+sigmaIntroString m u8s = do
+  z <- newNameWith'' "sigma"
+  let zv = (m, WeakTermUpsilon z)
+  k <- newNameWith'' "sigma"
+  lenVar <- newNameWith'' "len"
+  arrVar <- newNameWith'' "array"
+  return
+    ( m
+    , WeakTermPiIntro
+        [ (m, z, (m, WeakTermTau))
+        , ( m
+          , k
+          , ( m
+            , weakTermPi
+                [ (m, lenVar, (m, WeakTermEnum (EnumTypeIntU 64)))
+                , ( m
+                  , arrVar
+                  , ( m
+                    , WeakTermArray
+                        (m, WeakTermUpsilon lenVar)
+                        (ArrayKindIntU 8)))
+                ]
+                zv))
+        ]
+        ( m
+        , WeakTermPiElim
+            (m, WeakTermUpsilon k)
+            [ (m, WeakTermEnumIntro (EnumValueIntU 64 (toInteger $ length u8s)))
+            , (m, WeakTermArrayIntro (ArrayKindIntU 8) u8s)
+            ]))
+
 sigmaElim ::
      Meta
   -> WeakTermPlus
