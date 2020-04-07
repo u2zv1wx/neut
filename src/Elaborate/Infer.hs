@@ -307,7 +307,7 @@ inferExternal ::
   -> WithEnv (WeakTermPlus, WeakTermPlus)
 inferExternal m x comp = do
   t <- comp
-  return ((m, WeakTermConst x), weaken t)
+  return ((m, WeakTermConst x), (m, snd $ weaken t))
 
 inferSymbol :: Meta -> Identifier -> WithEnv (WeakTermPlus, WeakTermPlus)
 inferSymbol m x = do

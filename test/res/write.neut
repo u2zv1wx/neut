@@ -16,6 +16,8 @@
 
 (include library "core/string.neut")
 
+(include library "core/list.neut")
+
 (let test "あ")
 
 ;; (section os)
@@ -66,15 +68,15 @@
 ;;   (let len (os:write os:stdout &test 3))
 ;;   len) ;; ここでtestがfreeされる（直前のwriteでborrowされているので）
 
-;; (theorem some-theorem
-;;   (Π ((A tau))
-;;     (hom A A))
-;;   (assume (a)
-;;     (assume (x) x)))
+(theorem some-theorem
+  (Π ((A tau))
+    (hom A A))
+  (assume (a)
+    (assume (x) x)))
 
-;; (verify ((λ ((x tau)) x) top))
+(verify ((λ ((x tau)) x) top))
 
-;; (verify some-theorem)
+(verify some-theorem)
 
 ;; (@os:write 3 os:stdout "あ" 3)
 ;; (@os:write 3 os:stdout "あ" 3)
@@ -106,9 +108,14 @@
         (string:print "\n")
         (i64:mul n (fact (i64:sub n 1)))))))
 
+(let xs (list i64)
+  (list:new 1 2 3 4 5))
+
 (string:print "\n")
 
-(i64:print (fact 10))
+;; (i64:print (fact 10))
+
+(i64:print (fact (unsafe:cast u64 i64 (list:length xs))))
 
 (string:print "\n")
 
