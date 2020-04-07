@@ -5,7 +5,7 @@ module Data.Basic where
 
 import Path
 
-import qualified Data.IntMap.Strict as IntMap
+-- import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Set as S
 import qualified Data.Text as T
 
@@ -35,22 +35,16 @@ instance Show Identifier where
 
 -- note that UnivLevel is just a name of the level of a universe (i.e. the integer
 -- itself is not the level of the universe)
-type UnivLevel = Int
-
-newtype UnivLevelPlus =
-  UnivLevelPlus (Meta, UnivLevel)
-
-instance Show UnivLevelPlus where
-  show (UnivLevelPlus (_, l)) = "[" ++ show l ++ "]"
-
-instance Eq UnivLevelPlus where
-  (UnivLevelPlus (_, l1)) == (UnivLevelPlus (_, l2)) = l1 == l2
-
-type UnivParams = IntMap.IntMap UnivLevel
-
-emptyUP :: UnivParams
-emptyUP = IntMap.empty
-
+-- type UnivLevel = Int
+-- newtype UnivLevelPlus =
+--   UnivLevelPlus (Meta, UnivLevel)
+-- instance Show UnivLevelPlus where
+--   show (UnivLevelPlus (_, l)) = "[" ++ show l ++ "]"
+-- instance Eq UnivLevelPlus where
+--   (UnivLevelPlus (_, l1)) == (UnivLevelPlus (_, l2)) = l1 == l2
+-- type UnivParams = IntMap.IntMap UnivLevel
+-- emptyUP :: UnivParams
+-- emptyUP = IntMap.empty
 type Phase = Int
 
 type Line = Int

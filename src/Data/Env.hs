@@ -39,8 +39,9 @@ type RuleEnv = IntMap.IntMap (Maybe [Data.WeakTerm.IdentifierPlus])
 
 type UnivInstEnv = IntMap.IntMap (S.Set Int)
 
-type TypeEnv = IntMap.IntMap (TermPlus, UnivLevelPlus)
+type TypeEnv = IntMap.IntMap TermPlus
 
+-- type TypeEnv = IntMap.IntMap (TermPlus, UnivLevelPlus)
 data Env =
   Env
     { count :: Int
@@ -88,17 +89,19 @@ data Env =
     -- var ~> (index of implicit arguments of the var)
     , impEnv :: IntMap.IntMap [Int]
     -- var ~> (typeof(var), level-of-type)
-    , weakTypeEnv :: IntMap.IntMap (WeakTermPlus, UnivLevelPlus)
-    , equalityEnv :: [(UnivLevel, UnivLevel)]
+    , weakTypeEnv :: IntMap.IntMap WeakTermPlus
+    -- , weakTypeEnv :: IntMap.IntMap (WeakTermPlus, UnivLevelPlus)
+    -- , equalityEnv :: [(UnivLevel, UnivLevel)]
     , univInstEnv :: UnivInstEnv
     , univRenameEnv :: IntMap.IntMap Int
     , typeEnv :: TypeEnv
     , constraintEnv :: [PreConstraint]
     , constraintQueue :: ConstraintQueue
-    , levelEnv :: [LevelConstraint]
+    -- , levelEnv :: [LevelConstraint]
     -- metavar ~> beta-equivalent weakterm
     , substEnv :: IntMap.IntMap WeakTermPlus
-    , zetaEnv :: IntMap.IntMap (WeakTermPlus, WeakTermPlus, UnivLevelPlus)
+    , zetaEnv :: IntMap.IntMap (WeakTermPlus, WeakTermPlus)
+    -- , zetaEnv :: IntMap.IntMap (WeakTermPlus, WeakTermPlus, UnivLevelPlus)
     --
     -- clarify
     --
@@ -143,7 +146,7 @@ initialEnv =
     , introEnv = S.empty
     , nonCandSet = S.empty
     , labelEnv = Map.empty
-    , equalityEnv = []
+    -- , equalityEnv = []
     , univInstEnv = IntMap.empty
     , univRenameEnv = IntMap.empty
     , impEnv = IntMap.empty
@@ -160,7 +163,7 @@ initialEnv =
           ]
     , constraintEnv = []
     , constraintQueue = Q.empty
-    , levelEnv = []
+    -- , levelEnv = []
     , substEnv = IntMap.empty
     , zetaEnv = IntMap.empty
     , nameSet = S.empty
@@ -240,16 +243,20 @@ newDataUpsilonWith m name = do
   x <- newNameWith' name
   return (x, (m, DataUpsilon x))
 
-insTypeEnv :: Identifier -> TermPlus -> UnivLevelPlus -> WithEnv ()
-insTypeEnv (I (_, i)) t ml =
-  modify (\e -> e {typeEnv = IntMap.insert i (t, ml) (typeEnv e)})
+insTypeEnv :: Identifier -> TermPlus -> WithEnv ()
+insTypeEnv (I (_, i)) t =
+  modify (\e -> e {typeEnv = IntMap.insert i t (typeEnv e)})
 
+-- insTypeEnv :: Identifier -> TermPlus -> UnivLevelPlus -> WithEnv ()
+-- insTypeEnv (I (_, i)) t ml =
+--   modify (\e -> e {typeEnv = IntMap.insert i (t, ml) (typeEnv e)})
 insTypeEnv'' :: Identifier -> TermPlus -> TypeEnv -> TypeEnv
-insTypeEnv'' (I (_, i)) t tenv = do
-  let ml = UnivLevelPlus (fst t, 0)
-  IntMap.insert i (t, ml) tenv
+insTypeEnv'' (I (_, i)) t tenv
+  -- let ml = UnivLevelPlus (fst t, 0)
+ = do
+  IntMap.insert i t tenv
 
-lookupTypeEnv :: Meta -> Identifier -> WithEnv (TermPlus, UnivLevelPlus)
+lookupTypeEnv :: Meta -> Identifier -> WithEnv TermPlus
 lookupTypeEnv m x = do
   mt <- lookupTypeEnvMaybe x
   case mt of
@@ -257,7 +264,7 @@ lookupTypeEnv m x = do
     Nothing ->
       raiseCritical m $ asText' x <> " is not found in the type environment."
 
-lookupTypeEnvMaybe :: Identifier -> WithEnv (Maybe (TermPlus, UnivLevelPlus))
+lookupTypeEnvMaybe :: Identifier -> WithEnv (Maybe TermPlus)
 lookupTypeEnvMaybe (I (_, i)) = do
   tenv <- gets typeEnv
   return $ IntMap.lookup i tenv
@@ -269,15 +276,13 @@ lookupTypeEnv' m x = do
 
 lookupTypeEnv'' :: Meta -> Identifier -> TypeEnv -> WithEnv TermPlus
 lookupTypeEnv'' m x@(I (s, i)) tenv
-  | Just _ <- asLowTypeMaybe s = do
-    l <- newCount
-    return (m, TermTau l)
+  | Just _ <- asLowTypeMaybe s = return (m, TermTau)
   | Just op <- asUnaryOpMaybe s = unaryOpToType m op
   | Just op <- asBinaryOpMaybe s = binaryOpToType m op
   | Just lowType <- asArrayAccessMaybe s = arrayAccessToType m lowType
   | otherwise = do
     case IntMap.lookup i tenv of
-      Just (t, _) -> return t
+      Just t -> return t
       Nothing ->
         raiseCritical m $ asText' x <> " is not found in the type environment."
 
@@ -287,7 +292,8 @@ lowTypeToType m (LowTypeIntU s) = return (m, TermEnum (EnumTypeIntU s))
 lowTypeToType m (LowTypeFloat s) = do
   let x = "f" <> T.pack (show (sizeAsInt s))
   i <- lookupConstNum x
-  return (m, TermConst (I (x, i)) emptyUP)
+  -- return (m, TermConst (I (x, i)) emptyUP)
+  return (m, TermConst (I (x, i)))
 lowTypeToType m _ = raiseCritical m "invalid argument passed to lowTypeToType"
 
 unaryOpToType :: Meta -> UnaryOp -> WithEnv TermPlus
@@ -330,8 +336,8 @@ weakTermSigma m xts = do
   z <- newNameWith'' "sigma"
   let vz = (m, WeakTermUpsilon z)
   k <- newNameWith'' "sigma"
-  l <- newCount
-  let yts = [(m, z, (m, WeakTermTau l)), (m, k, (m, weakTermPi xts vz))]
+  -- l <- newCount
+  let yts = [(m, z, (m, WeakTermTau)), (m, k, (m, weakTermPi xts vz))]
   return (m, weakTermPi yts vz)
 
 termSigma :: Meta -> [Data.Term.IdentifierPlus] -> WithEnv TermPlus
@@ -339,8 +345,8 @@ termSigma m xts = do
   z <- newNameWith'' "sigma"
   let vz = (m, TermUpsilon z)
   k <- newNameWith'' "sigma"
-  l <- newCount
-  let yts = [(m, z, (m, TermTau l)), (m, k, (m, termPi xts vz))]
+  -- l <- newCount
+  let yts = [(m, z, (m, TermTau)), (m, k, (m, termPi xts vz))]
   return (m, termPi yts vz)
 
 insEnumEnv :: Meta -> T.Text -> [(T.Text, Int)] -> WithEnv ()
@@ -422,12 +428,12 @@ lookupConstantPlus :: Meta -> T.Text -> WithEnv WeakTermPlus
 lookupConstantPlus m constName = do
   cenv <- gets constantEnv
   case Map.lookup constName cenv of
-    Just i -> return (m, WeakTermConst (I (constName, i)) emptyUP)
+    Just i -> return (m, WeakTermConst (I (constName, i)))
     Nothing -> do
       i <- newCount
       let ident = I (constName, i)
       modify (\env -> env {constantEnv = Map.insert constName i cenv})
-      return (m, WeakTermConst ident emptyUP)
+      return (m, WeakTermConst ident)
 
 lookupConstantPlus' :: T.Text -> WithEnv Identifier
 lookupConstantPlus' constName = do

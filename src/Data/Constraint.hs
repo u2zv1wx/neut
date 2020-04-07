@@ -41,5 +41,4 @@ instance Eq EnrichedConstraint where
 
 instance Ord EnrichedConstraint where
   compare (Enriched _ _ c1) (Enriched _ _ c2) = compare c1 c2
-
-type LevelConstraint = (UnivLevelPlus, (Integer, UnivLevelPlus))
+-- type LevelConstraint = (UnivLevelPlus, (Integer, UnivLevelPlus))

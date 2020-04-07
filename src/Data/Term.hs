@@ -9,7 +9,7 @@ import Data.Basic
 import Data.WeakTerm hiding (IdentifierPlus)
 
 data Term
-  = TermTau UnivLevel
+  = TermTau
   | TermUpsilon Identifier
   | TermPi (Maybe T.Text) [IdentifierPlus] TermPlus
   | TermPiIntro [IdentifierPlus] TermPlus
@@ -21,7 +21,8 @@ data Term
       TermPlus
   | TermPiElim TermPlus [TermPlus]
   | TermIter IdentifierPlus [IdentifierPlus] TermPlus
-  | TermConst Identifier UnivParams
+  -- | TermConst Identifier UnivParams
+  | TermConst Identifier
   | TermFloat16 Half
   | TermFloat32 Float
   | TermFloat64 Double
@@ -60,7 +61,7 @@ asUpsilon (_, TermUpsilon x) = Just x
 asUpsilon _ = Nothing
 
 varTermPlus :: TermPlus -> [Identifier]
-varTermPlus (_, TermTau _) = []
+varTermPlus (_, TermTau) = []
 varTermPlus (_, TermUpsilon x) = [x]
 varTermPlus (_, TermPi _ xts t) = varTermPlus' xts [t]
 varTermPlus (_, TermPiIntro xts e) = varTermPlus' xts [e]
@@ -72,7 +73,7 @@ varTermPlus (_, TermPiElim e es) = do
   xs1 ++ xs2
 varTermPlus (_, TermIter (_, x, t) xts e) =
   varTermPlus t ++ filter (/= x) (varTermPlus' xts [e])
-varTermPlus (_, TermConst _ _) = []
+varTermPlus (_, TermConst _) = []
 varTermPlus (_, TermFloat16 _) = []
 varTermPlus (_, TermFloat32 _) = []
 varTermPlus (_, TermFloat64 _) = []
@@ -106,7 +107,7 @@ varTermPlus' ((_, x, t):xts) es = do
   xs1 ++ filter (\y -> y /= x) xs2
 
 substTermPlus :: SubstTerm -> TermPlus -> TermPlus
-substTermPlus _ (m, TermTau l) = (m, TermTau l)
+substTermPlus _ (m, TermTau) = (m, TermTau)
 substTermPlus sub (m, TermUpsilon x) =
   fromMaybe (m, TermUpsilon x) (lookup (asInt x) sub)
 substTermPlus sub (m, TermPi mName xts t) = do
@@ -133,7 +134,7 @@ substTermPlus sub (m, TermIter (mx, x, t) xts e) = do
   let sub' = filter (\(k, _) -> k /= asInt x) sub
   let (xts', e') = substTermPlus'' sub' xts e
   (m, TermIter (mx, x, t') xts' e')
-substTermPlus _ e@(_, TermConst _ _) = e
+substTermPlus _ e@(_, TermConst _) = e
 substTermPlus _ (m, TermFloat16 x) = (m, TermFloat16 x)
 substTermPlus _ (m, TermFloat32 x) = (m, TermFloat32 x)
 substTermPlus _ (m, TermFloat64 x) = (m, TermFloat64 x)
@@ -192,7 +193,7 @@ substTermPlus'' sub ((mx, x, t):xts) e = do
   ((mx, x, substTermPlus sub t) : xts', e')
 
 weaken :: TermPlus -> WeakTermPlus
-weaken (m, TermTau l) = (m, WeakTermTau l)
+weaken (m, TermTau) = (m, WeakTermTau)
 weaken (m, TermUpsilon x) = (m, WeakTermUpsilon x)
 weaken (m, TermPi mName xts t) =
   (m, WeakTermPi mName (weakenArgs xts) (weaken t))
@@ -214,7 +215,7 @@ weaken (m, TermIter (mx, x, t) xts e) = do
   let xts' = weakenArgs xts
   let e' = weaken e
   (m, WeakTermIter (mx, x, t') xts' e')
-weaken (m, TermConst x up) = (m, WeakTermConst x up)
+weaken (m, TermConst x) = (m, WeakTermConst x)
 weaken (m, TermFloat16 x) = (m, WeakTermFloat16 x)
 weaken (m, TermFloat32 x) = (m, WeakTermFloat32 x)
 weaken (m, TermFloat64 x) = (m, WeakTermFloat64 x)

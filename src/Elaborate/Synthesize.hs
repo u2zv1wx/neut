@@ -197,7 +197,7 @@ constructErrorMsg e1 e2 =
   toText e1 <> "\n- " <> toText e2
 
 unravel :: WeakTermPlus -> WithEnv WeakTermPlus
-unravel (m, WeakTermTau l) = return (m, WeakTermTau l)
+unravel (m, WeakTermTau) = return (m, WeakTermTau)
 unravel (m, WeakTermUpsilon x) = do
   x' <- unravelUpsilon x
   return (m, WeakTermUpsilon x')
@@ -221,7 +221,7 @@ unravel (m, WeakTermIter (mx, x, t) xts e) = do
   x' <- unravelUpsilon x
   (xts', e') <- unravelBinder xts e
   return (m, WeakTermIter (mx, x', t) xts' e')
-unravel (m, WeakTermConst x up) = return (m, WeakTermConst x up)
+unravel (m, WeakTermConst x) = return (m, WeakTermConst x)
 unravel (m, WeakTermZeta h) = do
   h' <- unravelZeta h
   return (m, WeakTermZeta h')

@@ -10,7 +10,7 @@ import qualified Data.Text as T
 import Data.Basic
 
 data WeakTerm
-  = WeakTermTau UnivLevel
+  = WeakTermTau
   | WeakTermUpsilon Identifier
   | WeakTermPi (Maybe T.Text) [IdentifierPlus] WeakTermPlus
   | WeakTermPiIntro [IdentifierPlus] WeakTermPlus
@@ -23,7 +23,8 @@ data WeakTerm
   | WeakTermPiElim WeakTermPlus [WeakTermPlus]
   | WeakTermIter IdentifierPlus [IdentifierPlus] WeakTermPlus
   | WeakTermZeta Identifier
-  | WeakTermConst Identifier UnivParams
+  -- | WeakTermConst Identifier UnivParams
+  | WeakTermConst Identifier
   | WeakTermInt WeakTermPlus Integer
   | WeakTermFloat16 Half
   | WeakTermFloat32 Float
@@ -118,7 +119,7 @@ weakTermPi :: [IdentifierPlus] -> WeakTermPlus -> WeakTerm
 weakTermPi = WeakTermPi Nothing
 
 varWeakTermPlus :: WeakTermPlus -> S.Set Identifier
-varWeakTermPlus (_, WeakTermTau _) = S.empty
+varWeakTermPlus (_, WeakTermTau) = S.empty
 varWeakTermPlus (_, WeakTermUpsilon x) = S.singleton x
 varWeakTermPlus (_, WeakTermPi _ xts t) = varWeakTermPlus' xts [t]
 varWeakTermPlus (_, WeakTermPiIntro xts e) = varWeakTermPlus' xts [e]
@@ -132,7 +133,7 @@ varWeakTermPlus (_, WeakTermIter (_, x, t) xts e) = do
   let set1 = varWeakTermPlus t
   let set2 = S.filter (/= x) (varWeakTermPlus' xts [e])
   S.union set1 set2
-varWeakTermPlus (_, WeakTermConst _ _) = S.empty
+varWeakTermPlus (_, WeakTermConst _) = S.empty
 varWeakTermPlus (_, WeakTermZeta _) = S.empty
 varWeakTermPlus (_, WeakTermInt t _) = varWeakTermPlus t
 varWeakTermPlus (_, WeakTermFloat16 _) = S.empty
@@ -173,7 +174,7 @@ varWeakTermPlus' ((_, x, t):xts) es = do
   S.union hs1 $ S.filter (/= x) hs2
 
 holeWeakTermPlus :: WeakTermPlus -> S.Set Identifier
-holeWeakTermPlus (_, WeakTermTau _) = S.empty
+holeWeakTermPlus (_, WeakTermTau) = S.empty
 holeWeakTermPlus (_, WeakTermUpsilon _) = S.empty
 holeWeakTermPlus (_, WeakTermPi _ xts t) = holeWeakTermPlus' xts [t]
 holeWeakTermPlus (_, WeakTermPiIntro xts e) = holeWeakTermPlus' xts [e]
@@ -188,7 +189,7 @@ holeWeakTermPlus (_, WeakTermIter (_, _, t) xts e) = do
   let set2 = holeWeakTermPlus' xts [e]
   S.union set1 set2
 holeWeakTermPlus (_, WeakTermZeta h) = S.singleton h
-holeWeakTermPlus (_, WeakTermConst _ _) = S.empty
+holeWeakTermPlus (_, WeakTermConst _) = S.empty
 holeWeakTermPlus (_, WeakTermInt t _) = holeWeakTermPlus t
 holeWeakTermPlus (_, WeakTermFloat16 _) = S.empty
 holeWeakTermPlus (_, WeakTermFloat32 _) = S.empty
@@ -229,7 +230,7 @@ holeWeakTermPlus' ((_, _, t):xts) es = do
   S.union set1 set2
 
 substWeakTermPlus :: SubstWeakTerm -> WeakTermPlus -> WeakTermPlus
-substWeakTermPlus _ tau@(_, WeakTermTau _) = tau
+substWeakTermPlus _ tau@(_, WeakTermTau) = tau
 substWeakTermPlus sub e1@(_, WeakTermUpsilon x) = do
   case lookup x sub of
     Nothing -> e1
@@ -258,7 +259,7 @@ substWeakTermPlus sub (m, WeakTermIter (mx, x, t) xts e) = do
   let sub' = filter (\(k, _) -> k /= x) sub
   let (xts', e') = substWeakTermPlus'' sub' xts e
   (m, WeakTermIter (mx, x, t') xts' e')
-substWeakTermPlus _ e@(_, WeakTermConst _ _) = e
+substWeakTermPlus _ e@(_, WeakTermConst _) = e
 substWeakTermPlus sub e1@(_, WeakTermZeta x) = do
   case lookup x sub of
     Nothing -> e1
@@ -344,11 +345,10 @@ asUpsilon :: WeakTermPlus -> Maybe Identifier
 asUpsilon (_, WeakTermUpsilon x) = Just x
 asUpsilon _ = Nothing
 
-asUniv :: UnivLevelPlus -> WeakTermPlus
-asUniv (UnivLevelPlus (m, l)) = (m, WeakTermTau l)
-
+-- asUniv :: UnivLevelPlus -> WeakTermPlus
+-- asUniv (UnivLevelPlus (m, l)) = (m, WeakTermTau l)
 toText :: WeakTermPlus -> T.Text
-toText (_, WeakTermTau _) = "tau"
+toText (_, WeakTermTau) = "tau"
 toText (_, WeakTermUpsilon x) = asText' x
 -- toText (_, WeakTermUpsilon x) = asText x
 toText piType@(_, WeakTermPi Nothing xts@[(_, x, dom)] cod) = do
@@ -402,7 +402,7 @@ toText (_, WeakTermPiElim e es) = do
 toText (_, WeakTermIter (_, x, _) xts e) = do
   let argStr = inParen $ showItems $ map showArg xts
   showCons ["μ", asText' x, argStr, toText e]
-toText (_, WeakTermConst x _) = asText' x
+toText (_, WeakTermConst x) = asText' x
 toText (_, WeakTermZeta (I (_, i))) = "?M" <> T.pack (show i)
 toText (_, WeakTermInt _ a) = T.pack $ show a
 toText (_, WeakTermFloat16 a) = T.pack $ show a
@@ -510,7 +510,7 @@ showStruct :: [T.Text] -> T.Text
 showStruct = inBrace . T.intercalate " "
 
 extractSigmaArg :: WeakTermPlus -> Maybe [IdentifierPlus]
-extractSigmaArg (_, WeakTermPi _ [(_, z, (_, WeakTermTau _)), (_, _, (_, WeakTermPi _ xts (_, WeakTermUpsilon z')))] (_, WeakTermUpsilon z''))
+extractSigmaArg (_, WeakTermPi _ [(_, z, (_, WeakTermTau)), (_, _, (_, WeakTermPi _ xts (_, WeakTermUpsilon z')))] (_, WeakTermUpsilon z''))
   | z == z'
   , z == z'' = return xts
 extractSigmaArg _ = Nothing

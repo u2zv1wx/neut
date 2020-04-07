@@ -31,9 +31,7 @@ interpret :: TreePlus -> WithEnv WeakTermPlus
 --
 -- foundational interpretations
 --
-interpret (m, TreeLeaf "tau") = do
-  l <- newCount
-  return (m, WeakTermTau l)
+interpret (m, TreeLeaf "tau") = return (m, WeakTermTau)
 interpret (m, TreeNode ((_, TreeLeaf "upsilon"):rest))
   | [(_, TreeLeaf x)] <- rest = do return (m, WeakTermUpsilon $ asIdent x)
   | otherwise = raiseSyntaxError m "(upsilon TREE)"
@@ -80,7 +78,7 @@ interpret (m, TreeNode ((_, TreeLeaf "zeta"):rest))
     return (m, WeakTermZeta x')
   | otherwise = raiseSyntaxError m "(zeta LEAF)"
 interpret (m, TreeNode ((_, TreeLeaf "constant"):rest))
-  | [(_, TreeLeaf x)] <- rest = do return (m, WeakTermConst (asIdent x) emptyUP)
+  | [(_, TreeLeaf x)] <- rest = do return (m, WeakTermConst (asIdent x))
   | otherwise = raiseSyntaxError m "(constant LEAF)"
 interpret (m, TreeNode ((_, TreeLeaf "f16"):rest))
   | [(mx, TreeLeaf x)] <- rest = do
@@ -257,7 +255,7 @@ sigmaIntro :: Meta -> [WeakTermPlus] -> WithEnv WeakTermPlus
 sigmaIntro m es = do
   z <- newNameWith'' "sigma"
   let zv = (m, WeakTermUpsilon z)
-  l <- newCount
+  -- l <- newCount
   k <- newNameWith'' "sigma"
   ts <- mapM (const (newHole m)) es
   xs <- mapM (const (newNameWith'' "hole")) es
@@ -266,7 +264,7 @@ sigmaIntro m es = do
   return
     ( m
     , WeakTermPiIntro
-        [(m, z, (m, WeakTermTau l)), (m, k, piType)]
+        [(m, z, (m, WeakTermTau)), (m, k, piType)]
         (m, WeakTermPiElim (m, WeakTermUpsilon k) es))
 
 --   return (m, WeakTermSigmaIntro h es')

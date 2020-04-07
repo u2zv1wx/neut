@@ -30,7 +30,7 @@ clarify e = do
   clarify' tenv e
 
 clarify' :: TypeEnv -> TermPlus -> WithEnv CodePlus
-clarify' _ (m, TermTau _) = returnCartesianImmediate m
+clarify' _ (m, TermTau) = returnCartesianImmediate m
 clarify' _ (m, TermUpsilon x) = return (m, CodeUpIntro (m, DataUpsilon x))
 clarify' _ (m, TermPi {}) = returnClosureType m
 clarify' tenv lam@(m, TermPiIntro mxts e) = do
@@ -54,7 +54,7 @@ clarify' tenv iter@(m, TermIter (_, x, t) mxts e) = do
   e' <- clarify' (insTypeEnv1 mxts tenv') e
   fvs <- nubFVS <$> chainTermPlus' tenv iter
   retClosureFix tenv x fvs m mxts e'
-clarify' tenv (m, TermConst x _) = clarifyConst tenv m x
+clarify' tenv (m, TermConst x) = clarifyConst tenv m x
 clarify' _ (m, TermFloat16 l) = return (m, CodeUpIntro (m, DataFloat16 l))
 clarify' _ (m, TermFloat32 l) = return (m, CodeUpIntro (m, DataFloat32 l))
 clarify' _ (m, TermFloat64 l) = return (m, CodeUpIntro (m, DataFloat64 l))
@@ -155,7 +155,7 @@ constructCaseFVS tenv cxtes m typeVarName envVarName = do
   fvss <- mapM (chainCaseClause tenv) cxtes
   let fvs = nubFVS $ concat fvss
   return $
-    (m, typeVarName, (m, TermTau 0)) :
+    (m, typeVarName, (m, TermTau)) :
     (m, envVarName, (m, TermUpsilon typeVarName)) : fvs
 
 chainCaseClause :: TypeEnv -> Clause -> WithEnv [IdentifierPlus]
@@ -206,7 +206,7 @@ clarifyCast tenv m = do
   b <- newNameWith' "t2"
   z <- newNameWith' "z"
   let varA = (m, TermUpsilon a)
-  let u = (m, TermTau 0)
+  let u = (m, TermTau)
   clarify'
     tenv
     (m, TermPiIntro [(m, a, u), (m, b, u), (m, z, varA)] (m, TermUpsilon z))
@@ -457,7 +457,7 @@ inferKind m (ArrayKindIntU i) = return (m, TermEnum (EnumTypeIntU i))
 inferKind m (ArrayKindFloat size) = do
   let constName = "f" <> T.pack (show (sizeAsInt size))
   i <- lookupConstNum' m constName
-  return (m, TermConst (I (constName, i)) emptyUP)
+  return (m, TermConst (I (constName, i)))
 inferKind m _ = raiseCritical m "inferKind for void-pointer"
 
 rightmostOf :: TermPlus -> WithEnv (Meta, TermPlus)
@@ -570,7 +570,7 @@ nameFromMaybe mName =
     Nothing -> asText' <$> newNameWith' "thunk"
 
 chainTermPlus' :: TypeEnv -> TermPlus -> WithEnv [IdentifierPlus]
-chainTermPlus' _ (_, TermTau _) = return []
+chainTermPlus' _ (_, TermTau) = return []
 chainTermPlus' tenv (m, TermUpsilon x) = do
   (xts, t) <- obtainChain m x tenv
   return $ xts ++ [(m, x, t)]
@@ -588,7 +588,7 @@ chainTermPlus' tenv (_, TermIter (_, x, t) xts e) = do
   xs1 <- chainTermPlus' tenv t
   xs2 <- chainTermPlus'' (insTypeEnv'' x t tenv) xts [e]
   return $ xs1 ++ filter (\(_, y, _) -> y /= x) xs2
-chainTermPlus' tenv (m, TermConst x _) = do
+chainTermPlus' tenv (m, TermConst x) = do
   (xts, _) <- obtainChain m x tenv
   return xts
 chainTermPlus' _ (_, TermFloat16 _) = return []

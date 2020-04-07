@@ -216,9 +216,7 @@ ruleAsIdentPlus (mb, b, m, xts, t) = do
   return (mb, b, (m, weakTermPi xts t))
 
 formationRuleOf :: Connective -> WithEnv Rule
-formationRuleOf (m, a, xts, _) = do
-  l <- newCount
-  return (m, a, m, xts, (m, WeakTermTau l))
+formationRuleOf (m, a, xts, _) = return (m, a, m, xts, (m, WeakTermTau))
 
 formationRuleOf' :: Connective -> WithEnv Rule
 formationRuleOf' (m, a@(I (x, _)), xts, rules) = do
@@ -226,8 +224,7 @@ formationRuleOf' (m, a@(I (x, _)), xts, rules) = do
   let bis = zip bs [0 ..]
   -- register "nat" ~> [("zero", 0), ("succ", 1)], "list" ~> [("nil", 0), ("cons", 1)], etc.
   insEnumEnv m x bis
-  l <- newCount
-  return (m, a, m, xts, (m, WeakTermTau l))
+  return (m, a, m, xts, (m, WeakTermTau))
 
 toInternalRuleList :: Connective -> WithEnv [IdentifierPlus]
 toInternalRuleList (_, _, _, rules) = mapM ruleAsIdentPlus rules
@@ -457,7 +454,7 @@ type RuleType = (Identifier, [WeakTermPlus])
 
 -- subst a @ (e1, ..., en) ~> a' @ (e1', ..., en')
 substRuleType :: (RuleType, RuleType) -> WeakTermPlus -> WithEnv WeakTermPlus
-substRuleType _ (m, WeakTermTau l) = return (m, WeakTermTau l)
+substRuleType _ (m, WeakTermTau) = return (m, WeakTermTau)
 substRuleType _ (m, WeakTermUpsilon x) = return (m, WeakTermUpsilon x)
 substRuleType sub (m, WeakTermPi mName xts t) = do
   (xts', t') <- substRuleType'' sub xts t
@@ -495,7 +492,7 @@ substRuleType sub (m, WeakTermIter (mx, x, t) xts e) = do
     else do
       (xts', e') <- substRuleType'' sub xts e
       return (m, WeakTermIter (mx, x, t') xts' e')
-substRuleType _ (m, WeakTermConst x up) = return (m, WeakTermConst x up)
+substRuleType _ (m, WeakTermConst x) = return (m, WeakTermConst x)
 substRuleType _ (m, WeakTermZeta x) = return (m, WeakTermZeta x)
 substRuleType sub (m, WeakTermInt t x) = do
   t' <- substRuleType sub t

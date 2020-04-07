@@ -117,14 +117,14 @@ reduceTermIdentPlus :: IdentifierPlus -> IdentifierPlus
 reduceTermIdentPlus (m, x, t) = (m, x, reduceTermPlus t)
 
 isValue :: TermPlus -> Bool
-isValue (_, TermTau _) = True
+isValue (_, TermTau) = True
 isValue (_, TermUpsilon _) = True
 isValue (_, TermPi {}) = True
 isValue (_, TermPiIntro {}) = True
 isValue (_, TermPiIntroNoReduce {}) = True
 isValue (_, TermPiIntroPlus {}) = True
 isValue (_, TermIter {}) = True
-isValue (_, TermConst x _) = isValueConst x
+isValue (_, TermConst x) = isValueConst x
 isValue (_, TermFloat16 _) = True
 isValue (_, TermFloat32 _) = True
 isValue (_, TermFloat64 _) = True
