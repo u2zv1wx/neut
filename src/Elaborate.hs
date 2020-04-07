@@ -169,7 +169,7 @@ elaborate' (m, WeakTermPiIntroPlus ind (name, is, args1, args2) xts e) = do
   e' <- elaborate' e
   xts' <- mapM elaboratePlus xts
   return (m, TermPiIntroPlus ind (name, is, args1', args2') xts' e')
-elaborate' (m, WeakTermPiElim (mh, WeakTermZeta h@(I (_, x))) es) = do
+elaborate' (m, WeakTermPiElim (mh, WeakTermZeta (I (_, x))) es) = do
   sub <- gets substEnv
   case IntMap.lookup x sub of
     Nothing -> raiseError mh $ "couldn't instantiate the hole here"
