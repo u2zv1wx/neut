@@ -162,7 +162,7 @@ parse' ((m, TreeNode ((_, TreeLeaf "section"):es)):as)
     modify (\e -> e {namespace = s : namespace e})
     n <- getCurrentSection
     stmtList <- parse' as
-    return $ QuasiStmtUse n : stmtList -- auto-use
+    return $ QuasiStmtUse n : QuasiStmtUse (n <> ":" <> "private") : stmtList -- auto-use
   | otherwise = raiseSyntaxError m "(section LEAF)"
 parse' ((m, TreeNode ((_, TreeLeaf "end"):es)):as)
   | [(_, TreeLeaf s)] <- es = do
@@ -174,7 +174,8 @@ parse' ((m, TreeNode ((_, TreeLeaf "end"):es)):as)
           n <- getCurrentSection
           modify (\e -> e {namespace = ns'})
           stmtList <- parse' as
-          return $ QuasiStmtUnuse n : stmtList -- auto-unuse
+          return $
+            QuasiStmtUnuse n : QuasiStmtUnuse (n <> ":" <> "private") : stmtList -- auto-unuse
         | otherwise ->
           raiseError m $
           "the innermost section is not `" <> s <> "`, but is `" <> s' <> "`"
