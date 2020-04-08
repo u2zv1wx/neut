@@ -87,7 +87,6 @@ data Env =
     -- elaborate
     --
     -- set of the names of constructors (e.g. ["nil", "cons", "zero", "succ", ...] (as int))
-    , introEnv :: S.Set Int
     , nonCandSet :: S.Set T.Text
     -- var ~> (index of implicit arguments of the var)
     , impEnv :: IntMap.IntMap [Int]
@@ -144,7 +143,6 @@ initialEnv =
     , namespace = []
     , formationEnv = IntMap.empty
     , inductiveEnv = IntMap.empty
-    , introEnv = S.empty
     , nonCandSet = S.empty
     , labelEnv = Map.empty
     , impEnv = IntMap.empty
@@ -161,7 +159,6 @@ initialEnv =
           ]
     , constraintEnv = []
     , constraintQueue = Q.empty
-    -- , levelEnv = []
     , substEnv = IntMap.empty
     , zetaEnv = IntMap.empty
     , nameSet = S.empty

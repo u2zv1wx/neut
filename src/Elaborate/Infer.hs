@@ -181,7 +181,7 @@ infer' ctx (m, WeakTermCase indName e cxtes) = do
       cxtes' <-
         forM (zip indInfo cxtes) $ \(is, (((mc, c), patArgs), body)) -> do
           let usedHoleList = map (\i -> argHoleList !! i) is
-          let var = (mc {metaIsExplicit = True}, WeakTermUpsilon c)
+          let var = (mc, WeakTermUpsilon c)
           patArgs' <- inferPatArgs ctx patArgs
           let items =
                 map (\(mx, x, tx) -> ((mx, WeakTermUpsilon x), tx)) patArgs'

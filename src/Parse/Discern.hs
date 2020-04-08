@@ -64,16 +64,11 @@ discern' nenv ((QuasiStmtVerify m e):ss) = do
 discern' nenv ((QuasiStmtImplicit m x i):ss) = do
   set <- gets intactSet
   penv <- gets prefixEnv
+  mc <- lookupConstantMaybe m penv (asText x)
   x' <-
-    do mc <- lookupConstantMaybe m penv (asText x)
-       case mc of
-         Just c -> return c
-         Nothing -> lookupName'' m penv nenv x
-  ienv <- gets introEnv
-  when (S.member (asInt x') ienv) $ do
-    raiseError m $
-      "modifying implicit attribute of a constructor `" <>
-      asText x' <> "` is prohibited"
+    case mc of
+      Just c -> return c
+      Nothing -> lookupName'' m penv nenv x
   modify (\env -> env {intactSet = set})
   ss' <- discern' nenv ss
   return $ QuasiStmtImplicit m x' i : ss'
