@@ -62,6 +62,7 @@ discern' nenv ((QuasiStmtVerify m e):ss) = do
   ss' <- discern' nenv ss
   return $ QuasiStmtVerify m e' : ss'
 discern' nenv ((QuasiStmtImplicit m x i):ss) = do
+  set <- gets unusedNameSet
   penv <- gets prefixEnv
   x' <-
     do mc <- lookupConstantMaybe m penv (asText x)
@@ -73,6 +74,7 @@ discern' nenv ((QuasiStmtImplicit m x i):ss) = do
     raiseError m $
       "modifying implicit attribute of a constructor `" <>
       asText x' <> "` is prohibited"
+  modify (\env -> env {unusedNameSet = set})
   ss' <- discern' nenv ss
   return $ QuasiStmtImplicit m x' i : ss'
 discern' nenv ((QuasiStmtEnum m name xis):ss) = do
