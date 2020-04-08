@@ -94,8 +94,7 @@ generateProjections ts = do
         let b' = asIdent (asText a <> ":" <> asText b)
         let attrList = map (QuasiStmtImplicit mb b') [0 .. length xts - 1]
         return $
-          -- caseが入っているので推論の必要アリ (LetWTにすると狂う)
-          QuasiStmtLet
+          QuasiStmtLetWT
             mb
             (mb, b', (mb, WeakTermPi Nothing (xts ++ [dom]) cod))
             ( mb
@@ -106,7 +105,8 @@ generateProjections ts = do
                     (asText a)
                     (my, WeakTermUpsilon y)
                     [ ( ( (mb, asIdent (asText a <> ":" <> "unfold"))
-                        , [(ma, a, ta)] ++ bts ++ [(mb, v, ty)])
+                        -- `xts ++` is required since LetWT bypasses `infer`
+                        , xts ++ [(ma, a, ta)] ++ bts ++ [(mb, v, ty)])
                       , ( mb
                         , WeakTermPiElim
                             (mb, WeakTermUpsilon b)

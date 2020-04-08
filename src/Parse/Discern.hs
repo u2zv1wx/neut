@@ -34,7 +34,8 @@ discern' nenv ((QuasiStmtLetWT m (mx, x, t) e):ss) = do
   t' <- discern'' nenv t
   x' <- newDefinedNameWith' mx nenv x
   e' <- discern'' nenv e
-  modify (\env -> env {unusedNameSet = set})
+  set' <- gets unusedNameSet
+  modify (\env -> env {unusedNameSet = S.intersection set set'})
   ss' <- discern' (insertName x x' nenv) ss
   return $ QuasiStmtLetWT m (mx, x', t') e' : ss'
 discern' nenv ((QuasiStmtDef xds):ss) = do
@@ -82,7 +83,8 @@ discern' nenv ((QuasiStmtLetInductive n m (mx, a, t) e):ss) = do
   t' <- discern'' nenv t
   a' <- newDefinedNameWith' m nenv a
   e' <- discern'' nenv e
-  modify (\env -> env {unusedNameSet = set})
+  set' <- gets unusedNameSet
+  modify (\env -> env {unusedNameSet = S.intersection set set'})
   ss' <- discern' (insertName a a' nenv) ss
   return $ QuasiStmtLetInductive n m (mx, a', t') e' : ss'
 discern' nenv ((QuasiStmtLetInductiveIntro m (mx, x, t) e as):ss) = do
@@ -92,7 +94,8 @@ discern' nenv ((QuasiStmtLetInductiveIntro m (mx, x, t) e as):ss) = do
   e' <- discern'' nenv e
   penv <- gets prefixEnv
   as' <- mapM (lookupName'' m penv nenv) as
-  modify (\env -> env {unusedNameSet = set})
+  set' <- gets unusedNameSet
+  modify (\env -> env {unusedNameSet = S.intersection set set'})
   ss' <- discern' (insertName x x' nenv) ss
   return $ QuasiStmtLetInductiveIntro m (mx, x', t') e' as' : ss'
 discern' nenv ((QuasiStmtUse prefix):ss) = do
