@@ -29,6 +29,7 @@ dependencies:
 - text
 - time
 - unordered-containers
+- utf8-string
 - zlib
 
 library:
