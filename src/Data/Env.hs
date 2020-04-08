@@ -82,7 +82,7 @@ data Env =
     , consToInd :: IntMap.IntMap Identifier
     -- "list:cons-8" ~> [0] (the used indices of xts)
     , consToArgs :: IntMap.IntMap [Int]
-    , unusedNameSet :: S.Set (Meta, Identifier)
+    , intactSet :: S.Set (Meta, Identifier)
     --
     -- elaborate
     --
@@ -139,7 +139,7 @@ initialEnv =
     , revNameEnv = IntMap.empty
     , consToInd = IntMap.empty
     , consToArgs = IntMap.empty
-    , unusedNameSet = S.empty
+    , intactSet = S.empty
     , prefixEnv = []
     , namespace = []
     , formationEnv = IntMap.empty

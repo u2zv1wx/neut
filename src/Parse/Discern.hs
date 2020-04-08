@@ -30,12 +30,12 @@ discern' nenv ((QuasiStmtLet m (mx, x, t) e):ss) = do
   ss' <- discern' (insertName x x' nenv) ss
   return $ QuasiStmtLet m (mx, x', t') e' : ss'
 discern' nenv ((QuasiStmtLetWT m (mx, x, t) e):ss) = do
-  set <- gets unusedNameSet
+  set <- gets intactSet
   t' <- discern'' nenv t
   x' <- newDefinedNameWith' mx nenv x
   e' <- discern'' nenv e
-  set' <- gets unusedNameSet
-  modify (\env -> env {unusedNameSet = S.intersection set set'})
+  set' <- gets intactSet
+  modify (\env -> env {intactSet = S.intersection set set'})
   ss' <- discern' (insertName x x' nenv) ss
   return $ QuasiStmtLetWT m (mx, x', t') e' : ss'
 discern' nenv ((QuasiStmtDef xds):ss) = do
@@ -62,7 +62,7 @@ discern' nenv ((QuasiStmtVerify m e):ss) = do
   ss' <- discern' nenv ss
   return $ QuasiStmtVerify m e' : ss'
 discern' nenv ((QuasiStmtImplicit m x i):ss) = do
-  set <- gets unusedNameSet
+  set <- gets intactSet
   penv <- gets prefixEnv
   x' <-
     do mc <- lookupConstantMaybe m penv (asText x)
@@ -74,30 +74,30 @@ discern' nenv ((QuasiStmtImplicit m x i):ss) = do
     raiseError m $
       "modifying implicit attribute of a constructor `" <>
       asText x' <> "` is prohibited"
-  modify (\env -> env {unusedNameSet = set})
+  modify (\env -> env {intactSet = set})
   ss' <- discern' nenv ss
   return $ QuasiStmtImplicit m x' i : ss'
 discern' nenv ((QuasiStmtEnum m name xis):ss) = do
   insEnumEnv m name xis
   discern' nenv ss
 discern' nenv ((QuasiStmtLetInductive n m (mx, a, t) e):ss) = do
-  set <- gets unusedNameSet
+  set <- gets intactSet
   t' <- discern'' nenv t
   a' <- newDefinedNameWith' m nenv a
   e' <- discern'' nenv e
-  set' <- gets unusedNameSet
-  modify (\env -> env {unusedNameSet = S.intersection set set'})
+  set' <- gets intactSet
+  modify (\env -> env {intactSet = S.intersection set set'})
   ss' <- discern' (insertName a a' nenv) ss
   return $ QuasiStmtLetInductive n m (mx, a', t') e' : ss'
 discern' nenv ((QuasiStmtLetInductiveIntro m (mx, x, t) e as):ss) = do
-  set <- gets unusedNameSet
+  set <- gets intactSet
   t' <- discern'' nenv t
   x' <- newDefinedNameWith' m nenv x
   e' <- discern'' nenv e
   penv <- gets prefixEnv
   as' <- mapM (lookupName'' m penv nenv) as
-  set' <- gets unusedNameSet
-  modify (\env -> env {unusedNameSet = S.intersection set set'})
+  set' <- gets intactSet
+  modify (\env -> env {intactSet = S.intersection set set'})
   ss' <- discern' (insertName x x' nenv) ss
   return $ QuasiStmtLetInductiveIntro m (mx, x', t') e' as' : ss'
 discern' nenv ((QuasiStmtUse prefix):ss) = do
@@ -286,7 +286,7 @@ newDefinedNameWith m (I (s, _)) = do
   j <- newCount
   modify (\env -> env {nameEnv = Map.insert s s (nameEnv env)})
   let x = I (s, j)
-  modify (\env -> env {unusedNameSet = S.insert (m, x) (unusedNameSet env)})
+  insertIntoIntactSet m x
   return x
 
 newDefinedNameWith' :: Meta -> NameEnv -> Identifier -> WithEnv Identifier
@@ -300,13 +300,20 @@ newDefinedNameWith' m nenv x = do
 insertName :: Identifier -> Identifier -> NameEnv -> NameEnv
 insertName (I (s, _)) y nenv = Map.insert s y nenv
 
+insertIntoIntactSet :: Meta -> Identifier -> WithEnv ()
+insertIntoIntactSet m x =
+  modify (\env -> env {intactSet = S.insert (m, x) (intactSet env)})
+
+removeFromIntactSet :: Meta -> Identifier -> WithEnv ()
+removeFromIntactSet m x =
+  modify (\env -> env {intactSet = S.delete (m, x) (intactSet env)})
+
 lookupName ::
      Meta -> [T.Text] -> NameEnv -> Identifier -> WithEnv (Maybe Identifier)
 lookupName m penv nenv x =
   case Map.lookup (asText x) nenv of
     Just x' -> do
-      modify
-        (\env -> env {unusedNameSet = S.delete (m, x') (unusedNameSet env)})
+      removeFromIntactSet m x'
       return $ Just x'
     Nothing -> lookupName' m penv nenv x
 
@@ -317,9 +324,7 @@ lookupName' m (prefix:prefixList) nenv x = do
   let query = prefix <> ":" <> asText x
   case Map.lookup query nenv of
     Just x'@(I (_, i)) -> do
-      modify
-        (\env ->
-           env {unusedNameSet = S.delete (m, I (query, i)) (unusedNameSet env)})
+      removeFromIntactSet m $ I (query, i)
       return $ Just x'
     Nothing -> lookupName' m prefixList nenv x
 

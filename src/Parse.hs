@@ -615,7 +615,7 @@ adjustPhase' m = do
 
 warnUnusedVar :: WithEnv ()
 warnUnusedVar = do
-  set <- gets unusedNameSet
+  set <- gets intactSet
   let set' = S.map (\(m, I (x, _)) -> (getPosInfo m, x)) set
   warnUnusedVar' $ S.toList set'
 
