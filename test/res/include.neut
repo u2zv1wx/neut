@@ -2,9 +2,10 @@
 
 (coinductive my-record ((a tau))
   (item-1 ((_ (my-record a))) a)
-  (item-2 ((_ (my-record a))) u32)
+  (item-2 ((_ (my-record a))) i64)
   (item-3 ((_ (my-record a))) top))
 
+(include library "core/integer.neut")
 
 (let item
   (record (my-record i64)
@@ -66,6 +67,8 @@
 ;; (os:exit i64 20)
 
 ;; (os:exit i64 10)
+
+(i64:print (my-record:item-2 item))
 
 (os:exit i64 (my-record:item-1 item))
 

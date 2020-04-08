@@ -1,3 +1,4 @@
+
 ;; preliminary:
 
 (no-implicit-core)
@@ -115,5 +116,7 @@
    (k (hom a (list b))))
   (witness (list b)
     (concatenate (map k m))))
+
+(let _ bind)
 
 (end list)

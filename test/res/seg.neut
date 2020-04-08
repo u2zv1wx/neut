@@ -1,11 +1,14 @@
 
-(no-implicit-core)
+;; (no-implicit-core)
 
-(inductive list ((a tau))
-  (nil ()
-    (list a))
-  (cons ((x a) (xs (list a)))
-    (list a)))
+
+;; (inductive list ((a tau))
+;;   (nil ()
+;;     (list a))
+;;   (cons ((x a) (xs (list a)))
+;;     (list a)))
+
+(include library "core/integer.neut")
 
 (use list)
 
@@ -13,5 +16,5 @@
   (cons 25 (list:cons 100 (cons 1000 (nil)))))
 
 (case xs
-  ((nil) 10)
-  ((cons value ys) (i64 20)))
+  ((nil) (i64:print 10))
+  ((cons value ys) (i64:print (i64 20))))

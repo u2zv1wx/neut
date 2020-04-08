@@ -60,6 +60,7 @@
   (let len (string:print &test)) ;; ここの "defined but not used" はfreeを具体的に行うことを要求しているとみなせる。「せっかく借用したのに」というわけ。
   len) ;; ここでtestがfreeされる（直前のwriteでborrowされているので）
 
+
 ;; (begin
 ;;   (let len (os:write os:stdout &test 3))
 ;;   (let len (os:write os:stdout &test 3))
@@ -90,10 +91,11 @@
 
 (with let-bind
   (let _ (string:print &test))
-  (let hoge (string:print &test))
+  (let _ (string:print &test))
   (i64 10)
   (let _ (string:print &test))
   (let len (string:print &test))
+  (erase test)
   len)
 
 
@@ -105,7 +107,7 @@
 
 (string:print test)
 
-(let foo (i64 10))
+(let _ (i64 10))
 
 (string:print test)
 
@@ -132,7 +134,52 @@
 (let xs (list i64)
   (list:new 1 2 3 4 5))
 
-;; ここでtestが参照できないのはletSigmaが壊れているってこと？
+(inductive equal ((A tau) (x A) (y A))
+  (refl ((z A)) (equal A z z)))
+
+(attribute equal
+  (implicit 0))
+
+?equal:induction
+
+?equal:refl
+
+(let p (equal:refl (i64 3)))
+
+?p
+
+(inductive choice ()
+  (item-1 () (choice))
+  (item-2 () (choice)))
+
+?choice:induction
+
+(definition flip ((c (choice)))
+  (witness (choice)
+    (case c
+      ((choice:item-1)
+        (choice:item-2))
+      ((choice:item-2)
+        (choice:item-1)))))
+
+?flip
+
+(theorem double-flip-is-identity
+  (pi ((c (choice)))
+    (equal
+      c
+      (flip (flip c))))
+  (lambda (c)
+    (case c
+      ((choice:item-1)
+        admit) ;; (F @ c) {c := (choice:item-1)}
+      ((choice:item-2)
+        ?admit) ;; (F @ c) {c := (choice:item-2)}
+        ))) ;; F @ c
+
+?double-flip-is-identity
+
+;; (verify double-flip-is-identity)
 
 (string:print "\n")
 
@@ -140,7 +187,10 @@
 
 (i64:print (fact (unsafe:cast u64 i64 (list:length xs))))
 
+(definition unused-function ([_ tau]) tau)
+
 (?string:print "\n")
+
 
 ;; (let a1 (os:write os:stdout test 3))
 ;; (let a2 (os:write os:stdout test 3))

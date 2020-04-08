@@ -414,9 +414,12 @@ prefixFunName (m, TreeNode [xt, xts, body]) = do
 prefixFunName t = raiseSyntaxError (fst t) "(TREE TREE TREE)"
 
 prefixIdentPlus :: TreePlus -> WithEnv TreePlus
+prefixIdentPlus (m, TreeLeaf "_") = return (m, TreeLeaf "_")
 prefixIdentPlus (m, TreeLeaf x) = do
   x' <- withSectionPrefix x
   return (m, TreeLeaf x')
+prefixIdentPlus (m, TreeNode [(mx, TreeLeaf "_"), t]) =
+  return (m, TreeNode [(mx, TreeLeaf "_"), t])
 prefixIdentPlus (m, TreeNode [(mx, TreeLeaf x), t]) = do
   x' <- withSectionPrefix x
   return (m, TreeNode [(mx, TreeLeaf x'), t])

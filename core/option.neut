@@ -16,7 +16,7 @@
 
 (definition map
   (witness (functor-form option)
-    (lambda (a b f m)
+    (lambda (_ _ f m)
       (case m
         ((none)
           (none))
@@ -27,12 +27,12 @@
 
 (definition return
   (witness (return-type option)
-    (lambda (a x)
+    (lambda (_ x)
       (some x))))
 
 (definition bind
   (witness (bind-type option)
-    (lambda (a b m k)
+    (lambda (_ _ m k)
       (case m
         ((none)
           (none))
@@ -67,6 +67,7 @@
         option:bind))))
 
 (end option)
+
 
 ;; 射影はこういう実装になるはずだけど。推論が通ってねえ。
 ;; やっぱcaseの推論は修正する必要がある。
