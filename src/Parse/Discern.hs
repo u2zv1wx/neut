@@ -178,7 +178,6 @@ discern'' _ (m, WeakTermEnumIntro x) = return (m, WeakTermEnumIntro x)
 discern'' nenv (m, WeakTermEnumElim (e, t) caseList) = do
   e' <- discern'' nenv e
   t' <- discern'' nenv t
-  -- caseList' <- discernCaseList nenv caseList
   caseList' <-
     forM caseList $ \((mCase, l), body) -> do
       l' <- discernWeakCase mCase nenv l
