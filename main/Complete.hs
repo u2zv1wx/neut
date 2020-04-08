@@ -23,6 +23,8 @@ type CompInfo = [(Identifier, Meta)]
 
 type CursorName = Identifier
 
+type Prefix = T.Text
+
 complete :: Path Abs File -> Line -> Column -> WithEnv [String]
 complete inputPath l c = do
   info <- parseForCompletion inputPath l c
@@ -53,15 +55,12 @@ parseForCompletion path l c = do
       treeList <- tokenize content'
       stmtList <- parse' $ includeCore (newMeta 1 1 path) treeList
       case compInfo s stmtList of
-        Right () -> do
-          return []
+        Right () -> return []
         Left info -> do
           info' <- filterM (filterCompInfo prefix) info
           let compareLoc m1 m2 = metaLocation m2 `compare` metaLocation m1
           return $ nub $ sortBy (\(_, m1) (_, m2) -> compareLoc m1 m2) info'
 
--- 必要ならここでprefixの情報も与える
--- parenとかのときは何も返さないからNothingにする
 modifyFileForCompletion ::
      CursorName -> T.Text -> Line -> Column -> Maybe (Prefix, T.Text)
 modifyFileForCompletion (I (s, _)) content l c = do
@@ -201,8 +200,6 @@ filterCompInfo :: Prefix -> (Identifier, Meta) -> WithEnv Bool
 filterCompInfo prefix (I (x, _), _) = do
   nenv <- gets nonCandSet
   return $ prefix `T.isPrefixOf` x && not (S.member x nenv)
-
-type Prefix = T.Text
 
 headTailMaybe :: [a] -> Maybe (a, [a])
 headTailMaybe [] = Nothing

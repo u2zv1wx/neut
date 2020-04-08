@@ -103,7 +103,6 @@
   (witness i64
     (if (i64:le n 0)
       1
-
       (with let-bind
         (?string:print "looping with (もちろん日本語も出力できるよ): ")
         (i64:print ?n)
