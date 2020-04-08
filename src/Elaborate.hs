@@ -73,19 +73,6 @@ elaborateStmt (WeakStmtLetWT m (mx, x@(I (_, i)), t) e cont) = do
   x' <- newNameWith x
   let c = (m, TermConst x)
   return (m, TermPiElim (m, TermPiIntro [(mx, x', t'')] cont') [c])
--- elaborateStmt (WeakStmtLetSigma m xts e cont) = do
---   (e', t1) <- infer e
---   xts' <- inferSigma [] xts
---   sig <- weakTermSigma (fst e') xts'
---   insConstraintEnv t1 sig
---   analyze >> synthesize >> refine >> cleanup
---   e'' <- elaborate' e'
---   xts'' <- mapM elaboratePlus xts'
---   forM_ xts'' $ \(_, x, tx) -> insTypeEnv x (reduceTermPlus tx)
---   -- x = let (x1, ..., xn) := e in xiとしてcacheEnvを更新すべき？
---   -- forM_ xts'' $ \(_, x, tx) -> insWeakTypeEnv x (weaken (reduceTermPlus tx))
---   cont' <- elaborateStmt cont
---   termSigmaElim m (m, TermEnum $ EnumTypeIntS 64) xts'' e'' cont'
 elaborateStmt (WeakStmtVerify m e cont) = do
   (e', _) <- infer e
   e'' <- elaborate' e'
@@ -124,15 +111,6 @@ elaborateStmt (WeakStmtConstDecl _ (_, x, t) cont) = do
 showFloat' :: Float -> String
 showFloat' x = showFFloat Nothing x ""
 
--- termSigmaElim ::
---      Meta
---   -> TermPlus
---   -> [Data.Term.IdentifierPlus]
---   -> TermPlus
---   -> TermPlus
---   -> WithEnv TermPlus
--- termSigmaElim m t xts e1 e2 = do
---   return $ (m, TermPiElim e1 [t, (m, TermPiIntro xts e2)])
 refine :: WithEnv ()
 refine =
   modify (\env -> env {substEnv = IntMap.map reduceWeakTermPlus (substEnv env)})
