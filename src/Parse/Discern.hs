@@ -213,6 +213,12 @@ discern'' nenv (m, WeakTermWithNote e t) = do
   e' <- discern'' nenv e
   t' <- discern'' nenv t
   return (m, WeakTermWithNote e' t')
+discern'' nenv (_, WeakTermErase mxs e) = do
+  penv <- gets prefixEnv
+  forM_ mxs $ \(mx, x) -> lookupNameWithPrefix'' mx penv (asIdent x) nenv
+  let xs = map snd mxs
+  let nenv' = Map.filterWithKey (\k _ -> k `notElem` xs) nenv
+  discern'' nenv' e
 
 discernBinder ::
      NameEnv

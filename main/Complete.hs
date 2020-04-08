@@ -172,6 +172,8 @@ compInfoWeakTermPlus c info (_, WeakTermCase _ e cxtes) = do
 compInfoWeakTermPlus c info (_, WeakTermWithNote e t) = do
   compInfoWeakTermPlus c info e
   compInfoWeakTermPlus c info t
+compInfoWeakTermPlus c info (_, WeakTermErase _ e) =
+  compInfoWeakTermPlus c info e
 
 compInfoBinder ::
      CursorName

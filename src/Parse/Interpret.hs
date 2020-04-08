@@ -164,6 +164,15 @@ interpret (m, TreeNode ((_, TreeLeaf "question"):rest))
     h <- newHole m
     return (m, WeakTermWithNote e' h)
   | otherwise = raiseSyntaxError m "(question TREE)"
+-- interpret (m, TreeNode [(_, TreeLeaf "erase"), (_, TreeNode xs), body])
+interpret tree@(m, TreeNode ((_, TreeLeaf "erase"):rest))
+  | [(_, TreeNode mxs), body] <- rest
+  , Just mxs' <- mapM asLeaf mxs = do
+    body' <- interpret body
+    return (m, WeakTermErase mxs' body')
+  | otherwise = do
+    p' tree
+    raiseSyntaxError m "(erase (LEAF ... LEAF) TREE)"
 interpret (m, TreeNode ((_, TreeLeaf "cocase"):rest))
   | codType:cocaseClauseList <- rest = do
     (a, args) <- interpretCoinductive codType

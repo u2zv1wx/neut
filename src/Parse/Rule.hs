@@ -543,6 +543,9 @@ substRuleType sub (m, WeakTermWithNote e t) = do
   e' <- substRuleType sub e
   t' <- substRuleType sub t
   return (m, WeakTermWithNote e' t')
+substRuleType sub (m, WeakTermErase xs e) = do
+  e' <- substRuleType sub e
+  return (m, WeakTermErase xs e')
 
 substRuleType' ::
      (RuleType, RuleType) -> [IdentifierPlus] -> WithEnv [IdentifierPlus]

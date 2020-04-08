@@ -63,6 +63,8 @@
 ;; (notation (with bind (let (x t) e+) rest+)
 ;;   (bind (with bind e+) (lambda ((x t)) (with bind rest+))))
 
+(keyword erase)
+
 (notation (with bind e rest+)
   (bind hole hole (with bind e) (lambda ((_ hole)) (with bind rest+))))
 
@@ -72,7 +74,8 @@
 (notation (with bind (let (x t) e+) rest+)
   (bind hole hole (with bind e+) (lambda ((x t)) (with bind rest+))))
 
-
+(notation (with bind (erase x+) rest+)
+  (erase (x+) (with bind rest+)))
 
 ;; lambda: lambda with implicit begin block -> (discard)
 ;; (notation (lambda () e+)

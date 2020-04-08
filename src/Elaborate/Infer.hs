@@ -195,6 +195,7 @@ infer' ctx (m, WeakTermCase indName e cxtes) = do
 infer' ctx (m, WeakTermWithNote e _) = do
   (e', te) <- infer' ctx e
   return ((m, WeakTermWithNote e' te), te)
+infer' ctx (_, WeakTermErase _ e) = infer' ctx e
 
 toIdentPlus :: Meta -> (WeakTermPlus, WeakTermPlus) -> WithEnv IdentifierPlus
 toIdentPlus m (_, t) = do

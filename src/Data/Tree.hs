@@ -15,6 +15,10 @@ data Tree
 
 type TreePlus = (Meta, Tree)
 
+asLeaf :: TreePlus -> Maybe (Meta, T.Text)
+asLeaf (m, TreeLeaf x) = Just (m, x)
+asLeaf _ = Nothing
+
 atomListOf :: TreePlus -> S.Set T.Text
 atomListOf (_, TreeLeaf x) = S.singleton x
 atomListOf (_, TreeNode ts) = S.unions $ map atomListOf ts

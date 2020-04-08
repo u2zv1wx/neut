@@ -265,6 +265,7 @@ unravel (m, WeakTermCase indName e cxtes) = do
       return ((c, xts'), body')
   return (m, WeakTermCase indName e' cxtes')
 unravel (_, WeakTermWithNote e _) = unravel e
+unravel (_, WeakTermErase _ e) = unravel e
 
 unravelUpsilon :: Identifier -> WithEnv Identifier
 unravelUpsilon (I (s, i)) = do

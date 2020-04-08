@@ -309,6 +309,7 @@ elaborate' (m, WeakTermWithNote e t) = do
   t' <- elaborate' t
   note m $ toText (weaken t')
   return e'
+elaborate' (_, WeakTermErase _ e) = elaborate' e
 
 elaborateWeakCase :: WeakCasePlus -> WithEnv CasePlus
 elaborateWeakCase (m, WeakCaseInt t x) = do

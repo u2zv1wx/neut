@@ -105,6 +105,7 @@
       (with let-bind
         (?string:print "looping with (もちろん日本語も出力できるよ): ")
         (i64:print ?n)
+        ;; (erase n)
         (string:print "\n")
         (?i64:mul n (fact (?i64:sub n 1)))))))
 
