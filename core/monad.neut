@@ -60,4 +60,8 @@
       comp
       ((return M) top top:unit))))
 
+(provide monad:compose)
+
+(provide monad:when)
+
 (end monad)

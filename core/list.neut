@@ -117,6 +117,20 @@
   (witness (list b)
     (concatenate (map k m))))
 
-(let _ bind)
+(provide head)
+
+(provide length)
+
+(provide append)
+
+(provide is-null)
+
+(provide map)
+
+(provide return)
+
+(provide concatenate)
+
+(provide bind)
 
 (end list)

@@ -143,6 +143,11 @@
     (1 e1)
     (default e2)))
 
+(keyword provide)
+
+(notation (provide e)
+  (let _ e))
+
 ;; (notation (if b e1 e2)
 ;;   (switch b
 ;;     (bool:true e1)
