@@ -359,54 +359,33 @@ asUpsilon _ = Nothing
 
 toText :: WeakTermPlus -> T.Text
 toText (_, WeakTermTau) = "tau"
--- toText (_, WeakTermUpsilon x) = asText' x
 toText (_, WeakTermUpsilon x) = asText x
-toText piType@(_, WeakTermPi Nothing xts@[(_, x, dom)] cod) = do
-  case extractSigmaArg piType of
-    Just yts -> do
-      case splitLast yts of
-        Just (zts, (_, _, t)) -> do
-          let argStr = inParen $ showItems $ map showArg zts
-          showCons ["Σ", argStr, toText t]
-        _ -> "(product)"
-    Nothing -> do
-      if x `notElem` varWeakTermPlus cod
-        then do
-          showCons ["hom", toText dom, toText cod]
-        else do
-          let argStr = inParen $ showItems $ map showArg xts
-          showCons ["Π", argStr, toText cod]
 toText piType@(_, WeakTermPi Nothing xts cod) = do
   case extractSigmaArg piType of
     Just yts -> do
       case splitLast yts of
-        Just (zts, (_, _, t)) -> do
-          let (_, zs, ts) = unzip3 zts
-          -- if all (\z -> z `S.notMember` S.unions (map varWeakTermPlus ts)) zs
-          --   then showCons $ "product" : map toText ts ++ [toText t]
-          --   else do
-          let argStr = inParen $ showArgs zs ts
-          showCons ["Σ", argStr, toText t]
-        _ -> "(product)"
-    Nothing -> do
-      let (_, xs, ts) = unzip3 xts
-      let argStr = inParen $ showArgs xs ts
-      showCons ["Π", argStr, toText cod]
+        Just (zts, (_, _, t))
+          | isDependent zts t ->
+            showCons ["Σ", inParen $ showTypeArgs zts t, toText t]
+          | otherwise -> do
+            let (_, _, ts) = unzip3 zts
+            showCons $ "product" : map toText (ts ++ [t])
+        Nothing -> "(product)"
+    Nothing
+      | isDependent xts cod ->
+        showCons ["Π", inParen $ showTypeArgs xts cod, toText cod]
+      | otherwise -> do
+        let (_, _, ts) = unzip3 xts
+        showCons ["arrow", showCons $ map toText ts, toText cod]
 toText (_, WeakTermPi (Just _) _ cod) = toText cod
-  -- let argStr = inParen $ showItems $ map showArg xts
-  -- showCons ["Π+", argStr, toText cod]
-  -- toText cod -- Pi{nat} (...). (...) ~> nat
 toText (_, WeakTermPiIntro xts e) = do
   let argStr = inParen $ showItems $ map showArg xts
   showCons ["λ", argStr, toText e]
 toText (_, WeakTermPiIntroNoReduce xts e) = do
   let argStr = inParen $ showItems $ map showArg xts
   showCons ["λ", argStr, toText e]
-toText (_, WeakTermPiIntroPlus _ (_, _, _, _) xts e) = do
-  let argStr = inParen $ showItems $ map showArg xts
-  showCons ["λ", argStr, toText e]
--- toText (_, WeakTermPiIntroPlus _ (name, _, _) _ _) = do
---   "<#" <> name <> "-" <> "value" <> "#>" -- <#succ-value#>, <#cons-value#>, <#nil-value#>, etc.
+toText (_, WeakTermPiIntroPlus _ (name, _, _, _) _ _) = do
+  "<#" <> name <> "-" <> "internal" <> "#>"
 toText (_, WeakTermPiElim e es) = do
   showCons $ map toText $ e : es
 toText (_, WeakTermIter (_, x, _) xts e) = do
@@ -465,20 +444,26 @@ inBracket s = "[" <> s <> "]"
 showArg :: (Meta, Identifier, WeakTermPlus) -> T.Text
 showArg (_, x, t) = inParen $ asText x <> " " <> toText t
 
-showArgs :: [Identifier] -> [WeakTermPlus] -> T.Text
-showArgs [] [] = T.empty
--- showArgs [_] [t] = inParen $ "_" <> " " <> toText t
-showArgs [x] [t] = inParen $ asText x <> " " <> toText t
-showArgs (x:xs) (t:ts)
-  -- | x `S.member` S.unions (map varWeakTermPlus ts) = do
- = do
-  let s1 = inParen $ asText x <> " " <> toText t
-  let s2 = showArgs xs ts
-  s1 <> " " <> s2 -- | otherwise = do
-  --   let s1 = inParen $ "_" <> " " <> toText t
-  --   let s2 = showArgs xs ts
-  --   s1 <> " " <> s2
-showArgs _ _ = error "showArgs"
+showTypeArgs :: [IdentifierPlus] -> WeakTermPlus -> T.Text
+showTypeArgs [] _ = T.empty
+showTypeArgs [(_, x, t)] cod
+  | x `S.member` varWeakTermPlus cod = inParen $ asText x <> " " <> toText t
+  | otherwise = inParen $ "_" <> " " <> toText t
+showTypeArgs ((_, x, t):xts) cod
+  | x `S.member` varWeakTermPlus' xts [cod] = do
+    let s1 = inParen $ asText x <> " " <> toText t
+    let s2 = showTypeArgs xts cod
+    s1 <> " " <> s2
+  | otherwise = do
+    let s1 = inParen $ "_" <> " " <> toText t
+    let s2 = showTypeArgs xts cod
+    s1 <> " " <> s2
+
+isDependent :: [IdentifierPlus] -> WeakTermPlus -> Bool
+isDependent [] _ = False
+isDependent ((_, x, _):xts) cod
+  | x `S.member` varWeakTermPlus' xts [cod] = True
+  | otherwise = isDependent xts cod
 
 showClause :: (WeakCase, WeakTermPlus) -> T.Text
 showClause (c, e) = inParen $ showWeakCase c <> " " <> toText e

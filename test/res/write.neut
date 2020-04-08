@@ -76,6 +76,7 @@
 
 (verify some-theorem)
 
+
 ;; (@os:write 3 os:stdout "あ" 3)
 ;; (@os:write 3 os:stdout "あ" 3)
 ;; (@os:write 3 os:stdout "あ" 3)
