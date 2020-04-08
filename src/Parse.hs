@@ -220,15 +220,15 @@ parse' ((m, TreeNode ((mLet, TreeLeaf "let"):rest)):as)
       adjustPhase xt >>= macroExpand >>= prefixIdentPlus >>=
       interpretIdentifierPlus
     defList <- parse' as
-    case e' of
-      (_, WeakTermPiElim f args)
-        | (mmxs, args') <- unzip $ map parseBorrow args
-        , mxs <- catMaybes mmxs
-        , not (null mxs) -> do
-          xts <- mapM toIdentPlus mxs
-          let app = (m', WeakTermPiElim f args')
-          return $ QuasiStmtLetSigma m' (xts ++ [xt']) app : defList
-      _ -> return $ QuasiStmtLet m' xt' e' : defList
+    -- case e' of
+    --   (_, WeakTermPiElim f args)
+    --     | (mmxs, args') <- unzip $ map parseBorrow args
+    --     , mxs <- catMaybes mmxs
+    --     , not (null mxs) -> do
+    --       xts <- mapM toIdentPlus mxs
+    --       let app = (m', WeakTermPiElim f args')
+    --       return $ QuasiStmtLetSigma m' (xts ++ [xt']) app : defList
+    return $ QuasiStmtLet m' xt' e' : defList
   | otherwise = raiseSyntaxError m "(let LEAF TREE TREE) | (let TREE TREE)"
 parse' ((m, TreeNode ((_, TreeLeaf "verify"):rest)):as)
   | [e] <- rest = do
@@ -243,24 +243,25 @@ parse' (a:as) = do
     then parse' $ e : as
     else do
       e' <- interpret e
-      case e' of
-        (m, WeakTermPiElim f args)
-          | (mmxs, args') <- unzip $ map parseBorrow args
-          , mxs <- catMaybes mmxs
-          , not (null mxs) -> do
-            tmp <- newNameWith'' "borrow"
-            xts <- mapM toIdentPlus $ mxs ++ [(m, tmp)]
-            let app = (m, WeakTermPiElim f args')
-            defList <- parse' as
-            return $ QuasiStmtLetSigma m xts app : defList
-        (m, _) -> do
-          name <- newNameWith'' "hole"
-          m' <- adjustPhase' m
-          t <- newHole m'
-          defList <- parse' as
-          modify
-            (\env -> env {nonCandSet = S.insert (asText name) (nonCandSet env)})
-          return $ QuasiStmtLet m' (m', name, t) e' : defList
+      -- case e'
+      --   -- (m, WeakTermPiElim f args)
+      --   --   | (mmxs, args') <- unzip $ map parseBorrow args
+      --   --   , mxs <- catMaybes mmxs
+      --   --   , not (null mxs) -> do
+      --   --     tmp <- newNameWith'' "borrow"
+      --   --     xts <- mapM toIdentPlus $ mxs ++ [(m, tmp)]
+      --   --     let app = (m, WeakTermPiElim f args')
+      --   --     defList <- parse' as
+      --   --     return $ QuasiStmtLetSigma m xts app : defList
+      --       of
+      --   (m, _) -> do
+      name <- newNameWith'' "hole"
+      m' <- adjustPhase' $ metaOf e'
+      t <- newHole m'
+      defList <- parse' as
+      modify
+        (\env -> env {nonCandSet = S.insert (asText name) (nonCandSet env)})
+      return $ QuasiStmtLet m' (m', name, t) e' : defList
 
 lazyConcatHandler :: Response -> InputStream B.ByteString -> IO L.ByteString
 lazyConcatHandler _ i1 = do
@@ -351,13 +352,12 @@ styleRule (m, TreeNode [(mName, TreeLeaf name), (_, TreeNode xts), t]) = do
         ])
 styleRule t = raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) TREE)"
 
-parseBorrow :: WeakTermPlus -> (Maybe (Meta, Identifier), WeakTermPlus)
-parseBorrow (m, WeakTermUpsilon (I (s, _)))
-  | T.length s > 1
-  , T.head s == '&' =
-    (Just (m, asIdent $ T.tail s), (m, WeakTermUpsilon $ asIdent $ T.tail s))
-parseBorrow t = (Nothing, t)
-
+-- parseBorrow :: WeakTermPlus -> (Maybe (Meta, Identifier), WeakTermPlus)
+-- parseBorrow (m, WeakTermUpsilon (I (s, _)))
+--   | T.length s > 1
+--   , T.head s == '&' =
+--     (Just (m, asIdent $ T.tail s), (m, WeakTermUpsilon $ asIdent $ T.tail s))
+-- parseBorrow t = (Nothing, t)
 parseByteString :: Meta -> T.Text -> WithEnv B.ByteString
 parseByteString m quotedStr =
   case readMaybe (T.unpack quotedStr) of
@@ -507,9 +507,9 @@ concatQuasiStmtList (QuasiStmtLet m xt e:es) = do
 concatQuasiStmtList (QuasiStmtLetWT m xt e:es) = do
   cont <- concatQuasiStmtList es
   return $ WeakStmtLetWT m xt e cont
-concatQuasiStmtList (QuasiStmtLetSigma m xts e:es) = do
-  cont <- concatQuasiStmtList es
-  return $ WeakStmtLetSigma m xts e cont
+-- concatQuasiStmtList (QuasiStmtLetSigma m xts e:es) = do
+--   cont <- concatQuasiStmtList es
+--   return $ WeakStmtLetSigma m xts e cont
 concatQuasiStmtList (QuasiStmtVerify m e:es) = do
   cont <- concatQuasiStmtList es
   return $ WeakStmtVerify m e cont

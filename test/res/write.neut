@@ -96,11 +96,12 @@
   (let len (string:print &test))
   len)
 
-(let _ (string:print &test))
-(let hoge (string:print &test))
-(i64 10)
-(let _ (string:print &test))
-(let len (string:print &test))
+
+;; (let _ (string:print &test))
+;; (let hoge (string:print &test))
+;; (i64 10)
+;; (let _ (string:print &test))
+;; (let len (string:print &test))
 
 (string:print test)
 
