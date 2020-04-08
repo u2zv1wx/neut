@@ -42,7 +42,6 @@ import Parse.MacroExpand
 import Parse.Rule
 import Parse.Tokenize
 
--- import Parse.Utility
 parse :: Path Abs File -> WithEnv WeakStmt
 parse inputPath = do
   stmtList <- visit inputPath
