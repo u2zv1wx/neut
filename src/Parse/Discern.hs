@@ -313,11 +313,13 @@ lookupName m penv nenv x =
 lookupName' ::
      Meta -> [T.Text] -> NameEnv -> Identifier -> WithEnv (Maybe Identifier)
 lookupName' _ [] _ _ = return Nothing
-lookupName' m (prefix:prefixList) nenv x =
-  case Map.lookup (prefix <> ":" <> asText x) nenv of
-    Just x' -> do
+lookupName' m (prefix:prefixList) nenv x = do
+  let query = prefix <> ":" <> asText x
+  case Map.lookup query nenv of
+    Just x'@(I (_, i)) -> do
       modify
-        (\env -> env {unusedNameSet = S.delete (m, x') (unusedNameSet env)})
+        (\env ->
+           env {unusedNameSet = S.delete (m, I (query, i)) (unusedNameSet env)})
       return $ Just x'
     Nothing -> lookupName' m prefixList nenv x
 
