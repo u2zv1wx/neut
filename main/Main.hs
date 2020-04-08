@@ -19,12 +19,13 @@ import qualified Data.ByteString.Lazy as L
 
 import Clarify
 import Data.Env
+import Data.Log
 import Elaborate
 import Emit
 import LLVM
 import Parse
 
-import Data.Log
+import Complete
 
 type BuildOptInputPath = String
 
@@ -188,7 +189,7 @@ run (Complete inputPathStr l c) = do
   inputPath <- resolveFile' inputPathStr
   resultOrErr <- evalWithEnv (complete inputPath l c) initialEnv
   case resultOrErr of
-    Left _ -> return () -- just quit silently
+    Left _ -> return ()
     Right result -> mapM_ putStrLn result
 
 constructOutputPath ::
