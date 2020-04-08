@@ -103,9 +103,10 @@
     (if (i64:le n 0)
       1
       (with let-bind
-        (?string:print "looping with (もちろん日本語も出力できるよ): ")
+        (string:print "looping with (もちろん日本語も出力できるよ): ")
         (i64:print ?n)
         ;; (erase n)
+        (let x (i64:add 10 10))
         (string:print "\n")
         (?i64:mul n (fact (?i64:sub n 1)))))))
 
