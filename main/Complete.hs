@@ -57,7 +57,7 @@ parseForCompletion path l c = do
       case compInfo s stmtList of
         Right () -> return []
         Left info -> do
-          info' <- filterM (filterCompInfo prefix) info
+          info' <- filterM (filterCompInfo prefix) $ concatMap enrich info
           let compareLoc m1 m2 = metaLocation m2 `compare` metaLocation m1
           return $ nub $ sortBy (\(_, m1) (_, m2) -> compareLoc m1 m2) info'
 
@@ -197,9 +197,24 @@ compInfoArrayElim s info ((mx, x, _):xts) e = do
   compInfoArrayElim s info' xts e
 
 filterCompInfo :: Prefix -> (Identifier, Meta) -> WithEnv Bool
+filterCompInfo _ (I (x, _), _)
+  | "private:" `T.isPrefixOf` x = return False
 filterCompInfo prefix (I (x, _), _) = do
   nenv <- gets nonCandSet
   return $ prefix `T.isPrefixOf` x && not (S.member x nenv)
+
+enrich :: (Identifier, Meta) -> [(Identifier, Meta)]
+enrich (x, m) = map (\y -> (y, m)) $ toSuffixList x
+
+-- "bar:buz:qux" ~> ["bar:buz:qux", "buz:qux", "qux"]
+toSuffixList :: Identifier -> [Identifier]
+toSuffixList (I (s, i)) = map (\x -> I (x, i)) $ toSuffixList' s
+
+toSuffixList' :: T.Text -> [T.Text]
+toSuffixList' s =
+  case T.findIndex (== ':') s of
+    Nothing -> [s]
+    Just i -> s : toSuffixList' (T.drop (i + 1) s)
 
 headTailMaybe :: [a] -> Maybe (a, [a])
 headTailMaybe [] = Nothing

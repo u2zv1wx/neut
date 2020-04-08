@@ -94,7 +94,6 @@
 (let a (string:print &test))
 (let a (string:print &test))
 
-
 ;; (print-character 45)
 
 (i64:print -1234321)
