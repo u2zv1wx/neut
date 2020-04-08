@@ -25,20 +25,18 @@ discern' :: NameEnv -> [QuasiStmt] -> WithEnv [QuasiStmt]
 discern' _ [] = return []
 discern' nenv ((QuasiStmtLet m (mx, x, t) e):ss) = do
   t' <- discern'' nenv t
-  x' <- newDefinedNameWith' m nenv x
+  x' <- newDefinedNameWith' mx nenv x
   e' <- discern'' nenv e
   ss' <- discern' (insertName x x' nenv) ss
   return $ QuasiStmtLet m (mx, x', t') e' : ss'
 discern' nenv ((QuasiStmtLetWT m (mx, x, t) e):ss) = do
+  set <- gets unusedNameSet
   t' <- discern'' nenv t
-  x' <- newDefinedNameWith' m nenv x
+  x' <- newDefinedNameWith' mx nenv x
   e' <- discern'' nenv e
+  modify (\env -> env {unusedNameSet = set})
   ss' <- discern' (insertName x x' nenv) ss
   return $ QuasiStmtLetWT m (mx, x', t') e' : ss'
--- discern' nenv (QuasiStmtLetSigma m xts e:ss) = do
---   e' <- discern'' nenv e
---   (xts', ss') <- discernStmtBinder nenv xts ss
---   return $ QuasiStmtLetSigma m xts' e' : ss'
 discern' nenv ((QuasiStmtDef xds):ss) = do
   let (xs, ds) = unzip xds
   -- discern for deflist
@@ -80,18 +78,22 @@ discern' nenv ((QuasiStmtEnum m name xis):ss) = do
   insEnumEnv m name xis
   discern' nenv ss
 discern' nenv ((QuasiStmtLetInductive n m (mx, a, t) e):ss) = do
+  set <- gets unusedNameSet
   t' <- discern'' nenv t
   a' <- newDefinedNameWith' m nenv a
   e' <- discern'' nenv e
+  modify (\env -> env {unusedNameSet = set})
   ss' <- discern' (insertName a a' nenv) ss
   return $ QuasiStmtLetInductive n m (mx, a', t') e' : ss'
 discern' nenv ((QuasiStmtLetInductiveIntro m (mx, x, t) e as):ss) = do
+  set <- gets unusedNameSet
   t' <- discern'' nenv t
   x' <- newDefinedNameWith' m nenv x
   e' <- discern'' nenv e
-  ss' <- discern' (insertName x x' nenv) ss
   penv <- gets prefixEnv
   as' <- mapM (lookupName'' m penv nenv) as
+  modify (\env -> env {unusedNameSet = set})
+  ss' <- discern' (insertName x x' nenv) ss
   return $ QuasiStmtLetInductiveIntro m (mx, x', t') e' as' : ss'
 discern' nenv ((QuasiStmtUse prefix):ss) = do
   modify (\e -> e {prefixEnv = prefix : prefixEnv e})
@@ -100,19 +102,6 @@ discern' nenv ((QuasiStmtUnuse prefix):ss) = do
   modify (\e -> e {prefixEnv = filter (/= prefix) (prefixEnv e)})
   discern' nenv ss
 
--- discernStmtBinder ::
---      NameEnv
---   -> [IdentifierPlus]
---   -> [QuasiStmt]
---   -> WithEnv ([IdentifierPlus], [QuasiStmt])
--- discernStmtBinder nenv [] ss = do
---   ss' <- discern' nenv ss
---   return ([], ss')
--- discernStmtBinder nenv ((mx, x, t):xts) ss = do
---   t' <- discern'' nenv t
---   x' <- newDefinedNameWith mx x
---   (xts', ss') <- discernStmtBinder (insertName x x' nenv) xts ss
---   return ((mx, x', t') : xts', ss')
 discernDef :: NameEnv -> Def -> WithEnv Def
 discernDef nenv (m, (mx, x, t), xts, e) = do
   t' <- discern'' nenv t
