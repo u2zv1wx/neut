@@ -5,14 +5,12 @@ module Parse
   , parse'
   , includeCore
   , pushTrace
-  -- , complete
   ) where
 
 import Control.Monad.Except
 import Control.Monad.State hiding (get)
 import Data.ByteString.Builder
 
--- import Data.List
 import Data.Maybe (catMaybes)
 import Data.Monoid ((<>))
 import Network.Http.Client
@@ -75,68 +73,6 @@ pushTrace path = modify (\env -> env {traceEnv = path : traceEnv env})
 popTrace :: WithEnv ()
 popTrace = modify (\env -> env {traceEnv = tail (traceEnv env)})
 
--- complete :: Path Abs File -> Line -> Column -> WithEnv [String]
--- complete inputPath l c = do
---   info <- parseForCompletion inputPath l c
---   return $ showCompInfo info
--- showCompInfo :: CompInfo -> [String]
--- showCompInfo [] = []
--- showCompInfo ((x, m):xms) = do
---   let (path, (_, l, c)) = getPosInfo m
---   let pathStr = "\"" <> toFilePath path <> "\""
---   let x' = T.unpack $ asText x
---   let str =
---         "(\"" ++
---         x' ++ "\" (" ++ pathStr ++ " " ++ show l ++ " " ++ show c ++ "))"
---   str : showCompInfo xms
--- parseForCompletion :: Path Abs File -> Line -> Column -> WithEnv CompInfo
--- parseForCompletion path l c = do
---   pushTrace path
---   modify (\env -> env {fileEnv = Map.insert path VisitInfoActive (fileEnv env)})
---   modify (\env -> env {phase = 1 + phase env})
---   content <- liftIO $ TIO.readFile $ toFilePath path
---   let s = I ("*cursor*", 0)
---   case modifyFileForCompletion s content l c of
---     Nothing -> do
---       return []
---     Just (prefix, content') -> do
---       treeList <- tokenize content'
---       stmtList <- parse' $ includeCore (newMeta 1 1 path) treeList
---       case compInfo s stmtList of
---         Right () -> do
---           return []
---         Left info -> do
---           info' <- filterM (filterCompInfo prefix) info
---           let compareLoc m1 m2 = metaLocation m2 `compare` metaLocation m1
---           return $ nub $ sortBy (\(_, m1) (_, m2) -> compareLoc m1 m2) info'
--- -- 必要ならここでprefixの情報も与える
--- -- parenとかのときは何も返さないからNothingにする
--- modifyFileForCompletion ::
---      CursorName -> T.Text -> Line -> Column -> Maybe (Prefix, T.Text)
--- modifyFileForCompletion (I (s, _)) content l c = do
---   let xs = T.lines content
---   let (ys, ws) = splitAt (l - 1) xs
---   (targetLine, zs) <- headTailMaybe ws
---   (s1, s2) <- splitAtMaybe (c - 1) targetLine
---   (ch, s2') <- headTailMaybeText s2
---   case ch of
---     '(' -> Nothing
---     ')' -> do
---       let targetLine' = s1 <> " " <> s <> s2
---       return (T.empty, T.unlines $ ys ++ [targetLine'] ++ zs)
---     ' ' -> do
---       let targetLine' = s1 <> " " <> s <> s2
---       return (T.empty, T.unlines $ ys ++ [targetLine'] ++ zs)
---     _ -> do
---       let baseStr = s1 <> T.singleton ch
---       let revBaseStr = T.reverse baseStr
---       let revPrefix = T.takeWhile (`notElem` ['(', ' ', ')']) revBaseStr
---       let prefix = T.reverse revPrefix
---       let revStr = T.dropWhile (`notElem` ['(', ' ', ')']) revBaseStr
---       let s1' = T.reverse revStr
---       let s2'' = T.dropWhile (`notElem` ['(', ' ', ')']) s2'
---       let targetLine' = s1' <> s <> s2''
---       return (prefix, T.unlines $ ys ++ [targetLine'] ++ zs)
 parse' :: [TreePlus] -> WithEnv [QuasiStmt]
 parse' [] = leave
 parse' ((m, TreeNode ((_, TreeLeaf "notation"):es)):as)
