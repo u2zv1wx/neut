@@ -5,6 +5,7 @@ module Data.Log
   , outputLog
   , logInfo
   , logInfo'
+  , logWarning
   , logError
   , logCritical
   , logCritical'
@@ -83,6 +84,9 @@ logInfo pos text = (Just pos, LogLevelNote, text)
 
 logInfo' :: T.Text -> Log
 logInfo' text = (Nothing, LogLevelNote, text)
+
+logWarning :: PosInfo -> T.Text -> Log
+logWarning pos text = (Just pos, LogLevelWarning, text)
 
 logError :: PosInfo -> T.Text -> Log
 logError pos text = (Just pos, LogLevelError, text)

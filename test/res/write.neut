@@ -55,9 +55,9 @@
 ;; ここの最初の「&test」も「test」に解決されるわけだけど、するとbeginのあとでも「test」が
 ;; 使用されていることから、ここでtestのコピーが走ることになる。
 (begin
-  (let len (string:print &test))
-  (let len (string:print &test))
-  (let len (string:print &test))
+  (let _ (string:print &test))
+  (let _ (string:print &test))
+  (let len (string:print &test)) ;; ここの "defined but not used" はfreeを具体的に行うことを要求しているとみなせる。「せっかく借用したのに」というわけ。
   len) ;; ここでtestがfreeされる（直前のwriteでborrowされているので）
 
 ;; (begin
@@ -69,7 +69,7 @@
 (theorem some-theorem
   (Π ((A tau))
     (hom A A))
-  (assume (a)
+  (assume (_)
     (assume (x) x)))
 
 (verify ((λ ((x tau)) x) top))
@@ -88,13 +88,29 @@
 ;; (let a (os:write os:stdout &test 3))
 ;; (let a (os:write os:stdout &test 3))
 
+(with let-bind
+  (let _ (string:print &test))
+  (let hoge (string:print &test))
+  (i64 10)
+  (let _ (string:print &test))
+  (let len (string:print &test))
+  len)
 
-(let a (string:print &test))
-(let a (string:print &test))
-(let a (string:print &test))
-(let a (string:print &test))
+(let _ (string:print &test))
+(let hoge (string:print &test))
+(i64 10)
+(let _ (string:print &test))
+(let len (string:print &test))
+
+(string:print test)
+
+(let foo (i64 10))
+
+(string:print test)
+
 
 ;; (print-character 45)
+;; (string:print test)
 
 (i64:print -1234321)
 
@@ -106,13 +122,16 @@
         (string:print "looping with (もちろん日本語も出力できるよ): ")
         (i64:print ?n)
         ;; (erase n)
-        (let x (i64:add 10 10))
+        (let _ (i64:add 10 10))
+        (let hogehoge (i64 10))
+        (let _ (i64:add hogehoge 1))
         (string:print "\n")
         (?i64:mul n (fact (?i64:sub n 1)))))))
 
 (let xs (list i64)
   (list:new 1 2 3 4 5))
 
+;; ここでtestが参照できないのはletSigmaが壊れているってこと？
 
 (string:print "\n")
 

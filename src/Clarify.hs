@@ -193,7 +193,8 @@ clarifyConst tenv m name@(I (x, i))
       Nothing -> do
         cenv <- gets cacheEnv
         case IntMap.lookup i cenv of
-          Nothing -> return (m, CodeUpIntro (m, DataTheta $ asText'' name)) -- external
+          Nothing ->
+            return (m, CodeUpIntro (m, DataTheta $ asText'' name)) -- external
           Just (Right e) -> return e
           Just (Left e) -> do
             e' <- clarify' tenv e

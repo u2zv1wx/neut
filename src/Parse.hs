@@ -46,6 +46,7 @@ parse :: Path Abs File -> WithEnv WeakStmt
 parse inputPath = do
   stmtList <- visit inputPath
   stmtList' <- discern stmtList
+  warnUnusedVar
   pushTrace inputPath
   concatQuasiStmtList stmtList'
 
@@ -637,3 +638,19 @@ adjustPhase' m = do
   i <- gets phase
   let (_, l, c) = metaLocation m
   return $ m {metaLocation = (i, l, c)}
+
+warnUnusedVar :: WithEnv ()
+warnUnusedVar = do
+  set <- gets unusedNameSet
+  let set' = S.map (\(m, I (x, _)) -> (getPosInfo m, x)) set
+  warnUnusedVar' $ S.toList set'
+
+warnUnusedVar' :: [(PosInfo, T.Text)] -> WithEnv ()
+warnUnusedVar' [] = return ()
+warnUnusedVar' ((pos, x):pxs)
+  | T.all (`S.notMember` S.fromList "[]") x = do
+    warn pos $ "defined but not used: `" <> x <> "`"
+    warnUnusedVar' pxs
+  | otherwise = warnUnusedVar' pxs
+    -- warn pos $ "defined but not used: `" <> x <> "`"
+    -- warnUnusedVar' pxs

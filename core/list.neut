@@ -20,10 +20,10 @@
 
 (section list)
 
-(inductive list ((a tau))
+(inductive list ((a tau)) ;; list := Pi (a : tau). tauだからaがunusedとして報告される。修正すること。
   (nil ()
     (list a))
-  (cons ((x a) (xs (list a)))
+  (cons ((_ a) (_ (list a)))
     (list a)))
 
 (keyword list:new)

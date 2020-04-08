@@ -48,7 +48,8 @@ discern' nenv ((QuasiStmtDef xds):ss) = do
   let nenvForDef = Map.fromList (zip yis ys') `Map.union` nenv
   ds' <- mapM (discernDef nenvForDef) ds
   -- discern for continuation
-  xs' <- mapM newDefinedNameWith xs
+  let ms = map (\(m, _, _, _) -> m) ds
+  xs' <- zipWithM (\m x -> newDefinedNameWith m x) ms xs
   let xis = map asText xs
   let nenvForCont = Map.fromList (zip xis xs') `Map.union` nenv
   ss' <- discern' nenvForCont ss
@@ -109,7 +110,7 @@ discernStmtBinder nenv [] ss = do
   return ([], ss')
 discernStmtBinder nenv ((mx, x, t):xts) ss = do
   t' <- discern'' nenv t
-  x' <- newDefinedNameWith x
+  x' <- newDefinedNameWith mx x
   (xts', ss') <- discernStmtBinder (insertName x x' nenv) xts ss
   return ((mx, x', t') : xts', ss')
 
@@ -126,7 +127,7 @@ discern'' :: NameEnv -> WeakTermPlus -> WithEnv WeakTermPlus
 discern'' _ (m, WeakTermTau) = return (m, WeakTermTau)
 discern'' nenv (m, WeakTermUpsilon x@(I (s, _))) = do
   penv <- gets prefixEnv
-  mx <- lookupName penv nenv x
+  mx <- lookupName m penv nenv x
   b1 <- lookupEnumValueNameWithPrefix s
   b2 <- lookupEnumTypeNameWithPrefix s
   mc <- lookupConstantMaybe m penv s
@@ -236,7 +237,7 @@ discernBinder nenv [] e = do
   return ([], e')
 discernBinder nenv ((mx, x, t):xts) e = do
   t' <- discern'' nenv t
-  x' <- newDefinedNameWith x
+  x' <- newDefinedNameWith mx x
   (xts', e') <- discernBinder (insertName x x' nenv) xts e
   return ((mx, x', t') : xts', e')
 
@@ -254,12 +255,12 @@ discernIter ::
   -> WeakTermPlus
   -> WithEnv (IdentifierPlus, [IdentifierPlus], WeakTermPlus)
 discernIter nenv (mx, x, t') [] e = do
-  x' <- newDefinedNameWith x
+  x' <- newDefinedNameWith mx x
   e' <- discern'' (insertName x x' nenv) e
   return ((mx, x', t'), [], e')
 discernIter nenv xt ((mx, x, t):xts) e = do
   t' <- discern'' nenv t
-  x' <- newDefinedNameWith x
+  x' <- newDefinedNameWith mx x
   (xt', xts', e') <- discernIter (insertName x x' nenv) xt xts e
   return (xt', (mx, x', t') : xts', e')
 
@@ -283,20 +284,22 @@ discernStruct nenv [] e = do
   e' <- discern'' nenv e
   return ([], e')
 discernStruct nenv ((mx, x, t):xts) e = do
-  x' <- newDefinedNameWith x
+  x' <- newDefinedNameWith mx x
   (xts', e') <- discernStruct (insertName x x' nenv) xts e
   return ((mx, x', t) : xts', e')
 
-newDefinedNameWith :: Identifier -> WithEnv Identifier
-newDefinedNameWith (I (s, _)) = do
+newDefinedNameWith :: Meta -> Identifier -> WithEnv Identifier
+newDefinedNameWith m (I (s, _)) = do
   j <- newCount
-  modify (\e -> e {nameEnv = Map.insert s s (nameEnv e)})
-  return $ I (s, j)
+  modify (\env -> env {nameEnv = Map.insert s s (nameEnv env)})
+  let x = I (s, j)
+  modify (\env -> env {unusedNameSet = S.insert (m, x) (unusedNameSet env)})
+  return x
 
 newDefinedNameWith' :: Meta -> NameEnv -> Identifier -> WithEnv Identifier
 newDefinedNameWith' m nenv x = do
   case Map.lookup (asText x) nenv of
-    Nothing -> newDefinedNameWith x
+    Nothing -> newDefinedNameWith m x
     Just _ ->
       raiseError m $
       "the identifier `" <> asText x <> "` is already defined at top level"
@@ -304,22 +307,30 @@ newDefinedNameWith' m nenv x = do
 insertName :: Identifier -> Identifier -> NameEnv -> NameEnv
 insertName (I (s, _)) y nenv = Map.insert s y nenv
 
-lookupName :: [T.Text] -> NameEnv -> Identifier -> WithEnv (Maybe Identifier)
-lookupName penv nenv x =
+lookupName ::
+     Meta -> [T.Text] -> NameEnv -> Identifier -> WithEnv (Maybe Identifier)
+lookupName m penv nenv x =
   case Map.lookup (asText x) nenv of
-    Just x' -> return $ Just x'
-    Nothing -> lookupName' penv nenv x
+    Just x' -> do
+      modify
+        (\env -> env {unusedNameSet = S.delete (m, x') (unusedNameSet env)})
+      return $ Just x'
+    Nothing -> lookupName' m penv nenv x
 
-lookupName' :: [T.Text] -> NameEnv -> Identifier -> WithEnv (Maybe Identifier)
-lookupName' [] _ _ = return Nothing
-lookupName' (prefix:prefixList) nenv x =
+lookupName' ::
+     Meta -> [T.Text] -> NameEnv -> Identifier -> WithEnv (Maybe Identifier)
+lookupName' _ [] _ _ = return Nothing
+lookupName' m (prefix:prefixList) nenv x =
   case Map.lookup (prefix <> ":" <> asText x) nenv of
-    Just x' -> return $ Just x'
-    Nothing -> lookupName' prefixList nenv x
+    Just x' -> do
+      modify
+        (\env -> env {unusedNameSet = S.delete (m, x') (unusedNameSet env)})
+      return $ Just x'
+    Nothing -> lookupName' m prefixList nenv x
 
 lookupName'' :: Meta -> [T.Text] -> NameEnv -> Identifier -> WithEnv Identifier
 lookupName'' m penv nenv x = do
-  mx <- lookupName penv nenv x
+  mx <- lookupName m penv nenv x
   case mx of
     Just x' -> return x'
     Nothing -> raiseError m $ "undefined variable: " <> asText x

@@ -81,7 +81,9 @@ elaborateStmt (WeakStmtLetSigma m xts e cont) = do
   analyze >> synthesize >> refine >> cleanup
   e'' <- elaborate' e'
   xts'' <- mapM elaboratePlus xts'
-  forM_ xts'' $ \(_, x, tx) -> insWeakTypeEnv x (weaken (reduceTermPlus tx))
+  forM_ xts'' $ \(_, x, tx) -> insTypeEnv x (reduceTermPlus tx)
+  -- x = let (x1, ..., xn) := e in xiとしてcacheEnvを更新すべき？
+  -- forM_ xts'' $ \(_, x, tx) -> insWeakTypeEnv x (weaken (reduceTermPlus tx))
   cont' <- elaborateStmt cont
   termSigmaElim m (m, TermEnum $ EnumTypeIntS 64) xts'' e'' cont'
 elaborateStmt (WeakStmtVerify m e cont) = do

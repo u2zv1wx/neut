@@ -82,6 +82,7 @@ data Env =
     , consToInd :: IntMap.IntMap Identifier
     -- "list:cons-8" ~> [0] (the used indices of xts)
     , consToArgs :: IntMap.IntMap [Int]
+    , unusedNameSet :: S.Set (Meta, Identifier)
     --
     -- elaborate
     --
@@ -138,6 +139,7 @@ initialEnv =
     , revNameEnv = IntMap.empty
     , consToInd = IntMap.empty
     , consToArgs = IntMap.empty
+    , unusedNameSet = S.empty
     , prefixEnv = []
     , namespace = []
     , formationEnv = IntMap.empty
@@ -495,3 +497,9 @@ note' str = do
   b <- gets shouldColorize
   eoe <- gets endOfEntry
   liftIO $ outputLog b eoe $ logInfo' str
+
+warn :: PosInfo -> T.Text -> WithEnv ()
+warn pos str = do
+  b <- gets shouldColorize
+  eoe <- gets endOfEntry
+  liftIO $ outputLog b eoe $ logWarning pos str
