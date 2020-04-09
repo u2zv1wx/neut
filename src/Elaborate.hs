@@ -292,22 +292,22 @@ elaborate' (m, WeakTermQuestion e t) = do
       Nothing -> do
         note m $ toText (weaken t')
       Just len -> do
-        is <- getImpInfo e'
-        let form = toText (weaken e') : showFormArgs 0 is [0 .. len - 1]
+        (is, e'') <- getImpInfo e'
+        let form = toText (weaken e'') : showFormArgs 0 is [0 .. len - 1]
         let formStr = inParen $ showItems form
         note m $ toText (weaken t') <> "\n-\n" <> formStr
   return e'
 elaborate' (_, WeakTermErase _ e) = elaborate' e
 
-getImpInfo :: TermPlus -> WithEnv [Int]
-getImpInfo (m, TermConst x)
+getImpInfo :: TermPlus -> WithEnv ([Int], TermPlus)
+getImpInfo e@(m, TermConst x)
   | not (metaIsExplicit m) = do
     ienv <- gets impEnv
     case IntMap.lookup (asInt x) ienv of
-      Just is -> return is
-      Nothing -> return []
-  | otherwise = return []
-getImpInfo _ = return []
+      Just is -> return (is, e)
+      Nothing -> return ([], e)
+  | otherwise = return ([], (m, TermConst $ I ("@" <> asText x, asInt x)))
+getImpInfo e = return ([], e)
 
 getArgLen :: TermPlus -> Maybe Int
 getArgLen (_, TermPi _ xts _) = return $ length xts
