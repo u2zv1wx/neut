@@ -285,17 +285,17 @@ elaborate' (m, WeakTermCase indName e cxtes) = do
             (True, True) -> return (m, TermCase indName e' cxtes')
 elaborate' (m, WeakTermQuestion e t) = do
   e' <- elaborate' e
-  t' <- elaborate' t
-  case getArgLen t' of
-    Nothing -> do
-      note m $ toText (weaken t')
-      return e'
-    Just len -> do
-      is <- getImpInfo e'
-      let form = toText (weaken e') : showFormArgs 0 is [0 .. len - 1]
-      let formStr = inParen $ showItems form
-      note m $ toText (weaken t') <> "\n-\n" <> formStr
-      return e'
+  whenCheck $ do
+    t' <- elaborate' t
+    case getArgLen t' of
+      Nothing -> do
+        note m $ toText (weaken t')
+      Just len -> do
+        is <- getImpInfo e'
+        let form = toText (weaken e') : showFormArgs 0 is [0 .. len - 1]
+        let formStr = inParen $ showItems form
+        note m $ toText (weaken t') <> "\n-\n" <> formStr
+  return e'
 elaborate' (_, WeakTermErase _ e) = elaborate' e
 
 getImpInfo :: TermPlus -> WithEnv [Int]

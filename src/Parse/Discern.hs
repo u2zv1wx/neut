@@ -35,7 +35,7 @@ discern' nenv ((QuasiStmtLetWT m (mx, x, t) e):ss) = do
   x' <- newDefinedNameWith' mx nenv x
   e' <- discern'' nenv e
   set' <- gets intactSet
-  modify (\env -> env {intactSet = S.intersection set set'})
+  whenCheck $ modify (\env -> env {intactSet = S.intersection set set'})
   ss' <- discern' (insertName x x' nenv) ss
   return $ QuasiStmtLetWT m (mx, x', t') e' : ss'
 discern' nenv ((QuasiStmtDef xds):ss) = do
@@ -69,7 +69,7 @@ discern' nenv ((QuasiStmtImplicit m x i):ss) = do
     case mc of
       Just c -> return c
       Nothing -> lookupName'' m penv nenv x
-  modify (\env -> env {intactSet = set})
+  whenCheck $ modify (\env -> env {intactSet = set})
   ss' <- discern' nenv ss
   return $ QuasiStmtImplicit m x' i : ss'
 discern' nenv ((QuasiStmtEnum m name xis):ss) = do
@@ -81,7 +81,7 @@ discern' nenv ((QuasiStmtLetInductive n m (mx, a, t) e):ss) = do
   a' <- newDefinedNameWith' m nenv a
   e' <- discern'' nenv e
   set' <- gets intactSet
-  modify (\env -> env {intactSet = S.intersection set set'})
+  whenCheck $ modify (\env -> env {intactSet = S.intersection set set'})
   ss' <- discern' (insertName a a' nenv) ss
   return $ QuasiStmtLetInductive n m (mx, a', t') e' : ss'
 discern' nenv ((QuasiStmtLetInductiveIntro m (mx, x, t) e as):ss) = do
@@ -92,7 +92,7 @@ discern' nenv ((QuasiStmtLetInductiveIntro m (mx, x, t) e as):ss) = do
   penv <- gets prefixEnv
   as' <- mapM (lookupName'' m penv nenv) as
   set' <- gets intactSet
-  modify (\env -> env {intactSet = S.intersection set set'})
+  whenCheck $ modify (\env -> env {intactSet = S.intersection set set'})
   ss' <- discern' (insertName x x' nenv) ss
   return $ QuasiStmtLetInductiveIntro m (mx, x', t') e' as' : ss'
 discern' nenv ((QuasiStmtUse prefix):ss) = do
@@ -297,11 +297,11 @@ insertName (I (s, _)) y nenv = Map.insert s y nenv
 
 insertIntoIntactSet :: Meta -> Identifier -> WithEnv ()
 insertIntoIntactSet m x =
-  modify (\env -> env {intactSet = S.insert (m, x) (intactSet env)})
+  whenCheck $ modify (\env -> env {intactSet = S.insert (m, x) (intactSet env)})
 
 removeFromIntactSet :: Meta -> Identifier -> WithEnv ()
 removeFromIntactSet m x =
-  modify (\env -> env {intactSet = S.delete (m, x) (intactSet env)})
+  whenCheck $ modify (\env -> env {intactSet = S.delete (m, x) (intactSet env)})
 
 lookupName ::
      Meta -> [T.Text] -> NameEnv -> Identifier -> WithEnv (Maybe Identifier)

@@ -174,7 +174,7 @@ run (Check inputPathStr colorizeFlag eoe) = do
   inputPath <- resolveFile' inputPathStr
   resultOrErr <-
     evalWithEnv (check inputPath) $
-    initialEnv {shouldColorize = colorizeFlag, endOfEntry = eoe}
+    initialEnv {shouldColorize = colorizeFlag, endOfEntry = eoe, isCheck = True}
   case resultOrErr of
     Right _ -> return ()
     Left err ->

@@ -614,10 +614,11 @@ adjustPhase' m = do
   return $ m {metaLocation = (i, l, c)}
 
 warnUnusedVar :: WithEnv ()
-warnUnusedVar = do
-  set <- gets intactSet
-  let set' = S.map (\(m, I (x, _)) -> (getPosInfo m, x)) set
-  warnUnusedVar' $ S.toList set'
+warnUnusedVar =
+  whenCheck $ do
+    set <- gets intactSet
+    let set' = S.map (\(m, I (x, _)) -> (getPosInfo m, x)) set
+    warnUnusedVar' $ S.toList set'
 
 warnUnusedVar' :: [(PosInfo, T.Text)] -> WithEnv ()
 warnUnusedVar' [] = return ()

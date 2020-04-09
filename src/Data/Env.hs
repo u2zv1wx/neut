@@ -48,6 +48,7 @@ data Env =
     , ppCount :: Int -- count used only for pretty printing
     , shouldColorize :: Bool
     , endOfEntry :: String
+    , isCheck :: Bool
     --
     -- parse
     --
@@ -122,6 +123,7 @@ initialEnv =
     { count = 0
     , ppCount = 0
     , shouldColorize = False
+    , isCheck = False
     , endOfEntry = ""
     , phase = 0
     , target = Nothing
@@ -166,6 +168,11 @@ initialEnv =
     }
 
 type WithEnv a = StateT Env (ExceptT [Log] IO) a
+
+whenCheck :: WithEnv () -> WithEnv ()
+whenCheck f = do
+  b <- gets isCheck
+  when b f
 
 evalWithEnv :: WithEnv a -> Env -> IO (Either [Log] a)
 evalWithEnv c env = do

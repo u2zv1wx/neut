@@ -181,6 +181,7 @@
 
 
 ?choice:induction
+;; (choice:induction (choice:item-1) (lambda () i64) ?admit ?admit)
 
 (definition flip ((c (choice)))
   (witness (choice)
