@@ -87,7 +87,6 @@ data Env =
     --
     -- elaborate
     --
-    -- set of the names of constructors (e.g. ["nil", "cons", "zero", "succ", ...] (as int))
     , nonCandSet :: S.Set T.Text
     -- var ~> (index of implicit arguments of the var)
     , impEnv :: IntMap.IntMap [Int]
@@ -99,7 +98,6 @@ data Env =
     -- metavar ~> beta-equivalent weakterm
     , substEnv :: IntMap.IntMap WeakTermPlus
     , zetaEnv :: IntMap.IntMap (WeakTermPlus, WeakTermPlus)
-    -- , zetaEnv :: IntMap.IntMap (WeakTermPlus, WeakTermPlus, UnivLevelPlus)
     --
     -- clarify
     --
