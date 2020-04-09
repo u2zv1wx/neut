@@ -37,18 +37,18 @@
 
 (keyword let)
 
-(keyword begin)
+;; (keyword begin)
 
-(notation (begin e) e)
+;; (notation (begin e) e)
 
-(notation (begin e rest+)
-  ((lambda ((_ hole)) (begin rest+)) (begin e)))
+;; (notation (begin e rest+)
+;;   ((lambda ((_ hole)) (begin rest+)) (begin e)))
 
-(notation (begin (let x e+) rest+)
-  ((lambda ((x hole)) (begin rest+)) (begin e+)))
+;; (notation (begin (let x e+) rest+)
+;;   ((lambda ((x hole)) (begin rest+)) (begin e+)))
 
-(notation (begin (let (x t) e+) rest+)
-  ((lambda ((x t)) (begin rest+)) (begin e+)))
+;; (notation (begin (let (x t) e+) rest+)
+;;   ((lambda ((x t)) (begin rest+)) (begin e+)))
 
 ;; (keyword with)
 
@@ -129,7 +129,10 @@
 (keyword destruct)
 
 (notation (destruct e xts rest+)
-  (sigma-elimination xts e (begin rest+)))
+  (sigma-elimination xts e (with let-bind rest+)))
+
+;; (notation (destruct e xts rest+)
+;;   (sigma-elimination xts e (begin rest+)))
 
 (keyword cast)
 

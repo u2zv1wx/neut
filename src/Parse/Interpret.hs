@@ -240,32 +240,33 @@ interpret t@(m, TreeNode es) = do
 
 interpretPiElim :: Meta -> TreePlus -> [TreePlus] -> WithEnv WeakTermPlus
 interpretPiElim m f args = do
-  (args', headerList) <- unzip <$> mapM interpretBorrow args
   f' <- interpret f
-  return $ applyHeader headerList (m, WeakTermPiElim f' args')
+  args' <- mapM interpret args
+  return (m, WeakTermPiElim f' args')
+  -- (args', headerList) <- unzip <$> mapM interpretBorrow args
+  -- f' <- interpret f
+  -- return $ applyHeader headerList (m, WeakTermPiElim f' args')
 
-applyHeader :: [WeakTermPlus -> WeakTermPlus] -> WeakTermPlus -> WeakTermPlus
-applyHeader [] e = e
-applyHeader (f:fs) e = f (applyHeader fs e)
-
+-- applyHeader :: [WeakTermPlus -> WeakTermPlus] -> WeakTermPlus -> WeakTermPlus
+-- applyHeader [] e = e
+-- applyHeader (f:fs) e = f (applyHeader fs e)
 -- (e e1 ... en)みたいなやつのei部分をチェックしてborrow成分を集める
-interpretBorrow ::
-     TreePlus -> WithEnv (WeakTermPlus, WeakTermPlus -> WeakTermPlus)
-interpretBorrow (m, TreeNode (f:args))
-  | (mmxs, args') <- unzip $ map interpretBorrow' args
-  , mxs <- catMaybes mmxs
-  , not (null mxs) = do
-    f' <- interpret f
-    args'' <- mapM interpret args'
-    tmp <- newNameWith'' "borrow"
-    xts <- mapM toIdentPlus $ mxs ++ [(m, tmp)]
-    h <- newHole m
-    let app = (m, WeakTermPiElim f' args'')
-    return ((m, WeakTermUpsilon tmp), \term -> sigmaElim m h xts app term)
-interpretBorrow e = do
-  e' <- interpret e
-  return (e', id)
-
+-- interpretBorrow ::
+--      TreePlus -> WithEnv (WeakTermPlus, WeakTermPlus -> WeakTermPlus)
+-- interpretBorrow (m, TreeNode (f:args))
+--   | (mmxs, args') <- unzip $ map interpretBorrow' args
+--   , mxs <- catMaybes mmxs
+--   , not (null mxs) = do
+--     f' <- interpret f
+--     args'' <- mapM interpret args'
+--     tmp <- newNameWith'' "borrow"
+--     xts <- mapM toIdentPlus $ mxs ++ [(m, tmp)]
+--     h <- newHole m
+--     let app = (m, WeakTermPiElim f' args'')
+--     return ((m, WeakTermUpsilon tmp), \term -> sigmaElim m h xts app term)
+-- interpretBorrow e = do
+--   e' <- interpret e
+--   return (e', id)
 sigmaIntro :: Meta -> [WeakTermPlus] -> WithEnv WeakTermPlus
 sigmaIntro m es = do
   z <- newNameWith'' "sigma"
@@ -328,12 +329,11 @@ sigmaElim ::
 sigmaElim m t xts e1 e2 =
   (m, WeakTermPiElim e1 [t, (m, WeakTermPiIntro xts e2)])
 
-interpretBorrow' :: TreePlus -> (Maybe (Meta, Identifier), TreePlus)
-interpretBorrow' (m, TreeLeaf s)
-  | T.length s > 1
-  , T.head s == '&' = (Just (m, asIdent $ T.tail s), (m, TreeLeaf $ T.tail s))
-interpretBorrow' t = (Nothing, t)
-
+-- interpretBorrow' :: TreePlus -> (Maybe (Meta, Identifier), TreePlus)
+-- interpretBorrow' (m, TreeLeaf s)
+--   | T.length s > 1
+--   , T.head s == '&' = (Just (m, asIdent $ T.tail s), (m, TreeLeaf $ T.tail s))
+-- interpretBorrow' t = (Nothing, t)
 toIdentPlus :: (Meta, Identifier) -> WithEnv IdentifierPlus
 toIdentPlus (m, x) = do
   h <- newHole m
@@ -610,14 +610,33 @@ raiseSyntaxError m form =
 
 interpretWith :: TreePlus -> WithEnv WeakTermPlus
 interpretWith (m, TreeNode (with@(_, TreeLeaf "with"):bind:(_, TreeNode ((_, TreeLeaf "let"):xt:es)):rest)) = do
-  bind' <- interpret bind
-  h1 <- newHole m
-  h2 <- newHole m
-  e' <- interpretWith (m, TreeNode (with : bind : es))
-  xt' <- interpretIdentifierPlus xt
-  rest' <- interpretWith (m, TreeNode (with : bind : rest))
-  let lam = (m, WeakTermPiIntro [xt'] rest')
-  return (m, WeakTermPiElim bind' [h1, h2, e', lam])
+  (borrowVarList, es') <- interpretBorrow m es
+  if not (null borrowVarList)
+    then do
+      sig <- newTextWith "borrow"
+      interpretWith
+        ( m
+        , TreeNode
+            [ with
+            , bind
+            , (m, TreeNode ((m, TreeLeaf "let") : (m, TreeLeaf sig) : es'))
+            , ( m
+              , TreeNode
+                  [ (m, TreeLeaf "sigma-elimination")
+                  , (m, TreeNode (borrowVarList ++ [xt]))
+                  , (m, TreeLeaf sig)
+                  , (m, TreeNode (with : bind : rest))
+                  ])
+            ])
+    else do
+      bind' <- interpret bind
+      h1 <- newHole m
+      h2 <- newHole m
+      e' <- interpretWith (m, TreeNode (with : bind : es'))
+      xt' <- interpretIdentifierPlus xt
+      rest' <- interpretWith (m, TreeNode (with : bind : rest))
+      let lam = (m, WeakTermPiIntro [xt'] rest')
+      return (m, WeakTermPiElim bind' [h1, h2, e', lam])
 interpretWith (m, TreeNode (with@(_, TreeLeaf "with"):bind:(_, TreeNode ((_, TreeLeaf "erase"):xs)):rest)) = do
   case mapM asLeaf xs of
     Nothing -> raiseSyntaxError m "(with TREE (erase LEAF ... LEAF) TREE*)"
@@ -629,3 +648,26 @@ interpretWith (m, TreeNode (with@(_, TreeLeaf "with"):bind:e:rest)) = do
   let e' = (m, TreeNode [(m, TreeLeaf "let"), (m, TreeLeaf "_"), e])
   interpretWith (m, TreeNode (with : bind : e' : rest))
 interpretWith t = raiseSyntaxError (fst t) "(with TREE TREE+)"
+
+interpretBorrow :: Meta -> [TreePlus] -> WithEnv ([TreePlus], [TreePlus])
+interpretBorrow m [] = raiseSyntaxError m "(TREE TREE*)"
+interpretBorrow _ es = do
+  let (borrowVarList, e') = interpretBorrow' $ last es
+  return (borrowVarList, init es ++ [e'])
+
+interpretBorrow' :: TreePlus -> ([TreePlus], TreePlus)
+interpretBorrow' t@(_, TreeLeaf _) = ([], t)
+interpretBorrow' (m, TreeNode ts) = do
+  let (mmxs, ts') = unzip $ map interpretBorrow'' ts
+  (catMaybes mmxs, (m, TreeNode ts'))
+
+interpretBorrow'' :: TreePlus -> (Maybe TreePlus, TreePlus)
+interpretBorrow'' (m, TreeLeaf s)
+  | T.length s > 1
+  , T.head s == '&' = (Just (m, TreeLeaf $ T.tail s), (m, TreeLeaf $ T.tail s))
+interpretBorrow'' t = (Nothing, t)
+
+newTextWith :: T.Text -> WithEnv T.Text
+newTextWith s = do
+  i <- newCount
+  return $ "(" <> s <> "-" <> T.pack (show i) <> ")"
