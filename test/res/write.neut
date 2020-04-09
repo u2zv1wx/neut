@@ -144,13 +144,14 @@
 
 ?equal:induction
 
+?@@@equal:refl
 
-?@equal:refl
+?equal:refl
 
 
+@?equal:refl
 
 (definition my-id ((a tau) (_ tau) (_ tau) (x a)) x)
-
 
 
 ;; (definition my-id ((?a tau) (x a)) x)

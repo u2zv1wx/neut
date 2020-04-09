@@ -228,7 +228,7 @@ interpret (m, TreeLeaf x)
             else do
               e <- interpret (m, TreeLeaf rest)
               h <- newHole m
-              return (metaOf e, WeakTermQuestion e h)
+              return (m, WeakTermQuestion e h)
         | otherwise -> return (m, WeakTermUpsilon $ asIdent x)
 interpret t@(m, TreeNode es) = do
   ml <- interpretEnumValueMaybe t

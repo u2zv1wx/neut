@@ -300,11 +300,13 @@ elaborate' (m, WeakTermQuestion e t) = do
 elaborate' (_, WeakTermErase _ e) = elaborate' e
 
 getImpInfo :: TermPlus -> WithEnv [Int]
-getImpInfo (_, TermConst x) = do
-  ienv <- gets impEnv
-  case IntMap.lookup (asInt x) ienv of
-    Just is -> return is
-    Nothing -> return []
+getImpInfo (m, TermConst x)
+  | not (metaIsExplicit m) = do
+    ienv <- gets impEnv
+    case IntMap.lookup (asInt x) ienv of
+      Just is -> return is
+      Nothing -> return []
+  | otherwise = return []
 getImpInfo _ = return []
 
 getArgLen :: TermPlus -> Maybe Int
