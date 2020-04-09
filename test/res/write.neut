@@ -81,7 +81,6 @@
 
 (verify ((λ ((x tau)) x) top))
 
-
 (verify some-theorem)
 
 

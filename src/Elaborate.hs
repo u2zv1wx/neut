@@ -77,12 +77,10 @@ elaborateStmt (WeakStmtVerify m e cont) = do
   (e', _) <- infer e
   e'' <- elaborate' e'
   start <- liftIO $ getCurrentTime
-  e''' <- normalize e''
+  _ <- normalize e''
   stop <- liftIO $ getCurrentTime
   let sec = realToFrac $ diffUTCTime stop start :: Float
-  note m $
-    "verification succeeded with the following normal form (" <>
-    T.pack (showFloat' sec) <> " seconds):\n" <> toText (weaken e''')
+  note m $ "verification succeeded (" <> T.pack (showFloat' sec) <> " seconds)"
   elaborateStmt cont
 elaborateStmt (WeakStmtImplicit m x@(I (_, i)) idxList cont) = do
   t <- lookupTypeEnv' m x
