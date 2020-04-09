@@ -51,15 +51,16 @@
 ;; (write hole stdout &test 3)
 
 
+
 ;; こっちだと最初と最後の1回だけ。
 ;; ここの最初の「&test」も「test」に解決されるわけだけど、するとbeginのあとでも「test」が
 ;; 使用されていることから、ここでtestのコピーが走ることになる。
-(with let-bind
-  (let _ (string:print &test))
-  (let _ (string:print &test))
-  (let len (string:print &test)) ;; ここの "defined but not used" はfreeを具体的に行うことを要求しているとみなせる。「せっかく借用したのに」というわけ。
-  (erase test)
-  len) ;; ここでtestがfreeされる（直前のwriteでborrowされているので）
+;; (with let-bind
+;;   (let _ (string:print &test))
+;;   (let _ (string:print &test))
+;;   (let len (string:print &test)) ;; ここの "defined but not used" はfreeを具体的に行うことを要求しているとみなせる。「せっかく借用したのに」というわけ。
+;;   (erase test)
+;;   len) ;; ここでtestがfreeされる（直前のwriteでborrowされているので）
 
 
 ;; (begin
@@ -91,14 +92,14 @@
 ;; (let a (os:write os:stdout &test 3))
 ;; (let a (os:write os:stdout &test 3))
 
-(with let-bind
-  (let _ (string:print &test))
-  (let _ (string:print &test))
-  (i64 10)
-  (let _ (string:print &test))
-  (let len (string:print &test))
-  (erase test)
-  len)
+;; (with let-bind
+;;   (let _ (string:print &test))
+;;   (let _ (string:print &test))
+;;   (i64 10)
+;;   (let _ (string:print &test))
+;;   (let len (string:print &test))
+;;   (erase test)
+;;   len)
 
 
 ;; (let _ (string:print &test))
@@ -154,7 +155,6 @@
 
 (definition my-id ((a tau) (_ tau) (_ tau) (x a)) x)
 
-
 ;; (definition my-id ((?a tau) (x a)) x)
 
 ;; #my-id
@@ -166,7 +166,7 @@
 
 (attribute my-id (implicit 1))
 
-?my-id
+?@my-id
 
 
 (attribute my-id (implicit 2))

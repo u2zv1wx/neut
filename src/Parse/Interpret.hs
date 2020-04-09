@@ -200,6 +200,7 @@ interpret (m, TreeNode ((_, TreeLeaf "record"):rest))
     let f = (m, WeakTermUpsilon $ asIdent $ a <> ":unfold")
     return (m, WeakTermPiElim f es)
   | otherwise = raiseSyntaxError m "(record TREE TREE*)"
+interpret t@(_, TreeNode ((_, TreeLeaf "with"):_)) = interpretWith t
 interpret (m, TreeLeaf x)
   | Just x' <- readMaybe $ T.unpack x = do
     h <- newHole m
@@ -606,3 +607,25 @@ toValueIntU size i = WeakTermEnumIntro $ EnumValueIntU size i
 raiseSyntaxError :: Meta -> T.Text -> WithEnv a
 raiseSyntaxError m form =
   raiseError m $ "couldn't match the input with the expected form: " <> form
+
+interpretWith :: TreePlus -> WithEnv WeakTermPlus
+interpretWith (m, TreeNode (with@(_, TreeLeaf "with"):bind:(_, TreeNode ((_, TreeLeaf "let"):xt:es)):rest)) = do
+  bind' <- interpret bind
+  h1 <- newHole m
+  h2 <- newHole m
+  e' <- interpretWith (m, TreeNode (with : bind : es))
+  xt' <- interpretIdentifierPlus xt
+  rest' <- interpretWith (m, TreeNode (with : bind : rest))
+  let lam = (m, WeakTermPiIntro [xt'] rest')
+  return (m, WeakTermPiElim bind' [h1, h2, e', lam])
+interpretWith (m, TreeNode (with@(_, TreeLeaf "with"):bind:(_, TreeNode ((_, TreeLeaf "erase"):xs)):rest)) = do
+  case mapM asLeaf xs of
+    Nothing -> raiseSyntaxError m "(with TREE (erase LEAF ... LEAF) TREE*)"
+    Just xs' -> do
+      rest' <- interpretWith (m, TreeNode (with : bind : rest))
+      return (m, WeakTermErase xs' rest')
+interpretWith (_, TreeNode [(_, TreeLeaf "with"), _, e]) = interpret e
+interpretWith (m, TreeNode (with@(_, TreeLeaf "with"):bind:e:rest)) = do
+  let e' = (m, TreeNode [(m, TreeLeaf "let"), (m, TreeLeaf "_"), e])
+  interpretWith (m, TreeNode (with : bind : e' : rest))
+interpretWith t = raiseSyntaxError (fst t) "(with TREE TREE+)"
