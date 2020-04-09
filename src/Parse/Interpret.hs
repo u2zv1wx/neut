@@ -212,27 +212,23 @@ interpret (m, TreeLeaf x)
   | Just str <- readMaybe $ T.unpack x = do
     u8s <- forM (encode str) $ \u -> return (m, toValueIntU 8 (toInteger u))
     sigmaIntroString m u8s
-  -- note that enums/constants are interpreted as variables at this stage.
-  -- Those are reinterpreted into constants in Rename.
-  -- This is to handle terms like `lam (i64 : bool). e` (i.e. bound variable
-  -- with the same name of a constant) in saner way.
-  | otherwise
-    -- '@'-prefixed variables are interpreted as explicit variables
-   = do
+  | otherwise = do
     case T.uncons x of
       Nothing -> raiseCritical m "encountered a variable with empty identifier"
       Just (c, rest)
         | c == '@' ->
           if T.length rest == 0
             then raiseError m "found a explicit variable with empty identifier"
-            else return
-                   (m {metaIsExplicit = True}, WeakTermUpsilon $ asIdent rest)
+            else do
+              (m', e) <- interpret (m, TreeLeaf rest)
+              return (m' {metaIsExplicit = True}, e)
         | c == '?' ->
           if T.length rest == 0
             then raiseError m "found a note-variable with empty identifier"
             else do
+              e <- interpret (m, TreeLeaf rest)
               h <- newHole m
-              return (m, WeakTermQuestion (m, WeakTermUpsilon (asIdent rest)) h)
+              return (metaOf e, WeakTermQuestion e h)
         | otherwise -> return (m, WeakTermUpsilon $ asIdent x)
 interpret t@(m, TreeNode es) = do
   ml <- interpretEnumValueMaybe t
