@@ -162,9 +162,8 @@ interpret (m, TreeNode ((_, TreeLeaf "question"):rest))
   | [e] <- rest = do
     e' <- interpret e
     h <- newHole m
-    return (m, WeakTermWithNote e' h)
+    return (m, WeakTermQuestion e' h)
   | otherwise = raiseSyntaxError m "(question TREE)"
--- interpret (m, TreeNode [(_, TreeLeaf "erase"), (_, TreeNode xs), body])
 interpret tree@(m, TreeNode ((_, TreeLeaf "erase"):rest))
   | [(_, TreeNode mxs), body] <- rest
   , Just mxs' <- mapM asLeaf mxs = do
@@ -233,13 +232,8 @@ interpret (m, TreeLeaf x)
             then raiseError m "found a note-variable with empty identifier"
             else do
               h <- newHole m
-              return (m, WeakTermWithNote (m, WeakTermUpsilon (asIdent rest)) h)
+              return (m, WeakTermQuestion (m, WeakTermUpsilon (asIdent rest)) h)
         | otherwise -> return (m, WeakTermUpsilon $ asIdent x)
-        -- | c == '@'
-        -- , T.length rest == 0 ->
-        --   raiseError m "found a explicit variable with empty identifier"
-        -- | otherwise ->
-        --   return (m {metaIsExplicit = True}, WeakTermUpsilon $ asIdent rest)
 interpret t@(m, TreeNode es) = do
   ml <- interpretEnumValueMaybe t
   case (ml, es) of

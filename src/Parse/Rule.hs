@@ -539,10 +539,10 @@ substRuleType sub (m, WeakTermCase indName e cxtes) = do
       (xts', body') <- substRuleType'' sub xts body
       return ((c, xts'), body')
   return (m, WeakTermCase indName e' cxtes')
-substRuleType sub (m, WeakTermWithNote e t) = do
+substRuleType sub (m, WeakTermQuestion e t) = do
   e' <- substRuleType sub e
   t' <- substRuleType sub t
-  return (m, WeakTermWithNote e' t')
+  return (m, WeakTermQuestion e' t')
 substRuleType sub (m, WeakTermErase xs e) = do
   e' <- substRuleType sub e
   return (m, WeakTermErase xs e')

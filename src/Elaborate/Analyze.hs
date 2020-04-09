@@ -118,7 +118,7 @@ simp' (((_, WeakTermStructIntro eks1), (_, WeakTermStructIntro eks2)):cs)
   | (es1, ks1) <- unzip eks1
   , (es2, ks2) <- unzip eks2
   , ks1 == ks2 = simp $ zip es1 es2 ++ cs
-simp' (((_, WeakTermWithNote e1 t1), (_, WeakTermWithNote e2 t2)):cs) =
+simp' (((_, WeakTermQuestion e1 t1), (_, WeakTermQuestion e2 t2)):cs) =
   simp $ (e1, e2) : (t1, t2) : cs
 simp' ((e1@(m1, _), e2@(m2, _)):cs) = do
   let ms1 = asStuckedTerm e1

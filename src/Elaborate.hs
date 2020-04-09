@@ -283,7 +283,7 @@ elaborate' (m, WeakTermCase indName e cxtes) = do
             (False, _) -> raiseError m $ "found a non-linear pattern"
             (_, False) -> raiseError m $ "found a non-exhaustive pattern"
             (True, True) -> return (m, TermCase indName e' cxtes')
-elaborate' (m, WeakTermWithNote e t) = do
+elaborate' (m, WeakTermQuestion e t) = do
   e' <- elaborate' e
   t' <- elaborate' t
   case getArgLen t' of

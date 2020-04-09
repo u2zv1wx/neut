@@ -148,12 +148,27 @@
 
 
 
-(definition my-id ([a tau] [b tau] [c tau] (x a)) x)
+(definition my-id ((a tau) (_ tau) (_ tau) (x a)) x)
+
+
 
 ;; (definition my-id ((?a tau) (x a)) x)
 
 ;; #my-id
 ?my-id
+
+(attribute my-id (implicit 0))
+
+?my-id
+
+(attribute my-id (implicit 1))
+
+?my-id
+
+(attribute my-id (implicit 2))
+
+?my-id
+
 
 
 (let p (equal:refl (i64 3)))
@@ -191,7 +206,6 @@
         ))) ;; F @ c
 
 
-
 ?double-flip-is-identity
 
 ;; (verify double-flip-is-identity)
@@ -208,6 +222,7 @@
   (implicit 0))
 
 ;; (provide unused-function)
+
 
 (?string:print "\n")
 

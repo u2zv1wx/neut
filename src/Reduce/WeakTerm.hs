@@ -109,7 +109,7 @@ reduceWeakTermPlus (m, WeakTermCase indName e cxtes) = do
           let body' = reduceWeakTermPlus body
           ((c, zip3 ms xs ts'), body')
   (m, WeakTermCase indName e' cxtes'')
-reduceWeakTermPlus (_, WeakTermWithNote e _) = reduceWeakTermPlus e
+reduceWeakTermPlus (_, WeakTermQuestion e _) = reduceWeakTermPlus e
 reduceWeakTermPlus e = e
 
 reduceWeakTermIdentPlus :: IdentifierPlus -> IdentifierPlus

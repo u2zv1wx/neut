@@ -204,10 +204,10 @@ discern'' nenv (m, WeakTermCase indName e cxtes) = do
       (xts', body') <- discernBinder nenv xts body
       return (((mc, c'), xts'), body')
   return (m, WeakTermCase indName e' cxtes')
-discern'' nenv (m, WeakTermWithNote e t) = do
+discern'' nenv (m, WeakTermQuestion e t) = do
   e' <- discern'' nenv e
   t' <- discern'' nenv t
-  return (m, WeakTermWithNote e' t')
+  return (m, WeakTermQuestion e' t')
 discern'' nenv (_, WeakTermErase mxs e) = do
   penv <- gets prefixEnv
   forM_ mxs $ \(mx, x) -> lookupName'' mx penv nenv (asIdent x)

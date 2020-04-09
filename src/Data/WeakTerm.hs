@@ -46,7 +46,7 @@ data WeakTerm
       T.Text
       WeakTermPlus
       [(((Meta, Identifier), [IdentifierPlus]), WeakTermPlus)]
-  | WeakTermWithNote WeakTermPlus WeakTermPlus -- e : t (output the type `t` as note)
+  | WeakTermQuestion WeakTermPlus WeakTermPlus -- e : t (output the type `t` as note)
   | WeakTermErase [(Meta, T.Text)] WeakTermPlus
   deriving (Show, Eq)
 
@@ -163,7 +163,7 @@ varWeakTermPlus (_, WeakTermCase _ e cxes) = do
   let ys =
         S.unions $ map (\((_, xts), body) -> varWeakTermPlus' xts [body]) cxes
   S.union xs ys
-varWeakTermPlus (_, WeakTermWithNote e t) = do
+varWeakTermPlus (_, WeakTermQuestion e t) = do
   let set1 = varWeakTermPlus e
   let set2 = varWeakTermPlus t
   S.union set1 set2
@@ -224,7 +224,7 @@ holeWeakTermPlus (_, WeakTermCase _ e cxes) = do
   let set2 =
         S.unions $ map (\((_, xts), body) -> holeWeakTermPlus' xts [body]) cxes
   S.union set1 set2
-holeWeakTermPlus (_, WeakTermWithNote e t) = do
+holeWeakTermPlus (_, WeakTermQuestion e t) = do
   let set1 = holeWeakTermPlus e
   let set2 = holeWeakTermPlus t
   S.union set1 set2
@@ -323,10 +323,10 @@ substWeakTermPlus sub (m, WeakTermCase indName e cxtes) = do
           let (xts', body') = substWeakTermPlus'' sub xts body
           ((c, xts'), body')
   (m, WeakTermCase indName e' cxtes')
-substWeakTermPlus sub (m, WeakTermWithNote e t) = do
+substWeakTermPlus sub (m, WeakTermQuestion e t) = do
   let e' = substWeakTermPlus sub e
   let t' = substWeakTermPlus sub t
-  (m, WeakTermWithNote e' t')
+  (m, WeakTermQuestion e' t')
 substWeakTermPlus sub (m, WeakTermErase xs e) = do
   let e' = substWeakTermPlus sub e
   (m, WeakTermErase xs e')
@@ -430,7 +430,7 @@ toText (_, WeakTermCase _ e cxtes) = do
      (flip map cxtes $ \((c, xts), body) -> do
         let xs = map (\(_, x, _) -> asText x) xts
         showCons [showCons (asText (snd c) : xs), toText body]))
-toText (_, WeakTermWithNote e _) = toText e
+toText (_, WeakTermQuestion e _) = toText e
 toText (_, WeakTermErase _ e) = toText e
 
 inParen :: T.Text -> T.Text

@@ -264,7 +264,7 @@ unravel (m, WeakTermCase indName e cxtes) = do
       (xts', body') <- unravelBinder xts body
       return ((c, xts'), body')
   return (m, WeakTermCase indName e' cxtes')
-unravel (_, WeakTermWithNote e _) = unravel e
+unravel (_, WeakTermQuestion e _) = unravel e
 unravel (_, WeakTermErase _ e) = unravel e
 
 unravelUpsilon :: Identifier -> WithEnv Identifier
