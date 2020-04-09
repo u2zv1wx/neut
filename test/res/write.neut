@@ -56,7 +56,10 @@
 ;; ここの最初の「&test」も「test」に解決されるわけだけど、するとbeginのあとでも「test」が
 ;; 使用されていることから、ここでtestのコピーが走ることになる。
 (with let-bind
-  (let _ (string:print &test))
+  (let _
+    (let _ (i64 100))
+    (string:print &test) ;; これは「内側」のwithについてのborrowとして処理される
+    (string:print &test)) ;; 末尾でのみborrowが許される（途中では別な場所でのborrowになる）（というか途中のborrowも自動で実装されてるわ、これ）
   (let _ (string:print &test))
   (let len (string:print &test)) ;; ここの "defined but not used" はfreeを具体的に行うことを要求しているとみなせる。「せっかく借用したのに」というわけ。
   (erase test)
