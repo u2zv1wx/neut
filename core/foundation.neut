@@ -9,14 +9,18 @@
 (constant unsafe:cast
   (pi ((A tau) (B tau) (_ A)) B))
 
-(definition unsafe:cast-to ([A tau] (B tau) (x A))
+(definition unsafe:cast-to ((A tau) (B tau) (x A))
   (unsafe:cast A B x))
+
+(attribute unsafe:cast-to (implicit 0))
 
 ;; (definition admit-implicit ([a tau])
 ;;   (os:exit a 1))
 
-(definition admit-internal ([a tau])
+(definition admit-internal ((a tau))
   (os:exit a 1))
+
+(attribute admit-internal (implicit 0))
 
 (keyword admit)
 

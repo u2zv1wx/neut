@@ -210,7 +210,7 @@ newNameWith' s = do
 newNameWith'' :: T.Text -> WithEnv Identifier
 newNameWith'' s = do
   i <- newCount
-  return $ I ("[" <> s <> "-" <> T.pack (show i) <> "]", i)
+  return $ I ("(" <> s <> "-" <> T.pack (show i) <> ")", i)
 
 newHole :: Meta -> WithEnv WeakTermPlus
 newHole m = do

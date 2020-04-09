@@ -37,10 +37,10 @@
 
 ;; monadic composition
 (definition compose
-  ([m hole]
-   [a hole]
-   [b hole]
-   [c hole]
+  ((m hole)
+   (a hole)
+   (b hole)
+   (c hole)
    (M (monad m))
    (f (hom a (m b)))
    (g (hom b (m c))))
@@ -50,8 +50,10 @@
         (let tmp (f x))
         (g tmp)))))
 
+(attribute monad:compose (implicit 0 1 2 3))
+
 (definition when
-  ([f (hom tau tau)]
+  ((f (hom tau tau))
    (M (monad f))
    (condition bool)
    (comp (f top)))
@@ -59,6 +61,8 @@
     (if condition
       comp
       ((return M) top top:unit))))
+
+(attribute monad:when (implicit 0))
 
 (provide monad:compose)
 

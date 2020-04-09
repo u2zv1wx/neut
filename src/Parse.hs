@@ -11,7 +11,6 @@ import Control.Monad.Except
 import Control.Monad.State hiding (get)
 import Data.ByteString.Builder
 
-import Data.Maybe (catMaybes)
 import Data.Monoid ((<>))
 import Network.Http.Client
 import Path
@@ -186,9 +185,9 @@ parse' ((m, TreeNode (def@(mDef, TreeLeaf "definition"):rest)):as)
     parse' $
       (m, TreeNode [def, (mFun, TreeNode (name : xts : body : rest'))]) : as
   | otherwise = do
-    ss1 <- parseDef rest
-    ss2 <- parse' as
-    return $ ss1 ++ ss2
+    s <- parseDef rest
+    ss <- parse' as
+    return $ s : ss
 parse' ((m, TreeNode (ind@(_, TreeLeaf "inductive"):rest)):as)
   | name@(mFun, TreeLeaf _):xts@(_, TreeNode _):rest' <- rest = do
     parse' $ (m, TreeNode [ind, (mFun, TreeNode (name : xts : rest'))]) : as
@@ -388,25 +387,26 @@ ensureEnvSanity m = do
       raiseError m "`include` can only be used with no prefix assumption"
     _ -> return ()
 
-parseDef :: [TreePlus] -> WithEnv [QuasiStmt]
+parseDef :: [TreePlus] -> WithEnv QuasiStmt
 parseDef xds = do
   xds' <- mapM (adjustPhase >=> prefixFunName >=> macroExpand) xds
   xs <- mapM extractFunName xds'
-  (xds'', miss) <- unzip <$> mapM takeSquare xds'
-  xds''' <- mapM interpretIter xds''
-  let attrStmtList = zipWith (\x (m, is) -> QuasiStmtImplicit m x is) xs miss
-  return $ QuasiStmtDef (zip xs xds''') : attrStmtList
+  -- (xds'', miss) <- unzip <$> mapM takeSquare xds'
+  xds'' <- mapM interpretIter xds'
+  -- let attrStmtList = zipWith (\x (m, is) -> QuasiStmtImplicit m x is) xs miss
+  return $ QuasiStmtDef (zip xs xds'')
+  -- return $ QuasiStmtDef (zip xs xds''') : attrStmtList
 
-takeSquare :: TreePlus -> WithEnv (TreePlus, (Meta, [Int]))
-takeSquare (m, TreeNode [xt, (mArg, TreeNode xts), body]) = do
-  let (xts', mis) = unzip $ map takeSquare' $ zip xts [0 ..]
-  return ((m, TreeNode [xt, (mArg, TreeNode xts'), body]), (m, catMaybes mis))
-takeSquare t = raiseSyntaxError (fst t) "(TREE (TREE ... TREE) TREE)"
-
-takeSquare' :: (TreePlus, Int) -> (TreePlus, Maybe Int)
-takeSquare' ((m, TreeNodeSquare es), i) = ((m, TreeNode es), Just i)
-takeSquare' (t, _) = (t, Nothing)
-
+-- takeSquare :: TreePlus -> WithEnv (TreePlus, (Meta, [Int]))
+-- takeSquare (m, TreeNode [xt, (mArg, TreeNode xts), body])
+--   -- let (xts', mis) = unzip $ map takeSquare' $ zip xts [0 ..]
+--   -- return ((m, TreeNode [xt, (mArg, TreeNode xts'), body]), (m, catMaybes mis))
+--  = do
+--   return ((m, TreeNode [xt, (mArg, TreeNode xts), body]), (m, []))
+-- takeSquare t = raiseSyntaxError (fst t) "(TREE (TREE ... TREE) TREE)"
+-- takeSquare' :: (TreePlus, Int) -> (TreePlus, Maybe Int)
+-- takeSquare' ((m, TreeNodeSquare es), i) = ((m, TreeNode es), Just i)
+-- takeSquare' (t, _) = (t, Nothing)
 prefixFunName :: TreePlus -> WithEnv TreePlus
 prefixFunName (m, TreeNode [xt, xts, body]) = do
   xt' <- prefixIdentPlus xt
@@ -602,11 +602,11 @@ adjustPhase (m, TreeNode ts) = do
   m' <- adjustPhase' m
   ts' <- mapM adjustPhase ts
   return (m', TreeNode ts')
-adjustPhase (m, TreeNodeSquare ts) = do
-  m' <- adjustPhase' m
-  ts' <- mapM adjustPhase ts
-  return (m', TreeNodeSquare ts')
 
+-- adjustPhase (m, TreeNodeSquare ts) = do
+--   m' <- adjustPhase' m
+--   ts' <- mapM adjustPhase ts
+--   return (m', TreeNodeSquare ts')
 adjustPhase' :: Meta -> WithEnv Meta
 adjustPhase' m = do
   i <- gets phase
@@ -623,7 +623,7 @@ warnUnusedVar =
 warnUnusedVar' :: [(PosInfo, T.Text)] -> WithEnv ()
 warnUnusedVar' [] = return ()
 warnUnusedVar' ((pos, x):pxs)
-  | T.all (`S.notMember` S.fromList "[]") x = do
+  | T.all (`S.notMember` S.fromList "()") x = do
     warn pos $ "defined but not used: `" <> x <> "`"
     warnUnusedVar' pxs
   | otherwise = warnUnusedVar' pxs

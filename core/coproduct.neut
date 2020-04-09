@@ -13,9 +13,9 @@
   (right ((_ a)) (coproduct e a)))
 
 (definition map
-  ([e tau]
-   [a tau]
-   [b tau]
+  ((e tau)
+   (a tau)
+   (b tau)
    (f (hom a b))
    (m (coproduct e a)))
   (witness (coproduct e b)
@@ -25,14 +25,18 @@
       ((right val)
         (right (f val))))))
 
-(definition return ([e tau] [a tau] (x a))
+(attribute map (implicit 0 1 2))
+
+(definition return ((e tau) (a tau) (x a))
   (witness (coproduct e a)
     (right x)))
 
+(attribute return (implicit 0 1))
+
 (definition bind
-  ([e tau]
-   [a tau]
-   [b tau]
+  ((e tau)
+   (a tau)
+   (b tau)
    (comp (coproduct e a))
    (k (hom a (coproduct e b))))
   (witness (coproduct e b)
@@ -42,12 +46,16 @@
       ((right val)
         (k val)))))
 
+(attribute bind (implicit 0 1 2))
+
 (definition throw
-  ([e tau]
-   [a tau]
+  ((e tau)
+   (a tau)
    (err e))
   (witness (coproduct e a)
     (left err)))
+
+(attribute throw (implicit 0 1))
 
 (definition either ((e tau))
   (witness (hom tau tau)

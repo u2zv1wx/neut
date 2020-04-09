@@ -39,7 +39,7 @@
   (list:cons a (list:new rest+)))
 
 (definition head
-  ([a tau]
+  ((a tau)
    (xs (list a)))
   (witness (option a)
     (case xs
@@ -48,8 +48,10 @@
       ((cons y _)
         (some y)))))
 
+(attribute head (implicit 0))
+
 (definition length
-  ([a tau]
+  ((a tau)
    (xs (list a)))
   (witness u64
     (case xs
@@ -58,9 +60,10 @@
       ((cons _ ys)
         (u64:add 1 (length a ys))))))
 
+(attribute length (implicit 0))
 
 (definition append
-  ([a tau]
+  ((a tau)
    (xs (list a))
    (ys (list a)))
   (witness (list a)
@@ -70,8 +73,10 @@
       ((cons z zs)
         (cons z (append a zs ys))))))
 
+(attribute append (implicit 0))
+
 (definition is-null
-  ([a tau]
+  ((a tau)
    (xs (list a)))
   (witness bool
     (case xs
@@ -80,9 +85,11 @@
       ((cons _ _)
         false))))
 
+(attribute is-null (implicit 0))
+
 (definition map
-  ([a tau]
-   [b tau]
+  ((a tau)
+   (b tau)
    (f (hom a b))
    (xs (list a)))
   (witness (list b)
@@ -94,14 +101,18 @@
           (f y)
           (map a b f ys))))))
 
+(attribute map (implicit 0 1))
+
 (definition return
-  ([a tau]
+  ((a tau)
    (x a))
   (witness (list a)
     (cons x (nil))))
 
+(attribute return (implicit 0))
+
 (definition concatenate
-  ([a tau]
+  ((a tau)
    (m (list (list a))))
   (witness (list a)
     (case m
@@ -110,13 +121,17 @@
       ((cons x xs)
         (append x (concatenate a xs))))))
 
+(attribute concatenate (implicit 0))
+
 (definition bind
-  ([a tau]
-   [b tau]
+  ((a tau)
+   (b tau)
    (m (list a))
    (k (hom a (list b))))
   (witness (list b)
     (concatenate (map k m))))
+
+(attribute bind (implicit 0 1))
 
 (provide head)
 
