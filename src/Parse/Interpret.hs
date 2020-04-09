@@ -241,7 +241,6 @@ interpret t@(m, TreeNode es) = do
     (_, []) -> raiseSyntaxError (fst t) "(TREE TREE*)"
     (_, f:args) -> interpretPiElim m f args
 
--- interpret (m, TreeNodeSquare _) = raiseSyntaxError m "LEAF | TREE"
 interpretPiElim :: Meta -> TreePlus -> [TreePlus] -> WithEnv WeakTermPlus
 interpretPiElim m f args = do
   (args', headerList) <- unzip <$> mapM interpretBorrow args

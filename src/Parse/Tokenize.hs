@@ -55,7 +55,6 @@ term = do
   s <- gets text
   case T.uncons s of
     Just ('(', _) -> node
-    -- Just ('[', _) -> nodeSquare
     _ -> leaf
 
 leaf :: Tokenizer TreePlus
@@ -86,13 +85,6 @@ node = do
   skip >> char ')' >> skip
   return (m, TreeNode itemList)
 
--- nodeSquare :: Tokenizer TreePlus
--- nodeSquare = do
---   m <- currentMeta
---   char '[' >> skip
---   itemList <- many term
---   skip >> char ']' >> skip
---   return (m, TreeNodeSquare itemList)
 char :: Char -> Tokenizer ()
 char c = do
   s <- gets text
@@ -209,7 +201,6 @@ newlineSet = S.fromList "\n"
 
 {-# INLINE nonSymbolSet #-}
 nonSymbolSet :: S.Set Char
--- nonSymbolSet = S.fromList "()[] \"\n;"
 nonSymbolSet = S.fromList "() \"\n;"
 
 {-# INLINE updateStreamL #-}

@@ -29,9 +29,6 @@ recurM f (m, TreeNode ts) = do
   ts' <- mapM (recurM f) ts
   f (m, TreeNode ts')
 
--- recurM f (m, TreeNodeSquare ts) = do
---   ts' <- mapM (recurM f) ts
---   f (m, TreeNodeSquare ts')
 macroExpand1 :: TreePlus -> WithEnv TreePlus
 macroExpand1 t@(i, _) = do
   nenv <- gets notationEnv
@@ -80,7 +77,6 @@ macroMatch (m1, TreeNode ts1) (_, TreeNode ts2)
     return $ mzs >>= \zs -> Just $ join zs
   | otherwise = return Nothing
 
--- macroMatch _ _ = return Nothing
 applySubst :: MacroSubst -> Notation -> TreePlus
 applySubst sub (i, TreeLeaf s) = do
   case lookup s sub of
@@ -88,8 +84,6 @@ applySubst sub (i, TreeLeaf s) = do
     Just t -> replaceMeta i t
 applySubst sub (i, TreeNode ts) = (i, TreeNode $ map (applySubst sub) ts)
 
--- applySubst sub (i, TreeNodeSquare ts) =
---   (i, TreeNodeSquare $ map (applySubst sub) ts)
 toSpliceTree :: Meta -> [TreePlus] -> TreePlus
 toSpliceTree m ts = (m, TreeNode [(m, TreeLeaf "splice"), (m, TreeNode ts)])
 
@@ -119,11 +113,6 @@ checkPlusCondition (_, TreeNode ts) = do
     (_, TreeLeaf _) -> return ()
     ts' -> checkPlusCondition ts'
 
--- checkPlusCondition (_, TreeNodeSquare ts) = do
---   mapM_ checkPlusCondition $ init ts
---   case last ts of
---     (_, TreeLeaf _) -> return ()
---     ts' -> checkPlusCondition ts'
 splice :: TreePlus -> TreePlus
 splice t = splice' t
 
@@ -134,9 +123,6 @@ splice' (m, TreeNode ts) = do
   let ts' = map splice' ts
   (m, TreeNode $ expandSplice $ map findSplice ts')
 
--- splice' (m, TreeNodeSquare ts) = do
---   let ts' = map splice' ts
---   (m, TreeNodeSquare $ expandSplice $ map findSplice ts')
 findSplice :: TreePlus -> Either TreePlus [TreePlus]
 findSplice (_, TreeNode [(_, TreeLeaf "splice"), (_, TreeNode ts)]) = do
   Right ts

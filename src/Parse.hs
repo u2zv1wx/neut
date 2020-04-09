@@ -391,22 +391,9 @@ parseDef :: [TreePlus] -> WithEnv QuasiStmt
 parseDef xds = do
   xds' <- mapM (adjustPhase >=> prefixFunName >=> macroExpand) xds
   xs <- mapM extractFunName xds'
-  -- (xds'', miss) <- unzip <$> mapM takeSquare xds'
   xds'' <- mapM interpretIter xds'
-  -- let attrStmtList = zipWith (\x (m, is) -> QuasiStmtImplicit m x is) xs miss
   return $ QuasiStmtDef (zip xs xds'')
-  -- return $ QuasiStmtDef (zip xs xds''') : attrStmtList
 
--- takeSquare :: TreePlus -> WithEnv (TreePlus, (Meta, [Int]))
--- takeSquare (m, TreeNode [xt, (mArg, TreeNode xts), body])
---   -- let (xts', mis) = unzip $ map takeSquare' $ zip xts [0 ..]
---   -- return ((m, TreeNode [xt, (mArg, TreeNode xts'), body]), (m, catMaybes mis))
---  = do
---   return ((m, TreeNode [xt, (mArg, TreeNode xts), body]), (m, []))
--- takeSquare t = raiseSyntaxError (fst t) "(TREE (TREE ... TREE) TREE)"
--- takeSquare' :: (TreePlus, Int) -> (TreePlus, Maybe Int)
--- takeSquare' ((m, TreeNodeSquare es), i) = ((m, TreeNode es), Just i)
--- takeSquare' (t, _) = (t, Nothing)
 prefixFunName :: TreePlus -> WithEnv TreePlus
 prefixFunName (m, TreeNode [xt, xts, body]) = do
   xt' <- prefixIdentPlus xt
@@ -603,10 +590,6 @@ adjustPhase (m, TreeNode ts) = do
   ts' <- mapM adjustPhase ts
   return (m', TreeNode ts')
 
--- adjustPhase (m, TreeNodeSquare ts) = do
---   m' <- adjustPhase' m
---   ts' <- mapM adjustPhase ts
---   return (m', TreeNodeSquare ts')
 adjustPhase' :: Meta -> WithEnv Meta
 adjustPhase' m = do
   i <- gets phase
