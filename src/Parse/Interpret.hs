@@ -243,30 +243,7 @@ interpretPiElim m f args = do
   f' <- interpret f
   args' <- mapM interpret args
   return (m, WeakTermPiElim f' args')
-  -- (args', headerList) <- unzip <$> mapM interpretBorrow args
-  -- f' <- interpret f
-  -- return $ applyHeader headerList (m, WeakTermPiElim f' args')
 
--- applyHeader :: [WeakTermPlus -> WeakTermPlus] -> WeakTermPlus -> WeakTermPlus
--- applyHeader [] e = e
--- applyHeader (f:fs) e = f (applyHeader fs e)
--- (e e1 ... en)みたいなやつのei部分をチェックしてborrow成分を集める
--- interpretBorrow ::
---      TreePlus -> WithEnv (WeakTermPlus, WeakTermPlus -> WeakTermPlus)
--- interpretBorrow (m, TreeNode (f:args))
---   | (mmxs, args') <- unzip $ map interpretBorrow' args
---   , mxs <- catMaybes mmxs
---   , not (null mxs) = do
---     f' <- interpret f
---     args'' <- mapM interpret args'
---     tmp <- newNameWith'' "borrow"
---     xts <- mapM toIdentPlus $ mxs ++ [(m, tmp)]
---     h <- newHole m
---     let app = (m, WeakTermPiElim f' args'')
---     return ((m, WeakTermUpsilon tmp), \term -> sigmaElim m h xts app term)
--- interpretBorrow e = do
---   e' <- interpret e
---   return (e', id)
 sigmaIntro :: Meta -> [WeakTermPlus] -> WithEnv WeakTermPlus
 sigmaIntro m es = do
   z <- newNameWith'' "sigma"
@@ -329,11 +306,6 @@ sigmaElim ::
 sigmaElim m t xts e1 e2 =
   (m, WeakTermPiElim e1 [t, (m, WeakTermPiIntro xts e2)])
 
--- interpretBorrow' :: TreePlus -> (Maybe (Meta, Identifier), TreePlus)
--- interpretBorrow' (m, TreeLeaf s)
---   | T.length s > 1
---   , T.head s == '&' = (Just (m, asIdent $ T.tail s), (m, TreeLeaf $ T.tail s))
--- interpretBorrow' t = (Nothing, t)
 toIdentPlus :: (Meta, Identifier) -> WithEnv IdentifierPlus
 toIdentPlus (m, x) = do
   h <- newHole m
