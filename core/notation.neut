@@ -35,48 +35,6 @@
 
 (notation λ lambda)
 
-(keyword let)
-
-;; (keyword begin)
-
-;; (notation (begin e) e)
-
-;; (notation (begin e rest+)
-;;   ((lambda ((_ hole)) (begin rest+)) (begin e)))
-
-;; (notation (begin (let x e+) rest+)
-;;   ((lambda ((x hole)) (begin rest+)) (begin e+)))
-
-;; (notation (begin (let (x t) e+) rest+)
-;;   ((lambda ((x t)) (begin rest+)) (begin e+)))
-
-;; (keyword with)
-
-;; (notation (with bind e) e)
-
-;; (notation (with bind e rest+)
-;;   (bind (with bind e) (lambda ((_ hole)) (with bind rest+))))
-
-;; (notation (with bind (let x e+) rest+)
-;;   (bind (with bind e+) (lambda ((x hole)) (with bind rest+))))
-
-;; (notation (with bind (let (x t) e+) rest+)
-;;   (bind (with bind e+) (lambda ((x t)) (with bind rest+))))
-
-;; (keyword erase)
-
-;; (notation (with bind e rest+)
-;;   (bind hole hole (with bind e) (lambda ((_ hole)) (with bind rest+))))
-
-;; (notation (with bind (let x e+) rest+)
-;;   (bind hole hole (with bind e+) (lambda ((x hole)) (with bind rest+))))
-
-;; (notation (with bind (let (x t) e+) rest+)
-;;   (bind hole hole (with bind e+) (lambda ((x t)) (with bind rest+))))
-
-;; (notation (with bind (erase x+) rest+)
-;;   (erase (x+) (with bind rest+)))
-
 ;; lambda: lambda with implicit begin block -> (discard)
 ;; (notation (lambda () e+)
 ;;   (lambda () (begin e+)))
