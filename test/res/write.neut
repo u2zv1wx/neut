@@ -76,6 +76,7 @@
 
 (verify ((λ ((x tau)) x) top))
 
+
 (verify some-theorem)
 
 
@@ -145,6 +146,16 @@
 
 ?equal:refl
 
+
+
+(definition my-id ([a tau] [b tau] [c tau] (x a)) x)
+
+;; (definition my-id ((?a tau) (x a)) x)
+
+;; #my-id
+?my-id
+
+
 (let p (equal:refl (i64 3)))
 
 ?p
@@ -152,6 +163,7 @@
 (inductive choice ()
   (item-1 () (choice))
   (item-2 () (choice)))
+
 
 ?choice:induction
 
@@ -170,13 +182,14 @@
     (equal
       c
       (flip (flip c))))
-  (lambda (c)
+  (assume ((c (choice)))
     (case c
       ((choice:item-1)
         admit) ;; (F @ c) {c := (choice:item-1)}
       ((choice:item-2)
         ?admit) ;; (F @ c) {c := (choice:item-2)}
         ))) ;; F @ c
+
 
 
 ?double-flip-is-identity
@@ -189,7 +202,10 @@
 
 (i64:print (fact (unsafe:cast u64 i64 (list:length xs))))
 
-(definition unused-function ([_ tau]) tau)
+(definition unused-function ((_ tau)) tau)
+
+(attribute unused-function
+  (implicit 0))
 
 ;; (provide unused-function)
 

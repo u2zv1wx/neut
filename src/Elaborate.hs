@@ -286,9 +286,38 @@ elaborate' (m, WeakTermCase indName e cxtes) = do
 elaborate' (m, WeakTermWithNote e t) = do
   e' <- elaborate' e
   t' <- elaborate' t
-  note m $ toText (weaken t')
-  return e'
+  case getArgLen t' of
+    Nothing -> do
+      note m $ toText (weaken t')
+      return e'
+    Just len -> do
+      is <- getImpInfo e'
+      let form = toText (weaken e') : showFormArgs 0 is [0 .. len - 1]
+      let formStr = inParen $ showItems form
+      note m $ toText (weaken t') <> "\n-\n" <> formStr
+      return e'
 elaborate' (_, WeakTermErase _ e) = elaborate' e
+
+getImpInfo :: TermPlus -> WithEnv [Int]
+getImpInfo (_, TermConst x) = do
+  ienv <- gets impEnv
+  case IntMap.lookup (asInt x) ienv of
+    Just is -> return is
+    Nothing -> return []
+getImpInfo _ = return []
+
+getArgLen :: TermPlus -> Maybe Int
+getArgLen (_, TermPi _ xts _) = return $ length xts
+getArgLen _ = Nothing
+
+showFormArgs :: Int -> [Int] -> [Int] -> [T.Text]
+showFormArgs _ _ [] = []
+showFormArgs k impList [i]
+  | i `elem` impList = ["*"]
+  | otherwise = ["#" <> T.pack (show k)]
+showFormArgs k impList (i:is)
+  | i `elem` impList = "*" : showFormArgs k impList is
+  | otherwise = "#" <> T.pack (show k) : showFormArgs (k + 1) impList is
 
 elaborateWeakCase :: WeakCasePlus -> WithEnv CasePlus
 elaborateWeakCase (m, WeakCaseInt t x) = do
