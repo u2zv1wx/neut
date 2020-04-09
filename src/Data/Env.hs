@@ -41,7 +41,6 @@ type UnivInstEnv = IntMap.IntMap (S.Set Int)
 
 type TypeEnv = IntMap.IntMap TermPlus
 
--- type TypeEnv = IntMap.IntMap (TermPlus, UnivLevelPlus)
 data Env =
   Env
     { count :: Int

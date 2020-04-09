@@ -131,7 +131,6 @@
       (with let-bind
         (string:print "looping with (もちろん日本語も出力できるよ): ")
         (i64:print ?n)
-        ;; (erase n)
         (let _ (i64:add 10 10))
         (let hogehoge (i64 10))
         (let _ (i64:add hogehoge 1))
@@ -227,11 +226,11 @@
 
 (definition unused-function ((_ tau)) tau)
 
+
 (attribute unused-function
   (implicit 0))
 
 ;; (provide unused-function)
-
 
 (?string:print "\n")
 

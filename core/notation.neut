@@ -33,25 +33,7 @@
 
 (keyword λ)
 
-(notation λ lambda)
-
-;; lambda: lambda with implicit begin block -> (discard)
-;; (notation (lambda () e+)
-;;   (lambda () (begin e+)))
-
-;; (notation (lambda (xts+) e+)
-;;   (lambda (xts+) (begin e+)))
-
-;; type ascription
-(keyword ascription)
-
-(notation (ascription e t)
-  (let (_ t) e))
-
-(keyword with-type)
-
-(notation (with-type t e)
-  ((lambda ((x t)) x) e))
+(notation λ pi-introduction)
 
 (keyword witness)
 
@@ -88,14 +70,6 @@
 
 (notation (destruct e xts rest+)
   (sigma-elimination xts e (with let-bind rest+)))
-
-;; (notation (destruct e xts rest+)
-;;   (sigma-elimination xts e (begin rest+)))
-
-(keyword cast)
-
-(notation (cast t e)
-  (unsafe-cast hole t e))
 
 (keyword if)
 
