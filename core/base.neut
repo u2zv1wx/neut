@@ -3,21 +3,25 @@
 (include "foundation.neut")
 
 (definition compose
-  ([a tau]
-   [b tau]
-   [c tau]
+  ((a tau)
+   (b tau)
+   (c tau)
    (f (hom a b))
    (g (hom b c)))
   (witness (hom a c)
     (lambda ((x a))
       (g (f x)))))
 
-;; (attribute compose
-;;   (implicit 0 1 2))
+(attribute compose
+  (implicit 0 1 2))
 
 (definition let-bind ((a tau) (b tau) (x a) (k (hom a b)))
   (witness b
     (k x)))
-    ;; (definition let-bind ([a tau] [b tau] (x a) (k (hom a b)))
+
+(provide compose)
+
+(provide let-bind)
+;; (definition let-bind ([a tau] [b tau] (x a) (k (hom a b)))
 ;;   (witness b
 ;;     (k x)))
