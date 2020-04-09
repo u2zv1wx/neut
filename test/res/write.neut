@@ -64,6 +64,7 @@
   (let len (string:print &test)) ;; ここの "defined but not used" はfreeを具体的に行うことを要求しているとみなせる。「せっかく借用したのに」というわけ。
   (erase test)
   len) ;; ここでtestがfreeされる（直前のwriteでborrowされているので）
+  ;; 末尾でのborrowをここでもし許可しようとするなら、トップレベルのborrowが必要になってくる、というわけ。
 
 
 ;; (begin
@@ -137,6 +138,7 @@
         (string:print "\n")
         (?i64:mul n (fact (?i64:sub n 1)))))))
 
+
 (let xs (list i64)
   (list:new 1 2 3 4 5))
 
@@ -147,7 +149,6 @@
   (implicit 0))
 
 ?equal:induction
-
 
 ?@@@equal:refl
 
@@ -213,7 +214,6 @@
       ((choice:item-2)
         ?admit) ;; (F @ c) {c := (choice:item-2)}
         ))) ;; F @ c
-
 
 ?double-flip-is-identity
 

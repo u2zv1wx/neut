@@ -22,6 +22,8 @@
 
 (attribute admit-internal (implicit 0))
 
+(provide admit-internal)
+
 (keyword admit)
 
 (notation admit
@@ -32,5 +34,5 @@
 (notation ?admit
   (question admit))
 
-(definition admit-explicit ((a tau))
-  (os:exit a 1))
+;; (definition admit-explicit ((a tau))
+;;   (os:exit a 1))

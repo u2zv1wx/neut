@@ -12,6 +12,7 @@
   (leaf
     ((_ a))
     (free-internal g a))
+  ;; left Kan extension
   (node
     ((b tau)
      (_ (g b))
@@ -46,7 +47,7 @@
 
 (definition return ((g (hom tau tau)))
   (witness (return-type (free g))
-    (lambda (a x)
+    (lambda (_ x)
       (leaf x))))
 
 (definition bind ((g (hom tau tau)))
@@ -75,5 +76,15 @@
         (free:return g))
       (bind
         (free:bind g)))))
+
+(provide map)
+
+(provide return)
+
+(provide bind)
+
+(provide witness-functor)
+
+(provide witness-monad)
 
 (end free)
