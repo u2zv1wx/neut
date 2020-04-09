@@ -96,7 +96,7 @@ data QuasiStmt
   --     ((fn An) (ARGS-n) en))
   | QuasiStmtDef [(Identifier, Def)]
   | QuasiStmtVerify Meta WeakTermPlus
-  | QuasiStmtImplicit Meta Identifier Int
+  | QuasiStmtImplicit Meta Identifier [Int]
   | QuasiStmtEnum Meta T.Text [(T.Text, Int)]
   | QuasiStmtConstDecl Meta IdentifierPlus
   | QuasiStmtLetInductive Int Meta IdentifierPlus WeakTermPlus
@@ -110,7 +110,7 @@ data WeakStmt
   | WeakStmtLet Meta IdentifierPlus WeakTermPlus WeakStmt
   | WeakStmtLetWT Meta IdentifierPlus WeakTermPlus WeakStmt
   | WeakStmtVerify Meta WeakTermPlus WeakStmt
-  | WeakStmtImplicit Meta Identifier Int WeakStmt
+  | WeakStmtImplicit Meta Identifier [Int] WeakStmt
   | WeakStmtConstDecl Meta IdentifierPlus WeakStmt
   deriving (Show)
 

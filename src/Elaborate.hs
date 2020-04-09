@@ -5,7 +5,7 @@ module Elaborate
   ) where
 
 import Control.Monad.State
-import Data.List (nub)
+import Data.List (find, nub)
 import Data.Time
 import Numeric
 import Numeric.Half
@@ -84,19 +84,20 @@ elaborateStmt (WeakStmtVerify m e cont) = do
     "verification succeeded with the following normal form (" <>
     T.pack (showFloat' sec) <> " seconds):\n" <> toText (weaken e''')
   elaborateStmt cont
-elaborateStmt (WeakStmtImplicit m x@(I (_, i)) idx cont) = do
+elaborateStmt (WeakStmtImplicit m x@(I (_, i)) idxList cont) = do
   t <- lookupTypeEnv' m x
   case t of
     (_, TermPi _ xts _) -> do
-      if 0 <= idx && idx < length xts
-        then do
+      case find (\idx -> idx < 0 || length xts <= idx) idxList of
+        Nothing -> do
           ienv <- gets impEnv
-          modify (\env -> env {impEnv = IntMap.insertWith (++) i [idx] ienv})
+          modify (\env -> env {impEnv = IntMap.insertWith (++) i idxList ienv})
           elaborateStmt cont
-        else raiseError m $
-             "the specified index `" <>
-             T.pack (show idx) <>
-             "` is out of range of the domain of " <> asText x
+        Just idx -> do
+          raiseError m $
+            "the specified index `" <>
+            T.pack (show idx) <>
+            "` is out of range of the domain of " <> asText x
     _ ->
       raiseError m $
       "the type of " <>

@@ -345,11 +345,12 @@ parseString m quotedStr =
     Just str -> return str
 
 parseAttr :: T.Text -> TreePlus -> WithEnv QuasiStmt
-parseAttr name (m, TreeNode [(_, TreeLeaf "implicit"), (_, TreeLeaf num)]) = do
-  case readMaybe $ T.unpack num of
-    Nothing -> raiseError m "the argument of `implicit` must be an integer"
-    Just i -> return $ QuasiStmtImplicit m (asIdent name) i
-parseAttr _ t = raiseError (fst t) $ "invalid attribute: " <> showAsSExp t
+parseAttr name (m, TreeNode ((_, TreeLeaf "implicit"):rest))
+  | Just mxs <- mapM asLeaf rest = do
+    case mapM (readMaybe . T.unpack . snd) mxs of
+      Nothing -> raiseError m "the argument of `implicit` must be an integer"
+      Just is -> return $ QuasiStmtImplicit m (asIdent name) is
+parseAttr _ t = raiseSyntaxError (fst t) "(implicit LEAF ... LEAF)"
 
 includeFile ::
      Meta
@@ -393,8 +394,7 @@ parseDef xds = do
   xs <- mapM extractFunName xds'
   (xds'', miss) <- unzip <$> mapM takeSquare xds'
   xds''' <- mapM interpretIter xds''
-  let attrStmtList =
-        concat $ zipWith (\x (m, is) -> map (QuasiStmtImplicit m x) is) xs miss
+  let attrStmtList = zipWith (\x (m, is) -> QuasiStmtImplicit m x is) xs miss
   return $ QuasiStmtDef (zip xs xds''') : attrStmtList
 
 takeSquare :: TreePlus -> WithEnv (TreePlus, (Meta, [Int]))

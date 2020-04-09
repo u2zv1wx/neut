@@ -157,7 +157,7 @@
 ;; #my-id
 ?my-id
 
-(attribute my-id (implicit 0))
+(attribute my-id (implicit 0 1 2))
 
 ?my-id
 
@@ -165,10 +165,10 @@
 
 ?my-id
 
+
 (attribute my-id (implicit 2))
 
 ?my-id
-
 
 
 (let p (equal:refl (i64 3)))

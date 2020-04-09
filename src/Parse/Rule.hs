@@ -92,27 +92,28 @@ generateProjections ts = do
         (dom@(my, y, ty), cod) <- separate tb
         v <- newNameWith'' "base"
         let b' = asIdent (asText a <> ":" <> asText b)
-        let attrList = map (QuasiStmtImplicit mb b') [0 .. length xts - 1]
-        return $
-          QuasiStmtLetWT
-            mb
-            (mb, b', (mb, WeakTermPi Nothing (xts ++ [dom]) cod))
-            ( mb
-            , WeakTermPiIntro
-                (xts ++ [dom])
-                ( mb
-                , WeakTermCase
-                    (asText a)
-                    (my, WeakTermUpsilon y)
-                    [ ( ( (mb, asIdent (asText a <> ":" <> "unfold"))
+        let attr = QuasiStmtImplicit mb b' [0 .. length xts - 1]
+        return
+          [ QuasiStmtLetWT
+              mb
+              (mb, b', (mb, WeakTermPi Nothing (xts ++ [dom]) cod))
+              ( mb
+              , WeakTermPiIntro
+                  (xts ++ [dom])
+                  ( mb
+                  , WeakTermCase
+                      (asText a)
+                      (my, WeakTermUpsilon y)
+                      [ ( ( (mb, asIdent (asText a <> ":" <> "unfold"))
                         -- `xts ++` is required since LetWT bypasses `infer`
-                        , xts ++ [(ma, a, ta)] ++ bts ++ [(mb, v, ty)])
-                      , ( mb
-                        , WeakTermPiElim
-                            (mb, WeakTermUpsilon b)
-                            [(mb, WeakTermUpsilon v)]))
-                    ])) :
-          attrList
+                          , xts ++ [(ma, a, ta)] ++ bts ++ [(mb, v, ty)])
+                        , ( mb
+                          , WeakTermPiElim
+                              (mb, WeakTermUpsilon b)
+                              [(mb, WeakTermUpsilon v)]))
+                      ]))
+          , attr
+          ]
   return $ concat $ concat stmtListList
 
 separate :: WeakTermPlus -> WithEnv (IdentifierPlus, WeakTermPlus)
@@ -197,9 +198,9 @@ toInductiveIntro ats bts xts a@(I (ai, _)) (mb, b@(I (bi, _)), m, yts, cod)
                   (bi, buz, xts', yts)
                   (ats ++ bts)
                   (m, WeakTermPiElim (mb, WeakTermUpsilon b) (map toVar' yts))))
-    let attrList = map (QuasiStmtImplicit m b) [0 .. length xts' - 1]
+    let attr = QuasiStmtImplicit m b [0 .. length xts' - 1]
     let as = map (\(_, x, _) -> x) ats
-    return (QuasiStmtLetInductiveIntro m (mb, b, piType) lam as : attrList)
+    return [QuasiStmtLetInductiveIntro m (mb, b, piType) lam as, attr]
   | otherwise =
     raiseError m $
     "the succedent of an introduction rule of `" <>
