@@ -235,13 +235,11 @@ insForm _ (_, I (_, i), _) _ =
 
 insInductive :: [Identifier] -> IdentifierPlus -> WithEnv ()
 insInductive [I (_, i)] bt = do
-  ienv <- gets inductiveEnv
-  modify
-    (\env -> env {inductiveEnv = IntMap.insertWith optConcat i (Just [bt]) ienv})
+  ienv <- gets indEnv
+  modify (\env -> env {indEnv = IntMap.insertWith optConcat i (Just [bt]) ienv})
 insInductive as _ = do
   forM_ as $ \(I (_, i)) -> do
-    modify
-      (\env -> env {inductiveEnv = IntMap.insert i Nothing (inductiveEnv env)})
+    modify (\env -> env {indEnv = IntMap.insert i Nothing (indEnv env)})
 
 optConcat :: Maybe [a] -> Maybe [a] -> Maybe [a]
 optConcat mNew mOld = do
@@ -278,7 +276,7 @@ zeta ::
   -> WeakTermPlus -- a term `e` of type `A`
   -> WithEnv WeakTermPlus -- a term of type `A{x1 := x1', ..., xn := xn'}`
 zeta mode isub atsbts t e = do
-  ienv <- gets inductiveEnv
+  ienv <- gets indEnv
   isub' <- invSubst isub
   case t of
     (_, WeakTermPi _ xts cod) -> zetaPi mode isub atsbts xts cod e

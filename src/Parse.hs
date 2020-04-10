@@ -491,23 +491,24 @@ concatQuasiStmtList ((QuasiStmtLetInductive n m at e):es) = do
 concatQuasiStmtList (QuasiStmtLetInductiveIntro m bt e as:ss) = do
   case e of
     (mLam, WeakTermPiIntro xtsyts (_, WeakTermPiIntroPlus ai (bi, is, _) atsbts (_, WeakTermPiElim b _))) -> do
-      modify
-        (\env ->
-           env {consToIndInfo = Map.insert bi (ai, is) (consToIndInfo env)})
+      modify (\env -> env {revIndEnv = Map.insert bi (ai, is) (revIndEnv env)})
       yts' <- mapM (internalize as atsbts) $ drop (length is) xtsyts
       insInductive as bt -- register the constructor (if necessary)
-      let lam =
-            ( mLam -- metaIsReducible mLam == False
-            , WeakTermPiIntro
-                xtsyts
-                ( m
-                , WeakTermPiIntroPlus
-                    ai
-                    (bi, is, xtsyts)
-                    atsbts
-                    (m, WeakTermPiElim b yts')))
       cont <- concatQuasiStmtList ss
-      return $ WeakStmtLetWT m bt lam cont
+      return $
+        WeakStmtLetWT
+          m
+          bt
+          ( mLam -- metaIsReducible mLam == False
+          , WeakTermPiIntro
+              xtsyts
+              ( m
+              , WeakTermPiIntroPlus
+                  ai
+                  (bi, is, xtsyts)
+                  atsbts
+                  (m, WeakTermPiElim b yts')))
+          cont
     _ -> raiseCritical m "inductive-intro"
 concatQuasiStmtList (QuasiStmtUse _:ss) = concatQuasiStmtList ss
 concatQuasiStmtList (QuasiStmtUnuse _:ss) = concatQuasiStmtList ss

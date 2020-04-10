@@ -228,8 +228,8 @@ getIndInfo cs = do
 
 getIndInfo' :: (Meta, Identifier) -> WithEnv ((Meta, Identifier), [Int])
 getIndInfo' (m, c) = do
-  cienv <- gets consToIndInfo
-  case Map.lookup (asText c) cienv of
+  rienv <- gets revIndEnv
+  case Map.lookup (asText c) rienv of
     Just (i, is) -> return ((m, i), is)
     _ -> raiseError m $ "no such constructor defined: " <> asText c
 

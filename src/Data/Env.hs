@@ -77,9 +77,9 @@ data Env =
     -- "stream" ~> ["stream", "other-record-type", "head", "tail", "other-destructor"]
     , labelEnv :: Map.HashMap T.Text [T.Text]
     -- "list" ~> (cons, Pi (A : tau). A -> list A -> list A)
-    , inductiveEnv :: RuleEnv
+    , indEnv :: RuleEnv
     -- "list:cons" ~> ("list", [0])
-    , consToIndInfo :: Map.HashMap T.Text (Identifier, [Int])
+    , revIndEnv :: Map.HashMap T.Text (Identifier, [Int])
     , intactSet :: S.Set (Meta, Identifier)
     --
     -- elaborate
@@ -133,12 +133,12 @@ initialEnv =
     , revCaseEnv = IntMap.empty
     , nameEnv = Map.empty
     , revNameEnv = IntMap.empty
-    , consToIndInfo = Map.empty
+    , revIndEnv = Map.empty
     , intactSet = S.empty
     , prefixEnv = []
     , namespace = []
     , formationEnv = IntMap.empty
-    , inductiveEnv = IntMap.empty
+    , indEnv = IntMap.empty
     , nonCandSet = S.empty
     , labelEnv = Map.empty
     , impEnv = IntMap.empty
