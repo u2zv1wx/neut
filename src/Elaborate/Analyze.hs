@@ -143,15 +143,11 @@ simp' ((e1@(m1, _), e2@(m2, _)):cs) = do
               [] -> simpPattern h2 ies2 e2' e1' fvs1 cs
               _ -> simp $ (substWeakTermPlus (zip zs es) e1', e2') : cs
         (Just (StuckPiElimConst x1 mx1 mess1), _)
-          | Just (Left (mBody, body)) <- IntMap.lookup (asInt x1) cenv
-            -- body' <- univInstWith up1 $ weaken (supMeta mx1 mBody, body)
-           -> do
+          | Just (Left (mBody, body)) <- IntMap.lookup (asInt x1) cenv -> do
             let body' = weaken (supMeta mx1 mBody, body)
             simp $ (toPiElim body' mess1, e2) : cs
         (_, Just (StuckPiElimConst x2 mx2 mess2))
-          | Just (Left (mBody, body)) <- IntMap.lookup (asInt x2) cenv
-            -- body' <- univInstWith up2 $ weaken (supMeta mx2 mBody, body)
-           -> do
+          | Just (Left (mBody, body)) <- IntMap.lookup (asInt x2) cenv -> do
             let body' = weaken (supMeta mx2 mBody, body)
             simp $ (e1, toPiElim body' mess2) : cs
         (Just (StuckPiElimZetaStrict h1 ies1), _)
