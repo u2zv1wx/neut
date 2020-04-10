@@ -65,6 +65,7 @@ leave = do
   popTrace
   modify (\env -> env {fileEnv = Map.insert path VisitInfoFinish (fileEnv env)})
   modify (\env -> env {prefixEnv = []})
+  modify (\env -> env {namespace = []})
   return []
 
 pushTrace :: Path Abs File -> WithEnv ()
