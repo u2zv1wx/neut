@@ -145,7 +145,6 @@ elaborate' (m, WeakTermPiIntro xts e) = do
   return (m, TermPiIntro xts' e')
 elaborate' (m, WeakTermPiIntroPlus ind (name, is, args) xts e) = do
   args' <- mapM elaboratePlus args
-  -- args2' <- mapM elaboratePlus args2
   e' <- elaborate' e
   xts' <- mapM elaboratePlus xts
   return (m, TermPiIntroPlus ind (name, is, args') xts' e')

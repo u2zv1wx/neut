@@ -27,7 +27,6 @@ reduceTermPlus (m, TermPiIntro xts e) = do
   (m, TermPiIntro (zip3 ms xs ts') e')
 reduceTermPlus (m, TermPiIntroPlus ind (name, is, args) xts e) = do
   let args' = map reduceIdentPlus args
-  -- let args2' = map reduceIdentPlus args2
   let xts' = map reduceIdentPlus xts
   let e' = reduceTermPlus e
   (m, TermPiIntroPlus ind (name, is, args') xts' e')
@@ -160,7 +159,6 @@ normalize (m, TermPiIntro xts e) = do
   return (m, TermPiIntro (zip3 ms xs ts') e')
 normalize (m, TermPiIntroPlus ind (name, is, args) xts e) = do
   args' <- mapM normalizeIdentPlus args
-  -- args2' <- mapM normalizeIdentPlus args2
   xts' <- mapM normalizeIdentPlus xts
   e' <- normalize e
   return (m, TermPiIntroPlus ind (name, is, args') xts' e')

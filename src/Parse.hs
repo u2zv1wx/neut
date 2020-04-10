@@ -489,9 +489,7 @@ concatQuasiStmtList ((QuasiStmtLetInductive n m at e):es) = do
   cont <- concatQuasiStmtList es
   return $ WeakStmtLetWT m at e cont
 concatQuasiStmtList (QuasiStmtLetInductiveIntro m bt e as:ss) = do
-  case e
-    -- (mLam, WeakTermPiIntro xtsyts (_, WeakTermPiIntroPlus ai (bi, is, xts, yts) atsbts (_, WeakTermPiElim b _))) -> do
-        of
+  case e of
     (mLam, WeakTermPiIntro xtsyts (_, WeakTermPiIntroPlus ai (bi, is, _) atsbts (_, WeakTermPiElim b _))) -> do
       modify
         (\env ->

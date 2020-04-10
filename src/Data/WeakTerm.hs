@@ -12,11 +12,6 @@ data WeakTerm
   | WeakTermUpsilon Identifier
   | WeakTermPi (Maybe T.Text) [IdentifierPlus] WeakTermPlus
   | WeakTermPiIntro [IdentifierPlus] WeakTermPlus
-  -- | WeakTermPiIntroPlus
-  --     Identifier -- name of inductive type
-  --     (T.Text, [Int], [IdentifierPlus], [IdentifierPlus]) -- (name of construtor, xts, yts)
-  --     [IdentifierPlus]
-  --     WeakTermPlus
   | WeakTermPiIntroPlus
       Identifier -- name of inductive type
       (T.Text, [Int], [IdentifierPlus]) -- (name of construtor, xts, yts)
@@ -242,11 +237,8 @@ substWeakTermPlus sub (m, WeakTermPiIntro xts body) = do
   (m, WeakTermPiIntro xts' body')
 substWeakTermPlus sub (m, WeakTermPiIntroPlus ind (name, is, args) xts body) = do
   let args' = substWeakTermPlus' sub args
-  -- let args1' = take (length args1) args'
-  -- let args2' = drop (length args1) args'
   let (xts', body') = substWeakTermPlus'' sub xts body
   (m, WeakTermPiIntroPlus ind (name, is, args') xts' body')
-  -- (m, WeakTermPiIntroPlus ind (name, is, args1', args2') xts' body')
 substWeakTermPlus sub (m, WeakTermPiElim e es) = do
   let e' = substWeakTermPlus sub e
   let es' = map (substWeakTermPlus sub) es
