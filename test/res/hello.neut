@@ -1,5 +1,9 @@
 ;; hello, world!
 
+(no-implicit-core)
+
+(include library "core/string.neut")
+
 (use string)
 
 (print "hello, world!\n")

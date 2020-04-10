@@ -266,9 +266,7 @@ flipMode ModeForward = ModeBackward
 flipMode ModeBackward = ModeForward
 
 isResolved :: SubstWeakTerm -> WeakTermPlus -> Bool
-isResolved sub e
-  -- let xs = map fst sub
- = do
+isResolved sub e = do
   let xs = IntMap.keys sub
   let ys = S.map asInt $ varWeakTermPlus e
   all (\x -> x `S.notMember` ys) xs
@@ -311,7 +309,6 @@ zetaPi mode isub atsbts xts cod e = do
   let (ms', xs', ts') = unzip3 xts'
   let vs' = zipWith (\m x -> (m, WeakTermUpsilon x)) ms' xs'
   vs <- zipWithM (zeta (flipMode mode) isub atsbts) ts' vs'
-  -- forward conversion to create B -> B'
   app' <- zeta mode isub atsbts cod' (fst e, WeakTermPiElim e vs)
   -- return the composition: (A' ..., A') -> (A, ..., A) -> B -> B'
   let ts'' = map (substWeakTermPlus isub) ts'

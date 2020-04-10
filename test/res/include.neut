@@ -23,13 +23,7 @@
   (cons 25 (list:cons 100 (cons 1000 (nil)))))
 
 (let ps (list i64)
-  (cons
-    25
-    (cons
-      100
-      (cons
-        1000
-        (nil)))))
+  (cons 25 (cons 100 (cons 1000 (nil)))))
 
 
 ;; ↓ こう書くとエラーがlist.neutのほうで報告されてしまうという問題がある。修正すること。
@@ -59,12 +53,15 @@
 
 
 (i64:print
-(case xs
-  ((nil) (i64 10))
-  ((cons value ys)
-   (case ys
-     ((nil) (i64 20))
-     ((cons v2 zs) v2)))))
+  (case xs
+    ((nil)
+      (i64 10))
+    ((cons value ys)
+      (case ys
+        ((nil)
+          (i64 20))
+        ((cons v2 zs)
+          v2)))))
 
 
 
