@@ -72,7 +72,7 @@ data Env =
     -- [("foo.13", "foo"), ...] (as corresponding int)
     , revNameEnv :: IntMap.IntMap Int
     , prefixEnv :: [T.Text]
-    , namespace :: [T.Text]
+    , sectionEnv :: [T.Text]
     , formationEnv :: IntMap.IntMap (Maybe WeakTermPlus)
     -- "stream" ~> ["stream", "other-record-type", "head", "tail", "other-destructor"]
     , labelEnv :: Map.HashMap T.Text [T.Text]
@@ -135,7 +135,7 @@ initialEnv =
     , revIndEnv = Map.empty
     , intactSet = S.empty
     , prefixEnv = []
-    , namespace = []
+    , sectionEnv = []
     , formationEnv = IntMap.empty
     , indEnv = IntMap.empty
     , labelEnv = Map.empty

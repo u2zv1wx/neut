@@ -65,7 +65,7 @@ leave = do
   popTrace
   modify (\env -> env {fileEnv = Map.insert path VisitInfoFinish (fileEnv env)})
   modify (\env -> env {prefixEnv = []})
-  modify (\env -> env {namespace = []})
+  modify (\env -> env {sectionEnv = []})
   return []
 
 pushTrace :: Path Abs File -> WithEnv ()
@@ -102,20 +102,20 @@ parse' ((m, TreeNode ((_, TreeLeaf "unuse"):es)):as)
   | otherwise = raiseSyntaxError m "(unuse LEAF)"
 parse' ((m, TreeNode ((_, TreeLeaf "section"):es)):as)
   | [(_, TreeLeaf s)] <- es = do
-    modify (\e -> e {namespace = s : namespace e})
+    modify (\e -> e {sectionEnv = s : sectionEnv e})
     n <- getCurrentSection
     stmtList <- parse' as
     return $ QuasiStmtUse n : QuasiStmtUse (n <> ":" <> "private") : stmtList -- auto-use
   | otherwise = raiseSyntaxError m "(section LEAF)"
 parse' ((m, TreeNode ((_, TreeLeaf "end"):es)):as)
   | [(_, TreeLeaf s)] <- es = do
-    ns <- gets namespace
+    ns <- gets sectionEnv
     case ns of
       [] -> raiseError m "there is no section to end"
       (s':ns')
         | s == s' -> do
           n <- getCurrentSection
-          modify (\e -> e {namespace = ns'})
+          modify (\e -> e {sectionEnv = ns'})
           stmtList <- parse' as
           return $
             QuasiStmtUnuse n : QuasiStmtUnuse (n <> ":" <> "private") : stmtList
@@ -250,7 +250,7 @@ lazyConcatHandler _ i1 = do
 
 withSectionPrefix :: T.Text -> WithEnv T.Text
 withSectionPrefix x = do
-  ns <- gets namespace
+  ns <- gets sectionEnv
   return $ withSectionPrefix' ns x
 
 withSectionPrefix' :: [T.Text] -> T.Text -> T.Text
@@ -259,7 +259,7 @@ withSectionPrefix' (n:ns) x = withSectionPrefix' ns $ n <> ":" <> x
 
 getCurrentSection :: WithEnv T.Text
 getCurrentSection = do
-  ns <- gets namespace
+  ns <- gets sectionEnv
   return $ getCurrentSection' ns
 
 getCurrentSection' :: [T.Text] -> T.Text
@@ -379,7 +379,7 @@ includeFile' m path as = do
 
 ensureEnvSanity :: Meta -> WithEnv ()
 ensureEnvSanity m = do
-  ns <- gets namespace
+  ns <- gets sectionEnv
   penv <- gets prefixEnv
   case (null ns, null penv) of
     (False, _) -> raiseError m "`include` can only be used at top-level section"
