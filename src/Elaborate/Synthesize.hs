@@ -35,13 +35,8 @@ synthesize = do
       resolvePiElim m ess e
     Just (Enriched _ _ (ConstraintFlexRigid m ess e)) -> do
       resolvePiElim m ess e
-    Just (Enriched _ _ _) -> do
-      resolveOther $ Q.toList q
+    _ -> throwTypeErrors
 
--- e1だけがstuckしているとき、e2だけがstuckしているとき、両方がstuckしているときをそれぞれ
--- 独立したケースとして扱えるようにしたほうがよい（そうすればsubstを減らせる）
--- つまり、e1とe2のstuck reasonをそれぞれ別々に保持したほうがよい。
--- synthのときにlookupAnyできるかでseparateするとか？
 resolveStuck ::
      WeakTermPlus -> WeakTermPlus -> Identifier -> WeakTermPlus -> WithEnv ()
 resolveStuck e1 e2 h e = do
@@ -81,16 +76,8 @@ resolveIdentifier h@(I (_, i)) e = do
   modify (\env -> env {constraintQueue = q1' `Q.union` q2})
   synthesize
 
-resolveOther :: [EnrichedConstraint] -> WithEnv ()
-resolveOther [] = throwTypeErrors
-resolveOther ((Enriched (e1, e2) fmvs _):cs) = do
-  sub <- gets substEnv
-  case lookupAny (S.toList fmvs) sub of
-    Just (h, e) -> resolveStuck e1 e2 h e
-    Nothing -> resolveOther cs
-
 asAnalyzable :: EnrichedConstraint -> EnrichedConstraint
-asAnalyzable (Enriched cs ms _) = Enriched cs ms ConstraintAnalyzable
+asAnalyzable (Enriched cs hs _) = Enriched cs hs ConstraintAnalyzable
 
 -- Try the list of alternatives.
 tryPlanList :: Meta -> [WithEnv a] -> WithEnv a
@@ -207,7 +194,6 @@ unravel (m, WeakTermPi mName xts t) = do
 unravel (m, WeakTermPiIntro xts e) = do
   (xts', e') <- unravelBinder xts e
   return (m, WeakTermPiIntro xts' e')
--- the "content" of this term is not used in toText, and so there's no need to unravel this term
 unravel (m, WeakTermPiIntroPlus ind (name, is, args) xts e) =
   return (m, WeakTermPiIntroPlus ind (name, is, args) xts e)
 unravel (m, WeakTermPiElim e es) = do
