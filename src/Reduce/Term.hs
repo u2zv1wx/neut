@@ -41,12 +41,14 @@ reduceTermPlus (m, TermPiElim e es) = do
       , metaIsReducible mLam
       , valueCond -> do
         let xs = map (\(_, x, _) -> asInt x) xts
-        reduceTermPlus $ substTermPlus (zip xs es') body
+        let sub = IntMap.fromList $ zip xs es'
+        reduceTermPlus $ substTermPlus sub body
     (_, TermPiIntroPlus _ _ xts body)
       | length xts == length es'
       , valueCond -> do
         let xs = map (\(_, x, _) -> asInt x) xts
-        reduceTermPlus $ substTermPlus (zip xs es') body
+        let sub = IntMap.fromList $ zip xs es'
+        reduceTermPlus $ substTermPlus sub body
     _ -> (m, app)
 reduceTermPlus (m, TermIter (mx, x, t) xts e)
   | x `notElem` varTermPlus e = reduceTermPlus (m, TermPiIntro xts e)
@@ -89,7 +91,8 @@ reduceTermPlus (m, TermArrayElim k xts e1 e2) = do
       | length es == length xts
       , k == k' -> do
         let xs = map (\(_, x, _) -> asInt x) xts
-        reduceTermPlus $ substTermPlus (zip xs es) e2
+        let sub = IntMap.fromList $ zip xs es
+        reduceTermPlus $ substTermPlus sub e2
     _ -> (m, TermArrayElim k xts e1' e2)
 reduceTermPlus (m, TermStructIntro eks) = do
   let (es, ks) = unzip eks
@@ -101,7 +104,9 @@ reduceTermPlus (m, TermStructElim xks e1 e2) = do
     (_, TermStructIntro eks)
       | (_, xs, ks1) <- unzip3 xks
       , (es, ks2) <- unzip eks
-      , ks1 == ks2 -> reduceTermPlus $ substTermPlus (zip (map asInt xs) es) e2
+      , ks1 == ks2 -> do
+        let sub = IntMap.fromList $ zip (map asInt xs) es
+        reduceTermPlus $ substTermPlus sub e2
     _ -> (m, TermStructElim xks e1' e2)
 reduceTermPlus (m, TermCase indName e cxtes) = do
   let e' = reduceTermPlus e
@@ -168,13 +173,16 @@ normalize (m, TermPiElim e es) = do
   case e' of
     (_, TermPiIntro xts body) -> do
       let xs = map (\(_, x, _) -> asInt x) xts
-      normalize $ substTermPlus (zip xs es') body
+      let sub = IntMap.fromList $ zip xs es'
+      normalize $ substTermPlus sub body
     (_, TermPiIntroPlus _ _ xts body) -> do
       let xs = map (\(_, x, _) -> asInt x) xts
-      normalize $ substTermPlus (zip xs es') body
+      let sub = IntMap.fromList $ zip xs es'
+      normalize $ substTermPlus sub body
     iter@(_, TermIter (_, self, _) xts body) -> do
       let xs = map (\(_, x, _) -> asInt x) xts
-      normalize $ substTermPlus ((asInt self, iter) : zip xs es') body
+      let sub = IntMap.fromList $ (asInt self, iter) : zip xs es'
+      normalize $ substTermPlus sub body
     _ -> return (m, TermPiElim e' es')
 normalize (m, TermIter (mx, x, t) xts e) = do
   t' <- normalize t
@@ -223,7 +231,8 @@ normalize (m, TermArrayElim k xts e1 e2) = do
       | length es == length xts
       , k == k' -> do
         let xs = map (\(_, x, _) -> asInt x) xts
-        normalize $ substTermPlus (zip xs es) e2
+        let sub = IntMap.fromList $ zip xs es
+        normalize $ substTermPlus sub e2
     _ -> return (m, TermArrayElim k xts e1' e2)
 normalize (m, TermStruct ks) = return (m, TermStruct ks)
 normalize (m, TermStructIntro eks) = do
@@ -236,7 +245,9 @@ normalize (m, TermStructElim xks e1 e2) = do
     (_, TermStructIntro eks)
       | (_, xs, ks1) <- unzip3 xks
       , (es, ks2) <- unzip eks
-      , ks1 == ks2 -> normalize $ substTermPlus (zip (map asInt xs) es) e2
+      , ks1 == ks2 -> do
+        let sub = IntMap.fromList $ zip (map asInt xs) es
+        normalize $ substTermPlus sub e2
     _ -> return (m, TermStructElim xks e1' e2)
 normalize (m, TermCase indName e cxtes) = do
   e' <- normalize e

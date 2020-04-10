@@ -122,7 +122,3 @@ substTheta sub (ThetaArrayAccess t d1 d2) = do
 substTheta sub (ThetaSysCall sysCall ds) = do
   let ds' = map (substDataPlus sub) ds
   ThetaSysCall sysCall ds'
-
-deleteKeys :: SubstDataPlus -> [Int] -> SubstDataPlus
-deleteKeys sub [] = sub
-deleteKeys sub (i:is) = IntMap.delete i $ deleteKeys sub is

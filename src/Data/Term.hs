@@ -4,6 +4,7 @@ module Data.Term where
 
 import Data.Maybe (fromMaybe)
 
+import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Text as T
 
 import Data.Basic
@@ -46,7 +47,7 @@ type TermPlus = (Meta, Term)
 
 type Clause = (((Meta, Identifier), [IdentifierPlus]), TermPlus)
 
-type SubstTerm = [(Int, TermPlus)]
+type SubstTerm = IntMap.IntMap TermPlus
 
 type IdentifierPlus = (Meta, Identifier, TermPlus)
 
@@ -103,7 +104,7 @@ varTermPlus' ((_, x, t):xts) es = do
 substTermPlus :: SubstTerm -> TermPlus -> TermPlus
 substTermPlus _ (m, TermTau) = (m, TermTau)
 substTermPlus sub (m, TermUpsilon x) =
-  fromMaybe (m, TermUpsilon x) (lookup (asInt x) sub)
+  fromMaybe (m, TermUpsilon x) (IntMap.lookup (asInt x) sub)
 substTermPlus sub (m, TermPi mName xts t) = do
   let (xts', t') = substTermPlus'' sub xts t
   (m, TermPi mName xts' t')
@@ -120,7 +121,7 @@ substTermPlus sub (m, TermPiElim e es) = do
   (m, TermPiElim e' es')
 substTermPlus sub (m, TermIter (mx, x, t) xts e) = do
   let t' = substTermPlus sub t
-  let sub' = filter (\(k, _) -> k /= asInt x) sub
+  let sub' = IntMap.delete (asInt x) sub
   let (xts', e') = substTermPlus'' sub' xts e
   (m, TermIter (mx, x, t') xts' e')
 substTermPlus _ e@(_, TermConst _) = e
@@ -152,7 +153,7 @@ substTermPlus sub (m, TermStructIntro ets) = do
 substTermPlus sub (m, TermStructElim xts v e) = do
   let v' = substTermPlus sub v
   let xs = map (\(_, x, _) -> asInt x) xts
-  let sub' = filter (\(k, _) -> k `notElem` xs) sub
+  let sub' = deleteKeys sub xs
   let e' = substTermPlus sub' e
   (m, TermStructElim xts v' e')
 substTermPlus sub (m, TermCase indName e cxtes) = do
@@ -166,7 +167,7 @@ substTermPlus sub (m, TermCase indName e cxtes) = do
 substTermPlus' :: SubstTerm -> [IdentifierPlus] -> [IdentifierPlus]
 substTermPlus' _ [] = []
 substTermPlus' sub ((m, x, t):xts) = do
-  let sub' = filter (\(k, _) -> k /= asInt x) sub
+  let sub' = IntMap.delete (asInt x) sub
   let xts' = substTermPlus' sub' xts
   let t' = substTermPlus sub t
   (m, x, t') : xts'
@@ -175,7 +176,7 @@ substTermPlus'' ::
      SubstTerm -> [IdentifierPlus] -> TermPlus -> ([IdentifierPlus], TermPlus)
 substTermPlus'' sub [] e = ([], substTermPlus sub e)
 substTermPlus'' sub ((mx, x, t):xts) e = do
-  let sub' = filter (\(k, _) -> k /= asInt x) sub
+  let sub' = IntMap.delete (asInt x) sub
   let (xts', e') = substTermPlus'' sub' xts e
   ((mx, x, substTermPlus sub t) : xts', e')
 

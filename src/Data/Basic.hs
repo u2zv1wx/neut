@@ -5,6 +5,7 @@ module Data.Basic where
 
 import Path
 
+import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Set as S
 import qualified Data.Text as T
 
@@ -364,3 +365,7 @@ breakOnMaybe needle text =
       if T.null t
         then Nothing
         else return (h, T.tail t)
+
+deleteKeys :: IntMap.IntMap a -> [Int] -> IntMap.IntMap a
+deleteKeys sub [] = sub
+deleteKeys sub (i:is) = IntMap.delete i $ deleteKeys sub is
