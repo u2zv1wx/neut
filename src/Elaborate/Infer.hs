@@ -460,7 +460,6 @@ lookupWeakTypeEnv m s = do
 lookupWeakTypeEnvMaybe :: Identifier -> WithEnv (Maybe WeakTermPlus)
 lookupWeakTypeEnvMaybe (I (_, s)) = do
   wtenv <- gets weakTypeEnv
-  -- mt <- gets (IntMap.lookup s . weakTypeEnv)
   case IntMap.lookup s wtenv of
     Nothing -> return Nothing
     Just t -> return $ Just t
