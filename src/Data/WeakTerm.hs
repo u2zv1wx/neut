@@ -2,6 +2,7 @@
 
 module Data.WeakTerm where
 
+import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Set as S
 import qualified Data.Text as T
 
@@ -56,7 +57,8 @@ data WeakCase
 
 type WeakCasePlus = (Meta, WeakCase)
 
-type SubstWeakTerm = [(Identifier, WeakTermPlus)]
+-- type SubstWeakTerm = [(Identifier, WeakTermPlus)]
+type SubstWeakTerm = IntMap.IntMap WeakTermPlus
 
 type IdentifierPlus = (Meta, Identifier, WeakTermPlus)
 
@@ -226,7 +228,7 @@ holeWeakTermPlus' ((_, _, t):xts) es = do
 substWeakTermPlus :: SubstWeakTerm -> WeakTermPlus -> WeakTermPlus
 substWeakTermPlus _ tau@(_, WeakTermTau) = tau
 substWeakTermPlus sub e1@(_, WeakTermUpsilon x) = do
-  case lookup x sub of
+  case IntMap.lookup (asInt x) sub of
     Nothing -> e1
     Just e2@(_, e) -> (supMeta (metaOf e1) (metaOf e2), e)
 substWeakTermPlus sub (m, WeakTermPi mName xts t) = do
@@ -245,12 +247,13 @@ substWeakTermPlus sub (m, WeakTermPiElim e es) = do
   (m, WeakTermPiElim e' es')
 substWeakTermPlus sub (m, WeakTermIter (mx, x, t) xts e) = do
   let t' = substWeakTermPlus sub t
-  let sub' = filter (\(k, _) -> k /= x) sub
+  -- let sub' = filter (\(k, _) -> k /= x) sub
+  let sub' = IntMap.delete (asInt x) sub
   let (xts', e') = substWeakTermPlus'' sub' xts e
   (m, WeakTermIter (mx, x, t') xts' e')
 substWeakTermPlus _ e@(_, WeakTermConst _) = e
 substWeakTermPlus sub e1@(_, WeakTermZeta x) = do
-  case lookup x sub of
+  case IntMap.lookup (asInt x) sub of
     Nothing -> e1
     Just e2@(_, e) -> (supMeta (metaOf e1) (metaOf e2), e)
 substWeakTermPlus sub (m, WeakTermInt t x) = do
@@ -288,7 +291,8 @@ substWeakTermPlus sub (m, WeakTermStructIntro ets) = do
 substWeakTermPlus sub (m, WeakTermStructElim xts v e) = do
   let v' = substWeakTermPlus sub v
   let xs = map (\(_, x, _) -> x) xts
-  let sub' = filter (\(k, _) -> k `notElem` xs) sub
+  -- let sub' = filter (\(k, _) -> k `notElem` xs) sub
+  let sub' = deleteKeys sub (map asInt xs)
   let e' = substWeakTermPlus sub' e
   (m, WeakTermStructElim xts v' e')
 substWeakTermPlus sub (m, WeakTermCase indName e cxtes) = do
@@ -308,8 +312,10 @@ substWeakTermPlus sub (m, WeakTermErase xs e) = do
 
 substWeakTermPlus' :: SubstWeakTerm -> [IdentifierPlus] -> [IdentifierPlus]
 substWeakTermPlus' _ [] = []
-substWeakTermPlus' sub ((m, x, t):xts) = do
-  let sub' = filter (\(k, _) -> k /= x) sub
+substWeakTermPlus' sub ((m, x, t):xts)
+  -- let sub' = filter (\(k, _) -> k /= x) sub
+ = do
+  let sub' = IntMap.delete (asInt x) sub
   let xts' = substWeakTermPlus' sub' xts
   let t' = substWeakTermPlus sub t
   (m, x, t') : xts'
@@ -319,11 +325,11 @@ substWeakTermPlus'' ::
   -> [IdentifierPlus]
   -> WeakTermPlus
   -> ([IdentifierPlus], WeakTermPlus)
-substWeakTermPlus'' sub [] e = do
-  let e' = substWeakTermPlus sub e
-  ([], e')
-substWeakTermPlus'' sub ((m, x, t):xts) e = do
-  let sub' = filter (\(k, _) -> k /= x) sub
+substWeakTermPlus'' sub [] e = ([], substWeakTermPlus sub e)
+substWeakTermPlus'' sub ((m, x, t):xts) e
+  -- let sub' = filter (\(k, _) -> k /= x) sub
+ = do
+  let sub' = IntMap.delete (asInt x) sub
   let (xts', e') = substWeakTermPlus'' sub' xts e
   let t' = substWeakTermPlus sub t
   ((m, x, t') : xts', e')
@@ -356,6 +362,7 @@ toText piType@(_, WeakTermPi Nothing xts cod) = do
         let (_, _, ts) = unzip3 xts
         showCons ["arrow", showCons $ map toText ts, toText cod]
 toText (_, WeakTermPi (Just _) _ cod) = toText cod
+-- toText (m, WeakTermPi _ xts cod) = "+" <> toText (m, WeakTermPi Nothing xts cod)
 toText (_, WeakTermPiIntro xts e) = do
   let argStr = inParen $ showItems $ map showArg xts
   showCons ["λ", argStr, toText e]

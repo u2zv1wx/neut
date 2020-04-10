@@ -195,7 +195,8 @@ inferArgs ::
 inferArgs _ [] [] cod = return cod
 inferArgs m ((e, t):ets) ((_, x, tx):xts) cod = do
   insConstraintEnv t tx
-  let (xts', cod') = substWeakTermPlus'' [(x, e)] xts cod
+  let sub = IntMap.singleton (asInt x) e
+  let (xts', cod') = substWeakTermPlus'' sub xts cod
   inferArgs m ets xts' cod'
 inferArgs m _ _ _ = raiseCritical m $ "invalid argument passed to inferArgs"
 

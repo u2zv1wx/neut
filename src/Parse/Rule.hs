@@ -255,17 +255,20 @@ data Mode
 
 internalize ::
      [Identifier] -> [IdentifierPlus] -> IdentifierPlus -> WithEnv WeakTermPlus
-internalize as atsbts (m, y, t) =
-  zeta ModeForward (zip as (map toVar' atsbts)) atsbts t (m, WeakTermUpsilon y)
+internalize as atsbts (m, y, t) = do
+  let sub = IntMap.fromList $ zip (map asInt as) (map toVar' atsbts)
+  zeta ModeForward sub atsbts t (m, WeakTermUpsilon y)
 
 flipMode :: Mode -> Mode
 flipMode ModeForward = ModeBackward
 flipMode ModeBackward = ModeForward
 
 isResolved :: SubstWeakTerm -> WeakTermPlus -> Bool
-isResolved sub e = do
-  let xs = map fst sub
-  let ys = varWeakTermPlus e
+isResolved sub e
+  -- let xs = map fst sub
+ = do
+  let xs = IntMap.keys sub
+  let ys = S.map asInt $ varWeakTermPlus e
   all (\x -> x `S.notMember` ys) xs
 
 zeta ::
@@ -277,11 +280,10 @@ zeta ::
   -> WithEnv WeakTermPlus -- a term of type `A{x1 := x1', ..., xn := xn'}`
 zeta mode isub atsbts t e = do
   ienv <- gets indEnv
-  isub' <- invSubst isub
   case t of
     (_, WeakTermPi _ xts cod) -> zetaPi mode isub atsbts xts cod e
     (_, WeakTermPiElim va@(_, WeakTermUpsilon a@(I (_, i))) es) -- esの長さをチェックするべきでは？
-      | Just _ <- lookup a (isub ++ isub') ->
+      | Just _ <- IntMap.lookup (asInt a) isub ->
         zetaInductive mode isub atsbts es e
       | Just (Just bts) <- IntMap.lookup i ienv
       , not (all (isResolved isub) es) ->
@@ -306,9 +308,7 @@ zetaPi mode isub atsbts xts cod e = do
   (xts', cod') <- renameBinder xts cod
   let (ms', xs', ts') = unzip3 xts'
   let vs' = zipWith (\m x -> (m, WeakTermUpsilon x)) ms' xs'
-  -- backward conversion to create (A', ..., A') -> (A, ..., A)
-  isub' <- invSubst isub
-  vs <- zipWithM (zeta (flipMode mode) isub' atsbts) ts' vs' -- これだとtsの中のxの出現が狂う、というわけ？
+  vs <- zipWithM (zeta (flipMode mode) isub atsbts) ts' vs'
   -- forward conversion to create B -> B'
   app' <- zeta mode isub atsbts cod' (fst e, WeakTermPiElim e vs)
   -- return the composition: (A' ..., A') -> (A, ..., A) -> B -> B'
@@ -406,8 +406,9 @@ toInternalizedArg mode isub aInner aOuter xts atsbts es es' b (mbInner, _, (_, W
   --   - aOuterの中身はすべて処理済み
   --   - aOuterの外にはeiが出現しうる
   -- という状況が実現できる。これはrecursionの停止を与える。
-  let xs = map (\(_, x, _) -> x) xts -- fixme: このへんもrenameBinderでやったほうがいい？
-  let ts'' = map (substWeakTermPlus (zip xs es)) ts'
+  let xs = map (\(_, x, _) -> asInt x) xts -- fixme: このへんもrenameBinderでやったほうがいい？
+  let sub = IntMap.fromList $ zip xs es
+  let ts'' = map (substWeakTermPlus sub) ts'
   ys' <- mapM newNameWith ys
   -- これで引数の型の調整が終わったので、あらためてidentPlusの形に整える
   -- もしかしたらyって名前を別名に変更したほうがいいかもしれないが。
@@ -435,7 +436,7 @@ renameBinder ::
 renameBinder [] e = return ([], e)
 renameBinder ((m, x, t):ats) e = do
   x' <- newNameWith x
-  let sub = [(x, (m, WeakTermUpsilon x'))]
+  let sub = IntMap.singleton (asInt x) (m, WeakTermUpsilon x')
   let (ats', e') = substWeakTermPlus'' sub ats e -- discern済みなのでこれでオーケーのはず
   (ats'', e'') <- renameBinder ats' e'
   return ((m, x', t) : ats'', e'')
@@ -557,12 +558,3 @@ substRuleType'' sub ((m, x, t):xts) e = do
     else do
       (xts', e') <- substRuleType'' sub xts e
       return ((m, x, t') : xts', e')
-
-invSubst :: SubstWeakTerm -> WithEnv SubstWeakTerm
-invSubst [] = return []
-invSubst ((x, (m, WeakTermUpsilon x')):sub) = do
-  sub' <- invSubst sub
-  return $ (x', (m, WeakTermUpsilon x)) : sub'
-invSubst _ =
-  raiseCritical'
-    "substitution used in internalization/externalization must be of the form {VAR ~> VAR, ..., VAR ~> VAR}"

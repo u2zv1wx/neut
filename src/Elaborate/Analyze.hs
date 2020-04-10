@@ -109,8 +109,9 @@ simp' ((e1@(m1, _), e2@(m2, _)):cs) = do
   let fvs2 = varWeakTermPlus e2
   case lookupAny (S.toList fmvs) sub of
     Just (h, e) -> do
-      let e1' = substWeakTermPlus [(h, e)] (m, snd e1)
-      let e2' = substWeakTermPlus [(h, e)] (m, snd e2)
+      let s = IntMap.singleton (asInt h) e
+      let e1' = substWeakTermPlus s (m, snd e1)
+      let e2' = substWeakTermPlus s (m, snd e2)
       simp $ (e1', e2') : cs
     Nothing -> do
       let e1' = (m, snd e1)
@@ -132,7 +133,9 @@ simp' ((e1@(m1, _), e2@(m2, _)):cs) = do
           , Just es <- lookupAll zs sub ->
             case es of
               [] -> simpPattern h1 ies1 e1' e2' fvs2 cs
-              _ -> simp $ (e1', substWeakTermPlus (zip zs es) e2') : cs
+              _ -> do
+                let s = IntMap.fromList $ zip (map asInt zs) es
+                simp $ (e1', substWeakTermPlus s e2') : cs
         (_, Just (StuckPiElimZetaStrict h2 ies2))
           | xs2 <- concatMap getVarList ies2
           , occurCheck h2 hs1
@@ -141,7 +144,9 @@ simp' ((e1@(m1, _), e2@(m2, _)):cs) = do
           , Just es <- lookupAll zs sub ->
             case es of
               [] -> simpPattern h2 ies2 e2' e1' fvs1 cs
-              _ -> simp $ (substWeakTermPlus (zip zs es) e1', e2') : cs
+              _ -> do
+                let s = IntMap.fromList $ zip (map asInt zs) es
+                simp $ (substWeakTermPlus s e1', e2') : cs
         (Just (StuckPiElimConst x1 mx1 mess1), _)
           | Just (Left (mBody, body)) <- IntMap.lookup (asInt x1) cenv -> do
             let body' = weaken (supMeta mx1 mBody, body)
@@ -157,7 +162,9 @@ simp' ((e1@(m1, _), e2@(m2, _)):cs) = do
           , Just es <- lookupAll zs sub ->
             case es of
               [] -> simpQuasiPattern h1 ies1 e1' e2' fmvs cs
-              _ -> simp $ (e1', substWeakTermPlus (zip zs es) e2') : cs
+              _ -> do
+                let s = IntMap.fromList $ zip (map asInt zs) es
+                simp $ (e1', substWeakTermPlus s e2') : cs
         (_, Just (StuckPiElimZetaStrict h2 ies2))
           | xs2 <- concatMap getVarList ies2
           , occurCheck h2 hs1
@@ -165,7 +172,9 @@ simp' ((e1@(m1, _), e2@(m2, _)):cs) = do
           , Just es <- lookupAll zs sub ->
             case es of
               [] -> simpQuasiPattern h2 ies2 e2' e1' fmvs cs
-              _ -> simp $ (substWeakTermPlus (zip zs es) e1', e2') : cs
+              _ -> do
+                let s = IntMap.fromList $ zip (map asInt zs) es
+                simp $ (substWeakTermPlus s e1', e2') : cs
         (Just (StuckPiElimZeta h1 ies1), Nothing)
           | xs1 <- concatMap getVarList ies1
           , occurCheck h1 hs2
@@ -179,14 +188,14 @@ simp' ((e1@(m1, _), e2@(m2, _)):cs) = do
           simp cs
 
 simpBinder :: [IdentifierPlus] -> [IdentifierPlus] -> WithEnv ()
-simpBinder xts1 xts2 = simpBinder' [] xts1 xts2
+simpBinder xts1 xts2 = simpBinder' IntMap.empty xts1 xts2
 
 simpBinder' ::
      SubstWeakTerm -> [IdentifierPlus] -> [IdentifierPlus] -> WithEnv ()
 simpBinder' sub ((m1, x1, t1):xts1) ((m2, x2, t2):xts2) = do
   simp [(t1, substWeakTermPlus sub t2)]
   let var1 = (supMeta m1 m2, WeakTermUpsilon x1)
-  let sub' = (x2, var1) : sub
+  let sub' = IntMap.insert (asInt x2) var1 sub
   simpBinder' sub' xts1 xts2
 simpBinder' _ _ _ = return ()
 

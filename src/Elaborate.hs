@@ -156,8 +156,9 @@ elaborate' (m, WeakTermPiElim (mh, WeakTermZeta (I (_, x))) es) = do
     Nothing -> raiseError mh $ "couldn't instantiate the hole here"
     Just (_, WeakTermPiIntro xts e)
       | length xts == length es -> do
-        let xs = map (\(_, y, _) -> y) xts
-        elaborate' $ substWeakTermPlus (zip xs es) e
+        let xs = map (\(_, y, _) -> asInt y) xts
+        let s = IntMap.fromList $ zip xs es
+        elaborate' $ substWeakTermPlus s e
     Just e -> elaborate' $ reduceWeakTermPlus (m, WeakTermPiElim e es)
 elaborate' (m, WeakTermPiElim e es) = do
   e' <- elaborate' e

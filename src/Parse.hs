@@ -23,8 +23,8 @@ import qualified Codec.Compression.GZip as GZip
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as L
 import qualified Data.HashMap.Strict as Map
+import qualified Data.IntMap.Strict as IntMap
 
--- import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
@@ -479,7 +479,7 @@ concatQuasiStmtList (QuasiStmtImplicit m x i:es) = do
 concatQuasiStmtList (QuasiStmtEnum {}:ss) = concatQuasiStmtList ss
 concatQuasiStmtList (QuasiStmtDef xds:ss) = do
   let ds = map snd xds
-  let baseSub = map defToSub ds
+  let baseSub = IntMap.fromList $ map defToSub ds
   let sub = selfCompose (length baseSub) baseSub
   let varList = map (\(_, (m, x, _), _, _) -> (m, WeakTermUpsilon x)) ds
   let iterList = map (substWeakTermPlus sub) varList
@@ -518,20 +518,23 @@ toLetList [] = []
 toLetList (((x, (m, (mx, _, t), _, _)), iter):rest) =
   QuasiStmtLet m (mx, x, t) iter : toLetList rest
 
-defToSub :: Def -> (Identifier, WeakTermPlus)
-defToSub (m, (mx, x, t), xts, e) = (x, (m, WeakTermIter (mx, x, t) xts e))
+defToSub :: Def -> (Int, WeakTermPlus)
+defToSub (m, (mx, x, t), xts, e) = (asInt x, (m, WeakTermIter (mx, x, t) xts e))
 
+-- defToSub :: Def -> (Identifier, WeakTermPlus)
+-- defToSub (m, (mx, x, t), xts, e) = (x, (m, WeakTermIter (mx, x, t) xts e))
 selfCompose :: Int -> SubstWeakTerm -> SubstWeakTerm
 selfCompose 0 sub = sub
 selfCompose n sub = compose sub $ selfCompose (n - 1) sub
 
 compose :: SubstWeakTerm -> SubstWeakTerm -> SubstWeakTerm
 compose s1 s2 = do
-  let domS2 = map fst s2
-  let codS2 = map snd s2
-  let codS2' = map (substWeakTermPlus s1) codS2
-  let s1' = filter (\(ident, _) -> ident `notElem` domS2) s1
-  s1' ++ zip domS2 codS2'
+  IntMap.union s1 $ IntMap.map (substWeakTermPlus s1) s2
+  -- let domS2 = map fst s2
+  -- let codS2 = map snd s2
+  -- let codS2' = map (substWeakTermPlus s1) codS2
+  -- let s1' = filter (\(ident, _) -> ident `notElem` domS2) s1
+  -- s1' ++ zip domS2 codS2'
 
 checkKeywordSanity :: Meta -> T.Text -> WithEnv ()
 checkKeywordSanity m "" = raiseError m "empty string for a keyword"

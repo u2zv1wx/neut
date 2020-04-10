@@ -40,8 +40,9 @@ synthesize = do
 resolveStuck ::
      WeakTermPlus -> WeakTermPlus -> Identifier -> WeakTermPlus -> WithEnv ()
 resolveStuck e1 e2 h e = do
-  let e1' = substWeakTermPlus [(h, e)] e1
-  let e2' = substWeakTermPlus [(h, e)] e2
+  let s = IntMap.singleton (asInt h) e
+  let e1' = substWeakTermPlus s e1
+  let e2' = substWeakTermPlus s e2
   deleteMin
   simp [(e1', e2')]
   synthesize
