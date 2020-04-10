@@ -79,7 +79,7 @@ data Env =
     -- "list" ~> (cons, Pi (A : tau). A -> list A -> list A)
     , inductiveEnv :: RuleEnv
     -- "list:cons" ~> ("list", [0])
-    , consToIndInfo :: IntMap.IntMap (Identifier, [Int])
+    , consToIndInfo :: Map.HashMap T.Text (Identifier, [Int])
     , intactSet :: S.Set (Meta, Identifier)
     --
     -- elaborate
@@ -133,7 +133,7 @@ initialEnv =
     , revCaseEnv = IntMap.empty
     , nameEnv = Map.empty
     , revNameEnv = IntMap.empty
-    , consToIndInfo = IntMap.empty
+    , consToIndInfo = Map.empty
     , intactSet = S.empty
     , prefixEnv = []
     , namespace = []
