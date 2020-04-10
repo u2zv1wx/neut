@@ -57,12 +57,16 @@
   ((nil) (i64 10))
   ((cons value ys) (i64 20)))
 
+
+(i64:print
 (case xs
   ((nil) (i64 10))
   ((cons value ys)
    (case ys
      ((nil) (i64 20))
-     ((cons v2 zs) v2))))
+     ((cons v2 zs) v2)))))
+
+
 
 ;; (os:exit i64 20)
 

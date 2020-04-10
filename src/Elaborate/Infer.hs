@@ -40,9 +40,9 @@ infer' ctx (m, WeakTermPi mName xts t) = do
 infer' ctx (m, WeakTermPiIntro xts e) = do
   (xts', (e', t')) <- inferBinder ctx xts e
   return ((m, WeakTermPiIntro xts' e'), (m, weakTermPi xts' t'))
-infer' ctx (m, WeakTermPiIntroNoReduce xts e) = do
-  (xts', (e', t')) <- inferBinder ctx xts e
-  return ((m, WeakTermPiIntroNoReduce xts' e'), (m, weakTermPi xts' t'))
+-- infer' ctx (m, WeakTermPiIntroNoReduce xts e) = do
+--   (xts', (e', t')) <- inferBinder ctx xts e
+--   return ((m, WeakTermPiIntroNoReduce xts' e'), (m, weakTermPi xts' t'))
 infer' ctx (m, WeakTermPiIntroPlus ind (name, is, args1, args2) xts e) = do
   let args = args1 ++ args2
   args' <- inferSigma ctx args

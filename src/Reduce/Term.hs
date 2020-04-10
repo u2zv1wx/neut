@@ -25,11 +25,11 @@ reduceTermPlus (m, TermPiIntro xts e) = do
   let ts' = map reduceTermPlus ts
   let e' = reduceTermPlus e
   (m, TermPiIntro (zip3 ms xs ts') e')
-reduceTermPlus (m, TermPiIntroNoReduce xts e) = do
-  let (ms, xs, ts) = unzip3 xts
-  let ts' = map reduceTermPlus ts
-  let e' = reduceTermPlus e
-  (m, TermPiIntroNoReduce (zip3 ms xs ts') e')
+-- reduceTermPlus (m, TermPiIntroNoReduce xts e) = do
+--   let (ms, xs, ts) = unzip3 xts
+--   let ts' = map reduceTermPlus ts
+--   let e' = reduceTermPlus e
+--   (m, TermPiIntroNoReduce (zip3 ms xs ts') e')
 reduceTermPlus (m, TermPiIntroPlus ind (name, is, args1, args2) xts e) = do
   let args1' = map reduceIdentPlus args1
   let args2' = map reduceIdentPlus args2
@@ -42,8 +42,9 @@ reduceTermPlus (m, TermPiElim e es) = do
   let app = TermPiElim e' es'
   let valueCond = and $ map isValue es
   case e' of
-    (_, TermPiIntro xts body) -- fixme: reduceできるだけreduceするようにする (partial evaluation)
+    (mLam, TermPiIntro xts body) -- fixme: reduceできるだけreduceするようにする (partial evaluation)
       | length xts == length es'
+      , metaIsReducible mLam
       , valueCond -> do
         let xs = map (\(_, x, _) -> asInt x) xts
         reduceTermPlus $ substTermPlus (zip xs es') body
@@ -127,7 +128,7 @@ isValue (_, TermTau) = True
 isValue (_, TermUpsilon _) = True
 isValue (_, TermPi {}) = True
 isValue (_, TermPiIntro {}) = True
-isValue (_, TermPiIntroNoReduce {}) = True
+-- isValue (_, TermPiIntroNoReduce {}) = True
 isValue (_, TermPiIntroPlus {}) = True
 isValue (_, TermIter {}) = True
 isValue (_, TermConst x) = isValueConst x
@@ -166,11 +167,11 @@ normalize (m, TermPiIntro xts e) = do
   ts' <- mapM normalize ts
   e' <- normalize e
   return (m, TermPiIntro (zip3 ms xs ts') e')
-normalize (m, TermPiIntroNoReduce xts e) = do
-  let (ms, xs, ts) = unzip3 xts
-  ts' <- mapM normalize ts
-  e' <- normalize e
-  return (m, TermPiIntroNoReduce (zip3 ms xs ts') e')
+-- normalize (m, TermPiIntroNoReduce xts e) = do
+--   let (ms, xs, ts) = unzip3 xts
+--   ts' <- mapM normalize ts
+--   e' <- normalize e
+--   return (m, TermPiIntroNoReduce (zip3 ms xs ts') e')
 normalize (m, TermPiIntroPlus ind (name, is, args1, args2) xts e) = do
   args1' <- mapM normalizeIdentPlus args1
   args2' <- mapM normalizeIdentPlus args2
@@ -184,9 +185,9 @@ normalize (m, TermPiElim e es) = do
     (_, TermPiIntro xts body) -> do
       let xs = map (\(_, x, _) -> asInt x) xts
       normalize $ substTermPlus (zip xs es') body
-    (_, TermPiIntroNoReduce xts body) -> do
-      let xs = map (\(_, x, _) -> asInt x) xts
-      normalize $ substTermPlus (zip xs es') body
+    -- (_, TermPiIntroNoReduce xts body) -> do
+    --   let xs = map (\(_, x, _) -> asInt x) xts
+    --   normalize $ substTermPlus (zip xs es') body
     (_, TermPiIntroPlus _ _ xts body) -> do
       let xs = map (\(_, x, _) -> asInt x) xts
       normalize $ substTermPlus (zip xs es') body

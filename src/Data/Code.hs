@@ -20,7 +20,7 @@ data Code
   | CodePiElimDownElim DataPlus [DataPlus] -- ((force v) v1 ... vn)
   | CodeSigmaElim ArrayKind [Identifier] DataPlus CodePlus
   | CodeUpIntro DataPlus
-  | CodeUpIntroNoReduce DataPlus
+  -- | CodeUpIntroNoReduce DataPlus
   | CodeUpElim Identifier CodePlus CodePlus
   | CodeEnumElim SubstDataPlus DataPlus [(Case, CodePlus)]
   | CodeStructElim [(Identifier, ArrayKind)] DataPlus CodePlus
@@ -88,9 +88,9 @@ substCodePlus sub (m, CodeSigmaElim mk xs v e) = do
 substCodePlus sub (m, CodeUpIntro v) = do
   let v' = substDataPlus sub v
   (m, CodeUpIntro v')
-substCodePlus sub (m, CodeUpIntroNoReduce v) = do
-  let v' = substDataPlus sub v
-  (m, CodeUpIntroNoReduce v')
+-- substCodePlus sub (m, CodeUpIntroNoReduce v) = do
+--   let v' = substDataPlus sub v
+--   (m, CodeUpIntroNoReduce v')
 substCodePlus sub (m, CodeUpElim x e1 e2) = do
   let e1' = substCodePlus sub e1
   let sub' = filter (\(y, _) -> y /= x) sub

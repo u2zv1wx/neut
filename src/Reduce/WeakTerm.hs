@@ -5,6 +5,7 @@ module Reduce.WeakTerm
   , reduceWeakTermIdentPlus
   ) where
 
+import Data.Basic
 import Data.WeakTerm
 
 reduceWeakTermPlus :: WeakTermPlus -> WeakTermPlus
@@ -23,11 +24,11 @@ reduceWeakTermPlus (m, WeakTermPiIntro xts e) = do
   let ts' = map reduceWeakTermPlus ts
   let e' = reduceWeakTermPlus e
   (m, WeakTermPiIntro (zip3 ms xs ts') e')
-reduceWeakTermPlus (m, WeakTermPiIntroNoReduce xts e) = do
-  let (ms, xs, ts) = unzip3 xts
-  let ts' = map reduceWeakTermPlus ts
-  let e' = reduceWeakTermPlus e
-  (m, WeakTermPiIntroNoReduce (zip3 ms xs ts') e')
+-- reduceWeakTermPlus (m, WeakTermPiIntroNoReduce xts e) = do
+--   let (ms, xs, ts) = unzip3 xts
+--   let ts' = map reduceWeakTermPlus ts
+--   let e' = reduceWeakTermPlus e
+--   (m, WeakTermPiIntroNoReduce (zip3 ms xs ts') e')
 reduceWeakTermPlus (m, WeakTermPiIntroPlus ind (name, is, args1, args2) xts e) = do
   let args1' = map reduceWeakTermIdentPlus args1
   let args2' = map reduceWeakTermIdentPlus args2
@@ -39,8 +40,9 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
   let es' = map reduceWeakTermPlus es
   let app = WeakTermPiElim e' es'
   case e' of
-    (_, WeakTermPiIntro xts body)
-      | length xts == length es' -> do
+    (mLam, WeakTermPiIntro xts body)
+      | length xts == length es'
+      , metaIsReducible mLam -> do
         let xs = map (\(_, x, _) -> x) xts
         reduceWeakTermPlus $ substWeakTermPlus (zip xs es') body
     (_, WeakTermPiIntroPlus _ _ xts body)

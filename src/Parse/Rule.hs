@@ -189,8 +189,8 @@ toInductiveIntro ats bts xts a@(I (ai, _)) (mb, b@(I (bi, _)), m, yts, cod)
     let xts' = filter (\(_, x, _) -> x `S.member` vs) xts
     let piType = (m, weakTermPi (xts' ++ yts) cod)
     let lam =
-          ( m
-          , WeakTermPiIntroNoReduce
+          ( m {metaIsReducible = False}
+          , WeakTermPiIntro
               (xts' ++ yts)
               ( m
               , WeakTermPiIntroPlus
@@ -198,6 +198,16 @@ toInductiveIntro ats bts xts a@(I (ai, _)) (mb, b@(I (bi, _)), m, yts, cod)
                   (bi, buz, xts', yts)
                   (ats ++ bts)
                   (m, WeakTermPiElim (mb, WeakTermUpsilon b) (map toVar' yts))))
+    -- let lam =
+    --       ( m
+    --       , WeakTermPiIntroNoReduce
+    --           (xts' ++ yts)
+    --           ( m
+    --           , WeakTermPiIntroPlus
+    --               a
+    --               (bi, buz, xts', yts)
+    --               (ats ++ bts)
+    --               (m, WeakTermPiElim (mb, WeakTermUpsilon b) (map toVar' yts))))
     let attr = QuasiStmtImplicit m b [0 .. length xts' - 1]
     let as = map (\(_, x, _) -> x) ats
     return [QuasiStmtLetInductiveIntro m (mb, b, piType) lam as, attr]
@@ -458,9 +468,9 @@ substRuleType sub (m, WeakTermPi mName xts t) = do
 substRuleType sub (m, WeakTermPiIntro xts body) = do
   (xts', body') <- substRuleType'' sub xts body
   return (m, WeakTermPiIntro xts' body')
-substRuleType sub (m, WeakTermPiIntroNoReduce xts body) = do
-  (xts', body') <- substRuleType'' sub xts body
-  return (m, WeakTermPiIntroNoReduce xts' body')
+-- substRuleType sub (m, WeakTermPiIntroNoReduce xts body) = do
+--   (xts', body') <- substRuleType'' sub xts body
+--   return (m, WeakTermPiIntroNoReduce xts' body')
 substRuleType sub (m, WeakTermPiIntroPlus ind (name, is, args1, args2) xts body) = do
   args' <- substRuleType' sub $ args1 ++ args2
   let args1' = take (length args1) args'

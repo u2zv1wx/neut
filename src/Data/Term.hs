@@ -14,7 +14,7 @@ data Term
   | TermUpsilon Identifier
   | TermPi (Maybe T.Text) [IdentifierPlus] TermPlus
   | TermPiIntro [IdentifierPlus] TermPlus
-  | TermPiIntroNoReduce [IdentifierPlus] TermPlus
+  -- | TermPiIntroNoReduce [IdentifierPlus] TermPlus
   | TermPiIntroPlus
       Identifier -- name of corresponding inductive type
       (T.Text, [Int], [IdentifierPlus], [IdentifierPlus])
@@ -63,7 +63,7 @@ varTermPlus (_, TermTau) = []
 varTermPlus (_, TermUpsilon x) = [x]
 varTermPlus (_, TermPi _ xts t) = varTermPlus' xts [t]
 varTermPlus (_, TermPiIntro xts e) = varTermPlus' xts [e]
-varTermPlus (_, TermPiIntroNoReduce xts e) = varTermPlus' xts [e]
+-- varTermPlus (_, TermPiIntroNoReduce xts e) = varTermPlus' xts [e]
 varTermPlus (_, TermPiIntroPlus _ _ xts e) = varTermPlus' xts [e]
 varTermPlus (_, TermPiElim e es) = do
   let xs1 = varTermPlus e
@@ -112,9 +112,9 @@ substTermPlus sub (m, TermPi mName xts t) = do
 substTermPlus sub (m, TermPiIntro xts body) = do
   let (xts', body') = substTermPlus'' sub xts body
   (m, TermPiIntro xts' body')
-substTermPlus sub (m, TermPiIntroNoReduce xts body) = do
-  let (xts', body') = substTermPlus'' sub xts body
-  (m, TermPiIntroNoReduce xts' body')
+-- substTermPlus sub (m, TermPiIntroNoReduce xts body) = do
+--   let (xts', body') = substTermPlus'' sub xts body
+--   (m, TermPiIntroNoReduce xts' body')
 substTermPlus sub (m, TermPiIntroPlus ind (name, is, args1, args2) xts body) = do
   let args' = substTermPlus' sub $ args1 ++ args2
   let args1' = take (length args1) args'
@@ -193,8 +193,8 @@ weaken (m, TermPi mName xts t) =
   (m, WeakTermPi mName (weakenArgs xts) (weaken t))
 weaken (m, TermPiIntro xts body) = do
   (m, WeakTermPiIntro (weakenArgs xts) (weaken body))
-weaken (m, TermPiIntroNoReduce xts body) = do
-  (m, WeakTermPiIntroNoReduce (weakenArgs xts) (weaken body))
+-- weaken (m, TermPiIntroNoReduce xts body) = do
+--   (m, WeakTermPiIntroNoReduce (weakenArgs xts) (weaken body))
 weaken (m, TermPiIntroPlus ind (name, is, args1, args2) xts body) = do
   let args1' = weakenArgs args1
   let args2' = weakenArgs args2
