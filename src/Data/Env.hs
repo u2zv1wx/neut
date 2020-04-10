@@ -79,9 +79,10 @@ data Env =
     -- "list" ~> (cons, Pi (A : tau). A -> list A -> list A)
     , inductiveEnv :: RuleEnv
     -- "list:cons-8" ~> list
-    , consToInd :: IntMap.IntMap Identifier
+    -- , consToInd :: IntMap.IntMap Identifier
     -- "list:cons-8" ~> [0] (the used indices of xts)
-    , consToArgs :: IntMap.IntMap [Int]
+    -- , consToArgs :: IntMap.IntMap [Int]
+    , consToIndInfo :: IntMap.IntMap (Identifier, [Int])
     , intactSet :: S.Set (Meta, Identifier)
     --
     -- elaborate
@@ -135,8 +136,9 @@ initialEnv =
     , revCaseEnv = IntMap.empty
     , nameEnv = Map.empty
     , revNameEnv = IntMap.empty
-    , consToInd = IntMap.empty
-    , consToArgs = IntMap.empty
+    , consToIndInfo = IntMap.empty
+    -- , consToInd = IntMap.empty
+    -- , consToArgs = IntMap.empty
     , intactSet = S.empty
     , prefixEnv = []
     , namespace = []

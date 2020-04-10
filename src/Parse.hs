@@ -490,8 +490,11 @@ concatQuasiStmtList ((QuasiStmtLetInductive n m at e):es) = do
 concatQuasiStmtList (QuasiStmtLetInductiveIntro m bt@(_, I (_, j), _) e as:ss) = do
   case e of
     (mLam, WeakTermPiIntro xtsyts (_, WeakTermPiIntroPlus ai (bi, is, xts, yts) atsbts (_, WeakTermPiElim b _))) -> do
-      modify (\env -> env {consToInd = IntMap.insert j ai (consToInd env)})
-      modify (\env -> env {consToArgs = IntMap.insert j is (consToArgs env)})
+      modify
+        (\env ->
+           env {consToIndInfo = IntMap.insert j (ai, is) (consToIndInfo env)})
+      -- modify (\env -> env {consToInd = IntMap.insert j ai (consToInd env)})
+      -- modify (\env -> env {consToArgs = IntMap.insert j is (consToArgs env)})
       let isub = zip as (map toVar' atsbts) -- outer ~> innerで、ytsの型のなかのouterをinnerにしていく
       yts' <- mapM (internalize isub atsbts) $ drop (length xts) xtsyts
       insInductive as bt -- register the constructor (if necessary)
