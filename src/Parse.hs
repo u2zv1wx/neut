@@ -494,8 +494,7 @@ concatQuasiStmtList (QuasiStmtLetInductiveIntro m bt e as:ss) = do
       modify
         (\env ->
            env {consToIndInfo = Map.insert bi (ai, is) (consToIndInfo env)})
-      let isub = zip as (map toVar' atsbts) -- outer ~> innerで、ytsの型のなかのouterをinnerにしていく
-      yts' <- mapM (internalize isub atsbts) $ drop (length is) xtsyts
+      yts' <- mapM (internalize as atsbts) $ drop (length is) xtsyts
       insInductive as bt -- register the constructor (if necessary)
       let lam =
             ( mLam -- metaIsReducible mLam == False

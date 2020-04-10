@@ -5,7 +5,6 @@ module Parse.Rule
   , insForm
   , insInductive
   , internalize
-  , toVar'
   , registerLabelInfo
   , generateProjections
   ) where
@@ -257,9 +256,9 @@ data Mode
   deriving (Show)
 
 internalize ::
-     SubstWeakTerm -> [IdentifierPlus] -> IdentifierPlus -> WithEnv WeakTermPlus
-internalize isub atsbts (m, y, t) =
-  zeta ModeForward isub atsbts t (m, WeakTermUpsilon y)
+     [Identifier] -> [IdentifierPlus] -> IdentifierPlus -> WithEnv WeakTermPlus
+internalize as atsbts (m, y, t) =
+  zeta ModeForward (zip as (map toVar' atsbts)) atsbts t (m, WeakTermUpsilon y)
 
 flipMode :: Mode -> Mode
 flipMode ModeForward = ModeBackward
@@ -283,7 +282,6 @@ zeta mode isub atsbts t e = do
   isub' <- invSubst isub
   case t of
     (_, WeakTermPi _ xts cod) -> zetaPi mode isub atsbts xts cod e
-    -- (_, WeakTermSigma xts) -> zetaSigma mode isub atsbts xts e
     (_, WeakTermPiElim va@(_, WeakTermUpsilon a@(I (_, i))) es) -- esの長さをチェックするべきでは？
       | Just _ <- lookup a (isub ++ isub') ->
         zetaInductive mode isub atsbts es e

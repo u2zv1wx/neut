@@ -14,7 +14,7 @@ data WeakTerm
   | WeakTermPiIntro [IdentifierPlus] WeakTermPlus
   | WeakTermPiIntroPlus
       Identifier -- name of inductive type
-      (T.Text, [Int], [IdentifierPlus]) -- (name of construtor, xts, yts)
+      (T.Text, [Int], [IdentifierPlus]) -- (name of construtor, is (s.t. map (\i -> xts !! i) is == xts'), xts' ++ yts)
       [IdentifierPlus]
       WeakTermPlus
   | WeakTermPiElim WeakTermPlus [WeakTermPlus]
