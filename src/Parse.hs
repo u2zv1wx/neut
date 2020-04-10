@@ -283,38 +283,38 @@ asInductive' (m, TreeNode ((_, TreeLeaf a):(_, TreeNode xts):rules)) = do
   rules'' <- mapM styleRule $ map (substTree sub) rules
   let hole = "[_]"
   argList <- mapM extractArg xts
-  let result =
-        ( m
-        , TreeNode
-            [ (m, TreeLeaf a)
-            , (m, TreeNode xts')
-            , ( m
-              , TreeNode
-                  [ (m, TreeLeaf "unfold")
-                  , ( m
-                    , TreeNode
-                        ([ ( m
-                           , TreeNode
-                               [ (m, TreeLeaf a')
-                               , ( m
-                                 , TreeNode
-                                     [ (m, TreeLeaf "pi")
-                                     , (m, TreeNode xts')
-                                     , (m, TreeLeaf "tau")
-                                     ])
-                               ])
-                         ] ++
-                         rules'' ++
-                         [ ( m
-                           , TreeNode
-                               [ (m, TreeLeaf hole)
-                               , (m, TreeNode ((m, TreeLeaf a') : argList))
-                               ])
-                         ]))
-                  , (m, TreeNode ((m, TreeLeaf a) : argList))
-                  ])
-            ])
-  return ((a, a'), result)
+  return
+    ( (a, a')
+    , ( m
+      , TreeNode
+          [ (m, TreeLeaf a)
+          , (m, TreeNode xts')
+          , ( m
+            , TreeNode
+                [ (m, TreeLeaf "unfold")
+                , ( m
+                  , TreeNode
+                      ([ ( m
+                         , TreeNode
+                             [ (m, TreeLeaf a')
+                             , ( m
+                               , TreeNode
+                                   [ (m, TreeLeaf "pi")
+                                   , (m, TreeNode xts')
+                                   , (m, TreeLeaf "tau")
+                                   ])
+                             ])
+                       ] ++
+                       rules'' ++
+                       [ ( m
+                         , TreeNode
+                             [ (m, TreeLeaf hole)
+                             , (m, TreeNode ((m, TreeLeaf a') : argList))
+                             ])
+                       ]))
+                , (m, TreeNode ((m, TreeLeaf a) : argList))
+                ])
+          ]))
 asInductive' t = raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) ...)"
 
 extractArg :: TreePlus -> WithEnv TreePlus
