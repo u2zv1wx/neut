@@ -20,9 +20,6 @@ type MacroSubst = [(T.Text, TreePlus)]
 macroExpand :: TreePlus -> WithEnv TreePlus
 macroExpand t = recurM (macroExpand1 . splice) t
 
-macroExpand' :: TreePlus -> WithEnv TreePlus
-macroExpand' t = recurM (macroExpand1 . splice) t
-
 recurM :: (Monad m) => (TreePlus -> m TreePlus) -> TreePlus -> m TreePlus
 recurM f (m, TreeLeaf s) = f (m, TreeLeaf s)
 recurM f (m, TreeNode ts) = do
@@ -39,7 +36,7 @@ macroExpand1 t@(i, _) = do
     else do
       mMatch <- try (macroMatch t) nenv
       case mMatch of
-        Just (sub, skel) -> macroExpand' $ applySubst sub $ replaceMeta i skel
+        Just (sub, skel) -> macroExpand $ applySubst sub $ replaceMeta i skel
         Nothing -> return t
 
 type Notation = TreePlus
