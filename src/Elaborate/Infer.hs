@@ -232,12 +232,8 @@ getIndInfo cs = do
 getIndInfo' :: (Meta, Identifier) -> WithEnv ((Meta, Identifier), [Int])
 getIndInfo' (m, c@(I (_, j))) = do
   cienv <- gets consToIndInfo
-  -- cienv <- gets consToInd
-  -- caenv <- gets consToArgs
   case IntMap.lookup j cienv of
     Just (i, is) -> return ((m, i), is)
-    -- case (IntMap.lookup j cienv, IntMap.lookup j caenv) of
-    -- (Just i, Just is) -> return ((m, i), is)
     _ -> raiseError m $ "no such constructor defined: " <> asText c
 
 checkIntegrity :: [(Meta, Identifier)] -> WithEnv ()
