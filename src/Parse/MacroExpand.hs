@@ -66,7 +66,7 @@ macroMatch (_, TreeNode _) (_, TreeNode []) = return Nothing
 macroMatch (_, TreeNode []) (_, TreeNode _) = return Nothing
 macroMatch (m1, TreeNode ts1) (_, TreeNode ts2)
   | (_, TreeLeaf s2) <- last ts2
-  , T.last s2 == '+' -- this ensures that s2 is not a keyword
+  , T.last s2 == '+'
   , length ts1 >= length ts2 = do
     let (xs, rest) = splitAt (length ts2 - 1) ts1
     let ys = take (length ts2 - 1) ts2
