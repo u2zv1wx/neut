@@ -458,9 +458,6 @@ substRuleType sub (m, WeakTermPi mName xts t) = do
 substRuleType sub (m, WeakTermPiIntro xts body) = do
   (xts', body') <- substRuleType'' sub xts body
   return (m, WeakTermPiIntro xts' body')
--- substRuleType sub (m, WeakTermPiIntroNoReduce xts body) = do
---   (xts', body') <- substRuleType'' sub xts body
---   return (m, WeakTermPiIntroNoReduce xts' body')
 substRuleType sub (m, WeakTermPiIntroPlus ind (name, is, args1, args2) xts body) = do
   args' <- substRuleType' sub $ args1 ++ args2
   let args1' = take (length args1) args'

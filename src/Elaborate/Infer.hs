@@ -15,7 +15,6 @@ import Control.Monad.State
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.IntMap.Strict as IntMap
-
 import qualified Data.Text as T
 
 import Data.Basic
