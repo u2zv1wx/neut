@@ -12,6 +12,7 @@ import Numeric.Half
 
 import qualified Data.ByteString.Lazy as L
 import qualified Data.HashMap.Strict as HashMap
+import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Map as Map
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -26,12 +27,12 @@ emit :: LLVM -> WithEnv L.ByteString
 emit mainTerm = do
   lenv <- gets llvmEnv
   g <- emitDeclarations
-  mainTerm' <- reduceLLVM [] Map.empty mainTerm
+  mainTerm' <- reduceLLVM IntMap.empty Map.empty mainTerm
   zs <- emitDefinition "i64" "main" [] mainTerm'
   xs <-
     forM (HashMap.toList lenv) $ \(name, (args, body)) -> do
       let args' = map (showLLVMData . LLVMDataLocal) args
-      body' <- reduceLLVM [] Map.empty body
+      body' <- reduceLLVM IntMap.empty Map.empty body
       emitDefinition "i8*" (TE.encodeUtf8Builder name) args' body'
   return $ toLazyByteString $ unlinesL $ g <> zs <> concat xs
 

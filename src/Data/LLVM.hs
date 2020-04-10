@@ -1,5 +1,6 @@
 module Data.LLVM where
 
+import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Text as T
 
 import Data.Basic
@@ -46,42 +47,14 @@ data LLVMOp
 
 type SizeInfo = LowType
 
-type SubstLLVM = [(Int, LLVMData)]
+type SubstLLVM = IntMap.IntMap LLVMData
 
 substLLVMData :: SubstLLVM -> LLVMData -> LLVMData
 substLLVMData sub (LLVMDataLocal x) =
-  case lookup (asInt x) sub of
+  case IntMap.lookup (asInt x) sub of
     Just d -> d
     Nothing -> LLVMDataLocal x
 substLLVMData _ d = d
-
-substLLVM :: SubstLLVM -> LLVM -> LLVM
-substLLVM sub (LLVMReturn d) = LLVMReturn $ substLLVMData sub d
-substLLVM sub (LLVMLet x op cont) = do
-  let op' = substLLVMOp sub op
-  let sub' = filter (\(y, _) -> y /= asInt x) sub
-  let cont' = substLLVM sub' cont
-  LLVMLet x op' cont'
-substLLVM sub (LLVMCont op cont) = do
-  let op' = substLLVMOp sub op
-  let cont' = substLLVM sub cont
-  LLVMCont op' cont'
-substLLVM sub (LLVMSwitch (d, t) defaultBranch les) = do
-  let (ls, es) = unzip les
-  let d' = substLLVMData sub d
-  let defaultBranch' = substLLVM sub defaultBranch
-  let es' = map (substLLVM sub) es
-  LLVMSwitch (d', t) defaultBranch' (zip ls es')
-substLLVM sub (LLVMBranch d onTrue onFalse) = do
-  let d' = substLLVMData sub d
-  let onTrue' = substLLVM sub onTrue
-  let onFalse' = substLLVM sub onFalse
-  LLVMBranch d' onTrue' onFalse'
-substLLVM sub (LLVMCall d ds) = do
-  let d' = substLLVMData sub d
-  let ds' = map (substLLVMData sub) ds
-  LLVMCall d' ds'
-substLLVM _ LLVMUnreachable = LLVMUnreachable
 
 substLLVMOp :: SubstLLVM -> LLVMOp -> LLVMOp
 substLLVMOp sub (LLVMOpCall d ds) = do

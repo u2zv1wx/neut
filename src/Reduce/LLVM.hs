@@ -4,6 +4,7 @@ module Reduce.LLVM
 
 import Control.Monad.State
 
+import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Map as Map
 import qualified Data.Set as S
 
@@ -14,21 +15,24 @@ import Data.LLVM
 type SizeMap = Map.Map SizeInfo [(Int, LLVMData)]
 
 reduceLLVM :: SubstLLVM -> SizeMap -> LLVM -> WithEnv LLVM
-reduceLLVM sub _ (LLVMReturn d) = do
-  let d' = substLLVMData sub d
-  return $ LLVMReturn d'
+reduceLLVM sub _ (LLVMReturn d) = return $ LLVMReturn $ substLLVMData sub d
 reduceLLVM sub sm (LLVMLet x (LLVMOpBitcast d from to) cont)
-  | from == to = reduceLLVM ((asInt x, substLLVMData sub d) : sub) sm cont
+  | from == to = do
+    let sub' = IntMap.insert (asInt x) (substLLVMData sub d) sub
+    reduceLLVM sub' sm cont
 reduceLLVM sub sm (LLVMLet x (LLVMOpAlloc _ (LowTypePtr (LowTypeArray 0 _))) cont) = do
-  reduceLLVM ((asInt x, LLVMDataNull) : sub) sm cont
+  let sub' = IntMap.insert (asInt x) LLVMDataNull sub
+  reduceLLVM sub' sm cont
 reduceLLVM sub sm (LLVMLet x (LLVMOpAlloc _ (LowTypePtr (LowTypeStruct []))) cont) = do
-  reduceLLVM ((asInt x, LLVMDataNull) : sub) sm cont
+  let sub' = IntMap.insert (asInt x) LLVMDataNull sub
+  reduceLLVM sub' sm cont
 reduceLLVM sub sm (LLVMLet x op@(LLVMOpAlloc _ size) cont) = do
   case Map.lookup size sm of
     Just ((j, d):rest) -> do
       modify (\env -> env {nopFreeSet = S.insert j (nopFreeSet env)})
       let sm' = Map.insert size rest sm
-      reduceLLVM ((asInt x, substLLVMData sub d) : sub) sm' cont
+      let sub' = IntMap.insert (asInt x) (substLLVMData sub d) sub
+      reduceLLVM sub' sm' cont
     _ -> do
       cont' <- reduceLLVM sub sm cont
       return $ LLVMLet x op cont'
