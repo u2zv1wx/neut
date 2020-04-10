@@ -39,14 +39,15 @@ infer' ctx (m, WeakTermPi mName xts t) = do
 infer' ctx (m, WeakTermPiIntro xts e) = do
   (xts', (e', t')) <- inferBinder ctx xts e
   return ((m, WeakTermPiIntro xts' e'), (m, weakTermPi xts' t'))
-infer' ctx (m, WeakTermPiIntroPlus ind (name, is, args1, args2) xts e) = do
-  let args = args1 ++ args2
+infer' ctx (m, WeakTermPiIntroPlus ind (name, is, args) xts e)
+  -- let args = args1 ++ args2
+ = do
   args' <- inferSigma ctx args
-  let args1' = take (length args1) args'
-  let args2' = drop (length args1) args'
+  -- let args1' = take (length args1) args'
+  -- let args2' = drop (length args1) args'
   (xts', (e', t')) <- inferBinder ctx xts e
   return
-    ( (m, WeakTermPiIntroPlus ind (name, is, args1', args2') xts' e')
+    ( (m, WeakTermPiIntroPlus ind (name, is, args') xts' e')
     , (m, WeakTermPi (Just $ asText ind) xts' t'))
 infer' ctx (m, WeakTermPiElim e es) = do
   es' <- insertHoleIfNecessary e es

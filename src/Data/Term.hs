@@ -16,9 +16,14 @@ data Term
   | TermPiIntro [IdentifierPlus] TermPlus
   | TermPiIntroPlus
       Identifier -- name of corresponding inductive type
-      (T.Text, [Int], [IdentifierPlus], [IdentifierPlus])
+      (T.Text, [Int], [IdentifierPlus])
       [IdentifierPlus]
       TermPlus
+  -- | TermPiIntroPlus
+  --     Identifier -- name of corresponding inductive type
+  --     (T.Text, [Int], [IdentifierPlus], [IdentifierPlus])
+  --     [IdentifierPlus]
+  --     TermPlus
   | TermPiElim TermPlus [TermPlus]
   | TermIter IdentifierPlus [IdentifierPlus] TermPlus
   | TermConst Identifier
@@ -110,12 +115,14 @@ substTermPlus sub (m, TermPi mName xts t) = do
 substTermPlus sub (m, TermPiIntro xts body) = do
   let (xts', body') = substTermPlus'' sub xts body
   (m, TermPiIntro xts' body')
-substTermPlus sub (m, TermPiIntroPlus ind (name, is, args1, args2) xts body) = do
-  let args' = substTermPlus' sub $ args1 ++ args2
-  let args1' = take (length args1) args'
-  let args2' = drop (length args1) args'
+-- substTermPlus sub (m, TermPiIntroPlus ind (name, is, args1, args2) xts body) = do
+substTermPlus sub (m, TermPiIntroPlus ind (name, is, args) xts body) = do
+  let args' = substTermPlus' sub args
+  -- let args' = substTermPlus' sub $ args1 ++ args2
+  -- let args1' = take (length args1) args'
+  -- let args2' = drop (length args1) args'
   let (xts', body') = substTermPlus'' sub xts body
-  (m, TermPiIntroPlus ind (name, is, args1', args2') xts' body')
+  (m, TermPiIntroPlus ind (name, is, args') xts' body')
 substTermPlus sub (m, TermPiElim e es) = do
   let e' = substTermPlus sub e
   let es' = map (substTermPlus sub) es
@@ -188,11 +195,11 @@ weaken (m, TermPi mName xts t) =
   (m, WeakTermPi mName (weakenArgs xts) (weaken t))
 weaken (m, TermPiIntro xts body) = do
   (m, WeakTermPiIntro (weakenArgs xts) (weaken body))
-weaken (m, TermPiIntroPlus ind (name, is, args1, args2) xts body) = do
-  let args1' = weakenArgs args1
-  let args2' = weakenArgs args2
+weaken (m, TermPiIntroPlus ind (name, is, args) xts body) = do
+  let args' = weakenArgs args
+  -- let args2' = weakenArgs args2
   let xts' = (weakenArgs xts)
-  (m, WeakTermPiIntroPlus ind (name, is, args1', args2') xts' (weaken body))
+  (m, WeakTermPiIntroPlus ind (name, is, args') xts' (weaken body))
 weaken (m, TermPiElim e es) = do
   let e' = weaken e
   let es' = map weaken es

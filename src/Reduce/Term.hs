@@ -25,12 +25,12 @@ reduceTermPlus (m, TermPiIntro xts e) = do
   let ts' = map reduceTermPlus ts
   let e' = reduceTermPlus e
   (m, TermPiIntro (zip3 ms xs ts') e')
-reduceTermPlus (m, TermPiIntroPlus ind (name, is, args1, args2) xts e) = do
-  let args1' = map reduceIdentPlus args1
-  let args2' = map reduceIdentPlus args2
+reduceTermPlus (m, TermPiIntroPlus ind (name, is, args) xts e) = do
+  let args' = map reduceIdentPlus args
+  -- let args2' = map reduceIdentPlus args2
   let xts' = map reduceIdentPlus xts
   let e' = reduceTermPlus e
-  (m, TermPiIntroPlus ind (name, is, args1', args2') xts' e')
+  (m, TermPiIntroPlus ind (name, is, args') xts' e')
 reduceTermPlus (m, TermPiElim e es) = do
   let e' = reduceTermPlus e
   let es' = map reduceTermPlus es
@@ -158,12 +158,12 @@ normalize (m, TermPiIntro xts e) = do
   ts' <- mapM normalize ts
   e' <- normalize e
   return (m, TermPiIntro (zip3 ms xs ts') e')
-normalize (m, TermPiIntroPlus ind (name, is, args1, args2) xts e) = do
-  args1' <- mapM normalizeIdentPlus args1
-  args2' <- mapM normalizeIdentPlus args2
+normalize (m, TermPiIntroPlus ind (name, is, args) xts e) = do
+  args' <- mapM normalizeIdentPlus args
+  -- args2' <- mapM normalizeIdentPlus args2
   xts' <- mapM normalizeIdentPlus xts
   e' <- normalize e
-  return (m, TermPiIntroPlus ind (name, is, args1', args2') xts' e')
+  return (m, TermPiIntroPlus ind (name, is, args') xts' e')
 normalize (m, TermPiElim e es) = do
   e' <- normalize e
   es' <- mapM normalize es

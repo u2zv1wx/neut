@@ -489,13 +489,15 @@ concatQuasiStmtList ((QuasiStmtLetInductive n m at e):es) = do
   cont <- concatQuasiStmtList es
   return $ WeakStmtLetWT m at e cont
 concatQuasiStmtList (QuasiStmtLetInductiveIntro m bt e as:ss) = do
-  case e of
-    (mLam, WeakTermPiIntro xtsyts (_, WeakTermPiIntroPlus ai (bi, is, xts, yts) atsbts (_, WeakTermPiElim b _))) -> do
+  case e
+    -- (mLam, WeakTermPiIntro xtsyts (_, WeakTermPiIntroPlus ai (bi, is, xts, yts) atsbts (_, WeakTermPiElim b _))) -> do
+        of
+    (mLam, WeakTermPiIntro xtsyts (_, WeakTermPiIntroPlus ai (bi, is, _) atsbts (_, WeakTermPiElim b _))) -> do
       modify
         (\env ->
            env {consToIndInfo = Map.insert bi (ai, is) (consToIndInfo env)})
       let isub = zip as (map toVar' atsbts) -- outer ~> innerで、ytsの型のなかのouterをinnerにしていく
-      yts' <- mapM (internalize isub atsbts) $ drop (length xts) xtsyts
+      yts' <- mapM (internalize isub atsbts) $ drop (length is) xtsyts
       insInductive as bt -- register the constructor (if necessary)
       let lam =
             ( mLam -- metaIsReducible mLam == False
@@ -504,7 +506,7 @@ concatQuasiStmtList (QuasiStmtLetInductiveIntro m bt e as:ss) = do
                 ( m
                 , WeakTermPiIntroPlus
                     ai
-                    (bi, is, xts, yts)
+                    (bi, is, xtsyts)
                     atsbts
                     (m, WeakTermPiElim b yts')))
       cont <- concatQuasiStmtList ss

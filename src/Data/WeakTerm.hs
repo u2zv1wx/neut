@@ -12,9 +12,14 @@ data WeakTerm
   | WeakTermUpsilon Identifier
   | WeakTermPi (Maybe T.Text) [IdentifierPlus] WeakTermPlus
   | WeakTermPiIntro [IdentifierPlus] WeakTermPlus
+  -- | WeakTermPiIntroPlus
+  --     Identifier -- name of inductive type
+  --     (T.Text, [Int], [IdentifierPlus], [IdentifierPlus]) -- (name of construtor, xts, yts)
+  --     [IdentifierPlus]
+  --     WeakTermPlus
   | WeakTermPiIntroPlus
       Identifier -- name of inductive type
-      (T.Text, [Int], [IdentifierPlus], [IdentifierPlus]) -- (name of construtor, xts, yts)
+      (T.Text, [Int], [IdentifierPlus]) -- (name of construtor, xts, yts)
       [IdentifierPlus]
       WeakTermPlus
   | WeakTermPiElim WeakTermPlus [WeakTermPlus]
@@ -235,12 +240,13 @@ substWeakTermPlus sub (m, WeakTermPi mName xts t) = do
 substWeakTermPlus sub (m, WeakTermPiIntro xts body) = do
   let (xts', body') = substWeakTermPlus'' sub xts body
   (m, WeakTermPiIntro xts' body')
-substWeakTermPlus sub (m, WeakTermPiIntroPlus ind (name, is, args1, args2) xts body) = do
-  let args' = substWeakTermPlus' sub $ args1 ++ args2
-  let args1' = take (length args1) args'
-  let args2' = drop (length args1) args'
+substWeakTermPlus sub (m, WeakTermPiIntroPlus ind (name, is, args) xts body) = do
+  let args' = substWeakTermPlus' sub args
+  -- let args1' = take (length args1) args'
+  -- let args2' = drop (length args1) args'
   let (xts', body') = substWeakTermPlus'' sub xts body
-  (m, WeakTermPiIntroPlus ind (name, is, args1', args2') xts' body')
+  (m, WeakTermPiIntroPlus ind (name, is, args') xts' body')
+  -- (m, WeakTermPiIntroPlus ind (name, is, args1', args2') xts' body')
 substWeakTermPlus sub (m, WeakTermPiElim e es) = do
   let e' = substWeakTermPlus sub e
   let es' = map (substWeakTermPlus sub) es
@@ -361,7 +367,7 @@ toText (_, WeakTermPi (Just _) _ cod) = toText cod
 toText (_, WeakTermPiIntro xts e) = do
   let argStr = inParen $ showItems $ map showArg xts
   showCons ["λ", argStr, toText e]
-toText (_, WeakTermPiIntroPlus _ (name, _, _, _) _ _) = do
+toText (_, WeakTermPiIntroPlus _ (name, _, _) _ _) = do
   "<#" <> name <> "-" <> "internal" <> "#>"
 toText (_, WeakTermPiElim e es) = do
   showCons $ map toText $ e : es

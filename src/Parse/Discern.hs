@@ -131,14 +131,14 @@ discern'' nenv (m, WeakTermPi mName xts t) = do
 discern'' nenv (m, WeakTermPiIntro xts e) = do
   (xts', e') <- discernBinder nenv xts e
   return (m, WeakTermPiIntro xts' e')
-discern'' nenv (m, WeakTermPiIntroPlus ind (name, is, args1, args2) xts e) = do
+discern'' nenv (m, WeakTermPiIntroPlus ind (name, is, args) xts e) = do
   penv <- gets prefixEnv
   ind' <- lookupName'' m penv nenv ind
-  args' <- mapM (discernIdentPlus nenv) (args1 ++ args2)
-  let args1' = take (length args1) args'
-  let args2' = drop (length args1) args'
+  args' <- mapM (discernIdentPlus nenv) args
+  -- let args1' = take (length args1) args'
+  -- let args2' = drop (length args1) args'
   (xts', e') <- discernBinder nenv xts e
-  return (m, WeakTermPiIntroPlus ind' (name, is, args1', args2') xts' e')
+  return (m, WeakTermPiIntroPlus ind' (name, is, args') xts' e')
 discern'' nenv (m, WeakTermPiElim e es) = do
   es' <- mapM (discern'' nenv) es
   e' <- discern'' nenv e
