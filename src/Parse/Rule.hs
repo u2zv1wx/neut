@@ -184,8 +184,10 @@ toInductiveIntro ats bts xts a@(I (ai, _)) (mb, b@(I (bi, _)), m, yts, cod)
     let vs = varWeakTermPlus (m, weakTermPi yts cod)
     let ixts = filter (\(_, (_, x, _)) -> x `S.member` vs) $ zip [0 ..] xts
     let (is, xts') = unzip ixts
-    let piType = (m, weakTermPi (xts' ++ yts) cod)
-    let lam =
+    return
+      [ QuasiStmtLetInductiveIntro
+          m
+          (mb, b, (m, weakTermPi (xts' ++ yts) cod))
           ( m {metaIsReducible = False}
           , WeakTermPiIntro
               (xts' ++ yts)
@@ -195,9 +197,9 @@ toInductiveIntro ats bts xts a@(I (ai, _)) (mb, b@(I (bi, _)), m, yts, cod)
                   (bi, is, xts' ++ yts)
                   (ats ++ bts)
                   (m, WeakTermPiElim (mb, WeakTermUpsilon b) (map toVar' yts))))
-    let attr = QuasiStmtImplicit m b [0 .. length xts' - 1]
-    let as = map (\(_, x, _) -> x) ats
-    return [QuasiStmtLetInductiveIntro m (mb, b, piType) lam as, attr]
+          (map (\(_, x, _) -> x) ats)
+      , QuasiStmtImplicit m b [0 .. length xts' - 1]
+      ]
   | otherwise =
     raiseError m $
     "the succedent of an introduction rule of `" <>
