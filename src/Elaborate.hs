@@ -279,16 +279,21 @@ elaborate' (m, WeakTermQuestion e t) = do
   e' <- elaborate' e
   whenCheck $ do
     t' <- elaborate' t
-    case getArgLen t' of
-      Nothing -> do
-        note m $ toText (weaken t')
-      Just len -> do
+    case (getArgLen t', isUpsilonOrConst e') of
+      (Just len, True) -> do
         (is, e'') <- getImpInfo e'
         let form = toText (weaken e'') : showFormArgs 0 is [0 .. len - 1]
         let formStr = inParen $ showItems form
         note m $ toText (weaken t') <> "\n-\n" <> formStr
+      _ -> do
+        note m $ toText (weaken t')
   return e'
 elaborate' (_, WeakTermErase _ e) = elaborate' e
+
+isUpsilonOrConst :: TermPlus -> Bool
+isUpsilonOrConst (_, TermUpsilon _) = True
+isUpsilonOrConst (_, TermConst _) = True
+isUpsilonOrConst _ = False
 
 getImpInfo :: TermPlus -> WithEnv ([Int], TermPlus)
 getImpInfo e@(m, TermConst x)

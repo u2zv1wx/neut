@@ -20,7 +20,9 @@
 
 (definition string:print ((str string))
   (witness (product string u64)
-    (destruct str ((n u64) (content (array n u8)))
+    ;; (let (tuple n content) str) ← こんなふうに書けると嬉しい？
+    ;; (...)
+    (destruct str (n content)
       (let len (write stdout &content n))
       (tuple (tuple n content) len))))
 

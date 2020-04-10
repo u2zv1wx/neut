@@ -23,7 +23,7 @@ data Term
   | TermPiElim TermPlus [TermPlus]
   | TermIter IdentifierPlus [IdentifierPlus] TermPlus
   | TermConst Identifier
-  | TermFloat (FloatSize, Int) Double
+  | TermFloat (FloatSize, Int) Double -- ((floatSize, the int-name of "f16", "f32", or "f64"), float value)
   | TermEnum EnumType
   | TermEnumIntro EnumValue
   | TermEnumElim (TermPlus, TermPlus) [(CasePlus, TermPlus)]

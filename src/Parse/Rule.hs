@@ -286,7 +286,7 @@ zeta mode isub atsbts t e = do
     (_, WeakTermPi _ xts cod) -> zetaPi mode isub atsbts xts cod e
     (_, WeakTermPiElim va@(_, WeakTermUpsilon a@(I (_, i))) es) -- esの長さをチェックするべきでは？
       | Just _ <- IntMap.lookup (asInt a) isub ->
-        zetaInductive mode isub atsbts es e
+        zetaInductive mode isub a atsbts es e
       | Just (Just bts) <- IntMap.lookup i ienv
       , not (all (isResolved isub) es) ->
         zetaInductiveNested mode isub atsbts e va a es bts
@@ -320,15 +320,16 @@ zetaPi mode isub atsbts xts cod e = do
 zetaInductive ::
      Mode
   -> SubstWeakTerm
+  -> Identifier
   -> [IdentifierPlus]
   -> [WeakTermPlus]
   -> WeakTermPlus
   -> WithEnv WeakTermPlus
-zetaInductive mode isub atsbts es e
+zetaInductive mode isub a atsbts es e
   | ModeBackward <- mode =
-    raiseError
-      (metaOf e)
-      "found a contravariant occurence of <name> in the antecedent of an introduction rule"
+    raiseError (metaOf e) $
+    "found a contravariant occurence of `" <>
+    asText a <> "` in the antecedent of an introduction rule"
   | all (isResolved isub) es = do
     return (fst e, WeakTermPiElim e (map toVar' atsbts))
   | otherwise = raiseError (metaOf e) "found a self-nested inductive type"

@@ -80,8 +80,8 @@
 
 (verify ((λ ((x tau)) x) top))
 
-
 (verify some-theorem)
+
 
 
 ;; (@os:write 3 os:stdout "あ" 3)
@@ -131,7 +131,6 @@
         (string:print "looping with (もちろん日本語も出力できるよ): ")
         (i64:print ?n)
         (let _ (i64:add 10 10))
-        (erase n)
         (let hogehoge (i64 10))
         (let _ (i64:add hogehoge 1))
         (string:print "\n")
@@ -152,8 +151,6 @@
 ?@@@equal:refl
 
 ?equal:refl
-
-
 
 @?equal:refl
 
@@ -192,6 +189,7 @@
 ?choice:induction
 ;; (choice:induction (choice:item-1) (lambda () i64) ?admit ?admit)
 
+
 (definition flip ((c (choice)))
   (witness (choice)
     (case c
@@ -229,12 +227,17 @@
 (definition unused-function ((_ tau)) tau)
 
 
+;; (inductive hogehoge ((a tau))
+;;   (make ((_ (hom (hogehoge a) (hogehoge a)))) (hogehoge a)))
+
+
 (attribute unused-function
   (implicit 0))
 
 ;; (provide unused-function)
 
 (?string:print "\n")
+
 
 
 ;; (let a1 (os:write os:stdout test 3))
