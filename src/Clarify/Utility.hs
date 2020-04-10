@@ -4,14 +4,14 @@ module Clarify.Utility where
 
 import Control.Monad.State
 
+import qualified Data.HashMap.Strict as Map
+import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Text as T
 
 import Data.Basic
 import Data.Code
 import Data.Env
 import Data.Term
-
-import qualified Data.HashMap.Strict as Map
 
 type Context = [(Identifier, TermPlus)]
 
@@ -82,7 +82,11 @@ cartesianImmediate m = do
       insCodeEnv
         ident
         [switchVarName, argVarName]
-        (m, CodeEnumElim [(argVarName, argVar)] switchVar (switch aff rel))
+        ( m
+        , CodeEnumElim
+            (IntMap.fromList [(asInt argVarName, argVar)])
+            switchVar
+            (switch aff rel))
       return theta
 
 affineImmediate :: DataPlus -> WithEnv CodePlus
@@ -106,7 +110,11 @@ cartesianStruct m ks = do
       insCodeEnv
         ident
         [switchVarName, argVarName]
-        (m, CodeEnumElim [(argVarName, argVar)] switchVar (switch aff rel))
+        ( m
+        , CodeEnumElim
+            (IntMap.fromList [(asInt argVarName, argVar)])
+            switchVar
+            (switch aff rel))
       return theta
 
 affineStruct :: DataPlus -> [ArrayKind] -> WithEnv CodePlus

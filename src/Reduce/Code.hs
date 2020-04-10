@@ -5,6 +5,7 @@ module Reduce.Code
 import Control.Monad.State
 
 import qualified Data.HashMap.Strict as Map
+import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Set as S
 
 import Data.Basic
@@ -18,8 +19,9 @@ reduceCodePlus (m, CodePiElimDownElim v ds) = do
   case v of
     (_, DataTheta x)
       | Just (Definition (IsFixed False) xs body) <- Map.lookup x cenv
-      , length xs == length ds ->
-        reduceCodePlus $ substCodePlus (zip xs ds) body
+      , length xs == length ds -> do
+        let sub = IntMap.fromList (zip (map asInt xs) ds)
+        reduceCodePlus $ substCodePlus sub body
     (_, DataTheta x)
       | Just (Definition (IsFixed True) xs body) <- Map.lookup x cenv
       , length xs == length ds
@@ -34,7 +36,9 @@ reduceCodePlus (m, CodeSigmaElim mk xs v e) = do
   case v of
     (_, DataSigmaIntro mk' ds)
       | length ds == length xs
-      , mk == mk' -> do reduceCodePlus $ substCodePlus (zip xs ds) e
+      , mk == mk' -> do
+        let sub = IntMap.fromList (zip (map asInt xs) ds)
+        reduceCodePlus $ substCodePlus sub e
     _ -> do
       e' <- reduceCodePlus e
       case e' of
@@ -46,7 +50,9 @@ reduceCodePlus (m, CodeUpElim x e1 e2) = do
   e1' <- reduceCodePlus e1
   case e1' of
     (mUp, CodeUpIntro d)
-      | metaIsReducible mUp -> reduceCodePlus $ substCodePlus [(x, d)] e2
+      | metaIsReducible mUp -> do
+        let sub = IntMap.fromList [(asInt x, d)]
+        reduceCodePlus $ substCodePlus sub e2
     (my, CodeUpElim y ey1 ey2) -> do
       reduceCodePlus (my, CodeUpElim y ey1 (m, CodeUpElim x ey2 e2)) -- commutative conversion
     (my, CodeSigmaElim mk yts vy ey) -> do
@@ -80,7 +86,9 @@ reduceCodePlus (m, CodeStructElim xks d e) = do
   case d of
     (_, DataStructIntro eks)
       | (es, ks2) <- unzip eks
-      , ks1 == ks2 -> reduceCodePlus $ substCodePlus (zip xs es) e
+      , ks1 == ks2 -> do
+        let sub = IntMap.fromList (zip (map asInt xs) es)
+        reduceCodePlus $ substCodePlus sub e
     _ -> do
       e' <- reduceCodePlus e
       case e' of

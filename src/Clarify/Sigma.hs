@@ -10,6 +10,7 @@ import Control.Monad.Except
 import Control.Monad.State
 
 import qualified Data.HashMap.Strict as Map
+import qualified Data.IntMap.Strict as IntMap
 
 import Clarify.Linearize
 import Clarify.Utility
@@ -37,7 +38,11 @@ cartesianSigma (I (thetaName, i)) m k mxts = do
       insCodeEnv
         ident
         [switchVarName, argVarName]
-        (m, CodeEnumElim [(argVarName, argVar)] switchVar (switch aff rel))
+        ( m
+        , CodeEnumElim
+            (IntMap.fromList [(asInt argVarName, argVar)])
+            switchVar
+            (switch aff rel))
       return theta
 
 -- (Assuming `ti` = `return di` for some `di` such that `xi : di`)

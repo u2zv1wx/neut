@@ -59,7 +59,9 @@ clarify' tenv (m, TermEnumElim (e, _) bs) = do
   let (cs, es) = unzip bs
   fvs <- constructEnumFVS tenv es
   es' <- (mapM (clarify' tenv) >=> alignFVS tenv m fvs) es
-  let sub = map (\(mx, x, _) -> (x, (mx, DataUpsilon x))) fvs
+  let sub =
+        IntMap.fromList $
+        map (\(mx, x, _) -> (asInt x, (mx, DataUpsilon x))) fvs
   (y, e', yVar) <- clarifyPlus tenv e
   return $ bindLet [(y, e')] (m, CodeEnumElim sub yVar (zip (map snd cs) es'))
 clarify' _ (m, TermArray {}) = returnArrayType m
@@ -135,7 +137,9 @@ clarifyCase tenv m cxtes typeVarName envVarName lamVarName = do
   fvs <- constructCaseFVS tenv cxtes m typeVarName envVarName
   es <- (mapM (clarifyCase' tenv m envVarName) >=> alignFVS tenv m fvs) cxtes
   (y, e', yVar) <- clarifyPlus tenv (m, TermUpsilon lamVarName)
-  let sub = map (\(mx, x, _) -> (x, (mx, DataUpsilon x))) fvs
+  let sub =
+        IntMap.fromList $
+        map (\(mx, x, _) -> (asInt x, (mx, DataUpsilon x))) fvs
   let cs = map (\cxte -> fst $ fst cxte) cxtes
   return $ bindLet [(y, e')] (m, CodeCase sub yVar (zip cs es))
 
@@ -296,7 +300,7 @@ knot m z cls = do
   case Map.lookup (asText'' z) cenv of
     Nothing -> raiseCritical m "knot"
     Just (Definition _ args body) -> do
-      let body' = substCodePlus [(z, cls)] body
+      let body' = substCodePlus (IntMap.fromList [(asInt z, cls)]) body
       let def' = Definition (IsFixed True) args body'
       modify (\env -> env {codeEnv = Map.insert (asText'' z) def' cenv})
 

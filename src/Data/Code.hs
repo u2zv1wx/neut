@@ -2,6 +2,7 @@ module Data.Code where
 
 import Data.Maybe (fromMaybe)
 
+import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Text as T
 
 import Data.Basic
@@ -55,12 +56,13 @@ sigmaIntro = DataSigmaIntro arrVoidPtr
 sigmaElim :: [Identifier] -> DataPlus -> CodePlus -> Code
 sigmaElim = CodeSigmaElim arrVoidPtr
 
-type SubstDataPlus = [(Identifier, DataPlus)]
+-- type SubstDataPlus = [(Identifier, DataPlus)]
+type SubstDataPlus = IntMap.IntMap DataPlus
 
 substDataPlus :: SubstDataPlus -> DataPlus -> DataPlus
 substDataPlus _ (m, DataTheta x) = (m, DataTheta x)
 substDataPlus sub (m, DataUpsilon s) =
-  fromMaybe (m, DataUpsilon s) (lookup s sub) -- ここではsの整数部分を比較したほうがよさそう？
+  fromMaybe (m, DataUpsilon s) (IntMap.lookup (asInt s) sub) -- ここではsの整数部分を比較したほうがよさそう？
 substDataPlus sub (m, DataSigmaIntro mk vs) = do
   let vs' = map (substDataPlus sub) vs
   (m, DataSigmaIntro mk vs')
@@ -81,7 +83,8 @@ substCodePlus sub (m, CodePiElimDownElim v ds) = do
   (m, CodePiElimDownElim v' ds')
 substCodePlus sub (m, CodeSigmaElim mk xs v e) = do
   let v' = substDataPlus sub v
-  let sub' = filter (\(y, _) -> y `notElem` xs) sub
+  -- let sub' = filter (\(y, _) -> y `notElem` xs) sub
+  let sub' = deleteKeys sub (map asInt xs)
   let e' = substCodePlus sub' e
   (m, CodeSigmaElim mk xs v' e')
 substCodePlus sub (m, CodeUpIntro v) = do
@@ -89,24 +92,30 @@ substCodePlus sub (m, CodeUpIntro v) = do
   (m, CodeUpIntro v')
 substCodePlus sub (m, CodeUpElim x e1 e2) = do
   let e1' = substCodePlus sub e1
-  let sub' = filter (\(y, _) -> y /= x) sub
+  let sub' = IntMap.delete (asInt x) sub
+  -- let sub' = filter (\(y, _) -> y /= x) sub
   let e2' = substCodePlus sub' e2
   (m, CodeUpElim x e1' e2')
-substCodePlus sub (m, CodeEnumElim fvInfo v branchList) = do
-  let (from, to) = unzip fvInfo
-  let to' = map (substDataPlus sub) to
-  let fvInfo' = zip from to'
+substCodePlus sub (m, CodeEnumElim fvInfo v branchList)
+  -- let (from, to) = unzip $ IntMap.toList fvInfo
+  -- let to' = map (substDataPlus sub) to
+  -- let fvInfo' = zip from to'
+ = do
+  let fvInfo' = IntMap.map (substDataPlus sub) fvInfo
   let v' = substDataPlus sub v
   (m, CodeEnumElim fvInfo' v' branchList)
 substCodePlus sub (m, CodeStructElim xks v e) = do
   let v' = substDataPlus sub v
-  let sub' = filter (\(k, _) -> k `notElem` map fst xks) sub
+  let sub' = deleteKeys sub (map (asInt . fst) xks)
+  -- let sub' = filter (\(k, _) -> k `notElem` map fst xks) sub
   let e' = substCodePlus sub' e
   (m, CodeStructElim xks v' e')
-substCodePlus sub (m, CodeCase fvInfo v branchList) = do
-  let (from, to) = unzip fvInfo
-  let to' = map (substDataPlus sub) to
-  let fvInfo' = zip from to'
+substCodePlus sub (m, CodeCase fvInfo v branchList)
+  -- let (from, to) = unzip fvInfo
+  -- let to' = map (substDataPlus sub) to
+  -- let fvInfo' = zip from to'
+ = do
+  let fvInfo' = IntMap.map (substDataPlus sub) fvInfo
   let v' = substDataPlus sub v
   (m, CodeCase fvInfo' v' branchList)
 
@@ -125,3 +134,7 @@ substTheta sub (ThetaArrayAccess t d1 d2) = do
 substTheta sub (ThetaSysCall sysCall ds) = do
   let ds' = map (substDataPlus sub) ds
   ThetaSysCall sysCall ds'
+
+deleteKeys :: SubstDataPlus -> [Int] -> SubstDataPlus
+deleteKeys sub [] = sub
+deleteKeys sub (i:is) = IntMap.delete i $ deleteKeys sub is
