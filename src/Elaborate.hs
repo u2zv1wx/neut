@@ -8,8 +8,8 @@ import Control.Monad.State
 import Data.List (find, nub)
 import Data.Time
 import Numeric
-import Numeric.Half
 
+-- import Numeric.Half
 import qualified Data.HashMap.Strict as Map
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Text as T
@@ -203,19 +203,21 @@ elaborate' (m, WeakTermInt t x) = do
       "the term `" <>
       T.pack (show x) <>
       "` is an integer, but its type is: " <> toText (weaken t')
-elaborate' (m, WeakTermFloat16 x) = return (m, TermFloat16 x)
-elaborate' (m, WeakTermFloat32 x) = return (m, TermFloat32 x)
-elaborate' (m, WeakTermFloat64 x) = return (m, TermFloat64 x)
+-- elaborate' (m, WeakTermFloat16 x) = return (m, TermFloat16 x)
+-- elaborate' (m, WeakTermFloat32 x) = return (m, TermFloat32 x)
+-- elaborate' (m, WeakTermFloat64 x) = return (m, TermFloat64 x)
 elaborate' (m, WeakTermFloat t x) = do
   t' <- reduceTermPlus <$> elaborate' t
   case t' of
-    (_, TermConst (I (floatType, _))) -> do
-      let x16 = realToFrac x :: Half
-      let x32 = realToFrac x :: Float
+    (_, TermConst (I (floatType, i)))
+      -- let x16 = realToFrac x :: Half
+      -- let x32 = realToFrac x :: Float
+     -> do
       case asLowTypeMaybe floatType of
-        Just (LowTypeFloat FloatSize16) -> return (m, TermFloat16 x16)
-        Just (LowTypeFloat FloatSize32) -> return (m, TermFloat32 x32)
-        Just (LowTypeFloat FloatSize64) -> return (m, TermFloat64 x)
+        Just (LowTypeFloat size) -> return (m, TermFloat (size, i) x)
+        -- Just (LowTypeFloat FloatSize16) -> return (m, TermFloat16 x16)
+        -- Just (LowTypeFloat FloatSize32) -> return (m, TermFloat32 x32)
+        -- Just (LowTypeFloat FloatSize64) -> return (m, TermFloat64 x)
         _ ->
           raiseError m $
           T.pack (show x) <> " must be float, but is " <> floatType

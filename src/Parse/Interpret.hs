@@ -83,21 +83,21 @@ interpret (m, TreeNode ((_, TreeLeaf "f16"):rest))
     case readMaybe $ T.unpack x of
       Nothing -> raiseError mx "the argument of `f16` must be a float"
       Just x' -> do
-        return (m, WeakTermFloat16 x')
+        return (m, WeakTermFloat (m, WeakTermConst $ asIdent "f16") x')
   | otherwise = raiseSyntaxError m "(f16 LEAF)"
 interpret (m, TreeNode ((_, TreeLeaf "f32"):rest))
   | [(mx, TreeLeaf x)] <- rest = do
     case readMaybe $ T.unpack x of
       Nothing -> raiseError mx "the argument of `f32` must be a float"
       Just x' -> do
-        return (m, WeakTermFloat32 x')
+        return (m, WeakTermFloat (m, WeakTermConst $ asIdent "f32") x')
   | otherwise = raiseSyntaxError m "(f32 LEAF)"
 interpret (m, TreeNode ((_, TreeLeaf "f64"):rest))
   | [(mx, TreeLeaf x)] <- rest = do
     case readMaybe $ T.unpack x of
       Nothing -> raiseError mx "the argument of `f64` must be a float"
       Just x' -> do
-        return (m, WeakTermFloat64 x')
+        return (m, WeakTermFloat (m, WeakTermConst $ asIdent "f64") x')
   | otherwise = raiseSyntaxError m "(f64 LEAF)"
 interpret (m, TreeNode ((_, TreeLeaf "enum"):rest))
   | [(_, TreeLeaf x)] <- rest = do

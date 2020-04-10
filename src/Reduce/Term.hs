@@ -131,9 +131,10 @@ isValue (_, TermPiIntroNoReduce {}) = True
 isValue (_, TermPiIntroPlus {}) = True
 isValue (_, TermIter {}) = True
 isValue (_, TermConst x) = isValueConst x
-isValue (_, TermFloat16 _) = True
-isValue (_, TermFloat32 _) = True
-isValue (_, TermFloat64 _) = True
+-- isValue (_, TermFloat16 _) = True
+-- isValue (_, TermFloat32 _) = True
+-- isValue (_, TermFloat64 _) = True
+isValue (_, TermFloat _ _) = True
 isValue (_, TermEnum _) = True
 isValue (_, TermEnumIntro _) = True
 isValue (_, TermArray {}) = True
@@ -204,9 +205,10 @@ normalize (m, TermConst x) = do
   case IntMap.lookup (asInt x) cenv of
     Just (Left e) -> normalize e
     _ -> return (m, TermConst x)
-normalize (m, TermFloat16 x) = return (m, TermFloat16 x)
-normalize (m, TermFloat32 x) = return (m, TermFloat32 x)
-normalize (m, TermFloat64 x) = return (m, TermFloat64 x)
+-- normalize (m, TermFloat16 x) = return (m, TermFloat16 x)
+-- normalize (m, TermFloat32 x) = return (m, TermFloat32 x)
+-- normalize (m, TermFloat64 x) = return (m, TermFloat64 x)
+normalize (m, TermFloat size x) = return (m, TermFloat size x)
 normalize (m, TermEnum enumType) = return (m, TermEnum enumType)
 normalize (m, TermEnumIntro enumValue) = return (m, TermEnumIntro enumValue)
 normalize (m, TermEnumElim (e, t) les) = do

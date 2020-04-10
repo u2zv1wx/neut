@@ -2,8 +2,7 @@
 
 module Data.WeakTerm where
 
-import Numeric.Half
-
+-- import Numeric.Half
 import qualified Data.Set as S
 import qualified Data.Text as T
 
@@ -25,9 +24,9 @@ data WeakTerm
   | WeakTermZeta Identifier
   | WeakTermConst Identifier
   | WeakTermInt WeakTermPlus Integer
-  | WeakTermFloat16 Half
-  | WeakTermFloat32 Float
-  | WeakTermFloat64 Double
+  -- | WeakTermFloat16 Half
+  -- | WeakTermFloat32 Float
+  -- | WeakTermFloat64 Double
   | WeakTermFloat WeakTermPlus Double
   | WeakTermEnum EnumType
   | WeakTermEnumIntro EnumValue
@@ -135,9 +134,9 @@ varWeakTermPlus (_, WeakTermIter (_, x, t) xts e) = do
 varWeakTermPlus (_, WeakTermConst _) = S.empty
 varWeakTermPlus (_, WeakTermZeta _) = S.empty
 varWeakTermPlus (_, WeakTermInt t _) = varWeakTermPlus t
-varWeakTermPlus (_, WeakTermFloat16 _) = S.empty
-varWeakTermPlus (_, WeakTermFloat32 _) = S.empty
-varWeakTermPlus (_, WeakTermFloat64 _) = S.empty
+-- varWeakTermPlus (_, WeakTermFloat16 _) = S.empty
+-- varWeakTermPlus (_, WeakTermFloat32 _) = S.empty
+-- varWeakTermPlus (_, WeakTermFloat64 _) = S.empty
 varWeakTermPlus (_, WeakTermFloat t _) = varWeakTermPlus t
 varWeakTermPlus (_, WeakTermEnum _) = S.empty
 varWeakTermPlus (_, WeakTermEnumIntro _) = S.empty
@@ -194,9 +193,9 @@ holeWeakTermPlus (_, WeakTermIter (_, _, t) xts e) = do
 holeWeakTermPlus (_, WeakTermZeta h) = S.singleton h
 holeWeakTermPlus (_, WeakTermConst _) = S.empty
 holeWeakTermPlus (_, WeakTermInt t _) = holeWeakTermPlus t
-holeWeakTermPlus (_, WeakTermFloat16 _) = S.empty
-holeWeakTermPlus (_, WeakTermFloat32 _) = S.empty
-holeWeakTermPlus (_, WeakTermFloat64 _) = S.empty
+-- holeWeakTermPlus (_, WeakTermFloat16 _) = S.empty
+-- holeWeakTermPlus (_, WeakTermFloat32 _) = S.empty
+-- holeWeakTermPlus (_, WeakTermFloat64 _) = S.empty
 holeWeakTermPlus (_, WeakTermFloat t _) = holeWeakTermPlus t
 holeWeakTermPlus (_, WeakTermEnum _) = S.empty
 holeWeakTermPlus (_, WeakTermEnumIntro _) = S.empty
@@ -275,12 +274,12 @@ substWeakTermPlus sub e1@(_, WeakTermZeta x) = do
 substWeakTermPlus sub (m, WeakTermInt t x) = do
   let t' = substWeakTermPlus sub t
   (m, WeakTermInt t' x)
-substWeakTermPlus _ (m, WeakTermFloat16 x) = do
-  (m, WeakTermFloat16 x)
-substWeakTermPlus _ (m, WeakTermFloat32 x) = do
-  (m, WeakTermFloat32 x)
-substWeakTermPlus _ (m, WeakTermFloat64 x) = do
-  (m, WeakTermFloat64 x)
+-- substWeakTermPlus _ (m, WeakTermFloat16 x) = do
+--   (m, WeakTermFloat16 x)
+-- substWeakTermPlus _ (m, WeakTermFloat32 x) = do
+--   (m, WeakTermFloat32 x)
+-- substWeakTermPlus _ (m, WeakTermFloat64 x) = do
+--   (m, WeakTermFloat64 x)
 substWeakTermPlus sub (m, WeakTermFloat t x) = do
   let t' = substWeakTermPlus sub t
   (m, WeakTermFloat t' x)
@@ -397,9 +396,9 @@ toText (_, WeakTermIter (_, x, _) xts e) = do
 toText (_, WeakTermConst x) = asText x
 toText (_, WeakTermZeta (I (_, i))) = "?M" <> T.pack (show i)
 toText (_, WeakTermInt _ a) = T.pack $ show a
-toText (_, WeakTermFloat16 a) = T.pack $ show a
-toText (_, WeakTermFloat32 a) = T.pack $ show a
-toText (_, WeakTermFloat64 a) = T.pack $ show a
+-- toText (_, WeakTermFloat16 a) = T.pack $ show a
+-- toText (_, WeakTermFloat32 a) = T.pack $ show a
+-- toText (_, WeakTermFloat64 a) = T.pack $ show a
 toText (_, WeakTermFloat _ a) = T.pack $ show a
 toText (_, WeakTermEnum enumType) =
   case enumType of

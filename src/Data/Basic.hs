@@ -115,6 +115,11 @@ asFloatSize 32 = Just FloatSize32
 asFloatSize 64 = Just FloatSize64
 asFloatSize _ = Nothing
 
+showFloatSize :: FloatSize -> T.Text
+showFloatSize FloatSize16 = "f16"
+showFloatSize FloatSize32 = "f32"
+showFloatSize FloatSize64 = "f64"
+
 data EnumType
   = EnumTypeLabel T.Text
   | EnumTypeIntS Int -- i{k}

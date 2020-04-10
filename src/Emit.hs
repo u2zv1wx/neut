@@ -8,6 +8,7 @@ import Control.Monad.Except
 import Control.Monad.State
 import Data.ByteString.Builder
 import Data.Monoid ((<>))
+import Numeric.Half
 
 import qualified Data.ByteString.Lazy as L
 import qualified Data.HashMap.Strict as HashMap
@@ -414,9 +415,18 @@ showLLVMData :: LLVMData -> Builder
 showLLVMData (LLVMDataLocal (I (_, i))) = "%_" <> intDec i
 showLLVMData (LLVMDataGlobal x) = "@" <> TE.encodeUtf8Builder x
 showLLVMData (LLVMDataInt i) = integerDec i
-showLLVMData (LLVMDataFloat16 x) = "0x" <> (doubleHexFixed $ realToFrac x)
-showLLVMData (LLVMDataFloat32 x) = "0x" <> (doubleHexFixed $ realToFrac x)
-showLLVMData (LLVMDataFloat64 x) = "0x" <> (doubleHexFixed x)
+showLLVMData (LLVMDataFloat FloatSize16 x) = do
+  let x' = realToFrac x :: Half
+  "0x" <> (doubleHexFixed $ realToFrac x')
+showLLVMData (LLVMDataFloat FloatSize32 x) = do
+  let x' = realToFrac x :: Float
+  "0x" <> (doubleHexFixed $ realToFrac x')
+showLLVMData (LLVMDataFloat FloatSize64 x) = do
+  let x' = realToFrac x :: Double
+  "0x" <> (doubleHexFixed $ realToFrac x')
+-- showLLVMData (LLVMDataFloat16 x) = "0x" <> (doubleHexFixed $ realToFrac x)
+-- showLLVMData (LLVMDataFloat32 x) = "0x" <> (doubleHexFixed $ realToFrac x)
+-- showLLVMData (LLVMDataFloat64 x) = "0x" <> (doubleHexFixed x)
 showLLVMData LLVMDataNull = "null"
 
 showItems :: (a -> Builder) -> [a] -> Builder

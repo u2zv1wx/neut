@@ -55,9 +55,11 @@ clarify' tenv iter@(m, TermIter (_, x, t) mxts e) = do
   fvs <- nubFVS <$> chainTermPlus' tenv iter
   retClosureFix tenv x fvs m mxts e'
 clarify' tenv (m, TermConst x) = clarifyConst tenv m x
-clarify' _ (m, TermFloat16 l) = return (m, CodeUpIntro (m, DataFloat16 l))
-clarify' _ (m, TermFloat32 l) = return (m, CodeUpIntro (m, DataFloat32 l))
-clarify' _ (m, TermFloat64 l) = return (m, CodeUpIntro (m, DataFloat64 l))
+-- clarify' _ (m, TermFloat16 l) = return (m, CodeUpIntro (m, DataFloat16 l))
+-- clarify' _ (m, TermFloat32 l) = return (m, CodeUpIntro (m, DataFloat32 l))
+-- clarify' _ (m, TermFloat64 l) = return (m, CodeUpIntro (m, DataFloat64 l))
+clarify' _ (m, TermFloat (size, _) l) =
+  return (m, CodeUpIntro (m, DataFloat size l))
 clarify' _ (m, TermEnum _) = returnCartesianImmediate m
 clarify' _ (m, TermEnumIntro l) = return (m, CodeUpIntro (m, DataEnumIntro l))
 clarify' tenv (m, TermEnumElim (e, _) bs) = do
@@ -592,9 +594,10 @@ chainTermPlus' tenv (_, TermIter (_, x, t) xts e) = do
 chainTermPlus' tenv (m, TermConst x) = do
   (xts, _) <- obtainChain m x tenv
   return xts
-chainTermPlus' _ (_, TermFloat16 _) = return []
-chainTermPlus' _ (_, TermFloat32 _) = return []
-chainTermPlus' _ (_, TermFloat64 _) = return []
+-- chainTermPlus' _ (_, TermFloat16 _) = return []
+-- chainTermPlus' _ (_, TermFloat32 _) = return []
+-- chainTermPlus' _ (_, TermFloat64 _) = return []
+chainTermPlus' _ (_, TermFloat _ _) = return []
 chainTermPlus' _ (_, TermEnum _) = return []
 chainTermPlus' _ (_, TermEnumIntro _) = return []
 chainTermPlus' tenv (_, TermEnumElim (e, t) les) = do

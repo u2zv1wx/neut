@@ -493,12 +493,12 @@ substRuleType _ (m, WeakTermZeta x) = return (m, WeakTermZeta x)
 substRuleType sub (m, WeakTermInt t x) = do
   t' <- substRuleType sub t
   return (m, WeakTermInt t' x)
-substRuleType _ (m, WeakTermFloat16 x) = do
-  return (m, WeakTermFloat16 x)
-substRuleType _ (m, WeakTermFloat32 x) = do
-  return (m, WeakTermFloat32 x)
-substRuleType _ (m, WeakTermFloat64 x) = do
-  return (m, WeakTermFloat64 x)
+-- substRuleType _ (m, WeakTermFloat16 x) = do
+--   return (m, WeakTermFloat16 x)
+-- substRuleType _ (m, WeakTermFloat32 x) = do
+--   return (m, WeakTermFloat32 x)
+-- substRuleType _ (m, WeakTermFloat64 x) = do
+--   return (m, WeakTermFloat64 x)
 substRuleType sub (m, WeakTermFloat t x) = do
   t' <- substRuleType sub t
   return (m, WeakTermFloat t' x)
