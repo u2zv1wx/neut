@@ -500,7 +500,6 @@ registerIfNecessary ::
   -> WithEnv ()
 registerIfNecessary m name xts1 xts2 e = do
   cenv <- gets codeEnv
-  -- when (name `notElem` Map.keys cenv) $ do
   when (not $ name `Map.member` cenv) $ do
     e' <- linearize (xts2 ++ xts1) e
     (envVarName, envVar) <- newDataUpsilonWith m "env"

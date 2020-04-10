@@ -192,7 +192,6 @@ distinguishCode zs (ml, CodeEnumElim varInfo d branchList) = do
   let (from, to) = unzip $ IntMap.toList varInfo
   (vss, to') <- unzip <$> mapM (distinguishData zs) to
   let varInfo' = IntMap.fromList $ zip from to'
-  -- varInfo' <- mapM (distinguishData zs) varInfo
   return (merge (vs : vss), (ml, CodeEnumElim varInfo' d' branchList))
 distinguishCode zs (ml, CodeStructElim xts d e) = do
   (vs1, d') <- distinguishData zs d
@@ -204,7 +203,6 @@ distinguishCode zs (ml, CodeCase varInfo d branchList) = do
   let (from, to) = unzip $ IntMap.toList varInfo
   (vss, to') <- unzip <$> mapM (distinguishData zs) to
   let varInfo' = IntMap.fromList $ zip from to'
-  -- varInfo' <- mapM (distinguishData zs) varInfo
   return (merge (vs : vss), (ml, CodeCase varInfo' d' branchList))
 
 distinguishTheta :: [Identifier] -> Theta -> WithEnv (NameMap, Theta)

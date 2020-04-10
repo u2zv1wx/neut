@@ -56,7 +56,6 @@ sigmaIntro = DataSigmaIntro arrVoidPtr
 sigmaElim :: [Identifier] -> DataPlus -> CodePlus -> Code
 sigmaElim = CodeSigmaElim arrVoidPtr
 
--- type SubstDataPlus = [(Identifier, DataPlus)]
 type SubstDataPlus = IntMap.IntMap DataPlus
 
 substDataPlus :: SubstDataPlus -> DataPlus -> DataPlus
@@ -83,7 +82,6 @@ substCodePlus sub (m, CodePiElimDownElim v ds) = do
   (m, CodePiElimDownElim v' ds')
 substCodePlus sub (m, CodeSigmaElim mk xs v e) = do
   let v' = substDataPlus sub v
-  -- let sub' = filter (\(y, _) -> y `notElem` xs) sub
   let sub' = deleteKeys sub (map asInt xs)
   let e' = substCodePlus sub' e
   (m, CodeSigmaElim mk xs v' e')
@@ -93,28 +91,18 @@ substCodePlus sub (m, CodeUpIntro v) = do
 substCodePlus sub (m, CodeUpElim x e1 e2) = do
   let e1' = substCodePlus sub e1
   let sub' = IntMap.delete (asInt x) sub
-  -- let sub' = filter (\(y, _) -> y /= x) sub
   let e2' = substCodePlus sub' e2
   (m, CodeUpElim x e1' e2')
-substCodePlus sub (m, CodeEnumElim fvInfo v branchList)
-  -- let (from, to) = unzip $ IntMap.toList fvInfo
-  -- let to' = map (substDataPlus sub) to
-  -- let fvInfo' = zip from to'
- = do
+substCodePlus sub (m, CodeEnumElim fvInfo v branchList) = do
   let fvInfo' = IntMap.map (substDataPlus sub) fvInfo
   let v' = substDataPlus sub v
   (m, CodeEnumElim fvInfo' v' branchList)
 substCodePlus sub (m, CodeStructElim xks v e) = do
   let v' = substDataPlus sub v
   let sub' = deleteKeys sub (map (asInt . fst) xks)
-  -- let sub' = filter (\(k, _) -> k `notElem` map fst xks) sub
   let e' = substCodePlus sub' e
   (m, CodeStructElim xks v' e')
-substCodePlus sub (m, CodeCase fvInfo v branchList)
-  -- let (from, to) = unzip fvInfo
-  -- let to' = map (substDataPlus sub) to
-  -- let fvInfo' = zip from to'
- = do
+substCodePlus sub (m, CodeCase fvInfo v branchList) = do
   let fvInfo' = IntMap.map (substDataPlus sub) fvInfo
   let v' = substDataPlus sub v
   (m, CodeCase fvInfo' v' branchList)
