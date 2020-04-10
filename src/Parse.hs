@@ -521,15 +521,14 @@ toLetList (((x, (m, (mx, _, t), _, _)), iter):rest) =
 defToSub :: Def -> (Int, WeakTermPlus)
 defToSub (m, (mx, x, t), xts, e) = (asInt x, (m, WeakTermIter (mx, x, t) xts e))
 
--- defToSub :: Def -> (Identifier, WeakTermPlus)
--- defToSub (m, (mx, x, t), xts, e) = (x, (m, WeakTermIter (mx, x, t) xts e))
 selfCompose :: Int -> SubstWeakTerm -> SubstWeakTerm
 selfCompose 0 sub = sub
 selfCompose n sub = compose sub $ selfCompose (n - 1) sub
 
 compose :: SubstWeakTerm -> SubstWeakTerm -> SubstWeakTerm
 compose s1 s2 = do
-  IntMap.union s1 $ IntMap.map (substWeakTermPlus s1) s2
+  IntMap.union (IntMap.map (substWeakTermPlus s1) s2) s1
+  -- IntMap.union s1 $ IntMap.map (substWeakTermPlus s1) s2
   -- let domS2 = map fst s2
   -- let codS2 = map snd s2
   -- let codS2' = map (substWeakTermPlus s1) codS2

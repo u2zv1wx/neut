@@ -131,6 +131,7 @@
         (string:print "looping with (もちろん日本語も出力できるよ): ")
         (i64:print ?n)
         (let _ (i64:add 10 10))
+        (erase n)
         (let hogehoge (i64 10))
         (let _ (i64:add hogehoge 1))
         (string:print "\n")
@@ -223,6 +224,7 @@
 ;; (i64:print (fact 10))
 
 (i64:print (fact (unsafe:cast u64 i64 (list:length xs))))
+
 
 (definition unused-function ((_ tau)) tau)
 
