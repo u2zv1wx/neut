@@ -4,7 +4,6 @@ module Data.Term where
 
 import Data.Maybe (fromMaybe)
 
--- import Numeric.Half
 import qualified Data.Text as T
 
 import Data.Basic
@@ -24,9 +23,6 @@ data Term
   | TermPiElim TermPlus [TermPlus]
   | TermIter IdentifierPlus [IdentifierPlus] TermPlus
   | TermConst Identifier
-  -- | TermFloat16 Half
-  -- | TermFloat32 Float
-  -- | TermFloat64 Double
   | TermFloat (FloatSize, Int) Double
   | TermEnum EnumType
   | TermEnumIntro EnumValue
@@ -77,9 +73,6 @@ varTermPlus (_, TermIter (_, x, t) xts e) =
   varTermPlus t ++ filter (/= x) (varTermPlus' xts [e])
 varTermPlus (_, TermConst _) = []
 varTermPlus (_, TermFloat _ _) = []
--- varTermPlus (_, TermFloat16 _) = []
--- varTermPlus (_, TermFloat32 _) = []
--- varTermPlus (_, TermFloat64 _) = []
 varTermPlus (_, TermEnum _) = []
 varTermPlus (_, TermEnumIntro _) = []
 varTermPlus (_, TermEnumElim (e, t) les) = do
@@ -139,9 +132,6 @@ substTermPlus sub (m, TermIter (mx, x, t) xts e) = do
   (m, TermIter (mx, x, t') xts' e')
 substTermPlus _ e@(_, TermConst _) = e
 substTermPlus _ e@(_, TermFloat _ _) = e
--- substTermPlus _ (m, TermFloat16 x) = (m, TermFloat16 x)
--- substTermPlus _ (m, TermFloat32 x) = (m, TermFloat32 x)
--- substTermPlus _ (m, TermFloat64 x) = (m, TermFloat64 x)
 substTermPlus _ (m, TermEnum x) = (m, TermEnum x)
 substTermPlus _ (m, TermEnumIntro l) = (m, TermEnumIntro l)
 substTermPlus sub (m, TermEnumElim (e, t) branchList) = do
@@ -222,13 +212,6 @@ weaken (m, TermIter (mx, x, t) xts e) = do
 weaken (m, TermConst x) = (m, WeakTermConst x)
 weaken (m, TermFloat (size, i) x) =
   (m, WeakTermFloat (m, WeakTermConst (I (showFloatSize size, i))) x)
--- weaken (m, TermFloat FloatSize32 x) =
---   (m, WeakTermFloat (m, WeakTermConst $ asIdent "f32") x)
--- weaken (m, TermFloat FloatSize64 x) =
---   (m, WeakTermFloat (m, WeakTermConst $ asIdent "f64") x)
--- weaken (m, TermFloat16 x) = (m, WeakTermFloat16 x)
--- weaken (m, TermFloat32 x) = (m, WeakTermFloat32 x)
--- weaken (m, TermFloat64 x) = (m, WeakTermFloat64 x)
 weaken (m, TermEnum x) = (m, WeakTermEnum x)
 weaken (m, TermEnumIntro l) = (m, WeakTermEnumIntro l)
 weaken (m, TermEnumElim (e, t) branchList) = do

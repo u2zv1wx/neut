@@ -2,7 +2,6 @@ module Data.Code where
 
 import Data.Maybe (fromMaybe)
 
--- import Numeric.Half
 import qualified Data.Text as T
 
 import Data.Basic
@@ -11,11 +10,8 @@ data Data
   = DataTheta T.Text
   | DataUpsilon Identifier
   | DataSigmaIntro ArrayKind [DataPlus]
-  -- | DataFloat16 Half
-  -- | DataFloat32 Float
-  -- | DataFloat64 Double
-  | DataFloat FloatSize Double
   | DataEnumIntro EnumValue
+  | DataFloat FloatSize Double
   | DataStructIntro [(DataPlus, ArrayKind)]
   deriving (Show)
 
@@ -69,9 +65,6 @@ substDataPlus sub (m, DataUpsilon s) =
 substDataPlus sub (m, DataSigmaIntro mk vs) = do
   let vs' = map (substDataPlus sub) vs
   (m, DataSigmaIntro mk vs')
--- substDataPlus _ (m, DataFloat16 l) = (m, DataFloat16 l)
--- substDataPlus _ (m, DataFloat32 l) = (m, DataFloat32 l)
--- substDataPlus _ (m, DataFloat64 l) = (m, DataFloat64 l)
 substDataPlus _ (m, DataFloat size l) = (m, DataFloat size l)
 substDataPlus _ (m, DataEnumIntro l) = (m, DataEnumIntro l)
 substDataPlus sub (m, DataStructIntro dks) = do

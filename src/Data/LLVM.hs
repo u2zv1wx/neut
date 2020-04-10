@@ -1,6 +1,5 @@
 module Data.LLVM where
 
--- import Numeric.Half
 import qualified Data.Text as T
 
 import Data.Basic
@@ -9,9 +8,6 @@ data LLVMData
   = LLVMDataLocal Identifier
   | LLVMDataGlobal T.Text
   | LLVMDataInt Integer
-  -- | LLVMDataFloat16 Half
-  -- | LLVMDataFloat32 Float
-  -- | LLVMDataFloat64 Double
   | LLVMDataFloat FloatSize Double
   | LLVMDataNull
   deriving (Show)
