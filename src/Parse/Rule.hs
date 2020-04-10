@@ -183,10 +183,8 @@ toInductiveIntro ats bts xts a@(I (ai, _)) (mb, b@(I (bi, _)), m, yts, cod)
   , a == a'
   , length xts == length es = do
     let vs = varWeakTermPlus (m, weakTermPi yts cod)
-    let foo = zip [0 ..] xts
-    let bar = filter (\(_, (_, x, _)) -> x `S.member` vs) foo
-    let buz = map fst bar
-    let xts' = filter (\(_, x, _) -> x `S.member` vs) xts
+    let ixts = filter (\(_, (_, x, _)) -> x `S.member` vs) $ zip [0 ..] xts
+    let (is, xts') = unzip ixts
     let piType = (m, weakTermPi (xts' ++ yts) cod)
     let lam =
           ( m {metaIsReducible = False}
@@ -195,7 +193,7 @@ toInductiveIntro ats bts xts a@(I (ai, _)) (mb, b@(I (bi, _)), m, yts, cod)
               ( m
               , WeakTermPiIntroPlus
                   a
-                  (bi, buz, xts', yts)
+                  (bi, is, xts', yts)
                   (ats ++ bts)
                   (m, WeakTermPiElim (mb, WeakTermUpsilon b) (map toVar' yts))))
     let attr = QuasiStmtImplicit m b [0 .. length xts' - 1]
