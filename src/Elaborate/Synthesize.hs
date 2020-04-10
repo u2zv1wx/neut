@@ -207,9 +207,6 @@ unravel (m, WeakTermPi mName xts t) = do
 unravel (m, WeakTermPiIntro xts e) = do
   (xts', e') <- unravelBinder xts e
   return (m, WeakTermPiIntro xts' e')
--- unravel (m, WeakTermPiIntroNoReduce xts e) = do
---   (xts', e') <- unravelBinder xts e
---   return (m, WeakTermPiIntroNoReduce xts' e')
 -- the "content" of this term is not used in toText, and so there's no need to unravel this term
 unravel (m, WeakTermPiIntroPlus ind (name, is, args1, args2) xts e) =
   return (m, WeakTermPiIntroPlus ind (name, is, args1, args2) xts e)

@@ -198,16 +198,6 @@ toInductiveIntro ats bts xts a@(I (ai, _)) (mb, b@(I (bi, _)), m, yts, cod)
                   (bi, buz, xts', yts)
                   (ats ++ bts)
                   (m, WeakTermPiElim (mb, WeakTermUpsilon b) (map toVar' yts))))
-    -- let lam =
-    --       ( m
-    --       , WeakTermPiIntroNoReduce
-    --           (xts' ++ yts)
-    --           ( m
-    --           , WeakTermPiIntroPlus
-    --               a
-    --               (bi, buz, xts', yts)
-    --               (ats ++ bts)
-    --               (m, WeakTermPiElim (mb, WeakTermUpsilon b) (map toVar' yts))))
     let attr = QuasiStmtImplicit m b [0 .. length xts' - 1]
     let as = map (\(_, x, _) -> x) ats
     return [QuasiStmtLetInductiveIntro m (mb, b, piType) lam as, attr]

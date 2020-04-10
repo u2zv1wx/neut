@@ -25,11 +25,6 @@ reduceTermPlus (m, TermPiIntro xts e) = do
   let ts' = map reduceTermPlus ts
   let e' = reduceTermPlus e
   (m, TermPiIntro (zip3 ms xs ts') e')
--- reduceTermPlus (m, TermPiIntroNoReduce xts e) = do
---   let (ms, xs, ts) = unzip3 xts
---   let ts' = map reduceTermPlus ts
---   let e' = reduceTermPlus e
---   (m, TermPiIntroNoReduce (zip3 ms xs ts') e')
 reduceTermPlus (m, TermPiIntroPlus ind (name, is, args1, args2) xts e) = do
   let args1' = map reduceIdentPlus args1
   let args2' = map reduceIdentPlus args2
@@ -128,13 +123,9 @@ isValue (_, TermTau) = True
 isValue (_, TermUpsilon _) = True
 isValue (_, TermPi {}) = True
 isValue (_, TermPiIntro {}) = True
--- isValue (_, TermPiIntroNoReduce {}) = True
 isValue (_, TermPiIntroPlus {}) = True
 isValue (_, TermIter {}) = True
 isValue (_, TermConst x) = isValueConst x
--- isValue (_, TermFloat16 _) = True
--- isValue (_, TermFloat32 _) = True
--- isValue (_, TermFloat64 _) = True
 isValue (_, TermFloat _ _) = True
 isValue (_, TermEnum _) = True
 isValue (_, TermEnumIntro _) = True
@@ -167,11 +158,6 @@ normalize (m, TermPiIntro xts e) = do
   ts' <- mapM normalize ts
   e' <- normalize e
   return (m, TermPiIntro (zip3 ms xs ts') e')
--- normalize (m, TermPiIntroNoReduce xts e) = do
---   let (ms, xs, ts) = unzip3 xts
---   ts' <- mapM normalize ts
---   e' <- normalize e
---   return (m, TermPiIntroNoReduce (zip3 ms xs ts') e')
 normalize (m, TermPiIntroPlus ind (name, is, args1, args2) xts e) = do
   args1' <- mapM normalizeIdentPlus args1
   args2' <- mapM normalizeIdentPlus args2
@@ -185,9 +171,6 @@ normalize (m, TermPiElim e es) = do
     (_, TermPiIntro xts body) -> do
       let xs = map (\(_, x, _) -> asInt x) xts
       normalize $ substTermPlus (zip xs es') body
-    -- (_, TermPiIntroNoReduce xts body) -> do
-    --   let xs = map (\(_, x, _) -> asInt x) xts
-    --   normalize $ substTermPlus (zip xs es') body
     (_, TermPiIntroPlus _ _ xts body) -> do
       let xs = map (\(_, x, _) -> asInt x) xts
       normalize $ substTermPlus (zip xs es') body
@@ -206,9 +189,6 @@ normalize (m, TermConst x) = do
   case IntMap.lookup (asInt x) cenv of
     Just (Left e) -> normalize e
     _ -> return (m, TermConst x)
--- normalize (m, TermFloat16 x) = return (m, TermFloat16 x)
--- normalize (m, TermFloat32 x) = return (m, TermFloat32 x)
--- normalize (m, TermFloat64 x) = return (m, TermFloat64 x)
 normalize (m, TermFloat size x) = return (m, TermFloat size x)
 normalize (m, TermEnum enumType) = return (m, TermEnum enumType)
 normalize (m, TermEnumIntro enumValue) = return (m, TermEnumIntro enumValue)

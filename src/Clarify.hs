@@ -37,10 +37,6 @@ clarify' tenv lam@(m, TermPiIntro mxts e) = do
   fvs <- nubFVS <$> chainTermPlus' tenv lam
   e' <- clarify' (insTypeEnv1 mxts tenv) e
   retClosure tenv Nothing fvs m mxts e'
--- clarify' tenv lam@(m, TermPiIntroNoReduce mxts e) = do
---   fvs <- nubFVS <$> chainTermPlus' tenv lam
---   e' <- clarify' (insTypeEnv1 mxts tenv) e
---   retClosure tenv Nothing fvs m mxts e'
 clarify' tenv (m, TermPiIntroPlus _ (name, _, args1, args2) mxts e) = do
   name' <- lookupLLVMEnumEnv m name
   e' <- clarify' (insTypeEnv1 mxts tenv) e
@@ -378,7 +374,6 @@ toHeaderInfo m x t ArgArray = do
             ( m
             , CodeUpElim
                 arrayInnerTmpName
-                -- (m, CodeUpIntroNoReduce arrayInner)
                 (m {metaIsReducible = False}, CodeUpIntro arrayInner)
                 ( m
                 , CodeUpElim
@@ -577,8 +572,6 @@ chainTermPlus' tenv (m, TermUpsilon x) = do
   return $ xts ++ [(m, x, t)]
 chainTermPlus' tenv (_, TermPi _ xts t) = chainTermPlus'' tenv xts [t]
 chainTermPlus' tenv (_, TermPiIntro xts e) = chainTermPlus'' tenv xts [e]
--- chainTermPlus' tenv (_, TermPiIntroNoReduce xts e) =
---   chainTermPlus'' tenv xts [e]
 chainTermPlus' tenv (_, TermPiIntroPlus _ _ xts e) =
   chainTermPlus'' tenv xts [e]
 chainTermPlus' tenv (_, TermPiElim e es) = do

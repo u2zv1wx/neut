@@ -24,11 +24,6 @@ reduceWeakTermPlus (m, WeakTermPiIntro xts e) = do
   let ts' = map reduceWeakTermPlus ts
   let e' = reduceWeakTermPlus e
   (m, WeakTermPiIntro (zip3 ms xs ts') e')
--- reduceWeakTermPlus (m, WeakTermPiIntroNoReduce xts e) = do
---   let (ms, xs, ts) = unzip3 xts
---   let ts' = map reduceWeakTermPlus ts
---   let e' = reduceWeakTermPlus e
---   (m, WeakTermPiIntroNoReduce (zip3 ms xs ts') e')
 reduceWeakTermPlus (m, WeakTermPiIntroPlus ind (name, is, args1, args2) xts e) = do
   let args1' = map reduceWeakTermIdentPlus args1
   let args2' = map reduceWeakTermIdentPlus args2

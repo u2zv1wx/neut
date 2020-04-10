@@ -9,7 +9,6 @@ import Data.List (find, nub)
 import Data.Time
 import Numeric
 
--- import Numeric.Half
 import qualified Data.HashMap.Strict as Map
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Text as T
@@ -144,10 +143,6 @@ elaborate' (m, WeakTermPiIntro xts e) = do
   e' <- elaborate' e
   xts' <- mapM elaboratePlus xts
   return (m, TermPiIntro xts' e')
--- elaborate' (m, WeakTermPiIntroNoReduce xts e) = do
---   e' <- elaborate' e
---   xts' <- mapM elaboratePlus xts
---   return (m, TermPiIntroNoReduce xts' e')
 elaborate' (m, WeakTermPiIntroPlus ind (name, is, args1, args2) xts e) = do
   args1' <- mapM elaboratePlus args1
   args2' <- mapM elaboratePlus args2
