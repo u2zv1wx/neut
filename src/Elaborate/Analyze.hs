@@ -79,30 +79,6 @@ simp' (((m, WeakTermEnumIntro (EnumValueIntU s1 l1)), (_, WeakTermInt t2 l2)):cs
   | l1 == l2 = simp $ (toIntU m s1, t2) : cs
 simp' (((_, WeakTermInt t1 l1), (_, WeakTermInt t2 l2)):cs)
   | l1 == l2 = simp $ (t1, t2) : cs
--- simp' (((_, WeakTermFloat t1 l1), (m2, WeakTermFloat16 l2)):cs)
---   | show l1 == show l2 = do
---     f16 <- lookupConstantPlus m2 "f16"
---     simp $ (t1, f16) : cs
--- simp' (((m1, WeakTermFloat16 l1), (_, WeakTermFloat t2 l2)):cs)
---   | show l1 == show l2 = do
---     f16 <- lookupConstantPlus m1 "f16"
---     simp $ (f16, t2) : cs
--- simp' (((_, WeakTermFloat t1 l1), (m2, WeakTermFloat32 l2)):cs)
---   | show l1 == show l2 = do
---     f32 <- lookupConstantPlus m2 "f32"
---     simp $ (t1, f32) : cs
--- simp' (((m1, WeakTermFloat32 l1), (_, WeakTermFloat t2 l2)):cs)
---   | show l1 == show l2 = do
---     f32 <- lookupConstantPlus m1 "f32"
---     simp $ (f32, t2) : cs
--- simp' (((_, WeakTermFloat t1 l1), (m2, WeakTermFloat64 l2)):cs)
---   | l1 == l2 = do
---     f64 <- lookupConstantPlus m2 "f64"
---     simp $ (t1, f64) : cs
--- simp' (((m1, WeakTermFloat64 l1), (_, WeakTermFloat t2 l2)):cs)
---   | l1 == l2 = do
---     f64 <- lookupConstantPlus m1 "f64"
---     simp $ (f64, t2) : cs
 simp' (((_, WeakTermFloat t1 l1), (_, WeakTermFloat t2 l2)):cs)
   | l1 == l2 = simp $ (t1, t2) : cs
 simp' (((_, WeakTermEnum (EnumTypeIntS 1)), (_, WeakTermEnum (EnumTypeLabel "bool"))):cs) =

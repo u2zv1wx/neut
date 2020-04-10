@@ -85,15 +85,6 @@ infer' _ (m, WeakTermConst x@(I (s, _)))
 infer' _ (m, WeakTermInt t i) = do
   t' <- inferType' [] t -- ctx == [] since t' should be i64, i8, etc. (i.e. t must be closed)
   return ((m, WeakTermInt t' i), t')
--- infer' _ (m, WeakTermFloat16 f) = do
---   (_, f16) <- lookupConstantPlus m "f16"
---   return ((m, WeakTermFloat16 f), (m, f16))
--- infer' _ (m, WeakTermFloat32 f) = do
---   (_, f32) <- lookupConstantPlus m "f32"
---   return ((m, WeakTermFloat32 f), (m, f32))
--- infer' _ (m, WeakTermFloat64 f) = do
---   (_, f64) <- lookupConstantPlus m "f64"
---   return ((m, WeakTermFloat64 f), (m, f64))
 infer' _ (m, WeakTermFloat t f) = do
   t' <- inferType' [] t -- t must be closed
   return ((m, WeakTermFloat t' f), t')

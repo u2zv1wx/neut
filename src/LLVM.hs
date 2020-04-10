@@ -94,9 +94,6 @@ takeBaseName (_, DataSigmaIntro _ ds) = "array" <> T.pack (show (length ds))
 takeBaseName (_, DataFloat FloatSize16 _) = "half"
 takeBaseName (_, DataFloat FloatSize32 _) = "float"
 takeBaseName (_, DataFloat FloatSize64 _) = "double"
--- takeBaseName (_, DataFloat16 _) = "half"
--- takeBaseName (_, DataFloat32 _) = "float"
--- takeBaseName (_, DataFloat64 _) = "double"
 takeBaseName (_, DataEnumIntro (EnumValueIntS size _)) =
   "i" <> T.pack (show size)
 takeBaseName (_, DataEnumIntro (EnumValueIntU size _)) =
@@ -111,9 +108,6 @@ takeBaseName' (LLVMDataInt _) = "int"
 takeBaseName' (LLVMDataFloat FloatSize16 _) = "half"
 takeBaseName' (LLVMDataFloat FloatSize32 _) = "float"
 takeBaseName' (LLVMDataFloat FloatSize64 _) = "double"
--- takeBaseName' (LLVMDataFloat16 _) = "half"
--- takeBaseName' (LLVMDataFloat32 _) = "float"
--- takeBaseName' (LLVMDataFloat64 _) = "double"
 takeBaseName' LLVMDataNull = "null"
 
 loadContent ::
@@ -302,12 +296,6 @@ llvmDataLet x (m, DataSigmaIntro k ds) cont = do
   storeContent m x arrayType dts cont
 llvmDataLet x (_, DataFloat size f) cont =
   llvmUncastLet x (LLVMDataFloat size f) (LowTypeFloat size) cont
--- llvmDataLet x (_, DataFloat16 f) cont =
---   llvmUncastLet x (LLVMDataFloat16 f) (LowTypeFloat FloatSize16) cont
--- llvmDataLet x (_, DataFloat32 f) cont =
---   llvmUncastLet x (LLVMDataFloat32 f) (LowTypeFloat FloatSize32) cont
--- llvmDataLet x (_, DataFloat64 f) cont =
---   llvmUncastLet x (LLVMDataFloat64 f) (LowTypeFloat FloatSize64) cont
 llvmDataLet x (m, DataEnumIntro intOrLabel) cont = do
   case intOrLabel of
     EnumValueIntS size i ->

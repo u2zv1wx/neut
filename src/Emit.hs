@@ -424,9 +424,6 @@ showLLVMData (LLVMDataFloat FloatSize32 x) = do
 showLLVMData (LLVMDataFloat FloatSize64 x) = do
   let x' = realToFrac x :: Double
   "0x" <> (doubleHexFixed $ realToFrac x')
--- showLLVMData (LLVMDataFloat16 x) = "0x" <> (doubleHexFixed $ realToFrac x)
--- showLLVMData (LLVMDataFloat32 x) = "0x" <> (doubleHexFixed $ realToFrac x)
--- showLLVMData (LLVMDataFloat64 x) = "0x" <> (doubleHexFixed x)
 showLLVMData LLVMDataNull = "null"
 
 showItems :: (a -> Builder) -> [a] -> Builder

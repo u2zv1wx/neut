@@ -156,9 +156,6 @@ discern'' _ (m, WeakTermZeta h) = do
 discern'' nenv (m, WeakTermInt t x) = do
   t' <- discern'' nenv t
   return (m, WeakTermInt t' x)
--- discern'' _ (m, WeakTermFloat16 x) = return (m, WeakTermFloat16 x)
--- discern'' _ (m, WeakTermFloat32 x) = return (m, WeakTermFloat32 x)
--- discern'' _ (m, WeakTermFloat64 x) = return (m, WeakTermFloat64 x)
 discern'' nenv (m, WeakTermFloat t x) = do
   t' <- discern'' nenv t
   return (m, WeakTermFloat t' x)

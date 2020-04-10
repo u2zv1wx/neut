@@ -227,9 +227,6 @@ unravel (m, WeakTermZeta h) = do
   return (m, WeakTermZeta h')
 unravel (m, WeakTermInt t x) = do
   return (m, WeakTermInt t x)
--- unravel (m, WeakTermFloat16 x) = return (m, WeakTermFloat16 x)
--- unravel (m, WeakTermFloat32 x) = return (m, WeakTermFloat32 x)
--- unravel (m, WeakTermFloat64 x) = return (m, WeakTermFloat64 x)
 unravel (m, WeakTermFloat t x) = do
   return (m, WeakTermFloat t x)
 unravel (m, WeakTermEnum s) = return (m, WeakTermEnum s)
