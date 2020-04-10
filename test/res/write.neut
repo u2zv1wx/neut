@@ -227,9 +227,8 @@
 (definition unused-function ((_ tau)) tau)
 
 
-;; (inductive hogehoge ((a tau))
-;;   (make ((_ (hom (hogehoge a) (hogehoge a)))) (hogehoge a)))
-
+(inductive hogehoge ((a tau))
+  (make ((_ (hom i64 (list (hogehoge a))))) (hogehoge a)))
 
 (attribute unused-function
   (implicit 0))

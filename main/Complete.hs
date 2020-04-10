@@ -196,9 +196,8 @@ compInfoArrayElim s info ((mx, x, _):xts) e = do
 filterCompInfo :: Prefix -> (Identifier, Meta) -> WithEnv Bool
 filterCompInfo _ (I (x, _), _)
   | "private:" `T.isPrefixOf` x = return False
-filterCompInfo prefix (I (x, _), _) = do
-  nenv <- gets nonCandSet
-  return $ prefix `T.isPrefixOf` x && not (S.member x nenv)
+filterCompInfo prefix (I (x, _), _) =
+  return $ prefix `T.isPrefixOf` x && T.all (`S.notMember` S.fromList "()") x
 
 enrich :: (Identifier, Meta) -> [(Identifier, Meta)]
 enrich (x, m) = map (\y -> (y, m)) $ toSuffixList x

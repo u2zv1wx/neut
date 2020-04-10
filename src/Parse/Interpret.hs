@@ -17,7 +17,6 @@ import Data.Maybe (catMaybes, fromMaybe)
 import Text.Read (readMaybe)
 
 import qualified Data.HashMap.Strict as Map
-import qualified Data.Set as S
 import qualified Data.Text as T
 
 import Data.Basic
@@ -72,7 +71,6 @@ interpret (m, TreeNode ((_, TreeLeaf "iterate"):rest))
 interpret (m, TreeNode ((_, TreeLeaf "zeta"):rest))
   | [x@(_, TreeLeaf _)] <- rest = do
     (_, x') <- interpretLeaf x
-    modify (\env -> env {nonCandSet = S.insert (asText x') (nonCandSet env)})
     return (m, WeakTermZeta x')
   | otherwise = raiseSyntaxError m "(zeta LEAF)"
 interpret (m, TreeNode ((_, TreeLeaf "constant"):rest))
@@ -332,7 +330,6 @@ interpretIter t = raiseSyntaxError (fst t) "(TREE (TREE ... TREE) TREE)"
 interpretLeaf :: TreePlus -> WithEnv (Meta, Identifier)
 interpretLeaf (m, TreeLeaf "_") = do
   h <- newNameWith'' "H"
-  modify (\env -> env {nonCandSet = S.insert (asText h) (nonCandSet env)})
   return (m, h)
 interpretLeaf (m, TreeLeaf x) = do
   return (m, asIdent x)

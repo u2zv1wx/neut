@@ -239,8 +239,6 @@ parse' (a:as) = do
       m' <- adjustPhase' $ metaOf e'
       t <- newHole m'
       defList <- parse' as
-      modify
-        (\env -> env {nonCandSet = S.insert (asText name) (nonCandSet env)})
       return $ QuasiStmtLet m' (m', name, t) e' : defList
 
 lazyConcatHandler :: Response -> InputStream B.ByteString -> IO L.ByteString

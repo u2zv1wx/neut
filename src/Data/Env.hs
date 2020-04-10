@@ -84,7 +84,6 @@ data Env =
     --
     -- elaborate
     --
-    , nonCandSet :: S.Set T.Text
     -- var ~> (index of implicit arguments of the var)
     , impEnv :: IntMap.IntMap [Int]
     -- var ~> (typeof(var), level-of-type)
@@ -139,7 +138,6 @@ initialEnv =
     , namespace = []
     , formationEnv = IntMap.empty
     , indEnv = IntMap.empty
-    , nonCandSet = S.empty
     , labelEnv = Map.empty
     , impEnv = IntMap.empty
     , weakTypeEnv = IntMap.empty
