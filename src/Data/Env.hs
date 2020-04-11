@@ -241,8 +241,8 @@ newDataUpsilonWith m name = do
 insTypeEnv :: TypeEnvKey -> TermPlus -> WithEnv ()
 insTypeEnv x t = modify (\e -> e {typeEnv = Map.insert x t (typeEnv e)})
 
-insTypeEnv'' :: TypeEnvKey -> TermPlus -> TypeEnv -> TypeEnv
-insTypeEnv'' x t tenv = Map.insert x t tenv
+insTypeEnv' :: TypeEnvKey -> TermPlus -> TypeEnv -> TypeEnv
+insTypeEnv' x t tenv = Map.insert x t tenv
 
 lookupTypeEnv :: Meta -> TypeEnvKey -> T.Text -> WithEnv TermPlus
 lookupTypeEnv m x name = do
@@ -253,13 +253,13 @@ lookupTypeEnv m x name = do
       raiseCritical m $
       "the constant `" <> name <> "` is not found in the type environment."
 
-lookupTypeEnv'' :: Meta -> TypeEnvKey -> TypeEnv -> T.Text -> WithEnv TermPlus
-lookupTypeEnv'' m (Right s) _ _
+lookupTypeEnv' :: Meta -> TypeEnvKey -> TypeEnv -> T.Text -> WithEnv TermPlus
+lookupTypeEnv' m (Right s) _ _
   | Just _ <- asLowTypeMaybe s = return (m, TermTau)
   | Just op <- asUnaryOpMaybe s = unaryOpToType m op
   | Just op <- asBinaryOpMaybe s = binaryOpToType m op
   | Just lowType <- asArrayAccessMaybe s = arrayAccessToType m lowType
-lookupTypeEnv'' m key tenv name = do
+lookupTypeEnv' m key tenv name = do
   case Map.lookup key tenv of
     Just t -> return t
     Nothing ->
