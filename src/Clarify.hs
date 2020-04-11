@@ -194,10 +194,7 @@ clarifyConst tenv m x
         -- ここで定数の処理をやる。
         -- codeEnvをうまく更新することになりそう？
         case Map.lookup x cenv of
-          Nothing -> do
-            p "external:"
-            p' x
-            return (m, CodeUpIntro (m, DataConst x)) -- external
+          Nothing -> return (m, CodeUpIntro (m, DataConst x)) -- external
           Just (Right e) -> return e
           Just (Left e) -> do
             e' <- clarify' tenv e
@@ -224,7 +221,7 @@ clarifyUnaryOp tenv name op m = do
       let varX = (mx, DataUpsilon x)
       retClosure
         tenv
-        (Just $ showInHex name)
+        (Just $ showInHex name) -- ここの名前はなんでもいい
         -- (Just name)
         []
         m

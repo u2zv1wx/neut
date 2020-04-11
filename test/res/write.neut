@@ -161,6 +161,9 @@
 ;; #my-id
 ?my-id
 
+(constant external i64)
+
+(i64:add 10 external)
 
 (attribute my-id (implicit 0 1 2))
 
