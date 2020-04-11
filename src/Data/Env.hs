@@ -86,7 +86,6 @@ data Env =
     , indEnv :: RuleEnv
     -- "list:cons" ~> ("list", [0])
     , revIndEnv :: Map.HashMap T.Text (T.Text, [Int])
-    , consNumEnv :: Map.HashMap T.Text Int
     -- , revIndEnv :: Map.HashMap T.Text (Identifier, [Int])
     , intactSet :: S.Set (Meta, T.Text)
     --
@@ -133,7 +132,6 @@ initialEnv =
     , keywordEnv = S.empty
     -- , constantEnv = Map.empty
     , constantSet = S.empty
-    , consNumEnv = Map.empty
     , enumEnv = Map.empty
     , fileEnv = Map.empty
     , traceEnv = []
