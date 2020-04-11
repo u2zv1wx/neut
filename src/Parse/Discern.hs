@@ -24,49 +24,24 @@ discern' :: NameEnv -> [QuasiStmt] -> WithEnv [QuasiStmt]
 discern' _ [] = return []
 discern' nenv ((QuasiStmtLet m (mx, x, t) e):ss) = do
   t' <- discern'' nenv t
-  -- penv <- gets prefixEnv
-  -- x' <- lookupConstant m penv x
-  -- x' <- newDefinedNameWith' mx nenv x
   e' <- discern'' nenv e
-  -- modify (\env -> env {constantSet = S.insert x (constantSet env)})
   insertConstant mx x
-  -- ss' <- discern' (insertName x x' nenv) ss
   ss' <- discern' nenv ss -- xはconstだからnenvの更新の必要なし
-  -- return $ QuasiStmtLet m (mx, x', t') e' : ss'
   return $ QuasiStmtLet m (mx, x, t') e' : ss'
 discern' nenv ((QuasiStmtLetWT m (mx, x, t) e):ss) = do
   set <- gets intactSet
   t' <- discern'' nenv t
-  -- penv <- gets prefixEnv
-  -- x' <- newDefinedNameWith' mx nenv x
   e' <- discern'' nenv e
   set' <- gets intactSet
   whenCheck $ modify (\env -> env {intactSet = S.intersection set set'})
   insertConstant mx x
-  -- modify (\env -> env {constantSet = S.insert x (constantSet env)})
   ss' <- discern' nenv ss
-  -- ss' <- discern' (insertName x x' nenv) ss
-  -- return $ QuasiStmtLetWT m (mx, x', t') e' : ss'
   return $ QuasiStmtLetWT m (mx, x, t') e' : ss'
 discern' nenv ((QuasiStmtDef xds):ss) = do
   forM_ xds $ \(x, (m, _, _, _)) -> insertConstant m x
   let (xs, ds) = unzip xds
-  -- discern for deflist
-    -- modify (\env -> env {constantSet = S.insert x (constantSet env)})
-  -- let mys = map (\(_, (my, y, _), _, _) -> (my, y)) ds
-  -- ys' <- mapM (\(my, y) -> newDefinedNameWith' my nenv y) mys
-  -- let yis = map (asText . snd) mys
-  -- let nenvForDef = Map.fromList (zip yis ys') `Map.union` nenv
-  -- ds' <- mapM (discernDef nenvForDef) ds
   ds' <- mapM (discernDef nenv) ds
-  -- discern for continuation
-  -- let ms = map (\(m, _, _, _) -> m) ds
-  -- xs' <- zipWithM (\m x -> newDefinedNameWith m x) ms xs
-  -- let xis = map asText xs
-  -- let nenvForCont = Map.fromList (zip xis xs') `Map.union` nenv
-  -- ss' <- discern' nenvForCont ss
   ss' <- discern' nenv ss
-  -- return $ QuasiStmtDef (zip xs' ds') : ss'
   return $ QuasiStmtDef (zip xs ds') : ss'
 discern' nenv ((QuasiStmtConstDecl m (mx, x, t)):ss) = do
   t' <- discern'' nenv t
@@ -76,12 +51,9 @@ discern' nenv ((QuasiStmtVerify m e):ss) = do
   e' <- discern'' nenv e
   ss' <- discern' nenv ss
   return $ QuasiStmtVerify m e' : ss'
-discern' nenv ((QuasiStmtImplicit m x i):ss)
-  -- set <- gets intactSet
- = do
+discern' nenv ((QuasiStmtImplicit m x i):ss) = do
   penv <- gets prefixEnv
   x' <- lookupConstant m penv x
-  -- whenCheck $ modify (\env -> env {intactSet = set})
   ss' <- discern' nenv ss
   return $ QuasiStmtImplicit m x' i : ss'
 discern' nenv ((QuasiStmtEnum m name xis):ss) = do
@@ -90,34 +62,21 @@ discern' nenv ((QuasiStmtEnum m name xis):ss) = do
 discern' nenv ((QuasiStmtLetInductive n m (mx, a, t) e):ss) = do
   set <- gets intactSet
   t' <- discern'' nenv t
-  -- a' <- newDefinedNameWith' m nenv a
   e' <- discern'' nenv e
   set' <- gets intactSet
   whenCheck $ modify (\env -> env {intactSet = S.intersection set set'})
   insertConstant mx a
-  -- modify (\env -> env {constantSet = S.insert a (constantSet env)})
   ss' <- discern' nenv ss
   return $ QuasiStmtLetInductive n m (mx, a, t') e' : ss'
-  -- ss' <- discern' (insertName a a' nenv) ss
-  -- return $ QuasiStmtLetInductive n m (mx, a', t') e' : ss'
 discern' nenv ((QuasiStmtLetInductiveIntro m (mx, x, t) e as):ss) = do
   set <- gets intactSet
   t' <- discern'' nenv t
-  -- x' <- newDefinedNameWith' m nenv x
   e' <- discern'' nenv e
-  -- penv <- gets prefixEnv
-  -- p "let-inductive-intro"
-  -- as' <- mapM (lookupName'' m penv nenv) as
-  -- p "after-let-inductive-intro"
   set' <- gets intactSet
   whenCheck $ modify (\env -> env {intactSet = S.intersection set set'})
   insertConstant mx x
-  -- modify (\env -> env {constantSet = S.insert x (constantSet env)})
   ss' <- discern' nenv ss
-  -- return $ QuasiStmtLetInductiveIntro m (mx, x, t') e' as' : ss'
   return $ QuasiStmtLetInductiveIntro m (mx, x, t') e' as : ss'
-  -- ss' <- discern' (insertName x x' nenv) ss
-  -- return $ QuasiStmtLetInductiveIntro m (mx, x', t') e' as' : ss'
 discern' nenv ((QuasiStmtUse prefix):ss) = do
   modify (\e -> e {prefixEnv = prefix : prefixEnv e})
   discern' nenv ss
@@ -130,15 +89,6 @@ discernDef nenv (m, (mx, x, t), xts, e) = do
   t' <- discern'' nenv t
   x' <- newDefinedNameWith mx x
   (xts', e') <- discernBinder (insertName x x' nenv) xts e
-  -- (xts', e') <- discernBinder nenv xts e
-  -- penv <- gets prefixEnv
-  -- p "discernDef. x:"
-  -- p' x
-  -- p "args:"
-  -- p' xts
-  -- p "content:"
-  -- p' e
-  -- x' <- lookupName'' mx penv nenv x
   return (m, (mx, x', t'), xts', e')
 
 -- Alpha-convert all the variables so that different variables have different names.
@@ -150,13 +100,11 @@ discern'' nenv (m, WeakTermUpsilon x@(I (s, _))) = do
   b1 <- lookupEnumValueNameWithPrefix s
   b2 <- lookupEnumTypeNameWithPrefix s
   mc <- lookupConstantMaybe penv s
-  -- b <- isConstant s
   case (mx, b1, b2, mc) of
     (Just x', _, _, _) -> return (m, WeakTermUpsilon x')
     (_, _, _, Just c) -> return (m, WeakTermConst c)
     (_, Just s', _, _) -> return (m, WeakTermEnumIntro (EnumValueLabel s'))
     (_, _, Just s', _) -> return (m, WeakTermEnum (EnumTypeLabel s'))
-    -- (_, _, _, True) -> return (m, WeakTermConst s)
     _ -> raiseError m $ "(*) undefined variable:  " <> asText x
 discern'' nenv (m, WeakTermPi mName xts t) = do
   (xts', t') <- discernBinder nenv xts t
@@ -164,13 +112,9 @@ discern'' nenv (m, WeakTermPi mName xts t) = do
 discern'' nenv (m, WeakTermPiIntro xts e) = do
   (xts', e') <- discernBinder nenv xts e
   return (m, WeakTermPiIntro xts' e')
-discern'' nenv (m, WeakTermPiIntroPlus ind (name, is, args) xts e)
-  -- penv <- gets prefixEnv
-  -- ind' <- lookupName'' m penv nenv ind
- = do
+discern'' nenv (m, WeakTermPiIntroPlus ind (name, is, args) xts e) = do
   args' <- mapM (discernIdentPlus nenv) args
   (xts', e') <- discernBinder nenv xts e
-  -- return (m, WeakTermPiIntroPlus ind' (name, is, args') xts' e')
   return (m, WeakTermPiIntroPlus ind (name, is, args') xts' e')
 discern'' nenv (m, WeakTermPiElim e es) = do
   es' <- mapM (discern'' nenv) es
@@ -223,15 +167,11 @@ discern'' nenv (m, WeakTermCase indName e cxtes) = do
   e' <- discern'' nenv e
   penv <- gets prefixEnv
   cxtes' <-
-    flip mapM cxtes $ \(((mc, c), xts), body)
-      -- (expandedName, c') <- lookupConsName mc penv nenv c
-     -> do
-      c' <- lookupConsName mc penv nenv c
-      -- expandedName <- lookupConsName mc penv nenv c
+    flip mapM cxtes $ \(((mc, c), xts), body) -> do
+      c' <- lookupConstant mc penv c
+      -- c' <- lookupConsName mc penv nenv c
       label <- lookupLLVMEnumEnv mc c'
-      -- label <- lookupLLVMEnumEnv mc expandedName
       renv <- gets revCaseEnv
-      -- modify (\env -> env {revCaseEnv = IntMap.insert (asInt c') label renv})
       modify (\env -> env {revCaseEnv = Map.insert c' label renv})
       (xts', body') <- discernBinder nenv xts body
       return (((mc, c'), xts'), body')
@@ -323,13 +263,6 @@ insertConstant m x = do
     then raiseError m $ "the constant `" <> x <> "` is already defined"
     else modify (\env -> env {constantSet = S.insert x (constantSet env)})
 
--- newDefinedNameWith' :: Meta -> NameEnv -> Identifier -> WithEnv Identifier
--- newDefinedNameWith' m nenv x = do
---   case Map.lookup (asText x) nenv of
---     Nothing -> newDefinedNameWith m x
---     Just _ ->
---       raiseError m $
---       "the identifier `" <> asText x <> "` is already defined at top level"
 insertName :: Identifier -> Identifier -> NameEnv -> NameEnv
 insertName (I (s, _)) y nenv = Map.insert s y nenv
 
@@ -377,7 +310,6 @@ lookupConstantMaybe penv x = do
 
 lookupConstantMaybe' :: [T.Text] -> T.Text -> WithEnv (Maybe T.Text)
 lookupConstantMaybe' [] _ = return Nothing
-  -- raiseError m $ "undefined constant: " <> x
 lookupConstantMaybe' (prefix:prefixList) x = do
   let query = prefix <> ":" <> x
   b <- isConstant query
@@ -391,39 +323,6 @@ lookupConstant m penv x = do
   case mc of
     Just c -> return c
     Nothing -> raiseError m $ "undefined constant: " <> x
-  -- case Map.lookup query nenv of
-  --   Just x'@(I (_, i)) -> do
-  --     removeFromIntactSet m $ I (query, i)
-  --     return $ Just x'
-  --   Nothing -> lookupConstant' m prefixList nenv x
-
--- lookupConstant'' :: Meta -> [T.Text] ->  Identifier -> WithEnv T.Text
--- lookupConstant'' m penv nenv x = do
---   mx <- lookupConstant m penv nenv x
---   case mx of
---     Just x' -> return x'
---     Nothing -> raiseError m $ "undefined variable: " <> asText x
-lookupConsName :: Meta -> [T.Text] -> NameEnv -> T.Text -> WithEnv T.Text
-lookupConsName m penv nenv x = do
-  b <- isConstant x
-  if b
-    then return x
-    else lookupConsName' m penv nenv x
-  -- case Map.lookup (asText x) nenv of
-  --   Just x' -> return (asText x, x')
-  --   Nothing -> lookupConsName' m penv nenv x
-
-lookupConsName' :: Meta -> [T.Text] -> NameEnv -> T.Text -> WithEnv T.Text
-lookupConsName' m [] _ x = raiseError m $ "(consName) undefined variable: " <> x
-lookupConsName' m (prefix:prefixList) nenv x = do
-  let query = prefix <> ":" <> x
-  b <- isConstant query
-  if b
-    then return query
-    else lookupConsName' m prefixList nenv x
-  -- case Map.lookup query nenv of
-  --   Just x' -> return (query, x')
-  --   Nothing -> lookupConsName' m prefixList nenv x
 
 lookupEnum :: (T.Text -> WithEnv Bool) -> T.Text -> WithEnv (Maybe T.Text)
 lookupEnum f name = do

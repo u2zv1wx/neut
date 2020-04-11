@@ -63,25 +63,12 @@ elaborateStmt (WeakStmtLet m (mx, x, t) e cont) = do
   t'' <- reduceTermPlus <$> elaborate' t'
   insTypeEnv (Right x) t''
   modify (\env -> env {cacheEnv = Map.insert x (Left e'') (cacheEnv env)})
+  -- cはエフェクトをもちうるのでこう変換する必要あり
   cont' <- elaborateStmt cont
-  -- x' <- newNameWith x
   x' <- newNameWith'' x
   let c = (m, TermConst x)
-  -- ここでtermEnvを更新する感じ。
+  -- このxをトップレベルに登録したいんですが。codeEnvに入るのはすべて関数だけなのでむずい。
   return (m, TermPiElim (m, TermPiIntro [(mx, x', t'')] cont') [c])
--- elaborateStmt (WeakStmtLet m (mx, x@(I (_, i)), t) e cont) = do
---   (e', te) <- infer e
---   t' <- inferType t
---   insConstraintEnv te t'
---   analyze >> synthesize >> refine >> cleanup
---   e'' <- elaborate' e'
---   t'' <- reduceTermPlus <$> elaborate' t'
---   insTypeEnv x t''
---   modify (\env -> env {cacheEnv = IntMap.insert i (Left e'') (cacheEnv env)})
---   cont' <- elaborateStmt cont
---   x' <- newNameWith x
---   let c = (m, TermConst x)
---   return (m, TermPiElim (m, TermPiIntro [(mx, x', t'')] cont') [c])
 elaborateStmt (WeakStmtLetWT m (mx, x, t) e cont) = do
   t' <- inferType t
   analyze >> synthesize >> refine >> cleanup
@@ -147,10 +134,6 @@ cleanup = do
 elaborate' :: WeakTermPlus -> WithEnv TermPlus
 elaborate' (m, WeakTermTau) = return (m, TermTau)
 elaborate' (m, WeakTermUpsilon x) = return (m, TermUpsilon x)
-  -- cenv <- gets cacheEnv
-  -- if IntMap.member (asInt x) cenv
-  --   then return (m, TermConst x)
-  --   else return (m, TermUpsilon x)
 elaborate' (m, WeakTermPi mName xts t) = do
   xts' <- mapM elaboratePlus xts
   t' <- elaborate' t
@@ -220,9 +203,6 @@ elaborate' (m, WeakTermFloat t x) = do
     (_, TermConst floatType)
       | Just (LowTypeFloat size) <- asLowTypeMaybe floatType -> do
         return (m, TermFloat size x)
-    -- (_, TermConst (I (floatType, i)))
-    --   | Just (LowTypeFloat size) <- asLowTypeMaybe floatType -> do
-    --     return (m, TermFloat (size, i) x)
     _ ->
       raiseError m $
       "the term `" <>

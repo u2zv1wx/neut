@@ -32,7 +32,9 @@ inferType t = inferType' [] t
 
 infer' :: Context -> WeakTermPlus -> WithEnv (WeakTermPlus, WeakTermPlus)
 infer' _ (m, WeakTermTau) = return ((m, WeakTermTau), (m, WeakTermTau))
-infer' _ (m, WeakTermUpsilon x) = inferSymbol m x
+infer' _ (m, WeakTermUpsilon x) = do
+  t <- lookupWeakTypeEnv m x
+  return ((m, WeakTermUpsilon x), (m, snd t))
 infer' ctx (m, WeakTermPi mName xts t) = do
   (xts', t') <- inferPi ctx xts t
   return ((m, WeakTermPi mName xts' t'), (m, WeakTermTau))
@@ -74,9 +76,9 @@ infer' _ (m, WeakTermConst x)
   | Just op <- asUnaryOpMaybe x = inferExternal m x (unaryOpToType m op)
   | Just op <- asBinaryOpMaybe x = inferExternal m x (binaryOpToType m op)
   | Just lt <- asArrayAccessMaybe x = inferExternal m x (arrayAccessToType m lt)
-  | otherwise = inferConstant m x
-    -- inferSymbol m x
--- infer' _ (m, WeakTermConst x@(I (s, _)))
+  | otherwise = do
+    t <- lookupTypeEnv m (Right x) x
+    return ((m, WeakTermConst x), (m, snd $ weaken t))
 infer' _ (m, WeakTermInt t i) = do
   t' <- inferType' [] t -- ctx == [] since t' should be i64, i8, etc. (i.e. t must be closed)
   return ((m, WeakTermInt t' i), t')
@@ -299,22 +301,6 @@ inferExternal m x comp = do
   t <- comp
   return ((m, WeakTermConst x), (m, snd $ weaken t))
 
-inferSymbol :: Meta -> Identifier -> WithEnv (WeakTermPlus, WeakTermPlus)
-inferSymbol m x = do
-  t <- lookupWeakTypeEnv m x
-  return ((m, WeakTermUpsilon x), (m, snd t))
-  -- mt <- lookupTypeEnvMaybe x
-  -- case mt of
-  --   Just t -> return ((m, WeakTermConst x), (m, snd $ weaken t))
-  --   Nothing -> do
-  --     (_, t) <- lookupWeakTypeEnv m x
-  --     return ((m, WeakTermUpsilon x), (m, t))
-
-inferConstant :: Meta -> T.Text -> WithEnv (WeakTermPlus, WeakTermPlus)
-inferConstant m x = do
-  t <- lookupTypeEnv m (Right x) x
-  return ((m, WeakTermConst x), (m, snd $ weaken t))
-
 inferType' :: Context -> WeakTermPlus -> WithEnv WeakTermPlus
 inferType' ctx t = do
   (t', u) <- infer' ctx t
@@ -324,9 +310,7 @@ inferType' ctx t = do
 inferKind :: Meta -> ArrayKind -> WithEnv WeakTermPlus
 inferKind m (ArrayKindIntS i) = return (m, WeakTermEnum (EnumTypeIntS i))
 inferKind m (ArrayKindIntU i) = return (m, WeakTermEnum (EnumTypeIntU i))
-inferKind m (ArrayKindFloat size)
-  -- (_, t) <- lookupConstantPlus m $ "f" <> T.pack (show (sizeAsInt size))
- = do
+inferKind m (ArrayKindFloat size) = do
   return (m, (WeakTermConst ("f" <> T.pack (show (sizeAsInt size)))))
 inferKind m _ = raiseCritical m "inferKind for void-pointer"
 
