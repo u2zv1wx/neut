@@ -189,6 +189,7 @@ toInductiveIntro ats bts xts ai (mb, bi, m, yts, cod)
     let vs = varWeakTermPlus (m, weakTermPi yts cod)
     let ixts = filter (\(_, (_, x, _)) -> x `S.member` vs) $ zip [0 ..] xts
     let (is, xts') = unzip ixts
+    modify (\env -> env {revIndEnv = Map.insert bi (ai, is) (revIndEnv env)})
     return
       [ QuasiStmtLetInductiveIntro
           m
@@ -199,7 +200,7 @@ toInductiveIntro ats bts xts ai (mb, bi, m, yts, cod)
               ( m
               , WeakTermPiIntroPlus
                   ai
-                  (bi, is, xts' ++ yts)
+                  (bi, xts' ++ yts)
                   (ats ++ bts)
                   ( m
                   , WeakTermPiElim
@@ -487,10 +488,10 @@ substRuleType sub (m, WeakTermPi mName xts t) = do
 substRuleType sub (m, WeakTermPiIntro xts body) = do
   (xts', body') <- substRuleType'' sub xts body
   return (m, WeakTermPiIntro xts' body')
-substRuleType sub (m, WeakTermPiIntroPlus ind (name, is, args) xts body) = do
+substRuleType sub (m, WeakTermPiIntroPlus ind (name, args) xts body) = do
   args' <- substRuleType' sub args
   (xts', body') <- substRuleType'' sub xts body
-  return (m, WeakTermPiIntroPlus ind (name, is, args') xts' body')
+  return (m, WeakTermPiIntroPlus ind (name, args') xts' body')
 substRuleType sub@((a1, es1), (a2, es2)) (m, WeakTermPiElim e es)
   | (mx, WeakTermUpsilon x) <- e
   , a1 == x =

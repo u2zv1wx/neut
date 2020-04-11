@@ -436,3 +436,10 @@ warn pos str = do
   b <- gets shouldColorize
   eoe <- gets endOfEntry
   liftIO $ outputLog b eoe $ logWarning pos str
+
+lookupRevIndEnv :: Meta -> T.Text -> WithEnv (T.Text, [Int])
+lookupRevIndEnv m bi = do
+  rienv <- gets revIndEnv
+  case Map.lookup bi rienv of
+    Nothing -> raiseCritical m $ "no such constructor defined: `" <> bi <> "`"
+    Just val -> return val

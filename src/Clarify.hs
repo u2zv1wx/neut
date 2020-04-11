@@ -37,7 +37,7 @@ clarify' tenv lam@(m, TermPiIntro mxts e) = do
   fvs <- nubFVS <$> chainTermPlus tenv lam
   e' <- clarify' (insTypeEnv1 mxts tenv) e
   retClosure tenv Nothing fvs m mxts e'
-clarify' tenv (m, TermPiIntroPlus _ (name, _, args) mxts e) = do
+clarify' tenv (m, TermPiIntroPlus _ (name, args) mxts e) = do
   e' <- clarify' (insTypeEnv1 mxts tenv) e
   retClosure tenv (Just $ showInHex name) args m mxts e'
 clarify' tenv (m, TermPiElim e es) = do

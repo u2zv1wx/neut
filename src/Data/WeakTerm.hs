@@ -15,7 +15,7 @@ data WeakTerm
   | WeakTermPiIntro [IdentifierPlus] WeakTermPlus
   | WeakTermPiIntroPlus
       T.Text -- name of inductive type
-      (T.Text, [Int], [IdentifierPlus]) -- (name of construtor, is (s.t. map (\i -> xts !! i) is == xts'), xts' ++ yts)
+      (T.Text, [IdentifierPlus]) -- (name of construtor, is (s.t. map (\i -> xts !! i) is == xts'), xts' ++ yts)
       [IdentifierPlus]
       WeakTermPlus
   | WeakTermPiElim WeakTermPlus [WeakTermPlus]
@@ -299,10 +299,10 @@ substWeakTermPlus sub (m, WeakTermPi mName xts t) = do
 substWeakTermPlus sub (m, WeakTermPiIntro xts body) = do
   let (xts', body') = substWeakTermPlus'' sub xts body
   (m, WeakTermPiIntro xts' body')
-substWeakTermPlus sub (m, WeakTermPiIntroPlus ind (name, is, args) xts body) = do
+substWeakTermPlus sub (m, WeakTermPiIntroPlus ind (name, args) xts body) = do
   let args' = substWeakTermPlus' sub args
   let (xts', body') = substWeakTermPlus'' sub xts body
-  (m, WeakTermPiIntroPlus ind (name, is, args') xts' body')
+  (m, WeakTermPiIntroPlus ind (name, args') xts' body')
 substWeakTermPlus sub (m, WeakTermPiElim e es) = do
   let e' = substWeakTermPlus sub e
   let es' = map (substWeakTermPlus sub) es
@@ -432,7 +432,7 @@ toText (_, WeakTermPi (Just _) _ cod) = toText cod
 toText (_, WeakTermPiIntro xts e) = do
   let argStr = inParen $ showItems $ map showArg xts
   showCons ["λ", argStr, toText e]
-toText (_, WeakTermPiIntroPlus _ (name, _, _) _ _) = do
+toText (_, WeakTermPiIntroPlus _ (name, _) _ _) = do
   "<#" <> name <> "-" <> "internal" <> "#>"
 toText (_, WeakTermPiElim e es) = do
   showCons $ map toText $ e : es
