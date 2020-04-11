@@ -104,7 +104,8 @@ parse' ((m, TreeNode ((_, TreeLeaf "section"):es)):as)
     modify (\e -> e {sectionEnv = s : sectionEnv e})
     n <- getCurrentSection
     stmtList <- parse' as
-    return $ QuasiStmtUse n : QuasiStmtUse (n <> ":" <> "private") : stmtList -- auto-use
+    return $ QuasiStmtUse n : QuasiStmtUse (n <> ":" <> "private") : stmtList
+    -- auto-use
   | otherwise = raiseSyntaxError m "(section LEAF)"
 parse' ((m, TreeNode ((_, TreeLeaf "end"):es)):as)
   | [(_, TreeLeaf s)] <- es = do

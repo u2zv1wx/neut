@@ -168,7 +168,7 @@ run (Build inputPathStr mOutputPathStr outputKind) = do
   outputPath <- constructOutputPath basename mOutputPath outputKind
   case resultOrErr of
     Left err ->
-      seqIO (map (outputLog True "\n") err) >> exitWith (ExitFailure 1)
+      seqIO (map (outputLog True "") err) >> exitWith (ExitFailure 1)
     Right result -> writeResult result outputPath outputKind
 run (Check inputPathStr colorizeFlag eoe) = do
   inputPath <- resolveFile' inputPathStr
