@@ -262,8 +262,6 @@ inferPatArgs ctx ((mx, x, t):xts) = do
 
 insertHoleIfNecessary ::
      WeakTermPlus -> [WeakTermPlus] -> WithEnv [WeakTermPlus]
--- insertHoleIfNecessary (m, WeakTermUpsilon x) es
---   | not (metaIsExplicit m) = insertHoleIfNecessary' m x es
 insertHoleIfNecessary (m, WeakTermConst x) es
   | not (metaIsExplicit m) = insertHoleIfNecessary' m x es
 insertHoleIfNecessary _ es = return es

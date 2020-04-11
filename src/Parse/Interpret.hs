@@ -247,7 +247,6 @@ sigmaIntro :: Meta -> [WeakTermPlus] -> WithEnv WeakTermPlus
 sigmaIntro m es = do
   z <- newNameWith'' "sigma"
   let zv = (m, WeakTermUpsilon z)
-  -- l <- newCount
   k <- newNameWith'' "sigma"
   ts <- mapM (const (newHole m)) es
   xs <- mapM (const (newNameWith'' "hole")) es
@@ -655,7 +654,3 @@ interpretBorrow'' (m, TreeLeaf s)
   | T.length s > 1
   , T.head s == '&' = (Just (m, TreeLeaf $ T.tail s), (m, TreeLeaf $ T.tail s))
 interpretBorrow'' t = (Nothing, t)
--- newTextWith :: T.Text -> WithEnv T.Text
--- newTextWith s = do
---   i <- newCount
---   return $ "(" <> s <> "-" <> T.pack (show i) <> ")"

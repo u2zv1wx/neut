@@ -161,9 +161,14 @@
 ;; #my-id
 ?my-id
 
-;; (constant external i64)
+;; (constant outer (hom i64 i64))
 
-;; (i64:add 10 externals)
+;; (outer 10)
+
+;; (constant something i64)
+
+;; (i64:add 10 something)
+
 
 (attribute my-id (implicit 0 1 2))
 
@@ -202,6 +207,8 @@
         (choice:item-1)))))
 
 ?flip
+
+(definition 日本語でもべつにいい ((x i64)) (i64:add x 10))
 
 (theorem double-flip-is-identity
   (pi ((c (choice)))

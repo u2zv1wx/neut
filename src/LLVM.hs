@@ -17,12 +17,19 @@ import Data.Basic
 import Data.Code
 import Data.Env hiding (newNameWith'')
 import Data.LLVM
+import Data.Term
+import Data.WeakTerm
 import Reduce.Code
 
 toLLVM :: CodePlus -> WithEnv LLVM
 toLLVM mainTerm@(m, _) = do
+  cenv <- Map.toList <$> gets codeEnv
+  forM_ cenv $ \(name, Definition _ args e) -> do
+    e' <- reduceCodePlus e
+    e'' <- llvmCode e'
+    (args', e''') <- rename args e''
+    insLLVMEnv name args' e'''
   mainTerm' <- reduceCodePlus mainTerm
-  modify (\env -> env {nameSet = S.empty})
   mainTerm'' <- llvmCode mainTerm'
   -- the result of "main" must be i64, not i8*
   (result, resultVar) <- newDataUpsilonWith m "result"
@@ -272,18 +279,22 @@ llvmUncastLet x@(I (s, _)) d lowType cont = do
 llvmDataLet :: Identifier -> DataPlus -> LLVM -> WithEnv LLVM
 llvmDataLet x (m, DataConst y) cont = do
   cenv <- gets codeEnv
-  ns <- gets nameSet
   case Map.lookup y cenv of
-    Nothing -> raiseCritical m $ "no such global label defined: " <> y -- fixme: support FFI (update declEnv)
-    Just (Definition _ args e)
-      | not (y `S.member` ns) -> do
-        modify (\env -> env {nameSet = S.insert y ns})
-        llvm <- llvmCode e
-        (args', llvm') <- rename args llvm
-        insLLVMEnv y args' llvm'
-        llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType args) cont
-      | otherwise -> do
-        llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType args) cont
+    Nothing -> do
+      t <- lookupTypeEnv m (Right y) y
+      case t of
+        (_, TermPi _ xts _) -> do
+          let y' = "llvm_" <> y
+          denv <- gets declEnv
+          let argType = map (const voidPtr) xts
+          modify (\env -> env {declEnv = Map.insert y' (argType, voidPtr) denv})
+          llvmUncastLet x (LLVMDataGlobal y') (toFunPtrType xts) cont
+        _ -> do
+          raiseError m $
+            "external constants must have pi-type, but the type of `" <>
+            y <> "` is:\n" <> toText (weaken t)
+    Just (Definition _ args _) ->
+      llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType args) cont
 llvmDataLet x (_, DataUpsilon y) cont =
   llvmUncastLet x (LLVMDataLocal y) voidPtr cont
 llvmDataLet x (m, DataSigmaIntro k ds) cont = do

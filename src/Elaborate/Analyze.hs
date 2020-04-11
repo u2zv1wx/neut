@@ -145,9 +145,7 @@ simp' ((e1@(m1, _), e2@(m2, _)):cs) = do
           , Just es <- lookupAll zs sub ->
             case es of
               [] -> simpPattern h2 ies2 e2' e1' fvs1 cs
-              _
-                -- let s = IntMap.fromList $ zip (map asInt zs) es
-               -> do
+              _ -> do
                 let s = Map.fromList $ zip (map (Left . asInt) zs) es
                 simp $ (substWeakTermPlus s e1', e2') : cs
         (Just (StuckPiElimConst x1 mx1 mess1), _)
@@ -167,7 +165,6 @@ simp' ((e1@(m1, _), e2@(m2, _)):cs) = do
               [] -> simpQuasiPattern h1 ies1 e1' e2' fmvs cs
               _ -> do
                 let s = Map.fromList $ zip (map (Left . asInt) zs) es
-                -- let s = IntMap.fromList $ zip (map asInt zs) es
                 simp $ (e1', substWeakTermPlus s e2') : cs
         (_, Just (StuckPiElimZetaStrict h2 ies2))
           | xs2 <- concatMap getVarList ies2
@@ -178,7 +175,6 @@ simp' ((e1@(m1, _), e2@(m2, _)):cs) = do
               [] -> simpQuasiPattern h2 ies2 e2' e1' fmvs cs
               _ -> do
                 let s = Map.fromList $ zip (map (Left . asInt) zs) es
-                -- let s = IntMap.fromList $ zip (map asInt zs) es
                 simp $ (substWeakTermPlus s e1', e2') : cs
         (Just (StuckPiElimZeta h1 ies1), Nothing)
           | xs1 <- concatMap getVarList ies1

@@ -60,14 +60,9 @@ returnCartesianImmediate m = do
   return (m, CodeUpIntro v)
 
 toConstInfo :: T.Text -> Meta -> WithEnv (T.Text, DataPlus)
-toConstInfo thetaName m
-  -- i <- lookupConstNum thetaName
- = do
+toConstInfo thetaName m = do
   i <- newCount
   let name = thetaName <> "-" <> T.pack (show i)
-  -- name <- newTextWith thetaName
-  -- let ident = asText' $ I (thetaName, i)
-  -- return (ident, (m, DataConst ident))
   return (name, (m, DataConst name))
 
 switch :: CodePlus -> CodePlus -> [(Case, CodePlus)]

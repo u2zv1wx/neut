@@ -168,22 +168,15 @@ parse' ((m, TreeNode ((_, TreeLeaf "constant"):rest)):as)
   | [(mn, TreeLeaf name), t] <- rest = do
     t' <- adjustPhase t >>= macroExpand >>= interpret
     name' <- withSectionPrefix name
-    -- cenv <- gets constantEnv
     set <- gets constantSet
     if S.member name' set
       then raiseError m $ "the constant " <> name' <> " is already defined"
-    -- case Map.lookup name' cenv of
-    --   Just _ -> raiseError m $ "the constant " <> name' <> " is already defined"
-    --   Nothing -> do
-        -- i <- newCount
       else do
         modify (\env -> env {constantSet = S.insert name' set})
-        -- modify (\e -> e {constantEnv = Map.insert name' i (constantEnv e)})
         defList <- parse' as
         m' <- adjustPhase' m
         mn' <- adjustPhase' mn
         return $ QuasiStmtConstDecl m' (mn', name', t') : defList
-        -- return $ QuasiStmtConstDecl m' (mn', I (name', i), t') : defList
   | otherwise = raiseSyntaxError m "(constant LEAF TREE)"
 parse' ((m, TreeNode (def@(mDef, TreeLeaf "definition"):rest)):as)
   | [name@(_, TreeLeaf _), body] <- rest =
@@ -241,7 +234,6 @@ parse' (a:as) = do
     else do
       e' <- interpret e
       name <- newTextWith "_"
-      -- name <- newNameWith'' "hole"
       m' <- adjustPhase' $ metaOf e'
       t <- newHole m'
       defList <- parse' as
@@ -417,7 +409,6 @@ prefixTextPlus (m, TreeNode [(mx, TreeLeaf x), t]) = do
   return (m, TreeNode [(mx, TreeLeaf x'), t])
 prefixTextPlus t = raiseSyntaxError (fst t) "LEAF | (LEAF TREE)"
 
--- extractFunName :: TreePlus -> WithEnv Identifier
 extractFunName :: TreePlus -> WithEnv T.Text
 extractFunName (_, TreeNode ((_, TreeLeaf x):_)) = return x
 extractFunName (_, TreeNode ((_, TreeNode [(_, TreeLeaf x), _]):_)) = return x

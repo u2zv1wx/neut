@@ -191,15 +191,16 @@ clarifyConst tenv m x
       Just (syscall, argInfo) -> clarifySysCall tenv x syscall argInfo m
       Nothing -> do
         cenv <- gets cacheEnv
-        -- ここで定数の処理をやる。
-        -- codeEnvをうまく更新することになりそう？
+        let x' = showInHex x
         case Map.lookup x cenv of
           Nothing -> return (m, CodeUpIntro (m, DataConst x)) -- external
-          Just (Right e) -> return e
+          Just (Right _) -> do
+            return (m, CodePiElimDownElim (m, DataConst x') [])
           Just (Left e) -> do
             e' <- clarify' tenv e
             modify (\env -> env {cacheEnv = Map.insert x (Right e') cenv})
-            return e'
+            insCodeEnv x' [] e'
+            return (m, CodePiElimDownElim (m, DataConst x') [])
 
 clarifyCast :: TypeEnv -> Meta -> WithEnv CodePlus
 clarifyCast tenv m = do
