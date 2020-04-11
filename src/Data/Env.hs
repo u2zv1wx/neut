@@ -72,8 +72,8 @@ data Env =
     -- [("left", ("choice", 0)), ("right", ("choice", 1)), ...]
     , revEnumEnv :: Map.HashMap T.Text (T.Text, Int)
     -- "list:nil" ~> "list-nil-12", etc.
-    , llvmEnumEnv :: Map.HashMap T.Text T.Text
-    , revCaseEnv :: Map.HashMap T.Text T.Text
+    -- , llvmEnumEnv :: Map.HashMap T.Text T.Text
+    -- , revCaseEnv :: Map.HashMap T.Text T.Text
     , nameEnv :: Map.HashMap T.Text T.Text
     -- [("foo.13", "foo"), ...] (as corresponding int)
     , revNameEnv :: IntMap.IntMap Int
@@ -138,8 +138,8 @@ initialEnv =
     , fileEnv = Map.empty
     , traceEnv = []
     , revEnumEnv = Map.empty
-    , llvmEnumEnv = Map.empty
-    , revCaseEnv = Map.empty
+    -- , llvmEnumEnv = Map.empty
+    -- , revCaseEnv = Map.empty
     , nameEnv = Map.empty
     , revNameEnv = IntMap.empty
     , revIndEnv = Map.empty
@@ -352,7 +352,7 @@ insEnumEnv m name xis = do
       raiseError m $ "the constant `" <> x <> "` is already defined [ENUM]"
     _ -> do
       let (xs, is) = unzip xis
-      forM_ xs insLLVMEnumEnv
+      -- forM_ xs insLLVMEnumEnv
       let rev = Map.fromList $ zip xs (zip (repeat name) is)
       modify
         (\e ->
@@ -361,20 +361,18 @@ insEnumEnv m name xis = do
              , revEnumEnv = rev `Map.union` (revEnumEnv e)
              })
 
-insLLVMEnumEnv :: T.Text -> WithEnv ()
-insLLVMEnumEnv labelName = do
-  j <- newCount
-  let name = "_" <> T.pack (show j)
-  lenv <- gets llvmEnumEnv
-  modify (\env -> env {llvmEnumEnv = Map.insert labelName name lenv})
-
-lookupLLVMEnumEnv :: Meta -> T.Text -> WithEnv T.Text
-lookupLLVMEnumEnv m labelName = do
-  lenv <- gets llvmEnumEnv
-  case Map.lookup labelName lenv of
-    Nothing -> raiseCritical m $ "no such enum-label defined: " <> labelName
-    Just labelName' -> return labelName'
-
+-- insLLVMEnumEnv :: T.Text -> WithEnv ()
+-- insLLVMEnumEnv labelName = do
+--   j <- newCount
+--   let name = "_" <> T.pack (show j)
+--   lenv <- gets llvmEnumEnv
+--   modify (\env -> env {llvmEnumEnv = Map.insert labelName name lenv})
+-- lookupLLVMEnumEnv :: Meta -> T.Text -> WithEnv T.Text
+-- lookupLLVMEnumEnv m labelName = do
+--   lenv <- gets llvmEnumEnv
+--   case Map.lookup labelName lenv of
+--     Nothing -> raiseCritical m $ "no such enum-label defined: " <> labelName
+--     Just labelName' -> return labelName'
 -- f32とかi64.addとかは定数
 isConstant :: T.Text -> WithEnv Bool
 isConstant name
