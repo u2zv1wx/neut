@@ -13,6 +13,7 @@ import Data.List (nubBy)
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.IntMap.Strict as IntMap
+import qualified Data.Set as S
 import qualified Data.Text as T
 
 import Clarify.Linearize
@@ -22,6 +23,7 @@ import Data.Basic
 import Data.Code
 import Data.Env
 import Data.Term
+import Reduce.Code
 import Reduce.Term
 
 clarify :: TermPlus -> WithEnv CodePlus
@@ -197,7 +199,9 @@ clarifyConst tenv m x
           Just (Left e) -> do
             e' <- clarify' tenv e
             modify (\env -> env {cacheEnv = Map.insert x (Right e') cenv})
-            insCodeEnv x' [] e'
+            modify (\env -> env {nameSet = S.empty})
+            e'' <- reduceCodePlus e'
+            insCodeEnv x' [] e''
             return (m, CodePiElimDownElim (m, DataConst x') [])
 
 clarifyCast :: TypeEnv -> Meta -> WithEnv CodePlus
@@ -220,8 +224,7 @@ clarifyUnaryOp tenv name op m = do
       let varX = (mx, DataUpsilon x)
       retClosure
         tenv
-        (Just $ showInHex name) -- ここの名前はなんでもいい
-        -- (Just name)
+        (Just $ showInHex name)
         []
         m
         [(mx, x, tx)]
@@ -239,7 +242,6 @@ clarifyBinaryOp tenv name op m = do
       retClosure
         tenv
         (Just $ showInHex name)
-        -- (Just name)
         []
         m
         [(mx, x, tx), (my, y, ty)]
@@ -571,7 +573,7 @@ nameFromMaybe mName =
 chainTermPlus :: TypeEnv -> TermPlus -> WithEnv [IdentifierPlus]
 chainTermPlus _ (_, TermTau) = return []
 chainTermPlus tenv (m, TermUpsilon x) = do
-  (xts, t) <- obtainChain m (Left (asInt x)) tenv
+  (xts, t) <- obtainChain m (Left (asInt x)) (asText x) tenv
   return $ xts ++ [(m, x, t)]
 chainTermPlus tenv (_, TermPi _ xts t) = chainTermPlus' tenv xts [t]
 chainTermPlus tenv (_, TermPiIntro xts e) = chainTermPlus' tenv xts [e]
@@ -585,7 +587,7 @@ chainTermPlus tenv (_, TermIter (_, x, t) xts e) = do
   xs2 <- chainTermPlus' (insTypeEnv' (Left (asInt x)) t tenv) xts [e]
   return $ xs1 ++ filter (\(_, y, _) -> y /= x) xs2
 chainTermPlus tenv (m, TermConst x) = do
-  (xts, _) <- obtainChain m (Right x) tenv
+  (xts, _) <- obtainChain m (Right x) x tenv
   return xts
 chainTermPlus _ (_, TermFloat _ _) = return []
 chainTermPlus _ (_, TermEnum _) = return []
@@ -636,13 +638,17 @@ insTypeEnv1 ((_, x, t):rest) tenv =
   insTypeEnv' (Left (asInt x)) t $ insTypeEnv1 rest tenv
 
 obtainChain ::
-     Meta -> TypeEnvKey -> TypeEnv -> WithEnv ([IdentifierPlus], TermPlus)
-obtainChain m x tenv = do
+     Meta
+  -> TypeEnvKey
+  -> T.Text
+  -> TypeEnv
+  -> WithEnv ([IdentifierPlus], TermPlus)
+obtainChain m x name tenv = do
   cenv <- gets chainEnv
   case Map.lookup x cenv of
     Just xtst -> return xtst
     Nothing -> do
-      t <- lookupTypeEnv' m x tenv "name"
+      t <- lookupTypeEnv' m x tenv name
       xts <- chainTermPlus tenv t
       modify (\env -> env {chainEnv = Map.insert x (xts, t) cenv})
       return (xts, t)

@@ -23,8 +23,6 @@ import Elaborate.Synthesize
 import Reduce.Term
 import Reduce.WeakTerm
 
--- import Data.Version (showVersion)
--- import Paths_neut (version)
 -- Given a term `e` and its name `main`, this function
 --   (1) traces `e` using `infer e`, collecting type constraints,
 --   (2) updates weakTypeEnv for `main` by the result of `infer e`,
@@ -35,11 +33,7 @@ import Reduce.WeakTerm
 -- S. Kong, and C. Roux. "Elaboration in Dependent Type Theory", arxiv,
 -- https://arxiv.org/abs/1505.04324, 2015.
 elaborate :: WeakStmt -> WithEnv TermPlus
-elaborate stmt
-  -- p "version:"
-  -- p $ showVersion version -- ~> "0.1.0.0" が得られる。これをキャッシュディレクトリの構成に利用していく。
- = do
-  reduceTermPlus <$> elaborateStmt stmt
+elaborate stmt = reduceTermPlus <$> elaborateStmt stmt
   -- tmp <- reduceTermPlus <$> elaborateStmt stmt
   -- -- p "elaborated:"
   -- -- p $ T.unpack $ toText (weaken tmp)
@@ -59,20 +53,18 @@ elaborateStmt (WeakStmtLet m (mx, x, t) e cont) = do
   t' <- inferType t
   insConstraintEnv te t'
   analyze >> synthesize >> refine >> cleanup
-  e'' <- elaborate' e'
+  e'' <- reduceTermPlus <$> elaborate' e'
   t'' <- reduceTermPlus <$> elaborate' t'
   insTypeEnv (Right x) t''
   modify (\env -> env {cacheEnv = Map.insert x (Left e'') (cacheEnv env)})
-  -- cはエフェクトをもちうるのでこう変換する必要あり
   cont' <- elaborateStmt cont
   x' <- newNameWith'' x
   let c = (m, TermConst x)
-  -- このxをトップレベルに登録したいんですが。codeEnvに入るのはすべて関数だけなのでむずい。
   return (m, TermPiElim (m, TermPiIntro [(mx, x', t'')] cont') [c])
 elaborateStmt (WeakStmtLetWT m (mx, x, t) e cont) = do
   t' <- inferType t
   analyze >> synthesize >> refine >> cleanup
-  e' <- elaborate' e -- `e` is supposed to be well-typed
+  e' <- reduceTermPlus <$> elaborate' e -- `e` is supposed to be well-typed
   t'' <- reduceTermPlus <$> elaborate' t'
   insTypeEnv (Right x) t''
   modify (\env -> env {cacheEnv = Map.insert x (Left e') (cacheEnv env)})

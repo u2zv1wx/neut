@@ -168,21 +168,17 @@ infer' ctx (m, WeakTermCase indName e cxtes) = do
       -- indType = a @ (HOLE, ..., HOLE)
       insConstraintEnv indType t'
       cxtes' <-
-        forM (zip indInfo cxtes) $ \(is, (((mc, c), patArgs), body)) -> do
+        forM (zip indInfo cxtes) $ \(is, (((mc, c), args), body)) -> do
           let usedHoleList = map (\i -> argHoleList !! i) is
-          let var = (mc, WeakTermConst c)
-          -- let var = (mc, WeakTermUpsilon c)
-          patArgs' <- inferPatArgs ctx patArgs
-          let items =
-                map (\(mx, x, tx) -> ((mx, WeakTermUpsilon x), tx)) patArgs'
-          etl <- infer' ctx var
-          _ <- inferPiElim ctx m etl (usedHoleList ++ items)
-          (body', bodyType) <- infer' (ctx ++ patArgs') body
+          args' <- inferPatArgs ctx args
+          let items = map (\(mx, x, tx) -> ((mx, WeakTermUpsilon x), tx)) args'
+          et <- infer' ctx (mc, WeakTermConst c)
+          _ <- inferPiElim ctx m et (usedHoleList ++ items)
+          (body', bodyType) <- infer' (ctx ++ args') body
           insConstraintEnv resultType bodyType
           xts <- mapM (toIdentPlus mc) usedHoleList
-          return (((mc, c), xts ++ patArgs'), body')
+          return (((mc, c), xts ++ args'), body')
       return ((m, WeakTermCase name e' cxtes'), resultType)
-      -- return ((m, WeakTermCase nameStr e' cxtes'), resultType)
 infer' ctx (m, WeakTermQuestion e _) = do
   (e', te) <- infer' ctx e
   return ((m, WeakTermQuestion e' te), te)
@@ -210,7 +206,6 @@ inferArgs m _ _ _ = raiseCritical m $ "invalid argument passed to inferArgs"
 constructIndType ::
      Meta
   -> Context
-  -- -> Identifier
   -> T.Text
   -> WithEnv (WeakTermPlus, [(WeakTermPlus, WeakTermPlus)])
 constructIndType m ctx x = do

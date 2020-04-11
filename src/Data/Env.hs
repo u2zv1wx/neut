@@ -16,7 +16,9 @@ import Data.LLVM
 import Data.Log
 import Data.Term
 import Data.Tree
+import Data.Version (showVersion)
 import Data.WeakTerm
+import Paths_neut (version)
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.IntMap.Strict as IntMap
@@ -333,7 +335,6 @@ insEnumEnv m name xis = do
       raiseError m $ "the constant `" <> x <> "` is already defined [ENUM]"
     _ -> do
       let (xs, is) = unzip xis
-      -- forM_ xs insLLVMEnumEnv
       let rev = Map.fromList $ zip xs (zip (repeat name) is)
       modify
         (\e ->
@@ -342,19 +343,6 @@ insEnumEnv m name xis = do
              , revEnumEnv = rev `Map.union` (revEnumEnv e)
              })
 
--- insLLVMEnumEnv :: T.Text -> WithEnv ()
--- insLLVMEnumEnv labelName = do
---   j <- newCount
---   let name = "_" <> T.pack (show j)
---   lenv <- gets llvmEnumEnv
---   modify (\env -> env {llvmEnumEnv = Map.insert labelName name lenv})
--- lookupLLVMEnumEnv :: Meta -> T.Text -> WithEnv T.Text
--- lookupLLVMEnumEnv m labelName = do
---   lenv <- gets llvmEnumEnv
---   case Map.lookup labelName lenv of
---     Nothing -> raiseCritical m $ "no such enum-label defined: " <> labelName
---     Just labelName' -> return labelName'
--- f32とかi64.addとかは定数
 isConstant :: T.Text -> WithEnv Bool
 isConstant name
   | name == "f16" = return True
@@ -403,7 +391,8 @@ getCurrentDirPath = parent <$> getCurrentFilePath
 getLibraryDirPath :: WithEnv (Path Abs Dir)
 getLibraryDirPath = do
   homeDirPath <- getHomeDir
-  relLibPath <- parseRelDir ".local/share/neut/library"
+  let ver = showVersion version
+  relLibPath <- parseRelDir $ ".local/share/neut/" <> ver <> "/library"
   return $ homeDirPath </> relLibPath
 
 note :: Meta -> T.Text -> WithEnv ()

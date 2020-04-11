@@ -53,8 +53,6 @@ data WeakCase
 
 type WeakCasePlus = (Meta, WeakCase)
 
--- type SubstWeakTerm = [(Identifier, WeakTermPlus)]
--- type SubstWeakTerm = IntMap.IntMap WeakTermPlus
 type SubstWeakTerm = Map.HashMap (Either Int T.Text) WeakTermPlus
 
 type IdentifierPlus = (Meta, Identifier, WeakTermPlus)
@@ -63,12 +61,10 @@ type TextPlus = (Meta, T.Text, WeakTermPlus)
 
 type Def = (Meta, IdentifierPlus, [IdentifierPlus], WeakTermPlus)
 
--- type IdentDef = (Identifier, Def)
 type IdentDef = (T.Text, Def)
 
 type Rule -- inference rule
    = ( Meta -- location of the name
-     -- , Identifier -- the name of the rule
      , T.Text -- the name of the rule
      , Meta -- location of the rule
      , [IdentifierPlus] -- the antecedents of the inference rule (e.g. [(x, A), (xs, list A)])
@@ -77,7 +73,6 @@ type Rule -- inference rule
 
 type Connective
    = ( Meta -- location of the connective
-     -- , Identifier -- the name of the connective (e.g. nat, list)
      , T.Text -- the name of the connective (e.g. nat, list)
      , [IdentifierPlus] -- parameter of the connective (e.g. the `A` in `list A`)
      , [Rule] -- list of introduction rule when inductive / list of elimination rule when coinductive
@@ -304,7 +299,6 @@ substWeakTermPlus sub (m, WeakTermPiElim e es) = do
   (m, WeakTermPiElim e' es')
 substWeakTermPlus sub (m, WeakTermIter (mx, x, t) xts e) = do
   let t' = substWeakTermPlus sub t
-  -- let sub' = filter (\(k, _) -> k /= x) sub
   let sub' = Map.delete (Left $ asInt x) sub
   let (xts', e') = substWeakTermPlus'' sub' xts e
   (m, WeakTermIter (mx, x, t') xts' e')
@@ -312,7 +306,6 @@ substWeakTermPlus sub e@(_, WeakTermConst x) = do
   case Map.lookup (Right x) sub of
     Nothing -> e
     Just e2 -> (supMeta (metaOf e) (metaOf e2), snd e2)
-  -- e
 substWeakTermPlus sub e1@(_, WeakTermZeta x) = do
   case Map.lookup (Left $ asInt x) sub of
     Nothing -> e1
@@ -352,7 +345,6 @@ substWeakTermPlus sub (m, WeakTermStructIntro ets) = do
 substWeakTermPlus sub (m, WeakTermStructElim xts v e) = do
   let v' = substWeakTermPlus sub v
   let xs = map (\(_, x, _) -> x) xts
-  -- let sub' = filter (\(k, _) -> k `notElem` xs) sub
   let sub' = deleteKeys' sub (map (Left . asInt) xs)
   let e' = substWeakTermPlus sub' e
   (m, WeakTermStructElim xts v' e')
@@ -373,9 +365,7 @@ substWeakTermPlus sub (m, WeakTermErase xs e) = do
 
 substWeakTermPlus' :: SubstWeakTerm -> [IdentifierPlus] -> [IdentifierPlus]
 substWeakTermPlus' _ [] = []
-substWeakTermPlus' sub ((m, x, t):xts)
-  -- let sub' = filter (\(k, _) -> k /= x) sub
- = do
+substWeakTermPlus' sub ((m, x, t):xts) = do
   let sub' = Map.delete (Left $ asInt x) sub
   let xts' = substWeakTermPlus' sub' xts
   let t' = substWeakTermPlus sub t
@@ -387,9 +377,7 @@ substWeakTermPlus'' ::
   -> WeakTermPlus
   -> ([IdentifierPlus], WeakTermPlus)
 substWeakTermPlus'' sub [] e = ([], substWeakTermPlus sub e)
-substWeakTermPlus'' sub ((m, x, t):xts) e
-  -- let sub' = filter (\(k, _) -> k /= x) sub
- = do
+substWeakTermPlus'' sub ((m, x, t):xts) e = do
   let sub' = Map.delete (Left $ asInt x) sub
   let (xts', e') = substWeakTermPlus'' sub' xts e
   let t' = substWeakTermPlus sub t

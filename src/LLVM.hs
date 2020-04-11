@@ -25,10 +25,12 @@ toLLVM :: CodePlus -> WithEnv LLVM
 toLLVM mainTerm@(m, _) = do
   cenv <- Map.toList <$> gets codeEnv
   forM_ cenv $ \(name, Definition _ args e) -> do
+    modify (\env -> env {nameSet = S.empty})
     e' <- reduceCodePlus e
     e'' <- llvmCode e'
     (args', e''') <- rename args e''
     insLLVMEnv name args' e'''
+  modify (\env -> env {nameSet = S.empty})
   mainTerm' <- reduceCodePlus mainTerm
   mainTerm'' <- llvmCode mainTerm'
   -- the result of "main" must be i64, not i8*
