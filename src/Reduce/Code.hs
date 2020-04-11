@@ -17,12 +17,12 @@ reduceCodePlus (m, CodePiElimDownElim v ds) = do
   cenv <- gets codeEnv
   ns <- gets nameSet
   case v of
-    (_, DataTheta x)
+    (_, DataConst x)
       | Just (Definition (IsFixed False) xs body) <- Map.lookup x cenv
       , length xs == length ds -> do
         let sub = IntMap.fromList (zip (map asInt xs) ds)
         reduceCodePlus $ substCodePlus sub body
-    (_, DataTheta x)
+    (_, DataConst x)
       | Just (Definition (IsFixed True) xs body) <- Map.lookup x cenv
       , length xs == length ds
       , not (x `S.member` ns) -> do

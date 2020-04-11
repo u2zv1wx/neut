@@ -8,7 +8,7 @@ import qualified Data.Text as T
 import Data.Basic
 
 data Data
-  = DataTheta T.Text
+  = DataConst T.Text
   | DataUpsilon Identifier
   | DataSigmaIntro ArrayKind [DataPlus]
   | DataEnumIntro EnumValue
@@ -17,21 +17,21 @@ data Data
   deriving (Show)
 
 data Code
-  = CodeTheta Theta
+  = CodeConst Const
   | CodePiElimDownElim DataPlus [DataPlus] -- ((force v) v1 ... vn)
   | CodeSigmaElim ArrayKind [Identifier] DataPlus CodePlus
   | CodeUpIntro DataPlus
   | CodeUpElim Identifier CodePlus CodePlus
   | CodeEnumElim SubstDataPlus DataPlus [(Case, CodePlus)]
   | CodeStructElim [(Identifier, ArrayKind)] DataPlus CodePlus
-  | CodeCase SubstDataPlus DataPlus [((Meta, Identifier), CodePlus)]
+  | CodeCase SubstDataPlus DataPlus [((Meta, T.Text), CodePlus)]
   deriving (Show)
 
-data Theta
-  = ThetaUnaryOp UnaryOp DataPlus
-  | ThetaBinaryOp BinaryOp DataPlus DataPlus
-  | ThetaArrayAccess LowType DataPlus DataPlus
-  | ThetaSysCall Syscall [DataPlus]
+data Const
+  = ConstUnaryOp UnaryOp DataPlus
+  | ConstBinaryOp BinaryOp DataPlus DataPlus
+  | ConstArrayAccess LowType DataPlus DataPlus
+  | ConstSysCall Syscall [DataPlus]
   deriving (Show)
 
 newtype IsFixed =
@@ -59,7 +59,7 @@ sigmaElim = CodeSigmaElim arrVoidPtr
 type SubstDataPlus = IntMap.IntMap DataPlus
 
 substDataPlus :: SubstDataPlus -> DataPlus -> DataPlus
-substDataPlus _ (m, DataTheta x) = (m, DataTheta x)
+substDataPlus _ (m, DataConst x) = (m, DataConst x)
 substDataPlus sub (m, DataUpsilon s) =
   fromMaybe (m, DataUpsilon s) (IntMap.lookup (asInt s) sub) -- ここではsの整数部分を比較したほうがよさそう？
 substDataPlus sub (m, DataSigmaIntro mk vs) = do
@@ -73,9 +73,9 @@ substDataPlus sub (m, DataStructIntro dks) = do
   (m, DataStructIntro $ zip ds' ks)
 
 substCodePlus :: SubstDataPlus -> CodePlus -> CodePlus
-substCodePlus sub (m, CodeTheta theta) = do
-  let theta' = substTheta sub theta
-  (m, CodeTheta theta')
+substCodePlus sub (m, CodeConst theta) = do
+  let theta' = substConst sub theta
+  (m, CodeConst theta')
 substCodePlus sub (m, CodePiElimDownElim v ds) = do
   let v' = substDataPlus sub v
   let ds' = map (substDataPlus sub) ds
@@ -107,18 +107,18 @@ substCodePlus sub (m, CodeCase fvInfo v branchList) = do
   let v' = substDataPlus sub v
   (m, CodeCase fvInfo' v' branchList)
 
-substTheta :: SubstDataPlus -> Theta -> Theta
-substTheta sub (ThetaUnaryOp a v) = do
+substConst :: SubstDataPlus -> Const -> Const
+substConst sub (ConstUnaryOp a v) = do
   let v' = substDataPlus sub v
-  ThetaUnaryOp a v'
-substTheta sub (ThetaBinaryOp a v1 v2) = do
+  ConstUnaryOp a v'
+substConst sub (ConstBinaryOp a v1 v2) = do
   let v1' = substDataPlus sub v1
   let v2' = substDataPlus sub v2
-  ThetaBinaryOp a v1' v2'
-substTheta sub (ThetaArrayAccess t d1 d2) = do
+  ConstBinaryOp a v1' v2'
+substConst sub (ConstArrayAccess t d1 d2) = do
   let d1' = substDataPlus sub d1
   let d2' = substDataPlus sub d2
-  ThetaArrayAccess t d1' d2'
-substTheta sub (ThetaSysCall sysCall ds) = do
+  ConstArrayAccess t d1' d2'
+substConst sub (ConstSysCall sysCall ds) = do
   let ds' = map (substDataPlus sub) ds
-  ThetaSysCall sysCall ds'
+  ConstSysCall sysCall ds'

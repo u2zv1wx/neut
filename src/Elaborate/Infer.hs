@@ -44,7 +44,7 @@ infer' ctx (m, WeakTermPiIntroPlus ind (name, is, args) xts e) = do
   (xts', (e', t')) <- inferBinder ctx xts e
   return
     ( (m, WeakTermPiIntroPlus ind (name, is, args') xts' e')
-    , (m, WeakTermPi (Just $ asText ind) xts' t'))
+    , (m, WeakTermPi (Just ind) xts' t'))
 infer' ctx (m, WeakTermPiElim e es) = do
   es' <- insertHoleIfNecessary e es
   etls <- mapM (infer' ctx) es'
@@ -68,13 +68,15 @@ infer' ctx (m, WeakTermZeta x) = do
       modify
         (\env -> env {zetaEnv = IntMap.insert (asInt x) (app, higherApp) zenv})
       return (app, higherApp)
-infer' _ (m, WeakTermConst x@(I (s, _)))
+infer' _ (m, WeakTermConst x)
   -- i64, f16, u8, etc.
-  | Just _ <- asLowTypeMaybe s = return ((m, WeakTermConst x), (m, WeakTermTau))
-  | Just op <- asUnaryOpMaybe s = inferExternal m x (unaryOpToType m op)
-  | Just op <- asBinaryOpMaybe s = inferExternal m x (binaryOpToType m op)
-  | Just lt <- asArrayAccessMaybe s = inferExternal m x (arrayAccessToType m lt)
-  | otherwise = inferSymbol m x
+  | Just _ <- asLowTypeMaybe x = return ((m, WeakTermConst x), (m, WeakTermTau))
+  | Just op <- asUnaryOpMaybe x = inferExternal m x (unaryOpToType m op)
+  | Just op <- asBinaryOpMaybe x = inferExternal m x (binaryOpToType m op)
+  | Just lt <- asArrayAccessMaybe x = inferExternal m x (arrayAccessToType m lt)
+  | otherwise = inferConstant m x
+    -- inferSymbol m x
+-- infer' _ (m, WeakTermConst x@(I (s, _)))
 infer' _ (m, WeakTermInt t i) = do
   t' <- inferType' [] t -- ctx == [] since t' should be i64, i8, etc. (i.e. t must be closed)
   return ((m, WeakTermInt t' i), t')
@@ -158,14 +160,15 @@ infer' ctx (m, WeakTermCase indName e cxtes) = do
     then do
       return ((m, WeakTermCase indName e' []), resultType) -- ex falso quodlibet
     else do
-      (name@(I (nameStr, _)), indInfo) <- getIndInfo $ map (fst . fst) cxtes
+      (name, indInfo) <- getIndInfo $ map (fst . fst) cxtes
       (indType, argHoleList) <- constructIndType m ctx name
       -- indType = a @ (HOLE, ..., HOLE)
       insConstraintEnv indType t'
       cxtes' <-
         forM (zip indInfo cxtes) $ \(is, (((mc, c), patArgs), body)) -> do
           let usedHoleList = map (\i -> argHoleList !! i) is
-          let var = (mc, WeakTermUpsilon c)
+          let var = (mc, WeakTermConst c)
+          -- let var = (mc, WeakTermUpsilon c)
           patArgs' <- inferPatArgs ctx patArgs
           let items =
                 map (\(mx, x, tx) -> ((mx, WeakTermUpsilon x), tx)) patArgs'
@@ -175,7 +178,8 @@ infer' ctx (m, WeakTermCase indName e cxtes) = do
           insConstraintEnv resultType bodyType
           xts <- mapM (toIdentPlus mc) usedHoleList
           return (((mc, c), xts ++ patArgs'), body')
-      return ((m, WeakTermCase nameStr e' cxtes'), resultType)
+      return ((m, WeakTermCase name e' cxtes'), resultType)
+      -- return ((m, WeakTermCase nameStr e' cxtes'), resultType)
 infer' ctx (m, WeakTermQuestion e _) = do
   (e', te) <- infer' ctx e
   return ((m, WeakTermQuestion e' te), te)
@@ -195,7 +199,7 @@ inferArgs ::
 inferArgs _ [] [] cod = return cod
 inferArgs m ((e, t):ets) ((_, x, tx):xts) cod = do
   insConstraintEnv t tx
-  let sub = IntMap.singleton (asInt x) e
+  let sub = Map.singleton (Left $ asInt x) e
   let (xts', cod') = substWeakTermPlus'' sub xts cod
   inferArgs m ets xts' cod'
 inferArgs m _ _ _ = raiseCritical m $ "invalid argument passed to inferArgs"
@@ -203,11 +207,12 @@ inferArgs m _ _ _ = raiseCritical m $ "invalid argument passed to inferArgs"
 constructIndType ::
      Meta
   -> Context
-  -> Identifier
+  -- -> Identifier
+  -> T.Text
   -> WithEnv (WeakTermPlus, [(WeakTermPlus, WeakTermPlus)])
-constructIndType m ctx i = do
+constructIndType m ctx x = do
   cenv <- gets cacheEnv
-  case IntMap.lookup (asInt i) cenv of
+  case Map.lookup x cenv of
     Just (Left e) -> do
       case weaken e of
         e'@(me, WeakTermPiIntro xts cod) -> do
@@ -219,26 +224,26 @@ constructIndType m ctx i = do
           raiseCritical m $
           "the definition of inductive type must be of the form `(lambda (xts) (...))`, but is:\n" <>
           toText e'
-    _ -> raiseCritical m $ "no such inductive type defined: " <> asText i
+    _ -> raiseCritical m $ "no such inductive type defined: " <> x
 
-getIndInfo :: [(Meta, Identifier)] -> WithEnv (Identifier, [[Int]])
+getIndInfo :: [(Meta, T.Text)] -> WithEnv (T.Text, [[Int]])
 getIndInfo cs = do
   (indNameList, usedPosList) <- unzip <$> mapM getIndInfo' cs
   checkIntegrity indNameList
   return (snd $ head indNameList, usedPosList)
 
-getIndInfo' :: (Meta, Identifier) -> WithEnv ((Meta, Identifier), [Int])
+getIndInfo' :: (Meta, T.Text) -> WithEnv ((Meta, T.Text), [Int])
 getIndInfo' (m, c) = do
   rienv <- gets revIndEnv
-  case Map.lookup (asText c) rienv of
+  case Map.lookup c rienv of
     Just (i, is) -> return ((m, i), is)
-    _ -> raiseError m $ "no such constructor defined: " <> asText c
+    _ -> raiseError m $ "no such constructor defined: " <> c
 
-checkIntegrity :: [(Meta, Identifier)] -> WithEnv ()
+checkIntegrity :: [(Meta, T.Text)] -> WithEnv ()
 checkIntegrity [] = return ()
 checkIntegrity (mi:is) = checkIntegrity' mi is
 
-checkIntegrity' :: (Meta, Identifier) -> [(Meta, Identifier)] -> WithEnv ()
+checkIntegrity' :: (Meta, T.Text) -> [(Meta, T.Text)] -> WithEnv ()
 checkIntegrity' _ [] = return ()
 checkIntegrity' i (j:js) =
   if snd i == snd j
@@ -255,26 +260,26 @@ inferPatArgs ctx ((mx, x, t):xts) = do
 
 insertHoleIfNecessary ::
      WeakTermPlus -> [WeakTermPlus] -> WithEnv [WeakTermPlus]
-insertHoleIfNecessary (m, WeakTermUpsilon x) es
-  | not (metaIsExplicit m) = insertHoleIfNecessary' m x es
+-- insertHoleIfNecessary (m, WeakTermUpsilon x) es
+--   | not (metaIsExplicit m) = insertHoleIfNecessary' m x es
 insertHoleIfNecessary (m, WeakTermConst x) es
   | not (metaIsExplicit m) = insertHoleIfNecessary' m x es
 insertHoleIfNecessary _ es = return es
 
 insertHoleIfNecessary' ::
-     Meta -> Identifier -> [WeakTermPlus] -> WithEnv [WeakTermPlus]
+     Meta -> T.Text -> [WeakTermPlus] -> WithEnv [WeakTermPlus]
 insertHoleIfNecessary' m x es = do
   ienv <- gets impEnv
-  case IntMap.lookup (asInt x) ienv of
+  case Map.lookup x ienv of
     Nothing -> return es
     Just is -> do
-      tl <- lookupTypeEnv m x
+      tl <- lookupTypeEnv m (Right x) x
       case tl of
         (_, TermPi _ xts _) -> supplyHole' m 0 (length xts) is es
         t ->
           raiseCritical m $
           "the type of `" <>
-          asText x <> "` must be a Pi-type, but is:\n" <> toText (weaken t)
+          x <> "` must be a Pi-type, but is:\n" <> toText (weaken t)
 
 supplyHole' ::
      Meta -> Int -> Int -> [Int] -> [WeakTermPlus] -> WithEnv [WeakTermPlus]
@@ -289,22 +294,26 @@ supplyHole' m idx len is es
   | otherwise = return es
 
 inferExternal ::
-     Meta
-  -> Identifier
-  -> WithEnv TermPlus
-  -> WithEnv (WeakTermPlus, WeakTermPlus)
+     Meta -> T.Text -> WithEnv TermPlus -> WithEnv (WeakTermPlus, WeakTermPlus)
 inferExternal m x comp = do
   t <- comp
   return ((m, WeakTermConst x), (m, snd $ weaken t))
 
 inferSymbol :: Meta -> Identifier -> WithEnv (WeakTermPlus, WeakTermPlus)
 inferSymbol m x = do
-  mt <- lookupTypeEnvMaybe x
-  case mt of
-    Just t -> return ((m, WeakTermConst x), (m, snd $ weaken t))
-    Nothing -> do
-      (_, t) <- lookupWeakTypeEnv m x
-      return ((m, WeakTermUpsilon x), (m, t))
+  t <- lookupWeakTypeEnv m x
+  return ((m, WeakTermUpsilon x), (m, snd t))
+  -- mt <- lookupTypeEnvMaybe x
+  -- case mt of
+  --   Just t -> return ((m, WeakTermConst x), (m, snd $ weaken t))
+  --   Nothing -> do
+  --     (_, t) <- lookupWeakTypeEnv m x
+  --     return ((m, WeakTermUpsilon x), (m, t))
+
+inferConstant :: Meta -> T.Text -> WithEnv (WeakTermPlus, WeakTermPlus)
+inferConstant m x = do
+  t <- lookupTypeEnv m (Right x) x
+  return ((m, WeakTermConst x), (m, snd $ weaken t))
 
 inferType' :: Context -> WeakTermPlus -> WithEnv WeakTermPlus
 inferType' ctx t = do
@@ -315,9 +324,10 @@ inferType' ctx t = do
 inferKind :: Meta -> ArrayKind -> WithEnv WeakTermPlus
 inferKind m (ArrayKindIntS i) = return (m, WeakTermEnum (EnumTypeIntS i))
 inferKind m (ArrayKindIntU i) = return (m, WeakTermEnum (EnumTypeIntU i))
-inferKind m (ArrayKindFloat size) = do
-  (_, t) <- lookupConstantPlus m $ "f" <> T.pack (show (sizeAsInt size))
-  return (m, t)
+inferKind m (ArrayKindFloat size)
+  -- (_, t) <- lookupConstantPlus m $ "f" <> T.pack (show (sizeAsInt size))
+ = do
+  return (m, (WeakTermConst ("f" <> T.pack (show (sizeAsInt size)))))
 inferKind m _ = raiseCritical m "inferKind for void-pointer"
 
 inferPi ::

@@ -33,7 +33,7 @@ toLLVM mainTerm@(m, _) = do
   snd <$> rename [] mainTerm'''
 
 llvmCode :: CodePlus -> WithEnv LLVM
-llvmCode (m, CodeTheta theta) = llvmCodeTheta m theta
+llvmCode (m, CodeConst theta) = llvmCodeConst m theta
 llvmCode (_, CodePiElimDownElim v ds) = do
   (xs, vs) <- unzip <$> mapM (\d -> newDataLocal $ takeBaseName d) ds
   (fun, castThen) <- llvmCast (Just $ takeBaseName v) v $ toFunPtrType ds
@@ -85,7 +85,7 @@ uncastList ((y, (x, et)):yxs) e = do
   llvmUncastLet x (LLVMDataLocal y) et e'
 
 takeBaseName :: DataPlus -> T.Text
-takeBaseName (_, DataTheta s) = s
+takeBaseName (_, DataConst s) = s
 takeBaseName (_, DataUpsilon (I (s, _))) = s
 takeBaseName (_, DataSigmaIntro _ ds) = "array" <> T.pack (show (length ds))
 takeBaseName (_, DataFloat FloatSize16 _) = "half"
@@ -142,10 +142,10 @@ loadContent' bp bt ((i, (x, et)):xis) cont = do
       (LLVMOpGetElementPtr (bp, bt) [(LLVMDataInt 0, LowTypeIntS 32), i]) $
     LLVMLet x (LLVMOpLoad pos et) cont'
 
-llvmCodeTheta :: Meta -> Theta -> WithEnv LLVM
-llvmCodeTheta _ (ThetaUnaryOp op v) = llvmCodeUnaryOp op v
-llvmCodeTheta _ (ThetaBinaryOp op v1 v2) = llvmCodeBinaryOp op v1 v2
-llvmCodeTheta _ (ThetaArrayAccess lowType arr idx) = do
+llvmCodeConst :: Meta -> Const -> WithEnv LLVM
+llvmCodeConst _ (ConstUnaryOp op v) = llvmCodeUnaryOp op v
+llvmCodeConst _ (ConstBinaryOp op v1 v2) = llvmCodeBinaryOp op v1 v2
+llvmCodeConst _ (ConstArrayAccess lowType arr idx) = do
   let arrayType = LowTypePtr $ LowTypeArray 0 lowType
   (arrVar, castArrThen) <- llvmCast (Just $ takeBaseName arr) arr arrayType
   (idxVar, castIdxThen) <- llvmCast (Just $ takeBaseName idx) idx i64
@@ -159,7 +159,7 @@ llvmCodeTheta _ (ThetaArrayAccess lowType arr idx) = do
          (arrVar, arrayType)
          [(LLVMDataInt 0, i32), (idxVar, i64)])
       (LLVMLet resName (LLVMOpLoad resPtr lowType) uncast)
-llvmCodeTheta _ (ThetaSysCall syscall args) = do
+llvmCodeConst _ (ConstSysCall syscall args) = do
   (xs, vs) <- unzip <$> mapM (const $ newDataLocal "sys-call-arg") args
   call <- syscallToLLVM syscall vs
   llvmDataLet' (zip xs args) call
@@ -270,7 +270,7 @@ llvmUncastLet x@(I (s, _)) d lowType cont = do
 -- `llvmDataLet x d cont` binds the data `d` to the variable `x`, and computes the
 -- continuation `cont`.
 llvmDataLet :: Identifier -> DataPlus -> LLVM -> WithEnv LLVM
-llvmDataLet x (m, DataTheta y) cont = do
+llvmDataLet x (m, DataConst y) cont = do
   cenv <- gets codeEnv
   ns <- gets nameSet
   case Map.lookup y cenv of
@@ -356,12 +356,12 @@ llvmCodeEnumElim v branchList = do
       (cast, castThen) <- llvmCast (Just "enum-base") v t
       castThen $ LLVMSwitch (cast, t) defaultCase caseList
 
-llvmCodeCase ::
-     Meta -> DataPlus -> [((Meta, Identifier), CodePlus)] -> WithEnv LLVM
+llvmCodeCase :: Meta -> DataPlus -> [((Meta, T.Text), CodePlus)] -> WithEnv LLVM
 llvmCodeCase _ _ [] = return LLVMUnreachable
 llvmCodeCase _ _ [(_, code)] = llvmCode code
 llvmCodeCase m v (((mc, x), code):branchList) = do
-  c <- lookupRevCaseEnv mc $ asInt x
+  c <- lookupRevCaseEnv mc x
+  -- c <- lookupRevCaseEnv mc $ asInt x
   funPtrType <- getLabelType m c
   code' <- llvmCode code
   cont <- llvmCodeCase m v branchList
@@ -621,9 +621,9 @@ renameLLVMOp nenv (LLVMOpSysCall i ds) = do
   ds' <- mapM (renameLLVMData nenv) ds
   return $ LLVMOpSysCall i ds'
 
-lookupRevCaseEnv :: Meta -> Int -> WithEnv T.Text
-lookupRevCaseEnv m i = do
+lookupRevCaseEnv :: Meta -> T.Text -> WithEnv T.Text
+lookupRevCaseEnv m x = do
   renv <- gets revCaseEnv
-  case IntMap.lookup i renv of
+  case Map.lookup x renv of
     Nothing -> raiseCritical m $ "revCaseEnv"
     Just label -> return label

@@ -165,9 +165,9 @@ distinguishData zs (m, DataStructIntro dks) = do
 distinguishData _ d = return (IntMap.empty, d)
 
 distinguishCode :: [Identifier] -> CodePlus -> WithEnv (NameMap, CodePlus)
-distinguishCode zs (ml, CodeTheta theta) = do
-  (vs, theta') <- distinguishTheta zs theta
-  return (vs, (ml, CodeTheta theta'))
+distinguishCode zs (ml, CodeConst theta) = do
+  (vs, theta') <- distinguishConst zs theta
+  return (vs, (ml, CodeConst theta'))
 distinguishCode zs (ml, CodePiElimDownElim d ds) = do
   (vs, d') <- distinguishData zs d
   (vss, ds') <- unzip <$> mapM (distinguishData zs) ds
@@ -205,18 +205,18 @@ distinguishCode zs (ml, CodeCase varInfo d branchList) = do
   let varInfo' = IntMap.fromList $ zip from to'
   return (merge (vs : vss), (ml, CodeCase varInfo' d' branchList))
 
-distinguishTheta :: [Identifier] -> Theta -> WithEnv (NameMap, Theta)
-distinguishTheta zs (ThetaUnaryOp op d) = do
+distinguishConst :: [Identifier] -> Const -> WithEnv (NameMap, Const)
+distinguishConst zs (ConstUnaryOp op d) = do
   (vs, d') <- distinguishData zs d
-  return (vs, ThetaUnaryOp op d')
-distinguishTheta zs (ThetaBinaryOp op d1 d2) = do
+  return (vs, ConstUnaryOp op d')
+distinguishConst zs (ConstBinaryOp op d1 d2) = do
   (vs1, d1') <- distinguishData zs d1
   (vs2, d2') <- distinguishData zs d2
-  return (merge [vs1, vs2], ThetaBinaryOp op d1' d2')
-distinguishTheta zs (ThetaArrayAccess lowType d1 d2) = do
+  return (merge [vs1, vs2], ConstBinaryOp op d1' d2')
+distinguishConst zs (ConstArrayAccess lowType d1 d2) = do
   (vs1, d1') <- distinguishData zs d1
   (vs2, d2') <- distinguishData zs d2
-  return (merge [vs1, vs2], ThetaArrayAccess lowType d1' d2')
-distinguishTheta zs (ThetaSysCall num ds) = do
+  return (merge [vs1, vs2], ConstArrayAccess lowType d1' d2')
+distinguishConst zs (ConstSysCall num ds) = do
   (vss, ds') <- unzip <$> mapM (distinguishData zs) ds
-  return (merge vss, ThetaSysCall num ds')
+  return (merge vss, ConstSysCall num ds')

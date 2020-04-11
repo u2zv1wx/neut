@@ -8,7 +8,9 @@ module Reduce.Term
 
 import Control.Monad.State
 
+import qualified Data.HashMap.Strict as Map
 import qualified Data.IntMap.Strict as IntMap
+import qualified Data.Text as T
 
 import Data.Basic
 import Data.Env
@@ -139,8 +141,8 @@ isValue (_, TermStruct {}) = True
 isValue (_, TermStructIntro eks) = and $ map (isValue . fst) eks
 isValue _ = False
 
-isValueConst :: Identifier -> Bool
-isValueConst (I (x, _))
+isValueConst :: T.Text -> Bool
+isValueConst x
   | Just _ <- asLowTypeMaybe x = True
   | Just _ <- asUnaryOpMaybe x = True
   | Just _ <- asBinaryOpMaybe x = True
@@ -192,7 +194,7 @@ normalize (m, TermIter (mx, x, t) xts e) = do
   return (m, TermIter (mx, x, t') (zip3 ms xs ts') e')
 normalize (m, TermConst x) = do
   cenv <- gets cacheEnv
-  case IntMap.lookup (asInt x) cenv of
+  case Map.lookup x cenv of
     Just (Left e) -> normalize e
     _ -> return (m, TermConst x)
 normalize (m, TermFloat size x) = return (m, TermFloat size x)

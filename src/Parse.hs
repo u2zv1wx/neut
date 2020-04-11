@@ -23,7 +23,6 @@ import qualified Codec.Compression.GZip as GZip
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as L
 import qualified Data.HashMap.Strict as Map
-import qualified Data.IntMap.Strict as IntMap
 
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -169,16 +168,22 @@ parse' ((m, TreeNode ((_, TreeLeaf "constant"):rest)):as)
   | [(mn, TreeLeaf name), t] <- rest = do
     t' <- adjustPhase t >>= macroExpand >>= interpret
     name' <- withSectionPrefix name
-    cenv <- gets constantEnv
-    case Map.lookup name' cenv of
-      Just _ -> raiseError m $ "the constant " <> name' <> " is already defined"
-      Nothing -> do
-        i <- newCount
-        modify (\e -> e {constantEnv = Map.insert name' i (constantEnv e)})
+    -- cenv <- gets constantEnv
+    set <- gets constantSet
+    if S.member name' set
+      then raiseError m $ "the constant " <> name' <> " is already defined"
+    -- case Map.lookup name' cenv of
+    --   Just _ -> raiseError m $ "the constant " <> name' <> " is already defined"
+    --   Nothing -> do
+        -- i <- newCount
+      else do
+        modify (\env -> env {constantSet = S.insert name' set})
+        -- modify (\e -> e {constantEnv = Map.insert name' i (constantEnv e)})
         defList <- parse' as
         m' <- adjustPhase' m
         mn' <- adjustPhase' mn
-        return $ QuasiStmtConstDecl m' (mn', I (name', i), t') : defList
+        return $ QuasiStmtConstDecl m' (mn', name', t') : defList
+        -- return $ QuasiStmtConstDecl m' (mn', I (name', i), t') : defList
   | otherwise = raiseSyntaxError m "(constant LEAF TREE)"
 parse' ((m, TreeNode (def@(mDef, TreeLeaf "definition"):rest)):as)
   | [name@(_, TreeLeaf _), body] <- rest =
@@ -218,8 +223,7 @@ parse' ((m, TreeNode ((mLet, TreeLeaf "let"):rest)):as)
     m' <- adjustPhase' m
     e' <- adjustPhase e >>= macroExpand >>= interpret
     xt' <-
-      adjustPhase xt >>= macroExpand >>= prefixIdentPlus >>=
-      interpretIdentifierPlus
+      adjustPhase xt >>= macroExpand >>= prefixTextPlus >>= interpretTextPlus
     defList <- parse' as
     return $ QuasiStmtLet m' xt' e' : defList
   | otherwise = raiseSyntaxError m "(let LEAF TREE TREE) | (let TREE TREE)"
@@ -236,7 +240,8 @@ parse' (a:as) = do
     then parse' $ e : as
     else do
       e' <- interpret e
-      name <- newNameWith'' "hole"
+      name <- newTextWith "_"
+      -- name <- newNameWith'' "hole"
       m' <- adjustPhase' $ metaOf e'
       t <- newHole m'
       defList <- parse' as
@@ -348,7 +353,7 @@ parseAttr name (m, TreeNode ((_, TreeLeaf "implicit"):rest))
   | Just mxs <- mapM asLeaf rest = do
     case mapM (readMaybe . T.unpack . snd) mxs of
       Nothing -> raiseError m "the argument of `implicit` must be an integer"
-      Just is -> return $ QuasiStmtImplicit m (asIdent name) is
+      Just is -> return $ QuasiStmtImplicit m name is
 parseAttr _ t = raiseSyntaxError (fst t) "(implicit LEAF ... LEAF)"
 
 includeFile ::
@@ -396,26 +401,26 @@ parseDef xds = do
 
 prefixFunName :: TreePlus -> WithEnv TreePlus
 prefixFunName (m, TreeNode [xt, xts, body]) = do
-  xt' <- prefixIdentPlus xt
+  xt' <- prefixTextPlus xt
   return (m, TreeNode [xt', xts, body])
 prefixFunName t = raiseSyntaxError (fst t) "(TREE TREE TREE)"
 
-prefixIdentPlus :: TreePlus -> WithEnv TreePlus
-prefixIdentPlus (m, TreeLeaf "_") = return (m, TreeLeaf "_")
-prefixIdentPlus (m, TreeLeaf x) = do
+prefixTextPlus :: TreePlus -> WithEnv TreePlus
+prefixTextPlus (m, TreeLeaf "_") = return (m, TreeLeaf "_")
+prefixTextPlus (m, TreeLeaf x) = do
   x' <- withSectionPrefix x
   return (m, TreeLeaf x')
-prefixIdentPlus (m, TreeNode [(mx, TreeLeaf "_"), t]) =
+prefixTextPlus (m, TreeNode [(mx, TreeLeaf "_"), t]) =
   return (m, TreeNode [(mx, TreeLeaf "_"), t])
-prefixIdentPlus (m, TreeNode [(mx, TreeLeaf x), t]) = do
+prefixTextPlus (m, TreeNode [(mx, TreeLeaf x), t]) = do
   x' <- withSectionPrefix x
   return (m, TreeNode [(mx, TreeLeaf x'), t])
-prefixIdentPlus t = raiseSyntaxError (fst t) "LEAF | (LEAF TREE)"
+prefixTextPlus t = raiseSyntaxError (fst t) "LEAF | (LEAF TREE)"
 
-extractFunName :: TreePlus -> WithEnv Identifier
-extractFunName (_, TreeNode ((_, TreeLeaf x):_)) = return $ asIdent x
-extractFunName (_, TreeNode ((_, TreeNode [(_, TreeLeaf x), _]):_)) =
-  return $ asIdent x
+-- extractFunName :: TreePlus -> WithEnv Identifier
+extractFunName :: TreePlus -> WithEnv T.Text
+extractFunName (_, TreeNode ((_, TreeLeaf x):_)) = return x
+extractFunName (_, TreeNode ((_, TreeNode [(_, TreeLeaf x), _]):_)) = return x
 extractFunName t = raiseSyntaxError (fst t) "(LEAF ...) | ((LEAF TREE) ...)"
 
 parseStmtClause :: TreePlus -> WithEnv (T.Text, [TreePlus])
@@ -478,7 +483,7 @@ concatQuasiStmtList (QuasiStmtImplicit m x i:es) = do
 concatQuasiStmtList (QuasiStmtEnum {}:ss) = concatQuasiStmtList ss
 concatQuasiStmtList (QuasiStmtDef xds:ss) = do
   let ds = map snd xds
-  let baseSub = IntMap.fromList $ map defToSub ds
+  let baseSub = Map.fromList $ map defToSub ds
   let sub = selfCompose (length baseSub) baseSub
   let varList = map (\(_, (m, x, _), _, _) -> (m, WeakTermUpsilon x)) ds
   let iterList = map (substWeakTermPlus sub) varList
@@ -517,8 +522,9 @@ toLetList [] = []
 toLetList (((x, (m, (mx, _, t), _, _)), iter):rest) =
   QuasiStmtLet m (mx, x, t) iter : toLetList rest
 
-defToSub :: Def -> (Int, WeakTermPlus)
-defToSub (m, (mx, x, t), xts, e) = (asInt x, (m, WeakTermIter (mx, x, t) xts e))
+defToSub :: Def -> (Key, WeakTermPlus)
+defToSub (m, (mx, x, t), xts, e) =
+  (Left $ asInt x, (m, WeakTermIter (mx, x, t) xts e))
 
 selfCompose :: Int -> SubstWeakTerm -> SubstWeakTerm
 selfCompose 0 sub = sub
@@ -526,7 +532,7 @@ selfCompose n sub = compose sub $ selfCompose (n - 1) sub
 
 compose :: SubstWeakTerm -> SubstWeakTerm -> SubstWeakTerm
 compose s1 s2 = do
-  IntMap.union (IntMap.map (substWeakTermPlus s1) s2) s1
+  Map.union (Map.map (substWeakTermPlus s1) s2) s1
   -- IntMap.union s1 $ IntMap.map (substWeakTermPlus s1) s2
   -- let domS2 = map fst s2
   -- let codS2 = map snd s2

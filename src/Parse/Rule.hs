@@ -11,10 +11,10 @@ module Parse.Rule
 
 import Control.Monad.Except
 import Control.Monad.State
+import Data.Either (rights)
 import Data.Monoid ((<>))
 
 import qualified Data.HashMap.Strict as Map
-import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Set as S
 import qualified Data.Text as T
 
@@ -48,13 +48,14 @@ setupIndPrefix' _ t = raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) TREE)"
 parseConnective ::
      Meta
   -> [TreePlus]
-  -> ([IdentifierPlus] -> [IdentifierPlus] -> Connective -> WithEnv [QuasiStmt])
-  -> ([IdentifierPlus] -> Connective -> WithEnv [QuasiStmt])
+  -> ([TextPlus] -> [TextPlus] -> Connective -> WithEnv [QuasiStmt])
+  -> ([TextPlus] -> Connective -> WithEnv [QuasiStmt])
   -> WithEnv [QuasiStmt]
 parseConnective m ts f g = do
   connectiveList <- mapM parseConnective' ts
   fs <- mapM formationRuleOf' connectiveList
-  ats <- mapM ruleAsIdentPlus fs
+  -- fs <- mapM formationRuleOf connectiveList
+  ats <- mapM ruleAsTextPlus fs
   bts <- concat <$> mapM toInternalRuleList connectiveList
   checkNameSanity m $ ats ++ bts
   connectiveList' <- concat <$> mapM (f ats bts) connectiveList
@@ -65,32 +66,33 @@ parseConnective' :: TreePlus -> WithEnv Connective
 parseConnective' (m, TreeNode ((_, TreeLeaf name):(_, TreeNode xts):rules)) = do
   xts' <- mapM interpretIdentifierPlus xts
   rules' <- mapM parseRule rules
-  return (m, asIdent name, xts', rules')
+  return (m, name, xts', rules')
 parseConnective' t = raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) ...)"
 
 registerLabelInfo :: [TreePlus] -> WithEnv ()
 registerLabelInfo ts = do
   connectiveList <- mapM parseConnective' ts
   fs <- mapM formationRuleOf connectiveList
-  ats <- mapM ruleAsIdentPlus fs
+  ats <- mapM ruleAsTextPlus fs
   bts <- concat <$> mapM toInternalRuleList connectiveList
-  forM_ ats $ \(_, I (a, _), _) -> do
-    let asbs = map (\(_, x, _) -> asText x) $ ats ++ bts
+  forM_ ats $ \(_, a, _) -> do
+    let asbs = map (\(_, x, _) -> x) $ ats ++ bts
     modify (\env -> env {labelEnv = Map.insert a asbs (labelEnv env)})
 
 generateProjections :: [TreePlus] -> WithEnv [QuasiStmt]
 generateProjections ts = do
   connectiveList <- mapM parseConnective' ts
   fs <- mapM formationRuleOf connectiveList
-  ats <- mapM ruleAsIdentPlus fs
+  ats <- mapM ruleAsTextPlus fs
   bts <- concat <$> mapM toInternalRuleList connectiveList
+  let bts' = map textPlusToIdentPlus bts
   stmtListList <-
     forM ats $ \(ma, a, ta) -> do
       forM bts $ \(mb, b, tb) -> do
         xts <- takeXTS ta
         (dom@(my, y, ty), cod) <- separate tb
         v <- newNameWith'' "base"
-        let b' = asIdent (asText a <> ":" <> asText b)
+        let b' = a <> ":" <> b
         let attr = QuasiStmtImplicit mb b' [0 .. length xts - 1]
         return
           [ QuasiStmtLetWT
@@ -101,14 +103,15 @@ generateProjections ts = do
                   (xts ++ [dom])
                   ( mb
                   , WeakTermCase
-                      (asText a)
+                      a
                       (my, WeakTermUpsilon y)
-                      [ ( ( (mb, asIdent (asText a <> ":" <> "unfold"))
+                      [ ( ( (mb, (a <> ":" <> "unfold"))
                         -- `xts ++` is required since LetWT bypasses `infer`
-                          , xts ++ [(ma, a, ta)] ++ bts ++ [(mb, v, ty)])
+                          , xts ++
+                            [(ma, asIdent a, ta)] ++ bts' ++ [(mb, v, ty)])
                         , ( mb
                           , WeakTermPiElim
-                              (mb, WeakTermUpsilon b)
+                              (mb, WeakTermUpsilon $ asIdent b)
                               [(mb, WeakTermUpsilon v)]))
                       ]))
           , attr
@@ -127,59 +130,61 @@ parseRule :: TreePlus -> WithEnv Rule
 parseRule (m, TreeNode [(mName, TreeLeaf name), (_, TreeNode xts), t]) = do
   t' <- interpret t
   xts' <- mapM interpretIdentifierPlus xts
-  return (m, asIdent name, mName, xts', t')
+  return (m, name, mName, xts', t')
 parseRule t = raiseSyntaxError (fst t) "(LEAF (TREE ... TREE) TREE)"
 
-checkNameSanity :: Meta -> [IdentifierPlus] -> WithEnv ()
+checkNameSanity :: Meta -> [TextPlus] -> WithEnv ()
 checkNameSanity m atsbts = do
   let asbs = map (\(_, x, _) -> x) atsbts
-  when (not $ linearCheck $ map asText asbs) $
+  when (not $ linearCheck asbs) $
     raiseError
       m
       "the names of the rules of inductive/coinductive type must be distinct"
 
-toInductive ::
-     [IdentifierPlus] -> [IdentifierPlus] -> Connective -> WithEnv [QuasiStmt]
-toInductive ats bts connective@(m, a@(I (ai, _)), xts, _) = do
-  formationRule <- formationRuleOf connective >>= ruleAsIdentPlus
+toInductive :: [TextPlus] -> [TextPlus] -> Connective -> WithEnv [QuasiStmt]
+toInductive ats bts connective@(m, ai, xts, _) = do
+  let a = asIdent ai
+  formationRule <- formationRuleOf connective >>= ruleAsTextPlus
   let cod = (m, WeakTermPiElim (m, WeakTermUpsilon a) (map toVar' xts))
   z <- newNameWith'' "_"
   let zt = (m, z, cod)
+  let atsbts = map textPlusToIdentPlus $ ats ++ bts
   return $
     [ QuasiStmtLetInductive
         (length ats)
         m
         formationRule
         -- nat := lam (...). Pi{nat} (...)
-        (m, WeakTermPiIntro xts (m, WeakTermPi (Just ai) (ats ++ bts) cod))
+        (m, WeakTermPiIntro xts (m, WeakTermPi (Just ai) atsbts cod))
     -- induction principle
     , QuasiStmtLetWT
         m
         ( m
-        , asIdent (ai <> ":" <> "induction")
-        , (m, WeakTermPi Nothing (xts ++ [zt] ++ ats ++ bts) cod))
+        , (ai <> ":" <> "induction")
+        , (m, WeakTermPi Nothing (xts ++ [zt] ++ atsbts) cod))
         ( m
         , WeakTermPiIntro
-            (xts ++ [zt] ++ ats ++ bts)
-            (m, WeakTermPiElim (toVar' zt) (map toVar' (ats ++ bts))))
+            (xts ++ [zt] ++ atsbts)
+            (m, WeakTermPiElim (toVar' zt) (map toVar' atsbts)))
     ]
 
-toInductiveIntroList :: [IdentifierPlus] -> Connective -> WithEnv [QuasiStmt]
+toInductiveIntroList :: [TextPlus] -> Connective -> WithEnv [QuasiStmt]
 toInductiveIntroList ats (_, a, xts, rules) = do
+  let ats' = map textPlusToIdentPlus ats
   bts <- mapM ruleAsIdentPlus rules -- fixme: このbtsはmutualな別の部分からもとってくる必要があるはず
-  concat <$> mapM (toInductiveIntro ats bts xts a) rules
+  concat <$> mapM (toInductiveIntro ats' bts xts a) rules
 
 -- represent the introduction rule within CoC
 toInductiveIntro ::
      [IdentifierPlus]
   -> [IdentifierPlus]
   -> [IdentifierPlus]
-  -> Identifier
+  -> T.Text
   -> Rule
   -> WithEnv [QuasiStmt]
-toInductiveIntro ats bts xts a@(I (ai, _)) (mb, b@(I (bi, _)), m, yts, cod)
+toInductiveIntro ats bts xts ai (mb, bi, m, yts, cod)
   | (_, WeakTermPiElim (_, WeakTermUpsilon a') es) <- cod
-  , a == a'
+  , ai == asText a'
   , length xts == length es = do
     let vs = varWeakTermPlus (m, weakTermPi yts cod)
     let ixts = filter (\(_, (_, x, _)) -> x `S.member` vs) $ zip [0 ..] xts
@@ -187,18 +192,21 @@ toInductiveIntro ats bts xts a@(I (ai, _)) (mb, b@(I (bi, _)), m, yts, cod)
     return
       [ QuasiStmtLetInductiveIntro
           m
-          (mb, b, (m, weakTermPi (xts' ++ yts) cod))
+          (mb, bi, (m, weakTermPi (xts' ++ yts) cod))
           ( m {metaIsReducible = False}
           , WeakTermPiIntro
               (xts' ++ yts)
               ( m
               , WeakTermPiIntroPlus
-                  a
+                  ai
                   (bi, is, xts' ++ yts)
                   (ats ++ bts)
-                  (m, WeakTermPiElim (mb, WeakTermUpsilon b) (map toVar' yts))))
-          (map (\(_, x, _) -> x) ats)
-      , QuasiStmtImplicit m b [0 .. length xts' - 1]
+                  ( m
+                  , WeakTermPiElim
+                      (mb, WeakTermUpsilon (asIdent bi))
+                      (map toVar' yts))))
+          (map (\(_, x, _) -> asText x) ats)
+      , QuasiStmtImplicit m bi [0 .. length xts' - 1]
       ]
   | otherwise =
     raiseError m $
@@ -208,40 +216,48 @@ toInductiveIntro ats bts xts a@(I (ai, _)) (mb, b@(I (bi, _)), m, yts, cod)
 
 ruleAsIdentPlus :: Rule -> WithEnv IdentifierPlus
 ruleAsIdentPlus (mb, b, m, xts, t) = do
+  return (mb, asIdent b, (m, weakTermPi xts t))
+
+ruleAsTextPlus :: Rule -> WithEnv TextPlus
+ruleAsTextPlus (mb, b, m, xts, t) = do
   return (mb, b, (m, weakTermPi xts t))
+
+textPlusToIdentPlus :: TextPlus -> IdentifierPlus
+textPlusToIdentPlus (mx, x, t) = (mx, asIdent x, t)
 
 formationRuleOf :: Connective -> WithEnv Rule
 formationRuleOf (m, a, xts, _) = return (m, a, m, xts, (m, WeakTermTau))
 
 formationRuleOf' :: Connective -> WithEnv Rule
-formationRuleOf' (m, a@(I (x, _)), xts, rules) = do
-  let bs = map (\(_, I (b, _), _, _, _) -> b) rules
+formationRuleOf' (m, x, xts, rules) = do
+  let bs = map (\(_, b, _, _, _) -> b) rules
   let bis = zip bs [0 ..]
   -- register "nat" ~> [("zero", 0), ("succ", 1)], "list" ~> [("nil", 0), ("cons", 1)], etc.
   insEnumEnv m x bis
-  return (m, a, m, xts, (m, WeakTermTau))
+  return (m, x, m, xts, (m, WeakTermTau))
 
-toInternalRuleList :: Connective -> WithEnv [IdentifierPlus]
-toInternalRuleList (_, _, _, rules) = mapM ruleAsIdentPlus rules
+toInternalRuleList :: Connective -> WithEnv [TextPlus]
+toInternalRuleList (_, _, _, rules) = mapM ruleAsTextPlus rules
 
 toVar' :: IdentifierPlus -> WeakTermPlus
 toVar' (m, x, _) = (m, WeakTermUpsilon x)
 
-insForm :: Int -> IdentifierPlus -> WeakTermPlus -> WithEnv ()
-insForm 1 (_, I (_, i), _) e =
-  modify
-    (\env -> env {formationEnv = IntMap.insert i (Just e) (formationEnv env)})
-insForm _ (_, I (_, i), _) _ =
-  modify
-    (\env -> env {formationEnv = IntMap.insert i Nothing (formationEnv env)})
+toConst :: TextPlus -> WeakTermPlus
+toConst (m, x, _) = (m, WeakTermConst x)
 
-insInductive :: [Identifier] -> IdentifierPlus -> WithEnv ()
-insInductive [I (_, i)] bt = do
+insForm :: Int -> TextPlus -> WeakTermPlus -> WithEnv ()
+insForm 1 (_, x, _) e =
+  modify (\env -> env {formationEnv = Map.insert x (Just e) (formationEnv env)})
+insForm _ (_, x, _) _ =
+  modify (\env -> env {formationEnv = Map.insert x Nothing (formationEnv env)})
+
+insInductive :: [T.Text] -> TextPlus -> WithEnv ()
+insInductive [ai] bt = do
   ienv <- gets indEnv
-  modify (\env -> env {indEnv = IntMap.insertWith optConcat i (Just [bt]) ienv})
+  modify (\env -> env {indEnv = Map.insertWith optConcat ai (Just [bt]) ienv})
 insInductive as _ = do
-  forM_ as $ \(I (_, i)) -> do
-    modify (\env -> env {indEnv = IntMap.insert i Nothing (indEnv env)})
+  forM_ as $ \ai -> do
+    modify (\env -> env {indEnv = Map.insert ai Nothing (indEnv env)})
 
 optConcat :: Maybe [a] -> Maybe [a] -> Maybe [a]
 optConcat mNew mOld = do
@@ -256,10 +272,10 @@ data Mode
   deriving (Show)
 
 internalize ::
-     [Identifier] -> [IdentifierPlus] -> IdentifierPlus -> WithEnv WeakTermPlus
+     [T.Text] -> [IdentifierPlus] -> IdentifierPlus -> WithEnv WeakTermPlus
 internalize as atsbts (m, y, t) = do
-  let sub = IntMap.fromList $ zip (map asInt as) (map toVar' atsbts)
-  zeta ModeForward sub atsbts t (m, WeakTermUpsilon y)
+  let sub = Map.fromList $ zip (map Right as) (map toVar' atsbts)
+  theta ModeForward sub atsbts t (m, WeakTermUpsilon y)
 
 flipMode :: Mode -> Mode
 flipMode ModeForward = ModeBackward
@@ -267,36 +283,41 @@ flipMode ModeBackward = ModeForward
 
 isResolved :: SubstWeakTerm -> WeakTermPlus -> Bool
 isResolved sub e = do
-  let xs = IntMap.keys sub
-  let ys = S.map asInt $ varWeakTermPlus e
-  all (\x -> x `S.notMember` ys) xs
+  let xs = rights $ Map.keys sub
+  all (`S.notMember` constWeakTermPlus e) xs
 
-zeta ::
-     Mode -- 現在の変換がinvertedかそうでないかをtrackするための変数
-  -> SubstWeakTerm -- out ~> in (substitution {x1 := x1', ..., xn := xn'})
-  -> [IdentifierPlus] -- ats ++ bts
+-- type SubstWeakTerm = Map.HashMap T.Text WeakTermPlus
+-- e : Aを受け取って、flipしていないときはIN(A) = BをみたすB型のtermを、
+-- また、flipしてるときはOUT(A) = BをみたすB型のtermを、
+-- それぞれ構成して返す。IN/OUTはSubstWeakTermによって定まるものとする。
+theta ::
+     Mode -- 現在の変換がflipしているかそうでないかの情報
+  -> SubstWeakTerm -- out ~> in (substitution sub := {x1 := x1', ..., xn := xn'})
+  -> [IdentifierPlus] -- 現在定義しようとしているinductive typeのatsbts. base caseのinternalizeのために必要。
   -> WeakTermPlus -- a type `A`
   -> WeakTermPlus -- a term `e` of type `A`
-  -> WithEnv WeakTermPlus -- a term of type `A{x1 := x1', ..., xn := xn'}`
-zeta mode isub atsbts t e = do
+  -> WithEnv WeakTermPlus
+theta mode isub atsbts t e = do
   ienv <- gets indEnv
   case t of
-    (_, WeakTermPi _ xts cod) -> zetaPi mode isub atsbts xts cod e
-    (_, WeakTermPiElim va@(_, WeakTermUpsilon a@(I (_, i))) es) -- esの長さをチェックするべきでは？
-      | Just _ <- IntMap.lookup (asInt a) isub ->
-        zetaInductive mode isub a atsbts es e
-      | Just (Just bts) <- IntMap.lookup i ienv
+    (_, WeakTermPi _ xts cod) -> thetaPi mode isub atsbts xts cod e
+    (_, WeakTermPiElim va@(_, WeakTermConst ai) es)
+      | Just _ <- Map.lookup (Right ai) isub ->
+        thetaInductive mode isub ai atsbts es e
+      -- nested inductive
+      | Just (Just bts) <- Map.lookup ai ienv
       , not (all (isResolved isub) es) ->
-        zetaInductiveNested mode isub atsbts e va a es bts
-      | Just Nothing <- IntMap.lookup i ienv ->
-        zetaInductiveNestedMutual (metaOf t) a
+        thetaInductiveNested mode isub atsbts e va ai es bts
+      -- nestedの外側がmutualであるとき。このときはエラーとする。
+      | Just Nothing <- Map.lookup ai ienv ->
+        thetaInductiveNestedMutual (metaOf t) ai
     _ -> do
-      if isResolved isub t -- flipが絡むのでは？
+      if isResolved isub t
         then return e
         else raiseError (metaOf t) $
              "malformed inductive/coinductive type definition: " <> toText t
 
-zetaPi ::
+thetaPi ::
      Mode
   -> SubstWeakTerm
   -> [IdentifierPlus]
@@ -304,44 +325,50 @@ zetaPi ::
   -> WeakTermPlus
   -> WeakTermPlus
   -> WithEnv WeakTermPlus
-zetaPi mode isub atsbts xts cod e = do
+thetaPi mode isub atsbts xts cod e = do
   (xts', cod') <- renameBinder xts cod
   let (ms', xs', ts') = unzip3 xts'
-  let vs' = zipWith (\m x -> (m, WeakTermUpsilon x)) ms' xs'
-  vs <- zipWithM (zeta (flipMode mode) isub atsbts) ts' vs'
-  app' <- zeta mode isub atsbts cod' (fst e, WeakTermPiElim e vs)
-  -- return the composition: (A' ..., A') -> (A, ..., A) -> B -> B'
-  let ts'' = map (substWeakTermPlus isub) ts'
-  return (fst e, WeakTermPiIntro (zip3 ms' xs' ts'') app')
+  -- eta展開のための変数を用意
+  let xs'' = zipWith (\m x -> (m, WeakTermUpsilon x)) ms' xs'
+  -- xsを「逆方向」で変換（実際には逆向きの変換は不可能なので、2回flipされることを期待して変換）
+  -- こうしたあとでx : In(A)と束縛してからthetaでの変換結果を使えば、x' : Out(A)が得られるので
+  -- 引数として与えられるようになる、というわけ。
+  xsBackward <- zipWithM (theta (flipMode mode) isub atsbts) ts' xs''
+  -- appのほうを「順方向」で変換
+  appForward <- theta mode isub atsbts cod' (fst e, WeakTermPiElim e xsBackward)
+  -- 結果をまとめる
+  let ts'' = map (substWeakTermPlus isub) ts' -- 引数をinternalizeされたバージョンの型にする
+  return (fst e, WeakTermPiIntro (zip3 ms' xs' ts'') appForward)
 
-zetaInductive ::
+thetaInductive ::
      Mode
   -> SubstWeakTerm
-  -> Identifier
+  -> T.Text
   -> [IdentifierPlus]
   -> [WeakTermPlus]
   -> WeakTermPlus
   -> WithEnv WeakTermPlus
-zetaInductive mode isub a atsbts es e
+thetaInductive mode isub a atsbts es e
   | ModeBackward <- mode =
     raiseError (metaOf e) $
     "found a contravariant occurence of `" <>
-    asText a <> "` in the antecedent of an introduction rule"
+    a <> "` in the antecedent of an introduction rule"
+  -- `list @ i64` のように、中身が処理済みであることをチェック (この場合はes == [i64])
   | all (isResolved isub) es = do
     return (fst e, WeakTermPiElim e (map toVar' atsbts))
   | otherwise = raiseError (metaOf e) "found a self-nested inductive type"
 
-zetaInductiveNested ::
+thetaInductiveNested ::
      Mode
   -> SubstWeakTerm -- inductiveのためのaのsubst (outer -> inner)
   -> [IdentifierPlus] -- innerのためのatsbts
   -> WeakTermPlus -- 変換されるべきterm
   -> WeakTermPlus -- list Aにおけるlist
-  -> Identifier -- list (トップレベルで定義されている名前、つまりouterの名前)
+  -> T.Text -- list (トップレベルで定義されている名前、つまりouterの名前)
   -> [WeakTermPlus] -- list AにおけるA
-  -> [IdentifierPlus] -- トップレベルで定義されているコンストラクタたち
+  -> [TextPlus] -- トップレベルで定義されているコンストラクタたち
   -> WithEnv WeakTermPlus
-zetaInductiveNested mode isub atsbts e va aOuter es bts = do
+thetaInductiveNested mode isub atsbts e va aOuter es bts = do
   (xts, (_, aInner, _), btsInner) <- lookupInductive (metaOf va) aOuter
   let es' = map (substWeakTermPlus isub) es
   args <-
@@ -356,19 +383,19 @@ zetaInductiveNested mode isub atsbts e va aOuter es bts = do
         e
         ((m, WeakTermPiIntro xts (m, WeakTermPiElim va es')) : args))
 
-zetaInductiveNestedMutual :: Meta -> Identifier -> WithEnv WeakTermPlus
-zetaInductiveNestedMutual m (I (a, _)) =
+thetaInductiveNestedMutual :: Meta -> T.Text -> WithEnv WeakTermPlus
+thetaInductiveNestedMutual m ai =
   raiseError m $
   "mutual inductive type `" <>
-  a <> "` cannot be used to construct a nested inductive type"
+  ai <> "` cannot be used to construct a nested inductive type"
 
 lookupInductive ::
      Meta
-  -> Identifier
+  -> T.Text
   -> WithEnv ([IdentifierPlus], IdentifierPlus, [IdentifierPlus])
-lookupInductive m (I (ai, i)) = do
+lookupInductive m ai = do
   fenv <- gets formationEnv
-  case IntMap.lookup i fenv of
+  case Map.lookup ai fenv of
     Just (Just (_, WeakTermPiIntro xts (_, WeakTermPi (Just _) atsbts (_, WeakTermPiElim (_, WeakTermUpsilon _) _)))) -> do
       let at = head atsbts
       let bts = tail atsbts -- valid since a is not mutual
@@ -381,16 +408,18 @@ lookupInductive m (I (ai, i)) = do
       "the inductive type `" <> ai <> "` must be a non-mutual inductive type"
     Nothing -> raiseCritical m $ "no such inductive type defined: " <> ai
 
+-- nested inductiveにおける引数をinternalizeする。
+-- （これ、recursiveに処理できないの？）
 toInternalizedArg ::
      Mode
   -> SubstWeakTerm -- inductiveのためのaのsubst (outer -> inner)
   -> Identifier -- innerでのaの名前。listの定義の中に出てくるほうのlist.
-  -> Identifier -- outerでのaの名前。listとか。
+  -> T.Text -- outerでのaの名前。listとか。
   -> [IdentifierPlus] -- aの引数。
   -> [IdentifierPlus] -- base caseでのinternalizeのための情報。
   -> [WeakTermPlus] -- list @ (e1, ..., en)の引数部分。
   -> [WeakTermPlus] -- eiをisubでsubstしたもの。
-  -> IdentifierPlus -- outerでのコンストラクタ。
+  -> TextPlus -- outerでのコンストラクタ。
   -> IdentifierPlus -- innerでのコンストラクタ。xts部分の引数だけouterのコンストラクタと型がずれていることに注意。
   -> WithEnv WeakTermPlus
 toInternalizedArg mode isub aInner aOuter xts atsbts es es' b (mbInner, _, (_, WeakTermPi _ ytsInner _)) = do
@@ -406,24 +435,25 @@ toInternalizedArg mode isub aInner aOuter xts atsbts es es' b (mbInner, _, (_, W
   --   - aOuterの中身はすべて処理済み
   --   - aOuterの外にはeiが出現しうる
   -- という状況が実現できる。これはrecursionの停止を与える。
-  let xs = map (\(_, x, _) -> asInt x) xts -- fixme: このへんもrenameBinderでやったほうがいい？
-  let sub = IntMap.fromList $ zip xs es
+  let xs = map (\(_, x, _) -> Left $ asInt x) xts -- fixme: このへんもrenameBinderでやったほうがいい？
+  let sub = Map.fromList $ zip xs es
   let ts'' = map (substWeakTermPlus sub) ts'
   ys' <- mapM newNameWith ys
   -- これで引数の型の調整が終わったので、あらためてidentPlusの形に整える
   -- もしかしたらyって名前を別名に変更したほうがいいかもしれないが。
   let ytsInner' = zip3 ms ys' ts''
   -- 引数をコンストラクタに渡せるようにするために再帰的にinternalizeをおこなう。
-  -- list (item-outer A)みたいな形だったものは、list (item-inner A)となっているはずなので、zetaは停止する。
-  -- list (list (item-outer A))みたいな形だったものも、list (list (item-inner A))となってzetaは停止する。
-  let f (m, y, t) = zeta mode isub atsbts t (m, WeakTermUpsilon y)
+  -- list (item-outer A)みたいな形だったものは、list (item-inner A)となっているはずなので、thetaは停止する。
+  -- list (list (item-outer A))みたいな形だったものも、list (list (item-inner A))となってthetaは停止する。
+  let f (m, y, t) = theta mode isub atsbts t (m, WeakTermUpsilon y)
   args <- mapM f ytsInner'
   -- あとは結果を返すだけ
   return
     ( mbInner
     , WeakTermPiIntro
         ytsInner'
-        (mbInner, WeakTermPiElim (toVar' b) (es' ++ args)))
+        (mbInner, WeakTermPiElim (toConst b) (es' ++ args)))
+        -- (mbInner, WeakTermPiElim (toVar' b) (es' ++ args)))
 toInternalizedArg _ _ _ _ _ _ _ _ _ (m, _, _) =
   raiseCritical
     m
@@ -436,15 +466,19 @@ renameBinder ::
 renameBinder [] e = return ([], e)
 renameBinder ((m, x, t):ats) e = do
   x' <- newNameWith x
-  let sub = IntMap.singleton (asInt x) (m, WeakTermUpsilon x')
+  let sub = Map.singleton (Left $ asInt x) (m, WeakTermUpsilon x')
   let (ats', e') = substWeakTermPlus'' sub ats e -- discern済みなのでこれでオーケーのはず
   (ats'', e'') <- renameBinder ats' e'
   return ((m, x', t) : ats'', e'')
 
-type RuleType = (Identifier, [WeakTermPlus])
+type RuleTypeDom = (Identifier, [WeakTermPlus])
+
+type RuleTypeCod = (T.Text, [WeakTermPlus])
+
+type SubstRule = (RuleTypeDom, RuleTypeCod)
 
 -- subst a @ (e1, ..., en) ~> a' @ (e1', ..., en')
-substRuleType :: (RuleType, RuleType) -> WeakTermPlus -> WithEnv WeakTermPlus
+substRuleType :: SubstRule -> WeakTermPlus -> WithEnv WeakTermPlus
 substRuleType _ (m, WeakTermTau) = return (m, WeakTermTau)
 substRuleType _ (m, WeakTermUpsilon x) = return (m, WeakTermUpsilon x)
 substRuleType sub (m, WeakTermPi mName xts t) = do
@@ -462,7 +496,7 @@ substRuleType sub@((a1, es1), (a2, es2)) (m, WeakTermPiElim e es)
   , a1 == x =
     case (mapM asUpsilon es1, mapM asUpsilon es) of
       (Just xs', Just ys')
-        | xs' == ys' -> return (m, WeakTermPiElim (mx, WeakTermUpsilon a2) es2)
+        | xs' == ys' -> return (m, WeakTermPiElim (mx, WeakTermConst a2) es2) -- `aOuter @ (処理済み, ..., 処理済み)` への変換
       _ ->
         raiseError
           m
@@ -532,8 +566,7 @@ substRuleType sub (m, WeakTermErase xs e) = do
   e' <- substRuleType sub e
   return (m, WeakTermErase xs e')
 
-substRuleType' ::
-     (RuleType, RuleType) -> [IdentifierPlus] -> WithEnv [IdentifierPlus]
+substRuleType' :: SubstRule -> [IdentifierPlus] -> WithEnv [IdentifierPlus]
 substRuleType' _ [] = return []
 substRuleType' sub ((m, x, t):xts) = do
   t' <- substRuleType sub t
@@ -544,7 +577,7 @@ substRuleType' sub ((m, x, t):xts) = do
       return $ (m, x, t') : xts'
 
 substRuleType'' ::
-     (RuleType, RuleType)
+     SubstRule
   -> [IdentifierPlus]
   -> WeakTermPlus
   -> WithEnv ([IdentifierPlus], WeakTermPlus)

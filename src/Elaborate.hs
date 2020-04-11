@@ -54,28 +54,43 @@ elaborateStmt (WeakStmtReturn e) = do
   (e', _) <- infer e
   analyze >> synthesize >> refine
   elaborate' e'
-elaborateStmt (WeakStmtLet m (mx, x@(I (_, i)), t) e cont) = do
+elaborateStmt (WeakStmtLet m (mx, x, t) e cont) = do
   (e', te) <- infer e
   t' <- inferType t
   insConstraintEnv te t'
   analyze >> synthesize >> refine >> cleanup
   e'' <- elaborate' e'
   t'' <- reduceTermPlus <$> elaborate' t'
-  insTypeEnv x t''
-  modify (\env -> env {cacheEnv = IntMap.insert i (Left e'') (cacheEnv env)})
+  insTypeEnv (Right x) t''
+  modify (\env -> env {cacheEnv = Map.insert x (Left e'') (cacheEnv env)})
   cont' <- elaborateStmt cont
-  x' <- newNameWith x
+  -- x' <- newNameWith x
+  x' <- newNameWith'' x
   let c = (m, TermConst x)
+  -- ここでtermEnvを更新する感じ。
   return (m, TermPiElim (m, TermPiIntro [(mx, x', t'')] cont') [c])
-elaborateStmt (WeakStmtLetWT m (mx, x@(I (_, i)), t) e cont) = do
+-- elaborateStmt (WeakStmtLet m (mx, x@(I (_, i)), t) e cont) = do
+--   (e', te) <- infer e
+--   t' <- inferType t
+--   insConstraintEnv te t'
+--   analyze >> synthesize >> refine >> cleanup
+--   e'' <- elaborate' e'
+--   t'' <- reduceTermPlus <$> elaborate' t'
+--   insTypeEnv x t''
+--   modify (\env -> env {cacheEnv = IntMap.insert i (Left e'') (cacheEnv env)})
+--   cont' <- elaborateStmt cont
+--   x' <- newNameWith x
+--   let c = (m, TermConst x)
+--   return (m, TermPiElim (m, TermPiIntro [(mx, x', t'')] cont') [c])
+elaborateStmt (WeakStmtLetWT m (mx, x, t) e cont) = do
   t' <- inferType t
   analyze >> synthesize >> refine >> cleanup
   e' <- elaborate' e -- `e` is supposed to be well-typed
   t'' <- reduceTermPlus <$> elaborate' t'
-  insTypeEnv x t''
-  modify (\env -> env {cacheEnv = IntMap.insert i (Left e') (cacheEnv env)})
+  insTypeEnv (Right x) t''
+  modify (\env -> env {cacheEnv = Map.insert x (Left e') (cacheEnv env)})
   cont' <- elaborateStmt cont
-  x' <- newNameWith x
+  x' <- newNameWith'' x
   let c = (m, TermConst x)
   return (m, TermPiElim (m, TermPiIntro [(mx, x', t'')] cont') [c])
 elaborateStmt (WeakStmtVerify m e cont) = do
@@ -89,29 +104,28 @@ elaborateStmt (WeakStmtVerify m e cont) = do
     note m $
       "verification succeeded (" <> T.pack (showFloat' sec) <> " seconds)"
   elaborateStmt cont
-elaborateStmt (WeakStmtImplicit m x@(I (_, i)) idxList cont) = do
-  t <- lookupTypeEnv' m x
+elaborateStmt (WeakStmtImplicit m x idxList cont) = do
+  t <- lookupTypeEnv m (Right x) x
   case t of
     (_, TermPi _ xts _) -> do
       case find (\idx -> idx < 0 || length xts <= idx) idxList of
         Nothing -> do
           ienv <- gets impEnv
-          modify (\env -> env {impEnv = IntMap.insertWith (++) i idxList ienv})
+          modify (\env -> env {impEnv = Map.insertWith (++) x idxList ienv})
           elaborateStmt cont
         Just idx -> do
           raiseError m $
             "the specified index `" <>
-            T.pack (show idx) <>
-            "` is out of range of the domain of " <> asText x
+            T.pack (show idx) <> "` is out of range of the domain of " <> x
     _ ->
       raiseError m $
       "the type of " <>
-      asText x <> " is supposed to be a Pi-type, but is:\n" <> toText (weaken t)
+      x <> " is supposed to be a Pi-type, but is:\n" <> toText (weaken t)
 elaborateStmt (WeakStmtConstDecl _ (_, x, t) cont) = do
   t' <- inferType t
   analyze >> synthesize >> refine >> cleanup
   t'' <- reduceTermPlus <$> elaborate' t'
-  insTypeEnv x t''
+  insTypeEnv (Right x) t''
   elaborateStmt cont
 
 showFloat' :: Float -> String
@@ -132,11 +146,11 @@ cleanup = do
 -- This doesn't cause any problem since types doesn't have any beta-reduction.
 elaborate' :: WeakTermPlus -> WithEnv TermPlus
 elaborate' (m, WeakTermTau) = return (m, TermTau)
-elaborate' (m, WeakTermUpsilon x) = do
-  cenv <- gets cacheEnv
-  if IntMap.member (asInt x) cenv
-    then return (m, TermConst x)
-    else return (m, TermUpsilon x)
+elaborate' (m, WeakTermUpsilon x) = return (m, TermUpsilon x)
+  -- cenv <- gets cacheEnv
+  -- if IntMap.member (asInt x) cenv
+  --   then return (m, TermConst x)
+  --   else return (m, TermUpsilon x)
 elaborate' (m, WeakTermPi mName xts t) = do
   xts' <- mapM elaboratePlus xts
   t' <- elaborate' t
@@ -156,8 +170,8 @@ elaborate' (m, WeakTermPiElim (mh, WeakTermZeta (I (_, x))) es) = do
     Nothing -> raiseError mh $ "couldn't instantiate the hole here"
     Just (_, WeakTermPiIntro xts e)
       | length xts == length es -> do
-        let xs = map (\(_, y, _) -> asInt y) xts
-        let s = IntMap.fromList $ zip xs es
+        let xs = map (\(_, y, _) -> Left $ asInt y) xts
+        let s = Map.fromList $ zip xs es
         elaborate' $ substWeakTermPlus s e
     Just e -> elaborate' $ reduceWeakTermPlus (m, WeakTermPiElim e es)
 elaborate' (m, WeakTermPiElim e es) = do
@@ -203,9 +217,12 @@ elaborate' (m, WeakTermInt t x) = do
 elaborate' (m, WeakTermFloat t x) = do
   t' <- reduceTermPlus <$> elaborate' t
   case t' of
-    (_, TermConst (I (floatType, i)))
+    (_, TermConst floatType)
       | Just (LowTypeFloat size) <- asLowTypeMaybe floatType -> do
-        return (m, TermFloat (size, i) x)
+        return (m, TermFloat size x)
+    -- (_, TermConst (I (floatType, i)))
+    --   | Just (LowTypeFloat size) <- asLowTypeMaybe floatType -> do
+    --     return (m, TermFloat (size, i) x)
     _ ->
       raiseError m $
       "the term `" <>
@@ -268,7 +285,7 @@ elaborate' (m, WeakTermCase indName e cxtes) = do
       case Map.lookup indName eenv of
         Nothing -> raiseError m $ "no such inductive type defined: " <> indName
         Just bis -> do
-          let bs' = map (asText . snd . fst . fst) cxtes
+          let bs' = map (snd . fst . fst) cxtes
           let isLinear = linearCheck bs'
           let isExhaustive = length bis == length bs'
           case (isLinear, isExhaustive) of
@@ -299,10 +316,10 @@ getImpInfo :: TermPlus -> WithEnv ([Int], TermPlus)
 getImpInfo e@(m, TermConst x)
   | not (metaIsExplicit m) = do
     ienv <- gets impEnv
-    case IntMap.lookup (asInt x) ienv of
+    case Map.lookup x ienv of
       Just is -> return (is, e)
       Nothing -> return ([], e)
-  | otherwise = return ([], (m, TermConst $ I ("@" <> asText x, asInt x)))
+  | otherwise = return ([], (m, TermConst ("@" <> x)))
 getImpInfo e = return ([], e)
 
 getArgLen :: TermPlus -> Maybe Int

@@ -16,14 +16,14 @@ data Term
   | TermPi (Maybe T.Text) [IdentifierPlus] TermPlus
   | TermPiIntro [IdentifierPlus] TermPlus
   | TermPiIntroPlus
-      Identifier -- name of corresponding inductive type
+      T.Text -- name of corresponding inductive type
       (T.Text, [Int], [IdentifierPlus])
       [IdentifierPlus]
       TermPlus
   | TermPiElim TermPlus [TermPlus]
   | TermIter IdentifierPlus [IdentifierPlus] TermPlus
-  | TermConst Identifier
-  | TermFloat (FloatSize, Int) Double -- ((floatSize, the int-name of "f16", "f32", or "f64"), float value)
+  | TermConst T.Text
+  | TermFloat FloatSize Double
   | TermEnum EnumType
   | TermEnumIntro EnumValue
   | TermEnumElim (TermPlus, TermPlus) [(CasePlus, TermPlus)]
@@ -45,7 +45,7 @@ data Term
 
 type TermPlus = (Meta, Term)
 
-type Clause = (((Meta, Identifier), [IdentifierPlus]), TermPlus)
+type Clause = (((Meta, T.Text), [IdentifierPlus]), TermPlus)
 
 type SubstTerm = IntMap.IntMap TermPlus
 
@@ -201,8 +201,8 @@ weaken (m, TermIter (mx, x, t) xts e) = do
   let e' = weaken e
   (m, WeakTermIter (mx, x, t') xts' e')
 weaken (m, TermConst x) = (m, WeakTermConst x)
-weaken (m, TermFloat (size, i) x) =
-  (m, WeakTermFloat (m, WeakTermConst (I (showFloatSize size, i))) x)
+weaken (m, TermFloat size x) =
+  (m, WeakTermFloat (m, WeakTermConst ("f" <> showFloatSize size)) x)
 weaken (m, TermEnum x) = (m, WeakTermEnum x)
 weaken (m, TermEnumIntro l) = (m, WeakTermEnumIntro l)
 weaken (m, TermEnumElim (e, t) branchList) = do

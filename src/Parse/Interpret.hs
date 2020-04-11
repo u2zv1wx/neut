@@ -3,6 +3,7 @@
 module Parse.Interpret
   ( interpret
   , interpretIdentifierPlus
+  , interpretTextPlus
   , interpretIter
   , interpretEnumItem
   , raiseSyntaxError
@@ -74,28 +75,28 @@ interpret (m, TreeNode ((_, TreeLeaf "zeta"):rest))
     return (m, WeakTermZeta x')
   | otherwise = raiseSyntaxError m "(zeta LEAF)"
 interpret (m, TreeNode ((_, TreeLeaf "constant"):rest))
-  | [(_, TreeLeaf x)] <- rest = do return (m, WeakTermConst (asIdent x))
+  | [(_, TreeLeaf x)] <- rest = return (m, WeakTermConst x)
   | otherwise = raiseSyntaxError m "(constant LEAF)"
 interpret (m, TreeNode ((_, TreeLeaf "f16"):rest))
   | [(mx, TreeLeaf x)] <- rest = do
     case readMaybe $ T.unpack x of
       Nothing -> raiseError mx "the argument of `f16` must be a float"
       Just x' -> do
-        return (m, WeakTermFloat (m, WeakTermConst $ asIdent "f16") x')
+        return (m, WeakTermFloat (m, WeakTermConst "f16") x')
   | otherwise = raiseSyntaxError m "(f16 LEAF)"
 interpret (m, TreeNode ((_, TreeLeaf "f32"):rest))
   | [(mx, TreeLeaf x)] <- rest = do
     case readMaybe $ T.unpack x of
       Nothing -> raiseError mx "the argument of `f32` must be a float"
       Just x' -> do
-        return (m, WeakTermFloat (m, WeakTermConst $ asIdent "f32") x')
+        return (m, WeakTermFloat (m, WeakTermConst "f32") x')
   | otherwise = raiseSyntaxError m "(f32 LEAF)"
 interpret (m, TreeNode ((_, TreeLeaf "f64"):rest))
   | [(mx, TreeLeaf x)] <- rest = do
     case readMaybe $ T.unpack x of
       Nothing -> raiseError mx "the argument of `f64` must be a float"
       Just x' -> do
-        return (m, WeakTermFloat (m, WeakTermConst $ asIdent "f64") x')
+        return (m, WeakTermFloat (m, WeakTermConst "f64") x')
   | otherwise = raiseSyntaxError m "(f64 LEAF)"
 interpret (m, TreeNode ((_, TreeLeaf "enum"):rest))
   | [(_, TreeLeaf x)] <- rest = do
@@ -335,6 +336,25 @@ interpretLeaf (m, TreeLeaf x) = do
   return (m, asIdent x)
 interpretLeaf t = raiseSyntaxError (fst t) "LEAF"
 
+interpretTextPlus :: TreePlus -> WithEnv TextPlus
+interpretTextPlus leaf@(_, TreeLeaf _) = do
+  (m, x') <- interpretLeafText leaf
+  h <- newHole m
+  return (m, x', h)
+interpretTextPlus (_, TreeNode [x, t]) = do
+  (m, x') <- interpretLeafText x
+  t' <- interpret t
+  return (m, x', t')
+interpretTextPlus t = raiseSyntaxError (fst t) "(LEAF TREE)"
+
+interpretLeafText :: TreePlus -> WithEnv (Meta, T.Text)
+interpretLeafText (m, TreeLeaf "_") = do
+  h <- newTextWith "_"
+  return (m, h)
+interpretLeafText (m, TreeLeaf x) = do
+  return (m, x)
+interpretLeafText t = raiseSyntaxError (fst t) "LEAF"
+
 interpretEnumValueMaybe :: TreePlus -> WithEnv (Maybe EnumValue)
 interpretEnumValueMaybe t =
   (Just <$> interpretEnumValue t) `catchError` (const $ return Nothing)
@@ -414,11 +434,11 @@ interpretStructElim (_, TreeNode [(m, TreeLeaf x), k]) = do
 interpretStructElim e = raiseSyntaxError (fst e) "(LEAF TREE)"
 
 interpretCaseClause ::
-     TreePlus -> WithEnv (((Meta, Identifier), [IdentifierPlus]), WeakTermPlus)
+     TreePlus -> WithEnv (((Meta, T.Text), [IdentifierPlus]), WeakTermPlus)
 interpretCaseClause (_, TreeNode [(_, TreeNode ((m, TreeLeaf c):xts)), e]) = do
   xts' <- mapM interpretIdentifierPlus xts
   e' <- interpret e
-  return (((m, asIdent c), xts'), e')
+  return (((m, c), xts'), e')
 interpretCaseClause t = raiseSyntaxError (fst t) "((LEAF TREE ... TREE) TREE)"
 
 type CocaseClause = ((Identifier, [WeakTermPlus]), [(Identifier, WeakTermPlus)])
@@ -635,8 +655,7 @@ interpretBorrow'' (m, TreeLeaf s)
   | T.length s > 1
   , T.head s == '&' = (Just (m, TreeLeaf $ T.tail s), (m, TreeLeaf $ T.tail s))
 interpretBorrow'' t = (Nothing, t)
-
-newTextWith :: T.Text -> WithEnv T.Text
-newTextWith s = do
-  i <- newCount
-  return $ "(" <> s <> "-" <> T.pack (show i) <> ")"
+-- newTextWith :: T.Text -> WithEnv T.Text
+-- newTextWith s = do
+--   i <- newCount
+--   return $ "(" <> s <> "-" <> T.pack (show i) <> ")"

@@ -2,7 +2,7 @@
 
 module Data.WeakTerm where
 
-import qualified Data.IntMap.Strict as IntMap
+import qualified Data.HashMap.Strict as Map
 import qualified Data.Set as S
 import qualified Data.Text as T
 
@@ -14,14 +14,14 @@ data WeakTerm
   | WeakTermPi (Maybe T.Text) [IdentifierPlus] WeakTermPlus
   | WeakTermPiIntro [IdentifierPlus] WeakTermPlus
   | WeakTermPiIntroPlus
-      Identifier -- name of inductive type
+      T.Text -- name of inductive type
       (T.Text, [Int], [IdentifierPlus]) -- (name of construtor, is (s.t. map (\i -> xts !! i) is == xts'), xts' ++ yts)
       [IdentifierPlus]
       WeakTermPlus
   | WeakTermPiElim WeakTermPlus [WeakTermPlus]
   | WeakTermIter IdentifierPlus [IdentifierPlus] WeakTermPlus
   | WeakTermZeta Identifier
-  | WeakTermConst Identifier
+  | WeakTermConst T.Text
   | WeakTermInt WeakTermPlus Integer
   | WeakTermFloat WeakTermPlus Double
   | WeakTermEnum EnumType
@@ -40,7 +40,7 @@ data WeakTerm
   | WeakTermCase
       T.Text
       WeakTermPlus
-      [(((Meta, Identifier), [IdentifierPlus]), WeakTermPlus)]
+      [(((Meta, T.Text), [IdentifierPlus]), WeakTermPlus)]
   | WeakTermQuestion WeakTermPlus WeakTermPlus -- e : t (output the type `t` as note)
   | WeakTermErase [(Meta, T.Text)] WeakTermPlus
   deriving (Show, Eq)
@@ -58,17 +58,22 @@ data WeakCase
 type WeakCasePlus = (Meta, WeakCase)
 
 -- type SubstWeakTerm = [(Identifier, WeakTermPlus)]
-type SubstWeakTerm = IntMap.IntMap WeakTermPlus
+-- type SubstWeakTerm = IntMap.IntMap WeakTermPlus
+type SubstWeakTerm = Map.HashMap (Either Int T.Text) WeakTermPlus
 
 type IdentifierPlus = (Meta, Identifier, WeakTermPlus)
 
+type TextPlus = (Meta, T.Text, WeakTermPlus)
+
 type Def = (Meta, IdentifierPlus, [IdentifierPlus], WeakTermPlus)
 
-type IdentDef = (Identifier, Def)
+-- type IdentDef = (Identifier, Def)
+type IdentDef = (T.Text, Def)
 
 type Rule -- inference rule
    = ( Meta -- location of the name
-     , Identifier -- the name of the rule
+     -- , Identifier -- the name of the rule
+     , T.Text -- the name of the rule
      , Meta -- location of the rule
      , [IdentifierPlus] -- the antecedents of the inference rule (e.g. [(x, A), (xs, list A)])
      , WeakTermPlus -- the consequent of the inference rule
@@ -76,38 +81,39 @@ type Rule -- inference rule
 
 type Connective
    = ( Meta -- location of the connective
-     , Identifier -- the name of the connective (e.g. nat, list)
+     -- , Identifier -- the name of the connective (e.g. nat, list)
+     , T.Text -- the name of the connective (e.g. nat, list)
      , [IdentifierPlus] -- parameter of the connective (e.g. the `A` in `list A`)
      , [Rule] -- list of introduction rule when inductive / list of elimination rule when coinductive
       )
 
 data QuasiStmt
-  = QuasiStmtLet Meta IdentifierPlus WeakTermPlus
+  = QuasiStmtLet Meta TextPlus WeakTermPlus
   -- special case of `let` in which the `e` in `let x := e` is known to be well-typed
-  | QuasiStmtLetWT Meta IdentifierPlus WeakTermPlus
+  | QuasiStmtLetWT Meta TextPlus WeakTermPlus
   -- mutually recursive definition (n >= 0)
   --   (definition
   --     ((f1 A1) (ARGS-1) e1)
   --     ...
   --     ((fn An) (ARGS-n) en))
-  | QuasiStmtDef [(Identifier, Def)]
+  | QuasiStmtDef [(T.Text, Def)]
   | QuasiStmtVerify Meta WeakTermPlus
-  | QuasiStmtImplicit Meta Identifier [Int]
+  | QuasiStmtImplicit Meta T.Text [Int]
   | QuasiStmtEnum Meta T.Text [(T.Text, Int)]
-  | QuasiStmtConstDecl Meta IdentifierPlus
-  | QuasiStmtLetInductive Int Meta IdentifierPlus WeakTermPlus
-  | QuasiStmtLetInductiveIntro Meta IdentifierPlus WeakTermPlus [Identifier]
+  | QuasiStmtConstDecl Meta TextPlus
+  | QuasiStmtLetInductive Int Meta TextPlus WeakTermPlus
+  | QuasiStmtLetInductiveIntro Meta TextPlus WeakTermPlus [T.Text]
   | QuasiStmtUse T.Text
   | QuasiStmtUnuse T.Text
   deriving (Show)
 
 data WeakStmt
   = WeakStmtReturn WeakTermPlus
-  | WeakStmtLet Meta IdentifierPlus WeakTermPlus WeakStmt
-  | WeakStmtLetWT Meta IdentifierPlus WeakTermPlus WeakStmt
+  | WeakStmtLet Meta TextPlus WeakTermPlus WeakStmt
+  | WeakStmtLetWT Meta TextPlus WeakTermPlus WeakStmt
   | WeakStmtVerify Meta WeakTermPlus WeakStmt
-  | WeakStmtImplicit Meta Identifier [Int] WeakStmt
-  | WeakStmtConstDecl Meta IdentifierPlus WeakStmt
+  | WeakStmtImplicit Meta T.Text [Int] WeakStmt
+  | WeakStmtConstDecl Meta TextPlus WeakStmt
   deriving (Show)
 
 weakTermPi :: [IdentifierPlus] -> WeakTermPlus -> WeakTerm
@@ -225,10 +231,66 @@ holeWeakTermPlus' ((_, _, t):xts) es = do
   let set2 = holeWeakTermPlus' xts es
   S.union set1 set2
 
+constWeakTermPlus :: WeakTermPlus -> S.Set T.Text
+constWeakTermPlus (_, WeakTermTau) = S.empty
+constWeakTermPlus (_, WeakTermUpsilon _) = S.empty
+constWeakTermPlus (_, WeakTermPi _ xts t) = constWeakTermPlus' xts [t]
+constWeakTermPlus (_, WeakTermPiIntro xts e) = constWeakTermPlus' xts [e]
+constWeakTermPlus (_, WeakTermPiIntroPlus _ _ xts e) =
+  constWeakTermPlus' xts [e]
+constWeakTermPlus (_, WeakTermPiElim e es) = do
+  let xs = constWeakTermPlus e
+  let ys = S.unions $ map constWeakTermPlus es
+  S.union xs ys
+constWeakTermPlus (_, WeakTermIter (_, _, t) xts e) = do
+  let set1 = constWeakTermPlus t
+  let set2 = constWeakTermPlus' xts [e]
+  S.union set1 set2
+constWeakTermPlus (_, WeakTermConst x) = S.singleton x
+constWeakTermPlus (_, WeakTermZeta _) = S.empty
+constWeakTermPlus (_, WeakTermInt t _) = constWeakTermPlus t
+constWeakTermPlus (_, WeakTermFloat t _) = constWeakTermPlus t
+constWeakTermPlus (_, WeakTermEnum _) = S.empty
+constWeakTermPlus (_, WeakTermEnumIntro _) = S.empty
+constWeakTermPlus (_, WeakTermEnumElim (e, t) les) = do
+  let xs = constWeakTermPlus t
+  let ys = constWeakTermPlus e
+  let zs = S.unions $ map (constWeakTermPlus . snd) les
+  S.unions [xs, ys, zs]
+constWeakTermPlus (_, WeakTermArray dom _) = constWeakTermPlus dom
+constWeakTermPlus (_, WeakTermArrayIntro _ es) =
+  S.unions $ map constWeakTermPlus es
+constWeakTermPlus (_, WeakTermArrayElim _ xts d e) =
+  constWeakTermPlus d `S.union` constWeakTermPlus' xts [e]
+constWeakTermPlus (_, WeakTermStruct {}) = S.empty
+constWeakTermPlus (_, WeakTermStructIntro ets) =
+  S.unions $ map (constWeakTermPlus . fst) ets
+constWeakTermPlus (_, WeakTermStructElim _ d e) = do
+  let set1 = constWeakTermPlus d
+  let set2 = constWeakTermPlus e
+  S.union set1 set2
+constWeakTermPlus (_, WeakTermCase _ e cxes) = do
+  let xs = constWeakTermPlus e
+  let ys =
+        S.unions $ map (\((_, xts), body) -> constWeakTermPlus' xts [body]) cxes
+  S.union xs ys
+constWeakTermPlus (_, WeakTermQuestion e t) = do
+  let set1 = constWeakTermPlus e
+  let set2 = constWeakTermPlus t
+  S.union set1 set2
+constWeakTermPlus (_, WeakTermErase _ e) = constWeakTermPlus e
+
+constWeakTermPlus' :: [IdentifierPlus] -> [WeakTermPlus] -> S.Set T.Text
+constWeakTermPlus' [] es = S.unions $ map constWeakTermPlus es
+constWeakTermPlus' ((_, _, t):xts) es = do
+  let hs1 = constWeakTermPlus t
+  let hs2 = constWeakTermPlus' xts es
+  S.union hs1 hs2
+
 substWeakTermPlus :: SubstWeakTerm -> WeakTermPlus -> WeakTermPlus
 substWeakTermPlus _ tau@(_, WeakTermTau) = tau
 substWeakTermPlus sub e1@(_, WeakTermUpsilon x) = do
-  case IntMap.lookup (asInt x) sub of
+  case Map.lookup (Left $ asInt x) sub of
     Nothing -> e1
     Just e2@(_, e) -> (supMeta (metaOf e1) (metaOf e2), e)
 substWeakTermPlus sub (m, WeakTermPi mName xts t) = do
@@ -248,12 +310,16 @@ substWeakTermPlus sub (m, WeakTermPiElim e es) = do
 substWeakTermPlus sub (m, WeakTermIter (mx, x, t) xts e) = do
   let t' = substWeakTermPlus sub t
   -- let sub' = filter (\(k, _) -> k /= x) sub
-  let sub' = IntMap.delete (asInt x) sub
+  let sub' = Map.delete (Left $ asInt x) sub
   let (xts', e') = substWeakTermPlus'' sub' xts e
   (m, WeakTermIter (mx, x, t') xts' e')
-substWeakTermPlus _ e@(_, WeakTermConst _) = e
+substWeakTermPlus sub e@(_, WeakTermConst x) = do
+  case Map.lookup (Right x) sub of
+    Nothing -> e
+    Just e2 -> (supMeta (metaOf e) (metaOf e2), snd e2)
+  -- e
 substWeakTermPlus sub e1@(_, WeakTermZeta x) = do
-  case IntMap.lookup (asInt x) sub of
+  case Map.lookup (Left $ asInt x) sub of
     Nothing -> e1
     Just e2@(_, e) -> (supMeta (metaOf e1) (metaOf e2), e)
 substWeakTermPlus sub (m, WeakTermInt t x) = do
@@ -292,7 +358,7 @@ substWeakTermPlus sub (m, WeakTermStructElim xts v e) = do
   let v' = substWeakTermPlus sub v
   let xs = map (\(_, x, _) -> x) xts
   -- let sub' = filter (\(k, _) -> k `notElem` xs) sub
-  let sub' = deleteKeys sub (map asInt xs)
+  let sub' = deleteKeys' sub (map (Left . asInt) xs)
   let e' = substWeakTermPlus sub' e
   (m, WeakTermStructElim xts v' e')
 substWeakTermPlus sub (m, WeakTermCase indName e cxtes) = do
@@ -315,7 +381,7 @@ substWeakTermPlus' _ [] = []
 substWeakTermPlus' sub ((m, x, t):xts)
   -- let sub' = filter (\(k, _) -> k /= x) sub
  = do
-  let sub' = IntMap.delete (asInt x) sub
+  let sub' = Map.delete (Left $ asInt x) sub
   let xts' = substWeakTermPlus' sub' xts
   let t' = substWeakTermPlus sub t
   (m, x, t') : xts'
@@ -329,7 +395,7 @@ substWeakTermPlus'' sub [] e = ([], substWeakTermPlus sub e)
 substWeakTermPlus'' sub ((m, x, t):xts) e
   -- let sub' = filter (\(k, _) -> k /= x) sub
  = do
-  let sub' = IntMap.delete (asInt x) sub
+  let sub' = Map.delete (Left $ asInt x) sub
   let (xts', e') = substWeakTermPlus'' sub' xts e
   let t' = substWeakTermPlus sub t
   ((m, x, t') : xts', e')
@@ -373,7 +439,7 @@ toText (_, WeakTermPiElim e es) = do
 toText (_, WeakTermIter (_, x, _) xts e) = do
   let argStr = inParen $ showItems $ map showArg xts
   showCons ["μ", asText x, argStr, toText e]
-toText (_, WeakTermConst x) = asText x
+toText (_, WeakTermConst x) = x
 toText (_, WeakTermZeta (I (_, i))) = "?M" <> T.pack (show i)
 toText (_, WeakTermInt _ a) = T.pack $ show a
 toText (_, WeakTermFloat _ a) = T.pack $ show a
@@ -405,7 +471,7 @@ toText (_, WeakTermCase _ e cxtes) = do
      toText e :
      (flip map cxtes $ \((c, xts), body) -> do
         let xs = map (\(_, x, _) -> asText x) xts
-        showCons [showCons (asText (snd c) : xs), toText body]))
+        showCons [showCons ((snd c) : xs), toText body]))
 toText (_, WeakTermQuestion e _) = toText e
 toText (_, WeakTermErase _ e) = toText e
 
@@ -498,3 +564,9 @@ splitLast [x] = return ([], x)
 splitLast (x:xs) = do
   (xs', z) <- splitLast xs
   return (x : xs', z)
+
+type Key = Either Int T.Text
+
+deleteKeys' :: Map.HashMap Key a -> [Key] -> Map.HashMap Key a
+deleteKeys' sub [] = sub
+deleteKeys' sub (i:is) = Map.delete i $ deleteKeys' sub is

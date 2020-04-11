@@ -21,6 +21,12 @@
      (_ (m a)))
     (m b)))
 
+;; (inductive )
+
+;; (inductive list ()
+;;   (nil ()
+;;     (list)))
+
 (coinductive functor ((f (hom tau tau)))
   (map ((_ (functor f)))
     (functor-form f)))

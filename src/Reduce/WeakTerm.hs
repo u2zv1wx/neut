@@ -5,7 +5,7 @@ module Reduce.WeakTerm
   , reduceWeakTermIdentPlus
   ) where
 
-import qualified Data.IntMap.Strict as IntMap
+import qualified Data.HashMap.Strict as Map
 
 import Data.Basic
 import Data.WeakTerm
@@ -39,13 +39,13 @@ reduceWeakTermPlus (m, WeakTermPiElim e es) = do
     (mLam, WeakTermPiIntro xts body)
       | length xts == length es'
       , metaIsReducible mLam -> do
-        let xs = map (\(_, x, _) -> asInt x) xts
-        let sub = IntMap.fromList $ zip xs es'
+        let xs = map (\(_, x, _) -> Left $ asInt x) xts
+        let sub = Map.fromList $ zip xs es'
         reduceWeakTermPlus $ substWeakTermPlus sub body
     (_, WeakTermPiIntroPlus _ _ xts body)
       | length xts == length es' -> do
-        let xs = map (\(_, x, _) -> asInt x) xts
-        let sub = IntMap.fromList $ zip xs es'
+        let xs = map (\(_, x, _) -> Left $ asInt x) xts
+        let sub = Map.fromList $ zip xs es'
         reduceWeakTermPlus $ substWeakTermPlus sub body
     _ -> (m, app)
 reduceWeakTermPlus (m, WeakTermIter (mx, x, t) xts e)
@@ -86,7 +86,7 @@ reduceWeakTermPlus (m, WeakTermArrayElim k xts e1 e2) = do
       | length es == length xts
       , k == k' -> do
         let (_, xs, _) = unzip3 xts
-        let sub = IntMap.fromList $ zip (map asInt xs) es
+        let sub = Map.fromList $ zip (map (Left . asInt) xs) es
         reduceWeakTermPlus $ substWeakTermPlus sub e2
     _ -> (m, WeakTermArrayElim k xts e1' e2)
 reduceWeakTermPlus (m, WeakTermStructIntro eks) = do
@@ -100,7 +100,7 @@ reduceWeakTermPlus (m, WeakTermStructElim xks e1 e2) = do
       | (_, xs, ks1) <- unzip3 xks
       , (es, ks2) <- unzip eks
       , ks1 == ks2 -> do
-        let sub = IntMap.fromList $ zip (map asInt xs) es
+        let sub = Map.fromList $ zip (map (Left . asInt) xs) es
         reduceWeakTermPlus $ substWeakTermPlus sub e2
     _ -> (m, WeakTermStructElim xks e1' e2)
 reduceWeakTermPlus (m, WeakTermCase indName e cxtes) = do

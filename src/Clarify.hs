@@ -7,9 +7,11 @@ module Clarify
   ( clarify
   ) where
 
+import Codec.Binary.UTF8.String
 import Control.Monad.Except
 import Control.Monad.State
 import Data.List (nubBy)
+import Data.Word
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.IntMap.Strict as IntMap
@@ -46,13 +48,12 @@ clarify' tenv (m, TermPiElim e es) = do
   e' <- clarify' tenv e
   callClosure m e' es'
 clarify' tenv iter@(m, TermIter (_, x, t) mxts e) = do
-  let tenv' = insTypeEnv'' x t tenv
+  let tenv' = insTypeEnv'' (Left (asInt x)) t tenv
   e' <- clarify' (insTypeEnv1 mxts tenv') e
   fvs <- nubFVS <$> chainTermPlus tenv iter
   retClosureFix tenv x fvs m mxts e'
 clarify' tenv (m, TermConst x) = clarifyConst tenv m x
-clarify' _ (m, TermFloat (size, _) l) =
-  return (m, CodeUpIntro (m, DataFloat size l))
+clarify' _ (m, TermFloat size l) = return (m, CodeUpIntro (m, DataFloat size l))
 clarify' _ (m, TermEnum _) = returnCartesianImmediate m
 clarify' _ (m, TermEnumIntro l) = return (m, CodeUpIntro (m, DataEnumIntro l))
 clarify' tenv (m, TermEnumElim (e, _) bs) = do
@@ -171,14 +172,13 @@ clarifyCase' tenv m envVarName ((_, xts), e) = do
   let xs = map (\(_, x, _) -> x) xts
   return (m, sigmaElim xs (m, DataUpsilon envVarName) e')
 
-clarifyConst :: TypeEnv -> Meta -> Identifier -> WithEnv CodePlus
-clarifyConst tenv m name@(I (x, i))
-  | Just op <- asUnaryOpMaybe x = clarifyUnaryOp tenv name op m
-  | Just op <- asBinaryOpMaybe x = clarifyBinaryOp tenv name op m
+clarifyConst :: TypeEnv -> Meta -> T.Text -> WithEnv CodePlus
+clarifyConst tenv m x
+  | Just op <- asUnaryOpMaybe x = clarifyUnaryOp tenv x op m
+  | Just op <- asBinaryOpMaybe x = clarifyBinaryOp tenv x op m
   | Just _ <- asLowTypeMaybe x =
     clarify' tenv (m, TermEnum $ EnumTypeLabel "top")
-  | Just lowType <- asArrayAccessMaybe x =
-    clarifyArrayAccess tenv m name lowType
+  | Just lowType <- asArrayAccessMaybe x = clarifyArrayAccess tenv m x lowType
   | x == "os:file-descriptor" =
     clarify' tenv (m, TermEnum $ EnumTypeLabel "top")
   | x == "os:stdin" = clarify' tenv (m, TermEnumIntro (EnumValueIntS 64 0))
@@ -188,16 +188,20 @@ clarifyConst tenv m name@(I (x, i))
   | otherwise = do
     os <- getOS
     case asSysCallMaybe os x of
-      Just (syscall, argInfo) -> clarifySysCall tenv name syscall argInfo m
+      Just (syscall, argInfo) -> clarifySysCall tenv x syscall argInfo m
       Nothing -> do
         cenv <- gets cacheEnv
-        case IntMap.lookup i cenv of
-          Nothing ->
-            return (m, CodeUpIntro (m, DataTheta $ asText'' name)) -- external
+        -- ここで定数の処理をやる。
+        -- codeEnvをうまく更新することになりそう？
+        case Map.lookup x cenv of
+          Nothing -> do
+            p "external:"
+            p' x
+            return (m, CodeUpIntro (m, DataConst x)) -- external
           Just (Right e) -> return e
           Just (Left e) -> do
             e' <- clarify' tenv e
-            modify (\env -> env {cacheEnv = IntMap.insert i (Right e') cenv})
+            modify (\env -> env {cacheEnv = Map.insert x (Right e') cenv})
             return e'
 
 clarifyCast :: TypeEnv -> Meta -> WithEnv CodePlus
@@ -211,25 +215,26 @@ clarifyCast tenv m = do
     tenv
     (m, TermPiIntro [(m, a, u), (m, b, u), (m, z, varA)] (m, TermUpsilon z))
 
-clarifyUnaryOp :: TypeEnv -> Identifier -> UnaryOp -> Meta -> WithEnv CodePlus
+clarifyUnaryOp :: TypeEnv -> T.Text -> UnaryOp -> Meta -> WithEnv CodePlus
 clarifyUnaryOp tenv name op m = do
-  t <- lookupTypeEnv'' m name tenv
+  t <- lookupTypeEnv'' m (Right name) tenv name
   let t' = reduceTermPlus t
   case t' of
     (_, TermPi _ [(mx, x, tx)] _) -> do
       let varX = (mx, DataUpsilon x)
       retClosure
         tenv
-        (Just $ asText'' name)
+        (Just $ showInHex name)
+        -- (Just name)
         []
         m
         [(mx, x, tx)]
-        (m, CodeTheta (ThetaUnaryOp op varX))
-    _ -> raiseCritical m $ "the arity of " <> asText name <> " is wrong"
+        (m, CodeConst (ConstUnaryOp op varX))
+    _ -> raiseCritical m $ "the arity of " <> name <> " is wrong"
 
-clarifyBinaryOp :: TypeEnv -> Identifier -> BinaryOp -> Meta -> WithEnv CodePlus
+clarifyBinaryOp :: TypeEnv -> T.Text -> BinaryOp -> Meta -> WithEnv CodePlus
 clarifyBinaryOp tenv name op m = do
-  t <- lookupTypeEnv'' m name tenv
+  t <- lookupTypeEnv'' m (Right name) tenv name
   let t' = reduceTermPlus t
   case t' of
     (_, TermPi _ [(mx, x, tx), (my, y, ty)] _) -> do
@@ -237,17 +242,17 @@ clarifyBinaryOp tenv name op m = do
       let varY = (my, DataUpsilon y)
       retClosure
         tenv
-        (Just $ asText'' name)
+        (Just $ showInHex name)
+        -- (Just name)
         []
         m
         [(mx, x, tx), (my, y, ty)]
-        (m, CodeTheta (ThetaBinaryOp op varX varY))
-    _ -> raiseCritical m $ "the arity of " <> asText name <> " is wrong"
+        (m, CodeConst (ConstBinaryOp op varX varY))
+    _ -> raiseCritical m $ "the arity of " <> name <> " is wrong"
 
-clarifyArrayAccess ::
-     TypeEnv -> Meta -> Identifier -> LowType -> WithEnv CodePlus
+clarifyArrayAccess :: TypeEnv -> Meta -> T.Text -> LowType -> WithEnv CodePlus
 clarifyArrayAccess tenv m name lowType = do
-  arrayAccessType <- lookupTypeEnv'' m name tenv
+  arrayAccessType <- lookupTypeEnv'' m (Right name) tenv name
   let arrayAccessType' = reduceTermPlus arrayAccessType
   case arrayAccessType' of
     (_, TermPi _ xts cod)
@@ -258,19 +263,19 @@ clarifyArrayAccess tenv m name lowType = do
           [index, arr] -> do
             callThenReturn <- toArrayAccessTail tenv m lowType cod arr index xs
             let body = iterativeApp headerList callThenReturn
-            retClosure tenv (Just $ asText'' name) [] m xts body
+            retClosure tenv (Just $ showInHex name) [] m xts body
           _ -> raiseCritical m $ "the type of array-access is wrong"
     _ -> raiseCritical m $ "the type of array-access is wrong"
 
 clarifySysCall ::
      TypeEnv
-  -> Identifier -- the name of theta
+  -> T.Text -- the name of theta
   -> Syscall
   -> [Arg] -- the length of the arguments of the theta
   -> Meta -- the meta of the theta
   -> WithEnv CodePlus
 clarifySysCall tenv name syscall args m = do
-  sysCallType <- lookupTypeEnv'' m name tenv
+  sysCallType <- lookupTypeEnv'' m (Right name) tenv name
   let sysCallType' = reduceTermPlus sysCallType
   case sysCallType' of
     (_, TermPi _ xts cod)
@@ -279,8 +284,8 @@ clarifySysCall tenv name syscall args m = do
         let tenv' = insTypeEnv1 xts tenv
         callThenReturn <- toSysCallTail tenv' m cod syscall ds xs
         let body = iterativeApp headerList callThenReturn
-        retClosure tenv (Just $ asText'' name) [] m xts body
-    _ -> raiseCritical m $ "the type of " <> asText name <> " is wrong"
+        retClosure tenv (Just $ showInHex name) [] m xts body
+    _ -> raiseCritical m $ "the type of " <> name <> " is wrong"
 
 iterativeApp :: [a -> a] -> a -> a
 iterativeApp [] x = x
@@ -291,7 +296,7 @@ clarifyBinder ::
 clarifyBinder _ [] = return []
 clarifyBinder tenv ((m, x, t):xts) = do
   t' <- clarify' tenv t
-  xts' <- clarifyBinder (insTypeEnv'' x t tenv) xts
+  xts' <- clarifyBinder (insTypeEnv'' (Left (asInt x)) t tenv) xts
   return $ (m, x, t') : xts'
 
 knot :: Meta -> Identifier -> DataPlus -> WithEnv ()
@@ -409,7 +414,7 @@ toSysCallTail tenv m cod syscall args xs = do
   result <- retWithBorrowedVars tenv m cod xs resultVarName
   return
     ( m
-    , CodeUpElim resultVarName (m, CodeTheta (ThetaSysCall syscall args)) result)
+    , CodeUpElim resultVarName (m, CodeConst (ConstSysCall syscall args)) result)
 
 toArrayAccessTail ::
      TypeEnv
@@ -427,7 +432,7 @@ toArrayAccessTail tenv m lowType cod arr index xs = do
     ( m
     , CodeUpElim
         resultVarName
-        (m, CodeTheta (ThetaArrayAccess lowType arr index))
+        (m, CodeConst (ConstArrayAccess lowType arr index))
         result)
 
 retWithBorrowedVars ::
@@ -456,8 +461,7 @@ inferKind m (ArrayKindIntS i) = return (m, TermEnum (EnumTypeIntS i))
 inferKind m (ArrayKindIntU i) = return (m, TermEnum (EnumTypeIntU i))
 inferKind m (ArrayKindFloat size) = do
   let constName = "f" <> T.pack (show (sizeAsInt size))
-  i <- lookupConstNum' m constName
-  return (m, TermConst (I (constName, i)))
+  return (m, TermConst constName)
 inferKind m _ = raiseCritical m "inferKind for void-pointer"
 
 rightmostOf :: TermPlus -> WithEnv (Meta, TermPlus)
@@ -489,7 +493,7 @@ makeClosure mName mxts2 m mxts1 e = do
   registerIfNecessary m name xts1 xts2 e
   let vs = map (\(mx, x, _) -> (mx, DataUpsilon x)) mxts2
   let fvEnv = (m, sigmaIntro vs)
-  return (m, sigmaIntro [envExp, fvEnv, (m, DataTheta name)])
+  return (m, sigmaIntro [envExp, fvEnv, (m, DataConst name)])
 
 registerIfNecessary ::
      Meta
@@ -565,13 +569,13 @@ callClosure m e zexes = do
 nameFromMaybe :: Maybe T.Text -> WithEnv T.Text
 nameFromMaybe mName =
   case mName of
-    Just lamThetaName -> return lamThetaName
+    Just lamConstName -> return lamConstName
     Nothing -> asText' <$> newNameWith' "thunk"
 
 chainTermPlus :: TypeEnv -> TermPlus -> WithEnv [IdentifierPlus]
 chainTermPlus _ (_, TermTau) = return []
 chainTermPlus tenv (m, TermUpsilon x) = do
-  (xts, t) <- obtainChain m x tenv
+  (xts, t) <- obtainChain m (Left (asInt x)) tenv
   return $ xts ++ [(m, x, t)]
 chainTermPlus tenv (_, TermPi _ xts t) = chainTermPlus' tenv xts [t]
 chainTermPlus tenv (_, TermPiIntro xts e) = chainTermPlus' tenv xts [e]
@@ -582,10 +586,10 @@ chainTermPlus tenv (_, TermPiElim e es) = do
   return $ xs1 ++ xs2
 chainTermPlus tenv (_, TermIter (_, x, t) xts e) = do
   xs1 <- chainTermPlus tenv t
-  xs2 <- chainTermPlus' (insTypeEnv'' x t tenv) xts [e]
+  xs2 <- chainTermPlus' (insTypeEnv'' (Left (asInt x)) t tenv) xts [e]
   return $ xs1 ++ filter (\(_, y, _) -> y /= x) xs2
 chainTermPlus tenv (m, TermConst x) = do
-  (xts, _) <- obtainChain m x tenv
+  (xts, _) <- obtainChain m (Right x) tenv
   return xts
 chainTermPlus _ (_, TermFloat _ _) = return []
 chainTermPlus _ (_, TermEnum _) = return []
@@ -622,7 +626,7 @@ chainTermPlus' ::
 chainTermPlus' tenv [] es = concat <$> mapM (chainTermPlus tenv) es
 chainTermPlus' tenv ((_, x, t):xts) es = do
   xs1 <- chainTermPlus tenv t
-  xs2 <- chainTermPlus' (insTypeEnv'' x t tenv) xts es
+  xs2 <- chainTermPlus' (insTypeEnv'' (Left (asInt x)) t tenv) xts es
   return $ xs1 ++ filter (\(_, y, _) -> y /= x) xs2
 
 dropFst :: [(a, b, c)] -> [(b, c)]
@@ -632,16 +636,44 @@ dropFst xyzs = do
 
 insTypeEnv1 :: [IdentifierPlus] -> TypeEnv -> TypeEnv
 insTypeEnv1 [] tenv = tenv
-insTypeEnv1 ((_, x, t):rest) tenv = insTypeEnv'' x t $ insTypeEnv1 rest tenv
+insTypeEnv1 ((_, x, t):rest) tenv =
+  insTypeEnv'' (Left (asInt x)) t $ insTypeEnv1 rest tenv
 
 obtainChain ::
-     Meta -> Identifier -> TypeEnv -> WithEnv ([IdentifierPlus], TermPlus)
+     Meta -> TypeEnvKey -> TypeEnv -> WithEnv ([IdentifierPlus], TermPlus)
 obtainChain m x tenv = do
   cenv <- gets chainEnv
-  case IntMap.lookup (asInt x) cenv of
+  case Map.lookup x cenv of
     Just xtst -> return xtst
     Nothing -> do
-      t <- lookupTypeEnv'' m x tenv
+      t <- lookupTypeEnv'' m x tenv "name"
       xts <- chainTermPlus tenv t
-      modify (\env -> env {chainEnv = IntMap.insert (asInt x) (xts, t) cenv})
+      modify (\env -> env {chainEnv = Map.insert x (xts, t) cenv})
       return (xts, t)
+
+showInHex :: T.Text -> T.Text
+showInHex x = "x" <> foldr (<>) "" (map showInHex' (encode $ T.unpack x))
+
+showInHex' :: Word8 -> T.Text
+showInHex' w = do
+  let (high, low) = (fromIntegral w :: Int) `divMod` 16
+  hex high <> hex low
+
+hex :: Int -> T.Text
+hex 0 = "0"
+hex 1 = "1"
+hex 2 = "2"
+hex 3 = "3"
+hex 4 = "4"
+hex 5 = "5"
+hex 6 = "6"
+hex 7 = "7"
+hex 8 = "8"
+hex 9 = "9"
+hex 10 = "a"
+hex 11 = "b"
+hex 12 = "c"
+hex 13 = "d"
+hex 14 = "e"
+hex 15 = "f"
+hex _ = " "

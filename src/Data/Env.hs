@@ -35,11 +35,16 @@ data VisitInfo
 
 type FileEnv = Map.HashMap (Path Abs File) VisitInfo
 
-type RuleEnv = IntMap.IntMap (Maybe [Data.WeakTerm.IdentifierPlus])
+-- type RuleEnv = IntMap.IntMap (Maybe [Data.WeakTerm.IdentifierPlus])
+type RuleEnv = Map.HashMap T.Text (Maybe [TextPlus])
 
+-- type RuleEnv = IntMap.IntMap (Maybe [TextPlus])
 type UnivInstEnv = IntMap.IntMap (S.Set Int)
 
-type TypeEnv = IntMap.IntMap TermPlus
+-- type TypeEnv = IntMap.IntMap TermPlus
+type TypeEnvKey = Either Int T.Text
+
+type TypeEnv = Map.HashMap TypeEnvKey TermPlus
 
 data Env =
   Env
@@ -57,7 +62,8 @@ data Env =
     , keywordEnv :: S.Set T.Text
     -- macro transformers
     , notationEnv :: [(TreePlus, TreePlus)]
-    , constantEnv :: Map.HashMap T.Text Int
+    -- , constantEnv :: Map.HashMap T.Text Int
+    , constantSet :: S.Set T.Text
     -- path ~> identifiers defined in the file at toplevel
     , fileEnv :: FileEnv
     , traceEnv :: [Path Abs File]
@@ -67,25 +73,27 @@ data Env =
     , revEnumEnv :: Map.HashMap T.Text (T.Text, Int)
     -- "list:nil" ~> "list-nil-12", etc.
     , llvmEnumEnv :: Map.HashMap T.Text T.Text
-    , revCaseEnv :: IntMap.IntMap T.Text
+    , revCaseEnv :: Map.HashMap T.Text T.Text
     , nameEnv :: Map.HashMap T.Text T.Text
     -- [("foo.13", "foo"), ...] (as corresponding int)
     , revNameEnv :: IntMap.IntMap Int
     , prefixEnv :: [T.Text]
     , sectionEnv :: [T.Text]
-    , formationEnv :: IntMap.IntMap (Maybe WeakTermPlus)
+    , formationEnv :: Map.HashMap T.Text (Maybe WeakTermPlus)
     -- "stream" ~> ["stream", "other-record-type", "head", "tail", "other-destructor"]
     , labelEnv :: Map.HashMap T.Text [T.Text]
     -- "list" ~> (cons, Pi (A : tau). A -> list A -> list A)
     , indEnv :: RuleEnv
     -- "list:cons" ~> ("list", [0])
-    , revIndEnv :: Map.HashMap T.Text (Identifier, [Int])
+    , revIndEnv :: Map.HashMap T.Text (T.Text, [Int])
+    , consNumEnv :: Map.HashMap T.Text Int
+    -- , revIndEnv :: Map.HashMap T.Text (Identifier, [Int])
     , intactSet :: S.Set (Meta, Identifier)
     --
     -- elaborate
     --
-    -- var ~> (index of implicit arguments of the var)
-    , impEnv :: IntMap.IntMap [Int]
+    -- const ~> (index of implicit arguments of the const)
+    , impEnv :: Map.HashMap T.Text [Int]
     -- var ~> (typeof(var), level-of-type)
     , weakTypeEnv :: IntMap.IntMap WeakTermPlus
     , typeEnv :: TypeEnv
@@ -97,11 +105,11 @@ data Env =
     --
     -- clarify
     --
-    , cacheEnv :: IntMap.IntMap (Either TermPlus CodePlus)
+    , cacheEnv :: Map.HashMap T.Text (Either TermPlus CodePlus)
     -- f ~> thunk (lam (x1 ... xn) e)
     , codeEnv :: Map.HashMap T.Text Definition
     , nameSet :: S.Set T.Text
-    , chainEnv :: IntMap.IntMap ([Data.Term.IdentifierPlus], TermPlus)
+    , chainEnv :: Map.HashMap TypeEnvKey ([Data.Term.IdentifierPlus], TermPlus)
     --
     -- LLVM
     --
@@ -123,28 +131,30 @@ initialEnv =
     , target = Nothing
     , notationEnv = []
     , keywordEnv = S.empty
-    , constantEnv = Map.empty
+    -- , constantEnv = Map.empty
+    , constantSet = S.empty
+    , consNumEnv = Map.empty
     , enumEnv = Map.empty
     , fileEnv = Map.empty
     , traceEnv = []
     , revEnumEnv = Map.empty
     , llvmEnumEnv = Map.empty
-    , revCaseEnv = IntMap.empty
+    , revCaseEnv = Map.empty
     , nameEnv = Map.empty
     , revNameEnv = IntMap.empty
     , revIndEnv = Map.empty
     , intactSet = S.empty
     , prefixEnv = []
     , sectionEnv = []
-    , formationEnv = IntMap.empty
-    , indEnv = IntMap.empty
+    , formationEnv = Map.empty
+    , indEnv = Map.empty
     , labelEnv = Map.empty
-    , impEnv = IntMap.empty
+    , impEnv = Map.empty
     , weakTypeEnv = IntMap.empty
-    , typeEnv = IntMap.empty
-    , cacheEnv = IntMap.empty
+    , typeEnv = Map.empty
+    , cacheEnv = Map.empty
     , codeEnv = Map.empty
-    , chainEnv = IntMap.empty
+    , chainEnv = Map.empty
     , llvmEnv = Map.empty
     , declEnv =
         Map.fromList
@@ -204,6 +214,11 @@ newNameWith'' s = do
   i <- newCount
   return $ I ("(" <> s <> "-" <> T.pack (show i) <> ")", i)
 
+newTextWith :: T.Text -> WithEnv T.Text
+newTextWith s = do
+  i <- newCount
+  return $ "(" <> s <> "-" <> T.pack (show i) <> ")"
+
 newHole :: Meta -> WithEnv WeakTermPlus
 newHole m = do
   h <- newNameWith'' "hole"
@@ -237,51 +252,70 @@ newDataUpsilonWith m name = do
   x <- newNameWith' name
   return (x, (m, DataUpsilon x))
 
-insTypeEnv :: Identifier -> TermPlus -> WithEnv ()
-insTypeEnv (I (_, i)) t =
-  modify (\e -> e {typeEnv = IntMap.insert i t (typeEnv e)})
+insTypeEnv :: TypeEnvKey -> TermPlus -> WithEnv ()
+-- insTypeEnv :: Identifier -> TermPlus -> WithEnv ()
+-- insTypeEnv (I (_, i)) t =
+insTypeEnv x t = modify (\e -> e {typeEnv = Map.insert x t (typeEnv e)})
 
-insTypeEnv'' :: Identifier -> TermPlus -> TypeEnv -> TypeEnv
-insTypeEnv'' (I (_, i)) t tenv = do
-  IntMap.insert i t tenv
+insTypeEnv'' :: TypeEnvKey -> TermPlus -> TypeEnv -> TypeEnv
+insTypeEnv'' x t tenv = Map.insert x t tenv
 
-lookupTypeEnv :: Meta -> Identifier -> WithEnv TermPlus
-lookupTypeEnv m x = do
-  mt <- lookupTypeEnvMaybe x
-  case mt of
-    Just tl -> return tl
+-- insTypeEnv'' :: Identifier -> TermPlus -> TypeEnv -> TypeEnv
+-- insTypeEnv'' (I (_, i)) t tenv = do
+--   IntMap.insert i t tenv
+lookupTypeEnv :: Meta -> TypeEnvKey -> T.Text -> WithEnv TermPlus
+-- lookupTypeEnv :: Meta -> Identifier -> WithEnv TermPlus
+lookupTypeEnv m x name = do
+  tenv <- gets typeEnv
+  case Map.lookup x tenv of
+    Just t -> return t
     Nothing ->
-      raiseCritical m $ asText' x <> " is not found in the type environment."
+      raiseCritical m $
+      "the constant `" <> name <> "` is not found in the type environment."
 
-lookupTypeEnvMaybe :: Identifier -> WithEnv (Maybe TermPlus)
-lookupTypeEnvMaybe (I (_, i)) = do
+-- lookupTypeEnvMaybe :: Identifier -> WithEnv (Maybe TermPlus)
+-- lookupTypeEnvMaybe (I (_, i)) = do
+--   tenv <- gets typeEnv
+--   return $ IntMap.lookup i tenv
+lookupTypeEnv' :: Meta -> TypeEnvKey -> T.Text -> WithEnv TermPlus
+lookupTypeEnv' m x name = do
   tenv <- gets typeEnv
-  return $ IntMap.lookup i tenv
+  lookupTypeEnv'' m x tenv name
 
-lookupTypeEnv' :: Meta -> Identifier -> WithEnv TermPlus
-lookupTypeEnv' m x = do
-  tenv <- gets typeEnv
-  lookupTypeEnv'' m x tenv
-
-lookupTypeEnv'' :: Meta -> Identifier -> TypeEnv -> WithEnv TermPlus
-lookupTypeEnv'' m x@(I (s, i)) tenv
+-- lookupTypeEnv'' :: Meta -> Identifier -> TypeEnv -> WithEnv TermPlus
+-- lookupTypeEnv'' m x@(I (s, i)) tenv
+--   | Just _ <- asLowTypeMaybe s = return (m, TermTau)
+--   | Just op <- asUnaryOpMaybe s = unaryOpToType m op
+--   | Just op <- asBinaryOpMaybe s = binaryOpToType m op
+--   | Just lowType <- asArrayAccessMaybe s = arrayAccessToType m lowType
+--   | otherwise = lookupTypeEnv m s
+lookupTypeEnv'' :: Meta -> TypeEnvKey -> TypeEnv -> T.Text -> WithEnv TermPlus
+lookupTypeEnv'' m (Right s) _ _
   | Just _ <- asLowTypeMaybe s = return (m, TermTau)
   | Just op <- asUnaryOpMaybe s = unaryOpToType m op
   | Just op <- asBinaryOpMaybe s = binaryOpToType m op
   | Just lowType <- asArrayAccessMaybe s = arrayAccessToType m lowType
-  | otherwise = do
-    case IntMap.lookup i tenv of
-      Just t -> return t
-      Nothing ->
-        raiseCritical m $ asText' x <> " is not found in the type environment."
+  -- | otherwise = lookupTypeEnv m $ Right s
+lookupTypeEnv'' m key tenv name = do
+  case Map.lookup key tenv of
+    Just t -> return t
+    Nothing ->
+      raiseCritical m $
+      "the constant `" <> name <> "` is not found in the type environment."
+  -- lookupTypeEnv m key name
+    -- case IntMap.lookup i tenv of
+    --   Just t -> return t
+    --   Nothing ->
+    --     raiseCritical m $ asText' x <> " is not found in the type environment."
 
 lowTypeToType :: Meta -> LowType -> WithEnv TermPlus
 lowTypeToType m (LowTypeIntS s) = return (m, TermEnum (EnumTypeIntS s))
 lowTypeToType m (LowTypeIntU s) = return (m, TermEnum (EnumTypeIntU s))
 lowTypeToType m (LowTypeFloat s) = do
-  let x = "f" <> T.pack (show (sizeAsInt s))
-  i <- lookupConstNum x
-  return (m, TermConst (I (x, i)))
+  return (m, TermConst $ "f" <> T.pack (show (sizeAsInt s)))
+  -- let x = "f" <> T.pack (show (sizeAsInt s))
+  -- i <- lookupConstNum x
+  -- return (m, TermConst (I (x, i)))
 lowTypeToType m _ = raiseCritical m "invalid argument passed to lowTypeToType"
 
 unaryOpToType :: Meta -> UnaryOp -> WithEnv TermPlus
@@ -364,85 +398,89 @@ lookupLLVMEnumEnv :: Meta -> T.Text -> WithEnv T.Text
 lookupLLVMEnumEnv m labelName = do
   lenv <- gets llvmEnumEnv
   case Map.lookup labelName lenv of
-    Nothing -> do
-      p' lenv
-      raiseCritical m $ "no such enum-label defined: " <> labelName
+    Nothing -> raiseCritical m $ "no such enum-label defined: " <> labelName
     Just labelName' -> return labelName'
 
-lookupConstNum :: T.Text -> WithEnv Int
-lookupConstNum constName = do
-  cenv <- gets constantEnv
-  case Map.lookup constName cenv of
-    Just i -> return i
-    Nothing -> do
-      i <- newCount
-      modify (\env -> env {constantEnv = Map.insert constName i cenv})
-      return i
-
-lookupConstNum' :: Meta -> T.Text -> WithEnv Int
-lookupConstNum' m constName = do
-  cenv <- gets constantEnv
-  case Map.lookup constName cenv of
-    Just i -> return i
-    Nothing -> raiseCritical m $ "no such constant: " <> constName
-
-lookupConstantMaybe :: Meta -> [T.Text] -> T.Text -> WithEnv (Maybe Identifier)
-lookupConstantMaybe m penv constName = do
-  me <- lookupConstantMaybe'' constName
-  case me of
-    Just e -> return $ Just e
-    Nothing -> lookupConstantMaybe' m penv constName
-
-lookupConstantMaybe' :: Meta -> [T.Text] -> T.Text -> WithEnv (Maybe Identifier)
-lookupConstantMaybe' _ [] _ = return Nothing
-lookupConstantMaybe' m (prefix:prefixList) name = do
-  me <- lookupConstantMaybe'' $ prefix <> ":" <> name
-  case me of
-    Just e -> return $ Just e
-    Nothing -> lookupConstantMaybe' m prefixList name
-
-lookupConstantMaybe'' :: T.Text -> WithEnv (Maybe Identifier)
-lookupConstantMaybe'' constName = do
-  cenv <- gets constantEnv
-  case Map.lookup constName cenv of
-    Just i -> return $ Just $ I (constName, i)
-    Nothing
-      | isConstant constName -> Just <$> lookupConstantPlus' constName
-      | otherwise -> return Nothing
-
-lookupConstantPlus :: Meta -> T.Text -> WithEnv WeakTermPlus
-lookupConstantPlus m constName = do
-  cenv <- gets constantEnv
-  case Map.lookup constName cenv of
-    Just i -> return (m, WeakTermConst (I (constName, i)))
-    Nothing -> do
-      i <- newCount
-      let ident = I (constName, i)
-      modify (\env -> env {constantEnv = Map.insert constName i cenv})
-      return (m, WeakTermConst ident)
-
-lookupConstantPlus' :: T.Text -> WithEnv Identifier
-lookupConstantPlus' constName = do
-  cenv <- gets constantEnv
-  case Map.lookup constName cenv of
-    Just i -> return $ I (constName, i)
-    Nothing -> do
-      i <- newCount
-      let ident = I (constName, i)
-      modify (\env -> env {constantEnv = Map.insert constName i cenv})
-      return ident
-
+-- lookupConstNum :: T.Text -> WithEnv Int
+-- lookupConstNum constName = do
+--   cenv <- gets constantEnv
+--   case Map.lookup constName cenv of
+--     Just i -> return i
+--     Nothing -> do
+--       i <- newCount
+--       modify (\env -> env {constantEnv = Map.insert constName i cenv})
+--       return i
+-- lookupConstNum' :: Meta -> T.Text -> WithEnv Int
+-- lookupConstNum' m constName = do
+--   cenv <- gets constantEnv
+--   case Map.lookup constName cenv of
+--     Just i -> return i
+--     Nothing -> raiseCritical m $ "no such constant: " <> constName
+-- lookupConstantMaybe :: Meta -> [T.Text] -> T.Text -> WithEnv (Maybe Identifier)
+-- lookupConstantMaybe :: Meta -> [T.Text] -> T.Text -> WithEnv (Maybe T.Text)
+-- lookupConstantMaybe m penv constName = do
+--   me <- lookupConstantMaybe'' constName
+--   case me of
+--     Just e -> return constNam
+--       -- return $ Just e
+--     Nothing -> lookupConstantMaybe' m penv constName
+-- lookupConstantMaybe' :: Meta -> [T.Text] -> T.Text -> WithEnv (Maybe Identifier)
+-- lookupConstantMaybe' _ [] _ = return Nothing
+-- lookupConstantMaybe' m (prefix:prefixList) name = do
+--   me <- lookupConstantMaybe'' $ prefix <> ":" <> name
+--   case me of
+--     Just e -> return $ Just e
+--     Nothing -> lookupConstantMaybe' m prefixList name
+-- lookupConstantMaybe'' :: T.Text -> WithEnv (Maybe Identifier)
+-- lookupConstantMaybe'' constName = do
+--   cenv <- gets constantEnv
+--   case Map.lookup constName cenv of
+--     Just i -> return $ Just $ I (constName, i)
+--     Nothing
+--       | isConstant constName -> Just <$> lookupConstantPlus' constName
+--       | otherwise -> return Nothing
+-- lookupConstantPlus :: Meta -> T.Text -> WithEnv WeakTermPlus
+-- lookupConstantPlus m constName = return (m, WeakTermConst constName)
+-- lookupConstantPlus m constName = do
+--   cenv <- gets constantEnv
+--   case Map.lookup constName cenv of
+--     Just i -> return (m, WeakTermConst (I (constName, i)))
+--     Nothing -> do
+--       i <- newCount
+--       let ident = I (constName, i)
+--       modify (\env -> env {constantEnv = Map.insert constName i cenv})
+--       return (m, WeakTermConst ident)
+-- lookupConstantPlus' :: T.Text -> WithEnv Identifier
+-- lookupConstantPlus' constName = do
+--   cenv <- gets constantEnv
+--   case Map.lookup constName cenv of
+--     Just i -> return $ I (constName, i)
+--     Nothing -> do
+--       i <- newCount
+--       let ident = I (constName, i)
+--       modify (\env -> env {constantEnv = Map.insert constName i cenv})
+--       return ident
 -- f32とかi64.addとかは定数
-isConstant :: T.Text -> Bool
+isConstant :: T.Text -> WithEnv Bool
 isConstant name
-  | name == "f16" = True
-  | name == "f32" = True
-  | name == "f64" = True
-  | Just _ <- asUnaryOpMaybe name = True
-  | Just _ <- asBinaryOpMaybe name = True
-  | Just _ <- asArrayAccessMaybe name = True
-  | otherwise = False
+  | name == "f16" = return True
+  | name == "f32" = return True
+  | name == "f64" = return True
+  | Just _ <- asUnaryOpMaybe name = return True
+  | Just _ <- asBinaryOpMaybe name = return True
+  | Just _ <- asArrayAccessMaybe name = return True
+  | otherwise = do
+    set <- gets constantSet
+    return $ S.member name set
 
+-- isConstant name
+--   | name == "f16" = True
+--   | name == "f32" = True
+--   | name == "f64" = True
+--   | Just _ <- asUnaryOpMaybe name = True
+--   | Just _ <- asBinaryOpMaybe name = True
+--   | Just _ <- asArrayAccessMaybe name = True
+--   | otherwise = False
 -- for debug
 p :: String -> WithEnv ()
 p s = liftIO $ putStrLn s

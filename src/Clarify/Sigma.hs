@@ -27,7 +27,7 @@ cartesianSigma ::
 cartesianSigma (I (thetaName, i)) m k mxts = do
   cenv <- gets codeEnv
   let ident = asText' $ I ("cartesian-" <> thetaName, i)
-  let theta = (m, DataTheta ident)
+  let theta = (m, DataConst ident)
   case Map.lookup ident cenv of
     Just _ -> return theta
     Nothing -> do

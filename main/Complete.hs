@@ -96,7 +96,7 @@ compInfoQuasiStmtList ::
 compInfoQuasiStmtList _ _ [] = return ()
 compInfoQuasiStmtList c info ((QuasiStmtLet _ (mx, x, t) e):ss) = do
   compInfoWeakTermPlus c info t
-  let info' = (x, mx) : info
+  let info' = (asIdent x, mx) : info
   compInfoWeakTermPlus c info' e
   compInfoQuasiStmtList c info' ss
 compInfoQuasiStmtList c info ((QuasiStmtDef xds):ss) = do
@@ -105,7 +105,7 @@ compInfoQuasiStmtList c info ((QuasiStmtDef xds):ss) = do
   compInfoQuasiStmtList c info' ss
 compInfoQuasiStmtList c info ((QuasiStmtConstDecl _ (mx, x, t)):ss) = do
   compInfoWeakTermPlus c info t
-  let info' = (x, mx) : info
+  let info' = (asIdent x, mx) : info
   compInfoQuasiStmtList c info' ss
 compInfoQuasiStmtList c info (_:ss) = compInfoQuasiStmtList c info ss
 

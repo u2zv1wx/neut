@@ -59,11 +59,16 @@ returnCartesianImmediate m = do
   v <- cartesianImmediate m
   return (m, CodeUpIntro v)
 
-toThetaInfo :: T.Text -> Meta -> WithEnv (T.Text, DataPlus)
-toThetaInfo thetaName m = do
-  i <- lookupConstNum thetaName
-  let ident = asText' $ I (thetaName, i)
-  return (ident, (m, DataTheta ident))
+toConstInfo :: T.Text -> Meta -> WithEnv (T.Text, DataPlus)
+toConstInfo thetaName m
+  -- i <- lookupConstNum thetaName
+ = do
+  i <- newCount
+  let name = thetaName <> "-" <> T.pack (show i)
+  -- name <- newTextWith thetaName
+  -- let ident = asText' $ I (thetaName, i)
+  -- return (ident, (m, DataConst ident))
+  return (name, (m, DataConst name))
 
 switch :: CodePlus -> CodePlus -> [(Case, CodePlus)]
 switch e1 e2 = [(CaseValue (EnumValueIntS 64 0), e1), (CaseDefault, e2)]
@@ -71,7 +76,7 @@ switch e1 e2 = [(CaseValue (EnumValueIntS 64 0), e1), (CaseDefault, e2)]
 cartesianImmediate :: Meta -> WithEnv DataPlus
 cartesianImmediate m = do
   cenv <- gets codeEnv
-  (ident, theta) <- toThetaInfo "cartesian-immediate" m
+  (ident, theta) <- toConstInfo "cartesian-immediate" m
   case Map.lookup ident cenv of
     Just _ -> return theta
     Nothing -> do
@@ -99,7 +104,7 @@ relevantImmediate argVar@(m, _) =
 cartesianStruct :: Meta -> [ArrayKind] -> WithEnv DataPlus
 cartesianStruct m ks = do
   cenv <- gets codeEnv
-  (ident, theta) <- toThetaInfo "cartesian-struct" m
+  (ident, theta) <- toConstInfo "cartesian-struct" m
   case Map.lookup ident cenv of
     Just _ -> return theta
     Nothing -> do
