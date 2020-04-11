@@ -13,10 +13,7 @@ data WeakTerm
   | WeakTermUpsilon Identifier
   | WeakTermPi (Maybe T.Text) [IdentifierPlus] WeakTermPlus
   | WeakTermPiIntro [IdentifierPlus] WeakTermPlus
-  | WeakTermPiIntroPlus
-      (T.Text, [IdentifierPlus]) -- (name of construtor, xts' ++ yts)
-      [IdentifierPlus]
-      WeakTermPlus
+  | WeakTermPiIntroPlus (T.Text, [IdentifierPlus]) [IdentifierPlus] WeakTermPlus
   | WeakTermPiElim WeakTermPlus [WeakTermPlus]
   | WeakTermIter IdentifierPlus [IdentifierPlus] WeakTermPlus
   | WeakTermZeta Identifier

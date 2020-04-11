@@ -35,13 +35,10 @@ data VisitInfo
 
 type FileEnv = Map.HashMap (Path Abs File) VisitInfo
 
--- type RuleEnv = IntMap.IntMap (Maybe [Data.WeakTerm.IdentifierPlus])
 type RuleEnv = Map.HashMap T.Text (Maybe [TextPlus])
 
--- type RuleEnv = IntMap.IntMap (Maybe [TextPlus])
 type UnivInstEnv = IntMap.IntMap (S.Set Int)
 
--- type TypeEnv = IntMap.IntMap TermPlus
 type TypeEnvKey = Either Int T.Text
 
 type TypeEnv = Map.HashMap TypeEnvKey TermPlus
@@ -62,7 +59,6 @@ data Env =
     , keywordEnv :: S.Set T.Text
     -- macro transformers
     , notationEnv :: [(TreePlus, TreePlus)]
-    -- , constantEnv :: Map.HashMap T.Text Int
     , constantSet :: S.Set T.Text
     -- path ~> identifiers defined in the file at toplevel
     , fileEnv :: FileEnv
@@ -89,7 +85,6 @@ data Env =
     --
     -- const ~> (index of implicit arguments of the const)
     , impEnv :: Map.HashMap T.Text [Int]
-    -- var ~> (typeof(var), level-of-type)
     , weakTypeEnv :: IntMap.IntMap WeakTermPlus
     , typeEnv :: TypeEnv
     , constraintEnv :: [PreConstraint]
@@ -126,14 +121,11 @@ initialEnv =
     , target = Nothing
     , notationEnv = []
     , keywordEnv = S.empty
-    -- , constantEnv = Map.empty
     , constantSet = S.empty
     , enumEnv = Map.empty
     , fileEnv = Map.empty
     , traceEnv = []
     , revEnumEnv = Map.empty
-    -- , llvmEnumEnv = Map.empty
-    -- , revCaseEnv = Map.empty
     , nameEnv = Map.empty
     , revNameEnv = IntMap.empty
     , revIndEnv = Map.empty
@@ -260,11 +252,6 @@ lookupTypeEnv m x name = do
     Nothing ->
       raiseCritical m $
       "the constant `" <> name <> "` is not found in the type environment."
-
-lookupTypeEnv' :: Meta -> TypeEnvKey -> T.Text -> WithEnv TermPlus
-lookupTypeEnv' m x name = do
-  tenv <- gets typeEnv
-  lookupTypeEnv'' m x tenv name
 
 lookupTypeEnv'' :: Meta -> TypeEnvKey -> TypeEnv -> T.Text -> WithEnv TermPlus
 lookupTypeEnv'' m (Right s) _ _
