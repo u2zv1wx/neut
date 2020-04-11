@@ -71,9 +71,6 @@ data Env =
     , enumEnv :: Map.HashMap T.Text [(T.Text, Int)]
     -- [("left", ("choice", 0)), ("right", ("choice", 1)), ...]
     , revEnumEnv :: Map.HashMap T.Text (T.Text, Int)
-    -- "list:nil" ~> "list-nil-12", etc.
-    -- , llvmEnumEnv :: Map.HashMap T.Text T.Text
-    -- , revCaseEnv :: Map.HashMap T.Text T.Text
     , nameEnv :: Map.HashMap T.Text T.Text
     -- [("foo.13", "foo"), ...] (as corresponding int)
     , revNameEnv :: IntMap.IntMap Int
@@ -86,7 +83,6 @@ data Env =
     , indEnv :: RuleEnv
     -- "list:cons" ~> ("list", [0])
     , revIndEnv :: Map.HashMap T.Text (T.Text, [Int])
-    -- , revIndEnv :: Map.HashMap T.Text (Identifier, [Int])
     , intactSet :: S.Set (Meta, T.Text)
     --
     -- elaborate
