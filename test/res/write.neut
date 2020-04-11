@@ -83,7 +83,6 @@
 (verify some-theorem)
 
 
-
 ;; (@os:write 3 os:stdout "あ" 3)
 ;; (@os:write 3 os:stdout "あ" 3)
 ;; (@os:write 3 os:stdout "あ" 3)
@@ -143,6 +142,7 @@
 (inductive equal ((A tau) (x A) (y A))
   (refl ((z A)) (equal A z z)))
 
+
 (attribute equal
   (implicit 0))
 
@@ -154,12 +154,14 @@
 
 @?equal:refl
 
+
 (definition my-id ((a tau) (_ tau) (_ tau) (x a)) x)
 
 ;; (definition my-id ((?a tau) (x a)) x)
 
 ;; #my-id
 ?my-id
+
 
 ;; (constant outer (hom i64 i64))
 
@@ -168,6 +170,7 @@
 ;; (constant something i64)
 
 ;; (i64:add 10 something)
+
 
 
 (attribute my-id (implicit 0 1 2))
@@ -209,6 +212,9 @@
 ?flip
 
 (definition 日本語でもべつにいい ((x i64)) (i64:add x 10))
+
+
+(definition sample ((x i64)) (i64:add x 10))
 
 (theorem double-flip-is-identity
   (pi ((c (choice)))

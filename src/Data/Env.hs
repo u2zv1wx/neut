@@ -88,7 +88,7 @@ data Env =
     , revIndEnv :: Map.HashMap T.Text (T.Text, [Int])
     , consNumEnv :: Map.HashMap T.Text Int
     -- , revIndEnv :: Map.HashMap T.Text (Identifier, [Int])
-    , intactSet :: S.Set (Meta, Identifier)
+    , intactSet :: S.Set (Meta, T.Text)
     --
     -- elaborate
     --

@@ -598,7 +598,7 @@ warnUnusedVar :: WithEnv ()
 warnUnusedVar =
   whenCheck $ do
     set <- gets intactSet
-    let set' = S.map (\(m, I (x, _)) -> (getPosInfo m, x)) set
+    let set' = S.map (\(m, x) -> (getPosInfo m, x)) set
     warnUnusedVar' $ S.toList set'
 
 warnUnusedVar' :: [(PosInfo, T.Text)] -> WithEnv ()

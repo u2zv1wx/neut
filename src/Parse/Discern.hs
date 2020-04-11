@@ -99,7 +99,7 @@ discern'' nenv (m, WeakTermUpsilon x@(I (s, _))) = do
   mx <- lookupName m penv nenv x
   b1 <- lookupEnumValueNameWithPrefix s
   b2 <- lookupEnumTypeNameWithPrefix s
-  mc <- lookupConstantMaybe penv s
+  mc <- lookupConstantMaybe m penv s
   case (mx, b1, b2, mc) of
     (Just x', _, _, _) -> return (m, WeakTermUpsilon x')
     (_, _, _, Just c) -> return (m, WeakTermConst c)
@@ -216,6 +216,7 @@ discernIter ::
   -> WithEnv (IdentifierPlus, [IdentifierPlus], WeakTermPlus)
 discernIter nenv (mx, x, t') [] e = do
   x' <- newDefinedNameWith mx x
+  removeFromIntactSet mx $ asText x'
   e' <- discern'' (insertName x x' nenv) e
   return ((mx, x', t'), [], e')
 discernIter nenv xt ((mx, x, t):xts) e = do
@@ -253,7 +254,7 @@ newDefinedNameWith m (I (s, _)) = do
   j <- newCount
   modify (\env -> env {nameEnv = Map.insert s s (nameEnv env)})
   let x = I (s, j)
-  insertIntoIntactSet m x
+  insertIntoIntactSet m s
   return x
 
 insertConstant :: Meta -> T.Text -> WithEnv ()
@@ -261,16 +262,18 @@ insertConstant m x = do
   cset <- gets constantSet
   if S.member x cset
     then raiseError m $ "the constant `" <> x <> "` is already defined"
-    else modify (\env -> env {constantSet = S.insert x (constantSet env)})
+    else do
+      modify (\env -> env {constantSet = S.insert x (constantSet env)})
+      insertIntoIntactSet m x
 
 insertName :: Identifier -> Identifier -> NameEnv -> NameEnv
 insertName (I (s, _)) y nenv = Map.insert s y nenv
 
-insertIntoIntactSet :: Meta -> Identifier -> WithEnv ()
+insertIntoIntactSet :: Meta -> T.Text -> WithEnv ()
 insertIntoIntactSet m x =
   whenCheck $ modify (\env -> env {intactSet = S.insert (m, x) (intactSet env)})
 
-removeFromIntactSet :: Meta -> Identifier -> WithEnv ()
+removeFromIntactSet :: Meta -> T.Text -> WithEnv ()
 removeFromIntactSet m x =
   whenCheck $ modify (\env -> env {intactSet = S.delete (m, x) (intactSet env)})
 
@@ -279,7 +282,7 @@ lookupName ::
 lookupName m penv nenv x =
   case Map.lookup (asText x) nenv of
     Just x' -> do
-      removeFromIntactSet m x'
+      removeFromIntactSet m $ asText x'
       return $ Just x'
     Nothing -> lookupName' m penv nenv x
 
@@ -289,8 +292,8 @@ lookupName' _ [] _ _ = return Nothing
 lookupName' m (prefix:prefixList) nenv x = do
   let query = prefix <> ":" <> asText x
   case Map.lookup query nenv of
-    Just x'@(I (_, i)) -> do
-      removeFromIntactSet m $ I (query, i)
+    Just x' -> do
+      removeFromIntactSet m query
       return $ Just x'
     Nothing -> lookupName' m prefixList nenv x
 
@@ -301,25 +304,29 @@ lookupName'' m penv nenv x = do
     Just x' -> return x'
     Nothing -> raiseError m $ "(double-prime) undefined variable: " <> asText x
 
-lookupConstantMaybe :: [T.Text] -> T.Text -> WithEnv (Maybe T.Text)
-lookupConstantMaybe penv x = do
+lookupConstantMaybe :: Meta -> [T.Text] -> T.Text -> WithEnv (Maybe T.Text)
+lookupConstantMaybe m penv x = do
   b <- isConstant x
   if b
-    then return $ Just x
-    else lookupConstantMaybe' penv x
+    then do
+      removeFromIntactSet m x
+      return $ Just x
+    else lookupConstantMaybe' m penv x
 
-lookupConstantMaybe' :: [T.Text] -> T.Text -> WithEnv (Maybe T.Text)
-lookupConstantMaybe' [] _ = return Nothing
-lookupConstantMaybe' (prefix:prefixList) x = do
+lookupConstantMaybe' :: Meta -> [T.Text] -> T.Text -> WithEnv (Maybe T.Text)
+lookupConstantMaybe' _ [] _ = return Nothing
+lookupConstantMaybe' m (prefix:prefixList) x = do
   let query = prefix <> ":" <> x
   b <- isConstant query
   if b
-    then return $ Just query
-    else lookupConstantMaybe' prefixList x
+    then do
+      removeFromIntactSet m query
+      return $ Just query
+    else lookupConstantMaybe' m prefixList x
 
 lookupConstant :: Meta -> [T.Text] -> T.Text -> WithEnv T.Text
 lookupConstant m penv x = do
-  mc <- lookupConstantMaybe penv x
+  mc <- lookupConstantMaybe m penv x
   case mc of
     Just c -> return c
     Nothing -> raiseError m $ "undefined constant: " <> x
