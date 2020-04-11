@@ -485,7 +485,7 @@ concatQuasiStmtList ((QuasiStmtLetInductive n m at e):es) = do
   return $ WeakStmtLetWT m at e cont
 concatQuasiStmtList (QuasiStmtLetInductiveIntro m bt e as:ss) = do
   case e of
-    (mLam, WeakTermPiIntro xtsyts (_, WeakTermPiIntroPlus ai (bi, _) atsbts (_, WeakTermPiElim b _))) -> do
+    (mLam, WeakTermPiIntro xtsyts (_, WeakTermPiIntroPlus (bi, _) atsbts (_, WeakTermPiElim b _))) -> do
       (_, is) <- lookupRevIndEnv m bi
       yts' <- mapM (internalize as atsbts) $ drop (length (is :: [Int])) xtsyts
       insInductive as bt -- register the constructor (if necessary)
@@ -499,7 +499,6 @@ concatQuasiStmtList (QuasiStmtLetInductiveIntro m bt e as:ss) = do
               xtsyts
               ( m
               , WeakTermPiIntroPlus
-                  ai
                   (bi, xtsyts)
                   atsbts
                   (m, WeakTermPiElim b yts')))

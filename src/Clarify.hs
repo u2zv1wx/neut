@@ -37,7 +37,7 @@ clarify' tenv lam@(m, TermPiIntro mxts e) = do
   fvs <- nubFVS <$> chainTermPlus tenv lam
   e' <- clarify' (insTypeEnv1 mxts tenv) e
   retClosure tenv Nothing fvs m mxts e'
-clarify' tenv (m, TermPiIntroPlus _ (name, args) mxts e) = do
+clarify' tenv (m, TermPiIntroPlus (name, args) mxts e) = do
   e' <- clarify' (insTypeEnv1 mxts tenv) e
   retClosure tenv (Just $ showInHex name) args m mxts e'
 clarify' tenv (m, TermPiElim e es) = do
@@ -575,7 +575,7 @@ chainTermPlus tenv (m, TermUpsilon x) = do
   return $ xts ++ [(m, x, t)]
 chainTermPlus tenv (_, TermPi _ xts t) = chainTermPlus' tenv xts [t]
 chainTermPlus tenv (_, TermPiIntro xts e) = chainTermPlus' tenv xts [e]
-chainTermPlus tenv (_, TermPiIntroPlus _ _ xts e) = chainTermPlus' tenv xts [e]
+chainTermPlus tenv (_, TermPiIntroPlus _ xts e) = chainTermPlus' tenv xts [e]
 chainTermPlus tenv (_, TermPiElim e es) = do
   xs1 <- chainTermPlus tenv e
   xs2 <- concat <$> mapM (chainTermPlus tenv) es

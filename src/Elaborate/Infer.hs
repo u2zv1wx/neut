@@ -41,12 +41,13 @@ infer' ctx (m, WeakTermPi mName xts t) = do
 infer' ctx (m, WeakTermPiIntro xts e) = do
   (xts', (e', t')) <- inferBinder ctx xts e
   return ((m, WeakTermPiIntro xts' e'), (m, weakTermPi xts' t'))
-infer' ctx (m, WeakTermPiIntroPlus ind (name, args) xts e) = do
+infer' ctx (m, WeakTermPiIntroPlus (name, args) xts e) = do
   args' <- inferSigma ctx args
   (xts', (e', t')) <- inferBinder ctx xts e
+  (ai, _) <- lookupRevIndEnv m name
   return
-    ( (m, WeakTermPiIntroPlus ind (name, args') xts' e')
-    , (m, WeakTermPi (Just ind) xts' t'))
+    ( (m, WeakTermPiIntroPlus (name, args') xts' e')
+    , (m, WeakTermPi (Just ai) xts' t'))
 infer' ctx (m, WeakTermPiElim e es) = do
   es' <- insertHoleIfNecessary e es
   etls <- mapM (infer' ctx) es'

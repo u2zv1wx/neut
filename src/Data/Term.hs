@@ -15,11 +15,7 @@ data Term
   | TermUpsilon Identifier
   | TermPi (Maybe T.Text) [IdentifierPlus] TermPlus
   | TermPiIntro [IdentifierPlus] TermPlus
-  | TermPiIntroPlus
-      T.Text -- name of corresponding inductive type
-      (T.Text, [IdentifierPlus])
-      [IdentifierPlus]
-      TermPlus
+  | TermPiIntroPlus (T.Text, [IdentifierPlus]) [IdentifierPlus] TermPlus
   | TermPiElim TermPlus [TermPlus]
   | TermIter IdentifierPlus [IdentifierPlus] TermPlus
   | TermConst T.Text
@@ -63,7 +59,7 @@ varTermPlus (_, TermTau) = []
 varTermPlus (_, TermUpsilon x) = [x]
 varTermPlus (_, TermPi _ xts t) = varTermPlus' xts [t]
 varTermPlus (_, TermPiIntro xts e) = varTermPlus' xts [e]
-varTermPlus (_, TermPiIntroPlus _ _ xts e) = varTermPlus' xts [e]
+varTermPlus (_, TermPiIntroPlus _ xts e) = varTermPlus' xts [e]
 varTermPlus (_, TermPiElim e es) = do
   let xs1 = varTermPlus e
   let xs2 = concatMap varTermPlus es
@@ -111,10 +107,10 @@ substTermPlus sub (m, TermPi mName xts t) = do
 substTermPlus sub (m, TermPiIntro xts body) = do
   let (xts', body') = substTermPlus'' sub xts body
   (m, TermPiIntro xts' body')
-substTermPlus sub (m, TermPiIntroPlus ind (name, args) xts body) = do
+substTermPlus sub (m, TermPiIntroPlus (name, args) xts body) = do
   let args' = substTermPlus' sub args
   let (xts', body') = substTermPlus'' sub xts body
-  (m, TermPiIntroPlus ind (name, args') xts' body')
+  (m, TermPiIntroPlus (name, args') xts' body')
 substTermPlus sub (m, TermPiElim e es) = do
   let e' = substTermPlus sub e
   let es' = map (substTermPlus sub) es
@@ -187,10 +183,10 @@ weaken (m, TermPi mName xts t) =
   (m, WeakTermPi mName (weakenArgs xts) (weaken t))
 weaken (m, TermPiIntro xts body) = do
   (m, WeakTermPiIntro (weakenArgs xts) (weaken body))
-weaken (m, TermPiIntroPlus ind (name, args) xts body) = do
+weaken (m, TermPiIntroPlus (name, args) xts body) = do
   let args' = weakenArgs args
   let xts' = (weakenArgs xts)
-  (m, WeakTermPiIntroPlus ind (name, args') xts' (weaken body))
+  (m, WeakTermPiIntroPlus (name, args') xts' (weaken body))
 weaken (m, TermPiElim e es) = do
   let e' = weaken e
   let es' = map weaken es
