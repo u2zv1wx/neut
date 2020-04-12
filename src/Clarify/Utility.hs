@@ -61,9 +61,7 @@ returnCartesianImmediate m = do
 
 toConstInfo :: T.Text -> Meta -> WithEnv (T.Text, DataPlus)
 toConstInfo thetaName m = do
-  i <- newCount
-  let name = thetaName <> "-" <> T.pack (show i)
-  return (name, (m, DataConst name))
+  return (thetaName, (m, DataConst thetaName))
 
 switch :: CodePlus -> CodePlus -> [(Case, CodePlus)]
 switch e1 e2 = [(CaseValue (EnumValueIntS 64 0), e1), (CaseDefault, e2)]

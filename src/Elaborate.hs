@@ -34,14 +34,6 @@ import Reduce.WeakTerm
 -- https://arxiv.org/abs/1505.04324, 2015.
 elaborate :: WeakStmt -> WithEnv TermPlus
 elaborate stmt = reduceTermPlus <$> elaborateStmt stmt
-  -- tmp <- reduceTermPlus <$> elaborateStmt stmt
-  -- -- p "elaborated:"
-  -- -- p $ T.unpack $ toText (weaken tmp)
-  -- -- _ <- error "stop."
-  -- -- p "tenv:"
-  -- -- tenv <- gets typeEnv
-  -- -- p' tenv
-  -- return tmp
 
 elaborateStmt :: WeakStmt -> WithEnv TermPlus
 elaborateStmt (WeakStmtReturn e) = do
@@ -59,6 +51,7 @@ elaborateStmt (WeakStmtLet m (mx, x, t) e cont) = do
   modify (\env -> env {cacheEnv = Map.insert x (Left e'') (cacheEnv env)})
   cont' <- elaborateStmt cont
   x' <- newNameWith'' x
+  -- ここでcがeffectありかもとみなされることによってIRのトップレベルに出現するようになる
   let c = (m, TermConst x)
   return (m, TermPiElim (m, TermPiIntro [(mx, x', t'')] cont') [c])
 elaborateStmt (WeakStmtLetWT m (mx, x, t) e cont) = do
@@ -79,9 +72,8 @@ elaborateStmt (WeakStmtVerify m e cont) = do
     start <- liftIO $ getCurrentTime
     _ <- normalize e''
     stop <- liftIO $ getCurrentTime
-    let sec = realToFrac $ diffUTCTime stop start :: Float
-    note m $
-      "verification succeeded (" <> T.pack (showFloat' sec) <> " seconds)"
+    let sec = showFloat' (realToFrac $ diffUTCTime stop start :: Float)
+    note m $ "verification succeeded (" <> T.pack sec <> " seconds)"
   elaborateStmt cont
 elaborateStmt (WeakStmtImplicit m x idxList cont) = do
   t <- lookupTypeEnv m (Right x) x
@@ -99,7 +91,7 @@ elaborateStmt (WeakStmtImplicit m x idxList cont) = do
     _ ->
       raiseError m $
       "the type of " <>
-      x <> " is supposed to be a Pi-type, but is:\n" <> toText (weaken t)
+      x <> " must be a Pi-type, but is:\n" <> toText (weaken t)
 elaborateStmt (WeakStmtConstDecl _ (_, x, t) cont) = do
   t' <- inferType t
   analyze >> synthesize >> refine >> cleanup
