@@ -7,6 +7,7 @@ import Control.Monad.State
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Map as Map
 import qualified Data.Set as S
+import qualified Data.Text as T
 
 import Data.Basic
 import Data.Env
@@ -34,12 +35,32 @@ reduceLLVM sub sm (LLVMLet x op@(LLVMOpAlloc _ size) cont) = do
       let sub' = IntMap.insert (asInt x) (substLLVMData sub d) sub
       reduceLLVM sub' sm' cont
     _ -> do
-      cont' <- reduceLLVM sub sm cont
-      return $ LLVMLet x op cont'
+      b <- isAlreadyDefined x
+      if b
+        then do
+          x' <- newNameWith x
+          let sub' = IntMap.insert (asInt x) (LLVMDataLocal x') sub
+          insVar x'
+          cont' <- reduceLLVM sub' sm cont
+          return $ LLVMLet x' op cont'
+        else do
+          insVar x
+          cont' <- reduceLLVM sub sm cont
+          return $ LLVMLet x op cont'
 reduceLLVM sub sm (LLVMLet x op cont) = do
   let op' = substLLVMOp sub op
-  cont' <- reduceLLVM sub sm cont
-  return $ LLVMLet x op' cont'
+  b <- isAlreadyDefined x
+  if b
+    then do
+      x' <- newNameWith x
+      let sub' = IntMap.insert (asInt x) (LLVMDataLocal x') sub
+      insVar x'
+      cont' <- reduceLLVM sub' sm cont
+      return $ LLVMLet x' op' cont'
+    else do
+      insVar x
+      cont' <- reduceLLVM sub sm cont
+      return $ LLVMLet x op' cont'
 reduceLLVM sub sm (LLVMCont op@(LLVMOpFree d size j) cont) = do
   let op' = substLLVMOp sub op
   let sm' = Map.insertWith (++) size [(j, d)] sm
@@ -65,3 +86,11 @@ reduceLLVM sub _ (LLVMCall d ds) = do
   let ds' = map (substLLVMData sub) ds
   return $ LLVMCall d' ds'
 reduceLLVM _ _ LLVMUnreachable = return LLVMUnreachable
+
+isAlreadyDefined :: Identifier -> WithEnv Bool
+isAlreadyDefined x = do
+  set <- gets defVarSet
+  return $ S.member (asInt x) set
+
+insVar :: Identifier -> WithEnv ()
+insVar x = modify (\env -> env {defVarSet = S.insert (asInt x) (defVarSet env)})

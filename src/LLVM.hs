@@ -8,7 +8,6 @@ import Control.Monad.Except
 import Control.Monad.State
 
 import qualified Data.HashMap.Strict as Map
-import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Set as S
 import qualified Data.Text as T
 
@@ -24,25 +23,20 @@ import Reduce.Code
 toLLVM :: CodePlus -> WithEnv LLVM
 toLLVM mainTerm@(m, _) = do
   cenv <- Map.toList <$> gets codeEnv
-  -- modify (\env -> env {nameSet = S.empty})
   forM_ cenv $ \(name, Definition _ args e) -> do
-    -- modify (\env -> env {nameSet = S.empty})
-    -- e' <- reduceCodePlus e
-    e' <- return e
+    e' <- reduceCodePlus e
     e'' <- llvmCode e'
-    (args', e''') <- rename args e''
-    insLLVMEnv name args' e'''
-  -- modify (\env -> env {nameSet = S.empty})
-  mainTerm' <- return mainTerm
-  -- mainTerm' <- reduceCodePlus mainTerm
+    insLLVMEnv name args e''
+  mainTerm' <- reduceCodePlus mainTerm
   mainTerm'' <- llvmCode mainTerm'
   -- the result of "main" must be i64, not i8*
   (result, resultVar) <- newDataUpsilonWith m "result"
   (cast, castThen) <- llvmCast (Just "cast") resultVar (LowTypeIntS 64)
   castResult <- castThen (LLVMReturn cast)
   -- let result: i8* := (main-term) in {cast result to i64}
-  mainTerm''' <- commConv result mainTerm'' $ castResult
-  snd <$> rename [] mainTerm'''
+  commConv result mainTerm'' $ castResult
+  -- mainTerm''' <- commConv result mainTerm'' $ castResult
+  -- snd <$> rename [] mainTerm'''
 
 llvmCode :: CodePlus -> WithEnv LLVM
 llvmCode (m, CodeConst theta) = llvmCodeConst m theta
@@ -289,7 +283,7 @@ llvmDataLet x (m, DataConst y) cont = do
       t <- lookupTypeEnv m (Right y) y
       case t of
         (_, TermPi _ xts _) -> do
-          let y' = "llvm_" <> y
+          let y' = "llvm_" <> y -- ここのprefixは設定できるようにしてもよさそう
           denv <- gets declEnv
           let argType = map (const voidPtr) xts
           modify (\env -> env {declEnv = Map.insert y' (argType, voidPtr) denv})
@@ -533,104 +527,3 @@ commConv x (LLVMBranch d onTrue onFalse) cont2 = do
   return $ LLVMBranch d onTrue' onFalse'
 commConv x (LLVMCall d ds) cont2 = return $ LLVMLet x (LLVMOpCall d ds) cont2
 commConv _ LLVMUnreachable _ = return LLVMUnreachable
-
-rename :: [Identifier] -> LLVM -> WithEnv ([Identifier], LLVM)
-rename args e = do
-  args' <- mapM newNameWith args
-  let is = map asInt args
-  let js = map asInt args'
-  l <- gets count
-  (e', l') <- renameLLVM l (IntMap.fromList $ zip is js) e
-  modify (\env -> env {count = l'})
-  return (args', e')
-
-type NameEnv = IntMap.IntMap Int
-
-renameLLVMData :: NameEnv -> LLVMData -> WithEnv LLVMData
-renameLLVMData nenv (LLVMDataLocal x@(I (s, i))) = do
-  case IntMap.lookup i nenv of
-    Just i' -> return $ LLVMDataLocal $ I (s, i')
-    Nothing ->
-      raiseCritical' $
-      "found an unbound variable when renaming LLVM code: " <> asText' x
-renameLLVMData _ d = return d
-
-renameLLVM :: Int -> NameEnv -> LLVM -> WithEnv (LLVM, Int)
-renameLLVM l nenv (LLVMReturn d) = do
-  d' <- renameLLVMData nenv d
-  return (LLVMReturn d', l)
-renameLLVM l nenv (LLVMLet (I (s, i)) op cont) = do
-  op' <- renameLLVMOp nenv op
-  let x' = I (s, l)
-  (cont', l') <- renameLLVM (l + 1) (IntMap.insert i l nenv) cont
-  return (LLVMLet x' op' cont', l')
-renameLLVM l nenv (LLVMCont op cont) = do
-  op' <- renameLLVMOp nenv op
-  (cont', l') <- renameLLVM l nenv cont
-  return (LLVMCont op' cont', l')
-renameLLVM l nenv (LLVMSwitch (d, t) defaultBranch les) = do
-  let (ls, es) = unzip les
-  d' <- renameLLVMData nenv d
-  (defaultBranch', l') <- renameLLVM l nenv defaultBranch
-  (es', l'') <- renameLLVM' l' nenv es
-  return (LLVMSwitch (d', t) defaultBranch' (zip ls es'), l'')
-renameLLVM l nenv (LLVMBranch d onTrue onFalse) = do
-  d' <- renameLLVMData nenv d
-  (onTrue', l') <- renameLLVM l nenv onTrue
-  (onFalse', l'') <- renameLLVM l' nenv onFalse
-  return (LLVMBranch d' onTrue' onFalse', l'')
-renameLLVM l nenv (LLVMCall d ds) = do
-  d' <- renameLLVMData nenv d
-  ds' <- mapM (renameLLVMData nenv) ds
-  return (LLVMCall d' ds', l)
-renameLLVM l _ LLVMUnreachable = return (LLVMUnreachable, l)
-
-renameLLVM' :: Int -> NameEnv -> [LLVM] -> WithEnv ([LLVM], Int)
-renameLLVM' l _ [] = return ([], l)
-renameLLVM' l nenv (e:es) = do
-  (e', l') <- renameLLVM l nenv e
-  (es', l'') <- renameLLVM' l' nenv es
-  return (e' : es', l'')
-
-renameLLVMOp :: NameEnv -> LLVMOp -> WithEnv LLVMOp
-renameLLVMOp nenv (LLVMOpCall d ds) = do
-  d' <- renameLLVMData nenv d
-  ds' <- mapM (renameLLVMData nenv) ds
-  return $ LLVMOpCall d' ds'
-renameLLVMOp nenv (LLVMOpGetElementPtr (d, t) dts) = do
-  d' <- renameLLVMData nenv d
-  let (ds, ts) = unzip dts
-  ds' <- mapM (renameLLVMData nenv) ds
-  return $ LLVMOpGetElementPtr (d', t) (zip ds' ts)
-renameLLVMOp nenv (LLVMOpBitcast d t1 t2) = do
-  d' <- renameLLVMData nenv d
-  return $ LLVMOpBitcast d' t1 t2
-renameLLVMOp nenv (LLVMOpIntToPointer d t1 t2) = do
-  d' <- renameLLVMData nenv d
-  return $ LLVMOpIntToPointer d' t1 t2
-renameLLVMOp nenv (LLVMOpPointerToInt d t1 t2) = do
-  d' <- renameLLVMData nenv d
-  return $ LLVMOpPointerToInt d' t1 t2
-renameLLVMOp nenv (LLVMOpLoad d t) = do
-  d' <- renameLLVMData nenv d
-  return $ LLVMOpLoad d' t
-renameLLVMOp nenv (LLVMOpStore t d1 d2) = do
-  d1' <- renameLLVMData nenv d1
-  d2' <- renameLLVMData nenv d2
-  return $ LLVMOpStore t d1' d2'
-renameLLVMOp nenv (LLVMOpAlloc d sizeInfo) = do
-  d' <- renameLLVMData nenv d
-  return $ LLVMOpAlloc d' sizeInfo
-renameLLVMOp nenv (LLVMOpFree d sizeInfo j) = do
-  d' <- renameLLVMData nenv d
-  return $ LLVMOpFree d' sizeInfo j
-renameLLVMOp nenv (LLVMOpUnaryOp op d) = do
-  d' <- renameLLVMData nenv d
-  return $ LLVMOpUnaryOp op d'
-renameLLVMOp nenv (LLVMOpBinaryOp op d1 d2) = do
-  d1' <- renameLLVMData nenv d1
-  d2' <- renameLLVMData nenv d2
-  return $ LLVMOpBinaryOp op d1' d2'
-renameLLVMOp nenv (LLVMOpSysCall i ds) = do
-  ds' <- mapM (renameLLVMData nenv) ds
-  return $ LLVMOpSysCall i ds'
