@@ -35,8 +35,6 @@ toLLVM mainTerm@(m, _) = do
   castResult <- castThen (LLVMReturn cast)
   -- let result: i8* := (main-term) in {cast result to i64}
   commConv result mainTerm'' $ castResult
-  -- mainTerm''' <- commConv result mainTerm'' $ castResult
-  -- snd <$> rename [] mainTerm'''
 
 llvmCode :: CodePlus -> WithEnv LLVM
 llvmCode (m, CodeConst theta) = llvmCodeConst m theta
