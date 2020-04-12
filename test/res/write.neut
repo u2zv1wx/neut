@@ -196,6 +196,8 @@
   (item-1 () (choice))
   (item-2 () (choice)))
 
+(definition hoge-func ((x i64)) x)
+
 
 ?choice:induction
 ;; (choice:induction (choice:item-1) (lambda () i64) ?admit ?admit)
@@ -229,6 +231,7 @@
         ?admit) ;; (F @ c) {c := (choice:item-2)}
         ))) ;; F @ c
 
+
 ?double-flip-is-identity
 
 ;; (verify double-flip-is-identity)
@@ -250,10 +253,7 @@
   (implicit 0))
 
 ;; (provide unused-function)
-
 (?string:print "\n")
-
-
 
 ;; (let a1 (os:write os:stdout test 3))
 ;; (let a2 (os:write os:stdout test 3))

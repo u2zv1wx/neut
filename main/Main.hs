@@ -18,6 +18,7 @@ import qualified Codec.Compression.GZip as GZip
 import qualified Data.ByteString.Lazy as L
 
 import Build
+import Check
 import Complete
 import Data.Env
 import Data.Log
@@ -157,7 +158,7 @@ run :: Command -> IO ()
 run (Build inputPathStr mOutputPathStr outputKind) = do
   inputPath <- resolveFile' inputPathStr
   resultOrErr <-
-    evalWithEnv (compile inputPath) $
+    evalWithEnv (runBuild inputPath) $
     initialEnv {shouldColorize = True, endOfEntry = ""}
   basename <- setFileExtension "" $ filename inputPath
   mOutputPath <- mapM resolveFile' mOutputPathStr
@@ -168,7 +169,7 @@ run (Build inputPathStr mOutputPathStr outputKind) = do
 run (Check inputPathStr colorizeFlag eoe) = do
   inputPath <- resolveFile' inputPathStr
   resultOrErr <-
-    evalWithEnv (check inputPath) $
+    evalWithEnv (runCheck inputPath) $
     initialEnv {shouldColorize = colorizeFlag, endOfEntry = eoe, isCheck = True}
   case resultOrErr of
     Right _ -> return ()
@@ -217,14 +218,11 @@ writeResult result outputPath OutputKindObject = do
     [tmpOutputPathStr, "-Wno-override-module", "-o" ++ toFilePath outputPath]
   removeFile tmpOutputPath
 
-compile :: Path Abs File -> WithEnv L.ByteString
-compile inputPath = do
-  parse inputPath >>= build
-  -- parse inputPath >>= elaborate >>= clarify >>= toLLVM >>= emit
+runBuild :: Path Abs File -> WithEnv L.ByteString
+runBuild inputPath = parse inputPath >>= build
 
-check :: Path Abs File -> WithEnv ()
-check _ = undefined
-  -- parse inputPath >>= elaborate >> return ()
+runCheck :: Path Abs File -> WithEnv ()
+runCheck inputPath = parse inputPath >>= check
 
 seqIO :: [IO ()] -> IO ()
 seqIO [] = return ()

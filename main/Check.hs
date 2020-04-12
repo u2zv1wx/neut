@@ -18,14 +18,12 @@ import Data.Term
 import Data.WeakTerm
 import Elaborate
 import Reduce.Term
-import Reduce.WeakTerm
 
 check :: WeakStmt -> WithEnv ()
 check (WeakStmtReturn e) = do
   (e', _) <- infer e
-  analyze >> synthesize >> refine
-  _ <- elaborate e'
-  return ()
+  analyze >> synthesize
+  void $ elaborate e'
 check (WeakStmtLet _ (_, x, t) e cont) = do
   (e', te) <- infer e
   t' <- inferType t
@@ -62,14 +60,14 @@ check (WeakStmtImplicit m x idxList cont) = do
       x <> " must be a Pi-type, but is:\n" <> toText (weaken t)
 check (WeakStmtConstDecl _ (_, x, t) cont) = do
   t' <- inferType t
-  analyze >> synthesize >> refine >> cleanup
+  analyze >> synthesize >> cleanup
   t'' <- reduceTermPlus <$> elaborate t'
   insTypeEnv (Right x) t''
   check cont
 
 check' :: T.Text -> WeakTermPlus -> WeakTermPlus -> WeakStmt -> WithEnv ()
 check' x e t cont = do
-  analyze >> synthesize >> refine >> cleanup
+  analyze >> synthesize >> cleanup
   e' <- elaborate e
   t' <- elaborate t
   insTypeEnv (Right x) t'
@@ -84,7 +82,3 @@ cleanup = do
 
 showFloat' :: Float -> String
 showFloat' x = showFFloat Nothing x ""
-
-refine :: WithEnv ()
-refine =
-  modify (\env -> env {substEnv = IntMap.map reduceWeakTermPlus (substEnv env)})

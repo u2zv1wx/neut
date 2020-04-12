@@ -1,18 +1,16 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Elaborate
-  (
-    -- elaborate
-   elaborate'
+  ( elaborate
   , analyze
   , synthesize
-  , refine
+  , infer
+  , inferType
+  , insConstraintEnv
   ) where
 
 import Control.Monad.State
-import Data.List (find, nub)
-import Data.Time
-import Numeric
+import Data.List (nub)
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.IntMap.Strict as IntMap
@@ -23,120 +21,28 @@ import Data.Env
 import Data.Term
 import Data.WeakTerm
 import Elaborate.Analyze
--- import Elaborate.Infer
+import Elaborate.Infer
 import Elaborate.Synthesize
 import Reduce.Term
 import Reduce.WeakTerm
 
--- Given a term `e` and its name `main`, this function
---   (1) traces `e` using `infer e`, collecting type constraints,
---   (2) updates weakTypeEnv for `main` by the result of `infer e`,
---   (3) analyze the constraints, solving easy ones,
---   (4) synthesize these analyzed constraints, solving as many solutions as possible,
---   (5) elaborate the given term using the result of synthesis.
--- The inference algorithm in this module is based on L. de Moura, J. Avigad,
--- S. Kong, and C. Roux. "Elaboration in Dependent Type Theory", arxiv,
--- https://arxiv.org/abs/1505.04324, 2015.
--- elaborate :: WeakStmt -> WithEnv TermPlus
--- elaborate stmt = reduceTermPlus <$> elaborateStmt stmt
-
--- elaborateStmt :: WeakStmt -> WithEnv TermPlus
--- elaborateStmt (WeakStmtReturn e) = do
---   (e', _) <- infer e
---   analyze >> synthesize >> refine
---   elaborate' e'
--- elaborateStmt (WeakStmtLet m (mx, x, t) e cont) = do
---   (e', te) <- infer e
---   t' <- inferType t
---   insConstraintEnv te t'
---   analyze >> synthesize >> refine >> cleanup
---   e'' <- reduceTermPlus <$> elaborate' e'
---   t'' <- reduceTermPlus <$> elaborate' t'
---   insTypeEnv (Right x) t''
---   modify (\env -> env {cacheEnv = Map.insert x (Left e'') (cacheEnv env)})
---   cont' <- elaborateStmt cont
---   x' <- newNameWith'' x
---   -- ここでcがeffectありかもとみなされることによってIRのトップレベルに出現するようになる
---   let c = (m, TermConst x)
---   return (m, TermPiElim (m, TermPiIntro [(mx, x', t'')] cont') [c])
--- elaborateStmt (WeakStmtLetWT m (mx, x, t) e cont) = do
---   t' <- inferType t
---   analyze >> synthesize >> refine >> cleanup
---   e' <- reduceTermPlus <$> elaborate' e -- `e` is supposed to be well-typed
---   t'' <- reduceTermPlus <$> elaborate' t'
---   insTypeEnv (Right x) t''
---   modify (\env -> env {cacheEnv = Map.insert x (Left e') (cacheEnv env)})
---   cont' <- elaborateStmt cont
---   x' <- newNameWith'' x
---   let c = (m, TermConst x)
---   return (m, TermPiElim (m, TermPiIntro [(mx, x', t'')] cont') [c])
--- elaborateStmt (WeakStmtVerify m e cont) = do
---   whenCheck $ do
---     (e', _) <- infer e
---     e'' <- elaborate' e'
---     start <- liftIO $ getCurrentTime
---     _ <- normalize e''
---     stop <- liftIO $ getCurrentTime
---     let sec = showFloat' (realToFrac $ diffUTCTime stop start :: Float)
---     note m $ "verification succeeded (" <> T.pack sec <> " seconds)"
---   elaborateStmt cont
--- elaborateStmt (WeakStmtImplicit m x idxList cont) = do
---   t <- lookupTypeEnv m (Right x) x
---   case t of
---     (_, TermPi _ xts _) -> do
---       case find (\idx -> idx < 0 || length xts <= idx) idxList of
---         Nothing -> do
---           ienv <- gets impEnv
---           modify (\env -> env {impEnv = Map.insertWith (++) x idxList ienv})
---           elaborateStmt cont
---         Just idx -> do
---           raiseError m $
---             "the specified index `" <>
---             T.pack (show idx) <> "` is out of range of the domain of " <> x
---     _ ->
---       raiseError m $
---       "the type of " <>
---       x <> " must be a Pi-type, but is:\n" <> toText (weaken t)
--- elaborateStmt (WeakStmtConstDecl _ (_, x, t) cont) = do
---   t' <- inferType t
---   analyze >> synthesize >> refine >> cleanup
---   t'' <- reduceTermPlus <$> elaborate' t'
---   insTypeEnv (Right x) t''
---   elaborateStmt cont
-
--- showFloat' :: Float -> String
--- showFloat' x = showFFloat Nothing x ""
-
-refine :: WithEnv ()
-refine =
-  modify (\env -> env {substEnv = IntMap.map reduceWeakTermPlus (substEnv env)})
-
--- cleanup :: WithEnv ()
--- cleanup = do
---   modify (\env -> env {constraintEnv = []})
---   modify (\env -> env {weakTypeEnv = IntMap.empty})
---   modify (\env -> env {zetaEnv = IntMap.empty})
-
--- This function translates a well-typed term into an untyped term in a
--- reduction-preserving way. Here, we translate types into units (nullary product).
--- This doesn't cause any problem since types doesn't have any beta-reduction.
-elaborate' :: WeakTermPlus -> WithEnv TermPlus
-elaborate' (m, WeakTermTau) = return (m, TermTau)
-elaborate' (m, WeakTermUpsilon x) = return (m, TermUpsilon x)
-elaborate' (m, WeakTermPi mName xts t) = do
+elaborate :: WeakTermPlus -> WithEnv TermPlus
+elaborate (m, WeakTermTau) = return (m, TermTau)
+elaborate (m, WeakTermUpsilon x) = return (m, TermUpsilon x)
+elaborate (m, WeakTermPi mName xts t) = do
   xts' <- mapM elaboratePlus xts
-  t' <- elaborate' t
+  t' <- elaborate t
   return (m, TermPi mName xts' t')
-elaborate' (m, WeakTermPiIntro xts e) = do
-  e' <- elaborate' e
+elaborate (m, WeakTermPiIntro xts e) = do
+  e' <- elaborate e
   xts' <- mapM elaboratePlus xts
   return (m, TermPiIntro xts' e')
-elaborate' (m, WeakTermPiIntroPlus (name, args) xts e) = do
+elaborate (m, WeakTermPiIntroPlus (name, args) xts e) = do
   args' <- mapM elaboratePlus args
-  e' <- elaborate' e
+  e' <- elaborate e
   xts' <- mapM elaboratePlus xts
   return (m, TermPiIntroPlus (name, args') xts' e')
-elaborate' (m, WeakTermPiElim (mh, WeakTermZeta (I (_, x))) es) = do
+elaborate (m, WeakTermPiElim (mh, WeakTermZeta (I (_, x))) es) = do
   sub <- gets substEnv
   case IntMap.lookup x sub of
     Nothing -> raiseError mh $ "couldn't instantiate the hole here"
@@ -144,24 +50,24 @@ elaborate' (m, WeakTermPiElim (mh, WeakTermZeta (I (_, x))) es) = do
       | length xts == length es -> do
         let xs = map (\(_, y, _) -> Left $ asInt y) xts
         let s = Map.fromList $ zip xs es
-        elaborate' $ substWeakTermPlus s e
-    Just e -> elaborate' $ reduceWeakTermPlus (m, WeakTermPiElim e es)
-elaborate' (m, WeakTermPiElim e es) = do
-  e' <- elaborate' e
-  es' <- mapM elaborate' es
+        elaborate $ substWeakTermPlus s e
+    Just e -> elaborate $ reduceWeakTermPlus (m, WeakTermPiElim e es)
+elaborate (m, WeakTermPiElim e es) = do
+  e' <- elaborate e
+  es' <- mapM elaborate es
   return (m, TermPiElim e' es')
-elaborate' (m, WeakTermIter (mx, x, t) xts e) = do
-  t' <- elaborate' t
+elaborate (m, WeakTermIter (mx, x, t) xts e) = do
+  t' <- elaborate t
   xts' <- mapM elaboratePlus xts
-  e' <- elaborate' e
+  e' <- elaborate e
   return (m, TermIter (mx, x, t') xts' e')
-elaborate' (m, WeakTermZeta _) =
+elaborate (m, WeakTermZeta _) =
   raiseCritical
     m
     "every meta-variable must be of the form (?M e1 ... en) where n >= 0, but found the meta-variable here that doesn't fit this pattern"
-elaborate' (m, WeakTermConst x) = return (m, TermConst x)
-elaborate' (m, WeakTermInt t x) = do
-  t' <- reduceTermPlus <$> elaborate' t
+elaborate (m, WeakTermConst x) = return (m, TermConst x)
+elaborate (m, WeakTermInt t x) = do
+  t' <- reduceTermPlus <$> elaborate t
   case t' of
     (_, TermEnum (EnumTypeIntS size))
       | (-1) * (2 ^ (size - 1)) <= x
@@ -186,8 +92,8 @@ elaborate' (m, WeakTermInt t x) = do
       "the term `" <>
       T.pack (show x) <>
       "` is an integer, but its type is: " <> toText (weaken t')
-elaborate' (m, WeakTermFloat t x) = do
-  t' <- reduceTermPlus <$> elaborate' t
+elaborate (m, WeakTermFloat t x) = do
+  t' <- reduceTermPlus <$> elaborate t
   case t' of
     (_, TermConst floatType)
       | Just (LowTypeFloat size) <- asLowTypeMaybe floatType -> do
@@ -197,14 +103,14 @@ elaborate' (m, WeakTermFloat t x) = do
       "the term `" <>
       T.pack (show x) <>
       "` is a float, but its type is:\n" <> toText (weaken t')
-elaborate' (m, WeakTermEnum k) = return (m, TermEnum k)
-elaborate' (m, WeakTermEnumIntro x) = return (m, TermEnumIntro x)
-elaborate' (m, WeakTermEnumElim (e, t) les) = do
-  e' <- elaborate' e
+elaborate (m, WeakTermEnum k) = return (m, TermEnum k)
+elaborate (m, WeakTermEnumIntro x) = return (m, TermEnumIntro x)
+elaborate (m, WeakTermEnumElim (e, t) les) = do
+  e' <- elaborate e
   let (ls, es) = unzip les
   ls' <- mapM elaborateWeakCase ls
-  es' <- mapM elaborate' es
-  t' <- reduceTermPlus <$> elaborate' t
+  es' <- mapM elaborate es
+  t' <- reduceTermPlus <$> elaborate t
   case t' of
     (_, TermEnum x) -> do
       caseCheckEnumIdentifier m x $ map snd ls'
@@ -214,32 +120,32 @@ elaborate' (m, WeakTermEnumElim (e, t) les) = do
       "the type of `" <>
       toText (weaken e') <>
       "` must be an enum type, but is:\n" <> toText (weaken t')
-elaborate' (m, WeakTermArray dom k) = do
-  dom' <- elaborate' dom
+elaborate (m, WeakTermArray dom k) = do
+  dom' <- elaborate dom
   return (m, TermArray dom' k)
-elaborate' (m, WeakTermArrayIntro k es) = do
-  es' <- mapM elaborate' es
+elaborate (m, WeakTermArrayIntro k es) = do
+  es' <- mapM elaborate es
   return (m, TermArrayIntro k es')
-elaborate' (m, WeakTermArrayElim k xts e1 e2) = do
-  e1' <- elaborate' e1
+elaborate (m, WeakTermArrayElim k xts e1 e2) = do
+  e1' <- elaborate e1
   xts' <- mapM elaboratePlus xts
-  e2' <- elaborate' e2
+  e2' <- elaborate e2
   return (m, TermArrayElim k xts' e1' e2')
-elaborate' (m, WeakTermStruct ts) = return (m, TermStruct ts)
-elaborate' (m, WeakTermStructIntro eks) = do
+elaborate (m, WeakTermStruct ts) = return (m, TermStruct ts)
+elaborate (m, WeakTermStructIntro eks) = do
   let (es, ks) = unzip eks
-  es' <- mapM elaborate' es
+  es' <- mapM elaborate es
   return (m, TermStructIntro $ zip es' ks)
-elaborate' (m, WeakTermStructElim xts e1 e2) = do
-  e1' <- elaborate' e1
-  e2' <- elaborate' e2
+elaborate (m, WeakTermStructElim xts e1 e2) = do
+  e1' <- elaborate e1
+  e2' <- elaborate e2
   return (m, TermStructElim xts e1' e2')
-elaborate' (m, WeakTermCase indName e cxtes) = do
-  e' <- elaborate' e
+elaborate (m, WeakTermCase indName e cxtes) = do
+  e' <- elaborate e
   cxtes' <-
     forM cxtes $ \((c, xts), body) -> do
       xts' <- mapM elaboratePlus xts
-      body' <- elaborate' body
+      body' <- elaborate body
       return ((c, xts'), body')
   eenv <- gets enumEnv
   case cxtes' of
@@ -261,10 +167,10 @@ elaborate' (m, WeakTermCase indName e cxtes) = do
             (False, _) -> raiseError m $ "found a non-linear pattern"
             (_, False) -> raiseError m $ "found a non-exhaustive pattern"
             (True, True) -> return (m, TermCase indName e' cxtes')
-elaborate' (m, WeakTermQuestion e t) = do
-  e' <- elaborate' e
+elaborate (m, WeakTermQuestion e t) = do
+  e' <- elaborate e
   whenCheck $ do
-    t' <- elaborate' t
+    t' <- elaborate t
     case (getArgLen t', isUpsilonOrConst e') of
       (Just len, True) -> do
         (is, e'') <- getImpInfo e'
@@ -274,7 +180,7 @@ elaborate' (m, WeakTermQuestion e t) = do
       _ -> do
         note m $ toText (weaken t')
   return e'
-elaborate' (_, WeakTermErase _ e) = elaborate' e
+elaborate (_, WeakTermErase _ e) = elaborate e
 
 isUpsilonOrConst :: TermPlus -> Bool
 isUpsilonOrConst (_, TermUpsilon _) = True
@@ -306,7 +212,7 @@ showFormArgs k impList (i:is)
 
 elaborateWeakCase :: WeakCasePlus -> WithEnv CasePlus
 elaborateWeakCase (m, WeakCaseInt t x) = do
-  t' <- reduceTermPlus <$> elaborate' t
+  t' <- reduceTermPlus <$> elaborate t
   case t' of
     (_, TermEnum (EnumTypeIntS size)) ->
       return (m, CaseValue (EnumValueIntS size x))
@@ -329,7 +235,7 @@ elaborateWeakCase (m, WeakCaseDefault) = return (m, CaseDefault)
 
 elaboratePlus :: (Meta, a, WeakTermPlus) -> WithEnv (Meta, a, TermPlus)
 elaboratePlus (m, x, t) = do
-  t' <- elaborate' t
+  t' <- elaborate t
   return (m, x, t')
 
 caseCheckEnumIdentifier :: Meta -> EnumType -> [Case] -> WithEnv ()

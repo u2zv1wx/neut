@@ -15,22 +15,22 @@ import Data.Env
 reduceCodePlus :: CodePlus -> WithEnv CodePlus
 -- reduceCodePlus (m, CodePiElimDownElim v ds) = do
 --   cenv <- gets codeEnv
---   ns <- gets nameSet
+--   -- ns <- gets nameSet
 --   case v of
 --     (_, DataConst x)
 --       | Just (Definition (IsFixed False) xs body) <- Map.lookup x cenv
 --       , length xs == length ds -> do
 --         let sub = IntMap.fromList (zip (map asInt xs) ds)
 --         reduceCodePlus $ substCodePlus sub body
---     (_, DataConst x)
---       | Just (Definition (IsFixed True) xs body) <- Map.lookup x cenv
---       , length xs == length ds
---       , not (x `S.member` ns) -> do
---         modify (\env -> env {nameSet = S.insert x ns})
---         body' <- reduceCodePlus body
---         let def = Definition (IsFixed True) xs body'
---         modify (\env -> env {codeEnv = Map.insert x def cenv})
---         return (m, CodePiElimDownElim v ds)
+--     -- (_, DataConst x)
+--     --   | Just (Definition (IsFixed True) xs body) <- Map.lookup x cenv
+--     --   , length xs == length ds
+--     --   , not (x `S.member` ns) -> do
+--     --     modify (\env -> env {nameSet = S.insert x ns})
+--     --     body' <- reduceCodePlus body
+--     --     let def = Definition (IsFixed True) xs body'
+--     --     modify (\env -> env {codeEnv = Map.insert x def cenv})
+--     --     return (m, CodePiElimDownElim v ds)
 --     _ -> return (m, CodePiElimDownElim v ds)
 reduceCodePlus (m, CodeSigmaElim mk xs v e) = do
   case v of
