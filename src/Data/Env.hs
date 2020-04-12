@@ -7,6 +7,7 @@ import Control.Monad.State
 import Data.List (find)
 import Path
 import Path.IO
+import System.Directory
 import System.Info
 
 import Data.Basic
@@ -396,10 +397,22 @@ getCurrentDirPath = parent <$> getCurrentFilePath
 
 getLibraryDirPath :: WithEnv (Path Abs Dir)
 getLibraryDirPath = do
-  homeDirPath <- getHomeDir
   let ver = showVersion version
   relLibPath <- parseRelDir $ ".local/share/neut/" <> ver <> "/library"
-  return $ homeDirPath </> relLibPath
+  getDirPath relLibPath
+
+getObjectCacheDirPath :: WithEnv (Path Abs Dir)
+getObjectCacheDirPath = do
+  let ver = showVersion version
+  relCachePath <- parseRelDir $ ".cache/neut/" <> ver <> "/object"
+  getDirPath relCachePath
+
+getDirPath :: Path Rel Dir -> WithEnv (Path Abs Dir)
+getDirPath base = do
+  homeDirPath <- getHomeDir
+  let path = homeDirPath </> base
+  liftIO $ createDirectoryIfMissing True $ toFilePath path
+  return path
 
 note :: Meta -> T.Text -> WithEnv ()
 note m str = do
