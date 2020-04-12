@@ -1,7 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Elaborate
-  ( elaborate
+  (
+    -- elaborate
+   elaborate'
+  , analyze
+  , synthesize
+  , refine
   ) where
 
 import Control.Monad.State
@@ -18,7 +23,7 @@ import Data.Env
 import Data.Term
 import Data.WeakTerm
 import Elaborate.Analyze
-import Elaborate.Infer
+-- import Elaborate.Infer
 import Elaborate.Synthesize
 import Reduce.Term
 import Reduce.WeakTerm
@@ -32,85 +37,85 @@ import Reduce.WeakTerm
 -- The inference algorithm in this module is based on L. de Moura, J. Avigad,
 -- S. Kong, and C. Roux. "Elaboration in Dependent Type Theory", arxiv,
 -- https://arxiv.org/abs/1505.04324, 2015.
-elaborate :: WeakStmt -> WithEnv TermPlus
-elaborate stmt = reduceTermPlus <$> elaborateStmt stmt
+-- elaborate :: WeakStmt -> WithEnv TermPlus
+-- elaborate stmt = reduceTermPlus <$> elaborateStmt stmt
 
-elaborateStmt :: WeakStmt -> WithEnv TermPlus
-elaborateStmt (WeakStmtReturn e) = do
-  (e', _) <- infer e
-  analyze >> synthesize >> refine
-  elaborate' e'
-elaborateStmt (WeakStmtLet m (mx, x, t) e cont) = do
-  (e', te) <- infer e
-  t' <- inferType t
-  insConstraintEnv te t'
-  analyze >> synthesize >> refine >> cleanup
-  e'' <- reduceTermPlus <$> elaborate' e'
-  t'' <- reduceTermPlus <$> elaborate' t'
-  insTypeEnv (Right x) t''
-  modify (\env -> env {cacheEnv = Map.insert x (Left e'') (cacheEnv env)})
-  cont' <- elaborateStmt cont
-  x' <- newNameWith'' x
-  -- ここでcがeffectありかもとみなされることによってIRのトップレベルに出現するようになる
-  let c = (m, TermConst x)
-  return (m, TermPiElim (m, TermPiIntro [(mx, x', t'')] cont') [c])
-elaborateStmt (WeakStmtLetWT m (mx, x, t) e cont) = do
-  t' <- inferType t
-  analyze >> synthesize >> refine >> cleanup
-  e' <- reduceTermPlus <$> elaborate' e -- `e` is supposed to be well-typed
-  t'' <- reduceTermPlus <$> elaborate' t'
-  insTypeEnv (Right x) t''
-  modify (\env -> env {cacheEnv = Map.insert x (Left e') (cacheEnv env)})
-  cont' <- elaborateStmt cont
-  x' <- newNameWith'' x
-  let c = (m, TermConst x)
-  return (m, TermPiElim (m, TermPiIntro [(mx, x', t'')] cont') [c])
-elaborateStmt (WeakStmtVerify m e cont) = do
-  whenCheck $ do
-    (e', _) <- infer e
-    e'' <- elaborate' e'
-    start <- liftIO $ getCurrentTime
-    _ <- normalize e''
-    stop <- liftIO $ getCurrentTime
-    let sec = showFloat' (realToFrac $ diffUTCTime stop start :: Float)
-    note m $ "verification succeeded (" <> T.pack sec <> " seconds)"
-  elaborateStmt cont
-elaborateStmt (WeakStmtImplicit m x idxList cont) = do
-  t <- lookupTypeEnv m (Right x) x
-  case t of
-    (_, TermPi _ xts _) -> do
-      case find (\idx -> idx < 0 || length xts <= idx) idxList of
-        Nothing -> do
-          ienv <- gets impEnv
-          modify (\env -> env {impEnv = Map.insertWith (++) x idxList ienv})
-          elaborateStmt cont
-        Just idx -> do
-          raiseError m $
-            "the specified index `" <>
-            T.pack (show idx) <> "` is out of range of the domain of " <> x
-    _ ->
-      raiseError m $
-      "the type of " <>
-      x <> " must be a Pi-type, but is:\n" <> toText (weaken t)
-elaborateStmt (WeakStmtConstDecl _ (_, x, t) cont) = do
-  t' <- inferType t
-  analyze >> synthesize >> refine >> cleanup
-  t'' <- reduceTermPlus <$> elaborate' t'
-  insTypeEnv (Right x) t''
-  elaborateStmt cont
+-- elaborateStmt :: WeakStmt -> WithEnv TermPlus
+-- elaborateStmt (WeakStmtReturn e) = do
+--   (e', _) <- infer e
+--   analyze >> synthesize >> refine
+--   elaborate' e'
+-- elaborateStmt (WeakStmtLet m (mx, x, t) e cont) = do
+--   (e', te) <- infer e
+--   t' <- inferType t
+--   insConstraintEnv te t'
+--   analyze >> synthesize >> refine >> cleanup
+--   e'' <- reduceTermPlus <$> elaborate' e'
+--   t'' <- reduceTermPlus <$> elaborate' t'
+--   insTypeEnv (Right x) t''
+--   modify (\env -> env {cacheEnv = Map.insert x (Left e'') (cacheEnv env)})
+--   cont' <- elaborateStmt cont
+--   x' <- newNameWith'' x
+--   -- ここでcがeffectありかもとみなされることによってIRのトップレベルに出現するようになる
+--   let c = (m, TermConst x)
+--   return (m, TermPiElim (m, TermPiIntro [(mx, x', t'')] cont') [c])
+-- elaborateStmt (WeakStmtLetWT m (mx, x, t) e cont) = do
+--   t' <- inferType t
+--   analyze >> synthesize >> refine >> cleanup
+--   e' <- reduceTermPlus <$> elaborate' e -- `e` is supposed to be well-typed
+--   t'' <- reduceTermPlus <$> elaborate' t'
+--   insTypeEnv (Right x) t''
+--   modify (\env -> env {cacheEnv = Map.insert x (Left e') (cacheEnv env)})
+--   cont' <- elaborateStmt cont
+--   x' <- newNameWith'' x
+--   let c = (m, TermConst x)
+--   return (m, TermPiElim (m, TermPiIntro [(mx, x', t'')] cont') [c])
+-- elaborateStmt (WeakStmtVerify m e cont) = do
+--   whenCheck $ do
+--     (e', _) <- infer e
+--     e'' <- elaborate' e'
+--     start <- liftIO $ getCurrentTime
+--     _ <- normalize e''
+--     stop <- liftIO $ getCurrentTime
+--     let sec = showFloat' (realToFrac $ diffUTCTime stop start :: Float)
+--     note m $ "verification succeeded (" <> T.pack sec <> " seconds)"
+--   elaborateStmt cont
+-- elaborateStmt (WeakStmtImplicit m x idxList cont) = do
+--   t <- lookupTypeEnv m (Right x) x
+--   case t of
+--     (_, TermPi _ xts _) -> do
+--       case find (\idx -> idx < 0 || length xts <= idx) idxList of
+--         Nothing -> do
+--           ienv <- gets impEnv
+--           modify (\env -> env {impEnv = Map.insertWith (++) x idxList ienv})
+--           elaborateStmt cont
+--         Just idx -> do
+--           raiseError m $
+--             "the specified index `" <>
+--             T.pack (show idx) <> "` is out of range of the domain of " <> x
+--     _ ->
+--       raiseError m $
+--       "the type of " <>
+--       x <> " must be a Pi-type, but is:\n" <> toText (weaken t)
+-- elaborateStmt (WeakStmtConstDecl _ (_, x, t) cont) = do
+--   t' <- inferType t
+--   analyze >> synthesize >> refine >> cleanup
+--   t'' <- reduceTermPlus <$> elaborate' t'
+--   insTypeEnv (Right x) t''
+--   elaborateStmt cont
 
-showFloat' :: Float -> String
-showFloat' x = showFFloat Nothing x ""
+-- showFloat' :: Float -> String
+-- showFloat' x = showFFloat Nothing x ""
 
 refine :: WithEnv ()
 refine =
   modify (\env -> env {substEnv = IntMap.map reduceWeakTermPlus (substEnv env)})
 
-cleanup :: WithEnv ()
-cleanup = do
-  modify (\env -> env {constraintEnv = []})
-  modify (\env -> env {weakTypeEnv = IntMap.empty})
-  modify (\env -> env {zetaEnv = IntMap.empty})
+-- cleanup :: WithEnv ()
+-- cleanup = do
+--   modify (\env -> env {constraintEnv = []})
+--   modify (\env -> env {weakTypeEnv = IntMap.empty})
+--   modify (\env -> env {zetaEnv = IntMap.empty})
 
 -- This function translates a well-typed term into an untyped term in a
 -- reduction-preserving way. Here, we translate types into units (nullary product).

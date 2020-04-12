@@ -5,6 +5,7 @@
 --
 module Clarify
   ( clarify
+  , insCodeEnv
   ) where
 
 import Control.Monad.Except

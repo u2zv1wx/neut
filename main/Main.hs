@@ -17,13 +17,14 @@ import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Compression.GZip as GZip
 import qualified Data.ByteString.Lazy as L
 
-import Clarify
+-- import Clarify
 import Data.Env
 import Data.Log
 import Elaborate
-import Emit
-import LLVM
+-- import Emit
+-- import LLVM
 import Parse
+import Build
 
 import Complete
 
@@ -161,7 +162,7 @@ run :: Command -> IO ()
 run (Build inputPathStr mOutputPathStr outputKind) = do
   inputPath <- resolveFile' inputPathStr
   resultOrErr <-
-    evalWithEnv (build inputPath) $
+    evalWithEnv (compile inputPath) $
     initialEnv {shouldColorize = True, endOfEntry = ""}
   basename <- setFileExtension "" $ filename inputPath
   mOutputPath <- mapM resolveFile' mOutputPathStr
@@ -222,12 +223,14 @@ writeResult result outputPath OutputKindObject = do
     [tmpOutputPathStr, "-Wno-override-module", "-o" ++ toFilePath outputPath]
   removeFile tmpOutputPath
 
-build :: Path Abs File -> WithEnv L.ByteString
-build inputPath = do
-  parse inputPath >>= elaborate >>= clarify >>= toLLVM >>= emit
+compile :: Path Abs File -> WithEnv L.ByteString
+compile inputPath = do
+  parse inputPath >>= build
+  -- parse inputPath >>= elaborate >>= clarify >>= toLLVM >>= emit
 
 check :: Path Abs File -> WithEnv ()
-check inputPath = parse inputPath >>= elaborate >> return ()
+check _ = undefined
+  -- parse inputPath >>= elaborate >> return ()
 
 seqIO :: [IO ()] -> IO ()
 seqIO [] = return ()

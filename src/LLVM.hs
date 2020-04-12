@@ -2,6 +2,7 @@
 
 module LLVM
   ( toLLVM
+  , toLLVM'
   ) where
 
 import Control.Monad.Except
@@ -22,11 +23,7 @@ import Reduce.Code
 
 toLLVM :: CodePlus -> WithEnv LLVM
 toLLVM mainTerm@(m, _) = do
-  cenv <- Map.toList <$> gets codeEnv
-  forM_ cenv $ \(name, Definition _ args e) -> do
-    e' <- reduceCodePlus e
-    e'' <- llvmCode e'
-    insLLVMEnv name args e''
+  toLLVM'
   mainTerm' <- reduceCodePlus mainTerm
   mainTerm'' <- llvmCode mainTerm'
   -- the result of "main" must be i64, not i8*
@@ -35,6 +32,22 @@ toLLVM mainTerm@(m, _) = do
   castResult <- castThen (LLVMReturn cast)
   -- let result: i8* := (main-term) in {cast result to i64}
   commConv result mainTerm'' $ castResult
+
+toLLVM' :: WithEnv ()
+toLLVM' = do
+  cenv <- Map.toList <$> gets codeEnv
+  forM_ cenv $ \(name, Definition _ args e) -> do
+    whenNotFinished name $ do
+      e' <- reduceCodePlus e
+      e'' <- llvmCode e'
+      insLLVMEnv name args e''
+
+whenNotFinished :: T.Text -> WithEnv () -> WithEnv ()
+whenNotFinished name f = do
+  lenv <- gets llvmEnv
+  if Map.member name lenv
+    then return ()
+    else f
 
 llvmCode :: CodePlus -> WithEnv LLVM
 llvmCode (m, CodeConst theta) = llvmCodeConst m theta
@@ -278,15 +291,16 @@ llvmDataLet x (m, DataConst y) cont = do
   cenv <- gets codeEnv
   case Map.lookup y cenv of
     Nothing -> do
-      t <- lookupTypeEnv m (Right y) y
-      case t of
-        (_, TermPi _ xts _) -> do
+      mt <- lookupTypeEnvMaybe (Right y)
+      case mt of
+        Nothing -> llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType []) cont
+        Just (_, TermPi _ xts _) -> do
           let y' = "llvm_" <> y -- ここのprefixは設定できるようにしてもよさそう
           denv <- gets declEnv
           let argType = map (const voidPtr) xts
           modify (\env -> env {declEnv = Map.insert y' (argType, voidPtr) denv})
           llvmUncastLet x (LLVMDataGlobal y') (toFunPtrType xts) cont
-        _ -> do
+        Just t -> do
           raiseError m $
             "external constants must have pi-type, but the type of `" <>
             y <> "` is:\n" <> toText (weaken t)
@@ -525,3 +539,8 @@ commConv x (LLVMBranch d onTrue onFalse) cont2 = do
   return $ LLVMBranch d onTrue' onFalse'
 commConv x (LLVMCall d ds) cont2 = return $ LLVMLet x (LLVMOpCall d ds) cont2
 commConv _ LLVMUnreachable _ = return LLVMUnreachable
+
+lookupTypeEnvMaybe :: TypeEnvKey -> WithEnv (Maybe TermPlus)
+lookupTypeEnvMaybe x = do
+  tenv <- gets typeEnv
+  return $ Map.lookup x tenv

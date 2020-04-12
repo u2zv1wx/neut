@@ -2,6 +2,8 @@
 
 module Emit
   ( emit
+  , emit'
+  , emitDeclarations
   ) where
 
 import Control.Monad.Except
@@ -10,7 +12,6 @@ import Data.ByteString.Builder
 import Data.Monoid ((<>))
 import Numeric.Half
 
-import qualified Data.ByteString.Lazy as L
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Map as Map
@@ -23,25 +24,75 @@ import Data.Env
 import Data.LLVM
 import Reduce.LLVM
 
-emit :: LLVM -> WithEnv L.ByteString
+-- emit :: LLVM -> WithEnv L.ByteString
+-- emit mainTerm = do
+--   lenv <- gets llvmEnv
+--   g <- emitDeclarations
+--   modify (\env -> env {defVarSet = S.empty})
+--   mainTerm' <- reduceLLVM IntMap.empty Map.empty mainTerm
+--   zs <- emitDefinition "i64" "main" [] mainTerm'
+--   xs <-
+--     forM (HashMap.toList lenv) $ \(name, (args, body)) -> do
+--       let args' = map (showLLVMData . LLVMDataLocal) args
+--       modify (\env -> env {defVarSet = S.fromList $ map asInt args})
+--       body' <- reduceLLVM IntMap.empty Map.empty body
+--       emitDefinition "i8*" (TE.encodeUtf8Builder name) args' body'
+--   return $ toLazyByteString $ unlinesL $ g <> zs <> concat xs
+emit :: LLVM -> WithEnv Builder
 emit mainTerm = do
-  lenv <- gets llvmEnv
-  g <- emitDeclarations
   modify (\env -> env {defVarSet = S.empty})
   mainTerm' <- reduceLLVM IntMap.empty Map.empty mainTerm
   zs <- emitDefinition "i64" "main" [] mainTerm'
+  -- rset <- gets restrictSet
+  code <- emit'
+  return $ unlinesL $ zs <> [code]
+
+-- emit (Just mainName) mainTerm = do
+--   lenv <- gets llvmEnv
+--   modify (\env -> env {defVarSet = S.empty})
+--   mainTerm' <- reduceLLVM IntMap.empty Map.empty mainTerm
+--   let mainName' = TE.encodeUtf8Builder mainName
+--   zs <- emitDefinition "i8*" mainName' [] mainTerm'
+--   rset <- gets restrictSet
+--   xs <-
+--     forM (HashMap.toList lenv) $ \(name, (args, body)) -> do
+--       if (S.notMember name rset)
+--         then do
+--           let args' = map (showLLVMData . LLVMDataLocal) args
+--           modify (\env -> env {defVarSet = S.fromList $ map asInt args})
+--           body' <- reduceLLVM IntMap.empty Map.empty body
+--           emitDefinition "i8*" (TE.encodeUtf8Builder name) args' body'
+--         else return []
+--   return $ unlinesL $ zs <> concat xs
+emit' :: WithEnv Builder
+emit' = do
+  lenv <- gets llvmEnv
+  modify (\env -> env {defVarSet = S.empty})
   xs <-
     forM (HashMap.toList lenv) $ \(name, (args, body)) -> do
-      let args' = map (showLLVMData . LLVMDataLocal) args
-      modify (\env -> env {defVarSet = S.fromList $ map asInt args})
-      body' <- reduceLLVM IntMap.empty Map.empty body
-      emitDefinition "i8*" (TE.encodeUtf8Builder name) args' body'
-  return $ toLazyByteString $ unlinesL $ g <> zs <> concat xs
+      whenNotFinished name $ do
+        modify (\env -> env {finishedSet = S.insert name (finishedSet env)})
+        let args' = map (showLLVMData . LLVMDataLocal) args
+        modify (\env -> env {defVarSet = S.fromList $ map asInt args})
+        body' <- reduceLLVM IntMap.empty Map.empty body
+        emitDefinition "i8*" (TE.encodeUtf8Builder name) args' body'
+  return $ unlinesL $ concat xs
 
-emitDeclarations :: WithEnv [Builder]
+whenNotFinished :: T.Text -> WithEnv [a] -> WithEnv [a]
+whenNotFinished name f = do
+  set <- gets finishedSet
+  if S.member name set
+    then return []
+    else f
+  -- lenv <- gets llvmEnv
+  -- if Map.member name lenv
+  --   then return ()
+  --   else f
+
+emitDeclarations :: WithEnv Builder
 emitDeclarations = do
   denv <- HashMap.toList <$> gets declEnv
-  return $ map declToBuilder denv
+  return $ unlinesL $ map declToBuilder denv
 
 declToBuilder :: (T.Text, ([LowType], LowType)) -> Builder
 declToBuilder (name, (dom, cod)) = do
