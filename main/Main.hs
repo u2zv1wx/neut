@@ -17,16 +17,11 @@ import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Compression.GZip as GZip
 import qualified Data.ByteString.Lazy as L
 
--- import Clarify
+import Build
+import Complete
 import Data.Env
 import Data.Log
-import Elaborate
--- import Emit
--- import LLVM
 import Parse
-import Build
-
-import Complete
 
 type BuildOptInputPath = String
 
@@ -168,8 +163,7 @@ run (Build inputPathStr mOutputPathStr outputKind) = do
   mOutputPath <- mapM resolveFile' mOutputPathStr
   outputPath <- constructOutputPath basename mOutputPath outputKind
   case resultOrErr of
-    Left err ->
-      seqIO (map (outputLog True "") err) >> exitWith (ExitFailure 1)
+    Left err -> seqIO (map (outputLog True "") err) >> exitWith (ExitFailure 1)
     Right result -> writeResult result outputPath outputKind
 run (Check inputPathStr colorizeFlag eoe) = do
   inputPath <- resolveFile' inputPathStr
