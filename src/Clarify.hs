@@ -10,10 +10,10 @@ module Clarify
 import Control.Monad.Except
 import Control.Monad.State
 import Data.List (nubBy)
+import qualified Data.Set as S
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.IntMap.Strict as IntMap
-import qualified Data.Set as S
 import qualified Data.Text as T
 
 import Clarify.Linearize
@@ -176,33 +176,31 @@ clarifyConst :: TypeEnv -> Meta -> T.Text -> WithEnv CodePlus
 clarifyConst tenv m x
   | Just op <- asUnaryOpMaybe x = clarifyUnaryOp tenv x op m
   | Just op <- asBinaryOpMaybe x = clarifyBinaryOp tenv x op m
-  | Just _ <- asLowTypeMaybe x =
-    clarify' tenv (m, TermEnum $ EnumTypeLabel "top")
+  | Just _ <- asLowTypeMaybe x = clarify' tenv $ immType m
   | Just lowType <- asArrayAccessMaybe x = clarifyArrayAccess tenv m x lowType
-  | x == "os:file-descriptor" =
-    clarify' tenv (m, TermEnum $ EnumTypeLabel "top")
+  | x == "os:file-descriptor" = clarify' tenv $ immType m
   | x == "os:stdin" = clarify' tenv (m, TermEnumIntro (EnumValueIntS 64 0))
   | x == "os:stdout" = clarify' tenv (m, TermEnumIntro (EnumValueIntS 64 1))
   | x == "os:stderr" = clarify' tenv (m, TermEnumIntro (EnumValueIntS 64 2))
   | x == "unsafe:cast" = clarifyCast tenv m
   | otherwise = do
     os <- getOS
-    case asSysCallMaybe os x of
-      Just (syscall, argInfo) -> clarifySysCall tenv x syscall argInfo m
-      Nothing -> do
-        cenv <- gets cacheEnv
-        let x' = showInHex x
-        case Map.lookup x cenv of
-          Nothing -> return (m, CodeUpIntro (m, DataConst x)) -- external
-          Just (Right _) -> do
-            return (m, CodePiElimDownElim (m, DataConst x') [])
-          Just (Left e) -> do
-            e' <- clarify' tenv e
-            modify (\env -> env {cacheEnv = Map.insert x (Right e') cenv})
-            modify (\env -> env {nameSet = S.empty})
-            e'' <- reduceCodePlus e'
-            insCodeEnv x' [] e''
-            return (m, CodePiElimDownElim (m, DataConst x') [])
+    cenv <- gets cacheEnv
+    let x' = showInHex x
+    case (asSysCallMaybe os x, Map.lookup x cenv) of
+      (Just (syscall, argInfo), _) -> clarifySysCall tenv x syscall argInfo m
+      (_, Nothing) -> return (m, CodeUpIntro (m, DataConst x)) -- external
+      (_, Just (Right _)) -> return (m, CodePiElimDownElim (m, DataConst x') [])
+      (_, Just (Left e))
+        | T.any (`S.member` S.fromList "()") x -> clarify' tenv e
+        | otherwise -> do
+          e' <- clarify' tenv e >>= reduceCodePlus
+          modify (\env -> env {cacheEnv = Map.insert x (Right e') cenv})
+          insCodeEnv x' [] e'
+          return (m, CodePiElimDownElim (m, DataConst x') [])
+
+immType :: Meta -> TermPlus
+immType m = (m, TermEnum (EnumTypeIntS 64))
 
 clarifyCast :: TypeEnv -> Meta -> WithEnv CodePlus
 clarifyCast tenv m = do
@@ -573,7 +571,7 @@ nameFromMaybe mName =
 chainTermPlus :: TypeEnv -> TermPlus -> WithEnv [IdentifierPlus]
 chainTermPlus _ (_, TermTau) = return []
 chainTermPlus tenv (m, TermUpsilon x) = do
-  (xts, t) <- obtainChain m (Left (asInt x)) (asText x) tenv
+  (xts, t) <- obtainChain m x tenv
   return $ xts ++ [(m, x, t)]
 chainTermPlus tenv (_, TermPi _ xts t) = chainTermPlus' tenv xts [t]
 chainTermPlus tenv (_, TermPiIntro xts e) = chainTermPlus' tenv xts [e]
@@ -586,9 +584,7 @@ chainTermPlus tenv (_, TermIter (_, x, t) xts e) = do
   xs1 <- chainTermPlus tenv t
   xs2 <- chainTermPlus' (insTypeEnv' (Left (asInt x)) t tenv) xts [e]
   return $ xs1 ++ filter (\(_, y, _) -> y /= x) xs2
-chainTermPlus tenv (m, TermConst x) = do
-  (xts, _) <- obtainChain m (Right x) x tenv
-  return xts
+chainTermPlus _ (_, TermConst _) = return []
 chainTermPlus _ (_, TermFloat _ _) = return []
 chainTermPlus _ (_, TermEnum _) = return []
 chainTermPlus _ (_, TermEnumIntro _) = return []
@@ -638,17 +634,13 @@ insTypeEnv1 ((_, x, t):rest) tenv =
   insTypeEnv' (Left (asInt x)) t $ insTypeEnv1 rest tenv
 
 obtainChain ::
-     Meta
-  -> TypeEnvKey
-  -> T.Text
-  -> TypeEnv
-  -> WithEnv ([IdentifierPlus], TermPlus)
-obtainChain m x name tenv = do
+     Meta -> Identifier -> TypeEnv -> WithEnv ([IdentifierPlus], TermPlus)
+obtainChain m (I (name, x)) tenv = do
   cenv <- gets chainEnv
-  case Map.lookup x cenv of
+  case IntMap.lookup x cenv of
     Just xtst -> return xtst
     Nothing -> do
-      t <- lookupTypeEnv' m x tenv name
+      t <- lookupTypeEnv' m (Left x) tenv name
       xts <- chainTermPlus tenv t
-      modify (\env -> env {chainEnv = Map.insert x (xts, t) cenv})
+      modify (\env -> env {chainEnv = IntMap.insert x (xts, t) cenv})
       return (xts, t)

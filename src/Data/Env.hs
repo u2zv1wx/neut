@@ -101,7 +101,7 @@ data Env =
     -- f ~> thunk (lam (x1 ... xn) e)
     , codeEnv :: Map.HashMap T.Text Definition
     , nameSet :: S.Set T.Text
-    , chainEnv :: Map.HashMap TypeEnvKey ([Data.Term.IdentifierPlus], TermPlus)
+    , chainEnv :: IntMap.IntMap ([Data.Term.IdentifierPlus], TermPlus)
     --
     -- LLVM
     --
@@ -142,7 +142,7 @@ initialEnv =
     , typeEnv = Map.empty
     , cacheEnv = Map.empty
     , codeEnv = Map.empty
-    , chainEnv = Map.empty
+    , chainEnv = IntMap.empty
     , llvmEnv = Map.empty
     , declEnv =
         Map.fromList
