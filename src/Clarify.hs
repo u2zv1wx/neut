@@ -14,6 +14,7 @@ import Data.List (nubBy)
 
 import qualified Data.HashMap.Strict as Map
 import qualified Data.IntMap.Strict as IntMap
+import qualified Data.Set as S
 import qualified Data.Text as T
 
 import Clarify.Linearize
@@ -185,6 +186,7 @@ clarifyConst tenv m x
   | otherwise = do
     os <- getOS
     cenv <- gets cacheEnv
+    -- showInHexはLLVMのときまで遅延させたほうがいいかも（型情報の取得が絡むので）
     let x' = showInHex x
     case (asSysCallMaybe os x, Map.lookup x cenv) of
       (Just (syscall, argInfo), _) -> clarifySysCall tenv x syscall argInfo m
@@ -212,6 +214,8 @@ clarifyUnaryOp tenv name op m = do
   case t' of
     (_, TermPi _ [(mx, x, tx)] _) -> do
       let varX = (mx, DataUpsilon x)
+      let name' = showInHex name
+      modify (\env -> env {sharedSet = S.insert (name', 2) (sharedSet env)})
       retClosure
         tenv
         (Just $ showInHex name)
@@ -229,6 +233,8 @@ clarifyBinaryOp tenv name op m = do
     (_, TermPi _ [(mx, x, tx), (my, y, ty)] _) -> do
       let varX = (mx, DataUpsilon x)
       let varY = (my, DataUpsilon y)
+      let name' = showInHex name
+      modify (\env -> env {sharedSet = S.insert (name', 3) (sharedSet env)})
       retClosure
         tenv
         (Just $ showInHex name)
@@ -251,6 +257,9 @@ clarifyArrayAccess tenv m name lowType = do
           [index, arr] -> do
             callThenReturn <- toArrayAccessTail tenv m lowType cod arr index xs
             let body = iterativeApp headerList callThenReturn
+            let name' = showInHex name
+            modify
+              (\env -> env {sharedSet = S.insert (name', 4) (sharedSet env)})
             retClosure tenv (Just $ showInHex name) [] m xts body
           _ -> raiseCritical m $ "the type of array-access is wrong"
     _ -> raiseCritical m $ "the type of array-access is wrong"
@@ -272,6 +281,10 @@ clarifySysCall tenv name syscall args m = do
         let tenv' = insTypeEnv1 xts tenv
         callThenReturn <- toSysCallTail tenv' m cod syscall ds xs
         let body = iterativeApp headerList callThenReturn
+        let name' = showInHex name
+        modify
+          (\env ->
+             env {sharedSet = S.insert (name', length args + 1) (sharedSet env)})
         retClosure tenv (Just $ showInHex name) [] m xts body
     _ -> raiseCritical m $ "the type of " <> name <> " is wrong"
 

@@ -113,6 +113,7 @@ data Env =
     , nopFreeSet :: S.Set Int
     , restrictSet :: S.Set T.Text
     , finishedSet :: S.Set T.Text
+    , sharedSet :: S.Set (T.Text, Int)
     }
 
 initialEnv :: Env
@@ -162,6 +163,13 @@ initialEnv =
     , nopFreeSet = S.empty
     , restrictSet = S.empty
     , finishedSet = S.empty
+    , sharedSet =
+        S.fromList
+          [ ("cartesian-immediate", 2)
+          , ("cartesian-struct", 2)
+          , ("cartesian-array-closure-0", 2)
+          , ("cartesian-closure-0", 2)
+          ]
     }
 
 type WithEnv a = StateT Env (ExceptT [Log] IO) a

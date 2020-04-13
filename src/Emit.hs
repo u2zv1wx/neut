@@ -43,31 +43,12 @@ emit mainTerm = do
   modify (\env -> env {defVarSet = S.empty})
   mainTerm' <- reduceLLVM IntMap.empty Map.empty mainTerm
   zs <- emitDefinition "i64" "main" [] mainTerm'
-  -- rset <- gets restrictSet
   code <- emit'
   return $ unlinesL $ zs <> [code]
 
--- emit (Just mainName) mainTerm = do
---   lenv <- gets llvmEnv
---   modify (\env -> env {defVarSet = S.empty})
---   mainTerm' <- reduceLLVM IntMap.empty Map.empty mainTerm
---   let mainName' = TE.encodeUtf8Builder mainName
---   zs <- emitDefinition "i8*" mainName' [] mainTerm'
---   rset <- gets restrictSet
---   xs <-
---     forM (HashMap.toList lenv) $ \(name, (args, body)) -> do
---       if (S.notMember name rset)
---         then do
---           let args' = map (showLLVMData . LLVMDataLocal) args
---           modify (\env -> env {defVarSet = S.fromList $ map asInt args})
---           body' <- reduceLLVM IntMap.empty Map.empty body
---           emitDefinition "i8*" (TE.encodeUtf8Builder name) args' body'
---         else return []
---   return $ unlinesL $ zs <> concat xs
 emit' :: WithEnv Builder
 emit' = do
   lenv <- gets llvmEnv
-  modify (\env -> env {defVarSet = S.empty})
   xs <-
     forM (HashMap.toList lenv) $ \(name, (args, body)) -> do
       whenNotFinished name $ do
@@ -80,8 +61,9 @@ emit' = do
 
 whenNotFinished :: T.Text -> WithEnv [a] -> WithEnv [a]
 whenNotFinished name f = do
-  set <- gets finishedSet
-  if S.member name set
+  set1 <- gets finishedSet
+  set2 <- gets sharedSet
+  if S.member name set1 || S.member name (S.map fst set2)
     then return []
     else f
   -- lenv <- gets llvmEnv
@@ -92,7 +74,13 @@ whenNotFinished name f = do
 emitDeclarations :: WithEnv Builder
 emitDeclarations = do
   denv <- HashMap.toList <$> gets declEnv
-  return $ unlinesL $ map declToBuilder denv
+  sharedDecls <- toResDecl
+  return $ unlinesL $ map declToBuilder $ denv ++ sharedDecls
+
+toResDecl :: WithEnv [(T.Text, ([LowType], LowType))]
+toResDecl = do
+  set <- gets sharedSet
+  return $ map (\(x, i) -> (x, (replicate i voidPtr, voidPtr))) $ S.toList set
 
 declToBuilder :: (T.Text, ([LowType], LowType)) -> Builder
 declToBuilder (name, (dom, cod)) = do

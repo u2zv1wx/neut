@@ -45,7 +45,8 @@ toLLVM' = do
 whenNotFinished :: T.Text -> WithEnv () -> WithEnv ()
 whenNotFinished name f = do
   lenv <- gets llvmEnv
-  if Map.member name lenv
+  set <- gets sharedSet
+  if Map.member name lenv || S.member name (S.map fst set)
     then return ()
     else f
 
@@ -293,9 +294,12 @@ llvmDataLet x (m, DataConst y) cont = do
     Nothing -> do
       mt <- lookupTypeEnvMaybe (Right y)
       case mt of
-        Nothing -> do
-          raiseCritical m $ "no such external constant defined: " <> y
-          -- llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType []) cont
+        Nothing
+          -- raiseCritical m $ "no such external constant defined: " <> y
+         -> do
+          denv <- gets declEnv
+          modify (\env -> env {declEnv = Map.insert y ([], voidPtr) denv})
+          llvmUncastLet x (LLVMDataGlobal y) (toFunPtrType []) cont
         Just (_, TermPi _ xts _) -> do
           let y' = "llvm_" <> y -- ここのprefixは設定できるようにしてもよさそう
           denv <- gets declEnv

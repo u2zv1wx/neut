@@ -2,6 +2,8 @@
 
 module Data.WeakTerm where
 
+import Path
+
 import qualified Data.HashMap.Strict as Map
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -96,6 +98,8 @@ data QuasiStmt
   | QuasiStmtLetInductiveIntro Meta TextPlus WeakTermPlus [T.Text]
   | QuasiStmtUse T.Text
   | QuasiStmtUnuse T.Text
+  | QuasiStmtBOF (Path Abs File)
+  | QuasiStmtEOF (Path Abs File)
   deriving (Show)
 
 data WeakStmt
@@ -105,6 +109,8 @@ data WeakStmt
   | WeakStmtVerify Meta WeakTermPlus WeakStmt
   | WeakStmtImplicit Meta T.Text [Int] WeakStmt
   | WeakStmtConstDecl Meta TextPlus WeakStmt
+  | WeakStmtBOF (Path Abs File) WeakStmt
+  | WeakStmtEOF (Path Abs File) WeakStmt
   deriving (Show)
 
 weakTermPi :: [IdentifierPlus] -> WeakTermPlus -> WeakTerm

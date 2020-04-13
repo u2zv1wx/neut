@@ -64,6 +64,8 @@ check (WeakStmtConstDecl _ (_, x, t) cont) = do
   t'' <- reduceTermPlus <$> elaborate t'
   insTypeEnv (Right x) t''
   check cont
+check (WeakStmtBOF _ cont) = check cont
+check (WeakStmtEOF _ cont) = check cont
 
 check' :: T.Text -> WeakTermPlus -> WeakTermPlus -> WeakStmt -> WithEnv ()
 check' x e t cont = do

@@ -56,7 +56,8 @@ visit path = do
   modify (\env -> env {phase = 1 + phase env})
   content <- liftIO $ TIO.readFile $ toFilePath path
   treeList <- tokenize content
-  parse' $ includeCore (newMeta 1 1 path) treeList
+  ss <- parse' $ includeCore (newMeta 1 1 path) treeList
+  return $ QuasiStmtBOF path : ss
 
 leave :: WithEnv [QuasiStmt]
 leave = do
@@ -65,7 +66,7 @@ leave = do
   modify (\env -> env {fileEnv = Map.insert path VisitInfoFinish (fileEnv env)})
   modify (\env -> env {prefixEnv = []})
   modify (\env -> env {sectionEnv = []})
-  return []
+  return [QuasiStmtEOF path]
 
 pushTrace :: Path Abs File -> WithEnv ()
 pushTrace path = modify (\env -> env {traceEnv = path : traceEnv env})
@@ -507,6 +508,12 @@ concatQuasiStmtList (QuasiStmtLetInductiveIntro m bt e as:ss) = do
     _ -> raiseCritical m "inductive-intro"
 concatQuasiStmtList (QuasiStmtUse _:ss) = concatQuasiStmtList ss
 concatQuasiStmtList (QuasiStmtUnuse _:ss) = concatQuasiStmtList ss
+concatQuasiStmtList (QuasiStmtBOF path:ss) = do
+  ss' <- concatQuasiStmtList ss
+  return $ WeakStmtBOF path ss'
+concatQuasiStmtList (QuasiStmtEOF path:ss) = do
+  ss' <- concatQuasiStmtList ss
+  return $ WeakStmtEOF path ss'
 
 toLetList :: [(IdentDef, WeakTermPlus)] -> [QuasiStmt]
 toLetList [] = []

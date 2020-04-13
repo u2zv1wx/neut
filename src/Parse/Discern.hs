@@ -83,6 +83,12 @@ discern' nenv ((QuasiStmtUse prefix):ss) = do
 discern' nenv ((QuasiStmtUnuse prefix):ss) = do
   modify (\e -> e {prefixEnv = filter (/= prefix) (prefixEnv e)})
   discern' nenv ss
+discern' nenv (QuasiStmtBOF path:ss) = do
+  ss' <- discern' nenv ss
+  return $ QuasiStmtBOF path : ss'
+discern' nenv (QuasiStmtEOF path:ss) = do
+  ss' <- discern' nenv ss
+  return $ QuasiStmtEOF path : ss'
 
 discernDef :: NameEnv -> Def -> WithEnv Def
 discernDef nenv (m, (mx, x, t), xts, e) = do
