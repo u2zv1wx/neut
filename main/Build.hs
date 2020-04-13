@@ -87,50 +87,67 @@ build' acc (WeakStmtConstDecl _ (_, x, t) cont) = do
   t'' <- reduceTermPlus <$> elaborate t'
   insTypeEnv (Right x) t''
   build' acc cont
-build' acc (WeakStmtBOF path cont) = do
-  p $ "========BOF (" <> toFilePath path <> ")============="
+build' acc (WeakStmtVisit path ss1 ss2) = do
+  p $ "========VISIT (" <> toFilePath path <> ")============="
   b <- isCacheAvailable path
   if b
     then do
-      (cont', acc') <- bypass path cont
-      modify (\env -> env {codeEnv = Map.empty})
-      modify (\env -> env {llvmEnv = Map.empty})
-      _ <- toCacheFilePath path
-      build' (acc' ++ acc) cont'
+      acc' <- bypass ss1 -- 引数情報だけ集める
+      cachePath <- toCacheFilePath path
+      code <- readCache cachePath
+      cont <- build' (acc' ++ acc) ss2
+      return $ code <> cont
     else do
-      build' acc cont -- ここでevalWithEnvでcodeEnv = emptyでrunするのが正解っぽい？
-      -- そうすると全てのファイルがmain fileであるかのように扱われることになる？
-      -- 現在注目中のpathのEOFが出てくるまで続ける、みたいな？
-      -- それ結局Stmtのほうにネスト構造を反映させろって話にならない？
-      -- つまりWeakStmtOtherFile Stmt Stmtみたいな感じで。
-      -- 第1引数のほうもreturnで終了するわけだけど、ここがEOFに対応する、と。
-      -- それ、たとえばcheckのほうはどうなる？前のstmtを全部チェックしてから後ろのStmtをチェックするだけか。
-      -- このときはそれぞれのファイルの末尾にreturn 0が入ってるって理解になるわけですね。
-build' _ (WeakStmtEOF path (WeakStmtReturn _)) = do
-  p $ "========LAST-EOF (" <> toFilePath path <> ")============="
-  error "stop"
-build' acc (WeakStmtEOF path cont) = do
-  p $ "========EOF (" <> toFilePath path <> ")============="
-  cachePath <- toCacheFilePath path
-  tmpOutputPath <- setFileExtension "ll" cachePath
-  code <- toLLVM' >> emit'
-  header <- emitDeclarations
-  let code' = toLazyByteString $ header <> "\n" <> code
-  liftIO $ L.writeFile (toFilePath tmpOutputPath) code'
-  liftIO $
-    callProcess
-      "clang"
-      [ "-c"
-      , toFilePath tmpOutputPath
-      , "-Wno-override-module"
-      , "-o" ++ toFilePath cachePath
-      ]
-  removeFile tmpOutputPath
-  -- sharedCodeEnvは保持
-  modify (\env -> env {codeEnv = Map.empty}) -- ここは修正必要？
-  modify (\env -> env {llvmEnv = Map.empty})
-  build' acc cont
+      cenv <- gets codeEnv
+      -- ss1をcodeEnv = emptyとしてwithEnvで実行してどうにかする
+      undefined
 
+readCache :: Path Abs File -> WithEnv Builder
+readCache = undefined
+
+-- build' acc (WeakStmtBOF path cont) = do
+--   p $ "========BOF (" <> toFilePath path <> ")============="
+--   b <- isCacheAvailable path
+--   if b
+--     then do
+--       (cont', acc') <- bypass path cont
+--       modify (\env -> env {codeEnv = Map.empty})
+--       modify (\env -> env {llvmEnv = Map.empty})
+--       _ <- toCacheFilePath path
+--       build' (acc' ++ acc) cont'
+--     else do
+--       build' acc cont -- ここでevalWithEnvでcodeEnv = emptyでrunするのが正解っぽい？
+--       -- そうすると全てのファイルがmain fileであるかのように扱われることになる？
+--       -- 現在注目中のpathのEOFが出てくるまで続ける、みたいな？
+--       -- それ結局Stmtのほうにネスト構造を反映させろって話にならない？
+--       -- つまりWeakStmtOtherFile Stmt Stmtみたいな感じで。
+--       -- 第1引数のほうもreturnで終了するわけだけど、ここがEOFに対応する、と。
+--       -- それ、たとえばcheckのほうはどうなる？前のstmtを全部チェックしてから後ろのStmtをチェックするだけか。
+--       -- このときはそれぞれのファイルの末尾にreturn 0が入ってるって理解になるわけですね。
+-- build' _ (WeakStmtEOF path (WeakStmtReturn _)) = do
+--   p $ "========LAST-EOF (" <> toFilePath path <> ")============="
+--   error "stop"
+-- build' acc (WeakStmtEOF path cont) = do
+--   p $ "========EOF (" <> toFilePath path <> ")============="
+--   cachePath <- toCacheFilePath path
+--   tmpOutputPath <- setFileExtension "ll" cachePath
+--   code <- toLLVM' >> emit'
+--   header <- emitDeclarations
+--   let code' = toLazyByteString $ header <> "\n" <> code
+--   liftIO $ L.writeFile (toFilePath tmpOutputPath) code'
+--   liftIO $
+--     callProcess
+--       "clang"
+--       [ "-c"
+--       , toFilePath tmpOutputPath
+--       , "-Wno-override-module"
+--       , "-o" ++ toFilePath cachePath
+--       ]
+--   removeFile tmpOutputPath
+--   -- sharedCodeEnvは保持
+--   modify (\env -> env {codeEnv = Map.empty}) -- ここは修正必要？
+--   modify (\env -> env {llvmEnv = Map.empty})
+--   build' acc cont
 build'' ::
      Meta
   -> T.Text
@@ -161,19 +178,18 @@ toCacheFilePath srcPath = do
   ensureDir $ parent item
   setFileExtension "o" $ cacheDirPath </> srcPath'
 
-bypass ::
-     Path Abs File -> WeakStmt -> WithEnv (WeakStmt, [(Meta, T.Text, TermPlus)])
-bypass _ (WeakStmtReturn _) = raiseCritical' "bypass"
-bypass path (WeakStmtLet _ (mx, x, t) e cont) = do
+bypass :: WeakStmt -> WithEnv [(Meta, T.Text, TermPlus)]
+bypass (WeakStmtReturn _) = return []
+bypass (WeakStmtLet _ (mx, x, t) e cont) = do
   (e', te) <- infer e
   t' <- inferType t
   insConstraintEnv te t'
-  bypass' path mx x e' t' cont
-bypass path (WeakStmtLetWT _ (mx, x, t) e cont) = do
+  bypass' mx x e' t' cont
+bypass (WeakStmtLetWT _ (mx, x, t) e cont) = do
   t' <- inferType t
-  bypass' path mx x e t' cont
-bypass path (WeakStmtVerify _ _ cont) = bypass path cont
-bypass path (WeakStmtImplicit m x idxList cont) = do
+  bypass' mx x e t' cont
+bypass (WeakStmtVerify _ _ cont) = bypass cont
+bypass (WeakStmtImplicit m x idxList cont) = do
   t <- lookupTypeEnv m (Right x) x
   case t of
     (_, TermPi _ xts _) -> do
@@ -181,7 +197,7 @@ bypass path (WeakStmtImplicit m x idxList cont) = do
         Nothing -> do
           ienv <- gets impEnv
           modify (\env -> env {impEnv = Map.insertWith (++) x idxList ienv})
-          bypass path cont
+          bypass cont
         Just idx -> do
           raiseError m $
             "the specified index `" <>
@@ -190,37 +206,32 @@ bypass path (WeakStmtImplicit m x idxList cont) = do
       raiseError m $
       "the type of " <>
       x <> " must be a Pi-type, but is:\n" <> toText (weaken t)
-bypass path (WeakStmtConstDecl _ (_, x, t) cont) = do
+bypass (WeakStmtConstDecl _ (_, x, t) cont) = do
   t' <- inferType t
   analyze >> synthesize >> refine >> cleanup
   t'' <- reduceTermPlus <$> elaborate t'
   insTypeEnv (Right x) t''
-  bypass path cont
-bypass path (WeakStmtBOF path' cont) = do
-  p $ "========BYPASS-BOF (" <> toFilePath path' <> ")============="
-  bypass path cont
-bypass path (WeakStmtEOF path' cont)
-  | path == path' = return (cont, [])
-  | otherwise = do
-    p $ "========BYPASS-EOF (" <> toFilePath path' <> ")============="
-    bypass path cont
+  bypass cont
+bypass (WeakStmtVisit _ ss1 ss2) = do
+  acc1 <- bypass ss1
+  acc2 <- bypass ss2
+  return $ acc1 ++ acc2
 
 bypass' ::
-     Path Abs File
-  -> Meta
+     Meta
   -> T.Text
   -> WeakTermPlus
   -> WeakTermPlus
   -> WeakStmt
-  -> WithEnv (WeakStmt, [(Meta, T.Text, TermPlus)])
-bypass' path mx x e t cont = do
+  -> WithEnv [(Meta, T.Text, TermPlus)]
+bypass' mx x e t cont = do
   analyze >> synthesize >> refine >> cleanup
   e' <- reduceTermPlus <$> elaborate e
   t' <- reduceTermPlus <$> elaborate t
   insTypeEnv (Right x) t'
   modify (\env -> env {cacheEnv = Map.insert x (Left e') (cacheEnv env)})
-  (cont', acc) <- bypass path cont
-  return (cont', (mx, x, t') : acc)
+  acc <- bypass cont
+  return $ (mx, x, t') : acc
 
 bind :: [(Meta, T.Text, TermPlus)] -> TermPlus -> WithEnv TermPlus
 bind [] e = return e
