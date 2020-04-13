@@ -2,6 +2,7 @@
 
 module Build
   ( build
+  , link
   ) where
 
 import Control.Monad.Except
@@ -28,11 +29,16 @@ import LLVM
 import Reduce.Term
 import Reduce.WeakTerm
 
-build :: WeakStmt -> WithEnv L.ByteString
-build stmt = do
+build :: Path Abs File -> WeakStmt -> WithEnv ()
+build mainFilePath stmt = do
   llvm <- build' stmt
-  g <- emitDeclarations
-  return $ toLazyByteString $ g <> "\n" <> llvm
+  compileObject mainFilePath llvm
+
+link :: Path Abs File -> [Path Abs File] -> IO ()
+link outputPath pathList = do
+  callProcess "clang" $
+    map toFilePath pathList ++
+    ["-Wno-override-module", "-o" ++ toFilePath outputPath]
 
 build' :: WeakStmt -> WithEnv Builder
 build' (WeakStmtReturn e) = do
