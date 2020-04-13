@@ -57,7 +57,8 @@ visit path = do
   content <- liftIO $ TIO.readFile $ toFilePath path
   treeList <- tokenize content
   ss <- parse' $ includeCore (newMeta 1 1 path) treeList
-  return $ QuasiStmtBOF path : ss
+  return [QuasiStmtVisit path ss]
+  -- return $ QuasiStmtBOF path : ss
 
 leave :: WithEnv [QuasiStmt]
 leave = do
@@ -66,7 +67,8 @@ leave = do
   modify (\env -> env {fileEnv = Map.insert path VisitInfoFinish (fileEnv env)})
   modify (\env -> env {prefixEnv = []})
   modify (\env -> env {sectionEnv = []})
-  return [QuasiStmtEOF path]
+  return []
+  -- return [QuasiStmtEOF path]
 
 pushTrace :: Path Abs File -> WithEnv ()
 pushTrace path = modify (\env -> env {traceEnv = path : traceEnv env})
@@ -357,10 +359,10 @@ includeFile ::
   -> WithEnv (Path Abs Dir)
   -> [TreePlus]
   -> WithEnv [QuasiStmt]
-includeFile m mPath pathString getDirPath as = do
+includeFile m mPath pathString computeDirPath as = do
   ensureEnvSanity m
   path <- parseString mPath pathString
-  dirPath <- getDirPath
+  dirPath <- computeDirPath
   newPath <- resolveFile dirPath path
   includeFile' m newPath as
 
@@ -508,13 +510,17 @@ concatQuasiStmtList (QuasiStmtLetInductiveIntro m bt e as:ss) = do
     _ -> raiseCritical m "inductive-intro"
 concatQuasiStmtList (QuasiStmtUse _:ss) = concatQuasiStmtList ss
 concatQuasiStmtList (QuasiStmtUnuse _:ss) = concatQuasiStmtList ss
-concatQuasiStmtList (QuasiStmtBOF path:ss) = do
-  ss' <- concatQuasiStmtList ss
-  return $ WeakStmtBOF path ss'
-concatQuasiStmtList (QuasiStmtEOF path:ss) = do
-  ss' <- concatQuasiStmtList ss
-  return $ WeakStmtEOF path ss'
+concatQuasiStmtList (QuasiStmtVisit path ss1:ss2) = do
+  ss1' <- concatQuasiStmtList ss1
+  ss2' <- concatQuasiStmtList ss2
+  return $ WeakStmtVisit path ss1' ss2'
 
+-- concatQuasiStmtList (QuasiStmtBOF path:ss) = do
+--   ss' <- concatQuasiStmtList ss
+--   return $ WeakStmtBOF path ss'
+-- concatQuasiStmtList (QuasiStmtEOF path:ss) = do
+--   ss' <- concatQuasiStmtList ss
+--   return $ WeakStmtEOF path ss'
 toLetList :: [(IdentDef, WeakTermPlus)] -> [QuasiStmt]
 toLetList [] = []
 toLetList (((x, (m, (mx, _, t), _, _)), iter):rest) =

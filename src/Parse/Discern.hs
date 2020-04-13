@@ -58,7 +58,8 @@ discern' nenv ((QuasiStmtImplicit m x i):ss) = do
   return $ QuasiStmtImplicit m x' i : ss'
 discern' nenv ((QuasiStmtEnum m name xis):ss) = do
   insEnumEnv m name xis
-  discern' nenv ss
+  ss' <- discern' nenv ss
+  return $ QuasiStmtEnum m name xis : ss'
 discern' nenv ((QuasiStmtLetInductive n m (mx, a, t) e):ss) = do
   set <- gets intactSet
   t' <- discern'' nenv t
@@ -79,17 +80,24 @@ discern' nenv ((QuasiStmtLetInductiveIntro m (mx, x, t) e as):ss) = do
   return $ QuasiStmtLetInductiveIntro m (mx, x, t') e' as : ss'
 discern' nenv ((QuasiStmtUse prefix):ss) = do
   modify (\e -> e {prefixEnv = prefix : prefixEnv e})
-  discern' nenv ss
+  ss' <- discern' nenv ss
+  return $ QuasiStmtUse prefix : ss'
 discern' nenv ((QuasiStmtUnuse prefix):ss) = do
   modify (\e -> e {prefixEnv = filter (/= prefix) (prefixEnv e)})
-  discern' nenv ss
-discern' nenv (QuasiStmtBOF path:ss) = do
   ss' <- discern' nenv ss
-  return $ QuasiStmtBOF path : ss'
-discern' nenv (QuasiStmtEOF path:ss) = do
-  ss' <- discern' nenv ss
-  return $ QuasiStmtEOF path : ss'
+  return $ QuasiStmtUnuse prefix : ss'
+discern' nenv (QuasiStmtVisit path ss1:ss2) = do
+  ssss <- discern' nenv $ ss1 ++ ss2 -- stmtの長さはdiscernにおいて不変なのでこれでオッケー
+  let ss1' = take (length ss1) ssss
+  let ss2' = drop (length ss1) ssss
+  return $ QuasiStmtVisit path ss1' : ss2'
 
+-- discern' nenv (QuasiStmtBOF path:ss) = do
+--   ss' <- discern' nenv ss
+--   return $ QuasiStmtBOF path : ss'
+-- discern' nenv (QuasiStmtEOF path:ss) = do
+--   ss' <- discern' nenv ss
+--   return $ QuasiStmtEOF path : ss'
 discernDef :: NameEnv -> Def -> WithEnv Def
 discernDef nenv (m, (mx, x, t), xts, e) = do
   t' <- discern'' nenv t

@@ -98,8 +98,9 @@ data QuasiStmt
   | QuasiStmtLetInductiveIntro Meta TextPlus WeakTermPlus [T.Text]
   | QuasiStmtUse T.Text
   | QuasiStmtUnuse T.Text
-  | QuasiStmtBOF (Path Abs File)
-  | QuasiStmtEOF (Path Abs File)
+  | QuasiStmtVisit (Path Abs File) [QuasiStmt]
+  -- | QuasiStmtBOF (Path Abs File)
+  -- | QuasiStmtEOF (Path Abs File)
   deriving (Show)
 
 data WeakStmt
@@ -109,8 +110,9 @@ data WeakStmt
   | WeakStmtVerify Meta WeakTermPlus WeakStmt
   | WeakStmtImplicit Meta T.Text [Int] WeakStmt
   | WeakStmtConstDecl Meta TextPlus WeakStmt
-  | WeakStmtBOF (Path Abs File) WeakStmt
-  | WeakStmtEOF (Path Abs File) WeakStmt
+  | WeakStmtVisit (Path Abs File) WeakStmt WeakStmt
+  -- | WeakStmtBOF (Path Abs File) WeakStmt
+  -- | WeakStmtEOF (Path Abs File) WeakStmt
   deriving (Show)
 
 weakTermPi :: [IdentifierPlus] -> WeakTermPlus -> WeakTerm
