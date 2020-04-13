@@ -457,8 +457,7 @@ note' str = do
 note'' :: T.Text -> WithEnv ()
 note'' str = do
   b <- gets shouldColorize
-  eoe <- gets endOfEntry
-  liftIO $ outputLog b "" $ logInfo' str
+  liftIO $ outputLog' b $ logInfo' str
 
 warn :: PosInfo -> T.Text -> WithEnv ()
 warn pos str = do

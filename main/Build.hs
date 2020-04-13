@@ -32,10 +32,8 @@ import Reduce.WeakTerm
 build :: Path Abs File -> WeakStmt -> WithEnv [Path Abs File]
 build mainFilePath stmt = do
   llvm <- build' stmt
-  -- p "main-compile-object. codeenv:"
-  -- cenv <- gets codeEnv
-  -- p' $ Map.keys cenv
-  compileObject mainFilePath llvm
+  sharedCode <- buildShared
+  compileObject mainFilePath $ sharedCode <> "\n" <> llvm
   gets cachePathList
 
 link :: Path Abs File -> [Path Abs File] -> IO ()
@@ -91,8 +89,16 @@ revertEnv snapshot = do
   modify (\e -> e {codeEnv = codeEnv snapshot})
   modify (\e -> e {llvmEnv = llvmEnv snapshot})
   modify (\e -> e {declEnv = declEnv snapshot})
-  -- modify (\e -> e {codeEnv = Map.union (codeEnv e) (codeEnv snapshot)})
-  -- modify (\e -> e {llvmEnv = Map.union (llvmEnv e) (llvmEnv snapshot)})
+
+buildShared :: WithEnv Builder
+buildShared = do
+  scenv <- gets sharedCodeEnv
+  modify (\env -> env {codeEnv = scenv, llvmEnv = Map.empty})
+  denv <- gets declEnv
+  let denv' = Map.filterWithKey (\k _ -> not $ Map.member k scenv) denv
+  modify (\env -> env {declEnv = denv'})
+  toLLVM'
+  emit'
 
 compileObject :: Path Abs File -> Builder -> WithEnv ()
 compileObject srcPath code = do
@@ -125,7 +131,6 @@ build'' ::
   -> WeakStmt
   -> WithEnv Builder
 build'' mx x e t cont = do
-  p' x
   analyze >> synthesize >> refine >> cleanup
   e' <- reduceTermPlus <$> elaborate e
   t' <- reduceTermPlus <$> elaborate t

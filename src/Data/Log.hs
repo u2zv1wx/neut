@@ -3,6 +3,7 @@
 module Data.Log
   ( Log
   , outputLog
+  , outputLog'
   , logInfo
   , logInfo'
   , logWarning
@@ -55,6 +56,15 @@ outputLog b eoe (Just pos, l, t) = do
   outputLogLevel b l
   outputLogText t
   outputFooter eoe
+
+outputLog' :: ColorFlag -> Log -> IO ()
+outputLog' b (Nothing, l, t) = do
+  outputLogLevel b l
+  TIO.putStr t
+outputLog' b (Just pos, l, t) = do
+  outputPosInfo b pos
+  outputLogLevel b l
+  TIO.putStr t
 
 outputFooter :: String -> IO ()
 outputFooter "" = return ()
